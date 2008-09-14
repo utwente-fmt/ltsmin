@@ -2,7 +2,7 @@
 #define MISC_H
 
 #include "config.h"
-
+#include <pthread.h>
 
 /** Check for existence of a directory.
   * @return 1 if @c name is a directory
@@ -31,6 +31,9 @@ typedef int (*EachFile)(char *path);
 extern int ForEachFileInDir(const char *dir, EachFile eachFile);
 extern int ForEachDirInDir(const char *path, EachFile eachDir);
 
+int serversocket(int port);
+void tcp_listen(pthread_t *thr,int port,void(*setup)(int sd,void*arg),void*arg);
+int clientsocket(char *hostname,int port);
 
 
 #endif
