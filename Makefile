@@ -1,22 +1,32 @@
 # CFLAGS=-m32 -std=c99 -Wall -O4 -D_FILE_OFFSET_BITS=64 -g -pthread -pg 
 # LDFLAGS=-m32 -pthread -pg 
-LDFLAGS=-m32 -pthread
 CC=gcc
 LD=gcc
 MPICC=mpicc
 MPILD=mpicc
 
+ifeq ($(shell arch),i686)
+LDFLAGS=-m32 -pthread
 ifeq ($(CADP),)
 $(warning "set CADP variable to enable BCG support")
 CFLAGS=-m32 -std=c99 -Wall -O4 -D_FILE_OFFSET_BITS=64 -pthread
 LIBS=
+bcgall=
 else
 $(warning "BCG support enabled")
 CFLAGS=-m32 -std=c99 -Wall -O4 -D_FILE_OFFSET_BITS=64 -pthread -DUSE_BCG -I$(CADP)/incl
 LIBS=-L$(CADP)/bin.iX86 -lBCG_IO -lBCG -lm
+bcgall=bcg2gsf dir2bcg
+endif
+else
+$(warning "assuming 64 bit environment")
+CFLAGS=-m64 -std=c99 -Wall -O4 -pthread
+LIBS=
+bcgall=
+LDFLAGS=-m64 -pthread
 endif
 
-all: .depend dir2gsf gsf2dir bcg2gsf dir2bcg
+all: .depend dir2gsf gsf2dir $(bcgall)
 
 docs:
 	doxygen docs.cfg
