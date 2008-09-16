@@ -124,7 +124,13 @@ stream_t stream_input(FILE*f){
 	s->procs.write=stream_illegal_io_op;
 	s->procs.flush=stream_illegal_void;
 	s->procs.close=file_close;
-	return stream_buffer(s,4096,4096);
+	return s;
+}
+
+stream_t fs_read(char *name){
+	FILE*f=fopen(name,"r");
+	if (f==NULL) Fatal(0,error,"failed to open %s for reading",name);
+	return stream_input(f);
 }
 
 stream_t stream_output(FILE*f){
@@ -141,7 +147,13 @@ stream_t stream_output(FILE*f){
 	s->procs.write=file_write;
 	s->procs.flush=file_flush;
 	s->procs.close=file_close;
-	return stream_buffer(s,4096,4096);
+	return s;
+}
+
+stream_t fs_write(char *name){
+	FILE*f=fopen(name,"w");
+	if (f==NULL) Fatal(0,error,"failed to open %s for writing",name);
+	return stream_output(f);
 }
 
 

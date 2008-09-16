@@ -28,7 +28,9 @@ extern void arch_enum(archive_t archive,char *regex,struct archive_enum *cb,void
 
 extern void arch_close(archive_t *archive);
 
-extern archive_t arch_dir(char*dirname);
+typedef stream_t(*stream_create_t)(char*name);
+
+extern archive_t arch_dir(char*dirname,stream_create_t crd,stream_create_t cwr,int buf);
 
 extern archive_t arch_gsf_read(stream_t s);
 

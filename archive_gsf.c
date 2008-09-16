@@ -59,7 +59,7 @@ static stream_t gsf_write(archive_t archive,char *name){
 	DSwriteU16(archive->ds,s->id);
 	DSwriteS(archive->ds,name);
 	archive->count++;
-	return stream_buffer(s,4096,4096);
+	return stream_buffer(s,4096);
 }
 
 static void gsf_play(archive_t arch,char *regex,struct archive_enum *cb,void*arg){

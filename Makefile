@@ -14,7 +14,7 @@ LIBS=-lrt
 bcgall=
 else
 $(warning "BCG support enabled")
-CFLAGS=-m32 -std=c99 -Wall -O4 -D_FILE_OFFSET_BITS=64 -pthread -DUSE_BCG -I$(CADP)/incl
+CFLAGS=-m32 -std=c99 -Wall -O4 -D_FILE_OFFSET_BITS=64 -pthread -DUSE_BCG -I$(CADP)/incl -I/local/sccblom/mCRL/include
 LIBS=-L$(CADP)/bin.iX86 -lBCG_IO -lBCG -lm -lrt
 bcgall=bcg2gsf dir2bcg
 endif
@@ -53,15 +53,17 @@ clean::
 	/bin/rm -f libutil.a
 
 libutil.a: runtime.o stream.o data_io.o misc.o archive.o archive_dir.o archive_gsf.o ltsmeta.o \
-		stream_buffer.o
-
+		stream_buffer.o fast_hash.o generichash4.o generichash8.o treedbs.o
 	ar -r $@ $?
 
 clean::
 	/bin/rm -f libmpi.a
 
-libmpi.a: mpi_kernel.o
+libmpi.a: mpi_io_stream.o
 	ar -r $@ $?
+
+mpi-inst: mpi-inst.o libmpi.a libutil.a
+	$(MPILD) $(LDFLAGS) -o $@ $^ $(LIBS) -L/local/sccblom/mCRL/lib -ldl -lATerm -lmcrl -lstep -lmcrlunix -lexplicit -lz
 
 mpi%: mpi%.o libmpi.a libutil.a
 	$(MPILD) $(LDFLAGS) -o $@ $^ $(LIBS)

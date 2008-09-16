@@ -112,10 +112,10 @@ static void buf_close(stream_t *stream){
 	*stream=NULL;
 }
 
-stream_t stream_buffer(stream_t s,int rdsz,int wrsz){
+stream_t stream_buffer(stream_t s,int size){
 	stream_t bs=(stream_t)RTmalloc(sizeof(struct stream_s));
 	if (stream_readable(s)) {
-		bs->rd_buf=RTmalloc(rdsz);
+		bs->rd_buf=RTmalloc(size);
 		bs->procs.read_max=buf_read_max;
 		bs->procs.read=buf_read;
 		bs->procs.empty=buf_empty;
@@ -125,11 +125,11 @@ stream_t stream_buffer(stream_t s,int rdsz,int wrsz){
 		bs->procs.read=stream_illegal_io_op;
 		bs->procs.empty=stream_illegal_int;
 	}
-	bs->rd_sz=rdsz;
+	bs->rd_sz=size;
 	bs->rd_next=0;
 	bs->rd_used=0;
 	if (stream_writable(s)){
-		bs->wr_buf=RTmalloc(wrsz);
+		bs->wr_buf=RTmalloc(size);
 		bs->procs.write=buf_write;
 		bs->procs.flush=buf_flush;
 	} else {
@@ -137,7 +137,7 @@ stream_t stream_buffer(stream_t s,int rdsz,int wrsz){
 		bs->procs.write=stream_illegal_io_op;
 		bs->procs.flush=stream_illegal_void;
 	}
-	bs->wr_sz=wrsz;
+	bs->wr_sz=size;
 	bs->wr_used=0;
 	bs->s=s;
 	bs->procs.close=buf_close;

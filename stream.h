@@ -31,10 +31,14 @@ extern int stream_writable(stream_t stream);
 /// Create input stream from a FILE.
 extern stream_t stream_input(FILE*f);
 
+extern stream_t fs_read(char *name);
+
 /// Create output stream from a FILE.
 extern stream_t stream_output(FILE*f);
 
-extern stream_t stream_buffer(stream_t s,int rd_buf,int wr_buf);
+extern stream_t fs_write(char *name);
+
+extern stream_t stream_buffer(stream_t s,int size);
 
 #endif
 
