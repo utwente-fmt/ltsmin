@@ -1,0 +1,21 @@
+/**
+
+\mainpage Introduction
+@author Stefan Blom
+@author Jaco van de Pol
+
+\section Motivation
+
+Our approach to model checking is to explicitly enumerate
+the labeled transition system of a given model using distributed tools.
+If this is small enough it will be checked immediately.
+If not then a distributed state space reduction tool will be called first.
+
+*/ this is a comment /*
+
+
+
+
+
+*/ end of file
+
