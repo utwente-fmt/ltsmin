@@ -27,7 +27,7 @@ int main(int argc, char *argv[]){
 	cb.data=cp_data;
 	runtime_init();
 	set_label("dir2gsf");
-	archive_t a=arch_dir(argv[1]);
+	archive_t a=arch_dir(argv[1],4096);
 	if(argc>2){
 		b=arch_gsf_write(stream_output(fopen(argv[2],"w")));
 	} else {

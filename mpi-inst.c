@@ -26,7 +26,7 @@ static archive_t arch;
 static int compare_terms=0;
 static int sequential_init_rewriter=0;
 static int verbosity=1;
-static char *outputdir=NULL;
+static char *outputfmt=NULL;
 static int write_lts=1;
 //static int write_pi=0;
 //static int write_si=0;
@@ -52,9 +52,8 @@ struct option options[]={
 		"print help for the mCRL stepper",
 		"WARNING: some options (e.g. -conf-table) will",
 		"break the correctness of the distributed instantiator"},
-	{"-dir",OPT_REQ_ARG,assign_string,&outputdir,"-dir <dir>",
-		"write output in directory <dir>. If the input is lpo.tbf then",
-		"the default is to create lpo.dir in the current working directory."},
+	{"-fmt",OPT_REQ_ARG,assign_string,&outputfmt,"-fmt <format>",
+		"This option is mandatory. Format should have one occurrence of %s"},
 	{"-nolb",OPT_NORMAL,reset_int,&loadbalancing,NULL,
 		"disable load balancing"},
 	{"-nolts",OPT_NORMAL,reset_int,&write_lts,NULL,
@@ -421,10 +420,10 @@ int main(int argc, char*argv[]){
 		}
 	}
 	if (mpi_me==0){
-		if (!outputdir) ATerror("-dir option is required!");
+		if (!outputfmt) ATerror("-fmt option is required!");
 	}
 	MPI_Barrier(MPI_COMM_WORLD);
-	arch=arch_dir(outputdir,mpi_io_read,mpi_io_write,65536);
+	arch=arch_fmt(outputfmt,mpi_io_read,mpi_io_write,65536);
 	/***************************************************/
 	if (write_lts) {
 		output_src=(data_stream_t*)malloc(mpi_nodes*sizeof(FILE*));

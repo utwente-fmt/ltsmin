@@ -16,8 +16,6 @@
 
 struct archive_s {
 	struct archive_obj procs;
-	stream_create_t crd;
-	stream_create_t cwr;
 	int buf;
 	char dir[NAME_MAX];
 };
@@ -26,13 +24,13 @@ struct archive_s {
 static stream_t dir_read(archive_t archive,char *name){
 	char fname[NAME_MAX*2+2];
 	sprintf(fname,"%s/%s",archive->dir,name);
-	return stream_buffer(archive->crd(fname),archive->buf);
+	return stream_buffer(fs_read(fname),archive->buf);
 }
 
 static stream_t dir_write(archive_t archive,char *name){
 	char fname[NAME_MAX*2+2];
 	sprintf(fname,"%s/%s",archive->dir,name);
-	return stream_buffer(archive->cwr(fname),archive->buf);
+	return stream_buffer(fs_write(fname),archive->buf);
 }
 
 static void dir_list(archive_t archive,char *regex,string_enum_t cb,void*arg){
@@ -54,8 +52,24 @@ static void dir_close(archive_t *archive){
 	*archive=NULL;
 };
 
-archive_t arch_dir(char*dirname,stream_create_t crd,stream_create_t cwr,int buf){
+static int IsADir(const char *name){
+   struct stat info;
+   return ((stat(name,&info)==0)&&(S_ISDIR(info.st_mode)))?1:0;
+   }
+
+        
+static int CreateDir(const char *pathname) {
+       return mkdir(pathname, S_IRWXU|S_IRWXG|S_IRWXO);
+       }
+
+archive_t arch_dir(char*dirname,int buf){
 	archive_t arch=(archive_t)malloc(sizeof(struct archive_s));
+	if(!IsADir(dirname)){
+		if(CreateDir(dirname)){
+			Fatal(0,error,"could not create directory %s",dirname);
+			return NULL;
+		}
+	}
 	if (arch==NULL) {
 		Fatal(0,error,"out of memory");
 		return NULL;
@@ -67,8 +81,6 @@ archive_t arch_dir(char*dirname,stream_create_t crd,stream_create_t cwr,int buf)
 	arch->procs.list=dir_list;
 	arch->procs.play=arch_play;
 	arch->procs.close=dir_close;
-	arch->crd=crd;
-	arch->cwr=cwr;
 	arch->buf=buf;
 	return arch;
 }

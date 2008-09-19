@@ -30,7 +30,9 @@ extern void arch_close(archive_t *archive);
 
 typedef stream_t(*stream_create_t)(char*name);
 
-extern archive_t arch_dir(char*dirname,stream_create_t crd,stream_create_t cwr,int buf);
+extern archive_t arch_dir(char*dirname,int buf);
+
+extern archive_t arch_fmt(char*format,stream_create_t crd,stream_create_t cwr,int buf);
 
 extern archive_t arch_gsf_read(stream_t s);
 

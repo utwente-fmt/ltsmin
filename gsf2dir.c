@@ -31,10 +31,10 @@ int main(int argc, char *argv[]){
 	archive_t a;
 	if(argc>2){
 		a=arch_gsf_read(stream_input(fopen(argv[1],"r")));
-		b=arch_dir(argv[2]);
+		b=arch_dir(argv[2],4096);
 	} else {
 		a=arch_gsf_read(stream_input(stdin));
-		b=arch_dir(argv[1]);
+		b=arch_dir(argv[1],4096);
 	}
 	arch_enum(a,NULL,&cb,NULL);
 	arch_close(&a);

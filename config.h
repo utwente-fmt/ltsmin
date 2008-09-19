@@ -7,6 +7,8 @@
 #define _FILE_OFFSET_BITS 64
 #define _LARGEFILE64_SOURCE
 
+#define _XOPEN_SOURCE 500
+
 #include <features.h>
 
 #define NAME_MAX 1024

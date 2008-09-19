@@ -11,7 +11,7 @@ int main(int argc,char**argv){
 	runtime_init();
 	set_label("bcg2gsf");
 	BCG_INIT();
-	dir=arch_dir(argv[1]);
+	dir=arch_dir(argv[1],4096);
 	Warning(info,"reading info");
 	ds=DScreate(arch_read(dir,"info"),SWAP_NETWORK);
 	lts=lts_read(ds);

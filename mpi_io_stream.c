@@ -34,7 +34,7 @@ static void file_flush(stream_t stream){
 
 stream_t mpi_io_read(char *name){
 	stream_t s=(stream_t)RTmalloc(sizeof(struct stream_s));
-	int e=MPI_File_open(MPI_COMM_SELF,name,MPI_MODE_RDONLY|MPI_MODE_CREATE,MPI_INFO_NULL,&(s->f));
+	int e=MPI_File_open(MPI_COMM_SELF,name,MPI_MODE_RDONLY,MPI_INFO_NULL,&(s->f));
 	if(e){
 		int i=1024;
 		char msg[1024];
