@@ -2,17 +2,24 @@
 #ifndef RUNTIME_H
 #define RUNTIME_H
 
-#define _XOPEN_SOURCE 600 
+#include "config.h"
 #include <string.h>
 #include <pthread.h>
 #include <setjmp.h>
 #include <errno.h>
-
+#include <stdint.h>
 
 
 extern void* RTmalloc(size_t size);
 
 extern void runtime_init();
+
+extern void runtime_init_args(int*argc,char**argv[]);
+
+extern char* prop_get_S(char*name,char* def_val);
+
+extern uint32_t prop_get_U32(char*name,uint32_t def_val);
+
 
 typedef struct runtime_log *log_t;
 

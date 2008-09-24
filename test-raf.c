@@ -3,19 +3,24 @@
 #include "raf.h"
 #include <stdio.h>
 
-#define BUFSIZE 512
-
-
 int main(int argc,char*argv[]){
-	runtime_init();
+	runtime_init_args(&argc,&argv);
 	set_label("%s",argv[0]);
+	Warning(info,"testing");
+	uint32_t BUFSIZE=prop_get_U32("bs",512);
 	int len,i;
 	char buf[BUFSIZE];
-	for(i=0;i<BUFSIZE;i++) buf[i]=atoi(argv[2]);
-	raf_t raf=raf_unistd(argv[1]);
+	int val=prop_get_U32("val",0);
+	for(i=0;i<BUFSIZE;i++) buf[i]=val;
+	char*name=prop_get_S("raf",NULL);
+	if (name==NULL) {
+		Fatal(0,error,"please declare raf=file");
+	}
+	raf_t raf=raf_unistd(name);
 	printf("size is %d\n",(int)raf_size(raf));
 	raf_write(raf,buf,BUFSIZE,0);
-	raf_resize(raf,atoi(argv[3]));
+	uint32_t fs=prop_get_U32("fs",BUFSIZE);
+	raf_resize(raf,fs);
 	raf_close(&raf);
 	return 0;
 }

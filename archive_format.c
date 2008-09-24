@@ -41,16 +41,12 @@ static void dir_close(archive_t *archive){
 };
 
 archive_t arch_fmt(char*format,stream_create_t crd,stream_create_t cwr,int buf){
-	archive_t arch=(archive_t)malloc(sizeof(struct archive_s));
-	if (arch==NULL) {
-		Fatal(0,error,"out of memory");
-		return NULL;
-	}
+	archive_t arch=(archive_t)RTmalloc(sizeof(struct archive_s));
 	strncpy(arch->format,format,NAME_MAX-1);
 	arch->format[NAME_MAX-1]=0;
+	arch_init(arch);
 	arch->procs.read=dir_read;
 	arch->procs.write=dir_write;
-	arch->procs.list=NULL;
 	arch->procs.play=arch_play;
 	arch->procs.close=dir_close;
 	arch->crd=crd;

@@ -40,5 +40,9 @@ extern stream_t fs_write(char *name);
 
 extern stream_t stream_buffer(stream_t s,int size);
 
+extern stream_t stream_write_mem(void*buf,size_t len,size_t *used);
+
+extern stream_t stream_read_mem(void*buf,size_t len,size_t *used);
+
 #endif
 

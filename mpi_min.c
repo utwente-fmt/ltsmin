@@ -4,7 +4,7 @@
 #include <mpi.h>
 #include "mpi_core.h"
 #include "set.h"
-// include "time.h"
+#include "time.h"
 #include <unistd.h>
 #include "runtime.h"
 #include "dlts.h"
@@ -178,7 +178,7 @@ int main(int argc,char **argv){
 	int **synch_send_buffer;
 	MPI_Status *status_array;
 	MPI_Request *request_array;
-//	mytimer_t timer,compute_timer,synch_timer,exchange_timer;
+	mytimer_t timer,compute_timer,synch_timer,exchange_timer;
 	lts_t auxlts;
 	int auxcount;
 	int *auxmap;
@@ -196,13 +196,16 @@ int main(int argc,char **argv){
         MPI_Init(&argc, &argv);
 /*
 	memstat_enable=1;
-	timer=createTimer();
-	compute_timer=createTimer();
-	synch_timer=createTimer();
-	exchange_timer=createTimer();
+*/
+	timer=SCCcreateTimer();
+	compute_timer=SCCcreateTimer();
+	synch_timer=SCCcreateTimer();
+	exchange_timer=SCCcreateTimer();
+/*
 	verbosity=1;
 */
-	runtime_init();
+	runtime_init_args(&argc,&argv);
+	core_init();
 	set_label("bsim2mpi(%d/%d)",mpi_me,mpi_nodes);
 	if (!strcmp(argv[1],"s")){
 		if(mpi_me==0) Warning(info,"strong bisimulation reduction");
@@ -213,7 +216,6 @@ int main(int argc,char **argv){
 	} else {
 		Fatal(1,error,"specify b or s");
 	}
-	core_init();
 	synch_request=core_add(NULL,synch_request_service);
 	synch_answer=core_add(NULL,synch_answer_service);
 	if(branching){
@@ -221,10 +223,14 @@ int main(int argc,char **argv){
 		fwd_tag=core_add(NULL,fwd_service);
 	}
 	core_barrier();
-//	if (mpi_me==0) startTimer(timer);
-//	core_barrier();
+	if (mpi_me==0) SCCstartTimer(timer);
+	core_barrier();
 	lts=dlts_create();
-	lts->arch=arch_fmt(argv[2],mpi_io_read,mpi_io_write,65536);
+	if (strstr(argv[2],"%s")) {
+		lts->arch=arch_fmt(argv[2],mpi_io_read,mpi_io_write,prop_get_U32("bs",65536));
+	} else {
+		lts->arch=arch_gcf_read(MPI_Create_raf(argv[2],MPI_COMM_WORLD));
+	}
 	dlts_getinfo(lts);
 	tau=lts->tau;
 	if (mpi_nodes!=lts->segment_count){
@@ -276,14 +282,15 @@ int main(int argc,char **argv){
 		dlts_load_dest(lts,i,mpi_me);
 	}
 	MPI_Barrier(MPI_COMM_WORLD);
-/*
+	arch_close(&(lts->arch));
+	MPI_Barrier(MPI_COMM_WORLD);
 	if (mpi_me==0) {
-		stopTimer(timer);
-		reportTimer(timer,"reading the LTS took");
-		resetTimer(timer);
-		startTimer(timer);
+		SCCstopTimer(timer);
+		SCCreportTimer(timer,"reading the LTS took");
+		//resetTimer(timer);
+		//startTimer(timer);
 	}
-*/
+
 	iter=0;
 	oldcount=0;
 	for(i=0;i<lts->state_count[mpi_me];i++) oldid[i]=0;
@@ -634,7 +641,14 @@ int main(int argc,char **argv){
 	MPI_Bcast(&root,1,MPI_INT,lts->root_seg,MPI_COMM_WORLD);
 	Warning(info,"%d: root is %d/%d",mpi_me,GET_SEG(root),GET_OFS(root));
 
-	archive_t arch=arch_fmt(argv[3],mpi_io_read,mpi_io_write,65536);
+	archive_t arch;
+	if (strstr(argv[3],"%s")){
+		arch=arch_fmt(argv[3],mpi_io_read,mpi_io_write,prop_get_U32("bs",65536));
+	} else {
+		uint32_t bs=prop_get_U32("bs",65536);
+		uint32_t bc=prop_get_U32("bc",128);
+		arch=arch_gcf_create(MPI_Create_raf(argv[3],MPI_COMM_WORLD),bs,bs*bc,mpi_me,mpi_nodes);
+	}
 	
 	output_src=(data_stream_t*)RTmalloc(mpi_nodes*sizeof(FILE*));
 	output_label=(data_stream_t*)RTmalloc(mpi_nodes*sizeof(FILE*));
@@ -724,9 +738,9 @@ int main(int argc,char **argv){
 		DSclose(&infos);
 		Warning(info,"wrote %lld states and %lld transitions",total_states,total_transitions);
 	}
-	MPI_Barrier(MPI_COMM_WORLD);
+	arch_close(&arch);
+	core_barrier();
 	MPI_Finalize();
-	//sleep(mpi_me);
 	return 0;
 }
 

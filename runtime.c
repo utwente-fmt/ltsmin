@@ -77,6 +77,50 @@ void runtime_init(){
 	pthread_key_create(&label_key, label_destroy);
 }
 
+static int prop_count=0;
+static char**prop_name;
+static char**prop_val;
+
+void runtime_init_args(int*argc,char**argv[]){
+	char**keep=RTmalloc((*argc)*sizeof(char*));
+	prop_name=RTmalloc((*argc)*sizeof(char*));
+	prop_val=RTmalloc((*argc)*sizeof(char*));
+	keep[0]=(*argv)[0];
+	int kept=1;
+	for(int i=1;i<(*argc);i++){
+		//Warning(info,"argument %d is %s",i,(*argv)[i]);
+		char *pos=strchr((*argv)[i],'=');
+		if(pos){
+			char *name=strndup((*argv)[i],pos-((*argv)[i]));
+			char *val=strdup(pos+1);
+			//Warning(info,"property %s is %s",name,val);
+			prop_name[prop_count]=name;
+			prop_val[prop_count]=val;
+			prop_count++;
+		} else {
+			keep[kept]=(*argv)[i];
+			kept++;
+		}
+	}
+	*argc=kept;
+	*argv=keep;
+}
+
+char* prop_get_S(char*name,char* def_val){
+	for(int i=0;i<prop_count;i++){
+		if(!strcmp(name,prop_name[i])) return prop_val[i];
+	}
+	return def_val;
+}
+
+uint32_t prop_get_U32(char*name,uint32_t def_val){
+	for(int i=0;i<prop_count;i++){
+		if(!strcmp(name,prop_name[i])) return atoi(prop_val[i]);
+	}
+	return def_val;
+}
+
+
 void throw_int(int e){
 	void *jump=pthread_getspecific(jmp_key);
 	if (jump==NULL) {

@@ -90,7 +90,7 @@ static void buf_write(stream_t stream,void*buf,size_t count){
 }
 
 static void buf_flush(stream_t stream){
-	if(stream->wr_used){
+	if(stream->wr_used && (stream->s->procs.flush != stream_illegal_flush)){
 		stream_write(stream->s,stream->wr_buf,stream->wr_used);
 		stream->wr_used=0;
 	}
@@ -114,6 +114,7 @@ static void buf_close(stream_t *stream){
 
 stream_t stream_buffer(stream_t s,int size){
 	stream_t bs=(stream_t)RTmalloc(sizeof(struct stream_s));
+	stream_init(bs);
 	if (stream_readable(s)) {
 		bs->rd_buf=RTmalloc(size);
 		bs->procs.read_max=buf_read_max;
@@ -121,9 +122,6 @@ stream_t stream_buffer(stream_t s,int size){
 		bs->procs.empty=buf_empty;
 	} else {
 		bs->rd_buf=NULL;	
-		bs->procs.read_max=stream_illegal_io_try;
-		bs->procs.read=stream_illegal_io_op;
-		bs->procs.empty=stream_illegal_int;
 	}
 	bs->rd_sz=size;
 	bs->rd_next=0;
@@ -134,8 +132,6 @@ stream_t stream_buffer(stream_t s,int size){
 		bs->procs.flush=buf_flush;
 	} else {
 		bs->wr_buf=NULL;
-		bs->procs.write=stream_illegal_io_op;
-		bs->procs.flush=stream_illegal_void;
 	}
 	bs->wr_sz=size;
 	bs->wr_used=0;

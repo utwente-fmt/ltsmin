@@ -63,16 +63,13 @@ static int CreateDir(const char *pathname) {
        }
 
 archive_t arch_dir(char*dirname,int buf){
-	archive_t arch=(archive_t)malloc(sizeof(struct archive_s));
+	archive_t arch=(archive_t)RTmalloc(sizeof(struct archive_s));
+	arch_init(arch);
 	if(!IsADir(dirname)){
 		if(CreateDir(dirname)){
 			Fatal(0,error,"could not create directory %s",dirname);
 			return NULL;
 		}
-	}
-	if (arch==NULL) {
-		Fatal(0,error,"out of memory");
-		return NULL;
 	}
 	strncpy(arch->dir,dirname,NAME_MAX-1);
 	arch->dir[NAME_MAX-1]=0;

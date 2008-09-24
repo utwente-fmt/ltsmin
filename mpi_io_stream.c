@@ -34,6 +34,7 @@ static void file_flush(stream_t stream){
 
 stream_t mpi_io_read(char *name){
 	stream_t s=(stream_t)RTmalloc(sizeof(struct stream_s));
+	stream_init(s);
 	int e=MPI_File_open(MPI_COMM_SELF,name,MPI_MODE_RDONLY,MPI_INFO_NULL,&(s->f));
 	if(e){
 		int i=1024;
@@ -44,15 +45,13 @@ stream_t mpi_io_read(char *name){
 	MPI_File_set_errhandler(s->f,MPI_ERRORS_ARE_FATAL);
 	s->procs.read_max=file_read_max;
 	s->procs.read=file_read;
-	s->procs.empty=stream_illegal_int;
-	s->procs.write=stream_illegal_io_op;
-	s->procs.flush=stream_illegal_void;
 	s->procs.close=file_close;
 	return s;
 }
 
 stream_t mpi_io_write(char*name){
 	stream_t s=(stream_t)RTmalloc(sizeof(struct stream_s));
+	stream_init(s);
 	int e=MPI_File_open(MPI_COMM_SELF,name,MPI_MODE_WRONLY|MPI_MODE_CREATE,MPI_INFO_NULL,&(s->f));
 	if(e){
 		int i=1024;
@@ -61,9 +60,6 @@ stream_t mpi_io_write(char*name){
 		Fatal(0,error,"err is %s\n",msg);
 	}
 	MPI_File_set_errhandler(s->f,MPI_ERRORS_ARE_FATAL);
-	s->procs.read_max=stream_illegal_io_try;
-	s->procs.read=stream_illegal_io_op;
-	s->procs.empty=stream_illegal_int;
 	s->procs.write=file_write;
 	s->procs.flush=file_flush;
 	s->procs.close=file_close;

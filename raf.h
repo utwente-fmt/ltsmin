@@ -22,6 +22,12 @@ extern void raf_read(raf_t raf,void*buf,size_t len,off_t offset);
 /** @brief Write to a random access file. */
 extern void raf_write(raf_t raf,void*buf,size_t len,off_t offset);
 
+/** @brief Asynchronous write to a raf. */
+extern void raf_async_write(raf_t raf,void*buf,size_t len,off_t offset);
+
+/** @brief Wait for completion of asynchronous write */
+extern void raf_wait(raf_t raf);
+
 /** @brief Get the current size of a file. */
 extern off_t raf_size(raf_t raf);
 

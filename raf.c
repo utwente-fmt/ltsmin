@@ -4,10 +4,13 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <aio.h>
+#include <malloc.h>
 
 struct raf_struct_s {
 	struct raf_object shared;
 	int fd;
+	struct aiocb request;
 };
 
 void raf_read(raf_t raf,void*buf,size_t len,off_t ofs){
@@ -15,6 +18,12 @@ void raf_read(raf_t raf,void*buf,size_t len,off_t ofs){
 }
 void raf_write(raf_t raf,void*buf,size_t len,off_t ofs){
 	raf->shared.write(raf,buf,len,ofs);
+}
+void raf_async_write(raf_t raf,void*buf,size_t len,off_t offset){
+	raf->shared.awrite(raf,buf,len,offset);
+}
+void raf_wait(raf_t raf){
+	raf->shared.await(raf);
 }
 off_t raf_size(raf_t raf){
 	return raf->shared.size(raf);
@@ -25,13 +34,16 @@ void raf_resize(raf_t raf,off_t size){
 void raf_close(raf_t *raf){
 	(*raf)->shared.close(raf);
 }
+
+
+
 static void Pread(raf_t raf,void*buf,size_t len,off_t ofs){
 	size_t res=pread(raf->fd,buf,len,ofs);
 	if (res<0) {
 		FatalCall(1,error,"could not read %s",raf->shared.name);
 	}
 	if (res!=len) {
-		FatalCall(1,error,"short read from %s",raf->shared.name);
+		FatalCall(1,error,"short read %u/%u from %s at %llu",res,len,raf->shared.name,ofs);
 	}
 }
 static void Pwrite(raf_t raf,void*buf,size_t len,off_t ofs){
@@ -43,6 +55,27 @@ static void Pwrite(raf_t raf,void*buf,size_t len,off_t ofs){
 		FatalCall(1,error,"short write to %s",raf->shared.name);
 	}
 }
+
+
+static void AIOwrite(raf_t raf,void*buf,size_t len,off_t ofs){
+	raf->request.aio_buf=buf;
+	raf->request.aio_nbytes=len;
+	raf->request.aio_offset=ofs;
+	if (aio_write(&(raf->request))){
+		FatalCall(1,error,"aio_write to %s",raf->shared.name);
+	}
+}
+static void AIOwait(raf_t raf){
+	const struct aiocb* list[1];
+	list[0]=&(raf->request); 
+	if (aio_suspend(list,1,NULL)){
+		FatalCall(1,error,"aio_suspend for %s",raf->shared.name);
+	}
+	if (aio_error(list[0])){
+		FatalCall(1,error,"aio_error for %s",raf->shared.name);
+	}
+}
+
 static off_t Psize(raf_t raf){
 	struct stat info;
 	if (fstat(raf->fd,&info)==-1){
@@ -59,13 +92,20 @@ static void Pclose(raf_t *raf){
 	if (close((*raf)->fd)==-1){
 		FatalCall(1,error,"could not close %s",(*raf)->shared.name);
 	}
-	
+	free(*raf);
+	*raf=NULL;
 }
 void raf_illegal_read(raf_t raf,void*buf,size_t len,off_t ofs){
 	Fatal(1,error,"read not supported for raf %s",raf->shared.name);
 }
 void raf_illegal_write(raf_t raf,void*buf,size_t len,off_t ofs){
 	Fatal(1,error,"write not supported for raf %s",raf->shared.name);
+}
+void raf_illegal_awrite(raf_t raf,void*buf,size_t len,off_t ofs){
+	Fatal(1,error,"asynchronous write not supported for raf %s",raf->shared.name);
+}
+void raf_illegal_await(raf_t raf){
+	Fatal(1,error,"asynchronous wait not supported for raf %s",raf->shared.name);
 }
 off_t raf_illegal_size(raf_t raf){
 	Fatal(1,error,"size not supported for raf %s",raf->shared.name);
@@ -81,6 +121,8 @@ void raf_illegal_close(raf_t *raf){
 void raf_init(raf_t raf,char*name){
 	raf->shared.read=raf_illegal_read;
 	raf->shared.write=raf_illegal_write;
+	raf->shared.awrite=raf_illegal_awrite;
+	raf->shared.await=raf_illegal_await;
 	raf->shared.size=raf_illegal_size;
 	raf->shared.resize=raf_illegal_resize;
 	raf->shared.close=raf_illegal_close;
@@ -95,9 +137,13 @@ raf_t raf_unistd(char *name){
 	raf->fd=fd;
 	raf->shared.read=Pread;
 	raf->shared.write=Pwrite;
+	raf->shared.awrite=AIOwrite;
+	raf->shared.await=AIOwait;
 	raf->shared.size=Psize;
 	raf->shared.resize=Presize;
 	raf->shared.close=Pclose;
+	raf->request.aio_fildes=fd;
+	raf->request.aio_reqprio=0;
 	return raf;
 }
 

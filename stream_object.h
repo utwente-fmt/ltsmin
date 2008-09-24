@@ -18,15 +18,14 @@ struct stream_obj {
 	void(*close)(stream_t *stream);
 };
 
-extern void stream_illegal_op(stream_t *stream);
+extern size_t stream_illegal_read_max(stream_t stream,void*buf,size_t count);
+extern void stream_illegal_read(stream_t stream,void*buf,size_t count);
+extern int stream_illegal_empty(stream_t stream);
+extern void stream_illegal_write(stream_t stream,void*buf,size_t count);
+extern void stream_illegal_flush(stream_t stream);
+extern void stream_illegal_close(stream_t *stream);
 
-extern void stream_illegal_void(stream_t stream);
-
-extern int stream_illegal_int(stream_t stream);
-
-extern void stream_illegal_io_op(stream_t stream,void*buf,size_t count);
-
-extern size_t stream_illegal_io_try(stream_t stream,void*buf,size_t count);
+extern void stream_init(stream_t s);
 
 #endif
 

@@ -4,7 +4,7 @@
 
 #include "config.h"
 #include "stream.h"
-
+#include "raf.h"
 typedef struct archive_s *archive_t;
 
 extern int arch_readable(archive_t archive);
@@ -39,6 +39,10 @@ extern archive_t arch_gsf_read(stream_t s);
 extern archive_t arch_gsf_write(stream_t s);
 
 extern archive_t arch_gsf(stream_t s);
+
+extern archive_t arch_gcf_create(raf_t raf,size_t block_size,size_t cluster_size,int worker,int worker_count);
+
+extern archive_t arch_gcf_read(raf_t raf);
 
 #endif
 

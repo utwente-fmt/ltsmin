@@ -3,11 +3,7 @@
 #include "data_io.h"
 #include "runtime.h"
 #include <malloc.h>
-
-#define GSF_NEW 0x01
-#define GSF_END 0x02
-#define GSF_EOF 0x03
-#define GSF_DAT 0x04
+#include "ghf.h"
 
 struct archive_s {
 	struct archive_obj procs;
@@ -18,20 +14,15 @@ struct archive_s {
 struct stream_s {
 	struct stream_obj procs;
 	archive_t archive;
-	uint16_t id;
+	uint32_t id;
 };
 
 static void chan_write(stream_t stream,void*buf,size_t count){
-	if (count==0) return;
-	DSwriteU8(stream->archive->ds,GSF_DAT);
-	DSwriteU16(stream->archive->ds,stream->id);
-	DSwriteVL(stream->archive->ds,count-1);
-	DSwrite(stream->archive->ds,buf,count);
+	ghf_write_data(stream->archive->ds,stream->id,buf,count);
 }
 
 static void chan_close(stream_t *stream){
-	DSwriteU8((*stream)->archive->ds,GSF_END);
-	DSwriteU16((*stream)->archive->ds,(*stream)->id);
+	ghf_write_end((*stream)->archive->ds,(*stream)->id);
 	free(*stream);
 	*stream=NULL;
 }
@@ -42,22 +33,14 @@ static void chan_flush(stream_t stream){
 
 
 static stream_t gsf_write(archive_t archive,char *name){
-	stream_t s=(stream_t)malloc(sizeof(struct stream_s));
-	if (s==NULL) {
-		Fatal(0,error,"out of memory");
-		return NULL;
-	}
-	s->procs.read_max=stream_illegal_io_try;
-	s->procs.read=stream_illegal_io_op;
-	s->procs.empty=stream_illegal_int;
+	stream_t s=(stream_t)RTmalloc(sizeof(struct stream_s));
+	stream_init(s);
 	s->procs.write=chan_write;
 	s->procs.flush=chan_flush;
 	s->procs.close=chan_close;
 	s->id=archive->count;
 	s->archive=archive;
-	DSwriteU8(archive->ds,GSF_NEW);
-	DSwriteU16(archive->ds,s->id);
-	DSwriteS(archive->ds,name);
+	ghf_write_new(archive->ds,s->id,name);
 	archive->count++;
 	return stream_buffer(s,4096);
 }
@@ -74,100 +57,73 @@ static void gsf_play(archive_t arch,char *regex,struct archive_enum *cb,void*arg
 	for(;;){
 		uint8_t tag=DSreadU8(arch->ds);
 		switch(tag){
-			case GSF_NEW: {
-				char name[NAME_MAX];
-				uint16_t id=DSreadU16(arch->ds);
-				DSreadS(arch->ds,name,NAME_MAX);
+			case GHF_NEW: {
+				char *name;
+				uint32_t id;
+				ghf_read_new(arch->ds,&id,&name);
 				cb->new_item(arg,id,name);
+				free(name);
 				continue;
 			}
-			case GSF_END: {
-				uint16_t id=DSreadU16(arch->ds);
+			case GHF_END: {
+				uint32_t id;
+				ghf_read_end(arch->ds,&id);
 				cb->end_item(arg,id);
 				continue;
 			}
-			case GSF_DAT: {
-				uint16_t id=DSreadU16(arch->ds);
-				size_t len=DSreadVL(arch->ds)+1;
+			case GHF_DAT: {
+				uint32_t id;
+				size_t len;
+				ghf_read_data(arch->ds,&id,&len);
 				char buf[len];
 				DSread(arch->ds,buf,len);
 				cb->data(arg,id,buf,len);
 				continue;
 			}
-			case GSF_EOF: {
-				return;
-			}
 			default:
-				Fatal(0,error,"bad tag %d",(int)tag);
+				ghf_skip(arch->ds,tag);
+				Warning(info,"archive ended");
+				return;
 		}
 	}
 }
 
 static void gsf_close(archive_t *arch){
-	if ((*arch)->procs.write!=NULL) {
-		DSwriteU8((*arch)->ds,GSF_EOF);
+	if (DSwritable((*arch)->ds)) {
+		ghf_write_eof((*arch)->ds);
 	}
 	DSclose(&((*arch)->ds));
 	free(*arch);
 	*arch=NULL;
 }
 
-archive_t arch_gsf_read(stream_t s){
-	archive_t arch=(archive_t)malloc(sizeof(struct archive_s));
-	if (arch==NULL) {
-		Fatal(0,error,"out of memory");
-		return NULL;
-	}
+
+static archive_t gsf_create(stream_t s,int rd,int wr){
+	archive_t arch=(archive_t)RTmalloc(sizeof(struct archive_s));
+	arch_init(arch);
 	arch->ds=DScreate(s,SWAP_NETWORK);
-	arch->count=-1;
-	arch->procs.read=NULL;
-	arch->procs.write=NULL;
-	arch->procs.list=NULL;
-	arch->procs.play=gsf_play;
+	if (rd) {
+		arch->procs.play=gsf_play;
+	}
+	if (wr){
+		arch->procs.write=gsf_write;
+		DSwriteS(arch->ds,"GSF 0.1");
+	}
+	arch->count=0;
 	arch->procs.close=gsf_close;
 	return arch;
+}
+
+archive_t arch_gsf_read(stream_t s){
+	return gsf_create(s,1,0);
 }
 
 archive_t arch_gsf_write(stream_t s){
-	archive_t arch=(archive_t)malloc(sizeof(struct archive_s));
-	if (arch==NULL) {
-		Fatal(0,error,"out of memory");
-		return NULL;
-	}
-	arch->ds=DScreate(s,SWAP_NETWORK);
-	arch->count=0;
-	arch->procs.read=NULL;
-	arch->procs.write=gsf_write;
-	arch->procs.list=NULL;
-	arch->procs.play=NULL;
-	arch->procs.close=gsf_close;
-	DSwriteS(arch->ds,"GSF 0.1");
-	return arch;
+	return gsf_create(s,0,1);
 }
 
 archive_t arch_gsf(stream_t s){
-	archive_t arch=(archive_t)malloc(sizeof(struct archive_s));
-	if (arch==NULL) {
-		Fatal(0,error,"out of memory");
-		return NULL;
-	}
-	arch->ds=DScreate(s,SWAP_NETWORK);
-	if (DSreadable(arch->ds)) {
-		arch->procs.play=gsf_play;
-	} else {
-		arch->procs.play=NULL;
-	}
-	if (DSwritable(arch->ds)){
-		arch->procs.write=gsf_write;
-		DSwriteS(arch->ds,"GSF 0.1");
-	} else {
-		arch->procs.write=NULL;
-	}
-	arch->count=0;
-	arch->procs.read=NULL;
-	arch->procs.list=NULL;
-	arch->procs.close=gsf_close;
-	return arch;
+	return gsf_create(s,stream_readable(s),stream_writable(s));
 }
 
 

@@ -27,6 +27,7 @@ static int compare_terms=0;
 static int sequential_init_rewriter=0;
 static int verbosity=1;
 static char *outputfmt=NULL;
+static char *outputgcf=NULL;
 static int write_lts=1;
 //static int write_pi=0;
 //static int write_si=0;
@@ -53,7 +54,9 @@ struct option options[]={
 		"WARNING: some options (e.g. -conf-table) will",
 		"break the correctness of the distributed instantiator"},
 	{"-fmt",OPT_REQ_ARG,assign_string,&outputfmt,"-fmt <format>",
-		"This option is mandatory. Format should have one occurrence of %s"},
+		"Write output as separate files. Format should have one occurrence of %s."},
+	{"-gcf",OPT_REQ_ARG,assign_string,&outputgcf,"-gcf <file>",
+		"Write output in a GCF archive."},
 	{"-nolb",OPT_NORMAL,reset_int,&loadbalancing,NULL,
 		"disable load balancing"},
 	{"-nolts",OPT_NORMAL,reset_int,&write_lts,NULL,
@@ -359,7 +362,7 @@ int main(int argc, char*argv[]){
         MPI_Comm_size(MPI_COMM_WORLD, &mpi_nodes);
         MPI_Comm_rank(MPI_COMM_WORLD, &mpi_me);
 	sprintf(who,"inst-mpi(%2d)",mpi_me);
-	runtime_init();
+	runtime_init_args(&argc,&argv);
 	set_label(who);
 	if (mpi_me==0){
 		lvl_temp=(int*)malloc(mpi_nodes*sizeof(int));
@@ -420,10 +423,16 @@ int main(int argc, char*argv[]){
 		}
 	}
 	if (mpi_me==0){
-		if (!outputfmt) ATerror("-fmt option is required!");
+		if (!outputfmt && !outputgcf) ATerror("need -fmt or -gcf");
+		if (outputfmt && outputgcf) ATerror("need -fmt or -gcf, but not both");
 	}
 	MPI_Barrier(MPI_COMM_WORLD);
-	arch=arch_fmt(outputfmt,mpi_io_read,mpi_io_write,65536);
+	if (outputfmt) arch=arch_fmt(outputfmt,mpi_io_read,mpi_io_write,prop_get_U32("bs",65536));
+	if (outputgcf) {
+		uint32_t bs=prop_get_U32("bs",65536);
+		uint32_t bc=prop_get_U32("bc",128);
+		arch=arch_gcf_create(MPI_Create_raf(outputgcf,MPI_COMM_WORLD),bs,bs*bc,mpi_me,mpi_nodes);
+	}
 	/***************************************************/
 	if (write_lts) {
 		output_src=(data_stream_t*)malloc(mpi_nodes*sizeof(FILE*));

@@ -39,39 +39,50 @@ void stream_close(stream_t *stream){
 }
 
 int stream_readable(stream_t stream){
-	return (stream->procs.read!=stream_illegal_io_op);
+	return (stream->procs.read_max!=stream_illegal_read_max);
 }
 
 int stream_writable(stream_t stream){
-	return (stream->procs.write!=stream_illegal_io_op);
+	return (stream->procs.write!=stream_illegal_write);
 }
 
+
+/*************************************************************************/
+/* Initialize to illegal                                                 */
+/*************************************************************************/
+
+size_t stream_illegal_read_max(stream_t stream,void*buf,size_t count){
+	Fatal(0,error,"illegal read max on stream");
+	return 0;
+}
+void stream_illegal_read(stream_t stream,void*buf,size_t count){
+	Fatal(0,error,"illegal read on stream");
+}
+int stream_illegal_empty(stream_t stream){
+	Fatal(0,error,"illegal empty on stream");
+	return 0;
+}
+void stream_illegal_write(stream_t stream,void*buf,size_t count){
+	Fatal(0,error,"illegal write on stream");
+}
+void stream_illegal_flush(stream_t stream){
+	Fatal(0,error,"illegal flush on stream");
+}
+void stream_illegal_close(stream_t *stream){
+	Fatal(0,error,"illegal close on stream");
+}
+void stream_init(stream_t s){
+	s->procs.read_max=stream_illegal_read_max;
+	s->procs.read=stream_illegal_read;
+	s->procs.empty=stream_illegal_empty;
+	s->procs.write=stream_illegal_write;
+	s->procs.flush=stream_illegal_flush;
+	s->procs.close=stream_illegal_close;
+}
 
 /*************************************************************************/
 /* FILE IO functions.                                                    */
 /*************************************************************************/
-
-void stream_illegal_op(stream_t *stream){
-	Fatal(0,error,"illegal operation");
-}
-
-void stream_illegal_void(stream_t stream){
-	Fatal(0,error,"illegal operation");
-}
-
-int stream_illegal_int(stream_t stream){
-	Fatal(0,error,"illegal operation");
-	return 0;
-}
-
-void stream_illegal_io_op(stream_t stream,void*buf,size_t count){
-	Fatal(0,error,"illegal operation");
-}
-
-size_t stream_illegal_io_try(stream_t stream,void*buf,size_t count){
-	Fatal(0,error,"illegal operation");
-	return 0;
-}
 
 static void file_read(stream_t stream,void*buf,size_t count){
 	size_t res=fread(buf,1,count,stream->f);
@@ -111,18 +122,13 @@ static void file_flush(stream_t stream){
 }
 
 stream_t stream_input(FILE*f){
-	stream_t s=(stream_t)malloc(sizeof(struct stream_s));
-	if (s==NULL){
-		Fatal(0,error,"out of memory");
-		return NULL;
-	}
+	stream_t s=(stream_t)RTmalloc(sizeof(struct stream_s));
+	stream_init(s);
 	setbuf(f,NULL);
 	s->f=f;
 	s->procs.read_max=file_read_max;
 	s->procs.read=file_read;
 	s->procs.empty=file_empty;
-	s->procs.write=stream_illegal_io_op;
-	s->procs.flush=stream_illegal_void;
 	s->procs.close=file_close;
 	return s;
 }
@@ -134,16 +140,10 @@ stream_t fs_read(char *name){
 }
 
 stream_t stream_output(FILE*f){
-	stream_t s=(stream_t)malloc(sizeof(struct stream_s));
-	if (s==NULL){
-		Fatal(0,error,"out of memory");
-		return s;
-	}
+	stream_t s=(stream_t)RTmalloc(sizeof(struct stream_s));
+	stream_init(s);
 	setbuf(f,NULL);
 	s->f=f;
-	s->procs.read_max=stream_illegal_io_try;
-	s->procs.read=stream_illegal_io_op;
-	s->procs.empty=stream_illegal_int;
 	s->procs.write=file_write;
 	s->procs.flush=file_flush;
 	s->procs.close=file_close;
