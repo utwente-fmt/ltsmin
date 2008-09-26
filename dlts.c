@@ -53,6 +53,7 @@ void dlts_getinfo(dlts_t lts){
 	version=DSreadU32(ds);
 	if (version!=31) Fatal(1,error,"wrong file version: %d",version);
 	lts->info=DSreadSA(ds);
+	Warning(info,"info field is %s",lts->info);
 	lts->segment_count=DSreadU32(ds);
 	lts->root_seg=DSreadU32(ds);
 	lts->root_ofs=DSreadU32(ds);
@@ -68,6 +69,7 @@ void dlts_getinfo(dlts_t lts){
 		lts->transition_count[i]=(int*)RTmalloc(lts->segment_count*sizeof(int));
 		for(j=0;j<lts->segment_count;j++){
 			lts->transition_count[i][j]=DSreadU32(ds);
+			Warning(info,"%d transitions from %d to %d",lts->transition_count[i][j],i,j);
 		}
 	}
 	lts->src=(int***)malloc(lts->segment_count*sizeof(int**));

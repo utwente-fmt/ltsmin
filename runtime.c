@@ -82,6 +82,7 @@ static char**prop_name;
 static char**prop_val;
 
 void runtime_init_args(int*argc,char**argv[]){
+	runtime_init();
 	char**keep=RTmalloc((*argc)*sizeof(char*));
 	prop_name=RTmalloc((*argc)*sizeof(char*));
 	prop_val=RTmalloc((*argc)*sizeof(char*));
@@ -133,7 +134,7 @@ void throw_int(int e){
 void* RTmalloc(size_t size){
 	if(size==0) return NULL;
 	void *tmp=malloc(size);
-	if (tmp==NULL) Fatal(0,error,"out of memory");
+	if (tmp==NULL) Fatal(0,error,"out of memory trying to get %d",size);
 	return tmp;
 }
 

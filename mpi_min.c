@@ -194,6 +194,7 @@ int main(int argc,char **argv){
 
 
         MPI_Init(&argc, &argv);
+
 /*
 	memstat_enable=1;
 */
@@ -229,9 +230,26 @@ int main(int argc,char **argv){
 	if (strstr(argv[2],"%s")) {
 		lts->arch=arch_fmt(argv[2],mpi_io_read,mpi_io_write,prop_get_U32("bs",65536));
 	} else {
-		lts->arch=arch_gcf_read(MPI_Create_raf(argv[2],MPI_COMM_WORLD));
+		//lts->arch=arch_gcf_read(MPI_Create_raf(argv[2],MPI_COMM_WORLD));
+		//lts->arch=arch_gcf_read(MPI_Load_raf(argv[2],MPI_COMM_WORLD));
+		//core_barrier();
+		//arch_close(&(lts->arch));
+		//core_barrier();
+		if (prop_get_U32("load",1)) {
+			//Warning(info,"loading");
+			raf_t raf=MPI_Load_raf(argv[2],MPI_COMM_WORLD);
+			core_barrier();
+			lts->arch=arch_gcf_read(raf);
+			core_barrier();
+			//Warning(info,"archive opened");
+		} else {
+			lts->arch=arch_gcf_read(MPI_Create_raf(argv[2],MPI_COMM_WORLD));
+		}
 	}
+	//Warning(info,"got the archive");
 	dlts_getinfo(lts);
+	core_barrier();
+	//Warning(info,"got info");
 	tau=lts->tau;
 	if (mpi_nodes!=lts->segment_count){
 		if (mpi_me==0) Warning(info,"segment count does not equal worker count");
@@ -240,6 +258,8 @@ int main(int argc,char **argv){
 		return 0;
 	}
 	dlts_getTermDB(lts);
+	core_barrier();
+	//Warning(info,"got TermDB");
 	if (mpi_me==0 && branching) Warning(info,"invisible label is %s",lts->label_string[tau]);
 	status_array=(MPI_Status*)RTmalloc(2*lts->segment_count*sizeof(MPI_Status));
 	request_array=(MPI_Request*)RTmalloc(2*lts->segment_count*sizeof(MPI_Request));
@@ -276,12 +296,19 @@ int main(int argc,char **argv){
 		}
 		newmap[i]=(int*)malloc(lts->transition_count[i][mpi_me]*sizeof(int));
 		for(j=0;j<lts->transition_count[mpi_me][i];j++) map[i][j]=0;
+		//Warning(info,"reading src");
 		dlts_load_src(lts,mpi_me,i);
+		//Warning(info,"finished src");
+		//core_barrier();
+		//Warning(info,"reading label");
 		dlts_load_label(lts,mpi_me,i);
+		//Warning(info,"reading dest");
 		if (i!=mpi_me && branching) dlts_load_dest(lts,mpi_me,i);
 		dlts_load_dest(lts,i,mpi_me);
 	}
-	MPI_Barrier(MPI_COMM_WORLD);
+	Warning(info,"waiting for others");
+	core_barrier();
+	Warning(info,"done");
 	arch_close(&(lts->arch));
 	MPI_Barrier(MPI_COMM_WORLD);
 	if (mpi_me==0) {
@@ -640,6 +667,7 @@ int main(int argc,char **argv){
 	}
 	MPI_Bcast(&root,1,MPI_INT,lts->root_seg,MPI_COMM_WORLD);
 	Warning(info,"%d: root is %d/%d",mpi_me,GET_SEG(root),GET_OFS(root));
+	core_barrier();
 
 	archive_t arch;
 	if (strstr(argv[3],"%s")){
@@ -667,7 +695,7 @@ int main(int argc,char **argv){
 	write_tag=core_add(NULL,write_service);
 	TERM_INIT(term);
 	MPI_Barrier(MPI_COMM_WORLD);
-	Warning(info,"%d: starting to write",mpi_me);
+	Warning(info,"%d: starting to write using tag %d",mpi_me,write_tag);
 	for(j=0;j<synch_next;j++){
 		int set;
 		int src;
@@ -739,8 +767,10 @@ int main(int argc,char **argv){
 		Warning(info,"wrote %lld states and %lld transitions",total_states,total_transitions);
 	}
 	arch_close(&arch);
+
 	core_barrier();
 	MPI_Finalize();
+	Warning(info,"That's all!");
 	return 0;
 }
 

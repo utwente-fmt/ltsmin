@@ -20,6 +20,8 @@ static int		core_max=0;
 static core_handler	*handler=NULL;
 static void		**arg=NULL;
 static PENDING_T	*pending=NULL;
+//static int		buffer_size=0;
+//static void 		*buffer=NULL;
 
 /** main functions **/
 
@@ -34,6 +36,9 @@ void core_init(){
 	mpi_zeros=(int*)malloc(mpi_nodes*sizeof(int));
 	mpi_ones=(int*)malloc(mpi_nodes*sizeof(int));
 	mpi_indices=(int*)malloc(mpi_nodes*sizeof(int));
+//	buffer_size=1048576 * mpi_nodes;
+//	buffer=malloc(buffer_size);
+//	MPI_Buffer_attach(buffer,buffer_size);
 	for(i=0;i<mpi_nodes;i++){
 		mpi_zeros[i]=0;
 		mpi_ones[i]=1;
@@ -94,7 +99,8 @@ static int barrier_count;
 
 static void barrier_service(void *arg,MPI_Status*probe_status){
 	MPI_Status status,*recv_status=&status;
-	MPI_Recv(NULL,0,MPI_CHAR,MPI_ANY_SOURCE,barrier_tag,MPI_COMM_WORLD,recv_status);
+	int other;
+	MPI_Recv(&other,1,MPI_INT,MPI_ANY_SOURCE,barrier_tag,MPI_COMM_WORLD,recv_status);
 	barrier_count--;
 }
 
@@ -103,7 +109,7 @@ void core_barrier(){
 	/* first wait for all workers to go from active (client and server) to passive (server only) */
 	/* also send message to myself to force all service requests to myself to be flushed */
 	for(i=0;i<mpi_nodes;i++) {
-		MPI_Send(NULL,0,MPI_CHAR,i,barrier_tag,MPI_COMM_WORLD);
+		MPI_Send(&mpi_me,1,MPI_INT,i,barrier_tag,MPI_COMM_WORLD);
 	}
 	while(barrier_count) core_wait(barrier_tag);
 	barrier_count=mpi_nodes;

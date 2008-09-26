@@ -4,18 +4,45 @@
 @author Stefan Blom
 @author Jaco van de Pol
 
-\section Motivation
+\section motivation Motivation
 
 Our approach to model checking is to explicitly enumerate
 the labeled transition system of a given model using distributed tools.
 If this is small enough it will be checked immediately.
 If not then a distributed state space reduction tool will be called first.
 
-*/ this is a comment /*
+\section ddb Distributed DataBase support
+
+\latexonly
+\begin{comment}
+\endlatexonly
+See the LaTeX documentation for full details.
+\latexonly
+\end{comment}
+
+\subsection{Introduction}
+
+The distributed part of the $\mu$CRL toolset has tools for state space generation
+and state space reduction. For use in these tools several distributed data structures
+were implemented. In the Distributed DataBase library we collect these data structures
+to make them more easily reused.
 
 
+\subsection{Design Principles}
 
 
+During state space generation, we build a large data base.
+The state information is kept in memory and optionally written to disk.
+At the same time the transitions are written to disk.
 
-*/ end of file
+There are two ways of writing the result of bisimulation reduction:
+First, we can add an equivalence to the original LTS. Second,
+we can compute the LTS modulo the equivalence and write it to disk.
+
+
+\subsection{Description of the DDB info file format}
+
+\endlatexonly
+
+*/
 
