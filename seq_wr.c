@@ -15,6 +15,7 @@ int main(int argc,char*argv[]){
 	int count=prop_get_U32("count",0);
 	int size=prop_get_U32("size",0);
 	int syncrate=prop_get_U32("sync",0);
+	int delay=prop_get_U32("sleep",0);
 	if (!(size&&count)){
 		Fatal(1,error,"please define size and count");
 	}
@@ -29,6 +30,7 @@ int main(int argc,char*argv[]){
 	for(i=0;i<N;i++){
 		for(j=0;j<count;j++){
 			if (write(fd[i],buf,size)<size)  Fatal(1,error,"short write i=%d j=%d",i,j);
+			if (delay) usleep(delay);
 			if (syncrate && ((i*count+j)%syncrate)==0) sync();
 		}
 	}
