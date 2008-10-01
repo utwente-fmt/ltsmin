@@ -1,0 +1,73 @@
+\documentclass{article}
+
+\title{LTS-IO}
+\author{Stefan Blom and Jaco van de Pol}
+
+\begin{document}
+
+\begin{abstract}
+In this paper, we explain the design and implementation of LTS-IO.
+\end{abstract}
+
+\section{Introduction}
+
+The concept of the $\mu$CRL toolset is to generate the LTS.
+If necessary apply bisimulation reduction. And subsequently
+model check it. The LTS is passed between those stages on disk.
+
+
+Let us consider a distribtued setting with $W$ workers.
+The natural way of writing the LTS in a distributed generator is to let each worker
+write their transitions separately. This is reflected in the number of files used in
+distributed file formats. The PBCG format uses one small meta file and $W$ data files.
+The DIR format uses two small meta files and $3\cdot W^2$ data files.
+The motivation for having so many files in the DIR format is that when there are many files,
+it is easy for a worker to read the data it needs directly without the need for
+information exchange procedures in a distributed application. The motivation for
+PBCG to have $W$ is that because the BCG format is compressed, it is better for performance.
+Moreover, writing to $W$ files means that they can be on $W$ different files systems.
+This is very useful, when writing to local disks on the workers rather than to
+a single shared file system.
+
+The rate at which $\mu$CRL produces transition data is not very high,
+so performance problems with writing were never seen. However, performance problems
+can be seen while reading the LTS. To explain why, we consider the generic problem
+of $N$ files on a single file system. If the file system has a good block
+allocation algorihtm then no matter in which order the files were written,
+they are more or less contiguous on the disk. If the block allocation algorithm is
+too naive then the $N$ files will be fragmented and the fragment will be on
+the disk more or less in the order they were written. In the former case, the optimal order
+for reading is to read files sequentially. In the latter case the optimal order is
+to read them in the order they were written. Nowadays it seems safe to assume that
+the file system properly defragments files as they are written. (See task list.)
+So we need to read the files sequentially. This is easy enough if every worker has one file locally
+and also if each client can match the bandwidth of the server. However, when one uses
+a clustered file system, the bandwidth of the server exceeds that of one client.
+In this case we need to have all workers read in parallel and redistribute the data
+among themselves.
+
+When reading in parallel, we can completely overlap decompression and 
+reading. When reading sequentially, we can only overlap decompression and
+reading of the last files. If either decompression of the file server is fast,
+the problem should be minor. However, if the file server is slow and
+decompression is slow as well then there should be a problem. (See task list.)
+
+Solution 1: Have an agent that when a client opens a file, reads the entire file
+into memory and then serves reads in parallel with other opens. This can be a
+problem if the files are very small. (Reads need to be 1MB or bigger for efficiency.)
+It can also be a problem in case of large files where processing can overlap with
+reading.
+
+\section{Task list}
+
+\begin{itemize}
+\item Run experiments to assess the quality of block allocation algorithms on various
+file system implementations by measuring the speed of read and write orders.
+\item Run experiments to assess compression/decompression speeds for gzip/bzip2/lzo
+to be able to determine if parallel decompression is necessary or not.
+\end{itemize}
+
+
+
+\end{document}
+
