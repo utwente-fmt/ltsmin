@@ -85,7 +85,7 @@ lts_t lts_create(){
 	return lts;
 }
 
-void lts_write_info(lts_t lts,data_stream_t ds,info_fmt_t format){
+void lts_write_info(lts_t lts,stream_t ds,info_fmt_t format){
 	switch(format){
 	case DIR_INFO: {
 		DSwriteU32(ds,31);
@@ -114,7 +114,7 @@ void lts_write_info(lts_t lts,data_stream_t ds,info_fmt_t format){
 	Fatal(0,error,"unimplemented format");
 }
 
-static lts_t create_info_v31(data_stream_t ds) {
+static lts_t create_info_v31(stream_t ds) {
 	lts_t lts=lts_create();
 	lts_set_comment(lts,DSreadSA(ds));
 
@@ -138,7 +138,7 @@ static lts_t create_info_v31(data_stream_t ds) {
 	return lts;
 }
 
-lts_t lts_read(data_stream_t ds){
+lts_t lts_read(stream_t ds){
 	char description[1024];
 	DSreadS(ds,description,1024);
 	if (strlen(description)!=0) {

@@ -1,13 +1,13 @@
 #include "arch_object.h"
 #include "stream_object.h"
-#include "data_io.h"
+#include "stream.h"
 #include "runtime.h"
 #include <malloc.h>
 #include "ghf.h"
 
 struct archive_s {
 	struct archive_obj procs;
-	data_stream_t ds;
+	stream_t ds;
 	int count;
 };
 
@@ -28,7 +28,7 @@ static void chan_close(stream_t *stream){
 }
 
 static void chan_flush(stream_t stream){
-	DSflush(stream->archive->ds);
+	stream_flush(stream->archive->ds);
 }
 
 
@@ -61,7 +61,10 @@ static void gsf_play(archive_t arch,char *regex,struct archive_enum *cb,void*arg
 				char *name;
 				uint32_t id;
 				ghf_read_new(arch->ds,&id,&name);
-				cb->new_item(arg,id,name);
+				char* code=cb->new_item(arg,id,name);
+				if (code!=NULL) {
+					Fatal(1,error,"code %s not supported",code);
+				}
 				free(name);
 				continue;
 			}
@@ -76,7 +79,7 @@ static void gsf_play(archive_t arch,char *regex,struct archive_enum *cb,void*arg
 				size_t len;
 				ghf_read_data(arch->ds,&id,&len);
 				char buf[len];
-				DSread(arch->ds,buf,len);
+				stream_read(arch->ds,buf,len);
 				cb->data(arg,id,buf,len);
 				continue;
 			}
@@ -89,10 +92,10 @@ static void gsf_play(archive_t arch,char *regex,struct archive_enum *cb,void*arg
 }
 
 static void gsf_close(archive_t *arch){
-	if (DSwritable((*arch)->ds)) {
+	if (stream_writable((*arch)->ds)) {
 		ghf_write_eof((*arch)->ds);
 	}
-	DSclose(&((*arch)->ds));
+	stream_close(&((*arch)->ds));
 	free(*arch);
 	*arch=NULL;
 }
@@ -101,7 +104,7 @@ static void gsf_close(archive_t *arch){
 static archive_t gsf_create(stream_t s,int rd,int wr){
 	archive_t arch=(archive_t)RTmalloc(sizeof(struct archive_s));
 	arch_init(arch);
-	arch->ds=DScreate(s,SWAP_NETWORK);
+	arch->ds=s;
 	if (rd) {
 		arch->procs.play=gsf_play;
 	}

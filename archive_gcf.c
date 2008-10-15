@@ -2,7 +2,7 @@
 #include "arch_object.h"
 #include "stream_object.h"
 #include <stdint.h>
-#include "data_io.h"
+#include "stream.h"
 #include <string.h>
 #include "ghf.h"
 #include <malloc.h>
@@ -25,7 +25,7 @@ struct archive_s {
 	uint32_t data_begin;
 	uint32_t *meta;
 	uint32_t next_id;
-	data_stream_t ds;
+	stream_t  ds;
 	uint32_t stream_count;
 	uint32_t *blockmap;
 	char **name;
@@ -199,7 +199,7 @@ archive_t arch_gcf_create(raf_t raf,size_t block_size,size_t cluster_size,int wo
 	if(worker==0) {
 		raf_resize(raf,0);
 		size_t used;
-		data_stream_t ds=DScreate(stream_write_mem(arch->buffer,block_size,&used),SWAP_NETWORK);
+		stream_t  ds=stream_write_mem(arch->buffer,block_size,&used);
 		DSwriteS(ds,"GCF 0.1");
 		DSwriteU32(ds,arch->block_size);
 		DSwriteU32(ds,arch->cluster_size);
@@ -208,7 +208,7 @@ archive_t arch_gcf_create(raf_t raf,size_t block_size,size_t cluster_size,int wo
 		DSwriteU32(ds,arch->meta_offset);
 		DSclose(&ds);
 	}
-	arch->ds=DScreate(gcf_create_stream(arch,worker+(arch->meta_begin)),SWAP_NETWORK);
+	arch->ds=gcf_create_stream(arch,worker+(arch->meta_begin));
 	arch->procs.write=gcf_write;
 	arch->procs.close=gcf_close_write;
 	return arch;
@@ -257,7 +257,7 @@ archive_t arch_gcf_read(raf_t raf){
 		size_t used;
 		char ident[NAME_MAX];
 		raf_read(raf,buf,4096,0);
-		data_stream_t ds=DScreate(stream_read_mem(buf,4096,&used),SWAP_NETWORK);
+		stream_t  ds=stream_read_mem(buf,4096,&used);
 		DSreadS(ds,ident,NAME_MAX);
 		if(strncmp(ident,"GCF",3)){
 			Fatal(0,error,"I do not recognize %s as a GCF file.",ident);
@@ -297,7 +297,7 @@ archive_t arch_gcf_read(raf_t raf){
 	}
 	for(i=arch->meta_begin;i<arch->data_begin;i++){
 		//Warning(info,"scanning meta stream %u",i);
-		data_stream_t ds=DScreate(gcf_read_stream(arch,i),SWAP_NETWORK);
+		stream_t  ds=gcf_read_stream(arch,i);
 		for(;;){
 			uint8_t tag=DSreadU8(ds);
 			if (tag==GHF_EOF) break;

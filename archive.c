@@ -8,15 +8,25 @@ struct archive_s {
 int arch_readable(archive_t archive){
 	return (archive->procs.read!=arch_illegal_read);
 }
-stream_t arch_read(archive_t archive,char *name){
-	return archive->procs.read(archive,name);
+stream_t arch_read(archive_t archive,char *name,char*code){
+	stream_t s=archive->procs.read(archive,name);
+	if (code==NULL) {
+		return s;
+	} else {
+		return stream_setup(s,code);
+	}
 }
 
 int arch_writable(archive_t archive){
 	return (archive->procs.write!=arch_illegal_write);
 }
-stream_t arch_write(archive_t archive,char *name){
-	return archive->procs.write(archive,name);
+stream_t arch_write(archive_t archive,char *name,char*code){
+	stream_t s=archive->procs.write(archive,name);
+	if (code==NULL) {
+		return s;
+	} else {
+		return stream_setup(s,code);
+	}
 }
 
 int arch_searchable(archive_t archive){
@@ -44,9 +54,10 @@ struct cb_arg {
 	void *arg;
 };
 
-static void arch_copy(struct cb_arg *cba,char*name){
-	cba->cb->new_item(cba->arg,cba->id,name);
-	stream_t s=arch_read(cba->arch,name);
+static void arch_copy(void*arg,char*name){
+#define cba ((struct cb_arg *)arg)
+	char* code=cba->cb->new_item(cba->arg,cba->id,name);
+	stream_t s=arch_read(cba->arch,name,code);
 	char buf[4096];
 	for(;;){
 		int len=stream_read_max(s,buf,4096);
@@ -56,6 +67,7 @@ static void arch_copy(struct cb_arg *cba,char*name){
 	stream_close(&s);
 	cba->cb->end_item(cba->arg,cba->id);
 	cba->id++;
+#undef cba
 }
 
 void arch_play(archive_t arch,char*regex,struct archive_enum *cb,void*arg){

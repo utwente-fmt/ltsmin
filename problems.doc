@@ -1,0 +1,35 @@
+/**
+
+\page problems Known Problems
+
+\subsection Endianness
+
+The endian detection/configuration is not what it should be. One of the problems is the situation with difference encoding.
+To dodifference encoding one must know both the input and output encodings. The current DSsetSwap calls
+do not set this order properly.
+
+
+\subsection empty
+
+The semantics of empty is not so easy to implement: in general to implement it in a wrapper,
+a read should be done on the underlying stream and the result buffered.
+
+\subsection buffers
+
+The default buffer size for normal unix files is now 0.
+That should be a bit more sensible....
+
+\subsection Mixing old and new dir's
+
+Very dangerous at the moment.
+
+
+\subsection removing compression from GSF
+
+Because the code is written in the stream itself,
+it is difficult to remove while enumerating the stream.
+
+Enumerating might work better if the code was stored in a meta file
+and given to the new_item callback.
+
+*/

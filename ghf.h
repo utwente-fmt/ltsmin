@@ -2,8 +2,7 @@
 #define GHF_H
 
 #include "config.h"
-#include "data_io.h"
-#include <stdint.h>
+#include "stream.h"
 
 /**
 @file ghf.h
@@ -16,21 +15,22 @@
 #define GHF_DAT 0x04
 #define GHF_LEN 0x05
 
-extern void ghf_skip(data_stream_t ds,uint8_t tag);
+extern void ghf_skip(stream_t ds,uint8_t tag);
 
-extern void ghf_write_new(data_stream_t ds,uint32_t id,char*name);
-extern void ghf_read_new(data_stream_t ds,uint32_t *id,char**name);
+extern void ghf_write_new(stream_t ds,uint32_t id,char*name);
+extern void ghf_read_new(stream_t ds,uint32_t *id,char**name);
 
-extern void ghf_write_end(data_stream_t ds,uint32_t id);
-extern void ghf_read_end(data_stream_t ds,uint32_t *id);
+extern void ghf_write_end(stream_t ds,uint32_t id);
+extern void ghf_read_end(stream_t ds,uint32_t *id);
 
-extern void ghf_write_eof(data_stream_t ds);
+extern void ghf_write_eof(stream_t ds);
 
-extern void ghf_write_data(data_stream_t ds,uint32_t id,void*buf,size_t count);
-extern void ghf_read_data(data_stream_t ds,uint32_t *id,size_t*count);
+extern void ghf_write_data(stream_t ds,uint32_t id,void*buf,size_t count);
+extern void ghf_read_data(stream_t ds,uint32_t *id,size_t*count);
 
-extern void ghf_write_len(data_stream_t ds,uint32_t id,off_t len);
-extern void ghf_read_len(data_stream_t ds,uint32_t *id,off_t *len);
+extern void ghf_write_len(stream_t ds,uint32_t id,off_t len);
+extern void ghf_read_len(stream_t ds,uint32_t *id,off_t *len);
 
 
 #endif
+

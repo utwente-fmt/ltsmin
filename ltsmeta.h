@@ -4,7 +4,6 @@
 #include "config.h"
 #include "stream.h"
 #include <stdint.h>
-#include "data_io.h"
 
 typedef struct lts_meta_s *lts_t;
 typedef uint64_t lts_state_t;
@@ -32,8 +31,8 @@ extern char* lts_get_comment(lts_t lts);
 extern lts_t lts_create();
 
 typedef enum {DIR_INFO} info_fmt_t;
-extern void lts_write_info(lts_t lts,data_stream_t ds,info_fmt_t format);
-extern lts_t lts_read(data_stream_t ds);
+extern void lts_write_info(lts_t lts,stream_t ds,info_fmt_t format);
+extern lts_t lts_read(stream_t ds);
 
 #endif
 

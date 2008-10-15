@@ -87,6 +87,8 @@ void runtime_init_args(int*argc,char**argv[]){
 	prop_name=RTmalloc((*argc)*sizeof(char*));
 	prop_val=RTmalloc((*argc)*sizeof(char*));
 	keep[0]=(*argv)[0];
+	char*tmp=strrchr(keep[0],'/');
+	set_label("%s",tmp?tmp:keep[0]);
 	int kept=1;
 	for(int i=1;i<(*argc);i++){
 		//Warning(info,"argument %d is %s",i,(*argv)[i]);
@@ -117,6 +119,13 @@ char* prop_get_S(char*name,char* def_val){
 uint32_t prop_get_U32(char*name,uint32_t def_val){
 	for(int i=0;i<prop_count;i++){
 		if(!strcmp(name,prop_name[i])) return atoi(prop_val[i]);
+	}
+	return def_val;
+}
+
+uint64_t prop_get_U64(char*name,uint64_t def_val){
+	for(int i=0;i<prop_count;i++){
+		if(!strcmp(name,prop_name[i])) return atoll(prop_val[i]);
 	}
 	return def_val;
 }

@@ -3,12 +3,12 @@
 #include "runtime.h"
 
 
-void ghf_write_new(data_stream_t ds,uint32_t id,char*name){
+void ghf_write_new(stream_t ds,uint32_t id,char*name){
 	DSwriteU8(ds,GHF_NEW);
 	DSwriteVL(ds,id);
 	DSwriteS(ds,name);
 }
-void ghf_read_new(data_stream_t ds,uint32_t *id,char**name){
+void ghf_read_new(stream_t ds,uint32_t *id,char**name){
 	uint32_t i=DSreadVL(ds);
 	char*n=DSreadSA(ds);
 	if(id) *id=i;
@@ -16,27 +16,27 @@ void ghf_read_new(data_stream_t ds,uint32_t *id,char**name){
 }
 
 
-void ghf_write_end(data_stream_t ds,uint32_t id){
+void ghf_write_end(stream_t ds,uint32_t id){
 	DSwriteU8(ds,GHF_END);
 	DSwriteVL(ds,id);
 }
-void ghf_read_end(data_stream_t ds,uint32_t *id){
+void ghf_read_end(stream_t ds,uint32_t *id){
 	uint32_t i=DSreadVL(ds);
 	if(id) *id=i;
 }
 
-void ghf_write_eof(data_stream_t ds){
+void ghf_write_eof(stream_t ds){
 	DSwriteU8(ds,GHF_EOF);
 }
 
-void ghf_write_data(data_stream_t ds,uint32_t id,void*buf,size_t count){
+void ghf_write_data(stream_t ds,uint32_t id,void*buf,size_t count){
 	if (count==0) return;
 	DSwriteU8(ds,GHF_DAT);
 	DSwriteVL(ds,id);
 	DSwriteVL(ds,count-1);
 	DSwrite(ds,buf,count);
 }
-void ghf_read_data(data_stream_t ds,uint32_t *id,size_t*count){
+void ghf_read_data(stream_t ds,uint32_t *id,size_t*count){
 	uint32_t i=DSreadVL(ds);
 	if(id) *id=i;
 	size_t size=DSreadVL(ds);
@@ -44,20 +44,20 @@ void ghf_read_data(data_stream_t ds,uint32_t *id,size_t*count){
 	// Actual data to be read by the user.
 }
 
-void ghf_write_len(data_stream_t ds,uint32_t id,off_t len){
+void ghf_write_len(stream_t ds,uint32_t id,off_t len){
 	DSwriteU8(ds,GHF_LEN);
 	DSwriteVL(ds,id);
 	DSwriteVL(ds,len);
 }
 
-void ghf_read_len(data_stream_t ds,uint32_t *id,off_t *len){
+void ghf_read_len(stream_t ds,uint32_t *id,off_t *len){
 	uint32_t i=DSreadVL(ds);
 	if(id) *id=i;
 	off_t size=DSreadVL(ds);
 	if(len) *len=size;
 }
 
-void ghf_skip(data_stream_t ds,uint8_t tag){
+void ghf_skip(stream_t ds,uint8_t tag){
 	switch(tag){
 	case GHF_NEW:
 		ghf_read_new(ds,NULL,NULL);

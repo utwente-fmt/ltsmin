@@ -8,10 +8,10 @@
 typedef struct archive_s *archive_t;
 
 extern int arch_readable(archive_t archive);
-extern stream_t arch_read(archive_t archive,char *name);
+extern stream_t arch_read(archive_t archive,char *name,char*code);
 
 extern int arch_writable(archive_t archive);
-extern stream_t arch_write(archive_t archive,char *name);
+extern stream_t arch_write(archive_t archive,char *name,char*code);
 
 extern int arch_searchable(archive_t archive);
 typedef void(*string_enum_t)(void*arg,char*name);
@@ -20,7 +20,7 @@ extern void arch_search(archive_t archive,char *regex,string_enum_t cb,void*arg)
 
 extern int arch_enumerable(archive_t archive);
 struct archive_enum {
-	void(*new_item)(void*arg,int no,char*name);
+	char*(*new_item)(void*arg,int no,char*name);
 	void(*end_item)(void*arg,int no);
 	void(*data)(void*arg,int no,void*data,size_t len);
 };

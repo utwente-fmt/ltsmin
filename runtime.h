@@ -20,6 +20,8 @@ extern char* prop_get_S(char*name,char* def_val);
 
 extern uint32_t prop_get_U32(char*name,uint32_t def_val);
 
+extern uint64_t prop_get_U64(char*name,uint64_t def_val);
+
 
 typedef struct runtime_log *log_t;
 

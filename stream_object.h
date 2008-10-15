@@ -16,6 +16,7 @@ struct stream_obj {
 	void(*write)(stream_t stream,void*buf,size_t count);
 	void(*flush)(stream_t stream);
 	void(*close)(stream_t *stream);
+	int swap;
 };
 
 extern size_t stream_illegal_read_max(stream_t stream,void*buf,size_t count);
