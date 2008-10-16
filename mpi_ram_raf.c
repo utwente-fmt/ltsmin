@@ -1,7 +1,7 @@
 #include "raf_object.h"
 #include "runtime.h"
 #include <mpi.h>
-#include <malloc.h>
+#include <stdlib.h>
 #include "mpi_core.h"
 
 struct raf_struct_s {

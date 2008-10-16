@@ -8,7 +8,7 @@
 #include <unistd.h>
 #include "runtime.h"
 #include "dlts.h"
-#include <malloc.h>
+#include <stdlib.h>
 #include "mpi_io_stream.h"
 #include "lts.h"
 #include "stream.h"

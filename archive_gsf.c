@@ -2,7 +2,7 @@
 #include "stream_object.h"
 #include "stream.h"
 #include "runtime.h"
-#include <malloc.h>
+#include <stdlib.h>
 #include "ghf.h"
 
 struct archive_s {

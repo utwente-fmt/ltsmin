@@ -4,7 +4,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <aio.h>
-#include <malloc.h>
+#include <stdlib.h>
 #include <sys/times.h>
 #include <unistd.h>
 

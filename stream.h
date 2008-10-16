@@ -70,7 +70,12 @@ extern stream_t stream_setup(stream_t s,char* code);
 
 #define SWAP_NONE 0x00
 
+#if defined(__linux__)
 #include <endian.h>
+#elif defined(__FreeBSD__) || defined(__APPLE__)
+#include <machine/endian.h>
+#endif
+
 #if __BYTE_ORDER == __LITTLE_ENDIAN
 #define SWAP_NETWORK 0x03
 #else

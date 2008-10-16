@@ -5,7 +5,8 @@
 #include "stream.h"
 #include <string.h>
 #include "ghf.h"
-#include <malloc.h>
+#include <stdlib.h>
+#include <strings.h>
 
 struct archive_s {
 	struct archive_obj procs;

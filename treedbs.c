@@ -1,6 +1,5 @@
 #include "config.h"
 #include <stdlib.h>
-#include <malloc.h>
 #include <stdio.h>
 #include "runtime.h"
 #include "fast_hash.h"

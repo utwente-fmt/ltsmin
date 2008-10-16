@@ -2,7 +2,7 @@
 #include "stream_object.h"
 #include "runtime.h"
 #include <string.h>
-#include <malloc.h>
+#include <stdlib.h>
 
 struct stream_s {
 	struct stream_obj procs;

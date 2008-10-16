@@ -2,7 +2,7 @@
 #include "mpi_core.h"
 #include <unistd.h>
 #include <stdio.h>
-#include <malloc.h>
+#include <stdlib.h>
 #include "runtime.h"
 
 #define PENDING_T char

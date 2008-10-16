@@ -2,8 +2,7 @@
 #include "stream_object.h"
 #include "runtime.h"
 #include <string.h>
-#include <malloc.h>
-#include <byteswap.h>
+#include <stdlib.h>
 
 typedef int32_t diff_t ;
 

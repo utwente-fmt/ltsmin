@@ -11,7 +11,7 @@
 #include <limits.h>
 #include <string.h>
 #include <stdlib.h>
-#include <malloc.h>
+#include <stdlib.h>
 #include "runtime.h"
 
 #include <netdb.h>

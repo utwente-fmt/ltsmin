@@ -38,7 +38,7 @@
 
 #include "set.h"
 #include "runtime.h"
-#include <malloc.h>
+#include <stdlib.h>
 
 #define EMPTY_LIST -1
 

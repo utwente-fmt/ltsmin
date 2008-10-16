@@ -6,8 +6,8 @@
 #include <fcntl.h>
 #ifdef __linux__
 #include <aio.h>
-#include <malloc.h>
 #endif
+#include <stdlib.h>
 
 struct raf_struct_s {
 	struct raf_object shared;
@@ -151,8 +151,10 @@ raf_t raf_unistd(char *name){
 	raf->shared.size=Psize;
 	raf->shared.resize=Presize;
 	raf->shared.close=Pclose;
+#ifdef __linux__
 	raf->request.aio_fildes=fd;
 	raf->request.aio_reqprio=0;
+#endif
 	return raf;
 }
 

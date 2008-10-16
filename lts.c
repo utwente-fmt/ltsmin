@@ -3,7 +3,7 @@
 #include <unistd.h>
 #include "runtime.h"
 #include <string.h>
-#include <malloc.h>
+#include <stdlib.h>
 #include <sys/types.h>
 #include <stdlib.h>
 

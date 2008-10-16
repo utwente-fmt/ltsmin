@@ -1,6 +1,6 @@
 #include "stream_object.h"
 #include "runtime.h"
-#include <malloc.h>
+#include <stdlib.h>
 #include <string.h>
 #include <zlib.h>
 

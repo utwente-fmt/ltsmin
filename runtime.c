@@ -1,9 +1,9 @@
-
 #include "runtime.h"
 #include <stdlib.h>
 #include <errno.h>
 #include <stdio.h>
 #include <stdarg.h>
+#include "unix.h"
 
 pthread_key_t jmp_key;
 
@@ -11,7 +11,7 @@ pthread_key_t jmp_key;
 
 static pthread_key_t label_key;
 
-log_t err=NULL;
+log_t error=NULL;
 log_t info=NULL;
 
 void set_label(const char* fmt,...){

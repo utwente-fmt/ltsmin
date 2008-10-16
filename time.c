@@ -4,7 +4,7 @@
 #include <unistd.h>
 #include "runtime.h"
 #include "time.h"
-#include <malloc.h>
+#include <stdlib.h>
 
 struct timer {
 	clock_t	real_time;

@@ -1,8 +1,7 @@
 
 #include "stream_object.h"
 #include "runtime.h"
-#include <malloc.h>
-#include <byteswap.h>
+#include <stdlib.h>
 #include <zlib.h>
 
 struct stream_s {
