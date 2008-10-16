@@ -5,7 +5,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "data_io.h"
+#include "stream.h"
 #include "config.h"
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -46,10 +46,10 @@ void dlts_free(dlts_t lts){
 }
 
 void dlts_getinfo(dlts_t lts){
-	data_stream_t ds;
+	stream_t ds;
 	int i,j,version,dummy;
 
-	ds=DScreate(arch_read(lts->arch,"info"),SWAP_NETWORK);
+	ds=arch_read(lts->arch,"info","auto");
 	version=DSreadU32(ds);
 	if (version!=31) Fatal(1,error,"wrong file version: %d",version);
 	lts->info=DSreadSA(ds);
@@ -90,7 +90,7 @@ void dlts_getinfo(dlts_t lts){
 
 void dlts_getTermDB(dlts_t lts){
 	int N=lts->label_count;
-	data_stream_t ds=DScreate(arch_read(lts->arch,"TermDB"),SWAP_NETWORK);
+	stream_t ds=arch_read(lts->arch,"TermDB","auto");
 	char **label=RTmalloc(N*sizeof(char*));
 	for(int i=0;i<N;i++){
 		//Warning(info,"reading label %d",i);
@@ -106,7 +106,7 @@ void dlts_load_src(dlts_t lts,int from,int to){
 	int *data;
 
 	sprintf(name,"src-%d-%d",from,to);
-	data_stream_t ds=DScreate(arch_read(lts->arch,name),SWAP_NETWORK);
+	stream_t ds=arch_read(lts->arch,name,"auto");
 	data=(int*)RTmalloc((lts->transition_count[from][to])*sizeof(int));
 	for(i=0;i<lts->transition_count[from][to];i++){
 		data[i]=DSreadU32(ds);
@@ -120,7 +120,7 @@ void dlts_load_label(dlts_t lts,int from,int to){
 	int *data;
 
 	sprintf(name,"label-%d-%d",from,to);
-	data_stream_t ds=DScreate(arch_read(lts->arch,name),SWAP_NETWORK);
+	stream_t ds=arch_read(lts->arch,name,"auto");
 	data=(int*)RTmalloc((lts->transition_count[from][to])*sizeof(int));
 	for(i=0;i<lts->transition_count[from][to];i++){
 		data[i]=DSreadU32(ds);
@@ -134,7 +134,7 @@ void dlts_load_dest(dlts_t lts,int from,int to){
 	int *data;
 
 	sprintf(name,"dest-%d-%d",from,to);
-	data_stream_t ds=DScreate(arch_read(lts->arch,name),SWAP_NETWORK);
+	stream_t ds=arch_read(lts->arch,name,"auto");
 	data=(int*)RTmalloc((lts->transition_count[from][to])*sizeof(int));
 	for(i=0;i<lts->transition_count[from][to];i++){
 		data[i]=DSreadU32(ds);

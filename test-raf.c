@@ -8,7 +8,7 @@ int main(int argc,char*argv[]){
 	set_label("%s",argv[0]);
 	Warning(info,"testing");
 	uint32_t BUFSIZE=prop_get_U32("bs",512);
-	int len,i;
+	int i;
 	char buf[BUFSIZE];
 	int val=prop_get_U32("val",0);
 	for(i=0;i<BUFSIZE;i++) buf[i]=val;

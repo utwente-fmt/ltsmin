@@ -23,10 +23,10 @@ lts_t lts_create(){
 }
 
 void lts_free(lts_t lts){
-	realloc(lts->begin,0);
-	realloc(lts->src,0);
-	realloc(lts->label,0);
-	realloc(lts->dest,0);
+	free(lts->begin);
+	free(lts->src);
+	free(lts->label);
+	free(lts->dest);
 	free(lts);
 }
 
@@ -137,12 +137,18 @@ void lts_set_size(lts_t lts,u_int32_t states,u_int32_t transitions){
 		case LTS_BLOCK_INV:
 			lts->begin=(u_int32_t*)realloc(lts->begin,sizeof(u_int32_t)*(states+1));
 			if (lts->begin==NULL) Fatal(1,error,"out of memory in lts_set_size");
+			break;
+		case LTS_LIST:
+			break;
 	}
 	switch(lts->type){
 		case LTS_LIST:
 		case LTS_BLOCK_INV:
 			lts->src=(u_int32_t*)realloc(lts->src,sizeof(u_int32_t)*transitions);
 			if (lts->src==NULL&&transitions!=0) Fatal(1,error,"out of memory in lts_set_size");
+			break;
+		case LTS_BLOCK:
+			break;
 	}
 	switch(lts->type){
 		case LTS_LIST:
@@ -150,12 +156,16 @@ void lts_set_size(lts_t lts,u_int32_t states,u_int32_t transitions){
 		case LTS_BLOCK_INV:
 			lts->label=(u_int32_t*)realloc(lts->label,sizeof(u_int32_t)*transitions);
 			if (lts->label==NULL&&transitions!=0) Fatal(1,error,"out of memory in lts_set_size");
+			break;
 	}
 	switch(lts->type){
 		case LTS_LIST:
 		case LTS_BLOCK:
 			lts->dest=(u_int32_t*)realloc(lts->dest,sizeof(u_int32_t)*transitions);
 			if (lts->dest==NULL&&transitions!=0) Fatal(1,error,"out of memory in lts_set_size");
+			break;
+		case LTS_BLOCK_INV:
+			break;
 	}
 }
 

@@ -4,13 +4,17 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#ifdef __linux__
 #include <aio.h>
 #include <malloc.h>
+#endif
 
 struct raf_struct_s {
 	struct raf_object shared;
 	int fd;
+#ifdef __linux__
 	struct aiocb request;
+#endif
 };
 
 void raf_read(raf_t raf,void*buf,size_t len,off_t ofs){
@@ -56,6 +60,7 @@ static void Pwrite(raf_t raf,void*buf,size_t len,off_t ofs){
 	}
 }
 
+#ifdef __linux__
 
 static void AIOwrite(raf_t raf,void*buf,size_t len,off_t ofs){
 	raf->request.aio_buf=buf;
@@ -75,6 +80,8 @@ static void AIOwait(raf_t raf){
 		FatalCall(1,error,"aio_error for %s",raf->shared.name);
 	}
 }
+
+#endif
 
 static off_t Psize(raf_t raf){
 	struct stat info;
@@ -137,8 +144,10 @@ raf_t raf_unistd(char *name){
 	raf->fd=fd;
 	raf->shared.read=Pread;
 	raf->shared.write=Pwrite;
+#ifdef __linux__
 	raf->shared.awrite=AIOwrite;
 	raf->shared.await=AIOwait;
+#endif
 	raf->shared.size=Psize;
 	raf->shared.resize=Presize;
 	raf->shared.close=Pclose;
