@@ -8,6 +8,12 @@ MPICC=mpicc -DUSE_MPI
 MPILD=mpicc
 OPT=-O4 -g
 
+ifeq (Linux,$(shell uname -s))
+ARCH_LIBS=-lrt
+else
+ARCH_LIBS=
+endif
+
 mcrl:=$(shell which mcrl 2>/dev/null)
 ifeq ($(mcrl),)
 $(warning mCRL not found)
@@ -42,11 +48,11 @@ endif
 ifneq (, $(findstring $(ARCH), i386 i486 i586))
 LDFLAGS=-m32 -pthread
 CFLAGS=-m32 -std=c99 -Wall $(OPT) -D_FILE_OFFSET_BITS=64 -pthread $(BCG_FLAGS)
-LIBS=$(BCG_LIBS) -lz
+LIBS=$(BCG_LIBS) -lz $(ARCH_LIBS)
 else
 $(warning assuming 64 bit environment)
 CFLAGS=-m64 -std=c99 -Wall $(OPT) -pthread
-LIBS=-lz
+LIBS=-lz $(ARCH_LIBS)
 LDFLAGS=-m64 -pthread
 endif
 

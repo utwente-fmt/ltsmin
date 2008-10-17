@@ -26,9 +26,10 @@
 #include <byteswap.h>
 #define HAVE_STRNDUP
 #else
-#error Don't know how to deal with endianness on this platform.
+#error "Don't know how to deal with endianness on this platform."
 #endif
 
 #define NAME_MAX 1024
 
 #endif
+
