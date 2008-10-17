@@ -37,18 +37,15 @@ int main(int argc, char *argv[]){
 		Fatal(1,error,"basename should be ltscompress or ltsuncompress, not %s",appl);
 	}
 	if (strstr(argv[1],"%s")){
-		ar_in=arch_fmt(argv[1],file_input,file_output,prop_get_U32("bs",65536));
+		ar_in=arch_fmt(argv[1],file_input,file_output,prop_get_U32("bs",blocksize));
 	} else {
-		uint32_t bs=prop_get_U32("bs",65536);
-		uint32_t bc=prop_get_U32("bc",128);
-		ar_in=arch_gcf_create(raf_unistd(argv[1]),bs,bs*bc,0,1);
+		ar_in=arch_gcf_read(raf_unistd(argv[1]));
 	}
 	if (strstr(argv[2],"%s")){
-		ar_out=arch_fmt(argv[2],file_input,file_output,prop_get_U32("bs",65536));
+		ar_out=arch_fmt(argv[2],file_input,file_output,prop_get_U32("bs",blocksize));
 	} else {
-		uint32_t bs=prop_get_U32("bs",65536);
 		uint32_t bc=prop_get_U32("bc",128);
-		ar_out=arch_gcf_create(raf_unistd(argv[2]),bs,bs*bc,0,1);
+		ar_out=arch_gcf_create(raf_unistd(argv[2]),blocksize,blocksize*bc,0,1);
 	}
 	stream_t ds;
 	ds=arch_read(ar_in,"info",in_code);
