@@ -22,11 +22,14 @@ extern void lts_set_labels(lts_t lts,uint64_t count);
 extern uint64_t lts_get_labels(lts_t lts);
 
 extern int lts_has_tau(lts_t lts);
-extern void lts_set_tau(lts_t lts,uint64_t tau);
-extern uint64_t lts_get_tau(lts_t lts);
+extern void lts_set_tau(lts_t lts,uint32_t tau);
+extern uint32_t lts_get_tau(lts_t lts);
 
 extern void lts_set_comment(lts_t lts,char*comment);
 extern char* lts_get_comment(lts_t lts);
+
+extern void lts_set_segments(lts_t lts,int N);
+extern int lts_get_segments(lts_t lts);
 
 extern lts_t lts_create();
 

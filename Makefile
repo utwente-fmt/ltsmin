@@ -22,7 +22,7 @@ else
 p1=$(shell dirname $(mcrl))
 MCRL=$(shell dirname $(p1))/mCRL
 $(warning mCRL found in $(MCRL))
-mcrlall=mpi-inst
+mcrlall=instantiator-mpi
 endif
 
 MACHINE := $(subst -, ,$(shell $(CC) -dumpmachine))
@@ -56,13 +56,16 @@ LIBS=-lz $(ARCH_LIBS)
 LDFLAGS=-m64 -pthread
 endif
 
-all: .depend $(bcgall) gsf2ar ar2gsf mkar sdd \
-	par_wr par_rd seq_wr seq_rd mpi_rw_test mpi_min
+BINARIES= $(bcgall) $(mcrlall) ltsmin-mpi ltscompress ltsuncompress \
+	gsf2ar ar2gsf mkar sdd par_wr par_rd seq_wr seq_rd mpi_rw_test
 
+all: .depend $(BINARIES)
 
+distclean: clean
+	$(RM) -f $(BINARIES)
 
-
-# mpi_min $(mcrlall) dir2gcf gcf2dir
+ltsuncompress: ltscompress
+	/bin/cp -f ltscompress ltsuncompress
 
 docs:
 	doxygen docs.cfg
@@ -79,10 +82,13 @@ clean:: .depend
 
 .SUFFIXES: .o .c .h
 
-mpi-inst.o: mpi-inst.c
+instantiator-mpi.o: instantiator-mpi.c
 	$(MPICC) $(CFLAGS) -I$(MCRL)/include -c $<
 
 mpi%.o: mpi%.c
+	$(MPICC) $(CFLAGS) -c $<
+
+%-mpi.o: %-mpi.c
 	$(MPICC) $(CFLAGS) -c $<
 
 .c.o:
@@ -106,14 +112,21 @@ libmpi.a: mpi_io_stream.o mpi_core.o mpi_raf.o mpi_ram_raf.o
 	$(RANLIB) $@
 
 
-mpi_min:  mpi_min.o set.o lts.o dlts.o libmpi.a libutil.a
+ltsmin-mpi:  ltsmin-mpi.o set.o lts.o dlts.o libmpi.a libutil.a
 	$(MPILD) $(LDFLAGS) -o $@ $^ $(LIBS)
 
-mpi-inst: mpi-inst.o libmpi.a libutil.a
+instantiator-mpi: instantiator-mpi.o libmpi.a libutil.a
 	$(MPILD) $(LDFLAGS) -o $@ $^ $(LIBS) -L$(MCRL)/lib -ldl -lATerm -lmcrl -lstep -lmcrlunix -lexplicit -lz
 
 mpi%: mpi%.o libmpi.a libutil.a
 	$(MPILD) $(LDFLAGS) -o $@ $^ $(LIBS)
 
+%-mpi: %-mpi.o libmpi.a libutil.a
+	$(MPILD) $(LDFLAGS) -o $@ $^ $(LIBS)
+
+lts%: lts%.o libutil.a
+	$(LD) $(LDFLAGS) -o $@ $^ $(LIBS)
+
 %: %.o libutil.a
 	$(LD) $(LDFLAGS) -o $@ $^ $(LIBS)
+
