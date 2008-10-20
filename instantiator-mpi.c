@@ -29,13 +29,11 @@ static int verbosity=1;
 static char *outputfmt=NULL;
 static char *outputgcf=NULL;
 static int write_lts=1;
-//static int write_pi=0;
-//static int write_si=0;
-//static int write_dlk=0;
 static int nice_value=0;
 static int master_no_step=0;
 static int no_step=0;
 static int loadbalancing=1;
+static int plain=0;
 
 static int st_help(char* opt,char*optarg,void *arg){
 	SThelp();
@@ -61,15 +59,11 @@ struct option options[]={
 		"disable load balancing"},
 	{"-nolts",OPT_NORMAL,reset_int,&write_lts,NULL,
 		"disable writing of the bare LTS"},
-//	{"-pi",OPT_NORMAL,set_int,&write_pi,NULL,
-//		"enable writing of parent information"},
-//	{"-dlk",OPT_NORMAL,set_int,&write_dlk,NULL,
-//		"enable writing of deadlock information"},
-//	{"-si",OPT_NORMAL,set_int,&write_si,NULL,
-//		"enable writing of state information information"},
 	{"-nice",OPT_REQ_ARG,parse_int,&nice_value,"-nice <val>",
 		"all workers will set nice to <val>",
 		"useful when running on other people's workstations"},
+	{"-plain",OPT_NORMAL,set_int,&plain,NULL,
+		"disable compression of the output"},
 	{"-cmp",OPT_NORMAL,set_int,&compare_terms,NULL,
 		"compare terms in term vector",
 		"useful if the representation of data is not unique",
@@ -90,14 +84,6 @@ static char who[24];
 static stream_t *output_src=NULL;
 static stream_t *output_label=NULL;
 static stream_t *output_dest=NULL;
-
-/*
-static stream_t parent_seg=NULL;
-static stream_t parent_ofs=NULL;
-static stream_t parent_lbl=NULL;
-
-static stream_t target_file=NULL;
-*/
 
 static int *tcount;
 
@@ -129,14 +115,6 @@ static struct submit_msg {
 	int state[MAX_PARAMETERS];
 } submit_msg;
 
-/*
-static struct target_msg {
-	int offset;
-} target_msg;
-*/
-
-#define TARGET_TAG 8
-#define TARGET_SIZE sizeof(struct target_msg)
 #define SUBMIT_TAG 7
 #define SUBMIT_SIZE sizeof(struct submit_msg)
 #define IDLE_TAG 6
@@ -362,7 +340,7 @@ int main(int argc, char*argv[]){
         MPI_Comm_size(MPI_COMM_WORLD, &mpi_nodes);
         MPI_Comm_rank(MPI_COMM_WORLD, &mpi_me);
 	sprintf(who,"inst-mpi(%2d)",mpi_me);
-	runtime_init_args(&argc,&argv);
+	RTinit(argc,&argv);
 	set_label(who);
 	if (mpi_me==0){
 		lvl_temp=(int*)malloc(mpi_nodes*sizeof(int));
@@ -440,40 +418,14 @@ int main(int argc, char*argv[]){
 		output_dest=(stream_t*)malloc(mpi_nodes*sizeof(FILE*));
 		for(i=0;i<mpi_nodes;i++){
 			sprintf(name,"src-%d-%d",i,mpi_me);
-			output_src[i]=arch_write(arch,name,"diff32|gzip");
+			output_src[i]=arch_write(arch,name,plain?NULL:"diff32|gzip");
 			sprintf(name,"label-%d-%d",i,mpi_me);
-			output_label[i]=arch_write(arch,name,"gzip");
+			output_label[i]=arch_write(arch,name,plain?NULL:"gzip");
 			sprintf(name,"dest-%d-%d",i,mpi_me);
-			output_dest[i]=arch_write(arch,name,"diff32|gzip");
+			output_dest[i]=arch_write(arch,name,plain?NULL:"diff32|gzip");
 			tcount[i]=0;
 		}
 	}
-	/***************************************************/
-/*
-	if (write_pi) {
-		sprintf(name,"%s/parent-seg-%d",outputdir,mpi_me);
-		parent_seg=fopen(name,"wb");
-		sprintf(name,"%s/parent-ofs-%d",outputdir,mpi_me);
-		parent_ofs=fopen(name,"wb");
-		sprintf(name,"%s/parent-lbl-%d",outputdir,mpi_me);
-		parent_lbl=fopen(name,"wb");
-		if (mpi_me==0){
-			fwrite8(parent_seg,0);
-			fwrite32(parent_ofs,0);
-			fwrite32(parent_lbl,0);
-			parent_next=1;
-		} else {
-			parent_next=0;
-		}
-	}
-*/
-	/***************************************************/
-/*
-	if (write_dlk) {
-		sprintf(name,"%s/target-%d",outputdir,mpi_me);
-		target_file=fopen(name,"wb");
-	}
-*/
 	/***************************************************/
 	MCRLinitialize();
 	if (sequential_init_rewriter){
@@ -495,7 +447,7 @@ int main(int argc, char*argv[]){
 	TreeDBSinit(size,1);
 	/***************************************************/
 	if (mpi_me==0) {
-		map=ATmapCreate(arch_write(arch,"TermDB","gzip"));
+		map=ATmapCreate(arch_write(arch,"TermDB",plain?NULL:"gzip"));
 	} else {
 		map=ATmapCreate(NULL);
 	}
@@ -548,15 +500,6 @@ int main(int argc, char*argv[]){
 					}
 				}
 			}
-			/* Handle deadlock reports. */
-/*
-			if (write_dlk) for(;;) {
-				MPI_Iprobe(MPI_ANY_SOURCE,TARGET_TAG,MPI_COMM_WORLD,&found,&status);
-				if (!found) break;
-				MPI_Recv(&target_msg,TARGET_SIZE,MPI_CHAR,MPI_ANY_SOURCE,TARGET_TAG,MPI_COMM_WORLD,&status);
-				fwrite32(target_file,target_msg.offset);
-			}
-*/
 			/* Handle incoming transitions. */
 			for(;;) {
 				MPI_Iprobe(MPI_ANY_SOURCE,WORK_TAG,MPI_COMM_WORLD,&found,&status);
@@ -576,14 +519,6 @@ int main(int argc, char*argv[]){
 					DSwriteU32(output_label[work_msg.src_worker],work_msg.label);
 					DSwriteU32(output_dest[work_msg.src_worker],temp[1]);
 				}
-/*
-				if (write_pi && temp[1]==parent_next) {
-					fwrite8(parent_seg,work_msg.src_worker);
-					fwrite32(parent_ofs,work_msg.src_number);
-					fwrite32(parent_lbl,work_msg.label);
-					parent_next++;
-				}
-*/
 				tcount[work_msg.src_worker]++;
 				transitions++;
 			}
@@ -656,13 +591,6 @@ int main(int argc, char*argv[]){
 				//ATwarning("stepping %d.%d",work_msg.src_worker,work_msg.src_number);
 				count=STstep(src);
 				if (count<0) ATerror("error in STstep");
-/*
-				if (count==0 && write_dlk) {
-					if (verbosity) ATwarning("state %d.%d is a deadlock",work_msg.src_worker,work_msg.src_number);
-					target_msg.offset=work_msg.src_number;
-					MPI_Send(&target_msg,TARGET_SIZE,MPI_CHAR,work_msg.src_worker,TARGET_TAG,MPI_COMM_WORLD);
-				}
-*/
 				lvl_scount++;
 				lvl_tcount+=count;
 				if ((lvl_scount%1000)==0) {
@@ -756,13 +684,6 @@ int main(int argc, char*argv[]){
 			DSclose(&output_dest[i]);
 		}
 	}
-/*
-	if (write_pi) {
-		fclose(parent_seg);
-		fclose(parent_ofs);
-		fclose(parent_lbl);
-	}
-*/
 	{
 	int *temp=NULL;
 	int tau;
@@ -772,7 +693,7 @@ int main(int argc, char*argv[]){
 			tau=ATerm2int(map,MCRLterm_tau);
 			DSclose(&(map->TermDB));
 			/* Start writing the info file. */
-			info=arch_write(arch,"info","");
+			info=arch_write(arch,"info",plain?NULL:"");
 			DSwriteU32(info,31);
 			DSwriteS(info,"generated by mpi-inst");
 			DSwriteU32(info,mpi_nodes);
@@ -809,16 +730,6 @@ int main(int argc, char*argv[]){
 			}
 		}
 	}
-/*
-	if (write_si) {
-		sprintf(name,"%s/node-%%d-%d",outputdir,mpi_me);
-		WriteDBS(name);
-	}
-	if (write_dlk) {
-		fclose(target_file);
-	}
-*/
-
 	arch_close(&arch);
 	MPI_Finalize();
 

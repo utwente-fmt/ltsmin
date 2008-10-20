@@ -8,6 +8,7 @@
 
 typedef struct dlts {
 	archive_t arch;
+	char *decode;
 	char *info;
 	int segment_count;
 	int root_seg;

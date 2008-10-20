@@ -15,7 +15,7 @@
 
 #define SYNCH_BUFFER_SIZE 8000
 
-static int branching;
+static int branching=0;
 static int synch_receive_buffer[SYNCH_BUFFER_SIZE];
 static int synch_request;
 static int synch_answer;
@@ -26,6 +26,69 @@ static int* synch_set=NULL;
 static int* synch_id=NULL;
 static int synch_pending;
 static int tau;
+
+
+#define STRONG_REDUCTION_SET 1
+#define BRANCHING_REDUCTION_SET 2
+
+static int action=STRONG_REDUCTION_SET;
+static int plain=0;
+
+static int select_branching_reduction(char* opt,char*optarg,void *arg){
+	branching=1;
+	if(optarg==NULL){
+		action=BRANCHING_REDUCTION_SET;
+		return OPT_OK;
+	}
+	if (!strcmp(optarg,"set")) {
+		action=BRANCHING_REDUCTION_SET;
+		return OPT_OK;
+	}
+	Warning(info,"unknown branching bisimulation method: %s",optarg);
+	return OPT_USAGE;
+}
+
+static int select_strong_reduction(char* opt,char*optarg,void *arg){
+	branching=0;
+	if(optarg==NULL){
+		action=STRONG_REDUCTION_SET;
+		return OPT_OK;
+	}
+	if (!strcmp(optarg,"set")) {
+		action=STRONG_REDUCTION_SET;
+		return OPT_OK;
+	}
+	Warning(info,"unknown strong bisimulation method: %s",optarg);
+	return OPT_USAGE;
+}
+
+struct option options[]={
+	{"",OPT_NORMAL,NULL,NULL,NULL,	"usage: ltsmin-mpi options input output",
+		"This tool reduces a labeled transition system modulo bisimulation.",
+		"The default bisimulation is strong bisimulation."},
+	{"",OPT_NORMAL,NULL,NULL,NULL,
+		"Both input and output can be a GCF archive or a set of files.",
+		"To use a set of files the argument needs and occurrence of %s.",
+		"If no %s is present then a GCF archive is assumed."},
+	{"-plain",OPT_NORMAL,set_int,&plain,NULL,
+		"Disable compression of the output.",
+		"The tool detects if the input is compressed or not."},
+	{"-s",OPT_NORMAL,select_strong_reduction,NULL,"-s","apply strong bisimulation reduction"},
+	{"-b",OPT_NORMAL,select_branching_reduction,NULL,"-b","apply branching bisimulation reduction"},
+	{"-q",OPT_NORMAL,log_suppress,&info,"-q","do not print info messages"},
+	{"-help",OPT_NORMAL,usage,NULL,NULL,
+		"print this help message"},
+/* for future use
+	{"-S",OPT_REQ_ARG,select_strong_reduction,NULL,"-S method",
+		"apply alternative strong bisimulation reduction method",
+		"method is set"},
+	{"-B",OPT_REQ_ARG,select_branching_reduction,NULL,"-B method",
+		"apply alternative branching bisimulation reduction method",
+		"method is set"},
+*/
+	{0}
+};
+
 
 static void synch_request_service(void *arg,MPI_Status*probe_stat){
 	MPI_Status status,*recv_status=&status;
@@ -205,18 +268,29 @@ int main(int argc,char **argv){
 /*
 	verbosity=1;
 */
-	runtime_init_args(&argc,&argv);
+	RTinit(argc,&argv);
 	core_init();
-	set_label("bsim2mpi(%d/%d)",mpi_me,mpi_nodes);
-	if (!strcmp(argv[1],"s")){
-		if(mpi_me==0) Warning(info,"strong bisimulation reduction");
-		branching=0;
-	} else if (!strcmp(argv[1],"b")){
-		if(mpi_me==0) Warning(info,"branching bisimulation reduction");
-		branching=1;
-	} else {
-		Fatal(1,error,"specify b or s");
+	set_label("bsim2mpi(%2d)",mpi_me);
+	if(mpi_me!=0) core_barrier();
+	take_vars(&argc,argv);
+	take_options(options,&argc,argv);
+	if (argc!=3) {
+		Warning(info,"wrong number of options %d",argc);
+		printoptions(options);
+		MPI_Abort(MPI_COMM_WORLD,1);
 	}
+	if (mpi_me==0) switch(action){
+	case STRONG_REDUCTION_SET:
+		Warning(info,"reduction modulp strong bisimulation");
+		break;
+	case BRANCHING_REDUCTION_SET:
+		Warning(info,"reduction modulo branching bisimulation");
+		break;
+	default:
+		printoptions(options);
+		MPI_Abort(MPI_COMM_WORLD,1);
+	}
+	if(mpi_me==0) core_barrier();
 	synch_request=core_add(NULL,synch_request_service);
 	synch_answer=core_add(NULL,synch_answer_service);
 	if(branching){
@@ -227,23 +301,18 @@ int main(int argc,char **argv){
 	if (mpi_me==0) SCCstartTimer(timer);
 	core_barrier();
 	lts=dlts_create();
-	if (strstr(argv[2],"%s")) {
-		lts->arch=arch_fmt(argv[2],mpi_io_read,mpi_io_write,prop_get_U32("bs",65536));
+	if (strstr(argv[1],"%s")) {
+		lts->arch=arch_fmt(argv[1],mpi_io_read,mpi_io_write,prop_get_U32("bs",65536));
 	} else {
-		//lts->arch=arch_gcf_read(MPI_Create_raf(argv[2],MPI_COMM_WORLD));
-		//lts->arch=arch_gcf_read(MPI_Load_raf(argv[2],MPI_COMM_WORLD));
-		//core_barrier();
-		//arch_close(&(lts->arch));
-		//core_barrier();
 		if (prop_get_U32("load",1)) {
 			//Warning(info,"loading");
-			raf_t raf=MPI_Load_raf(argv[2],MPI_COMM_WORLD);
+			raf_t raf=MPI_Load_raf(argv[1],MPI_COMM_WORLD);
 			core_barrier();
 			lts->arch=arch_gcf_read(raf);
 			core_barrier();
 			//Warning(info,"archive opened");
 		} else {
-			lts->arch=arch_gcf_read(MPI_Create_raf(argv[2],MPI_COMM_WORLD));
+			lts->arch=arch_gcf_read(MPI_Create_raf(argv[1],MPI_COMM_WORLD));
 		}
 	}
 	//Warning(info,"got the archive");
@@ -670,12 +739,12 @@ int main(int argc,char **argv){
 	core_barrier();
 
 	archive_t arch;
-	if (strstr(argv[3],"%s")){
-		arch=arch_fmt(argv[3],mpi_io_read,mpi_io_write,prop_get_U32("bs",65536));
+	if (strstr(argv[2],"%s")){
+		arch=arch_fmt(argv[2],mpi_io_read,mpi_io_write,prop_get_U32("bs",65536));
 	} else {
 		uint32_t bs=prop_get_U32("bs",65536);
 		uint32_t bc=prop_get_U32("bc",128);
-		arch=arch_gcf_create(MPI_Create_raf(argv[3],MPI_COMM_WORLD),bs,bs*bc,mpi_me,mpi_nodes);
+		arch=arch_gcf_create(MPI_Create_raf(argv[2],MPI_COMM_WORLD),bs,bs*bc,mpi_me,mpi_nodes);
 	}
 	
 	output_src=(stream_t*)RTmalloc(mpi_nodes*sizeof(FILE*));
@@ -685,11 +754,11 @@ int main(int argc,char **argv){
 	for(i=0;i<mpi_nodes;i++){
 		char name[1024];
 		sprintf(name,"src-%d-%d",i,mpi_me);
-		output_src[i]=arch_write(arch,name,"diff32|gzip");
+		output_src[i]=arch_write(arch,name,plain?NULL:"diff32|gzip");
 		sprintf(name,"label-%d-%d",i,mpi_me);
-		output_label[i]=arch_write(arch,name,"gzip");
+		output_label[i]=arch_write(arch,name,plain?NULL:"gzip");
 		sprintf(name,"dest-%d-%d",i,mpi_me);
-		output_dest[i]=arch_write(arch,name,"diff32|gzip");
+		output_dest[i]=arch_write(arch,name,plain?NULL:"diff32|gzip");
 		tcount[i]=0;
 	}
 	write_tag=core_add(NULL,write_service);
@@ -727,14 +796,14 @@ int main(int argc,char **argv){
 	stream_t infos;
 	int *temp=NULL;
 	if (mpi_me==0){
-		stream_t ds=arch_write(arch,"TermDB","gzip");
+		stream_t ds=arch_write(arch,"TermDB",plain?NULL:"gzip");
 		for(i=0;i<lts->label_count;i++){
 			char*ln=lts->label_string[i];
 			DSwrite(ds,ln,strlen(ln));
 			DSwrite(ds,"\n",1);
 		}
 		DSclose(&ds);
-		infos=arch_write(arch,"info","");
+		infos=arch_write(arch,"info",plain?NULL:"");
 		DSwriteU32(infos,31);
 		DSwriteS(infos,"generated by mpi_min");
 		DSwriteU32(infos,mpi_nodes);

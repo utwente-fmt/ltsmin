@@ -174,15 +174,32 @@ static lts_t create_info_v31(stream_t ds) {
 	return lts;
 }
 
-lts_t lts_read(stream_t ds){
+lts_t lts_read(stream_t ds,int*header_found){
 	char description[1024];
 	DSreadS(ds,description,1024);
-	if (strlen(description)!=0) {
-		Fatal(0,error,"cannot read %s format",description);
+	if (strlen(description)==0) {
+		switch(DSreadU16(ds)){
+		case 0:
+			if (DSreadU16(ds)!=31) {
+				Fatal(0,error,"cannot identify input format");
+				return NULL;
+			}
+			Log(info,"input uses headers");
+			*header_found=1;
+			return create_info_v31(ds);
+		case 31:
+			*header_found=0;
+			Log(info,"input has no headers");
+			return create_info_v31(ds);
+		default:
+			Fatal(0,error,"cannot identify input format");
+			return NULL;
+		}
 	}
-	if (DSreadU16(ds)==31){
-		return create_info_v31(ds);
-	}
+	Log(info,"input uses headers");
+	*header_found=1;
+	ds=stream_setup(ds,description);
+	if (DSreadU32(ds)!=31) return create_info_v31(ds);
 	Fatal(0,error,"cannot identify input format");
 	return NULL;
 }

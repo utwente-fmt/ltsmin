@@ -49,8 +49,20 @@ void dlts_getinfo(dlts_t lts){
 	stream_t ds;
 	int i,j,version,dummy;
 
-	ds=arch_read(lts->arch,"info","auto");
+	ds=arch_read(lts->arch,"info",NULL);
 	version=DSreadU32(ds);
+
+/* If info is compressed with "" then the file starts with 00 00 00 00 00 1f
+   If info is uncompressed       then the file starts with 00 00 00 1f
+ */
+	if (version==0) {
+		Warning(info,"detected compressed input",lts->decode);
+		lts->decode="auto";
+		version=DSreadU16(ds);
+	} else {
+		Warning(info,"detected uncompressed input");
+		lts->decode=NULL;
+	}
 	if (version!=31) Fatal(1,error,"wrong file version: %d",version);
 	lts->info=DSreadSA(ds);
 	Warning(info,"info field is %s",lts->info);
@@ -90,7 +102,7 @@ void dlts_getinfo(dlts_t lts){
 
 void dlts_getTermDB(dlts_t lts){
 	int N=lts->label_count;
-	stream_t ds=arch_read(lts->arch,"TermDB","auto");
+	stream_t ds=arch_read(lts->arch,"TermDB",lts->decode);
 	char **label=RTmalloc(N*sizeof(char*));
 	for(int i=0;i<N;i++){
 		//Warning(info,"reading label %d",i);
@@ -106,7 +118,7 @@ void dlts_load_src(dlts_t lts,int from,int to){
 	int *data;
 
 	sprintf(name,"src-%d-%d",from,to);
-	stream_t ds=arch_read(lts->arch,name,"auto");
+	stream_t ds=arch_read(lts->arch,name,lts->decode);
 	data=(int*)RTmalloc((lts->transition_count[from][to])*sizeof(int));
 	for(i=0;i<lts->transition_count[from][to];i++){
 		data[i]=DSreadU32(ds);
@@ -120,7 +132,7 @@ void dlts_load_label(dlts_t lts,int from,int to){
 	int *data;
 
 	sprintf(name,"label-%d-%d",from,to);
-	stream_t ds=arch_read(lts->arch,name,"auto");
+	stream_t ds=arch_read(lts->arch,name,lts->decode);
 	data=(int*)RTmalloc((lts->transition_count[from][to])*sizeof(int));
 	for(i=0;i<lts->transition_count[from][to];i++){
 		data[i]=DSreadU32(ds);
@@ -134,7 +146,7 @@ void dlts_load_dest(dlts_t lts,int from,int to){
 	int *data;
 
 	sprintf(name,"dest-%d-%d",from,to);
-	stream_t ds=arch_read(lts->arch,name,"auto");
+	stream_t ds=arch_read(lts->arch,name,lts->decode);
 	data=(int*)RTmalloc((lts->transition_count[from][to])*sizeof(int));
 	for(i=0;i<lts->transition_count[from][to];i++){
 		data[i]=DSreadU32(ds);

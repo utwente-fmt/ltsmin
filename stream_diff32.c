@@ -64,7 +64,7 @@ static void diff_write(stream_t stream,void*buf,size_t count){
 }
 
 static void diff_close(stream_t *stream){
-	Warning(info,"closing stream, clear swap %d code swap %d",DSgetSwap(*stream),DSgetSwap((*stream)->s));
+	//Warning(info,"closing stream, clear swap %d code swap %d",DSgetSwap(*stream),DSgetSwap((*stream)->s));
 	stream_close(&((*stream)->s));
 	free(*stream);
 	*stream=NULL;
@@ -73,7 +73,6 @@ static void diff_close(stream_t *stream){
 static void diff_flush(stream_t stream){
 	stream_flush(stream->s);
 }
-
 
 stream_t stream_diff32(stream_t s){
 	stream_t ds=(stream_t)RTmalloc(sizeof(struct stream_s));

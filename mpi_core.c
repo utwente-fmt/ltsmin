@@ -146,10 +146,10 @@ void core_terminate(TERM_STRUCT*status){
 	if (mpi_me==0) {
 		term_message[0]=RUNNING;
 		for(i=0;;i++){
-			fprintf(stderr,"starting new termination round %d %d\n",status->dirty,status->count);
+			Log(debug,"starting new termination round %d %d\n",status->dirty,status->count);
 			if ((term_message[0]==IDLE)&&(!status->dirty)&&((term_message[1]+status->count)==0)) {
 				term_message[0]=TERMINATED;
-				fprintf(stderr,"termination detected in %d rounds\n",i);
+				Log(debug,"termination detected in %d rounds\n",i);
 				break;
 			}
 			term_message[0]=IDLE;
@@ -157,7 +157,7 @@ void core_terminate(TERM_STRUCT*status){
 			status->dirty=0;
 			MPI_Send(term_message,2,MPI_INT,mpi_nodes-1,term_tag,MPI_COMM_WORLD);
 			core_wait(term_tag);
-			fprintf(stderr,"reply is %d %d\n",term_message[0],term_message[1]);
+			Log(debug,"reply is %d %d\n",term_message[0],term_message[1]);
 		}
 	} else {
 		if (term_message[0]==TERMINATED) core_wait(term_tag);

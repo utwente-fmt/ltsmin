@@ -31,14 +31,15 @@ int main(int argc,char**argv){
 	Warning(info,"copying %s to %s",ar,bcg);
 	BCG_INIT();
 	Warning(info,"reading info");
-	ds=arch_read(dir,"info","auto");
-	lts=lts_read(ds);
+	ds=arch_read(dir,"info",NULL);
+	int decode;
+	lts=lts_read(ds,&decode);
 	DSclose(&ds);
-	BCG_IO_WRITE_BCG_BEGIN (bcg,lts_get_root(lts),2,lts_get_comment(lts),0);
+	BCG_IO_WRITE_BCG_BEGIN (bcg,lts_get_root(lts),1,lts_get_comment(lts),0);
 	int i,N;
 	N=lts_get_labels(lts);
 	Warning(info,"reading %d labels",N);
-	ds=arch_read(dir,"TermDB","auto");
+	ds=arch_read(dir,"TermDB",decode?"auto":NULL);
 	char **label=RTmalloc(N*sizeof(char*));
 	for(i=0;i<N;i++){
 		//Warning(info,"reading label %d",i);
@@ -47,9 +48,9 @@ int main(int argc,char**argv){
 	DSclose(&ds);
 	Warning(info,"copying transitions");
 	N=lts_get_trans(lts);
-	stream_t src=arch_read(dir,"src-0-0","auto");
-	stream_t lbl=arch_read(dir,"label-0-0","auto");
-	stream_t dst=arch_read(dir,"dest-0-0","auto");
+	stream_t src=arch_read(dir,"src-0-0",decode?"auto":NULL);
+	stream_t lbl=arch_read(dir,"label-0-0",decode?"auto":NULL);
+	stream_t dst=arch_read(dir,"dest-0-0",decode?"auto":NULL);
 	for(i=0;i<N;i++){
 		int s=DSreadU32(src);
                 int l=DSreadU32(lbl);

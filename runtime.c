@@ -4,15 +4,34 @@
 #include <stdio.h>
 #include <stdarg.h>
 #include "unix.h"
-
-pthread_key_t jmp_key;
+#include <libgen.h>
 
 #define LABEL_SIZE 1024
 
+struct runtime_log {
+	FILE*f;
+	char *tag;
+	int flags;
+};
+
+log_t create_log(FILE* f,char*tag,int flags){
+	log_t log=(log_t)RTmalloc(sizeof(struct runtime_log));
+	log->f=f;
+	log->tag=tag?strdup(tag):NULL;
+	log->flags=flags;
+	return log;
+}
+void log_set_flags(log_t log,int flags){
+	log->flags=flags;
+}
+
 static pthread_key_t label_key;
+
+void (*RThandleFatal)(char*file,int line,int errnum,int code);
 
 log_t error=NULL;
 log_t info=NULL;
+log_t debug=NULL;
 
 void set_label(const char* fmt,...){
 	va_list args;
@@ -28,11 +47,14 @@ static void label_destroy(void *buf){
 }
 
 static void log_begin(log_t log,int line,char*file){
-	fprintf(stderr,"%s, file %s, line %d: ",(char *) pthread_getspecific(label_key),file,line);
+	fprintf(log->f,"%s",(char *)pthread_getspecific(label_key));
+	if (log->flags & LOG_WHERE) fprintf(log->f,", file %s, line %d",file,line);
+	if (log->tag) fprintf(log->f,", %s",log->tag);
+	fprintf(log->f,": ");
 }
 
 static void log_va(log_t log,const char *fmt, va_list args){
-	vfprintf(stderr,fmt,args);
+	vfprintf(log->f,fmt,args);
 }
 
 static void log_to(log_t log,const char *fmt,...){
@@ -43,10 +65,19 @@ static void log_to(log_t log,const char *fmt,...){
 }
 
 static void log_end(log_t log){
-	fprintf(stderr,"\n");
+	fprintf(log->f,"\n");
 }
 
 void log_message(log_t log,char*file,int line,int errnum,const char *fmt,...){
+	struct runtime_log null_log;
+	if (!log) {
+		null_log.f=stderr;
+		null_log.tag=NULL;
+		null_log.flags=LOG_PRINT;
+		log=&null_log;
+	} else {
+		if ((log->flags & LOG_PRINT)==0) return;
+	}
 	va_list args;
 	va_start(args,fmt);
 	log_begin(log,line,file);
@@ -71,74 +102,20 @@ void log_message(log_t log,char*file,int line,int errnum,const char *fmt,...){
 	va_end(args);
 }
 
-
-void runtime_init(){
-	pthread_key_create(&jmp_key, NULL);
+void RTinit(int argc,char**argv[]){
+	RThandleFatal=NULL;
+	error=create_log(stderr,"ERROR",LOG_PRINT);
+	info=create_log(stderr,NULL,LOG_PRINT);
+	debug=create_log(stderr,NULL,LOG_PRINT);
 	pthread_key_create(&label_key, label_destroy);
-}
-
-static int prop_count=0;
-static char**prop_name;
-static char**prop_val;
-
-void runtime_init_args(int*argc,char**argv[]){
-	runtime_init();
-	char**keep=RTmalloc((*argc)*sizeof(char*));
-	prop_name=RTmalloc((*argc)*sizeof(char*));
-	prop_val=RTmalloc((*argc)*sizeof(char*));
-	keep[0]=(*argv)[0];
-	char*tmp=strrchr(keep[0],'/');
-	set_label("%s",tmp?tmp:keep[0]);
-	int kept=1;
-	for(int i=1;i<(*argc);i++){
-		//Warning(info,"argument %d is %s",i,(*argv)[i]);
-		char *pos=strchr((*argv)[i],'=');
-		if(pos){
-			char *name=strndup((*argv)[i],pos-((*argv)[i]));
-			char *val=strdup(pos+1);
-			//Warning(info,"property %s is %s",name,val);
-			prop_name[prop_count]=name;
-			prop_val[prop_count]=val;
-			prop_count++;
-		} else {
-			keep[kept]=(*argv)[i];
-			kept++;
-		}
+	char **copy=RTmalloc(argc*sizeof(char*));
+	for(int i=0;i<argc;i++){
+		copy[i]=strdup((*argv)[i]);
 	}
-	*argc=kept;
-	*argv=keep;
+	*argv=copy;
+	set_label("%s",basename(copy[0]));
 }
 
-char* prop_get_S(char*name,char* def_val){
-	for(int i=0;i<prop_count;i++){
-		if(!strcmp(name,prop_name[i])) return prop_val[i];
-	}
-	return def_val;
-}
-
-uint32_t prop_get_U32(char*name,uint32_t def_val){
-	for(int i=0;i<prop_count;i++){
-		if(!strcmp(name,prop_name[i])) return atoi(prop_val[i]);
-	}
-	return def_val;
-}
-
-uint64_t prop_get_U64(char*name,uint64_t def_val){
-	for(int i=0;i<prop_count;i++){
-		if(!strcmp(name,prop_name[i])) return atoll(prop_val[i]);
-	}
-	return def_val;
-}
-
-
-void throw_int(int e){
-	void *jump=pthread_getspecific(jmp_key);
-	if (jump==NULL) {
-		exit(e);
-	} else {
-		siglongjmp(jump,e);
-	}
-}
 
 void* RTmalloc(size_t size){
 	if(size==0) return NULL;

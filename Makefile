@@ -56,16 +56,13 @@ LIBS=-lz $(ARCH_LIBS)
 LDFLAGS=-m64 -pthread
 endif
 
-BINARIES= $(bcgall) $(mcrlall) ltsmin-mpi ltscompress ltsuncompress \
+BINARIES= $(bcgall) $(mcrlall) ltsmin-mpi ltscopy \
 	gsf2ar ar2gsf mkar sdd par_wr par_rd seq_wr seq_rd mpi_rw_test
 
 all: .depend $(BINARIES)
 
 distclean: clean
 	$(RM) -f $(BINARIES)
-
-ltsuncompress: ltscompress
-	/bin/cp -f ltscompress ltsuncompress
 
 docs:
 	doxygen docs.cfg
@@ -100,7 +97,7 @@ clean::
 libutil.a: unix.o runtime.o stream.o misc.o archive.o archive_dir.o archive_gsf.o ltsmeta.o \
 		stream_buffer.o fast_hash.o generichash4.o generichash8.o treedbs.o \
 		archive_format.o raf.o stream_mem.o ghf.o archive_gcf.o time.o \
-		gzstream.o stream_diff32.o
+		gzstream.o stream_diff32.o options.o
 	$(AR) -r $@ $?
 	$(RANLIB) $@
 
@@ -116,7 +113,7 @@ ltsmin-mpi:  ltsmin-mpi.o set.o lts.o dlts.o libmpi.a libutil.a
 	$(MPILD) $(LDFLAGS) -o $@ $^ $(LIBS)
 
 instantiator-mpi: instantiator-mpi.o libmpi.a libutil.a
-	$(MPILD) $(LDFLAGS) -o $@ $^ $(LIBS) -L$(MCRL)/lib -ldl -lATerm -lmcrl -lstep -lmcrlunix -lexplicit -lz
+	$(MPILD) $(LDFLAGS) -o $@ $^ $(LIBS) -L$(MCRL)/lib -ldl -lATerm -lmcrl -lstep -lmcrlunix -lz
 
 mpi%: mpi%.o libmpi.a libutil.a
 	$(MPILD) $(LDFLAGS) -o $@ $^ $(LIBS)

@@ -115,7 +115,7 @@ static size_t gcf_stream_read_max(stream_t stream,void*buf,size_t count){
 	if (count!=stream->arch->block_size) Fatal(0,error,"incorrect buffering");
 	if (stream->id>=stream->arch->data_begin) {
 		if(stream->len==stream->arch->length[stream->id]) {
-			Warning(info,"attempt to read from empty file %u",stream->id);
+			//Warning(info,"attempt to read from empty file %u",stream->id);
 			return 0;
 		}
 	}
@@ -158,7 +158,6 @@ static stream_t gcf_write(archive_t archive,char *name){
 static void gcf_close_write(archive_t *archive){
 	#define arch(field) ((*archive)->field)
 	ghf_write_eof(arch(ds));
-	DSwriteS(arch(ds),"test");
 	//Warning(info,"close");
 	DSclose(&arch(ds));
 	if (arch(pending)){
@@ -263,7 +262,7 @@ archive_t arch_gcf_read(raf_t raf){
 		if(strncmp(ident,"GCF",3)){
 			Fatal(0,error,"I do not recognize %s as a GCF file.",ident);
 		}
-		Warning(info,"reading a %s file",ident);
+		//Warning(info,"reading a %s file",ident);
 		arch->block_size=DSreadU32(ds);
 		arch->cluster_size=DSreadU32(ds);
 		arch->meta_begin=DSreadU32(ds);
@@ -278,7 +277,7 @@ archive_t arch_gcf_read(raf_t raf){
 	uint32_t i;
 	for(i=0;i<cluster_count;i++){
 		off_t ofs=(i%arch->block_count)*arch->block_size + i*arch->cluster_size + arch->meta_offset;
-		Warning(info,"reading meta from offset %x",ofs);
+		//Warning(info,"reading meta from offset %x",ofs);
 		raf_read(raf,arch->blockmap+(i*arch->block_count),4*arch->block_count,ofs);
 	}
 	uint32_t stream_count=0;

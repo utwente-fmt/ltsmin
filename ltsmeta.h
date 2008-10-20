@@ -35,7 +35,7 @@ extern lts_t lts_create();
 
 typedef enum {DIR_INFO} info_fmt_t;
 extern void lts_write_info(lts_t lts,stream_t ds,info_fmt_t format);
-extern lts_t lts_read(stream_t ds);
+extern lts_t lts_read(stream_t ds,int*header_found);
 
 #endif
 
