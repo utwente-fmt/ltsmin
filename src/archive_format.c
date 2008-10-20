@@ -1,5 +1,4 @@
 #include "arch_object.h"
-#include "misc.h"
 #include "runtime.h"
 #include <sys/types.h>
 #include <sys/stat.h>

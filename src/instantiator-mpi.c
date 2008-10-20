@@ -14,7 +14,6 @@
 #include "stream.h"
 #include "options.h"
 #include "runtime.h"
-#include "misc.h"
 #include "archive.h"
 #include "sysdep.h"
 #include "mpi_io_stream.h"

@@ -76,7 +76,7 @@ mpi%.o: mpi%.c
 clean::
 	$(RM) -f libutil.a
 
-libutil.a: unix.o runtime.o stream.o misc.o archive.o archive_dir.o archive_gsf.o ltsmeta.o \
+libutil.a: unix.o runtime.o stream.o archive.o ltsmeta.o \
 		stream_buffer.o fast_hash.o generichash4.o generichash8.o treedbs.o \
 		archive_format.o raf.o stream_mem.o ghf.o archive_gcf.o time.o \
 		gzstream.o stream_diff32.o options.o
