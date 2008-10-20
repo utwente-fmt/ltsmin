@@ -58,6 +58,7 @@ int main(int argc, char *argv[]){
 	ds=arch_read(ar_in,"info",NULL);
 	lts_t lts=lts_read(ds,&decode);
 	DSclose(&ds);
+	Log(info,"output compression is %s",plain?"disabled":"enabled");
 	int N=lts_get_segments(lts);
 	ds=arch_write(ar_out,"info",plain?NULL:"");
 	lts_write_info(lts,ds,DIR_INFO);
