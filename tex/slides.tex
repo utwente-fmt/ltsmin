@@ -1,0 +1,200 @@
+\documentclass{beamer}
+%\documentclass[handout]{beamer}
+
+\usepackage{graphics}
+\usepackage{pgf,pgfarrows,pgfnodes,pgfautomata,pgfheaps,pgfshade}
+%\pgfdeclareimage[height=1em]{ec-moan-logo}{ec-moan-logo}
+%\logo{\pgfuseimage{ec-moan-logo}}
+
+
+\date{Progress report 16-10-2008}
+
+\usepackage[all]{xy}
+
+%\usetheme[dutch,navbarbot]{utwente}
+\usetheme[english]{utwente}
+
+\usepackage[english]{babel}
+\usepackage[latin1]{inputenc}
+
+\usepackage{times}
+\usepackage[T1]{fontenc}
+
+%\usepackage[xy]{arrows}
+\usepackage{amssymb}
+
+\usepackage{colortbl}
+
+\title{The Distributed Tool Chain\\Cluster Questions}
+\author{Stefan Blom}
+
+\begin{document}
+
+\frame[plain]{\titlepage}
+
+
+%\begin{frame}
+%\frametitle{Outline}
+%\begin{itemize}
+%\item Introduction
+%\end{itemize}
+%\end{frame}
+
+
+\begin{frame}
+\frametitle{end goal}
+\begin{itemize}
+\item Distributed state space generation for black box and grey box models.
+\item Distributed bisimulation minimization:
+\begin{itemize}
+\item strong bisimulation
+\item branching bisimulation
+\item markovian bisimulation
+\item $\tau$-cycle elimination
+\end{itemize}
+\item On-disk state space generation ready.
+\end{itemize}
+\end{frame}
+
+\begin{frame}
+\frametitle{architecture}
+\begin{center}
+\setlength{\arrayrulewidth}{1pt}
+\begin{tabular}{|@{\phantom{\Huge{g}}}l@{\phantom{\Huge{g}}}|}
+\hline
+(Distributed) Application
+\\\hline
+(Distributed) LTS library
+\\\hline
+(Distributed) support framework
+\\\hline
+\end{tabular}
+\end{center}
+\end{frame}
+
+\begin{frame}
+\frametitle{LTS library}
+Manage a segmented LTS with:
+\begin{itemize}
+\item State labels including full state vectors and atomic propositions.
+\item Edges labels including actions and rates.
+\end{itemize}
+\end{frame}
+
+\begin{frame}
+\frametitle{support framework}
+The support frame work should:
+\begin{itemize}
+\item provide efficient IO abstraction layer
+\item provide small replicated hash table (leaf DB,label DB, small node DB)
+\item provide big (optionally cached) hash table (signatures, big node DB)
+\item transparent compression/decompression of data
+\end{itemize}
+\end{frame}
+
+\begin{frame}
+\frametitle{File formats}
+\begin{itemize}
+\item Standardized data stream header to enable coding and/or compression
+of a single data stream.
+\item Support for multiple stream archives:
+\begin{itemize}
+\item By storing each stream as a separate file. E.g. in a directory or by using a pattern.
+\item By storing the streams in one stream in such a way that it is easy to use as a pipeline.
+\item By storing the streams in one file with an index to make efficient
+ access to each stream possible.
+\end{itemize}
+\end{itemize}
+\end{frame}
+
+\begin{frame}
+\frametitle{Experiments}
+\begin{itemize}
+\item Run experiments to assess the quality of block allocation algorithms on various
+file system implementations by measuring the speed of read and write orders and number of files.
+\item Run experiments to asses the effect of the cluster size on sequentialized reads.
+(E.g. tweety: 4k: 8.53MB/s; 256k: 11.66MB/s; 1024k: 19.39MB/s; $\infty$: 24.53MB/s).
+\item Run experiments to assess compression/decompression speeds for gzip/bzip2/lzo
+to be able to determine if parallel decompression is necessary or not.
+\end{itemize}
+\end{frame}
+
+\begin{frame}
+\frametitle{Initial results}
+Interleaved writing of 4 files of 1GB with 4k block size:
+\begin{tabular}{llrrr}
+\hline
+&&write&par&seq
+\\\hline
+tweety & ext3 & 22.22 & 9.32 & 24.56
+\\\hline
+tweety & xfs & 23.28 & 8.58 & 24.53
+\\\hline
+tweety & vfat & 5.89 & 14.75 & 6.43
+\\\hline
+\end{tabular}
+Tweety single 4GB file yields write 19.39 MB/s and read 24.18 MB/s.
+\end{frame}
+
+
+\begin{frame}
+\frametitle{Cluster}
+\begin{itemize}
+\item Backup policy for home directories?
+\\
+Yes or no ; if yes include list or exclude list  and how: direct or rsync to EWI home dir.
+\item Access to big mems.
+\\
+What do we require (direct connection, VPN connection, hidden behind twickel)?
+\\
+In other words: ssh weldam or ssh twickel ssh weldam?
+\item Access from cluster:
+\\
+Which nodes, besides twickel, can see the internet: big, data, compute?
+\item How much root access do we demand?
+\\
+E.g. configuration of torque/maui? File systems on data nodes?
+\\
+(Jan Veninga raised the security question.)
+\end{itemize}
+\end{frame}
+
+\begin{frame}
+\frametitle{Roadmap}
+\begin{enumerate}
+\item Low level IO library and tools.
+\item Library and tools for managing LTS's.
+\item Rewrite MPI event loop from probe to wait.
+\item Distributed generator for testing purposes.
+\item Linking in the new Grey Box interface.
+\item Porting Instantiators to the new framework.
+\item Porting the distributed reduction tools.
+\item Generating abstractions for big biological ODE's.
+\item Add property specific reductions to reduction tools.
+\end{enumerate}
+\end{frame}
+
+\begin{frame}
+\frametitle{Sequential Tools}
+\begin{description}
+\item[sdd] Tool that can add/remove/change the compression of a stream.
+\item[mkar] Build an archive from a list of files.
+\item[gsf2ar] Convert an archive stream to a (set of) file(s).
+\item[ar2gsf] Convert a (set of) file(s) to an archive stream.
+\item[ar2bcg] Convert a (set of) file(s) containing a single segment SVC2 to a BCG file.
+\item[bcg2gsf] Convert a BCG file to a single segment SVC2 as an archive stream.
+\end{description}
+\end{frame}
+
+\begin{frame}[fragile]
+\frametitle{MPI Tools}
+\begin{description}
+\item[mpi-inst] Distributed state space generator based on \verb+libstep+.
+\item[mpi\underline{~}min] Distributed strong/branching bisimulation reduction.
+\end{description}
+\end{frame}
+
+\end{document}
+
+
+
