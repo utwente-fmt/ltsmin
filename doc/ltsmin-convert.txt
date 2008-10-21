@@ -1,0 +1,24 @@
+//                           -*- mode: doc; outline-regexp: "==\(=*\) ." -*-
+ltsmin-convert(1)
+=================
+:Author:  Michael Weber
+:Email:   <michaelw@foldr.org>
+:Date:    2008-10-20
+
+== NAME
+ltsmin-convert - convert file formats for labelled transition system 
+
+== SYNOPSIS
+{manname} '<input>' '<output>'
+
+== DESCRIPTION
+todo
+
+== OPTIONS
+todo
+
+== EXIT STATUS
+todo
+
+== SEE ALSO
+linkman:instantiator-mpi[1], linkman:ltsmin-convert[1]
