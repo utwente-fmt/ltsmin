@@ -44,11 +44,11 @@ BINARIES=$(mcrlall) ltsmin-mpi ltsmin-convert
 all: .depend $(BINARIES)
 
 distclean: clean
-	$(RM) -f $(BINARIES)
+	$(RM) $(BINARIES)
 
 docs:
 	doxygen docs.cfg
-	(cd doc/latex ; make clean refman.pdf)
+	cd doc/latex && make clean refman.pdf
 
 .depend: *.c
 	touch .depend
@@ -57,7 +57,7 @@ docs:
 -include .depend
 
 clean:: .depend
-	$(RM) -rf *.o *~
+	$(RM) -r *.o *~
 
 .SUFFIXES: .o .c .h
 
@@ -74,7 +74,7 @@ mpi%.o: mpi%.c
 	$(CC) $(CFLAGS) -c $<
 
 clean::
-	$(RM) -f libutil.a
+	$(RM) libutil.a
 
 libutil.a: unix.o runtime.o stream.o archive.o ltsmeta.o \
 		stream_buffer.o fast_hash.o generichash4.o generichash8.o treedbs.o \
@@ -84,7 +84,7 @@ libutil.a: unix.o runtime.o stream.o archive.o ltsmeta.o \
 	$(RANLIB) $@
 
 clean::
-	$(RM) -f libmpi.a
+	$(RM) libmpi.a
 
 libmpi.a: mpi_io_stream.o mpi_core.o mpi_raf.o mpi_ram_raf.o
 	$(AR) -r $@ $?
@@ -108,4 +108,3 @@ lts%: lts%.o libutil.a
 
 %: %.o libutil.a
 	$(LD) $(LDFLAGS) -o $@ $^ $(LIBS)
-

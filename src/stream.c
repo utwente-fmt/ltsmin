@@ -1,8 +1,10 @@
-
-#include "stream_object.h"
-#include "runtime.h"
+#include "config.h"
 #include <stdlib.h>
 #include <zlib.h>
+
+#include "unix.h"
+#include "stream_object.h"
+#include "runtime.h"
 
 struct stream_s {
 	struct stream_obj procs;

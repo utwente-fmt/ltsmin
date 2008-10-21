@@ -1,0 +1,24 @@
+//                           -*- mode: doc; outline-regexp: "==\(=*\) ." -*-
+ltsmin-mpi(1)
+=============
+:Author:  Michael Weber
+:Email:   <michaelw@foldr.org>
+:Date:    2008-10-20
+
+== NAME
+ltsmin-mpi - distributed minimization of labelled transition systems
+
+== SYNOPSIS
+{manname} '<input>' '<output>'
+
+== DESCRIPTION
+TODO
+
+== OPTIONS
+TODO
+
+== EXIT STATUS
+TODO
+
+== SEE ALSO
+linkman:instantiator-mpi[1], linkman:ltsmin-convert[1]
