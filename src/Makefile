@@ -56,7 +56,7 @@ LIBS=-lz $(ARCH_LIBS)
 LDFLAGS=-m64 -pthread
 endif
 
-BINARIES= $(bcgall) $(mcrlall) ltsmin-mpi ltscopy \
+BINARIES= $(bcgall) $(mcrlall) ltsmin-mpi ltsmin-convert \
 	gsf2ar ar2gsf mkar sdd par_wr par_rd seq_wr seq_rd mpi_rw_test
 
 all: .depend $(BINARIES)
