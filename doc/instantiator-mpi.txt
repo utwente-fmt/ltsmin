@@ -86,5 +86,8 @@ mpirun -np 2 instantiator-mpi -alt rww brp.tbf
 ----
 
 == SEE ALSO
-linkman:ltsmin-mpi[1], linkman:ltsmin-convert[1], linkman:mcrl[1],
-http://www.mpi-forum.org/[MPI Forum], http://www.mcrl2.org/[mcrl2]
+linkman:ltsmin-mpi[1], 
+linkman:ltsmin-convert[1], 
+linkman:mcrl[1],
+http://www.mcrl2.org/[mcrl2],
+http://www.mpi-forum.org/[MPI Forum]
