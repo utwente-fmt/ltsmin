@@ -1,8 +1,10 @@
 #include "config.h"
+#include <stdlib.h>
+#include <string.h>
+
+#include "unix.h"
 #include "stream_object.h"
 #include "runtime.h"
-#include <string.h>
-#include <stdlib.h>
 
 typedef int32_t diff_t ;
 
