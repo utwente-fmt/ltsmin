@@ -35,11 +35,11 @@ clean:
 
 
 define ASCIIDOC.xml
-  $(ASCIIDOC) -b docbook -d manpage $(ASCIIDOC_FLAGS) $(OUTPUT_OPTION) $^
+  $(ASCIIDOC) $(OUTPUT_OPTION) -b docbook -d manpage $(ASCIIDOC_FLAGS) $^
 endef
 
 define ASCIIDOC.html
-  $(ASCIIDOC) -d manpage $(ASCIIDOC_FLAGS) $(OUTPUT_OPTION) $^
+  $(ASCIIDOC) $(OUTPUT_OPTION) -d manpage $(ASCIIDOC_FLAGS) $^
 endef
 
 define ASCIIDOC.man
