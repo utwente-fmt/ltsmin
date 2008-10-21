@@ -28,13 +28,15 @@ endif
 MACHINE := $(subst -, ,$(shell $(CC) -dumpmachine))
 ARCH    := $(firstword $(MACHINE))
 
+CFLAGS := -W -Wall -pthread -std=c99
+
 ifneq (, $(findstring $(ARCH), i386 i486 i586))
 LDFLAGS=-m32 -pthread
-CFLAGS=-m32 -std=c99 -Wall $(OPT) -D_FILE_OFFSET_BITS=64 -pthread
+CFLAGS+= -m32 $(OPT) -D_FILE_OFFSET_BITS=64
 LIBS=-lz $(ARCH_LIBS)
 else
 $(warning assuming 64 bit environment)
-CFLAGS=-m64 -std=c99 -Wall $(OPT) -pthread
+CFLAGS+= -m64 $(OPT)
 LIBS=-lz $(ARCH_LIBS)
 LDFLAGS=-m64 -pthread
 endif

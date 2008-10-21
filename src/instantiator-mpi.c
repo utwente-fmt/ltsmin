@@ -35,45 +35,46 @@ static int loadbalancing=1;
 static int plain=0;
 
 static int st_help(char* opt,char*optarg,void *arg){
+	(void)opt;(void)optarg;(void)arg;
 	SThelp();
 	return OPT_EXIT;
 }
 
 struct option options[]={
 	{"",OPT_NORMAL,NULL,NULL,NULL,
-		"usage: mpirun <nodespec> inst-mpi options file ..."},
-	{"-v",OPT_NORMAL,inc_int,&verbosity,NULL,"increase the level of verbosity"},
-	{"-q",OPT_NORMAL,reset_int,&verbosity,NULL,"be silent"},
+		"usage: mpirun <nodespec> inst-mpi options file ...",NULL,NULL,NULL},
+	{"-v",OPT_NORMAL,inc_int,&verbosity,NULL,"increase the level of verbosity",NULL,NULL,NULL},
+	{"-q",OPT_NORMAL,reset_int,&verbosity,NULL,"be silent",NULL,NULL,NULL},
 	{"-help",OPT_NORMAL,usage,NULL,NULL,
-		"print this help message"},
+		"print this help message",NULL,NULL,NULL},
 	{"-st-help",OPT_NORMAL,st_help,NULL,NULL,
 		"print help for the mCRL stepper",
 		"WARNING: some options (e.g. -conf-table) will",
-		"break the correctness of the distributed instantiator"},
+		"break the correctness of the distributed instantiator",NULL},
 	{"-fmt",OPT_REQ_ARG,assign_string,&outputfmt,"-fmt <format>",
-		"Write output as separate files. Format should have one occurrence of %s."},
+		"Write output as separate files. Format should have one occurrence of %s.",NULL,NULL,NULL},
 	{"-gcf",OPT_REQ_ARG,assign_string,&outputgcf,"-gcf <file>",
-		"Write output in a GCF archive."},
+		"Write output in a GCF archive.",NULL,NULL,NULL},
 	{"-nolb",OPT_NORMAL,reset_int,&loadbalancing,NULL,
-		"disable load balancing"},
+		"disable load balancing",NULL,NULL,NULL},
 	{"-nolts",OPT_NORMAL,reset_int,&write_lts,NULL,
-		"disable writing of the bare LTS"},
+		"disable writing of the bare LTS",NULL,NULL,NULL},
 	{"-nice",OPT_REQ_ARG,parse_int,&nice_value,"-nice <val>",
 		"all workers will set nice to <val>",
-		"useful when running on other people's workstations"},
+		"useful when running on other people's workstations",NULL,NULL},
 	{"-plain",OPT_NORMAL,set_int,&plain,NULL,
-		"disable compression of the output"},
+		"disable compression of the output",NULL,NULL,NULL},
 	{"-cmp",OPT_NORMAL,set_int,&compare_terms,NULL,
 		"compare terms in term vector",
 		"useful if the representation of data is not unique",
-		"e.g. when a set is represented by an unsorted list"},
+		"e.g. when a set is represented by an unsorted list",NULL},
 	{"-seq-rw",OPT_NORMAL,set_int,&sequential_init_rewriter,NULL,
 		"Perform initialisation of rewriters sequentially",
-		"rather than in parallel. (Needed for rw)"},
+		"rather than in parallel. (Needed for rw)",NULL,NULL},
 	{"-master-no-step",OPT_NORMAL,set_int,&master_no_step,NULL,
 		"instruct master to act as database only",
-		"this improves latency of database lookups"},
-	{0}
+		"this improves latency of database lookups",NULL,NULL},
+	{0,0,0,0,0,0,0,0,0}
 };
 
 static int chkbase;
@@ -327,14 +328,14 @@ int main(int argc, char*argv[]){
 	int i,j,clean,found,visited,explored,explored_this_level,transitions,limit,level,begin,accepted;
 	int lvl_scount,lvl_tcount,*lvl_temp=NULL,submitted,src_filled;
 	MPI_Status status;
-	ATerm *bottom;
+	void *bottom;
 
 	long long int total_states=0,lvl_states=0;
 	long long int total_transitions=0,lvl_transitions=0;
 	int first_unused;
 	//int parent_next=0;;
 
-	bottom=(ATerm*)&argc;
+	bottom=(void*)&argc;
         MPI_Init(&argc, &argv);
         MPI_Comm_size(MPI_COMM_WORLD, &mpi_nodes);
         MPI_Comm_rank(MPI_COMM_WORLD, &mpi_me);

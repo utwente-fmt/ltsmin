@@ -42,20 +42,20 @@ void raf_close(raf_t *raf){
 
 
 static void Pread(raf_t raf,void*buf,size_t len,off_t ofs){
-	size_t res=pread(raf->fd,buf,len,ofs);
+	ssize_t res=pread(raf->fd,buf,len,ofs);
 	if (res<0) {
 		FatalCall(1,error,"could not read %s",raf->shared.name);
 	}
-	if (res!=len) {
+	if (res!=(ssize_t)len) {
 		FatalCall(1,error,"short read %u/%u from %s at %llu",res,len,raf->shared.name,ofs);
 	}
 }
 static void Pwrite(raf_t raf,void*buf,size_t len,off_t ofs){
-	size_t res=pwrite(raf->fd,buf,len,ofs);
+	ssize_t res=pwrite(raf->fd,buf,len,ofs);
 	if (res<0) {
 		FatalCall(1,error,"could not write %s",raf->shared.name);
 	}
-	if (res!=len) {
+	if (res!=(ssize_t)len) {
 		FatalCall(1,error,"short write to %s",raf->shared.name);
 	}
 }
@@ -103,12 +103,15 @@ static void Pclose(raf_t *raf){
 	*raf=NULL;
 }
 void raf_illegal_read(raf_t raf,void*buf,size_t len,off_t ofs){
+	(void)buf;(void)len;(void)ofs;
 	Fatal(1,error,"read not supported for raf %s",raf->shared.name);
 }
 void raf_illegal_write(raf_t raf,void*buf,size_t len,off_t ofs){
+	(void)buf;(void)len;(void)ofs;
 	Fatal(1,error,"write not supported for raf %s",raf->shared.name);
 }
 void raf_illegal_awrite(raf_t raf,void*buf,size_t len,off_t ofs){
+	(void)buf;(void)len;(void)ofs;
 	Fatal(1,error,"asynchronous write not supported for raf %s",raf->shared.name);
 }
 void raf_illegal_await(raf_t raf){
@@ -119,6 +122,7 @@ off_t raf_illegal_size(raf_t raf){
 	return -1;
 }
 void raf_illegal_resize(raf_t raf,off_t size){
+	(void)size;
 	Fatal(1,error,"resize not supported for raf %s",raf->shared.name);
 }
 void raf_illegal_close(raf_t *raf){
