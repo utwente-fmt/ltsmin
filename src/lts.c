@@ -30,16 +30,17 @@ void lts_free(lts_t lts){
 	free(lts);
 }
 
-static void build_block(int states,int transitions,u_int32_t *begin,u_int32_t *block,u_int32_t *label,u_int32_t *other){
-	int i;
-	int loc1,loc2;
+static void build_block(uint32_t states,uint32_t transitions,u_int32_t *begin,u_int32_t *block,u_int32_t *label,u_int32_t *other){
+	uint32_t i;
+	uint32_t loc1,loc2;
 	u_int32_t tmp_label1,tmp_label2;
 	u_int32_t tmp_other1,tmp_other2;
 
 	for(i=0;i<states;i++) begin[i]=0;
 	for(i=0;i<transitions;i++) begin[block[i]]++;
 	for(i=1;i<states;i++) begin[i]=begin[i]+begin[i-1];
-	for(i=transitions-1;i>=0;i--){
+	for(i=transitions;i>0;){
+		i--;
 		block[i]=--begin[block[i]];
 	}
 	begin[states]=transitions;
@@ -80,7 +81,7 @@ static void build_block(int states,int transitions,u_int32_t *begin,u_int32_t *b
 }
 
 void lts_set_type(lts_t lts,LTS_TYPE type){
-	int i,j;
+	uint32_t i,j;
 
 	if (lts->type==type) return; /* no type change */
 
@@ -170,7 +171,7 @@ void lts_set_size(lts_t lts,u_int32_t states,u_int32_t transitions){
 }
 
 void lts_uniq_sort(lts_t lts){
-	int i,j,k,q,l,d,count,found;
+	uint32_t i,j,k,q,l,d,count,found;
 	lts_set_type(lts,LTS_BLOCK);
 	count=0;
 	for(i=0;i<lts->states;i++){
@@ -207,7 +208,7 @@ void lts_uniq_sort(lts_t lts){
 }
 
 void lts_uniq(lts_t lts){
-	int i,j,k,count,oldbegin,found;
+	uint32_t i,j,k,count,oldbegin,found;
 	lts_set_type(lts,LTS_BLOCK);
 	count=0;
 	for(i=0;i<lts->states;i++){
@@ -233,7 +234,7 @@ void lts_uniq(lts_t lts){
 }
 
 void lts_sort_alt(lts_t lts){
-	int i,j,k,l,d;
+	uint32_t i,j,k,l,d;
 	int *lbl_index;
 
 	lbl_index=(int*)malloc(lts->label_count*sizeof(int));
@@ -265,7 +266,7 @@ void lts_sort_alt(lts_t lts){
 }
 
 void lts_sort(lts_t lts){
-	int i,j,k,l,d;
+	uint32_t i,j,k,l,d;
 	lts_set_type(lts,LTS_BLOCK);
 	for(i=0;i<lts->states;i++){
 		for(j=lts->begin[i];j<lts->begin[i+1];j++){
@@ -285,7 +286,7 @@ void lts_sort(lts_t lts){
 
 
 void lts_sort_dest(lts_t lts){
-	int i,j,k,l,d;
+	uint32_t i,j,k,l,d;
 	lts_set_type(lts,LTS_BLOCK);
 	for(i=0;i<lts->states;i++){
 		for(j=lts->begin[i];j<lts->begin[i+1];j++){

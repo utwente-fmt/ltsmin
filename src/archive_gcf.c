@@ -45,6 +45,7 @@ struct stream_s {
 };
 
 static void gcf_stream_pre_close(stream_t s,void* buf,size_t count){
+	(void)s;(void)buf;(void)count;
 	Fatal(0,error,"expected stream to be closed");
 }
 
@@ -227,7 +228,8 @@ static void gcf_close_read(archive_t *archive){
 
 
 static void gcf_list(archive_t archive,char *regex,string_enum_t cb,void*arg){
-	int i=0;
+	if (regex!=NULL) Fatal(0,error,"regex not supported");
+	uint32_t i=0;
 	for(i=0;i<archive->stream_count;i++){
 		if(archive->name[i]!=NULL){
 			//Warning(info,"reporting %s as %u",archive->name[i],i);
@@ -237,7 +239,7 @@ static void gcf_list(archive_t archive,char *regex,string_enum_t cb,void*arg){
 }
 
 static stream_t gcf_read(archive_t archive,char *name){
-	int i=0;
+	uint32_t i=0;
 	for(i=0;i<archive->stream_count;i++){
 		if(archive->name[i]!=NULL && !strcmp(name,archive->name[i])){
 			return gcf_read_stream(archive,i);

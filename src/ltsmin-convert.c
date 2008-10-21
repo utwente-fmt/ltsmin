@@ -10,13 +10,14 @@ static int decode=0;
 
 struct option options[]={
 	{"",OPT_NORMAL,NULL,NULL,NULL,
-		"usage: ltscopy options input output"},
-	{"-q",OPT_NORMAL,log_suppress,&info,"-q","do not print info messages"},
+		"usage: ltscopy options input output",NULL,NULL,NULL},
+	{"-q",OPT_NORMAL,log_suppress,&info,"-q",
+		"do not print info messages",NULL,NULL,NULL},
 	{"-plain",OPT_NORMAL,set_int,&plain,NULL,
-		"disable compression of the output"},
+		"disable compression of the output",NULL,NULL,NULL},
 	{"-help",OPT_NORMAL,usage,NULL,NULL,
-		"print this help message"},
-	{0}
+		"print this help message",NULL,NULL,NULL},
+	{0,0,0,0,0,0,0,0,0}
 };
 
 static void stream_copy(archive_t src,archive_t dst,char*name,char*decode,char*encode){

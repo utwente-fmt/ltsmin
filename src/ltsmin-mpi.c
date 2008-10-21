@@ -25,7 +25,7 @@ static int synch_size=0;
 static int* synch_set=NULL;
 static int* synch_id=NULL;
 static int synch_pending;
-static int tau;
+static uint32_t tau;
 
 
 #define STRONG_REDUCTION_SET 1
@@ -35,6 +35,7 @@ static int action=STRONG_REDUCTION_SET;
 static int plain=0;
 
 static int select_branching_reduction(char* opt,char*optarg,void *arg){
+	(void)opt;(void)arg;
 	branching=1;
 	if(optarg==NULL){
 		action=BRANCHING_REDUCTION_SET;
@@ -49,6 +50,7 @@ static int select_branching_reduction(char* opt,char*optarg,void *arg){
 }
 
 static int select_strong_reduction(char* opt,char*optarg,void *arg){
+	(void)opt;(void)arg;
 	branching=0;
 	if(optarg==NULL){
 		action=STRONG_REDUCTION_SET;
@@ -65,32 +67,37 @@ static int select_strong_reduction(char* opt,char*optarg,void *arg){
 struct option options[]={
 	{"",OPT_NORMAL,NULL,NULL,NULL,	"usage: ltsmin-mpi options input output",
 		"This tool reduces a labeled transition system modulo bisimulation.",
-		"The default bisimulation is strong bisimulation."},
+		"The default bisimulation is strong bisimulation.",NULL},
 	{"",OPT_NORMAL,NULL,NULL,NULL,
 		"Both input and output can be a GCF archive or a set of files.",
 		"To use a set of files the argument needs and occurrence of %s.",
-		"If no %s is present then a GCF archive is assumed."},
+		"If no %s is present then a GCF archive is assumed.",NULL},
 	{"-plain",OPT_NORMAL,set_int,&plain,NULL,
 		"Disable compression of the output.",
-		"The tool detects if the input is compressed or not."},
-	{"-s",OPT_NORMAL,select_strong_reduction,NULL,"-s","apply strong bisimulation reduction"},
-	{"-b",OPT_NORMAL,select_branching_reduction,NULL,"-b","apply branching bisimulation reduction"},
-	{"-q",OPT_NORMAL,log_suppress,&info,"-q","do not print info messages"},
+		"The tool detects if the input is compressed or not.",NULL,NULL},
+	{"-s",OPT_NORMAL,select_strong_reduction,NULL,"-s",
+		"apply strong bisimulation reduction",NULL,NULL,NULL},
+	{"-b",OPT_NORMAL,select_branching_reduction,NULL,"-b",
+		"apply branching bisimulation reduction",NULL,NULL,NULL},
+	{"-q",OPT_NORMAL,log_suppress,&info,"-q",
+		"do not print info messages",NULL,NULL,NULL},
 	{"-help",OPT_NORMAL,usage,NULL,NULL,
-		"print this help message"},
+		"print this help message",NULL,NULL,NULL},
 /* for future use
 	{"-S",OPT_REQ_ARG,select_strong_reduction,NULL,"-S method",
 		"apply alternative strong bisimulation reduction method",
-		"method is set"},
+		"method is set",NULL,NULL},
 	{"-B",OPT_REQ_ARG,select_branching_reduction,NULL,"-B method",
 		"apply alternative branching bisimulation reduction method",
-		"method is set"},
+		"method is set",NULL,NULL},
 */
-	{0}
+	{0,0,0,0,0,0,0,0,0}
 };
 
 
 static void synch_request_service(void *arg,MPI_Status*probe_stat){
+	(void)arg;(void)probe_stat;
+
 	MPI_Status status,*recv_status=&status;
 	int len;
 	int item;
@@ -136,6 +143,7 @@ static void synch_request_service(void *arg,MPI_Status*probe_stat){
 }
 
 static void synch_answer_service(void *arg,MPI_Status*probe_stat){
+	(void)arg;(void)probe_stat;
 	MPI_Status status,*recv_status=&status;
 	int len,i;
 
@@ -161,6 +169,7 @@ static int *tcount=NULL;
 static int write_buffer[WRITE_BUFFER_SIZE];
 
 static void write_service(void *arg,MPI_Status*probe_stat){
+	(void)arg;(void)probe_stat;
 	MPI_Status status,*recv_status=&status;
 	int len,i;
 
@@ -191,6 +200,7 @@ static int *set,*new_set,*send_set;
 static int new_count,*new_list;
 
 static void fwd_service(void*arg,MPI_Status*probe_stat){
+	(void)arg;(void)probe_stat;
 	MPI_Status status,*recv_status=&status;
 	int msg[FWD_BUFFER_SIZE];
 	int i;
@@ -214,6 +224,7 @@ static void fwd_service(void*arg,MPI_Status*probe_stat){
 }
 
 static void inv_register_service(void*arg,MPI_Status*probe_stat){
+	(void)arg;(void)probe_stat;
 	MPI_Status status,*recv_status=&status;
 	int msg[FWD_BUFFER_SIZE];
 	int i;
@@ -236,7 +247,7 @@ static void inv_register_service(void*arg,MPI_Status*probe_stat){
 
 int main(int argc,char **argv){
 	dlts_t lts;
-	int i,j,**map,**newmap,iter,oldcount,newcount,localcount,*oldid,transitions,*oldsynch,*offset,root;
+	int **map,**newmap,iter,oldcount,newcount,localcount,*oldid,transitions,*oldsynch,*offset,root;
 	int *synch_send_offset;
 	int **synch_send_buffer;
 	MPI_Status *status_array;
@@ -251,7 +262,8 @@ int main(int argc,char **argv){
 	int not_done;
 	int *fwd_send_offset=NULL,**fwd_send_buffer=NULL;
 	int total_new_set_count;
-	int fwd_todo,*fwd_todo_list=NULL;
+	uint32_t fwd_todo;
+	int *fwd_todo_list=NULL;
 	int *tmp;
 
 
@@ -349,11 +361,11 @@ int main(int argc,char **argv){
 	set=(int*)RTmalloc(lts->state_count[mpi_me]*sizeof(int));
 	oldid=(int*)RTmalloc(lts->state_count[mpi_me]*sizeof(int));
 	auxcount=0;
-	for(i=0;i<lts->segment_count;i++) auxcount+=lts->transition_count[mpi_me][i];
+	for(int i=0;i<lts->segment_count;i++) auxcount+=lts->transition_count[mpi_me][i];
 	auxmap=(int*)malloc(auxcount*sizeof(int));
 	auxcount=0;
 	in_count=0;
-	for(i=0;i<lts->segment_count;i++){
+	for(int i=0;i<lts->segment_count;i++){
 		//map[i]=(int*)malloc(lts->transition_count[mpi_me][i]*sizeof(int));
 		map[i]=auxmap+auxcount;
 		auxcount+=lts->transition_count[mpi_me][i];
@@ -364,7 +376,7 @@ int main(int argc,char **argv){
 			fwd_send_offset[i]=0;
 		}
 		newmap[i]=(int*)malloc(lts->transition_count[i][mpi_me]*sizeof(int));
-		for(j=0;j<lts->transition_count[mpi_me][i];j++) map[i][j]=0;
+		for(uint32_t j=0;j<lts->transition_count[mpi_me][i];j++) map[i][j]=0;
 		//Warning(info,"reading src");
 		dlts_load_src(lts,mpi_me,i);
 		//Warning(info,"finished src");
@@ -389,7 +401,7 @@ int main(int argc,char **argv){
 
 	iter=0;
 	oldcount=0;
-	for(i=0;i<lts->state_count[mpi_me];i++) oldid[i]=0;
+	for(uint32_t i=0;i<lts->state_count[mpi_me];i++) oldid[i]=0;
 
 	auxlts=lts_create();
 	lts_set_type(auxlts,LTS_LIST);
@@ -400,7 +412,7 @@ int main(int argc,char **argv){
 		lts_set_size(inv_lts,lts->state_count[mpi_me],in_count);
 	}
 	auxcount=0;
-	for(i=0;i<lts->segment_count;i++) for(j=0;j<lts->transition_count[mpi_me][i];j++) {
+	for(int i=0;i<lts->segment_count;i++) for(uint32_t j=0;j<lts->transition_count[mpi_me][i];j++) {
 		auxlts->src[auxcount]=lts->src[mpi_me][i][j];
 		auxlts->label[auxcount]=lts->label[mpi_me][i][j];
 		auxlts->dest[auxcount]=auxcount;
@@ -418,9 +430,9 @@ int main(int argc,char **argv){
 		SetClear(-1);
 /** build initial signatures **/
 		Warning(info,"%d: building initial signatures",mpi_me);
-		for(i=0;i<auxlts->states;i++){
+		for(uint32_t i=0;i<auxlts->states;i++){
 			int s=EMPTY_SET;
-			for(j=auxlts->begin[i];j<auxlts->begin[i+1];j++){
+			for(uint32_t j=auxlts->begin[i];j<auxlts->begin[i+1];j++){
 				if ((auxlts->label[j]!=tau) || (oldid[i]!=auxmap[auxlts->dest[j]])) {
 					s=SetInsert(s,auxlts->label[j],auxmap[auxlts->dest[j]]);
 				}
@@ -433,10 +445,10 @@ int main(int argc,char **argv){
 		lts_set_type(inv_lts,LTS_LIST);
 		inv_lts->transitions=0;
 		not_done=1;
-		for(j=0;not_done;j++){
+		for(uint32_t j=0;not_done;j++){
 			if((j&0x3f)==0)core_yield();
 			not_done=0;
-			for(i=0;i<lts->segment_count;i++){
+			for(int i=0;i<lts->segment_count;i++){
 				if(j<lts->transition_count[mpi_me][i]){
 					not_done=1;
 					if ((lts->label[mpi_me][i][j]==tau) && (oldid[lts->src[mpi_me][i][j]]==map[i][j])) {
@@ -455,7 +467,7 @@ int main(int argc,char **argv){
 				}
 			}
 		}
-		for(i=0;i<lts->segment_count;i++){
+		for(int i=0;i<lts->segment_count;i++){
 			if (fwd_send_offset[i]!=0) {
 				core_yield();
 				MPI_Send(fwd_send_buffer[i],fwd_send_offset[i],MPI_INT,i,inv_register,MPI_COMM_WORLD);
@@ -470,7 +482,7 @@ int main(int argc,char **argv){
 		Warning(info,"%d: got %d inbound invisible tau's",mpi_me,inv_lts->transitions);
 /** forwarding along invisible tau's **/
 		fwd_todo=0;
-		for(i=0;i<lts->state_count[mpi_me];i++) {
+		for(uint32_t i=0;i<lts->state_count[mpi_me];i++) {
 			new_set[i]=EMPTY_SET;
 			send_set[i]=set[i];
 			if (set[i]!=EMPTY_SET){
@@ -481,14 +493,14 @@ int main(int argc,char **argv){
 		total_new_set_count=1;
 		while(total_new_set_count>0){
 			new_count=0;
-			for(i=0;i<fwd_todo;i++){
+			for(uint32_t i=0;i<fwd_todo;i++){
 				int s=fwd_todo_list[i];
 				if ((i&0xff)==0) core_yield();
 				while(send_set[s]!=EMPTY_SET){
 					int l=SetGetLabel(send_set[s]);
 					int d=SetGetDest(send_set[s]);
 					send_set[s]=SetGetParent(send_set[s]);
-					for(j=inv_lts->begin[s];j<inv_lts->begin[s+1];j++){
+					for(uint32_t j=inv_lts->begin[s];j<inv_lts->begin[s+1];j++){
 						int to=inv_lts->label[j];
 						fwd_send_buffer[to][fwd_send_offset[to]]=inv_lts->src[j];
 						fwd_send_buffer[to][fwd_send_offset[to]+1]=l;
@@ -503,7 +515,7 @@ int main(int argc,char **argv){
 					}
 				}
 			}
-			for(i=0;i<lts->segment_count;i++){
+			for(int i=0;i<lts->segment_count;i++){
 				if (fwd_send_offset[i]!=0) {
 					core_yield();
 					MPI_Send(fwd_send_buffer[i],fwd_send_offset[i],MPI_INT,i,fwd_tag,MPI_COMM_WORLD);
@@ -530,8 +542,8 @@ int main(int argc,char **argv){
 		synch_pending=0;
 		synch_next=0;
 		synch_trans=0;
-		for(i=0;i<lts->segment_count;i++) synch_send_offset[i]=0;
-		for(i=0;i<lts->state_count[mpi_me];i++){
+		for(int i=0;i<lts->segment_count;i++) synch_send_offset[i]=0;
+		for(uint32_t i=0;i<lts->state_count[mpi_me];i++){
 			if(SetGetTag(set[i])<0){
 				int len;
 				int hash;
@@ -569,7 +581,7 @@ int main(int argc,char **argv){
 			if ((i&0x3fff)==0) core_yield();
 		}
 		//Warning(1,"%d: sending partial buffers",mpi_me);
-		for(i=0;i<lts->segment_count;i++) {
+		for(int i=0;i<lts->segment_count;i++) {
 			if (synch_send_offset[i]>0){
 				core_yield();
 				MPI_Send(synch_send_buffer[i],synch_send_offset[i],MPI_INT,i,synch_request,MPI_COMM_WORLD);
@@ -579,11 +591,11 @@ int main(int argc,char **argv){
 		while(synch_pending) core_wait(synch_answer);
 		Warning(info,"%d: got all sigs",mpi_me);
 		core_barrier();
-		for(i=0;i<lts->segment_count;i++){
+		for(int i=0;i<lts->segment_count;i++){
 			int jmax=lts->transition_count[i][mpi_me];
 			int *nm=newmap[i];
-			int *s=lts->dest[i][mpi_me];
-			for(j=0;j<jmax;j++){
+			uint32_t *s=lts->dest[i][mpi_me];
+			for(int j=0;j<jmax;j++){
 				nm[j]=SetGetTag(set[s[j]]);
 			}
 		}
@@ -592,13 +604,13 @@ int main(int argc,char **argv){
 		MPI_Allreduce(&synch_next,&newcount,1,MPI_INT,MPI_SUM,MPI_COMM_WORLD);
 		if (mpi_me==0) Warning(info,"count of iteration %d is %d",iter,newcount);
 		if (oldcount==newcount) break;
-		for(i=0;i<lts->state_count[mpi_me];i++){
+		for(uint32_t i=0;i<lts->state_count[mpi_me];i++){
 			oldid[i]=SetGetTag(set[i]);
 		}
 		MPI_Alltoallv(&synch_next,mpi_ones,mpi_zeros,MPI_INT,oldsynch,mpi_ones,mpi_indices,MPI_INT,MPI_COMM_WORLD);
 		oldcount=newcount;
 		if (mpi_me==0) Warning(info,"updating map");
-		for(i=0;i<lts->segment_count;i++){
+		for(int i=0;i<lts->segment_count;i++){
 			MPI_Isend(newmap[i],lts->transition_count[i][mpi_me],MPI_INT,i,37,MPI_COMM_WORLD,request_array+i);
 			MPI_Irecv(map[i],lts->transition_count[mpi_me][i],MPI_INT,i,37,MPI_COMM_WORLD,request_array+lts->segment_count+i);
 		}
@@ -626,9 +638,9 @@ int main(int argc,char **argv){
 			}
 		}
 ***************/
-		for(i=0;i<auxlts->states;i++){
+		for(uint32_t i=0;i<auxlts->states;i++){
 			int s=EMPTY_SET;
-			for(j=auxlts->begin[i];j<auxlts->begin[i+1];j++){
+			for(uint32_t j=auxlts->begin[i];j<auxlts->begin[i+1];j++){
 				s=SetInsert(s,auxlts->label[j],auxmap[auxlts->dest[j]]);
 			}
 			set[i]=s;
@@ -642,8 +654,8 @@ int main(int argc,char **argv){
 		synch_pending=0;
 		synch_next=0;
 		synch_trans=0;
-		for(i=0;i<lts->segment_count;i++) synch_send_offset[i]=0;
-		for(i=0;i<lts->state_count[mpi_me];i++){
+		for(int i=0;i<lts->segment_count;i++) synch_send_offset[i]=0;
+		for(uint32_t i=0;i<lts->state_count[mpi_me];i++){
 			if(SetGetTag(set[i])<0){
 				int len;
 				int hash;
@@ -680,7 +692,7 @@ int main(int argc,char **argv){
 			if ((i&0x3fff)==0) core_yield();
 		}
 		//Warning(1,"%d: sending partial buffers",mpi_me);
-		for(i=0;i<lts->segment_count;i++) {
+		for(int i=0;i<lts->segment_count;i++) {
 			if (synch_send_offset[i]>0){
 				core_yield();
 				MPI_Send(synch_send_buffer[i],synch_send_offset[i],MPI_INT,i,synch_request,MPI_COMM_WORLD);
@@ -690,11 +702,11 @@ int main(int argc,char **argv){
 		while(synch_pending) core_wait(synch_answer);
 		Warning(info,"%d: got all sigs",mpi_me);
 		core_barrier();
-		for(i=0;i<lts->segment_count;i++){
+		for(int i=0;i<lts->segment_count;i++){
 			int jmax=lts->transition_count[i][mpi_me];
 			int *nm=newmap[i];
-			int *s=lts->dest[i][mpi_me];
-			for(j=0;j<jmax;j++){
+			uint32_t *s=lts->dest[i][mpi_me];
+			for(int j=0;j<jmax;j++){
 				nm[j]=SetGetTag(set[s[j]]);
 			}
 		}
@@ -705,13 +717,13 @@ int main(int argc,char **argv){
 //		stopTimer(synch_timer);
 		if (oldcount==newcount) break;
 //		startTimer(exchange_timer);
-		for(i=0;i<lts->state_count[mpi_me];i++){
+		for(uint32_t i=0;i<lts->state_count[mpi_me];i++){
 			oldid[i]=SetGetTag(set[i]);
 		}
 		MPI_Alltoallv(&synch_next,mpi_ones,mpi_zeros,MPI_INT,oldsynch,mpi_ones,mpi_indices,MPI_INT,MPI_COMM_WORLD);
 		oldcount=newcount;
 		if (mpi_me==0) Warning(info,"updating map");
-		for(i=0;i<lts->segment_count;i++){
+		for(int i=0;i<lts->segment_count;i++){
 			MPI_Isend(newmap[i],lts->transition_count[i][mpi_me],MPI_INT,i,37,MPI_COMM_WORLD,request_array+i);
 			MPI_Irecv(map[i],lts->transition_count[mpi_me][i],MPI_INT,i,37,MPI_COMM_WORLD,
 							request_array+lts->segment_count+i);
@@ -729,7 +741,7 @@ int main(int argc,char **argv){
 
 
 	MPI_Reduce(&synch_trans,&transitions,1,MPI_INT,MPI_SUM,0,MPI_COMM_WORLD);
-	if (mpi_me==lts->root_seg) {
+	if ((uint32_t)mpi_me==lts->root_seg) {
 		Warning(info,"reduced state space has %d states and %d transitions",newcount,transitions);
 		root=oldid[lts->root_ofs];
 		Warning(info,"root is %d/%d",GET_SEG(root),GET_OFS(root));
@@ -751,7 +763,7 @@ int main(int argc,char **argv){
 	output_label=(stream_t*)RTmalloc(mpi_nodes*sizeof(FILE*));
 	output_dest=(stream_t*)RTmalloc(mpi_nodes*sizeof(FILE*));
 	tcount=(int*)RTmalloc(mpi_nodes*sizeof(int));
-	for(i=0;i<mpi_nodes;i++){
+	for(int i=0;i<mpi_nodes;i++){
 		char name[1024];
 		sprintf(name,"src-%d-%d",i,mpi_me);
 		output_src[i]=arch_write(arch,name,plain?NULL:"diff32|gzip");
@@ -765,7 +777,7 @@ int main(int argc,char **argv){
 	TERM_INIT(term);
 	MPI_Barrier(MPI_COMM_WORLD);
 	Warning(info,"%d: starting to write using tag %d",mpi_me,write_tag);
-	for(j=0;j<synch_next;j++){
+	for(int j=0;j<synch_next;j++){
 		int set;
 		int src;
 		int label;
@@ -788,7 +800,7 @@ int main(int argc,char **argv){
 	Warning(info,"%d: waiting for write to finish",mpi_me);
 	core_terminate(term);
 	Warning(info,"%d: closing files",mpi_me);
-	for(i=0;i<mpi_nodes;i++){
+	for(int i=0;i<mpi_nodes;i++){
 		DSclose(&output_src[i]);
 		DSclose(&output_label[i]);
 		DSclose(&output_dest[i]);
@@ -797,7 +809,7 @@ int main(int argc,char **argv){
 	int *temp=NULL;
 	if (mpi_me==0){
 		stream_t ds=arch_write(arch,"TermDB",plain?NULL:"gzip");
-		for(i=0;i<lts->label_count;i++){
+		for(int i=0;i<lts->label_count;i++){
 			char*ln=lts->label_string[i];
 			DSwrite(ds,ln,strlen(ln));
 			DSwrite(ds,"\n",1);
@@ -817,7 +829,7 @@ int main(int argc,char **argv){
 	MPI_Gather(&scount,1,MPI_INT,temp,1,MPI_INT,0,MPI_COMM_WORLD);
 	long long int total_states=0;
 	if (mpi_me==0){
-		for(i=0;i<mpi_nodes;i++){
+		for(int i=0;i<mpi_nodes;i++){
 			total_states+=temp[i];
 			DSwriteU32(infos,temp[i]);
 		}
@@ -825,8 +837,8 @@ int main(int argc,char **argv){
 	MPI_Gather(tcount,mpi_nodes,MPI_INT,temp,mpi_nodes,MPI_INT,0,MPI_COMM_WORLD);
 	long long int total_transitions=0;
 	if (mpi_me==0){
-		for(i=0;i<mpi_nodes;i++){
-			for(j=0;j<mpi_nodes;j++){
+		for(int i=0;i<mpi_nodes;i++){
+			for(int j=0;j<mpi_nodes;j++){
 				total_transitions+=temp[i+mpi_nodes*j];
 				//ATwarning("%d -> %d : %d",i,j,temp[i+mpi_nodes*j]);
 				DSwriteU32(infos,temp[i+mpi_nodes*j]);

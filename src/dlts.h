@@ -11,16 +11,16 @@ typedef struct dlts {
 	char *decode;
 	char *info;
 	int segment_count;
-	int root_seg;
-	int root_ofs;
+	uint32_t root_seg;
+	uint32_t root_ofs;
 	int label_count;
-	int tau;
-	int *state_count;
-	int **transition_count;
+	uint32_t tau;
+	uint32_t *state_count;
+	uint32_t **transition_count;
 	char **label_string;
-	int ***src;
-	int ***label;
-	int ***dest;
+	uint32_t ***src;
+	uint32_t ***label;
+	uint32_t ***dest;
 } *dlts_t;
 
 extern dlts_t dlts_create();

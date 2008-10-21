@@ -262,30 +262,36 @@ int parse_options(struct option options[],int argc,char *argv[]){
 }
 
 int usage(char* opt,char*optarg,void *arg){
+	(void)opt;(void)optarg;(void)arg;
 	return OPT_USAGE;
 }
 
 int inc_int(char* opt,char*optarg,void *arg){
+	(void)opt;(void)optarg;
 	(*((int*)arg))++;
 	return OPT_OK;
 }
 
 int dec_int(char* opt,char*optarg,void *arg){
+	(void)opt;(void)optarg;
 	(*((int*)arg))--;
 	return OPT_OK;
 }
 
 int set_int(char* opt,char*optarg,void *arg){
+	(void)opt;(void)optarg;
 	*((int*)arg)=1;
 	return OPT_OK;
 }
 
 int reset_int(char* opt,char*optarg,void *arg){
+	(void)opt;(void)optarg;
 	*((int*)arg)=0;
 	return OPT_OK;
 }
 
 int parse_int(char* opt,char*optarg,void *arg){
+	(void)opt;
 	char* tmp;
 	*((int*)arg)=strtol(optarg,&tmp,0);
 	if (*tmp!='\0') {
@@ -297,17 +303,20 @@ int parse_int(char* opt,char*optarg,void *arg){
 }
 
 int parse_float(char* opt,char*optarg,void *arg){
+	(void)opt;
 	if (optarg==NULL) return OPT_EXIT;
 	if (sscanf(optarg,"%f",(float*)arg)!=1) return OPT_EXIT;
 	return OPT_OK;
 }
 
 int assign_string(char* opt,char*optarg,void *arg){
+	(void)opt;
 	*((char**)arg)=optarg;
 	return OPT_OK;
 }
 
 int log_suppress(char* opt,char*optarg,void *arg){
+	(void)opt;(void)optarg;
 	log_set_flags(*((log_t*)arg),LOG_IGNORE);
 	return OPT_OK;
 }

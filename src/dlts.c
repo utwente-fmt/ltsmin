@@ -72,25 +72,25 @@ void dlts_getinfo(dlts_t lts){
 	lts->label_count=DSreadU32(ds);
 	lts->tau=DSreadU32(ds);
 	dummy=DSreadU32(ds);
-	lts->state_count=(int*)RTmalloc(lts->segment_count*sizeof(int));
+	lts->state_count=(uint32_t*)RTmalloc(lts->segment_count*sizeof(uint32_t));
 	for(i=0;i<lts->segment_count;i++){
 		lts->state_count[i]=DSreadU32(ds);
 	}
-	lts->transition_count=(int**)RTmalloc(lts->segment_count*sizeof(int*));
+	lts->transition_count=(uint32_t**)RTmalloc(lts->segment_count*sizeof(uint32_t*));
 	for(i=0;i<lts->segment_count;i++){
-		lts->transition_count[i]=(int*)RTmalloc(lts->segment_count*sizeof(int));
+		lts->transition_count[i]=(uint32_t*)RTmalloc(lts->segment_count*sizeof(uint32_t));
 		for(j=0;j<lts->segment_count;j++){
 			lts->transition_count[i][j]=DSreadU32(ds);
 			Warning(info,"%d transitions from %d to %d",lts->transition_count[i][j],i,j);
 		}
 	}
-	lts->src=(int***)malloc(lts->segment_count*sizeof(int**));
-	lts->label=(int***)malloc(lts->segment_count*sizeof(int**));
-	lts->dest=(int***)malloc(lts->segment_count*sizeof(int**));
+	lts->src=(uint32_t***)malloc(lts->segment_count*sizeof(uint32_t**));
+	lts->label=(uint32_t***)malloc(lts->segment_count*sizeof(uint32_t**));
+	lts->dest=(uint32_t***)malloc(lts->segment_count*sizeof(uint32_t**));
 	for(i=0;i<lts->segment_count;i++){
-		lts->src[i]=(int**)malloc(lts->segment_count*sizeof(int*));
-		lts->label[i]=(int**)malloc(lts->segment_count*sizeof(int*));
-		lts->dest[i]=(int**)malloc(lts->segment_count*sizeof(int*));
+		lts->src[i]=(uint32_t**)malloc(lts->segment_count*sizeof(uint32_t*));
+		lts->label[i]=(uint32_t**)malloc(lts->segment_count*sizeof(uint32_t*));
+		lts->dest[i]=(uint32_t**)malloc(lts->segment_count*sizeof(uint32_t*));
 		for(j=0;j<lts->segment_count;j++){
 			lts->src[i][j]=NULL;
 			lts->label[i][j]=NULL;
@@ -113,13 +113,13 @@ void dlts_getTermDB(dlts_t lts){
 }
 
 void dlts_load_src(dlts_t lts,int from,int to){
-	int i;
+	uint32_t i;
 	char name[1024];
-	int *data;
+	uint32_t *data;
 
 	sprintf(name,"src-%d-%d",from,to);
 	stream_t ds=arch_read(lts->arch,name,lts->decode);
-	data=(int*)RTmalloc((lts->transition_count[from][to])*sizeof(int));
+	data=(uint32_t*)RTmalloc((lts->transition_count[from][to])*sizeof(uint32_t));
 	for(i=0;i<lts->transition_count[from][to];i++){
 		data[i]=DSreadU32(ds);
 	}
@@ -127,13 +127,13 @@ void dlts_load_src(dlts_t lts,int from,int to){
 	DSclose(&ds);
 }
 void dlts_load_label(dlts_t lts,int from,int to){
-	int i;
+	uint32_t i;
 	char name[1024];
-	int *data;
+	uint32_t *data;
 
 	sprintf(name,"label-%d-%d",from,to);
 	stream_t ds=arch_read(lts->arch,name,lts->decode);
-	data=(int*)RTmalloc((lts->transition_count[from][to])*sizeof(int));
+	data=(uint32_t*)RTmalloc((lts->transition_count[from][to])*sizeof(uint32_t));
 	for(i=0;i<lts->transition_count[from][to];i++){
 		data[i]=DSreadU32(ds);
 	}
@@ -141,13 +141,13 @@ void dlts_load_label(dlts_t lts,int from,int to){
 	DSclose(&ds);
 }
 void dlts_load_dest(dlts_t lts,int from,int to){
-	int i;
+	uint32_t i;
 	char name[1024];
-	int *data;
+	uint32_t *data;
 
 	sprintf(name,"dest-%d-%d",from,to);
 	stream_t ds=arch_read(lts->arch,name,lts->decode);
-	data=(int*)RTmalloc((lts->transition_count[from][to])*sizeof(int));
+	data=(uint32_t*)RTmalloc((lts->transition_count[from][to])*sizeof(uint32_t));
 	for(i=0;i<lts->transition_count[from][to];i++){
 		data[i]=DSreadU32(ds);
 	}

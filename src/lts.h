@@ -20,7 +20,7 @@ typedef struct lts {
 	u_int32_t *src;
 	u_int32_t *label;
 	u_int32_t *dest;
-	int tau;
+	u_int32_t tau;
 	char **label_string;
 	u_int32_t label_count;
 } *lts_t;
