@@ -6,7 +6,7 @@
 
 struct raf_struct_s {
 	struct raf_object shared;
-	int blocksize;
+	uint32_t blocksize;
 	void* rqbuf;
 	int rqlen;
 	void* data;
@@ -24,7 +24,7 @@ struct read_request {
 
 static void read_at(raf_t raf,void*buf,size_t len,off_t ofs){
 	uint64_t ofs_block=ofs/(raf->blocksize);
-	if ((ofs+len)>((ofs_block+1)*(raf->blocksize))) Fatal(0,error,"read not within one block");
+	if (((uint64_t)ofs+len)>((ofs_block+(uint32_t)1)*(raf->blocksize))) Fatal(0,error,"read not within one block");
 	raf->rqbuf=buf;
 	raf->rqlen=len;
 	uint64_t where=ofs_block%(raf->workers);
