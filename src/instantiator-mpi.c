@@ -1,12 +1,11 @@
-#include <mpi.h>
-
 #include "config.h"
-#include "generichash.h"
-
 #include <string.h>
 #include <unistd.h>
 #include <stdio.h>
 #include <string.h>
+#include <mpi.h>
+
+#include "generichash.h"
 #include "rw.h"
 #include "mcrl.h"
 #include "step.h"
@@ -17,6 +16,7 @@
 #include "archive.h"
 #include "sysdep.h"
 #include "mpi_io_stream.h"
+#include "mpi_ram_raf.h"
 
 #define MAX_PARAMETERS 256
 #define MAX_TERM_LEN 5000
