@@ -11,9 +11,12 @@ AM_PROG_CC_C_O
 AC_PROG_MAKE_SET
 AC_PROG_RANLIB
 AC_PROG_INSTALL
-ACX_MPI()
+ACX_MPI(
+  [CC="$MPICC"
+   have_mpi=yes],
+  [have_mpi=])
 AC_ARG_VAR([MCRL], [muCRL command])
-AC_PATH_TOOL(MCRL, [mcrl], [])
+AC_PATH_TOOL(MCRL, [mcrl])
 if test "x$MCRL" = "x"; then
   AC_MSG_WARN([mCRL installation not found.])
 fi
@@ -25,14 +28,16 @@ AC_CACHE_SAVE
 CFLAGS="-W -Wall -O2 -pthread -std=c99 $CFLAGS"
 CPPFLAGS="-I$(dirname $MCRL)/../mCRL/include $CPPFLAGS"
 LDFLAGS="-L$(dirname $MCRL)/../mCRL/lib $LDFLAGS"
+LIBS="$MPILIBS $LIBS"
 AC_CHECK_LIB([z], [inflateEnd],,
   [AC_MSG_FAILURE([zlib not found.])])
 AC_CHECK_LIB([dl], [dlopen])
 AC_CHECK_LIB([ATerm], [ATinit])
 AC_CHECK_LIB([mcrlunix], [main])
-AC_CHECK_LIB([mcrl], [MCRLsetArguments], [
-  LIBS="-lmcrl $LIBS"
-  have_mcrl=yes])
+AC_CHECK_LIB([mcrl], [MCRLsetArguments],
+  [LIBS="-lmcrl $LIBS"
+   have_mcrl=yes],
+  [have_mcrl=])
 AC_CHECK_LIB([step], [STsetArguments])
 AC_CHECK_LIB([rt], [aio_error])
 
@@ -64,7 +69,7 @@ AC_FUNC_STRERROR_R
 AC_FUNC_VPRINTF
 AC_CHECK_FUNCS([atexit bzero ftruncate strchr strdup strndup strstr strtol])
 
-AM_CONDITIONAL([HAVE_MPI], [test "x$MPICC" != "x"])
+AM_CONDITIONAL([HAVE_MPI], [test "x$have_mpi" != "x"])
 AM_CONDITIONAL([HAVE_LIBMCRL], [test "x$have_mcrl" != x])
 AM_CONDITIONAL([HAVE_ASCIIDOC], [test "x$ASCIIDOC" != x])
 AM_CONDITIONAL([HAVE_XMLTO], [test "x$XMLTO" != x])
@@ -79,6 +84,7 @@ AC_OUTPUT
 cat <<EOM
 Configuration:
 ======================================================================
+    CC       = ${CC:-NOT FOUND}
     MPICC    = ${MPICC:-NOT FOUND, building without MPI support}
     MCRL     = ${MCRL:-NOT FOUND, building without mCRL support}
 
