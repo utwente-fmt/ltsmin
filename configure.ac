@@ -34,7 +34,7 @@ AC_CHECK_LIB([z], [inflateEnd],,
   [AC_MSG_FAILURE([zlib not found.])])
 AC_CHECK_LIB([dl], [dlopen])
 AC_CHECK_LIB([ATerm], [ATinit])
-AC_CHECK_LIB([mcrlunix], [main])
+AC_CHECK_LIB([mcrlunix], [CreateDir])
 AC_CHECK_LIB([mcrl], [MCRLsetArguments],
   [LIBS="-lmcrl $LIBS"
    have_mcrl=yes],
