@@ -17,8 +17,8 @@ AC_PATH_TOOL(MCRL, [mcrl], [])
 if test "$MCRL" == ""; then
   AC_MSG_ERROR(mCRL installation not found.)
 fi
-AC_CHECK_PROG(ASCIIDOC, [asciidoc])
-AC_CHECK_PROG(XMLTO, [xmlto])
+AC_PATH_PROG(ASCIIDOC, [asciidoc])
+AC_PATH_PROG(XMLTO, [xmlto])
 AC_CACHE_SAVE
 
 # Checks for libraries.
@@ -41,7 +41,10 @@ AC_CHECK_LIB([rt], [aio_error])
 
 # Checks for header files.
 AH_TOP(
-[#define _GNU_SOURCE
+[#ifndef LTSMIN_CONFIG_H
+#define LTSMIN_CONFIG_H
+
+#define _GNU_SOURCE
 #define _LARGEFILE_SOURCE
 #define _FILE_OFFSET_BITS 64
 #define _LARGEFILE64_SOURCE
@@ -59,6 +62,7 @@ AH_TOP(
 
 #define NAME_MAX 1024
 ])
+AH_BOTTOM([#endif /* LTSMIN_CONFIG_H */])
 
 AC_HEADER_DIRENT
 AC_HEADER_STDC
