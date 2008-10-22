@@ -53,7 +53,6 @@ AH_TOP(
 
 #if defined(__linux__)
 #include <features.h>
-#define HAVE_STRNDUP
 #endif
 
 #ifndef DEFFILEMODE
