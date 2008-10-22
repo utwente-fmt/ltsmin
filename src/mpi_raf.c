@@ -23,7 +23,7 @@ static void mpi_wait(raf_t raf){
 }
 
 static off_t mpi_size(raf_t raf){
-	off_t size;
+	MPI_Offset size;
 	MPI_File_get_size(raf->f,&size);
 	return size;
 }

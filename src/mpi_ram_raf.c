@@ -10,7 +10,7 @@ struct raf_struct_s {
 	void* rqbuf;
 	int rqlen;
 	void* data;
-	off_t size;
+	MPI_Offset size;
 	int rank;
 	int workers;
 	int rq_tag;
@@ -23,11 +23,11 @@ struct read_request {
 };
 
 static void read_at(raf_t raf,void*buf,size_t len,off_t ofs){
-	int ofs_block=ofs/(raf->blocksize);
+	uint64_t ofs_block=ofs/(raf->blocksize);
 	if ((ofs+len)>((ofs_block+1)*(raf->blocksize))) Fatal(0,error,"read not within one block");
 	raf->rqbuf=buf;
 	raf->rqlen=len;
-	int where=ofs_block%(raf->workers);
+	uint64_t where=ofs_block%(raf->workers);
 	struct read_request rq;
 	rq.ofs=((ofs_block/(raf->workers))*(raf->blocksize))+(ofs-(ofs_block*(raf->blocksize)));
 	rq.len=len;
