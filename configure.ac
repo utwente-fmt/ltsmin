@@ -13,11 +13,15 @@ AC_PROG_RANLIB
 AC_PROG_INSTALL
 ACX_MPI(
   [CC="$MPICC"
+   LIBS="$MPILIBS $LIBS"
    have_mpi=yes],
   [have_mpi=])
 AC_ARG_VAR([MCRL], [muCRL command])
 AC_PATH_TOOL(MCRL, [mcrl])
-if test "x$MCRL" = "x"; then
+if test "x$MCRL" != "x"; then
+  CPPFLAGS="-I$(dirname "$MCRL")/../mCRL/include $CPPFLAGS"
+  LDFLAGS="-L$(dirname "$MCRL")/../mCRL/lib $LDFLAGS"
+else
   AC_MSG_WARN([mCRL installation not found.])
 fi
 AC_PATH_PROG(ASCIIDOC, [asciidoc])
@@ -26,9 +30,6 @@ AC_CACHE_SAVE
 
 # Checks for libraries.
 CFLAGS="-W -Wall -O2 -pthread -std=c99 $CFLAGS"
-CPPFLAGS="-I$(dirname $MCRL)/../mCRL/include $CPPFLAGS"
-LDFLAGS="-L$(dirname $MCRL)/../mCRL/lib $LDFLAGS"
-LIBS="$MPILIBS $LIBS"
 AC_CHECK_LIB([z], [inflateEnd],,
   [AC_MSG_FAILURE([zlib not found.])])
 AC_CHECK_LIB([dl], [dlopen])
