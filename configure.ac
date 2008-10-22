@@ -14,29 +14,26 @@ AC_PROG_INSTALL
 ACX_MPI()
 AC_ARG_VAR([MCRL], [muCRL command])
 AC_PATH_TOOL(MCRL, [mcrl], [])
-if test "$MCRL" == ""; then
-  AC_MSG_ERROR(mCRL installation not found.)
+if test "x$MCRL" = "x"; then
+  AC_MSG_WARN([mCRL installation not found.])
 fi
 AC_PATH_PROG(ASCIIDOC, [asciidoc])
 AC_PATH_PROG(XMLTO, [xmlto])
 AC_CACHE_SAVE
 
 # Checks for libraries.
-CFLAGS="-W -Wall -pthread -std=c99"
+CFLAGS="-W -Wall -O2 -pthread -std=c99 $CFLAGS"
 CPPFLAGS="-I$(dirname $MCRL)/../mCRL/include $CPPFLAGS"
 LDFLAGS="-L$(dirname $MCRL)/../mCRL/lib $LDFLAGS"
-AC_CHECK_LIB([ATerm], [ATinit],,
-  [AC_MSG_FAILURE([libATerm not found.  Remember to use the same
-  library that mcrl is linked against.])])
 AC_CHECK_LIB([z], [inflateEnd],,
   [AC_MSG_FAILURE([zlib not found.])])
 AC_CHECK_LIB([dl], [dlopen])
-AC_CHECK_LIB([mcrlunix], [main],,
-  [AC_MSG_FAILURE([libmcrlunix not found.])])
-AC_CHECK_LIB([mcrl], [MCRLsetArguments],,
-  [AC_MSG_FAILURE([libmcrl not found.])])
-AC_CHECK_LIB([step], [STsetArguments],,
-  [AC_MSG_FAILURE([libstep not found.])])
+AC_CHECK_LIB([ATerm], [ATinit])
+AC_CHECK_LIB([mcrlunix], [main])
+AC_CHECK_LIB([mcrl], [MCRLsetArguments], [
+  LIBS="-lmcrl $LIBS"
+  have_mcrl=yes])
+AC_CHECK_LIB([step], [STsetArguments])
 AC_CHECK_LIB([rt], [aio_error])
 
 # Checks for header files.
@@ -67,9 +64,25 @@ AC_FUNC_STRERROR_R
 AC_FUNC_VPRINTF
 AC_CHECK_FUNCS([atexit bzero ftruncate strchr strdup strndup strstr strtol])
 
+AM_CONDITIONAL([HAVE_MPI], [test "x$MPICC" != "x"])
+AM_CONDITIONAL([HAVE_LIBMCRL], [test "x$have_mcrl" != x])
+AM_CONDITIONAL([HAVE_ASCIIDOC], [test "x$ASCIIDOC" != x])
+AM_CONDITIONAL([HAVE_XMLTO], [test "x$XMLTO" != x])
+
 AC_CONFIG_FILES([
        Makefile
        src/Makefile
        doc/Makefile
 ])
 AC_OUTPUT
+
+cat <<EOM
+Configuration:
+======================================================================
+    MPICC    = ${MPICC:-NOT FOUND, building without MPI support}
+    MCRL     = ${MCRL:-NOT FOUND, building without mCRL support}
+
+    ASCIIDOC = ${ASCIIDOC:-NOT FOUND, not building documentation}
+    XMLTO    = ${XMLTO:-NOT FOUND, not building manpages}
+======================================================================
+EOM

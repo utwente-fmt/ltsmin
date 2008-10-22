@@ -1,5 +1,14 @@
-bin_PROGRAMS = instantiator-mpi ltsmin-mpi ltsmin-convert
-noinst_LIBRARIES = libmpi.a libutil.a
+if HAVE_MPI
+EXEMPI = ltsmin-mpi
+if HAVE_LIBMCRL
+EXEMPI += instantiator-mpi
+endif
+LIBMPI = libmpi.a
+endif
+
+bin_PROGRAMS = ltsmin-convert $(EXEMPI)
+noinst_LIBRARIES = $(LIBMPI) libutil.a
+
 EXTRA_DIST = docs.cfg
 
 # instantiator-mpi

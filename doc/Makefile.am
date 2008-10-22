@@ -5,9 +5,12 @@ ASCIIDOC_FLAGS = -a version=$(VERSION)
 doc_ASCIIDOC = instantiator-mpi.txt ltsmin-mpi.txt ltsmin-convert.txt
 EXTRA_DIST = asciidoc.conf callouts.xsl $(doc_ASCIIDOC)
 
+if HAVE_ASCIIDOC
+if HAVE_XMLTO
 dist_man_MANS = instantiator-mpi.1 ltsmin-mpi.1 ltsmin-convert.1
-
+endif
 HTML      = $(doc_ASCIIDOC:%.txt=%.html)
+endif
 dist_html_DATA = $(HTML)
 
 
