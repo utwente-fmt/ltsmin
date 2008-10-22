@@ -1,18 +1,19 @@
-#include "raf_object.h"
-#include "runtime.h"
+#include "config.h"
 #include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-#ifdef __linux__
+#ifdef HAVE_LIBRT
 #include <aio.h>
 #endif
 #include <stdlib.h>
+#include "raf_object.h"
+#include "runtime.h"
 
 struct raf_struct_s {
 	struct raf_object shared;
 	int fd;
-#ifdef __linux__
+#ifdef HAVE_LIBRT
 	struct aiocb request;
 #endif
 };
@@ -60,7 +61,7 @@ static void Pwrite(raf_t raf,void*buf,size_t len,off_t ofs){
 	}
 }
 
-#ifdef __linux__
+#ifdef HAVE_LIBRT
 
 static void AIOwrite(raf_t raf,void*buf,size_t len,off_t ofs){
 	raf->request.aio_buf=buf;
@@ -148,14 +149,14 @@ raf_t raf_unistd(char *name){
 	raf->fd=fd;
 	raf->shared.read=Pread;
 	raf->shared.write=Pwrite;
-#ifdef __linux__
+#ifdef HAVE_LIBRT
 	raf->shared.awrite=AIOwrite;
 	raf->shared.await=AIOwait;
 #endif
 	raf->shared.size=Psize;
 	raf->shared.resize=Presize;
 	raf->shared.close=Pclose;
-#ifdef __linux__
+#ifdef HAVE_LIBRT
 	raf->request.aio_fildes=fd;
 	raf->request.aio_reqprio=0;
 #endif

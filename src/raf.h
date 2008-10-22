@@ -41,7 +41,7 @@ extern void raf_close(raf_t *raf);
 /** @brief Open a random acces file using UNIX calls. */
 extern raf_t raf_unistd(char *name);
 
-#ifdef USE_MPI
+#ifdef HAVE_MPI
 #include <mpi.h>
 /** @brief Open a random acces file using MPI-IO. */
 extern raf_t MPI_Create_raf(char *name,MPI_Comm comm);
@@ -50,4 +50,3 @@ extern raf_t MPI_Load_raf(char *name,MPI_Comm comm);
 #endif
 
 #endif
-

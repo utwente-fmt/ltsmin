@@ -1,0 +1,4 @@
+For developers:
+
+Use ./ltsminreconf after version control checkout to pull in autotools
+changes.
