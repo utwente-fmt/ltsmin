@@ -30,6 +30,7 @@ static void file_close(stream_t *stream){
 }
 
 static void file_flush(stream_t stream){
+	(void)stream;
 }
 
 stream_t mpi_io_read(char *name){

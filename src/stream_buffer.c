@@ -6,12 +6,12 @@
 struct stream_s {
 	struct stream_obj procs;
 	stream_t s;
-	int rd_sz;
-	int rd_next;
-	int rd_used;
+	uint32_t rd_sz;
+	uint32_t rd_next;
+	uint32_t rd_used;
 	void *rd_buf;
-	int wr_sz;
-	int wr_used;
+	uint32_t wr_sz;
+	uint32_t wr_used;
 	void *wr_buf;
 };
 

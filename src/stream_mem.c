@@ -43,6 +43,7 @@ static void mem_close(stream_t *stream){
 }
 
 static void mem_flush(stream_t stream){
+	(void)stream;
 }
 
 

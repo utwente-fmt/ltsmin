@@ -55,23 +55,29 @@ int stream_writable(stream_t stream){
 /*************************************************************************/
 
 size_t stream_illegal_read_max(stream_t stream,void*buf,size_t count){
+	(void)stream;(void)buf;(void)count;
 	Fatal(0,error,"illegal read max on stream");
 	return 0;
 }
 void stream_illegal_read(stream_t stream,void*buf,size_t count){
+	(void)stream;(void)buf;(void)count;
 	Fatal(0,error,"illegal read on stream");
 }
 int stream_illegal_empty(stream_t stream){
+	(void)stream;
 	Fatal(0,error,"illegal empty on stream");
 	return 0;
 }
 void stream_illegal_write(stream_t stream,void*buf,size_t count){
+	(void)stream;(void)buf;(void)count;
 	Fatal(0,error,"illegal write on stream");
 }
 void stream_illegal_flush(stream_t stream){
+	(void)stream;
 	Fatal(0,error,"illegal flush on stream");
 }
 void stream_illegal_close(stream_t *stream){
+	(void)stream;
 	Fatal(0,error,"illegal close on stream");
 }
 void stream_init(stream_t s){

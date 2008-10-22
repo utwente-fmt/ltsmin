@@ -39,6 +39,7 @@ static void read_at(raf_t raf,void*buf,size_t len,off_t ofs){
 
 static void request_service(void *arg,MPI_Status*probe_status){
 #define raf ((raf_t)arg)
+	(void)probe_status;
 	MPI_Status status;
 	struct read_request rq;
 	MPI_Recv(&rq,sizeof(struct read_request),MPI_CHAR,MPI_ANY_SOURCE,raf->rq_tag,MPI_COMM_WORLD,&status);
@@ -57,6 +58,7 @@ static void request_service(void *arg,MPI_Status*probe_status){
 
 static void receive_service(void *arg,MPI_Status*probe_status){
 #define raf ((raf_t)arg)
+	(void)probe_status;
 	MPI_Status status;
 	MPI_Recv(raf->rqbuf,raf->rqlen,MPI_CHAR,MPI_ANY_SOURCE,raf->ack_tag,MPI_COMM_WORLD,&status);
 	//Warning(info,"got data");

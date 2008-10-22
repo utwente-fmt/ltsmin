@@ -98,6 +98,7 @@ static int barrier_tag;
 static int barrier_count;
 
 static void barrier_service(void *arg,MPI_Status*probe_status){
+	(void)arg;(void)probe_status;
 	MPI_Status status,*recv_status=&status;
 	int other;
 	MPI_Recv(&other,1,MPI_INT,MPI_ANY_SOURCE,barrier_tag,MPI_COMM_WORLD,recv_status);
@@ -133,6 +134,7 @@ static int term_count;
 #define TERMINATED 2
 
 static void termination_service(void *arg,MPI_Status*probe_status){
+	(void)arg;(void)probe_status;
 	MPI_Status status,*recv_status=&status;
 	MPI_Recv(term_message,2,MPI_INT,MPI_ANY_SOURCE,term_tag,MPI_COMM_WORLD,recv_status);
 	if (term_message[0]==TERMINATED) {

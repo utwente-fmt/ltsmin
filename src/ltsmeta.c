@@ -16,7 +16,7 @@ struct lts_meta_s {
 	uint64_t trans;
 	uint64_t labels;
 	uint32_t tau;
-	uint32_t segment_count;
+	int32_t segment_count;
 	uint32_t root_seg;
 	uint32_t root_ofs;
 	uint32_t label_count;

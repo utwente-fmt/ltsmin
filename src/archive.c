@@ -80,20 +80,25 @@ void arch_play(archive_t arch,char*regex,struct archive_enum *cb,void*arg){
 }
 
 stream_t arch_illegal_read(archive_t arch,char*name){
+	(void)arch;(void)name;
 	Fatal(0,error,"illegal read on archive");
 	return NULL;
 }
 stream_t arch_illegal_write(archive_t arch,char*name){
+	(void)arch;(void)name;
 	Fatal(0,error,"illegal write on archive");
 	return NULL;
 }
 void arch_illegal_list(archive_t arch,char*regex,string_enum_t cb,void*arg){
+	(void)arch;(void)regex;(void)cb;(void)arg;
 	Fatal(0,error,"illegal list on archive");
 }
 void arch_illegal_play(archive_t arch,char*regex,struct archive_enum *cb,void*arg){
+	(void)arch;(void)regex;(void)cb;(void)arg;
 	Fatal(0,error,"illegal play on archive");
 }
 void arch_illegal_close(archive_t *arch){
+	(void)arch;
 	Fatal(0,error,"illegal close on archive");
 }
 void arch_init(archive_t arch){
