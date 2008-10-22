@@ -1,5 +1,8 @@
 /* src/config.h.in.  Generated from configure.ac by autoheader.  */
 
+#ifndef LTSMIN_CONFIG_H
+#define LTSMIN_CONFIG_H
+
 #define _GNU_SOURCE
 #define _LARGEFILE_SOURCE
 #define _FILE_OFFSET_BITS 64
@@ -9,6 +12,7 @@
 
 #if defined(__linux__)
 #include <features.h>
+#define HAVE_STRNDUP
 #endif
 
 #ifndef DEFFILEMODE
@@ -235,3 +239,5 @@
 /* Define to the type of an unsigned integer type of width exactly 8 bits if
    such a type exists and the standard includes do not define it. */
 #undef uint8_t
+
+#endif /* LTSMIN_CONFIG_H */
