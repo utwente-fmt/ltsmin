@@ -1,10 +1,10 @@
-
+#include "config.h"
 #include <sys/types.h>
 #include <sys/times.h>
+#include <stdlib.h>
 #include <unistd.h>
 #include "runtime.h"
-#include "time.h"
-#include <stdlib.h>
+#include "scctimer.h"
 
 struct timer {
 	clock_t	real_time;

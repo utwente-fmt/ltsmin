@@ -3,6 +3,7 @@
 
 #include "config.h"
 #include <stdlib.h>
+#include "amconfig.h"
 
 #if !defined(HAVE_STRNDUP)
 extern char *strndup(const char *str, size_t n);

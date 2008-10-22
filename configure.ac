@@ -4,7 +4,7 @@ AC_INIT([LTSmin], [1.0],
         [ltsmin])
 AM_INIT_AUTOMAKE
 AC_CONFIG_SRCDIR([src/ltsmin-mpi.c])
-AC_CONFIG_HEADERS([src/config.h])
+AC_CONFIG_HEADERS([src/amconfig.h])
 
 # Checks for programs.
 AM_PROG_CC_C_O
@@ -40,29 +40,6 @@ AC_CHECK_LIB([step], [STsetArguments],,
 AC_CHECK_LIB([rt], [aio_error])
 
 # Checks for header files.
-AH_TOP(
-[#ifndef LTSMIN_CONFIG_H
-#define LTSMIN_CONFIG_H
-
-#define _GNU_SOURCE
-#define _LARGEFILE_SOURCE
-#define _FILE_OFFSET_BITS 64
-#define _LARGEFILE64_SOURCE
-
-#define _XOPEN_SOURCE 600
-
-#if defined(__linux__)
-#include <features.h>
-#endif
-
-#ifndef DEFFILEMODE
-#define DEFFILEMODE 0666
-#endif
-
-#define NAME_MAX 1024
-])
-AH_BOTTOM([#endif /* LTSMIN_CONFIG_H */])
-
 AC_HEADER_DIRENT
 AC_HEADER_STDC
 AC_CHECK_HEADERS([fcntl.h limits.h stdint.h stdlib.h string.h strings.h unistd.h])

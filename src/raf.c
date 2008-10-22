@@ -3,10 +3,10 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <stdlib.h>
 #ifdef HAVE_LIBRT
 #include <aio.h>
 #endif
-#include <stdlib.h>
 #include "raf_object.h"
 #include "runtime.h"
 

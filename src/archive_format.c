@@ -1,16 +1,16 @@
-#include "arch_object.h"
-#include "runtime.h"
+#include "config.h"
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <errno.h>
+#include <stdlib.h>
 #include <unistd.h>
+#include <errno.h>
 #include <dirent.h>
 #include <string.h>
 #include <stdio.h>
 #include <limits.h>
 #include <string.h>
-#include <stdlib.h>
-
+#include "arch_object.h"
+#include "runtime.h"
 
 struct archive_s {
 	struct archive_obj procs;

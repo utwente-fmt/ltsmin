@@ -1,17 +1,18 @@
 #include "config.h"
 #include <stdio.h>
 #include <string.h>
-#include <mpi.h>
-#include "mpi_core.h"
-#include "set.h"
-#include "time.h"
 #include <unistd.h>
-#include "runtime.h"
-#include "dlts.h"
 #include <stdlib.h>
-#include "mpi_io_stream.h"
+#include <mpi.h>
+#include "dlts.h"
 #include "lts.h"
+#include "runtime.h"
+#include "scctimer.h"
+#include "set.h"
 #include "stream.h"
+#include "mpi_core.h"
+#include "mpi_io_stream.h"
+#include "mpi_ram_raf.h"
 
 #define SYNCH_BUFFER_SIZE 8000
 
