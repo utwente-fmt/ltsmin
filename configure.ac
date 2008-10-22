@@ -1,4 +1,4 @@
-AC_PREREQ(2.61)
+AC_PREREQ(2.60)
 AC_INIT([LTSmin], [1.0], 
         [ltsmin-support@cs.utwente.nl],
         [ltsmin])
