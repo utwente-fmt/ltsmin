@@ -39,7 +39,7 @@ DX_INIT_DOXYGEN([$PACKAGE_NAME])
 AC_CACHE_SAVE
 
 # Checks for libraries.
-CFLAGS="-W -Wall -O2 -pthread -std=c99 $CFLAGS"
+CFLAGS="-g -W -Wall -O2 -pthread -std=c99 $CFLAGS"
 AC_CHECK_LIB([z], [inflateEnd],,
   [AC_MSG_FAILURE([zlib not found.])])
 AC_CHECK_LIB([dl], [dlopen])
