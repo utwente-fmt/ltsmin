@@ -7,20 +7,22 @@ EXTRA_DIST = asciidoc.conf callouts.xsl $(doc_ASCIIDOC)
 
 if HAVE_ASCIIDOC
 if HAVE_XMLTO
-dist_man_MANS = instantiator-mpi.1 ltsmin-mpi.1 ltsmin-convert.1
+MANPAGES = instantiator-mpi.1 ltsmin-mpi.1 ltsmin-convert.1
 endif
-HTML      = $(doc_ASCIIDOC:%.txt=%.html)
+HTML = $(doc_ASCIIDOC:%.txt=%.html)
 endif
+dist_man_MANS  = $(MANPAGES)
 dist_html_DATA = $(HTML)
 
+MOSTLYCLEANFILES     = $(doc_ASCIIDOC:.txt=.xml)
+MAINTAINERCLEANFILES = $(HTML) $(MANPAGES)
 
-CLEANFILES = $(doc_ASCIIDOC:.txt=.xml)
-MAINTAINERCLEANFILES = $(dist_man_MANS) $(HTML)
-
-docs: html-local $(man_MANS)
 html-local: $(HTML)
 
-.PHONY: docs
+docs-clean:
+	$(RM) -- $(HTML) $(MANPAGES)
+
+.PHONY: docs-clean
 
 .txt.xml:
 	$(ASCIIDOC.xml)

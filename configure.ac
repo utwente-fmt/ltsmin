@@ -1,7 +1,6 @@
 AC_PREREQ(2.60)
-AC_INIT([LTSmin], [1.0], 
-        [ltsmin-support@cs.utwente.nl],
-        [ltsmin])
+AC_INIT([ltsmin], [1.0], 
+        [ltsmin-support@cs.utwente.nl])
 AM_INIT_AUTOMAKE
 AC_CONFIG_SRCDIR([src/ltsmin-mpi.c])
 AC_CONFIG_HEADERS([src/amconfig.h])
@@ -17,15 +16,26 @@ ACX_MPI(
    have_mpi=yes],
   [have_mpi=])
 AC_ARG_VAR([MCRL], [muCRL command])
-AC_PATH_TOOL(MCRL, [mcrl])
-if test "x$MCRL" != "x"; then
+AC_PATH_TOOL(MCRL, [${MCRL:-mcrl}], [""])
+if test "x$MCRL" != x; then
   CPPFLAGS="-I$(dirname "$MCRL")/../mCRL/include $CPPFLAGS"
   LDFLAGS="-L$(dirname "$MCRL")/../mCRL/lib $LDFLAGS"
 else
-  AC_MSG_WARN([mCRL installation not found.])
+  AC_MSG_WARN([no acceptable mCRL installation found in \$PATH.])
 fi
-AC_PATH_PROG(ASCIIDOC, [asciidoc])
-AC_PATH_PROG(XMLTO, [xmlto])
+AC_CHECK_PROGS(ASCIIDOC, [asciidoc])
+AC_CHECK_PROGS(XMLTO, [xmlto])
+DX_DOXYGEN_FEATURE(ON)
+DX_HTML_FEATURE(ON)
+DX_CHM_FEATURE(OFF)
+DX_CHI_FEATURE(OFF)
+DX_MAN_FEATURE(OFF)
+DX_RTF_FEATURE(OFF)
+DX_XML_FEATURE(OFF)
+DX_PDF_FEATURE(ON)
+DX_PS_FEATURE(OFF)
+DX_DOT_FEATURE(OFF)
+DX_INIT_DOXYGEN([$PACKAGE_NAME])
 AC_CACHE_SAVE
 
 # Checks for libraries.

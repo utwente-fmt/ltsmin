@@ -1,0 +1,9 @@
+aclocal.m4
+autom4te.cache/
+compile
+configure
+depcomp
+doxygen-doc
+install-sh
+Makefile.in
+missing

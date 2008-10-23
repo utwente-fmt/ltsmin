@@ -44,7 +44,7 @@ void raf_close(raf_t *raf){
 
 
 
-static void Pread(raf_t raf,void*buf,size_t len,off_t ofs){
+static void RAFread(raf_t raf,void*buf,size_t len,off_t ofs){
 	ssize_t res=pread(raf->fd,buf,len,ofs);
 	if (res<0) {
 		FatalCall(1,error,"could not read %s",raf->shared.name);
@@ -53,7 +53,7 @@ static void Pread(raf_t raf,void*buf,size_t len,off_t ofs){
 		FatalCall(1,error,"short read %u/%u from %s at %llu",res,len,raf->shared.name,ofs);
 	}
 }
-static void Pwrite(raf_t raf,void*buf,size_t len,off_t ofs){
+static void RAFwrite(raf_t raf,void*buf,size_t len,off_t ofs){
 	ssize_t res=pwrite(raf->fd,buf,len,ofs);
 	if (res<0) {
 		FatalCall(1,error,"could not write %s",raf->shared.name);
@@ -98,19 +98,19 @@ static void AIOwait(raf_t raf){
 
 #endif
 
-static off_t Psize(raf_t raf){
+static off_t RAFsize(raf_t raf){
 	struct stat info;
 	if (fstat(raf->fd,&info)==-1){
 		FatalCall(1,error,"could not get size of %s",raf->shared.name);
 	}
 	return info.st_size;
 }
-static void Presize(raf_t raf,off_t size){
+static void RAFresize(raf_t raf,off_t size){
 	if (ftruncate(raf->fd,size)==-1){
 		FatalCall(1,error,"could not resize %s",raf->shared.name);
 	}
 }
-static void Pclose(raf_t *raf){
+static void RAFclose(raf_t *raf){
 	if (close((*raf)->fd)==-1){
 		FatalCall(1,error,"could not close %s",(*raf)->shared.name);
 	}
@@ -161,8 +161,8 @@ raf_t raf_unistd(char *name){
 	raf_t raf=(raf_t)RTmalloc(sizeof(struct raf_struct_s));
 	raf_init(raf,name);
 	raf->fd=fd;
-	raf->shared.read=Pread;
-	raf->shared.write=Pwrite;
+	raf->shared.read=RAFread;
+	raf->shared.write=RAFwrite;
 #ifdef HAVE_LIBRT
 	raf->shared.awrite=AIOwrite;
 	raf->shared.await=AIOwait;
@@ -171,9 +171,9 @@ raf_t raf_unistd(char *name){
 	raf->shared.awrite=RAFwrite;
 	raf->shared.await=RAFwait;
 #endif
-	raf->shared.size=Psize;
-	raf->shared.resize=Presize;
-	raf->shared.close=Pclose;
+	raf->shared.size=RAFsize;
+	raf->shared.resize=RAFresize;
+	raf->shared.close=RAFclose;
 #ifdef HAVE_LIBRT
 	raf->request.aio_fildes=fd;
 	raf->request.aio_reqprio=0;
