@@ -2,3 +2,9 @@
 *.a
 .depend
 .depend.bak
+.deps/
+amconfig.h
+instantiator-mpi
+ltsmin-convert
+ltsmin-mpi
+stamp-h1

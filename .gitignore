@@ -2,9 +2,13 @@
 aclocal.m4
 autom4te.cache/
 compile
+config.log
+config.status
 configure
 depcomp
 doxygen-doc
 install-sh
+Makefile
 Makefile.in
 missing
+ltsmin-*.tar.gz
