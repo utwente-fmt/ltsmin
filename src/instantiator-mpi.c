@@ -25,8 +25,7 @@ static archive_t arch;
 static int compare_terms=0;
 static int sequential_init_rewriter=0;
 static int verbosity=1;
-static char *outputfmt=NULL;
-static char *outputgcf=NULL;
+static char *outputarch=NULL;
 static int write_lts=1;
 static int nice_value=0;
 static int master_no_step=0;
@@ -51,14 +50,14 @@ struct option options[]={
 		"print help for the mCRL stepper",
 		"WARNING: some options (e.g. -conf-table) will",
 		"break the correctness of the distributed instantiator",NULL},
-	{"-fmt",OPT_REQ_ARG,assign_string,&outputfmt,"-fmt <format>",
-		"Write output as separate files. Format should have one occurrence of %s.",NULL,NULL,NULL},
-	{"-gcf",OPT_REQ_ARG,assign_string,&outputgcf,"-gcf <file>",
-		"Write output in a GCF archive.",NULL,NULL,NULL},
+	{"-out",OPT_REQ_ARG,assign_string,&outputarch,"-out <archive>",
+		"Specifiy the name of the output archive.",
+		"This will be a pattern archive if <archive> contains %s",
+		"and a GCF archive otherwise",NULL},
 	{"-nolb",OPT_NORMAL,reset_int,&loadbalancing,NULL,
 		"disable load balancing",NULL,NULL,NULL},
 	{"-nolts",OPT_NORMAL,reset_int,&write_lts,NULL,
-		"disable writing of the bare LTS",NULL,NULL,NULL},
+		"disable writing of the LTS",NULL,NULL,NULL},
 	{"-nice",OPT_REQ_ARG,parse_int,&nice_value,"-nice <val>",
 		"all workers will set nice to <val>",
 		"useful when running on other people's workstations",NULL,NULL},
@@ -70,7 +69,7 @@ struct option options[]={
 		"e.g. when a set is represented by an unsorted list",NULL},
 	{"-seq-rw",OPT_NORMAL,set_int,&sequential_init_rewriter,NULL,
 		"Perform initialisation of rewriters sequentially",
-		"rather than in parallel. (Needed for rw)",NULL,NULL},
+		"rather than in parallel. (The old rw needed this option.)",NULL,NULL},
 	{"-master-no-step",OPT_NORMAL,set_int,&master_no_step,NULL,
 		"instruct master to act as database only",
 		"this improves latency of database lookups",NULL,NULL},
@@ -401,15 +400,15 @@ int main(int argc, char*argv[]){
 		}
 	}
 	if (mpi_me==0){
-		if (!outputfmt && !outputgcf) ATerror("need -fmt or -gcf");
-		if (outputfmt && outputgcf) ATerror("need -fmt or -gcf, but not both");
+		if (write_lts && !outputarch) ATerror("please specify the output archive with -out");
 	}
 	MPI_Barrier(MPI_COMM_WORLD);
-	if (outputfmt) arch=arch_fmt(outputfmt,mpi_io_read,mpi_io_write,prop_get_U32("bs",65536));
-	if (outputgcf) {
+	if (strstr(outputarch,"%s")) {
+		arch=arch_fmt(outputarch,mpi_io_read,mpi_io_write,prop_get_U32("bs",65536));
+	} else {
 		uint32_t bs=prop_get_U32("bs",65536);
 		uint32_t bc=prop_get_U32("bc",128);
-		arch=arch_gcf_create(MPI_Create_raf(outputgcf,MPI_COMM_WORLD),bs,bs*bc,mpi_me,mpi_nodes);
+		arch=arch_gcf_create(MPI_Create_raf(outputarch,MPI_COMM_WORLD),bs,bs*bc,mpi_me,mpi_nodes);
 	}
 	/***************************************************/
 	if (write_lts) {

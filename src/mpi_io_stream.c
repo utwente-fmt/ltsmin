@@ -61,6 +61,7 @@ stream_t mpi_io_write(char*name){
 		Fatal(0,error,"err is %s\n",msg);
 	}
 	MPI_File_set_errhandler(s->f,MPI_ERRORS_ARE_FATAL);
+	MPI_File_set_size(s->f,0);
 	s->procs.write=file_write;
 	s->procs.flush=file_flush;
 	s->procs.close=file_close;

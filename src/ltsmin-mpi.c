@@ -66,13 +66,18 @@ static int select_strong_reduction(char* opt,char*optarg,void *arg){
 }
 
 struct option options[]={
-	{"",OPT_NORMAL,NULL,NULL,NULL,	"usage: ltsmin-mpi options input output",
+	{"",OPT_NORMAL,NULL,NULL,NULL,	"usage: mpirun <nodespec> ltsmin-mpi options input output",
+		"",
 		"This tool reduces a labeled transition system modulo bisimulation.",
-		"The default bisimulation is strong bisimulation.",NULL},
+		"The default bisimulation is strong bisimulation."},
 	{"",OPT_NORMAL,NULL,NULL,NULL,
 		"Both input and output can be a GCF archive or a set of files.",
 		"To use a set of files the argument needs and occurrence of %s.",
 		"If no %s is present then a GCF archive is assumed.",NULL},
+	{"",OPT_NORMAL,NULL,NULL,NULL,
+		"The workers send messages to themselves. So if you use openmpi, you",
+		"have to use 'mpirun -mca btl <connect>,self <nodespec>' where",
+		"<connect> can be tcp, mx, ib, etc.",NULL},
 	{"-plain",OPT_NORMAL,set_int,&plain,NULL,
 		"Disable compression of the output.",
 		"The tool detects if the input is compressed or not.",NULL,NULL},

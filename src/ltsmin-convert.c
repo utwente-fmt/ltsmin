@@ -10,7 +10,7 @@ static int decode=0;
 
 struct option options[]={
 	{"",OPT_NORMAL,NULL,NULL,NULL,
-		"usage: ltscopy options input output",NULL,NULL,NULL},
+		"usage: ltsmin-convert options input output",NULL,NULL,NULL},
 	{"-q",OPT_NORMAL,log_suppress,&info,"-q",
 		"do not print info messages",NULL,NULL,NULL},
 	{"-plain",OPT_NORMAL,set_int,&plain,NULL,

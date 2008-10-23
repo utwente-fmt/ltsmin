@@ -9,16 +9,41 @@ ltsmin-convert(1)
 ltsmin-convert - convert file formats for labelled transition system 
 
 == SYNOPSIS
-{manname} '<input>' '<output>'
+{manname} [OPTION] '<input>' '<output>'
 
 == DESCRIPTION
-todo
+This tool copies the input to the output and changes the achive format on-the-fly.
+Both input and output can be a GCF archive or a set of files.
+To use a set of files the argument needs and occurrence of ++%s++.
+If no ++%s++ is present then a GCF archive is assumed.
+
+Please note that this tool _does not_ use MPI-IO.
 
 == OPTIONS
-todo
+
+*-plain*::
+        Disable output compression. Input compression is detected.
+
+*-q*::
+Suppress all warning and information messages.
+
+*-help*::
+        Print help message.
+
+== EXAMPLES
+The expected use of this tool is to convert (uncompressed) _DIR_ to GCF and back:
+
+----
+ltsmin-convert brp.dir brp.cgf
+ltsmin-convert -plain brp.gcf brp.dir
+----
 
 == EXIT STATUS
-todo
+0::
+        Successful termination.
+1::
+        Some error occurred.
 
 == SEE ALSO
 linkman:instantiator-mpi[1], linkman:ltsmin-convert[1]
+
