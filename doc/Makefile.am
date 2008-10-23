@@ -2,12 +2,13 @@ ASCIIDOC = @ASCIIDOC@
 XMLTO    = @XMLTO@
 ASCIIDOC_FLAGS = -a version=$(VERSION)
 
-doc_ASCIIDOC = instantiator-mpi.txt ltsmin-mpi.txt ltsmin-convert.txt
+doc_ASCIIDOC = instantiator-mpi.txt ltsmin-mpi.txt ltsmin-convert.txt	\
+    ltsmin.txt
 EXTRA_DIST = asciidoc.conf callouts.xsl $(doc_ASCIIDOC)
 
 if HAVE_ASCIIDOC
 if HAVE_XMLTO
-MANPAGES = instantiator-mpi.1 ltsmin-mpi.1 ltsmin-convert.1
+MANPAGES = instantiator-mpi.1 ltsmin-mpi.1 ltsmin-convert.1 ltsmin.5
 endif
 HTML = $(doc_ASCIIDOC:%.txt=%.html)
 endif
