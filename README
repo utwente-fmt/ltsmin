@@ -1,5 +1,17 @@
 ltsmin - distributed minimization of labelled transition systems -*- outline -*-
 
+* Introduction
+
+The main tool in this release is ltsmin-mpi, which is a distributed implementation
+of signature based bisimulation reduction for strong bisimulation and branching
+bisimulation. The input for this tool is an lts in DIR format. To create an LTS
+in dir format one can either use instantiators and dmp2dir from the mCRL toolset
+or the instantiator-mpi tool bundled with this release.
+
+The tools in this release support compression of DIR files as well as putting
+a DIR in an archive file. A utility that can convert files from one DIR variant
+to another (ltsmin-convert) is the third and final tool in this release.
+
 * Supported Systems
  - GNU/Linux (tested on Debian, Fedora, OpenSuSE 10.2)
  - MacOS X, version 10.5 "Leopard"
