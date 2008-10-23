@@ -1,4 +1,145 @@
-For developers:
+ltsmin - distributed minimization of labelled transition systems -*- outline -*-
 
-Use ./ltsminreconf after version control checkout to pull in autotools
-changes.
+* Supported Systems
+ - GNU/Linux (tested on Debian, Fedora, OpenSuSE 10.2)
+ - MacOS X, version 10.5 "Leopard"
+ - MacOS X, version 10.4 "Tiger"
+
+* Installation Instructions
+
+First, install the dependencies listed in Section "Build Dependencies" below.
+
+  # Unpack the tarball
+  $ tar xvzf ltsmin-<version>.tar.gz
+  $ cd ltsmin-<version>
+
+  # Configure
+  $ ./configure --prefix /path/
+
+It is a good idea to check the output of ./configure, to see whether
+all dependencies were found.
+
+  # Build
+  $ make
+
+  # Install
+  $ make install
+
+** Additional Build Options
+*** configure options
+
+For one-shot builds, the following option speeds up the build process
+by not recording dependencies:
+
+    ./configure --disable-dependency-tracking ...
+
+Non-standard compilers, etc., can be configured by using variables:
+
+    ./configure CFLAGS='-O3 -m64' MPICC=/sw/openmpi/1.2.8/bin/mpicc ...
+
+This would add some options to the standard CFLAGS settings used for
+building, to enable more optimizations and force a 64-bit build (for
+the GCC C compiler).  Furthermore, the MPI compiler wrapper is set
+explicitly instead of search it in the current shell PATH.
+
+See `./configure --help' for the list of available variables,
+and file INSTALL for further details.
+
+*** MacOS X
+MacOS X supports building of ``universal binaries'' which include
+support for more than one architecture:
+
+    ./configure CFLAGS='-arch ppc -arch ppc64 -arch i386 -arch x86_64 \
+                -isystem /Developer/SDKs/MacOSX10.4u.sdk' \
+                --disable-dependency-tracking
+
+This would build the software for four architectures, provided the
+relevant Software Development Kits (SDKs) are installed.  The
+resulting binaries are compatible with MacOS X 10.4 "Tiger".
+
+Note that dependency tracking *must* be disabled for this type of
+build.  Furthermore, all library dependencies are required to be built
+for all architectures listed above.
+
+*** make targets
+The following additional make targets are supported:
+
+    mostlyclean::
+    clean::
+        Clean the source tree.
+
+    doxygen-doc::
+        Builds Doxygen documentation for the source code.
+
+
+* Required Build Dependencies
+*** zlib
+Download zlib from <http://www.zlib.net/>.
+
+*** GNU make
+
+
+** Optional Dependencies
+*** muCRL
+Download muCRL from <http://www.cwi.nl/~mcrl/>.  We tested with
+muCRL-2.18.3.  Without muCRL, the distributed tool for state space
+generation (instantiator-mpi) will not be built.
+
+*** MPI
+In principle, any MPI library which supports MPI-IO should work.
+However, we tested only with Open MPI <http://www.open-mpi.org/>.
+Without MPI, the distributed tools (instantiator-mpi, ltsmin-mpi) will
+not be built.
+
+*** AsciiDoc
+Download AsciiDoc (>= 8) from <http://www.methods.co.nz/asciidoc/>.
+We tested with asciidoc-8.2.7.  Without asciidoc, documentation cannot
+be rebuilt.  For convenience, release tarballs are shipping with
+pre-built man pages and HTML documentation.
+
+*** xmlto
+Download xmlto from <http://cyberelk.net/tim/software/xmlto/>.  We
+tested with xmlto-0.0.18.  Without xmlto, man pages cannot be rebuilt.
+
+*** Doxygen
+Download Doxygen from <http://www.doxygen.org/>.  We tested with
+doxygen-1.5.5.  Without doxygen, internal source code documentation
+cannot be generated.
+
+*** MacOS X
+For cross-compilation builds on MacOS X, the Apple Developer SDKs must
+be installed.  They are available from Apple
+<http://developer.apple.com/tools/download/>, or from the MacOS X
+installation CDs.
+
+* Building from a Version Control Checkout
+Before building the software as described above, the following commands
+have to be executed in the top-level source directory:
+
+    $ ./ltsminreconf
+
+** Dependencies
+Building from another source than the release tarball requires some
+extra tools to be installed:
+
+*** GNU automake
+Download automake (>= 1.10) from
+<http://www.gnu.org/software/automake/>.  We tested with
+automake-1.10.
+
+*** GNU autoconf
+Download autoconf (>= 2.60) from
+<http://www.gnu.org/software/autoconf/>.  We tested with
+autoconf-2.61.
+
+*** AsciiDoc
+See above.
+
+*** xmlto
+See above.
+
+
+* Contact
+Send questions, bug reports, comments and feature suggestions to
+<ltsmin-support@cs.utwente.nl>.  New versions can be found at
+<http://fmt.cs.utwente.nl/tools/ltsmin/>.
