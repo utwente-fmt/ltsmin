@@ -20,8 +20,8 @@ An LTS in _DIR_ format for W workers uses 3W^2^\+2 data stream written to one fi
 tools store these file in a directory which must have the extension .dir. Pattern mode
 allows a more general mapping of stream to file name. To write in pattern mode you
 specify a filename containing one occurrence of ++%s++. For example, a backwards compatible 
-layout for +lts.dir+ would be +lts.dir/%s+. Another example, would be prefixing every files with
-+pre+. This woudl be specified as +pre%s+.
+layout for ++lts.dir++ would be ++lts.dir/%s++. Another example, would be prefixing every files with
+++pre++. This would be specified as ++pre%s++.
 Any LTS file name containing ++%s++ will be assumed to be a pattern mode archive.
 
 *archive mode*::
