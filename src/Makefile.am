@@ -9,8 +9,6 @@ endif
 bin_PROGRAMS = ltsmin-convert $(EXEMPI)
 noinst_LIBRARIES = $(LIBMPI) libutil.a
 
-EXTRA_DIST = docs.cfg
-
 # instantiator-mpi
 instantiator_mpi_SOURCES = instantiator-mpi.c
 instantiator_mpi_LDADD = libmpi.a libutil.a
