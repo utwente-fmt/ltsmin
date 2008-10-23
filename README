@@ -61,7 +61,7 @@ and file INSTALL for further details.
 MacOS X supports building of ``universal binaries'' which include
 support for more than one architecture:
 
-    ./configure CFLAGS='-arch ppc -arch ppc64 -arch i386 -arch x86_64 \
+    ./configure CFLAGS='-arch ppc -arch ppc64 -arch i386 -arch x86_64
                 -isystem /Developer/SDKs/MacOSX10.4u.sdk' \
                 --disable-dependency-tracking
 
