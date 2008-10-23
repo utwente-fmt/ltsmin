@@ -1,12 +1,13 @@
+#include "config.h"
+#include <stdint.h>
+#include <string.h>
+#include <stdlib.h>
+#include <strings.h>
 
 #include "arch_object.h"
 #include "stream_object.h"
-#include <stdint.h>
 #include "stream.h"
-#include <string.h>
 #include "ghf.h"
-#include <stdlib.h>
-#include <strings.h>
 
 struct archive_s {
 	struct archive_obj procs;

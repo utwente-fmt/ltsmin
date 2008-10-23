@@ -4,6 +4,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <stdlib.h>
+#include "amconfig.h"
 #ifdef HAVE_LIBRT
 #include <aio.h>
 #endif
@@ -15,6 +16,7 @@ struct raf_struct_s {
 	int fd;
 #ifdef HAVE_LIBRT
 	struct aiocb request;
+	int pending;
 #endif
 };
 
@@ -61,9 +63,19 @@ static void Pwrite(raf_t raf,void*buf,size_t len,off_t ofs){
 	}
 }
 
+#ifndef HAVE_LIBRT
+static void RAFwait(raf_t raf){
+	(void)raf;
+}
+#endif
+
 #ifdef HAVE_LIBRT
 
 static void AIOwrite(raf_t raf,void*buf,size_t len,off_t ofs){
+	if(raf->pending) {
+		Fatal(1,error,"There may not be more than one asynchronous call pending.");
+	}
+	raf->pending=1;
 	raf->request.aio_buf=buf;
 	raf->request.aio_nbytes=len;
 	raf->request.aio_offset=ofs;
@@ -72,6 +84,7 @@ static void AIOwrite(raf_t raf,void*buf,size_t len,off_t ofs){
 	}
 }
 static void AIOwait(raf_t raf){
+	if(raf->pending==0) return;
 	const struct aiocb* list[1];
 	list[0]=&(raf->request); 
 	if (aio_suspend(list,1,NULL)){
@@ -80,6 +93,7 @@ static void AIOwait(raf_t raf){
 	if (aio_error(list[0])){
 		FatalCall(1,error,"aio_error for %s",raf->shared.name);
 	}
+	raf->pending=0;
 }
 
 #endif
@@ -152,6 +166,10 @@ raf_t raf_unistd(char *name){
 #ifdef HAVE_LIBRT
 	raf->shared.awrite=AIOwrite;
 	raf->shared.await=AIOwait;
+#else
+	Warning(info,"Asynchronous writing not supported. Falling back on normal writes.");
+	raf->shared.awrite=RAFwrite;
+	raf->shared.await=RAFwait;
 #endif
 	raf->shared.size=Psize;
 	raf->shared.resize=Presize;
@@ -160,6 +178,7 @@ raf_t raf_unistd(char *name){
 	raf->request.aio_fildes=fd;
 	raf->request.aio_reqprio=0;
 #endif
+	raf->pending=0;
 	return raf;
 }
 
