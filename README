@@ -1,16 +1,17 @@
 ltsmin - distributed minimization of labelled transition systems -*- outline -*-
 
 * Introduction
+The main tool in this release is ltsmin-mpi, which is a distributed
+implementation of signature based bisimulation reduction for strong
+bisimulation and branching bisimulation.  The input for this tool is a
+labelled transition system (LTS) in DIR format.  To create an LTS in
+DIR format one can either use instantiators and dmp2dir from the muCRL
+toolset or the instantiator-mpi tool bundled with this release.
 
-The main tool in this release is ltsmin-mpi, which is a distributed implementation
-of signature based bisimulation reduction for strong bisimulation and branching
-bisimulation. The input for this tool is an lts in DIR format. To create an LTS
-in dir format one can either use instantiators and dmp2dir from the mCRL toolset
-or the instantiator-mpi tool bundled with this release.
-
-The tools in this release support compression of DIR files as well as putting
-a DIR in an archive file. A utility that can convert files from one DIR variant
-to another (ltsmin-convert) is the third and final tool in this release.
+The tools in this release support compression of DIR files as well as
+putting a DIR in an archive file.  A utility that can convert files
+from one DIR variant to another (ltsmin-convert) is the third and
+final tool in this release.
 
 * Supported Systems
  - GNU/Linux (tested on Debian, Fedora, OpenSuSE 10.2)
@@ -18,28 +19,27 @@ to another (ltsmin-convert) is the third and final tool in this release.
  - MacOS X, version 10.4 "Tiger"
 
 * Installation Instructions
+First, install the dependencies listed in Section "Build Dependencies"
+below.
 
-First, install the dependencies listed in Section "Build Dependencies" below.
+    # Unpack the tarball
+    $ tar xvzf ltsmin-<version>.tar.gz
+    $ cd ltsmin-<version>
 
-  # Unpack the tarball
-  $ tar xvzf ltsmin-<version>.tar.gz
-  $ cd ltsmin-<version>
-
-  # Configure
-  $ ./configure --prefix /path/
+    # Configure
+    $ ./configure --disable-dependency-tracking --prefix /path/
 
 It is a good idea to check the output of ./configure, to see whether
 all dependencies were found.
 
-  # Build
-  $ make
+    # Build
+    $ make
 
-  # Install
-  $ make install
+    # Install
+    $ make install
 
 ** Additional Build Options
 *** configure options
-
 For one-shot builds, the following option speeds up the build process
 by not recording dependencies:
 
