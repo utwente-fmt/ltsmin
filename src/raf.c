@@ -177,8 +177,8 @@ raf_t raf_unistd(char *name){
 #ifdef HAVE_LIBRT
 	raf->request.aio_fildes=fd;
 	raf->request.aio_reqprio=0;
-#endif
 	raf->pending=0;
+#endif
 	return raf;
 }
 
