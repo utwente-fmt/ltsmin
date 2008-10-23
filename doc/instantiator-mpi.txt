@@ -106,9 +106,9 @@ mpirun -np 2 instantiator-mpi -alt rww -out brp.gcf brp.tbf
 This GCF file can be read by both linkman:ltsmin-mpi[1] and linkman:ltsmin-convert[1].
 
 == SEE ALSO
+linkman:ltsmin[5], 
 linkman:ltsmin-mpi[1], 
 linkman:ltsmin-convert[1], 
 linkman:mcrl[1],
 http://www.mcrl2.org/[mcrl2],
 http://www.mpi-forum.org/[MPI Forum]
-

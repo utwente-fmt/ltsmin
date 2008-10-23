@@ -73,5 +73,6 @@ mpirun -np 2 -mca btl tcp,self ltsmin-mpi -plain -b brp-s.gcf brp-b.dir/%s
         Some error occurred.
 
 == SEE ALSO
-linkman:instantiator-mpi[1], linkman:ltsmin-convert[1]
-
+linkman:ltsmin[5], 
+linkman:instantiator-mpi[1], 
+linkman:ltsmin-convert[1]

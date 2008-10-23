@@ -45,5 +45,6 @@ ltsmin-convert -plain brp.gcf brp.dir
         Some error occurred.
 
 == SEE ALSO
-linkman:instantiator-mpi[1], linkman:ltsmin-convert[1]
-
+linkman:ltsmin[5], 
+linkman:instantiator-mpi[1], 
+linkman:ltsmin-convert[1]
