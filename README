@@ -1,4 +1,4 @@
-ltsmin - distributed minimization of labelled transition systems -*- outline -*-
+ltsmin - distributed minimization of labelled transition systems 
 
 * Introduction
 The main tool in this release is ltsmin-mpi, which is a distributed
@@ -89,11 +89,11 @@ The following additional make targets are supported:
 Download zlib from <http://www.zlib.net/>.
 
 *** GNU make
-
+Download GNU make from <http://www.gnu.org/software/make/>.
 
 ** Optional Dependencies
 *** muCRL
-Download muCRL from <http://www.cwi.nl/~mcrl/>.  We tested with
+Download muCRL from <http://www.cwi.nl/~mcrl/mutool.html>.  We tested with
 muCRL-2.18.3.  Without muCRL, the distributed tool for state space
 generation (instantiator-mpi) will not be built.
 
@@ -155,3 +155,7 @@ See above.
 Send questions, bug reports, comments and feature suggestions to
 <ltsmin-support@cs.utwente.nl>.  New versions can be found at
 <http://fmt.cs.utwente.nl/tools/ltsmin/>.
+
+;; Local Variables:
+;; mode: outline
+;; End:
