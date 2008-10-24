@@ -52,7 +52,7 @@ Non-standard compilers, etc., can be configured by using variables:
 This would add some options to the standard CFLAGS settings used for
 building, to enable more optimizations and force a 64-bit build (for
 the GCC C compiler).  Furthermore, the MPI compiler wrapper is set
-explicitly instead of search it in the current shell PATH.
+explicitly instead of searching it in the current shell PATH.
 
 See `./configure --help' for the list of available variables,
 and file INSTALL for further details.
