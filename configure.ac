@@ -6,7 +6,13 @@ AC_CONFIG_SRCDIR([src/ltsmin-mpi.c])
 AC_CONFIG_HEADERS([src/amconfig.h])
 
 # Checks for programs.
+CFLAGS="-g -W -Wall -O2 -std=c99 $CFLAGS"
 AM_PROG_CC_C_O
+ACX_PTHREAD(
+  [LIBS="$PTHREAD_LIBS $LIBS"
+   CFLAGS="$CFLAGS $PTHREAD_CFLAGS"
+   CC="$PTHREAD_CC"],
+  [AC_MSG_FAILURE([no pthread support found.])])
 AC_PROG_MAKE_SET
 AC_PROG_RANLIB
 AC_PROG_INSTALL
@@ -14,7 +20,8 @@ ACX_MPI(
   [CC="$MPICC"
    LIBS="$MPILIBS $LIBS"
    have_mpi=yes],
-  [have_mpi=])
+  [have_mpi=
+   AC_MSG_WARN([no acceptable MPI support found.])])
 AC_ARG_VAR([MCRL], [muCRL command])
 AC_PATH_TOOL(MCRL, [${MCRL:-mcrl}], [""])
 if test "x$MCRL" != x; then
@@ -39,7 +46,6 @@ DX_INIT_DOXYGEN([$PACKAGE_NAME])
 AC_CACHE_SAVE
 
 # Checks for libraries.
-CFLAGS="-g -W -Wall -O2 -pthread -std=c99 $CFLAGS"
 AC_CHECK_LIB([z], [inflateEnd],,
   [AC_MSG_FAILURE([zlib not found.])])
 AC_CHECK_LIB([dl], [dlopen])

@@ -1,4 +1,4 @@
-ltsmin - distributed minimization of labelled transition systems -*- outline -*-
+ltsmin - distributed minimization of labelled transition systems 
 
 * Introduction
 The main tool in this release is ltsmin-mpi, which is a distributed
@@ -52,7 +52,7 @@ Non-standard compilers, etc., can be configured by using variables:
 This would add some options to the standard CFLAGS settings used for
 building, to enable more optimizations and force a 64-bit build (for
 the GCC C compiler).  Furthermore, the MPI compiler wrapper is set
-explicitly instead of search it in the current shell PATH.
+explicitly instead of searching it in the current shell PATH.
 
 See `./configure --help' for the list of available variables,
 and file INSTALL for further details.
@@ -61,7 +61,7 @@ and file INSTALL for further details.
 MacOS X supports building of ``universal binaries'' which include
 support for more than one architecture:
 
-    ./configure CFLAGS='-arch ppc -arch ppc64 -arch i386 -arch x86_64 \
+    ./configure CFLAGS='-arch ppc -arch ppc64 -arch i386 -arch x86_64
                 -isystem /Developer/SDKs/MacOSX10.4u.sdk' \
                 --disable-dependency-tracking
 
@@ -84,16 +84,19 @@ The following additional make targets are supported:
         Builds Doxygen documentation for the source code.
 
 
-* Required Build Dependencies
+* Build Dependencies
+We list the external libraries and tools which are required to build
+this software.
+
 *** zlib
 Download zlib from <http://www.zlib.net/>.
 
 *** GNU make
-
+Download GNU make from <http://www.gnu.org/software/make/>.
 
 ** Optional Dependencies
 *** muCRL
-Download muCRL from <http://www.cwi.nl/~mcrl/>.  We tested with
+Download muCRL from <http://www.cwi.nl/~mcrl/mutool.html>.  We tested with
 muCRL-2.18.3.  Without muCRL, the distributed tool for state space
 generation (instantiator-mpi) will not be built.
 
@@ -155,3 +158,7 @@ See above.
 Send questions, bug reports, comments and feature suggestions to
 <ltsmin-support@cs.utwente.nl>.  New versions can be found at
 <http://fmt.cs.utwente.nl/tools/ltsmin/>.
+
+;; Local Variables:
+;; mode: outline
+;; End:
