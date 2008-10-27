@@ -34,8 +34,8 @@ Suppress all warning and information messages.
 The expected use of this tool is to convert (uncompressed) _DIR_ to GCF and back:
 
 ----
-ltsmin-convert brp.dir brp.cgf
-ltsmin-convert -plain brp.gcf brp.dir
+ltsmin-convert brp.dir/%s brp.cgf
+mkdir brp.dir ; ltsmin-convert -plain brp.gcf brp.dir/%s
 ----
 
 == EXIT STATUS
