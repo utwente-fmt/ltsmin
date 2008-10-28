@@ -28,7 +28,7 @@ if test "x$MCRL" != x; then
   CPPFLAGS="-I$(dirname "$MCRL")/../mCRL/include $CPPFLAGS"
   LDFLAGS="-L$(dirname "$MCRL")/../mCRL/lib $LDFLAGS"
 else
-  AC_MSG_WARN([no acceptable mCRL installation found in \$PATH.])
+  AC_MSG_WARN([no acceptable muCRL installation found in \$PATH.])
 fi
 AC_CHECK_PROGS(ASCIIDOC, [asciidoc])
 AC_CHECK_PROGS(XMLTO, [xmlto])
@@ -48,15 +48,23 @@ AC_CACHE_SAVE
 # Checks for libraries.
 AC_CHECK_LIB([z], [inflateEnd],,
   [AC_MSG_FAILURE([zlib not found.])])
-AC_CHECK_LIB([dl], [dlopen])
-AC_CHECK_LIB([ATerm], [ATinit])
-AC_CHECK_LIB([mcrlunix], [CreateDir])
-AC_CHECK_LIB([mcrl], [MCRLsetArguments],
-  [LIBS="-lmcrl $LIBS"
-   have_mcrl=yes],
-  [have_mcrl=])
-AC_CHECK_LIB([step], [STsetArguments])
+if test "x$MCRL" != x; then
+  AC_CHECK_LIB([dl], [dlopen])
+  AC_CHECK_LIB([ATerm], [ATinit])
+  AC_CHECK_LIB([mcrlunix], [CreateDir])
+  AC_CHECK_LIB([mcrl], [MCRLsetArguments],
+    [LIBS="-lmcrl $LIBS"
+     have_mcrl=yes],
+    [have_mcrl=])
+  AC_CHECK_LIB([step], [STsetArguments],,[have_mcrl=])
+  if test x"$have_mcrl" = x; then
+    AC_MSG_WARN([some muCRL libraries not found.])
+  fi
+fi
 AC_CHECK_LIB([rt], [aio_error])
+ACX_CADP_BCG_WRITE([have_bcg=yes],[
+  AC_MSG_WARN([no acceptable BCG libraries found; building without.])
+])
 
 # Checks for header files.
 AC_HEADER_DIRENT
@@ -90,6 +98,7 @@ AM_CONDITIONAL([HAVE_MPI], [test "x$have_mpi" != "x"])
 AM_CONDITIONAL([HAVE_LIBMCRL], [test "x$have_mcrl" != x])
 AM_CONDITIONAL([HAVE_ASCIIDOC], [test "x$ASCIIDOC" != x])
 AM_CONDITIONAL([HAVE_XMLTO], [test "x$XMLTO" != x])
+AM_CONDITIONAL([HAVE_LIBBCG], [test "x$have_bcg" != x])
 
 AC_CONFIG_FILES([
        Makefile
@@ -103,7 +112,8 @@ Configuration:
 ======================================================================
     CC       = ${CC:-NOT FOUND}
     MPICC    = ${MPICC:-NOT FOUND, building without MPI support}
-    MCRL     = ${MCRL:-NOT FOUND, building without mCRL support}
+    MCRL     = ${MCRL:-NOT FOUND, building without muCRL support}
+    CADP     = ${CADP:-NOT FOUND, building without CADP support}
 
     ASCIIDOC = ${ASCIIDOC:-NOT FOUND, not building documentation}
     XMLTO    = ${XMLTO:-NOT FOUND, not building manpages}
