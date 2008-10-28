@@ -22,19 +22,23 @@ static smdinfo_t *summand;
 
 static chunk_table_t termdb_table;
 static ATermIndexedSet termdb_set;
+static chunk_table_t actiondb_table;
+static ATermIndexedSet actiondb_set;
 
 static void new_term(void*context,size_t len,void* chunk){
-	ATerm t=ATreadFromSharedString(chunk,len);
+	((char*)chunk)[len]=0;
+	ATerm t=ATreadFromString((char*)chunk);
 	ATindexedSetPut((ATermIndexedSet)context,t,NULL);
 }
 
 static long find_index(chunk_table_t chunks,ATermIndexedSet terms,ATerm t){
 	long idx=ATindexedSetGetIndex(terms,t);
 	if (idx>=0) return idx;
-	int len;
-	char *tmp=ATwriteToSharedString(t,&len);
-	char chunk[len];
+	char *tmp=ATwriteToString(t);
+	int len=strlen(tmp);
+	char chunk[len+1];
 	for(int i=0;i<len;i++) chunk[i]=tmp[i];
+	chunk[len]=0;
 	CTsubmitChunk(chunks,len,chunk,new_term,terms);
 	return ATindexedSetGetIndex(terms,t);
 }
@@ -52,13 +56,12 @@ static TransitionCB user_cb;
 static void* user_context;
 
 static void callback(void){
-	int lbl=find_index(termdb_table,termdb_set,label);
+	int lbl=find_index(actiondb_table,actiondb_set,label);
 	if (expand){
 		int dst_p[summand[smd].count];
 		for(int i=0;i<summand[smd].count;i++){
 			dst_p[i]=find_index(termdb_table,termdb_set,dst[summand[smd].proj[i]]);
 		}
-		int lbl=find_index(termdb_table,termdb_set,label);
 		user_cb(user_context,&lbl,dst_p);
 	} else {
 		int dst_p[nPars];
@@ -130,8 +133,10 @@ model_t GBcreateModel(char*model){
 		summand[i].proj=malloc(summand[i].count*sizeof(int));
 		for(j=0;j<summand[i].count;j++) summand[i].proj[j]=temp[j];
 	}
-	termdb_table=CTcreate("TermDB");
+	termdb_table=CTcreate("leaf");
 	termdb_set=ATindexedSetCreate(1024,75);
+	actiondb_table=CTcreate("action");
+	actiondb_set=ATindexedSetCreate(1024,75);
 	return NULL;
 }
 
