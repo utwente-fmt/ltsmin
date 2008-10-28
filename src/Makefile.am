@@ -7,7 +7,14 @@ LIBMPI = libmpi.a
 endif
 
 bin_PROGRAMS = ltsmin-convert $(EXEMPI)
+if HAVE_LIBMCRL
+bin_PROGRAMS += lpo2lts-grey 
+endif
 noinst_LIBRARIES = $(LIBMPI) libutil.a
+
+# lpo2lts-grey
+lpo2lts_grey_SOURCES = lpo2lts-grey.c
+lpo2lts_grey_LDADD = libutil.a mcrl-greybox.o
 
 # instantiator-mpi
 instantiator_mpi_SOURCES = instantiator-mpi.c config.h
@@ -34,7 +41,7 @@ libutil_a_SOURCES = unix.c runtime.c stream.c archive.c ltsmeta.c	\
                     generichash.h unix.h archive.h ghf.h options.h	\
                     stream.h raf.h stream_object.h ltsmeta.h		\
                     raf_object.h scctimer.h fast_hash.h runtime.h	\
-                    treedbs.h config.h
+                    treedbs.h config.h greybox.h
 
 # make 
 .DELETE_ON_ERROR:
