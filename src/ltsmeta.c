@@ -99,6 +99,7 @@ int lts_get_segments(lts_t lts){
 
 lts_t lts_create(){
 	lts_t lts=(lts_t)RTmalloc(sizeof(struct lts_meta_s));
+	lts->segment_count=-1;
 	lts->known=0;
 	lts->comment=NULL;
 	return lts;
@@ -114,7 +115,7 @@ void lts_write_info(lts_t lts,stream_t ds,info_fmt_t format){
 		} else {
 			DSwriteS(ds,"no comment");
 		}
-		DSwriteU32(ds,lts->segment_count);
+		DSwriteU32(ds,lts->segment_count<0?1:lts->segment_count);
 		DSwriteU32(ds,lts->root_seg);
 		DSwriteU32(ds,lts->root_ofs);
 		DSwriteU32(ds,lts_get_labels(lts));
@@ -124,12 +125,17 @@ void lts_write_info(lts_t lts,stream_t ds,info_fmt_t format){
 			DSwriteS32(ds,-1);
 		}
 		DSwriteU32(ds,0);
-		for(i=0;i<lts->segment_count;i++){
-			DSwriteU32(ds,lts->state_count[i]);
-		}
-		for(i=0;i<lts->segment_count;i++){
-			for(j=0;j<lts->segment_count;j++){
-				DSwriteU32(ds,lts->transition_count[i][j]);
+		if(lts->segment_count<0){
+			DSwriteU32(ds,lts_get_states(lts));
+			DSwriteU32(ds,lts_get_trans(lts));
+		} else {
+			for(i=0;i<lts->segment_count;i++){
+				DSwriteU32(ds,lts->state_count[i]);
+			}
+			for(i=0;i<lts->segment_count;i++){
+				for(j=0;j<lts->segment_count;j++){
+					DSwriteU32(ds,lts->transition_count[i][j]);
+				}
 			}
 		}
 		return;
