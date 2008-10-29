@@ -27,7 +27,9 @@ ltsmin_mpi_LDADD = libmpi.a libutil.a
 
 # ltsmin-convert
 ltsmin_convert_SOURCES = ltsmin-convert.c
-ltsmin_convert_LDADD = libutil.a
+ltsmin_convert_LDADD = libutil.a $(CADP_LIBS)
+ltsmin_convert_LDFLAGS = $(CADP_LDFLAGS) $(AM_LDFLAGS)
+ltsmin_convert_CPPFLAGS = $(CADP_CPPFLAGS) $(AM_CPPFLAGS)
 
 # libraries
 libmpi_a_SOURCES = mpi_io_stream.c mpi_core.c mpi_raf.c mpi_ram_raf.c	\
@@ -41,7 +43,9 @@ libutil_a_SOURCES = unix.c runtime.c stream.c archive.c ltsmeta.c	\
                     generichash.h unix.h archive.h ghf.h options.h	\
                     stream.h raf.h stream_object.h ltsmeta.h		\
                     raf_object.h scctimer.h fast_hash.h runtime.h	\
-                    treedbs.h config.h greybox.h
+                    treedbs.h config.h greybox.h stringindex.c          \
+                    stringindex.h
 
 # make 
 .DELETE_ON_ERROR:
+
