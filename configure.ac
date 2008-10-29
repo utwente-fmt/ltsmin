@@ -22,14 +22,8 @@ ACX_MPI(
    have_mpi=yes],
   [have_mpi=
    AC_MSG_WARN([no acceptable MPI support found.])])
-AC_ARG_VAR([MCRL], [muCRL command])
-AC_PATH_TOOL(MCRL, [${MCRL:-mcrl}], [""])
-if test "x$MCRL" != x; then
-  CPPFLAGS="-I$(dirname "$MCRL")/../mCRL/include $CPPFLAGS"
-  LDFLAGS="-L$(dirname "$MCRL")/../mCRL/lib $LDFLAGS"
-else
-  AC_MSG_WARN([no acceptable muCRL installation found in \$PATH.])
-fi
+ACX_MCRL([],
+  [AC_MSG_WARN([no acceptable muCRL installation found.])])
 AC_CHECK_PROGS(ASCIIDOC, [asciidoc])
 AC_CHECK_PROGS(XMLTO, [xmlto])
 DX_DOXYGEN_FEATURE(ON)
@@ -48,29 +42,25 @@ AC_CACHE_SAVE
 # Checks for libraries.
 AC_CHECK_LIB([z], [inflateEnd],,
   [AC_MSG_FAILURE([zlib not found.])])
-if test "x$MCRL" != x; then
-  AC_CHECK_LIB([dl], [dlopen])
-  AC_CHECK_LIB([ATerm], [ATinit])
-  AC_CHECK_LIB([mcrlunix], [CreateDir])
-  AC_CHECK_LIB([mcrl], [MCRLsetArguments],
-    [LIBS="-lmcrl $LIBS"
-     have_mcrl=yes],
-    [have_mcrl=])
-  AC_CHECK_LIB([step], [STsetArguments],,[have_mcrl=])
-  if test x"$have_mcrl" != x; then
-    AC_CHECK_FUNCS([STgetSummandCount STgetProjection],
+if test "x$acx_mcrl" = xyes; then
+  ACX_MCRL_LIBS(
+    [ltsmin_save_LIBS="$LIBS"
+     ltsmin_save_LDFLAGS="$LDFLAGS"
+     LIBS="$MCRL_LIBS $LIBS"
+     LDFLAGS="$MCRL_LDFLAGS $LDFLAGS"
+     AC_CHECK_FUNCS([STgetSummandCount STgetProjection],
       [have_libstep_info=yes],
       [AC_MSG_WARN([muCRL library too old; some tools will not be built.])
-       have_libstep_info=
+       have_libstep_info=no
        break])
-  else
-    AC_MSG_WARN([some muCRL libraries not found.])
-  fi
+     LIBS="$ltsmin_save_LIBS"
+     LDFLAGS="$ltsmin_save_LDFLAGS"],
+    [AC_MSG_WARN([some muCRL libraries not found.])])
 fi
 AC_CHECK_LIB([rt], [aio_error])
-ACX_CADP_BCG_WRITE([have_bcg=yes],[
-  AC_MSG_WARN([no acceptable BCG libraries found; building without.])
-])
+ACX_CADP_BCG_WRITE([have_bcg=yes],
+  [have_bcg=no
+   AC_MSG_WARN([no acceptable BCG libraries found; building without.])])
 
 # Checks for header files.
 AC_HEADER_DIRENT
@@ -100,12 +90,12 @@ AC_FUNC_STRERROR_R
 AC_FUNC_VPRINTF
 AC_CHECK_FUNCS([atexit bzero ftruncate strchr strdup strndup strstr strtol])
 
-AM_CONDITIONAL([HAVE_MPI], [test "x$have_mpi" != "x"])
-AM_CONDITIONAL([HAVE_LIBMCRL], [test "x$have_mcrl" != x])
-AM_CONDITIONAL([HAVE_LIBSTEP_INFO], [test "x$have_libstep_info" != x])
-AM_CONDITIONAL([HAVE_ASCIIDOC], [test "x$ASCIIDOC" != x])
-AM_CONDITIONAL([HAVE_XMLTO], [test "x$XMLTO" != x])
-AM_CONDITIONAL([HAVE_LIBBCG], [test "x$have_bcg" != x])
+AM_CONDITIONAL([HAVE_MPI], [test x"$have_mpi" != "x"])
+AM_CONDITIONAL([HAVE_LIBMCRL], [test x"$acx_mcrl" = xyes])
+AM_CONDITIONAL([HAVE_LIBSTEP_INFO], [test x"$have_libstep_info" = xyes])
+AM_CONDITIONAL([HAVE_ASCIIDOC], [test x"$ASCIIDOC" != x])
+AM_CONDITIONAL([HAVE_XMLTO], [test x"$XMLTO" != x])
+AM_CONDITIONAL([HAVE_LIBBCG], [test x"$have_bcg" = xyes])
 
 AC_CONFIG_FILES([
        Makefile
@@ -119,7 +109,7 @@ Configuration:
 ======================================================================
     CC       = ${CC:-NOT FOUND}
     MPICC    = ${MPICC:-NOT FOUND, building without MPI support}
-    MCRL     = ${MCRL:-NOT FOUND, building without muCRL support}
+    MCRL     = ${with_mcrl:-NOT FOUND, building without muCRL support}
     CADP     = ${CADP:-NOT FOUND, building without CADP support}
 
     ASCIIDOC = ${ASCIIDOC:-NOT FOUND, not building documentation}
