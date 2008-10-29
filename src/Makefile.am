@@ -7,7 +7,7 @@ LIBMPI = libmpi.a
 endif
 
 bin_PROGRAMS = ltsmin-convert $(EXEMPI)
-if HAVE_LIBMCRL
+if HAVE_LIBSTEP_INFO
 bin_PROGRAMS += lpo2lts-grey 
 endif
 noinst_LIBRARIES = $(LIBMPI) libutil.a

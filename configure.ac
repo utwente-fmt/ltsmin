@@ -57,7 +57,13 @@ if test "x$MCRL" != x; then
      have_mcrl=yes],
     [have_mcrl=])
   AC_CHECK_LIB([step], [STsetArguments],,[have_mcrl=])
-  if test x"$have_mcrl" = x; then
+  if test x"$have_mcrl" != x; then
+    AC_CHECK_FUNCS([STgetSummandCount STgetProjection],
+      [have_libstep_info=yes],
+      [AC_MSG_WARN([muCRL library too old; some tools will not be built.])
+       have_libstep_info=
+       break])
+  else
     AC_MSG_WARN([some muCRL libraries not found.])
   fi
 fi
@@ -96,6 +102,7 @@ AC_CHECK_FUNCS([atexit bzero ftruncate strchr strdup strndup strstr strtol])
 
 AM_CONDITIONAL([HAVE_MPI], [test "x$have_mpi" != "x"])
 AM_CONDITIONAL([HAVE_LIBMCRL], [test "x$have_mcrl" != x])
+AM_CONDITIONAL([HAVE_LIBSTEP_INFO], [test "x$have_libstep_info" != x])
 AM_CONDITIONAL([HAVE_ASCIIDOC], [test "x$ASCIIDOC" != x])
 AM_CONDITIONAL([HAVE_XMLTO], [test "x$XMLTO" != x])
 AM_CONDITIONAL([HAVE_LIBBCG], [test "x$have_bcg" != x])
