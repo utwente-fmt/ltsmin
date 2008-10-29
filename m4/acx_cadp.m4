@@ -56,17 +56,19 @@ if test "x$acx_cadp" = xyes; then
     acx_cadp_save_LDFLAGS="$LDFLAGS"
     CPPFLAGS="$CADP_CPPFLAGS $CPPFLAGS"
     LDFLAGS="$CADP_LDFLAGS $LDFLAGS"
-    AC_CHECK_HEADERS([bcg_user.h])
+    acx_cadp_have_bcg=yes
+    AC_CHECK_HEADERS([bcg_user.h],[],[acx_cadp_have_bcg=no])
     AC_CHECK_LIB([m], [cos],
-      [CADP_LIBS="-lm $CADP_LIBS"])
-    AC_CHECK_LIB([BCG], [BCG_INIT],
-      [CADP_LIBS="-lBCG $CADP_LIBS"],
+      [CADP_LIBS="-lm $CADP_LIBS"],
       [],
       [$CADP_LIBS])
+    AC_CHECK_LIB([BCG], [BCG_INIT],
+      [CADP_LIBS="-lBCG $CADP_LIBS"],
+      [acx_cadp_have_bcg=no],
+      [$CADP_LIBS])
     AC_CHECK_LIB([BCG_IO], [BCG_IO_WRITE_BCG_BEGIN],
-      [CADP_LIBS="-lBCG_IO $CADP_LIBS"
-       acx_cadp_have_bcg=yes],
-      [acx_cadp_have_bcg=],
+      [CADP_LIBS="-lBCG_IO $CADP_LIBS"],
+      [acx_cadp_have_bcg=no],
       [$CADP_LIBS])
 
     CPPFLAGS="$acx_cadp_save_CPPFLAGS"
@@ -75,13 +77,12 @@ if test "x$acx_cadp" = xyes; then
     AC_LANG_RESTORE
 
     AC_SUBST(CADP_LIBS)
-
-    if test x"$acx_cadp_have_bcg" = xyes; then
-        $1
-        :
-    else
-        $2
-        :
-    fi
+fi
+if test x"$acx_cadp_have_bcg" = xyes; then
+    $1
+    :
+else
+    $2
+    :
 fi
 ])
