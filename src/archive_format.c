@@ -45,7 +45,6 @@ archive_t arch_fmt(char*format,stream_create_t crd,stream_create_t cwr,int buf){
 	arch_init(arch);
 	arch->procs.read=dir_read;
 	arch->procs.write=dir_write;
-	arch->procs.play=arch_play;
 	arch->procs.close=dir_close;
 	arch->crd=crd;
 	arch->cwr=cwr;

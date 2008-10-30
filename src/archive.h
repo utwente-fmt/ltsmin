@@ -13,18 +13,20 @@ extern stream_t arch_read(archive_t archive,char *name,char*code);
 extern int arch_writable(archive_t archive);
 extern stream_t arch_write(archive_t archive,char *name,char*code);
 
-extern int arch_searchable(archive_t archive);
-typedef void(*string_enum_t)(void*arg,char*name);
-extern void arch_search(archive_t archive,char *regex,string_enum_t cb,void*arg);
+typedef struct arch_enum* arch_enum_t;
+extern arch_enum_t arch_enum(archive_t archive,char *regex);
 
-
-extern int arch_enumerable(archive_t archive);
-struct archive_enum {
-	char*(*new_item)(void*arg,int no,char*name);
-	void(*end_item)(void*arg,int no);
-	void(*data)(void*arg,int no,void*data,size_t len);
+struct arch_enum_callbacks {
+	int(*new_item)(void*arg,int no,char*name);
+	int(*end_item)(void*arg,int no);
+	int(*data)(void*arg,int no,void*data,size_t len);
 };
-extern void arch_enum(archive_t archive,char *regex,struct archive_enum *cb,void*arg);
+/**
+ * Returns 0 if everything is completed. If one of the callbacks returns non-zero this
+   non-zero response is immediately returned.
+ */
+extern int arch_enumerate(arch_enum_t enumerator,struct arch_enum_callbacks *cb,void*arg);
+extern void arch_enum_free(arch_enum_t* enumerator);
 
 extern void arch_close(archive_t *archive);
 
@@ -35,6 +37,12 @@ extern archive_t arch_fmt(char*format,stream_create_t crd,stream_create_t cwr,in
 extern archive_t arch_gcf_create(raf_t raf,size_t block_size,size_t cluster_size,int worker,int worker_count);
 
 extern archive_t arch_gcf_read(raf_t raf);
+
+extern archive_t arch_gsf_read(stream_t s);
+
+extern archive_t arch_gsf_write(stream_t s);
+
+extern archive_t arch_gsf(stream_t s);
 
 #endif
 

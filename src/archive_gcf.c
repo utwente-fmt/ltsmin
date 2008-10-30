@@ -227,16 +227,39 @@ static void gcf_close_read(archive_t *archive){
 	*archive=NULL;
 }
 
+struct arch_enum {
+	struct archive_enum_obj procs;
+	archive_t archive;
+	uint32_t next_stream;
+};
 
-static void gcf_list(archive_t archive,char *regex,string_enum_t cb,void*arg){
-	if (regex!=NULL) Fatal(0,error,"regex not supported");
-	uint32_t i=0;
-	for(i=0;i<archive->stream_count;i++){
-		if(archive->name[i]!=NULL){
-			//Warning(info,"reporting %s as %u",archive->name[i],i);
-			cb(arg,archive->name[i]);
+static int gcf_enumerate(arch_enum_t e,struct arch_enum_callbacks *cb,void*arg){
+	if (cb->data!=NULL) Fatal(1,error,"cannot enumerate data");
+	while(e->next_stream<e->archive->stream_count){
+		if(cb->new_item) {
+			int res=cb->new_item(arg,e->next_stream,e->archive->name[e->next_stream]);
+			e->next_stream++;
+			if (res) return res;
+		} else {
+			e->next_stream++;
 		}
 	}
+	return 0;
+}
+
+static void gcf_enum_free(arch_enum_t *e){
+	free(*e);
+	*e=NULL;
+}
+
+static arch_enum_t gcf_enum(archive_t archive,char *regex){
+	if (regex!=NULL) Warning(info,"regex not supported");
+	arch_enum_t e=(arch_enum_t)RTmalloc(sizeof(struct arch_enum));
+	e->procs.enumerate=gcf_enumerate;
+	e->procs.free=gcf_enum_free;
+	e->archive=archive;
+	e->next_stream=0;
+	return e;
 }
 
 static stream_t gcf_read(archive_t archive,char *name){
@@ -331,8 +354,7 @@ archive_t arch_gcf_read(raf_t raf){
 	}
 	arch->procs.close=gcf_close_read;
 	arch->procs.read=gcf_read;
-	arch->procs.list=gcf_list;
-	arch->procs.play=arch_play;
+	arch->procs.enumerator=gcf_enum;
 	return arch;
 }
 

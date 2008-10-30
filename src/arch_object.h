@@ -8,19 +8,21 @@
 struct archive_obj {
 	stream_t(*read)(archive_t arch,char*name);
 	stream_t(*write)(archive_t arch,char*name);
-	void(*list)(archive_t arch,char*regex,string_enum_t cb,void*arg);
-	void(*play)(archive_t arch,char*regex,struct archive_enum *cb,void*arg);
+	arch_enum_t(*enumerator)(archive_t arch,char*regex);
 	void(*close)(archive_t *arch);
 };
 
-extern void arch_play(archive_t arch,char*regex,struct archive_enum *cb,void*arg);
-
 extern stream_t arch_illegal_read(archive_t arch,char*name);
 extern stream_t arch_illegal_write(archive_t arch,char*name);
-extern void arch_illegal_list(archive_t arch,char*regex,string_enum_t cb,void*arg);
-extern void arch_illegal_play(archive_t arch,char*regex,struct archive_enum *cb,void*arg);
+extern arch_enum_t arch_illegal_enum(archive_t arch,char*regex);
 extern void arch_illegal_close(archive_t *arch);
+
 extern void arch_init(archive_t arch);
+
+struct archive_enum_obj {
+	int(*enumerate)(arch_enum_t enumerator,struct arch_enum_callbacks *cb,void*arg);
+	void(*free)(arch_enum_t* enumerator);
+};
 
 #endif
 

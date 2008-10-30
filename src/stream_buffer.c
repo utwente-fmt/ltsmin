@@ -55,10 +55,12 @@ static void buf_read(stream_t stream,void*buf,size_t count){
 }
 
 static int buf_empty(stream_t stream){
-	if (stream->rd_next < stream->rd_used) return 1;
+	if (stream->rd_next < stream->rd_used) {
+		return 0;
+	}
 	stream->rd_next=0;
 	stream->rd_used=stream_read_max(stream->s,stream->rd_buf,stream->rd_sz);
-	return (stream->rd_used>0);
+	return (stream->rd_used==0);
 }
 
 static void buf_write(stream_t stream,void*buf,size_t count){

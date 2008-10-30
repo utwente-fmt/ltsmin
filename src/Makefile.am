@@ -1,4 +1,4 @@
-bin_PROGRAMS = ltsmin-convert
+bin_PROGRAMS = ltsmin-convert gsf-extract gsf-build
 noinst_LIBRARIES = libutil.a
 
 if HAVE_MPI
@@ -11,6 +11,30 @@ endif
 if HAVE_LIBSTEP_INFO
 bin_PROGRAMS += lpo2lts-grey 
 endif
+
+if HAVE_LIBBCG
+bin_PROGRAMS += bcg2gsf gsf2bcg
+endif
+
+# gsf-extract
+gsf_extract_SOURCES = gsf-extract.c
+gsf_extract_LDADD = libutil.a
+
+# gsf-build
+gsf_build_SOURCES = gsf-build.c
+gsf_build_LDADD = libutil.a
+
+# bcg2gsf
+bcg2gsf_SOURCES = bcg2gsf.c
+bcg2gsf_LDADD = libutil.a $(CADP_LIBS)
+bcg2gsf_LDFLAGS = $(CADP_LDFLAGS) $(AM_LDFLAGS)
+bcg2gsf_CPPFLAGS = $(CADP_CPPFLAGS) $(AM_CPPFLAGS)
+
+# gsf2bcg
+gsf2bcg_SOURCES = gsf2bcg.c
+gsf2bcg_LDADD = libutil.a $(CADP_LIBS)
+gsf2bcg_LDFLAGS = $(CADP_LDFLAGS) $(AM_LDFLAGS)
+gsf2bcg_CPPFLAGS = $(CADP_CPPFLAGS) $(AM_CPPFLAGS)
 
 # lpo2lts-grey
 lpo2lts_grey_SOURCES  = lpo2lts-grey.c mcrl-greybox.c mcrl-greybox.h
@@ -48,7 +72,7 @@ libutil_a_SOURCES = unix.c runtime.c stream.c archive.c ltsmeta.c	\
                     stream.h raf.h stream_object.h ltsmeta.h		\
                     raf_object.h scctimer.h fast_hash.h runtime.h	\
                     treedbs.h config.h greybox.h stringindex.c          \
-                    stringindex.h
+                    stringindex.h archive_gsf.c
 
 # make 
 .DELETE_ON_ERROR:

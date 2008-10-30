@@ -268,7 +268,7 @@ uint8_t DSreadU8(stream_t ds){
 void DSreadS(stream_t ds,char *s,int maxlen){
 	uint16_t len=DSreadU16(ds);
 	if (len>=maxlen) {
-		Fatal(0,error,"string overflow");
+		Fatal(0,error,"string overflow (%d>=%d)",len,maxlen);
 	}
 	stream_read(ds,s,len);
 	s[len]=0;

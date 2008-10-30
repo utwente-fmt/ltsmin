@@ -29,54 +29,24 @@ stream_t arch_write(archive_t archive,char *name,char*code){
 	}
 }
 
-int arch_searchable(archive_t archive){
-	return (archive->procs.list!=arch_illegal_list);
-}
-void arch_search(archive_t archive,char *regex,string_enum_t cb,void*arg){
-	archive->procs.list(archive,regex,cb,arg);
-}
 
-int arch_enumerable(archive_t archive){
-	return (archive->procs.play!=arch_illegal_play);
-}
-void arch_enum(archive_t archive,char *regex,struct archive_enum *cb,void*arg){
-	archive->procs.play(archive,regex,cb,arg);
+arch_enum_t arch_enum(archive_t archive,char *regex){
+	archive->procs.enumerator(archive,regex);
 }
 
 void arch_close(archive_t *archive){
 	(*archive)->procs.close(archive);
 }
 
-struct cb_arg {
-	int id;
-	archive_t arch;
-	struct archive_enum *cb;
-	void *arg;
+typedef struct arch_enum {
+	struct archive_enum_obj procs;
 };
 
-static void arch_copy(void*arg,char*name){
-#define cba ((struct cb_arg *)arg)
-	char* code=cba->cb->new_item(cba->arg,cba->id,name);
-	stream_t s=arch_read(cba->arch,name,code);
-	char buf[4096];
-	for(;;){
-		int len=stream_read_max(s,buf,4096);
-		if(len==0) break;
-		cba->cb->data(cba->arg,cba->id,buf,len);
-	}
-	stream_close(&s);
-	cba->cb->end_item(cba->arg,cba->id);
-	cba->id++;
-#undef cba
+int arch_enumerate(arch_enum_t enumerator,struct arch_enum_callbacks *cb,void*arg){
+	return enumerator->procs.enumerate(enumerator,cb,arg);
 }
-
-void arch_play(archive_t arch,char*regex,struct archive_enum *cb,void*arg){
-	struct cb_arg cba;
-	cba.id=0;
-	cba.arch=arch;
-	cba.cb=cb;
-	cba.arg=arg;
-	arch->procs.list(arch,regex,arch_copy,&cba);
+void arch_enum_free(arch_enum_t* enumerator){
+	(*enumerator)->procs.free(enumerator);
 }
 
 stream_t arch_illegal_read(archive_t arch,char*name){
@@ -89,13 +59,10 @@ stream_t arch_illegal_write(archive_t arch,char*name){
 	Fatal(0,error,"illegal write on archive");
 	return NULL;
 }
-void arch_illegal_list(archive_t arch,char*regex,string_enum_t cb,void*arg){
-	(void)arch;(void)regex;(void)cb;(void)arg;
-	Fatal(0,error,"illegal list on archive");
-}
-void arch_illegal_play(archive_t arch,char*regex,struct archive_enum *cb,void*arg){
-	(void)arch;(void)regex;(void)cb;(void)arg;
-	Fatal(0,error,"illegal play on archive");
+arch_enum_t arch_illegal_enum(archive_t arch,char*regex){
+	(void)arch;(void)regex;
+	Fatal(1,error,"This archive cannot create an(other) enumerator.");
+	return NULL;
 }
 void arch_illegal_close(archive_t *arch){
 	(void)arch;
@@ -104,8 +71,7 @@ void arch_illegal_close(archive_t *arch){
 void arch_init(archive_t arch){
 	arch->procs.read=arch_illegal_read;
 	arch->procs.write=arch_illegal_write;
-	arch->procs.list=arch_illegal_list;
-	arch->procs.play=arch_illegal_play;
+	arch->procs.enumerator=arch_illegal_enum;
 	arch->procs.close=arch_illegal_close;
 }
 
