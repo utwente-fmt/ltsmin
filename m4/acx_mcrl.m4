@@ -1,3 +1,5 @@
+#serial 1
+# Author: Michael Weber <michaelw@cs.utwente.nl>
 #
 # SYNOPSIS
 #
@@ -29,45 +31,39 @@ fi
 
 #
 # SYNOPSIS
-# 
+#
 #   ACX_MCRL_LIBS([ACTION-IF-FOUND[, ACTION-IF-NOT-FOUND]])
 #
 AC_DEFUN([ACX_MCRL_LIBS],[
-AC_REQUIRE([ACX_MCRL])
+AC_REQUIRE([ACX_MCRL])dnl
 if test x"$acx_mcrl" = xyes; then
     AC_LANG_SAVE
     AC_LANG_C
 
-    acx_mcrl_save_CPPFLAGS="$CPPFLAGS"
-    acx_mcrl_save_LIBS="$LIBS"
-    acx_mcrl_save_LDFLAGS="$LDFLAGS"
-    CPPFLAGS="$MCRL_CPPFLAGS $CPPFLAGS"
-    LDFLAGS="$MCRL_LDFLAGS $LDFLAGS"
-
-    acx_mcrl_libs=yes
-    AC_CHECK_LIB([dl], [dlopen], 
-      [MCRL_LIBS="-ldl $MCRL_LIBS"],
-      [],
-      [$MCRL_LIBS])
-    AC_CHECK_LIB([ATerm], [ATinit],
-      [MCRL_LIBS="-lATerm $MCRL_LIBS"],
-      [],
-      [$MCRL_LIBS])
-    AC_CHECK_LIB([mcrlunix], [CreateDir],
-      [MCRL_LIBS="-lmcrlunix $MCRL_LIBS"],
-      [],
-      [$MCRL_LIBS])
-    AC_CHECK_LIB([mcrl], [MCRLsetArguments],
-      [MCRL_LIBS="-lmcrl $MCRL_LIBS"],
-      [acx_mcrl_libs=no],
-      [$MCRL_LIBS])
-    AC_CHECK_LIB([step], [STsetArguments],
-      [MCRL_LIBS="-lstep $MCRL_LIBS"],
-      [acx_mcrl_libs=no],
-      [$MCRL_LIBS])
-
-    CPPFLAGS="$acx_mcrl_save_CPPFLAGS"
-    LDFLAGS="$acx_mcrl_save_LDFLAGS"
+    AX_LET([CPPFLAGS], ["$MCRL_CPPFLAGS $CPPFLAGS"],
+           [LIBS], ["$LIBS"],
+           [LDFLAGS], ["$MCRL_LDFLAGS $LDFLAGS"],
+      [acx_mcrl_libs=yes
+       AC_CHECK_LIB([dl], [dlopen],
+         [MCRL_LIBS="-ldl $MCRL_LIBS"],
+         [],
+         [$MCRL_LIBS])
+       AC_CHECK_LIB([ATerm], [ATinit],
+         [MCRL_LIBS="-lATerm $MCRL_LIBS"],
+         [],
+         [$MCRL_LIBS])
+       AC_CHECK_LIB([mcrlunix], [CreateDir],
+         [MCRL_LIBS="-lmcrlunix $MCRL_LIBS"],
+         [],
+         [$MCRL_LIBS])
+       AC_CHECK_LIB([mcrl], [MCRLsetArguments],
+         [MCRL_LIBS="-lmcrl $MCRL_LIBS"],
+         [acx_mcrl_libs=no],
+         [$MCRL_LIBS])
+       AC_CHECK_LIB([step], [STsetArguments],
+         [MCRL_LIBS="-lstep $MCRL_LIBS"],
+         [acx_mcrl_libs=no],
+         [$MCRL_LIBS])])
 
     AC_LANG_RESTORE
 
