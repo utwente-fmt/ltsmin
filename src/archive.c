@@ -20,12 +20,16 @@ stream_t arch_read(archive_t archive,char *name,char*code){
 int arch_writable(archive_t archive){
 	return (archive->procs.write!=arch_illegal_write);
 }
-stream_t arch_write(archive_t archive,char *name,char*code){
+stream_t arch_write(archive_t archive,char *name,char*code,int hdr){
 	stream_t s=archive->procs.write(archive,name);
 	if (code==NULL) {
 		return s;
 	} else {
-		return stream_setup(s,code);
+		if (hdr) {
+			return stream_setup(s,code);
+		} else {
+			return stream_add_code(s,code);
+		}
 	}
 }
 

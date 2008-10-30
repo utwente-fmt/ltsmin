@@ -395,10 +395,10 @@ void DSautoSwap(stream_t ds){
 	}
 }
 
-static stream_t add_code(stream_t s,char* code){
+stream_t stream_add_code(stream_t s,char* code){
 	char*tail=strchr(code,'|');
 	if(tail){
-		s=add_code(s,tail+1);
+		s=stream_add_code(s,tail+1);
 	}
 	if(strlen(code)==0) return s;
 	if(!strncmp(code,"diff32",6)){
@@ -413,6 +413,11 @@ static stream_t add_code(stream_t s,char* code){
 		sscanf(code+4,"%d",&level);
 		return stream_gzip(s,Z_DEFAULT_COMPRESSION,8192);
 	}
+	if(!strncmp(code,"gunzip",6)){
+		int level=Z_DEFAULT_COMPRESSION;
+		sscanf(code+6,"%d",&level);
+		return stream_gunzip(s,Z_DEFAULT_COMPRESSION,8192);
+	}
 	Fatal(1,error,"unknown code prefix %s",code);
 	return NULL;
 }
@@ -425,9 +430,9 @@ stream_t stream_setup(stream_t s,char* code){
 	if (detect) {
 		char code[1024];
 		DSreadS(s,code,1024);
-		return add_code(s,code);
+		return stream_add_code(s,code);
 	} else {
-		return add_code(s,code);
+		return stream_add_code(s,code);
 	}
 }
 

@@ -103,10 +103,10 @@ int main(int argc, char *argv[]){
 	lts=lts_create();
 	lts_set_root(lts,0);
 	Fold(src);
-	termdb_stream=arch_write(arch,"TermDB","gzip");
-	src_stream=arch_write(arch,"src-0-0","diff32|gzip");
-	lbl_stream=arch_write(arch,"label-0-0","gzip");
-	dst_stream=arch_write(arch,"dest-0-0","diff32|gzip");
+	termdb_stream=arch_write(arch,"TermDB","gzip",1);
+	src_stream=arch_write(arch,"src-0-0","diff32|gzip",1);
+	lbl_stream=arch_write(arch,"label-0-0","gzip",1);
+	dst_stream=arch_write(arch,"dest-0-0","diff32|gzip",1);
 	while(explored<visited){
 		src[1]=explored;
 		Unfold(src);
@@ -120,7 +120,7 @@ int main(int argc, char *argv[]){
 	lts_set_states(lts,visited);
 	lts_set_trans(lts,trans);
 	lts_set_labels(lts,label_count);
-	stream_t ds=arch_write(arch,"info","");
+	stream_t ds=arch_write(arch,"info","",1);
 	lts_write_info(lts,ds,DIR_INFO);
 	DSclose(&ds);
 	DSclose(&termdb_stream);

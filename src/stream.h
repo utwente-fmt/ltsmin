@@ -55,10 +55,14 @@ extern stream_t stream_read_mem(void*buf,size_t len,size_t *used);
 
 extern stream_t stream_gzip(stream_t compressed,int level,int bufsize);
 
+extern stream_t stream_gunzip(stream_t expanded,int level,int bufsize);
+
 /* future work:
 extern stream_t stream_gunzip(stream_t expanded,int level,int bufsize);
 */
 extern stream_t stream_diff32(stream_t s);
+
+extern stream_t stream_add_code(stream_t s,char* code);
 
 extern stream_t stream_setup(stream_t s,char* code);
 

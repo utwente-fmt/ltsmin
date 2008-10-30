@@ -11,7 +11,7 @@ extern int arch_readable(archive_t archive);
 extern stream_t arch_read(archive_t archive,char *name,char*code);
 
 extern int arch_writable(archive_t archive);
-extern stream_t arch_write(archive_t archive,char *name,char*code);
+extern stream_t arch_write(archive_t archive,char *name,char*code,int hdr);
 
 typedef struct arch_enum* arch_enum_t;
 extern arch_enum_t arch_enum(archive_t archive,char *regex);
@@ -33,6 +33,8 @@ extern void arch_close(archive_t *archive);
 typedef stream_t(*stream_create_t)(char*name);
 
 extern archive_t arch_fmt(char*format,stream_create_t crd,stream_create_t cwr,int buf);
+
+extern archive_t arch_dir(char*dirname,int buf);
 
 extern archive_t arch_gcf_create(raf_t raf,size_t block_size,size_t cluster_size,int worker,int worker_count);
 

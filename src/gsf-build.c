@@ -24,7 +24,7 @@ int main(int argc, char *argv[]){
 	for(int i=1;i<argc;i++){
 		Warning(info,"writing %s",argv[i]);
 		stream_t is=file_input(argv[i]);
-		stream_t os=arch_write(dir,argv[i],code);
+		stream_t os=arch_write(dir,argv[i],code,0);
 		char buf[blocksize];
 		for(;;){
 			int len=stream_read_max(is,buf,blocksize);

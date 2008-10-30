@@ -11,7 +11,7 @@ int new_item(void*arg,int id,char*name){
 	if (id>=1024) {
 		Fatal(1,error,"sorry, this version is limited to 1024 streams");
 	}
-	stream[id]=arch_write(dir,name,code);
+	stream[id]=arch_write(dir,name,code,0);
 	return 0;
 }
 

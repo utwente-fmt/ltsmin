@@ -22,7 +22,7 @@ struct option options[]={
 
 static void stream_copy(archive_t src,archive_t dst,char*name,char*decode,char*encode){
 	stream_t is=arch_read(src,name,decode);
-	stream_t os=arch_write(dst,name,encode);
+	stream_t os=arch_write(dst,name,encode,1);
 	char buf[blocksize];
 	for(;;){
 		int len=stream_read_max(is,buf,blocksize);
@@ -61,7 +61,7 @@ int main(int argc, char *argv[]){
 	DSclose(&ds);
 	Log(info,"output compression is %s",plain?"disabled":"enabled");
 	int N=lts_get_segments(lts);
-	ds=arch_write(ar_out,"info",plain?NULL:"");
+	ds=arch_write(ar_out,"info",plain?NULL:"",1);
 	lts_write_info(lts,ds,DIR_INFO);
 	DSclose(&ds);
 	stream_copy(ar_in,ar_out,"TermDB",decode?"auto":NULL,plain?NULL:"gzip");
