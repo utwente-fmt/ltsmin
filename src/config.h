@@ -12,6 +12,6 @@
 #define DEFFILEMODE 0666
 #endif
 
-#define NAME_MAX 1024
+#define LTSMIN_PATHNAME_MAX 1024
 
 #endif /* CONFIG_H_ */

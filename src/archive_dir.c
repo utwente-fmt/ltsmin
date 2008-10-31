@@ -16,17 +16,17 @@
 struct archive_s {
 	struct archive_obj procs;
 	int buf;
-	char dir[NAME_MAX];
+	char dir[LTSMIN_PATHNAME_MAX];
 };
 
 static stream_t dir_read(archive_t archive,char *name){
-	char fname[NAME_MAX*2+2];
+	char fname[LTSMIN_PATHNAME_MAX*2+2];
 	sprintf(fname,"%s/%s",archive->dir,name);
 	return stream_buffer(fs_read(fname),archive->buf);
 }
 
 static stream_t dir_write(archive_t archive,char *name){
-	char fname[NAME_MAX*2+2];
+	char fname[LTSMIN_PATHNAME_MAX*2+2];
 	sprintf(fname,"%s/%s",archive->dir,name);
 	return stream_buffer(fs_write(fname),archive->buf);
 }
@@ -84,8 +84,8 @@ archive_t arch_dir(char*dirname,int buf){
 	if(CreateEmptyDir(dirname,DELETE_ALL)){
 		FatalCall(1,error,"could not create or clear directory %s",dirname);
 	}
-	strncpy(arch->dir,dirname,NAME_MAX-1);
-	arch->dir[NAME_MAX-1]=0;
+	strncpy(arch->dir,dirname,LTSMIN_PATHNAME_MAX-1);
+	arch->dir[LTSMIN_PATHNAME_MAX-1]=0;
 	arch->procs.read=dir_read;
 	arch->procs.write=dir_write;
 	arch->procs.enumerator=dir_enum;

@@ -26,10 +26,6 @@
 #define CPRINTF(args...)
 #endif
 
-#ifndef NAME_MAX
-#define NAME_MAX MAXNAMLEN
-#endif
-
 int CreateEmptyDir(char *name,int delete){
 	struct stat info;
 
@@ -56,7 +52,7 @@ int CreateEmptyDir(char *name,int delete){
 	if (S_ISDIR(info.st_mode)){
 		DIR *dir;
 		struct dirent *file;
-		char fname[NAME_MAX*2+2];
+		char fname[LTSMIN_PATHNAME_MAX*2+2];
 
 		CPRINTF("%s is a directory\n",name);
 		if (!(delete&DELETE_DIR)) {

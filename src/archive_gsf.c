@@ -159,8 +159,8 @@ static stream_t gsf_read(archive_t arch,char*name){
 }
 
 static stream_t gsf_read_first(archive_t arch,char*name){
-	char ident[NAME_MAX];
-	DSreadS(arch->ds,ident,NAME_MAX);
+	char ident[LTSMIN_PATHNAME_MAX];
+	DSreadS(arch->ds,ident,LTSMIN_PATHNAME_MAX);
 	if(strncmp(ident,"GSF",3)){
 		Fatal(0,error,"I do not recognize %s as a GSF file.",ident);
 	}
@@ -244,8 +244,8 @@ static arch_enum_t gsf_enum(archive_t archive,char *regex){
 	e->procs.enumerate=gsf_enumerate;
 	e->procs.free=gsf_enum_free;
 	e->archive=archive;
-	char ident[NAME_MAX];
-	DSreadS(archive->ds,ident,NAME_MAX);
+	char ident[LTSMIN_PATHNAME_MAX];
+	DSreadS(archive->ds,ident,LTSMIN_PATHNAME_MAX);
 	if(strncmp(ident,"GSF",3)){
 		Fatal(0,error,"I do not recognize %s as a GSF file.",ident);
 	}

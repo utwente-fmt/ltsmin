@@ -281,10 +281,10 @@ archive_t arch_gcf_read(raf_t raf){
 	{
 		char buf[4096];
 		size_t used;
-		char ident[NAME_MAX];
+		char ident[LTSMIN_PATHNAME_MAX];
 		raf_read(raf,buf,4096,0);
 		stream_t  ds=stream_read_mem(buf,4096,&used);
-		DSreadS(ds,ident,NAME_MAX);
+		DSreadS(ds,ident,LTSMIN_PATHNAME_MAX);
 		if(strncmp(ident,"GCF",3)){
 			Fatal(0,error,"I do not recognize %s as a GCF file.",ident);
 		}

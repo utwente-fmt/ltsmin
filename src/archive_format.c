@@ -17,18 +17,18 @@ struct archive_s {
 	stream_create_t crd;
 	stream_create_t cwr;
 	int buf;
-	char format[NAME_MAX];
+	char format[LTSMIN_PATHNAME_MAX];
 };
 
 
 static stream_t dir_read(archive_t archive,char *name){
-	char fname[NAME_MAX*2+2];
+	char fname[LTSMIN_PATHNAME_MAX*2+2];
 	sprintf(fname,archive->format,name);
 	return stream_buffer(archive->crd(fname),archive->buf);
 }
 
 static stream_t dir_write(archive_t archive,char *name){
-	char fname[NAME_MAX*2+2];
+	char fname[LTSMIN_PATHNAME_MAX*2+2];
 	sprintf(fname,archive->format,name);
 	return stream_buffer(archive->cwr(fname),archive->buf);
 }
@@ -40,8 +40,8 @@ static void dir_close(archive_t *archive){
 
 archive_t arch_fmt(char*format,stream_create_t crd,stream_create_t cwr,int buf){
 	archive_t arch=(archive_t)RTmalloc(sizeof(struct archive_s));
-	strncpy(arch->format,format,NAME_MAX-1);
-	arch->format[NAME_MAX-1]=0;
+	strncpy(arch->format,format,LTSMIN_PATHNAME_MAX-1);
+	arch->format[LTSMIN_PATHNAME_MAX-1]=0;
 	arch_init(arch);
 	arch->procs.read=dir_read;
 	arch->procs.write=dir_write;
