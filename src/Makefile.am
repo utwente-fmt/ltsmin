@@ -73,7 +73,7 @@ libutil_a_SOURCES = unix.c runtime.c stream.c archive.c ltsmeta.c	\
                     raf_object.h scctimer.h fast_hash.h runtime.h	\
                     treedbs.h config.h greybox.h stringindex.c          \
                     stringindex.h archive_gsf.c dirops.c dirops.h       \
-                    archive_dir.c
+                    archive_dir.c chunk-table.h
 
 # make 
 .DELETE_ON_ERROR:
