@@ -7,7 +7,8 @@ static archive_t dir=NULL;
 static stream_t stream[1024];
 
 int new_item(void*arg,int id,char*name){
-	printf("item %d is %s\n",id,name);
+	(void)arg;
+	//printf("item %d is %s\n",id,name);
 	if (id>=1024) {
 		Fatal(1,error,"sorry, this version is limited to 1024 streams");
 	}
@@ -16,13 +17,15 @@ int new_item(void*arg,int id,char*name){
 }
 
 int end_item(void*arg,int id){
-	printf("end of item %d\n",id);
+	(void)arg;
+	//printf("end of item %d\n",id);
 	stream_close(&stream[id]);
 	return 0;
 }
 
 int cp_data(void*arg,int id,void*data,size_t len){
-	printf("data for %d\n",id);
+	(void)arg;
+	//printf("data for %d\n",id);
 	stream_write(stream[id],data,len);
 	return 0;
 }
