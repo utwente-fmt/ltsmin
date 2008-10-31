@@ -42,7 +42,7 @@ void arch_close(archive_t *archive){
 	(*archive)->procs.close(archive);
 }
 
-typedef struct arch_enum {
+struct arch_enum {
 	struct archive_enum_obj procs;
 };
 

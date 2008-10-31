@@ -34,14 +34,14 @@ int main(int argc,char**argv){
 	N=BCG_OT_NB_EDGES (bcg_graph);
 	bcg_s1=BCG_OT_INITIAL_STATE (bcg_graph);
 	Warning(info,"initial state is %d",bcg_s1);
-	ds=arch_write(gsf,"header",NULL);
+	ds=arch_write(gsf,"header",NULL,0);
 	DSwriteU32(ds,1); // 1 segment
 	DSwriteU32(ds,0); // root segment
 	DSwriteU32(ds,bcg_s1); // root offset
 	DSwriteS(ds,bcg_comment); // comment
 	DSclose(&ds);
 	N=BCG_OT_NB_LABELS (bcg_graph);
-	ds=arch_write(gsf,"actions",NULL);
+	ds=arch_write(gsf,"actions",NULL,0);
 	invis=0;
 	for(i=0;i<N;i++){
 		if (BCG_OT_LABEL_VISIBLE (bcg_graph,i)){
@@ -54,9 +54,9 @@ int main(int argc,char**argv){
 	}
 	Warning(info,"found %d invisible label(s)",invis);
 	DSclose(&ds);
-	stream_t src=arch_write(gsf,"src-0-0",NULL);
-	stream_t lbl=arch_write(gsf,"label-0-0",NULL);
-	stream_t dst=arch_write(gsf,"dest-0-0",NULL);
+	stream_t src=arch_write(gsf,"src-0-0",NULL,0);
+	stream_t lbl=arch_write(gsf,"label-0-0",NULL,0);
+	stream_t dst=arch_write(gsf,"dest-0-0",NULL,0);
 	BCG_OT_ITERATE_PLN (bcg_graph,bcg_s1,bcg_label_number,bcg_s2){
 		DSwriteU32(src,bcg_s1);
 		DSwriteU32(lbl,bcg_label_number);
