@@ -285,8 +285,8 @@ char* DSreadSA(stream_t ds){
 char* DSreadLN(stream_t ds){
 	char tmp[4096];
 	for(int i=0;i<4096;i++){
-		tmp[i]=DSreadU8(ds);
-		if (tmp[i]=='\n') {
+		size_t res=stream_read_max(ds,tmp+i,1);
+		if (res==0 || tmp[i]=='\n') {
 			char *s=RTmalloc(i+1);
 			memcpy(s,tmp,i);
 			s[i]=0;
@@ -344,6 +344,11 @@ void DSwriteS8(stream_t ds,int8_t i){
 
 void DSwriteU8(stream_t ds,uint8_t i){
 	stream_write(ds,&i,1);
+}
+
+void DSwriteC(stream_t ds,uint16_t len,char *c){
+	DSwriteU16(ds,len);
+	stream_write(ds,c,len);
 }
 
 void DSwriteS(stream_t ds,char *s){

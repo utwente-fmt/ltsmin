@@ -106,6 +106,7 @@ extern void DSwriteF(stream_t ds,float f);
 extern void DSwriteD(stream_t ds,double d);
 
 extern void DSwriteS(stream_t ds,char *s);
+extern void DSwriteC(stream_t ds,uint16_t len,char *c);
 extern void DSwriteVL(stream_t ds,uint64_t i);
 
 

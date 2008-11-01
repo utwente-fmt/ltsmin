@@ -78,11 +78,27 @@ static arch_enum_t dir_enum(archive_t archive,char *regex){
 	return e;
 }
 
-archive_t arch_dir(char*dirname,int buf){
+archive_t arch_dir_create(char*dirname,int buf,int del){
 	archive_t arch=(archive_t)RTmalloc(sizeof(struct archive_s));
 	arch_init(arch);
-	if(CreateEmptyDir(dirname,DELETE_ALL)){
+	if(CreateEmptyDir(dirname,del)){
 		FatalCall(1,error,"could not create or clear directory %s",dirname);
+	}
+	strncpy(arch->dir,dirname,LTSMIN_PATHNAME_MAX-1);
+	arch->dir[LTSMIN_PATHNAME_MAX-1]=0;
+	arch->procs.read=dir_read;
+	arch->procs.write=dir_write;
+	arch->procs.enumerator=dir_enum;
+	arch->procs.close=dir_close;
+	arch->buf=buf;
+	return arch;
+}
+
+archive_t arch_dir_open(char*dirname,int buf){
+	archive_t arch=(archive_t)RTmalloc(sizeof(struct archive_s));
+	arch_init(arch);
+	if(!IsADir(dirname)){
+		FatalCall(1,error,"directory %s does not exist",dirname);
 	}
 	strncpy(arch->dir,dirname,LTSMIN_PATHNAME_MAX-1);
 	arch->dir[LTSMIN_PATHNAME_MAX-1]=0;

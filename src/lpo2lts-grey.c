@@ -9,8 +9,9 @@
 #include "mcrl-greybox.h"
 #include "chunk-table.h"
 #include "treedbs.h"
-#include "ltsmeta.h"
+#include "ltsman.h"
 #include "options.h"
+#include "stringindex.h"
 
 static char *outputarch=NULL;
 //static int plain=0;
@@ -32,6 +33,8 @@ static stream_t src_stream;
 static stream_t lbl_stream;
 static stream_t dst_stream;
 
+static string_index_t si;
+
 chunk_table_t CTcreate(char *name){
 	if (!strcmp(name,"action")) {
 		return (void*)1;
@@ -42,12 +45,7 @@ chunk_table_t CTcreate(char *name){
 
 void CTsubmitChunk(chunk_table_t table,size_t len,void* chunk,chunk_add_t cb,void* context){
 	if ((int)table) {
-		if(!strcmp(chunk,"tau")) {
-			lts_set_tau(lts,label_count);
-		}
-		if(!strcmp(chunk,"\"tau\"")) {
-			lts_set_tau(lts,label_count);
-		}
+		SIputAt(si,chunk,label_count);
 		DSwrite(termdb_stream,chunk,len);
 		DSwrite(termdb_stream,"\n",1);
 		label_count++;
@@ -100,9 +98,11 @@ int main(int argc, char *argv[]){
 		uint32_t bc=prop_get_U32("bc",128);
 		arch=arch_gcf_create(raf_unistd(outputarch),bs,bs*bc,0,1);
 	}
-	lts=lts_create();
-	lts_set_root(lts,0);
+	lts=lts_new();
+	lts_set_root(lts,0,0);
+	lts_set_segments(lts,1);
 	Fold(src);
+	si=lts_get_string_index(lts);
 	termdb_stream=arch_write(arch,"TermDB","gzip",1);
 	src_stream=arch_write(arch,"src-0-0","diff32|gzip",1);
 	lbl_stream=arch_write(arch,"label-0-0","gzip",1);
@@ -117,11 +117,10 @@ int main(int argc, char *argv[]){
 		if(explored%1000 ==0) Warning(info,"explored %d visited %d trans %d",explored,visited,trans);
 	}
 	Warning(info,"state space has %d states %d transitions",visited,trans);		
-	lts_set_states(lts,visited);
-	lts_set_trans(lts,trans);
-	lts_set_labels(lts,label_count);
+	lts_set_states(lts,0,visited);
+	lts_set_trans(lts,0,0,trans);
 	stream_t ds=arch_write(arch,"info","",1);
-	lts_write_info(lts,ds,DIR_INFO);
+	lts_write_info(lts,ds,LTS_INFO_DIR);
 	DSclose(&ds);
 	DSclose(&termdb_stream);
 	DSclose(&src_stream);
