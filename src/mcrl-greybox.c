@@ -1,11 +1,11 @@
 #include <stdio.h>
 
 #include "mcrl-greybox.h"
-#include "chunk-table.h"
 #include "runtime.h"
 #include "rw.h"
 #include "mcrl.h"
 #include "step.h"
+#include "at-map.h"
 
 static ATerm label=NULL;
 static ATerm *dst;
@@ -20,38 +20,8 @@ typedef struct {
 
 static smdinfo_t *summand;
 
-struct map_s {
-	chunk_table_t table;
-	ATermIndexedSet set;
-	int size;
-};
-static struct map_s termmap;
-static struct map_s actionmap;
-
-static void new_term(void*context,size_t len,void* chunk){
-	((char*)chunk)[len]=0;
-	ATerm t=ATreadFromString((char*)chunk);
-	ATindexedSetPut(((struct map_s*)context)->set,t,NULL);
-	((struct map_s*)context)->size++;
-}
-
-static long find_index(struct map_s*map,ATerm t){
-	long idx=ATindexedSetGetIndex(map->set,t);
-	if (idx>=0) return idx;
-	char *tmp=ATwriteToString(t);
-	int len=strlen(tmp);
-	char chunk[len+1];
-	for(int i=0;i<len;i++) chunk[i]=tmp[i];
-	chunk[len]=0;
-	CTsubmitChunk(map->table,len,chunk,new_term,map);
-	return ATindexedSetGetIndex(map->set,t);
-}
-
-static ATerm find_term(struct map_s*map,long idx){
-	if(idx<map->size) return ATindexedSetGetElem(map->set,idx);
-	CTupdateTable(map->table,idx,new_term,map);
-	return ATindexedSetGetElem(map->set,idx);
-}
+static at_map_t termmap;
+static at_map_t actionmap;
 
 static int expand;
 static int smd;
@@ -59,17 +29,17 @@ static TransitionCB user_cb;
 static void* user_context;
 
 static void callback(void){
-	int lbl=find_index(&actionmap,label);
+	int lbl=ATfindIndex(actionmap,label);
 	if (expand){
 		int dst_p[summand[smd].count];
 		for(int i=0;i<summand[smd].count;i++){
-			dst_p[i]=find_index(&termmap,dst[summand[smd].proj[i]]);
+			dst_p[i]=ATfindIndex(termmap,dst[summand[smd].proj[i]]);
 		}
 		user_cb(user_context,&lbl,dst_p);
 	} else {
 		int dst_p[nPars];
 		for(int i=0;i<nPars;i++){
-			dst_p[i]=find_index(&termmap,dst[i]);
+			dst_p[i]=ATfindIndex(termmap,dst[i]);
 		}
 		user_cb(user_context,&lbl,dst_p);
 	}
@@ -136,12 +106,8 @@ model_t GBcreateModel(char*model){
 		summand[i].proj=malloc(summand[i].count*sizeof(int));
 		for(j=0;j<summand[i].count;j++) summand[i].proj[j]=temp[j];
 	}
-	termmap.table=CTcreate("leaf");
-	termmap.set=ATindexedSetCreate(1024,75);
-	termmap.size=0;
-	actionmap.table=CTcreate("action");
-	actionmap.set=ATindexedSetCreate(1024,75);
-	actionmap.size=0;
+	termmap=ATmapCreate("leaf");
+	actionmap=ATmapCreate("action");
 	return NULL;
 }
 
@@ -175,7 +141,7 @@ void GBgetInitialState(model_t model,int *state){
 	(void)model;
 	int i;
 	STsetInitialState();
-	for(i=0;i<nPars;i++) state[i]=find_index(&termmap,dst[i]);
+	for(i=0;i<nPars;i++) state[i]=ATfindIndex(termmap,dst[i]);
 }
 
 int GBgetTransitionsShort(model_t model,int group,int*src,TransitionCB cb,void*context){
@@ -189,7 +155,7 @@ int GBgetTransitionsShort(model_t model,int group,int*src,TransitionCB cb,void*c
 		at_src[i]=dst[i];
 	}
 	for(int i=0;i<summand[group].count;i++){
-		at_src[summand[group].proj[i]]=find_term(&termmap,src[i]);
+		at_src[summand[group].proj[i]]=ATfindTerm(termmap,src[i]);
 	}
 	return STstepSmd(at_src,&smd,1);
 }
@@ -202,7 +168,7 @@ int GBgetTransitionsLong(model_t model,int group,int*src,TransitionCB cb,void*co
 	user_cb=cb;
 	user_context=context;
 	for(int i=0;i<nPars;i++) {
-		at_src[i]=find_term(&termmap,src[i]);
+		at_src[i]=ATfindTerm(termmap,src[i]);
 	}
 	return STstepSmd(at_src,&smd,1);
 }
@@ -214,7 +180,7 @@ int GBgetTransitionsAll(model_t model,int*src,TransitionCB cb,void*context){
 	user_cb=cb;
 	user_context=context;
 	for(int i=0;i<nPars;i++) {
-		at_src[i]=find_term(&termmap,src[i]);
+		at_src[i]=ATfindTerm(termmap,src[i]);
 	}
 	return STstep(at_src);
 }

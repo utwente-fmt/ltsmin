@@ -53,7 +53,7 @@ chunk_table_t CTcreate(char *name){
 }
 
 void CTsubmitChunk(chunk_table_t table,size_t len,void* chunk,chunk_add_t cb,void* context){
-	if ((int)table) {
+	if (table == (void*)1) {
 		SIputAt(si,chunk,label_count);
 		DSwrite(termdb_stream,chunk,len);
 		DSwrite(termdb_stream,"\n",1);
@@ -135,7 +135,7 @@ int main(int argc, char *argv[]){
 	Warning(info,"state space has %d states %d transitions",visited,trans);		
 	lts_set_states(lts,0,visited);
 	lts_set_trans(lts,0,0,trans);
-	stream_t ds=arch_write(arch,"info","",1);
+	stream_t ds=arch_write(arch,"info",plain?NULL:"",1);
 	lts_write_info(lts,ds,LTS_INFO_DIR);
 	DSclose(&ds);
 	DSclose(&termdb_stream);
