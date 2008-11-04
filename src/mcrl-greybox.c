@@ -20,34 +20,37 @@ typedef struct {
 
 static smdinfo_t *summand;
 
-static chunk_table_t termdb_table;
-static ATermIndexedSet termdb_set;
-static chunk_table_t actiondb_table;
-static ATermIndexedSet actiondb_set;
+struct map_s {
+	chunk_table_t table;
+	ATermIndexedSet set;
+	int size;
+};
+static struct map_s termmap;
+static struct map_s actionmap;
 
 static void new_term(void*context,size_t len,void* chunk){
 	((char*)chunk)[len]=0;
 	ATerm t=ATreadFromString((char*)chunk);
-	ATindexedSetPut((ATermIndexedSet)context,t,NULL);
+	ATindexedSetPut(((struct map_s*)context)->set,t,NULL);
+	((struct map_s*)context)->size++;
 }
 
-static long find_index(chunk_table_t chunks,ATermIndexedSet terms,ATerm t){
-	long idx=ATindexedSetGetIndex(terms,t);
+static long find_index(struct map_s*map,ATerm t){
+	long idx=ATindexedSetGetIndex(map->set,t);
 	if (idx>=0) return idx;
 	char *tmp=ATwriteToString(t);
 	int len=strlen(tmp);
 	char chunk[len+1];
 	for(int i=0;i<len;i++) chunk[i]=tmp[i];
 	chunk[len]=0;
-	CTsubmitChunk(chunks,len,chunk,new_term,terms);
-	return ATindexedSetGetIndex(terms,t);
+	CTsubmitChunk(map->table,len,chunk,new_term,map);
+	return ATindexedSetGetIndex(map->set,t);
 }
 
-static ATerm find_term(chunk_table_t chunks,ATermIndexedSet terms,long idx){
-	ATerm t=ATindexedSetGetElem(terms,idx);
-	if(t) return t;
-	CTupdateTable(chunks,idx,new_term,terms);
-	return ATindexedSetGetElem(terms,idx);
+static ATerm find_term(struct map_s*map,long idx){
+	if(idx<map->size) return ATindexedSetGetElem(map->set,idx);
+	CTupdateTable(map->table,idx,new_term,map);
+	return ATindexedSetGetElem(map->set,idx);
 }
 
 static int expand;
@@ -56,17 +59,17 @@ static TransitionCB user_cb;
 static void* user_context;
 
 static void callback(void){
-	int lbl=find_index(actiondb_table,actiondb_set,label);
+	int lbl=find_index(&actionmap,label);
 	if (expand){
 		int dst_p[summand[smd].count];
 		for(int i=0;i<summand[smd].count;i++){
-			dst_p[i]=find_index(termdb_table,termdb_set,dst[summand[smd].proj[i]]);
+			dst_p[i]=find_index(&termmap,dst[summand[smd].proj[i]]);
 		}
 		user_cb(user_context,&lbl,dst_p);
 	} else {
 		int dst_p[nPars];
 		for(int i=0;i<nPars;i++){
-			dst_p[i]=find_index(termdb_table,termdb_set,dst[i]);
+			dst_p[i]=find_index(&termmap,dst[i]);
 		}
 		user_cb(user_context,&lbl,dst_p);
 	}
@@ -133,10 +136,12 @@ model_t GBcreateModel(char*model){
 		summand[i].proj=malloc(summand[i].count*sizeof(int));
 		for(j=0;j<summand[i].count;j++) summand[i].proj[j]=temp[j];
 	}
-	termdb_table=CTcreate("leaf");
-	termdb_set=ATindexedSetCreate(1024,75);
-	actiondb_table=CTcreate("action");
-	actiondb_set=ATindexedSetCreate(1024,75);
+	termmap.table=CTcreate("leaf");
+	termmap.set=ATindexedSetCreate(1024,75);
+	termmap.size=0;
+	actionmap.table=CTcreate("action");
+	actionmap.set=ATindexedSetCreate(1024,75);
+	actionmap.size=0;
 	return NULL;
 }
 
@@ -170,7 +175,7 @@ void GBgetInitialState(model_t model,int *state){
 	(void)model;
 	int i;
 	STsetInitialState();
-	for(i=0;i<nPars;i++) state[i]=find_index(termdb_table,termdb_set,dst[i]);
+	for(i=0;i<nPars;i++) state[i]=find_index(&termmap,dst[i]);
 }
 
 int GBgetTransitionsShort(model_t model,int group,int*src,TransitionCB cb,void*context){
@@ -184,7 +189,7 @@ int GBgetTransitionsShort(model_t model,int group,int*src,TransitionCB cb,void*c
 		at_src[i]=dst[i];
 	}
 	for(int i=0;i<summand[group].count;i++){
-		at_src[summand[group].proj[i]]=find_term(termdb_table,termdb_set,src[i]);
+		at_src[summand[group].proj[i]]=find_term(&termmap,src[i]);
 	}
 	return STstepSmd(at_src,&smd,1);
 }
@@ -197,9 +202,20 @@ int GBgetTransitionsLong(model_t model,int group,int*src,TransitionCB cb,void*co
 	user_cb=cb;
 	user_context=context;
 	for(int i=0;i<nPars;i++) {
-		at_src[i]=find_term(termdb_table,termdb_set,src[i]);
+		at_src[i]=find_term(&termmap,src[i]);
 	}
 	return STstepSmd(at_src,&smd,1);
 }
 
+int GBgetTransitionsAll(model_t model,int*src,TransitionCB cb,void*context){
+	(void)model;
+	ATerm at_src[nPars];
+	expand=0;
+	user_cb=cb;
+	user_context=context;
+	for(int i=0;i<nPars;i++) {
+		at_src[i]=find_term(&termmap,src[i]);
+	}
+	return STstep(at_src);
+}
 

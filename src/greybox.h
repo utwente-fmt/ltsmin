@@ -71,5 +71,14 @@ Given a group number and a long vector for that group, enumerate the local
    All positions in this vector must have legal values. However, the given state does not have to be reachable.
  */
 
+extern int GBgetTransitionsAll(model_t model,int*src,TransitionCB cb,void*context);
+/**< @brief Enumerate the transitions of all groups for a long state.
+
+Of course it would be equivalent to just call GBgetTransitionsLong for all groups,
+but for MCRL(2) it is more efficient if this call is implemented directly in the language module:
+it avoids having to initialize the rewriter several times for the same state.
+ */
+
+
 #endif
 

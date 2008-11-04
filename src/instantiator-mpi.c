@@ -6,9 +6,8 @@
 #include <mpi.h>
 
 #include "generichash.h"
-#include "rw.h"
-#include "mcrl.h"
-#include "step.h"
+#include "chunk-table.h"
+#include "mcrl-greybox.h"
 #include "treedbs.h"
 #include "stream.h"
 #include "options.h"
@@ -17,13 +16,12 @@
 #include "sysdep.h"
 #include "mpi_io_stream.h"
 #include "mpi_ram_raf.h"
+#include "stringindex.h"
 
 #define MAX_PARAMETERS 256
 #define MAX_TERM_LEN 5000
 
 static archive_t arch;
-static int compare_terms=0;
-static int sequential_init_rewriter=0;
 static int verbosity=1;
 static char *outputarch=NULL;
 static int write_lts=1;
@@ -33,12 +31,6 @@ static int no_step=0;
 static int loadbalancing=1;
 static int plain=0;
 
-static int st_help(char* opt,char*optarg,void *arg){
-	(void)opt;(void)optarg;(void)arg;
-	SThelp();
-	return OPT_EXIT;
-}
-
 struct option options[]={
 	{"",OPT_NORMAL,NULL,NULL,NULL,
 		"usage: mpirun <nodespec> inst-mpi options file ...",NULL,NULL,NULL},
@@ -46,10 +38,6 @@ struct option options[]={
 	{"-q",OPT_NORMAL,reset_int,&verbosity,NULL,"be silent",NULL,NULL,NULL},
 	{"-help",OPT_NORMAL,usage,NULL,NULL,
 		"print this help message",NULL,NULL,NULL},
-	{"-st-help",OPT_NORMAL,st_help,NULL,NULL,
-		"print help for the mCRL stepper",
-		"WARNING: some options (e.g. -conf-table) will",
-		"break the correctness of the distributed instantiator",NULL},
 	{"-out",OPT_REQ_ARG,assign_string,&outputarch,"-out <archive>",
 		"Specifiy the name of the output archive.",
 		"This will be a pattern archive if <archive> contains %s",
@@ -63,13 +51,6 @@ struct option options[]={
 		"useful when running on other people's workstations",NULL,NULL},
 	{"-plain",OPT_NORMAL,set_int,&plain,NULL,
 		"disable compression of the output",NULL,NULL,NULL},
-	{"-cmp",OPT_NORMAL,set_int,&compare_terms,NULL,
-		"compare terms in term vector",
-		"useful if the representation of data is not unique",
-		"e.g. when a set is represented by an unsorted list",NULL},
-	{"-seq-rw",OPT_NORMAL,set_int,&sequential_init_rewriter,NULL,
-		"Perform initialisation of rewriters sequentially",
-		"rather than in parallel. (The old rw needed this option.)",NULL,NULL},
 	{"-master-no-step",OPT_NORMAL,set_int,&master_no_step,NULL,
 		"instruct master to act as database only",
 		"this improves latency of database lookups",NULL,NULL},
@@ -85,10 +66,7 @@ static stream_t *output_label=NULL;
 static stream_t *output_dest=NULL;
 
 static int *tcount;
-
-static ATerm label=NULL;
-static ATerm src[MAX_PARAMETERS];
-static ATerm dest[MAX_PARAMETERS];
+static int *src;
 static int size;
 
 static struct round_msg {
@@ -114,12 +92,16 @@ static struct submit_msg {
 	int state[MAX_PARAMETERS];
 } submit_msg;
 
+#define LEAF_CHUNK_TAG 9
+#define LEAF_INT_TAG 8
 #define SUBMIT_TAG 7
+//define SUBMIT_SIZE (sizeof(struct submit_msg)-(MAX_PARAMETERS-size)*sizeof(int))
 #define SUBMIT_SIZE sizeof(struct submit_msg)
 #define IDLE_TAG 6
-#define ATERM_TAG 5
-#define INT_TAG 4
+#define ACT_CHUNK_TAG 5
+#define ACT_INT_TAG 4
 #define WORK_TAG 3
+//define WORK_SIZE (sizeof(struct work_msg)-(MAX_PARAMETERS-size)*sizeof(int))
 #define WORK_SIZE sizeof(struct work_msg)
 #define ROUND_TAG 2
 #define ROUND_SIZE sizeof(struct round_msg)
@@ -128,176 +110,127 @@ static struct submit_msg {
 
 static int mpi_nodes,mpi_me;
 
-typedef struct {
-	ATermTable table;
-	ATerm *map;
-	stream_t TermDB;
-	int size;
-	int next;
-} ATmapStruct;
+static string_index_t act_db;
+static int next_act=0;
 
-typedef ATmapStruct *ATmap;
+static string_index_t leaf_db;
+static int next_leaf=0;
 
-#define MAP_BLOCK_SIZE 256
-
-static ATmap ATmapCreate(stream_t s){
-	ATmap map;
-	int i;
-
-	map=(ATmap)malloc(sizeof(ATmapStruct));
-	map->table=ATtableCreate(MAP_BLOCK_SIZE,75);
-	map->map=(ATerm*)malloc(MAP_BLOCK_SIZE*sizeof(ATerm));
-	for(i=0;i<MAP_BLOCK_SIZE;i++){
-		map->map[i]=NULL;
+static int chunk2int(string_index_t term_db,int chunk_tag,int int_tag,size_t len,void* chunk){
+	if (mpi_me==0) {
+		((char*)chunk)[len]=0;
+		return SIput(term_db,chunk);
+	} else {
+		int idx;
+		MPI_Status status;
+		MPI_Sendrecv(chunk,len,MPI_CHAR,0,chunk_tag,
+			&idx,1,MPI_INT,0,int_tag,MPI_COMM_WORLD,&status);
+		return idx;
 	}
-	map->size=MAP_BLOCK_SIZE;
-	map->next=0;
-	map->TermDB=s;
-	return map;
+}
+
+static void chunk_call(string_index_t term_db,int chunk_tag,int int_tag,int next_cb,chunk_add_t cb,void* context){
+	if (mpi_me==0) {
+		char*s=SIget(term_db,next_cb);
+		int len=strlen(s);
+		cb(context,len,s);
+	} else {
+		MPI_Status status;
+		char chunk[MAX_TERM_LEN+1];
+		MPI_Sendrecv(&next_cb,1,MPI_INT,0,int_tag,
+			&chunk,MAX_TERM_LEN,MPI_CHAR,0,chunk_tag,MPI_COMM_WORLD,&status);
+		int len;
+		MPI_Get_count(&status,MPI_CHAR,&len);
+		cb(context,len,chunk);
+	}
 }
 
 
-static ATerm EQ(ATerm t, ATerm s) {
-  char eq[1024],buf[1024];
-  AFun sort;
-  Symbol sym;
-  sort = MCRLgetSort(t);
-  strcpy(buf,ATgetName(sort));
-  sprintf(eq,"eq#%s#%s",buf,buf);
-  sym = ATmakeSymbol(eq,2,ATtrue);
-  if (MCRLgetType(sym)==MCRLunknown) {
-    return NULL;
-  } else {
-    return (ATerm)ATmakeAppl2(sym,t,s);
-  }
+chunk_table_t CTcreate(char *name){
+	if (!strcmp(name,"action")) {
+		return (void*)1;
+	}
+	if (!strcmp(name,"leaf")) {
+		return (void*)2;
+	}
+	Fatal(1,error,"CT support incomplete canniot deal with table %s",name);
+	return NULL;
 }
 
-static int ATerm2int(ATmap map,ATerm t){
-	ATerm i;
-	int ii;
-
-	i=ATtableGet(map->table,t);
-	if(i!=NULL){
-		return ATgetInt((ATermInt)i);
-	}
-	if(mpi_me==0){
-		if (compare_terms && (MCRLgetType(ATgetSymbol(t))==MCRLconstructor)) {
-			ATerm e;
-			for(ii=0;ii<map->next;ii++){
-				if(MCRLgetSort(t)!=MCRLgetSort(map->map[ii])) {
-					continue;
-				}
-				e=EQ(map->map[ii],t);
-				if (e==NULL) {
-					ATwarning("equality between %t and %t cannot be computed",MCRLprint(t),MCRLprint(map->map[ii]));
-				}
-				e=RWrewrite(e);
-				if (e==MCRLterm_true) {
-					break;
-				}
-			}
-			if (ii==map->next) {
-				map->next++;
-			}
-		} else {
-			ii=map->next;
-			map->next++;
-		}
-		while(map->size<=ii){
-			int j;
-			map->size+=MAP_BLOCK_SIZE;
-			map->map=realloc(map->map,(map->size)*sizeof(ATerm));
-			for(j=map->size-MAP_BLOCK_SIZE;j<map->size;j++){
-				map->map[j]=NULL;
-			}
-		}
-		if (map->map[ii]==NULL) {
-			char *s=ATwriteToString(t);
-			DSwrite(map->TermDB,s,strlen(s));
-			DSwrite(map->TermDB,"\n",1);
-			map->map[ii]=t;
+void CTsubmitChunk(chunk_table_t table,size_t len,void* chunk,chunk_add_t cb,void* context){
+	if(table==(void*)1){
+		int res=chunk2int(act_db,ACT_CHUNK_TAG,ACT_INT_TAG,len,chunk);
+		while(next_act<=res){
+			chunk_call(act_db,ACT_CHUNK_TAG,ACT_INT_TAG,next_act,cb,context);
+			next_act++;
 		}
 	} else {
-		char *s=ATwriteToString(t);
-		int len=strlen(s);
-		MPI_Status status;
-		if (len>MAX_TERM_LEN) ATerror("label too long");
-		MPI_Send(s,len,MPI_CHAR,0,ATERM_TAG,MPI_COMM_WORLD);
-		MPI_Recv(&ii,1,MPI_INT,0,INT_TAG,MPI_COMM_WORLD,&status);
-	}
-	i=(ATerm)ATmakeInt(ii);
-	ATtablePut(map->table,t,i);
-	return ii;
-}
-
-static ATerm int2ATerm(ATmap map,int i){
-	int len;
-	char buf[MAX_TERM_LEN+1];
-	ATerm ii,t;
-	MPI_Status status;
-
-	if ((i<map->size) && (map->map[i]!=NULL)) {
-		return map->map[i];
-	}
-	if(mpi_me==0) ATerror("query item without entering");
-	while(map->size<=i){
-		int j;
-		map->size+=MAP_BLOCK_SIZE;
-		map->map=realloc(map->map,(map->size)*sizeof(ATerm));
-		for(j=map->size-MAP_BLOCK_SIZE;j<map->size;j++){
-			map->map[j]=NULL;
+		int res=chunk2int(leaf_db,LEAF_CHUNK_TAG,LEAF_INT_TAG,len,chunk);
+		while(next_leaf<=res){
+			chunk_call(leaf_db,LEAF_CHUNK_TAG,LEAF_INT_TAG,next_leaf,cb,context);
+			next_leaf++;
 		}
 	}
-	MPI_Send(&i,1,MPI_INT,0,INT_TAG,MPI_COMM_WORLD);
-	MPI_Recv(&buf,MAX_TERM_LEN,MPI_CHAR,0,ATERM_TAG,MPI_COMM_WORLD,&status);
-	MPI_Get_count(&status,MPI_CHAR,&len);
-	buf[len]=0;
-	t=ATreadFromString(buf);
-	map->map[i]=t;
-	ii=(ATerm)ATmakeInt(i);
-	ATtablePut(map->table,t,ii);
-	return t;
 }
 
-static void map_server_probe(ATmap map){
+void CTupdateTable(chunk_table_t table,uint32_t wanted,chunk_add_t cb,void* context){
+	if(table==(void*)1){
+		while(next_act<=(int)wanted){
+			chunk_call(act_db,ACT_CHUNK_TAG,ACT_INT_TAG,next_act,cb,context);
+			next_act++;
+		}
+	} else {
+		while(next_leaf<=(int)wanted){
+			chunk_call(leaf_db,LEAF_CHUNK_TAG,LEAF_INT_TAG,next_leaf,cb,context);
+			next_leaf++;
+		}
+	}
+}
+
+static void map_server_probe(int id){
 	MPI_Status status;
 	int ii,len,found;
 	char *s,buf[MAX_TERM_LEN+1];
-	ATerm t;
-
-	for(;;) {
-		MPI_Iprobe(MPI_ANY_SOURCE,ATERM_TAG,MPI_COMM_WORLD,&found,&status);
-		if (!found) break;
-		MPI_Recv(&buf,MAX_TERM_LEN,MPI_CHAR,MPI_ANY_SOURCE,ATERM_TAG,MPI_COMM_WORLD,&status);
-		MPI_Get_count(&status,MPI_CHAR,&len);
-		buf[len]=0;
-		t=ATreadFromString(buf);
-		ii=ATerm2int(map,t);
-		MPI_Send(&ii,1,MPI_INT,status.MPI_SOURCE,INT_TAG,MPI_COMM_WORLD);
+	int chunk_tag,int_tag;
+	string_index_t term_db;
+	if (id==1){
+		chunk_tag=ACT_CHUNK_TAG;
+		int_tag=ACT_INT_TAG;
+		term_db=act_db;
+	} else {
+		chunk_tag=LEAF_CHUNK_TAG;
+		int_tag=LEAF_INT_TAG;
+		term_db=leaf_db;
 	}
 	for(;;) {
-		MPI_Iprobe(MPI_ANY_SOURCE,INT_TAG,MPI_COMM_WORLD,&found,&status);
+		MPI_Iprobe(MPI_ANY_SOURCE,chunk_tag,MPI_COMM_WORLD,&found,&status);
 		if (!found) break;
-		MPI_Recv(&ii,1,MPI_INT,MPI_ANY_SOURCE,INT_TAG,MPI_COMM_WORLD,&status);
-		s=ATwriteToString(int2ATerm(map,ii));
+		MPI_Recv(&buf,MAX_TERM_LEN,MPI_CHAR,MPI_ANY_SOURCE,chunk_tag,MPI_COMM_WORLD,&status);
+		MPI_Get_count(&status,MPI_CHAR,&len);
+		buf[len]=0;
+		ii=SIput(term_db,buf);
+		MPI_Send(&ii,1,MPI_INT,status.MPI_SOURCE,int_tag,MPI_COMM_WORLD);
+	}
+	for(;;) {
+		MPI_Iprobe(MPI_ANY_SOURCE,int_tag,MPI_COMM_WORLD,&found,&status);
+		if (!found) break;
+		MPI_Recv(&ii,1,MPI_INT,MPI_ANY_SOURCE,int_tag,MPI_COMM_WORLD,&status);
+		s=SIget(term_db,ii);
 		len=strlen(s);
-		MPI_Send(s,len,MPI_CHAR,status.MPI_SOURCE,ATERM_TAG,MPI_COMM_WORLD);
+		MPI_Send(s,len,MPI_CHAR,status.MPI_SOURCE,chunk_tag,MPI_COMM_WORLD);
 	}
 }
 
-
-static ATmap map;
-
 static int msgcount;
 
-static void callback(void){
-	int i,ai,who;
+static void callback(void*context,int*labels,int*dst){
+	(void)context;
+	int i,who;
 	int chksum;
 
-	work_msg.label=ATerm2int(map,label);
+	work_msg.label=labels[0];
 	for(i=0;i<size;i++){
-		ai=ATerm2int(map,dest[i]);
-		work_msg.dest[i]=ai;
+		work_msg.dest[i]=dst[i];
 	}
 	chksum=chkbase^hash_4_4((ub4*)(work_msg.dest),size,0);
 	who=chksum%mpi_nodes;
@@ -306,19 +239,6 @@ static void callback(void){
 	msgcount++;
 }
 
-static void WarningHandler(const char *format, va_list args) {
-     if (!verbosity) return;
-     fprintf(stderr,"%s: ", who);
-     ATvfprintf(stderr, format, args);
-     fprintf(stderr,"\n");
-     }
-     
-static void ErrorHandler(const char *format, va_list args) {
-     fprintf(stderr,"%s: ", who);
-     ATvfprintf(stderr, format, args);
-     fprintf(stderr,"\n");
-     MPI_Abort(MPI_COMM_WORLD,-1);
-     }
 
 static int temp[2*MAX_PARAMETERS];
 static char name[100];
@@ -331,8 +251,6 @@ int main(int argc, char*argv[]){
 
 	long long int total_states=0,lvl_states=0;
 	long long int total_transitions=0,lvl_transitions=0;
-	int first_unused;
-	//int parent_next=0;;
 
 	bottom=(void*)&argc;
         MPI_Init(&argc, &argv);
@@ -350,57 +268,33 @@ int main(int argc, char*argv[]){
 	msgcount=0;
 	clean=1;
 
-	/* Set up the ATerm library.
-	 */
-	ATinit(argc, argv, bottom);
-	ATsetWarningHandler(WarningHandler);
-	ATsetErrorHandler(ErrorHandler);
- 	ATprotect(&label);
-	for(i=0;i<MAX_PARAMETERS;i++) {
-		src[i]=NULL;
-		dest[i]=NULL;
-	}	
-	ATprotectArray(src,MAX_PARAMETERS);
-	ATprotectArray(dest,MAX_PARAMETERS);
-	/* Parsing options in 2 turns.
-	 * In the first turn worker 0 parses options.
-	 * In the second turn all other workers parse the options.
-	 * In this way an error in the options is reported
-	 * precisely once.
-	 */
+	Warning(info,"initializing grey box module");
+	MCRLinitGreybox(argc,argv,bottom);
 	if (mpi_me!=0) MPI_Barrier(MPI_COMM_WORLD);
-	MCRLsetArguments(&argc, &argv);
-	RWsetArguments(&argc, &argv);
-	STsetArguments(&argc, &argv);
-        first_unused=parse_options(options,argc,argv);
-	if (mpi_me==0){
-		//for (i=0;i<argc;i++){
-		//	ATwarning("opt %d is %s",i,argv[i]);
-		//}
-		if (argc!=first_unused) ATerror("unused options");
-	}
-	if (mpi_me==0) {
-		MPI_Barrier(MPI_COMM_WORLD);
-		ATwarning("term comparison is %s",compare_terms?"enabled":"disabled");
-	}
+	parse_options(options,argc,argv);
+	if (mpi_me==0) MPI_Barrier(MPI_COMM_WORLD);
+	Warning(info,"creating model for %s",argv[argc-1]);
+	GBcreateModel(argv[argc-1]);
+	Warning(info,"model created");
+
 	/* Initializing according to the options just parsed.
 	 */
 	if (nice_value) {
-		if (mpi_me==0) ATwarning("setting nice to %d\n",nice_value);
+		if (mpi_me==0) Warning(info,"setting nice to %d\n",nice_value);
 		nice(nice_value);
 	}
 	if (mpi_me==0) {
 		if (master_no_step) {
 			if (loadbalancing && mpi_nodes>1) {
 				no_step=1;
-				ATwarning("stepping disabled at master node");
+				Warning(info,"stepping disabled at master node");
 			} else {
-				ATwarning("ignoring -master-no-step");
+				Warning(info,"ignoring -master-no-step");
 			}
 		}
 	}
 	if (mpi_me==0){
-		if (write_lts && !outputarch) ATerror("please specify the output archive with -out");
+		if (write_lts && !outputarch) Fatal(1,error,"please specify the output archive with -out");
 	}
 	MPI_Barrier(MPI_COMM_WORLD);
 	if (strstr(outputarch,"%s")) {
@@ -426,44 +320,26 @@ int main(int argc, char*argv[]){
 		}
 	}
 	/***************************************************/
-	MCRLinitialize();
-	if (sequential_init_rewriter){
-		for(i=0;i<mpi_me;i++){
-			MPI_Barrier(MPI_COMM_WORLD);
-		}
-	}
-	if (!RWinitialize(MCRLgetAdt())) ATerror("Initialize rewriter");
-	if (sequential_init_rewriter){
-		for(i=mpi_me;i<mpi_nodes;i++){
-			MPI_Barrier(MPI_COMM_WORLD);
-		}
-	}
-	STinitialize(noOrdering,&label,dest,callback);
-	/***************************************************/
-	size=MCRLgetNumberOfPars();
-	if (size<2) ATerror("there must be at least 2 parameters");
-	if (size>MAX_PARAMETERS) ATerror("please make src and dest dynamic");
+	size=GBgetStateLength(NULL);
+	if (size<2) Fatal(1,error,"there must be at least 2 parameters");
+	if (size>MAX_PARAMETERS) Fatal(1,error,"please make src and dest dynamic");
 	TreeDBSinit(size,1);
 	/***************************************************/
 	if (mpi_me==0) {
-		map=ATmapCreate(arch_write(arch,"TermDB",plain?NULL:"gzip",1));
-	} else {
-		map=ATmapCreate(NULL);
+		act_db=SIcreate();
+		leaf_db=SIcreate();
 	}
 	/***************************************************/
-	STsetInitialState();
-	ATwarning("initial state computed at %d",mpi_me);
-	for(i=0;i<size;i++){
-		temp[size+i]=ATerm2int(map,dest[i]);
-	}
+	GBgetInitialState(NULL,temp+size);
+	Warning(info,"initial state computed at %d",mpi_me);
 	chkbase=hash_4_4((ub4*)(temp+size),size,0);
-	ATwarning("initial state translated at %d",mpi_me);
+	Warning(info,"initial state translated at %d",mpi_me);
 	explored=0;
 	transitions=0;
 	if(mpi_me==0){
-		ATwarning("folding initial state at %d",mpi_me);
+		Warning(info,"folding initial state at %d",mpi_me);
 		Fold(temp);
-		if (temp[1]) ATerror("Initial state wasn't assigned state no 0");
+		if (temp[1]) Fatal(1,error,"Initial state wasn't assigned state no 0");
 		visited=1;
 	} else {
 		visited=0;
@@ -480,20 +356,20 @@ int main(int argc, char*argv[]){
 		level++;
 		lvl_scount=0;
 		lvl_tcount=0;
-		//fprintf(stderr,"%d entering loop\n",mpi_me);
+		Warning(info,"entering loop\n");
 		for(;;){
 			/* Check if we have finished exploring our own states */
 			if (limit==explored) {
 				limit--; // Make certain we run this code precisely once.
 				if (mpi_me==0) {
-					//ATwarning("initiating termination detection.");
+					//Warning(info,"initiating termination detection.");
 					term_msg.clean=1;
 					term_msg.count=0;
 					term_msg.unexplored=(visited-explored);
 					MPI_Send(&term_msg,TERM_SIZE,MPI_CHAR,mpi_nodes-1,TERM_TAG,MPI_COMM_WORLD);
 				}
 				if (loadbalancing && !no_step) {
-					ATwarning("broadcasting idle");
+					Warning(info,"broadcasting idle");
 					for(i=0;i<mpi_nodes;i++) if (i!= mpi_me) {
 						MPI_Send(&level,1,MPI_INT,i,IDLE_TAG,MPI_COMM_WORLD);
 					}
@@ -523,7 +399,8 @@ int main(int argc, char*argv[]){
 			}
 			/* Let master check for term database queries. */
 			if (mpi_me==0){
-				map_server_probe(map);
+				map_server_probe(1);
+				map_server_probe(2);
 			}
 			/* In case of load balancing offload as many states as possible. */
 			if (loadbalancing) while (limit>explored) {
@@ -544,7 +421,7 @@ int main(int argc, char*argv[]){
 					for(i=0;i<size;i++){
 						submit_msg.state[i]=temp[size+i];
 					}
-					//ATwarning("submitting state %d to %d",explored,status.MPI_SOURCE);
+					//Warning(info,"submitting state %d to %d",explored,status.MPI_SOURCE);
 					MPI_Send(&submit_msg,SUBMIT_SIZE,MPI_CHAR,status.MPI_SOURCE,SUBMIT_TAG,MPI_COMM_WORLD);
 					msgcount++;
 					explored++;
@@ -555,13 +432,11 @@ int main(int argc, char*argv[]){
 			if (!no_step && limit>explored) {
 				temp[1]=explored;
 				Unfold(temp);
-				for(i=0;i<size;i++){
-					src[i]=int2ATerm(map,temp[size+i]);
-				}
+				src=temp+size;
 				src_filled=1;
 				work_msg.src_worker=mpi_me;
 				work_msg.src_number=explored;
-				//ATwarning("exploring state %d",explored);
+				//Warning(info,"exploring state %d",explored);
 				explored++;
 			} else {
 				src_filled=0;
@@ -575,9 +450,7 @@ int main(int argc, char*argv[]){
 					//fprintf(stderr,"%2d: receiving state from %d\n",mpi_me,status.MPI_SOURCE);
 					accepted++;
 					MPI_Send(&level,1,MPI_INT,status.MPI_SOURCE,IDLE_TAG,MPI_COMM_WORLD);
-					for(i=0;i<size;i++){
-						src[i]=int2ATerm(map,submit_msg.state[i]);
-					}
+					src=submit_msg.state;
 					src_filled=1;
 					work_msg.src_worker=submit_msg.segment;
 					work_msg.src_number=submit_msg.offset;	
@@ -587,9 +460,9 @@ int main(int argc, char*argv[]){
 			if (src_filled){
 				int count;
 				src_filled=0;
-				//ATwarning("stepping %d.%d",work_msg.src_worker,work_msg.src_number);
-				count=STstep(src);
-				if (count<0) ATerror("error in STstep");
+				//Warning(info,"stepping %d.%d",work_msg.src_worker,work_msg.src_number);
+				count=GBgetTransitionsAll(NULL,src,callback,NULL);;
+				if (count<0) Fatal(1,error,"error in STstep");
 				lvl_scount++;
 				lvl_tcount+=count;
 				if ((lvl_scount%1000)==0) {
@@ -639,9 +512,9 @@ int main(int argc, char*argv[]){
 			MPI_Probe(MPI_ANY_SOURCE,MPI_ANY_TAG,MPI_COMM_WORLD,&status);
 		}
 		/* The level was finished. */
-		ATwarning("explored %d states and %d transitions",lvl_scount,lvl_tcount);
+		Warning(info,"explored %d states and %d transitions",lvl_scount,lvl_tcount);
 		if (loadbalancing) {
-			ATwarning("states accepted %d submitted %d\n",accepted,submitted);
+			Warning(info,"states accepted %d submitted %d\n",accepted,submitted);
 		}
 		/* Compute the global counts at the master. */
 		MPI_Gather(&lvl_scount,1,MPI_INT,lvl_temp,1,MPI_INT,0,MPI_COMM_WORLD);
@@ -675,7 +548,7 @@ int main(int argc, char*argv[]){
 		}
 	}
 	/* State space was succesfully generated. */
-	ATwarning("My share is %d states and %d transitions",explored,transitions);
+	Warning(info,"My share is %d states and %d transitions",explored,transitions);
 	if (write_lts){
 		for(i=0;i<mpi_nodes;i++){
 			DSclose(&output_src[i]);
@@ -683,25 +556,35 @@ int main(int argc, char*argv[]){
 			DSclose(&output_dest[i]);
 		}
 	}
+	Warning(info,"transition files closed");
 	{
 	int *temp=NULL;
 	int tau;
-	stream_t info=NULL;
+	stream_t info_s=NULL;
 		if (mpi_me==0){
 			/* It would be better if we didn't create tau if it is non-existent. */
-			tau=ATerm2int(map,MCRLterm_tau);
-			DSclose(&(map->TermDB));
+			stream_t ds=arch_write(arch,"TermDB",plain?NULL:"gzip",1);
+			int act_count=0;
+			for(;;){
+				char*s=SIget(act_db,act_count);
+				if (s==NULL) break;
+				act_count++;
+				DSwrite(ds,s,strlen(s));
+				DSwrite(ds,"\n",1);
+			}
+			DSclose(&ds);
+			tau=SIlookup(act_db,"tau");
+			Warning(info,"%d actions, tau has index %d",act_count,tau);
 			/* Start writing the info file. */
-			info=arch_write(arch,"info",plain?NULL:"",1);
-			DSwriteU32(info,31);
-			DSwriteS(info,"generated by mpi-inst");
-			DSwriteU32(info,mpi_nodes);
-			DSwriteU32(info,0);
-			DSwriteU32(info,0);
-			DSwriteU32(info,map->next);
-			DSwriteU32(info,tau);
-			DSwriteU32(info,MCRLgetNumberOfPars()-1);
-			ATwarning("%d terms in TermDB, tau has index %d",map->next,tau);
+			info_s=arch_write(arch,"info",plain?NULL:"",1);
+			DSwriteU32(info_s,31);
+			DSwriteS(info_s,"generated by instantiator-mpi");
+			DSwriteU32(info_s,mpi_nodes);
+			DSwriteU32(info_s,0);
+			DSwriteU32(info_s,0);
+			DSwriteU32(info_s,act_count);
+			DSwriteU32(info_s,tau);
+			DSwriteU32(info_s,size-1);
 			temp=(int*)malloc(mpi_nodes*mpi_nodes*sizeof(int));
 		}
 		MPI_Gather(&explored,1,MPI_INT,temp,1,MPI_INT,0,MPI_COMM_WORLD);
@@ -709,7 +592,7 @@ int main(int argc, char*argv[]){
 			total_states=0;
 			for(i=0;i<mpi_nodes;i++){
 				total_states+=temp[i];
-				DSwriteU32(info,temp[i]);
+				DSwriteU32(info_s,temp[i]);
 			}
 			total_transitions=0;
 		}
@@ -718,11 +601,11 @@ int main(int argc, char*argv[]){
 			for(i=0;i<mpi_nodes;i++){
 				for(j=0;j<mpi_nodes;j++){
 					total_transitions+=temp[i+mpi_nodes*j];
-					//ATwarning("%d -> %d : %d",i,j,temp[i+mpi_nodes*j]);
-					DSwriteU32(info,temp[i+mpi_nodes*j]);
+					//Warning(info,"%d -> %d : %d",i,j,temp[i+mpi_nodes*j]);
+					DSwriteU32(info_s,temp[i+mpi_nodes*j]);
 				}
 			}
-			DSclose(&info);
+			DSclose(&info_s);
 			if (verbosity) {
 				fprintf(stderr,"generated %lld states and %lld transitions\n",total_states,total_transitions);
 				fprintf(stderr,"state space has %d levels\n",level);

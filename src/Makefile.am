@@ -53,7 +53,7 @@ lpo2lts_grey_CPPFLAGS = $(MCRL_CPPFLAGS) $(AM_CPPFLAGS)
 lpo2lts_grey_LDFLAGS  = $(MCRL_LDFLAGS) $(AM_LDFLAGS)
 
 # instantiator-mpi
-instantiator_mpi_SOURCES  = instantiator-mpi.c config.h
+instantiator_mpi_SOURCES  = instantiator-mpi.c mcrl-greybox.c config.h
 instantiator_mpi_LDADD    = libmpi.a libutil.a $(MCRL_LIBS)
 instantiator_mpi_CPPFLAGS = $(MCRL_CPPFLAGS) $(AM_CPPFLAGS)
 instantiator_mpi_LDFLAGS  = $(MCRL_LDFLAGS) $(AM_LDFLAGS)
