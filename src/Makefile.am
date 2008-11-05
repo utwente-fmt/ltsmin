@@ -5,7 +5,7 @@ if HAVE_MPI
 bin_PROGRAMS += ltsmin-mpi
 noinst_LIBRARIES += libmpi.a
 if HAVE_LIBMCRL
-bin_PROGRAMS += instantiator-mpi
+bin_PROGRAMS += lpo2lts-mpi
 endif
 endif
 if HAVE_LIBSTEP_INFO
@@ -52,11 +52,11 @@ lpo2lts_grey_LDADD    = libutil.a $(MCRL_LIBS)
 lpo2lts_grey_CPPFLAGS = -DMCRL $(MCRL_CPPFLAGS) $(AM_CPPFLAGS)
 lpo2lts_grey_LDFLAGS  = $(MCRL_LDFLAGS) $(AM_LDFLAGS)
 
-# instantiator-mpi
-instantiator_mpi_SOURCES  = instantiator-mpi.c mcrl-greybox.c mcrl-greybox.h at-map.c at-map.h config.h
-instantiator_mpi_LDADD    = libmpi.a libutil.a $(MCRL_LIBS)
-instantiator_mpi_CPPFLAGS = $(MCRL_CPPFLAGS) $(AM_CPPFLAGS)
-instantiator_mpi_LDFLAGS  = $(MCRL_LDFLAGS) $(AM_LDFLAGS)
+# lpo2lts-mpi
+lpo2lts_mpi_SOURCES  = spec2lts-mpi.c mcrl-greybox.c mcrl-greybox.h at-map.c at-map.h config.h
+lpo2lts_mpi_LDADD    = libmpi.a libutil.a $(MCRL_LIBS)
+lpo2lts_mpi_CPPFLAGS = -DMCRL $(MCRL_CPPFLAGS) $(AM_CPPFLAGS)
+lpo2lts_mpi_LDFLAGS  = $(MCRL_LDFLAGS) $(AM_LDFLAGS)
 
 # ltsmin-mpi
 ltsmin_mpi_SOURCES = ltsmin-mpi.c set.c lts.c dlts.c set.h lts.h	\

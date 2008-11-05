@@ -7,13 +7,17 @@
 
 #include "generichash.h"
 #include "chunk-table.h"
+#ifdef MCRL
 #include "mcrl-greybox.h"
+#endif
+#ifdef MCRL2
+#include "mcrl2-greybox.h"
+#endif
 #include "treedbs.h"
 #include "stream.h"
 #include "options.h"
 #include "runtime.h"
 #include "archive.h"
-#include "sysdep.h"
 #include "mpi_io_stream.h"
 #include "mpi_ram_raf.h"
 #include "stringindex.h"
@@ -269,12 +273,17 @@ int main(int argc, char*argv[]){
 	clean=1;
 
 	Warning(info,"initializing grey box module");
+#ifdef MCRL
 	MCRLinitGreybox(argc,argv,bottom);
+#endif
+#ifdef MCRL2
+	MCRL2initGreybox(argc,argv,bottom);
+#endif
 	if (mpi_me!=0) MPI_Barrier(MPI_COMM_WORLD);
 	parse_options(options,argc,argv);
 	if (mpi_me==0) MPI_Barrier(MPI_COMM_WORLD);
 	Warning(info,"creating model for %s",argv[argc-1]);
-	GBcreateModel(argv[argc-1]);
+	model_t model=GBcreateModel(argv[argc-1]);
 	Warning(info,"model created");
 
 	/* Initializing according to the options just parsed.
@@ -320,7 +329,7 @@ int main(int argc, char*argv[]){
 		}
 	}
 	/***************************************************/
-	size=GBgetStateLength(NULL);
+	size=GBgetStateLength(model);
 	if (size<2) Fatal(1,error,"there must be at least 2 parameters");
 	if (size>MAX_PARAMETERS) Fatal(1,error,"please make src and dest dynamic");
 	TreeDBSinit(size,1);
@@ -330,7 +339,7 @@ int main(int argc, char*argv[]){
 		leaf_db=SIcreate();
 	}
 	/***************************************************/
-	GBgetInitialState(NULL,temp+size);
+	GBgetInitialState(model,temp+size);
 	Warning(info,"initial state computed at %d",mpi_me);
 	chkbase=hash_4_4((ub4*)(temp+size),size,0);
 	Warning(info,"initial state translated at %d",mpi_me);
@@ -461,7 +470,7 @@ int main(int argc, char*argv[]){
 				int count;
 				src_filled=0;
 				//Warning(info,"stepping %d.%d",work_msg.src_worker,work_msg.src_number);
-				count=GBgetTransitionsAll(NULL,src,callback,NULL);;
+				count=GBgetTransitionsAll(model,src,callback,NULL);;
 				if (count<0) Fatal(1,error,"error in STstep");
 				lvl_scount++;
 				lvl_tcount+=count;
