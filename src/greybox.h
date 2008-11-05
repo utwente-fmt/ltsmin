@@ -1,7 +1,6 @@
 #ifndef GREYBOX_H
 #define GREYBOX_H
 
-#include "config.h"
 
 /**
  @file greybox.h
@@ -13,8 +12,7 @@ This version assumes a few things:
 - The types of labels are the same for each transition.
 */
 
-
-typedef void* model_t;
+typedef struct grey_box_model* model_t;
 /**< @brief Abstract type for a model.
 */
 

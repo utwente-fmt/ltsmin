@@ -6,7 +6,12 @@
 
 #include "archive.h"
 #include "runtime.h"
+#ifdef MCRL
 #include "mcrl-greybox.h"
+#endif
+#ifdef MCRL2
+#include "mcrl2-greybox.h"
+#endif
 #include "chunk-table.h"
 #include "treedbs.h"
 #include "ltsman.h"
@@ -89,17 +94,23 @@ int main(int argc, char *argv[]){
 	void* stackbottom=&argv;
 	RTinit(argc,&argv);
 	take_vars(&argc,argv);
+#ifdef MCRL
 	MCRLinitGreybox(argc,argv,stackbottom);
+#endif
+#ifdef MCRL2
+	MCRL2initGreybox(argc,argv,stackbottom);
+#endif
 	parse_options(options,argc,argv);
 	Warning(info,"opening %s",argv[argc-1]);
-	GBcreateModel(argv[argc-1]);
-	N=GBgetStateLength(NULL);
-	K=GBgetGroupCount(NULL);
+	model_t model=GBcreateModel(argv[argc-1]);
+	N=GBgetStateLength(model);
+	K=GBgetGroupCount(model);
 	TreeDBSinit(N,1);
-	Warning(info,"length is %d",N);
+	Warning(info,"length is %d, there are %d groups",N,K);
 	Warning(info,"Using %s mode",blackbox?"black box":"grey box");	
 	int src[N+N];
-	GBgetInitialState(NULL,src+N);
+	GBgetInitialState(model,src+N);
+	Warning(info,"got initial state");
 	archive_t arch;
 	if (!outputarch) Fatal(1,error,"please specify the output archive with -out");
 	if (strstr(outputarch,"%s")) {
@@ -123,10 +134,10 @@ int main(int argc, char *argv[]){
 		Unfold(src);
 		int c;
 		if(blackbox){
-			c=GBgetTransitionsAll(NULL,src+N,print_next,&(src[1]));
+			c=GBgetTransitionsAll(model,src+N,print_next,&(src[1]));
 		} else {
 			for(int i=0;i<K;i++){
-				c=GBgetTransitionsLong(NULL,i,src+N,print_next,&(src[1]));
+				c=GBgetTransitionsLong(model,i,src+N,print_next,&(src[1]));
 			}
 		}
 		explored++;
