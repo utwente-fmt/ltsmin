@@ -84,7 +84,9 @@ libutil_a_SOURCES = unix.c runtime.c stream.c archive.c	\
                     treedbs.h config.h greybox.h stringindex.c          \
                     stringindex.h archive_gsf.c dirops.c dirops.h       \
                     ltsman.c ltsman.h packet_stream.h packet_stream.c \
-                    archive_dir.c chunk-table.h
+                    archive_dir.c chunk-table.h \
+                    dynamic-array.c  dynamic-array.h
+
 
 # make 
 .DELETE_ON_ERROR:

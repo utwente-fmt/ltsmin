@@ -21,6 +21,7 @@
 #include "mpi_io_stream.h"
 #include "mpi_ram_raf.h"
 #include "stringindex.h"
+#include "dynamic-array.h"
 
 #define MAX_PARAMETERS 256
 #define MAX_TERM_LEN 5000
@@ -34,6 +35,7 @@ static int master_no_step=0;
 static int no_step=0;
 static int loadbalancing=1;
 static int plain=0;
+static int find_dlk=0;
 
 struct option options[]={
 	{"",OPT_NORMAL,NULL,NULL,NULL,
@@ -42,6 +44,10 @@ struct option options[]={
 	{"-q",OPT_NORMAL,reset_int,&verbosity,NULL,"be silent",NULL,NULL,NULL},
 	{"-help",OPT_NORMAL,usage,NULL,NULL,
 		"print this help message",NULL,NULL,NULL},
+	{"-dlk",OPT_NORMAL,set_int,&find_dlk,NULL,
+		"If a deadlock is found, a trace to the deadlock will be",
+		"printed and the exploration will be aborted.",
+		"using this option implies -nolts",NULL},
 	{"-out",OPT_REQ_ARG,assign_string,&outputarch,"-out <archive>",
 		"Specifiy the name of the output archive.",
 		"This will be a pattern archive if <archive> contains %s",
@@ -99,14 +105,14 @@ static struct submit_msg {
 #define LEAF_CHUNK_TAG 9
 #define LEAF_INT_TAG 8
 #define SUBMIT_TAG 7
-//define SUBMIT_SIZE (sizeof(struct submit_msg)-(MAX_PARAMETERS-size)*sizeof(int))
-#define SUBMIT_SIZE sizeof(struct submit_msg)
+#define SUBMIT_SIZE (sizeof(struct submit_msg)-(MAX_PARAMETERS-size)*sizeof(int))
+//define SUBMIT_SIZE sizeof(struct submit_msg)
 #define IDLE_TAG 6
 #define ACT_CHUNK_TAG 5
 #define ACT_INT_TAG 4
 #define WORK_TAG 3
-//define WORK_SIZE (sizeof(struct work_msg)-(MAX_PARAMETERS-size)*sizeof(int))
-#define WORK_SIZE sizeof(struct work_msg)
+#define WORK_SIZE (sizeof(struct work_msg)-(MAX_PARAMETERS-size)*sizeof(int))
+//define WORK_SIZE sizeof(struct work_msg)
 #define ROUND_TAG 2
 #define ROUND_SIZE sizeof(struct round_msg)
 #define TERM_TAG 1
@@ -302,16 +308,29 @@ int main(int argc, char*argv[]){
 			}
 		}
 	}
+	/***************************************************/
+	array_manager_t state_man=NULL;
+	uint32_t *parent_ofs=NULL;
+	uint16_t *parent_seg=NULL;
+	if (find_dlk) {
+		write_lts=0;
+		state_man=create_manager(65536);
+		add_array(state_man,&parent_ofs,4);
+		add_array(state_man,&parent_seg,2);
+	}
+	/***************************************************/
 	if (mpi_me==0){
 		if (write_lts && !outputarch) Fatal(1,error,"please specify the output archive with -out");
 	}
 	MPI_Barrier(MPI_COMM_WORLD);
-	if (strstr(outputarch,"%s")) {
-		arch=arch_fmt(outputarch,mpi_io_read,mpi_io_write,prop_get_U32("bs",65536));
-	} else {
-		uint32_t bs=prop_get_U32("bs",65536);
-		uint32_t bc=prop_get_U32("bc",128);
-		arch=arch_gcf_create(MPI_Create_raf(outputarch,MPI_COMM_WORLD),bs,bs*bc,mpi_me,mpi_nodes);
+	if (write_lts){
+		if (strstr(outputarch,"%s")) {
+			arch=arch_fmt(outputarch,mpi_io_read,mpi_io_write,prop_get_U32("bs",65536));
+		} else {
+			uint32_t bs=prop_get_U32("bs",65536);
+			uint32_t bc=prop_get_U32("bc",128);
+			arch=arch_gcf_create(MPI_Create_raf(outputarch,MPI_COMM_WORLD),bs,bs*bc,mpi_me,mpi_nodes);
+		}
 	}
 	/***************************************************/
 	if (write_lts) {
@@ -397,6 +416,11 @@ int main(int argc, char*argv[]){
 				Fold(temp);
 				if (temp[1]>=visited) {
 					visited=temp[1]+1;
+					if(find_dlk){
+						ensure_access(state_man,temp[1]);
+						parent_seg[temp[1]]=work_msg.src_worker;
+						parent_ofs[temp[1]]=work_msg.src_number;
+					}
 				}
 				if (write_lts){
 					DSwriteU32(output_src[work_msg.src_worker],work_msg.src_number);
@@ -472,6 +496,10 @@ int main(int argc, char*argv[]){
 				//Warning(info,"stepping %d.%d",work_msg.src_worker,work_msg.src_number);
 				count=GBgetTransitionsAll(model,src,callback,NULL);;
 				if (count<0) Fatal(1,error,"error in STstep");
+				if (count==0 && find_dlk){
+					Warning(info,"deadlock found");
+					MPI_Abort(MPI_COMM_WORLD,1);
+				}
 				lvl_scount++;
 				lvl_tcount+=count;
 				if ((lvl_scount%1000)==0) {
@@ -570,7 +598,7 @@ int main(int argc, char*argv[]){
 	int *temp=NULL;
 	int tau;
 	stream_t info_s=NULL;
-		if (mpi_me==0){
+		if (write_lts && mpi_me==0){
 			/* It would be better if we didn't create tau if it is non-existent. */
 			stream_t ds=arch_write(arch,"TermDB",plain?NULL:"gzip",1);
 			int act_count=0;
@@ -594,10 +622,10 @@ int main(int argc, char*argv[]){
 			DSwriteU32(info_s,act_count);
 			DSwriteU32(info_s,tau);
 			DSwriteU32(info_s,size-1);
-			temp=(int*)malloc(mpi_nodes*mpi_nodes*sizeof(int));
 		}
+		if (mpi_me==0) temp=(int*)malloc(mpi_nodes*mpi_nodes*sizeof(int));
 		MPI_Gather(&explored,1,MPI_INT,temp,1,MPI_INT,0,MPI_COMM_WORLD);
-		if (mpi_me==0){
+		if (write_lts && mpi_me==0){
 			total_states=0;
 			for(i=0;i<mpi_nodes;i++){
 				total_states+=temp[i];
@@ -606,7 +634,7 @@ int main(int argc, char*argv[]){
 			total_transitions=0;
 		}
 		MPI_Gather(tcount,mpi_nodes,MPI_INT,temp,mpi_nodes,MPI_INT,0,MPI_COMM_WORLD);
-		if (mpi_me==0){
+		if (write_lts && mpi_me==0){
 			for(i=0;i<mpi_nodes;i++){
 				for(j=0;j<mpi_nodes;j++){
 					total_transitions+=temp[i+mpi_nodes*j];
@@ -615,13 +643,13 @@ int main(int argc, char*argv[]){
 				}
 			}
 			DSclose(&info_s);
-			if (verbosity) {
-				fprintf(stderr,"generated %lld states and %lld transitions\n",total_states,total_transitions);
-				fprintf(stderr,"state space has %d levels\n",level);
-			}
+		}
+		if(mpi_me==0) {
+			Warning(info,"generated %lld states and %lld transitions\n",total_states,total_transitions);
+			Warning(info,"state space has %d levels\n",level);
 		}
 	}
-	arch_close(&arch);
+	if (write_lts) arch_close(&arch);
 	MPI_Finalize();
 
 	return 0;
