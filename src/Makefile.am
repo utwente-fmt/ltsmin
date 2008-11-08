@@ -2,7 +2,7 @@ bin_PROGRAMS = ltsmin-convert gsf-extract gsf-build gsf2dir dir2gsf
 noinst_LIBRARIES = libutil.a
 
 if HAVE_MPI
-bin_PROGRAMS += ltsmin-mpi
+bin_PROGRAMS += ltsmin-mpi mpi-event-test
 noinst_LIBRARIES += libmpi.a
 if HAVE_LIBMCRL
 bin_PROGRAMS += lpo2lts-mpi
@@ -58,6 +58,10 @@ lpo2lts_mpi_LDADD    = libmpi.a libutil.a $(MCRL_LIBS)
 lpo2lts_mpi_CPPFLAGS = -DMCRL $(MCRL_CPPFLAGS) $(AM_CPPFLAGS)
 lpo2lts_mpi_LDFLAGS  = $(MCRL_LDFLAGS) $(AM_LDFLAGS)
 
+# mpi-event-test
+mpi_event_test_SOURCES = mpi-event-test.c config.h
+mpi_event_test_LDADD = libmpi.a libutil.a
+
 # ltsmin-mpi
 ltsmin_mpi_SOURCES = ltsmin-mpi.c set.c lts.c dlts.c set.h lts.h	\
                      dlts.h config.h
@@ -71,7 +75,8 @@ ltsmin_convert_CPPFLAGS = $(CADP_CPPFLAGS) $(AM_CPPFLAGS)
 
 # libraries
 libmpi_a_SOURCES = mpi_io_stream.c mpi_core.c mpi_raf.c mpi_ram_raf.c	\
-	           mpi_core.h mpi_io_stream.h mpi_ram_raf.h config.h
+		mpi_core.h mpi_io_stream.h mpi_ram_raf.h config.h \
+		mpi-event-loop.c mpi-event-loop.h
 
 libutil_a_SOURCES = unix.c runtime.c stream.c archive.c	\
                     stream_buffer.c fast_hash.c generichash4.c		\

@@ -22,6 +22,7 @@
 #include "mpi_ram_raf.h"
 #include "stringindex.h"
 #include "dynamic-array.h"
+#include "mpi-event-loop.h"
 
 #define MAX_PARAMETERS 256
 #define MAX_TERM_LEN 5000
@@ -36,6 +37,8 @@ static int no_step=0;
 static int loadbalancing=1;
 static int plain=0;
 static int find_dlk=0;
+
+static event_queue_t mpi_queue;
 
 struct option options[]={
 	{"",OPT_NORMAL,NULL,NULL,NULL,
@@ -133,8 +136,8 @@ static int chunk2int(string_index_t term_db,int chunk_tag,int int_tag,size_t len
 	} else {
 		int idx;
 		MPI_Status status;
-		MPI_Sendrecv(chunk,len,MPI_CHAR,0,chunk_tag,
-			&idx,1,MPI_INT,0,int_tag,MPI_COMM_WORLD,&status);
+		event_Send(mpi_queue,chunk,len,MPI_CHAR,0,chunk_tag,MPI_COMM_WORLD);
+		event_Recv(mpi_queue,&idx,1,MPI_INT,0,int_tag,MPI_COMM_WORLD,&status);
 		return idx;
 	}
 }
@@ -147,8 +150,8 @@ static void chunk_call(string_index_t term_db,int chunk_tag,int int_tag,int next
 	} else {
 		MPI_Status status;
 		char chunk[MAX_TERM_LEN+1];
-		MPI_Sendrecv(&next_cb,1,MPI_INT,0,int_tag,
-			&chunk,MAX_TERM_LEN,MPI_CHAR,0,chunk_tag,MPI_COMM_WORLD,&status);
+		event_Send(mpi_queue,&next_cb,1,MPI_INT,0,int_tag,MPI_COMM_WORLD);
+		event_Recv(mpi_queue,&chunk,MAX_TERM_LEN,MPI_CHAR,0,chunk_tag,MPI_COMM_WORLD,&status);
 		int len;
 		MPI_Get_count(&status,MPI_CHAR,&len);
 		cb(context,len,chunk);
@@ -163,7 +166,7 @@ chunk_table_t CTcreate(char *name){
 	if (!strcmp(name,"leaf")) {
 		return (void*)2;
 	}
-	Fatal(1,error,"CT support incomplete canniot deal with table %s",name);
+	Fatal(1,error,"CT support incomplete cannot deal with table %s",name);
 	return NULL;
 }
 
@@ -215,19 +218,19 @@ static void map_server_probe(int id){
 	for(;;) {
 		MPI_Iprobe(MPI_ANY_SOURCE,chunk_tag,MPI_COMM_WORLD,&found,&status);
 		if (!found) break;
-		MPI_Recv(&buf,MAX_TERM_LEN,MPI_CHAR,MPI_ANY_SOURCE,chunk_tag,MPI_COMM_WORLD,&status);
+		event_Recv(mpi_queue,&buf,MAX_TERM_LEN,MPI_CHAR,MPI_ANY_SOURCE,chunk_tag,MPI_COMM_WORLD,&status);
 		MPI_Get_count(&status,MPI_CHAR,&len);
 		buf[len]=0;
 		ii=SIput(term_db,buf);
-		MPI_Send(&ii,1,MPI_INT,status.MPI_SOURCE,int_tag,MPI_COMM_WORLD);
+		event_Send(mpi_queue,&ii,1,MPI_INT,status.MPI_SOURCE,int_tag,MPI_COMM_WORLD);
 	}
 	for(;;) {
 		MPI_Iprobe(MPI_ANY_SOURCE,int_tag,MPI_COMM_WORLD,&found,&status);
 		if (!found) break;
-		MPI_Recv(&ii,1,MPI_INT,MPI_ANY_SOURCE,int_tag,MPI_COMM_WORLD,&status);
+		event_Recv(mpi_queue,&ii,1,MPI_INT,MPI_ANY_SOURCE,int_tag,MPI_COMM_WORLD,&status);
 		s=SIget(term_db,ii);
 		len=strlen(s);
-		MPI_Send(s,len,MPI_CHAR,status.MPI_SOURCE,chunk_tag,MPI_COMM_WORLD);
+		event_Send(mpi_queue,s,len,MPI_CHAR,status.MPI_SOURCE,chunk_tag,MPI_COMM_WORLD);
 	}
 }
 
@@ -245,13 +248,21 @@ static void callback(void*context,int*labels,int*dst){
 	chksum=chkbase^hash_4_4((ub4*)(work_msg.dest),size,0);
 	who=chksum%mpi_nodes;
 	if (who<0) who+=mpi_nodes;
-	MPI_Send(&work_msg,WORK_SIZE,MPI_CHAR,who,WORK_TAG,MPI_COMM_WORLD);
+	event_Send(mpi_queue,&work_msg,WORK_SIZE,MPI_CHAR,who,WORK_TAG,MPI_COMM_WORLD);
 	msgcount++;
 }
 
 
 static int temp[2*MAX_PARAMETERS];
 static char name[100];
+
+static array_manager_t state_man=NULL;
+static uint32_t *parent_ofs=NULL;
+static uint16_t *parent_seg=NULL;
+
+
+
+
 
 int main(int argc, char*argv[]){
 	int i,j,clean,found,visited,explored,explored_this_level,transitions,limit,level,begin,accepted;
@@ -264,11 +275,13 @@ int main(int argc, char*argv[]){
 
 	bottom=(void*)&argc;
         MPI_Init(&argc, &argv);
+	MPI_Errhandler_set(MPI_COMM_WORLD,MPI_ERRORS_ARE_FATAL);
         MPI_Comm_size(MPI_COMM_WORLD, &mpi_nodes);
         MPI_Comm_rank(MPI_COMM_WORLD, &mpi_me);
 	sprintf(who,"inst-mpi(%2d)",mpi_me);
 	RTinit(argc,&argv);
 	set_label(who);
+	mpi_queue=event_queue();
 	if (mpi_me==0){
 		lvl_temp=(int*)malloc(mpi_nodes*sizeof(int));
 	}
@@ -309,9 +322,6 @@ int main(int argc, char*argv[]){
 		}
 	}
 	/***************************************************/
-	array_manager_t state_man=NULL;
-	uint32_t *parent_ofs=NULL;
-	uint16_t *parent_seg=NULL;
 	if (find_dlk) {
 		write_lts=0;
 		state_man=create_manager(65536);
@@ -394,12 +404,12 @@ int main(int argc, char*argv[]){
 					term_msg.clean=1;
 					term_msg.count=0;
 					term_msg.unexplored=(visited-explored);
-					MPI_Send(&term_msg,TERM_SIZE,MPI_CHAR,mpi_nodes-1,TERM_TAG,MPI_COMM_WORLD);
+					event_Send(mpi_queue,&term_msg,TERM_SIZE,MPI_CHAR,mpi_nodes-1,TERM_TAG,MPI_COMM_WORLD);
 				}
 				if (loadbalancing && !no_step) {
 					Warning(info,"broadcasting idle");
 					for(i=0;i<mpi_nodes;i++) if (i!= mpi_me) {
-						MPI_Send(&level,1,MPI_INT,i,IDLE_TAG,MPI_COMM_WORLD);
+						event_Send(mpi_queue,&level,1,MPI_INT,i,IDLE_TAG,MPI_COMM_WORLD);
 					}
 				}
 			}
@@ -407,7 +417,7 @@ int main(int argc, char*argv[]){
 			for(;;) {
 				MPI_Iprobe(MPI_ANY_SOURCE,WORK_TAG,MPI_COMM_WORLD,&found,&status);
 				if (!found) break;
-				MPI_Recv(&work_msg,WORK_SIZE,MPI_CHAR,MPI_ANY_SOURCE,WORK_TAG,MPI_COMM_WORLD,&status);
+				event_Recv(mpi_queue,&work_msg,WORK_SIZE,MPI_CHAR,MPI_ANY_SOURCE,WORK_TAG,MPI_COMM_WORLD,&status);
 				msgcount--;
 				clean=0;
 				for(i=0;i<size;i++){
@@ -442,7 +452,7 @@ int main(int argc, char*argv[]){
 					break;
 				} else {
 					int idle_level;
-					MPI_Recv(&idle_level,1,MPI_INT,MPI_ANY_SOURCE,IDLE_TAG,MPI_COMM_WORLD, &status);
+					event_Recv(mpi_queue,&idle_level,1,MPI_INT,MPI_ANY_SOURCE,IDLE_TAG,MPI_COMM_WORLD, &status);
 					if (idle_level != level) {
 						//fprintf(stderr,"%2d: discarding idle %d at %d\n",mpi_me,idle_level,level);
 						continue;
@@ -455,7 +465,7 @@ int main(int argc, char*argv[]){
 						submit_msg.state[i]=temp[size+i];
 					}
 					//Warning(info,"submitting state %d to %d",explored,status.MPI_SOURCE);
-					MPI_Send(&submit_msg,SUBMIT_SIZE,MPI_CHAR,status.MPI_SOURCE,SUBMIT_TAG,MPI_COMM_WORLD);
+					event_Send(mpi_queue,&submit_msg,SUBMIT_SIZE,MPI_CHAR,status.MPI_SOURCE,SUBMIT_TAG,MPI_COMM_WORLD);
 					msgcount++;
 					explored++;
 					submitted++;
@@ -478,11 +488,11 @@ int main(int argc, char*argv[]){
 			if (!no_step && !src_filled && loadbalancing) {
 				MPI_Iprobe(MPI_ANY_SOURCE,SUBMIT_TAG,MPI_COMM_WORLD,&found,&status);
 				if (found) {
-					MPI_Recv(&submit_msg,SUBMIT_SIZE,MPI_CHAR,MPI_ANY_SOURCE,SUBMIT_TAG,MPI_COMM_WORLD,&status);
+					event_Recv(mpi_queue,&submit_msg,SUBMIT_SIZE,MPI_CHAR,MPI_ANY_SOURCE,SUBMIT_TAG,MPI_COMM_WORLD,&status);
 					msgcount--;
 					//fprintf(stderr,"%2d: receiving state from %d\n",mpi_me,status.MPI_SOURCE);
 					accepted++;
-					MPI_Send(&level,1,MPI_INT,status.MPI_SOURCE,IDLE_TAG,MPI_COMM_WORLD);
+					event_Send(mpi_queue,&level,1,MPI_INT,status.MPI_SOURCE,IDLE_TAG,MPI_COMM_WORLD);
 					src=submit_msg.state;
 					src_filled=1;
 					work_msg.src_worker=submit_msg.segment;
@@ -513,13 +523,13 @@ int main(int argc, char*argv[]){
 			 */
 			MPI_Iprobe(MPI_ANY_SOURCE,TERM_TAG,MPI_COMM_WORLD,&found,&status);
 			if (found) {
-				MPI_Recv(&term_msg,TERM_SIZE,MPI_CHAR,MPI_ANY_SOURCE,TERM_TAG,MPI_COMM_WORLD,&status);
+				event_Recv(mpi_queue,&term_msg,TERM_SIZE,MPI_CHAR,MPI_ANY_SOURCE,TERM_TAG,MPI_COMM_WORLD,&status);
 				if (mpi_me==0){
 					if(clean && term_msg.clean && (msgcount+term_msg.count)==0){
 						//fprintf(stderr,"level %d terminated with %d unexplored\n",level,term_msg.unexplored);
 						round_msg.go=(term_msg.unexplored!=0);
 						for(i=1;i<mpi_nodes;i++){
-							MPI_Send(&round_msg,ROUND_SIZE,MPI_CHAR,i,ROUND_TAG,MPI_COMM_WORLD);
+							event_Send(mpi_queue,&round_msg,ROUND_SIZE,MPI_CHAR,i,ROUND_TAG,MPI_COMM_WORLD);
 						}
 						break;
 					} else {
@@ -528,7 +538,7 @@ int main(int argc, char*argv[]){
 						term_msg.clean=1;
 						term_msg.count=0;
 						term_msg.unexplored=(visited-explored);
-						MPI_Send(&term_msg,TERM_SIZE,MPI_CHAR,mpi_nodes-1,TERM_TAG,MPI_COMM_WORLD);
+						event_Send(mpi_queue,&term_msg,TERM_SIZE,MPI_CHAR,mpi_nodes-1,TERM_TAG,MPI_COMM_WORLD);
 					}
 				} else {
 					//fprintf(stderr,"%d forwarding token\n",mpi_me);
@@ -536,13 +546,13 @@ int main(int argc, char*argv[]){
 					term_msg.count+=msgcount;
 					term_msg.unexplored+=(visited-explored);
 					clean=1;
-					MPI_Send(&term_msg,TERM_SIZE,MPI_CHAR,mpi_me-1,TERM_TAG,MPI_COMM_WORLD);
+					event_Send(mpi_queue,&term_msg,TERM_SIZE,MPI_CHAR,mpi_me-1,TERM_TAG,MPI_COMM_WORLD);
 				}
 			}
 			/* If this level was finished start with the next. */
 			MPI_Iprobe(MPI_ANY_SOURCE,ROUND_TAG,MPI_COMM_WORLD,&found,&status);
 			if (found) {
-				MPI_Recv(&round_msg,ROUND_SIZE,MPI_CHAR,0,ROUND_TAG,MPI_COMM_WORLD,&status);
+				event_Recv(mpi_queue,&round_msg,ROUND_SIZE,MPI_CHAR,0,ROUND_TAG,MPI_COMM_WORLD,&status);
 				break;
 			}
 			/* Nothing to do anymore, so we block until the next message. */
