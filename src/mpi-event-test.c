@@ -17,13 +17,17 @@ static void  send_complete(void* context,MPI_Status *status){
 static char msg[64];
 static char msg2[64];
 
+static char who[24];
+
 int main(int argc, char*argv[]){
 	int mpi_nodes,mpi_me;
 	MPI_Init(&argc, &argv);
-	//MPI_Errhandler_set(MPI_COMM_WORLD,MPI_ERRORS_ARE_FATAL);
-	RTinit(argc,&argv);
+	MPI_Errhandler_set(MPI_COMM_WORLD,MPI_ERRORS_ARE_FATAL);
 	MPI_Comm_size(MPI_COMM_WORLD, &mpi_nodes);
 	MPI_Comm_rank(MPI_COMM_WORLD, &mpi_me);
+	sprintf(who,"inst-mpi(%2d)",mpi_me);
+	RTinit(argc,&argv);
+	set_label(who);
 
 	mpi_queue=event_queue();
 	event_yield(mpi_queue);
@@ -45,6 +49,26 @@ int main(int argc, char*argv[]){
 		event_wait(mpi_queue,&rq,&stat);
 		Warning(info,"%d/%d got %s",mpi_me,mpi_nodes,msg2);
 	}
+	MPI_Barrier(MPI_COMM_WORLD);
+	sleep(2);
+	MPI_Barrier(MPI_COMM_WORLD);
+	printf("testing barrier (%d) 1\n",mpi_me);
+	event_barrier_t barrier=event_barrier_create(mpi_queue,MPI_COMM_WORLD,16);
+	event_barrier_wait(barrier);
+	sleep(mpi_me);
+	printf("testing barrier (%d) 2\n",mpi_me);
+	event_barrier_wait(barrier);
+	sleep(mpi_nodes-mpi_me);
+	printf("testing barrier (%d) 3\n",mpi_me);
+	event_barrier_wait(barrier);
+	printf("testing termination detection\n");
+	idle_detect_t counter=event_idle_create(mpi_queue,MPI_COMM_WORLD,32);
+	printf("waiting for termination\n");
+	event_idle_send(counter);
+	event_idle_recv(counter);
+	event_idle_detect(counter);
+	printf("terminated\n");
+	MPI_Barrier(MPI_COMM_WORLD);
 	printf("cleaning up\n");
 	event_yield(mpi_queue);
 	event_queue_destroy(&mpi_queue);

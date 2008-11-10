@@ -51,6 +51,11 @@ extern void event_post(event_queue_t queue,MPI_Request *request,event_callback c
 extern void event_wait(event_queue_t queue,MPI_Request *request,MPI_Status *status);
 
 /**
+\brief Keep exectuing while the condition is true.
+*/
+extern void event_while(event_queue_t queue,int *condition);
+
+/**
 \brief Execute events until the mpi send has completed.
 */
 extern void event_Send(event_queue_t queue,void *buf, int count, MPI_Datatype datatype,
@@ -74,28 +79,23 @@ extern void event_Recv(event_queue_t queue, void *buf, int count, MPI_Datatype d
 extern void event_Irecv(event_queue_t queue,void *buf, int count, MPI_Datatype datatype,
 	int source, int tag, MPI_Comm comm,event_callback cb,void*context);
 
-/// mpi lock type
-typedef struct mpi_lock_s *mpi_lock_t;
 
-/**
-\brief Create an MPI lock
+typedef struct idle_detect_s *idle_detect_t;
 
-Create an MPI lock for a communicator, where the messages that maintain the
-lock can use tag.
-*/
-mpi_lock_t mpi_lock_create(MPI_Comm comm,int tag);
+extern idle_detect_t event_idle_create(event_queue_t queue,MPI_Comm comm,int tag);
 
-/// Block until you have the lock.
-void mpi_lock_get(mpi_lock_t lock);
+extern void event_idle_send(idle_detect_t detector);
 
-/// Try to get the lock, return the current holder of the lock.
-int mpi_lock_try(mpi_lock_t lock);
+extern void event_idle_recv(idle_detect_t detector);
 
-/// Release the lock.
-void mpi_lock_free(mpi_lock_t lock);
+extern void event_idle_detect(idle_detect_t detector);
 
-/// Check if someone is trying to lock
-int mpi_lock_check(mpi_lock_t lock);
+typedef struct event_barrier_s *event_barrier_t;
+
+extern event_barrier_t event_barrier_create(event_queue_t queue,MPI_Comm comm,int tag);
+
+extern void event_barrier_wait(event_barrier_t barrier);
+
 
 
 #endif

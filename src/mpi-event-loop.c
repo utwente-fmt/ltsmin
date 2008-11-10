@@ -61,8 +61,28 @@ void event_yield(event_queue_t queue){
 	}
 }
 
+void event_while(event_queue_t queue,int *condition){
+	while(*condition){
+		MPI_Status stat;
+		int completed;
+		MPI_Waitany(queue->pending,queue->request,&completed,&stat);
+		event_callback cb=queue->cb[completed];
+		void*context=queue->context[completed];
+		queue->pending--;
+		if (completed<queue->pending){
+			queue->request[completed]=queue->request[queue->pending];
+			queue->cb[completed]=queue->cb[queue->pending];
+			queue->context[completed]=queue->context[queue->pending];
+		}
+		cb(context,&stat); // this call can change the queue!
+	}
+}
+
 void event_wait(event_queue_t queue,MPI_Request *request,MPI_Status *status){
 	for(;;){
+		int found;
+		MPI_Test(request,&found,status);
+		if (found) return;
 		//Warning(info,"%d+1 requests",queue->pending);
 		int completed;
 		ensure_access(queue->man,queue->pending);
@@ -118,38 +138,154 @@ void event_Irecv(event_queue_t queue,void *buf, int count, MPI_Datatype datatype
 	queue->pending++;	
 }
 
-
-/** mpi lock implementation */
-
-struct mpi_lock_s {
+struct idle_detect_s {
+	event_queue_t queue;
 	MPI_Comm comm;
 	int tag;
-	int nodes;
 	int me;
+	int nodes;
+	int dirty;
+	int count;
+	int msg_pending;
+	int term_msg[2];
 };
 
+#define RUNNING 0
+#define IDLE 1
+#define TERMINATED 2
 
-mpi_lock_t mpi_lock_create(MPI_Comm comm,int tag){
-	mpi_lock_t lock=(mpi_lock_t)RTmalloc(sizeof(struct mpi_lock_s));
-	lock->comm=comm;
-	lock->tag=tag;
-	MPI_Comm_size(comm, &lock->nodes);
-	MPI_Comm_rank(comm, &lock->me);
-	return lock;
+static void idle_receiver(void *context,MPI_Status *status){
+#define detect ((idle_detect_t)context)
+	(void)status;
+	detect->msg_pending--;
+	event_Irecv(detect->queue,&detect->term_msg,2,MPI_INT,MPI_ANY_SOURCE,
+			detect->tag,detect->comm,idle_receiver,context);
+#undef detect
 }
 
-void mpi_lock_get(mpi_lock_t lock){
+idle_detect_t event_idle_create(event_queue_t queue,MPI_Comm comm,int tag){
+	idle_detect_t d=(idle_detect_t)RTmalloc(sizeof(struct idle_detect_s));
+	d->queue=queue;
+	d->comm=comm;
+	d->tag=tag;
+	d->dirty=0;
+	d->count=0;
+        MPI_Comm_size(comm,&d->nodes);
+        MPI_Comm_rank(comm,&d->me);
+	d->msg_pending=(d->me==0)?0:1;
+	event_Irecv(queue,&d->term_msg,2,MPI_INT,MPI_ANY_SOURCE,tag,comm,idle_receiver,d);
+	return d;
 }
 
-int mpi_lock_try(mpi_lock_t lock){
-	return 0;
+void event_idle_send(idle_detect_t detector){
+	detector->count++;
 }
 
-void mpi_lock_free(mpi_lock_t lock){
+void event_idle_recv(idle_detect_t detector){
+	detector->dirty=1;
+	detector->count--;
 }
 
-int mpi_lock_check(mpi_lock_t lock){
-	return 0;
+void event_idle_detect(idle_detect_t detector){
+	if (detector->me==0){
+		int round=0;
+		int term_send[2];
+		term_send[0]=IDLE;
+		term_send[1]=0;
+		for(;;){
+			//Log(debug,"starting new termination round %d %d\n",detector->dirty,detector->count);
+			round++;
+			detector->dirty=0;
+			//Log(debug,"sending %d %d\n",term_send[0],term_send[1]);
+			event_Send(detector->queue,term_send,2,MPI_INT,detector->nodes-1,detector->tag,detector->comm);
+			detector->msg_pending++;
+			event_while(detector->queue,&detector->msg_pending);
+			//Log(debug,"reply is %d %d\n",detector->term_msg[0],detector->term_msg[1]);
+			if (detector->term_msg[0]!=IDLE) {
+				//Log(debug,"not idle yet");
+				continue;
+			}
+			if (detector->dirty){
+				//Log(debug,"I'm dirty");
+				continue;
+			}
+			if ((detector->term_msg[1]+detector->count)!=0){
+				//Log(debug,"message total is %d",detector->term_msg[2]+detector->count);
+				continue;
+			}
+			//Log(debug,"termination detected in %d rounds\n",round);
+			term_send[0]=TERMINATED;
+			event_Send(detector->queue,term_send,2,MPI_INT,detector->nodes-1,
+					detector->tag,detector->comm);
+			detector->msg_pending++;
+			event_while(detector->queue,&detector->msg_pending);
+			//Log(debug,"broadcast complete");
+			return;
+		}
+	} else {
+		for(;;){
+			int term_send[2];
+			event_while(detector->queue,&detector->msg_pending);
+			//Log(debug,"got %d %d\n",detector->term_msg[0],detector->term_msg[1]);
+			if (detector->term_msg[0]==TERMINATED) {
+				term_send[0]=TERMINATED;
+				event_Send(detector->queue,term_send,2,MPI_INT,detector->me-1,
+						detector->tag,detector->comm);
+				detector->msg_pending++;
+				return;
+			}
+			term_send[0]=detector->dirty?RUNNING:detector->term_msg[0];
+			detector->dirty=0;
+			term_send[1]=detector->term_msg[1]+detector->count;
+			//Log(debug,"sending %d %d\n",term_send[0],term_send[1]);
+			event_Send(detector->queue,term_send,2,MPI_INT,detector->me-1,
+						detector->tag,detector->comm);
+			detector->msg_pending++;
+		}
+	}
+}
+
+
+struct event_barrier_s{
+	event_queue_t queue;
+	MPI_Comm comm;
+	int tag;
+	int me;
+	int nodes;
+	int wait;
+	int msg[1];
+};
+
+static void barrier_recv(void *context,MPI_Status *status){
+#define barrier ((event_barrier_t)context)
+	(void)status;
+	barrier->wait--;
+	if (barrier->wait) event_Irecv(barrier->queue,&barrier->msg,1,
+			MPI_INT,MPI_ANY_SOURCE,barrier->tag,barrier->comm,barrier_recv,context);
+#undef barrier
+}
+
+event_barrier_t event_barrier_create(event_queue_t queue,MPI_Comm comm,int tag){
+	event_barrier_t b=(event_barrier_t)RTmalloc(sizeof(struct event_barrier_s));
+	b->queue=queue;
+	b->comm=comm;
+	b->tag=tag;
+        MPI_Comm_size(comm,&b->nodes);
+        MPI_Comm_rank(comm,&b->me);
+	b->wait=b->nodes-1;
+	event_Irecv(queue,&b->msg,1,MPI_INT,MPI_ANY_SOURCE,tag,comm,barrier_recv,b);
+	return b;
+}
+
+void event_barrier_wait(event_barrier_t barrier){
+	for(int i=0;i<barrier->nodes;i++){
+		if(i==barrier->me) continue;
+		event_Send(barrier->queue,&barrier->me,1,MPI_INT,i,barrier->tag,barrier->comm);
+	}
+	event_while(barrier->queue,&barrier->wait);
+	barrier->wait=barrier->nodes-1;
+	event_Irecv(barrier->queue,&barrier->msg,1,
+			MPI_INT,MPI_ANY_SOURCE,barrier->tag,barrier->comm,barrier_recv,barrier);
 }
 
 
