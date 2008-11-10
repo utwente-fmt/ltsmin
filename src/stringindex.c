@@ -6,7 +6,7 @@
 
 #include "stringindex.h"
 #include "runtime.h"
-#include "generichash.h"
+#include "fast_hash.h"
 
 #define DATA_BLOCK_SIZE 512
 //define DATA_BLOCK_SIZE 4
@@ -143,13 +143,13 @@ char* SIget(string_index_t si,int i){
 }
 
 int SIlookup(string_index_t si,const char*str){
-	ub4 hash;
-	ub4 len;
+	uint32_t hash;
+	uint32_t len;
 	int bucket;
 	int idx;
 
 	len=strlen(str);
-	hash=hash_4_1((unsigned char*) str,len,0);
+	hash=SuperFastHash((unsigned char*) str,len,0);
 	bucket=hash&si->mask;
 	for(idx=si->table[bucket];idx!=END_OF_LIST;idx=si->next[idx]){
 		if (0==strcmp(str,si->data[idx])) return idx;
@@ -160,8 +160,8 @@ int SIlookup(string_index_t si,const char*str){
 
 static void PutEntry(string_index_t si,const char*str,int index){
 	int i,current,next,N;
-	ub4 hash;
-	ub4 len;
+	uint32_t hash;
+	uint32_t len;
 	int bucket;
 
 	if(index>=si->size){
@@ -188,7 +188,7 @@ static void PutEntry(string_index_t si,const char*str,int index){
 				while(current!=END_OF_LIST){
 					next=si->next[current];
 					len=strlen(si->data[current]);
-					hash=hash_4_1((unsigned char*) si->data[current],len,0);
+					hash=SuperFastHash((unsigned char*) si->data[current],len,0);
 					bucket=hash&si->mask;
 					assert(bucket==i||bucket==N+i);
 					si->next[current]=si->table[bucket];
@@ -211,7 +211,7 @@ static void PutEntry(string_index_t si,const char*str,int index){
 		return;
 	}
 	len=strlen(str);
-	hash=hash_4_1((unsigned char*) str,len,0);
+	hash=SuperFastHash((unsigned char*) str,len,0);
 	bucket=hash&si->mask;
 	si->next[index]=si->table[bucket];
 	si->table[bucket]=index;
@@ -261,13 +261,13 @@ void SIreset(string_index_t si){
 }
 
 void SIdelete(string_index_t si,const char*str){
-	ub4 hash;
-	ub4 len;
+	uint32_t hash;
+	uint32_t len;
 	int bucket;
 	int idx,next,deleted;
 
 	len=strlen(str);
-	hash=hash_4_1((unsigned char*) str,len,0);
+	hash=SuperFastHash((unsigned char*) str,len,0);
 	bucket=hash&si->mask;
 	idx=si->table[bucket];
 	si->table[bucket]=END_OF_LIST;

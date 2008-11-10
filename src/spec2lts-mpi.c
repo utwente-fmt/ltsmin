@@ -5,7 +5,7 @@
 #include <string.h>
 #include <mpi.h>
 
-#include "generichash.h"
+#include "fast_hash.h"
 #include "chunk-table.h"
 #ifdef MCRL
 #include "mcrl-greybox.h"
@@ -64,9 +64,8 @@ struct option options[]={
 	{0,0,0,0,0,0,0,0,0}
 };
 
-static int chkbase;
-
 static char who[24];
+static int mpi_nodes,mpi_me;
 
 static stream_t *output_src=NULL;
 static stream_t *output_label=NULL;
@@ -75,6 +74,20 @@ static stream_t *output_dest=NULL;
 static int *tcount;
 static int *src;
 static int size;
+
+static uint32_t chk_base=0;
+
+static inline void adjust_owner(int32_t *state){
+	chk_base=SuperFastHash((char*)state,size*4,0);
+	//Warning(info,"chkbase=%x",chk_base);
+	//for (int i=0;i<size;i++) fprintf(stderr,"%3d",state[i]);
+	//fprintf(stderr,"\n");
+}
+
+static inline int owner(int32_t *state){
+	uint32_t hash=chk_base^SuperFastHash((char*)state,size*4,0);
+	return (hash%mpi_nodes);
+}
 
 struct work_msg {
 	int src_worker;
@@ -136,7 +149,6 @@ static void deadlock_found(int segment,int offset){
 
 
 
-static int mpi_nodes,mpi_me;
 
 static string_index_t act_db;
 static int next_act=0;
@@ -298,15 +310,12 @@ static void map_server_init(){
 static void callback(void*context,int*labels,int*dst){
 	(void)context;
 	int i,who;
-	int chksum;
 
 	work_send.label=labels[0];
 	for(i=0;i<size;i++){
 		work_send.dest[i]=dst[i];
 	}
-	chksum=chkbase^hash_4_4((ub4*)(work_send.dest),size,0);
-	who=chksum%mpi_nodes;
-	if (who<0) who+=mpi_nodes;
+	who=owner(work_send.dest);
 	event_Send(mpi_queue,&work_send,WORK_SIZE,MPI_CHAR,who,WORK_TAG,MPI_COMM_WORLD);
 	event_idle_send(work_counter);
 }
@@ -325,6 +334,10 @@ static void in_trans_handler(void*context,MPI_Status *status){
 	event_idle_recv(work_counter);
 	for(int i=0;i<size;i++){
 		temp[size+i]=work_recv.dest[i];
+	}
+	int who=owner(work_recv.dest);
+	if (who != mpi_me) {
+		Fatal(1,error,"state does not belong to me");
 	}
 	Fold(temp);
 	if (temp[1]>=visited) {
@@ -441,7 +454,7 @@ int main(int argc, char*argv[]){
 	/***************************************************/
 	GBgetInitialState(model,temp+size);
 	Warning(info,"initial state computed at %d",mpi_me);
-	chkbase=hash_4_4((ub4*)(temp+size),size,0);
+	adjust_owner(temp+size);
 	Warning(info,"initial state translated at %d",mpi_me);
 	explored=0;
 	transitions=0;

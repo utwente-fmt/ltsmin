@@ -78,30 +78,24 @@ void event_while(event_queue_t queue,int *condition){
 	}
 }
 
+struct event_status {
+	int pending;
+	MPI_Status *status;
+};
+
+static void copy_status(void* context,MPI_Status *status){
+#define e_stat_ptr ((struct event_status*)context)
+	*(e_stat_ptr->status)=*status;
+	e_stat_ptr->pending=0;
+#undef e_stat_ptr
+}
+
 void event_wait(event_queue_t queue,MPI_Request *request,MPI_Status *status){
-	for(;;){
-		int found;
-		MPI_Test(request,&found,status);
-		if (found) return;
-		//Warning(info,"%d+1 requests",queue->pending);
-		int completed;
-		ensure_access(queue->man,queue->pending);
-		queue->request[queue->pending]=*request;
-		MPI_Waitany(queue->pending+1,queue->request,&completed,status);
-		if(completed==queue->pending) {
-			//Warning(info,"it was the last one");
-			return;
-		}
-		event_callback cb=queue->cb[completed];
-		void*context=queue->context[completed];
-		queue->pending--;
-		if (completed<queue->pending){
-			queue->request[completed]=queue->request[queue->pending];
-			queue->cb[completed]=queue->cb[queue->pending];
-			queue->context[completed]=queue->context[queue->pending];
-		}
-		cb(context,status); // this call can change the queue!
-	}
+	struct event_status e_stat;
+	e_stat.pending=1;
+	e_stat.status=status;
+	event_post(queue,request,copy_status,&e_stat);
+	event_while(queue,&e_stat.pending);
 }
 
 void event_Send(event_queue_t queue,void *buf, int count, MPI_Datatype datatype,
