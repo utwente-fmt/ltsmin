@@ -30,6 +30,10 @@ array_manager_t create_manager(int block_size){
 	return man;
 }
 
+int array_size(array_manager_t man){
+	return man->size;
+}
+
 static void fix_array(void**ar,int size,int e_size){
 	void*tmp;
 	tmp=realloc(*ar,size*e_size);

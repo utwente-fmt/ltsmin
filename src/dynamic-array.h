@@ -9,4 +9,6 @@ extern void add_array(array_manager_t man,void**ar,int e_size);
 
 extern void ensure_access(array_manager_t man,int index);
 
+extern int array_size(array_manager_t man);
+
 #endif

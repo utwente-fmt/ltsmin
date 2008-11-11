@@ -96,7 +96,9 @@ extern event_barrier_t event_barrier_create(event_queue_t queue,MPI_Comm comm,in
 
 extern void event_barrier_wait(event_barrier_t barrier);
 
+extern void event_decr(void*context,MPI_Status *status);
 
+extern void event_statistics(event_queue_t queue);
 
 #endif
 

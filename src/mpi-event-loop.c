@@ -6,9 +6,28 @@ struct event_queue_s{
 	array_manager_t man;
 	MPI_Request *request;
 	event_callback *cb;
-	void** context;
+	void* *context;
 	int pending;
+	long long int wait_some_calls;
+	long long int wait_some_none;
+	long long int wait_some_multi;
+	long long int test_some_calls;
+	long long int test_some_none;
+	long long int test_some_multi;
 };
+
+void event_statistics(event_queue_t queue){
+	Warning(info,"wait : %lld calls, %lld multiple",
+		queue->wait_some_calls,queue->wait_some_multi);
+	Warning(info,"test : %lld calls, %lld none, %lld multiple",
+		queue->test_some_calls,queue->test_some_none,queue->test_some_multi);
+	Warning(info,"queue size is %d",array_size(queue->man));
+}
+
+static void null_cb(void* context,MPI_Status *status){
+	(void)context;
+	(void)status;
+}
 
 event_queue_t event_queue(){
 	event_queue_t queue=(event_queue_t)RTmalloc(sizeof(struct event_queue_s));
@@ -20,6 +39,11 @@ event_queue_t event_queue(){
 	queue->context=NULL;
 	add_array(queue->man,&queue->context,sizeof(void*));
 	queue->pending=0;
+	queue->wait_some_calls=0;
+	queue->wait_some_multi=0;
+	queue->test_some_calls=0;
+	queue->test_some_none=0;
+	queue->test_some_multi=0;
 	return queue;
 }
 
@@ -37,44 +61,108 @@ void event_queue_destroy(event_queue_t *queue){
 void event_post(event_queue_t queue,MPI_Request *request,event_callback cb,void*context){
 	ensure_access(queue->man,queue->pending);
 	queue->request[queue->pending]=*request;
-	queue->cb[queue->pending]=cb;
+	queue->cb[queue->pending]=cb?cb:null_cb; // we cannot allow NULL as a call-back.
 	queue->context[queue->pending]=context;
 	queue->pending++;
 }
 
-void event_yield(event_queue_t queue){
-	MPI_Status stat;
-	int found;
-	int completed;
-	while(queue->pending){
-		MPI_Testany(queue->pending,queue->request,&completed,&found,&stat);
-		if(!found) return;
-		event_callback cb=queue->cb[completed];
-		void*context=queue->context[completed];
-		queue->pending--;
-		if (completed<queue->pending){
-			queue->request[completed]=queue->request[queue->pending];
-			queue->cb[completed]=queue->cb[queue->pending];
-			queue->context[completed]=queue->context[queue->pending];
+/// static inline??
+/*
+void dispatch(event_queue_t queue){
+	/// This function must be reentrant: a callback can end up calling this function.
+	/// First we dispatch all of the callbacks in the completed queue.
+	while(queue->dispatched<queue->completed){
+		int idx=queue->index[queue->dispatched];
+		event_callback cb=queue->cb[idx];
+		void *context=queue->context[idx];
+		MPI_Status stat=queue->status[queue->dispatched];
+		queue->dispatched++;
+		cb(context,&stat);
+	}
+	/// Then we compact the request queue.
+	queue->dispatched=0;
+	queue->completed=0;
+	int k=0;
+	for(int i=0;i<queue->pending;i++){
+		if (queue->cb[i]) {
+			if (k<i) {
+				queue->request[k]=queue->request[i];
+				queue->cb[k]=queue->cb[i];
+				queue->context[k]=queue->context[i];
+			}
+			k++;
 		}
-		cb(context,&stat); // this call can change the queue!
+	}
+}
+*/
+
+void event_yield(event_queue_t queue){
+	while(queue->pending){
+		int index[queue->pending];
+		int completed;
+		MPI_Status status[queue->pending];
+		MPI_Testsome(queue->pending,queue->request,&completed,index,status);
+		queue->test_some_calls++;
+		if (completed==0) {
+			queue->test_some_none++;
+			return;
+		}
+		if (completed>1) queue->test_some_multi++;
+		event_callback cb[completed];
+		void *ctx[completed];
+		for(int i=0;i<completed;i++){
+			cb[i]=queue->cb[index[i]];
+			queue->cb[index[i]]=NULL;
+			ctx[i]=queue->context[index[i]];
+		}
+		int k=0;
+		for(int i=0;i<queue->pending;i++){
+			if (queue->cb[i]) {
+				if (k<i) {
+					queue->request[k]=queue->request[i];
+					queue->cb[k]=queue->cb[i];
+					queue->context[k]=queue->context[i];
+				}
+				k++;
+			}
+		}
+		queue->pending=k;
+		for(int i=0;i<completed;i++) {
+			cb[i](ctx[i],&status[i]);
+		}
 	}
 }
 
 void event_while(event_queue_t queue,int *condition){
 	while(*condition){
-		MPI_Status stat;
+		int index[queue->pending];
 		int completed;
-		MPI_Waitany(queue->pending,queue->request,&completed,&stat);
-		event_callback cb=queue->cb[completed];
-		void*context=queue->context[completed];
-		queue->pending--;
-		if (completed<queue->pending){
-			queue->request[completed]=queue->request[queue->pending];
-			queue->cb[completed]=queue->cb[queue->pending];
-			queue->context[completed]=queue->context[queue->pending];
+		MPI_Status status[queue->pending];
+		MPI_Waitsome(queue->pending,queue->request,&completed,index,status);
+		queue->wait_some_calls++;
+		if (completed>1) queue->wait_some_multi++;
+		event_callback cb[completed];
+		void *ctx[completed];
+		for(int i=0;i<completed;i++){
+			cb[i]=queue->cb[index[i]];
+			queue->cb[index[i]]=NULL;
+			ctx[i]=queue->context[index[i]];
 		}
-		cb(context,&stat); // this call can change the queue!
+		int k=0;
+		for(int i=0;i<queue->pending;i++){
+			if (queue->cb[i]) {
+				if (k<i) {
+					queue->request[k]=queue->request[i];
+					queue->cb[k]=queue->cb[i];
+					queue->context[k]=queue->context[i];
+				}
+				k++;
+			}
+		}
+		queue->pending=k;
+		for(int i=0;i<completed;i++) {
+			cb[i](ctx[i],&status[i]);
+		}
 	}
 }
 
@@ -280,6 +368,11 @@ void event_barrier_wait(event_barrier_t barrier){
 	barrier->wait=barrier->nodes-1;
 	event_Irecv(barrier->queue,&barrier->msg,1,
 			MPI_INT,MPI_ANY_SOURCE,barrier->tag,barrier->comm,barrier_recv,barrier);
+}
+
+void event_decr(void*context,MPI_Status *status){
+	(void)status;
+	(*((int*)context))--;
 }
 
 

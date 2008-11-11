@@ -89,12 +89,16 @@ static inline int owner(int32_t *state){
 	return (hash%mpi_nodes);
 }
 
+#define POOL_SIZE 256
+
 struct work_msg {
 	int src_worker;
 	int src_number;
 	int label;
 	int dest[MAX_PARAMETERS];
-} work_send,work_recv;
+} work_send_buf[POOL_SIZE],work_recv_buf[POOL_SIZE];
+static int work_send_used[POOL_SIZE];
+static int work_send_next=0;
 
 #define BARRIER_TAG 12
 #define EXPLORE_IDLE_TAG 11
@@ -161,6 +165,8 @@ static int int_buf_leaf[1];
 static char chunk_buf_leaf[MAX_TERM_LEN+1];
 
 static int chunk2int(string_index_t term_db,int chunk_tag,int int_tag,size_t len,void* chunk){
+	//struct timeval tv1,tv2;
+	//gettimeofday(&tv1,NULL);
 	if (mpi_me==0) {
 		((char*)chunk)[len]=0;
 		return SIput(term_db,chunk);
@@ -174,9 +180,14 @@ static int chunk2int(string_index_t term_db,int chunk_tag,int int_tag,size_t len
 		//Warning(info,"got chunk %s: %d",chunk,idx);
 		return idx;
 	}
+	//gettimeofday(&tv2,NULL);
+	//long long int usec=(tv2.tv_sec-tv1.tv_sec)*1000000LL + tv2.tv_usec - tv1.tv_usec;
+	//Warning(info,"chunk2int took %lld us",usec);
 }
 
 static void chunk_call(string_index_t term_db,int chunk_tag,int int_tag,int next_cb,chunk_add_t cb,void* context){
+	//struct timeval tv1,tv2;
+	//gettimeofday(&tv1,NULL);
 	if (mpi_me==0) {
 		char*s=SIget(term_db,next_cb);
 		int len=strlen(s);
@@ -193,6 +204,9 @@ static void chunk_call(string_index_t term_db,int chunk_tag,int int_tag,int next
 		//Warning(info,"got int %d; %s",next_cb,chunk);
 		cb(context,len,chunk);
 	}
+	//gettimeofday(&tv2,NULL);
+	//long long int usec=(tv2.tv_sec-tv1.tv_sec)*1000000LL + tv2.tv_usec - tv1.tv_usec;
+	//Warning(info,"cunk_call took %lld us",usec);
 }
 
 
@@ -208,6 +222,8 @@ chunk_table_t CTcreate(char *name){
 }
 
 void CTsubmitChunk(chunk_table_t table,size_t len,void* chunk,chunk_add_t cb,void* context){
+	//struct timeval tv1,tv2;
+	//gettimeofday(&tv1,NULL);
 	if(table==(void*)1){
 		int res=chunk2int(act_db,ACT_CHUNK_TAG,ACT_INT_TAG,len,chunk);
 		while(next_act<=res){
@@ -221,9 +237,18 @@ void CTsubmitChunk(chunk_table_t table,size_t len,void* chunk,chunk_add_t cb,voi
 			next_leaf++;
 		}
 	}
+	//gettimeofday(&tv2,NULL);
+	//long long int usec=(tv2.tv_sec-tv1.tv_sec)*1000000LL + tv2.tv_usec - tv1.tv_usec;
+	//static long long int max=0;
+	//Warning(info,"CTsubmitChunk took %lld us",usec);
+	//if (usec>max) {
+	//	max=usec;
+	//}
 }
 
 void CTupdateTable(chunk_table_t table,uint32_t wanted,chunk_add_t cb,void* context){
+	//struct timeval tv1,tv2;
+	//gettimeofday(&tv1,NULL);
 	if(table==(void*)1){
 		while(next_act<=(int)wanted){
 			chunk_call(act_db,ACT_CHUNK_TAG,ACT_INT_TAG,next_act,cb,context);
@@ -235,6 +260,13 @@ void CTupdateTable(chunk_table_t table,uint32_t wanted,chunk_add_t cb,void* cont
 			next_leaf++;
 		}
 	}
+	//gettimeofday(&tv2,NULL);
+	//long long int usec=(tv2.tv_sec-tv1.tv_sec)*1000000LL + tv2.tv_usec - tv1.tv_usec;
+	//static long long int max=0;
+	//Warning(info,"CTupdateTable took %lld us",usec);
+	//if (usec>max) {
+	//	max=usec;
+	//}
 }
 
 static void int_handler(void *context,MPI_Status *status){
@@ -306,18 +338,37 @@ static void map_server_init(){
 
 /********************************************************/
 
+struct src_info {
+	int seg;
+	int ofs;
+};
 
 static void callback(void*context,int*labels,int*dst){
 	(void)context;
 	int i,who;
 
-	work_send.label=labels[0];
+	//struct timeval tv1,tv2;
+	//gettimeofday(&tv1,NULL);
+	event_while(mpi_queue,&work_send_used[work_send_next]);
+	work_send_used[work_send_next]=1;
+	work_send_buf[work_send_next].src_worker=((struct src_info*)context)->seg;
+	work_send_buf[work_send_next].src_number=((struct src_info*)context)->ofs;
+	work_send_buf[work_send_next].label=labels[0];
 	for(i=0;i<size;i++){
-		work_send.dest[i]=dst[i];
+		work_send_buf[work_send_next].dest[i]=dst[i];
 	}
-	who=owner(work_send.dest);
-	event_Send(mpi_queue,&work_send,WORK_SIZE,MPI_CHAR,who,WORK_TAG,MPI_COMM_WORLD);
+	who=owner(work_send_buf[work_send_next].dest);
+	event_Isend(mpi_queue,&work_send_buf[work_send_next],WORK_SIZE,MPI_CHAR,who,
+			WORK_TAG,MPI_COMM_WORLD,event_decr,&work_send_used[work_send_next]);
 	event_idle_send(work_counter);
+	work_send_next=(work_send_next+1)%POOL_SIZE;
+	//gettimeofday(&tv2,NULL);
+	//long long int usec=(tv2.tv_sec-tv1.tv_sec)*1000000LL + tv2.tv_usec - tv1.tv_usec;
+	//static long long int max=0;
+	//if (usec>max) {
+	//	Warning(info,"callback took %lld us",usec);
+	//	max=usec;
+	//}
 }
 
 
@@ -329,13 +380,14 @@ static uint16_t *parent_seg=NULL;
 static long long int explored,visited,transitions;
 
 static void in_trans_handler(void*context,MPI_Status *status){
-	(void)context;(void)status;
+#define work_recv ((struct work_msg*)context)
+	(void)status;
 	int temp[2*MAX_PARAMETERS];
 	event_idle_recv(work_counter);
 	for(int i=0;i<size;i++){
-		temp[size+i]=work_recv.dest[i];
+		temp[size+i]=work_recv->dest[i];
 	}
-	int who=owner(work_recv.dest);
+	int who=owner(work_recv->dest);
 	if (who != mpi_me) {
 		Fatal(1,error,"state does not belong to me");
 	}
@@ -344,27 +396,31 @@ static void in_trans_handler(void*context,MPI_Status *status){
 		visited=temp[1]+1;
 		if(find_dlk){
 			ensure_access(state_man,temp[1]);
-			parent_seg[temp[1]]=work_recv.src_worker;
-			parent_ofs[temp[1]]=work_recv.src_number;
+			parent_seg[temp[1]]=work_recv->src_worker;
+			parent_ofs[temp[1]]=work_recv->src_number;
 		}
 	}
 	if (write_lts){
-		DSwriteU32(output_src[work_recv.src_worker],work_recv.src_number);
-		DSwriteU32(output_label[work_recv.src_worker],work_recv.label);
-		DSwriteU32(output_dest[work_recv.src_worker],temp[1]);
+		DSwriteU32(output_src[work_recv->src_worker],work_recv->src_number);
+		DSwriteU32(output_label[work_recv->src_worker],work_recv->label);
+		DSwriteU32(output_dest[work_recv->src_worker],temp[1]);
 	}
-	tcount[work_recv.src_worker]++;
+	tcount[work_recv->src_worker]++;
 	transitions++;
-	if (transitions%10000==0) {
-		Warning(info,"%lld transitions %lld explored",transitions,explored);
-	}
-	event_Irecv(mpi_queue,&work_recv,WORK_SIZE,MPI_CHAR,MPI_ANY_SOURCE,
-			WORK_TAG,MPI_COMM_WORLD,in_trans_handler,NULL);
+	//if (transitions%1000==0) {
+	//	Warning(info,"%lld transitions %lld explored",transitions,explored);
+	//}
+	event_Irecv(mpi_queue,work_recv,WORK_SIZE,MPI_CHAR,MPI_ANY_SOURCE,
+			WORK_TAG,MPI_COMM_WORLD,in_trans_handler,work_recv);
+#undef work_recv
 }
 
-static void in_trans_init(){
-	event_Irecv(mpi_queue,&work_recv,WORK_SIZE,MPI_CHAR,MPI_ANY_SOURCE,
-			WORK_TAG,MPI_COMM_WORLD,in_trans_handler,NULL);
+static void io_trans_init(){
+	for(int i=0;i<POOL_SIZE;i++){
+		event_Irecv(mpi_queue,&work_recv_buf[i],WORK_SIZE,MPI_CHAR,MPI_ANY_SOURCE,
+			WORK_TAG,MPI_COMM_WORLD,in_trans_handler,&work_recv_buf[i]);
+		work_send_used[i]=0;
+	}
 }
 
 int main(int argc, char*argv[]){
@@ -447,7 +503,7 @@ int main(int argc, char*argv[]){
 	if (size<2) Fatal(1,error,"there must be at least 2 parameters");
 	if (size>MAX_PARAMETERS) Fatal(1,error,"please make src and dest dynamic");
 	TreeDBSinit(size,1);
-	in_trans_init();
+	io_trans_init();
 	/***************************************************/
 	map_server_init();
 	event_barrier_wait(barrier);
@@ -480,14 +536,15 @@ int main(int argc, char*argv[]){
 			temp[1]=explored;
 			Unfold(temp);
 			src=temp+size;
-			work_send.src_worker=mpi_me;
-			work_send.src_number=explored;
+			struct src_info ctx;
+			ctx.seg=mpi_me;
+			ctx.ofs=explored;
 			explored++;
-			int count=GBgetTransitionsAll(model,src,callback,NULL);;
+			int count=GBgetTransitionsAll(model,src,callback,&ctx);;
 			if (count<0) Fatal(1,error,"error in GBgetTransitionsAll");
 			if (count==0 && find_dlk){
-				Warning(info,"deadlock found: %d.%d",work_send.src_worker,work_send.src_number);
-				deadlock_found(work_send.src_worker,work_send.src_number);
+				Warning(info,"deadlock found: %d.%d",ctx.seg,ctx.ofs);
+				deadlock_found(ctx.seg,ctx.ofs);
 			}
 			lvl_scount++;
 			lvl_tcount+=count;
@@ -495,6 +552,7 @@ int main(int argc, char*argv[]){
 				Warning(info,"generated %d transitions from %d states",
 					lvl_tcount,lvl_scount);
 			}
+			event_yield(mpi_queue);
 		}
 		Warning(info,"explored %d states and %d transitions",lvl_scount,lvl_tcount);
 		event_idle_detect(work_counter);
@@ -505,6 +563,7 @@ int main(int argc, char*argv[]){
 			Warning(info,"level %d: %lld explored %lld transitions %lld visited",
 				level,global_explored,global_transitions,global_visited);
 		}
+		event_statistics(mpi_queue);
 		if (global_visited==global_explored) break;
 	}
 	/* State space was succesfully generated. */
@@ -565,6 +624,9 @@ int main(int argc, char*argv[]){
 		}
 	}
 	if (write_lts) arch_close(&arch);
+	char dir[16];
+	sprintf(dir,"gmon-%d",mpi_me);
+	chdir(dir);
 	MPI_Finalize();
 	return 0;
 }
