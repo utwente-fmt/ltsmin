@@ -46,10 +46,12 @@ struct option options[]={
 	{"-q",OPT_NORMAL,reset_int,&verbosity,NULL,"be silent",NULL,NULL,NULL},
 	{"-help",OPT_NORMAL,usage,NULL,NULL,
 		"print this help message",NULL,NULL,NULL},
+/* Deadlocks can be found, but traces cannot be printed yet.
 	{"-dlk",OPT_NORMAL,set_int,&find_dlk,NULL,
 		"If a deadlock is found, a trace to the deadlock will be",
 		"printed and the exploration will be aborted.",
 		"using this option implies -nolts",NULL},
+*/
 	{"-out",OPT_REQ_ARG,assign_string,&outputarch,"-out <archive>",
 		"Specifiy the name of the output archive.",
 		"This will be a pattern archive if <archive> contains %s",
@@ -149,6 +151,7 @@ static void deadlock_found(int segment,int offset){
 	msg.offset=offset;
 	event_Send(mpi_queue,&msg,sizeof(struct state_found_msg),MPI_CHAR,
 		0,STATE_FOUND_TAG,MPI_COMM_WORLD);
+	event_idle_send(work_counter);
 }
 
 

@@ -228,6 +228,7 @@ struct idle_detect_s {
 	int nodes;
 	int dirty;
 	int count;
+	int exit_code;
 	int msg_pending;
 	int term_msg[2];
 };
@@ -252,11 +253,16 @@ idle_detect_t event_idle_create(event_queue_t queue,MPI_Comm comm,int tag){
 	d->tag=tag;
 	d->dirty=0;
 	d->count=0;
+	d->exit_code=0;
         MPI_Comm_size(comm,&d->nodes);
         MPI_Comm_rank(comm,&d->me);
 	d->msg_pending=(d->me==0)?0:1;
 	event_Irecv(queue,&d->term_msg,2,MPI_INT,MPI_ANY_SOURCE,tag,comm,idle_receiver,d);
 	return d;
+}
+
+void event_idle_set_code(idle_detect_t detector,int code){
+	detector->exit_code=code;
 }
 
 void event_idle_send(idle_detect_t detector){
@@ -268,7 +274,7 @@ void event_idle_recv(idle_detect_t detector){
 	detector->count--;
 }
 
-void event_idle_detect(idle_detect_t detector){
+int event_idle_detect(idle_detect_t detector){
 	if (detector->me==0){
 		int round=0;
 		int term_send[2];
@@ -297,12 +303,13 @@ void event_idle_detect(idle_detect_t detector){
 			}
 			//Log(debug,"termination detected in %d rounds\n",round);
 			term_send[0]=TERMINATED;
+			term_send[1]=detector->exit_code;
 			event_Send(detector->queue,term_send,2,MPI_INT,detector->nodes-1,
 					detector->tag,detector->comm);
 			detector->msg_pending++;
 			event_while(detector->queue,&detector->msg_pending);
 			//Log(debug,"broadcast complete");
-			return;
+			return detector->exit_code;
 		}
 	} else {
 		for(;;){
@@ -310,11 +317,13 @@ void event_idle_detect(idle_detect_t detector){
 			event_while(detector->queue,&detector->msg_pending);
 			//Log(debug,"got %d %d\n",detector->term_msg[0],detector->term_msg[1]);
 			if (detector->term_msg[0]==TERMINATED) {
+				detector->exit_code=detector->term_msg[1];
 				term_send[0]=TERMINATED;
+				term_send[1]=detector->term_msg[1];
 				event_Send(detector->queue,term_send,2,MPI_INT,detector->me-1,
 						detector->tag,detector->comm);
 				detector->msg_pending++;
-				return;
+				return detector->exit_code;
 			}
 			term_send[0]=detector->dirty?RUNNING:detector->term_msg[0];
 			detector->dirty=0;

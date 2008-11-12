@@ -79,16 +79,42 @@ extern void event_Recv(event_queue_t queue, void *buf, int count, MPI_Datatype d
 extern void event_Irecv(event_queue_t queue,void *buf, int count, MPI_Datatype datatype,
 	int source, int tag, MPI_Comm comm,event_callback cb,void*context);
 
+/** \defgroup termination_detection Termination Detection
+Detect when all messages sent have been received.
 
+Given one main thread per worker and several coroutines that can send messages to each other.
+Once the main threads have no more work left, the coroutines may still be active, so
+the main threads must wait for all of the coroutines to become idle.
+
+The main threads are active until they call detect.
+The coroutines are active iff they are executing.
+The system is idle if all threads and coroutines are idle
+and there are no messages pending.
+  */
+//@{
+
+/// handle
 typedef struct idle_detect_s *idle_detect_t;
 
+/// create
 extern idle_detect_t event_idle_create(event_queue_t queue,MPI_Comm comm,int tag);
 
+/// To be called for every tracked message sent.
 extern void event_idle_send(idle_detect_t detector);
 
+/// to be called for every tracked message received.
 extern void event_idle_recv(idle_detect_t detector);
 
-extern void event_idle_detect(idle_detect_t detector);
+/** Wait for all other to become idle as well.
+*/
+extern int event_idle_detect(idle_detect_t detector);
+
+/**
+Set the exit code of idle_detect.
+*/
+extern void event_idle_set_code(idle_detect_t detector,int code);
+
+//@}
 
 typedef struct event_barrier_s *event_barrier_t;
 
