@@ -172,7 +172,12 @@ Create a greybox object.
 
 \param context_size The size of the model context.
 */
-extern model_t GBcreateBase(int context_size);
+extern model_t GBcreateBase();
+
+/**
+\brief Set a pointer to the user context;
+*/
+extern void GBsetContext(model_t model,void*context);
 
 /**
 \brief Get a pointer to the user context;
@@ -248,6 +253,23 @@ integers split the set into the subsets of even integers and odd integers.
 
 //@{
 
+/** The newmap method creates a new map, given the newmap context.
+ */
+typedef void*(*newmap_t)(void*newmap_context);
+/** Translate the given chunk to an integer with repect to the given map.
+ */
+typedef int (*chunk2int_t)(void*map,int len,void*chunk);
+/** Translate the given integer to a chunk with repect to the given map.
+ */
+typedef void* (*int2chunk_t)(void*map,int idx,int*len);
+
+typedef int (*get_count_t)(void* object);
+
+/** Set the map factory method and the lookup methods for chunk maps.
+ */
+extern void GBsetChunkMethods(model_t model,newmap_t newmap,void*newmap_context,
+	int2chunk_t int2chunk,chunk2int_t chunk2int,get_count_t get_count);
+
 /**
 \brief Get the number of different chunks of type type_no.
 
@@ -267,22 +289,14 @@ These integers must be from a range 0..count-1.
 extern int GBchunkPut(model_t model,int type_no,int len,void*chunk);
 
 /**
-\brief Get the size of a chunk in a type.
-
-\param type_no The number of the type.
-\param chunk_no The numer of the chunk.
-\returns The length of chunk chunk_no in type  type_no.
-*/
-extern int GBchunkLength(model_t model,int type_no,int chunk_no);
-/**
 \brief Get the a chunk in a type.
 
 \param type_no The number of the type.
 \param chunk_no The numer of the chunk.
-\param chunk A pointer to a piece of memory at least as long the lenght of the chunk.
-\returns The given chunk with the chunk data written to it.
+\param len A place in memory where the length can be written. (May be NULL);
+\returns An area of memory with the chunk in it.
 */
-extern void* GBchunkGet(model_t model,int type_no,int chunk_no,void* chunk);
+extern void* GBchunkGet(model_t model,int type_no,int chunk_no,int *len);
 
 /**
 \brief Set the escape character for translating chunks to strings.

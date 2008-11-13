@@ -7,6 +7,7 @@
 */
 
 #include "aterm1.h"
+#include "greybox.h"
 
 /// Handle to a map.
 typedef struct at_map_s *at_map_t;
@@ -15,7 +16,7 @@ typedef struct at_map_s *at_map_t;
  *
  * Suggested names for maps are action for the action labels and leaf for the terms.
  */
-extern at_map_t ATmapCreate(char* name);
+extern at_map_t ATmapCreate(model_t model,int type_no);
 
 /// Translate a term to in integer.
 extern int ATfindIndex(at_map_t map,ATerm t);

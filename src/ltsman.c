@@ -266,7 +266,7 @@ void lts_write_info(lts_t lts,stream_t ds,info_fmt_t format){
 		DSwriteU32(ds,lts_get_segments(lts));
 		DSwriteU32(ds,lts_get_root_seg(lts));
 		DSwriteU32(ds,lts_get_root_ofs(lts));
-		DSwriteU32(ds,SIgetSize(lts->string_index));
+		DSwriteU32(ds,SIgetCount(lts->string_index));
 		int tau=SIlookup(lts->string_index,"tau");
 		if (tau==SI_INDEX_FAILED) {
 			DSwriteS32(ds,-1);

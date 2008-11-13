@@ -3,18 +3,22 @@
 #include "greybox.h"
 #include "runtime.h"
 
-#define MAX_CONTEXT 1048576
-
-
 struct grey_box_model {
 	lts_struct_t ltstype;
 	edge_info_t e_info;
 	state_info_t s_info;
 	int *s0;
+	void*context;
 	next_method_grey_t next_short;
 	next_method_grey_t next_long;
 	next_method_black_t next_all;
-	uint64_t context[MAX_CONTEXT/8];
+	void* newmap_context;
+	newmap_t newmap;
+	int2chunk_t int2chunk;
+	chunk2int_t chunk2int;
+	get_count_t get_count;
+	void** map;
+	char escape;
 };
 
 struct nested_cb {
@@ -96,25 +100,39 @@ static int default_all(model_t self,int*src,TransitionCB cb,void*context){
 	return res;
 }
 
-model_t GBcreateBase(int context_size){
-	int unused=((MAX_CONTEXT - context_size)%8)*8;
-	model_t model=(model_t)RTmalloc(sizeof(struct grey_box_model)-unused);
+model_t GBcreateBase(){
+	model_t model=(model_t)RTmalloc(sizeof(struct grey_box_model));
 	model->ltstype=NULL;
 	model->e_info=NULL;
 	model->s_info=NULL;
 	model->s0=NULL;
+	model->context=0;
 	model->next_short=default_short;
 	model->next_long=default_long;
 	model->next_all=default_all;
+	model->newmap_context=NULL;
+	model->newmap=NULL;
+	model->int2chunk=NULL;
+	model->chunk2int=NULL;
+	model->map=NULL;
+	model->get_count=NULL;
+	model->escape='&';
 }
 
 void* GBgetContext(model_t model){
-	return &(model->context);
+	return model->context;
+}
+void GBsetContext(model_t model,void* context){
+	model->context=context;
 }
 
 void GBsetLTStype(model_t model,lts_struct_t info){
 	if (model->ltstype != NULL)  Fatal(1,error,"ltstype already set");
 	model->ltstype=info;
+	model->map=(void**)RTmalloc(info->type_count*sizeof(void*));
+	for(int i=0;i<info->type_count;i++){
+		model->map[i]=model->newmap(model->newmap_context);
+	}
 }
 
 lts_struct_t GBgetLTStype(model_t model){
@@ -159,7 +177,7 @@ void GBsetNextStateShort(model_t model,next_method_grey_t method){
 }
 
 int GBgetTransitionsShort(model_t model,int group,int*src,TransitionCB cb,void*context){
-	model->next_short(model,group,src,cb,context);
+	return model->next_short(model,group,src,cb,context);
 }
 
 void GBsetNextStateLong(model_t model,next_method_grey_t method){
@@ -167,7 +185,7 @@ void GBsetNextStateLong(model_t model,next_method_grey_t method){
 }
 
 int GBgetTransitionsLong(model_t model,int group,int*src,TransitionCB cb,void*context){
-	model->next_long(model,group,src,cb,context);
+	return model->next_long(model,group,src,cb,context);
 }
 
 
@@ -178,4 +196,30 @@ void GBsetNextStateAll(model_t model,next_method_black_t method){
 int GBgetTransitionsAll(model_t model,int*src,TransitionCB cb,void*context){
 	return model->next_all(model,src,cb,context);
 }
+
+void GBsetChunkMethods(model_t model,newmap_t newmap,void*newmap_context,
+	int2chunk_t int2chunk,chunk2int_t chunk2int,get_count_t get_count){
+	model->newmap_context=newmap_context;
+	model->newmap=newmap;
+	model->int2chunk=int2chunk;
+	model->chunk2int=chunk2int;
+	model->get_count=get_count;
+}
+
+void GBsetEscapeChar(model_t model,char escape){
+	model->escape=escape;
+}
+
+int GBchunkPut(model_t model,int type_no,int len,void*chunk){
+	return model->chunk2int(model->map[type_no],chunk,len);
+}
+
+void* GBchunkGet(model_t model,int type_no,int chunk_no,int *len){
+	return model->int2chunk(model->map[type_no],chunk_no,len);
+}
+
+int GBchunkCount(model_t model,int type_no){
+	return model->get_count(model->map[type_no]);
+}
+
 

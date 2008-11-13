@@ -12,11 +12,9 @@
 #ifdef MCRL2
 #include "mcrl2-greybox.h"
 #endif
-#include "chunk-table.h"
 #include "treedbs.h"
 #include "ltsman.h"
 #include "options.h"
-#include "stringindex.h"
 
 static char *outputarch=NULL;
 static int plain=0;
@@ -40,41 +38,11 @@ struct option options[]={
 	{0,0,0,0,0,0,0,0,0}
 };
 
-static int label_count=0;
 static lts_t lts;
-static stream_t termdb_stream;
+
 static stream_t src_stream;
 static stream_t lbl_stream;
 static stream_t dst_stream;
-
-static string_index_t si;
-
-chunk_table_t CTcreate(char *name){
-	if (!strcmp(name,"action")) {
-		return (void*)1;
-	}
-	if (!strcmp(name,"leaf")) {
-		return (void*)2;
-	}
-	Fatal(1,error,"CT support incomplete canniot deal with table %s",name);
-	return NULL;
-}
-
-void CTsubmitChunk(chunk_table_t table,size_t len,void* chunk,chunk_add_t cb,void* context){
-	if (table == (void*)1) {
-		SIputAt(si,chunk,label_count);
-		if (write_lts){
-			DSwrite(termdb_stream,chunk,len);
-			DSwrite(termdb_stream,"\n",1);
-		}
-		label_count++;
-	}
-	cb(context,len,chunk);
-}
-
-void CTupdateTable(chunk_table_t table,uint32_t wanted,chunk_add_t cb,void* context){
-	(void)table;(void)wanted;(void)cb;(void)context;
-}
 
 static int N;
 static int K;
@@ -97,6 +65,12 @@ void print_next(void*arg,int*lbl,int*dst){
 	if (tmp[1]>=visited) visited=tmp[1]+1;
 }
 
+void *new_string_index(void* context){
+	(void)context;
+	Warning(info,"creating a new string index");
+	return SIcreate();
+}
+
 int main(int argc, char *argv[]){
 	void* stackbottom=&argv;
 	RTinit(argc,&argv);
@@ -110,11 +84,14 @@ int main(int argc, char *argv[]){
 	parse_options(options,argc,argv);
 	if (!outputarch && write_lts) Fatal(1,error,"please specify the output archive with -out");
 	Warning(info,"opening %s",argv[argc-1]);
+	model_t model=GBcreateBase();
+	GBsetChunkMethods(model,new_string_index,NULL,
+		(int2chunk_t)SIgetC,(chunk2int_t)SIputC,(get_count_t)SIgetCount);
 #ifdef MCRL
-	model_t model=MCRLcreateGreyboxModel(argv[argc-1]);
+	MCRLloadGreyboxModel(model,argv[argc-1]);
 #endif
 #ifdef MCRL2
-	model_t model=MCRL2createGreyboxModel(argv[argc-1]);
+	MCRL2loadGreyboxModel(model,argv[argc-1]);
 #endif
 	lts_struct_t ltstype=GBgetLTStype(model);
 	N=ltstype->state_length;
@@ -142,9 +119,7 @@ int main(int argc, char *argv[]){
 	lts_set_root(lts,0,0);
 	lts_set_segments(lts,1);
 	Fold(src);
-	si=lts_get_string_index(lts);
 	if (write_lts){
-		termdb_stream=arch_write(arch,"TermDB",plain?NULL:"gzip",1);
 		src_stream=arch_write(arch,"src-0-0",plain?NULL:"diff32|gzip",1);
 		lbl_stream=arch_write(arch,"label-0-0",plain?NULL:"gzip",1);
 		dst_stream=arch_write(arch,"dest-0-0",plain?NULL:"diff32|gzip",1);
@@ -175,10 +150,22 @@ int main(int argc, char *argv[]){
 	if (write_lts){
 		lts_set_states(lts,0,visited);
 		lts_set_trans(lts,0,0,trans);
-		stream_t ds=arch_write(arch,"info",plain?NULL:"",1);
+		stream_t ds;
+		ds=arch_write(arch,"TermDB",plain?NULL:"gzip",1);
+		int label_count=GBchunkCount(model,ltstype->edge_label_type[0]);
+		Warning(info,"%d action labels",label_count);
+		string_index_t si=lts_get_string_index(lts);
+		for(int i=0;i<label_count;i++){
+			int len;
+			char* label=GBchunkGet(model,ltstype->edge_label_type[0],i,&len);
+			SIputAt(si,label,i);
+			DSwrite(ds,label,len-1);
+			DSwrite(ds,"\n",1);
+		}
+		DSclose(&ds);
+		ds=arch_write(arch,"info",plain?NULL:"",1);
 		lts_write_info(lts,ds,LTS_INFO_DIR);
 		DSclose(&ds);
-		DSclose(&termdb_stream);
 		DSclose(&src_stream);
 		DSclose(&lbl_stream);
 		DSclose(&dst_stream);

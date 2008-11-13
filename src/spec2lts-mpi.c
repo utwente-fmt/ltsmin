@@ -457,11 +457,12 @@ int main(int argc, char*argv[]){
 	parse_options(options,argc,argv);
 	if (mpi_me==0) MPI_Barrier(MPI_COMM_WORLD);
 	Warning(info,"creating model for %s",argv[argc-1]);
+	model_t model=GBcreateBase();
 #ifdef MCRL
-	model_t model=MCRLcreateGreyboxModel(argv[argc-1]);
+	MCRLloadGreyboxModel(model,argv[argc-1]);
 #endif
 #ifdef MCRL2
-	model_t model=MCRL2createGreyboxModel(argv[argc-1]);
+	MCRL2loadGreyboxModel(model,argv[argc-1]);
 #endif
 	event_barrier_wait(barrier);
 	Warning(info,"model created");

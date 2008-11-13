@@ -24,13 +24,18 @@ struct stringindex {
 	int count;
 	int size;
 	int *next;
+	int *len;
 	char **data;
 	int *table;
 	int mask;
 };
 
-int SIgetSize(string_index_t si){
+int SIgetRange(string_index_t si){
 	return si->size;
+}
+
+int SIgetCount(string_index_t si){
+	return si->count;
 }
 
 /*
@@ -111,6 +116,7 @@ string_index_t SIcreate(){
 	si->count=0;
 	si->size=DATA_BLOCK_SIZE;
 	si->next=(int*)RTmalloc(DATA_BLOCK_SIZE*sizeof(int));
+	si->len=(int*)RTmalloc(DATA_BLOCK_SIZE*sizeof(int));
 	si->data=(char**)RTmalloc(DATA_BLOCK_SIZE*sizeof(char*));
 	create_free_list(si);
 	si->table=(int*)RTmalloc((TABLE_INITIAL+1)*sizeof(int));
@@ -127,6 +133,7 @@ void SIdestroy(string_index_t *si){
 	for(i=0;i<(*si)->size;i++){
 		if (USED(*si,i)) free((*si)->data[i]);
 	}
+	free((*si)->len);
 	free((*si)->data);
 	free((*si)->next);
 	free((*si)->table);
@@ -142,23 +149,34 @@ char* SIget(string_index_t si,int i){
 	}
 }
 
-int SIlookup(string_index_t si,const char*str){
+char* SIgetC(string_index_t si,int i,int *len){
+	if(0<=i && i<si->size && (si->next[i]>=0)) {
+		if (len) *len=si->len[i];
+		return si->data[i];
+	} else {
+		return NULL;
+	}
+}
+
+int SIlookupC(string_index_t si,const char*str,int len){
 	uint32_t hash;
-	uint32_t len;
 	int bucket;
 	int idx;
 
-	len=strlen(str);
 	hash=SuperFastHash((unsigned char*) str,len,0);
 	bucket=hash&si->mask;
 	for(idx=si->table[bucket];idx!=END_OF_LIST;idx=si->next[idx]){
-		if (0==strcmp(str,si->data[idx])) return idx;
+		if (0==memcmp(str,si->data[idx],len)) return idx;
 	}
 	return SI_INDEX_FAILED;
 }
 
+int SIlookup(string_index_t si,const char*str){
+	return SIlookupC(si,str,strlen(str)+1);
+}
 
-static void PutEntry(string_index_t si,const char*str,int index){
+
+static void PutEntry(string_index_t si,const char*str,int s_len,int index){
 	int i,current,next,N;
 	uint32_t hash;
 	uint32_t len;
@@ -172,6 +190,7 @@ static void PutEntry(string_index_t si,const char*str,int index){
 		extra2=old_size/DATA_BLOCK_SIZE/4;
 		new_size=old_size+DATA_BLOCK_SIZE*((extra1>=extra2)?extra1:extra2);
 		//fprintf(stderr,"resizing data from %d to %d\n",old_size,new_size);
+		si->len=(int*)realloc(si->len,new_size*sizeof(int));
 		si->data=(char**)realloc(si->data,new_size*sizeof(char*));
 		si->next=(int*)realloc(si->next,new_size*sizeof(int));
 		expand_free_list(si,old_size,new_size);
@@ -187,7 +206,7 @@ static void PutEntry(string_index_t si,const char*str,int index){
 				si->table[N+i]=END_OF_LIST;
 				while(current!=END_OF_LIST){
 					next=si->next[current];
-					len=strlen(si->data[current]);
+					len=si->len[current];
 					hash=SuperFastHash((unsigned char*) si->data[current],len,0);
 					bucket=hash&si->mask;
 					assert(bucket==i||bucket==N+i);
@@ -205,13 +224,10 @@ static void PutEntry(string_index_t si,const char*str,int index){
 		return;
 	}
 	cut_from_free_list(si,index);
-	si->data[index]=strdup(str);
-	if (si->data[index]==NULL) {
-		Fatal(1,error,"Could not duplicate string %s",str);
-		return;
-	}
-	len=strlen(str);
-	hash=SuperFastHash((unsigned char*) str,len,0);
+	si->len[index]=s_len;
+	si->data[index]=RTmalloc(s_len);
+	memcpy(si->data[index],str,s_len);
+	hash=SuperFastHash((unsigned char*) str,s_len,0);
 	bucket=hash&si->mask;
 	si->next[index]=si->table[bucket];
 	si->table[bucket]=index;
@@ -219,10 +235,10 @@ static void PutEntry(string_index_t si,const char*str,int index){
 }
 
 
-int SIput(string_index_t si,const char*str){
+int SIputC(string_index_t si,const char*str,int len){
 	int idx;
 
-	idx=SIlookup(si,str);
+	idx=SIlookupC(si,str,len);
 	if (idx!=SI_INDEX_FAILED) {
 		return idx;
 	}
@@ -231,21 +247,29 @@ int SIput(string_index_t si,const char*str){
 	} else {
 		idx=si->free_list;
 	}
-	PutEntry(si,str,idx);
+	PutEntry(si,str,len,idx);
 	return idx;
 }
 
+int SIput(string_index_t si,const char*str){
+	return SIputC(si,str,strlen(str)+1);
+}
 
-void SIputAt(string_index_t si,const char*str,int pos){
+
+void SIputCAt(string_index_t si,const char*str,int len,int pos){
 	int idx;
 
-	idx=SIlookup(si,str);
+	idx=SIlookupC(si,str,len);
 	if (idx==pos) return;
 	if (idx!=SI_INDEX_FAILED){
 		Fatal(1,error,"Cannot put %s at %d: already at %d",str,pos,idx);
 		return;
 	}
-	PutEntry(si,str,pos);
+	PutEntry(si,str,len,pos);
+}
+
+void SIputAt(string_index_t si,const char*str,int pos){
+	SIputCAt(si,str,strlen(str)+1,pos);
 }
 
 void SIreset(string_index_t si){
@@ -260,14 +284,12 @@ void SIreset(string_index_t si){
 	create_free_list(si);
 }
 
-void SIdelete(string_index_t si,const char*str){
+void SIdeleteC(string_index_t si,const char*str,int len){
 	uint32_t hash;
-	uint32_t len;
 	int bucket;
 	int idx,next,deleted;
 
-	len=strlen(str);
-	hash=SuperFastHash((unsigned char*) str,len,0);
+	hash=SuperFastHash(str,len,0);
 	bucket=hash&si->mask;
 	idx=si->table[bucket];
 	si->table[bucket]=END_OF_LIST;
@@ -292,6 +314,10 @@ void SIdelete(string_index_t si,const char*str){
 			idx=next;
 		}
 	}
+}
+
+void SIdelete(string_index_t si,const char*str){
+	SIdeleteC(si,str,strlen(str)+1);
 }
 
 

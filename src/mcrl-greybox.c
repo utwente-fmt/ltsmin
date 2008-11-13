@@ -90,12 +90,11 @@ static char* edge_name[1]={"action"};
 static int edge_type[1]={1};
 static char* MCRL_types[2]={"leaf","action"};
 
-model_t MCRLcreateGreyboxModel(char*model){
+void MCRLloadGreyboxModel(model_t m,char*model){
 	if(instances) {
 		Fatal(1,error,"mCRL is limited to one instance, due to global variables.");
 	}
 	instances++;
-	model_t m=GBcreateBase(0);
 	if(!MCRLinitNamedFile(model)) {
 		Fatal(1,error,"failed to open %s",model);
 		return NULL;
@@ -118,8 +117,8 @@ model_t MCRLcreateGreyboxModel(char*model){
 	ltstype.type_names=MCRL_types;
 	GBsetLTStype(m,&ltstype);
 
-	termmap=ATmapCreate("leaf");
-	actionmap=ATmapCreate("action");
+	termmap=ATmapCreate(m,0);
+	actionmap=ATmapCreate(m,1);
 
 	dst=(ATerm*)malloc(ltstype.state_length*sizeof(ATerm));
 	for(int i=0;i<ltstype.state_length;i++) {
@@ -147,7 +146,6 @@ model_t MCRLcreateGreyboxModel(char*model){
 	GBsetStateInfo(m,&s_info);
 	GBsetNextStateLong(m,MCRLgetTransitionsLong);
 	GBsetNextStateAll(m,MCRLgetTransitionsAll);
-	return m;
 }
 
 
