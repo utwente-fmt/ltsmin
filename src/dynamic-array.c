@@ -1,5 +1,5 @@
 #include "dynamic-array.h"
-#include <malloc.h>
+#include <stdlib.h>
 #include "runtime.h"
 
 #define MBLOCK 16

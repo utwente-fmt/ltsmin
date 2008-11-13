@@ -1,4 +1,4 @@
-#include <malloc.h>
+#include <stdlib.h>
 
 #include "vector_set.h"
 #include "runtime.h"
