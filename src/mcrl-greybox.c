@@ -10,39 +10,24 @@
 static ATerm label=NULL;
 static ATerm *dst;
 
-static int nPars;
-static int nSmds;
-
-typedef struct {
-	int count;
-	int *proj;
-} smdinfo_t ;
-
-static smdinfo_t *summand;
+static int instances=0;
+static struct lts_structure_s ltstype;
+static struct edge_info e_info;
+static struct state_info s_info={0,NULL,NULL};
 
 static at_map_t termmap;
 static at_map_t actionmap;
 
-static int expand;
-static int smd;
 static TransitionCB user_cb;
 static void* user_context;
 
 static void callback(void){
 	int lbl=ATfindIndex(actionmap,label);
-	if (expand){
-		int dst_p[summand[smd].count];
-		for(int i=0;i<summand[smd].count;i++){
-			dst_p[i]=ATfindIndex(termmap,dst[summand[smd].proj[i]]);
-		}
-		user_cb(user_context,&lbl,dst_p);
-	} else {
-		int dst_p[nPars];
-		for(int i=0;i<nPars;i++){
-			dst_p[i]=ATfindIndex(termmap,dst[i]);
-		}
-		user_cb(user_context,&lbl,dst_p);
+	int dst_p[ltstype.state_length];
+	for(int i=0;i<ltstype.state_length;i++){
+		dst_p[i]=ATfindIndex(termmap,dst[i]);
 	}
+	user_cb(user_context,&lbl,dst_p);
 }
 
 static void WarningHandler(const char *format, va_list args) {
@@ -79,9 +64,38 @@ void MCRLinitGreybox(int argc,char *argv[],void* stack_bottom){
 	STsetArguments(&c, &xargv);
 }
 
+int MCRLgetTransitionsLong(model_t model,int group,int*src,TransitionCB cb,void*context){
+	(void)model;
+	ATerm at_src[ltstype.state_length];
+	user_cb=cb;
+	user_context=context;
+	for(int i=0;i<ltstype.state_length;i++) {
+		at_src[i]=ATfindTerm(termmap,src[i]);
+	}
+	return STstepSmd(at_src,&group,1);
+}
 
-model_t GBcreateModel(char*model){
-	int i,j;
+int MCRLgetTransitionsAll(model_t model,int*src,TransitionCB cb,void*context){
+	(void)model;
+	ATerm at_src[ltstype.state_length];
+	user_cb=cb;
+	user_context=context;
+	for(int i=0;i<ltstype.state_length;i++) {
+		at_src[i]=ATfindTerm(termmap,src[i]);
+	}
+	return STstep(at_src);
+}
+
+static char* edge_name[1]={"action"};
+static int edge_type[1]={1};
+static char* MCRL_types[2]={"leaf","action"};
+
+model_t MCRLcreateGreyboxModel(char*model){
+	if(instances) {
+		Fatal(1,error,"mCRL is limited to one instance, due to global variables.");
+	}
+	instances++;
+	model_t m=GBcreateBase(0);
 	if(!MCRLinitNamedFile(model)) {
 		Fatal(1,error,"failed to open %s",model);
 		return NULL;
@@ -89,99 +103,51 @@ model_t GBcreateModel(char*model){
 	if (!RWinitialize(MCRLgetAdt())) {
 		ATerror("Initialize rewriter");
 	}
-	nPars=MCRLgetNumberOfPars();
-	dst=(ATerm*)malloc(nPars*sizeof(ATerm));
-	for(i=0;i<nPars;i++) {
+	ltstype.state_length=MCRLgetNumberOfPars();
+	ltstype.visible_count=0;
+	ltstype.visible_indices=NULL;
+	ltstype.visible_name=NULL;
+	ltstype.visible_type=NULL;
+	ltstype.state_labels=0;
+	ltstype.state_label_name=NULL;
+	ltstype.state_label_type=NULL;
+	ltstype.edge_labels=1;
+	ltstype.edge_label_name=edge_name;
+	ltstype.edge_label_type=edge_type;
+	ltstype.type_count=2;
+	ltstype.type_names=MCRL_types;
+	GBsetLTStype(m,&ltstype);
+
+	termmap=ATmapCreate("leaf");
+	actionmap=ATmapCreate("action");
+
+	dst=(ATerm*)malloc(ltstype.state_length*sizeof(ATerm));
+	for(int i=0;i<ltstype.state_length;i++) {
 		dst[i]=NULL;
 	}
  	ATprotect(&label);
-	ATprotectArray(dst,nPars);
+	ATprotectArray(dst,ltstype.state_length);
 	STinitialize(noOrdering,&label,dst,callback);
-	STsetInitialState(); // Fills dst with a legal vector for later calls.
-	nSmds=STgetSummandCount();
-	summand=malloc(nSmds*sizeof(smdinfo_t));
-	for(i=0;i<nSmds;i++){
-		int temp[nPars];
-		summand[i].count=STgetProjection(temp,i);
-		summand[i].proj=malloc(summand[i].count*sizeof(int));
-		for(j=0;j<summand[i].count;j++) summand[i].proj[j]=temp[j];
-	}
-	termmap=ATmapCreate("leaf");
-	actionmap=ATmapCreate("action");
-	return NULL;
-}
-
-int GBgetStateLength(model_t model){
-	(void)model;
-	return nPars;
-}
-
-int GBgetLabelCount(model_t model){
-	(void)model;
-	return 1;
-}
-
-char* GBgetLabelDescription(model_t model,int label){
-	(void)model;(void)label;
-	return "action";
-}
-
-int GBgetGroupCount(model_t model){
-	(void)model;
-	return nSmds;
-}
-
-void GBgetGroupInfo(model_t model,int group,int*length,int**indices){
-	(void)model;
-	if(length) *length=summand[group].count;
-	if(indices) *indices=summand[group].proj;
-}
-
-void GBgetInitialState(model_t model,int *state){
-	(void)model;
-	int i;
 	STsetInitialState();
-	for(i=0;i<nPars;i++) state[i]=ATfindIndex(termmap,dst[i]);
+	int temp[ltstype.state_length];
+	for(int i=0;i<ltstype.state_length;i++) temp[i]=ATfindIndex(termmap,dst[i]);
+	GBsetInitialState(m,temp);
+
+
+	e_info.groups=STgetSummandCount();
+	e_info.length=(int*)RTmalloc(e_info.groups*sizeof(int));
+	e_info.indices=(int**)RTmalloc(e_info.groups*sizeof(int*));
+	for(int i=0;i<e_info.groups;i++){
+		int temp[ltstype.state_length];
+		e_info.length[i]=STgetProjection(temp,i);
+		e_info.indices[i]=(int*)RTmalloc(e_info.length[i]*sizeof(int));
+		for(int j=0;j<e_info.length[i];j++) e_info.indices[i][j]=temp[j];
+	}
+	GBsetEdgeInfo(m,&e_info);
+	GBsetStateInfo(m,&s_info);
+	GBsetNextStateLong(m,MCRLgetTransitionsLong);
+	GBsetNextStateAll(m,MCRLgetTransitionsAll);
+	return m;
 }
 
-int GBgetTransitionsShort(model_t model,int group,int*src,TransitionCB cb,void*context){
-	(void)model;
-	ATerm at_src[nPars];
-	expand=1;
-	smd=group;
-	user_cb=cb;
-	user_context=context;
-	for(int i=0;i<nPars;i++) {
-		at_src[i]=dst[i];
-	}
-	for(int i=0;i<summand[group].count;i++){
-		at_src[summand[group].proj[i]]=ATfindTerm(termmap,src[i]);
-	}
-	return STstepSmd(at_src,&smd,1);
-}
-
-int GBgetTransitionsLong(model_t model,int group,int*src,TransitionCB cb,void*context){
-	(void)model;
-	ATerm at_src[nPars];
-	expand=0;
-	smd=group;
-	user_cb=cb;
-	user_context=context;
-	for(int i=0;i<nPars;i++) {
-		at_src[i]=ATfindTerm(termmap,src[i]);
-	}
-	return STstepSmd(at_src,&smd,1);
-}
-
-int GBgetTransitionsAll(model_t model,int*src,TransitionCB cb,void*context){
-	(void)model;
-	ATerm at_src[nPars];
-	expand=0;
-	user_cb=cb;
-	user_context=context;
-	for(int i=0;i<nPars;i++) {
-		at_src[i]=ATfindTerm(termmap,src[i]);
-	}
-	return STstep(at_src);
-}
 

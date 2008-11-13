@@ -16,9 +16,6 @@ typedef struct grey_box_model* model_t;
 /**< @brief Abstract type for a model.
 */
 
-extern model_t GBcreateModel(char*model);
-/**< @brief Factory method for creating a model.
- */
 
 /**
 \brief Structure defining the important characteristics of an LTS.
@@ -26,20 +23,63 @@ extern model_t GBcreateModel(char*model);
 This is the common part for both black box and grey box.
  */
 typedef struct lts_structure_s {
-	int state_length; ///< The length of the state vector.
-	int visible_count; ///< The number of visible elements in the state vector.
-	int* visible_indices; ///< Sorted list of indices of visible elements.
-	char** visible_name; ///< Variable names of the visible elements.
-	int* visible_type; ///< Type numbers of the visible elements.
-	int state_labels; ///< The number of state labels.
-	char** state_label_name; ///< The names of the state labels.
-	int* state_label_type; ///< The type numbers of the state labels.
-	int edge_labels; ///< The number of state labels.
-	char** edge_label_name; ///< The names of the edge labels.
-	int* edge_label_type; ///< The type numbers of the edge labels.
-	int type_count; ///< The number of different types.
-	char** type_names; ///< The names of the types.
+int state_length;
+/**<
+\brief The length of the state vector.
+
+This describes the length of the internal representation of states.
+For mCRL(2) this would be equal to the number of parameters.
+For a segmented LTS it would be equal to 2.
+*/
+int visible_count;
+/**<
+\brief The number of visible elements in the state vector.
+
+This describes how many of the internal variables are relevant.
+In most cases this will be 0, but if we want to write FSM output
+for mCRL(2) then it would be equal to state_length.
+*/
+int* visible_indices; ///< Sorted list of indices of visible elements.
+char** visible_name; ///< Variable names of the visible elements.
+int* visible_type; ///< Type numbers of the visible elements.
+int state_labels; ///< The number of state labels.
+char** state_label_name; ///< The names of the state labels.
+int* state_label_type; ///< The type numbers of the state labels.
+int edge_labels; ///< The number of state labels.
+char** edge_label_name; ///< The names of the edge labels.
+int* edge_label_type; ///< The type numbers of the edge labels.
+int type_count; ///< The number of different types.
+char** type_names; ///< The names of the types.
 } *lts_struct_t;
+
+
+/**
+\brief Edge group information. 
+
+For each grey box model, anumber of groups must be determined and
+for each of those groups the influenced variables must de given.
+*/
+typedef struct edge_info {
+	int   groups;  ///< The number of groups.
+	int*  length;  ///< The number of influenced variables per group.
+	int** indices; ///< A sorted list of indices of influenced variables per group.
+} *edge_info_t;
+
+
+/**
+\brief State label information. 
+
+For each grey box model, anumber of groups must be determined and
+for each of those groups the influenced variables must de given.
+*/
+typedef struct state_info {
+	int   labels;  ///< The number of defined state labels.
+	int*  length;  ///< The number of influenced variables per label.
+	int** indices; ///< A sorted list of indices of influenced variables per label.
+} *state_info_t;
+
+
+
 
 /**
 \defgroup greybox_user The Greybox user interface.
@@ -51,27 +91,7 @@ typedef struct lts_structure_s {
 */
 extern lts_struct_t GBgetLTStype(model_t model);
 
-extern int GBgetStateLength(model_t model);
-/**< @brief Get the length of the state vector of model.
-\deprecated Use GBgetLTSinfo instead.
- */
-
-
-/**
-\brief Group information. 
-
-For each grey box model, anumber of groups must be determined and
-for each of those groups the influenced variables must de given.
-*/
-struct group_info {
-	int   groups;  ///< The number of groups.
-	int*  length;  ///< The number of influenced variables per group.
-	int** indices; ///< A sorted list of indices of influenced variables per group.
-};
-typedef struct group_info *group_info_t;
-
-
-extern group_info_t GBgetEdgeGroupInfo(model_t model);
+extern edge_info_t GBgetEdgeInfo(model_t model);
 /**<
 \brief Get the edge group information of a model.
 */
@@ -101,7 +121,16 @@ Given a group number and a long vector for that group, enumerate the local
    All positions in this vector must have legal values. However, the given state does not have to be reachable.
  */
 
-extern group_info_t GBgetStateGroupInfo(model_t model);
+extern int GBgetTransitionsAll(model_t model,int*src,TransitionCB cb,void*context);
+/**< @brief Enumerate the transitions of all groups for a long state.
+
+Of course it would be equivalent to just call GBgetTransitionsLong for all groups,
+but for MCRL(2) it is more efficient if this call is implemented directly in the language module:
+it avoids having to initialize the rewriter several times for the same state.
+ */
+
+
+extern state_info_t GBgetStateInfo(model_t model);
 /**<
 \brief Get the state group information of a model.
 */
@@ -116,13 +145,6 @@ extern int GBgetStateLabelLong(model_t model,int label,int *state);
 \brief Return the value of state label label given a long state
 */
 
-extern int GBgetTransitionsAll(model_t model,int*src,TransitionCB cb,void*context);
-/**< @brief Enumerate the transitions of all groups for a long state.
-
-Of course it would be equivalent to just call GBgetTransitionsLong for all groups,
-but for MCRL(2) it is more efficient if this call is implemented directly in the language module:
-it avoids having to initialize the rewriter several times for the same state.
- */
 
 extern void GBgetStateLabelsAll(model_t model,int*state,int*labels);
 /**<
@@ -153,6 +175,11 @@ Create a greybox object.
 extern model_t GBcreateBase(int context_size);
 
 /**
+\brief Get a pointer to the user context;
+*/
+extern void* GBgetContext(model_t model);
+
+/**
 \brief Add LTS structure information to a model.
 */
 extern void GBsetLTStype(model_t model,lts_struct_t info);
@@ -160,12 +187,12 @@ extern void GBsetLTStype(model_t model,lts_struct_t info);
 /**
 \brief Add edge group information to a model.
 */
-extern void GBsetEdgeInfo(model_t model,group_info_t info);
+extern void GBsetEdgeInfo(model_t model,edge_info_t info);
 
 /**
 \brief Add state label information to a model.
 */
-extern void GBsetStateInfo(model_t model,group_info_t info);
+extern void GBsetStateInfo(model_t model,state_info_t info);
 
 /**
 \brief Set the initial state.
@@ -179,33 +206,33 @@ extern void GBsetInitialState(model_t model,int *state);
 /**
 \brief Type of the greybox next state method.
 */
-typedef int(*next_method_grey_t)(void*model_context,int group,int*src,TransitionCB cb,void*user_context);
+typedef int(*next_method_grey_t)(model_t self,int group,int*src,TransitionCB cb,void*user_context);
 
 /**
 \brief Set the next state method that works on long vectors.
 
 If this method is not set then the short version is used.
 */
-extern void GTsetNextStateLong(model_t model);
+extern void GBsetNextStateLong(model_t model,next_method_grey_t method);
 
 /**
 \brief Set the next state method that works on short vectors.
 
 If this method is not set then the long version is used.
 */
-extern void GTsetNextStateShort(model_t model);
+extern void GBsetNextStateShort(model_t model,next_method_grey_t method);
 
 /**
 \brief Type of the blackbox next state method.
 */
-typedef int(*next_method_black_t)(void*model_context,int*src,TransitionCB cb,void*user_context);
+typedef int(*next_method_black_t)(model_t self,int*src,TransitionCB cb,void*user_context);
 
 /**
 \brief Set the black box next state method.
 
 If this method is not set explicitly then the grey box calls are iterated.
 */
-extern void GTsetNextStateAll(model_t model);
+extern void GBsetNextStateAll(model_t model,next_method_black_t method);
 
 //@}
 

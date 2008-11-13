@@ -86,11 +86,11 @@ libutil_a_SOURCES = unix.c runtime.c stream.c archive.c	\
                     generichash.h unix.h archive.h ghf.h options.h	\
                     stream.h raf.h stream_object.h		\
                     raf_object.h scctimer.h fast_hash.h runtime.h	\
-                    treedbs.h config.h greybox.h stringindex.c          \
+                    treedbs.h config.h greybox.c greybox.h stringindex.c          \
                     stringindex.h archive_gsf.c dirops.c dirops.h       \
                     ltsman.c ltsman.h packet_stream.h packet_stream.c \
                     archive_dir.c chunk-table.h \
-                    dynamic-array.c  dynamic-array.h
+                    dynamic-array.c dynamic-array.h
 
 
 # make 

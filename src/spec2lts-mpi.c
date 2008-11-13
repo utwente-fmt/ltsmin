@@ -456,8 +456,14 @@ int main(int argc, char*argv[]){
 	parse_options(options,argc,argv);
 	if (mpi_me==0) MPI_Barrier(MPI_COMM_WORLD);
 	Warning(info,"creating model for %s",argv[argc-1]);
-	model_t model=GBcreateModel(argv[argc-1]);
+#ifdef MCRL
+	model_t model=MCRLcreateGreyboxModel(argv[argc-1]);
+#endif
+#ifdef MCRL2
+	model_t model=MCRL2createGreyboxModel(argv[argc-1]);
+#endif
 	Warning(info,"model created");
+	lts_struct_t ltstype=GBgetLTStype(model);
 
 	/* Initializing according to the options just parsed.
 	 */
@@ -502,7 +508,7 @@ int main(int argc, char*argv[]){
 		}
 	}
 	/***************************************************/
-	size=GBgetStateLength(model);
+	size=ltstype->state_length;
 	if (size<2) Fatal(1,error,"there must be at least 2 parameters");
 	if (size>MAX_PARAMETERS) Fatal(1,error,"please make src and dest dynamic");
 	TreeDBSinit(size,1);
