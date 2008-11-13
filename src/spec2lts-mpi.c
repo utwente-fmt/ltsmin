@@ -440,6 +440,7 @@ int main(int argc, char*argv[]){
 	set_label(who);
 	mpi_queue=event_queue();
 	state_found_init();
+	map_server_init();
 	work_counter=event_idle_create(mpi_queue,MPI_COMM_WORLD,EXPLORE_IDLE_TAG);
 	barrier=event_barrier_create(mpi_queue,MPI_COMM_WORLD,BARRIER_TAG);
 
@@ -462,6 +463,7 @@ int main(int argc, char*argv[]){
 #ifdef MCRL2
 	model_t model=MCRL2createGreyboxModel(argv[argc-1]);
 #endif
+	event_barrier_wait(barrier);
 	Warning(info,"model created");
 	lts_struct_t ltstype=GBgetLTStype(model);
 
@@ -514,7 +516,6 @@ int main(int argc, char*argv[]){
 	TreeDBSinit(size,1);
 	io_trans_init();
 	/***************************************************/
-	map_server_init();
 	event_barrier_wait(barrier);
 	/***************************************************/
 	GBgetInitialState(model,temp+size);
