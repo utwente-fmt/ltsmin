@@ -24,9 +24,131 @@
 #include "dynamic-array.h"
 #include "mpi-event-loop.h"
 
+/********************************************************************************************/
+
+typedef struct mpi_index_pool {
+	MPI_Comm comm;
+	event_queue_t queue;
+	int me;
+	int nodes;
+	int next_tag;
+	int max_chunk;
+} *mpi_index_pool_t;
+
+typedef struct mpi_index {
+	mpi_index_pool_t pool;
+	int tag;
+	int owner;
+	string_index_t index;
+	char *recv_buf;
+	void *wanted;
+	int w_len;
+	int looking;
+} *mpi_index_t;
+
+static void mpi_index_handler(void* context,MPI_Status *status){
+	mpi_index_t index=(mpi_index_t)context;
+	int len;
+	MPI_Get_count(status,MPI_CHAR,&len);
+	if (index->pool->me==index->owner) {
+		int res=SIlookupC(index->index,index->recv_buf,len);
+		if (res==SI_INDEX_FAILED) {
+			res=SIputC(index->index,index->recv_buf,len);
+			int todo=index->pool->nodes-1;
+			for(int i=0;i<index->pool->nodes;i++) if (i!=index->owner) {
+				event_Isend(index->pool->queue,index->recv_buf,len,MPI_CHAR,
+					i,index->tag,index->pool->comm,event_decr,&todo);
+			}
+			event_while(index->pool->queue,&todo);
+		}
+	} else {
+		int res=SIputC(index->index,index->recv_buf,len);
+		if (index->wanted) {
+			if (len==index->w_len && memcmp(index->recv_buf,index->wanted,len)==0){
+				index->looking=0;
+			}
+		} else {
+			if (index->looking==res+1){
+				index->looking=0;
+			}
+		}
+	}
+	event_Irecv(index->pool->queue,index->recv_buf,index->pool->max_chunk,MPI_CHAR,
+		MPI_ANY_SOURCE,index->tag,index->pool->comm,mpi_index_handler,context);
+}
+
+mpi_index_pool_t mpi_index_pool_create(MPI_Comm comm,event_queue_t queue,int max_chunk){
+	mpi_index_pool_t pool=(mpi_index_pool_t)RTmalloc(sizeof(struct mpi_index_pool));
+	MPI_Comm_dup(comm,&pool->comm);
+	pool->queue=queue;
+	MPI_Comm_size(pool->comm,&pool->nodes);
+        MPI_Comm_rank(pool->comm,&pool->me);
+	pool->next_tag=1;
+	pool->max_chunk=max_chunk;
+	return pool;
+}
+
+void* mpi_newmap(void*newmap_context){
+	mpi_index_pool_t pool=(mpi_index_pool_t)newmap_context;
+	mpi_index_t index=(mpi_index_t)RTmalloc(sizeof(struct mpi_index));
+	index->pool=pool;
+	index->tag=pool->next_tag;
+	pool->next_tag++;
+	index->owner=(index->tag)%(pool->nodes);
+	index->index=SIcreate();
+	index->wanted=NULL;
+	index->looking=0;
+	index->recv_buf=RTmalloc(pool->max_chunk);
+	event_Irecv(index->pool->queue,index->recv_buf,index->pool->max_chunk,MPI_CHAR,
+		MPI_ANY_SOURCE,index->tag,index->pool->comm,mpi_index_handler,index);
+	return index;
+}
+
+int mpi_chunk2int(void*map,void*chunk,int len){
+	mpi_index_t index=(mpi_index_t)map;
+	int res=SIlookupC(index->index,chunk,len);
+	if (res==SI_INDEX_FAILED) {
+		if (index->pool->me==index->owner) {
+			res=SIputC(index->index,chunk,len);
+			int todo=index->pool->nodes-1;
+			for(int i=0;i<index->pool->nodes;i++) if (i!=index->owner) {
+				event_Isend(index->pool->queue,chunk,len,MPI_CHAR,
+					i,index->tag,index->pool->comm,event_decr,&todo);
+			}
+			event_while(index->pool->queue,&todo);
+		} else {
+			index->wanted=chunk;
+			index->w_len=len;
+			index->looking=1;
+			event_Isend(index->pool->queue,chunk,len,MPI_CHAR,
+				index->owner,index->tag,index->pool->comm,NULL,NULL);
+			event_while(index->pool->queue,&index->looking);
+			res=SIlookupC(index->index,chunk,len);
+		}
+	}
+	return res;
+}
+
+void* mpi_int2chunk(void*map,int idx,int*len){
+	mpi_index_t index=(mpi_index_t)map;
+	if (index->pool->me!=index->owner && SIgetCount(index->index)<=idx){
+		index->looking=idx+1;
+		event_while(index->pool->queue,&index->looking);
+	}
+	return SIgetC(index->index,idx,len);
+}
+
+int mpi_get_count(void*map){
+	mpi_index_t index=(mpi_index_t)map;
+	return SIgetCount(index->index);
+}
+
+/********************************************************************************************/
+
 #define MAX_PARAMETERS 256
 #define MAX_TERM_LEN 5000
 
+static mpi_index_pool_t index_pool;
 static archive_t arch;
 static int verbosity=1;
 static char *outputarch=NULL;
@@ -91,7 +213,7 @@ static inline int owner(int32_t *state){
 	return (hash%mpi_nodes);
 }
 
-#define POOL_SIZE 256
+#define POOL_SIZE 16
 
 struct work_msg {
 	int src_worker;
@@ -154,9 +276,7 @@ static void deadlock_found(int segment,int offset){
 	event_idle_send(work_counter);
 }
 
-
-
-
+/*
 static string_index_t act_db;
 static int next_act=0;
 static int int_buf_act[1];
@@ -338,6 +458,7 @@ static void map_server_init(){
 				LEAF_INT_TAG,MPI_COMM_WORLD,int_handler,leaf_db);
 	}
 }
+*/
 
 /********************************************************/
 
@@ -426,6 +547,14 @@ static void io_trans_init(){
 	}
 }
 
+/*
+void *new_string_index(void* context){
+	(void)context;
+	Warning(info,"creating a new string index");
+	return SIcreate();
+}
+*/
+
 int main(int argc, char*argv[]){
 	int temp[2*MAX_PARAMETERS];
 	long long int global_visited,global_explored,global_transitions;
@@ -440,7 +569,6 @@ int main(int argc, char*argv[]){
 	set_label(who);
 	mpi_queue=event_queue();
 	state_found_init();
-	map_server_init();
 	work_counter=event_idle_create(mpi_queue,MPI_COMM_WORLD,EXPLORE_IDLE_TAG);
 	barrier=event_barrier_create(mpi_queue,MPI_COMM_WORLD,BARRIER_TAG);
 
@@ -458,6 +586,10 @@ int main(int argc, char*argv[]){
 	if (mpi_me==0) MPI_Barrier(MPI_COMM_WORLD);
 	Warning(info,"creating model for %s",argv[argc-1]);
 	model_t model=GBcreateBase();
+	GBsetChunkMethods(model,mpi_newmap,mpi_index_pool_create(MPI_COMM_WORLD,mpi_queue,MAX_TERM_LEN),
+		 mpi_int2chunk,mpi_chunk2int,mpi_get_count);
+//	GBsetChunkMethods(model,new_string_index,NULL,
+//		(int2chunk_t)SIgetC,(chunk2int_t)SIputC,(get_count_t)SIgetCount);
 #ifdef MCRL
 	MCRLloadGreyboxModel(model,argv[argc-1]);
 #endif
@@ -570,13 +702,18 @@ int main(int argc, char*argv[]){
 		MPI_Allreduce(&visited,&global_visited,1,MPI_LONG_LONG,MPI_SUM,MPI_COMM_WORLD);
 		MPI_Allreduce(&explored,&global_explored,1,MPI_LONG_LONG,MPI_SUM,MPI_COMM_WORLD);
 		MPI_Allreduce(&transitions,&global_transitions,1,MPI_LONG_LONG,MPI_SUM,MPI_COMM_WORLD);
+		event_statistics(mpi_queue);
+		if (global_visited==global_explored) break;
 		if (mpi_me==0) {
 			Warning(info,"level %d: %lld explored %lld transitions %lld visited",
 				level,global_explored,global_transitions,global_visited);
 		}
-		event_statistics(mpi_queue);
-		if (global_visited==global_explored) break;
 	}
+	if (mpi_me==0) {
+		Warning(info,"State space has %d levels %lld states %lld transitions",
+			level,global_explored,global_transitions);
+	}
+	event_barrier_wait(barrier);
 	/* State space was succesfully generated. */
 	Warning(info,"My share is %lld states and %lld transitions",explored,transitions);
 	if (write_lts){
@@ -593,6 +730,7 @@ int main(int argc, char*argv[]){
 	stream_t info_s=NULL;
 		if (write_lts && mpi_me==0){
 			/* It would be better if we didn't create tau if it is non-existent. */
+/*
 			stream_t ds=arch_write(arch,"TermDB",plain?NULL:"gzip",1);
 			int act_count=0;
 			for(;;){
@@ -605,6 +743,7 @@ int main(int argc, char*argv[]){
 			DSclose(&ds);
 			tau=SIlookup(act_db,"tau");
 			Warning(info,"%d actions, tau has index %d",act_count,tau);
+*/
 			/* Start writing the info file. */
 			info_s=arch_write(arch,"info",plain?NULL:"",1);
 			DSwriteU32(info_s,31);
@@ -612,7 +751,7 @@ int main(int argc, char*argv[]){
 			DSwriteU32(info_s,mpi_nodes);
 			DSwriteU32(info_s,0);
 			DSwriteU32(info_s,0);
-			DSwriteU32(info_s,act_count);
+//			DSwriteU32(info_s,act_count);
 			DSwriteU32(info_s,tau);
 			DSwriteU32(info_s,size-1);
 		}

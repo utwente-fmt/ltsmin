@@ -258,7 +258,7 @@ integers split the set into the subsets of even integers and odd integers.
 typedef void*(*newmap_t)(void*newmap_context);
 /** Translate the given chunk to an integer with repect to the given map.
  */
-typedef int (*chunk2int_t)(void*map,int len,void*chunk);
+typedef int (*chunk2int_t)(void*map,void*chunk,int len);
 /** Translate the given integer to a chunk with repect to the given map.
  */
 typedef void* (*int2chunk_t)(void*map,int idx,int*len);

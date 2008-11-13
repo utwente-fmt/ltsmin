@@ -198,7 +198,7 @@ void event_Isend(event_queue_t queue,void *buf, int count, MPI_Datatype datatype
 	int dest, int tag, MPI_Comm comm,event_callback cb,void*context){
 	ensure_access(queue->man,queue->pending);
 	MPI_Isend(buf,count,datatype,dest,tag,comm,&queue->request[queue->pending]);
-	queue->cb[queue->pending]=cb;
+	queue->cb[queue->pending]=cb?cb:null_cb; // we cannot allow NULL as a call-back.
 	queue->context[queue->pending]=context;
 	queue->pending++;
 	
@@ -215,7 +215,7 @@ void event_Irecv(event_queue_t queue,void *buf, int count, MPI_Datatype datatype
 	int source, int tag, MPI_Comm comm,event_callback cb,void*context){
 	ensure_access(queue->man,queue->pending);
 	MPI_Irecv(buf,count,datatype,source,tag,comm,&queue->request[queue->pending]);
-	queue->cb[queue->pending]=cb;
+	queue->cb[queue->pending]=cb?cb:null_cb; // we cannot allow NULL as a call-back.
 	queue->context[queue->pending]=context;
 	queue->pending++;	
 }
