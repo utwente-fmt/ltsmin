@@ -16,6 +16,7 @@
 #include "ltsman.h"
 #include "options.h"
 
+static treedbs_t dbs;
 static char *outputarch=NULL;
 static int plain=0;
 static int blackbox=0;
@@ -51,18 +52,14 @@ static int explored=0;
 static int trans=0;
 
 void print_next(void*arg,int*lbl,int*dst){
-	int tmp[N+N];
-	for(int i=0;i<N;i++) {
-		tmp[N+i]=dst[i];
-	}
-	Fold(tmp);
+	int tmp=TreeFold(dbs,dst);
 	trans++;
 	if (write_lts){
 		DSwriteU32(src_stream,*((int*)arg));
 		DSwriteU32(lbl_stream,lbl[0]);
-		DSwriteU32(dst_stream,tmp[1]);
+		DSwriteU32(dst_stream,tmp);
 	}
-	if (tmp[1]>=visited) visited=tmp[1]+1;
+	if (tmp>=visited) visited=tmp+1;
 }
 
 void *new_string_index(void* context){
@@ -97,11 +94,11 @@ int main(int argc, char *argv[]){
 	N=ltstype->state_length;
 	edge_info_t e_info=GBgetEdgeInfo(model);
 	K=e_info->groups;
-	TreeDBSinit(N,1);
+	dbs=TreeDBScreate(N);
 	Warning(info,"length is %d, there are %d groups",N,K);
 	Warning(info,"Using %s mode",blackbox?"black box":"grey box");	
-	int src[N+N];
-	GBgetInitialState(model,src+N);
+	int src[N];
+	GBgetInitialState(model,src);
 	Warning(info,"got initial state");
 	archive_t arch;
 	if (write_lts) {
@@ -118,7 +115,9 @@ int main(int argc, char *argv[]){
 	lts=lts_new();
 	lts_set_root(lts,0,0);
 	lts_set_segments(lts,1);
-	Fold(src);
+	if(TreeFold(dbs,src)!=0){
+		Fatal(1,error,"root should be 0");
+	}
 	if (write_lts){
 		src_stream=arch_write(arch,"src-0-0",plain?NULL:"diff32|gzip",1);
 		lbl_stream=arch_write(arch,"label-0-0",plain?NULL:"gzip",1);
@@ -133,20 +132,19 @@ int main(int argc, char *argv[]){
 			limit=visited;
 			level++;
 		}
-		src[1]=explored;
-		Unfold(src);
+		TreeUnfold(dbs,explored,src);
 		int c;
 		if(blackbox){
-			c=GBgetTransitionsAll(model,src+N,print_next,&(src[1]));
+			c=GBgetTransitionsAll(model,src,print_next,&explored);
 		} else {
 			for(int i=0;i<K;i++){
-				c=GBgetTransitionsLong(model,i,src+N,print_next,&(src[1]));
+				c=GBgetTransitionsLong(model,i,src,print_next,&explored);
 			}
 		}
 		explored++;
 		if(explored%1000 ==0) Warning(info,"explored %d visited %d trans %d",explored,visited,trans);
 	}
-	Warning(info,"state space has %d states %d transitions",visited,trans);		
+	Warning(info,"state space has %d levels %d states %d transitions",level,visited,trans);		
 	if (write_lts){
 		lts_set_states(lts,0,visited);
 		lts_set_trans(lts,0,0,trans);

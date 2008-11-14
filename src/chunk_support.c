@@ -1,13 +1,14 @@
+#include <ctype.h>
 #include "chunk_support.h"
 #include "runtime.h"
 
-#define VALID_LEN(i,c) if (i>=c.len) Fatal(1,error,"chunk overflow")
+#define VALID_IDX(i,c) if (i>=c.len) Fatal(1,error,"chunk overflow")
 
 static const char HEX[17]="0123456789ABCDEF";
 
 void chunk_encode_copy(chunk dst,chunk src,char esc){
-	int k=0;
-	for(int i=0;i<src.len;i++){
+	chunk_len k=0;
+	for(chunk_len i=0;i<src.len;i++){
 		if (isprint(src.data[i])) {
 			if (src.data[i]==esc){
 				VALID_IDX(k+1,dst);
@@ -43,7 +44,7 @@ static int hex_decode(char c){
 }
 
 void chunk_decode_copy(chunk dst,chunk src,char esc){
-	int i=0,j=0;
+	chunk_len i=0,j=0;
 	while(i<src.len){
 		if (src.data[i]==0) break;
 		VALID_IDX(j,dst);
@@ -52,7 +53,7 @@ void chunk_decode_copy(chunk dst,chunk src,char esc){
 				dst.data[j]=esc;
 				i+=2;
 			} else {
-				dst.data[j]=hex_decode(src.data[i+1])<<4+hex_decode(src.data[i+2]);
+				dst.data[j]=(hex_decode(src.data[i+1])<<4)+hex_decode(src.data[i+2]);
 				i+=3;
 			}
 		} else {

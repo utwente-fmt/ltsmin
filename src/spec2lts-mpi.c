@@ -155,6 +155,7 @@ static int write_lts=1;
 static int nice_value=0;
 static int plain=0;
 static int find_dlk=0;
+static treedbs_t dbs;
 
 
 static event_queue_t mpi_queue;
@@ -195,7 +196,6 @@ static stream_t *output_label=NULL;
 static stream_t *output_dest=NULL;
 
 static int *tcount;
-static int *src;
 static int size;
 
 static uint32_t chk_base=0;
@@ -275,190 +275,6 @@ static void deadlock_found(int segment,int offset){
 	event_idle_send(work_counter);
 }
 
-/*
-static string_index_t act_db;
-static int next_act=0;
-static int int_buf_act[1];
-static char chunk_buf_act[MAX_TERM_LEN+1];
-
-static string_index_t leaf_db;
-static int next_leaf=0;
-static int int_buf_leaf[1];
-static char chunk_buf_leaf[MAX_TERM_LEN+1];
-
-static int chunk2int(string_index_t term_db,int chunk_tag,int int_tag,size_t len,void* chunk){
-	//struct timeval tv1,tv2;
-	//gettimeofday(&tv1,NULL);
-	if (mpi_me==0) {
-		((char*)chunk)[len]=0;
-		return SIput(term_db,chunk);
-	} else {
-		int idx;
-		((char*)chunk)[len]=0;
-		//Warning(info,"requesting chunk %s",chunk);
-		MPI_Status status;
-		event_Send(mpi_queue,chunk,len,MPI_CHAR,0,chunk_tag,MPI_COMM_WORLD);
-		event_Recv(mpi_queue,&idx,1,MPI_INT,0,int_tag,MPI_COMM_WORLD,&status);
-		//Warning(info,"got chunk %s: %d",chunk,idx);
-		return idx;
-	}
-	//gettimeofday(&tv2,NULL);
-	//long long int usec=(tv2.tv_sec-tv1.tv_sec)*1000000LL + tv2.tv_usec - tv1.tv_usec;
-	//Warning(info,"chunk2int took %lld us",usec);
-}
-
-static void chunk_call(string_index_t term_db,int chunk_tag,int int_tag,int next_cb,chunk_add_t cb,void* context){
-	//struct timeval tv1,tv2;
-	//gettimeofday(&tv1,NULL);
-	if (mpi_me==0) {
-		char*s=SIget(term_db,next_cb);
-		int len=strlen(s);
-		cb(context,len,s);
-	} else {
-		MPI_Status status;
-		char chunk[MAX_TERM_LEN+1];
-		//Warning(info,"requesting int %d",next_cb);
-		event_Send(mpi_queue,&next_cb,1,MPI_INT,0,int_tag,MPI_COMM_WORLD);
-		event_Recv(mpi_queue,&chunk,MAX_TERM_LEN,MPI_CHAR,0,chunk_tag,MPI_COMM_WORLD,&status);
-		int len;
-		MPI_Get_count(&status,MPI_CHAR,&len);
-		chunk[len]=0;
-		//Warning(info,"got int %d; %s",next_cb,chunk);
-		cb(context,len,chunk);
-	}
-	//gettimeofday(&tv2,NULL);
-	//long long int usec=(tv2.tv_sec-tv1.tv_sec)*1000000LL + tv2.tv_usec - tv1.tv_usec;
-	//Warning(info,"cunk_call took %lld us",usec);
-}
-
-
-chunk_table_t CTcreate(char *name){
-	if (!strcmp(name,"action")) {
-		return (void*)1;
-	}
-	if (!strcmp(name,"leaf")) {
-		return (void*)2;
-	}
-	Fatal(1,error,"CT support incomplete cannot deal with table %s",name);
-	return NULL;
-}
-
-void CTsubmitChunk(chunk_table_t table,size_t len,void* chunk,chunk_add_t cb,void* context){
-	//struct timeval tv1,tv2;
-	//gettimeofday(&tv1,NULL);
-	if(table==(void*)1){
-		int res=chunk2int(act_db,ACT_CHUNK_TAG,ACT_INT_TAG,len,chunk);
-		while(next_act<=res){
-			chunk_call(act_db,ACT_CHUNK_TAG,ACT_INT_TAG,next_act,cb,context);
-			next_act++;
-		}
-	} else {
-		int res=chunk2int(leaf_db,LEAF_CHUNK_TAG,LEAF_INT_TAG,len,chunk);
-		while(next_leaf<=res){
-			chunk_call(leaf_db,LEAF_CHUNK_TAG,LEAF_INT_TAG,next_leaf,cb,context);
-			next_leaf++;
-		}
-	}
-	//gettimeofday(&tv2,NULL);
-	//long long int usec=(tv2.tv_sec-tv1.tv_sec)*1000000LL + tv2.tv_usec - tv1.tv_usec;
-	//static long long int max=0;
-	//Warning(info,"CTsubmitChunk took %lld us",usec);
-	//if (usec>max) {
-	//	max=usec;
-	//}
-}
-
-void CTupdateTable(chunk_table_t table,uint32_t wanted,chunk_add_t cb,void* context){
-	//struct timeval tv1,tv2;
-	//gettimeofday(&tv1,NULL);
-	if(table==(void*)1){
-		while(next_act<=(int)wanted){
-			chunk_call(act_db,ACT_CHUNK_TAG,ACT_INT_TAG,next_act,cb,context);
-			next_act++;
-		}
-	} else {
-		while(next_leaf<=(int)wanted){
-			chunk_call(leaf_db,LEAF_CHUNK_TAG,LEAF_INT_TAG,next_leaf,cb,context);
-			next_leaf++;
-		}
-	}
-	//gettimeofday(&tv2,NULL);
-	//long long int usec=(tv2.tv_sec-tv1.tv_sec)*1000000LL + tv2.tv_usec - tv1.tv_usec;
-	//static long long int max=0;
-	//Warning(info,"CTupdateTable took %lld us",usec);
-	//if (usec>max) {
-	//	max=usec;
-	//}
-}
-
-static void int_handler(void *context,MPI_Status *status){
-	//Warning(info,"int request");
-	int chunk_tag,int_tag;
-	string_index_t term_db;
-	int *int_buf;
-	if (context==act_db){
-		chunk_tag=ACT_CHUNK_TAG;
-		int_tag=ACT_INT_TAG;
-		term_db=act_db;
-		int_buf=int_buf_act;
-	} else {
-		chunk_tag=LEAF_CHUNK_TAG;
-		int_tag=LEAF_INT_TAG;
-		term_db=leaf_db;
-		int_buf=int_buf_leaf;
-	}
-	char *s=SIget(term_db,int_buf[0]);
-	int len=strlen(s);
-	event_Send(mpi_queue,s,len,MPI_CHAR,status->MPI_SOURCE,chunk_tag,MPI_COMM_WORLD);
-	event_Irecv(mpi_queue,int_buf,1,MPI_INT,MPI_ANY_SOURCE,
-				int_tag,MPI_COMM_WORLD,int_handler,context);
-}
-
-static void chunk_handler(void* context,MPI_Status *status){
-	//Warning(info,"chunk request");
-	int chunk_tag,int_tag;
-	string_index_t term_db;
-	char* chunk_buf;
-	if (context==act_db){
-		//Warning(info,"action");
-		chunk_tag=ACT_CHUNK_TAG;
-		int_tag=ACT_INT_TAG;
-		term_db=act_db;
-		chunk_buf=chunk_buf_act;
-	} else {
-		//Warning(info,"leaf");
-		chunk_tag=LEAF_CHUNK_TAG;
-		int_tag=LEAF_INT_TAG;
-		term_db=leaf_db;
-		chunk_buf=chunk_buf_leaf;
-	}
-	int len;
-	MPI_Get_count(status,MPI_CHAR,&len);
-	chunk_buf[len]=0;
-	//Warning(info,"chunk request %s",chunk_buf);
-	int ii=SIput(term_db,chunk_buf);
-	event_Send(mpi_queue,&ii,1,MPI_INT,status->MPI_SOURCE,int_tag,MPI_COMM_WORLD);
-	event_Irecv(mpi_queue,chunk_buf,MAX_TERM_LEN,MPI_CHAR,MPI_ANY_SOURCE,
-				chunk_tag,MPI_COMM_WORLD,chunk_handler,context);	
-}
-
-static void map_server_init(){
-	if (mpi_me==0) {
-		act_db=SIcreate();
-		event_Irecv(mpi_queue,chunk_buf_act,MAX_TERM_LEN,MPI_CHAR,MPI_ANY_SOURCE,
-				ACT_CHUNK_TAG,MPI_COMM_WORLD,chunk_handler,act_db);	
-		event_Irecv(mpi_queue,int_buf_act,1,MPI_INT,MPI_ANY_SOURCE,
-				ACT_INT_TAG,MPI_COMM_WORLD,int_handler,act_db);
-		leaf_db=SIcreate();
-		event_Irecv(mpi_queue,chunk_buf_leaf,MAX_TERM_LEN,MPI_CHAR,MPI_ANY_SOURCE,
-				LEAF_CHUNK_TAG,MPI_COMM_WORLD,chunk_handler,leaf_db);	
-		
-		event_Irecv(mpi_queue,int_buf_leaf,1,MPI_INT,MPI_ANY_SOURCE,
-				LEAF_INT_TAG,MPI_COMM_WORLD,int_handler,leaf_db);
-	}
-}
-*/
-
 /********************************************************/
 
 struct src_info {
@@ -505,28 +321,24 @@ static long long int explored,visited,transitions;
 static void in_trans_handler(void*context,MPI_Status *status){
 #define work_recv ((struct work_msg*)context)
 	(void)status;
-	int temp[2*MAX_PARAMETERS];
 	event_idle_recv(work_counter);
-	for(int i=0;i<size;i++){
-		temp[size+i]=work_recv->dest[i];
-	}
 	int who=owner(work_recv->dest);
 	if (who != mpi_me) {
 		Fatal(1,error,"state does not belong to me");
 	}
-	Fold(temp);
-	if (temp[1]>=visited) {
-		visited=temp[1]+1;
+	int temp=TreeFold(dbs,work_recv->dest);
+	if (temp>=visited) {
+		visited=temp+1;
 		if(find_dlk){
-			ensure_access(state_man,temp[1]);
-			parent_seg[temp[1]]=work_recv->src_worker;
-			parent_ofs[temp[1]]=work_recv->src_number;
+			ensure_access(state_man,temp);
+			parent_seg[temp]=work_recv->src_worker;
+			parent_ofs[temp]=work_recv->src_number;
 		}
 	}
 	if (write_lts){
 		DSwriteU32(output_src[work_recv->src_worker],work_recv->src_number);
 		DSwriteU32(output_label[work_recv->src_worker],work_recv->label);
-		DSwriteU32(output_dest[work_recv->src_worker],temp[1]);
+		DSwriteU32(output_dest[work_recv->src_worker],temp);
 	}
 	tcount[work_recv->src_worker]++;
 	transitions++;
@@ -546,16 +358,8 @@ static void io_trans_init(){
 	}
 }
 
-/*
-void *new_string_index(void* context){
-	(void)context;
-	Warning(info,"creating a new string index");
-	return SIcreate();
-}
-*/
 
 int main(int argc, char*argv[]){
-	int temp[2*MAX_PARAMETERS];
 	long long int global_visited,global_explored,global_transitions;
 	void *bottom=(void*)&argc;
 
@@ -587,8 +391,6 @@ int main(int argc, char*argv[]){
 	model_t model=GBcreateBase();
 	GBsetChunkMethods(model,mpi_newmap,mpi_index_pool_create(MPI_COMM_WORLD,mpi_queue,MAX_TERM_LEN),
 		 mpi_int2chunk,mpi_chunk2int,mpi_get_count);
-//	GBsetChunkMethods(model,new_string_index,NULL,
-//		(int2chunk_t)SIgetC,(chunk2int_t)SIputC,(get_count_t)SIgetCount);
 #ifdef MCRL
 	MCRLloadGreyboxModel(model,argv[argc-1]);
 #endif
@@ -645,21 +447,21 @@ int main(int argc, char*argv[]){
 	size=ltstype->state_length;
 	if (size<2) Fatal(1,error,"there must be at least 2 parameters");
 	if (size>MAX_PARAMETERS) Fatal(1,error,"please make src and dest dynamic");
-	TreeDBSinit(size,1);
+	dbs=TreeDBScreate(size);
+	int src[size];
 	io_trans_init();
 	/***************************************************/
 	event_barrier_wait(barrier);
 	/***************************************************/
-	GBgetInitialState(model,temp+size);
+	GBgetInitialState(model,src);
 	Warning(info,"initial state computed at %d",mpi_me);
-	adjust_owner(temp+size);
+	adjust_owner(src);
 	Warning(info,"initial state translated at %d",mpi_me);
 	explored=0;
 	transitions=0;
 	if(mpi_me==0){
 		Warning(info,"folding initial state at %d",mpi_me);
-		Fold(temp);
-		if (temp[1]) Fatal(1,error,"Initial state wasn't assigned state no 0");
+		if (TreeFold(dbs,src)) Fatal(1,error,"Initial state wasn't assigned state no 0");
 		visited=1;
 	} else {
 		visited=0;
@@ -675,9 +477,7 @@ int main(int argc, char*argv[]){
 		event_barrier_wait(barrier);
 		Warning(info,"exploring level %d",level);
 		while(explored<limit){
-			temp[1]=explored;
-			Unfold(temp);
-			src=temp+size;
+			TreeUnfold(dbs,explored,src);
 			struct src_info ctx;
 			ctx.seg=mpi_me;
 			ctx.ofs=explored;
@@ -729,20 +529,16 @@ int main(int argc, char*argv[]){
 	stream_t info_s=NULL;
 		if (write_lts && mpi_me==0){
 			/* It would be better if we didn't create tau if it is non-existent. */
-/*
 			stream_t ds=arch_write(arch,"TermDB",plain?NULL:"gzip",1);
-			int act_count=0;
-			for(;;){
-				char*s=SIget(act_db,act_count);
-				if (s==NULL) break;
-				act_count++;
-				DSwrite(ds,s,strlen(s));
+			tau=GBchunkPut(model,ltstype->edge_label_type[0],chunk_str("tau"));
+			int act_count=GBchunkCount(model,ltstype->edge_label_type[0]);
+			for(int i=0;i<act_count;i++){
+				chunk c=GBchunkGet(model,ltstype->edge_label_type[0],i);
+				DSwrite(ds,c.data,c.len);
 				DSwrite(ds,"\n",1);
 			}
 			DSclose(&ds);
-			tau=SIlookup(act_db,"tau");
 			Warning(info,"%d actions, tau has index %d",act_count,tau);
-*/
 			/* Start writing the info file. */
 			info_s=arch_write(arch,"info",plain?NULL:"",1);
 			DSwriteU32(info_s,31);
@@ -750,7 +546,7 @@ int main(int argc, char*argv[]){
 			DSwriteU32(info_s,mpi_nodes);
 			DSwriteU32(info_s,0);
 			DSwriteU32(info_s,0);
-//			DSwriteU32(info_s,act_count);
+			DSwriteU32(info_s,act_count);
 			DSwriteU32(info_s,tau);
 			DSwriteU32(info_s,size-1);
 		}
