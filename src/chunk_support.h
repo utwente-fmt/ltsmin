@@ -40,7 +40,7 @@ Convert a standard C string to a chunk.
 /**
 Wrap a length and a pointer as a chunk.
 */
-#define chunk_ld(len,data) ((chunk){.len=len,.data=data})
+#define chunk_ld(l,d) ((chunk){.len=l,.data=d})
 
 /**
 \brief Copy the given binary source chunk and encode it as a string chunk.
