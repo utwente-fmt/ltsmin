@@ -6,7 +6,6 @@
 #include <mpi.h>
 
 #include "fast_hash.h"
-#include "chunk-table.h"
 #ifdef MCRL
 #include "mcrl-greybox.h"
 #endif

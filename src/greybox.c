@@ -210,12 +210,14 @@ void GBsetEscapeChar(model_t model,char escape){
 	model->escape=escape;
 }
 
-int GBchunkPut(model_t model,int type_no,int len,void*chunk){
-	return model->chunk2int(model->map[type_no],chunk,len);
+int GBchunkPut(model_t model,int type_no,chunk c){
+	return model->chunk2int(model->map[type_no],c.data,c.len);
 }
 
-void* GBchunkGet(model_t model,int type_no,int chunk_no,int *len){
-	return model->int2chunk(model->map[type_no],chunk_no,len);
+chunk GBchunkGet(model_t model,int type_no,int chunk_no){
+	chunk_len len;
+	char* data=(char*)model->int2chunk(model->map[type_no],chunk_no,&len);
+	return chunk_ld(len,data);
 }
 
 int GBchunkCount(model_t model,int type_no){

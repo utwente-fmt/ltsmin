@@ -2,6 +2,8 @@
 #define GREYBOX_H
 
 
+#include "chunk_support.h"
+
 /**
  @file greybox.h
  @brief The grey box interface to models.
@@ -286,37 +288,17 @@ extern int GBchunkCount(model_t model,int type_no);
 This call translates a chunk to an integer.
 These integers must be from a range 0..count-1.
 */
-extern int GBchunkPut(model_t model,int type_no,int len,void*chunk);
+extern int GBchunkPut(model_t model,int type_no,chunk c);
 
 /**
 \brief Get the a chunk in a type.
 
 \param type_no The number of the type.
 \param chunk_no The numer of the chunk.
-\param len A place in memory where the length can be written. (May be NULL);
-\returns An area of memory with the chunk in it.
+\returns The requested chunk. The user can assume that the data area of the chunk
+will keep its contents forever. The user is not allowed to change the contents.
 */
-extern void* GBchunkGet(model_t model,int type_no,int chunk_no,int *len);
-
-/**
-\brief Set the escape character for translating chunks to strings.
-
-A chunk is translated to a string as follows:
-
-Any printable, non-escape character is copied.
-The escape caracter is encoded as two escape characters.
-Any non-printable character is encoded as the escape character followed by the 
-character in hex. (E.g. with escape ' (char)0 becomes '00).
-*/
-extern void GBsetEscapeChar(model_t model,char escape);
-/// Get the size of the string representation of a chunk.
-
-extern int GBstringLength(model_t model,int type_no,int string_no);
-/** Get the string representation of a chunk.
-
-Data must be string length plus 1 long, as the terminating 0 is also written.
-*/
-extern char* GBstringGet(model_t model,int type_no,int string_no,char* data);
+extern chunk GBchunkGet(model_t model,int type_no,int chunk_no);
 
 //@}
 

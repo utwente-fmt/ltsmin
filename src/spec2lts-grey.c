@@ -156,10 +156,9 @@ int main(int argc, char *argv[]){
 		Warning(info,"%d action labels",label_count);
 		string_index_t si=lts_get_string_index(lts);
 		for(int i=0;i<label_count;i++){
-			int len;
-			char* label=GBchunkGet(model,ltstype->edge_label_type[0],i,&len);
-			SIputAt(si,label,i);
-			DSwrite(ds,label,len-1);
+			chunk c=GBchunkGet(model,ltstype->edge_label_type[0],i);
+			SIputCAt(si,c.data,c.len,i);
+			DSwrite(ds,c.data,c.len);
 			DSwrite(ds,"\n",1);
 		}
 		DSclose(&ds);

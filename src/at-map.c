@@ -3,6 +3,7 @@
 #include "runtime.h"
 #include "greybox.h"
 #include "aterm2.h"
+#include "chunk_support.h"
 
 struct at_map_s {
 	model_t model;
@@ -25,8 +26,7 @@ int ATfindIndex(at_map_t map,ATerm t){
 	ATermInt i=(ATermInt)ATtableGet(map->aterm2int,t);
 	if (!i){
 		char *tmp=ATwriteToString(t);
-		int len=strlen(tmp)+1;
-		i=ATmakeInt(GBchunkPut(map->model,map->type_no,len,tmp));
+		i=ATmakeInt(GBchunkPut(map->model,map->type_no,chunk_str(tmp)));
 		ATtablePut(map->aterm2int,t,(ATerm)i);
 		ATtablePut(map->int2aterm,(ATerm)i,t);
 	}
@@ -39,7 +39,11 @@ ATerm ATfindTerm(at_map_t map,int idx){
 	ATermInt i=ATmakeInt(idx);
 	ATerm t=ATtableGet(map->int2aterm,(ATerm)i);
 	if (!t) {
-		t=ATreadFromString(GBchunkGet(map->model,map->type_no,idx,NULL));
+		chunk c=GBchunkGet(map->model,map->type_no,idx);
+		char s[c.len+1];
+		for(int i=0;i<c.len;i++) s[i]=c.data[i];
+		s[c.len]=0;
+		t=ATreadFromString(s);
 		ATtablePut(map->aterm2int,t,(ATerm)i);
 		ATtablePut(map->int2aterm,(ATerm)i,t);
 	}
