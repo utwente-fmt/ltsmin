@@ -23,6 +23,11 @@ static inline uint32_t hashvalue(int left,int right) {
 struct treedbs_s {
 	int nPars;
 
+	int count;
+	int range;
+	int *map;
+	int *rev;
+
 	int **db_left;
 	int **db_right;
 	int **db_bucket;
@@ -54,7 +59,8 @@ static void resize_hash(treedbs_t dbs,int node){
 }
 
 static void resize_data(treedbs_t dbs,int node){
-	dbs->db_size[node]+=BLOCKSIZE;
+	int blk_count=dbs->db_size[node]/BLOCKSIZE;
+	dbs->db_size[node]+=BLOCKSIZE*((blk_count/2)+1);
 	if (!(dbs->db_left[node]=realloc(dbs->db_left[node],dbs->db_size[node]*sizeof(int)))
 	|| !(dbs->db_right[node]=realloc(dbs->db_right[node],dbs->db_size[node]*sizeof(int)))
 	|| !(dbs->db_bucket[node]=realloc(dbs->db_bucket[node],dbs->db_size[node]*sizeof(int)))
@@ -90,16 +96,36 @@ static int db_insert(treedbs_t dbs,int node,int left, int right){
 
 int TreeFold(treedbs_t dbs,int *vector){
 	int nPars=dbs->nPars;
-	int tmp[nPars];
-	for(int i=nPars-1;i>0;i--) {
-		int left=dbs->db_tree_left[i];
-		int right=dbs->db_tree_right[i];
-		tmp[i]=db_insert(dbs,i,
-			(left<nPars)?tmp[left]:vector[left-nPars],
-			(right<nPars)?tmp[right]:vector[right-nPars]);
+	if (nPars==1) {
+		if (dbs->map[vector[0]]==-1) {
+			if(vector[0]>=dbs->range){
+				int old=dbs->range;
+				while(vector[0]>=dbs->range) dbs->range+=BLOCKSIZE;
+				dbs->map=realloc(dbs->map,dbs->range*sizeof(int));
+				dbs->rev=realloc(dbs->rev,dbs->range*sizeof(int));
+				while(old<dbs->range){
+					dbs->map[old]=-1;
+					dbs->rev[old]=-1;
+				}
+			}
+			dbs->map[vector[0]]=dbs->count;
+			dbs->rev[dbs->count]=vector[0];
+			dbs->count++;
+		}
+		return dbs->map[vector[0]];
+	} else {
+		int tmp[nPars];
+		for(int i=nPars-1;i>0;i--) {
+			int left=dbs->db_tree_left[i];
+			int right=dbs->db_tree_right[i];
+			tmp[i]=db_insert(dbs,i,
+				(left<nPars)?tmp[left]:vector[left-nPars],
+				(right<nPars)?tmp[right]:vector[right-nPars]);
+		}
+		return tmp[1];
 	}
-	return tmp[1];
 }
+
 
 /*
 void FoldHint(int *src,int *dest) {
@@ -125,22 +151,26 @@ void Unfold(int *src) {
 
 void TreeUnfold(treedbs_t dbs,int index,int*vector){
 	int nPars=dbs->nPars;
-	int tmp[nPars];
-	tmp[1]=index;
-	for(int i=1;i<nPars;i++){
-		int left=dbs->db_tree_left[i];
-		if (left<nPars){
-			tmp[left]=dbs->db_left[i][tmp[i]];
-		} else {
-			vector[left-nPars]=dbs->db_left[i][tmp[i]];
+	if (nPars==1) {
+		vector[0]=dbs->rev[index];
+	} else {
+		int tmp[nPars];
+		tmp[1]=index;
+		for(int i=1;i<nPars;i++){
+			int left=dbs->db_tree_left[i];
+			if (left<nPars){
+				tmp[left]=dbs->db_left[i][tmp[i]];
+			} else {
+				vector[left-nPars]=dbs->db_left[i][tmp[i]];
+			}
+			int right=dbs->db_tree_right[i];
+			if (right<nPars){
+				tmp[right]=dbs->db_right[i][tmp[i]];
+			} else {
+				vector[right-nPars]=dbs->db_right[i][tmp[i]];
+			}
 		}
-		int right=dbs->db_tree_right[i];
-		if (right<nPars){
-			tmp[right]=dbs->db_right[i][tmp[i]];
-		} else {
-			vector[right-nPars]=dbs->db_right[i][tmp[i]];
-		}
-	}	
+	}
 }
 
 static int mktree(treedbs_t dbs,int next_node,int begin,int end){
@@ -170,30 +200,41 @@ static void maketree(treedbs_t dbs){
 treedbs_t TreeDBScreate(int nPars){
 	treedbs_t dbs=(treedbs_t)RTmalloc(sizeof(struct treedbs_s));
 	dbs->nPars=nPars;
-	dbs->db_left=(int**)RTmalloc(nPars*sizeof(int*));
-	dbs->db_right=(int**)RTmalloc(nPars*sizeof(int*));
-	dbs->db_bucket=(int**)RTmalloc(nPars*sizeof(int*));
-	dbs->db_size=(int*)malloc(nPars*sizeof(int));
-	dbs->db_next=(int*)malloc(nPars*sizeof(int));
-	dbs->db_hash=(int**)malloc(nPars*sizeof(int*));
-	dbs->db_mask=(int*)malloc(nPars*sizeof(int));
-	dbs->db_tree_left=(int*)malloc(nPars*sizeof(int));
-	dbs->db_tree_right=(int*)malloc(nPars*sizeof(int));
-	dbs->db_hash_size=(int*)malloc(nPars*sizeof(int));
-	for(int i=1;i<dbs->nPars;i++){
-		dbs->db_left[i]=(int*)malloc(BLOCKSIZE*sizeof(int));
-		dbs->db_right[i]=(int*)malloc(BLOCKSIZE*sizeof(int));
-		dbs->db_bucket[i]=(int*)malloc(BLOCKSIZE*sizeof(int));
-		dbs->db_hash[i]=(int*)malloc(INIT_HASH_SIZE*sizeof(int));
-	}
-	maketree(dbs);
-	for(int i=1;i<nPars;i++){
-		dbs->db_size[i]=BLOCKSIZE;
-		dbs->db_next[i]=0;
-		dbs->db_hash_size[i]=INIT_HASH_SIZE;
-		dbs->db_mask[i]=INIT_HASH_MASK;
-		for(int j=0;j<INIT_HASH_SIZE;j++) {
-			dbs->db_hash[i][j]=-1;
+	if (nPars==1) {
+		dbs->count=0;
+		dbs->range=BLOCKSIZE;
+		dbs->map=(int*)RTmalloc(BLOCKSIZE*sizeof(int));
+		dbs->rev=(int*)RTmalloc(BLOCKSIZE*sizeof(int));
+		for(int i=0;i<BLOCKSIZE;i++) {
+			dbs->map[i]=-1;
+			dbs->rev[i]=-1;
+		}
+	} else {
+		dbs->db_left=(int**)RTmalloc(nPars*sizeof(int*));
+		dbs->db_right=(int**)RTmalloc(nPars*sizeof(int*));
+		dbs->db_bucket=(int**)RTmalloc(nPars*sizeof(int*));
+		dbs->db_size=(int*)RTmalloc(nPars*sizeof(int));
+		dbs->db_next=(int*)RTmalloc(nPars*sizeof(int));
+		dbs->db_hash=(int**)RTmalloc(nPars*sizeof(int*));
+		dbs->db_mask=(int*)RTmalloc(nPars*sizeof(int));
+		dbs->db_tree_left=(int*)RTmalloc(nPars*sizeof(int));
+		dbs->db_tree_right=(int*)RTmalloc(nPars*sizeof(int));
+		dbs->db_hash_size=(int*)RTmalloc(nPars*sizeof(int));
+		for(int i=1;i<dbs->nPars;i++){
+			dbs->db_left[i]=(int*)RTmalloc(BLOCKSIZE*sizeof(int));
+			dbs->db_right[i]=(int*)RTmalloc(BLOCKSIZE*sizeof(int));
+			dbs->db_bucket[i]=(int*)RTmalloc(BLOCKSIZE*sizeof(int));
+			dbs->db_hash[i]=(int*)RTmalloc(INIT_HASH_SIZE*sizeof(int));
+		}
+		maketree(dbs);
+		for(int i=1;i<nPars;i++){
+			dbs->db_size[i]=BLOCKSIZE;
+			dbs->db_next[i]=0;
+			dbs->db_hash_size[i]=INIT_HASH_SIZE;
+			dbs->db_mask[i]=INIT_HASH_MASK;
+			for(int j=0;j<INIT_HASH_SIZE;j++) {
+				dbs->db_hash[i][j]=-1;
+			}
 		}
 	}
 	return dbs;

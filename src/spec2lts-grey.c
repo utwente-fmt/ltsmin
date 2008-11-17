@@ -22,6 +22,7 @@ static int plain=0;
 static int blackbox=0;
 static int verbosity=1;
 static int write_lts=1;
+static int cache=0;
 
 struct option options[]={
 	{"-out",OPT_REQ_ARG,assign_string,&outputarch,"-out <archive>",
@@ -36,6 +37,8 @@ struct option options[]={
 		"disable compression of the output",NULL,NULL,NULL},
 	{"-black",OPT_NORMAL,set_int,&blackbox,NULL,
 		"use the black box call (TransitionsAll)",NULL,NULL,NULL},
+	{"-cache",OPT_NORMAL,set_int,&cache,NULL,
+		"Add the caching wrapper around the model",NULL,NULL,NULL},
 	{0,0,0,0,0,0,0,0,0}
 };
 
@@ -90,6 +93,9 @@ int main(int argc, char *argv[]){
 #ifdef MCRL2
 	MCRL2loadGreyboxModel(model,argv[argc-1]);
 #endif
+
+	if (cache) model=GBaddCache(model);
+
 	lts_struct_t ltstype=GBgetLTStype(model);
 	N=ltstype->state_length;
 	edge_info_t e_info=GBgetEdgeInfo(model);
@@ -133,6 +139,11 @@ int main(int argc, char *argv[]){
 			level++;
 		}
 		TreeUnfold(dbs,explored,src);
+		//printf("explore");
+		//for(int i=0;i<N;i++){
+		//	printf("%2d ",src[i]);
+		//}
+		//printf("\n");
 		int c;
 		if(blackbox){
 			c=GBgetTransitionsAll(model,src,print_next,&explored);
@@ -142,7 +153,7 @@ int main(int argc, char *argv[]){
 			}
 		}
 		explored++;
-		if(explored%1000 ==0) Warning(info,"explored %d visited %d trans %d",explored,visited,trans);
+		if(explored%1000==0) Warning(info,"explored %d visited %d trans %d",explored,visited,trans);
 	}
 	Warning(info,"state space has %d levels %d states %d transitions",level,visited,trans);		
 	if (write_lts){

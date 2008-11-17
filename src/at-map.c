@@ -26,7 +26,9 @@ int ATfindIndex(at_map_t map,ATerm t){
 	ATermInt i=(ATermInt)ATtableGet(map->aterm2int,t);
 	if (!i){
 		char *tmp=ATwriteToString(t);
-		i=ATmakeInt(GBchunkPut(map->model,map->type_no,chunk_str(tmp)));
+		int idx=GBchunkPut(map->model,map->type_no,chunk_str(tmp));
+		i=ATmakeInt(idx);
+		//Warning(info,"putting %s as %d",tmp,idx);
 		ATtablePut(map->aterm2int,t,(ATerm)i);
 		ATtablePut(map->int2aterm,(ATerm)i,t);
 	}
@@ -39,7 +41,11 @@ ATerm ATfindTerm(at_map_t map,int idx){
 	ATermInt i=ATmakeInt(idx);
 	ATerm t=ATtableGet(map->int2aterm,(ATerm)i);
 	if (!t) {
+		//Warning(info,"missing index %d",idx);
 		chunk c=GBchunkGet(map->model,map->type_no,idx);
+		if (c.len==0) {
+			Fatal(1,error,"lookup of %d failed",idx);
+		}
 		char s[c.len+1];
 		for(int i=0;i<c.len;i++) s[i]=c.data[i];
 		s[c.len]=0;

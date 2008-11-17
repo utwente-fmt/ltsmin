@@ -302,6 +302,20 @@ extern chunk GBchunkGet(model_t model,int type_no,int chunk_no);
 
 //@}
 
+/**
+\defgroup greybox_operators The Greybox operator suite.
+*/
+
+//@{
+
+/**
+\brief Add caching of grey box short calls.
+*/
+extern model_t GBaddCache(model_t model);
+
+
+//@}
+
 
 #endif
 

@@ -8,7 +8,7 @@
 #include "runtime.h"
 #include "fast_hash.h"
 
-#define DATA_BLOCK_SIZE 512
+#define DATA_BLOCK_SIZE 4096
 //define DATA_BLOCK_SIZE 4
 #define TABLE_INITIAL 0xfff
 //define TABLE_INITIAL 0xf
