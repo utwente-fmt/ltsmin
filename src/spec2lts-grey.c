@@ -15,6 +15,7 @@
 #include "treedbs.h"
 #include "ltsman.h"
 #include "options.h"
+#include "vector_set.h"
 
 static treedbs_t dbs;
 static char *outputarch=NULL;
@@ -23,6 +24,7 @@ static int blackbox=0;
 static int verbosity=1;
 static int write_lts=1;
 static int cache=0;
+static int use_vset=0;
 
 struct option options[]={
 	{"-out",OPT_REQ_ARG,assign_string,&outputarch,"-out <archive>",
@@ -39,8 +41,14 @@ struct option options[]={
 		"use the black box call (TransitionsAll)",NULL,NULL,NULL},
 	{"-cache",OPT_NORMAL,set_int,&cache,NULL,
 		"Add the caching wrapper around the model",NULL,NULL,NULL},
+	{"-vset",OPT_NORMAL,set_int,&use_vset,NULL,
+		"Use vector sets instead of tree compression",NULL,NULL,NULL},
 	{0,0,0,0,0,0,0,0,0}
 };
+
+static vdom_t domain;
+static vset_t visited_set;
+static vset_t next_set;
 
 static lts_t lts;
 
@@ -54,7 +62,7 @@ static int visited=1;
 static int explored=0;
 static int trans=0;
 
-void print_next(void*arg,int*lbl,int*dst){
+static void print_next(void*arg,int*lbl,int*dst){
 	int tmp=TreeFold(dbs,dst);
 	trans++;
 	if (write_lts){
@@ -65,11 +73,36 @@ void print_next(void*arg,int*lbl,int*dst){
 	if (tmp>=visited) visited=tmp+1;
 }
 
-void *new_string_index(void* context){
+static void *new_string_index(void* context){
 	(void)context;
 	Warning(info,"creating a new string index");
 	return SIcreate();
 }
+
+static void set_next(void*arg,int*lbl,int*dst){
+	(void)arg;
+	(void)lbl;
+	trans++;
+	if (vset_member(visited_set,dst)) return;
+	visited++;
+	vset_add(visited_set,dst);
+	vset_add(next_set,dst);
+}
+
+static void explore_elem(void*context,int*src){
+	model_t model=(model_t)context;
+	int c;
+	if(blackbox){
+		c=GBgetTransitionsAll(model,src,set_next,NULL);
+	} else {
+		for(int i=0;i<K;i++){
+			c=GBgetTransitionsLong(model,i,src,set_next,NULL);
+		}
+	}
+	explored++;
+	if(explored%1000==0) Warning(info,"explored %d visited %d trans %d",explored,visited,trans);
+}
+
 
 int main(int argc, char *argv[]){
 	void* stackbottom=&argv;
@@ -83,6 +116,7 @@ int main(int argc, char *argv[]){
 #endif
 	parse_options(options,argc,argv);
 	if (!outputarch && write_lts) Fatal(1,error,"please specify the output archive with -out");
+	if (write_lts && use_vset) Fatal(1,error,"writing in vector set mode is future work");
 	Warning(info,"opening %s",argv[argc-1]);
 	model_t model=GBcreateBase();
 	GBsetChunkMethods(model,new_string_index,NULL,
@@ -100,7 +134,13 @@ int main(int argc, char *argv[]){
 	N=ltstype->state_length;
 	edge_info_t e_info=GBgetEdgeInfo(model);
 	K=e_info->groups;
-	dbs=TreeDBScreate(N);
+	if (use_vset) {
+		domain=vdom_create(N);
+		visited_set=vset_create(domain,0,NULL);
+		next_set=vset_create(domain,0,NULL);
+	} else {
+		dbs=TreeDBScreate(N);
+	}
 	Warning(info,"length is %d, there are %d groups",N,K);
 	Warning(info,"Using %s mode",blackbox?"black box":"grey box");	
 	int src[N];
@@ -121,39 +161,56 @@ int main(int argc, char *argv[]){
 	lts=lts_new();
 	lts_set_root(lts,0,0);
 	lts_set_segments(lts,1);
-	if(TreeFold(dbs,src)!=0){
-		Fatal(1,error,"root should be 0");
+	if (use_vset) {
+		vset_add(visited_set,src);
+		vset_add(next_set,src);
+	} else {
+		if(TreeFold(dbs,src)!=0){
+			Fatal(1,error,"root should be 0");
+		}
 	}
 	if (write_lts){
 		src_stream=arch_write(arch,"src-0-0",plain?NULL:"diff32|gzip",1);
 		lbl_stream=arch_write(arch,"label-0-0",plain?NULL:"gzip",1);
 		dst_stream=arch_write(arch,"dest-0-0",plain?NULL:"diff32|gzip",1);
 	}
-	int limit=0;
 	int level=0;
-	while(explored<visited){
-		if (limit==explored){
+	if (use_vset){
+		vset_t current_set=vset_create(domain,0,NULL);
+		while (!vset_is_empty(next_set)){
 			Warning(info,"level %d has %d states, explored %d states %d trans",
 				level,(visited-explored),explored,trans);
-			limit=visited;
 			level++;
+			vset_copy(current_set,next_set);
+			vset_clear(next_set);
+			vset_enum(current_set,explore_elem,model);
 		}
-		TreeUnfold(dbs,explored,src);
-		//printf("explore");
-		//for(int i=0;i<N;i++){
-		//	printf("%2d ",src[i]);
-		//}
-		//printf("\n");
-		int c;
-		if(blackbox){
-			c=GBgetTransitionsAll(model,src,print_next,&explored);
-		} else {
-			for(int i=0;i<K;i++){
-				c=GBgetTransitionsLong(model,i,src,print_next,&explored);
+	} else {
+		int limit=0;
+		while(explored<visited){
+			if (limit==explored){
+				Warning(info,"level %d has %d states, explored %d states %d trans",
+					level,(visited-explored),explored,trans);
+				limit=visited;
+				level++;
 			}
+			TreeUnfold(dbs,explored,src);
+			//printf("explore");
+			//for(int i=0;i<N;i++){
+			//	printf("%2d ",src[i]);
+			//}
+			//printf("\n");
+			int c;
+			if(blackbox){
+				c=GBgetTransitionsAll(model,src,print_next,&explored);
+			} else {
+				for(int i=0;i<K;i++){
+					c=GBgetTransitionsLong(model,i,src,print_next,&explored);
+				}
+			}
+			explored++;
+			if(explored%1000==0) Warning(info,"explored %d visited %d trans %d",explored,visited,trans);
 		}
-		explored++;
-		if(explored%1000==0) Warning(info,"explored %d visited %d trans %d",explored,visited,trans);
 	}
 	Warning(info,"state space has %d levels %d states %d transitions",level,visited,trans);		
 	if (write_lts){

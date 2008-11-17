@@ -47,7 +47,7 @@ gsf2dir_LDADD = libutil.a
 gsf2dir_CPPFLAGS = -DOUTPUT_DIR $(AM_CPPFLAGS)
 
 # lpo2lts-grey
-lpo2lts_grey_SOURCES  = spec2lts-grey.c mcrl-greybox.c mcrl-greybox.h at-map.c at-map.h 
+lpo2lts_grey_SOURCES  = spec2lts-grey.c mcrl-greybox.c mcrl-greybox.h at-map.c at-map.h vector_set.c vector_set.h
 lpo2lts_grey_LDADD    = libutil.a $(MCRL_LIBS)
 lpo2lts_grey_CPPFLAGS = -DMCRL $(MCRL_CPPFLAGS) $(AM_CPPFLAGS)
 lpo2lts_grey_LDFLAGS  = $(MCRL_LDFLAGS) $(AM_LDFLAGS)
