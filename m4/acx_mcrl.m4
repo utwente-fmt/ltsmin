@@ -19,8 +19,14 @@ case "$with_mcrl" in
       ;;
    *) acx_mcrl=yes;;
 esac
-if test "x$acx_mcrl" = xyes; then
-    AC_SUBST(MCRL_CPPFLAGS, ["-I$with_mcrl/include"])
+
+AC_CHECK_SIZEOF([void *])
+if test x"$ac_cv_sizeof_void_p" = x8; then
+    MCRL_CPPFLAGS="-DAT_64BIT"
+fi
+
+if test x"$acx_mcrl" = xyes; then
+    AC_SUBST(MCRL_CPPFLAGS, ["$MCRL_CPPFLAGS -I$with_mcrl/include"])
     AC_SUBST(MCRL_LDFLAGS,  ["-L$with_mcrl/lib"])
     $1
 else
