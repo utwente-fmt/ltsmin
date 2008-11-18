@@ -20,9 +20,13 @@ typedef struct grey_box_model* model_t;
 
 
 /**
-\brief Structure defining the important characteristics of an LTS.
+\brief This data type stores signatures of labeled transition systems.
 
-This is the common part for both black box and grey box.
+- How long is the state vector?
+- Which elements of the state vector are visible and what are their types?
+- How many labels of which type are there on every edge?
+- How many defined state labels are there?
+- What are the types used in the LTS?
  */
 typedef struct lts_structure_s {
 int state_length;

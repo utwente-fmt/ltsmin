@@ -82,6 +82,13 @@ struct vector_set {
 	int proj[];
 };
 
+struct vector_relation {
+	vdom_t dom;
+	ATerm rel;
+	int p_len;
+	int proj[];
+};
+
 vset_t vset_create(vdom_t dom,int k,int* proj){
 	vset_t set=(vset_t)RTmalloc(sizeof(struct vector_set)+k*sizeof(int));
 	set->dom=dom;
@@ -91,6 +98,17 @@ vset_t vset_create(vdom_t dom,int k,int* proj){
 	for(int i=0;i<k;i++) set->proj[i]=proj[i];
 	return set;
 }
+
+vrel_t vrel_create(vdom_t dom,int k,int* proj){
+	vrel_t rel=(vrel_t)RTmalloc(sizeof(struct vector_relation)+k*sizeof(int));
+	rel->dom=dom;
+	rel->rel=emptyset;
+	ATprotect(&rel->rel);
+	rel->p_len=k;
+	for(int i=0;i<k;i++) rel->proj[i]=proj[i];
+	return rel;
+}
+
 
 void vset_add(vset_t set,int* e){
 	int N=set->p_len?set->p_len:set->dom->size;
@@ -137,6 +155,42 @@ void vset_enum(vset_t set,vset_element_cb cb,void* context){
 	global_context=context;
 	set_enum(set->set,vec,N,vset_enum_wrap);
 }
+
+void vset_count(vset_t set,long *nodes,long long *elements){
+	count_set(set->set,nodes,elements);
+}
+
+void vset_union(vset_t dst,vset_t src){
+	dst->set=set_union(dst->set,src->set);
+}
+
+void vset_minus(vset_t dst,vset_t src){
+	dst->set=set_minus(dst->set,src->set);
+}
+
+void vset_next(vset_t dst,vset_t src,vrel_t rel){
+	dst->set=set_reach(src->set,src->dom->size,rel->rel,rel->proj,rel->p_len);
+}
+
+void vset_project(vset_t dst,vset_t src){
+	dst->set=set_project(src->set,dst->proj,dst->p_len);
+}
+
+void vset_zip(vset_t dst,vset_t src){
+	set_zip(dst->set,src->set,&dst->set,&src->set);
+}
+
+void vrel_add(vrel_t rel,int* src,int *dst){
+	int N=rel->p_len?rel->p_len:rel->dom->size;
+	ATerm vec[2*N];
+	for(int i=0;i<N;i++) {
+		vec[i+i]=(ATerm)ATmakeInt(src[i]);
+		vec[i+i+1]=(ATerm)ATmakeInt(dst[i]);
+	}
+	rel->rel=set_add(rel->rel,vec,2*N,NULL);
+}
+
+/***************************/
 
 static ATermIndexedSet count_is;
 static long node_count;

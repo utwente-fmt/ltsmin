@@ -9,7 +9,7 @@ bin_PROGRAMS += lpo2lts-mpi
 endif
 endif
 if HAVE_LIBSTEP_INFO
-bin_PROGRAMS +=  lpo2lts-grey
+bin_PROGRAMS +=  lpo2lts-grey lpo-reach
 endif
 
 if HAVE_LIBBCG
@@ -51,6 +51,12 @@ lpo2lts_grey_SOURCES  = spec2lts-grey.c mcrl-greybox.c mcrl-greybox.h at-map.c a
 lpo2lts_grey_LDADD    = libutil.a $(MCRL_LIBS)
 lpo2lts_grey_CPPFLAGS = -DMCRL $(MCRL_CPPFLAGS) $(AM_CPPFLAGS)
 lpo2lts_grey_LDFLAGS  = $(MCRL_LDFLAGS) $(AM_LDFLAGS)
+
+# lpo-reach
+lpo_reach_SOURCES  = spec-reach.c mcrl-greybox.c mcrl-greybox.h at-map.c at-map.h vector_set.c vector_set.h
+lpo_reach_LDADD    = libutil.a $(MCRL_LIBS)
+lpo_reach_CPPFLAGS = -DMCRL $(MCRL_CPPFLAGS) $(AM_CPPFLAGS)
+lpo_reach_LDFLAGS  = $(MCRL_LDFLAGS) $(AM_LDFLAGS)
 
 # lpo2lts-mpi
 lpo2lts_mpi_SOURCES  = spec2lts-mpi.c mcrl-greybox.c mcrl-greybox.h at-map.c at-map.h config.h
