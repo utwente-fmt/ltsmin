@@ -120,7 +120,7 @@ void reach_bfs(){
 		vset_union(visited,next_level);
 		vset_copy(current_level,next_level);
 	}
-	Warning(info,"Exploration took %l group checks and %l next state calls",eg_count,next_count);
+	Warning(info,"Exploration took %ld group checks and %ld next state calls",eg_count,next_count);
 }
 
 void reach_sat(){
