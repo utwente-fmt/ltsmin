@@ -27,7 +27,7 @@ void log_set_flags(log_t log,int flags){
 
 static pthread_key_t label_key;
 
-void (*RThandleFatal)(char*file,int line,int errnum,int code);
+void (*RThandleFatal)(const char*file,int line,int errnum,int code);
 
 log_t error=NULL;
 log_t info=NULL;
@@ -46,7 +46,7 @@ static void label_destroy(void *buf){
 	if(buf) free(buf);
 }
 
-static void log_begin(log_t log,int line,char*file){
+static void log_begin(log_t log,int line,const char*file){
 	fprintf(log->f,"%s",(char *)pthread_getspecific(label_key));
 	if (log->flags & LOG_WHERE) fprintf(log->f,", file %s, line %d",file,line);
 	if (log->tag) fprintf(log->f,", %s",log->tag);
@@ -68,7 +68,7 @@ static void log_end(log_t log){
 	fprintf(log->f,"\n");
 }
 
-void log_message(log_t log,char*file,int line,int errnum,const char *fmt,...){
+void log_message(log_t log,const char*file,int line,int errnum,const char *fmt,...){
 	struct runtime_log null_log;
 	if (!log) {
 		null_log.f=stderr;

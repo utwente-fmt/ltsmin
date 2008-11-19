@@ -3,6 +3,7 @@
 #include "stream.h"
 #include "bcg_user.h"
 #include "runtime.h"
+#include "ltsman.h"
 
 int main(int argc,char**argv){
 	BCG_TYPE_OBJECT_TRANSITION bcg_graph;
@@ -15,30 +16,24 @@ int main(int argc,char**argv){
 	stream_t ds;
 
 	runtime_init_args(&argc,&argv);
-	char*bcg;
-	if (!(bcg=prop_get_S("bcg",NULL))){
-		Fatal(1,error,"please specify input with bcg=...");
-	}
-	char*out=prop_get_S("out",NULL);
+	if(argc!=2) Fatal(1,error,"usage bcg2gsf [options] input");
+	char*bcg=argv[1];
 	BCG_INIT();
 	BCG_OT_READ_BCG_BEGIN (bcg, &bcg_graph, 0);
+	char*out=prop_get_S("out",NULL);
 	if(out){
 		gsf=arch_gsf_write(file_output(out));
 	} else {
 		gsf=arch_gsf_write(stream_output(stdout));
 	}
-	Warning(info,"copying %s to %s",bcg,out?out:"stdout");
-	Warning(info,"%d states %d transitions",BCG_OT_NB_STATES (bcg_graph),BCG_OT_NB_EDGES (bcg_graph));
+	lts_t lts=lts_new();
+	lts_set_segments(lts,1);
+	lts_set_states(lts,0,BCG_OT_NB_STATES (bcg_graph));
+	lts_set_trans(lts,0,0,BCG_OT_NB_EDGES (bcg_graph));
+	lts_set_root(lts,0,BCG_OT_INITIAL_STATE (bcg_graph));
 	BCG_READ_COMMENT (BCG_OT_GET_FILE (bcg_graph), &bcg_comment);
-	Warning(info,"comment is %s",bcg_comment);
-	N=BCG_OT_NB_EDGES (bcg_graph);
-	bcg_s1=BCG_OT_INITIAL_STATE (bcg_graph);
-	Warning(info,"initial state is %d",bcg_s1);
-	ds=arch_write(gsf,"header",NULL,0);
-	DSwriteU32(ds,1); // 1 segment
-	DSwriteU32(ds,0); // root segment
-	DSwriteU32(ds,bcg_s1); // root offset
-	DSwriteS(ds,bcg_comment); // comment
+	ds=arch_write(gsf,"info",NULL,0);
+	lts_write_info(lts,ds,LTS_INFO_PACKET);
 	DSclose(&ds);
 	N=BCG_OT_NB_LABELS (bcg_graph);
 	ds=arch_write(gsf,"actions",NULL,0);
@@ -52,7 +47,6 @@ int main(int argc,char**argv){
 			invis++;
 		}
 	}
-	Warning(info,"found %d invisible label(s)",invis);
 	DSclose(&ds);
 	stream_t src=arch_write(gsf,"src-0-0",NULL,0);
 	stream_t lbl=arch_write(gsf,"label-0-0",NULL,0);

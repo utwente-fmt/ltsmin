@@ -1,75 +1,33 @@
 #include <stdio.h>
 
 #include "mcrl-greybox.h"
-#include "chunk-table.h"
 #include "runtime.h"
 #include "rw.h"
 #include "mcrl.h"
 #include "step.h"
+#include "at-map.h"
 
 static ATerm label=NULL;
 static ATerm *dst;
 
-static int nPars;
-static int nSmds;
+static int instances=0;
+static struct lts_structure_s ltstype;
+static struct edge_info e_info;
+static struct state_info s_info={0,NULL,NULL};
 
-typedef struct {
-	int count;
-	int *proj;
-} smdinfo_t ;
+static at_map_t termmap;
+static at_map_t actionmap;
 
-static smdinfo_t *summand;
-
-static chunk_table_t termdb_table;
-static ATermIndexedSet termdb_set;
-static chunk_table_t actiondb_table;
-static ATermIndexedSet actiondb_set;
-
-static void new_term(void*context,size_t len,void* chunk){
-	((char*)chunk)[len]=0;
-	ATerm t=ATreadFromString((char*)chunk);
-	ATindexedSetPut((ATermIndexedSet)context,t,NULL);
-}
-
-static long find_index(chunk_table_t chunks,ATermIndexedSet terms,ATerm t){
-	long idx=ATindexedSetGetIndex(terms,t);
-	if (idx>=0) return idx;
-	char *tmp=ATwriteToString(t);
-	int len=strlen(tmp);
-	char chunk[len+1];
-	for(int i=0;i<len;i++) chunk[i]=tmp[i];
-	chunk[len]=0;
-	CTsubmitChunk(chunks,len,chunk,new_term,terms);
-	return ATindexedSetGetIndex(terms,t);
-}
-
-static ATerm find_term(chunk_table_t chunks,ATermIndexedSet terms,long idx){
-	ATerm t=ATindexedSetGetElem(terms,idx);
-	if(t) return t;
-	CTupdateTable(chunks,idx,new_term,terms);
-	return ATindexedSetGetElem(terms,idx);
-}
-
-static int expand;
-static int smd;
 static TransitionCB user_cb;
 static void* user_context;
 
 static void callback(void){
-	int lbl=find_index(actiondb_table,actiondb_set,label);
-	if (expand){
-		int dst_p[summand[smd].count];
-		for(int i=0;i<summand[smd].count;i++){
-			dst_p[i]=find_index(termdb_table,termdb_set,dst[summand[smd].proj[i]]);
-		}
-		user_cb(user_context,&lbl,dst_p);
-	} else {
-		int dst_p[nPars];
-		for(int i=0;i<nPars;i++){
-			dst_p[i]=find_index(termdb_table,termdb_set,dst[i]);
-		}
-		user_cb(user_context,&lbl,dst_p);
+	int lbl=ATfindIndex(actionmap,label);
+	int dst_p[ltstype.state_length];
+	for(int i=0;i<ltstype.state_length;i++){
+		dst_p[i]=ATfindIndex(termmap,dst[i]);
 	}
+	user_cb(user_context,&lbl,dst_p);
 }
 
 static void WarningHandler(const char *format, va_list args) {
@@ -106,9 +64,37 @@ void MCRLinitGreybox(int argc,char *argv[],void* stack_bottom){
 	STsetArguments(&c, &xargv);
 }
 
+int MCRLgetTransitionsLong(model_t model,int group,int*src,TransitionCB cb,void*context){
+	(void)model;
+	ATerm at_src[ltstype.state_length];
+	user_cb=cb;
+	user_context=context;
+	for(int i=0;i<ltstype.state_length;i++) {
+		at_src[i]=ATfindTerm(termmap,src[i]);
+	}
+	return STstepSmd(at_src,&group,1);
+}
 
-model_t GBcreateModel(char*model){
-	int i,j;
+int MCRLgetTransitionsAll(model_t model,int*src,TransitionCB cb,void*context){
+	(void)model;
+	ATerm at_src[ltstype.state_length];
+	user_cb=cb;
+	user_context=context;
+	for(int i=0;i<ltstype.state_length;i++) {
+		at_src[i]=ATfindTerm(termmap,src[i]);
+	}
+	return STstep(at_src);
+}
+
+static char* edge_name[1]={"action"};
+static int edge_type[1]={1};
+static char* MCRL_types[2]={"leaf","action"};
+
+void MCRLloadGreyboxModel(model_t m,char*model){
+	if(instances) {
+		Fatal(1,error,"mCRL is limited to one instance, due to global variables.");
+	}
+	instances++;
 	if(!MCRLinitNamedFile(model)) {
 		Fatal(1,error,"failed to open %s",model);
 		return NULL;
@@ -116,90 +102,50 @@ model_t GBcreateModel(char*model){
 	if (!RWinitialize(MCRLgetAdt())) {
 		ATerror("Initialize rewriter");
 	}
-	nPars=MCRLgetNumberOfPars();
-	dst=(ATerm*)malloc(nPars*sizeof(ATerm));
-	for(i=0;i<nPars;i++) {
+	ltstype.state_length=MCRLgetNumberOfPars();
+	ltstype.visible_count=0;
+	ltstype.visible_indices=NULL;
+	ltstype.visible_name=NULL;
+	ltstype.visible_type=NULL;
+	ltstype.state_labels=0;
+	ltstype.state_label_name=NULL;
+	ltstype.state_label_type=NULL;
+	ltstype.edge_labels=1;
+	ltstype.edge_label_name=edge_name;
+	ltstype.edge_label_type=edge_type;
+	ltstype.type_count=2;
+	ltstype.type_names=MCRL_types;
+	GBsetLTStype(m,&ltstype);
+
+	termmap=ATmapCreate(m,0);
+	actionmap=ATmapCreate(m,1);
+
+	dst=(ATerm*)malloc(ltstype.state_length*sizeof(ATerm));
+	for(int i=0;i<ltstype.state_length;i++) {
 		dst[i]=NULL;
 	}
  	ATprotect(&label);
-	ATprotectArray(dst,nPars);
+	ATprotectArray(dst,ltstype.state_length);
 	STinitialize(noOrdering,&label,dst,callback);
-	STsetInitialState(); // Fills dst with a legal vector for later calls.
-	nSmds=STgetSummandCount();
-	summand=malloc(nSmds*sizeof(smdinfo_t));
-	for(i=0;i<nSmds;i++){
-		int temp[nPars];
-		summand[i].count=STgetProjection(temp,i);
-		summand[i].proj=malloc(summand[i].count*sizeof(int));
-		for(j=0;j<summand[i].count;j++) summand[i].proj[j]=temp[j];
-	}
-	termdb_table=CTcreate("leaf");
-	termdb_set=ATindexedSetCreate(1024,75);
-	actiondb_table=CTcreate("action");
-	actiondb_set=ATindexedSetCreate(1024,75);
-	return NULL;
-}
-
-int GBgetStateLength(model_t model){
-	(void)model;
-	return nPars;
-}
-
-int GBgetLabelCount(model_t model){
-	(void)model;
-	return 1;
-}
-
-char* GBgetLabelDescription(model_t model,int label){
-	(void)model;(void)label;
-	return "action";
-}
-
-int GBgetGroupCount(model_t model){
-	(void)model;
-	return nSmds;
-}
-
-void GBgetGroupInfo(model_t model,int group,int*length,int**indices){
-	(void)model;
-	if(length) *length=summand[group].count;
-	if(indices) *indices=summand[group].proj;
-}
-
-void GBgetInitialState(model_t model,int *state){
-	(void)model;
-	int i;
 	STsetInitialState();
-	for(i=0;i<nPars;i++) state[i]=find_index(termdb_table,termdb_set,dst[i]);
-}
+	int temp[ltstype.state_length];
+	for(int i=0;i<ltstype.state_length;i++) temp[i]=ATfindIndex(termmap,dst[i]);
+	GBsetInitialState(m,temp);
 
-int GBgetTransitionsShort(model_t model,int group,int*src,TransitionCB cb,void*context){
-	(void)model;
-	ATerm at_src[nPars];
-	expand=1;
-	smd=group;
-	user_cb=cb;
-	user_context=context;
-	for(int i=0;i<nPars;i++) {
-		at_src[i]=dst[i];
-	}
-	for(int i=0;i<summand[group].count;i++){
-		at_src[summand[group].proj[i]]=find_term(termdb_table,termdb_set,src[i]);
-	}
-	return STstepSmd(at_src,&smd,1);
-}
 
-int GBgetTransitionsLong(model_t model,int group,int*src,TransitionCB cb,void*context){
-	(void)model;
-	ATerm at_src[nPars];
-	expand=0;
-	smd=group;
-	user_cb=cb;
-	user_context=context;
-	for(int i=0;i<nPars;i++) {
-		at_src[i]=find_term(termdb_table,termdb_set,src[i]);
+	e_info.groups=STgetSummandCount();
+	e_info.length=(int*)RTmalloc(e_info.groups*sizeof(int));
+	e_info.indices=(int**)RTmalloc(e_info.groups*sizeof(int*));
+	for(int i=0;i<e_info.groups;i++){
+		int temp[ltstype.state_length];
+		e_info.length[i]=STgetProjection(temp,i);
+		e_info.indices[i]=(int*)RTmalloc(e_info.length[i]*sizeof(int));
+		for(int j=0;j<e_info.length[i];j++) e_info.indices[i][j]=temp[j];
 	}
-	return STstepSmd(at_src,&smd,1);
+	GBsetEdgeInfo(m,&e_info);
+	GBsetStateInfo(m,&s_info);
+	GBsetNextStateLong(m,MCRLgetTransitionsLong);
+	GBsetNextStateAll(m,MCRLgetTransitionsAll);
 }
 
 

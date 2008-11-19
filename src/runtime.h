@@ -45,9 +45,9 @@ extern void log_set_flags(log_t log,int flags);
 
 extern void set_label(const char* fmt,...);
 
-extern void log_message(log_t log,char*file,int line,int errnum,const char *fmt,...);
+extern void log_message(log_t log,const char*file,int line,int errnum,const char *fmt,...);
 
-extern void (*RThandleFatal)(char*file,int line,int errnum,int code);
+extern void (*RThandleFatal)(const char*file,int line,int errnum,int code);
 
 #define Warning(log,...) log_message(log,__FILE__,__LINE__,0,__VA_ARGS__)
 #define WarningCall(log,...) log_message(log,__FILE__,__LINE__,errno,__VA_ARGS__)

@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include "runtime.h"
 #include <libgen.h>
-#include "ltsmeta.h"
+#include "ltsman.h"
 
 static int blocksize=65536;
 static int plain=0;
@@ -57,12 +57,12 @@ int main(int argc, char *argv[]){
 	Warning(info,"copying %s to %s",argv[1],argv[2]);
 	stream_t ds;
 	ds=arch_read(ar_in,"info",NULL);
-	lts_t lts=lts_read(ds,&decode);
+	lts_t lts=lts_read_info(ds,&decode);
 	DSclose(&ds);
 	Log(info,"output compression is %s",plain?"disabled":"enabled");
 	int N=lts_get_segments(lts);
 	ds=arch_write(ar_out,"info",plain?NULL:"",1);
-	lts_write_info(lts,ds,DIR_INFO);
+	lts_write_info(lts,ds,LTS_INFO_DIR);
 	DSclose(&ds);
 	stream_copy(ar_in,ar_out,"TermDB",decode?"auto":NULL,plain?NULL:"gzip");
 	for(int i=0;i<N;i++){

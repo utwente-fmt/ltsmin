@@ -34,7 +34,9 @@ typedef stream_t(*stream_create_t)(char*name);
 
 extern archive_t arch_fmt(char*format,stream_create_t crd,stream_create_t cwr,int buf);
 
-extern archive_t arch_dir(char*dirname,int buf);
+extern archive_t arch_dir_create(char*dirname,int buf,int del);
+
+extern archive_t arch_dir_open(char*dirname,int buf);
 
 extern archive_t arch_gcf_create(raf_t raf,size_t block_size,size_t cluster_size,int worker,int worker_count);
 
