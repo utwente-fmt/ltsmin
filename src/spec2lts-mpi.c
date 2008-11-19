@@ -156,6 +156,7 @@ static int nice_value=0;
 static int plain=0;
 static int find_dlk=0;
 static treedbs_t dbs;
+static int cache=0;
 
 
 static event_queue_t mpi_queue;
@@ -178,6 +179,8 @@ struct option options[]={
 		"Specifiy the name of the output archive.",
 		"This will be a pattern archive if <archive> contains %s",
 		"and a GCF archive otherwise",NULL},
+	{"-cache",OPT_NORMAL,set_int,&cache,NULL,
+		"Add the caching wrapper around the model",NULL,NULL,NULL},
 	{"-nolts",OPT_NORMAL,reset_int,&write_lts,NULL,
 		"disable writing of the LTS",NULL,NULL,NULL},
 	{"-nice",OPT_REQ_ARG,parse_int,&nice_value,"-nice <val>",
@@ -397,6 +400,7 @@ int main(int argc, char*argv[]){
 #ifdef MCRL2
 	MCRL2loadGreyboxModel(model,argv[argc-1]);
 #endif
+	if (cache) model=GBaddCache(model);
 	event_barrier_wait(barrier);
 	Warning(info,"model created");
 	lts_struct_t ltstype=GBgetLTStype(model);

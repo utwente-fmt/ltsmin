@@ -21,6 +21,7 @@ static treedbs_t dbs;
 static char *outputarch=NULL;
 static int plain=0;
 static int blackbox=0;
+static int greybox=0;
 static int verbosity=1;
 static int write_lts=1;
 static int cache=0;
@@ -38,7 +39,9 @@ struct option options[]={
 	{"-plain",OPT_NORMAL,set_int,&plain,NULL,
 		"disable compression of the output",NULL,NULL,NULL},
 	{"-black",OPT_NORMAL,set_int,&blackbox,NULL,
-		"use the black box call (TransitionsAll)",NULL,NULL,NULL},
+		"use the black box call (TransitionsAll)","this is the default",NULL,NULL},
+	{"-grey",OPT_NORMAL,set_int,&greybox,NULL,
+		"use the box call (TransitionsLong)",NULL,NULL,NULL},
 	{"-cache",OPT_NORMAL,set_int,&cache,NULL,
 		"Add the caching wrapper around the model",NULL,NULL,NULL},
 	{"-vset",OPT_NORMAL,set_int,&use_vset,NULL,
@@ -117,6 +120,17 @@ int main(int argc, char *argv[]){
 	parse_options(options,argc,argv);
 	if (!outputarch && write_lts) Fatal(1,error,"please specify the output archive with -out");
 	if (write_lts && use_vset) Fatal(1,error,"writing in vector set mode is future work");
+
+	switch(blackbox+greybox){
+	case 0:
+		blackbox=1;
+		break;
+	case 1:
+		break;
+	default:
+		Fatal(1,error,"cannot use blackbox and greybox at the same time.");
+	}
+
 	Warning(info,"opening %s",argv[argc-1]);
 	model_t model=GBcreateBase();
 	GBsetChunkMethods(model,new_string_index,NULL,
