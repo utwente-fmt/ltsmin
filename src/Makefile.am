@@ -7,6 +7,9 @@ noinst_LIBRARIES += libmpi.a
 if HAVE_LIBMCRL
 bin_PROGRAMS += lpo2lts-mpi
 endif
+if HAVE_LIBMCRL2
+bin_PROGRAMS += lps2lts-mpi
+endif
 endif
 if HAVE_LIBSTEP_INFO
 bin_PROGRAMS +=  lpo2lts-grey lpo-reach
@@ -15,6 +18,10 @@ endif
 # if HAVE_LIBBCG
 # bin_PROGRAMS += 
 # endif
+
+if HAVE_LIBMCRL2
+bin_PROGRAMS += lps2lts-grey lps-reach
+endif
 
 # gcf
 gcf_SOURCES = gcf-rw.c
@@ -26,17 +33,36 @@ lpo2lts_grey_LDADD    = libutil.a $(MCRL_LIBS)
 lpo2lts_grey_CPPFLAGS = -DMCRL $(MCRL_CPPFLAGS) $(AM_CPPFLAGS)
 lpo2lts_grey_LDFLAGS  = $(MCRL_LDFLAGS) $(AM_LDFLAGS)
 
+# lps2lts-grey
+lps2lts_grey_SOURCES  = spec2lts-grey.c mcrl2-greybox.cpp mcrl2-greybox.h at-map.c at-map.h vector_set.c vector_set.h
+lps2lts_grey_LDADD    = libutil.a $(MCRL2_LIBS)
+lps2lts_grey_CPPFLAGS = -DMCRL2 $(MCRL2_CPPFLAGS) $(AM_CPPFLAGS)
+lps2lts_grey_LDFLAGS  = $(MCRL2_LDFLAGS) $(AM_LDFLAGS)
+
 # lpo-reach
 lpo_reach_SOURCES  = spec-reach.c mcrl-greybox.c mcrl-greybox.h at-map.c at-map.h vector_set.c vector_set.h
 lpo_reach_LDADD    = libutil.a $(MCRL_LIBS)
 lpo_reach_CPPFLAGS = -DMCRL $(MCRL_CPPFLAGS) $(AM_CPPFLAGS)
 lpo_reach_LDFLAGS  = $(MCRL_LDFLAGS) $(AM_LDFLAGS)
 
+# lps-reach
+lps_reach_SOURCES  = spec-reach.c mcrl2-greybox.cpp mcrl2-greybox.h at-map.c at-map.h vector_set.c vector_set.h
+lps_reach_LDADD    = libutil.a $(MCRL2_LIBS)
+lps_reach_CPPFLAGS = -DMCRL2 $(MCRL2_CPPFLAGS) $(AM_CPPFLAGS)
+lps_reach_LDFLAGS  = $(MCRL2_LDFLAGS) $(AM_LDFLAGS)
+
 # lpo2lts-mpi
 lpo2lts_mpi_SOURCES  = spec2lts-mpi.c mcrl-greybox.c mcrl-greybox.h at-map.c at-map.h config.h
 lpo2lts_mpi_LDADD    = libmpi.a libutil.a $(MCRL_LIBS)
 lpo2lts_mpi_CPPFLAGS = -DMCRL $(MCRL_CPPFLAGS) $(AM_CPPFLAGS)
 lpo2lts_mpi_LDFLAGS  = $(MCRL_LDFLAGS) $(AM_LDFLAGS)
+
+# lps2lts-mpi
+lps2lts_mpi_SOURCES  = spec2lts-mpi.c mcrl2-greybox.cpp mcrl2-greybox.h at-map.c at-map.h config.h
+lps2lts_mpi_LDADD    = libmpi.a libutil.a $(MCRL2_LIBS)
+lps2lts_mpi_CPPFLAGS = -DMCRL2 $(MCRL2_CPPFLAGS) $(AM_CPPFLAGS)
+lps2lts_mpi_LDFLAGS  = $(MCRL2_LDFLAGS) $(AM_LDFLAGS)
+lps2lts_mpi_LINK     = $(CCLD) $(AM_CFLAGS) $(CFLAGS) $(lpo_reach_LDFLAGS) $(LDFLAGS) -o $@
 
 # mpi-event-test
 mpi_event_test_SOURCES = mpi-event-test.c config.h

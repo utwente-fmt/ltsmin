@@ -8,6 +8,8 @@ AC_CONFIG_HEADERS([src/amconfig.h])
 # Checks for programs.
 CFLAGS="-g -W -Wall -O2 -std=c99 $CFLAGS"
 AM_PROG_CC_C_O
+CXXFLAGS="-g -W -Wall -O2 -ftemplate-depth-128 -finline-functions -Wno-inline -pthread -fPIC $CXXFLAGS"
+AC_PROG_CXX
 ACX_PTHREAD(
   [LIBS="$PTHREAD_LIBS $LIBS"
    CFLAGS="$CFLAGS $PTHREAD_CFLAGS"
@@ -24,6 +26,8 @@ ACX_MPI(
    AC_MSG_WARN([no acceptable MPI support found.])])
 ACX_MCRL([],
   [AC_MSG_WARN([no acceptable muCRL installation found.])])
+ACX_MCRL2([],
+  [AC_MSG_WARN([no acceptable mCRL2 installation found.])])
 AC_CHECK_PROGS(ASCIIDOC, [asciidoc])
 AC_CHECK_PROGS(XMLTO, [xmlto])
 DX_DOXYGEN_FEATURE(ON)
@@ -57,6 +61,13 @@ if test "x$acx_mcrl" = xyes; then
      LDFLAGS="$ltsmin_save_LDFLAGS"],
     [AC_MSG_WARN([some muCRL libraries not found.])])
 fi
+AC_MSG_WARN([checking mCRL2 libs begin])
+if test "x$acx_mcrl2" = xyes; then
+  ACX_MCRL2_LIBS(
+    [],
+    [AC_MSG_WARN([some mCRL2 libraries not found.])])
+fi
+AC_MSG_WARN([checking mCRL2 libs end])
 AC_CHECK_LIB([rt], [aio_error])
 ACX_CADP_BCG_WRITE([have_bcg=yes],
   [have_bcg=no
@@ -92,6 +103,7 @@ AC_CHECK_FUNCS([atexit bzero ftruncate strchr strdup strndup strstr strtol])
 
 AM_CONDITIONAL([HAVE_MPI], [test x"$have_mpi" != "x"])
 AM_CONDITIONAL([HAVE_LIBMCRL], [test x"$acx_mcrl" = xyes])
+AM_CONDITIONAL([HAVE_LIBMCRL2], [test x"$acx_mcrl2" = xyes])
 AM_CONDITIONAL([HAVE_LIBSTEP_INFO], [test x"$have_libstep_info" = xyes])
 AM_CONDITIONAL([HAVE_ASCIIDOC], [test x"$ASCIIDOC" != x])
 AM_CONDITIONAL([HAVE_XMLTO], [test x"$XMLTO" != x])
@@ -110,6 +122,7 @@ Configuration:
     CC       = ${CC:-NOT FOUND}
     MPICC    = ${MPICC:-NOT FOUND, building without MPI support}
     MCRL     = ${with_mcrl:-NOT FOUND, building without muCRL support}
+    MCRL2    = ${with_mcrl2:-NOT FOUND, building without mCRL2 support}
     CADP     = ${CADP:-NOT FOUND, building without CADP support}
 
     ASCIIDOC = ${ASCIIDOC:-NOT FOUND, not building documentation}

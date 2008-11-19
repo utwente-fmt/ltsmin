@@ -17,8 +17,14 @@ esac
 AC_MSG_CHECKING([for CADP])
 if test x"$CADP" != x && test -f "$CADP/com/arch"; then
     AC_MSG_RESULT([$CADP])
-    AC_MSG_CHECKING([for CADP architecture string])
-    AC_SUBST(CADP_ARCH, ["$($CADP/com/arch)"])
+    AC_CHECK_SIZEOF([void *])
+    if test x"$ac_cv_sizeof_void_p" = x8; then
+       AC_MSG_CHECKING([for 64 bit CADP architecture string])
+       AC_SUBST(CADP_ARCH, ["$(CADP_BITS=64 $CADP/com/arch)"])
+    else
+        AC_MSG_CHECKING([for 32 bit CADP architecture string])
+        AC_SUBST(CADP_ARCH, ["$(CADP_BITS=32 $CADP/com/arch)"])
+    fi
     if test x"$CADP_ARCH" != x; then
         AC_MSG_RESULT([$CADP_ARCH])
         AC_SUBST(CADP_LDFLAGS,  ["-L$CADP/bin.$CADP_ARCH"])
