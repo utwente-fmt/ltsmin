@@ -27,6 +27,8 @@ static int* synch_set=NULL;
 static int* synch_id=NULL;
 static int synch_pending;
 static uint32_t tau;
+static int unix_io=0;
+static int mpi_io=0;
 
 
 #define STRONG_REDUCTION_SET 1
@@ -87,6 +89,10 @@ struct option options[]={
 		"apply branching bisimulation reduction",NULL,NULL,NULL},
 	{"-q",OPT_NORMAL,log_suppress,&info,"-q",
 		"do not print info messages",NULL,NULL,NULL},
+	{"-mpi-io",OPT_NORMAL,set_int,&mpi_io,NULL,
+		"use MPI-IO (default)",NULL,NULL,NULL},
+	{"-unix-io",OPT_NORMAL,set_int,&unix_io,NULL,
+		"use UNIX IO (e.g. if your NFS locking is broken)",NULL,NULL,NULL},
 	{"-help",OPT_NORMAL,usage,NULL,NULL,
 		"print this help message",NULL,NULL,NULL},
 /* for future use
@@ -297,6 +303,16 @@ int main(int argc,char **argv){
 		printoptions(options);
 		MPI_Abort(MPI_COMM_WORLD,1);
 	}
+	switch(mpi_io+unix_io){
+	case 0:
+		mpi_io=1;
+	case 1:
+		if(mpi_me==0 && mpi_io) Warning(info,"using MPI-IO");
+		if(mpi_me==0 && unix_io) Warning(info,"using UNIX IO");
+		break;
+	default:
+		Fatal(1,error,"IO selections -mpi-io and -unix-io are mutually exclusive");
+	}
 	if (mpi_me==0) switch(action){
 	case STRONG_REDUCTION_SET:
 		Warning(info,"reduction modulp strong bisimulation");
@@ -320,18 +336,21 @@ int main(int argc,char **argv){
 	core_barrier();
 	lts=dlts_create();
 	if (strstr(argv[1],"%s")) {
-		lts->arch=arch_fmt(argv[1],mpi_io_read,mpi_io_write,prop_get_U32("bs",65536));
+		if (mpi_io) lts->arch=arch_fmt(argv[1],mpi_io_read,mpi_io_write,prop_get_U32("bs",65536));
+		if (unix_io) lts->arch=arch_fmt(argv[1],file_input,file_output,prop_get_U32("bs",65536));
 	} else {
-		if (prop_get_U32("load",1)) {
-			//Warning(info,"loading");
-			raf_t raf=MPI_Load_raf(argv[1],MPI_COMM_WORLD);
-			core_barrier();
-			lts->arch=arch_gcf_read(raf);
-			core_barrier();
-			//Warning(info,"archive opened");
-		} else {
-			lts->arch=arch_gcf_read(MPI_Create_raf(argv[1],MPI_COMM_WORLD));
+		raf_t raf=NULL;
+		if (mpi_io) {
+			if (prop_get_U32("load",1)) {
+				raf=MPI_Load_raf(argv[1],MPI_COMM_WORLD);
+			} else {
+				raf=MPI_Create_raf(argv[1],MPI_COMM_WORLD);
+			}
 		}
+		if (unix_io) raf=raf_unistd(argv[1]);
+		core_barrier();
+		lts->arch=arch_gcf_read(raf);
+		core_barrier();
 	}
 	//Warning(info,"got the archive");
 	dlts_getinfo(lts);
@@ -758,11 +777,15 @@ int main(int argc,char **argv){
 
 	archive_t arch;
 	if (strstr(argv[2],"%s")){
-		arch=arch_fmt(argv[2],mpi_io_read,mpi_io_write,prop_get_U32("bs",65536));
+		if (mpi_io) arch=arch_fmt(argv[2],mpi_io_read,mpi_io_write,prop_get_U32("bs",65536));
+		if (unix_io) arch=arch_fmt(argv[2],file_input,file_output,prop_get_U32("bs",65536));
 	} else {
 		uint32_t bs=prop_get_U32("bs",65536);
 		uint32_t bc=prop_get_U32("bc",128);
-		arch=arch_gcf_create(MPI_Create_raf(argv[2],MPI_COMM_WORLD),bs,bs*bc,mpi_me,mpi_nodes);
+		raf_t raf=NULL;
+		if (mpi_io) raf=MPI_Create_raf(argv[2],MPI_COMM_WORLD);
+		if (unix_io) raf=raf_unistd(argv[2]);
+		arch=arch_gcf_create(raf,bs,bs*bc,mpi_me,mpi_nodes);
 	}
 	
 	output_src=(stream_t*)RTmalloc(mpi_nodes*sizeof(FILE*));

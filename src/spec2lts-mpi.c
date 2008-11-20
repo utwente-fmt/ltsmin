@@ -157,7 +157,8 @@ static int plain=0;
 static int find_dlk=0;
 static treedbs_t dbs;
 static int cache=0;
-
+static int unix_io=0;
+static int mpi_io=0;
 
 static event_queue_t mpi_queue;
 static event_barrier_t barrier;
@@ -175,6 +176,10 @@ struct option options[]={
 		"printed and the exploration will be aborted.",
 		"using this option implies -nolts",NULL},
 */
+	{"-mpi-io",OPT_NORMAL,set_int,&mpi_io,NULL,
+		"use MPI-IO (default)",NULL,NULL,NULL},
+	{"-unix-io",OPT_NORMAL,set_int,&unix_io,NULL,
+		"use UNIX IO (e.g. if your NFS locking is broken)",NULL,NULL,NULL},
 	{"-out",OPT_REQ_ARG,assign_string,&outputarch,"-out <archive>",
 		"Specifiy the name of the output archive.",
 		"This will be a pattern archive if <archive> contains %s",
@@ -389,6 +394,16 @@ int main(int argc, char*argv[]){
 #endif
 	if (mpi_me!=0) MPI_Barrier(MPI_COMM_WORLD);
 	parse_options(options,argc,argv);
+	switch(mpi_io+unix_io){
+	case 0:
+		mpi_io=1;
+	case 1:
+		if(mpi_me==0 && mpi_io) Warning(info,"using MPI-IO");
+		if(mpi_me==0 && unix_io) Warning(info,"using UNIX IO");
+		break;
+	default:
+		Fatal(1,error,"IO selections -mpi-io and -unix-io are mutually exclusive");
+	}
 	if (mpi_me==0) MPI_Barrier(MPI_COMM_WORLD);
 	Warning(info,"creating model for %s",argv[argc-1]);
 	model_t model=GBcreateBase();
@@ -425,11 +440,13 @@ int main(int argc, char*argv[]){
 	MPI_Barrier(MPI_COMM_WORLD);
 	if (write_lts){
 		if (strstr(outputarch,"%s")) {
-			arch=arch_fmt(outputarch,mpi_io_read,mpi_io_write,prop_get_U32("bs",65536));
+			if (mpi_io) arch=arch_fmt(outputarch,mpi_io_read,mpi_io_write,prop_get_U32("bs",65536));
+			if (unix_io) arch=arch_fmt(outputarch,file_input,file_output,prop_get_U32("bs",65536));
 		} else {
 			uint32_t bs=prop_get_U32("bs",65536);
 			uint32_t bc=prop_get_U32("bc",128);
-			arch=arch_gcf_create(MPI_Create_raf(outputarch,MPI_COMM_WORLD),bs,bs*bc,mpi_me,mpi_nodes);
+			if (mpi_io) arch=arch_gcf_create(MPI_Create_raf(outputarch,MPI_COMM_WORLD),bs,bs*bc,mpi_me,mpi_nodes);
+			if (unix_io) arch=arch_gcf_create(raf_unistd(outputarch),bs,bs*bc,mpi_me,mpi_nodes);
 		}
 	}
 	/***************************************************/
@@ -529,12 +546,9 @@ int main(int argc, char*argv[]){
 	Warning(info,"transition files closed");
 	{
 	int *temp=NULL;
-	int tau;
 	stream_t info_s=NULL;
 		if (write_lts && mpi_me==0){
-			/* It would be better if we didn't create tau if it is non-existent. */
 			stream_t ds=arch_write(arch,"TermDB",plain?NULL:"gzip",1);
-			tau=GBchunkPut(model,ltstype->edge_label_type[0],chunk_str("tau"));
 			int act_count=GBchunkCount(model,ltstype->edge_label_type[0]);
 			for(int i=0;i<act_count;i++){
 				chunk c=GBchunkGet(model,ltstype->edge_label_type[0],i);
@@ -542,7 +556,7 @@ int main(int argc, char*argv[]){
 				DSwrite(ds,"\n",1);
 			}
 			DSclose(&ds);
-			Warning(info,"%d actions, tau has index %d",act_count,tau);
+			Warning(info,"%d actions",act_count);
 			/* Start writing the info file. */
 			info_s=arch_write(arch,"info",plain?NULL:"",1);
 			DSwriteU32(info_s,31);
@@ -551,7 +565,7 @@ int main(int argc, char*argv[]){
 			DSwriteU32(info_s,0);
 			DSwriteU32(info_s,0);
 			DSwriteU32(info_s,act_count);
-			DSwriteU32(info_s,tau);
+			DSwriteU32(info_s,-1); //tau
 			DSwriteU32(info_s,size-1);
 		}
 		if (mpi_me==0) temp=(int*)malloc(mpi_nodes*mpi_nodes*sizeof(int));
