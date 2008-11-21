@@ -94,6 +94,15 @@ static int db_insert(treedbs_t dbs,int node,int left, int right){
 	return result;
 }
 
+int TreeCount(treedbs_t dbs){
+	int nPars=dbs->nPars;
+	if (nPars==1) {
+		return dbs->count;
+	} else {
+		return dbs->db_next[1];
+	}
+}
+
 int TreeFold(treedbs_t dbs,int *vector){
 	int nPars=dbs->nPars;
 	if (nPars==1) {

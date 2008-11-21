@@ -27,5 +27,10 @@ Unfold an element to a tree,
 */
 extern void TreeUnfold(treedbs_t dbs,int index,int*vector);
 
+/**
+Get the number of elements
+*/
+extern int TreeCount(treedbs_t dbs);
+
 #endif
 
