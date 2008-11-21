@@ -435,9 +435,9 @@ stream_t stream_setup(stream_t s,char* code){
 	if (detect) {
 		char code[1024];
 		DSreadS(s,code,1024);
-		return stream_add_code(s,code);
+		return stream_buffer(stream_add_code(s,code),4096);
 	} else {
-		return stream_add_code(s,code);
+		return stream_buffer(stream_add_code(s,code),4096);
 	}
 }
 
