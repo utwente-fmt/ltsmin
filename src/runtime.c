@@ -25,6 +25,19 @@ void log_set_flags(log_t log,int flags){
 	log->flags=flags;
 }
 
+int log_get_flags(log_t log){
+	return log->flags;
+}
+
+FILE* log_get_stream(log_t log){
+	if (log->flags & LOG_PRINT) {
+		return log->f;
+	} else {
+		return NULL;
+	}
+}
+
+
 static pthread_key_t label_key;
 
 void (*RThandleFatal)(const char*file,int line,int errnum,int code);

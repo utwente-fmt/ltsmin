@@ -167,7 +167,7 @@ struct option options[]={
 	{"",OPT_NORMAL,NULL,NULL,NULL,
 		"usage: mpirun <nodespec> inst-mpi options file ...",NULL,NULL,NULL},
 	{"-v",OPT_NORMAL,inc_int,&verbosity,NULL,"increase the level of verbosity",NULL,NULL,NULL},
-	{"-q",OPT_NORMAL,reset_int,&verbosity,NULL,"be silent",NULL,NULL,NULL},
+	{"-q",OPT_NORMAL,log_suppress,&info,NULL,"be silent",NULL,NULL,NULL},
 	{"-help",OPT_NORMAL,usage,NULL,NULL,
 		"print this help message",NULL,NULL,NULL},
 /* Deadlocks can be found, but traces cannot be printed yet.
@@ -210,9 +210,6 @@ static uint32_t chk_base=0;
 
 static inline void adjust_owner(int32_t *state){
 	chk_base=SuperFastHash((char*)state,size*4,0);
-	//Warning(info,"chkbase=%x",chk_base);
-	//for (int i=0;i<size;i++) fprintf(stderr,"%3d",state[i]);
-	//fprintf(stderr,"\n");
 }
 
 static inline int owner(int32_t *state){
@@ -385,13 +382,6 @@ int main(int argc, char*argv[]){
 
 	tcount=(int*)malloc(mpi_nodes*sizeof(int));
 
-	Warning(info,"initializing grey box module");
-#ifdef MCRL
-	MCRLinitGreybox(argc,argv,bottom);
-#endif
-#ifdef MCRL2
-	MCRL2initGreybox(argc,argv,bottom);
-#endif
 	if (mpi_me!=0) MPI_Barrier(MPI_COMM_WORLD);
 	parse_options(options,argc,argv);
 	switch(mpi_io+unix_io){
@@ -405,6 +395,13 @@ int main(int argc, char*argv[]){
 		Fatal(1,error,"IO selections -mpi-io and -unix-io are mutually exclusive");
 	}
 	if (mpi_me==0) MPI_Barrier(MPI_COMM_WORLD);
+	Warning(info,"initializing grey box module");
+#ifdef MCRL
+	MCRLinitGreybox(argc,argv,bottom);
+#endif
+#ifdef MCRL2
+	MCRL2initGreybox(argc,argv,bottom);
+#endif
 	Warning(info,"creating model for %s",argv[argc-1]);
 	model_t model=GBcreateBase();
 	GBsetChunkMethods(model,mpi_newmap,mpi_index_pool_create(MPI_COMM_WORLD,mpi_queue,MAX_TERM_LEN),
@@ -522,7 +519,7 @@ int main(int argc, char*argv[]){
 		MPI_Allreduce(&visited,&global_visited,1,MPI_LONG_LONG,MPI_SUM,MPI_COMM_WORLD);
 		MPI_Allreduce(&explored,&global_explored,1,MPI_LONG_LONG,MPI_SUM,MPI_COMM_WORLD);
 		MPI_Allreduce(&transitions,&global_transitions,1,MPI_LONG_LONG,MPI_SUM,MPI_COMM_WORLD);
-		event_statistics(mpi_queue);
+		if (verbosity>1) event_statistics(mpi_queue);
 		if (global_visited==global_explored) break;
 		if (mpi_me==0) {
 			Warning(info,"level %d: %lld explored %lld transitions %lld visited",
@@ -530,8 +527,13 @@ int main(int argc, char*argv[]){
 		}
 	}
 	if (mpi_me==0) {
-		Warning(info,"State space has %d levels %lld states %lld transitions",
-			level,global_explored,global_transitions);
+		if (write_lts) {
+			Warning(info,"State space has %d levels %lld states %lld transitions",
+				level,global_explored,global_transitions);
+		} else {
+			printf("State space has %d levels %lld states %lld transitions\n",
+				level,global_explored,global_transitions);
+		}
 	}
 	event_barrier_wait(barrier);
 	/* State space was succesfully generated. */
@@ -587,9 +589,9 @@ int main(int argc, char*argv[]){
 		}
 	}
 	if (write_lts) arch_close(&arch);
-	char dir[16];
-	sprintf(dir,"gmon-%d",mpi_me);
-	chdir(dir);
+	//char dir[16];
+	//sprintf(dir,"gmon-%d",mpi_me);
+	//chdir(dir);
 	MPI_Finalize();
 	return 0;
 }

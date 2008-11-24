@@ -33,7 +33,7 @@ struct option options[]={
 		"This will be a pattern archive if <archive> contains %s",
 		"and a GCF archive otherwise",NULL},
 	{"-v",OPT_NORMAL,inc_int,&verbosity,NULL,"increase the level of verbosity",NULL,NULL,NULL},
-	{"-q",OPT_NORMAL,reset_int,&verbosity,NULL,"be silent",NULL,NULL,NULL},
+	{"-q",OPT_NORMAL,log_suppress,&info,NULL,"be silent",NULL,NULL,NULL},
 	{"-help",OPT_NORMAL,usage,NULL,NULL,
 		"print this help message",NULL,NULL,NULL},
 	{"-nolts",OPT_NORMAL,reset_int,&write_lts,NULL,
@@ -211,11 +211,6 @@ int main(int argc, char *argv[]){
 				level++;
 			}
 			TreeUnfold(dbs,explored,src);
-			//printf("explore");
-			//for(int i=0;i<N;i++){
-			//	printf("%2d ",src[i]);
-			//}
-			//printf("\n");
 			int c;
 			if(blackbox){
 				c=GBgetTransitionsAll(model,src,print_next,&explored);
@@ -228,7 +223,11 @@ int main(int argc, char *argv[]){
 			if(explored%1000==0) Warning(info,"explored %d visited %d trans %d",explored,visited,trans);
 		}
 	}
-	Warning(info,"state space has %d levels %d states %d transitions",level,visited,trans);		
+	if (write_lts){
+		Warning(info,"state space has %d levels %d states %d transitions",level,visited,trans);
+	} else {
+		printf("state space has %d levels %d states %d transitions\n",level,visited,trans);
+	}
 	if (write_lts){
 		lts_set_states(lts,0,visited);
 		lts_set_trans(lts,0,0,trans);

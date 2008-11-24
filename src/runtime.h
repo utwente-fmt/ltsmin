@@ -42,6 +42,15 @@ extern log_t debug;
 extern log_t create_log(FILE* f,char*tag,int flags);
 
 extern void log_set_flags(log_t log,int flags);
+extern int log_get_flags(log_t log);
+
+/**
+\brief Get a stream that write to the given log.
+
+If the log is suppressed then this function will return NULL;
+*/
+extern FILE* log_get_stream(log_t log);
+
 
 extern void set_label(const char* fmt,...);
 

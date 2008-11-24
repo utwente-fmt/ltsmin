@@ -139,9 +139,32 @@ extern "C" {
 #include "runtime.h"
 #include "at-map.h"
 
+static void WarningHandler(const char *format, va_list args) {
+	FILE* f=log_get_stream(info);
+	if (f) {
+		fprintf(f,"MCRL2 grey box: ");
+		ATvfprintf(f, format, args);
+		fprintf(f,"\n");
+	}
+}
+     
+static void ErrorHandler(const char *format, va_list args) {
+	FILE* f=log_get_stream(error);
+	if (f) {
+		fprintf(f,"MCRL2 grey box: ");
+		ATvfprintf(f, format, args);
+		fprintf(f,"\n");
+	}
+	Fatal(1,error,"ATerror");
+	exit(1);
+}
+
+
 
 void MCRL2initGreybox(int argc,char *argv[],void* stack_bottom){
 	ATinit(argc, argv, (ATerm*) stack_bottom);
+	ATsetWarningHandler(WarningHandler);
+	ATsetErrorHandler(ErrorHandler);
 }
 
 typedef struct grey_box_context {
@@ -162,7 +185,7 @@ static inline int resolve_label(mcrl2_model_t model,ATerm act){
 	ATerm res=ATtableGet(model->action_memo,act);
 	if (res==NULL){
 		char str[1024];
-		sprintf(str,"\"%s\"",mcrl2::core::pp(act).c_str());
+		sprintf(str,"%s",mcrl2::core::pp(act).c_str());
 		res=(ATerm)ATmakeInt(ATfindIndex(model->actionmap,ATreadFromString(str)));
 		ATtablePut(model->action_memo,act,res);
 	}
@@ -270,8 +293,8 @@ void MCRL2loadGreyboxModel(model_t m,char*model_name){
 	// Note the second argument that specifies that don't care variables are not treated specially
 	ctx->explorer = createNextState(model, false, GS_STATE_VECTOR,GS_REWR_JITTYC);
 	ctx->info=new group_information(model);
-	ctx->termmap=ATmapCreate(m,0);
-	ctx->actionmap=ATmapCreate(m,1);
+	ctx->termmap=ATmapCreate(m,0,NULL,NULL);
+	ctx->actionmap=ATmapCreate(m,1,NULL,NULL);
 
 	ctx->atPars=model.process().process_parameters().size();
 	ctx->atGrps=model.process().summands().size();

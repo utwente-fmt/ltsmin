@@ -21,6 +21,21 @@ static at_map_t actionmap;
 static TransitionCB user_cb;
 static void* user_context;
 
+static char* remove_quotes(ATerm t){
+	char* temp=ATwriteToString(t);
+	temp++;
+	temp[strlen(temp)-1]=0;
+	return temp;
+}
+
+static char* print_term(ATerm t){
+	return ATwriteToString(MCRLprint(t));
+}
+
+static ATerm parse_term(const char*str){
+	return MCRLparse(str);
+}
+
 static void callback(void){
 	int lbl=ATfindIndex(actionmap,label);
 	int dst_p[ltstype.state_length];
@@ -31,18 +46,24 @@ static void callback(void){
 }
 
 static void WarningHandler(const char *format, va_list args) {
-     fprintf(stderr,"MCRL grey box: ");
-     ATvfprintf(stderr, format, args);
-     fprintf(stderr,"\n");
-     }
+	FILE* f=log_get_stream(info);
+	if (f) {
+		fprintf(f,"MCRL grey box: ");
+		ATvfprintf(f, format, args);
+		fprintf(f,"\n");
+	}
+}
      
 static void ErrorHandler(const char *format, va_list args) {
-     fprintf(stderr,"MCRL grey box: ");
-     ATvfprintf(stdout, format, args);
-     fprintf(stdout,"\n");
-     Fatal(1,error,"ATerror");
-     exit(1);
-     }
+	FILE* f=log_get_stream(error);
+	if (f) {
+		fprintf(f,"MCRL grey box: ");
+		ATvfprintf(f, format, args);
+		fprintf(f,"\n");
+	}
+	Fatal(1,error,"ATerror");
+	exit(1);
+}
 
 
 void MCRLinitGreybox(int argc,char *argv[],void* stack_bottom){
@@ -117,8 +138,8 @@ void MCRLloadGreyboxModel(model_t m,char*model){
 	ltstype.type_names=MCRL_types;
 	GBsetLTStype(m,&ltstype);
 
-	termmap=ATmapCreate(m,0);
-	actionmap=ATmapCreate(m,1);
+	termmap=ATmapCreate(m,0,print_term,parse_term);
+	actionmap=ATmapCreate(m,1,remove_quotes,NULL);
 
 	dst=(ATerm*)malloc(ltstype.state_length*sizeof(ATerm));
 	for(int i=0;i<ltstype.state_length;i++) {

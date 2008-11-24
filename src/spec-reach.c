@@ -31,7 +31,7 @@ static struct option options[]={
 	{"--help",OPT_NORMAL,usage,NULL,NULL,
 		"print this help message",NULL,NULL,NULL},
 	{"-v",OPT_NORMAL,inc_int,&verbosity,NULL,"increase the level of verbosity",NULL,NULL,NULL},
-	{"-q",OPT_NORMAL,reset_int,&verbosity,NULL,"be silent",NULL,NULL,NULL},
+	{"-q",OPT_NORMAL,log_suppress,&info,NULL,"be silent",NULL,NULL,NULL},
 	{"",OPT_NORMAL,NULL,NULL,NULL,"exploration order options (default is BFS):",NULL,NULL,NULL},
 	{"-bfs",OPT_NORMAL,set_int,&bfs,NULL,"enable saturation",NULL,NULL,NULL},
 	{"-sat",OPT_NORMAL,set_int,&sat,NULL,"enable saturation",NULL,NULL,NULL},
@@ -204,7 +204,7 @@ int main(int argc, char *argv[]){
 	long long e_count;
 	long n_count;
 	vset_count(visited,&n_count,&e_count);
-	fprintf(stderr,"state space has %ld nodes and %lld elements\n",n_count,e_count);
+	printf("state space has %ld nodes and %lld elements\n",n_count,e_count);
 	return 0;
 }
 
