@@ -1,4 +1,4 @@
-bin_PROGRAMS = ltsmin-convert gsf-extract gsf-build gsf2dir dir2gsf
+bin_PROGRAMS = ltsmin-convert gcf gsf2dir dir2gsf
 noinst_LIBRARIES = libutil.a
 
 if HAVE_MPI
@@ -13,7 +13,7 @@ bin_PROGRAMS +=  lpo2lts-grey lpo-reach
 endif
 
 if HAVE_LIBBCG
-bin_PROGRAMS += bcg2gsf gsf2bcg
+bin_PROGRAMS += bcg2gcf gcf2bcg
 endif
 
 # dir2gsf
@@ -21,25 +21,21 @@ dir2gsf_SOURCES = ar2gsf.c
 dir2gsf_LDADD = libutil.a
 dir2gsf_CPPFLAGS = -DINPUTTYPE=dir $(AM_CPPFLAGS)
 
-# gsf-extract
-gsf_extract_SOURCES = gsf-extract.c
-gsf_extract_LDADD = libutil.a
+# gcf
+gcf_SOURCES = gcf-rw.c
+gcf_LDADD = libutil.a
 
-# gsf-build
-gsf_build_SOURCES = gsf-build.c
-gsf_build_LDADD = libutil.a
+# bcg2gcf
+bcg2gcf_SOURCES = bcg2gcf.c
+bcg2gcf_LDADD = libutil.a $(CADP_LIBS)
+bcg2gcf_LDFLAGS = $(CADP_LDFLAGS) $(AM_LDFLAGS)
+bcg2gcf_CPPFLAGS = $(CADP_CPPFLAGS) $(AM_CPPFLAGS)
 
-# bcg2gsf
-bcg2gsf_SOURCES = bcg2gsf.c
-bcg2gsf_LDADD = libutil.a $(CADP_LIBS)
-bcg2gsf_LDFLAGS = $(CADP_LDFLAGS) $(AM_LDFLAGS)
-bcg2gsf_CPPFLAGS = $(CADP_CPPFLAGS) $(AM_CPPFLAGS)
-
-# gsf2bcg
-gsf2bcg_SOURCES = gsf2any.c
-gsf2bcg_LDADD = libutil.a $(CADP_LIBS)
-gsf2bcg_LDFLAGS = $(CADP_LDFLAGS) $(AM_LDFLAGS)
-gsf2bcg_CPPFLAGS = -DOUTPUT_BCG $(CADP_CPPFLAGS) $(AM_CPPFLAGS)
+# gcf2bcg
+gcf2bcg_SOURCES = gcf2bcg.c
+gcf2bcg_LDADD = libutil.a $(CADP_LIBS)
+gcf2bcg_LDFLAGS = $(CADP_LDFLAGS) $(AM_LDFLAGS)
+gcf2bcg_CPPFLAGS = $(CADP_CPPFLAGS) $(AM_CPPFLAGS)
 
 # gsf2dir
 gsf2dir_SOURCES = gsf2any.c

@@ -236,7 +236,7 @@ struct arch_enum {
 static int gcf_enumerate(arch_enum_t e,struct arch_enum_callbacks *cb,void*arg){
 	if (cb->data!=NULL) Fatal(1,error,"cannot enumerate data");
 	while(e->next_stream<e->archive->stream_count){
-		if(cb->new_item) {
+		if(e->archive->name[e->next_stream]!=NULL && cb->new_item) {
 			int res=cb->new_item(arg,e->next_stream,e->archive->name[e->next_stream]);
 			e->next_stream++;
 			if (res) return res;
@@ -258,7 +258,7 @@ static arch_enum_t gcf_enum(archive_t archive,char *regex){
 	e->procs.enumerate=gcf_enumerate;
 	e->procs.free=gcf_enum_free;
 	e->archive=archive;
-	e->next_stream=0;
+	e->next_stream=archive->data_begin;
 	return e;
 }
 

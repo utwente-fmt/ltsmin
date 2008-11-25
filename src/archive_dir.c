@@ -71,6 +71,7 @@ static void dir_enum_free(arch_enum_t *e){
 static arch_enum_t dir_enum(archive_t archive,char *regex){
 	if (regex!=NULL) Warning(info,"regex not supported");
 	arch_enum_t e=(arch_enum_t)RTmalloc(sizeof(struct arch_enum));
+	e->e=GetDirEnum(archive->dir);
 	e->procs.enumerate=dir_enumerate;
 	e->procs.free=dir_enum_free;
 	e->archive=archive;
