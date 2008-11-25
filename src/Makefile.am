@@ -1,4 +1,4 @@
-bin_PROGRAMS = ltsmin-convert gcf gsf2dir dir2gsf
+bin_PROGRAMS = ltsmin-convert gcf
 noinst_LIBRARIES = libutil.a
 
 if HAVE_MPI
@@ -16,11 +16,6 @@ if HAVE_LIBBCG
 bin_PROGRAMS += bcg2gcf gcf2bcg
 endif
 
-# dir2gsf
-dir2gsf_SOURCES = ar2gsf.c
-dir2gsf_LDADD = libutil.a
-dir2gsf_CPPFLAGS = -DINPUTTYPE=dir $(AM_CPPFLAGS)
-
 # gcf
 gcf_SOURCES = gcf-rw.c
 gcf_LDADD = libutil.a
@@ -36,11 +31,6 @@ gcf2bcg_SOURCES = gcf2bcg.c
 gcf2bcg_LDADD = libutil.a $(CADP_LIBS)
 gcf2bcg_LDFLAGS = $(CADP_LDFLAGS) $(AM_LDFLAGS)
 gcf2bcg_CPPFLAGS = $(CADP_CPPFLAGS) $(AM_CPPFLAGS)
-
-# gsf2dir
-gsf2dir_SOURCES = gsf2any.c
-gsf2dir_LDADD = libutil.a
-gsf2dir_CPPFLAGS = -DOUTPUT_DIR $(AM_CPPFLAGS)
 
 # lpo2lts-grey
 lpo2lts_grey_SOURCES  = spec2lts-grey.c mcrl-greybox.c mcrl-greybox.h at-map.c at-map.h vector_set.c vector_set.h
