@@ -10,6 +10,7 @@
 static int plain=0;
 static int blocksize=32768;
 static int blockcount=32;
+static int segments=1;
 
 struct option options[]={
 	{"",OPT_NORMAL,NULL,NULL,NULL,
@@ -21,6 +22,10 @@ struct option options[]={
 		"do not print info messages",NULL,NULL,NULL},
 	{"-help",OPT_NORMAL,usage,NULL,NULL,
 		"print this help message",NULL,NULL,NULL},
+	{"-segments",OPT_REQ_ARG,parse_int,&segments,NULL,
+		"Set the number of segments in the output file.",
+		"The default is a single segment",
+		NULL,NULL},
 	{"-bs",OPT_REQ_ARG,parse_int,&blocksize,"-bs <block size>",
 		"Set the block size to be used for copying streams.",
 		NULL,NULL,NULL},
@@ -56,10 +61,9 @@ int main(int argc,char**argv){
 	BCG_OT_READ_BCG_BEGIN (bcg, &bcg_graph, 0);
 	gcf=arch_gcf_create(raf_unistd(argv[2]),blocksize,blocksize*blockcount,0,1);
 	lts_t lts=lts_new();
-	lts_set_segments(lts,1);
-	lts_set_states(lts,0,BCG_OT_NB_STATES (bcg_graph));
-	lts_set_trans(lts,0,0,BCG_OT_NB_EDGES (bcg_graph));
-	lts_set_root(lts,0,BCG_OT_INITIAL_STATE (bcg_graph));
+	lts_set_segments(lts,segments);
+	uint32_t bcg_root=BCG_OT_INITIAL_STATE (bcg_graph);
+	lts_set_root(lts,bcg_root%segments,bcg_root/segments);
 	BCG_READ_COMMENT (BCG_OT_GET_FILE (bcg_graph), &bcg_comment);
 	N=BCG_OT_NB_LABELS (bcg_graph);
 	ds=arch_write(gcf,"TermDB",plain?"":"gzip",1);
@@ -80,22 +84,48 @@ int main(int argc,char**argv){
 	}
 	DSclose(&ds);
 
+	N=segments;
+
+	stream_t src[N][N];
+	stream_t lbl[N][N];
+	stream_t dst[N][N];
+	uint32_t trans[N][N];
+
+	for(int i=0;i<N;i++) {
+		lts_set_states(lts,i,((BCG_OT_NB_STATES (bcg_graph))+N-1-i)/N);
+		for(int j=0;j<N;j++){
+			char fname[1024];
+			sprintf(fname,"src-%d-%d",i,j);
+			src[i][j]=arch_write(gcf,fname,plain?"":"diff32|gzip",1);
+			sprintf(fname,"label-%d-%d",i,j);
+			lbl[i][j]=arch_write(gcf,fname,plain?"":"gzip",1);
+			sprintf(fname,"dest-%d-%d",i,j);
+			dst[i][j]=arch_write(gcf,fname,plain?"":"diff32|gzip",1);
+			trans[i][j]=0;
+		}
+	}
+	BCG_OT_ITERATE_PLN (bcg_graph,bcg_s1,bcg_label_number,bcg_s2){
+		int i=bcg_s1%N;
+		int j=bcg_s2%N;
+		DSwriteU32(src[i][j],bcg_s1/N);
+		DSwriteU32(lbl[i][j],bcg_label_number);
+		DSwriteU32(dst[i][j],bcg_s2/N);
+		trans[i][j]++;
+	} BCG_OT_END_ITERATE;
+	BCG_OT_READ_BCG_END (&bcg_graph);
+	for(int i=0;i<N;i++) {
+		for(int j=0;j<N;j++){
+			DSclose(&(src[i][j]));
+			DSclose(&(lbl[i][j]));
+			DSclose(&(dst[i][j]));
+			lts_set_trans(lts,i,j,trans[i][j]);
+		}
+	}
+
 	ds=arch_write(gcf,"info","",1);
 	lts_write_info(lts,ds,LTS_INFO_DIR);
 	DSclose(&ds);
 
-	stream_t src=arch_write(gcf,"src-0-0",plain?"":"diff32|gzip",1);
-	stream_t lbl=arch_write(gcf,"label-0-0",plain?"":"gzip",1);
-	stream_t dst=arch_write(gcf,"dest-0-0",plain?"":"diff32|gzip",1);
-	BCG_OT_ITERATE_PLN (bcg_graph,bcg_s1,bcg_label_number,bcg_s2){
-		DSwriteU32(src,bcg_s1);
-		DSwriteU32(lbl,bcg_label_number);
-		DSwriteU32(dst,bcg_s2);
-	} BCG_OT_END_ITERATE;
-	BCG_OT_READ_BCG_END (&bcg_graph);
-	DSclose(&src);
-	DSclose(&lbl);
-	DSclose(&dst);
 	arch_close(&gcf);
 	return 0;
 }
