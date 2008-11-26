@@ -34,6 +34,8 @@ struct option options[]={
 		"and a GCF archive otherwise",NULL},
 	{"-v",OPT_NORMAL,inc_int,&verbosity,NULL,"increase the level of verbosity",NULL,NULL,NULL},
 	{"-q",OPT_NORMAL,reset_int,&verbosity,NULL,"be silent",NULL,NULL,NULL},
+	{"-help",OPT_NORMAL,usage,NULL,NULL,
+		"print this help message",NULL,NULL,NULL},
 	{"-nolts",OPT_NORMAL,reset_int,&write_lts,NULL,
 		"disable writing of the LTS",NULL,NULL,NULL},
 	{"-plain",OPT_NORMAL,set_int,&plain,NULL,
