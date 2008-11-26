@@ -12,25 +12,13 @@ if HAVE_LIBSTEP_INFO
 bin_PROGRAMS +=  lpo2lts-grey lpo-reach
 endif
 
-if HAVE_LIBBCG
-bin_PROGRAMS += bcg2gcf gcf2bcg
-endif
+# if HAVE_LIBBCG
+# bin_PROGRAMS += 
+# endif
 
 # gcf
 gcf_SOURCES = gcf-rw.c
 gcf_LDADD = libutil.a
-
-# bcg2gcf
-bcg2gcf_SOURCES = bcg2gcf.c
-bcg2gcf_LDADD = libutil.a $(CADP_LIBS)
-bcg2gcf_LDFLAGS = $(CADP_LDFLAGS) $(AM_LDFLAGS)
-bcg2gcf_CPPFLAGS = $(CADP_CPPFLAGS) $(AM_CPPFLAGS)
-
-# gcf2bcg
-gcf2bcg_SOURCES = gcf2bcg.c
-gcf2bcg_LDADD = libutil.a $(CADP_LIBS)
-gcf2bcg_LDFLAGS = $(CADP_LDFLAGS) $(AM_LDFLAGS)
-gcf2bcg_CPPFLAGS = $(CADP_CPPFLAGS) $(AM_CPPFLAGS)
 
 # lpo2lts-grey
 lpo2lts_grey_SOURCES  = spec2lts-grey.c mcrl-greybox.c mcrl-greybox.h at-map.c at-map.h vector_set.c vector_set.h
