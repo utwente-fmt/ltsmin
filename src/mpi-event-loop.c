@@ -66,36 +66,6 @@ void event_post(event_queue_t queue,MPI_Request *request,event_callback cb,void*
 	queue->pending++;
 }
 
-/// static inline??
-/*
-void dispatch(event_queue_t queue){
-	/// This function must be reentrant: a callback can end up calling this function.
-	/// First we dispatch all of the callbacks in the completed queue.
-	while(queue->dispatched<queue->completed){
-		int idx=queue->index[queue->dispatched];
-		event_callback cb=queue->cb[idx];
-		void *context=queue->context[idx];
-		MPI_Status stat=queue->status[queue->dispatched];
-		queue->dispatched++;
-		cb(context,&stat);
-	}
-	/// Then we compact the request queue.
-	queue->dispatched=0;
-	queue->completed=0;
-	int k=0;
-	for(int i=0;i<queue->pending;i++){
-		if (queue->cb[i]) {
-			if (k<i) {
-				queue->request[k]=queue->request[i];
-				queue->cb[k]=queue->cb[i];
-				queue->context[k]=queue->context[i];
-			}
-			k++;
-		}
-	}
-}
-*/
-
 void event_yield(event_queue_t queue){
 	while(queue->pending){
 		int index[queue->pending];

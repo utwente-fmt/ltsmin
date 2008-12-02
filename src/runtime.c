@@ -119,7 +119,7 @@ void RTinit(int argc,char**argv[]){
 	RThandleFatal=NULL;
 	error=create_log(stderr,"ERROR",LOG_PRINT);
 	info=create_log(stderr,NULL,LOG_PRINT);
-	debug=create_log(stderr,NULL,LOG_PRINT);
+	debug=create_log(stderr,NULL,LOG_IGNORE);
 	pthread_key_create(&label_key, label_destroy);
 	char **copy=RTmalloc(argc*sizeof(char*));
 	for(int i=0;i<argc;i++){

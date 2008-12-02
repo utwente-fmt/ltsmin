@@ -29,7 +29,7 @@ static int synch_pending;
 static uint32_t tau;
 static int unix_io=0;
 static int mpi_io=0;
-
+static int verbosity=1;
 
 #define STRONG_REDUCTION_SET 1
 #define BRANCHING_REDUCTION_SET 2
@@ -87,8 +87,8 @@ struct option options[]={
 		"apply strong bisimulation reduction",NULL,NULL,NULL},
 	{"-b",OPT_NORMAL,select_branching_reduction,NULL,"-b",
 		"apply branching bisimulation reduction",NULL,NULL,NULL},
-	{"-q",OPT_NORMAL,log_suppress,&info,"-q",
-		"do not print info messages",NULL,NULL,NULL},
+	{"-v",OPT_NORMAL,inc_int,&verbosity,NULL,"increase the level of verbosity",NULL,NULL,NULL},
+	{"-q",OPT_NORMAL,log_suppress,&info,"-q","do not print info messages",NULL,NULL,NULL},
 	{"-mpi-io",OPT_NORMAL,set_int,&mpi_io,NULL,
 		"use MPI-IO (default)",NULL,NULL,NULL},
 	{"-unix-io",OPT_NORMAL,set_int,&unix_io,NULL,
@@ -282,16 +282,11 @@ int main(int argc,char **argv){
 
         MPI_Init(&argc, &argv);
 
-/*
-	memstat_enable=1;
-*/
 	timer=SCCcreateTimer();
 	compute_timer=SCCcreateTimer();
 	synch_timer=SCCcreateTimer();
 	exchange_timer=SCCcreateTimer();
-/*
-	verbosity=1;
-*/
+
 	RTinit(argc,&argv);
 	core_init();
 	set_label("bsim2mpi(%2d)",mpi_me);
@@ -361,7 +356,7 @@ int main(int argc,char **argv){
 		if (mpi_me==0) Warning(info,"segment count does not equal worker count");
 		core_barrier();
 		MPI_Finalize();
-		return 0;
+		return 1;
 	}
 	dlts_getTermDB(lts);
 	core_barrier();
@@ -450,11 +445,11 @@ int main(int argc,char **argv){
     if (branching) { /* branching reduction */
 	for(;;){
 		core_barrier();
-		if (mpi_me==0) Warning(info,"computing signatures");
+		if (mpi_me==0 && verbosity>1) Warning(info,"computing signatures");
 		iter++;
 		SetClear(-1);
 /** build initial signatures **/
-		Warning(info,"%d: building initial signatures",mpi_me);
+		if (verbosity>1) Warning(info,"%d: building initial signatures",mpi_me);
 		for(uint32_t i=0;i<auxlts->states;i++){
 			int s=EMPTY_SET;
 			for(uint32_t j=auxlts->begin[i];j<auxlts->begin[i+1];j++){
@@ -466,7 +461,7 @@ int main(int argc,char **argv){
 		}
 		core_barrier();
 /** build forwarding structures **/
-		Warning(info,"%d: building forwarding structures",mpi_me);
+		if (verbosity>1) Warning(info,"%d: building forwarding structures",mpi_me);
 		lts_set_type(inv_lts,LTS_LIST);
 		inv_lts->transitions=0;
 		not_done=1;
@@ -499,12 +494,12 @@ int main(int argc,char **argv){
 				fwd_send_offset[i]=0;
 			}
 		}
-		Warning(info,"%d: submission finished",mpi_me);
+		if (verbosity>1) Warning(info,"%d: submission finished",mpi_me);
 		core_barrier();
 		lts_set_size(inv_lts,inv_lts->states,inv_lts->transitions);
 		lts_set_type(inv_lts,LTS_BLOCK_INV);
 		core_barrier();
-		Warning(info,"%d: got %d inbound invisible tau's",mpi_me,inv_lts->transitions);
+		if (verbosity>1) Warning(info,"%d: got %d inbound invisible tau's",mpi_me,inv_lts->transitions);
 /** forwarding along invisible tau's **/
 		fwd_todo=0;
 		for(uint32_t i=0;i<lts->state_count[mpi_me];i++) {
@@ -557,11 +552,11 @@ int main(int argc,char **argv){
 			send_set=new_set;
 			new_set=tmp;
 			MPI_Allreduce(&fwd_todo,&total_new_set_count,1,MPI_INT,MPI_SUM,MPI_COMM_WORLD);
-			if (mpi_me==0) Warning(info,"sub iteration yielded %d modified sigs.",total_new_set_count);
+			if (mpi_me==0 && verbosity>1) Warning(info,"sub iteration yielded %d modified sigs.",total_new_set_count);
 		}
 /** finished computing signatures **/
 		core_barrier();
-		if (mpi_me==0) Warning(info,"exchanging signatures");
+		if (mpi_me==0 && verbosity>1) Warning(info,"exchanging signatures");
 		//Warning(1,"%d: exchanging signatures",mpi_me);
 		localcount=0;
 		synch_pending=0;
@@ -612,9 +607,9 @@ int main(int argc,char **argv){
 				MPI_Send(synch_send_buffer[i],synch_send_offset[i],MPI_INT,i,synch_request,MPI_COMM_WORLD);
 			}
 		}
-		Warning(info,"%d: submitted all requests",mpi_me);
+		if (verbosity>1) Warning(info,"%d: submitted all requests",mpi_me);
 		while(synch_pending) core_wait(synch_answer);
-		Warning(info,"%d: got all sigs",mpi_me);
+		if (verbosity>1) Warning(info,"%d: got all sigs",mpi_me);
 		core_barrier();
 		for(int i=0;i<lts->segment_count;i++){
 			int jmax=lts->transition_count[i][mpi_me];
@@ -624,7 +619,7 @@ int main(int argc,char **argv){
 				nm[j]=SetGetTag(set[s[j]]);
 			}
 		}
-		Warning(info,"%d: share is %d",mpi_me,synch_next);
+		if (verbosity>1) Warning(info,"%d: share is %d",mpi_me,synch_next);
 		MPI_Barrier(MPI_COMM_WORLD);
 		MPI_Allreduce(&synch_next,&newcount,1,MPI_INT,MPI_SUM,MPI_COMM_WORLD);
 		if (mpi_me==0) Warning(info,"count of iteration %d is %d",iter,newcount);
@@ -634,7 +629,7 @@ int main(int argc,char **argv){
 		}
 		MPI_Alltoallv(&synch_next,mpi_ones,mpi_zeros,MPI_INT,oldsynch,mpi_ones,mpi_indices,MPI_INT,MPI_COMM_WORLD);
 		oldcount=newcount;
-		if (mpi_me==0) Warning(info,"updating map");
+		if (mpi_me==0 && verbosity>1) Warning(info,"updating map");
 		for(int i=0;i<lts->segment_count;i++){
 			MPI_Isend(newmap[i],lts->transition_count[i][mpi_me],MPI_INT,i,37,MPI_COMM_WORLD,request_array+i);
 			MPI_Irecv(map[i],lts->transition_count[mpi_me][i],MPI_INT,i,37,MPI_COMM_WORLD,request_array+lts->segment_count+i);
@@ -646,7 +641,7 @@ int main(int argc,char **argv){
 	for(;;){
 		core_barrier();
 //		startTimer(compute_timer);
-		if (mpi_me==0) Warning(info,"computing signatures");
+		if (mpi_me==0 && verbosity>1) Warning(info,"computing signatures");
 		iter++;
 //		MEMSTAT_CHECK;
 		SetClear(-1);
@@ -673,8 +668,7 @@ int main(int argc,char **argv){
 //		stopTimer(compute_timer);
 		core_barrier();
 //		startTimer(synch_timer);
-		//if (mpi_me==0)
-		Warning(info,"%d: exchanging signatures",mpi_me);
+		if (mpi_me==0 && verbosity>1) Warning(info,"%d: exchanging signatures",mpi_me);
 		localcount=0;
 		synch_pending=0;
 		synch_next=0;
@@ -723,9 +717,9 @@ int main(int argc,char **argv){
 				MPI_Send(synch_send_buffer[i],synch_send_offset[i],MPI_INT,i,synch_request,MPI_COMM_WORLD);
 			}
 		}
-		Warning(info,"%d: submitted all requests",mpi_me);
+		if (verbosity>1) Warning(info,"%d: submitted all requests",mpi_me);
 		while(synch_pending) core_wait(synch_answer);
-		Warning(info,"%d: got all sigs",mpi_me);
+		if (verbosity>1) Warning(info,"%d: got all sigs",mpi_me);
 		core_barrier();
 		for(int i=0;i<lts->segment_count;i++){
 			int jmax=lts->transition_count[i][mpi_me];
@@ -735,7 +729,7 @@ int main(int argc,char **argv){
 				nm[j]=SetGetTag(set[s[j]]);
 			}
 		}
-		Warning(info,"%d: share is %d",mpi_me,synch_next);
+		if (verbosity>1) Warning(info,"%d: share is %d",mpi_me,synch_next);
 		MPI_Barrier(MPI_COMM_WORLD);
 		MPI_Allreduce(&synch_next,&newcount,1,MPI_INT,MPI_SUM,MPI_COMM_WORLD);
 		if (mpi_me==0) Warning(info,"count of iteration %d is %d",iter,newcount);
@@ -747,7 +741,7 @@ int main(int argc,char **argv){
 		}
 		MPI_Alltoallv(&synch_next,mpi_ones,mpi_zeros,MPI_INT,oldsynch,mpi_ones,mpi_indices,MPI_INT,MPI_COMM_WORLD);
 		oldcount=newcount;
-		if (mpi_me==0) Warning(info,"updating map");
+		if (mpi_me==0 && verbosity>1) Warning(info,"updating map");
 		for(int i=0;i<lts->segment_count;i++){
 			MPI_Isend(newmap[i],lts->transition_count[i][mpi_me],MPI_INT,i,37,MPI_COMM_WORLD,request_array+i);
 			MPI_Irecv(map[i],lts->transition_count[mpi_me][i],MPI_INT,i,37,MPI_COMM_WORLD,
@@ -769,10 +763,10 @@ int main(int argc,char **argv){
 	if ((uint32_t)mpi_me==lts->root_seg) {
 		Warning(info,"reduced state space has %d states and %d transitions",newcount,transitions);
 		root=oldid[lts->root_ofs];
-		Warning(info,"root is %d/%d",GET_SEG(root),GET_OFS(root));
+		if (verbosity>1) Warning(info,"root is %d/%d",GET_SEG(root),GET_OFS(root));
 	}
 	MPI_Bcast(&root,1,MPI_INT,lts->root_seg,MPI_COMM_WORLD);
-	Warning(info,"%d: root is %d/%d",mpi_me,GET_SEG(root),GET_OFS(root));
+	if ((uint32_t)mpi_me!=lts->root_seg && verbosity>1) Warning(info,"root is %d/%d",GET_SEG(root),GET_OFS(root));
 	core_barrier();
 
 	archive_t arch;
@@ -805,7 +799,7 @@ int main(int argc,char **argv){
 	write_tag=core_add(NULL,write_service);
 	TERM_INIT(term);
 	MPI_Barrier(MPI_COMM_WORLD);
-	Warning(info,"%d: starting to write using tag %d",mpi_me,write_tag);
+	if (verbosity>1) Warning(info,"starting to write using tag %d",write_tag);
 	for(int j=0;j<synch_next;j++){
 		int set;
 		int src;
@@ -826,9 +820,9 @@ int main(int argc,char **argv){
 		}
 		core_yield();
 	}
-	Warning(info,"%d: waiting for write to finish",mpi_me);
+	if (verbosity>1) Warning(info,"waiting for write to finish");
 	core_terminate(term);
-	Warning(info,"%d: closing files",mpi_me);
+	if (verbosity>1) Warning(info,"closing files");
 	for(int i=0;i<mpi_nodes;i++){
 		DSclose(&output_src[i]);
 		DSclose(&output_label[i]);
@@ -874,13 +868,11 @@ int main(int argc,char **argv){
 			}
 		}
 		DSclose(&infos);
-		Warning(info,"wrote %lld states and %lld transitions",total_states,total_transitions);
 	}
 	arch_close(&arch);
 
 	core_barrier();
 	MPI_Finalize();
-	Warning(info,"That's all!");
 	return 0;
 }
 

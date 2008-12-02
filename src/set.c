@@ -199,7 +199,7 @@ void SetClear(int tag){
 	setcheckbucket();
 	undefined_tag=tag;
 	setnodes[0].tag=tag;
-	Warning(info,"Clearing set structure with %d nodes and %d edges.",setnodenext,setbucketnext);
+	//Warning(info,"Clearing set structure with %d nodes and %d edges.",setnodenext,setbucketnext);
 	setnodenext=1;
 	setbucketnext=0;
 	for(i=0;i<=sethashmask;i++) sethash[i]=EMPTY_LIST;
