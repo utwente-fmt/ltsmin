@@ -31,12 +31,12 @@ static struct option options[]={
 	{"--help",OPT_NORMAL,usage,NULL,NULL,
 		"print this help message",NULL,NULL,NULL},
 	{"-v",OPT_NORMAL,inc_int,&verbosity,NULL,"increase the level of verbosity",NULL,NULL,NULL},
-	{"-q",OPT_NORMAL,log_suppress,&info,NULL,"be silent",NULL,NULL,NULL},
+	{"-q",OPT_NORMAL,reset_int,&verbosity,NULL,"be silent",NULL,NULL,NULL},
 	{"",OPT_NORMAL,NULL,NULL,NULL,"exploration order options (default is BFS):",NULL,NULL,NULL},
 	{"-bfs",OPT_NORMAL,set_int,&bfs,NULL,"enable saturation",NULL,NULL,NULL},
 	{"-sat",OPT_NORMAL,set_int,&sat,NULL,"enable saturation",NULL,NULL,NULL},
 	{"-chain",OPT_NORMAL,set_int,&chain,NULL,"enable chaining",NULL,NULL,NULL},
- 	{0}
+ 	{0,0,0,0,0,0,0,0,0}
 };
 
 static lts_struct_t ltstype;
@@ -62,6 +62,7 @@ struct group_add_info {
 };
 
 static void group_add(void*context,int*labels,int*dst){
+	(void)labels;
 	struct group_add_info* ctx=(struct group_add_info*)context;
 	vrel_add(group_rel[ctx->group],ctx->src,dst);
 }
@@ -135,12 +136,6 @@ int main(int argc, char *argv[]){
 	void* stackbottom=&argv;
 	RTinit(argc,&argv);
 	take_vars(&argc,argv);
-#ifdef MCRL
-	MCRLinitGreybox(argc,argv,stackbottom);
-#endif
-#ifdef MCRL2
-	MCRL2initGreybox(argc,argv,stackbottom);
-#endif
 	parse_options(options,argc,argv);
 	switch(bfs+sat+chain){
 	case 0:
@@ -151,6 +146,15 @@ int main(int argc, char *argv[]){
 	default:
 		Fatal(1,error,"please select a unique exploration order.");
 	}
+	if (verbosity==0) {
+		log_set_flags(info,LOG_IGNORE);
+	}
+#ifdef MCRL
+	MCRLinitGreybox(argc,argv,stackbottom);
+#endif
+#ifdef MCRL2
+	MCRL2initGreybox(argc,argv,stackbottom);
+#endif
 	Warning(info,"opening %s",argv[argc-1]);
 	model=GBcreateBase();
 	GBsetChunkMethods(model,new_string_index,NULL,
