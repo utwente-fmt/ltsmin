@@ -47,7 +47,9 @@ struct option options[]={
 	{"-cache",OPT_NORMAL,set_int,&cache,NULL,
 		"Add the caching wrapper around the model",NULL,NULL,NULL},
 	{"-vset",OPT_NORMAL,set_int,&use_vset,NULL,
-		"Use vector sets instead of tree compression",NULL,NULL,NULL},
+		"Use vector sets instead of tree compression",
+		"This option cannot be used in combination with -out",
+		NULL,NULL},
 	{0,0,0,0,0,0,0,0,0}
 };
 
