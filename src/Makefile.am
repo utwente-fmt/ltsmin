@@ -16,7 +16,7 @@ bin_PROGRAMS +=  lpo2lts-grey lpo-reach
 endif
 
 # if HAVE_LIBBCG
-# bin_PROGRAMS += 
+# bin_PROGRAMS +=
 # endif
 
 if HAVE_LIBMCRL2
@@ -62,7 +62,6 @@ lps2lts_mpi_SOURCES  = spec2lts-mpi.c mcrl2-greybox.cpp mcrl2-greybox.h at-map.c
 lps2lts_mpi_LDADD    = libmpi.a libutil.a $(MCRL2_LIBS)
 lps2lts_mpi_CPPFLAGS = -DMCRL2 $(MCRL2_CPPFLAGS) $(AM_CPPFLAGS)
 lps2lts_mpi_LDFLAGS  = $(MCRL2_LDFLAGS) $(AM_LDFLAGS)
-lps2lts_mpi_LINK     = $(CCLD) $(AM_CFLAGS) $(CFLAGS) $(lpo_reach_LDFLAGS) $(LDFLAGS) -o $@
 
 # mpi-event-test
 mpi_event_test_SOURCES = mpi-event-test.c config.h
@@ -81,24 +80,24 @@ ltsmin_convert_CPPFLAGS = $(CADP_CPPFLAGS) $(AM_CPPFLAGS)
 
 # libraries
 libmpi_a_SOURCES = mpi_io_stream.c mpi_core.c mpi_raf.c mpi_ram_raf.c	\
-		mpi_core.h mpi_io_stream.h mpi_ram_raf.h config.h \
-		mpi-event-loop.c mpi-event-loop.h
+		   mpi_core.h mpi_io_stream.h mpi_ram_raf.h config.h	\
+		   mpi-event-loop.c mpi-event-loop.h
 
-libutil_a_SOURCES = unix.c runtime.c stream.c archive.c	\
+libutil_a_SOURCES = unix.c runtime.c stream.c archive.c			\
                     stream_buffer.c fast_hash.c generichash4.c		\
                     generichash8.c treedbs.c archive_format.c raf.c	\
                     stream_mem.c ghf.c archive_gcf.c scctimer.c		\
                     gzstream.c stream_diff32.c options.c arch_object.h	\
                     generichash.h unix.h archive.h ghf.h options.h	\
-                    stream.h raf.h stream_object.h		\
-                    raf_object.h scctimer.h fast_hash.h runtime.h	\
-                    treedbs.h config.h greybox.c greybox.h stringindex.c          \
-                    stringindex.h archive_gsf.c dirops.c dirops.h       \
-                    ltsman.c ltsman.h packet_stream.h packet_stream.c \
-                    archive_dir.c chunk_support.c chunk_support.h \
+                    stream.h raf.h stream_object.h raf_object.h		\
+                    scctimer.h fast_hash.h runtime.h treedbs.h		\
+                    config.h greybox.c greybox.h stringindex.c		\
+                    stringindex.h archive_gsf.c dirops.c dirops.h	\
+                    ltsman.c ltsman.h packet_stream.h packet_stream.c	\
+                    archive_dir.c chunk_support.c chunk_support.h	\
                     dynamic-array.c dynamic-array.h
 
 
-# make 
+# make
 .DELETE_ON_ERROR:
 

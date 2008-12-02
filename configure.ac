@@ -18,15 +18,30 @@ ACX_PTHREAD(
 AC_PROG_MAKE_SET
 AC_PROG_RANLIB
 AC_PROG_INSTALL
+
 ACX_MPI(
   [CC="$MPICC"
    LIBS="$MPILIBS $LIBS"
-   have_mpi=yes],
+   AC_ARG_VAR(MPICXX, [MPI C++ compiler command])
+   AC_CHECK_PROGS(MPICXX, [mpic++ mpicxx mpiCC hcp mpxlC_r mpxlC mpCC cmpic++, $CXX])
+   AC_SUBST(MPICXX)
+   ltsmin_save_CXX="$CXX"
+   CXX="$MPICXX"
+   AC_LANG_PUSH([C++])
+   AC_TRY_LINK(
+     [#include <mpi.h>],
+     [MPI::Init();],
+     [have_mpi=yes],
+     [have_mpi=
+      CXX="$ltsmin_save_CXX"
+      AC_MSG_WARN([no acceptable MPI C++ support found.])])
+   AC_LANG_POP([C++])],
   [have_mpi=
    AC_MSG_WARN([no acceptable MPI support found.])])
-ACX_MCRL([],
+
+ACX_MCRL([:],
   [AC_MSG_WARN([no acceptable muCRL installation found.])])
-ACX_MCRL2([],
+ACX_MCRL2([:],
   [AC_MSG_WARN([no acceptable mCRL2 installation found.])])
 AC_CHECK_PROGS(ASCIIDOC, [asciidoc])
 AC_CHECK_PROGS(XMLTO, [xmlto])
@@ -48,26 +63,20 @@ AC_CHECK_LIB([z], [inflateEnd],,
   [AC_MSG_FAILURE([zlib not found.])])
 if test "x$acx_mcrl" = xyes; then
   ACX_MCRL_LIBS(
-    [ltsmin_save_LIBS="$LIBS"
-     ltsmin_save_LDFLAGS="$LDFLAGS"
-     LIBS="$MCRL_LIBS $LIBS"
-     LDFLAGS="$MCRL_LDFLAGS $LDFLAGS"
-     AC_CHECK_FUNCS([STgetSummandCount STgetProjection],
-      [have_libstep_info=yes],
-      [AC_MSG_WARN([muCRL library too old; some tools will not be built.])
-       have_libstep_info=no
-       break])
-     LIBS="$ltsmin_save_LIBS"
-     LDFLAGS="$ltsmin_save_LDFLAGS"],
+    [AX_LET([LIBS], ["$MCRL_LIBS $LIBS"],
+            [LDFLAGS], ["$MCRL_LDFLAGS $LDFLAGS"],
+       [AC_CHECK_FUNCS([STgetSummandCount STgetProjection],
+          [have_libstep_info=yes],
+          [AC_MSG_WARN([muCRL library too old; some tools will not be built.])
+           have_libstep_info=no
+           break])])],
     [AC_MSG_WARN([some muCRL libraries not found.])])
 fi
-AC_MSG_WARN([checking mCRL2 libs begin])
 if test "x$acx_mcrl2" = xyes; then
   ACX_MCRL2_LIBS(
-    [],
-    [AC_MSG_WARN([some mCRL2 libraries not found.])])
+    [:],
+    [AC_MSG_WARN([mcrl2 library not found.])])
 fi
-AC_MSG_WARN([checking mCRL2 libs end])
 AC_CHECK_LIB([rt], [aio_error])
 ACX_CADP_BCG_WRITE([have_bcg=yes],
   [have_bcg=no
@@ -121,6 +130,8 @@ Configuration:
 ======================================================================
     CC       = ${CC:-NOT FOUND}
     MPICC    = ${MPICC:-NOT FOUND, building without MPI support}
+    CXX      = ${CXX:-NOT FOUND}
+    MPICXX   = ${MPICXX:-NOT FOUND, building without MPI support}
     MCRL     = ${with_mcrl:-NOT FOUND, building without muCRL support}
     MCRL2    = ${with_mcrl2:-NOT FOUND, building without mCRL2 support}
     CADP     = ${CADP:-NOT FOUND, building without CADP support}

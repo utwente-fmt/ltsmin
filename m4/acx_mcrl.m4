@@ -20,12 +20,12 @@ case "$with_mcrl" in
    *) acx_mcrl=yes;;
 esac
 
-AC_CHECK_SIZEOF([void *])
-if test x"$ac_cv_sizeof_void_p" = x8; then
-    MCRL_CPPFLAGS="-DAT_64BIT"
-fi
-
 if test x"$acx_mcrl" = xyes; then
+    AC_CHECK_SIZEOF([void *])
+    if test x"$ac_cv_sizeof_void_p" = x8; then
+        MCRL_CPPFLAGS="-DAT_64BIT"
+    fi
+
     AC_SUBST(MCRL_CPPFLAGS, ["$MCRL_CPPFLAGS -I$with_mcrl/include"])
     AC_SUBST(MCRL_LDFLAGS,  ["-L$with_mcrl/lib"])
     $1
@@ -43,8 +43,7 @@ fi
 AC_DEFUN([ACX_MCRL_LIBS],[
 AC_REQUIRE([ACX_MCRL])dnl
 if test x"$acx_mcrl" = xyes; then
-    AC_LANG_SAVE
-    AC_LANG_C
+    AC_LANG_PUSH([C])
 
     AX_LET([CPPFLAGS], ["$MCRL_CPPFLAGS $CPPFLAGS"],
            [LIBS], ["$LIBS"],
@@ -71,7 +70,7 @@ if test x"$acx_mcrl" = xyes; then
          [acx_mcrl_libs=no],
          [$MCRL_LIBS])])
 
-    AC_LANG_RESTORE
+    AC_LANG_POP([C])
 
     AC_SUBST(MCRL_LIBS)
 fi
