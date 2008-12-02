@@ -100,6 +100,21 @@ Download muCRL from <http://www.cwi.nl/~mcrl/mutool.html>.  We tested with
 muCRL-2.18.3.  Without muCRL, the distributed tool for state space
 generation (instantiator-mpi) will not be built.
 
+
+*** mCRL2
+Download the latest SVN version of mCRL2 from http://www.mcrl2.org/wiki/index.php/Download
+Build and install mCRL2 as usual:
+
+  ./configure <options>
+  make
+  make install
+
+Then type the command:
+
+  ./build/bin/bjam --install --install-boost-headers
+
+This should allow the mCRL2 greybox interface to compile.
+
 *** MPI
 In principle, any MPI library which supports MPI-IO should work.
 However, we tested only with Open MPI <http://www.open-mpi.org/>.
