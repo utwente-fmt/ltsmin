@@ -18,6 +18,7 @@ ACX_PTHREAD(
 AC_PROG_MAKE_SET
 AC_PROG_RANLIB
 AC_PROG_INSTALL
+AM_PROG_LIBTOOL
 
 ACX_MPI(
   [CC="$MPICC"
@@ -77,6 +78,10 @@ if test "x$acx_mcrl2" = xyes; then
     [:],
     [AC_MSG_WARN([mcrl2 library not found.])])
 fi
+AC_SUBST([NIPS_LIBS],['${top_srcdir}/nips-vm/libnips_vm.la'])
+AC_SUBST([NIPS_CPPFLAGS],['-I${top_srcdir}'])
+AC_SUBST([NIPS_LDFLAGS])
+
 AC_CHECK_LIB([rt], [aio_error])
 ACX_CADP_BCG_WRITE([have_bcg=yes],
   [have_bcg=no
@@ -123,6 +128,8 @@ AC_CONFIG_FILES([
        src/Makefile
        doc/Makefile
 ])
+ac_configure_args="$ac_configure_args --enable-keep-terminated-procs"
+AC_CONFIG_SUBDIRS([nips-vm])
 AC_OUTPUT
 
 cat <<EOM

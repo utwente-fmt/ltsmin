@@ -28,10 +28,6 @@ bin_PROGRAMS += nips2lts-grey nips-reach
 # endif
 endif
 
-NIPSLIBS = $(top_srcdir)/nips-vm/libnips_vm.a
-NIPSCPPFLAGS = -I$(top_srcdir)
-NIPSLDFLAGS =
-
 # gcf
 gcf_SOURCES = gcf-rw.c
 gcf_LDADD = libutil.a
@@ -54,9 +50,9 @@ lps2lts_grey_LDFLAGS  = $(MCRL2_LDFLAGS) $(AM_LDFLAGS)
 # nips2lts-grey
 nips2lts_grey_SOURCES  = spec2lts-grey.c nips-greybox.c nips-greybox.h   \
                          vector_set.c vector_set.h
-nips2lts_grey_LDADD    = libutil.a -lATerm $(NIPSLIBS)
-nips2lts_grey_CPPFLAGS = -DNIPS $(NIPSCPPFLAGS) $(MCRL_CPPFLAGS) $(AM_CPPFLAGS)
-nips2lts_grey_LDFLAGS  = $(NIPSLDFLAGS) $(MCRL_LDFLAGS) $(AM_LDFLAGS)
+nips2lts_grey_LDADD    = libutil.a -lATerm $(NIPS_LIBS)
+nips2lts_grey_CPPFLAGS = -DNIPS $(NIPS_CPPFLAGS) $(MCRL_CPPFLAGS) $(AM_CPPFLAGS)
+nips2lts_grey_LDFLAGS  = $(NIPS_LDFLAGS) $(MCRL_LDFLAGS) $(AM_LDFLAGS)
 
 # lpo-reach
 lpo_reach_SOURCES  = spec-reach.c mcrl-greybox.c mcrl-greybox.h  \
@@ -75,9 +71,9 @@ lps_reach_LDFLAGS  = $(MCRL2_LDFLAGS) $(AM_LDFLAGS)
 # nips-reach
 nips_reach_SOURCES  = spec-reach.c nips-greybox.c nips-greybox.h	\
                       vector_set.c vector_set.h
-nips_reach_LDADD    = libutil.a -lATerm $(NIPSLIBS)
-nips_reach_CPPFLAGS = -DNIPS $(NIPSCPPFLAGS) $(MCRL_CPPFLAGS) $(AM_CPPFLAGS)
-nips_reach_LDFLAGS  = $(NIPSLDFLAGS) $(MCRL_LDFLAGS) $(AM_LDFLAGS)
+nips_reach_LDADD    = libutil.a -lATerm $(NIPS_LIBS)
+nips_reach_CPPFLAGS = -DNIPS $(NIPS_CPPFLAGS) $(MCRL_CPPFLAGS) $(AM_CPPFLAGS)
+nips_reach_LDFLAGS  = $(NIPS_LDFLAGS) $(MCRL_LDFLAGS) $(AM_LDFLAGS)
 
 # lpo2lts-mpi
 lpo2lts_mpi_SOURCES  = spec2lts-mpi.c mcrl-greybox.c mcrl-greybox.h	\
@@ -95,9 +91,9 @@ lps2lts_mpi_LDFLAGS  = $(MCRL2_LDFLAGS) $(AM_LDFLAGS)
 
 # nips2lts-mpi
 nips2lts_mpi_SOURCES  = spec2lts-mpi.c nips-greybox.c nips-greybox.h config.h
-nips2lts_mpi_LDADD    = libmpi.a libutil.a $(NIPSLIBS)
-nips2lts_mpi_CPPFLAGS = -DNIPS $(NIPSCPPFLAGS) $(MCRL_CPPFLAGS) $(AM_CPPFLAGS)
-nips2lts_mpi_LDFLAGS  = $(NIPSLDFLAGS) $(AM_LDFLAGS)
+nips2lts_mpi_LDADD    = libmpi.a libutil.a $(NIPS_LIBS)
+nips2lts_mpi_CPPFLAGS = -DNIPS $(NIPS_CPPFLAGS) $(MCRL_CPPFLAGS) $(AM_CPPFLAGS)
+nips2lts_mpi_LDFLAGS  = $(NIPS_LDFLAGS) $(AM_LDFLAGS)
 
 # mpi-event-test
 mpi_event_test_SOURCES = mpi-event-test.c config.h
