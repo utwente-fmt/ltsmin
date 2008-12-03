@@ -54,7 +54,7 @@ lps2lts_grey_LDFLAGS  = $(MCRL2_LDFLAGS) $(AM_LDFLAGS)
 # nips2lts-grey
 nips2lts_grey_SOURCES  = spec2lts-grey.c nips-greybox.c nips-greybox.h   \
                          vector_set.c vector_set.h
-nips2lts_grey_LDADD    = libutil.a -laterm $(NIPSLIBS)
+nips2lts_grey_LDADD    = libutil.a -lATerm $(NIPSLIBS)
 nips2lts_grey_CPPFLAGS = -DNIPS $(NIPSCPPFLAGS) $(MCRL_CPPFLAGS) $(AM_CPPFLAGS)
 nips2lts_grey_LDFLAGS  = $(NIPSLDFLAGS) $(MCRL_LDFLAGS) $(AM_LDFLAGS)
 
@@ -75,7 +75,7 @@ lps_reach_LDFLAGS  = $(MCRL2_LDFLAGS) $(AM_LDFLAGS)
 # nips-reach
 nips_reach_SOURCES  = spec-reach.c nips-greybox.c nips-greybox.h	\
                       vector_set.c vector_set.h
-nips_reach_LDADD    = libutil.a -laterm $(NIPSLIBS)
+nips_reach_LDADD    = libutil.a -lATerm $(NIPSLIBS)
 nips_reach_CPPFLAGS = -DNIPS $(NIPSCPPFLAGS) $(MCRL_CPPFLAGS) $(AM_CPPFLAGS)
 nips_reach_LDFLAGS  = $(NIPSLDFLAGS) $(MCRL_LDFLAGS) $(AM_LDFLAGS)
 
