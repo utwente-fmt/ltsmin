@@ -7,16 +7,16 @@ AC_CONFIG_HEADERS([src/amconfig.h])
 
 # Checks for programs.
 CFLAGS="-g -W -Wall -O2 -std=c99 $CFLAGS"
+CXXFLAGS="-g -W -Wall -Wno-inline -O2 -ftemplate-depth-128 -finline-functions $CXXFLAGS"
 AM_PROG_CC_C_O
-CXXFLAGS="-g -W -Wall -O2 -ftemplate-depth-128 -finline-functions -Wno-inline -pthread -fPIC $CXXFLAGS"
 AC_PROG_CXX
 ACX_PTHREAD(
   [LIBS="$PTHREAD_LIBS $LIBS"
    CFLAGS="$CFLAGS $PTHREAD_CFLAGS"
+   CXXFLAGS="$CXXFLAGS $PTHREAD_CFLAGS"
    CC="$PTHREAD_CC"],
   [AC_MSG_FAILURE([no pthread support found.])])
 AC_PROG_MAKE_SET
-AC_PROG_RANLIB
 AC_PROG_INSTALL
 AM_PROG_LIBTOOL
 
