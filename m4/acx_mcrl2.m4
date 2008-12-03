@@ -31,7 +31,7 @@ if test x"$acx_mcrl2" = xyes; then
     AC_SUBST(MCRL2_LDFLAGS,  ["-L${with_mcrl2}/lib/mcrl2"])
     AX_LET([CPPFLAGS], ["$MCRL2_CPPFLAGS $CPPFLAGS"],
       [AC_CHECK_HEADER([mcrl2/atermpp/set.h],,
-         [AC_MSG_ERROR([cannot find mCRL2 Boost headers,
+         [AC_MSG_FAILURE([cannot find mCRL2 Boost headers,
 see README on how to install mCRL2 properly (--install-boost-headers).])]
          )])
     AC_LANG_POP([C++])
