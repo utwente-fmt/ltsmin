@@ -6,11 +6,14 @@
 #include <mpi.h>
 
 #include "fast_hash.h"
-#ifdef MCRL
+#if defined(MCRL)
 #include "mcrl-greybox.h"
-#endif
-#ifdef MCRL2
+#elif defined(MCRL2)
 #include "mcrl2-greybox.h"
+#elif defined(NIPS)
+#include "nips-greybox.h"
+#else
+#error "Unknown greybox provider."
 #endif
 #include "treedbs.h"
 #include "stream.h"
@@ -396,21 +399,24 @@ int main(int argc, char*argv[]){
 	}
 	if (mpi_me==0) MPI_Barrier(MPI_COMM_WORLD);
 	Warning(info,"initializing grey box module");
-#ifdef MCRL
+#if defined(MCRL)
 	MCRLinitGreybox(argc,argv,bottom);
-#endif
-#ifdef MCRL2
+#elif defined(MCRL2)
 	MCRL2initGreybox(argc,argv,bottom);
+#elif defined(NIPS)
+        (void)bottom;
+	NIPSinitGreybox(argc,argv);
 #endif
 	Warning(info,"creating model for %s",argv[argc-1]);
 	model_t model=GBcreateBase();
 	GBsetChunkMethods(model,mpi_newmap,mpi_index_pool_create(MPI_COMM_WORLD,mpi_queue,MAX_TERM_LEN),
 		 mpi_int2chunk,mpi_chunk2int,mpi_get_count);
-#ifdef MCRL
+#if defined(MCRL)
 	MCRLloadGreyboxModel(model,argv[argc-1]);
-#endif
-#ifdef MCRL2
+#elif defined(MCRL2)
 	MCRL2loadGreyboxModel(model,argv[argc-1]);
+#elif defined(NIPS)
+	NIPSloadGreyboxModel(model,argv[argc-1]);
 #endif
 	if (cache) model=GBaddCache(model);
 	event_barrier_wait(barrier);

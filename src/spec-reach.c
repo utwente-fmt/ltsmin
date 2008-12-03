@@ -6,11 +6,14 @@
 
 #include "archive.h"
 #include "runtime.h"
-#ifdef MCRL
+#if defined(MCRL)
 #include "mcrl-greybox.h"
-#endif
-#ifdef MCRL2
+#elif defined(MCRL2)
 #include "mcrl2-greybox.h"
+#elif defined(NIPS)
+#include "nips-greybox.h"
+#else
+#error "Unknown greybox provider."
 #endif
 #include "treedbs.h"
 #include "ltsman.h"
@@ -149,21 +152,24 @@ int main(int argc, char *argv[]){
 	if (verbosity==0) {
 		log_set_flags(info,LOG_IGNORE);
 	}
-#ifdef MCRL
+#if defined(MCRL)
 	MCRLinitGreybox(argc,argv,stackbottom);
-#endif
-#ifdef MCRL2
+#elif defined(MCRL2)
 	MCRL2initGreybox(argc,argv,stackbottom);
+#elif defined(NIPS)
+        (void)stackbottom;
+	NIPSinitGreybox(argc,argv);
 #endif
 	Warning(info,"opening %s",argv[argc-1]);
 	model=GBcreateBase();
 	GBsetChunkMethods(model,new_string_index,NULL,
 		(int2chunk_t)SIgetC,(chunk2int_t)SIputC,(get_count_t)SIgetCount);
-#ifdef MCRL
+#if defined(MCRL)
 	MCRLloadGreyboxModel(model,argv[argc-1]);
-#endif
-#ifdef MCRL2
+#elif defined(MCRL2)
 	MCRL2loadGreyboxModel(model,argv[argc-1]);
+#elif defined(NIPS)
+	NIPSloadGreyboxModel(model,argv[argc-1]);
 #endif
 
 	ltstype=GBgetLTStype(model);

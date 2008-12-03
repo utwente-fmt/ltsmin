@@ -6,11 +6,14 @@
 
 #include "archive.h"
 #include "runtime.h"
-#ifdef MCRL
+#if defined(MCRL)
 #include "mcrl-greybox.h"
-#endif
-#ifdef MCRL2
+#elif defined(MCRL2)
 #include "mcrl2-greybox.h"
+#elif defined(NIPS)
+#include "nips-greybox.h"
+#else
+#error "Unknown greybox provider."
 #endif
 #include "treedbs.h"
 #include "ltsman.h"
@@ -115,11 +118,13 @@ int main(int argc, char *argv[]){
 	void* stackbottom=&argv;
 	RTinit(argc,&argv);
 	take_vars(&argc,argv);
-#ifdef MCRL
+#if defined(MCRL)
 	MCRLinitGreybox(argc,argv,stackbottom);
-#endif
-#ifdef MCRL2
+#elif defined(MCRL2)
 	MCRL2initGreybox(argc,argv,stackbottom);
+#elif defined(NIPS)
+        (void)stackbottom;
+	NIPSinitGreybox(argc,argv);
 #endif
 	parse_options(options,argc,argv);
 	if (!outputarch && write_lts) Fatal(1,error,"please specify the output archive with -out");
@@ -139,11 +144,12 @@ int main(int argc, char *argv[]){
 	model_t model=GBcreateBase();
 	GBsetChunkMethods(model,new_string_index,NULL,
 		(int2chunk_t)SIgetC,(chunk2int_t)SIputC,(get_count_t)SIgetCount);
-#ifdef MCRL
+#if defined(MCRL)
 	MCRLloadGreyboxModel(model,argv[argc-1]);
-#endif
-#ifdef MCRL2
+#elif defined(MCRL2)
 	MCRL2loadGreyboxModel(model,argv[argc-1]);
+#elif defined(NIPS)
+	NIPSloadGreyboxModel(model,argv[argc-1]);
 #endif
 
 	if (cache) model=GBaddCache(model);
