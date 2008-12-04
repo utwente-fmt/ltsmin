@@ -129,6 +129,7 @@ model_t GBcreateBase(){
 	model->chunk2int=NULL;
 	model->map=NULL;
 	model->get_count=NULL;
+	return model;
 }
 
 struct group_cache {
@@ -156,7 +157,7 @@ static void add_cache_entry(void*context,int*label,int*dst){
 	struct group_cache *ctx=(struct group_cache *)context;
 	//Warning(info,"adding entry %d",ctx->begin[ctx->explored]);
 	//int dst_index=TreeFold(ctx->dbs,dst);
-	int dst_index=SIputC(ctx->idx,dst,ctx->len);
+	int dst_index=SIputC(ctx->idx,(char*)dst,ctx->len);
 	if (dst_index>=ctx->visited) ctx->visited=dst_index+1;
 	ensure_access(ctx->dest_man,ctx->begin[ctx->explored]);
 	ctx->label[ctx->begin[ctx->explored]]=label[0];
@@ -181,7 +182,7 @@ static int cached_short(model_t self,int group,int*src,TransitionCB cb,void*user
 	int len=parent->e_info->length[group];
 	int tmp[len];
 	//int src_idx=TreeFold(ctx->dbs,src);
-	int src_idx=SIputC(ctx->idx,src,ctx->len);
+	int src_idx=SIputC(ctx->idx,(char*)src,ctx->len);
 	if (src_idx==ctx->visited){
 		//Warning(info,"exploring in group %d len=%d",group,len);
 		ctx->visited++;
@@ -223,20 +224,20 @@ model_t GBaddCache(model_t model){
 	for(int i=0;i<N;i++){
 		int len=model->e_info->length[i];
 		Warning(info,"group %d/%d depends on %d variables",i,N,len);
-		ctx->cache[i].len=len*4;
+		ctx->cache[i].len=len*sizeof(int);
 		ctx->cache[i].idx=SIcreate();
 		//ctx->cache[i].dbs=TreeDBScreate(model->e_info->length[i]);
 		ctx->cache[i].explored=0;
 		ctx->cache[i].visited=0;
 		ctx->cache[i].begin_man=create_manager(256);
 		ctx->cache[i].begin=NULL;
-		add_array(ctx->cache[i].begin_man,(void**)&(ctx->cache[i].begin),sizeof(int));
+		ADD_ARRAY(ctx->cache[i].begin_man,ctx->cache[i].begin,int);
 		ctx->cache[i].begin[0]=0;
 		ctx->cache[i].dest_man=create_manager(256);
 		ctx->cache[i].label=NULL;
-		add_array(ctx->cache[i].dest_man,(void**)&(ctx->cache[i].label),sizeof(int));
+		ADD_ARRAY(ctx->cache[i].dest_man,ctx->cache[i].label,int);
 		ctx->cache[i].dest=NULL;
-		add_array(ctx->cache[i].dest_man,(void**)&(ctx->cache[i].dest),sizeof(int));
+		ADD_ARRAY(ctx->cache[i].dest_man,ctx->cache[i].dest,int);
 	}
 	cached->context=ctx;
 	cached->next_short=cached_short;
@@ -341,7 +342,9 @@ int GBchunkPut(model_t model,int type_no,chunk c){
 
 chunk GBchunkGet(model_t model,int type_no,int chunk_no){
 	chunk_len len;
-	char* data=(char*)model->int2chunk(model->map[type_no],chunk_no,&len);
+	int tmp;
+	char* data=(char*)model->int2chunk(model->map[type_no],chunk_no,&tmp);
+	len=(chunk_len)tmp;
 	return chunk_ld(len,data);
 }
 

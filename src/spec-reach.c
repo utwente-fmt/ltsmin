@@ -265,7 +265,7 @@ int main(int argc, char *argv[]){
 
 	ltstype=GBgetLTStype(model);
 	N=ltstype->state_length;
-	edge_info_t e_info=GBgetEdgeInfo(model);
+	e_info=GBgetEdgeInfo(model);
 	nGrps=e_info->groups;
 	domain=vdom_create(N);
 	visited=vset_create(domain,0,NULL);

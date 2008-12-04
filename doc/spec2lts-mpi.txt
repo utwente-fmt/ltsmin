@@ -23,6 +23,10 @@ The tool uses http://www.mpi-forum.org/[MPI] for distributed
 computation, thus it has to be started via `mpirun`.  _nodespec_
 determines which processors the tool is run on.
 
+The workers send messages to themselves. So if you use http://www.open-mpi.org/[Open MPI],
+you have to use +mpirun -mca btl <connect>,self <nodespec>+ where
+<connect> can be tcp, mx, ib, etc. 
+
 The tool uses MPI-IO, the I/O chapter in MPI-2, so if your MPI implementation
 has special extensions in MPI-IO, such as http://www.pvfs.org/[PVFS2], then
 those extensions are supported.
@@ -99,7 +103,7 @@ is compatible with the mCRL tools, you need to type
 
 ----
 mkdir brp.dir
-mpirun -np 2 instantiator-mpi -alt rww -plain -out brp.dir/%s brp.tbf
+mpirun -np 2 -mca btl tcp,self lpo2lts-mpi -plain -out brp.dir/%s brp.tbf
 ----
 
 Please note that you must create the directory yourself. We would have liked
@@ -109,7 +113,7 @@ for creating directories.
 If you want to create a compressed GCF file then all you need to type is
 
 ----
-mpirun -np 2 instantiator-mpi -alt rww -out brp.gcf brp.tbf
+mpirun -np 2 -mca btl tcp,self lpo2lts-mpi -out brp.gcf brp.tbf
 ----
 
 This GCF file can be read by both linkman:ltsmin-mpi[1] and linkman:ltsmin-convert[1].

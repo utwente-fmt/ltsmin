@@ -49,7 +49,8 @@ static void fix_array(void**ar,int size,int e_size){
 void add_array(array_manager_t man,void**ar,int e_size){
 	if(man->managed>=man->managed_size){
 		man->managed_size+=MBLOCK;
-		fix_array((void**)&(man->arrays),man->managed_size,sizeof(struct array));
+		struct array **ptr=&(man->arrays);
+		fix_array((void**)ptr,man->managed_size,sizeof(struct array));
 	}
 	fix_array(ar,man->size,e_size);
 	man->arrays[man->managed].e_size=e_size;

@@ -163,7 +163,7 @@ int SIlookupC(string_index_t si,const char*str,int len){
 	int bucket;
 	int idx;
 
-	hash=SuperFastHash((unsigned char*) str,len,0);
+	hash=SuperFastHash(str,len,0);
 	bucket=hash&si->mask;
 	for(idx=si->table[bucket];idx!=END_OF_LIST;idx=si->next[idx]){
 		if (0==memcmp(str,si->data[idx],len)) return idx;
@@ -207,7 +207,7 @@ static void PutEntry(string_index_t si,const char*str,int s_len,int index){
 				while(current!=END_OF_LIST){
 					next=si->next[current];
 					len=si->len[current];
-					hash=SuperFastHash((unsigned char*) si->data[current],len,0);
+					hash=SuperFastHash(si->data[current],len,0);
 					bucket=hash&si->mask;
 					assert(bucket==i||bucket==N+i);
 					si->next[current]=si->table[bucket];
@@ -227,7 +227,7 @@ static void PutEntry(string_index_t si,const char*str,int s_len,int index){
 	si->len[index]=s_len;
 	si->data[index]=RTmalloc(s_len);
 	memcpy(si->data[index],str,s_len);
-	hash=SuperFastHash((unsigned char*) str,s_len,0);
+	hash=SuperFastHash(str,s_len,0);
 	bucket=hash&si->mask;
 	si->next[index]=si->table[bucket];
 	si->table[bucket]=index;

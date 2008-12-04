@@ -62,11 +62,15 @@ Suppress all warning and information messages.
         Print help message.
 
 == EXAMPLES
-The expected use of this tool is to convert (uncompressed) _DIR_ to GCF and back:
+
+The expected use of this tool is to convert GCF files to other file formats and back:
 
 ----
-ltsmin-convert brp.dir/%s brp.cgf
-mkdir brp.dir ; ltsmin-convert -plain brp.gcf brp.dir/%s
+ltsmin-convert brp.gcf brp.dir
+ltsmin-convert brp.dir brp.gcf
+ltsmin-convert brp.gcf brp.bcg
+ltsmin-convert brp.bcg brp.gcf
+ltsmin-convert -segments 2 brp.bcg brp.gcf
 ----
 
 == EXIT STATUS
@@ -77,5 +81,12 @@ mkdir brp.dir ; ltsmin-convert -plain brp.gcf brp.dir/%s
 
 == SEE ALSO
 linkman:ltsmin[5], 
-linkman:instantiator-mpi[1], 
-linkman:ltsmin-convert[1]
+linkman:lpo2lts-grey[1],
+linkman:lps2lts-grey[1],
+linkman:nips2lts-grey[1],
+linkman:lpo2lts-mpi[1],
+linkman:lps2lts-mpi[1],
+linkman:nips2lts-mpi[1],
+linkman:ltsmin-convert[1],
+http://www.inrialpes.fr/vasy/cadp/[CADP],
+http://www.inrialpes.fr/vasy/cadp/man/bcg.html[BCG]

@@ -32,7 +32,7 @@ static char* print_term(ATerm t){
 	return ATwriteToString(MCRLprint(t));
 }
 
-static ATerm parse_term(const char*str){
+static ATerm parse_term(char*str){
 	return MCRLparse(str);
 }
 
@@ -118,7 +118,6 @@ void MCRLloadGreyboxModel(model_t m,char*model){
 	instances++;
 	if(!MCRLinitNamedFile(model)) {
 		Fatal(1,error,"failed to open %s",model);
-		return NULL;
 	}
 	if (!RWinitialize(MCRLgetAdt())) {
 		ATerror("Initialize rewriter");

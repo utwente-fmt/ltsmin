@@ -30,7 +30,7 @@ static void pkt_write(stream_t stream,void*buf,size_t count){
 			buf++;
 		default:
 			for(;;){
-				if(stream->state==stream->len+2){
+				if(stream->state==((uint32_t)stream->len)+2){
 					stream->cb(stream->context,stream->len,stream->buffer);
 					stream->state=0;
 					break;

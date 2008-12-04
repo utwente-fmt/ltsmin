@@ -21,7 +21,7 @@ at_map_t ATmapCreate(model_t model,int type_no,pretty_print_t print,parse_t pars
 	map->int2aterm=ATtableCreate(1024,75);
 	map->aterm2int=ATtableCreate(1024,75);
 	map->print=print?print:ATwriteToString;
-	map->parse=parse?parse:ATreadFromString;
+	map->parse=parse?parse:((parse_t)ATreadFromString);
 	return map;
 }
 
@@ -51,7 +51,7 @@ ATerm ATfindTerm(at_map_t map,int idx){
 			Fatal(1,error,"lookup of %d failed",idx);
 		}
 		char s[c.len+1];
-		for(int i=0;i<c.len;i++) s[i]=c.data[i];
+		for(unsigned int i=0;i<c.len;i++) s[i]=c.data[i];
 		s[c.len]=0;
 		t=map->parse(s);
 		ATtablePut(map->aterm2int,t,(ATerm)i);

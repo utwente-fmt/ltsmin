@@ -6,7 +6,7 @@ implementation of signature based bisimulation reduction for strong
 bisimulation and branching bisimulation.  The input for this tool is a
 labelled transition system (LTS) in DIR format.  To create an LTS in
 DIR format one can either use instantiators and dmp2dir from the muCRL
-toolset or the instantiator-mpi tool bundled with this release.
+toolset or one of the xxx2lts-mpi tools bundled with this release.
 
 The tools in this release support compression of DIR files as well as
 putting a DIR in an archive file.  A utility that can convert files
@@ -100,7 +100,7 @@ Download GNU make from <http://www.gnu.org/software/make/>.
 *** muCRL
 Download muCRL from <http://www.cwi.nl/~mcrl/mutool.html>.  We tested with
 muCRL-2.18.3.  Without muCRL, the distributed tool for state space
-generation (instantiator-mpi) will not be built.
+generation (lpo2lts-mpi) will not be built.
 
 
 *** mCRL2
@@ -120,7 +120,7 @@ This should allow the mCRL2 greybox interface to compile.
 *** MPI
 In principle, any MPI library which supports MPI-IO should work.
 However, we tested only with Open MPI <http://www.open-mpi.org/>.
-Without MPI, the distributed tools (instantiator-mpi, ltsmin-mpi) will
+Without MPI, the distributed tools (xxx2lts-mpi, ltsmin-mpi) will
 not be built.
 
 *** AsciiDoc

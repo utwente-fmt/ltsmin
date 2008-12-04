@@ -31,11 +31,12 @@ stream_t arch_write(archive_t archive,char *name,char*code,int hdr){
 			return stream_add_code(s,code);
 		}
 	}
+	return s;
 }
 
 
 arch_enum_t arch_enum(archive_t archive,char *regex){
-	archive->procs.enumerator(archive,regex);
+	return archive->procs.enumerator(archive,regex);
 }
 
 void arch_close(archive_t *archive){

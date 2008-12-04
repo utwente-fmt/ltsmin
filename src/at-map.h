@@ -16,7 +16,7 @@ typedef struct at_map_s *at_map_t;
 typedef char*(*pretty_print_t)(ATerm t);
 
 /// Parsing function as a parameter for the map.
-typedef ATerm(*parse_t)(const char* str);
+typedef ATerm(*parse_t)(char* str);
 
 /** \brief Create a map for a type in a grey box model.
  *

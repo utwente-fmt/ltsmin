@@ -153,7 +153,6 @@ int mpi_get_count(void*map){
 #define MAX_PARAMETERS 256
 #define MAX_TERM_LEN 5000
 
-static mpi_index_pool_t index_pool;
 static archive_t arch;
 static int verbosity=1;
 static char *outputarch=NULL;
@@ -437,8 +436,8 @@ int main(int argc, char*argv[]){
 	if (find_dlk) {
 		write_lts=0;
 		state_man=create_manager(65536);
-		add_array(state_man,&parent_ofs,4);
-		add_array(state_man,&parent_seg,2);
+		ADD_ARRAY(state_man,parent_ofs,uint32_t);
+		ADD_ARRAY(state_man,parent_seg,uint16_t);
 	}
 	/***************************************************/
 	if (mpi_me==0){

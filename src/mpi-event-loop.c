@@ -33,11 +33,11 @@ event_queue_t event_queue(){
 	event_queue_t queue=(event_queue_t)RTmalloc(sizeof(struct event_queue_s));
 	queue->man=create_manager(1024);
 	queue->request=NULL;
-	add_array(queue->man,&queue->request,sizeof(MPI_Request));
+	ADD_ARRAY(queue->man,queue->request,MPI_Request);
 	queue->cb=NULL;
-	add_array(queue->man,&queue->cb,sizeof(event_callback));
+	ADD_ARRAY(queue->man,queue->cb,event_callback);
 	queue->context=NULL;
-	add_array(queue->man,&queue->context,sizeof(void*));
+	ADD_ARRAY(queue->man,queue->context,void*);
 	queue->pending=0;
 	queue->wait_some_calls=0;
 	queue->wait_some_multi=0;

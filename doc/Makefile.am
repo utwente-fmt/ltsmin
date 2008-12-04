@@ -2,14 +2,14 @@ ASCIIDOC = @ASCIIDOC@
 XMLTO    = @XMLTO@
 ASCIIDOC_FLAGS = -a version=$(VERSION)
 
-doc_ASCIIDOC = instantiator-mpi.txt ltsmin-mpi.txt ltsmin-convert.txt	\
+doc_ASCIIDOC = ltsmin-mpi.txt ltsmin-convert.txt	\
 	ltsmin.txt gcf.txt lpo2lts-mpi.txt lps2lts-mpi.txt nips2lts-mpi.txt \
 	lpo2lts-grey.txt lps2lts-grey.txt nips2lts-grey.txt \
 	lpo-reach.txt lps-reach.txt nips-reach.txt
 EXTRA_DIST = asciidoc.conf callouts.xsl spec2lts-mpi.txt spec2lts-grey.txt \
 	spec-reach.txt $(doc_ASCIIDOC)
 
-MANPAGES = instantiator-mpi.1 ltsmin-mpi.1 ltsmin-convert.1 gcf.1       \
+MANPAGES = ltsmin-mpi.1 ltsmin-convert.1 gcf.1       \
         lpo-reach.1 lps-reach.1 nips-reach.1 lpo2lts-grey.1             \
         lps2lts-grey.1 nips2lts-grey.1 lpo2lts-mpi.1 lps2lts-mpi.1      \
         nips2lts-mpi.1 ltsmin.5

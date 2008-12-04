@@ -50,7 +50,7 @@ Print a help message.
 == EXAMPLES
 In this example, we assume Open MPI with a TCP interconnect.
 
-Working with the LTS, we generated in the example for linkman:instantiator-mpi[1], we
+Working with the LTS, we generated in the example for linkman:lpo2lts-mpi[1], we
 can now apply strong bisimulation reduction.
 
 ----
@@ -74,5 +74,7 @@ mpirun -np 2 -mca btl tcp,self ltsmin-mpi -plain -b brp-s.gcf brp-b.dir/%s
 
 == SEE ALSO
 linkman:ltsmin[5], 
-linkman:instantiator-mpi[1], 
+linkman:lpo2lts-mpi[1], 
+linkman:lps2lts-mpi[1], 
+linkman:nips2lts-mpi[1], 
 linkman:ltsmin-convert[1]
