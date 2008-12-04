@@ -1,4 +1,4 @@
 #!/bin/sh
 rm -f config.cache
 export AUTOMAKE="automake -a"
-autoreconf
+autoreconf -is
