@@ -169,6 +169,7 @@ static int mpi_io=0;
 static event_queue_t mpi_queue;
 static event_barrier_t barrier;
 
+
 struct option options[]={
 	{"",OPT_NORMAL,NULL,NULL,NULL,
 		"usage: mpirun <nodespec> " MODEL_TYPE "2lts-mpi [options] <model>",NULL,NULL,NULL},

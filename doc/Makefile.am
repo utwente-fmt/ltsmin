@@ -3,10 +3,13 @@ XMLTO    = @XMLTO@
 ASCIIDOC_FLAGS = -a version=$(VERSION)
 
 doc_ASCIIDOC = instantiator-mpi.txt ltsmin-mpi.txt ltsmin-convert.txt	\
-    ltsmin.txt
-EXTRA_DIST = asciidoc.conf callouts.xsl $(doc_ASCIIDOC)
+	ltsmin.txt gcf.txt lpo2lts-mpi.txt lps2lts-mpi.txt nips2lts-mpi.txt \
+	lpo2lts-grey.txt lps2lts-grey.txt nips2lts-grey.txt \
+	lpo-reach.txt lps-reach.txt nips-reach.txt
+EXTRA_DIST = asciidoc.conf callouts.xsl spec2lts-mpi.txt spec2lts-grey.txt \
+	spec-reach.txt $(doc_ASCIIDOC)
 
-MANPAGES = instantiator-mpi.1 ltsmin-mpi.1 ltsmin-convert.1 ltsmin.5
+MANPAGES = instantiator-mpi.1 ltsmin-mpi.1 ltsmin-convert.1 ltsmin.5 gcf.1 lpo2lts-mpi.txt
 HTML = $(doc_ASCIIDOC:%.txt=%.html)
 
 dist_man_MANS  = $(MANPAGES)
@@ -25,6 +28,18 @@ MAINTAINERCLEANFILES = $(HTML) $(MANPAGES)
 html-local: $(HTML)
 
 if HAVE_ASCIIDOC
+lpo2lts-mpi.html lpo2lts-mpi.xml: spec2lts-mpi.txt
+lps2lts-mpi.html lps2lts-mpi.xml: spec2lts-mpi.txt
+nips2lts-mpi.html nips2lts-mpi.xml: spec2lts-mpi.txt
+
+lpo2lts-grey.html lpo2lts-grey.xml: spec2lts-grey.txt
+lps2lts-grey.html lps2lts-grey.xml: spec2lts-grey.txt
+nips2lts-grey.html nips2lts-grey.xml: spec2lts-grey.txt
+
+lpo-reach.html lpo-reach.xml: spec-reach.txt
+lps-reach.html lps-reach.xml: spec-reach.txt
+nips-reach.html nips-reach.xml: spec-reach.txt
+
 .txt.html:
 	$(ASCIIDOC.html)
 
@@ -38,15 +53,15 @@ endif
 endif
 
 define ASCIIDOC.xml
-  $(ASCIIDOC) $(OUTPUT_OPTION) -b docbook -d manpage $(ASCIIDOC_FLAGS) $^
+  $(ASCIIDOC) $(OUTPUT_OPTION) -b docbook -d manpage $(ASCIIDOC_FLAGS) $<
 endef
 
 define ASCIIDOC.html
-  $(ASCIIDOC) $(OUTPUT_OPTION) -d manpage $(ASCIIDOC_FLAGS) $^
+  $(ASCIIDOC) $(OUTPUT_OPTION) -d manpage $(ASCIIDOC_FLAGS) $<
 endef
 
 define ASCIIDOC.man
-  $(XMLTO) -m callouts.xsl man $^
+  $(XMLTO) -m callouts.xsl man $<
 endef
 
 .DELETE_ON_ERROR:

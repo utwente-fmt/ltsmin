@@ -13,16 +13,47 @@ ltsmin-convert - convert file formats for labelled transition system
 
 == DESCRIPTION
 This tool copies the input to the output and changes the achive format on-the-fly.
-Both input and output can be a GCF archive or a set of files.
-To use a set of files the argument needs an occurrence of ++%s++.
-If no ++%s++ is present then a GCF archive is assumed.
+Both input and output format are detected by pattern matching in the following table:
 
-Please note that this tool _does not_ use MPI-IO.
+++\*.dir++:: DIR format in a directory.
+++\*.bcg++:: BCG file format. The format is always detected, but BCG can only be read or written if CADP was enabled during compilation.
+++\*%s\*++:: DIR+ format for reading and DIR format for writing using a set of files.
+++*++:: DIR+ format using a GCF archive.
+
+The difference between DIR and DIR+ format is the former uses uncompressed files and the latter support compression.
+It is possible that a directory named .dir actually contain DIR+ format.
+This tool will read that directory, but the tools from the mCRL toolset will failed with the error message
+----
+wrong file version: 0
+----
+If that happens then you may convert the directory by typing the command:
+----
+ltsmin-convert bad.dir good.dir
+----
 
 == OPTIONS
 
+
+*-segments*::
+Set the number of segments in the output file.
+If the output format does not support segmentation (BCG) then the default is 1 and
+specifying any number other than 1 is an error. Otherwise, the default is the same
+number of segments as the input. Please note that the algorithm used for changing
+the number of segments is simple. It guarantees that the number of states in the output is balanced,
+but not much more. E.g. if the input is in BFS order and just one segment then
+then the output will still be in BFS order. however, if the input has more than one segment then
+BFS order is lost.
+
 *-plain*::
-        Disable output compression. Input compression is detected.
+Disable output compression. Input compression is detected. For file sets and .dir directories output
+compression is disabled by default.
+
+*-bs <block size>*::
+Set the block size to be used for copying streams.
+This is also used as the GCF block size.
+
+*-bc <block count>*::
+Set the number of blocks in one GCF cluster.
 
 *-q*::
 Suppress all warning and information messages.
@@ -41,7 +72,7 @@ mkdir brp.dir ; ltsmin-convert -plain brp.gcf brp.dir/%s
 == EXIT STATUS
 0::
         Successful termination.
-1::
+>0::
         Some error occurred.
 
 == SEE ALSO

@@ -35,8 +35,6 @@ static struct option options[]={
 		"usage: " MODEL_TYPE "-reach [options] <model>",NULL,NULL,NULL},
 	{"-help",OPT_NORMAL,usage,NULL,NULL,
 		"print this help message",NULL,NULL,NULL},
-	{"--help",OPT_NORMAL,usage,NULL,NULL,
-		"print this help message",NULL,NULL,NULL},
 	{"-v",OPT_NORMAL,inc_int,&verbosity,NULL,"increase the level of verbosity",NULL,NULL,NULL},
 	{"-q",OPT_NORMAL,reset_int,&verbosity,NULL,"be silent",NULL,NULL,NULL},
 	{"",OPT_NORMAL,NULL,NULL,NULL,"exploration order options (default is BFS):",NULL,NULL,NULL},

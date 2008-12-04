@@ -1,0 +1,59 @@
+//                           -*- mode: doc; outline-regexp: "==\(=*\) ." -*-
+gcf(1)
+====
+:Author:  Stefan Blom
+:Email:   <sccblom@cs.utwente.nl>
+:Date:    2008-12-03
+
+
+== NAME
+gcf - Build and extract GCF archives.
+
+== SYNOPSIS
+gcf <gcf> [file1 [file2 [...]]]
+
+gcf <gcf> directory
+
+gcf -x <gcf> <outputspec>
+
+
+== DESCRIPTION
+This tool can build a GCF archive from a given list of files or from all files within a given directory.
+It can extract the files from a GCF archive and write them to a directory or to a set of files given by a pattern.
+
+A GCF archive provides interleaved storage of multiple large files within one very large file.
+The GCF file structure was designed with distributed file systems and distributed applications in mind.
+The key points of the structure are that a GCF file contains one or more clusters and each of those clusters contains
+2 or more blocks. One block in each cluster is reserved for meta data.
+
+== OPTIONS
+
+*-q*::
+Suppress the printing of runtime information.
+
+*-z <compression>*::
+Set the compression method for all files.
+The default compression is gzip. To use a different level of gzip compression
+you can use *-z "gzip<level>"*. To disable all forms of compression
+use *-z ""*
+
+*-x*::
+Enables extraction of a GCF archive.
+
+*-help*::
+Print a help message.
+
+*-bs <block size>*::
+Set the block size to be used for copying streams.
+This is also used as the GCF block size.
+
+*-bc <block count>*::
+Set the number of blocks in one GCF cluster.
+
+== EXIT STATUS
+0::
+        Successful termination.
+>0::
+        Some error occurred.
+
+

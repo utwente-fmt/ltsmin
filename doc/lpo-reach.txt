@@ -1,0 +1,9 @@
+//                           -*- mode: doc; outline-regexp: "==\(=*\) ." -*-
+lpo-reach(1)
+==========
+:Author:  Stefan Blom
+:Email:   <sccblom@cs.utwente.nl>
+:Date:    2008-12-03
+
+include::spec-reach.txt[]
+
