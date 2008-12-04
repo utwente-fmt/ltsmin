@@ -42,6 +42,11 @@ extern void vset_add(vset_t set,int* e);
 extern int vset_member(vset_t set,int* e);
 
 /**
+\brief Test if two sets are equal.
+*/
+extern int vset_equal(vset_t set1,vset_t set2);
+
+/**
 \brief Test if a set is empty.
 */
 extern int vset_is_empty(vset_t set);

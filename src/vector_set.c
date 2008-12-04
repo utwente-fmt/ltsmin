@@ -129,6 +129,10 @@ int vset_is_empty(vset_t set){
 	return ATisEqual(set->set,emptyset);
 }
 
+int vset_equal(vset_t set1,vset_t set2){
+	return ATisEqual(set1->set,set2->set);
+}
+
 void vset_clear(vset_t set){
 	set->set=emptyset;
 }

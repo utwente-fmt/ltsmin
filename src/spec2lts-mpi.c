@@ -8,10 +8,13 @@
 #include "fast_hash.h"
 #if defined(MCRL)
 #include "mcrl-greybox.h"
+#define MODEL_TYPE "mcrl"
 #elif defined(MCRL2)
 #include "mcrl2-greybox.h"
+#define MODEL_TYPE "mcrl2"
 #elif defined(NIPS)
 #include "nips-greybox.h"
+#define MODEL_TYPE "nips"
 #else
 #error "Unknown greybox provider."
 #endif
@@ -168,7 +171,7 @@ static event_barrier_t barrier;
 
 struct option options[]={
 	{"",OPT_NORMAL,NULL,NULL,NULL,
-		"usage: mpirun <nodespec> inst-mpi options file ...",NULL,NULL,NULL},
+		"usage: mpirun <nodespec> " MODEL_TYPE "2lts-mpi [options] <model>",NULL,NULL,NULL},
 	{"-v",OPT_NORMAL,inc_int,&verbosity,NULL,"increase the level of verbosity",NULL,NULL,NULL},
 	{"-q",OPT_NORMAL,log_suppress,&info,NULL,"be silent",NULL,NULL,NULL},
 	{"-help",OPT_NORMAL,usage,NULL,NULL,

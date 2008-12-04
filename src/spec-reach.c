@@ -8,10 +8,13 @@
 #include "runtime.h"
 #if defined(MCRL)
 #include "mcrl-greybox.h"
+#define MODEL_TYPE "mcrl"
 #elif defined(MCRL2)
 #include "mcrl2-greybox.h"
+#define MODEL_TYPE "mcrl2"
 #elif defined(NIPS)
 #include "nips-greybox.h"
+#define MODEL_TYPE "nips"
 #else
 #error "Unknown greybox provider."
 #endif
@@ -23,12 +26,13 @@
 
 static int verbosity=1;
 static int bfs=0;
+static int bfs2=0;
 static int sat=0;
 static int chain=0;
 
 static struct option options[]={
 	{"",OPT_NORMAL,NULL,NULL,NULL,
-		"usage: inst_lps [options] model.lps",NULL,NULL,NULL},
+		"usage: " MODEL_TYPE "-reach [options] <model>",NULL,NULL,NULL},
 	{"-help",OPT_NORMAL,usage,NULL,NULL,
 		"print this help message",NULL,NULL,NULL},
 	{"--help",OPT_NORMAL,usage,NULL,NULL,
@@ -36,8 +40,9 @@ static struct option options[]={
 	{"-v",OPT_NORMAL,inc_int,&verbosity,NULL,"increase the level of verbosity",NULL,NULL,NULL},
 	{"-q",OPT_NORMAL,reset_int,&verbosity,NULL,"be silent",NULL,NULL,NULL},
 	{"",OPT_NORMAL,NULL,NULL,NULL,"exploration order options (default is BFS):",NULL,NULL,NULL},
-	{"-bfs",OPT_NORMAL,set_int,&bfs,NULL,"enable saturation",NULL,NULL,NULL},
-	{"-sat",OPT_NORMAL,set_int,&sat,NULL,"enable saturation",NULL,NULL,NULL},
+	{"-bfs",OPT_NORMAL,set_int,&bfs,NULL,"enable BFS",NULL,NULL,NULL},
+	{"-bfs2",OPT_NORMAL,set_int,&bfs2,NULL,"enable BFS2",NULL,NULL,NULL},
+//	{"-sat",OPT_NORMAL,set_int,&sat,NULL,"enable saturation",NULL,NULL,NULL},
 	{"-chain",OPT_NORMAL,set_int,&chain,NULL,"enable chaining",NULL,NULL,NULL},
  	{0,0,0,0,0,0,0,0,0}
 };
@@ -107,22 +112,57 @@ void reach_bfs(){
 		if(vset_is_empty(current_level)) break;
 		level++;
 		for(i=0;i<nGrps;i++){
-			if (verbosity >= 2) fprintf(stderr,"exploring group %4d/%d\r",i+1,nGrps);
+			if (verbosity >= 2) fprintf(stderr,"\rexploring group %4d/%d",i+1,nGrps);
 			expand_group_rel(i,current_level);
 			eg_count++;
 		}
-		if (verbosity >= 2) fprintf(stderr,"\n");
+		if (verbosity >= 2) fprintf(stderr,"\rexploration complete             \n");
 		vset_clear(next_level);
 		for(i=0;i<nGrps;i++){
-			if (verbosity >= 2) fprintf(stderr,"local next %4d/%d\r",i+1,nGrps);
+			if (verbosity >= 2) fprintf(stderr,"\rlocal next %4d/%d",i+1,nGrps);
 			next_count++;
 			vset_next(temp,current_level,group_rel[i]);
 			vset_minus(temp,visited);
 			vset_union(next_level,temp);
 		}
-		if (verbosity >= 2) fprintf(stderr,"\n");
+		if (verbosity >= 2) fprintf(stderr,"\rlocal next complete       \n");
 		vset_union(visited,next_level);
 		vset_copy(current_level,next_level);
+	}
+	Warning(info,"Exploration took %ld group checks and %ld next state calls",eg_count,next_count);
+}
+
+void reach_bfs2(){
+	int level,i;
+	long long e_count;
+	long n_count;
+	long eg_count=0;
+	long next_count=0;
+
+	level=0;
+	vset_t old_vis=vset_create(domain,0,NULL);
+	vset_t temp=vset_create(domain,0,NULL);
+	for(;;){
+		vset_copy(old_vis,visited);
+		if (verbosity >= 1) {
+			vset_count(visited,&n_count,&e_count);
+			fprintf(stderr,"visited %d has %ld nodes and %lld elements\n",level,n_count,e_count);
+		}
+		level++;
+		for(i=0;i<nGrps;i++){
+			if (verbosity >= 2) fprintf(stderr,"\rexploring group %4d/%d",i+1,nGrps);
+			expand_group_rel(i,visited);
+			eg_count++;
+		}
+		if (verbosity >= 2) fprintf(stderr,"\rexploration complete             \n");
+		for(i=0;i<nGrps;i++){
+			if (verbosity >= 2) fprintf(stderr,"\rlocal next %4d/%d",i+1,nGrps);
+			next_count++;
+			vset_next(temp,old_vis,group_rel[i]);
+			vset_union(visited,temp);
+		}
+		if (verbosity >= 2) fprintf(stderr,"\rlocal next complete       \n");
+		if (vset_equal(visited,old_vis)) break;
 	}
 	Warning(info,"Exploration took %ld group checks and %ld next state calls",eg_count,next_count);
 }
@@ -132,7 +172,34 @@ void reach_sat(){
 }
 
 void reach_chain(){
-	Fatal(1,error,"Chaining not implemented yet");
+	int level,i;
+	long long e_count;
+	long n_count;
+	long eg_count=0;
+	long next_count=0;
+
+	level=0;
+	vset_t old_vis=vset_create(domain,0,NULL);
+	vset_t temp=vset_create(domain,0,NULL);
+	for(;;){
+		vset_copy(old_vis,visited);
+		if (verbosity >= 1) {
+			vset_count(visited,&n_count,&e_count);
+			fprintf(stderr,"visited %d has %ld nodes and %lld elements\n",level,n_count,e_count);
+		}
+		level++;
+		for(i=0;i<nGrps;i++){
+			if (verbosity >= 2) fprintf(stderr,"\rgroup %4d/%d",i+1,nGrps);
+			expand_group_rel(i,visited);
+			eg_count++;
+			next_count++;
+			vset_next(temp,visited,group_rel[i]);
+			vset_union(visited,temp);
+		}
+		if (verbosity >= 2) fprintf(stderr,"\rround %d complete       \n",level);
+		if (vset_equal(visited,old_vis)) break;
+	}
+	Warning(info,"Exploration took %ld group checks and %ld next state calls",eg_count,next_count);
 }
 
 #if defined(NIPS)
@@ -164,7 +231,7 @@ int main(int argc, char *argv[]){
 	RTinit(argc,&argv);
 	take_vars(&argc,argv);
 	parse_options(options,argc,argv);
-	switch(bfs+sat+chain){
+	switch(bfs+bfs2+sat+chain){
 	case 0:
 		bfs=1;
 		break;
@@ -221,22 +288,19 @@ int main(int argc, char *argv[]){
 	SCCstartTimer(timer);
 	if(bfs) {
 		reach_bfs();
-		SCCstopTimer(timer);
-		SCCreportTimer(timer,"BFS reachability took");
-		fprintf(stderr,"\n");
+	}
+	if(bfs2) {
+		reach_bfs2();
 	}
 	if(sat) {
 		reach_sat();
-		SCCstopTimer(timer);
-		SCCreportTimer(timer,"Saturation took");
-		fprintf(stderr,"\n");
 	}
 	if (chain) {
 		reach_chain();
-		SCCstopTimer(timer);
-		SCCreportTimer(timer,"Chaining took");
-		fprintf(stderr,"\n");
 	}
+	SCCstopTimer(timer);
+	SCCreportTimer(timer,"reachability took");
+	fprintf(stderr,"\n");
 	long long e_count;
 	long n_count;
 	vset_count(visited,&n_count,&e_count);

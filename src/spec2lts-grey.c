@@ -8,10 +8,13 @@
 #include "runtime.h"
 #if defined(MCRL)
 #include "mcrl-greybox.h"
+#define MODEL_TYPE "mcrl"
 #elif defined(MCRL2)
 #include "mcrl2-greybox.h"
+#define MODEL_TYPE "mcrl2"
 #elif defined(NIPS)
 #include "nips-greybox.h"
+#define MODEL_TYPE "nips"
 #else
 #error "Unknown greybox provider."
 #endif
@@ -31,6 +34,8 @@ static int cache=0;
 static int use_vset=0;
 
 struct option options[]={
+	{"",OPT_NORMAL,NULL,NULL,NULL,
+		"usage: " MODEL_TYPE "2lts-grey [options] <model>",NULL,NULL,NULL},
 	{"-out",OPT_REQ_ARG,assign_string,&outputarch,"-out <archive>",
 		"Specifiy the name of the output archive.",
 		"This will be a pattern archive if <archive> contains %s",
