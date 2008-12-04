@@ -374,7 +374,7 @@ ISscheduler_callback (size_t succ_size, nipsvm_state_t *succ,
     if (sc->depth >= sc->nmaxdepth)
         return IC_STOP;
     ++sc->ntransitions;
-    sc->stack[sc->depth++] = memcpy (malloc (succ_size), succ, succ_size);
+    sc->stack[sc->depth++] = memcpy (RTmalloc (succ_size), succ, succ_size);
     return IC_CONTINUE;
 }
 
@@ -397,7 +397,7 @@ NIPSfindInitializedState (nipsvm_bytecode_t *bytecode, size_t nmax_states)
     size_t              count = 0;
     nipsvm_state_t     *s = nipsvm_initial_state (&vm);
     size_t              sz = nipsvm_state_size (s);
-    sc.stack[sc.depth++] = memcpy (malloc (sz), s, sz);
+    sc.stack[sc.depth++] = memcpy (RTmalloc (sz), s, sz);
     for (; sc.depth-- > 0 && count < nmax_states;) {
         nipsvm_state_t     *state = sc.stack[sc.depth];
         if (SIlookupC (visited, (void *)state, nipsvm_state_size (state))
