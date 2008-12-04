@@ -55,6 +55,7 @@ static model_t model;
 static vrel_t *group_rel;
 static vset_t *group_explored;
 static vset_t *group_tmp;
+static int explored;
 
 static void *new_string_index(void* context){
 	(void)context;
@@ -77,10 +78,15 @@ static void explore_cb(void*context,int *src){
 	struct group_add_info* ctx=(struct group_add_info*)context;
 	ctx->src=src;
 	GBgetTransitionsShort(model,ctx->group,src,group_add,context);
+	explored++;
+	if (explored%1000 ==0) {
+		Warning(info,"explored %d short vectors for group %d",explored,ctx->group);
+	}
 }
 
 static inline void expand_group_rel(int group,vset_t set){
 	struct group_add_info ctx;
+	explored=0;
 	ctx.group=group;
 	vset_project(group_tmp[group],set);
 	vset_zip(group_explored[group],group_tmp[group]);
