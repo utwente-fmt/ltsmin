@@ -113,6 +113,29 @@ static void explore_elem(void*context,int*src){
 	if(explored%1000==0) Warning(info,"explored %d visited %d trans %d",explored,visited,trans);
 }
 
+#if defined(NIPS)
+#include "aterm1.h"
+
+static void WarningHandler(const char *format, va_list args) {
+	FILE* f=log_get_stream(info);
+	if (f) {
+		fprintf(f,"ATerm library: ");
+		ATvfprintf(f, format, args);
+		fprintf(f,"\n");
+	}
+}
+     
+static void ErrorHandler(const char *format, va_list args) {
+	FILE* f=log_get_stream(error);
+	if (f) {
+		fprintf(f,"ATerm library: ");
+		ATvfprintf(f, format, args);
+		fprintf(f,"\n");
+	}
+	Fatal(1,error,"ATerror");
+	exit(1);
+}
+#endif
 
 int main(int argc, char *argv[]){
 	void* stackbottom=&argv;
@@ -123,7 +146,9 @@ int main(int argc, char *argv[]){
 #elif defined(MCRL2)
 	MCRL2initGreybox(argc,argv,stackbottom);
 #elif defined(NIPS)
-        (void)stackbottom;
+ 	ATinit(argc, argv, (ATerm*) stackbottom);
+	ATsetWarningHandler(WarningHandler);
+	ATsetErrorHandler(ErrorHandler);
 	NIPSinitGreybox(argc,argv);
 #endif
 	parse_options(options,argc,argv);

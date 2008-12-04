@@ -135,6 +135,30 @@ void reach_chain(){
 	Fatal(1,error,"Chaining not implemented yet");
 }
 
+#if defined(NIPS)
+#include "aterm1.h"
+
+static void WarningHandler(const char *format, va_list args) {
+	FILE* f=log_get_stream(info);
+	if (f) {
+		fprintf(f,"ATerm library: ");
+		ATvfprintf(f, format, args);
+		fprintf(f,"\n");
+	}
+}
+     
+static void ErrorHandler(const char *format, va_list args) {
+	FILE* f=log_get_stream(error);
+	if (f) {
+		fprintf(f,"ATerm library: ");
+		ATvfprintf(f, format, args);
+		fprintf(f,"\n");
+	}
+	Fatal(1,error,"ATerror");
+	exit(1);
+}
+#endif
+
 int main(int argc, char *argv[]){
 	void* stackbottom=&argv;
 	RTinit(argc,&argv);
@@ -157,8 +181,10 @@ int main(int argc, char *argv[]){
 #elif defined(MCRL2)
 	MCRL2initGreybox(argc,argv,stackbottom);
 #elif defined(NIPS)
-        (void)stackbottom;
-	NIPSinitGreybox(argc,argv);
+ 	ATinit(argc, argv, (ATerm*) stackbottom);
+	ATsetWarningHandler(WarningHandler);
+	ATsetErrorHandler(ErrorHandler);
+ 	NIPSinitGreybox(argc,argv);
 #endif
 	Warning(info,"opening %s",argv[argc-1]);
 	model=GBcreateBase();
