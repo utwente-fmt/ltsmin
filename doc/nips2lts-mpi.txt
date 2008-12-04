@@ -5,5 +5,8 @@ nips2lts-mpi(1)
 :Email:   <sccblom@cs.utwente.nl>
 :Date:    2008-12-03
 
+== NAME
+nips2lts-mpi - Distributed state space generator.
+
 include::spec2lts-mpi.txt[]
 

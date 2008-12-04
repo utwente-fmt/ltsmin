@@ -5,5 +5,8 @@ lps-reach(1)
 :Email:   <sccblom@cs.utwente.nl>
 :Date:    2008-12-03
 
+== NAME
+lps-reach - Symbolic reachability analysis for mCRL2 models.
+
 include::spec-reach.txt[]
 

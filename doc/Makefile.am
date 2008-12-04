@@ -9,7 +9,11 @@ doc_ASCIIDOC = instantiator-mpi.txt ltsmin-mpi.txt ltsmin-convert.txt	\
 EXTRA_DIST = asciidoc.conf callouts.xsl spec2lts-mpi.txt spec2lts-grey.txt \
 	spec-reach.txt $(doc_ASCIIDOC)
 
-MANPAGES = instantiator-mpi.1 ltsmin-mpi.1 ltsmin-convert.1 ltsmin.5 gcf.1 lpo2lts-mpi.txt
+MANPAGES = instantiator-mpi.1 ltsmin-mpi.1 ltsmin-convert.1 gcf.1       \
+        lpo-reach.1 lps-reach.1 nips-reach.1 lpo2lts-grey.1             \
+        lps2lts-grey.1 nips2lts-grey.1 lpo2lts-mpi.1 lps2lts-mpi.1      \
+        nips2lts-mpi.1 ltsmin.5
+
 HTML = $(doc_ASCIIDOC:%.txt=%.html)
 
 dist_man_MANS  = $(MANPAGES)
@@ -18,7 +22,7 @@ dist_html_DATA = $(HTML)
 MOSTLYCLEANFILES     = $(doc_ASCIIDOC:.txt=.xml)
 CLEANFILES =
 if HAVE_ASCIIDOC
-CLEANFILES += $(HTML) 
+CLEANFILES += $(HTML)
 if HAVE_XMLTO
 CLEANFILES += $(MANPAGES)
 endif

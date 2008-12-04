@@ -5,5 +5,8 @@ nips-reach(1)
 :Email:   <sccblom@cs.utwente.nl>
 :Date:    2008-12-03
 
+== NAME
+nips-reach - Symbolic reachability analysis for NIPS models.
+
 include::spec-reach.txt[]
 

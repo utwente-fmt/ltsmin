@@ -5,6 +5,9 @@ nips2lts-grey(1)
 :Email:   <sccblom@cs.utwente.nl>
 :Date:    2008-12-03
 
+== NAME
+nips2lts-grey - Sequential state space generator
+
 include::spec2lts-mpi.txt[]
 
 

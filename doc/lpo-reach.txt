@@ -5,5 +5,8 @@ lpo-reach(1)
 :Email:   <sccblom@cs.utwente.nl>
 :Date:    2008-12-03
 
+== NAME
+lpo-reach - Symbolic reachability analysis for mCRL models.
+
 include::spec-reach.txt[]
 
