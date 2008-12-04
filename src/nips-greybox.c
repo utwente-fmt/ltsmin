@@ -207,7 +207,7 @@ init_gb_context (struct gb_context_s *gb_ctx, model_t model,
     return gb_ctx;
 }
 
-static              nipsvm_status_t
+static nipsvm_status_t
 scheduler_callback (size_t succ_size, nipsvm_state_t *succ,
                     nipsvm_transition_information_t *ti, void *context)
 {
@@ -238,7 +238,7 @@ scheduler_callback (size_t succ_size, nipsvm_state_t *succ,
     return IC_CONTINUE;
 }
 
-static              nipsvm_status_t
+static nipsvm_status_t
 error_callback (nipsvm_errorcode_t err,
                 nipsvm_pid_t pid, nipsvm_pc_t pc, void *context)
 {
@@ -364,7 +364,7 @@ typedef struct {
     size_t              ntransitions;
 } search_context_t;
 
-static              nipsvm_status_t
+static nipsvm_status_t
 ISscheduler_callback (size_t succ_size, nipsvm_state_t *succ,
                       nipsvm_transition_information_t *ti, void *context)
 {
