@@ -60,6 +60,8 @@ those extensions are supported.
 
 *-cache*::
 	Add the caching wrapper around the model.
+If this option is used, the state space generator makes calls to the short version of the grey box next
+state function and memoizes the results. If the next state function is expensive this will yield substantial speedups.
 
 *-nolts*::
 	Disable writing of the LTS.
