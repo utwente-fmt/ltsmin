@@ -19,8 +19,10 @@ final tool in this release.
  - MacOS X, version 10.4 "Tiger"
 
 * Installation Instructions
-First, install the dependencies listed in Section "Build Dependencies"
-below.
+If you are building the software from a Git repository rather than a
+release tarball, refer to Section "Building from a Git Repository" for
+additional set-up instructions.  Then install the dependencies listed
+in Section "Build Dependencies" below.
 
     # Unpack the tarball
     $ tar xvzf ltsmin-<version>.tar.gz
@@ -142,10 +144,11 @@ be installed.  They are available from Apple
 <http://developer.apple.com/tools/download/>, or from the MacOS X
 installation CDs.
 
-* Building from a Version Control Checkout
+* Building from a Git Repository
 Before building the software as described above, the following commands
 have to be executed in the top-level source directory:
 
+    $ git submodule update --init
     $ ./ltsminreconf
 
 ** Dependencies
