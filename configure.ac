@@ -78,7 +78,7 @@ if test "x$acx_mcrl2" = xyes; then
     [:],
     [AC_MSG_WARN([mcrl2 library not found.])])
 fi
-AC_SUBST([NIPS_LIBS],['${top_srcdir}/nips-vm/libnips_vm.la'])
+AC_SUBST([NIPS_LIBS],['${top_builddir}/nips-vm/libnips_vm.la'])
 AC_SUBST([NIPS_CPPFLAGS],['-I${top_srcdir}'])
 AC_SUBST([NIPS_LDFLAGS])
 
