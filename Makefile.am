@@ -1,4 +1,4 @@
-ACLOCAL_AMFLAGS = -I m4 --install
+ACLOCAL_AMFLAGS = -I m4
 
 SUBDIRS = nips-vm src doc
 EXTRA_DIST = ltsminreconf Doxyfile
