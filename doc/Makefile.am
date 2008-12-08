@@ -16,8 +16,12 @@ MANPAGES = ltsmin-mpi.1 ltsmin-convert.1 gcf.1       \
 
 HTML = $(doc_ASCIIDOC:%.txt=%.html)
 
-dist_man_MANS  = $(MANPAGES)
+if HAVE_ASCIIDOC
 dist_html_DATA = $(HTML)
+if HAVE_XMLTO
+dist_man_MANS  = $(MANPAGES)
+endif
+endif
 
 MOSTLYCLEANFILES     = $(doc_ASCIIDOC:.txt=.xml)
 CLEANFILES =
