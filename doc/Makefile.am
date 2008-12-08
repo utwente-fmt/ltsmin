@@ -65,7 +65,7 @@ define ASCIIDOC.html
 endef
 
 define ASCIIDOC.man
-  $(XMLTO) -m callouts.xsl man $<
+  $(XMLTO) -m $(srcdir)/callouts.xsl man $<
 endef
 
 .DELETE_ON_ERROR:
