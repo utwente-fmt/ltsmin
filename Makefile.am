@@ -5,7 +5,9 @@ EXTRA_DIST = ltsminreconf Doxyfile
 
 doc_DATA = AUTHORS ChangeLog COPYING NEWS README
 
+if DX_COND_doc
 mostlyclean-local: doxygen-clean
+endif
 
 .DELETE_ON_ERROR:
 
