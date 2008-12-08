@@ -57,7 +57,7 @@ if test x"$acx_mcrl2" = xyes; then
       [acx_mcrl2_libs=yes
        AC_CHECK_LIB([mcrl2], [ATinit],
          [MCRL2_LIBS="-lmcrl2 $MCRL2_LIBS"],
-         [],
+         [acx_mcrl2_libs=no],
          [$MCRL2_LIBS])])
     AC_LANG_POP([C++])
     AC_SUBST(MCRL2_LIBS)

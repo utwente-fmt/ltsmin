@@ -62,8 +62,9 @@ if test "x$acx_cadp" = xyes; then
     AX_LET([CPPFLAGS], ["$CADP_CPPFLAGS $CPPFLAGS"],
            [LIBS], ["$LIBS"],
            [LDFLAGS], ["$CADP_LDFLAGS $LDFLAGS"],
-      [acx_cadp_have_bcg=yes
-       AC_CHECK_HEADERS([bcg_user.h],[],[acx_cadp_have_bcg=no])
+      [AC_CHECK_HEADER([bcg_user.h],
+         [acx_cadp_have_bcg=yes],
+         [acx_cadp_have_bcg=no])
        AC_CHECK_LIB([m], [cos],
          [CADP_LIBS="-lm $CADP_LIBS"],
          [],
@@ -77,6 +78,9 @@ if test "x$acx_cadp" = xyes; then
          [acx_cadp_have_bcg=no],
          [$CADP_LIBS])])
 
+    AS_IF([test x"$acx_cadp_have_bcg" = xyes],
+      [AC_DEFINE([HAVE_BCG_USER_H], [1],
+         [have <bcg_user.h> and can link against the BCG libraries])])
     AC_LANG_RESTORE
 
     AC_SUBST(CADP_LIBS)

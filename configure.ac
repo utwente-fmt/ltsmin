@@ -7,7 +7,7 @@ AC_CONFIG_HEADERS([src/amconfig.h])
 
 # Checks for programs.
 CFLAGS="-g -W -Wall -O2 -std=c99 $CFLAGS"
-CXXFLAGS="-g -W -Wall -Wno-inline -O2 -ftemplate-depth-128 -finline-functions $CXXFLAGS"
+CXXFLAGS="-g -W -Wall -O2 -Wno-inline -ftemplate-depth-128 -finline-functions $CXXFLAGS"
 AM_PROG_CC_C_O
 AC_PROG_CXX
 ACX_PTHREAD(
@@ -71,12 +71,14 @@ if test "x$acx_mcrl" = xyes; then
           [AC_MSG_WARN([muCRL library too old; some tools will not be built.])
            have_libstep_info=no
            break])])],
-    [AC_MSG_WARN([some muCRL libraries not found.])])
+    [acx_mcrl=no
+     AC_MSG_WARN([some muCRL libraries not found.])])
 fi
 if test "x$acx_mcrl2" = xyes; then
   ACX_MCRL2_LIBS(
     [:],
-    [AC_MSG_WARN([mcrl2 library not found.])])
+    [acx_mcrl2=no
+     AC_MSG_WARN([mcrl2 library not found.])])
 fi
 AC_SUBST([NIPS_LIBS],['${top_builddir}/nips-vm/libnips_vm.la'])
 AC_SUBST([NIPS_CPPFLAGS],['-I${top_srcdir}'])
