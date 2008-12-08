@@ -104,6 +104,9 @@ void event_yield(event_queue_t queue){
 }
 
 void event_while(event_queue_t queue,int *condition){
+	for(int i=0;i<queue->pending;i++){
+		if (queue->cb[i]==NULL) Fatal(1,error,"illegal NULL in queue");
+	}
 	while(*condition){
 		int index[queue->pending];
 		int completed;
@@ -210,6 +213,7 @@ struct idle_detect_s {
 static void idle_receiver(void *context,MPI_Status *status){
 #define detect ((idle_detect_t)context)
 	(void)status;
+	//Log(info,"got idle message (%d) [%d %d]",detect->msg_pending,detect->term_msg[0],detect->term_msg[1]);
 	detect->msg_pending--;
 	event_Irecv(detect->queue,&detect->term_msg,2,MPI_INT,MPI_ANY_SOURCE,
 			detect->tag,detect->comm,idle_receiver,context);
@@ -251,14 +255,15 @@ int event_idle_detect(idle_detect_t detector){
 		term_send[0]=IDLE;
 		term_send[1]=0;
 		for(;;){
-			//Log(debug,"starting new termination round %d %d\n",detector->dirty,detector->count);
+			//Log(info,"starting new termination round %d %d\n",detector->dirty,detector->count);
 			round++;
 			detector->dirty=0;
-			//Log(debug,"sending %d %d\n",term_send[0],term_send[1]);
+			//Log(info,"sending %d %d",term_send[0],term_send[1]);
 			event_Send(detector->queue,term_send,2,MPI_INT,detector->nodes-1,detector->tag,detector->comm);
 			detector->msg_pending++;
+			//Log(info,"while");
 			event_while(detector->queue,&detector->msg_pending);
-			//Log(debug,"reply is %d %d\n",detector->term_msg[0],detector->term_msg[1]);
+			//Log(info,"reply is %d %d",detector->term_msg[0],detector->term_msg[1]);
 			if (detector->term_msg[0]!=IDLE) {
 				//Log(debug,"not idle yet");
 				continue;
@@ -284,8 +289,9 @@ int event_idle_detect(idle_detect_t detector){
 	} else {
 		for(;;){
 			int term_send[2];
+			//Log(info,"while");
 			event_while(detector->queue,&detector->msg_pending);
-			//Log(debug,"got %d %d\n",detector->term_msg[0],detector->term_msg[1]);
+			//Log(info,"got %d %d",detector->term_msg[0],detector->term_msg[1]);
 			if (detector->term_msg[0]==TERMINATED) {
 				detector->exit_code=detector->term_msg[1];
 				term_send[0]=TERMINATED;
@@ -298,7 +304,7 @@ int event_idle_detect(idle_detect_t detector){
 			term_send[0]=detector->dirty?RUNNING:detector->term_msg[0];
 			detector->dirty=0;
 			term_send[1]=detector->term_msg[1]+detector->count;
-			//Log(debug,"sending %d %d\n",term_send[0],term_send[1]);
+			//Log(info,"sending %d %d",term_send[0],term_send[1]);
 			event_Send(detector->queue,term_send,2,MPI_INT,detector->me-1,
 						detector->tag,detector->comm);
 			detector->msg_pending++;

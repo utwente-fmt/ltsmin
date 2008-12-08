@@ -59,20 +59,26 @@ static void mpi_index_handler(void* context,MPI_Status *status){
 		int res=SIlookupC(index->index,index->recv_buf,len);
 		if (res==SI_INDEX_FAILED) {
 			res=SIputC(index->index,index->recv_buf,len);
+			//Warning(info,"added label %d, broadcasting",res);
 			int todo=index->pool->nodes-1;
 			for(int i=0;i<index->pool->nodes;i++) if (i!=index->owner) {
 				event_Isend(index->pool->queue,index->recv_buf,len,MPI_CHAR,
 					i,index->tag,index->pool->comm,event_decr,&todo);
 			}
 			event_while(index->pool->queue,&todo);
+			//Warning(info,"broadcast complete");
 		}
 	} else {
 		int res=SIputC(index->index,index->recv_buf,len);
+		if (index->wanted && !index->looking) Fatal(1,error,"wanted and not looking");
 		if (index->wanted) {
+			//Warning(info,"added %d waiting for wanted",res);
 			if (len==index->w_len && memcmp(index->recv_buf,index->wanted,len)==0){
+				index->wanted=NULL;
 				index->looking=0;
 			}
 		} else {
+			//Warning(info,"added %d waiting for %d",res,index->looking-1);
 			if (index->looking==res+1){
 				index->looking=0;
 			}
@@ -113,6 +119,7 @@ int mpi_chunk2int(void*map,void*chunk,int len){
 	mpi_index_t index=(mpi_index_t)map;
 	int res=SIlookupC(index->index,chunk,len);
 	if (res==SI_INDEX_FAILED) {
+		//Warning(info,"looking up chunk");
 		if (index->pool->me==index->owner) {
 			res=SIputC(index->index,chunk,len);
 			int todo=index->pool->nodes-1;
@@ -130,6 +137,7 @@ int mpi_chunk2int(void*map,void*chunk,int len){
 			event_while(index->pool->queue,&index->looking);
 			res=SIlookupC(index->index,chunk,len);
 		}
+		//Warning(info,"got %d",res);
 	}
 	return res;
 }
@@ -137,8 +145,10 @@ int mpi_chunk2int(void*map,void*chunk,int len){
 void* mpi_int2chunk(void*map,int idx,int*len){
 	mpi_index_t index=(mpi_index_t)map;
 	if (index->pool->me!=index->owner && SIgetCount(index->index)<=idx){
+		//Warning(info,"looking up %d",idx);
 		index->looking=idx+1;
 		event_while(index->pool->queue,&index->looking);
+		//Warning(info,"got it");
 	}
 	return SIgetC(index->index,idx,len);
 }
@@ -378,7 +388,7 @@ int main(int argc, char*argv[]){
 	MPI_Errhandler_set(MPI_COMM_WORLD,MPI_ERRORS_ARE_FATAL);
         MPI_Comm_size(MPI_COMM_WORLD, &mpi_nodes);
         MPI_Comm_rank(MPI_COMM_WORLD, &mpi_me);
-	sprintf(who,"inst-mpi(%2d)",mpi_me);
+	sprintf(who,MODEL_TYPE "2lts-mpi(%2d)",mpi_me);
 	RTinit(argc,&argv);
 	set_label(who);
 	mpi_queue=event_queue();
@@ -500,9 +510,8 @@ int main(int argc, char*argv[]){
 		level++;
 		int lvl_scount=0;
 		int lvl_tcount=0;
-		//if (mpi_me==0) Warning(info,"exploring level %d",level);
+		if (mpi_me==0 || verbosity>1) Warning(info,"exploring level %d",level);
 		event_barrier_wait(barrier);
-		Warning(info,"exploring level %d",level);
 		while(explored<limit){
 			TreeUnfold(dbs,explored,src);
 			struct src_info ctx;
@@ -523,7 +532,7 @@ int main(int argc, char*argv[]){
 			}
 			event_yield(mpi_queue);
 		}
-		Warning(info,"explored %d states and %d transitions",lvl_scount,lvl_tcount);
+		if (verbosity>1) Warning(info,"explored %d states and %d transitions",lvl_scount,lvl_tcount);
 		event_idle_detect(work_counter);
 		MPI_Allreduce(&visited,&global_visited,1,MPI_LONG_LONG,MPI_SUM,MPI_COMM_WORLD);
 		MPI_Allreduce(&explored,&global_explored,1,MPI_LONG_LONG,MPI_SUM,MPI_COMM_WORLD);
@@ -546,7 +555,7 @@ int main(int argc, char*argv[]){
 	}
 	event_barrier_wait(barrier);
 	/* State space was succesfully generated. */
-	Warning(info,"My share is %lld states and %lld transitions",explored,transitions);
+	if (verbosity>1) Warning(info,"My share is %lld states and %lld transitions",explored,transitions);
 	if (write_lts){
 		for(int i=0;i<mpi_nodes;i++){
 			DSclose(&output_src[i]);
@@ -554,7 +563,7 @@ int main(int argc, char*argv[]){
 			DSclose(&output_dest[i]);
 		}
 	}
-	Warning(info,"transition files closed");
+	if (verbosity>1) Warning(info,"transition files closed");
 	{
 	int *temp=NULL;
 	stream_t info_s=NULL;

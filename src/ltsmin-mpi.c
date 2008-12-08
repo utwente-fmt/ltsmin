@@ -289,7 +289,7 @@ int main(int argc,char **argv){
 
 	RTinit(argc,&argv);
 	core_init();
-	set_label("bsim2mpi(%2d)",mpi_me);
+	set_label("ltsmin-mpi(%2d)",mpi_me);
 	if(mpi_me!=0) core_barrier();
 	take_vars(&argc,argv);
 	take_options(options,&argc,argv);
