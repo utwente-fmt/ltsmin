@@ -6,8 +6,8 @@ AC_CONFIG_SRCDIR([src/ltsmin-mpi.c])
 AC_CONFIG_HEADERS([src/amconfig.h])
 
 # Checks for programs.
-CFLAGS="-g -W -Wall -O2 -std=c99 $CFLAGS"
-CXXFLAGS="-g -W -Wall -O2 -Wno-inline -ftemplate-depth-128 -finline-functions $CXXFLAGS"
+CFLAGS="-g -O2 $CFLAGS"
+CXXFLAGS="-g -O2 -Wno-inline -ftemplate-depth-128 -finline-functions $CXXFLAGS"
 AM_PROG_CC_C_O
 AC_PROG_CXX
 ACX_PTHREAD(
@@ -39,6 +39,16 @@ ACX_MPI(
    AC_LANG_POP([C++])],
   [have_mpi=
    AC_MSG_WARN([no acceptable MPI support found.])])
+
+AC_PROG_CC_C99
+AS_IF([test x"$ac_cv_prog_cc_c99" = xno],
+  [AC_MSG_FAILURE([no acceptable C99 compiler found.])])
+AX_TRY_CFLAGS_IFELSE([-W -Wall])
+AX_TRY_CFLAGS_IFELSE([-pipe])
+AX_TRY_CXXFLAGS_IFELSE([-W -Wall])
+AX_TRY_CXXFLAGS_IFELSE([-pipe])
+
+AX_CC_COMPILE_CXX_LINK
 
 ACX_MCRL([:],
   [AC_MSG_WARN([no acceptable muCRL installation found.])])
