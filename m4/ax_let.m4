@@ -3,9 +3,9 @@
 #
 # SYNOPSIS
 #
-#   AX_LET([VAR1],[EXPR1],
-#          [VAR2],[EXPR2],...
-#     [...])
+#   AX_LET(VAR1, EXPR1,
+#          [VAR2, EXPR2,]...
+#     BODY)
 #
 m4_define([AX_LET_counter_],0)
 m4_define([AX_LET_AUX], [dnl
