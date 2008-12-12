@@ -31,6 +31,8 @@ static int unix_io=0;
 static int mpi_io=0;
 static int verbosity=1;
 
+#define NO_TAU ((uint32_t)-1)
+
 #define STRONG_REDUCTION_SET 1
 #define BRANCHING_REDUCTION_SET 2
 
@@ -361,7 +363,13 @@ int main(int argc,char **argv){
 	dlts_getTermDB(lts);
 	core_barrier();
 	//Warning(info,"got TermDB");
-	if (mpi_me==0 && branching) Warning(info,"invisible label is %s",lts->label_string[tau]);
+	if (mpi_me==0 && branching) {
+		if (tau==NO_TAU) {
+			Warning(info,"state space does not have invisible steps.");
+		} else {
+			Warning(info,"invisible label is %s",lts->label_string[tau]);
+		}
+	}
 	status_array=(MPI_Status*)RTmalloc(2*lts->segment_count*sizeof(MPI_Status));
 	request_array=(MPI_Request*)RTmalloc(2*lts->segment_count*sizeof(MPI_Request));
 	offset=(int*)RTmalloc(lts->segment_count*sizeof(int));
