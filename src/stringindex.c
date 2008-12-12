@@ -23,8 +23,8 @@ struct stringindex {
 	int free_list;
 	int count;
 	int size;
-	int *next;
-	int *len;
+	int *next; // next in bucket and in free list.
+	int *len;  // length for bucket and previous in free list.
 	char **data;
 	int *table;
 	int mask;
@@ -38,29 +38,16 @@ int SIgetCount(string_index_t si){
 	return si->count;
 }
 
-/*
-static void dump_free_list(string_index_t si){
-	int i,j;
-
-	i=si->free_list;
-	for(j=0;j<si->size;j++) {
-		fprintf(stderr,"%d: prev %d next %d\n",i,(int)si->data[i],~si->next[i]);
-		i=~si->next[i];
-		if (i==si->free_list) break;
-	}
-}
-*/
-
 static void create_free_list(string_index_t si){
 	int i;
 
 	si->free_list=0;
 	for(i=0;i<si->size;i++) {
 		si->next[i]=~(i+1);
-		si->data[i]=(char*)(i-1);
+		si->len[i]=(i-1);
 	}
 	si->next[si->size-1]=~0;
-	si->data[0]=(char*)(si->size-1);	
+	si->len[0]=(si->size-1);	
 }
 
 static void cut_from_free_list(string_index_t si,int index){
@@ -71,20 +58,20 @@ static void cut_from_free_list(string_index_t si,int index){
 		}
 		si->free_list=~si->next[index];
 	}
-	si->next[(int)si->data[index]]=si->next[index];
-	si->data[~si->next[index]]=si->data[index];
+	si->next[si->len[index]]=si->next[index];
+	si->len[~si->next[index]]=si->len[index];
 }
 
 static void add_to_free_list(string_index_t si,int idx){
 	if (si->free_list==END_OF_LIST) {
 		si->free_list=idx;
 		si->next[idx]=~idx;
-		si->data[idx]=(char*)idx;
+		si->len[idx]=idx;
 	} else {
 		si->next[idx]=~si->free_list;
-		si->data[idx]=si->data[si->free_list];
-		si->next[(int)si->data[si->free_list]]=~idx;
-		si->data[si->free_list]=(char*)idx;
+		si->len[idx]=si->len[si->free_list];
+		si->next[si->len[si->free_list]]=~idx;
+		si->len[si->free_list]=idx;
 		si->free_list=idx;
 	}
 }
@@ -95,17 +82,17 @@ static void expand_free_list(string_index_t si,int old_size,int new_size){
 
 	for(i=old_size;i<new_size;i++) {
 		si->next[i]=~(i+1);
-		si->data[i]=(char*)(i-1);
+		si->len[i]=(i-1);
 	}
 	if (si->free_list==END_OF_LIST) {
 		si->free_list=old_size;
 		si->next[new_size-1]=~(old_size);
-		si->data[old_size]=(char*)(new_size-1);
+		si->len[old_size]=(new_size-1);
 	} else {
-		si->next[(int)si->data[si->free_list]]=~old_size;
-		si->data[old_size]=si->data[si->free_list];
+		si->next[si->len[si->free_list]]=~old_size;
+		si->len[old_size]=si->len[si->free_list];
 		si->next[new_size-1]=~(si->free_list);
-		si->data[si->free_list]=(char*)(new_size-1);
+		si->len[si->free_list]=(new_size-1);
 	}
 }
 
