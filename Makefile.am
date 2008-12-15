@@ -12,3 +12,8 @@ endif
 .DELETE_ON_ERROR:
 
 include m4/amdoxygen.m4
+
+distcheck-hook:
+# sample check whether manpages are present in generated tarball
+	test -f $(top_distdir)/doc/ltsmin.5
+	test -f $(top_distdir)/doc/gcf.1
