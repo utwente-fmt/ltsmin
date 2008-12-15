@@ -14,12 +14,14 @@ Release Checklist
   Regenerate website (staging area)
 
 * merge 'next' branch into 'master'
+  git checkout master && git pull . next
 
 * Tag release
+  git tag ltsmin-<version>
 
-* On 'next' branch, bump minor version in configure.ac
+* On 'next' branch, bump patch level (version) in configure.ac
 
-* Push to public repository
+* Push 'master' and 'next' branches to public repository
 
 * Upload website:
   cd staging-area &&
