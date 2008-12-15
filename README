@@ -59,22 +59,6 @@ explicitly instead of searching it in the current shell PATH.
 See `./configure --help' for the list of available variables,
 and file INSTALL for further details.
 
-*** MacOS X
-MacOS X supports building of ``universal binaries'' which include
-support for more than one architecture:
-
-    ./configure CFLAGS='-arch ppc -arch ppc64 -arch i386 -arch x86_64
-                -isystem /Developer/SDKs/MacOSX10.4u.sdk' \
-                --disable-dependency-tracking
-
-This would build the software for four architectures, provided the
-relevant Software Development Kits (SDKs) are installed.  The
-resulting binaries are compatible with MacOS X 10.4 "Tiger".
-
-Note that dependency tracking *must* be disabled for this type of
-build.  Furthermore, all library dependencies are required to be built
-for all architectures listed above.
-
 *** make targets
 The following additional make targets are supported:
 
@@ -98,10 +82,10 @@ Download GNU make from <http://www.gnu.org/software/make/>.
 
 ** Optional Dependencies
 *** muCRL
-Download muCRL from <http://www.cwi.nl/~mcrl/mutool.html>.  We tested with
-muCRL-2.18.3.  Without muCRL, the distributed tool for state space
-generation (lpo2lts-mpi) will not be built.
-
+Download muCRL from <http://www.cwi.nl/~mcrl/mutool.html>.  We tested
+with muCRL-2.18.3.  Without muCRL, the distributed tool for state
+space generation (lpo2lts-mpi) will not be built, and neither will any
+NIPS-based tools.
 
 *** mCRL2
 Download the latest SVN version of mCRL2 from http://www.mcrl2.org/wiki/index.php/Download
@@ -164,6 +148,11 @@ automake-1.10.
 Download autoconf (>= 2.60) from
 <http://www.gnu.org/software/autoconf/>.  We tested with
 autoconf-2.61.
+
+*** GNU libtool
+Download libtool (>= 1.5.26) from
+<http://www.gnu.org/software/libtool/>.  We tested with
+libtool-1.5.26.
 
 *** AsciiDoc
 See above.
