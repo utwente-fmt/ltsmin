@@ -1,7 +1,7 @@
 AC_PREREQ(2.60)
 AC_INIT([ltsmin], [1.1],
         [ltsmin-support@cs.utwente.nl])
-AM_INIT_AUTOMAKE
+AM_INIT_AUTOMAKE([foreign])
 AC_CONFIG_SRCDIR([src/ltsmin-mpi.c])
 AC_CONFIG_HEADERS([src/amconfig.h])
 
