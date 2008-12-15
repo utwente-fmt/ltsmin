@@ -1,17 +1,22 @@
-ltsmin - distributed minimization of labelled transition systems 
+ltsmin - minimization and instantiation of labelled transition systems 
 
 * Introduction
-The main tool in this release is ltsmin-mpi, which is a distributed
-implementation of signature based bisimulation reduction for strong
-bisimulation and branching bisimulation.  The input for this tool is a
-labelled transition system (LTS) in DIR format.  To create an LTS in
-DIR format one can either use instantiators and dmp2dir from the muCRL
-toolset or one of the xxx2lts-mpi tools bundled with this release.
+LTSmin is a toolset for manipulating labelled transition systems. The
+main tool in this release is ltsmin-mpi, which is a distributed
+implementation of signature-based bisimulation reduction for strong
+bisimulation and branching bisimulation. The input for this tool is a
+labelled transition system (LTS) in DIR format.
+
+Various sequential, symbolic and distributed tools are provided for
+the creation of LTSs, for example from muCRL, mcrl2 and PROMELA (via
+NIPS) specifications. Alternatively, LTSs in DIR format can be created
+by third-party tools, for example instantiators and dmp2dir from the
+muCRL toolset.
 
 The tools in this release support compression of DIR files as well as
-putting a DIR in an archive file.  A utility that can convert files
-from one DIR variant to another (ltsmin-convert) is the third and
-final tool in this release.
+putting a DIR in an archive file. The ltsmin-convert utility can
+convert files from one DIR variant to another, and to the BCG file
+format from the CADP toolset.
 
 * Supported Systems
  - GNU/Linux (tested on Debian, Fedora, OpenSuSE 10.2)
