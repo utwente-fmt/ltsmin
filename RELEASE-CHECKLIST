@@ -1,0 +1,26 @@
+Release Checklist
+=================
+
+* Bump version in configure.ac
+
+* make distcheck (creates tarball and checks whether it builds)
+  To test specific configurations:
+    make distcheck DISTCHECK_CONFIGURE_FLAGS='...'
+
+* Generate and copy documentation to website (staging area);
+  possibly add renamed files to .htaccess
+
+* Update link to tarball and copy to website (staging area);
+  Regenerate website (staging area)
+
+* merge 'next' branch into 'master'
+
+* Tag release
+
+* On 'next' branch, bump minor version in configure.ac
+
+* Push to public repository
+
+* Upload website:
+  cd staging-area &&
+    rsync --delete -avuz . ewi1057:~fmt/public_html/tools/ltsmin/
