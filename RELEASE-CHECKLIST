@@ -10,8 +10,9 @@ Release Checklist
 * Generate and copy documentation to website (staging area);
   possibly add renamed files to .htaccess
 
-* Update link to tarball and copy to website (staging area);
-  Regenerate website (staging area)
+* Copy tarball and symlink to unversioned tar.gz to website (staging
+  area); Update link to tarball on website; Regenerate website (staging
+  area)
 
 * merge 'next' branch into 'master'
   git checkout master && git pull . next
