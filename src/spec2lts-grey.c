@@ -3,6 +3,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <strings.h>
+#include <ctype.h>
 
 #include "archive.h"
 #include "runtime.h"
@@ -32,6 +33,7 @@ static int verbosity=1;
 static int write_lts=1;
 static int cache=0;
 static int use_vset=0;
+static int torx =0;
 
 struct option options[]={
 	{"",OPT_NORMAL,NULL,NULL,NULL,
@@ -58,8 +60,16 @@ struct option options[]={
 		"Use vector sets instead of tree compression",
 		"This option cannot be used in combination with -out",
 		NULL,NULL},
+	{"-torx",OPT_NORMAL,set_int,&torx,NULL,
+		"Run TorX-Explorer textual interface on stdin+stdout",NULL,NULL,NULL},
 	{0,0,0,0,0,0,0,0,0}
 };
+
+typedef struct torx_context_t {
+	model_t model;
+	lts_struct_t ltstype;
+} torx_struct_t;
+
 
 static vdom_t domain;
 static vset_t visited_set;
@@ -142,6 +152,79 @@ static void ErrorHandler(const char *format, va_list args) {
 }
 #endif
 
+static void torx_transition(void*arg,int*lbl,int*dst){
+
+	torx_struct_t *context=(torx_struct_t*)arg;
+
+	int tmp=TreeFold(dbs,dst);
+	chunk c=GBchunkGet(context->model,context->ltstype->edge_label_type[0],lbl[0]);
+	
+	int vis = 1;
+	if (c.len==3 && strncmp(c.data, "tau", c.len)==0)
+		vis =0;
+
+	/* tab-separated fields: edge vis sat lbl pred vars state */
+	fprintf(stdout, "Ee\t\t%d\t1\t%*s\t\t\t%d\n", vis, c.len, c.data, tmp);
+}
+
+
+static int torx_handle_request(torx_struct_t *context, char *req)
+{
+	while(isspace((int)*req))
+		req++;
+	switch(req[0]) {
+	case 'r': {			/* reset */
+		fprintf(stdout, "R 0\t1\n");
+		fflush(stdout);
+		break;
+	}
+	case 'e': {			/*explore */
+		int n, res;
+		req++;
+		while(isspace((int)*req))
+			req++;
+		if ((res = sscanf(req, "%u", &n)) != 1) {
+			int l = strlen(req);
+			if (req[l - 1] == '\n')
+				req[l - 1] = '\0';
+			fprintf(stdout, "E0 Missing event number (%s; sscanf found #%d)\n", req, res);
+		} else if (n >= TreeCount(dbs)) {
+			fprintf(stdout, "E0 Unknown event number\n");
+			fflush(stdout);
+		} else {
+			int src[N], c;
+			TreeUnfold(dbs,n,src);
+			fprintf(stdout, "EB\n");
+			c=GBgetTransitionsAll(context->model,src,torx_transition,context);
+			fprintf(stdout, "EE\n");
+			fflush(stdout);
+		}
+		break;
+	}
+	case 'q': {
+		fprintf(stdout, "Q\n");
+		fflush(stdout);
+		return 1;
+		break;
+	}
+	default:			/* unknown command */
+		fprintf(stdout, "A_ERROR UnknownCommand: %s\n", req);
+		fflush(stdout);
+	}
+	return 0;
+}
+
+static void torx_ui(torx_struct_t *context) {
+	char buf[BUFSIZ];
+	int stop = 0;
+	while (!stop && fgets(buf, BUFSIZ, stdin)) {
+		if (!strchr(buf, '\n'))
+			/* uncomplete read; ignore the problem for now */
+			Warning(info, "no end-of-line character read on standard input (incomplete read?)\n") ;
+		stop = torx_handle_request(context, buf);
+	}
+}
+
 int main(int argc, char *argv[]){
 	void* stackbottom=&argv;
 	RTinit(argc,&argv);
@@ -157,6 +240,10 @@ int main(int argc, char *argv[]){
 	NIPSinitGreybox(argc,argv);
 #endif
 	parse_options(options,argc,argv);
+	if (torx) {
+		write_lts = 0;
+		use_vset = 0;
+	}
 	if (!outputarch && write_lts) Fatal(1,error,"please specify the output archive with -out");
 	if (write_lts && use_vset) Fatal(1,error,"writing in vector set mode is future work");
 
@@ -222,6 +309,11 @@ int main(int argc, char *argv[]){
 		if(TreeFold(dbs,src)!=0){
 			Fatal(1,error,"root should be 0");
 		}
+	}
+	if (torx) {
+		torx_struct_t context = { model, ltstype };
+		torx_ui(&context);
+		return 0;
 	}
 	if (write_lts){
 		src_stream=arch_write(arch,"src-0-0",plain?NULL:"diff32|gzip",1);
