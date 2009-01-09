@@ -176,20 +176,21 @@ typedef struct grey_box_context {
 	ATerm s0;
 	at_map_t termmap;
 	at_map_t actionmap;
-	ATermTable action_memo;
 } *mcrl2_model_t;
 
 static struct state_info s_info={0,NULL,NULL};
 
-static inline int resolve_label(mcrl2_model_t model,ATerm act){
-	ATerm res=ATtableGet(model->action_memo,act);
-	if (res==NULL){
-		char str[1024];
-		sprintf(str,"%s",mcrl2::core::pp(act).c_str());
-		res=(ATerm)ATmakeInt(ATfindIndex(model->actionmap,ATreadFromString(str)));
-		ATtablePut(model->action_memo,act,res);
+
+static char global_label[65536];
+
+static char* print_label(ATerm act){
+	std::string s=mcrl2::core::pp(act);
+	const char* cs=s.c_str();
+	if(strlen(cs)>=65536){
+		Fatal(1,error,"global_label overflow");
 	}
-	return ATgetInt((ATermInt)res);
+	strcpy(global_label,cs);
+	return global_label;
 }
 
 
@@ -212,7 +213,7 @@ static int MCRL2getTransitionsLong(model_t m,int group,int*src,TransitionCB cb,v
 		for(int i=0;i<model->atPars;i++) {
 			dst[i]=ATfindIndex(model->termmap,ATgetArgument(state,i));
 		}
-		pp_lbl[0]=resolve_label(model,(ATerm)transition);
+		pp_lbl[0]=ATfindIndex(model->actionmap,(ATerm)transition);
 		cb(context,pp_lbl,dst);
 		count++;
 	}
@@ -238,7 +239,7 @@ static int MCRL2getTransitionsAll(model_t m,int*src,TransitionCB cb,void*context
 		for(int i=0;i<model->atPars;i++) {
 			dst[i]=ATfindIndex(model->termmap,ATgetArgument(state,i));
 		}
-		pp_lbl[0]=resolve_label(model,(ATerm)transition);
+		pp_lbl[0]=ATfindIndex(model->actionmap,(ATerm)transition);
 		cb(context,pp_lbl,dst);
 		count++;
 	}
@@ -294,14 +295,13 @@ void MCRL2loadGreyboxModel(model_t m,char*model_name){
 	ctx->explorer = createNextState(model, false, GS_STATE_VECTOR,GS_REWR_JITTYC);
 	ctx->info=new group_information(model);
 	ctx->termmap=ATmapCreate(m,0,NULL,NULL);
-	ctx->actionmap=ATmapCreate(m,1,NULL,NULL);
+	ctx->actionmap=ATmapCreate(m,1,print_label,NULL);
 
 	ctx->atPars=model.process().process_parameters().size();
 	ctx->atGrps=model.process().summands().size();
 	ATerm s0=ctx->explorer->getInitialState();
 	s0=(ATerm)ctx->explorer->makeStateVector(s0);
 	ctx->StateFun=ATgetAFun(s0);
-	ctx->action_memo=ATtableCreate(1024,75);
 	int temp[ltstype->state_length];
 	for(int i=0;i<ltstype->state_length;i++) {
 		temp[i]=ATfindIndex(ctx->termmap,ATgetArgument(s0,i));
