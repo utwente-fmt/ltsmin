@@ -82,6 +82,10 @@ To find out which ones use the option below.
 >0::
         Some error occurred.
 
+== SUPPORT
+Send questions, bug reports, comments and feature suggestions to the
+mailto:ltsmin-support@cs.utwente.nl[LTSmin Support Team].
+
 == SEE ALSO
 linkman:ltsmin[5],
 linkman:ltsmin-mpi[1],
