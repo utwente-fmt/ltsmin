@@ -1,8 +1,10 @@
+#include "amconfig.h"
 #include "config.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include "runtime.h"
+#include "git_version.h"
 
 static int option_length(struct option options[]){
 	int len;
@@ -366,5 +368,14 @@ uint64_t prop_get_U64(char*name,uint64_t def_val){
 		if(!strcmp(name,prop_name[i])) return atoll(prop_val[i]);
 	}
 	return def_val;
+}
+
+int print_version(char* opt,char*optarg,void *arg){
+	if (strcmp(GIT_VERSION,"")) {
+		fprintf(stdout,"%s\n",GIT_VERSION);
+	} else {
+		fprintf(stdout,"%s\n",PACKAGE_STRING);
+	}
+	return OPT_EXIT;
 }
 

@@ -67,6 +67,7 @@ struct option options[]={
 		NULL,NULL},
 	{"-torx",OPT_NORMAL,set_int,&torx,NULL,
 		"Run TorX-Explorer textual interface on stdin+stdout",NULL,NULL,NULL},
+	{"-version",OPT_NORMAL,print_version,NULL,NULL,"print the version",NULL,NULL,NULL},
 	{0,0,0,0,0,0,0,0,0}
 };
 

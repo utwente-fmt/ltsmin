@@ -18,6 +18,7 @@ extern int parse_int(char* opt,char*optarg,void *arg);
 extern int parse_float(char* opt,char*optarg,void *arg);
 extern int assign_string(char* opt,char*optarg,void *arg);
 extern int log_suppress(char* opt,char*optarg,void *arg);
+extern int print_version(char* opt,char*optarg,void *arg);
 
 #define OPT_NORMAL 0
 #define OPT_OPT_ARG 1
