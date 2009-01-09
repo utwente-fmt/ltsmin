@@ -75,7 +75,7 @@ TODO
 linkman:ltsmin[5],
 linkman:ltsmin-mpi[1],
 linkman:ltsmin-convert[1],
-http://dx.doi.org/10.1007/978-3-540-85762-4_6,[ICTAC 2008, LNCS 5160],
+http://dx.doi.org/10.1007/978-3-540-85762-4_6[ICTAC 2008, LNCS 5160],
 http://www.cwi.nl/\~mcrl/[muCRL],
 http://www.mcrl2.org/[mCRL2],
 http://fmt.cs.utwente.nl/\~michaelw/nips/[NIPS],
