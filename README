@@ -8,7 +8,7 @@ bisimulation and branching bisimulation. The input for this tool is a
 labelled transition system (LTS) in DIR format.
 
 Various sequential, symbolic and distributed tools are provided for
-the creation of LTSs, for example from muCRL, mcrl2 and PROMELA (via
+the creation of LTSs, for example from muCRL, mCRL2 and PROMELA (via
 NIPS) specifications. Alternatively, LTSs in DIR format can be created
 by third-party tools, for example instantiators and dmp2dir from the
 muCRL toolset.
