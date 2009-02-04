@@ -171,6 +171,7 @@ typedef struct grey_box_context {
 	int atPars;
 	int atGrps;
 	NextState* explorer;
+	Rewriter* rewriter;
 	AFun StateFun;
 	group_information *info;
 	ATerm s0;
@@ -183,7 +184,8 @@ static struct state_info s_info={0,NULL,NULL};
 
 static char global_label[65536];
 
-static char* print_label(ATerm act){
+static char* print_label(void*arg,ATerm act){
+	(void)arg;
 	std::string s=mcrl2::core::pp(act);
 	const char* cs=s.c_str();
 	if(strlen(cs)>=65536){
@@ -193,6 +195,15 @@ static char* print_label(ATerm act){
 	return global_label;
 }
 
+static char* print_term(void*arg,ATerm t){
+	Rewriter* rw=(Rewriter*)arg;
+	return ATwriteToString((ATerm)rw->fromRewriteFormat(t));
+}
+
+static ATerm parse_term(void *arg,char*str){
+	Rewriter* rw=(Rewriter*)arg;
+	return rw->toRewriteFormat((ATermAppl)ATreadFromString(str));
+}
 
 static int MCRL2getTransitionsLong(model_t m,int group,int*src,TransitionCB cb,void*context){
 	struct grey_box_context *model=(struct grey_box_context*)GBgetContext(m);
@@ -201,7 +212,7 @@ static int MCRL2getTransitionsLong(model_t m,int group,int*src,TransitionCB cb,v
 		src_term[i]=ATfindTerm(model->termmap,src[i]);
 	}
 	ATerm src_state=(ATerm)ATmakeApplArray(model->StateFun,src_term);
-	src_state=(ATerm)model->explorer->parseStateVector((ATermAppl)src_state);
+	//src_state=(ATerm)model->explorer->parseStateVector((ATermAppl)src_state);
 	std::auto_ptr< NextStateGenerator > generator(model->explorer->getNextStates(src_state, group));
 	ATerm     state;
 	ATermAppl transition;
@@ -209,7 +220,7 @@ static int MCRL2getTransitionsLong(model_t m,int group,int*src,TransitionCB cb,v
 	int pp_lbl[1];
 	int count=0;
 	while(generator->next(&transition, &state)){
-		state=(ATerm)model->explorer->makeStateVector(state);
+		//state=(ATerm)model->explorer->makeStateVector(state);
 		for(int i=0;i<model->atPars;i++) {
 			dst[i]=ATfindIndex(model->termmap,ATgetArgument(state,i));
 		}
@@ -227,7 +238,7 @@ static int MCRL2getTransitionsAll(model_t m,int*src,TransitionCB cb,void*context
 		src_term[i]=ATfindTerm(model->termmap,src[i]);
 	}
 	ATerm src_state=(ATerm)ATmakeApplArray(model->StateFun,src_term);
-	src_state=(ATerm)model->explorer->parseStateVector((ATermAppl)src_state);
+	//src_state=(ATerm)model->explorer->parseStateVector((ATermAppl)src_state);
 	std::auto_ptr< NextStateGenerator > generator(model->explorer->getNextStates(src_state));
 	ATerm     state;
 	ATermAppl transition;
@@ -235,7 +246,7 @@ static int MCRL2getTransitionsAll(model_t m,int*src,TransitionCB cb,void*context
 	int pp_lbl[1];
 	int count=0;
 	while(generator->next(&transition, &state)){
-		state=(ATerm)model->explorer->makeStateVector(state);
+		//state=(ATerm)model->explorer->makeStateVector(state);
 		for(int i=0;i<model->atPars;i++) {
 			dst[i]=ATfindIndex(model->termmap,ATgetArgument(state,i));
 		}
@@ -296,14 +307,15 @@ void MCRL2loadGreyboxModel(model_t m,char*model_name){
 
 	// Note the second argument that specifies that don't care variables are not treated specially
 	ctx->explorer = createNextState(model, false, GS_STATE_VECTOR,GS_REWR_JITTYC);
+	ctx->rewriter = ctx->explorer->getRewriter();
 	ctx->info=new group_information(model);
-	ctx->termmap=ATmapCreate(m,0,NULL,NULL);
-	ctx->actionmap=ATmapCreate(m,1,print_label,NULL);
+	ctx->termmap=ATmapCreate(m,0,ctx->rewriter,print_term,parse_term);
+	ctx->actionmap=ATmapCreate(m,1,ctx->rewriter,print_label,NULL);
 
 	ctx->atPars=model.process().process_parameters().size();
 	ctx->atGrps=model.process().summands().size();
 	ATerm s0=ctx->explorer->getInitialState();
-	s0=(ATerm)ctx->explorer->makeStateVector(s0);
+	//s0=(ATerm)ctx->explorer->makeStateVector(s0);
 	ctx->StateFun=ATgetAFun(s0);
 	int temp[ltstype->state_length];
 	for(int i=0;i<ltstype->state_length;i++) {

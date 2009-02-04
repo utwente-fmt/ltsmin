@@ -20,19 +20,24 @@ static at_map_t actionmap;
 
 static TransitionCB user_cb;
 static void* user_context;
+static ATerm* src_term;
+static int * src_int;
 
-static char* remove_quotes(ATerm t){
+static char* remove_quotes(void *dummy,ATerm t){
+	(void)dummy;
 	char* temp=ATwriteToString(t);
 	temp++;
 	temp[strlen(temp)-1]=0;
 	return temp;
 }
 
-static char* print_term(ATerm t){
+static char* print_term(void *dummy,ATerm t){
+	(void)dummy;
 	return ATwriteToString(MCRLprint(t));
 }
 
-static ATerm parse_term(char*str){
+static ATerm parse_term(void *dummy,char*str){
+	(void)dummy;
 	return MCRLparse(str);
 }
 
@@ -40,7 +45,11 @@ static void callback(void){
 	int lbl=ATfindIndex(actionmap,label);
 	int dst_p[ltstype.state_length];
 	for(int i=0;i<ltstype.state_length;i++){
-		dst_p[i]=ATfindIndex(termmap,dst[i]);
+		if(ATisEqual(src_term[i],dst[i])){
+			dst_p[i]=src_int[i];
+		} else {
+			dst_p[i]=ATfindIndex(termmap,dst[i]);
+		}
 	}
 	user_cb(user_context,&lbl,dst_p);
 }
@@ -90,6 +99,8 @@ int MCRLgetTransitionsLong(model_t model,int group,int*src,TransitionCB cb,void*
 	ATerm at_src[ltstype.state_length];
 	user_cb=cb;
 	user_context=context;
+	src_int=src;
+	src_term=at_src;
 	for(int i=0;i<ltstype.state_length;i++) {
 		at_src[i]=ATfindTerm(termmap,src[i]);
 	}
@@ -101,6 +112,8 @@ int MCRLgetTransitionsAll(model_t model,int*src,TransitionCB cb,void*context){
 	ATerm at_src[ltstype.state_length];
 	user_cb=cb;
 	user_context=context;
+	src_int=src;
+	src_term=at_src;
 	for(int i=0;i<ltstype.state_length;i++) {
 		at_src[i]=ATfindTerm(termmap,src[i]);
 	}
@@ -137,8 +150,8 @@ void MCRLloadGreyboxModel(model_t m,char*model){
 	ltstype.type_names=MCRL_types;
 	GBsetLTStype(m,&ltstype);
 
-	termmap=ATmapCreate(m,0,print_term,parse_term);
-	actionmap=ATmapCreate(m,1,remove_quotes,NULL);
+	termmap=ATmapCreate(m,0,NULL,print_term,parse_term);
+	actionmap=ATmapCreate(m,1,NULL,remove_quotes,NULL);
 
 	dst=(ATerm*)malloc(ltstype.state_length*sizeof(ATerm));
 	for(int i=0;i<ltstype.state_length;i++) {
