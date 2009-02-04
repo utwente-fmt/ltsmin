@@ -264,6 +264,9 @@ void MCRL2loadGreyboxModel(model_t m,char*model_name){
 	using namespace mcrl2::lps;
 
 	ATermAppl Spec=(ATermAppl)ATreadFromNamedFile(model_name);
+	if (!Spec) {
+		Fatal(1,error,"could not read specification from %s",model_name);
+	}
 	Warning(info,"removing unused parts of the data specification.");
 	Spec = removeUnusedData(Spec);
 

@@ -247,6 +247,9 @@ int main(int argc, char *argv[]){
 	if (verbosity==0) {
 		log_set_flags(info,LOG_IGNORE);
 	}
+	if (argc<=1) {
+		Fatal(1,error,"need a model as input, use -help for help");
+	}
 #if defined(MCRL)
 	MCRLinitGreybox(argc,argv,stackbottom);
 #elif defined(MCRL2)
