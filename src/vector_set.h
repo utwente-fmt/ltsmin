@@ -34,12 +34,12 @@ extern vset_t vset_create(vdom_t dom,int k,int* proj);
 /**
 \brief Add an element to a set.
 */
-extern void vset_add(vset_t set,int* e);
+extern void vset_add(vset_t set,const int* e);
 
 /**
 \brief Test if an element is a member.
 */
-extern int vset_member(vset_t set,int* e);
+extern int vset_member(vset_t set,const int* e);
 
 /**
 \brief Test if two sets are equal.
@@ -107,7 +107,7 @@ extern vrel_t vrel_create(vdom_t dom,int k,int* proj);
 /**
 \brief Add an element to a relation.
 */
-extern void vrel_add(vrel_t rel,int* src,int *dst);
+extern void vrel_add(vrel_t rel,const int* src,const int* dst);
 
 /**
 \brief dst := { y | exists x in src : x rel y }
