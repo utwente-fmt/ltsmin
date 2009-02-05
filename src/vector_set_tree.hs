@@ -8,10 +8,10 @@ down (Cons s _ _) = s
 left (Cons _ s _) = s
 right (Cons _ _ s)= s
 
-singleton([])=Atom
-singleton(1:rest)          = Cons (singleton rest) Empty Empty
-singleton(n:rest) | odd n  = Cons Empty Empty (singleton (n `div` 2 : rest))
-singleton(n:rest) | even n = Cons Empty (singleton (n `div` 2 : rest)) Empty
+singleton []                = Atom
+singleton (1:rest)          = Cons (singleton rest) Empty Empty
+singleton (n:rest) | odd n  = Cons Empty Empty (singleton (n `div` 2 : rest))
+singleton (n:rest) | even n = Cons Empty (singleton (n `div` 2 : rest)) Empty
 
 add Empty l = singleton l
 add Atom l = Atom

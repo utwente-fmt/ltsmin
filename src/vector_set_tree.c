@@ -4,9 +4,9 @@
 #include "runtime.h"
 #include "aterm2.h"
 
-ATbool set_member(ATerm set,int *a);
-ATerm singleton(int *a,int len);
-ATerm set_add(ATerm set, int *a,int len,ATbool *new);
+ATbool set_member(ATerm set,const int *a);
+ATerm singleton(const int *a,int len);
+ATerm set_add(ATerm set, const int *a,int len,ATbool *new);
 int set_enum(ATerm set,int *a,int len,int (*callback)(int *,int));
 void set_init();
 int print_array(const int *a,int len);
@@ -45,10 +45,8 @@ vset_t vset_create(vdom_t dom,int k,int* proj){
 
 void vset_add(vset_t set,const int* e){
   int N=set->p_len?set->p_len:set->dom->size;
-  int vec[N];
-  ATbool new;
-  for(int i=0;i<N;i++) vec[i]=e[i]+1;
-  set->set=set_add(set->set,vec,N,&new);
+  // ATbool new;
+  set->set=set_add(set->set,e,N,NULL);
   //  if (new) {
   //    fprintf(stderr,"add: ");
   //    print_array(e,N);
@@ -56,12 +54,7 @@ void vset_add(vset_t set,const int* e){
 }
 
 int vset_member(vset_t set,const int* e){
-  int N=set->p_len?set->p_len:set->dom->size;
-  int vec[N];
-  for (int i=0;i<N;i++) vec[i]=e[i]+1;
-  return set_member(set->set,vec);
-  // fprintf(stderr,"mem?s:",(i?"1":"0"));
-  // print_array(e,N);
+  return set_member(set->set,e);
 }
 
 int vset_is_empty(vset_t set){
@@ -80,11 +73,9 @@ static vset_element_cb global_cb;
 static void* global_context;
 
 static int vset_enum_wrap(int *a,int len){
-  int vec[len];
-  for (int i=0;i<len;i++) vec[i]=a[i]-1;
   // fprintf(stderr,"cbk: ");
-  // print_array(vec,len);
-  global_cb(global_context,vec);
+  // print_array(a,len);
+  global_cb(global_context,a);
   return 0;
 }
 
@@ -111,45 +102,68 @@ static inline ATerm Right(ATerm e) {
   return ATgetArgument(e,2);
 }
 
-ATbool set_member(ATerm set,int *a){
+ATbool set_member2(ATerm set, int x, const int*a) {
+  if (set==Empty) return ATfalse;
+  else if (x==1) return set_member(Down(set),a);
+  else {
+    int odd = x & 0x0001;
+    x = x>>1;
+    if (odd)
+      return set_member2(Right(set),x,a);
+    else
+      return set_member2(Left(set),x,a);
+  }
+}
+
+ATbool set_member(ATerm set,const int *a){
   if (set==Empty) return ATfalse;
   else if (set==Atom) return ATtrue;
-  else if (a[0]==1) return set_member(Down(set),a+1);
+  else return set_member2(set,a[0]+1,a+1);
+}
+
+ATerm singleton2(int x, const int *a, int len) {
+  if (x==1) return Cons(singleton(a,len-1),Empty,Empty);
   else {
-    int odd = a[0] & 0x0001;
-    a[0] = a[0]>>1;
+    int odd = x & 0x0001;
+    x = x>>1;
     if (odd)
-      return set_member(Right(set),a);
+      return Cons(Empty,Empty,singleton2(x,a,len));
     else
-      return set_member(Left(set),a);
+      return Cons(Empty,singleton2(x,a,len),Empty);
   }
 }
 
-ATerm singleton(int *a,int len){
+ATerm singleton(const int *a,int len){
   if (len==0) return Atom;
-  else if (a[0]==1) return Cons(singleton(a+1,len-1),Empty,Empty);
+  else return singleton2(a[0]+1,a+1,len); // only values >0 can be stored
+}
+
+ATerm set_add2(ATerm set,int x, const int *a,int len,ATbool *new){
+  if (set==Empty) {
+    if (new) *new=ATtrue; 
+    return singleton2(x,a,len);
+  }
+  else if (x==1) return Cons(set_add(Down(set),a,len-1,new),Left(set),Right(set));
   else {
-    int odd = a[0] & 0x0001;
-    a[0] = a[0]>>1;
+    int odd = x & 0x0001;
+    x = x>>1;
     if (odd)
-      return Cons(Empty,Empty,singleton(a,len));
+      return Cons(Down(set),Left(set),set_add2(Right(set),x,a,len,new));
     else
-      return Cons(Empty,singleton(a,len),Empty);
+      return Cons(Down(set),set_add2(Left(set),x,a,len,new),Right(set));
   }
 }
 
-ATerm set_add(ATerm set,int *a,int len,ATbool *new){
-  if (set==Empty) {*new=ATtrue; return singleton(a,len);}
-  else if (set==Atom) {*new=ATfalse; return Atom;}
-  else if (a[0]==1) return Cons(set_add(Down(set),a+1,len-1,new),Left(set),Right(set));
-  else {
-    int odd = a[0] & 0x0001;
-    a[0] = a[0]>>1;
-    if (odd)
-      return Cons(Down(set),Left(set),set_add(Right(set),a,len,new));
-    else
-      return Cons(Down(set),set_add(Left(set),a,len,new),Right(set));
+ATerm set_add(ATerm set,const int *a,int len,ATbool *new){
+  if (set==Atom) {
+    if (new) *new=ATfalse; 
+    return Atom;
   }
+  else if (set==Empty) {
+    if (new) *new=ATtrue; 
+    return singleton(a,len);
+  }
+  else return set_add2(set,a[0]+1,a+1,len,new);
 }
 
 static int set_enum_2(ATerm set,int *a,int len,int (*callback)(int*,int),int ofs,int shift, int cur){
@@ -158,7 +172,7 @@ static int set_enum_2(ATerm set,int *a,int len,int (*callback)(int*,int),int ofs
   else if (set==Empty) return 0;
   else {
     if (ofs<len) {
-      a[ofs]=shift+cur;
+      a[ofs]=shift+cur-1; // Recall that 0 cannot be stored
       tmp=set_enum_2(Down(set),a,len,callback,ofs+1,1,0);
       if (tmp) return tmp;
     }
