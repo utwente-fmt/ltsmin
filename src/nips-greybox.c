@@ -446,7 +446,7 @@ NIPSloadGreyboxModel (model_t m, char *filename)
 
     bytecode = bytecode_load_from_file (filename, NULL);
     if (bytecode == NULL) {
-        Fatal (1, error, "Failed to open %s.", filename);
+        FatalCall (1, error, "Failed to open %s.", filename);
         return;
     }
     if (nipsvm_init (vm, bytecode, scheduler_callback, error_callback) !=

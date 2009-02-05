@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <mpi.h>
+#include <stdlib.h>
 
 #include "fast_hash.h"
 #if defined(MCRL)
@@ -379,12 +380,26 @@ static void io_trans_init(){
 	}
 }
 
+static int armed=0;
+
+static void abort_if_armed(){
+	if(armed) {
+		fprintf(stderr,"bad exit, aborting\n");
+		MPI_Abort(MPI_COMM_WORLD,1);
+	} else {
+	//	fprintf(stderr,"exit verified\n");
+	}
+}
 
 int main(int argc, char*argv[]){
 	long long int global_visited,global_explored,global_transitions;
 	void *bottom=(void*)&argc;
 
+	if (atexit(abort_if_armed)){
+		Fatal(1,error,"atexit failed");
+	}
         MPI_Init(&argc, &argv);
+	armed=1;
 	MPI_Errhandler_set(MPI_COMM_WORLD,MPI_ERRORS_ARE_FATAL);
         MPI_Comm_size(MPI_COMM_WORLD, &mpi_nodes);
         MPI_Comm_rank(MPI_COMM_WORLD, &mpi_me);
@@ -611,6 +626,7 @@ int main(int argc, char*argv[]){
 	//sprintf(dir,"gmon-%d",mpi_me);
 	//chdir(dir);
 	MPI_Finalize();
+	armed=0;
 	return 0;
 }
 

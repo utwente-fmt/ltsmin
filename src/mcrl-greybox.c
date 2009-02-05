@@ -130,7 +130,7 @@ void MCRLloadGreyboxModel(model_t m,char*model){
 	}
 	instances++;
 	if(!MCRLinitNamedFile(model)) {
-		Fatal(1,error,"failed to open %s",model);
+		FatalCall(1,error,"failed to open %s",model);
 	}
 	if (!RWinitialize(MCRLgetAdt())) {
 		ATerror("Initialize rewriter");
