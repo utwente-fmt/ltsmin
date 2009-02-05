@@ -1,7 +1,7 @@
 #ifndef GREYBOX_H
 #define GREYBOX_H
 
-
+#include <stdio.h>
 #include "chunk_support.h"
 
 /**
@@ -320,6 +320,11 @@ extern model_t GBaddCache(model_t model);
 
 //@}
 
+//@{
+
+/**
+\brief Print the current dependency matrix in human readable form.
+*/
+extern void GBprintDependencyMatrix(FILE* file, model_t model);
 
 #endif
-

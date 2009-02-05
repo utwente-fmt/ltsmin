@@ -353,3 +353,18 @@ int GBchunkCount(model_t model,int type_no){
 }
 
 
+void GBprintDependencyMatrix(FILE* file, model_t model) {
+  edge_info_t e = GBgetEdgeInfo(model);
+  int N=model->ltstype->state_length;
+  for (int i=0;i<e->groups;i++) {
+    for (int j=0,c=0;j<N;j++) {
+      if (c<e->length[i] && j==e->indices[i][c]) {
+	fprintf(file,"+");
+	c++;
+      }
+      else
+	fprintf(file,"-");
+    }
+    fprintf(file,"\n");
+  }
+}
