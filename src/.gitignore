@@ -8,3 +8,14 @@ instantiator-mpi
 ltsmin-convert
 ltsmin-mpi
 stamp-h1
+gcf
+lpo-reach
+lpo2lts-grey
+lpo2lts-mpi
+lps-reach
+lps2lts-grey
+lps2lts-mpi
+mpi-event-test
+nips-reach
+nips2lts-grey
+nips2lts-mpi

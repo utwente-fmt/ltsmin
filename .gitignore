@@ -16,3 +16,5 @@ Makefile
 Makefile.in
 missing
 ltsmin-*.tar.gz
+libtool
+ltmain.sh
