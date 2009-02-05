@@ -102,14 +102,14 @@ vrel_t vrel_create(vdom_t dom,int k,int* proj){
 	return rel;
 }
 
-void vset_add(vset_t set,int* e){
+void vset_add(vset_t set,const int* e){
 	int N=set->p_len?set->p_len:set->dom->size;
 	ATerm vec[N];
 	for(int i=0;i<N;i++) vec[i]=(ATerm)ATmakeInt(e[i]);
 	set->set=set_add(set->set,vec,N,NULL);
 }
 
-int vset_member(vset_t set,int* e){
+int vset_member(vset_t set,const int* e){
 	int N=set->p_len?set->p_len:set->dom->size;
 	ATerm vec[N];
 	for(int i=0;i<N;i++) vec[i]=(ATerm)ATmakeInt(e[i]);
@@ -175,7 +175,7 @@ void vset_zip(vset_t dst,vset_t src){
 	set_zip(dst->set,src->set,&dst->set,&src->set);
 }
 
-void vrel_add(vrel_t rel,int* src,int *dst){
+void vrel_add(vrel_t rel,const int* src, const int* dst){
 	int N=rel->p_len?rel->p_len:rel->dom->size;
 	ATerm vec[2*N];
 	for(int i=0;i<N;i++) {
