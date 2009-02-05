@@ -8,7 +8,7 @@ bisimulation and branching bisimulation. The input for this tool is a
 labelled transition system (LTS) in DIR format.
 
 Various sequential, symbolic and distributed tools are provided for
-the creation of LTSs, for example from muCRL, mcrl2 and PROMELA (via
+the creation of LTSs, for example from muCRL, mCRL2 and PROMELA (via
 NIPS) specifications. Alternatively, LTSs in DIR format can be created
 by third-party tools, for example instantiators and dmp2dir from the
 muCRL toolset.
@@ -105,6 +105,10 @@ Then type the command:
   ./build/bin/bjam --install --install-boost-headers
 
 This should allow the mCRL2 greybox interface to compile.
+
+*** CADP
+See the CADP website <http://www.inrialpes.fr/vasy/cadp/> on how to
+obtain a licence and download the CADP toolkit.
 
 *** MPI
 In principle, any MPI library which supports MPI-IO should work.

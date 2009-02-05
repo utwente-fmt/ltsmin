@@ -25,7 +25,7 @@ layout for ++lts.dir++ would be ++lts.dir/%s++. Another example, would be prefix
 Any LTS file name containing ++%s++ will be assumed to be a pattern mode archive.
 
 *archive mode*::
-In archive mode all data streams files are written to a single archive file.
+In archive mode all data stream files are written to a single archive file.
 This single archive file is a home-grown archive file format called
 Generic Archive Format. Unlike ZIP, this archive format supports
 interleaved writing of multiple data streams by multiple processes.
@@ -37,7 +37,7 @@ All tools can apply compression to an LTS file. Compression is enabled by defaul
 by giving the command line argument ++-plain++. Similar to a ZIP archive, compression is applied to separate
 data streams. These fall into two categories: labels and states. The labels are compressed using gzip.
 The states are compressed with difference encoding followed by gzip.
-The tools will detect if the input file is comressed or not.
+The tools will detect if the input file is compressed or not.
 
 Please note that the tools
 from the mCRL toolset require uncompressed data streams with a +name.dir/%s+ layout to work.

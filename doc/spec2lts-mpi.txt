@@ -120,6 +120,10 @@ mpirun -np 2 -mca btl tcp,self lpo2lts-mpi -out brp.gcf brp.tbf
 
 This GCF file can be read by both linkman:ltsmin-mpi[1] and linkman:ltsmin-convert[1].
 
+== SUPPORT
+Send questions, bug reports, comments and feature suggestions to the
+mailto:ltsmin-support@cs.utwente.nl[LTSmin Support Team].
+
 == SEE ALSO
 linkman:ltsmin[5],
 linkman:ltsmin-mpi[1],
