@@ -269,6 +269,11 @@ int main(int argc, char *argv[]){
 	NIPSloadGreyboxModel(model,argv[argc-1]);
 #endif
 
+	if (verbosity >=2) {
+	  fprintf(stderr,"Dependency Matrix:\n");
+	  GBprintDependencyMatrix(stderr,model);
+	}
+
 	if (cache) model=GBaddCache(model);
 
 	lts_struct_t ltstype=GBgetLTStype(model);
