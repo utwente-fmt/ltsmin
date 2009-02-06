@@ -605,23 +605,24 @@ static inline ATerm Right(ATerm e) {
   return ATgetArgument(e,2);
 }
 
-ATbool set_member2(ATerm set, int x, const int*a) {
-  if (set==Empty) return ATfalse;
-  else if (x==1) return set_member_tree(Down(set),a);
-  else {
-    int odd = x & 0x0001;
-    x = x>>1;
-    if (odd)
-      return set_member2(Right(set),x,a);
-    else
-      return set_member2(Left(set),x,a);
+ATbool set_member_tree(ATerm set, const int *a) {
+  for (;;) {
+    if (set==Empty) return ATfalse;
+    else if (set==Atom ) return ATtrue;
+    else {
+      int x=a++[0]+1;
+      while (x!=1) {
+	int odd = x & 0x0001;
+	x = x>>1;
+	if (odd)
+	  set = Right(set);
+	else
+	  set = Left(set);
+	if (set==Empty) return ATfalse;
+      }
+    }
+    set = Down(set);
   }
-}
-
-ATbool set_member_tree(ATerm set,const int *a){
-  if (set==Empty) return ATfalse;
-  else if (set==Atom) return ATtrue;
-  else return set_member2(set,a[0]+1,a+1); // Only values >0 can be stored
 }
 
 ATerm singleton2(int x, const int *a, int len) {
@@ -640,7 +641,7 @@ ATerm singleton_tree(const int *a,int len){
   if (len==0) return Atom;
   else return singleton2(a[0]+1,a+1,len); // only values >0 can be stored
 }
-
+    
 ATerm set_add2(ATerm set,int x, const int *a,int len,ATbool *new){
   if (set==Empty) {
     if (new) *new=ATtrue; 
