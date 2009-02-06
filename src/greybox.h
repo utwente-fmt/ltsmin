@@ -62,8 +62,8 @@ char** type_names; ///< The names of the types.
 /**
 \brief Edge group information. 
 
-For each grey box model, anumber of groups must be determined and
-for each of those groups the influenced variables must de given.
+For each grey box model, a number of groups must be determined and
+for each of those groups the influenced variables must be given.
 */
 typedef struct edge_info {
 	int   groups;  ///< The number of groups.
@@ -101,6 +101,12 @@ extern edge_info_t GBgetEdgeInfo(model_t model);
 /**<
 \brief Get the edge group information of a model.
 */
+
+/**
+\brief Print the current dependency matrix in human readable form.
+*/
+extern void GBprintDependencyMatrix(FILE* file, model_t model);
+
 
 extern void GBgetInitialState(model_t model,int *state);
 /**< @brief Write the initial state of model into state. */
@@ -319,12 +325,5 @@ extern model_t GBaddCache(model_t model);
 
 
 //@}
-
-//@{
-
-/**
-\brief Print the current dependency matrix in human readable form.
-*/
-extern void GBprintDependencyMatrix(FILE* file, model_t model);
 
 #endif
