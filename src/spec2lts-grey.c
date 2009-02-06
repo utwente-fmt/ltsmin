@@ -33,6 +33,7 @@ static int verbosity=1;
 static int write_lts=1;
 static int cache=0;
 static int use_vset=0;
+static int use_vset_tree=0;
 static int torx =0;
 
 struct option options[]={
@@ -58,6 +59,10 @@ struct option options[]={
 		"Add the caching wrapper around the model",NULL,NULL,NULL},
 	{"-vset",OPT_NORMAL,set_int,&use_vset,NULL,
 		"Use vector sets instead of tree compression",
+		"This option cannot be used in combination with -out",
+		NULL,NULL},
+	{"-vset-tree",OPT_NORMAL,set_int,&use_vset_tree,NULL,
+		"Use vector sets with MDD nodes organized in a tree",
 		"This option cannot be used in combination with -out",
 		NULL,NULL},
 	{"-torx",OPT_NORMAL,set_int,&torx,NULL,
@@ -108,10 +113,16 @@ static void set_next(void*arg,int*lbl,int*dst){
 	(void)arg;
 	(void)lbl;
 	trans++;
-	if (vset_member(visited_set,dst)) return;
+	if (use_vset && vset_member(visited_set,dst)) return;
+	if (use_vset_tree && vset_member_tree(visited_set,dst)) return;
 	visited++;
-	vset_add(visited_set,dst);
-	vset_add(next_set,dst);
+	if (use_vset) {
+	  vset_add(visited_set,dst);
+	  vset_add(next_set,dst);
+	} else {
+	  vset_add_tree(visited_set,dst);
+	  vset_add_tree(next_set,dst);
+	}
 }
 
 static void explore_elem(void*context,int*src){
@@ -243,9 +254,10 @@ int main(int argc, char *argv[]){
 	if (torx) {
 		write_lts = 0;
 		use_vset = 0;
+		use_vset_tree = 0;
 	}
 	if (!outputarch && write_lts) Fatal(1,error,"please specify the output archive with -out");
-	if (write_lts && use_vset) Fatal(1,error,"writing in vector set mode is future work");
+	if (write_lts && (use_vset || use_vset_tree)) Fatal(1,error,"writing in vector set mode is future work");
 
 	switch(blackbox+greybox){
 	case 0:
@@ -280,7 +292,7 @@ int main(int argc, char *argv[]){
 	N=ltstype->state_length;
 	edge_info_t e_info=GBgetEdgeInfo(model);
 	K=e_info->groups;
-	if (use_vset) {
+	if (use_vset || use_vset_tree) {
 		domain=vdom_create(N);
 		visited_set=vset_create(domain,0,NULL);
 		next_set=vset_create(domain,0,NULL);
@@ -310,6 +322,9 @@ int main(int argc, char *argv[]){
 	if (use_vset) {
 		vset_add(visited_set,src);
 		vset_add(next_set,src);
+	} else if (use_vset_tree) {
+		vset_add_tree(visited_set,src);
+		vset_add_tree(next_set,src);
 	} else {
 		if(TreeFold(dbs,src)!=0){
 			Fatal(1,error,"root should be 0");
@@ -326,7 +341,7 @@ int main(int argc, char *argv[]){
 		dst_stream=arch_write(arch,"dest-0-0",plain?NULL:"diff32|gzip",1);
 	}
 	int level=0;
-	if (use_vset){
+	if (use_vset || use_vset_tree){
 		vset_t current_set=vset_create(domain,0,NULL);
 		while (!vset_is_empty(next_set)){
 			Warning(info,"level %d has %d states, explored %d states %d trans",
@@ -334,7 +349,10 @@ int main(int argc, char *argv[]){
 			level++;
 			vset_copy(current_set,next_set);
 			vset_clear(next_set);
-			vset_enum(current_set,explore_elem,model);
+			if (use_vset)
+			  vset_enum(current_set,explore_elem,model);
+			else
+			  vset_enum_tree(current_set,explore_elem,model);
 		}
 	} else {
 		int limit=0;

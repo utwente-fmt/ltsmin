@@ -117,5 +117,31 @@ extern void vset_next(vset_t dst,vset_t src,vrel_t rel);
 //@}
 
 
+/**
+\defgroup vector_set_tree Alternative: MDD nodes organized in binary tree
+*/
+//@{
+
+/**
+\brief Test if an element is a member.
+*/
+extern int vset_member_tree(vset_t set,const int* e);
+
+/**
+\brief Add an element to a set.
+*/
+extern void vset_add_tree(vset_t set,const int* e);
+
+/**
+\brief Enumerate the elements of a set.
+
+For each element of the given set, the given callback with be called with as arguments
+the given context and the set element.
+*/
+extern void vset_enum_tree(vset_t set,vset_element_cb cb,void* context);
+
+//@}
+
+
 #endif
 

@@ -48,6 +48,8 @@ ATbool set_put(ATerm *set,ATerm *a,int len);
 static AFun cons;
 static AFun zip,min,sum,pi,reach;
 static ATerm atom;
+static ATerm Atom=NULL;
+static ATerm Empty=NULL;
 
 static ATermTable global_ct=NULL;
 
@@ -532,7 +534,151 @@ void set_init(){
 	ATprotectAFun(pi);
 	reach=ATmakeAFun("VSET_REACH",2,ATfalse);
 	ATprotectAFun(reach);
+	// used for vector_set_tree:
+	Empty=ATmake("VSET_E");
+	ATprotect(&Empty);
+	Atom=ATmake("VSET_A");
+	ATprotect(&Atom);
 	set_reset_ct();
+}
+
+
+/*
+From here an alternative implementation starts,
+where MDD nodes are organized in a tree rather than a linked list.
+See vector_set_tree.hs for specification/documentation
+*/
+
+ATbool set_member_tree(ATerm set,const int *a);
+ATerm singleton_tree(const int *a,int len);
+ATerm set_add_tree(ATerm set, const int *a,int len,ATbool *new);
+int set_enum_tree(ATerm set,int *a,int len,int (*callback)(int *,int));
+
+void vset_add_tree(vset_t set,const int* e){
+  int N=set->p_len?set->p_len:set->dom->size;
+  // ATbool new;
+  set->set=set_add_tree(set->set,e,N,NULL);
+  //  if (new) {
+  //    fprintf(stderr,"add: ");
+  //    print_array(e,N);
+  //  }
+}
+
+int vset_member_tree(vset_t set,const int* e){
+  return set_member_tree(set->set,e);
+}
+
+static int vset_enum_wrap_tree(int *a,int len){
+  // fprintf(stderr,"cbk: ");
+  // print_array(a,len);
+  global_cb(global_context,a);
+  return 0;
+}
+
+void vset_enum_tree(vset_t set,vset_element_cb cb,void* context){
+	int N=set->p_len?set->p_len:set->dom->size;
+	int vec[N];
+	global_cb=cb;
+	global_context=context;
+	set_enum_tree(set->set,vec,N,vset_enum_wrap_tree);
+}
+
+/***************************/
+
+static inline ATerm Cons(ATerm down,ATerm left,ATerm right) {
+  return (ATerm)ATmakeAppl3(cons,down,left,right);
+}
+static inline ATerm Down(ATerm e) {
+  return ATgetArgument(e,0);
+}
+static inline ATerm Left(ATerm e) {
+  return ATgetArgument(e,1);
+}
+static inline ATerm Right(ATerm e) {
+  return ATgetArgument(e,2);
+}
+
+ATbool set_member2(ATerm set, int x, const int*a) {
+  if (set==Empty) return ATfalse;
+  else if (x==1) return set_member_tree(Down(set),a);
+  else {
+    int odd = x & 0x0001;
+    x = x>>1;
+    if (odd)
+      return set_member2(Right(set),x,a);
+    else
+      return set_member2(Left(set),x,a);
+  }
+}
+
+ATbool set_member_tree(ATerm set,const int *a){
+  if (set==Empty) return ATfalse;
+  else if (set==Atom) return ATtrue;
+  else return set_member2(set,a[0]+1,a+1); // Only values >0 can be stored
+}
+
+ATerm singleton2(int x, const int *a, int len) {
+  if (x==1) return Cons(singleton_tree(a,len-1),Empty,Empty);
+  else {
+    int odd = x & 0x0001;
+    x = x>>1;
+    if (odd)
+      return Cons(Empty,Empty,singleton2(x,a,len));
+    else
+      return Cons(Empty,singleton2(x,a,len),Empty);
+  }
+}
+
+ATerm singleton_tree(const int *a,int len){
+  if (len==0) return Atom;
+  else return singleton2(a[0]+1,a+1,len); // only values >0 can be stored
+}
+
+ATerm set_add2(ATerm set,int x, const int *a,int len,ATbool *new){
+  if (set==Empty) {
+    if (new) *new=ATtrue; 
+    return singleton2(x,a,len);
+  }
+  else if (x==1) return Cons(set_add_tree(Down(set),a,len-1,new),Left(set),Right(set));
+  else {
+    int odd = x & 0x0001;
+    x = x>>1;
+    if (odd)
+      return Cons(Down(set),Left(set),set_add2(Right(set),x,a,len,new));
+    else
+      return Cons(Down(set),set_add2(Left(set),x,a,len,new),Right(set));
+  }
+}
+
+ATerm set_add_tree(ATerm set,const int *a,int len,ATbool *new){
+  if (set==Atom) {
+    if (new) *new=ATfalse; 
+    return Atom;
+  }
+  else if (set==Empty) {
+    if (new) *new=ATtrue; 
+    return singleton_tree(a,len);
+  }
+  else return set_add2(set,a[0]+1,a+1,len,new);
+}
+
+static int set_enum_t2(ATerm set,int *a,int len,int (*callback)(int*,int),int ofs,int shift, int cur){
+  int tmp;
+  if (set==Atom) return callback(a,ofs);
+  else if (set==Empty) return 0;
+  else {
+    if (ofs<len) {
+      a[ofs]=shift+cur-1; // Recall that 0 cannot be stored
+      tmp=set_enum_t2(Down(set),a,len,callback,ofs+1,1,0);
+      if (tmp) return tmp;
+    }
+    set_enum_t2(Left(set),a,len,callback,ofs,shift<<1,cur);
+    set_enum_t2(Right(set),a,len,callback,ofs,shift<<1,shift|cur);
+  }
+}
+
+int set_enum_tree(ATerm set,int *a,int len,int (*callback)(int *,int)){
+  return set_enum_t2(set,a,len,callback,0,1,0);
 }
 
 
