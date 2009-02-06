@@ -140,6 +140,11 @@ the given context and the set element.
 */
 extern void vset_enum_tree(vset_t set,vset_element_cb cb,void* context);
 
+/**
+\brief Count the number of diagram nodes and the number of elements stored.
+*/
+extern void vset_count_tree(vset_t set,long *nodes,long long *elements);
+
 //@}
 
 

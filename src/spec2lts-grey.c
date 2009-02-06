@@ -379,7 +379,16 @@ int main(int argc, char *argv[]){
 	if (write_lts){
 		Warning(info,"state space has %d levels %d states %d transitions",level,visited,trans);
 	} else {
-		printf("state space has %d levels %d states %d transitions\n",level,visited,trans);
+	  printf("state space has %d levels %d states %d transitions\n",level,visited,trans);
+	  if (use_vset || use_vset_tree) {
+	    long long size;
+	    long nodes;
+	    if (use_vset)
+	      vset_count(visited_set,&nodes,&size);
+	    else 
+	      vset_count_tree(visited_set,&nodes,&size);
+	    printf("(%lld states represented symbolically with %ld nodes)\n",size,nodes);
+	  }
 	}
 	if (write_lts){
 		lts_set_states(lts,0,visited);

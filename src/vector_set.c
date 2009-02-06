@@ -553,6 +553,7 @@ ATbool set_member_tree(ATerm set,const int *a);
 ATerm singleton_tree(const int *a,int len);
 ATerm set_add_tree(ATerm set, const int *a,int len,ATbool *new);
 int set_enum_tree(ATerm set,int *a,int len,int (*callback)(int *,int));
+void count_set_tree(ATerm set,long *nodes,long long *elements);
 
 void vset_add_tree(vset_t set,const int* e){
   int N=set->p_len?set->p_len:set->dom->size;
@@ -569,6 +570,7 @@ int vset_member_tree(vset_t set,const int* e){
 }
 
 static int vset_enum_wrap_tree(int *a,int len){
+  (void)len;
   // fprintf(stderr,"cbk: ");
   // print_array(a,len);
   global_cb(global_context,a);
@@ -582,6 +584,11 @@ void vset_enum_tree(vset_t set,vset_element_cb cb,void* context){
 	global_context=context;
 	set_enum_tree(set->set,vec,N,vset_enum_wrap_tree);
 }
+
+void vset_count_tree(vset_t set,long *nodes,long long *elements){
+	count_set_tree(set->set,nodes,elements);
+}
+
 
 /***************************/
 
@@ -679,6 +686,40 @@ static int set_enum_t2(ATerm set,int *a,int len,int (*callback)(int*,int),int of
 
 int set_enum_tree(ATerm set,int *a,int len,int (*callback)(int *,int)){
   return set_enum_t2(set,a,len,callback,0,1,0);
+}
+
+// this uses global variables: elem_size, *elem_count, count_is
+
+static long long count_set_t2(ATerm set){
+  if (set==Empty) return 0;
+  else if (set==Atom) return 1;
+  else {
+    ATbool new;
+    long idx=ATindexedSetPut(count_is,(ATerm)set,&new);
+    if(new){
+      node_count++;
+      if (idx>=elem_size){
+	elem_size=elem_size+(elem_size>>1);
+	elem_count=realloc(elem_count,elem_size*sizeof(long long));
+	//ATwarning("resize %d %d %x",idx,elem_size,elem_count);
+      }
+      long long c=count_set_t2(ATgetArgument(set,0))+count_set_t2(ATgetArgument(set,1))+count_set_t2(ATgetArgument(set,2));
+      return elem_count[idx]=c;
+    }
+    else
+      return elem_count[idx];
+  }
+}
+
+void count_set_tree(ATerm set,long *nodes,long long *elements){
+	count_is=ATindexedSetCreate(HASH_INIT,HASH_LOAD);
+	elem_count=malloc(HASH_INIT*sizeof(long long));
+	elem_size=HASH_INIT;
+	node_count=2; // atom and emptyset
+	*elements=count_set_t2(set);
+	ATindexedSetDestroy(count_is);
+	free(elem_count);
+	*nodes=node_count;
 }
 
 
