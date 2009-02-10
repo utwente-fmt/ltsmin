@@ -198,7 +198,7 @@ struct option options[]={
 	{"-unix-io",OPT_NORMAL,set_int,&unix_io,NULL,
 		"use UNIX IO (e.g. if your NFS locking is broken)",NULL,NULL,NULL},
 	{"-out",OPT_REQ_ARG,assign_string,&outputarch,"-out <archive>",
-		"Specifiy the name of the output archive.",
+		"Specify the name of the output archive.",
 		"This will be a pattern archive if <archive> contains %s",
 		"and a GCF archive otherwise",NULL},
 	{"-cache",OPT_NORMAL,set_int,&cache,NULL,
