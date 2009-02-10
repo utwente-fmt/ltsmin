@@ -9,10 +9,10 @@
 #include "fast_hash.h"
 #if defined(MCRL)
 #include "mcrl-greybox.h"
-#define MODEL_TYPE "mcrl"
+#define MODEL_TYPE "lpo"
 #elif defined(MCRL2)
 #include "mcrl2-greybox.h"
-#define MODEL_TYPE "mcrl2"
+#define MODEL_TYPE "lps"
 #elif defined(NIPS)
 #include "nips-greybox.h"
 #define MODEL_TYPE "nips"
