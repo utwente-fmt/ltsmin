@@ -33,7 +33,9 @@ static int verbosity=1;
 static int write_lts=1;
 static int cache=0;
 static int use_vset=0;
+static int use_vset_list=0;
 static int use_vset_tree=0;
+static int use_vset_fdd=0;
 static int torx =0;
 
 struct option options[]={
@@ -57,12 +59,17 @@ struct option options[]={
 		"use the box call (TransitionsLong)",NULL,NULL,NULL},
 	{"-cache",OPT_NORMAL,set_int,&cache,NULL,
 		"Add the caching wrapper around the model",NULL,NULL,NULL},
-	{"-vset",OPT_NORMAL,set_int,&use_vset,NULL,
+	{"-vset",OPT_NORMAL,set_int,&use_vset_tree,NULL,"alias for -vset-tree",NULL,NULL,NULL},
+	{"-vset-list",OPT_NORMAL,set_int,&use_vset_list,NULL,
 	        "Use vector sets with MDD nodes organized in a linked list",
 		"This option cannot be used in combination with -out",
 		NULL,NULL},
 	{"-vset-tree",OPT_NORMAL,set_int,&use_vset_tree,NULL,
 		"Use vector sets with MDD nodes organized in a tree",
+		"This option cannot be used in combination with -out",
+		NULL,NULL},
+	{"-vset-fdd",OPT_NORMAL,set_int,&use_vset_fdd,NULL,
+		"Uses the FDD interface of BuddY to represent sets",
 		"This option cannot be used in combination with -out",
 		NULL,NULL},
 	{"-torx",OPT_NORMAL,set_int,&torx,NULL,
@@ -252,7 +259,16 @@ int main(int argc, char *argv[]){
 		use_vset_tree = 0;
 	}
 	if (!outputarch && write_lts) Fatal(1,error,"please specify the output archive with -out");
-	if (write_lts && (use_vset || use_vset_tree)) Fatal(1,error,"writing in vector set mode is future work");
+	switch(use_vset_tree+use_vset_list+use_vset_fdd){
+	case 0:
+		break;
+	case 1:
+		use_vset=1;
+		break;
+	default:
+		Fatal(1,error,"cannot use more than one vset implementation at once.");
+	}
+	if (write_lts && use_vset) Fatal(1,error,"writing in vector set mode is future work");
 
 	switch(blackbox+greybox){
 	case 0:
@@ -287,10 +303,10 @@ int main(int argc, char *argv[]){
 	N=ltstype->state_length;
 	edge_info_t e_info=GBgetEdgeInfo(model);
 	K=e_info->groups;
-	if (use_vset || use_vset_tree) {
-		if (use_vset) domain=vdom_create_list(N);
-		else domain=vdom_create_tree(N);
-		use_vset=1;
+	if (use_vset) {
+		if (use_vset_list) domain=vdom_create_list(N);
+		if (use_vset_tree) domain=vdom_create_tree(N);
+		if (use_vset_fdd) domain=vdom_create_fdd(N);
 		visited_set=vset_create(domain,0,NULL);
 		next_set=vset_create(domain,0,NULL);
 	} else {

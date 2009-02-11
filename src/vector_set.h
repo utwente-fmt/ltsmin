@@ -26,18 +26,25 @@ typedef struct vector_set *vset_t;
 typedef struct vector_relation *vrel_t;
 
 /**
+\brief Create a domain that uses the fdd form of BuDDy.
+
+\param n The length of vectors in the domain.
+*/
+extern vdom_t vdom_create_fdd(int n);
+
+/**
 \brief Create a domain that uses the list variant of ATermDD.
 
 \param n The length of vectors in the domain.
 */
+extern vdom_t vdom_create_list(int n);
 
-extern vdom_t vdom_create_tree(int n);
 /**
 \brief Create a domain that uses the tree variant of ATermDD.
 
 \param n The length of vectors in the domain.
 */
-extern vdom_t vdom_create_list(int n);
+extern vdom_t vdom_create_tree(int n);
 
 /**
 \brief Create a set.
@@ -139,38 +146,6 @@ extern void vrel_add(vrel_t rel,const int* src,const int* dst);
 extern void vset_next(vset_t dst,vset_t src,vrel_t rel);
 
 //@}
-
-
-/**
-\defgroup vector_set_tree Alternative: MDD nodes organized in binary tree
-*/
-//@{
-
-/**
-\brief Test if an element is a member.
-*/
-extern int vset_member_tree(vset_t set,const int* e);
-
-/**
-\brief Add an element to a set.
-*/
-extern void vset_add_tree(vset_t set,const int* e);
-
-/**
-\brief Enumerate the elements of a set.
-
-For each element of the given set, the given callback with be called with as arguments
-the given context and the set element.
-*/
-extern void vset_enum_tree(vset_t set,vset_element_cb cb,void* context);
-
-/**
-\brief Count the number of diagram nodes and the number of elements stored.
-*/
-extern void vset_count_tree(vset_t set,long *nodes,long long *elements);
-
-//@}
-
 
 #endif
 
