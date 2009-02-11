@@ -592,9 +592,12 @@ void vset_count_tree(vset_t set,long *nodes,long long *elements){
 
 /***************************/
 
+#if 0
+/* see above */
 static inline ATerm Cons(ATerm down,ATerm left,ATerm right) {
   return (ATerm)ATmakeAppl3(cons,down,left,right);
 }
+#endif
 static inline ATerm Down(ATerm e) {
   return ATgetArgument(e,0);
 }
