@@ -74,7 +74,7 @@ lps_reach_LDFLAGS  = $(MCRL2_LDFLAGS) $(AM_LDFLAGS)
 # nips-reach
 nips_reach_SOURCES  = spec-reach.c nips-greybox.c nips-greybox.h	\
                       $(VSET_SRC)
-nips_reach_LDADD    = libutil.a -lATerm $(NIPS_LIBS)
+nips_reach_LDADD    = libutil.a -lATerm $(NIPS_LIBS) $(BUDDY_LIBS)
 nips_reach_CPPFLAGS = -DNIPS $(NIPS_CPPFLAGS) $(MCRL_CPPFLAGS) $(AM_CPPFLAGS) $(BUDDY_CPPFLAGS)
 nips_reach_LDFLAGS  = $(NIPS_LDFLAGS) $(MCRL_LDFLAGS) $(AM_LDFLAGS)
 
