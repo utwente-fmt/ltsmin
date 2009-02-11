@@ -70,6 +70,14 @@ the given context and the set element.
 extern void vset_enum(vset_t set,vset_element_cb cb,void* context);
 
 /**
+\brief Enumerate the elements of a set that match the given projection.
+
+For each element of the given set, the given callback with be called with as arguments
+the given context and the set element.
+*/
+extern void vset_enum_match(vset_t set,int p_len,int* proj,int*match,vset_element_cb cb,void* context);
+
+/**
 \brief Copy a vset.
 */
 extern void vset_copy(vset_t dst,vset_t src);

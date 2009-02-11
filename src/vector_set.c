@@ -6,41 +6,41 @@
 
 static ATerm emptyset=NULL;
 
-ATbool set_member(ATerm set,ATerm *a);
+static ATbool set_member(ATerm set,ATerm *a);
 
-ATerm singleton(ATerm *a,int len);
+static ATerm singleton(ATerm *a,int len);
 
-ATerm set_add(ATerm set,ATerm *a,int len,ATbool *new);
+static ATerm set_add(ATerm set,ATerm *a,int len,ATbool *new);
 
-ATerm set_union(ATerm s1,ATerm s2);
+static ATerm set_union(ATerm s1,ATerm s2);
 
-ATerm set_minus(ATerm a,ATerm b);
+static ATerm set_minus(ATerm a,ATerm b);
 
-void set_zip(ATerm in1,ATerm in2,ATerm *out1,ATerm *out2);
+static void set_zip(ATerm in1,ATerm in2,ATerm *out1,ATerm *out2);
 
-ATerm set_project(ATerm set,int *proj,int len);
+static ATerm set_project(ATerm set,int *proj,int len);
 
-ATerm set_reach(ATerm set,ATerm trans,int *proj,int p_len);
+static ATerm set_reach(ATerm set,ATerm trans,int *proj,int p_len);
 
-int set_enum(ATerm set,ATerm *a,int len,int (*callback)(ATerm *,int));
+static int set_enum(ATerm set,ATerm *a,int len,int (*callback)(ATerm *,int));
 
-void set_reset_ct();
+static int set_enum_match(ATerm set,ATerm *a,int len,ATerm*pattern,int *proj,int p_len,int (*callback)(ATerm *,int));
 
-void set_init();
+static void set_reset_ct();
 
-void count_set(ATerm set,long *nodes,long long *elements);
+static void set_init();
+
+static void count_set(ATerm set,long *nodes,long long *elements);
 
 /* currently not used:
 
-long long get_number(ATerm set,ATermIndexedSet idx,long long *count,ATerm *a,int len);
+static long long get_number(ATerm set,ATermIndexedSet idx,long long *count,ATerm *a,int len);
 
-int set_enum_match(ATerm set,ATerm *a,int len,ATerm*pattern,int *proj,int p_len,int (*callback)(ATerm *,int));
+static int print_array(ATerm *a,int len);
 
-int print_array(ATerm *a,int len);
+static void create_numbering(ATerm set,ATermIndexedSet *idx,long long **count);
 
-void create_numbering(ATerm set,ATermIndexedSet *idx,long long **count);
-
-ATbool set_put(ATerm *set,ATerm *a,int len);
+static ATbool set_put(ATerm *set,ATerm *a,int len);
 
 */
 
@@ -153,6 +153,16 @@ void vset_enum(vset_t set,vset_element_cb cb,void* context){
 	set_enum(set->set,vec,N,vset_enum_wrap);
 }
 
+void vset_enum_match(vset_t set,int p_len,int* proj,int*match,vset_element_cb cb,void* context){
+	int N=set->p_len?set->p_len:set->dom->size;
+	ATerm vec[N];
+	ATerm pattern[p_len];
+	for(int i=0;i<p_len;i++) pattern[i]=(ATerm)ATmakeInt(match[i]);
+	global_cb=cb;
+	global_context=context;
+	set_enum_match(set->set,vec,N,pattern,proj,p_len,vset_enum_wrap);
+}
+
 void vset_count(vset_t set,long *nodes,long long *elements){
 	count_set(set->set,nodes,elements);
 }
@@ -189,7 +199,7 @@ void vrel_add(vrel_t rel,const int* src, const int* dst){
 
 /***************************/
 
-ATbool set_member(ATerm set,ATerm *a){
+static ATbool set_member(ATerm set,ATerm *a){
   if (set==emptyset) return ATfalse;
   else if (set==atom) return ATtrue;
   else { 
@@ -211,14 +221,14 @@ static ATerm MakeCons(ATerm e,ATerm es,ATerm tl){
   return Cons(e,es,tl);
 }
 
-ATerm singleton(ATerm *a,int len){
+static ATerm singleton(ATerm *a,int len){
   if (len==0)
     return atom;
   else
     return Cons(a[0],singleton(a+1,len-1),emptyset);
 }
 
-ATerm set_add(ATerm set,ATerm *a,int len,ATbool *new){
+static ATerm set_add(ATerm set,ATerm *a,int len,ATbool *new){
   if (set==emptyset) {if (new) *new=ATtrue; return singleton(a,len);}
   else if (set==atom) {if (new) *new=ATfalse; return atom;}
   else {
@@ -265,7 +275,7 @@ static ATerm set_union_2(ATerm s1, ATerm s2,char lookup) {
   }
 }
 
-ATerm set_union(ATerm s1,ATerm s2){
+static ATerm set_union(ATerm s1,ATerm s2){
         s1=set_union_2(s1,s2,0);
 	ATtableReset(global_ct);
 	return s1;
@@ -300,7 +310,7 @@ static ATerm set_minus_2(ATerm a,ATerm b, char lookup) {
   }
 }
 
-ATerm set_minus(ATerm s1,ATerm s2){
+static ATerm set_minus(ATerm s1,ATerm s2){
   s1=set_minus_2(s1,s2,0);
   ATtableReset(global_ct);
   return s1;
@@ -348,7 +358,7 @@ static void set_zip_2(ATerm in1,ATerm in2,ATerm *out1,ATerm *out2, char lookup){
   }
 }
 
-void set_zip(ATerm in1,ATerm in2,ATerm *out1,ATerm *out2){
+static void set_zip(ATerm in1,ATerm in2,ATerm *out1,ATerm *out2){
   set_zip_2(in1,in2,out1,out2,0);
   ATtableReset(global_ct);
 }
@@ -379,7 +389,7 @@ static ATerm set_project_2(ATerm set,int ofs,int *proj,int len,char lookup) {
   }
 }
 
-ATerm set_project(ATerm set,int *proj,int len){
+static ATerm set_project(ATerm set,int *proj,int len){
   set=set_project_2(set,0,proj,len,0);
   ATtableReset(global_ct);
   return set;
@@ -447,7 +457,7 @@ static ATerm set_reach_2(ATerm set,ATerm trans,int *proj,int p_len,int ofs, char
   }
 }
 
-ATerm set_reach(ATerm set,ATerm trans,int *proj,int p_len){
+static ATerm set_reach(ATerm set,ATerm trans,int *proj,int p_len){
   set=set_reach_2(set,trans,proj,p_len,0,0);
   ATtableReset(global_ct);
   return set;
@@ -469,288 +479,12 @@ static int set_enum_2(ATerm set,ATerm *a,int len,int (*callback)(ATerm *,int),in
 	return 0;
 }
 
-int set_enum(ATerm set,ATerm *a,int len,int (*callback)(ATerm *,int)){
+static int set_enum(ATerm set,ATerm *a,int len,int (*callback)(ATerm *,int)){
 	return set_enum_2(set,a,len,callback,0);
 }
 
-static ATermIndexedSet count_is;
-static long node_count;
-static long long *elem_count;
-static long elem_size;
 
-static long long count_set_2(ATerm set){
-  if (set==emptyset) return 0;
-  else if (set==atom) return 1;
-  else {
-    ATbool new;
-    long idx=ATindexedSetPut(count_is,(ATerm)set,&new);
-    if(new){
-      node_count++;
-      if (idx>=elem_size){
-	elem_size=elem_size+(elem_size>>1);
-	elem_count=realloc(elem_count,elem_size*sizeof(long long));
-	//ATwarning("resize %d %d %x",idx,elem_size,elem_count);
-      }
-      long long c=count_set_2(ATgetArgument(set,1))+count_set_2(ATgetArgument(set,2));
-      return elem_count[idx]=c;
-    }
-    else
-      return elem_count[idx];
-  }
-}
-
-void count_set(ATerm set,long *nodes,long long *elements){
-	count_is=ATindexedSetCreate(HASH_INIT,HASH_LOAD);
-	elem_count=malloc(HASH_INIT*sizeof(long long));
-	elem_size=HASH_INIT;
-	node_count=2; // atom and emptyset
-	*elements=count_set_2(set);
-	ATindexedSetDestroy(count_is);
-	free(elem_count);
-	*nodes=node_count;
-}
-
-void set_reset_ct(){
-	if (global_ct!=NULL) {
-		ATtableDestroy(global_ct);
-	}
-	global_ct=ATtableCreate(1024,75);
-}
-
-void set_init(){
-	ATprotect(&emptyset);
-	ATprotect(&atom);
-	emptyset=ATmake("VSET_E");
-	atom=ATmake("VSET_A");
-	cons=ATmakeAFun("VSET_C",3,ATfalse);
-	ATprotectAFun(cons);
-	zip=ATmakeAFun("VSET_ZIP",2,ATfalse);
-	ATprotectAFun(zip);
-	min=ATmakeAFun("VSET_MINUS",2,ATfalse);
-	ATprotectAFun(min);
-	sum=ATmakeAFun("VSET_UNION",2,ATfalse);
-	ATprotectAFun(sum);
-	pi=ATmakeAFun("VSET_PI",1,ATfalse);
-	ATprotectAFun(pi);
-	reach=ATmakeAFun("VSET_REACH",2,ATfalse);
-	ATprotectAFun(reach);
-	// used for vector_set_tree:
-	Empty=ATmake("VSET_E");
-	ATprotect(&Empty);
-	Atom=ATmake("VSET_A");
-	ATprotect(&Atom);
-	set_reset_ct();
-}
-
-
-/*
-From here an alternative implementation starts,
-where MDD nodes are organized in a tree rather than a linked list.
-See vector_set_tree.hs for specification/documentation
-*/
-
-ATbool set_member_tree(ATerm set,const int *a);
-ATerm singleton_tree(const int *a,int len);
-ATerm set_add_tree(ATerm set, const int *a,int len,ATbool *new);
-int set_enum_tree(ATerm set,int *a,int len,int (*callback)(int *,int));
-void count_set_tree(ATerm set,long *nodes,long long *elements);
-
-void vset_add_tree(vset_t set,const int* e){
-  int N=set->p_len?set->p_len:set->dom->size;
-  // ATbool new;
-  set->set=set_add_tree(set->set,e,N,NULL);
-  //  if (new) {
-  //    fprintf(stderr,"add: ");
-  //    print_array(e,N);
-  //  }
-}
-
-int vset_member_tree(vset_t set,const int* e){
-  return set_member_tree(set->set,e);
-}
-
-static int vset_enum_wrap_tree(int *a,int len){
-  (void)len;
-  // fprintf(stderr,"cbk: ");
-  // print_array(a,len);
-  global_cb(global_context,a);
-  return 0;
-}
-
-void vset_enum_tree(vset_t set,vset_element_cb cb,void* context){
-	int N=set->p_len?set->p_len:set->dom->size;
-	int vec[N];
-	global_cb=cb;
-	global_context=context;
-	set_enum_tree(set->set,vec,N,vset_enum_wrap_tree);
-}
-
-void vset_count_tree(vset_t set,long *nodes,long long *elements){
-	count_set_tree(set->set,nodes,elements);
-}
-
-
-/***************************/
-
-#if 0
-/* see above */
-static inline ATerm Cons(ATerm down,ATerm left,ATerm right) {
-  return (ATerm)ATmakeAppl3(cons,down,left,right);
-}
-#endif
-static inline ATerm Down(ATerm e) {
-  return ATgetArgument(e,0);
-}
-static inline ATerm Left(ATerm e) {
-  return ATgetArgument(e,1);
-}
-static inline ATerm Right(ATerm e) {
-  return ATgetArgument(e,2);
-}
-
-ATbool set_member_tree(ATerm set, const int *a) {
-  for (;;) {
-    if (set==Empty) return ATfalse;
-    else if (set==Atom ) return ATtrue;
-    else {
-      int x=a++[0]+1;
-      while (x!=1) {
-	int odd = x & 0x0001;
-	x = x>>1;
-	if (odd)
-	  set = Right(set);
-	else
-	  set = Left(set);
-	if (set==Empty) return ATfalse;
-      }
-    }
-    set = Down(set);
-  }
-}
-
-ATerm singleton2(int x, const int *a, int len) {
-  if (x==1) return Cons(singleton_tree(a,len-1),Empty,Empty);
-  else {
-    int odd = x & 0x0001;
-    x = x>>1;
-    if (odd)
-      return Cons(Empty,Empty,singleton2(x,a,len));
-    else
-      return Cons(Empty,singleton2(x,a,len),Empty);
-  }
-}
-
-ATerm singleton_tree(const int *a,int len){
-  if (len==0) return Atom;
-  else return singleton2(a[0]+1,a+1,len); // only values >0 can be stored
-}
-    
-ATerm set_add2(ATerm set,int x, const int *a,int len,ATbool *new){
-  if (set==Empty) {
-    if (new) *new=ATtrue; 
-    return singleton2(x,a,len);
-  }
-  else if (x==1) return Cons(set_add_tree(Down(set),a,len-1,new),Left(set),Right(set));
-  else {
-    int odd = x & 0x0001;
-    x = x>>1;
-    if (odd)
-      return Cons(Down(set),Left(set),set_add2(Right(set),x,a,len,new));
-    else
-      return Cons(Down(set),set_add2(Left(set),x,a,len,new),Right(set));
-  }
-}
-
-ATerm set_add_tree(ATerm set,const int *a,int len,ATbool *new){
-  if (set==Atom) {
-    if (new) *new=ATfalse; 
-    return Atom;
-  }
-  else if (set==Empty) {
-    if (new) *new=ATtrue; 
-    return singleton_tree(a,len);
-  }
-  else return set_add2(set,a[0]+1,a+1,len,new);
-}
-
-static int set_enum_t2(ATerm set,int *a,int len,int (*callback)(int*,int),int ofs,int shift, int cur){
-  int tmp;
-  if (set==Atom) return callback(a,ofs);
-  else if (set==Empty) return 0;
-  else {
-    if (ofs<len) {
-      a[ofs]=shift+cur-1; // Recall that 0 cannot be stored
-      tmp=set_enum_t2(Down(set),a,len,callback,ofs+1,1,0);
-      if (tmp) return tmp;
-    }
-    set_enum_t2(Left(set),a,len,callback,ofs,shift<<1,cur);
-    set_enum_t2(Right(set),a,len,callback,ofs,shift<<1,shift|cur);
-  }
-}
-
-int set_enum_tree(ATerm set,int *a,int len,int (*callback)(int *,int)){
-  return set_enum_t2(set,a,len,callback,0,1,0);
-}
-
-// this uses global variables: elem_size, *elem_count, count_is
-
-static long long count_set_t2(ATerm set){
-  if (set==Empty) return 0;
-  else if (set==Atom) return 1;
-  else {
-    ATbool new;
-    long idx=ATindexedSetPut(count_is,(ATerm)set,&new);
-    if(new){
-      node_count++;
-      if (idx>=elem_size){
-	elem_size=elem_size+(elem_size>>1);
-	elem_count=realloc(elem_count,elem_size*sizeof(long long));
-	//ATwarning("resize %d %d %x",idx,elem_size,elem_count);
-      }
-      long long c=count_set_t2(ATgetArgument(set,0))+count_set_t2(ATgetArgument(set,1))+count_set_t2(ATgetArgument(set,2));
-      return elem_count[idx]=c;
-    }
-    else
-      return elem_count[idx];
-  }
-}
-
-void count_set_tree(ATerm set,long *nodes,long long *elements){
-	count_is=ATindexedSetCreate(HASH_INIT,HASH_LOAD);
-	elem_count=malloc(HASH_INIT*sizeof(long long));
-	elem_size=HASH_INIT;
-	node_count=2; // atom and emptyset
-	*elements=count_set_t2(set);
-	ATindexedSetDestroy(count_is);
-	free(elem_count);
-	*nodes=node_count;
-}
-
-
-/*  CURRENTLY NOT USED 
-
-long long get_number(ATerm set,ATermIndexedSet idx,long long *count,ATerm *a,int len){
-	if (len==0) {
-		while(ATgetAFun(set)==cons) set=ATgetArgument(set,2);
-		if(ATisEqual(set,atom)) {
-			return 0;
-		} else {
-			ATerror("atom not a member %t",set);
-		}
-	} else {
-		while(ATgetAFun(set)==cons) {
-			if (ATisEqual(a[0],ATgetArgument(set,0))) {
-				long node=ATindexedSetGetIndex(idx,ATgetArgument(set,2));
-				if (node<0) ATerror("set and index do not match");
-				return (get_number(ATgetArgument(set,1),idx,count,a+1,len-1)+count[node]);
-			}
-			set=ATgetArgument(set,2);
-		}
-		ATerror("%t not a member prefix",a[0]);
-	}
-	return 0;
-}
-
+/* return < 0 : error, 0 no matches, >0 matches found */
 static int set_enum_match_2(ATermIndexedSet dead,ATerm set,ATerm *a,int len,ATerm*pattern,int *proj,int p_len,
 	int (*callback)(ATerm *,int),int ofs
 ){
@@ -792,15 +526,295 @@ static int set_enum_match_2(ATermIndexedSet dead,ATerm set,ATerm *a,int len,ATer
 	}
 }
 
-
-int set_enum_match(ATerm set,ATerm *a,int len,ATerm*pattern,int *proj,int p_len,int (*callback)(ATerm *,int)){
+/* return < 0 : error, 0 no matches, >0 matches found */
+static int set_enum_match(ATerm set,ATerm *a,int len,ATerm*pattern,int *proj,int p_len,int (*callback)(ATerm *,int)){
 	ATermIndexedSet dead_branches=ATindexedSetCreate(HASH_INIT,HASH_LOAD);
 	int result=set_enum_match_2(dead_branches,set,a,len,pattern,proj,p_len,callback,0);
 	ATindexedSetDestroy(dead_branches);
 	return (result<0)?1:0;
 }
 
-int print_array(ATerm *a,int len){
+
+
+static ATermIndexedSet count_is;
+static long node_count;
+static long long *elem_count;
+static long elem_size;
+
+static long long count_set_2(ATerm set){
+  if (set==emptyset) return 0;
+  else if (set==atom) return 1;
+  else {
+    ATbool new;
+    long idx=ATindexedSetPut(count_is,(ATerm)set,&new);
+    if(new){
+      node_count++;
+      if (idx>=elem_size){
+	elem_size=elem_size+(elem_size>>1);
+	elem_count=realloc(elem_count,elem_size*sizeof(long long));
+	//ATwarning("resize %d %d %x",idx,elem_size,elem_count);
+      }
+      long long c=count_set_2(ATgetArgument(set,1))+count_set_2(ATgetArgument(set,2));
+      return elem_count[idx]=c;
+    }
+    else
+      return elem_count[idx];
+  }
+}
+
+static void count_set(ATerm set,long *nodes,long long *elements){
+	count_is=ATindexedSetCreate(HASH_INIT,HASH_LOAD);
+	elem_count=malloc(HASH_INIT*sizeof(long long));
+	elem_size=HASH_INIT;
+	node_count=2; // atom and emptyset
+	*elements=count_set_2(set);
+	ATindexedSetDestroy(count_is);
+	free(elem_count);
+	*nodes=node_count;
+}
+
+static void set_reset_ct(){
+	if (global_ct!=NULL) {
+		ATtableDestroy(global_ct);
+	}
+	global_ct=ATtableCreate(1024,75);
+}
+
+static void set_init(){
+	ATprotect(&emptyset);
+	ATprotect(&atom);
+	emptyset=ATmake("VSET_E");
+	atom=ATmake("VSET_A");
+	cons=ATmakeAFun("VSET_C",3,ATfalse);
+	ATprotectAFun(cons);
+	zip=ATmakeAFun("VSET_ZIP",2,ATfalse);
+	ATprotectAFun(zip);
+	min=ATmakeAFun("VSET_MINUS",2,ATfalse);
+	ATprotectAFun(min);
+	sum=ATmakeAFun("VSET_UNION",2,ATfalse);
+	ATprotectAFun(sum);
+	pi=ATmakeAFun("VSET_PI",1,ATfalse);
+	ATprotectAFun(pi);
+	reach=ATmakeAFun("VSET_REACH",2,ATfalse);
+	ATprotectAFun(reach);
+	// used for vector_set_tree:
+	Empty=ATmake("VSET_E");
+	ATprotect(&Empty);
+	Atom=ATmake("VSET_A");
+	ATprotect(&Atom);
+	set_reset_ct();
+}
+
+
+/*
+From here an alternative implementation starts,
+where MDD nodes are organized in a tree rather than a linked list.
+See vector_set_tree.hs for specification/documentation
+*/
+
+static ATbool set_member_tree(ATerm set,const int *a);
+static ATerm singleton_tree(const int *a,int len);
+static ATerm set_add_tree(ATerm set, const int *a,int len,ATbool *new);
+static int set_enum_tree(ATerm set,int *a,int len,int (*callback)(int *,int));
+static void count_set_tree(ATerm set,long *nodes,long long *elements);
+
+void vset_add_tree(vset_t set,const int* e){
+  int N=set->p_len?set->p_len:set->dom->size;
+  // ATbool new;
+  set->set=set_add_tree(set->set,e,N,NULL);
+  //  if (new) {
+  //    fprintf(stderr,"add: ");
+  //    print_array(e,N);
+  //  }
+}
+
+int vset_member_tree(vset_t set,const int* e){
+  return set_member_tree(set->set,e);
+}
+
+int vset_enum_wrap_tree(int *a,int len){
+  (void)len;
+  // fprintf(stderr,"cbk: ");
+  // print_array(a,len);
+  global_cb(global_context,a);
+  return 0;
+}
+
+void vset_enum_tree(vset_t set,vset_element_cb cb,void* context){
+	int N=set->p_len?set->p_len:set->dom->size;
+	int vec[N];
+	global_cb=cb;
+	global_context=context;
+	set_enum_tree(set->set,vec,N,vset_enum_wrap_tree);
+}
+
+void vset_count_tree(vset_t set,long *nodes,long long *elements){
+	count_set_tree(set->set,nodes,elements);
+}
+
+
+/***************************/
+
+#if 0
+/* see above */
+static inline ATerm Cons(ATerm down,ATerm left,ATerm right) {
+  return (ATerm)ATmakeAppl3(cons,down,left,right);
+}
+#endif
+static inline ATerm Down(ATerm e) {
+  return ATgetArgument(e,0);
+}
+static inline ATerm Left(ATerm e) {
+  return ATgetArgument(e,1);
+}
+static inline ATerm Right(ATerm e) {
+  return ATgetArgument(e,2);
+}
+
+static ATbool set_member_tree(ATerm set, const int *a) {
+  for (;;) {
+    if (set==Empty) return ATfalse;
+    else if (set==Atom ) return ATtrue;
+    else {
+      int x=a++[0]+1;
+      while (x!=1) {
+	int odd = x & 0x0001;
+	x = x>>1;
+	if (odd)
+	  set = Right(set);
+	else
+	  set = Left(set);
+	if (set==Empty) return ATfalse;
+      }
+    }
+    set = Down(set);
+  }
+}
+
+static ATerm singleton2(int x, const int *a, int len) {
+  if (x==1) return Cons(singleton_tree(a,len-1),Empty,Empty);
+  else {
+    int odd = x & 0x0001;
+    x = x>>1;
+    if (odd)
+      return Cons(Empty,Empty,singleton2(x,a,len));
+    else
+      return Cons(Empty,singleton2(x,a,len),Empty);
+  }
+}
+
+static ATerm singleton_tree(const int *a,int len){
+  if (len==0) return Atom;
+  else return singleton2(a[0]+1,a+1,len); // only values >0 can be stored
+}
+    
+static ATerm set_add2(ATerm set,int x, const int *a,int len,ATbool *new){
+  if (set==Empty) {
+    if (new) *new=ATtrue; 
+    return singleton2(x,a,len);
+  }
+  else if (x==1) return Cons(set_add_tree(Down(set),a,len-1,new),Left(set),Right(set));
+  else {
+    int odd = x & 0x0001;
+    x = x>>1;
+    if (odd)
+      return Cons(Down(set),Left(set),set_add2(Right(set),x,a,len,new));
+    else
+      return Cons(Down(set),set_add2(Left(set),x,a,len,new),Right(set));
+  }
+}
+
+static ATerm set_add_tree(ATerm set,const int *a,int len,ATbool *new){
+  if (set==Atom) {
+    if (new) *new=ATfalse; 
+    return Atom;
+  }
+  else if (set==Empty) {
+    if (new) *new=ATtrue; 
+    return singleton_tree(a,len);
+  }
+  else return set_add2(set,a[0]+1,a+1,len,new);
+}
+
+static int set_enum_t2(ATerm set,int *a,int len,int (*callback)(int*,int),int ofs,int shift, int cur){
+  int tmp;
+  if (set==Atom) return callback(a,ofs);
+  else if (set==Empty) return 0;
+  else {
+    if (ofs<len) {
+      a[ofs]=shift+cur-1; // Recall that 0 cannot be stored
+      tmp=set_enum_t2(Down(set),a,len,callback,ofs+1,1,0);
+      if (tmp) return tmp;
+    }
+    set_enum_t2(Left(set),a,len,callback,ofs,shift<<1,cur);
+    set_enum_t2(Right(set),a,len,callback,ofs,shift<<1,shift|cur);
+  }
+}
+
+static int set_enum_tree(ATerm set,int *a,int len,int (*callback)(int *,int)){
+  return set_enum_t2(set,a,len,callback,0,1,0);
+}
+
+// this uses global variables: elem_size, *elem_count, count_is
+
+static long long count_set_t2(ATerm set){
+  if (set==Empty) return 0;
+  else if (set==Atom) return 1;
+  else {
+    ATbool new;
+    long idx=ATindexedSetPut(count_is,(ATerm)set,&new);
+    if(new){
+      node_count++;
+      if (idx>=elem_size){
+	elem_size=elem_size+(elem_size>>1);
+	elem_count=realloc(elem_count,elem_size*sizeof(long long));
+	//ATwarning("resize %d %d %x",idx,elem_size,elem_count);
+      }
+      long long c=count_set_t2(ATgetArgument(set,0))+count_set_t2(ATgetArgument(set,1))+count_set_t2(ATgetArgument(set,2));
+      return elem_count[idx]=c;
+    }
+    else
+      return elem_count[idx];
+  }
+}
+
+static void count_set_tree(ATerm set,long *nodes,long long *elements){
+	count_is=ATindexedSetCreate(HASH_INIT,HASH_LOAD);
+	elem_count=malloc(HASH_INIT*sizeof(long long));
+	elem_size=HASH_INIT;
+	node_count=2; // atom and emptyset
+	*elements=count_set_t2(set);
+	ATindexedSetDestroy(count_is);
+	free(elem_count);
+	*nodes=node_count;
+}
+
+
+/*  CURRENTLY NOT USED 
+
+static long long get_number(ATerm set,ATermIndexedSet idx,long long *count,ATerm *a,int len){
+	if (len==0) {
+		while(ATgetAFun(set)==cons) set=ATgetArgument(set,2);
+		if(ATisEqual(set,atom)) {
+			return 0;
+		} else {
+			ATerror("atom not a member %t",set);
+		}
+	} else {
+		while(ATgetAFun(set)==cons) {
+			if (ATisEqual(a[0],ATgetArgument(set,0))) {
+				long node=ATindexedSetGetIndex(idx,ATgetArgument(set,2));
+				if (node<0) ATerror("set and index do not match");
+				return (get_number(ATgetArgument(set,1),idx,count,a+1,len-1)+count[node]);
+			}
+			set=ATgetArgument(set,2);
+		}
+		ATerror("%t not a member prefix",a[0]);
+	}
+	return 0;
+}
+
+static int print_array(ATerm *a,int len){
 	ATprintf("[");
 	if (len) {
 		int i;
@@ -811,7 +825,7 @@ int print_array(ATerm *a,int len){
 	return 0;
 }
 
-void create_numbering(ATerm set,ATermIndexedSet *idx,long long **count){
+static void create_numbering(ATerm set,ATermIndexedSet *idx,long long **count){
 	count_is=ATindexedSetCreate(HASH_INIT,HASH_LOAD);
 	elem_count=malloc(HASH_INIT*sizeof(long long));
 	elem_size=HASH_INIT;
@@ -823,7 +837,7 @@ void create_numbering(ATerm set,ATermIndexedSet *idx,long long **count){
 	elem_count=NULL;
 }
 
-ATbool set_put(ATerm *set,ATerm *a,int len){
+static ATbool set_put(ATerm *set,ATerm *a,int len){
 	if(len==0) {
 		if (ATgetAFun(*set)==cons){
 			ATerm subset=ATgetArgument(*set,2);
