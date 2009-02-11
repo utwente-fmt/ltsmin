@@ -42,6 +42,7 @@ static struct option options[]={
 	{"-bfs2",OPT_NORMAL,set_int,&bfs2,NULL,"enable BFS2",NULL,NULL,NULL},
 //	{"-sat",OPT_NORMAL,set_int,&sat,NULL,"enable saturation",NULL,NULL,NULL},
 	{"-chain",OPT_NORMAL,set_int,&chain,NULL,"enable chaining",NULL,NULL,NULL},
+	{"-version",OPT_NORMAL,print_version,NULL,NULL,"print the version",NULL,NULL,NULL},
  	{0,0,0,0,0,0,0,0,0}
 };
 

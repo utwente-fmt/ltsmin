@@ -210,6 +210,7 @@ struct option options[]={
 		"useful when running on other people's workstations",NULL,NULL},
 	{"-plain",OPT_NORMAL,set_int,&plain,NULL,
 		"disable compression of the output",NULL,NULL,NULL},
+	{"-version",OPT_NORMAL,print_version,NULL,NULL,"print the version",NULL,NULL,NULL},
 	{0,0,0,0,0,0,0,0,0}
 };
 
