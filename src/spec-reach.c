@@ -282,7 +282,7 @@ int main(int argc, char *argv[]){
 	N=ltstype->state_length;
 	e_info=GBgetEdgeInfo(model);
 	nGrps=e_info->groups;
-	domain=vdom_create(N);
+	domain=vdom_create_list(N);
 	visited=vset_create(domain,0,NULL);
 	group_rel=(vrel_t*)RTmalloc(nGrps*sizeof(vrel_t));
 	group_explored=(vset_t*)RTmalloc(nGrps*sizeof(vset_t));

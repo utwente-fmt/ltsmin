@@ -3,25 +3,41 @@
 
 /**
 \file vector_set.h
-*/
-
-/**
 \defgroup vector_set Data structures for manipulating sets of vectors.
+
+For manipulating sets of vectors, we need use three objects: domains,
+sets and relations.
 */
 //@{
 
+/**
+\brief Abstract type for a domain.
+*/
 typedef struct vector_domain *vdom_t;
 
+/**
+\brief Abstract type for a set in a domain.
+*/
 typedef struct vector_set *vset_t;
 
+/**
+\brief Abstract type for a relation over a domain.
+*/
 typedef struct vector_relation *vrel_t;
 
 /**
-\brief Create a domain.
+\brief Create a domain that uses the list variant of ATermDD.
 
 \param n The length of vectors in the domain.
 */
-extern vdom_t vdom_create(int n);
+
+extern vdom_t vdom_create_tree(int n);
+/**
+\brief Create a domain that uses the tree variant of ATermDD.
+
+\param n The length of vectors in the domain.
+*/
+extern vdom_t vdom_create_list(int n);
 
 /**
 \brief Create a set.
