@@ -20,7 +20,7 @@ static int segments=0;
 
 struct option options[]={
 	{"",OPT_NORMAL,NULL,NULL,NULL,
-		"usage: ltsmin-convert options input output",
+		"usage: ltsmin-convert [options] input output",
 		"The file format is detected as follows:",
 		"*.dir : uncompressed DIR format in a directory",
 #ifdef HAVE_BCG_USER_H
