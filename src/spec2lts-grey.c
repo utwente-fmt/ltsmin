@@ -114,16 +114,10 @@ static void set_next(void*arg,int*lbl,int*dst){
 	(void)arg;
 	(void)lbl;
 	trans++;
-	if (use_vset && vset_member(visited_set,dst)) return;
-	if (use_vset_tree && vset_member_tree(visited_set,dst)) return;
+	if (vset_member(visited_set,dst)) return;
 	visited++;
-	if (use_vset) {
-	  vset_add(visited_set,dst);
-	  vset_add(next_set,dst);
-	} else {
-	  vset_add_tree(visited_set,dst);
-	  vset_add_tree(next_set,dst);
-	}
+	vset_add(visited_set,dst);
+	vset_add(next_set,dst);
 }
 
 static void explore_elem(void*context,int*src){
@@ -294,7 +288,9 @@ int main(int argc, char *argv[]){
 	edge_info_t e_info=GBgetEdgeInfo(model);
 	K=e_info->groups;
 	if (use_vset || use_vset_tree) {
-		domain=vdom_create(N);
+		if (use_vset) domain=vdom_create_list(N);
+		else domain=vdom_create_tree(N);
+		use_vset=1;
 		visited_set=vset_create(domain,0,NULL);
 		next_set=vset_create(domain,0,NULL);
 	} else {
@@ -323,9 +319,6 @@ int main(int argc, char *argv[]){
 	if (use_vset) {
 		vset_add(visited_set,src);
 		vset_add(next_set,src);
-	} else if (use_vset_tree) {
-		vset_add_tree(visited_set,src);
-		vset_add_tree(next_set,src);
 	} else {
 		if(TreeFold(dbs,src)!=0){
 			Fatal(1,error,"root should be 0");
@@ -342,7 +335,7 @@ int main(int argc, char *argv[]){
 		dst_stream=arch_write(arch,"dest-0-0",plain?NULL:"diff32|gzip",1);
 	}
 	int level=0;
-	if (use_vset || use_vset_tree){
+	if (use_vset){
 		vset_t current_set=vset_create(domain,0,NULL);
 		while (!vset_is_empty(next_set)){
 			Warning(info,"level %d has %d states, explored %d states %d trans",
@@ -350,10 +343,7 @@ int main(int argc, char *argv[]){
 			level++;
 			vset_copy(current_set,next_set);
 			vset_clear(next_set);
-			if (use_vset)
-			  vset_enum(current_set,explore_elem,model);
-			else
-			  vset_enum_tree(current_set,explore_elem,model);
+			vset_enum(current_set,explore_elem,model);
 		}
 	} else {
 		int limit=0;
@@ -381,7 +371,7 @@ int main(int argc, char *argv[]){
 		Warning(info,"state space has %d levels %d states %d transitions",level,visited,trans);
 	} else {
 	  printf("state space has %d levels %d states %d transitions\n",level,visited,trans);
-	  if (use_vset || use_vset_tree) {
+	  if (use_vset) {
 	    long long size;
 	    long nodes;
 	    if (use_vset)
