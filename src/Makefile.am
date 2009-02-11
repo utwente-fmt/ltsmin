@@ -28,7 +28,9 @@ bin_PROGRAMS += nips2lts-grey nips-reach
 # endif
 endif
 
-VSET_SRC := vector_set.c vector_set.h vset_atermdd.c vdom_object.h
+VSET_SRC := vector_set.c vector_set.h vset_atermdd.c vset_buddy.c vdom_object.h
+BUDDY_LIBS := ../buddy/lib/libbdd.a 
+BUDDY_CPPFLAGS := -I../buddy/include
 
 # gcf
 gcf_SOURCES = gcf-rw.c
@@ -37,49 +39,49 @@ gcf_LDADD = libutil.a
 # lpo2lts-grey
 lpo2lts_grey_SOURCES  = spec2lts-grey.c mcrl-greybox.c mcrl-greybox.h    \
                         at-map.c at-map.h $(VSET_SRC)
-lpo2lts_grey_LDADD    = libutil.a $(MCRL_LIBS)
-lpo2lts_grey_CPPFLAGS = -DMCRL $(MCRL_CPPFLAGS) $(AM_CPPFLAGS)
+lpo2lts_grey_LDADD    = libutil.a $(MCRL_LIBS) $(BUDDY_LIBS)
+lpo2lts_grey_CPPFLAGS = -DMCRL $(MCRL_CPPFLAGS) $(AM_CPPFLAGS) $(BUDDY_CPPFLAGS)
 lpo2lts_grey_LDFLAGS  = $(MCRL_LDFLAGS) $(AM_LDFLAGS)
 
 # lps2lts-grey
 lps2lts_grey_SOURCES  = spec2lts-grey.c mcrl2-greybox.cpp		\
                         mcrl2-greybox.h at-map.c at-map.h $(VSET_SRC)
-lps2lts_grey_LDADD    = libutil.a $(MCRL2_LIBS)
-lps2lts_grey_CPPFLAGS = -DMCRL2 $(MCRL2_CPPFLAGS) $(AM_CPPFLAGS)
+lps2lts_grey_LDADD    = libutil.a $(MCRL2_LIBS) $(BUDDY_LIBS)
+lps2lts_grey_CPPFLAGS = -DMCRL2 $(MCRL2_CPPFLAGS) $(AM_CPPFLAGS) $(BUDDY_CPPFLAGS)
 lps2lts_grey_LDFLAGS  = $(MCRL2_LDFLAGS) $(AM_LDFLAGS)
 
 # nips2lts-grey
 nips2lts_grey_SOURCES  = spec2lts-grey.c nips-greybox.c nips-greybox.h   \
                          $(VSET_SRC)
-nips2lts_grey_LDADD    = libutil.a -lATerm $(NIPS_LIBS)
-nips2lts_grey_CPPFLAGS = -DNIPS $(NIPS_CPPFLAGS) $(MCRL_CPPFLAGS) $(AM_CPPFLAGS)
+nips2lts_grey_LDADD    = libutil.a -lATerm $(NIPS_LIBS) $(BUDDY_LIBS)
+nips2lts_grey_CPPFLAGS = -DNIPS $(NIPS_CPPFLAGS) $(MCRL_CPPFLAGS) $(AM_CPPFLAGS) $(BUDDY_CPPFLAGS)
 nips2lts_grey_LDFLAGS  = $(NIPS_LDFLAGS) $(MCRL_LDFLAGS) $(AM_LDFLAGS)
 
 # lpo-reach
 lpo_reach_SOURCES  = spec-reach.c mcrl-greybox.c mcrl-greybox.h  \
                      at-map.c at-map.h $(VSET_SRC)
-lpo_reach_LDADD    = libutil.a $(MCRL_LIBS)
-lpo_reach_CPPFLAGS = -DMCRL $(MCRL_CPPFLAGS) $(AM_CPPFLAGS)
+lpo_reach_LDADD    = libutil.a $(MCRL_LIBS) $(BUDDY_LIBS)
+lpo_reach_CPPFLAGS = -DMCRL $(MCRL_CPPFLAGS) $(AM_CPPFLAGS) $(BUDDY_CPPFLAGS)
 lpo_reach_LDFLAGS  = $(MCRL_LDFLAGS) $(AM_LDFLAGS)
 
 # lps-reach
 lps_reach_SOURCES  = spec-reach.c mcrl2-greybox.cpp mcrl2-greybox.h      \
                      at-map.c at-map.h $(VSET_SRC)
-lps_reach_LDADD    = libutil.a $(MCRL2_LIBS)
-lps_reach_CPPFLAGS = -DMCRL2 $(MCRL2_CPPFLAGS) $(AM_CPPFLAGS)
+lps_reach_LDADD    = libutil.a $(MCRL2_LIBS) $(BUDDY_LIBS)
+lps_reach_CPPFLAGS = -DMCRL2 $(MCRL2_CPPFLAGS) $(AM_CPPFLAGS) $(BUDDY_CPPFLAGS)
 lps_reach_LDFLAGS  = $(MCRL2_LDFLAGS) $(AM_LDFLAGS)
 
 # nips-reach
 nips_reach_SOURCES  = spec-reach.c nips-greybox.c nips-greybox.h	\
                       $(VSET_SRC)
 nips_reach_LDADD    = libutil.a -lATerm $(NIPS_LIBS)
-nips_reach_CPPFLAGS = -DNIPS $(NIPS_CPPFLAGS) $(MCRL_CPPFLAGS) $(AM_CPPFLAGS)
+nips_reach_CPPFLAGS = -DNIPS $(NIPS_CPPFLAGS) $(MCRL_CPPFLAGS) $(AM_CPPFLAGS) $(BUDDY_CPPFLAGS)
 nips_reach_LDFLAGS  = $(NIPS_LDFLAGS) $(MCRL_LDFLAGS) $(AM_LDFLAGS)
 
 # lpo2lts-mpi
 lpo2lts_mpi_SOURCES  = spec2lts-mpi.c mcrl-greybox.c mcrl-greybox.h	\
                        at-map.c at-map.h config.h
-lpo2lts_mpi_LDADD    = libmpi.a libutil.a $(MCRL_LIBS)
+lpo2lts_mpi_LDADD    = libmpi.a libutil.a $(MCRL_LIBS) $(BUDDY_LIBS)
 lpo2lts_mpi_CPPFLAGS = -DMCRL $(MCRL_CPPFLAGS) $(AM_CPPFLAGS)
 lpo2lts_mpi_LDFLAGS  = $(MCRL_LDFLAGS) $(AM_LDFLAGS)
 

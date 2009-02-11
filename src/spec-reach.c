@@ -29,6 +29,9 @@ static int bfs=0;
 static int bfs2=0;
 static int sat=0;
 static int chain=0;
+static int use_vset_list=0;
+static int use_vset_tree=0;
+static int use_vset_fdd=0;
 
 static struct option options[]={
 	{"",OPT_NORMAL,NULL,NULL,NULL,
@@ -42,6 +45,19 @@ static struct option options[]={
 	{"-bfs2",OPT_NORMAL,set_int,&bfs2,NULL,"enable BFS2",NULL,NULL,NULL},
 //	{"-sat",OPT_NORMAL,set_int,&sat,NULL,"enable saturation",NULL,NULL,NULL},
 	{"-chain",OPT_NORMAL,set_int,&chain,NULL,"enable chaining",NULL,NULL,NULL},
+	{"-vset-list",OPT_NORMAL,set_int,&use_vset_list,NULL,
+	        "Use vector sets with MDD nodes organized in a linked list",
+		"This option cannot be used in combination with -out",
+		NULL,NULL},
+//	tree mode does not implement relations!
+//	{"-vset-tree",OPT_NORMAL,set_int,&use_vset_tree,NULL,
+//		"Use vector sets with MDD nodes organized in a tree",
+//		"This option cannot be used in combination with -out",
+//		NULL,NULL},
+	{"-vset-fdd",OPT_NORMAL,set_int,&use_vset_fdd,NULL,
+		"Uses the FDD interface of BuddY to represent sets",
+		"This option cannot be used in combination with -out",
+		NULL,NULL},
 	{"-version",OPT_NORMAL,print_version,NULL,NULL,"print the version",NULL,NULL,NULL},
  	{0,0,0,0,0,0,0,0,0}
 };
@@ -236,6 +252,15 @@ int main(int argc, char *argv[]){
 	RTinit(argc,&argv);
 	take_vars(&argc,argv);
 	parse_options(options,argc,argv);
+	switch(use_vset_tree+use_vset_list+use_vset_fdd){
+	case 0:
+		use_vset_list=1;
+		break;
+	case 1:
+		break;
+	default:
+		Fatal(1,error,"cannot use more than one vset implementation at once.");
+	}
 	switch(bfs+bfs2+sat+chain){
 	case 0:
 		bfs=1;
@@ -282,7 +307,9 @@ int main(int argc, char *argv[]){
 	N=ltstype->state_length;
 	e_info=GBgetEdgeInfo(model);
 	nGrps=e_info->groups;
-	domain=vdom_create_list(N);
+	if (use_vset_list) domain=vdom_create_list(N);
+	if (use_vset_tree) domain=vdom_create_tree(N);
+	if (use_vset_fdd) domain=vdom_create_fdd(N);
 	visited=vset_create(domain,0,NULL);
 	group_rel=(vrel_t*)RTmalloc(nGrps*sizeof(vrel_t));
 	group_explored=(vset_t*)RTmalloc(nGrps*sizeof(vset_t));

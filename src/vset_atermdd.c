@@ -97,7 +97,7 @@ static int set_equal_both(vset_t set1,vset_t set2){
 	return ATisEqual(set1->set,set2->set);
 }
 
-static void vset_clear_both(vset_t set){
+static void set_clear_both(vset_t set){
 	set->set=emptyset;
 }
 
@@ -698,7 +698,7 @@ vdom_t vdom_create_tree(int n){
 	dom->shared.set_member=set_member_tree;
 	dom->shared.set_is_empty=set_is_empty_both;
 	dom->shared.set_equal=set_equal_both;
-	dom->shared.set_clear=vset_clear_both;
+	dom->shared.set_clear=set_clear_both;
 	dom->shared.set_copy=set_copy_both;
 	dom->shared.set_enum=set_enum_tree;
 	dom->shared.set_count=set_count_tree;
@@ -715,7 +715,7 @@ vdom_t vdom_create_list(int n){
 	dom->shared.set_member=set_member_list;
 	dom->shared.set_is_empty=set_is_empty_both;
 	dom->shared.set_equal=set_equal_both;
-	dom->shared.set_clear=vset_clear_both;
+	dom->shared.set_clear=set_clear_both;
 	dom->shared.set_copy=set_copy_both;
 	dom->shared.set_enum=set_enum_list;
 	dom->shared.set_enum_match=set_enum_match_list;
