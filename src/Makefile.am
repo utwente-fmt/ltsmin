@@ -130,7 +130,7 @@ libutil_a_SOURCES = unix.c runtime.c stream.c archive.c			\
                     dynamic-array.c dynamic-array.h
 
 
-option.c: git_version.h
+options.c: git_version.h
 
 GIT_DESCRIBE := $(shell git describe --tags --abbrev=6 HEAD 2>/dev/null)
 
