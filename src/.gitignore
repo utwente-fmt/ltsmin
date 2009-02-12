@@ -9,6 +9,7 @@ ltsmin-convert
 ltsmin-mpi
 stamp-h1
 gcf
+git_version.h
 lpo-reach
 lpo2lts-grey
 lpo2lts-mpi
