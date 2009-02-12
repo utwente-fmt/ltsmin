@@ -94,6 +94,10 @@ AC_SUBST([NIPS_LIBS],['${top_builddir}/nips-vm/libnips_vm.la'])
 AC_SUBST([NIPS_CPPFLAGS],['-I${top_srcdir}'])
 AC_SUBST([NIPS_LDFLAGS])
 
+AC_SUBST([BUDDY_LIBS],['${top_builddir}/buddy/src/libbdd.la'])
+AC_SUBST([BUDDY_CPPFLAGS],['-I${top_srcdir}/buddy/src'])
+AC_SUBST([BUDDY_LDFLAGS])
+
 AC_CHECK_LIB([rt], [aio_error])
 ACX_CADP_BCG_WRITE([have_bcg=yes],
   [have_bcg=no
@@ -141,7 +145,7 @@ AC_CONFIG_FILES([
        doc/Makefile
 ])
 ac_configure_args="$ac_configure_args --enable-keep-terminated-procs"
-AC_CONFIG_SUBDIRS([nips-vm])
+AC_CONFIG_SUBDIRS([nips-vm buddy])
 AC_OUTPUT
 
 cat <<EOM

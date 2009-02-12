@@ -69,7 +69,7 @@ struct option options[]={
 		"This option cannot be used in combination with -out",
 		NULL,NULL},
 	{"-vset-fdd",OPT_NORMAL,set_int,&use_vset_fdd,NULL,
-		"Uses the FDD interface of BuddY to represent sets",
+		"Uses the FDD interface of BuDDy to represent sets",
 		"This option cannot be used in combination with -out",
 		NULL,NULL},
 	{"-torx",OPT_NORMAL,set_int,&torx,NULL,

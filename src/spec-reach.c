@@ -55,7 +55,7 @@ static struct option options[]={
 //		"This option cannot be used in combination with -out",
 //		NULL,NULL},
 	{"-vset-fdd",OPT_NORMAL,set_int,&use_vset_fdd,NULL,
-		"Uses the FDD interface of BuddY to represent sets",
+		"Uses the FDD interface of BuDDy to represent sets",
 		"This option cannot be used in combination with -out",
 		NULL,NULL},
 	{"-version",OPT_NORMAL,print_version,NULL,NULL,"print the version",NULL,NULL,NULL},
