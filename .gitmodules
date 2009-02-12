@@ -1,3 +1,6 @@
 [submodule "nips-vm"]
 	path = nips-vm
 	url = http://www.foldr.org/~michaelw/projects/nips-vm.git
+[submodule "buddy"]
+	path = buddy
+	url = http://fmt.cs.utwente.nl/tools/scm/buddy.git
