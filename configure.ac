@@ -144,7 +144,8 @@ AC_CONFIG_FILES([
        src/Makefile
        doc/Makefile
 ])
-ac_configure_args="$ac_configure_args --enable-keep-terminated-procs"
+ac_configure_args="$ac_configure_args --enable-keep-terminated-procs \
+                                      --disable-shared"
 AC_CONFIG_SUBDIRS([nips-vm buddy])
 AC_OUTPUT
 
