@@ -136,13 +136,14 @@ options.c: git_version.h
 
 GIT_DESCRIBE := $(shell git describe --tags --abbrev=6 HEAD 2>/dev/null)
 
-git_version.h.tmp:
-	echo "#define GIT_VERSION \"$(GIT_DESCRIBE)\"" > git_version.h.tmp
+git_version.h: git_version.h.tmp
+	@if cmp $< $@ 2>/dev/null; then $(RM) $<; else mv $< $@; fi
 
+git_version.h.tmp:
+	@echo "#define GIT_VERSION \"$(GIT_DESCRIBE)\"" > git_version.h.tmp
 .PHONY: git_version.h.tmp
 
-git_version.h: git_version.h.tmp
-	if cmp $< $@ 2>/dev/null; then $(RM) $<; else mv $< $@; fi
+DISTCLEANFILES = git_version.h git_version.h.tmp
 
 # make
 .DELETE_ON_ERROR:
