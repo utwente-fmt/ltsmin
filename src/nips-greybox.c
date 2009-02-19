@@ -15,8 +15,9 @@ static struct lts_structure_s ltstype;
 static struct edge_info e_info;
 static struct state_info s_info = { 0, NULL, NULL };
 
-static int          NIPSgroupCheck (int, nipsvm_state_t *,
-                                    nipsvm_transition_information_t *);
+int ILABEL_TAU  = -1;
+
+static t_pid        NIPSgroupPID (int, nipsvm_state_t *);
 
 /* Debugging ============================================== */
 #ifdef DEBUG
@@ -188,6 +189,7 @@ struct gb_context_s {
     TransitionCB        callback;
     void               *context;
 
+    nipsvm_state_t     *source_state;
     int                 group;
 
     nipsvm_errorcode_t  err;
@@ -197,15 +199,19 @@ struct gb_context_s {
 
 static struct gb_context_s *
 init_gb_context (struct gb_context_s *gb_ctx, model_t model,
-                 TransitionCB cb, void *context, int group)
+                 TransitionCB cb, void *context,
+                 nipsvm_state_t *source, int group)
 {
     gb_ctx->model = model;
     gb_ctx->callback = cb;
     gb_ctx->context = context;
+    gb_ctx->source_state = source;
     gb_ctx->group = group;
     gb_ctx->err = 0;
     return gb_ctx;
 }
+
+static const int GB_NO_GROUP = -1;
 
 static nipsvm_status_t
 scheduler_callback (size_t succ_size, nipsvm_state_t *succ,
@@ -213,21 +219,30 @@ scheduler_callback (size_t succ_size, nipsvm_state_t *succ,
 {
     struct gb_context_s *gb_context = context;
     struct part_context_s part_ctx;
-    size_t              ilen = GBgetLTStype (gb_context->model)->state_length;
-    int                 ivec[ilen];
-    int                 ilabel[] = { 0 };       /* XXX */
     (void)succ_size;
     (void)ti;
 
+    const unsigned int NIPS_UNSUPPORTED_FEATURES_MASK =
+        INSTR_SUCC_CB_FLAG_SYNC   |
+        INSTR_SUCC_CB_FLAG_TIMEOUT;
     assert (succ != NULL);
-    assert ((!(ti->succ_cb_flags & INSTR_SUCC_CB_FLAG_SYNC) &&
-             ti->step_info && !ti->step_info->previous));
+    assert (!(ti->succ_cb_flags & NIPS_UNSUPPORTED_FEATURES_MASK));
+    assert (ti->step_info);
+    assert (!ti->step_info->previous);
+    
+    if (gb_context->group != GB_NO_GROUP &&
+        NIPSgroupPID (gb_context->group, succ) != ti->step_info->pid)
+        return IC_CONTINUE;
 
-    if (gb_context->group != -1) {
-        if (!NIPSgroupCheck (gb_context->group, succ, ti))
-            return IC_CONTINUE;
-    }
-
+    /* Continue until atomic flag is unset.  Downside: a model checker
+     * does not see these intermediate "atomic" states.
+     */
+    if (succ->excl_pid != 0)
+        return IC_CONTINUE_INVISIBLY;
+    
+    size_t          ilen = GBgetLTStype (gb_context->model)->state_length;
+    int             ivec[ilen];
+    int             ilabel[] = { ILABEL_TAU };
     init_part_context (&part_ctx, gb_context->model, ivec, ilen);
     state_parts (succ, part_glob_callback, part_proc_callback,
                  part_chan_callback, &part_ctx);
@@ -250,33 +265,24 @@ error_callback (nipsvm_errorcode_t err,
 }
 
 /* Transition groups ====================================== */
-static int
-NIPSgroupCheck (int group,
-                nipsvm_state_t *succ, nipsvm_transition_information_t *ti)
+static t_pid
+NIPSgroupPID (int group, nipsvm_state_t *succ)
 // This crucially depends on the group setup done in
 // NIPSgetProjection.
 {
     char               *ptr;
-    int                 i;
-    ptr = (char *)succ + sizeof (st_global_state_header)        // header
-        + be2h_16 (succ->gvar_sz);     // variables
-    for (i = 0; i < succ->proc_cnt; ++i) {
-        t_pid               pid_be = h2be_pid (ti->step_info->pid);
-        if (((st_process_header *)ptr)->pid == pid_be) {
-#ifdef DEBUG
-            Warning (info, "pid %d modified, group %d, %s\n",
-                     ti->step_info->pid, group,
-                     i != group ? "DISREGARD" : "OK");
-#endif
-            if (i != group) {
-                // other group -> not okay
-                return 0;
-            }
-        }
+    assert (group != GB_NO_GROUP);
 
+    ptr = (char *)succ + sizeof (st_global_state_header) // header
+        + be2h_16 (succ->gvar_sz);                       // variables
+
+    for (int i = 0; i < group; ++i) {
+        assert (i < succ->proc_cnt);
         ptr += process_size ((st_process_header *)ptr); // next process
     }
-    return 1;
+
+    t_pid group_pid = be2h_pid (((st_process_header *)ptr)->pid);
+    return group_pid;
 }
 
 size_t
@@ -313,6 +319,17 @@ NIPSgetVM (model_t model)
     return GBgetContext (model);
 }
 
+extern void
+NIPSstateRestore (model_t model, int *src, char *state, size_t sz)
+{
+    assert (state != NULL);
+    struct part_context_s part_ctx;
+    init_part_context (&part_ctx, model, src, -1);
+    state_restore (state, sz,
+                   Rpart_glob_callback,
+                   Rpart_proc_callback, Rpart_chan_callback, &part_ctx);
+}
+
 int
 NIPSgetTransitionsAll (model_t model, int *src, TransitionCB cb,
                        void *context)
@@ -328,7 +345,8 @@ NIPSgetTransitionsAll (model_t model, int *src, TransitionCB cb,
                    Rpart_glob_callback,
                    Rpart_proc_callback, Rpart_chan_callback, &part_ctx);
 
-    init_gb_context (&gb_context, model, cb, context, -1);
+    init_gb_context (&gb_context, model, cb, context,
+                     (nipsvm_state_t *)state, GB_NO_GROUP);
     nipsvm_scheduler_iter (NIPSgetVM (model), (nipsvm_state_t *)state,
                            &gb_context);
 
@@ -350,7 +368,8 @@ NIPSgetTransitionsLong (model_t model, int group, int *src,
                    Rpart_glob_callback,
                    Rpart_proc_callback, Rpart_chan_callback, &part_ctx);
 
-    init_gb_context (&gb_context, model, cb, context, group);
+    init_gb_context (&gb_context, model, cb, context,
+                     (nipsvm_state_t *)state, group);
     nipsvm_scheduler_iter (NIPSgetVM (model), (nipsvm_state_t *)state,
                            &gb_context);
 
@@ -370,6 +389,9 @@ ISscheduler_callback (size_t succ_size, nipsvm_state_t *succ,
 {
     search_context_t   *sc = context;
     (void)ti;
+
+    if (succ->excl_pid != 0)
+        return IC_CONTINUE_INVISIBLY;
 
     if (sc->depth >= sc->nmaxdepth)
         return IC_STOP;
@@ -481,7 +503,7 @@ NIPSloadGreyboxModel (model_t m, char *filename)
     ltstype.edge_label_name = edge_name;
     ltstype.edge_label_type = edge_type;
     GBsetLTStype (m, &ltstype);
-    GBchunkPut(m, 3, chunk_str("dummy")); /* XXX */
+    ILABEL_TAU  = GBchunkPut(m, edge_type[0], chunk_str("tau"));  /* XXX */
 
     struct part_context_s part_ctx;
     int                 ivec[Cpart_ctx.count];

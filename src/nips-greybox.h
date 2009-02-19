@@ -3,6 +3,8 @@
 
 #include "greybox.h"
 
+extern int ILABEL_TAU;
+
 extern void NIPSinitGreybox(int argc,char *argv[]);
 /**< Initialize NIPS library up to the loading of a specification. */
 
