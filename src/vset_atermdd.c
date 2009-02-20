@@ -420,6 +420,15 @@ static void set_enum_tree(vset_t set,vset_element_cb cb,void* context){
 }
 
 
+static vset_element_cb match_cb;
+static void* match_context;
+
+static int vset_match_wrap(ATerm *a,int len){
+	int vec[len];
+	for(int i=0;i<len;i++) vec[i]=ATgetInt((ATermInt)a[i]);
+	match_cb(match_context,vec);
+	return 0;
+}
 
 /* return < 0 : error, 0 no matches, >0 matches found */
 static int set_enum_match_2(ATermIndexedSet dead,ATerm set,ATerm *a,int len,ATerm*pattern,int *proj,int p_len,
@@ -468,10 +477,10 @@ void set_enum_match_list(vset_t set,int p_len,int* proj,int*match,vset_element_c
 	ATerm vec[N];
 	ATerm pattern[p_len];
 	for(int i=0;i<p_len;i++) pattern[i]=(ATerm)ATmakeInt(match[i]);
-	global_cb=cb;
-	global_context=context;
+	match_cb=cb;
+	match_context=context;
 	ATermIndexedSet dead_branches=ATindexedSetCreate(HASH_INIT,HASH_LOAD);
-	set_enum_match_2(dead_branches,set->set,vec,N,pattern,proj,p_len,vset_enum_wrap,0);
+	set_enum_match_2(dead_branches,set->set,vec,N,pattern,proj,p_len,vset_match_wrap,0);
 	ATindexedSetDestroy(dead_branches);
 }
 

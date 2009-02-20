@@ -4,7 +4,9 @@
 .depend.bak
 .deps/
 amconfig.h
-instantiator-mpi
+etf-convert
+etf-reach
+etf2lts-grey
 ltsmin-convert
 ltsmin-mpi
 stamp-h1

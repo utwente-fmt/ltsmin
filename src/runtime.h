@@ -5,6 +5,12 @@
 #ifndef RUNTIME_H
 #define RUNTIME_H
 
+/**
+\defgroup runtime Runtime support library.
+ */
+///@{
+
+
 #include "config.h"
 #include <stdlib.h>
 #include <string.h>
@@ -15,13 +21,17 @@
 #include "options.h"
 #include <stdio.h>
 
+
+
 extern void* RTmalloc(size_t size);
 
-#define runtime_init() RTinit(argc,&argv)
-#define runtime_init_args(argcp,argvp) RTinit(*argcp,argvp);take_vars(argcp,*argvp)
+extern void* RTmallocZero(size_t size);
 
-extern void RTinit(int argc, char **argv[]);
-/**< @brief Initializes the runtime library. 
+#define RT_NEW(sort) ((sort*)RTmallocZero(sizeof(sort)))
+
+extern void RTinit(int *argc, char **argv[]);
+/**< @brief Initializes the runtime library.
+
 Some platform do not like it is you change argv. Thus this
 call makes a copy of argv allowing subsequent calls
 to make changes to argv without copying again.
@@ -53,6 +63,7 @@ extern FILE* log_get_stream(log_t log);
 
 
 extern void set_label(const char* fmt,...);
+extern char* get_label();
 
 extern void log_message(log_t log,const char*file,int line,int errnum,const char *fmt,...);
 
@@ -82,6 +93,8 @@ extern void (*RThandleFatal)(const char*file,int line,int errnum,int code);
 		exit(code);\
 	}\
 }
+
+///@}
 
 
 #endif

@@ -6,6 +6,9 @@
 #include <mpi.h>
 #include <stdlib.h>
 
+#include <lts_enum.h>
+#include <lts_io.h>
+
 #include "fast_hash.h"
 #if defined(MCRL)
 #include "mcrl-greybox.h"
@@ -22,13 +25,16 @@
 #include "treedbs.h"
 #include "stream.h"
 #include "options.h"
-#include "runtime.h"
+#include <mpi-runtime.h>
 #include "archive.h"
 #include "mpi_io_stream.h"
 #include "mpi_ram_raf.h"
 #include "stringindex.h"
 #include "dynamic-array.h"
 #include "mpi-event-loop.h"
+
+static lts_enum_cb_t output_handle=NULL;
+static lts_output_t output=NULL;
 
 /********************************************************************************************/
 
@@ -175,6 +181,7 @@ static treedbs_t dbs;
 static int cache=0;
 static int unix_io=0;
 static int mpi_io=0;
+static int state_visible=0;
 
 static event_queue_t mpi_queue;
 static event_barrier_t barrier;
@@ -193,10 +200,12 @@ struct option options[]={
 		"printed and the exploration will be aborted.",
 		"using this option implies -nolts",NULL},
 */
+/*
 	{"-mpi-io",OPT_NORMAL,set_int,&mpi_io,NULL,
 		"use MPI-IO (default)",NULL,NULL,NULL},
 	{"-unix-io",OPT_NORMAL,set_int,&unix_io,NULL,
 		"use UNIX IO (e.g. if your NFS locking is broken)",NULL,NULL,NULL},
+*/
 	{"-out",OPT_REQ_ARG,assign_string,&outputarch,"-out <archive>",
 		"Specify the name of the output archive.",
 		"This will be a pattern archive if <archive> contains %s",
@@ -210,16 +219,16 @@ struct option options[]={
 		"useful when running on other people's workstations",NULL,NULL},
 	{"-plain",OPT_NORMAL,set_int,&plain,NULL,
 		"disable compression of the output",NULL,NULL,NULL},
+#ifdef MCRL
+	{"-state",OPT_NORMAL,set_int,&state_visible,NULL,
+		"Make all state variables visible.",NULL,NULL,NULL},
+#endif
 	{"-version",OPT_NORMAL,print_version,NULL,NULL,"print the version",NULL,NULL,NULL},
 	{0,0,0,0,0,0,0,0,0}
 };
 
 static char who[24];
 static int mpi_nodes,mpi_me;
-
-static stream_t *output_src=NULL;
-static stream_t *output_label=NULL;
-static stream_t *output_dest=NULL;
 
 static int *tcount;
 static int size;
@@ -359,9 +368,10 @@ static void in_trans_handler(void*context,MPI_Status *status){
 		}
 	}
 	if (write_lts){
-		DSwriteU32(output_src[work_recv->src_worker],work_recv->src_number);
-		DSwriteU32(output_label[work_recv->src_worker],work_recv->label);
-		DSwriteU32(output_dest[work_recv->src_worker],temp);
+		//DSwriteU32(output_src[work_recv->src_worker],work_recv->src_number);
+		//DSwriteU32(output_label[work_recv->src_worker],work_recv->label);
+		//DSwriteU32(output_dest[work_recv->src_worker],temp);
+		enum_seg_seg(output_handle,work_recv->src_worker,work_recv->src_number,mpi_me,temp,&(work_recv->label));		
 	}
 	tcount[work_recv->src_worker]++;
 	transitions++;
@@ -399,33 +409,24 @@ int main(int argc, char*argv[]){
 	if (atexit(abort_if_armed)){
 		Fatal(1,error,"atexit failed");
 	}
-        MPI_Init(&argc, &argv);
+        RTinitMPI(&argc, &argv);
 	armed=1;
 	MPI_Errhandler_set(MPI_COMM_WORLD,MPI_ERRORS_ARE_FATAL);
         MPI_Comm_size(MPI_COMM_WORLD, &mpi_nodes);
         MPI_Comm_rank(MPI_COMM_WORLD, &mpi_me);
 	sprintf(who,MODEL_TYPE "2lts-mpi(%2d)",mpi_me);
-	RTinit(argc,&argv);
 	set_label(who);
 	mpi_queue=event_queue();
 	state_found_init();
 	work_counter=event_idle_create(mpi_queue,MPI_COMM_WORLD,EXPLORE_IDLE_TAG);
 	barrier=event_barrier_create(mpi_queue,MPI_COMM_WORLD,BARRIER_TAG);
 
-	tcount=(int*)malloc(mpi_nodes*sizeof(int));
+	tcount=(int*)RTmalloc(mpi_nodes*sizeof(int));
+	bzero(tcount,mpi_nodes*sizeof(int));
 
 	if (mpi_me!=0) MPI_Barrier(MPI_COMM_WORLD);
+	lts_io_init(&argc,argv);
 	parse_options(options,argc,argv);
-	switch(mpi_io+unix_io){
-	case 0:
-		mpi_io=1;
-	case 1:
-		if(mpi_me==0 && mpi_io) Warning(info,"using MPI-IO");
-		if(mpi_me==0 && unix_io) Warning(info,"using UNIX IO");
-		break;
-	default:
-		Fatal(1,error,"IO selections -mpi-io and -unix-io are mutually exclusive");
-	}
 	if (mpi_me==0) MPI_Barrier(MPI_COMM_WORLD);
 	Warning(info,"initializing grey box module");
 #if defined(MCRL)
@@ -441,7 +442,7 @@ int main(int argc, char*argv[]){
 	GBsetChunkMethods(model,mpi_newmap,mpi_index_pool_create(MPI_COMM_WORLD,mpi_queue,MAX_TERM_LEN),
 		 mpi_int2chunk,mpi_chunk2int,mpi_get_count);
 #if defined(MCRL)
-	MCRLloadGreyboxModel(model,argv[argc-1]);
+	MCRLloadGreyboxModel(model,argv[argc-1],(state_visible*STATE_VISIBLE));
 #elif defined(MCRL2)
 	MCRL2loadGreyboxModel(model,argv[argc-1]);
 #elif defined(NIPS)
@@ -450,7 +451,7 @@ int main(int argc, char*argv[]){
 	if (cache) model=GBaddCache(model);
 	event_barrier_wait(barrier);
 	Warning(info,"model created");
-	lts_struct_t ltstype=GBgetLTStype(model);
+	lts_type_t ltstype=GBgetLTStype(model);
 
 	/* Initializing according to the options just parsed.
 	 */
@@ -471,33 +472,12 @@ int main(int argc, char*argv[]){
 	}
 	MPI_Barrier(MPI_COMM_WORLD);
 	if (write_lts){
-		if (strstr(outputarch,"%s")) {
-			if (mpi_io) arch=arch_fmt(outputarch,mpi_io_read,mpi_io_write,prop_get_U32("bs",65536));
-			if (unix_io) arch=arch_fmt(outputarch,file_input,file_output,prop_get_U32("bs",65536));
-		} else {
-			uint32_t bs=prop_get_U32("bs",65536);
-			uint32_t bc=prop_get_U32("bc",128);
-			if (mpi_io) arch=arch_gcf_create(MPI_Create_raf(outputarch,MPI_COMM_WORLD),bs,bs*bc,mpi_me,mpi_nodes);
-			if (unix_io) arch=arch_gcf_create(raf_unistd(outputarch),bs,bs*bc,mpi_me,mpi_nodes);
-		}
+		Warning(info,"opening %s",outputarch);
+		output=lts_output_open(outputarch,model,mpi_nodes,mpi_me,mpi_nodes,mpi_me);
+		output_handle=lts_output_enum(output);
 	}
 	/***************************************************/
-	if (write_lts) {
-		output_src=(stream_t*)malloc(mpi_nodes*sizeof(FILE*));
-		output_label=(stream_t*)malloc(mpi_nodes*sizeof(FILE*));
-		output_dest=(stream_t*)malloc(mpi_nodes*sizeof(FILE*));
-		for(int i=0;i<mpi_nodes;i++){
-			sprintf(name,"src-%d-%d",i,mpi_me);
-			output_src[i]=arch_write(arch,name,plain?NULL:"diff32|gzip",1);
-			sprintf(name,"label-%d-%d",i,mpi_me);
-			output_label[i]=arch_write(arch,name,plain?NULL:"gzip",1);
-			sprintf(name,"dest-%d-%d",i,mpi_me);
-			output_dest[i]=arch_write(arch,name,plain?NULL:"diff32|gzip",1);
-			tcount[i]=0;
-		}
-	}
-	/***************************************************/
-	size=ltstype->state_length;
+	size=lts_type_get_state_length(ltstype);
 	if (size<2) Fatal(1,error,"there must be at least 2 parameters");
 	if (size>MAX_PARAMETERS) Fatal(1,error,"please make src and dest dynamic");
 	dbs=TreeDBScreate(size);
@@ -572,60 +552,37 @@ int main(int argc, char*argv[]){
 	event_barrier_wait(barrier);
 	/* State space was succesfully generated. */
 	if (verbosity>1) Warning(info,"My share is %lld states and %lld transitions",explored,transitions);
-	if (write_lts){
+	event_barrier_wait(barrier);
+	if (mpi_me==0) Warning(info,"collecting LTS info");
+	int temp[mpi_nodes*mpi_nodes];
+	MPI_Gather(&explored,1,MPI_INT,temp,1,MPI_INT,0,MPI_COMM_WORLD);
+	if (mpi_me==0){
+		lts_count_t *count=lts_output_count(output);
 		for(int i=0;i<mpi_nodes;i++){
-			DSclose(&output_src[i]);
-			DSclose(&output_label[i]);
-			DSclose(&output_dest[i]);
+			//Warning(info,"state count of %d is %d",i,temp[i]);
+			count->state[i]=temp[i];
 		}
 	}
-	if (verbosity>1) Warning(info,"transition files closed");
-	{
-	int *temp=NULL;
-	stream_t info_s=NULL;
-		if (write_lts && mpi_me==0){
-			stream_t ds=arch_write(arch,"TermDB",plain?NULL:"gzip",1);
-			int act_count=GBchunkCount(model,ltstype->edge_label_type[0]);
-			for(int i=0;i<act_count;i++){
-				chunk c=GBchunkGet(model,ltstype->edge_label_type[0],i);
-				DSwrite(ds,c.data,c.len);
-				DSwrite(ds,"\n",1);
+	//for(int i=0;i<mpi_nodes;i++){
+	//	Warning(info,"in from %d is %d",i,tcount[i]);
+	//}
+	MPI_Gather(tcount,mpi_nodes,MPI_INT,temp,mpi_nodes,MPI_INT,0,MPI_COMM_WORLD);
+	if (mpi_me==0){
+		lts_count_t *count=lts_output_count(output);
+		for(int i=0;i<mpi_nodes;i++){
+			for(int j=0;j<mpi_nodes;j++){
+				//Warning(info,"transition count %d to %d is %d",i,j,temp[i+mpi_nodes*j]);
+				count->cross[i][j]=temp[i+mpi_nodes*j];
 			}
-			DSclose(&ds);
-			Warning(info,"%d actions",act_count);
-			/* Start writing the info file. */
-			info_s=arch_write(arch,"info",plain?NULL:"",1);
-			DSwriteU32(info_s,31);
-			DSwriteS(info_s,"generated by instantiator-mpi");
-			DSwriteU32(info_s,mpi_nodes);
-			DSwriteU32(info_s,0);
-			DSwriteU32(info_s,0);
-			DSwriteU32(info_s,act_count);
-			DSwriteU32(info_s,-1); //tau
-			DSwriteU32(info_s,size-1);
-		}
-		if (mpi_me==0) temp=(int*)malloc(mpi_nodes*mpi_nodes*sizeof(int));
-		MPI_Gather(&explored,1,MPI_INT,temp,1,MPI_INT,0,MPI_COMM_WORLD);
-		if (write_lts && mpi_me==0){
-			for(int i=0;i<mpi_nodes;i++){
-				DSwriteU32(info_s,temp[i]);
-			}
-		}
-		MPI_Gather(tcount,mpi_nodes,MPI_INT,temp,mpi_nodes,MPI_INT,0,MPI_COMM_WORLD);
-		if (write_lts && mpi_me==0){
-			for(int i=0;i<mpi_nodes;i++){
-				for(int j=0;j<mpi_nodes;j++){
-					//Warning(info,"%d -> %d : %d",i,j,temp[i+mpi_nodes*j]);
-					DSwriteU32(info_s,temp[i+mpi_nodes*j]);
-				}
-			}
-			DSclose(&info_s);
 		}
 	}
-	if (write_lts) arch_close(&arch);
+	if (write_lts) {
+		lts_output_close(&output);
+	}
 	//char dir[16];
 	//sprintf(dir,"gmon-%d",mpi_me);
 	//chdir(dir);
+	event_barrier_wait(barrier);
 	MPI_Finalize();
 	armed=0;
 	return 0;

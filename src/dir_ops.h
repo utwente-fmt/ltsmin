@@ -27,7 +27,7 @@
   * @return 0 on success.
   * @return -1 on error. In addition #errno# is set appropriately.
   */
-extern int CreateEmptyDir(char *name,int delete);
+extern int create_empty_dir(char *name,int delete);
 
 #define DELETE_NONE 0x00
 #define DELETE_FILE 0x01
@@ -38,15 +38,15 @@ extern int CreateEmptyDir(char *name,int delete);
   * @return 1 if #name# is a directory
   * @return 0 otherwise
   */
-extern int IsADir(char *name);
+extern int is_a_dir(char *name);
 
 typedef void* dir_enum_t;
 
-extern dir_enum_t GetDirEnum(char *name);
+extern dir_enum_t get_dir_enum(char *name);
 
-extern char* GetNextDir(dir_enum_t e);
+extern char* get_next_dir(dir_enum_t e);
 
-extern void DelDirEnum(dir_enum_t e);
+extern void del_dir_enum(dir_enum_t e);
 
 //@}
 

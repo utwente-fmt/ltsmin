@@ -59,8 +59,12 @@ static void label_destroy(void *buf){
 	if(buf) free(buf);
 }
 
+char* get_label(){
+	return (char *)pthread_getspecific(label_key);
+}
+
 static void log_begin(log_t log,int line,const char*file){
-	fprintf(log->f,"%s",(char *)pthread_getspecific(label_key));
+	fprintf(log->f,"%s",get_label());
 	if (log->flags & LOG_WHERE) fprintf(log->f,", file %s, line %d",file,line);
 	if (log->tag) fprintf(log->f,", %s",log->tag);
 	fprintf(log->f,": ");
@@ -115,17 +119,18 @@ void log_message(log_t log,const char*file,int line,int errnum,const char *fmt,.
 	va_end(args);
 }
 
-void RTinit(int argc,char**argv[]){
+void RTinit(int *argcp,char**argvp[]){
 	RThandleFatal=NULL;
 	error=create_log(stderr,"ERROR",LOG_PRINT);
 	info=create_log(stderr,NULL,LOG_PRINT);
 	debug=create_log(stderr,NULL,LOG_IGNORE);
 	pthread_key_create(&label_key, label_destroy);
-	char **copy=RTmalloc(argc*sizeof(char*));
-	for(int i=0;i<argc;i++){
-		copy[i]=strdup((*argv)[i]);
+	char **copy=RTmalloc((*argcp)*sizeof(char*));
+	for(int i=0;i<(*argcp);i++){
+		copy[i]=strdup((*argvp)[i]);
 	}
-	*argv=copy;
+	*argvp=copy;
+	take_vars(argcp,*argvp);
 	set_label("%s",basename(copy[0]));
 }
 
@@ -135,5 +140,11 @@ void* RTmalloc(size_t size){
 	void *tmp=malloc(size);
 	if (tmp==NULL) Fatal(0,error,"out of memory trying to get %d",size);
 	return tmp;
+}
+
+void* RTmallocZero(size_t size){
+	void *p=RTmalloc(size);
+	bzero(p,size);
+	return p;
 }
 

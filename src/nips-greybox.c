@@ -11,7 +11,7 @@
 static const size_t MAX_INITIAL_STATE_COUNT = 10000;
 static const size_t MAX_NIPSVM_STATE_SIZE   = 65536;
 
-static struct lts_structure_s ltstype;
+static lts_type_t ltstype;
 static struct edge_info e_info;
 static struct state_info s_info = { 0, NULL, NULL };
 
@@ -186,6 +186,7 @@ Rpart_chan_callback (char *data, unsigned int len, void *ctx)
 /* NIPS next-state callback ============================= */
 struct gb_context_s {
     model_t             model;
+    int                 state_length;
     TransitionCB        callback;
     void               *context;
 
@@ -203,6 +204,7 @@ init_gb_context (struct gb_context_s *gb_ctx, model_t model,
                  nipsvm_state_t *source, int group)
 {
     gb_ctx->model = model;
+    gb_ctx->state_length = lts_type_get_state_length(GBgetLTStype(model));
     gb_ctx->callback = cb;
     gb_ctx->context = context;
     gb_ctx->source_state = source;
@@ -240,7 +242,7 @@ scheduler_callback (size_t succ_size, nipsvm_state_t *succ,
     if (succ->excl_pid != 0)
         return IC_CONTINUE_INVISIBLY;
     
-    size_t          ilen = GBgetLTStype (gb_context->model)->state_length;
+    size_t          ilen = gb_context->state_length;
     int             ivec[ilen];
     int             ilabel[] = { ILABEL_TAU };
     init_part_context (&part_ctx, gb_context->model, ivec, ilen);
@@ -456,10 +458,6 @@ NIPSfindInitializedState (nipsvm_bytecode_t *bytecode, size_t nmax_states)
     return initial;
 }
 
-static char        *edge_name[] = { "action" };
-static int          edge_type[] = { 3 };
-static char        *NIPS_types[] = { "globals", "process", "channel", "label" };
-
 void
 NIPSloadGreyboxModel (model_t m, char *filename)
 {
@@ -489,21 +487,27 @@ NIPSloadGreyboxModel (model_t m, char *filename)
     state_parts (initial, Cpart_glob_callback, Cpart_proc_callback,
                  Cpart_chan_callback, &Cpart_ctx);
 
-    ltstype.state_length = Cpart_ctx.count;
-    ltstype.type_count = count (NIPS_types);
-    ltstype.type_names = NIPS_types;
-    ltstype.visible_count = 0;
-    ltstype.visible_indices = NULL;
-    ltstype.visible_name = NULL;
-    ltstype.visible_type = NULL;
-    ltstype.state_labels = 0;
-    ltstype.state_label_name = NULL;
-    ltstype.state_label_type = NULL;
-    ltstype.edge_labels = count (edge_name);
-    ltstype.edge_label_name = edge_name;
-    ltstype.edge_label_type = edge_type;
-    GBsetLTStype (m, &ltstype);
-    ILABEL_TAU  = GBchunkPut(m, edge_type[0], chunk_str("tau"));  /* XXX */
+	ltstype=lts_type_create();
+	if (lts_type_add_type(ltstype,"globals",NULL)!=0) {
+		Fatal(1,error,"wrong type number");
+	}
+	if (lts_type_add_type(ltstype,"process",NULL)!=1) {
+		Fatal(1,error,"wrong type number");
+	}
+	if (lts_type_add_type(ltstype,"channel",NULL)!=2) {
+		Fatal(1,error,"wrong type number");
+	}
+	if (lts_type_add_type(ltstype,"label",NULL)!=3) {
+		Fatal(1,error,"wrong type number");
+	}
+	int state_length=Cpart_ctx.count;
+	lts_type_set_state_length(ltstype,state_length);
+	lts_type_set_edge_label_count(ltstype,1);
+	lts_type_set_edge_label_name(ltstype,0,"label");
+	lts_type_set_edge_label_type(ltstype,0,"label");
+
+    GBsetLTStype (m, ltstype);
+    GBchunkPut(m, 3, chunk_str("dummy")); /* XXX */
 
     struct part_context_s part_ctx;
     int                 ivec[Cpart_ctx.count];
@@ -516,7 +520,7 @@ NIPSloadGreyboxModel (model_t m, char *filename)
     e_info.length = RTmalloc (e_info.groups * sizeof (int));
     e_info.indices = RTmalloc (e_info.groups * sizeof (int *));
     for (int i = 0; i < e_info.groups; ++i) {
-        int                 temp[ltstype.state_length];
+        int                 temp[state_length];
         e_info.length[i] = NIPSgetProjection (vm, &Cpart_ctx, temp, i);
         e_info.indices[i] = RTmalloc (e_info.length[i] * sizeof (int));
         for (int j = 0; j < e_info.length[i]; ++j)

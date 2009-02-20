@@ -6,7 +6,7 @@
 #include <mpi.h>
 #include "dlts.h"
 #include "lts.h"
-#include "runtime.h"
+#include <mpi-runtime.h>
 #include "scctimer.h"
 #include "set.h"
 #include "stream.h"
@@ -282,18 +282,16 @@ int main(int argc,char **argv){
 
 
 
-        MPI_Init(&argc, &argv);
+        RTinitMPI(&argc, &argv);
 
 	timer=SCCcreateTimer();
 	compute_timer=SCCcreateTimer();
 	synch_timer=SCCcreateTimer();
 	exchange_timer=SCCcreateTimer();
 
-	RTinit(argc,&argv);
 	core_init();
 	set_label("ltsmin-mpi(%2d)",mpi_me);
 	if(mpi_me!=0) core_barrier();
-	take_vars(&argc,argv);
 	take_options(options,&argc,argv);
 	if (argc!=3) {
 		Warning(info,"wrong number of options %d",argc);

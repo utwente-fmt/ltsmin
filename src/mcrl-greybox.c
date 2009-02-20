@@ -1,4 +1,6 @@
+#include "config.h"
 #include <stdio.h>
+#include <string.h>
 
 #include "mcrl-greybox.h"
 #include "runtime.h"
@@ -11,9 +13,11 @@ static ATerm label=NULL;
 static ATerm *dst;
 
 static int instances=0;
-static struct lts_structure_s ltstype;
+static int state_length;
 static struct edge_info e_info;
+static int* e_smd_map=NULL;
 static struct state_info s_info={0,NULL,NULL};
+static int* s_smd_map=NULL;
 
 static at_map_t termmap;
 static at_map_t actionmap;
@@ -22,6 +26,9 @@ static TransitionCB user_cb;
 static void* user_context;
 static ATerm* src_term;
 static int * src_int;
+
+static int next_label=0;
+static int *user_labels;
 
 static char* remove_quotes(void *dummy,ATerm t){
 	(void)dummy;
@@ -43,8 +50,8 @@ static ATerm parse_term(void *dummy,char*str){
 
 static void callback(void){
 	int lbl=ATfindIndex(actionmap,label);
-	int dst_p[ltstype.state_length];
-	for(int i=0;i<ltstype.state_length;i++){
+	int dst_p[state_length];
+	for(int i=0;i<state_length;i++){
 		if(ATisEqual(src_term[i],dst[i])){
 			dst_p[i]=src_int[i];
 		} else {
@@ -94,37 +101,50 @@ void MCRLinitGreybox(int argc,char *argv[],void* stack_bottom){
 	STsetArguments(&c, &xargv);
 }
 
-int MCRLgetTransitionsLong(model_t model,int group,int*src,TransitionCB cb,void*context){
+static void MCRLgetStateLabelsAll(model_t model,int*state,int*labels){
 	(void)model;
-	ATerm at_src[ltstype.state_length];
+	ATerm at_src[state_length];
+	next_label=0;
+	user_cb=NULL;
+	user_labels=labels;
+	for(int i=0;i<state_length;i++) {
+		at_src[i]=ATfindTerm(termmap,state[i]);
+	}
+	int res=STstepSmd(at_src,s_smd_map,s_info.labels);
+	if (res<0) Fatal(1,error,"error in STstepSmd")
+}
+
+static int MCRLgetTransitionsLong(model_t model,int group,int*src,TransitionCB cb,void*context){
+	(void)model;
+	ATerm at_src[state_length];
 	user_cb=cb;
 	user_context=context;
 	src_int=src;
 	src_term=at_src;
-	for(int i=0;i<ltstype.state_length;i++) {
+	for(int i=0;i<state_length;i++) {
 		at_src[i]=ATfindTerm(termmap,src[i]);
 	}
-	return STstepSmd(at_src,&group,1);
+	int res=STstepSmd(at_src,e_smd_map+group,1);
+	if (res<0) Fatal(1,error,"error in STstepSmd")
+	return res;
 }
 
-int MCRLgetTransitionsAll(model_t model,int*src,TransitionCB cb,void*context){
+static int MCRLgetTransitionsAll(model_t model,int*src,TransitionCB cb,void*context){
 	(void)model;
-	ATerm at_src[ltstype.state_length];
+	ATerm at_src[state_length];
 	user_cb=cb;
 	user_context=context;
 	src_int=src;
 	src_term=at_src;
-	for(int i=0;i<ltstype.state_length;i++) {
+	for(int i=0;i<state_length;i++) {
 		at_src[i]=ATfindTerm(termmap,src[i]);
 	}
-	return STstep(at_src);
+	int res=STstepSmd(at_src,e_smd_map,e_info.groups);
+	if (res<0) Fatal(1,error,"error in STstepSmd")
+	return res;
 }
 
-static char* edge_name[1]={"action"};
-static int edge_type[1]={1};
-static char* MCRL_types[2]={"leaf","action"};
-
-void MCRLloadGreyboxModel(model_t m,char*model){
+void MCRLloadGreyboxModel(model_t m,char*model,int vars){
 	if(instances) {
 		Fatal(1,error,"mCRL is limited to one instance, due to global variables.");
 	}
@@ -133,52 +153,72 @@ void MCRLloadGreyboxModel(model_t m,char*model){
 		FatalCall(1,error,"failed to open %s",model);
 	}
 	if (!RWinitialize(MCRLgetAdt())) {
-		ATerror("Initialize rewriter");
+		Fatal(1,error,"could not initialize rewriter for %s",model);
 	}
-	ltstype.state_length=MCRLgetNumberOfPars();
-	ltstype.visible_count=0;
-	ltstype.visible_indices=NULL;
-	ltstype.visible_name=NULL;
-	ltstype.visible_type=NULL;
-	ltstype.state_labels=0;
-	ltstype.state_label_name=NULL;
-	ltstype.state_label_type=NULL;
-	ltstype.edge_labels=1;
-	ltstype.edge_label_name=edge_name;
-	ltstype.edge_label_type=edge_type;
-	ltstype.type_count=2;
-	ltstype.type_names=MCRL_types;
-	GBsetLTStype(m,&ltstype);
+	lts_type_t ltstype=lts_type_create();
+	state_length=MCRLgetNumberOfPars();
+	lts_type_set_state_length(ltstype,state_length);
+	if (vars & STATE_VISIBLE){
+		Warning(info,"state variables are visible.");
+		ATermList pars=MCRLgetListOfPars();
+		for(int i=0;i<state_length;i++){
+			ATerm decl=ATelementAt(pars,i);
+			ATerm var=MCRLprint(ATgetArgument(decl,0));
+			ATerm type=MCRLprint(ATgetArgument(decl,1));
+			lts_type_set_state_name(ltstype,i,ATwriteToString(var));
+			lts_type_set_state_type(ltstype,i,"leaf");
+			Warning(info,"parameter %8s: %8s",lts_type_get_state_name(ltstype,i),ATwriteToString(type));
+		}
+	} else {
+		Warning(info,"hiding the state.");
+		for(int i=0;i<state_length;i++){
+			lts_type_set_state_type(ltstype,i,"leaf");
+		}
+	}
+	termmap=ATmapCreate(m,lts_type_add_type(ltstype,"leaf",NULL),NULL,print_term,parse_term);
+	actionmap=ATmapCreate(m,lts_type_add_type(ltstype,"action",NULL),NULL,remove_quotes,NULL);
 
-	termmap=ATmapCreate(m,0,NULL,print_term,parse_term);
-	actionmap=ATmapCreate(m,1,NULL,remove_quotes,NULL);
-
-	dst=(ATerm*)malloc(ltstype.state_length*sizeof(ATerm));
-	for(int i=0;i<ltstype.state_length;i++) {
+	dst=(ATerm*)malloc(state_length*sizeof(ATerm));
+	for(int i=0;i<state_length;i++) {
 		dst[i]=NULL;
 	}
  	ATprotect(&label);
-	ATprotectArray(dst,ltstype.state_length);
+	ATprotectArray(dst,state_length);
 	STinitialize(noOrdering,&label,dst,callback);
-	STsetInitialState();
-	int temp[ltstype.state_length];
-	for(int i=0;i<ltstype.state_length;i++) temp[i]=ATfindIndex(termmap,dst[i]);
-	GBsetInitialState(m,temp);
 
-
-	e_info.groups=STgetSummandCount();
-	e_info.length=(int*)RTmalloc(e_info.groups*sizeof(int));
-	e_info.indices=(int**)RTmalloc(e_info.groups*sizeof(int*));
-	for(int i=0;i<e_info.groups;i++){
-		int temp[ltstype.state_length];
-		e_info.length[i]=STgetProjection(temp,i);
-		e_info.indices[i]=(int*)RTmalloc(e_info.length[i]*sizeof(int));
-		for(int j=0;j<e_info.length[i];j++) e_info.indices[i][j]=temp[j];
+	int nSmds=STgetSummandCount();
+	{
+		e_info.groups=nSmds;
 	}
+	lts_type_set_edge_label_count(ltstype,1);
+	lts_type_set_edge_label_name(ltstype,0,"action");
+	lts_type_set_edge_label_type(ltstype,0,"action");
+	e_info.length=(int*)RTmalloc(e_info.groups*sizeof(int));
+	e_smd_map=(int*)RTmalloc(e_info.groups*sizeof(int));
+	e_info.indices=(int**)RTmalloc(e_info.groups*sizeof(int*));
+	int next_edge=0;
+	for(int i=0;i<nSmds;i++){
+		int temp[state_length];
+		e_info.length[next_edge]=STgetProjection(temp,i);
+		e_info.indices[next_edge]=(int*)RTmalloc(e_info.length[next_edge]*sizeof(int));
+		for(int j=0;j<e_info.length[next_edge];j++) e_info.indices[next_edge][j]=temp[j];
+		e_smd_map[next_edge]=i;
+		next_edge++;
+	}
+	GBsetLTStype(m,ltstype);
 	GBsetEdgeInfo(m,&e_info);
 	GBsetStateInfo(m,&s_info);
+
+	STsetInitialState();
+	int temp[state_length];
+	for(int i=0;i<state_length;i++) temp[i]=ATfindIndex(termmap,dst[i]);
+	GBsetInitialState(m,temp);
+
 	GBsetNextStateLong(m,MCRLgetTransitionsLong);
 	GBsetNextStateAll(m,MCRLgetTransitionsAll);
+	GBsetStateLabelsAll(m,MCRLgetStateLabelsAll);
+	Warning(info,"model %s loaded",model);
 }
+
 
 

@@ -15,11 +15,14 @@
 #elif defined(NIPS)
 #include "nips-greybox.h"
 #define MODEL_TYPE "nips"
+#elif defined(ETF)
+#include "etf-greybox.h"
+#define MODEL_TYPE "etf"
 #else
 #error "Unknown greybox provider."
 #endif
 #include "treedbs.h"
-#include "ltsman.h"
+#include <stringindex.h>
 #include "options.h"
 #include "vector_set.h"
 #include "scctimer.h"
@@ -29,9 +32,16 @@ static int bfs=0;
 static int bfs2=0;
 static int sat=0;
 static int chain=0;
+
+#if defined(MCRL)
+static int state_visible=0;
+#endif
+static char* table=NULL;
+
 static int use_vset_list=0;
 static int use_vset_tree=0;
 static int use_vset_fdd=0;
+
 
 static struct option options[]={
 	{"",OPT_NORMAL,NULL,NULL,NULL,
@@ -45,6 +55,13 @@ static struct option options[]={
 	{"-bfs2",OPT_NORMAL,set_int,&bfs2,NULL,"enable BFS2",NULL,NULL,NULL},
 //	{"-sat",OPT_NORMAL,set_int,&sat,NULL,"enable saturation",NULL,NULL,NULL},
 	{"-chain",OPT_NORMAL,set_int,&chain,NULL,"enable chaining",NULL,NULL,NULL},
+#ifdef MCRL
+	{"-state",OPT_NORMAL,set_int,&state_visible,NULL,
+		"Make all state variables visible.",NULL,NULL,NULL},
+#endif
+	{"",OPT_NORMAL,NULL,NULL,NULL,"output options:",NULL,NULL,NULL},
+	{"-etf",OPT_REQ_ARG,assign_string,&table,"-etf <file_name>",
+		"write the dynamically computed ETF to <file_name>",NULL,NULL,NULL},
 	{"-vset-list",OPT_NORMAL,set_int,&use_vset_list,NULL,
 	        "Use vector sets with MDD nodes organized in a linked list",
 		"This option cannot be used in combination with -out",
@@ -62,8 +79,9 @@ static struct option options[]={
  	{0,0,0,0,0,0,0,0,0}
 };
 
-static lts_struct_t ltstype;
+static lts_type_t ltstype;
 static int N;
+static int eLbls;
 static edge_info_t e_info;
 static int nGrps;
 static vdom_t domain;
@@ -223,7 +241,7 @@ void reach_chain(){
 	Warning(info,"Exploration took %ld group checks and %ld next state calls",eg_count,next_count);
 }
 
-#if defined(NIPS)
+#if defined(NIPS) || defined(ETF)
 #include "aterm1.h"
 
 static void WarningHandler(const char *format, va_list args) {
@@ -247,10 +265,99 @@ static void ErrorHandler(const char *format, va_list args) {
 }
 #endif
 
+static FILE* table_file;
+
+static int table_count=0;
+
+typedef struct output_context {
+	int group;
+	int *src;
+	int *lbl;
+	int *dst;
+} output_context;
+
+static void print_edge(void*context,int*labels,int*dst){
+	output_context* ctx=(output_context*)context;
+	table_count++;
+/*
+	fprintf(stderr,"enumerating");
+	for(int i=0;i<eLbls;i++) {
+		chunk c=GBchunkGet(model,ltstype->edge_label_type[i],labels[i]);
+		char str[1024];
+		chunk_encode_copy(chunk_ld(1024,str),c,':');
+		fprintf(stderr," %s",str);
+	}
+	fprintf(stderr," transitions\n");
+*/
+	if (table) {
+		int k=0;
+		for(int i=0;i<N;i++) {
+			if (k<e_info->length[ctx->group] && e_info->indices[ctx->group][k]==i){
+				fprintf(table_file," %d/%d",ctx->src[k],dst[k]);
+				k++;
+			} else {
+				fprintf(table_file," *");
+			}
+		}
+		for(int i=0;i<eLbls;i++) {
+			chunk c=GBchunkGet(model,lts_type_get_edge_label_typeno(ltstype,i),labels[i]);
+			char str[1024];
+			chunk_encode_copy(chunk_ld(1024,str),c,':');
+			fprintf(table_file," %s",str);
+		}
+		fprintf(table_file,"\n");
+	}
+}
+
+static void enum_edge(void*context,int *src){
+	output_context* ctx=(output_context*)context;
+	ctx->src=src;
+	GBgetTransitionsShort(model,ctx->group,ctx->src,print_edge,context);
+}
+
+void do_output(){
+	eLbls=lts_type_get_edge_label_count(ltstype);
+	int state[N];
+	char edge_label_spec[256*(eLbls+1)];
+	GBgetInitialState(model,state);
+	if(table){
+		table_file=fopen(table,"w");
+		fprintf(table_file,"begin state\n");
+		for(int i=0;i<N;i++){
+			fprintf(table_file,"_:_%s",(i==(N-1))?"\n":" ");
+		}
+		fprintf(table_file,"end state\n");
+		fprintf(table_file,"begin init\n");
+		for(int i=0;i<N;i++) {
+			fprintf(table_file,"%d%s",state[i],(i==(N-1))?"\n":" ");
+		}
+		fprintf(table_file,"end init\n");
+		edge_label_spec[0]=0;
+		int ptr=0;
+		for(int i=0;i<eLbls;i++){
+			ptr+=sprintf(edge_label_spec+ptr," %s",lts_type_get_edge_label_type(ltstype,i));
+		}
+	}	
+	for(int g=0;g<nGrps;g++){
+		output_context ctx;
+		ctx.group=g;
+		if(table){
+			fprintf(table_file,"begin trans%s\n",edge_label_spec);
+		}
+		vset_enum(group_explored[g],enum_edge,&ctx);
+		if(table){
+			fprintf(table_file,"end trans\n");
+		}
+	}
+	if(table){
+		fclose(table_file);
+	}
+	Warning(info,"Symbolic tables have %d reachable transitions",table_count);
+}
+
 int main(int argc, char *argv[]){
 	void* stackbottom=&argv;
-	RTinit(argc,&argv);
-	take_vars(&argc,argv);
+	RTinit(&argc,&argv);
 	parse_options(options,argc,argv);
 	switch(use_vset_tree+use_vset_list+use_vset_fdd){
 	case 0:
@@ -285,17 +392,24 @@ int main(int argc, char *argv[]){
 	ATsetWarningHandler(WarningHandler);
 	ATsetErrorHandler(ErrorHandler);
  	NIPSinitGreybox(argc,argv);
+#elif defined(ETF)
+ 	ATinit(argc, argv, (ATerm*) stackbottom);
+	ATsetWarningHandler(WarningHandler);
+	ATsetErrorHandler(ErrorHandler);
+	// ETF has no init!
 #endif
 	Warning(info,"opening %s",argv[argc-1]);
 	model=GBcreateBase();
 	GBsetChunkMethods(model,new_string_index,NULL,
 		(int2chunk_t)SIgetC,(chunk2int_t)SIputC,(get_count_t)SIgetCount);
 #if defined(MCRL)
-	MCRLloadGreyboxModel(model,argv[argc-1]);
+	MCRLloadGreyboxModel(model,argv[argc-1],(state_visible*STATE_VISIBLE));
 #elif defined(MCRL2)
 	MCRL2loadGreyboxModel(model,argv[argc-1]);
 #elif defined(NIPS)
 	NIPSloadGreyboxModel(model,argv[argc-1]);
+#elif defined(ETF)
+	ETFloadGreyboxModel(model,argv[argc-1]);
 #endif
 
 	if (verbosity >=2) {
@@ -304,7 +418,7 @@ int main(int argc, char *argv[]){
 	}
 
 	ltstype=GBgetLTStype(model);
-	N=ltstype->state_length;
+	N=lts_type_get_state_length(ltstype);
 	e_info=GBgetEdgeInfo(model);
 	nGrps=e_info->groups;
 	if (use_vset_list) domain=vdom_create_list(N);
@@ -344,7 +458,17 @@ int main(int argc, char *argv[]){
 	long long e_count;
 	long n_count;
 	vset_count(visited,&n_count,&e_count);
-	printf("state space has %ld nodes and %lld elements\n",n_count,e_count);
+	if (table) {
+		fprintf(stderr,"state space has %ld nodes and %lld elements\n",n_count,e_count);
+		SCCresetTimer(timer);
+		SCCstartTimer(timer);
+		do_output();
+		SCCstopTimer(timer);
+		SCCreportTimer(timer,"writing output took");
+		fprintf(stderr,"\n");
+	} else {
+		printf("state space has %ld nodes and %lld elements\n",n_count,e_count);
+	}
 	return 0;
 }
 

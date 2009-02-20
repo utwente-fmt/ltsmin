@@ -3,6 +3,7 @@
 
 #include <stdio.h>
 #include "chunk_support.h"
+#include "lts-type.h"
 
 /**
  @file greybox.h
@@ -17,47 +18,6 @@ This version assumes a few things:
 typedef struct grey_box_model* model_t;
 /**< @brief Abstract type for a model.
 */
-
-
-/**
-\brief This data type stores signatures of labeled transition systems.
-
-- How long is the state vector?
-- Which elements of the state vector are visible and what are their types?
-- How many labels of which type are there on every edge?
-- How many defined state labels are there?
-- What are the types used in the LTS?
- */
-typedef struct lts_structure_s {
-int state_length;
-/**<
-\brief The length of the state vector.
-
-This describes the length of the internal representation of states.
-For mCRL(2) this would be equal to the number of parameters.
-For a segmented LTS it would be equal to 2.
-*/
-int visible_count;
-/**<
-\brief The number of visible elements in the state vector.
-
-This describes how many of the internal variables are relevant.
-In most cases this will be 0, but if we want to write FSM output
-for mCRL(2) then it would be equal to state_length.
-*/
-int* visible_indices; ///< Sorted list of indices of visible elements.
-char** visible_name; ///< Variable names of the visible elements.
-int* visible_type; ///< Type numbers of the visible elements.
-int state_labels; ///< The number of state labels.
-char** state_label_name; ///< The names of the state labels.
-int* state_label_type; ///< The type numbers of the state labels.
-int edge_labels; ///< The number of state labels.
-char** edge_label_name; ///< The names of the edge labels.
-int* edge_label_type; ///< The type numbers of the edge labels.
-int type_count; ///< The number of different types.
-char** type_names; ///< The names of the types.
-} *lts_struct_t;
-
 
 /**
 \brief Edge group information. 
@@ -84,9 +44,6 @@ typedef struct state_info {
 	int** indices; ///< A sorted list of indices of influenced variables per label.
 } *state_info_t;
 
-
-
-
 /**
 \defgroup greybox_user The Greybox user interface.
 */
@@ -95,7 +52,7 @@ typedef struct state_info {
 /**
 \brief Get the basic LTS type or structure of the model.
 */
-extern lts_struct_t GBgetLTStype(model_t model);
+extern lts_type_t GBgetLTStype(model_t model);
 
 extern edge_info_t GBgetEdgeInfo(model_t model);
 /**<
@@ -199,7 +156,7 @@ extern void* GBgetContext(model_t model);
 /**
 \brief Add LTS structure information to a model.
 */
-extern void GBsetLTStype(model_t model,lts_struct_t info);
+extern void GBsetLTStype(model_t model,lts_type_t info);
 
 /**
 \brief Add edge group information to a model.
@@ -250,6 +207,27 @@ typedef int(*next_method_black_t)(model_t self,int*src,TransitionCB cb,void*user
 If this method is not set explicitly then the grey box calls are iterated.
 */
 extern void GBsetNextStateAll(model_t model,next_method_black_t method);
+
+/// Type of label retrieval methods.
+typedef void (*get_label_all_method_t)(model_t self,int*src,int *label);
+
+/**
+\brief Set the method that retrieves all state labels.
+*/
+extern void GBsetStateLabelsAll(model_t model,get_label_all_method_t method);
+
+/// Type of label retrieval methods.
+typedef int (*get_label_method_t)(model_t self,int label,int*src);
+
+/**
+\brief Set the method that retrieves labels given long vectors.
+*/
+extern void GBsetStateLabelLong(model_t model,get_label_method_t method);
+
+/**
+\brief Set the method that retrieves labels given short vectors.
+*/
+extern void GBsetStateLabelShort(model_t model,get_label_method_t method);
 
 //@}
 

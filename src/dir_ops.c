@@ -10,7 +10,7 @@
 #include <string.h>
 #include <stdlib.h>
 
-#include "dirops.h"
+#include <dir_ops.h>
 #include "runtime.h"
 
 /* printable comments
@@ -26,7 +26,7 @@
 #define CPRINTF(args...)
 #endif
 
-int CreateEmptyDir(char *name,int delete){
+int create_empty_dir(char *name,int delete){
 	struct stat info;
 
 	if (lstat(name,&info)==-1){
@@ -69,20 +69,21 @@ int CreateEmptyDir(char *name,int delete){
 			CPRINTF("unlinking %s\n",fname);
 			if(unlink(fname)==-1) return -1;
 		}
-		return (errno==0)?0:-1;
+		// this is apparently wrong: return (errno==0)?0:-1; but why was it there in the first place?
+		return 0;
 	}
 	CPRINTF("%s is unknown type\n",name);
 	errno=EINVAL;
 	return -1;
 }
 
-int IsADir(char *name){
+int is_a_dir(char *name){
 	struct stat info;
 	if ((lstat(name,&info)==0)&&(S_ISDIR(info.st_mode))) return 1 ; else return 0;
 }
 
 
-dir_enum_t GetDirEnum(char *name){
+dir_enum_t get_dir_enum(char *name){
 	DIR *dir=opendir(name);
 	if (dir==NULL) {
 		FatalCall(1,error,"opendir failed");
@@ -90,7 +91,7 @@ dir_enum_t GetDirEnum(char *name){
 	return dir;
 }
 
-char* GetNextDir(dir_enum_t dir){
+char* get_next_dir(dir_enum_t dir){
 	struct dirent *file;
 	while ((file=readdir(dir))) {
 		if(!strcmp(file->d_name,".")) continue;
@@ -101,7 +102,7 @@ char* GetNextDir(dir_enum_t dir){
 	return NULL;
 }
 
-void DelDirEnum(dir_enum_t dir){
+void del_dir_enum(dir_enum_t dir){
 	closedir(dir);
 }
 

@@ -2,12 +2,16 @@
 #include <stdio.h>
 #include "runtime.h"
 #include <libgen.h>
-#include "ltsman.h"
-#include "dirops.h"
+#include <dir_ops.h>
 #include "amconfig.h"
 #ifdef HAVE_BCG_USER_H
 #include "bcg_user.h"
 #endif
+
+#include <lts_enum.h>
+#include <lts_io.h>
+#include <greybox.h>
+#include <stringindex.h>
 
 #include <inttypes.h>
 
@@ -21,17 +25,7 @@ static int segments=0;
 struct option options[]={
 	{"",OPT_NORMAL,NULL,NULL,NULL,
 		"usage: ltsmin-convert [options] input output",
-		"The file format is detected as follows:",
-		"*.dir : uncompressed DIR format in a directory",
-#ifdef HAVE_BCG_USER_H
-		"*.bcg : BCG file format"},
-#else
-		"*.bcg : BCG file format (get CADP and/or recompile to enable)"},
-#endif
-	{"",OPT_NORMAL,NULL,NULL,NULL,
-		"*%s*  : DIR format using pattern substitution",
-		" *    : DIR format using a GCF archive",
-		NULL,NULL},
+		NULL,NULL,NULL},
 	{"-q",OPT_NORMAL,log_suppress,&info,"-q",
 		"do not print info messages",NULL,NULL,NULL},
 	{"-segments",OPT_REQ_ARG,parse_int,&segments,NULL,
@@ -39,27 +33,72 @@ struct option options[]={
 		"The default is the same as the input if the output support segments.",
 		"The default is 1 if the output cannot support segmentation.",
 		NULL},
-	{"-plain",OPT_NORMAL,set_int,&plain,NULL,
-		"disable compression of the output",NULL,NULL,NULL},
-	{"-bs",OPT_REQ_ARG,parse_int,&blocksize,"-bs <block size>",
-		"Set the block size to be used for copying streams.",
-		"This is also used as the GCF block size.",
-		NULL,NULL},
-	{"-bc",OPT_REQ_ARG,parse_int,&blockcount,"-bc <block count>",
-		"Set the number of blocks in one GCF cluster.",
-		NULL,NULL,NULL},
 	{"-help",OPT_NORMAL,usage,NULL,NULL,
 		"print this help message",NULL,NULL,NULL},
+	{"-io-help",OPT_NORMAL,usage,NULL,NULL,
+		"print help for io sub system",NULL,NULL,NULL},
 	{0,0,0,0,0,0,0,0,0}
 };
 
 static char* plain_code;
 
+/*
+copied from spec2lts-grey.c
+ */
+static void *new_string_index(void* context){
+	(void)context;
+	Warning(info,"creating a new string index");
+	return SIcreate();
+}
+
+static void copy_seg_ofs(void*ctx,int seg,int ofs,int*vec){
+	vec[0]=seg;
+	vec[1]=ofs;
+}
+
+static void convert_div_mod(void*ctx,int *vec,int *seg,int *ofs){
+	uint64_t *offset=(uint64_t *)ctx;
+	uint64_t state=offset[vec[0]+1]+vec[1];
+	*seg=state%offset[0];
+	*ofs=state/offset[0];
+}
+
 int main(int argc, char *argv[]){
-	RTinit(argc,&argv);
-	take_vars(&argc,argv);
+	RTinit(&argc,&argv);
+	lts_io_init(&argc,argv);
 	take_options(options,&argc,argv);
-	archive_t ar_in,ar_out;
+	if (argc!=3) {
+		Fatal(1,error,"usage: ltsmin-convert [options] input output");
+	}
+	model_t model=GBcreateBase();
+	GBsetChunkMethods(model,new_string_index,NULL,
+		(int2chunk_t)SIgetC,(chunk2int_t)SIputC,(get_count_t)SIgetCount);
+	Warning(info,"copying %s to %s",argv[1],argv[2]);
+	lts_input_t input=lts_input_open(argv[1],model,0,1);
+	if (segments==0) {
+		segments=lts_input_segments(input);
+	}
+	lts_output_t output=lts_output_open(argv[2],model,segments,segments,segments,segments);
+	if (segments==lts_input_segments(input)){
+		lts_input_enum(input,1,1,lts_output_enum(output));
+	} else {
+		int N=lts_input_segments(input);
+		uint64_t offset[N+1];
+		lts_count_t *count=lts_input_count(input);
+		offset[0]=segments;
+		offset[1]=0;
+		for(int i=1;i<N;i++){
+			offset[i+1]=offset[i]+count->state[i-1];
+		}
+		lts_enum_cb_t ecb=lts_output_enum(output);
+		ecb=lts_enum_convert(ecb,offset,convert_div_mod,copy_seg_ofs,1);
+		lts_input_enum(input,1,1,ecb);
+	}
+	lts_input_close(&input);
+	lts_output_close(&output);
+	return 0;
+
+/*	archive_t ar_in,ar_out;
 	stream_t ds;
 	int N=0;
 	int K=0;
@@ -80,7 +119,7 @@ int main(int argc, char *argv[]){
 #else
 		Fatal(1,error,"BCG support has not been configured");
 #endif
-	} else if (IsADir(argv[1])) {
+	} else if (is_a_dir(argv[1])) {
 		ar_in=arch_dir_open(argv[1],blocksize);
 	} else {
 		ar_in=arch_gcf_read(raf_unistd(argv[1]));
@@ -351,7 +390,8 @@ int main(int argc, char *argv[]){
 		BCG_OT_READ_BCG_END (&bcg_graph);
 #endif
 	}
-	return 0;
+
+*/
 }
 
 

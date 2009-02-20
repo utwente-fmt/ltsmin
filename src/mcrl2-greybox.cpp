@@ -133,9 +133,12 @@ mcrl2::lps::specification convert(mcrl2::lps::specification const& l) {
 
 extern "C" {
 
-#include "mcrl2-greybox.h"
 /// We have to define CONFIG_H_ due to a problem with double defines.
 #define CONFIG_H_
+
+/// We have to define CONFIG_H_ due to a problem with double defines.
+#define CONFIG_H_
+#include "mcrl2-greybox.h"
 #include "runtime.h"
 #include "at-map.h"
 
@@ -183,6 +186,7 @@ static struct state_info s_info={0,NULL,NULL};
 
 
 static char global_label[65536];
+
 
 static char* print_label(void*arg,ATerm act){
 	(void)arg;
@@ -257,14 +261,6 @@ static int MCRL2getTransitionsAll(model_t m,int*src,TransitionCB cb,void*context
 	return count;
 }
 
-
-
-static char const_action[7]="action";
-static char* edge_name[1]={const_action};
-static int edge_type[1]={1};
-static char const_leaf[5]="leaf";
-static char* MCRL_types[2]={const_leaf,const_action};
-
 void MCRL2loadGreyboxModel(model_t m,char*model_name){
 	struct grey_box_context *ctx=(struct grey_box_context*)RTmalloc(sizeof(struct grey_box_context));
 	GBsetContext(m,ctx);
@@ -287,20 +283,15 @@ void MCRL2loadGreyboxModel(model_t m,char*model_name){
 	model = convert(model);
 	
 
-	lts_struct_t ltstype=(lts_struct_t)RTmalloc(sizeof(struct lts_structure_s));
-	ltstype->state_length=model.process().process_parameters().size();
-	ltstype->visible_count=0;
-	ltstype->visible_indices=NULL;
-	ltstype->visible_name=NULL;
-	ltstype->visible_type=NULL;
-	ltstype->state_labels=0;
-	ltstype->state_label_name=NULL;
-	ltstype->state_label_type=NULL;
-	ltstype->edge_labels=1;
-	ltstype->edge_label_name=edge_name;
-	ltstype->edge_label_type=edge_type;
-	ltstype->type_count=2;
-	ltstype->type_names=MCRL_types;
+	int state_length=model.process().process_parameters().size();
+	lts_type_t ltstype=lts_type_create();
+	lts_type_set_state_length(ltstype,state_length);
+	for(int i=0;i<state_length;i++) {
+		lts_type_set_state_type(ltstype,i,"leaf");
+	}
+	lts_type_set_edge_label_count(ltstype,1);
+	lts_type_set_edge_label_name(ltstype,0,"action");
+	lts_type_set_edge_label_type(ltstype,0,"action");
 	GBsetLTStype(m,ltstype);
 
 
@@ -309,16 +300,15 @@ void MCRL2loadGreyboxModel(model_t m,char*model_name){
 	ctx->explorer = createNextState(model, false, GS_STATE_VECTOR,GS_REWR_JITTYC);
 	ctx->rewriter = ctx->explorer->getRewriter();
 	ctx->info=new group_information(model);
-	ctx->termmap=ATmapCreate(m,0,ctx->rewriter,print_term,parse_term);
-	ctx->actionmap=ATmapCreate(m,1,ctx->rewriter,print_label,NULL);
-
-	ctx->atPars=model.process().process_parameters().size();
+	ctx->termmap=ATmapCreate(m,lts_type_add_type(ltstype,"leaf",NULL),ctx->rewriter,print_term,parse_term);
+	ctx->actionmap=ATmapCreate(m,lts_type_add_type(ltstype,"action",NULL),ctx->rewriter,print_label,NULL);
+	ctx->atPars=state_length;
 	ctx->atGrps=model.process().summands().size();
 	ATerm s0=ctx->explorer->getInitialState();
 	//s0=(ATerm)ctx->explorer->makeStateVector(s0);
 	ctx->StateFun=ATgetAFun(s0);
-	int temp[ltstype->state_length];
-	for(int i=0;i<ltstype->state_length;i++) {
+	int temp[state_length];
+	for(int i=0;i<state_length;i++) {
 		temp[i]=ATfindIndex(ctx->termmap,ATgetArgument(s0,i));
 	}
 	GBsetInitialState(m,temp);

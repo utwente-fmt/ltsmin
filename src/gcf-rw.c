@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "runtime.h"
-#include "dirops.h"
+#include <dir_ops.h>
 #include "options.h"
 
 /********************************************************************************/
@@ -90,8 +90,7 @@ struct option options[]={
 };
 
 int main(int argc, char *argv[]){
-	RTinit(argc,&argv);
-	take_vars(&argc,argv);
+	RTinit(&argc,&argv);
 	take_options(options,&argc,argv);
 	archive_t gcf=NULL;
 
@@ -101,7 +100,7 @@ int main(int argc, char *argv[]){
 	}
 	if (extract) {
 		archive_t dir;
-		if (IsADir(argv[2])){
+		if (is_a_dir(argv[2])){
 			dir=arch_dir_open(argv[2],blocksize);
 		} else if (strstr(argv[2],"%s")) {
 			dir=arch_fmt(argv[2],file_input,file_output,blocksize);
@@ -114,7 +113,7 @@ int main(int argc, char *argv[]){
 		arch_close(&gcf);
 	} else {
 		gcf=arch_gcf_create(raf_unistd(argv[1]),blocksize,blocksize*blockcount,0,1);
-		if (argc==3 && IsADir(argv[2])){
+		if (argc==3 && is_a_dir(argv[2])){
 			archive_t dir=arch_dir_open(argv[2],blocksize);
 			archive_copy(dir,NULL,gcf,code,blocksize);
 			arch_close(&dir);

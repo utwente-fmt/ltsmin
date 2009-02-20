@@ -9,7 +9,7 @@
 #include <string.h>
 #include <stdlib.h>
 
-#include "dirops.h"
+#include <dir_ops.h>
 #include "arch_object.h"
 #include "runtime.h"
 
@@ -47,7 +47,7 @@ static int dir_enumerate(arch_enum_t e,struct arch_enum_callbacks *cb,void*arg){
 	if (cb->data!=NULL) Fatal(1,error,"cannot enumerate data");
 	if (e->e==NULL) return 0;
 	char*name;
-	while((name=GetNextDir(e->e))){
+	while((name=get_next_dir(e->e))){
 		if(cb->new_item) {
 			int res=cb->new_item(arg,e->next_stream,name);
 			e->next_stream++;
@@ -62,7 +62,7 @@ static int dir_enumerate(arch_enum_t e,struct arch_enum_callbacks *cb,void*arg){
 
 static void dir_enum_free(arch_enum_t *e){
 	if ((*e)->e) {
-		DelDirEnum((*e)->e);
+		del_dir_enum((*e)->e);
 	}
 	free(*e);
 	*e=NULL;
@@ -71,7 +71,7 @@ static void dir_enum_free(arch_enum_t *e){
 static arch_enum_t dir_enum(archive_t archive,char *regex){
 	if (regex!=NULL) Warning(info,"regex not supported");
 	arch_enum_t e=(arch_enum_t)RTmalloc(sizeof(struct arch_enum));
-	e->e=GetDirEnum(archive->dir);
+	e->e=get_dir_enum(archive->dir);
 	e->procs.enumerate=dir_enumerate;
 	e->procs.free=dir_enum_free;
 	e->archive=archive;
@@ -82,7 +82,7 @@ static arch_enum_t dir_enum(archive_t archive,char *regex){
 archive_t arch_dir_create(char*dirname,int buf,int del){
 	archive_t arch=(archive_t)RTmalloc(sizeof(struct archive_s));
 	arch_init(arch);
-	if(CreateEmptyDir(dirname,del)){
+	if(create_empty_dir(dirname,del)){
 		FatalCall(1,error,"could not create or clear directory %s",dirname);
 	}
 	strncpy(arch->dir,dirname,LTSMIN_PATHNAME_MAX-1);
@@ -98,7 +98,7 @@ archive_t arch_dir_create(char*dirname,int buf,int del){
 archive_t arch_dir_open(char*dirname,int buf){
 	archive_t arch=(archive_t)RTmalloc(sizeof(struct archive_s));
 	arch_init(arch);
-	if(!IsADir(dirname)){
+	if(!is_a_dir(dirname)){
 		FatalCall(1,error,"directory %s does not exist",dirname);
 	}
 	strncpy(arch->dir,dirname,LTSMIN_PATHNAME_MAX-1);

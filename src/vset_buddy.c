@@ -226,6 +226,21 @@ static void set_enum_fdd(vset_t set,vset_element_cb cb,void* context){
 	vset_enum_do_fdd(set->dom,set->bdd,set->proj,vec,N,0,cb,context);
 }
 
+static void set_enum_match_fdd(vset_t set,int p_len,int* proj,int*match,vset_element_cb cb,void* context){
+	BDD subset=set->bdd;
+	bdd_addref(subset);
+	for(int i=0;i<p_len;i++){
+		BDD val=mkvar(set->dom,proj[i],match[i]);
+		BDD tmp=bdd_addref(bdd_and(subset,val));
+		bdd_delref(subset);
+		subset=tmp;
+		rmvar(val);
+	}
+	int N=set->p_len;
+	int vec[N];
+	vset_enum_do_fdd(set->dom,subset,set->proj,vec,N,0,cb,context);
+}
+
 static void set_count_fdd(vset_t set,long *nodes,long long *elements){
 	*nodes=bdd_nodecount(set->bdd);
 	double count=bdd_satcountlnset(set->bdd,set->p_set);
@@ -335,7 +350,7 @@ vdom_t vdom_create_fdd(int n){
 	dom->shared.set_clear=set_clear_all;
 	dom->shared.set_copy=set_copy_all;
 	dom->shared.set_enum=set_enum_fdd;
-	//dom->shared.set_enum_match=set_enum_match_fdd;
+	dom->shared.set_enum_match=set_enum_match_fdd;
 	dom->shared.set_count=set_count_fdd;
 	dom->shared.set_union=set_union_fdd;
 	dom->shared.set_minus=set_minus_fdd;

@@ -5,6 +5,11 @@
 #include <strings.h>
 #include <ctype.h>
 
+
+#include <lts_enum.h>
+#include <lts_io.h>
+#include <stringindex.h>
+
 #include "archive.h"
 #include "runtime.h"
 #if defined(MCRL)
@@ -16,16 +21,25 @@
 #elif defined(NIPS)
 #include "nips-greybox.h"
 #define MODEL_TYPE "nips"
+#elif defined(ETF)
+#include "etf-greybox.h"
+#define MODEL_TYPE "etf"
 #else
 #error "Unknown greybox provider."
 #endif
 #include "treedbs.h"
-#include "ltsman.h"
 #include "options.h"
 #include "vector_set.h"
+#include "struct_io.h"
 
-static treedbs_t dbs;
-static char *outputarch=NULL;
+
+static lts_enum_cb_t output_handle=NULL;
+static lts_output_t output=NULL;
+
+static treedbs_t dbs=NULL;
+static char *dir_name=NULL;
+static int write_state=0;
+static char *vec_name=NULL;
 static int plain=0;
 static int blackbox=0;
 static int greybox=0;
@@ -33,6 +47,7 @@ static int verbosity=1;
 static int write_lts=1;
 static int cache=0;
 static int use_vset=0;
+static int state_visible=0;
 static int use_vset_list=0;
 static int use_vset_tree=0;
 static int use_vset_fdd=0;
@@ -41,14 +56,23 @@ static int torx =0;
 struct option options[]={
 	{"",OPT_NORMAL,NULL,NULL,NULL,
 		"usage: " MODEL_TYPE "2lts-grey [options] <model>",NULL,NULL,NULL},
-	{"-out",OPT_REQ_ARG,assign_string,&outputarch,"-out <archive>",
-		"Specify the name of the output archive.",
+	{"-dir",OPT_REQ_ARG,assign_string,&dir_name,"-dir <archive>",
+		"Give a name of an output archive to be written in DIR format.",
 		"This will be a pattern archive if <archive> contains %s",
 		"and a GCF archive otherwise",NULL},
+	{"-out",OPT_REQ_ARG,assign_string,&dir_name,"-out <archive>",
+		"alias for -dir",NULL,NULL,NULL},
+	{"-state",OPT_NORMAL,set_int,&write_state,NULL,
+		"Add full state information to the DIR archive",NULL,NULL,NULL},
+	{"-vec",OPT_REQ_ARG,assign_string,&vec_name,"-vec <archive>",
+		"Give a name of an output archive to be written in vector format.",
+		NULL,NULL,NULL},
 	{"-v",OPT_NORMAL,inc_int,&verbosity,NULL,"increase the level of verbosity",NULL,NULL,NULL},
 	{"-q",OPT_NORMAL,log_suppress,&info,NULL,"be silent",NULL,NULL,NULL},
 	{"-help",OPT_NORMAL,usage,NULL,NULL,
 		"print this help message",NULL,NULL,NULL},
+	{"-io-help",OPT_NORMAL,usage,NULL,NULL,
+		"print help for io sub system",NULL,NULL,NULL},
 	{"-nolts",OPT_NORMAL,reset_int,&write_lts,NULL,
 		"disable writing of the LTS",NULL,NULL,NULL},
 	{"-plain",OPT_NORMAL,set_int,&plain,NULL,
@@ -64,6 +88,11 @@ struct option options[]={
 	        "Use vector sets with MDD nodes organized in a linked list",
 		"This option cannot be used in combination with -out",
 		NULL,NULL},
+	{"-version",OPT_NORMAL,print_version,NULL,NULL,"print the version",NULL,NULL,NULL},
+#ifdef MCRL
+	{"-mcrl-state",OPT_NORMAL,set_int,&state_visible,NULL,
+		"Make all state variables visible.",NULL,NULL,NULL},
+#endif
 	{"-vset-tree",OPT_NORMAL,set_int,&use_vset_tree,NULL,
 		"Use vector sets with MDD nodes organized in a tree",
 		"This option cannot be used in combination with -out",
@@ -80,7 +109,7 @@ struct option options[]={
 
 typedef struct torx_context_t {
 	model_t model;
-	lts_struct_t ltstype;
+	lts_type_t ltstype;
 } torx_struct_t;
 
 
@@ -88,27 +117,31 @@ static vdom_t domain;
 static vset_t visited_set;
 static vset_t next_set;
 
-static lts_t lts;
-
-static stream_t src_stream;
-static stream_t lbl_stream;
-static stream_t dst_stream;
 
 static int N;
 static int K;
+static int state_labels;
+static int edge_labels;
 static int visited=1;
 static int explored=0;
 static int trans=0;
 
-static void print_next(void*arg,int*lbl,int*dst){
-	int tmp=TreeFold(dbs,dst);
-	trans++;
-	if (write_lts){
-		DSwriteU32(src_stream,*((int*)arg));
-		DSwriteU32(lbl_stream,lbl[0]);
-		DSwriteU32(dst_stream,tmp);
+
+static void handle_next(void*arg,int*lbl,int*dst){
+	(void)arg;
+	if (use_vset) {
+		if (!vset_member(visited_set,dst)) {
+			visited++;
+			vset_add(visited_set,dst);
+			vset_add(next_set,dst);
+		if (write_lts) enum_seg_vec(output_handle,0,explored,dst,lbl);
+		}		
+	} else {
+		int tmp=TreeFold(dbs,dst);
+		if (tmp>=visited) visited=tmp+1;
+		if (write_lts) enum_seg_seg(output_handle,0,explored,0,tmp,lbl);
 	}
-	if (tmp>=visited) visited=tmp+1;
+	trans++;
 }
 
 static void *new_string_index(void* context){
@@ -117,31 +150,45 @@ static void *new_string_index(void* context){
 	return SIcreate();
 }
 
-static void set_next(void*arg,int*lbl,int*dst){
-	(void)arg;
-	(void)lbl;
-	trans++;
-	if (vset_member(visited_set,dst)) return;
-	visited++;
-	vset_add(visited_set,dst);
-	vset_add(next_set,dst);
-}
+/**
+\brief Explore one state.
 
-static void explore_elem(void*context,int*src){
+It is critical that the given state is the state whose number is explored.
+When called from vector set enumeration this condition is met
+because this is where the state number is defined and immediately forgotten.
+When called from an exploration that uses dbs, the caller has to guarantee this.
+ */
+static void explore_state(void*context,int*src){
 	model_t model=(model_t)context;
-	int c;
+	if (state_labels){
+		int labels[state_labels];
+		GBgetStateLabelsAll(model,src,labels);
+		if(write_lts){
+			if(dbs) {
+				enum_seg(output_handle,0,explored,labels);
+			} else {
+				enum_vec(output_handle,src,labels);
+			}
+		}
+	} else if (write_lts) {
+		if (dbs) {
+			enum_seg(output_handle,0,explored,NULL);
+		} else {
+			enum_vec(output_handle,src,NULL);
+		}
+	}
 	if(blackbox){
-		c=GBgetTransitionsAll(model,src,set_next,NULL);
+		GBgetTransitionsAll(model,src,handle_next,NULL);
 	} else {
 		for(int i=0;i<K;i++){
-			c=GBgetTransitionsLong(model,i,src,set_next,NULL);
+			GBgetTransitionsLong(model,i,src,handle_next,NULL);
 		}
 	}
 	explored++;
 	if(explored%1000==0) Warning(info,"explored %d visited %d trans %d",explored,visited,trans);
 }
 
-#if defined(NIPS)
+#if defined(NIPS) || defined(ETF)
 #include "aterm1.h"
 
 static void WarningHandler(const char *format, va_list args) {
@@ -170,7 +217,7 @@ static void torx_transition(void*arg,int*lbl,int*dst){
 	torx_struct_t *context=(torx_struct_t*)arg;
 
 	int tmp=TreeFold(dbs,dst);
-	chunk c=GBchunkGet(context->model,context->ltstype->edge_label_type[0],lbl[0]);
+	chunk c=GBchunkGet(context->model,lts_type_get_edge_label_typeno(context->ltstype,0),lbl[0]);
 	
 	int vis = 1;
 	if (c.len==3 && strncmp(c.data, "tau", c.len)==0)
@@ -240,8 +287,7 @@ static void torx_ui(torx_struct_t *context) {
 
 int main(int argc, char *argv[]){
 	void* stackbottom=&argv;
-	RTinit(argc,&argv);
-	take_vars(&argc,argv);
+	RTinit(&argc,&argv);
 #if defined(MCRL)
 	MCRLinitGreybox(argc,argv,stackbottom);
 #elif defined(MCRL2)
@@ -251,8 +297,26 @@ int main(int argc, char *argv[]){
 	ATsetWarningHandler(WarningHandler);
 	ATsetErrorHandler(ErrorHandler);
 	NIPSinitGreybox(argc,argv);
+#elif defined(ETF)
+ 	ATinit(argc, argv, (ATerm*) stackbottom);
+	ATsetWarningHandler(WarningHandler);
+	ATsetErrorHandler(ErrorHandler);
+	// ETF has no init!
 #endif
+	lts_io_init(&argc,argv);
 	parse_options(options,argc,argv);
+	char*outputarch=NULL;
+	if (write_lts) {
+		if (dir_name && vec_name) Fatal(1,error,"please select a single output file");
+		if (dir_name) {
+			outputarch=dir_name;
+			if (use_vset) Fatal(1,error,"cannot write DIR format when using vector sets");
+		} else if (vec_name) {
+			outputarch=vec_name;
+		} else {
+			Fatal(1,error,"please select an output mode");
+		}
+	}
 	if (torx) {
 		write_lts = 0;
 		use_vset = 0;
@@ -268,8 +332,6 @@ int main(int argc, char *argv[]){
 	default:
 		Fatal(1,error,"cannot use more than one vset implementation at once.");
 	}
-	if (write_lts && use_vset) Fatal(1,error,"writing in vector set mode is future work");
-
 	switch(blackbox+greybox){
 	case 0:
 		blackbox=1;
@@ -285,11 +347,13 @@ int main(int argc, char *argv[]){
 	GBsetChunkMethods(model,new_string_index,NULL,
 		(int2chunk_t)SIgetC,(chunk2int_t)SIputC,(get_count_t)SIgetCount);
 #if defined(MCRL)
-	MCRLloadGreyboxModel(model,argv[argc-1]);
+	MCRLloadGreyboxModel(model,argv[argc-1],(state_visible*STATE_VISIBLE));
 #elif defined(MCRL2)
 	MCRL2loadGreyboxModel(model,argv[argc-1]);
 #elif defined(NIPS)
 	NIPSloadGreyboxModel(model,argv[argc-1]);
+#elif defined(ETF)
+	ETFloadGreyboxModel(model,argv[argc-1]);
 #endif
 
 	if (verbosity >=2) {
@@ -299,8 +363,8 @@ int main(int argc, char *argv[]){
 
 	if (cache) model=GBaddCache(model);
 
-	lts_struct_t ltstype=GBgetLTStype(model);
-	N=ltstype->state_length;
+	lts_type_t ltstype=GBgetLTStype(model);
+	N=lts_type_get_state_length(ltstype);
 	edge_info_t e_info=GBgetEdgeInfo(model);
 	K=e_info->groups;
 	if (use_vset) {
@@ -313,25 +377,21 @@ int main(int argc, char *argv[]){
 		dbs=TreeDBScreate(N);
 	}
 	Warning(info,"length is %d, there are %d groups",N,K);
-	Warning(info,"Using %s mode",blackbox?"black box":"grey box");	
+	Warning(info,"Using %s mode",blackbox?"black box":"grey box");
+	state_info_t s_info=GBgetStateInfo(model);
+	state_labels=lts_type_get_state_label_count(ltstype);
+	edge_labels=lts_type_get_edge_label_count(ltstype);
+	Warning(info,"There are %d state labels and %d edge labels",state_labels,edge_labels);
 	int src[N];
 	GBgetInitialState(model,src);
 	Warning(info,"got initial state");
-	archive_t arch;
+	archive_t arch=NULL;
 	if (write_lts) {
-		if (strstr(outputarch,"%s")) {
-			arch=arch_fmt(outputarch,file_input,file_output,prop_get_U32("bs",65536));
-		} else {
-			uint32_t bs=prop_get_U32("bs",65536);
-			uint32_t bc=prop_get_U32("bc",128);
-			arch=arch_gcf_create(raf_unistd(outputarch),bs,bs*bc,0,1);
-		}
-	} else {
-		arch=NULL;
+		Warning(info,"opening %s",outputarch);
+		if (use_vset) Fatal(1,error,"output unsupported");
+		output=lts_output_open(outputarch,model,1,0,0,0);
+		output_handle=lts_output_enum(output);
 	}
-	lts=lts_new();
-	lts_set_root(lts,0,0);
-	lts_set_segments(lts,1);
 	if (use_vset) {
 		vset_add(visited_set,src);
 		vset_add(next_set,src);
@@ -345,11 +405,6 @@ int main(int argc, char *argv[]){
 		torx_ui(&context);
 		return 0;
 	}
-	if (write_lts){
-		src_stream=arch_write(arch,"src-0-0",plain?NULL:"diff32|gzip",1);
-		lbl_stream=arch_write(arch,"label-0-0",plain?NULL:"gzip",1);
-		dst_stream=arch_write(arch,"dest-0-0",plain?NULL:"diff32|gzip",1);
-	}
 	int level=0;
 	if (use_vset){
 		vset_t current_set=vset_create(domain,0,NULL);
@@ -359,7 +414,7 @@ int main(int argc, char *argv[]){
 			level++;
 			vset_copy(current_set,next_set);
 			vset_clear(next_set);
-			vset_enum(current_set,explore_elem,model);
+			vset_enum(current_set,explore_state,model);
 		}
 	} else {
 		int limit=0;
@@ -371,54 +426,22 @@ int main(int argc, char *argv[]){
 				level++;
 			}
 			TreeUnfold(dbs,explored,src);
-			int c;
-			if(blackbox){
-				c=GBgetTransitionsAll(model,src,print_next,&explored);
-			} else {
-				for(int i=0;i<K;i++){
-					c=GBgetTransitionsLong(model,i,src,print_next,&explored);
-				}
-			}
-			explored++;
-			if(explored%1000==0) Warning(info,"explored %d visited %d trans %d",explored,visited,trans);
+			explore_state(model,src);
 		}
 	}
 	if (write_lts){
 		Warning(info,"state space has %d levels %d states %d transitions",level,visited,trans);
 	} else {
-	  printf("state space has %d levels %d states %d transitions\n",level,visited,trans);
-	  if (use_vset) {
-	    long long size;
-	    long nodes;
-	    if (use_vset)
-	      vset_count(visited_set,&nodes,&size);
-	    else 
-	      vset_count_tree(visited_set,&nodes,&size);
-	    printf("(%lld states represented symbolically with %ld nodes)\n",size,nodes);
-	  }
+		printf("state space has %d levels %d states %d transitions\n",level,visited,trans);
+	}
+	if (use_vset) {
+		long long size;
+		long nodes;
+		vset_count(visited_set,&nodes,&size);
+	    	Warning(info,"%lld states represented symbolically with %ld nodes",size,nodes);
 	}
 	if (write_lts){
-		lts_set_states(lts,0,visited);
-		lts_set_trans(lts,0,0,trans);
-		stream_t ds;
-		ds=arch_write(arch,"TermDB",plain?NULL:"gzip",1);
-		int label_count=GBchunkCount(model,ltstype->edge_label_type[0]);
-		Warning(info,"%d action labels",label_count);
-		string_index_t si=lts_get_string_index(lts);
-		for(int i=0;i<label_count;i++){
-			chunk c=GBchunkGet(model,ltstype->edge_label_type[0],i);
-			SIputCAt(si,c.data,c.len,i);
-			DSwrite(ds,c.data,c.len);
-			DSwrite(ds,"\n",1);
-		}
-		DSclose(&ds);
-		ds=arch_write(arch,"info",plain?NULL:"",1);
-		lts_write_info(lts,ds,LTS_INFO_DIR);
-		DSclose(&ds);
-		DSclose(&src_stream);
-		DSclose(&lbl_stream);
-		DSclose(&dst_stream);
-		arch_close(&arch);
+		lts_output_close(&output);
 	}
 	return 0;
 }

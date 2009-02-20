@@ -34,25 +34,27 @@ int array_size(array_manager_t man){
 	return man->size;
 }
 
-static void fix_array(void**ar,int size,int e_size){
+static void fix_array(void**ar,int oldsize,int size,int e_size){
 	void*tmp;
 	tmp=realloc(*ar,size*e_size);
 	if (tmp) {
 		DEBUG(info,"%x -> %x",*ar,tmp);
 		*ar=tmp;
+		bzero(tmp+(oldsize*e_size),(size-oldsize)*e_size);
 	} else {
 		// size is never 0, so tmp==NULL is an error.
-		Fatal(1,error,"realloc to %d * %d failed",size,e_size);
+		Fatal(1,error,"realloc from %d to %d * %d failed",oldsize,size,e_size);
 	}
 }
 
 void add_array(array_manager_t man,void**ar,int e_size){
 	if(man->managed>=man->managed_size){
+		int old=man->managed_size;
 		man->managed_size+=MBLOCK;
 		struct array **ptr=&(man->arrays);
-		fix_array((void**)ptr,man->managed_size,sizeof(struct array));
+		fix_array((void**)ptr,old,man->managed_size,sizeof(struct array));
 	}
-	fix_array(ar,man->size,e_size);
+	fix_array(ar,0,man->size,e_size);
 	man->arrays[man->managed].e_size=e_size;
 	man->arrays[man->managed].ar=ar;
 	man->managed++;
@@ -60,13 +62,13 @@ void add_array(array_manager_t man,void**ar,int e_size){
 }
 
 void ensure_access(array_manager_t man,int index){
-	int i;
 	if (index < man->size) return;
-	i=((index+man->block)/man->block)*man->block;
-	DEBUG("resize from %d to %d",man->size,i);
-	man->size=i;
-	for(i=0;i<man->managed;i++){
-		fix_array(man->arrays[i].ar,man->size,man->arrays[i].e_size);
+	int old=man->size;
+	man->size=((index+man->block)/man->block)*man->block;
+	DEBUG("resize from %d to %d",old,man->size);
+	for(int i=0;i<man->managed;i++){
+		fix_array(man->arrays[i].ar,old,man->size,man->arrays[i].e_size);
 	}
 }
+
 
