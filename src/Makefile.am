@@ -2,7 +2,7 @@ bin_PROGRAMS = ltsmin-convert gcf etf-convert
 noinst_LIBRARIES = libutil.a
 
 if HAVE_MPI
-bin_PROGRAMS += ltsmin-mpi mpi-event-test
+bin_PROGRAMS += ltsmin-mpi mpi-event-test etf2lts-mpi
 noinst_LIBRARIES += libmpi.a
 if HAVE_LIBMCRL
 bin_PROGRAMS += lpo2lts-mpi
@@ -114,6 +114,12 @@ nips2lts_mpi_SOURCES  = spec2lts-mpi.c nips-greybox.c nips-greybox.h config.h
 nips2lts_mpi_LDADD    = libmpi.a libutil.a $(NIPS_LIBS) $(CADP_LIBS)
 nips2lts_mpi_CPPFLAGS = -DNIPS $(NIPS_CPPFLAGS) $(MCRL_CPPFLAGS) $(AM_CPPFLAGS)
 nips2lts_mpi_LDFLAGS  = $(NIPS_LDFLAGS) $(AM_LDFLAGS) $(CADP_LDFLAGS)
+
+# etf2lts-mpi
+etf2lts_mpi_SOURCES  = spec2lts-mpi.c etf-greybox.c etf-greybox.h config.h lts.c lts.h 
+etf2lts_mpi_LDADD    = libmpi.a libutil.a $(CADP_LIBS)
+etf2lts_mpi_CPPFLAGS = -DETF $(MCRL_CPPFLAGS) $(AM_CPPFLAGS)
+etf2lts_mpi_LDFLAGS  = $(AM_LDFLAGS) $(CADP_LDFLAGS)
 
 # mpi-event-test
 mpi_event_test_SOURCES = mpi-event-test.c config.h

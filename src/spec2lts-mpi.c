@@ -19,6 +19,9 @@
 #elif defined(NIPS)
 #include "nips-greybox.h"
 #define MODEL_TYPE "nips"
+#elif defined(ETF)
+#include "etf-greybox.h"
+#define MODEL_TYPE "etf"
 #else
 #error "Unknown greybox provider."
 #endif
@@ -437,6 +440,8 @@ int main(int argc, char*argv[]){
 #elif defined(NIPS)
         (void)bottom;
 	NIPSinitGreybox(argc,argv);
+#elif defined(ETF)
+	// No init needed
 #endif
 	Warning(info,"creating model for %s",argv[argc-1]);
 	model_t model=GBcreateBase();
@@ -448,6 +453,8 @@ int main(int argc, char*argv[]){
 	MCRL2loadGreyboxModel(model,argv[argc-1]);
 #elif defined(NIPS)
 	NIPSloadGreyboxModel(model,argv[argc-1]);
+#elif defined(ETF)
+	ETFloadGreyboxModel(model,argv[argc-1]);
 #endif
 	if (cache) model=GBaddCache(model);
 	event_barrier_wait(barrier);

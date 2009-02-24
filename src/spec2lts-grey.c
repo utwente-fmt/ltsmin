@@ -189,6 +189,7 @@ static void explore_state(void*context,int*src){
 }
 
 #if defined(NIPS) || defined(ETF)
+// This code belongs to ATermDD.
 #include "aterm1.h"
 
 static void WarningHandler(const char *format, va_list args) {
