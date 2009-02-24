@@ -15,11 +15,6 @@
 
 #include <inttypes.h>
 
-
-static int plain=0;
-static int decode=0;
-static int blocksize=32768;
-static int blockcount=32;
 static int segments=0;
 
 struct option options[]={
@@ -39,8 +34,6 @@ struct option options[]={
 		"print help for io sub system",NULL,NULL,NULL},
 	{0,0,0,0,0,0,0,0,0}
 };
-
-static char* plain_code;
 
 /*
 copied from spec2lts-grey.c
@@ -78,9 +71,13 @@ int main(int argc, char *argv[]){
 	if (segments==0) {
 		segments=lts_input_segments(input);
 	}
-	lts_output_t output=lts_output_open(argv[2],model,segments,segments,segments,segments);
 	if (segments==lts_input_segments(input)){
-		lts_input_enum(input,1,1,lts_output_enum(output));
+		lts_output_t output=lts_output_open_root(argv[2],model,segments,0,1,
+			lts_root_segment(input),lts_root_offset(input));
+		lts_enum_cb_t ecb=lts_output_begin(output,segments,segments,segments);
+		lts_input_enum(input,segments,segments,segments,ecb);
+		lts_output_end(output,ecb);
+		lts_output_close(&output);
 	} else {
 		int N=lts_input_segments(input);
 		uint64_t offset[N+1];
@@ -90,12 +87,14 @@ int main(int argc, char *argv[]){
 		for(int i=1;i<N;i++){
 			offset[i+1]=offset[i]+count->state[i-1];
 		}
-		lts_enum_cb_t ecb=lts_output_enum(output);
-		ecb=lts_enum_convert(ecb,offset,convert_div_mod,copy_seg_ofs,1);
-		lts_input_enum(input,1,1,ecb);
+		uint64_t root=offset[lts_root_segment(input)+1]+lts_root_offset(input);
+		lts_output_t output=lts_output_open_root(argv[2],model,segments,0,1,root%segments,root/segments);
+		lts_enum_cb_t ecb=lts_output_begin(output,segments,segments,segments);
+		lts_input_enum(input,N,N,N,lts_enum_convert(ecb,offset,convert_div_mod,copy_seg_ofs,1));
+		lts_output_end(output,ecb);
+		lts_output_close(&output);
 	}
 	lts_input_close(&input);
-	lts_output_close(&output);
 	return 0;
 
 /*	archive_t ar_in,ar_out;

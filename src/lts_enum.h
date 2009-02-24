@@ -50,6 +50,9 @@ meaning that every state has to be converted to a vector and (if necessary) back
 extern lts_enum_cb_t lts_enum_convert(lts_enum_cb_t base,void*context,state_fold_t fold,state_unfold_t unfold,int idx_convert);
 
 
+extern void* enum_get_context(lts_enum_cb_t e);
+
+
 extern void enum_vec(lts_enum_cb_t sink,int* state,int* labels);
 extern void enum_seg(lts_enum_cb_t sink,int seg,int ofs,int* labels);
 extern void enum_vec_vec(lts_enum_cb_t sink,int* src,int* dst,int*labels);

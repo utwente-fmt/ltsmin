@@ -15,7 +15,7 @@ static lts_type_t ltstype;
 static struct edge_info e_info;
 static struct state_info s_info = { 0, NULL, NULL };
 
-int ILABEL_TAU  = -1;
+int ILABEL_TAU  = 0;
 
 static t_pid        NIPSgroupPID (int, nipsvm_state_t *);
 
@@ -507,7 +507,9 @@ NIPSloadGreyboxModel (model_t m, char *filename)
 	lts_type_set_edge_label_type(ltstype,0,"label");
 
     GBsetLTStype (m, ltstype);
-    GBchunkPut(m, 3, chunk_str("dummy")); /* XXX */
+    if(GBchunkPut(m, 3, chunk_str("tau"))){
+        Fatal(1,error,"index of tau should be 0");
+    }
 
     struct part_context_s part_ctx;
     int                 ivec[Cpart_ctx.count];

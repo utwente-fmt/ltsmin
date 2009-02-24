@@ -24,7 +24,6 @@ struct grey_box_model {
 	chunk2int_t chunk2int;
 	get_count_t get_count;
 	void** map;
-	array_manager_t map_manager;
 };
 
 struct nested_cb {
@@ -167,8 +166,6 @@ model_t GBcreateBase(){
 	model->chunk2int=NULL;
 	model->map=NULL;
 	model->get_count=NULL;
-	model->map_manager=create_manager(8);
-	ADD_ARRAY(model->map_manager,model->map,void*);
 	return model;
 }
 
@@ -299,6 +296,11 @@ void GBsetContext(model_t model,void* context){
 void GBsetLTStype(model_t model,lts_type_t info){
 	if (model->ltstype != NULL)  Fatal(1,error,"ltstype already set");
 	model->ltstype=info;
+	int N=lts_type_get_type_count(info);
+	model->map=RTmalloc(N*sizeof(void*));
+	for(int i=0;i<N;i++){
+		model->map[i]=model->newmap(model->newmap_context);
+	}
 }
 
 lts_type_t GBgetLTStype(model_t model){
@@ -399,16 +401,10 @@ void GBsetChunkMethods(model_t model,newmap_t newmap,void*newmap_context,
 }
 
 int GBchunkPut(model_t model,int type_no,chunk c){
-	if (model->map[type_no]==NULL){
-		model->map[type_no]=model->newmap(model->newmap_context);
-	}
 	return model->chunk2int(model->map[type_no],c.data,c.len);
 }
 
 chunk GBchunkGet(model_t model,int type_no,int chunk_no){
-	if (model->map[type_no]==NULL){
-		model->map[type_no]=model->newmap(model->newmap_context);
-	}
 	chunk_len len;
 	int tmp;
 	char* data=(char*)model->int2chunk(model->map[type_no],chunk_no,&tmp);
@@ -417,9 +413,6 @@ chunk GBchunkGet(model_t model,int type_no,int chunk_no){
 }
 
 int GBchunkCount(model_t model,int type_no){
-	if (model->map[type_no]==NULL){
-		model->map[type_no]=model->newmap(model->newmap_context);
-	}
 	return model->get_count(model->map[type_no]);
 }
 

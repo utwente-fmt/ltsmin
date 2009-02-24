@@ -136,7 +136,7 @@ libmpi_a_SOURCES = mpi_io_stream.c mpi_core.c mpi_raf.c mpi_ram_raf.c	\
 		   mpi-event-loop.c mpi-event-loop.h mpi-runtime.c \
                    mpi-runtime.h
 
-libutil_a_SOURCES = unix.c runtime.c stream.c archive.c			\
+libutil_a_SOURCES := unix.c runtime.c stream.c archive.c			\
                     stream_buffer.c fast_hash.c generichash4.c		\
                     generichash8.c treedbs.c archive_format.c raf.c	\
                     stream_mem.c ghf.c archive_gcf.c scctimer.c		\
@@ -151,10 +151,18 @@ libutil_a_SOURCES = unix.c runtime.c stream.c archive.c			\
                     dynamic-array.c dynamic-array.h struct_io.c		\
                     struct_io.h etf-util.c etf-util.h lts-type.c	\
                     lts-type.h vset_buddy.c vector_set.c vector_set.h	\
-                    vdom_object.h lts_io.c lts_io.h \
-                    lts_enum.c lts_enum.h lts_count.c lts_count.h 
+                    vdom_object.h lts_io.c lts_io.h lts_io_internal.h \
+                    lts_enum.c lts_enum.h lts_count.c lts_count.h \
+                    archive_io_ops.c
 
-libutil_a_CPPFLAGS = $(BUDDY_CPPFLAGS) $(CADP_CPPFLAGS)
+libutil_a_CPPFLAGS := $(BUDDY_CPPFLAGS)
+
+
+if HAVE_LIBBCG
+libutil_a_SOURCES += bcg_io_ops.c
+libutil_a_CPPFLAGS  += $(CADP_CPPFLAGS)
+endif
+
 
 options.c: git_version.h
 

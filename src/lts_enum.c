@@ -16,6 +16,9 @@ struct lts_enum_struct{
 	int force;
 };
 
+void* enum_get_context(lts_enum_cb_t e){
+	return e->cb_context;
+}
 
 void enum_vec(lts_enum_cb_t sink,int* state,int* labels){
 	sink->vec_cb(sink->cb_context,state,labels);

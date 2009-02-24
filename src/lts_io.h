@@ -29,34 +29,25 @@ typedef struct lts_output_struct *lts_output_t;
 
 /**
 \brief Create a handle for output to an archive.
-
-
-\param outputname The name of the output file or directory.
-\param model A grey box model, which is used to get static
-information like state vector length, names of labels, etc.
-The model is also used to access the chunk tables, which are
-needed for writing the LTS.
-\param segment_count The number of segments of the output file.
-\param state_segment If less than then the segment count, this is
-the number of the segment, whose state information will be written
-through this output object. If equal to segment count then all
-state information will be written through this object.
-\param src_segment Select the source segment(s) of edges to be written.
-\param dst_segment Select the destination segment(s) of edges to be written.
  */
-extern lts_output_t lts_output_open(
-	char *outputname,
-	model_t model,
-	int segment_count,
-	int state_segment,
-	int src_segment,
-	int dst_segment
-);
+extern lts_output_t lts_output_open(char *outputname,model_t model,int segment_count,int share,int share_count);
+
+/**
+\brief Create a handle for output to an archive with explicit root state.
+ */
+extern lts_output_t lts_output_open_root(char *outputname,model_t model,int segment_count,int share,int share_count,
+		uint32_t root_seg,uint64_t root_ofs);
 
 /**
 \brief Get an enumeration consumer for an output.
  */
-extern lts_enum_cb_t lts_output_enum(lts_output_t out);
+extern lts_enum_cb_t lts_output_begin(lts_output_t out,int which_state,int which_src,int which_dst);
+
+/**
+\brief Close and destroy output handle.
+ */
+extern void lts_output_end(lts_output_t out,lts_enum_cb_t e);
+
 
 /**
 \brief Provide access to the state/transition counters.
@@ -91,6 +82,16 @@ extern lts_input_t lts_input_open(char*inputname,model_t model,int share,int sha
 extern int lts_input_segments(lts_input_t input);
 
 /**
+\brief Get root segment.
+ */
+extern uint32_t lts_root_segment(lts_input_t input);
+
+/**
+\brief Get root segment.
+ */
+extern uint64_t lts_root_offset(lts_input_t input);
+
+/**
 \brief Provide access to the state/transition counters.
  */
 extern lts_count_t *lts_input_count(lts_input_t in);
@@ -103,7 +104,7 @@ extern lts_count_t *lts_input_count(lts_input_t in);
 \param edges If zero then edges are not enumerated otherwise they are.
 \param output Delivery point.
  */
-extern void lts_input_enum(lts_input_t input,int states,int edges,lts_enum_cb_t output);
+extern void lts_input_enum(lts_input_t input,int which_state,int which_src,int which_dst,lts_enum_cb_t output);
 
 /**
 \brief Destroy an input object.

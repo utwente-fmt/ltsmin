@@ -119,6 +119,7 @@ void* mpi_newmap(void*newmap_context){
 	index->recv_buf=RTmalloc(pool->max_chunk);
 	event_Irecv(index->pool->queue,index->recv_buf,index->pool->max_chunk,MPI_CHAR,
 		MPI_ANY_SOURCE,index->tag,index->pool->comm,mpi_index_handler,index);
+	Warning(info,"%d: new index tag %d owned by %d",index->pool->me,index->tag,index->owner);
 	return index;
 }
 
@@ -470,11 +471,13 @@ int main(int argc, char*argv[]){
 	if (mpi_me==0){
 		if (write_lts && !outputarch) Fatal(1,error,"please specify the output archive with -out");
 	}
-	MPI_Barrier(MPI_COMM_WORLD);
+	//MPI_Barrier(MPI_COMM_WORLD);
+	event_barrier_wait(barrier);
 	if (write_lts){
 		Warning(info,"opening %s",outputarch);
-		output=lts_output_open(outputarch,model,mpi_nodes,mpi_me,mpi_nodes,mpi_me);
-		output_handle=lts_output_enum(output);
+		output=lts_output_open(outputarch,model,mpi_nodes,mpi_me,mpi_nodes);
+		output_handle=lts_output_begin(output,mpi_me,mpi_nodes,mpi_me);
+		// write states belonging to me and edge from any source to me.
 	}
 	/***************************************************/
 	size=lts_type_get_state_length(ltstype);
@@ -553,30 +556,31 @@ int main(int argc, char*argv[]){
 	/* State space was succesfully generated. */
 	if (verbosity>1) Warning(info,"My share is %lld states and %lld transitions",explored,transitions);
 	event_barrier_wait(barrier);
-	if (mpi_me==0) Warning(info,"collecting LTS info");
-	int temp[mpi_nodes*mpi_nodes];
-	MPI_Gather(&explored,1,MPI_INT,temp,1,MPI_INT,0,MPI_COMM_WORLD);
-	if (mpi_me==0){
-		lts_count_t *count=lts_output_count(output);
-		for(int i=0;i<mpi_nodes;i++){
-			//Warning(info,"state count of %d is %d",i,temp[i]);
-			count->state[i]=temp[i];
-		}
-	}
-	//for(int i=0;i<mpi_nodes;i++){
-	//	Warning(info,"in from %d is %d",i,tcount[i]);
-	//}
-	MPI_Gather(tcount,mpi_nodes,MPI_INT,temp,mpi_nodes,MPI_INT,0,MPI_COMM_WORLD);
-	if (mpi_me==0){
-		lts_count_t *count=lts_output_count(output);
-		for(int i=0;i<mpi_nodes;i++){
-			for(int j=0;j<mpi_nodes;j++){
-				//Warning(info,"transition count %d to %d is %d",i,j,temp[i+mpi_nodes*j]);
-				count->cross[i][j]=temp[i+mpi_nodes*j];
+	if(write_lts){
+		if (mpi_me==0) Warning(info,"collecting LTS info");
+		int temp[mpi_nodes*mpi_nodes];
+		MPI_Gather(&explored,1,MPI_INT,temp,1,MPI_INT,0,MPI_COMM_WORLD);
+		if (mpi_me==0){
+			lts_count_t *count=lts_output_count(output);
+			for(int i=0;i<mpi_nodes;i++){
+				Warning(info,"state count of %d is %d",i,temp[i]);
+				count->state[i]=temp[i];
 			}
 		}
-	}
-	if (write_lts) {
+		//for(int i=0;i<mpi_nodes;i++){
+		//	Warning(info,"in from %d is %d",i,tcount[i]);
+		//}
+		MPI_Gather(tcount,mpi_nodes,MPI_INT,temp,mpi_nodes,MPI_INT,0,MPI_COMM_WORLD);
+		if (mpi_me==0){
+			lts_count_t *count=lts_output_count(output);
+			for(int i=0;i<mpi_nodes;i++){
+				for(int j=0;j<mpi_nodes;j++){
+					Warning(info,"transition count %d to %d is %d",i,j,temp[i+mpi_nodes*j]);
+					count->cross[i][j]=temp[i+mpi_nodes*j];
+				}
+			}
+		}
+		lts_output_end(output,output_handle);
 		lts_output_close(&output);
 	}
 	//char dir[16];

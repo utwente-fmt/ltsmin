@@ -389,8 +389,10 @@ int main(int argc, char *argv[]){
 	if (write_lts) {
 		Warning(info,"opening %s",outputarch);
 		if (use_vset) Fatal(1,error,"output unsupported");
-		output=lts_output_open(outputarch,model,1,0,0,0);
-		output_handle=lts_output_enum(output);
+		output=lts_output_open(outputarch,model,1,0,1);
+		Warning(info,"opened");
+		output_handle=lts_output_begin(output,0,0,0);
+		Warning(info,"ready for writing");
 	}
 	if (use_vset) {
 		vset_add(visited_set,src);
@@ -441,6 +443,7 @@ int main(int argc, char *argv[]){
 	    	Warning(info,"%lld states represented symbolically with %ld nodes",size,nodes);
 	}
 	if (write_lts){
+		lts_output_end(output,output_handle);
 		lts_output_close(&output);
 	}
 	return 0;
