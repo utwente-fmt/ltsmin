@@ -15,7 +15,7 @@ static lts_type_t ltstype;
 static struct edge_info e_info;
 static struct state_info s_info = { 0, NULL, NULL };
 
-int ILABEL_TAU  = 0;
+int ILABEL_TAU  = -1;
 
 static t_pid        NIPSgroupPID (int, nipsvm_state_t *);
 
@@ -487,29 +487,28 @@ NIPSloadGreyboxModel (model_t m, char *filename)
     state_parts (initial, Cpart_glob_callback, Cpart_proc_callback,
                  Cpart_chan_callback, &Cpart_ctx);
 
-	ltstype=lts_type_create();
-	if (lts_type_add_type(ltstype,"globals",NULL)!=0) {
-		Fatal(1,error,"wrong type number");
-	}
-	if (lts_type_add_type(ltstype,"process",NULL)!=1) {
-		Fatal(1,error,"wrong type number");
-	}
-	if (lts_type_add_type(ltstype,"channel",NULL)!=2) {
-		Fatal(1,error,"wrong type number");
-	}
-	if (lts_type_add_type(ltstype,"label",NULL)!=3) {
-		Fatal(1,error,"wrong type number");
-	}
-	int state_length=Cpart_ctx.count;
-	lts_type_set_state_length(ltstype,state_length);
-	lts_type_set_edge_label_count(ltstype,1);
-	lts_type_set_edge_label_name(ltstype,0,"label");
-	lts_type_set_edge_label_type(ltstype,0,"label");
+    ltstype=lts_type_create();
+    if (lts_type_add_type(ltstype,"globals",NULL) != 0) {
+        Fatal(1,error,"wrong type number");
+    }
+    if (lts_type_add_type(ltstype,"process",NULL) != 1) {
+        Fatal(1,error,"wrong type number");
+    }
+    if (lts_type_add_type(ltstype,"channel",NULL) != 2) {
+        Fatal(1,error,"wrong type number");
+    }
+    int label_type;
+    if ((label_type = lts_type_add_type (ltstype,"label",NULL)) != 3) {
+        Fatal(1,error,"wrong type number");
+    }
+    int state_length=Cpart_ctx.count;
+    lts_type_set_state_length(ltstype,state_length);
+    lts_type_set_edge_label_count(ltstype,1);
+    lts_type_set_edge_label_name(ltstype,0,"label");
+    lts_type_set_edge_label_type(ltstype,0,"label");
 
     GBsetLTStype (m, ltstype);
-    if(GBchunkPut(m, 3, chunk_str("tau"))){
-        Fatal(1,error,"index of tau should be 0");
-    }
+    ILABEL_TAU = GBchunkPut(m, label_type, chunk_str("tau"));
 
     struct part_context_s part_ctx;
     int                 ivec[Cpart_ctx.count];
