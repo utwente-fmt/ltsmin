@@ -1,5 +1,6 @@
 *.o
 *.a
+*.hi
 .depend
 .depend.bak
 .deps/
@@ -7,6 +8,7 @@ amconfig.h
 etf-convert
 etf-reach
 etf2lts-grey
+etf2lts-mpi
 ltsmin-convert
 ltsmin-mpi
 stamp-h1

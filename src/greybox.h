@@ -22,7 +22,7 @@ typedef struct grey_box_model* model_t;
 /**
 \brief Edge group information. 
 
-For each grey box model, a number of groups must be determined and
+For each grey box model, the number of groups must be determined and
 for each of those groups the influenced variables must be given.
 */
 typedef struct edge_info {
@@ -35,8 +35,8 @@ typedef struct edge_info {
 /**
 \brief State label information. 
 
-For each grey box model, anumber of groups must be determined and
-for each of those groups the influenced variables must de given.
+For each grey box model, the number of state labels must be determined and
+for each of those labels the influenced variables must be given.
 */
 typedef struct state_info {
 	int   labels;  ///< The number of defined state labels.
