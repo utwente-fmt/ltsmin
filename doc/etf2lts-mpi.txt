@@ -1,0 +1,29 @@
+//                           -*- mode: doc; outline-regexp: "==\(=*\) ." -*-
+etf2lts-mpi(1)
+==============
+:Author:  Stefan Blom
+:Email:   <sccblom@cs.utwente.nl>
+:Date:    2009-03-16
+
+== NAME
+
+etf2lts-mpi - Distributed state space generator for ETF models.
+
+== SYNOPSIS
+
+mpirun _<nodespec>_ *etf2lts-mpi* [OPTION]... 'input.etf' ['output.fmt']
+
+== DESCRIPTION
+
+etf2lts-mpi generates a labelled transition system from a
+specification provided in 'input.etf'.  Specifications are in
+linkman:etf[5] format.  'output.fmt' specifies the name of the output
+archive.  The desired format is deduced from the filename extension.
+
+include::inc/mpi-blurb.txt[]
+
+== OPTIONS
+
+include::inc/spec2lts-mpi-options.txt[]
+
+include::inc/spec2lts-mpi.txt[]

@@ -1,6 +1,7 @@
 #ifndef LTS_IO_H
 #define LTS_IO_H
 
+#include <popt.h>
 #include <stdint.h>
 #include <amconfig.h>
 #include <archive.h>
@@ -20,10 +21,8 @@
 /*@{*/
 
 /**
-\brief Initialize the LTS IO library.
  */
-extern void lts_io_init(int *argcp,char*argv[]);
-
+extern struct poptOption lts_io_options[];
 
 typedef struct lts_output_struct *lts_output_t;
 

@@ -3,10 +3,25 @@ nips-reach(1)
 ===========
 :Author:  Stefan Blom
 :Email:   <sccblom@cs.utwente.nl>
-:Date:    2008-12-03
+:Date:    2009-03-16
 
 == NAME
+
 nips-reach - Symbolic reachability analysis for NIPS models.
 
-include::spec-reach.txt[]
+== SYNOPSIS
+
+*nips-reach* [OPTION]... 'input.b' ['output.etf']
+
+== DESCRIPTION
+
+nips-reach performs a reachability analysis on a specification
+provided in 'input.b'.  'output.etf' specifies the name of the output
+archive, written in linkman:etf[5] format.
+
+== OPTIONS
+
+include::inc/spec-reach-options.txt[]
+
+include::inc/spec-reach.txt[]
 

@@ -1,0 +1,9 @@
+=== Greybox Options
+
+*-c*, *--cache*::
+    Enable caching of greybox calls.
++
+If this option is used, the state space generator makes calls to the
+short version of the greybox next-state function and memoizes the
+results. If the next-state function is expensive this will yield
+substantial speedups.

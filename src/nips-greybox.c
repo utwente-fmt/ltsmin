@@ -8,6 +8,30 @@
 #include <nips-vm/bytecode.h>
 #include <nips-vm/state_parts.h>
 
+static void nips_popt(poptContext con,
+ 		enum poptCallbackReason reason,
+                            const struct poptOption * opt,
+                             const char * arg, void * data){
+	(void)con;(void)opt;(void)arg;(void)data;
+	switch(reason){
+	case POPT_CALLBACK_REASON_PRE:
+		break;
+	case POPT_CALLBACK_REASON_POST: {
+		nipsvm_module_init ();
+		GBregisterLoader("b",NIPSloadGreyboxModel);
+		Warning(info,"NIPS language module initialized");
+		return;
+	}
+	case POPT_CALLBACK_REASON_OPTION:
+		break;
+	}
+	Fatal(1,error,"unexpected call to nips_popt");
+}
+struct poptOption nips_options[]= {
+	{ NULL, 0 , POPT_ARG_CALLBACK|POPT_CBFLAG_POST|POPT_CBFLAG_SKIPOPTION , nips_popt , 0 , NULL ,NULL},
+	POPT_TABLEEND
+};
+
 static const size_t MAX_INITIAL_STATE_COUNT = 10000;
 static const size_t MAX_NIPSVM_STATE_SIZE   = 65536;
 
@@ -459,7 +483,7 @@ NIPSfindInitializedState (nipsvm_bytecode_t *bytecode, size_t nmax_states)
 }
 
 void
-NIPSloadGreyboxModel (model_t m, char *filename)
+NIPSloadGreyboxModel (model_t m, const char *filename)
 {
     st_bytecode        *bytecode;
     nipsvm_t           *vm = RTmalloc (sizeof *vm);

@@ -74,6 +74,7 @@ DX_INIT_DOXYGEN([$PACKAGE_NAME])
 AC_CACHE_SAVE
 
 # Checks for libraries.
+AC_CHECK_LIB([popt],[poptGetContext],,[AC_MSG_FAILURE([popt not found.])])
 AC_CHECK_LIB([z], [inflateEnd],,
   [AC_MSG_FAILURE([zlib not found.])])
 if test "x$acx_mcrl" = xyes; then
@@ -111,6 +112,7 @@ ACX_CADP_BCG_WRITE([have_bcg=yes],
 AC_HEADER_DIRENT
 AC_HEADER_STDC
 AC_CHECK_HEADERS([fcntl.h limits.h stdint.h stdlib.h string.h strings.h unistd.h])
+AC_CHECK_HEADER([popt.h],[], [AC_MSG_FAILURE([popt.h not found.])])
 AC_CACHE_SAVE
 
 # Checks for typedefs, structures, and compiler characteristics.
@@ -133,7 +135,10 @@ AC_FUNC_MALLOC
 AC_FUNC_REALLOC
 AC_FUNC_STRERROR_R
 AC_FUNC_VPRINTF
-AC_CHECK_FUNCS([atexit bzero ftruncate strchr strdup strndup strstr strtol])
+AC_CHECK_FUNCS([atexit bzero ftruncate strdup strndup strchr strstr strtol])
+AC_CHECK_DECLS([strdup, strndup, strchr, strstr],,,[
+#include "src/config.h"
+AC_INCLUDES_DEFAULT])
 
 AM_CONDITIONAL([HAVE_MPI], [test x"$have_mpi" != "x"])
 AM_CONDITIONAL([HAVE_LIBMCRL], [test x"$acx_mcrl" = xyes])

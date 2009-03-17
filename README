@@ -61,6 +61,15 @@ building, to enable more optimizations and force a 64-bit build (for
 the GCC C compiler).  Furthermore, the MPI compiler wrapper is set
 explicitly instead of searching it in the current shell PATH.
 
+Note that for libraries installed in non-standard places need special
+attention: to be picked up by the configure script, library and header
+search paths must be added, e.g.:
+
+    ./configure LDFLAGS=-L/opt/local/lib CPPFLAGS=-I/opt/local/include
+
+Additional setting of (DY)LD_LIBRARY_PATH might be needed for the
+dynamic linker/loader (see, e.g., "man ld.so" or "man dyld").
+
 See `./configure --help' for the list of available variables,
 and file INSTALL for further details.
 
@@ -78,6 +87,10 @@ The following additional make targets are supported:
 * Build Dependencies
 We list the external libraries and tools which are required to build
 this software.
+
+*** popt
+Download popt (>= 1.7) from <http://rpm5.org/files/popt/>.  We tested
+with popt 1.14.
 
 *** zlib
 Download zlib from <http://www.zlib.net/>.

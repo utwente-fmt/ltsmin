@@ -52,76 +52,61 @@ static void archive_copy(archive_t src,char*decode,archive_t dst,char*encode,int
 
 /********************************************************************************/
 
-
 static char* code="gzip";
 static int blocksize=32768;
 static int blockcount=32;
 static int extract=0;
 
-struct option options[]={
-	{"",OPT_NORMAL,NULL,NULL,NULL,
-		"usage: gcf <gcf> [file1 [file2 [...]]]",
-		"       gcf <gcf> directory",
-		"       gcf -x <gcf> <outputspec>",
-		"The first form builds a GCF with the given files."},
-	{"",OPT_NORMAL,NULL,NULL,NULL,
-		"The second form builds a GCF with the files in the directory.",
-		"The third form extracts the files in the GCF:",
-		" * to a directory if <outputspec> is a directory",
-		" * to a pattern if <outputspec> contains %s"},
-	{"",OPT_NORMAL,NULL,NULL,NULL,
-		"other options:",NULL,NULL,NULL},
-	{"-q",OPT_NORMAL,log_suppress,&info,"-q",
-		"do not print info messages",NULL,NULL,NULL},
-	{"-z",OPT_REQ_ARG,assign_string,&code,"-z <compression>",
-		"The default compression is gzip",
-		"To disable compression use -z \"\"",
-		NULL,NULL},
-	{"-x",OPT_NORMAL,set_int,&extract,NULL,"enable extraction",NULL,NULL,NULL},
-	{"-help",OPT_NORMAL,usage,NULL,NULL,
-		"print this help message",NULL,NULL,NULL},
-	{"-bs",OPT_REQ_ARG,parse_int,&blocksize,"-bs <block size>",
-		"Set the block size to be used for copying streams.",
-		NULL,NULL,NULL},
-	{"-bc",OPT_REQ_ARG,parse_int,&blockcount,"-bc <block count>",
-		"Set the number of block in one GCF cluster.",
-		NULL,NULL,NULL},
-	{0,0,0,0,0,0,0,0,0}
+
+static  struct poptOption options[] = {
+	{ "extract",'x', POPT_ARG_VAL , &extract , 1 , "Extract files from an archive" , NULL },
+	{ "create",'c', POPT_ARG_VAL , &extract , 0 , "Create a new archive (default)" , NULL },
+	{ "block-size" , 0 , POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT , &blocksize , 0 , "The size of a block in bytes" , "<bytes>" },
+	{ "cluster-size" , 0 , POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT , &blockcount , 0 , "The number of block in a cluster" , "<blocks>"},
+	{ "compression",'z',POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT,
+		&code,0,"Set the compression used in the archive. To disable compression use none","<compression>"},
+	POPT_TABLEEND
 };
 
 int main(int argc, char *argv[]){
-	RTinit(&argc,&argv);
-	take_options(options,&argc,argv);
+	char*gcf_name;
 	archive_t gcf=NULL;
-
-	if (argc==1 || (extract && argc!=3)) {
-		printoptions(options);
-		exit(1);
-	}
+	RTinitPopt(&argc,&argv,options,1,-1,&gcf_name,NULL,"([-c] <gcf> (<dir>|<file>)*) | (-x <gcf> [<dir>|<pattern>])",
+		"Tool for creating and extracting GCF archives\n\nOptions");
+	if (!strcmp(code,"none")) code="";
 	if (extract) {
+		char *out_name=RTinitNextArg();
 		archive_t dir;
-		if (is_a_dir(argv[2])){
-			dir=arch_dir_open(argv[2],blocksize);
-		} else if (strstr(argv[2],"%s")) {
-			dir=arch_fmt(argv[2],file_input,file_output,blocksize);
+		if(out_name){
+			if(RTinitNextArg()){
+				Fatal(1,error,"extraction uses gcf -x <gcf> [<dir>|<pattern>]");
+			}
+			if (strstr(out_name,"%s")) {
+				dir=arch_fmt(out_name,file_input,file_output,blocksize);
+			} else {
+				dir=arch_dir_create(out_name,blocksize,DELETE_NONE);
+			}
 		} else {
-			Fatal(1,error,"%s is not a directory, nor does it contain %%s",argv[2]);
+			dir=arch_dir_open(".",blocksize);
 		}
-		gcf=arch_gcf_read(raf_unistd(argv[1]));
+		gcf=arch_gcf_read(raf_unistd(gcf_name));
 		archive_copy(gcf,"auto",dir,NULL,blocksize);
 		arch_close(&dir);
 		arch_close(&gcf);
 	} else {
-		gcf=arch_gcf_create(raf_unistd(argv[1]),blocksize,blocksize*blockcount,0,1);
-		if (argc==3 && is_a_dir(argv[2])){
-			archive_t dir=arch_dir_open(argv[2],blocksize);
-			archive_copy(dir,NULL,gcf,code,blocksize);
-			arch_close(&dir);
-		} else {
-			for(int i=2;i<argc;i++){
-				Warning(info,"copying %s",argv[i]);
-				stream_t is=file_input(argv[i]);
-				stream_t os=arch_write(gcf,argv[i],code,1);
+		gcf=arch_gcf_create(raf_unistd(gcf_name),blocksize,blocksize*blockcount,0,1);
+		for(;;){
+			char *input_name=RTinitNextArg();
+			if (!input_name) break;
+			if (is_a_dir(input_name)){
+				Warning(info,"copying contents of %s",input_name);
+				archive_t dir=arch_dir_open(argv[2],blocksize);
+				archive_copy(dir,NULL,gcf,code,blocksize);
+				arch_close(&dir);
+			} else {
+				Warning(info,"copying %s",input_name);
+				stream_t is=file_input(input_name);
+				stream_t os=arch_write(gcf,input_name,code,1);
 				char buf[blocksize];
 				for(;;){
 					int len=stream_read_max(is,buf,blocksize);

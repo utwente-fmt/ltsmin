@@ -10,24 +10,8 @@
 #include <lts_io.h>
 
 #include "fast_hash.h"
-#if defined(MCRL)
-#include "mcrl-greybox.h"
-#define MODEL_TYPE "lpo"
-#elif defined(MCRL2)
-#include "mcrl2-greybox.h"
-#define MODEL_TYPE "lps"
-#elif defined(NIPS)
-#include "nips-greybox.h"
-#define MODEL_TYPE "nips"
-#elif defined(ETF)
-#include "etf-greybox.h"
-#define MODEL_TYPE "etf"
-#else
-#error "Unknown greybox provider."
-#endif
 #include "treedbs.h"
 #include "stream.h"
-#include "options.h"
 #include <mpi-runtime.h>
 #include "archive.h"
 #include "mpi_io_stream.h"
@@ -174,62 +158,61 @@ int mpi_get_count(void*map){
 #define MAX_PARAMETERS 256
 #define MAX_TERM_LEN 5000
 
-static archive_t arch;
-static int verbosity=1;
-static char *outputarch=NULL;
-static int write_lts=1;
+static int write_lts;
 static int nice_value=0;
-static int plain=0;
 static int find_dlk=0;
 static treedbs_t dbs;
-static int cache=0;
-static int unix_io=0;
-static int mpi_io=0;
-static int state_visible=0;
 
 static event_queue_t mpi_queue;
 static event_barrier_t barrier;
 
+#if defined(MCRL)
+#include "mcrl-greybox.h"
+#endif
+#if defined(MCRL2)
+#include "mcrl2-greybox.h"
+#endif
+#if defined(NIPS)
+#include "nips-greybox.h"
+#endif
+#if defined(ETF)
+#include "etf-greybox.h"
+#endif
 
-struct option options[]={
-	{"",OPT_NORMAL,NULL,NULL,NULL,
-		"usage: mpirun <nodespec> " MODEL_TYPE "2lts-mpi [options] <model>",NULL,NULL,NULL},
-	{"-v",OPT_NORMAL,inc_int,&verbosity,NULL,"increase the level of verbosity",NULL,NULL,NULL},
-	{"-q",OPT_NORMAL,log_suppress,&info,NULL,"be silent",NULL,NULL,NULL},
-	{"-help",OPT_NORMAL,usage,NULL,NULL,
-		"print this help message",NULL,NULL,NULL},
-/* Deadlocks can be found, but traces cannot be printed yet.
+static  struct poptOption options[] = {
+	{ "nice" , 0 , POPT_ARG_INT , &nice_value , 0 , "Set the nice level of all workers."
+		" This is useful when running on other peoples workstations." , NULL},
+#if defined(MCRL)
+	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, mcrl_options , 0 , "mCRL options", NULL},
+#endif
+#if defined(MCRL2)
+	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, mcrl2_options , 0 , "mCRL2 options", NULL},
+#endif
+#if defined(NIPS)
+	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, nips_options , 0 , "NIPS options", NULL},
+#endif
+#if defined(ETF)
+	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, etf_options , 0 , "ETF options", NULL},
+#endif
+	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, greybox_options , 0 , "Greybox options", NULL },
+	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, lts_io_options , 0 , NULL, NULL},
+	POPT_TABLEEND
+};
+
+/*
+Deadlocks can be found, but traces cannot be printed yet.
 	{"-dlk",OPT_NORMAL,set_int,&find_dlk,NULL,
 		"If a deadlock is found, a trace to the deadlock will be",
 		"printed and the exploration will be aborted.",
 		"using this option implies -nolts",NULL},
-*/
-/*
+
 	{"-mpi-io",OPT_NORMAL,set_int,&mpi_io,NULL,
 		"use MPI-IO (default)",NULL,NULL,NULL},
-	{"-unix-io",OPT_NORMAL,set_int,&unix_io,NULL,
-		"use UNIX IO (e.g. if your NFS locking is broken)",NULL,NULL,NULL},
-*/
-	{"-out",OPT_REQ_ARG,assign_string,&outputarch,"-out <archive>",
-		"Specify the name of the output archive.",
-		"This will be a pattern archive if <archive> contains %s",
-		"and a GCF archive otherwise",NULL},
-	{"-cache",OPT_NORMAL,set_int,&cache,NULL,
-		"Add the caching wrapper around the model",NULL,NULL,NULL},
-	{"-nolts",OPT_NORMAL,reset_int,&write_lts,NULL,
-		"disable writing of the LTS",NULL,NULL,NULL},
 	{"-nice",OPT_REQ_ARG,parse_int,&nice_value,"-nice <val>",
 		"all workers will set nice to <val>",
 		"useful when running on other people's workstations",NULL,NULL},
-	{"-plain",OPT_NORMAL,set_int,&plain,NULL,
-		"disable compression of the output",NULL,NULL,NULL},
-#ifdef MCRL
-	{"-state",OPT_NORMAL,set_int,&state_visible,NULL,
-		"Make all state variables visible.",NULL,NULL,NULL},
-#endif
-	{"-version",OPT_NORMAL,print_version,NULL,NULL,"print the version",NULL,NULL,NULL},
-	{0,0,0,0,0,0,0,0,0}
-};
+
+*/
 
 static char who[24];
 static int mpi_nodes,mpi_me;
@@ -347,8 +330,6 @@ static void callback(void*context,int*labels,int*dst){
 }
 
 
-static char name[100];
-
 static array_manager_t state_man=NULL;
 static uint32_t *parent_ofs=NULL;
 static uint16_t *parent_seg=NULL;
@@ -395,30 +376,19 @@ static void io_trans_init(){
 	}
 }
 
-static int armed=0;
-
-static void abort_if_armed(){
-	if(armed) {
-		fprintf(stderr,"bad exit, aborting\n");
-		MPI_Abort(MPI_COMM_WORLD,1);
-	} else {
-	//	fprintf(stderr,"exit verified\n");
-	}
-}
-
 int main(int argc, char*argv[]){
 	long long int global_visited,global_explored,global_transitions;
-	void *bottom=(void*)&argc;
-
-	if (atexit(abort_if_armed)){
-		Fatal(1,error,"atexit failed");
-	}
-        RTinitMPI(&argc, &argv);
-	armed=1;
-	MPI_Errhandler_set(MPI_COMM_WORLD,MPI_ERRORS_ARE_FATAL);
+	char *files[2];
+#ifdef OMPI_MPI_H
+	char* mpirun="mpirun --mca btl <transport>,self [MPI OPTIONS] -np <workers>"; 
+#else
+	char* mpirun="mpirun [MPI OPTIONS] -np <workers>";
+#endif
+	RTinitPoptMPI(&argc, &argv, options,1,2,files,mpirun,"<model> [<lts>]",
+		"Perform a distributed enumerative reachability analysis of <model>\n\nOptions");
         MPI_Comm_size(MPI_COMM_WORLD, &mpi_nodes);
         MPI_Comm_rank(MPI_COMM_WORLD, &mpi_me);
-	sprintf(who,MODEL_TYPE "2lts-mpi(%2d)",mpi_me);
+	sprintf(who,"%s(%2d)",get_label(),mpi_me);
 	set_label(who);
 	mpi_queue=event_queue();
 	state_found_init();
@@ -428,35 +398,12 @@ int main(int argc, char*argv[]){
 	tcount=(int*)RTmalloc(mpi_nodes*sizeof(int));
 	bzero(tcount,mpi_nodes*sizeof(int));
 
-	if (mpi_me!=0) MPI_Barrier(MPI_COMM_WORLD);
-	lts_io_init(&argc,argv);
-	parse_options(options,argc,argv);
-	if (mpi_me==0) MPI_Barrier(MPI_COMM_WORLD);
-	Warning(info,"initializing grey box module");
-#if defined(MCRL)
-	MCRLinitGreybox(argc,argv,bottom);
-#elif defined(MCRL2)
-	MCRL2initGreybox(argc,argv,bottom);
-#elif defined(NIPS)
-        (void)bottom;
-	NIPSinitGreybox(argc,argv);
-#elif defined(ETF)
-	// No init needed
-#endif
-	Warning(info,"creating model for %s",argv[argc-1]);
 	model_t model=GBcreateBase();
 	GBsetChunkMethods(model,mpi_newmap,mpi_index_pool_create(MPI_COMM_WORLD,mpi_queue,MAX_TERM_LEN),
 		 mpi_int2chunk,mpi_chunk2int,mpi_get_count);
-#if defined(MCRL)
-	MCRLloadGreyboxModel(model,argv[argc-1],(state_visible*STATE_VISIBLE));
-#elif defined(MCRL2)
-	MCRL2loadGreyboxModel(model,argv[argc-1]);
-#elif defined(NIPS)
-	NIPSloadGreyboxModel(model,argv[argc-1]);
-#elif defined(ETF)
-	ETFloadGreyboxModel(model,argv[argc-1]);
-#endif
-	if (cache) model=GBaddCache(model);
+
+	GBloadFile(model,files[0],&model);
+
 	event_barrier_wait(barrier);
 	Warning(info,"model created");
 	lts_type_t ltstype=GBgetLTStype(model);
@@ -469,23 +416,24 @@ int main(int argc, char*argv[]){
 	}
 	/***************************************************/
 	if (find_dlk) {
-		write_lts=0;
 		state_man=create_manager(65536);
 		ADD_ARRAY(state_man,parent_ofs,uint32_t);
 		ADD_ARRAY(state_man,parent_seg,uint16_t);
 	}
 	/***************************************************/
-	if (mpi_me==0){
-		if (write_lts && !outputarch) Fatal(1,error,"please specify the output archive with -out");
-	}
-	//MPI_Barrier(MPI_COMM_WORLD);
 	event_barrier_wait(barrier);
-	if (write_lts){
-		Warning(info,"opening %s",outputarch);
-		output=lts_output_open(outputarch,model,mpi_nodes,mpi_me,mpi_nodes);
+	if (files[1]) {
+		Warning(info,"Writing output to %s",files[1]);
+		write_lts=1;
+		output=lts_output_open(files[1],model,mpi_nodes,mpi_me,mpi_nodes);
+		event_barrier_wait(barrier); // opening is sometimes a collaborative operation. (e.g. *.dir)
 		output_handle=lts_output_begin(output,mpi_me,mpi_nodes,mpi_me);
 		// write states belonging to me and edge from any source to me.
+	} else {
+		Warning(info,"No output, just counting the number of states");
+		write_lts=0;
 	}
+	event_barrier_wait(barrier);
 	/***************************************************/
 	size=lts_type_get_state_length(ltstype);
 	if (size<2) Fatal(1,error,"there must be at least 2 parameters");
@@ -516,7 +464,7 @@ int main(int argc, char*argv[]){
 		level++;
 		int lvl_scount=0;
 		int lvl_tcount=0;
-		if (mpi_me==0 || verbosity>1) Warning(info,"exploring level %d",level);
+		if (mpi_me==0 || RTverbosity>1) Warning(info,"exploring level %d",level);
 		event_barrier_wait(barrier);
 		while(explored<limit){
 			TreeUnfold(dbs,explored,src);
@@ -538,12 +486,12 @@ int main(int argc, char*argv[]){
 			}
 			event_yield(mpi_queue);
 		}
-		if (verbosity>1) Warning(info,"explored %d states and %d transitions",lvl_scount,lvl_tcount);
+		if (RTverbosity>1) Warning(info,"explored %d states and %d transitions",lvl_scount,lvl_tcount);
 		event_idle_detect(work_counter);
 		MPI_Allreduce(&visited,&global_visited,1,MPI_LONG_LONG,MPI_SUM,MPI_COMM_WORLD);
 		MPI_Allreduce(&explored,&global_explored,1,MPI_LONG_LONG,MPI_SUM,MPI_COMM_WORLD);
 		MPI_Allreduce(&transitions,&global_transitions,1,MPI_LONG_LONG,MPI_SUM,MPI_COMM_WORLD);
-		if (verbosity>1) event_statistics(mpi_queue);
+		if (RTverbosity>1) event_statistics(mpi_queue);
 		if (global_visited==global_explored) break;
 		if (mpi_me==0) {
 			Warning(info,"level %d: %lld explored %lld transitions %lld visited",
@@ -561,16 +509,16 @@ int main(int argc, char*argv[]){
 	}
 	event_barrier_wait(barrier);
 	/* State space was succesfully generated. */
-	if (verbosity>1) Warning(info,"My share is %lld states and %lld transitions",explored,transitions);
+	if (RTverbosity>1) Warning(info,"My share is %lld states and %lld transitions",explored,transitions);
 	event_barrier_wait(barrier);
 	if(write_lts){
-		if (mpi_me==0) Warning(info,"collecting LTS info");
+		if (mpi_me==0 && RTverbosity>1) Warning(info,"collecting LTS info");
 		int temp[mpi_nodes*mpi_nodes];
 		MPI_Gather(&explored,1,MPI_INT,temp,1,MPI_INT,0,MPI_COMM_WORLD);
 		if (mpi_me==0){
 			lts_count_t *count=lts_output_count(output);
 			for(int i=0;i<mpi_nodes;i++){
-				Warning(info,"state count of %d is %d",i,temp[i]);
+				if (RTverbosity>1) Warning(info,"state count of %d is %d",i,temp[i]);
 				count->state[i]=temp[i];
 			}
 		}
@@ -582,7 +530,7 @@ int main(int argc, char*argv[]){
 			lts_count_t *count=lts_output_count(output);
 			for(int i=0;i<mpi_nodes;i++){
 				for(int j=0;j<mpi_nodes;j++){
-					Warning(info,"transition count %d to %d is %d",i,j,temp[i+mpi_nodes*j]);
+					if (RTverbosity>1) Warning(info,"transition count %d to %d is %d",i,j,temp[i+mpi_nodes*j]);
 					count->cross[i][j]=temp[i+mpi_nodes*j];
 				}
 			}
@@ -594,8 +542,8 @@ int main(int argc, char*argv[]){
 	//sprintf(dir,"gmon-%d",mpi_me);
 	//chdir(dir);
 	event_barrier_wait(barrier);
+	RTfiniMPI();
 	MPI_Finalize();
-	armed=0;
 	return 0;
 }
 

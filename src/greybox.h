@@ -1,6 +1,7 @@
 #ifndef GREYBOX_H
 #define GREYBOX_H
 
+#include <popt.h>
 #include <stdio.h>
 #include "chunk_support.h"
 #include "lts-type.h"
@@ -45,9 +46,24 @@ typedef struct state_info {
 } *state_info_t;
 
 /**
+\brief Options for greybox management module.
+ */
+extern struct poptOption greybox_options[];
+
+/**
 \defgroup greybox_user The Greybox user interface.
 */
 //@{
+
+/**
+\brief Factory method for loading models.
+
+Given a model that has been initialized with data synchronization functions,
+this method determines the type of model by extension and loads it. If
+the parameter wrapped is not NULL then the default wrappers are applied to
+the model and the result is put in wrapped.
+*/
+extern void GBloadFile(model_t model,const char *filename,model_t *wrapped);
 
 /**
 \brief Get the basic LTS type or structure of the model.
@@ -142,6 +158,13 @@ Create a greybox object.
 \param context_size The size of the model context.
 */
 extern model_t GBcreateBase();
+
+typedef void(*pins_loader_t)(model_t model,const char*filename);
+
+/**
+\brief Register a loader for an extension.
+ */
+extern void GBregisterLoader(const char*extension,pins_loader_t loader);
 
 /**
 \brief Set a pointer to the user context;

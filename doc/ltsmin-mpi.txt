@@ -18,34 +18,20 @@ Both input and output can be a GCF archive or a set of files.
 To use a set of files the argument needs and occurrence of ++%s++.
 If no ++%s++ is present then a GCF archive is assumed.
 
-The tool uses http://www.mpi-forum.org/[MPI] for distributed
-computation, thus it has to be started via `mpirun`.  _nodespec_
-determines which processors the tool is run on.
-
-The workers send messages to themselves. So if you use http://www.open-mpi.org/[Open MPI],
-you have to use +mpirun -mca btl <connect>,self <nodespec>+ where
-<connect> can be tcp, mx, ib, etc. 
-
-The tool uses MPI-IO, the I/O chapter in MPI-2, so if your MPI implementation
-has special extensions in MPI-IO, such as http://www.pvfs.org/[PVFS2], then
-those extensions are supported.
+include::inc/mpi-blurb.txt[]
 
 == OPTIONS
-*-plain*::
-Disable compression of the output.
-The tool detects if the input is compressed or not.
 
-*-s*::
+=== Reductions
+
+*-s*, $--strong*::
 Apply strong bisimulation reduction. This is the default.
 
-*-b*::
+*-b*, *--branching*::
 Apply branching bisimulation reduction.
 
-*-help*::
-Print a help message.
+include::inc/general-options.txt[]
 
-*-q*::
-        Be quiet; do not print anything to the terminal.
 
 == EXAMPLES
 In this example, we assume Open MPI with a TCP interconnect.
@@ -61,8 +47,7 @@ Subsequently, we can reduce the result modulo branching bisimulation and write
 it in the uncompressed format that is compatible with the mCRL tools:
 
 ----
-mkdir brp-b.dir
-mpirun -np 2 -mca btl tcp,self ltsmin-mpi -plain -b brp-s.gcf brp-b.dir/%s
+mpirun -np 2 -mca btl tcp,self ltsmin-mpi -b brp-s.gcf brp-b.dir
 ----
 
 

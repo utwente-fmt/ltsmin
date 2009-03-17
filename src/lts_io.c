@@ -11,7 +11,7 @@
 #include "amconfig.h"
 #include <lts_count.h>
 
-
+/*
 static void cannot_write_open(lts_output_t output){
 	Fatal(1,error,"support for writing %s not available",output->name);
 }
@@ -37,6 +37,7 @@ static void cannot_read_part(lts_input_t input,int which_state,int which_src,int
 static void cannot_read_close(lts_input_t input){
 	Fatal(1,error,"support for reading %s not available",input->name);
 }
+*/
 
 #ifdef HAVE_BCG_USER_H
 #include <bcg_user.h>
@@ -56,6 +57,34 @@ extern struct lts_io_ops dir_io_ops;
 extern struct lts_io_ops gcf_io_ops;
 extern struct lts_io_ops fmt_io_ops;
 
+
+#ifdef HAVE_BCG_USER_H
+#include "bcg_user.h"
+static void bcg_popt(poptContext con,
+ 		enum poptCallbackReason reason,
+                            const struct poptOption * opt,
+                             const char * arg, void * data){
+	(void)con;(void)opt;(void)arg;(void)data;
+	switch(reason){
+	case POPT_CALLBACK_REASON_PRE:
+		Fatal(1,error,"unexpected call to bcg_popt");
+	case POPT_CALLBACK_REASON_POST:
+		BCG_INIT();
+		return;
+	case POPT_CALLBACK_REASON_OPTION:
+		Fatal(1,error,"unexpected call to bcg_popt");
+	}
+}
+
+static struct poptOption bcg_options[]= {
+	{ NULL, 0 , POPT_ARG_CALLBACK|POPT_CBFLAG_POST|POPT_CBFLAG_SKIPOPTION , bcg_popt , 0 , NULL , NULL },
+	POPT_TABLEEND
+};
+#endif
+
+static struct poptOption dir_options[]= {
+	POPT_TABLEEND
+};
 
 static struct lts_io_ops* get_ops_for(char*name){
 	char* extension=strrchr(name,'.');
@@ -87,41 +116,31 @@ extern int plain;
 extern int blocksize;
 extern int blockcount;
 
-static struct option io_options[]={
-	{"",OPT_NORMAL,NULL,NULL,NULL,
-		"The IO subsystem detects the following file formats:",
-		"*.dir : uncompressed DIR format in a directory",
-		"*.gcf : DIR format using a GCF archive",
-#ifdef HAVE_BCG_USER_H
-		"*.bcg : BCG file format"},
-#else
-		"*.bcg : BCG file format (get CADP and/or recompile to enable)"},
-#endif
-	{"",OPT_NORMAL,NULL,NULL,NULL,
-		"*%s*  : DIR format using pattern substitution",
-		NULL,NULL,NULL},
-	{"-plain",OPT_NORMAL,set_int,&plain,NULL,
-		"disable compression of the output",
-		"applies to .gcf",NULL,NULL},
-	{"-bs",OPT_REQ_ARG,parse_int,&blocksize,"-bs <block size>",
-		"Set the block size to be used for streams.",
-		"This is also used as the GCF block size.",
-		NULL,NULL},
-	{"-bc",OPT_REQ_ARG,parse_int,&blockcount,"-bc <block count>",
-		"Set the number of blocks in one GCF cluster.",
-		NULL,NULL,NULL},
-	{"-io-help",OPT_NORMAL,usage,NULL,NULL,
-		"print this help message",NULL,NULL,NULL},
-	{0,0,0,0,0,0,0,0,0}
+
+static struct poptOption gcf_options[]= {
+	{ "block-size" , 0 , POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT , &blocksize , 0 , "The size of a block in bytes" , "<bytes>" },
+	{ "cluster-size" , 0 , POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT , &blockcount , 0 , "The number of block in a cluster" , "<blocks>"},
+	{ "plain" , 0 , POPT_ARG_VAL , &plain , 1 , "Disable compression of containers" , NULL},
+	POPT_TABLEEND
 };
 
-void lts_io_init(int *argcp,char*argv[]){
-#ifdef HAVE_BCG_USER_H
-	Warning(info,"BCG init");
-	BCG_INIT();
-#endif
-	take_options(io_options,argcp,argv);
-}
+struct poptOption lts_io_options[]= {
+	{ NULL,0 , POPT_ARG_INCLUDE_TABLE , dir_options , 0 , "This system support the following file formats:"
+	"\n * Directory format (*.dir and *.gcf)"
+	#ifdef HAVE_BCG_USER_H
+	"\n * Binary Coded Graphs (*.bcg)"
+	#endif
+	,NULL},
+	#ifdef HAVE_BCG_USER_H
+	{ NULL,0 , POPT_ARG_INCLUDE_TABLE , bcg_options , 0 , NULL , NULL }, 
+	#endif
+	{ NULL,0 , POPT_ARG_INCLUDE_TABLE , gcf_options , 0 ,
+"The .dir format uses multiple files in a directory by default. It is also\n"
+"possible to put these files in a GCF archive (*.gcf).\n"
+"\n"
+"Container I/O options",NULL},
+	POPT_TABLEEND
+};
 
 lts_output_t lts_output_open(char *outputname,model_t model,int segment_count,int share,int share_count){
 	return lts_output_open_root(outputname,model,segment_count,share,share_count,0,0);

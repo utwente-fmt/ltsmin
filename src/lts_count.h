@@ -22,7 +22,7 @@ typedef struct {
 #define LTS_COUNT_CROSS_OUT 0x10
 #define LTS_COUNT_ALL       0x1F
 
-#define LTS_CHECK_STATE(count,seg,ofs) {if(ofs>=count.state[seg]) count.state[seg]=ofs+1;}
+#define LTS_CHECK_STATE(count,seg,ofs) {if((ofs)>=count.state[seg]) count.state[seg]=(ofs)+1;}
 #define LTS_INCR_CROSS(count,from,to) {if(count.cross[from][to]<LTS_COUNT_UNDEF) count.cross[from][to]++;}
 #define LTS_INCR_IN(count,seg) {if(count.in[seg]<LTS_COUNT_UNDEF) {count.in[seg]++;}}
 #define LTS_INCR_OUT(count,seg) {if(count.out[seg]<LTS_COUNT_UNDEF) {count.out[seg]++;}}

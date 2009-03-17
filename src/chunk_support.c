@@ -4,7 +4,7 @@
 
 #define VALID_IDX(i,c) if (i>=c.len) Fatal(1,error,"chunk overflow")
 
-static const char HEX[17]="0123456789ABCDEF";
+static const char HEX[16]="0123456789ABCDEF";
 
 void chunk_encode_copy(chunk dst,chunk src,char esc){
 	chunk_len k=0;
@@ -24,7 +24,7 @@ void chunk_encode_copy(chunk dst,chunk src,char esc){
 		} else {
 			VALID_IDX(k+2,dst);
 			dst.data[k]=esc;
-			dst.data[k+1]=HEX[src.data[i]>>4];
+			dst.data[k+1]=HEX[(src.data[i]>>4)&(char)0x0F];
 			dst.data[k+2]=HEX[src.data[i]&(char)0x0F];
 			k+=3;
 		}

@@ -1,3 +1,5 @@
+#include <config.h>
+#include <unistd.h>
 #include <runtime.h>
 #include <lts_io_internal.h>
 #include <archive.h>
@@ -17,11 +19,22 @@ struct archive_io {
 
 static void dir_write_open(lts_output_t output){
 	struct archive_io *ctx=RT_NEW(struct archive_io);
-	ctx->archive=arch_dir_create(output->name,blocksize,DELETE_ALL);
+	if (output->share==0){
+		if(create_empty_dir(output->name,DELETE_ALL)){
+			FatalCall(1,error,"could not create or clear directory %s",output->name);
+		}
+	} else {
+		for(;;){
+			if (is_a_dir(output->name)) break;
+			usleep(10000);
+		}
+	}
+	ctx->archive=arch_dir_open(output->name,blocksize);
 	ctx->plain=1;
 	ctx->plain_code=NULL;
 	output->ops_context=ctx;
 }
+
 static void gcf_write_open(lts_output_t output){
 	struct archive_io *ctx=RT_NEW(struct archive_io);
 	ctx->archive=arch_gcf_create(raf_unistd(output->name),blocksize,blocksize*blockcount,output->share,output->share_count);
@@ -63,9 +76,9 @@ static inline void matrixU32(stream_t **mat,int i,int j,uint32_t v){
 
 static void dir_write_edge(void* lts_output,int src_seg,int src_ofs,int dst_seg,int dst_ofs,int*labels){
 	struct dir_output_struct* out=(struct dir_output_struct*)lts_output;
-	LTS_CHECK_STATE((*(out->count_p)),src_seg,src_ofs);
-	LTS_CHECK_STATE((*(out->count_p)),dst_seg,dst_ofs);
-	LTS_INCR_CROSS((*(out->count_p)),src_seg,dst_seg);
+	LTS_CHECK_STATE((*(out->count_p)),(uint32_t)src_seg,(uint32_t)src_ofs);
+	LTS_CHECK_STATE((*(out->count_p)),(uint32_t)dst_seg,(uint32_t)dst_ofs);
+	LTS_INCR_CROSS((*(out->count_p)),(uint32_t)src_seg,(uint32_t)dst_seg);
 	matrixU32(out->src_ofs,src_seg,dst_seg,src_ofs);
 	matrixU32(out->lbl_one,src_seg,dst_seg,labels[0]);
 	matrixU32(out->dst_ofs,src_seg,dst_seg,dst_ofs);
@@ -98,7 +111,7 @@ static lts_enum_cb_t dir_write_begin(lts_output_t output,int which_state,int whi
 		int j_from=(which_dst==segment_count)?0:which_dst;
 		int j_to=(which_dst==segment_count)?segment_count:(which_dst+1);
 		for(int j=j_from;j<j_to;j++){
-			Warning(info,"opening for %d -> %d",i,j);
+			Warning(debug,"opening for %d -> %d",i,j);
 			char fname[128];
 			sprintf(fname,"src-%d-%d",i,j);
 			out->src_ofs[i][j]=arch_write(ctx->archive,fname,ctx->plain?ctx->plain_code:"diff32|gzip",1);
@@ -118,7 +131,7 @@ static inline void close_stream_matrix(stream_t **mat,int N){
 			if(mat[i]) {
 				for(int j=0;j<N;j++){
 					if (mat[i][j]) {
-						Warning(info,"closing for %d -> %d",i,j);
+						Warning(debug,"closing for %d -> %d",i,j);
 						DSclose(&(mat[i][j]));
 					}
 				}
@@ -147,12 +160,12 @@ static void write_dir_info(stream_t ds,lts_count_t *count,int action_count,int t
 	DSwriteU32(ds,tau);
 	DSwriteU32(ds,0); // This field was either top count or vector length. CHECK!
 	for(int i=0;i<count->segments;i++){
-		Warning(info,"output segment %d has %d states",i,(int)count->state[i]);
+		Warning(debug,"output segment %d has %d states",i,(int)count->state[i]);
 		DSwriteU32(ds,count->state[i]);
 	}
 	for(int i=0;i<count->segments;i++){
 		for(int j=0;j<count->segments;j++){
-			Warning(info,"output edge count from %d to %d is %d",i,j,(int)count->cross[i][j]);
+			Warning(debug,"output edge count from %d to %d is %d",i,j,(int)count->cross[i][j]);
 			DSwriteU32(ds,count->cross[i][j]);
 		}
 	}
@@ -176,7 +189,7 @@ static void dir_write_close(lts_output_t output){
 			}
 		}
 		DSclose(&ds);
-		Warning(info,"TermDB contains %d actions",act_count);
+		Warning(debug,"TermDB contains %d actions",act_count);
 		ds=arch_write(ctx->archive,"info",ctx->plain?ctx->plain_code:"",1);
 		write_dir_info(ds,&(output->count),act_count,tau,output->root_seg,output->root_ofs);
 		DSclose(&ds);
@@ -184,6 +197,7 @@ static void dir_write_close(lts_output_t output){
 	arch_close(&(ctx->archive));
 }
 
+/*
 static void vec_write_close(lts_output_t output){
 	lts_type_t ltstype=GBgetLTStype(output->model);
 	struct archive_io *ctx=(struct archive_io *)output->ops_context;
@@ -195,7 +209,7 @@ static void vec_write_close(lts_output_t output){
 		sprintf(stream_name,"CT-%s",lts_type_get_type(ltstype,i));
 		ds=arch_write(ctx->archive,stream_name,plain?"":"gzip",1);
 		int element_count=GBchunkCount(output->model,i);
-		Warning(info,"type %d has %d elements",i,element_count);
+		Warning(debug,"type %d has %d elements",i,element_count);
 		for(int j=0;j<element_count;j++){
 			chunk c=GBchunkGet(output->model,i,j);
 			DSwriteVL(ds,c.len);
@@ -208,6 +222,7 @@ static void vec_write_close(lts_output_t output){
 	DSclose(&ds);
 	arch_close(&(ctx->archive));
 }
+*/
 
 static void load_headers(lts_input_t input){
 	struct archive_io *ctx=(struct archive_io *)input->ops_context;
@@ -221,18 +236,18 @@ static void load_headers(lts_input_t input){
 				Fatal(1,error,"cannot identify input format");
 				return;
 			}
-			Log(info,"input uses headers");
+			Log(debug,"input uses headers");
 			ctx->decode="auto";
 			break;
 		case 31:
-			Log(info,"input has no headers");
+			Log(debug,"input has no headers");
 			break;
 		default:
 			Fatal(1,error,"cannot identify input format");
 			return;
 		}
 	} else {
-		Log(info,"input uses headers");
+		Log(debug,"input uses headers");
 		ctx->decode="auto";
 		ds=stream_setup(ds,description);
 		if (DSreadU32(ds)!=31){
@@ -249,12 +264,12 @@ static void load_headers(lts_input_t input){
 	DSreadU32(ds); // skip top count;
 	for(int i=0;i<input->segment_count;i++){
 		input->count.state[i]=DSreadU32(ds);
-		Warning(info,"input segment %d has %d states",i,(int)input->count.state[i]);
+		Warning(debug,"input segment %d has %d states",i,(int)input->count.state[i]);
 	}
 	for(int i=0;i<input->segment_count;i++){
 		for(int j=0;j<input->segment_count;j++){
 			input->count.cross[i][j]=DSreadU32(ds);
-			Warning(info,"input edge count from %d to %d is %d",i,j,(int)input->count.cross[i][j]);
+			Warning(debug,"input edge count from %d to %d is %d",i,j,(int)input->count.cross[i][j]);
 		}
 	}
 	DSclose(&ds);
@@ -297,21 +312,21 @@ static void load_headers(lts_input_t input){
 
 
 static void dir_read_open(lts_input_t input){
-	Warning(info,"opening %s",input->name);
+	Warning(debug,"opening %s",input->name);
 	struct archive_io *ctx=RT_NEW(struct archive_io);
 	ctx->archive=arch_dir_open(input->name,blocksize);
 	input->ops_context=ctx;
 	load_headers(input);
 }
 static void gcf_read_open(lts_input_t input){
-	Warning(info,"opening %s",input->name);
+	Warning(debug,"opening %s",input->name);
 	struct archive_io *ctx=RT_NEW(struct archive_io);
 	ctx->archive=arch_gcf_read(raf_unistd(input->name));
 	input->ops_context=ctx;
 	load_headers(input);
 }
 static void fmt_read_open(lts_input_t input){
-	Warning(info,"opening %s",input->name);
+	Warning(debug,"opening %s",input->name);
 	struct archive_io *ctx=RT_NEW(struct archive_io);
 	ctx->archive=arch_fmt(input->name,file_input,file_output,blocksize);
 	input->ops_context=ctx;
@@ -319,6 +334,7 @@ static void fmt_read_open(lts_input_t input){
 }
 
 static void dir_read_part(lts_input_t input,int which_state,int which_src,int which_dst,lts_enum_cb_t output){
+	(void)which_state;
 	struct archive_io *ctx=(struct archive_io *)input->ops_context;
 	int segment_count=input->segment_count;
 
@@ -340,7 +356,7 @@ static void dir_read_part(lts_input_t input,int which_state,int which_src,int wh
 				uint32_t s=DSreadU32(src_in);
 				uint32_t l=DSreadU32(lbl_in);
 				uint32_t d=DSreadU32(dst_in);
-				enum_seg_seg(output,i,s,j,d,&l);
+				enum_seg_seg(output,i,s,j,d,(int*)&l);
 			}
 			DSclose(&src_in);
 			DSclose(&lbl_in);

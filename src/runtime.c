@@ -1,3 +1,4 @@
+#include <amconfig.h>
 #include "runtime.h"
 #include <stdlib.h>
 #include <errno.h>
@@ -5,8 +6,42 @@
 #include <stdarg.h>
 #include "unix.h"
 #include <libgen.h>
+#include <git_version.h>
 
 #define LABEL_SIZE 1024
+
+int RTverbosity=1;
+
+#define INCR_VERBOSITY 1
+#define PRINT_VERSION 2
+#define PRINT_HELP 3
+#define PRINT_USAGE 4
+#define ENABLE_DEBUG 5
+
+static struct poptOption runtime_options[]={
+	{ NULL, 'v' , POPT_ARG_NONE , NULL , INCR_VERBOSITY , "increase verbosity of logging" ,NULL },
+	{ NULL, 'q' , POPT_ARG_VAL , &RTverbosity , 0 , "reduces number of messages to absolute minimum",NULL },
+	{ "debug" , 0 , POPT_ARG_NONE , NULL , ENABLE_DEBUG , "enable debugging output" ,NULL},
+	{ "version" , 0 , POPT_ARG_NONE , NULL , PRINT_VERSION , "print the version of this tool",NULL},
+	{ "help" , 'h' , POPT_ARG_NONE , NULL , PRINT_HELP , "print help text",NULL},
+	{ "usage" , 0 , POPT_ARG_NONE , NULL , PRINT_USAGE , "print usage",NULL},
+	POPT_TABLEEND
+};
+
+
+int linear_search(si_map_entry map[],const char*key){
+	while(map[0].key){
+		if(!strcmp(map[0].key,key)) return map[0].val;
+		map++;
+	}
+	return -1;
+}
+
+
+static void* stackbottom=NULL;
+void* RTstackBottom(){
+	return stackbottom;
+}
 
 struct runtime_log {
 	FILE*f;
@@ -120,6 +155,7 @@ void log_message(log_t log,const char*file,int line,int errnum,const char *fmt,.
 }
 
 void RTinit(int *argcp,char**argvp[]){
+	stackbottom=argcp;
 	RThandleFatal=NULL;
 	error=create_log(stderr,"ERROR",LOG_PRINT);
 	info=create_log(stderr,NULL,LOG_PRINT);
@@ -130,10 +166,118 @@ void RTinit(int *argcp,char**argvp[]){
 		copy[i]=strdup((*argvp)[i]);
 	}
 	*argvp=copy;
-	take_vars(argcp,*argvp);
 	set_label("%s",basename(copy[0]));
 }
 
+static poptContext optCon=NULL;
+
+void RTinitPopt(int *argc_p,char**argv_p[],const struct poptOption * options,
+	int min_args,int max_args,char*args[],
+	const char* pgm_prefix,const char* arg_help,const char* extra_help
+){
+	RTinit(argc_p,argv_p);
+	struct poptOption optionsTable[] = {
+		{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, options , 0 , extra_help , NULL},
+		{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, runtime_options , 0 , "Runtime options",NULL},
+		POPT_TABLEEND
+	};
+	char*program=(*argv_p)[0];
+	char*pgm_base=strrchr(program,'/');
+	if(pgm_base) {
+		pgm_base++;
+	} else {
+		pgm_base=program;
+	}
+	char*pgm_print;
+	if (pgm_prefix) {
+		char tmp[strlen(pgm_prefix)+strlen(pgm_base)+2];
+		sprintf(tmp,"%s %s",pgm_prefix,pgm_base);
+		pgm_print=strdup(tmp);
+	} else {
+		pgm_print=pgm_base;
+	}
+	(*argv_p)[0]=pgm_print;
+	optCon=poptGetContext(NULL, *argc_p, *argv_p, optionsTable, 0);
+	//if (extrahelp) poptSetOtherOptionHelp(optCon, extrahelp);
+	for(;;){
+		int res=poptGetNextOpt(optCon);
+		switch(res){
+		case INCR_VERBOSITY:
+			RTverbosity++;
+			continue;
+		case PRINT_VERSION:
+			if (strcmp(GIT_VERSION,"")) {
+				fprintf(stdout,"%s\n",GIT_VERSION);
+			} else {
+				fprintf(stdout,"%s\n",PACKAGE_STRING);
+			}
+			exit(EXIT_SUCCESS);
+		case PRINT_HELP:{
+			char extra[1024];
+			if (arg_help){
+				sprintf(extra,"[OPTIONS] %s",arg_help);
+				poptSetOtherOptionHelp(optCon, extra);
+			}
+			poptPrintHelp(optCon,stdout,0);
+			exit(EXIT_SUCCESS);
+		}
+		case PRINT_USAGE:
+			if (arg_help) poptSetOtherOptionHelp(optCon, arg_help);
+			poptPrintUsage(optCon,stdout,0);
+			exit(EXIT_SUCCESS);
+		case ENABLE_DEBUG:
+			log_set_flags(debug,LOG_PRINT|LOG_WHERE);
+			continue;
+		default:
+			break;
+		}
+		if (res==-1) break;
+		if (res==POPT_ERROR_BADOPT){
+			Fatal(1,error,"bad option: %s (use --help for help)",poptBadOption(optCon,0));
+		}
+		if (res<0) {
+			Fatal(1,error,"option parse error: %s",poptStrerror(res));
+		} else {
+			Fatal(1,error,"option %s has unexpected return %d",poptBadOption(optCon,0),res);
+		}
+	}
+	for(int i=0;i<min_args;i++){
+		args[i]=poptGetArg(optCon);
+		if (!args[i]) {
+			Warning(info,"not enough arguments");
+			poptPrintUsage(optCon, stderr, 0);
+			exit(EXIT_FAILURE);
+		}
+	}
+	if (max_args >= min_args) {
+		for(int i=min_args;i<max_args;i++){
+			if (poptPeekArg(optCon)){
+				args[i]=poptGetArg(optCon);
+			} else {
+				args[i]=NULL;
+			}
+		}
+		if (poptPeekArg(optCon)!=NULL) {
+			Warning(info,"too many arguments");
+			poptPrintUsage(optCon, stderr, 0);
+			exit(EXIT_FAILURE);
+		}
+		poptFreeContext(optCon);
+		optCon=NULL;
+	}
+	(*argv_p)[0]=program;
+	Warning(info,"verbosity is set to %d",RTverbosity);
+}
+
+char* RTinitNextArg(){
+	if (optCon) {
+		char* res=poptGetArg(optCon);
+		if (res) return res;
+		poptFreeContext(optCon);
+		optCon=NULL;	
+	}
+	return NULL;
+}
 
 void* RTmalloc(size_t size){
 	if(size==0) return NULL;

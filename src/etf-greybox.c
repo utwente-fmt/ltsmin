@@ -4,6 +4,27 @@
 #include "etf-greybox.h"
 #include "lts.h"
 
+static void etf_popt(poptContext con,
+ 		enum poptCallbackReason reason,
+                            const struct poptOption * opt,
+                             const char * arg, void * data){
+	(void)con;(void)opt;(void)arg;(void)data;
+	switch(reason){
+	case POPT_CALLBACK_REASON_PRE:
+		break;
+	case POPT_CALLBACK_REASON_POST:
+		GBregisterLoader("etf",ETFloadGreyboxModel);
+		Warning(info,"ETF language module initialized");
+		return;
+	case POPT_CALLBACK_REASON_OPTION:
+		break;
+	}
+	Fatal(1,error,"unexpected call to etf_popt");
+}
+struct poptOption etf_options[]= {
+	{ NULL, 0 , POPT_ARG_CALLBACK|POPT_CBFLAG_POST|POPT_CBFLAG_SKIPOPTION , etf_popt , 0 , NULL , NULL },
+	POPT_TABLEEND
+};
 
 typedef struct grey_box_context {
 	treedbs_t label_db;
@@ -52,7 +73,7 @@ static int etf_state_short(model_t self,int label,int *state){
 	return ctx->label_data[label][TreeFold(ctx->label_key[label],state)];
 }
 
-void ETFloadGreyboxModel(model_t model,char*name){
+void ETFloadGreyboxModel(model_t model,const char*name){
 	gb_context_t ctx=(gb_context_t)RTmalloc(sizeof(struct grey_box_context));
 	GBsetContext(model,ctx);
 	etf_model_t etf=etf_parse(name);

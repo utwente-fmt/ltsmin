@@ -1,6 +1,8 @@
 #ifndef VECTOR_SET_H
 #define VECTOR_SET_H
 
+#include <popt.h>
+
 /**
 \file vector_set.h
 \defgroup vector_set Data structures for manipulating sets of vectors.
@@ -9,6 +11,10 @@ For manipulating sets of vectors, we need use three objects: domains,
 sets and relations.
 */
 //@{
+
+extern struct poptOption vset_setonly_options[];
+
+extern struct poptOption vset_full_options[];
 
 /**
 \brief Abstract type for a domain.
@@ -24,6 +30,13 @@ typedef struct vector_set *vset_t;
 \brief Abstract type for a relation over a domain.
 */
 typedef struct vector_relation *vrel_t;
+
+/**
+\brief Create a domain that uses the default vector set implementation.
+
+\param n The length of vectors in the domain.
+*/
+extern vdom_t vdom_create_default(int n);
 
 /**
 \brief Create a domain that uses the fdd form of BuDDy.

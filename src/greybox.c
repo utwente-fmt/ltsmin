@@ -433,5 +433,51 @@ void GBprintDependencyMatrix(FILE* file, model_t model) {
   }
 }
 
+/**********************************************************************
+ * Grey box factory functionality
+ */
+
+#define MAX_TYPES 16
+static char* model_type[MAX_TYPES];
+static pins_loader_t model_loader[MAX_TYPES];
+static int registered=0;
+static int cache=0;
+
+void GBloadFile(model_t model,const char *filename,model_t *wrapped){
+	char* extension=strrchr(filename,'.');
+	if (extension) {
+		extension++;
+		for(int i=0;i<registered;i++){
+			if(!strcmp(model_type[i],extension)){
+				model_loader[i](model,filename);
+				if (wrapped) {
+					if (cache) {
+						model=GBaddCache(model);
+					}
+					*wrapped=model;
+				}
+				return;
+			}
+		}
+		Fatal(1,error,"No factory method has been registered for %s models",extension);
+	} else {
+		Fatal(1,error,"filename %s doesn't have an extension",filename);
+	}
+}
+
+void GBregisterLoader(const char*extension,pins_loader_t loader){
+	if (registered<MAX_TYPES){
+		model_type[registered]=strdup(extension);
+		model_loader[registered]=loader;
+		registered++;
+	} else {
+		Fatal(1,error,"model type registry overflow");
+	}
+}
+
+struct poptOption greybox_options[]={
+	{ "cache" , 'c' , POPT_ARG_VAL , &cache , 1 , "Enable caching of grey box calls." , NULL },
+	POPT_TABLEEND	
+};
 
 

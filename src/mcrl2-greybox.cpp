@@ -133,6 +133,8 @@ mcrl2::lps::specification convert(mcrl2::lps::specification const& l) {
 
 extern "C" {
 
+#include <popt.h>
+
 /// We have to define CONFIG_H_ due to a problem with double defines.
 #define CONFIG_H_
 
@@ -162,7 +164,33 @@ static void ErrorHandler(const char *format, va_list args) {
 	exit(1);
 }
 
-
+static void mcrl2_popt(poptContext con,
+ 		enum poptCallbackReason reason,
+                            const struct poptOption * opt,
+                             const char * arg, void * data){
+	(void)con;(void)opt;(void)arg;(void)data;
+	switch(reason){
+	case POPT_CALLBACK_REASON_PRE:
+		break;
+	case POPT_CALLBACK_REASON_POST: {
+		char dummy[4]={'x','x','x',0};
+		char*argv[]={dummy,NULL};
+		ATinit(1, argv, (ATerm*) RTstackBottom());
+		ATsetWarningHandler(WarningHandler);
+		ATsetErrorHandler(ErrorHandler);
+		GBregisterLoader("lps",MCRL2loadGreyboxModel);
+		Warning(info,"mCRL2 language module initialized");
+		return;
+	}
+	case POPT_CALLBACK_REASON_OPTION:
+		break;
+	}
+	Fatal(1,error,"unexpected call to mcrl2_popt");
+}
+struct poptOption mcrl2_options[]= {
+	{ NULL, 0 , POPT_ARG_CALLBACK|POPT_CBFLAG_POST|POPT_CBFLAG_SKIPOPTION , (void*)mcrl2_popt , 0 , NULL , NULL},
+	POPT_TABLEEND
+};
 
 void MCRL2initGreybox(int argc,char *argv[],void* stack_bottom){
 	ATinit(argc, argv, (ATerm*) stack_bottom);
@@ -261,7 +289,7 @@ static int MCRL2getTransitionsAll(model_t m,int*src,TransitionCB cb,void*context
 	return count;
 }
 
-void MCRL2loadGreyboxModel(model_t m,char*model_name){
+void MCRL2loadGreyboxModel(model_t m,const char*model_name){
 	struct grey_box_context *ctx=(struct grey_box_context*)RTmalloc(sizeof(struct grey_box_context));
 	GBsetContext(m,ctx);
 
@@ -321,7 +349,7 @@ void MCRL2loadGreyboxModel(model_t m,char*model_name){
 		std::vector< size_t > const & vec = ctx->info->get_group(i);
 		e_info->length[i]=vec.size();
 		e_info->indices[i]=(int*)RTmalloc(vec.size()*sizeof(int));
-		for(int j=0;j<vec.size();j++) e_info->indices[i][j]=vec[j];
+		for(int j=0;j<(int)(vec.size());j++) e_info->indices[i][j]=vec[j];
 	}
 	GBsetEdgeInfo(m,e_info);
 	GBsetStateInfo(m,&s_info);

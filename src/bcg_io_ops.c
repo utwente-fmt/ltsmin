@@ -53,6 +53,7 @@ static lts_enum_cb_t bcg_write_begin(lts_output_t output,int which_state,int whi
 }
 
 static void bcg_write_end(lts_output_t output,lts_enum_cb_t writer){
+	(void)output;
 	BCG_IO_WRITE_BCG_END();
 	free(enum_get_context(writer));
 	bcg_write_used=0;
@@ -118,7 +119,7 @@ static void bcg_read_part(lts_input_t input,int which_state,int which_src,int wh
 	bcg_type_state_number bcg_s1, bcg_s2;
 	BCG_TYPE_LABEL_NUMBER bcg_label_number;
 	BCG_OT_ITERATE_PLN (ctx->bcg_graph, bcg_s1, bcg_label_number, bcg_s2) {
-		enum_seg_seg(output,0,bcg_s1,0,bcg_s2,&bcg_label_number);
+		enum_seg_seg(output,0,bcg_s1,0,bcg_s2,(int*)&bcg_label_number);
 	} BCG_OT_END_ITERATE;
 }
 static void bcg_read_close(lts_input_t input){

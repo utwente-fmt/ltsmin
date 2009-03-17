@@ -1,0 +1,20 @@
+=== General Options
+
+*-v*::
+        Increase the level of verbosity
+
+*-q*::
+        Be quiet; do not print anything to the terminal.
+
+*--debug*::
+        Enable debugging output.
+
+*--version*::
+        Print version string of this tool.
+
+*-h*, *--help*::
+        Print help text
+
+*--usage*::
+        Print short usage summary.
+

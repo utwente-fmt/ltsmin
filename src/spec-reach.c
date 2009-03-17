@@ -5,78 +5,78 @@
 #include <strings.h>
 
 #include "archive.h"
-#include "runtime.h"
-#if defined(MCRL)
-#include "mcrl-greybox.h"
-#define MODEL_TYPE "lpo"
-#elif defined(MCRL2)
-#include "mcrl2-greybox.h"
-#define MODEL_TYPE "lps"
-#elif defined(NIPS)
-#include "nips-greybox.h"
-#define MODEL_TYPE "nips"
-#elif defined(ETF)
-#include "etf-greybox.h"
-#define MODEL_TYPE "etf"
-#else
-#error "Unknown greybox provider."
-#endif
+#include <runtime.h>
 #include "treedbs.h"
 #include <stringindex.h>
-#include "options.h"
 #include "vector_set.h"
 #include "scctimer.h"
 
-static int verbosity=1;
-static int bfs=0;
-static int bfs2=0;
-static int sat=0;
-static int chain=0;
-
 #if defined(MCRL)
-static int state_visible=0;
+#include "mcrl-greybox.h"
 #endif
-static char* table=NULL;
-
-static int use_vset_list=0;
-static int use_vset_tree=0;
-static int use_vset_fdd=0;
-
-
-static struct option options[]={
-	{"",OPT_NORMAL,NULL,NULL,NULL,
-		"usage: " MODEL_TYPE "-reach [options] <model>",NULL,NULL,NULL},
-	{"-help",OPT_NORMAL,usage,NULL,NULL,
-		"print this help message",NULL,NULL,NULL},
-	{"-v",OPT_NORMAL,inc_int,&verbosity,NULL,"increase the level of verbosity",NULL,NULL,NULL},
-	{"-q",OPT_NORMAL,reset_int,&verbosity,NULL,"be silent",NULL,NULL,NULL},
-	{"",OPT_NORMAL,NULL,NULL,NULL,"exploration order options (default is BFS):",NULL,NULL,NULL},
-	{"-bfs",OPT_NORMAL,set_int,&bfs,NULL,"enable BFS",NULL,NULL,NULL},
-	{"-bfs2",OPT_NORMAL,set_int,&bfs2,NULL,"enable BFS2",NULL,NULL,NULL},
-//	{"-sat",OPT_NORMAL,set_int,&sat,NULL,"enable saturation",NULL,NULL,NULL},
-	{"-chain",OPT_NORMAL,set_int,&chain,NULL,"enable chaining",NULL,NULL,NULL},
-#ifdef MCRL
-	{"-state",OPT_NORMAL,set_int,&state_visible,NULL,
-		"Make all state variables visible.",NULL,NULL,NULL},
+#if defined(MCRL2)
+#include "mcrl2-greybox.h"
 #endif
-	{"",OPT_NORMAL,NULL,NULL,NULL,"output options:",NULL,NULL,NULL},
-	{"-etf",OPT_REQ_ARG,assign_string,&table,"-etf <file_name>",
-		"write the dynamically computed ETF to <file_name>",NULL,NULL,NULL},
-	{"-vset-list",OPT_NORMAL,set_int,&use_vset_list,NULL,
-	        "Use vector sets with MDD nodes organized in a linked list",
-		"This option cannot be used in combination with -out",
-		NULL,NULL},
-//	tree mode does not implement relations!
-//	{"-vset-tree",OPT_NORMAL,set_int,&use_vset_tree,NULL,
-//		"Use vector sets with MDD nodes organized in a tree",
-//		"This option cannot be used in combination with -out",
-//		NULL,NULL},
-	{"-vset-fdd",OPT_NORMAL,set_int,&use_vset_fdd,NULL,
-		"Uses the FDD interface of BuDDy to represent sets",
-		"This option cannot be used in combination with -out",
-		NULL,NULL},
-	{"-version",OPT_NORMAL,print_version,NULL,NULL,"print the version",NULL,NULL,NULL},
- 	{0,0,0,0,0,0,0,0,0}
+#if defined(NIPS)
+#include "nips-greybox.h"
+#endif
+#if defined(ETF)
+#include "etf-greybox.h"
+#endif
+
+static char* etf_output=NULL;
+
+static enum { BFS , BFS2 , Chain } strategy = BFS;
+
+static si_map_entry strategies[]={
+	{"bfs",BFS},
+	{"bfs2",BFS2},
+	{"chain",Chain},
+	{NULL,0}
+};
+
+static void reach_popt(poptContext con,
+ 		enum poptCallbackReason reason,
+                            const struct poptOption * opt,
+                             const char * arg, void * data){
+	switch(reason){
+	case POPT_CALLBACK_REASON_PRE:
+	case POPT_CALLBACK_REASON_POST:
+		Fatal(1,error,"unexpected call to vset_popt");
+	case POPT_CALLBACK_REASON_OPTION:
+		if (!strcmp(opt->longName,"order")){
+			int res=linear_search((si_map_entry*)data,arg);
+			if (res<0) {
+				Warning(error,"unknown exploration order %s",arg);
+				poptPrintUsage(con, stderr, 0);
+				exit(EXIT_FAILURE);
+			}
+			strategy = res;
+			return;
+		}
+		Fatal(1,error,"unexpected call to reach_popt");
+	}
+}
+
+
+static  struct poptOption options[] = {
+	{ NULL, 0 , POPT_ARG_CALLBACK , (void*)reach_popt , 0 , (void*)strategies, NULL },
+	{ "order" , 0 , POPT_ARG_STRING , NULL , 1 , "Select the exploration strategy to a specific order. (default: bfs)" ,"<bfs|bfs2|chain>" },
+#if defined(MCRL)
+	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, mcrl_options , 0 , "mCRL options",NULL},
+#endif
+#if defined(MCRL2)
+	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, mcrl2_options , 0 , "mCRL2 options",NULL},
+#endif
+#if defined(NIPS)
+	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, nips_options , 0 , "NIPS options",NULL},
+#endif
+#if defined(ETF)
+	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, etf_options , 0 , "ETF options",NULL},
+#endif
+	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, greybox_options , 0 , "Greybox options",NULL},
+	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, vset_full_options , 0 , "Vector set options",NULL},
+	POPT_TABLEEND
 };
 
 static lts_type_t ltstype;
@@ -142,7 +142,7 @@ void reach_bfs(){
 	vset_t temp=vset_create(domain,0,NULL);
 	vset_copy(current_level,visited);
 	for(;;){
-		if (verbosity >= 1) {
+		if (RTverbosity >= 1) {
 			vset_count(current_level,&n_count,&e_count);
 			fprintf(stderr,"level %d has %ld nodes and %lld elements\n",level,n_count,e_count);
 			vset_count(visited,&n_count,&e_count);
@@ -151,20 +151,20 @@ void reach_bfs(){
 		if(vset_is_empty(current_level)) break;
 		level++;
 		for(i=0;i<nGrps;i++){
-			if (verbosity >= 2) fprintf(stderr,"\rexploring group %4d/%d",i+1,nGrps);
+			if (RTverbosity >= 2) fprintf(stderr,"\rexploring group %4d/%d",i+1,nGrps);
 			expand_group_rel(i,current_level);
 			eg_count++;
 		}
-		if (verbosity >= 2) fprintf(stderr,"\rexploration complete             \n");
+		if (RTverbosity >= 2) fprintf(stderr,"\rexploration complete             \n");
 		vset_clear(next_level);
 		for(i=0;i<nGrps;i++){
-			if (verbosity >= 2) fprintf(stderr,"\rlocal next %4d/%d",i+1,nGrps);
+			if (RTverbosity >= 2) fprintf(stderr,"\rlocal next %4d/%d",i+1,nGrps);
 			next_count++;
 			vset_next(temp,current_level,group_rel[i]);
 			vset_minus(temp,visited);
 			vset_union(next_level,temp);
 		}
-		if (verbosity >= 2) fprintf(stderr,"\rlocal next complete       \n");
+		if (RTverbosity >= 2) fprintf(stderr,"\rlocal next complete       \n");
 		vset_union(visited,next_level);
 		vset_copy(current_level,next_level);
 	}
@@ -183,24 +183,24 @@ void reach_bfs2(){
 	vset_t temp=vset_create(domain,0,NULL);
 	for(;;){
 		vset_copy(old_vis,visited);
-		if (verbosity >= 1) {
+		if (RTverbosity >= 1) {
 			vset_count(visited,&n_count,&e_count);
 			fprintf(stderr,"visited %d has %ld nodes and %lld elements\n",level,n_count,e_count);
 		}
 		level++;
 		for(i=0;i<nGrps;i++){
-			if (verbosity >= 2) fprintf(stderr,"\rexploring group %4d/%d",i+1,nGrps);
+			if (RTverbosity >= 2) fprintf(stderr,"\rexploring group %4d/%d",i+1,nGrps);
 			expand_group_rel(i,visited);
 			eg_count++;
 		}
-		if (verbosity >= 2) fprintf(stderr,"\rexploration complete             \n");
+		if (RTverbosity >= 2) fprintf(stderr,"\rexploration complete             \n");
 		for(i=0;i<nGrps;i++){
-			if (verbosity >= 2) fprintf(stderr,"\rlocal next %4d/%d",i+1,nGrps);
+			if (RTverbosity >= 2) fprintf(stderr,"\rlocal next %4d/%d",i+1,nGrps);
 			next_count++;
 			vset_next(temp,old_vis,group_rel[i]);
 			vset_union(visited,temp);
 		}
-		if (verbosity >= 2) fprintf(stderr,"\rlocal next complete       \n");
+		if (RTverbosity >= 2) fprintf(stderr,"\rlocal next complete       \n");
 		if (vset_equal(visited,old_vis)) break;
 	}
 	Warning(info,"Exploration took %ld group checks and %ld next state calls",eg_count,next_count);
@@ -222,48 +222,24 @@ void reach_chain(){
 	vset_t temp=vset_create(domain,0,NULL);
 	for(;;){
 		vset_copy(old_vis,visited);
-		if (verbosity >= 1) {
+		if (RTverbosity >= 1) {
 			vset_count(visited,&n_count,&e_count);
 			fprintf(stderr,"visited %d has %ld nodes and %lld elements\n",level,n_count,e_count);
 		}
 		level++;
 		for(i=0;i<nGrps;i++){
-			if (verbosity >= 2) fprintf(stderr,"\rgroup %4d/%d",i+1,nGrps);
+			if (RTverbosity >= 2) fprintf(stderr,"\rgroup %4d/%d",i+1,nGrps);
 			expand_group_rel(i,visited);
 			eg_count++;
 			next_count++;
 			vset_next(temp,visited,group_rel[i]);
 			vset_union(visited,temp);
 		}
-		if (verbosity >= 2) fprintf(stderr,"\rround %d complete       \n",level);
+		if (RTverbosity >= 2) fprintf(stderr,"\rround %d complete       \n",level);
 		if (vset_equal(visited,old_vis)) break;
 	}
 	Warning(info,"Exploration took %ld group checks and %ld next state calls",eg_count,next_count);
 }
-
-#if defined(NIPS) || defined(ETF)
-#include "aterm1.h"
-
-static void WarningHandler(const char *format, va_list args) {
-	FILE* f=log_get_stream(info);
-	if (f) {
-		fprintf(f,"ATerm library: ");
-		ATvfprintf(f, format, args);
-		fprintf(f,"\n");
-	}
-}
-     
-static void ErrorHandler(const char *format, va_list args) {
-	FILE* f=log_get_stream(error);
-	if (f) {
-		fprintf(f,"ATerm library: ");
-		ATvfprintf(f, format, args);
-		fprintf(f,"\n");
-	}
-	Fatal(1,error,"ATerror");
-	exit(1);
-}
-#endif
 
 static FILE* table_file;
 
@@ -272,47 +248,30 @@ static int table_count=0;
 typedef struct output_context {
 	int group;
 	int *src;
-	int *lbl;
-	int *dst;
 } output_context;
 
-static void print_edge(void*context,int*labels,int*dst){
+static void etf_edge(void*context,int*labels,int*dst){
 	output_context* ctx=(output_context*)context;
 	table_count++;
-/*
-	fprintf(stderr,"enumerating");
+	int k=0;
+	for(int i=0;i<N;i++) {
+		if (k<e_info->length[ctx->group] && e_info->indices[ctx->group][k]==i){
+			fprintf(table_file," %d/%d",ctx->src[k],dst[k]);
+			k++;
+		} else {
+			fprintf(table_file," *");
+		}
+	}
 	for(int i=0;i<eLbls;i++) {
-		chunk c=GBchunkGet(model,ltstype->edge_label_type[i],labels[i]);
-		char str[1024];
-		chunk_encode_copy(chunk_ld(1024,str),c,':');
-		fprintf(stderr," %s",str);
+		fprintf(table_file," %d",labels[i]);
 	}
-	fprintf(stderr," transitions\n");
-*/
-	if (table) {
-		int k=0;
-		for(int i=0;i<N;i++) {
-			if (k<e_info->length[ctx->group] && e_info->indices[ctx->group][k]==i){
-				fprintf(table_file," %d/%d",ctx->src[k],dst[k]);
-				k++;
-			} else {
-				fprintf(table_file," *");
-			}
-		}
-		for(int i=0;i<eLbls;i++) {
-			chunk c=GBchunkGet(model,lts_type_get_edge_label_typeno(ltstype,i),labels[i]);
-			char str[1024];
-			chunk_encode_copy(chunk_ld(1024,str),c,':');
-			fprintf(table_file," %s",str);
-		}
-		fprintf(table_file,"\n");
-	}
+	fprintf(table_file,"\n");
 }
 
 static void enum_edge(void*context,int *src){
 	output_context* ctx=(output_context*)context;
 	ctx->src=src;
-	GBgetTransitionsShort(model,ctx->group,ctx->src,print_edge,context);
+	GBgetTransitionsShort(model,ctx->group,ctx->src,etf_edge,context);
 }
 
 void do_output(){
@@ -320,99 +279,66 @@ void do_output(){
 	int state[N];
 	char edge_label_spec[256*(eLbls+1)];
 	GBgetInitialState(model,state);
-	if(table){
-		table_file=fopen(table,"w");
-		fprintf(table_file,"begin state\n");
-		for(int i=0;i<N;i++){
-			fprintf(table_file,"_:_%s",(i==(N-1))?"\n":" ");
-		}
-		fprintf(table_file,"end state\n");
-		fprintf(table_file,"begin init\n");
-		for(int i=0;i<N;i++) {
-			fprintf(table_file,"%d%s",state[i],(i==(N-1))?"\n":" ");
-		}
-		fprintf(table_file,"end init\n");
-		edge_label_spec[0]=0;
-		int ptr=0;
-		for(int i=0;i<eLbls;i++){
-			ptr+=sprintf(edge_label_spec+ptr," %s",lts_type_get_edge_label_type(ltstype,i));
-		}
-	}	
+	table_file=fopen(etf_output,"w");
+	fprintf(table_file,"begin state\n");
+	for(int i=0;i<N;i++){
+		fprintf(table_file,"_:_%s",(i==(N-1))?"\n":" ");
+	}
+	fprintf(table_file,"end state\n");
+	fprintf(table_file,"begin init\n");
+	for(int i=0;i<N;i++) {
+		fprintf(table_file,"%d%s",state[i],(i==(N-1))?"\n":" ");
+	}
+	fprintf(table_file,"end init\n");
+	edge_label_spec[0]=0;
+	int ptr=0;
+	for(int i=0;i<eLbls;i++){
+		ptr+=sprintf(edge_label_spec+ptr," [%s]",lts_type_get_edge_label_type(ltstype,i));
+	}
 	for(int g=0;g<nGrps;g++){
 		output_context ctx;
 		ctx.group=g;
-		if(table){
-			fprintf(table_file,"begin trans%s\n",edge_label_spec);
-		}
+		fprintf(table_file,"begin trans%s\n",edge_label_spec);
 		vset_enum(group_explored[g],enum_edge,&ctx);
-		if(table){
-			fprintf(table_file,"end trans\n");
-		}
-	}
-	if(table){
-		fclose(table_file);
+		fprintf(table_file,"end trans\n");
 	}
 	Warning(info,"Symbolic tables have %d reachable transitions",table_count);
+	int type_count=lts_type_get_type_count(ltstype);
+	for(int i=0;i<type_count;i++){
+		Warning(info,"dumping type %s",lts_type_get_type(ltstype,i));
+		fprintf(table_file,"begin sort %s\n",lts_type_get_type(ltstype,i));
+		int values=GBchunkCount(model,i);
+		for(int j=0;j<values;j++){
+			chunk c=GBchunkGet(model,i,j);
+			int len=c.len*3+1;
+			char str[len];
+			chunk_encode_copy(chunk_ld(len,str),c,':');
+			fprintf(table_file,"%s\n",str);
+		}
+		fprintf(table_file,"end sort\n");
+	}
+	int sLbls=lts_type_get_state_label_count(ltstype);
+	if (sLbls) Warning(info,"Writing of state labels is unimplemented");
+	fclose(table_file);
 }
 
 int main(int argc, char *argv[]){
-	void* stackbottom=&argv;
-	RTinit(&argc,&argv);
-	parse_options(options,argc,argv);
-	switch(use_vset_tree+use_vset_list+use_vset_fdd){
-	case 0:
-		use_vset_list=1;
-		break;
-	case 1:
-		break;
-	default:
-		Fatal(1,error,"cannot use more than one vset implementation at once.");
-	}
-	switch(bfs+bfs2+sat+chain){
-	case 0:
-		bfs=1;
-		break;
-	case 1:
-		break;
-	default:
-		Fatal(1,error,"please select a unique exploration order.");
-	}
-	if (verbosity==0) {
+	char* files[2];
+	RTinitPopt(&argc,&argv,options,1,2,files,NULL,"<model> [<etf>]",
+		"Perform a symbolic reachability analysis of <model>\n"
+		"The optional output of this analysis is an ETF representation of the input\n\nOptions");
+	etf_output=files[1];
+	if (RTverbosity==0) {
 		log_set_flags(info,LOG_IGNORE);
 	}
-	if (argc<=1) {
-		Fatal(1,error,"need a model as input, use -help for help");
-	}
-#if defined(MCRL)
-	MCRLinitGreybox(argc,argv,stackbottom);
-#elif defined(MCRL2)
-	MCRL2initGreybox(argc,argv,stackbottom);
-#elif defined(NIPS)
- 	ATinit(argc, argv, (ATerm*) stackbottom);
-	ATsetWarningHandler(WarningHandler);
-	ATsetErrorHandler(ErrorHandler);
- 	NIPSinitGreybox(argc,argv);
-#elif defined(ETF)
- 	ATinit(argc, argv, (ATerm*) stackbottom);
-	ATsetWarningHandler(WarningHandler);
-	ATsetErrorHandler(ErrorHandler);
-	// ETF has no init!
-#endif
-	Warning(info,"opening %s",argv[argc-1]);
+	Warning(info,"opening %s",files[0]);
 	model=GBcreateBase();
 	GBsetChunkMethods(model,new_string_index,NULL,
 		(int2chunk_t)SIgetC,(chunk2int_t)SIputC,(get_count_t)SIgetCount);
-#if defined(MCRL)
-	MCRLloadGreyboxModel(model,argv[argc-1],(state_visible*STATE_VISIBLE));
-#elif defined(MCRL2)
-	MCRL2loadGreyboxModel(model,argv[argc-1]);
-#elif defined(NIPS)
-	NIPSloadGreyboxModel(model,argv[argc-1]);
-#elif defined(ETF)
-	ETFloadGreyboxModel(model,argv[argc-1]);
-#endif
 
-	if (verbosity >=2) {
+	GBloadFile(model,files[0],&model);
+
+	if (RTverbosity >=2) {
 	  fprintf(stderr,"Dependency Matrix:\n");
 	  GBprintDependencyMatrix(stderr,model);
 	}
@@ -421,9 +347,7 @@ int main(int argc, char *argv[]){
 	N=lts_type_get_state_length(ltstype);
 	e_info=GBgetEdgeInfo(model);
 	nGrps=e_info->groups;
-	if (use_vset_list) domain=vdom_create_list(N);
-	if (use_vset_tree) domain=vdom_create_tree(N);
-	if (use_vset_fdd) domain=vdom_create_fdd(N);
+	domain=vdom_create_default(N);
 	visited=vset_create(domain,0,NULL);
 	group_rel=(vrel_t*)RTmalloc(nGrps*sizeof(vrel_t));
 	group_explored=(vset_t*)RTmalloc(nGrps*sizeof(vset_t));
@@ -440,17 +364,16 @@ int main(int argc, char *argv[]){
 	Warning(info,"got initial state");
 	mytimer_t timer=SCCcreateTimer();
 	SCCstartTimer(timer);
-	if(bfs) {
+	switch(strategy){
+	case BFS:
 		reach_bfs();
-	}
-	if(bfs2) {
+		break;
+	case BFS2:
 		reach_bfs2();
-	}
-	if(sat) {
-		reach_sat();
-	}
-	if (chain) {
+		break;
+	case Chain:
 		reach_chain();
+		break;
 	}
 	SCCstopTimer(timer);
 	SCCreportTimer(timer,"reachability took");
@@ -458,7 +381,7 @@ int main(int argc, char *argv[]){
 	long long e_count;
 	long n_count;
 	vset_count(visited,&n_count,&e_count);
-	if (table) {
+	if (etf_output) {
 		fprintf(stderr,"state space has %ld nodes and %lld elements\n",n_count,e_count);
 		SCCresetTimer(timer);
 		SCCstartTimer(timer);

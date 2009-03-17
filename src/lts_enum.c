@@ -43,22 +43,27 @@ void enum_seg_seg(lts_enum_cb_t sink,int src_seg,int src_ofs,int dst_seg,int dst
 
 
 static void missing_vec(void*ctx,int* state,int* labels){
+	(void)ctx;(void)state;(void)labels;
 	Fatal(1,error,"missing callback");
 }
 
 static void missing_seg(void*ctx,int seg,int ofs,int* labels){
+	(void)ctx;(void)seg;(void)ofs;(void)labels;
 	Fatal(1,error,"missing callback");
 }
 
 static void missing_vec_vec(void*ctx,int* src,int* dst,int*labels){
+	(void)ctx;(void)src;(void)dst;(void)labels;
 	Fatal(1,error,"missing callback");
 }
 
 static void missing_seg_vec(void*ctx,int src_seg,int src_ofs,int* dst,int*labels){
+	(void)ctx;(void)src_seg;(void)src_ofs;(void)dst;(void)labels;
 	Fatal(1,error,"missing callback");
 }
 
 static void missing_seg_seg(void*ctx,int src_seg,int src_ofs,int dst_seg,int dst_ofs,int*labels){
+	(void)ctx;(void)src_seg;(void)src_ofs;(void)dst_seg;(void)dst_ofs;(void)labels;
 	Fatal(1,error,"missing callback");
 }
 
@@ -71,6 +76,7 @@ lts_enum_cb_t lts_enum_viv(int len,void* context,state_vec_cb state_cb,edge_seg_
 	output->vec_vec_cb=missing_vec_vec;
 	output->seg_vec_cb=edge_cb;
 	output->seg_seg_cb=missing_seg_seg;
+	return output;
 }
 
 lts_enum_cb_t lts_enum_iii(int len,void* context,state_seg_cb state_cb,edge_seg_seg_cb edge_cb){
@@ -82,25 +88,26 @@ lts_enum_cb_t lts_enum_iii(int len,void* context,state_seg_cb state_cb,edge_seg_
 	output->vec_vec_cb=missing_vec_vec;
 	output->seg_vec_cb=missing_seg_vec;
 	output->seg_seg_cb=edge_cb;
+	return output;
 }
 
 static void convert_vec(void*ctx,int* state,int* labels){
-	lts_enum_cb_t output=(lts_enum_cb_t)ctx;
+	(void)ctx;(void)state;(void)labels;
 	Fatal(1,error,"TODO 1");
 }
 
 static void convert_seg(void*ctx,int seg,int ofs,int* labels){
-	lts_enum_cb_t output=(lts_enum_cb_t)ctx;
+	(void)ctx;(void)seg;(void)ofs;(void)labels;
 	Fatal(1,error,"TODO 2");
 }
 
 static void convert_vec_vec(void*ctx,int* src,int* dst,int*labels){
-	lts_enum_cb_t output=(lts_enum_cb_t)ctx;
+	(void)ctx;(void)src;(void)dst;(void)labels;
 	Fatal(1,error,"TODO 3");
 }
 
 static void convert_seg_vec(void*ctx,int src_seg,int src_ofs,int* dst,int*labels){
-	lts_enum_cb_t output=(lts_enum_cb_t)ctx;
+	(void)ctx;(void)src_seg;(void)src_ofs;(void)dst;(void)labels;
 	Fatal(1,error,"TODO 4");
 }
 
@@ -129,6 +136,7 @@ lts_enum_cb_t lts_enum_convert(lts_enum_cb_t base,void*context,state_fold_t fold
 	output->fold=fold;
 	output->unfold=unfold;
 	output->force=idx_convert;
+	return output;
 }
 
 

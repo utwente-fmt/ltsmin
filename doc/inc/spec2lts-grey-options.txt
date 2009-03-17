@@ -1,0 +1,8 @@
+*--state*='TYPE'::
+        Select type of data structure for storing states: 'tree' or
+        'vset'.  With 'tree', a tree-compressed hash table is used to
+        store the set of states.  With 'vset', a vector set (decision
+        diagram) is used. Defaults to 'tree'.
+
+*--torx*::
+        Run TorX-Explorer textual interface on 'stdin' and 'stdout'.

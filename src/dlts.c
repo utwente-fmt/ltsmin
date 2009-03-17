@@ -60,7 +60,7 @@ void dlts_getinfo(dlts_t lts){
 		lts->decode="auto";
 		version=DSreadU16(ds);
 	} else {
-		Warning(info,"detected uncompressed input");
+		Warning(debug,"detected uncompressed input");
 		lts->decode=NULL;
 	}
 	if (version!=31) Fatal(1,error,"wrong file version: %d",version);
@@ -81,7 +81,7 @@ void dlts_getinfo(dlts_t lts){
 		lts->transition_count[i]=(uint32_t*)RTmalloc(lts->segment_count*sizeof(uint32_t));
 		for(j=0;j<lts->segment_count;j++){
 			lts->transition_count[i][j]=DSreadU32(ds);
-			Warning(info,"%d transitions from %d to %d",lts->transition_count[i][j],i,j);
+			Warning(debug,"%d transitions from %d to %d",lts->transition_count[i][j],i,j);
 		}
 	}
 	lts->src=(uint32_t***)malloc(lts->segment_count*sizeof(uint32_t**));

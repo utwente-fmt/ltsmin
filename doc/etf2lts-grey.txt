@@ -1,0 +1,29 @@
+//                           -*- mode: doc; outline-regexp: "==\(=*\) ." -*-
+etf2lts-grey(1)
+===============
+:Author:  Stefan Blom
+:Email:   <sccblom@cs.utwente.nl>
+:Date:    2009-03-16
+
+== NAME
+
+etf2lts-grey - Sequential state space generator for ETF models.
+
+== SYNOPSIS
+
+*etf2lts-grey* [OPTION]... 'input.etf' ['output.fmt']
+
+== DESCRIPTION
+
+etf2lts-grey generates a labelled transition system from a
+specification provided in 'input.etf' by enumerative reachability
+analysis.  Specifications are in linkman:etf[5] format.  'output.fmt'
+specifies the name of the output archive.  The desired format is
+deduced from the filename extension.
+
+== OPTIONS
+
+include::inc/spec2lts-grey-options.txt[]
+
+include::inc/spec2lts-grey.txt[]
+

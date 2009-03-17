@@ -3,11 +3,25 @@ nips2lts-grey(1)
 ==============
 :Author:  Stefan Blom
 :Email:   <sccblom@cs.utwente.nl>
-:Date:    2008-12-03
+:Date:    2009-03-16
 
 == NAME
+
 nips2lts-grey - Sequential state space generator
 
-include::spec2lts-mpi.txt[]
+== SYNOPSIS
 
+*nips2lts-grey* [OPTION]... 'input.b' ['output.fmt']
 
+== DESCRIPTION
+
+nips2lts-grey generates a labelled transition system from a
+specification provided in 'input.b'.  'output.fmt' specifies the name
+of the output archive.  The desired format is deduced from the
+filename extension.
+
+== OPTIONS
+
+include::inc/spec2lts-grey-options.txt[]
+
+include::inc/spec2lts-grey.txt[]

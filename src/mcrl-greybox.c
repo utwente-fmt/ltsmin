@@ -9,6 +9,89 @@
 #include "step.h"
 #include "at-map.h"
 
+
+/**
+\brief Flag that tells the mCRL grey box loader to pass state variable names.
+ */
+#define STATE_VISIBLE 0x01
+static int flags=0;
+static char *mcrl_args="-alt rw";
+
+
+static void WarningHandler(const char *format, va_list args) {
+	FILE* f=log_get_stream(info);
+	if (f) {
+		fprintf(f,"MCRL grey box: ");
+		ATvfprintf(f, format, args);
+		fprintf(f,"\n");
+	}
+}
+     
+static void ErrorHandler(const char *format, va_list args) {
+	FILE* f=log_get_stream(error);
+	if (f) {
+		fprintf(f,"MCRL grey box: ");
+		ATvfprintf(f, format, args);
+		fprintf(f,"\n");
+	}
+	Fatal(1,error,"ATerror");
+	exit(EXIT_FAILURE);
+}
+
+
+static void MCRLinitGreybox(int argc,char *argv[],void* stack_bottom){
+	ATinit(argc, argv, stack_bottom);
+	ATsetWarningHandler(WarningHandler);
+	ATsetErrorHandler(ErrorHandler);
+	int i;
+	int c=argc+2;
+	char* cpargv[c];
+	char** xargv=cpargv;
+	xargv[0]=get_label();
+	for(i=0;i<argc;i++) xargv[i+1]=argv[i];
+	xargv[argc+1]="bug in mCRL that assume an input on the command line";
+	MCRLsetArguments(&c, &xargv);
+	RWsetArguments(&c, &xargv);
+	STsetArguments(&c, &xargv);
+}
+
+
+static void mcrl_popt(poptContext con,
+ 		enum poptCallbackReason reason,
+                            const struct poptOption * opt,
+                             const char * arg, void * data){
+	(void)con;(void)opt;(void)arg;(void)data;
+	switch(reason){
+	case POPT_CALLBACK_REASON_PRE:
+		break;
+	case POPT_CALLBACK_REASON_POST: {
+		int argc;
+		char **argv;
+		int res=poptParseArgvString(mcrl_args,&argc,(const char ***)&argv);
+		if (res){
+			Fatal(1,error,"could not parse %s: %s",mcrl_args,poptStrerror(res));
+		}
+//		Warning(info,"passing %s to mCRL",mcrl_args);	
+//		for(int i=0;i<argc;i++){
+//			Warning(info,"arg %d is %s",i,argv[i]);
+//		}
+		MCRLinitGreybox(argc,argv,RTstackBottom());
+		GBregisterLoader("tbf",MCRLloadGreyboxModel);
+		Warning(debug,"mCRL language module initialized");
+		return;
+	}
+	case POPT_CALLBACK_REASON_OPTION:
+		break;
+	}
+	Fatal(1,error,"unexpected call to mcrl_popt");
+}
+struct poptOption mcrl_options[]= {
+	{ NULL, 0 , POPT_ARG_CALLBACK|POPT_CBFLAG_POST|POPT_CBFLAG_SKIPOPTION , mcrl_popt , 0 , NULL , NULL },
+	{ "state-names" , 0 , POPT_ARG_VAL|POPT_ARGFLAG_OR , &flags , STATE_VISIBLE , "make the state parameters visible" ,NULL},
+	{ "mcrl" , 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &mcrl_args , 0, "Pass options to the mCRL library.","<mCRL options>" },
+	POPT_TABLEEND
+};
+
 static ATerm label=NULL;
 static ATerm *dst;
 
@@ -61,45 +144,6 @@ static void callback(void){
 	user_cb(user_context,&lbl,dst_p);
 }
 
-static void WarningHandler(const char *format, va_list args) {
-	FILE* f=log_get_stream(info);
-	if (f) {
-		fprintf(f,"MCRL grey box: ");
-		ATvfprintf(f, format, args);
-		fprintf(f,"\n");
-	}
-}
-     
-static void ErrorHandler(const char *format, va_list args) {
-	FILE* f=log_get_stream(error);
-	if (f) {
-		fprintf(f,"MCRL grey box: ");
-		ATvfprintf(f, format, args);
-		fprintf(f,"\n");
-	}
-	Fatal(1,error,"ATerror");
-	exit(1);
-}
-
-
-void MCRLinitGreybox(int argc,char *argv[],void* stack_bottom){
-	ATinit(argc, argv, stack_bottom);
-	ATsetWarningHandler(WarningHandler);
-	ATsetErrorHandler(ErrorHandler);
-	int i;
-	int c=argc+2;
-	char* cpargv[c];
-	char** xargv=cpargv;
-	xargv[0]=argv[0];
-	xargv[1]="-alt";
-	xargv[2]="rw";
-//	xargv[3]="-no-hash";
-//	xargv[4]="-conditional";
-	for(i=1;i<argc;i++) xargv[i+2]=argv[i];
-	MCRLsetArguments(&c, &xargv);
-	RWsetArguments(&c, &xargv);
-	STsetArguments(&c, &xargv);
-}
 
 static void MCRLgetStateLabelsAll(model_t model,int*state,int*labels){
 	(void)model;
@@ -144,21 +188,23 @@ static int MCRLgetTransitionsAll(model_t model,int*src,TransitionCB cb,void*cont
 	return res;
 }
 
-void MCRLloadGreyboxModel(model_t m,char*model,int vars){
+void MCRLloadGreyboxModel(model_t m,const char*model){
 	if(instances) {
 		Fatal(1,error,"mCRL is limited to one instance, due to global variables.");
 	}
 	instances++;
-	if(!MCRLinitNamedFile(model)) {
+	char*x=strdup(model);
+	if(!MCRLinitNamedFile(x)) {
 		FatalCall(1,error,"failed to open %s",model);
 	}
+	free(x);
 	if (!RWinitialize(MCRLgetAdt())) {
 		Fatal(1,error,"could not initialize rewriter for %s",model);
 	}
 	lts_type_t ltstype=lts_type_create();
 	state_length=MCRLgetNumberOfPars();
 	lts_type_set_state_length(ltstype,state_length);
-	if (vars & STATE_VISIBLE){
+	if (flags & STATE_VISIBLE){
 		Warning(info,"state variables are visible.");
 		ATermList pars=MCRLgetListOfPars();
 		for(int i=0;i<state_length;i++){

@@ -146,8 +146,8 @@ libutil_a_SOURCES := unix.c runtime.c stream.c archive.c			\
                     stream_buffer.c fast_hash.c generichash4.c		\
                     generichash8.c treedbs.c archive_format.c raf.c	\
                     stream_mem.c ghf.c archive_gcf.c scctimer.c		\
-                    gzstream.c stream_diff32.c options.c arch_object.h	\
-                    generichash.h unix.h archive.h ghf.h options.h	\
+                    gzstream.c stream_diff32.c arch_object.h	\
+                    generichash.h unix.h archive.h ghf.h	\
                     stream.h raf.h stream_object.h raf_object.h		\
                     scctimer.h fast_hash.h runtime.h treedbs.h		\
                     config.h greybox.c greybox.h stringindex.c		\
@@ -159,7 +159,7 @@ libutil_a_SOURCES := unix.c runtime.c stream.c archive.c			\
                     lts-type.h vset_buddy.c vector_set.c vector_set.h	\
                     vdom_object.h lts_io.c lts_io.h lts_io_internal.h \
                     lts_enum.c lts_enum.h lts_count.c lts_count.h \
-                    archive_io_ops.c
+                    archive_io_ops.c options.h
 
 libutil_a_CPPFLAGS := $(BUDDY_CPPFLAGS)
 
@@ -170,7 +170,7 @@ libutil_a_CPPFLAGS  += $(CADP_CPPFLAGS)
 endif
 
 
-options.c: git_version.h
+runtime.c: git_version.h
 
 GIT_DESCRIBE := $(shell git describe --tags --abbrev=6 HEAD 2>/dev/null)
 

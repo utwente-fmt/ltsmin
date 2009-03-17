@@ -1,0 +1,56 @@
+include::pins-options.txt[]
+
+include::io-options.txt[]
+
+include::general-options.txt[]
+
+include::file-formats.txt[]
+
+== EXIT STATUS
+*0*::
+        Successful termination.
+*>0*::
+        Some error occurred.
+
+== EXAMPLES
+
+As running example, we use a model of the bounded retransmission
+protocol from the muCRL examples. Assuming we have copied the file
+'brp.mcrl' to our working directory, we can linearize the model with
+the following command:
+
+----
+mcrl -regular -nocluster brp.mcrl
+----
+
+This produces a file named 'brp.tbf'. This is the input for the state
+space generator. In order to produce a _DIR_ format output, which
+is compatible with the muCRL tools, the tool can be run like this:
+
+----
+mpirun -np 2 -mca btl tcp,self lpo2lts-mpi brp.tbf brp.dir
+----
+
+In order to create a compressed GCF file, the tool can be run like this:
+
+----
+mpirun -np 2 -mca btl tcp,self lpo2lts-mpi brp.tbf brp.gcf
+----
+
+This GCF file can be read by linkman:ltsmin-mpi[1], linkman:ltsmin-convert[1].
+It cannot be read by the mCRL tools. To convert ++brp.gcf++ to ++brp.dir++,
+one can simply extract the GCF file:
+
+----
+gcf -x brp.gcf brp.dir
+----
+
+include::support.txt[]
+
+== SEE ALSO
+linkman:ltsmin-mpi[1],
+linkman:ltsmin-convert[1],
+http://www.cwi.nl/{tilde}mcrl/[muCRL],
+http://www.mcrl2.org/[mCRL2],
+http://fmt.cs.utwente.nl/{tilde}michaelw/nips/[NIPS],
+http://www.mpi-forum.org/[MPI Forum]

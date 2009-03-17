@@ -1,0 +1,14 @@
+The tool uses http://www.mpi-forum.org/[MPI] for distributed
+computation, thus it has to be started via `mpirun`.  _nodespec_
+determines which processors the tool is run on.
+
+The workers send messages to themselves. So if you use
+http://www.open-mpi.org/[Open MPI], you have to use 
++mpirun -mca btl+ 'CONNECT'+,self+ 'NODESPEC' where
+'CONNECT' can be +tcp+, +mx+, +ib+, etc..
+
+//MPI-IO support disabled due to refactoring and bugs.
+//
+//The tool uses MPI-IO, the I/O chapter in MPI-2, so if your MPI
+//implementation has special extensions in MPI-IO, such as
+//http://www.pvfs.org/[PVFS2], then those extensions are supported.

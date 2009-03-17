@@ -78,7 +78,7 @@ static void mpi_close(raf_t *raf){
 raf_t MPI_Load_raf(char *name,MPI_Comm comm){
 	raf_t raf=(raf_t)RTmalloc(sizeof(struct raf_struct_s));
 	raf_init(raf,name);
-	raf->blocksize=prop_get_U32("bs",65536);
+	raf->blocksize=65536;
 	MPI_File f;
 	MPI_Comm_size(comm,&(raf->workers));
 	MPI_Comm_rank(comm,&(raf->rank));
@@ -95,7 +95,7 @@ raf_t MPI_Load_raf(char *name,MPI_Comm comm){
 	if (((raf->size)/(raf->blocksize))%(raf->workers)) Fatal(0,error,"block count not multiple of worker count");
 	//Warning(info,"my share is %d",(raf->size)/(raf->workers));
 	raf->data=RTmalloc((raf->size)/(raf->workers));
-	if (prop_get_U32("readall",1)) {
+	if (1) {
 		Warning(info,"using MPI_File_read_all");
 		MPI_Datatype ftype;
 		MPI_Type_vector((raf->size)/(raf->blocksize),(raf->blocksize),(raf->blocksize)*(raf->workers),MPI_CHAR,&ftype);

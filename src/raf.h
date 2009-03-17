@@ -40,4 +40,8 @@ extern void raf_close(raf_t *raf);
 /** @brief Open a random acces file using UNIX calls. */
 extern raf_t raf_unistd(char *name);
 
+/** @brief Open a random acces file using UNIX/AIO calls. */
+extern raf_t raf_aio(char *name);
+
+
 #endif

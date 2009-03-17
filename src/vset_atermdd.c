@@ -4,6 +4,51 @@
 #include <runtime.h>
 #include <aterm2.h>
 
+static void WarningHandler(const char *format, va_list args) {
+	FILE* f=log_get_stream(info);
+	if (f) {
+		fprintf(f,"%s: ",get_label());
+		ATvfprintf(f, format, args);
+		fprintf(f,"\n");
+	}
+}
+     
+static void ErrorHandler(const char *format, va_list args) {
+	FILE* f=log_get_stream(error);
+	if (f) {
+		fprintf(f,"%s: ",get_label());
+		ATvfprintf(f, format, args);
+		fprintf(f,"\n");
+	}
+	Fatal(1,error,"ATerror");
+	exit(EXIT_FAILURE);
+}
+
+static void atermdd_popt(poptContext con,
+ 		enum poptCallbackReason reason,
+                            const struct poptOption * opt,
+                             const char * arg, void * data){
+	(void)con;(void)opt;(void)arg;(void)data;
+	switch(reason){
+	case POPT_CALLBACK_REASON_PRE:
+		break;
+	case POPT_CALLBACK_REASON_POST: {
+		char*argv[]={"xxx",NULL};
+		ATinit(1, argv, (ATerm*) RTstackBottom());
+		ATsetWarningHandler(WarningHandler);
+		ATsetErrorHandler(ErrorHandler);
+		return;
+	}
+	case POPT_CALLBACK_REASON_OPTION:
+		break;
+	}
+	Fatal(1,error,"unexpected call to atermdd_popt");
+}
+
+struct poptOption atermdd_options[]= {
+	{ NULL, 0 , POPT_ARG_CALLBACK|POPT_CBFLAG_POST|POPT_CBFLAG_SKIPOPTION , (void*)atermdd_popt , 0 , NULL , NULL },
+	POPT_TABLEEND
+};
 
 struct vector_domain {
 	struct vector_domain_shared shared;
@@ -408,6 +453,7 @@ static int set_enum_t2(ATerm set,int *a,int len,int (*callback)(int*,int),int of
     }
     set_enum_t2(Left(set),a,len,callback,ofs,shift<<1,cur);
     set_enum_t2(Right(set),a,len,callback,ofs,shift<<1,shift|cur);
+    return 0;
   }
 }
 

@@ -401,7 +401,6 @@ void etf_ode_add(etf_model_t model){
 	}
 	int vcount[state_length];
 	for(int i=0;i<state_length;i++){
-		int typeno=lts_type_get_state_typeno(model->ltstype,i);
 		vcount[i]=SIgetCount(model->type_values[i]);
 		Warning(info,"var %d is %s with %d values",i,lts_type_get_state_name(model->ltstype,i),vcount[i]);
 	}

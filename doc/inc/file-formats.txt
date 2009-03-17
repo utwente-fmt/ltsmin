@@ -1,0 +1,25 @@
+== File Formats
+The following file formats are supported:
+
+* Directory format ('{ast}.dir' and '{ast}.gcf')
+* Binary Coded Graphs ('{ast}.bcg')
+
+The '{ast}.dir' format uses multiple files in a directory by
+default. It is also possible to put these files in a GCF archive
+('{ast}.gcf'). When the files are put in a directory, the default
+is to store them uncompressed, because otherwise the mCRL tools
+cannot read the files.
+When the files are stored in a GCF archive then the default is
+compression enabled.
+
+
+If you try to open a compressed directory wiht an mCRL tools,
+you will get the error message:
+----
+wrong file version: 0
+----
+If that happens then you may convert the directory by typing the command:
+----
+ltsmin-convert bad.dir good.dir
+----
+

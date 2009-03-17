@@ -5,7 +5,30 @@
 #include <runtime.h>
 #include <vdom_object.h>
 
+static int fdd_bits=16;
+static int cacheratio=64;
+static int maxincrease=1000000;
+static int minfreenodes=20;
 
+static void buddy_init(){
+	static int initialized=0;
+	if (!initialized) {
+		bdd_init(1000000, 100000);
+		Warning(info,"ratio %d, maxixum increase %d, minimum free %d",cacheratio,maxincrease,minfreenodes);
+		bdd_setcacheratio(cacheratio);
+		bdd_setmaxincrease(maxincrease);
+		bdd_setminfreenodes(minfreenodes);
+		initialized=1;
+	}
+}
+
+struct poptOption buddy_options[]= {
+	{ "cache-ratio",0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &cacheratio , 0 , "set cache ratio","<nodes/slot>"},
+	{ "max-increase" , 0 , POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &maxincrease , 0 , "set maximum increase","<number>"},
+	{ "min-free-nodes", 0 , POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &minfreenodes , 0 , "set minimum free node percentage","<percentage>"},
+	{ "fdd-bits" , 0 , POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &fdd_bits , 0 , "set the number of bits for each fdd variable","<number>"},
+	POPT_TABLEEND
+};
 
 struct vector_domain {
 	struct vector_domain_shared shared;
@@ -30,14 +53,6 @@ static BDD mkvar2(vdom_t dom,int idx,int val){
 static void rmvar2(BDD var) {
 	bdd_delref(var);
 }
-
-static int bdd_init_done=0;
-static int fdd_bits=16;
-static int cacheratio=64;
-static int maxincrease=1000000;
-static int minfreenodes=20;
-
-
 
 struct vector_set {
 	vdom_t dom;
@@ -111,7 +126,7 @@ static vrel_t rel_create_fdd(vdom_t dom,int k,int* proj){
 	return rel;
 }
 
-static inline BDD fdd_element(vset_t set,int* e){
+static inline BDD fdd_element(vset_t set,const int* e){
 	int N=set->p_len;
 	BDD bdd=bddtrue;
 	for(int i=0;i<N;i++){
@@ -128,7 +143,7 @@ static inline BDD fdd_element(vset_t set,int* e){
 	return bdd;
 }
 
-static BDD fdd_pair(vrel_t rel,int* e1,int*e2){
+static BDD fdd_pair(vrel_t rel,const int* e1,const int*e2){
 //	Warning(info,"args %x %x %x",rel,e1,e2);
 	int N=rel->p_len;
 //	Warning(info,"N: %d %d",N,rel->p_len);
@@ -152,7 +167,7 @@ static BDD fdd_pair(vrel_t rel,int* e1,int*e2){
 	return bdd;
 }
 
-static void set_add_fdd(vset_t set,int* e){
+static void set_add_fdd(vset_t set,const int* e){
 	BDD bdd=fdd_element(set,e);
 	BDD tmp=set->bdd;
 	set->bdd=bdd_addref(bdd_or(set->bdd,bdd));
@@ -162,7 +177,7 @@ static void set_add_fdd(vset_t set,int* e){
 	//fdd_printset(set->bdd);
 	//printf("\n");
 }
-
+/*
 static void set_add_check_fdd(vset_t set,int* e,int*new_e){
 	BDD bdd=fdd_element(set,e);
 	BDD tmp=set->bdd;
@@ -171,9 +186,9 @@ static void set_add_check_fdd(vset_t set,int* e,int*new_e){
 	bdd_delref(bdd);
 	bdd_delref(tmp);
 }
+*/
 
-
-static int set_member_fdd(vset_t set,int* e){
+static int set_member_fdd(vset_t set,const int* e){
 	BDD ebdd=fdd_element(set,e);
 	int res=(bdd_and(set->bdd,ebdd)!=bddfalse);
 	bdd_delref(ebdd);
@@ -285,7 +300,7 @@ static void set_zip_fdd(vset_t dst,vset_t src){
 	bdd_delref(tmp2);
 }
 
-static void rel_add_fdd(vrel_t rel,int* src,int *dst){
+static void rel_add_fdd(vrel_t rel,const int* src,const int *dst){
 	BDD bdd=fdd_pair(rel,src,dst);
 	BDD tmp=rel->bdd;
 	rel->bdd=bdd_addref(bdd_or(rel->bdd,bdd));
@@ -296,28 +311,10 @@ static void rel_add_fdd(vrel_t rel,int* src,int *dst){
 
 vdom_t vdom_create_fdd(int n){
 	Warning(info,"Creating a BuDDy fdd domain.");
+	buddy_init();
 	vdom_t dom=(vdom_t)RTmalloc(sizeof(struct vector_domain));
 	vdom_init_shared(dom,n);
 	int res;
-	if( !bdd_init_done) {
-		bdd_init(1000000, 100000);
-		cacheratio=prop_get_U32("ratio",cacheratio);
-		Warning(info,"setting cache ratio to %d",cacheratio);
-		Warning(info,"this value can be set with the option ratio=<percentage>");
-		bdd_setcacheratio(cacheratio);
-		maxincrease=prop_get_U32("maxinc",maxincrease);
-		Warning(info,"setting maximum increase to %d",maxincrease);
-		Warning(info,"this value can be set with the option maxinc=<increase>");
-		bdd_setmaxincrease(maxincrease);
-		minfreenodes=prop_get_U32("minfree",minfreenodes);
-		Warning(info,"setting minimum free nodes to %d",minfreenodes);
-		Warning(info,"this value can be set with the option minfree=<percentage>");
-		bdd_setminfreenodes(minfreenodes);
-		fdd_bits=prop_get_U32("fdd",fdd_bits);
-		Warning(info,"using %d bits for every fdd variable",fdd_bits);
-		Warning(info,"this value can be set with the option fdd=<bits>");
-		bdd_init_done=1;
-	}
 	int domain[2];
 	domain[0]=1<<fdd_bits;
 	domain[1]=1<<fdd_bits;

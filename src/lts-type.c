@@ -4,7 +4,7 @@
 #include "lts-type.h"
 #include "stringindex.h"
 
-typedef struct lts_type_s {
+struct lts_type_s {
 int state_length;
 char** state_name;
 int* state_type;

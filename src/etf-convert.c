@@ -3,6 +3,12 @@
 #include <ctype.h>
 #include "runtime.h"
 #include "etf-util.h"
+#include <popt.h>
+
+static  struct poptOption options[] = {
+	POPT_TABLEEND
+};
+
 
 #define ETF_BUF 4096
 
@@ -74,14 +80,14 @@ void dve_write(const char*name,etf_model_t model){
 }
 
 int main(int argc,char *argv[]){
-	RTinit(&argc,&argv);
-        //take_options(options,&argc,argv);
+	char* files[2];
+	RTinitPopt(&argc,&argv,options,2,2,files,NULL,"<input> <output>","Convert ETF to DVE");
 
-	Warning(info,"parsing %s",argv[1]);
-	etf_model_t model=etf_parse(argv[1]);
+	Warning(info,"parsing %s",files[0]);
+	etf_model_t model=etf_parse(files[0]);
 
-	Warning(info,"writing %s",argv[2]);
-	dve_write(argv[2],model);
+	Warning(info,"writing %s",files[1]);
+	dve_write(files[1],model);
 	Warning(info,"done");
 	return 0;
 }
