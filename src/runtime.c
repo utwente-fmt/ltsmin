@@ -288,7 +288,7 @@ void* RTmalloc(size_t size){
 
 void* RTmallocZero(size_t size){
 	void *p=RTmalloc(size);
-	bzero(p,size);
+	memset(p, 0, size);
 	return p;
 }
 
