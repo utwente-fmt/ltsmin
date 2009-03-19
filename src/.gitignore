@@ -24,3 +24,5 @@ mpi-event-test
 nips-reach
 nips2lts-grey
 nips2lts-mpi
+*.hi
+regroup
