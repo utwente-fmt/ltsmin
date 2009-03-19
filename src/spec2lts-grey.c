@@ -34,6 +34,8 @@ static lts_output_t output=NULL;
 
 static treedbs_t dbs=NULL;
 static int write_lts;
+static int matrix=0;
+
 
 typedef enum { UseGreyBox , UseBlackBox } mode_t;
 static mode_t call_mode=UseBlackBox;
@@ -45,6 +47,7 @@ static enum { ReachTreeDBS, ReachVset, RunTorX } application=ReachTreeDBS;
 
 static  struct poptOption development_options[] = {
 	{ "grey", 0 , POPT_ARG_VAL , &call_mode , UseGreyBox , "make use of GetTransitionsLong calls" , NULL },
+	{ "matrix", 0 , POPT_ARG_VAL, &matrix,1,"Print the dependency matrix and quit",NULL},
 	POPT_TABLEEND
 };
 
@@ -176,7 +179,8 @@ static void explore_state_index(void*context,int idx,int*src){
 		break;
 	}
 	explored++;
-	if(explored%1000==0) Warning(info,"explored %d visited %d trans %d",explored,visited,trans);
+	if (explored%1000==0 && RTverbosity>=2) 
+	  Warning(info,"explored %d visited %d trans %d",explored,visited,trans);
 }
 
 static void explore_state_vector(void*context,int*src){
@@ -199,7 +203,8 @@ static void explore_state_vector(void*context,int*src){
 		break;
 	}
 	explored++;
-	if(explored%1000==0) Warning(info,"explored %d visited %d trans %d",explored,visited,trans);
+	if (explored%1000==0 && RTverbosity>=2) 
+	  Warning(info,"explored %d visited %d trans %d",explored,visited,trans);
 }
 
 
@@ -301,7 +306,10 @@ int main(int argc, char *argv[]){
 	  fprintf(stderr,"Dependency Matrix:\n");
 	  GBprintDependencyMatrix(stderr,model);
 	}
-
+	if (matrix) {
+	  GBprintDependencyMatrix(stdout,model);
+	  exit(0);
+	}
 	lts_type_t ltstype=GBgetLTStype(model);
 	N=lts_type_get_state_length(ltstype);
 	edge_info_t e_info=GBgetEdgeInfo(model);
@@ -336,12 +344,13 @@ int main(int argc, char *argv[]){
 		vset_add(next_set,src);
 		vset_t current_set=vset_create(domain,0,NULL);
 		while (!vset_is_empty(next_set)){
-			Warning(info,"level %d has %d states, explored %d states %d trans",
-				level,(visited-explored),explored,trans);
-			level++;
-			vset_copy(current_set,next_set);
-			vset_clear(next_set);
-			vset_enum(current_set,explore_state_vector,model);
+		  if (RTverbosity >= 1)
+		    Warning(info,"level %d has %d states, explored %d states %d trans",
+			    level,(visited-explored),explored,trans);
+		  level++;
+		  vset_copy(current_set,next_set);
+		  vset_clear(next_set);
+		  vset_enum(current_set,explore_state_vector,model);
 		}
 		long long size;
 		long nodes;
@@ -354,14 +363,15 @@ int main(int argc, char *argv[]){
 		}
 		int limit=visited;
 		while(explored<visited){
-			if (limit==explored){
-				Warning(info,"level %d has %d states, explored %d states %d trans",
-					level,(visited-explored),explored,trans);
-				limit=visited;
-				level++;
-			}
-			TreeUnfold(dbs,explored,src);
-			explore_state_index(model,explored,src);
+		  if (limit==explored){
+		    if (RTverbosity >= 1)
+		      Warning(info,"level %d has %d states, explored %d states %d trans",
+			      level,(visited-explored),explored,trans);
+		    limit=visited;
+		    level++;
+		  }
+		  TreeUnfold(dbs,explored,src);
+		  explore_state_index(model,explored,src);
 		}
 		break;
 	case RunTorX:

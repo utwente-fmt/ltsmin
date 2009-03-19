@@ -86,6 +86,7 @@ static edge_info_t e_info;
 static int nGrps;
 static vdom_t domain;
 static vset_t visited;
+static long max_count=0;
 static model_t model;
 static vrel_t *group_rel;
 static vset_t *group_explored;
@@ -114,7 +115,7 @@ static void explore_cb(void*context,int *src){
 	ctx->src=src;
 	GBgetTransitionsShort(model,ctx->group,src,group_add,context);
 	explored++;
-	if (explored%1000 ==0) {
+	if (explored%1000 ==0 && RTverbosity >=2) {
 		Warning(info,"explored %d short vectors for group %d",explored,ctx->group);
 	}
 }
@@ -144,9 +145,12 @@ void reach_bfs(){
 	for(;;){
 		if (RTverbosity >= 1) {
 			vset_count(current_level,&n_count,&e_count);
-			fprintf(stderr,"level %d has %ld nodes and %lld elements\n",level,n_count,e_count);
-			vset_count(visited,&n_count,&e_count);
-			fprintf(stderr,"visited %d has %ld nodes and %lld elements\n",level,n_count,e_count);
+			fprintf(stderr,"level %d has %lld states (%ld nodes)\n",level,e_count,n_count);
+		}
+		vset_count(visited,&n_count,&e_count);
+		if (n_count>max_count) max_count=n_count;
+		if (RTverbosity >= 1) {
+			fprintf(stderr,"visited %d has %lld states (%ld nodes)\n",level,e_count,n_count);
 		}
 		if(vset_is_empty(current_level)) break;
 		level++;
@@ -183,9 +187,10 @@ void reach_bfs2(){
 	vset_t temp=vset_create(domain,0,NULL);
 	for(;;){
 		vset_copy(old_vis,visited);
+		vset_count(visited,&n_count,&e_count);
+		if (n_count>max_count) max_count=n_count;
 		if (RTverbosity >= 1) {
-			vset_count(visited,&n_count,&e_count);
-			fprintf(stderr,"visited %d has %ld nodes and %lld elements\n",level,n_count,e_count);
+			fprintf(stderr,"visited %d has %lld states (%ld nodes)\n",level,e_count,n_count);
 		}
 		level++;
 		for(i=0;i<nGrps;i++){
@@ -222,9 +227,10 @@ void reach_chain(){
 	vset_t temp=vset_create(domain,0,NULL);
 	for(;;){
 		vset_copy(old_vis,visited);
+		vset_count(visited,&n_count,&e_count);
+		if (n_count>max_count) max_count=n_count;
 		if (RTverbosity >= 1) {
-			vset_count(visited,&n_count,&e_count);
-			fprintf(stderr,"visited %d has %ld nodes and %lld elements\n",level,n_count,e_count);
+			fprintf(stderr,"visited %d has %lld states (%ld nodes)\n",level,e_count,n_count);
 		}
 		level++;
 		for(i=0;i<nGrps;i++){
@@ -377,20 +383,22 @@ int main(int argc, char *argv[]){
 	}
 	SCCstopTimer(timer);
 	SCCreportTimer(timer,"reachability took");
-	fprintf(stderr,"\n");
+	Warning(info,"\n");
 	long long e_count;
 	long n_count;
 	vset_count(visited,&n_count,&e_count);
 	if (etf_output) {
-		fprintf(stderr,"state space has %ld nodes and %lld elements\n",n_count,e_count);
+   	        fprintf(stderr,"state space has %lld states (%ld final nodes, %ld peak nodes)\n",
+			e_count,n_count,max_count);
 		SCCresetTimer(timer);
 		SCCstartTimer(timer);
 		do_output();
 		SCCstopTimer(timer);
 		SCCreportTimer(timer,"writing output took");
-		fprintf(stderr,"\n");
+		Warning(info,"\n");
 	} else {
-		printf("state space has %ld nodes and %lld elements\n",n_count,e_count);
+	  printf("state space has %lld states (%ld final nodes, %ld peak nodes)\n"
+		 ,e_count,n_count,max_count);
 	}
 	return 0;
 }
