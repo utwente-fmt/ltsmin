@@ -337,4 +337,14 @@ extern model_t GBaddCache(model_t model);
 
 //@}
 
+//@{
+
+/**
+\brief Reorder and regroup transitions and state vectors
+*/
+extern model_t GBregroup(model_t model,char* group_spec);
+
+
+//@}
+
 #endif

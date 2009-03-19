@@ -45,7 +45,7 @@ void project_dest(void*context,int*labels,int*dst){
 #undef info
 }
 
-static int default_short(model_t self,int group,int*src,TransitionCB cb,void*context){
+int default_short(model_t self,int group,int*src,TransitionCB cb,void*context){
 	struct nested_cb info;
 	info.len=self->e_info->length[group];
 	info.indices=self->e_info->indices[group];
@@ -86,7 +86,7 @@ void expand_dest(void*context,int*labels,int*dst){
 #undef info
 }
 
-static int default_long(model_t self,int group,int*src,TransitionCB cb,void*context){
+int default_long(model_t self,int group,int*src,TransitionCB cb,void*context){
 	struct nested_cb info;
 	info.len=self->e_info->length[group];
 	info.indices=self->e_info->indices[group];
@@ -108,7 +108,7 @@ static int default_long(model_t self,int group,int*src,TransitionCB cb,void*cont
 	return self->next_short(self,group,src_short,expand_dest,&info);
 }
 
-static int default_all(model_t self,int*src,TransitionCB cb,void*context){
+int default_all(model_t self,int*src,TransitionCB cb,void*context){
 	int res=0;
 	for(int i=0;i<self->e_info->groups;i++){
 		res+=self->next_long(self,i,src,cb,context);
@@ -260,7 +260,7 @@ model_t GBaddCache(model_t model){
 	ctx->cache=(struct group_cache*)RTmalloc(N*sizeof(struct group_cache));
 	for(int i=0;i<N;i++){
 		int len=model->e_info->length[i];
-		Warning(info,"group %d/%d depends on %d variables",i,N,len);
+		//Warning(info,"group %d/%d depends on %d variables",i,N,len);
 		ctx->cache[i].len=len*sizeof(int);
 		ctx->cache[i].idx=SIcreate();
 		//ctx->cache[i].dbs=TreeDBScreate(model->e_info->length[i]);
@@ -489,6 +489,7 @@ static char* model_type[MAX_TYPES];
 static pins_loader_t model_loader[MAX_TYPES];
 static int registered=0;
 static int cache=0;
+static char *group_file=NULL;
 
 void GBloadFile(model_t model,const char *filename,model_t *wrapped){
 	char* extension=strrchr(filename,'.');
@@ -498,10 +499,9 @@ void GBloadFile(model_t model,const char *filename,model_t *wrapped){
 			if(!strcmp(model_type[i],extension)){
 				model_loader[i](model,filename);
 				if (wrapped) {
-					if (cache) {
-						model=GBaddCache(model);
-					}
-					*wrapped=model;
+				  if (group_file) model=GBregroup(model,group_file);
+				  if (cache) model=GBaddCache(model);
+				  *wrapped=model;
 				}
 				return;
 			}
@@ -523,8 +523,7 @@ void GBregisterLoader(const char*extension,pins_loader_t loader){
 }
 
 struct poptOption greybox_options[]={
-	{ "cache" , 'c' , POPT_ARG_VAL , &cache , 1 , "enable caching of grey box calls" , NULL },
+	{ "cache" , 'c' , POPT_ARG_VAL , &cache , 1 , "Enable caching of grey box calls." , NULL },
+	{ "regroup" , 'r' , POPT_ARG_STRING , &group_file , 0 , "Regrouping wrapper, using group specification" ,"<file>" },
 	POPT_TABLEEND	
 };
-
-

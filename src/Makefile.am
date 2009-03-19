@@ -41,7 +41,7 @@ gcf_LDADD = libutil.a
 
 # etf2lts-grey
 etf2lts_grey_SOURCES  = spec2lts-grey.c etf-greybox.c etf-greybox.h    \
-                        lts.c lts.h vset_atermdd.c
+                        lts.c lts.h vset_atermdd.c group.c
 etf2lts_grey_LDADD    = libutil.a -lATerm $(BUDDY_LIBS) $(CADP_LIBS)
 etf2lts_grey_CPPFLAGS = -DETF $(MCRL_CPPFLAGS) $(AM_CPPFLAGS)
 etf2lts_grey_LDFLAGS  = $(MCRL_LDFLAGS) $(AM_LDFLAGS) $(CADP_LDFLAGS)
@@ -49,79 +49,79 @@ etf2lts_grey_LDFLAGS  = $(MCRL_LDFLAGS) $(AM_LDFLAGS) $(CADP_LDFLAGS)
 
 # lpo2lts-grey
 lpo2lts_grey_SOURCES  = spec2lts-grey.c mcrl-greybox.c mcrl-greybox.h    \
-                        at-map.c at-map.h vset_atermdd.c
+                        at-map.c at-map.h vset_atermdd.c group.c
 lpo2lts_grey_LDADD    = libutil.a $(MCRL_LIBS) $(BUDDY_LIBS) $(CADP_LIBS)
 lpo2lts_grey_CPPFLAGS = -DMCRL $(MCRL_CPPFLAGS) $(AM_CPPFLAGS)
 lpo2lts_grey_LDFLAGS  = $(MCRL_LDFLAGS) $(AM_LDFLAGS) $(CADP_LDFLAGS)
 
 # lps2lts-grey
 lps2lts_grey_SOURCES  = spec2lts-grey.c mcrl2-greybox.cpp		\
-                        mcrl2-greybox.h at-map.c at-map.h vset_atermdd.c
+                        mcrl2-greybox.h at-map.c at-map.h vset_atermdd.c group.c
 lps2lts_grey_LDADD    = libutil.a $(MCRL2_LIBS) $(BUDDY_LIBS) $(CADP_LIBS)
 lps2lts_grey_CPPFLAGS = -DMCRL2 $(MCRL2_CPPFLAGS) $(AM_CPPFLAGS)
 lps2lts_grey_LDFLAGS  = $(MCRL2_LDFLAGS) $(AM_LDFLAGS) $(CADP_LDFLAGS)
 
 # nips2lts-grey
 nips2lts_grey_SOURCES  = spec2lts-grey.c nips-greybox.c nips-greybox.h   \
-                         vset_atermdd.c
+                         vset_atermdd.c group.c
 nips2lts_grey_LDADD    = libutil.a -lATerm $(NIPS_LIBS) $(BUDDY_LIBS) $(CADP_LIBS)
 nips2lts_grey_CPPFLAGS = -DNIPS $(NIPS_CPPFLAGS) $(MCRL_CPPFLAGS) $(AM_CPPFLAGS)
 nips2lts_grey_LDFLAGS  = $(NIPS_LDFLAGS) $(MCRL_LDFLAGS) $(AM_LDFLAGS) $(CADP_LDFLAGS)
 
 # lpo-reach
 lpo_reach_SOURCES  = spec-reach.c mcrl-greybox.c mcrl-greybox.h  \
-                     at-map.c at-map.h vset_atermdd.c
+                     at-map.c at-map.h vset_atermdd.c group.c
 lpo_reach_LDADD    = libutil.a $(MCRL_LIBS) $(BUDDY_LIBS)
 lpo_reach_CPPFLAGS = -DMCRL $(MCRL_CPPFLAGS) $(AM_CPPFLAGS)
 lpo_reach_LDFLAGS  = $(MCRL_LDFLAGS) $(AM_LDFLAGS)
 
 # lps-reach
 lps_reach_SOURCES  = spec-reach.c mcrl2-greybox.cpp mcrl2-greybox.h      \
-                     at-map.c at-map.h vset_atermdd.c
+                     at-map.c at-map.h vset_atermdd.c group.c
 lps_reach_LDADD    = libutil.a $(MCRL2_LIBS) $(BUDDY_LIBS)
 lps_reach_CPPFLAGS = -DMCRL2 $(MCRL2_CPPFLAGS) $(AM_CPPFLAGS)
 lps_reach_LDFLAGS  = $(MCRL2_LDFLAGS) $(AM_LDFLAGS)
 
 # nips-reach
 nips_reach_SOURCES  = spec-reach.c nips-greybox.c nips-greybox.h	\
-                      vset_atermdd.c
+                      vset_atermdd.c group.c
 nips_reach_LDADD    = libutil.a -lATerm $(NIPS_LIBS) $(BUDDY_LIBS)
 nips_reach_CPPFLAGS = -DNIPS $(NIPS_CPPFLAGS) $(MCRL_CPPFLAGS) $(AM_CPPFLAGS)
 nips_reach_LDFLAGS  = $(NIPS_LDFLAGS) $(MCRL_LDFLAGS) $(AM_LDFLAGS)
 
 # etf-reach
 etf_reach_SOURCES  = spec-reach.c etf-greybox.c etf-greybox.h    \
-                        lts.c lts.h vset_atermdd.c
+                        lts.c lts.h vset_atermdd.c group.c
 etf_reach_LDADD    = libutil.a -lATerm  $(BUDDY_LIBS)
 etf_reach_CPPFLAGS = -DETF $(MCRL_CPPFLAGS) $(AM_CPPFLAGS)
 etf_reach_LDFLAGS  = $(MCRL_LDFLAGS) $(AM_LDFLAGS)
 
 
 # lpo2lts-mpi
-lpo2lts_mpi_SOURCES  = spec2lts-mpi.c mcrl-greybox.c mcrl-greybox.h	\
+lpo2lts_mpi_SOURCES  = spec2lts-mpi.c mcrl-greybox.c mcrl-greybox.h group.c	\
                        at-map.c at-map.h config.h
-lpo2lts_mpi_LDADD    = libmpi.a libutil.a $(MCRL_LIBS) $(CADP_LIBS)
+lpo2lts_mpi_LDADD    = libmpi.a libutil.a $(MCRL_LIBS) $(CADP_LIBS) -lATerm
 lpo2lts_mpi_CPPFLAGS = -DMCRL $(MCRL_CPPFLAGS) $(AM_CPPFLAGS)
-lpo2lts_mpi_LDFLAGS  = $(MCRL_LDFLAGS) $(AM_LDFLAGS) $(CADP_LDFLAGS)
+lpo2lts_mpi_LDFLAGS  = $(MCRL_LDFLAGS) $(MCRL_LDFLAGS) $(AM_LDFLAGS) $(CADP_LDFLAGS)
 
 # lps2lts-mpi
-lps2lts_mpi_SOURCES  = spec2lts-mpi.c mcrl2-greybox.cpp mcrl2-greybox.h	\
+lps2lts_mpi_SOURCES  = spec2lts-mpi.c mcrl2-greybox.cpp mcrl2-greybox.h	group.c\
                        at-map.c at-map.h config.h
-lps2lts_mpi_LDADD    = libmpi.a libutil.a $(MCRL2_LIBS) $(CADP_LIBS)
+lps2lts_mpi_LDADD    = libmpi.a libutil.a $(MCRL2_LIBS) $(CADP_LIBS) -lATerm
 lps2lts_mpi_CPPFLAGS = -DMCRL2 $(MCRL2_CPPFLAGS) $(AM_CPPFLAGS)
-lps2lts_mpi_LDFLAGS  = $(MCRL2_LDFLAGS) $(AM_LDFLAGS) $(CADP_LDFLAGS)
+lps2lts_mpi_LDFLAGS  = $(MCRL2_LDFLAGS) $(MCRL_LDFLAGS) $(AM_LDFLAGS) $(CADP_LDFLAGS)
 
 # nips2lts-mpi
-nips2lts_mpi_SOURCES  = spec2lts-mpi.c nips-greybox.c nips-greybox.h config.h
-nips2lts_mpi_LDADD    = libmpi.a libutil.a $(NIPS_LIBS) $(CADP_LIBS)
+nips2lts_mpi_SOURCES  = spec2lts-mpi.c nips-greybox.c nips-greybox.h config.h group.c
+nips2lts_mpi_LDADD    = libmpi.a libutil.a $(NIPS_LIBS) $(CADP_LIBS) -lATerm
 nips2lts_mpi_CPPFLAGS = -DNIPS $(NIPS_CPPFLAGS) $(MCRL_CPPFLAGS) $(AM_CPPFLAGS)
-nips2lts_mpi_LDFLAGS  = $(NIPS_LDFLAGS) $(AM_LDFLAGS) $(CADP_LDFLAGS)
+nips2lts_mpi_LDFLAGS  = $(NIPS_LDFLAGS) $(MCRL_LDFLAGS) $(AM_LDFLAGS) $(CADP_LDFLAGS)
 
 # etf2lts-mpi
-etf2lts_mpi_SOURCES  = spec2lts-mpi.c etf-greybox.c etf-greybox.h config.h lts.c lts.h 
-etf2lts_mpi_LDADD    = libmpi.a libutil.a $(CADP_LIBS)
+etf2lts_mpi_SOURCES  = spec2lts-mpi.c etf-greybox.c etf-greybox.h config.h lts.c lts.h group.c
+etf2lts_mpi_LDADD    = libmpi.a libutil.a $(CADP_LIBS) -lATerm
 etf2lts_mpi_CPPFLAGS = -DETF $(MCRL_CPPFLAGS) $(AM_CPPFLAGS)
-etf2lts_mpi_LDFLAGS  = $(AM_LDFLAGS) $(CADP_LDFLAGS)
+etf2lts_mpi_LDFLAGS  = $(AM_LDFLAGS) $(MCRL_LDFLAGS) $(CADP_LDFLAGS)
 
 # mpi-event-test
 mpi_event_test_SOURCES = mpi-event-test.c config.h
@@ -133,10 +133,10 @@ ltsmin_mpi_SOURCES = ltsmin-mpi.c set.c lts.c dlts.c set.h lts.h	\
 ltsmin_mpi_LDADD   = libmpi.a libutil.a
 
 # ltsmin-convert
-ltsmin_convert_SOURCES = ltsmin-convert.c
-ltsmin_convert_LDADD = libutil.a $(CADP_LIBS)
-ltsmin_convert_LDFLAGS = $(CADP_LDFLAGS) $(AM_LDFLAGS)
-ltsmin_convert_CPPFLAGS = $(CADP_CPPFLAGS) $(AM_CPPFLAGS)
+ltsmin_convert_SOURCES = ltsmin-convert.c group.c
+ltsmin_convert_LDADD = libutil.a $(CADP_LIBS) -lATerm
+ltsmin_convert_LDFLAGS = $(CADP_LDFLAGS) $(MCRL_LDFLAGS) $(AM_LDFLAGS) 
+ltsmin_convert_CPPFLAGS = $(CADP_CPPFLAGS) $(MCRL_CPPFLAGS) $(AM_CPPFLAGS) 
 
 # libraries
 libmpi_a_SOURCES = mpi_io_stream.c mpi_core.c mpi_raf.c mpi_ram_raf.c	\
