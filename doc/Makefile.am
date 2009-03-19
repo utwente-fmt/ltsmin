@@ -22,12 +22,8 @@ EXTRA_DIST = asciidoc.conf callouts.xsl $(doc_ASCIIDOC) $(extra_ASCIIDOC)
 
 HTML = $(doc_ASCIIDOC:.txt=.html)
 
-if HAVE_ASCIIDOC
 dist_html_DATA = $(HTML)
-if HAVE_XMLTO
 dist_man_MANS  = $(MANPAGES)
-endif
-endif
 
 MOSTLYCLEANFILES     = $(doc_ASCIIDOC:.txt=.xml)
 CLEANFILES =
@@ -41,31 +37,45 @@ MAINTAINERCLEANFILES = $(HTML) $(MANPAGES)
 
 html-local: $(HTML)
 
-if HAVE_ASCIIDOC
 .txt.html:
+if HAVE_ASCIIDOC
 	$(ASCIIDOC.html)
+else
+	@:
+endif
 
 .txt.xml:
+if HAVE_ASCIIDOC
 	$(ASCIIDOC.xml)
+else
+	@:
+endif
 
 %.txt:
 	@test -f $@ && touch $@
 
-if HAVE_XMLTO
 %.1 %.2 %.3 %.4 %.5 %.6 %.7 %.8: %.xml
+if HAVE_ASCIIDOC
+if HAVE_XMLTO
 	$(ASCIIDOC.man)
+else
+	@:
+endif
+else
+	@:
 endif
 
+if HAVE_ASCIIDOC
 -include ./$(DEPDIR)/asciidoc.d
-
-distclean-local:
-	-$(RM) -r ./$(DEPDIR)
 
 ./$(DEPDIR)/asciidoc.d: $(doc_ASCIIDOC) $(extra_ASCIIDOC)
 	@$(MKDIR_P) ./$(DEPDIR)
 	@grep 'include::' $^ |\
 		sed 's/include::/ /;s/\[]//;/^inc\//s%: %&inc/%' > $@
 endif
+
+distclean-local:
+	-$(RM) -r ./$(DEPDIR)
 
 define ASCIIDOC.xml
   $(ASCIIDOC) $(OUTPUT_OPTION) -b docbook -d manpage $(ASCIIDOC_FLAGS) $<
