@@ -71,7 +71,7 @@ if HAVE_ASCIIDOC
 ./$(DEPDIR)/asciidoc.d: $(doc_ASCIIDOC) $(extra_ASCIIDOC)
 	@$(MKDIR_P) ./$(DEPDIR)
 	@grep 'include::' $^ |\
-		sed 's/include::/ /;s/\[]//;/^inc\//s%: %&inc/%' > $@
+		sed 's/include::/ /;s/\[]//;s%\(.*inc/\).*: *%&\1%' > $@
 endif
 
 distclean-local:
