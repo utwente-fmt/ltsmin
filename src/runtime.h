@@ -18,7 +18,6 @@
 #include <setjmp.h>
 #include <errno.h>
 #include <stdint.h>
-#include "options.h"
 #include <popt.h>
 
 typedef struct {

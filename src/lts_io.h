@@ -5,7 +5,6 @@
 #include <stdint.h>
 #include <amconfig.h>
 #include <archive.h>
-#include <options.h>
 #include <greybox.h>
 #include <lts_enum.h>
 #include <lts_count.h>

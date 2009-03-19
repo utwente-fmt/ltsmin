@@ -3,7 +3,6 @@
 #include <string.h>
 #include "runtime.h"
 #include <dir_ops.h>
-#include "options.h"
 
 /********************************************************************************/
 

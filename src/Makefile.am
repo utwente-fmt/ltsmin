@@ -159,7 +159,7 @@ libutil_a_SOURCES := unix.c runtime.c stream.c archive.c			\
                     lts-type.h vset_buddy.c vector_set.c vector_set.h	\
                     vdom_object.h lts_io.c lts_io.h lts_io_internal.h \
                     lts_enum.c lts_enum.h lts_count.c lts_count.h \
-                    archive_io_ops.c options.h
+                    archive_io_ops.c
 
 libutil_a_CPPFLAGS := $(BUDDY_CPPFLAGS)
 
