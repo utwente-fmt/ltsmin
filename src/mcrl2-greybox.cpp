@@ -315,8 +315,7 @@ void MCRL2loadGreyboxModel(model_t m,char*model_name){
 	for(int i=0;i<e_info->groups;i++){
 		std::vector< size_t > const & vec = ctx->info->get_group(i);
 		e_info->length[i]=vec.size();
-		e_info->indices[i]=(int*)RTmalloc(vec.size()*sizeof(int));
-		for(int j=0;j<vec.size();j++) e_info->indices[i][j]=vec[j];
+		e_info->indices[i]=(int*)&(vec[0]);
 	}
 	GBsetEdgeInfo(m,e_info);
 	GBsetStateInfo(m,&s_info);
