@@ -1,6 +1,5 @@
 #!/bin/sh
 rm -f config.cache
-export AUTOMAKE="automake -a"
 echo "Note: Do NOT run aclocal by yourself, even if requested by autoreconf."
 echo "      This is done automatically."
-autoreconf -I m4 -is
+autoreconf -is
