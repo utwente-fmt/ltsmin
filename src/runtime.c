@@ -175,6 +175,17 @@ void RTinit(int *argcp,char**argvp[]){
 	set_label("%s",basename(copy[0]));
 }
 
+void RTparseOptions(const char* argline,int *argc_p,char***argv_p){
+	char* cmd=get_label();
+	int len=strlen(argline)+strlen(cmd);
+	char cmdline[len+4];
+	sprintf(cmdline,"%s %s",cmd,argline);
+	int res=poptParseArgvString(cmdline,argc_p,(const char ***)argv_p);
+	if (res){
+		Fatal(1,error,"could not parse %s: %s",cmdline,poptStrerror(res));
+	}
+}
+
 static poptContext optCon=NULL;
 
 void RTinitPopt(int *argc_p,char**argv_p[],const struct poptOption * options,

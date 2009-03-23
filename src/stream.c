@@ -72,7 +72,6 @@ void stream_default_read(stream_t stream,void*buf,size_t count){
 	if (res<count) {
 		Fatal(1,error,"short read");
 	}
-	return res;
 }
 int stream_illegal_empty(stream_t stream){
 	(void)stream;

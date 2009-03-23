@@ -63,7 +63,6 @@ static int blocksize=32768;
 static int blockcount=32;
 static int operation=GCF_FILE;
 static int force=0;
-static int compressed_dir=0;
 
 static  struct poptOption options[] = {
 	{ "create",'c', POPT_ARG_VAL , &operation , GCF_FILE , "Create a new archive (default)" , NULL },

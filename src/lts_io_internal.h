@@ -15,7 +15,7 @@ extern void lts_write_register(char*extension,lts_write_open_t open);
 
 typedef void(*lts_read_open_t)(lts_input_t input);
 
-extern void lts_read_register(char*extension,lts_write_open_t open);
+extern void lts_read_register(char*extension,lts_read_open_t open);
 
 struct lts_write_ops{
 	lts_enum_cb_t(*write_begin)(lts_output_t output,int which_state,int which_src,int which_dst);

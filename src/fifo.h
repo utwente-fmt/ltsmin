@@ -6,7 +6,7 @@
 
 typedef struct fifo_s *fifo_t;
 
-extern fifo_t FIFOcreate(int blocksize);
+extern fifo_t FIFOcreate(size_t blocksize);
 
 extern void FIFOdestroy(fifo_t *fifo_p);
 

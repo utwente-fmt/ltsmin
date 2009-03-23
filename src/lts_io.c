@@ -177,7 +177,7 @@ static char* read_type[MAX_TYPES];
 static lts_read_open_t read_open[MAX_TYPES];
 static int read_registered=0;
 
-void lts_read_register(char*extension,lts_write_open_t open){
+void lts_read_register(char*extension,lts_read_open_t open){
 	if (read_registered<MAX_TYPES){
 		read_type[read_registered]=extension;
 		read_open[read_registered]=open;

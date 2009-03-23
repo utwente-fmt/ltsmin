@@ -461,7 +461,7 @@ int main(int argc, char*argv[]){
 		} else {
 			output=lts_output_open(files[1],model,mpi_nodes,mpi_me,mpi_nodes,"-ii",NULL);
 		}
-		lts_output_set_root_vec(output,src);
+		lts_output_set_root_vec(output,(uint32_t*)src);
 		lts_output_set_root_idx(output,0,0);
 		event_barrier_wait(barrier); // opening is sometimes a collaborative operation. (e.g. *.dir)
 		output_handle=lts_output_begin(output,mpi_me,mpi_nodes,mpi_me);

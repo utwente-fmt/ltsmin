@@ -9,7 +9,6 @@
 #include <fifo.h>
 
 /* Global I/O parameters */
-static int compress=0;
 static int plain=0;
 static int blocksize=32768;
 static int blockcount=32;
@@ -186,6 +185,7 @@ static void dir_write_open_ops(lts_output_t output){
 }
 
 static void dir_read_part(lts_input_t input,int which_state,int which_src,int which_dst,lts_enum_cb_t output){
+	(void)which_state;
 	struct archive_io *ctx=(struct archive_io *)input->ops_context;
 	int segment_count=input->segment_count;
 
@@ -207,7 +207,7 @@ static void dir_read_part(lts_input_t input,int which_state,int which_src,int wh
 				uint32_t s=DSreadU32(src_in);
 				uint32_t l=DSreadU32(lbl_in);
 				uint32_t d=DSreadU32(dst_in);
-				enum_seg_seg(output,i,s,j,d,&l);
+				enum_seg_seg(output,i,(int)s,j,(int)d,(int*)&l);
 			}
 			DSclose(&src_in);
 			DSclose(&lbl_in);
@@ -298,7 +298,7 @@ struct vec_output_struct {
 
 static void idx_write_state(void*context,int seg,int ofs,int* labels){
 	struct vec_output_struct *out=(struct vec_output_struct *)context;
-	LTS_CHECK_STATE((*(out->count_p)),seg,ofs);
+	LTS_CHECK_STATE((*(out->count_p)),seg,(uint32_t)ofs);
 	DSwriteStruct(out->s_lbl,labels);
 }
 
@@ -310,16 +310,16 @@ static void vec_write_state(void* context,int* state,int* labels){
 }
 static void iv_write_edge(void* context,int src_seg,int src_ofs,int* dst,int*labels){
 	struct vec_output_struct *out=(struct vec_output_struct *)context;
-	LTS_CHECK_STATE((*(out->count_p)),src_seg,src_ofs);
-	LTS_INCR_OUT((*(out->count_p)),src_seg);
+	LTS_CHECK_STATE((*(out->count_p)),src_seg,(uint32_t)src_ofs);
+	LTS_INCR_OUT((*(out->count_p)),(uint32_t)src_seg);
 	DSwriteStruct(out->src,&src_ofs);
 	DSwriteStruct(out->e_lbl,labels);
 	DSwriteStruct(out->dst,dst);
 }
 static void si_write_edge(void*context,int src_seg,int src_ofs,int dst_seg,int dst_ofs,int*labels){
 	struct vec_output_struct *out=(struct vec_output_struct *)context;
-	LTS_CHECK_STATE((*(out->count_p)),src_seg,src_ofs);
-	LTS_INCR_IN((*(out->count_p)),src_seg);
+	LTS_CHECK_STATE((*(out->count_p)),src_seg,(uint32_t)src_ofs);
+	LTS_INCR_IN((*(out->count_p)),(uint32_t)src_seg);
 	int src[2];
 	src[0]=src_seg;
 	src[1]=src_ofs;
@@ -386,11 +386,13 @@ static lts_enum_cb_t vec_write_begin(lts_output_t output,int which_state,int whi
 		Warning(info,"begin write done");
 		return lts_enum_vii(N,out,vec_write_state,si_write_edge);
 	}
+	(void)idx_write_state; //needed for -si and -is
 	Fatal(1,error,"unknown mode %s",output->mode);
 	return NULL;
 }
 
 static void vec_write_end(lts_output_t output,lts_enum_cb_t writer){
+	(void)output;
 	struct vec_output_struct *out=(struct vec_output_struct *)enum_get_context(writer);
 	if (out->state) DSstructClose(&(out->state));
 	if (out->s_lbl) DSstructClose(&(out->s_lbl));
@@ -510,7 +512,6 @@ static void vec_write_close(lts_output_t output){
 }
 
 static void vec_write_open(lts_output_t output){
-	struct archive_io *ctx=(struct archive_io*)output->ops_context;
 	if (!strcmp(output->mode,"viv") || !strcmp(output->mode,"vsi")){
 		output->ops.write_begin=vec_write_begin;
 		output->ops.write_end=vec_write_end;
@@ -521,6 +522,7 @@ static void vec_write_open(lts_output_t output){
 }
 
 static void vec_read_part(lts_input_t input,int which_state,int which_src,int which_dst,lts_enum_cb_t output){
+	(void)which_state;(void)which_dst;
 	struct archive_io *ctx=(struct archive_io *)input->ops_context;
 	int segment_count=input->segment_count;
 	lts_type_t ltstype=GBgetLTStype(input->model);
@@ -542,7 +544,7 @@ static void vec_read_part(lts_input_t input,int which_state,int which_src,int wh
 		struct_stream_t map=arch_read_vec_U32(ctx->archive,base,sLbls,ctx->decode);
 		int src_vec[N];
 		int map_vec[sLbls];
-		for (int j=0;j<input->count.state[i];j++){
+		for (uint32_t j=0;j<input->count.state[i];j++){
 			DSreadStruct(vec,src_vec);
 			DSreadStruct(map,map_vec);
 			enum_vec(output,src_vec,map_vec);
@@ -564,7 +566,7 @@ static void vec_read_part(lts_input_t input,int which_state,int which_src,int wh
 			struct_stream_t lbl=arch_read_vec_U32(ctx->archive,base,eLbls,ctx->decode);
 			sprintf(base,"ED-%d-%%d",i);
 			struct_stream_t dst=arch_read_vec_U32(ctx->archive,base,N,ctx->decode);
-			for (int j=0;j<input->count.out[i];j++){
+			for (uint32_t j=0;j<input->count.out[i];j++){
 				DSreadStruct(src,src_ofs);
 				DSreadStruct(dst,dst_vec);
 				DSreadStruct(lbl,lbl_vec);
@@ -588,7 +590,7 @@ static void vec_read_part(lts_input_t input,int which_state,int which_src,int wh
 			struct_stream_t lbl=arch_read_vec_U32(ctx->archive,base,eLbls,ctx->decode);
 			sprintf(base,"ED-%d-%%s",i);
 			struct_stream_t dst=arch_read_vec_U32_named(ctx->archive,base,1,ofs,ctx->decode);
-			for (int j=0;j<input->count.in[i];j++){
+			for (uint32_t j=0;j<input->count.in[i];j++){
 				DSreadStruct(src,src_vec);
 				DSreadStruct(dst,dst_ofs);
 				DSreadStruct(lbl,lbl_vec);
@@ -634,7 +636,7 @@ static void load_chunk_tables(lts_input_t input){
 /** Continue loading vec headers. The description has been read and copied to input->mode;
  */
 static void load_vec_headers(lts_input_t input,stream_t ds){
-	struct archive_io *ctx=(struct archive_io *)input->ops_context;
+	//struct archive_io *ctx=(struct archive_io *)input->ops_context;
 	Warning(info,"reading header (%s)",input->mode);
 	int N;
 	fifo_t fifo=FIFOcreate(4096);
@@ -684,7 +686,7 @@ static void load_vec_headers(lts_input_t input,stream_t ds){
 		lts_type_t ltstype=lts_type_deserialize(fs);
 		if (FIFOsize(fifo)) Fatal(1,error,"Too much data in lts type (%d bytes)",FIFOsize(fifo));
 		GBsetLTStype(input->model,ltstype);
-		if (input->root_vec) GBsetInitialState(input->model,input->root_vec);
+		if (input->root_vec) GBsetInitialState(input->model,(int*)input->root_vec);
 	}
 	Warning(debug,"getting counts");
 	N=DSreadVL(ds);
@@ -890,8 +892,8 @@ static void archive_popt(poptContext con,
 
 /* Options for archive based file formats. */
 struct poptOption archive_io_options[]= {
-	{ NULL, 0 , POPT_ARG_CALLBACK|POPT_CBFLAG_POST|POPT_CBFLAG_SKIPOPTION , archive_popt , 0 , NULL },
-	{ NULL,0 , POPT_ARG_INCLUDE_TABLE , gcf_options , 0 , "For creating containers, the following parameters are used:"},
+	{ NULL, 0 , POPT_ARG_CALLBACK|POPT_CBFLAG_POST|POPT_CBFLAG_SKIPOPTION , archive_popt , 0 , NULL , NULL },
+	{ NULL,0 , POPT_ARG_INCLUDE_TABLE , gcf_options , 0 , "For creating containers, the following parameters are used:" , NULL},
 	POPT_TABLEEND
 };
 

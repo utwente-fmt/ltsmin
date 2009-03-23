@@ -5,12 +5,12 @@
 
 struct stream_s {
 	struct stream_obj procs;
-	int blocksize;
-	int blocks;
+	size_t blocksize;
+	size_t blocks;
 	void*read_block;
-	int read_idx;
+	size_t read_idx;
 	void*write_block;
-	int write_idx;
+	size_t write_idx;
 };
 
 static size_t fifo_read_max(stream_t fifo,void*buf,size_t count){
@@ -55,7 +55,7 @@ static void fifo_write(stream_t fifo,void*buf,size_t count){
 		fifo->write_idx+=count;
 	} else {
 		// write to current block what we can.
-		int len=fifo->blocksize-fifo->write_idx;
+		size_t len=fifo->blocksize-fifo->write_idx;
 		memcpy(fifo->write_block+fifo->write_idx,buf,len);
 		buf+=len;
 		count-=len;
@@ -88,7 +88,7 @@ static void fifo_flush(stream_t stream){
 static int fifo_empty(stream_t stream){
 	return (stream->blocks==1)&&(stream->read_idx==stream->write_idx);
 }
-fifo_t FIFOcreate(int blocksize){
+fifo_t FIFOcreate(size_t blocksize){
 	if(blocksize<=sizeof(void*)){
 		Fatal(1,error,"block size must exceed pointer size");
 	}

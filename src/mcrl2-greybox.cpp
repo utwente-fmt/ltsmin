@@ -164,6 +164,14 @@ static void ErrorHandler(const char *format, va_list args) {
 	exit(1);
 }
 
+#ifdef MCRL2_INNERC_AVAILABLE
+static char*mcrl2_args="--rewriter=jittyc";
+static RewriteStrategy mcrl2_rewriter=GS_REWR_JITTYC;
+#else
+static char*mcrl2_args="--rewriter=jitty";
+static RewriteStrategy mcrl2_rewriter=GS_REWR_JITTY;
+#endif
+
 static void mcrl2_popt(poptContext con,
  		enum poptCallbackReason reason,
                             const struct poptOption * opt,
@@ -173,11 +181,39 @@ static void mcrl2_popt(poptContext con,
 	case POPT_CALLBACK_REASON_PRE:
 		break;
 	case POPT_CALLBACK_REASON_POST: {
-		char dummy[4]={'x','x','x',0};
-		char*argv[]={dummy,NULL};
-		ATinit(1, argv, (ATerm*) RTstackBottom());
+		Warning(debug,"mcrl2 init");
+		int argc;
+		char **argv;
+		RTparseOptions(mcrl2_args,&argc,&argv);
+		Warning(debug,"ATerm init");
+		ATinit(argc, argv, (ATerm*) RTstackBottom());
 		ATsetWarningHandler(WarningHandler);
 		ATsetErrorHandler(ErrorHandler);
+		char*rewriter=NULL;
+		struct poptOption options[]={
+			{ "rewriter", 0 , POPT_ARG_STRING , &rewriter , 0 , "select rewriter" , NULL },
+			POPT_TABLEEND
+		};
+		Warning(debug,"options");
+		poptContext optCon=poptGetContext(NULL, argc,(const char **) argv, options, 0);
+		int res=poptGetNextOpt(optCon);
+		if (res != -1 || poptPeekArg(optCon)!=NULL){
+			Fatal(1,error,"Bad mcrl2 options: %s",mcrl2_args);
+		}
+		poptFreeContext(optCon);
+		if (rewriter) {
+			if (!strcmp(rewriter,"jitty")){
+				mcrl2_rewriter=GS_REWR_JITTY;
+			} else if (!strcmp(rewriter,"jittyc")){
+				mcrl2_rewriter=GS_REWR_JITTYC;
+			} else if (!strcmp(rewriter,"inner")){
+				mcrl2_rewriter=GS_REWR_INNER;
+			} else if (!strcmp(rewriter,"innerc")){
+				mcrl2_rewriter=GS_REWR_INNERC;
+			} else {
+				Fatal(1,error,"unrecognized rewriter: %s (jitty, jittyc, inner and innerc supported)",rewriter);
+			}
+		}
 		GBregisterLoader("lps",MCRL2loadGreyboxModel);
 		Warning(info,"mCRL2 language module initialized");
 		return;
@@ -187,8 +223,10 @@ static void mcrl2_popt(poptContext con,
 	}
 	Fatal(1,error,"unexpected call to mcrl2_popt");
 }
+
 struct poptOption mcrl2_options[]= {
 	{ NULL, 0 , POPT_ARG_CALLBACK|POPT_CBFLAG_POST|POPT_CBFLAG_SKIPOPTION , (void*)mcrl2_popt , 0 , NULL , NULL},
+	{ "mcrl2" , 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &mcrl2_args , 0, "Pass options to the mcrl2 library.","<mcrl2 options>" },
 	POPT_TABLEEND
 };
 
@@ -325,7 +363,7 @@ void MCRL2loadGreyboxModel(model_t m,const char*model_name){
 
 
 	// Note the second argument that specifies that don't care variables are not treated specially
-	ctx->explorer = createNextState(model, false, GS_STATE_VECTOR,GS_REWR_JITTYC);
+	ctx->explorer = createNextState(model, false, GS_STATE_VECTOR,mcrl2_rewriter);
 	ctx->rewriter = ctx->explorer->getRewriter();
 	ctx->info=new group_information(model);
 	ctx->termmap=ATmapCreate(m,lts_type_add_type(ltstype,"leaf",NULL),ctx->rewriter,print_term,parse_term);

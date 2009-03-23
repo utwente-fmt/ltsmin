@@ -98,7 +98,7 @@ int main(int argc, char *argv[]){
 			lts_output_end(output,ecb);
 			lts_output_close(&output);
 			uint32_t* root=lts_input_root(input);
-			uint32_t root_no=TreeFold(dbs,root);
+			uint32_t root_no=TreeFold(dbs,(int*)root);
 			if (root_no!=0){
 				Fatal(1,error,"root is %u rather than 0",root_no);
 			}

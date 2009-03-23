@@ -43,18 +43,16 @@ static void MCRLinitGreybox(int argc,char *argv[],void* stack_bottom){
 	ATinit(argc, argv, stack_bottom);
 	ATsetWarningHandler(WarningHandler);
 	ATsetErrorHandler(ErrorHandler);
-	int i;
-	int c=argc+2;
-	char* cpargv[c];
-	char** xargv=cpargv;
-	xargv[0]=get_label();
-	for(i=0;i<argc;i++) xargv[i+1]=argv[i];
-	xargv[argc+1]="bug in mCRL that assume an input on the command line";
-	MCRLsetArguments(&c, &xargv);
-	RWsetArguments(&c, &xargv);
-	STsetArguments(&c, &xargv);
+	RWsetArguments(&argc, &argv);
+	STsetArguments(&argc, &argv);
+	MCRLsetArguments(&argc, &argv);
+	if (argc!=1) {
+		for(int i=0;i<argc;i++){
+			Warning(error,"unparsed mCRL option %s",argv[i]);
+		}
+		Fatal(1,error,"Exiting");
+	}
 }
-
 
 static void mcrl_popt(poptContext con,
  		enum poptCallbackReason reason,
@@ -67,14 +65,10 @@ static void mcrl_popt(poptContext con,
 	case POPT_CALLBACK_REASON_POST: {
 		int argc;
 		char **argv;
-		int res=poptParseArgvString(mcrl_args,&argc,(const char ***)&argv);
-		if (res){
-			Fatal(1,error,"could not parse %s: %s",mcrl_args,poptStrerror(res));
+		if (strstr(mcrl_args,"-confluent")||strstr(mcrl_args,"-conf-table")||strstr(mcrl_args,"-conf-compute")){
+			Fatal(1,error,"This tool does not support tau confluence reduction.");
 		}
-//		Warning(info,"passing %s to mCRL",mcrl_args);	
-//		for(int i=0;i<argc;i++){
-//			Warning(info,"arg %d is %s",i,argv[i]);
-//		}
+		RTparseOptions(mcrl_args,&argc,&argv);
 		MCRLinitGreybox(argc,argv,RTstackBottom());
 		GBregisterLoader("tbf",MCRLloadGreyboxModel);
 		Warning(debug,"mCRL language module initialized");

@@ -6,9 +6,7 @@
 #include <stdlib.h>
 #include "amconfig.h"
 #ifdef HAVE_LIBRT
-#warning "Disabling AIO due to unexpected bugs."
-#undef HAVE_LIBRT
-//#include <aio.h>
+#include <aio.h>
 #endif
 #include "raf_object.h"
 #include "runtime.h"

@@ -71,7 +71,7 @@ static void bcg_read_part(lts_input_t input,int which_state,int which_src,int wh
 	bcg_type_state_number bcg_s1, bcg_s2;
 	BCG_TYPE_LABEL_NUMBER bcg_label_number;
 	BCG_OT_ITERATE_PLN (ctx->bcg_graph, bcg_s1, bcg_label_number, bcg_s2) {
-		enum_seg_seg(output,0,bcg_s1,0,bcg_s2,&bcg_label_number);
+		enum_seg_seg(output,0,bcg_s1,0,bcg_s2,(int*)&bcg_label_number);
 	} BCG_OT_END_ITERATE;
 }
 
@@ -155,7 +155,7 @@ static void bcg_popt(poptContext con,
 }
 
 struct poptOption bcg_io_options[]= {
-	{ NULL, 0 , POPT_ARG_CALLBACK|POPT_CBFLAG_POST|POPT_CBFLAG_SKIPOPTION , bcg_popt , 0 , NULL },
+	{ NULL, 0 , POPT_ARG_CALLBACK|POPT_CBFLAG_POST|POPT_CBFLAG_SKIPOPTION , bcg_popt , 0 , NULL , NULL},
 	POPT_TABLEEND
 };
 

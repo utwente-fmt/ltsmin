@@ -333,7 +333,7 @@ int main(int argc, char *argv[]){
 		next_set=vset_create(domain,0,NULL);
 		if (write_lts){
 			output=lts_output_open(files[1],model,1,0,1,"viv",NULL);
-			lts_output_set_root_vec(output,src);
+			lts_output_set_root_vec(output,(uint32_t*)src);
 			lts_output_set_root_idx(output,0,0);
 			output_handle=lts_output_begin(output,0,0,0);	
 		}
@@ -361,7 +361,7 @@ int main(int argc, char *argv[]){
 		}
 		if (write_lts){
 			output=lts_output_open(files[1],model,1,0,1,write_state?"vsi":"-ii",NULL);
-			if (write_state) lts_output_set_root_vec(output,src);
+			if (write_state) lts_output_set_root_vec(output,(uint32_t*)src);
 			lts_output_set_root_idx(output,0,0);
 			output_handle=lts_output_begin(output,0,0,0);	
 		}

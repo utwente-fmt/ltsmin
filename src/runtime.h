@@ -30,6 +30,10 @@ typedef struct {
  */
 extern int linear_search(si_map_entry map[],const char*key);
 
+/**
+\brief Parse a string that represents command line options.
+ */
+extern void RTparseOptions(const char* argline,int *argc_p,char***argv_p);
 
 /**
 \brief Return the bottom of the stack.
