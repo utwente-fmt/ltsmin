@@ -136,7 +136,13 @@ void log_message(log_t log,const char*file,int line,int errnum,const char *fmt,.
 	log_va(log,fmt,args);
 	if (errnum) {
 		char errmsg[256];
+#ifdef _GNU_SOURCE
+		char*err_msg=strerror_r(errnum,errmsg,256);
+		if(!err_msg){
+#else
+		char*err_msg=errmsg;
 		if(strerror_r(errnum,errmsg,256)){
+#endif
 			switch(errno){
 			case EINVAL:
 				sprintf(errmsg,"%d is not an error",errnum);
@@ -148,7 +154,7 @@ void log_message(log_t log,const char*file,int line,int errnum,const char *fmt,.
 				sprintf(errmsg,"this statement should have been unreachable");
 			}
 		}
-		log_to(log,": %s",errmsg);
+		log_to(log,": %s",err_msg);
 	}
 	log_end(log);
 	va_end(args);

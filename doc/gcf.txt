@@ -27,10 +27,14 @@ The key points of the structure are that a GCF file contains one or more cluster
 
 *-x*, *--extract*::
 Extract a GCF archive. This mode requires an optional output argument. If no argument is present then the fiels are extracted into the current directory.
-If the argument is a name then a directory of that name is created (deleting any file or directory under that name first) and the files are extracted into that directory. If the argument is a string contain ++%s++ (for example ++out-%s++) then files are extracted as this pattern with ++%s++ replaced by the file name (for example ++file++ ends up extracted as  ++out-file++).
+If the argument is a name then a directory of that name is created if no file or directory using that name exists and the files are extracted into that directory. If the argument is a string contain ++%s++ (for example ++out-%s++) then files are extracted as this pattern with ++%s++ replaced by the file name (for example ++file++ ends up extracted as  ++out-file++).
 
 *-c*, *--create*::
 Create a GCF archive.
+
+*-f*, *--force*::
+By default extraction to a directory fails is a file or directory already exists.
+If this flag is used any existing file or directory is removed.
 
 *--block-size*='BYTES'::
         Size of a block in bytes.  Defaults to 32,768.
@@ -45,6 +49,8 @@ you can use *-z "gzip<level>"*. To disable all forms of compression
 use *-z none*.
 
 include::inc/general-options.txt[]
+
+include::inc/compression.txt[]
 
 == EXAMPLE
 
