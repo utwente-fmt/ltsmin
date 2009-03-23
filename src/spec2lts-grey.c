@@ -14,7 +14,6 @@
 #include "runtime.h"
 #include "treedbs.h"
 #include "vector_set.h"
-#include "struct_io.h"
 
 #if defined(MCRL)
 #include "mcrl-greybox.h"
@@ -35,7 +34,7 @@ static lts_output_t output=NULL;
 static treedbs_t dbs=NULL;
 static int write_lts;
 static int matrix=0;
-
+static int write_state=0;
 
 typedef enum { UseGreyBox , UseBlackBox } mode_t;
 static mode_t call_mode=UseBlackBox;
@@ -48,6 +47,7 @@ static enum { ReachTreeDBS, ReachVset, RunTorX } application=ReachTreeDBS;
 static  struct poptOption development_options[] = {
 	{ "grey", 0 , POPT_ARG_VAL , &call_mode , UseGreyBox , "make use of GetTransitionsLong calls" , NULL },
 	{ "matrix", 0 , POPT_ARG_VAL, &matrix,1,"Print the dependency matrix and quit",NULL},
+	{ "write-state" , 0 , POPT_ARG_VAL , &write_state, 1 , "write the full state vector" , NULL },
 	POPT_TABLEEND
 };
 
@@ -164,7 +164,11 @@ static void explore_state_index(void*context,int idx,int*src){
 	int labels[state_labels];
 	if (state_labels){
 		GBgetStateLabelsAll(model,src,labels);
-		if(write_lts){
+	}
+	if(write_lts){
+		if(write_state){
+			enum_vec(output_handle,src,labels);
+		} else {
 			enum_seg(output_handle,0,idx,labels);
 		}
 	}
@@ -314,17 +318,6 @@ int main(int argc, char *argv[]){
 	N=lts_type_get_state_length(ltstype);
 	edge_info_t e_info=GBgetEdgeInfo(model);
 	K=e_info->groups;
-	switch(application){
-	case RunTorX:
-	case ReachTreeDBS:
-		dbs=TreeDBScreate(N);
-		break;
-	case ReachVset:
-		domain=vdom_create_default(N);
-		visited_set=vset_create(domain,0,NULL);
-		next_set=vset_create(domain,0,NULL);
-		break;
-	}
 	Warning(info,"length is %d, there are %d groups",N,K);
 	state_labels=lts_type_get_state_label_count(ltstype);
 	edge_labels=lts_type_get_edge_label_count(ltstype);
@@ -332,14 +325,18 @@ int main(int argc, char *argv[]){
 	int src[N];
 	GBgetInitialState(model,src);
 	Warning(info,"got initial state");
-	if (write_lts) {
-		Warning(info,"opening %s for writing",files[1]);
-		output=lts_output_open(files[1],model,1,0,1);
-		output_handle=lts_output_begin(output,0,0,0);
-	}
 	int level=0;
 	switch(application){
 	case ReachVset:
+		domain=vdom_create_default(N);
+		visited_set=vset_create(domain,0,NULL);
+		next_set=vset_create(domain,0,NULL);
+		if (write_lts){
+			output=lts_output_open(files[1],model,1,0,1,"viv",NULL);
+			lts_output_set_root_vec(output,src);
+			lts_output_set_root_idx(output,0,0);
+			output_handle=lts_output_begin(output,0,0,0);	
+		}
 		vset_add(visited_set,src);
 		vset_add(next_set,src);
 		vset_t current_set=vset_create(domain,0,NULL);
@@ -358,8 +355,15 @@ int main(int argc, char *argv[]){
 	    	Warning(info,"%lld reachable states represented symbolically with %ld nodes",size,nodes);
 		break;
 	case ReachTreeDBS:
+		dbs=TreeDBScreate(N);
 		if(TreeFold(dbs,src)!=0){
 			Fatal(1,error,"expected 0");
+		}
+		if (write_lts){
+			output=lts_output_open(files[1],model,1,0,1,write_state?"vsi":"-ii",NULL);
+			if (write_state) lts_output_set_root_vec(output,src);
+			lts_output_set_root_idx(output,0,0);
+			output_handle=lts_output_begin(output,0,0,0);	
 		}
 		int limit=visited;
 		while(explored<visited){
@@ -383,6 +387,7 @@ int main(int argc, char *argv[]){
 	}
 	if (write_lts){
 		lts_output_end(output,output_handle);
+		Warning(info,"finishing the writing");
 		lts_output_close(&output);
 		Warning(info,"state space has %d levels %d states %d transitions",level,visited,trans);
 	} else {

@@ -3,9 +3,7 @@
 #include <stdio.h>
 #include <runtime.h>
 #include <amconfig.h>
-#ifdef HAVE_BCG_USER_H
-#include <bcg_user.h>
-#endif
+#include "treedbs.h"
 
 #include <lts_enum.h>
 #include <lts_io.h>
@@ -44,6 +42,22 @@ static void convert_div_mod(void*ctx,int *vec,int *seg,int *ofs){
 	*ofs=state/offset[0];
 }
 
+struct dbs_ctx {
+	treedbs_t dbs;
+	uint32_t *begin;
+};
+
+static void dbs_unfold(void*context,int seg,int ofs,int*vec){
+	struct dbs_ctx *ctx=(struct dbs_ctx *)context;
+	TreeUnfold(ctx->dbs,ctx->begin[seg]+ofs,vec);
+}
+
+static void dbs_fold(void*context,int *vec,int *seg,int *ofs){
+	struct dbs_ctx *ctx=(struct dbs_ctx *)context;
+	*seg=0;
+	*ofs=TreeFold(ctx->dbs,vec);
+}
+
 int main(int argc, char *argv[]){
 	char* files[2];
 	RTinitPopt(&argc,&argv,options,2,2,files,NULL,"<input> <output>","Stream based file format conversion\n\nOptions");
@@ -55,14 +69,52 @@ int main(int argc, char *argv[]){
 	if (segments==0) {
 		segments=lts_input_segments(input);
 	}
-	if (segments==lts_input_segments(input)){
-		lts_output_t output=lts_output_open_root(files[1],model,segments,0,1,
-			lts_root_segment(input),lts_root_offset(input));
+	char*input_mode=lts_input_mode(input);
+	if (input_mode) {
+		Warning(info,"input was written in %s mode",input_mode);
+		if (!strcmp(input_mode,"viv") || !strcmp(input_mode,"vsi")){
+			if (segments!=1) Fatal(1,error,"cannot write more than one segment");
+			lts_type_t ltstype=GBgetLTStype(model);
+			int N=lts_type_get_state_length(ltstype);
+			Warning(info,"state length is %d",N);
+			treedbs_t dbs=TreeDBScreate(N);
+			// we should convert the ltstype of the model.
+			lts_output_t output=lts_output_open(files[1],model,segments,0,1,"-ii",NULL);
+			lts_output_set_root_idx(output,0,0);
+			lts_enum_cb_t ecb=lts_output_begin(output,segments,segments,segments);
+			// We should have two passes (if the file is not in BFS order then the state numbers are wrong!)
+			// pass 1: states with labels.
+			// pass 2: edges with labels.
+			// Currently the viv reader illegally does two passes.
+			N=lts_input_segments(input);
+			uint32_t begin[N];
+			lts_count_t *count=lts_input_count(input);
+			begin[0]=0;
+			for(int i=1;i<N;i++) begin[i]=begin[i-1]+count->state[i-1];
+			struct dbs_ctx ctx;
+			ctx.dbs=dbs;
+			ctx.begin=begin;
+			lts_input_enum(input,N,N,N,lts_enum_convert(ecb,&ctx,dbs_fold,dbs_unfold,1));
+			lts_output_end(output,ecb);
+			lts_output_close(&output);
+			uint32_t* root=lts_input_root(input);
+			uint32_t root_no=TreeFold(dbs,root);
+			if (root_no!=0){
+				Fatal(1,error,"root is %u rather than 0",root_no);
+			}
+		} else {
+			Warning(info,"input mode %s not supported",input_mode);
+		}
+	} else if (segments==lts_input_segments(input)){
+		Warning(info,"undefined input mode");
+		lts_output_t output=lts_output_open(files[1],model,segments,0,1,"-ii",NULL);
+		lts_output_set_root_idx(output,lts_root_segment(input),lts_root_offset(input));
 		lts_enum_cb_t ecb=lts_output_begin(output,segments,segments,segments);
 		lts_input_enum(input,segments,segments,segments,ecb);
 		lts_output_end(output,ecb);
 		lts_output_close(&output);
 	} else {
+		Warning(info,"undefined input mode with segment conversion");
 		int N=lts_input_segments(input);
 		uint64_t offset[N+1];
 		lts_count_t *count=lts_input_count(input);
@@ -72,7 +124,8 @@ int main(int argc, char *argv[]){
 			offset[i+1]=offset[i]+count->state[i-1];
 		}
 		uint64_t root=offset[lts_root_segment(input)+1]+lts_root_offset(input);
-		lts_output_t output=lts_output_open_root(files[1],model,segments,0,1,root%segments,root/segments);
+		lts_output_t output=lts_output_open(files[1],model,segments,0,1,"-ii",NULL);
+		lts_output_set_root_idx(output,root%segments,root/segments);
 		lts_enum_cb_t ecb=lts_output_begin(output,segments,segments,segments);
 		lts_input_enum(input,N,N,N,lts_enum_convert(ecb,offset,convert_div_mod,copy_seg_ofs,1));
 		lts_output_end(output,ecb);

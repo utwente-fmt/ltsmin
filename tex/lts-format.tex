@@ -1,0 +1,283 @@
+\chapter{File Formats}
+
+\section{Preliminaries}
+
+We use the following data types:
+\par\noindent\begin{tabularx}{\textwidth}{@{}lX@{}}
+Datatype & description
+\\
+{\tt string} & A string of 7 bit characters encoded as follows. A string of length $N$ is encoded as follows:
+first $N$ is written as an int16, followed by the characters of the string as bytes. The 7 bit restriction is
+necessary to maintain compatibility with Java.
+\\
+{\tt varint} & A variable length integer.
+\\
+{\tt chunk} & The length (as a varint) of the chunk followed by the data.
+\end{tabularx}
+
+\section{Containers and compression}
+
+\subsection{Containers}
+
+A container is a way of storing multiple files in a structured way. Simple examples of containers are
+directories and ZIP archives. Directories are usually a features of the operating system,
+but sometimes they are difficult to use. (MPI-IO doesn't have directory manipulation functions.
+NFS doesn't guarantee that if mkdir terminates on one node the directory is visible on all other nodes.)
+ZIP archives suffer from the problem that at most one files can be written.
+Thus, we developed our own file archive format: GCF. This format has a few features that set it apart from ZIP:
+\begin{itemize}
+\item Support for parallel and distributed writing. (Multiple workers can open multiple streams each.)
+\item Compression is orthogonal to archiving, so every file can use a different compression scheme.
+\end{itemize}
+
+\subsection{Compression}
+
+To support compression in an orthogonal way every compressed file starts with a string that describes
+the compression method used. Uncompressed files can be provided in two incompatible ways: one can prefix the file with an empty string, which means 
+no compression, or one can just start the file without any header.
+In GCF archives, every file starts with a header. In a directory, compressed files use headers and uncompressed files do not.
+We reserve the extension .dir for uncompressed directories and the extension .dz for compressed directories.
+
+\section{The multi file LTS format, Proposal.}
+
+\subsection{Introduction}
+
+The vector format stores two main tables and several auxiliary tables. The first main table is a table with states and state labels.
+The second main table is a table with edges and edge labels. The vector format makes a few assumptions:
+\begin{itemize}
+\item The set of states is partitioned into segments.
+\item The state table and edge table are also partitioned with one partition per segment.
+\item Partition $i$ of the state table stores the state and labels belonging to segment $i$.
+\item The state labels are always written in index order.
+\item States have two representations: vector and index.
+\end{itemize}
+
+
+\begin{table}[tp]
+\caption{LTS representation modes.}
+\label{mode table}
+\begin{tabularx}{\textwidth}{|l|l|X|}
+\hline
+a & v,- & State representation used in the state table: vector(v) or implicit(-).
+\\\hline
+b & v , i , s & State representation of the source states of edges: vector(v), index(i) or segment and offset(s).
+\\\hline
+c & v , i , s & State representation of the destination states of edges: vector(v), index(i) or segment and offset(s).
+\\\hline
+\end{tabularx}
+\end{table}
+
+The layout of the main tables is determined by a sequence of three characters: {\em abc}.
+For an overview see Table \ref{mode table}.
+In general v means that the whole vector is stored, s means that both segment and offset are stored,
+i means that an index is used and ${-}$ means that the record number is
+the index. The most space consuming format is vvv, which means that every state is represented by the full state vector.
+This format is necessary if we do not know any state index. However, even if we do not maintain a state index (E.g. \verb+spec2lts-grey --state=vset+) we still know the index of the source state of a transition: the position of a state in the state label file defines one
+and we can use this for writing edges. Thus, we get the viv format.
+
+A vector format file, stores the states and transitions
+in $W$ partitions each. For each partition, a list of source states and state labels is stored
+as one file per state slot and state label. This defines a segmented state numbering.
+In a distributed application that does not maintain indices (E.g. on-disk generation) a format such as viv is sensible.
+If indices are known then a format such as vsi (state labels written by state owner, edges written by destination owner which means that the source
+segment has to be recorded) makes sense. After bisimulation reduction, state information is not very meaningful anymore,
+so we can go to ${-}$si or ${-}$is for reduced LTSs.
+
+Converting viv to vsi needs a lot of memory: the entire set of states needs to be stored in memory.
+By doing the conversion in two passes, we can reduce the memory requirement. In pass 1, we convert
+from viv (states+outgoing edges) to vsv (states+incoming edges), which uses no extra memory. In the second pass we convert from
+vsv to vsi, which requires just the states of one segment in memory.
+
+\subsection{Data streams of the vector format, version 1.0}
+
+\par\noindent\begin{tabularx}{\textwidth}{llX}
+{\bf file} & {\bf mode} & {\bf description}
+\\
+\verb+info+ & ??? & Stores the meta information of the LTS.
+\\
+\verb+SV-+$i$\verb+-+$k$ & v?? & Contains the State Vector value of slot $k$ for states in partition $i$.
+\\
+\verb+SL-+$i$\verb+-+$k$ & ??? & Contains the State Label value of label $k$ for states in partition $i$.
+State labels, which are also state slots are stored under the slot number.
+\\
+\verb+ES-+$i$\verb+-+$k$ & ?v? & Contains the Edge Source value of slot $k$ for edges in partition $i$.
+\\
+\verb+ES-+$i$\verb+-seg+ & ?s? &Contains the Edge Source segment for edges in partition $i$.
+\\
+\verb+ES-+$i$\verb+-ofs+ & ?[is]? & Contains the Edge Source state number for edges in partition $i$.
+\\
+\verb+ED-+$i$\verb+-+$k$ & ??v & Contains the Edge Destination value of slot $k$ for edges in partition $i$.
+\\
+\verb+ED-+$i$\verb+-seg+ & ??s & Contains the Edge Destination segment for transitions in partition $i$.
+\\
+\verb+ED-+$i$\verb+-ofs+ & ??[is] & Contains the Edge Destination state number for transitions in partition $i$.
+\\
+\verb+EL-+$i$\verb+-+$k$ & ??? & Contain the Edge Label value of label $k$ for the edges in partition $i$.
+\\
+\verb+CT-+$k$ & ??? & Stores serialized values of the sort $k$.
+\end{tabularx}
+
+By using numbers instead of names, we avoid problems with names that cannot be file names.
+(E.g. a probabilistic LTS where non-deterministic choice is interleaved
+ with probabilistic choice might have type "action\/probability".)
+
+\subsection{The info stream of the vector format}
+
+\subsubsection{top level}
+
+\par\noindent\begin{tabularx}{\textwidth}{lX}
+{\tt string} & A string describing the lts format and version. (E.g. "viv 1.0").
+\\
+{\tt string} & Comment string.
+\\
+{\tt int32} & The segment count.
+\\
+{\tt chunk} & Description of the initial state.
+\\
+{\tt chunk} & A serialization of the LTS type.
+\\
+{\tt chunk} & The state and transition counts of each partition. For viv the transition counts are out counts, for vsi the counts are in counts.
+\\
+{\tt chunk} & A serialization of the compression tree. If the chunk size is 0 then
+tree compression was not used.
+\end{tabularx}
+
+\subsubsection{The initial state}
+
+\par\noindent\begin{tabularx}{\textwidth}{lX}
+{\tt int32} & The root segment. Any value that is not in the range [0,segment count) means undefined.
+\\
+{\tt int32} & The root offset. Has no meaning if the root segment is undefined.
+\\
+{\tt int32} & The length $l$ of the initial state vector. (0 means no initial state vector).
+\\
+{\tt int32}${}^l$ & The initial state.
+\end{tabularx}
+
+
+\subsubsection{The serialization of LTS type}
+
+\par\noindent\begin{tabularx}{\textwidth}{lX}
+{\tt string} & A string describing the version: "lts signature 1.0".
+\\
+{\tt int32} & The length of the state vector: vlen.
+\\
+({\tt string} {\tt int32})${}^{\rm vlen}$ & For each state vector slot a string describing the name and an integer that describes the type.
+An empty string means undefined.
+\\
+{\tt int32} & The number of defined state labels: sl.
+\\
+({\tt string} {\tt int32})${}^{\rm sl}$ & For each defined state label a string describing the name and an integer that describes the type.
+\\
+{\tt int32} & The number of edge labels: el.
+\\
+({\tt string} {\tt int32})${}^{\rm el}$ & For each edge label a string describing the name and an integer that describes the type.
+\\
+{\tt int32} & The number of types: T.
+\\
+{\tt string}${}^{\rm T}$ & For each type a string describing the name of the type.
+\end{tabularx}
+
+\subsubsection{The state and transition count chunk}
+
+If there are $p$ partitions then this chunk contains the $p$ state counts as {\tt int32} followed by
+the $p$ transition counts as {\tt int32}.
+
+\subsubsection{tree compression chunk}
+
+This is a placeholder for a tree compression extension, which is being discussed
+at the moment.
+
+\section{The DIRectory format}
+
+The DIR format stores a labeled transition system as multiple streams in a container.
+The original tools can deal with one type of container only: an uncompressed directory.
+The LTSmin tools can deal with this format in any supported container.
+
+\subsection{data streams}
+
+The DIR format specifies the following data streams:
+\par\noindent\begin{tabularx}{\textwidth}{@{}lX@{}}
+stream & contents
+\\
+{\tt info} & global information, see section \ref{info format} for details.
+\\
+\begin{tabular}[t]{@{}l@{}}
+{\tt src-$i$-$j$}\\
+{\tt label-$i$-$j$}\\
+{\tt dest-$i$-$j$}
+\end{tabular}
+& the source, label and destination of transitions from segment $i$ to segment $j$.
+All values are stored as {\tt int32}.
+\\
+\begin{tabular}[t]{@{}l@{}}
+{\tt parent-seg-$i$}\\
+{\tt parent-ofs-$i$}\\
+{\tt parent-lbl-$i$}
+\end{tabular}
+& These files store reverse transitions which form a spanning tree for the state space.
+The offset and the label are stored as {\tt int32}, the segment is stored as {\tt int8}.
+The parent of the root is the root itself.
+\\
+\begin{tabular}[t]{@{}l@{}}
+{\tt TermDB}\\
+{\tt TermDB.gz}
+\end{tabular}
+& Mapping from {\tt ATerm}'s to integers. This is a simple text file with lines counting form $0$, the
+term which maps to $i$ is printed on line $i$ of the file. The mapping is used for both labels and vector terms.
+Precisely one of these files must exist. If the {\tt .gz} extension is used then the file is gzip compressed.
+\\
+{\tt target-$i$}&
+ASCII file. Each line consists of a target state (number) followed by the actions (strings) which are 
+enabled by that state.
+A target state which is not followed by any action is a deadlock state.
+\\
+\begin{tabular}[t]{@{}l@{}}
+{\tt node-$i$-$j$}\\
+{\tt node-$i$}
+\end{tabular}
+&
+These files store the node databases as lists of {\tt int32} pairs.
+If the database for node $i$ is a bottom database then it is stored in
+{\tt node-$i$}. Otherwise, segment $j$ of that database is stored in {\tt node-$i$-$j$}.
+\end{tabularx}
+
+\subsection{contents of the info stream}
+\label{info format}
+The contents of the info file are as follows:
+
+
+\par\noindent\begin{tabularx}{\textwidth}{lX}
+{\tt int32} & A version number, which allows testing if the directory is in the correct format.
+The current version is 31.
+\\
+{\tt string} & A short description of the transition system.
+\\
+{\tt int32} & The number of segments $N$.
+\\
+{\tt int32} & The segment of the initial state.
+\\
+{\tt int32} & The offset of the initial state.
+\\
+{\tt int32} & The number of entries in the {\tt TermDB} file.
+\\
+{\tt int32} & The index of the silent transition.
+\\
+{\tt int32} & The number of top databases $K$.
+\\
+{\tt int32} & The number of states in segment $0$.
+\\
+&$\vdots$
+\\
+{\tt int32} & The number of states in segment $N-1$.
+\\
+{\tt int32} & The number of transitions from segment $0$ to segment $0$.
+\\
+{\tt int32} & The number of transitions from segment $0$ to segment $1$.
+\\
+&$\vdots$
+\\
+{\tt int32} & The number of transitions from segment $N-1$ to segment $N-1$.
+\end{tabularx}
+
+

@@ -21,6 +21,8 @@ struct stream_obj {
 
 extern size_t stream_illegal_read_max(stream_t stream,void*buf,size_t count);
 extern void stream_illegal_read(stream_t stream,void*buf,size_t count);
+extern size_t stream_default_read_max(stream_t stream,void*buf,size_t count);
+extern void stream_default_read(stream_t stream,void*buf,size_t count);
 extern int stream_illegal_empty(stream_t stream);
 extern void stream_illegal_write(stream_t stream,void*buf,size_t count);
 extern void stream_illegal_flush(stream_t stream);

@@ -68,8 +68,8 @@ extern int lts_type_get_type_count(lts_type_t  t);
 extern int lts_type_add_type(lts_type_t  t,const char *name,int* is_new);
 extern char* lts_type_get_type(lts_type_t  t,int typeno);
 
-extern void lts_type_serialize(stream_t s,lts_type_t t);
-extern void lts_type_deserialize(lts_type_t t,stream_t s);
+extern void lts_type_serialize(lts_type_t t,stream_t s);
+extern lts_type_t lts_type_deserialize(stream_t s);
 
 #endif
 

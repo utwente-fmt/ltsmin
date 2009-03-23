@@ -36,73 +36,11 @@
 \tableofcontents
 
 
-\chapter{Design Rationale}
-
-\section{Management of data values.}
-
-All data type functionality is provided by the languages modules.
-The tool level itself can only manage integers, chunks and strings.
-Thus, every other data type has to be serialized to a chunk
-and/or pretty printed to a string.
-
-While this approach makes the tool design simpler, it does add cost
-in time and memory: (de)serialization is expensive in time and the
-serialized form often takes up a lot more memory than the real data
-type. For example, it takes time to print/parse ATerms. Moreover,
-ATerm use maximal sharing to reduce the memory footprint which is not
-possible in the serialized form.
-
-Because of the time cost, we try to avoid (de)serialization by
-keeping a global integer to value mapping, so we can send integers
-instead of chunks. Because of the memory cost, duplication of
-serialized values should be avoided. That is, tools that start language
-modules should use the language modules to store values in native form
-and the file format should store all values for each type once.
-
-This requirement is somewhat at odds with the fact that the performance
-of the symbolic data structures depends on the integers used.
-A variable with integers $1,2,3,4$ performs better than one with
-$1,5,45,81$, simply because the first set can be represented with less bits.
-This is solved by introducing a global map for each variable that maps
-the used indices to a consecutive range.
+\input{design}
 
 \input{etf-format}
 
-\chapter{File Formats}
-
-\section{DIRectory format}
-
-\section{Vector Format}
-
-A vector format file, stores the states and transitions
-in $W$ partitions each. For each partition, a list of source states and state labels is stored
-as one file per state slot and state label. This defines a segmented state numbering.
-The transitions are stored as one file containing the state number of a source state
-plus one file per destination state slot and edge label.
-
-\par\noindent\begin{tabularx}{\textwidth}{lX}
-\verb+info+ & Stores all information that is needed but does not need a file of its own.
-\\
-\verb+SV-+$i$\verb+-+$k$ & Contains the State Vector slot value for segment $i$ and slots $k$.
-If $N = 1$ and $S^i$ is of the form $\{ 0 , \cdots , |S^i| -1 \}$ then the
-file \verb+SV-1-1+ can be omitted because it is a simple sequence $0,1,\cdots,|S^1|-1$.
-\\
-\verb+SL-+$i$\verb+-+{\it name} & Contains the value of state label {\it name} for the states in
-segment $i$.
-\\
-\verb+ES-+$i$ & Contains the Edge Source state number for transitions starting in segment $i$.
-\\
-\verb+ED-+$i$\verb+-+$k$ & Contains the Edge Destination state slot value for 
-segment $i$ and slot $k$.
-\\
-\verb+EL-+$i$\verb+-+{\it name} &  Contain the Edge Label value for the edge label {\it name} for
-edges starting in segment $i$.
-\\
-\verb+CT-+{\it name} & Stores serialized values of the sort {\it name}.
-\\
-\verb+PP-+{\it name} & Stores pretty printed values of the sort {\it name}.
-\end{tabularx}
-
+\input{lts-format}
 
 \end{document}
 

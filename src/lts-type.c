@@ -165,3 +165,82 @@ char* lts_type_get_type(lts_type_t  t,int typeno){
 	return SIget(t->type_db,typeno);
 }
 
+void lts_type_serialize(lts_type_t t,stream_t ds){
+	DSwriteS(ds,"lts signature 1.0");
+	uint32_t N=lts_type_get_state_length(t);
+	Warning(debug,"state length is %d",N);
+	DSwriteU32(ds,N);
+	for(uint32_t i=0;i<N;i++){
+		char*x=lts_type_get_state_name(t,i);
+		if (x) DSwriteS(ds,x); else DSwriteS(ds,"");
+		DSwriteU32(ds,lts_type_get_state_typeno(t,i));
+	}
+	N=lts_type_get_state_label_count(t);
+	Warning(info,"%d state labels",N);
+	DSwriteU32(ds,N);
+	for(uint32_t i=0;i<N;i++){
+		char*x=lts_type_get_state_label_name(t,i);
+		DSwriteS(ds,x);
+		DSwriteU32(ds,lts_type_get_state_label_typeno(t,i));
+	}
+	N=lts_type_get_edge_label_count(t);
+	Warning(info,"%d edge labels",N);
+	DSwriteU32(ds,N);
+	for(uint32_t i=0;i<N;i++){
+		char*x=lts_type_get_edge_label_name(t,i);
+		DSwriteS(ds,x);
+		DSwriteU32(ds,lts_type_get_edge_label_typeno(t,i));
+	}
+	N=lts_type_get_type_count(t);
+	Warning(info,"%d types",N);
+	DSwriteU32(ds,N);
+	for(uint32_t i=0;i<N;i++){
+		DSwriteS(ds,lts_type_get_type(t,i));
+	}
+}
+
+lts_type_t lts_type_deserialize(stream_t ds){
+	lts_type_t t=lts_type_create();
+	char version[1024];
+	DSreadS(ds,version,1024);
+	if (strcmp(version,"lts signature 1.0")){
+		Fatal(1,error,"cannot deserialize %s",version);
+	}
+	uint32_t N=DSreadU32(ds);
+	Warning(info,"state length is %d",N);
+	lts_type_set_state_length(t,N);
+	for(uint32_t i=0;i<N;i++){
+		char*x=DSreadSA(ds);
+		if (strlen(x)) lts_type_set_state_name(t,i,x);
+		free(x);
+		lts_type_set_state_typeno(t,i,DSreadU32(ds));
+	}
+	N=DSreadU32(ds);
+	Warning(info,"%d state labels",N);
+	lts_type_set_state_label_count(t,N);
+	for(uint32_t i=0;i<N;i++){
+		char*x=DSreadSA(ds);
+		lts_type_set_state_label_name(t,i,x);
+		free(x);
+		lts_type_set_state_label_typeno(t,i,DSreadU32(ds));
+	}
+	N=DSreadU32(ds);
+	Warning(info,"%d edge labels",N);
+	lts_type_set_edge_label_count(t,N);
+	for(uint32_t i=0;i<N;i++){
+		char*x=DSreadSA(ds);
+		lts_type_set_edge_label_name(t,i,x);
+		free(x);
+		lts_type_set_edge_label_typeno(t,i,DSreadU32(ds));
+	}
+	N=DSreadU32(ds);
+	Warning(info,"%d types",N);
+	for(uint32_t i=0;i<N;i++){
+		char*x=DSreadSA(ds);
+		SIputAt(t->type_db,x,i);
+		free(x);
+	}
+	return t;
+}
+
+

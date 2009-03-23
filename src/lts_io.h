@@ -20,21 +20,41 @@
 /*@{*/
 
 /**
+\brief Options for the LTS I/O library.
+
+Parsing these options has the side effect of initializing the library.
  */
 extern struct poptOption lts_io_options[];
 
 typedef struct lts_output_struct *lts_output_t;
 
 /**
-\brief Create a handle for output to an archive.
+\brief Open an LTS file for writing in a certain mode.
+
+\param requested_mode A string of length three that describes the requested write mode.
+\param actual_mode A pointer to a string, where the actual mode can be returned.
+If this is NULL then the requested mode is mandatory. Otherwise the mode might be changed
+and the chosen mode is returned here.
  */
-extern lts_output_t lts_output_open(char *outputname,model_t model,int segment_count,int share,int share_count);
+extern lts_output_t lts_output_open(
+	char *outputname,
+	model_t model,
+	int segment_count,
+	int share,
+	int share_count,
+	const char *requested_mode,
+	char **actual_mode
+);
 
 /**
-\brief Create a handle for output to an archive with explicit root state.
+\brief Set the root vector.
  */
-extern lts_output_t lts_output_open_root(char *outputname,model_t model,int segment_count,int share,int share_count,
-		uint32_t root_seg,uint64_t root_ofs);
+extern void lts_output_set_root_vec(lts_output_t output,uint32_t * root);
+
+/**
+\brief Set the root segment/offset.
+ */
+extern void lts_output_set_root_idx(lts_output_t output,uint32_t root_seg,uint32_t root_ofs);
 
 /**
 \brief Get an enumeration consumer for an output.
@@ -79,15 +99,22 @@ extern lts_input_t lts_input_open(char*inputname,model_t model,int share,int sha
  */
 extern int lts_input_segments(lts_input_t input);
 
+extern char* lts_input_mode(lts_input_t input);
+
 /**
-\brief Get root segment.
+\brief Get the root vector
+*/
+extern uint32_t* lts_input_root(lts_input_t input);
+
+/**
+\brief Get the root segment.
  */
 extern uint32_t lts_root_segment(lts_input_t input);
 
 /**
-\brief Get root segment.
+\brief Get the root offset.
  */
-extern uint64_t lts_root_offset(lts_input_t input);
+extern uint32_t lts_root_offset(lts_input_t input);
 
 /**
 \brief Provide access to the state/transition counters.
@@ -101,6 +128,9 @@ extern lts_count_t *lts_input_count(lts_input_t in);
 \param states If zero then states are not enumerated otherwise they are.
 \param edges If zero then edges are not enumerated otherwise they are.
 \param output Delivery point.
+
+Callback order has to be defined in case of both states and edges:
+Is first the states then the edges legal?
  */
 extern void lts_input_enum(lts_input_t input,int which_state,int which_src,int which_dst,lts_enum_cb_t output);
 

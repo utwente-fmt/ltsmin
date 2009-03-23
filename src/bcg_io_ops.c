@@ -1,16 +1,9 @@
-
+#include <string.h>
 #include <bcg_user.h>
 #include <lts_io_internal.h>
 #include <runtime.h>
 
 static int bcg_write_used=0;
-
-static void bcg_write_open(lts_output_t output){
-	if (output->segment_count!=1) {
-		Fatal(1,error,"this tool does not support partitioned BCG");
-	}
-}
-
 
 struct bcg_output {
 	model_t model;
@@ -19,6 +12,7 @@ struct bcg_output {
 };
 
 static void bcg_write_state(void* lts_output,int seg,int ofs,int* labels){
+	//Warning(debug,"state");
 	(void)lts_output;
 	(void)seg;
 	(void)ofs;
@@ -26,6 +20,7 @@ static void bcg_write_state(void* lts_output,int seg,int ofs,int* labels){
 }
 
 static void bcg_write_edge(void* lts_output,int src_seg,int src_ofs,int dst_seg,int dst_ofs,int*labels){
+	//Warning(debug,"edge");
 	struct bcg_output* out=(struct bcg_output*)lts_output;
 	char buffer[1024];
 	chunk c=chunk_ld(1024,buffer);
@@ -39,9 +34,8 @@ static lts_enum_cb_t bcg_write_begin(lts_output_t output,int which_state,int whi
 		Fatal(1,error,"cannot write more than one BCG file at the same time");
 	}
 	bcg_write_used=1;
-	Warning(info,"assuming root of %s is state 0",output->name);
-	int root=0;
-	BCG_IO_WRITE_BCG_BEGIN (output->name,root,1,get_label(),0);
+	if (output->root_seg) Fatal(1,error,"illegal root segment %d",output->root_seg);
+	BCG_IO_WRITE_BCG_BEGIN (output->name,output->root_ofs,1,get_label(),0);
 	Warning(info,"opened %s",output->name);
 	lts_type_t ltstype=GBgetLTStype(output->model);
 	int N=lts_type_get_state_length(ltstype);
@@ -62,6 +56,7 @@ static void bcg_write_end(lts_output_t output,lts_enum_cb_t writer){
 static void bcg_write_close(lts_output_t output){
 	if (output->segment_count!=1) {
 		Warning(info,"Writing of PBG file unimplemented");
+		Fatal(1,error,"%d",output->segment_count);
 	}
 }
 
@@ -69,6 +64,31 @@ static void bcg_write_close(lts_output_t output){
 struct bcg_input {
 	BCG_TYPE_OBJECT_TRANSITION bcg_graph;
 };
+
+static void bcg_read_part(lts_input_t input,int which_state,int which_src,int which_dst,lts_enum_cb_t output){
+	(void)which_state;(void)which_src;(void)which_dst;
+	struct bcg_input*ctx=(struct bcg_input*)input->ops_context;
+	bcg_type_state_number bcg_s1, bcg_s2;
+	BCG_TYPE_LABEL_NUMBER bcg_label_number;
+	BCG_OT_ITERATE_PLN (ctx->bcg_graph, bcg_s1, bcg_label_number, bcg_s2) {
+		enum_seg_seg(output,0,bcg_s1,0,bcg_s2,&bcg_label_number);
+	} BCG_OT_END_ITERATE;
+}
+
+static void bcg_read_close(lts_input_t input){
+	struct bcg_input*ctx=(struct bcg_input*)input->ops_context;
+	BCG_OT_READ_BCG_END (&(ctx->bcg_graph));
+}
+
+static void bcg_write_open(lts_output_t output){
+	if (output->segment_count!=1) {
+		Fatal(1,error,"this tool does not support partitioned BCG");
+	}
+	if (strcmp(output->mode,"iii")&&strcmp(output->mode,"-ii")) Fatal(1,error,"Write mode %s not supported when writing BCG",output->mode);
+	output->ops.write_begin=bcg_write_begin;
+	output->ops.write_end=bcg_write_end;
+	output->ops.write_close=bcg_write_close;
+}
 
 static void bcg_read_open(lts_input_t input){
 	if (input->share_count!=1) {
@@ -112,29 +132,30 @@ static void bcg_read_open(lts_input_t input){
 	input->count.out[0]=input->count.in[0];
 	input->count.cross[0][0]=input->count.in[0];
 	input->ops_context=ctx;
-}
-static void bcg_read_part(lts_input_t input,int which_state,int which_src,int which_dst,lts_enum_cb_t output){
-	(void)which_state;(void)which_src;(void)which_dst;
-	struct bcg_input*ctx=(struct bcg_input*)input->ops_context;
-	bcg_type_state_number bcg_s1, bcg_s2;
-	BCG_TYPE_LABEL_NUMBER bcg_label_number;
-	BCG_OT_ITERATE_PLN (ctx->bcg_graph, bcg_s1, bcg_label_number, bcg_s2) {
-		enum_seg_seg(output,0,bcg_s1,0,bcg_s2,(int*)&bcg_label_number);
-	} BCG_OT_END_ITERATE;
-}
-static void bcg_read_close(lts_input_t input){
-	struct bcg_input*ctx=(struct bcg_input*)input->ops_context;
-	BCG_OT_READ_BCG_END (&(ctx->bcg_graph));
+	input->ops.read_part=bcg_read_part;
+	input->ops.read_close=bcg_read_close;
 }
 
+static void bcg_popt(poptContext con,
+ 		enum poptCallbackReason reason,
+                            const struct poptOption * opt,
+                             const char * arg, void * data){
+	(void)con;(void)opt;(void)arg;(void)data;
+	switch(reason){
+	case POPT_CALLBACK_REASON_PRE:
+		Fatal(1,error,"unexpected call to bcg_popt");
+	case POPT_CALLBACK_REASON_POST:
+		BCG_INIT();
+		lts_write_register("bcg",bcg_write_open);
+		lts_read_register("bcg",bcg_read_open);
+		return;
+	case POPT_CALLBACK_REASON_OPTION:
+		Fatal(1,error,"unexpected call to bcg_popt");
+	}
+}
 
-struct lts_io_ops bcg_io_ops={
-	bcg_write_open,
-	bcg_write_begin,
-	bcg_write_end,
-	bcg_write_close,
-	bcg_read_open,
-	bcg_read_part,
-	bcg_read_close
+struct poptOption bcg_io_options[]= {
+	{ NULL, 0 , POPT_ARG_CALLBACK|POPT_CBFLAG_POST|POPT_CBFLAG_SKIPOPTION , bcg_popt , 0 , NULL },
+	POPT_TABLEEND
 };
 

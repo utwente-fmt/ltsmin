@@ -12,16 +12,19 @@ from a specifcation are two examples of tasks that enumerate all states and tran
 This library provides a common interface for producers and consumers of labels transition systems.
 */
 
+typedef void (*state_cb)(void* context,int seg,int* state,int* labels);
+
 typedef void (*state_vec_cb)(void* context,int* state,int* labels);
 
 typedef void (*state_seg_cb)(void* context,int seg,int ofs,int* labels);
+
+typedef void (*edge_cb)(void* context,int src_seg,int* src,int dst_seg,int* dst,int*labels);
 
 typedef void (*edge_vec_vec_cb)(void* context,int* src,int* dst,int*labels);
 
 typedef void (*edge_seg_vec_cb)(void* context,int src_seg,int src_ofs,int* dst,int*labels);
 
 typedef void (*edge_seg_seg_cb)(void* context,int src_seg,int src_ofs,int dst_seg,int dst_ofs,int*labels);
-
 
 typedef void (*state_fold_t)(void* context,int *state,int*seg,int*ofs);
 
@@ -42,6 +45,11 @@ extern lts_enum_cb_t lts_enum_viv(int len,void* context,state_vec_cb state_cb,ed
 extern lts_enum_cb_t lts_enum_iii(int len,void* context,state_seg_cb state_cb,edge_seg_seg_cb edge_cb);
 
 /**
+\brief Create an output object for vector states and index/index edges.
+ */
+extern lts_enum_cb_t lts_enum_vii(int len,void* context,state_vec_cb state_cb,edge_seg_seg_cb edge_cb);
+
+/**
 \brief Stack a conversion on top an output.
 
 \param idx_convert If 0 then source and destination index are the same. If 1 they are different,
@@ -52,9 +60,11 @@ extern lts_enum_cb_t lts_enum_convert(lts_enum_cb_t base,void*context,state_fold
 
 extern void* enum_get_context(lts_enum_cb_t e);
 
-
+extern void enum_state(lts_enum_cb_t sink,int seg,int* state,int* labels);
 extern void enum_vec(lts_enum_cb_t sink,int* state,int* labels);
 extern void enum_seg(lts_enum_cb_t sink,int seg,int ofs,int* labels);
+
+extern void enum_edge(lts_enum_cb_t sink,int src_seg,int* src,int dst_seg,int* dst,int*labels);
 extern void enum_vec_vec(lts_enum_cb_t sink,int* src,int* dst,int*labels);
 extern void enum_seg_vec(lts_enum_cb_t sink,int src_seg,int src_ofs,int* dst,int*labels);
 extern void enum_seg_seg(lts_enum_cb_t sink,int src_seg,int src_ofs,int dst_seg,int dst_ofs,int*labels);

@@ -179,9 +179,12 @@ static event_barrier_t barrier;
 #include "etf-greybox.h"
 #endif
 
+static int write_state=0;
+
 static  struct poptOption options[] = {
 	{ "nice" , 0 , POPT_ARG_INT , &nice_value , 0 , "Set the nice level of all workers."
 		" This is useful when running on other peoples workstations." , NULL},
+	{ "write-state" , 0 , POPT_ARG_VAL , &write_state, 1 , "write the full state vector" , NULL },
 #if defined(MCRL)
 	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, mcrl_options , 0 , "mCRL options", NULL},
 #endif
@@ -219,6 +222,7 @@ static int mpi_nodes,mpi_me;
 
 static int *tcount;
 static int size;
+static int state_labels;
 
 static uint32_t chk_base=0;
 
@@ -420,19 +424,6 @@ int main(int argc, char*argv[]){
 		ADD_ARRAY(state_man,parent_ofs,uint32_t);
 		ADD_ARRAY(state_man,parent_seg,uint16_t);
 	}
-	/***************************************************/
-	event_barrier_wait(barrier);
-	if (files[1]) {
-		Warning(info,"Writing output to %s",files[1]);
-		write_lts=1;
-		output=lts_output_open(files[1],model,mpi_nodes,mpi_me,mpi_nodes);
-		event_barrier_wait(barrier); // opening is sometimes a collaborative operation. (e.g. *.dir)
-		output_handle=lts_output_begin(output,mpi_me,mpi_nodes,mpi_me);
-		// write states belonging to me and edge from any source to me.
-	} else {
-		Warning(info,"No output, just counting the number of states");
-		write_lts=0;
-	}
 	event_barrier_wait(barrier);
 	/***************************************************/
 	size=lts_type_get_state_length(ltstype);
@@ -441,6 +432,9 @@ int main(int argc, char*argv[]){
 	dbs=TreeDBScreate(size);
 	int src[size];
 	io_trans_init();
+	state_labels=lts_type_get_state_label_count(ltstype);
+	Warning(info,"there are %d state labels",state_labels);
+	int labels[state_labels];
 	/***************************************************/
 	event_barrier_wait(barrier);
 	/***************************************************/
@@ -458,6 +452,26 @@ int main(int argc, char*argv[]){
 		visited=0;
 	}
 	/***************************************************/
+	event_barrier_wait(barrier);
+	if (files[1]) {
+		Warning(info,"Writing output to %s",files[1]);
+		write_lts=1;
+		if (write_state) {
+			output=lts_output_open(files[1],model,mpi_nodes,mpi_me,mpi_nodes,"vsi",NULL);
+		} else {
+			output=lts_output_open(files[1],model,mpi_nodes,mpi_me,mpi_nodes,"-ii",NULL);
+		}
+		lts_output_set_root_vec(output,src);
+		lts_output_set_root_idx(output,0,0);
+		event_barrier_wait(barrier); // opening is sometimes a collaborative operation. (e.g. *.dir)
+		output_handle=lts_output_begin(output,mpi_me,mpi_nodes,mpi_me);
+		// write states belonging to me and edge from any source to me.
+	} else {
+		Warning(info,"No output, just counting the number of states");
+		write_lts=0;
+	}
+	event_barrier_wait(barrier);
+	/***************************************************/
 	int level=0;
 	for(;;){
 		long long int limit=visited;
@@ -472,12 +486,19 @@ int main(int argc, char*argv[]){
 			ctx.seg=mpi_me;
 			ctx.ofs=explored;
 			explored++;
-			int count=GBgetTransitionsAll(model,src,callback,&ctx);;
+			int count=GBgetTransitionsAll(model,src,callback,&ctx);
 			if (count<0) Fatal(1,error,"error in GBgetTransitionsAll");
 			if (count==0 && find_dlk){
 				Warning(info,"deadlock found: %d.%d",ctx.seg,ctx.ofs);
 				deadlock_found(ctx.seg,ctx.ofs);
 			}
+			if (state_labels){
+				GBgetStateLabelsAll(model,src,labels);
+			}
+			if(write_lts && write_state){
+				enum_vec(output_handle,src,labels);
+			}
+
 			lvl_scount++;
 			lvl_tcount+=count;
 			if ((lvl_scount%1000)==0) {
@@ -532,6 +553,14 @@ int main(int argc, char*argv[]){
 				for(int j=0;j<mpi_nodes;j++){
 					if (RTverbosity>1) Warning(info,"transition count %d to %d is %d",i,j,temp[i+mpi_nodes*j]);
 					count->cross[i][j]=temp[i+mpi_nodes*j];
+				}
+			}
+			for(int i=0;i<mpi_nodes;i++){
+				count->in[i]=0;
+				count->out[i]=0;
+				for(int j=0;j<mpi_nodes;j++){
+					count->in[i]+=count->cross[j][i];
+					count->out[i]+=count->cross[i][j];
 				}
 			}
 		}
