@@ -1,8 +1,10 @@
 bin_PROGRAMS = ltsmin-convert gcf etf-convert
+noinst_PROGRAMS =
 noinst_LIBRARIES = libutil.a
 
 if HAVE_MPI
-bin_PROGRAMS += ltsmin-mpi mpi-event-test etf2lts-mpi
+bin_PROGRAMS += ltsmin-mpi etf2lts-mpi
+noinst_PROGRAMS += mpi-event-test
 noinst_LIBRARIES += libmpi.a
 if HAVE_LIBMCRL
 bin_PROGRAMS += lpo2lts-mpi

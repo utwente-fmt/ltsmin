@@ -70,7 +70,7 @@ static  struct poptOption options[] = {
 	{ "extract",'x', POPT_ARG_VAL , &operation , GCF_EXTRACT , "Extract files from an archive" , NULL },
 	{ "force",'f' ,  POPT_ARG_VAL , &force , 1 , "Force creation of a directory for output" , NULL },
 	{ "block-size" , 0 , POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT , &blocksize , 0 , "The size of a block in bytes" , "<bytes>" },
-	{ "cluster-size" , 0 , POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT , &blockcount , 0 , "The number of block in a cluster" , "<blocks>"},
+	{ "cluster-size" , 0 , POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT , &blockcount , 0 , "The number of blocks in a cluster" , "<blocks>"},
 	{ "compression",'z',POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT,
 		&policy,0,"Set the compression policy used in the archive. See man page for details.","<policy>"},
 	POPT_TABLEEND

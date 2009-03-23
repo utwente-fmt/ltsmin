@@ -38,7 +38,7 @@ static int verbosity=1;
 #define BRANCHING_REDUCTION_SET 2
 
 static int action=STRONG_REDUCTION_SET;
-static int plain=1;
+static int plain;
 
 static  struct poptOption options[] = {
 	{"strong",'s',POPT_ARG_VAL,&action,STRONG_REDUCTION_SET,"reduce modulo strong bisimulation (default)",NULL},
@@ -761,6 +761,7 @@ int main(int argc,char **argv){
 		archive_t arch;
 		if (strstr(files[1],"%s")){
 			if (mpi_me==0) Warning(debug,"pattern archive");
+			plain=0;
 			if (mpi_io) arch=arch_fmt(files[1],mpi_io_read,mpi_io_write,65536);
 			if (unix_io) arch=arch_fmt(files[1],file_input,file_output,65536);
 		} else if (strlen(files[1])>4&& !strcmp(files[1]+(strlen(files[1])-4),".dir")){
@@ -780,6 +781,7 @@ int main(int argc,char **argv){
 			arch=arch_dir_open(files[1],65536);
 		} else {
 			if (mpi_me==0) Warning(debug,"GCF archive");
+			plain=0;
 			uint32_t bs=65536;
 			uint32_t bc=128;
 			raf_t raf=NULL;

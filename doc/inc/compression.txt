@@ -22,11 +22,11 @@ with an emtpy string or with the word none. Known compression filters are
 When compressing labeled transition systems that were obtained using BFS exploration order, it is a good idea to
 apply difference encoding to state numbers before compression them. This leads to a default compression strategy of
 ----
-src*:diff32|gzip;dest*"diff32|gzip;gzip
+src*:diff32|gzip;dest*:diff32|gzip;gzip
 ----
 For the legacy directory format and
 ----
-*ofs:diff32;gzip
+*ofs:diff32|gzip;gzip
 ----
 For the state label extended directory format.
 

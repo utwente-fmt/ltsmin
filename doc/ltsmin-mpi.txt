@@ -24,32 +24,13 @@ include::inc/mpi-blurb.txt[]
 
 === Reductions
 
-*-s*, $--strong*::
+*-s*, *--strong*::
 Apply strong bisimulation reduction. This is the default.
 
 *-b*, *--branching*::
 Apply branching bisimulation reduction.
 
 include::inc/general-options.txt[]
-
-
-== EXAMPLES
-In this example, we assume Open MPI with a TCP interconnect.
-
-Working with the LTS, we generated in the example for linkman:lpo2lts-mpi[1], we
-can now apply strong bisimulation reduction.
-
-----
-mpirun -np 2 -mca btl tcp,self ltsmin-mpi -s brp.gcf brp-s.gcf
-----
-
-Subsequently, we can reduce the result modulo branching bisimulation and write
-it in the uncompressed format that is compatible with the mCRL tools:
-
-----
-mpirun -np 2 -mca btl tcp,self ltsmin-mpi -b brp-s.gcf brp-b.dir
-----
-
 
 == EXIT STATUS
 0::
@@ -58,7 +39,7 @@ mpirun -np 2 -mca btl tcp,self ltsmin-mpi -b brp-s.gcf brp-b.dir
         Some error occurred.
 
 == SEE ALSO
-linkman:ltsmin[5], 
+linkman:ltsmin[7], 
 linkman:lpo2lts-mpi[1], 
 linkman:lps2lts-mpi[1], 
 linkman:nips2lts-mpi[1], 

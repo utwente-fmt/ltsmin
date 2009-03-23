@@ -12,13 +12,10 @@ include::general-options.txt[]
 *>0*::
         Some error occurred.
 
-== EXAMPLES
-
-TODO
-
 include::support.txt[]
 
 == SEE ALSO
+linkman:ltsmin[7],
 linkman:etf[5],
 linkman:ltsmin-mpi[1],
 linkman:ltsmin-convert[1],

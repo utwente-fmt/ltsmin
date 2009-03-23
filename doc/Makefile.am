@@ -5,7 +5,7 @@ ASCIIDOC_FLAGS = -a version=$(VERSION)
 MANPAGES = ltsmin-mpi.1 ltsmin-convert.1 gcf.1 lpo-reach.1 lps-reach.1	\
         nips-reach.1 lpo2lts-grey.1 lps2lts-grey.1 nips2lts-grey.1	\
         lpo2lts-mpi.1 lps2lts-mpi.1 nips2lts-mpi.1 etf.5	\
-        etf2lts-grey.1 etf2lts-mpi.1 etf-reach.1
+        etf2lts-grey.1 etf2lts-mpi.1 etf-reach.1 ltsmin.7 etf-convert.1
 
 doc_ASCIIDOC = $(addsuffix .txt, $(basename $(MANPAGES)))
 

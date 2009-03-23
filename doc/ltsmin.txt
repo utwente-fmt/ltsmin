@@ -1,0 +1,162 @@
+//                           -*- mode: doc; outline-regexp: "==\(=*\) ." -*-
+ltsmin(7)
+=========
+:Author:  Stefan Blom
+:Email:   <sccblom@cs.utwente.nl>
+:Date:    2008-23-03
+
+
+== NAME
+
+ltsmin - Overview of the LTSmin toolset.
+
+== SYNOPSIS
+
+This man page provides an overview of the tools in the LTSmin toolset.
+
+== Language Modules.
+
+The LTSmin toolset was designed to support multiple languages.
+Thus all tools for a specific language start with a prefix that
+indicates the language. Below, we list the languages and the prefixes that are supported in this release:
+
+mCRL(+lpo+)::
+
+The first version of the mCRL language. See the
+http://www.cwi.nl/~mcrl/[mCRL website].
+
+mCRL2(+lps+)::
+
+The second edition of the mCRL language. See the
+http://www.mcrl2.org/[mCRL2 website].
+
+NIPS-VM(+nips+)::
+
+The NIPS Virtual Machine. See the
+http://www.ewi.utwente.nl/~michaelw/nips/[NIPS-VM website].
+
+ETF(+etf+)::
+
+The Enumerated Table Format is an intermediate format for models in the LTSmin toolset.
+See linkman:etf[5].
+
+== State Space Exploration Tools.
+
+The LTSmin toolset has three tools for reachability analysis:
+
+<prefix>-reach::
+Symbolic reachability tools that use decision diagrams for
+manipulating sets of states. The optional output produced by these tools is an ETF model.
++
+See linkman:lps-reach[1], linkman:lpo-reach[1], linkman:nips-reach[1], and linkman:etf-reach[1].
+
+<prefix>2lts-grey::
+
+Sequential state space explorers that enumerate states and can use
+both decision diagrams and hash tables to represent sets of states.
+The optional output produced by these tools is an explicit LTS.
++
+See linkman:lps2lts-grey[1], linkman:lpo2lts-grey[1], linkman:nips2lts-grey[1], and linkman:etf2lts-grey[1].
+
+<prefix>2lts-mpi::
+
+Distributed state space generators that enumerate states and use
+distributed hash tables for storing sets of states.
+The optional output produced by these tools is an explicit LTS.
++
+See linkman:lps2lts-mpi[1], linkman:lpo2lts-mpi[1], linkman:nips2lts-mpi[1], and linkman:etf2lts-mpi[1].
+
+== State Space Reduction Tool.
+
+The LTSmin toolset provides distributed minimisation modulo strong and branching bisimulation.
+
+ltsmin-mpi::
+Distributed minimisation modulo strong and branching bisimulation.
+See linkman:ltsmin-mpi[1].
+
+
+== Conversion Tools
+
+=== basic use
+
+etf-convert::
+Translate ETF to DVE. See linkman:etf-convert[1].
+
+ltsmin-convert::
+Convert LTS file formats. See linkman:ltsmin-convert[1].
+
+gcf::
+Utility for creating and extracting 'Generic Container Format' archives. See linkman:gcf[1].
+
+include::inc/file-formats.txt[]
+
+== Mini Tutorial
+
+As running example, we use a model of the bounded retransmission
+protocol from the mCRL examples. Assuming we have copied the file
+'brp.mcrl' to our working directory, we can linearize the model with
+the following command:
+----
+mcrl -regular -nocluster brp.mcrl
+----
+This produces a file named 'brp.tbf'. This is the input for the state
+space generator. Just to see how many states and transitions are produced,
+we can run the command
+----
+lpo2lts-grey brp.tbf
+----
+Assuming that the model is small and CADP is installed, we can simply generate a BCG file
+----
+lpo2lts-grey brp.tbf brp.bcg
+----
+and then use CADP.
+
+If it turns out that the LTS was very big then we might want to use the distributed tools
+to generate and reduce the LTS:
+----
+mpirun -np 4 -mca btl tcp,self lpo2lts-mpi brp.tbf brp.dir
+mpirun -np 4 -mca btl tcp,self ltsmin-mpi brp.dir brp-s.dir
+ltsmin-convert --segments 1 brp-s.dir brp-s.bcg
+----
+
+The dir format used to store the LTS in the example is backwards compatible with the mCRL toolset.
+We also support a newer format that adds compression:
+----
+mpirun -np 4 -mca btl tcp,self lpo2lts-mpi brp.tbf brp.gcf
+mpirun -np 4 -mca btl tcp,self ltsmin-mpi brp.gcf brp-s.gcf
+ltsmin-convert --segments 1 brp-s.gcf brp-s.bcg
+----
+
+When the model is suitable, state space generation can be speeded up by memoizing next state calls:
+----
+mpirun -np 4 -mca btl tcp,self lpo2lts-mpi --cache brp.tbf brp.gcf
+----
+
+=== symbolic tools
+
+The LTSmin tool set also has a symbolic reachability tool.
+If we want to know the number of states, we can give the command:
+
+----
+lpo-reach brp.tbf
+----
+
+This command will compute the necessary part of the transition relation and the 
+set of reachable states. If we want to record the necessary part of the transition relation
+then we can do so in the form of an ETF file:
+
+----
+lpo-reach brp.tbf brp.etf
+----
+
+This etf file can be translated to DVE for model checking:
+----
+etf-convert brp.etf brp.dve
+----
+
+It can also serve as the input for state space generation
+----
+mpirun -np 4 -mca btl tcp,self ltsmin-mpi brp.gcf brp-s.gcf
+----
+
+

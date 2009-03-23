@@ -71,7 +71,7 @@ int main(int argc, char *argv[]){
 	}
 	char*input_mode=lts_input_mode(input);
 	if (input_mode) {
-		Warning(info,"input was written in %s mode",input_mode);
+		Warning(debug,"input was written in %s mode",input_mode);
 		if (!strcmp(input_mode,"viv") || !strcmp(input_mode,"vsi")){
 			if (segments!=1) Fatal(1,error,"cannot write more than one segment");
 			lts_type_t ltstype=GBgetLTStype(model);
@@ -106,7 +106,7 @@ int main(int argc, char *argv[]){
 			Warning(info,"input mode %s not supported",input_mode);
 		}
 	} else if (segments==lts_input_segments(input)){
-		Warning(info,"undefined input mode");
+		Warning(debug,"undefined input mode");
 		lts_output_t output=lts_output_open(files[1],model,segments,0,1,"-ii",NULL);
 		lts_output_set_root_idx(output,lts_root_segment(input),lts_root_offset(input));
 		lts_enum_cb_t ecb=lts_output_begin(output,segments,segments,segments);
@@ -114,7 +114,7 @@ int main(int argc, char *argv[]){
 		lts_output_end(output,ecb);
 		lts_output_close(&output);
 	} else {
-		Warning(info,"undefined input mode with segment conversion");
+		Warning(debug,"undefined input mode with segment conversion");
 		int N=lts_input_segments(input);
 		uint64_t offset[N+1];
 		lts_count_t *count=lts_input_count(input);

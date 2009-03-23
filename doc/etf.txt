@@ -108,6 +108,7 @@ end sort
 ----
 
 == SEE ALSO
+linkman:ltsmin[7],
 linkman:etf2lts-mpi[1],
 linkman:etf2lts-grey[1],
 linkman:etf-reach[1],

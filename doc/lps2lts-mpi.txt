@@ -27,5 +27,7 @@ include::inc/mpi-blurb.txt[]
 
 include::inc/spec2lts-mpi-options.txt[]
 
+include::inc/mcrl2-options.txt[]
+
 include::inc/spec2lts-mpi.txt[]
 

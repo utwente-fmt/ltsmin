@@ -26,6 +26,8 @@ filename extension.
 
 include::inc/spec2lts-grey-options.txt[]
 
+include::inc/mcrl2-options.txt[]
+
 include::inc/spec2lts-grey.txt[]
 
 

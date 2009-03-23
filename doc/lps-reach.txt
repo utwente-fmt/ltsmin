@@ -24,5 +24,7 @@ of the output archive, written in linkman:etf[5] format.
 
 include::inc/spec-reach-options.txt[]
 
+include::inc/mcrl2-options.txt[]
+
 include::inc/spec-reach.txt[]
 
