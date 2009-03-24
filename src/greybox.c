@@ -476,7 +476,7 @@ void GBregisterLoader(const char*extension,pins_loader_t loader){
 }
 
 struct poptOption greybox_options[]={
-	{ "cache" , 'c' , POPT_ARG_VAL , &cache , 1 , "Enable caching of grey box calls." , NULL },
+	{ "cache" , 'c' , POPT_ARG_VAL , &cache , 1 , "enable caching of grey box calls" , NULL },
 	POPT_TABLEEND	
 };
 

@@ -1,0 +1,36 @@
+//                           -*- mode: doc; outline-regexp: "==\(=*\) ." -*-
+gcf(1)
+======
+:Author:  Stefan Blom
+:Email:   <sccblom@cs.utwente.nl>
+:Date:    2008-12-03
+
+
+== NAME
+
+etf-convert - Translate ETF to DVE.
+
+== SYNOPSIS
+
+etf-convert [OPTIONS] <input> <output>
+
+== DESCRIPTION
+
+This tool translates ETF to DVE. Note that the translation
+is a very simple one, that produces relatively inefficient DVE code.
+
+== OPTIONS
+
+include::inc/general-options.txt[]
+
+
+== EXIT STATUS
+0::
+        Successful termination.
+>0::
+        Some error occurred.
+
+== SEE ALSO
+linkman:ltsmin[7], 
+http://divine.fi.muni.cz/[DiVinE].
+

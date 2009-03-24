@@ -15,6 +15,7 @@ static void vset_popt(poptContext con,
  		enum poptCallbackReason reason,
                             const struct poptOption * opt,
                              const char * arg, void * data){
+	(void)con;
 	switch(reason){
 	case POPT_CALLBACK_REASON_PRE:
 	case POPT_CALLBACK_REASON_POST:
@@ -24,8 +25,7 @@ static void vset_popt(poptContext con,
 			int res=linear_search((si_map_entry*)data,arg);
 			if (res<0) {
 				Warning(error,"unknown vector set implementation %s",arg);
-				poptPrintUsage(con, stderr, 0);
-				exit(EXIT_FAILURE);
+				RTexitUsage(EXIT_FAILURE);
 			}
 			vset_default_domain=res;
 			return;
@@ -51,8 +51,8 @@ static si_map_entry set_and_rel_table[]={
 
 struct poptOption vset_setonly_options[]={
 	{ NULL, 0 , POPT_ARG_CALLBACK , (void*)vset_popt , 0 , (void*)setonly_table ,NULL },
-	{ "vset" , 0 , POPT_ARG_STRING , NULL , 0 , "select a vector set implementation from ATermDD with list encoding,"
-		" ATermDD with tree encoding, or BuDDy using the fdd feature.  (default: list)" , "<list|tree|fdd>" },
+	{ "vset" , 0 , POPT_ARG_STRING , NULL , 0 , "select a vector set implementation from ATermDD with *list* encoding,"
+		" ATermDD with *tree* encoding, or BuDDy using the *fdd* feature  (default: list)" , "<list|tree|fdd>" },
 	{ NULL,0 , POPT_ARG_INCLUDE_TABLE , atermdd_options , 0 , "ATermDD options" , NULL},
 	{ NULL,0 , POPT_ARG_INCLUDE_TABLE , buddy_options , 0 , "BuDDy options" , NULL},
 	POPT_TABLEEND
@@ -61,7 +61,7 @@ struct poptOption vset_setonly_options[]={
 struct poptOption vset_full_options[]={
 	{ NULL, 0 , POPT_ARG_CALLBACK , (void*)vset_popt , 0 ,  (void*)set_and_rel_table , NULL},
 	{ "vset" , 0 , POPT_ARG_STRING , NULL , 0 , "select a vector set implementation from ATermDD with list encoding,"
-		" or BuDDy using the fdd feature.  (default ATermDD list)" , "<list|fdd>" },
+		" or BuDDy using the fdd feature  (default ATermDD list)" , "<list|fdd>" },
 	{ NULL,0 , POPT_ARG_INCLUDE_TABLE , atermdd_options , 0 , "ATermDD options", NULL},
 	{ NULL,0 , POPT_ARG_INCLUDE_TABLE , buddy_options , 0 , "BuDDy options", NULL},
 	POPT_TABLEEND

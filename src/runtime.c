@@ -187,6 +187,22 @@ void RTparseOptions(const char* argline,int *argc_p,char***argv_p){
 }
 
 static poptContext optCon=NULL;
+static const char* arg_help_global;
+
+void RTexitUsage(int exit_code){
+	if (arg_help_global) poptSetOtherOptionHelp(optCon, arg_help_global);
+	poptPrintUsage(optCon,stdout,0);
+	exit(exit_code);
+}
+void RTexitHelp(int exit_code){
+	char extra[1024];
+	if (arg_help_global){
+		sprintf(extra,"[OPTIONS] %s",arg_help_global);
+		poptSetOtherOptionHelp(optCon, extra);
+	}
+	poptPrintHelp(optCon,stdout,0);
+	exit(exit_code);
+}
 
 void RTinitPopt(int *argc_p,char**argv_p[],const struct poptOption * options,
 	int min_args,int max_args,char*args[],
@@ -198,6 +214,7 @@ void RTinitPopt(int *argc_p,char**argv_p[],const struct poptOption * options,
 		{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, runtime_options , 0 , "Runtime options",NULL},
 		POPT_TABLEEND
 	};
+	arg_help_global=arg_help;
 	char*program=(*argv_p)[0];
 	char*pgm_base=strrchr(program,'/');
 	if(pgm_base) {
@@ -215,7 +232,6 @@ void RTinitPopt(int *argc_p,char**argv_p[],const struct poptOption * options,
 	}
 	(*argv_p)[0]=pgm_print;
 	optCon=poptGetContext(NULL, *argc_p, *argv_p, optionsTable, 0);
-	//if (extrahelp) poptSetOtherOptionHelp(optCon, extrahelp);
 	for(;;){
 		int res=poptGetNextOpt(optCon);
 		switch(res){
@@ -230,18 +246,10 @@ void RTinitPopt(int *argc_p,char**argv_p[],const struct poptOption * options,
 			}
 			exit(EXIT_SUCCESS);
 		case PRINT_HELP:{
-			char extra[1024];
-			if (arg_help){
-				sprintf(extra,"[OPTIONS] %s",arg_help);
-				poptSetOtherOptionHelp(optCon, extra);
-			}
-			poptPrintHelp(optCon,stdout,0);
-			exit(EXIT_SUCCESS);
+			RTexitHelp(EXIT_SUCCESS);
 		}
 		case PRINT_USAGE:
-			if (arg_help) poptSetOtherOptionHelp(optCon, arg_help);
-			poptPrintUsage(optCon,stdout,0);
-			exit(EXIT_SUCCESS);
+			RTexitUsage(EXIT_SUCCESS);
 		case ENABLE_DEBUG:
 			log_set_flags(debug,LOG_PRINT|LOG_WHERE);
 			continue;
@@ -261,9 +269,8 @@ void RTinitPopt(int *argc_p,char**argv_p[],const struct poptOption * options,
 	for(int i=0;i<min_args;i++){
 		args[i]=poptGetArg(optCon);
 		if (!args[i]) {
-			Warning(info,"not enough arguments");
-			poptPrintUsage(optCon, stderr, 0);
-			exit(EXIT_FAILURE);
+			Warning(error,"not enough arguments");
+			RTexitUsage(EXIT_FAILURE);
 		}
 	}
 	if (max_args >= min_args) {
@@ -275,15 +282,14 @@ void RTinitPopt(int *argc_p,char**argv_p[],const struct poptOption * options,
 			}
 		}
 		if (poptPeekArg(optCon)!=NULL) {
-			Warning(info,"too many arguments");
-			poptPrintUsage(optCon, stderr, 0);
-			exit(EXIT_FAILURE);
+			Warning(error,"too many arguments");
+			RTexitUsage(EXIT_FAILURE);
 		}
 		poptFreeContext(optCon);
 		optCon=NULL;
 	}
 	(*argv_p)[0]=program;
-	Warning(info,"verbosity is set to %d",RTverbosity);
+	Warning(debug,"verbosity is set to %d",RTverbosity);
 }
 
 char* RTinitNextArg(){

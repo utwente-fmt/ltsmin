@@ -25,7 +25,7 @@ static struct poptOption dummy_options[]={
 
 struct poptOption lts_io_options[]= {
 	{ NULL,0 , POPT_ARG_INCLUDE_TABLE , dummy_options , 0 , "This system support the following file formats:"
-	"\n * Directory format (*.dir and *.gcf)"
+	"\n * Directory format (*.dir, *.dz and *.gcf)"
 	#ifdef HAVE_BCG_USER_H
 	"\n * Binary Coded Graphs (*.bcg)"
 	#endif
@@ -34,8 +34,9 @@ struct poptOption lts_io_options[]= {
 	{ NULL,0 , POPT_ARG_INCLUDE_TABLE , bcg_io_options , 0 , NULL , NULL }, 
 	#endif
 	{ NULL,0 , POPT_ARG_INCLUDE_TABLE , archive_io_options , 0 ,
-"The .dir format uses multiple files in a directory by default. It is also\n"
-"possible to put these files in a GCF archive (*.gcf).\n"
+"The .dir format uses multiple files in a directory, the .dz format uses\n"
+"compressed files in a directory and the .gcf format folds multiple files\n"
+"into a single archive with optional compression.\n"
 "\n"
 "Container I/O options",NULL},
 	POPT_TABLEEND
@@ -122,7 +123,6 @@ void lts_write_register(char*extension,lts_write_open_t open){
 		write_type[write_registered]=extension;
 		write_open[write_registered]=open;
 		write_registered++;
-		Warning(info,"registered %x for %s",open,extension);
 	} else {
 		Fatal(1,error,"write type registry overflow");
 	}

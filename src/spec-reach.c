@@ -28,6 +28,7 @@ static char* etf_output=NULL;
 
 static enum { BFS , BFS2 , Chain } strategy = BFS;
 
+static char* order="bfs";
 static si_map_entry strategies[]={
 	{"bfs",BFS},
 	{"bfs2",BFS2},
@@ -39,29 +40,30 @@ static void reach_popt(poptContext con,
  		enum poptCallbackReason reason,
                             const struct poptOption * opt,
                              const char * arg, void * data){
+	(void)con;(void)opt;(void)arg;(void)data;
 	switch(reason){
 	case POPT_CALLBACK_REASON_PRE:
-	case POPT_CALLBACK_REASON_POST:
 		Fatal(1,error,"unexpected call to vset_popt");
-	case POPT_CALLBACK_REASON_OPTION:
-		if (!strcmp(opt->longName,"order")){
-			int res=linear_search((si_map_entry*)data,arg);
-			if (res<0) {
-				Warning(error,"unknown exploration order %s",arg);
-				poptPrintUsage(con, stderr, 0);
-				exit(EXIT_FAILURE);
-			}
-			strategy = res;
-			return;
+	case POPT_CALLBACK_REASON_POST: {
+		int res=linear_search(strategies,order);
+		if (res<0) {
+			Warning(error,"unknown exploration order %s",order);
+			RTexitUsage(EXIT_FAILURE);
+		} else {
+			Warning(info,"Exploration order is %s",order);
 		}
+		strategy = res;
+		return;
+	}
+	case POPT_CALLBACK_REASON_OPTION:
 		Fatal(1,error,"unexpected call to reach_popt");
 	}
 }
 
 
 static  struct poptOption options[] = {
-	{ NULL, 0 , POPT_ARG_CALLBACK , (void*)reach_popt , 0 , (void*)strategies, NULL },
-	{ "order" , 0 , POPT_ARG_STRING , NULL , 1 , "Select the exploration strategy to a specific order. (default: bfs)" ,"<bfs|bfs2|chain>" },
+	{ NULL, 0 , POPT_ARG_CALLBACK|POPT_CBFLAG_POST|POPT_CBFLAG_SKIPOPTION , (void*)reach_popt , 0 , NULL , NULL },
+	{ "order" , 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &order , 0 , "select the exploration strategy to a specific order" ,"<bfs|bfs2|chain>" },
 #if defined(MCRL)
 	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, mcrl_options , 0 , "mCRL options",NULL},
 #endif
@@ -383,7 +385,6 @@ int main(int argc, char *argv[]){
 	}
 	SCCstopTimer(timer);
 	SCCreportTimer(timer,"reachability took");
-	Warning(info,"\n");
 	long long e_count;
 	long n_count;
 	vset_count(visited,&n_count,&e_count);

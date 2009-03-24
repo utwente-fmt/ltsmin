@@ -65,6 +65,21 @@ extern void RTinitPopt(int *argc_p,char**argv_p[],const struct poptOption * opti
  */
 extern char* RTinitNextArg();
 
+
+/**
+\brief Print usage of tool.
+Due to the fact that we may have different extra string for help and usage,
+the function poptPrintUsage should not be called directly.
+ */
+extern void RTexitUsage(int exit_code);
+
+/**
+\brief Print help of tool.
+Due to the fact that we may have different extra string for help and usage,
+the function poptPrintHelp should not be called directly.
+ */
+extern void RTexitHelp(int exit_code);
+
 extern int RTverbosity;
 
 extern void RTinit(int *argc, char **argv[]);

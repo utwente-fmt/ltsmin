@@ -81,8 +81,8 @@ static void mcrl_popt(poptContext con,
 }
 struct poptOption mcrl_options[]= {
 	{ NULL, 0 , POPT_ARG_CALLBACK|POPT_CBFLAG_POST|POPT_CBFLAG_SKIPOPTION , mcrl_popt , 0 , NULL , NULL },
-	{ "state-names" , 0 , POPT_ARG_VAL|POPT_ARGFLAG_OR , &flags , STATE_VISIBLE , "make the state parameters visible" ,NULL},
-	{ "mcrl" , 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &mcrl_args , 0, "Pass options to the mCRL library.","<mCRL options>" },
+	{ "state-names" , 0 , POPT_ARG_VAL|POPT_ARGFLAG_OR , &flags , STATE_VISIBLE , "make the names of the state parameters visible" ,NULL},
+	{ "mcrl" , 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &mcrl_args , 0, "pass options to the mCRL library","<mCRL options>" },
 	POPT_TABLEEND
 };
 

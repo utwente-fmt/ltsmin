@@ -61,7 +61,7 @@ static void state_db_popt(poptContext con,
  		enum poptCallbackReason reason,
                             const struct poptOption * opt,
                              const char * arg, void * data){
-	(void)opt;(void)arg;(void)data;
+	(void)con;(void)opt;(void)arg;(void)data;
 	switch(reason){
 	case POPT_CALLBACK_REASON_PRE:
 		break;
@@ -69,14 +69,12 @@ static void state_db_popt(poptContext con,
 		if (state_repr!=state_default){
 			if (application==RunTorX){
 				Warning(error,"using --state=%s with --torx is not permitted",state_repr);				
-				poptPrintUsage(con, stderr, 0);
 				exit(EXIT_FAILURE);
 			}
 			int res=linear_search(db_types,state_repr);
 			if (res<0) {
 				Warning(error,"unknown vector storage mode type %s",state_repr);
-				poptPrintUsage(con, stderr, 0);
-				exit(EXIT_FAILURE);
+				RTexitUsage(EXIT_FAILURE);
 			}
 			application = res;
 			return;
@@ -92,8 +90,8 @@ static void state_db_popt(poptContext con,
 static  struct poptOption options[] = {
 	{ NULL, 0 , POPT_ARG_CALLBACK|POPT_CBFLAG_POST|POPT_CBFLAG_SKIPOPTION  , (void*)state_db_popt , 0 , NULL , NULL },
 	{ "state" , 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &state_repr , 0 ,
-		"Select the data structure for storing states.", "<tree|vset>"},
-	{ "torx" , 0 , POPT_ARG_VAL , &application ,RunTorX, "Run TorX-Explorer textual interface on stdin+stdout" , NULL },
+		"select the data structure for storing states", "<tree|vset>"},
+	{ "torx" , 0 , POPT_ARG_VAL , &application ,RunTorX, "run TorX-Explorer textual interface on stdin+stdout" , NULL },
 #if defined(MCRL)
 	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, mcrl_options , 0 , "mCRL options", NULL },
 #endif

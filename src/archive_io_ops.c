@@ -859,14 +859,6 @@ static void gcf_read_open(lts_input_t input){
 	load_headers(input);
 }
 
-/* archive I/O options */
-static struct poptOption gcf_options[]= {
-	{ "block-size" , 0 , POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT , &blocksize , 0 , "The size of a block in bytes" , "<bytes>" },
-	{ "cluster-size" , 0 , POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT , &blockcount , 0 , "The number of block in a GCF cluster" , "<blocks>"},
-	{ "plain" , 0 , POPT_ARG_VAL , &plain , 1 , "Disable compression of GCF containers" , NULL },
-	POPT_TABLEEND
-};
-
 /* initialisation callback */
 static void archive_popt(poptContext con,
  		enum poptCallbackReason reason,
@@ -893,7 +885,9 @@ static void archive_popt(poptContext con,
 /* Options for archive based file formats. */
 struct poptOption archive_io_options[]= {
 	{ NULL, 0 , POPT_ARG_CALLBACK|POPT_CBFLAG_POST|POPT_CBFLAG_SKIPOPTION , archive_popt , 0 , NULL , NULL },
-	{ NULL,0 , POPT_ARG_INCLUDE_TABLE , gcf_options , 0 , "For creating containers, the following parameters are used:" , NULL},
+	{ "block-size" , 0 , POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT , &blocksize , 0 , "set the size of a block in bytes" , "<bytes>" },
+	{ "cluster-size" , 0 , POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT , &blockcount , 0 , "set the number of blocks in a GCF cluster" , "<blocks>"},
+	{ "plain" , 0 , POPT_ARG_VAL , &plain , 1 , "disable compression of GCF containers" , NULL },
 	POPT_TABLEEND
 };
 

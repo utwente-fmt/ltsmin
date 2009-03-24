@@ -182,8 +182,8 @@ static event_barrier_t barrier;
 static int write_state=0;
 
 static  struct poptOption options[] = {
-	{ "nice" , 0 , POPT_ARG_INT , &nice_value , 0 , "Set the nice level of all workers."
-		" This is useful when running on other peoples workstations." , NULL},
+	{ "nice" , 0 , POPT_ARG_INT , &nice_value , 0 , "set the nice level of all workers"
+		" (useful when running on other peoples workstations)" , NULL},
 	{ "write-state" , 0 , POPT_ARG_VAL , &write_state, 1 , "write the full state vector" , NULL },
 #if defined(MCRL)
 	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, mcrl_options , 0 , "mCRL options", NULL},

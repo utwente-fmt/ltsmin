@@ -15,7 +15,7 @@
 static int segments=0;
 
 static  struct poptOption options[] = {
-	{ "segments" , 0 , POPT_ARG_INT , &segments , 0 , "Set the number of segments in the output. (default: same as input)" , "<count>" },
+	{ "segments" , 0 , POPT_ARG_INT , &segments , 0 , "set the number of segments in the output. (default: same as input)" , "<count>" },
 	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, lts_io_options , 0 , NULL ,NULL},
 	POPT_TABLEEND
 };

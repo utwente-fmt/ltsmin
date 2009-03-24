@@ -65,14 +65,14 @@ static int operation=GCF_FILE;
 static int force=0;
 
 static  struct poptOption options[] = {
-	{ "create",'c', POPT_ARG_VAL , &operation , GCF_FILE , "Create a new archive (default)" , NULL },
-	{ "create-dz",0, POPT_ARG_VAL , &operation , GCF_DIR , "Create a compressed directory instead of a file" , NULL },
-	{ "extract",'x', POPT_ARG_VAL , &operation , GCF_EXTRACT , "Extract files from an archive" , NULL },
-	{ "force",'f' ,  POPT_ARG_VAL , &force , 1 , "Force creation of a directory for output" , NULL },
-	{ "block-size" , 0 , POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT , &blocksize , 0 , "The size of a block in bytes" , "<bytes>" },
-	{ "cluster-size" , 0 , POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT , &blockcount , 0 , "The number of blocks in a cluster" , "<blocks>"},
+	{ "create",'c', POPT_ARG_VAL , &operation , GCF_FILE , "create a new archive (default)" , NULL },
+	{ "create-dz",0, POPT_ARG_VAL , &operation , GCF_DIR , "create a compressed directory instead of an archive file" , NULL },
+	{ "extract",'x', POPT_ARG_VAL , &operation , GCF_EXTRACT , "extract files from an archive" , NULL },
+	{ "force",'f' ,  POPT_ARG_VAL , &force , 1 , "force creation of a directory for output" , NULL },
+	{ "block-size" , 0 , POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT , &blocksize , 0 , "set the size of a block in bytes" , "<bytes>" },
+	{ "cluster-size" , 0 , POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT , &blockcount , 0 , "set the number of blocks in a cluster" , "<blocks>"},
 	{ "compression",'z',POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT,
-		&policy,0,"Set the compression policy used in the archive. See man page for details.","<policy>"},
+		&policy,0,"set the compression policy used in the archive","<policy>"},
 	POPT_TABLEEND
 };
 
