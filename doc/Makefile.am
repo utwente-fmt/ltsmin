@@ -17,7 +17,7 @@ extra_ASCIIDOC = inc/spec2lts-mpi.txt inc/spec2lts-grey.txt		\
 	inc/spec-reach.txt inc/spec2lts-grey-options.txt		\
 	inc/spec2lts-grey.txt inc/spec2lts-mpi-options.txt		\
 	inc/spec2lts-mpi.txt inc/support.txt inc/vset-options.txt       \
-        inc/compression.txt
+        inc/compression.txt inc/mcrl2-options.txt
 
 EXTRA_DIST = asciidoc.conf callouts.xsl $(doc_ASCIIDOC) $(extra_ASCIIDOC)
 
@@ -53,7 +53,7 @@ else
 endif
 
 %.txt:
-	@test -f $@ && touch $@
+	test -f $@ && touch $@
 
 %.1 %.2 %.3 %.4 %.5 %.6 %.7 %.8: %.xml
 if HAVE_ASCIIDOC
