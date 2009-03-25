@@ -16,42 +16,51 @@ A text based intermediate format for PINS models.
 An ETF file is a sequence of sections.
 
 * The first section must be a state section, describing the state vector.
+* The second section must be an edge section, describing the edge labels.
 * There must be a single init section, describing the initial state(s).
 * There can be 0 or more map sections, defining a state label each.
-* There can be 0 or more sort section, describing the values of sorts.
+* There can be 0 or more sort sections, describing the values of sorts.
 * There can be 0 or more trans sections, describing a partition of the transition relation each.
 
 == GRAMMER
 
 ----
-etf         ::= state ( trans | map | sort )* init ( trans | map | sort )*
+etf         ::= state edge ( trans | map | sort )* init ( trans | map | sort )*
 state       ::= "begin state"
-                declaration*
+                opt_decl*
                 "end state"
+edge        ::= "begin edge"
+                declaration*
+                "end edge"
 init        ::= "begin init"
-                state*
+                number*
                 "end init"
-map         ::= "begin map" ident valspec
+map         ::= "begin map" declaration
                 mapentry*
                 "end map" 
-trans       ::= "begin trans" valspec*
+trans       ::= "begin trans"
                 transentry*
                 "end trans"
 sort        ::= "begin sort" ident
                 value*
                 "end ident"
-declaration ::= (ident | "_") ":" (ident | "_")
-state       ::= number *
-valspec     ::= ident | ("[" ident "]")
+opt_decl    ::= (ident | "_") ":" (ident | "_")
+declaration ::= ident ":" ident
 mapentry    ::= ( number | "*" ) * ( value | number )
 transentry  ::= ((number "/" number)|"*")* ( value | number )*
 number      ::= ['0'..'9']+
+value       ::= 'see below'
 ----
 
 Note that the current parser is line based and requires that every section entry is one line and
-that the begins and end are also lines. Also note that value is undefined in this table. For now,
-the tool will accept any white space free string in the map and trans sections and will
-accept any printable character on a line in a sort section.
+that the begins and end are also lines. This version supports three kinds of values:
+
+* A string of printable characters that contains no white space, is not a number and which does not
+  both start and end with `{hash}`. E.g. `abc`.
+* Many strings of printable characters can be quoted.
+  E.g. `"12"`, `"x y z"`. (No escape rules are implemented. We expect a future version to support C style escape rules.)
+* A hex encoding of a byte string. That is, `{hash}` followed by pairs of hex digits encoding chars followed by `{hash}`.
+  E.g. `{hash}616263{hash}`.
 
 == EXAMPLE
 
@@ -78,20 +87,23 @@ with initial state 00 is represented by the ETF specification:
 begin state
 _:_  _:_
 end state
+begin edge
+action:action
+end edge
 begin init
 0 0
 end init
-begin trans [action]
+begin trans
 0/1 * 0
 end trans
-begin trans [action]
+begin trans
 * 0/1 1
 end trans
-begin map shape shape
+begin map shape:shape
 0 * square
 1 * circle
 end map
-begin map multiplicity [multiplicity]
+begin map multiplicity:multiplicity
 0 0 1
 0 1 0
 1 0 0

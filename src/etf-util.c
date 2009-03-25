@@ -29,12 +29,19 @@ struct etf_model_s {
 static int ensure_type(etf_model_t model,const char*sort){
 	int is_new;
 	int type_no=lts_type_add_type(model->ltstype,sort,&is_new);
+	Warning(debug,"type %s %s (%d)",sort,is_new?"created":"present",type_no);
 	if (is_new) {
 		ensure_access(model->type_manager,type_no);
 		model->type_names[type_no]=strdup(sort);
 		model->type_values[type_no]=SIcreate();
 	}
 	return type_no;
+}
+
+static inline int is_a_number(const char* v){
+	int len=strlen(v);
+	for(int i=0;i<len;i++) if (!isdigit(v[i])) return 0;
+	return 1;
 }
 
 etf_model_t etf_parse(const char *file){
@@ -45,6 +52,7 @@ etf_model_t etf_parse(const char *file){
 	FILE* etf=fopen(file,"r");
 	char*line;
 	char buf[ETF_BUF];
+
 
 	do line=fgets(buf,ETF_BUF,etf); while (line[0]=='%');
 	if (!strcmp("begin state",line)) { Fatal(1,error,"etf model must start with a state section"); }
@@ -103,7 +111,44 @@ etf_model_t etf_parse(const char *file){
 
 	line=fgets(buf,ETF_BUF,etf);
 	if (!strcmp("end state",line)) { Fatal(1,error,"expected end state"); }
-	int edge_type_undefined=1;
+
+	do line=fgets(buf,ETF_BUF,etf); while (line[0]=='%');
+	if (!strcmp("begin edge",line)) { Fatal(1,error,"expected begin edge"); }
+	line=fgets(buf,ETF_BUF,etf);
+	int K=0;
+	for(int i=0;i<(int)strlen(line);i++){
+		if (line[i]==':') K++;
+		if (line[i]=='\n') {
+			line[i]=0;
+			break;
+		}
+	}
+	Warning(info,"The model has %d edge labels",K);
+	int edge_type_no[K];
+	lts_type_set_edge_label_count(model->ltstype,K);
+	for(int i=0;i<K;i++){
+		int j;
+		while(isblank(line[0])) line+=1;
+		char var[1024];
+		for(j=0;line[j]!=':';j++){
+			var[j]=line[j];
+		}
+		var[j]=0;
+		line+=j+1;
+		char sort[1024];
+		for(j=0;line[j]!=0&&!isblank(line[j]);j++){
+			sort[j]=line[j];
+		}
+		sort[j]=0;
+		line+=j;
+		Warning(info,"edge label %d: name \"%s\" sort \"%s\"",i,var,sort);
+		lts_type_set_edge_label_name(model->ltstype,i,var);
+		edge_type_no[i]=ensure_type(model,sort);
+		lts_type_set_edge_label_type(model->ltstype,i,sort);
+	}
+	line=fgets(buf,ETF_BUF,etf);
+	if (!strcmp("end edge",line)) { Fatal(1,error,"expected end state"); }
+
 	for(;;){
 		line=fgets(buf,ETF_BUF,etf);
 		if (line==NULL && feof(etf)) break;
@@ -132,54 +177,7 @@ etf_model_t etf_parse(const char *file){
 			//Warning(info,"got initial state");
 			continue;
 		}
-		if (!strncmp(line,"begin trans",11)) {
-			int K=0;
-			int ptr;
-			for(ptr=11;;){
-				while(isblank(line[ptr])) ptr++;
-				if (line[ptr]==0) {
-					break;
-				}
-				K++;
-				while(line[ptr] && !isblank(line[ptr])) ptr++;
-			}
-			Warning(info,"transition section with %d label(s)",K);
-			if (edge_type_undefined) {
-				lts_type_set_edge_label_count(model->ltstype,K);
-			} else if (K != lts_type_get_edge_label_count(model->ltstype)){
-				Fatal(1,error,"inconsistent edge label count");
-			}
-			ptr=11;
-			int indexed[K];
-			int type_no[K];
-			for(int i=0;i<K;i++){
-				while(isblank(line[ptr])) ptr++;
-				char *sort;
-				if (line[ptr]=='[') {
-					indexed[i]=1;
-					ptr++;
-					sort=line+ptr;
-					while(line[ptr]!=']') ptr++;
-					line[ptr]=0;
-					ptr++;
-				} else {
-					indexed[i]=0;
-					sort=line+ptr;
-					while(line[ptr] && !isblank(line[ptr])) ptr++;
-					if(line[ptr]){
-						line[ptr]=0;
-						ptr++;
-					}
-				}
-				type_no[i]=ensure_type(model,sort);
-				if(edge_type_undefined) {
-					lts_type_set_edge_label_type(model->ltstype,i,sort);
-				} else if (strcmp(sort,lts_type_get_edge_label_type(model->ltstype,i))) {
-					Fatal(1,error,"inconsistent edge label type");
-				}
-				while(line[ptr] && !isblank(line[ptr])) ptr++;
-			}
-			edge_type_undefined=0;
+		if (!strcmp(line,"begin trans")) {
 			treedbs_t trans=TreeDBScreate(2+K);
 			for(;;){
 				line=fgets(buf,ETF_BUF,etf);
@@ -192,7 +190,7 @@ etf_model_t etf_parse(const char *file){
 					//Warning(info,"transition section ended");
 					break;
 				}
-				ptr=0;
+				int ptr=0;
 				int src[N];
 				int dst[N];
 				for(int i=0;i<N;i++){
@@ -216,15 +214,29 @@ etf_model_t etf_parse(const char *file){
 				for(int i=0;i<K;i++){
 					while(isblank(line[ptr])) ptr++;
 					char*v=line+ptr;
-					while(line[ptr] && !isblank(line[ptr])) ptr++;
-					if (indexed[i]){
+					if (v[0]=='"') {
+						for(ptr++;line[ptr]&&line[ptr]!='"';) ptr++;
+						if(line[ptr]!='"') Fatal(1,error,"line ended in the middle of a string");
+						ptr++;
+					} else {
+						while(line[ptr] && !isblank(line[ptr])) ptr++;
+					}
+					if (line[ptr]){
+						line[ptr]=0;
+						ptr++;
+					}
+					if (strlen(v)==0) Fatal(1,error,"missing value");
+					if (is_a_number(v)){
 						edge[2+i]=atoi(v);
 					} else {
 						if(line[ptr]){
 							line[ptr]=0;
 							ptr++;
 						}
-						edge[2+i]=SIput(model->type_values[type_no[i]],v);;
+						char tmp_data[ETF_BUF];
+						chunk tmp_chunk=chunk_ld(ETF_BUF,tmp_data);
+						string2chunk(v,&tmp_chunk);
+						edge[2+i]=SIputC(model->type_values[edge_type_no[i]],tmp_chunk.data ,tmp_chunk.len);
 					}
 				}
 				TreeFold(trans,edge);
@@ -241,23 +253,17 @@ etf_model_t etf_parse(const char *file){
 		if (!strncmp(line,"begin map",9)){
 			char name[1024];
 			char sort[1024];
+			char *tmp=strchr(line+9,':');
+			if (!tmp) Fatal(1,error,"cannot get name and type from %s",line+9);
+			tmp[0]=' ';
 			if (sscanf(line+9,"%s %s",name,sort)!=2){
 				Fatal(1,error,"cannot get name and type from %s",line+9);
 			}
 			ensure_access(model->map_manager,model->map_count);
 			model->map_names[model->map_count]=strdup(name);
-			int indexed;
-			if (sort[0]=='[' && sort[strlen(sort)-1]==']') {
-				indexed=1;
-				sort[strlen(sort)-1]=0;
-				model->map_types[model->map_count]=strdup(sort+1);
-			} else {
-				indexed=0;
-				model->map_types[model->map_count]=strdup(sort);
-			}
+			model->map_types[model->map_count]=strdup(sort);
 			int type_no=ensure_type(model,model->map_types[model->map_count]);
-			Warning(info,"map %s: %s type %s",name,
-				indexed?"indexed":"direct",model->map_types[model->map_count]);
+			Warning(info,"map %s, type %s",name,model->map_types[model->map_count]);
 			treedbs_t current_map=TreeDBScreate(N+1);
 			for(;;){
 				line=fgets(buf,ETF_BUF,etf);
@@ -272,7 +278,7 @@ etf_model_t etf_parse(const char *file){
 				}
 				int entry[N+1];
 				int ptr=0;
-				for(int i=0;i<N+indexed;i++){
+				for(int i=0;i<N;i++){
 					while(isblank(line[ptr])) ptr++;
 					if (line[ptr]=='*') {
 						entry[i]=0;
@@ -281,11 +287,28 @@ etf_model_t etf_parse(const char *file){
 					}
 					while(line[ptr] && !isblank(line[ptr])) ptr++;
 				}
-				if(!indexed){
-					char value[1024];
-					sscanf(line+ptr,"%s",value);
-					//Warning(info,"value is <%s>",value);
-					entry[N]=SIput(model->type_values[type_no],value);
+
+				while(isblank(line[ptr])) ptr++;
+				char*v=line+ptr;
+				if (v[0]=='"') {
+					for(ptr++;line[ptr]&&line[ptr]!='"';) ptr++;
+					if(line[ptr]!='"') Fatal(1,error,"line ended in the middle of a string");
+					ptr++;
+				} else {
+					while(line[ptr] && !isblank(line[ptr])) ptr++;
+				}
+				if (line[ptr]){
+					line[ptr]=0;
+					ptr++;
+				}
+				if (strlen(v)==0) Fatal(1,error,"missing value");
+				if (is_a_number(v)){
+					entry[N]=atoi(v);
+				} else {
+					char tmp_data[ETF_BUF];
+					chunk tmp_chunk=chunk_ld(ETF_BUF,tmp_data);
+					string2chunk(v,&tmp_chunk);
+					entry[N]=SIputC(model->type_values[type_no],tmp_chunk.data ,tmp_chunk.len);
 				}
 				TreeFold(current_map,entry);
 			}
@@ -312,7 +335,10 @@ etf_model_t etf_parse(const char *file){
 					//Warning(info,"sort section ended");
 					break;
 				}
-				if (count!=SIput(model->type_values[type_no],line)){
+				char tmp_data[ETF_BUF];
+				chunk tmp_chunk=chunk_ld(ETF_BUF,tmp_data);
+				string2chunk(line,&tmp_chunk);
+				if (count!=SIputC(model->type_values[type_no],tmp_chunk.data ,tmp_chunk.len)){
 					Warning(error,"inconsistent value indexing");
 					Fatal(1,error,"put sort section(s) before the first direct use of the type");
 				}
@@ -369,8 +395,9 @@ treedbs_t etf_trans_section(etf_model_t model,int section){
 }
 
 chunk etf_get_value(etf_model_t model,int type_no,int idx){
-	char *v=SIget(model->type_values[type_no],idx);
-	return chunk_str(v);
+	int len;
+	char *v=SIgetC(model->type_values[type_no],idx,&len);
+	return chunk_ld(len,v);
 }
 
 int etf_get_value_count(etf_model_t model,int type_no){
@@ -471,7 +498,10 @@ void etf_ode_add(etf_model_t model){
 				}
 				char label[1024];
 				sprintf(label,"%s%s",var,(entry[state_length]==neg)?"-":"+");
-				trans[2]=SIput(model->type_values[actiontype],label);
+				char tmp_data[ETF_BUF];
+				chunk tmp_chunk=chunk_ld(ETF_BUF,tmp_data);
+				string2chunk(label,&tmp_chunk);
+				trans[2]=SIputC(model->type_values[actiontype],tmp_chunk.data ,tmp_chunk.len );
 				for(int k=first;k<=last;k++){
 					if (entry[state_length]==neg && k==1) continue;
 					if (entry[state_length]==pos && k==(vcount[varidx]-1)) continue;

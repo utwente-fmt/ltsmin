@@ -285,28 +285,35 @@ static void enum_edge(void*context,int *src){
 void do_output(){
 	eLbls=lts_type_get_edge_label_count(ltstype);
 	int state[N];
-	char edge_label_spec[256*(eLbls+1)];
 	GBgetInitialState(model,state);
 	table_file=fopen(etf_output,"w");
 	fprintf(table_file,"begin state\n");
 	for(int i=0;i<N;i++){
-		fprintf(table_file,"_:_%s",(i==(N-1))?"\n":" ");
+		char*name=lts_type_get_state_name(ltstype,i);
+		int sort=lts_type_get_state_typeno(ltstype,i);
+		fprintf(table_file,"%s:%s%s",
+			name?name:"_",
+			(sort>=0)?lts_type_get_state_type(ltstype,i):"_",
+			(i==(N-1))?"\n":" ");
 	}
 	fprintf(table_file,"end state\n");
+	fprintf(table_file,"begin edge\n");
+	for(int i=0;i<eLbls;i++){
+		fprintf(table_file,"%s:%s%s",
+			lts_type_get_edge_label_name(ltstype,i),
+			lts_type_get_edge_label_type(ltstype,i),
+			(i==(eLbls-1))?"\n":" ");
+	}
+	fprintf(table_file,"end edge\n");
 	fprintf(table_file,"begin init\n");
 	for(int i=0;i<N;i++) {
 		fprintf(table_file,"%d%s",state[i],(i==(N-1))?"\n":" ");
 	}
 	fprintf(table_file,"end init\n");
-	edge_label_spec[0]=0;
-	int ptr=0;
-	for(int i=0;i<eLbls;i++){
-		ptr+=sprintf(edge_label_spec+ptr," [%s]",lts_type_get_edge_label_type(ltstype,i));
-	}
 	for(int g=0;g<nGrps;g++){
 		output_context ctx;
 		ctx.group=g;
-		fprintf(table_file,"begin trans%s\n",edge_label_spec);
+		fprintf(table_file,"begin trans\n");
 		vset_enum(group_explored[g],enum_edge,&ctx);
 		fprintf(table_file,"end trans\n");
 	}
@@ -318,9 +325,9 @@ void do_output(){
 		int values=GBchunkCount(model,i);
 		for(int j=0;j<values;j++){
 			chunk c=GBchunkGet(model,i,j);
-			int len=c.len*3+1;
+			size_t len=c.len*2+3;
 			char str[len];
-			chunk_encode_copy(chunk_ld(len,str),c,':');
+			chunk2string(c,len,str);
 			fprintf(table_file,"%s\n",str);
 		}
 		fprintf(table_file,"end sort\n");
@@ -396,7 +403,6 @@ int main(int argc, char *argv[]){
 		do_output();
 		SCCstopTimer(timer);
 		SCCreportTimer(timer,"writing output took");
-		Warning(info,"\n");
 	} else {
 	  printf("state space has %lld states (%ld final nodes, %ld peak nodes)\n"
 		 ,e_count,n_count,max_count);
