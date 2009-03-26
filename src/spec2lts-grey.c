@@ -320,6 +320,10 @@ int main(int argc, char *argv[]){
 	state_labels=lts_type_get_state_label_count(ltstype);
 	edge_labels=lts_type_get_edge_label_count(ltstype);
 	Warning(info,"There are %d state labels and %d edge labels",state_labels,edge_labels);
+	if (state_labels&&write_lts&&!write_state) {
+		Fatal(1,error,"Writing state labels, but not state vectors unsupported. "
+			"Writing of state vector is enabled with the option --write-state");
+	}
 	int src[N];
 	GBgetInitialState(model,src);
 	Warning(info,"got initial state");

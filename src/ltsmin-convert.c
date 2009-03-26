@@ -78,7 +78,8 @@ int main(int argc, char *argv[]){
 			int N=lts_type_get_state_length(ltstype);
 			Warning(info,"state length is %d",N);
 			treedbs_t dbs=TreeDBScreate(N);
-			// we should convert the ltstype of the model.
+			// we should convert the GB not and not hack the ltstype.
+			lts_type_set_state_label_count(ltstype,0);
 			lts_output_t output=lts_output_open(files[1],model,segments,0,1,"-ii",NULL);
 			lts_output_set_root_idx(output,0,0);
 			lts_enum_cb_t ecb=lts_output_begin(output,segments,segments,segments);

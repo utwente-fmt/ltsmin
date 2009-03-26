@@ -65,7 +65,7 @@ etf_model_t etf_parse(const char *file){
 			break;
 		}
 	}
-	Warning(info,"state vector has length %d",N);
+	Warning(debug,"state vector has length %d",N);
 	lts_type_set_state_length(model->ltstype,N);
 	model->pattern_db=TreeDBScreate(N);
 	model->map_count=0;
@@ -101,7 +101,7 @@ etf_model_t etf_parse(const char *file){
 		}
 		sort[j]=0;
 		line+=j;
-		Warning(info,"position %d: var \"%s\" sort \"%s\"",i,var,sort);
+		Warning(debug,"position %d: var \"%s\" sort \"%s\"",i,var,sort);
 		if (strcmp(var,"_")) lts_type_set_state_name(model->ltstype,i,var);
 		if (strcmp(sort,"_")) {
 			int typeno=ensure_type(model,sort);
@@ -123,7 +123,7 @@ etf_model_t etf_parse(const char *file){
 			break;
 		}
 	}
-	Warning(info,"The model has %d edge labels",K);
+	Warning(debug,"The model has %d edge labels",K);
 	int edge_type_no[K];
 	lts_type_set_edge_label_count(model->ltstype,K);
 	for(int i=0;i<K;i++){
@@ -141,7 +141,7 @@ etf_model_t etf_parse(const char *file){
 		}
 		sort[j]=0;
 		line+=j;
-		Warning(info,"edge label %d: name \"%s\" sort \"%s\"",i,var,sort);
+		Warning(debug,"edge label %d: name \"%s\" sort \"%s\"",i,var,sort);
 		lts_type_set_edge_label_name(model->ltstype,i,var);
 		edge_type_no[i]=ensure_type(model,sort);
 		lts_type_set_edge_label_type(model->ltstype,i,sort);
@@ -174,7 +174,7 @@ etf_model_t etf_parse(const char *file){
 			if (strcmp(line,"end init\n")) {
 				Fatal(1,error,"expected end init");
 			}
-			//Warning(info,"got initial state");
+			//Warning(debug,"got initial state");
 			continue;
 		}
 		if (!strcmp(line,"begin trans")) {
@@ -187,7 +187,7 @@ etf_model_t etf_parse(const char *file){
 					len--;
 				}
 				if (!strcmp(line,"end trans")) {
-					//Warning(info,"transition section ended");
+					//Warning(debug,"transition section ended");
 					break;
 				}
 				int ptr=0;
@@ -246,7 +246,7 @@ etf_model_t etf_parse(const char *file){
 				model->trans[model->trans_count]=trans;
 				model->trans_count++;
 			} else {
-				Warning(info,"skipping empty trans section");
+				Warning(debug,"skipping empty trans section");
 			}
 			continue;
 		}
@@ -263,7 +263,7 @@ etf_model_t etf_parse(const char *file){
 			model->map_names[model->map_count]=strdup(name);
 			model->map_types[model->map_count]=strdup(sort);
 			int type_no=ensure_type(model,model->map_types[model->map_count]);
-			Warning(info,"map %s, type %s",name,model->map_types[model->map_count]);
+			Warning(debug,"map %s, type %s",name,model->map_types[model->map_count]);
 			treedbs_t current_map=TreeDBScreate(N+1);
 			for(;;){
 				line=fgets(buf,ETF_BUF,etf);
@@ -273,7 +273,7 @@ etf_model_t etf_parse(const char *file){
 					len--;
 				}
 				if (!strcmp(line,"end map")) {
-					//Warning(info,"map section ended");
+					//Warning(debug,"map section ended");
 					break;
 				}
 				int entry[N+1];
@@ -322,7 +322,7 @@ etf_model_t etf_parse(const char *file){
 				Fatal(1,error,"cannot get type from %s",line+10);
 			}
 			int type_no=ensure_type(model,sort);
-			Warning(info,"scanning values for sort %s",sort);
+			Warning(debug,"scanning values for sort %s",sort);
 			int count=0;
 			for(;;count++){
 				line=fgets(buf,ETF_BUF,etf);
@@ -332,7 +332,7 @@ etf_model_t etf_parse(const char *file){
 					len--;
 				}
 				if (!strcmp(line,"end sort")) {
-					//Warning(info,"sort section ended");
+					//Warning(debug,"sort section ended");
 					break;
 				}
 				char tmp_data[ETF_BUF];
@@ -351,14 +351,15 @@ etf_model_t etf_parse(const char *file){
 	lts_type_set_state_label_count(model->ltstype,model->map_count);
 	for(int i=0;i<model->map_count;i++){
 		lts_type_set_state_label_name(model->ltstype,i,model->map_names[i]);
+		lts_type_set_state_label_type(model->ltstype,i,model->map_types[i]);
 	}
 	if (model->trans_count==0){
 		Warning(info,"ETF model has no transition sections. Assuming input is an ODE.");
 		etf_ode_add(model);
 	}
-	Warning(info,"ETF model has %d transition sections",model->trans_count);
-	Warning(info,"ETF model has %d map sections",model->map_count);
-	Warning(info,"ETF model has %d types",lts_type_get_type_count(model->ltstype));
+	Warning(debug,"ETF model has %d transition sections",model->trans_count);
+	Warning(debug,"ETF model has %d map sections",model->map_count);
+	Warning(debug,"ETF model has %d types",lts_type_get_type_count(model->ltstype));
 	return model;	
 }
 
@@ -429,7 +430,7 @@ void etf_ode_add(etf_model_t model){
 	int vcount[state_length];
 	for(int i=0;i<state_length;i++){
 		vcount[i]=SIgetCount(model->type_values[i]);
-		Warning(info,"var %d is %s with %d values",i,lts_type_get_state_name(model->ltstype,i),vcount[i]);
+		Warning(debug,"var %d is %s with %d values",i,lts_type_get_state_name(model->ltstype,i),vcount[i]);
 	}
 	int is_new;
 	int signtype=lts_type_add_type(model->ltstype,"sign",&is_new);
@@ -441,7 +442,7 @@ void etf_ode_add(etf_model_t model){
 	lts_type_set_edge_label_count(model->ltstype,1);
 	lts_type_set_edge_label_type(model->ltstype,0,"action");
 	for(int i=0;i<state_length;i++){
-		Warning(info,"parsing map %d",i);
+		Warning(debug,"parsing map %d",i);
 		treedbs_t map=model->map[i];
 		int used[state_length+1];
 		TreeUnfold(map,0,used);
@@ -454,7 +455,7 @@ void etf_ode_add(etf_model_t model){
 				}
 			}
 		}
-		Warning(info,"map is consistent");
+		Warning(debug,"map is consistent");
 		char var[1024];
 		{
 			int len=strlen(model->map_names[i]);
@@ -468,7 +469,7 @@ void etf_ode_add(etf_model_t model){
 		if(varidx>=state_length){
 			Fatal(1,error,"variable %s is not a state variable",var);
 		} else {
-			Warning(info,"variable %s has index %d",var,varidx);
+			Warning(debug,"variable %s has index %d",var,varidx);
 		}
 		treedbs_t transdb=TreeDBScreate(3);
 		int trans[3];
@@ -507,11 +508,12 @@ void etf_ode_add(etf_model_t model){
 					if (entry[state_length]==pos && k==(vcount[varidx]-1)) continue;
 					src[varidx]=k;
 					dst[varidx]=(entry[state_length]==neg)?(k-1):(k+1);
-					for(int l=0;l<state_length;l++){
-						if (src[l]) printf("%d/%d ",src[l]-1,dst[l]-1);
-						else printf("* ");
-					}
-					printf("%s\n",label);
+					// Debug code
+					//for(int l=0;l<state_length;l++){
+					//	if (src[l]) printf("%d/%d ",src[l]-1,dst[l]-1);
+					//	else printf("* ");
+					//}
+					//printf("%s\n",label);
 					trans[0]=TreeFold(model->pattern_db,src);
 					trans[1]=TreeFold(model->pattern_db,dst);
 					TreeFold(transdb,trans);
@@ -519,12 +521,12 @@ void etf_ode_add(etf_model_t model){
 			} while (!incr_ofs(state_length,ofs,ofs_used,2));
 		}
 		if (TreeCount(transdb)){
-			Warning(info,"adding trans section with %d entries",TreeCount(transdb));
+			Warning(debug,"adding trans section with %d entries",TreeCount(transdb));
 			ensure_access(model->trans_manager,model->trans_count);
 			model->trans[model->trans_count]=transdb;
 			model->trans_count++;
 		} else {
-			Warning(info,"skipping empty trans section");
+			Warning(debug,"skipping empty trans section");
 		}
 	}
 }

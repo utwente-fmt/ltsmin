@@ -253,7 +253,7 @@ static FILE* table_file;
 
 static int table_count=0;
 
-typedef struct output_context {
+typedef struct {
 	int group;
 	int *src;
 } output_context;
@@ -281,6 +281,29 @@ static void enum_edge(void*context,int *src){
 	ctx->src=src;
 	GBgetTransitionsShort(model,ctx->group,ctx->src,etf_edge,context);
 }
+
+typedef struct {
+	int mapno;
+	int len;
+	int*used;
+} map_context;
+
+
+static void enum_map(void*context,int *src){
+	map_context*ctx=(map_context*)context;
+	int val=GBgetStateLabelShort(model,ctx->mapno,src);
+	int k=0;
+	for(int i=0;i<N;i++){
+		if (k<ctx->len && ctx->used[k]==i){
+			fprintf(table_file,"%d ",src[k]);
+			k++;
+		} else {
+			fprintf(table_file,"* ");
+		}
+	}
+	fprintf(table_file,"%d\n",val);
+}
+
 
 void do_output(){
 	eLbls=lts_type_get_edge_label_count(ltstype);
@@ -318,6 +341,24 @@ void do_output(){
 		fprintf(table_file,"end trans\n");
 	}
 	Warning(info,"Symbolic tables have %d reachable transitions",table_count);
+	int sLbls=lts_type_get_state_label_count(ltstype);
+	state_info_t s_info=GBgetStateInfo(model);
+	for(int i=0;i<sLbls;i++){
+		int len=s_info->length[i];
+		int *used=s_info->indices[i];
+		vset_t patterns=vset_create(domain,len,used);
+		vset_project(patterns,visited);
+		map_context ctx;
+		ctx.mapno=i;
+		ctx.len=len;
+		ctx.used=used;
+		fprintf(table_file,"begin map %s:%s\n",
+			lts_type_get_state_label_name(ltstype,i),
+			lts_type_get_state_label_type(ltstype,i));
+		vset_enum(patterns,enum_map,&ctx);
+		fprintf(table_file,"end map\n");
+		vset_clear(patterns); // Should be vset_destroy, which doesn't exist.
+	}
 	int type_count=lts_type_get_type_count(ltstype);
 	for(int i=0;i<type_count;i++){
 		Warning(info,"dumping type %s",lts_type_get_type(ltstype,i));
@@ -332,8 +373,6 @@ void do_output(){
 		}
 		fprintf(table_file,"end sort\n");
 	}
-	int sLbls=lts_type_get_state_label_count(ltstype);
-	if (sLbls) Warning(info,"Writing of state labels is unimplemented");
 	fclose(table_file);
 }
 

@@ -434,6 +434,10 @@ int main(int argc, char*argv[]){
 	io_trans_init();
 	state_labels=lts_type_get_state_label_count(ltstype);
 	Warning(info,"there are %d state labels",state_labels);
+	if (state_labels&&files[1]&&!write_state) {
+		Fatal(1,error,"Writing state labels, but not state vectors unsupported. "
+			"Writing of state vector is enabled with the option --write-state");
+	}
 	int labels[state_labels];
 	/***************************************************/
 	event_barrier_wait(barrier);
