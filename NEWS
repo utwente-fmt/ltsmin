@@ -1,0 +1,15 @@
+March 31, 2009 - Release 1.2 of the LTSmin toolset.
+
+The main improvements in this release are:
+ * Option parsing is now performed using the popt library. Thus, all
+   long options now start with a double minus.
+ * The user can choose between BuDDy and ATermDD as the decision diagram
+   library used in the symbolic tools.
+ * A new compressed file format for labeled transition systems with
+   arbitrary numbers of state and edge labels has been implemented.
+ * The symbolic tools can write the results of the reachability analysis
+   in the form of an ETF (Enumerated Table Format) file. This ETF file
+   can be used as input for the reachabilty tools and can be directly
+   translated to DVE.
+
+
