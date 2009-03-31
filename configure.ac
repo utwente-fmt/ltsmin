@@ -1,5 +1,5 @@
 AC_PREREQ(2.60)
-AC_INIT([ltsmin], [1.2],
+AC_INIT([ltsmin], [1.2.1],
         [ltsmin-support@cs.utwente.nl])
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_AUX_DIR([autotools])
