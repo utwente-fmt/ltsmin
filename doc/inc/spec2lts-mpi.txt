@@ -1,0 +1,24 @@
+include::pins-options.txt[]
+
+include::io-options.txt[]
+
+include::general-options.txt[]
+
+include::file-formats.txt[]
+
+== EXIT STATUS
+*0*::
+        Successful termination.
+*>0*::
+        Some error occurred.
+
+include::support.txt[]
+
+== SEE ALSO
+linkman:ltsmin[7],
+linkman:ltsmin-mpi[1],
+linkman:ltsmin-convert[1],
+http://www.cwi.nl/{tilde}mcrl/[muCRL],
+http://www.mcrl2.org/[mCRL2],
+http://fmt.cs.utwente.nl/{tilde}michaelw/nips/[NIPS],
+http://www.mpi-forum.org/[MPI Forum]

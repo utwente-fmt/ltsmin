@@ -1,0 +1,15 @@
+=== BuDDy Options
+
+*--cache-ratio*='RATIO'::
+        Set cache ration.  Defaults to 64.
+
+*--max-increase*='NUMBER'::
+        Set maximum increase.  Defaults to 1,000,000.
+
+*--min-free-nodes*='PERCENTAGE'::
+        Sets the minimum percentage of free nodes as integer between 0
+        and 100.  Defaults to 20.
+
+*--fdd-bits*='BITS'::
+        Sets the number of bits for each FDD variable.  Defaults to
+        16.

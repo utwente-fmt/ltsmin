@@ -59,9 +59,19 @@ size_t stream_illegal_read_max(stream_t stream,void*buf,size_t count){
 	Fatal(0,error,"illegal read max on stream");
 	return 0;
 }
+size_t stream_default_read_max(stream_t stream,void*buf,size_t count){
+	stream->procs.read(stream,buf,count);
+	return count;
+}
 void stream_illegal_read(stream_t stream,void*buf,size_t count){
 	(void)stream;(void)buf;(void)count;
 	Fatal(0,error,"illegal read on stream");
+}
+void stream_default_read(stream_t stream,void*buf,size_t count){
+	size_t res=stream->procs.read_max(stream,buf,count);
+	if (res<count) {
+		Fatal(1,error,"short read");
+	}
 }
 int stream_illegal_empty(stream_t stream){
 	(void)stream;

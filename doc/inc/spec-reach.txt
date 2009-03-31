@@ -1,0 +1,27 @@
+include::pins-options.txt[]
+
+include::vset-options.txt[]
+
+include::buddy-options.txt[]
+
+include::general-options.txt[]
+
+== EXIT STATUS
+*0*::
+        Successful termination.
+*>0*::
+        Some error occurred.
+
+include::support.txt[]
+
+== SEE ALSO
+linkman:ltsmin[7],
+linkman:etf[5],
+linkman:ltsmin-mpi[1],
+linkman:ltsmin-convert[1],
+http://dx.doi.org/10.1007/978-3-540-85762-4_6[ICTAC 2008, LNCS 5160],
+http://www.cwi.nl/{tilde}mcrl/[muCRL],
+http://www.mcrl2.org/[mCRL2],
+http://fmt.cs.utwente.nl/{tilde}michaelw/nips/[NIPS],
+http://www.mpi-forum.org/[MPI Forum]
+

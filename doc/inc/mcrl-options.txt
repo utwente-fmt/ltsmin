@@ -1,0 +1,15 @@
+=== mCRL Options
+
+*--state-names*::
+        Make the state parameters visible.
+
+*--mcrl*='OPTIONS'::
+        Pass options to the linkman:mcrl[1] library.
+        Defaults to "+-alt rw+".
++
+Allowed values depend on the linkman:mcrl[1] library.
+//Commonly, the following are provided: +rw+, +rww+, +jitty+.
++
+NOTE: Some option combinations can lead to incorrect results, e.g.,
+tau confluence when caching is enabled. Therefore, the use of tau confluence
+has been disabled, but there may be other combinations.

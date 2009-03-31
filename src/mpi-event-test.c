@@ -26,7 +26,7 @@ int main(int argc, char*argv[]){
 	MPI_Comm_size(MPI_COMM_WORLD, &mpi_nodes);
 	MPI_Comm_rank(MPI_COMM_WORLD, &mpi_me);
 	sprintf(who,"inst-mpi(%2d)",mpi_me);
-	RTinit(argc,&argv);
+	RTinit(&argc,&argv);
 	set_label(who);
 
 	mpi_queue=event_queue();

@@ -8,15 +8,40 @@
 #include <nips-vm/bytecode.h>
 #include <nips-vm/state_parts.h>
 
+static void nips_popt(poptContext con,
+ 		enum poptCallbackReason reason,
+                            const struct poptOption * opt,
+                             const char * arg, void * data){
+	(void)con;(void)opt;(void)arg;(void)data;
+	switch(reason){
+	case POPT_CALLBACK_REASON_PRE:
+		break;
+	case POPT_CALLBACK_REASON_POST: {
+		nipsvm_module_init ();
+		GBregisterLoader("b",NIPSloadGreyboxModel);
+		Warning(info,"NIPS language module initialized");
+		return;
+	}
+	case POPT_CALLBACK_REASON_OPTION:
+		break;
+	}
+	Fatal(1,error,"unexpected call to nips_popt");
+}
+struct poptOption nips_options[]= {
+	{ NULL, 0 , POPT_ARG_CALLBACK|POPT_CBFLAG_POST|POPT_CBFLAG_SKIPOPTION , nips_popt , 0 , NULL ,NULL},
+	POPT_TABLEEND
+};
+
 static const size_t MAX_INITIAL_STATE_COUNT = 10000;
 static const size_t MAX_NIPSVM_STATE_SIZE   = 65536;
 
-static struct lts_structure_s ltstype;
+static lts_type_t ltstype;
 static struct edge_info e_info;
 static struct state_info s_info = { 0, NULL, NULL };
 
-static int          NIPSgroupCheck (int, nipsvm_state_t *,
-                                    nipsvm_transition_information_t *);
+int ILABEL_TAU  = -1;
+
+static t_pid        NIPSgroupPID (int, nipsvm_state_t *);
 
 /* Debugging ============================================== */
 #ifdef DEBUG
@@ -185,9 +210,11 @@ Rpart_chan_callback (char *data, unsigned int len, void *ctx)
 /* NIPS next-state callback ============================= */
 struct gb_context_s {
     model_t             model;
+    int                 state_length;
     TransitionCB        callback;
     void               *context;
 
+    nipsvm_state_t     *source_state;
     int                 group;
 
     nipsvm_errorcode_t  err;
@@ -197,15 +224,20 @@ struct gb_context_s {
 
 static struct gb_context_s *
 init_gb_context (struct gb_context_s *gb_ctx, model_t model,
-                 TransitionCB cb, void *context, int group)
+                 TransitionCB cb, void *context,
+                 nipsvm_state_t *source, int group)
 {
     gb_ctx->model = model;
+    gb_ctx->state_length = lts_type_get_state_length(GBgetLTStype(model));
     gb_ctx->callback = cb;
     gb_ctx->context = context;
+    gb_ctx->source_state = source;
     gb_ctx->group = group;
     gb_ctx->err = 0;
     return gb_ctx;
 }
+
+static const int GB_NO_GROUP = -1;
 
 static nipsvm_status_t
 scheduler_callback (size_t succ_size, nipsvm_state_t *succ,
@@ -213,21 +245,30 @@ scheduler_callback (size_t succ_size, nipsvm_state_t *succ,
 {
     struct gb_context_s *gb_context = context;
     struct part_context_s part_ctx;
-    size_t              ilen = GBgetLTStype (gb_context->model)->state_length;
-    int                 ivec[ilen];
-    int                 ilabel[] = { 0 };       /* XXX */
     (void)succ_size;
     (void)ti;
 
+    const unsigned int NIPS_UNSUPPORTED_FEATURES_MASK =
+        INSTR_SUCC_CB_FLAG_SYNC   |
+        INSTR_SUCC_CB_FLAG_TIMEOUT;
     assert (succ != NULL);
-    assert ((!(ti->succ_cb_flags & INSTR_SUCC_CB_FLAG_SYNC) &&
-             ti->step_info && !ti->step_info->previous));
+    assert (!(ti->succ_cb_flags & NIPS_UNSUPPORTED_FEATURES_MASK));
+    assert (ti->step_info);
+    assert (!ti->step_info->previous);
+    
+    if (gb_context->group != GB_NO_GROUP &&
+        NIPSgroupPID (gb_context->group, succ) != ti->step_info->pid)
+        return IC_CONTINUE;
 
-    if (gb_context->group != -1) {
-        if (!NIPSgroupCheck (gb_context->group, succ, ti))
-            return IC_CONTINUE;
-    }
-
+    /* Continue until atomic flag is unset.  Downside: a model checker
+     * does not see these intermediate "atomic" states.
+     */
+    if (succ->excl_pid != 0)
+        return IC_CONTINUE_INVISIBLY;
+    
+    size_t          ilen = gb_context->state_length;
+    int             ivec[ilen];
+    int             ilabel[] = { ILABEL_TAU };
     init_part_context (&part_ctx, gb_context->model, ivec, ilen);
     state_parts (succ, part_glob_callback, part_proc_callback,
                  part_chan_callback, &part_ctx);
@@ -250,33 +291,24 @@ error_callback (nipsvm_errorcode_t err,
 }
 
 /* Transition groups ====================================== */
-static int
-NIPSgroupCheck (int group,
-                nipsvm_state_t *succ, nipsvm_transition_information_t *ti)
+static t_pid
+NIPSgroupPID (int group, nipsvm_state_t *succ)
 // This crucially depends on the group setup done in
 // NIPSgetProjection.
 {
     char               *ptr;
-    int                 i;
-    ptr = (char *)succ + sizeof (st_global_state_header)        // header
-        + be2h_16 (succ->gvar_sz);     // variables
-    for (i = 0; i < succ->proc_cnt; ++i) {
-        t_pid               pid_be = h2be_pid (ti->step_info->pid);
-        if (((st_process_header *)ptr)->pid == pid_be) {
-#ifdef DEBUG
-            Warning (info, "pid %d modified, group %d, %s\n",
-                     ti->step_info->pid, group,
-                     i != group ? "DISREGARD" : "OK");
-#endif
-            if (i != group) {
-                // other group -> not okay
-                return 0;
-            }
-        }
+    assert (group != GB_NO_GROUP);
 
+    ptr = (char *)succ + sizeof (st_global_state_header) // header
+        + be2h_16 (succ->gvar_sz);                       // variables
+
+    for (int i = 0; i < group; ++i) {
+        assert (i < succ->proc_cnt);
         ptr += process_size ((st_process_header *)ptr); // next process
     }
-    return 1;
+
+    t_pid group_pid = be2h_pid (((st_process_header *)ptr)->pid);
+    return group_pid;
 }
 
 size_t
@@ -313,6 +345,17 @@ NIPSgetVM (model_t model)
     return GBgetContext (model);
 }
 
+extern void
+NIPSstateRestore (model_t model, int *src, char *state, size_t sz)
+{
+    assert (state != NULL);
+    struct part_context_s part_ctx;
+    init_part_context (&part_ctx, model, src, -1);
+    state_restore (state, sz,
+                   Rpart_glob_callback,
+                   Rpart_proc_callback, Rpart_chan_callback, &part_ctx);
+}
+
 int
 NIPSgetTransitionsAll (model_t model, int *src, TransitionCB cb,
                        void *context)
@@ -328,7 +371,8 @@ NIPSgetTransitionsAll (model_t model, int *src, TransitionCB cb,
                    Rpart_glob_callback,
                    Rpart_proc_callback, Rpart_chan_callback, &part_ctx);
 
-    init_gb_context (&gb_context, model, cb, context, -1);
+    init_gb_context (&gb_context, model, cb, context,
+                     (nipsvm_state_t *)state, GB_NO_GROUP);
     nipsvm_scheduler_iter (NIPSgetVM (model), (nipsvm_state_t *)state,
                            &gb_context);
 
@@ -350,7 +394,8 @@ NIPSgetTransitionsLong (model_t model, int group, int *src,
                    Rpart_glob_callback,
                    Rpart_proc_callback, Rpart_chan_callback, &part_ctx);
 
-    init_gb_context (&gb_context, model, cb, context, group);
+    init_gb_context (&gb_context, model, cb, context,
+                     (nipsvm_state_t *)state, group);
     nipsvm_scheduler_iter (NIPSgetVM (model), (nipsvm_state_t *)state,
                            &gb_context);
 
@@ -370,6 +415,9 @@ ISscheduler_callback (size_t succ_size, nipsvm_state_t *succ,
 {
     search_context_t   *sc = context;
     (void)ti;
+
+    if (succ->excl_pid != 0)
+        return IC_CONTINUE_INVISIBLY;
 
     if (sc->depth >= sc->nmaxdepth)
         return IC_STOP;
@@ -434,19 +482,15 @@ NIPSfindInitializedState (nipsvm_bytecode_t *bytecode, size_t nmax_states)
     return initial;
 }
 
-static char        *edge_name[] = { "action" };
-static int          edge_type[] = { 3 };
-static char        *NIPS_types[] = { "globals", "process", "channel", "label" };
-
 void
-NIPSloadGreyboxModel (model_t m, char *filename)
+NIPSloadGreyboxModel (model_t m, const char *filename)
 {
     st_bytecode        *bytecode;
     nipsvm_t           *vm = RTmalloc (sizeof *vm);
 
     bytecode = bytecode_load_from_file (filename, NULL);
     if (bytecode == NULL) {
-        Fatal (1, error, "Failed to open %s.", filename);
+        FatalCall (1, error, "Failed to open %s.", filename);
         return;
     }
     if (nipsvm_init (vm, bytecode, scheduler_callback, error_callback) !=
@@ -467,21 +511,28 @@ NIPSloadGreyboxModel (model_t m, char *filename)
     state_parts (initial, Cpart_glob_callback, Cpart_proc_callback,
                  Cpart_chan_callback, &Cpart_ctx);
 
-    ltstype.state_length = Cpart_ctx.count;
-    ltstype.type_count = count (NIPS_types);
-    ltstype.type_names = NIPS_types;
-    ltstype.visible_count = 0;
-    ltstype.visible_indices = NULL;
-    ltstype.visible_name = NULL;
-    ltstype.visible_type = NULL;
-    ltstype.state_labels = 0;
-    ltstype.state_label_name = NULL;
-    ltstype.state_label_type = NULL;
-    ltstype.edge_labels = count (edge_name);
-    ltstype.edge_label_name = edge_name;
-    ltstype.edge_label_type = edge_type;
-    GBsetLTStype (m, &ltstype);
-    GBchunkPut(m, 3, chunk_str("dummy")); /* XXX */
+    ltstype=lts_type_create();
+    if (lts_type_add_type(ltstype,"globals",NULL) != 0) {
+        Fatal(1,error,"wrong type number");
+    }
+    if (lts_type_add_type(ltstype,"process",NULL) != 1) {
+        Fatal(1,error,"wrong type number");
+    }
+    if (lts_type_add_type(ltstype,"channel",NULL) != 2) {
+        Fatal(1,error,"wrong type number");
+    }
+    int label_type;
+    if ((label_type = lts_type_add_type (ltstype,"label",NULL)) != 3) {
+        Fatal(1,error,"wrong type number");
+    }
+    int state_length=Cpart_ctx.count;
+    lts_type_set_state_length(ltstype,state_length);
+    lts_type_set_edge_label_count(ltstype,1);
+    lts_type_set_edge_label_name(ltstype,0,"label");
+    lts_type_set_edge_label_type(ltstype,0,"label");
+
+    GBsetLTStype (m, ltstype);
+    ILABEL_TAU = GBchunkPut(m, label_type, chunk_str("tau"));
 
     struct part_context_s part_ctx;
     int                 ivec[Cpart_ctx.count];
@@ -494,7 +545,7 @@ NIPSloadGreyboxModel (model_t m, char *filename)
     e_info.length = RTmalloc (e_info.groups * sizeof (int));
     e_info.indices = RTmalloc (e_info.groups * sizeof (int *));
     for (int i = 0; i < e_info.groups; ++i) {
-        int                 temp[ltstype.state_length];
+        int                 temp[state_length];
         e_info.length[i] = NIPSgetProjection (vm, &Cpart_ctx, temp, i);
         e_info.indices[i] = RTmalloc (e_info.length[i] * sizeof (int));
         for (int j = 0; j < e_info.length[i]; ++j)

@@ -1,0 +1,26 @@
+== File Formats
+The following file formats are supported:
+
+* Directory format ('{ast}.dir', '{ast}.dz' and '{ast}.gcf')
+* Binary Coded Graphs ('{ast}.bcg')
+
+
+The directory format uses multiple files to store a LTS.
+The various extension explain how these files are stored in the underlying file system.
+The '{ast}.dir' format uses multiple files in a directory without compression.
+If the LTS has one edge label, no state labels and does not store state vectors then
+these files are backwards compatible. Neither the '{ast}.dz' nor the '{ast}.gcf'
+formats are backwards compatible. Both formats use compression. The first uses a directory for the files,
+second interleaves files into a single file.
+
+If you try to open a '{ast}.dir' with the old mCRL tools and
+you get the error message:
+----
+wrong file version: 0
+----
+then the directory is probably compressed.
+If that happens then you may convert the directory by typing the command:
+----
+ltsmin-convert bad.dir good.dir
+----
+

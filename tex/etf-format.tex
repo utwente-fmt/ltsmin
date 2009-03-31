@@ -1,0 +1,210 @@
+\chapter{The Enumerated Table Format}
+
+
+The problem with a model given by means of a partitioned
+next state function is that one needs to do a reachability analysis to
+compute the transitions relations and state label mappings.
+Hence it is convenient to store the computed transition relations
+and state label mappings in a file that can itself be
+used as an input to other tools. Because we do this by enumerating
+transitions and mappings, rather than by writing  some
+form of decision diagram, we refer to the resulting intermediate
+format as Enumerated Table Format (ETF).
+
+\section{Introduction}
+
+An ETF file is a simple text file that describes a grey box model,
+it consists of several sections. Each ETF file contains the following sections:
+\begin{itemize}
+\item A single {\em state} section. This must be the first section in the file.
+It describes the structure of the state vector.
+\item A single {\em edge} section. This must be the second section in the file.
+It describes the names and types of the edge labels.
+\item A single {\em init} section. This section describes the set of initial states.
+Please note that tool support assumes that this set is singleton.
+\item Zero or more {\em trans} sections. Each section describes a set of transitions
+in the model and the attached edge labels. Semantically a single section would suffice,
+but having one section for each edge group allows a simpler implementation.
+\item Zero or more {\em map} sections. Each section defines the value of a state variable.
+\item Zero or more {\em sort} sections. Each section enumerates the values of one sort.
+\end{itemize}
+
+As a running example, we will use the LTS below.
+\[
+{\xymatrix@=4em{
+*+[F=]{\,0\,0\,} \ar@{->}[r]^a\ar@{->}[d]_b
+&
+*+[F]{\,0\,1\,} \ar@{->}[d]^b
+\\
+*+[Fo]{\,1\,0\,} \ar@{->}[r]_a
+&
+*+[Fo]+=+[Fo]{\,1\,1\,}
+}}
+\]
+That is the state is a pair of bits, the single edge label is $a$ or $b$ and there are
+two state labels: shape (circle or rectangle) and multiplicity (single or double).
+
+\section{The state section.}
+
+The state section of our example is:
+\begin{verbatim}
+begin state
+x:bit y:bit
+end state
+\end{verbatim}
+Which means that each state has length 2, the first element is called x and of type bit,
+the second element is called y and of type bit as well. For this LTS, we do not need to know the
+names of the variables, so we can replace those with the special symbol \verb+_+  which denotes unknown.
+\begin{verbatim}
+begin state
+_:bit _:bit
+end state
+\end{verbatim}
+We also do not need to know the type of the variables, so we can omit those as well:
+\begin{verbatim}
+begin state
+_:_  _:_
+end state
+\end{verbatim}
+
+\section{The edge section}
+
+The edge section is similar in form to the state section. The only difference is that
+names and types for edge labels is mandatory, so the only legal form is:
+\begin{verbatim}
+begin edge
+action:action
+end edge
+\end{verbatim}
+
+\section{The init section}
+
+Assuming that the initial state is $0\,0$, the init section of our example is:
+\begin{verbatim}
+begin init
+0 0
+end init
+\end{verbatim}
+
+While the syntax allows for an arbitrary number of initial states.
+We require the use of precisely one initial state.
+
+\section{The trans sections}
+
+The transitions of the LTS can be described in many ways.
+The simplest is:
+
+\begin{verbatim}
+begin trans
+0/1 * a
+* 0/1 b
+end trans
+\end{verbatim}
+That is an $a$ actions changes the first element from 0 to 1 and
+a $b$ action changes the second element from 0 to 1. However this section lacks
+an important property. A section is called uniform if for every column it
+holds that either every element is a \verb+*+ or none of the elements is \verb+*+.
+Tools are allowed to require uniform input. A uniform representation
+of the transition relation is:
+\begin{verbatim}
+begin trans
+0/1 * a
+end trans
+begin trans
+* 0/1 b
+end trans
+\end{verbatim}
+If the labels get big then we want to use table compression on them.
+That is supported by using numbers instead of string. E.g.
+\begin{verbatim}
+begin trans
+0/1 * 0
+end trans
+begin trans
+* 0/1 1
+end trans
+\end{verbatim}
+We will see later how to specify the values of 0 and 1.
+If you want to specify the string 0 then you need to write \verb+"0"+.
+
+\section{The map sections}
+
+Our two maps are specified as follows:
+\begin{verbatim}
+begin map shape:shape
+0 * square
+1 * circle
+end map
+begin map multiplicity:multiplicity
+0 0 double
+0 1 single
+1 0 single
+1 1 double
+end map
+\end{verbatim}
+Note how the map multiplicity enumerates every reachable state explicitly.
+This is because the multiplicity depends on the parity of the state vector.
+In general, every map that depends on the entire state vector can leads
+to an extremely big table. 
+
+\section{The sort sections}
+
+Earlier we used references to the action sort:
+\begin{verbatim}
+begin trans
+0/1 * 0
+end trans
+begin trans
+* 0/1 1
+end trans
+\end{verbatim}
+To make that precise, we need to add the section
+
+\begin{verbatim}
+begin sort action
+a
+b
+end sort
+\end{verbatim}
+
+\section{Summary}
+
+So one possible ETF specification of our LTS is
+
+\begin{verbatim}
+begin state
+_:_  _:_
+end state
+begin edge
+action:action
+end edge
+begin init
+0 0
+end init
+begin trans
+0/1 * 0
+end trans
+begin trans
+* 0/1 1
+end trans
+begin map shape:shape
+0 * square
+1 * circle
+end map
+begin map multiplicity:multiplicity
+0 0 1
+0 1 0
+1 0 0
+1 1 1
+end map
+begin sort action
+a
+b
+end sort
+begin sort multiplicity
+single
+double
+end sort
+\end{verbatim}
+
+

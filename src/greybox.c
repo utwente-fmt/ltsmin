@@ -7,7 +7,7 @@
 #include "stringindex.h"
 
 struct grey_box_model {
-	lts_struct_t ltstype;
+	lts_type_t ltstype;
 	edge_info_t e_info;
 	state_info_t s_info;
 	int *s0;
@@ -15,6 +15,9 @@ struct grey_box_model {
 	next_method_grey_t next_short;
 	next_method_grey_t next_long;
 	next_method_black_t next_all;
+	get_label_method_t state_labels_short;
+	get_label_method_t state_labels_long;
+	get_label_all_method_t state_labels_all;
 	void* newmap_context;
 	newmap_t newmap;
 	int2chunk_t int2chunk;
@@ -46,7 +49,7 @@ static int default_short(model_t self,int group,int*src,TransitionCB cb,void*con
 	struct nested_cb info;
 	info.len=self->e_info->length[group];
 	info.indices=self->e_info->indices[group];
-	info.s_len=self->ltstype->state_length;
+	info.s_len=lts_type_get_state_length(self->ltstype);
 	info.src=src;
 	info.cb=cb;
 	info.user_ctx=context;
@@ -87,7 +90,7 @@ static int default_long(model_t self,int group,int*src,TransitionCB cb,void*cont
 	struct nested_cb info;
 	info.len=self->e_info->length[group];
 	info.indices=self->e_info->indices[group];
-	info.s_len=self->ltstype->state_length;
+	info.s_len=lts_type_get_state_length(self->ltstype);
 	info.src=src;
 	info.cb=cb;
 	info.user_ctx=context;
@@ -113,6 +116,37 @@ static int default_all(model_t self,int*src,TransitionCB cb,void*context){
 	return res;
 }
 
+static int state_default_short(model_t model,int label,int *state){
+	int N=lts_type_get_state_length(model->ltstype);
+	int len=model->s_info->length[label];
+	int k=0;
+	int long_state[N];
+	int *proj=model->s_info->indices[label];
+	for(int i=0;i<N;i++){
+		if(k<len && proj[k]==i){
+			long_state[i]=state[k];
+			k++;
+		} else {
+			long_state[i]=model->s0[i];
+		}
+	}
+	return model->state_labels_long(model,label,long_state);
+}
+
+static int state_default_long(model_t model,int label,int *state){
+	int len=model->s_info->length[label];
+	int short_state[len];
+	int *proj=model->s_info->indices[label];
+	for(int i=0;i<len;i++) short_state[i]=state[proj[i]];
+	return model->state_labels_short(model,label,short_state);
+}
+
+static void state_default_all(model_t model,int*state,int*labels){
+	for(int i=0;i<model->s_info->labels;i++) {
+		labels[i]=model->state_labels_long(model,i,state);
+	}
+}
+
 model_t GBcreateBase(){
 	model_t model=(model_t)RTmalloc(sizeof(struct grey_box_model));
 	model->ltstype=NULL;
@@ -123,6 +157,9 @@ model_t GBcreateBase(){
 	model->next_short=default_short;
 	model->next_long=default_long;
 	model->next_all=default_all;
+	model->state_labels_short=state_default_short;
+	model->state_labels_long=state_default_long;
+	model->state_labels_all=state_default_all;
 	model->newmap_context=NULL;
 	model->newmap=NULL;
 	model->int2chunk=NULL;
@@ -256,16 +293,17 @@ void GBsetContext(model_t model,void* context){
 	model->context=context;
 }
 
-void GBsetLTStype(model_t model,lts_struct_t info){
+void GBsetLTStype(model_t model,lts_type_t info){
 	if (model->ltstype != NULL)  Fatal(1,error,"ltstype already set");
 	model->ltstype=info;
-	model->map=(void**)RTmalloc(info->type_count*sizeof(void*));
-	for(int i=0;i<info->type_count;i++){
+	int N=lts_type_get_type_count(info);
+	model->map=RTmalloc(N*sizeof(void*));
+	for(int i=0;i<N;i++){
 		model->map[i]=model->newmap(model->newmap_context);
 	}
 }
 
-lts_struct_t GBgetLTStype(model_t model){
+lts_type_t GBgetLTStype(model_t model){
 	return model->ltstype;
 }
 
@@ -290,14 +328,16 @@ state_info_t GBgetStateInfo(model_t model){
 void GBsetInitialState(model_t model,int *state){
 	if (model->s0 !=NULL) Fatal(1,error,"initial state already set");
 	if (model->ltstype==NULL) Fatal(1,error,"must set ltstype before setting initial state");
-	model->s0=(int*)RTmalloc(model->ltstype->state_length * sizeof(int));
-	for(int i=0;i<model->ltstype->state_length;i++){
+	int len=lts_type_get_state_length(model->ltstype);
+	model->s0=(int*)RTmalloc(len * sizeof(int));
+	for(int i=0;i<len;i++){
 		model->s0[i]=state[i];
 	}
 }
 
 void GBgetInitialState(model_t model,int *state){
-	for(int i=0;i<model->ltstype->state_length;i++){
+	int len=lts_type_get_state_length(model->ltstype);
+	for(int i=0;i<len;i++){
 		state[i]=model->s0[i];
 	}
 }
@@ -327,6 +367,30 @@ int GBgetTransitionsAll(model_t model,int*src,TransitionCB cb,void*context){
 	return model->next_all(model,src,cb,context);
 }
 
+void GBsetStateLabelsAll(model_t model,get_label_all_method_t method){
+	model->state_labels_all=method;
+}
+
+void GBsetStateLabelLong(model_t model,get_label_method_t method){
+	model->state_labels_long=method;
+}
+
+void GBsetStateLabelShort(model_t model,get_label_method_t method){
+	model->state_labels_short=method;
+}
+
+int GBgetStateLabelShort(model_t model,int label,int *state){
+	return model->state_labels_short(model,label,state);
+}
+
+int GBgetStateLabelLong(model_t model,int label,int *state){
+	return model->state_labels_long(model,label,state);
+}
+
+void GBgetStateLabelsAll(model_t model,int*state,int*labels){
+	model->state_labels_all(model,state,labels);
+}
+
 void GBsetChunkMethods(model_t model,newmap_t newmap,void*newmap_context,
 	int2chunk_t int2chunk,chunk2int_t chunk2int,get_count_t get_count){
 	model->newmap_context=newmap_context;
@@ -351,5 +415,69 @@ chunk GBchunkGet(model_t model,int type_no,int chunk_no){
 int GBchunkCount(model_t model,int type_no){
 	return model->get_count(model->map[type_no]);
 }
+
+
+void GBprintDependencyMatrix(FILE* file, model_t model) {
+  edge_info_t e = GBgetEdgeInfo(model);
+  int N=lts_type_get_state_length(model->ltstype);
+  for (int i=0;i<e->groups;i++) {
+    for (int j=0,c=0;j<N;j++) {
+      if (c<e->length[i] && j==e->indices[i][c]) {
+	fprintf(file,"+");
+	c++;
+      }
+      else
+	fprintf(file,"-");
+    }
+    fprintf(file,"\n");
+  }
+}
+
+/**********************************************************************
+ * Grey box factory functionality
+ */
+
+#define MAX_TYPES 16
+static char* model_type[MAX_TYPES];
+static pins_loader_t model_loader[MAX_TYPES];
+static int registered=0;
+static int cache=0;
+
+void GBloadFile(model_t model,const char *filename,model_t *wrapped){
+	char* extension=strrchr(filename,'.');
+	if (extension) {
+		extension++;
+		for(int i=0;i<registered;i++){
+			if(!strcmp(model_type[i],extension)){
+				model_loader[i](model,filename);
+				if (wrapped) {
+					if (cache) {
+						model=GBaddCache(model);
+					}
+					*wrapped=model;
+				}
+				return;
+			}
+		}
+		Fatal(1,error,"No factory method has been registered for %s models",extension);
+	} else {
+		Fatal(1,error,"filename %s doesn't have an extension",filename);
+	}
+}
+
+void GBregisterLoader(const char*extension,pins_loader_t loader){
+	if (registered<MAX_TYPES){
+		model_type[registered]=strdup(extension);
+		model_loader[registered]=loader;
+		registered++;
+	} else {
+		Fatal(1,error,"model type registry overflow");
+	}
+}
+
+struct poptOption greybox_options[]={
+	{ "cache" , 'c' , POPT_ARG_VAL , &cache , 1 , "enable caching of grey box calls" , NULL },
+	POPT_TABLEEND	
+};
 
 

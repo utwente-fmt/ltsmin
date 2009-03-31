@@ -1,0 +1,46 @@
+\documentclass{report}
+
+\title{The LTSmin toolset}
+\author{Stefan Blom, Jaco van de Pol and Michael Weber}
+
+\usepackage{tabularx}
+\usepackage[all]{xypic}
+
+\newcommand{\struct}[1]{\ensuremath{\langle#1\rangle}}
+
+%% Set up theorems and such...
+
+\usepackage{theorem}
+\theoremstyle{plain}
+\theoremheaderfont{\bfseries\upshape}
+\theorembodyfont{\mdseries\upshape}
+
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{intermezzo}[theorem]{Intermezzo}
+\newtheorem{example}[theorem]{Example}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{corollary}[theorem]{Corollary}
+\newtheorem{conjecture}[theorem]{Conjecture}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{fact}[theorem]{Fact}
+\newtheorem{remark}[theorem]{Remark}
+\newenvironment{proof}[1][Proof.~]{{\bf #1}}{\mbox{}\hfill$\Box$\medskip}
+
+%% End theorem setup.
+
+\begin{document}
+
+\maketitle
+
+\tableofcontents
+
+
+\input{design}
+
+\input{etf-format}
+
+\input{lts-format}
+
+\end{document}
+

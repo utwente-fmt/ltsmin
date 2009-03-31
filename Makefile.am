@@ -1,6 +1,6 @@
 ACLOCAL_AMFLAGS = -I m4
 
-SUBDIRS = nips-vm src doc
+SUBDIRS = buddy nips-vm src doc
 EXTRA_DIST = ltsminreconf Doxyfile
 
 doc_DATA = AUTHORS COPYING README
@@ -15,5 +15,5 @@ include m4/amdoxygen.m4
 
 distcheck-hook:
 # sample check whether manpages are present in generated tarball
-	test -f $(top_distdir)/doc/ltsmin.5
+	test -f $(top_distdir)/doc/etf.5
 	test -f $(top_distdir)/doc/gcf.1

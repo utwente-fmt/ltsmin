@@ -133,9 +133,14 @@ mcrl2::lps::specification convert(mcrl2::lps::specification const& l) {
 
 extern "C" {
 
-#include "mcrl2-greybox.h"
+#include <popt.h>
+
 /// We have to define CONFIG_H_ due to a problem with double defines.
 #define CONFIG_H_
+
+/// We have to define CONFIG_H_ due to a problem with double defines.
+#define CONFIG_H_
+#include "mcrl2-greybox.h"
 #include "runtime.h"
 #include "at-map.h"
 
@@ -159,7 +164,71 @@ static void ErrorHandler(const char *format, va_list args) {
 	exit(1);
 }
 
+#ifdef MCRL2_INNERC_AVAILABLE
+static char*mcrl2_args="--rewriter=jittyc";
+static RewriteStrategy mcrl2_rewriter=GS_REWR_JITTYC;
+#else
+static char*mcrl2_args="--rewriter=jitty";
+static RewriteStrategy mcrl2_rewriter=GS_REWR_JITTY;
+#endif
 
+static void mcrl2_popt(poptContext con,
+ 		enum poptCallbackReason reason,
+                            const struct poptOption * opt,
+                             const char * arg, void * data){
+	(void)con;(void)opt;(void)arg;(void)data;
+	switch(reason){
+	case POPT_CALLBACK_REASON_PRE:
+		break;
+	case POPT_CALLBACK_REASON_POST: {
+		Warning(debug,"mcrl2 init");
+		int argc;
+		char **argv;
+		RTparseOptions(mcrl2_args,&argc,&argv);
+		Warning(debug,"ATerm init");
+		ATinit(argc, argv, (ATerm*) RTstackBottom());
+		ATsetWarningHandler(WarningHandler);
+		ATsetErrorHandler(ErrorHandler);
+		char*rewriter=NULL;
+		struct poptOption options[]={
+			{ "rewriter", 0 , POPT_ARG_STRING , &rewriter , 0 , "select rewriter" , NULL },
+			POPT_TABLEEND
+		};
+		Warning(debug,"options");
+		poptContext optCon=poptGetContext(NULL, argc,(const char **) argv, options, 0);
+		int res=poptGetNextOpt(optCon);
+		if (res != -1 || poptPeekArg(optCon)!=NULL){
+			Fatal(1,error,"Bad mcrl2 options: %s",mcrl2_args);
+		}
+		poptFreeContext(optCon);
+		if (rewriter) {
+			if (!strcmp(rewriter,"jitty")){
+				mcrl2_rewriter=GS_REWR_JITTY;
+			} else if (!strcmp(rewriter,"jittyc")){
+				mcrl2_rewriter=GS_REWR_JITTYC;
+			} else if (!strcmp(rewriter,"inner")){
+				mcrl2_rewriter=GS_REWR_INNER;
+			} else if (!strcmp(rewriter,"innerc")){
+				mcrl2_rewriter=GS_REWR_INNERC;
+			} else {
+				Fatal(1,error,"unrecognized rewriter: %s (jitty, jittyc, inner and innerc supported)",rewriter);
+			}
+		}
+		GBregisterLoader("lps",MCRL2loadGreyboxModel);
+		Warning(info,"mCRL2 language module initialized");
+		return;
+	}
+	case POPT_CALLBACK_REASON_OPTION:
+		break;
+	}
+	Fatal(1,error,"unexpected call to mcrl2_popt");
+}
+
+struct poptOption mcrl2_options[]= {
+	{ NULL, 0 , POPT_ARG_CALLBACK|POPT_CBFLAG_POST|POPT_CBFLAG_SKIPOPTION , (void*)mcrl2_popt , 0 , NULL , NULL},
+	{ "mcrl2" , 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &mcrl2_args , 0, "Pass options to the mcrl2 library.","<mcrl2 options>" },
+	POPT_TABLEEND
+};
 
 void MCRL2initGreybox(int argc,char *argv[],void* stack_bottom){
 	ATinit(argc, argv, (ATerm*) stack_bottom);
@@ -171,27 +240,40 @@ typedef struct grey_box_context {
 	int atPars;
 	int atGrps;
 	NextState* explorer;
+	Rewriter* rewriter;
 	AFun StateFun;
 	group_information *info;
 	ATerm s0;
 	at_map_t termmap;
 	at_map_t actionmap;
-	ATermTable action_memo;
 } *mcrl2_model_t;
 
 static struct state_info s_info={0,NULL,NULL};
 
-static inline int resolve_label(mcrl2_model_t model,ATerm act){
-	ATerm res=ATtableGet(model->action_memo,act);
-	if (res==NULL){
-		char str[1024];
-		sprintf(str,"%s",mcrl2::core::pp(act).c_str());
-		res=(ATerm)ATmakeInt(ATfindIndex(model->actionmap,ATreadFromString(str)));
-		ATtablePut(model->action_memo,act,res);
+
+static char global_label[65536];
+
+
+static char* print_label(void*arg,ATerm act){
+	(void)arg;
+	std::string s=mcrl2::core::pp(act);
+	const char* cs=s.c_str();
+	if(strlen(cs)>=65536){
+		Fatal(1,error,"global_label overflow");
 	}
-	return ATgetInt((ATermInt)res);
+	strcpy(global_label,cs);
+	return global_label;
 }
 
+static char* print_term(void*arg,ATerm t){
+	Rewriter* rw=(Rewriter*)arg;
+	return ATwriteToString((ATerm)rw->fromRewriteFormat(t));
+}
+
+static ATerm parse_term(void *arg,char*str){
+	Rewriter* rw=(Rewriter*)arg;
+	return rw->toRewriteFormat((ATermAppl)ATreadFromString(str));
+}
 
 static int MCRL2getTransitionsLong(model_t m,int group,int*src,TransitionCB cb,void*context){
 	struct grey_box_context *model=(struct grey_box_context*)GBgetContext(m);
@@ -200,7 +282,7 @@ static int MCRL2getTransitionsLong(model_t m,int group,int*src,TransitionCB cb,v
 		src_term[i]=ATfindTerm(model->termmap,src[i]);
 	}
 	ATerm src_state=(ATerm)ATmakeApplArray(model->StateFun,src_term);
-	src_state=(ATerm)model->explorer->parseStateVector((ATermAppl)src_state);
+	//src_state=(ATerm)model->explorer->parseStateVector((ATermAppl)src_state);
 	std::auto_ptr< NextStateGenerator > generator(model->explorer->getNextStates(src_state, group));
 	ATerm     state;
 	ATermAppl transition;
@@ -208,11 +290,11 @@ static int MCRL2getTransitionsLong(model_t m,int group,int*src,TransitionCB cb,v
 	int pp_lbl[1];
 	int count=0;
 	while(generator->next(&transition, &state)){
-		state=(ATerm)model->explorer->makeStateVector(state);
+		//state=(ATerm)model->explorer->makeStateVector(state);
 		for(int i=0;i<model->atPars;i++) {
 			dst[i]=ATfindIndex(model->termmap,ATgetArgument(state,i));
 		}
-		pp_lbl[0]=resolve_label(model,(ATerm)transition);
+		pp_lbl[0]=ATfindIndex(model->actionmap,(ATerm)transition);
 		cb(context,pp_lbl,dst);
 		count++;
 	}
@@ -226,7 +308,7 @@ static int MCRL2getTransitionsAll(model_t m,int*src,TransitionCB cb,void*context
 		src_term[i]=ATfindTerm(model->termmap,src[i]);
 	}
 	ATerm src_state=(ATerm)ATmakeApplArray(model->StateFun,src_term);
-	src_state=(ATerm)model->explorer->parseStateVector((ATermAppl)src_state);
+	//src_state=(ATerm)model->explorer->parseStateVector((ATermAppl)src_state);
 	std::auto_ptr< NextStateGenerator > generator(model->explorer->getNextStates(src_state));
 	ATerm     state;
 	ATermAppl transition;
@@ -234,26 +316,18 @@ static int MCRL2getTransitionsAll(model_t m,int*src,TransitionCB cb,void*context
 	int pp_lbl[1];
 	int count=0;
 	while(generator->next(&transition, &state)){
-		state=(ATerm)model->explorer->makeStateVector(state);
+		//state=(ATerm)model->explorer->makeStateVector(state);
 		for(int i=0;i<model->atPars;i++) {
 			dst[i]=ATfindIndex(model->termmap,ATgetArgument(state,i));
 		}
-		pp_lbl[0]=resolve_label(model,(ATerm)transition);
+		pp_lbl[0]=ATfindIndex(model->actionmap,(ATerm)transition);
 		cb(context,pp_lbl,dst);
 		count++;
 	}
 	return count;
 }
 
-
-
-static char const_action[7]="action";
-static char* edge_name[1]={const_action};
-static int edge_type[1]={1};
-static char const_leaf[5]="leaf";
-static char* MCRL_types[2]={const_leaf,const_action};
-
-void MCRL2loadGreyboxModel(model_t m,char*model_name){
+void MCRL2loadGreyboxModel(model_t m,const char*model_name){
 	struct grey_box_context *ctx=(struct grey_box_context*)RTmalloc(sizeof(struct grey_box_context));
 	GBsetContext(m,ctx);
 
@@ -263,6 +337,9 @@ void MCRL2loadGreyboxModel(model_t m,char*model_name){
 	using namespace mcrl2::lps;
 
 	ATermAppl Spec=(ATermAppl)ATreadFromNamedFile(model_name);
+	if (!Spec) {
+		Fatal(1,error,"could not read specification from %s",model_name);
+	}
 	Warning(info,"removing unused parts of the data specification.");
 	Spec = removeUnusedData(Spec);
 
@@ -272,38 +349,32 @@ void MCRL2loadGreyboxModel(model_t m,char*model_name){
 	model = convert(model);
 	
 
-	lts_struct_t ltstype=(lts_struct_t)RTmalloc(sizeof(struct lts_structure_s));
-	ltstype->state_length=model.process().process_parameters().size();
-	ltstype->visible_count=0;
-	ltstype->visible_indices=NULL;
-	ltstype->visible_name=NULL;
-	ltstype->visible_type=NULL;
-	ltstype->state_labels=0;
-	ltstype->state_label_name=NULL;
-	ltstype->state_label_type=NULL;
-	ltstype->edge_labels=1;
-	ltstype->edge_label_name=edge_name;
-	ltstype->edge_label_type=edge_type;
-	ltstype->type_count=2;
-	ltstype->type_names=MCRL_types;
+	int state_length=model.process().process_parameters().size();
+	lts_type_t ltstype=lts_type_create();
+	lts_type_set_state_length(ltstype,state_length);
+	for(int i=0;i<state_length;i++) {
+		lts_type_set_state_type(ltstype,i,"leaf");
+	}
+	lts_type_set_edge_label_count(ltstype,1);
+	lts_type_set_edge_label_name(ltstype,0,"action");
+	lts_type_set_edge_label_type(ltstype,0,"action");
 	GBsetLTStype(m,ltstype);
 
 
 
 	// Note the second argument that specifies that don't care variables are not treated specially
-	ctx->explorer = createNextState(model, false, GS_STATE_VECTOR,GS_REWR_JITTYC);
+	ctx->explorer = createNextState(model, false, GS_STATE_VECTOR,mcrl2_rewriter);
+	ctx->rewriter = ctx->explorer->getRewriter();
 	ctx->info=new group_information(model);
-	ctx->termmap=ATmapCreate(m,0,NULL,NULL);
-	ctx->actionmap=ATmapCreate(m,1,NULL,NULL);
-
-	ctx->atPars=model.process().process_parameters().size();
+	ctx->termmap=ATmapCreate(m,lts_type_add_type(ltstype,"leaf",NULL),ctx->rewriter,print_term,parse_term);
+	ctx->actionmap=ATmapCreate(m,lts_type_add_type(ltstype,"action",NULL),ctx->rewriter,print_label,NULL);
+	ctx->atPars=state_length;
 	ctx->atGrps=model.process().summands().size();
 	ATerm s0=ctx->explorer->getInitialState();
-	s0=(ATerm)ctx->explorer->makeStateVector(s0);
+	//s0=(ATerm)ctx->explorer->makeStateVector(s0);
 	ctx->StateFun=ATgetAFun(s0);
-	ctx->action_memo=ATtableCreate(1024,75);
-	int temp[ltstype->state_length];
-	for(int i=0;i<ltstype->state_length;i++) {
+	int temp[state_length];
+	for(int i=0;i<state_length;i++) {
 		temp[i]=ATfindIndex(ctx->termmap,ATgetArgument(s0,i));
 	}
 	GBsetInitialState(m,temp);
@@ -315,7 +386,8 @@ void MCRL2loadGreyboxModel(model_t m,char*model_name){
 	for(int i=0;i<e_info->groups;i++){
 		std::vector< size_t > const & vec = ctx->info->get_group(i);
 		e_info->length[i]=vec.size();
-		e_info->indices[i]=(int*)&(vec[0]);
+		e_info->indices[i]=(int*)RTmalloc(vec.size()*sizeof(int));
+		for(int j=0;j<(int)(vec.size());j++) e_info->indices[i][j]=vec[j];
 	}
 	GBsetEdgeInfo(m,e_info);
 	GBsetStateInfo(m,&s_info);

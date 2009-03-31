@@ -1,0 +1,9 @@
+=== Vector Set Options
+
+*--vset*='TYPE'::
+        Select type of vector set: 'list', 'tree' or 'fdd'.  With
+        'list', ATermDD with list encoding are used.  With 'tree',
+        ATermDD with tree encoding are used.  With 'fdd', BuDDy FDDs
+        are used.  Defaults to 'list'. Note that the tree version of
+        ATermDD is a partial implementation and therefore not available
+        in the symbolic reachability tools.

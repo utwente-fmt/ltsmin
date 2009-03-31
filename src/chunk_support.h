@@ -59,6 +59,19 @@ This function shortens the destination chunk if necessary.
 */
 extern void chunk_decode_copy(chunk dst,chunk src,char escape);
 
+/**
+\brief Copy the chunk to a string.
+If all characters are printable and non-white space, the characters are copied verbatim.
+If all characters are printable, but there is white space then a quoted form is used.
+Otherwise, the results is #hex ... hex#. The empty string is "".
+*/
+extern void chunk2string(chunk src,size_t  dst_size,char*dst);
+
+/**
+\brief Decode a string to a chunk.
+*/
+extern void string2chunk(char*src,chunk *dst);
+
 //@}
 
 #endif

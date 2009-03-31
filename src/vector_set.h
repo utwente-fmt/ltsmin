@@ -1,27 +1,63 @@
 #ifndef VECTOR_SET_H
 #define VECTOR_SET_H
 
-/**
-\file vector_set.h
-*/
+#include <popt.h>
 
 /**
+\file vector_set.h
 \defgroup vector_set Data structures for manipulating sets of vectors.
+
+For manipulating sets of vectors, we need use three objects: domains,
+sets and relations.
 */
 //@{
 
+extern struct poptOption vset_setonly_options[];
+
+extern struct poptOption vset_full_options[];
+
+/**
+\brief Abstract type for a domain.
+*/
 typedef struct vector_domain *vdom_t;
 
+/**
+\brief Abstract type for a set in a domain.
+*/
 typedef struct vector_set *vset_t;
 
+/**
+\brief Abstract type for a relation over a domain.
+*/
 typedef struct vector_relation *vrel_t;
 
 /**
-\brief Create a domain.
+\brief Create a domain that uses the default vector set implementation.
 
 \param n The length of vectors in the domain.
 */
-extern vdom_t vdom_create(int n);
+extern vdom_t vdom_create_default(int n);
+
+/**
+\brief Create a domain that uses the fdd form of BuDDy.
+
+\param n The length of vectors in the domain.
+*/
+extern vdom_t vdom_create_fdd(int n);
+
+/**
+\brief Create a domain that uses the list variant of ATermDD.
+
+\param n The length of vectors in the domain.
+*/
+extern vdom_t vdom_create_list(int n);
+
+/**
+\brief Create a domain that uses the tree variant of ATermDD.
+
+\param n The length of vectors in the domain.
+*/
+extern vdom_t vdom_create_tree(int n);
 
 /**
 \brief Create a set.
@@ -34,12 +70,12 @@ extern vset_t vset_create(vdom_t dom,int k,int* proj);
 /**
 \brief Add an element to a set.
 */
-extern void vset_add(vset_t set,int* e);
+extern void vset_add(vset_t set,const int* e);
 
 /**
 \brief Test if an element is a member.
 */
-extern int vset_member(vset_t set,int* e);
+extern int vset_member(vset_t set,const int* e);
 
 /**
 \brief Test if two sets are equal.
@@ -68,6 +104,14 @@ For each element of the given set, the given callback with be called with as arg
 the given context and the set element.
 */
 extern void vset_enum(vset_t set,vset_element_cb cb,void* context);
+
+/**
+\brief Enumerate the elements of a set that match the given projection.
+
+For each element of the given set, the given callback with be called with as arguments
+the given context and the set element.
+*/
+extern void vset_enum_match(vset_t set,int p_len,int* proj,int*match,vset_element_cb cb,void* context);
 
 /**
 \brief Copy a vset.
@@ -107,7 +151,7 @@ extern vrel_t vrel_create(vdom_t dom,int k,int* proj);
 /**
 \brief Add an element to a relation.
 */
-extern void vrel_add(vrel_t rel,int* src,int *dst);
+extern void vrel_add(vrel_t rel,const int* src,const int* dst);
 
 /**
 \brief dst := { y | exists x in src : x rel y }
@@ -115,7 +159,6 @@ extern void vrel_add(vrel_t rel,int* src,int *dst);
 extern void vset_next(vset_t dst,vset_t src,vrel_t rel);
 
 //@}
-
 
 #endif
 

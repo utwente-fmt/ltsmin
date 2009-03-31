@@ -1,0 +1,161 @@
+Types: 
+  Nat        natural numbers 0,1,2,...
+  ListNat[n] (list of naturals of length n)
+  X,         (individual element)
+  List[n],   (list of elements of length n)
+  Set[n],    (set of vectors of elements, all of length n)
+
+Constructors:
+  empty : Set[n]
+  atom  : Set[0]
+  cons(X,Set[n],Set[n+1]): Set[n+1]
+
+Semantics:
+  <empty>       = {}     (empty set)
+  <atom>        = { [] } (singleton with empty vector)
+  <cons(x,s,t)> =  x::<s> union <t>,   where x::S = {x::l | l in S}
+
+Invariants:
+  in cons(x,s,t)          : s is not empty  
+  in cons(x,s,cons(y,r,t)): x<y  
+
+Rewrite rules (only for documentation):
+  cons(x,empty,t) -> t                                     % ensured by MCons
+  cons(x,s,cons(x,r,t)) -> cons(x,union(r,s),t)            % union only defined below
+  cons(y,s,cons(x,r,t)) -> cons(x,r,cons(y,s,t)), if x<y   % 
+
+Functions:
+================================================================================
+MCons: X,Set[n],Set[n+1] -> Set[n+1]   --- ensure invariant
+
+MCons(x,empty,t) = t
+MCons(x,s,t)     = cons(x,s,t), otherwise
+================================================================================
+
+member: Set[n],List[n] -> Bool   --- <member(s,l)> = l in <s>
+
+member(empty,_)          = false
+member(atom,_)           = true
+member(cons(x,s,_),x::l) = member(s,l)
+member(cons(x,_,t),y::l) = member(t,x::l), if x<y
+member(cons(y,_,_),x::l) = false, if x<y
+
+================================================================================
+
+singleton: List[n] -> Set[n]     --- <singleton(l)> = {l}
+
+singleton([])   = atom
+singleton(x::l) = cons(x,singleton(l),empty)
+
+================================================================================
+
+add: Set[n],List[n]->Set[n],Bool   --- <add(s,l)> = <s> union {l}
+
+  add(s,l) = (s,false)                     , if member(s,l)
+  add(s,l) = (union(s,singleton(l)), true) , otherwise
+
+alternatively (no cache needed, one pass)
+
+add(atom,_)  = atom                                               (OLD)
+add(empty,x) = singleton(x)                                       (NEW)
+add(cons(x,s,t),x::l) = cons(x,add(s,l),t)
+add(cons(x,s,t),y::l) = cons(x,s,add(t,y::l))           , if x<y
+add(cons(y,s,t),x::l) = cons(x,singleton(l),cons(y,s,t)), if x<y  (NEW)
+
+================================================================================
+
+union: Set[n],Set[n]->Set[n]     --- <union(s,t)> = <s> union <t>
+
+union(atom,_) = atom
+union(empty,s) = s
+union(s,empty) = s
+union(cons(x,s1,s2),cons(x,t1,t2)) = cons(x,union(s1,t1),union(s2,t2))
+union(cons(x,s1,s2),cons(y,t1,t2)) = cons(x,s1,union(s2,cons(y,t1,t2)))  [x<y]
+union(cons(y,s1,s2),cons(x,t1,t2)) = cons(x,t1,union(cons(y,s1,s2),t2))  [x<y]
+
+================================================================================
+
+minus: Set[n],Set[n]->Set[n]     ---  <minus(s,t)> = <s> \ <t>
+
+minus(s,empty)  = s
+minus(empty,_)  = empty
+minus(_,atom)   = empty
+minus(cons(x,s1,s2),cons(x,t1,t2)) = MCons(x,minus(s1,t1),minus(s2,t2))
+minus(cons(x,s1,s2),cons(y,t1,t2)) = cons(x,s1,minus(s2,cons(y,t1,t2)))  [x<y]
+minus(cons(y,s1,s2),cons(x,_ ,t2)) = minus(cons(y,s1,s2),t2)             [x<y]
+
+================================================================================
+
+zip: Set[n],Set[n]->Set[n],Set[n]   --- zip(s,t) = (s union t , t \ s)
+
+zip(atom,_) = (atom,empty)
+zip(s,empty)= (s,empty)
+zip(empty,s)= (s,s)
+zip(cons(x,s1,s2),cons(x,t1,t2)) = (cons(x,S1,S2) , MCons(x,T1,T2))
+  where (S1,T1)=zip(s1,t1)
+        (S2,T2)=zip(s2,t2)
+zip(cons(x,s1,s2),cons(y,t1,t2)) = (cons(x,s1,S2) , T2)              , if [x<y]
+  where (S2,T2) = zip(s2,cons(y,t1,t2))
+zip(cons(y,s1,s2),cons(x,t1,t2)) = (cons(x,t1,S1) , cons(x,t1,T1))   , if [x<y]
+  where (S1,T1) = zip(cons(y,s1,s2),t2)
+
+================================================================================
+
+project: Set[n],Nat,Natlist[k] -> Set[k]
+
+precondition project(s,i,j1..jk) :
+- i <= j1 < j2 < .. < jk <= i+n
+  (i is the offset: first level in s , j1..jk are the levels to project on)
+
+project(empty,_,_)= empty
+project(_,_,[])   = atom,   otherwise
+project(cons(x,s,t),i,i::l) = cons(x,project(s,i+1,l),project(t,i,i::l))
+project(cons(_,s,t),i,j::l) = union(project(s,i+1,j::l),project(t,i,j::l)) , if i<j
+
+================================================================================
+reach(set,ofs,trans,proj): "compute image of trans on set"
+
+reach: Set[n], Nat, Set[2k], NatList[k] -> Set[n]
+copy : Set[n], Nat, Set[2k], NatList[k] -> Set[n]
+apply: Set[n],      Set[2k], NatList[k] -> Set[n]
+trans: Set[n-1],    Set[2k], NatList[k] -> Set[n]
+
+precondition reach(s,i,r,j1..jk) :
+-  i<=j1<j2<..jk<=i+n
+  (i is the offset: first level in s , j1..jk are the levels to which r applies)
+
+reach(s,_,_,[]) = s
+reach(s,i,R,i::l) = apply(s,i,R,i::l)
+reach(s,i,R,j::l) = copy(s,i,R,j::l)       if i<j
+
+apply(empty,_,_) = empty
+apply(_,empty,_) = empty
+apply(cons(x,s1,s2),cons(y,r1,r2),l) = apply(s2,cons(y,r1,r2),l),   if x<y
+apply(cons(y,s1,s2),cons(x,r1,r2),l) = apply(cons(y,s1,s2),r2,l),   if x<y
+apply(cons(x,s1,s2),cons(x,r1,r2),l) = union(trans(s1,r1,l),apply(s2,r2,l))
+
+trans(_,empty,_)            = empty
+trans(s,cons(x,r1,r2),i::l) = MCons(x,reach(s,i+1,r1,l),trans(s,r2,i::l))
+
+copy(empty,_,_,_)           = empty
+copy(cons(x,s1,s2),i,r,l)   = MCons(x,reach(s1,i+1,r,l),copy(s2,i,r,l))
+
+================================================================================
+
+count: Set[n] -> nat     ---  count(s) = |{x | member(s,x)}|
+
+count(emptyset) = 0
+count(atom)     = 1
+count(cons(x,s,t)) = count(s)+count(t)
+
+================================================================================
+
+other functions (not documented):
+
+set_enum: callback on every element in set.
+set_put: not used??   (variant of set_add)
+get_number: not used??
+set_enum_match: not used??
+create_numbering: not used??
+print_array: not used, useful for debugging??
+================================================================================

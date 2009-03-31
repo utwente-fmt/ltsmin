@@ -63,11 +63,11 @@ static void RAFwrite(raf_t raf,void*buf,size_t len,off_t ofs){
 	}
 }
 
-#ifndef HAVE_LIBRT
+
 static void RAFwait(raf_t raf){
 	(void)raf;
 }
-#endif
+
 
 #ifdef HAVE_LIBRT
 
@@ -86,8 +86,9 @@ static void AIOwrite(raf_t raf,void*buf,size_t len,off_t ofs){
 static void AIOwait(raf_t raf){
 	if(raf->pending==0) return;
 	const struct aiocb* list[1];
-	list[0]=&(raf->request); 
-	if (aio_suspend(list,1,NULL)){
+	list[0]=&(raf->request);
+	// TODO check out why aio_suspend complains about 1st argument.
+	if (aio_suspend((void*)list,1,NULL)){
 		FatalCall(1,error,"aio_suspend for %s",raf->shared.name);
 	}
 	if (aio_error(list[0])){
@@ -163,22 +164,37 @@ raf_t raf_unistd(char *name){
 	raf->fd=fd;
 	raf->shared.read=RAFread;
 	raf->shared.write=RAFwrite;
-#ifdef HAVE_LIBRT
-	raf->shared.awrite=AIOwrite;
-	raf->shared.await=AIOwait;
-#else
-	Warning(info,"Asynchronous writing not supported. Falling back on normal writes.");
 	raf->shared.awrite=RAFwrite;
 	raf->shared.await=RAFwait;
-#endif
 	raf->shared.size=RAFsize;
 	raf->shared.resize=RAFresize;
 	raf->shared.close=RAFclose;
+	return raf;
+}
+
 #ifdef HAVE_LIBRT
+raf_t raf_aio(char *name){
+	int fd=open(name,O_RDWR|O_CREAT,DEFFILEMODE);
+	if (fd==-1) FatalCall(1,error,"could not open %s",name);
+	raf_t raf=(raf_t)RTmalloc(sizeof(struct raf_struct_s));
+	raf_init(raf,name);
+	raf->fd=fd;
+	raf->shared.read=RAFread;
+	raf->shared.write=RAFwrite;
+	raf->shared.awrite=AIOwrite;
+	raf->shared.await=AIOwait;
+	raf->shared.size=RAFsize;
+	raf->shared.resize=RAFresize;
+	raf->shared.close=RAFclose;
 	raf->request.aio_fildes=fd;
 	raf->request.aio_reqprio=0;
 	raf->pending=0;
-#endif
 	return raf;
 }
+#else
+raf_t raf_aio(char *name){
+	Fatal(1,error,"AIO not supported");
+	return NULL;
+}
+#endif
 

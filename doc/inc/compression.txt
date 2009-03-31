@@ -1,0 +1,32 @@
+== COMPRESSION POLICIES
+
+The grammer for compression policies is:
+----
+<policy>      ::= ( <pattern> ":" <compression> ";" ) *  <compression>
+<pattern>     ::= 'shell wildcard pattern'
+<compression> ::= "" | "none" | (<filter> "|") * <filter>
+<filter>      ::= "diff32" | ("gzip" [("1"|...|"9")])
+----
+The list of ++<pattern>":"<compression>++ pairs are rules that specify
+specific compression methods for files matching certain patterns. The final
+++<compression>++ is the default.
+
+A compression method is built from zero or more filters. The empty sequence can be denoted
+with an emtpy string or with the word none. Known compression filters are
+
+++diff32++:: Difference ecoding on 32 bit integers.
+
+++gzip[level]++:: Standard gzip compression with an optional level.
+
+
+When compressing labeled transition systems that were obtained using BFS exploration order, it is a good idea to
+apply difference encoding to state numbers before compression them. This leads to a default compression strategy of
+----
+src*:diff32|gzip;dest*:diff32|gzip;gzip
+----
+For the legacy directory format and
+----
+*ofs:diff32|gzip;gzip
+----
+For the state label extended directory format.
+

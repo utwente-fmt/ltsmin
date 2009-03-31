@@ -21,3 +21,4 @@ strndup(const char *str, size_t n)
        return copy;
 }
 #endif
+

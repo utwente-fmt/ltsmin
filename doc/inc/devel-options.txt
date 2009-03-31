@@ -1,0 +1,15 @@
+=== Development Options
+
+*--grey*::
+        Make use of +GetTransitionsLong+ calls.
++
+A language module can have three next state calls:
++GetTransitionsAll+, +GetTransitionsLong+ and +GetTransitionsShort+. The first call is used by default,
+the second call is used when this flag is passed and the third form is used if *--cache* is enabled.
+This allows all three calls in a language module to be tested.
+
+*--matrix*:: Print the dependency matrix and quit.
+
+*--write-state*:: Write the full state vector.
+
+

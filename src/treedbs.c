@@ -6,9 +6,9 @@
 #include <stdint.h>
 #include "treedbs.h"
 
-#define BLOCKSIZE 65536
-#define INIT_HASH_SIZE 65536
-#define INIT_HASH_MASK 0x0ffff
+#define BLOCKSIZE 256
+#define INIT_HASH_SIZE 256
+#define INIT_HASH_MASK 0x0ff
 
 //static inline int hashvalue(int left,int right) { return (236487217*left+677435677*right) ; }
 /*
@@ -55,7 +55,7 @@ static void resize_hash(treedbs_t dbs,int node){
 		dbs->db_bucket[node][i]=dbs->db_hash[node][hash];
 		dbs->db_hash[node][hash]=i;
 	}
-	Warning(info,"rehash of %d to %d succesful",node,dbs->db_hash_size[node]);
+	//Warning(info,"rehash of %d to %d succesful",node,dbs->db_hash_size[node]);
 }
 
 static void resize_data(treedbs_t dbs,int node){
@@ -106,21 +106,28 @@ int TreeCount(treedbs_t dbs){
 int TreeFold(treedbs_t dbs,int *vector){
 	int nPars=dbs->nPars;
 	if (nPars==1) {
-		if (dbs->map[vector[0]]==-1) {
-			if(vector[0]>=dbs->range){
-				int old=dbs->range;
-				while(vector[0]>=dbs->range) dbs->range+=BLOCKSIZE;
-				dbs->map=realloc(dbs->map,dbs->range*sizeof(int));
-				dbs->rev=realloc(dbs->rev,dbs->range*sizeof(int));
-				while(old<dbs->range){
-					dbs->map[old]=-1;
-					dbs->rev[old]=-1;
-				}
+		//Warning(info,"insert %d",vector[0]);
+		if(vector[0]>=dbs->range){
+			int old=dbs->range;
+			while(vector[0]>=dbs->range) {
+				int blk_count=dbs->range/BLOCKSIZE;
+				dbs->range+=BLOCKSIZE*((blk_count/2)+1);
 			}
+			//Warning(info,"resize from %d to %d",old,dbs->range);
+			dbs->map=realloc(dbs->map,dbs->range*sizeof(int));
+			dbs->rev=realloc(dbs->rev,dbs->range*sizeof(int));
+			while(old<dbs->range){
+				dbs->map[old]=-1;
+				dbs->rev[old]=-1;
+				old++;
+			}
+		}
+		if (dbs->map[vector[0]]==-1) {
 			dbs->map[vector[0]]=dbs->count;
 			dbs->rev[dbs->count]=vector[0];
 			dbs->count++;
 		}
+		//Warning(info,"insert %d as %d",vector[0],dbs->map[vector[0]]);
 		return dbs->map[vector[0]];
 	} else {
 		int tmp[nPars];
@@ -134,29 +141,6 @@ int TreeFold(treedbs_t dbs,int *vector){
 		return tmp[1];
 	}
 }
-
-
-/*
-void FoldHint(int *src,int *dest) {
-	int i;
-	for (i=nPars-1;i>=1;i--) {
-		if(src[i+i]== dest[i+i] && src[i+i+1]==dest[i+i+1]) {
-			dest[i]=src[i];
-		} else {
-			dest[i]=db_insert(i, dest[i+i], dest[i+i+1]);
-		}
-	}
-}
-*/
-/*
-void Unfold(int *src) {
-	int i;
-	for(i=topcount;i<nPars;i++){
-		src[db_tree_left[i]]=db_left[i][src[i]];
-		src[db_tree_right[i]]=db_right[i][src[i]];
-	}
-}
-*/
 
 void TreeUnfold(treedbs_t dbs,int index,int*vector){
 	int nPars=dbs->nPars;

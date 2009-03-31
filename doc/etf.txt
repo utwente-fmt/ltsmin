@@ -1,0 +1,128 @@
+//                           -*- mode: doc; outline-regexp: "==\(=*\) ." -*-
+etf(5)
+======
+:Author:  Stefan Blom
+:Email:   <sccblom@cs.utwente.nl>
+:Date:    2009-03-12
+
+== NAME
+etf - enumerated table format
+
+== SYNOPSIS
+A text based intermediate format for PINS models.
+
+== DESCRIPTION
+
+An ETF file is a sequence of sections.
+
+* The first section must be a state section, describing the state vector.
+* The second section must be an edge section, describing the edge labels.
+* There must be a single init section, describing the initial state(s).
+* There can be 0 or more map sections, defining a state label each.
+* There can be 0 or more sort sections, describing the values of sorts.
+* There can be 0 or more trans sections, describing a partition of the transition relation each.
+
+== GRAMMER
+
+----
+etf         ::= state edge ( trans | map | sort )* init ( trans | map | sort )*
+state       ::= "begin state"
+                opt_decl*
+                "end state"
+edge        ::= "begin edge"
+                declaration*
+                "end edge"
+init        ::= "begin init"
+                number*
+                "end init"
+map         ::= "begin map" declaration
+                mapentry*
+                "end map" 
+trans       ::= "begin trans"
+                transentry*
+                "end trans"
+sort        ::= "begin sort" ident
+                value*
+                "end ident"
+opt_decl    ::= (ident | "_") ":" (ident | "_")
+declaration ::= ident ":" ident
+mapentry    ::= ( number | "*" ) * ( value | number )
+transentry  ::= ((number "/" number)|"*")* ( value | number )*
+number      ::= ['0'..'9']+
+value       ::= 'see below'
+----
+
+Note that the current parser is line based and requires that every section entry is one line and
+that the begins and end are also lines. This version supports three kinds of values:
+
+* A string of printable characters that contains no white space, is not a number and which does not
+  both start and end with `{hash}`. E.g. `abc`.
+* Many strings of printable characters can be quoted.
+  E.g. `"12"`, `"x y z"`. (No escape rules are implemented. We expect a future version to support C style escape rules.)
+* A hex encoding of a byte string. That is, `{hash}` followed by pairs of hex digits encoding chars followed by `{hash}`.
+  E.g. `{hash}616263{hash}`.
+
+== EXAMPLE
+
+The LTS
+----
++-------+           +-------+
+|+-----+|     a     |       |
+|| 0 0 || ------->  |  0 1  |
+|+-----+|           |       |
++-------+           +-------+
+
+    |                   |
+    |b                  |b
+    V                   V
+   ___                 ___
+  /   \               /___\    
+ /     \     a       //   \\   
+|  1 0  | ------->  || 1 1 ||  
+ \     /             \\___//  
+  \___/               \___/   
+----
+with initial state 00 is represented by the ETF specification:
+----
+begin state
+_:_  _:_
+end state
+begin edge
+action:action
+end edge
+begin init
+0 0
+end init
+begin trans
+0/1 * 0
+end trans
+begin trans
+* 0/1 1
+end trans
+begin map shape:shape
+0 * square
+1 * circle
+end map
+begin map multiplicity:multiplicity
+0 0 1
+0 1 0
+1 0 0
+1 1 1
+end map
+begin sort action
+a
+b
+end sort
+begin sort multiplicity
+single
+double
+end sort
+----
+
+== SEE ALSO
+linkman:ltsmin[7],
+linkman:etf2lts-mpi[1],
+linkman:etf2lts-grey[1],
+linkman:etf-reach[1],
+linkman:etf-convert[1]
+

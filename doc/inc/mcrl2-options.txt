@@ -1,0 +1,10 @@
+=== mcrl2 Options
+
+
+*--mcrl2*='OPTIONS'::
+	Set options of the mcrl2 language module.
+        Defaults to "+--rewriter=jittyc+".
++
+The "+--rewriter=<rewriter>+" option is the only recognized option.
+Possible rewriters are +jitty+, +jittyc+, +inner+ and +innerc+.
+

@@ -1,0 +1,12 @@
+*--order*='ORDER'::
+        Select the exploration strategy: 'bfs', 'bfs2' or 'chain'.
+        With 'bfs', breadth-first search is used.  With 'bfs2', the
+        visited set is always extends the visited set.  With 'chain',
+        a chaining strategy to explore.  Defaults to 'chain'.
++
+When using BFS, the tool performs the next state computation for all
+edge groups on the current level or current set of visited states.
+Chaining means to apply next state for the first group to the visited
+states, then apply next-state for the second group to the result,
+etc..  Thus, a chaining analysis can be completed in much less
+iterations than a BFS analysis.

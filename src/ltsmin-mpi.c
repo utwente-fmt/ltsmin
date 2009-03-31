@@ -6,13 +6,14 @@
 #include <mpi.h>
 #include "dlts.h"
 #include "lts.h"
-#include "runtime.h"
+#include <mpi-runtime.h>
 #include "scctimer.h"
 #include "set.h"
 #include "stream.h"
 #include "mpi_core.h"
 #include "mpi_io_stream.h"
 #include "mpi_ram_raf.h"
+#include "dir_ops.h"
 
 #define SYNCH_BUFFER_SIZE 8000
 
@@ -37,38 +38,17 @@ static int verbosity=1;
 #define BRANCHING_REDUCTION_SET 2
 
 static int action=STRONG_REDUCTION_SET;
-static int plain=0;
+static int plain;
 
-static int select_branching_reduction(char* opt,char*optarg,void *arg){
-	(void)opt;(void)arg;
-	branching=1;
-	if(optarg==NULL){
-		action=BRANCHING_REDUCTION_SET;
-		return OPT_OK;
-	}
-	if (!strcmp(optarg,"set")) {
-		action=BRANCHING_REDUCTION_SET;
-		return OPT_OK;
-	}
-	Warning(info,"unknown branching bisimulation method: %s",optarg);
-	return OPT_USAGE;
-}
+static  struct poptOption options[] = {
+	{"strong",'s',POPT_ARG_VAL,&action,STRONG_REDUCTION_SET,"reduce modulo strong bisimulation (default)",NULL},
+	{"branching",'b',POPT_ARG_VAL,&action,BRANCHING_REDUCTION_SET,"reduce modulo branching bisimulation",NULL},
+// This program should use:
+//	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, lts_io_options , 0 , NULL, NULL},
+	POPT_TABLEEND
+};
 
-static int select_strong_reduction(char* opt,char*optarg,void *arg){
-	(void)opt;(void)arg;
-	branching=0;
-	if(optarg==NULL){
-		action=STRONG_REDUCTION_SET;
-		return OPT_OK;
-	}
-	if (!strcmp(optarg,"set")) {
-		action=STRONG_REDUCTION_SET;
-		return OPT_OK;
-	}
-	Warning(info,"unknown strong bisimulation method: %s",optarg);
-	return OPT_USAGE;
-}
-
+/*
 struct option options[]={
 	{"",OPT_NORMAL,NULL,NULL,NULL,	"usage: mpirun <nodespec> ltsmin-mpi options input output",
 		"",
@@ -97,17 +77,17 @@ struct option options[]={
 		"use UNIX IO (e.g. if your NFS locking is broken)",NULL,NULL,NULL},
 	{"-help",OPT_NORMAL,usage,NULL,NULL,
 		"print this help message",NULL,NULL,NULL},
-/* for future use
+ for future use
 	{"-S",OPT_REQ_ARG,select_strong_reduction,NULL,"-S method",
 		"apply alternative strong bisimulation reduction method",
 		"method is set",NULL,NULL},
 	{"-B",OPT_REQ_ARG,select_branching_reduction,NULL,"-B method",
 		"apply alternative branching bisimulation reduction method",
 		"method is set",NULL,NULL},
-*/
+
 	{0,0,0,0,0,0,0,0,0}
 };
-
+*/
 
 static void synch_request_service(void *arg,MPI_Status*probe_stat){
 	(void)arg;(void)probe_stat;
@@ -280,47 +260,37 @@ int main(int argc,char **argv){
 	int *fwd_todo_list=NULL;
 	int *tmp;
 
+	char *files[2];
+#ifdef OMPI_MPI_H
+	char* mpirun="mpirun --mca btl <transport>,self [MPI OPTIONS] -np <workers>"; 
+#else
+	char* mpirun="mpirun [MPI OPTIONS] -np <workers>";
+#endif
 
-
-        MPI_Init(&argc, &argv);
-
+	RTinitPoptMPI(&argc, &argv, options,1,2,files,mpirun,"<input> [<output>]",
+		"Perform a distributed enumerative reachability analysis of <model>\n\nOptions");
 	timer=SCCcreateTimer();
 	compute_timer=SCCcreateTimer();
 	synch_timer=SCCcreateTimer();
 	exchange_timer=SCCcreateTimer();
 
-	RTinit(argc,&argv);
 	core_init();
-	set_label("ltsmin-mpi(%2d)",mpi_me);
 	if(mpi_me!=0) core_barrier();
-	take_vars(&argc,argv);
-	take_options(options,&argc,argv);
-	if (argc!=3) {
-		Warning(info,"wrong number of options %d",argc);
-		printoptions(options);
-		MPI_Abort(MPI_COMM_WORLD,1);
-	}
-	switch(mpi_io+unix_io){
-	case 0:
-		mpi_io=1;
-	case 1:
-		if(mpi_me==0 && mpi_io) Warning(info,"using MPI-IO");
-		if(mpi_me==0 && unix_io) Warning(info,"using UNIX IO");
-		break;
-	default:
-		Fatal(1,error,"IO selections -mpi-io and -unix-io are mutually exclusive");
-	}
+	/* move IO to library: */
+	mpi_io=0;
+	unix_io=1;
 	if (mpi_me==0) switch(action){
 	case STRONG_REDUCTION_SET:
-		Warning(info,"reduction modulp strong bisimulation");
+		Warning(info,"reduction modulo strong bisimulation");
 		break;
 	case BRANCHING_REDUCTION_SET:
 		Warning(info,"reduction modulo branching bisimulation");
 		break;
 	default:
-		printoptions(options);
+		Fatal(1,error,"undefined action %d",action);
 		MPI_Abort(MPI_COMM_WORLD,1);
 	}
+	branching=(action==BRANCHING_REDUCTION_SET);
 	if(mpi_me==0) core_barrier();
 	synch_request=core_add(NULL,synch_request_service);
 	synch_answer=core_add(NULL,synch_answer_service);
@@ -332,19 +302,24 @@ int main(int argc,char **argv){
 	if (mpi_me==0) SCCstartTimer(timer);
 	core_barrier();
 	lts=dlts_create();
-	if (strstr(argv[1],"%s")) {
-		if (mpi_io) lts->arch=arch_fmt(argv[1],mpi_io_read,mpi_io_write,prop_get_U32("bs",65536));
-		if (unix_io) lts->arch=arch_fmt(argv[1],file_input,file_output,prop_get_U32("bs",65536));
+	if (strstr(files[0],"%s")) {
+		if (mpi_me==0) Warning(debug,"pattern archive");
+		if (mpi_io) lts->arch=arch_fmt(files[0],mpi_io_read,mpi_io_write,65536);
+		if (unix_io) lts->arch=arch_fmt(files[0],file_input,file_output,65536);
+	} else if (strlen(files[0])>4&& !strcmp(files[0]+(strlen(files[0])-4),".dir")){
+		if (mpi_me==0) Warning(debug,"DIR archive");
+		lts->arch=arch_dir_open(files[0],65536);
 	} else {
+		if (mpi_me==0) Warning(debug,"GCF archive");
 		raf_t raf=NULL;
 		if (mpi_io) {
-			if (prop_get_U32("load",1)) {
-				raf=MPI_Load_raf(argv[1],MPI_COMM_WORLD);
-			} else {
-				raf=MPI_Create_raf(argv[1],MPI_COMM_WORLD);
-			}
+//			if (prop_get_U32("load",1)) {
+//				raf=MPI_Load_raf(files[0],MPI_COMM_WORLD);
+//			} else {
+				raf=MPI_Create_raf(files[0],MPI_COMM_WORLD);
+//			}
 		}
-		if (unix_io) raf=raf_unistd(argv[1]);
+		if (unix_io) raf=raf_unistd(files[0]);
 		core_barrier();
 		lts->arch=arch_gcf_read(raf);
 		core_barrier();
@@ -449,8 +424,10 @@ int main(int argc,char **argv){
 	lts_set_type(auxlts,LTS_BLOCK);
 	lts_sort(auxlts);
 	lts_set_type(auxlts,LTS_BLOCK);
+	core_barrier();
 
     if (branching) { /* branching reduction */
+	core_barrier();
 	for(;;){
 		core_barrier();
 		if (mpi_me==0 && verbosity>1) Warning(info,"computing signatures");
@@ -777,109 +754,133 @@ int main(int argc,char **argv){
 	if ((uint32_t)mpi_me!=lts->root_seg && verbosity>1) Warning(info,"root is %d/%d",GET_SEG(root),GET_OFS(root));
 	core_barrier();
 
-	archive_t arch;
-	if (strstr(argv[2],"%s")){
-		if (mpi_io) arch=arch_fmt(argv[2],mpi_io_read,mpi_io_write,prop_get_U32("bs",65536));
-		if (unix_io) arch=arch_fmt(argv[2],file_input,file_output,prop_get_U32("bs",65536));
-	} else {
-		uint32_t bs=prop_get_U32("bs",65536);
-		uint32_t bc=prop_get_U32("bc",128);
-		raf_t raf=NULL;
-		if (mpi_io) raf=MPI_Create_raf(argv[2],MPI_COMM_WORLD);
-		if (unix_io) raf=raf_unistd(argv[2]);
-		arch=arch_gcf_create(raf,bs,bs*bc,mpi_me,mpi_nodes);
-	}
+	if (files[1]) {
+		//output=lts_output_open(files[1],model,mpi_nodes,mpi_me,mpi_nodes);
+		//lts_enum_cb_t ecb=lts_output_begin(output,mpi_me,mpi_nodes,mpi_me);
+
+		archive_t arch;
+		if (strstr(files[1],"%s")){
+			if (mpi_me==0) Warning(debug,"pattern archive");
+			plain=0;
+			if (mpi_io) arch=arch_fmt(files[1],mpi_io_read,mpi_io_write,65536);
+			if (unix_io) arch=arch_fmt(files[1],file_input,file_output,65536);
+		} else if (strlen(files[1])>4&& !strcmp(files[1]+(strlen(files[1])-4),".dir")){
+			if (mpi_me==0) Warning(debug,"DIR archive");
+			plain=1;
+			if (mpi_me==0){
+				if(create_empty_dir(files[1],DELETE_ALL)){
+					FatalCall(1,error,"could not create or clear directory %s",files[1]);
+				}
+			} else {
+				for(;;){
+					if (is_a_dir(files[1])) break;
+					usleep(10000);
+				}
+			}
+			core_barrier();
+			arch=arch_dir_open(files[1],65536);
+		} else {
+			if (mpi_me==0) Warning(debug,"GCF archive");
+			plain=0;
+			uint32_t bs=65536;
+			uint32_t bc=128;
+			raf_t raf=NULL;
+			if (mpi_io) raf=MPI_Create_raf(files[1],MPI_COMM_WORLD);
+			if (unix_io) raf=raf_unistd(files[1]);
+			arch=arch_gcf_create(raf,bs,bs*bc,mpi_me,mpi_nodes);
+		}
 	
-	output_src=(stream_t*)RTmalloc(mpi_nodes*sizeof(FILE*));
-	output_label=(stream_t*)RTmalloc(mpi_nodes*sizeof(FILE*));
-	output_dest=(stream_t*)RTmalloc(mpi_nodes*sizeof(FILE*));
-	tcount=(int*)RTmalloc(mpi_nodes*sizeof(int));
-	for(int i=0;i<mpi_nodes;i++){
-		char name[1024];
-		sprintf(name,"src-%d-%d",i,mpi_me);
-		output_src[i]=arch_write(arch,name,plain?NULL:"diff32|gzip",1);
-		sprintf(name,"label-%d-%d",i,mpi_me);
-		output_label[i]=arch_write(arch,name,plain?NULL:"gzip",1);
-		sprintf(name,"dest-%d-%d",i,mpi_me);
-		output_dest[i]=arch_write(arch,name,plain?NULL:"diff32|gzip",1);
-		tcount[i]=0;
-	}
-	write_tag=core_add(NULL,write_service);
-	TERM_INIT(term);
-	MPI_Barrier(MPI_COMM_WORLD);
-	if (verbosity>1) Warning(info,"starting to write using tag %d",write_tag);
-	for(int j=0;j<synch_next;j++){
-		int set;
-		int src;
-		int label;
-		int dest;
-		src=synch_id[j];
-		for(set=synch_set[j];set!=EMPTY_SET;set=SetGetParent(set)){
-			label=SetGetLabel(set);
-			//char*lbl=lts->label_string[label];
-			dest=SetGetDest(set);
-			int msg[4];
-			msg[0]=GET_SEG(src);
-			msg[1]=GET_OFS(src);
-			msg[2]=label;
-			msg[3]=GET_OFS(dest);
-			MPI_Send(msg,4,MPI_INT,GET_SEG(dest),write_tag,MPI_COMM_WORLD);
-			SEND(term);
-		}
-		core_yield();
-	}
-	if (verbosity>1) Warning(info,"waiting for write to finish");
-	core_terminate(term);
-	if (verbosity>1) Warning(info,"closing files");
-	for(int i=0;i<mpi_nodes;i++){
-		DSclose(&output_src[i]);
-		DSclose(&output_label[i]);
-		DSclose(&output_dest[i]);
-	}
-	stream_t infos;
-	int *temp=NULL;
-	if (mpi_me==0){
-		stream_t ds=arch_write(arch,"TermDB",plain?NULL:"gzip",1);
-		for(int i=0;i<lts->label_count;i++){
-			char*ln=lts->label_string[i];
-			DSwrite(ds,ln,strlen(ln));
-			DSwrite(ds,"\n",1);
-		}
-		DSclose(&ds);
-		infos=arch_write(arch,"info",plain?NULL:"",1);
-		DSwriteU32(infos,31);
-		DSwriteS(infos,"generated by mpi_min");
-		DSwriteU32(infos,mpi_nodes);
-		DSwriteU32(infos,GET_SEG(root));
-		DSwriteU32(infos,GET_OFS(root));
-		DSwriteU32(infos,lts->label_count);
-		DSwriteU32(infos,tau);
-		DSwriteU32(infos,0);
-		temp=(int*)malloc(mpi_nodes*mpi_nodes*sizeof(int));
-	}
-	MPI_Gather(&scount,1,MPI_INT,temp,1,MPI_INT,0,MPI_COMM_WORLD);
-	long long int total_states=0;
-	if (mpi_me==0){
+		output_src=(stream_t*)RTmalloc(mpi_nodes*sizeof(FILE*));
+		output_label=(stream_t*)RTmalloc(mpi_nodes*sizeof(FILE*));
+		output_dest=(stream_t*)RTmalloc(mpi_nodes*sizeof(FILE*));
+		tcount=(int*)RTmalloc(mpi_nodes*sizeof(int));
 		for(int i=0;i<mpi_nodes;i++){
-			total_states+=temp[i];
-			DSwriteU32(infos,temp[i]);
+			char name[1024];
+			sprintf(name,"src-%d-%d",i,mpi_me);
+			output_src[i]=arch_write(arch,name,plain?NULL:"diff32|gzip",1);
+			sprintf(name,"label-%d-%d",i,mpi_me);
+			output_label[i]=arch_write(arch,name,plain?NULL:"gzip",1);
+			sprintf(name,"dest-%d-%d",i,mpi_me);
+			output_dest[i]=arch_write(arch,name,plain?NULL:"diff32|gzip",1);
+			tcount[i]=0;
 		}
-	}
-	MPI_Gather(tcount,mpi_nodes,MPI_INT,temp,mpi_nodes,MPI_INT,0,MPI_COMM_WORLD);
-	long long int total_transitions=0;
-	if (mpi_me==0){
+		write_tag=core_add(NULL,write_service);
+		TERM_INIT(term);
+		MPI_Barrier(MPI_COMM_WORLD);
+		if (verbosity>1) Warning(info,"starting to write using tag %d",write_tag);
+		for(int j=0;j<synch_next;j++){
+			int set;
+			int src;
+			int label;
+			int dest;
+			src=synch_id[j];
+			for(set=synch_set[j];set!=EMPTY_SET;set=SetGetParent(set)){
+				label=SetGetLabel(set);
+				//char*lbl=lts->label_string[label];
+				dest=SetGetDest(set);
+				int msg[4];
+				msg[0]=GET_SEG(src);
+				msg[1]=GET_OFS(src);
+				msg[2]=label;
+				msg[3]=GET_OFS(dest);
+				MPI_Send(msg,4,MPI_INT,GET_SEG(dest),write_tag,MPI_COMM_WORLD);
+				SEND(term);
+			}
+			core_yield();
+		}
+		if (verbosity>1) Warning(info,"waiting for write to finish");
+		core_terminate(term);
+		if (verbosity>1) Warning(info,"closing files");
 		for(int i=0;i<mpi_nodes;i++){
-			for(int j=0;j<mpi_nodes;j++){
-				total_transitions+=temp[i+mpi_nodes*j];
-				//ATwarning("%d -> %d : %d",i,j,temp[i+mpi_nodes*j]);
-				DSwriteU32(infos,temp[i+mpi_nodes*j]);
+			DSclose(&output_src[i]);
+			DSclose(&output_label[i]);
+			DSclose(&output_dest[i]);
+		}
+		stream_t infos;
+		int *temp=NULL;
+		if (mpi_me==0){
+			stream_t ds=arch_write(arch,"TermDB",plain?NULL:"gzip",1);
+			for(int i=0;i<lts->label_count;i++){
+				char*ln=lts->label_string[i];
+				DSwrite(ds,ln,strlen(ln));
+				DSwrite(ds,"\n",1);
+			}
+			DSclose(&ds);
+			infos=arch_write(arch,"info",plain?NULL:"",1);
+			DSwriteU32(infos,31);
+			DSwriteS(infos,"generated by mpi_min");
+			DSwriteU32(infos,mpi_nodes);
+			DSwriteU32(infos,GET_SEG(root));
+			DSwriteU32(infos,GET_OFS(root));
+			DSwriteU32(infos,lts->label_count);
+			DSwriteU32(infos,tau);
+			DSwriteU32(infos,0);
+			temp=(int*)malloc(mpi_nodes*mpi_nodes*sizeof(int));
+		}
+		MPI_Gather(&scount,1,MPI_INT,temp,1,MPI_INT,0,MPI_COMM_WORLD);
+		long long int total_states=0;
+		if (mpi_me==0){
+			for(int i=0;i<mpi_nodes;i++){
+				total_states+=temp[i];
+				DSwriteU32(infos,temp[i]);
 			}
 		}
-		DSclose(&infos);
+		MPI_Gather(tcount,mpi_nodes,MPI_INT,temp,mpi_nodes,MPI_INT,0,MPI_COMM_WORLD);
+		long long int total_transitions=0;
+		if (mpi_me==0){
+			for(int i=0;i<mpi_nodes;i++){
+				for(int j=0;j<mpi_nodes;j++){
+					total_transitions+=temp[i+mpi_nodes*j];
+					//ATwarning("%d -> %d : %d",i,j,temp[i+mpi_nodes*j]);
+					DSwriteU32(infos,temp[i+mpi_nodes*j]);
+				}
+			}
+			DSclose(&infos);
+		}
+		arch_close(&arch);
+		core_barrier();
 	}
-	arch_close(&arch);
-
-	core_barrier();
+	RTfiniMPI();
 	MPI_Finalize();
 	return 0;
 }

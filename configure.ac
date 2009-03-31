@@ -1,6 +1,8 @@
 AC_PREREQ(2.60)
-AC_INIT([ltsmin], [1.1],
+AC_INIT([ltsmin], [1.2],
         [ltsmin-support@cs.utwente.nl])
+AC_CONFIG_MACRO_DIR([m4])
+AC_CONFIG_AUX_DIR([autotools])
 AM_INIT_AUTOMAKE([foreign])
 AC_CONFIG_SRCDIR([src/ltsmin-mpi.c])
 AC_CONFIG_HEADERS([src/amconfig.h])
@@ -10,6 +12,8 @@ CFLAGS="-g -O2 $CFLAGS"
 CXXFLAGS="-g -O2 -Wno-inline -ftemplate-depth-128 -finline-functions $CXXFLAGS"
 AM_PROG_CC_C_O
 AC_PROG_CXX
+ACX_FINK
+ACX_MACPORTS
 ACX_PTHREAD(
   [LIBS="$PTHREAD_LIBS $LIBS"
    CFLAGS="$CFLAGS $PTHREAD_CFLAGS"
@@ -70,6 +74,7 @@ DX_INIT_DOXYGEN([$PACKAGE_NAME])
 AC_CACHE_SAVE
 
 # Checks for libraries.
+AC_CHECK_LIB([popt],[poptGetContext],,[AC_MSG_FAILURE([popt not found.])])
 AC_CHECK_LIB([z], [inflateEnd],,
   [AC_MSG_FAILURE([zlib not found.])])
 if test "x$acx_mcrl" = xyes; then
@@ -94,6 +99,10 @@ AC_SUBST([NIPS_LIBS],['${top_builddir}/nips-vm/libnips_vm.la'])
 AC_SUBST([NIPS_CPPFLAGS],['-I${top_srcdir}'])
 AC_SUBST([NIPS_LDFLAGS])
 
+AC_SUBST([BUDDY_LIBS],['${top_builddir}/buddy/src/libbdd.la'])
+AC_SUBST([BUDDY_CPPFLAGS],['-I${top_srcdir}/buddy/src'])
+AC_SUBST([BUDDY_LDFLAGS])
+
 AC_CHECK_LIB([rt], [aio_error])
 ACX_CADP_BCG_WRITE([have_bcg=yes],
   [have_bcg=no
@@ -103,6 +112,7 @@ ACX_CADP_BCG_WRITE([have_bcg=yes],
 AC_HEADER_DIRENT
 AC_HEADER_STDC
 AC_CHECK_HEADERS([fcntl.h limits.h stdint.h stdlib.h string.h strings.h unistd.h])
+AC_CHECK_HEADER([popt.h],[], [AC_MSG_FAILURE([popt.h not found.])])
 AC_CACHE_SAVE
 
 # Checks for typedefs, structures, and compiler characteristics.
@@ -125,7 +135,10 @@ AC_FUNC_MALLOC
 AC_FUNC_REALLOC
 AC_FUNC_STRERROR_R
 AC_FUNC_VPRINTF
-AC_CHECK_FUNCS([atexit bzero ftruncate strchr strdup strndup strstr strtol])
+AC_CHECK_FUNCS([atexit bzero ftruncate strdup strndup strchr strstr strtol])
+AC_CHECK_DECLS([strdup, strndup, strchr, strstr],,,[
+#include "src/config.h"
+AC_INCLUDES_DEFAULT])
 
 AM_CONDITIONAL([HAVE_MPI], [test x"$have_mpi" != "x"])
 AM_CONDITIONAL([HAVE_LIBMCRL], [test x"$acx_mcrl" = xyes])
@@ -140,8 +153,9 @@ AC_CONFIG_FILES([
        src/Makefile
        doc/Makefile
 ])
-ac_configure_args="$ac_configure_args --enable-keep-terminated-procs"
-AC_CONFIG_SUBDIRS([nips-vm])
+ac_configure_args="$ac_configure_args --enable-keep-terminated-procs \
+                                      --disable-shared"
+AC_CONFIG_SUBDIRS([nips-vm buddy])
 AC_OUTPUT
 
 cat <<EOM

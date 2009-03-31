@@ -1,9 +1,9 @@
 #include "archive.h"
+#include <fnmatch.h>
 #include <stdio.h>
 #include <string.h>
 #include "runtime.h"
-#include "dirops.h"
-#include "options.h"
+#include <dir_ops.h>
 
 /********************************************************************************/
 
@@ -11,7 +11,7 @@ typedef struct copy_context {
 	archive_t src;
 	archive_t dst;
 	char* decode;
-	char* encode;
+	char* (*encode)(char*);
 	int bs;
 } *copy_context_t;
 
@@ -19,8 +19,10 @@ static int copy_item(void*arg,int id,char*name){
 	(void)id;
 	copy_context_t ctx=(copy_context_t)arg;
 	Warning(info,"copying %s",name);
+	char*compression=ctx->encode?ctx->encode(name):NULL;
+	Warning(debug,"compression method is %s",compression);
 	stream_t is=arch_read(ctx->src,name,ctx->decode);
-	stream_t os=arch_write(ctx->dst,name,ctx->encode,1);
+	stream_t os=arch_write(ctx->dst,name,compression,1);
 	char buf[ctx->bs];
 	for(;;){
 		int len=stream_read_max(is,buf,ctx->bs);
@@ -32,7 +34,7 @@ static int copy_item(void*arg,int id,char*name){
 	return 0;
 }
 
-static void archive_copy(archive_t src,char*decode,archive_t dst,char*encode,int blocksize){
+static void archive_copy(archive_t src,char*decode,archive_t dst,char*(*encode)(char*),int blocksize){
 	struct arch_enum_callbacks cb;
 	cb.new_item=copy_item;
 	cb.end_item=NULL;
@@ -52,77 +54,110 @@ static void archive_copy(archive_t src,char*decode,archive_t dst,char*encode,int
 
 /********************************************************************************/
 
+#define GCF_FILE 0
+#define GCF_DIR 1
+#define GCF_EXTRACT 2
 
-static char* code="gzip";
+static char* policy="gzip";
 static int blocksize=32768;
 static int blockcount=32;
-static int extract=0;
+static int operation=GCF_FILE;
+static int force=0;
 
-struct option options[]={
-	{"",OPT_NORMAL,NULL,NULL,NULL,
-		"usage: gcf <gcf> [file1 [file2 [...]]]",
-		"       gcf <gcf> directory",
-		"       gcf -x <gcf> <outputspec>",
-		"The first form builds a GCF with the given files."},
-	{"",OPT_NORMAL,NULL,NULL,NULL,
-		"The second form builds a GCF with the files in the directory.",
-		"The third form extracts the files in the GCF:",
-		" * to a directory if <outputspec> is a directory",
-		" * to a pattern if <outputspec> contains %s"},
-	{"",OPT_NORMAL,NULL,NULL,NULL,
-		"other options:",NULL,NULL,NULL},
-	{"-q",OPT_NORMAL,log_suppress,&info,"-q",
-		"do not print info messages",NULL,NULL,NULL},
-	{"-z",OPT_REQ_ARG,assign_string,&code,"-z <compression>",
-		"The default compression is gzip",
-		"To disable compression use -z \"\"",
-		NULL,NULL},
-	{"-x",OPT_NORMAL,set_int,&extract,NULL,"enable extraction",NULL,NULL,NULL},
-	{"-help",OPT_NORMAL,usage,NULL,NULL,
-		"print this help message",NULL,NULL,NULL},
-	{"-bs",OPT_REQ_ARG,parse_int,&blocksize,"-bs <block size>",
-		"Set the block size to be used for copying streams.",
-		NULL,NULL,NULL},
-	{"-bc",OPT_REQ_ARG,parse_int,&blockcount,"-bc <block count>",
-		"Set the number of block in one GCF cluster.",
-		NULL,NULL,NULL},
-	{0,0,0,0,0,0,0,0,0}
+static  struct poptOption options[] = {
+	{ "create",'c', POPT_ARG_VAL , &operation , GCF_FILE , "create a new archive (default)" , NULL },
+	{ "create-dz",0, POPT_ARG_VAL , &operation , GCF_DIR , "create a compressed directory instead of an archive file" , NULL },
+	{ "extract",'x', POPT_ARG_VAL , &operation , GCF_EXTRACT , "extract files from an archive" , NULL },
+	{ "force",'f' ,  POPT_ARG_VAL , &force , 1 , "force creation of a directory for output" , NULL },
+	{ "block-size" , 0 , POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT , &blocksize , 0 , "set the size of a block in bytes" , "<bytes>" },
+	{ "cluster-size" , 0 , POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT , &blockcount , 0 , "set the number of blocks in a cluster" , "<blocks>"},
+	{ "compression",'z',POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT,
+		&policy,0,"set the compression policy used in the archive","<policy>"},
+	POPT_TABLEEND
 };
 
-int main(int argc, char *argv[]){
-	RTinit(argc,&argv);
-	take_vars(&argc,argv);
-	take_options(options,&argc,argv);
-	archive_t gcf=NULL;
+char *pattern[1024];
+char *code[1024];
+int pattern_count=0;
 
-	if (argc==1 || (extract && argc!=3)) {
-		printoptions(options);
-		exit(1);
-	}
-	if (extract) {
-		archive_t dir;
-		if (IsADir(argv[2])){
-			dir=arch_dir_open(argv[2],blocksize);
-		} else if (strstr(argv[2],"%s")) {
-			dir=arch_fmt(argv[2],file_input,file_output,blocksize);
-		} else {
-			Fatal(1,error,"%s is not a directory, nor does it contain %%s",argv[2]);
+static void compression_policy_compile(char *policy){
+	char*delim;
+	while((delim=strchr(policy,';'))){
+		pattern[pattern_count]=policy;
+		delim[0]=0;
+		char*tmp=strrchr(policy,':');
+		if (!tmp){
+			Fatal(1,error,"bad policy entry %s",policy);
 		}
-		gcf=arch_gcf_read(raf_unistd(argv[1]));
+		tmp[0]=0;
+		code[pattern_count]=tmp+1;
+		policy=delim+1;
+		Warning(debug,"rule %d: %s : %s",pattern_count,pattern[pattern_count],code[pattern_count]);
+		pattern_count++;
+	}
+	pattern[pattern_count]="*";
+	code[pattern_count]=policy;
+	Warning(debug,"rule %d: %s : %s",pattern_count,pattern[pattern_count],code[pattern_count]);
+	pattern_count++;
+}
+
+static char* get_compression(char*filename){
+	for(int i=0;i<pattern_count;i++){
+		if (!fnmatch(pattern[i],filename,0)) {
+			if (strcmp(code[i],"none")) return code[i]; else return "";
+		}
+	}
+	Fatal(1,error,"file %s doesn't match a policy rule",filename);
+	return NULL;
+}
+
+int main(int argc, char *argv[]){
+	char*gcf_name;
+	archive_t gcf=NULL;
+	RTinitPopt(&argc,&argv,options,1,-1,&gcf_name,NULL,"([-c] <gcf> (<dir>|<file>)*) | (-x <gcf> [<dir>|<pattern>])",
+		"Tool for creating and extracting GCF archives\n\nOptions");
+	compression_policy_compile(policy);
+	if (operation==GCF_EXTRACT) {
+		char *out_name=RTinitNextArg();
+		archive_t dir;
+		if(out_name){
+			if(RTinitNextArg()){
+				Fatal(1,error,"extraction uses gcf -x <gcf> [<dir>|<pattern>]");
+			}
+			if (strstr(out_name,"%s")) {
+				dir=arch_fmt(out_name,file_input,file_output,blocksize);
+			} else {
+				dir=arch_dir_create(out_name,blocksize,force?DELETE_ALL:DELETE_NONE);
+			}
+		} else {
+			dir=arch_dir_open(".",blocksize);
+		}
+		if (is_a_dir(gcf_name)){
+			gcf=arch_dir_open(gcf_name,blocksize);
+		} else {
+			gcf=arch_gcf_read(raf_unistd(gcf_name));
+		}
 		archive_copy(gcf,"auto",dir,NULL,blocksize);
 		arch_close(&dir);
 		arch_close(&gcf);
 	} else {
-		gcf=arch_gcf_create(raf_unistd(argv[1]),blocksize,blocksize*blockcount,0,1);
-		if (argc==3 && IsADir(argv[2])){
-			archive_t dir=arch_dir_open(argv[2],blocksize);
-			archive_copy(dir,NULL,gcf,code,blocksize);
-			arch_close(&dir);
+		if (operation==GCF_FILE){
+			gcf=arch_gcf_create(raf_unistd(gcf_name),blocksize,blocksize*blockcount,0,1);
 		} else {
-			for(int i=2;i<argc;i++){
-				Warning(info,"copying %s",argv[i]);
-				stream_t is=file_input(argv[i]);
-				stream_t os=arch_write(gcf,argv[i],code,1);
+			gcf=arch_dir_create(gcf_name,blocksize,force?DELETE_ALL:DELETE_NONE);
+		}
+		for(;;){
+			char *input_name=RTinitNextArg();
+			if (!input_name) break;
+			if (is_a_dir(input_name)){
+				Warning(info,"copying contents of %s",input_name);
+				archive_t dir=arch_dir_open(input_name,blocksize);
+				archive_copy(dir,NULL,gcf,get_compression,blocksize);
+				arch_close(&dir);
+			} else {
+				Warning(info,"copying %s",input_name);
+				stream_t is=file_input(input_name);
+				stream_t os=arch_write(gcf,input_name,get_compression(input_name),1);
 				char buf[blocksize];
 				for(;;){
 					int len=stream_read_max(is,buf,blocksize);

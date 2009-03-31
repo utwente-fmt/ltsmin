@@ -3,84 +3,50 @@ ltsmin-convert(1)
 =================
 :Author:  Michael Weber
 :Email:   <michaelw@foldr.org>
-:Date:    2008-10-20
+:Date:    2009-03-16
 
 == NAME
+
 ltsmin-convert - convert file formats for labelled transition system 
 
 == SYNOPSIS
-{manname} [OPTION] '<input>' '<output>'
+
+*ltsmin-convert* [OPTION]... 'input' 'output'
 
 == DESCRIPTION
-This tool copies the input to the output and changes the achive format on-the-fly.
-Both input and output format are detected by pattern matching in the following table:
 
-++\*.dir++:: DIR format in a directory.
-++\*.bcg++:: BCG file format. The format is always detected, but BCG can only be read or written if CADP was enabled during compilation.
-++\*%s\*++:: DIR+ format for reading and DIR format for writing using a set of files.
-++*++:: DIR+ format using a GCF archive.
-
-The difference between DIR and DIR+ format is the former uses uncompressed files and the latter support compression.
-It is possible that a directory named .dir actually contain DIR+ format.
-This tool will read that directory, but the tools from the mCRL toolset will failed with the error message
-----
-wrong file version: 0
-----
-If that happens then you may convert the directory by typing the command:
-----
-ltsmin-convert bad.dir good.dir
-----
+This tool copies 'input' to 'output' and changes the archive format
+on-the-fly.  Both input and output format are detected by pattern
+matching. See the File Formats section for details.
 
 == OPTIONS
 
+*--segments*::
+Set the number of segments in the output file.  If the output format
+does not support segmentation (BCG) then the default is 1 and
+specifying any number other than 1 is an error.  Otherwise, the
+default is the same number of segments as the input.  Please note that
+the algorithm used for changing the number of segments is simple.  It
+guarantees that the number of states in the output is balanced, but
+not much more.  E.g., if the input is in BFS order and just one
+segment then then the output will still be in BFS order.  However, if
+the input has more than one segment then BFS order is lost.
 
-*-segments*::
-Set the number of segments in the output file.
-If the output format does not support segmentation (BCG) then the default is 1 and
-specifying any number other than 1 is an error. Otherwise, the default is the same
-number of segments as the input. Please note that the algorithm used for changing
-the number of segments is simple. It guarantees that the number of states in the output is balanced,
-but not much more. E.g. if the input is in BFS order and just one segment then
-then the output will still be in BFS order. however, if the input has more than one segment then
-BFS order is lost.
+include::inc/io-options.txt[]
 
-*-plain*::
-Disable output compression. Input compression is detected. For file sets and .dir directories output
-compression is disabled by default.
+include::inc/general-options.txt[]
 
-*-bs <block size>*::
-Set the block size to be used for copying streams.
-This is also used as the GCF block size.
-
-*-bc <block count>*::
-Set the number of blocks in one GCF cluster.
-
-*-q*::
-Suppress all warning and information messages.
-
-*-help*::
-        Print help message.
-
-== EXAMPLES
-
-The expected use of this tool is to convert GCF files to other file formats and back:
-
-----
-ltsmin-convert brp.gcf brp.dir
-ltsmin-convert brp.dir brp.gcf
-ltsmin-convert brp.gcf brp.bcg
-ltsmin-convert brp.bcg brp.gcf
-ltsmin-convert -segments 2 brp.bcg brp.gcf
-----
+include::inc/file-formats.txt[]
 
 == EXIT STATUS
-0::
+
+*0*::
         Successful termination.
->0::
+*>0*::
         Some error occurred.
 
 == SEE ALSO
-linkman:ltsmin[5], 
+linkman:ltsmin[7], 
 linkman:lpo2lts-grey[1],
 linkman:lps2lts-grey[1],
 linkman:nips2lts-grey[1],
@@ -90,3 +56,4 @@ linkman:nips2lts-mpi[1],
 linkman:ltsmin-convert[1],
 http://www.inrialpes.fr/vasy/cadp/[CADP],
 http://www.inrialpes.fr/vasy/cadp/man/bcg.html[BCG]
+

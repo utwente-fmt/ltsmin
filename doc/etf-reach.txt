@@ -1,0 +1,27 @@
+//                           -*- mode: doc; outline-regexp: "==\(=*\) ." -*-
+etf-reach(1)
+==========
+:Author:  Stefan Blom
+:Email:   <sccblom@cs.utwente.nl>
+:Date:    2009-03-16
+
+== NAME
+
+etf-reach - Symbolic reachability analysis for ETF models.
+
+== SYNOPSIS
+
+*etf-reach* [OPTION]... 'input.etf' ['output.etf']
+
+== DESCRIPTION
+
+etf-reach performs a reachability analysis on a specification provided
+in 'input.etf'.  Specifications are in linkman:etf[5] format.
+'output.etf' specifies the name of the output archive, also written in
+linkman:etf[5] format.
+
+== OPTIONS
+
+include::inc/spec-reach-options.txt[]
+
+include::inc/spec-reach.txt[]

@@ -1,12 +1,15 @@
 #ifndef MCRL_GREYBOX_H
 #define MCRL_GREYBOX_H
 
+#include <popt.h>
 #include "greybox.h"
 
-extern void MCRLinitGreybox(int argc,char *argv[],void* stack_bottom);
-/**< Initialize ATerm library and MCRL library up to the loading of a specification. */
+/**
+\brief Options of the mCRL language module.
+ */
+extern struct poptOption mcrl_options[];
 
-extern void MCRLloadGreyboxModel(model_t model,char*name);
+extern void MCRLloadGreyboxModel(model_t model,const char*name);
 /**< @brief Factory method for creating a model.
  */
 

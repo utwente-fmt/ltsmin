@@ -1,0 +1,3 @@
+*--nice*='LEVEL'::
+        Set the nice level of all worker processes. This is useful
+        when running on other people's workstations.

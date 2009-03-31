@@ -1,0 +1,159 @@
+
+\chapter{Design Rationale}
+
+\section{Introduction}
+
+\begin{enumerate}
+\item The LTSmin toolset can be used in two ways:
+\begin{enumerate}
+\item It can be used as a library that provides functionality and data types.
+\item The LTSmin toolset provides language independent tools, such as the bisimulation reduction tools.
+\end{enumerate}
+\item The LTSmin toolset provides a number of building blocks:
+\begin{enumerate}
+\item A language independent I/O library.
+\item Data value synchronization for MPI.
+\item State storage structures:
+\begin{enumerate}
+\item Sets of states using decision diagrams, optionally including transition relations.
+\item Sets of states using tree compression.
+\end{enumerate}
+\item Model optimizers:
+\begin{enumerate}
+\item PINS based next state caching.
+\item PINS based partial order reduction.
+\item PINS based state representation mangling.
+\end{enumerate}
+\end{enumerate}
+\end{enumerate}
+
+
+\section{Model optimizers}
+
+The problem with model optimizers is that they influence how the interaction
+between language module and the LTSmin library works out.
+
+\subsection{next state caching}
+
+This is merely a speedup. It does not influence interaction.
+
+\subsection{partial order reduction}
+
+Partial order reduction influences how traces are reported back to the language
+module. If the partial order reduction merges steps then these steps have to be unmerged
+when the trace is reported. Or else we must restrict to partial order methods that
+work by selecting subsets of the possible transitions.
+
+\subsection{state representation mangling}
+
+The major problem with state mangling and demangling is that the (de)mangling needs the dependency matrices.
+A big question is if the LTS files should be written in the original representation or in the mangled representation.
+
+In principle the mangled representation should lead to better compression and better performance of generic tools.
+But native tools should still be able to read and understand the mangled representation files and that means
+the capability to unmangle has to be in the files. This means that we need to either store dependency matrices,
+which were used to compute the mangling, or we should restrict file mangling to permutation and add tree compression.
+In that case more advanced state manglers could be implemented as state-set to state-set wrappers rather than
+pins to pins wrappers.
+
+
+\subsection{Other questions}
+
+\subsubsection{What is the best way of specifying a permutation?}
+
+We have two options:
+\begin{enumerate}
+\item Explicitly as a list of integers.
+\item Implicitly by giving every variable a name and using a different variable order
+in the signature of the LTS.
+\item Implicitly by specifying a tree compression order/structure on the state labels
+and edges and keeping the original LTS type.
+\item Both of the previous.
+\end{enumerate}
+
+
+
+\subsubsection{Do we need to store information twice?}
+
+If we store full states then computed state labels can in principle be recomputed.
+It would be possible to store them as an ETF map rather than as an explicit list.
+
+\section{Management of data values.}
+
+All data type functionality is provided by the languages modules.
+The tool level itself can only manage integers, chunks and strings.
+Thus, every other data type has to be serialized to a chunk
+and/or pretty printed to a string.
+
+While this approach makes the tool design simpler, it does add cost
+in time and memory: (de)serialization is expensive in time and the
+serialized form often takes up a lot more memory than the real data
+type. For example, it takes time to print/parse ATerms. Moreover,
+ATerm use maximal sharing to reduce the memory footprint which is not
+possible in the serialized form.
+
+Because of the time cost, we try to avoid (de)serialization by
+keeping a global integer to value mapping, so we can send integers
+instead of chunks. Because of the memory cost, duplication of
+serialized values should be avoided. That is, tools that start language
+modules should use the language modules to store values in native form
+and the file format should store all values for each type once.
+
+This requirement is somewhat at odds with the fact that the performance
+of the symbolic data structures depends on the integers used.
+A variable with integers $1,2,3,4$ performs better than one with
+$1,5,45,81$, simply because the first set can be represented with less bits.
+This is solved by introducing a global map for each variable that maps
+the used indices to a consecutive range.
+
+
+\section{Conventions}
+
+In principle, we want to implement language independent tools.
+However, some tools need to know things. For branching bisimulation
+we need to know which transitions are invisible. For lumping we
+need to know how to add rates. In other cases, having a convention
+improves the usability or the performance a lot.
+
+\subsection{Reserved type names}
+
+Boolean and 32 bit natural seem obvious. Rate is to be discussed...
+\begin{description}
+\item[boolean] False is represented by $0$ and true is represented by $1$. No chunk table used.
+\item[nat32] Unsigned 32 bit integer. No chunk table needed.
+\item[num32] The 32 bit unsigned numerator of a rate.
+\item[denom32] The 32 bit unsigned denominator of a rate.
+\item[rate32] Every chunk contains 2 unsigned 32 bit integers in network byte order, representing a rational number.
+\item[float] A 32bit floating point number. Could be used as a rate.
+\end{description}
+
+\subsection{Reserved edge label names}
+
+\begin{description}
+\item[action]
+\item[rate]
+\item[numerator] 
+\item[denominator]
+\item[visible]
+\item[assert]
+\item[accept]
+\end{description}
+
+Note that if action/visible and numerator/denominator are defined as distinct labels,
+we may need implementation tricks such as: \verb+action_visible=action<<1+visible+
+and \verb+rate=num*global_lcm_of_denom/denom+ or possibly tree compression for memory efficiency.
+
+\subsection{Reserved state label names}
+
+For edges, one label is good enough the edges are partitioned by group.
+For states, we need multiple asserts and accepts because we need the number of dependencies
+of every label to be as low as possible.
+
+\begin{description}
+\item[assert{\tt .*}] 
+\item[accept{\tt .*}] 
+\end{description}
+
+
+
+
