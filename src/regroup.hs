@@ -8,41 +8,44 @@ import IO
 import System
 import Debug.Trace
 import Array
+import Monad
 
-delIndex i l = 
-  let (xs,y:ys) = splitAt i l
-  in xs ++ ys
+-----------------------------------------------------------------------
 
-addIndex x i l = 
-  let (xs,ys) = splitAt i l
-  in xs ++ x:ys
- 
-swap_row i j l = 
-  let x = l !! i
-  in addIndex x j (delIndex i l)
+addIndex x 0 l = x:l
+addIndex x i (y:l) = y:addIndex x (i-1) l
+
+delIndex 0 l = l
+delIndex i (x:l) = let (y:k) = delIndex (i-1) l in (y:x:k)
+
+swap_row 0 j (x:l) = addIndex x j l
+swap_row i 0    l  = delIndex i l
+swap_row i j (x:l) = x:swap_row (i-1) (j-1) l
+
+swap g i j = map (swap_row i j) g
+cost g = sum (map cost_row g)
 
 fst3 (x,_,_) = x
 snd3 (_,y,_) = y
 trd3 (_,_,z) = z
 
-cost_row l = length $ dropWhile (=='-') $ reverse $ dropWhile (=='-') $ map fst3 l
+cost_row l =  cost_row1 l
 
-cost g     = sum (map cost_row g)
-swap g i j = map (swap_row i j) g
+cost_row1 (('-',_,_):l) = cost_row1 l
+cost_row1 (('+',_,c):l) = length c + cost_row2 l
+cost_row1 _ = 0
 
-costswap g i j 
---  = cost (swap g i j)
---  = sum (map cost_row (map (swap_row i j) g))
---  = foldl + 0 (map (cost_row . swap_row i j) g)
-    = foldl (\y -> \x -> cost_row (swap_row i j x) + y) 0 g
+cost_row2 (('-',_,c):l) = let m = cost_row2 l in if m==0 then 0 else m+length c
+cost_row2 (('+',_,c):l) = length c + cost_row2 l
+cost_row2 _ = 0
  
 allswaps l = (0,0,cost l) : 
   [ (i,j,k) | 
-      let n=length (head l) -1,
+      let n=length (head l) - 1,
       i <- [0..n], 
       j <- [0..n], 
       j<i || j>i+1,
-      let k=costswap l i j]
+      let k = cost (swap l i j)]
 
 lesscost (a,b,c) (d,e,f) = compare c f
 
@@ -52,34 +55,34 @@ lesscost (a,b,c) (d,e,f) = compare c f
 
 bestswap g = minimumBy lesscost (allswaps g)
 
-nextswap g = let (i,j,_) = bestswap g in  (trace (show i ++ " -> " ++ show j)) 
-                    swap g i j
+nextswap g = let (i,j,_) = bestswap g in  
+                trace (show i ++ " -> " ++ show j ++ "  (" ++ show (cost g) ++ ")")
+                 swap g i j
 
 optimal_group g =
   let h = nextswap g in
   if cost g==cost h then g else optimal_group h
 
 -----------------------------------------------------------------------
+
+-- cost in transposed matrix
+
+cost_t ([]:_) = 0
+cost_t g     = let (heads,tails) = unzip $ map (\(x:l)->(x,l)) g
+               in cost_row heads + cost tails
+
 allinsert x [] = [[x]]
 allinsert x (y:l) = (x:y:l) : map (y:) (allinsert x l)
 
 allperms [] = [[]]
 allperms (x:l) = concat (map (allinsert x) (allperms l))
 
-applypermrow [] _ = []
-applypermrow (m:l) r = 
-   let (xs,y:ys) = (splitAt m r)
-   in y : applypermrow l r
-
-applyperm g p = map (applypermrow p) g
-lesscostperm (k,c) (l,f) = compare c f
+lesscostperm (_,c) (_,f) = compare c f
 
 bestresult g =
-  let l = length $ head g
-      ps = allperms [0..l-1]
-      gs = map (applyperm g) ps
-      (i,j) = minimumBy lesscostperm $ map (\(i,g)->(i,cost g)) (zip [0..] gs)
-  in applyperm g (allperms [0..l-1] !! i)
+  let gs = allperms (transpose g)
+      (h,_) = minimumBy lesscostperm $ map (\g->(g,cost g)) gs
+  in transpose h
 
 -----------------------------------------------------------------------
 
@@ -121,6 +124,7 @@ dep2 r [] = []
 dep2 r (l:g) = (r,dep3 0 l) : dep2 (r+1) g
 
 dependencies i = dep2 0 i
+
 -----------------------------------------------------------------
 
 print_row fp []    = hPutStr fp "\n"
@@ -144,25 +148,63 @@ stats s g =
      ++ show (length (head g)) ++ " columns, penalty: " 
      ++ show (cost g) ++ "\n")
 
+-----------------------------------------------------------------
+
+subsumed [] [] = True
+subsumed (_:l) (('+',_,_):k) = subsumed l k
+subsumed (('-',_,_):l) (_:k) = subsumed l k
+subsumed _ _ = False
+
+subsume [] result = result
+subsume (l:g) result = subsume g (cover l result)
+
+cover l [] = [l]
+cover l (x:g) = 
+  if subsumed l x then merge_rows x l : g
+    else if subsumed x l then cover (merge_rows l x) g
+    else x:cover l g
+
+-----------------------------------------------------------------
+colnub g = transpose_matrix $ nub_matrix $ transpose_matrix g
+colunnub g = map rowunnub g
+
+rowunnub [] = []
+rowunnub ( (c,x,[y]):l )   = (c,x,[y]) : rowunnub l
+rowunnub ( (c,x,y:z:k):l ) = (c,x,[y]) : rowunnub ( (c,x,z:k):l )
+
+transelt (c,x,y) = (c,y,x)
+
+transpose_matrix g = 
+  map (map transelt) $ transpose g
+
 main = do 
   l <- getArgs
   g <- readmatrix 0 []
-  let h = nub_matrix $ sort_matrix g
 
-  i <- if (elem "-sort" l) then do
-     return h
-   else if (elem "-best" l) then do 
-     hPutStr stderr "All permutations:\n"
-     let i = sort_matrix $ bestresult h
-     return i
-   else do
-     hPutStr stderr "Shifting columns:\n"
-     let i = sort_matrix $ optimal_group h
-     return i
+  preprocess <- if (elem "-subsume" l) then
+    return (\g -> sort_matrix $ subsume g [])
+   else
+    return (\g -> nub_matrix $ sort_matrix g)
 
-  i `seq` stats "Input  matrix" g
-  stats "Sorted matrix" h
-  stats "Output matrix" i
+  optimize <- if (elem "-sort" l) then
+    return (\g -> g)
+   else if (elem "-best" l) then
+    return (\g -> sort_matrix $ bestresult g)
+   else
+    return (\g -> sort_matrix $ optimal_group g)
+
+  postprocess <- if (elem "-columns" l) then
+    return (\g -> colunnub $ optimize $ colnub g)
+   else
+    return (\g -> optimize g)
+
+  let h = preprocess g
+  let i = postprocess h  
+
+  i `seq`                   -- to force the trace output before the stats...
+   stats "Input  matrix" g
+  stats  "Sorted matrix" (if elem "-columns" l then colnub h else h)
+  stats  "Output matrix" i
 
   if (elem "-matrix" l)
    then do 
