@@ -400,6 +400,20 @@ void GBsetChunkMethods(model_t model,newmap_t newmap,void*newmap_context,
 	model->get_count=get_count;
 }
 
+void GBcopyChunkMaps(model_t dst, model_t src)
+/* XXX This method should be removed when factoring out the chunk
+ * business from the PINS interface.  If src->map is replaced after
+ * copying, bad things are likely to happen when dst is used.
+ */
+{
+    dst->newmap_context = src->newmap_context;
+    dst->newmap = src->newmap;
+    dst->int2chunk = src->int2chunk;
+    dst->chunk2int = src->chunk2int;
+    dst->get_count = src->get_count;
+    dst->map = src->map;
+}
+
 int GBchunkPut(model_t model,int type_no,chunk c){
 	return model->chunk2int(model->map[type_no],c.data,c.len);
 }

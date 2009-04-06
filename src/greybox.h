@@ -284,6 +284,11 @@ extern void GBsetChunkMethods(model_t model,newmap_t newmap,void*newmap_context,
 	int2chunk_t int2chunk,chunk2int_t chunk2int,get_count_t get_count);
 
 /**
+\brief Copy map factory methods, lookup methods AND chunk maps.
+*/
+extern void GBcopyChunkMaps(model_t dst, model_t src);
+
+/**
 \brief Get the number of different chunks of type type_no.
 
 Please note that this function is potentially expensive in a distributed setting
