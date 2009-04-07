@@ -315,3 +315,8 @@ void* RTmallocZero(size_t size){
 	return p;
 }
 
+void* RTfree(void *rt_ptr){
+	if(rt_ptr != NULL)
+            free (rt_ptr);
+}
+
