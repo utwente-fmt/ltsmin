@@ -47,7 +47,7 @@ extern void* RTmalloc(size_t size);
 
 extern void* RTmallocZero(size_t size);
 
-extern void* RTfree(void *rt_ptr);
+extern void RTfree(void *rt_ptr);
 
 #define RT_NEW(sort) ((sort*)RTmallocZero(sizeof(sort)))
 
