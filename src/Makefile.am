@@ -152,7 +152,7 @@ libutil_a_SOURCES := unix.c runtime.c stream.c archive.c			\
                     generichash.h unix.h archive.h ghf.h	\
                     stream.h raf.h stream_object.h raf_object.h		\
                     scctimer.h fast_hash.h runtime.h treedbs.h		\
-                    config.h greybox.c greybox.h stringindex.c		\
+                    config.h greybox.c greybox.h pins-cache.c stringindex.c		\
                     stringindex.h archive_gsf.c dir_ops.c dir_ops.h	\
                     packet_stream.h packet_stream.c	\
                     archive_dir.c chunk_support.c chunk_support.h	\

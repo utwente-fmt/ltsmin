@@ -89,11 +89,9 @@ cached_short (model_t self, int group, int *src, TransitionCB cb,
 model_t
 GBaddCache (model_t model)
 {
-    model_t             cached = GBcreateBase ();
-    struct cache_context *ctx = RTmalloc (sizeof *ctx);
     edge_info_t         e_info = GBgetEdgeInfo (model);
     int                 N = e_info->groups;
-    struct group_cache *cache = RTmalloc (N * sizeof *(ctx->cache));
+    struct group_cache *cache = RTmalloc (N * sizeof (struct group_cache));
     for (int i = 0; i < N; i++) {
         int                 len = e_info->length[i];
         cache[i].len = len * sizeof (int);
@@ -110,21 +108,23 @@ GBaddCache (model_t model)
         cache[i].dest = NULL;
         ADD_ARRAY (cache[i].dest_man, cache[i].dest, int);
     }
+    struct cache_context *ctx = RTmalloc (sizeof *ctx);
+    model_t             cached = GBcreateBase ();
     ctx->cache = cache;
     ctx->parent = model;
 
-    GBcopyChunkMaps (cached, model);
-    GBsetLTStype (cached, GBgetLTStype (model));
-    GBsetEdgeInfo (cached, e_info);
+    GBsetEdgeInfo(cached, GBgetEdgeInfo(model));
+    GBsetContext (cached, ctx);
+
+    GBsetNextStateShort (cached, cached_short);
+
+    GBinitModelDefaults (&cached, model);
 
     int                 len =
         lts_type_get_state_length (GBgetLTStype (model));
     int                 s0[len];
     GBgetInitialState (model, s0);
     GBsetInitialState (cached, s0);
-
-    GBsetContext (cached, ctx);
-    GBsetNextStateShort (cached, cached_short);
 
     return cached;
 }
