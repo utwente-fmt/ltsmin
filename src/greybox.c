@@ -282,9 +282,42 @@ model_t GBaddCache(model_t model){
 	cached->next_all=default_all;
 	return cached;
 }
+void GBinitModelDefaults (model_t *p_model, model_t default_src)
+{
+    model_t model = *p_model;
+    if (model->ltstype == NULL) {
+        GBcopyChunkMaps(model, default_src);
+        GBsetLTStype(model, GBgetLTStype(default_src));
+    }
+    if (model->e_info == NULL)
+        GBsetEdgeInfo(model, GBgetEdgeInfo(default_src));
+    if (model->s_info == NULL)
+        GBsetStateInfo(model, GBgetStateInfo(default_src));
+    if (model->s0 == NULL) {
+        int N = lts_type_get_state_length (GBgetLTStype (default_src));
+        int s0[N];
+        GBgetInitialState(default_src, s0);
+        GBsetInitialState(model, s0);
+    }
+    if (model->context == NULL)
+        GBsetContext(model, GBgetContext(default_src));
 
+    if (model->next_short == NULL)
+        GBsetNextStateShort(model, default_src->next_short);
+    if (model->next_long == NULL)
+        GBsetNextStateLong(model, default_src->next_long);
+    if (model->next_all == NULL)
+        GBsetNextStateAll(model, default_src->next_all);
 
+    if (model->state_labels_short == NULL)
+        GBsetStateLabelShort(model, default_src->state_labels_short);
+    if (model->state_labels_long == NULL)
+        GBsetStateLabelLong(model, default_src->state_labels_long);
+    if (model->state_labels_all == NULL)
+        GBsetStateLabelsAll(model, default_src->state_labels_all);
 
+    return model;
+}
 
 void* GBgetContext(model_t model){
 	return model->context;
@@ -326,8 +359,9 @@ state_info_t GBgetStateInfo(model_t model){
 }
 
 void GBsetInitialState(model_t model,int *state){
-	if (model->s0 !=NULL) Fatal(1,error,"initial state already set");
-	if (model->ltstype==NULL) Fatal(1,error,"must set ltstype before setting initial state");
+	if (model->ltstype==NULL)
+            Fatal(1,error,"must set ltstype before setting initial state");
+	RTfree (model->s0);
 	int len=lts_type_get_state_length(model->ltstype);
 	model->s0=(int*)RTmalloc(len * sizeof(int));
 	for(int i=0;i<len;i++){
