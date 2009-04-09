@@ -13,6 +13,7 @@
 #include "mcrl2/atermpp/set.h"
 #include "mcrl2/core/print.h"
 #include "mcrl2/lps/data_elimination.h"
+#include "dm/dm.h"
 
 class group_information {
 
@@ -379,17 +380,16 @@ void MCRL2loadGreyboxModel(model_t m,const char*model_name){
 	}
 	GBsetInitialState(m,temp);
 
-	edge_info_t e_info=(edge_info_t)RTmalloc(sizeof(struct edge_info));
-	e_info->groups=ctx->atGrps;
-	e_info->length=(int*)RTmalloc(e_info->groups*sizeof(int));
-	e_info->indices=(int**)RTmalloc(e_info->groups*sizeof(int*));
-	for(int i=0;i<e_info->groups;i++){
+	matrix_t * p_dm_info = (matrix_t*)RTmalloc(sizeof(matrix_t));
+	dm_create(p_dm_info, ctx->atGrps, state_length);
+
+	for(int i=0; i < dm_nrows(p_dm_info); i++) {
 		std::vector< size_t > const & vec = ctx->info->get_group(i);
-		e_info->length[i]=vec.size();
-		e_info->indices[i]=(int*)RTmalloc(vec.size()*sizeof(int));
-		for(int j=0;j<(int)(vec.size());j++) e_info->indices[i][j]=vec[j];
+		for(int j=0; j < vec.size(); j++)
+			dm_set (p_dm_info, i, vec[j]);
 	}
-	GBsetEdgeInfo(m,e_info);
+
+	GBsetDMInfo(m, p_dm_info);
 	GBsetStateInfo(m,&s_info);
 	GBsetNextStateLong(m,MCRL2getTransitionsLong);
 	GBsetNextStateAll(m,MCRL2getTransitionsAll);

@@ -10,6 +10,7 @@
 #include <stringindex.h>
 #include "vector_set.h"
 #include "scctimer.h"
+#include "dm/dm.h"
 
 #if defined(MCRL)
 #include "mcrl-greybox.h"
@@ -84,7 +85,6 @@ static  struct poptOption options[] = {
 static lts_type_t ltstype;
 static int N;
 static int eLbls;
-static edge_info_t e_info;
 static int nGrps;
 static vdom_t domain;
 static vset_t visited;
@@ -254,6 +254,7 @@ static FILE* table_file;
 static int table_count=0;
 
 typedef struct {
+	model_t model;
 	int group;
 	int *src;
 } output_context;
@@ -263,9 +264,8 @@ static void etf_edge(void*context,int*labels,int*dst){
 	table_count++;
 	int k=0;
 	for(int i=0;i<N;i++) {
-		if (k<e_info->length[ctx->group] && e_info->indices[ctx->group][k]==i){
+		if (dm_is_set(GBgetDMInfo(ctx->model), ctx->group, i)) {
 			fprintf(table_file," %d/%d",ctx->src[k],dst[k]);
-			k++;
 		} else {
 			fprintf(table_file," *");
 		}
@@ -335,6 +335,7 @@ void do_output(){
 	fprintf(table_file,"end init\n");
 	for(int g=0;g<nGrps;g++){
 		output_context ctx;
+		ctx.model = model;
 		ctx.group=g;
 		fprintf(table_file,"begin trans\n");
 		vset_enum(group_explored[g],enum_edge,&ctx);
@@ -399,17 +400,26 @@ int main(int argc, char *argv[]){
 
 	ltstype=GBgetLTStype(model);
 	N=lts_type_get_state_length(ltstype);
-	e_info=GBgetEdgeInfo(model);
-	nGrps=e_info->groups;
+	nGrps=dm_nrows(GBgetDMInfo(model));
 	domain=vdom_create_default(N);
 	visited=vset_create(domain,0,NULL);
 	group_rel=(vrel_t*)RTmalloc(nGrps*sizeof(vrel_t));
 	group_explored=(vset_t*)RTmalloc(nGrps*sizeof(vset_t));
 	group_tmp=(vset_t*)RTmalloc(nGrps*sizeof(vset_t));
 	for(int i=0;i<nGrps;i++){
-		group_rel[i]=vrel_create(domain,e_info->length[i],e_info->indices[i]);
-		group_explored[i]=vset_create(domain,e_info->length[i],e_info->indices[i]);
-		group_tmp[i]=vset_create(domain,e_info->length[i],e_info->indices[i]);
+		// dm_ones_in_row one is slow, replace it
+		int len = dm_ones_in_row(GBgetDMInfo(model), i);
+		// get indices
+		int tmp[len];
+		// temporary replacement for e_info->indices[i]
+		for(int j=0, k=0; j < dm_ncols(GBgetDMInfo(model)); j++) {
+			if (dm_is_set(GBgetDMInfo(model), i,j))
+				tmp[k++] = j;
+		}
+
+		group_rel[i]=vrel_create(domain,len,tmp);
+		group_explored[i]=vset_create(domain,len,tmp);
+		group_tmp[i]=vset_create(domain,len,tmp);
 	}
 	Warning(info,"length is %d, there are %d groups",N,nGrps);
 	int src[N];

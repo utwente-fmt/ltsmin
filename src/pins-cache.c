@@ -29,7 +29,8 @@ static void
 add_cache_entry (void *context, int *label, int *dst)
 {
     struct group_cache *ctx = (struct group_cache *)context;
-    int                 dst_index = SIputC (ctx->idx, (char *)dst, ctx->len);
+    int                 dst_index =
+        SIputC (ctx->idx, (char *)dst, ctx->len);
     if (dst_index >= ctx->visited)
         ctx->visited = dst_index + 1;
     ensure_access (ctx->dest_man, ctx->begin[ctx->explored]);
@@ -60,7 +61,10 @@ cached_short (model_t self, int group, int *src, TransitionCB cb,
     struct cache_context *ctx =
         (struct cache_context *)GBgetContext (self);
     struct group_cache *cache = &(ctx->cache[group]);
-    int                 len = GBgetEdgeInfo (self)->length[group];
+    // dm_ones_in_row is rather slow, therefore use value in group cache
+    // int len = dm_ones_in_row(GBgetDMInfo(self), group);
+    int                 len = cache->len / sizeof (int);
+
     int                 tmp[len];
     int                 src_idx =
         SIputC (cache->idx, (char *)src, cache->len);
@@ -89,11 +93,12 @@ cached_short (model_t self, int group, int *src, TransitionCB cb,
 model_t
 GBaddCache (model_t model)
 {
-    edge_info_t         e_info = GBgetEdgeInfo (model);
-    int                 N = e_info->groups;
+    matrix_t           *p_dm = GBgetDMInfo (model);
+    int                 N = dm_nrows (p_dm);
     struct group_cache *cache = RTmalloc (N * sizeof (struct group_cache));
     for (int i = 0; i < N; i++) {
-        int                 len = e_info->length[i];
+        // note: dm_ones_in_row is rather slow
+        int                 len = dm_ones_in_row (p_dm, i);
         cache[i].len = len * sizeof (int);
         cache[i].idx = SIcreate ();
         cache[i].explored = 0;
@@ -113,7 +118,7 @@ GBaddCache (model_t model)
     ctx->cache = cache;
     ctx->parent = model;
 
-    GBsetEdgeInfo(cached, GBgetEdgeInfo(model));
+    GBsetDMInfo (cached, p_dm);
     GBsetContext (cached, ctx);
 
     GBsetNextStateShort (cached, cached_short);

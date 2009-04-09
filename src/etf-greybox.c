@@ -3,6 +3,7 @@
 #include "etf-util.h"
 #include "etf-greybox.h"
 #include "lts.h"
+#include "dm/dm.h"
 
 static void etf_popt(poptContext con,
  		enum poptCallbackReason reason,
@@ -31,7 +32,6 @@ typedef struct grey_box_context {
 	int edge_labels;
 	treedbs_t* trans_db;
 	lts_t* trans_table;
-	int* trans_len;
 	treedbs_t* label_key;
 	int** label_data;
 } *gb_context_t;
@@ -39,7 +39,7 @@ typedef struct grey_box_context {
 static int etf_short(model_t self,int group,int*src,TransitionCB cb,void*user_context){
 	gb_context_t ctx=(gb_context_t)GBgetContext(self);
 	int src_no=TreeFold(ctx->trans_db[group],src);
-	int dst[ctx->trans_len[group]];
+	int dst[dm_ones_in_row(GBgetDMInfo(self), group)];
 	//Warning(info,"group %d, state %d",group,src_no);
 	lts_t lts=ctx->trans_table[group];
 	//for(int j=0;j<=lts->states;j++){
@@ -88,32 +88,26 @@ void ETFloadGreyboxModel(model_t model,const char*name){
 	GBsetLTStype(model,ltstype);
 
 	treedbs_t pattern_db=etf_patterns(etf);
-	edge_info_t e_info=(edge_info_t)RTmalloc(sizeof(struct edge_info));
-	e_info->groups=etf_trans_section_count(etf);
-	e_info->length=(int*)RTmalloc(e_info->groups*sizeof(int));
-	e_info->indices=(int**)RTmalloc(e_info->groups*sizeof(int*));
-	ctx->trans_len=e_info->length;
-	ctx->trans_db=(treedbs_t*)RTmalloc(e_info->groups*sizeof(treedbs_t));
-	ctx->trans_table=(lts_t*)RTmalloc(e_info->groups*sizeof(lts_t));
-	for(int i=0;i<e_info->groups;i++){
+	matrix_t* p_dm_info = (matrix_t*)RTmalloc(sizeof(matrix_t));
+	dm_create(p_dm_info, etf_trans_section_count(etf), state_length);
+	ctx->trans_db=(treedbs_t*)RTmalloc(dm_nrows(p_dm_info)*sizeof(treedbs_t));
+	ctx->trans_table=(lts_t*)RTmalloc(dm_nrows(p_dm_info)*sizeof(lts_t));
+	for(int i=0; i < dm_nrows(p_dm_info); i++) {
 		Warning(info,"parsing table %d",i);
 		treedbs_t trans=etf_trans_section(etf,i);
 		int used[state_length];
+		int proj[state_length];
 		int step[2+ctx->edge_labels];
 		TreeUnfold(trans,0,step);
 		TreeUnfold(pattern_db,step[0],used);
 		int len=0;
 		for(int j=0;j<state_length;j++){
 			if (used[j]) {
-				used[len]=j;
+				proj[len]=j;
 				len++;
+				dm_set(p_dm_info, i, j);
 			}
 		}
-		int*proj=(int*)RTmalloc(len*sizeof(int));
-		for(int j=0;j<len;j++) proj[j]=used[j];
-		e_info->length[i]=len;
-		e_info->indices[i]=proj;
-		TreeUnfold(pattern_db,step[0],used);
 
 		ctx->trans_db[i]=TreeDBScreate(len);
 		ctx->trans_table[i]=lts_create();
@@ -161,7 +155,7 @@ void ETFloadGreyboxModel(model_t model,const char*name){
 		//	Warning(info,"begin[%d]=%d",j,ctx->trans_table[i]->begin[j]);
 		//}
 	}
-	GBsetEdgeInfo(model,e_info);
+	GBsetDMInfo(model, p_dm_info);
 	GBsetNextStateShort(model,etf_short);
 
 	state_info_t s_info=(state_info_t)RTmalloc(sizeof(struct state_info));

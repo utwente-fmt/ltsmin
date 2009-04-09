@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include "chunk_support.h"
 #include "lts-type.h"
+#include "dm/dm.h"
 
 /**
  @file greybox.h
@@ -19,19 +20,6 @@ This version assumes a few things:
 typedef struct grey_box_model* model_t;
 /**< @brief Abstract type for a model.
 */
-
-/**
-\brief Edge group information. 
-
-For each grey box model, the number of groups must be determined and
-for each of those groups the influenced variables must be given.
-*/
-typedef struct edge_info {
-	int   groups;  ///< The number of groups.
-	int*  length;  ///< The number of influenced variables per group.
-	int** indices; ///< A sorted list of indices of influenced variables per group.
-} *edge_info_t;
-
 
 /**
 \brief State label information. 
@@ -70,16 +58,20 @@ extern void GBloadFile(model_t model,const char *filename,model_t *wrapped);
 */
 extern lts_type_t GBgetLTStype(model_t model);
 
-extern edge_info_t GBgetEdgeInfo(model_t model);
-/**<
-\brief Get the edge group information of a model.
-*/
-
 /**
 \brief Print the current dependency matrix in human readable form.
 */
 extern void GBprintDependencyMatrix(FILE* file, model_t model);
 
+/**
+\brief Get the dependency matrix of the model
+*/
+extern matrix_t* GBgetDMInfo(model_t model);
+
+/**
+\brief Set the dependency matrix of the model
+*/
+extern void GBsetDMInfo(model_t model, matrix_t* dm_info);
 
 extern void GBgetInitialState(model_t model,int *state);
 /**< @brief Write the initial state of model into state. */
@@ -180,11 +172,6 @@ extern void* GBgetContext(model_t model);
 \brief Add LTS structure information to a model.
 */
 extern void GBsetLTStype(model_t model,lts_type_t info);
-
-/**
-\brief Add edge group information to a model.
-*/
-extern void GBsetEdgeInfo(model_t model,edge_info_t info);
 
 /**
 \brief Add state label information to a model.
@@ -291,7 +278,7 @@ extern void GBcopyChunkMaps(model_t dst, model_t src);
 /**
 \brief Initializes unset model parameters from default_src.
 */
-extern void GBinitModelDefaults (model_t *p_model, model_t default_src);
+extern model_t GBinitModelDefaults (model_t *p_model, model_t default_src);
 
 /**
 \brief Get the number of different chunks of type type_no.

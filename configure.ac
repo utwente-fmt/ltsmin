@@ -151,6 +151,7 @@ AM_CONDITIONAL([HAVE_LIBBCG], [test x"$have_bcg" = xyes])
 AC_CONFIG_FILES([
        Makefile
        src/Makefile
+	   src/dm/Makefile
        doc/Makefile
 ])
 ac_configure_args="$ac_configure_args --enable-keep-terminated-procs \

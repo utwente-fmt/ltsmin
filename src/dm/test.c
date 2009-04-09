@@ -1,0 +1,260 @@
+#include <stdio.h>
+#include "bitvector.h"
+#include "dm.h"
+
+void
+print_matrix (matrix_t *m)
+{
+    printf ("matrix(%d, %d)\n", dm_nrows (m), dm_ncols (m));
+    dm_print (stdout, m);
+    printf ("\n");
+}
+void
+user_bitvector_print (bitvector_t *bv)
+{
+    int                 i;
+    int                 s = bitvector_size (bv);
+    printf ("bitvector: %d\n", s);
+    for (i = 0; i < s; i++)
+        printf ("%c", bitvector_is_set (bv, i) ? '1' : '0');
+    printf ("\n");
+}
+int
+max_row_first (matrix_t *m, int rowa, int rowb)
+{
+    int                 i,
+                        ra,
+                        rb;
+
+    for (i = 0; i < dm_ncols (m); i++) {
+        ra = dm_is_set (m, rowa, i);
+        rb = dm_is_set (m, rowb, i);
+
+        if ((ra && rb) || (!ra && !rb))
+            continue;
+        return (rb - ra);
+    }
+
+    return 0;
+}
+int
+min_row_first (matrix_t *m, int rowa, int rowb)
+{
+    int                 i,
+                        ra,
+                        rb;
+
+    for (i = 0; i < dm_ncols (m); i++) {
+        ra = dm_is_set (m, rowa, i);
+        rb = dm_is_set (m, rowb, i);
+
+        if ((ra && rb) || (!ra && !rb))
+            continue;
+        return (ra - rb);
+    }
+
+    return 0;
+}
+
+
+int
+main (void)
+{
+
+    bitvector_t         b1;
+    bitvector_t         b2;
+    bitvector_create (&b1, 20);
+
+    user_bitvector_print (&b1);
+
+    bitvector_set (&b1, 4);
+    user_bitvector_print (&b1);
+
+    bitvector_copy (&b1, &b2);
+
+    bitvector_unset (&b1, 4);
+    user_bitvector_print (&b1);
+
+    user_bitvector_print (&b2);
+
+    bitvector_free (&b2);
+    bitvector_free (&b1);
+
+    matrix_t            m1;
+    matrix_t            m2;
+    dm_create (&m1, 10, 10);
+
+    print_matrix (&m1);
+    printf ("dm_set(4,4)\n");
+    dm_set (&m1, 4, 4);
+    print_matrix (&m1);
+    printf ("dm_unset(4,4)\n");
+    dm_unset (&m1, 4, 4);
+    print_matrix (&m1);
+
+    printf ("test shift permutation (3,4,5)(6,7)\n");
+    printf ("before\n");
+    dm_set (&m1, 3, 3);
+    dm_set (&m1, 4, 4);
+    dm_set (&m1, 5, 5);
+    dm_set (&m1, 6, 6);
+    dm_set (&m1, 7, 7);
+    print_matrix (&m1);
+
+    printf ("after\n");
+    // create permutation_group, apply
+    permutation_group_t o1;
+    dm_create_permutation_group (&o1, 2, NULL);
+    dm_add_to_permutation_group (&o1, 3);
+    dm_add_to_permutation_group (&o1, 4);
+    dm_add_to_permutation_group (&o1, 5);
+    dm_close_group (&o1);
+    dm_add_to_permutation_group (&o1, 6);
+    dm_add_to_permutation_group (&o1, 7);
+
+    dm_permute_cols (&m1, &o1);
+
+    print_matrix (&m1);
+
+    dm_free_permutation_group (&o1);
+
+    printf ("swap cols 6,7\n");
+    dm_swap_cols (&m1, 6, 7);
+    print_matrix (&m1);
+
+    printf ("swap rows 6,7\n");
+    dm_swap_rows (&m1, 6, 7);
+    print_matrix (&m1);
+
+    printf ("copy\n");
+    dm_copy (&m1, &m2);
+    // TODO: needs some more work
+    print_matrix (&m2);
+
+
+    dm_sort_rows (&m1, &min_row_first);
+    print_matrix (&m1);
+
+    dm_sort_rows (&m1, &max_row_first);
+    print_matrix (&m1);
+
+    dm_print_perm (&(m1.row_perm));
+
+    printf ("to nub rows added & resorted\n");
+    dm_set (&m1, 7, 3);
+    dm_set (&m1, 8, 4);
+    dm_sort_rows (&m1, &max_row_first);
+    print_matrix (&m1);
+
+    printf ("flatten \n");
+    dm_flatten (&m1);
+
+    print_matrix (&m1);
+    dm_print_perm (&(m1.row_perm));
+
+    printf ("nub sorted\n");
+
+    dm_nub_rows (&m1);
+
+    print_matrix (&m1);
+
+    dm_print_perm (&(m1.row_perm));
+    /* 
+     * printf("again, now to test row order & nub idx\n"); dm_free(&m1);
+     * dm_create(&m1, 10, 10); dm_set(&m1, 0,0); dm_set(&m1, 1,0);
+     * dm_set(&m1, 2,3); dm_set(&m1, 3,3); print_matrix(&m1);
+     * 
+     * printf("nub sorted\n");
+     * 
+     * dm_nub_rows(&m1);
+     * 
+     * print_matrix(&m1);
+     * 
+     * dm_print_perm(&(m1.row_perm)); */
+    printf ("optimize sorted\n");
+    dm_set (&m1, 0, 7);
+    dm_set (&m1, 1, 6);
+    dm_set (&m1, 3, 9);
+
+    printf ("before\n");
+    print_matrix (&m1);
+    dm_optimize (&m1);
+    printf ("after\n");
+    print_matrix (&m1);
+
+    printf ("resorted\n");
+    dm_sort_rows (&m1, &max_row_first);
+    print_matrix (&m1);
+
+
+    printf ("count test\n");
+    for (int i = 0; i < dm_nrows (&m1); i++)
+        printf ("ones in row %d: %d\n", i, dm_ones_in_row (&m1, i));
+    for (int i = 0; i < dm_ncols (&m1); i++)
+        printf ("ones in col %d: %d\n", i, dm_ones_in_col (&m1, i));
+
+    printf ("iterator test\n");
+
+    dm_row_iterator_t   mx;
+    dm_col_iterator_t   my;
+
+    for (int i = 0; i < dm_nrows (&m1); i++) {
+        printf ("iterator row: %d\n", i);
+        dm_create_row_iterator (&mx, &m1, i);
+        int                 r;
+        while ((r = dm_row_next (&mx)) != -1)
+            printf (" next: %d\n", r);
+        printf ("\n\n");
+    }
+
+    for (int i = 0; i < dm_ncols (&m1); i++) {
+        printf ("iterator col: %d\n", i);
+        dm_create_col_iterator (&my, &m1, i);
+        int                 r;
+        while ((r = dm_col_next (&my)) != -1)
+            printf (" next: %d\n", r);
+        printf ("\n\n");
+    }
+
+    printf ("projection test\n");
+    int                 s0[10];
+    int                 src[10];
+    int                 prj[2];
+    int                 tgt[10];
+
+    // initialize
+    for (int i = 0; i < 10; i++) {
+        s0[i] = -i;
+        src[i] = i;
+    }
+
+    // do projection
+    int                 prj_n = dm_project_vector (&m1, 0, src, prj);
+
+    // print projection
+    printf ("projection:");
+    for (int i = 0; i < prj_n; i++) {
+        printf (" %d", prj[i]);
+    }
+    printf ("\n");
+
+    printf ("expantion test\n");
+
+    // do expantion
+    int                 exp_n = dm_expand_vector (&m1, 0, s0, prj, tgt);
+    (void)exp_n;
+
+    // print expantion
+    printf ("expantion:");
+    for (int i = 0; i < 10; i++) {
+        printf (" %d", tgt[i]);
+    }
+    printf ("\n");
+
+
+
+    dm_free (&m2);
+    dm_free (&m1);
+
+    return 0;
+}

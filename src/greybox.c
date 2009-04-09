@@ -3,10 +3,11 @@
 #include "greybox.h"
 #include "runtime.h"
 #include "treedbs.h"
+#include "dm/dm.h"
 
 struct grey_box_model {
 	lts_type_t ltstype;
-	edge_info_t e_info;
+	matrix_t* dm_info;
 	state_info_t s_info;
 	int *s0;
 	void*context;
@@ -25,9 +26,8 @@ struct grey_box_model {
 };
 
 struct nested_cb {
-	int len;
-	int *indices;
-	int s_len;
+	model_t model;
+	int group;
 	int *src;
 	TransitionCB cb;
 	void* user_ctx;
@@ -35,80 +35,54 @@ struct nested_cb {
 
 void project_dest(void*context,int*labels,int*dst){
 #define info ((struct nested_cb*)context)
-	int short_dst[info->len];
-	for(int i=0;i<info->len;i++){
-		short_dst[i]=dst[info->indices[i]];
-	}
+	// dm_ones_in_row one is slow, replace it
+	int len = dm_ones_in_row(GBgetDMInfo(info->model), info->group);
+	int short_dst[len];
+	dm_project_vector(GBgetDMInfo(info->model), info->group, dst, short_dst);
 	info->cb(info->user_ctx,labels,short_dst);
 #undef info
 }
 
 int default_short(model_t self,int group,int*src,TransitionCB cb,void*context){
 	struct nested_cb info;
-	info.len=self->e_info->length[group];
-	info.indices=self->e_info->indices[group];
-	info.s_len=lts_type_get_state_length(self->ltstype);
+	info.model = self;
+	info.group = group;
 	info.src=src;
 	info.cb=cb;
 	info.user_ctx=context;
-	int long_src[info.s_len];
-	int k=0;
-	//printf("group %d len %d\ndef_short",group,info.len);
-	for(int i=0;i<info.s_len;i++){
-		if(k<info.len && info.indices[k]==i){
-			long_src[i]=src[k];
-			//printf("%2d*",long_src[i]);
-			k++;
-		} else {
-			long_src[i]=self->s0[i];
-			//printf("%2d ",long_src[i]);
-		}
-	}
-	//printf("\n");
+
+	int long_src[dm_ncols(GBgetDMInfo(self))];
+	dm_expand_vector(GBgetDMInfo(self), group, self->s0, src, long_src);
 	return self->next_long(self,group,long_src,project_dest,&info);
 }
 
 void expand_dest(void*context,int*labels,int*dst){
 #define info ((struct nested_cb*)context)
-	int long_dst[info->s_len];
-	int k=0;
-	for(int i=0;i<info->s_len;i++){
-		if(k<info->len && info->indices[k]==i){
-			long_dst[i]=dst[k];
-			k++;
-		} else {
-			long_dst[i]=info->src[i];
-		}
-	}
+	int long_dst[dm_ncols(GBgetDMInfo(info->model))];
+	dm_expand_vector(GBgetDMInfo(info->model), info->group, info->src, dst, long_dst);
 	info->cb(info->user_ctx,labels,long_dst);
 #undef info
 }
 
 int default_long(model_t self,int group,int*src,TransitionCB cb,void*context){
 	struct nested_cb info;
-	info.len=self->e_info->length[group];
-	info.indices=self->e_info->indices[group];
-	info.s_len=lts_type_get_state_length(self->ltstype);
+	info.model = self;
+	info.group = group;
 	info.src=src;
 	info.cb=cb;
 	info.user_ctx=context;
-	int src_short[info.len];
-	//printf("def_long");
-	//for(int i=0;i<info.s_len;i++){
-	//	printf("%3d",src[i]);
-	//}
-	//printf("\n group %d len %d",group,info.len);
-	for(int i=0;i<info.len;i++){
-		src_short[i]=src[info.indices[i]];
-		//printf("%3d",src_short[i]);
-	}
-	//printf("\n");
+
+	// dm_ones_in_row one is slow, replace it
+	int len = dm_ones_in_row(GBgetDMInfo(self), group);
+	int src_short[len];
+	dm_project_vector(GBgetDMInfo(self), group, src, src_short);
+
 	return self->next_short(self,group,src_short,expand_dest,&info);
 }
 
 int default_all(model_t self,int*src,TransitionCB cb,void*context){
 	int res=0;
-	for(int i=0;i<self->e_info->groups;i++){
+	for(int i=0; i < dm_nrows(GBgetDMInfo(self)); i++) {
 		res+=self->next_long(self,i,src,cb,context);
 	}
 	return res;
@@ -148,7 +122,7 @@ static void state_default_all(model_t model,int*state,int*labels){
 model_t GBcreateBase(){
 	model_t model=(model_t)RTmalloc(sizeof(struct grey_box_model));
 	model->ltstype=NULL;
-	model->e_info=NULL;
+	model->dm_info=NULL;
 	model->s_info=NULL;
 	model->s0=NULL;
 	model->context=0;
@@ -167,15 +141,15 @@ model_t GBcreateBase(){
 	return model;
 }
 
-void GBinitModelDefaults (model_t *p_model, model_t default_src)
+model_t GBinitModelDefaults (model_t *p_model, model_t default_src)
 {
     model_t model = *p_model;
     if (model->ltstype == NULL) {
         GBcopyChunkMaps(model, default_src);
         GBsetLTStype(model, GBgetLTStype(default_src));
     }
-    if (model->e_info == NULL)
-        GBsetEdgeInfo(model, GBgetEdgeInfo(default_src));
+	if (model->dm_info == NULL)
+		GBsetDMInfo(model, GBgetDMInfo(default_src));
     if (model->s_info == NULL)
         GBsetStateInfo(model, GBgetStateInfo(default_src));
     if (model->s0 == NULL) {
@@ -224,13 +198,13 @@ lts_type_t GBgetLTStype(model_t model){
 	return model->ltstype;
 }
 
-void GBsetEdgeInfo(model_t model,edge_info_t info){
-	if (model->s_info != NULL)  Fatal(1,error,"edge info already set");
-	model->e_info=info;
+void GBsetDMInfo(model_t model, matrix_t* dm_info) {
+	if (model->dm_info != NULL) Fatal(1, error, "dependency matrix already set");
+	model->dm_info=dm_info;
 }
 
-edge_info_t GBgetEdgeInfo(model_t model){
-	return model->e_info;
+matrix_t* GBgetDMInfo(model_t model) {
+	return model->dm_info;
 }
 
 void GBsetStateInfo(model_t model,state_info_t info){
@@ -350,19 +324,7 @@ int GBchunkCount(model_t model,int type_no){
 
 
 void GBprintDependencyMatrix(FILE* file, model_t model) {
-  edge_info_t e = GBgetEdgeInfo(model);
-  int N=lts_type_get_state_length(model->ltstype);
-  for (int i=0;i<e->groups;i++) {
-    for (int j=0,c=0;j<N;j++) {
-      if (c<e->length[i] && j==e->indices[i][c]) {
-	fprintf(file,"+");
-	c++;
-      }
-      else
-	fprintf(file,"-");
-    }
-    fprintf(file,"\n");
-  }
+	dm_print(file, GBgetDMInfo(model));
 }
 
 /**********************************************************************

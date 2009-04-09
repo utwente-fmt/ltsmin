@@ -314,8 +314,7 @@ int main(int argc, char *argv[]){
 	}
 	lts_type_t ltstype=GBgetLTStype(model);
 	N=lts_type_get_state_length(ltstype);
-	edge_info_t e_info=GBgetEdgeInfo(model);
-	K=e_info->groups;
+	K= dm_nrows(GBgetDMInfo(model));
 	Warning(info,"length is %d, there are %d groups",N,K);
 	state_labels=lts_type_get_state_label_count(ltstype);
 	edge_labels=lts_type_get_edge_label_count(ltstype);

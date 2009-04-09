@@ -8,6 +8,7 @@
 #include "mcrl.h"
 #include "step.h"
 #include "at-map.h"
+#include "dm/dm.h"
 
 
 /**
@@ -91,7 +92,7 @@ static ATerm *dst;
 
 static int instances=0;
 static int state_length;
-static struct edge_info e_info;
+static matrix_t dm_info;
 static int* e_smd_map=NULL;
 static struct state_info s_info={0,NULL,NULL};
 static int* s_smd_map=NULL;
@@ -177,7 +178,7 @@ static int MCRLgetTransitionsAll(model_t model,int*src,TransitionCB cb,void*cont
 	for(int i=0;i<state_length;i++) {
 		at_src[i]=ATfindTerm(termmap,src[i]);
 	}
-	int res=STstepSmd(at_src,e_smd_map,e_info.groups);
+	int res=STstepSmd(at_src,e_smd_map,dm_nrows(&dm_info));
 	if (res<0) Fatal(1,error,"error in STstepSmd")
 	return res;
 }
@@ -227,27 +228,32 @@ void MCRLloadGreyboxModel(model_t m,const char*model){
 	STinitialize(noOrdering,&label,dst,callback);
 
 	int nSmds=STgetSummandCount();
-	{
-		e_info.groups=nSmds;
-	}
+
 	lts_type_set_edge_label_count(ltstype,1);
 	lts_type_set_edge_label_name(ltstype,0,"action");
 	lts_type_set_edge_label_type(ltstype,0,"action");
-	e_info.length=(int*)RTmalloc(e_info.groups*sizeof(int));
-	e_smd_map=(int*)RTmalloc(e_info.groups*sizeof(int));
-	e_info.indices=(int**)RTmalloc(e_info.groups*sizeof(int*));
-	int next_edge=0;
-	for(int i=0;i<nSmds;i++){
+
+	dm_create(&dm_info, nSmds, state_length);
+	e_smd_map=(int*)RTmalloc( nSmds *sizeof(int));
+
+	// load projection from mcrl into matrix
+	for(int i=0; i < nSmds; i++)
+	{
 		int temp[state_length];
-		e_info.length[next_edge]=STgetProjection(temp,i);
-		e_info.indices[next_edge]=(int*)RTmalloc(e_info.length[next_edge]*sizeof(int));
-		for(int j=0;j<e_info.length[next_edge];j++) e_info.indices[next_edge][j]=temp[j];
-		e_smd_map[next_edge]=i;
-		next_edge++;
+		int temp_len = STgetProjection(temp, i);
+		for(int j=0; j < temp_len; j++)
+			dm_set(&dm_info, i, temp[j]);
+		e_smd_map[i] = i;
 	}
+
 	GBsetLTStype(m,ltstype);
-	GBsetEdgeInfo(m,&e_info);
+	GBsetDMInfo(m, &dm_info);
 	GBsetStateInfo(m,&s_info);
+
+	if (RTverbosity >=2) {
+	  fprintf(stderr,"Regrouped dependency Matrix:\n");
+	  GBprintDependencyMatrix(stderr,m);
+	}
 
 	STsetInitialState();
 	int temp[state_length];
