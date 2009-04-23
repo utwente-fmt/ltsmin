@@ -316,7 +316,6 @@ void GBinitModelDefaults (model_t *p_model, model_t default_src)
     if (model->state_labels_all == NULL)
         GBsetStateLabelsAll(model, default_src->state_labels_all);
 
-    return model;
 }
 
 void* GBgetContext(model_t model){
