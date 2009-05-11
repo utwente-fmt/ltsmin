@@ -382,6 +382,10 @@ int main(int argc, char *argv[]){
 		break;
 	case RunTorX:
 		{
+		dbs=TreeDBScreate(N);
+		if(TreeFold(dbs,src)!=0){
+			Fatal(1,error,"expected 0");
+		}
 		torx_struct_t context = { model, ltstype };
 		torx_ui(&context);
 		return 0;
