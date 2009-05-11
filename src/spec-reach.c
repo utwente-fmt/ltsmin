@@ -222,8 +222,12 @@ static int find_trace_to(int step,int *src,int *dst){
 }
 
 static void find_trace(int *src,int *dst){
+	mytimer_t timer=SCCcreateTimer();
+	SCCstartTimer(timer);
 	int len=find_trace_to(0,src,dst);
 	write_trace_step(len,dst);
+	SCCstopTimer(timer);
+	SCCreportTimer(timer,"constructing the trace took");
 }
 
 static void reach_bfs(){
