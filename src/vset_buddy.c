@@ -14,7 +14,7 @@ static void buddy_init(){
 	static int initialized=0;
 	if (!initialized) {
 		bdd_init(1000000, 100000);
-		Warning(info,"ratio %d, maxixum increase %d, minimum free %d",cacheratio,maxincrease,minfreenodes);
+		Warning(info,"ratio %d, maximum increase %d, minimum free %d",cacheratio,maxincrease,minfreenodes);
 		bdd_setcacheratio(cacheratio);
 		bdd_setmaxincrease(maxincrease);
 		bdd_setminfreenodes(minfreenodes);
@@ -40,6 +40,7 @@ struct vector_domain {
 	int *proj;
 };
 
+// JvdP: addref/delref not needed for variables (according to buddy.sourceforge.net)
 
 static BDD mkvar(vdom_t dom,int idx,int val){
 	return bdd_addref(fdd_ithvar(dom->vars[idx],val));
@@ -286,6 +287,14 @@ static void set_next_fdd(vset_t dst,vset_t src,vrel_t rel){
 	bdd_delref(tmp2);
 }
 
+static void set_next_appex_fdd(vset_t dst,vset_t src,vrel_t rel){
+  BDD tmp=bdd_addref(bdd_appex(src->bdd,rel->bdd,bddop_and,rel->p_set));
+  bdd_delref(dst->bdd);
+  dst->bdd=bdd_addref(bdd_replace(tmp,rel->dom->pairs));
+  bdd_delref(tmp);
+}
+
+// JvdP: gaat dit goed met aliasing? (dst=src)
 static void set_project_fdd(vset_t dst,vset_t src){
 	bdd_delref(dst->bdd);
 	dst->bdd=bdd_addref(bdd_exist(src->bdd,dst->c_set));
@@ -355,7 +364,7 @@ vdom_t vdom_create_fdd(int n){
 	dom->shared.set_project=set_project_fdd;
 	dom->shared.rel_create=rel_create_fdd;
 	dom->shared.rel_add=rel_add_fdd;
-	dom->shared.set_next=set_next_fdd;
+	dom->shared.set_next=set_next_appex_fdd; // JvdP 30/05/09
 	return dom;
 }
 
