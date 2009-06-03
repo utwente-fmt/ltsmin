@@ -38,21 +38,20 @@ struct vector_domain {
 	int *vars2;
 	bddPair *pairs;
 	int *proj;
+  int *encoding; // storing boolean variables for FDD variables
 };
 
-// JvdP: addref/delref not needed for variables (according to buddy.sourceforge.net)
-
 static BDD mkvar(vdom_t dom,int idx,int val){
-	return bdd_addref(fdd_ithvar(dom->vars[idx],val));
+  	return bdd_addref(fdd_ithvar(dom->vars[idx],val));
 }
 static void rmvar(BDD var) {
-	bdd_delref(var);
+  	bdd_delref(var);
 }
 static BDD mkvar2(vdom_t dom,int idx,int val){
-	return bdd_addref(fdd_ithvar(dom->vars2[idx],val));
+  	return bdd_addref(fdd_ithvar(dom->vars2[idx],val));
 }
 static void rmvar2(BDD var) {
-	bdd_delref(var);
+  	bdd_delref(var);
 }
 
 struct vector_set {
@@ -130,8 +129,8 @@ static vrel_t rel_create_fdd(vdom_t dom,int k,int* proj){
 static inline BDD fdd_element(vset_t set,const int* e){
 	int N=set->p_len;
 	BDD bdd=bddtrue;
-	for(int i=0;i<N;i++){
-	//for(int i=N-1;i>=0;i--){
+	//for(int i=0;i<N;i++){
+	  for(int i=N-1;i>=0;i--){
 		BDD val=mkvar(set->dom,set->proj[i],e[i]);
 		BDD tmp=bdd;
 		bdd=bdd_addref(bdd_and(bdd,val));
@@ -149,8 +148,8 @@ static BDD fdd_pair(vrel_t rel,const int* e1,const int*e2){
 	int N=rel->p_len;
 //	Warning(info,"N: %d %d",N,rel->p_len);
 	BDD bdd=bddtrue;
-	for(int i=0;i<N;i++){
-	//for(int i=N-1;i>=0;i--){
+	//for(int i=0;i<N;i++){
+	  for(int i=N-1;i>=0;i--){
 		BDD val=mkvar(rel->dom,rel->proj[i],e1[i]);
 		BDD tmp=bdd;
 		bdd=bdd_addref(bdd_and(bdd,val));
@@ -330,11 +329,17 @@ vdom_t vdom_create_fdd(int n){
 	dom->vars=(int*)RTmalloc(n*sizeof(int));
 	dom->vars2=(int*)RTmalloc(n*sizeof(int));
 	dom->proj=(int*)RTmalloc(n*sizeof(int));
+	//	dom->encoding=(int*)RTmalloc(n*fdd_bits*sizeof(int));
 	for(int i=0;i<n;i++){
 		res=fdd_extdomain(domain,2);
 		if (res<0){
 			Fatal(1,error,"BuDDy error: %s",bdd_errstring(res));
 		}
+		//		{ // JvdP: store encoded boolean variables
+		//int* bools = fdd_vars(res);
+		//for (int j=0;j<fdd_bits;j++) 
+		//  encoding[i*fdd_bits+j] = bools[j];
+		//}
 		dom->vars[i]=res;
 		dom->vars2[i]=res+1;
 		dom->proj[i]=i;
