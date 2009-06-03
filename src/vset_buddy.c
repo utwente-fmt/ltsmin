@@ -38,7 +38,7 @@ struct vector_domain {
 	int *vars2;
 	bddPair *pairs;
 	int *proj;
-  int *encoding; // storing boolean variables for FDD variables
+  //int *encoding; // storing boolean variables for FDD variables
 };
 
 static BDD mkvar(vdom_t dom,int idx,int val){
@@ -150,16 +150,16 @@ static BDD fdd_pair(vrel_t rel,const int* e1,const int*e2){
 	BDD bdd=bddtrue;
 	//for(int i=0;i<N;i++){
 	  for(int i=N-1;i>=0;i--){
-		BDD val=mkvar(rel->dom,rel->proj[i],e1[i]);
+		BDD val=mkvar2(rel->dom,rel->proj[i],e2[i]);
 		BDD tmp=bdd;
 		bdd=bdd_addref(bdd_and(bdd,val));
 		bdd_delref(tmp);
-		rmvar(val);
-		val=mkvar2(rel->dom,rel->proj[i],e2[i]);
+		rmvar2(val);
+		val=mkvar(rel->dom,rel->proj[i],e1[i]);
 		tmp=bdd;
 		bdd=bdd_addref(bdd_and(bdd,val));
 		bdd_delref(tmp);
-		rmvar2(val);
+		rmvar(val);
 	}
 	//printf("element: ");
 	//fdd_printset(bdd);
@@ -214,8 +214,8 @@ static void set_copy_all(vset_t dst,vset_t src){
 	bdd_addref(dst->bdd);
 }
 
-static void vset_enum_do_fdd(vdom_t dom,BDD set,int* proj,int *vec,int N,int i,vset_element_cb cb,void* context){
-	if (i==N) {
+static void vset_enum_do_fdd(vdom_t dom,BDD set,int* proj,int *vec,int i,vset_element_cb cb,void* context){
+	if (i==-1) {
 		cb(context,vec);
 	} else {
 		for(;;){
@@ -228,7 +228,7 @@ static void vset_enum_do_fdd(vdom_t dom,BDD set,int* proj,int *vec,int N,int i,v
 			set=bdd_addref(bdd_apply(set,val,bddop_diff));
 			bdd_delref(tmp);
 			rmvar(val);
-			vset_enum_do_fdd(dom,subset,proj,vec,N,i+1,cb,context);
+			vset_enum_do_fdd(dom,subset,proj,vec,i-1,cb,context);
 		}
 	}
 	bdd_delref(set);
@@ -238,7 +238,7 @@ static void set_enum_fdd(vset_t set,vset_element_cb cb,void* context){
 	int N=set->p_len;
 	int vec[N];
 	bdd_addref(set->bdd);
-	vset_enum_do_fdd(set->dom,set->bdd,set->proj,vec,N,0,cb,context);
+	vset_enum_do_fdd(set->dom,set->bdd,set->proj,vec,N-1,cb,context);
 }
 
 static void set_enum_match_fdd(vset_t set,int p_len,int* proj,int*match,vset_element_cb cb,void* context){
@@ -253,7 +253,7 @@ static void set_enum_match_fdd(vset_t set,int p_len,int* proj,int*match,vset_ele
 	}
 	int N=set->p_len;
 	int vec[N];
-	vset_enum_do_fdd(set->dom,subset,set->proj,vec,N,0,cb,context);
+	vset_enum_do_fdd(set->dom,subset,set->proj,vec,N-1,cb,context);
 }
 
 static void set_count_fdd(vset_t set,long *nodes,long long *elements){
@@ -329,16 +329,16 @@ vdom_t vdom_create_fdd(int n){
 	dom->vars=(int*)RTmalloc(n*sizeof(int));
 	dom->vars2=(int*)RTmalloc(n*sizeof(int));
 	dom->proj=(int*)RTmalloc(n*sizeof(int));
-	//	dom->encoding=(int*)RTmalloc(n*fdd_bits*sizeof(int));
+	//dom->encoding=(int*)RTmalloc(n*fdd_bits*sizeof(int));
 	for(int i=0;i<n;i++){
 		res=fdd_extdomain(domain,2);
 		if (res<0){
 			Fatal(1,error,"BuDDy error: %s",bdd_errstring(res));
 		}
-		//		{ // JvdP: store encoded boolean variables
+		//{ // JvdP: store encoded boolean variables
 		//int* bools = fdd_vars(res);
 		//for (int j=0;j<fdd_bits;j++) 
-		//  encoding[i*fdd_bits+j] = bools[j];
+		//  dom->encoding[i*fdd_bits+j] = bools[j];
 		//}
 		dom->vars[i]=res;
 		dom->vars2[i]=res+1;
