@@ -191,6 +191,17 @@ static void set_count_tree(vset_t set,long *nodes,long long *elements){
 	*nodes=node_count;
 }
 
+static void rel_count_tree(vrel_t rel,long *nodes,long long *elements){
+	count_is=ATindexedSetCreate(HASH_INIT,HASH_LOAD);
+	elem_count=malloc(HASH_INIT*sizeof(long long));
+	elem_size=HASH_INIT;
+	node_count=2; // atom and emptyset
+	*elements=count_set_t2(rel->rel);
+	ATindexedSetDestroy(count_is);
+	free(elem_count);
+	*nodes=node_count;
+}
+
 static long long count_set_2(ATerm set){
   if (set==emptyset) return 0;
   else if (set==atom) return 1;
@@ -218,6 +229,17 @@ static void set_count_list(vset_t set,long *nodes,long long *elements){
 	elem_size=HASH_INIT;
 	node_count=2; // atom and emptyset
 	*elements=count_set_2(set->set);
+	ATindexedSetDestroy(count_is);
+	free(elem_count);
+	*nodes=node_count;
+}
+
+static void rel_count_list(vrel_t rel,long *nodes,long long *elements){
+	count_is=ATindexedSetCreate(HASH_INIT,HASH_LOAD);
+	elem_count=malloc(HASH_INIT*sizeof(long long));
+	elem_size=HASH_INIT;
+	node_count=2; // atom and emptyset
+	*elements=count_set_2(rel->rel);
 	ATindexedSetDestroy(count_is);
 	free(elem_count);
 	*nodes=node_count;
@@ -259,22 +281,21 @@ static inline ATerm Right(ATerm e) {
 }
 
 
-
 static ATerm singleton(ATerm *a,int len){
-  if (len==0)
-    return atom;
-  else
-    return Cons(a[0],singleton(a+1,len-1),emptyset);
+  ATerm set=atom;
+  for (int i=len-1;i>=0;i--)
+    set=Cons(a[i],set,emptyset);
+  return set;
 }
 
 static ATerm set_add(ATerm set,ATerm *a,int len,ATbool *new){
-  if (set==emptyset) {if (new) *new=ATtrue; return singleton(a,len);}
-  else if (set==atom) {if (new) *new=ATfalse; return atom;}
+  if (set==emptyset) {*new=ATtrue; return singleton(a,len);}
+  else if (set==atom) {*new=ATfalse; return atom;}
   else {
     ATerm x=ATgetArgument(set,0);
     int c = ATcmp(a[0],x);
     if (c<0) {
-      if (new) *new=ATtrue;
+      *new=ATtrue;
       return Cons(a[0],singleton(a+1,len-1),set);
     }
     else {
@@ -288,22 +309,23 @@ static ATerm set_add(ATerm set,ATerm *a,int len,ATbool *new){
   }
 }
 
-
 static void set_add_list(vset_t set,const int* e){
+  ATbool new;
 	int N=set->p_len?set->p_len:set->dom->shared.size;
 	ATerm vec[N];
 	for(int i=0;i<N;i++) vec[i]=(ATerm)ATmakeInt(e[i]);
-	set->set=set_add(set->set,vec,N,NULL);
+	set->set=set_add(set->set,vec,N,&new);
 }
 
 static void rel_add_list(vrel_t rel,const int* src, const int* dst){
+  ATbool new;
 	int N=rel->p_len?rel->p_len:rel->dom->shared.size;
 	ATerm vec[2*N];
 	for(int i=0;i<N;i++) {
 		vec[i+i]=(ATerm)ATmakeInt(src[i]);
 		vec[i+i+1]=(ATerm)ATmakeInt(dst[i]);
 	}
-	rel->rel=set_add(rel->rel,vec,2*N,NULL);
+	rel->rel=set_add(rel->rel,vec,2*N,&new);
 }
 
 static int set_member_list(vset_t set,const int* e){
@@ -757,6 +779,7 @@ vdom_t vdom_create_tree(int n){
 	dom->shared.set_copy=set_copy_both;
 	dom->shared.set_enum=set_enum_tree;
 	dom->shared.set_count=set_count_tree;
+	dom->shared.rel_count=rel_count_tree;
 	return dom;
 }
 
@@ -775,6 +798,7 @@ vdom_t vdom_create_list(int n){
 	dom->shared.set_enum=set_enum_list;
 	dom->shared.set_enum_match=set_enum_match_list;
 	dom->shared.set_count=set_count_list;
+	dom->shared.rel_count=rel_count_list;
 	dom->shared.set_union=set_union_list;
 	dom->shared.set_minus=set_minus_list;
 	dom->shared.set_zip=set_zip_list;

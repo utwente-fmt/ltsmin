@@ -10,6 +10,20 @@ static int cacheratio=64;
 static int maxincrease=1000000;
 static int minfreenodes=20;
 
+// print buddy garbage collect statistics to stderr...
+// problem: want to restrict this to VERBOSE flag from main, not visible here
+static void vset_fdd_gbchandler(int pre, bddGbcStat *s)
+{
+   if (!pre)
+   {
+      fprintf(stderr,"Garbage collection #%d: %d nodes / %d free",
+ 	     s->num, s->nodes, s->freenodes);
+      fprintf(stderr," / %.1fs / %.1fs total\n",
+	     (float)s->time/(float)(CLOCKS_PER_SEC),
+	     (float)s->sumtime/(float)CLOCKS_PER_SEC);
+   }
+}
+
 static void buddy_init(){
 	static int initialized=0;
 	if (!initialized) {
@@ -18,6 +32,7 @@ static void buddy_init(){
 		bdd_setcacheratio(cacheratio);
 		bdd_setmaxincrease(maxincrease);
 		bdd_setminfreenodes(minfreenodes);
+                bdd_gbc_hook(vset_fdd_gbchandler);
 		initialized=1;
 	}
 }
@@ -69,6 +84,7 @@ struct vector_relation {
 	BDD p_set; // variables in the projection.
 	int p_len;
 	int* proj;
+	BDD rel_set; // variables + primed variables in the projection.
 };
 
 static vset_t set_create_fdd(vdom_t dom,int k,int* proj){
@@ -110,15 +126,21 @@ static vrel_t rel_create_fdd(vdom_t dom,int k,int* proj){
 	rel->dom=dom;
 	rel->bdd=bddfalse;
 	if (k && k<dom->shared.size) {
-		int vars[k];
+	        int vars[k];
+		int allvars[2*k];
 		rel->p_len=k;
 		rel->proj=(int*)RTmalloc(k*sizeof(int));
 		for(int i=0;i<k;i++) {
 			rel->proj[i]=proj[i];
 			vars[i]=dom->vars[proj[i]];
+	                allvars[2*i]=vars[i];
+                        allvars[2*i+1]=vars[i]+1; // hidden assumption on encoding
 		}
 		rel->p_set=bdd_addref(fdd_makeset(vars,k));
+                rel->rel_set=bdd_addref(fdd_makeset(allvars,2*k));
+
 	} else {
+	  fprintf(stderr,"NEVER\n"); abort();
 		rel->p_len=dom->shared.size;
 		rel->p_set=dom->varset;
 		rel->proj=dom->proj;
@@ -265,6 +287,15 @@ static void set_count_fdd(vset_t set,long *nodes,long long *elements){
 	*elements=llround(count);
 }
 
+static void rel_count_fdd(vrel_t rel,long *nodes,long long *elements){
+	*nodes=bdd_nodecount(rel->bdd);
+	double count=bdd_satcountlnset(rel->bdd,rel->rel_set);
+	//Warning(info,"log of satcount is %f",count);
+	count=pow(2.0,count);
+	//Warning(info,"satcount is %f",count);
+	*elements=llround(count);
+}
+
 static void set_union_fdd(vset_t dst,vset_t src){
 	BDD tmp=dst->bdd;
 	dst->bdd=bdd_addref(bdd_apply(tmp,src->bdd,bddop_or));
@@ -369,6 +400,7 @@ vdom_t vdom_create_fdd(int n){
 	dom->shared.set_project=set_project_fdd;
 	dom->shared.rel_create=rel_create_fdd;
 	dom->shared.rel_add=rel_add_fdd;
+	dom->shared.rel_count=rel_count_fdd;
 	dom->shared.set_next=set_next_appex_fdd; // JvdP 30/05/09
 	return dom;
 }

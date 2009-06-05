@@ -89,6 +89,8 @@ static int nGrps;
 static vdom_t domain;
 static vset_t visited;
 static long max_count=0;
+static long max_grp_count=0;
+static long max_trans_count=0;
 static model_t model;
 static vrel_t *group_rel;
 static vset_t *group_explored;
@@ -147,12 +149,30 @@ void reach_bfs(){
 	for(;;){
 		if (RTverbosity >= 1) {
 			vset_count(current_level,&n_count,&e_count);
-			fprintf(stderr,"level %d has %lld states (%ld nodes)\n",level,e_count,n_count);
+			fprintf(stderr,"level %d has %lld states ( %ld nodes )\n",level,e_count,n_count);
 		}
 		vset_count(visited,&n_count,&e_count);
 		if (n_count>max_count) max_count=n_count;
 		if (RTverbosity >= 1) {
-			fprintf(stderr,"visited %d has %lld states (%ld nodes)\n",level,e_count,n_count);
+			fprintf(stderr,"visited %d has %lld states ( %ld nodes )\n",level,e_count,n_count);
+			if (RTverbosity >= 2) fprintf(stderr,"transition caches (grp,nds,elts): ");
+			for (i=0;i<nGrps;i++) 
+			  {long long e;
+			   long int n;
+			   vrel_count(group_rel[i],&n,&e);
+			   if (RTverbosity >= 2) fprintf(stderr,"( %d %ld %lld ) ",i,n,e);
+			   if (n>max_trans_count) max_trans_count=n;
+			  }
+			if (RTverbosity >= 2) fprintf(stderr,"\n");
+			if (RTverbosity >= 2) fprintf(stderr,"group explored    (grp,nds,elts): ");
+			for (i=0;i<nGrps;i++) 
+			  {long long e;
+			   long int n;
+			   vset_count(group_explored[i],&n,&e);
+			   if (RTverbosity >= 2) fprintf(stderr,"( %d %ld %lld ) ",i,n,e);
+			   if (n>max_grp_count) max_grp_count=n;
+			  }
+			if (RTverbosity >= 2) fprintf(stderr,"\n");
 		}
 		if(vset_is_empty(current_level)) break;
 		level++;
@@ -192,7 +212,25 @@ void reach_bfs2(){
 		vset_count(visited,&n_count,&e_count);
 		if (n_count>max_count) max_count=n_count;
 		if (RTverbosity >= 1) {
-			fprintf(stderr,"visited %d has %lld states (%ld nodes)\n",level,e_count,n_count);
+			fprintf(stderr,"visited %d has %lld states ( %ld nodes )\n",level,e_count,n_count);
+			if (RTverbosity >= 2) fprintf(stderr,"transition caches (grp,nds,elts): ");
+			for (i=0;i<nGrps;i++) 
+			  {long long e;
+			   long int n;
+			   vrel_count(group_rel[i],&n,&e);
+			   if (RTverbosity >= 2) fprintf(stderr,"( %d %ld %lld ) ",i,n,e);
+			   if (n>max_trans_count) max_trans_count=n;
+			  }
+			if (RTverbosity >= 2) fprintf(stderr,"\n");
+			if (RTverbosity >= 2) fprintf(stderr,"group explored    (grp,nds,elts): ");
+			for (i=0;i<nGrps;i++) 
+			  {long long e;
+			   long int n;
+			   vset_count(group_explored[i],&n,&e);
+			   if (RTverbosity >= 2) fprintf(stderr,"( %d %ld %lld ) ",i,n,e);
+			   if (n>max_grp_count) max_grp_count=n;
+			  }
+			if (RTverbosity >= 2) fprintf(stderr,"\n");
 		}
 		level++;
 		for(i=0;i<nGrps;i++){
@@ -232,7 +270,25 @@ void reach_chain(){
 		vset_count(visited,&n_count,&e_count);
 		if (n_count>max_count) max_count=n_count;
 		if (RTverbosity >= 1) {
-			fprintf(stderr,"visited %d has %lld states (%ld nodes)\n",level,e_count,n_count);
+			fprintf(stderr,"visited %d has %lld states ( %ld nodes )\n",level,e_count,n_count);
+			if (RTverbosity >= 2) fprintf(stderr,"transition caches (grp,nds,elts): ");
+			for (i=0;i<nGrps;i++) 
+			  {long long e;
+			   long int n;
+			   vrel_count(group_rel[i],&n,&e);
+			   if (RTverbosity >= 2) fprintf(stderr,"( %d %ld %lld ) ",i,n,e);
+			   if (n>max_trans_count) max_trans_count=n;
+			  }
+			if (RTverbosity >= 2) fprintf(stderr,"\n");
+			if (RTverbosity >= 2) fprintf(stderr,"group explored    (grp,nds,elts): ");
+			for (i=0;i<nGrps;i++) 
+			  {long long e;
+			   long int n;
+			   vset_count(group_explored[i],&n,&e);
+			   if (RTverbosity >= 2) fprintf(stderr,"( %d %ld %lld ) ",i,n,e);
+			   if (n>max_grp_count) max_grp_count=n;
+			  }
+			if (RTverbosity >= 2) fprintf(stderr,"\n");
 		}
 		level++;
 		for(i=0;i<nGrps;i++){
@@ -447,7 +503,7 @@ int main(int argc, char *argv[]){
 	long n_count;
 	vset_count(visited,&n_count,&e_count);
 	if (etf_output) {
-   	        fprintf(stderr,"state space has %lld states (%ld final nodes, %ld peak nodes)\n",
+   	        fprintf(stderr,"state space has %lld states ( %ld final nodes, %ld peak nodes)\n",
 			e_count,n_count,max_count);
 		SCCresetTimer(timer);
 		SCCstartTimer(timer);
@@ -455,9 +511,10 @@ int main(int argc, char *argv[]){
 		SCCstopTimer(timer);
 		SCCreportTimer(timer,"writing output took");
 	} else {
-	  printf("state space has %lld states (%ld final nodes, %ld peak nodes)\n"
+	  printf("state space has %lld states ( %ld final nodes, %ld peak nodes)\n"
 		 ,e_count,n_count,max_count);
+	  if (RTverbosity >=1)
+	    printf("peak transition cache: %ld nodes; peak group explored: %ld nodes\n",max_trans_count,max_grp_count);
 	}
 	return 0;
 }
-

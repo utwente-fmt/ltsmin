@@ -154,6 +154,11 @@ extern vrel_t vrel_create(vdom_t dom,int k,int* proj);
 extern void vrel_add(vrel_t rel,const int* src,const int* dst);
 
 /**
+\brief Count the number of diagram nodes and the number of elements stored.
+*/
+extern void vrel_count(vrel_t rel,long *nodes,long long *elements);
+
+/**
 \brief dst := { y | exists x in src : x rel y }
 */
 extern void vset_next(vset_t dst,vset_t src,vrel_t rel);
