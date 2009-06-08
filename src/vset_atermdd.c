@@ -288,33 +288,30 @@ static ATerm singleton(ATerm *a,int len){
   return set;
 }
 
-static ATerm set_add(ATerm set,ATerm *a,int len,ATbool *new){
-  if (set==emptyset) {*new=ATtrue; return singleton(a,len);}
-  else if (set==atom) {*new=ATfalse; return atom;}
+static ATerm set_add(ATerm set,ATerm *a,int len){
+  if (set==emptyset) return singleton(a,len);
+  else if (set==atom) return atom;
   else {
     ATerm x=ATgetArgument(set,0);
     int c = ATcmp(a[0],x);
-    if (c<0) {
-      *new=ATtrue;
+    if (c<0)
       return Cons(a[0],singleton(a+1,len-1),set);
-    }
     else {
       ATerm set1 = ATgetArgument(set,1);
       ATerm set2 = ATgetArgument(set,2);
       if (c==0) 
-	return Cons(x,set_add(set1,a+1,len-1,new),set2);
+	return Cons(x,set_add(set1,a+1,len-1),set2);
       else
-	return Cons(x,set1,set_add(set2,a,len,new));
+	return Cons(x,set1,set_add(set2,a,len));
     }
   }
 }
 
 static void set_add_list(vset_t set,const int* e){
-  ATbool new;
 	int N=set->p_len?set->p_len:set->dom->shared.size;
 	ATerm vec[N];
 	for(int i=0;i<N;i++) vec[i]=(ATerm)ATmakeInt(e[i]);
-	set->set=set_add(set->set,vec,N,&new);
+	set->set=set_add(set->set,vec,N);
 }
 
 static void rel_add_list(vrel_t rel,const int* src, const int* dst){
@@ -325,7 +322,7 @@ static void rel_add_list(vrel_t rel,const int* src, const int* dst){
 		vec[i+i]=(ATerm)ATmakeInt(src[i]);
 		vec[i+i+1]=(ATerm)ATmakeInt(dst[i]);
 	}
-	rel->rel=set_add(rel->rel,vec,2*N,&new);
+	rel->rel=set_add(rel->rel,vec,2*N);
 }
 
 static int set_member_list(vset_t set,const int* e){
