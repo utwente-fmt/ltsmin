@@ -73,6 +73,8 @@ max_row_first (matrix_t *m, int rowa, int rowb)
     return 0;
 }
 
+void GBcopyLTStype(model_t model,lts_type_t info);
+
 model_t
 GBregroup (model_t model, char *group_spec)
 {
@@ -91,7 +93,7 @@ GBregroup (model_t model, char *group_spec)
     // create new model
     model_t             group = GBcreateBase ();
     GBcopyChunkMaps (group, model);
-    GBsetLTStype (group, GBgetLTStype (model));
+    GBcopyLTStype (group, GBgetLTStype (model)); // Jvdp onbegrepen
         
     struct group_context *ctx = RTmalloc (sizeof *ctx);
 

@@ -194,6 +194,12 @@ void GBsetLTStype(model_t model,lts_type_t info){
 	}
 }
 
+//JvdP: onbegrepen wijziging
+void GBcopyLTStype(model_t model,lts_type_t info){
+	if (model->ltstype != NULL)  Fatal(1,error,"ltstype already set");
+	model->ltstype=info;
+}
+
 lts_type_t GBgetLTStype(model_t model){
 	return model->ltstype;
 }
