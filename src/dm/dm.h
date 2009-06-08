@@ -7,6 +7,10 @@
 #include <stdio.h>
 #include <string.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef struct {
     int                 becomes;
     int                 at;
@@ -112,4 +116,8 @@ extern int          dm_expand_vector (matrix_t *, int row, int *s0, int *src,
 
 // erase me later
 int                 dm_print_perm (matrix_header_t *p);
+
+#ifdef __cplusplus
+}
+#endif
 #endif                          // DM_H
