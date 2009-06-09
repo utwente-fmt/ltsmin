@@ -141,7 +141,7 @@ model_t GBcreateBase(){
 	return model;
 }
 
-model_t GBinitModelDefaults (model_t *p_model, model_t default_src)
+void GBinitModelDefaults (model_t *p_model, model_t default_src)
 {
     model_t model = *p_model;
     if (model->ltstype == NULL) {
@@ -174,7 +174,6 @@ model_t GBinitModelDefaults (model_t *p_model, model_t default_src)
         GBsetStateLabelLong(model, default_src->state_labels_long);
     if (model->state_labels_all == NULL)
         GBsetStateLabelsAll(model, default_src->state_labels_all);
-
 }
 
 void* GBgetContext(model_t model){

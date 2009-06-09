@@ -278,7 +278,7 @@ extern void GBcopyChunkMaps(model_t dst, model_t src);
 /**
 \brief Initializes unset model parameters from default_src.
 */
-extern model_t GBinitModelDefaults (model_t *p_model, model_t default_src);
+extern void GBinitModelDefaults (model_t *p_model, model_t default_src);
 
 /**
 \brief Get the number of different chunks of type type_no.

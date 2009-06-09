@@ -49,7 +49,7 @@ read_matrix ()
             dm_set (&m, row, col);
         }
 
-        if (c == '-' || c == '0');
+        if (c == '-' || c == '0') { } ;
         if (c == '\n') {
             max_col = max_col < col ? col : max_col;
             col = -1;
