@@ -32,5 +32,15 @@ Get the number of elements
 */
 extern int TreeCount(treedbs_t dbs);
 
+/**
+Print node count info for the given dbs.
+ */
+extern void TreeInfo(treedbs_t dbs);
+
+/**
+\brief Free the memory used by a tree dbs.
+*/
+extern void TreeDBSfree(treedbs_t dbs);
+
 #endif
 
