@@ -120,6 +120,14 @@ static void log_end(log_t log){
 	fprintf(log->f,"\n");
 }
 
+int log_active(log_t log){
+ 	if (!log) {
+ 	    return 1;
+	} else {
+		return (log->flags & LOG_PRINT)!=0;
+	}
+}
+
 void log_message(log_t log,const char*file,int line,int errnum,const char *fmt,...){
 	struct runtime_log null_log;
 	if (!log) {
