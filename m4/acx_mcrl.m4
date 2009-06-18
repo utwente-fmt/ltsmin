@@ -1,4 +1,4 @@
-#serial 1
+#serial 2
 # Author: Michael Weber <michaelw@cs.utwente.nl>
 #
 # SYNOPSIS
@@ -27,7 +27,9 @@ if test x"$acx_mcrl" = xyes; then
     fi
 
     AC_SUBST(MCRL_CPPFLAGS, ["$MCRL_CPPFLAGS -I$with_mcrl/include"])
-    AC_SUBST(MCRL_LDFLAGS,  ["-L$with_mcrl/lib"])
+# -export-dynamic ensures that symbol "rw_size" can be resolved when
+# (lib)mcrl dynamically loads compiled rewriters
+    AC_SUBST(MCRL_LDFLAGS,  ["-L$with_mcrl/lib -export-dynamic"])
     $1
 else
     $2
