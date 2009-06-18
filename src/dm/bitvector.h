@@ -4,11 +4,11 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-
+#include <stdint.h>
 
 typedef struct bitvector {
     int                 n_bits;
-    unsigned long      *data;
+    uint32_t           *data;
 } bitvector_t;
 
 extern int          bitvector_create (bitvector_t *, const int);
