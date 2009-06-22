@@ -68,6 +68,12 @@ extern void event_Isend(event_queue_t queue,void *buf, int count, MPI_Datatype d
 	int dest, int tag, MPI_Comm comm,event_callback cb,void*context);
 
 /**
+\brief Post a new Issend in a queue with a callback.
+*/
+extern void event_Issend(event_queue_t queue,void *buf, int count, MPI_Datatype datatype,
+	int dest, int tag, MPI_Comm comm,event_callback cb,void*context);
+
+/**
 Execute queue events until message received.
 */
 extern void event_Recv(event_queue_t queue, void *buf, int count, MPI_Datatype datatype,

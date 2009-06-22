@@ -235,7 +235,7 @@ static inline int owner(int32_t *state){
 	return (hash%mpi_nodes);
 }
 
-#define POOL_SIZE 16
+#define POOL_SIZE 256
 
 struct work_msg {
 	int src_worker;
@@ -320,7 +320,7 @@ static void callback(void*context,int*labels,int*dst){
 		work_send_buf[work_send_next].dest[i]=dst[i];
 	}
 	who=owner(work_send_buf[work_send_next].dest);
-	event_Isend(mpi_queue,&work_send_buf[work_send_next],WORK_SIZE,MPI_CHAR,who,
+	event_Issend(mpi_queue,&work_send_buf[work_send_next],WORK_SIZE,MPI_CHAR,who,
 			WORK_TAG,MPI_COMM_WORLD,event_decr,&work_send_used[work_send_next]);
 	event_idle_send(work_counter);
 	work_send_next=(work_send_next+1)%POOL_SIZE;
