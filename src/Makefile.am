@@ -165,6 +165,20 @@ libutil_a_SOURCES := unix.c runtime.c stream.c archive.c			\
 
 libutil_a_CPPFLAGS := $(BUDDY_CPPFLAGS)
 
+# libltsminopen
+CADPCC = $(CADP)/src/com/cadp_cc
+CADPINCLUDES = -I$(CADP)/incl
+
+lib_LIBRARIES = libltsminopen.a
+libltsminopen_a_SOURCES := \
+		    ltsmin_open.c \
+	            mcrl-greybox.c mcrl-greybox.h    \
+                    at-map.c at-map.h vset_atermdd.c
+# libltsminopen_a_LIBADD    = libutil.a $(MCRL_LIBS) $(BUDDY_LIBS) $(CADP_LIBS)
+libltsminopen_a_CPPFLAGS := -DMCRL $(MCRL_CPPFLAGS) $(AM_CPPFLAGS)  $(CADP_CPPFLAGS)
+# libltsminopen_a_LDFLAGS  = $(MCRL_LDFLAGS) $(AM_LDFLAGS) $(CADP_LDFLAGS)
+
+
 
 if HAVE_LIBBCG
 libutil_a_SOURCES += bcg_io_ops.c
