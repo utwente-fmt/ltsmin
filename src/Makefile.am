@@ -1,6 +1,16 @@
 bin_PROGRAMS = ltsmin-convert gcf etf-convert
 noinst_PROGRAMS =
-noinst_LIBRARIES = libutil.a
+noinst_LIBRARIES =
+
+# ltsminopen
+if HAVE_CADP
+CADPCC = $(CADP)/src/com/cadp_cc
+CADPINCLUDES = -I$(CADP)/incl
+bin_SCRIPTS = ltsmin_open
+lib_LIBRARIES = libutil.a
+else
+noinst_LIBRARIES += libutil.a
+endif
 
 if HAVE_MPI
 bin_PROGRAMS += ltsmin-mpi etf2lts-mpi
@@ -18,15 +28,24 @@ bin_PROGRAMS += nips2lts-mpi
 endif
 if HAVE_LIBSTEP_INFO
 bin_PROGRAMS +=  lpo2lts-grey lpo-reach
+if HAVE_CADP
+lib_LIBRARIES += liblpo-open.a
+endif
 endif
 
 if HAVE_LIBMCRL2
 bin_PROGRAMS += lps2lts-grey lps-reach
+if HAVE_CADP
+lib_LIBRARIES += liblps-open.a
+endif
 endif
 
 if HAVE_LIBMCRL
 # if HAVE_LIBNIPS
 bin_PROGRAMS += nips2lts-grey nips-reach etf2lts-grey etf-reach
+if HAVE_CADP
+lib_LIBRARIES += libnips-open.a libetf-open.a
+endif
 # endif
 endif
 
@@ -123,6 +142,27 @@ etf2lts_mpi_LDADD    = libmpi.a libutil.a $(CADP_LIBS)
 etf2lts_mpi_CPPFLAGS = -DETF $(MCRL_CPPFLAGS) $(AM_CPPFLAGS)
 etf2lts_mpi_LDFLAGS  = $(AM_LDFLAGS) $(CADP_LDFLAGS)
 
+
+# liblpo-open.a
+liblpo_open_a_SOURCES = spec_open.c mcrl-greybox.c mcrl-greybox.h \
+    at-map.c at-map.h vset_atermdd.c
+liblpo_open_a_CPPFLAGS = -DMCRL $(MCRL_CPPFLAGS) $(AM_CPPFLAGS)  $(CADP_CPPFLAGS)
+
+# liblps-open.a
+liblps_open_a_SOURCES = spec_open.c mcrl2-greybox.cpp mcrl2-greybox.h \
+    at-map.c at-map.h vset_atermdd.c
+liblps_open_a_CPPFLAGS = -DMCRL2 $(MCRL2_CPPFLAGS) $(AM_CPPFLAGS) $(CADP_CPPFLAGS)
+
+# libetf-open.a
+libetf_open_a_SOURCES = spec_open.c etf-greybox.c etf-greybox.h    \
+                        lts.c lts.h vset_atermdd.c
+libetf_open_a_CPPFLAGS = -DETF $(MCRL_CPPFLAGS) $(AM_CPPFLAGS) $(CADP_CPPFLAGS)
+
+# libnips-open.a
+libnips_open_a_SOURCES = spec_open.c nips-greybox.c nips-greybox.h   \
+                         vset_atermdd.c
+libnips_open_a_CPPFLAGS = -DNIPS $(NIPS_CPPFLAGS) $(MCRL_CPPFLAGS) $(AM_CPPFLAGS) $(CADP_CPPFLAGS)
+
 # mpi-event-test
 mpi_event_test_SOURCES = mpi-event-test.c config.h
 mpi_event_test_LDADD   = libmpi.a libutil.a
@@ -164,20 +204,6 @@ libutil_a_SOURCES := unix.c runtime.c stream.c archive.c			\
                     archive_io_ops.c fifo.c fifo.h
 
 libutil_a_CPPFLAGS := $(BUDDY_CPPFLAGS)
-
-# libltsminopen
-CADPCC = $(CADP)/src/com/cadp_cc
-CADPINCLUDES = -I$(CADP)/incl
-
-lib_LIBRARIES = libltsminopen.a
-libltsminopen_a_SOURCES := \
-		    ltsmin_open.c \
-	            mcrl-greybox.c mcrl-greybox.h    \
-                    at-map.c at-map.h vset_atermdd.c
-# libltsminopen_a_LIBADD    = libutil.a $(MCRL_LIBS) $(BUDDY_LIBS) $(CADP_LIBS)
-libltsminopen_a_CPPFLAGS := -DMCRL $(MCRL_CPPFLAGS) $(AM_CPPFLAGS)  $(CADP_CPPFLAGS)
-# libltsminopen_a_LDFLAGS  = $(MCRL_LDFLAGS) $(AM_LDFLAGS) $(CADP_LDFLAGS)
-
 
 
 if HAVE_LIBBCG

@@ -30,6 +30,7 @@ if test x"$CADP" != x && test -f "$CADP/com/arch"; then
         AC_SUBST(CADP_LDFLAGS,  ["-L$CADP/bin.$CADP_ARCH"])
         AC_SUBST(CADP_CPPFLAGS, ["-I$CADP/incl"])
         acx_cadp=yes
+        AC_CONFIG_FILES([src/ltsmin_open])
     else
         AC_MSG_RESULT([unknown])
         acx_cadp=no

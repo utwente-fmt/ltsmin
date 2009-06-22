@@ -1,6 +1,8 @@
-#define CAESAR_GRAPH_IMPLEMENTATION 0
+#define CAESAR_GRAPH_IMPLEMENTATION 1
 #include "config.h"
-#include "caesar_graph.h"
+#include <stdarg.h>
+#include <caesar_standard.h>
+#include <caesar_graph.h>
 #include <stdio.h>
 
 #include <stdint.h>
@@ -63,7 +65,6 @@ static  struct poptOption options[] = {
 #if defined(MCRL)
 	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, mcrl_options , 0 , "mCRL options", NULL },
 #endif
-/*
 #if defined(MCRL2)
 	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, mcrl2_options , 0 , "mCRL2 options", NULL },
 #endif
@@ -73,6 +74,7 @@ static  struct poptOption options[] = {
 #if defined(ETF)
 	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, etf_options , 0 , "ETF options", NULL },
 #endif
+/*
 	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, greybox_options , 0 , "Greybox options", NULL },
 	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, vset_setonly_options , 0 , "Vector set options", NULL },
 	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, lts_io_options , 0 , NULL , NULL },
@@ -95,8 +97,10 @@ CAESAR_TYPE_VERSION CAESAR_GRAPH_VERSION() {
 typedef  struct CAESAR_STRUCT_STATE { int state[0]; } CAESAR_BODY_STATE;
 typedef  struct CAESAR_STRUCT_LABEL { int label[0]; } CAESAR_BODY_LABEL;
 
+/*
 typedef  CAESAR_TYPE_ABSTRACT(CAESAR_STRUCT_STATE) CAESAR_TYPE_STATE;
 typedef  CAESAR_TYPE_ABSTRACT(CAESAR_STRUCT_LABEL) CAESAR_TYPE_LABEL;
+*/
 
 CAESAR_TYPE_NATURAL CAESAR_HINT_SIZE_STATE;
 CAESAR_TYPE_NATURAL CAESAR_HINT_SIZE_LABEL;
@@ -435,7 +439,7 @@ static void *new_string_index(void* context){
 
 
 void CAESAR_INIT_GRAPH(void) {
-	char *opencaesar_args, *opencaesar_prog;
+	char *opencaesar_args, *opencaesar_prog,*ltsmin_options;
 	 edge_info_t e_info;
 	 int argc;
 	 char **argv;
@@ -446,19 +450,23 @@ void CAESAR_INIT_GRAPH(void) {
 	opencaesar_args = getenv ("OPEN_CAESAR_FILE");
 	if (opencaesar_args == NULL)
 		CAESAR_ERROR ("undefined environment variable $OPEN_CAESAR_FILE");
+	ltsmin_options = getenv ("LTSMIN_OPTIONS");
+	if (ltsmin_options == NULL)
+		CAESAR_ERROR ("undefined environment variable $LTSMIN_OPTIONS");
 	
-	int len=strlen(opencaesar_prog)+strlen(opencaesar_args);
-	char cmdline[len+4];
-	sprintf(cmdline,"%s %s",opencaesar_prog,opencaesar_args);
+	
+	int len=strlen(opencaesar_prog)+strlen(ltsmin_options)+strlen(opencaesar_args);
+	char cmdline[len+6];
+	sprintf(cmdline,"%s %s %s",opencaesar_prog,ltsmin_options,opencaesar_args);
 
-	int res=poptParseArgvString(cmdline,&argc,(const char ***)&argv);
+	int res=poptParseArgvString(cmdline,&argc,(const void*)(&argv));
+	// last argument should be of type const char***, but that doesn't work :-(
 	if (res){
 		Fatal(1,error,"could not parse %s: %s",opencaesar_args,poptStrerror(res));
 	}
 
  	char *files[2];
-	RTinitPopt(&argc,&argv,options,1,1,files,NULL,"<model>",
-		"Options");
+	RTinitPopt(&argc,&argv,options,1,1,files,NULL,"<model>","Options");
 	Warning(info,"loading model from %s",files[0]);
 	model=GBcreateBase();
 	GBsetChunkMethods(model,new_string_index,NULL,

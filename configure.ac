@@ -147,6 +147,7 @@ AM_CONDITIONAL([HAVE_LIBSTEP_INFO], [test x"$have_libstep_info" = xyes])
 AM_CONDITIONAL([HAVE_ASCIIDOC], [test x"$ASCIIDOC" != x])
 AM_CONDITIONAL([HAVE_XMLTO], [test x"$XMLTO" != x])
 AM_CONDITIONAL([HAVE_LIBBCG], [test x"$have_bcg" = xyes])
+AM_CONDITIONAL([HAVE_CADP], [test x"$acx_cadp" = xyes])
 
 AC_CONFIG_FILES([
        Makefile
