@@ -67,7 +67,7 @@ then
 	exit 1
 fi
 case $FILE in
- *tbf)
+ *.tbf)
     if test "@MCRL_LDFLAGS@" == "\@MCRL_LDFLAGS\@" ; then
         echo "mCRL is not supported"
         exit 1
@@ -75,13 +75,29 @@ case $FILE in
     echo "input is mCRL"
     LTSMIN_LD_FLAGS="@MCRL_LDFLAGS@ -L$LTSMIN_LIB @CADP_LDFLAGS@ -llpo-open -lutil @MCRL_LIBS@ @CADP_LIBS@ -lz -lpopt"
     ;;
- *lps)
+ *.lps)
     if test "@MCRL2_LDFLAGS@" == "\@MCRL2_LDFLAGS\@" ; then
         echo "mCRL2 is not supported"
         exit 1
     fi
     echo "input is mCRL2"
     LTSMIN_LD_FLAGS="@MCRL2_LDFLAGS@ -L$LTSMIN_LIB @CADP_LDFLAGS@ -llps-open -lutil @MCRL2_LIBS@ @CADP_LIBS@ -lz -lpopt"
+    ;;
+ *.b)
+    if test "@MCRL_LDFLAGS@" == "\@MCRL_LDFLAGS\@" ; then
+        echo "cannot use NIPS-VM without mCRL."
+        exit 1
+    fi
+    echo "input is NIPS-VM"
+    LTSMIN_LD_FLAGS="@NIPS_LDFLAGS@ @MCRL_LDFLAGS@ -L$LTSMIN_LIB @CADP_LDFLAGS@ -lnips-open -lutil -lnips_vm @CADP_LIBS@ -lz -lpopt"
+    ;;
+ *.etf)
+    if test "@MCRL_LDFLAGS@" == "\@MCRL_LDFLAGS\@" ; then
+        echo "cannot use ETF without mCRL."
+        exit 1
+    fi
+    echo "input is ETF"
+    LTSMIN_LD_FLAGS="@MCRL_LDFLAGS@ -L$LTSMIN_LIB @CADP_LDFLAGS@ -letf-open -lutil @CADP_LIBS@ -lz -lpopt"
     ;;
  *)
     echo "Did not recognize type of $FILE"
