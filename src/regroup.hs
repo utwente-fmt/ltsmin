@@ -69,7 +69,7 @@ optimal_group g =
 
 cost_t ([]:_) = 0
 cost_t g     = let (heads,tails) = unzip $ map (\(x:l)->(x,l)) g
-               in cost_row heads + cost tails
+               in cost_row heads + cost_t tails
 
 allinsert x [] = [[x]]
 allinsert x (y:l) = (x:y:l) : map (y:) (allinsert x l)
@@ -81,7 +81,7 @@ lesscostperm (_,c) (_,f) = compare c f
 
 bestresult g =
   let gs = allperms (transpose g)
-      (h,_) = minimumBy lesscostperm $ map (\g->(g,cost g)) gs
+      (h,_) = minimumBy lesscostperm $ map (\g->(g,cost_t g)) gs
   in transpose h
 
 -----------------------------------------------------------------------
