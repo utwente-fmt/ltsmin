@@ -14,7 +14,7 @@ if HAVE_MPI
 bin_PROGRAMS += ltsmin-mpi etf2lts-mpi
 noinst_PROGRAMS += mpi-event-test
 noinst_LTLIBRARIES += libmpi.la
-if HAVE_LIBMCRL
+if HAVE_LIBSTEP_INFO
 bin_PROGRAMS += lpo2lts-mpi
 endif
 if HAVE_LIBMCRL2
