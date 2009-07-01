@@ -62,6 +62,12 @@ extern void event_Send(event_queue_t queue,void *buf, int count, MPI_Datatype da
 	int dest, int tag, MPI_Comm comm);
 
 /**
+\brief Execute events until the mpi synchronous send has completed.
+*/
+extern void event_Ssend(event_queue_t queue,void *buf, int count, MPI_Datatype datatype,
+	int dest, int tag, MPI_Comm comm);
+
+/**
 \brief Post a new Isend in a queue with a callback.
 */
 extern void event_Isend(event_queue_t queue,void *buf, int count, MPI_Datatype datatype,
