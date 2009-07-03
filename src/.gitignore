@@ -1,5 +1,7 @@
 *.o
 *.a
+*.lo
+*.la
 *.hi
 .depend
 .depend.bak
