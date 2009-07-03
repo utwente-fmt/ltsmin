@@ -1,11 +1,12 @@
 AC_PREREQ(2.60)
-AC_INIT([ltsmin], [1.2.1],
-        [ltsmin-support@cs.utwente.nl])
+AC_INIT([ltsmin],[1.2.1],[ltsmin-support@cs.utwente.nl])
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_AUX_DIR([autotools])
 AM_INIT_AUTOMAKE([foreign])
 AC_CONFIG_SRCDIR([src/ltsmin-mpi.c])
 AC_CONFIG_HEADERS([src/amconfig.h])
+
+AC_SUBST([pkglibdir], "\${libdir}/${PACKAGE_NAME}-${PACKAGE_VERSION}")
 
 # Checks for programs.
 CFLAGS="-g -O2 $CFLAGS"
@@ -22,7 +23,9 @@ ACX_PTHREAD(
   [AC_MSG_FAILURE([no pthread support found.])])
 AC_PROG_MAKE_SET
 AC_PROG_INSTALL
-AM_PROG_LIBTOOL
+
+AC_DISABLE_SHARED
+AC_PROG_LIBTOOL
 
 ACX_MPI(
   [CC="$MPICC"
@@ -33,9 +36,7 @@ ACX_MPI(
    ltsmin_save_CXX="$CXX"
    CXX="$MPICXX"
    AC_LANG_PUSH([C++])
-   AC_TRY_LINK(
-     [#include <mpi.h>],
-     [MPI::Init();],
+   AC_LINK_IFELSE([AC_LANG_PROGRAM([[#include <mpi.h>]], [[MPI::Init();]])],
      [have_mpi=yes],
      [have_mpi=
       CXX="$ltsmin_save_CXX"
@@ -99,9 +100,9 @@ AC_SUBST([NIPS_LIBS],['${top_builddir}/nips-vm/libnips_vm.la'])
 AC_SUBST([NIPS_CPPFLAGS],['-I${top_srcdir}'])
 AC_SUBST([NIPS_LDFLAGS])
 
-AC_SUBST([BUDDY_LIBS],['${top_builddir}/buddy/src/libbdd.la -lm'])
+AC_SUBST([BUDDY_LIBS],['-lbdd -lm'])
 AC_SUBST([BUDDY_CPPFLAGS],['-I${top_srcdir}/buddy/src'])
-AC_SUBST([BUDDY_LDFLAGS])
+AC_SUBST([BUDDY_LDFLAGS],['-L${top_builddir}/buddy/src'])
 
 AC_CHECK_LIB([rt], [aio_error])
 ACX_CADP_BCG_WRITE([have_bcg=yes],
@@ -149,14 +150,17 @@ AM_CONDITIONAL([HAVE_XMLTO], [test x"$XMLTO" != x])
 AM_CONDITIONAL([HAVE_LIBBCG], [test x"$have_bcg" = xyes])
 AM_CONDITIONAL([HAVE_CADP], [test x"$acx_cadp" = xyes])
 
-AC_CONFIG_FILES([
-       Makefile
-       src/Makefile
-       doc/Makefile
-])
-ac_configure_args="$ac_configure_args --enable-keep-terminated-procs \
-                                      --disable-shared"
-AC_CONFIG_SUBDIRS([nips-vm buddy])
+AC_CONFIG_COMMANDS_POST(
+  [ac_configure_args="$ac_configure_args --enable-keep-terminated-procs \
+                                         --disable-shared \
+                                         --libdir='$(eval echo "$pkglibdir")'"])
+
+AC_CONFIG_FILES(
+  [Makefile
+   src/Makefile
+   doc/Makefile])
+
+AC_CONFIG_SUBDIRS([buddy nips-vm])
 AC_OUTPUT
 
 cat <<EOM

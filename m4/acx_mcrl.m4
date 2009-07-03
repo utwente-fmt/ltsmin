@@ -6,6 +6,7 @@
 #   ACX_MCRL([ACTION-IF-FOUND[, ACTION-IF-NOT-FOUND]])
 #
 AC_DEFUN([ACX_MCRL], [
+AC_REQUIRE([ACX_EXPORT_DYNAMIC])
 AC_ARG_WITH([mcrl],
   [AS_HELP_STRING([--with-mcrl=<prefix>],[mCRL prefix directory])])
 AC_ARG_VAR([MCRL], [muCRL command])
@@ -27,9 +28,7 @@ if test x"$acx_mcrl" = xyes; then
     fi
 
     AC_SUBST(MCRL_CPPFLAGS, ["$MCRL_CPPFLAGS -I$with_mcrl/include"])
-# -export-dynamic ensures that symbol "rw_size" can be resolved when
-# (lib)mcrl dynamically loads compiled rewriters
-    AC_SUBST(MCRL_LDFLAGS,  ["-L$with_mcrl/lib -export-dynamic"])
+    AC_SUBST(MCRL_LDFLAGS,  ["$acx_cv_cc_export_dynamic -L$with_mcrl/lib"])
     $1
 else
     $2

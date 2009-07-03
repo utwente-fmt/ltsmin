@@ -1,6 +1,6 @@
 ACLOCAL_AMFLAGS = -I m4
 
-SUBDIRS = buddy nips-vm src doc
+SUBDIRS = @subdirs@ src doc
 EXTRA_DIST = ltsminreconf Doxyfile
 
 doc_DATA = AUTHORS COPYING README
