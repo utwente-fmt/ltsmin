@@ -35,7 +35,6 @@ struct nested_cb {
 
 void project_dest(void*context,int*labels,int*dst){
 #define info ((struct nested_cb*)context)
-	// dm_ones_in_row one is slow, replace it
 	int len = dm_ones_in_row(GBgetDMInfo(info->model), info->group);
 	int short_dst[len];
 	dm_project_vector(GBgetDMInfo(info->model), info->group, dst, short_dst);
@@ -72,7 +71,6 @@ int default_long(model_t self,int group,int*src,TransitionCB cb,void*context){
 	info.cb=cb;
 	info.user_ctx=context;
 
-	// dm_ones_in_row one is slow, replace it
 	int len = dm_ones_in_row(GBgetDMInfo(self), group);
 	int src_short[len];
 	dm_project_vector(GBgetDMInfo(self), group, src, src_short);

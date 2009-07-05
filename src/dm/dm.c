@@ -12,9 +12,11 @@ dm_create_header (matrix_header_t *p, int size)
     int                 i;
     p->size = size;
     p->data = (header_entry_t *)malloc (sizeof (header_entry_t) * size);
+    p->count = (int *)malloc (sizeof (int) * size);
     // TODO: null ptr exception
     for (i = 0; i < p->size; i++) {
         p->data[i].becomes = p->data[i].at = p->data[i].group = i;
+        p->count[i] = 0;
     }
 
     return (p->data != NULL);
@@ -28,6 +30,10 @@ dm_free_header (matrix_header_t *p)
         p->size = 0;
         p->data = NULL;
     }
+    if (p->count != NULL) {
+        free (p->count);
+        p->count = NULL;
+    }
 }
 
 int
@@ -38,6 +44,8 @@ dm_copy_header (matrix_header_t *src, matrix_header_t *tgt)
         (header_entry_t *)malloc (sizeof (header_entry_t) * tgt->size);
     // TODO: null ptr exception
     memcpy (tgt->data, src->data, sizeof (header_entry_t) * tgt->size);
+    tgt->count = (int *)malloc (sizeof (int) * tgt->size);
+    memcpy (tgt->count, src->count, sizeof (int) * tgt->size);
     return (tgt->data != NULL);
 }
 
@@ -106,8 +114,7 @@ dm_close_group (permutation_group_t *o)
 int
 dm_create (matrix_t *m, const int rows, const int cols)
 {
-    DMDBG (printf ("rows, cols: %d, %d\n", rows, cols);
-        )
+    DMDBG (printf ("rows, cols: %d, %d\n", rows, cols);)
 
         m->rows = rows;
     m->cols = cols;
@@ -177,6 +184,13 @@ dm_set (matrix_t *m, int row, int col)
 
     // calculate bit number
     int                 bitnr = rowp * (m->bits_per_row) + colp;
+
+    // counts
+    if (!bitvector_is_set (&(m->bits), bitnr)) {
+        m->row_perm.count[rowp]++;
+        m->col_perm.count[colp]++;
+    }
+
     return bitvector_set (&(m->bits), bitnr);
 }
 
@@ -189,6 +203,13 @@ dm_unset (matrix_t *m, int row, int col)
 
     // calculate bit number
     int                 bitnr = rowp * (m->bits_per_row) + colp;
+
+    // counts
+    if (bitvector_is_set (&(m->bits), bitnr)) {
+        m->row_perm.count[rowp]--;
+        m->col_perm.count[colp]--;
+    }
+
     return bitvector_unset (&(m->bits), bitnr);
 }
 
@@ -422,6 +443,9 @@ dm_sort_cols (matrix_t *m, dm_comparator_fn cmp)
 int
 _dm_eq_rows (matrix_t *m, int rowa, int rowb)
 {
+    if (dm_ones_in_row (m, rowa) != dm_ones_in_row (m, rowb))
+        return 0;
+
     int                 i;
     for (i = 0; i < dm_ncols (m); i++) {
         int                 a = dm_is_set (m, rowa, i);
@@ -448,6 +472,9 @@ _dm_subsume_rows (matrix_t *m, int rowa, int rowb)
 int
 _dm_eq_cols (matrix_t *m, int cola, int colb)
 {
+    if (dm_ones_in_col (m, cola) != dm_ones_in_col (m, colb))
+        return 0;
+
     int                 i;
     for (i = 0; i < dm_nrows (m); i++) {
         int                 a = dm_is_set (m, i, cola);
@@ -504,6 +531,40 @@ _dm_unmerge_group (matrix_header_t *h, int groupedrow)
     h->data[groupedrow].group = groupedrow;
 }
 
+void
+_dm_uncount_row (matrix_t *m, int row)
+{
+    // get permutation
+    int                 rowp = m->row_perm.data[row].becomes;
+
+    int                 i;
+    for (i = 0; i < dm_ncols (m); i++) {
+        if (dm_is_set (m, row, i)) {
+            int                 colp = m->col_perm.data[i].becomes;
+
+            m->row_perm.count[rowp]--;
+            m->col_perm.count[colp]--;
+        }
+    }
+}
+
+void
+_dm_count_row (matrix_t *m, int row)
+{
+    // get permutation
+    int                 rowp = m->row_perm.data[row].becomes;
+
+    int                 i;
+    for (i = 0; i < dm_ncols (m); i++) {
+        if (dm_is_set (m, row, i)) {
+            int                 colp = m->col_perm.data[i].becomes;
+
+            m->row_perm.count[rowp]++;
+            m->col_perm.count[colp]++;
+        }
+    }
+}
+
 // merge rowa and rowb, remove rowb from the matrix
 int
 _dm_merge_rows (matrix_t *m, int rowa, int rowb)
@@ -535,6 +596,9 @@ _dm_merge_rows (matrix_t *m, int rowa, int rowb)
     // merge the groups (last row in matrix is now rowb)
     _dm_merge_group (&(m->row_perm), m->row_perm.data[rows - 1].becomes,
                      m->row_perm.data[rowa].becomes);
+
+    // update matrix counts
+    _dm_uncount_row (m, rows - 1);
 
     // remove the last row from the matrix
     m->rows--;
@@ -574,10 +638,50 @@ _dm_unmerge_row (matrix_t *m, int row)
 
     dm_permute_rows (m, &o);
     dm_free_permutation_group (&o);
+
+    // update matrix counts
+    _dm_count_row (m, j + 1);
+
+    // increase matrix size
     m->rows++;
 
     return 1;
 }
+
+void
+_dm_uncount_col (matrix_t *m, int col)
+{
+    // get permutation
+    int                 colp = m->col_perm.data[col].becomes;
+
+    int                 i;
+    for (i = 0; i < dm_nrows (m); i++) {
+        if (dm_is_set (m, i, col)) {
+            int                 rowp = m->row_perm.data[i].becomes;
+
+            m->col_perm.count[colp]--;
+            m->row_perm.count[rowp]--;
+        }
+    }
+}
+
+void
+_dm_count_col (matrix_t *m, int col)
+{
+    // get permutation
+    int                 colp = m->col_perm.data[col].becomes;
+
+    int                 i;
+    for (i = 0; i < dm_nrows (m); i++) {
+        if (dm_is_set (m, i, col)) {
+            int                 rowp = m->row_perm.data[i].becomes;
+
+            m->col_perm.count[colp]++;
+            m->row_perm.count[rowp]++;
+        }
+    }
+}
+
 
 // merge cola and colb, remove colb from the matrix
 int
@@ -610,6 +714,9 @@ _dm_merge_cols (matrix_t *m, int cola, int colb)
     // merge the groups (last col in matrix is now colb)
     _dm_merge_group (&(m->col_perm), m->col_perm.data[cols - 1].becomes,
                      m->col_perm.data[cola].becomes);
+
+    // update matrix counts
+    _dm_uncount_col (m, cols - 1);
 
     // remove the last col from the matrix
     m->cols--;
@@ -649,6 +756,11 @@ _dm_unmerge_col (matrix_t *m, int col)
 
     dm_permute_cols (m, &o);
     dm_free_permutation_group (&o);
+
+    // update matrix counts
+    _dm_count_col (m, j + 1);
+
+    // increase matrix size
     m->cols++;
 
     return 1;
@@ -690,7 +802,6 @@ dm_subsume_rows (matrix_t *m)
                 if (_dm_subsume_rows (m, j, i)) {
                     _dm_merge_rows (m, i, j);
                     // now row j is removed, don't increment it in the for 
-                    // 
                     // loop
                     j--;
                 }
@@ -737,7 +848,6 @@ dm_subsume_cols (matrix_t *m)
                 if (_dm_subsume_cols (m, j, i)) {
                     _dm_merge_cols (m, i, j);
                     // now col j is removed, don't increment it in the for 
-                    // 
                     // loop
                     j--;
                 }
@@ -872,8 +982,7 @@ dm_optimize (matrix_t *m)
         }
 
         DMDBG (printf
-               ("best rotation: %d-%d, costs %d\n", best_i, best_j, min);
-            )
+               ("best rotation: %d-%d, costs %d\n", best_i, best_j, min);)
             // apply it 
             if (best_i != best_j) {
             d = best_i < best_j ? 1 : -1;
@@ -887,8 +996,7 @@ dm_optimize (matrix_t *m)
             dm_permute_cols (m, &rot);
             dm_free_permutation_group (&rot);
 
-            DMDBG (dm_print (stdout, m);
-                )
+            DMDBG (dm_print (stdout, m);)
         }
 
         best_i = best_j = 0;
@@ -962,25 +1070,15 @@ dm_row_next (dm_row_iterator_t *ix)
 int
 dm_ones_in_col (matrix_t *m, int col)
 {
-    int                 result = 0;
-    for (int i = 0; i < dm_nrows (m); i++) {
-        if (dm_is_set (m, i, col))
-            result++;
-    }
-    return result;
+    int                 colp = m->col_perm.data[col].becomes;
+    return m->col_perm.count[colp];
 }
 
 int
 dm_ones_in_row (matrix_t *m, int row)
 {
-    // http://gurmeetsingh.wordpress.com/2008/08/05/fast-bit-counting-routines/
-    // http://graphics.stanford.edu/~seander/bithacks.html#CountBitsSetNaive
-    int                 result = 0;
-    for (int i = 0; i < dm_ncols (m); i++) {
-        if (dm_is_set (m, row, i))
-            result++;
-    }
-    return result;
+    int                 rowp = m->row_perm.data[row].becomes;
+    return m->row_perm.count[rowp];
 }
 
 int

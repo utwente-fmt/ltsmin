@@ -61,9 +61,7 @@ cached_short (model_t self, int group, int *src, TransitionCB cb,
     struct cache_context *ctx =
         (struct cache_context *)GBgetContext (self);
     struct group_cache *cache = &(ctx->cache[group]);
-    // dm_ones_in_row is rather slow, therefore use value in group cache
-    // int len = dm_ones_in_row(GBgetDMInfo(self), group);
-    int                 len = cache->len / sizeof (int);
+    int len = dm_ones_in_row(GBgetDMInfo(self), group);
 
     int                 tmp[len];
     int                 src_idx =
@@ -97,7 +95,6 @@ GBaddCache (model_t model)
     int                 N = dm_nrows (p_dm);
     struct group_cache *cache = RTmalloc (N * sizeof (struct group_cache));
     for (int i = 0; i < N; i++) {
-        // note: dm_ones_in_row is rather slow
         int                 len = dm_ones_in_row (p_dm, i);
         cache[i].len = len * sizeof (int);
         cache[i].idx = SIcreate ();

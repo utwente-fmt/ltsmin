@@ -20,6 +20,7 @@ typedef struct {
 typedef struct {
     int                 size;
     header_entry_t     *data;
+    int                *count;
 } matrix_header_t;
 
 extern int          dm_create_header (matrix_header_t *, int);

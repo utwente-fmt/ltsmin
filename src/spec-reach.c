@@ -407,7 +407,6 @@ int main(int argc, char *argv[]){
 	group_explored=(vset_t*)RTmalloc(nGrps*sizeof(vset_t));
 	group_tmp=(vset_t*)RTmalloc(nGrps*sizeof(vset_t));
 	for(int i=0;i<nGrps;i++){
-		// dm_ones_in_row one is slow, replace it
 		int len = dm_ones_in_row(GBgetDMInfo(model), i);
 		// get indices
 		int tmp[len];

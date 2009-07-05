@@ -225,6 +225,12 @@ main (void)
     dm_sort_rows (&m1, &max_row_first);
     print_matrix (&m1);
 
+/*
+    dm_nub_cols(&m1);
+    dm_ungroup_rows(&m1);
+    dm_ungroup_cols(&m1);
+    print_matrix (&m1);
+*/
 
     printf ("count test\n");
     for (int i = 0; i < dm_nrows (&m1); i++)
