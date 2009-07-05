@@ -13,7 +13,7 @@ dm_create_header (matrix_header_t *p, int size)
     p->size = size;
     p->data = (header_entry_t *)malloc (sizeof (header_entry_t) * size);
     // TODO: null ptr exception
-    for (i = 0; i < size; i++) {
+    for (i = 0; i < p->size; i++) {
         p->data[i].becomes = p->data[i].at = p->data[i].group = i;
     }
 
@@ -370,7 +370,8 @@ dm_print (FILE * f, matrix_t *m)
 }
 
 void
-_dm_sift_down (matrix_t *m, int root, int bottom, dm_comparator_fn cmp)
+_dm_sift_down (matrix_t *m, int root, int bottom, dm_comparator_fn cmp,
+               int (*dm_swap_fn) (matrix_t *, int, int))
 {
     int                 child;
 
@@ -381,7 +382,7 @@ _dm_sift_down (matrix_t *m, int root, int bottom, dm_comparator_fn cmp)
             child++;
 
         if (cmp (m, root, child) < 0) {
-            dm_swap_rows (m, root, child);
+            dm_swap_fn (m, root, child);
             root = child;
         } else {
             return;
@@ -390,21 +391,33 @@ _dm_sift_down (matrix_t *m, int root, int bottom, dm_comparator_fn cmp)
 }
 
 int
-dm_sort_rows (matrix_t *m, dm_comparator_fn cmp)
+_dm_sort (matrix_t *m, dm_comparator_fn cmp, int size,
+          int (*dm_swap_fn) (matrix_t *, int, int))
 {
     // heapsort
     int                 i;
 
-    for (i = (dm_nrows (m) / 2) - 1; i >= 0; i--)
-        _dm_sift_down (m, i, dm_nrows (m) - 1, cmp);
+    for (i = (size / 2) - 1; i >= 0; i--)
+        _dm_sift_down (m, i, size - 1, cmp, dm_swap_fn);
 
-    for (i = dm_nrows (m) - 1; i >= 0; i--) {
-        dm_swap_rows (m, i, 0);
-        _dm_sift_down (m, 0, i - 1, cmp);
+    for (i = size - 1; i >= 0; i--) {
+        dm_swap_fn (m, i, 0);
+        _dm_sift_down (m, 0, i - 1, cmp, dm_swap_fn);
     }
     return 1;
 }
 
+int
+dm_sort_rows (matrix_t *m, dm_comparator_fn cmp)
+{
+    return _dm_sort (m, cmp, dm_nrows (m), dm_swap_rows);
+}
+
+int
+dm_sort_cols (matrix_t *m, dm_comparator_fn cmp)
+{
+    return _dm_sort (m, cmp, dm_ncols (m), dm_swap_cols);
+}
 
 int
 _dm_eq_rows (matrix_t *m, int rowa, int rowb)
@@ -420,63 +433,339 @@ _dm_eq_rows (matrix_t *m, int rowa, int rowb)
 }
 
 int
-_dm_last_in_group (matrix_t *m, int group)
+_dm_subsume_rows (matrix_t *m, int rowa, int rowb)
+{
+    int                 i;
+    for (i = 0; i < dm_ncols (m); i++) {
+        int                 a = dm_is_set (m, rowa, i);
+        int                 b = dm_is_set (m, rowb, i);
+        if (a > b)
+            return 0;                  // unequal
+    }
+    return 1;                          // equal
+}
+
+int
+_dm_eq_cols (matrix_t *m, int cola, int colb)
+{
+    int                 i;
+    for (i = 0; i < dm_nrows (m); i++) {
+        int                 a = dm_is_set (m, i, cola);
+        int                 b = dm_is_set (m, i, colb);
+        if (a != b)
+            return 0;                  // unequal
+    }
+    return 1;                          // equal
+}
+
+int
+_dm_subsume_cols (matrix_t *m, int cola, int colb)
+{
+    int                 i;
+    for (i = 0; i < dm_nrows (m); i++) {
+        int                 a = dm_is_set (m, i, cola);
+        int                 b = dm_is_set (m, i, colb);
+        if (a > b)
+            return 0;                  // unequal
+    }
+    return 1;                          // equal
+}
+
+int
+_dm_last_in_group (matrix_header_t *h, int group)
 {
     int                 start = group;
-    while (m->row_perm.data[start].group != group)
-        start = m->row_perm.data[start].group;
+    while (h->data[start].group != group)
+        start = h->data[start].group;
 
     return start;
 }
 
 void
-_dm_merge_group (matrix_t *m, int groupa, int groupb)
+_dm_merge_group (matrix_header_t *h, int groupa, int groupb)
 {
-    int                 la = _dm_last_in_group (m, groupa);
-    int                 lb = _dm_last_in_group (m, groupb);
+    int                 la = _dm_last_in_group (h, groupa);
+    int                 lb = _dm_last_in_group (h, groupb);
 
     // merge
-    m->row_perm.data[la].group = groupb;
-    m->row_perm.data[lb].group = groupa;
+    h->data[la].group = groupb;
+    h->data[lb].group = groupa;
 }
 
+
+// remove groupedrow from the group
+void
+_dm_unmerge_group (matrix_header_t *h, int groupedrow)
+{
+    int                 last = _dm_last_in_group (h, groupedrow);
+    int                 next = h->data[groupedrow].group;
+
+    h->data[last].group = next;
+    h->data[groupedrow].group = groupedrow;
+}
+
+// merge rowa and rowb, remove rowb from the matrix
 int
-dm_nub_rows (matrix_t *m)
+_dm_merge_rows (matrix_t *m, int rowa, int rowb)
 {
     int                 rows = dm_nrows (m);
     permutation_group_t o;
     int                 d[rows];
 
+    int                 j;
+
+    // make sure rowb > rowa
+    if (rowa == rowb)
+        return 0;
+    if (rowb < rowa) {
+        // in this case, rowa will move 1 row up
+        rowa--;
+    }
+    // create permutation
+    dm_create_permutation_group (&o, rows, d);
+
+    // create proper permutation group
+    for (j = rowb; j < rows; j++) {
+        dm_add_to_permutation_group (&o, j);
+    }
+
+    dm_permute_rows (m, &o);
+    dm_free_permutation_group (&o);
+
+    // merge the groups (last row in matrix is now rowb)
+    _dm_merge_group (&(m->row_perm), m->row_perm.data[rows - 1].becomes,
+                     m->row_perm.data[rowa].becomes);
+
+    // remove the last row from the matrix
+    m->rows--;
+
+    return 1;
+}
+
+// unmerge the first item in the group of this row and put it right after
+// this row
+int
+_dm_unmerge_row (matrix_t *m, int row)
+{
+    int                 org_row = m->row_perm.data[row].becomes;
+    int                 org_group = m->row_perm.data[org_row].group;
+    int                 next_at = m->row_perm.data[org_group].at;
+
+    // if this row is ungrouped, return
+    if (org_row == org_group)
+        return 1;
+
+    // remove this row from the group
+    _dm_unmerge_group (&(m->row_perm), org_row);
+
+    int                 perm_size = m->row_perm.size;
+    permutation_group_t o;
+    int                 d[perm_size];
+
+    int                 j;
+
+    // create permutation
+    dm_create_permutation_group (&o, perm_size, d);
+
+    // create proper permutation group
+    for (j = next_at; j > row; j--) {
+        dm_add_to_permutation_group (&o, j);
+    }
+
+    dm_permute_rows (m, &o);
+    dm_free_permutation_group (&o);
+    m->rows++;
+
+    return 1;
+}
+
+// merge cola and colb, remove colb from the matrix
+int
+_dm_merge_cols (matrix_t *m, int cola, int colb)
+{
+    int                 cols = dm_ncols (m);
+    permutation_group_t o;
+    int                 d[cols];
+
+    int                 j;
+
+    // make sure colb > cola
+    if (cola == colb)
+        return 0;
+    if (colb < cola) {
+        // in this case, cola will move 1 col up
+        cola--;
+    }
+    // create permutation
+    dm_create_permutation_group (&o, cols, d);
+
+    // create proper permutation group
+    for (j = colb; j < cols; j++) {
+        dm_add_to_permutation_group (&o, j);
+    }
+
+    dm_permute_cols (m, &o);
+    dm_free_permutation_group (&o);
+
+    // merge the groups (last col in matrix is now colb)
+    _dm_merge_group (&(m->col_perm), m->col_perm.data[cols - 1].becomes,
+                     m->col_perm.data[cola].becomes);
+
+    // remove the last col from the matrix
+    m->cols--;
+
+    return 1;
+}
+
+// unmerge the first item in the group of this col and put it right after
+// this col
+int
+_dm_unmerge_col (matrix_t *m, int col)
+{
+    int                 org_col = m->col_perm.data[col].becomes;
+    int                 org_group = m->col_perm.data[org_col].group;
+    int                 next_at = m->col_perm.data[org_group].at;
+
+    // if this col is ungrouped, return
+    if (org_col == org_group)
+        return 1;
+
+    // remove this col from the group
+    _dm_unmerge_group (&(m->col_perm), org_col);
+
+    int                 perm_size = m->col_perm.size;
+    permutation_group_t o;
+    int                 d[perm_size];
+
+    int                 j;
+
+    // create permutation
+    dm_create_permutation_group (&o, perm_size, d);
+
+    // create proper permutation group
+    for (j = next_at; j > col; j--) {
+        dm_add_to_permutation_group (&o, j);
+    }
+
+    dm_permute_cols (m, &o);
+    dm_free_permutation_group (&o);
+    m->cols++;
+
+    return 1;
+}
+
+int
+dm_nub_rows (matrix_t *m)
+{
     int                 i,
                         j;
-    for (i = rows - 1; i > 0; i--) {
-        if (_dm_eq_rows (m, i, i - 1)) {
-            DMDBG (printf ("rows eq: %d, %d\n", i, i - 1);
-                )
-                dm_create_permutation_group (&o, rows, d);
-            // create shift
-            for (j = i; j < rows; j++) {
-                dm_add_to_permutation_group (&o, j);
+    for (i = 0; i < dm_nrows (m); i++) {
+        for (j = i + 1; j < dm_nrows (m); j++) {
+            if (_dm_eq_rows (m, i, j)) {
+                _dm_merge_rows (m, i, j);
+                // now row j is removed, don't increment it in the for
+                // loop
+                j--;
             }
-            dm_permute_rows (m, &o);
-            dm_free_permutation_group (&o);
-            rows--;
-            // set group value?
-            // m->row_perm.data[m->row_perm.data[rows].becomes].group =
-            // -1;// m->row_perm.data[i-1].becomes;
-            /* 
-             * DMDBG (printf ("rows %d -> becomes %d\n", rows,
-             * m->row_perm.data[rows].becomes); ) DMDBG (dm_print_perm
-             * (&(m->row_perm)); ) */
-            // m->row_perm.data[m->row_perm.data[rows].becomes].group
-            // = -1;// m->row_perm.data[i-1].becomes;
-            // m->row_perm.data[m->row_perm.data[rows].becomes].group
-            // = m->row_perm.data[i-1].becomes;
-            _dm_merge_group (m, m->row_perm.data[rows].becomes,
-                             m->row_perm.data[i - 1].becomes);
         }
     }
-    m->rows = rows;
+    return 1;
+}
+
+int
+dm_subsume_rows (matrix_t *m)
+{
+    int                 i,
+                        j;
+    for (i = 0; i < dm_nrows (m); i++) {
+        for (j = i + 1; j < dm_nrows (m); j++) {
+            // is row i subsumed by row j?
+            if (_dm_subsume_rows (m, i, j)) {
+                _dm_merge_rows (m, j, i);
+                // now row j is removed, don't increment it in the for
+                // loop
+                j--;
+            } else {
+                // is row j subsumed by row i?
+                if (_dm_subsume_rows (m, j, i)) {
+                    _dm_merge_rows (m, i, j);
+                    // now row j is removed, don't increment it in the for 
+                    // 
+                    // loop
+                    j--;
+                }
+            }
+
+        }
+    }
+    return 1;
+}
+
+int
+dm_nub_cols (matrix_t *m)
+{
+    int                 i,
+                        j;
+    for (i = 0; i < dm_ncols (m); i++) {
+        for (j = i + 1; j < dm_ncols (m); j++) {
+            if (_dm_eq_cols (m, i, j)) {
+                _dm_merge_cols (m, i, j);
+                // now row j is removed, don't increment it in the for
+                // loop
+                j--;
+            }
+        }
+    }
+    return 1;
+}
+
+int
+dm_subsume_cols (matrix_t *m)
+{
+    int                 i,
+                        j;
+    for (i = 0; i < dm_ncols (m); i++) {
+        for (j = i + 1; j < dm_ncols (m); j++) {
+            // is col i subsumed by row j?
+            if (_dm_subsume_cols (m, i, j)) {
+                _dm_merge_cols (m, j, i);
+                // now col j is removed, don't increment it in the for
+                // loop
+                j--;
+            } else {
+                // is col j subsumed by row i?
+                if (_dm_subsume_cols (m, j, i)) {
+                    _dm_merge_cols (m, i, j);
+                    // now col j is removed, don't increment it in the for 
+                    // 
+                    // loop
+                    j--;
+                }
+            }
+
+        }
+    }
+    return 1;
+}
+
+int
+dm_ungroup_rows (matrix_t *m)
+{
+    int                 i;
+    for (i = 0; i < dm_nrows (m); i++) {
+        _dm_unmerge_row (m, i);
+    }
+
+    return 1;
+}
+
+int
+dm_ungroup_cols (matrix_t *m)
+{
+    int                 i;
+    for (i = 0; i < dm_ncols (m); i++) {
+        _dm_unmerge_col (m, i);
+    }
 
     return 1;
 }
@@ -604,6 +893,12 @@ dm_optimize (matrix_t *m)
 
         best_i = best_j = 0;
     }
+    return 1;
+}
+
+int
+dm_all_perm (matrix_t *m)
+{
     return 1;
 }
 

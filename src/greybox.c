@@ -341,7 +341,8 @@ static char* model_type[MAX_TYPES];
 static pins_loader_t model_loader[MAX_TYPES];
 static int registered=0;
 static int cache=0;
-static char *group_file=NULL;
+static const char regroup_default[] = "cs,cn,rs,rn,cw";
+static char *regroup_options = (char*)&regroup_default;
 
 void GBloadFile(model_t model,const char *filename,model_t *wrapped){
 	char* extension=strrchr(filename,'.');
@@ -351,7 +352,9 @@ void GBloadFile(model_t model,const char *filename,model_t *wrapped){
 			if(!strcmp(model_type[i],extension)){
 				model_loader[i](model,filename);
 				if (wrapped) {
-				  if (group_file) model=GBregroup(model,group_file);
+				  // regroup_options is null if the default should be used
+				  if (regroup_options != (char*)&regroup_default) 
+				      model=GBregroup(model,regroup_options == NULL ? (char*)&regroup_default : regroup_options);
 				  if (cache) model=GBaddCache(model);
 				  *wrapped=model;
 				}
@@ -376,6 +379,6 @@ void GBregisterLoader(const char*extension,pins_loader_t loader){
 
 struct poptOption greybox_options[]={
 	{ "cache" , 'c' , POPT_ARG_VAL , &cache , 1 , "Enable caching of grey box calls." , NULL },
-	{ "regroup" , 'r' , POPT_ARG_STRING , &group_file , 0 , "Regrouping wrapper, using group specification" ,"<file>" },
+	{ "regroup" , 'r' , POPT_ARG_STRING | POPT_ARGFLAG_OPTIONAL, &regroup_options , 0 , "Regrouping wrapper, using optional regroup specification" ,"<(c{s,n,w,a}|r{s,n,u})+>" },
 	POPT_TABLEEND	
 };

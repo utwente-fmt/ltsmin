@@ -73,22 +73,91 @@ max_row_first (matrix_t *m, int rowa, int rowb)
     return 0;
 }
 
+int
+max_col_first (matrix_t *m, int cola, int colb)
+{
+    int                 i,
+                        ca,
+                        cb;
+
+    for (i = 0; i < dm_nrows (m); i++) {
+        ca = dm_is_set (m, i, cola);
+        cb = dm_is_set (m, i, colb);
+
+        if ((ca && cb) || (!ca && !cb))
+            continue;
+        return (cb - ca);
+    }
+
+    return 0;
+}
+
 void GBcopyLTStype(model_t model,lts_type_t info);
 
 model_t
-GBregroup (model_t model, char *group_spec)
+GBregroup (model_t model, char *regroup_spec)
 {
     // note: context information is available via matrix, doesn't need to
     // be stored again
-    (void)group_spec;                  // ignore warning
+    Warning (info, "Regroup specification: %s", regroup_spec);
+
     matrix_t           *m = RTmalloc (sizeof (matrix_t));
 
     dm_copy (GBgetDMInfo (model), m);
 
-    dm_sort_rows (m, &max_row_first);
-    dm_nub_rows (m);
-    dm_optimize (m);
-    dm_sort_rows (m, &max_row_first);
+	// parse regrouping arguments
+	// allowed arguments
+	// col { sort, nub, swap, allperm}
+	// row { sort, nub, subsume }
+	if (regroup_spec)
+	{
+		char* tok = strtok(regroup_spec, ",");
+
+		while(tok != NULL)
+		{
+			// Column Sort
+			if (strcasecmp(tok, "cs") == 0) {
+				Warning (info, "Regroup Column Sort");
+				dm_sort_cols(m, &max_col_first);
+
+			// Column Nub
+			} else if (strcasecmp(tok, "cn") == 0) {
+				Warning (info, "Regroup Column Nub");
+				dm_nub_cols(m);
+
+			// Column sWap
+			} else if (strcasecmp(tok, "cw") == 0) {
+				Warning (info, "Regroup Column Swaps");
+				dm_optimize (m);
+
+			// Column All permutations
+			} else if (strcasecmp(tok, "ca") == 0) {
+				Warning (info, "Regroup Column All Permutations");
+				dm_all_perm (m);
+
+			// Row Sort
+			} else if (strcasecmp(tok, "rs") == 0) {
+				Warning (info, "Regroup Row Sort");
+				dm_sort_rows (m, &max_row_first);
+
+			// Row Nub
+			} else if (strcasecmp(tok, "rn") == 0) {
+				Warning (info, "Regroup Row Nub");
+				dm_nub_rows (m);
+
+			// Row sUbsume
+			} else if (strcasecmp(tok, "ru") == 0) {
+				Warning (info, "Regroup Row Subsume");
+				dm_subsume_rows (m);
+			}
+
+			tok = strtok(NULL, ",");
+		}
+	}
+
+	// post processing regroup specification
+	// undo column nub
+	dm_ungroup_cols(m);
 
     // create new model
     model_t             group = GBcreateBase ();

@@ -80,10 +80,17 @@ extern int          dm_sort_cols (matrix_t *, dm_comparator_fn);
 extern int          dm_nub_rows (matrix_t *);
 extern int          dm_nub_cols (matrix_t *);
 
+extern int          dm_subsume_rows (matrix_t *);
+extern int          dm_subsume_cols (matrix_t *);
+
+// note: rewrite nub & subsume to dm_group_rows/cols(matrix_t *, dm_group_fn)?
+extern int          dm_ungroup_rows (matrix_t *);
+extern int          dm_ungroup_cols (matrix_t *);
+
 extern int          dm_print (FILE *, matrix_t *);
 
-
 extern int          dm_optimize (matrix_t *);
+extern int          dm_all_perm (matrix_t *);
 
 
 typedef struct dm_row_iterator {

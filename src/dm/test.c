@@ -56,6 +56,45 @@ min_row_first (matrix_t *m, int rowa, int rowb)
     return 0;
 }
 
+int
+max_col_first (matrix_t *m, int cola, int colb)
+{
+    int                 i,
+                        ca,
+                        cb;
+
+    for (i = 0; i < dm_nrows (m); i++) {
+        ca = dm_is_set (m, i, cola);
+        cb = dm_is_set (m, i, colb);
+
+        if ((ca && cb) || (!ca && !cb))
+            continue;
+        return (cb - ca);
+    }
+
+    return 0;
+}
+
+int
+min_col_first (matrix_t *m, int cola, int colb)
+{
+    int                 i,
+                        ca,
+                        cb;
+
+    for (i = 0; i < dm_nrows (m); i++) {
+        ca = dm_is_set (m, i, cola);
+        cb = dm_is_set (m, i, colb);
+
+        if ((ca && cb) || (!ca && !cb))
+            continue;
+        return (ca - cb);
+    }
+
+    return 0;
+}
+
+
 
 int
 main (void)
@@ -238,19 +277,66 @@ main (void)
     }
     printf ("\n");
 
-    printf ("expantion test\n");
+    printf ("expansion test\n");
 
-    // do expantion
+    // do expansion
     int                 exp_n = dm_expand_vector (&m1, 0, s0, prj, tgt);
     (void)exp_n;
 
-    // print expantion
-    printf ("expantion:");
+    // print expansion
+    printf ("expansion:");
     for (int i = 0; i < 10; i++) {
         printf (" %d", tgt[i]);
     }
     printf ("\n");
 
+    // subsumption
+    printf ("subsumption test:\n");
+    dm_swap_rows (&m1, 0, 3);
+    dm_swap_rows (&m1, 1, 2);
+    dm_flatten (&m1);
+    print_matrix (&m1);
+    dm_subsume_rows (&m1);
+    printf ("after subsumption:\n");
+    print_matrix (&m1);
+    printf ("\n");
+
+    printf ("after ungrouping:\n");
+    dm_ungroup_rows (&m1);
+    print_matrix (&m1);
+    printf ("\n");
+
+    printf ("column sort test:\n");
+    dm_flatten (&m1);
+    printf ("max col first:\n");
+    dm_sort_cols (&m1, &max_col_first);
+    print_matrix (&m1);
+    printf ("min col first:\n");
+    dm_sort_cols (&m1, &min_col_first);
+    print_matrix (&m1);
+
+    printf ("nub columns test:\n");
+    dm_set (&m1, 0, 1);
+    dm_set (&m1, 3, 1);
+    dm_set (&m1, 3, 4);
+    dm_set (&m1, 3, 5);
+    dm_sort_cols (&m1, &max_col_first);
+    // dm_flatten(&m1);
+    printf ("max col first:\n");
+    print_matrix (&m1);
+    printf ("nub columns:\n");
+    dm_nub_cols (&m1);
+    print_matrix (&m1);
+    printf ("column permutation:\n");
+    dm_print_perm (&(m1.col_perm));
+
+    printf ("optimize columns:\n");
+    dm_optimize (&m1);
+    print_matrix (&m1);
+
+    printf ("ungroup columns:\n");
+    dm_ungroup_cols (&m1);
+    print_matrix (&m1);
 
 
     dm_free (&m2);
