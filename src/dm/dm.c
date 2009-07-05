@@ -116,7 +116,7 @@ dm_create (matrix_t *m, const int rows, const int cols)
 {
     DMDBG (printf ("rows, cols: %d, %d\n", rows, cols);)
 
-        m->rows = rows;
+    m->rows = rows;
     m->cols = cols;
     m->row_perm.data = NULL;
     m->col_perm.data = NULL;
@@ -1004,9 +1004,113 @@ dm_optimize (matrix_t *m)
     return 1;
 }
 
+
+inline void
+_dm_swap (int *i, int x, int y)
+{
+    int                 tmp = i[x];
+    i[x] = i[y];
+    i[y] = tmp;
+}
+
+void
+_current_all_perm (int *p, int size)
+{
+    int                 i;
+    for (i = 0; i < size; i++) {
+        printf ("%d ", p[i]);
+    }
+    printf ("\n");
+}
+
 int
 dm_all_perm (matrix_t *m)
 {
+    // http://www.freewebz.com/permute/soda_submit.html
+    int                 len = dm_ncols (m);
+    int                 perm[len];
+    int                 best_perm[len];
+    int                 min,
+                        last_min;
+
+    min = _dm_cost (m);
+
+    int                 i,
+                        j;
+
+    for (i = 0; i < len; i++) {
+        perm[i] = best_perm[i] = i;
+    }
+
+    while (1) {
+        last_min = _dm_cost (m);
+        if (last_min < min) {
+            memcpy (best_perm, perm, len * sizeof (int));
+            min = last_min;
+        }
+        // debug
+        DMDBG (_current_all_perm ((int *)&perm, len);)
+        DMDBG (dm_print (stdout, m);)
+        DMDBG (printf ("costs: %d\n", last_min);)
+
+        int                 key = len - 1;
+        int                 newkey = key;
+
+        // The key value is the first value from the end which
+        // is smaller than the value to its immediate right
+        while (key > 0 && (perm[key] <= perm[key - 1]))
+            key--;
+        key--;
+
+        // If key < 0 the data is in reverse sorted order, 
+        // which is the last permutation.
+        if (key < 0)
+            break;
+
+        // perm[key+1] is greater than perm[key] because of how key 
+        // was found. If no other is greater, perm[key+1] is used
+        while ((newkey > key) && (perm[newkey] <= perm[key]))
+            newkey--;
+
+        _dm_swap ((int *)&perm, key, newkey);
+        dm_swap_cols (m, key, newkey);
+
+
+        i = len - 1;
+        key++;
+
+        // The tail must end in sorted order to produce the
+        // next permutation.
+
+        while (i > key) {
+            _dm_swap ((int *)&perm, i, key);
+            dm_swap_cols (m, i, key);
+            key++;
+            i--;
+        }
+    }
+
+    // permutation:
+    DMDBG (printf ("best: %d = ", min);)
+    DMDBG (_current_all_perm ((int *)&best_perm, len);)
+    DMDBG (printf ("current:");)
+    DMDBG (_current_all_perm ((int *)&perm, len);)
+
+    // now iterate over best, find in current and swap
+    for (i = 0; i < len - 1; i++) {
+        for (j = i; j < len; j++) {
+            if (best_perm[i] == perm[j]) {
+                DMDBG (printf ("swap %d, %d\n", i, j);)
+                _dm_swap ((int *)&perm, i, j);
+                dm_swap_cols (m, i, j);
+                break;
+            }
+        }
+    }
+    DMDBG (printf ("current:");)
+    DMDBG (_current_all_perm ((int *)&perm, len);)
+    DMDBG (printf ("cost: %d ", _dm_cost (m));)
+
     return 1;
 }
 

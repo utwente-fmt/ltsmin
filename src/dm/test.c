@@ -331,7 +331,8 @@ main (void)
     printf ("max col first:\n");
     print_matrix (&m1);
     printf ("nub columns:\n");
-    dm_nub_cols (&m1);
+    dm_subsume_cols (&m1);
+    dm_subsume_rows (&m1);
     print_matrix (&m1);
     printf ("column permutation:\n");
     dm_print_perm (&(m1.col_perm));
@@ -344,6 +345,12 @@ main (void)
     dm_ungroup_cols (&m1);
     print_matrix (&m1);
 
+
+    printf ("all permutations:\n");
+    dm_set (&m1, 0, 9);
+    dm_nub_cols(&m1);
+    print_matrix (&m1);
+    dm_all_perm (&m1);
 
     dm_free (&m2);
     dm_free (&m1);
