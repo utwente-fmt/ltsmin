@@ -339,7 +339,7 @@ static char* model_type[MAX_TYPES];
 static pins_loader_t model_loader[MAX_TYPES];
 static int registered=0;
 static int cache=0;
-static const char regroup_default[] = "cs,cn,rs,rn,cw";
+static char regroup_default[] = "cs,cn,rs,rn,cw";
 static char *regroup_options = (char*)&regroup_default;
 
 void GBloadFile(model_t model,const char *filename,model_t *wrapped){

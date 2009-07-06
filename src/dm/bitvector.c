@@ -7,11 +7,11 @@ bitvector_create (bitvector_t *bv, const int n_bits)
     bv->data = malloc (size);
     if (bv->data == NULL) {
         bv->n_bits = 0;
-        return 0;
+        return -1;
     } else {
         memset (bv->data, 0, size);
         bv->n_bits = n_bits;
-        return 1;
+        return 0;
     }
 }
 
@@ -29,17 +29,15 @@ bitvector_copy (bitvector_t *bv_src, bitvector_t *bv_tgt)
 {
     // check validity src
     if (bv_src->n_bits == 0 || bv_src->data == NULL)
-        return 0;
+        return -1;
 
     // alloc memory for target
-    int                 alloc_ok =
-        bitvector_create (bv_tgt, bv_src->n_bits);
-    if (alloc_ok) {
+    if (bitvector_create (bv_tgt, bv_src->n_bits)) {
+        return - 1;
+    } else {
         // copy bitvector
         size_t              size = (int)4 * ((bv_src->n_bits / 32) + 1);
         memcpy (bv_tgt->data, bv_src->data, size);
-        return 1;
-    } else {
         return 0;
     }
 }
@@ -56,7 +54,7 @@ bitvector_set (bitvector_t *bv, const int idx)
     // set bit
     unsigned long       mask = 0x1 << (idx % 32);
     bv->data[idx / 32] |= mask;
-    return 1;
+    return 0;
 }
 
 int
@@ -65,7 +63,7 @@ bitvector_unset (bitvector_t *bv, const int idx)
     // set bit
     unsigned long       mask = ~(0x1 << (idx % 32));
     bv->data[idx / 32] &= mask;
-    return 1;
+    return 0;
 }
 
 int

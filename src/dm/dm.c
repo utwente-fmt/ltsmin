@@ -19,7 +19,7 @@ dm_create_header (matrix_header_t *p, int size)
         p->count[i] = 0;
     }
 
-    return (p->data != NULL);
+    return (p->data == NULL);
 }
 
 void
@@ -46,9 +46,8 @@ dm_copy_header (matrix_header_t *src, matrix_header_t *tgt)
     memcpy (tgt->data, src->data, sizeof (header_entry_t) * tgt->size);
     tgt->count = (int *)malloc (sizeof (int) * tgt->size);
     memcpy (tgt->count, src->count, sizeof (int) * tgt->size);
-    return (tgt->data != NULL);
+    return (tgt->data == NULL);
 }
-
 
 int
 dm_create_permutation_group (permutation_group_t *o, int size, int *data)
@@ -62,7 +61,7 @@ dm_create_permutation_group (permutation_group_t *o, int size, int *data)
     } else {
         o->data = data;
     }
-    return (o->data != NULL);
+    return (o->data == NULL);
 }
 
 void
@@ -83,7 +82,7 @@ dm_add_to_permutation_group (permutation_group_t *o, int idx)
     if (o->size >= o->data_size) {
         // can realloc?
         if (o->fixed_size)
-            return 0;
+            return -1;
 
         // realloc
         int                 new_size = o->size + 20;
@@ -92,12 +91,12 @@ dm_add_to_permutation_group (permutation_group_t *o, int idx)
             o->data_size = new_size;
             o->data = new_data;
         } else {
-            return 0;
+            return -1;
         }
     }
     // add index to end
     o->data[o->size++] = idx;
-    return 1;
+    return 0;
 }
 
 int
@@ -105,10 +104,10 @@ dm_close_group (permutation_group_t *o)
 {
     // add last index again
     if (o->size == 0)
-        return 0;
+        return -1;
 
     dm_add_to_permutation_group (o, o->data[o->size - 1]);
-    return 1;
+    return 0;
 }
 
 int
@@ -126,22 +125,22 @@ dm_create (matrix_t *m, const int rows, const int cols)
     size_t              row_size =
         (cols % 32) ? cols - (cols % 32) + 32 : cols;
     m->bits_per_row = row_size;
-    if (!bitvector_create (&(m->bits), rows * row_size)) {
+    if (bitvector_create (&(m->bits), rows * row_size)) {
         dm_free (m);
-        return 0;
+        return -1;
     }
     // create row header
-    if (!dm_create_header (&(m->row_perm), rows)) {
+    if (dm_create_header (&(m->row_perm), rows)) {
         dm_free (m);
-        return 0;
+        return -1;
     }
     // create column header
-    if (!dm_create_header (&(m->col_perm), cols)) {
+    if (dm_create_header (&(m->col_perm), cols)) {
         dm_free (m);
-        return 0;
+        return -1;
     }
 
-    return 1;
+    return 0;
 }
 
 void
@@ -243,7 +242,7 @@ dm_apply_permutation_group (matrix_header_t *p, permutation_group_t *o)
 
     // no work to do
     if (o->size == 0)
-        return 0;
+        return -1;
 
     // store first 
     last = o->data[0];
@@ -267,7 +266,7 @@ dm_apply_permutation_group (matrix_header_t *p, permutation_group_t *o)
         }
     }
     _dm_set_header (p, last, tmp.becomes);
-    return 1;
+    return 0;
 }
 
 #ifdef DMDEBUG
@@ -281,7 +280,7 @@ dm_print_perm (matrix_header_t *p)
         printf ("i %d, becomes %d,  at %d, group %d\n", i, u.becomes, u.at,
                 u.group);
     }
-    return 1;
+    return 0;
 }
 #endif                          // DMDBG
 
@@ -309,7 +308,7 @@ dm_swap_rows (matrix_t *m, int rowa, int rowb)
     dm_add_to_permutation_group (&o, rowb);
     dm_permute_rows (m, &o);
     dm_free_permutation_group (&o);
-    return 1;
+    return 0;
 }
 
 int
@@ -323,7 +322,7 @@ dm_swap_cols (matrix_t *m, int cola, int colb)
     dm_add_to_permutation_group (&o, colb);
     dm_permute_cols (m, &o);
     dm_free_permutation_group (&o);
-    return 1;
+    return 0;
 }
 
 int
@@ -336,23 +335,23 @@ dm_copy (matrix_t *src, matrix_t *tgt)
     tgt->col_perm.data = NULL;
     tgt->bits.data = NULL;
 
-    if (!dm_copy_header (&(src->row_perm), &(tgt->row_perm))) {
+    if (dm_copy_header (&(src->row_perm), &(tgt->row_perm))) {
         dm_free (tgt);
-        return 0;
+        return -1;
     }
 
 
-    if (!dm_copy_header (&(src->col_perm), &(tgt->col_perm))) {
+    if (dm_copy_header (&(src->col_perm), &(tgt->col_perm))) {
         dm_free (tgt);
-        return 0;
+        return -1;
     }
 
-    if (!bitvector_copy (&(src->bits), &(tgt->bits))) {
+    if (bitvector_copy (&(src->bits), &(tgt->bits))) {
         dm_free (tgt);
-        return 0;
+        return -1;
     }
 
-    return 1;
+    return 0;
 }
 
 int
@@ -373,7 +372,7 @@ dm_flatten (matrix_t *m)
 
     dm_free (m);
     *m = m_new;
-    return 1;
+    return 0;
 }
 
 int
@@ -387,7 +386,7 @@ dm_print (FILE * f, matrix_t *m)
         }
         fprintf (f, "\n");
     }
-    return 1;
+    return 0;
 }
 
 void
@@ -425,7 +424,7 @@ _dm_sort (matrix_t *m, dm_comparator_fn cmp, int size,
         dm_swap_fn (m, i, 0);
         _dm_sift_down (m, 0, i - 1, cmp, dm_swap_fn);
     }
-    return 1;
+    return 0;
 }
 
 int
@@ -440,6 +439,7 @@ dm_sort_cols (matrix_t *m, dm_comparator_fn cmp)
     return _dm_sort (m, cmp, dm_ncols (m), dm_swap_cols);
 }
 
+// return 0 or 1?
 int
 _dm_eq_rows (matrix_t *m, int rowa, int rowb)
 {
@@ -456,6 +456,7 @@ _dm_eq_rows (matrix_t *m, int rowa, int rowb)
     return 1;                          // equal
 }
 
+// return 0 or 1?
 int
 _dm_subsume_rows (matrix_t *m, int rowa, int rowb)
 {
@@ -469,6 +470,7 @@ _dm_subsume_rows (matrix_t *m, int rowa, int rowb)
     return 1;                          // equal
 }
 
+// return 0 or 1?
 int
 _dm_eq_cols (matrix_t *m, int cola, int colb)
 {
@@ -485,6 +487,7 @@ _dm_eq_cols (matrix_t *m, int cola, int colb)
     return 1;                          // equal
 }
 
+// return 0 or 1?
 int
 _dm_subsume_cols (matrix_t *m, int cola, int colb)
 {
@@ -577,7 +580,8 @@ _dm_merge_rows (matrix_t *m, int rowa, int rowb)
 
     // make sure rowb > rowa
     if (rowa == rowb)
-        return 0;
+        return -1;
+
     if (rowb < rowa) {
         // in this case, rowa will move 1 row up
         rowa--;
@@ -603,7 +607,7 @@ _dm_merge_rows (matrix_t *m, int rowa, int rowb)
     // remove the last row from the matrix
     m->rows--;
 
-    return 1;
+    return 0;
 }
 
 // unmerge the first item in the group of this row and put it right after
@@ -617,7 +621,7 @@ _dm_unmerge_row (matrix_t *m, int row)
 
     // if this row is ungrouped, return
     if (org_row == org_group)
-        return 1;
+        return 0;
 
     // remove this row from the group
     _dm_unmerge_group (&(m->row_perm), org_row);
@@ -645,7 +649,7 @@ _dm_unmerge_row (matrix_t *m, int row)
     // increase matrix size
     m->rows++;
 
-    return 1;
+    return 0;
 }
 
 void
@@ -695,7 +699,8 @@ _dm_merge_cols (matrix_t *m, int cola, int colb)
 
     // make sure colb > cola
     if (cola == colb)
-        return 0;
+        return -1;
+
     if (colb < cola) {
         // in this case, cola will move 1 col up
         cola--;
@@ -721,7 +726,7 @@ _dm_merge_cols (matrix_t *m, int cola, int colb)
     // remove the last col from the matrix
     m->cols--;
 
-    return 1;
+    return 0;
 }
 
 // unmerge the first item in the group of this col and put it right after
@@ -735,7 +740,7 @@ _dm_unmerge_col (matrix_t *m, int col)
 
     // if this col is ungrouped, return
     if (org_col == org_group)
-        return 1;
+        return 0;
 
     // remove this col from the group
     _dm_unmerge_group (&(m->col_perm), org_col);
@@ -763,7 +768,7 @@ _dm_unmerge_col (matrix_t *m, int col)
     // increase matrix size
     m->cols++;
 
-    return 1;
+    return 0;
 }
 
 int
@@ -781,7 +786,7 @@ dm_nub_rows (matrix_t *m)
             }
         }
     }
-    return 1;
+    return 0;
 }
 
 int
@@ -809,7 +814,7 @@ dm_subsume_rows (matrix_t *m)
 
         }
     }
-    return 1;
+    return 0;
 }
 
 int
@@ -827,7 +832,7 @@ dm_nub_cols (matrix_t *m)
             }
         }
     }
-    return 1;
+    return 0;
 }
 
 int
@@ -855,7 +860,7 @@ dm_subsume_cols (matrix_t *m)
 
         }
     }
-    return 1;
+    return 0;
 }
 
 int
@@ -866,7 +871,7 @@ dm_ungroup_rows (matrix_t *m)
         _dm_unmerge_row (m, i);
     }
 
-    return 1;
+    return 0;
 }
 
 int
@@ -877,7 +882,7 @@ dm_ungroup_cols (matrix_t *m)
         _dm_unmerge_col (m, i);
     }
 
-    return 1;
+    return 0;
 }
 
 int
@@ -1001,7 +1006,7 @@ dm_optimize (matrix_t *m)
 
         best_i = best_j = 0;
     }
-    return 1;
+    return 0;
 }
 
 
@@ -1111,7 +1116,7 @@ dm_all_perm (matrix_t *m)
     DMDBG (_current_all_perm ((int *)&perm, len);)
     DMDBG (printf ("cost: %d ", _dm_cost (m));)
 
-    return 1;
+    return 0;
 }
 
 int
@@ -1122,7 +1127,7 @@ dm_create_col_iterator (dm_col_iterator_t *ix, matrix_t *m, int col)
     ix->col = col;
     if (!dm_is_set (m, 0, col))
         dm_col_next (ix);
-    return 1;
+    return 0;
 }
 
 int
@@ -1133,7 +1138,7 @@ dm_create_row_iterator (dm_row_iterator_t *ix, matrix_t *m, int row)
     ix->col = 0;
     if (!dm_is_set (m, row, 0))
         dm_row_next (ix);
-    return 1;
+    return 0;
 }
 
 int
@@ -1151,7 +1156,6 @@ dm_col_next (dm_col_iterator_t *ix)
         }
     }
     return result;
-
 }
 
 int
