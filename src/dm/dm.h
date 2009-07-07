@@ -84,7 +84,7 @@ extern int          dm_nub_cols (matrix_t *);
 extern int          dm_subsume_rows (matrix_t *);
 extern int          dm_subsume_cols (matrix_t *);
 
-// note: rewrite nub & subsume to dm_group_rows/cols(matrix_t *, dm_group_fn)?
+// NOTE: rewrite nub & subsume to dm_group_rows/cols(matrix_t *, dm_group_fn)?
 extern int          dm_ungroup_rows (matrix_t *);
 extern int          dm_ungroup_cols (matrix_t *);
 

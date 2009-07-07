@@ -112,7 +112,7 @@ dm_close_group (permutation_group_t *o)
 int
 dm_create (matrix_t *m, const int rows, const int cols)
 {
-    DMDBG (printf ("rows, cols: %d, %d\n", rows, cols);)
+    DMDBG (printf ("rows, cols: %d, %d\n", rows, cols));
 
     m->rows = rows;
     m->cols = cols;
@@ -228,7 +228,6 @@ static inline void
 set_header_ (matrix_header_t *p, int idx, int val)
 {
     p->data[val].at = idx;
-    // p->data[u.right_at].group = idx;
     p->data[idx].becomes = val;
 }
 
@@ -822,8 +821,7 @@ dm_nub_cols (matrix_t *m)
         for (j = i + 1; j < dm_ncols (m); j++) {
             if (eq_cols_ (m, i, j)) {
                 merge_cols_ (m, i, j);
-                // now row j is removed, don't increment it in the for
-                // loop
+                // now row j is removed, don't increment it in the for loop
                 j--;
             }
         }
@@ -841,15 +839,13 @@ dm_subsume_cols (matrix_t *m)
             // is col i subsumed by row j?
             if (subsume_cols_ (m, i, j)) {
                 merge_cols_ (m, j, i);
-                // now col j is removed, don't increment it in the for
-                // loop
+                // now col j is removed, don't increment it in the for loop
                 j--;
             } else {
                 // is col j subsumed by row i?
                 if (subsume_cols_ (m, j, i)) {
                     merge_cols_ (m, i, j);
-                    // now col j is removed, don't increment it in the for 
-                    // loop
+                    // now col j is removed, don't increment it in the for loop
                     j--;
                 }
             }
@@ -976,10 +972,9 @@ dm_optimize (matrix_t *m)
             }
         }
 
-        DMDBG (printf
-               ("best rotation: %d-%d, costs %d\n", best_i, best_j, min);)
-            // apply it 
-            if (best_i != best_j) {
+        DMDBG (printf ("best rotation: %d-%d, costs %d\n", best_i, best_j, min));
+        // apply it
+        if (best_i != best_j) {
             d = best_i < best_j ? 1 : -1;
             // rotate
             dm_create_permutation_group (&rot, dm_ncols (m), d_rot);
@@ -991,7 +986,7 @@ dm_optimize (matrix_t *m)
             dm_permute_cols (m, &rot);
             dm_free_permutation_group (&rot);
 
-            DMDBG (dm_print (stdout, m);)
+            DMDBG (dm_print (stdout, m));
         }
 
         best_i = best_j = 0;
@@ -1047,9 +1042,9 @@ dm_all_perm (matrix_t *m)
             min = last_min;
         }
         // debug
-        DMDBG (current_all_perm_ (perm, len);)
-        DMDBG (dm_print (stdout, m);)
-        DMDBG (printf ("costs: %d\n", last_min);)
+        DMDBG (current_all_perm_ (perm, len));
+        DMDBG (dm_print (stdout, m));
+        DMDBG (printf ("costs: %d\n", last_min));
 
         int                 key = len - 1;
         int                 newkey = key;
@@ -1089,25 +1084,25 @@ dm_all_perm (matrix_t *m)
     }
 
     // permutation:
-    DMDBG (printf ("best: %d = ", min);)
-    DMDBG (current_all_perm_ (best_perm, len);)
-    DMDBG (printf ("current:");)
-    DMDBG (current_all_perm_ (perm, len);)
+    DMDBG (printf ("best: %d = ", min));
+    DMDBG (current_all_perm_ (best_perm, len));
+    DMDBG (printf ("current:"));
+    DMDBG (current_all_perm_ (perm, len));
 
     // now iterate over best, find in current and swap
     for (i = 0; i < len - 1; i++) {
         for (j = i; j < len; j++) {
             if (best_perm[i] == perm[j]) {
-                DMDBG (printf ("swap %d, %d\n", i, j);)
+                DMDBG (printf ("swap %d, %d\n", i, j));
                 swap_ (perm, i, j);
                 dm_swap_cols (m, i, j);
                 break;
             }
         }
     }
-    DMDBG (printf ("current:");)
-    DMDBG (current_all_perm_ (perm, len);)
-    DMDBG (printf ("cost: %d ", cost_ (m));)
+    DMDBG (printf ("current:"));
+    DMDBG (current_all_perm_ (perm, len));
+    DMDBG (printf ("cost: %d ", cost_ (m)));
 
     return 0;
 }
