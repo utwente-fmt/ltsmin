@@ -288,6 +288,7 @@ static void load_dir_headers(lts_input_t input,stream_t ds){
 
 struct vec_output_struct {
 	lts_count_t *count_p;
+	int seg;
 	struct_stream_t state;
 	struct_stream_t s_lbl;
 	struct_stream_t src;
@@ -304,13 +305,12 @@ static void idx_write_state(void*context,int seg,int ofs,int* labels){
 
 static void vec_write_state(void* context,int* state,int* labels){
 	struct vec_output_struct *out=(struct vec_output_struct *)context;
-	// TODO State count might be wrong in case of deadlocks.
+	LTS_INCR_STATE((*(out->count_p)),out->seg);
 	DSwriteStruct(out->state,state);
 	DSwriteStruct(out->s_lbl,labels);
 }
 static void iv_write_edge(void* context,int src_seg,int src_ofs,int* dst,int*labels){
 	struct vec_output_struct *out=(struct vec_output_struct *)context;
-	LTS_CHECK_STATE((*(out->count_p)),src_seg,(uint32_t)src_ofs);
 	LTS_INCR_OUT((*(out->count_p)),(uint32_t)src_seg);
 	DSwriteStruct(out->src,&src_ofs);
 	DSwriteStruct(out->e_lbl,labels);
@@ -339,6 +339,7 @@ static lts_enum_cb_t vec_write_begin(lts_output_t output,int which_state,int whi
 	int eLbls=lts_type_get_edge_label_count(ltstype);
 	int segment_count=output->segment_count;
 	out->count_p=&(output->count);
+	out->seg=which_state;
 
 	if (which_state==segment_count){
 		Fatal(1,error,"cannot write more than one segment");
