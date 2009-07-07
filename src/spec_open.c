@@ -440,7 +440,6 @@ static void *new_string_index(void* context){
 
 void CAESAR_INIT_GRAPH(void) {
 	char *opencaesar_args, *opencaesar_prog,*ltsmin_options;
-	 edge_info_t e_info;
 	 int argc;
 	 char **argv;
 
@@ -475,9 +474,8 @@ void CAESAR_INIT_GRAPH(void) {
 	GBloadFile(model,files[0],&model);
 
 	ltstype=GBgetLTStype(model);
-	N=lts_type_get_state_length(ltstype);
-	e_info=GBgetEdgeInfo(model);
-	K=e_info->groups;
+	N = lts_type_get_state_length(ltstype);
+	K = dm_nrows(GBgetDMInfo(model));
 	Warning(info,"length is %d, there are %d groups",N,K);
 	state_labels=lts_type_get_state_label_count(ltstype);
 	edge_labels=lts_type_get_edge_label_count(ltstype);
