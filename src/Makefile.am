@@ -186,7 +186,7 @@ ltsmin_convert_CPPFLAGS = $(CADP_CPPFLAGS) $(AM_CPPFLAGS)
 libmpi_la_SOURCES = mpi_io_stream.c mpi_core.c mpi_raf.c mpi_ram_raf.c	\
 		   mpi_core.h mpi_io_stream.h mpi_ram_raf.h config.h	\
 		   mpi-event-loop.c mpi-event-loop.h mpi-runtime.c \
-                   mpi-runtime.h
+		   mpi-runtime.h task-queue.c task-queue.h
 
 libutil_la_SOURCES := unix.c runtime.c stream.c archive.c			\
                     stream_buffer.c fast_hash.c generichash4.c		\

@@ -310,6 +310,9 @@ void do_output(){
 	int state[N];
 	GBgetInitialState(model,state);
 	table_file=fopen(etf_output,"w");
+	if(!table_file){
+	    FatalCall(1,error,"could not open %s",etf_output);
+	}
 	fprintf(table_file,"begin state\n");
 	for(int i=0;i<N;i++){
 		char*name=lts_type_get_state_name(ltstype,i);
