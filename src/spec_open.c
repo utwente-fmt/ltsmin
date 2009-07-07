@@ -85,7 +85,7 @@ static  struct poptOption options[] = {
 /* ADMINISTRATIVE STUFF */
 
 CAESAR_TYPE_STRING CAESAR_GRAPH_COMPILER() {
-	return "ltsmin_open";
+	return "pins_open";
 }
 
 CAESAR_TYPE_VERSION CAESAR_GRAPH_VERSION() {
@@ -140,14 +140,14 @@ void CAESAR_FORMAT_STATE(CAESAR_TYPE_NATURAL x) {
 	if (x<=CAESAR_MAX_FORMAT_STATE())
 		state_format = x;
 	else
-		CAESAR_ERROR("ltsmin_open: %d exceeds max state format",x);
+		CAESAR_ERROR("pins_open: %d exceeds max state format",x);
 }
 
 void CAESAR_FORMAT_LABEL(CAESAR_TYPE_NATURAL x) {
 	if (x<=CAESAR_MAX_FORMAT_LABEL())
 		label_format = x;
 	else
-		CAESAR_ERROR("ltsmin_open: %d exceeds max label format",x);
+		CAESAR_ERROR("pins_open: %d exceeds max label format",x);
 }
 
 void CAESAR_PRINT_STATE(CAESAR_TYPE_FILE f,CAESAR_TYPE_STATE s) {

@@ -3,11 +3,11 @@ noinst_PROGRAMS =
 noinst_LTLIBRARIES = libutil.la
 pkglib_LTLIBRARIES =
 
-# ltsminopen
+# pins_open
 if HAVE_CADP
 CADPCC = $(CADP)/src/com/cadp_cc
 CADPINCLUDES = -I$(CADP)/incl
-bin_SCRIPTS = ltsmin_open
+bin_SCRIPTS = pins_open
 endif
 
 if HAVE_MPI

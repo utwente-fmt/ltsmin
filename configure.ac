@@ -155,6 +155,10 @@ AC_CONFIG_COMMANDS_POST(
                                          --disable-shared \
                                          --libdir='$(eval echo "$pkglibdir")'"])
 
+if test x"$acx_cadp" = xyes; then
+   AC_CONFIG_FILES([src/pins_open])
+fi
+
 AC_CONFIG_FILES(
   [Makefile
    src/Makefile
