@@ -39,7 +39,7 @@ bitvector_free (bitvector_t *bv)
 }
 
 int
-bitvector_copy (bitvector_t *bv_src, bitvector_t *bv_tgt)
+bitvector_copy (const bitvector_t *bv_src, bitvector_t *bv_tgt)
 {
     // check validity src
     if (bv_src->n_bits == 0 || bv_src->data == NULL)
@@ -58,31 +58,29 @@ bitvector_copy (bitvector_t *bv_src, bitvector_t *bv_tgt)
 }
 
 size_t
-bitvector_size (bitvector_t *bv)
+bitvector_size (const bitvector_t *bv)
 {
     return bv->n_bits;
 }
 
-int
+void
 bitvector_set (bitvector_t *bv, const int idx)
 {
     // set bit
     size_t              mask = 1UL << bv_ofs (idx);
     bv->data[bv_seg (idx)] |= mask;
-    return 0;
 }
 
-int
+void
 bitvector_unset (bitvector_t *bv, const int idx)
 {
     // set bit
     size_t              mask = ~(1UL << bv_ofs (idx));
     bv->data[bv_seg (idx)] &= mask;
-    return 0;
 }
 
 int
-bitvector_is_set (bitvector_t *bv, const int idx)
+bitvector_is_set (const bitvector_t *bv, const int idx)
 {
     size_t              mask = 1UL << bv_ofs (idx);
     return (bv->data[bv_seg (idx)] & mask) != 0;

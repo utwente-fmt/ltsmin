@@ -37,7 +37,7 @@ dm_free_header (matrix_header_t *p)
 }
 
 int
-dm_copy_header (matrix_header_t *src, matrix_header_t *tgt)
+dm_copy_header (const matrix_header_t *src, matrix_header_t *tgt)
 {
     tgt->size = src->size;
     tgt->data = malloc (sizeof (header_entry_t) * tgt->size);
@@ -173,7 +173,7 @@ dm_ncols (const matrix_t *m)
     return m->cols;
 }
 
-int
+void
 dm_set (matrix_t *m, int row, int col)
 {
     // get permutation
@@ -189,10 +189,10 @@ dm_set (matrix_t *m, int row, int col)
         m->col_perm.count[colp]++;
     }
 
-    return bitvector_set (&(m->bits), bitnr);
+    bitvector_set (&(m->bits), bitnr);
 }
 
-int
+void
 dm_unset (matrix_t *m, int row, int col)
 {
     // get permutation
@@ -208,12 +208,12 @@ dm_unset (matrix_t *m, int row, int col)
         m->col_perm.count[colp]--;
     }
 
-    return bitvector_unset (&(m->bits), bitnr);
+    bitvector_unset (&(m->bits), bitnr);
 }
 
 
 int
-dm_is_set (matrix_t *m, int row, int col)
+dm_is_set (const matrix_t *m, int row, int col)
 {
     // get permutation
     int                 rowp = m->row_perm.data[row].becomes;
@@ -233,7 +233,7 @@ set_header_ (matrix_header_t *p, int idx, int val)
 }
 
 int
-dm_apply_permutation_group (matrix_header_t *p, permutation_group_t *o)
+dm_apply_permutation_group (matrix_header_t *p, const permutation_group_t *o)
 {
     int                 i,
                         last;
@@ -268,8 +268,8 @@ dm_apply_permutation_group (matrix_header_t *p, permutation_group_t *o)
     return 0;
 }
 
-int
-dm_print_perm (matrix_header_t *p)
+void
+dm_print_perm (const matrix_header_t *p)
 {
     int                 i;
     for (i = 0; i < p->size; i++) {
@@ -278,17 +278,16 @@ dm_print_perm (matrix_header_t *p)
         printf ("i %d, becomes %d,  at %d, group %d\n", i, u.becomes, u.at,
                 u.group);
     }
-    return 0;
 }
 
 int
-dm_permute_rows (matrix_t *m, permutation_group_t *o)
+dm_permute_rows (matrix_t *m, const permutation_group_t *o)
 {
     return dm_apply_permutation_group (&(m->row_perm), o);
 }
 
 int
-dm_permute_cols (matrix_t *m, permutation_group_t *o)
+dm_permute_cols (matrix_t *m, const permutation_group_t *o)
 {
     return dm_apply_permutation_group (&(m->col_perm), o);
 }
@@ -323,7 +322,7 @@ dm_swap_cols (matrix_t *m, int cola, int colb)
 }
 
 int
-dm_copy (matrix_t *src, matrix_t *tgt)
+dm_copy (const matrix_t *src, matrix_t *tgt)
 {
     tgt->rows = src->rows;
     tgt->cols = src->cols;
@@ -373,7 +372,7 @@ dm_flatten (matrix_t *m)
 }
 
 int
-dm_print (FILE * f, matrix_t *m)
+dm_print (FILE * f, const matrix_t *m)
 {
     int                 i,
                         j;

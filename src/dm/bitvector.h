@@ -13,13 +13,12 @@ typedef struct bitvector {
 
 extern int          bitvector_create (bitvector_t *, const int);
 extern void         bitvector_free (bitvector_t *);
-extern int          bitvector_copy (bitvector_t *, bitvector_t *);
+extern int          bitvector_copy (const bitvector_t *, bitvector_t *);
 
-extern size_t       bitvector_size (bitvector_t *);
+extern size_t       bitvector_size (const bitvector_t *);
 
-extern int          bitvector_set (bitvector_t *, const int);
-extern int          bitvector_unset (bitvector_t *, const int);
-extern int          bitvector_is_set (bitvector_t *, const int);
-extern int          bitvector_eq (bitvector_t *, bitvector_t *);
+extern void         bitvector_set (bitvector_t *, const int);
+extern void         bitvector_unset (bitvector_t *, const int);
+extern int          bitvector_is_set (const bitvector_t *, const int);
 
 #endif                          // BITVECTOR_H
