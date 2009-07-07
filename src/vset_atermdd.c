@@ -315,7 +315,6 @@ static void set_add_list(vset_t set,const int* e){
 }
 
 static void rel_add_list(vrel_t rel,const int* src, const int* dst){
-  ATbool new;
 	int N=rel->p_len?rel->p_len:rel->dom->shared.size;
 	ATerm vec[2*N];
 	for(int i=0;i<N;i++) {
