@@ -105,59 +105,57 @@ GBregroup (model_t model, char *regroup_spec)
 
     dm_copy (GBgetDMInfo (model), m);
 
-	// parse regrouping arguments
-	// allowed arguments
-	// col { sort, nub, swap, allperm}
-	// row { sort, nub, subsume }
-	if (regroup_spec)
-	{
-		char* tok = strtok(regroup_spec, ",");
+    // parse regrouping arguments
+    // allowed arguments
+    // col { sort, nub, swap, allperm}
+    // row { sort, nub, subsume }
+    if (regroup_spec) {
+        char* tok = strtok(regroup_spec, ",");
 
-		while(tok != NULL)
-		{
-			// Column Sort
-			if (strcasecmp(tok, "cs") == 0) {
-				Warning (info, "Regroup Column Sort");
-				dm_sort_cols(m, &max_col_first);
+        while(tok != NULL) {
+            // Column Sort
+            if (strcasecmp(tok, "cs") == 0) {
+                Warning (info, "Regroup Column Sort");
+                dm_sort_cols(m, &max_col_first);
 
-			// Column Nub
-			} else if (strcasecmp(tok, "cn") == 0) {
-				Warning (info, "Regroup Column Nub");
-				dm_nub_cols(m);
+                // Column Nub
+            } else if (strcasecmp(tok, "cn") == 0) {
+                Warning (info, "Regroup Column Nub");
+                dm_nub_cols(m);
 
-			// Column sWap
-			} else if (strcasecmp(tok, "cw") == 0) {
-				Warning (info, "Regroup Column Swaps");
-				dm_optimize (m);
+                // Column sWap
+            } else if (strcasecmp(tok, "cw") == 0) {
+                Warning (info, "Regroup Column Swaps");
+                dm_optimize (m);
 
-			// Column All permutations
-			} else if (strcasecmp(tok, "ca") == 0) {
-				Warning (info, "Regroup Column All Permutations");
-				dm_all_perm (m);
+                // Column All permutations
+            } else if (strcasecmp(tok, "ca") == 0) {
+                Warning (info, "Regroup Column All Permutations");
+                dm_all_perm (m);
 
-			// Row Sort
-			} else if (strcasecmp(tok, "rs") == 0) {
-				Warning (info, "Regroup Row Sort");
-				dm_sort_rows (m, &max_row_first);
+                // Row Sort
+            } else if (strcasecmp(tok, "rs") == 0) {
+                Warning (info, "Regroup Row Sort");
+                dm_sort_rows (m, &max_row_first);
 
-			// Row Nub
-			} else if (strcasecmp(tok, "rn") == 0) {
-				Warning (info, "Regroup Row Nub");
-				dm_nub_rows (m);
+                // Row Nub
+            } else if (strcasecmp(tok, "rn") == 0) {
+                Warning (info, "Regroup Row Nub");
+                dm_nub_rows (m);
 
-			// Row sUbsume
-			} else if (strcasecmp(tok, "ru") == 0) {
-				Warning (info, "Regroup Row Subsume");
-				dm_subsume_rows (m);
-			}
+                // Row sUbsume
+            } else if (strcasecmp(tok, "ru") == 0) {
+                Warning (info, "Regroup Row Subsume");
+                dm_subsume_rows (m);
+            }
 
-			tok = strtok(NULL, ",");
-		}
-	}
+            tok = strtok(NULL, ",");
+        }
+    }
 
-	// post processing regroup specification
-	// undo column nub
-	dm_ungroup_cols(m);
+    // post processing regroup specification
+    // undo column nub
+    dm_ungroup_cols(m);
 
     // create new model
     model_t             group = GBcreateBase ();
@@ -226,7 +224,7 @@ GBregroup (model_t model, char *regroup_spec)
     {
         int                 len = ctx->len;
         int                 s0[len],
-                            news0[len];
+            news0[len];
         GBgetInitialState (model, s0);
         for (int i = 0; i < len; i++)
             news0[i] = s0[ctx->statemap[i]];
