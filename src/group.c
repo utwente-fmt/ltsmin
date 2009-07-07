@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <assert.h>
 #include "greybox.h"
 #include "runtime.h"
 #include "dm/dm.h"
@@ -95,11 +96,11 @@ max_col_first (matrix_t *m, int cola, int colb)
 void GBcopyLTStype(model_t model,lts_type_t info);
 
 model_t
-GBregroup (model_t model, char *regroup_spec)
+GBregroup (model_t model, const char *regroup_spec_)
 {
     // note: context information is available via matrix, doesn't need to
     // be stored again
-    Warning (info, "Regroup specification: %s", regroup_spec);
+    Warning (info, "Regroup specification: %s", regroup_spec_);
 
     matrix_t           *m = RTmalloc (sizeof (matrix_t));
 
@@ -109,10 +110,12 @@ GBregroup (model_t model, char *regroup_spec)
     // allowed arguments
     // col { sort, nub, swap, allperm}
     // row { sort, nub, subsume }
-    if (regroup_spec) {
-        char* tok = strtok(regroup_spec, ",");
+    if (regroup_spec_) {
+        char *regroup_spec = strdup (regroup_spec_);
+        assert (regroup_spec != NULL);
 
-        while(tok != NULL) {
+        char *tok;
+        while ((tok = strsep (&regroup_spec, ",")) != NULL) {
             // Column Sort
             if (strcasecmp(tok, "cs") == 0) {
                 Warning (info, "Regroup Column Sort");
@@ -147,10 +150,12 @@ GBregroup (model_t model, char *regroup_spec)
             } else if (strcasecmp(tok, "ru") == 0) {
                 Warning (info, "Regroup Row Subsume");
                 dm_subsume_rows (m);
-            }
 
-            tok = strtok(NULL, ",");
+            } else if (tok[0] != '\0') {
+                Fatal (1, error, "Unknown regrouping specification: %s", tok);
+            }
         }
+        free (regroup_spec);
     }
 
     // post processing regroup specification
