@@ -25,7 +25,7 @@ BIN="$CADP/bin.$ARCH"
 SRC="$CADP/src/open_caesar"
 
 # recording the command-line for OCIS
-OPEN_CAESAR_COMMAND="$0 \"$@\""
+OPEN_CAESAR_COMMAND="$0 $@"
 export OPEN_CAESAR_COMMAND
 
 # the following variables are initialised by "configure"
