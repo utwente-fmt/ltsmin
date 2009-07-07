@@ -1,0 +1,295 @@
+#! /bin/sh
+ 
+##############################################################################
+#                           L T S M I N _ O P E N
+#-----------------------------------------------------------------------------
+#   INRIA - Unite de Recherche Rhone-Alpes
+#   655, avenue de l'Europe
+#   38330 Montbonnot Saint Martin
+#   FRANCE
+#-----------------------------------------------------------------------------
+#   Module             :       pins_open
+#   Auteurs            :       Hubert GARAVEL and Jaco van de POL et al.
+#   Version            :       1.1
+#   Date               :       04/05/05 18:21:35
+#############################################################################/
+
+set -e
+
+COMMAND="$(basename "$0")"
+ARCH="`$CADP/com/arch`"
+CC="$CADP/src/com/cadp_cc"
+LD="$CC"
+
+BIN="$CADP/bin.$ARCH"
+SRC="$CADP/src/open_caesar"
+
+# recording the command-line for OCIS
+OPEN_CAESAR_COMMAND="$0 \"$@\""
+export OPEN_CAESAR_COMMAND
+
+# the following variables are initialised by "configure"
+LTSMIN_VERSION="@VERSION@"
+top_srcdir="@top_srcdir@"
+prefix="@prefix@"
+LTSMIN_PREFIX="$prefix"
+exec_prefix="@exec_prefix@"
+datarootdir="@datarootdir@"
+datadir="@datadir@"
+libdir="@libdir@"
+LTSMIN_LIB="@pkglibdir@"
+
+# phase 1: parsing the options
+
+LTSMIN_OPTIONS=""
+while true
+do
+	if test $# -lt 1
+	then
+		echo "$COMMAND: missing model argument"
+		exit 1
+	fi
+	case $1 in
+        -* )
+            LTSMIN_OPTIONS="$LTSMIN_OPTIONS \"$1\""
+            shift 1
+            ;;
+        * )
+            break
+        ;;
+    esac
+done
+export LTSMIN_OPTIONS
+
+# phase 2: parsing the TBF filename (TODO: the value of $FILE may contain spaces)
+
+FILE="$1"
+if test ! -f "$FILE"
+then
+	echo "$COMMAND: file \`\`$FILE'' does not exist"
+	exit 1
+fi
+case "$FILE" in
+ *.tbf)
+    if test "@MCRL_LDFLAGS@" = "\@MCRL_LDFLAGS\@" ; then
+        echo "mCRL is not supported"
+        exit 1
+    fi
+    echo "input is mCRL"
+    LTSMIN_MOD_LDFLAGS="@MCRL_LDFLAGS@ @CADP_LDFLAGS@ -llpo-open @BUDDY_LIBS@ @MCRL_LIBS@ @CADP_LIBS@"
+    ;;
+ *.lps)
+    if test "@MCRL2_LDFLAGS@" = "\@MCRL2_LDFLAGS\@" ; then
+        echo "mCRL2 is not supported"
+        exit 1
+    fi
+    echo "input is mCRL2"
+    LTSMIN_MOD_LDFLAGS="@MCRL2_LDFLAGS@ @CADP_LDFLAGS@ -llps-open @BUDDY_LIBS@ @MCRL2_LIBS@ @CADP_LIBS@"
+    ;;
+ *.b)
+    if test "@MCRL_LDFLAGS@" = "\@MCRL_LDFLAGS\@" ; then
+        echo "cannot use NIPS-VM without mCRL."
+        exit 1
+    fi
+    echo "input is NIPS byte-code"
+    LTSMIN_MOD_LDFLAGS="@NIPS_LDFLAGS@ @MCRL_LDFLAGS@ @CADP_LDFLAGS@ -lnips-open @BUDDY_LIBS@ @CADP_LIBS@"
+    ;;
+ *.etf)
+    if test "@MCRL_LDFLAGS@" = "\@MCRL_LDFLAGS\@" ; then
+        echo "cannot use ETF without mCRL."
+        exit 1
+    fi
+    echo "input is ETF"
+    LTSMIN_MOD_LDFLAGS="@MCRL_LDFLAGS@ @CADP_LDFLAGS@ -letf-open @BUDDY_LIBS@ @CADP_LIBS@"
+    ;;
+ *)
+    echo "Did not recognize type of $FILE"
+    exit 1
+    ;;
+esac
+shift
+
+# phase 3: passing the TBF filename to the C library
+
+OPEN_CAESAR_FILE="$FILE"
+export OPEN_CAESAR_FILE
+
+# phase 4: parsing the options for cc(1) and preparing other options
+
+CPPFLAGS="-I. -I$CADP/incl -I$SRC"
+CFLAGS="@CFLAGS@"
+LTSMIN_LDFLAGS="@LDFLAGS@ -L${LTSMIN_LIB} ${LTSMIN_MOD_LDFLAGS} -lz -lpopt"
+LDFLAGS="${LTSMIN_LDFLAGS} -L$CADP/bin.$ARCH -lcaesar -lm"
+
+while true
+do
+	if test $# -lt 1
+	then
+		echo "$COMMAND: missing C filename argument"
+		exit 1
+	fi
+	case $1 in
+		-[DI]* ) CPPFLAGS="$CPPFLAGS $1"
+			 shift
+			 ;;
+		-[lL]* ) LDFLAGS="$LDFLAGS $1"
+			 shift
+			 ;;
+		-* ) CFLAGS="$CFLAGS $1"
+		     shift
+		     ;;
+		*) break
+		   ;; 
+	esac
+done
+
+# phase 5: parsing the ``.c'', ``.o'', or ``.a'' filename, possibly looking in
+#          $SRC or $BIN if the file is not present in the current directory
+
+NAME="$1"
+shift
+
+case "$NAME" in
+	*.c )	
+		if test -f $NAME
+		then
+			USER="$NAME"
+		elif test -f $SRC/$NAME
+		then
+			USER="$SRC/$NAME"
+		else
+			echo "$COMMAND: file \`\`$NAME'' does not exist"
+			exit 1
+		fi
+		;;
+
+	*.o | *.a )
+		if test -f $NAME
+		then
+			USER="$NAME"
+		elif test -f $BIN/$NAME
+		then
+			USER="$BIN/$NAME"
+		else
+			echo "$COMMAND: file \`\`$NAME'' does not exist"
+			exit 1
+		fi
+		;;
+
+	* )
+		if test -f $NAME.c
+		then
+			USER="$NAME.c"
+		elif test -f $SRC/$NAME.c
+		then
+			USER="$SRC/$NAME.c"
+		elif test -f $NAME.a
+		then
+			USER="$NAME.a"
+		elif test -f $BIN/$NAME.a
+		then
+			USER="$BIN/$NAME.a"
+		elif test -f $NAME.o
+		then
+			USER="$NAME.o"
+		elif test -f $BIN/$NAME.o
+		then
+			USER="$BIN/$NAME.o"
+		else
+			echo "$COMMAND: cannot locate \`\`$NAME''"
+			exit 1
+		fi
+esac
+
+if test "$USER" != "$NAME"
+then
+	echo "$COMMAND: using \`\`$USER''"
+fi
+
+# phase 6: updating compiler options, if necessary
+
+case "$USER" in
+	*.c )
+		CPPFLAGS_AUX=`grep '@(#)CPPFLAGS' $USER | sed -e 's/.*".*=\(.*\)".*/\1/'`
+		CFLAGS_AUX=`grep '@(#)CFLAGS' $USER | sed -e 's/.*".*=\(.*\)".*/\1/'`
+		LDFLAGS_AUX=`grep '@(#)LDFLAGS' $USER | sed -e 's/.*".*=\(.*\)".*/\1/'`
+		LD_LIBRARY_PATH_AUX=`grep '@(#)LD_LIBRARY_PATH' $USER | sed -e 's/.*".*=\(.*\)".*/\1/'`
+		;;
+	*.o | *.a )
+		LC_CTYPE="C" ; export LC_CTYPE
+		CPPFLAGS_AUX=`strings $USER 2> /dev/null | grep '@(#)CPPFLAGS' | sed -e 's/.*=//'`
+		CFLAGS_AUX=`strings $USER 2> /dev/null | grep '@(#)CFLAGS' | sed -e 's/.*=//'`
+		LDFLAGS_AUX=`strings $USER 2> /dev/null | grep '@(#)LDFLAGS' | sed -e 's/.*=//'`
+		LD_LIBRARY_PATH_AUX=`strings $USER 2> /dev/null | grep '@(#)LD_LIBRARY_PATH' | sed -e 's/.*=//'`
+		;;
+esac
+
+CPPFLAGS_AUX=`eval echo $CPPFLAGS_AUX`
+if test "$CPPFLAGS_AUX" != ""
+then
+	CPPFLAGS="$CPPFLAGS $CPPFLAGS_AUX"
+fi
+
+CFLAGS_AUX=`eval echo $CFLAGS_AUX`
+if test "$CFLAGS_AUX" != ""
+then
+	CFLAGS="$CFLAGS $CFLAGS_AUX"
+fi
+
+LDFLAGS_AUX=`eval echo $LDFLAGS_AUX`
+if test "$LDFLAGS_AUX" != ""
+then
+	LDFLAGS="$LDFLAGS $LDFLAGS_AUX"
+fi
+
+LD_LIBRARY_PATH_AUX=`eval echo $LD_LIBRARY_PATH_AUX`
+if test "$LD_LIBRARY_PATH_AUX" != ""
+then
+	LD_LIBRARY_PATH="$LD_LIBRARY_PATH_AUX:$LD_LIBRARY_PATH"
+	export LD_LIBRARY_PATH
+fi
+
+# phase 7: compilation and link edition of $USER
+
+case "$USER" in
+	*.c )
+		PROG=`basename $USER .c`
+		$CC $CPPFLAGS $CFLAGS -c $USER -o $PROG.o
+		$LD $CFLAGS $PROG.o $LDFLAGS -o $PROG
+		rm -f $PROG.o
+		;;
+	*.o )
+		PROG=`basename $USER .o`
+		$LD $CFLAGS $USER $LDFLAGS -o $PROG
+		;;
+	*.a )
+		PROG=`basename $USER .a`
+		$LD $CFLAGS $USER $LDFLAGS -o $PROG
+		;;
+esac
+
+# phase 8: program execution (here, "$@" denotes the arguments, if any, to
+# be passed to the program, and $# denotes the number of these arguments)
+
+# export the name of the compiled program:
+# we need it when (e.g) mcrl compiles the rewrite stuff,
+# then we need the name of the program to pass it as
+# parameter in:   -bundle -bundle_loader   PROG
+OPEN_CAESAR_PROG="`pwd`/$PROG"
+export OPEN_CAESAR_PROG
+
+echo "LC_CTYPE=$LCTYPE"
+echo "OPEN_CAESAR_COMMAND=$OPEN_CAESAR_COMMAND"
+echo "OPEN_CAESAR_FILE=$OPEN_CAESAR_FILE"
+echo "OPEN_CAESAR_PROG=$OPEN_CAESAR_PROG"
+echo "LD_LIBRARY_PATH_AUX=$LD_LIBRARY_PATH_AUX"
+
+if test "$#" -eq 0
+then
+	echo "$COMMAND: running \`\`$PROG'' for \`\`$FILE''"
+else
+	echo "$COMMAND: running \`\`$PROG $@'' for \`\`$FILE''"
+fi
+./$PROG "$@"
+
+exit 0

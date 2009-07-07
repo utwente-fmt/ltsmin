@@ -3,10 +3,12 @@ TAGS
 \#*\#
 *~
 *.in
+.libs/
 aclocal.m4
 autom4te.cache/
 autotools/
 config.log
+config.lt
 config.status
 configure
 doxygen-doc
