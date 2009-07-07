@@ -1,10 +1,14 @@
 noinst_PROGRAMS = regroup test
-noinst_LIBRARIES = libdm.a
+noinst_LTLIBRARIES = libdm.la libdm_debug.la
 
-regroup_SOURCES = regroup.c dm.c dm.h bitvector.c bitvector.h
+libdm_la_SOURCES = dm.c dm.h bitvector.c bitvector.h
+libdm_debug_la_SOURCES = dm.c dm.h bitvector.c bitvector.h
+libdm_debug_la_CFLAGS = -DDMDEBUG
 
-test_SOURCES = test.c dm.c dm.h bitvector.c bitvector.h
+regroup_SOURCES = regroup.c
+regroup_LDADD = libdm.la
+
+test_SOURCES = test.c
+test_LDADD = libdm_debug.la
 test_CFLAGS = -DDMDEBUG
-
-libdm_a_SOURCES = dm.c dm.h bitvector.c bitvector.h
 

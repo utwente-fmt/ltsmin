@@ -208,7 +208,7 @@ libutil_la_SOURCES := unix.c runtime.c stream.c archive.c			\
                     lts_enum.c lts_enum.h lts_count.c lts_count.h \
                     archive_io_ops.c fifo.c fifo.h
 
-libutil_la_LIBADD = dm/libdm.a
+libutil_la_LIBADD = dm/libdm.la
 
 libutil_la_CPPFLAGS = $(BUDDY_CPPFLAGS)
 if HAVE_LIBBCG
