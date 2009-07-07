@@ -7,15 +7,15 @@
 #include <stdint.h>
 
 typedef struct bitvector {
-    int                 n_bits;
-    uint32_t           *data;
+    size_t              n_bits;
+    size_t             *data;
 } bitvector_t;
 
 extern int          bitvector_create (bitvector_t *, const int);
 extern void         bitvector_free (bitvector_t *);
 extern int          bitvector_copy (bitvector_t *, bitvector_t *);
 
-extern int          bitvector_size (bitvector_t *);
+extern size_t       bitvector_size (bitvector_t *);
 
 extern int          bitvector_set (bitvector_t *, const int);
 extern int          bitvector_unset (bitvector_t *, const int);
