@@ -55,6 +55,23 @@ group_long (model_t self, int group, int *newsrc, TransitionCB cb,
     return Ntrans;
 }
 
+static int
+group_all (model_t self, int *newsrc, TransitionCB cb,
+            void *user_context)
+{
+    group_context_t     ctx = (group_context_t)GBgetContext (self);
+    model_t             parent = ctx->parent;
+    int                 len = ctx->len;
+    int                 oldsrc[len];
+    ctx->cb = cb;
+    ctx->user_context = user_context;
+
+    for (int i = 0; i < len; i++)
+        oldsrc[ctx->statemap[i]] = newsrc[i];
+
+    return GBgetTransitionsAll(parent, oldsrc, group_cb, ctx);
+}
+
 int
 max_row_first (matrix_t *m, int rowa, int rowb)
 {
@@ -172,6 +189,7 @@ GBregroup (model_t model, const char *regroup_spec_)
     GBsetContext (group, ctx);
     
     GBsetNextStateLong (group, group_long);
+    GBsetNextStateAll (group, group_all);
 
     // fill statemapping: assumption this is a bijection
     {
