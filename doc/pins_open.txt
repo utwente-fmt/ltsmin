@@ -1,0 +1,78 @@
+//                           -*- mode: doc; outline-regexp: "==\(=*\) ." -*-
+pins_open(1)
+============
+:Author:  Michael Weber
+:Email:   <michaelw@cs.utwente.nl>
+:Date:    2009-07-07
+
+== NAME
+
+pins_open - execute OPEN/CAESAR application programs on PINS-based
+state space generators
+
+== SYNOPSIS
+
+*pins_open* 'model'._type_ ['cc_options'] 'app'[_.a_|_.c_|_.o_] ['app_options']
+
+*pins_open* [OPTION]...
+
+== DESCRIPTION
+
+pins_open provides the OPEN/CAESAR interface for state space
+generators which themselves provide a LTSmin PINS interface.
+Supporting PINS libraries which correspond to the _type_ of 'model'
+are linked to an OPEN/CAESAR application 'app'[_.a_|_.c_|_.o_].  The
+resulting executable 'app' is then executed.
+
+pins_open follows the OPEN/CAESAR command line conventions.
+
+== OPTIONS
+*--version*::
+        Print version information of this tool.
+
+*-h*, *--help*::
+        Print help text.
+
+== EXAMPLES
+
+Run the *declarator* test application (provided by
+http://www.inrialpes.fr/vasy/cadp/[CADP]) with the linkman:mcrl[1]
+specification 'brp.tbf':
+
+----
+pins_open brp.tbf declarator
+----
+
+Output:
+----
+pins_open: running ``declarator'' for ``brp.tbf''
+
+*** checking compatibility of ``./declarator''
+
+declarator: loading model from brp.tbf
+MCRL grey box: Start compiling ...
+MCRL grey box: .... end compiling.
+declarator: hiding the state.
+declarator: creating a new string index
+declarator: creating a new string index
+declarator: model brp.tbf loaded
+declarator: length is 21, there are 45 groups
+declarator: There are 0 state labels and 1 edge labels
+declarator: CAESAR_HINT_SIZE_STATE=84 CAESAR_HINT_SIZE_LABEL=4
+*** general parameters
+
+[...]
+
+*** state #1
+
+CAESAR_COPY_STATE : OK
+CAESAR_COMPARE_STATE : OK
+
+[...]
+----
+
+== SEE ALSO
+
+linkman:ltsmin[7], linkman:caesar.open[l], linkman:mcrl[1],
+http://www.inrialpes.fr/vasy/cadp/[CADP]
+
