@@ -60,7 +60,13 @@ ACX_MCRL([:],
 ACX_MCRL2([:],
   [AC_MSG_WARN([no acceptable mCRL2 installation found.])])
 AC_CHECK_PROGS(ASCIIDOC, [asciidoc])
+if test x"$ASCIIDOC" = x && test -d "${srcdir}/.git"; then
+  AC_MSG_FAILURE([Asciidoc is needed unless building from a release tarball.])
+fi
 AC_CHECK_PROGS(XMLTO, [xmlto])
+if test x"$XMLTO" = x && test -d "${srcdir}/.git"; then
+  AC_MSG_FAILURE([xmlto is needed unless building from a release tarball.])
+fi
 DX_DOXYGEN_FEATURE(ON)
 DX_HTML_FEATURE(ON)
 DX_CHM_FEATURE(OFF)
