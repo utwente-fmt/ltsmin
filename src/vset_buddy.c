@@ -308,6 +308,7 @@ static void set_minus_fdd(vset_t dst,vset_t src){
 	bdd_delref(tmp);
 }
 
+/*
 static void set_next_fdd(vset_t dst,vset_t src,vrel_t rel){
 	BDD tmp=bdd_addref(bdd_and(src->bdd,rel->bdd));
 	bdd_delref(dst->bdd);
@@ -316,6 +317,7 @@ static void set_next_fdd(vset_t dst,vset_t src,vrel_t rel){
 	dst->bdd=bdd_addref(bdd_replace(tmp2,rel->dom->pairs));
 	bdd_delref(tmp2);
 }
+*/
 
 static void set_next_appex_fdd(vset_t dst,vset_t src,vrel_t rel){
   BDD tmp=bdd_addref(bdd_appex(src->bdd,rel->bdd,bddop_and,rel->p_set));
