@@ -322,6 +322,7 @@ static void etf_edge(void*context,int*labels,int*dst){
 	for(int i=0;i<N;i++) {
 		if (dm_is_set(GBgetDMInfo(ctx->model), ctx->group, i)) {
 			fprintf(table_file," %d/%d",ctx->src[k],dst[k]);
+			k++;
 		} else {
 			fprintf(table_file," *");
 		}
