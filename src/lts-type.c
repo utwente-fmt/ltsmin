@@ -33,6 +33,64 @@ lts_type_t lts_type_create(){
 	return ltstype;
 }
 
+#define STRDUP(s) (s==NULL)?NULL:strdup(s);
+
+lts_type_t lts_type_permute(lts_type_t t0,int *pi){
+    lts_type_t t=RT_NEW(struct lts_type_s);
+    
+    // clone state signature
+	t->state_length=t0->state_length;
+	t->state_name=(char**)RTmalloc(t0->state_length*sizeof(char*));
+	t->state_type=(int*)RTmalloc(t0->state_length*sizeof(int));
+	for(int i=0;i<t0->state_length;i++){
+		t->state_name[i]=STRDUP(t0->state_name[pi[i]]);
+		t->state_type[i]=t0->state_type[pi[i]];
+	}
+	// clone state label signature
+	t->state_label_count=t0->state_label_count;
+	t->state_label_name=(char**)RTmalloc(t->state_label_count*sizeof(char*));
+	t->state_label_type=(int*)RTmalloc(t->state_label_count*sizeof(int));
+	for(int i=0;i<t0->state_label_count;i++){
+	    t->state_label_name[i]=strdup(t0->state_label_name[i]);
+	    t->state_label_type[i]=t0->state_label_type[i];
+	}
+	// clone edge label signature
+	t->edge_label_count=t0->edge_label_count;
+	t->edge_label_name=(char**)RTmalloc(t0->edge_label_count*sizeof(char*));
+	t->edge_label_type=(int*)RTmalloc(t0->edge_label_count*sizeof(int));
+	for(int i=0;i<t0->edge_label_count;i++){
+	    t->edge_label_name[i]=strdup(t0->edge_label_name[i]);
+	    t->edge_label_type[i]=t0->edge_label_type[i];
+	}
+	// clone type numbering
+	t->type_db=SIcreate();
+	int N=SIgetCount(t0->type_db);
+	for(int i=0;i<N;i++){
+	    SIputAt(t->type_db,SIget(t0->type_db,i),i);
+	}
+    return t;
+}
+
+void lts_type_print(log_t log, lts_type_t t){
+    log_println(log,"the state vector is:");
+ 	for(int i=0;i<t->state_length;i++){
+ 	    log_println(log,"%4d: %s:%d(%s)",i,t->state_name[i],t->state_type[i],SIget(t->type_db,t->state_type[i]));
+	}
+	log_println(log,"the state labels are");
+	for(int i=0;i<t->state_label_count;i++){
+	    log_println(log,"%4d: %s:%d(%s)",i,t->state_label_name[i],t->state_label_type[i],SIget(t->type_db,t->state_label_type[i]));
+	}
+	log_println(log,"the edge labels are");
+	for(int i=0;i<t->edge_label_count;i++){
+	    log_println(log,"%4d: %s:%d(%s)",i,t->edge_label_name[i],t->edge_label_type[i],SIget(t->type_db,t->edge_label_type[i]));
+	}
+    log_println(log,"the registered types are");
+ 	int N=SIgetCount(t->type_db);
+	for(int i=0;i<N;i++){
+	    log_println(log,"%4d: %s",i,SIget(t->type_db,i));
+	}
+}
+
 void lts_type_destroy(lts_type_t *t){
 	Warning(info,"Need to define ownership and implement destroy of LTS type.");
 	free(*t);

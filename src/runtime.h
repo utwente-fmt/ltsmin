@@ -121,6 +121,7 @@ extern void set_label(const char* fmt,...);
 extern char* get_label();
 
 extern void log_message(log_t log,const char*file,int line,int errnum,const char *fmt,...);
+extern void log_println(log_t log,const char *fmt,...);
 
 /**
 \brief Test if the given log is active.

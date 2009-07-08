@@ -128,6 +128,17 @@ int log_active(log_t log){
 	}
 }
 
+void log_println(log_t log,const char *fmt,...){
+    if (log && log->flags & LOG_PRINT) {
+     	va_list args;
+	    va_start(args,fmt);
+	    fprintf(log->f,"%s: ",get_label());
+	    vfprintf(log->f,fmt,args);
+	    fprintf(log->f,"\n");
+	    va_end(args);
+    }
+}
+
 void log_message(log_t log,const char*file,int line,int errnum,const char *fmt,...){
 	struct runtime_log null_log;
 	if (!log) {

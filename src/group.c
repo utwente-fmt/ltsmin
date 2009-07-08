@@ -165,8 +165,7 @@ GBregroup (model_t model, const char *regroup_spec_)
     // create new model
     model_t             group = GBcreateBase ();
     GBcopyChunkMaps (group, model);
-    GBcopyLTStype (group, GBgetLTStype (model)); // Jvdp onbegrepen
-        
+           
     struct group_context *ctx = RTmalloc (sizeof *ctx);
 
     ctx->parent = model;
@@ -219,7 +218,14 @@ GBregroup (model_t model, const char *regroup_spec_)
         }
         ctx->transbegin[newNgroups] = p;
     }
-
+    
+    lts_type_t ltstype=GBgetLTStype (model);
+    lts_type_print(debug,ltstype);
+    Warning(debug,"permuting ltstype");
+    ltstype=lts_type_permute(ltstype,ctx->statemap);
+    lts_type_print(debug,ltstype);
+    GBsetLTStype (group, ltstype);
+ 
     // fill edge_info
     GBsetDMInfo (group, m);
 

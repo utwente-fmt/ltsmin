@@ -184,17 +184,13 @@ void GBsetContext(model_t model,void* context){
 void GBsetLTStype(model_t model,lts_type_t info){
 	if (model->ltstype != NULL)  Fatal(1,error,"ltstype already set");
 	model->ltstype=info;
-	int N=lts_type_get_type_count(info);
-	model->map=RTmalloc(N*sizeof(void*));
-	for(int i=0;i<N;i++){
-		model->map[i]=model->newmap(model->newmap_context);
-	}
-}
-
-//JvdP: onbegrepen wijziging
-void GBcopyLTStype(model_t model,lts_type_t info){
-	if (model->ltstype != NULL)  Fatal(1,error,"ltstype already set");
-	model->ltstype=info;
+    if (model->map==NULL){
+	    int N=lts_type_get_type_count(info);
+	    model->map=RTmalloc(N*sizeof(void*));
+	    for(int i=0;i<N;i++){
+		    model->map[i]=model->newmap(model->newmap_context);
+	    }
+    }
 }
 
 lts_type_t GBgetLTStype(model_t model){
