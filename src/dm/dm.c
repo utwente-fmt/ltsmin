@@ -377,7 +377,7 @@ dm_print (FILE * f, const matrix_t *m)
                         j;
     for (i = 0; i < dm_nrows (m); i++) {
         for (j = 0; j < dm_ncols (m); j++) {
-            fprintf (f, "%c", (char)(dm_is_set (m, i, j) ? '1' : '0'));
+            fprintf (f, "%c", (char)(dm_is_set (m, i, j) ? '+' : '-'));
         }
         fprintf (f, "\n");
     }
