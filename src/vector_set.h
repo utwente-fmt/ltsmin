@@ -114,6 +114,11 @@ the given context and the set element.
 extern void vset_enum_match(vset_t set,int p_len,int* proj,int*match,vset_element_cb cb,void* context);
 
 /**
+\brief Produce a member of a non-empty set.
+*/
+extern void vset_example(vset_t set,int *e);
+
+/**
 \brief Copy a vset.
 */
 extern void vset_copy(vset_t dst,vset_t src);
