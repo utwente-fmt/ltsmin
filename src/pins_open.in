@@ -25,12 +25,12 @@ BIN="$CADP/bin.$ARCH"
 SRC="$CADP/src/open_caesar"
 
 # recording the command-line for OCIS
-OPEN_CAESAR_COMMAND="$0 $@"
+
+  OPEN_CAESAR_COMMAND="$0 $@"
 export OPEN_CAESAR_COMMAND
 
 # the following variables are initialised by "configure"
 LTSMIN_VERSION="@VERSION@"
-top_srcdir="@top_srcdir@"
 prefix="@prefix@"
 LTSMIN_PREFIX="$prefix"
 exec_prefix="@exec_prefix@"
@@ -50,6 +50,15 @@ do
 		exit 1
 	fi
 	case $1 in
+        --version )
+                echo "$COMMAND (LTSmin) $LTSMIN_VERSION"
+                exit 0
+                ;;
+        --help )
+                echo "$COMMAND model[.b|.etf|.lps|.tbf] [cc_options] app[.a|.c|.o] [app_options]..."
+                echo "  where \`\`app'' is an OPEN/CAESAR application"
+                exit 0
+                ;;
         -* )
             LTSMIN_OPTIONS="$LTSMIN_OPTIONS \"$1\""
             shift 1
@@ -71,34 +80,26 @@ then
 fi
 case "$FILE" in
  *.tbf)
-    if test "@MCRL_LDFLAGS@" = "\@MCRL_LDFLAGS\@" ; then
-        echo "mCRL is not supported"
-        exit 1
-    fi
+    @HAVE_LIBSTEP_INFO_FALSE@ echo "muCRL support (> 2.18.3) not installed"
+    @HAVE_LIBSTEP_INFO_FALSE@ exit 1
     echo "input is mCRL"
     LTSMIN_MOD_LDFLAGS="@MCRL_LDFLAGS@ @CADP_LDFLAGS@ -llpo-open @BUDDY_LIBS@ @MCRL_LIBS@ @CADP_LIBS@"
     ;;
  *.lps)
-    if test "@MCRL2_LDFLAGS@" = "\@MCRL2_LDFLAGS\@" ; then
-        echo "mCRL2 is not supported"
-        exit 1
-    fi
+    @HAVE_LIBMCRL2_FALSE@ echo "mCRL2 support not installed"
+    @HAVE_LIBMCRL2_FALSE@ exit 1
     echo "input is mCRL2"
     LTSMIN_MOD_LDFLAGS="@MCRL2_LDFLAGS@ @CADP_LDFLAGS@ -llps-open @BUDDY_LIBS@ @MCRL2_LIBS@ @CADP_LIBS@"
     ;;
  *.b)
-    if test "@MCRL_LDFLAGS@" = "\@MCRL_LDFLAGS\@" ; then
-        echo "cannot use NIPS-VM without mCRL."
-        exit 1
-    fi
+    @HAVE_LIBMCRL_FALSE@ echo "cannot use NIPS without muCRL"
+    @HAVE_LIBMCRL_FALSE@ exit 1
     echo "input is NIPS byte-code"
     LTSMIN_MOD_LDFLAGS="@NIPS_LDFLAGS@ @MCRL_LDFLAGS@ @CADP_LDFLAGS@ -lnips-open @BUDDY_LIBS@ @CADP_LIBS@"
     ;;
  *.etf)
-    if test "@MCRL_LDFLAGS@" = "\@MCRL_LDFLAGS\@" ; then
-        echo "cannot use ETF without mCRL."
-        exit 1
-    fi
+    @HAVE_LIBMCRL_FALSE@ echo "cannot use ETF without muCRL"
+    @HAVE_LIBMCRL_FALSE@ exit 1
     echo "input is ETF"
     LTSMIN_MOD_LDFLAGS="@MCRL_LDFLAGS@ @CADP_LDFLAGS@ -letf-open @BUDDY_LIBS@ @CADP_LIBS@"
     ;;
