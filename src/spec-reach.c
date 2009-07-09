@@ -12,6 +12,9 @@
 #include "scctimer.h"
 #include "dm/dm.h"
 
+#include <lts_enum.h>
+#include <lts_io.h>
+
 #if defined(MCRL)
 #include "mcrl-greybox.h"
 #endif
@@ -26,7 +29,11 @@
 #endif
 
 static char* etf_output=NULL;
+static char* trc_output=NULL;
 static int dlk_detect=0;
+
+static lts_enum_cb_t trace_handle=NULL;
+static lts_output_t trace_output=NULL;
 
 static enum { BFS , BFS2 , Chain } strategy = BFS;
 
@@ -66,7 +73,8 @@ static void reach_popt(poptContext con,
 static  struct poptOption options[] = {
 	{ NULL, 0 , POPT_ARG_CALLBACK|POPT_CBFLAG_POST|POPT_CBFLAG_SKIPOPTION , (void*)reach_popt , 0 , NULL , NULL },
 	{ "order" , 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &order , 0 , "select the exploration strategy to a specific order" ,"<bfs|bfs2|chain>" },
-	{ "deadlock" , 'd' , POPT_ARG_VAL , &dlk_detect , 1 , "detect deadlocks" , NULL } ,
+	{ "deadlock" , 'd' , POPT_ARG_VAL , &dlk_detect , 1 , "detect deadlocks" , NULL },
+	{ "trace" , 0 , POPT_ARG_STRING , &trc_output , 0 , "file to write trace to" , "<lts output>" },
 #if defined(MCRL)
 	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, mcrl_options , 0 , "mCRL options",NULL},
 #endif
@@ -81,12 +89,14 @@ static  struct poptOption options[] = {
 #endif
 	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, greybox_options , 0 , "Greybox options",NULL},
 	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, vset_full_options , 0 , "Vector set options",NULL},
+	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, lts_io_options , 0 , NULL , NULL },
 	POPT_TABLEEND
 };
 
 static lts_type_t ltstype;
 static int N;
 static int eLbls;
+static int sLbls;
 static int nGrps;
 static vdom_t domain;
 static vset_t visited;
@@ -138,12 +148,43 @@ static inline void expand_group_next(int group,vset_t set){
 	vset_clear(group_tmp[group]);
 }
 
-static void write_trace_step(int step, int*state){
-	fprintf(stderr,"%4d:",step);
+static void write_trace_state(int src_no, int*state){
+	Warning(info,"dumping state %d",src_no);
+    int labels[sLbls];
+	if (sLbls) GBgetStateLabelsAll(model,state,labels);
+    enum_vec(trace_handle,state,labels);
 	for (int i=0;i<N;i++) {
 		fprintf(stderr," %d",state[i]);
 	}
 	fprintf(stderr,"\n");
+}
+
+struct write_trace_step_s {
+    int src_no;
+    int dst_no;
+    int* dst;
+    int found;
+};
+
+static void write_trace_next(void*arg,int*lbl,int*dst){
+	struct write_trace_step_s*ctx=(struct write_trace_step_s*)arg;
+	if(ctx->found) return;
+	for(int i=0;i<N;i++){
+	    if (ctx->dst[i]!=dst[i]) return;
+	}
+	ctx->found=1;
+	enum_seg_seg(trace_handle,0,ctx->src_no,0,ctx->dst_no,lbl);
+}
+
+static void write_trace_step(int src_no,int*src,int dst_no,int*dst){
+    Warning(info,"finding edge for state %d",src_no);
+    struct write_trace_step_s ctx;
+    ctx.src_no=src_no;
+    ctx.dst_no=dst_no;
+    ctx.dst=dst;
+    ctx.found=0;
+    GBgetTransitionsAll(model,src,write_trace_next,&ctx);
+    if (ctx.found==0) Fatal(1,error,"no matching transition found");
 }
 
 static int same_state(int*s1,int*s2){
@@ -209,11 +250,14 @@ static int find_trace_to(int step,int *src,int *dst){
 	vset_clear(temp);
 	switch(distance){
 	case 1:
-		write_trace_step(step,src);
+		write_trace_state(step,src);
+		write_trace_step(step,src,step+1,dst);
 		return step+1;
 	case 2:
-		write_trace_step(step,src);
-		write_trace_step(step+1,middle);
+		write_trace_state(step,src);
+		write_trace_step(step,src,step+1,middle);
+		write_trace_state(step+1,middle);
+		write_trace_step(step+1,middle,step+2,dst);
 		return step+2;
 	default:
 		step=find_trace_to(step,src,middle);
@@ -222,10 +266,12 @@ static int find_trace_to(int step,int *src,int *dst){
 }
 
 static void find_trace(int *src,int *dst){
+	eLbls=lts_type_get_edge_label_count(ltstype);
+	sLbls=lts_type_get_state_label_count(ltstype);
 	mytimer_t timer=SCCcreateTimer();
 	SCCstartTimer(timer);
 	int len=find_trace_to(0,src,dst);
-	write_trace_step(len,dst);
+	write_trace_state(len,dst);
 	SCCstopTimer(timer);
 	SCCreportTimer(timer,"constructing the trace took");
 }
@@ -257,7 +303,7 @@ static void reach_bfs(){
 			for (i=0;i<nGrps;i++) 
 			  {long long e;
 			   long int n;
-			   vrel_count(group_rel[i],&n,&e);
+			   vrel_count(group_next[i],&n,&e);
 			   if (RTverbosity >= 2) fprintf(stderr,"( %d %ld %lld ) ",i,n,e);
 			   if (n>max_trans_count) max_trans_count=n;
 			  }
@@ -298,11 +344,20 @@ static void reach_bfs(){
 		if (RTverbosity >= 2) fprintf(stderr,"\rlocal next complete       \n");
 		if (dlk_detect && !vset_is_empty(deadlocks)) {
 			Warning(info,"deadlock found");
-			int init_state[N];
-			GBgetInitialState(model,init_state);
-			int dlk_state[N];
-			vset_example(deadlocks,dlk_state);
-			find_trace(init_state,dlk_state);
+			if (trc_output){
+			    int init_state[N];
+			    GBgetInitialState(model,init_state);
+			    int dlk_state[N];
+			    vset_example(deadlocks,dlk_state);
+			    trace_output=lts_output_open(trc_output,model,1,0,1,"vsi",NULL);
+    			lts_output_set_root_vec(trace_output,(uint32_t*)init_state);
+			    lts_output_set_root_idx(trace_output,0,0);
+			    trace_handle=lts_output_begin(trace_output,0,0,0);	
+		        find_trace(init_state,dlk_state);
+	            lts_output_end(trace_output,trace_handle);
+	            lts_output_close(&trace_output);
+		    }
+	        Fatal(1,info,"exiting now");
 			break;
 		}
 		vset_union(visited,next_level);
@@ -331,7 +386,7 @@ void reach_bfs2(){
 			for (i=0;i<nGrps;i++) 
 			  {long long e;
 			   long int n;
-			   vrel_count(group_rel[i],&n,&e);
+			   vrel_count(group_next[i],&n,&e);
 			   if (RTverbosity >= 2) fprintf(stderr,"( %d %ld %lld ) ",i,n,e);
 			   if (n>max_trans_count) max_trans_count=n;
 			  }
@@ -389,7 +444,7 @@ void reach_chain(){
 			for (i=0;i<nGrps;i++) 
 			  {long long e;
 			   long int n;
-			   vrel_count(group_rel[i],&n,&e);
+			   vrel_count(group_next[i],&n,&e);
 			   if (RTverbosity >= 2) fprintf(stderr,"( %d %ld %lld ) ",i,n,e);
 			   if (n>max_trans_count) max_trans_count=n;
 			  }
@@ -447,7 +502,7 @@ static void etf_edge(void*context,int*labels,int*dst){
 	fprintf(table_file,"\n");
 }
 
-static void enum_edge(void*context,int *src){
+static void enum_edges(void*context,int *src){
 	output_context* ctx=(output_context*)context;
 	ctx->src=src;
 	GBgetTransitionsShort(model,ctx->group,ctx->src,etf_edge,context);
@@ -512,11 +567,11 @@ void do_output(){
 		ctx.model = model;
 		ctx.group=g;
 		fprintf(table_file,"begin trans\n");
-		vset_enum(group_explored[g],enum_edge,&ctx);
+		vset_enum(group_explored[g],enum_edges,&ctx);
 		fprintf(table_file,"end trans\n");
 	}
 	Warning(info,"Symbolic tables have %d reachable transitions",table_count);
-	int sLbls=lts_type_get_state_label_count(ltstype);
+	sLbls=lts_type_get_state_label_count(ltstype);
 	state_info_t s_info=GBgetStateInfo(model);
 	for(int i=0;i<sLbls;i++){
 		int len=s_info->length[i];
@@ -555,7 +610,8 @@ int main(int argc, char *argv[]){
 	char* files[2];
 	RTinitPopt(&argc,&argv,options,1,2,files,NULL,"<model> [<etf>]",
 		"Perform a symbolic reachability analysis of <model>\n"
-		"The optional output of this analysis is an ETF representation of the input\n\nOptions");
+		"The optional output of this analysis is an ETF representation of the input\n"
+		"\nOptions");
 	etf_output=files[1];
 	if (RTverbosity==0) {
 		log_set_flags(info,LOG_IGNORE);
