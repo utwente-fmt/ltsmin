@@ -112,71 +112,75 @@ max_col_first (matrix_t *m, int cola, int colb)
 
 void GBcopyLTStype(model_t model,lts_type_t info);
 
+static void
+apply_regroup_spec (matrix_t *m, const char *spec_)
+{
+    // parse regrouping arguments
+    if (spec_ != NULL) {
+        char               *spec = strdup (spec_);
+        assert (spec != NULL);
+
+        char               *tok;
+        while ((tok = strsep (&spec, ",")) != NULL) {
+            if (strcasecmp (tok, "cs") == 0) {
+                Warning (info, "Regroup Column Sort");
+                dm_sort_cols (m, &max_col_first);
+            } else if (strcasecmp (tok, "cn") == 0) {
+                Warning (info, "Regroup Column Nub");
+                dm_nub_cols (m);
+            } else if (strcasecmp (tok, "cw") == 0) {
+                Warning (info, "Regroup Column sWaps");
+                dm_optimize (m);
+            } else if (strcasecmp (tok, "ca") == 0) {
+                Warning (info, "Regroup Column All permutations");
+                dm_all_perm (m);
+            } else if (strcasecmp (tok, "rs") == 0) {
+                Warning (info, "Regroup Row Sort");
+                dm_sort_rows (m, &max_row_first);
+            } else if (strcasecmp (tok, "rn") == 0) {
+                Warning (info, "Regroup Row Nub");
+                dm_nub_rows (m);
+            } else if (strcasecmp (tok, "ru") == 0) {
+                Warning (info, "Regroup Row sUbsume");
+                dm_subsume_rows (m);
+            } else if (strcasecmp (tok, "gs") == 0) {
+                const char         *macro = "gc,gr,cw,rs";
+                Warning (info, "Regroup macro Group Safely: %s", macro);
+                apply_regroup_spec (m, macro);
+            } else if (strcasecmp (tok, "ga") == 0) {
+                const char         *macro = "gc,rs,ru,cw,rs";
+                Warning (info, "Regroup macro Group Aggressively: %s", macro);
+                apply_regroup_spec (m, macro);
+            } else if (strcasecmp (tok, "gc") == 0) {
+                const char         *macro = "cs,cn";
+                Warning (info, "Regroup macro Cols: %s", macro);
+                apply_regroup_spec (m, macro);
+            } else if (strcasecmp (tok, "gr") == 0) {
+                const char         *macro = "rs,rn";
+                Warning (info, "Regroup macro Rows: %s", macro);
+                apply_regroup_spec (m, macro);
+            } else if (tok[0] != '\0') {
+                Fatal (1, error, "Unknown regrouping specification: '%s'",
+                       tok);
+            }
+        }
+        free (spec);
+    }
+}
+
 model_t
-GBregroup (model_t model, const char *regroup_spec_)
+GBregroup (model_t model, const char *regroup_spec)
 {
     // note: context information is available via matrix, doesn't need to
     // be stored again
-    Warning (info, "Regroup specification: %s", regroup_spec_);
-
     matrix_t           *m = RTmalloc (sizeof (matrix_t));
 
     dm_copy (GBgetDMInfo (model), m);
 
-    // parse regrouping arguments
-    // allowed arguments
-    // col { sort, nub, swap, allperm}
-    // row { sort, nub, subsume }
-    if (regroup_spec_) {
-        char *regroup_spec = strdup (regroup_spec_);
-        assert (regroup_spec != NULL);
-
-        char *tok;
-        while ((tok = strsep (&regroup_spec, ",")) != NULL) {
-            // Column Sort
-            if (strcasecmp(tok, "cs") == 0) {
-                Warning (info, "Regroup Column Sort");
-                dm_sort_cols(m, &max_col_first);
-
-                // Column Nub
-            } else if (strcasecmp(tok, "cn") == 0) {
-                Warning (info, "Regroup Column Nub");
-                dm_nub_cols(m);
-
-                // Column sWap
-            } else if (strcasecmp(tok, "cw") == 0) {
-                Warning (info, "Regroup Column Swaps");
-                dm_optimize (m);
-
-                // Column All permutations
-            } else if (strcasecmp(tok, "ca") == 0) {
-                Warning (info, "Regroup Column All Permutations");
-                dm_all_perm (m);
-
-                // Row Sort
-            } else if (strcasecmp(tok, "rs") == 0) {
-                Warning (info, "Regroup Row Sort");
-                dm_sort_rows (m, &max_row_first);
-
-                // Row Nub
-            } else if (strcasecmp(tok, "rn") == 0) {
-                Warning (info, "Regroup Row Nub");
-                dm_nub_rows (m);
-
-                // Row sUbsume
-            } else if (strcasecmp(tok, "ru") == 0) {
-                Warning (info, "Regroup Row Subsume");
-                dm_subsume_rows (m);
-
-            } else if (tok[0] != '\0') {
-                Fatal (1, error, "Unknown regrouping specification: %s", tok);
-            }
-        }
-        free (regroup_spec);
-    }
-
+    Warning (info, "Regroup specification: %s", regroup_spec);
+    apply_regroup_spec (m, regroup_spec);
     // post processing regroup specification
-    // undo column nub
+    // undo column grouping
     dm_ungroup_cols(m);
 
     // create new model

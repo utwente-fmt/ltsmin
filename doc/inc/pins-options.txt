@@ -7,3 +7,52 @@ If this option is used, the state space generator makes calls to the
 short version of the greybox next-state function and memoizes the
 results. If the next-state function is expensive this will yield
 substantial speedups.
+
+*-r*, *--regroup*='SPEC'::
+    Enable regrouping optimizations on the dependency matrix.
++
+'SPEC' is a comma-separated sequence of transformations
+'<(_T_,)+>' which are applied in this order to the
+dependency matrix.  The following transformations _T_ are available:
+
+gs;;
+  Group Safely; macro for "*gc*,*gr*,*cw*,*rs*"; almost
+  always a win.
+
+ga;;
+  Group Aggressively (row subsumption); macro for
+  "*gc*,*rs*,*ru*,*cw*,*rs*"; can be a huge win, but in some
+  cases causes slower state space generation.
+
+gc;;
+  Group Columns; macro for "*cs*,*cn*".
+
+gr;;
+  Group Rows; macro for "*rs*,*rn*".
+
+cs;;
+  Column Sort; sort columns lexicographically.
+
+cn;;
+  Column Nub; (temporarily) group duplicate columns, thereby making
+  'ca' more tractable.  Requires *cs*.
+
+cw;;
+  Column sWap; minimize distance between changing columns
+  heuristically.  This reordering improves performance of the symbolic
+  data structures.
+
+ca;;
+  Column All permutations; try to find the column permutation with the
+  best cost metric.  Potentially, this is an expensive operation.
+
+rs;;
+  Row Sort; sort rows lexicographically.
+
+rn;;
+  Row Nub; remove duplicate rows from the dependency matrix.  This is
+  always a win.  Requires *rs*.
+
+ru;;
+  Row sUbsume; try to remove more rows than nubbing, thereby trading
+  speed for memory.  Requires *rs*.
