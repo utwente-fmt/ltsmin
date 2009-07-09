@@ -149,14 +149,10 @@ static inline void expand_group_next(int group,vset_t set){
 }
 
 static void write_trace_state(int src_no, int*state){
-	Warning(info,"dumping state %d",src_no);
+	Warning(debug,"dumping state %d",src_no);
     int labels[sLbls];
 	if (sLbls) GBgetStateLabelsAll(model,state,labels);
     enum_vec(trace_handle,state,labels);
-	for (int i=0;i<N;i++) {
-		fprintf(stderr," %d",state[i]);
-	}
-	fprintf(stderr,"\n");
 }
 
 struct write_trace_step_s {
@@ -177,7 +173,7 @@ static void write_trace_next(void*arg,int*lbl,int*dst){
 }
 
 static void write_trace_step(int src_no,int*src,int dst_no,int*dst){
-    Warning(info,"finding edge for state %d",src_no);
+    Warning(debug,"finding edge for state %d",src_no);
     struct write_trace_step_s ctx;
     ctx.src_no=src_no;
     ctx.dst_no=dst_no;
