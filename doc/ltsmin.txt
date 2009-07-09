@@ -156,7 +156,7 @@ etf-convert brp.etf brp.dve
 
 It can also serve as the input for state space generation
 ----
-mpirun -np 4 -mca btl tcp,self ltsmin-mpi brp.gcf brp-s.gcf
+mpirun -np 4 -mca btl tcp,self etf2lts-mpi brp.etf brp-s.gcf
 ----
 
 
