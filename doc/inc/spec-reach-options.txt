@@ -10,3 +10,11 @@ Chaining means to apply next state for the first group to the visited
 states, then apply next-state for the second group to the result,
 etc..  Thus, a chaining analysis can be completed in much less
 iterations than a BFS analysis.
+
+*-d*, *--deadlock*::
+      Find state with no outgoing transitions.  Returns with exit code
+      1 if deadlock is found, otherwise 0.
+
+*--trace*='FILE'::
+      When finding a deadlock state, write a trace to 'FILE',
+      beginning at the initial state.
