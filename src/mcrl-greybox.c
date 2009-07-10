@@ -44,11 +44,25 @@ static void MCRLinitGreybox(int argc,char *argv[],void* stack_bottom){
 	ATinit(argc, argv, stack_bottom);
 	ATsetWarningHandler(WarningHandler);
 	ATsetErrorHandler(ErrorHandler);
+#if defined(__APPLE__)
+        /* KLUDGE: On OSX, mcrl at least up to 2.18.4 unconditionally
+         *   sets -bundle_loader to mcrl's installation path, in
+         *   <prefix>/mCRL/libexec/Rww.  Thus, linking the compiled
+         *   rewriters into our application fails (-alt rww).  We can
+         *   fake it to work by pretending to be mcrl's rewr
+         *   executable.
+         */
+        const char *tmp = argv[0];
+        argv[0] = "/fake/path/to/rewr";
 	RWsetArguments(&argc, &argv);
+        argv[0] = tmp;
+#else
+	RWsetArguments(&argc, &argv);
+#endif
 	STsetArguments(&argc, &argv);
 	MCRLsetArguments(&argc, &argv);
-	if (argc!=1) {
-		for(int i=0;i<argc;i++){
+	if (argc > 1) {
+		for(int i=1;i<argc;i++){
 			Warning(error,"unparsed mCRL option %s",argv[i]);
 		}
 		Fatal(1,error,"Exiting");
