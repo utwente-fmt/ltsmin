@@ -335,32 +335,33 @@ static char* model_type[MAX_TYPES];
 static pins_loader_t model_loader[MAX_TYPES];
 static int registered=0;
 static int cache=0;
-static const char regroup_default[] = "gs";
-static const char *regroup_options = "gs";
+static const char *regroup_options = NULL;
 
-void GBloadFile(model_t model,const char *filename,model_t *wrapped){
-	char* extension=strrchr(filename,'.');
-	if (extension) {
-		extension++;
-		for(int i=0;i<registered;i++){
-			if(!strcmp(model_type[i],extension)){
-				model_loader[i](model,filename);
-				if (wrapped) {
-				  if (regroup_options != regroup_default) {
-                                      const char *spec = regroup_options == NULL ?
-                                          regroup_default : regroup_options;
-				      model = GBregroup(model, spec);
-                                  }
-				  if (cache) model=GBaddCache(model);
-				  *wrapped=model;
-				}
-				return;
-			}
-		}
-		Fatal(1,error,"No factory method has been registered for %s models",extension);
-	} else {
-		Fatal(1,error,"filename %s doesn't have an extension",filename);
-	}
+void
+GBloadFile (model_t model, const char *filename, model_t *wrapped)
+{
+    char               *extension = strrchr (filename, '.');
+    if (extension) {
+        extension++;
+        for (int i = 0; i < registered; i++) {
+            if (!strcmp (model_type[i], extension)) {
+                model_loader[i] (model, filename);
+                if (wrapped) {
+                    if (regroup_options != NULL)
+                        model = GBregroup (model, regroup_options);
+                    if (cache)
+                        model = GBaddCache (model);
+                    *wrapped = model;
+                }
+                return;
+            }
+        }
+        Fatal (1, error, "No factory method has been registered for %s models",
+               extension);
+    } else {
+        Fatal (1, error, "filename %s doesn't have an extension",
+               filename);
+    }
 }
 
 void GBregisterLoader(const char*extension,pins_loader_t loader){
