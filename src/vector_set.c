@@ -150,6 +150,10 @@ void vset_enum_match(vset_t set,int p_len,int* proj,int*match,vset_element_cb cb
 	set->dom->shared.set_enum_match(set,p_len,proj,match,cb,context);
 }
 
+void vset_example(vset_t set,int *e){
+	set->dom->shared.set_example(set,e);
+}
+
 void vset_count(vset_t set,long *nodes,long long *elements){
 	set->dom->shared.set_count(set,nodes,elements);
 }

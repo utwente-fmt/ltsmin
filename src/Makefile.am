@@ -90,30 +90,30 @@ nips2lts_grey_LDFLAGS  = $(NIPS_LDFLAGS) $(BUDDY_LDFLAGS) $(MCRL_LDFLAGS) $(AM_L
 # lpo-reach
 lpo_reach_SOURCES  = spec-reach.c mcrl-greybox.c mcrl-greybox.h  \
                      at-map.c at-map.h vset_atermdd.c
-lpo_reach_LDADD    = libutil.la $(MCRL_LIBS) $(BUDDY_LIBS)
+lpo_reach_LDADD    = libutil.la $(MCRL_LIBS) $(BUDDY_LIBS) $(CADP_LIBS)
 lpo_reach_CPPFLAGS = -DMCRL $(MCRL_CPPFLAGS) $(AM_CPPFLAGS)
-lpo_reach_LDFLAGS  = $(MCRL_LDFLAGS) $(BUDDY_LDFLAGS) $(AM_LDFLAGS)
+lpo_reach_LDFLAGS  = $(MCRL_LDFLAGS) $(BUDDY_LDFLAGS) $(AM_LDFLAGS) $(CADP_LDFLAGS)
 
 # lps-reach
 lps_reach_SOURCES  = spec-reach.c mcrl2-greybox.cpp mcrl2-greybox.h      \
                      at-map.c at-map.h vset_atermdd.c
-lps_reach_LDADD    = libutil.la $(MCRL2_LIBS) $(BUDDY_LIBS)
+lps_reach_LDADD    = libutil.la $(MCRL2_LIBS) $(BUDDY_LIBS) $(CADP_LIBS)
 lps_reach_CPPFLAGS = -DMCRL2 $(MCRL2_CPPFLAGS) $(AM_CPPFLAGS)
-lps_reach_LDFLAGS  = $(MCRL2_LDFLAGS) $(BUDDY_LDFLAGS) $(AM_LDFLAGS)
+lps_reach_LDFLAGS  = $(MCRL2_LDFLAGS) $(BUDDY_LDFLAGS) $(AM_LDFLAGS) $(CADP_LDFLAGS)
 
 # nips-reach
 nips_reach_SOURCES  = spec-reach.c nips-greybox.c nips-greybox.h	\
                       vset_atermdd.c
-nips_reach_LDADD    = libutil.la -lATerm $(NIPS_LIBS) $(BUDDY_LIBS)
+nips_reach_LDADD    = libutil.la -lATerm $(NIPS_LIBS) $(BUDDY_LIBS) $(CADP_LIBS)
 nips_reach_CPPFLAGS = -DNIPS $(NIPS_CPPFLAGS) $(MCRL_CPPFLAGS) $(AM_CPPFLAGS)
-nips_reach_LDFLAGS  = $(NIPS_LDFLAGS) $(MCRL_LDFLAGS) $(BUDDY_LDFLAGS) $(AM_LDFLAGS)
+nips_reach_LDFLAGS  = $(NIPS_LDFLAGS) $(MCRL_LDFLAGS) $(BUDDY_LDFLAGS) $(AM_LDFLAGS) $(CADP_LDFLAGS)
 
 # etf-reach
 etf_reach_SOURCES  = spec-reach.c etf-greybox.c etf-greybox.h    \
                         lts.c lts.h vset_atermdd.c
-etf_reach_LDADD    = libutil.la -lATerm  $(BUDDY_LIBS)
+etf_reach_LDADD    = libutil.la -lATerm  $(BUDDY_LIBS) $(CADP_LIBS)
 etf_reach_CPPFLAGS = -DETF $(MCRL_CPPFLAGS) $(AM_CPPFLAGS)
-etf_reach_LDFLAGS  = $(MCRL_LDFLAGS) $(BUDDY_LDFLAGS) $(AM_LDFLAGS)
+etf_reach_LDFLAGS  = $(MCRL_LDFLAGS) $(BUDDY_LDFLAGS) $(AM_LDFLAGS) $(CADP_LDFLAGS)
 
 
 # lpo2lts-mpi
