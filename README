@@ -101,7 +101,7 @@ Download GNU make from <http://www.gnu.org/software/make/>.
 ** Optional Dependencies
 *** muCRL
 Download muCRL from <http://www.cwi.nl/~mcrl/mutool.html>.  We tested
-with muCRL-2.18.3.  Without muCRL, the distributed tool for state
+with muCRL-2.18.4.  Without muCRL, the distributed tool for state
 space generation (lpo2lts-mpi) will not be built, and neither will any
 NIPS-based tools.
 
