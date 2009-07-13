@@ -62,6 +62,9 @@ static void reach_popt(poptContext con,
 			Warning(info,"Exploration order is %s",order);
 		}
 		strategy = res;
+
+                if (trc_output)
+                    dlk_detect = 1;
 		return;
 	}
 	case POPT_CALLBACK_REASON_OPTION:
