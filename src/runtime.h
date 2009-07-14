@@ -47,6 +47,8 @@ extern void* RTmalloc(size_t size);
 
 extern void* RTmallocZero(size_t size);
 
+extern void RTfree(void *rt_ptr);
+
 #define RT_NEW(sort) ((sort*)RTmallocZero(sizeof(sort)))
 
 
@@ -119,13 +121,19 @@ extern void set_label(const char* fmt,...);
 extern char* get_label();
 
 extern void log_message(log_t log,const char*file,int line,int errnum,const char *fmt,...);
+extern void log_println(log_t log,const char *fmt,...);
+
+/**
+\brief Test if the given log is active.
+ */
+extern int log_active(log_t log);
 
 extern void (*RThandleFatal)(const char*file,int line,int errnum,int code);
 
-#define Warning(log,...) log_message(log,__FILE__,__LINE__,0,__VA_ARGS__)
-#define WarningCall(log,...) log_message(log,__FILE__,__LINE__,errno,__VA_ARGS__)
-#define Log(log,...) log_message(log,__FILE__,__LINE__,0,__VA_ARGS__)
-#define LogCall(log,...) log_message(log,__FILE__,__LINE__,errno,__VA_ARGS__)
+#define Warning(log,...) if (log_active(log)) log_message(log,__FILE__,__LINE__,0,__VA_ARGS__)
+#define WarningCall(log,...) if (log_active(log)) log_message(log,__FILE__,__LINE__,errno,__VA_ARGS__)
+#define Log(log,...) if (log_active(log)) log_message(log,__FILE__,__LINE__,0,__VA_ARGS__)
+#define LogCall(log,...) if (log_active(log)) log_message(log,__FILE__,__LINE__,errno,__VA_ARGS__)
 #define Fatal(code,log,...) {\
 	log_message(log,__FILE__,__LINE__,0,__VA_ARGS__);\
 	if (RThandleFatal) RThandleFatal(__FILE__,__LINE__,0,code);\

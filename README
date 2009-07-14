@@ -101,23 +101,27 @@ Download GNU make from <http://www.gnu.org/software/make/>.
 ** Optional Dependencies
 *** muCRL
 Download muCRL from <http://www.cwi.nl/~mcrl/mutool.html>.  We tested
-with muCRL-2.18.3.  Without muCRL, the distributed tool for state
+with muCRL-2.18.4.  Without muCRL, the distributed tool for state
 space generation (lpo2lts-mpi) will not be built, and neither will any
 NIPS-based tools.
 
 *** mCRL2
-Download the latest SVN version of mCRL2 from http://www.mcrl2.org/wiki/index.php/Download
+Download the latest released version of mCRL2 from
+<http://www.mcrl2.org/>.  We tested with mcrl2-200901.
+
 Build and install mCRL2 as usual:
 
   ./configure <options>
   make
   make install
 
-Then type the command:
+Unless mcrl2 is configured to use an external Boost library instead of
+its own copy, the headers have to be installed as well:
 
   ./build/bin/bjam --install --install-boost-headers
 
-This should allow the mCRL2 greybox interface to compile.
+Ensure that these headers are actually used to compile the PINS
+support for mcrl2 (instead of, e.g., system-provided Boost headers).
 
 *** CADP
 See the CADP website <http://www.inrialpes.fr/vasy/cadp/> on how to

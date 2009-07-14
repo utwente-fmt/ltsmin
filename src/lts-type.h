@@ -2,6 +2,7 @@
 #define LTS_TYPE_H
 
 #include <stream.h>
+#include <runtime.h>
 
 /**
 \file lts-type.h
@@ -16,11 +17,17 @@
 
 typedef struct lts_type_s *lts_type_t;
 
-/// Create a new lts type.
+/// Create a new empty lts type.
 extern lts_type_t lts_type_create();
+
+/// Create a new lts type by permuting the state vector of an existing type.
+extern lts_type_t lts_type_permute(lts_type_t t,int *pi);
 
 /// Destroy an lts type.
 extern void lts_type_destroy(lts_type_t *t);
+
+/// Print the lts type to the log stream;
+extern void lts_type_print(log_t log, lts_type_t t);
 
 /// Set state length.
 extern void lts_type_set_state_length(lts_type_t  t,int length);

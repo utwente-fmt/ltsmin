@@ -120,6 +120,25 @@ static void log_end(log_t log){
 	fprintf(log->f,"\n");
 }
 
+int log_active(log_t log){
+ 	if (!log) {
+ 	    return 1;
+	} else {
+		return (log->flags & LOG_PRINT)!=0;
+	}
+}
+
+void log_println(log_t log,const char *fmt,...){
+    if (log && log->flags & LOG_PRINT) {
+     	va_list args;
+	    va_start(args,fmt);
+	    fprintf(log->f,"%s: ",get_label());
+	    vfprintf(log->f,fmt,args);
+	    fprintf(log->f,"\n");
+	    va_end(args);
+    }
+}
+
 void log_message(log_t log,const char*file,int line,int errnum,const char *fmt,...){
 	struct runtime_log null_log;
 	if (!log) {
@@ -313,5 +332,10 @@ void* RTmallocZero(size_t size){
 	void *p=RTmalloc(size);
 	memset(p, 0, size);
 	return p;
+}
+
+void RTfree(void *rt_ptr){
+	if(rt_ptr != NULL)
+            free (rt_ptr);
 }
 

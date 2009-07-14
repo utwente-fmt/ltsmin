@@ -106,6 +106,7 @@ void vdom_init_shared(vdom_t dom,int n){
 	dom->shared.set_project=NULL;
 	dom->shared.rel_create=NULL;
 	dom->shared.rel_add=NULL;
+	dom->shared.rel_count=NULL;
 	dom->shared.set_next=NULL;
 }
 
@@ -149,8 +150,16 @@ void vset_enum_match(vset_t set,int p_len,int* proj,int*match,vset_element_cb cb
 	set->dom->shared.set_enum_match(set,p_len,proj,match,cb,context);
 }
 
+void vset_example(vset_t set,int *e){
+	set->dom->shared.set_example(set,e);
+}
+
 void vset_count(vset_t set,long *nodes,long long *elements){
 	set->dom->shared.set_count(set,nodes,elements);
+}
+
+void vrel_count(vrel_t rel,long *nodes,long long *elements){
+	rel->dom->shared.rel_count(rel,nodes,elements);
 }
 
 void vset_union(vset_t dst,vset_t src){

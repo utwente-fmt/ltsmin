@@ -5,6 +5,7 @@
 #include <string.h>
 #include <mpi.h>
 #include <stdlib.h>
+#include <task-queue.h>
 
 #include <lts_enum.h>
 #include <lts_io.h>
@@ -22,6 +23,10 @@
 
 static lts_enum_cb_t output_handle=NULL;
 static lts_output_t output=NULL;
+static task_t new_trans=NULL;
+static int dst_ofs=2;
+static int lbl_ofs;
+static int trans_len;
 
 /********************************************************************************************/
 
@@ -223,6 +228,7 @@ static int mpi_nodes,mpi_me;
 static int *tcount;
 static int size;
 static int state_labels;
+static int edge_labels;
 
 static uint32_t chk_base=0;
 
@@ -235,8 +241,8 @@ static inline int owner(int32_t *state){
 	return (hash%mpi_nodes);
 }
 
-#define POOL_SIZE 16
-
+#define POOL_SIZE 256
+/*
 struct work_msg {
 	int src_worker;
 	int src_number;
@@ -245,6 +251,7 @@ struct work_msg {
 } work_send_buf[POOL_SIZE],work_recv_buf[POOL_SIZE];
 static int work_send_used[POOL_SIZE];
 static int work_send_next=0;
+*/
 
 #define BARRIER_TAG 12
 #define EXPLORE_IDLE_TAG 11
@@ -261,8 +268,7 @@ static int work_send_next=0;
 #define WORK_SIZE (sizeof(struct work_msg)-(MAX_PARAMETERS-size)*sizeof(int))
 //define WORK_SIZE sizeof(struct work_msg)
 
-static idle_detect_t work_counter;
-
+/*
 static struct state_found_msg {
 	int reason; // -1: deadlock n>=0: action n is enabled and matches a wanted action.
 	int segment;
@@ -297,6 +303,7 @@ static void deadlock_found(int segment,int offset){
 		0,STATE_FOUND_TAG,MPI_COMM_WORLD);
 	event_idle_send(work_counter);
 }
+*/
 
 /********************************************************/
 
@@ -306,9 +313,18 @@ struct src_info {
 };
 
 static void callback(void*context,int*labels,int*dst){
-	(void)context;
-	int i,who;
-
+	int who=owner(dst);
+    uint32_t trans[trans_len];
+    trans[0]=((struct src_info*)context)->seg;
+    trans[1]=((struct src_info*)context)->ofs;
+    for(int i=0;i<size;i++){
+        trans[dst_ofs+i]=dst[i];
+    }
+    for(int i=0;i<edge_labels;i++){
+        trans[lbl_ofs+i]=labels[i];
+    }
+    TaskSubmitFixed(new_trans,who,trans);
+/*
 	//struct timeval tv1,tv2;
 	//gettimeofday(&tv1,NULL);
 	event_while(mpi_queue,&work_send_used[work_send_next]);
@@ -320,7 +336,7 @@ static void callback(void*context,int*labels,int*dst){
 		work_send_buf[work_send_next].dest[i]=dst[i];
 	}
 	who=owner(work_send_buf[work_send_next].dest);
-	event_Isend(mpi_queue,&work_send_buf[work_send_next],WORK_SIZE,MPI_CHAR,who,
+	event_Issend(mpi_queue,&work_send_buf[work_send_next],WORK_SIZE,MPI_CHAR,who,
 			WORK_TAG,MPI_COMM_WORLD,event_decr,&work_send_used[work_send_next]);
 	event_idle_send(work_counter);
 	work_send_next=(work_send_next+1)%POOL_SIZE;
@@ -331,6 +347,7 @@ static void callback(void*context,int*labels,int*dst){
 	//	Warning(info,"callback took %lld us",usec);
 	//	max=usec;
 	//}
+*/
 }
 
 
@@ -339,6 +356,29 @@ static uint32_t *parent_ofs=NULL;
 static uint16_t *parent_seg=NULL;
 static long long int explored,visited,transitions;
 
+static void new_transition(void*context,int len,void*arg){
+    (void)context;(void)len;
+    uint32_t *trans=(uint32_t*)arg;
+	int temp=TreeFold(dbs,(int32_t*)(trans+dst_ofs));
+	if (temp>=visited) {
+		visited=temp+1;
+		if(find_dlk){
+			ensure_access(state_man,temp);
+			parent_seg[temp]=trans[0];
+			parent_ofs[temp]=trans[1];
+		}
+	}
+	if (write_lts){
+		//DSwriteU32(output_src[work_recv->src_worker],work_recv->src_number);
+		//DSwriteU32(output_label[work_recv->src_worker],work_recv->label);
+		//DSwriteU32(output_dest[work_recv->src_worker],temp);
+		enum_seg_seg(output_handle,trans[0],trans[1],mpi_me,temp,(int32_t*)(trans+lbl_ofs));		
+	}
+	tcount[trans[0]]++;
+	transitions++;
+}
+
+/*
 static void in_trans_handler(void*context,MPI_Status *status){
 #define work_recv ((struct work_msg*)context)
 	(void)status;
@@ -379,6 +419,7 @@ static void io_trans_init(){
 		work_send_used[i]=0;
 	}
 }
+*/
 
 int main(int argc, char*argv[]){
 	long long int global_visited,global_explored,global_transitions;
@@ -395,9 +436,9 @@ int main(int argc, char*argv[]){
 	sprintf(who,"%s(%2d)",get_label(),mpi_me);
 	set_label(who);
 	mpi_queue=event_queue();
-	state_found_init();
-	work_counter=event_idle_create(mpi_queue,MPI_COMM_WORLD,EXPLORE_IDLE_TAG);
+//	state_found_init();
 	barrier=event_barrier_create(mpi_queue,MPI_COMM_WORLD,BARRIER_TAG);
+    task_queue_t task_queue=TQcreateMPI(mpi_queue);
 
 	tcount=(int*)RTmalloc(mpi_nodes*sizeof(int));
 	bzero(tcount,mpi_nodes*sizeof(int));
@@ -431,9 +472,9 @@ int main(int argc, char*argv[]){
 	if (size>MAX_PARAMETERS) Fatal(1,error,"please make src and dest dynamic");
 	dbs=TreeDBScreate(size);
 	int src[size];
-	io_trans_init();
 	state_labels=lts_type_get_state_label_count(ltstype);
-	Warning(info,"there are %d state labels",state_labels);
+	edge_labels=lts_type_get_edge_label_count(ltstype);
+	Warning(info,"there are %d state labels and %d edge labels",state_labels,edge_labels);
 	if (state_labels&&files[1]&&!write_state) {
 		Fatal(1,error,"Writing state labels, but not state vectors unsupported. "
 			"Writing of state vector is enabled with the option --write-state");
@@ -476,6 +517,11 @@ int main(int argc, char*argv[]){
 	}
 	event_barrier_wait(barrier);
 	/***************************************************/
+	dst_ofs=2;
+	lbl_ofs=dst_ofs+size;
+	trans_len=lbl_ofs+edge_labels;
+	new_trans=TaskCreateFixed(task_queue,trans_len*4,NULL,new_transition);
+	/***************************************************/
 	int level=0;
 	for(;;){
 		long long int limit=visited;
@@ -494,7 +540,8 @@ int main(int argc, char*argv[]){
 			if (count<0) Fatal(1,error,"error in GBgetTransitionsAll");
 			if (count==0 && find_dlk){
 				Warning(info,"deadlock found: %d.%d",ctx.seg,ctx.ofs);
-				deadlock_found(ctx.seg,ctx.ofs);
+				//deadlock_found(ctx.seg,ctx.ofs);
+			    Fatal(1,error,"trace printing unimplemented");
 			}
 			if (state_labels){
 				GBgetStateLabelsAll(model,src,labels);
@@ -512,7 +559,7 @@ int main(int argc, char*argv[]){
 			event_yield(mpi_queue);
 		}
 		if (RTverbosity>1) Warning(info,"explored %d states and %d transitions",lvl_scount,lvl_tcount);
-		event_idle_detect(work_counter);
+		TQwait(task_queue);
 		MPI_Allreduce(&visited,&global_visited,1,MPI_LONG_LONG,MPI_SUM,MPI_COMM_WORLD);
 		MPI_Allreduce(&explored,&global_explored,1,MPI_LONG_LONG,MPI_SUM,MPI_COMM_WORLD);
 		MPI_Allreduce(&transitions,&global_transitions,1,MPI_LONG_LONG,MPI_SUM,MPI_COMM_WORLD);

@@ -10,14 +10,29 @@ static int cacheratio=64;
 static int maxincrease=1000000;
 static int minfreenodes=20;
 
+// print buddy garbage collect statistics to stderr...
+// problem: want to restrict this to VERBOSE flag from main, not visible here
+static void vset_fdd_gbchandler(int pre, bddGbcStat *s)
+{
+   if (!pre)
+   {
+      fprintf(stderr,"Garbage collection #%d: %d nodes / %d free",
+ 	     s->num, s->nodes, s->freenodes);
+      fprintf(stderr," / %.1fs / %.1fs total\n",
+	     (float)s->time/(float)(CLOCKS_PER_SEC),
+	     (float)s->sumtime/(float)CLOCKS_PER_SEC);
+   }
+}
+
 static void buddy_init(){
 	static int initialized=0;
 	if (!initialized) {
 		bdd_init(1000000, 100000);
-		Warning(info,"ratio %d, maxixum increase %d, minimum free %d",cacheratio,maxincrease,minfreenodes);
+		Warning(info,"ratio %d, maximum increase %d, minimum free %d",cacheratio,maxincrease,minfreenodes);
 		bdd_setcacheratio(cacheratio);
 		bdd_setmaxincrease(maxincrease);
 		bdd_setminfreenodes(minfreenodes);
+                bdd_gbc_hook(vset_fdd_gbchandler);
 		initialized=1;
 	}
 }
@@ -38,20 +53,20 @@ struct vector_domain {
 	int *vars2;
 	bddPair *pairs;
 	int *proj;
+  //int *encoding; // storing boolean variables for FDD variables
 };
 
-
 static BDD mkvar(vdom_t dom,int idx,int val){
-	return bdd_addref(fdd_ithvar(dom->vars[idx],val));
+  	return bdd_addref(fdd_ithvar(dom->vars[idx],val));
 }
 static void rmvar(BDD var) {
-	bdd_delref(var);
+  	bdd_delref(var);
 }
 static BDD mkvar2(vdom_t dom,int idx,int val){
-	return bdd_addref(fdd_ithvar(dom->vars2[idx],val));
+  	return bdd_addref(fdd_ithvar(dom->vars2[idx],val));
 }
 static void rmvar2(BDD var) {
-	bdd_delref(var);
+  	bdd_delref(var);
 }
 
 struct vector_set {
@@ -69,6 +84,7 @@ struct vector_relation {
 	BDD p_set; // variables in the projection.
 	int p_len;
 	int* proj;
+	BDD rel_set; // variables + primed variables in the projection.
 };
 
 static vset_t set_create_fdd(vdom_t dom,int k,int* proj){
@@ -110,15 +126,21 @@ static vrel_t rel_create_fdd(vdom_t dom,int k,int* proj){
 	rel->dom=dom;
 	rel->bdd=bddfalse;
 	if (k && k<dom->shared.size) {
-		int vars[k];
+	        int vars[k];
+		int allvars[2*k];
 		rel->p_len=k;
 		rel->proj=(int*)RTmalloc(k*sizeof(int));
 		for(int i=0;i<k;i++) {
 			rel->proj[i]=proj[i];
 			vars[i]=dom->vars[proj[i]];
+	                allvars[2*i]=vars[i];
+                        allvars[2*i+1]=vars[i]+1; // hidden assumption on encoding
 		}
 		rel->p_set=bdd_addref(fdd_makeset(vars,k));
+                rel->rel_set=bdd_addref(fdd_makeset(allvars,2*k));
+
 	} else {
+	  fprintf(stderr,"NEVER\n"); abort();
 		rel->p_len=dom->shared.size;
 		rel->p_set=dom->varset;
 		rel->proj=dom->proj;
@@ -129,8 +151,8 @@ static vrel_t rel_create_fdd(vdom_t dom,int k,int* proj){
 static inline BDD fdd_element(vset_t set,const int* e){
 	int N=set->p_len;
 	BDD bdd=bddtrue;
-	for(int i=0;i<N;i++){
-	//for(int i=N-1;i>=0;i--){
+	//for(int i=0;i<N;i++){
+	  for(int i=N-1;i>=0;i--){
 		BDD val=mkvar(set->dom,set->proj[i],e[i]);
 		BDD tmp=bdd;
 		bdd=bdd_addref(bdd_and(bdd,val));
@@ -148,18 +170,18 @@ static BDD fdd_pair(vrel_t rel,const int* e1,const int*e2){
 	int N=rel->p_len;
 //	Warning(info,"N: %d %d",N,rel->p_len);
 	BDD bdd=bddtrue;
-	for(int i=0;i<N;i++){
-	//for(int i=N-1;i>=0;i--){
-		BDD val=mkvar(rel->dom,rel->proj[i],e1[i]);
+	//for(int i=0;i<N;i++){
+	  for(int i=N-1;i>=0;i--){
+		BDD val=mkvar2(rel->dom,rel->proj[i],e2[i]);
 		BDD tmp=bdd;
 		bdd=bdd_addref(bdd_and(bdd,val));
 		bdd_delref(tmp);
-		rmvar(val);
-		val=mkvar2(rel->dom,rel->proj[i],e2[i]);
+		rmvar2(val);
+		val=mkvar(rel->dom,rel->proj[i],e1[i]);
 		tmp=bdd;
 		bdd=bdd_addref(bdd_and(bdd,val));
 		bdd_delref(tmp);
-		rmvar2(val);
+		rmvar(val);
 	}
 	//printf("element: ");
 	//fdd_printset(bdd);
@@ -214,8 +236,8 @@ static void set_copy_all(vset_t dst,vset_t src){
 	bdd_addref(dst->bdd);
 }
 
-static void vset_enum_do_fdd(vdom_t dom,BDD set,int* proj,int *vec,int N,int i,vset_element_cb cb,void* context){
-	if (i==N) {
+static void vset_enum_do_fdd(vdom_t dom,BDD set,int* proj,int *vec,int i,vset_element_cb cb,void* context){
+	if (i==-1) {
 		cb(context,vec);
 	} else {
 		for(;;){
@@ -228,7 +250,7 @@ static void vset_enum_do_fdd(vdom_t dom,BDD set,int* proj,int *vec,int N,int i,v
 			set=bdd_addref(bdd_apply(set,val,bddop_diff));
 			bdd_delref(tmp);
 			rmvar(val);
-			vset_enum_do_fdd(dom,subset,proj,vec,N,i+1,cb,context);
+			vset_enum_do_fdd(dom,subset,proj,vec,i-1,cb,context);
 		}
 	}
 	bdd_delref(set);
@@ -238,7 +260,7 @@ static void set_enum_fdd(vset_t set,vset_element_cb cb,void* context){
 	int N=set->p_len;
 	int vec[N];
 	bdd_addref(set->bdd);
-	vset_enum_do_fdd(set->dom,set->bdd,set->proj,vec,N,0,cb,context);
+	vset_enum_do_fdd(set->dom,set->bdd,set->proj,vec,N-1,cb,context);
 }
 
 static void set_enum_match_fdd(vset_t set,int p_len,int* proj,int*match,vset_element_cb cb,void* context){
@@ -253,12 +275,21 @@ static void set_enum_match_fdd(vset_t set,int p_len,int* proj,int*match,vset_ele
 	}
 	int N=set->p_len;
 	int vec[N];
-	vset_enum_do_fdd(set->dom,subset,set->proj,vec,N,0,cb,context);
+	vset_enum_do_fdd(set->dom,subset,set->proj,vec,N-1,cb,context);
 }
 
 static void set_count_fdd(vset_t set,long *nodes,long long *elements){
 	*nodes=bdd_nodecount(set->bdd);
 	double count=bdd_satcountlnset(set->bdd,set->p_set);
+	//Warning(info,"log of satcount is %f",count);
+	count=pow(2.0,count);
+	//Warning(info,"satcount is %f",count);
+	*elements=llround(count);
+}
+
+static void rel_count_fdd(vrel_t rel,long *nodes,long long *elements){
+	*nodes=bdd_nodecount(rel->bdd);
+	double count=bdd_satcountlnset(rel->bdd,rel->rel_set);
 	//Warning(info,"log of satcount is %f",count);
 	count=pow(2.0,count);
 	//Warning(info,"satcount is %f",count);
@@ -277,6 +308,7 @@ static void set_minus_fdd(vset_t dst,vset_t src){
 	bdd_delref(tmp);
 }
 
+/*
 static void set_next_fdd(vset_t dst,vset_t src,vrel_t rel){
 	BDD tmp=bdd_addref(bdd_and(src->bdd,rel->bdd));
 	bdd_delref(dst->bdd);
@@ -285,7 +317,16 @@ static void set_next_fdd(vset_t dst,vset_t src,vrel_t rel){
 	dst->bdd=bdd_addref(bdd_replace(tmp2,rel->dom->pairs));
 	bdd_delref(tmp2);
 }
+*/
 
+static void set_next_appex_fdd(vset_t dst,vset_t src,vrel_t rel){
+  BDD tmp=bdd_addref(bdd_appex(src->bdd,rel->bdd,bddop_and,rel->p_set));
+  bdd_delref(dst->bdd);
+  dst->bdd=bdd_addref(bdd_replace(tmp,rel->dom->pairs));
+  bdd_delref(tmp);
+}
+
+// JvdP: gaat dit goed met aliasing? (dst=src)
 static void set_project_fdd(vset_t dst,vset_t src){
 	bdd_delref(dst->bdd);
 	dst->bdd=bdd_addref(bdd_exist(src->bdd,dst->c_set));
@@ -321,11 +362,17 @@ vdom_t vdom_create_fdd(int n){
 	dom->vars=(int*)RTmalloc(n*sizeof(int));
 	dom->vars2=(int*)RTmalloc(n*sizeof(int));
 	dom->proj=(int*)RTmalloc(n*sizeof(int));
+	//dom->encoding=(int*)RTmalloc(n*fdd_bits*sizeof(int));
 	for(int i=0;i<n;i++){
 		res=fdd_extdomain(domain,2);
 		if (res<0){
 			Fatal(1,error,"BuDDy error: %s",bdd_errstring(res));
 		}
+		//{ // JvdP: store encoded boolean variables
+		//int* bools = fdd_vars(res);
+		//for (int j=0;j<fdd_bits;j++) 
+		//  dom->encoding[i*fdd_bits+j] = bools[j];
+		//}
 		dom->vars[i]=res;
 		dom->vars2[i]=res+1;
 		dom->proj[i]=i;
@@ -355,7 +402,8 @@ vdom_t vdom_create_fdd(int n){
 	dom->shared.set_project=set_project_fdd;
 	dom->shared.rel_create=rel_create_fdd;
 	dom->shared.rel_add=rel_add_fdd;
-	dom->shared.set_next=set_next_fdd;
+	dom->shared.rel_count=rel_count_fdd;
+	dom->shared.set_next=set_next_appex_fdd; // JvdP 30/05/09
 	return dom;
 }
 

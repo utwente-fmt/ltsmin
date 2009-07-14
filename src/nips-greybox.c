@@ -7,6 +7,7 @@
 #include <nips-vm/nipsvm.h>
 #include <nips-vm/bytecode.h>
 #include <nips-vm/state_parts.h>
+#include "dm/dm.h"
 
 static void nips_popt(poptContext con,
  		enum poptCallbackReason reason,
@@ -36,7 +37,7 @@ static const size_t MAX_INITIAL_STATE_COUNT = 10000;
 static const size_t MAX_NIPSVM_STATE_SIZE   = 65536;
 
 static lts_type_t ltstype;
-static struct edge_info e_info;
+static matrix_t dm_info;
 static struct state_info s_info = { 0, NULL, NULL };
 
 int ILABEL_TAU  = -1;
@@ -541,18 +542,16 @@ NIPSloadGreyboxModel (model_t m, const char *filename)
                  part_chan_callback, &part_ctx);
     GBsetInitialState (m, ivec);
 
-    e_info.groups = Cpart_ctx.nprocs;
-    e_info.length = RTmalloc (e_info.groups * sizeof (int));
-    e_info.indices = RTmalloc (e_info.groups * sizeof (int *));
-    for (int i = 0; i < e_info.groups; ++i) {
+    dm_create (&dm_info, Cpart_ctx.nprocs, state_length);
+    for (int i = 0; i < dm_nrows(&dm_info); i++) {
         int                 temp[state_length];
-        e_info.length[i] = NIPSgetProjection (vm, &Cpart_ctx, temp, i);
-        e_info.indices[i] = RTmalloc (e_info.length[i] * sizeof (int));
-        for (int j = 0; j < e_info.length[i]; ++j)
-            e_info.indices[i][j] = temp[j];
+        int                 len;
+        len = NIPSgetProjection (vm, &Cpart_ctx, temp, i);
+        for (int j = 0; j < len; j++)
+            dm_set (&dm_info, i, temp[j]);
     }
 
-    GBsetEdgeInfo (m, &e_info);
+    GBsetDMInfo (m, &dm_info);
     GBsetStateInfo (m, &s_info);
     GBsetNextStateLong (m, NIPSgetTransitionsLong);
     GBsetNextStateAll (m, NIPSgetTransitionsAll);

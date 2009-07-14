@@ -1,0 +1,88 @@
+input:
+   N: number of summands
+init: initial state
+
+bfs - current:
+
+visited := { init }
+current_level := visited
+next_level := empty
+tmp := empty
+
+while (current_level =/= empty)
+  for i:= 0..N
+    expand_group_rel(i,current_level)
+  next_level := empty
+  for i:= 0..N
+    tmp := Next(current_level,group_rel[i])
+    tmp := tmp - visited
+    next_level := next_level + tmp
+  visited := visited + next_level  
+  current_level := next_level
+
+
+
+bfs - alternative:
+
+visited := { init }
+current_level := visited
+next_level := empty
+tmp := empty
+
+while (current_level =/= empty)
+  for i:= 0..N-1
+    expand_group_rel(i,current_level)
+    tmp := Next(current_level,group_rel[i])
+    next_level := next_level + tmp
+    tmp := empty
+  next_level := next_level - visited
+  visited := visited + next_level  
+  current_level := next_level
+  next_level := empty
+
+
+
+bfs 2 - current
+
+visited := { init }
+old_vis := empty
+tmp := empty
+
+while (visited =/= old_vis)
+  old_vis := visited
+  for i = 0..N-1
+    expand_group_rel(i,visited)
+  for i = 0..N-1
+    tmp := Next(old_vis,group_rel[i])
+    visited := visited + tmp
+
+
+bfs 2 - alternative
+
+visited := { init }
+old_vis := empty
+tmp := empty
+
+while (visited =/= old_vis)
+  old_vis := visited
+  for i = 0..N-1
+    expand_group_rel(i,visited)
+    tmp := Next(old_vis,group_rel[i])
+    visited := visited + tmp
+    tmp := empty
+
+
+
+chain - current [alternative]
+
+visited := { init }
+old_vis := empty
+tmp := empty
+
+while (visited =/= old_vis)
+  old_vis := visited
+  for i=0..N-1
+    expand_group_rel(i,visited)
+    tmp := Next(visited,group_rel[i])
+    visited := visited + tmp
+[   tmp := empty                      ]

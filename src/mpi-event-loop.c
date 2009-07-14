@@ -167,6 +167,14 @@ void event_Send(event_queue_t queue,void *buf, int count, MPI_Datatype datatype,
 	event_wait(queue,&request,&status);
 }
 
+void event_Ssend(event_queue_t queue,void *buf, int count, MPI_Datatype datatype,
+	int dest, int tag, MPI_Comm comm){
+	MPI_Request request;
+	MPI_Status status;
+	MPI_Issend(buf,count,datatype,dest,tag,comm,&request);
+	event_wait(queue,&request,&status);
+}
+
 void event_Isend(event_queue_t queue,void *buf, int count, MPI_Datatype datatype,
 	int dest, int tag, MPI_Comm comm,event_callback cb,void*context){
 	ensure_access(queue->man,queue->pending);
@@ -174,7 +182,15 @@ void event_Isend(event_queue_t queue,void *buf, int count, MPI_Datatype datatype
 	queue->cb[queue->pending]=cb?cb:null_cb; // we cannot allow NULL as a call-back.
 	queue->context[queue->pending]=context;
 	queue->pending++;
-	
+}
+
+void event_Issend(event_queue_t queue,void *buf, int count, MPI_Datatype datatype,
+	int dest, int tag, MPI_Comm comm,event_callback cb,void*context){
+	ensure_access(queue->man,queue->pending);
+	MPI_Issend(buf,count,datatype,dest,tag,comm,&queue->request[queue->pending]);
+	queue->cb[queue->pending]=cb?cb:null_cb; // we cannot allow NULL as a call-back.
+	queue->context[queue->pending]=context;
+	queue->pending++;
 }
 
 void event_Recv(event_queue_t queue, void *buf, int count, MPI_Datatype datatype,
@@ -250,6 +266,12 @@ void event_idle_recv(idle_detect_t detector){
 
 int event_idle_detect(idle_detect_t detector){
 	if (detector->me==0){
+	    if (detector->nodes==1){
+	        if (detector->count) {
+	            Fatal(1,error,"illegal non-zero count %d",detector->count);
+	        }
+	        return detector->exit_code;
+	    }
 		int round=0;
 		int term_send[2];
 		term_send[0]=IDLE;

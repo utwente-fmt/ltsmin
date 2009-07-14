@@ -1,5 +1,7 @@
 *.o
 *.a
+*.lo
+*.la
 *.hi
 .depend
 .depend.bak
@@ -24,3 +26,7 @@ mpi-event-test
 nips-reach
 nips2lts-grey
 nips2lts-mpi
+*.hi
+regroup
+test
+pins_open
