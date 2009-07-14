@@ -9,7 +9,7 @@
 #include <string.h>
 #include <stdlib.h>
 
-#include <dir_ops.h>
+#include "dir_ops.h"
 #include "arch_object.h"
 #include "runtime.h"
 

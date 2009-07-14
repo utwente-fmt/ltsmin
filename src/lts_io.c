@@ -128,6 +128,11 @@ void lts_write_register(char*extension,lts_write_open_t open){
 	}
 }
 
+/**
+ * @param outputname file name
+ * @param model model to store
+ * @return lts output info
+ */
 lts_output_t lts_output_open(
 	char *outputname,
 	model_t model,

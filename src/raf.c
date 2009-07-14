@@ -193,6 +193,7 @@ raf_t raf_aio(char *name){
 }
 #else
 raf_t raf_aio(char *name){
+    (void)name;
 	Fatal(1,error,"AIO not supported");
 	return NULL;
 }
