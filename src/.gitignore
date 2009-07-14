@@ -36,3 +36,4 @@ etf-lexer.c
 etf-lexer.h
 lempar.c
 test-bitset
+test-state-buffer

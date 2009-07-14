@@ -1,5 +1,5 @@
 bin_PROGRAMS = ltsmin-convert gcf etf-convert
-noinst_PROGRAMS = test-bitset
+noinst_PROGRAMS = test-bitset test-state-buffer
 noinst_LTLIBRARIES = libutil.la
 pkglib_LTLIBRARIES =
 
@@ -179,6 +179,11 @@ ltsmin_mpi_SOURCES = ltsmin-mpi.c set.c lts.c dlts.c set.h lts.h	\
                      dlts.h config.h
 ltsmin_mpi_LDADD   = libmpi.la libutil.la
 
+
+# test-state-buffer
+test_state_buffer_SOURCES = test-state-buffer.c
+test_state_buffer_LDADD   = libutil.la
+
 # ltsmin-convert
 ltsmin_convert_SOURCES = ltsmin-convert.c
 ltsmin_convert_LDADD = libutil.la $(CADP_LIBS)
@@ -210,6 +215,7 @@ libutil_la_SOURCES := unix.c runtime.c stream.c archive.c			\
                     vdom_object.h lts_io.c lts_io.h lts_io_internal.h \
                     lts_enum.c lts_enum.h lts_count.c lts_count.h \
                     archive_io_ops.c fifo.c fifo.h \
+                    state-buffer.c state-buffer.h \
                     balloc.c balloc.h bitset.c bitset.h
 
 libutil_la_LIBADD = dm/libdm.la
