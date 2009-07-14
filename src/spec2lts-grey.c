@@ -6,14 +6,18 @@
 #include <ctype.h>
 
 
+#include <stdint.h>
 #include <lts_enum.h>
 #include <lts_io.h>
 #include <stringindex.h>
+#include <limits.h>
 
 #include "archive.h"
 #include "runtime.h"
 #include "treedbs.h"
 #include "vector_set.h"
+#include "dfs-stack.h"
+#include "state-buffer.h"
 
 #if defined(MCRL)
 #include "mcrl-greybox.h"
@@ -35,14 +39,15 @@ static treedbs_t dbs=NULL;
 static int write_lts;
 static int matrix=0;
 static int write_state=0;
+static size_t max = UINT_MAX;
 
 typedef enum { UseGreyBox , UseBlackBox } mode_t;
 static mode_t call_mode=UseBlackBox;
 
 static const char state_default[5]="tree";
-static char* state_repr=state_default;
+static char* state_repr=(char*)state_default;
 
-static enum { ReachTreeDBS, ReachVset, RunTorX } application=ReachTreeDBS;
+static enum { ReachTreeDBS, ReachTreeDFS, ReachVset, RunTorX } application=ReachTreeDBS;
 
 static  struct poptOption development_options[] = {
 	{ "grey", 0 , POPT_ARG_VAL , &call_mode , UseGreyBox , "make use of GetTransitionsLong calls" , NULL },
@@ -53,6 +58,7 @@ static  struct poptOption development_options[] = {
 
 static si_map_entry db_types[]={
 	{"tree",ReachTreeDBS},
+	{"stack",ReachTreeDFS},
 	{"vset",ReachVset},
 	{NULL,0}
 };
@@ -68,7 +74,7 @@ static void state_db_popt(poptContext con,
 	case POPT_CALLBACK_REASON_POST:
 		if (state_repr!=state_default){
 			if (application==RunTorX){
-				Warning(error,"using --state=%s with --torx is not permitted",state_repr);				
+				Warning(error,"using --state=%s with --torx is not permitted",state_repr);
 				exit(EXIT_FAILURE);
 			}
 			int res=linear_search(db_types,state_repr);
@@ -78,7 +84,7 @@ static void state_db_popt(poptContext con,
 			}
 			application = res;
 			return;
-			
+
 		}
 		return;
 	case POPT_CALLBACK_REASON_OPTION:
@@ -90,7 +96,8 @@ static void state_db_popt(poptContext con,
 static  struct poptOption options[] = {
 	{ NULL, 0 , POPT_ARG_CALLBACK|POPT_CBFLAG_POST|POPT_CBFLAG_SKIPOPTION  , (void*)state_db_popt , 0 , NULL , NULL },
 	{ "state" , 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &state_repr , 0 ,
-		"select the data structure for storing states", "<tree|vset>"},
+		"select the data structure for storing states", "<tree|vset|stack>"},
+	{ "max" , 0 , POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT , &max , 0 ,"maximum search depth", "<int>"},
 	{ "torx" , 0 , POPT_ARG_VAL , &application ,RunTorX, "run TorX-Explorer textual interface on stdin+stdout" , NULL },
 #if defined(MCRL)
 	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, mcrl_options , 0 , "mCRL options", NULL },
@@ -116,11 +123,11 @@ typedef struct torx_context_t {
 	lts_type_t ltstype;
 } torx_struct_t;
 
-
 static vdom_t domain;
 static vset_t visited_set;
 static vset_t next_set;
-
+static dfs_stack_t stack;
+static int *state;
 
 static int N;
 static int K;
@@ -141,13 +148,32 @@ static void vector_next(void*arg,int*lbl,int*dst){
 	if (write_lts) enum_seg_vec(output_handle,0,*src_ofs_p,dst,lbl);
 	trans++;
 }
-	
+
 static void index_next(void*arg,int*lbl,int*dst){
 	int *src_ofs_p=(int*)arg;
 	int tmp=TreeFold(dbs,dst);
 	if (tmp>=visited) visited=tmp+1;
 	if (write_lts) enum_seg_seg(output_handle,0,*src_ofs_p,0,tmp,lbl);
 	trans++;
+}
+
+static void index_next_dfs(void* arg,int* lbl,int* dst){
+	int *src_ofs_p=(int*)arg;
+	int idx = TreeFold(dbs, dst);
+	if (write_lts){
+		if (write_state){
+			enum_seg_vec(output_handle,0,*src_ofs_p,dst,lbl);
+		} else {
+			enum_seg_seg(output_handle,0,*src_ofs_p,0,idx,lbl);
+		}
+	}
+	trans++;
+
+	if (idx >= visited) {
+		visited=idx+1;
+		push(stack, &idx);
+		if (RTverbosity>=2 && visited%100000==0) Warning(info, "visited %d trans %d", visited, trans);
+	}
 }
 
 static void *new_string_index(void* context){
@@ -181,7 +207,7 @@ static void explore_state_index(void*context,int idx,int*src){
 		break;
 	}
 	explored++;
-	if (explored%1000==0 && RTverbosity>=2) 
+	if (explored%1000==0 && RTverbosity>=2)
 	  Warning(info,"explored %d visited %d trans %d",explored,visited,trans);
 }
 
@@ -205,10 +231,38 @@ static void explore_state_vector(void*context,int*src){
 		break;
 	}
 	explored++;
-	if (explored%1000==0 && RTverbosity>=2) 
+	if (explored%1000==0 && RTverbosity>=2)
 	  Warning(info,"explored %d visited %d trans %d",explored,visited,trans);
 }
 
+int explore_state_dfs(void* context, int idx, int next_index) {
+	model_t model = (model_t)context;
+	TreeUnfold(dbs, idx, state);
+	if (!next_index) { //store state&trans when exploring the first time
+		int labels[state_labels];
+		if (state_labels) GBgetStateLabelsAll(model, state, labels);
+		if(write_lts){
+			if(write_state){
+				enum_vec(output_handle, state, labels);
+			} else {
+				enum_seg(output_handle, 0, idx, labels);
+			}
+		}
+		if (stack->nframes>max) return K;
+	}
+	int i = K;
+    switch (call_mode){
+        case UseBlackBox:
+            GBgetTransitionsAll(model, state, index_next_dfs, &idx);
+            break;
+        case UseGreyBox:
+        	for(i = next_index; i<K && !stack->frame_size; i++){
+				GBgetTransitionsLong(model, i, state, index_next_dfs, &idx);
+			}
+            break;
+    }
+	return i;
+}
 
 static void torx_transition(void*arg,int*lbl,int*dst){
 
@@ -216,7 +270,7 @@ static void torx_transition(void*arg,int*lbl,int*dst){
 
 	int tmp=TreeFold(dbs,dst);
 	chunk c=GBchunkGet(context->model,lts_type_get_edge_label_typeno(context->ltstype,0),lbl[0]);
-	
+
 	int vis = 1;
 	if (c.len==3 && strncmp(c.data, "tau", c.len)==0)
 		vis =0;
@@ -326,7 +380,7 @@ int main(int argc, char *argv[]){
 	int src[N];
 	GBgetInitialState(model,src);
 	Warning(info,"got initial state");
-	int level=0;
+	size_t level=0;
 	switch(application){
 	case ReachVset:
 		domain=vdom_create_default(N);
@@ -336,7 +390,7 @@ int main(int argc, char *argv[]){
 			output=lts_output_open(files[1],model,1,0,1,"viv",NULL);
 			lts_output_set_root_vec(output,(uint32_t*)src);
 			lts_output_set_root_idx(output,0,0);
-			output_handle=lts_output_begin(output,0,0,0);	
+			output_handle=lts_output_begin(output,0,0,0);
 		}
 		vset_add(visited_set,src);
 		vset_add(next_set,src);
@@ -345,6 +399,7 @@ int main(int argc, char *argv[]){
 		  if (RTverbosity >= 1)
 		    Warning(info,"level %d has %d states, explored %d states %d trans",
 			    level,(visited-explored),explored,trans);
+		  if (level == max) break;
 		  level++;
 		  vset_copy(current_set,next_set);
 		  vset_clear(next_set);
@@ -364,7 +419,7 @@ int main(int argc, char *argv[]){
 			output=lts_output_open(files[1],model,1,0,1,write_state?"vsi":"-ii",NULL);
 			if (write_state) lts_output_set_root_vec(output,(uint32_t*)src);
 			lts_output_set_root_idx(output,0,0);
-			output_handle=lts_output_begin(output,0,0,0);	
+			output_handle=lts_output_begin(output,0,0,0);
 		}
 		int limit=visited;
 		while(explored<visited){
@@ -374,11 +429,49 @@ int main(int argc, char *argv[]){
 			      level,(visited-explored),explored,trans);
 		    limit=visited;
 		    level++;
+			if (level == max) break;
 		  }
 		  TreeUnfold(dbs,explored,src);
 		  explore_state_index(model,explored,src);
 		}
 		break;
+	case ReachTreeDFS:
+		stack = create_stack(1);
+		state_buffer_t buffer = create_buffer(1);
+		dbs = TreeDBScreate(N);
+		int idx = TreeFold(dbs, src);
+		push(stack, &idx);
+		if (write_lts) {
+			output=lts_output_open(files[1],model,1,0,1,write_state?"vsi":"-ii",NULL);
+			if (write_state) lts_output_set_root_vec(output,(uint32_t*)src);
+			lts_output_set_root_idx(output,0,0);
+			output_handle=lts_output_begin(output,0,0,0);
+		}
+		state = src;
+		int* ar = src;
+		int next_index = 0;
+		while ((ar = top(stack)) || stack->nframes) {
+			if (ar) {
+				if (next_index == K) {
+					pop(stack);
+				} else {
+					enter(stack);
+					next_index = explore_state_dfs(model, ar[0], next_index);
+					push_int(buffer, (int[]){next_index});
+					if (stack->nframes > level) {
+						level = stack->nframes;
+						if (RTverbosity >= 1) {
+							Warning(info,"new depth reached %d. Visited %d states and %d trans", level, visited, trans);
+						}
+					}
+				}
+				next_index = 0;
+			} else {
+				leave(stack);
+				next_index = pop_int(buffer)[0];
+			}
+		}
+	    break;
 	case RunTorX:
 		{
 		dbs=TreeDBScreate(N);
@@ -394,10 +487,8 @@ int main(int argc, char *argv[]){
 		lts_output_end(output,output_handle);
 		Warning(info,"finishing the writing");
 		lts_output_close(&output);
-		Warning(info,"state space has %d levels %d states %d transitions",level,visited,trans);
-	} else {
-		printf("state space has %d levels %d states %d transitions\n",level,visited,trans);
 	}
+    Warning(info,"state space has %zu levels %d states %d transitions",level,visited,trans);
 	return 0;
 }
 
