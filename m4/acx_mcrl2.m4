@@ -30,7 +30,7 @@ if test x"$acx_mcrl2" = xyes; then
     AC_SUBST(MCRL2_CPPFLAGS, ["$MCRL2_CPPFLAGS -DBOOST_MPL_CFG_NO_PREPROCESSED_HEADERS=1 -I$with_mcrl2/include -I$with_mcrl2/include/mcrl2/aterm"])
     AC_SUBST(MCRL2_LDFLAGS,  ["-L${with_mcrl2}/lib/mcrl2"])
     AX_LET([CPPFLAGS], ["$MCRL2_CPPFLAGS $CPPFLAGS"],
-      [AC_CHECK_HEADER([mcrl2/atermpp/set.h],,
+      [AC_CHECK_HEADER([mcrl2/atermpp/aterm.h],,
          [AC_MSG_FAILURE([cannot find mCRL2 Boost headers,
 see README on how to install mCRL2 properly (--install-boost-headers).])]
          )])
