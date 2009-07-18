@@ -2,4 +2,4 @@
 rm -f config.cache
 echo "Note: Do NOT run aclocal by yourself, even if requested by autoreconf."
 echo "      This is done automatically."
-autoreconf -is
+autoreconf -i
