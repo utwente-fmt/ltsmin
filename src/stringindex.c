@@ -153,6 +153,7 @@ int SIlookupC(string_index_t si,const char*str,int len){
 	hash=SuperFastHash(str,len,0);
 	bucket=hash&si->mask;
 	for(idx=si->table[bucket];idx!=END_OF_LIST;idx=si->next[idx]){
+		if (si->len[idx]!=len) continue;
 		if (0==memcmp(str,si->data[idx],len)) return idx;
 	}
 	return SI_INDEX_FAILED;
