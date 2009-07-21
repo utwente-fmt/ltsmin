@@ -38,7 +38,7 @@ static const size_t MAX_NIPSVM_STATE_SIZE   = 65536;
 
 static lts_type_t ltstype;
 static matrix_t dm_info;
-static struct state_info s_info = { 0, NULL, NULL };
+static matrix_t sl_info;
 
 int ILABEL_TAU  = -1;
 
@@ -552,7 +552,8 @@ NIPSloadGreyboxModel (model_t m, const char *filename)
     }
 
     GBsetDMInfo (m, &dm_info);
-    GBsetStateInfo (m, &s_info);
+    dm_create (&sl_info, 0, state_length);
+    GBsetStateLabelInfo (m, &sl_info);
     GBsetNextStateLong (m, NIPSgetTransitionsLong);
     GBsetNextStateAll (m, NIPSgetTransitionsAll);
 }

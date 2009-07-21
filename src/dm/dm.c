@@ -39,6 +39,10 @@ dm_free_header (matrix_header_t *p)
 int
 dm_copy_header (const matrix_header_t *src, matrix_header_t *tgt)
 {
+    if (tgt->data != NULL)
+        free(tgt->data);
+    if (tgt->count != NULL)
+        free(tgt->count);
     tgt->size = src->size;
     tgt->data = malloc (sizeof (header_entry_t) * tgt->size);
     // TODO: null ptr exception
