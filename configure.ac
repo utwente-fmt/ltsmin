@@ -145,7 +145,7 @@ AC_FUNC_STRERROR_R
 AC_FUNC_VPRINTF
 AC_CHECK_FUNCS([atexit bzero ftruncate strdup strndup strchr strstr strtol])
 AC_CHECK_DECLS([strdup, strndup, strchr, strstr],,,[
-#include "src/config.h"
+#include "${srcdir}/src/config.h"
 AC_INCLUDES_DEFAULT])
 
 AM_CONDITIONAL([HAVE_MPI], [test x"$have_mpi" != "x"])
