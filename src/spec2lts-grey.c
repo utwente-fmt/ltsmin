@@ -11,6 +11,7 @@
 #include <lts_io.h>
 #include <stringindex.h>
 #include <limits.h>
+#include "dynamic-array.h"
 
 #include "archive.h"
 #include "runtime.h"
@@ -19,6 +20,7 @@
 #include "dfs-stack.h"
 #include "is-balloc.h"
 #include "bitset.h"
+#include "scctimer.h"
 
 #if defined(MCRL)
 #include "mcrl-greybox.h"
@@ -34,6 +36,14 @@
 #endif
 
 static lts_enum_cb_t output_handle=NULL;
+
+static char* trc_output=NULL;
+static int dlk_detect=0;
+static lts_enum_cb_t trace_handle=NULL;
+static lts_output_t trace_output=NULL;
+
+static array_manager_t state_man=NULL;
+static uint32_t *parent_ofs=NULL;
 
 static treedbs_t dbs=NULL;
 static int write_lts;
@@ -70,6 +80,9 @@ state_db_popt (poptContext con, enum poptCallbackReason reason,
     case POPT_CALLBACK_REASON_PRE:
         break;
     case POPT_CALLBACK_REASON_POST: {
+            if (trc_output)
+                dlk_detect = 1;
+
             int db = linear_search (db_types, arg_state_db);
             if (db < 0) {
                 Warning (error, "unknown vector storage mode type %s", arg_state_db);
@@ -100,6 +113,8 @@ static  struct poptOption development_options[] = {
 
 static  struct poptOption options[] = {
 	{ NULL, 0 , POPT_ARG_CALLBACK|POPT_CBFLAG_POST|POPT_CBFLAG_SKIPOPTION  , (void*)state_db_popt , 0 , NULL , NULL },
+	{ "deadlock" , 'd' , POPT_ARG_VAL , &dlk_detect , 1 , "detect deadlocks" , NULL },
+	{ "trace" , 0 , POPT_ARG_STRING , &trc_output , 0 , "file to write trace to" , "<lts output>" },
 	{ "state" , 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &arg_state_db , 0 ,
 		"select the data structure for storing states", "<tree|vset>"},
 	{ "strategy" , 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &arg_strategy , 0 ,
@@ -183,10 +198,97 @@ index_next (void *arg, int *lbl, int *dst)
 {
     int                 src_ofs = *(int *)arg;
     int                 idx = TreeFold (dbs, dst);
-    if (idx >= visited)
+    if (idx >= visited) {
         visited = idx + 1;
+        if (trc_output) {
+            ensure_access(state_man,idx);
+            parent_ofs[idx]=src_ofs;
+        }
+    }
     if (write_lts) enum_seg_seg (output_handle, 0, src_ofs, 0, idx, lbl);
     trans++;
+}
+
+inline void get_state(int state_no, int *state)
+{
+    TreeUnfold(dbs, state_no, state);
+}
+
+static void write_trace_state(model_t model, int src_no, int *state){
+    Warning(debug,"dumping state %d",src_no);
+    int labels[state_labels];
+    if (state_labels) GBgetStateLabelsAll(model,state,labels);
+    enum_vec(trace_handle,state,labels);
+}
+
+struct write_trace_step_s {
+    int src_no;
+    int dst_no;
+    int* dst;
+    int found;
+};
+
+static void write_trace_next(void*arg,int*lbl,int*dst){
+    struct write_trace_step_s*ctx=(struct write_trace_step_s*)arg;
+    if(ctx->found) return;
+    for(int i=0;i<N;i++) {
+        if (ctx->dst[i]!=dst[i]) return;
+    }
+    ctx->found=1;
+    enum_seg_seg(trace_handle,0,ctx->src_no,0,ctx->dst_no,lbl);
+}
+
+static void write_trace_step(model_t model, int src_no,int*src,int dst_no,int*dst){
+    Warning(debug,"finding edge for state %d",src_no);
+    struct write_trace_step_s ctx;
+    ctx.src_no=src_no;
+    ctx.dst_no=dst_no;
+    ctx.dst=dst;
+    ctx.found=0;
+    GBgetTransitionsAll(model,src,write_trace_next,&ctx);
+    if (ctx.found==0) Fatal(1,error,"no matching transition found");
+}
+
+static int find_trace_to(model_t model, int dst_idx)
+{
+    int src_idx = parent_ofs[dst_idx];
+    int src_new_idx = 0;
+    // backtrace to initial state
+    if (dst_idx > 0)  {
+        src_new_idx = find_trace_to(model, src_idx);
+    // special case, initial state
+    } else if (dst_idx == 0) {
+        // write initial state
+        int state[N];
+        get_state(dst_idx, state);
+        write_trace_state(model, dst_idx, state);
+        return 0;
+    }
+
+    // trace to root
+    printf("trace %d -> %d\n", src_idx, dst_idx);
+
+    // get state
+    int src[N];
+    get_state(src_idx, src);
+    int dst[N];
+    get_state(dst_idx, dst);
+
+    // assume stc_idx state has been written
+    // write step
+    write_trace_step(model, src_new_idx, src, src_new_idx + 1, dst);
+    // write dst_idx
+    write_trace_state(model, dst_idx, dst);
+
+    return src_new_idx + 1;
+}
+
+static void find_trace(model_t model, int dst_idx) {
+    mytimer_t timer = SCCcreateTimer();
+    SCCstartTimer(timer);
+    find_trace_to(model, dst_idx);
+    SCCstopTimer(timer);
+    SCCreportTimer(timer,"constructing the trace took");
 }
 
 static void
@@ -222,16 +324,35 @@ bfs_explore_state_index (void *context, int idx, int *src)
 {
     model_t             model = (model_t)context;
     maybe_write_state (model, &idx, src);
+    int count = 0;
     switch (call_mode) {
     case UseBlackBox:
-        GBgetTransitionsAll (model, src, index_next, &idx);
+        count = GBgetTransitionsAll (model, src, index_next, &idx);
         break;
     case UseGreyBox:
         for (int i = 0; i < K; i++) {
-            GBgetTransitionsLong (model, i, src, index_next, &idx);
+            count += GBgetTransitionsLong (model, i, src, index_next, &idx);
         }
         break;
     }
+    if (count == 0 && dlk_detect) {
+        Warning(info,"deadlock found in state %d", idx);
+        if (trc_output) {
+            trace_output=lts_output_open(trc_output,model,1,0,1,"vsi",NULL);
+            {
+                int init_state[N];
+                get_state(0, init_state);
+                lts_output_set_root_vec(trace_output,(uint32_t*)init_state);
+                lts_output_set_root_idx(trace_output,0,0);
+            }
+            trace_handle=lts_output_begin(trace_output,0,0,0);
+            find_trace(model, idx);
+            lts_output_end(trace_output,trace_handle);
+            lts_output_close(&trace_output);
+        }
+        Fatal(1,info, "exiting now");
+    }
+
     explored++;
     if (explored % 1000 == 0 && RTverbosity >= 2)
         Warning (info, "explored %d visited %d trans %d", explored, visited, trans);
@@ -463,6 +584,11 @@ int main(int argc, char *argv[]){
 	  fprintf(stderr,"Dependency Matrix:\n");
 	  GBprintDependencyMatrix(stderr,model);
 	}
+    if (trc_output)
+    {
+        state_man=create_manager(65536);
+        ADD_ARRAY(state_man, parent_ofs, uint32_t);
+    }
 	lts_type_t ltstype=GBgetLTStype(model);
 	N=lts_type_get_state_length(ltstype);
 	K= dm_nrows(GBgetDMInfo(model));
