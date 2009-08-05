@@ -22,18 +22,6 @@ typedef struct grey_box_model* model_t;
 */
 
 /**
-\brief State label information. 
-
-For each grey box model, the number of state labels must be determined and
-for each of those labels the influenced variables must be given.
-*/
-typedef struct state_info {
-	int   labels;  ///< The number of defined state labels.
-	int*  length;  ///< The number of influenced variables per label.
-	int** indices; ///< A sorted list of indices of influenced variables per label.
-} *state_info_t;
-
-/**
 \brief Options for greybox management module.
  */
 extern struct poptOption greybox_options[];
@@ -66,12 +54,12 @@ extern void GBprintDependencyMatrix(FILE* file, model_t model);
 /**
 \brief Get the dependency matrix of the model
 */
-extern matrix_t* GBgetDMInfo(model_t model);
+extern matrix_t *GBgetDMInfo(model_t model);
 
 /**
 \brief Set the dependency matrix of the model
 */
-extern void GBsetDMInfo(model_t model, matrix_t* dm_info);
+extern void GBsetDMInfo(model_t model, matrix_t *dm_info);
 
 extern void GBgetInitialState(model_t model,int *state);
 /**< @brief Write the initial state of model into state. */
@@ -107,7 +95,7 @@ it avoids having to initialize the rewriter several times for the same state.
  */
 
 
-extern state_info_t GBgetStateInfo(model_t model);
+extern matrix_t *GBgetStateLabelInfo(model_t model);
 /**<
 \brief Get the state group information of a model.
 */
@@ -176,7 +164,7 @@ extern void GBsetLTStype(model_t model,lts_type_t info);
 /**
 \brief Add state label information to a model.
 */
-extern void GBsetStateInfo(model_t model,state_info_t info);
+extern void GBsetStateLabelInfo(model_t model, matrix_t *info);
 
 /**
 \brief Set the initial state.

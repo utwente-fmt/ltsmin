@@ -88,7 +88,7 @@ void ETFloadGreyboxModel(model_t model,const char*name){
 	GBsetLTStype(model,ltstype);
 
 	treedbs_t pattern_db=etf_patterns(etf);
-	matrix_t* p_dm_info = (matrix_t*)RTmalloc(sizeof(matrix_t));
+	matrix_t *p_dm_info = RTmalloc(sizeof *p_dm_info);
 	dm_create(p_dm_info, etf_trans_section_count(etf), state_length);
 	ctx->trans_db=(treedbs_t*)RTmalloc(dm_nrows(p_dm_info)*sizeof(treedbs_t));
 	ctx->trans_table=(lts_t*)RTmalloc(dm_nrows(p_dm_info)*sizeof(lts_t));
@@ -158,28 +158,24 @@ void ETFloadGreyboxModel(model_t model,const char*name){
 	GBsetDMInfo(model, p_dm_info);
 	GBsetNextStateShort(model,etf_short);
 
-	state_info_t s_info=(state_info_t)RTmalloc(sizeof(struct state_info));
-	s_info->labels=etf_map_section_count(etf);
-	s_info->length=(int*)RTmalloc(s_info->labels*sizeof(int));
-	s_info->indices=(int**)RTmalloc(s_info->labels*sizeof(int*));
-	ctx->label_key=(treedbs_t*)RTmalloc(s_info->labels*sizeof(treedbs_t));
-	ctx->label_data=(int**)RTmalloc(s_info->labels*sizeof(int*));
-	for(int i=0;i<s_info->labels;i++){
+	matrix_t *p_sl_info = RTmalloc(sizeof *p_sl_info);
+	dm_create(p_sl_info, etf_map_section_count(etf), state_length);
+	ctx->label_key=(treedbs_t*)RTmalloc(dm_nrows(p_sl_info)*sizeof(treedbs_t));
+	ctx->label_data=(int**)RTmalloc(dm_nrows(p_sl_info)*sizeof(int*));
+	for(int i=0;i<dm_nrows(p_sl_info);i++){
 		Warning(info,"parsing map %d",i);
 		treedbs_t map=etf_get_map(etf,i);
 		int used[state_length+1];
+		int proj[state_length+1];
 		TreeUnfold(map,0,used);
 		int len=0;
 		for(int j=0;j<state_length;j++){
 			if (used[j]) {
-				used[len]=j;
+				used[len]=proj[len]=j;
 				len++;
+				dm_set(p_sl_info, i, j);
 			}
 		}
-		int*proj=(int*)RTmalloc(len*sizeof(int));
-		for(int j=0;j<len;j++) proj[j]=used[j];
-		s_info->length[i]=len;
-		s_info->indices[i]=proj;
 		TreeUnfold(map,0,used);
 		treedbs_t key_db=TreeDBScreate(len);
 		int *data=(int*)RTmalloc(TreeCount(map)*sizeof(int));
@@ -198,7 +194,7 @@ void ETFloadGreyboxModel(model_t model,const char*name){
 		ctx->label_key[i]=key_db;
 		ctx->label_data[i]=data;
 	}
-	GBsetStateInfo(model,s_info);
+    GBsetStateLabelInfo(model, p_sl_info);
 	GBsetStateLabelShort(model,etf_state_short);
 
 	int type_count=lts_type_get_type_count(ltstype);

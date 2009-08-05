@@ -7,8 +7,8 @@
 
 struct grey_box_model {
 	lts_type_t ltstype;
-	matrix_t* dm_info;
-	state_info_t s_info;
+	matrix_t *dm_info;
+	matrix_t *sl_info;
 	int *s0;
 	void*context;
 	next_method_grey_t next_short;
@@ -86,33 +86,29 @@ int default_all(model_t self,int*src,TransitionCB cb,void*context){
 	return res;
 }
 
-static int state_default_short(model_t model,int label,int *state){
-	int N=lts_type_get_state_length(model->ltstype);
-	int len=model->s_info->length[label];
-	int k=0;
-	int long_state[N];
-	int *proj=model->s_info->indices[label];
-	for(int i=0;i<N;i++){
-		if(k<len && proj[k]==i){
-			long_state[i]=state[k];
-			k++;
-		} else {
-			long_state[i]=model->s0[i];
-		}
-	}
-	return model->state_labels_long(model,label,long_state);
+static int
+state_labels_default_short(model_t model, int label, int *state)
+{
+    matrix_t *sl_info = GBgetStateLabelInfo(model);
+    int long_state[dm_nrows(sl_info)];
+    dm_expand_vector(sl_info, label, model->s0, state, long_state);
+    return model->state_labels_long(model, label, long_state);
 }
 
-static int state_default_long(model_t model,int label,int *state){
-	int len=model->s_info->length[label];
-	int short_state[len];
-	int *proj=model->s_info->indices[label];
-	for(int i=0;i<len;i++) short_state[i]=state[proj[i]];
-	return model->state_labels_short(model,label,short_state);
+static int
+state_labels_default_long(model_t model, int label, int *state)
+{
+    matrix_t *sl_info = GBgetStateLabelInfo(model);
+    int len = dm_ones_in_row(sl_info, label);
+    int short_state[len];
+    dm_project_vector(sl_info, label, state, short_state);
+    return model->state_labels_short(model, label, short_state);
 }
 
-static void state_default_all(model_t model,int*state,int*labels){
-	for(int i=0;i<model->s_info->labels;i++) {
+static void
+state_labels_default_all(model_t model, int *state, int *labels)
+{
+	for(int i=0;i<dm_nrows(GBgetStateLabelInfo(model));i++) {
 		labels[i]=model->state_labels_long(model,i,state);
 	}
 }
@@ -121,15 +117,15 @@ model_t GBcreateBase(){
 	model_t model=(model_t)RTmalloc(sizeof(struct grey_box_model));
 	model->ltstype=NULL;
 	model->dm_info=NULL;
-	model->s_info=NULL;
+	model->sl_info=NULL;
 	model->s0=NULL;
 	model->context=0;
 	model->next_short=default_short;
 	model->next_long=default_long;
 	model->next_all=default_all;
-	model->state_labels_short=state_default_short;
-	model->state_labels_long=state_default_long;
-	model->state_labels_all=state_default_all;
+	model->state_labels_short=state_labels_default_short;
+	model->state_labels_long=state_labels_default_long;
+	model->state_labels_all=state_labels_default_all;
 	model->newmap_context=NULL;
 	model->newmap=NULL;
 	model->int2chunk=NULL;
@@ -148,8 +144,8 @@ void GBinitModelDefaults (model_t *p_model, model_t default_src)
     }
 	if (model->dm_info == NULL)
 		GBsetDMInfo(model, GBgetDMInfo(default_src));
-    if (model->s_info == NULL)
-        GBsetStateInfo(model, GBgetStateInfo(default_src));
+    if (model->sl_info == NULL)
+        GBsetStateLabelInfo(model, GBgetStateLabelInfo(default_src));
     if (model->s0 == NULL) {
         int N = lts_type_get_state_length (GBgetLTStype (default_src));
         int s0[N];
@@ -197,22 +193,22 @@ lts_type_t GBgetLTStype(model_t model){
 	return model->ltstype;
 }
 
-void GBsetDMInfo(model_t model, matrix_t* dm_info) {
+void GBsetDMInfo(model_t model, matrix_t *dm_info) {
 	if (model->dm_info != NULL) Fatal(1, error, "dependency matrix already set");
 	model->dm_info=dm_info;
 }
 
-matrix_t* GBgetDMInfo(model_t model) {
+matrix_t *GBgetDMInfo(model_t model) {
 	return model->dm_info;
 }
 
-void GBsetStateInfo(model_t model,state_info_t info){
-	if (model->s_info != NULL)  Fatal(1,error,"state info already set");
-	model->s_info=info;
+void GBsetStateLabelInfo(model_t model, matrix_t *info){
+	if (model->sl_info != NULL)  Fatal(1,error,"state info already set");
+	model->sl_info=info;
 }
 
-state_info_t GBgetStateInfo(model_t model){
-	return model->s_info;
+matrix_t *GBgetStateLabelInfo(model_t model){
+	return model->sl_info;
 }
 
 void GBsetInitialState(model_t model,int *state){
