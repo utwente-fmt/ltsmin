@@ -1,6 +1,6 @@
 ACLOCAL_AMFLAGS = -I m4
 
-SUBDIRS = @subdirs@ src doc
+SUBDIRS = @subdirs@ lemon src doc
 EXTRA_DIST = ltsminreconf Doxyfile
 
 doc_DATA = AUTHORS COPYING README

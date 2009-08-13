@@ -221,6 +221,14 @@ libutil_la_CPPFLAGS += $(CADP_CPPFLAGS)
 endif
 libutil_la_CPPFLAGS += $(AM_CPPFLAGS)
 
+LEMON_FLAGS = -s
+
+%.c %.h: %.lemon lempar.c
+	cd $(top_builddir)/lemon && $(MAKE) $(AM_MAKEFLAGS) lemon$(EXEEXT)
+	$(top_builddir)/lemon/lemon$(EXEEXT) $(LEMON_FLAGS) $<
+
+%.c: %.l
+	$(am__skiplex) $(LEX) $<
 
 runtime.c: git_version.h
 
