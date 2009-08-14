@@ -1,5 +1,5 @@
 bin_PROGRAMS = ltsmin-convert gcf etf-convert
-noinst_PROGRAMS =
+noinst_PROGRAMS = test-bitset
 noinst_LTLIBRARIES = libutil.la
 pkglib_LTLIBRARIES =
 
@@ -57,6 +57,9 @@ etf_convert_LDADD = libutil.la
 gcf_SOURCES = gcf-rw.c
 gcf_LDADD = libutil.la
 
+# test-bitset
+test_bitset_SOURCES = test-bitset.c
+test_bitset_LDADD = libutil.la
 
 # etf2lts-grey
 etf2lts_grey_SOURCES  = spec2lts-grey.c etf-greybox.c etf-greybox.h    \
@@ -206,7 +209,8 @@ libutil_la_SOURCES := unix.c runtime.c stream.c archive.c			\
                     lts-type.h vset_buddy.c vector_set.c vector_set.h	\
                     vdom_object.h lts_io.c lts_io.h lts_io_internal.h \
                     lts_enum.c lts_enum.h lts_count.c lts_count.h \
-                    archive_io_ops.c fifo.c fifo.h
+                    archive_io_ops.c fifo.c fifo.h \
+                    balloc.c balloc.h bitset.c bitset.h
 
 libutil_la_LIBADD = dm/libdm.la
 
