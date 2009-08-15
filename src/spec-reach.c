@@ -275,6 +275,25 @@ static void find_trace(int *src,int *dst){
 	SCCreportTimer(timer,"constructing the trace took");
 }
 
+static void deadlock_check(vset_t deadlocks){
+    if (vset_is_empty(deadlocks)) return;
+    Warning(info,"deadlock found");
+    if (trc_output){
+        int init_state[N];
+        GBgetInitialState(model,init_state);
+        int dlk_state[N];
+        vset_example(deadlocks,dlk_state);
+        trace_output=lts_output_open(trc_output,model,1,0,1,"vsi",NULL);
+        lts_output_set_root_vec(trace_output,(uint32_t*)init_state);
+        lts_output_set_root_idx(trace_output,0,0);
+        trace_handle=lts_output_begin(trace_output,0,0,0);	
+        find_trace(init_state,dlk_state);
+        lts_output_end(trace_output,trace_handle);
+        lts_output_close(&trace_output);
+    }
+    Fatal(1,info,"exiting now");
+}
+
 static void reach_bfs(){
 	int level,i;
 	long long e_count;
@@ -340,25 +359,7 @@ static void reach_bfs(){
 			vset_union(next_level,temp);
 			vset_clear(temp);
 		}
-		if (RTverbosity >= 2) fprintf(stderr,"\rlocal next complete       \n");
-		if (dlk_detect && !vset_is_empty(deadlocks)) {
-			Warning(info,"deadlock found");
-			if (trc_output){
-			    int init_state[N];
-			    GBgetInitialState(model,init_state);
-			    int dlk_state[N];
-			    vset_example(deadlocks,dlk_state);
-			    trace_output=lts_output_open(trc_output,model,1,0,1,"vsi",NULL);
-    			lts_output_set_root_vec(trace_output,(uint32_t*)init_state);
-			    lts_output_set_root_idx(trace_output,0,0);
-			    trace_handle=lts_output_begin(trace_output,0,0,0);	
-		        find_trace(init_state,dlk_state);
-	            lts_output_end(trace_output,trace_handle);
-	            lts_output_close(&trace_output);
-		    }
-	        Fatal(1,info,"exiting now");
-			break;
-		}
+		if (dlk_detect) deadlock_check(deadlocks);
 		vset_union(visited,next_level);
 		vset_copy(current_level,next_level);
 	}
@@ -377,6 +378,8 @@ void reach_bfs2(){
 	level=0;
 	vset_t old_vis=vset_create(domain,0,NULL);
 	vset_t temp=vset_create(domain,0,NULL);
+	vset_t deadlocks=dlk_detect?vset_create(domain,0,NULL):NULL;
+	vset_t dlk_temp=dlk_detect?vset_create(domain,0,NULL):NULL;
 	for(;;){
 		vset_copy(old_vis,visited);
 		vset_count(visited,&n_count,&e_count);
@@ -409,16 +412,25 @@ void reach_bfs2(){
 			eg_count++;
 		}
 		if (RTverbosity >= 2) fprintf(stderr,"\rexploration complete             \n");
+		if (dlk_detect) vset_copy(deadlocks,visited);
 		for(i=0;i<nGrps;i++){
 			if (RTverbosity >= 2) fprintf(stderr,"\rlocal next %4d/%d",i+1,nGrps);
 			next_count++;
 			vset_next(temp,old_vis,group_next[i]);
 			vset_union(visited,temp);
+			if (dlk_detect) {
+				vset_next(dlk_temp,temp,group_prev[i]);
+				vset_minus(deadlocks,dlk_temp);
+				vset_clear(dlk_temp);
+			}
 		}
 		if (RTverbosity >= 2) fprintf(stderr,"\rlocal next complete       \n");
+		if (dlk_detect) deadlock_check(deadlocks);
 		if (vset_equal(visited,old_vis)) break;
 	}
 	Warning(info,"Exploration took %ld group checks and %ld next state calls",eg_count,next_count);
+	if (dlk_detect)
+	  Warning(info,"No deadlocks found");
 }
 
 void reach_sat(){
@@ -435,6 +447,8 @@ void reach_chain(){
 	level=0;
 	vset_t old_vis=vset_create(domain,0,NULL);
 	vset_t temp=vset_create(domain,0,NULL);
+	vset_t deadlocks=dlk_detect?vset_create(domain,0,NULL):NULL;
+	vset_t dlk_temp=dlk_detect?vset_create(domain,0,NULL):NULL;
 	for(;;){
 		vset_copy(old_vis,visited);
 		vset_count(visited,&n_count,&e_count);
@@ -461,6 +475,7 @@ void reach_chain(){
 			if (RTverbosity >= 2) fprintf(stderr,"\n");
 		}
 		level++;
+		if (dlk_detect) vset_copy(deadlocks,visited);
 		for(i=0;i<nGrps;i++){
 			if (RTverbosity >= 2) fprintf(stderr,"\rgroup %4d/%d",i+1,nGrps);
 			expand_group_next(i,visited);
@@ -468,11 +483,19 @@ void reach_chain(){
 			next_count++;
 			vset_next(temp,visited,group_next[i]);
 			vset_union(visited,temp);
+			if (dlk_detect) {
+				vset_next(dlk_temp,temp,group_prev[i]);
+				vset_minus(deadlocks,dlk_temp);
+				vset_clear(dlk_temp);
+			}
 		}
 		if (RTverbosity >= 2) fprintf(stderr,"\rround %d complete       \n",level);
+		if (dlk_detect) deadlock_check(deadlocks); // no deadlocks in old_vis.
 		if (vset_equal(visited,old_vis)) break;
 	}
 	Warning(info,"Exploration took %ld group checks and %ld next state calls",eg_count,next_count);
+	if (dlk_detect)
+	  Warning(info,"No deadlocks found");
 }
 
 static FILE* table_file;
@@ -637,7 +660,6 @@ int main(int argc, char *argv[]){
 	group_next=(vrel_t*)RTmalloc(nGrps*sizeof(vrel_t));
 	if (dlk_detect) {
 		group_prev=(vrel_t*)RTmalloc(nGrps*sizeof(vrel_t));
-		if (strategy!= BFS) Fatal(1,error,"to detect deadlocks, please use the BFS strategy");
 	}
 	group_explored=(vset_t*)RTmalloc(nGrps*sizeof(vset_t));
 	group_tmp=(vset_t*)RTmalloc(nGrps*sizeof(vset_t));
