@@ -1,0 +1,111 @@
+%option prefix="ltsmin_"
+%option header-file="ltsmin-lexer.h"
+%option outfile="ltsmin-lexer.c"
+%option nodefault noyywrap reentrant noyyalloc noyyrealloc noyyfree batch noinput
+%option extra-type="ltsmin_parse_env_t"
+%{
+#include <ltsmin-parse-env.h>
+#include <ltsmin-grammar.h>
+#include <runtime.h>
+#include <stream.h>
+#include <chunk_support.h>
+
+void * yyalloc (size_t bytes, void * yyscanner){
+    (void)yyscanner;
+    return malloc(bytes);
+}
+void * yyrealloc (void * ptr, size_t bytes, void * yyscanner){
+    (void)yyscanner;
+    return realloc(ptr,bytes);
+}
+
+void   yyfree (void * ptr, void * yyscanner){
+    (void)yyscanner;
+    free(ptr);
+}
+
+
+#pragma GCC diagnostic ignored "-Wsign-compare"
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+
+#define YY_INPUT(buf,result,max_size) \
+    { result = stream_read_max(yyextra->input, buf , max_size ) ; }
+
+#define YY_FATAL_ERROR(msg) Fatal(1,error,"LTSmin lexer: %s",msg);
+
+%}
+
+white_space [ \t\n]+
+ident       [a-zA-Z][a-zA-Z0-9_]*
+number      [0-9]+
+string      \"(([[:print:]]{-}[\\])|"\\\\"|"\\\"")*\"
+chunk       #([0-9a-fA-F][0-9a-fA-F])*#
+operator    [~!@<>=\-+/?&\\|*]+
+
+%%
+
+{white_space}  {} //white space, including end of line.
+
+"%".*   {} //comment
+
+"(" {
+    Parse(yyextra->parser,LPAR,0,yyextra);
+}
+
+")" {
+    Parse(yyextra->parser,RPAR,0,yyextra);
+}
+
+"." {
+    Parse(yyextra->parser,DOT,0,yyextra);
+}
+
+{string}|{chunk} {
+    int len=strlen(yytext);
+    char decode[len];
+    chunk c={.data=decode,.len=len};
+    string2chunk(yytext,&c);
+    Parse(yyextra->parser,VALUE,SIputC(yyextra->values,c.data,c.len),yyextra);
+}
+
+{ident} {
+    int idx;
+    if ((idx=SIlookup(yyextra->keywords,yytext))!=SI_INDEX_FAILED) {
+        Parse(yyextra->parser,idx,0,yyextra);
+    } else if ((idx=SIlookup(yyextra->state_vars,yytext))!=SI_INDEX_FAILED) {
+        Parse(yyextra->parser,STATE_VAR,idx,yyextra);
+    } else if ((idx=SIlookup(yyextra->edge_vars,yytext))!=SI_INDEX_FAILED) {
+        Parse(yyextra->parser,EDGE_VAR,idx,yyextra);
+    } else {
+        Parse(yyextra->parser,IDENT,SIput(yyextra->idents,yytext),yyextra);
+    }
+}
+
+{number} {
+    Parse(yyextra->parser,NUMBER,atoi(yytext),yyextra);
+}
+
+<<EOF>> {
+    Parse(yyextra->parser,0,0,yyextra);
+    return 0;
+}
+
+{operator} {
+    int idx;
+    if((idx=SIlookup(yyextra->unary_ops,yytext))!=SI_INDEX_FAILED){
+        Parse(yyextra->parser,yyextra->unary_info[idx].token,idx,yyextra);
+    } else if((idx=SIlookup(yyextra->binary_ops,yytext))!=SI_INDEX_FAILED){
+        Parse(yyextra->parser,yyextra->binary_info[idx].token,idx,yyextra);
+    } else {
+        Fatal(1,error,"Unknown operator %s",yytext);
+    }
+}
+
+. {
+    Fatal(1,error,"Unexpected character %s (%x)",yytext,yytext[0]);
+    (void)yyunput;
+}
+
+%%
+
+

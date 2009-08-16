@@ -1,0 +1,140 @@
+%include {
+#include <assert.h>
+#include <stdlib.h>
+#include <etf-util.h>
+#include <runtime.h>
+#include <ltsmin-parse-env.h>
+#include <chunk_support.h>
+
+}
+
+%token_type { int } 
+%syntax_error {
+    (void)yymajor;(void)yyminor;
+    Fatal(1,error,"syntax error");
+}
+%parse_failure { Fatal(1,error,"parse error"); }
+%parse_accept { Warning(info,"success!"); }
+%extra_argument { ltsmin_parse_env_t env }
+%stack_overflow {
+    (void)yypMinor;
+    Fatal(1,error,"stack overflow");
+}
+%type expr { ltsmin_expr_t }
+%destructor expr {
+    (void)env;(void)$$;
+    Fatal(1,error,"Expressions are not supposed to be destroyed.");
+}
+
+input ::= DUMMY dummy .
+input ::= TOKENS tokenlist .
+input ::= EXPR expr(E) . {
+    (void)E;
+    log_printf(info,"Expression is: ");
+    LTSminPrintExpr(info,env,E);
+    log_printf(info,"\n");
+}
+
+dummy ::= LPAR IDENT RPAR sub_dummy .
+
+%type sub_dummy { int }
+%destructor sub_dummy { (void)env;(void)$$; }
+
+sub_dummy(R) ::= NUMBER(N) . {
+    Warning(info,"n=%d",N);
+    R=481;
+}
+
+tokenlist ::= .
+tokenlist ::= tokenlist VALUE .
+tokenlist ::= tokenlist NUMBER .
+tokenlist ::= tokenlist LPAR . { Warning(info,"parenthesis open"); }
+tokenlist ::= tokenlist RPAR . { Warning(info,"parenthesis close"); }
+
+%right QUANTIFIER .
+%left BIN3 .
+%left BIN2 .
+%left BIN1 .
+
+expr(E) ::= LPAR expr(EE) RPAR . { E=EE; }
+expr(E) ::= STATE_VAR(ID) . {
+    E=RT_NEW(struct ltsmin_expr_s );
+    E->node_type=SVAR;
+    E->idx=ID;
+}
+expr(E) ::= IDENT(ID) . {
+    E=RT_NEW(struct ltsmin_expr_s );
+    E->node_type=VAR;
+    E->idx=ID;
+}
+expr(E) ::= EDGE_VAR(ID) . {
+    E=RT_NEW(struct ltsmin_expr_s );
+    E->node_type=EVAR;
+    E->idx=ID;
+}
+expr(E) ::= VALUE(ID) . {
+    E=RT_NEW(struct ltsmin_expr_s );
+    E->node_type=CHUNK;
+    E->idx=ID;
+}
+expr(E) ::= NUMBER(N) . {
+    E=RT_NEW(struct ltsmin_expr_s );
+    E->node_type=INT;
+    E->idx=N;
+}
+
+expr(E) ::= expr(E1) BIN1(OP) expr(E2) . {
+    E=RT_NEW(struct ltsmin_expr_s );
+    E->node_type=BINARY_OP;
+    E->idx=OP;
+    E->arg1=E1;
+    E->arg2=E2;
+}
+expr(E) ::= expr(E1) BIN2(OP) expr(E2) . {
+    E=RT_NEW(struct ltsmin_expr_s );
+    E->node_type=BINARY_OP;
+    E->idx=OP;
+    E->arg1=E1;
+    E->arg2=E2;
+}
+expr(E) ::= expr(E1) BIN3(OP) expr(E2) . {
+    E=RT_NEW(struct ltsmin_expr_s );
+    E->node_type=BINARY_OP;
+    E->idx=OP;
+    E->arg1=E1;
+    E->arg2=E2;
+}
+
+expr(E) ::= MU_SYM IDENT(ID) DOT expr(E1) . [QUANTIFIER] {
+    E=RT_NEW(struct ltsmin_expr_s );
+    E->node_type=MU_FIX;
+    E->idx=ID;
+    E->arg1=E1;
+}
+
+expr(E) ::= NU_SYM IDENT(ID) DOT expr(E1) . [QUANTIFIER] {
+    E=RT_NEW(struct ltsmin_expr_s );
+    E->node_type=NU_FIX;
+    E->idx=ID;
+    E->arg1=E1;
+}
+
+expr(E) ::= EXISTS_SYM expr(E1) DOT expr(E2) . [QUANTIFIER]  {
+    E=RT_NEW(struct ltsmin_expr_s );
+    E->node_type=EXISTS_STEP;
+    E->idx=0;
+    E->arg1=E1;
+    E->arg2=E2;  
+}
+
+expr(E) ::= ALL_SYM expr(E1) DOT expr(E2) . [QUANTIFIER] {
+    E=RT_NEW(struct ltsmin_expr_s );
+    E->node_type=FORALL_STEP;
+    E->idx=0;
+    E->arg1=E1;
+    E->arg2=E2;  
+}
+
+expr(E) ::= IF IDENT THEN expr(EE) . [QUANTIFIER] {
+    E = EE ;
+}

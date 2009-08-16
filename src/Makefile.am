@@ -1,9 +1,12 @@
 bin_PROGRAMS = ltsmin-convert gcf etf-convert
-noinst_PROGRAMS = test-bitset test-is-balloc test-dfs-stack test-hre
+noinst_PROGRAMS = test-bitset test-is-balloc test-dfs-stack test-hre ltsmin-parse
 noinst_LTLIBRARIES = libutil.la libltsmin-nompi.la
 pkglib_LTLIBRARIES =
 
 SUBDIRS = dm . ce torx
+
+EXTRA_DIST = ltsmin-lexer.c ltsmin-lexer.h
+BUILT_SOURCES = ltsmin-grammar.c ltsmin-grammar.h ltsmin-lexer.c ltsmin-lexer.h
 
 # pins_open
 if HAVE_CADP
@@ -69,6 +72,10 @@ if HAVE_MPI
 test_hre_mpi_SOURCES = test-hre.c
 test_hre_mpi_LDADD = libltsmin-mpi.la
 endif
+
+# ltsmin-parse
+ltsmin_parse_SOURCES = ltsmin-parse.c
+ltsmin_parse_LDADD = libltsmin-nompi.la
 
 # etf2lts-grey
 etf2lts_grey_SOURCES  = spec2lts-grey.c etf-greybox.c etf-greybox.h    \
@@ -237,7 +244,11 @@ libutil_la_SOURCES += string-map.c string-map.h
 
 libutil_la_SOURCES += tables.c tables.h chunk_table_factory.c
 
-libutil_la_LIBADD = dm/libdm.la
+libutil_la_SOURCES += ltsmin-lexer.l ltsmin-syntax.c ltsmin-syntax.h \
+                    ltsmin-grammar.lemon ltsmin-parse-env.h
+
+
+libutil_la_LIBADD = ltsmin-grammar.lo dm/libdm.la
 
 libutil_la_CPPFLAGS = $(BUDDY_CPPFLAGS)
 if HAVE_LIBBCG
@@ -281,6 +292,8 @@ git_version.h.tmp:
 .PHONY: git_version.h.tmp
 
 DISTCLEANFILES = git_version.h git_version.h.tmp
+CLEANFILES = ltsmin-syntax.c ltsmin-syntax.h ltsmin-syntax.out
+MAINTAINERCLEANFILES = ltsmin-tokens.c ltsmin-tokens.h
 
 # make
 .DELETE_ON_ERROR:
