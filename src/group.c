@@ -93,9 +93,9 @@ group_state_labels_short(model_t self, int label, int *state)
     dm_expand_vector(GBgetStateLabelInfo(self), label, tmpstate, state, tmpstate);
 
     // 2) undo the regrouping on the long state
-    for (int i = 0; i < dm_ncols(GBgetStateLabelInfo(self)); i++)
-        oldstate[ctx->statemap[i]] = tmpstate[i];
-
+    for (int i = 0; i < dm_ncols(GBgetStateLabelInfo(self)); i++){
+        oldtmpstate[ctx->statemap[i]] = tmpstate[i];
+    }
     // 3) project this again to a short state, using the parent's state_label info matrix
     dm_project_vector(GBgetStateLabelInfo(parent), label, oldtmpstate, oldstate);
 
