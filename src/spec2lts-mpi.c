@@ -315,8 +315,7 @@ struct src_info {
 static void callback(void*context,int*labels,int*dst){
 	int who=owner(dst);
     uint32_t trans[trans_len];
-    trans[0]=((struct src_info*)context)->seg;
-    trans[1]=((struct src_info*)context)->ofs;
+    trans[0]=((struct src_info*)context)->ofs;
     for(int i=0;i<size;i++){
         trans[dst_ofs+i]=dst[i];
     }
@@ -356,7 +355,7 @@ static uint32_t *parent_ofs=NULL;
 static uint16_t *parent_seg=NULL;
 static long long int explored,visited,transitions;
 
-static void new_transition(void*context,int len,void*arg){
+static void new_transition(void*context,int src_seg,int len,void*arg){
     (void)context;(void)len;
     uint32_t *trans=(uint32_t*)arg;
 	int temp=TreeFold(dbs,(int32_t*)(trans+dst_ofs));
@@ -364,17 +363,17 @@ static void new_transition(void*context,int len,void*arg){
 		visited=temp+1;
 		if(find_dlk){
 			ensure_access(state_man,temp);
-			parent_seg[temp]=trans[0];
-			parent_ofs[temp]=trans[1];
+			parent_seg[temp]=src_seg;
+			parent_ofs[temp]=trans[0];
 		}
 	}
 	if (write_lts){
 		//DSwriteU32(output_src[work_recv->src_worker],work_recv->src_number);
 		//DSwriteU32(output_label[work_recv->src_worker],work_recv->label);
 		//DSwriteU32(output_dest[work_recv->src_worker],temp);
-		enum_seg_seg(output_handle,trans[0],trans[1],mpi_me,temp,(int32_t*)(trans+lbl_ofs));		
+		enum_seg_seg(output_handle,src_seg,trans[0],mpi_me,temp,(int32_t*)(trans+lbl_ofs));		
 	}
-	tcount[trans[0]]++;
+	tcount[src_seg]++;
 	transitions++;
 }
 
@@ -516,7 +515,7 @@ int main(int argc, char*argv[]){
 	}
 	event_barrier_wait(barrier);
 	/***************************************************/
-	dst_ofs=2;
+	dst_ofs=1;
 	lbl_ofs=dst_ofs+size;
 	trans_len=lbl_ofs+edge_labels;
 	new_trans=TaskCreateFixed(task_queue,trans_len*4,NULL,new_transition);
