@@ -50,8 +50,8 @@ void RTinitPoptMPI(int *argc_p,char**argv_p[],const struct poptOption * options,
 	}
 	if (mpi_me) {
 		RTinitPopt(argc_p,argv_p,options,min_args,max_args,args,pgm_prefix,arg_help,extra_help);
-		set_label("%s(%2d/%2d)",get_label(),mpi_me,mpi_nodes);
 	}
+	set_label("%s(%2d/%2d)",get_label(),mpi_me,mpi_nodes);
 }
 
 void RTinitMPIthread(int*argcp,char**argvp[],int requested,int *provided){
