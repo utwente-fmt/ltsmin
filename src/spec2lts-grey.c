@@ -222,7 +222,7 @@ static void torx_transition(void*arg,int*lbl,int*dst){
 		vis =0;
 
 	/* tab-separated fields: edge vis sat lbl pred vars state */
-	fprintf(stdout, "Ee\t\t%d\t1\t%*s\t\t\t%d\n", vis, c.len, c.data, tmp);
+	fprintf(stdout, "Ee\t\t%d\t1\t%.*s\t\t\t%d\n", vis, c.len, c.data, tmp);
 }
 
 
