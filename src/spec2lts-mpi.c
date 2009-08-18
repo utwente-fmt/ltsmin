@@ -545,7 +545,7 @@ int main(int argc, char*argv[]){
 				GBgetStateLabelsAll(model,src,labels);
 			}
 			if(write_lts && write_state){
-				enum_vec(output_handle,src,labels);
+				enum_state(output_handle,mpi_me,src,labels);
 			}
 
 			lvl_scount++;

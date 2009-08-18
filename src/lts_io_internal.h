@@ -13,7 +13,7 @@ typedef void(*lts_write_open_t)(lts_output_t output);
 
 extern void lts_write_register(char*extension,lts_write_open_t open);
 
-typedef void(*lts_read_open_t)(lts_input_t input);
+typedef void(*lts_read_open_t)(lts_input_t input,const char *requested_mode,char **actual_mode);
 
 extern void lts_read_register(char*extension,lts_read_open_t open);
 
@@ -24,7 +24,8 @@ struct lts_write_ops{
 };
 
 struct lts_read_ops{
-	void(*read_part)(lts_input_t input,int which_state,int which_src,int which_dst,lts_enum_cb_t output);
+	void(*read_part)(lts_input_t input,int part,int flags,lts_enum_cb_t output);
+	void(*load_lts)(lts_input_t input);
 	void(*read_close)(lts_input_t input);	
 };
 
@@ -57,6 +58,9 @@ struct lts_input_struct {
 	uint32_t *root_vec;
 	uint32_t root_seg;
 	uint32_t root_ofs;
+	value_table_t *value_table;
+	matrix_table_t *state_table;
+	matrix_table_t *edge_table;
 };
 
 #endif

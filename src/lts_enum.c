@@ -16,19 +16,49 @@ struct lts_enum_struct{
 	state_fold_t fold;
 	state_unfold_t unfold;
 	int force;
+	char *mode;
 };
+
+
+
+lts_enum_cb_t lts_enum_create(const char*mode){
+	lts_enum_cb_t output=RT_NEW(struct lts_enum_struct);
+	output->mode=strdup(mode);
+	return output;
+}
+
+void lts_enum_set_state_cb(lts_enum_cb_t ecb,state_cb cb){
+	ecb->s_cb=cb;
+}
+
+void lts_enum_set_edge_seg_seg_cb(lts_enum_cb_t ecb,edge_seg_seg_cb cb){
+	ecb->seg_seg_cb=cb;
+}
+
+void lts_enum_set_context(lts_enum_cb_t ecb,void*context){
+	ecb->cb_context=context;
+}
+
+void lts_enum_fix(lts_enum_cb_t ecb){
+	(void)ecb;
+}
+
+
+char* enum_get_mode(lts_enum_cb_t e){
+	return e->mode;
+}
+
+void enum_set_mode(lts_enum_cb_t e,const char*mode){
+	e->mode=strdup(mode);
+}
 
 void* enum_get_context(lts_enum_cb_t e){
 	return e->cb_context;
 }
 
-
 void enum_state(lts_enum_cb_t sink,int seg,int* state,int* labels){
-	sink->s_cb(sink->cb_context,seg,state,labels);
-}
-
-void enum_vec(lts_enum_cb_t sink,int* state,int* labels){
-	sink->vec_cb(sink->cb_context,state,labels);
+	if (sink->s_cb)	sink->s_cb(sink->cb_context,seg,state,labels);
+	else sink->vec_cb(sink->cb_context,state,labels);
 }
 
 void enum_seg(lts_enum_cb_t sink,int seg,int ofs,int* labels){
@@ -51,30 +81,29 @@ void enum_seg_seg(lts_enum_cb_t sink,int src_seg,int src_ofs,int dst_seg,int dst
 	sink->seg_seg_cb(sink->cb_context,src_seg,src_ofs,dst_seg,dst_ofs,labels);
 }
 
-
 static void missing_vec(void*ctx,int* state,int* labels){
 	(void)ctx;(void)state;(void)labels;
-	Fatal(1,error,"missing callback");
+	Fatal(1,error,"missing vec callback");
 }
 
 static void missing_seg(void*ctx,int seg,int ofs,int* labels){
 	(void)ctx;(void)seg;(void)ofs;(void)labels;
-	Fatal(1,error,"missing callback");
+	Fatal(1,error,"missing seg callback");
 }
 
 static void missing_vec_vec(void*ctx,int* src,int* dst,int*labels){
 	(void)ctx;(void)src;(void)dst;(void)labels;
-	Fatal(1,error,"missing callback");
+	Fatal(1,error,"missing vec vec callback");
 }
 
 static void missing_seg_vec(void*ctx,int src_seg,int src_ofs,int* dst,int*labels){
 	(void)ctx;(void)src_seg;(void)src_ofs;(void)dst;(void)labels;
-	Fatal(1,error,"missing callback");
+	Fatal(1,error,"missing seg vec callback");
 }
 
 static void missing_seg_seg(void*ctx,int src_seg,int src_ofs,int dst_seg,int dst_ofs,int*labels){
 	(void)ctx;(void)src_seg;(void)src_ofs;(void)dst_seg;(void)dst_ofs;(void)labels;
-	Fatal(1,error,"missing callback");
+	Fatal(1,error,"missing seg seg callback");
 }
 
 lts_enum_cb_t lts_enum_viv(int len,void* context,state_vec_cb state_cb,edge_seg_vec_cb edge_cb){

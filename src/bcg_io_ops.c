@@ -65,15 +65,48 @@ struct bcg_input {
 	BCG_TYPE_OBJECT_TRANSITION bcg_graph;
 };
 
-static void bcg_read_part(lts_input_t input,int which_state,int which_src,int which_dst,lts_enum_cb_t output){
-	(void)which_state;(void)which_src;(void)which_dst;
-	struct bcg_input*ctx=(struct bcg_input*)input->ops_context;
-	bcg_type_state_number bcg_s1, bcg_s2;
-	BCG_TYPE_LABEL_NUMBER bcg_label_number;
-	BCG_OT_ITERATE_PLN (ctx->bcg_graph, bcg_s1, bcg_label_number, bcg_s2) {
-		enum_seg_seg(output,0,bcg_s1,0,bcg_s2,(int*)&bcg_label_number);
-	} BCG_OT_END_ITERATE;
+static void bcg_read_part(lts_input_t input,int part,int flags,lts_enum_cb_t output){
+	(void)part;
+	if (flags & LTS_ENUM_EDGES){
+		Warning(debug,"iterating over BCG file");
+		struct bcg_input*ctx=(struct bcg_input*)input->ops_context;
+		bcg_type_state_number bcg_s1, bcg_s2;
+		BCG_TYPE_LABEL_NUMBER bcg_label_number;
+		BCG_OT_ITERATE_PLN (ctx->bcg_graph, bcg_s1, bcg_label_number, bcg_s2) {
+			enum_seg_seg(output,0,bcg_s1,0,bcg_s2,(int*)&bcg_label_number);
+		} BCG_OT_END_ITERATE;
+	} else {
+		Warning(debug,"skipping over BCG file");
+	}
 }
+
+static void bcg_load(lts_input_t input){
+	struct bcg_input*ctx=(struct bcg_input*)input->ops_context;
+	if (input->edge_table && input->edge_table[0]){
+		uint32_t edge[3];
+	    bcg_type_state_number bcg_s1, bcg_s2;
+	    BCG_TYPE_LABEL_NUMBER bcg_label_number;
+	    BCG_OT_ITERATE_PLN (ctx->bcg_graph, bcg_s1, bcg_label_number, bcg_s2) {
+		    edge[0]=bcg_s1;
+		    edge[1]=bcg_s2;
+		    edge[2]=bcg_label_number;
+		    MTaddRow(input->edge_table[0],edge);
+	    } BCG_OT_END_ITERATE;
+    }
+    if (input->value_table && input->value_table[0]){
+     	int label_count=BCG_OT_NB_LABELS (ctx->bcg_graph);
+	    for(int i=0;i<label_count;i++){
+		    char *lbl=BCG_OT_LABEL_STRING (ctx->bcg_graph,i);
+		    if (!BCG_OT_LABEL_VISIBLE (ctx->bcg_graph,i)){
+			    lbl="tau";
+		    }
+		    if ((int)VTputChunk(input->value_table[0],chunk_str(lbl))!=i){
+			    Fatal(1,error,"position of label %d was not %d",i,i);
+		    }
+	    }      
+    }
+}
+
 
 static void bcg_read_close(lts_input_t input){
 	struct bcg_input*ctx=(struct bcg_input*)input->ops_context;
@@ -90,13 +123,19 @@ static void bcg_write_open(lts_output_t output){
 	output->ops.write_close=bcg_write_close;
 }
 
-static void bcg_read_open(lts_input_t input){
+static void bcg_read_open(lts_input_t input,const char *requested_mode,char **actual_mode){
 	if (input->share_count!=1) {
 		Fatal(1,error,"parallel reading of BCG unsupported");
 	}
+	if (requested_mode && strcmp(requested_mode,"-ii") && actual_mode==NULL){
+        Fatal(1,error,"mode mismatch %s != -ii",requested_mode);
+	}
+	input->mode=strdup("-ii");
+	if (actual_mode) {
+	    *actual_mode=input->mode;
+    }
 	input->segment_count=1;
 	lts_count_init(&(input->count),0,1,1); 
-	if (input->share_count!=1) Fatal(1,error,"parallel reading not supported");
 	lts_type_t ltstype=lts_type_create();
 	lts_type_set_state_length(ltstype,2);
 	int action_type=lts_type_add_type(ltstype,"action",NULL);
@@ -133,6 +172,7 @@ static void bcg_read_open(lts_input_t input){
 	input->count.cross[0][0]=input->count.in[0];
 	input->ops_context=ctx;
 	input->ops.read_part=bcg_read_part;
+	input->ops.load_lts=bcg_load;
 	input->ops.read_close=bcg_read_close;
 }
 

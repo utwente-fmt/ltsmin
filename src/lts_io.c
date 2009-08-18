@@ -95,12 +95,29 @@ char* lts_input_mode(lts_input_t input){
 	return input->mode;
 }
 
+int lts_input_chmod(lts_input_t input,const char *mode){
+	if (!input->mode && (!strcmp(mode,"-si") || !strcmp(mode,"-is"))) {
+		input->mode=strdup(mode);
+		return 1;
+	} else {
+		return 0;
+	}
+}
+
 int lts_input_segments(lts_input_t input){
 	return input->segment_count;
 }
 
-void lts_input_enum(lts_input_t input,int which_state,int which_src,int which_dst,lts_enum_cb_t output){
-	input->ops.read_part(input,which_state,which_src,which_dst,output);
+void lts_input_enum_all(lts_input_t input,int flags,lts_enum_cb_t output){
+	Warning(debug,"input mode is %s, output mode is %s",input->mode,enum_get_mode(output));
+	for(int i=0;i<input->segment_count;i++){
+		input->ops.read_part(input,i,flags,output);
+	}
+}
+
+void lts_input_enum_part(lts_input_t input,int part,int flags,lts_enum_cb_t output){
+	Warning(debug,"input mode is %s, output mode is %s",input->mode,enum_get_mode(output));
+	input->ops.read_part(input,part,flags,output);
 }
 
 void lts_input_close(lts_input_t *input_p){
@@ -192,7 +209,14 @@ void lts_read_register(char*extension,lts_read_open_t open){
 	}
 }
 
-lts_input_t lts_input_open(char*inputname,model_t model,int share,int share_count){
+lts_input_t lts_input_open(
+    char*inputname,
+    model_t model,
+    int share,
+    int share_count,
+	const char *requested_mode,
+	char **actual_mode
+){
 	char* extension=strrchr(inputname,'.');
 	if (extension) {
 		extension++;
@@ -203,7 +227,7 @@ lts_input_t lts_input_open(char*inputname,model_t model,int share,int share_coun
 				input->model=model;
 				input->share=share;
 				input->share_count=share_count;
-				read_open[i](input);
+				read_open[i](input,requested_mode,actual_mode);
 				return input;
 			}
 		}
@@ -214,6 +238,86 @@ lts_input_t lts_input_open(char*inputname,model_t model,int share,int share_coun
 	return NULL;
 }
 
+/*
+int lts_input_vt_count(lts_input_t input){
+    return lts_type_get_type_count(GBgetLTStype(input->model));
+}
+*/
+
+char* lts_input_vt_type(lts_input_t input,int table){
+    return lts_type_get_type(GBgetLTStype(input->model),table);
+}
+
+lts_type_t lts_input_ltstype(lts_input_t input){
+    return GBgetLTStype(input->model);
+}
+
+
+void lts_input_vt_set(lts_input_t input,int table,value_table_t vt){
+    if (!input->value_table) {
+        int N=lts_type_get_type_count(GBgetLTStype(input->model));
+        RangeCheckInt(table,0,N-1);
+        input->value_table=RTmallocZero(N*sizeof(value_table_t));
+    }
+    input->value_table[table]=vt;
+}
+
+void lts_input_state_table_set(lts_input_t input,int segment,matrix_table_t mt){
+    RangeCheckInt(segment,0,input->segment_count-1);
+    if (!input->state_table) {
+        input->state_table=RTmallocZero(input->segment_count*sizeof(matrix_table_t));
+    }
+    input->state_table[segment]=mt;
+}
+
+void lts_input_edge_table_set(lts_input_t input,int segment,matrix_table_t mt){
+    RangeCheckInt(segment,0,input->segment_count-1);
+    if (!input->edge_table) {
+        input->edge_table=RTmallocZero(input->segment_count*sizeof(matrix_table_t));
+    }
+    input->edge_table[segment]=mt;
+}
+
+void lts_input_load(lts_input_t input){
+    if (input->ops.load_lts){
+        input->ops.load_lts(input);
+    } else {
+        Fatal(1,error,"Load method unimplemented");
+    }
+}
+/*
+    if(input->state_table){
+        for(int i=0;i<input->segments;i++) if (input->state_table[i]) {
+		    lts_enum_cb_t ecb=
+		    lts_input_enum(input,,,,ecb);
+        }
+    } else {
+        Warning(debug,"ignoring state information");
+    }
+    if(input->edge_table){
+        for(int i=0;i<input->segments;i++) if (input->edge_table[i]) {
+            
+        }
+    } else {
+        Warning(debug,"ignoring edge information");
+    }
+    if(input->value_table) {
+        Warning(debug,"loading value tables");
+        int N=lts_type_get_type_count(GBgetLTStype(input->model));
+        for(int i=0;i<N;i++){
+            if (input->value_table[i]){
+                uint32_t K=GBchunkCount(input->model,i);
+                for(uint32_t j=0;j<K;j++){
+                    if (j!=VTputChunk(input->value_table[i],GBchunkGet(input->model,i,j))){
+                        Fatal(1,error,"value table does not follow indexed set rules");
+                    }
+                }
+            }
+        }
+    } else {
+        Warning(debug,"no value tables were requested");
+    }
+*/
 
 
 
