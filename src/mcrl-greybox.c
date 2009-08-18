@@ -108,7 +108,7 @@ static int instances=0;
 static int state_length;
 static matrix_t dm_info;
 static int* e_smd_map=NULL;
-static struct state_info s_info={0,NULL,NULL};
+static matrix_t   sl_info;
 static int* s_smd_map=NULL;
 
 static at_map_t termmap;
@@ -163,7 +163,7 @@ static void MCRLgetStateLabelsAll(model_t model,int*state,int*labels){
 	for(int i=0;i<state_length;i++) {
 		at_src[i]=ATfindTerm(termmap,state[i]);
 	}
-	int res=STstepSmd(at_src,s_smd_map,s_info.labels);
+	int res=STstepSmd(at_src,s_smd_map,dm_nrows(&sl_info));
 	if (res<0) Fatal(1,error,"error in STstepSmd")
 }
 
@@ -262,7 +262,8 @@ void MCRLloadGreyboxModel(model_t m,const char*model){
 
 	GBsetLTStype(m,ltstype);
 	GBsetDMInfo(m, &dm_info);
-	GBsetStateInfo(m,&s_info);
+	dm_create(&sl_info, 0, state_length);
+	GBsetStateLabelInfo(m, &sl_info);
 
 	if (RTverbosity >=2) {
 	  fprintf(stderr,"Regrouped dependency Matrix:\n");

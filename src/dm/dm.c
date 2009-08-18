@@ -39,6 +39,10 @@ dm_free_header (matrix_header_t *p)
 int
 dm_copy_header (const matrix_header_t *src, matrix_header_t *tgt)
 {
+    if (tgt->data != NULL)
+        free(tgt->data);
+    if (tgt->count != NULL)
+        free(tgt->count);
     tgt->size = src->size;
     tgt->data = malloc (sizeof (header_entry_t) * tgt->size);
     // TODO: null ptr exception
@@ -327,7 +331,9 @@ dm_copy (const matrix_t *src, matrix_t *tgt)
     tgt->cols = src->cols;
     tgt->bits_per_row = src->bits_per_row;
     tgt->row_perm.data = NULL;
+    tgt->row_perm.count = NULL;
     tgt->col_perm.data = NULL;
+    tgt->col_perm.count = NULL;
     tgt->bits.data = NULL;
 
     if (dm_copy_header (&(src->row_perm), &(tgt->row_perm))) {
@@ -341,9 +347,13 @@ dm_copy (const matrix_t *src, matrix_t *tgt)
         return -1;
     }
 
-    if (bitvector_copy (&(src->bits), &(tgt->bits))) {
-        dm_free (tgt);
-        return -1;
+    if (src->rows != 0 && src->cols != 0) {
+        if (bitvector_copy (&(src->bits), &(tgt->bits))) {
+            dm_free (tgt);
+            return -1;
+        }
+    } else {
+        bitvector_create(&(tgt->bits), 0);
     }
 
     return 0;

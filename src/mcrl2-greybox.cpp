@@ -249,7 +249,7 @@ typedef struct grey_box_context {
 	at_map_t actionmap;
 } *mcrl2_model_t;
 
-static struct state_info s_info={0,NULL,NULL};
+static matrix_t sl_info;
 
 
 static char global_label[65536];
@@ -390,7 +390,8 @@ void MCRL2loadGreyboxModel(model_t m,const char*model_name){
 	}
 
 	GBsetDMInfo(m, p_dm_info);
-	GBsetStateInfo(m,&s_info);
+	dm_create(&sl_info, 0, state_length);
+	GBsetStateLabelInfo(m,&sl_info);
 	GBsetNextStateLong(m,MCRL2getTransitionsLong);
 	GBsetNextStateAll(m,MCRL2getTransitionsAll);
 }

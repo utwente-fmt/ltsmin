@@ -572,11 +572,20 @@ void do_output(){
 		fprintf(table_file,"end trans\n");
 	}
 	Warning(info,"Symbolic tables have %d reachable transitions",table_count);
-	sLbls=lts_type_get_state_label_count(ltstype);
-	state_info_t s_info=GBgetStateInfo(model);
+	matrix_t *sl_info = GBgetStateLabelInfo(model);
+	sLbls = dm_nrows(sl_info);
+	if (dm_nrows(sl_info) != lts_type_get_state_label_count(ltstype))
+		Warning(error,"State label count mismatch!");
 	for(int i=0;i<sLbls;i++){
-		int len=s_info->length[i];
-		int *used=s_info->indices[i];
+		int len = dm_ones_in_row(sl_info, i);
+		int used[len];
+		// get projection
+		for (int pi = 0, pk = 0; pi < dm_ncols (sl_info); pi++) {
+			if (dm_is_set (sl_info, i, pi)) {
+				used[pk++] = pi;
+			}
+		}
+
 		vset_t patterns=vset_create(domain,len,used);
 		vset_project(patterns,visited);
 		map_context ctx;

@@ -72,6 +72,64 @@ group_all (model_t self, int *newsrc, TransitionCB cb,
     return GBgetTransitionsAll(parent, oldsrc, group_cb, ctx);
 }
 
+
+static int
+group_state_labels_short(model_t self, int label, int *state)
+{
+    group_context_t     ctx = (group_context_t)GBgetContext (self);
+    model_t             parent = ctx->parent;
+
+    // this needs to be rewritten
+    int len = dm_ones_in_row(GBgetStateLabelInfo(self), label);
+    int tmpstate[dm_ncols(GBgetStateLabelInfo(self))];
+    int oldtmpstate[dm_ncols(GBgetStateLabelInfo(self))];
+    int oldstate[len];
+    // basic idea:
+    // 1) expand the short state to a long state using the permuted state_label info matrix
+    // note: expanded vector uses tmpstate as basis for the missing items in state
+    // this "should" work because after undoing the regrouping 
+    // project_vector should use only the indices that are in state
+    memset (tmpstate, 0, sizeof tmpstate);
+    dm_expand_vector(GBgetStateLabelInfo(self), label, tmpstate, state, tmpstate);
+
+    // 2) undo the regrouping on the long state
+    for (int i = 0; i < dm_ncols(GBgetStateLabelInfo(self)); i++){
+        oldtmpstate[ctx->statemap[i]] = tmpstate[i];
+    }
+    // 3) project this again to a short state, using the parent's state_label info matrix
+    dm_project_vector(GBgetStateLabelInfo(parent), label, oldtmpstate, oldstate);
+
+    return GBgetStateLabelShort(parent, label, oldstate);
+}
+
+static int
+group_state_labels_long(model_t self, int label, int *state)
+{
+    group_context_t     ctx = (group_context_t)GBgetContext (self);
+    model_t             parent = ctx->parent;
+    int                 len = ctx->len;
+    int                 oldstate[len];
+
+    for (int i = 0; i < len; i++)
+        oldstate[ctx->statemap[i]] = state[i];
+
+    return GBgetStateLabelLong(parent, label, oldstate);
+}
+
+static void
+group_state_labels_all(model_t self, int *state, int *labels)
+{
+    group_context_t     ctx = (group_context_t)GBgetContext (self);
+    model_t             parent = ctx->parent;
+    int                 len = ctx->len;
+    int                 oldstate[len];
+
+    for (int i = 0; i < len; i++)
+        oldstate[ctx->statemap[i]] = state[i];
+
+    return GBgetStateLabelsAll(parent, oldstate, labels);
+}
+
 int
 max_row_first (matrix_t *m, int rowa, int rowb)
 {
@@ -199,7 +257,7 @@ GBregroup (model_t model, const char *regroup_spec)
     {
         int                 Nparts = dm_ncols (m);
         if (Nparts != lts_type_get_state_length (GBgetLTStype (model)))
-            Fatal (-1, error,
+            Fatal (1, error,
                    "state mapping in file doesn't match the specification");
         ctx->len = Nparts;
         ctx->statemap = RTmalloc (Nparts * sizeof (int));
@@ -251,6 +309,21 @@ GBregroup (model_t model, const char *regroup_spec)
     // fill edge_info
     GBsetDMInfo (group, m);
 
+    // copy state label matrix and apply the same permutation
+    matrix_t           *s = RTmalloc (sizeof (matrix_t));
+
+    dm_copy (GBgetStateLabelInfo (model), s);
+    if (dm_ncols(m) != dm_ncols(s))
+            Fatal (-1, error,
+                   "Dependency Matrix and State label matrix"
+                   " have the same number of columns?!");
+
+    // probably better to write some functions to do this,
+    // i.e. dm_get_column_permutation
+    dm_copy_header(&(m->col_perm), &(s->col_perm));
+
+    GBsetStateLabelInfo(group, s);
+
     GBinitModelDefaults (&group, model);
 
     // permute initial state
@@ -264,10 +337,9 @@ GBregroup (model_t model, const char *regroup_spec)
         GBsetInitialState (group, news0);
     }
 
-    // not supported yet (should permute states)
-    GBsetStateLabelShort (group, NULL);
-    GBsetStateLabelLong (group, NULL);
-    GBsetStateLabelsAll (group, NULL);
+    GBsetStateLabelShort (group, group_state_labels_short);
+    GBsetStateLabelLong (group, group_state_labels_long);
+    GBsetStateLabelsAll (group, group_state_labels_all);
 
     // who is responsible for freeing matrix_t dm_info in group?
     // probably needed until program termination
