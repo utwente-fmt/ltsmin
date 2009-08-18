@@ -1,6 +1,6 @@
 #include "data_io.h"
 
-int fwrite64(FILE *f,u_int64_t i){
+int fwrite64(FILE *f,uint64_t i){
 	if (EOF==fputc(0xff & (i>>56),f)) return EOF;
 	if (EOF==fputc(0xff & (i>>48),f)) return EOF;
 	if (EOF==fputc(0xff & (i>>40),f)) return EOF;
@@ -31,8 +31,8 @@ int fwrite8(FILE *f,int i){
 	return 0;
 }
 
-int fread64(FILE *f,u_int64_t *ip){
-	u_int64_t i;
+int fread64(FILE *f,uint64_t *ip){
+	uint64_t i;
 	int c;
 
 	if (EOF==(c=fgetc(f))) return EOF;

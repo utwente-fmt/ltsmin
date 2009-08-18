@@ -6,7 +6,6 @@
 
 #include <sys/types.h>
 #include <mpi.h>
-#include "config.h"
 
 // in all types and functions
 // i made the hypothesis that 
@@ -35,6 +34,7 @@ void taudlts_reset(taudlts_t t);
 void taudlts_simple_join(taudlts_t t1, taudlts_t t2);
 void taudlts_aux2normal(taudlts_t t);
 void taudlts_normal2aux(taudlts_t t);
+void taudlts_delete_transitions(taudlts_t t, char* deleted);
 
 void taudlts_extract_from_dlts(taudlts_t t, dlts_t lts);
 // extracts the FORWARD tau transitions from a given dlts

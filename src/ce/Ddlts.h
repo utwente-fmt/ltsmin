@@ -11,7 +11,6 @@ start: miercuri 24 septembrie
 
 #include <sys/types.h>
 #include <mpi.h>
-#include "config.h"
 
 typedef struct dlts {
  MPI_Comm comm;
@@ -33,7 +32,6 @@ typedef struct dlts {
 dlts_t dlts_create(MPI_Comm communicator);
 void dlts_free(dlts_t lts);
 int dlts_read(dlts_t lts, char* filename, int type);
-int dlts_writeaut(dlts_t lts, char* filename, int writemode);
 int dlts_writedir(dlts_t lts, char* filename, int writemode);
 // both write functions
 // expect the following fields of the lts structure to be filled (with correct data):

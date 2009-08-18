@@ -3,7 +3,7 @@ noinst_PROGRAMS =
 noinst_LTLIBRARIES = libutil.la
 pkglib_LTLIBRARIES =
 
-SUBDIRS = dm .
+SUBDIRS = dm . ce
 
 # pins_open
 if HAVE_CADP
@@ -13,7 +13,8 @@ bin_SCRIPTS = pins_open
 endif
 
 if HAVE_MPI
-bin_PROGRAMS += ltsmin-mpi etf2lts-mpi
+bin_PROGRAMS += ltsmin-mpi
+bin_PROGRAMS += etf2lts-mpi
 noinst_PROGRAMS += mpi-event-test
 noinst_LTLIBRARIES += libmpi.la
 if HAVE_LIBSTEP_INFO

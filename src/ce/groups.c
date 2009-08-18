@@ -4,10 +4,11 @@
 #include "groups.h"
 #include <assert.h>
 #include "bufs.h"
-#include "time.h"
+#include "scctimer.h"
 #include "sortcount.h"
 #include <stdio.h>
-#include <malloc.h>
+#include <runtime.h>
+
 //#include "Dtaudlts.h"
 
 #define MAXMANAGERGRAPH 24000000
@@ -17,6 +18,7 @@
 
 static int me, nodes;
 
+#pragma GCC diagnostic ignored "-Wunused-variable"
 
 
 void reduce_all (taudlts_t t, int* wscc, int* oscc){
@@ -29,10 +31,10 @@ void reduce_all (taudlts_t t, int* wscc, int* oscc){
  workers=(char*)calloc(nodes, sizeof(char));	
  for(j = 0; j<nodes;j++) workers[j]=1;
  if (0==me)
-	Warning(1,"\n\n@@@@@@@@ REDUCE ALL with manager 0 @@@@@@@@@@\n\n");
+	Warning(info,"\n\n@@@@@@@@ REDUCE ALL with manager 0 @@@@@@@@@@\n\n");
  taudlts_reduce_some(t, workers, 0, wscc, oscc);
  if (0==me)
-	Warning(1,"\n\n@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n\n");
+	Warning(info,"\n\n@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n\n");
  MPI_Barrier(t->comm);
 }
 
@@ -51,7 +53,7 @@ void reduce_pairs(taudlts_t t, int* wscc, int* oscc){
  workers=(char*)calloc(nodes, sizeof(char));	
  if ((me < nodes-1)&&(me % 2 == 0)){
 	workers[me]=workers[me+1]=1;
-	Warning(1,"\n\n@@@@@@@@ REDUCE SOME with manager %d",me);
+	Warning(info,"\n\n@@@@@@@@ REDUCE SOME with manager %d",me);
 	taudlts_reduce_some(t, workers, me, wscc, oscc);
  }	
  else if (me % 2 != 0){
@@ -94,10 +96,10 @@ void reduce_tree(taudlts_t t, int* wscc, int* oscc){
  for (groupsize=2 ; groupsize <= maxgroupsize; groupsize++){	
 
 	mymanager = (me/groupsize) * groupsize;
-	Warning(1,"\n\nme %d manager %d ", me,mymanager);	
+	Warning(info,"\n\nme %d manager %d ", me,mymanager);	
 	 MPI_Barrier(t->comm);
 	if (me==mymanager)
-	 Warning(1,"\n\n@@@@@@@@ REDUCE SOME with manager %d and groupsize %d ",
+	 Warning(info,"\n\n@@@@@@@@ REDUCE SOME with manager %d and groupsize %d ",
 					 me,groupsize);	
 	for(i=0;i<nodes;i++) mysize[i] = t->M;
 	MPI_Alltoall(mysize,1,MPI_INT,size,1,MPI_INT,t->comm); 
@@ -153,14 +155,14 @@ int dlts_elim_tauscc_groups(dlts_t lts){
  MPI_Comm_size(lts->comm, &nodes);
  MPI_Comm_rank(lts->comm, &me);
  
- tau_timer=createTimer();startTimer(tau_timer);
+ tau_timer=SCCcreateTimer();SCCstartTimer(tau_timer);
 
  t = taudlts_create(lts->comm);
  taudlts_extract_from_dlts(t, lts);
  tviz = taudlts_create(t->comm);
  tviz->M=0; tviz->N = t->N;
 
- stopTimer(tau_timer);
+ SCCstopTimer(tau_timer);
 
  oscc=(int*)calloc(t->N,sizeof(int));	
  wscc=(int*)calloc(t->N,sizeof(int));
@@ -180,7 +182,7 @@ int dlts_elim_tauscc_groups(dlts_t lts){
  taudlts_cleanup(t, wscc, oscc);
 
  MPI_Allreduce(&(t->M), &Mtot, 1, MPI_INT, MPI_SUM, t->comm);
- if (me==0) Warning(1,"\n\nMtot:::: %d\n\n",Mtot);
+ if (me==0) Warning(info,"\n\nMtot:::: %d\n\n",Mtot);
 
 
  // if it's small enough, send it to one manager
@@ -190,7 +192,7 @@ int dlts_elim_tauscc_groups(dlts_t lts){
 	
 	taudlts_scc_stabilize(t, wscc, oscc);
 
-	startTimer(tau_timer);
+	SCCstartTimer(tau_timer);
 
 	taudlts_aux2normal(tviz);
 	taudlts_cleanup(tviz, wscc, oscc);
@@ -201,13 +203,13 @@ int dlts_elim_tauscc_groups(dlts_t lts){
 	if (wscc!=NULL) {free(wscc); wscc=NULL;}
 	// if (oscc!=NULL) {free(oscc); oscc=NULL;}
 
-	stopTimer(tau_timer); reportTimer(tau_timer, "taugraph I/O: ");
+	SCCstopTimer(tau_timer); SCCreportTimer(tau_timer, "taugraph I/O: ");
 	return 1;
  }
  // else, give up
  else{
 	taudlts_free(t); taudlts_free(tviz);
-	free(wscc); free(oscc); reportTimer(tau_timer, "taugraph I/O: ");
+	free(wscc); free(oscc); SCCreportTimer(tau_timer, "taugraph I/O: ");
 	return 0;
  }
 }

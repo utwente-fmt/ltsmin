@@ -1,9 +1,8 @@
-
+#include <stdlib.h>
+#include <stdio.h>
+#include <assert.h>
 
 #include "sortcount.h"
-#include <assert.h>
-#include <stdio.h>
-#include <malloc.h>
 
 /****************************************************
 
@@ -102,7 +101,7 @@ void sortpiece(int* a, int* b, int first, int last){
 
 
 void bucketsort(int* a, int n){
- int i,j,index, max;
+ int i,j, max;
  int* aux;
  max = 0; 
  for(i=0;i<n;i++) 

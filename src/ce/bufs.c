@@ -1,4 +1,4 @@
-
+#include <runtime.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <mpi.h>
@@ -25,7 +25,7 @@ char* tname[13]={"","NEWSIGS_MSG","NEWSIGS_END","NEWIDS_MSG",
 
 void checkSend(intbuf_t buf, int w, MPI_Comm comm, int tag, int size){ 
 
-  //  Warning(1,"checkSend %d %d %d",w,tag,size);
+  //  Warning(info,"checkSend %d %d %d",w,tag,size);
   assert(size <= MSGSIZE);
   if (buf->index + size > MSGSIZE){
 #ifdef DEBUG
@@ -49,7 +49,7 @@ void checkSend(intbuf_t buf, int w, MPI_Comm comm, int tag, int size){
 
 int IcheckSend(intbuf_t buf, int w, MPI_Comm comm, int size){ 
   // sends only UPDATE_MSG messages
-  //  Warning(1,"IcheckSend %d %d %d",w,tag,size);
+  //  Warning(info,"IcheckSend %d %d %d",w,tag,size);
   assert(size <= MSGSIZE);
   if (buf->index + size > MSGSIZE){
 #ifdef DEBUG
@@ -75,7 +75,7 @@ void rcvBuf(intbuf_t* bufs, int* w, MPI_Comm comm, int* tag, int* size){
 
   MPI_Status status; 
   if ((MPI_Probe(MPI_ANY_SOURCE, MPI_ANY_TAG, comm, &status)) != MPI_SUCCESS)
-    Fatal(1,1,"ERROR IN PROBE"); 
+    Fatal(1,error,"ERROR IN PROBE"); 
   MPI_Get_count(&status, MPI_INT, size);
   *w = status.MPI_SOURCE;
   *tag = status.MPI_TAG;
@@ -84,7 +84,7 @@ void rcvBuf(intbuf_t* bufs, int* w, MPI_Comm comm, int* tag, int* size){
 	    MPI_INT, status.MPI_SOURCE, 
 	    *tag, comm, &status);
 #ifdef DEBUG  
-   Warning(1,"       %d rcvBuf %s (size %d) from %d", 
+   Warning(info,"       %d rcvBuf %s (size %d) from %d", 
 	   mpi_me, tname[*tag], *size, *w);
 #endif
 }
@@ -102,7 +102,7 @@ int IrcvBuf(intbuf_t* bufs, intbuf_t serversbuf, int* w, MPI_Comm comm, int* tag
   intbuf_t bb = NULL;
   MPI_Status status; 
   int flag;
-  //  Warning(1,"$$$$$$$$$ (W%d) SP: %d   PP: %d  ", mpi_me, send_pending, bufnewids_pending);
+  //  Warning(info,"$$$$$$$$$ (W%d) SP: %d   PP: %d  ", mpi_me, send_pending, bufnewids_pending);
   if (send_pending) {
       MPI_Iprobe( MPI_ANY_SOURCE, UPDATE_END, comm, &flag, &status );
       if (!flag) 
@@ -146,7 +146,7 @@ int IrcvBuf(intbuf_t* bufs, intbuf_t serversbuf, int* w, MPI_Comm comm, int* tag
    bb->size = *size;
 
 #ifdef DEBUG  
-   Warning(1,"\n      %d IrcvBuf %s (size %d) from %d", 
+   Warning(info,"\n      %d IrcvBuf %s (size %d) from %d", 
 	   mpi_me, tname[*tag], *size, *w);
 #endif
 
@@ -183,10 +183,10 @@ void Receive(int* w, MPI_Comm comm, int tag, int* msg){
 intbuf_t newBuffer(int initialsize){
   intbuf_t buf;
   if ((buf = (intbuf_t)calloc(1,sizeof(struct intbuf))) == NULL)
-      Fatal(1,1,"Could not allocate IntBuffer");
+      Fatal(1,error,"Could not allocate IntBuffer");
   buf->size = initialsize;
   if ((buf->b = (int*)calloc(buf->size, sizeof(int))) == NULL)
-    Fatal(1,1,"Could not allocate IntBuffer");
+    Fatal(1,error,"Could not allocate IntBuffer");
   buf->index = 0;
   return buf;
 }
@@ -201,10 +201,10 @@ void freeBuffer(intbuf_t buf){
 
 void resetBuffer(intbuf_t buf){
   if (buf==NULL)
-    Fatal(1,1,"IntBuffer not initialized");
+    Fatal(1,error,"IntBuffer not initialized");
   buf->size = BUFSIZE;
   if ((buf->b = (int*)realloc(buf->b, buf->size*sizeof(int))) == NULL)
-    Fatal(1,1,"Could not re-allocate IntBuffer");
+    Fatal(1,error,"Could not re-allocate IntBuffer");
   buf->index = 0;  
 }
 
@@ -223,7 +223,7 @@ void add(intbuf_t buf, int* x, int n){
   while (buf->index  + n >= buf->size){
     buf->size += BUFSIZE;
     if(( buf->b = (int*)realloc(buf->b , (buf->size)*sizeof(int))) == NULL)
-      Fatal(1,1,"Could not reallocate a Buffer");
+      Fatal(1,error,"Could not reallocate a Buffer");
   };
   for(i = 0; i < n; i++)
     buf->b[buf->index++] = x[i];
@@ -233,7 +233,7 @@ void add1(intbuf_t buf, int x){
   if (buf->index  + 1 >= buf->size){
     buf->size += BUFSIZE;
     if(( buf->b = (int*)realloc(buf->b , (buf->size)*sizeof(int))) == NULL)
-      Fatal(1,1,"Could not reallocate a Buffer");
+      Fatal(1,error,"Could not reallocate a Buffer");
   };
   buf->b[buf->index++] = x;
 }
@@ -243,7 +243,7 @@ void add4(intbuf_t buf, int x, int y, int z, int t){
   while (buf->index  + 4 >= buf->size){
     buf->size += BUFSIZE;
     if(( buf->b = (int*)realloc(buf->b , (buf->size)*sizeof(int))) == NULL)
-      Fatal(1,1,"Could not reallocate a Buffer");
+      Fatal(1,error,"Could not reallocate a Buffer");
   };
   buf->b[buf->index++] = x;  
   buf->b[buf->index++] = y;  

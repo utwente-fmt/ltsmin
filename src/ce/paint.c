@@ -2,10 +2,13 @@
 #include "paint.h"
 #include <assert.h>
 #include "bufs.h"
-#include "time.h"
+#include "scctimer.h"
 #include "sortcount.h"
 #include <stdio.h>
-#include <malloc.h>
+#include <runtime.h>
+
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+#pragma GCC diagnostic ignored "-Wunused-variable"
 
 extern int me, nodes;
 
@@ -45,11 +48,11 @@ void taudlts_normal2split
  ///// MPI_Barrier(t->comm);
 
  if (((*srcout) = (int*)calloc(t->M, sizeof(int)))==NULL)
-	Fatal(1,1,"out of mem in normal2split");
+	Fatal(1,error,"out of mem in normal2split");
  if ((size_to_w = (int*)calloc(nodes+1, sizeof(int)))==NULL)
-	Fatal(1,1,"out of mem in normal2split");
+	Fatal(1,error,"out of mem in normal2split");
  if ((size_from_w = (int*)calloc(nodes+1, sizeof(int)))==NULL)
-	Fatal(1,1,"out of mem in normal2split");
+	Fatal(1,error,"out of mem in normal2split");
  for(i=0;i<t->N;i++)
 	for(j=t->begin[i];j<t->begin[i+1];j++)
 	 (*srcout)[j]=i;
@@ -64,7 +67,7 @@ void taudlts_normal2split
  begin_from_w[0]=0; 
  for(i=1;i<=nodes;i++) begin_from_w[i]=begin_from_w[i-1]+size_from_w[i-1];
  if (((*destin) = (int*)calloc(begin_from_w[nodes], sizeof(int)))==NULL)
-	Fatal(1,1,"out of mem in normal2split");
+	Fatal(1,error,"out of mem in normal2split");
  MPI_Alltoallv(t->o, size_to_w, begin_to_w, MPI_INT,
 							 (*destin), size_from_w, begin_from_w,MPI_INT,t->comm);
  free(t->o);t->o=NULL;
@@ -88,28 +91,28 @@ void taudlts_split2normal
  ///// MPI_Barrier(t->comm);
 
  if ((size_to_w = (int*)calloc(nodes+1, sizeof(int)))==NULL)
-	Fatal(1,1,"out of mem in split2normal");
+	Fatal(1,error,"out of mem in split2normal");
  if ((size_from_w = (int*)calloc(nodes+1, sizeof(int)))==NULL)
-	Fatal(1,1,"out of mem in split2normal");
+	Fatal(1,error,"out of mem in split2normal");
  for(i=0;i<nodes;i++){
 	size_to_w[i]=begin_to_w[i+1]-begin_to_w[i];
 	size_from_w[i]=begin_from_w[i+1]-begin_from_w[i];
  }
  if ((t->o = (int*)calloc(t->M, sizeof(int)))==NULL)
-	Fatal(1,1,"out of mem in split2normal");
+	Fatal(1,error,"out of mem in split2normal");
  MPI_Alltoallv((*destin), size_from_w, begin_from_w, MPI_INT,
 							 t->o, size_to_w, begin_to_w, MPI_INT, t->comm);
  free(*destin);*destin = NULL;
  free(size_to_w); free(size_from_w);
 
  if ((t->w = (int*)calloc(t->M, sizeof(int)))==NULL)
-	Fatal(1,1,"out of mem in split2normal");
+	Fatal(1,error,"out of mem in split2normal");
  for(i = 0; i < nodes; i++)
 	for(j = begin_to_w[i]; j < begin_to_w[i+1]; j++)
 	 t->w[j]=i;
 
  if ((t->begin=(int*)calloc(t->N+1, sizeof(int)))==NULL)
-	Fatal(1,1,"out of mem in split2normal");
+	Fatal(1,error,"out of mem in split2normal");
 #ifdef DEBUG
  for(i=0;i<t->M;i++)
 	assert((*srcout)[i] < t->N);
@@ -147,27 +150,27 @@ void taudlts_paintfwd_all(taudlts_t t, int* color){
  ///// MPI_Barrier(t->comm);
 
  if ((begin_to_w = (int*)calloc(nodes+1, sizeof(int)))==NULL)
-	Fatal(1,1,"out of mem in paintfwd_all");
+	Fatal(1,error,"out of mem in paintfwd_all");
  if ((begin_from_w = (int*)calloc(nodes+1, sizeof(int)))==NULL)
-	Fatal(1,1,"out of mem in paintfwd_all");
+	Fatal(1,error,"out of mem in paintfwd_all");
  taudlts_normal2split(t, &srcout, begin_to_w, &destin, begin_from_w);
  // for(i=0;i<nodes;i++){
- //	Warning(1,"%3d: to %3d: %10d        from %3d: %10d\n",
+ //	Warning(info,"%3d: to %3d: %10d        from %3d: %10d\n",
  //					me,i,begin_to_w[i+1]-begin_to_w[i],
  //					i,begin_from_w[i+1]-begin_from_w[i]);
  // }
  max=0; for(i=0;i<nodes;i++) 
 	if (max<(begin_to_w[i+1]-begin_to_w[i]))
 	 max = begin_to_w[i+1]-begin_to_w[i];
- // Warning(1,"%3d: maxout=%d  ",me,max);
+ // Warning(info,"%3d: maxout=%d  ",me,max);
  if ((colorout=(int*)calloc(max, sizeof(int)))==NULL)
-	Fatal(1,1,"out of mem in paintfwd_all");
+	Fatal(1,error,"out of mem in paintfwd_all");
  max=0; for(i=0;i<nodes;i++) 
 	if (max<(begin_from_w[i+1]-begin_from_w[i]))
 	 max = begin_from_w[i+1]-begin_from_w[i];
- // Warning(1,"%3d: maxin=%d  ",me,max);
+ // Warning(info,"%3d: maxin=%d  ",me,max);
  if ((colorin=(int*)calloc(max, sizeof(int)))==NULL)
-	Fatal(1,1,"out of mem in paintfwd_all");
+	Fatal(1,error,"out of mem in paintfwd_all");
 
  Nchanged=1;itno=0;
  //// repeated part
@@ -177,7 +180,7 @@ void taudlts_paintfwd_all(taudlts_t t, int* color){
 #ifdef DEBUG
 	assert(begin_from_w[me+1]-begin_from_w[me] == begin_to_w[me+1]-begin_to_w[me]);
 #endif
-	//	Warning(1,"%3d: %d  own transitions beginto %d beginfrom %d \n",
+	//	Warning(info,"%3d: %d  own transitions beginto %d beginfrom %d \n",
 	//					me,begin_from_w[me+1]-begin_from_w[me],begin_to_w[me],begin_from_w[me]);
 	for(i=0; i < (begin_from_w[me+1]-begin_from_w[me]); i++){
 #ifdef DEBUG
@@ -199,7 +202,7 @@ void taudlts_paintfwd_all(taudlts_t t, int* color){
 		 x++;
 		}
 	}
-	//	Warning(1,"%3d: coloured own nodes. x=%d\n",me,x);
+	//	Warning(info,"%3d: coloured own nodes. x=%d\n",me,x);
 	// exchange two by two. send to me+diff, recv from me-diff
 	for (diff=1;diff<nodes;diff++){
 	 wto = (me+diff)%nodes;
@@ -225,11 +228,11 @@ void taudlts_paintfwd_all(taudlts_t t, int* color){
 	// decide whether to stop	
 	MPI_Allreduce(&x, &Nchanged, 1, MPI_INT, MPI_SUM, t->comm);
 #ifdef VERBOSE
-	if (me==0) Warning(1,"Nchanged=%10d",Nchanged);
+	if (me==0) Warning(info,"Nchanged=%10d",Nchanged);
 #endif
 	itno++;
  } // end color iteration
- if (me==0) Warning(1,"there were %10d iterations",itno);
+ if (me==0) Warning(info,"there were %10d iterations",itno);
  free(colorin);free(colorout);
  //// back to the original form
  taudlts_split2normal(t, &srcout, begin_to_w, &destin, begin_from_w);
@@ -277,7 +280,7 @@ void taudlts_paintfwd(taudlts_t t, int* color){
  ///// MPI_Barrier(t->comm);
  MPI_Comm_size(t->comm, &nodes);
  MPI_Comm_rank(t->comm, &me); 
- if (me==0) Warning(1,"\nPAINT  ALL");
+ if (me==0) Warning(info,"\nPAINT  ALL");
  ///// MPI_Barrier(t->comm);
 
  // how many negatives
@@ -291,35 +294,35 @@ void taudlts_paintfwd(taudlts_t t, int* color){
  i=c0;MPI_Reduce(&i, &c0, 1, MPI_INT, MPI_SUM, 0, t->comm);
  i=c1;MPI_Reduce(&i, &c1, 1, MPI_INT, MPI_SUM, 0, t->comm);
  if (me==0) 
-	Warning(1,"%10d not participating   %10d unpainted   %10d coloured", 
+	Warning(info,"%10d not participating   %10d unpainted   %10d coloured", 
 					c,c0,c1);
  c=0;c0=0;c1=0;
  // colorify
  taudlts_paintfwd_all(t, color);
 
  MPI_Barrier(t->comm);
- if (me==0) Warning(1,"\nPAINT  ALL done. Now compute weights (if VERBOSE)");
+ if (me==0) Warning(info,"\nPAINT  ALL done. Now compute weights (if VERBOSE)");
 
 #ifdef VERBOSE
  // count colour weights..
  if ((request_array = (MPI_Request*)calloc(2*nodes, sizeof(MPI_Request)))==NULL)
-	Fatal(1,1,"out of mem in paintfwd");
+	Fatal(1,error,"out of mem in paintfwd");
  if ((status_array = (MPI_Status*)calloc(2*nodes, sizeof(MPI_Status)))==NULL)
-	Fatal(1,1,"out of mem in paintfwd");
+	Fatal(1,error,"out of mem in paintfwd");
  if ((weight = (int*)calloc(t->N, sizeof(int)))==NULL)
-	Fatal(1,1,"out of mem in paintfwd");
+	Fatal(1,error,"out of mem in paintfwd");
  if ((begin = (int*)calloc(nodes+2, sizeof(int)))==NULL)
-	Fatal(1,1,"out of mem in paintfwd"); 
+	Fatal(1,error,"out of mem in paintfwd"); 
  if ((count_to_w = (int*)calloc(nodes+2, sizeof(int)))==NULL)
-	Fatal(1,1,"out of mem in paintfwd"); 
+	Fatal(1,error,"out of mem in paintfwd"); 
  if ((count_from_w = (int*)calloc(nodes+2, sizeof(int)))==NULL)
-	Fatal(1,1,"out of mem in paintfwd"); 
+	Fatal(1,error,"out of mem in paintfwd"); 
  if ((wcolor=(int*)calloc(t->N, sizeof(int)))==NULL)
-	Fatal(1,1,"out of mem in paintfwd"); 
+	Fatal(1,error,"out of mem in paintfwd"); 
  if ((ocolor=(int*)calloc(t->N, sizeof(int)))==NULL)
-	Fatal(1,1,"out of mem in paintfwd");
+	Fatal(1,error,"out of mem in paintfwd");
 
- Warning(1,"\n%d: allocated ",me);
+ Warning(info,"\n%d: allocated ",me);
  for(i=0;i<t->N;i++){
 	if (color[i]<0){
 	 wcolor[i]=nodes;
@@ -334,34 +337,34 @@ void taudlts_paintfwd(taudlts_t t, int* color){
 #endif
 	}
  }
- // Warning(1,"\n%d: wcolor, ocolor computed ",me);
+ // Warning(info,"\n%d: wcolor, ocolor computed ",me);
  ComputeCount(wcolor, t->N, begin);
- Warning(1,"\n%d: begin (count) computed: %d . ",me,begin[nodes]);
+ Warning(info,"\n%d: begin (count) computed: %d . ",me,begin[nodes]);
  MPI_Barrier(t->comm);
  i=begin[nodes];
  MPI_Reduce(&i, &c, 1, MPI_INT, MPI_SUM, 0, t->comm);
  if (me==0) 
-	Warning(1,"%10d not participating or left unpainted  nodes", c);
+	Warning(info,"%10d not participating or left unpainted  nodes", c);
  c=0;
  for(i=0;i<=nodes;i++) count_to_w[i]=begin[i];
  MPI_Barrier(t->comm);
- Warning(1,"\n%d: sss ",me);
+ Warning(info,"\n%d: sss ",me);
  Count2BeginIndex(begin, nodes+1);
 #ifdef DEBUG
  if (begin[nodes+1] != t->N)
-			 Warning(1,"%3d: begin[nodes+1]=%d, t->N=%d",me,begin[nodes+1],t->N);
+			 Warning(info,"%3d: begin[nodes+1]=%d, t->N=%d",me,begin[nodes+1],t->N);
  assert(begin[nodes+1]==t->N);
 #endif
  if ((ooo = (int*)calloc(t->N, sizeof(int)))==NULL)
-	Fatal(1,1,"out of mem in paintfwd");
+	Fatal(1,error,"out of mem in paintfwd");
  for(i=0;i<t->N;i++) ooo[i]=ocolor[i]; 
  SortArray(&ooo, t->N, wcolor, begin, nodes+1);	
  i=0;
  MPI_Allreduce(&(t->N), &i, 1, MPI_INT, MPI_MAX, t->comm);
  MPI_Alltoall(count_to_w,1,MPI_INT,count_from_w,1,MPI_INT,t->comm);
  if ((tmp = (int*)calloc(i, sizeof(int)))==NULL)
-	Fatal(1,1,"out of mem in paintfwd");
- Warning(1,"%d: ooo computed..  ",me);
+	Fatal(1,error,"out of mem in paintfwd");
+ Warning(info,"%d: ooo computed..  ",me);
  MPI_Barrier(t->comm);
  for(i=0;i<nodes;i++){
 	MPI_Isend(ooo + begin[i], count_to_w[i], MPI_INT, 
@@ -391,7 +394,7 @@ void taudlts_paintfwd(taudlts_t t, int* color){
 
  i=c;MPI_Reduce(&i, &c, 1, MPI_INT, MPI_SUM, 0, t->comm);
  j=c1;MPI_Reduce(&j, &c1, 1, MPI_INT, MPI_SUM, 0, t->comm);
- if (me==0) Warning(1,"%10d colours(roots) %10d one-node colours (hidden trivial)", 
+ if (me==0) Warning(info,"%10d colours(roots) %10d one-node colours (hidden trivial)", 
 										c, c1); 
  c=i; c1=j;
 
@@ -401,17 +404,17 @@ void taudlts_paintfwd(taudlts_t t, int* color){
 	 c0=0;
 	 for(j=0;j<t->N;j++)
 		if (ocolor[j] == -1) c0++;
-	 Warning(1,"%3d: %10d trivial %10d roots %10d hidden trivial",
+	 Warning(info,"%3d: %10d trivial %10d roots %10d hidden trivial",
 					 me,c0,c,c1);
 	 for(j=0;j<t->N;j++)
 		if (weight[j] >= MAX_MANAGER_GRAPH_SIZE)
-		 Warning(1,"      root %10d size %10d\n",j,weight[j]);
+		 Warning(info,"      root %10d size %10d\n",j,weight[j]);
 	}
 	///// MPI_Barrier(t->comm);
  }
  free(weight); free(wcolor); free(ocolor);
 #endif
-if (me==0) Warning(1,"\nPAINT  ALL FINISHED");
+if (me==0) Warning(info,"\nPAINT  ALL FINISHED");
 }
 
 void dlts_fwd2back(dlts_t lts){
@@ -436,22 +439,22 @@ void taudlts_elim_mixed_transitions(taudlts_t t, taudlts_t tv, int* color){
  ///// MPI_Barrier(t->comm);
  MPI_Comm_size(t->comm, &nodes);
  MPI_Comm_rank(t->comm, &me); 
- if (me==0) Warning(1,"\nELIM MIXED TRANSITIONS");
+ if (me==0) Warning(info,"\nELIM MIXED TRANSITIONS");
  ///// MPI_Barrier(t->comm);
 
  // transform t->begin to osrc and sort on t->w
  if ((osrc = (int*)calloc(t->M, sizeof(int))) == NULL)
-	Fatal(1,1,"out of memory in elim_mixed");
+	Fatal(1,error,"out of memory in elim_mixed");
  for(i = 0; i < t->N; i++)
 	for(j = t->begin[i];j < t->begin[i+1]; j++)
 	 osrc[j] = i;
  free(t->begin);t->begin = NULL;
  if ((size_to_w = (int*)calloc(nodes+1, sizeof(int)))==NULL)
-	Fatal(1,1,"out of memory in elim_mixed");
+	Fatal(1,error,"out of memory in elim_mixed");
  if ((begin_to_w = (int*)calloc(nodes+1, sizeof(int)))==NULL)
-		 Fatal(1,1,"out of memory in elim_mixed");
+		 Fatal(1,error,"out of memory in elim_mixed");
  if ((size_from_w = (int*)calloc(nodes+1, sizeof(int)))==NULL)
-	Fatal(1,1,"out of memory in elim_mixed");
+	Fatal(1,error,"out of memory in elim_mixed");
  ComputeCount(t->w, t->M, begin_to_w);
  for(i=0;i<nodes;i++) size_to_w[i] = begin_to_w[i];
  Count2BeginIndex(begin_to_w, nodes);
@@ -460,28 +463,28 @@ void taudlts_elim_mixed_transitions(taudlts_t t, taudlts_t tv, int* color){
  free(t->w);
  MPI_Alltoall(size_to_w,1,MPI_INT,size_from_w,1,MPI_INT,t->comm);
  ///// MPI_Barrier(t->comm);
- // if (me==0) Warning(1,"sorted");
+ // if (me==0) Warning(info,"sorted");
  // bufin, bufcolor
  max=0; for(i=0;i<nodes;i++) 
 	if (max<(begin_to_w[i+1]-begin_to_w[i]))
 	 max = begin_to_w[i+1]-begin_to_w[i];
  if ((bufcolor=(int*)calloc(max, sizeof(int)))==NULL)
-	Fatal(1,1,"out of memory in elim_mixed");
+	Fatal(1,error,"out of memory in elim_mixed");
  max=0; for(i=0;i<nodes;i++) 
 	if (max<(size_from_w[i]))
 	 max = size_from_w[i];
  if ((bufin = (int*)calloc(max, sizeof(int))) == NULL)
-	Fatal(1,1,"out of memory in elim_mixed");
+	Fatal(1,error,"out of memory in elim_mixed");
  Aout=0;
  ///// MPI_Barrier(t->comm);
- // if (me==0) Warning(1,"allocated bufs");
+ // if (me==0) Warning(info,"allocated bufs");
  // solve transitions to own nodes : not needed, solved below with diff=0
  
  // exchange two by two. send to me+diff, recv from me-diff
  for (diff=0;diff<nodes;diff++){
 	wto = (me+diff)%nodes;
 	wfrom=(me-diff+nodes)%nodes;
-	//	Warning(1,"%3d: diff=%d wto: %3d begin %d size %d, wfrom %3d size %d\n", 
+	//	Warning(info,"%3d: diff=%d wto: %3d begin %d size %d, wfrom %3d size %d\n", 
 	//			me, diff, wto, begin_to_w[wto], size_to_w[wto], 
 	//			wfrom, size_from_w[wfrom]);
 	MPI_Isend(t->o+begin_to_w[wto],
@@ -503,7 +506,7 @@ void taudlts_elim_mixed_transitions(taudlts_t t, taudlts_t tv, int* color){
 	MPI_Wait(&reqsend, &stsend);	 
 	MPI_Wait(&reqrecv, &strecv);  	
 	// count the new mixed transitions
-	//	Warning(1,"bla");
+	//	Warning(info,"bla");
 	max=0;
 	for(i = 0; i < size_to_w[wto]; i++)
 	 if (color[osrc[begin_to_w[wto]+i]] != bufcolor[i])
@@ -512,16 +515,16 @@ void taudlts_elim_mixed_transitions(taudlts_t t, taudlts_t tv, int* color){
 #ifdef VERBOSE
 	///// MPI_Barrier(t->comm);
 	MPI_Reduce(&max, &i, 1, MPI_INT, MPI_SUM, 0, t->comm);
-	if (me==0) Warning(1,"nog %d final (diff=%d)",i,diff);
+	if (me==0) Warning(info,"nog %d final (diff=%d)",i,diff);
 #endif
 
 	max += tv->M+1;
 	if ((tv->begin = (int*)realloc(tv->begin, sizeof(int) * max)) == NULL)
-	 Fatal(1,1,"out of memory in elim_mixed");
+	 Fatal(1,error,"out of memory in elim_mixed");
 	if ((tv->w = (int*)realloc(tv->w, sizeof(int) * max)) == NULL)
-	 Fatal(1,1,"out of memory in elim_mixed");
+	 Fatal(1,error,"out of memory in elim_mixed");
 	if ((tv->o = (int*)realloc(tv->o, sizeof(int) * max)) == NULL)
-	 Fatal(1,1,"out of memory in elim_mixed");
+	 Fatal(1,error,"out of memory in elim_mixed");
 
 	// then mark them
 	for(i = 0; i < size_to_w[wto]; i++)
@@ -536,15 +539,15 @@ void taudlts_elim_mixed_transitions(taudlts_t t, taudlts_t tv, int* color){
  ///// MPI_Barrier(t->comm);
  // re-build t
  free(size_to_w); free(bufin); free(bufcolor);free(size_from_w);
- // 	Warning(1,"%3d: rebuild", me);
+ // 	Warning(info,"%3d: rebuild", me);
  if ((t->w = (int*)calloc(t->M, sizeof(int))) == NULL)
-	 Fatal(1,1,"out of memory in elim_mixed");
+	 Fatal(1,error,"out of memory in elim_mixed");
  for(i = 0; i < nodes; i++) 
 	for (j = begin_to_w[i]; j < begin_to_w[i+1]; j++)
 	 t->w[j]=i;
  free(begin_to_w);
  if ((t->begin=(int*)calloc(t->N+1, sizeof(int))) == NULL)
-	 Fatal(1,1,"out of memory in elim_mixed");
+	 Fatal(1,error,"out of memory in elim_mixed");
  ComputeCount(osrc, t->M, t->begin);
  Count2BeginIndex(t->begin, t->N);
  tmp=t->w;SortArray(&tmp, t->M, osrc, t->begin, t->N);t->w=tmp;
@@ -559,7 +562,7 @@ void taudlts_elim_mixed_transitions(taudlts_t t, taudlts_t tv, int* color){
 
  // really delete
  if ((deleted = (char*)calloc(t->M, sizeof(char))) == NULL)
-	 Fatal(1,1,"out of memory in elim_mixed");
+	 Fatal(1,error,"out of memory in elim_mixed");
  for(i = 0; i < t->M; i++)
 	if (t->o[i] == -1) deleted[i] = 1;
  taudlts_delete_transitions(t, deleted);
@@ -573,7 +576,7 @@ void taudlts_elim_mixed_transitions(taudlts_t t, taudlts_t tv, int* color){
  // statistics
  MPI_Reduce(&Aout, &i, 1, MPI_INT, MPI_SUM, 0, t->comm);
  Mfinal += Aout; Mleft -= Aout;
- if (me==0) Warning(1,"%d new final arcs\nEND ELIM MIXED TRANSITIONS",i);
+ if (me==0) Warning(info,"%d new final arcs\nEND ELIM MIXED TRANSITIONS",i);
 }
 
 
@@ -591,13 +594,13 @@ void taudlts_decapitate(taudlts_t t, int* cf, int* wscc, int* oscc){
  MPI_Comm_size(t->comm, &nodes);
  MPI_Comm_rank(t->comm, &me);
 
- if (me==0) Warning(1,"\nHEADS OFF");
+ if (me==0) Warning(info,"\nHEADS OFF");
  if ((cb = (int*)calloc(t->N,sizeof(int)))==NULL)
-	Fatal(1,1,"out of memory in decapitate");
+	Fatal(1,error,"out of memory in decapitate");
 
  Vout=other=0;
  for(i = 0; i < t->N; i++) {
-	//	Warning(1,"%d.%d : owncolor is %d, cf is %d    ",
+	//	Warning(info,"%d.%d : owncolor is %d, cf is %d    ",
 	//					me,i,OWNCOLOR(me,i), cf[i]);
 	if (cf[i] == OWNCOLOR(me,i)) cb[i] = cf[i];
 	else cb[i] = -1;
@@ -626,7 +629,7 @@ void taudlts_decapitate(taudlts_t t, int* cf, int* wscc, int* oscc){
 #ifdef VERBOSE
  for (i=0;i<nodes;i++){
 	if (i==me){
-	 Warning(1,"%3d: %10d nodes in root SCCs  %10d painted back in a different colour",
+	 Warning(info,"%3d: %10d nodes in root SCCs  %10d painted back in a different colour",
 					 me, Vout, other);
 	}
 	///// MPI_Barrier(t->comm);
@@ -660,7 +663,7 @@ void extreme_colours(taudlts_t t, taudlts_t tviz, int* wscc, int* oscc){
  cno=0;
  while (m > 0){
 
-	if (me==0) Warning(1,"\n\n___________________________________________\ncolour round no. %10d\n____________",cno++);
+	if (me==0) Warning(info,"\n\n___________________________________________\ncolour round no. %10d\n____________",cno++);
 
 	taux->N = t->N;
 	taudlts_elim_trivial(t, taux, oscc); 
@@ -718,7 +721,7 @@ void dlts_elim_tauscc_colours(dlts_t lts){
  int* weight = NULL;
  mytimer_t bugtimer;
 
- bugtimer=createTimer();startTimer(bugtimer);
+ bugtimer=SCCcreateTimer();SCCstartTimer(bugtimer);
 
  t = taudlts_create(lts->comm);
  taudlts_extract_from_dlts(t, lts);
@@ -737,14 +740,14 @@ void dlts_elim_tauscc_colours(dlts_t lts){
 	wscc[i] = me;
  }
 #ifdef DEBUG
- reportTimer(bugtimer, "taugraph IN: ");
+ SCCreportTimer(bugtimer, "taugraph IN: ");
 #endif
  
  extreme_colours(t, tviz, wscc, oscc);
 
  
 #ifdef DEBUG
- Warning(1,"ec finished");
+ Warning(info,"ec finished");
 #endif
  taudlts_aux2normal(tviz);
  taudlts_cleanup(tviz, wscc, oscc);
@@ -752,20 +755,20 @@ void dlts_elim_tauscc_colours(dlts_t lts){
  print_status(t);
 
 #ifdef DEBUG
- reportTimer(bugtimer, "E2 finished: ");
+ SCCreportTimer(bugtimer, "E2 finished: ");
 #endif
  
  // insert t and tviz in taudlts (???? is inserting t needed ???) 
  taudlts_insert_to_dlts(t, lts); taudlts_free(t);
  taudlts_insert_to_dlts(tviz, lts); taudlts_free(tviz);
 #ifdef DEBUG
- Warning(1,"real taus inserted");
+ Warning(info,"real taus inserted");
 #endif
 
  dlts_shuffle(lts, wscc, oscc); 
 #ifdef DEBUG
- Warning(1,"shuffled");
- reportTimer(bugtimer, "shuffled: ");
+ Warning(info,"shuffled");
+ SCCreportTimer(bugtimer, "shuffled: ");
 #endif
 
 #ifdef VERBOSE
@@ -775,8 +778,8 @@ void dlts_elim_tauscc_colours(dlts_t lts){
 #endif
 
 #ifdef DEBUG
- Warning(1,"shrinked");
- reportTimer(bugtimer, "shrinked: ");
+ Warning(info,"shrinked");
+ SCCreportTimer(bugtimer, "shrinked: ");
 #endif
  if (weight!=NULL) {free(weight); weight=NULL;}
  if (wscc!=NULL) {free(wscc); wscc=NULL;}

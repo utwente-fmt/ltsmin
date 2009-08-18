@@ -1,10 +1,10 @@
 
-#include "seglts.h"
-#include "data_io.h"
-#include <malloc.h>
 #include <string.h>
 #include <errno.h>
+#include <stdlib.h>
 #include <stdio.h>
+#include "seglts.h"
+#include "data_io.h"
 
 static char errormessage[1024]="Programming error in seglts: success or forgot to write error message";
 

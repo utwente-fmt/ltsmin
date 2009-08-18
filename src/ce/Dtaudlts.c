@@ -1,13 +1,12 @@
 
 //#include "Ddlts.h"
-#include "Dtaudlts.h"
+#include <stdlib.h>
 #include <stdio.h>
-#include <malloc.h>
 #include <sys/types.h>
 #include <mpi.h>
-#include "config.h"
-#include "messages.h"
+#include <runtime.h>
 #include <assert.h>
+#include "Dtaudlts.h"
 #include "bufs.h"
 #include "sortcount.h"
 
@@ -18,6 +17,10 @@
 #define WEIGHT_TAG 40
 
 #define MAX_MANAGER_GRAPH_SIZE 100000
+
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+#pragma GCC diagnostic ignored "-Wunused-variable"
+#pragma GCC diagnostic ignored "-Wuninitialized"
 
 //#define DEBUG
 //#define VERBOSE
@@ -59,7 +62,7 @@ taudlts_t taudlts_create(MPI_Comm communicator)
 taudlts_t taudlts_create(MPI_Comm communicator){
 	taudlts_t t;
 	t=(taudlts_t)malloc(sizeof(struct taudlts));
-	if (!t) Fatal(1,1,"out of memory in taudlts_create");
+	if (!t) Fatal(1,error,"out of memory in taudlts_create");
   t->comm=communicator;
 	t->N = 0;
   t->M = 0;
@@ -115,19 +118,19 @@ void taudlts_simple_join(taudlts_t t1, taudlts_t t2){
 #endif
  newM = t1->M + t2->M + 1;
  
- // Warning(1,"%d a %d (%d+%d),%p,%p  a   ",
+ // Warning(info,"%d a %d (%d+%d),%p,%p  a   ",
  //				 me,newM, t1->M, t2->M, t1, t1->begin); 
  if ((t1->begin = (int*)realloc(t1->begin, newM*sizeof(int))) == NULL)
-	Fatal(1,1,"out of memory in simple_join1");
+	Fatal(1,error,"out of memory in simple_join1");
 
- // Warning(1,"%d b ",me); fflush(stdout);
+ // Warning(info,"%d b ",me); fflush(stdout);
  if ((t1->w = (int*)realloc(t1->w, sizeof(int)*newM)) == NULL)
-	Fatal(1,1,"out of memory in simple_join2"); 
- // Warning(1,"%d c ",me); 
+	Fatal(1,error,"out of memory in simple_join2"); 
+ // Warning(info,"%d c ",me); 
  if ((t1->o = (int*)realloc(t1->o, sizeof(int)*newM)) == NULL)
-	Fatal(1,1,"out of memory in simple_join3");
+	Fatal(1,error,"out of memory in simple_join3");
 
- //Warning(1,"\n\n%d:M1=%d, M2=%d, newM=%d  t1 %p t1->begin %p",me,
+ //Warning(info,"\n\n%d:M1=%d, M2=%d, newM=%d  t1 %p t1->begin %p",me,
  //	 t1->M, t2->M, newM, t1, t1->begin);
 
  for(i = 0; i < t2->M; i++){
@@ -152,11 +155,11 @@ void taudlts_aux2normal(taudlts_t t){
  MPI_Comm_rank(t->comm, &me);
  osrc = t->begin;
  if ((t->begin = (int*)calloc(t->N + 1, sizeof(int)))==NULL)
-	Fatal(1,1,"out of memory in aux2normal");
+	Fatal(1,error,"out of memory in aux2normal");
  if (t->M > 0){
 	/*	for(i=0;i<t->M;i++){
 	 if (osrc[i] >= t->N)
-		Warning(1,"%d: i=%d, osrc=%d, N=%d  ",me,i,osrc[i],t->N);
+		Warning(info,"%d: i=%d, osrc=%d, N=%d  ",me,i,osrc[i],t->N);
 	 assert(osrc[i] < t->N);
 	 }
 */
@@ -166,7 +169,7 @@ void taudlts_aux2normal(taudlts_t t){
 	tmp=t->o; SortArray(&tmp, t->M, osrc, t->begin, t->N); t->o=tmp;
 	free(osrc);
  }
- // Warning(1,"\n%d:aux2normal: w=%p, o=%p, begin=%p, N=%d, M=%d\n",
+ // Warning(info,"\n%d:aux2normal: w=%p, o=%p, begin=%p, N=%d, M=%d\n",
  //				 me,t->w, t->o, t->begin, t->N, t->M);
 }
 
@@ -176,7 +179,7 @@ void taudlts_normal2aux(taudlts_t t){
  int* b;
  b = t->begin;
  if ((t->begin = (int*)calloc(t->M + 1, sizeof(int)))==NULL)
-	Fatal(1,1,"out of memory in normal2aux");
+	Fatal(1,error,"out of memory in normal2aux");
  for(i = 0; i < t->N; i++)
 	for(j = b[i] ;j < b[i+1]; j++)
 	 t->begin[j] = i;
@@ -252,7 +255,7 @@ void taudlts_extract_from_dlts(taudlts_t t, dlts_t lts){
  t->N=lts->state_count[me]; 
  t->begin=(int*)calloc(t->N+1, sizeof(int));
  if (!(t->begin))
-	Fatal(1,1,"out of memory in extract_from_dlts"); 
+	Fatal(1,error,"out of memory in extract_from_dlts"); 
 
  Mtot=0;
  for(i=0;i<nodes;i++){
@@ -266,7 +269,7 @@ void taudlts_extract_from_dlts(taudlts_t t, dlts_t lts){
 #ifdef VERBOSE
  MPI_Allreduce(&(t->N), &Dtot, 1, MPI_INT, MPI_SUM, t->comm); 
  j=Mtot; Mtot=0; MPI_Allreduce(&j, &Mtot, 1, MPI_INT, MPI_SUM, t->comm); 
- if(me==0) Warning(1,"%12d     transitions and %12d states", Mtot, Dtot);
+ if(me==0) Warning(info,"%12d     transitions and %12d states", Mtot, Dtot);
 #endif
 
  t->M = t->begin[t->N];
@@ -274,7 +277,7 @@ void taudlts_extract_from_dlts(taudlts_t t, dlts_t lts){
  t->w=(int*)calloc(t->M, sizeof(int));
  t->o=(int*)calloc(t->M, sizeof(int));
  if ((!(t->w)) || (!(t->o)))
-	Fatal(1,1,"out of memory in extract_from_dlts");
+	Fatal(1,error,"out of memory in extract_from_dlts");
 
  for(i = nodes-1; i >= 0; i--){
 	index = 0;
@@ -290,7 +293,7 @@ void taudlts_extract_from_dlts(taudlts_t t, dlts_t lts){
 		lts->dest[me][i][index] = lts->dest[me][i][j];
 		index++;
 	 }
-	//	Warning(1,"%3d: %12d non-tau transitions to %3d .. %12d taus OUT (%12d)", 
+	//	Warning(info,"%3d: %12d non-tau transitions to %3d .. %12d taus OUT (%12d)", 
 	//					me, index, i, lts->transition_count[me][i] - index,t->M);
 	lts->transition_count[me][i] = index;
 	lts->src[me][i] = realloc(lts->src[me][i], index*sizeof(int));
@@ -305,13 +308,13 @@ void taudlts_extract_from_dlts(taudlts_t t, dlts_t lts){
 	else for(k = t->begin[i]; k < t->begin[i+1]; k++)
 	 if ((t->w[k]==me)&&(t->o[k]==i))
 		l++;
- // Warning(1,"%3d has %12d tau transitions and %12d deadlocks",me, t->M, j);
+ // Warning(info,"%3d has %12d tau transitions and %12d deadlocks",me, t->M, j);
 #ifdef VERBOSE
  i=Mtot;
  MPI_Allreduce(&j, &Dtot, 1, MPI_INT, MPI_SUM, t->comm); 
  MPI_Allreduce(&(t->M), &Mtot, 1, MPI_INT, MPI_SUM, t->comm); 
  MPI_Allreduce(&l, &Stot, 1, MPI_INT, MPI_SUM, t->comm); 
- if(me==0) Warning(1,"%12d tau transitions (%3.3f pct.)\nand %12d deadlocks and %12d self-cycles", Mtot, ((float)Mtot/(float)i) * 100, Dtot, Stot);
+ if(me==0) Warning(info,"%12d tau transitions (%3.3f pct.)\nand %12d deadlocks and %12d self-cycles", Mtot, ((float)Mtot/(float)i) * 100, Dtot, Stot);
 #endif
 }
 
@@ -346,30 +349,30 @@ void taudlts_insert_to_dlts(taudlts_t t, dlts_t lts){
  MPI_Barrier(lts->comm);
  MPI_Comm_size(lts->comm, &nodes);
  MPI_Comm_rank(lts->comm, &me);
- if (me==0) Warning(1,"INSERT TAU TRANSITIONS");
+ if (me==0) Warning(info,"INSERT TAU TRANSITIONS");
 #ifdef VERBOSE
- Warning(1,"%d: %12d taus  ",me,t->M);
+ Warning(info,"%d: %12d taus  ",me,t->M);
 #endif
  if ((count_to_w = (int*)calloc(nodes, sizeof(int)))==NULL)
-	Fatal(1,1,"out of memory in insert_to_dlts");
+	Fatal(1,error,"out of memory in insert_to_dlts");
  for(i=0; i<t->M; i++){
 	//	assert(t->w[i]<nodes);
 	count_to_w[t->w[i]]++;
  }
  for(i = 0; i < nodes; i++){
 	index = lts->transition_count[me][i] + count_to_w[i]+1;
-	//	Warning(1,"%3d: %12d non-tau transitions to %3d .. %d new taus (%d) index=%d ", 
+	//	Warning(info,"%3d: %12d non-tau transitions to %3d .. %d new taus (%d) index=%d ", 
 	//					me, lts->transition_count[me][i], i, count_to_w[i], t->M, index);
 	lts->src[me][i] = realloc(lts->src[me][i], index*sizeof(int));
-	//	Warning(1,"%d i=%d  ",me,i);
+	//	Warning(info,"%d i=%d  ",me,i);
 	lts->label[me][i] = realloc(lts->label[me][i], index*sizeof(int));
 	lts->dest[me][i] = realloc(lts->dest[me][i], index*sizeof(int));
 	if ((!lts->src[me][i])||(!lts->label[me][i])||(!lts->dest[me][i]))
-	 Fatal(1,1,"out of memory in insert_to_dlts");
-	//Warning(1,"%d oooo ",me);
+	 Fatal(1,error,"out of memory in insert_to_dlts");
+	//Warning(info,"%d oooo ",me);
  }
 #ifdef DEBUG
- Warning(1,"%3d: lts reallocated  %d = %d",me, t->begin[t->N], t->M);
+ Warning(info,"%3d: lts reallocated  %d = %d",me, t->begin[t->N], t->M);
 #endif
  for(i = 0; i < t->N; i++){
 	//assert(t->begin[i]<=t->begin[i+1]);
@@ -384,7 +387,7 @@ void taudlts_insert_to_dlts(taudlts_t t, dlts_t lts){
  }
  free(count_to_w); 
  MPI_Barrier(lts->comm);
- if (me==0) Warning(1,"END INSERT TAU TRANSITIONS");
+ if (me==0) Warning(info,"END INSERT TAU TRANSITIONS");
 }
 
 
@@ -468,16 +471,16 @@ void taudlts_write(taudlts_t t, char* filename){
 		 transitions+=auxdata[2*k+1];
 		}
 		root=0;
-		Warning(1,"Root: %d  States: %d  Transitions: %d", root, states, transitions); fflush(stdout);	
+		Warning(info,"Root: %d  States: %d  Transitions: %d", root, states, transitions); fflush(stdout);	
 		fprintf(output,"des(%d,%d,%d)\n", root, transitions,states);
 	 } 
 	 else
 		output=fopen(filename,"a");
-	 Warning(1,"%d starts writing %d-%d",me,t->N,t->M); 
+	 Warning(info,"%d starts writing %d-%d",me,t->N,t->M); 
 	 fflush(stdout);
 	 // all: dump outgoing transitions
 	 if (t->M > 0){
-		Warning(1,"%d: actual M is %d (%d .. )",
+		Warning(info,"%d: actual M is %d (%d .. )",
 						me,t->begin[t->N], t->begin[t->N-1]);
 		for(k = 0; k < t->N; k++)
 		 for(j = t->begin[k]; j < t->begin[k+1]; j++){
@@ -488,11 +491,11 @@ void taudlts_write(taudlts_t t, char* filename){
 	 }
 	 fclose(output);
 	} // end if me==i	
-	//	Warning(1,"%d %d happy",me,i);
+	//	Warning(info,"%d %d happy",me,i);
 	///// MPI_Barrier(t->comm);
  }
  free(auxdata);free(first);free(datapair);
- // Warning(1,"\n>>>>>> %d finished!   N %d  M %d <<<<<<<",
+ // Warning(info,"\n>>>>>> %d finished!   N %d  M %d <<<<<<<",
  //		 me, t->N, t->M);
 }
 
@@ -544,23 +547,23 @@ void taudlts_fwd2back(taudlts_t t){
 		aux++;
 		if (t->o[j]==i) x++;
 	 }
- Warning(1,"%d BEFORE ...... %d self transitions, %d self loops",me, aux, x);
+ Warning(info,"%d BEFORE ...... %d self transitions, %d self loops",me, aux, x);
  */
  // alloc..
  if ((begin_to_w = (int*)calloc(nodes+1, sizeof(int)))==NULL)
-	Fatal(1,1,"out of memory in fwd2back");
+	Fatal(1,error,"out of memory in fwd2back");
  if ((count_to_w = (int*)calloc(nodes+1, sizeof(int)))==NULL)
-	Fatal(1,1,"out of memory in fwd2back");
+	Fatal(1,error,"out of memory in fwd2back");
  if ((begin_from_w = (int*)calloc(nodes+1, sizeof(int)))==NULL)
-	Fatal(1,1,"out of memory in fwd2back"); 
+	Fatal(1,error,"out of memory in fwd2back"); 
  if ((count_from_w = (int*)calloc(nodes+1, sizeof(int)))==NULL)
-	Fatal(1,1,"out of memory in fwd2back");
+	Fatal(1,error,"out of memory in fwd2back");
  if ((request_array = (MPI_Request*)calloc(2*nodes, sizeof(MPI_Request)))==NULL)
-	Fatal(1,1,"out of memory in fwd2back");
+	Fatal(1,error,"out of memory in fwd2back");
  if ((status_array = (MPI_Status*)calloc(2*nodes, sizeof(MPI_Status)))==NULL)
-	Fatal(1,1,"out of memory in fwd2back");
+	Fatal(1,error,"out of memory in fwd2back");
  // if ((!begin_to_w) || (!begin_from_w) || (!count_to_w) || (!count_from_w) || (!request_array) || (!status_array))
- //	Fatal(1,1,"out of memory in fwd2back"); 
+ //	Fatal(1,error,"out of memory in fwd2back"); 
 
  // count outgoing transitions
  for(i=0;i<t->M;i++)
@@ -571,7 +574,7 @@ void taudlts_fwd2back(taudlts_t t){
 	
  // exchange number of outgoing transitions
  MPI_Alltoall(count_to_w,1,MPI_INT,count_from_w,1,MPI_INT,t->comm);
- // if (me==0) Warning(1,"EXCHANGED count_from_w");
+ // if (me==0) Warning(info,"EXCHANGED count_from_w");
 
  // prepare receive buffers 
  begin_from_w[0]=0;
@@ -579,20 +582,20 @@ void taudlts_fwd2back(taudlts_t t){
   begin_from_w[i]=begin_from_w[i-1]+count_from_w[i-1];
  from_w=(int*)calloc(2*begin_from_w[nodes], sizeof(int));
  if (!(from_w))
-	Fatal(1,1,"out of memory in fwd2back");
+	Fatal(1,error,"out of memory in fwd2back");
 
  // prepare send buffers
  aux=count_to_w[me];
  to_w = (int*)calloc(2*(begin_to_w[nodes]-aux), sizeof(int));
  if (!(to_w))
-	Fatal(1,1,"out of memory in fwd2back");
+	Fatal(1,error,"out of memory in fwd2back");
  for(i=me+1;i<=nodes;i++)
 	begin_to_w[i]-=aux;
 
  /*
-Warning(1,"%d: %d local transitions, %d expected and %d to be sent",
+Warning(info,"%d: %d local transitions, %d expected and %d to be sent",
  				 me, aux, begin_from_w[nodes]-aux, begin_to_w[nodes]); 
-Warning(1,"%d,before: local trans begin from %d and end in %d",
+Warning(info,"%d,before: local trans begin from %d and end in %d",
 				me,begin_from_w[me], begin_from_w[me+1]);
  */
 
@@ -610,7 +613,7 @@ Warning(1,"%d,before: local trans begin from %d and end in %d",
 	 }
  begin_from_w[me]-=count_from_w[me];
 
- // Warning(1,"%d,after: local trans begin from %d and end in %d begin: %p  ",
+ // Warning(info,"%d,after: local trans begin from %d and end in %d begin: %p  ",
  // 		me,begin_from_w[me], begin_from_w[me+1],t->begin);
 
  for(i=nodes;i>0;i--)
@@ -618,16 +621,16 @@ Warning(1,"%d,before: local trans begin from %d and end in %d",
  begin_to_w[0]=0;
  free(t->w); t->w=NULL;
  free(t->o); t->o = NULL;
- // if (me==0) Warning(1,"BEEN HERE3!");
+ // if (me==0) Warning(info,"BEEN HERE3!");
  free(t->begin); t->begin = NULL;
 
  // send and receive
  ///// MPI_Barrier(t->comm);
- // if (me==0) Warning(1,"EXCHANGING TRANSITIONS");
+ // if (me==0) Warning(info,"EXCHANGING TRANSITIONS");
  aux=0;
  for(i=0;i<nodes;i++)
 	if (i!=me){
-	 //	 Warning(1,"%d->%d: %d   ",me,i,2 * count_to_w[i]);
+	 //	 Warning(info,"%d->%d: %d   ",me,i,2 * count_to_w[i]);
 	 MPI_Isend(to_w + 2 * begin_to_w[i],
 						 2 * count_to_w[i], MPI_INT, 
 						 i, 
@@ -645,7 +648,7 @@ Warning(1,"%d,before: local trans begin from %d and end in %d",
 	}
  MPI_Waitall(aux, request_array, status_array);
  ///// MPI_Barrier(t->comm);
- // if (me==0) Warning(1,"EXCHANGED new transitions");
+ // if (me==0) Warning(info,"EXCHANGED new transitions");
 
  // reorganize  t
  free(to_w);
@@ -654,7 +657,7 @@ Warning(1,"%d,before: local trans begin from %d and end in %d",
  t->o=(int*)calloc(t->M, sizeof(int));
  t->begin=(int*)calloc(t->N+1, sizeof(int));
  if ((!(t->w)) || (!(t->o)) || (!(t->begin)))
-	Fatal(1,1,"out of memory in fwd2back");
+	Fatal(1,error,"out of memory in fwd2back");
  
  for(i=0;i<t->M;i++)
 	t->begin[from_w[2*i+1]]++;
@@ -676,7 +679,7 @@ Warning(1,"%d,before: local trans begin from %d and end in %d",
 		if (t->o[j]==i) x++;
 	 }
  }
- Warning(1,"%d AFTER ...... %d self transitions, %d self loops",me, aux, x);
+ Warning(info,"%d AFTER ...... %d self transitions, %d self loops",me, aux, x);
  */
  
  free(from_w);
@@ -726,7 +729,7 @@ void taudlts_elim_trivial(taudlts_t t,  taudlts_t ta, int* oscc){
  MPI_Comm_size(t->comm, &nodes);
  MPI_Comm_rank(t->comm, &me); 
  
- if (me==0) Warning(1,"\nELIM TRIVIAL");
+ if (me==0) Warning(info,"\nELIM TRIVIAL");
 
 #ifdef DEBUG
 	for(i=0; i<t->N; i++)
@@ -744,7 +747,7 @@ void taudlts_elim_trivial(taudlts_t t,  taudlts_t ta, int* oscc){
  degree=(int*)calloc(t->N, sizeof(int));
  if ((!begin_to_w) || (!begin_from_w) || (!count_to_w) || (!count_from_w) 
 		 || (!request_array) || (!status_array) || (!degree))
-	Fatal(1,1,"out of memory in elim_trivial"); 
+	Fatal(1,error,"out of memory in elim_trivial"); 
  buflocal=newBuffer(0); 
 
  // compute degree of all states
@@ -772,11 +775,11 @@ void taudlts_elim_trivial(taudlts_t t,  taudlts_t ta, int* oscc){
 	begin_from_w[i]=begin_from_w[i-1]+count_from_w[i-1];
  from_w=(int*)calloc(begin_from_w[nodes], sizeof(int));
  if (!(from_w))
-	Fatal(1,1,"out of memory in elim_trivial");
+	Fatal(1,error,"out of memory in elim_trivial");
  //                  prepare send buffers
  to_w = (int*)calloc(begin_to_w[nodes], sizeof(int));
  if (!(to_w))
-	Fatal(1,1,"out of memory in elim_trivial");
+	Fatal(1,error,"out of memory in elim_trivial");
  for(src=0;src<t->N;src++)	
 	for(i=t->begin[src];i<t->begin[src+1];i++)
 	 if (t->w[i]==me)
@@ -818,7 +821,7 @@ void taudlts_elim_trivial(taudlts_t t,  taudlts_t ta, int* oscc){
 	for(j=begin_from_w[i+1]-1;j>=begin_from_w[i];j--)
 	 degree[from_w[j]]++;
  free(from_w);
- // Warning(1,">>>>>>>>>>>>>>>%d: computed the degrees",me); 
+ // Warning(info,">>>>>>>>>>>>>>>%d: computed the degrees",me); 
  //// ///// MPI_Barrier(t->comm);
 
  // iterations
@@ -845,14 +848,14 @@ void taudlts_elim_trivial(taudlts_t t,  taudlts_t ta, int* oscc){
 		}
 	 };	 
 	//        test termination
-		 //	Warning(1,">>>>>>>>>>>>>>>%d: %d zeros %d all %d eliminated transitions (%d total, %d local)",
+		 //	Warning(info,">>>>>>>>>>>>>>>%d: %d zeros %d all %d eliminated transitions (%d total, %d local)",
 		 //	me,Nzeros,Nzeros_all, aux,t->begin[t->N],count_to_w[me]); 
 		 //  for(aux=0;aux<nodes;aux++) printf("COUNT%d-%d-%d\n",me,aux,count_to_w[aux]);	
 
 	////	///// MPI_Barrier(t->comm);
 
 	MPI_Allreduce(&Nzeros, &Nzeros_all, 1, MPI_INT, MPI_SUM, t->comm );
-	//	if (me==0) Warning(1,"\n**************************\n%d total zeros",Nzeros_all);
+	//	if (me==0) Warning(info,"\n**************************\n%d total zeros",Nzeros_all);
 	if (Nzeros_all==0) break;
 	count_to_w[me]=0; begin_to_w[0]=0;
 	for(i=1;i<=nodes;i++)
@@ -863,27 +866,27 @@ void taudlts_elim_trivial(taudlts_t t,  taudlts_t ta, int* oscc){
 	 begin_from_w[i]=begin_from_w[i-1]+count_from_w[i-1];
 	from_w=(int*)calloc(begin_from_w[nodes], sizeof(int));
 	if (!(from_w))
-	 Fatal(1,1,"out of memory in elim_trivial");
-	//	 	Warning(1,">>>>>>>>>>>>>>>%d: before marking...",me); 
+	 Fatal(1,error,"out of memory in elim_trivial");
+	//	 	Warning(info,">>>>>>>>>>>>>>>%d: before marking...",me); 
 	//        mark transitions and prepare send buffers
 	to_w = (int*)calloc(begin_to_w[nodes], sizeof(int));
 	if (!(to_w))
-	 Fatal(1,1,"out of memory in elim_trivial");
+	 Fatal(1,error,"out of memory in elim_trivial");
 	//	for(aux=0;aux<nodes;aux++) printf("B%d-%d-%d\n",me,aux,begin_to_w[aux]);
 	for(i=0;i<t->N;i++)
 	 if (degree[i] == 0) {
 		for(j = t->begin[i]; j < t->begin[i+1]; j++){
-		 //		 Warning(1,"%d: i=%d, j=%d",me,i,j);
+		 //		 Warning(info,"%d: i=%d, j=%d",me,i,j);
 		 if (t->w[j]==me) 
 			add1(buflocal,t->o[j]);
 		 else{		
 			//			if ((t->w[j] < 0)||(t->w[j] >= nodes))
-			//			 Fatal(1,1,"%d: i=%d, wdest=%d outdegree=%d",me,i,t->w[j], t->begin[i+1]-t->begin[i]);
+			//			 Fatal(1,error,"%d: i=%d, wdest=%d outdegree=%d",me,i,t->w[j], t->begin[i+1]-t->begin[i]);
 			to_w[begin_to_w[t->w[j]]]=t->o[j];
 			begin_to_w[t->w[j]]++;
 			 // if (begin_to_w[t->w[j]]>begin_to_w[nodes]){
 			 //			 for(aux=0;aux<nodes;aux++) printf("B%d-%d-%d\n",me,aux,begin_to_w[aux]);
-			 // Fatal(1,1,"%d: i=%d, j=%d, t->w[j]=%d, count=%d, index=%d, totalM=%d",
+			 // Fatal(1,error,"%d: i=%d, j=%d, t->w[j]=%d, count=%d, index=%d, totalM=%d",
 			 //			 me,i,j,t->w[j], count_to_w[t->w[j]],begin_to_w[t->w[j]],begin_to_w[nodes]);
 			 //}
 		 }
@@ -894,7 +897,7 @@ void taudlts_elim_trivial(taudlts_t t,  taudlts_t ta, int* oscc){
 		};
 		degree[i]=-1;
 	 }; // end if degree==0		
-	//Warning(1,">>>>>>>>>>>>>>>%d: before exchange...",me); 
+	//Warning(info,">>>>>>>>>>>>>>>%d: before exchange...",me); 
 	//        exchange
 	for(i=nodes;i>0;i--)
 	 begin_to_w[i]=begin_to_w[i-1];
@@ -925,7 +928,7 @@ void taudlts_elim_trivial(taudlts_t t,  taudlts_t ta, int* oscc){
 	////	///// MPI_Barrier(t->comm);	
 
 	//        end exchange
-	//Warning(1,">>>>>>>>>>>>>>>%d: before decrease...",me); 
+	//Warning(info,">>>>>>>>>>>>>>>%d: before decrease...",me); 
 	//        decrease the degrees
 	free(to_w);
 	for(i=0;i<buflocal->index;i++)
@@ -948,13 +951,13 @@ void taudlts_elim_trivial(taudlts_t t,  taudlts_t ta, int* oscc){
 
  // really eliminate the "negative"(i.e. vizible) transitions
 #ifdef VERBOSE
- Warning(1,"%3d: %12d vizible transitions",me, Mviz);
+ Warning(info,"%3d: %12d vizible transitions",me, Mviz);
 #endif
  ta->begin = (int*)calloc(Mviz, sizeof(int));
  ta->w = (int*)calloc(Mviz, sizeof(int));
  ta->o = (int*)calloc(Mviz, sizeof(int));
  if ((!(ta->begin)) || (!(ta->w)) || (!(ta->o)))
-	Fatal(1,1,"out of memory in elim_trivial");
+	Fatal(1,error,"out of memory in elim_trivial");
  ta->N = t->N;
  ta->M = Mviz;
  Mviz=0;
@@ -978,7 +981,7 @@ void taudlts_elim_trivial(taudlts_t t,  taudlts_t ta, int* oscc){
  j=aux=0;
  MPI_Reduce(&i, &aux, 1, MPI_INT, MPI_SUM, 0, t->comm);
  MPI_Reduce(&(t->M), &j, 1, MPI_INT, MPI_SUM, 0, t->comm);
- if (me==0) Warning(1,"old M: %12d     new M: %12d",j,aux);
+ if (me==0) Warning(info,"old M: %12d     new M: %12d",j,aux);
  t->begin[t->N] = t->M = i;
  t->w=(int*)realloc(t->w, (t->M) * sizeof(int));
  t->o=(int*)realloc(t->o, (t->M) * sizeof(int));
@@ -1011,7 +1014,7 @@ void taudlts_printinfo(taudlts_t t, int* oscc){
  ///// MPI_Barrier(t->comm);
  MPI_Comm_size(t->comm, &nodes);
  MPI_Comm_rank(t->comm, &me); 
- if (me==0) Warning(1,"\nSTATISTICS");
+ if (me==0) Warning(info,"\nSTATISTICS");
 
  ta=taudlts_create(t->comm);
  taudlts_elim_trivial(t, ta, oscc);
@@ -1031,7 +1034,7 @@ void taudlts_printinfo(taudlts_t t, int* oscc){
 	 }
  } 
  MPI_Reduce(&cross, &i, 1, MPI_INT, MPI_SUM, 0, t->comm);
- if(me==0) Warning(1,"cross transitions: %12d",i);
+ if(me==0) Warning(info,"cross transitions: %12d",i);
 
  taudlts_fwd2back(t);
  
@@ -1058,27 +1061,27 @@ void taudlts_printinfo(taudlts_t t, int* oscc){
  }
 
  MPI_Reduce(&Nentry, &i, 1, MPI_INT, MPI_SUM, 0, t->comm);
- if(me==0) Warning(1,"entries       : %12d",i); 
+ if(me==0) Warning(info,"entries       : %12d",i); 
  MPI_Reduce(&Nexit, &i, 1, MPI_INT, MPI_SUM, 0, t->comm);
- if(me==0) Warning(1,"exits         : %12d",i); 
+ if(me==0) Warning(info,"exits         : %12d",i); 
  MPI_Reduce(&Nee, &i, 1, MPI_INT, MPI_SUM, 0, t->comm);
- if(me==0) Warning(1,"both          : %12d",i); 
+ if(me==0) Warning(info,"both          : %12d",i); 
  MPI_Reduce(&Nin0, &i, 1, MPI_INT, MPI_SUM, 0, t->comm);
- if(me==0) Warning(1,"in-degree 0   : %12d",i); 
+ if(me==0) Warning(info,"in-degree 0   : %12d",i); 
  MPI_Reduce(&Nout0, &i, 1, MPI_INT, MPI_SUM, 0, t->comm);
- if(me==0) Warning(1,"out-degree 0  : %12d",i); 
+ if(me==0) Warning(info,"out-degree 0  : %12d",i); 
  MPI_Reduce(&Nin1, &i, 1, MPI_INT, MPI_SUM, 0, t->comm);
- if(me==0) Warning(1,"in-degree 1   : %12d",i); 
+ if(me==0) Warning(info,"in-degree 1   : %12d",i); 
  MPI_Reduce(&Nout1, &i, 1, MPI_INT, MPI_SUM, 0, t->comm);
- if(me==0) Warning(1,"out-degree 1  : %12d",i); 
+ if(me==0) Warning(info,"out-degree 1  : %12d",i); 
  MPI_Reduce(&Nio, &i, 1, MPI_INT, MPI_SUM, 0, t->comm);
- if(me==0) Warning(1,"both degrees 1: %12d",i);
+ if(me==0) Warning(info,"both degrees 1: %12d",i);
  max=0;for(i=0;i<t->N;i++) if (out[i]>max) max = out[i];
  for(j=2;j<max;j++){
 	Nio=0; for(i=0;i<t->N;i++)
 	 if (out[i]==j) Nio++;
 	MPI_Reduce(&Nio, &i, 1, MPI_INT, MPI_SUM, 0, t->comm);
-	if(me==0) Warning(1,"out degree %3d: %12d",j,i);
+	if(me==0) Warning(info,"out degree %3d: %12d",j,i);
  }
 
  free(in);free(out);free(entry);free(exit);
@@ -1116,7 +1119,7 @@ void taudlts_elim_trivial_A_BIT_OLDER(taudlts_t t, int* oscc){
  MPI_Comm_size(t->comm, &nodes);
  MPI_Comm_rank(t->comm, &me); 
  
- if (me==0) Warning(1,"\nELIM TRIVIAL");
+ if (me==0) Warning(info,"\nELIM TRIVIAL");
  // alloc..
  begin_to_w = (int*)calloc(nodes+1, sizeof(int));
  count_to_w = (int*)calloc(nodes+1, sizeof(int));
@@ -1127,7 +1130,7 @@ void taudlts_elim_trivial_A_BIT_OLDER(taudlts_t t, int* oscc){
  degree=(int*)calloc(t->N, sizeof(int));
  if ((!begin_to_w) || (!begin_from_w) || (!count_to_w) || (!count_from_w) 
 		 || (!request_array) || (!status_array) || (!degree))
-	Fatal(1,1,"out of memory in elim_trivial"); 
+	Fatal(1,error,"out of memory in elim_trivial"); 
  buflocal=newBuffer(0); 
 
  // compute degree of all states
@@ -1146,11 +1149,11 @@ void taudlts_elim_trivial_A_BIT_OLDER(taudlts_t t, int* oscc){
 	begin_from_w[i]=begin_from_w[i-1]+count_from_w[i-1];
  from_w=(int*)calloc(begin_from_w[nodes], sizeof(int));
  if (!(from_w))
-	Fatal(1,1,"out of memory in elim_trivial");
+	Fatal(1,error,"out of memory in elim_trivial");
  //                  prepare send buffers
  to_w = (int*)calloc(begin_to_w[nodes], sizeof(int));
  if (!(to_w))
-	Fatal(1,1,"out of memory in elim_trivial");
+	Fatal(1,error,"out of memory in elim_trivial");
  for(src=0;src<t->N;src++)	
 	for(i=t->begin[src];i<t->begin[src+1];i++)
 	 if (t->w[i]==me)
@@ -1190,7 +1193,7 @@ void taudlts_elim_trivial_A_BIT_OLDER(taudlts_t t, int* oscc){
 	for(j=begin_from_w[i+1]-1;j>=begin_from_w[i];j--)
 	 degree[from_w[j]]++;
  free(from_w);
- //	 Warning(1,">>>>>>>>>>>>>>>%d: computed the degrees",me); 
+ //	 Warning(info,">>>>>>>>>>>>>>>%d: computed the degrees",me); 
  ///// MPI_Barrier(t->comm);
 
  // iterations
@@ -1211,12 +1214,12 @@ void taudlts_elim_trivial_A_BIT_OLDER(taudlts_t t, int* oscc){
 		 count_to_w[t->w[j]]++;
 	 };	 
 	//        test termination
-		 //	Warning(1,">>>>>>>>>>>>>>>%d: %d zeros %d all %d eliminated transitions (%d total, %d local)",
+		 //	Warning(info,">>>>>>>>>>>>>>>%d: %d zeros %d all %d eliminated transitions (%d total, %d local)",
 		 //	me,Nzeros,Nzeros_all, aux,t->begin[t->N],count_to_w[me]); 
 		 //  for(aux=0;aux<nodes;aux++) printf("COUNT%d-%d-%d\n",me,aux,count_to_w[aux]);	
 	///// MPI_Barrier(t->comm);
 	MPI_Allreduce(&Nzeros, &Nzeros_all, 1, MPI_INT, MPI_SUM, t->comm );
-	//	if (me==0) Warning(1,"\n**************************\n%d total zeros",Nzeros_all);
+	//	if (me==0) Warning(info,"\n**************************\n%d total zeros",Nzeros_all);
 	if (Nzeros_all==0) break;
 	count_to_w[me]=0; begin_to_w[0]=0;
 	for(i=1;i<=nodes;i++)
@@ -1227,27 +1230,27 @@ void taudlts_elim_trivial_A_BIT_OLDER(taudlts_t t, int* oscc){
 	 begin_from_w[i]=begin_from_w[i-1]+count_from_w[i-1];
 	from_w=(int*)calloc(begin_from_w[nodes], sizeof(int));
 	if (!(from_w))
-	 Fatal(1,1,"out of memory in elim_trivial");
-	 //	Warning(1,">>>>>>>>>>>>>>>%d: before marking...",me); 
+	 Fatal(1,error,"out of memory in elim_trivial");
+	 //	Warning(info,">>>>>>>>>>>>>>>%d: before marking...",me); 
 	//        mark transitions and prepare send buffers
 	to_w = (int*)calloc(begin_to_w[nodes], sizeof(int));
 	if (!(to_w))
-	 Fatal(1,1,"out of memory in elim_trivial");
+	 Fatal(1,error,"out of memory in elim_trivial");
 	//	for(aux=0;aux<nodes;aux++) printf("B%d-%d-%d\n",me,aux,begin_to_w[aux]);
 	for(i=0;i<t->N;i++)
 	 if (degree[i] == 0) {
 		for(j = t->begin[i]; j < t->begin[i+1]; j++){
-		 //		 Warning(1,"%d: i=%d, j=%d",me,i,j);
+		 //		 Warning(info,"%d: i=%d, j=%d",me,i,j);
 		 if (t->w[j]==me) 
 			add1(buflocal,t->o[j]);
 		 else{		
 			//			if ((t->w[j] < 0)||(t->w[j] >= nodes))
-			//			 Fatal(1,1,"%d: i=%d, wdest=%d outdegree=%d",me,i,t->w[j], t->begin[i+1]-t->begin[i]);
+			//			 Fatal(1,error,"%d: i=%d, wdest=%d outdegree=%d",me,i,t->w[j], t->begin[i+1]-t->begin[i]);
 			to_w[begin_to_w[t->w[j]]]=t->o[j];
 			begin_to_w[t->w[j]]++;
 			 // if (begin_to_w[t->w[j]]>begin_to_w[nodes]){
 			 //			 for(aux=0;aux<nodes;aux++) printf("B%d-%d-%d\n",me,aux,begin_to_w[aux]);
-			 // Fatal(1,1,"%d: i=%d, j=%d, t->w[j]=%d, count=%d, index=%d, totalM=%d",
+			 // Fatal(1,error,"%d: i=%d, j=%d, t->w[j]=%d, count=%d, index=%d, totalM=%d",
 			 //			 me,i,j,t->w[j], count_to_w[t->w[j]],begin_to_w[t->w[j]],begin_to_w[nodes]);
 			 //}
 		 }
@@ -1255,7 +1258,7 @@ void taudlts_elim_trivial_A_BIT_OLDER(taudlts_t t, int* oscc){
 		};
 		degree[i]=-1;
 	 }; // end if degree==0		
-	//	Warning(1,">>>>>>>>>>>>>>>%d: before exchange...",me); 
+	//	Warning(info,">>>>>>>>>>>>>>>%d: before exchange...",me); 
 	//        exchange
 	for(i=nodes;i>0;i--)
 	 begin_to_w[i]=begin_to_w[i-1];
@@ -1282,7 +1285,7 @@ void taudlts_elim_trivial_A_BIT_OLDER(taudlts_t t, int* oscc){
 	MPI_Waitall(aux, request_array, status_array);
 	///// MPI_Barrier(t->comm);	
 	//        end exchange
-	//	Warning(1,">>>>>>>>>>>>>>>%d: before decrease...",me); 
+	//	Warning(info,">>>>>>>>>>>>>>>%d: before decrease...",me); 
 	//        decrease the degrees
 	free(to_w);
 	for(i=0;i<buflocal->index;i++)
@@ -1319,7 +1322,7 @@ void taudlts_elim_trivial_A_BIT_OLDER(taudlts_t t, int* oscc){
  j=aux=0;
  MPI_Reduce(&i, &aux, 1, MPI_INT, MPI_SUM, 0, t->comm);
  MPI_Reduce(&(t->M), &j, 1, MPI_INT, MPI_SUM, 0, t->comm);
- if (me==0) Warning(1,"old M: %12d     new M: %12d",j,aux);
+ if (me==0) Warning(info,"old M: %12d     new M: %12d",j,aux);
  t->begin[t->N] = t->M = i;
 }
 
@@ -1456,14 +1459,14 @@ void taudlts_scc_local(taudlts_t t, int* oscc){
  }
 
  // ///// MPI_Barrier(t->comm);
- Warning(1,"%3d: %d local components, %d transitions on local cycles (AND %d global, %d out)\n", 
+ Warning(info,"%3d: %d local components, %d transitions on local cycles (AND %d global, %d out)\n", 
 				 me,n, m, t->M - m, transout);
 #ifdef DEBUG
  for(i=0;i<t->N;i++){
 	assert(oscc[i] >= 0);
 	assert(oscc[i] < t->N);
 	if (oscc[i] != oscc[oscc[i]])
-	 Warning(1,"%d -> %d (%d) -> %d (%d) -> %d -> ..",
+	 Warning(info,"%d -> %d (%d) -> %d (%d) -> %d -> ..",
 					 i,oscc[i], b[oscc[i]+1] - b[oscc[i]], 
 					 oscc[oscc[i]], b[oscc[oscc[i]]+1] - b[oscc[oscc[i]]], 
 					 oscc[oscc[oscc[i]]]);	
@@ -1476,7 +1479,7 @@ void taudlts_scc_local(taudlts_t t, int* oscc){
 	for(j=t->begin[i];((j < t->begin[i+1]) && (t->w[j]==me));) j++;
 	if (j<t->begin[i+1]) m++;
  }
- Warning(1,"%d: %d exit states", me, m);
+ Warning(info,"%d: %d exit states", me, m);
  */
 }
 
@@ -1511,7 +1514,7 @@ void taudlts_delete_transitions(taudlts_t t, char* deleted){
 		index++;
 	 }
  }
- // Warning(1,"reduced from %d to %d transitions!", t->M, index);
+ // Warning(info,"reduced from %d to %d transitions!", t->M, index);
  t->begin[t->N] = index;
  t->M = index;
  t->w = realloc(t->w, t->M * sizeof(int));
@@ -1561,7 +1564,7 @@ void taudlts_elim_small(taudlts_t t, int* wscc, int* oscc){
  MPI_Reduce(&Ndel, &aux, 1, MPI_INT, MPI_SUM, 0, t->comm);
  MPI_Reduce(&(t->M), &i, 1, MPI_INT, MPI_SUM, 0, t->comm);
  MPI_Reduce(&j, &k, 1, MPI_INT, MPI_SUM, 0, t->comm);
- if (me==0) Warning(1,"%12d transitions deleted, %12d left\n%12d head states left",aux, i, k); 
+ if (me==0) Warning(info,"%12d transitions deleted, %12d left\n%12d head states left",aux, i, k); 
 }
 
 
@@ -1585,10 +1588,10 @@ void BuffersToManager(char* workers, int nodes, int me, int manager,
  MPI_Request* request_array;
  MPI_Status* status_array;
  /*
- Warning(1,"BuffersToManager. me %d (some %d) manager %d",
+ Warning(info,"BuffersToManager. me %d (some %d) manager %d",
 				 me, workers[me], manager);
  if (me != manager)
-	Warning(1,"%d : send %d to M",me,size);
+	Warning(info,"%d : send %d to M",me,size);
  else 
 	for(i=0;i<nodes;i++)
 	 if ((workers[i]) && ( i != manager))
@@ -1605,12 +1608,12 @@ void BuffersToManager(char* workers, int nodes, int me, int manager,
 							MPI_INT, i, SOME_TAG, comm, request_array + aux);
 		aux++;
 	 }
-	//	Warning(1,"%d waiting",me);
+	//	Warning(info,"%d waiting",me);
 	MPI_Waitall(aux, request_array, status_array);
  }
  else{
 	MPI_Send(bufout, size, MPI_INT, manager, SOME_TAG, comm);
-	//	Warning(1,"%d SENT",me);
+	//	Warning(info,"%d SENT",me);
  }
 }
 
@@ -1626,7 +1629,7 @@ void BuffersFromManager(char* workers, int nodes, int me, int manager,
 
  /*
  if (me != manager)
-	Warning(1,"%d : send %d to M",me,size);
+	Warning(info,"%d : send %d to M",me,size);
  else 
 	for(i=0;i<nodes;i++)
 	 if ((workers[i]) && ( i != manager))
@@ -1661,7 +1664,7 @@ void ExchangeBuffers(char* workers_from, char* workers_to,
  MPI_Request* request_array;
  MPI_Status* status_array;
  // if (me==0)
- //		Warning(1,"\n\n\n\n\n\n===========\n\n");
+ //		Warning(info,"\n\n\n\n\n\n===========\n\n");
  request_array = (MPI_Request*)calloc(2*nodes, sizeof(MPI_Request));
  status_array = (MPI_Status*)calloc(2*nodes, sizeof(MPI_Status));
  aux = 0;
@@ -1693,20 +1696,20 @@ void ExchangeBuffers(char* workers_from, char* workers_to,
 	 *bufin = (int*)calloc(begin_from_w[nodes]+1, sizeof(int));
 	}
 	//	else{ 
-	 //	 Warning(1,"%d already set:  size %12d %12d %12d",
+	 //	 Warning(info,"%d already set:  size %12d %12d %12d",
 	 //					 me, size_from_w[0], size_from_w[1], size_from_w[2]);
-	 //	 Warning(1,"%d already set:  begin %12d %12d %12d %12d",
+	 //	 Warning(info,"%d already set:  begin %12d %12d %12d %12d",
 	 // me, begin_from_w[0], begin_from_w[1], begin_from_w[2], begin_from_w[nodes]);
 	 //	}
  }
- //  Warning(1,"%d counts exchanged",me);
+ //  Warning(info,"%d counts exchanged",me);
 
 	/*
  if (workers_from[me])
-	Warning(1,"%d sizes TO  :  %12d %12d %12d",
+	Warning(info,"%d sizes TO  :  %12d %12d %12d",
 					me, size_to_w[0], size_to_w[1], size_to_w[2]);
  if (workers_to[me])
-	Warning(1,"%d sizes FROM:  %12d %12d %12d",
+	Warning(info,"%d sizes FROM:  %12d %12d %12d",
 					me, size_from_w[0], size_from_w[1], size_from_w[2]); 
 	*/
 
@@ -1727,8 +1730,8 @@ void ExchangeBuffers(char* workers_from, char* workers_to,
 		aux++;
 	 }
  MPI_Waitall(aux, request_array, status_array); 
- // Warning(1,"%3d : received %d ",me, begin_from_w[nodes]);
- // Warning(1,"%d data exchanged",me);
+ // Warning(info,"%3d : received %d ",me, begin_from_w[nodes]);
+ // Warning(info,"%d data exchanged",me);
 }
 
 
@@ -1768,7 +1771,7 @@ void to_Manager(taudlts_t t, char* workers, int manager,
  int *tmp, *begin_to_w, *begin_from_w, *size_to_w, *size_from_w, *gindex;
  MPI_Comm_size(t->comm, &nodes);
  MPI_Comm_rank(t->comm, &me); 
- // Warning(1,"%d to Manager N: %d M: %d",me,t->N,t->M);
+ // Warning(info,"%d to Manager N: %d M: %d",me,t->N,t->M);
  // count SOME transitions
  n = ns = k= x = 0;
  for(i=0; i<t->N; i++){
@@ -1779,7 +1782,7 @@ void to_Manager(taudlts_t t, char* workers, int manager,
 	for(j=t->begin[i]; j<t->begin[i+1]; j++)
 	 if (workers[t->w[j]]) n++;
  }
- Warning(1, "%3d: %12d SOME (i.e. head) states (%12d all, %12d nonempty)\nand  %12d SOME transitions (%12d all)\n", 
+ Warning(info, "%3d: %12d SOME (i.e. head) states (%12d all, %12d nonempty)\nand  %12d SOME transitions (%12d all)\n", 
 				 me, ns, t->N, x, n, t->M);
  // send the states and transition counts
  if (me==manager){
@@ -1789,7 +1792,7 @@ void to_Manager(taudlts_t t, char* workers, int manager,
 	 if ((workers[i]) && (i!=manager)){
 		MPI_Recv(beginstates+i, 1, MPI_INT, i, SOME_TAG, t->comm, NULL);
 		MPI_Recv(begintrans+i, 1, MPI_INT, i, SOME_TAG, t->comm, NULL);
-		//					Warning(1,"%d RECV",me);
+		//					Warning(info,"%d RECV",me);
 	 }
 	Count2BeginIndex(beginstates, nodes);
 	Count2BeginIndex(begintrans, nodes);
@@ -1797,7 +1800,7 @@ void to_Manager(taudlts_t t, char* workers, int manager,
  else {	
 	MPI_Send(&ns, 1, MPI_INT, manager, SOME_TAG, t->comm);
 	MPI_Send(&n, 1, MPI_INT, manager, SOME_TAG, t->comm);
-	//		Warning(1,"%d SSSSSSENT",me);
+	//		Warning(info,"%d SSSSSSENT",me);
  } 
  // M->W  set first global index
  if (me==manager){
@@ -1812,7 +1815,7 @@ void to_Manager(taudlts_t t, char* workers, int manager,
 #ifdef DEBUG 
  MPI_Barrier(t->comm);
  if (me==manager)
-	Warning(1, "MMM: %12d total SOME transitions", begintrans[nodes]);
+	Warning(info, "MMM: %12d total SOME transitions", begintrans[nodes]);
 #endif
 
  // prepare the buffers with SOME transitions  
@@ -1855,7 +1858,7 @@ void to_Manager(taudlts_t t, char* workers, int manager,
  }
  tmp = NULL;
 #ifdef DEBUG 
-  Warning(1,"%d transforminggggg! first=%d, have %d head states",me,first,ns);
+  Warning(info,"%d transforminggggg! first=%d, have %d head states",me,first,ns);
 #endif
  // transform local offsets to global
  begin_to_w = (int*)calloc(nodes+1, sizeof(int));
@@ -1864,7 +1867,7 @@ void to_Manager(taudlts_t t, char* workers, int manager,
  size_from_w = (int*)calloc(nodes+1, sizeof(int));
  ComputeCount(wdest, n, begin_to_w);
  Count2BeginIndex(begin_to_w, nodes);
- //Warning(1,"%d q ",me);
+ //Warning(info,"%d q ",me);
 #ifdef DEBUG
 /* for(i = 0; i < nodes; i++){
 	assert((workers[i]) || (begin_to_w[i] == begin_to_w[i+1]));
@@ -1877,14 +1880,14 @@ void to_Manager(taudlts_t t, char* workers, int manager,
  SortArray(&osrc, n, wdest, begin_to_w, nodes); 
  free(wdest); 
 #ifdef DEBUG
- Warning(1,"%d sort DONE",me);
+ Warning(info,"%d sort DONE",me);
 #endif
  for(i=0;i<nodes;i++)
 	size_to_w[i]=begin_to_w[i+1]-begin_to_w[i];
  ExchangeBuffers(workers, workers, nodes, me, t->comm, 
 								 odest, begin_to_w, size_to_w, 
 								 &tmp, begin_from_w, size_from_w);
- //   Warning(1,"%d exchanged destinations",me);
+ //   Warning(info,"%d exchanged destinations",me);
  for (i=0;i<begin_from_w[nodes];i++)
 	tmp[i] = gindex[tmp[i]]+first;
  free(gindex);
@@ -1894,7 +1897,7 @@ void to_Manager(taudlts_t t, char* workers, int manager,
  // now osrc has global names - first 
  // and odest has global names
 
- ////    Warning(1,"%d exchanged NEW GLOBAL destinations",me);
+ ////    Warning(info,"%d exchanged NEW GLOBAL destinations",me);
  // build tcopy->begin
  if (me==manager){
 	tcopy->N = beginstates[nodes];
@@ -1907,7 +1910,7 @@ void to_Manager(taudlts_t t, char* workers, int manager,
  Count2BeginIndex(tmp, ns);
  SortArray(&odest, n, osrc, tmp, ns);
  free(osrc);
- //  Warning(1,"%d bla",me);
+ //  Warning(info,"%d bla",me);
  if (me == manager){ 
 	//	assert(tcopy->N == beginstates[nodes]);
 	BuffersToManager(workers, nodes, me, manager, 
@@ -1919,7 +1922,7 @@ void to_Manager(taudlts_t t, char* workers, int manager,
 #ifdef DEBUG
 	for(i=0;i<nodes;i++){	 
 	 //	 if (tcopy->begin[beginstates[i]] != begintrans[i])
-	 //		Warning(1,"%d : %d != %d !!",
+	 //		Warning(info,"%d : %d != %d !!",
 	 //						i, tcopy->begin[beginstates[i]],begintrans[i]);
 	 assert((workers[i]) || (beginstates[i] == beginstates[i+1]));
 	 assert((workers[i]) || (begintrans[i] == begintrans[i+1])); 
@@ -1933,7 +1936,7 @@ void to_Manager(taudlts_t t, char* workers, int manager,
 	free(tmp); tmp=NULL;
  }
 #ifdef DEBUG
- Warning(1,"%d ver gekomen",me);
+ Warning(info,"%d ver gekomen",me);
 #endif
  // build tcopy->o
  if (me == manager){
@@ -1946,7 +1949,7 @@ void to_Manager(taudlts_t t, char* workers, int manager,
 											 odest, n, NULL, begintrans, t->comm);
 #ifdef DEBUG
  if (me==manager){
-	//		 	Warning(1, "MANAGER (%d): tcopy filled!! N=%d, M=%d", 
+	//		 	Warning(info, "MANAGER (%d): tcopy filled!! N=%d, M=%d", 
 	//					me, tcopy->N, tcopy->M);
 	assert(tcopy->M == tcopy->begin[tcopy->N]);
  }
@@ -1968,7 +1971,7 @@ void to_Workers(taudlts_t t, char* workers, int manager,
  MPI_Comm_size(t->comm, &nodes);
  MPI_Comm_rank(t->comm, &me); 
 
- if (me==manager) Warning(1,"%d's crowd : UPDATE wscc, oscc",me);
+ if (me==manager) Warning(info,"%d's crowd : UPDATE wscc, oscc",me);
  // send/receive the new wscc values
 
 
@@ -1980,7 +1983,7 @@ void to_Workers(taudlts_t t, char* workers, int manager,
 		wmapback[j] = i;
 #ifdef DEBUG
 		if(omapback[j]>=totsize[wmapback[j]])
-		 Warning(1,"!!!! i=%d j=%d omapback[j]=%d wmapback[j]=%d totsize[..]=%d",
+		 Warning(info,"!!!! i=%d j=%d omapback[j]=%d wmapback[j]=%d totsize[..]=%d",
 						 i,j,omapback[j],wmapback[j], totsize[wmapback[j]]);
 		assert(omapback[j]<totsize[wmapback[j]]);
 #endif
@@ -1990,13 +1993,13 @@ void to_Workers(taudlts_t t, char* workers, int manager,
 	 buf[i] = wmapback[gscc[i]];
 	free(wmapback);
 #ifdef DEBUG
-	Warning(1,"%d wmapback DONE",me);
+	Warning(info,"%d wmapback DONE",me);
 #endif
 	BuffersFromManager(workers, nodes, me, manager, 
 										 NULL, 0, buf, beginstates, t->comm);
 	buf = buf + beginstates[me];
 #ifdef DEBUG
-	Warning(1,"%d wmapback SENT",me);
+	Warning(info,"%d wmapback SENT",me);
 #endif
  }
  else{
@@ -2004,7 +2007,7 @@ void to_Workers(taudlts_t t, char* workers, int manager,
 	BuffersFromManager(workers, nodes, me, manager, 
 										 buf, ns, NULL, NULL, t->comm);
 #ifdef DEBUG
-	Warning(1,"%d wmapback RECV",me);
+	Warning(info,"%d wmapback RECV",me);
 #endif
  }
 
@@ -2017,7 +2020,7 @@ void to_Workers(taudlts_t t, char* workers, int manager,
  for(i = 0; i < t->N; i++)
 	if ((oscc[i] == i)&&(wscc[i] == me)){    // used to be a global state..
 	 //	 if (j>=ns)
-		//		Warning(1,"%d: i=%d, N=%d, j=%d, ns=%d",me,i,t->N, j, ns);
+		//		Warning(info,"%d: i=%d, N=%d, j=%d, ns=%d",me,i,t->N, j, ns);
 	 //	 assert(j < ns);
 	 //	 assert(buf[j]<nodes);
 	 wscc[i] = buf[j++];
@@ -2041,12 +2044,12 @@ void to_Workers(taudlts_t t, char* workers, int manager,
 	BuffersFromManager(workers, nodes, me, manager, 
 										 NULL, 0, gscc, beginstates, t->comm);
 	buf = gscc + beginstates[me];
-	//	Warning(1,"omapback");
+	//	Warning(info,"omapback");
  }
  else
 	BuffersFromManager(workers, nodes, me, manager, 
 										 buf, ns, NULL, NULL, t->comm);
- //  Warning(1,"%d   oscc",me);
+ //  Warning(info,"%d   oscc",me);
  j = 0;
  for(i = 0; i < t->N; i++)
 	if ((oscc[i] == i)&&(wsccold[i] == me)){    // used to be a global state..
@@ -2054,7 +2057,7 @@ void to_Workers(taudlts_t t, char* workers, int manager,
 	 oscc[i] = buf[j++];
 	}
 #ifdef DEBUG	
- Warning(1,"%d   oscc updated",me);
+ Warning(info,"%d   oscc updated",me);
 #endif
  //free(buf); PROBLEM at worker 15, when it is a manager (WHY ?????)
  
@@ -2063,14 +2066,14 @@ void to_Workers(taudlts_t t, char* workers, int manager,
  for(i = 0; i < t->N; i++)
 	if ((wscc[i] == me) && (oscc[i] == i))
 	 j++;
- Warning(1,"%3d: Had %12d global states, now I have %12d",
+ Warning(info,"%3d: Had %12d global states, now I have %12d",
 				 me,ns,j);
 
  // check that wscc and oscc are right
 #ifdef DEBUG
  for(i=0;i<t->N;i++){
 	if (oscc[i]>=totsize[wscc[i]])
-	 Warning(1,"%d: i=%d, oscc=%d, wscc=%d, totsize=%d",
+	 Warning(info,"%d: i=%d, oscc=%d, wscc=%d, totsize=%d",
 					 me,i,oscc[i],wscc[i],totsize[wscc[i]]);
 	assert(oscc[i]<totsize[wscc[i]]);
  }
@@ -2111,26 +2114,26 @@ void update_destinations(taudlts_t t, int* wscc, int* oscc, char* workers){
  ///// MPI_Barrier(t->comm);
  MPI_Comm_size(t->comm, &nodes);
  MPI_Comm_rank(t->comm, &me); 
- // Warning(1,"%d UPDATE DESTINATIONS ",me);
+ // Warning(info,"%d UPDATE DESTINATIONS ",me);
 #ifdef DEBUG
  assert(t->begin[t->N] == t->M);
 #endif
- // Warning(1,"%d blaa %d",me,t->M);
+ // Warning(info,"%d blaa %d",me,t->M);
 
  // transform t->begin representation into osrc..
  if ((osrc=(int*)calloc(t->M, sizeof(int))) == NULL){
-	Warning(1,"%3d: out of memory in update_destinations",me);
+	Warning(info,"%3d: out of memory in update_destinations",me);
 	exit(1);
  }
-	//	Fatal(1,1,"%3d: out of memory in update_destinations",me);
- // Warning(1,"%d blllllllllllllaa ",me);
+	//	Fatal(1,error,"%3d: out of memory in update_destinations",me);
+ // Warning(info,"%d blllllllllllllaa ",me);
  for(i = 0; i < t->N; i++){
 	//	assert(t->begin[i]>=0);
 	//	assert(t->begin[i]<=t->M);
 	for(j = t->begin[i]; j < t->begin[i+1]; j++)
 	 osrc[j] = i;
  }
- //Warning(1,"%d bbbbbbbbbbbbbbbblllllllllllllaa ",me);
+ //Warning(info,"%d bbbbbbbbbbbbbbbblllllllllllllaa ",me);
  /*
  aux=(int*)calloc(t->N+1, sizeof(int));
  for(i=0;i<t->M;i++){
@@ -2142,7 +2145,7 @@ void update_destinations(taudlts_t t, int* wscc, int* oscc, char* workers){
 	assert(aux[i]==t->begin[i]);
  */
 
- // Warning(1,"%d sorts ",me);
+ // Warning(info,"%d sorts ",me);
  ///// MPI_Barrier(t->comm);
 
  // sort transitions on t->w 
@@ -2160,7 +2163,7 @@ void update_destinations(taudlts_t t, int* wscc, int* oscc, char* workers){
 	 t->w[j] = i;
 
  ///// MPI_Barrier(t->comm);
- // Warning(1,"%d sorted ",me);
+ // Warning(info,"%d sorted ",me);
  // send the destinations to their owners
  all = (char*)calloc(nodes, sizeof(char));
  for(i = 0; i < nodes; i++) all[i] = 1; 
@@ -2168,14 +2171,14 @@ void update_destinations(taudlts_t t, int* wscc, int* oscc, char* workers){
  ExchangeBuffers(all, workers, nodes, me, t->comm,
 								 t->o, begin_to_w, size_to_w,
 								 &tmp, begin_from_w, size_from_w);
- // Warning(1,"%d exchanged ",me);
+ // Warning(info,"%d exchanged ",me);
  ///// MPI_Barrier(t->comm);
 
  //  for (i = 0 ; i < nodes ; i++)
  //	Warning (1,"%d -> %d: beginto %12d sizeto %12d",
  //					 me, i, begin_to_w[i], size_to_w[i]);
  if (workers[me]){
-	//	Warning(1,"%d : received %d %d %d",
+	//	Warning(info,"%d : received %d %d %d",
 	//					me, begin_from_w[0], begin_from_w[1], begin_from_w[nodes]);
 
 	wtmp = (int*)calloc(begin_from_w[nodes], sizeof(int));
@@ -2183,9 +2186,9 @@ void update_destinations(taudlts_t t, int* wscc, int* oscc, char* workers){
 	 //	 assert(tmp[i] < t->N);
 	 wtmp[i] = wscc[tmp[i]];
 	}
-	//	Warning(1,"zzzzzzzzz",me);
+	//	Warning(info,"zzzzzzzzz",me);
  }
- // Warning(1,"%d exchangeddddd ",me);
+ // Warning(info,"%d exchangeddddd ",me);
 
  ExchangeBuffers(workers, all, nodes, me, t->comm, 
 								 wtmp, begin_from_w, size_from_w, 
@@ -2203,11 +2206,11 @@ void update_destinations(taudlts_t t, int* wscc, int* oscc, char* workers){
 	Warning (1,"%d -> %d: beginfrom %d   beginto %d",
 					 me, i, begin_from_w[i], begin_to_w[i]);
  */
- // Warning(1,"%d exchaaaaangedddddddd ",me);
+ // Warning(info,"%d exchaaaaangedddddddd ",me);
  free(tmp); free(begin_to_w); free(begin_from_w); free(all);
 
  // normalize t
- // Warning(1,"%d fixes t ",me);
+ // Warning(info,"%d fixes t ",me);
  /*  
  tmp = (int*)calloc(t->N, sizeof(int));
  for(i=0;i<t->M;i++){
@@ -2226,7 +2229,7 @@ void update_destinations(taudlts_t t, int* wscc, int* oscc, char* workers){
  tmp = t->w; SortArray(&tmp, t->M, osrc, t->begin, t->N); t->w = tmp;
  tmp = t->o; SortArray(&tmp, t->M, osrc, t->begin, t->N); t->o = tmp;
  // PROBLEMMM  // free(osrc); osrc=NULL; 
- // Warning(1,"%d t fixed ",me);
+ // Warning(info,"%d t fixed ",me);
 }
 
 
@@ -2244,7 +2247,7 @@ void	migrate_transitions(taudlts_t t, int* wscc, int* oscc, char* workers){
 #ifdef DEBUG
  for(i=0;i<t->N;i++){
 	if (oscc[i]>=totsize[wscc[i]])
-	 Warning(1,"%d: i=%d, oscc=%d, wscc=%d, totsize=%d",
+	 Warning(info,"%d: i=%d, oscc=%d, wscc=%d, totsize=%d",
 					 me,i,oscc[i],wscc[i],totsize[wscc[i]]);
 	assert(oscc[i]<totsize[wscc[i]]);
  }
@@ -2252,7 +2255,7 @@ void	migrate_transitions(taudlts_t t, int* wscc, int* oscc, char* workers){
  */
 
 
- //  Warning(1,"%3d MIGRATES",me);
+ //  Warning(info,"%3d MIGRATES",me);
  // fill in wsrc, osrc AND sort on wsrc
  wsrc=(int*)calloc(t->M, sizeof(int));
  osrc=(int*)calloc(t->M, sizeof(int));
@@ -2302,7 +2305,7 @@ void	migrate_transitions(taudlts_t t, int* wscc, int* oscc, char* workers){
 	 }
  i=t->M; t->M = t->M - back + begin_from_w[nodes];
  osrc = realloc(osrc, t->M * sizeof(int));
- // Warning(1,"%3d: before migration %d transitions, after migration %d",
+ // Warning(info,"%3d: before migration %d transitions, after migration %d",
  //				 me, i, t->M);
  firstnew=i-back; 
  for(i=firstnew,j=0; j<begin_from_w[nodes]; j++,i++)
@@ -2344,7 +2347,7 @@ void	migrate_transitions(taudlts_t t, int* wscc, int* oscc, char* workers){
  for(i=firstnew,j=0;j<begin_from_w[nodes];j++,i++)
 	t->o[i]=tmp[j];
  // sort on osrc and rebuild t->begin
- // Warning(1,"%3d now sorting M=%d",me,t->M);
+ // Warning(info,"%3d now sorting M=%d",me,t->M);
  free(tmp);
  t->begin=(int*)calloc(t->N+1, sizeof(int));
 #ifdef DEBUG
@@ -2353,9 +2356,9 @@ void	migrate_transitions(taudlts_t t, int* wscc, int* oscc, char* workers){
 #endif
  ComputeCount(osrc, t->M, t->begin);
  Count2BeginIndex(t->begin, t->N);
- // Warning(1,"%3d now sorting M=%d begin[%d]=%d",me,t->M, t->N,t->begin[t->N]);
+ // Warning(info,"%3d now sorting M=%d begin[%d]=%d",me,t->M, t->N,t->begin[t->N]);
  tmp=t->w;SortArray(&tmp, t->M, osrc, t->begin, t->N);t->w=tmp;
- // Warning(1,"%3d llll",me);
+ // Warning(info,"%3d llll",me);
  tmp=t->o;SortArray(&tmp, t->M, osrc, t->begin, t->N);t->o=tmp;
  free(osrc);
 #ifdef DEBUG
@@ -2363,7 +2366,7 @@ void	migrate_transitions(taudlts_t t, int* wscc, int* oscc, char* workers){
 	if (t->begin[i+1] > t->begin[i])
 	 assert((oscc[i]==i)&&(wscc[i]==me));
 #endif
-	 // Warning(1,"%3d: migration finished",me);
+	 // Warning(info,"%3d: migration finished",me);
 }
 
 
@@ -2381,7 +2384,7 @@ void taudlts_clear_useless_transitions1(taudlts_t t, char* workers, char verbose
  begin_to_w=(int*)calloc(nodes+1, sizeof(int));
  // sort on source, t->w, t->o
  // max = 0; for(i=0;i<t->M;i++) if (t->o[i]>max) max = t->o[i]; max++;
- // Warning(1,"%3d: max is %d",me,max);
+ // Warning(info,"%3d: max is %d",me,max);
  for(i = 0; i < t->N; i++)
 	if (t->begin[i+1] > t->begin[i]+1){
 	 tmp = t->o + t->begin[i];
@@ -2391,7 +2394,7 @@ void taudlts_clear_useless_transitions1(taudlts_t t, char* workers, char verbose
 	 SortArray_copy(tmp, t->begin[i+1] - t->begin[i], 
 									t->w + t->begin[i], begin_to_w, nodes);
 	 if ( t->begin[i+1]-t->begin[i] > 1000)
-		Warning(1,"%3d: sorted %3d (%d) on wdest", me, i, t->begin[i+1]-t->begin[i]);
+		Warning(info,"%3d: sorted %3d (%d) on wdest", me, i, t->begin[i+1]-t->begin[i]);
 	 
 	 for(j=0;j<nodes;j++){
 		for(k = t->begin[i] + begin_to_w[j] ; k < t->begin[i] + begin_to_w[j+1]; k++ )
@@ -2402,7 +2405,7 @@ void taudlts_clear_useless_transitions1(taudlts_t t, char* workers, char verbose
 	 //						 0, begin_to_w[j+1]-begin_to_w[j]-1);
 	 /*
 	 if (size>1){
-		//		Warning(1,"%d quick-sorting %d..%d",
+		//		Warning(info,"%d quick-sorting %d..%d",
 		//			me, t->begin[i]+begin_to_w[j],t->begin[i]+begin_to_w[j+1]-1);
 		//quicksort(t->o,  t->begin[i]+begin_to_w[j],  t->begin[i]+begin_to_w[j+1]-1);
 		for(i=0;i<=max;i++) aux[i]=0;
@@ -2420,7 +2423,7 @@ void taudlts_clear_useless_transitions1(taudlts_t t, char* workers, char verbose
 		bucketsort(tmp+begin_to_w[j], size);
 	 }
 	}
- // Warning(1,"%d been so far",me);
+ // Warning(info,"%d been so far",me);
  // mark what to delete
  deleted = (char*)calloc(t->M, sizeof(int));
  for(i=0;i<t->N;i++)
@@ -2436,7 +2439,7 @@ void taudlts_clear_useless_transitions1(taudlts_t t, char* workers, char verbose
  i=t->M;
  taudlts_delete_transitions(t, deleted);
  if (verbose)
-	Warning(1,"%d useless transitions CLEARED. Old M: %12d New M: %12d", 
+	Warning(info,"%d useless transitions CLEARED. Old M: %12d New M: %12d", 
 					me, i, t->M);
 }
 
@@ -2462,14 +2465,14 @@ void taudlts_cleanup(taudlts_t t, int* wscc, int* oscc){
  char* deleted;
  MPI_Barrier(t->comm);
  MPI_Comm_rank(t->comm, &me); 
- if (me==0) Warning(1,"\nCLEANUP");
+ if (me==0) Warning(info,"CLEANUP");
  taudlts_global_collapse(t, wscc, oscc);
  MPI_Barrier(t->comm);
- if (me==0) Warning(1,"\nafter global collapse");
+ if (me==0) Warning(info,"after global collapse");
  MPI_Barrier(t->comm);
  // count self transitions
  if ((deleted = (char*)calloc(t->M, sizeof(int)))==NULL)
-	Fatal(1,1,"out of memory in cleanup");
+	Fatal(1,error,"out of memory in cleanup");
  n=0;
  for (i=0;i<t->N;i++)
 	for (j=t->begin[i]; j < t->begin[i+1]; j++)
@@ -2483,7 +2486,7 @@ void taudlts_cleanup(taudlts_t t, int* wscc, int* oscc){
  taudlts_delete_transitions(t, deleted);
  free(deleted);
  i = n; MPI_Reduce(&i, &n, 1, MPI_INT, MPI_SUM, 0, t->comm);
- if (me==0) Warning(1,"%d intra transitions deleted\nEND CLEANUP\n",n);
+ if (me==0) Warning(info,"%d intra transitions deleted",n);
 }
 
 
@@ -2500,7 +2503,7 @@ void taudlts_clear_useless_transitions_old(taudlts_t t){
  if (t->M == 0) return;
  MPI_Comm_size(t->comm, &nodes);
  MPI_Comm_rank(t->comm, &me); 
- Warning(1,"%d CLEARS USELESS TRANSITIONS",me);
+ Warning(info,"%d CLEARS USELESS TRANSITIONS",me);
  // sort transitions of every source ON odest!
  // and then on wdest
  for(x=0;x<t->N;x++)
@@ -2508,9 +2511,9 @@ void taudlts_clear_useless_transitions_old(taudlts_t t){
 	 aw = t->w + t->begin[x];
 	 ao = t->o + t->begin[x];
 	 n = t->begin[x+1] - t->begin[x];
-	 Warning(1,"%d %d.. %d %d %d .................",me,x, t->begin[x], t->begin[x+1], n);
+	 Warning(info,"%d %d.. %d %d %d .................",me,x, t->begin[x], t->begin[x+1], n);
 	 sortpiece(aw, ao, 0, n-4);
-	 Warning(1,"%d %d ************************",me,x);
+	 Warning(info,"%d %d ************************",me,x);
 	}
  /*
  for(x=0;x<t->N;x++)
@@ -2522,9 +2525,9 @@ void taudlts_clear_useless_transitions_old(taudlts_t t){
 	 aux=(int*)calloc(max+1, sizeof(int));
 	 ComputeCount(ao, n, aux);
 	 Count2BeginIndex(aux, max);
-	 Warning(1,"%d %d .................",me,x);
+	 Warning(info,"%d %d .................",me,x);
 	 SortArray_copy(aw, n, ao, aux, max);
-	 Warning(1,"%d %d ************************",me,x);
+	 Warning(info,"%d %d ************************",me,x);
 	 for(i=0;i<max;i++)
 		for(j=aux[i];j<aux[i+1];j++)
 		 ao[j]=i;
@@ -2543,7 +2546,7 @@ void taudlts_clear_useless_transitions_old(taudlts_t t){
 	}
  // delete
  taudlts_delete_transitions(t, deleted);
- Warning(1,"%3d: new M: %d",me, t->M);
+ Warning(info,"%3d: new M: %d",me, t->M);
 }
 
 /****************************************************************/
@@ -2569,7 +2572,7 @@ void taudlts_reduce_some
  MPI_Comm_size(t->comm, &nodes);
  MPI_Comm_rank(t->comm, &me); 
 
- /////  Warning(1,"%d starting REDUCE_SOME by manager %d",me, manager);
+ /////  Warning(info,"%d starting REDUCE_SOME by manager %d",me, manager);
  ///// MPI_Barrier(t->comm);
 
  taudlts_scc_stabilize(t, wscc, oscc);
@@ -2586,11 +2589,11 @@ void taudlts_reduce_some
 	assert(wscc[i] < nodes);
 	assert(oscc[i] >= 0);
 	if (oscc[i] >= totsize[wscc[i]])
-	 Warning(1,"%3d: i=%d, oscc=%d, wscc=%d, totsize=%d", me, i, oscc[i], wscc[i], totsize[wscc[i]]);
+	 Warning(info,"%3d: i=%d, oscc=%d, wscc=%d, totsize=%d", me, i, oscc[i], wscc[i], totsize[wscc[i]]);
 	assert(oscc[i] < totsize[wscc[i]]);
 	if (t->begin[i]<t->begin[i+1]) assert((wscc[i]==me)&&(oscc[i]==i));
  }
- Warning(1,"%d: iiiiii ",me);
+ Warning(info,"%d: iiiiii ",me);
 #endif
 
  //1. SOME: send to the manager all "global" transitions 
@@ -2617,7 +2620,7 @@ void taudlts_reduce_some
 	for(i=0;i<nodes;i++)
 	 for(j=beginstates[i];j<beginstates[i+1];j++){
 		if (omapback[j] >= totsize[i])
-		 Warning(1,"!!!! worker=%d, j=%d(%d), omapback=%d, totsize=%d",
+		 Warning(info,"!!!! worker=%d, j=%d(%d), omapback=%d, totsize=%d",
 						 i,j,j-beginstates[i],omapback[j],totsize[i]);
 		assert(omapback[j] < totsize[i]);
 	 }
@@ -2627,7 +2630,7 @@ void taudlts_reduce_some
 
  //2. SOME: Manager: find the local components
  if (me==manager){
-	Warning(1,"\nSMALL GRAPH by manager %d: %12d states, %12d transitions \n", 
+	Warning(info,"\nSMALL GRAPH by manager %d: %12d states, %12d transitions \n", 
 					me, tcopy->N, tcopy->M);
 	gscc=(int*)calloc(tcopy->N, sizeof(int));
 	for(i=0;i<tcopy->N;i++)
@@ -2645,7 +2648,7 @@ void taudlts_reduce_some
 #ifdef DEBUG
 		for(i=0;i<tcopy->N;i++)
 		 assert(gscc[gscc[i]] == gscc[i]);	
- Warning(1,"%d: ooooooooooooo ",me);
+ Warning(info,"%d: ooooooooooooo ",me);
 #endif
 		taudlts_free(tcopy);
 	 }
@@ -2675,7 +2678,7 @@ void taudlts_reduce_some
 	taudlts_clear_useless_transitions1(t, workers,0);
  ///// MPI_Barrier(t->comm);
 
- // Warning(1,"%d finished REDUCE_SOME. New M: %d",me, t->M);
+ // Warning(info,"%d finished REDUCE_SOME. New M: %d",me, t->M);
  //     taudlts_scc_stabilize(t, wscc, oscc);
 }
 
@@ -2722,7 +2725,7 @@ void taudlts_scc_stabilize(taudlts_t t, int* wscc, int* oscc){
  MPI_Comm_rank(t->comm, &me);  
 
  if (me==0)
-	Warning(1,"\nSTABILIZE"); 
+	Warning(info,"\nSTABILIZE"); 
  ///// MPI_Barrier(t->comm);
  all =  (char*)calloc(nodes, sizeof(char));
  for(i=0;i<nodes;i++) all[i]=1;
@@ -2750,9 +2753,9 @@ void taudlts_scc_stabilize(taudlts_t t, int* wscc, int* oscc){
  // Now arrows point to the "owned" states
  taudlts_fwd2back(tscc);
 
- //Warning(1,"\n%d reversed \n",me); 
+ //Warning(info,"\n%d reversed \n",me); 
 
- newstable=(int*)calloc(t->N, sizeof(char));
+ newstable=(char*)calloc(t->N, sizeof(char));
  j=0;
  for(i=0;i<t->N;i++) 
 	if ((wscc[i]==me)&&(oscc[i]==i)) {
@@ -2761,26 +2764,26 @@ void taudlts_scc_stabilize(taudlts_t t, int* wscc, int* oscc){
 	}
  MPI_Allreduce(&j, &total, 1, MPI_INT, MPI_SUM, t->comm);
  total_all = 0;
- // Warning(1,"%d: initially %d stable (out of %d)", me, j,t->N);
+ // Warning(info,"%d: initially %d stable (out of %d)", me, j,t->N);
 
  // check for cycles of 2: x->y->x
  for(i=0;i<t->N;i++)
 	for(k=tscc->begin[i]; k<tscc->begin[i+1]; k++)
 	 if ((tscc->w[k]==wscc[i])&&(tscc->o[k]==oscc[i]))
-		Warning(1,"%d: %d is WRONG! ( %d , %d )\n",me,i,wscc[i],oscc[i]);
+		Warning(info,"%d: %d is WRONG! ( %d , %d )\n",me,i,wscc[i],oscc[i]);
 
  // while
  while (total > 0) {
 	if (me==0){
 	 total_all += total;
-	 //	 Warning(1,"Total new stable: %d total stable: %d",total, total_all);
+	 //	 Warning(info,"Total new stable: %d total stable: %d",total, total_all);
 	}
 
 	aux=0;
 	for(i=0;i<t->N;i++)
 	 if (newstable[i])
 		aux += tscc->begin[i+1] - tscc->begin[i];
-	//		Warning(1,"%d: %d to send",me,aux);
+	//		Warning(info,"%d: %d to send",me,aux);
 
 	wdesttmp=(int*)calloc(aux, sizeof(int));
 	odesttmp=(int*)calloc(aux, sizeof(int));
@@ -2832,7 +2835,7 @@ void taudlts_scc_stabilize(taudlts_t t, int* wscc, int* oscc){
 	for(i=0;i<begin_from_w[nodes];i++) oscctmp[i] = tmp[i];
 	free(tmp);tmp=NULL;
 
-	//		Warning(1,"%d: %d received",me,begin_from_w[nodes]);
+	//		Warning(info,"%d: %d received",me,begin_from_w[nodes]);
 
 	for(i=0;i<begin_from_w[nodes];i++){
 	 newstable[odesttmp[i]]=1;
@@ -2845,7 +2848,7 @@ void taudlts_scc_stabilize(taudlts_t t, int* wscc, int* oscc){
 	j=0;
 	for(i=0;i<t->N;i++) 
 	 if (newstable[i]) j++;
-	//	Warning(1,"%d: %d stable", me, j);
+	//	Warning(info,"%d: %d stable", me, j);
 	MPI_Allreduce(&j, &total, 1, MPI_INT, MPI_SUM, t->comm);
  }
 
@@ -2853,7 +2856,7 @@ void taudlts_scc_stabilize(taudlts_t t, int* wscc, int* oscc){
   MPI_Barrier(t->comm); 
  
   if (me==0)
-	 Warning(1,"\nSTABILIZE ended\n\n");
+	 Warning(info,"\nSTABILIZE ended\n\n");
 } 
 
 
@@ -2902,7 +2905,7 @@ void taudlts_local_collapse(taudlts_t t, int* map){
 		if (w[j] == me) t->o[b[map[i]]] = map[o[j]];
 		else t->o[b[map[i]]] = o[j];
 	 } 
- // Warning(1,"%d: had %d transitions.. %d deleted, %d left",
+ // Warning(info,"%d: had %d transitions.. %d deleted, %d left",
  //				 me, t->begin[t->N], t->begin[t->N] - t->M, t->M);
  if (t->begin != NULL) {free(t->begin); t->begin = b;}
  if (w!=NULL) free(w); if (o!=NULL) free(o);
@@ -3024,7 +3027,7 @@ void taudlts_scc_global(taudlts_t t, int* wscc, int* oscc){
  if (me==0){
 	begin[0]=0;
 	for(i=1;i<=nodes;i++) begin[i]=begin[i-1]+count[i-1];
-	//	Warning(1,"begin: %d %d %d !!",begin[0],begin[1],begin[2]);
+	//	Warning(info,"begin: %d %d %d !!",begin[0],begin[1],begin[2]);
  }
  MPI_Scatter(begin, 1, MPI_INT, &first, 1, MPI_INT, 0, t->comm); 
  // "create" wmap, omap, wmapback, omapback
@@ -3047,7 +3050,7 @@ void taudlts_scc_global(taudlts_t t, int* wscc, int* oscc){
  free(wmap); free(omap);
  ///// MPI_Barrier(t->comm); 
  if (me==0){
-	Warning(1,"\nSMALL GRAPH: %d states, %d transitions\n", t->N, t->M);
+	Warning(info,"\nSMALL GRAPH: %d states, %d transitions\n", t->N, t->M);
 	gscc=(int*)calloc(t->N, sizeof(int));
 	taudlts_scc_local(t,gscc);	
  }
@@ -3061,7 +3064,7 @@ void taudlts_scc_global(taudlts_t t, int* wscc, int* oscc){
  MPI_Gatherv(omapback, NG, MPI_INT, omapback_all, count, begin, MPI_INT, 0, t->comm);
 
  if (me==0){
-	// Warning(1,"begin: %d %d %d !!",begin[0],begin[1],begin[2]);
+	// Warning(info,"begin: %d %d %d !!",begin[0],begin[1],begin[2]);
 	aaux = (int*)calloc(nodes, sizeof(int));
 	for(i=0;i<nodes;i++)
 	 for(j=begin[i];j<begin[i+1];j++)
@@ -3072,7 +3075,7 @@ void taudlts_scc_global(taudlts_t t, int* wscc, int* oscc){
 	 oscc_all[i] = omapback_all[gscc[i]];
 	}
 	free(wmapback_all); free(omapback_all); free(gscc);
-	Warning(1,"DISTRIBUTION OF THE SMALL GRAPH: %d in 0, %d in 1, %d in 2 !!",aaux[0],aaux[1],aaux[2]);
+	Warning(info,"DISTRIBUTION OF THE SMALL GRAPH: %d in 0, %d in 1, %d in 2 !!",aaux[0],aaux[1],aaux[2]);
 	free(aaux);
  }
  aaux = (int*)calloc(NG, sizeof(int));
@@ -3098,12 +3101,12 @@ void taudlts_scc_global(taudlts_t t, int* wscc, int* oscc){
 	if (i < omapback[j]) {
 	 wscc[i] = wscc[oscc[i]];
 	 	 if ((oscc[i]==i)&&(wscc[i]!=me))
-	 		Fatal(1,1,"bad scc of non-global state: %d,%d,wscc=%d",me,i,wscc[i]);
+	 		Fatal(1,error,"bad scc of non-global state: %d,%d,wscc=%d",me,i,wscc[i]);
 	 oscc[i] = oscc[oscc[i]];
 	}
 	else {
 	 if (i>omapback[j])
-		Fatal(1,1,"RRRRRRRR%d: i=%d(out of %d) j=%d(out of %d) omapback=%d",
+		Fatal(1,error,"RRRRRRRR%d: i=%d(out of %d) j=%d(out of %d) omapback=%d",
 					me,i,t->N,j,NG,omapback[j]);
 	 j++;
 	}  
@@ -3226,11 +3229,11 @@ void taudlts_global_collapse_wrong(taudlts_t t, int* wmap, int* omap){
 
  // exchange osrc-wdest-odest 
  for(i=0;i<nodes;i++) count_to_w[i] = begin_to_w[i+1]-begin_to_w[i];
- //  Warning(1,"%d: tosend %d to_myself %d",me, begin_to_w[nodes], count_to_w[me]);
+ //  Warning(info,"%d: tosend %d to_myself %d",me, begin_to_w[nodes], count_to_w[me]);
  MPI_Alltoall(count_to_w,1,MPI_INT,count_from_w,1,MPI_INT,t->comm); 
  begin_from_w[0]=0; 
  for(i=1;i<=nodes;i++) begin_from_w[i]=begin_from_w[i-1]+count_from_w[i-1];
- // Warning(1,"%d: toreceive:%d from_myself %d",me,begin_from_w[nodes], count_from_w[me]);
+ // Warning(info,"%d: toreceive:%d from_myself %d",me,begin_from_w[nodes], count_from_w[me]);
  t->M = begin_from_w[nodes];
  aux1=(int*)calloc(t->M, sizeof(int));
  ///// MPI_Barrier(t->comm);
@@ -3316,7 +3319,7 @@ void taudlts_global_collapse_wrong(taudlts_t t, int* wmap, int* omap){
  MPI_Alltoall(count_to_w,1,MPI_INT,count_from_w,1,MPI_INT,t->comm);
  begin_from_w[0]=0; 
  for(i=1;i<=nodes;i++) begin_from_w[i]=begin_from_w[i-1]+count_from_w[i-1];
- // Warning(1,"%d: i'm the new destination of %d transitions, %d local",
+ // Warning(info,"%d: i'm the new destination of %d transitions, %d local",
  //		 me, begin_from_w[nodes], begin_from_w[me]);
 
  aux1=(int*)calloc(begin_from_w[nodes], sizeof(int));
@@ -3390,7 +3393,7 @@ void taudlts_global_collapse_wrong(taudlts_t t, int* wmap, int* omap){
  t->w = wdest;
  t->o = odest; 
  ///// MPI_Barrier(t->comm);
- Warning(1,"%d after shuffle: %d states, %d transitions",me, t->N, t->M);
+ Warning(info,"%d after shuffle: %d states, %d transitions",me, t->N, t->M);
  ///// MPI_Barrier(t->comm);
 }
 
@@ -3447,7 +3450,7 @@ void dlts_shuffle(dlts_t lts, int* wmap, int* omap){
  for(i=0;i<nodes;i++) M += lts->transition_count[me][i];
 
 #ifdef DEBUG
- Warning(1,"\n%d: N=%12d, M=%12d",N,M);
+ Warning(info,"\n%d: N=%12d, M=%12d",N,M);
 #endif
  request_array = (MPI_Request*)calloc(2*nodes, sizeof(MPI_Request));
  status_array = (MPI_Status*)calloc(2*nodes, sizeof(MPI_Status));
@@ -3459,7 +3462,7 @@ void dlts_shuffle(dlts_t lts, int* wmap, int* omap){
  begin_to_w = (int*)calloc(nodes+1, sizeof(int));
  if ((!request_array) || (!status_array) || 
 		 (!wsrc) || (!osrc) || (!wdest) || (!odest) || (!begin_to_w))
-	Fatal(1,1,"out of memory in dlts_shuffle");
+	Fatal(1,error,"out of memory in dlts_shuffle");
 
  // fill in wsrc-osrc-lab-wdest-odest
  M = 0;
@@ -3490,23 +3493,23 @@ void dlts_shuffle(dlts_t lts, int* wmap, int* omap){
  begin_from_w = (int*)calloc(nodes+1, sizeof(int)); 
  count_from_w = (int*)calloc(nodes+1, sizeof(int));
  if ((!count_to_w)||(!begin_from_w)||(!count_from_w))
-	Fatal(1,1,"out of memory in dlts_shuffle");
+	Fatal(1,error,"out of memory in dlts_shuffle");
 
  // exchange osrc-wdest-odest 
  for(i=0;i<nodes;i++) count_to_w[i] = begin_to_w[i+1]-begin_to_w[i];
- // Warning(1,"%d: tosend %d to_myself %d",me, begin_to_w[nodes], count_to_w[me]);
+ // Warning(info,"%d: tosend %d to_myself %d",me, begin_to_w[nodes], count_to_w[me]);
  MPI_Alltoall(count_to_w,1,MPI_INT,count_from_w,1,MPI_INT,lts->comm); 
  begin_from_w[0]=0; 
  for(i=1;i<=nodes;i++) begin_from_w[i]=begin_from_w[i-1]+count_from_w[i-1];
  
- // Warning(1,"%d: toreceive:%d from_myself %d",me,begin_from_w[nodes], count_from_w[me]);
+ // Warning(info,"%d: toreceive:%d from_myself %d",me,begin_from_w[nodes], count_from_w[me]);
 
  M = begin_from_w[nodes];
 #ifdef DEBUG
- Warning(1,"%d : %d new trans.. %d old \n",me, M,begin_to_w[nodes]);
+ Warning(info,"%d : %d new trans.. %d old \n",me, M,begin_to_w[nodes]);
 #endif
  if ((aux1=(int*)calloc(M+1, sizeof(int)))==NULL)
-	Fatal(1,1,"out of memory in dlts_shuffle");
+	Fatal(1,error,"out of memory in dlts_shuffle");
  ///// MPI_Barrier(lts->comm);
  aux=0;
  for(i=0;i<nodes;i++){
@@ -3521,7 +3524,7 @@ void dlts_shuffle(dlts_t lts, int* wmap, int* omap){
  ///// MPI_Barrier(lts->comm);
  free(osrc); osrc=aux1; aux1 = NULL;
  if ((aux4=(int*)calloc(M+1, sizeof(int)))==NULL)
-	Fatal(1,1,"out of memory in dlts_shuffle");
+	Fatal(1,error,"out of memory in dlts_shuffle");
  ///// MPI_Barrier(lts->comm);
  aux=0;
  for(i=0;i<nodes;i++){
@@ -3536,7 +3539,7 @@ void dlts_shuffle(dlts_t lts, int* wmap, int* omap){
  ///// MPI_Barrier(lts->comm);
  free(lab);lab=aux4;aux4=NULL;
  if((aux2=(int*)calloc(M, sizeof(int)))==NULL)
-	Fatal(1,1,"out of memory in dlts_shuffle");
+	Fatal(1,error,"out of memory in dlts_shuffle");
  aux=0;
  for(i=0;i<nodes;i++){
 	MPI_Isend(wdest + begin_to_w[i], count_to_w[i], MPI_INT, i, 
@@ -3551,7 +3554,7 @@ void dlts_shuffle(dlts_t lts, int* wmap, int* omap){
  free(wdest);wdest=aux2;aux2=NULL;
 
  if((aux3=(int*)calloc(M, sizeof(int)))==NULL)
-	Fatal(1,1,"out of memory in dlts_shuffle");
+	Fatal(1,error,"out of memory in dlts_shuffle");
  aux=0;
  for(i=0;i<nodes;i++){
 	MPI_Isend(odest + begin_to_w[i], count_to_w[i], MPI_INT, i, 
@@ -3582,13 +3585,13 @@ void dlts_shuffle(dlts_t lts, int* wmap, int* omap){
  begin_from_w[0]=0; 
  for(i=1;i<=nodes;i++) begin_from_w[i]=begin_from_w[i-1]+count_from_w[i-1];
 #ifdef DEBUG
- Warning(1,"%d: i'm the new destination of %d transitions, %d local",
+ Warning(info,"%d: i'm the new destination of %d transitions, %d local",
  				 me, begin_from_w[nodes], begin_from_w[me]);
 #endif
  aux1=(int*)calloc(begin_from_w[nodes], sizeof(int));
  aux2=(int*)calloc(begin_from_w[nodes], sizeof(int));
  if ((!aux1) || (!aux2))
-	Fatal(1,1,"out of memory in dlts_shuffle");
+	Fatal(1,error,"out of memory in dlts_shuffle");
 
  //       send odest / receive aux1  
  ///// MPI_Barrier(lts->comm);
@@ -3605,7 +3608,7 @@ void dlts_shuffle(dlts_t lts, int* wmap, int* omap){
  }
  MPI_Waitall(aux, request_array, status_array);
 #ifdef DEBUG
- Warning(1,"%d: sent odest, received aux1",me);
+ Warning(info,"%d: sent odest, received aux1",me);
  for(i=0;i<begin_from_w[nodes];i++){
 	assert(aux1[i] >= 0);
 	assert(aux1[i] < N);
@@ -3615,7 +3618,7 @@ void dlts_shuffle(dlts_t lts, int* wmap, int* omap){
  for(i=0;i<begin_from_w[nodes];i++)
 	aux2[i] = wmap[aux1[i]]; 
 #ifdef DEBUG
- Warning(1,"%d: aux2 filled ",me);
+ Warning(info,"%d: aux2 filled ",me);
 #endif
  //      send aux2 / receive wdest
  MPI_Barrier(lts->comm);
@@ -3632,7 +3635,7 @@ void dlts_shuffle(dlts_t lts, int* wmap, int* omap){
  }
  MPI_Waitall(aux, request_array, status_array); 
 #ifdef DEBUG
- Warning(1,"%d: sent aux2, received wdest",me);
+ Warning(info,"%d: sent aux2, received wdest",me);
 #endif
  //      aux2 := omap[aux1]
  for(i=0;i<begin_from_w[nodes];i++)
@@ -3652,16 +3655,16 @@ void dlts_shuffle(dlts_t lts, int* wmap, int* omap){
  }
  MPI_Waitall(aux, request_array, status_array);   
 #ifdef DEBUG
- Warning(1,"%d: sent aux2, received odest",me);
+ Warning(info,"%d: sent aux2, received odest",me);
 #endif
  ///// MPI_Barrier(lts->comm);
  free(aux1); free(aux2);
 #ifdef DEBUG
- Warning(1,"%3d: now re-creating lts..",me);
+ Warning(info,"%3d: now re-creating lts..",me);
 #endif
  // re-create lts
  if ((aux1=(int*)calloc(nodes+1, sizeof(int))) == NULL)
-	Fatal(1,1,"out of memory in dlts_shuffle");
+	Fatal(1,error,"out of memory in dlts_shuffle");
  ComputeCount(wdest,M,aux1);
  Count2BeginIndex(aux1, nodes);
  SortArray(&osrc,M,wdest,aux1,nodes);
@@ -3713,8 +3716,8 @@ void dlts_clear_useless_transitions(dlts_t lts){
  MPI_Comm_size(lts->comm, &nodes);
  MPI_Comm_rank(lts->comm, &me); 
  N = lts->state_count[me];
- if (me==0) Warning(1, "NOW COUNTING USELESS STATES and TRANSITIONS");
- // Warning(1,"%d: %d states",me,lts->state_count[me]);
+ if (me==0) Warning(info, "NOW COUNTING USELESS STATES and TRANSITIONS");
+ // Warning(info,"%d: %d states",me,lts->state_count[me]);
 
  // sort
  /*
@@ -3727,19 +3730,19 @@ void dlts_clear_useless_transitions(dlts_t lts){
 	ComputeCount(lts->src[me][i], M, aux1);
 	Count2BeginIndex(aux1, N);
 	
-	//	Warning(1,"%d %d eee. %d transitions, %d states. aux1: %d %d %d",
+	//	Warning(info,"%d %d eee. %d transitions, %d states. aux1: %d %d %d",
 	//			me, i, M, N, aux1[0], aux1[1], aux1[N]);
 
 	//	SortArray(lts->dest[me]+i, M,
 	//						lts->src[me][i], aux1, N);
 
-	//	Warning(1,"%d %d iii. %d transitions, %d states. aux1: %d %d %d",
+	//	Warning(info,"%d %d iii. %d transitions, %d states. aux1: %d %d %d",
 	//					me,i,M, N, aux1[0], aux1[1], aux1[N]);
 
 	//	SortArray(lts->label[me]+i, M, 
 	//					lts->src[me][i], aux1, N);
 
-	// Warning(1,"%d %d ooo. %d transitions, %d states. aux1: %d %d %d",
+	// Warning(info,"%d %d ooo. %d transitions, %d states. aux1: %d %d %d",
 	//			me,i,M, N,
 	//			aux1[0], aux1[1], aux1[N]);
 	
@@ -3759,7 +3762,7 @@ void dlts_clear_useless_transitions(dlts_t lts){
 	*/
  /*
  ///// MPI_Barrier(lts->comm);
- if (me==0) Warning(1,"%d DONE!!",i);
+ if (me==0) Warning(info,"%d DONE!!",i);
  }
  
  free(aux1);
@@ -3781,7 +3784,7 @@ void dlts_clear_useless_transitions(dlts_t lts){
  
  ///// MPI_Barrier(lts->comm);
  MPI_Allreduce(&MU, &MU_all, 1, MPI_INT, MPI_SUM, lts->comm);
- if (me==0) Warning(1,"at least %d transitions should be eliminated",MU_all);
+ if (me==0) Warning(info,"at least %d transitions should be eliminated",MU_all);
 }
 
 
@@ -3812,7 +3815,7 @@ void dlts_shrink(dlts_t lts, int* wscc, int* oscc, int** weight){
  ///// MPI_Barrier(lts->comm);
  MPI_Comm_size(lts->comm, &nodes);
  MPI_Comm_rank(lts->comm, &me); 
- if (me==0) Warning(1,"\n\nSHRINK");
+ if (me==0) Warning(info,"\n\nSHRINK");
 
  request_array = (MPI_Request*)calloc(2*nodes, sizeof(MPI_Request));
  status_array = (MPI_Status*)calloc(2*nodes, sizeof(MPI_Status));
@@ -3848,7 +3851,7 @@ void dlts_shrink(dlts_t lts, int* wscc, int* oscc, int** weight){
 	lts->dest[me][me][j] = newindex[lts->dest[me][me][j]];
  }
 
- //  Warning(1,"%3d: exchanging counts",me);
+ //  Warning(info,"%3d: exchanging counts",me);
 
  // exchange dest -> tmp
  // counts 
@@ -3859,7 +3862,7 @@ void dlts_shrink(dlts_t lts, int* wscc, int* oscc, int** weight){
  begin[0]=0; 
  for(i=1;i<=nodes;i++) begin[i]=begin[i-1]+count_from_w[i-1];
 
- //  Warning(1,"%3d: dest -> tmp",me);
+ //  Warning(info,"%3d: dest -> tmp",me);
  // dest->tmp
  tmp=(int*)calloc(begin[nodes], sizeof(int));
  ///// MPI_Barrier(lts->comm);
@@ -3867,7 +3870,7 @@ void dlts_shrink(dlts_t lts, int* wscc, int* oscc, int** weight){
  for(i=0;i<nodes;i++)
 	if (i != me){
 	 //	 assert(lts->dest[me][i] != NULL);
-	 //	 Warning(1,"%3d: send to %3d %12d(%p)\n%3d: receive from %3d %12d", 
+	 //	 Warning(info,"%3d: send to %3d %12d(%p)\n%3d: receive from %3d %12d", 
 	 //					 me, i, lts->transition_count[me][i], lts->dest[me][i], me,i,count_from_w[i]);
 	 MPI_Isend(lts->dest[me][i], lts->transition_count[me][i], MPI_INT, 
 						 i, COLLAPSE_TAG, lts->comm, request_array + aux);
@@ -3879,7 +3882,7 @@ void dlts_shrink(dlts_t lts, int* wscc, int* oscc, int** weight){
  MPI_Waitall(aux, request_array, status_array);
  ///// MPI_Barrier(lts->comm);
 
- //  Warning(1,"%3d: transforming tmp",me);
+ //  Warning(info,"%3d: transforming tmp",me);
  // transform tmp
  for(i=0;i<begin[nodes];i++){
 #ifdef DEBUG
@@ -3889,7 +3892,7 @@ void dlts_shrink(dlts_t lts, int* wscc, int* oscc, int** weight){
 	tmp[i] = newindex[tmp[i]];
  }
 
- //  Warning(1,"%3d: tmp -> dest",me);
+ //  Warning(info,"%3d: tmp -> dest",me);
 
 
  // tmp->dest
@@ -3917,7 +3920,7 @@ void dlts_shrink(dlts_t lts, int* wscc, int* oscc, int** weight){
 	ComputeCount(wscc, lts->state_count[me], begin);
 	for(i=0;i<nodes;i++) count_to_w[i]=begin[i];
 	Count2BeginIndex(begin, nodes);
-	//			Warning(1,"newN=%d, *weight is %p weight is %p w[0]=%d",newN, (*weight),weight, (*weight)[0]);
+	//			Warning(info,"newN=%d, *weight is %p weight is %p w[0]=%d",newN, (*weight),weight, (*weight)[0]);
 	ooo = oscc; SortArray(&ooo, lts->state_count[me], wscc, begin, nodes);
 	
 	i=0;
@@ -3945,7 +3948,7 @@ void dlts_shrink(dlts_t lts, int* wscc, int* oscc, int** weight){
  
  // update state_count
  
- //Warning(1,"*weight is %p weight is %p",(*weight),weight);
+ //Warning(info,"*weight is %p weight is %p",(*weight),weight);
  if (weight != NULL) {	
 	maxscc=0; nscc=0; j=0;
 	for(i=0;i<newN;i++) {
@@ -3954,7 +3957,7 @@ void dlts_shrink(dlts_t lts, int* wscc, int* oscc, int** weight){
 	 if ((*weight)[i] == 1) nscc++;
 	 //	 assert ((*weight)[i] >= 1);
 	}
-	Warning(1,"%3d: old N is %12d (weight: %12d), new N is %12d", 
+	Warning(info,"%3d: old N is %12d (weight: %12d), new N is %12d", 
 				 me, lts->state_count[me], j, newN); 
 	///// MPI_Barrier(lts->comm);
 	i=lts->state_count[me]; 
@@ -3962,13 +3965,13 @@ void dlts_shrink(dlts_t lts, int* wscc, int* oscc, int** weight){
 	i=maxscc; MPI_Reduce(&i, &maxscc, 1, MPI_INT, MPI_MAX, 0, lts->comm);
 	i=nscc; MPI_Reduce(&i, &nscc, 1, MPI_INT, MPI_SUM, 0, lts->comm);
 	if (me==0){
-	 Warning(1,"largest SCC has %12d nodes",maxscc);
-	 Warning(1,"there are %12d trivial SCCs", nscc);
+	 Warning(info,"largest SCC has %12d nodes",maxscc);
+	 Warning(info,"there are %12d trivial SCCs", nscc);
 	}
  }
  lts->state_count[me] = newN;
  ///// MPI_Barrier(lts->comm);
- // Warning(1,"\noooooooo\n");
+ // Warning(info,"\noooooooo\n");
 }
 
 
@@ -3994,7 +3997,7 @@ void dlts_mark(dlts_t lts, int L, char* mark){
  j=0;
  for(i=0;i<lts->state_count[me];i++)
 	if (mark[i]) j++;
- Warning(1,"%3d: %12d states marked (out of %12d)",
+ Warning(info,"%3d: %12d states marked (out of %12d)",
 				 me, j, lts->state_count[me]);
 }
 
@@ -4014,7 +4017,7 @@ void dlts_reachback(dlts_t lts, char* mark){
  ///// MPI_Barrier(lts->comm);
  MPI_Comm_size(lts->comm, &nodes);
  MPI_Comm_rank(lts->comm, &me); 
- if (me==0) Warning(1,"\nREACH BACK");
+ if (me==0) Warning(info,"\nREACH BACK");
 
  count_from_w = (int*)calloc(nodes+1, sizeof(int));
  MPI_Alltoall(lts->transition_count[me],1,MPI_INT,count_from_w,1,MPI_INT,lts->comm);
@@ -4053,10 +4056,10 @@ void dlts_reachback(dlts_t lts, char* mark){
 		}
 	} // end for i
 	MPI_Allreduce(&changed, &allchanged, 1, MPI_INT, MPI_SUM, lts->comm );
-	//	if (me==0) Warning(1,"new reachable: %12d",allchanged);
+	//	if (me==0) Warning(info,"new reachable: %12d",allchanged);
  } // end while changed
  free(bufin); free(bufout); free(count_from_w);
- if (me==0) Warning(1,"\n\n");
+ if (me==0) Warning(info,"\n\n");
 }
 
 
@@ -4081,7 +4084,7 @@ void print_status(taudlts_t t){
 	if (t->begin[i]<t->begin[i+1]) j++;
  MPI_Reduce(&j, &sn, 1, MPI_INT, MPI_SUM, 0, t->comm);
  if (me==0) 
-	Warning(1,"\n_____________\nleft:      N=%12d    M=%12d     \nfinal:     N=%12d    M=%12d    \non cycles: N=%12d    M=%12d  \n\"real\"     N=%12d    M=%12d\n_____________\n",n,m,nf,mf,nh,mh,sn,sm);
+	Warning(info,"\n_____________\nleft:      N=%12d    M=%12d     \nfinal:     N=%12d    M=%12d    \non cycles: N=%12d    M=%12d  \n\"real\"     N=%12d    M=%12d\n_____________\n",n,m,nf,mf,nh,mh,sn,sm);
  ///// MPI_Barrier(t->comm);
 }
 
