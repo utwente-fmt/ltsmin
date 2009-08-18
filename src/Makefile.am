@@ -222,6 +222,7 @@ libutil_la_SOURCES := unix.c runtime.c stream.c archive.c			\
                     is-balloc.c is-balloc.h \
                     dfs-stack.c dfs-stack.h \
                     balloc.c balloc.h bitset.c bitset.h
+libutil_la_SOURCES += string-map.c string-map.h
 
 libutil_la_LIBADD = dm/libdm.la
 

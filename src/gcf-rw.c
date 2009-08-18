@@ -1,5 +1,6 @@
 #include "archive.h"
 #include <fnmatch.h>
+#include <string-map.h>
 #include <stdio.h>
 #include <string.h>
 #include "runtime.h"
@@ -11,7 +12,7 @@ typedef struct copy_context {
 	archive_t src;
 	archive_t dst;
 	char* decode;
-	char* (*encode)(char*);
+	string_map_t encode;
 	int bs;
 } *copy_context_t;
 
@@ -19,7 +20,7 @@ static int copy_item(void*arg,int id,char*name){
 	(void)id;
 	copy_context_t ctx=(copy_context_t)arg;
 	Warning(info,"copying %s",name);
-	char*compression=ctx->encode?ctx->encode(name):NULL;
+	char*compression=SSMcall(ctx->encode,name);
 	Warning(debug,"compression method is %s",compression);
 	stream_t is=arch_read(ctx->src,name,ctx->decode);
 	stream_t os=arch_write(ctx->dst,name,compression,1);
@@ -34,7 +35,7 @@ static int copy_item(void*arg,int id,char*name){
 	return 0;
 }
 
-static void archive_copy(archive_t src,char*decode,archive_t dst,char*(*encode)(char*),int blocksize){
+static void archive_copy(archive_t src,char*decode,archive_t dst,string_map_t encode,int blocksize){
 	struct arch_enum_callbacks cb;
 	cb.new_item=copy_item;
 	cb.end_item=NULL;
@@ -76,47 +77,12 @@ static  struct poptOption options[] = {
 	POPT_TABLEEND
 };
 
-char *pattern[1024];
-char *code[1024];
-int pattern_count=0;
-
-static void compression_policy_compile(char *policy){
-	char*delim;
-	while((delim=strchr(policy,';'))){
-		pattern[pattern_count]=policy;
-		delim[0]=0;
-		char*tmp=strrchr(policy,':');
-		if (!tmp){
-			Fatal(1,error,"bad policy entry %s",policy);
-		}
-		tmp[0]=0;
-		code[pattern_count]=tmp+1;
-		policy=delim+1;
-		Warning(debug,"rule %d: %s : %s",pattern_count,pattern[pattern_count],code[pattern_count]);
-		pattern_count++;
-	}
-	pattern[pattern_count]="*";
-	code[pattern_count]=policy;
-	Warning(debug,"rule %d: %s : %s",pattern_count,pattern[pattern_count],code[pattern_count]);
-	pattern_count++;
-}
-
-static char* get_compression(char*filename){
-	for(int i=0;i<pattern_count;i++){
-		if (!fnmatch(pattern[i],filename,0)) {
-			if (strcmp(code[i],"none")) return code[i]; else return "";
-		}
-	}
-	Fatal(1,error,"file %s doesn't match a policy rule",filename);
-	return NULL;
-}
-
 int main(int argc, char *argv[]){
 	char*gcf_name;
 	archive_t gcf=NULL;
 	RTinitPopt(&argc,&argv,options,1,-1,&gcf_name,NULL,"([-c] <gcf> (<dir>|<file>)*) | (-x <gcf> [<dir>|<pattern>])",
 		"Tool for creating and extracting GCF archives\n\nOptions");
-	compression_policy_compile(policy);
+	string_map_t compression_policy=SSMcreateSWP(policy);
 	if (operation==GCF_EXTRACT) {
 		char *out_name=RTinitNextArg();
 		archive_t dir;
@@ -152,12 +118,12 @@ int main(int argc, char *argv[]){
 			if (is_a_dir(input_name)){
 				Warning(info,"copying contents of %s",input_name);
 				archive_t dir=arch_dir_open(input_name,blocksize);
-				archive_copy(dir,NULL,gcf,get_compression,blocksize);
+				archive_copy(dir,NULL,gcf,compression_policy,blocksize);
 				arch_close(&dir);
 			} else {
 				Warning(info,"copying %s",input_name);
 				stream_t is=file_input(input_name);
-				stream_t os=arch_write(gcf,input_name,get_compression(input_name),1);
+				stream_t os=arch_write(gcf,input_name,SSMcall(compression_policy,input_name),1);
 				char buf[blocksize];
 				for(;;){
 					int len=stream_read_max(is,buf,blocksize);
