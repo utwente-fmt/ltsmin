@@ -162,7 +162,14 @@ extern void (*RThandleFatal)(const char*file,int line,int errnum,int code);
     #define Debug(...)
 #endif
 
+/**
+\brief Check if an integer is between a minimum and a maximum.
+*/
+#define RangeCheckInt(val,min,max) if ((val) < (min) || (val) > (max)) \
+    Fatal(1,error,"value %d is out of range [%d,%d]",val,min,max)
+
 ///@}
 
 
 #endif
+
