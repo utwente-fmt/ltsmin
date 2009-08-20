@@ -10,7 +10,7 @@ AC_SUBST([pkglibdir], "\${libdir}/${PACKAGE_NAME}-${PACKAGE_VERSION}")
 
 # Checks for programs.
 CFLAGS="-O2 ${CFLAGS}"
-CXXFLAGS="-O2 ${$CXXFLAGS}"
+CXXFLAGS="-O2 ${CXXFLAGS}"
 AM_CFLAGS="-g"
 AM_CXXFLAGS="-g -Wno-inline -ftemplate-depth-128 -finline-functions"
 
