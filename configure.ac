@@ -175,6 +175,7 @@ AC_CONFIG_FILES([
        Makefile
        src/Makefile
        src/dm/Makefile
+       src/torx/Makefile
        doc/Makefile
        lemon/Makefile
 ])
