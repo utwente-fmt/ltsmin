@@ -1,12 +1,20 @@
-#include "state-buffer.h"
 #include <stdlib.h>
-#include "runtime.h"
 #include <unistd.h>
+#include "runtime.h"
+#include "is-balloc.h"
 
-#define MAX_MEM 128ULL*1024*1024*1024
+#define MAX_MEM (128ULL*1024*1024*1024)
+
+struct isb_allocator {
+    size_t el_size;
+    size_t max_blocks;
+    size_t num_block;
+    size_t cur_index;
+    int** blocks;
+};
 
 /**
- \brief Create a buffer
+ \brief Create a block allocator
 
  Lazy block allocation:
  Block allocation is done before operation execution, thus the amount
@@ -25,14 +33,12 @@
 
 static const size_t BLOCK_ELT_SIZE = 10000; //blocksize in el_size
 
-void
-add_block(state_buffer_t buf)
+static void
+add_block(isb_allocator_t buf)
 {
     Debug("adding block %zu", buf->num_block-1);
     int size = buf->el_size*sizeof(int)*BLOCK_ELT_SIZE;
-    int *block = malloc(size);
-    if (!block)
-        Fatal(1, error, "alloc of %d, for %zu", size, buf->num_block);
+    int *block = RTmalloc(size);
     buf->blocks[buf->num_block] = block;
     buf->num_block++;
     buf->cur_index = 0;
@@ -42,28 +48,34 @@ add_block(state_buffer_t buf)
 /*!
  * @param buf the buffer to remove a memory block from
  */
-void
-remove_block(state_buffer_t buf)
+static void
+remove_block(isb_allocator_t buf)
 {
     Debug("freeing block %zu", buf->num_block-1);
     buf->num_block--;
     free(buf->blocks[buf->num_block]);
 }
 
-state_buffer_t
-create_buffer(int element_size)
+isb_allocator_t
+isba_create(int element_size)
 {
-    state_buffer_t res = malloc(sizeof(struct state_buffer));
+    isb_allocator_t res = RTmalloc(sizeof *res);
     res->el_size = element_size;
     res->max_blocks = MAX_MEM/(BLOCK_ELT_SIZE*element_size);
-    res->blocks = malloc(res->max_blocks*sizeof(int*));
+    res->blocks = RTmalloc(res->max_blocks*sizeof(int*));
     res->num_block = 0;
     add_block(res);
     return res;
 }
 
+size_t
+isba_elt_size (const isb_allocator_t buf)
+{
+    return buf->el_size;
+}
+
 void
-destroy_buffer(state_buffer_t buf)
+isba_destroy(isb_allocator_t buf)
 {
     do {remove_block(buf);} while (buf->num_block > 0);
     free(buf->blocks);
@@ -74,11 +86,11 @@ destroy_buffer(state_buffer_t buf)
  \brief pushes an array of ints on this stack as one operation
  */
 void
-push_int(state_buffer_t buf, int* element)
+isba_push_int(isb_allocator_t buf, const int *element)
 {
     if (buf->cur_index == BLOCK_ELT_SIZE) {
         if (buf->num_block == buf->max_blocks)
-            Fatal(1, error, "state-buffer mem size of %zu exceeded", MAX_MEM/1024/1024/1024);
+            Fatal(1, error, "isb_allocator mem size of %zu exceeded", MAX_MEM/1024/1024/1024);
         add_block(buf);
     }
     size_t x;
@@ -95,7 +107,7 @@ push_int(state_buffer_t buf, int* element)
  live longer
  */
 int *
-pop_int(state_buffer_t buf)
+isba_pop_int(isb_allocator_t buf)
 {
     if (buf->cur_index == 0) {
         if (buf->num_block == 1) Fatal(1, error, "Pop on empty buffer");
@@ -110,11 +122,11 @@ pop_int(state_buffer_t buf)
  * \return use free
  */
 char *
-buffer_to_string(state_buffer_t buf)
+isba_to_string(isb_allocator_t buf)
 {
     char* res;
     int ar[1];
-    ar[0] = buffer_size_int(buf) ? top_int(buf)[0] : -1;
+    ar[0] = isba_size_int(buf) ? isba_top_int(buf)[0] : -1;
     asprintf(&res, "LIFOBuffer[%zu | %zu * %zu + %zu | top1(%d)]", buf->el_size,
              buf->num_block, BLOCK_ELT_SIZE, buf->cur_index, ar[0]);
     return res;
@@ -124,12 +136,12 @@ buffer_to_string(state_buffer_t buf)
  \brief pops and discards a number of elements on the stack
  */
 void
-discard_int(state_buffer_t buf, size_t amount)
+isba_discard_int(isb_allocator_t buf, size_t amount)
 {
     if (buf->cur_index < amount) {
         size_t blocks = amount/BLOCK_ELT_SIZE;
         if (buf->num_block == 1 || buf->num_block <= blocks)
-            Fatal(1, error, "Discard %zu on buffer of size %zu elements", amount, buffer_size_int(buf));
+            Fatal(1, error, "Discard %zu on buffer of size %zu elements", amount, isba_size_int(buf));
         size_t x;
         for (x = 0; x <= blocks; x++) remove_block(buf);
         buf->cur_index = BLOCK_ELT_SIZE-(amount%BLOCK_ELT_SIZE)+buf->cur_index;
@@ -139,7 +151,7 @@ discard_int(state_buffer_t buf, size_t amount)
 }
 
 size_t
-buffer_size_int(state_buffer_t buf)
+isba_size_int(isb_allocator_t buf)
 {
     return (buf->num_block-1) * BLOCK_ELT_SIZE + buf->cur_index;
 }
@@ -148,7 +160,7 @@ buffer_size_int(state_buffer_t buf)
  \brief returns a pointer to the top element
  */
 int *
-top_int(state_buffer_t buf)
+isba_top_int(isb_allocator_t buf)
 {
     if (buf->cur_index == 0) {
         if (buf->num_block == 1) Fatal(1, error, "Top on empty buffer");
@@ -159,9 +171,9 @@ top_int(state_buffer_t buf)
 }
 
 int *
-peek_int(state_buffer_t buf, size_t offset_top)
+isba_peek_int(isb_allocator_t buf, size_t offset_top)
 {
-    size_t size = buffer_size_int(buf);
+    size_t size = isba_size_int(buf);
     if (offset_top >= size)
         Fatal(1, error, "peeks offset %zu is too large for a buffer with size %zu", offset_top, size);
     size_t newsize = size - (offset_top+1);

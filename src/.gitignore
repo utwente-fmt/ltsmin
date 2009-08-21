@@ -36,5 +36,5 @@ etf-lexer.c
 etf-lexer.h
 lempar.c
 test-bitset
-test-state-buffer
+test-is-balloc
 test-dfs-stack
