@@ -8,9 +8,6 @@ bfs;;
 dfs;;
   explore state space in depth-first order.
 
-torx;;
-  run the TorX-Explorer textual interface on _stdin_ and _stdout_.
-
 *--state*='TYPE'::
         Select type of data structure for storing visited states.
         'TYPE' can be one of the following options:
@@ -20,6 +17,3 @@ tree;;
 
 vset;;
   use a vector set (decision diagram).
-
-*--torx*::
-        Synonym for '--strategy=torx'.
