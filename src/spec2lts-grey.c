@@ -637,7 +637,7 @@ int main(int argc, char *argv[]){
 		if(TreeFold(dbs,src)!=0){
 			Fatal(1,error,"expected 0");
 		}
-		int limit=visited;
+		int limit=explored;
 		while(explored<visited){
 		  if (limit==explored){
 		    if (RTverbosity >= 1)
