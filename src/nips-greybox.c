@@ -217,6 +217,7 @@ struct gb_context_s {
 
     nipsvm_state_t     *source_state;
     int                 group;
+    int                 transition_count;
 
     nipsvm_errorcode_t  err;
     nipsvm_pid_t        pid;
@@ -234,6 +235,7 @@ init_gb_context (struct gb_context_s *gb_ctx, model_t model,
     gb_ctx->context = context;
     gb_ctx->source_state = source;
     gb_ctx->group = group;
+    gb_ctx->transition_count = 0;
     gb_ctx->err = 0;
     return gb_ctx;
 }
@@ -266,7 +268,10 @@ scheduler_callback (size_t succ_size, nipsvm_state_t *succ,
      */
     if (succ->excl_pid != 0)
         return IC_CONTINUE_INVISIBLY;
-    
+
+    /* increment transition count in context */
+    gb_context->transition_count++;
+
     size_t          ilen = gb_context->state_length;
     int             ivec[ilen];
     int             ilabel[] = { ILABEL_TAU };
@@ -374,10 +379,11 @@ NIPSgetTransitionsAll (model_t model, int *src, TransitionCB cb,
 
     init_gb_context (&gb_context, model, cb, context,
                      (nipsvm_state_t *)state, GB_NO_GROUP);
+
     nipsvm_scheduler_iter (NIPSgetVM (model), (nipsvm_state_t *)state,
                            &gb_context);
 
-    return 0;
+    return gb_context.transition_count;
 }
 
 int
@@ -400,7 +406,7 @@ NIPSgetTransitionsLong (model_t model, int group, int *src,
     nipsvm_scheduler_iter (NIPSgetVM (model), (nipsvm_state_t *)state,
                            &gb_context);
 
-    return 0;
+    return gb_context.transition_count;
 }
 
 typedef struct {
