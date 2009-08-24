@@ -363,16 +363,21 @@ bfs_explore_state_vector (void *context, int *src)
 {
     model_t             model = (model_t)context;
     maybe_write_state (model, NULL, src);
+	int count = 0;
     switch (call_mode) {
     case UseBlackBox:
-        GBgetTransitionsAll (model, src, vector_next, &explored);
+        count = GBgetTransitionsAll (model, src, vector_next, &explored);
         break;
     case UseGreyBox:
         for (int i = 0; i < K; i++) {
-            GBgetTransitionsLong (model, i, src, vector_next, &explored);
+            count += GBgetTransitionsLong (model, i, src, vector_next, &explored);
         }
         break;
     }
+	if (count == 0 && dlk_detect) {
+		Warning(info,"deadlock found!");
+		Fatal(1,info, "exiting now");
+	}
     explored++;
     if (explored % 1000 == 0 && RTverbosity >= 2)
         Warning (info, "explored %d visited %d trans %d", explored, visited, trans);
@@ -611,6 +616,7 @@ int main(int argc, char *argv[]){
         case Strat_BFS:
             switch (state_db) {
             case DB_Vset:
+		if (trc_output) Fatal(1, error, "--trace not supported for vset, use tree");
 		domain=vdom_create_default(N);
 		visited_set=vset_create(domain,0,NULL);
 		next_set=vset_create(domain,0,NULL);
