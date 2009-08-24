@@ -249,44 +249,57 @@ static void write_trace_step(model_t model, int src_no,int*src,int dst_no,int*ds
     if (ctx.found==0) Fatal(1,error,"no matching transition found");
 }
 
-static int find_trace_to(model_t model, int dst_idx)
+static void find_trace_to(model_t model, int dst_idx, int level)
 {
-    int src_idx = parent_ofs[dst_idx];
-    int src_new_idx = 0;
-    // backtrace to initial state
-    if (dst_idx > 0)  {
-        src_new_idx = find_trace_to(model, src_idx);
-    // special case, initial state
-    } else if (dst_idx == 0) {
-        // write initial state
-        int state[N];
-        get_state(dst_idx, state);
-        write_trace_state(model, dst_idx, state);
-        return 0;
+    uint32_t *trace = (uint32_t*)RTmalloc(sizeof(uint32_t) * level);
+
+    if (trace == NULL)
+        Fatal(1, error, "unable to allocate memory for trace");
+
+    int i = level - 1;
+    int curr_idx = dst_idx;
+    trace[i] = curr_idx;
+    while(curr_idx != 0)
+    {
+        i--;
+        curr_idx = parent_ofs[curr_idx];
+        trace[i] = curr_idx;
     }
 
-    // trace to root
-    printf("trace %d -> %d\n", src_idx, dst_idx);
+    // write trace
 
-    // get state
+    // write initial state
+    int step = 0;
     int src[N];
-    get_state(src_idx, src);
     int dst[N];
-    get_state(dst_idx, dst);
+    get_state(0, dst);
+    write_trace_state(model, 0, dst);
 
-    // assume stc_idx state has been written
-    // write step
-    write_trace_step(model, src_new_idx, src, src_new_idx + 1, dst);
-    // write dst_idx
-    write_trace_state(model, dst_idx, dst);
+    i++;
+    while(i < level)
+    {
+        for(int j=0; j < N; ++j)
+            src[j] = dst[j];
+        get_state(trace[i], dst);
 
-    return src_new_idx + 1;
+        // write step
+        write_trace_step(model, step, src, step + 1, dst);
+        // write dst_idx
+        write_trace_state(model, trace[i], dst);
+
+        i++;
+        step++;
+    }
+
+    RTfree(trace);
+
+    return;
 }
 
-static void find_trace(model_t model, int dst_idx) {
+static void find_trace(model_t model, int dst_idx, int level) {
     mytimer_t timer = SCCcreateTimer();
     SCCstartTimer(timer);
-    find_trace_to(model, dst_idx);
+    find_trace_to(model, dst_idx, level);
     SCCstopTimer(timer);
     SCCreportTimer(timer,"constructing the trace took");
 }
@@ -320,7 +333,7 @@ index_next_dfs (void *arg, int *lbl, int *dst)
 
 /* Exploration */
 static void
-bfs_explore_state_index (void *context, int idx, int *src)
+bfs_explore_state_index (void *context, int idx, int *src, int level)
 {
     model_t             model = (model_t)context;
     maybe_write_state (model, &idx, src);
@@ -346,7 +359,7 @@ bfs_explore_state_index (void *context, int idx, int *src)
                 lts_output_set_root_idx(trace_output,0,0);
             }
             trace_handle=lts_output_begin(trace_output,0,0,0);
-            find_trace(model, idx);
+            find_trace(model, idx, level);
             lts_output_end(trace_output,trace_handle);
             lts_output_close(&trace_output);
         }
@@ -654,7 +667,7 @@ int main(int argc, char *argv[]){
 			if (level == max) break;
 		  }
 		  TreeUnfold(dbs,explored,src);
-		  bfs_explore_state_index(model,explored,src);
+		  bfs_explore_state_index(model,explored,src,level);
 		}
 		break;
             default:
