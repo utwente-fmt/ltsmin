@@ -34,4 +34,5 @@ etf-grammer.h
 etf-grammer.out
 etf-lexer.c
 etf-lexer.h
-
+lempar.c
+test-bitset
