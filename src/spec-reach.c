@@ -619,9 +619,6 @@ int main(int argc, char *argv[]){
 		"The optional output of this analysis is an ETF representation of the input\n"
 		"\nOptions");
 	etf_output=files[1];
-	if (RTverbosity==0) {
-		log_set_flags(info,LOG_IGNORE);
-	}
 	Warning(info,"opening %s",files[0]);
 	model=GBcreateBase();
 	GBsetChunkMethods(model,new_string_index,NULL,
