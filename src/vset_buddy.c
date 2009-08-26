@@ -53,7 +53,6 @@ struct vector_domain {
 	int *vars2;
 	bddPair *pairs;
 	int *proj;
-  //int *encoding; // storing boolean variables for FDD variables
 };
 
 static BDD mkvar(vdom_t dom,int idx,int val){
@@ -362,17 +361,11 @@ vdom_t vdom_create_fdd(int n){
 	dom->vars=(int*)RTmalloc(n*sizeof(int));
 	dom->vars2=(int*)RTmalloc(n*sizeof(int));
 	dom->proj=(int*)RTmalloc(n*sizeof(int));
-	//dom->encoding=(int*)RTmalloc(n*fdd_bits*sizeof(int));
 	for(int i=0;i<n;i++){
 		res=fdd_extdomain(domain,2);
 		if (res<0){
 			Fatal(1,error,"BuDDy error: %s",bdd_errstring(res));
 		}
-		//{ // JvdP: store encoded boolean variables
-		//int* bools = fdd_vars(res);
-		//for (int j=0;j<fdd_bits;j++) 
-		//  dom->encoding[i*fdd_bits+j] = bools[j];
-		//}
 		dom->vars[i]=res;
 		dom->vars2[i]=res+1;
 		dom->proj[i]=i;
@@ -403,7 +396,6 @@ vdom_t vdom_create_fdd(int n){
 	dom->shared.rel_create=rel_create_fdd;
 	dom->shared.rel_add=rel_add_fdd;
 	dom->shared.rel_count=rel_count_fdd;
-	dom->shared.set_next=set_next_appex_fdd; // JvdP 30/05/09
+	dom->shared.set_next=set_next_appex_fdd;
 	return dom;
 }
-
