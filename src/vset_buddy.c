@@ -10,18 +10,13 @@ static int cacheratio=64;
 static int maxincrease=1000000;
 static int minfreenodes=20;
 
-// print buddy garbage collect statistics to stderr...
-// problem: want to restrict this to VERBOSE flag from main, not visible here
-static void vset_fdd_gbchandler(int pre, bddGbcStat *s)
-{
-   if (!pre)
-   {
-      fprintf(stderr,"Garbage collection #%d: %d nodes / %d free",
- 	     s->num, s->nodes, s->freenodes);
-      fprintf(stderr," / %.1fs / %.1fs total\n",
-	     (float)s->time/(float)(CLOCKS_PER_SEC),
-	     (float)s->sumtime/(float)CLOCKS_PER_SEC);
-   }
+static void vset_fdd_gbchandler(int pre, bddGbcStat *s) {
+  if (!pre && RTverbosity>=2) {
+    Warning(info,"Garbage collection #%d: %d nodes / %d free / %.1fs / %.1fs total",
+	    s->num, s->nodes, s->freenodes,
+	    (float)s->time/(float)(CLOCKS_PER_SEC),
+	    (float)s->sumtime/(float)CLOCKS_PER_SEC);
+  }
 }
 
 static void buddy_init(){
