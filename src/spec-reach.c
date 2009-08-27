@@ -103,7 +103,8 @@ static int sLbls;
 static int nGrps;
 static vdom_t domain;
 static vset_t visited;
-static long max_count=0;
+static long max_lev_count=0;
+static long max_vis_count=0;
 static long max_grp_count=0;
 static long max_trans_count=0;
 static model_t model;
@@ -294,10 +295,55 @@ static void deadlock_check(vset_t deadlocks){
     Fatal(1,info,"exiting now");
 }
 
+static void stats_and_progress_report(vset_t current, vset_t visited, int level) {
+  long long e_count;
+  long n_count;
+  
+  if (current) {
+    vset_count(current,&n_count,&e_count);
+    if (n_count>max_lev_count) max_lev_count=n_count;
+    Warning(info,"level %d has %lld states ( %ld nodes )",level,e_count,n_count);
+  }
+  
+  vset_count(visited,&n_count,&e_count);
+  if (n_count>max_vis_count) max_vis_count=n_count;
+  Warning(info,"visited %d has %lld states ( %ld nodes )",level,e_count,n_count);
+  if (RTverbosity >= 2) {
+    int i;
+    fprintf(stderr,"transition caches (grp,nds,elts): ");
+    for (i=0;i<nGrps;i++) {
+      vrel_count(group_next[i],&n_count,&e_count);
+      fprintf(stderr,"( %d %ld %lld ) ",i,n_count,e_count);
+      if (n_count>max_trans_count) max_trans_count=n_count;
+    }
+    fprintf(stderr,"\ngroup explored    (grp,nds,elts): ");
+    for (i=0;i<nGrps;i++) {
+      vset_count(group_explored[i],&n_count,&e_count);
+      fprintf(stderr,"( %d %ld %lld ) ",i,n_count,e_count);
+      if (n_count>max_grp_count) max_grp_count=n_count;
+    }
+    fprintf(stderr,"\n");
+  }
+}
+
+static void final_stat_reporting(vset_t visited) {
+  long long e_count;
+  long n_count;
+  vset_count(visited,&n_count,&e_count);
+  fprintf(stderr,"state space has %lld states\n",e_count);
+  if (max_lev_count==0)
+    fprintf(stderr,"( %ld final BDD nodes; %ld peak nodes )\n",
+	    n_count,max_vis_count);
+  else
+    fprintf(stderr,"( %ld final BDD nodes; %ld peak nodes; %ld peak nodes per level )\n",
+	    n_count,max_vis_count,max_lev_count);
+  if (RTverbosity >=2)
+    fprintf(stderr,"( peak transition cache: %ld nodes; peak group explored: %ld nodes )\n",
+	    max_trans_count,max_grp_count);
+}
+
 static void reach_bfs(){
 	int level,i;
-	long long e_count;
-	long n_count;
 	long eg_count=0;
 	long next_count=0;
 
@@ -309,34 +355,8 @@ static void reach_bfs(){
 	vset_t dlk_temp=dlk_detect?vset_create(domain,0,NULL):NULL;
 	vset_copy(current_level,visited);
 	for(;;){
-		if (RTverbosity >= 1) {
-			vset_count(current_level,&n_count,&e_count);
-			fprintf(stderr,"level %d has %lld states ( %ld nodes )\n",level,e_count,n_count);
-		}
-		vset_count(visited,&n_count,&e_count);
-		if (n_count>max_count) max_count=n_count;
-		if (RTverbosity >= 1) {
-			fprintf(stderr,"visited %d has %lld states ( %ld nodes )\n",level,e_count,n_count);
-			if (RTverbosity >= 2) fprintf(stderr,"transition caches (grp,nds,elts): ");
-			for (i=0;i<nGrps;i++) 
-			  {long long e;
-			   long int n;
-			   vrel_count(group_next[i],&n,&e);
-			   if (RTverbosity >= 2) fprintf(stderr,"( %d %ld %lld ) ",i,n,e);
-			   if (n>max_trans_count) max_trans_count=n;
-			  }
-			if (RTverbosity >= 2) fprintf(stderr,"\n");
-			if (RTverbosity >= 2) fprintf(stderr,"group explored    (grp,nds,elts): ");
-			for (i=0;i<nGrps;i++) 
-			  {long long e;
-			   long int n;
-			   vset_count(group_explored[i],&n,&e);
-			   if (RTverbosity >= 2) fprintf(stderr,"( %d %ld %lld ) ",i,n,e);
-			   if (n>max_grp_count) max_grp_count=n;
-			  }
-			if (RTverbosity >= 2) fprintf(stderr,"\n");
-		}
 		if(vset_is_empty(current_level)) break;
+	        stats_and_progress_report(current_level,visited,level);
 		level++;
 		for(i=0;i<nGrps;i++){
 			if (RTverbosity >= 2) fprintf(stderr,"\rexploring group %4d/%d",i+1,nGrps);
@@ -359,6 +379,7 @@ static void reach_bfs(){
 			vset_union(next_level,temp);
 			vset_clear(temp);
 		}
+		if (RTverbosity >= 2) fprintf(stderr,"\rlocal next complete       \n");
 		if (dlk_detect) deadlock_check(deadlocks);
 		vset_union(visited,next_level);
 		vset_copy(current_level,next_level);
@@ -370,8 +391,6 @@ static void reach_bfs(){
 
 void reach_bfs2(){
 	int level,i;
-	long long e_count;
-	long n_count;
 	long eg_count=0;
 	long next_count=0;
 
@@ -382,29 +401,7 @@ void reach_bfs2(){
 	vset_t dlk_temp=dlk_detect?vset_create(domain,0,NULL):NULL;
 	for(;;){
 		vset_copy(old_vis,visited);
-		vset_count(visited,&n_count,&e_count);
-		if (n_count>max_count) max_count=n_count;
-		if (RTverbosity >= 1) {
-			fprintf(stderr,"visited %d has %lld states ( %ld nodes )\n",level,e_count,n_count);
-			if (RTverbosity >= 2) fprintf(stderr,"transition caches (grp,nds,elts): ");
-			for (i=0;i<nGrps;i++) 
-			  {long long e;
-			   long int n;
-			   vrel_count(group_next[i],&n,&e);
-			   if (RTverbosity >= 2) fprintf(stderr,"( %d %ld %lld ) ",i,n,e);
-			   if (n>max_trans_count) max_trans_count=n;
-			  }
-			if (RTverbosity >= 2) fprintf(stderr,"\n");
-			if (RTverbosity >= 2) fprintf(stderr,"group explored    (grp,nds,elts): ");
-			for (i=0;i<nGrps;i++) 
-			  {long long e;
-			   long int n;
-			   vset_count(group_explored[i],&n,&e);
-			   if (RTverbosity >= 2) fprintf(stderr,"( %d %ld %lld ) ",i,n,e);
-			   if (n>max_grp_count) max_grp_count=n;
-			  }
-			if (RTverbosity >= 2) fprintf(stderr,"\n");
-		}
+		stats_and_progress_report(NULL,visited,level);
 		level++;
 		for(i=0;i<nGrps;i++){
 			if (RTverbosity >= 2) fprintf(stderr,"\rexploring group %4d/%d",i+1,nGrps);
@@ -439,8 +436,6 @@ void reach_sat(){
 
 void reach_chain(){
 	int level,i;
-	long long e_count;
-	long n_count;
 	long eg_count=0;
 	long next_count=0;
 
@@ -451,29 +446,7 @@ void reach_chain(){
 	vset_t dlk_temp=dlk_detect?vset_create(domain,0,NULL):NULL;
 	for(;;){
 		vset_copy(old_vis,visited);
-		vset_count(visited,&n_count,&e_count);
-		if (n_count>max_count) max_count=n_count;
-		if (RTverbosity >= 1) {
-			fprintf(stderr,"visited %d has %lld states ( %ld nodes )\n",level,e_count,n_count);
-			if (RTverbosity >= 2) fprintf(stderr,"transition caches (grp,nds,elts): ");
-			for (i=0;i<nGrps;i++) 
-			  {long long e;
-			   long int n;
-			   vrel_count(group_next[i],&n,&e);
-			   if (RTverbosity >= 2) fprintf(stderr,"( %d %ld %lld ) ",i,n,e);
-			   if (n>max_trans_count) max_trans_count=n;
-			  }
-			if (RTverbosity >= 2) fprintf(stderr,"\n");
-			if (RTverbosity >= 2) fprintf(stderr,"group explored    (grp,nds,elts): ");
-			for (i=0;i<nGrps;i++) 
-			  {long long e;
-			   long int n;
-			   vset_count(group_explored[i],&n,&e);
-			   if (RTverbosity >= 2) fprintf(stderr,"( %d %ld %lld ) ",i,n,e);
-			   if (n>max_grp_count) max_grp_count=n;
-			  }
-			if (RTverbosity >= 2) fprintf(stderr,"\n");
-		}
+		stats_and_progress_report(NULL,visited,level);
 		level++;
 		if (dlk_detect) vset_copy(deadlocks,visited);
 		for(i=0;i<nGrps;i++){
@@ -646,9 +619,6 @@ int main(int argc, char *argv[]){
 		"The optional output of this analysis is an ETF representation of the input\n"
 		"\nOptions");
 	etf_output=files[1];
-	if (RTverbosity==0) {
-		log_set_flags(info,LOG_IGNORE);
-	}
 	Warning(info,"opening %s",files[0]);
 	model=GBcreateBase();
 	GBsetChunkMethods(model,new_string_index,NULL,
@@ -707,22 +677,13 @@ int main(int argc, char *argv[]){
 	}
 	SCCstopTimer(timer);
 	SCCreportTimer(timer,"reachability took");
-	long long e_count;
-	long n_count;
-	vset_count(visited,&n_count,&e_count);
+	final_stat_reporting(visited);
 	if (etf_output) {
-   	        fprintf(stderr,"state space has %lld states ( %ld final nodes, %ld peak nodes)\n",
-			e_count,n_count,max_count);
 		SCCresetTimer(timer);
 		SCCstartTimer(timer);
 		do_output();
 		SCCstopTimer(timer);
 		SCCreportTimer(timer,"writing output took");
-	} else {
-	  printf("state space has %lld states ( %ld final nodes, %ld peak nodes)\n"
-		 ,e_count,n_count,max_count);
-	  if (RTverbosity >=1)
-	    printf("peak transition cache: %ld nodes; peak group explored: %ld nodes\n",max_trans_count,max_grp_count);
 	}
 	return 0;
 }

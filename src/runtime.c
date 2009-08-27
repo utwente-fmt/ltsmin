@@ -17,10 +17,12 @@ int RTverbosity=1;
 #define PRINT_HELP 3
 #define PRINT_USAGE 4
 #define ENABLE_DEBUG 5
+#define RESET_VERBOSITY 6
 
 static struct poptOption runtime_options[]={
 	{ NULL, 'v' , POPT_ARG_NONE , NULL , INCR_VERBOSITY , "increase verbosity of logging" ,NULL },
-	{ NULL, 'q' , POPT_ARG_VAL , &RTverbosity , 0 , "reduces number of messages to absolute minimum",NULL },
+	{ NULL, 'q' , POPT_ARG_NONE , NULL , RESET_VERBOSITY ,
+            "reduces number of messages to absolute minimum",NULL },
 	{ "debug" , 0 , POPT_ARG_NONE , NULL , ENABLE_DEBUG , "enable debugging output" ,NULL},
 	{ "version" , 0 , POPT_ARG_NONE , NULL , PRINT_VERSION , "print the version of this tool",NULL},
 	{ "help" , 'h' , POPT_ARG_NONE , NULL , PRINT_HELP , "print help text",NULL},
@@ -254,10 +256,14 @@ void RTinitPopt(int *argc_p,char**argv_p[],const struct poptOption * options,
 	for(;;){
 		int res=poptGetNextOpt(optCon);
 		switch(res){
-		case INCR_VERBOSITY:
-			RTverbosity++;
-			continue;
-		case PRINT_VERSION:
+                    case INCR_VERBOSITY:
+                        RTverbosity++;
+                        continue;
+                    case RESET_VERBOSITY:
+                        RTverbosity=0;
+                        log_set_flags(info,LOG_IGNORE);
+                        continue;
+                    case PRINT_VERSION:
 			if (strcmp(GIT_VERSION,"")) {
 				fprintf(stdout,"%s\n",GIT_VERSION);
 			} else {
