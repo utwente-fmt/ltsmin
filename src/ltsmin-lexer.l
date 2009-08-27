@@ -35,29 +35,45 @@ void   yyfree (void * ptr, void * yyscanner){
 
 %}
 
-white_space [ \t\n]+
-ident       [a-zA-Z][a-zA-Z0-9_]*
+white_space [ \t]+
+ident       [a-zA-Z][a-zA-Z0-9_']*
 number      [0-9]+
-string      \"(([[:print:]]{-}[\\])|"\\\\"|"\\\"")*\"
+string      \"(([[:print:]]{-}[\\\"])|"\\\\"|"\\\"")*\"
 chunk       #([0-9a-fA-F][0-9a-fA-F])*#
 operator    [~!@<>=\-+/?&\\|*]+
 
 %%
 
-{white_space}  {} //white space, including end of line.
+{white_space}  {} //white space, but not end of line.
+
+"\n" {
+    yyextra->lineno++;
+    if(yyextra->linebased) {
+        Parse(yyextra->parser,TOKEN_END_OF_LINE,0,yyextra);
+    }
+}
 
 "%".*   {} //comment
 
 "(" {
-    Parse(yyextra->parser,LPAR,0,yyextra);
+    Parse(yyextra->parser,TOKEN_LPAR,0,yyextra);
 }
 
 ")" {
-    Parse(yyextra->parser,RPAR,0,yyextra);
+    Parse(yyextra->parser,TOKEN_RPAR,0,yyextra);
 }
 
 "." {
-    Parse(yyextra->parser,DOT,0,yyextra);
+    Parse(yyextra->parser,TOKEN_DOT,0,yyextra);
+}
+
+
+":" {
+    Parse(yyextra->parser,TOKEN_COLON,0,yyextra);
+}
+
+"_" {
+    Parse(yyextra->parser,TOKEN_DONTCARE,0,yyextra);
 }
 
 {string}|{chunk} {
@@ -65,7 +81,7 @@ operator    [~!@<>=\-+/?&\\|*]+
     char decode[len];
     chunk c={.data=decode,.len=len};
     string2chunk(yytext,&c);
-    Parse(yyextra->parser,VALUE,SIputC(yyextra->values,c.data,c.len),yyextra);
+    Parse(yyextra->parser,TOKEN_VALUE,SIputC(yyextra->values,c.data,c.len),yyextra);
 }
 
 {ident} {
@@ -73,16 +89,16 @@ operator    [~!@<>=\-+/?&\\|*]+
     if ((idx=SIlookup(yyextra->keywords,yytext))!=SI_INDEX_FAILED) {
         Parse(yyextra->parser,idx,0,yyextra);
     } else if ((idx=SIlookup(yyextra->state_vars,yytext))!=SI_INDEX_FAILED) {
-        Parse(yyextra->parser,STATE_VAR,idx,yyextra);
+        Parse(yyextra->parser,TOKEN_STATE_VAR,idx,yyextra);
     } else if ((idx=SIlookup(yyextra->edge_vars,yytext))!=SI_INDEX_FAILED) {
-        Parse(yyextra->parser,EDGE_VAR,idx,yyextra);
+        Parse(yyextra->parser,TOKEN_EDGE_VAR,idx,yyextra);
     } else {
-        Parse(yyextra->parser,IDENT,SIput(yyextra->idents,yytext),yyextra);
+        Parse(yyextra->parser,TOKEN_IDENT,SIput(yyextra->idents,yytext),yyextra);
     }
 }
 
 {number} {
-    Parse(yyextra->parser,NUMBER,atoi(yytext),yyextra);
+        Parse(yyextra->parser,TOKEN_NUMBER,atoi(yytext),yyextra);
 }
 
 <<EOF>> {
@@ -92,7 +108,9 @@ operator    [~!@<>=\-+/?&\\|*]+
 
 {operator} {
     int idx;
-    if((idx=SIlookup(yyextra->unary_ops,yytext))!=SI_INDEX_FAILED){
+    if ((idx=SIlookup(yyextra->keywords,yytext))!=SI_INDEX_FAILED) {
+        Parse(yyextra->parser,idx,0,yyextra);
+    } else if((idx=SIlookup(yyextra->unary_ops,yytext))!=SI_INDEX_FAILED){
         Parse(yyextra->parser,yyextra->unary_info[idx].token,idx,yyextra);
     } else if((idx=SIlookup(yyextra->binary_ops,yytext))!=SI_INDEX_FAILED){
         Parse(yyextra->parser,yyextra->binary_info[idx].token,idx,yyextra);

@@ -8,6 +8,7 @@
 
 #include <ltsmin-syntax.h>
 #include <dynamic-array.h>
+#include <etf-util.h>
 
 struct op_info{
     int token;
@@ -28,6 +29,12 @@ struct ltsmin_parse_env_s{
     string_index_t binary_ops; // integer <-> operator mapping
     array_manager_t binary_man;
     struct op_info *binary_info;
+    int lineno;    //line number, maintained by lexer.
+    int linebased; /* if 0 then end of line is ignored as white space. 
+                      Otherwise an EOL token is generated. */
+    etf_model_t etf;
+    string_index_t etf_current_idx;
+    ltsmin_expr_t expr;
 };
 
 

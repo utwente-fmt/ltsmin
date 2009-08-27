@@ -16,11 +16,16 @@ We have the following operator types:
 */
 typedef enum {PREFIX,POSTFIX,INFIX,TRI_LEFT,TRI_RIGHT} op_type;
 
+/**
+\brief The parser environment with all global variables.
+*/
 typedef struct ltsmin_parse_env_s *ltsmin_parse_env_t;
 
 extern void ltsmin_parse_stream(int select,ltsmin_parse_env_t env,stream_t stream);
 
 extern ltsmin_parse_env_t LTSminParseEnvCreate();
+
+extern void LTSminKeyword(ltsmin_parse_env_t env,int token,const char* keyword);
 
 extern int LTSminEdgeVarIndex(ltsmin_parse_env_t env,const char* name);
 extern const char* LTSminEdgeVarName(ltsmin_parse_env_t env,int idx);

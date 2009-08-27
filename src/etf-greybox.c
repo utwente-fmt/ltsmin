@@ -76,7 +76,7 @@ static int etf_state_short(model_t self,int label,int *state){
 void ETFloadGreyboxModel(model_t model,const char*name){
 	gb_context_t ctx=(gb_context_t)RTmalloc(sizeof(struct grey_box_context));
 	GBsetContext(model,ctx);
-	etf_model_t etf=etf_parse(name);
+	etf_model_t etf=etf_parse_file(name);
 	lts_type_t ltstype=etf_type(etf);
 	int state_length=lts_type_get_state_length(ltstype);
 	ctx->edge_labels=lts_type_get_edge_label_count(ltstype);
@@ -86,74 +86,78 @@ void ETFloadGreyboxModel(model_t model,const char*name){
 		ctx->label_db=NULL;
 	}
 	GBsetLTStype(model,ltstype);
-
-	treedbs_t pattern_db=etf_patterns(etf);
-	matrix_t *p_dm_info = RTmalloc(sizeof *p_dm_info);
+	matrix_t* p_dm_info = (matrix_t*)RTmalloc(sizeof(matrix_t));
 	dm_create(p_dm_info, etf_trans_section_count(etf), state_length);
 	ctx->trans_db=(treedbs_t*)RTmalloc(dm_nrows(p_dm_info)*sizeof(treedbs_t));
 	ctx->trans_table=(lts_t*)RTmalloc(dm_nrows(p_dm_info)*sizeof(lts_t));
 	for(int i=0; i < dm_nrows(p_dm_info); i++) {
 		Warning(info,"parsing table %d",i);
-		treedbs_t trans=etf_trans_section(etf,i);
+		etf_rel_t trans=etf_trans_section(etf,i);
 		int used[state_length];
+		int src[state_length];
+		int dst[state_length];
+		int lbl[ctx->edge_labels];
 		int proj[state_length];
-		int step[2+ctx->edge_labels];
-		TreeUnfold(trans,0,step);
-		TreeUnfold(pattern_db,step[0],used);
+		ETFrelIterate(trans);
+		if (!ETFrelNext(trans,src,dst,lbl)){
+			Fatal(1,error,"unexpected empty transition section");
+		}
 		int len=0;
 		for(int j=0;j<state_length;j++){
-			if (used[j]) {
+			if (src[j]) {
 				proj[len]=j;
+				Warning(debug,"pi[%d]=%d",len,proj[len]);
 				len++;
 				dm_set(p_dm_info, i, j);
+			    used[j]=1;
+			} else {
+			    used[j]=0;
 			}
 		}
-
+		Warning(info,"length is %d",len);
 		ctx->trans_db[i]=TreeDBScreate(len);
 		ctx->trans_table[i]=lts_create();
 		lts_set_type(ctx->trans_table[i],LTS_LIST);
-		lts_set_size(ctx->trans_table[i],TreeCount(trans),TreeCount(trans));
+		lts_set_size(ctx->trans_table[i],ETFrelCount(trans),ETFrelCount(trans));
 
-		int state[state_length];
-		int src[len];
-		int dst[len];
-
-		for(int j=TreeCount(trans)-1;j>=0;j--){
-			TreeUnfold(trans,j,step);
-			TreeUnfold(pattern_db,step[0],state);
+		int src_short[len];
+		int dst_short[len];
+		int j=0;
+		do {
 			for(int k=0;k<state_length;k++) {
-				if(used[k]?(state[k]==0):(state[k]!=0)){
-					Fatal(1,error,"inconsistent section");
+				if(used[k]?(src[k]==0):(src[k]!=0)){
+					Fatal(1,error,"inconsistent section in src vector");
 				}
 			}
-			for(int k=0;k<len;k++) src[k]=state[proj[k]]-1;
-			TreeUnfold(pattern_db,step[1],state);
+			for(int k=0;k<len;k++) src_short[k]=src[proj[k]]-1;
 			for(int k=0;k<state_length;k++) {
-				if(used[k]?(state[k]==0):(state[k]!=0)){
-					Fatal(1,error,"inconsistent section");
+				if(used[k]?(dst[k]==0):(dst[k]!=0)){
+					Fatal(1,error,"inconsistent section in dst vector");
 				}
 			}
-			for(int k=0;k<len;k++) dst[k]=state[proj[k]]-1;
-			ctx->trans_table[i]->src[j]=TreeFold(ctx->trans_db[i],src);
+			for(int k=0;k<len;k++) dst_short[k]=dst[proj[k]]-1;
+			ctx->trans_table[i]->src[j]=TreeFold(ctx->trans_db[i],src_short);
 			switch(ctx->edge_labels){
 				case 0:
 					ctx->trans_table[i]->label[j]=0;
 					break;
 				case 1:
-					ctx->trans_table[i]->label[j]=step[2];
+					ctx->trans_table[i]->label[j]=lbl[0];
 					break;
 				default:
-					ctx->trans_table[i]->label[j]=TreeFold(ctx->label_db,step+2);
+					ctx->trans_table[i]->label[j]=TreeFold(ctx->label_db,lbl);
 					break;
 			}
-			ctx->trans_table[i]->dest[j]=TreeFold(ctx->trans_db[i],dst);
-		}
-		Warning(info,"table %d has %d states and %d transitions",i,TreeCount(ctx->trans_db[i]),TreeCount(trans));
-		lts_set_size(ctx->trans_table[i],TreeCount(ctx->trans_db[i]),TreeCount(trans));
+			ctx->trans_table[i]->dest[j]=TreeFold(ctx->trans_db[i],dst_short);
+			j++;
+		} while(ETFrelNext(trans,src,dst,lbl));
+		Warning(info,"table %d has %d states and %d transitions",i,TreeCount(ctx->trans_db[i]),ETFrelCount(trans));
+		lts_set_size(ctx->trans_table[i],TreeCount(ctx->trans_db[i]),ETFrelCount(trans));
 		lts_set_type(ctx->trans_table[i],LTS_BLOCK);
 		//for(int j=0;j<=ctx->trans_table[i]->states;j++){
 		//	Warning(info,"begin[%d]=%d",j,ctx->trans_table[i]->begin[j]);
 		//}
+		ETFrelDestroy(&trans);
 	}
 	GBsetDMInfo(model, p_dm_info);
 	GBsetNextStateShort(model,etf_short);
@@ -164,33 +168,37 @@ void ETFloadGreyboxModel(model_t model,const char*name){
 	ctx->label_data=(int**)RTmalloc(dm_nrows(p_sl_info)*sizeof(int*));
 	for(int i=0;i<dm_nrows(p_sl_info);i++){
 		Warning(info,"parsing map %d",i);
-		treedbs_t map=etf_get_map(etf,i);
-		int used[state_length+1];
-		int proj[state_length+1];
-		TreeUnfold(map,0,used);
+		etf_map_t map=etf_get_map(etf,i);
+		int used[state_length];
+		int state[state_length];
+		int value;
+		ETFmapIterate(map);
+		if (!ETFmapNext(map,state,&value)){
+			Fatal(1,error,"Unexpected empty map");
+		}
 		int len=0;
 		for(int j=0;j<state_length;j++){
-			if (used[j]) {
-				used[len]=proj[len]=j;
+			if (state[j]) {
+				used[len]=j;
 				len++;
 				dm_set(p_sl_info, i, j);
 			}
 		}
-		TreeUnfold(map,0,used);
+		int*proj=(int*)RTmalloc(len*sizeof(int));
+		for(int j=0;j<len;j++) proj[j]=used[j];
+		for(int j=0;j<state_length;j++) used[j]=state[j];
 		treedbs_t key_db=TreeDBScreate(len);
-		int *data=(int*)RTmalloc(TreeCount(map)*sizeof(int));
-		int entry[state_length+1];
+		int *data=(int*)RTmalloc(ETFmapCount(map)*sizeof(int));
 		int key[len];
-		for(int j=TreeCount(map)-1;j>=0;j--){
-			TreeUnfold(map,j,entry);
+		do {
 			for(int k=0;k<state_length;k++) {
-				if(used[k]?(entry[k]==0):(entry[k]!=0)){
+				if(used[k]?(state[k]==0):(state[k]!=0)){
 					Fatal(1,error,"inconsistent map section");
 				}
 			}
-			for(int k=0;k<len;k++) key[k]=entry[proj[k]]-1;
-			data[TreeFold(key_db,key)]=entry[state_length];
-		}
+			for(int k=0;k<len;k++) key[k]=state[proj[k]]-1;
+			data[TreeFold(key_db,key)]=value;
+		} while(ETFmapNext(map,state,&value));
 		ctx->label_key[i]=key_db;
 		ctx->label_data[i]=data;
 	}

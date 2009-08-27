@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <runtime.h>
+#include <ltsmin-syntax.h>
 #include <ltsmin-grammar.h>
 #include <ltsmin-parse-env.h>
 #include <ltsmin-lexer.h>
@@ -17,6 +18,20 @@ void ltsmin_parse_stream(int select,ltsmin_parse_env_t env,stream_t stream){
     ParseFree( env->parser , RTfree ); 
 }
 
+void LTSminKeyword(ltsmin_parse_env_t env,int token,const char* keyword){
+    SIputAt(env->keywords,keyword,token);
+}
+
+/* set up for mu calculus
+    SIputAt(env->keywords,"mu",TOKEN_MU_SYM);
+    SIputAt(env->keywords,"nu",TOKEN_NU_SYM);
+    SIputAt(env->keywords,"A",TOKEN_ALL_SYM);
+    SIputAt(env->keywords,"E",TOKEN_EXISTS_SYM);
+    LTSminBinaryOperator(env,"/\\",2);
+    LTSminBinaryOperator(env,"\\/",3);
+    LTSminBinaryOperator(env,"=",1);
+*/
+
 ltsmin_parse_env_t LTSminParseEnvCreate(){
     ltsmin_parse_env_t env=RT_NEW(struct ltsmin_parse_env_s);
     env->values=SIcreate();
@@ -30,14 +45,6 @@ ltsmin_parse_env_t LTSminParseEnvCreate(){
     env->binary_ops=SIcreate();
     env->binary_man=create_manager(32);
     ADD_ARRAY(env->binary_man,env->binary_info,struct op_info);
-    // set up for mu calculus
-    SIputAt(env->keywords,"mu",MU_SYM);
-    SIputAt(env->keywords,"nu",NU_SYM);
-    SIputAt(env->keywords,"A",ALL_SYM);
-    SIputAt(env->keywords,"E",EXISTS_SYM);
-    LTSminBinaryOperator(env,"/\\",2);
-    LTSminBinaryOperator(env,"\\/",3);
-    LTSminBinaryOperator(env,"=",1);
     return env;
 }
 
@@ -72,9 +79,9 @@ int LTSminBinaryOperator(ltsmin_parse_env_t env,const char* name,int prio){
     int res=SIput(env->binary_ops,name);
     ensure_access(env->binary_man,res);
     switch(prio){
-        case 1: env->binary_info[res].token=BIN1; break;
-        case 2: env->binary_info[res].token=BIN2; break;
-        case 3: env->binary_info[res].token=BIN3; break;
+        case 1: env->binary_info[res].token=TOKEN_BIN1; break;
+        case 2: env->binary_info[res].token=TOKEN_BIN2; break;
+        case 3: env->binary_info[res].token=TOKEN_BIN3; break;
         default: Fatal(1,error,"priority %d is not supported",prio);
     }
     env->binary_info[res].prio=prio;

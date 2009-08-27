@@ -224,6 +224,8 @@ libutil_la_SOURCES := unix.c runtime.c stream.c archive.c			\
                     gzstream.c stream_diff32.c arch_object.h	\
                     generichash.h unix.h archive.h ghf.h	\
                     stream.h raf.h stream_object.h raf_object.h	stream_fd.c \
+                    string-map.c string-map.h \
+                    tables.c tables.h chunk_table_factory.c \
                     scctimer.h fast_hash.h runtime.h treedbs.h		\
                     config.h greybox.c greybox.h pins-cache.c group.c   \
                     stringindex.c stringindex.h archive_gsf.c           \
@@ -232,6 +234,10 @@ libutil_la_SOURCES := unix.c runtime.c stream.c archive.c			\
                     archive_dir.c chunk_support.c chunk_support.h	\
                     dynamic-array.c dynamic-array.h struct_io.c		\
                     struct_io.h etf-util.c etf-util.h lts-type.c	\
+                    etf-internal.h etf-objects.c etf-objects.h etf-parser.c \
+                    ltsmin-lexer.l ltsmin-syntax.c ltsmin-syntax.h \
+                    ltsmin-grammar.lemon ltsmin-parse-env.h \
+                    ltsmin-mu.c ltsmin-mu.h \
                     lts-type.h vset_buddy.c vector_set.c vector_set.h	\
                     vdom_object.h lts_io.c lts_io.h lts_io_internal.h \
                     lts_enum.c lts_enum.h lts_count.c lts_count.h \
@@ -239,14 +245,6 @@ libutil_la_SOURCES := unix.c runtime.c stream.c archive.c			\
                     is-balloc.c is-balloc.h \
                     dfs-stack.c dfs-stack.h \
                     balloc.c balloc.h bitset.c bitset.h
-
-libutil_la_SOURCES += string-map.c string-map.h
-
-libutil_la_SOURCES += tables.c tables.h chunk_table_factory.c
-
-libutil_la_SOURCES += ltsmin-lexer.l ltsmin-syntax.c ltsmin-syntax.h \
-                    ltsmin-grammar.lemon ltsmin-parse-env.h
-
 
 libutil_la_LIBADD = ltsmin-grammar.lo dm/libdm.la
 
