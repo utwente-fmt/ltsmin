@@ -45,14 +45,13 @@ typedef enum { UseGreyBox , UseBlackBox } mode_t;
 static mode_t call_mode=UseBlackBox;
 
 static char *arg_strategy = "bfs";
-static enum { Strat_BFS, Strat_DFS, Strat_TorX } strategy = Strat_BFS;
+static enum { Strat_BFS, Strat_DFS } strategy = Strat_BFS;
 static char *arg_state_db = "tree";
 static enum { DB_TreeDBS, DB_Vset } state_db = DB_TreeDBS;
 
 static si_map_entry strategies[] = {
     {"bfs",  Strat_BFS},
     {"dfs",  Strat_DFS},
-    {"torx", Strat_TorX},
     {NULL, 0}
 };
 
@@ -78,22 +77,12 @@ state_db_popt (poptContext con, enum poptCallbackReason reason,
             }
             state_db = db;
 
-            if (strategy == Strat_TorX)
-                arg_strategy = "torx";
-            else {
-                int s = linear_search (strategies, arg_strategy);
-                if (s < 0) {
-                    Warning (error, "unknown search mode %s",
-                             arg_strategy);
-                    RTexitUsage (EXIT_FAILURE);
-                }
-                strategy = s;
+            int s = linear_search (strategies, arg_strategy);
+            if (s < 0) {
+                Warning (error, "unknown search mode %s", arg_strategy);
+                RTexitUsage (EXIT_FAILURE);
             }
-
-            if (strategy == Strat_TorX && state_db != DB_TreeDBS) {
-                Fatal (1, error, "Unsupported combination: strategy=%s, state=%s",
-                       strategies[strategy].key, db_types[state_db].key);
-            }
+            strategy = s;
         }
         return;
     case POPT_CALLBACK_REASON_OPTION:
@@ -114,11 +103,8 @@ static  struct poptOption options[] = {
 	{ "state" , 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &arg_state_db , 0 ,
 		"select the data structure for storing states", "<tree|vset>"},
 	{ "strategy" , 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &arg_strategy , 0 ,
-		"select the search strategy", "<bfs|dfs|torx>"},
+		"select the search strategy", "<bfs|dfs>"},
 	{ "max" , 0 , POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT , &max , 0 ,"maximum search depth", "<int>"},
-	{ "torx" , 0 , POPT_ARG_VAL, &strategy, Strat_TorX,
-          "run TorX-Explorer textual interface on stdin+stdout,"
-          " synonym for --strategy=torx", NULL },
 #if defined(MCRL)
 	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, mcrl_options , 0 , "mCRL options", NULL },
 #endif
@@ -424,86 +410,6 @@ dfs_explore (model_t model, int *src, size_t *o_depth)
     *o_depth = depth;
 }
 
-
-/* TorX */
-typedef struct {
-    model_t model;
-    lts_type_t ltstype;
-} torx_struct_t;
-
-static void torx_transition(void*arg,int*lbl,int*dst){
-
-	torx_struct_t *context=(torx_struct_t*)arg;
-
-	int tmp=TreeFold(dbs,dst);
-	chunk c=GBchunkGet(context->model,lts_type_get_edge_label_typeno(context->ltstype,0),lbl[0]);
-
-	int vis = 1;
-	if (c.len==3 && strncmp(c.data, "tau", c.len)==0)
-		vis =0;
-
-	/* tab-separated fields: edge vis sat lbl pred vars state */
-	fprintf(stdout, "Ee\t\t%d\t1\t%.*s\t\t\t%d\n", vis, c.len, c.data, tmp);
-}
-
-
-static int torx_handle_request(torx_struct_t *context, char *req)
-{
-	while(isspace(*req))
-		req++;
-	switch(req[0]) {
-	case 'r': {			/* reset */
-		fprintf(stdout, "R 0\t1\n");
-		fflush(stdout);
-		break;
-	}
-	case 'e': {			/*explore */
-		int n, res;
-		req++;
-		while(isspace((int)*req))
-			req++;
-		if ((res = sscanf(req, "%u", &n)) != 1) {
-			int l = strlen(req);
-			if (req[l - 1] == '\n')
-				req[l - 1] = '\0';
-			fprintf(stdout, "E0 Missing event number (%s; sscanf found #%d)\n", req, res);
-		} else if (n >= TreeCount(dbs)) {
-			fprintf(stdout, "E0 Unknown event number\n");
-			fflush(stdout);
-		} else {
-			int src[N], c;
-			TreeUnfold(dbs,n,src);
-			fprintf(stdout, "EB\n");
-			c=GBgetTransitionsAll(context->model,src,torx_transition,context);
-			fprintf(stdout, "EE\n");
-			fflush(stdout);
-		}
-		break;
-	}
-	case 'q': {
-		fprintf(stdout, "Q\n");
-		fflush(stdout);
-		return 1;
-		break;
-	}
-	default:			/* unknown command */
-		fprintf(stdout, "A_ERROR UnknownCommand: %s\n", req);
-		fflush(stdout);
-	}
-	return 0;
-}
-
-static void torx_ui(torx_struct_t *context) {
-	char buf[BUFSIZ];
-	int stop = 0;
-	while (!stop && fgets(buf, BUFSIZ, stdin)) {
-		if (!strchr(buf, '\n'))
-			/* uncomplete read; ignore the problem for now */
-			Warning(info, "no end-of-line character read on standard input (incomplete read?)\n") ;
-		stop = torx_handle_request(context, buf);
-	}
-}
-
 /* Main */
 static void
 init_write_lts (lts_output_t *p_output,
@@ -532,8 +438,7 @@ int main(int argc, char *argv[]){
 	char           *files[2];
         lts_output_t    output = NULL;
 	RTinitPopt(&argc,&argv,options,1,2,files,NULL,"<model> [<lts>]",
-		"Perform an enumerative reachability analysis of <model>\n"
-		"Run the TorX remote procedure call protocol on <model> (--torx).\n\n"
+		"Perform an enumerative reachability analysis of <model>\n\n"
 		"Options");
 	if (files[1]) {
 		Warning(info,"Writing output to %s",files[1]);
@@ -542,8 +447,7 @@ int main(int argc, char *argv[]){
 		Warning(info,"No output, just counting the number of states");
 		write_lts=0;
 	}
-	if (strategy == Strat_TorX && write_lts)
-            Fatal(1,error,"A TorX server does not write to a file");
+
 	Warning(info,"loading model from %s",files[0]);
 	model_t model=GBcreateBase();
 	GBsetChunkMethods(model,new_string_index,NULL,
@@ -634,15 +538,6 @@ int main(int argc, char *argv[]){
             Warning (info, "state space has depth %zu, %d states %d transitions",
                     depth, visited, trans);
             break;
-        }
-	case Strat_TorX: {
-            dbs=TreeDBScreate(N);
-            if(TreeFold(dbs,src)!=0){
-                Fatal(1,error,"expected 0");
-            }
-            torx_struct_t context = { model, ltstype };
-            torx_ui(&context);
-            exit (EXIT_SUCCESS);
         }
 	}
 
