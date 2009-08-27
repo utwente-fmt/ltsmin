@@ -9,11 +9,13 @@
 #include <stack>
 
 #include "mcrl2/lps/nextstate.h"
+#include "mcrl2/lps/nextstate/standard.h"
 #include "mcrl2/lps/specification.h"
-#include "mcrl2/lps/mcrl22lps.h"
+#include "mcrl2/data/variable.h"
+#include "mcrl2/data/selection.h"
+#include "mcrl2/data/find.h"
 #include "mcrl2/atermpp/set.h"
 #include "mcrl2/core/print.h"
-#include "mcrl2/lps/data_elimination.h"
 #include "dm/dm.h"
 
 class group_information {
@@ -62,76 +64,53 @@ class group_information {
 void group_information::gather(mcrl2::lps::specification const& l) {
   using namespace mcrl2;
 
-  using data::find_all_data_variables;
-  using data::data_variable;
+  using data::find_variables;
+  using data::variable;
 
-  struct local {
-    static void add_used_variables(std::set< data_variable >& r, std::set< data_variable > const& c) {
-      r.insert(c.begin(), c.end());
-    }
-  };
-
-  lps::linear_process specification(l.process());
+  lps::linear_process const& specification = l.process();
 
   // the set with process parameters
-  std::set< data_variable > parameters = find_all_data_variables(specification.process_parameters());
+  std::set< variable > parameters = find_variables(specification.process_parameters());
 
   // the list of summands
-  std::vector< lps::summand > summands(specification.summands().begin(), specification.summands().end());
+  std::vector< lps::action_summand > const& summands = specification.action_summands();
 
   m_group_indices.resize(summands.size());
 
-  for (std::vector< lps::summand >::const_iterator i = summands.begin(); i != summands.end(); ++i) {
-    std::set< data_variable > used_variables;
+  for (std::vector< lps::action_summand >::const_iterator i = summands.begin(); i != summands.end(); ++i) {
+    std::set< variable > used_variables;
 
-    local::add_used_variables(used_variables, find_all_data_variables(i->condition()));
-    local::add_used_variables(used_variables, find_all_data_variables(i->actions()));
+    find_variables(i->condition(), std::inserter(used_variables, used_variables.end()));
+    find_variables(i->multi_action().actions(), std::inserter(used_variables, used_variables.end()));
 
-    if (i->has_time()) {
-      local::add_used_variables(used_variables, find_all_data_variables(i->time()));
+    if (i->multi_action().has_time()) {
+      find_variables(i->multi_action().time(), std::inserter(used_variables, used_variables.end()));
     }
 
-    data::data_assignment_list assignments(i->assignments());
+    data::assignment_list assignments(i->assignments());
 
-    for (data::data_assignment_list::const_iterator j = assignments.begin(); j != assignments.end(); ++j) {
+    for (data::assignment_list::const_iterator j = assignments.begin(); j != assignments.end(); ++j) {
       if(j->lhs() != j->rhs()) {
-        local::add_used_variables(used_variables, find_all_data_variables(j->lhs()));
-        local::add_used_variables(used_variables, find_all_data_variables(j->rhs()));
+        find_variables(j->lhs(), std::inserter(used_variables, used_variables.end()));
+        find_variables(j->rhs(), std::inserter(used_variables, used_variables.end()));
       }
     }
 
     // process parameters used in condition or action of summand
-    std::set< data_variable > used_parameters;
+    std::set< variable > used_parameters;
 
     std::set_intersection(used_variables.begin(), used_variables.end(),
                           parameters.begin(), parameters.end(), std::inserter(used_parameters, used_parameters.begin()));
 
-    std::vector< data_variable > parameters_list(specification.process_parameters().begin(), specification.process_parameters().end());
+    std::vector< variable > parameters_list = data::convert< std::vector< variable > >(specification.process_parameters());
 
-    for (std::vector< data_variable >::const_iterator j = parameters_list.begin(); j != parameters_list.end(); ++j) {
+    for (std::vector< variable >::const_iterator j = parameters_list.begin(); j != parameters_list.end(); ++j) {
       if (used_parameters.find(*j) != used_parameters.end()) {
         m_group_indices[i - summands.begin()].push_back(j - parameters_list.begin());
       }
     }
   }
 }
-
-mcrl2::lps::specification convert(mcrl2::lps::specification const& l) {
-  mcrl2::lps::linear_process lp(l.process());
-
-  mcrl2::lps::summand_list summands;
-
-  for (mcrl2::lps::non_delta_summand_list::iterator i = lp.non_delta_summands().begin(); i != lp.non_delta_summands().end(); ++i) {
-    summands = push_front(summands, *i);
-  }
-
-  summands = reverse(summands);
-
-  return mcrl2::lps::specification(l.data(), l.action_labels(),
-            mcrl2::lps::linear_process(lp.free_variables(), lp.process_parameters(), summands),
-               l.initial_process());
-}
-
 
 extern "C" {
 
@@ -154,7 +133,7 @@ static void WarningHandler(const char *format, va_list args) {
 		fprintf(f,"\n");
 	}
 }
-     
+
 static void ErrorHandler(const char *format, va_list args) {
 	FILE* f=log_get_stream(error);
 	if (f) {
@@ -167,15 +146,15 @@ static void ErrorHandler(const char *format, va_list args) {
 }
 
 #ifdef MCRL2_INNERC_AVAILABLE
-static char*mcrl2_args="--rewriter=jittyc";
-static RewriteStrategy mcrl2_rewriter=GS_REWR_JITTYC;
+static char const* mcrl2_args="--rewriter=jittyc";
+static mcrl2::data::rewriter::strategy mcrl2_rewriter=mcrl2::data::rewriter::jitty_compiling;
 #else
-static char*mcrl2_args="--rewriter=jitty";
-static RewriteStrategy mcrl2_rewriter=GS_REWR_JITTY;
+static char const* mcrl2_args="--rewriter=jitty";
+static RewriteStrategy mcrl2_rewriter=mcrl2::data::rewriter::jitty;
 #endif
 
 static void mcrl2_popt(poptContext con,
- 		enum poptCallbackReason reason,
+		enum poptCallbackReason reason,
                             const struct poptOption * opt,
                              const char * arg, void * data){
 	(void)con;(void)opt;(void)arg;(void)data;
@@ -205,13 +184,13 @@ static void mcrl2_popt(poptContext con,
 		poptFreeContext(optCon);
 		if (rewriter) {
 			if (!strcmp(rewriter,"jitty")){
-				mcrl2_rewriter=GS_REWR_JITTY;
+				mcrl2_rewriter=mcrl2::data::rewriter::jitty;
 			} else if (!strcmp(rewriter,"jittyc")){
-				mcrl2_rewriter=GS_REWR_JITTYC;
+				mcrl2_rewriter=mcrl2::data::rewriter::jitty_compiling;
 			} else if (!strcmp(rewriter,"inner")){
-				mcrl2_rewriter=GS_REWR_INNER;
+				mcrl2_rewriter=mcrl2::data::rewriter::innermost;
 			} else if (!strcmp(rewriter,"innerc")){
-				mcrl2_rewriter=GS_REWR_INNERC;
+				mcrl2_rewriter=mcrl2::data::rewriter::innermost_compiling;
 			} else {
 				Fatal(1,error,"unrecognized rewriter: %s (jitty, jittyc, inner and innerc supported)",rewriter);
 			}
@@ -242,7 +221,9 @@ typedef struct grey_box_context {
 	int atPars;
 	int atGrps;
 	NextState* explorer;
-	Rewriter* rewriter;
+	legacy_rewriter rewriter_object;
+	mcrl2::data::detail::Rewriter* rewriter;
+        mcrl2::data::enumerator_factory< mcrl2::data::classic_enumerator< > > enumerator_factory;
 	AFun StateFun;
 	group_information *info;
 	ATerm s0;
@@ -268,12 +249,12 @@ static char* print_label(void*arg,ATerm act){
 }
 
 static char* print_term(void*arg,ATerm t){
-	Rewriter* rw=(Rewriter*)arg;
+	mcrl2::data::detail::Rewriter* rw=(mcrl2::data::detail::Rewriter*)arg;
 	return ATwriteToString((ATerm)rw->fromRewriteFormat(t));
 }
 
 static ATerm parse_term(void *arg,char*str){
-	Rewriter* rw=(Rewriter*)arg;
+	mcrl2::data::detail::Rewriter* rw=(mcrl2::data::detail::Rewriter*)arg;
 	return rw->toRewriteFormat((ATermAppl)ATreadFromString(str));
 }
 
@@ -333,23 +314,21 @@ void MCRL2loadGreyboxModel(model_t m,const char*model_name){
 	struct grey_box_context *ctx=(struct grey_box_context*)RTmalloc(sizeof(struct grey_box_context));
 	GBsetContext(m,ctx);
 
-
-
 	using namespace mcrl2;
 	using namespace mcrl2::lps;
 
-	ATermAppl Spec=(ATermAppl)ATreadFromNamedFile(model_name);
-	if (!Spec) {
-		Fatal(1,error,"could not read specification from %s",model_name);
-	}
-	Warning(info,"removing unused parts of the data specification.");
-	Spec = removeUnusedData(Spec);
+	lps::specification model;
 
-	lps::specification model(Spec);
+        try {
+          model.load(model_name);
 
-//	model.load(model_name);
-	model = convert(model);
-	
+          model.instantiate_global_variables();
+        }
+        catch (...) {
+          Fatal(1,error,"could not read specification from %s",model_name);
+        }
+
+	model.process().deadlock_summands().clear();
 
 	int state_length=model.process().process_parameters().size();
 	lts_type_t ltstype=lts_type_create();
@@ -365,11 +344,15 @@ void MCRL2loadGreyboxModel(model_t m,const char*model_name){
 	lts_type_set_edge_label_type(ltstype,0,"action");
 	GBsetLTStype(m,ltstype);
 
+        ctx->rewriter_object = legacy_rewriter(model.data(),
+          mcrl2::data::used_data_equation_selector(model.data(), mcrl2::lps::specification_to_aterm(model, false)),
+          mcrl2_rewriter);
+        ctx->rewriter = &ctx->rewriter_object.get_rewriter();
 
+        ctx->enumerator_factory = mcrl2::data::enumerator_factory< mcrl2::data::classic_enumerator< > >(model.data(), ctx->rewriter_object);
 
 	// Note the second argument that specifies that don't care variables are not treated specially
-	ctx->explorer = createNextState(model, false, GS_STATE_VECTOR,mcrl2_rewriter);
-	ctx->rewriter = ctx->explorer->getRewriter();
+	ctx->explorer = createNextState(model, ctx->enumerator_factory, false);
 	ctx->info=new group_information(model);
 	ctx->termmap=ATmapCreate(m,lts_type_add_type(ltstype,"leaf",NULL),ctx->rewriter,print_term,parse_term);
 	ctx->actionmap=ATmapCreate(m,lts_type_add_type(ltstype,"action",NULL),ctx->rewriter,print_label,NULL);
