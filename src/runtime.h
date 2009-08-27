@@ -155,6 +155,13 @@ extern void (*RThandleFatal)(const char*file,int line,int errnum,int code);
 	}\
 }
 
+#define _DEBUG 0
+#if _DEBUG
+    #define Debug(...) log_message(debug,__FILE__,__LINE__,0,__VA_ARGS__)
+#else
+    #define Debug(...)
+#endif
+
 ///@}
 
 
