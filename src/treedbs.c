@@ -233,6 +233,53 @@ treedbs_t TreeDBScreate(int nPars){
 	return dbs;
 }
 
+void TreeDBSfree(treedbs_t dbs){
+	if(dbs->nPars==1){
+		RTfree(dbs->map);
+		RTfree(dbs->rev);
+		RTfree(dbs);
+	} else {
+		for(int i=1;i<dbs->nPars;i++){
+			RTfree(dbs->db_left[i]);
+			RTfree(dbs->db_right[i]);
+			RTfree(dbs->db_bucket[i]);
+			RTfree(dbs->db_hash[i]);
+		}
+		RTfree(dbs->db_left);
+		RTfree(dbs->db_right);
+		RTfree(dbs->db_bucket);
+		RTfree(dbs->db_size);
+		RTfree(dbs->db_next);
+		RTfree(dbs->db_hash);
+		RTfree(dbs->db_mask);
+		RTfree(dbs->db_tree_left);
+		RTfree(dbs->db_tree_right);
+		RTfree(dbs->db_hash_size);
+		RTfree(dbs);
+	}
+}
+
+
+static void TreeInfoPrint(int depth,int node,treedbs_t dbs){
+	if (node>=dbs->nPars) return;
+	char prefix[2*depth+1];
+	for(int i=0; i<(2*depth); i++) prefix[i]=' ';
+	prefix[2*depth]=0;
+	Warning(info,"%s%d: node has %d elements and %d hash slots",prefix,node,dbs->db_next[node],dbs->db_hash_size[node]);
+	TreeInfoPrint(depth+1,dbs->db_tree_left[node],dbs);
+	TreeInfoPrint(depth+1,dbs->db_tree_right[node],dbs);
+}
+
+
+void TreeInfo(treedbs_t dbs){
+	if (dbs->nPars==1){
+		Warning(info,"map with %d entries and range of %d elements.",dbs->count,dbs->range);
+	} else {
+		TreeInfoPrint(0,1,dbs);
+	}
+}
+
+
 /*
 void WriteDBS(char *pattern){
 	char name[1024];

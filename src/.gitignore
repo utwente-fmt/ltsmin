@@ -26,7 +26,13 @@ mpi-event-test
 nips-reach
 nips2lts-grey
 nips2lts-mpi
-*.hi
 regroup
 test
 pins_open
+etf-grammer.c
+etf-grammer.h
+etf-grammer.out
+etf-lexer.c
+etf-lexer.h
+lempar.c
+test-bitset

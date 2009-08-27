@@ -9,9 +9,14 @@ AC_CONFIG_HEADERS([src/amconfig.h])
 AC_SUBST([pkglibdir], "\${libdir}/${PACKAGE_NAME}-${PACKAGE_VERSION}")
 
 # Checks for programs.
-CFLAGS="-g -O2 $CFLAGS"
-CXXFLAGS="-g -O2 -Wno-inline -ftemplate-depth-128 -finline-functions $CXXFLAGS"
+CFLAGS="-O2 ${CFLAGS}"
+CXXFLAGS="-O2 ${CXXFLAGS}"
+AM_CFLAGS="-g"
+AM_CXXFLAGS="-g -Wno-inline -ftemplate-depth-128 -finline-functions"
+
 AM_PROG_CC_C_O
+AC_SUBST([CC_FOR_BUILD], [${CC_FOR_BUILD-$CC}])
+AM_PROG_LEX
 AC_PROG_CXX
 ACX_FINK
 ACX_MACPORTS
@@ -166,13 +171,18 @@ if test x"$acx_cadp" = xyes; then
    AC_CONFIG_FILES([src/pins_open])
 fi
 
-AC_CONFIG_FILES(
-  [Makefile
-   src/Makefile
-   src/dm/Makefile
-   doc/Makefile])
+AC_CONFIG_FILES([
+       Makefile
+       src/Makefile
+       src/dm/Makefile
+       doc/Makefile
+       lemon/Makefile
+])
 
-AC_CONFIG_SUBDIRS([buddy nips-vm])
+AC_CONFIG_LINKS([src/lempar.c:lemon/lempar.c])
+
+AC_CONFIG_SUBDIRS([nips-vm buddy])
+
 AC_OUTPUT
 
 cat <<EOM
