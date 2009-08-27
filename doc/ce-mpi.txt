@@ -1,0 +1,51 @@
+//                           -*- mode: doc; outline-regexp: "==\(=*\) ." -*-
+ce-mpi(1)
+=========
+:Author:  Michael Weber
+:Email:   <michaelw@foldr.org>
+:Date:    2009-08-18
+
+== NAME
+ce-mpi - distributed tau cycle elimination of labelled transition systems
+
+== SYNOPSIS
+mpirun _<nodespec>_ {manname} [OPTION] '<input>' '<output>'
+
+== DESCRIPTION
+
+This tool removes tau cycles (strongly connected components) from a
+labeled transition system.  The default reduction algorithm is
+coloring.
+
+For both, input and output only a (old-style) DIR archives are
+supported; see also linkman:ltsmin-convert[1].
+
+include::inc/mpi-blurb.txt[]
+
+== OPTIONS
+
+=== Reductions
+
+*--color*::
+  Apply cycle elimination using coloring (default).
+
+*--group*::
+  Apply cycle elimination using groups.
+
+include::inc/general-options.txt[]
+
+== EXIT STATUS
+0::
+        Successful termination.
+1::
+        Some error occurred.
+
+== SEE ALSO
+http://www.win.tue.nl/~sorzan/teza.pdf.gz[On Distributed Verification
+and Verified Distribution, 2004]
+linkman:ltsmin[7],
+linkman:ltsmin-mpi[1],
+linkman:lpo2lts-mpi[1],
+linkman:lps2lts-mpi[1],
+linkman:nips2lts-mpi[1],
+linkman:ltsmin-convert[1]
