@@ -1,0 +1,25 @@
+//                           -*- mode: doc; outline-regexp: "==\(=*\) ." -*-
+etf2torx(1)
+===========
+:Author:  Michael Weber
+:Email:   <michaelw@cs.utwente.nl>
+:Date:    2009-08-21
+
+== NAME
+
+etf2torx - TorX RPC interface for ETF models.
+
+== SYNOPSIS
+
+*{manname}* [OPTION]... 'input.etf'
+
+== DESCRIPTION
+
+{manname} provides access to a labelled transition system from a
+specification provided in 'input.etf' via the TorX-Explorer textual
+interface on _stdin_ and _stdout_.  Specifications are in
+linkman:etf[5] format.
+
+== OPTIONS
+
+include::inc/spec2torx.txt[]

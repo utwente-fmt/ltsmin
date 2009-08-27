@@ -3,7 +3,7 @@ noinst_PROGRAMS = test-bitset test-is-balloc test-dfs-stack
 noinst_LTLIBRARIES = libutil.la
 pkglib_LTLIBRARIES =
 
-SUBDIRS = dm . ce
+SUBDIRS = dm . ce torx
 
 # pins_open
 if HAVE_CADP
