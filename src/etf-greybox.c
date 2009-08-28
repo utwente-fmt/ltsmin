@@ -2,7 +2,7 @@
 #include "runtime.h"
 #include "etf-util.h"
 #include "etf-greybox.h"
-#include "lts.h"
+#include <tables.h>
 #include "dm/dm.h"
 
 static void etf_popt(poptContext con,
@@ -31,46 +31,46 @@ typedef struct grey_box_context {
 	treedbs_t label_db;
 	int edge_labels;
 	treedbs_t* trans_db;
-	lts_t* trans_table;
+	matrix_table_t* trans_table;
 	treedbs_t* label_key;
 	int** label_data;
 } *gb_context_t;
 
 static int etf_short(model_t self,int group,int*src,TransitionCB cb,void*user_context){
-	gb_context_t ctx=(gb_context_t)GBgetContext(self);
-	int src_no=TreeFold(ctx->trans_db[group],src);
-	int dst[dm_ones_in_row(GBgetDMInfo(self), group)];
-	//Warning(info,"group %d, state %d",group,src_no);
-	lts_t lts=ctx->trans_table[group];
-	//for(int j=0;j<=lts->states;j++){
-	//	Warning(info,"begin[%d]=%d",j,lts->begin[j]);
-	//}
-	if (((uint32_t)src_no)>=lts->states) return 0;
-	for(uint32_t i=lts->begin[src_no];i<lts->begin[src_no+1];i++){
-		TreeUnfold(ctx->trans_db[group],lts->dest[i],dst);
-		switch(ctx->edge_labels){
-			case 0:
-				cb(user_context,NULL,dst);
-				break;
-			case 1: {
-				int lbl=lts->label[i];
-				cb(user_context,&lbl,dst);
-				break;
-			}
-			default: {
-				int lbl[ctx->edge_labels];
-				TreeUnfold(ctx->label_db,lts->label[i],lbl);
-				cb(user_context,lbl,dst);
-				break;
-			}
-		}
-	}
-	return (lts->begin[src_no+1]-lts->begin[src_no]);
+    gb_context_t ctx=(gb_context_t)GBgetContext(self);
+    uint32_t src_no=(uint32_t)TreeFold(ctx->trans_db[group],src);
+    int dst[dm_ones_in_row(GBgetDMInfo(self), group)];
+    //Warning(info,"group %d, state %d",group,src_no);
+    matrix_table_t mt=ctx->trans_table[group];
+    if ((src_no)>=MTclusterCount(mt)) return 0;
+    int K=MTclusterSize(mt,src_no);
+    for(int i=0;i<K;i++){
+        uint32_t row[3];
+        MTclusterGetRow(mt,src_no,i,row);
+        TreeUnfold(ctx->trans_db[group],(int)row[1],dst);
+        switch(ctx->edge_labels){
+            case 0:
+                cb(user_context,NULL,dst);
+                break;
+            case 1: {
+                int lbl=(int)row[2];
+                cb(user_context,&lbl,dst);
+                break;
+            }
+            default: {
+                int lbl[ctx->edge_labels];
+                TreeUnfold(ctx->label_db,(int)row[2],lbl);
+                cb(user_context,lbl,dst);
+                break;
+            }
+        }
+    }
+    return K;
 }
 
 static int etf_state_short(model_t self,int label,int *state){
-	gb_context_t ctx=(gb_context_t)GBgetContext(self);
-	return ctx->label_data[label][TreeFold(ctx->label_key[label],state)];
+    gb_context_t ctx=(gb_context_t)GBgetContext(self);
+    return ctx->label_data[label][TreeFold(ctx->label_key[label],state)];
 }
 
 void ETFloadGreyboxModel(model_t model,const char*name){
@@ -89,7 +89,7 @@ void ETFloadGreyboxModel(model_t model,const char*name){
 	matrix_t* p_dm_info = (matrix_t*)RTmalloc(sizeof(matrix_t));
 	dm_create(p_dm_info, etf_trans_section_count(etf), state_length);
 	ctx->trans_db=(treedbs_t*)RTmalloc(dm_nrows(p_dm_info)*sizeof(treedbs_t));
-	ctx->trans_table=(lts_t*)RTmalloc(dm_nrows(p_dm_info)*sizeof(lts_t));
+        ctx->trans_table=(matrix_table_t*)RTmalloc(dm_nrows(p_dm_info)*sizeof(matrix_table_t));
 	for(int i=0; i < dm_nrows(p_dm_info); i++) {
 		Warning(info,"parsing table %d",i);
 		etf_rel_t trans=etf_trans_section(etf,i);
@@ -116,13 +116,10 @@ void ETFloadGreyboxModel(model_t model,const char*name){
 		}
 		Warning(info,"length is %d",len);
 		ctx->trans_db[i]=TreeDBScreate(len);
-		ctx->trans_table[i]=lts_create();
-		lts_set_type(ctx->trans_table[i],LTS_LIST);
-		lts_set_size(ctx->trans_table[i],ETFrelCount(trans),ETFrelCount(trans));
-
+                ctx->trans_table[i]=MTcreate(3);
 		int src_short[len];
 		int dst_short[len];
-		int j=0;
+                uint32_t row[3];
 		do {
 			for(int k=0;k<state_length;k++) {
 				if(used[k]?(src[k]==0):(src[k]!=0)){
@@ -136,28 +133,25 @@ void ETFloadGreyboxModel(model_t model,const char*name){
 				}
 			}
 			for(int k=0;k<len;k++) dst_short[k]=dst[proj[k]]-1;
-			ctx->trans_table[i]->src[j]=TreeFold(ctx->trans_db[i],src_short);
+			row[0]=(uint32_t)TreeFold(ctx->trans_db[i],src_short);
 			switch(ctx->edge_labels){
 				case 0:
-					ctx->trans_table[i]->label[j]=0;
+					row[2]=0;
 					break;
 				case 1:
-					ctx->trans_table[i]->label[j]=lbl[0];
+					row[2]=(uint32_t)lbl[0];
 					break;
 				default:
-					ctx->trans_table[i]->label[j]=TreeFold(ctx->label_db,lbl);
+                                        row[2]=(uint32_t)TreeFold(ctx->label_db,lbl);
 					break;
 			}
-			ctx->trans_table[i]->dest[j]=TreeFold(ctx->trans_db[i],dst_short);
-			j++;
+			row[1]=(int32_t)TreeFold(ctx->trans_db[i],dst_short);
+                        MTaddRow(ctx->trans_table[i],row);
 		} while(ETFrelNext(trans,src,dst,lbl));
-		Warning(info,"table %d has %d states and %d transitions",i,TreeCount(ctx->trans_db[i]),ETFrelCount(trans));
-		lts_set_size(ctx->trans_table[i],TreeCount(ctx->trans_db[i]),ETFrelCount(trans));
-		lts_set_type(ctx->trans_table[i],LTS_BLOCK);
-		//for(int j=0;j<=ctx->trans_table[i]->states;j++){
-		//	Warning(info,"begin[%d]=%d",j,ctx->trans_table[i]->begin[j]);
-		//}
+		Warning(info,"table %d has %d states and %d transitions",
+                        i,TreeCount(ctx->trans_db[i]),ETFrelCount(trans));
 		ETFrelDestroy(&trans);
+        MTclusterBuild(ctx->trans_table[i],0,TreeCount(ctx->trans_db[i]));
 	}
 	GBsetDMInfo(model, p_dm_info);
 	GBsetNextStateShort(model,etf_short);
