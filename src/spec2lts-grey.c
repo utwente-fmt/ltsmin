@@ -209,7 +209,7 @@ index_next (void *arg, int *lbl, int *dst)
     trans++;
 }
 
-inline void get_state(int state_no, int *state)
+static inline void get_state(int state_no, int *state)
 {
     TreeUnfold(dbs, state_no, state);
 }
