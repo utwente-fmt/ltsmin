@@ -18,7 +18,8 @@ extra_ASCIIDOC = inc/spec2lts-mpi.txt inc/spec2lts-grey.txt		\
 	inc/spec-reach.txt inc/spec2lts-grey-options.txt		\
 	inc/spec2lts-grey.txt inc/spec2lts-mpi-options.txt		\
 	inc/spec2lts-mpi.txt inc/support.txt inc/vset-options.txt       \
-    inc/compression.txt inc/mcrl2-options.txt inc/spec2torx.txt
+	inc/compression.txt inc/mcrl2-options.txt inc/spec2torx.txt     \
+	inc/reachability-options.txt
 
 EXTRA_DIST = asciidoc.conf callouts.xsl $(doc_ASCIIDOC) $(extra_ASCIIDOC)
 
