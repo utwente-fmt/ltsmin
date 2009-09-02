@@ -24,10 +24,12 @@ typedef unsigned int element_t;
 
 /**
 \brief Create a new empty set with new allocators.
-\param node_class Every internal node has 2^node_class successors.
-\param base_class Every leaf node has 2^base_class bits.
+\param node_size The number of bytes used for the internal nodes.
+\param base_size The number of bytes used for the leaf nodes.
+
+Both sizes must be a power of two.
 */
-extern bitset_t bitset_create(int node_class,int base_class);
+extern bitset_t bitset_create(int node_size,int leaf_size);
 
 /**
 \brief Create a new empty set with shared allocators. 

@@ -5,7 +5,7 @@
 
 static void setclear(){
 	int i;
-	bitset_t set=bitset_create(2,6);
+	bitset_t set=bitset_create(16,16);
 
 	int N=10;
 	printf("%d in set is %d\n",N,bitset_test(set,N));
@@ -46,7 +46,7 @@ static void setclear(){
 }
 
 static void prevnext(){
-	bitset_t set=bitset_create(2,6);
+	bitset_t set=bitset_create(16,16);
 	element_t e;
 	int i;
 
@@ -146,8 +146,8 @@ static void prevnext(){
 static void ops(){
 	bitset_t set1,set2;
 
-	set1=bitset_create(2,6);
-	set2=bitset_create(2,7);
+	set1=bitset_create(16,16);
+	set2=bitset_create(16,32);
 	bitset_set(set1,7);
 	bitset_set(set2,40);
 	bitset_invert(set2);
@@ -162,8 +162,8 @@ static void ops(){
 	bitset_destroy(set1);
 	bitset_destroy(set2);
 
-	set1=bitset_create(2,6);
-	set2=bitset_create(2,7);
+	set1=bitset_create(16,16);
+	set2=bitset_create(16,32);
 	bitset_set(set1,7);
 	bitset_set(set1,39);
 	bitset_set(set1,40);

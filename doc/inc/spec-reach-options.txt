@@ -11,10 +11,4 @@ states, then apply next-state for the second group to the result,
 etc..  Thus, a chaining analysis can be completed in much less
 iterations than a BFS analysis.
 
-*-d*, *--deadlock*::
-      Find state with no outgoing transitions.  Returns with exit code
-      1 if deadlock is found, otherwise 0.
-
-*--trace*='FILE'_.gcf_::
-      When finding a deadlock state, write a trace to 'FILE'_.gcf_,
-      beginning at the initial state.
+include::reachability-options.txt[]

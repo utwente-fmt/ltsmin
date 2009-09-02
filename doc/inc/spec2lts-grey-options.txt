@@ -17,3 +17,5 @@ tree;;
 
 vset;;
   use a vector set (decision diagram).
+
+include::reachability-options.txt[]
