@@ -20,7 +20,7 @@ struct block_allocator {
 
 allocater_t BAcreate(size_t element_size,size_t block_size){
 	if (element_size<sizeof(void*)) {
-		return NULL;
+		Fatal(1,error,"element size less than pointer size");
 	}
 	allocater_t a = (allocater_t)malloc(sizeof(struct block_allocator));
 	if (a!=NULL) {

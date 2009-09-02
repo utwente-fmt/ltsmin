@@ -6,13 +6,19 @@
 #include <stdint.h>
 #include <runtime.h>
 
-typedef unsigned int word_t;
+typedef unsigned long long int word_t;
 
 #define WORD_CLASS ((sizeof(word_t)==4)?5:\
 		    ((sizeof(word_t)==8)?6:\
 		     ((sizeof(word_t)==16)?7:\
                       (fprintf(stderr,"strange size for type word_t\n"),exit(1),0)\
 		   )))
+
+#define PTR_CLASS ((sizeof(void*)==4)?2:\
+		    ((sizeof(void*)==8)?3:\
+                      (fprintf(stderr,"strange size for type void*\n"),exit(1),0)\
+		   ))
+
 
 #define WORD_MASK ((1<<WORD_CLASS)-1)
 
@@ -32,24 +38,37 @@ struct bitset {
 #define ALL_ZERO ((void*)1)
 #define ALL_ONES ((void*)2)
 
-bitset_t bitset_create(int node_class,int base_class){
+static int ilog2(int n){
+    if (n<1) Fatal(1,error,"argument is not a power of 2");
+    int i=0;
+    while(n!=1){
+        if (n&1) Fatal(1,error,"argument is not a power of 2");
+        i++;
+        n=n>>1;
+    }
+    return i;
+}
+
+bitset_t bitset_create(int node_size,int leaf_size){
+    int node_class=ilog2(node_size)-PTR_CLASS;
+    if (node_class==0) Fatal(1,error,"node too small for two pointers");
+    int base_class=ilog2(leaf_size)+3; // one byte is 8 bits
 	bitset_t set;
 	if (base_class < WORD_CLASS) return NULL;
-	set=(bitset_t)malloc(sizeof(struct bitset));
-	if (set==NULL) return set;
+	set=RT_NEW(struct bitset);
 	set->max=(((element_t)1)<<base_class)-1;
 	set->set=ALL_ZERO;
 	set->default_value=ALL_ZERO;
 	set->node_class=node_class;
-	set->node_size=1<<node_class;
+	set->node_size=node_size;
 	set->base_class=base_class;
 	set->depth=0;
-	set->node_alloc=BAcreate((1<<node_class)*sizeof(void*),1024*1024);
+	set->node_alloc=BAcreate(node_size,1024*1024);
 	if (set->node_alloc==NULL){
 		free(set);
 		return NULL;
 	}
-	set->base_alloc=BAcreate((1<<base_class)>>3,1024*1024);
+	set->base_alloc=BAcreate(leaf_size,1024*1024);
 	if (set->base_alloc==NULL){
 		free(set->node_alloc);
 		free(set);
