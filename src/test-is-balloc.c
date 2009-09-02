@@ -5,6 +5,7 @@
  *      Author: laarman
  */
 
+#include "config.h"
 #include <stdlib.h>
 #include "is-balloc.c"
 
