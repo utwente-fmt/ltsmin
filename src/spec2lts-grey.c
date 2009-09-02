@@ -209,7 +209,7 @@ index_next (void *arg, int *lbl, int *dst)
     trans++;
 }
 
-inline void get_state(int state_no, int *state)
+static inline void get_state(int state_no, int *state)
 {
     TreeUnfold(dbs, state_no, state);
 }
@@ -506,7 +506,7 @@ dfs_explore (model_t model, int *src, size_t *o_depth)
         /* Store folded states on the stack, at the cost of having to
            unfold them */
         stack = dfs_stack_create (1);
-        dfs_open_set = bitset_create (11, 5); /* XXX magic numbers by sccblom */
+        dfs_open_set = bitset_create (128,128);
         dbs = TreeDBScreate (N);
         int                 idx = TreeFold (dbs, src);
         int                *fvec = &idx;
