@@ -209,18 +209,13 @@ void MTclusterSort(matrix_table_t mt,int col){
 }
 
 
-void MTclusterBuild(matrix_table_t mt,int col){
+void MTclusterBuild(matrix_table_t mt,int col,uint32_t count){
     if (mt->cluster_col!=-1) Fatal(1,error,"can only cluster once");
-    uint32_t count=0;
-    Warning(debug,"scanning for maximum");
-    for(uint32_t i=0;i<mt->count;i++){
-        if(mt->column[col][i]>=count) count=mt->column[col][i]+1;
-    }
-    Warning(debug,"cluster count is %u",count);
     mt->cluster_count=count;
     mt->begin=(uint32_t*)RTmallocZero((count+1)*sizeof(uint32_t));
     Warning(debug,"counting cluster sizes");
     for(uint32_t i=0;i<mt->count;i++){
+        if(mt->column[col][i]>=count) Fatal(1,error,"value exceeds cluster count");
         mt->begin[mt->column[col][i]]++;
     }
     Warning(debug,"summing up");
@@ -258,7 +253,7 @@ void MTclusterBuild(matrix_table_t mt,int col){
             pos1=mt->column[col][pos2];
             //Warning(debug,"moving row %d to %d",pos2,pos1);
             MTgetRow(mt,pos2,row1);
-            MTsetRow(mt,pos2,row2);            
+            MTsetRow(mt,pos2,row2);
         }
     }
     Warning(debug,"deleting old column");

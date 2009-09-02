@@ -137,7 +137,7 @@ extern void MTupdate(matrix_table_t mt,int row,int col,uint32_t val);
 /**
 \brief Cluster the rows of a matrix according to one column.
 */
-extern void MTclusterBuild(matrix_table_t mt,int col);
+extern void MTclusterBuild(matrix_table_t mt,int col,uint32_t cluster_count);
 
 /**
 \brief Sort the rows of a clustered table on another column.

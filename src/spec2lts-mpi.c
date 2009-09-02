@@ -16,7 +16,6 @@
 #include <mpi-runtime.h>
 #include "archive.h"
 #include "mpi_io_stream.h"
-#include "mpi_ram_raf.h"
 #include "stringindex.h"
 #include "dynamic-array.h"
 #include "mpi-event-loop.h"

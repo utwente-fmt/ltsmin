@@ -183,12 +183,6 @@ libnips_open_la_LIBADD = ${top_builddir}/nips-vm/libnips_vm.la libltsmin-nompi.l
 mpi_event_test_SOURCES = mpi-event-test.c config.h
 mpi_event_test_LDADD   = libltsmin-mpi.la
 
-# ltsmin-mpi
-ltsmin_mpi_SOURCES = ltsmin-mpi.c set.c lts.c dlts.c set.h lts.h	\
-                     dlts.h config.h
-ltsmin_mpi_LDADD   = libltsmin-mpi.la
-
-
 # test-is-balloc
 test_is_balloc_SOURCES = test-is-balloc.c
 test_is_balloc_LDADD   = libltsmin-nompi.la
@@ -197,6 +191,14 @@ test_is_balloc_LDADD   = libltsmin-nompi.la
 test_dfs_stack_SOURCES = test-dfs-stack.c
 test_dfs_stack_LDADD   = libltsmin-nompi.la
 
+# ltsmin-mpi
+ltsmin_mpi_SOURCES = sigmin-mpi.c sigmin-sig.h config.h seg-lts.c seg-lts.h \
+                     sig-array.c sig-array.h sigmin-array.c sigmin-array.h \
+                     sigmin-set.c sigmin-set.h set.c set.h sigmin-types.h
+ltsmin_mpi_LDFLAGS = $(AM_LDFLAGS) $(CADP_LDFLAGS)
+ltsmin_mpi_LDADD   = libltsmin-mpi.la $(CADP_LIBS)
+
+
 # ltsmin-convert
 ltsmin_convert_SOURCES = ltsmin-convert.c
 ltsmin_convert_LDADD = libltsmin-nompi.la $(CADP_LIBS)
@@ -204,8 +206,7 @@ ltsmin_convert_LDFLAGS = $(CADP_LDFLAGS) $(AM_LDFLAGS)
 ltsmin_convert_CPPFLAGS = $(CADP_CPPFLAGS) $(AM_CPPFLAGS)
 
 # libraries
-libmpi_la_SOURCES = mpi_io_stream.c mpi_core.c mpi_raf.c mpi_ram_raf.c	\
-		   mpi_core.h mpi_io_stream.h mpi_ram_raf.h config.h	\
+libmpi_la_SOURCES = mpi_io_stream.c mpi_raf.c mpi_io_stream.h \
 		   mpi-event-loop.c mpi-event-loop.h mpi-runtime.c \
 		   mpi-runtime.h task-queue.c task-queue.h
 
