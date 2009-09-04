@@ -601,14 +601,17 @@ int main(int argc, char *argv[]){
 	if (RTverbosity >=2) {
 	  fprintf(stderr,"Dependency Matrix:\n");
 	  GBprintDependencyMatrix(stderr,model);
-	}
+    }
     if (trc_output)
     {
         state_man=create_manager(65536);
         ADD_ARRAY(state_man, parent_ofs, uint32_t);
     }
 	lts_type_t ltstype=GBgetLTStype(model);
-	N=lts_type_get_state_length(ltstype);
+    if (RTverbosity >=2) {
+        lts_type_print(info,ltstype);
+    }
+    N=lts_type_get_state_length(ltstype);
 	K= dm_nrows(GBgetDMInfo(model));
 	Warning(info,"length is %d, there are %d groups",N,K);
 	state_labels=lts_type_get_state_label_count(ltstype);

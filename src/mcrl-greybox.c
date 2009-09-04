@@ -10,14 +10,7 @@
 #include "at-map.h"
 #include "dm/dm.h"
 
-
-/**
-\brief Flag that tells the mCRL grey box loader to pass state variable names.
- */
-#define STATE_VISIBLE 0x01
-static int flags=0;
 static char *mcrl_args="-alt rw";
-
 
 static void WarningHandler(const char *format, va_list args) {
 	FILE* f=log_get_stream(info);
@@ -96,7 +89,6 @@ static void mcrl_popt(poptContext con,
 }
 struct poptOption mcrl_options[]= {
 	{ NULL, 0 , POPT_ARG_CALLBACK|POPT_CBFLAG_POST|POPT_CBFLAG_SKIPOPTION , mcrl_popt , 0 , NULL , NULL },
-	{ "state-names" , 0 , POPT_ARG_VAL|POPT_ARGFLAG_OR , &flags , STATE_VISIBLE , "make the names of the state parameters visible" ,NULL},
 	{ "mcrl" , 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &mcrl_args , 0, "pass options to the mCRL library","<mCRL options>" },
 	POPT_TABLEEND
 };
@@ -213,23 +205,15 @@ void MCRLloadGreyboxModel(model_t m,const char*model){
 	lts_type_t ltstype=lts_type_create();
 	state_length=MCRLgetNumberOfPars();
 	lts_type_set_state_length(ltstype,state_length);
-	if (flags & STATE_VISIBLE){
-		Warning(info,"state variables are visible.");
-		ATermList pars=MCRLgetListOfPars();
-		for(int i=0;i<state_length;i++){
-			ATerm decl=ATelementAt(pars,i);
-			ATerm var=MCRLprint(ATgetArgument(decl,0));
-			ATerm type=MCRLprint(ATgetArgument(decl,1));
-			lts_type_set_state_name(ltstype,i,ATwriteToString(var));
-			lts_type_set_state_type(ltstype,i,"leaf");
-			Warning(info,"parameter %8s: %8s",lts_type_get_state_name(ltstype,i),ATwriteToString(type));
-		}
-	} else {
-		Warning(info,"hiding the state.");
-		for(int i=0;i<state_length;i++){
-			lts_type_set_state_type(ltstype,i,"leaf");
-		}
-	}
+    ATermList pars=MCRLgetListOfPars();
+    for(int i=0;i<state_length;i++){
+        ATerm decl=ATelementAt(pars,i);
+        ATerm var=MCRLprint(ATgetArgument(decl,0));
+        //ATerm type=MCRLprint(ATgetArgument(decl,1));
+        //should be used instead of "leaf", future work.
+        lts_type_set_state_name(ltstype,i,ATwriteToString(var));
+        lts_type_set_state_type(ltstype,i,"leaf");
+    }
 	termmap=ATmapCreate(m,lts_type_add_type(ltstype,"leaf",NULL),NULL,print_term,parse_term);
 	actionmap=ATmapCreate(m,lts_type_add_type(ltstype,"action",NULL),NULL,remove_quotes,NULL);
 

@@ -137,7 +137,7 @@ static void bcg_read_open(lts_input_t input,const char *requested_mode,char **ac
 	input->segment_count=1;
 	lts_count_init(&(input->count),0,1,1); 
 	lts_type_t ltstype=lts_type_create();
-	lts_type_set_state_length(ltstype,2);
+	lts_type_set_state_length(ltstype,0);
 	int action_type=lts_type_add_type(ltstype,"action",NULL);
 	lts_type_set_edge_label_count(ltstype,1);
 	lts_type_set_edge_label_name(ltstype,0,"action");

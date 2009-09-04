@@ -1,5 +1,6 @@
 #include <string.h>
 
+#include <hre-main.h>
 #include "runtime.h"
 #include "lts-type.h"
 #include "stringindex.h"
@@ -74,23 +75,23 @@ lts_type_t lts_type_permute(lts_type_t t0,int *pi){
 void lts_type_print(log_t log, lts_type_t t){
     log_printf(log,"The state vector is:\n");
  	for(int i=0;i<t->state_length;i++){
- 	    log_printf(log,"%4d: %s:%d(%s)\n",i,
-                   t->state_name[i],t->state_type[i],
+ 	    log_printf(log,"%4d: %s:%s\n",i,
+                   t->state_name[i],
                    SIget(t->type_db,t->state_type[i]));
 	}
 	log_printf(log,"The state labels are:\n");
 	for(int i=0;i<t->state_label_count;i++){
-	    log_printf(log,"%4d: %s:%d(%s)\n",i,
-                   t->state_label_name[i],t->state_label_type[i],
+	    log_printf(log,"%4d: %s:%s\n",i,
+                   t->state_label_name[i],
                    SIget(t->type_db,t->state_label_type[i]));
 	}
-	log_printf(log,"The edge labels are:");
+	log_printf(log,"The edge labels are:\n");
 	for(int i=0;i<t->edge_label_count;i++){
-	    log_printf(log,"%4d: %s:%d(%s)\n",i,
-                   t->edge_label_name[i],t->edge_label_type[i],
+	    log_printf(log,"%4d: %s:%s\n",i,
+                   t->edge_label_name[i],
                    SIget(t->type_db,t->edge_label_type[i]));
 	}
-    log_printf(log,"The registered types are:");
+    log_printf(log,"The registered types are:\n");
  	int N=SIgetCount(t->type_db);
 	for(int i=0;i<N;i++){
 	    log_printf(log,"%4d: %s\n",i,SIget(t->type_db,i));
@@ -229,6 +230,30 @@ char* lts_type_get_type(lts_type_t  t,int typeno){
 	return SIget(t->type_db,typeno);
 }
 
+void lts_type_validate(lts_type_t t){
+    for(int i=0;i<t->state_length;i++){
+        if (t->state_name[i]==NULL) Abort("name of state variable %d undefined",i);
+        if (t->state_type[i]<0) Abort("type of state variable %d undefined",i);
+        if (SIget(t->type_db,t->state_type[i])==NULL) {
+            Abort("type %d used for state variable %d, but undefined",t->state_type[i],i);
+        }
+    }
+    for(int i=0;i<t->state_label_count;i++){
+        if (t->state_label_name[i]==NULL) Abort("name of defined variable %d undefined",i);
+        if (t->state_label_type[i]<0) Abort("type of defined variable %d undefined",i);
+        if (SIget(t->type_db,t->state_label_type[i])==NULL) {
+            Abort("type %d used for state label %d, but undefined",t->state_label_type[i],i);
+        }
+    }
+    for(int i=0;i<t->edge_label_count;i++){
+        if (t->edge_label_name[i]==NULL) Abort("name of edge label %d undefined",i);
+        if (t->edge_label_type[i]<0) Abort("type of edge label %d undefined",i);
+        if (SIget(t->type_db,t->edge_label_type[i])==NULL) {
+            Abort("type %d used for edge label %d, but undefined",t->edge_label_type[i],i);
+        }
+    }
+}
+
 void lts_type_serialize(lts_type_t t,stream_t ds){
 	DSwriteS(ds,"lts signature 1.0");
 	uint32_t N=lts_type_get_state_length(t);
@@ -307,5 +332,3 @@ lts_type_t lts_type_deserialize(stream_t ds){
 	}
 	return t;
 }
-
-

@@ -179,6 +179,7 @@ void GBsetContext(model_t model,void* context){
 
 void GBsetLTStype(model_t model,lts_type_t info){
 	if (model->ltstype != NULL)  Fatal(1,error,"ltstype already set");
+    lts_type_validate(info);
 	model->ltstype=info;
     if (model->map==NULL){
 	    int N=lts_type_get_type_count(info);

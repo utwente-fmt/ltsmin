@@ -311,7 +311,7 @@ static void load_dir_headers(lts_input_t input,stream_t ds){
 	DSclose(&ds);
 	
 	lts_type_t ltstype=lts_type_create();
-	lts_type_set_state_length(ltstype,2);
+	lts_type_set_state_length(ltstype,0);
 	int action_type=lts_type_add_type(ltstype,"action",NULL);
 	lts_type_set_edge_label_count(ltstype,1);
 	lts_type_set_edge_label_name(ltstype,0,"action");
