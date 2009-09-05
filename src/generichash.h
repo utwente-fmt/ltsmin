@@ -6,8 +6,6 @@
  * This code was written by Bob Jenkins in 1996 bob_jenkins@burtleburtle.net and
  * put in the public domain. We will need to rewrite it to C99 standard with doxygen
  * annotations.
- *
- * CVS version $Id: generichash.h,v 1.1 2007/11/07 16:48:07 sccblom Exp $
  */
 
 #ifndef GENERIC_HASH_H
