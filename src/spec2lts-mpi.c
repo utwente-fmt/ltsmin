@@ -434,7 +434,6 @@ int main(int argc, char*argv[]){
         MPI_Comm_size(MPI_COMM_WORLD, &mpi_nodes);
         MPI_Comm_rank(MPI_COMM_WORLD, &mpi_me);
 	sprintf(who,"%s(%2d)",get_label(),mpi_me);
-	set_label(who);
 	mpi_queue=event_queue();
 //	state_found_init();
 	barrier=event_barrier_create(mpi_queue,MPI_COMM_WORLD,BARRIER_TAG);

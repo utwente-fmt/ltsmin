@@ -5,7 +5,6 @@
 #ifndef STREAM_H
 #define STREAM_H
 
-#include "config.h"
 #include <unistd.h>
 #include <stdio.h>
 #include <stdint.h>
@@ -65,6 +64,26 @@ extern stream_t stream_diff32(stream_t s);
 extern stream_t stream_add_code(stream_t s,char* code);
 
 extern stream_t stream_setup(stream_t s,char* code);
+
+/**
+\brief Create a stream that reads from the given file descriptor.
+*/
+extern stream_t fd_input(int fd);
+
+/**
+\brief Create a stream that write to the given file descriptor.
+*/
+extern stream_t fd_output(int fd);
+
+/**
+\brief Create a bidirectional stream around one file descriptor.
+*/
+extern stream_t fd_stream(int fd);
+
+/**
+\brief Create a bidirectional stream around two file descriptors.
+*/
+extern stream_t fd_stream_pair(int fd_in,int fd_out);
 
 /** \defgroup data_io Data Input/Output */
 /*@{*/

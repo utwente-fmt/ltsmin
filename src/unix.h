@@ -1,7 +1,6 @@
 #ifndef UNIX_H
 #define UNIX_H
 
-#include "config.h"
 #include <stdlib.h>
 #include "amconfig.h"
 

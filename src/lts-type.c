@@ -72,22 +72,28 @@ lts_type_t lts_type_permute(lts_type_t t0,int *pi){
 }
 
 void lts_type_print(log_t log, lts_type_t t){
-    log_println(log,"the state vector is:");
+    log_printf(log,"The state vector is:\n");
  	for(int i=0;i<t->state_length;i++){
- 	    log_println(log,"%4d: %s:%d(%s)",i,t->state_name[i],t->state_type[i],SIget(t->type_db,t->state_type[i]));
+ 	    log_printf(log,"%4d: %s:%d(%s)\n",i,
+                   t->state_name[i],t->state_type[i],
+                   SIget(t->type_db,t->state_type[i]));
 	}
-	log_println(log,"the state labels are");
+	log_printf(log,"The state labels are:\n");
 	for(int i=0;i<t->state_label_count;i++){
-	    log_println(log,"%4d: %s:%d(%s)",i,t->state_label_name[i],t->state_label_type[i],SIget(t->type_db,t->state_label_type[i]));
+	    log_printf(log,"%4d: %s:%d(%s)\n",i,
+                   t->state_label_name[i],t->state_label_type[i],
+                   SIget(t->type_db,t->state_label_type[i]));
 	}
-	log_println(log,"the edge labels are");
+	log_printf(log,"The edge labels are:");
 	for(int i=0;i<t->edge_label_count;i++){
-	    log_println(log,"%4d: %s:%d(%s)",i,t->edge_label_name[i],t->edge_label_type[i],SIget(t->type_db,t->edge_label_type[i]));
+	    log_printf(log,"%4d: %s:%d(%s)\n",i,
+                   t->edge_label_name[i],t->edge_label_type[i],
+                   SIget(t->type_db,t->edge_label_type[i]));
 	}
-    log_println(log,"the registered types are");
+    log_printf(log,"The registered types are:");
  	int N=SIgetCount(t->type_db);
 	for(int i=0;i<N;i++){
-	    log_println(log,"%4d: %s",i,SIget(t->type_db,i));
+	    log_printf(log,"%4d: %s\n",i,SIget(t->type_db,i));
 	}
 }
 
