@@ -22,14 +22,15 @@ typedef unsigned long long int word_t;
 
 #define WORD_MASK ((1<<WORD_CLASS)-1)
 
+
 struct bitset {
-	element_t max;
-	void *set;
-	void *default_value;
-	int node_class;
-	int node_size;
-	int base_class;
-	int depth;
+	element_t max; // the least element for which the default applies.
+	void *set; // tree of specific values.
+	void *default_value; // the default: either ALL_ONES or ALL_ZEROS.
+	int node_class; // ilog2(node_size);
+	int node_size; // number of children of an internal node. power of 2.
+	int base_class; // the number of bits in a leaf is 2^base_class.
+	int depth; // the depth of the specific value tree.
 	allocater_t node_alloc;
 	allocater_t base_alloc;	
 };
@@ -53,14 +54,13 @@ bitset_t bitset_create(int node_size,int leaf_size){
     int node_class=ilog2(node_size)-PTR_CLASS;
     if (node_class==0) Fatal(1,error,"node too small for two pointers");
     int base_class=ilog2(leaf_size)+3; // one byte is 8 bits
-	bitset_t set;
-	if (base_class < WORD_CLASS) return NULL;
-	set=RT_NEW(struct bitset);
+    if (base_class < WORD_CLASS) Fatal(1,error,"leaf smaller than word size");
+    bitset_t set=RT_NEW(struct bitset);
 	set->max=(((element_t)1)<<base_class)-1;
 	set->set=ALL_ZERO;
 	set->default_value=ALL_ZERO;
 	set->node_class=node_class;
-	set->node_size=node_size;
+	set->node_size=node_size>>PTR_CLASS;
 	set->base_class=base_class;
 	set->depth=0;
 	set->node_alloc=BAcreate(node_size,1024*1024);
@@ -109,10 +109,14 @@ static void free_set(bitset_t main,int depth,void *set){
 }
 
 void bitset_destroy(bitset_t set){
-	free_set(set,set->depth,set->set);
-	BAderef(set->node_alloc);
-	BAderef(set->base_alloc);
-	free(set);
+    Debug(1,"freeing set");
+    free_set(set,set->depth,set->set);
+    Debug(1,"deref node");
+    BAderef(set->node_alloc);
+    Debug(1,"deref base");
+    BAderef(set->base_alloc);
+    Debug(1,"done");
+    free(set);
 }
 
 int bitset_clear_all(bitset_t set){
