@@ -85,3 +85,77 @@ bitvector_is_set (const bitvector_t *bv, const int idx)
     size_t              mask = 1UL << bv_ofs (idx);
     return (bv->data[bv_seg (idx)] & mask) != 0;
 }
+
+void
+bitvector_union(bitvector_t *bv, const bitvector_t *bv2)
+{
+    // check size
+    if (bv->n_bits != bv2->n_bits) return;
+
+    // calculate number of words in the bitvector, union wordwise
+    size_t              n_words = utrunc (bv->n_bits, WORD_BITS);
+    for(size_t i=0; i < n_words; ++i) {
+        bv->data[i] |= bv2->data[i];
+    }
+}
+
+void
+bitvector_intersect(bitvector_t *bv, const bitvector_t *bv2)
+{
+    // check size
+    if (bv->n_bits != bv2->n_bits) return;
+
+    // calculate number of words in the bitvector, union wordwise
+    size_t              n_words = utrunc (bv->n_bits, WORD_BITS);
+    for(size_t i=0; i < n_words; ++i) {
+        bv->data[i] &= bv2->data[i];
+    }
+}
+
+int
+bitvector_is_empty(const bitvector_t *bv)
+{
+    size_t result = 0;
+    // bitvector of size 0
+    if (bv->n_bits == 0) return 1;
+
+    // calculate number of words in the bitvector, union wordwise
+    size_t              n_words = utrunc (bv->n_bits, WORD_BITS);
+    for(size_t i=0; i < n_words; ++i) {
+        result |= bv->data[i];
+    }
+    return (result == 0);
+}
+
+int
+bitvector_is_disjoint(const bitvector_t *bv1, const bitvector_t *bv2)
+{
+    size_t              result = 0;
+    // check size
+    if (bv1->n_bits != bv2->n_bits) return 0;
+
+    // calculate number of words in the bitvector, union wordwise
+    size_t              n_words = utrunc (bv1->n_bits, WORD_BITS);
+    for(size_t i=0; i < n_words; ++i) {
+        result |= (bv1->data[i] & bv2->data[i]);
+    }
+    return (result == 0);
+}
+
+void
+bitvector_invert(bitvector_t *bv)
+{
+    // check size
+    if (bv->n_bits == 0) return;
+
+    // calculate number of words in the bitvector, union wordwise
+    size_t              n_words = utrunc (bv->n_bits, WORD_BITS);
+    for(size_t i=0; i < n_words; ++i) {
+        bv->data[i] = ~bv->data[i];
+    }
+
+    // don't invert the unused bits!
+    int                 used_bits = WORD_BITS - (n_words * WORD_BITS - bv->n_bits);
+    size_t              mask = (1UL << (used_bits))-1;
+    bv->data[n_words-1] &= mask;
+}

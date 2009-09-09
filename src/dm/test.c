@@ -116,6 +116,57 @@ main (void)
 
     user_bitvector_print (&b2);
 
+    // test is_empty
+    printf ("is_empty b1? %c (should be t)\n", bitvector_is_empty(&b1)?'t':'f');
+    printf ("is_empty b2? %c (should be f)\n", bitvector_is_empty(&b2)?'t':'f');
+
+    // set even/odd bits in b1/b2
+    for(int i=0; i<20; ++i)
+    {
+        if (i%2)
+        {
+            bitvector_set(&b1,i);
+        } else {
+            bitvector_set(&b2,i);
+        }
+    }
+
+    // print before union
+    printf ("before union\n");
+    user_bitvector_print (&b1);
+    user_bitvector_print (&b2);
+
+    // disjoint?
+    printf ("b1,b2 are disjoint %c (should be t)\n", bitvector_is_disjoint(&b1, &b2)?'t':'f');
+
+    printf ("union\n");
+    bitvector_union(&b1, &b2);
+
+    // disjoint?
+    printf ("b1,b2 are disjoint %c (should be f)\n", bitvector_is_disjoint(&b1, &b2)?'t':'f');
+
+    // print after union
+    user_bitvector_print (&b1);
+    user_bitvector_print (&b2);
+    printf ("intersect\n");
+    bitvector_intersect(&b1, &b2);
+
+    // disjoint?
+    printf ("b1,b2 are disjoint %c (should be f)\n", bitvector_is_disjoint(&b1, &b2)?'t':'f');
+
+    // print after intersection
+    user_bitvector_print (&b1);
+    user_bitvector_print (&b2);
+
+    printf ("invert b1\n");
+    bitvector_invert(&b1);
+
+    // print after inversion
+    user_bitvector_print (&b1);
+
+    // disjoint?
+    printf ("b1,b2 are disjoint %c (should be t)\n", bitvector_is_disjoint(&b1, &b2)?'t':'f');
+
     bitvector_free (&b2);
     bitvector_free (&b1);
 
