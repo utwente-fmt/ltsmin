@@ -42,7 +42,7 @@ int
 bitvector_copy (bitvector_t *bv_tgt, const bitvector_t *bv_src)
 {
     // check validity src
-    if (bv_src->n_bits == 0 || bv_src->data == NULL)
+    if (bv_src->data == NULL)
         return -1;
 
     // alloc memory for target

@@ -102,6 +102,14 @@ main (void)
 
     bitvector_t         b1;
     bitvector_t         b2;
+
+    // test size zero bitvectors
+    printf ("bitvector_create(&b1, 0) = %d (should be 0)\n", bitvector_create (&b1, 0));
+    printf ("bitvector_copy(&b2, &b1) = %d (should be 0)\n", bitvector_copy (&b2, &b1));
+
+    bitvector_free (&b2);
+    bitvector_free (&b1);
+
     bitvector_create (&b1, 20);
 
     user_bitvector_print (&b1);
