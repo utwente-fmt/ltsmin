@@ -109,7 +109,7 @@ main (void)
     bitvector_set (&b1, 4);
     user_bitvector_print (&b1);
 
-    bitvector_copy (&b1, &b2);
+    bitvector_copy (&b2, &b1);
 
     bitvector_unset (&b1, 4);
     user_bitvector_print (&b1);

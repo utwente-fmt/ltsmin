@@ -348,7 +348,7 @@ dm_copy (const matrix_t *src, matrix_t *tgt)
     }
 
     if (src->rows != 0 && src->cols != 0) {
-        if (bitvector_copy (&(src->bits), &(tgt->bits))) {
+        if (bitvector_copy (&(tgt->bits), &(src->bits))) {
             dm_free (tgt);
             return -1;
         }

@@ -36,14 +36,14 @@ extern void         bitvector_free (bitvector_t *);
 /**
  * bitvector_copy
  *  Copy a bitvector to another bitvector
- *   1) source bitvector
- *   2) unused bitvector_t struct
+ *   1) unused bitvector_t struct
+ *   2) source bitvector
  *
  *  return value:
  *   0: new bitvector is created in the target, all bits are copied
  *  -1: error
  */
-extern int          bitvector_copy (const bitvector_t *, bitvector_t *);
+extern int          bitvector_copy (bitvector_t *, const bitvector_t *);
 
 /**
  * bitvector_size

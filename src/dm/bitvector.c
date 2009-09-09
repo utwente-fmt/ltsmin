@@ -39,7 +39,7 @@ bitvector_free (bitvector_t *bv)
 }
 
 int
-bitvector_copy (const bitvector_t *bv_src, bitvector_t *bv_tgt)
+bitvector_copy (bitvector_t *bv_tgt, const bitvector_t *bv_src)
 {
     // check validity src
     if (bv_src->n_bits == 0 || bv_src->data == NULL)
