@@ -291,6 +291,30 @@ main (void)
     print_matrix (&m1);
 */
 
+    // get bitvector from matrix text
+    bitvector_create (&b1, 6);
+    bitvector_create (&b2, 10);
+
+    printf ("get bitvector row, invalid size\n"
+            "returns %d (should be -1)\n",
+            dm_bitvector_row(&b1, &m1, 0));
+    printf ("get bitvector row, correct size\n"
+            "returns %d (should be 0)\n",
+            dm_bitvector_row(&b2, &m1, 0));
+
+    printf ("bitvector of row 0\n");
+    user_bitvector_print (&b2);
+
+    printf ("get bitvector col, correct size\n"
+            "returns %d (should be 0)\n",
+            dm_bitvector_col(&b1, &m1, 8));
+
+    printf ("bitvector of col 8\n");
+    user_bitvector_print (&b1);
+
+    bitvector_free (&b2);
+    bitvector_free (&b1);
+
     printf ("count test\n");
     for (int i = 0; i < dm_nrows (&m1); i++)
         printf ("ones in row %d: %d\n", i, dm_ones_in_row (&m1, i));
