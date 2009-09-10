@@ -26,7 +26,7 @@ void fd_write(stream_t stream,void*buf,size_t count){
     }
 }
 void fd_flush(stream_t stream){
-    if (fdatasync(stream->fd_out)){
+    if (fsync(stream->fd_out)){ /* might be unneeded, check with TCP sockets */
         FatalCall(1,error,"fdatasync failed");
     }
 }

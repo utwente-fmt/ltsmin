@@ -3,6 +3,7 @@
 
 #include <popt.h>
 #include <stream.h>
+#include <pthread.h>
 /*
 Internal details of HRE.
 Should not be installed!
