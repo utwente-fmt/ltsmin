@@ -290,7 +290,7 @@ git_version.h.tmp:
 .PHONY: git_version.h.tmp
 
 DISTCLEANFILES = git_version.h git_version.h.tmp
-CLEANFILES = ltsmin-syntax.c ltsmin-syntax.h ltsmin-syntax.out
+CLEANFILES = ltsmin-grammar.c ltsmin-grammar.h ltsmin-grammar.out
 MAINTAINERCLEANFILES = ltsmin-tokens.c ltsmin-tokens.h
 
 # make
