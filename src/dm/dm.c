@@ -348,7 +348,7 @@ dm_copy (const matrix_t *src, matrix_t *tgt)
     }
 
     if (src->rows != 0 && src->cols != 0) {
-        if (bitvector_copy (&(src->bits), &(tgt->bits))) {
+        if (bitvector_copy (&(tgt->bits), &(src->bits))) {
             dm_free (tgt);
             return -1;
         }
@@ -1218,4 +1218,38 @@ dm_expand_vector (matrix_t *m, int row, int *s0, int *src, int *tgt)
     }
     // return number of copied items from src
     return k;
+}
+
+int
+dm_bitvector_row(bitvector_t *bv, matrix_t *m, int row)
+{
+    // check size
+    if (bitvector_size (bv) != (size_t)dm_ncols (m)) return -1;
+
+    // copy row
+    for (int i = 0; i < dm_ncols (m); i++) {
+        if (dm_is_set (m, row, i)) {
+            bitvector_set(bv, i);
+        } else {
+            bitvector_unset(bv, i);
+        }
+    }
+    return 0;
+}
+
+int
+dm_bitvector_col(bitvector_t *bv, matrix_t *m, int col)
+{
+    // check size
+    if (bitvector_size (bv) != (size_t)dm_nrows (m)) return -1;
+
+    // copy row
+    for (int i = 0; i < dm_nrows (m); i++) {
+        if (dm_is_set (m, i, col)) {
+            bitvector_set(bv, i);
+        } else {
+            bitvector_unset(bv, i);
+        }
+    }
+    return 0;
 }
