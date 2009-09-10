@@ -1,6 +1,6 @@
 bin_PROGRAMS = ltsmin-convert gcf etf-convert
 noinst_PROGRAMS = test-bitset test-is-balloc test-dfs-stack test-hre ltsmin-parse
-noinst_LTLIBRARIES = libutil.la libltsmin-nompi.la
+noinst_LTLIBRARIES = libutil.la libltsmin.la
 pkglib_LTLIBRARIES =
 
 SUBDIRS = dm . ce torx
@@ -54,19 +54,19 @@ endif
 
 # etf-convert
 etf_convert_SOURCES = etf-convert.c
-etf_convert_LDADD = libltsmin-nompi.la
+etf_convert_LDADD = libltsmin.la
 
 # gcf
 gcf_SOURCES = gcf-rw.c
-gcf_LDADD = libltsmin-nompi.la
+gcf_LDADD = libltsmin.la
 
 # test-bitset
 test_bitset_SOURCES = test-bitset.c
-test_bitset_LDADD = libltsmin-nompi.la
+test_bitset_LDADD = libltsmin.la
 
 # test-hre
 test_hre_SOURCES = test-hre.c
-test_hre_LDADD = libltsmin-nompi.la
+test_hre_LDADD = libltsmin.la
 
 if HAVE_MPI
 test_hre_mpi_SOURCES = test-hre.c
@@ -75,12 +75,12 @@ endif
 
 # ltsmin-parse
 ltsmin_parse_SOURCES = ltsmin-parse.c
-ltsmin_parse_LDADD = libltsmin-nompi.la
+ltsmin_parse_LDADD = libltsmin.la
 
 # etf2lts-grey
 etf2lts_grey_SOURCES  = spec2lts-grey.c etf-greybox.c etf-greybox.h    \
                         lts.c lts.h vset_atermdd.c
-etf2lts_grey_LDADD    = libltsmin-nompi.la -lATerm $(BUDDY_LIBS) $(CADP_LIBS)
+etf2lts_grey_LDADD    = libltsmin.la -lATerm $(BUDDY_LIBS) $(CADP_LIBS)
 etf2lts_grey_CPPFLAGS = -DETF $(MCRL_CPPFLAGS) $(AM_CPPFLAGS)
 etf2lts_grey_LDFLAGS  = $(MCRL_LDFLAGS) $(BUDDY_LDFLAGS) $(AM_LDFLAGS) $(CADP_LDFLAGS)
 
@@ -88,49 +88,49 @@ etf2lts_grey_LDFLAGS  = $(MCRL_LDFLAGS) $(BUDDY_LDFLAGS) $(AM_LDFLAGS) $(CADP_LD
 # lpo2lts-grey
 lpo2lts_grey_SOURCES  = spec2lts-grey.c mcrl-greybox.c mcrl-greybox.h    \
                         at-map.c at-map.h vset_atermdd.c
-lpo2lts_grey_LDADD    = libltsmin-nompi.la $(MCRL_LIBS) $(BUDDY_LIBS) $(CADP_LIBS)
+lpo2lts_grey_LDADD    = libltsmin.la $(MCRL_LIBS) $(BUDDY_LIBS) $(CADP_LIBS)
 lpo2lts_grey_CPPFLAGS = -DMCRL $(MCRL_CPPFLAGS) $(AM_CPPFLAGS)
 lpo2lts_grey_LDFLAGS  = $(MCRL_LDFLAGS) $(BUDDY_LDFLAGS) $(AM_LDFLAGS) $(CADP_LDFLAGS)
 
 # lps2lts-grey
 lps2lts_grey_SOURCES  = spec2lts-grey.c mcrl2-greybox.cpp		\
                         mcrl2-greybox.h at-map.c at-map.h vset_atermdd.c
-lps2lts_grey_LDADD    = libltsmin-nompi.la $(MCRL2_LIBS) $(BUDDY_LIBS) $(CADP_LIBS)
+lps2lts_grey_LDADD    = libltsmin.la $(MCRL2_LIBS) $(BUDDY_LIBS) $(CADP_LIBS)
 lps2lts_grey_CPPFLAGS = -DMCRL2 $(MCRL2_CPPFLAGS) $(AM_CPPFLAGS)
 lps2lts_grey_LDFLAGS  = $(MCRL2_LDFLAGS) $(BUDDY_LDFLAGS) $(AM_LDFLAGS) $(CADP_LDFLAGS)
 
 # nips2lts-grey
 nips2lts_grey_SOURCES  = spec2lts-grey.c nips-greybox.c nips-greybox.h   \
                          vset_atermdd.c
-nips2lts_grey_LDADD    = libltsmin-nompi.la -lATerm $(NIPS_LIBS) $(BUDDY_LIBS) $(CADP_LIBS)
+nips2lts_grey_LDADD    = libltsmin.la -lATerm $(NIPS_LIBS) $(BUDDY_LIBS) $(CADP_LIBS)
 nips2lts_grey_CPPFLAGS = -DNIPS $(NIPS_CPPFLAGS) $(MCRL_CPPFLAGS) $(AM_CPPFLAGS)
 nips2lts_grey_LDFLAGS  = $(NIPS_LDFLAGS) $(BUDDY_LDFLAGS) $(MCRL_LDFLAGS) $(AM_LDFLAGS) $(CADP_LDFLAGS)
 
 # lpo-reach
 lpo_reach_SOURCES  = spec-reach.c mcrl-greybox.c mcrl-greybox.h  \
                      at-map.c at-map.h vset_atermdd.c
-lpo_reach_LDADD    = libltsmin-nompi.la $(MCRL_LIBS) $(BUDDY_LIBS) $(CADP_LIBS)
+lpo_reach_LDADD    = libltsmin.la $(MCRL_LIBS) $(BUDDY_LIBS) $(CADP_LIBS)
 lpo_reach_CPPFLAGS = -DMCRL $(MCRL_CPPFLAGS) $(AM_CPPFLAGS)
 lpo_reach_LDFLAGS  = $(MCRL_LDFLAGS) $(BUDDY_LDFLAGS) $(AM_LDFLAGS) $(CADP_LDFLAGS)
 
 # lps-reach
 lps_reach_SOURCES  = spec-reach.c mcrl2-greybox.cpp mcrl2-greybox.h      \
                      at-map.c at-map.h vset_atermdd.c
-lps_reach_LDADD    = libltsmin-nompi.la $(MCRL2_LIBS) $(BUDDY_LIBS) $(CADP_LIBS)
+lps_reach_LDADD    = libltsmin.la $(MCRL2_LIBS) $(BUDDY_LIBS) $(CADP_LIBS)
 lps_reach_CPPFLAGS = -DMCRL2 $(MCRL2_CPPFLAGS) $(AM_CPPFLAGS)
 lps_reach_LDFLAGS  = $(MCRL2_LDFLAGS) $(BUDDY_LDFLAGS) $(AM_LDFLAGS) $(CADP_LDFLAGS)
 
 # nips-reach
 nips_reach_SOURCES  = spec-reach.c nips-greybox.c nips-greybox.h	\
                       vset_atermdd.c
-nips_reach_LDADD    = libltsmin-nompi.la -lATerm $(NIPS_LIBS) $(BUDDY_LIBS) $(CADP_LIBS)
+nips_reach_LDADD    = libltsmin.la -lATerm $(NIPS_LIBS) $(BUDDY_LIBS) $(CADP_LIBS)
 nips_reach_CPPFLAGS = -DNIPS $(NIPS_CPPFLAGS) $(MCRL_CPPFLAGS) $(AM_CPPFLAGS)
 nips_reach_LDFLAGS  = $(NIPS_LDFLAGS) $(MCRL_LDFLAGS) $(BUDDY_LDFLAGS) $(AM_LDFLAGS) $(CADP_LDFLAGS)
 
 # etf-reach
 etf_reach_SOURCES  = spec-reach.c etf-greybox.c etf-greybox.h    \
                         lts.c lts.h vset_atermdd.c
-etf_reach_LDADD    = libltsmin-nompi.la -lATerm  $(BUDDY_LIBS) $(CADP_LIBS)
+etf_reach_LDADD    = libltsmin.la -lATerm  $(BUDDY_LIBS) $(CADP_LIBS)
 etf_reach_CPPFLAGS = -DETF $(MCRL_CPPFLAGS) $(AM_CPPFLAGS)
 etf_reach_LDFLAGS  = $(MCRL_LDFLAGS) $(BUDDY_LDFLAGS) $(AM_LDFLAGS) $(CADP_LDFLAGS)
 
@@ -166,25 +166,25 @@ etf2lts_mpi_LDFLAGS  = $(AM_LDFLAGS) $(MCRL_LDFLAGS) $(CADP_LDFLAGS)
 liblpo_open_la_SOURCES = spec_open.c mcrl-greybox.c mcrl-greybox.h \
 			 at-map.c at-map.h vset_atermdd.c
 liblpo_open_la_CPPFLAGS = -DMCRL $(MCRL_CPPFLAGS) $(AM_CPPFLAGS)  $(CADP_CPPFLAGS)
-liblpo_open_la_LIBADD = libltsmin-nompi.la
+liblpo_open_la_LIBADD = libltsmin.la
 
 # liblps-open.la
 liblps_open_la_SOURCES = spec_open.c mcrl2-greybox.cpp mcrl2-greybox.h \
 			 at-map.c at-map.h vset_atermdd.c
 liblps_open_la_CPPFLAGS = -DMCRL2 $(MCRL2_CPPFLAGS) $(AM_CPPFLAGS) $(CADP_CPPFLAGS)
-liblps_open_la_LIBADD = libltsmin-nompi.la
+liblps_open_la_LIBADD = libltsmin.la
 
 # libetf-open.la
 libetf_open_la_SOURCES = spec_open.c etf-greybox.c etf-greybox.h    \
                          lts.c lts.h vset_atermdd.c
 libetf_open_la_CPPFLAGS = -DETF $(MCRL_CPPFLAGS) $(AM_CPPFLAGS) $(CADP_CPPFLAGS)
-libetf_open_la_LIBADD = libltsmin-nompi.la
+libetf_open_la_LIBADD = libltsmin.la
 
 # libnips-open.la
 libnips_open_la_SOURCES = spec_open.c nips-greybox.c nips-greybox.h   \
                            vset_atermdd.c
 libnips_open_la_CPPFLAGS = -DNIPS $(NIPS_CPPFLAGS) $(MCRL_CPPFLAGS) $(AM_CPPFLAGS) $(CADP_CPPFLAGS)
-libnips_open_la_LIBADD = ${top_builddir}/nips-vm/libnips_vm.la libltsmin-nompi.la
+libnips_open_la_LIBADD = ${top_builddir}/nips-vm/libnips_vm.la libltsmin.la
 
 # mpi-event-test
 mpi_event_test_SOURCES = mpi-event-test.c config.h
@@ -192,11 +192,11 @@ mpi_event_test_LDADD   = libltsmin-mpi.la
 
 # test-is-balloc
 test_is_balloc_SOURCES = test-is-balloc.c
-test_is_balloc_LDADD   = libltsmin-nompi.la
+test_is_balloc_LDADD   = libltsmin.la
 
 # test-dfs-stack
 test_dfs_stack_SOURCES = test-dfs-stack.c
-test_dfs_stack_LDADD   = libltsmin-nompi.la
+test_dfs_stack_LDADD   = libltsmin.la
 
 # ltsmin-mpi
 ltsmin_mpi_SOURCES = sigmin-mpi.c sigmin-sig.h config.h seg-lts.c seg-lts.h \
@@ -208,7 +208,7 @@ ltsmin_mpi_LDADD   = libltsmin-mpi.la $(CADP_LIBS)
 
 # ltsmin-convert
 ltsmin_convert_SOURCES = ltsmin-convert.c
-ltsmin_convert_LDADD = libltsmin-nompi.la $(CADP_LIBS)
+ltsmin_convert_LDADD = libltsmin.la $(CADP_LIBS)
 ltsmin_convert_LDFLAGS = $(CADP_LDFLAGS) $(AM_LDFLAGS)
 ltsmin_convert_CPPFLAGS = $(CADP_CPPFLAGS) $(AM_CPPFLAGS)
 
@@ -261,8 +261,8 @@ libutil_la_SOURCES += hre-config.h hre-context.c hre-context.h \
 	hre-main.c hre-main.h hre-malloc.c hre-malloc.h \
 	hre-popt.c hre-popt.h hre-pthread.c
 
-libltsmin_nompi_la_SOURCES = hre-nompi.c
-libltsmin_nompi_la_LIBADD = libutil.la
+libltsmin_la_SOURCES = hre-nompi.c
+libltsmin_la_LIBADD = libutil.la
 
 if HAVE_MPI
 libltsmin_mpi_la_SOURCES = hre-mpi.c
