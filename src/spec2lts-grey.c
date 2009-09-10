@@ -249,6 +249,33 @@ static void write_trace_step(model_t model, int src_no,int*src,int dst_no,int*ds
     if (ctx.found==0) Fatal(1,error,"no matching transition found");
 }
 
+static void write_trace(model_t model, size_t trace_size, uint32_t *trace)
+{
+    // write initial state
+    size_t i = 0;
+    int step = 0;
+    int src[N];
+    int dst[N];
+    get_state(0, dst);
+    write_trace_state(model, 0, dst);
+
+    i++;
+    while(i < trace_size)
+    {
+        for(int j=0; j < N; ++j)
+            src[j] = dst[j];
+        get_state(trace[i], dst);
+
+        // write step
+        write_trace_step(model, step, src, step + 1, dst);
+        // write dst_idx
+        write_trace_state(model, trace[i], dst);
+
+        i++;
+        step++;
+    }
+}
+
 static void find_trace_to(model_t model, int dst_idx, int level)
 {
     uint32_t *trace = (uint32_t*)RTmalloc(sizeof(uint32_t) * level);
@@ -267,29 +294,7 @@ static void find_trace_to(model_t model, int dst_idx, int level)
     }
 
     // write trace
-
-    // write initial state
-    int step = 0;
-    int src[N];
-    int dst[N];
-    get_state(0, dst);
-    write_trace_state(model, 0, dst);
-
-    i++;
-    while(i < level)
-    {
-        for(int j=0; j < N; ++j)
-            src[j] = dst[j];
-        get_state(trace[i], dst);
-
-        // write step
-        write_trace_step(model, step, src, step + 1, dst);
-        // write dst_idx
-        write_trace_state(model, trace[i], dst);
-
-        i++;
-        step++;
-    }
+    write_trace(model, level - i, &trace[i]);
 
     RTfree(trace);
 
@@ -303,6 +308,64 @@ static void find_trace(model_t model, int dst_idx, int level) {
     SCCstopTimer(timer);
     SCCreportTimer(timer,"constructing the trace took");
 }
+
+static void
+find_dfs_stack_trace_tree(model_t model, dfs_stack_t stack)
+{
+    size_t              trace_len = dfs_stack_nframes(stack);
+    size_t              i = trace_len - 1;
+    uint32_t           *trace = (uint32_t*)RTmalloc(sizeof(uint32_t) * trace_len);
+
+    // gather trace
+    while(dfs_stack_nframes(stack))
+    {
+        dfs_stack_leave(stack);
+        int* idx = dfs_stack_pop(stack);
+        trace[i] = *idx;
+        i--;
+    }
+
+    // write it
+    write_trace(model, trace_len, trace);
+
+    RTfree(trace);
+}
+
+static void
+find_dfs_stack_trace_vset(model_t model, dfs_stack_t stack)
+{
+    size_t              trace_len = dfs_stack_nframes(stack);
+    size_t              i = trace_len - 1;
+    uint32_t           *trace = (uint32_t*)RTmalloc(sizeof(uint32_t) * trace_len);
+    int                 init_state[N];
+
+    // create treedbs
+    dbs = TreeDBScreate(N);
+
+    // load initial state
+    GBgetInitialState(model,init_state);
+
+    // initial state should be idx 0
+    dbs=TreeDBScreate(N);
+    if(TreeFold(dbs,init_state)!=0){
+        Fatal(1,error,"expected 0");
+    }
+
+    // gather trace
+    while(dfs_stack_nframes(stack))
+    {
+        dfs_stack_leave(stack);
+        int* state = dfs_stack_pop(stack);
+        trace[i] = TreeFold(dbs, state);
+        i--;
+    }
+
+    // write it
+    write_trace(model, trace_len, trace);
+
+    RTfree(trace);
+}
+
 
 static void
 vector_next_dfs (void *arg, int *lbl, int *dst)
@@ -418,6 +481,19 @@ dfs_explore_state_vector (model_t model, int src_idx, const int *src,
     }
     if (count == 0 && *o_next_group == 0 && dlk_detect) {
         Warning(info,"deadlock found!");
+        if (trc_output) {
+            trace_output=lts_output_open(trc_output,model,1,0,1,"vsi",NULL);
+            {
+                int init_state[N];
+                GBgetInitialState(model, init_state);
+                lts_output_set_root_vec(trace_output,(uint32_t*)init_state);
+                lts_output_set_root_idx(trace_output,0,0);
+            }
+            trace_handle=lts_output_begin(trace_output,0,0,0);
+            find_dfs_stack_trace_vset(model, stack);
+            lts_output_end(trace_output,trace_handle);
+            lts_output_close(&trace_output);
+        }
         Fatal(1,info, "exiting now");
     }
     if (i == K) {
@@ -451,7 +527,6 @@ dfs_explore_state_index (model_t model, int idx, int *o_next_group)
     }
     if (count == 0 && *o_next_group == 0 && dlk_detect) {
         Warning(info,"deadlock found!");
-        /*
         if (trc_output) {
             trace_output=lts_output_open(trc_output,model,1,0,1,"vsi",NULL);
             {
@@ -461,11 +536,10 @@ dfs_explore_state_index (model_t model, int idx, int *o_next_group)
                 lts_output_set_root_idx(trace_output,0,0);
             }
             trace_handle=lts_output_begin(trace_output,0,0,0);
-            find_trace(model, idx, level);
+            find_dfs_stack_trace_tree(model, stack);
             lts_output_end(trace_output,trace_handle);
             lts_output_close(&trace_output);
         }
-        */
         Fatal(1,info, "exiting now");
     }
     if (i == K) {
@@ -629,7 +703,7 @@ int main(int argc, char *argv[]){
 	  fprintf(stderr,"Dependency Matrix:\n");
 	  GBprintDependencyMatrix(stderr,model);
 	}
-    if (trc_output)
+    if (trc_output && strategy == Strat_BFS)
     {
         state_man=create_manager(65536);
         ADD_ARRAY(state_man, parent_ofs, uint32_t);
