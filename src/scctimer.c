@@ -72,10 +72,14 @@ void SCCstopTimer(mytimer_t timer){
 
 
 void SCCreportTimer(mytimer_t timer,char *msg){
+    SCClogTimer(info,timer,msg);
+}
+
+void SCClogTimer(log_t log,mytimer_t timer,char *msg){
 	clock_t tick=sysconf(_SC_CLK_TCK);
 	float tm_real=((float)(timer->real_time))/((float)tick);
 	float tm_user=((float)(timer->times.tms_utime))/((float)tick);
 	float tm_sys=((float)(timer->times.tms_stime))/((float)tick);
-	Warning(info,"%s %5.3f real %5.3f user %5.3f sys",msg,tm_real,tm_user,tm_sys);
+    Log(log,"%s %5.3f real %5.3f user %5.3f sys",msg,tm_real,tm_user,tm_sys);
 }
 

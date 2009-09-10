@@ -15,7 +15,9 @@
 #include "mpi_ram_raf.h"
 #include "dir_ops.h"
 
-#define SYNCH_BUFFER_SIZE 8000
+#define SYNCH_BUFFER_SIZE 16000
+/** FWD_BUFFER_SIZE must be multiple of 6 **/
+#define FWD_BUFFER_SIZE 12288
 
 static int branching=0;
 static int synch_receive_buffer[SYNCH_BUFFER_SIZE];
@@ -184,8 +186,6 @@ static void write_service(void *arg,MPI_Status*probe_stat){
 
 /******************* branching ************************/
 
-/** FWD_BUFFER_SIZE must be multiple of 6 **/
-#define FWD_BUFFER_SIZE 2400
 
 static lts_t inv_lts;
 static int inv_register;
@@ -395,12 +395,6 @@ int main(int argc,char **argv){
 	Warning(info,"done");
 	arch_close(&(lts->arch));
 	MPI_Barrier(MPI_COMM_WORLD);
-	if (mpi_me==0) {
-		SCCstopTimer(timer);
-		SCCreportTimer(timer,"reading the LTS took");
-		//resetTimer(timer);
-		//startTimer(timer);
-	}
 
 	iter=0;
 	oldcount=0;
@@ -425,6 +419,12 @@ int main(int argc,char **argv){
 	lts_sort(auxlts);
 	lts_set_type(auxlts,LTS_BLOCK);
 	core_barrier();
+	if (mpi_me==0) {
+		SCCstopTimer(timer);
+		SCCreportTimer(timer,"reading the LTS took");
+		SCCresetTimer(timer);
+		SCCstartTimer(timer);
+	}
 
     if (branching) { /* branching reduction */
 	core_barrier();
@@ -753,6 +753,12 @@ int main(int argc,char **argv){
 	MPI_Bcast(&root,1,MPI_INT,lts->root_seg,MPI_COMM_WORLD);
 	if ((uint32_t)mpi_me!=lts->root_seg && verbosity>1) Warning(info,"root is %d/%d",GET_SEG(root),GET_OFS(root));
 	core_barrier();
+	
+	if (mpi_me==0){
+	    SCCstopTimer(timer);
+	    SCClogTimer(info,timer,"reduction took");
+	    SCCdeleteTimer(timer);
+    }
 
 	if (files[1]) {
 		//output=lts_output_open(files[1],model,mpi_nodes,mpi_me,mpi_nodes);
