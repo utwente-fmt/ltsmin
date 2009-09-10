@@ -3,7 +3,7 @@ AC_INIT([ltsmin],[1.3],[ltsmin-support@cs.utwente.nl])
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_AUX_DIR([autotools])
 AM_INIT_AUTOMAKE([foreign])
-AC_CONFIG_SRCDIR([src/ltsmin-mpi.c])
+AC_CONFIG_SRCDIR([src/spec-reach.c])
 AC_CONFIG_HEADERS([src/amconfig.h])
 
 AC_SUBST([pkglibdir], "\${libdir}/${PACKAGE_NAME}-${PACKAGE_VERSION}")

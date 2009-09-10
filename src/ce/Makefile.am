@@ -18,4 +18,4 @@ ce_mpi_SOURCES = \
     seglts.c seglts.h \
     sortcount.c sortcount.h
 
-ce_mpi_LDADD = ../libmpi.la ../libutil.la
+ce_mpi_LDADD = ../libltsmin-mpi.la

@@ -415,7 +415,7 @@ stream_t stream_add_code(stream_t s,char* code){
 	if(tail){
 		s=stream_add_code(s,tail+1);
 	}
-	if(strlen(code)==0) return s;
+	if(strlen(code)==0 || !strcmp(code,"none")) return s;
 	if(!strncmp(code,"diff32",6)){
 		return stream_diff32(s);
 	}

@@ -78,5 +78,12 @@ extern char* lts_type_get_type(lts_type_t  t,int typeno);
 extern void lts_type_serialize(lts_type_t t,stream_t s);
 extern lts_type_t lts_type_deserialize(stream_t s);
 
+/**
+\brief Validate the given LTS type.
+
+If an inconsistent type is found the program aborts.
+*/
+extern void lts_type_validate(lts_type_t t);
+
 #endif
 

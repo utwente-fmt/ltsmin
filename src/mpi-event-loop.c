@@ -66,18 +66,25 @@ void event_post(event_queue_t queue,MPI_Request *request,event_callback cb,void*
 	queue->pending++;
 }
 
-void event_yield(event_queue_t queue){
+static void event_loop(event_queue_t queue,int block){
 	while(queue->pending){
 		int index[queue->pending];
 		int completed;
 		MPI_Status status[queue->pending];
-		MPI_Testsome(queue->pending,queue->request,&completed,index,status);
-		queue->test_some_calls++;
-		if (completed==0) {
-			queue->test_some_none++;
-			return;
-		}
-		if (completed>1) queue->test_some_multi++;
+		if (block) {
+		    MPI_Waitsome(queue->pending,queue->request,&completed,index,status);
+		    queue->wait_some_calls++;
+		    if (completed>1) queue->wait_some_multi++;
+		    block=0;
+	    } else {
+		    MPI_Testsome(queue->pending,queue->request,&completed,index,status);
+		    queue->test_some_calls++;
+		    if (completed==0) {
+			    queue->test_some_none++;
+			    return;
+		    }
+		    if (completed>1) queue->test_some_multi++;
+	    }
 		event_callback cb[completed];
 		void *ctx[completed];
 		for(int i=0;i<completed;i++){
@@ -103,10 +110,17 @@ void event_yield(event_queue_t queue){
 	}
 }
 
+void event_yield(event_queue_t queue){
+    event_loop(queue,0);
+}
+
+void event_block(event_queue_t queue){
+    event_loop(queue,1);
+}
+
+
+
 void event_while(event_queue_t queue,int *condition){
-	for(int i=0;i<queue->pending;i++){
-		if (queue->cb[i]==NULL) Fatal(1,error,"illegal NULL in queue");
-	}
 	while(*condition){
 		int index[queue->pending];
 		int completed;

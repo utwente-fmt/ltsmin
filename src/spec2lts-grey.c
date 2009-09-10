@@ -163,10 +163,10 @@ maybe_write_state (model_t model, const int *idx, const int *state)
             GBgetStateLabelsAll (model, (int *)state, labels);
         if (write_state || idx == NULL) {
             assert (state != NULL);
-            enum_vec (output_handle, (int *)state, labels);
+            enum_state (output_handle, 0 , (int *)state, labels);
         } else {
             assert (idx != NULL);
-            enum_seg (output_handle, 0, *idx, labels);
+            if (state_labels) enum_state (output_handle, 0, (int *)idx, labels);
         }
     }
 }
@@ -218,7 +218,7 @@ static void write_trace_state(model_t model, int src_no, int *state){
     Warning(debug,"dumping state %d",src_no);
     int labels[state_labels];
     if (state_labels) GBgetStateLabelsAll(model,state,labels);
-    enum_vec(trace_handle,state,labels);
+    enum_state(trace_handle,0,state,labels);
 }
 
 struct write_trace_step_s {
@@ -358,7 +358,7 @@ bfs_explore_state_index (void *context, int idx, int *src, int level)
                 lts_output_set_root_vec(trace_output,(uint32_t*)init_state);
                 lts_output_set_root_idx(trace_output,0,0);
             }
-            trace_handle=lts_output_begin(trace_output,0,0,0);
+            trace_handle=lts_output_begin(trace_output,0,1,0);
             find_trace(model, idx, level);
             lts_output_end(trace_output,trace_handle);
             lts_output_close(&trace_output);
@@ -569,7 +569,7 @@ init_write_lts (lts_output_t *p_output,
         break;
     }
     lts_output_set_root_idx (output, 0, 0);
-    output_handle = lts_output_begin (output, 0, 0, 0);
+    output_handle = lts_output_begin (output, 0, 1, 0);
     *p_output = output;
 }
 
@@ -601,14 +601,17 @@ int main(int argc, char *argv[]){
 	if (RTverbosity >=2) {
 	  fprintf(stderr,"Dependency Matrix:\n");
 	  GBprintDependencyMatrix(stderr,model);
-	}
+    }
     if (trc_output)
     {
         state_man=create_manager(65536);
         ADD_ARRAY(state_man, parent_ofs, uint32_t);
     }
 	lts_type_t ltstype=GBgetLTStype(model);
-	N=lts_type_get_state_length(ltstype);
+    if (RTverbosity >=2) {
+        lts_type_print(info,ltstype);
+    }
+    N=lts_type_get_state_length(ltstype);
 	K= dm_nrows(GBgetDMInfo(model));
 	Warning(info,"length is %d, there are %d groups",N,K);
 	state_labels=lts_type_get_state_label_count(ltstype);

@@ -537,7 +537,28 @@ NIPSloadGreyboxModel (model_t m, const char *filename)
     lts_type_set_edge_label_count(ltstype,1);
     lts_type_set_edge_label_name(ltstype,0,"label");
     lts_type_set_edge_label_type(ltstype,0,"label");
-
+    int var_no=0;
+    for(unsigned int i=0;i<Cpart_ctx.nglobals;var_no++,i++){
+        char name[64];
+        sprintf(name,"G%d",i);
+        lts_type_set_state_name(ltstype,var_no,name);
+        lts_type_set_state_typeno(ltstype,var_no,0);
+    }
+    for(unsigned int i=0;i<Cpart_ctx.nprocs;var_no++,i++){
+        char name[64];
+        sprintf(name,"P%d",i);
+        lts_type_set_state_name(ltstype,var_no,name);
+        lts_type_set_state_typeno(ltstype,var_no,1);
+    }
+    for(unsigned int i=0;i<Cpart_ctx.nchans;var_no++,i++){
+        char name[64];
+        sprintf(name,"C%d",i);
+        lts_type_set_state_name(ltstype,var_no,name);
+        lts_type_set_state_typeno(ltstype,var_no,2);
+    }
+    if (var_no != (int)Cpart_ctx.count){
+        Fatal(1,error,"counts inconsistent");
+    }
     GBsetLTStype (m, ltstype);
     ILABEL_TAU = GBchunkPut(m, label_type, chunk_str("tau"));
 

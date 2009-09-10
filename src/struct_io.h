@@ -16,7 +16,7 @@ typedef struct struct_stream_s *struct_stream_t;
 extern void DSwriteStruct(struct_stream_t stream,void *data);
 
 /// Read one structure.
-extern void DSreadStruct(struct_stream_t stream,void *data);
+extern int DSreadStruct(struct_stream_t stream,void *data);
 
 /// Close all streams.
 extern void DSstructClose(struct_stream_t *stream);

@@ -36,6 +36,13 @@ Execute the events in the queue that are currently ready to fire.
 extern void event_yield(event_queue_t queue);
 
 /**
+\brief Block until at least one event is executed.
+
+Like yield except that at least one event has to be executed.
+*/
+extern void event_block(event_queue_t queue);
+
+/**
 When a request has completed continue using context and status.
 */
 typedef void(*event_callback)(void* context,MPI_Status *status);

@@ -156,7 +156,7 @@ static void write_trace_state(int src_no, int*state){
 	Warning(debug,"dumping state %d",src_no);
     int labels[sLbls];
 	if (sLbls) GBgetStateLabelsAll(model,state,labels);
-    enum_vec(trace_handle,state,labels);
+    enum_state(trace_handle,0,state,labels);
 }
 
 struct write_trace_step_s {

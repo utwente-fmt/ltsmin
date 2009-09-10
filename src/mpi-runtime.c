@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <unistd.h>
 #include <mpi.h>
 #include <mpi-runtime.h>
 
@@ -34,7 +35,7 @@ void RTinitPoptMPI(int *argc_p,char**argv_p[],const struct poptOption * options,
 	int mpi_nodes;
 	int mpi_me;
 	MPI_Comm_size(MPI_COMM_WORLD, &mpi_nodes);
-        MPI_Comm_rank(MPI_COMM_WORLD, &mpi_me);
+    MPI_Comm_rank(MPI_COMM_WORLD, &mpi_me);
 	if (mpi_me==0) {
 		auto_abort=2;
 		RTinitPopt(argc_p,argv_p,options,min_args,max_args,args,pgm_prefix,arg_help,extra_help);
@@ -50,8 +51,8 @@ void RTinitPoptMPI(int *argc_p,char**argv_p[],const struct poptOption * options,
 	}
 	if (mpi_me) {
 		RTinitPopt(argc_p,argv_p,options,min_args,max_args,args,pgm_prefix,arg_help,extra_help);
-		set_label("%s(%2d/%2d)",get_label(),mpi_me,mpi_nodes);
 	}
+	set_label("%s(%2d/%2d)",get_label(),mpi_me,mpi_nodes);
 }
 
 void RTinitMPIthread(int*argcp,char**argvp[],int requested,int *provided){
@@ -61,6 +62,10 @@ void RTinitMPIthread(int*argcp,char**argvp[],int requested,int *provided){
 
 void RTfiniMPI(){
 	auto_abort=0;
-
+	int mpi_me;
+    MPI_Comm_rank(MPI_COMM_WORLD, &mpi_me);
+    char dir[16];
+    sprintf(dir,"gmon-%d",mpi_me);
+    chdir(dir);
 }
 
