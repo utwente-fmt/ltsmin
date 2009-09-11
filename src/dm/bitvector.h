@@ -21,7 +21,7 @@ typedef struct bitvector {
  *   0: n-bit bitvector has been allocated
  *  -1: error
  */
-extern int          bitvector_create (bitvector_t *, const int);
+extern int          bitvector_create (bitvector_t *, int);
 
 /**
  * bitvector_free
@@ -64,7 +64,7 @@ extern size_t       bitvector_size (const bitvector_t *);
  *  result:
  *   the bit in the bitvector is set to one
  */
-extern void         bitvector_set (bitvector_t *, const int);
+extern void         bitvector_set (bitvector_t *, int);
 
 /**
  * bitvector_unset
@@ -75,7 +75,7 @@ extern void         bitvector_set (bitvector_t *, const int);
  *  result:
  *   the bit in the bitvector is cleared
  */
-extern void         bitvector_unset (bitvector_t *, const int);
+extern void         bitvector_unset (bitvector_t *, int);
 
 /**
  * bitvector_is_set
@@ -87,7 +87,7 @@ extern void         bitvector_unset (bitvector_t *, const int);
  *   true:  the bit is one
  *   false: the bit is not one
  */
-extern int          bitvector_is_set (const bitvector_t *, const int);
+extern int          bitvector_is_set (const bitvector_t *, int);
 
 /**
  * bitvector_union
@@ -98,7 +98,7 @@ extern int          bitvector_is_set (const bitvector_t *, const int);
  *   2) the source bitvector
  *
  *  result:
- *   the target bitvector will have all bits set that are set either of the bitvectors
+ *   the target bitvector has all bits set that were set in either of the bitvectors
  */
 extern void         bitvector_union(bitvector_t *, const bitvector_t *);
 
@@ -106,18 +106,18 @@ extern void         bitvector_union(bitvector_t *, const bitvector_t *);
  * bitvector_intersect
  *  Intersect two bitvectors
  *   1) the target bitvector
- *      the bitvector should be created with bitvector_create and
- *      should be of the same size as the source bitvector
+ *      the bitvector should be created with bitvector_create or bitvector_copy
+ *      and should be of the same size as the source bitvector
  *   2) the source bitvector
  *
  *  result:
- *   the target bitvector have only those bits set that are set in both vectors
+ *   the target bitvector has only those bits set that were set in both vectors
  */
 extern void         bitvector_intersect(bitvector_t *, const bitvector_t *);
 
 /**
  * bitvector_is_empty
- *  Test wether all bits in the bitvector are not set
+ *  Test whether all bits in the bitvector are not set
  *   1) the bitvector to test
  *
  *  result:
@@ -128,7 +128,7 @@ extern int          bitvector_is_empty(const bitvector_t *);
 
 /**
  * bitvector_is_disjoint
- *  Test wether two bitvectors are disjoint or not
+ *  Test whether two bitvectors are disjoint or not
  *  Disjoint means that the intersection of the two bitvectors is empty
  *   1,2) the bitvectors (of the same size) to test
  *
@@ -141,10 +141,10 @@ extern int          bitvector_is_disjoint(const bitvector_t *, const bitvector_t
 /**
  * bitvector_invert
  *  Invert all bits in the bitvector
- *   1) the bitvectors to invert
+ *   1) the bitvector to invert
  *
  *  result:
- *   All bits that were not set are now set and visa versa
+ *   All bits that were not set are now set and vice versa
  */
 extern void         bitvector_invert(bitvector_t *);
 
