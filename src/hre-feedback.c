@@ -1,7 +1,9 @@
 #include <amconfig.h>
 #include "hre-config.h"
 #include <hre-main.h>
+#ifdef HAVE_EXECINFO_H
 #include <execinfo.h>
+#endif
 #include <signal.h>
 #include <sys/time.h>
 #include <stdlib.h>
@@ -24,10 +26,6 @@ struct runtime_log {
     char *tag;
     int flags;
 };
-
-void HREinitFeedback(){
-    // nothing to do.
-}
 
 static int HREwhen=0;
 
@@ -55,14 +53,23 @@ static struct sigaction segv_sa;
 static void segv_handle(int signum){
     (void)signum;
     fprintf(stderr,
-            "*** segmentation fault ***\n"
-            "stack trace is:\n");
+            "*** segmentation fault ***\n\n"
+            "Please send information on how to reproduce this problem to: \n"
+            "         " PACKAGE_BUGREPORT "\n"
+            "along with all output preceding this message.\n"
+            "In addition, include the following information:\n"
+            "Package: " PACKAGE_STRING "\n"
+            "Stack trace:\n");
+#if defined(HAVE_BACKTRACE) && defined(HAVE_BACKTRACE_SYMBOLS)
     void*stacktrace[64];
     int size=backtrace(stacktrace,64);
     char **stackinfo=backtrace_symbols(stacktrace,size);
     for(int i=0;i<size;i++){
         fprintf(stderr," %2d: %s\n",i,stackinfo[i]);
     }
+#else
+    fprintf (stderr, "not available.\n");
+#endif
     exit(EXIT_FAILURE);
 }
 static void segv_setup(){
@@ -80,6 +87,10 @@ static inline int is_number(const char*str){
 }
 
 #define IF_LONG(long) if(((opt->longName)&&!strcmp(opt->longName,long)))
+
+void HREinitFeedback(){
+    segv_setup();
+}
 
 void popt_callback(
     poptContext con,
@@ -102,7 +113,6 @@ void popt_callback(
             }
             IF_LONG(where_long) {
                 hre_debug->flags|=LOG_WHERE;
-                segv_setup();
                 return;
             }
             IF_LONG(when_long) {
