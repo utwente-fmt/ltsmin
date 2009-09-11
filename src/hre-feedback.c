@@ -27,10 +27,6 @@ struct runtime_log {
     int flags;
 };
 
-void HREinitFeedback(){
-    // nothing to do.
-}
-
 static int HREwhen=0;
 
 struct runtime_log stats_log={NULL,NULL,LOG_IGNORE};
@@ -92,6 +88,10 @@ static inline int is_number(const char*str){
 
 #define IF_LONG(long) if(((opt->longName)&&!strcmp(opt->longName,long)))
 
+void HREinitFeedback(){
+    segv_setup();
+}
+
 void popt_callback(
     poptContext con,
     enum poptCallbackReason reason,
@@ -113,7 +113,6 @@ void popt_callback(
             }
             IF_LONG(where_long) {
                 hre_debug->flags|=LOG_WHERE;
-                segv_setup();
                 return;
             }
             IF_LONG(when_long) {
