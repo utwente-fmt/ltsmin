@@ -27,11 +27,11 @@ ACX_PTHREAD(
   [AC_MSG_FAILURE([no pthread support found.])])
 
 AX_CHECK_FLEX([
-%option prefix="etf_"
-%option header-file="etf-lexer.h"
-%option outfile="etf-lexer.c"
+%option prefix="ltsmin_"
+%option header-file="ltsmin-lexer.h"
+%option outfile="ltsmin-lexer.c"
 %option nodefault noyywrap reentrant noyyalloc noyyrealloc noyyfree batch noinput
-%option extra-type="etf_parse_env_t"
+%option extra-type="ltsmin_parse_env_t"
 %%
 ],,
 [AC_MSG_FAILURE([no compatible lexer generator found.])])
