@@ -1221,7 +1221,7 @@ dm_expand_vector (matrix_t *m, int row, int *s0, int *src, int *tgt)
 }
 
 int
-dm_bitvector_row(bitvector_t *bv, matrix_t *m, int row)
+dm_bitvector_row(bitvector_t *bv, const matrix_t *m, int row)
 {
     // check size
     if (bitvector_size (bv) != (size_t)dm_ncols (m)) return -1;
@@ -1238,7 +1238,7 @@ dm_bitvector_row(bitvector_t *bv, matrix_t *m, int row)
 }
 
 int
-dm_bitvector_col(bitvector_t *bv, matrix_t *m, int col)
+dm_bitvector_col(bitvector_t *bv, const matrix_t *m, int col)
 {
     // check size
     if (bitvector_size (bv) != (size_t)dm_nrows (m)) return -1;

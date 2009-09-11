@@ -16,7 +16,7 @@ static inline size_t
 bv_ofs (size_t i) { return i % WORD_BITS; }
 
 int
-bitvector_create (bitvector_t *bv, const int n_bits)
+bitvector_create (bitvector_t *bv, int n_bits)
 {
     size_t              n_words = utrunc (n_bits, WORD_BITS);
     bv->data = calloc (n_words, sizeof (size_t));
@@ -64,7 +64,7 @@ bitvector_size (const bitvector_t *bv)
 }
 
 void
-bitvector_set (bitvector_t *bv, const int idx)
+bitvector_set (bitvector_t *bv, int idx)
 {
     // set bit
     size_t              mask = 1UL << bv_ofs (idx);
@@ -72,7 +72,7 @@ bitvector_set (bitvector_t *bv, const int idx)
 }
 
 void
-bitvector_unset (bitvector_t *bv, const int idx)
+bitvector_unset (bitvector_t *bv, int idx)
 {
     // set bit
     size_t              mask = ~(1UL << bv_ofs (idx));
@@ -80,7 +80,7 @@ bitvector_unset (bitvector_t *bv, const int idx)
 }
 
 int
-bitvector_is_set (const bitvector_t *bv, const int idx)
+bitvector_is_set (const bitvector_t *bv, int idx)
 {
     size_t              mask = 1UL << bv_ofs (idx);
     return (bv->data[bv_seg (idx)] & mask) != 0;
