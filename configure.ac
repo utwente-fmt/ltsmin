@@ -134,6 +134,7 @@ ACX_CADP_BCG_WRITE([have_bcg=yes],
 AC_HEADER_DIRENT
 AC_HEADER_STDC
 AC_CHECK_HEADERS([fcntl.h limits.h stdint.h stdlib.h string.h strings.h unistd.h])
+AC_CHECK_HEADERS([execinfo.h])
 AC_CHECK_HEADER([popt.h],[], [AC_MSG_FAILURE([popt.h not found.])])
 AC_CACHE_SAVE
 
@@ -159,6 +160,7 @@ AC_FUNC_REALLOC
 AC_FUNC_STRERROR_R
 AC_FUNC_VPRINTF
 AC_CHECK_FUNCS([atexit bzero ftruncate strdup strndup strchr strstr strtol])
+AC_CHECK_FUNCS([backtrace backtrace_symbols])
 AC_CHECK_DECLS([strdup, strndup, strchr, strstr],,,[
 #include "${srcdir}/src/config.h"
 AC_INCLUDES_DEFAULT])
