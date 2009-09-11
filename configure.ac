@@ -16,7 +16,6 @@ AM_CXXFLAGS="-g -Wno-inline -ftemplate-depth-128 -finline-functions"
 
 AM_PROG_CC_C_O
 AC_SUBST([CC_FOR_BUILD], [${CC_FOR_BUILD-$CC}])
-AM_PROG_LEX
 AC_PROG_CXX
 ACX_FINK
 ACX_MACPORTS
@@ -26,6 +25,17 @@ ACX_PTHREAD(
    CXXFLAGS="$CXXFLAGS $PTHREAD_CFLAGS"
    CC="$PTHREAD_CC"],
   [AC_MSG_FAILURE([no pthread support found.])])
+
+AX_CHECK_FLEX([
+%option prefix="etf_"
+%option header-file="etf-lexer.h"
+%option outfile="etf-lexer.c"
+%option nodefault noyywrap reentrant noyyalloc noyyrealloc noyyfree batch noinput
+%option extra-type="etf_parse_env_t"
+%%
+],,
+[AC_MSG_FAILURE([no compatible lexer generator found.])])
+
 AC_PROG_MAKE_SET
 AC_PROG_INSTALL
 
