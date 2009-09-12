@@ -39,13 +39,14 @@ static int dlk_detect=0;
 static lts_enum_cb_t trace_handle=NULL;
 static lts_output_t trace_output=NULL;
 
-static enum { BFS , BFS2 , Chain } strategy = BFS;
+static enum { BFS , BFS2 , Chain , Sat} strategy = BFS;
 
 static char* order="bfs";
 static si_map_entry strategies[]={
 	{"bfs",BFS},
 	{"bfs2",BFS2},
 	{"chain",Chain},
+	{"sat",Sat},
 	{NULL,0}
 };
 
@@ -79,7 +80,7 @@ static void reach_popt(poptContext con,
 
 static  struct poptOption options[] = {
 	{ NULL, 0 , POPT_ARG_CALLBACK|POPT_CBFLAG_POST|POPT_CBFLAG_SKIPOPTION , (void*)reach_popt , 0 , NULL , NULL },
-	{ "order" , 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &order , 0 , "select the exploration strategy to a specific order" ,"<bfs|bfs2|chain>" },
+	{ "order" , 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &order , 0 , "select the exploration strategy to a specific order" ,"<bfs|bfs2|chain|sat>" },
 	{ "deadlock" , 'd' , POPT_ARG_VAL , &dlk_detect , 1 , "detect deadlocks" , NULL },
 	{ "trace" , 0 , POPT_ARG_STRING , &trc_output , 0 , "file to write trace to" , "<lts-file>.gcf" },
 #if defined(MCRL)
@@ -504,7 +505,56 @@ void reach_bfs2(){
 }
 
 void reach_sat(){
-	Fatal(1,error,"Saturation not implemented yet");
+  fprintf(stderr,"%d groups, %d vars\n",nGrps,N);
+
+  int* level = (int*)RTmalloc( nGrps * sizeof(int) );
+  int* back  = (int*)RTmalloc( (N+1) * sizeof(int) );
+
+  fprintf(stderr,"%d groups, %d vars\n",nGrps,N);
+
+  // level[i] = first + of group i
+  for (int i=0;i<nGrps;i++) {
+    for (int j=0;j<N;j++)
+      if (dm_is_set(GBgetDMInfo(model),i,j)) {
+	level[i]=N-j;
+	break;
+      }
+  }
+  
+  // back[j] = last + in any group of level j
+  for (int j=0;j<N;j++) back[j]=N+1;
+  for (int i=0;i<nGrps;i++) {
+    for (int j=1;j<=N;j++)
+      if (dm_is_set(GBgetDMInfo(model),i,N-j)) {
+	if (j<back[level[i]]) back[level[i]]=j;
+	break;
+      }
+  }
+  
+  /* // test
+  fprintf(stderr,"level: ");
+  for (int i=0; i<nGrps;i++)
+    fprintf(stderr,"%d ",level[i]);
+  fprintf(stderr,"\nback: ");
+  for (int j=1; j<=N; j++)
+    fprintf(stderr,"%d ",back[j]);
+  fprintf(stderr,"\n");
+  */
+
+  int k=0;
+  vset_t new_vis=vset_create(domain,0,NULL);
+  while (k != N) {
+    vset_copy(old_vis,visited);
+    new_vis = Closure("sat",visited,...);
+    if (new_vis=visited)
+      k++;
+    else {
+      vset_clear(visited);
+      vset_copy(new_vis,visited);
+      k=back[k];
+    }
+  }
+  Fatal(1,error,"Saturation not implemented yet");
 }
 
 void reach_chain(){
@@ -758,6 +808,9 @@ int main(int argc, char *argv[]){
 		break;
 	case Chain:
 		reach_chain();
+		break;
+	case Sat:
+		reach_sat();
 		break;
 	}
 	SCCstopTimer(timer);

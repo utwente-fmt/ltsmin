@@ -1,0 +1,23 @@
+level[g] = k  <-> the first + on row g is at column k
+              <-> event g starts at level k in BDD
+
+back[k] = the index of the last + in any group at level k
+
+
+Remark: 
+- k=0 corresponds to leaves T/F in BDD.
+- k=1 corresponds to the rightmost column in the DM (bottom of BDD)
+- k=nVars corresponds to the leftmost column in the DM, 
+          which is the root of the BDD.
+
+k=0;
+Vis={init}
+{ invariant: Vis is saturated up to level k }
+while (k != nVars) do
+  Vis' := Closure (Vis, {g | level[g]=k})
+  if Vis=Vis' 
+    then k:=k+1
+    else k:=back[k]
+  Vis:=Vis'
+  Vis':=0
+end
