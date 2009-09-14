@@ -504,34 +504,87 @@ void reach_bfs2(){
 	  Warning(info,"No deadlocks found");
 }
 
-void reach_sat(){
-  fprintf(stderr,"%d groups, %d vars\n",nGrps,N);
+/**
+ * Closure
+ *  Compute the transitive closure with respect to a subset of groups
+ *   1) the set of initial states I
+ *   2) the set of groups to consider, defining a relation R
+ *  The result is the transitive closure of R on I is returned
+ *  As a side effect, the group tables (group_next) will be extended
+ **/
 
+static void Closure(vset_t visited,bitvector_t *groups) {
+  int level=0;
+  vset_t current=vset_create(domain,0,NULL);
+  vset_t next=vset_create(domain,0,NULL);
+  vset_t temp=vset_create(domain,0,NULL);
+
+  vset_copy(current,visited);
+  while (!vset_is_empty(current)) {
+    stats_and_progress_report(current,visited,level);
+    level++;
+    for (int i=0;i<nGrps;i++) {
+      if (!bitvector_is_set(groups,i)) continue;
+      if (RTverbosity >= 2) fprintf(stderr,"\rconf-exploring group %4d/%d",i+1,nGrps);
+      expand_group_next(i,current);
+    }
+    if (RTverbosity >= 2) fprintf(stderr,"\rconf-exploration complete             \n");
+    for(int i=0;i<nGrps;i++){
+      if (!bitvector_is_set(groups,i)) continue;
+      if (RTverbosity >= 2) fprintf(stderr,"\rconf-local next %4d/%d",i+1,nGrps);
+      vset_next(temp,current,group_next[i]);
+      vset_union(next,temp);
+      vset_clear(temp);
+    }
+    if (RTverbosity >= 2) fprintf(stderr,"\rconf-local next complete       \n");
+    vset_minus(next,visited);
+    vset_union(visited,next);
+    vset_copy(current,next);
+    vset_clear(next);
+  }
+}
+
+
+void reach_sat(){
   int* level = (int*)RTmalloc( nGrps * sizeof(int) );
   int* back  = (int*)RTmalloc( (N+1) * sizeof(int) );
+  bitvector_t **groups = (bitvector_t**)RTmalloc( (N+1) * sizeof(bitvector_t*));
 
-  fprintf(stderr,"%d groups, %d vars\n",nGrps,N);
+  // groups: i=0..nGrps-1
+  // vars  : j=0..N-1
+  // BDD levels:  k = N..1
 
-  // level[i] = first + of group i
+  for (int k=1;k<N+1;k++) {
+    groups[k] = (bitvector_t*)RTmalloc(sizeof(bitvector_t));
+    bitvector_create(groups[k],nGrps);
+  }
+  
+  // level[i] = first (highest) + of group i
   for (int i=0;i<nGrps;i++) {
-    for (int j=0;j<N;j++)
+    for (int j=0;j<N;j++) {
       if (dm_is_set(GBgetDMInfo(model),i,j)) {
 	level[i]=N-j;
 	break;
       }
+    }
   }
-  
-  // back[j] = last + in any group of level j
-  for (int j=0;j<N;j++) back[j]=N+1;
+
   for (int i=0;i<nGrps;i++) {
-    for (int j=1;j<=N;j++)
-      if (dm_is_set(GBgetDMInfo(model),i,N-j)) {
-	if (j<back[level[i]]) back[level[i]]=j;
+    fprintf(stderr,"i: %d, level[i]: %d\n",i,level[i]);
+    bitvector_set(groups[level[i]],i);
+  }
+
+  // back[k] = last + in any group of level k
+  for (int k=1;k<=N;k++) back[k]=N+1;
+  for (int i=0;i<nGrps;i++) {
+    for (int k=1;k<=N;k++)
+      if (dm_is_set(GBgetDMInfo(model),i,N-k)) {
+	if (k<back[level[i]]) back[level[i]]=k;
 	break;
       }
   }
   
-  /* // test
+   // test
   fprintf(stderr,"level: ");
   for (int i=0; i<nGrps;i++)
     fprintf(stderr,"%d ",level[i]);
@@ -539,22 +592,21 @@ void reach_sat(){
   for (int j=1; j<=N; j++)
     fprintf(stderr,"%d ",back[j]);
   fprintf(stderr,"\n");
-  */
+  
 
-  int k=0;
-  vset_t new_vis=vset_create(domain,0,NULL);
-  while (k != N) {
+  int k=1;
+  vset_t old_vis=vset_create(domain,0,NULL);
+  while (k <= N) {
+    fprintf(stderr,"Saturating level: %d\n",k);
     vset_copy(old_vis,visited);
-    new_vis = Closure("sat",visited,...);
-    if (new_vis=visited)
+    Closure(visited,groups[k]);
+    if (vset_equal(old_vis,visited))
       k++;
     else {
-      vset_clear(visited);
-      vset_copy(new_vis,visited);
+      vset_clear(old_vis);
       k=back[k];
     }
   }
-  Fatal(1,error,"Saturation not implemented yet");
 }
 
 void reach_chain(){
