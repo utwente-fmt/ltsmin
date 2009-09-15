@@ -570,7 +570,6 @@ void reach_sat(){
   }
 
   for (int i=0;i<nGrps;i++) {
-    fprintf(stderr,"i: %d, level[i]: %d\n",i,level[i]);
     bitvector_set(groups[level[i]],i);
   }
 
@@ -608,6 +607,98 @@ void reach_sat(){
     }
   }
 }
+
+void reach_sat2(){
+  int* level = (int*)RTmalloc( nGrps * sizeof(int) );
+  bitvector_t **groups = (bitvector_t**)RTmalloc( (N+1) * sizeof(bitvector_t*));
+
+  // groups: i=0..nGrps-1
+  // vars  : j=0..N-1
+  // BDD levels:  k = N..1
+
+  for (int k=1;k<N+1;k++) {
+    groups[k] = (bitvector_t*)RTmalloc(sizeof(bitvector_t));
+    bitvector_create(groups[k],nGrps);
+  }
+  
+  // level[i] = first (highest) + of group i
+  for (int i=0;i<nGrps;i++) {
+    for (int j=0;j<N;j++) {
+      if (dm_is_set(GBgetDMInfo(model),i,j)) {
+	level[i]=(N-j) / 10 + 1;
+	break;
+      }
+    }
+  }
+
+  for (int i=0;i<nGrps;i++) {
+    bitvector_set(groups[level[i]],i);
+  }
+
+   // test
+  fprintf(stderr,"level: ");
+  for (int i=0; i<nGrps;i++)
+    fprintf(stderr,"%d ",level[i]);
+  
+  int k=1, last=0;
+  vset_t old_vis=vset_create(domain,0,NULL);
+  while (k <= N/10 +1) {
+    if (k==last) k++;
+    fprintf(stderr,"Saturating level: %d\n",k);
+    vset_copy(old_vis,visited);
+    Closure(visited,groups[k]);
+    if (vset_equal(old_vis,visited))
+      k++;
+    else {
+      last=k;
+      vset_clear(old_vis);
+      k=1;
+    }
+  }
+}
+
+void reach_sat3(){
+  int* level = (int*)RTmalloc( nGrps * sizeof(int) );
+  bitvector_t **groups = (bitvector_t**)RTmalloc( (N+1) * sizeof(bitvector_t*));
+
+  // groups: i=0..nGrps-1
+  // vars  : j=0..N-1
+  // BDD levels:  k = N..1
+
+  for (int k=1;k<N+1;k++) {
+    groups[k] = (bitvector_t*)RTmalloc(sizeof(bitvector_t));
+    bitvector_create(groups[k],nGrps);
+  }
+  
+  // level[i] = first (highest) + of group i
+  for (int i=0;i<nGrps;i++) {
+    for (int j=0;j<N;j++) {
+      if (dm_is_set(GBgetDMInfo(model),i,j)) {
+	level[i]=(N-j) / 10 + 1;
+	break;
+      }
+    }
+  }
+
+  for (int i=0;i<nGrps;i++) {
+    bitvector_set(groups[level[i]],i);
+  }
+
+   // test
+  fprintf(stderr,"level: ");
+  for (int i=0; i<nGrps;i++)
+    fprintf(stderr,"%d ",level[i]);
+  
+  vset_t old_vis=vset_create(domain,0,NULL);
+  while (!vset_equal(old_vis,visited)) {
+    vset_copy(old_vis,visited);
+    for (int k=1; k <= N/10 + 1 ; k++) {
+      fprintf(stderr,"Saturating level: %d\n",k);
+      Closure(visited,groups[k]);
+    }
+  }
+}
+
 
 void reach_chain(){
 	int level,i;
@@ -862,7 +953,7 @@ int main(int argc, char *argv[]){
 		reach_chain();
 		break;
 	case Sat:
-		reach_sat();
+		reach_sat3();
 		break;
 	}
 	SCCstopTimer(timer);
