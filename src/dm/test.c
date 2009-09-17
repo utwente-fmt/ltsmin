@@ -102,6 +102,14 @@ main (void)
 
     bitvector_t         b1;
     bitvector_t         b2;
+
+    // test size zero bitvectors
+    printf ("bitvector_create(&b1, 0) = %d (should be 0)\n", bitvector_create (&b1, 0));
+    printf ("bitvector_copy(&b2, &b1) = %d (should be 0)\n", bitvector_copy (&b2, &b1));
+
+    bitvector_free (&b2);
+    bitvector_free (&b1);
+
     bitvector_create (&b1, 20);
 
     user_bitvector_print (&b1);
@@ -109,12 +117,63 @@ main (void)
     bitvector_set (&b1, 4);
     user_bitvector_print (&b1);
 
-    bitvector_copy (&b1, &b2);
+    bitvector_copy (&b2, &b1);
 
     bitvector_unset (&b1, 4);
     user_bitvector_print (&b1);
 
     user_bitvector_print (&b2);
+
+    // test is_empty
+    printf ("is_empty b1? %c (should be t)\n", bitvector_is_empty(&b1)?'t':'f');
+    printf ("is_empty b2? %c (should be f)\n", bitvector_is_empty(&b2)?'t':'f');
+
+    // set even/odd bits in b1/b2
+    for(int i=0; i<20; ++i)
+    {
+        if (i%2)
+        {
+            bitvector_set(&b1,i);
+        } else {
+            bitvector_set(&b2,i);
+        }
+    }
+
+    // print before union
+    printf ("before union\n");
+    user_bitvector_print (&b1);
+    user_bitvector_print (&b2);
+
+    // disjoint?
+    printf ("b1,b2 are disjoint %c (should be t)\n", bitvector_is_disjoint(&b1, &b2)?'t':'f');
+
+    printf ("union\n");
+    bitvector_union(&b1, &b2);
+
+    // disjoint?
+    printf ("b1,b2 are disjoint %c (should be f)\n", bitvector_is_disjoint(&b1, &b2)?'t':'f');
+
+    // print after union
+    user_bitvector_print (&b1);
+    user_bitvector_print (&b2);
+    printf ("intersect\n");
+    bitvector_intersect(&b1, &b2);
+
+    // disjoint?
+    printf ("b1,b2 are disjoint %c (should be f)\n", bitvector_is_disjoint(&b1, &b2)?'t':'f');
+
+    // print after intersection
+    user_bitvector_print (&b1);
+    user_bitvector_print (&b2);
+
+    printf ("invert b1\n");
+    bitvector_invert(&b1);
+
+    // print after inversion
+    user_bitvector_print (&b1);
+
+    // disjoint?
+    printf ("b1,b2 are disjoint %c (should be t)\n", bitvector_is_disjoint(&b1, &b2)?'t':'f');
 
     bitvector_free (&b2);
     bitvector_free (&b1);
@@ -231,6 +290,30 @@ main (void)
     dm_ungroup_cols(&m1);
     print_matrix (&m1);
 */
+
+    // get bitvector from matrix text
+    bitvector_create (&b1, 6);
+    bitvector_create (&b2, 10);
+
+    printf ("get bitvector row, invalid size\n"
+            "returns %d (should be -1)\n",
+            dm_bitvector_row(&b1, &m1, 0));
+    printf ("get bitvector row, correct size\n"
+            "returns %d (should be 0)\n",
+            dm_bitvector_row(&b2, &m1, 0));
+
+    printf ("bitvector of row 0\n");
+    user_bitvector_print (&b2);
+
+    printf ("get bitvector col, correct size\n"
+            "returns %d (should be 0)\n",
+            dm_bitvector_col(&b1, &m1, 8));
+
+    printf ("bitvector of col 8\n");
+    user_bitvector_print (&b1);
+
+    bitvector_free (&b2);
+    bitvector_free (&b1);
 
     printf ("count test\n");
     for (int i = 0; i < dm_nrows (&m1); i++)

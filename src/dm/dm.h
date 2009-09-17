@@ -124,6 +124,22 @@ extern int          dm_expand_vector (matrix_t *, int row, int *s0, int *src,
 
 extern void         dm_print_perm (const matrix_header_t *p);
 
+/**
+ * dm_bitvector_row/col
+ *  Copy a row/column of the matrix to a bitvector
+ *  (with the current permutation applied)
+ *  1) bitvector of the size (rows/cols) of the matrix;
+ *     it should be initialized by bitvector_create or bitvector_copy
+ *  2) the matrix
+ *  3) the row/column of the matrix
+ *
+ * return value:
+ *  0: bitvector copied, no errors
+ * -1: error
+ */
+extern int          dm_bitvector_row(bitvector_t *, const matrix_t *, int);
+extern int          dm_bitvector_col(bitvector_t *, const matrix_t *, int);
+
 #ifdef __cplusplus
 }
 #endif
