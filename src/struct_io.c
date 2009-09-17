@@ -15,11 +15,13 @@ void DSwriteStruct(struct_stream_t stream,void *data){
 	}
 }
 
-void DSreadStruct(struct_stream_t stream,void *data){
+int DSreadStruct(struct_stream_t stream,void *data){
 	uint32_t *vec=(uint32_t*)data;
 	for(int i=0;i<stream->len;i++){
+	    if (DSempty(stream->ds[i])) return 0;
 		vec[i]=DSreadU32(stream->ds[i]);
 	}
+	return 1;
 }
 
 void DSstructClose(struct_stream_t *stream){

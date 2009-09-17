@@ -2,6 +2,7 @@
 #ifndef ARCHIVE_H
 #define ARCHIVE_H
 
+#include <string-map.h>
 #include "config.h"
 #include "stream.h"
 #include "raf.h"

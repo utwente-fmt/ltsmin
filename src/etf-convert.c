@@ -1,9 +1,10 @@
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
-#include "runtime.h"
-#include "etf-util.h"
+#include <runtime.h>
+#include <etf-util.h>
 #include <popt.h>
+
 
 static  struct poptOption options[] = {
 	POPT_TABLEEND
@@ -16,6 +17,7 @@ void dve_write(const char*name,etf_model_t model){
 	FILE* dve=fopen(name,"w");
 
 	int N=lts_type_get_state_length(etf_type(model));
+	int K=lts_type_get_edge_label_count(etf_type(model));
 	int initial_state[N];
 	etf_get_initial(model,initial_state);
 
@@ -28,22 +30,19 @@ void dve_write(const char*name,etf_model_t model){
 	fprintf(dve,"  state s0;\n");
 	fprintf(dve,"  init s0;\n");
 	fprintf(dve,"  trans\n");
-	treedbs_t pattern_db=etf_patterns(model);
 	int transitions=0;
 	for(int section=0;section<etf_trans_section_count(model);section++){
-		treedbs_t trans=etf_trans_section(model,section);
-		for(int i=TreeCount(trans)-1;i>=0;i--){
+		etf_rel_t trans=etf_trans_section(model,section);
+		int src[N];
+		int dst[N];
+		int lbl[K];
+		ETFrelIterate(trans);
+		while(ETFrelNext(trans,src,dst,lbl)){
 			if (transitions) {
 				fprintf(dve,",\n");	
 			}
 			transitions++;
 			fprintf(dve,"    s0 -> s0 { guard ");
-			int step[2];
-			int src[N];
-			int dst[N];
-			TreeUnfold(trans,i,step);
-			TreeUnfold(pattern_db,step[0],src);
-			TreeUnfold(pattern_db,step[1],dst);
 			for(int j=0;j<N;j++){
 				if (src[j]) {
 					fprintf(dve,"x[%d]==%d && ",j,src[j]-1);
@@ -84,7 +83,7 @@ int main(int argc,char *argv[]){
 	RTinitPopt(&argc,&argv,options,2,2,files,NULL,"<input> <output>","Convert ETF to DVE");
 
 	Warning(info,"parsing %s",files[0]);
-	etf_model_t model=etf_parse(files[0]);
+	etf_model_t model=etf_parse_file(files[0]);
 
 	Warning(info,"writing %s",files[1]);
 	dve_write(files[1],model);

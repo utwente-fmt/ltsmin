@@ -184,36 +184,105 @@ static void dir_write_open_ops(lts_output_t output){
 	output->ops.write_close=dir_write_close;
 }
 
-static void dir_read_part(lts_input_t input,int which_state,int which_src,int which_dst,lts_enum_cb_t output){
-	(void)which_state;
-	struct archive_io *ctx=(struct archive_io *)input->ops_context;
-	int segment_count=input->segment_count;
+static void dir_read_part(lts_input_t input,int part,int flags,lts_enum_cb_t output){
+	if (flags & LTS_ENUM_EDGES){
+		Warning(debug,"enumerating edges");
+		struct archive_io *ctx=(struct archive_io *)input->ops_context;
+		int segment_count=input->segment_count;
 
-	int i_from=(which_src==segment_count)?0:which_src;
-	int i_to=(which_src==segment_count)?segment_count:(which_src+1);
-	for(int i=i_from;i<i_to;i++){
-		int j_from=(which_dst==segment_count)?0:which_dst;
-		int j_to=(which_dst==segment_count)?segment_count:(which_dst+1);
-		for(int j=j_from;j<j_to;j++){
-			char name[1024];
-			sprintf(name,"src-%d-%d",i,j);
-			stream_t src_in=arch_read(ctx->archive,name,ctx->decode);
-			sprintf(name,"label-%d-%d",i,j);
-			stream_t lbl_in=arch_read(ctx->archive,name,ctx->decode);
-			sprintf(name,"dest-%d-%d",i,j);
-			stream_t dst_in=arch_read(ctx->archive,name,ctx->decode);
-			for(;;){
-				if (DSempty(src_in)) break;
-				uint32_t s=DSreadU32(src_in);
-				uint32_t l=DSreadU32(lbl_in);
-				uint32_t d=DSreadU32(dst_in);
-				enum_seg_seg(output,i,(int)s,j,(int)d,(int*)&l);
+		Warning(debug,"input mode is %s",input->mode);
+		int i_from=part;
+		int i_to=part+1;
+		int j_from=0;
+		int j_to=segment_count;
+		for(int i=i_from;i<i_to;i++){
+			for(int j=j_from;j<j_to;j++){
+				char name[1024];
+				sprintf(name,"src-%d-%d",i,j);
+				stream_t src_in=arch_read(ctx->archive,name,ctx->decode);
+				sprintf(name,"label-%d-%d",i,j);
+				stream_t lbl_in=arch_read(ctx->archive,name,ctx->decode);
+				sprintf(name,"dest-%d-%d",i,j);
+				stream_t dst_in=arch_read(ctx->archive,name,ctx->decode);
+				for(;;){
+					if (DSempty(src_in)) break;
+					uint32_t s=DSreadU32(src_in);
+					uint32_t l=DSreadU32(lbl_in);
+					uint32_t d=DSreadU32(dst_in);
+					enum_seg_seg(output,i,(int)s,j,(int)d,(int*)&l);
+				}
+				DSclose(&src_in);
+				DSclose(&lbl_in);
+				DSclose(&dst_in);
 			}
-			DSclose(&src_in);
-			DSclose(&lbl_in);
-			DSclose(&dst_in);
 		}
-	}
+	} else {
+		Warning(debug,"ignoring states");
+	} 
+}
+
+static void dir_load(lts_input_t input){
+	struct archive_io *ctx=(struct archive_io *)input->ops_context;
+    if (input->edge_table){
+        uint32_t row[4];
+        for(int i=0;i<input->segment_count;i++){
+            for(int j=0;j<input->segment_count;j++){
+                matrix_table_t mt;
+                int src_ofs;
+                if (input->mode[1]=='i'){
+                    mt=input->edge_table[i];
+                    src_ofs=0;
+                    row[1]=j;
+                } else {
+                    mt=input->edge_table[j];
+                    row[0]=i;
+                    src_ofs=1;
+                }
+                if (mt==NULL) continue;
+                char name[1024];
+                sprintf(name,"src-%d-%d",i,j);
+                stream_t src_in=arch_read(ctx->archive,name,ctx->decode);
+                sprintf(name,"label-%d-%d",i,j);
+                stream_t lbl_in=arch_read(ctx->archive,name,ctx->decode);
+                sprintf(name,"dest-%d-%d",i,j);
+                stream_t dst_in=arch_read(ctx->archive,name,ctx->decode);
+     			for(;;){
+				    if (DSempty(src_in)) break;
+				    row[src_ofs]=DSreadU32(src_in);
+				    row[3]=DSreadU32(lbl_in);
+				    row[2]=DSreadU32(dst_in);
+				    MTaddRow(mt,row);
+			    }
+			    DSclose(&src_in);
+			    DSclose(&lbl_in);
+			    DSclose(&dst_in);
+            }
+        }
+    }
+    if (input->value_table && input->value_table[0]){
+	    stream_t ds=arch_read(ctx->archive,"TermDB",ctx->decode);
+	    for(int L=0;;L++){
+		    char*lbl=DSreadLN(ds);
+		    int len=strlen(lbl);
+		    if (len==0) {
+			    Warning(info,"read %d labels",L);
+			    break;
+		    }
+		    char*str;
+		    if (lbl[0]=='"' && lbl[len-1]=='"') {
+			    Warning(info,"stripping double quotes from %s",lbl);
+			    lbl[len-1]=0;
+			    str=lbl+1;
+		    } else {
+			    str=lbl;
+		    }
+		    if ((int)VTputChunk(input->value_table[0],chunk_str(lbl))!=L){
+			    Fatal(1,error,"position of label %d was not %d",L,L);
+		    }
+		    free(lbl);
+	    }
+	    DSclose(&ds);
+    }
 }
 
 /*
@@ -242,7 +311,7 @@ static void load_dir_headers(lts_input_t input,stream_t ds){
 	DSclose(&ds);
 	
 	lts_type_t ltstype=lts_type_create();
-	lts_type_set_state_length(ltstype,2);
+	lts_type_set_state_length(ltstype,0);
 	int action_type=lts_type_add_type(ltstype,"action",NULL);
 	lts_type_set_edge_label_count(ltstype,1);
 	lts_type_set_edge_label_name(ltstype,0,"action");
@@ -276,6 +345,7 @@ static void load_dir_headers(lts_input_t input,stream_t ds){
 	}
 	DSclose(&ds);
 	input->ops.read_part=dir_read_part;
+	input->ops.load_lts=dir_load;
 	input->ops.read_close=arch_read_close;
 }
 
@@ -522,61 +592,54 @@ static void vec_write_open(lts_output_t output){
 	Fatal(1,error,"Write mode %s unsupported in vector mode",output->mode);
 }
 
-static void vec_read_part(lts_input_t input,int which_state,int which_src,int which_dst,lts_enum_cb_t output){
-	(void)which_state;(void)which_dst;
+static void vec_read_part(lts_input_t input,int part,int flags,lts_enum_cb_t output){
 	struct archive_io *ctx=(struct archive_io *)input->ops_context;
-	int segment_count=input->segment_count;
 	lts_type_t ltstype=GBgetLTStype(input->model);
 	int N=lts_type_get_state_length(ltstype);
 	int sLbls=lts_type_get_state_label_count(ltstype);
 	int eLbls=lts_type_get_edge_label_count(ltstype);
 
-	int i_from=(which_src==segment_count)?0:which_src;
-	int i_to=(which_src==segment_count)?segment_count:(which_src+1);
 	char base[128];		
 	char* ofs[1]={"ofs"};
 	char* segofs[2]={"seg","ofs"};
 	// Pass 1: states and labels.
-	for(int i=i_from;i<i_to;i++){
-		Warning(info,"enumerating states of part %d",i);
-		sprintf(base,"SV-%d-%%d",i);
+	if (flags & LTS_ENUM_STATES) {
+		Warning(info,"enumerating states of part %d",part);
+		sprintf(base,"SV-%d-%%d",part);
 		struct_stream_t vec=arch_read_vec_U32(ctx->archive,base,N,ctx->decode);
-		sprintf(base,"SL-%d-%%d",i);
+		sprintf(base,"SL-%d-%%d",part);
 		struct_stream_t map=arch_read_vec_U32(ctx->archive,base,sLbls,ctx->decode);
 		int src_vec[N];
 		int map_vec[sLbls];
-		for (uint32_t j=0;j<input->count.state[i];j++){
+		for (uint32_t j=0;j<input->count.state[part];j++){
 			DSreadStruct(vec,src_vec);
 			DSreadStruct(map,map_vec);
-			enum_vec(output,src_vec,map_vec);
+			enum_state(output,part,src_vec,map_vec);
 			//Warning(info,"state %d",j);
 		}
 		DSstructClose(&vec);
 		DSstructClose(&map);
 	}
 	// Pass 2: edges and labels.	
-	for(int i=i_from;i<i_to;i++){
-		Warning(info,"enumerating edges of part %d",i);
+	if (flags & LTS_ENUM_EDGES) {
+		Warning(info,"enumerating edges of part %d",part);
 		if(!strcmp(input->mode,"viv")){
 			int src_ofs[1];
 			int lbl_vec[eLbls];
 			int dst_vec[N];
-			sprintf(base,"ES-%d-%%s",i);
+			sprintf(base,"ES-%d-%%s",part);
 			struct_stream_t src=arch_read_vec_U32_named(ctx->archive,base,1,ofs,ctx->decode);
-			sprintf(base,"EL-%d-%%d",i);
+			sprintf(base,"EL-%d-%%d",part);
 			struct_stream_t lbl=arch_read_vec_U32(ctx->archive,base,eLbls,ctx->decode);
-			sprintf(base,"ED-%d-%%d",i);
+			sprintf(base,"ED-%d-%%d",part);
 			struct_stream_t dst=arch_read_vec_U32(ctx->archive,base,N,ctx->decode);
-			for (uint32_t j=0;j<input->count.out[i];j++){
+			for (uint32_t j=0;j<input->count.out[part];j++){
 				DSreadStruct(src,src_ofs);
 				DSreadStruct(dst,dst_vec);
 				DSreadStruct(lbl,lbl_vec);
-				enum_seg_vec(output,i,src_ofs[0],dst_vec,lbl_vec);
+				enum_seg_vec(output,part,src_ofs[0],dst_vec,lbl_vec);
 				//Warning(info,"edge %d",j);
 			}
-			// Note that:
-			// 1. We should test what was requested.
-			// 2. We should return the requested info in one pass. (ltsmin-convert will break)
 			DSstructClose(&src);
 			DSstructClose(&lbl);
 			DSstructClose(&dst);
@@ -585,27 +648,140 @@ static void vec_read_part(lts_input_t input,int which_state,int which_src,int wh
 			int src_vec[2];
 			int lbl_vec[eLbls];
 			int dst_ofs[1];
-			sprintf(base,"ES-%d-%%s",i);
+			sprintf(base,"ES-%d-%%s",part);
 			struct_stream_t src=arch_read_vec_U32_named(ctx->archive,base,2,segofs,ctx->decode);
-			sprintf(base,"EL-%d-%%d",i);
+			sprintf(base,"EL-%d-%%d",part);
 			struct_stream_t lbl=arch_read_vec_U32(ctx->archive,base,eLbls,ctx->decode);
-			sprintf(base,"ED-%d-%%s",i);
+			sprintf(base,"ED-%d-%%s",part);
 			struct_stream_t dst=arch_read_vec_U32_named(ctx->archive,base,1,ofs,ctx->decode);
-			for (uint32_t j=0;j<input->count.in[i];j++){
+			for (uint32_t j=0;j<input->count.in[part];j++){
 				DSreadStruct(src,src_vec);
 				DSreadStruct(dst,dst_ofs);
 				DSreadStruct(lbl,lbl_vec);
-				enum_seg_seg(output,src_vec[0],src_vec[1],i,dst_ofs[0],lbl_vec);
+				enum_seg_seg(output,src_vec[0],src_vec[1],part,dst_ofs[0],lbl_vec);
 				//Warning(info,"edge %d (seg %d) of %d",j,i,input->count.in[i]);
 			}
-			// Note that:
-			// 1. We should test what was requested.
-			// 2. We should return the requested info in one pass. (ltsmin-convert will break)
 			DSstructClose(&src);
 			DSstructClose(&lbl);
 			DSstructClose(&dst);
 		}
 	}
+}
+
+static void vec_load(lts_input_t input){
+	struct archive_io *ctx=(struct archive_io *)input->ops_context;
+	char base[128];		
+    if (input->state_table) {
+        int label_offset;
+        if (input->mode[0]=='v'){
+            label_offset=lts_type_get_state_length(GBgetLTStype(input->model));
+        } else {
+            label_offset=0;
+        }
+        int label_count=lts_type_get_state_label_count(GBgetLTStype(input->model));
+        
+        for(int i=0;i<input->segment_count;i++){
+            if(input->state_table[i]){
+        		Warning(info,"loading states of segment %d",i);
+        		struct_stream_t vec=NULL;
+        		if(label_offset){
+    		        sprintf(base,"SV-%d-%%d",i);
+	            	vec=arch_read_vec_U32(ctx->archive,base,label_offset,ctx->decode);
+            	}
+        		sprintf(base,"SL-%d-%%d",i);
+	        	struct_stream_t map=arch_read_vec_U32(ctx->archive,base,label_count,ctx->decode);
+	        	uint32_t row[label_offset+label_count];
+		        for (uint32_t j=0;j<input->count.state[i];j++){
+			        if(label_offset) DSreadStruct(vec,row);
+			        DSreadStruct(map,row+label_offset);
+			        MTaddRow(input->state_table[i],row);
+			        //Warning(info,"state %d",j);
+		        }
+		        if (label_offset) DSstructClose(&vec);
+		        DSstructClose(&map);
+            }
+        }
+    }
+    if (input->edge_table){
+	    char* ofs[1]={"ofs"};
+	    char* segofs[2]={"seg","ofs"};
+        for(int i=0;i<input->segment_count;i++){
+            if(input->edge_table[i]){
+                Warning(info,"loading edges of segment %d",i);
+                int src_len, dst_len;
+     			struct_stream_t src,dst,lbl;
+     			switch(input->mode[1]){
+                    case 'i':
+                        src_len=1;
+            			sprintf(base,"ES-%d-%%s",i);
+		            	src=arch_read_vec_U32_named(ctx->archive,base,1,ofs,ctx->decode);
+                        break;
+                    case 's':
+                        src_len=2;
+            			sprintf(base,"ES-%d-%%s",i);
+		            	src=arch_read_vec_U32_named(ctx->archive,base,2,segofs,ctx->decode);
+                        break;
+                    default: Fatal(1,error,"src mode %c unsupported",input->mode[1]);
+                }
+                switch(input->mode[2]){
+                    case 'i':
+                        dst_len=1;
+            			sprintf(base,"ED-%d-%%s",i);
+		            	dst=arch_read_vec_U32_named(ctx->archive,base,1,ofs,ctx->decode);
+                        break;
+                    case 's':
+                        dst_len=2;
+             			sprintf(base,"ED-%d-%%s",i);
+		            	dst=arch_read_vec_U32_named(ctx->archive,base,2,segofs,ctx->decode);
+                        break;
+                    default: Fatal(1,error,"src mode %c unsupported",input->mode[1]);
+                }
+                int label_count=lts_type_get_edge_label_count(GBgetLTStype(input->model));
+                if(label_count){
+        			sprintf(base,"EL-%d-%%d",i);
+	        		lbl=arch_read_vec_U32(ctx->archive,base,label_count,ctx->decode);
+                } else {
+                    lbl=NULL;
+                }
+                uint32_t row[src_len+dst_len+label_count];
+                uint32_t *src_vec=row;
+                uint32_t *dst_vec=row+src_len;
+                uint32_t *lbl_vec=dst_vec+dst_len;
+                while(DSreadStruct(src,src_vec)){
+                    DSreadStruct(dst,dst_vec);
+                    if(label_count) DSreadStruct(lbl,lbl_vec);
+                    MTaddRow(input->edge_table[i],row);
+                }
+			    DSstructClose(&src);
+			    if (label_count) DSstructClose(&lbl);
+			    DSstructClose(&dst);
+		    }
+        }
+    }
+    if (input->value_table){
+        int type_count=lts_type_get_type_count(GBgetLTStype(input->model));
+        stream_t ds;
+        for(int i=0;i<type_count;i++){
+            if(input->value_table[i]){
+                Warning(info,"loading type %s",lts_type_get_type(GBgetLTStype(input->model),i));
+         		char stream_name[1024];
+		        sprintf(stream_name,"CT-%d",i);
+		        ds=arch_read(ctx->archive,stream_name,ctx->decode);
+		        int L;
+		        for(L=0;;L++){
+			        if (DSempty(ds)) break;
+			        int len=DSreadVL(ds);
+			        char data[len];
+			        DSread(ds,data,len);
+			        if ((int)VTputChunk(input->value_table[i],chunk_ld(len,data))!=L){
+				        Fatal(1,error,"position of chunk %d was not %d",L,L);
+			        }
+		        }
+		        Warning(info,"%d elements",L);
+		        DSclose(&ds);             
+            }
+        }
+    }
 }
 
 static void load_chunk_tables(lts_input_t input){
@@ -723,6 +899,7 @@ static void load_vec_headers(lts_input_t input,stream_t ds){
 	DSclose(&ds);
 	Warning(info,"vec header read");
 	input->ops.read_part=vec_read_part;
+	input->ops.load_lts=vec_load;
 	input->ops.read_close=arch_read_close;
 	load_chunk_tables(input);
 }
@@ -805,7 +982,7 @@ static void gcf_write_open(lts_output_t output){
 /*
  * Open the info stream in the archive and detect what format it is
  */
-static void load_headers(lts_input_t input){
+static void load_headers(lts_input_t input,const char *requested_mode,char **actual_mode){
 	struct archive_io *ctx=(struct archive_io *)input->ops_context;
 	stream_t ds=arch_read(ctx->archive,"info",ctx->decode);
 	char description[1024];
@@ -813,6 +990,23 @@ static void load_headers(lts_input_t input){
 	if (strlen(description)==0) {
 		if (DSreadU16(ds)==31){
 			Log(info,"legacy DIR format");
+			if(requested_mode) {
+			    if (!strcmp(requested_mode,"-si") || !strcmp(requested_mode,"-is")){
+			        input->mode=strdup(requested_mode);
+	            } else if (actual_mode==NULL) {
+    			    Fatal(1,error,"mode %s not supported while reading DIR",requested_mode);
+	            } else if (!strcmp(requested_mode,"vsi") || !strcmp(requested_mode,"vis")){
+                   input->mode=strdup(requested_mode);
+                   input->mode[0]='-';
+	            }
+			}
+			if (!input->mode) {
+			    Warning(debug,"using default input mode (-si)");
+			    input->mode=strdup("-si");
+			}
+			if(actual_mode){
+			    *actual_mode=input->mode;
+			}
 			load_dir_headers(input,ds);
 			return;
 		} else {
@@ -822,6 +1016,12 @@ static void load_headers(lts_input_t input){
 	} else {
 		if (!strncmp(description,"viv",3) || !strncmp(description,"vsi",3)){
 			input->mode=strdup(description);
+			if (requested_mode && strcmp(requested_mode,description) && actual_mode==NULL){
+			    Fatal(1,error,"mode mismatch %s != %s",requested_mode,description);
+			}
+			if(actual_mode){
+			    *actual_mode=input->mode;
+			}
 			load_vec_headers(input,ds);
 			return;
 		}
@@ -831,33 +1031,33 @@ static void load_headers(lts_input_t input){
 
 
 /* open an uncompressed directory for eading */
-static void dir_read_open(lts_input_t input){
+static void dir_read_open(lts_input_t input,const char *requested_mode,char **actual_mode){
 	Warning(debug,"opening %s",input->name);
 	struct archive_io *ctx=RT_NEW(struct archive_io);
 	ctx->archive=arch_dir_open(input->name,blocksize);
 	ctx->decode=NULL;
 	input->ops_context=ctx;
-	load_headers(input);
+	load_headers(input,requested_mode,actual_mode);
 }
 
 /* open a compressed directory for eading */
-static void dz_read_open(lts_input_t input){
+static void dz_read_open(lts_input_t input,const char *requested_mode,char **actual_mode){
 	Warning(debug,"opening %s",input->name);
 	struct archive_io *ctx=RT_NEW(struct archive_io);
 	ctx->archive=arch_dir_open(input->name,blocksize);
 	ctx->decode="auto";
 	input->ops_context=ctx;
-	load_headers(input);
+	load_headers(input,requested_mode,actual_mode);
 }
 
 /* open a GCF archive for reading */
-static void gcf_read_open(lts_input_t input){
+static void gcf_read_open(lts_input_t input,const char *requested_mode,char **actual_mode){
 	Warning(debug,"opening %s",input->name);
 	struct archive_io *ctx=RT_NEW(struct archive_io);
 	ctx->archive=arch_gcf_read(raf_unistd(input->name));
 	ctx->decode="auto";
 	input->ops_context=ctx;
-	load_headers(input);
+	load_headers(input,requested_mode,actual_mode);
 }
 
 /* initialisation callback */

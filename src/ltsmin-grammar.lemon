@@ -1,0 +1,405 @@
+%include {
+#include <assert.h>
+#include <stdlib.h>
+#include <etf-util.h>
+#include "etf-internal.h"
+#include <runtime.h>
+#include <ltsmin-parse-env.h>
+#include <chunk_support.h>
+}
+
+/* Section common parser configuration.
+
+This section is shared by the parsers for all LTSmin languages.
+*/
+
+%token_prefix TOKEN_
+%token_type { int } 
+%syntax_error {
+    (void)yymajor;(void)yyminor;
+    Fatal(1,error,"syntax error");
+}
+%parse_failure { Fatal(1,error,"parse error"); }
+%parse_accept { Warning(info,"success!"); }
+%extra_argument { ltsmin_parse_env_t env }
+%stack_overflow {
+    (void)yypMinor;
+    Fatal(1,error,"stack overflow");
+}
+
+/* Section ETF grammar
+
+This section contains the grammar definition of ETF.
+*/
+
+input ::= ETF etf_spec . {
+    Warning(info,"parsing finished");
+    etf_model_t model=env->etf;
+    lts_type_set_state_label_count(model->ltstype,model->map_count);
+    for(int i=0;i<model->map_count;i++){
+        lts_type_set_state_label_name(model->ltstype,i,model->map_names[i]);
+        lts_type_set_state_label_type(model->ltstype,i,model->map_types[i]);
+    }
+    Warning(debug,"ETF model has %d transition sections",model->trans_count);
+    Warning(debug,"ETF model has %d map sections",model->map_count);
+    Warning(debug,"ETF model has %d types",lts_type_get_type_count(model->ltstype));
+}
+
+etf_spec ::= state_section edge_section .
+etf_spec ::= etf_spec init_section .
+etf_spec ::= etf_spec trans_section.
+etf_spec ::= etf_spec map_section.
+etf_spec ::= etf_spec sort_section.
+
+etf_spec ::= EOL .
+
+state_section ::= BEGIN STATE decl_list(L) END STATE. {
+    int N=ETFlistLength(L);
+    if (N==0) {
+        Fatal(1,error,"state vector length must be at least 1");
+    }
+    Warning(info,"The state length is %d",N);
+    lts_type_set_state_length(env->etf->ltstype,N);
+    etf_list_t list=L;
+    for(int i=N-1;i>=0;i--){
+        if (list->fst!=SI_INDEX_FAILED) {
+            char *name=SIget(env->idents,list->fst);
+            lts_type_set_state_name(env->etf->ltstype,i,name);
+        }
+        if (list->snd!=SI_INDEX_FAILED) {
+            char*sort=SIget(env->idents,list->snd);
+            int typeno=ETFgetType(env->etf,sort);
+            lts_type_set_state_typeno(env->etf->ltstype,i,typeno);
+        }
+        list=list->prev;
+    }
+    ETFlistFree(L);
+    Warning(info,"done");
+}
+
+edge_section ::= BEGIN EDGE decl_list(L) END EDGE.
+{
+    int N=ETFlistLength(L);
+    Warning(info,"There are %d edge labels",N);
+    lts_type_set_edge_label_count(env->etf->ltstype,N);
+    etf_list_t list=L;
+    for(int i=N-1;i>=0;i--){
+        char *name=SIget(env->idents,list->fst);
+        lts_type_set_edge_label_name(env->etf->ltstype,i,name);
+        char*sort=SIget(env->idents,list->snd);
+        int typeno=ETFgetType(env->etf,sort);
+        lts_type_set_edge_label_typeno(env->etf->ltstype,i,typeno);
+        list=list->prev;
+    }
+    ETFlistFree(L);
+    Warning(info,"done");
+}
+
+init_section ::= BEGIN INIT valref_list(L) END INIT.
+{
+    int N=ETFlistLength(L);
+    if (N!=lts_type_get_state_length(env->etf->ltstype)){
+        Fatal(1,error,"incorrect length of initial state: %d instead of %d.",
+            N,lts_type_get_state_length(env->etf->ltstype));
+    }
+    if (env->etf->initial_state) Fatal(1,error,"more than one init section");
+    env->etf->initial_state=(int*)RTmalloc(N*sizeof(int));
+    etf_list_t list=L;
+    for(int i=N-1;i>=0;i--){
+        switch(list->fst){
+            case REFERENCE_VALUE:
+                env->etf->initial_state[i]=list->snd;
+                break;
+            case INLINE_VALUE: {
+                char *val=SIget(env->idents,list->snd);
+                int typeno=lts_type_get_state_typeno(env->etf->ltstype,i);
+                env->etf->initial_state[i]=SIput(env->etf->type_values[typeno],val);
+                break;
+            }
+            default:
+                Fatal(1,error,"unknown discriminator %d",list->fst);
+        }
+	list=list->prev;
+    }
+    ETFlistFree(L);
+    Warning(info,"initial state found");
+}
+
+%type valref_list { etf_list_t }
+%destructor valref_list { ETFlistFree($$); }
+
+valref_list(L) ::= . {L=NULL;}
+valref_list(L) ::= valref_list(P) NUMBER(N) . { L=ETFlistAppend(P,REFERENCE_VALUE,N); }
+valref_list(L) ::= valref_list(P) STRING(S) . { L=ETFlistAppend(P,INLINE_VALUE,S); }
+
+
+%type decl_list { etf_list_t }
+%destructor decl_list { ETFlistFree($$); }
+decl_list(L) ::= . { L=NULL; }
+decl_list(L) ::= decl_list(P) id_opt(N) COLON id_opt(T) . { L=ETFlistAppend(P,N,T); }
+
+%type id_opt { int }
+id_opt(A) ::= IDENT(B). {A=B;}
+id_opt(A) ::= DONTCARE. {A=SI_INDEX_FAILED;}
+
+%type sort_list { string_index_t }
+
+sort_section ::= BEGIN SORT sort_list(IDX) END SORT. {
+    Warning(info,"read %d values",SIgetCount(IDX));
+}
+
+sort_list(IDX) ::= IDENT(ID) . {
+    char *name=SIget(env->idents,ID);
+    Warning(info,"reading values for sort %s",name);
+    int typeno=ETFgetType(env->etf,name);
+    IDX=env->etf->type_values[typeno];
+    if (SIgetCount(IDX)!=0) {
+        Fatal(1,error,"sort %s not empty",name);
+    }
+}
+sort_list(IDX) ::= sort_list(IDX1) VALUE(S) . {
+    IDX=IDX1;
+    chunk c;
+    c.data=SIgetC(env->values,S,(int*)&c.len);
+    int idx=SIgetCount(IDX);
+    if (idx!=SIputC(IDX,c.data,c.len)) {
+	Fatal(1,error,"non-sequential index");
+    }
+}
+
+%type trans_list { etf_rel_t }
+
+trans_section ::= BEGIN TRANS trans_list(R) end TRANS. {
+    if (ETFrelCount(R)){
+        ensure_access(env->etf->trans_manager,env->etf->trans_count);
+        env->etf->trans[env->etf->trans_count]=R;
+        env->etf->trans_count++;
+    } else {
+        Warning(info,"skipping empty trans section");
+    }
+}
+
+end ::= END . { env->linebased=0; }
+
+%type map_list { etf_map_t }
+
+map_section ::= BEGIN MAP map_list(M) end MAP. {
+    env->etf->map[env->etf->map_count]=M;
+    char*name=env->etf->map_names[env->etf->map_count];
+    char*sort=env->etf->map_types[env->etf->map_count];
+    //int typeno=ETFgetType(env->etf,sort);
+    Warning(info,"added map %d (%s:%s) with %d entries",
+            env->etf->map_count,name,sort,ETFmapCount(M));
+    env->etf->map_count++;
+    env->etf_current_idx=NULL;
+    env->linebased=0;
+}
+
+map_list(M) ::= IDENT(N) COLON IDENT(S) . {
+    char *name=SIget(env->idents,N);
+    char *sort=SIget(env->idents,S);
+    int typeno=ETFgetType(env->etf,sort);
+    ensure_access(env->etf->map_manager,env->etf->map_count);
+    env->etf->map_names[env->etf->map_count]=strdup(name);
+    env->etf->map_types[env->etf->map_count]=strdup(sort);
+    M=ETFmapCreate(lts_type_get_state_length(env->etf->ltstype));
+    env->etf_current_idx=env->etf->type_values[typeno];
+    env->linebased=1;
+}
+
+map_list(M) ::= map_list(M1) END_OF_LINE . { M=M1; } // skip empty lines.
+
+map_list(M) ::= map_list(M1) map_entry(L) value(V) END_OF_LINE . {
+    int N=ETFlistLength(L);
+    if(N!=lts_type_get_state_length(env->etf->ltstype)) {
+        Fatal(1,error,"bad state length in map entry");
+    }
+    int state[N];
+    etf_list_t list=L;
+    for(int i=N-1;i>=0;i--){
+        state[i]=list->fst;
+        list=list->prev;
+    }
+    ETFlistFree(L);
+    ETFmapAdd(M1,state,V);
+    M=M1;
+}
+
+%type map_entry { etf_list_t }
+%destructor map_entry { ETFlistFree($$); }
+
+map_entry(L) ::= . { L=NULL; }
+map_entry(L) ::= map_entry(P) NUMBER(N). {L=ETFlistAppend(P,N+1,0); }
+map_entry(L) ::= map_entry(P) STAR. {L=ETFlistAppend(P,0,0);}
+
+%type value { int }
+
+value(V) ::= NUMBER(N) . { V=N; }
+value(V) ::= VALUE(S) . {
+    chunk c;
+    c.data=SIgetC(env->values,S,(int*)&c.len);
+    V=SIputC(env->etf_current_idx,c.data,c.len);
+}
+trans_list(R) ::= . {
+    R=ETFrelCreate(lts_type_get_state_length(env->etf->ltstype),
+                   lts_type_get_edge_label_count(env->etf->ltstype));
+    env->linebased=1;
+}
+trans_list(R) ::= trans_list(R1) step_list(L)  END_OF_LINE  . {
+    R=R1;
+    int len=ETFlistLength(L);
+    if(len){
+        int N=lts_type_get_state_length(env->etf->ltstype);
+        int K=lts_type_get_edge_label_count(env->etf->ltstype);
+        if(len!=N+K){
+            Fatal(1,error,"bad length in trans entry: %d",len);
+        }
+        int src[N];
+        int dst[N];
+        int lbl[K];
+        etf_list_t list=L;
+        for(int i=K-1;i>=0;i--){
+            switch(list->fst){
+                case REFERENCE_VALUE:
+                    lbl[i]=list->snd;
+                    break;
+                case INLINE_VALUE: {
+                    chunk c;
+                    c.data=SIgetC(env->values,list->snd,(int*)&c.len);
+                    int typeno=lts_type_get_edge_label_typeno(env->etf->ltstype,i);
+                    lbl[i]=SIputC(env->etf->type_values[typeno],c.data ,c.len);
+                    break;
+                }
+                default:
+                    Fatal(1,error,"unknown discriminator %d",list->fst);
+            }
+            list=list->prev;
+        }
+        for(int i=N-1;i>=0;i--){
+            src[i]=list->fst;
+            dst[i]=list->snd;
+            list=list->prev;
+        }
+        ETFlistFree(L);
+        ETFrelAdd(R,src,dst,lbl);
+    }
+}
+
+%type step_list { etf_list_t }
+%destructor step_list { ETFlistFree($$); }
+
+step_list(L) ::= . {L=NULL;}
+step_list(L) ::= step_list(P) STAR . { L=ETFlistAppend(P,0,0); }
+step_list(L) ::= step_list(P) NUMBER(S) SLASH NUMBER(D) . {L=ETFlistAppend(P,S+1,D+1);}
+step_list(L) ::= step_list(P) NUMBER(N) . { L=ETFlistAppend(P,REFERENCE_VALUE,N); }
+step_list(L) ::= step_list(P) VALUE(S) . { L=ETFlistAppend(P,INLINE_VALUE,S); }
+
+/* Section Expressions
+
+This section contains the grammar for mu-calculus expressions.
+It should be split into a section for mu-calculus and a library
+of state expressions, edge expression, data expressions, etc.
+that can be reused for other languages (e.g. CTL, LTL)
+*/
+
+%type expr { ltsmin_expr_t }
+%destructor expr {
+    (void)env;(void)$$;
+    Fatal(1,error,"Expressions are not supposed to be destroyed.");
+}
+
+input ::= EXPR expr(E) . {
+    (void)E;
+    log_printf(info,"Expression is: ");
+    LTSminPrintExpr(info,env,E);
+    log_printf(info,"\n");
+    env->expr=E;
+}
+
+%right QUANTIFIER .
+%left BIN3 .
+%left BIN2 .
+%left BIN1 .
+
+expr(E) ::= LPAR expr(EE) RPAR . { E=EE; }
+expr(E) ::= STATE_VAR(ID) . {
+    E=RT_NEW(struct ltsmin_expr_s );
+    E->node_type=SVAR;
+    E->idx=ID;
+}
+expr(E) ::= IDENT(ID) . {
+    E=RT_NEW(struct ltsmin_expr_s );
+    E->node_type=VAR;
+    E->idx=ID;
+}
+expr(E) ::= EDGE_VAR(ID) . {
+    E=RT_NEW(struct ltsmin_expr_s );
+    E->node_type=EVAR;
+    E->idx=ID;
+}
+expr(E) ::= VALUE(ID) . {
+    E=RT_NEW(struct ltsmin_expr_s );
+    E->node_type=CHUNK;
+    E->idx=ID;
+}
+expr(E) ::= NUMBER(N) . {
+    E=RT_NEW(struct ltsmin_expr_s );
+    E->node_type=INT;
+    E->idx=N;
+}
+
+expr(E) ::= expr(E1) BIN1(OP) expr(E2) . {
+    E=RT_NEW(struct ltsmin_expr_s );
+    E->node_type=BINARY_OP;
+    E->idx=OP;
+    E->arg1=E1;
+    E->arg2=E2;
+}
+expr(E) ::= expr(E1) BIN2(OP) expr(E2) . {
+    E=RT_NEW(struct ltsmin_expr_s );
+    E->node_type=BINARY_OP;
+    E->idx=OP;
+    E->arg1=E1;
+    E->arg2=E2;
+}
+expr(E) ::= expr(E1) BIN3(OP) expr(E2) . {
+    E=RT_NEW(struct ltsmin_expr_s );
+    E->node_type=BINARY_OP;
+    E->idx=OP;
+    E->arg1=E1;
+    E->arg2=E2;
+}
+
+expr(E) ::= MU_SYM IDENT(ID) DOT expr(E1) . [QUANTIFIER] {
+    E=RT_NEW(struct ltsmin_expr_s );
+    E->node_type=MU_FIX;
+    E->idx=ID;
+    E->arg1=E1;
+}
+
+expr(E) ::= NU_SYM IDENT(ID) DOT expr(E1) . [QUANTIFIER] {
+    E=RT_NEW(struct ltsmin_expr_s );
+    E->node_type=NU_FIX;
+    E->idx=ID;
+    E->arg1=E1;
+}
+
+expr(E) ::= EXISTS_SYM expr(E1) DOT expr(E2) . [QUANTIFIER]  {
+    E=RT_NEW(struct ltsmin_expr_s );
+    E->node_type=EXISTS_STEP;
+    E->idx=0;
+    E->arg1=E1;
+    E->arg2=E2;  
+}
+
+expr(E) ::= ALL_SYM expr(E1) DOT expr(E2) . [QUANTIFIER] {
+    E=RT_NEW(struct ltsmin_expr_s );
+    E->node_type=FORALL_STEP;
+    E->idx=0;
+    E->arg1=E1;
+    E->arg2=E2;  
+}
+
+expr(E) ::= IF IDENT THEN expr(EE) . [QUANTIFIER] {
+    E = EE ;
+}

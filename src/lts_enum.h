@@ -12,6 +12,9 @@ from a specifcation are two examples of tasks that enumerate all states and tran
 This library provides a common interface for producers and consumers of labels transition systems.
 */
 
+#define LTS_ENUM_STATES 0x01
+#define LTS_ENUM_EDGES  0x02
+
 typedef void (*state_cb)(void* context,int seg,int* state,int* labels);
 
 typedef void (*state_vec_cb)(void* context,int* state,int* labels);
@@ -32,6 +35,32 @@ typedef void (*state_unfold_t)(void* context,int seg,int ofs,int* state);
 
 
 typedef struct lts_enum_struct *lts_enum_cb_t;
+
+/**
+\brief Create an abstract enumeration output object.
+*/
+extern lts_enum_cb_t lts_enum_create(const char*mode);
+
+/**
+\brief override the current state_cb method
+*/
+extern void lts_enum_set_state_cb(lts_enum_cb_t ecb,state_cb cb);
+
+/**
+\brief override the current edge_seg_seg_cb method
+*/
+extern void lts_enum_set_edge_seg_seg_cb(lts_enum_cb_t ecb,edge_seg_seg_cb cb);
+
+/**
+\brief
+ */
+extern void lts_enum_set_context(lts_enum_cb_t ecb,void*context);
+
+/**
+\brief Fix inconsistencies in the object.
+*/
+extern void lts_enum_fix(lts_enum_cb_t ecb);
+
 
 
 /**
@@ -57,11 +86,12 @@ meaning that every state has to be converted to a vector and (if necessary) back
  */
 extern lts_enum_cb_t lts_enum_convert(lts_enum_cb_t base,void*context,state_fold_t fold,state_unfold_t unfold,int idx_convert);
 
+extern char* enum_get_mode(lts_enum_cb_t e);
+extern void enum_set_mode(lts_enum_cb_t e,const char*mode);
 
 extern void* enum_get_context(lts_enum_cb_t e);
 
 extern void enum_state(lts_enum_cb_t sink,int seg,int* state,int* labels);
-extern void enum_vec(lts_enum_cb_t sink,int* state,int* labels);
 extern void enum_seg(lts_enum_cb_t sink,int seg,int ofs,int* labels);
 
 extern void enum_edge(lts_enum_cb_t sink,int src_seg,int* src,int dst_seg,int* dst,int*labels);

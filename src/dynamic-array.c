@@ -63,6 +63,7 @@ void add_array(array_manager_t man,void**ar,int e_size){
 
 void ensure_access(array_manager_t man,int index){
 	if (index < man->size) return;
+	if (index/man->block > 10) man->block=man->block*2;
 	int old=man->size;
 	man->size=((index+man->block)/man->block)*man->block;
 	DEBUG("resize from %d to %d",old,man->size);

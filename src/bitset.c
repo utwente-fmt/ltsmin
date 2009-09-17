@@ -109,13 +109,9 @@ static void free_set(bitset_t main,int depth,void *set){
 }
 
 void bitset_destroy(bitset_t set){
-    Debug(1,"freeing set");
     free_set(set,set->depth,set->set);
-    Debug(1,"deref node");
     BAderef(set->node_alloc);
-    Debug(1,"deref base");
     BAderef(set->base_alloc);
-    Debug(1,"done");
     free(set);
 }
 

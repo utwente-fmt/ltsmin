@@ -67,6 +67,7 @@ void chunk_decode_copy(chunk dst,chunk src,char esc){
 
 void chunk2string(chunk src,size_t dst_size,char*dst){
 	Warning(debug,"encoding chunk of length %d",src.len);
+/* verbatim disabled
 	int verbatim=src.len;
 	if (src.len==0 || (src.data[0]=='#' && src.data[src.len-1]=='#')) {
 		verbatim=0;
@@ -96,21 +97,28 @@ void chunk2string(chunk src,size_t dst_size,char*dst){
 		dst[src.len]=0;
 		return;
 	}
+*/
 	int quotable=1;
 	for(uint32_t i=0;i<src.len;i++){
-		if (!isprint(src.data[i]) || src.data[i]=='"' || src.data[i]=='\\') {
+		if (!isprint(src.data[i])) {
 			quotable=0;
 			break;
 		}
 	}
 	if (quotable){
-		if (dst_size < src.len+3) Fatal(1,error,"chunk overflow");
-		dst[0]='"';
+		unsigned int k=0;
+#define PUT_CHAR(c) { if ( dst_size <= k ) { Fatal(1,error,"chunk overflow"); } else { dst[k]=c; k++ ; } }
+		PUT_CHAR('"');
 		for(uint32_t i=0;i<src.len;i++){
-			dst[i+1]=src.data[i];
+			switch(src.data[i]){
+			case '"': PUT_CHAR('\\'); PUT_CHAR('"'); continue;
+			case '\\': PUT_CHAR('\\'); PUT_CHAR('\\'); continue;
+			default: PUT_CHAR(src.data[i]);
+			}
 		}
-		dst[src.len+1]='"';
-		dst[src.len+2]=0;
+		PUT_CHAR('"');
+		PUT_CHAR(0);
+#undef PUT_CHAR
 	} else {
 		if (dst_size < 2*src.len+3) Fatal(1,error,"chunk overflow");
 		dst[0]='#';
@@ -138,13 +146,22 @@ void string2chunk(char*src,chunk *dst){
 		Warning(debug,"quoted");
 		len=len-2;
 		if (dst->len<len) Fatal(1,error,"chunk overflow");
-		dst->len=len;
+		dst->len=0;
+#define PUT_CHAR(c) { dst->data[dst->len]=c; dst->len++ ; }
 		for(uint32_t i=0;i<len;i++) {
 			if (!isprint(src[i+1])) Fatal(1,error,"non-printable character in source");
 			if (src[i+1]=='"') Fatal(1,error,"unquoted \" in string");
-			if (src[i+1]=='\\') Fatal(1,error,"escapes are not implemented, sorry.");
-			dst->data[i]=src[i+1];
+			if (src[i+1]=='\\') {
+				if (i+1==len) Fatal(1,error,"bad escape sequence");
+				switch(src[i+2]){
+				case '\\': PUT_CHAR('\\'); i++; continue;
+				case '"': PUT_CHAR('"'); i++; continue;
+				default: Fatal(1,error,"unknown escape sequence");
+				}
+			}
+			PUT_CHAR(src[i+1]);
 		}
+#undef PUT_CHAR
 	} else {
 		Warning(debug,"verbatim");
 		if (dst->len<len) Fatal(1,error,"chunk overflow");

@@ -10,7 +10,6 @@
  */
 ///@{
 
-#include "config.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -19,6 +18,7 @@
 #include <errno.h>
 #include <stdint.h>
 #include <popt.h>
+#include <hre-main.h>
 
 typedef struct {
 	char* key;
@@ -93,47 +93,12 @@ to make changes to argv without copying again.
 */
 
 
-typedef struct runtime_log *log_t;
-
-extern log_t error;
-extern log_t info;
-extern log_t debug;
-
-#define LOG_IGNORE 0x00
-#define LOG_PRINT 0x01
-#define LOG_WHERE 0x02
-#define LOG_TAG 0x04
-
-extern log_t create_log(FILE* f,char*tag,int flags);
-
-extern void log_set_flags(log_t log,int flags);
-extern int log_get_flags(log_t log);
-
-/**
-\brief Get a stream that write to the given log.
-
-If the log is suppressed then this function will return NULL;
-*/
-extern FILE* log_get_stream(log_t log);
-
-
-extern void set_label(const char* fmt,...);
-extern char* get_label();
-
-extern void log_message(log_t log,const char*file,int line,int errnum,const char *fmt,...);
-extern void log_println(log_t log,const char *fmt,...);
-
-/**
-\brief Test if the given log is active.
- */
-extern int log_active(log_t log);
-
 extern void (*RThandleFatal)(const char*file,int line,int errnum,int code);
 
-#define Warning(log,...) if (log_active(log)) log_message(log,__FILE__,__LINE__,0,__VA_ARGS__)
-#define WarningCall(log,...) if (log_active(log)) log_message(log,__FILE__,__LINE__,errno,__VA_ARGS__)
-#define Log(log,...) if (log_active(log)) log_message(log,__FILE__,__LINE__,0,__VA_ARGS__)
-#define LogCall(log,...) if (log_active(log)) log_message(log,__FILE__,__LINE__,errno,__VA_ARGS__)
+#define Warning(log,...)  HREmessage(log,__VA_ARGS__)
+#define WarningCall(log,...) HREmessageCall(log,__VA_ARGS__)
+#define Log(log,...) HREmessage(log,__VA_ARGS__)
+#define LogCall(log,...) HREmessageCall(log,__VA_ARGS__)
 #define Fatal(code,log,...) {\
 	log_message(log,__FILE__,__LINE__,0,__VA_ARGS__);\
 	if (RThandleFatal) RThandleFatal(__FILE__,__LINE__,0,code);\
@@ -155,14 +120,14 @@ extern void (*RThandleFatal)(const char*file,int line,int errnum,int code);
 	}\
 }
 
-#define _DEBUG 0
-#if _DEBUG
-    #define Debug(...) log_message(debug,__FILE__,__LINE__,0,__VA_ARGS__)
-#else
-    #define Debug(...)
-#endif
+/**
+\brief Check if an integer is between a minimum and a maximum.
+*/
+#define RangeCheckInt(val,min,max) if ((val) < (min) || (val) > (max)) \
+    Fatal(1,error,"value %d is out of range [%d,%d]",val,min,max)
 
 ///@}
 
 
 #endif
+

@@ -3,7 +3,7 @@ AC_INIT([ltsmin],[1.3],[ltsmin-support@cs.utwente.nl])
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_AUX_DIR([autotools])
 AM_INIT_AUTOMAKE([foreign])
-AC_CONFIG_SRCDIR([src/ltsmin-mpi.c])
+AC_CONFIG_SRCDIR([src/spec-reach.c])
 AC_CONFIG_HEADERS([src/amconfig.h])
 
 AC_SUBST([pkglibdir], "\${libdir}/${PACKAGE_NAME}-${PACKAGE_VERSION}")
@@ -16,7 +16,6 @@ AM_CXXFLAGS="-g -Wno-inline -ftemplate-depth-128 -finline-functions"
 
 AM_PROG_CC_C_O
 AC_SUBST([CC_FOR_BUILD], [${CC_FOR_BUILD-$CC}])
-AM_PROG_LEX
 AC_PROG_CXX
 ACX_FINK
 ACX_MACPORTS
@@ -26,6 +25,17 @@ ACX_PTHREAD(
    CXXFLAGS="$CXXFLAGS $PTHREAD_CFLAGS"
    CC="$PTHREAD_CC"],
   [AC_MSG_FAILURE([no pthread support found.])])
+
+AX_CHECK_FLEX([
+%option prefix="ltsmin_"
+%option header-file="conftest.h"
+%option outfile="conftest.c"
+%option nodefault noyywrap reentrant noyyalloc noyyrealloc noyyfree batch noinput
+%option extra-type="ltsmin_parse_env_t"
+%%
+],,
+[AC_MSG_FAILURE([no compatible lexer generator found.])])
+
 AC_PROG_MAKE_SET
 AC_PROG_INSTALL
 
@@ -124,6 +134,7 @@ ACX_CADP_BCG_WRITE([have_bcg=yes],
 AC_HEADER_DIRENT
 AC_HEADER_STDC
 AC_CHECK_HEADERS([fcntl.h limits.h stdint.h stdlib.h string.h strings.h unistd.h])
+AC_CHECK_HEADERS([execinfo.h])
 AC_CHECK_HEADER([popt.h],[], [AC_MSG_FAILURE([popt.h not found.])])
 AC_CACHE_SAVE
 
@@ -149,6 +160,7 @@ AC_FUNC_REALLOC
 AC_FUNC_STRERROR_R
 AC_FUNC_VPRINTF
 AC_CHECK_FUNCS([atexit bzero ftruncate strdup strndup strchr strstr strtol])
+AC_CHECK_FUNCS([backtrace backtrace_symbols])
 AC_CHECK_DECLS([strdup, strndup, strchr, strstr],,,[
 #include "${srcdir}/src/config.h"
 AC_INCLUDES_DEFAULT])
