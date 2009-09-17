@@ -41,3 +41,4 @@ test-is-balloc
 test-dfs-stack
 test-hre
 test-hre-mpi
+ltsmin-tracepp

@@ -33,6 +33,9 @@ extern struct_stream_t arch_read_vec_U32_named(archive_t archive,char*fmt,int le
 /// Create a stream that can write vectors of U32's.
 extern struct_stream_t arch_write_vec_U32_named(archive_t archive,char*fmt,int len,char **name,char*code,int hdr);
 
+/// Test if the stream is empty.
+extern int DSstructEmpty(struct_stream_t stream);
+
 #endif
 
 
