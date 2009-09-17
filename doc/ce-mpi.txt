@@ -17,7 +17,7 @@ This tool removes tau cycles (strongly connected components) from a
 labeled transition system.  The default reduction algorithm is
 coloring.
 
-For both, input and output only a (old-style) DIR archives are
+For both, input and output only (old-style) DIR archives are
 supported; see also linkman:ltsmin-convert[1].
 
 include::inc/mpi-blurb.txt[]
@@ -34,11 +34,14 @@ include::inc/mpi-blurb.txt[]
 
 include::inc/general-options.txt[]
 
+
 == EXIT STATUS
 0::
         Successful termination.
 1::
         Some error occurred.
+
+include::inc/support.txt[]
 
 == SEE ALSO
 http://www.win.tue.nl/~sorzan/teza.pdf.gz[On Distributed Verification
