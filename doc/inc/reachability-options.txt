@@ -4,4 +4,5 @@
 
 *--trace*='FILE'_.gcf_::
       When finding a deadlock state, write a trace to 'FILE'_.gcf_,
-      beginning at the initial state.
+      beginning at the initial state.   Traces can be pretty-printed
+      with linkman:ltsmin-tracepp[1].

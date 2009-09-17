@@ -1,4 +1,4 @@
-bin_PROGRAMS = ltsmin-convert gcf etf-convert
+bin_PROGRAMS = ltsmin-convert gcf etf-convert ltsmin-tracepp
 noinst_PROGRAMS = test-bitset test-is-balloc test-dfs-stack test-hre ltsmin-parse
 noinst_LTLIBRARIES = libutil.la libltsmin.la
 pkglib_LTLIBRARIES =
@@ -55,6 +55,11 @@ endif
 # etf-convert
 etf_convert_SOURCES = etf-convert.c
 etf_convert_LDADD = libltsmin.la
+
+# ltsmin-tracepp
+ltsmin_tracepp_SOURCES = ltsmin-tracepp.c trace.h
+ltsmin_tracepp_LDADD = libltsmin.la $(CADP_LIBS)
+ltsmin_tracepp_LDFLAGS = $(AM_LDFLAGS) $(CADP_LDFLAGS)
 
 # gcf
 gcf_SOURCES = gcf-rw.c

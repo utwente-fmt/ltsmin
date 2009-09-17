@@ -24,6 +24,10 @@ int DSreadStruct(struct_stream_t stream,void *data){
 	return 1;
 }
 
+int DSstructEmpty(struct_stream_t stream){
+    return DSempty(stream->ds[0]);
+}
+
 void DSstructClose(struct_stream_t *stream){
 	for(int i=0;i<(*stream)->len;i++){
 		DSclose(((*stream)->ds)+i);

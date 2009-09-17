@@ -1,0 +1,24 @@
+=== Tracepp Options
+
+*-s*, *--csv-separator*::
+        Define a custom the separator used in csv output
+
+*--values*='TYPE'::
+        Select the output type: 'idx' or 'name'. With 'idx' the state vector,
+        edge- and state labels will be displayed as number, with 'name' these
+        numbers will be translated (if possible) to their text representation.
+
+*-a*, *--all*::
+        Output all the values in state/state labels/edge labels instead of
+        differences. This option works for txt output.
+
+*-d*, *--diff*::
+        Output differences between state/state labels/edge labels instead of
+        just all values. This option works for txt output.
+
+*-t*, *--table*::
+        Output the trace in tabular form.  This option works for txt output.
+
+*-l*, *--list*::
+        Output the trace in list form.  This option works for txt output.
+
