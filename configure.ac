@@ -28,8 +28,8 @@ ACX_PTHREAD(
 
 AX_CHECK_FLEX([
 %option prefix="ltsmin_"
-%option header-file="ltsmin-lexer.h"
-%option outfile="ltsmin-lexer.c"
+%option header-file="conftest.h"
+%option outfile="conftest.c"
 %option nodefault noyywrap reentrant noyyalloc noyyrealloc noyyfree batch noinput
 %option extra-type="ltsmin_parse_env_t"
 %%
