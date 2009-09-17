@@ -249,6 +249,33 @@ static void write_trace_step(model_t model, int src_no,int*src,int dst_no,int*ds
     if (ctx.found==0) Fatal(1,error,"no matching transition found");
 }
 
+static void write_trace(model_t model, size_t trace_size, uint32_t *trace)
+{
+    // write initial state
+    size_t i = 0;
+    int step = 0;
+    int src[N];
+    int dst[N];
+    get_state(0, dst);
+    write_trace_state(model, 0, dst);
+
+    i++;
+    while(i < trace_size)
+    {
+        for(int j=0; j < N; ++j)
+            src[j] = dst[j];
+        get_state(trace[i], dst);
+
+        // write step
+        write_trace_step(model, step, src, step + 1, dst);
+        // write dst_idx
+        write_trace_state(model, trace[i], dst);
+
+        i++;
+        step++;
+    }
+}
+
 static void find_trace_to(model_t model, int dst_idx, int level)
 {
     uint32_t *trace = (uint32_t*)RTmalloc(sizeof(uint32_t) * level);
@@ -267,29 +294,7 @@ static void find_trace_to(model_t model, int dst_idx, int level)
     }
 
     // write trace
-
-    // write initial state
-    int step = 0;
-    int src[N];
-    int dst[N];
-    get_state(0, dst);
-    write_trace_state(model, 0, dst);
-
-    i++;
-    while(i < level)
-    {
-        for(int j=0; j < N; ++j)
-            src[j] = dst[j];
-        get_state(trace[i], dst);
-
-        // write step
-        write_trace_step(model, step, src, step + 1, dst);
-        // write dst_idx
-        write_trace_state(model, trace[i], dst);
-
-        i++;
-        step++;
-    }
+    write_trace(model, level - i, &trace[i]);
 
     RTfree(trace);
 
@@ -303,6 +308,64 @@ static void find_trace(model_t model, int dst_idx, int level) {
     SCCstopTimer(timer);
     SCCreportTimer(timer,"constructing the trace took");
 }
+
+static void
+find_dfs_stack_trace_tree(model_t model, dfs_stack_t stack)
+{
+    size_t              trace_len = dfs_stack_nframes(stack);
+    size_t              i = trace_len - 1;
+    uint32_t           *trace = (uint32_t*)RTmalloc(sizeof(uint32_t) * trace_len);
+
+    // gather trace
+    while(dfs_stack_nframes(stack))
+    {
+        dfs_stack_leave(stack);
+        int* idx = dfs_stack_pop(stack);
+        trace[i] = *idx;
+        i--;
+    }
+
+    // write it
+    write_trace(model, trace_len, trace);
+
+    RTfree(trace);
+}
+
+static void
+find_dfs_stack_trace_vset(model_t model, dfs_stack_t stack)
+{
+    size_t              trace_len = dfs_stack_nframes(stack);
+    size_t              i = trace_len - 1;
+    uint32_t           *trace = (uint32_t*)RTmalloc(sizeof(uint32_t) * trace_len);
+    int                 init_state[N];
+
+    // create treedbs
+    dbs = TreeDBScreate(N);
+
+    // load initial state
+    GBgetInitialState(model,init_state);
+
+    // initial state should be idx 0
+    dbs=TreeDBScreate(N);
+    if(TreeFold(dbs,init_state)!=0){
+        Fatal(1,error,"expected 0");
+    }
+
+    // gather trace
+    while(dfs_stack_nframes(stack))
+    {
+        dfs_stack_leave(stack);
+        int* state = dfs_stack_pop(stack);
+        trace[i] = TreeFold(dbs, state);
+        i--;
+    }
+
+    // write it
+    write_trace(model, trace_len, trace);
+
+    RTfree(trace);
+}
+
 
 static void
 vector_next_dfs (void *arg, int *lbl, int *dst)
@@ -376,7 +439,7 @@ bfs_explore_state_vector (void *context, int *src)
 {
     model_t             model = (model_t)context;
     maybe_write_state (model, NULL, src);
-	int count = 0;
+	int                 count = 0;
     switch (call_mode) {
     case UseBlackBox:
         count = GBgetTransitionsAll (model, src, vector_next, &explored);
@@ -400,20 +463,38 @@ static void
 dfs_explore_state_vector (model_t model, int src_idx, const int *src,
                           int *o_next_group)
 {
+	int                 count = 0;
     if (*o_next_group == 0)
         maybe_write_state (model, NULL, src);
     int                 i = *o_next_group;
     switch (call_mode) {
     case UseBlackBox:
-        GBgetTransitionsAll (model, (int *)src, vector_next_dfs, &src_idx);
+        count = GBgetTransitionsAll (model, (int *)src, vector_next_dfs, &src_idx);
         i = K;
         break;
     case UseGreyBox:
         /* try to find at least one transition */
         for (; i < K && !dfs_stack_frame_size(stack); ++i) {
-            GBgetTransitionsLong (model, i, (int *)src, vector_next_dfs, &src_idx);
+            count += GBgetTransitionsLong (model, i, (int *)src, vector_next_dfs, &src_idx);
         }
         break;
+    }
+    if (count == 0 && *o_next_group == 0 && dlk_detect) {
+        Warning(info,"deadlock found!");
+        if (trc_output) {
+            trace_output=lts_output_open(trc_output,model,1,0,1,"vsi",NULL);
+            {
+                int init_state[N];
+                GBgetInitialState(model, init_state);
+                lts_output_set_root_vec(trace_output,(uint32_t*)init_state);
+                lts_output_set_root_idx(trace_output,0,0);
+            }
+            trace_handle=lts_output_begin(trace_output,0,0,0);
+            find_dfs_stack_trace_vset(model, stack);
+            lts_output_end(trace_output,trace_handle);
+            lts_output_close(&trace_output);
+        }
+        Fatal(1,info, "exiting now");
     }
     if (i == K) {
         ++explored;
@@ -427,27 +508,45 @@ static void
 dfs_explore_state_index (model_t model, int idx, int *o_next_group)
 {
     int                 state[N];
+	int                 count = 0;
     TreeUnfold (dbs, idx, state);
     if (*o_next_group == 0)
         maybe_write_state (model, &idx, state);
     int                 i = *o_next_group;
     switch (call_mode) {
     case UseBlackBox:
-        GBgetTransitionsAll (model, state, index_next_dfs, &idx);
+        count = GBgetTransitionsAll (model, state, index_next_dfs, &idx);
         i = K;
         break;
     case UseGreyBox:
         /* try to find at least one transition */
         for (; i < K && dfs_stack_frame_size (stack) == 0; ++i) {
-            GBgetTransitionsLong (model, i, state, index_next_dfs, &idx);
+            count += GBgetTransitionsLong (model, i, state, index_next_dfs, &idx);
         }
         break;
+    }
+    if (count == 0 && *o_next_group == 0 && dlk_detect) {
+        Warning(info,"deadlock found!");
+        if (trc_output) {
+            trace_output=lts_output_open(trc_output,model,1,0,1,"vsi",NULL);
+            {
+                int init_state[N];
+                get_state(0, init_state);
+                lts_output_set_root_vec(trace_output,(uint32_t*)init_state);
+                lts_output_set_root_idx(trace_output,0,0);
+            }
+            trace_handle=lts_output_begin(trace_output,0,0,0);
+            find_dfs_stack_trace_tree(model, stack);
+            lts_output_end(trace_output,trace_handle);
+            lts_output_close(&trace_output);
+        }
+        Fatal(1,info, "exiting now");
     }
     if (i == K) {
         ++explored;
         if (explored % 1000 == 0 && RTverbosity >= 2)
             Warning (info, "explored %d visited %d trans %d", explored, visited, trans);
-    }    
+    }
     *o_next_group = i;
 }
 
@@ -495,8 +594,9 @@ dfs_explore (model_t model, int *src, size_t *o_depth)
                         Warning (info, "new depth reached %d. Visited %d states and %d trans",
                                  depth, visited, trans);
                 }
-            } else
+            } else {
                 dfs_stack_pop (stack);
+            }
             next_group = 0;
         }
         break;
@@ -525,7 +625,7 @@ dfs_explore (model_t model, int *src, size_t *o_depth)
                 else
                     bitset_clear (dfs_open_set, *fvec);
             }
-            
+
             if (next_group < K) {
                 dfs_stack_enter (stack);
                 dfs_explore_state_index (model, *fvec, &next_group);
@@ -536,8 +636,9 @@ dfs_explore (model_t model, int *src, size_t *o_depth)
                         Warning (info, "new depth reached %d. Visited %d states and %d trans",
                                  depth, visited, trans);
                 }
-            } else
+            } else {
                 dfs_stack_pop (stack);
+            }
             next_group = 0;
         }
         break;
@@ -602,7 +703,7 @@ int main(int argc, char *argv[]){
 	  fprintf(stderr,"Dependency Matrix:\n");
 	  GBprintDependencyMatrix(stderr,model);
 	}
-    if (trc_output)
+    if (trc_output && strategy == Strat_BFS)
     {
         state_man=create_manager(65536);
         ADD_ARRAY(state_man, parent_ofs, uint32_t);
@@ -629,47 +730,47 @@ int main(int argc, char *argv[]){
         case Strat_BFS:
             switch (state_db) {
             case DB_Vset:
-		if (trc_output) Fatal(1, error, "--trace not supported for vset, use tree");
-		domain=vdom_create_default(N);
-		visited_set=vset_create(domain,0,NULL);
-		next_set=vset_create(domain,0,NULL);
-		vset_add(visited_set,src);
-		vset_add(next_set,src);
-		vset_t current_set=vset_create(domain,0,NULL);
-		while (!vset_is_empty(next_set)){
-		  if (RTverbosity >= 1)
-		    Warning(info,"level %d has %d states, explored %d states %d trans",
-			    level,(visited-explored),explored,trans);
-		  if (level == max) break;
-		  level++;
-		  vset_copy(current_set,next_set);
-		  vset_clear(next_set);
-		  vset_enum(current_set,bfs_explore_state_vector,model);
-		}
-		long long size;
-		long nodes;
-		vset_count(visited_set,&nodes,&size);
-	    	Warning(info,"%lld reachable states represented symbolically with %ld nodes",size,nodes);
-		break;
+                if (trc_output) Fatal(1, error, "--trace not supported for vset, use tree");
+                domain=vdom_create_default(N);
+                visited_set=vset_create(domain,0,NULL);
+                next_set=vset_create(domain,0,NULL);
+                vset_add(visited_set,src);
+                vset_add(next_set,src);
+                vset_t current_set=vset_create(domain,0,NULL);
+                while (!vset_is_empty(next_set)){
+                  if (RTverbosity >= 1)
+                    Warning(info,"level %d has %d states, explored %d states %d trans",
+                        level,(visited-explored),explored,trans);
+                  if (level == max) break;
+                  level++;
+                  vset_copy(current_set,next_set);
+                  vset_clear(next_set);
+                  vset_enum(current_set,bfs_explore_state_vector,model);
+                }
+                long long size;
+                long nodes;
+                vset_count(visited_set,&nodes,&size);
+                Warning(info,"%lld reachable states represented symbolically with %ld nodes",size,nodes);
+                break;
             case DB_TreeDBS:
-		dbs=TreeDBScreate(N);
-		if(TreeFold(dbs,src)!=0){
-			Fatal(1,error,"expected 0");
-		}
-		int limit=explored;
-		while(explored<visited){
-		  if (limit==explored){
-		    if (RTverbosity >= 1)
-		      Warning(info,"level %d has %d states, explored %d states %d trans",
-			      level,(visited-explored),explored,trans);
-		    limit=visited;
-		    level++;
-			if (level == max) break;
-		  }
-		  TreeUnfold(dbs,explored,src);
-		  bfs_explore_state_index(model,explored,src,level);
-		}
-		break;
+                dbs=TreeDBScreate(N);
+                if(TreeFold(dbs,src)!=0){
+                    Fatal(1,error,"expected 0");
+                }
+                int limit=explored;
+                while(explored<visited){
+                  if (limit==explored){
+                    if (RTverbosity >= 1)
+                      Warning(info,"level %d has %d states, explored %d states %d trans",
+                          level,(visited-explored),explored,trans);
+                    limit=visited;
+                    level++;
+                    if (level == max) break;
+                  }
+                  TreeUnfold(dbs,explored,src);
+                  bfs_explore_state_index(model,explored,src,level);
+                }
+                break;
             default:
                 Fatal (1, error, "Unsupported combination: strategy=%s, state=%s",
                        strategies[strategy].key, db_types[state_db].key);
