@@ -478,28 +478,31 @@ main(int argc,char*argv[]){
                 "  aut: Aldebaran file format\n"
                 "  csv: Comma separated values\n\n"
                 "Options");
-    trace_t trace=read_trace(files[0]);
-    Warning(info,"length of trace is %d",trace->len);
-
     // open file (--file argument or stdout in case of NULL)
     FILE* output_file = stdout;
     if (files[1]) {
         // determine extension
         char *extension = strrchr (files[1], '.');
+        if (extension == NULL) {
+            Fatal(1,error,"unknown file format extension for file '%s'", files[1]);
+        }
         extension++;
         int ff = linear_search (file_formats, extension);
         if (ff < 0) {
-            Fatal(1,error,"unknown file format %s", extension);
+            Fatal(1,error,"unknown file format '%s'", extension);
         }
         file_format = ff;
 
         // open file
-		Warning(info,"Writing output to %s",files[1]);
+        Warning(info,"Writing output to '%s'",files[1]);
         output_file = fopen(files[1],"w");
         if (output_file == NULL) {
-            Fatal(1,error,"Could not open file %s\n", files[1]);
+            Fatal(1,error,"Could not open file '%s'\n", files[1]);
         }
     }
+
+    trace_t trace=read_trace(files[0]);
+    Warning(info,"length of trace is %d",trace->len);
 
     switch (file_format) {
         case FF_TXT:
