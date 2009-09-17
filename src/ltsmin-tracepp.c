@@ -101,7 +101,6 @@ output_text(trace_t trace, FILE* output_file) {
     uint32_t align = 0;  // maximal width of state header/state label header
     char tmp[BUFLEN];
     char tmp2[BUFLEN];
-    char fmt[BUFLEN]; // a bit too long
 
     // calculate width
     for(int j=0; j<N; ++j) {
@@ -150,8 +149,7 @@ output_text(trace_t trace, FILE* output_file) {
                 int typeno = lts_type_get_state_typeno(trace->ltstype, j);
                 trace_get_type_str(trace, typeno, state[j], BUFLEN, tmp2);
 
-                snprintf(fmt, BUFLEN, "\t%%%ds = %%s\n", align);
-                fprintf(output_file, fmt, tmp, tmp2);
+                fprintf(output_file, "\t%*s = %s", align, tmp, tmp2);
             }
         }
 
@@ -167,8 +165,7 @@ output_text(trace_t trace, FILE* output_file) {
                     int typeno = lts_type_get_state_label_typeno(trace->ltstype, j);
                     trace_get_type_str(trace, typeno, state_lbls[j], BUFLEN, tmp2);
 
-                    snprintf(fmt, BUFLEN, "\t%%%ds = %%s\n", align);
-                    fprintf(output_file, fmt, tmp, tmp2);
+                    fprintf(output_file, "\t%*s = %s", align, tmp, tmp2);
                 }
             }
         }
@@ -207,7 +204,6 @@ output_text_table(trace_t trace, FILE* output_file) {
     int width_el[eLbls]; // width of edge label column
     int width_sl[sLbls]; // width of state label column
     char tmp[BUFLEN];
-    char fmt[BUFLEN]; // a bit too long
 
     // calculate width
     for(int j=0; j<N; ++j) {
@@ -269,8 +265,7 @@ output_text_table(trace_t trace, FILE* output_file) {
         char *type = lts_type_get_state_type(trace->ltstype, j);
         snprintf(tmp, BUFLEN, "%s:%s", name == NULL ? "_" : name, type == NULL ? "_" : type);
 
-        snprintf(fmt, BUFLEN, "%%s%%-%ds", width_s[j]);
-        fprintf(output_file, fmt, j==0?"":" ", tmp);
+        fprintf(output_file, "%s%*s", j==0?"":" ", -width_s[j], tmp);
     }
     if (trace->state_lbl != NULL) {
         fprintf(output_file, "   ");
@@ -279,8 +274,7 @@ output_text_table(trace_t trace, FILE* output_file) {
             char *type = lts_type_get_state_label_type(trace->ltstype, j);
             snprintf(tmp, BUFLEN, "%s:%s", name == NULL ? "_" : name, type == NULL ? "_" : type);
 
-            snprintf(fmt, BUFLEN, "%%s%%-%ds", width_sl[j]);
-            fprintf(output_file, fmt, j==0?"":" ", tmp);
+            fprintf(output_file, "%s%*s", j==0?"":" ", -width_sl[j], tmp);
         }
     }
     if (trace->edge_lbl != NULL) {
@@ -290,8 +284,7 @@ output_text_table(trace_t trace, FILE* output_file) {
             char *type = lts_type_get_edge_label_type(trace->ltstype, j);
             snprintf(tmp, BUFLEN, "%s:%s", name == NULL ? "_" : name, type == NULL ? "_" : type);
 
-            snprintf(fmt, BUFLEN, "%%s%%-%ds", width_el[j]);
-            fprintf(output_file, fmt, j==0?"":" ", tmp);
+            fprintf(output_file, "%s%*s", j==0?"":" ", -width_el[j], tmp);
         }
     }
     fprintf(output_file, "\n");
@@ -316,8 +309,7 @@ output_text_table(trace_t trace, FILE* output_file) {
                 snprintf(tmp, BUFLEN, "...");
             }
 
-            snprintf(fmt, BUFLEN, "%%s%%%ds", width_s[j]);
-            fprintf(output_file, fmt, j==0?"":" ", tmp);
+            fprintf(output_file, "%s%*s", j==0?"":" ", width_s[j], tmp);
         }
         fprintf(output_file, "]");
 
@@ -334,8 +326,7 @@ output_text_table(trace_t trace, FILE* output_file) {
                     snprintf(tmp, BUFLEN, "...");
                 }
 
-                snprintf(fmt, BUFLEN, "%%s%%%ds", width_sl[j]);
-                fprintf(output_file, fmt, j==0?"":" ", tmp);
+                fprintf(output_file, "%s%*s", j==0?"":" ", width_sl[j], tmp);
             }
             fprintf(output_file, "]");
         }
@@ -354,8 +345,7 @@ output_text_table(trace_t trace, FILE* output_file) {
                         snprintf(tmp, BUFLEN, "...");
                     }
 
-                    snprintf(fmt, BUFLEN, "%%s%%%ds", width_el[j]);
-                    fprintf(output_file, fmt, j==0?"":" ", tmp);
+                    fprintf(output_file, "%s%*s", j==0?"":" ", width_el[j], tmp);
                 }
                 fprintf(output_file, "]");
             }
