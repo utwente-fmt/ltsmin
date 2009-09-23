@@ -86,7 +86,7 @@ static int HREcallPopt(int argc,char*argv[],struct poptOption optionsTable[],
         }
     }
     for(int i=0;i<min_args;i++){
-        args[i]=strdup(poptGetArg(optCon));
+        args[i] = RTstrdup (poptGetArg (optCon));
         if (!args[i]) {
             Warning(error,"not enough arguments");
             HREprintUsage();
@@ -96,7 +96,7 @@ static int HREcallPopt(int argc,char*argv[],struct poptOption optionsTable[],
     if (max_args >= min_args) {
         for(int i=min_args;i<max_args;i++){
             if (poptPeekArg(optCon)){
-                args[i]=strdup(poptGetArg(optCon));
+                args[i] = RTstrdup (poptGetArg (optCon));
             } else {
                 args[i]=NULL;
             }
