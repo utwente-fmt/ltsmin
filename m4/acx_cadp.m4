@@ -25,7 +25,8 @@ if test x"$CADP" != x && test -f "$CADP/com/arch"; then
         AC_MSG_CHECKING([for 32 bit CADP architecture string])
         AC_SUBST(CADP_ARCH, ["$(CADP_BITS=32 $CADP/com/arch)"])
     fi
-    if test x"$CADP_ARCH" != x; then
+    if test x"$CADP_ARCH" != x && \
+       test x"$CADP_ARCH" != x"UNKNOWN ARCHITECTURE"; then
         AC_MSG_RESULT([$CADP_ARCH])
         AC_SUBST(CADP_LDFLAGS,  ["-L$CADP/bin.$CADP_ARCH"])
         AC_SUBST(CADP_CPPFLAGS, ["-I$CADP/incl"])
