@@ -82,6 +82,14 @@ void* RTmallocZero(size_t size){
 	return p;
 }
 
+char* RTstrdup(const char *str){
+    if (str == NULL) return NULL;
+    char *tmp = strdup (str);
+    if (tmp == NULL) Fatal(0, error, "out of memory trying to get %d",
+                           strlen (str)+1);
+    return tmp;
+}
+
 void RTfree(void *rt_ptr){
 	if(rt_ptr != NULL)
             free (rt_ptr);
