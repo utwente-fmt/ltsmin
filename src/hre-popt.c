@@ -9,9 +9,11 @@
 #include "unix.h"
 #include <runtime.h>
 
-#define PRINT_VERSION 1
-#define PRINT_HELP 2
-#define PRINT_USAGE 3
+enum {
+    PRINT_VERSION = 1,
+    PRINT_HELP,
+    PRINT_USAGE,
+};
 
 static struct poptOption runtime_options[]={
     { "version" , 0 , POPT_ARG_NONE , NULL , PRINT_VERSION , "print the version of this tool",NULL},
@@ -35,7 +37,7 @@ void HREprintUsage(){
 void HREprintHelp(){
     char extra[1024];
     if (arg_help_global){
-        sprintf(extra,"[OPTIONS] %s",arg_help_global);
+        snprintf(extra, sizeof extra, "[OPTIONS] %s",arg_help_global);
         poptSetOtherOptionHelp(optCon, extra);
     }
     poptPrintHelp(optCon,stdout,0);
@@ -43,7 +45,7 @@ void HREprintHelp(){
 
 char* HREnextArg(){
     if (optCon) {
-        char* res=strdup(poptGetArg(optCon));
+        char* res=RTstrdup(poptGetArg(optCon));
         if (res) return res;
         poptFreeContext(optCon);
         optCon=NULL;    
