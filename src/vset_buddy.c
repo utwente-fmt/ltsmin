@@ -47,6 +47,7 @@ struct vector_domain {
 	BDD varset;
 	int *vars2;
 	bddPair *pairs;
+	bddPair *inv_pairs;
 	int *proj;
 };
 
@@ -76,6 +77,7 @@ struct vector_relation {
 	vdom_t dom;
 	BDD bdd;
 	BDD p_set; // variables in the projection.
+	BDD p_prime_set; // primed variables in the projection
 	int p_len;
 	int* proj;
 	BDD rel_set; // variables + primed variables in the projection.
@@ -132,7 +134,7 @@ static vrel_t rel_create_fdd(vdom_t dom,int k,int* proj){
 		}
 		rel->p_set=bdd_addref(fdd_makeset(vars,k));
                 rel->rel_set=bdd_addref(fdd_makeset(allvars,2*k));
-
+		rel->p_prime_set=bdd_addref(bdd_replace(rel->p_set, dom->inv_pairs));
 	} else {
 	  fprintf(stderr,"NEVER\n"); abort();
 		rel->p_len=dom->shared.size;
@@ -320,6 +322,15 @@ static void set_next_appex_fdd(vset_t dst,vset_t src,vrel_t rel){
   bdd_delref(tmp);
 }
 
+static void set_prev_appex_fdd(vset_t dst, vset_t src, vrel_t rel) {
+    BDD tmp1=bdd_addref(bdd_replace(src->bdd,rel->dom->inv_pairs));
+    BDD tmp2=bdd_addref(bdd_appex(tmp1,rel->bdd,bddop_and,rel->p_prime_set));
+    bdd_delref(dst->bdd);
+    dst->bdd=bdd_addref(bdd_replace(tmp2,rel->dom->pairs));
+    bdd_delref(tmp1);
+    bdd_delref(tmp2);
+}
+
 // JvdP: gaat dit goed met aliasing? (dst=src)
 static void set_project_fdd(vset_t dst,vset_t src){
 	bdd_delref(dst->bdd);
@@ -374,6 +385,12 @@ vdom_t vdom_create_fdd(int n){
 	if (res<0){
 		Fatal(1,error,"BuDDy error: %s",bdd_errstring(res));
 	}
+	// for prev function
+	dom->inv_pairs=bdd_newpair();
+	res=fdd_setpairs(dom->inv_pairs,dom->vars,dom->vars2,n);
+	if (res<0){
+		Fatal(1,error,"BuDDy error: %s",bdd_errstring(res));
+	}
 	dom->shared.set_create=set_create_fdd;
 	dom->shared.set_add=set_add_fdd;
 	dom->shared.set_member=set_member_fdd;
@@ -392,5 +409,6 @@ vdom_t vdom_create_fdd(int n){
 	dom->shared.rel_add=rel_add_fdd;
 	dom->shared.rel_count=rel_count_fdd;
 	dom->shared.set_next=set_next_appex_fdd;
+	dom->shared.set_prev=set_prev_appex_fdd;
 	return dom;
 }
