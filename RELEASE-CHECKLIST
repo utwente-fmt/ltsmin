@@ -1,7 +1,7 @@
 Release Checklist
 =================
 
-* Bump version in configure.ac
+* Bump version in configure.ac and commit to master
 
 * make distcheck (creates tarball and checks whether it builds)
   To test specific configurations:
@@ -14,15 +14,16 @@ Release Checklist
   area); Update link to tarball on website; Regenerate website (staging
   area)
 
-* merge 'next' branch into 'master'
-  git checkout master && git pull . next
-
 * Tag release
   git tag ltsmin-<version>
 
-* On 'next' branch, bump patch level (version) in configure.ac
+* merge 'master' branch into 'next'
+  git checkout next && git pull . master
 
-* Push 'master' and 'next' branches to public repository
+* merge 'master' branch into 'maint'
+  git checkout maint && git pull . master
+
+* Push 'master', 'maint' and 'next' branches to public repository
 
 * Upload website:
   cd staging-area &&
