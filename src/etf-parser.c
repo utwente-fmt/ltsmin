@@ -57,6 +57,7 @@ etf_list_t ETFlistAppend(etf_list_t prev,int fst,int snd){
 }
 
 void ETFlistFree(etf_list_t list){
+    if (list==NULL) return;
 	if (list->prev) ETFlistFree(list->prev);
 	RTfree(list);
 }
