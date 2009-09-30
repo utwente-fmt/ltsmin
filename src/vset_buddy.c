@@ -80,6 +80,7 @@ struct vector_relation {
 	int p_len;
 	int* proj;
 	BDD rel_set; // variables + primed variables in the projection.
+	bddPair *pairs;
 	bddPair *inv_pairs;
 };
 
@@ -134,9 +135,15 @@ static vrel_t rel_create_fdd(vdom_t dom,int k,int* proj){
             allvars[2*i]=vars[i];
             allvars[2*i+1]=vars2[i]; // hidden assumption on encoding
         }
+        // for next function
+        rel->pairs=bdd_newpair();
+        int res=fdd_setpairs(rel->inv_pairs,vars2,vars,k);
+        if (res<0){
+            Fatal(1,error,"BuDDy error: %s",bdd_errstring(res));
+        }
         // for prev function
         rel->inv_pairs=bdd_newpair();
-        int res=fdd_setpairs(rel->inv_pairs,vars,vars2,k);
+        res=fdd_setpairs(rel->inv_pairs,vars,vars2,k);
         if (res<0){
             Fatal(1,error,"BuDDy error: %s",bdd_errstring(res));
         }
@@ -327,7 +334,7 @@ static void set_next_fdd(vset_t dst,vset_t src,vrel_t rel){
 static void set_next_appex_fdd(vset_t dst,vset_t src,vrel_t rel){
   BDD tmp=bdd_addref(bdd_appex(src->bdd,rel->bdd,bddop_and,rel->p_set));
   bdd_delref(dst->bdd);
-  dst->bdd=bdd_addref(bdd_replace(tmp,rel->dom->pairs));
+  dst->bdd=bdd_addref(bdd_replace(tmp,rel->pairs));
   bdd_delref(tmp);
 }
 
