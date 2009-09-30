@@ -46,7 +46,6 @@ struct vector_domain {
 	int *vars;
 	BDD varset;
 	int *vars2;
-	bddPair *pairs;
 	int *proj;
 };
 
@@ -326,7 +325,7 @@ static void set_next_fdd(vset_t dst,vset_t src,vrel_t rel){
 	bdd_delref(dst->bdd);
 	BDD tmp2=bdd_addref(bdd_exist(tmp,rel->p_set));
 	bdd_delref(tmp);
-	dst->bdd=bdd_addref(bdd_replace(tmp2,rel->dom->pairs));
+	dst->bdd=bdd_addref(bdd_replace(tmp2,rel->pairs));
 	bdd_delref(tmp2);
 }
 */
@@ -393,11 +392,6 @@ vdom_t vdom_create_fdd(int n){
 	dom->varset=bdd_addref(fdd_makeset(dom->vars,n));
 	if (dom->varset==bddfalse) {
 		Fatal(1,error,"fdd_makeset failed");
-	}
-	dom->pairs=bdd_newpair();
-	res=fdd_setpairs(dom->pairs,dom->vars2,dom->vars,n);
-	if (res<0){
-		Fatal(1,error,"BuDDy error: %s",bdd_errstring(res));
 	}
 	dom->shared.set_create=set_create_fdd;
 	dom->shared.set_add=set_add_fdd;
