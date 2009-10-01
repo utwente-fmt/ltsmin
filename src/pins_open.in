@@ -92,16 +92,12 @@ case "$FILE" in
     LTSMIN_MOD_LDFLAGS="@MCRL2_LDFLAGS@ @CADP_LDFLAGS@ -llps-open @BUDDY_LIBS@ @MCRL2_LIBS@ @CADP_LIBS@"
     ;;
  *.b)
-    @HAVE_LIBMCRL_FALSE@ echo "cannot use NIPS without muCRL"
-    @HAVE_LIBMCRL_FALSE@ exit 1
     echo "input is NIPS byte-code"
-    LTSMIN_MOD_LDFLAGS="@NIPS_LDFLAGS@ @MCRL_LDFLAGS@ @CADP_LDFLAGS@ -lnips-open @BUDDY_LIBS@ @CADP_LIBS@"
+    LTSMIN_MOD_LDFLAGS="@NIPS_LDFLAGS@ @CADP_LDFLAGS@ -lnips-open @CADP_LIBS@"
     ;;
  *.etf)
-    @HAVE_LIBMCRL_FALSE@ echo "cannot use ETF without muCRL"
-    @HAVE_LIBMCRL_FALSE@ exit 1
     echo "input is ETF"
-    LTSMIN_MOD_LDFLAGS="@MCRL_LDFLAGS@ @CADP_LDFLAGS@ -letf-open @BUDDY_LIBS@ @CADP_LIBS@"
+    LTSMIN_MOD_LDFLAGS="@CADP_LDFLAGS@ -letf-open @CADP_LIBS@"
     ;;
  *)
     echo "Did not recognize type of $FILE"

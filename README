@@ -20,6 +20,7 @@ format from the CADP toolset.
 
 * Supported Systems
  - GNU/Linux (tested on Debian, Fedora, OpenSuSE 10.2)
+ - MacOS X, version 10.6 "Snow Leopard"
  - MacOS X, version 10.5 "Leopard"
  - MacOS X, version 10.4 "Tiger"
 
@@ -181,10 +182,12 @@ Download libtool (>= 1.5.26) from
 libtool-1.5.26.
 
 *** AsciiDoc
-See above.
+See above.  Note that AsciiDoc is a required dependency unless
+building from source tarballs.
 
 *** xmlto
-See above.
+See above.  Note that xmlto is a required dependency unless building
+from source tarballs.
 
 
 * Contact
