@@ -13,6 +13,7 @@ if HAVE_CADP
 CADPCC = $(CADP)/src/com/cadp_cc
 CADPINCLUDES = -I$(CADP)/incl
 bin_SCRIPTS = pins_open
+pkglib_LTLIBRARIES += libnips-open.la libetf-open.la
 endif
 
 if HAVE_MPI
@@ -46,9 +47,6 @@ endif
 if HAVE_LIBMCRL
 # if HAVE_LIBNIPS
 bin_PROGRAMS += nips2lts-grey nips-reach etf2lts-grey etf-reach
-if HAVE_CADP
-pkglib_LTLIBRARIES += libnips-open.la libetf-open.la
-endif
 # endif
 endif
 
@@ -180,15 +178,13 @@ liblps_open_la_CPPFLAGS = -DMCRL2 $(MCRL2_CPPFLAGS) $(AM_CPPFLAGS) $(CADP_CPPFLA
 liblps_open_la_LIBADD = libltsmin.la
 
 # libetf-open.la
-libetf_open_la_SOURCES = spec_open.c etf-greybox.c etf-greybox.h    \
-                         lts.c lts.h vset_atermdd.c
-libetf_open_la_CPPFLAGS = -DETF $(MCRL_CPPFLAGS) $(AM_CPPFLAGS) $(CADP_CPPFLAGS)
+libetf_open_la_SOURCES = spec_open.c etf-greybox.c etf-greybox.h lts.c lts.h
+libetf_open_la_CPPFLAGS = -DETF $(AM_CPPFLAGS) $(CADP_CPPFLAGS)
 libetf_open_la_LIBADD = libltsmin.la
 
 # libnips-open.la
-libnips_open_la_SOURCES = spec_open.c nips-greybox.c nips-greybox.h   \
-                           vset_atermdd.c
-libnips_open_la_CPPFLAGS = -DNIPS $(NIPS_CPPFLAGS) $(MCRL_CPPFLAGS) $(AM_CPPFLAGS) $(CADP_CPPFLAGS)
+libnips_open_la_SOURCES = spec_open.c nips-greybox.c nips-greybox.h
+libnips_open_la_CPPFLAGS = -DNIPS $(NIPS_CPPFLAGS) $(AM_CPPFLAGS) $(CADP_CPPFLAGS)
 libnips_open_la_LIBADD = ${top_builddir}/nips-vm/libnips_vm.la libltsmin.la
 
 # mpi-event-test

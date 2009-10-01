@@ -19,7 +19,6 @@
 #include "archive.h"
 #include "runtime.h"
 #include "treedbs.h"
-#include "vector_set.h"
 
 #if defined(MCRL)
 #include "mcrl-greybox.h"
