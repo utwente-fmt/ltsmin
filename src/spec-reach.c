@@ -109,7 +109,6 @@ static long max_grp_count=0;
 static long max_trans_count=0;
 static model_t model;
 static vrel_t *group_next;
-static vrel_t *group_prev=NULL;
 static vset_t *group_explored;
 static vset_t *group_tmp;
 static int explored;
@@ -129,7 +128,6 @@ static void group_add(void*context,int*labels,int*dst){
 	(void)labels;
 	struct group_add_info* ctx=(struct group_add_info*)context;
 	vrel_add(group_next[ctx->group],ctx->src,dst);
-	if (group_prev) vrel_add(group_prev[ctx->group],dst,ctx->src);
 }
 
 static void explore_cb(void*context,int *src){
@@ -230,7 +228,7 @@ static int find_trace_to(int step,int *src,int *dst){
 		//vset_count(current,&n_count,&e_count);
 		//fprintf(stderr,"current set has %lld states (%ld nodes)\n",e_count,n_count);
 		for(int i=0;i<nGrps;i++){
-			vset_next(temp,current,group_prev[i]);
+			vset_prev(temp,current,group_next[i]);
 			vset_union(dst_reach,temp);
 		}
 		vset_clear(temp);
@@ -371,7 +369,7 @@ static void reach_bfs(){
 			next_count++;
 			vset_next(temp,current_level,group_next[i]);
 			if (dlk_detect) {
-				vset_next(dlk_temp,temp,group_prev[i]);
+				vset_prev(dlk_temp,temp,group_next[i]);
 				vset_minus(deadlocks,dlk_temp);
 				vset_clear(dlk_temp);
 			}
@@ -416,7 +414,7 @@ void reach_bfs2(){
 			vset_next(temp,old_vis,group_next[i]);
 			vset_union(visited,temp);
 			if (dlk_detect) {
-				vset_next(dlk_temp,temp,group_prev[i]);
+				vset_prev(dlk_temp,temp,group_next[i]);
 				vset_minus(deadlocks,dlk_temp);
 				vset_clear(dlk_temp);
 			}
@@ -457,7 +455,7 @@ void reach_chain(){
 			vset_next(temp,visited,group_next[i]);
 			vset_union(visited,temp);
 			if (dlk_detect) {
-				vset_next(dlk_temp,temp,group_prev[i]);
+				vset_prev(dlk_temp,temp,group_next[i]);
 				vset_minus(deadlocks,dlk_temp);
 				vset_clear(dlk_temp);
 			}
@@ -637,9 +635,6 @@ int main(int argc, char *argv[]){
 	domain=vdom_create_default(N);
 	visited=vset_create(domain,0,NULL);
 	group_next=(vrel_t*)RTmalloc(nGrps*sizeof(vrel_t));
-	if (dlk_detect) {
-		group_prev=(vrel_t*)RTmalloc(nGrps*sizeof(vrel_t));
-	}
 	group_explored=(vset_t*)RTmalloc(nGrps*sizeof(vset_t));
 	group_tmp=(vset_t*)RTmalloc(nGrps*sizeof(vset_t));
 	for(int i=0;i<nGrps;i++){
@@ -653,7 +648,6 @@ int main(int argc, char *argv[]){
 		}
 
 		group_next[i]=vrel_create(domain,len,tmp);
-		if (group_prev) group_prev[i]=vrel_create(domain,len,tmp);
 		group_explored[i]=vset_create(domain,len,tmp);
 		group_tmp[i]=vset_create(domain,len,tmp);
 	}

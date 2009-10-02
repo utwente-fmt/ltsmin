@@ -108,6 +108,7 @@ void vdom_init_shared(vdom_t dom,int n){
 	dom->shared.rel_add=NULL;
 	dom->shared.rel_count=NULL;
 	dom->shared.set_next=NULL;
+	dom->shared.set_prev=NULL;
 }
 
 vset_t vset_create(vdom_t dom,int k,int* proj){
@@ -176,6 +177,10 @@ void vset_zip(vset_t dst,vset_t src){
 
 void vset_next(vset_t dst,vset_t src,vrel_t rel){
 	dst->dom->shared.set_next(dst,src,rel);
+}
+
+void vset_prev(vset_t dst,vset_t src,vrel_t rel){
+	dst->dom->shared.set_prev(dst,src,rel);
 }
 
 void vset_project(vset_t dst,vset_t src){
