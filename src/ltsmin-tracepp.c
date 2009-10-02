@@ -149,7 +149,7 @@ output_text(trace_t trace, FILE* output_file) {
                 int typeno = lts_type_get_state_typeno(trace->ltstype, j);
                 trace_get_type_str(trace, typeno, state[j], BUFLEN, tmp2);
 
-                fprintf(output_file, "\t%*s = %s", align, tmp, tmp2);
+                fprintf(output_file, "\t%*s = %s\n", align, tmp, tmp2);
             }
         }
 
@@ -165,7 +165,7 @@ output_text(trace_t trace, FILE* output_file) {
                     int typeno = lts_type_get_state_label_typeno(trace->ltstype, j);
                     trace_get_type_str(trace, typeno, state_lbls[j], BUFLEN, tmp2);
 
-                    fprintf(output_file, "\t%*s = %s", align, tmp, tmp2);
+                    fprintf(output_file, "\t%*s = %s\n", align, tmp, tmp2);
                 }
             }
         }
