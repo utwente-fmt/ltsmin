@@ -50,6 +50,10 @@ bin_PROGRAMS += nips2lts-grey nips-reach etf2lts-grey etf-reach
 # endif
 endif
 
+# if HAVE_DIVINE
+bin_PROGRAMS += dve2lts-grey dve-reach
+#endif
+
 # etf-convert
 etf_convert_SOURCES = etf-convert.c
 etf_convert_LDADD = libltsmin.la
@@ -80,6 +84,13 @@ endif
 ltsmin_parse_SOURCES = ltsmin-parse.c
 ltsmin_parse_LDADD = libltsmin.la
 
+# dve2lts-grey
+dve2lts_grey_SOURCES  = spec2lts-grey.c dve-greybox.cpp dve-greybox.h    \
+                        lts.c lts.h vset_atermdd.c
+dve2lts_grey_LDADD    = libltsmin.la -lATerm -lsevine -lbymoc_vm $(BUDDY_LIBS) $(CADP_LIBS)
+dve2lts_grey_CPPFLAGS = -DDIVINE $(MCRL_CPPFLAGS) $(DIVINE_CPPFLAGS) $(AM_CPPFLAGS) -I/usr/local/include/divine-cluster/
+dve2lts_grey_LDFLAGS  = $(DIVINE_LDFLAGS) $(MCRL_LDFLAGS) $(BUDDY_LDFLAGS) $(AM_LDFLAGS) $(CADP_LDFLAGS)
+
 # etf2lts-grey
 etf2lts_grey_SOURCES  = spec2lts-grey.c etf-greybox.c etf-greybox.h    \
                         lts.c lts.h vset_atermdd.c
@@ -108,6 +119,13 @@ nips2lts_grey_SOURCES  = spec2lts-grey.c nips-greybox.c nips-greybox.h   \
 nips2lts_grey_LDADD    = libltsmin.la -lATerm $(NIPS_LIBS) $(BUDDY_LIBS) $(CADP_LIBS)
 nips2lts_grey_CPPFLAGS = -DNIPS $(NIPS_CPPFLAGS) $(MCRL_CPPFLAGS) $(AM_CPPFLAGS)
 nips2lts_grey_LDFLAGS  = $(NIPS_LDFLAGS) $(BUDDY_LDFLAGS) $(MCRL_LDFLAGS) $(AM_LDFLAGS) $(CADP_LDFLAGS)
+
+# dve-reach
+dve_reach_SOURCES  = spec-reach.c dve-greybox.cpp dve-greybox.h  \
+                     lts.c lts.h vset_atermdd.c
+dve_reach_LDADD    = libltsmin.la -lATerm -lsevine -lbymoc_vm $(BUDDY_LIBS) $(CADP_LIBS)
+dve_reach_CPPFLAGS = -DDIVINE $(MCRL_CPPFLAGS) $(DIVINE_CPPFLAGS) $(AM_CPPFLAGS) -I/usr/local/include/divine-cluster/
+dve_reach_LDFLAGS  = $(MCRL_LDFLAGS) $(BUDDY_LDFLAGS) $(AM_LDFLAGS) $(CADP_LDFLAGS)
 
 # lpo-reach
 lpo_reach_SOURCES  = spec-reach.c mcrl-greybox.c mcrl-greybox.h  \
