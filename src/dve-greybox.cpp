@@ -130,13 +130,18 @@ void DVEloadGreyboxModel(model_t model, const char *filename){
 
     // Open dveC file
     // TODO: call dlclose() somewhere?
+    void *dlHandle = NULL;
     char* abs_filename = realpath(filename, NULL);
-    void *dlHandle = dlopen(abs_filename, RTLD_LAZY);
-    if (abs_filename) free(abs_filename);
-    if (dlHandle == NULL)
-    {
-        FatalCall (1, error, "%s, Library \"%s\" is not reachable", dlerror(), filename);
-        return;
+    if (abs_filename) {
+        dlHandle = dlopen(abs_filename, RTLD_LAZY);
+        free(abs_filename);
+        if (dlHandle == NULL)
+        {
+            FatalCall (1, error, "%s, Library \"%s\" is not reachable", dlerror(), filename);
+            return;
+        }
+    } else {
+        FatalCall (1, error, "%s, Library \"%s\" is not found", dlerror(), filename);
     }
 
     // get functions
@@ -150,6 +155,12 @@ void DVEloadGreyboxModel(model_t model, const char *filename){
 	dlsym( dlHandle, "lib_get_initial_state");
     lib_print_state = (void(*)(divine::state_t, std::ostream &))
 	dlsym( dlHandle, "lib_print_state");
+
+    if (lib_get_succ == NULL || lib_is_accepting == NULL ||
+        lib_is_in_accepting_component == NULL || lib_get_initial_state == NULL ||
+        lib_print_state == NULL) {
+        FatalCall (1, error, "Library \"%s\" doesn't export the required functions", filename);
+    }
 
     // added interface functions
     lib_get_state_variable_count = (size_t (*)())
@@ -179,6 +190,15 @@ void DVEloadGreyboxModel(model_t model, const char *filename){
     lib_new_state = (divine::state_t (*)())
     dlsym( dlHandle, "lib_new_state");
 
+    // test dveC file
+    if (lib_get_state_variable_count == NULL || lib_get_state_variable_name == NULL ||
+        lib_get_state_variable_type_count == NULL || lib_get_state_variable_type_name == NULL ||
+        lib_get_state_variable_type == NULL || lib_get_state_variable_type_value_count == NULL ||
+        lib_get_state_variable_type_value == NULL || lib_project_state_to_int_array == NULL ||
+        lib_project_int_array_to_state == NULL || lib_get_transition_proj == NULL ||
+        lib_get_transition_succ == NULL || lib_get_transition_count == NULL || lib_new_state == NULL) {
+        FatalCall (1, error, "Library \"%s\" doesn't export the required functions", filename);
+    }
 
     // get ltstypes
     int state_length = lib_get_state_variable_count();
@@ -234,7 +254,6 @@ void DVEloadGreyboxModel(model_t model, const char *filename){
     GBsetStateLabelInfo(model, &sl_info);
 
     // get initial state
-    printf("adding initial state\n");
 	int state[state_length];
     divine_get_initial_state(state);
 	GBsetInitialState(model,state);
