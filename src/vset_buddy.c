@@ -136,7 +136,7 @@ static vrel_t rel_create_fdd(vdom_t dom,int k,int* proj){
         }
         // for next function
         rel->pairs=bdd_newpair();
-        int res=fdd_setpairs(rel->inv_pairs,vars2,vars,k);
+        int res=fdd_setpairs(rel->pairs,vars2,vars,k);
         if (res<0){
             Fatal(1,error,"BuDDy error: %s",bdd_errstring(res));
         }
