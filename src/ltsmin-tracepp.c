@@ -80,9 +80,13 @@ trace_get_type(trace_t trace, int type, int label, size_t dst_size, char* dst)
     char tmp[BUFLEN];
     chunk c;
     c.data = SIgetC(trace->values[type], label, (int*)&c.len);
-    chunk2string(c, BUFLEN, tmp);
-    strncpy(dst, tmp, dst_size);
-    return 0;
+    if (c.data) {
+        chunk2string(c, BUFLEN, tmp);
+        strncpy(dst, tmp, dst_size);
+        return 0;
+    } else {
+        return -1;
+    }
 }
 
 static void
