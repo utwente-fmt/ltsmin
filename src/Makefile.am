@@ -55,6 +55,9 @@ endif
 
 if HAVE_DVEC
 bin_PROGRAMS += dve2lts-grey dve-reach
+if HAVE_CADP
+pkglib_LTLIBRARIES += libdve-open.la
+endif
 endif
 
 # etf-convert
@@ -191,6 +194,11 @@ etf2lts_mpi_LDADD    = libltsmin-mpi.la $(CADP_LIBS)
 etf2lts_mpi_CPPFLAGS = -DETF $(MCRL_CPPFLAGS) $(AM_CPPFLAGS)
 etf2lts_mpi_LDFLAGS  = $(AM_LDFLAGS) $(MCRL_LDFLAGS) $(CADP_LDFLAGS)
 
+
+# libdve-open.la
+libdve_open_la_SOURCES = spec_open.c dve-greybox.c dve-greybox.h
+libdve_open_la_CPPFLAGS = -DDIVINE $(DVE_CPPFLAGS) $(AM_CPPFLAGS) $(CADP_CPPFLAGS)
+libdve_open_la_LIBADD = libltsmin.la
 
 # liblpo-open.la
 liblpo_open_la_SOURCES = spec_open.c mcrl-greybox.c mcrl-greybox.h \
