@@ -94,7 +94,7 @@ static  struct poptOption options[] = {
 	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, etf_options , 0 , "ETF options",NULL},
 #endif
 #if defined(DIVINE)
-	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, dve_options , 0 , "DIVINE options", NULL },
+	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, dve_options , 0 , "DiVinE options", NULL },
 #endif
 	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, greybox_options , 0 , "Greybox options",NULL},
 	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, vset_full_options , 0 , "Vector set options",NULL},
