@@ -167,13 +167,13 @@ etf2lts_mpi_LDFLAGS  = $(AM_LDFLAGS) $(MCRL_LDFLAGS) $(CADP_LDFLAGS)
 
 # liblpo-open.la
 liblpo_open_la_SOURCES = spec_open.c mcrl-greybox.c mcrl-greybox.h \
-			 at-map.c at-map.h vset_atermdd.c
+			 at-map.c at-map.h
 liblpo_open_la_CPPFLAGS = -DMCRL $(MCRL_CPPFLAGS) $(AM_CPPFLAGS)  $(CADP_CPPFLAGS)
 liblpo_open_la_LIBADD = libltsmin.la
 
 # liblps-open.la
 liblps_open_la_SOURCES = spec_open.c mcrl2-greybox.cpp mcrl2-greybox.h \
-			 at-map.c at-map.h vset_atermdd.c
+			 at-map.c at-map.h
 liblps_open_la_CPPFLAGS = -DMCRL2 $(MCRL2_CPPFLAGS) $(AM_CPPFLAGS) $(CADP_CPPFLAGS)
 liblps_open_la_LIBADD = libltsmin.la
 
