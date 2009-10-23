@@ -29,6 +29,9 @@ endif
 #if HAVE_LIBNIPS
 bin_PROGRAMS += nips2lts-mpi
 #endif
+if HAVE_DVEC
+bin_PROGRAMS += dve2lts-mpi
+endif
 endif
 if HAVE_LIBSTEP_INFO
 bin_PROGRAMS +=  lpo2lts-grey lpo-reach
@@ -155,6 +158,12 @@ etf_reach_LDADD    = libltsmin.la -lATerm  $(BUDDY_LIBS) $(CADP_LIBS)
 etf_reach_CPPFLAGS = -DETF $(MCRL_CPPFLAGS) $(AM_CPPFLAGS)
 etf_reach_LDFLAGS  = $(MCRL_LDFLAGS) $(BUDDY_LDFLAGS) $(AM_LDFLAGS) $(CADP_LDFLAGS)
 
+
+# dve2lts-mpi
+dve2lts_mpi_SOURCES  = spec2lts-mpi.c dve-greybox.cpp dve-greybox.h config.h
+dve2lts_mpi_LDADD    = libltsmin-mpi.la $(DVEC_LIBS) $(CADP_LIBS)
+dve2lts_mpi_CPPFLAGS = -DDIVINE $(DIVINE_CPPFLAGS) $(AM_CPPFLAGS)
+dve2lts_mpi_LDFLAGS  = $(DIVINE_LDFLAGS) $(AM_LDFLAGS) $(CADP_LDFLAGS)
 
 # lpo2lts-mpi
 lpo2lts_mpi_SOURCES  = spec2lts-mpi.c mcrl-greybox.c mcrl-greybox.h \
