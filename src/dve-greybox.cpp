@@ -20,6 +20,7 @@ namespace divine {
 
 
 // added interface functions
+bool        (*lib_system_with_property)();
 size_t      (*lib_get_state_variable_count)();
 const char* (*lib_get_state_variable_name)(int var);
 size_t      (*lib_get_state_variable_type_count)();
@@ -130,7 +131,6 @@ void DVEloadGreyboxModel(model_t model, const char *filename){
 	GBsetContext(model,ctx);
 
     // Open dveC file
-    // TODO: call dlclose() somewhere?
     void *dlHandle = NULL;
     char* abs_filename = realpath(filename, NULL);
     if (abs_filename) {
@@ -164,6 +164,8 @@ void DVEloadGreyboxModel(model_t model, const char *filename){
     }
 
     // added interface functions
+    lib_system_with_property = (bool (*)())
+    dlsym( dlHandle, "lib_system_with_property");
     lib_get_state_variable_count = (size_t (*)())
     dlsym( dlHandle, "lib_get_state_variable_count");
     lib_get_state_variable_name = (const char* (*)(int var))
@@ -192,13 +194,20 @@ void DVEloadGreyboxModel(model_t model, const char *filename){
     dlsym( dlHandle, "lib_new_state");
 
     // test dveC file
-    if (lib_get_state_variable_count == NULL || lib_get_state_variable_name == NULL ||
-        lib_get_state_variable_type_count == NULL || lib_get_state_variable_type_name == NULL ||
-        lib_get_state_variable_type == NULL || lib_get_state_variable_type_value_count == NULL ||
-        lib_get_state_variable_type_value == NULL || lib_project_state_to_int_array == NULL ||
-        lib_project_int_array_to_state == NULL || lib_get_transition_proj == NULL ||
-        lib_get_transition_succ == NULL || lib_get_transition_count == NULL || lib_new_state == NULL) {
+    if (lib_system_with_property == NULL || lib_get_state_variable_count == NULL ||
+        lib_get_state_variable_name == NULL || lib_get_state_variable_type_count == NULL ||
+        lib_get_state_variable_type_name == NULL || lib_get_state_variable_type == NULL ||
+        lib_get_state_variable_type_value_count == NULL || lib_get_state_variable_type_value == NULL ||
+        lib_project_state_to_int_array == NULL || lib_project_int_array_to_state == NULL ||
+        lib_get_transition_proj == NULL || lib_get_transition_succ == NULL ||
+        lib_get_transition_count == NULL || lib_new_state == NULL) {
         FatalCall (1, error, "Library \"%s\" doesn't export the required functions", filename);
+    }
+    
+    // check system_with_property
+    if (lib_system_with_property())
+    {
+        Fatal(1,error,"DVE models with properties are currently not supported!");
     }
 
     // get ltstypes
