@@ -49,7 +49,10 @@ extern "C" {
 #include "dm/dm.h"
 #include "chunk_support.h"
 #include <dlfcn.h>
-
+#include <stdlib.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 static void dve_popt(poptContext con,
                enum poptCallbackReason reason,
@@ -60,8 +63,7 @@ static void dve_popt(poptContext con,
 	case POPT_CALLBACK_REASON_PRE:
 		break;
 	case POPT_CALLBACK_REASON_POST:
-        // TODO: add uncompiled extension, use divine to create dveC
-		//GBregisterLoader("dve", DVEloadGreyboxModel);
+		GBregisterLoader("dve", DVEcompileGreyboxModel);
 		GBregisterLoader("dveC",DVEloadGreyboxModel);
 		Warning(info,"Precompiled divine module initialized");
 		return;
@@ -90,6 +92,8 @@ static lts_type_t ltstype;
 static matrix_t dm_info;
 static matrix_t sl_info;
 static divine::succ_container_t cb_cont;
+static void* dlHandle = NULL;
+static char templatename[] = "/tmp/ltsmin-XXXXXX";
 
 static int
 succ_callback(TransitionCB cb, void* context)
@@ -126,12 +130,73 @@ divine_get_transitions_long(model_t self, int group, int*src, TransitionCB cb, v
     return succ_callback(cb, context);
 }
 
+void DVEexit()
+{
+    // close dveC library
+    if (dlHandle != NULL)
+    {
+        dlclose(dlHandle);
+
+        #define RMLEN (4096)
+        char rmcmd[RMLEN];
+        if (snprintf(rmcmd, RMLEN, "rm -rf %s", templatename) < RMLEN)
+        {
+            // remove!
+            system(rmcmd);
+        }
+    }
+}
+
+void DVEcompileGreyboxModel(model_t model, const char *filename){
+    // check file exists
+    struct stat st;
+    if (stat(filename, &st) != 0)
+        FatalCall (1, error, "File not found: %s ", filename);
+
+    // check /tmp
+    if (stat("/tmp", &st))
+        FatalCall (1, error, "Can't access /tmp for temporary compilation");
+
+    // get temporary directory
+    char* tmpdir = mkdtemp(templatename);
+    if (!tmpdir)
+        FatalCall (1, error, "Can't create temporary directory for compilation");
+
+    #define CMDLEN (4096)
+    char command[CMDLEN];
+    if (snprintf(command, CMDLEN, "cp %s %s", filename, tmpdir) < CMDLEN)
+    {
+        system(command);
+
+        // compile the dve model
+        if (snprintf(command, CMDLEN, "divine.precompile %s/%s", tmpdir, filename) < CMDLEN)
+        {
+            system(command);
+
+            // check existence dveC model
+            snprintf(command, CMDLEN, "%s/%sC", tmpdir, filename);
+            if (stat(command, &st) != 0)
+            {
+                FatalCall (1, error, "Something went wrong with creation of %s ", command);
+            }
+
+            // all good, continue
+            atexit(DVEexit); // hopefully this works :), if not, keep garbage
+
+            DVEloadGreyboxModel(model, command);
+            return;
+        } else {
+            FatalCall (1, error, "Problems occured when compiling %s/%s", tmpdir, filename);
+        }
+    }
+    FatalCall (1, error, "Can't copy, paths too long ");
+}
+
 void DVEloadGreyboxModel(model_t model, const char *filename){
 	gb_context_t ctx=(gb_context_t)RTmalloc(sizeof(struct grey_box_context));
 	GBsetContext(model,ctx);
 
     // Open dveC file
-    void *dlHandle = NULL;
     char* abs_filename = realpath(filename, NULL);
     if (abs_filename) {
         dlHandle = dlopen(abs_filename, RTLD_LAZY);
@@ -203,7 +268,7 @@ void DVEloadGreyboxModel(model_t model, const char *filename){
         lib_get_transition_count == NULL || lib_new_state == NULL) {
         FatalCall (1, error, "Library \"%s\" doesn't export the required functions", filename);
     }
-    
+
     // check system_with_property
     if (lib_system_with_property())
     {

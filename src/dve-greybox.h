@@ -14,6 +14,7 @@ extern struct poptOption dve_options[];
 Load an dveC model.
 */
 extern void DVEloadGreyboxModel(model_t model,const char*name);
+extern void DVEcompileGreyboxModel(model_t model,const char*name);
 
 
 #endif
