@@ -93,12 +93,13 @@ static divine::succ_container_t cb_cont;
 static int
 succ_callback(TransitionCB cb, void* context)
 {
+    int dummy = 42; // dummy to work with --cache
     int result = cb_cont.size();
     for(size_t i=0; i < (size_t)result;++i)
     {
         int dst[lib_get_state_variable_count()];
         lib_project_state_to_int_array(cb_cont[i], dst);
-        cb(context, NULL, dst);
+        cb(context, &dummy, dst);
     }
     cb_cont.clear();
     return result;
