@@ -7,7 +7,7 @@ MANPAGES = ltsmin-mpi.1 ltsmin-convert.1 gcf.1 lpo-reach.1 lps-reach.1	\
         lpo2lts-mpi.1 lps2lts-mpi.1 nips2lts-mpi.1 etf.5	\
         etf2lts-grey.1 etf2lts-mpi.1 etf-reach.1 ltsmin.7 etf-convert.1 \
         pins_open.1 ce-mpi.1 etf2torx.1 lpo2torx.1 lps2torx.1 nips2torx.1 \
-		ltsmin-tracepp.1
+		ltsmin-tracepp.1 dve2lts-grey.1 dve-reach.1 dve2lts-mpi.1
 
 doc_ASCIIDOC = $(addsuffix .txt, $(basename $(MANPAGES)))
 
