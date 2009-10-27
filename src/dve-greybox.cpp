@@ -228,48 +228,36 @@ void DVEloadGreyboxModel(model_t model, const char *filename){
 
     // added interface functions
     lib_system_with_property = (bool (*)())
-    dlsym( dlHandle, "lib_system_with_property");
+        RTdlsym (filename, dlHandle, "lib_system_with_property");
     lib_get_state_variable_count = (size_t (*)())
-    dlsym( dlHandle, "lib_get_state_variable_count");
+        RTdlsym (filename, dlHandle, "lib_get_state_variable_count");
     lib_get_state_variable_name = (const char* (*)(int var))
-    dlsym( dlHandle, "lib_get_state_variable_name" );
+        RTdlsym (filename, dlHandle, "lib_get_state_variable_name" );
     lib_get_state_variable_type_count = (size_t (*)())
-    dlsym( dlHandle, "lib_get_state_variable_type_count");
+        RTdlsym (filename, dlHandle, "lib_get_state_variable_type_count");
     lib_get_state_variable_type_name = (const char* (*)(int type))
-    dlsym( dlHandle, "lib_get_state_variable_type_name");
+        RTdlsym (filename, dlHandle, "lib_get_state_variable_type_name");
     lib_get_state_variable_type  = (const int (*)(int var))
-    dlsym( dlHandle, "lib_get_state_variable_type");
+        RTdlsym (filename, dlHandle, "lib_get_state_variable_type");
     lib_get_state_variable_type_value_count = (size_t (*)(int))
-    dlsym( dlHandle, "lib_get_state_variable_type_value_count");
+        RTdlsym (filename, dlHandle, "lib_get_state_variable_type_value_count");
     lib_get_state_variable_type_value = (const char* (*)(int type, int value))
-    dlsym( dlHandle, "lib_get_state_variable_type_value");
+        RTdlsym (filename, dlHandle, "lib_get_state_variable_type_value");
     lib_project_state_to_int_array = (void (*)(state_t state, int* proj))
-    dlsym( dlHandle, "lib_project_state_to_int_array");
+        RTdlsym (filename, dlHandle, "lib_project_state_to_int_array");
     lib_project_int_array_to_state = (void (*)(int* proj, state_t state))
-    dlsym( dlHandle, "lib_project_int_array_to_state");
+        RTdlsym (filename, dlHandle, "lib_project_int_array_to_state");
     lib_get_transition_proj = (int* (*)(int trans))
-    dlsym( dlHandle, "lib_get_transition_proj");
+        RTdlsym (filename, dlHandle, "lib_get_transition_proj");
     lib_get_transition_succ = (int (*)(size_int_t transition, state_t state, succ_container_t & succ_container))
-    dlsym( dlHandle, "lib_get_transition_succ");
+        RTdlsym (filename, dlHandle, "lib_get_transition_succ");
     lib_get_transition_count = (int (*)())
-    dlsym( dlHandle, "lib_get_transition_count");
+        RTdlsym (filename, dlHandle, "lib_get_transition_count");
     lib_new_state = (divine::state_t (*)())
-    dlsym( dlHandle, "lib_new_state");
-
-    // test dveC file
-    if (lib_system_with_property == NULL || lib_get_state_variable_count == NULL ||
-        lib_get_state_variable_name == NULL || lib_get_state_variable_type_count == NULL ||
-        lib_get_state_variable_type_name == NULL || lib_get_state_variable_type == NULL ||
-        lib_get_state_variable_type_value_count == NULL || lib_get_state_variable_type_value == NULL ||
-        lib_project_state_to_int_array == NULL || lib_project_int_array_to_state == NULL ||
-        lib_get_transition_proj == NULL || lib_get_transition_succ == NULL ||
-        lib_get_transition_count == NULL || lib_new_state == NULL) {
-        FatalCall (1, error, "Library \"%s\" doesn't export the required functions", filename);
-    }
+        RTdlsym (filename, dlHandle, "lib_new_state");
 
     // check system_with_property
-    if (lib_system_with_property())
-    {
+    if (lib_system_with_property()) {
         Fatal(1,error,"DVE models with properties are currently not supported!");
     }
 
