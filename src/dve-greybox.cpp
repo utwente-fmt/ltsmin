@@ -137,9 +137,8 @@ void DVEexit()
     {
         dlclose(dlHandle);
 
-        #define RMLEN (4096)
-        char rmcmd[RMLEN];
-        if (snprintf(rmcmd, RMLEN, "rm -rf %s", templatename) < RMLEN)
+        char rmcmd[4096];
+        if (snprintf(rmcmd, sizeof rmcmd, "rm -rf %s", templatename) < sizeof rmcmd)
         {
             // remove!
             system(rmcmd);
@@ -162,19 +161,18 @@ void DVEcompileGreyboxModel(model_t model, const char *filename){
     if (!tmpdir)
         FatalCall (1, error, "Can't create temporary directory for compilation");
 
-    #define CMDLEN (4096)
-    char command[CMDLEN];
-    if (snprintf(command, CMDLEN, "cp %s %s", filename, tmpdir) < CMDLEN)
+    char command[4096];
+    if (snprintf(command, sizeof command, "cp %s %s", filename, tmpdir) < sizeof command)
     {
         system(command);
 
         // compile the dve model
-        if (snprintf(command, CMDLEN, "divine.precompile %s/%s", tmpdir, filename) < CMDLEN)
+        if (snprintf(command, sizeof command, "divine.precompile %s/%s", tmpdir, filename) < sizeof command)
         {
             system(command);
 
             // check existence dveC model
-            snprintf(command, CMDLEN, "%s/%sC", tmpdir, filename);
+            snprintf(command, sizeof command, "%s/%sC", tmpdir, filename);
             if (stat(command, &st) != 0)
             {
                 FatalCall (1, error, "Something went wrong with creation of %s ", command);
@@ -322,7 +320,7 @@ void DVEloadGreyboxModel(model_t model, const char *filename){
             if (proj[j]) dm_set(&dm_info, i, j);
         }
     }
-	GBsetDMInfo(model, &dm_info);
+    GBsetDMInfo(model, &dm_info);
 
     // there are no state labels
     dm_create(&sl_info, 0, state_length);
@@ -331,7 +329,7 @@ void DVEloadGreyboxModel(model_t model, const char *filename){
     // get initial state
 	int state[state_length];
     divine_get_initial_state(state);
-	GBsetInitialState(model,state);
+    GBsetInitialState(model,state);
 
     GBsetNextStateAll  (model, divine_get_transitions_all);
     GBsetNextStateLong (model, divine_get_transitions_long);
