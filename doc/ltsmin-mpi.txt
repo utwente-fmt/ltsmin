@@ -39,8 +39,8 @@ include::inc/general-options.txt[]
         Some error occurred.
 
 == SEE ALSO
-linkman:ltsmin[7], 
-linkman:lpo2lts-mpi[1], 
-linkman:lps2lts-mpi[1], 
-linkman:nips2lts-mpi[1], 
-linkman:ltsmin-convert[1]
+manpage:ltsmin[7], 
+manpage:lpo2lts-mpi[1], 
+manpage:lps2lts-mpi[1], 
+manpage:nips2lts-mpi[1], 
+manpage:ltsmin-convert[1]

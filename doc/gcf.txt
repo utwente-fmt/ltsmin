@@ -61,7 +61,7 @@ gcf -x generated.gcf generated.dir
 ----
 
 The inverse (transforming 'generated.dir' to 'generated.gcf') is also possible, but it is better to use
-linkman:ltsmin-convert[1] for this task because the best compression is achieved by applying different compressions
+manpage:ltsmin-convert[1] for this task because the best compression is achieved by applying different compressions
 to different files, which cannot be specified with '-z'.
 
 == EXIT STATUS

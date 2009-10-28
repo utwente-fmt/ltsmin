@@ -31,6 +31,6 @@ include::inc/general-options.txt[]
         Some error occurred.
 
 == SEE ALSO
-linkman:ltsmin[7], 
+manpage:ltsmin[7], 
 http://divine.fi.muni.cz/[DiVinE].
 
