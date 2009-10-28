@@ -36,7 +36,7 @@ pins_open follows the OPEN/CAESAR command line conventions.
 == EXAMPLES
 
 Run the *declarator* test application (provided by
-http://www.inrialpes.fr/vasy/cadp/[CADP]) with the linkman:mcrl[1]
+http://www.inrialpes.fr/vasy/cadp/[CADP]) with the manpage:mcrl[1]
 specification 'brp.tbf':
 
 ----
@@ -73,6 +73,6 @@ CAESAR_COMPARE_STATE : OK
 
 == SEE ALSO
 
-linkman:ltsmin[7], linkman:caesar.open[l], linkman:mcrl[1],
+manpage:ltsmin[7], manpage:caesar.open[l], manpage:mcrl[1],
 http://www.inrialpes.fr/vasy/cadp/[CADP]
 

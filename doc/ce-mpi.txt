@@ -18,7 +18,7 @@ labeled transition system.  The default reduction algorithm is
 coloring.
 
 For both, input and output only (old-style) DIR archives are
-supported; see also linkman:ltsmin-convert[1].
+supported; see also manpage:ltsmin-convert[1].
 
 include::inc/mpi-blurb.txt[]
 
@@ -46,9 +46,9 @@ include::inc/support.txt[]
 == SEE ALSO
 http://www.win.tue.nl/~sorzan/teza.pdf.gz[On Distributed Verification
 and Verified Distribution, 2004]
-linkman:ltsmin[7],
-linkman:ltsmin-mpi[1],
-linkman:lpo2lts-mpi[1],
-linkman:lps2lts-mpi[1],
-linkman:nips2lts-mpi[1],
-linkman:ltsmin-convert[1]
+manpage:ltsmin[7],
+manpage:ltsmin-mpi[1],
+manpage:lpo2lts-mpi[1],
+manpage:lps2lts-mpi[1],
+manpage:nips2lts-mpi[1],
+manpage:ltsmin-convert[1]

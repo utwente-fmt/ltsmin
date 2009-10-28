@@ -18,7 +18,7 @@ etf2torx - TorX RPC interface for ETF models.
 {manname} provides access to a labelled transition system from a
 specification provided in 'input.etf' via the TorX-Explorer textual
 interface on _stdin_ and _stdout_.  Specifications are in
-linkman:etf[5] format.
+manpage:etf[5] format.
 
 == OPTIONS
 

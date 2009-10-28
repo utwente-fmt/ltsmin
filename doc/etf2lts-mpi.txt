@@ -17,7 +17,7 @@ mpirun _<nodespec>_ *etf2lts-mpi* [OPTION]... 'input.etf' ['output.fmt']
 
 etf2lts-mpi generates a labelled transition system from a
 specification provided in 'input.etf'.  Specifications are in
-linkman:etf[5] format.  'output.fmt' specifies the name of the output
+manpage:etf[5] format.  'output.fmt' specifies the name of the output
 archive.  The desired format is deduced from the filename extension.
 
 include::inc/mpi-blurb.txt[]

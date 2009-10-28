@@ -120,9 +120,9 @@ end sort
 ----
 
 == SEE ALSO
-linkman:ltsmin[7],
-linkman:etf2lts-mpi[1],
-linkman:etf2lts-grey[1],
-linkman:etf-reach[1],
-linkman:etf-convert[1]
+manpage:ltsmin[7],
+manpage:etf2lts-mpi[1],
+manpage:etf2lts-grey[1],
+manpage:etf-reach[1],
+manpage:etf-convert[1]
 

@@ -38,7 +38,7 @@ http://www.ewi.utwente.nl/~michaelw/nips/[NIPS-VM website].
 ETF(+etf+)::
 
 The Enumerated Table Format is an intermediate format for models in the LTSmin toolset.
-See linkman:etf[5].
+See manpage:etf[5].
 
 == State Space Exploration Tools.
 
@@ -48,7 +48,7 @@ The LTSmin toolset has three tools for reachability analysis:
 Symbolic reachability tools that use decision diagrams for
 manipulating sets of states. The optional output produced by these tools is an ETF model.
 +
-See linkman:lps-reach[1], linkman:lpo-reach[1], linkman:nips-reach[1], and linkman:etf-reach[1].
+See manpage:lps-reach[1], manpage:lpo-reach[1], manpage:nips-reach[1], and manpage:etf-reach[1].
 
 <prefix>2lts-grey::
 
@@ -56,7 +56,7 @@ Sequential state space explorers that enumerate states and can use
 both decision diagrams and hash tables to represent sets of states.
 The optional output produced by these tools is an explicit LTS.
 +
-See linkman:lps2lts-grey[1], linkman:lpo2lts-grey[1], linkman:nips2lts-grey[1], and linkman:etf2lts-grey[1].
+See manpage:lps2lts-grey[1], manpage:lpo2lts-grey[1], manpage:nips2lts-grey[1], and manpage:etf2lts-grey[1].
 
 <prefix>2lts-mpi::
 
@@ -64,7 +64,7 @@ Distributed state space generators that enumerate states and use
 distributed hash tables for storing sets of states.
 The optional output produced by these tools is an explicit LTS.
 +
-See linkman:lps2lts-mpi[1], linkman:lpo2lts-mpi[1], linkman:nips2lts-mpi[1], and linkman:etf2lts-mpi[1].
+See manpage:lps2lts-mpi[1], manpage:lpo2lts-mpi[1], manpage:nips2lts-mpi[1], and manpage:etf2lts-mpi[1].
 
 == State Space Reduction Tool.
 
@@ -72,7 +72,7 @@ The LTSmin toolset provides distributed minimisation modulo strong and branching
 
 ltsmin-mpi::
 Distributed minimisation modulo strong and branching bisimulation.
-See linkman:ltsmin-mpi[1].
+See manpage:ltsmin-mpi[1].
 
 
 == Conversion Tools
@@ -80,13 +80,13 @@ See linkman:ltsmin-mpi[1].
 === basic use
 
 etf-convert::
-Translate ETF to DVE. See linkman:etf-convert[1].
+Translate ETF to DVE. See manpage:etf-convert[1].
 
 ltsmin-convert::
-Convert LTS file formats. See linkman:ltsmin-convert[1].
+Convert LTS file formats. See manpage:ltsmin-convert[1].
 
 gcf::
-Utility for creating and extracting 'Generic Container Format' archives. See linkman:gcf[1].
+Utility for creating and extracting 'Generic Container Format' archives. See manpage:gcf[1].
 
 include::inc/file-formats.txt[]
 
