@@ -25,8 +25,8 @@ struct vector_domain_shared {
 	void (*set_union)(vset_t dst,vset_t src);
 	void (*set_minus)(vset_t dst,vset_t src);
 	void (*set_zip)(vset_t dst,vset_t src);
-	void (*set_count)(vset_t set,long *nodes,long long *elements);
-	void (*rel_count)(vrel_t rel,long *nodes,long long *elements);
+	void (*set_count)(vset_t set,long *nodes,bn_int *elements);
+	void (*rel_count)(vrel_t rel,long *nodes,bn_int *elements);
 	vrel_t (*rel_create)(vdom_t dom,int k,int* proj);
 	void (*rel_add)(vrel_t rel,const int* src,const int* dst);
 	void (*set_next)(vset_t dst,vset_t src,vrel_t rel);

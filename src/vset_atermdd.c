@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <assert.h>
 
 #include <vdom_object.h>
 #include <runtime.h>
@@ -156,96 +157,114 @@ static void set_copy_both(vset_t dst,vset_t src){
 
 static ATermIndexedSet count_is;
 static long node_count;
-static long long *elem_count;
+static bn_int *elem_count;
 static long elem_size;
 
-static long long count_set_t2(ATerm set){
-  if (set==Empty) return 0;
-  else if (set==Atom) return 1;
-  else {
-    ATbool new;
-    long idx=ATindexedSetPut(count_is,(ATerm)set,&new);
-    if(new){
-      node_count++;
-      if (idx>=elem_size){
-	elem_size=elem_size+(elem_size>>1);
-	elem_count=realloc(elem_count,elem_size*sizeof(long long));
-	//ATwarning("resize %d %d %x",idx,elem_size,elem_count);
-      }
-      long long c=count_set_t2(ATgetArgument(set,0))+count_set_t2(ATgetArgument(set,1))+count_set_t2(ATgetArgument(set,2));
-      return elem_count[idx]=c;
+static long count_set_t2(ATerm set){
+  ATbool new;
+  long idx, idx_0, idx_1, idx_2;
+
+  idx=ATindexedSetPut(count_is,(ATerm)set,&new)+2;
+  if(new){
+    node_count++;
+    if (idx>=elem_size){
+      long elem_size_old=elem_size;
+      elem_size=elem_size+(elem_size>>1);
+      elem_count=realloc(elem_count,elem_size*sizeof(bn_int));
+      //ATwarning("resize %d %d %x",idx,elem_size,elem_count);
+      for(int i=elem_size_old;i<elem_size;i++) bn_init(&elem_count[i]);
     }
-    else
-      return elem_count[idx];
+    idx_0=count_set_t2(ATgetArgument(set,0));
+    idx_1=count_set_t2(ATgetArgument(set,1));
+    idx_2=count_set_t2(ATgetArgument(set,2));
+    bn_add(&elem_count[idx_0],&elem_count[idx_1],&elem_count[idx]);
+    bn_add(&elem_count[idx_2],&elem_count[idx],&elem_count[idx]);
+    return idx;
   }
+  else
+    return idx;
 }
 
-static void set_count_tree(vset_t set,long *nodes,long long *elements){
-	count_is=ATindexedSetCreate(HASH_INIT,HASH_LOAD);
-	elem_count=malloc(HASH_INIT*sizeof(long long));
-	elem_size=HASH_INIT;
-	node_count=2; // atom and emptyset
-	*elements=count_set_t2(set->set);
-	ATindexedSetDestroy(count_is);
-	free(elem_count);
-	*nodes=node_count;
+static void set_count_t(ATerm set,long *nodes,bn_int *elements){
+  long idx;
+
+  count_is=ATindexedSetCreate(HASH_INIT,HASH_LOAD);
+  elem_size=HASH_INIT;
+  elem_count=malloc(elem_size*sizeof(bn_int));
+  for(int i=0;i<elem_size;i++) bn_init(&elem_count[i]);
+  node_count=2; // atom and emptyset
+  idx=ATindexedSetPut(count_is,(ATerm)Empty,NULL);
+  assert(idx<elem_size);
+  bn_set_zero(&elem_count[idx]);
+  idx=ATindexedSetPut(count_is,(ATerm)Atom,NULL);
+  assert(idx<elem_size);
+  bn_set_one(&elem_count[idx]);
+  idx=count_set_t2(set);
+  bn_init_copy(elements,&elem_count[idx]);
+  ATindexedSetDestroy(count_is);
+  for(int i=0;i<elem_size;i++) bn_clear(&elem_count[i]);
+  free(elem_count);
+  *nodes=node_count;}
+
+static void set_count_tree(vset_t set,long *nodes,bn_int *elements){
+  set_count_t(set->set,nodes,elements);
 }
 
-static void rel_count_tree(vrel_t rel,long *nodes,long long *elements){
-	count_is=ATindexedSetCreate(HASH_INIT,HASH_LOAD);
-	elem_count=malloc(HASH_INIT*sizeof(long long));
-	elem_size=HASH_INIT;
-	node_count=2; // atom and emptyset
-	*elements=count_set_t2(rel->rel);
-	ATindexedSetDestroy(count_is);
-	free(elem_count);
-	*nodes=node_count;
+static void rel_count_tree(vrel_t rel,long *nodes,bn_int *elements){
+  set_count_t(rel->rel,nodes,elements);
 }
 
-static long long count_set_2(ATerm set){
-  if (set==emptyset) return 0;
-  else if (set==atom) return 1;
-  else {
-    ATbool new;
-    long idx=ATindexedSetPut(count_is,(ATerm)set,&new);
-    if(new){
-      node_count++;
-      if (idx>=elem_size){
-	elem_size=elem_size+(elem_size>>1);
-	elem_count=realloc(elem_count,elem_size*sizeof(long long));
-	//ATwarning("resize %d %d %x",idx,elem_size,elem_count);
-      }
-      long long c=count_set_2(ATgetArgument(set,1))+count_set_2(ATgetArgument(set,2));
-      return elem_count[idx]=c;
+static long count_set_2(ATerm set){
+  ATbool new;
+  long idx, idx_1, idx_2;
+
+  idx=ATindexedSetPut(count_is,(ATerm)set,&new);
+  if(new){
+    node_count++;
+    if (idx>=elem_size){
+      long elem_size_old=elem_size;
+      elem_size=elem_size+(elem_size>>1);
+      elem_count=realloc(elem_count,elem_size*sizeof(bn_int));
+      //ATwarning("resize %d %d %x",idx,elem_size,elem_count);
+      for(int i=elem_size_old;i<elem_size;i++) bn_init(&elem_count[i]);
     }
-    else
-      return elem_count[idx];
+    idx_1=count_set_2(ATgetArgument(set,1));
+    idx_2=count_set_2(ATgetArgument(set,2));
+    bn_add(&elem_count[idx_1],&elem_count[idx_2],&elem_count[idx]);
+    return idx;
   }
+  else
+    return idx;
 }
 
-static void set_count_list(vset_t set,long *nodes,long long *elements){
-	count_is=ATindexedSetCreate(HASH_INIT,HASH_LOAD);
-	elem_count=malloc(HASH_INIT*sizeof(long long));
-	elem_size=HASH_INIT;
-	node_count=2; // atom and emptyset
-	*elements=count_set_2(set->set);
-	ATindexedSetDestroy(count_is);
-	free(elem_count);
-	*nodes=node_count;
+static void count_set(ATerm set,long *nodes,bn_int *elements){
+  long idx;
+
+  count_is=ATindexedSetCreate(HASH_INIT,HASH_LOAD);
+  elem_size=HASH_INIT;
+  elem_count=malloc(elem_size*sizeof(bn_int));
+  for(int i=0;i<elem_size;i++) bn_init(&elem_count[i]);
+  node_count=2; // atom and emptyset
+  idx=ATindexedSetPut(count_is,(ATerm)emptyset,NULL);
+  assert(idx<elem_size);
+  bn_set_zero(&elem_count[idx]);
+  idx=ATindexedSetPut(count_is,(ATerm)atom,NULL);
+  assert(idx<elem_size);
+  bn_set_one(&elem_count[idx]);
+  idx=count_set_2(set);
+  bn_init_copy(elements,&elem_count[idx]);
+  ATindexedSetDestroy(count_is);
+  for(int i=0;i<elem_size;i++) bn_clear(&elem_count[i]);
+  free(elem_count);
+  *nodes=node_count;}
+
+static void set_count_list(vset_t set,long *nodes,bn_int *elements){
+  count_set(set->set,nodes,elements);
 }
 
-static void rel_count_list(vrel_t rel,long *nodes,long long *elements){
-	count_is=ATindexedSetCreate(HASH_INIT,HASH_LOAD);
-	elem_count=malloc(HASH_INIT*sizeof(long long));
-	elem_size=HASH_INIT;
-	node_count=2; // atom and emptyset
-	*elements=count_set_2(rel->rel);
-	ATindexedSetDestroy(count_is);
-	free(elem_count);
-	*nodes=node_count;
+static void rel_count_list(vrel_t rel,long *nodes,bn_int *elements){
+  count_set(rel->rel,nodes,elements);
 }
-
-
 
 static ATbool set_member(ATerm set,ATerm *a){
   if (set==emptyset) return ATfalse;

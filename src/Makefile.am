@@ -1,6 +1,6 @@
 bin_PROGRAMS = ltsmin-convert gcf etf-convert ltsmin-tracepp
 noinst_PROGRAMS = test-bitset test-is-balloc test-dfs-stack test-hre ltsmin-parse
-noinst_LTLIBRARIES = libutil.la libltsmin.la
+noinst_LTLIBRARIES = libutil.la libltsmin.la libbignum.la
 pkglib_LTLIBRARIES =
 
 SUBDIRS = dm . ce torx
@@ -256,14 +256,16 @@ libutil_la_CPPFLAGS += $(CADP_CPPFLAGS)
 endif
 libutil_la_CPPFLAGS += $(AM_CPPFLAGS)
 
-
 libutil_la_SOURCES += hre-config.h hre-context.c hre-context.h \
 	hre-feedback.c hre-feedback.h hre-internal.h \
 	hre-main.c hre-main.h hre-malloc.c hre-malloc.h \
 	hre-popt.c hre-popt.h hre-pthread.c
 
 libltsmin_la_SOURCES = hre-nompi.c
-libltsmin_la_LIBADD = libutil.la
+libltsmin_la_LIBADD = libutil.la libbignum.la
+
+libbignum_la_SOURCES = bignum.c bignum.h
+libbignum_la_LIBADD  = -lgmp
 
 if HAVE_MPI
 libltsmin_mpi_la_SOURCES = hre-mpi.c
