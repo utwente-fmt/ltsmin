@@ -41,6 +41,7 @@ AC_PROG_INSTALL
 
 AC_DISABLE_SHARED
 AC_PROG_LIBTOOL
+AC_PROG_RANLIB
 
 ACX_MPI(
   [CC="$MPICC"
@@ -160,8 +161,9 @@ AC_FUNC_REALLOC
 AC_FUNC_STRERROR_R
 AC_FUNC_VPRINTF
 AC_CHECK_FUNCS([atexit bzero ftruncate strdup strndup strchr strstr strtol])
+AC_CHECK_FUNCS([memset mkdir pow strcasecmp strrchr])
 AC_CHECK_FUNCS([backtrace backtrace_symbols])
-AC_CHECK_DECLS([strdup, strndup, strchr, strstr],,,[
+AC_CHECK_DECLS([strdup, strndup, strchr, strrchr, strstr],,,[
 #include "${srcdir}/src/config.h"
 AC_INCLUDES_DEFAULT])
 
