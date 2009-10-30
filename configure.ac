@@ -96,6 +96,7 @@ DX_INIT_DOXYGEN([$PACKAGE_NAME])
 AC_CACHE_SAVE
 
 # Checks for libraries.
+AC_CHECK_LIB([dl], [dlsym],,[AC_MSG_FAILURE([libdl not found.])])
 AC_CHECK_LIB([popt],[poptGetContext],,[AC_MSG_FAILURE([popt not found.])])
 AC_CHECK_LIB([z], [inflateEnd],,
   [AC_MSG_FAILURE([zlib not found.])])
@@ -135,8 +136,9 @@ ACX_CADP_BCG_WRITE([have_bcg=yes],
 # Checks for header files.
 AC_HEADER_DIRENT
 AC_HEADER_STDC
-AC_CHECK_HEADERS([fcntl.h limits.h stdint.h stdlib.h string.h strings.h unistd.h])
-AC_CHECK_HEADERS([execinfo.h])
+AC_HEADER_STDBOOL
+AC_CHECK_HEADERS([fcntl.h limits.h stddef.h stdint.h stdlib.h sys/time.h string.h strings.h unistd.h])
+AC_CHECK_HEADERS([execinfo.h dlfcn.h])
 AC_CHECK_HEADER([popt.h],[], [AC_MSG_FAILURE([popt.h not found.])])
 AC_CACHE_SAVE
 
