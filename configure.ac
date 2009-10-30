@@ -9,16 +9,14 @@ AC_CONFIG_HEADERS([src/amconfig.h])
 AC_SUBST([pkglibdir], "\${libdir}/${PACKAGE_NAME}-${PACKAGE_VERSION}")
 
 # Checks for programs.
-CFLAGS="-O2 ${CFLAGS}"
-CXXFLAGS="-O2 ${CXXFLAGS}"
-AM_CFLAGS="-g"
-AM_CXXFLAGS="-g -Wno-inline -ftemplate-depth-128 -finline-functions"
+AC_SUBST(AM_CXXFLAGS,["-Wno-inline -ftemplate-depth-128 -finline-functions"])
 
 AM_PROG_CC_C_O
 AC_SUBST([CC_FOR_BUILD], [${CC_FOR_BUILD-$CC}])
 AC_PROG_CXX
 ACX_FINK
 ACX_MACPORTS
+ACX_PKGSRC
 ACX_PTHREAD(
   [LIBS="$PTHREAD_LIBS $LIBS"
    CFLAGS="$CFLAGS $PTHREAD_CFLAGS"
@@ -41,6 +39,7 @@ AC_PROG_INSTALL
 
 AC_DISABLE_SHARED
 AC_PROG_LIBTOOL
+AC_PROG_RANLIB
 
 ACX_MPI(
   [CC="$MPICC"
@@ -164,8 +163,9 @@ AC_FUNC_REALLOC
 AC_FUNC_STRERROR_R
 AC_FUNC_VPRINTF
 AC_CHECK_FUNCS([atexit bzero ftruncate strdup strndup strchr strstr strtol])
+AC_CHECK_FUNCS([memset mkdir pow strcasecmp strrchr])
 AC_CHECK_FUNCS([backtrace backtrace_symbols])
-AC_CHECK_DECLS([strdup, strndup, strchr, strstr],,,[
+AC_CHECK_DECLS([strdup, strndup, strchr, strrchr, strstr],,,[
 #include "${srcdir}/src/config.h"
 AC_INCLUDES_DEFAULT])
 
