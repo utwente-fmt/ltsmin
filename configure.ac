@@ -9,10 +9,7 @@ AC_CONFIG_HEADERS([src/amconfig.h])
 AC_SUBST([pkglibdir], "\${libdir}/${PACKAGE_NAME}-${PACKAGE_VERSION}")
 
 # Checks for programs.
-CFLAGS="-O2 ${CFLAGS}"
-CXXFLAGS="-O2 ${CXXFLAGS}"
-AM_CFLAGS="-g"
-AM_CXXFLAGS="-g -Wno-inline -ftemplate-depth-128 -finline-functions"
+AC_SUBST(AM_CXXFLAGS,["-Wno-inline -ftemplate-depth-128 -finline-functions"])
 
 AM_PROG_CC_C_O
 AC_SUBST([CC_FOR_BUILD], [${CC_FOR_BUILD-$CC}])
