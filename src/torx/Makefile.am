@@ -14,8 +14,9 @@ if HAVE_LIBMCRL
 # if HAVE_LIBNIPS
 bin_PROGRAMS += nips2torx
 # endif
-bin_PROGRAMS += etf2torx
+bin_PROGRAMS += etf2torx dve2torx
 endif
+
 
 # etf2torx
 etf2torx_SOURCES  = \
@@ -25,6 +26,15 @@ etf2torx_SOURCES  = \
 etf2torx_LDADD    = ../libltsmin.la -lATerm
 etf2torx_CPPFLAGS = -DETF $(TORX_CPPFLAGS) $(MCRL_CPPFLAGS) $(AM_CPPFLAGS)
 etf2torx_LDFLAGS  = $(MCRL_LDFLAGS) $(AM_LDFLAGS)
+
+# dve2torx
+dve2torx_SOURCES  = \
+	../dve-greybox.cpp ../dve-greybox.h \
+	../lts.c ../lts.h \
+	spec2torx.c
+dve2torx_LDADD    = ../libltsmin.la -lATerm $(DVEC_LIBS)
+dve2torx_CPPFLAGS = -DDIVINE $(TORX_CPPFLAGS) $(DIVINE_CPPFLAGS) $(MCRL_CPPFLAGS) $(AM_CPPFLAGS)
+dve2torx_LDFLAGS  = $(DIVINE_LDFLAGS) $(MCRL_LDFLAGS) $(AM_LDFLAGS)
 
 # lpo2torx
 lpo2torx_SOURCES  = \
