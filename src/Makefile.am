@@ -1,9 +1,9 @@
 bin_PROGRAMS = ltsmin-convert gcf etf-convert ltsmin-tracepp
 noinst_PROGRAMS = test-bitset test-is-balloc test-dfs-stack test-hre ltsmin-parse
-noinst_LTLIBRARIES = libutil.la libltsmin.la libbignum.la
+noinst_LTLIBRARIES = libutil.la libltsmin.la
 pkglib_LTLIBRARIES =
 
-SUBDIRS = dm . ce torx
+SUBDIRS = dm bignum . ce torx
 
 EXTRA_DIST = ltsmin-lexer.c ltsmin-lexer.h
 BUILT_SOURCES = ltsmin-grammar.c ltsmin-grammar.h ltsmin-lexer.c ltsmin-lexer.h
@@ -262,10 +262,7 @@ libutil_la_SOURCES += hre-config.h hre-context.c hre-context.h \
 	hre-popt.c hre-popt.h hre-pthread.c
 
 libltsmin_la_SOURCES = hre-nompi.c
-libltsmin_la_LIBADD = libutil.la libbignum.la
-
-libbignum_la_SOURCES = bignum.c bignum.h
-libbignum_la_LIBADD  = -lgmp
+libltsmin_la_LIBADD = libutil.la bignum/libbignum.la
 
 if HAVE_MPI
 libltsmin_mpi_la_SOURCES = hre-mpi.c
