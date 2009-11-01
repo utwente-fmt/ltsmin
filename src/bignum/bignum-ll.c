@@ -40,13 +40,7 @@ bn_add (long long *a, long long *b, long long *c)
 }
 
 void
-bn_set_zero (long long *a)
+bn_set_digit (long long *a, unsigned int digit)
 {
-    *a = 0;
-}
-
-void
-bn_set_one (long long *a)
-{
-    *a = 1;
+    *a = digit;
 }

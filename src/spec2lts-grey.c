@@ -750,7 +750,7 @@ int main(int argc, char *argv[]){
 		  vset_clear(next_set);
 		  vset_enum(current_set,bfs_explore_state_vector,model);
 		}
-		bn_int e_count;
+		bn_int_t e_count;
 		long nodes;
                 char string[1024];
 		int size;

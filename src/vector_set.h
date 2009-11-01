@@ -150,7 +150,7 @@ extern void vset_zip(vset_t dst,vset_t src);
 \param elements Pointer to bignum that will contain the count; this bignum
 is initialized by vset_count.
 */
-extern void vset_count(vset_t set,long *nodes,bn_int *elements);
+extern void vset_count(vset_t set,long *nodes,bn_int_t *elements);
 
 /**
 \brief Create a relation
@@ -168,7 +168,7 @@ extern void vrel_add(vrel_t rel,const int* src,const int* dst);
 \param elements Pointer to bignum that will contain the count; this bignum
 is initialized by vset_count.
 */
-extern void vrel_count(vrel_t rel,long *nodes,bn_int *elements);
+extern void vrel_count(vrel_t rel,long *nodes,bn_int_t *elements);
 
 /**
 \brief dst := { y | exists x in src : x rel y }

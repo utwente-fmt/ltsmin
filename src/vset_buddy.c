@@ -272,7 +272,7 @@ static void set_enum_match_fdd(vset_t set,int p_len,int* proj,int*match,vset_ele
 	vset_enum_do_fdd(set->dom,subset,set->proj,vec,N-1,cb,context);
 }
 
-static void count_fdd(BDD bdd, BDD p_set,long *nodes,bn_int *elements)
+static void count_fdd(BDD bdd, BDD p_set,long *nodes,bn_int_t *elements)
 {
 	*nodes=bdd_nodecount(bdd);
 	double count=bdd_satcountlnset(bdd,p_set);
@@ -282,11 +282,11 @@ static void count_fdd(BDD bdd, BDD p_set,long *nodes,bn_int *elements)
 	bn_double2int(count,elements);
 }
 
-static void set_count_fdd(vset_t set,long *nodes,bn_int *elements){
+static void set_count_fdd(vset_t set,long *nodes,bn_int_t *elements){
   count_fdd(set->bdd,set->p_set,nodes,elements);
 }
 
-static void rel_count_fdd(vrel_t rel,long *nodes,bn_int *elements){
+static void rel_count_fdd(vrel_t rel,long *nodes,bn_int_t *elements){
   count_fdd(rel->bdd,rel->rel_set,nodes,elements);
 }
 

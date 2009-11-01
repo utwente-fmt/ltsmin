@@ -157,7 +157,7 @@ static void set_copy_both(vset_t dst,vset_t src){
 
 static ATermIndexedSet count_is;
 static long node_count;
-static bn_int *elem_count;
+static bn_int_t *elem_count;
 static long elem_size;
 
 static long count_set_t2(ATerm set){
@@ -170,7 +170,7 @@ static long count_set_t2(ATerm set){
     if (idx>=elem_size){
       long elem_size_old=elem_size;
       elem_size=elem_size+(elem_size>>1);
-      elem_count=realloc(elem_count,elem_size*sizeof(bn_int));
+      elem_count=realloc(elem_count,elem_size*sizeof(bn_int_t));
       //ATwarning("resize %d %d %x",idx,elem_size,elem_count);
       for(int i=elem_size_old;i<elem_size;i++) bn_init(&elem_count[i]);
     }
@@ -185,20 +185,20 @@ static long count_set_t2(ATerm set){
     return idx;
 }
 
-static void set_count_t(ATerm set,long *nodes,bn_int *elements){
+static void set_count_t(ATerm set,long *nodes,bn_int_t *elements){
   long idx;
 
   count_is=ATindexedSetCreate(HASH_INIT,HASH_LOAD);
   elem_size=HASH_INIT;
-  elem_count=malloc(elem_size*sizeof(bn_int));
+  elem_count=malloc(elem_size*sizeof(bn_int_t));
   for(int i=0;i<elem_size;i++) bn_init(&elem_count[i]);
   node_count=2; // atom and emptyset
   idx=ATindexedSetPut(count_is,(ATerm)Empty,NULL);
   assert(idx<elem_size);
-  bn_set_zero(&elem_count[idx]);
+  bn_set_digit(&elem_count[idx],0);
   idx=ATindexedSetPut(count_is,(ATerm)Atom,NULL);
   assert(idx<elem_size);
-  bn_set_one(&elem_count[idx]);
+  bn_set_digit(&elem_count[idx],1);
   idx=count_set_t2(set);
   bn_init_copy(elements,&elem_count[idx]);
   ATindexedSetDestroy(count_is);
@@ -206,11 +206,11 @@ static void set_count_t(ATerm set,long *nodes,bn_int *elements){
   free(elem_count);
   *nodes=node_count;}
 
-static void set_count_tree(vset_t set,long *nodes,bn_int *elements){
+static void set_count_tree(vset_t set,long *nodes,bn_int_t *elements){
   set_count_t(set->set,nodes,elements);
 }
 
-static void rel_count_tree(vrel_t rel,long *nodes,bn_int *elements){
+static void rel_count_tree(vrel_t rel,long *nodes,bn_int_t *elements){
   set_count_t(rel->rel,nodes,elements);
 }
 
@@ -224,7 +224,7 @@ static long count_set_2(ATerm set){
     if (idx>=elem_size){
       long elem_size_old=elem_size;
       elem_size=elem_size+(elem_size>>1);
-      elem_count=realloc(elem_count,elem_size*sizeof(bn_int));
+      elem_count=realloc(elem_count,elem_size*sizeof(bn_int_t));
       //ATwarning("resize %d %d %x",idx,elem_size,elem_count);
       for(int i=elem_size_old;i<elem_size;i++) bn_init(&elem_count[i]);
     }
@@ -237,20 +237,20 @@ static long count_set_2(ATerm set){
     return idx;
 }
 
-static void count_set(ATerm set,long *nodes,bn_int *elements){
+static void count_set(ATerm set,long *nodes,bn_int_t *elements){
   long idx;
 
   count_is=ATindexedSetCreate(HASH_INIT,HASH_LOAD);
   elem_size=HASH_INIT;
-  elem_count=malloc(elem_size*sizeof(bn_int));
+  elem_count=malloc(elem_size*sizeof(bn_int_t));
   for(int i=0;i<elem_size;i++) bn_init(&elem_count[i]);
   node_count=2; // atom and emptyset
   idx=ATindexedSetPut(count_is,(ATerm)emptyset,NULL);
   assert(idx<elem_size);
-  bn_set_zero(&elem_count[idx]);
+  bn_set_digit(&elem_count[idx],0);
   idx=ATindexedSetPut(count_is,(ATerm)atom,NULL);
   assert(idx<elem_size);
-  bn_set_one(&elem_count[idx]);
+  bn_set_digit(&elem_count[idx],1);
   idx=count_set_2(set);
   bn_init_copy(elements,&elem_count[idx]);
   ATindexedSetDestroy(count_is);
@@ -258,11 +258,11 @@ static void count_set(ATerm set,long *nodes,bn_int *elements){
   free(elem_count);
   *nodes=node_count;}
 
-static void set_count_list(vset_t set,long *nodes,bn_int *elements){
+static void set_count_list(vset_t set,long *nodes,bn_int_t *elements){
   count_set(set->set,nodes,elements);
 }
 
-static void rel_count_list(vrel_t rel,long *nodes,bn_int *elements){
+static void rel_count_list(vrel_t rel,long *nodes,bn_int_t *elements){
   count_set(rel->rel,nodes,elements);
 }
 
