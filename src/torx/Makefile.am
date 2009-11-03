@@ -1,4 +1,4 @@
-TORX_CPPFLAGS = -I ${top_srcdir}/src
+TORX_CPPFLAGS = -I${top_srcdir}/src
 
 bin_PROGRAMS = 
 
