@@ -196,8 +196,8 @@ etf2lts_mpi_LDFLAGS  = $(AM_LDFLAGS) $(MCRL_LDFLAGS) $(CADP_LDFLAGS)
 
 
 # libdve-open.la
-libdve_open_la_SOURCES = spec_open.c dve-greybox.c dve-greybox.h
-libdve_open_la_CPPFLAGS = -DDIVINE $(DVE_CPPFLAGS) $(AM_CPPFLAGS) $(CADP_CPPFLAGS)
+libdve_open_la_SOURCES = spec_open.c dve-greybox.cpp dve-greybox.h
+libdve_open_la_CPPFLAGS = -DDIVINE $(DIVINE_CPPFLAGS) $(AM_CPPFLAGS) $(CADP_CPPFLAGS)
 libdve_open_la_LIBADD = libltsmin.la
 
 # liblpo-open.la
