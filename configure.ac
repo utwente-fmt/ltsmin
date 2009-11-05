@@ -206,8 +206,8 @@ AM_CONDITIONAL([HAVE_CADP], [test x"$acx_cadp" = xyes])
 AM_CONDITIONAL([HAVE_DVEC], [test x"$acx_dvec_libs" = xyes])
 
 AC_CONFIG_COMMANDS_POST(
-  [ac_configure_args="$ac_configure_args --enable-keep-terminated-procs \
-                                         --disable-shared \
+  [ac_configure_args="$ac_configure_args --enable-keep-terminated-procs dnl
+                                         --disable-shared dnl
                                          --libdir='$(eval echo "$pkglibdir")'"])
 
 if test x"$acx_cadp" = xyes; then
