@@ -289,22 +289,22 @@ static void set_enum_match_fdd(vset_t set,int p_len,int* proj,int*match,vset_ele
 	vset_enum_do_fdd(set->dom,subset,set->proj,vec,N-1,cb,context);
 }
 
-static void set_count_fdd(vset_t set,long *nodes,long long *elements){
-	*nodes=bdd_nodecount(set->bdd);
-	double count=bdd_satcountlnset(set->bdd,set->p_set);
+static void count_fdd(BDD bdd, BDD p_set,long *nodes,bn_int_t *elements)
+{
+	*nodes=bdd_nodecount(bdd);
+	double count=bdd_satcountlnset(bdd,p_set);
 	//Warning(info,"log of satcount is %f",count);
 	count=pow(2.0,count);
 	//Warning(info,"satcount is %f",count);
-	*elements=llround(count);
+	bn_double2int(count,elements);
 }
 
-static void rel_count_fdd(vrel_t rel,long *nodes,long long *elements){
-	*nodes=bdd_nodecount(rel->bdd);
-	double count=bdd_satcountlnset(rel->bdd,rel->rel_set);
-	//Warning(info,"log of satcount is %f",count);
-	count=pow(2.0,count);
-	//Warning(info,"satcount is %f",count);
-	*elements=llround(count);
+static void set_count_fdd(vset_t set,long *nodes,bn_int_t *elements){
+  count_fdd(set->bdd,set->p_set,nodes,elements);
+}
+
+static void rel_count_fdd(vrel_t rel,long *nodes,bn_int_t *elements){
+  count_fdd(rel->bdd,rel->rel_set,nodes,elements);
 }
 
 static void set_union_fdd(vset_t dst,vset_t src){

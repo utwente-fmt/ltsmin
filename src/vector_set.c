@@ -155,11 +155,11 @@ void vset_example(vset_t set,int *e){
 	set->dom->shared.set_example(set,e);
 }
 
-void vset_count(vset_t set,long *nodes,long long *elements){
+void vset_count(vset_t set,long *nodes,bn_int_t *elements){
 	set->dom->shared.set_count(set,nodes,elements);
 }
 
-void vrel_count(vrel_t rel,long *nodes,long long *elements){
+void vrel_count(vrel_t rel,long *nodes,bn_int_t *elements){
 	rel->dom->shared.rel_count(rel,nodes,elements);
 }
 
