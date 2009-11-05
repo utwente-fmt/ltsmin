@@ -205,16 +205,16 @@ AC_OUTPUT
 cat <<EOM
 Configuration:
 ======================================================================
-    CC             = ${CC:-NOT FOUND}
-    MPICC          = ${MPICC:-NOT FOUND, building without MPI support}
-    CXX            = ${CXX:-NOT FOUND}
-    MPICXX         = ${MPICXX:-NOT FOUND, building without MPI support}
-    MCRL           = ${with_mcrl:-NOT FOUND, building without muCRL support}
-    MCRL2          = ${with_mcrl2:-NOT FOUND, building without mCRL2 support}
-    CADP           = ${CADP:-NOT FOUND, building without CADP support}
-    DiVinE-cluster = ${with_divine:-NOT FOUND, building without DiVinE-cluster support}
+    CC       = ${CC:-NOT FOUND}
+    MPICC    = ${MPICC:-NOT FOUND, building without MPI support}
+    CXX      = ${CXX:-NOT FOUND}
+    MPICXX   = ${MPICXX:-NOT FOUND, building without MPI support}
+    MCRL     = ${with_mcrl:-NOT FOUND, building without muCRL support}
+    MCRL2    = ${with_mcrl2:-NOT FOUND, building without mCRL2 support}
+    CADP     = ${CADP:-NOT FOUND, building without CADP support}
+    DiVinE   = ${with_divine:-NOT FOUND, building without DiVinE support}
 
-    ASCIIDOC       = ${ASCIIDOC:-NOT FOUND, not building documentation}
-    XMLTO          = ${XMLTO:-NOT FOUND, not building manpages}
+    ASCIIDOC = ${ASCIIDOC:-NOT FOUND, not building documentation}
+    XMLTO    = ${XMLTO:-NOT FOUND, not building manpages}
 ======================================================================
 EOM

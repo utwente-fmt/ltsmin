@@ -6,8 +6,8 @@
 #   ACX_DIVINE([ACTION-IF-FOUND[, ACTION-IF-NOT-FOUND]])
 #
 AC_DEFUN([ACX_DIVINE], [
-AC_ARG_WITH([divine-cluster],
-  [AS_HELP_STRING([--with-divine-cluster=<prefix>],[DiVinE-cluster prefix directory])])
+AC_ARG_WITH([divine],
+  [AS_HELP_STRING([--with-divine=<prefix>],[DiVinE prefix directory])])
 AC_ARG_VAR([DIVINE_PRECOMPILE], [path to DiVinE 'precompile' command])
 case "$with_divine" in
   no) acx_divine=no ;;
@@ -21,7 +21,8 @@ case "$with_divine" in
 esac
 
 if test x"$acx_divine" = xyes; then
-    AC_SUBST(DIVINE_CPPFLAGS, ["$DIVINE_CPPFLAGS -I${with_divine}/include/divine-cluster"])
+    AC_SUBST(DIVINE_CPPFLAGS, 
+      ["$DIVINE_CPPFLAGS -I${with_divine}/include/divine-cluster"])
     AC_SUBST(DIVINE_LDFLAGS,  ["$DIVINE_LDFLAGS -L${with_divine}/lib"])
     $1
 else
