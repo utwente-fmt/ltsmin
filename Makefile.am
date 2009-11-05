@@ -17,3 +17,6 @@ distcheck-hook:
 # sample check whether manpages are present in generated tarball
 	test -f $(top_distdir)/doc/etf.5
 	test -f $(top_distdir)/doc/gcf.1
+
+libtool: $(LIBTOOL_DEPS)
+	$(SHELL) ./config.status --recheck

@@ -11,6 +11,8 @@ AC_SUBST([pkglibdir], "\${libdir}/${PACKAGE_NAME}-${PACKAGE_VERSION}")
 # Checks for programs.
 AC_SUBST(AM_CXXFLAGS,["-Wno-inline -ftemplate-depth-128 -finline-functions"])
 
+LT_PREREQ(1.5.22)
+LT_INIT([disable-shared])
 AM_PROG_CC_C_O
 AC_SUBST([CC_FOR_BUILD], [${CC_FOR_BUILD-$CC}])
 AC_PROG_CXX
@@ -36,10 +38,6 @@ AX_CHECK_FLEX([
 
 AC_PROG_MAKE_SET
 AC_PROG_INSTALL
-
-AC_DISABLE_SHARED
-AC_PROG_LIBTOOL
-AC_PROG_RANLIB
 
 ACX_MPI(
   [CC="$MPICC"
