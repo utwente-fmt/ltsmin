@@ -36,7 +36,7 @@ void   yyfree (void * ptr, void * yyscanner){
 %}
 
 white_space [ \t]+
-ident       ([a-zA-Z]|\\[[:print:]])([a-zA-Z0-9_']|\\[[:print:]])*
+ident       [_]*([a-zA-Z]|\\[[:print:]])([a-zA-Z0-9_']|\\[[:print:]])*
 number      [0-9]+
 string      \"(([[:print:]]{-}[\\\"])|"\\\\"|"\\\"")*\"
 chunk       #([0-9a-fA-F][0-9a-fA-F])*#
@@ -44,10 +44,11 @@ operator    [~!@<>=\-+/?&\\|*]+
 
 %%
 
-{white_space}  {} //white space, but not end of line.
+{white_space}  {yyextra->linepos+=strlen(yytext);} //white space, but not end of line.
 
 "\n" {
     yyextra->lineno++;
+    yyextra->linepos=0;
     if(yyextra->linebased) {
         Parse(yyextra->parser,TOKEN_END_OF_LINE,0,yyextra);
     }
@@ -56,28 +57,28 @@ operator    [~!@<>=\-+/?&\\|*]+
 "%".*   {} //comment
 
 "(" {
+    yyextra->linepos+=strlen(yytext);
     Parse(yyextra->parser,TOKEN_LPAR,0,yyextra);
 }
 
 ")" {
+    yyextra->linepos+=strlen(yytext);
     Parse(yyextra->parser,TOKEN_RPAR,0,yyextra);
 }
 
 "." {
+    yyextra->linepos+=strlen(yytext);
     Parse(yyextra->parser,TOKEN_DOT,0,yyextra);
 }
 
-
 ":" {
+    yyextra->linepos+=strlen(yytext);
     Parse(yyextra->parser,TOKEN_COLON,0,yyextra);
-}
-
-"_" {
-    Parse(yyextra->parser,TOKEN_DONTCARE,0,yyextra);
 }
 
 {string}|{chunk} {
     int len=strlen(yytext);
+    yyextra->linepos+=strlen(yytext);
     char decode[len];
     chunk c={.data=decode,.len=len};
     string2chunk(yytext,&c);
@@ -86,6 +87,7 @@ operator    [~!@<>=\-+/?&\\|*]+
 
 {ident} {
     int idx;
+    yyextra->linepos+=strlen(yytext);
     if ((idx=SIlookup(yyextra->keywords,yytext))!=SI_INDEX_FAILED) {
         Parse(yyextra->parser,idx,0,yyextra);
     } else {
@@ -113,16 +115,19 @@ operator    [~!@<>=\-+/?&\\|*]+
 }
 
 {number} {
-        Parse(yyextra->parser,TOKEN_NUMBER,atoi(yytext),yyextra);
+    yyextra->linepos+=strlen(yytext);
+    Parse(yyextra->parser,TOKEN_NUMBER,atoi(yytext),yyextra);
 }
 
 <<EOF>> {
+    yyextra->linepos+=strlen(yytext);
     Parse(yyextra->parser,0,0,yyextra);
     return 0;
 }
 
 {operator} {
     int idx;
+    yyextra->linepos+=strlen(yytext);
     if ((idx=SIlookup(yyextra->keywords,yytext))!=SI_INDEX_FAILED) {
         Parse(yyextra->parser,idx,0,yyextra);
     } else if((idx=SIlookup(yyextra->unary_ops,yytext))!=SI_INDEX_FAILED){
@@ -135,7 +140,12 @@ operator    [~!@<>=\-+/?&\\|*]+
 }
 
 . {
-    Fatal(1,error,"Unexpected character %s (%x)",yytext,yytext[0]);
+    yyextra->linepos++;
+    HREmessage(error,"Unexpected character %s (%x) at line %d, pos %d",
+          yytext,yytext[0],yyextra->lineno+1,yyextra->linepos+1);
+    Parse(yyextra->parser,TOKEN_ERROR,0,yyextra);
+    /* Because the same lexer is used for multiple languages, we give the
+       parser the opportunity to provide a sensible error message. */
     (void)yyunput;
 }
 
