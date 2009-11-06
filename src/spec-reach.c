@@ -309,7 +309,7 @@ static void stats_and_progress_report(vset_t current, vset_t visited, int level)
     vset_count(current,&n_count,&e_count);
     if (n_count>max_lev_count) max_lev_count=n_count;
     size = bn_int2string(string,sizeof string,&e_count);
-    if(size >= sizeof string) Fatal(1,error,"Error converting number to string");
+    if(size >= (ssize_t)sizeof string) Fatal(1,error,"Error converting number to string");
     Warning(info,"level %d has %s states ( %ld nodes )",level,string,n_count);
     bn_clear(&e_count);
   }
@@ -317,7 +317,7 @@ static void stats_and_progress_report(vset_t current, vset_t visited, int level)
   vset_count(visited,&n_count,&e_count);
   if (n_count>max_vis_count) max_vis_count=n_count;
   size = bn_int2string(string,sizeof string,&e_count);
-  if(size >= sizeof string) Fatal(1,error,"Error converting number to string");
+  if(size >= (ssize_t)sizeof string) Fatal(1,error,"Error converting number to string");
   Warning(info,"visited %d has %s states ( %ld nodes )",level,string,n_count);
   bn_clear(&e_count);
   if (RTverbosity >= 2) {
@@ -326,7 +326,7 @@ static void stats_and_progress_report(vset_t current, vset_t visited, int level)
     for (i=0;i<nGrps;i++) {
       vrel_count(group_next[i],&n_count,&e_count);
       size = bn_int2string(string,sizeof string,&e_count);
-      if(size >= sizeof string) Fatal(1,error,"Error converting number to string");
+      if(size >= (ssize_t)sizeof string) Fatal(1,error,"Error converting number to string");
       fprintf(stderr,"( %d %ld %s ) ",i,n_count,string);
       bn_clear(&e_count);
       if (n_count>max_trans_count) max_trans_count=n_count;
@@ -335,7 +335,7 @@ static void stats_and_progress_report(vset_t current, vset_t visited, int level)
     for (i=0;i<nGrps;i++) {
       vset_count(group_explored[i],&n_count,&e_count);
       size = bn_int2string(string,sizeof string,&e_count);
-      if(size >= sizeof string) Fatal(1,error,"Error converting number to string");
+      if(size >= (ssize_t)sizeof string) Fatal(1,error,"Error converting number to string");
       fprintf(stderr,"( %d %ld %s ) ",i,n_count,string);
       bn_clear(&e_count);
       if (n_count>max_grp_count) max_grp_count=n_count;
@@ -352,7 +352,7 @@ static void final_stat_reporting(vset_t visited) {
 
   vset_count(visited,&n_count,&e_count);
   size = bn_int2string(string,sizeof string,&e_count);
-  if(size >= sizeof string) Fatal(1,error,"Error converting number to string");
+  if(size >= (ssize_t)sizeof string) Fatal(1,error,"Error converting number to string");
   fprintf(stderr,"state space has %s states\n",string);
   bn_clear(&e_count);
   if (max_lev_count==0)
