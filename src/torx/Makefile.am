@@ -1,6 +1,10 @@
 TORX_CPPFLAGS = -I${top_srcdir}/src
 
-bin_PROGRAMS = 
+bin_PROGRAMS = etf2torx
+
+# if HAVE_LIBNIPS
+bin_PROGRAMS += nips2torx
+# endif
 
 if HAVE_LIBSTEP_INFO
 bin_PROGRAMS +=  lpo2torx
@@ -10,11 +14,8 @@ if HAVE_LIBMCRL2
 bin_PROGRAMS += lps2torx
 endif
 
-if HAVE_LIBMCRL
-# if HAVE_LIBNIPS
-bin_PROGRAMS += nips2torx
-# endif
-bin_PROGRAMS += etf2torx dve2torx
+if HAVE_DVEC
+bin_PROGRAMS += dve2torx
 endif
 
 
@@ -23,18 +24,17 @@ etf2torx_SOURCES  = \
 	../etf-greybox.c ../etf-greybox.h \
 	../lts.c ../lts.h \
 	spec2torx.c
-etf2torx_LDADD    = ../libltsmin.la -lATerm
-etf2torx_CPPFLAGS = -DETF $(TORX_CPPFLAGS) $(MCRL_CPPFLAGS) $(AM_CPPFLAGS)
-etf2torx_LDFLAGS  = $(MCRL_LDFLAGS) $(AM_LDFLAGS)
+etf2torx_LDADD    = ../libltsmin.la
+etf2torx_CPPFLAGS = -DETF $(TORX_CPPFLAGS) $(AM_CPPFLAGS)
 
 # dve2torx
 dve2torx_SOURCES  = \
 	../dve-greybox.cpp ../dve-greybox.h \
 	../lts.c ../lts.h \
 	spec2torx.c
-dve2torx_LDADD    = ../libltsmin.la -lATerm $(DVEC_LIBS)
-dve2torx_CPPFLAGS = -DDIVINE $(TORX_CPPFLAGS) $(DIVINE_CPPFLAGS) $(MCRL_CPPFLAGS) $(AM_CPPFLAGS)
-dve2torx_LDFLAGS  = $(DIVINE_LDFLAGS) $(MCRL_LDFLAGS) $(AM_LDFLAGS)
+dve2torx_LDADD    = ../libltsmin.la $(DVEC_LIBS)
+dve2torx_CPPFLAGS = -DDIVINE $(TORX_CPPFLAGS) $(DIVINE_CPPFLAGS) $(AM_CPPFLAGS)
+dve2torx_LDFLAGS  = $(DIVINE_LDFLAGS) $(AM_LDFLAGS)
 
 # lpo2torx
 lpo2torx_SOURCES  = \
@@ -58,9 +58,9 @@ lps2torx_LDFLAGS  = $(MCRL2_LDFLAGS) $(AM_LDFLAGS)
 nips2torx_SOURCES  = \
 	../nips-greybox.c ../nips-greybox.h \
 	spec2torx.c
-nips2torx_LDADD    = ../libltsmin.la -lATerm $(NIPS_LIBS)
-nips2torx_CPPFLAGS = -DNIPS $(TORX_CPPFLAGS) $(NIPS_CPPFLAGS) $(MCRL_CPPFLAGS) $(AM_CPPFLAGS)
-nips2torx_LDFLAGS  = $(NIPS_LDFLAGS) $(MCRL_LDFLAGS) $(AM_LDFLAGS)
+nips2torx_LDADD    = ../libltsmin.la $(NIPS_LIBS)
+nips2torx_CPPFLAGS = -DNIPS $(TORX_CPPFLAGS) $(NIPS_CPPFLAGS) $(AM_CPPFLAGS)
+nips2torx_LDFLAGS  = $(NIPS_LDFLAGS) $(AM_LDFLAGS)
 
 # make
 .DELETE_ON_ERROR:
