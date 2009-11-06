@@ -55,4 +55,14 @@ struct ltsmin_expr_s {
 };
 extern void LTSminPrintExpr(log_t log,ltsmin_parse_env_t env,ltsmin_expr_t expr);
 
+/**
+\brief Print the given string as a legal ETF identifier.
+ 
+Illegal characters are escaped with '\'. Moreover if the identifier happens to be a keyword
+then the entire keyword is escaped. The matching decoding is currently performed in the
+ltsmin lexer.
+
+ */
+extern void fprint_ltsmin_ident(FILE* f,char*ident);
+
 #endif

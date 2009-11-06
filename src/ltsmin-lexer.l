@@ -36,7 +36,7 @@ void   yyfree (void * ptr, void * yyscanner){
 %}
 
 white_space [ \t]+
-ident       [a-zA-Z][a-zA-Z0-9_']*
+ident       ([a-zA-Z]|\\[[:print:]])([a-zA-Z0-9_']|\\[[:print:]])*
 number      [0-9]+
 string      \"(([[:print:]]{-}[\\\"])|"\\\\"|"\\\"")*\"
 chunk       #([0-9a-fA-F][0-9a-fA-F])*#
@@ -88,12 +88,27 @@ operator    [~!@<>=\-+/?&\\|*]+
     int idx;
     if ((idx=SIlookup(yyextra->keywords,yytext))!=SI_INDEX_FAILED) {
         Parse(yyextra->parser,idx,0,yyextra);
-    } else if ((idx=SIlookup(yyextra->state_vars,yytext))!=SI_INDEX_FAILED) {
-        Parse(yyextra->parser,TOKEN_STATE_VAR,idx,yyextra);
-    } else if ((idx=SIlookup(yyextra->edge_vars,yytext))!=SI_INDEX_FAILED) {
-        Parse(yyextra->parser,TOKEN_EDGE_VAR,idx,yyextra);
     } else {
-        Parse(yyextra->parser,TOKEN_IDENT,SIput(yyextra->idents,yytext),yyextra);
+        int N=strlen(yytext);
+        char decoded[N+1];
+        int j=0;
+        for(int i=0;i<N;i++){
+            if(yytext[i]=='\\'){
+                decoded[j]=yytext[i+1];
+                i++;
+            } else {
+                decoded[j]=yytext[i];
+            }
+            j++;
+        }
+        decoded[j]=0;
+        if ((idx=SIlookup(yyextra->state_vars,decoded))!=SI_INDEX_FAILED) {
+            Parse(yyextra->parser,TOKEN_STATE_VAR,idx,yyextra);
+        } else if ((idx=SIlookup(yyextra->edge_vars,decoded))!=SI_INDEX_FAILED) {
+            Parse(yyextra->parser,TOKEN_EDGE_VAR,idx,yyextra);
+        } else {
+            Parse(yyextra->parser,TOKEN_IDENT,SIput(yyextra->idents,decoded),yyextra);
+        }
     }
 }
 
