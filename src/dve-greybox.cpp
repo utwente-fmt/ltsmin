@@ -138,7 +138,7 @@ void DVEexit()
         dlclose(dlHandle);
 
         char rmcmd[4096];
-        if (snprintf(rmcmd, sizeof rmcmd, "rm -rf %s", templatename) < sizeof rmcmd)
+        if (snprintf(rmcmd, sizeof rmcmd, "rm -rf %s", templatename) < (ssize_t)sizeof rmcmd)
         {
             // remove!
             system(rmcmd);
@@ -162,12 +162,12 @@ void DVEcompileGreyboxModel(model_t model, const char *filename){
         FatalCall (1, error, "Can't create temporary directory for compilation");
 
     char command[4096];
-    if (snprintf(command, sizeof command, "cp %s %s", filename, tmpdir) < sizeof command)
+    if (snprintf(command, sizeof command, "cp %s %s", filename, tmpdir) < (ssize_t)sizeof command)
     {
         system(command);
 
         // compile the dve model
-        if (snprintf(command, sizeof command, "divine.precompile %s/%s", tmpdir, filename) < sizeof command)
+        if (snprintf(command, sizeof command, "divine.precompile %s/%s", tmpdir, filename) < (ssize_t)sizeof command)
         {
             system(command);
 
