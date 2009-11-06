@@ -11,8 +11,6 @@ AC_SUBST([pkglibdir], "\${libdir}/${PACKAGE_NAME}-${PACKAGE_VERSION}")
 # Checks for programs.
 AC_SUBST(AM_CXXFLAGS,["-Wno-inline -ftemplate-depth-128 -finline-functions"])
 
-LT_PREREQ(1.5.22)
-LT_INIT([disable-shared])
 AM_PROG_CC_C_O
 AC_SUBST([CC_FOR_BUILD], [${CC_FOR_BUILD-$CC}])
 AC_PROG_CXX
@@ -25,6 +23,13 @@ ACX_PTHREAD(
    CXXFLAGS="$CXXFLAGS $PTHREAD_CFLAGS"
    CC="$PTHREAD_CC"],
   [AC_MSG_FAILURE([no pthread support found.])])
+
+dnl Newer libtool allows this instead:
+dnl LT_PREREQ(2.2)
+dnl LT_INIT([disable-shared])
+AC_DISABLE_SHARED
+AC_PROG_LIBTOOL
+AC_PROG_RANLIB
 
 AX_CHECK_FLEX([
 %option prefix="ltsmin_"
