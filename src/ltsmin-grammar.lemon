@@ -17,9 +17,9 @@ This section is shared by the parsers for all LTSmin languages.
 %token_type { int } 
 %syntax_error {
     (void)yymajor;(void)yyminor;
-    Fatal(1,error,"syntax error");
+    HREmessage(error,"syntax error near line %d, pos %d",env->lineno+1,env->linepos+1);
 }
-%parse_failure { Fatal(1,error,"parse error"); }
+%parse_failure { HREabort(0); }
 %parse_accept { Warning(info,"success!"); }
 %extra_argument { ltsmin_parse_env_t env }
 %stack_overflow {
@@ -44,6 +44,9 @@ input ::= ETF etf_spec . {
     Warning(debug,"ETF model has %d map sections",model->map_count);
     Warning(debug,"ETF model has %d types",lts_type_get_type_count(model->ltstype));
 }
+input ::= ERROR . {
+    Abort("The error token is meant to give the lexer a way of passing the error.");
+}
 
 etf_spec ::= state_section edge_section .
 etf_spec ::= etf_spec init_section .
@@ -51,7 +54,13 @@ etf_spec ::= etf_spec trans_section.
 etf_spec ::= etf_spec map_section.
 etf_spec ::= etf_spec sort_section.
 
-etf_spec ::= EOL .
+etf_spec ::= error . {
+    HREprintf(error,"ETF syntax has changed. Possible causes for syntax errors are:\n");
+    HREprintf(error," - keywords must be escaped when used as identifiers e.g. \\state\n");
+    HREprintf(error," - every variable name and type must be defined (don't use \"_\")\n");
+    HREprintf(error," - you can escape illegal identifier characters with '\\'\n");
+    HREabort(0);
+}
 
 state_section ::= BEGIN STATE decl_list(L) END STATE. {
     int N=ETFlistLength(L);
@@ -136,11 +145,7 @@ valref_list(L) ::= valref_list(P) STRING(S) . { L=ETFlistAppend(P,INLINE_VALUE,S
 %type decl_list { etf_list_t }
 %destructor decl_list { ETFlistFree($$); }
 decl_list(L) ::= . { L=NULL; }
-decl_list(L) ::= decl_list(P) id_opt(N) COLON id_opt(T) . { L=ETFlistAppend(P,N,T); }
-
-%type id_opt { int }
-id_opt(A) ::= IDENT(B). {A=B;}
-id_opt(A) ::= DONTCARE. {A=SI_INDEX_FAILED;}
+decl_list(L) ::= decl_list(P) IDENT(N) COLON IDENT(T) . { L=ETFlistAppend(P,N,T); }
 
 %type sort_list { string_index_t }
 

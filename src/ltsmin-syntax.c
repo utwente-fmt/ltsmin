@@ -5,6 +5,7 @@
 #include <ltsmin-parse-env.h>
 #include <ltsmin-lexer.h>
 #include <chunk_support.h>
+#include <ctype.h>
 
 void ltsmin_parse_stream(int select,ltsmin_parse_env_t env,stream_t stream){
     yyscan_t scanner;
@@ -151,3 +152,41 @@ void LTSminPrintExpr(log_t log,ltsmin_parse_env_t env,ltsmin_expr_t expr){
             break;
     }
 }
+
+static char*keyword[]={"begin","end","state","edge","init","trans","sort","map",NULL};
+
+static int legal_first_char(char c){
+    switch(c){
+        case 'a'...'z': return 1;
+        case 'A'...'Z': return 1;
+        default: return 0;
+    }
+}
+
+static int legal_other_char(char c){
+    switch(c){
+        case 'a'...'z': return 1;
+        case 'A'...'Z': return 1;
+        case '0'...'9': return 1;
+        case '_' : return 1;
+        case '\'' : return 1;
+        default: return 0;
+    }
+}
+
+void fprint_ltsmin_ident(FILE* f,char*ident){
+    for(int i=0;keyword[i];i++){
+        if (strcmp(keyword[i],ident)==0){
+            fprintf(f,"\\%s",ident);
+            return;
+        }
+    }
+    int N=strlen(ident);
+    fprintf(f,"%s%c",legal_first_char(ident[0])?"":"\\",ident[0]);
+    for(int i=1;i<N;i++){
+        fprintf(f,"%s%c",legal_other_char(ident[i])?"":"\\",ident[i]);
+    }
+}
+
+
+

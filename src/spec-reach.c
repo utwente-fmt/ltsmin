@@ -3,6 +3,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <strings.h>
+#include <ltsmin-syntax.h>
 
 #include "archive.h"
 #include <runtime.h>
@@ -562,20 +563,18 @@ void do_output(){
 	}
 	fprintf(table_file,"begin state\n");
 	for(int i=0;i<N;i++){
-		char*name=lts_type_get_state_name(ltstype,i);
-		int sort=lts_type_get_state_typeno(ltstype,i);
-		fprintf(table_file,"%s:%s%s",
-			name?name:"_",
-			(sort>=0)?lts_type_get_state_type(ltstype,i):"_",
-			(i==(N-1))?"\n":" ");
+                fprint_ltsmin_ident(table_file,lts_type_get_state_name(ltstype,i));
+                fprintf(table_file,":");
+                fprint_ltsmin_ident(table_file,lts_type_get_state_type(ltstype,i));
+		fprintf(table_file,(i==(N-1))?"\n":" ");
 	}
 	fprintf(table_file,"end state\n");
 	fprintf(table_file,"begin edge\n");
 	for(int i=0;i<eLbls;i++){
-		fprintf(table_file,"%s:%s%s",
-			lts_type_get_edge_label_name(ltstype,i),
-			lts_type_get_edge_label_type(ltstype,i),
-			(i==(eLbls-1))?"\n":" ");
+            fprint_ltsmin_ident(table_file,lts_type_get_edge_label_name(ltstype,i));
+            fprintf(table_file,":");
+            fprint_ltsmin_ident(table_file,lts_type_get_edge_label_type(ltstype,i));
+            fprintf(table_file,(i==(eLbls-1))?"\n":" ");
 	}
 	fprintf(table_file,"end edge\n");
 	fprintf(table_file,"begin init\n");
@@ -612,9 +611,11 @@ void do_output(){
 		ctx.mapno=i;
 		ctx.len=len;
 		ctx.used=used;
-		fprintf(table_file,"begin map %s:%s\n",
-			lts_type_get_state_label_name(ltstype,i),
-			lts_type_get_state_label_type(ltstype,i));
+		fprintf(table_file,"begin map ");
+                fprint_ltsmin_ident(table_file,lts_type_get_state_label_name(ltstype,i));
+                fprintf(table_file,":");
+                fprint_ltsmin_ident(table_file,lts_type_get_state_label_type(ltstype,i));
+                fprintf(table_file,"\n");
 		vset_enum(patterns,enum_map,&ctx);
 		fprintf(table_file,"end map\n");
 		vset_clear(patterns); // Should be vset_destroy, which doesn't exist.
@@ -622,7 +623,9 @@ void do_output(){
 	int type_count=lts_type_get_type_count(ltstype);
 	for(int i=0;i<type_count;i++){
 		Warning(info,"dumping type %s",lts_type_get_type(ltstype,i));
-		fprintf(table_file,"begin sort %s\n",lts_type_get_type(ltstype,i));
+		fprintf(table_file,"begin sort ");
+                fprint_ltsmin_ident(table_file,lts_type_get_type(ltstype,i));
+                fprintf(table_file,"\n");
 		int values=GBchunkCount(model,i);
 		for(int j=0;j<values;j++){
 			chunk c=GBchunkGet(model,i,j);
