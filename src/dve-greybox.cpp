@@ -93,7 +93,7 @@ static matrix_t dm_info;
 static matrix_t sl_info;
 static divine::succ_container_t cb_cont;
 static void* dlHandle = NULL;
-static char templatename[] = "/tmp/ltsmin-XXXXXX";
+static char templatename[4096];
 
 static int
 succ_callback(TransitionCB cb, void* context)
@@ -133,62 +133,81 @@ divine_get_transitions_long(model_t self, int group, int*src, TransitionCB cb, v
 void DVEexit()
 {
     // close dveC library
-    if (dlHandle != NULL)
-    {
-        dlclose(dlHandle);
+    if (dlHandle == NULL)
+        return;
+    dlclose(dlHandle);
 
-        char rmcmd[4096];
-        if (snprintf(rmcmd, sizeof rmcmd, "rm -rf %s", templatename) < (ssize_t)sizeof rmcmd)
-        {
-            // remove!
-            system(rmcmd);
-        }
+    if (strlen (templatename) == 0)
+        return;
+
+    char rmcmd[4096];
+    if (snprintf(rmcmd, sizeof rmcmd, "rm -rf %s", templatename) < (ssize_t)sizeof rmcmd) {
+        // remove!
+        system(rmcmd);
     }
 }
 
+#define SYSFAIL(cond,...)                                               \
+    do { if (cond) FatalCall(__VA_ARGS__) Fatal(__VA_ARGS__); } while (0)
 void DVEcompileGreyboxModel(model_t model, const char *filename){
-    // check file exists
     struct stat st;
-    if (stat(filename, &st) != 0)
-        FatalCall (1, error, "File not found: %s ", filename);
+    int ret;
+    // check file exists
+    if ((ret = stat (filename, &st)) != 0)
+        FatalCall (1, error, "%s", filename);
 
-    // check /tmp
-    if (stat("/tmp", &st))
-        FatalCall (1, error, "Can't access /tmp for temporary compilation");
-
+    char *abs_filename = realpath (filename, NULL);
+    if (abs_filename == NULL)
+        FatalCall (1, error, "Cannot determine absolute path of %s", filename);
+    
     // get temporary directory
-    char* tmpdir = mkdtemp(templatename);
-    if (!tmpdir)
-        FatalCall (1, error, "Can't create temporary directory for compilation");
+    const char *tmpdir = getenv("TMPDIR");
+    if (tmpdir == NULL)
+        tmpdir = "/tmp";
 
+    if ((ret = stat (tmpdir, &st)) != 0)
+        FatalCall(1, error, "Cannot access `%s' for temporary compilation",
+                  tmpdir);
+
+    if (snprintf (templatename, sizeof templatename, "%s/ltsmin-XXXXXX", tmpdir) >= (ssize_t)sizeof templatename)
+        Fatal (1, error, "Path too long: %s", tmpdir);
+        
+    atexit (DVEexit);                   // cleanup
+    if ((tmpdir = mkdtemp(templatename)) == NULL)
+        FatalCall(1, error, "Cannot create temporary directory for compilation: %s", tmpdir);
+
+    // copy
     char command[4096];
-    if (snprintf(command, sizeof command, "cp %s %s", filename, tmpdir) < (ssize_t)sizeof command)
-    {
-        system(command);
+    // XXX shell escape filename
+    if (snprintf (command, sizeof command, "cp '%s' '%s'", abs_filename, tmpdir) >= (ssize_t)sizeof command)
+        Fatal (1, error, "Paths to long: cannot copy `%s' to `%s'", abs_filename, tmpdir);
 
-        // compile the dve model
-        if (snprintf(command, sizeof command, "divine.precompile %s/%s", tmpdir, filename) < (ssize_t)sizeof command)
-        {
-            system(command);
+    if ((ret = system (command)) != 0)
+        SYSFAIL(ret < 0, 1, error, "Command failed with exit code %d: %s", ret, command);
 
-            // check existence dveC model
-            snprintf(command, sizeof command, "%s/%sC", tmpdir, filename);
-            if (stat(command, &st) != 0)
-            {
-                FatalCall (1, error, "Something went wrong with creation of %s ", command);
-            }
+    // compile dve model
+    char *basename = strrchr (abs_filename, '/');
+    if (basename == NULL)
+        Fatal (1, error, "Could not extract basename of file: %s", abs_filename);
+    ++basename;                         // skip '/'
+    
+    if (snprintf(command, sizeof command, "divine.precompile '%s/%s'", tmpdir, basename) >= (ssize_t)sizeof command)
+        Fatal (1, error, "Cannot copy `%s' to `%s', paths too long", abs_filename, tmpdir);
+        
+    if ((ret = system(command)) != 0)
+        SYSFAIL(ret < 0, 1, error, "Command failed with exit code %d: %s", ret, command);
 
-            // all good, continue
-            atexit(DVEexit); // hopefully this works :), if not, keep garbage
+    // check existence of dveC file
+    char dveC_fname[4096];
+    if (snprintf (dveC_fname, sizeof dveC_fname, "%s/%sC", tmpdir, basename) >= (ssize_t)sizeof dveC_fname)
+        Fatal (1, error, "Path too long: %s", tmpdir);
+    
+    if ((ret = stat (dveC_fname, &st)) != 0)
+        SYSFAIL(ret < 0, 1, error, "File not found: %s", dveC_fname);
 
-            DVEloadGreyboxModel(model, command);
-            return;
-        } else {
-            FatalCall (1, error, "Problems occured when compiling %s/%s", tmpdir, filename);
-        }
-    }
-    FatalCall (1, error, "Can't copy, paths too long ");
+    DVEloadGreyboxModel(model, dveC_fname);
 }
+#undef SYSFAIL
 
 void DVEloadGreyboxModel(model_t model, const char *filename){
 	gb_context_t ctx=(gb_context_t)RTmalloc(sizeof(struct grey_box_context));
@@ -201,11 +220,11 @@ void DVEloadGreyboxModel(model_t model, const char *filename){
         free(abs_filename);
         if (dlHandle == NULL)
         {
-            FatalCall (1, error, "%s, Library \"%s\" is not reachable", dlerror(), filename);
+            Fatal (1, error, "%s, Library \"%s\" is not reachable", dlerror(), filename);
             return;
         }
     } else {
-        FatalCall (1, error, "%s, Library \"%s\" is not found", dlerror(), filename);
+        Fatal (1, error, "%s, Library \"%s\" is not found", dlerror(), filename);
     }
 
     // get functions
@@ -223,7 +242,7 @@ void DVEloadGreyboxModel(model_t model, const char *filename){
     if (lib_get_succ == NULL || lib_is_accepting == NULL ||
         lib_is_in_accepting_component == NULL || lib_get_initial_state == NULL ||
         lib_print_state == NULL) {
-        FatalCall (1, error, "Library \"%s\" doesn't export the required functions", filename);
+        Fatal (1, error, "Library \"%s\" doesn't export the required functions", filename);
     }
 
     // added interface functions
