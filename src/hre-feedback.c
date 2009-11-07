@@ -203,7 +203,7 @@ void log_message(log_t log,const char*file,int line,int errnum,const char *fmt,.
     va_end(args);
     if (errnum) {
         char errmsg[256];
-#ifdef _GNU_SOURCE
+#ifdef STRERROR_R_CHAR_P
         char*err_msg=strerror_r(errnum,errmsg,256);
         if(!err_msg){
 #else
@@ -221,7 +221,7 @@ void log_message(log_t log,const char*file,int line,int errnum,const char *fmt,.
                     sprintf(errmsg,"this statement should have been unreachable");
             }
         }
-        fprintf(f,": %s",err_msg);
+        fprintf(f,": %s", errmsg);
     }
     fprintf(f,"\n");
 }
