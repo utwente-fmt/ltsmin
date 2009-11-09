@@ -29,6 +29,7 @@ bn_clear (mp_int *a)
 void
 bn_double2int (double a, mp_int *b)
 {
+    const unsigned int  FRAC_BITS = 52;
     int                 ret,
                         exp;
     long int            val;
@@ -45,7 +46,7 @@ bn_double2int (double a, mp_int *b)
     ret = mp_mul_2d (&upper, exp, &upper);
     if (ret != MP_OKAY)
         Fatal (1, error, "Error initializing number");
-    for (int i = 0; i < 52; i++) {
+    for (int i = 0; i < FRAC_BITS; i++) {
         frac = frac * 2;
         val = lround (floor (frac));
         assert (val == 0 || val == 1);
@@ -65,11 +66,12 @@ bn_double2int (double a, mp_int *b)
 int
 bn_int2string (char *string, size_t size, mp_int *a)
 {
+    const unsigned int  BASE = 10;
     int                 ret,
                         needed_size;
 
     assert (string != NULL && size > 0);
-    ret = mp_radix_size (a, 10, &needed_size);
+    ret = mp_radix_size (a, BASE, &needed_size);
     if (ret != MP_OKAY)
         Fatal (1, error, "Error getting radix size");
     if ((size_t) needed_size <= size) { // needed_size is always positive
