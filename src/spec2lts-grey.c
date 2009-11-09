@@ -761,8 +761,8 @@ int main(int argc, char *argv[]){
                 char string[1024];
 		int size;
 		vset_count(visited_set,&nodes,&e_count);
-                size = bn_int2string(string,1024,&e_count);
-		if(!(size < 1024)) Fatal(1,error,"Error converting number to string");
+                size = bn_int2string(string,sizeof string,&e_count);
+		if(size >= (ssize_t)sizeof string) Fatal(1,error,"Error converting number to string");
 	    	Warning(info,"%s reachable states represented symbolically with %ld nodes",string,nodes);
                 bn_clear(&e_count);
 		break;

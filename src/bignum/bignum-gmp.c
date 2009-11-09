@@ -35,8 +35,8 @@ int
 bn_int2string (char *string, size_t size, mpz_t *a)
 {
     const unsigned int  BASE = 10;
-    assert (string != NULL && size > 0);
     unsigned int        needed_size = mpz_sizeinbase (*a, BASE) + 2;
+    assert (string != NULL && size > 0);
     if (size >= needed_size)
         mpz_get_str (string, BASE, *a);
     else

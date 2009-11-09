@@ -86,7 +86,7 @@ extern void         bn_add (bn_int_t *a, bn_int_t *b, bn_int_t *c);
 
 \param a Pointer to initialized bignum whose value should be set.
 
-\param a small positive integer.
+\param digit A small positive integer.
  */
 extern void         bn_set_digit (bn_int_t *a, unsigned int digit);
 
