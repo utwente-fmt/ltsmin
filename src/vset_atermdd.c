@@ -13,7 +13,7 @@ static void WarningHandler(const char *format, va_list args) {
 		fprintf(f,"\n");
 	}
 }
-     
+
 static void ErrorHandler(const char *format, va_list args) {
 	FILE* f=log_get_stream(error);
 	if (f) {
@@ -26,9 +26,9 @@ static void ErrorHandler(const char *format, va_list args) {
 }
 
 static void atermdd_popt(poptContext con,
- 		enum poptCallbackReason reason,
+                            enum poptCallbackReason reason,
                             const struct poptOption * opt,
-                             const char * arg, void * data){
+                            const char * arg, void * data){
 	(void)con;(void)opt;(void)arg;(void)data;
 	switch(reason){
 	case POPT_CALLBACK_REASON_PRE:
@@ -166,7 +166,7 @@ static long count_set_t2(ATerm set){
   ATbool new;
   long idx, idx_0, idx_1, idx_2;
 
-  idx=ATindexedSetPut(count_is,(ATerm)set,&new)+2;
+  idx=ATindexedSetPut(count_is,(ATerm)set,&new);
   if(new){
     node_count++;
     if (idx>=elem_size){
@@ -179,7 +179,8 @@ static long count_set_t2(ATerm set){
     idx_0=count_set_t2(ATgetArgument(set,0));
     idx_1=count_set_t2(ATgetArgument(set,1));
     idx_2=count_set_t2(ATgetArgument(set,2));
-    bn_add(&elem_count[idx_0],&elem_count[idx_1],&elem_count[idx]);
+    bn_add(&elem_count[idx_0],&elem_count[idx],&elem_count[idx]);
+    bn_add(&elem_count[idx_1],&elem_count[idx],&elem_count[idx]);
     bn_add(&elem_count[idx_2],&elem_count[idx],&elem_count[idx]);
     return idx;
   }
@@ -195,10 +196,10 @@ static void set_count_t(ATerm set,long *nodes,bn_int_t *elements){
   elem_count=malloc(elem_size*sizeof(bn_int_t));
   for(int i=0;i<elem_size;i++) bn_init(&elem_count[i]);
   node_count=2; // atom and emptyset
-  idx=ATindexedSetPut(count_is,(ATerm)Empty,NULL);
+  idx=ATindexedSetPut(count_is,Empty,NULL);
   assert(idx<elem_size);
   bn_set_digit(&elem_count[idx],0);
-  idx=ATindexedSetPut(count_is,(ATerm)Atom,NULL);
+  idx=ATindexedSetPut(count_is,Atom,NULL);
   assert(idx<elem_size);
   bn_set_digit(&elem_count[idx],1);
   idx=count_set_t2(set);
@@ -271,7 +272,7 @@ static void rel_count_list(vrel_t rel,long *nodes,bn_int_t *elements){
 static ATbool set_member(ATerm set,ATerm *a){
   if (set==emptyset) return ATfalse;
   else if (set==atom) return ATtrue;
-  else { 
+  else {
     int c = ATcmp(a[0],ATgetArgument(set,0));
     if (c==0)
       return set_member(ATgetArgument(set,1),a+1);
@@ -290,6 +291,13 @@ static ATerm MakeCons(ATerm e,ATerm es,ATerm tl){
   return Cons(e,es,tl);
 }
 
+static ATerm MCons(ATerm down,ATerm left,ATerm right) { // used for tree
+    if (ATisEqual(down,Empty) &&
+        ATisEqual(left,Empty) &&
+        ATisEqual(right,Empty))
+        return Empty;
+    return Cons(down,left,right);
+}
 
 static inline ATerm Down(ATerm e) {
   return ATgetArgument(e,0);
@@ -320,7 +328,7 @@ static ATerm set_add(ATerm set,ATerm *a,int len){
     else {
       ATerm set1 = ATgetArgument(set,1);
       ATerm set2 = ATgetArgument(set,2);
-      if (c==0) 
+      if (c==0)
 	return Cons(x,set_add(set1,a+1,len-1),set2);
       else
 	return Cons(x,set1,set_add(set2,a,len));
@@ -358,6 +366,17 @@ static ATbool set_member_tree_2(ATerm set,const int *a);
 static ATerm singleton_tree(const int *a,int len);
 static ATerm set_add_tree_2(ATerm set, const int *a,int len,ATbool *new);
 
+static void rel_add_tree(vrel_t rel,const int* src, const int* dst){
+	int N=rel->p_len?rel->p_len:rel->dom->shared.size;
+	int vec[2*N];
+	for(int i=0;i<N;i++) {
+		vec[i+i]=src[i];
+		vec[i+i+1]=dst[i];
+	}
+	rel->rel=set_add_tree_2(rel->rel,vec,2*N,NULL);
+}
+
+
 static ATbool set_member_tree_2(ATerm set, const int *a) {
   for (;;) {
     if (set==Empty) return ATfalse;
@@ -394,10 +413,10 @@ static ATerm singleton_tree(const int *a,int len){
   if (len==0) return Atom;
   else return singleton2(a[0]+1,a+1,len); // only values >0 can be stored
 }
-    
+
 static ATerm set_add2(ATerm set,int x, const int *a,int len,ATbool *new){
   if (set==Empty) {
-    if (new) *new=ATtrue; 
+    if (new) *new=ATtrue;
     return singleton2(x,a,len);
   }
   else if (x==1) return Cons(set_add_tree_2(Down(set),a,len-1,new),Left(set),Right(set));
@@ -413,11 +432,11 @@ static ATerm set_add2(ATerm set,int x, const int *a,int len,ATbool *new){
 
 static ATerm set_add_tree_2(ATerm set,const int *a,int len,ATbool *new){
   if (set==Atom) {
-    if (new) *new=ATfalse; 
+    if (new) *new=ATfalse;
     return Atom;
   }
   else if (set==Empty) {
-    if (new) *new=ATtrue; 
+    if (new) *new=ATtrue;
     return singleton_tree(a,len);
   }
   else return set_add2(set,a[0]+1,a+1,len,new);
@@ -490,6 +509,12 @@ int vset_enum_wrap_tree(int *a,int len){
   return 0;
 }
 
+int vset_enum_tree_first(int *a,int len){
+  for(int i=0; i<len; i++) global_elem[i]=a[i];
+  return 1;
+}
+
+
 static int set_enum_t2(ATerm set,int *a,int len,int (*callback)(int*,int),int ofs,int shift, int cur){
   int tmp;
   if (set==Atom) return callback(a,ofs);
@@ -514,6 +539,12 @@ static void set_enum_tree(vset_t set,vset_element_cb cb,void* context){
 	set_enum_t2(set->set,vec,N,vset_enum_wrap_tree,0,1,0);
 }
 
+static void set_example_tree(vset_t set,int *e){
+	int N=set->p_len?set->p_len:set->dom->shared.size;
+	int vec[N];
+	global_elem=e;
+	set_enum_t2(set->set,vec,N,vset_enum_tree_first,0,1,0);
+}
 
 static vset_element_cb match_cb;
 static void* match_context;
@@ -666,13 +697,13 @@ static void set_zip_2(ATerm in1,ATerm in2,ATerm *out1,ATerm *out2, char lookup){
 	set_zip_2(ATgetArgument(in1,2),in2,&t1,&t2,0);
 	*out1=Cons(ATgetArgument(in1,0),ATgetArgument(in1,1),t1);
 	*out2=t2;
-      } 
+      }
       else if (c>0) {
 	ATerm t1=NULL,t2=NULL;
 	set_zip_2(in1,ATgetArgument(in2,2),&t1,&t2,0);
 	*out1=Cons(ATgetArgument(in2,0),ATgetArgument(in2,1),t1);
 	*out2=Cons(ATgetArgument(in2,0),ATgetArgument(in2,1),t2);
-      } 
+      }
       else {
 	ATerm t1=NULL,t2=NULL,t3=NULL,t4=NULL;
 	set_zip_2(ATgetArgument(in1,1),ATgetArgument(in2,1),&t1,&t2,1);
@@ -737,7 +768,7 @@ static ATerm copy_level(ATerm set,ATerm trans,int *proj,int p_len,int ofs){
 static ATerm trans_level(ATerm set,ATerm trans,int *proj,int p_len,int ofs){
   if (trans==emptyset)
     return emptyset;
-  else 
+  else
     return MakeCons(ATgetArgument(trans,0),
 		    set_reach_2(set,ATgetArgument(trans,1),proj+1,p_len-1,ofs+1,1),
 		    trans_level(set,ATgetArgument(trans,2),proj,p_len,ofs));
@@ -778,7 +809,7 @@ static ATerm set_reach_2(ATerm set,ATerm trans,int *proj,int p_len,int ofs, char
 	res = apply_reach(set,trans,proj,p_len,ofs);
       else
 	res = copy_level(set,trans,proj,p_len,ofs);
-      if (lookup) 
+      if (lookup)
 	ATtablePut(global_ct,key,res);
       return res;
     }
@@ -881,6 +912,339 @@ void set_prev_list(vset_t dst, vset_t src, vrel_t rel) {
     ATtableReset(global_ct);
 }
 
+
+#if 0
+union Atom _ = Atom
+union Empty s = s
+union s Empty = s
+union (Cons dstdown dstleft dstright) (Cons srcdown srcleft srcright) = Cons (union dstdown srcdown) (union dstleft srcleft) (union dstright srcright)
+#endif
+
+static ATerm set_union_tree_2(ATerm s1, ATerm s2, char lookup) {
+    if (s1==Atom) return Atom;
+    else if (s1==Empty) return s2;
+    else if (s2==Empty) return s1;
+    else {
+        ATerm key=NULL,res=NULL;
+        if (lookup) {
+            key = (ATerm)ATmakeAppl2(sum,s1,s2);
+            res = ATtableGet(global_ct,key);
+            if (res) return res;
+        }
+        // either not looked up, or not found in cache: compute
+        res = Cons(
+                set_union_tree_2(Down(s1),  Down(s2), 1),
+                set_union_tree_2(Left(s1),  Left(s2), 1),
+                set_union_tree_2(Right(s1), Right(s2), 1)
+              );
+        if (lookup) ATtablePut(global_ct,key,res);
+        return res;
+    }
+}
+
+static void set_union_tree(vset_t dst, vset_t src) {
+	dst->set=set_union_tree_2(dst->set,src->set,0);
+	ATtableReset(global_ct);
+}
+
+
+#if 0
+project Empty _ _ = Empty
+project _ _ [] = Atom
+project (Cons x s t) i (j:l) | i == j = Cons (project x (i+1) (l)) (project s i (j:l)) (project t i (j:l))
+project (Cons x s t) i (j:l) | i < j  = union (project x (i+1) (j:l)) (union (project s i (j:l)) (project t i (j:l)) )
+#endif
+
+static ATerm set_project_tree_2(ATerm set,int ofs,int *proj,int len,char lookup) {
+  // WARNING: cache results may never be reused from different toplevel calls to project!!
+    if (set==Empty) return Empty;
+    else if (len==0) return Atom;
+    else {
+        ATerm key=NULL, res=NULL;
+        if (lookup) {
+          key=(ATerm)ATmakeAppl1(pi,set);
+          res=ATtableGet(global_ct,key);
+          if (res) return res;
+        }
+        // not looked up, or not found in cache: compute
+        if (ofs==proj[0]) {
+            // check: projection of non-empty set is always nonempty...
+            res = Cons(set_project_tree_2(Down(set) , ofs+1, proj+1, len-1, 1),
+                       set_project_tree_2(Left(set) , ofs  , proj  , len  , 1),
+                       set_project_tree_2(Right(set), ofs  , proj  , len  , 1));
+        } else {
+            res = set_union_tree_2(
+                    set_project_tree_2(Down(set), ofs+1, proj, len, 1),
+                    set_union_tree_2(
+                        set_project_tree_2(Left(set) , ofs, proj, len, 1),
+                        set_project_tree_2(Right(set), ofs, proj, len, 1),
+                        1
+                    ), 1);
+        }
+        if (lookup) ATtablePut(global_ct,key,res);
+        return res;
+    }
+}
+
+
+static void set_project_tree(vset_t dst,vset_t src){
+	dst->set=set_project_tree_2(src->set,0,dst->proj,dst->p_len,0);
+	ATtableReset(global_ct);
+}
+
+#if 0
+minus s Empty = s
+minus Empty s = Empty
+minus _ Atom = Empty
+minus (Cons dstdown dstleft dstright) (Cons srcdown srcleft srcright) = mcons (minus dstdown srcdown) (minus dstleft srcleft) (minus dstright srcright)
+#endif
+
+static ATerm set_minus_tree_2(ATerm a, ATerm b, char lookup) {
+    if (b==Empty) return a;
+    else if (a==Empty) return Empty;
+    else if (b==Atom) return Empty;
+    else {
+        ATerm key=NULL, res=NULL;
+        if (lookup) {
+            key=(ATerm)ATmakeAppl2(min,a,b);
+            res=ATtableGet(global_ct,key);
+            if (res) return res;
+        }
+        // not looked up, or not found in cache.
+        res = MCons(
+            set_minus_tree_2(Down(a) ,Down(b) ,1),
+            set_minus_tree_2(Left(a) ,Left(b) ,1),
+            set_minus_tree_2(Right(a),Right(b),1)
+            );
+        if (lookup) ATtablePut(global_ct,key,res);
+        return res;
+    }
+}
+
+static void set_minus_tree(vset_t dst,vset_t src){
+	dst->set=set_minus_tree_2(dst->set,src->set,0);
+	ATtableReset(global_ct);
+}
+
+#if 0
+tzip (Atom, _)  = (Atom, Empty)
+tzip (s, Empty) = (s, Empty)
+tzip (Empty, s) = (s, s)
+tzip (Cons x s1 s2, Cons y t1 t2) = (Cons u u1 v1, mcons v u2 v2)
+	where
+		(u,v) =   tzip (x,y);
+		(u1,u2) = tzip (s1,t1);
+		(v1,v2) = tzip (s2,t2);
+#endif
+
+static void set_zip_tree_2(ATerm in1, ATerm in2, ATerm *out1, ATerm *out2, char lookup){
+    if (in1==Atom) { *out1=Atom; *out2=Empty; return; }
+    else if (in1==Empty) { *out1=*out2=in2; return; }
+    else if (in2==Empty) { *out1=in1; *out2=in2; return; }
+    else {
+        ATerm key=NULL, res=NULL;
+        if (lookup) {
+            key = (ATerm)ATmakeAppl2(zip,in1,in2);
+            res=ATtableGet(global_ct,key);
+            if (res) {
+                *out1=ATgetArgument(res,0);
+                *out2=ATgetArgument(res,1);
+                return;
+            }
+        }
+        // not looked up, or not found in cache: compute
+        ATerm u , m;
+        set_zip_tree_2(Down(in1), Down(in2),&u,&m,1);
+        ATerm u1,m1;
+        set_zip_tree_2(Left(in1), Left(in2),&u1,&m1,1);
+        ATerm u2,m2;
+        set_zip_tree_2(Right(in1), Right(in2),&u2,&m2,1);
+        *out1=Cons(u,u1,u2);
+        *out2=MCons(m,m1,m2);
+
+        if (lookup)
+            ATtablePut(global_ct,key,(ATerm)ATmakeAppl2(zip,*out1,*out2));
+    }
+}
+
+static void set_zip_tree(vset_t dst,vset_t src){
+	set_zip_tree_2(dst->set,src->set,&dst->set,&src->set,0);
+	ATtableReset(global_ct);
+}
+
+
+static ATerm set_reach_tree_2(ATerm set, ATerm trans, int *proj, int p_len, int ofs, char lookup);
+
+#if 0
+copy Empty _ _ _ = Empty
+copy (Cons down left right) rel i (j:k) = mcons (next down rel (i+1) (j:k)) (copy left rel i (j:k)) (copy right rel i (j:k))
+#endif
+
+static ATerm copy_level_next_tree(ATerm set, ATerm trans, int *proj, int p_len, int ofs) {
+    if (set==Empty) {
+        return Empty;
+    } else {
+        return MCons(set_reach_tree_2(    Down(set) , trans, proj, p_len, ofs+1, 1),
+                     copy_level_next_tree(Left(set) , trans, proj, p_len, ofs),
+                     copy_level_next_tree(Right(set), trans, proj, p_len, ofs));
+    }
+}
+
+
+#if 0
+trans src Atom i (j:k) = Atom
+trans src Empty i (j:k) = Empty
+trans src (Cons down left right) i (j:k) = mcons (next src down (i+1) k) (trans src left i (j:k)) (trans src right i (j:k))
+#endif
+
+static ATerm trans_level_next_tree(ATerm set, ATerm trans, int *proj, int p_len, int ofs) {
+    if (trans==Atom || trans==Empty) {
+        return trans;
+    } else {
+        return MCons(set_reach_tree_2(     set , Down(trans) , proj+1, p_len-1, ofs+1, 1),
+                     trans_level_next_tree(set , Left(trans) , proj  , p_len  , ofs),
+                     trans_level_next_tree(set , Right(trans), proj  , p_len  , ofs));
+    }
+}
+
+#if 0
+apply Empty _ _ _ = Empty
+apply _ Empty _ _ = Empty -- not matched
+apply (Cons x y z) (Cons u v w) i proj = union (trans x u i proj) (union (apply y v i proj) (apply z w i proj))
+#endif
+
+static ATerm apply_reach_next_tree(ATerm set, ATerm trans, int *proj, int p_len, int ofs) {
+    if (set==Empty) { return Empty; }
+    if (trans==Empty) { return Empty; }
+    return set_union_tree_2(
+                trans_level_next_tree(Down(set), Down(trans), proj, p_len, ofs),
+                set_union_tree_2(
+                    set_reach_tree_2(Left(set), Left(trans), proj, p_len, ofs, 1),
+                    set_reach_tree_2(Right(set), Right(trans), proj, p_len, ofs, 1), 1), 1);
+}
+
+#if 0
+next Empty _ _ _ = Empty -- nothing left in src set
+next _ Empty _ _ = Empty -- nothing left in relation
+next src rel i [] = src
+next src rel i (j:k) | i == j = apply src rel i (j:k)
+next src rel i (j:k) | i < j  = copy  src rel i (j:k)
+#endif
+
+static ATerm set_reach_tree_2(ATerm set, ATerm trans, int *proj, int p_len, int ofs, char lookup) {
+    if (set==Empty) { return Empty; }
+    if (trans==Empty) { return Empty; }
+
+    if (p_len==0) {
+        return set;
+    } else {
+        ATerm key=NULL, res=NULL;
+        if (lookup) {
+            key = (ATerm)ATmakeAppl2(reach,set,trans);
+            res=ATtableGet(global_ct,key);
+            if (res) return res;
+        }
+        if (proj[0]==ofs) {
+            res = apply_reach_next_tree(set,trans,proj,p_len,ofs);
+        } else {
+            res = copy_level_next_tree(set,trans,proj,p_len,ofs);
+        }
+        if (lookup) ATtablePut(global_ct,key,res);
+        return res;
+    }
+}
+
+
+void set_next_tree(vset_t dst,vset_t src,vrel_t rel){
+    dst->set=set_reach_tree_2(src->set, rel->rel, rel->proj, rel->p_len, 0, 0);
+    ATtableReset(global_ct);
+}
+
+static ATerm set_prev_tree_2(ATerm set, ATerm trans, int *proj, int p_len, int ofs, char lookup);
+
+#if 0
+pcopy Empty _ _ _ = Empty
+pcopy (Cons down left right) rel i (j:k) = mcons (prev down rel (i+1) (j:k)) (pcopy left rel i (j:k)) (pcopy right rel i (j:k))
+#endif
+
+static ATerm copy_level_prev_tree(ATerm set, ATerm trans, int *proj, int p_len, int ofs) {
+    if (set==Empty) {
+        return Empty;
+    } else {
+        return MCons(set_prev_tree_2(     Down(set) , trans, proj, p_len, ofs+1, 1),
+                     copy_level_next_tree(Left(set) , trans, proj, p_len, ofs),
+                     copy_level_next_tree(Right(set), trans, proj, p_len, ofs));
+    }
+}
+
+#if 0
+match Empty _ _ _ = Empty
+match _ Empty _ _ = Empty
+match (Cons x y z) (Cons u v w) i (j:k) = union (prev x u (i+1) k) (union (match y v i (j:k)) (match z w i (j:k)))
+#endif
+
+static ATerm match_prev_tree(ATerm set, ATerm trans, int *proj, int p_len, int ofs) {
+    if (set==Empty) return Empty;
+    if (trans==Empty) return Empty;
+    return set_union_tree_2(
+                set_prev_tree_2(Down(set), Down(trans), proj+1, p_len-1, ofs+1, 1),
+                set_union_tree_2(
+                    match_prev_tree(Left(set) , Left(trans) , proj, p_len, ofs),
+                    match_prev_tree(Right(set), Right(trans), proj, p_len, ofs), 1), 1);
+}
+
+#if 0
+merge src Empty _ _= Empty
+merge src (Cons u v w) i proj = mcons (match src u i proj) (merge src v i proj) (merge src w i proj)
+#endif
+
+static ATerm merge_prev_tree(ATerm set, ATerm trans, int *proj, int p_len, int ofs) {
+    if (trans==Empty) { return Empty; }
+    return MCons(
+                    match_prev_tree(set, Down(trans) , proj, p_len, ofs),
+                    merge_prev_tree(set, Left(trans) , proj, p_len, ofs),
+                    merge_prev_tree(set, Right(trans), proj, p_len, ofs)
+                );
+}
+
+#if 0
+prev Empty _ _ _ = Empty
+prev _ Empty _ _ = Empty
+prev src rel i [] = src
+prev src rel i (j:k) | i == j = merge src rel i (j:k)
+prev src rel i (j:k) | i <  j = pcopy src rel i (j:k)
+#endif
+
+static ATerm set_prev_tree_2(ATerm set, ATerm trans, int *proj, int p_len, int ofs, char lookup) {
+    if (set==Empty) { return Empty; }
+    if (trans==Empty) { return Empty; }
+
+    if (p_len==0) {
+        return set;
+    } else {
+        ATerm key=NULL, res=NULL;
+        if (lookup) {
+            key = (ATerm)ATmakeAppl2(inv_reach,set,trans);
+            res=ATtableGet(global_ct,key);
+            if (res) return res;
+        }
+        if (proj[0]==ofs) {
+            res = merge_prev_tree(set,trans,proj,p_len,ofs);
+        } else {
+            res = copy_level_prev_tree(set,trans,proj,p_len,ofs);
+        }
+        if (lookup) ATtablePut(global_ct,key,res);
+        return res;
+    }
+}
+
+void set_prev_tree(vset_t dst,vset_t src,vrel_t rel){
+    dst->set=set_prev_tree_2(src->set, rel->rel, rel->proj, rel->p_len, 0, 0);
+    ATtableReset(global_ct);
+}
+
+
+
 vdom_t vdom_create_tree(int n){
 	Warning(info,"Creating an AtermDD tree domain.");
 	vdom_t dom=(vdom_t)RTmalloc(sizeof(struct vector_domain));
@@ -894,8 +1258,19 @@ vdom_t vdom_create_tree(int n){
 	dom->shared.set_clear=set_clear_both;
 	dom->shared.set_copy=set_copy_both;
 	dom->shared.set_enum=set_enum_tree;
+	dom->shared.set_enum_match=set_enum_match_list; // TODO
+	dom->shared.set_example=set_example_tree;
 	dom->shared.set_count=set_count_tree;
 	dom->shared.rel_count=rel_count_tree;
+    dom->shared.set_union=set_union_tree;
+    dom->shared.set_minus=set_minus_tree;
+	dom->shared.set_zip=set_zip_tree;
+	dom->shared.set_project=set_project_tree;
+	dom->shared.rel_create=rel_create_both; // initializes with emptyset instead of empty? wrong? -> all both functions mix this..
+	dom->shared.rel_add=rel_add_tree;
+	dom->shared.set_next=set_next_tree;
+	dom->shared.set_prev=set_prev_tree;
+
 	return dom;
 }
 

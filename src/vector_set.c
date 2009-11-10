@@ -35,35 +35,20 @@ static void vset_popt(poptContext con,
 }
 
 
-static si_map_entry setonly_table[]={
+static si_map_entry vset_table[]={
 	{"list",AtermDD_list},
 	{"tree",AtermDD_tree},
 	{"fdd",BuDDy_fdd},
 	{NULL,0}
 };
 
-static si_map_entry set_and_rel_table[]={
-	{"list",AtermDD_list},
-	{"fdd",BuDDy_fdd},
-	{NULL,0}
-};
 
-
-struct poptOption vset_setonly_options[]={
-	{ NULL, 0 , POPT_ARG_CALLBACK , (void*)vset_popt , 0 , (void*)setonly_table ,NULL },
+struct poptOption vset_options[]={
+	{ NULL, 0 , POPT_ARG_CALLBACK , (void*)vset_popt , 0 , (void*)vset_table ,NULL },
 	{ "vset" , 0 , POPT_ARG_STRING , NULL , 0 , "select a vector set implementation from ATermDD with *list* encoding,"
 		" ATermDD with *tree* encoding, or BuDDy using the *fdd* feature  (default: list)" , "<list|tree|fdd>" },
 	{ NULL,0 , POPT_ARG_INCLUDE_TABLE , atermdd_options , 0 , "ATermDD options" , NULL},
 	{ NULL,0 , POPT_ARG_INCLUDE_TABLE , buddy_options , 0 , "BuDDy options" , NULL},
-	POPT_TABLEEND
-};
-
-struct poptOption vset_full_options[]={
-	{ NULL, 0 , POPT_ARG_CALLBACK , (void*)vset_popt , 0 ,  (void*)set_and_rel_table , NULL},
-	{ "vset" , 0 , POPT_ARG_STRING , NULL , 0 , "select a vector set implementation from ATermDD with list encoding,"
-		" or BuDDy using the fdd feature  (default ATermDD list)" , "<list|fdd>" },
-	{ NULL,0 , POPT_ARG_INCLUDE_TABLE , atermdd_options , 0 , "ATermDD options", NULL},
-	{ NULL,0 , POPT_ARG_INCLUDE_TABLE , buddy_options , 0 , "BuDDy options", NULL},
 	POPT_TABLEEND
 };
 
