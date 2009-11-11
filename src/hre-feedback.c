@@ -205,11 +205,11 @@ void log_message(log_t log,const char*file,int line,int errnum,const char *fmt,.
         char errmsg[256];
 #ifdef STRERROR_R_CHAR_P
         char*err_msg=strerror_r(errnum,errmsg,256);
-        if(!err_msg){
 #else
-        char*err_msg=errmsg;
-        if(strerror_r(errnum,errmsg,256)){
+        char*err_msg=strerror_r(errnum,errmsg,256)?NULL:errmsg;
 #endif
+        if(!err_msg){
+            err_msg=errmsg;
             switch(errno){
                 case EINVAL:
                     sprintf(errmsg,"%d is not an error",errnum);
@@ -221,7 +221,7 @@ void log_message(log_t log,const char*file,int line,int errnum,const char *fmt,.
                     sprintf(errmsg,"this statement should have been unreachable");
             }
         }
-        fprintf(f,": %s", errmsg);
+        fprintf(f,": %s", err_msg);
     }
     fprintf(f,"\n");
 }
