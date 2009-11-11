@@ -18,6 +18,7 @@ bn_init_copy (long long *a, long long *b)
 void
 bn_clear (long long *a)
 {
+    (void)a;
     return;
 }
 
