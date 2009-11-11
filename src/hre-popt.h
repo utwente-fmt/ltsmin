@@ -18,7 +18,7 @@ The sequence of events when using popt options is:
 /**
 \brief Register options to be parsed.
 */
-extern void HREaddOptions(struct poptOption *options,const char* header);
+extern void HREaddOptions(const struct poptOption *options,const char* header);
 
 /**
 \brief Initialize the runtime library using popt.
