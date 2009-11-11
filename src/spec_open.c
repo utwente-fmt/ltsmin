@@ -457,8 +457,7 @@ void CAESAR_INIT_GRAPH(void) {
 	char cmdline[len+6];
 	sprintf(cmdline,"%s %s %s",opencaesar_prog,ltsmin_options,opencaesar_args);
 
-	int res=poptParseArgvString(cmdline,&argc,(const void*)(&argv));
-	// last argument should be of type const char***, but that doesn't work :-(
+	int res=poptParseArgvString(cmdline,&argc,(const char***)(&argv));
 	if (res){
 		Fatal(1,error,"could not parse %s: %s",opencaesar_args,poptStrerror(res));
 	}

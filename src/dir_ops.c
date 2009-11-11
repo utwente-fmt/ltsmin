@@ -26,7 +26,7 @@
 #define CPRINTF(args...)
 #endif
 
-int create_empty_dir(char *name,int delete){
+int create_empty_dir(const char *name,int delete){
 	struct stat info;
 
 	if (lstat(name,&info)==-1){
@@ -77,13 +77,13 @@ int create_empty_dir(char *name,int delete){
 	return -1;
 }
 
-int is_a_dir(char *name){
+int is_a_dir(const char *name){
 	struct stat info;
 	if ((lstat(name,&info)==0)&&(S_ISDIR(info.st_mode))) return 1 ; else return 0;
 }
 
 
-dir_enum_t get_dir_enum(char *name){
+dir_enum_t get_dir_enum(const char *name){
 	DIR *dir=opendir(name);
 	if (dir==NULL) {
 		FatalCall(1,error,"opendir failed");

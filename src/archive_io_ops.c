@@ -1101,11 +1101,11 @@ trace_t read_trace(const char *name){
     char *decode;
     if (is_a_dir(name)){
         Warning(info,"open dir %s",name);
-        arch=arch_dir_open(name,blocksize);
+        arch=arch_dir_open((char*)name,blocksize);
         decode=NULL;
     } else {
         Warning(info,"open gcf %s",name);
-        arch=arch_gcf_read(raf_unistd(name));
+        arch=arch_gcf_read(raf_unistd((char*)name));
         decode="auto";
     }
     stream_t ds=arch_read(arch,"info",decode);

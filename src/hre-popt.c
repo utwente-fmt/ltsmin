@@ -115,13 +115,13 @@ static int HREcallPopt(int argc,char*argv[],struct poptOption optionsTable[],
 }
 
 
-void HREaddOptions(struct poptOption *options,const char* header){
+void HREaddOptions(const struct poptOption *options,const char* header){
     struct thread_context *ctx=pthread_getspecific(hre_key);
     if (ctx->next_group>=MAX_OPTION_GROUPS) {
         Fatal(1,error,"too many options groups");
     }
     struct poptOption include=
-    { NULL, 0 , POPT_ARG_INCLUDE_TABLE, options , 0 , header , NULL};
+    { NULL, 0 , POPT_ARG_INCLUDE_TABLE, (struct poptOption *) options , 0 , header , NULL};
     ctx->option_group[ctx->next_group]=include;
     ctx->next_group++;
     struct poptOption null_opt=POPT_TABLEEND;
