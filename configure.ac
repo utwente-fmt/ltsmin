@@ -185,8 +185,9 @@ AC_TYPE_UINT8_T
 AC_CACHE_SAVE
 
 # Checks for library functions.
-AC_FUNC_MALLOC
-AC_FUNC_REALLOC
+dnl LTSmin has its own *alloc wrappers
+dnl AC_FUNC_MALLOC
+dnl AC_FUNC_REALLOC
 AC_FUNC_STRERROR_R
 AC_FUNC_VPRINTF
 AC_CHECK_FUNCS([atexit bzero ftruncate strdup strndup strchr strstr strtol])
