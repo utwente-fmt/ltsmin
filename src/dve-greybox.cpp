@@ -86,6 +86,7 @@ static void divine_get_initial_state(int* state)
 {
     divine::state_t s = lib_get_initial_state();
     lib_project_state_to_int_array(s, state);
+    divine::delete_state(s);
 }
 
 static lts_type_t ltstype;
@@ -103,10 +104,11 @@ succ_callback(TransitionCB cb, void* context)
     for(size_t i=0; i < (size_t)result;++i)
     {
         int dst[lib_get_state_variable_count()];
-        lib_project_state_to_int_array(cb_cont[i], dst);
+        divine::state_t s = cb_cont.pop_back();
+        lib_project_state_to_int_array(s, dst);
+        divine::delete_state(s);
         cb(context, &dummy, dst);
     }
-    cb_cont.clear();
     return result;
 }
 
@@ -117,6 +119,7 @@ divine_get_transitions_all(model_t self, int*src, TransitionCB cb, void*context)
     divine::state_t s = lib_new_state();
     lib_project_int_array_to_state(src, s);
     lib_get_succ(s, cb_cont);
+    divine::delete_state(s);
     return succ_callback(cb, context);
 }
 
@@ -127,6 +130,7 @@ divine_get_transitions_long(model_t self, int group, int*src, TransitionCB cb, v
     divine::state_t s = lib_new_state();
     lib_project_int_array_to_state(src, s);
     lib_get_transition_succ(group, s, cb_cont);
+    divine::delete_state(s);
     return succ_callback(cb, context);
 }
 
