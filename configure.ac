@@ -102,6 +102,26 @@ AC_CHECK_LIB([dl], [dlsym],,[AC_MSG_FAILURE([libdl not found.])])
 AC_CHECK_LIB([popt],[poptGetContext],,[AC_MSG_FAILURE([popt not found.])])
 AC_CHECK_LIB([z], [inflateEnd],,
   [AC_MSG_FAILURE([zlib not found.])])
+
+AC_ARG_WITH([bignum],
+  [AS_HELP_STRING([--with-bignum=<type>], 
+    [enable support for bignums (type=yes|gmp|tommath|no) @<:@default=yes@:>@])],
+  [], [with_bignum=yes])
+AS_CASE(["$with_bignum"],
+  [no],[],
+  [yes|gmp|tommath],
+    [AS_IF([test x"$with_bignum" = xyes || test x"$with_bignum" = xgmp],
+           [AC_CHECK_LIB([gmp], [__gmpz_init], 
+              [with_bignum=gmp; have_libgmp=yes],
+              [AS_IF([test x"$with_bignum" = xgmp],
+                     [AC_MSG_WARN([cannot use libgmp as bignum library.])])])])
+     AS_IF([test x"$with_bignum" = xyes || test x"$with_bignum" = xtommath],
+           [AC_CHECK_LIB([tommath], [mp_init], 
+              [with_bignum=tommath; have_libtommath=yes],
+              [AS_IF([test x"$with_bignum" = xtommath],
+                     [AC_MSG_WARN([cannot use libtommath as bignum library.])])])])],
+  [AC_MSG_WARN([unknown bignum library request (--with-bignum=$with_bignum) ignored.])])
+
 if test "x$acx_mcrl" = xyes; then
   ACX_MCRL_LIBS(
     [AX_LET([LIBS], ["$MCRL_LIBS $LIBS"],
@@ -138,9 +158,13 @@ ACX_CADP_BCG_WRITE([have_bcg=yes],
 # Checks for header files.
 AC_HEADER_DIRENT
 AC_HEADER_STDC
-AC_HEADER_STDBOOL
-AC_CHECK_HEADERS([fcntl.h limits.h stddef.h stdint.h stdlib.h sys/time.h string.h strings.h unistd.h])
-AC_CHECK_HEADERS([execinfo.h dlfcn.h])
+AC_CHECK_HEADERS([fcntl.h limits.h stdint.h stdlib.h string.h strings.h dnl
+  unistd.h execinfo.h])
+AS_IF([test x"$have_libgmp" = xyes], 
+  [AC_CHECK_HEADERS([gmp.h],,[AC_MSG_FAILURE([gmp.h not found.])])])
+AS_IF([test x"$have_libtommath" = xyes], 
+  [AC_CHECK_HEADERS([tommath.h],,[AC_MSG_FAILURE([tommath.h not found.])])])
+
 AC_CHECK_HEADER([popt.h],[], [AC_MSG_FAILURE([popt.h not found.])])
 AC_CACHE_SAVE
 
@@ -174,6 +198,10 @@ AC_CHECK_DECLS([strdup, strndup, strchr, strrchr, strstr],,,[
 AC_INCLUDES_DEFAULT])
 
 AM_CONDITIONAL([HAVE_MPI], [test x"$have_mpi" != "x"])
+AM_CONDITIONAL([HAVE_LIBGMP], 
+  [test x"$with_bignum" != xno && test x"$have_libgmp" = xyes])
+AM_CONDITIONAL([HAVE_LIBTOMMATH], 
+  [test x"$with_bignum" != xno && test x"$have_libtommath" = xyes])
 AM_CONDITIONAL([HAVE_LIBMCRL], [test x"$acx_mcrl" = xyes])
 AM_CONDITIONAL([HAVE_LIBMCRL2], [test x"$acx_mcrl2" = xyes])
 AM_CONDITIONAL([HAVE_LIBSTEP_INFO], [test x"$have_libstep_info" = xyes])
@@ -196,6 +224,7 @@ AC_CONFIG_FILES([
        Makefile
        src/Makefile
        src/dm/Makefile
+       src/bignum/Makefile
        src/ce/Makefile
        src/torx/Makefile
        doc/Makefile

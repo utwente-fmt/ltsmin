@@ -3,7 +3,7 @@ noinst_PROGRAMS = test-bitset test-is-balloc test-dfs-stack test-hre ltsmin-pars
 noinst_LTLIBRARIES = libutil.la libltsmin.la
 pkglib_LTLIBRARIES =
 
-SUBDIRS = dm . ce torx
+SUBDIRS = dm bignum . ce torx
 
 EXTRA_DIST = ltsmin-lexer.c ltsmin-lexer.h
 BUILT_SOURCES = ltsmin-grammar.c ltsmin-grammar.h ltsmin-lexer.c ltsmin-lexer.h
@@ -291,14 +291,13 @@ libutil_la_CPPFLAGS += $(CADP_CPPFLAGS)
 endif
 libutil_la_CPPFLAGS += $(AM_CPPFLAGS)
 
-
 libutil_la_SOURCES += hre-config.h hre-context.c hre-context.h \
 	hre-feedback.c hre-feedback.h hre-internal.h \
 	hre-main.c hre-main.h hre-malloc.c hre-malloc.h \
 	hre-popt.c hre-popt.h hre-pthread.c
 
 libltsmin_la_SOURCES = hre-nompi.c
-libltsmin_la_LIBADD = libutil.la
+libltsmin_la_LIBADD = libutil.la bignum/libbignum.la
 
 if HAVE_MPI
 libltsmin_mpi_la_SOURCES = hre-mpi.c

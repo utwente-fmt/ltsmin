@@ -739,28 +739,33 @@ int main(int argc, char *argv[]){
         case Strat_BFS:
             switch (state_db) {
             case DB_Vset:
-                if (trc_output) Fatal(1, error, "--trace not supported for vset, use tree");
-                domain=vdom_create_default(N);
-                visited_set=vset_create(domain,0,NULL);
-                next_set=vset_create(domain,0,NULL);
-                vset_add(visited_set,src);
-                vset_add(next_set,src);
-                vset_t current_set=vset_create(domain,0,NULL);
-                while (!vset_is_empty(next_set)){
-                  if (RTverbosity >= 1)
-                    Warning(info,"level %d has %d states, explored %d states %d trans",
-                        level,(visited-explored),explored,trans);
-                  if (level == max) break;
-                  level++;
-                  vset_copy(current_set,next_set);
-                  vset_clear(next_set);
-                  vset_enum(current_set,bfs_explore_state_vector,model);
-                }
-                long long size;
-                long nodes;
-                vset_count(visited_set,&nodes,&size);
-                Warning(info,"%lld reachable states represented symbolically with %ld nodes",size,nodes);
-                break;
+		if (trc_output) Fatal(1, error, "--trace not supported for vset, use tree");
+		domain=vdom_create_default(N);
+		visited_set=vset_create(domain,0,NULL);
+		next_set=vset_create(domain,0,NULL);
+		vset_add(visited_set,src);
+		vset_add(next_set,src);
+		vset_t current_set=vset_create(domain,0,NULL);
+		while (!vset_is_empty(next_set)){
+		  if (RTverbosity >= 1)
+		    Warning(info,"level %d has %d states, explored %d states %d trans",
+			    level,(visited-explored),explored,trans);
+		  if (level == max) break;
+		  level++;
+		  vset_copy(current_set,next_set);
+		  vset_clear(next_set);
+		  vset_enum(current_set,bfs_explore_state_vector,model);
+		}
+		bn_int_t e_count;
+		long nodes;
+                char string[1024];
+		int size;
+		vset_count(visited_set,&nodes,&e_count);
+                size = bn_int2string(string,sizeof string,&e_count);
+		if(size >= (ssize_t)sizeof string) Fatal(1,error,"Error converting number to string");
+	    	Warning(info,"%s reachable states represented symbolically with %ld nodes",string,nodes);
+                bn_clear(&e_count);
+		break;
             case DB_TreeDBS:
                 dbs=TreeDBScreate(N);
                 if(TreeFold(dbs,src)!=0){

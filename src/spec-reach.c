@@ -301,30 +301,44 @@ static void deadlock_check(vset_t deadlocks){
 }
 
 static void stats_and_progress_report(vset_t current, vset_t visited, int level) {
-  long long e_count;
+  bn_int_t e_count;
   long n_count;
+  char string[1024];
+  int size;
   
   if (current) {
     vset_count(current,&n_count,&e_count);
     if (n_count>max_lev_count) max_lev_count=n_count;
-    Warning(info,"level %d has %lld states ( %ld nodes )",level,e_count,n_count);
+    size = bn_int2string(string,sizeof string,&e_count);
+    if(size >= (ssize_t)sizeof string) Fatal(1,error,"Error converting number to string");
+    Warning(info,"level %d has %s states ( %ld nodes )",level,string,n_count);
+    bn_clear(&e_count);
   }
   
   vset_count(visited,&n_count,&e_count);
   if (n_count>max_vis_count) max_vis_count=n_count;
-  Warning(info,"visited %d has %lld states ( %ld nodes )",level,e_count,n_count);
+  size = bn_int2string(string,sizeof string,&e_count);
+  if(size >= (ssize_t)sizeof string) Fatal(1,error,"Error converting number to string");
+  Warning(info,"visited %d has %s states ( %ld nodes )",level,string,n_count);
+  bn_clear(&e_count);
   if (RTverbosity >= 2) {
     int i;
     fprintf(stderr,"transition caches (grp,nds,elts): ");
     for (i=0;i<nGrps;i++) {
       vrel_count(group_next[i],&n_count,&e_count);
-      fprintf(stderr,"( %d %ld %lld ) ",i,n_count,e_count);
+      size = bn_int2string(string,sizeof string,&e_count);
+      if(size >= (ssize_t)sizeof string) Fatal(1,error,"Error converting number to string");
+      fprintf(stderr,"( %d %ld %s ) ",i,n_count,string);
+      bn_clear(&e_count);
       if (n_count>max_trans_count) max_trans_count=n_count;
     }
     fprintf(stderr,"\ngroup explored    (grp,nds,elts): ");
     for (i=0;i<nGrps;i++) {
       vset_count(group_explored[i],&n_count,&e_count);
-      fprintf(stderr,"( %d %ld %lld ) ",i,n_count,e_count);
+      size = bn_int2string(string,sizeof string,&e_count);
+      if(size >= (ssize_t)sizeof string) Fatal(1,error,"Error converting number to string");
+      fprintf(stderr,"( %d %ld %s ) ",i,n_count,string);
+      bn_clear(&e_count);
       if (n_count>max_grp_count) max_grp_count=n_count;
     }
     fprintf(stderr,"\n");
@@ -332,10 +346,16 @@ static void stats_and_progress_report(vset_t current, vset_t visited, int level)
 }
 
 static void final_stat_reporting(vset_t visited) {
-  long long e_count;
+  bn_int_t e_count;
   long n_count;
+  char string[1024];
+  int size;
+
   vset_count(visited,&n_count,&e_count);
-  fprintf(stderr,"state space has %lld states\n",e_count);
+  size = bn_int2string(string,sizeof string,&e_count);
+  if(size >= (ssize_t)sizeof string) Fatal(1,error,"Error converting number to string");
+  fprintf(stderr,"state space has %s states\n",string);
+  bn_clear(&e_count);
   if (max_lev_count==0)
     fprintf(stderr,"( %ld final BDD nodes; %ld peak nodes )\n",
 	    n_count,max_vis_count);
