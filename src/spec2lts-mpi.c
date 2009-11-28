@@ -182,6 +182,9 @@ static event_barrier_t barrier;
 #if defined(ETF)
 #include "etf-greybox.h"
 #endif
+#if defined(DIVINE)
+#include "dve-greybox.h"
+#endif
 
 static int write_state=0;
 
@@ -200,6 +203,9 @@ static  struct poptOption options[] = {
 #endif
 #if defined(ETF)
 	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, etf_options , 0 , "ETF options", NULL},
+#endif
+#if defined(DIVINE)
+	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, dve_options , 0 , "DiVinE options", NULL },
 #endif
 	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, greybox_options , 0 , "Greybox options", NULL },
 	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, lts_io_options , 0 , NULL, NULL},

@@ -28,6 +28,9 @@
 #if defined(ETF)
 #include "etf-greybox.h"
 #endif
+#if defined(DIVINE)
+#include "dve-greybox.h"
+#endif
 
 static char* etf_output=NULL;
 static char* trc_output=NULL;
@@ -90,6 +93,9 @@ static  struct poptOption options[] = {
 #endif
 #if defined(ETF)
 	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, etf_options , 0 , "ETF options",NULL},
+#endif
+#if defined(DIVINE)
+	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, dve_options , 0 , "DiVinE options", NULL },
 #endif
 	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, greybox_options , 0 , "Greybox options",NULL},
 	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, vset_full_options , 0 , "Vector set options",NULL},

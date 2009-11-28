@@ -4,6 +4,7 @@
 #include <errno.h>
 #include <stdio.h>
 #include <stdarg.h>
+#include <dlfcn.h>
 #include "unix.h"
 #include <libgen.h>
 #include <git_version.h>
@@ -95,3 +96,16 @@ void RTfree(void *rt_ptr){
             free (rt_ptr);
 }
 
+
+void *
+RTdlsym (const char *libname, void *handle, const char *symbol)
+{
+    void *ret = dlsym (handle, symbol);
+    if (ret == NULL) {
+        const char *dlerr = dlerror ();
+        Fatal (1, error, "dynamically loading from `%s': %s",
+               libname,
+               dlerr != NULL ? dlerr : "unknown error");
+    }
+    return ret;
+}

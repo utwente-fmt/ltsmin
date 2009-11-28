@@ -99,6 +99,12 @@ case "$FILE" in
     echo "input is ETF"
     LTSMIN_MOD_LDFLAGS="@CADP_LDFLAGS@ -letf-open @CADP_LIBS@"
     ;;
+ *.dveC)
+    @HAVE_DVEC_FALSE@ echo "DiVinE support not installed"
+    @HAVE_DVEC_FALSE@ exit 1
+    echo "input is DVE (precompiled)"
+    LTSMIN_MOD_LDFLAGS="@DIVINE_LDFLAGS@ -ldve-open @DVEC_LIBS@"
+    ;;
  *)
     echo "Did not recognize type of $FILE"
     exit 1
@@ -115,7 +121,7 @@ export OPEN_CAESAR_FILE
 
 CPPFLAGS="-I. -I$CADP/incl -I$SRC"
 CFLAGS="@CFLAGS@"
-LTSMIN_LDFLAGS="@LDFLAGS@ -L${LTSMIN_LIB} ${LTSMIN_MOD_LDFLAGS} -lz -lpopt"
+LTSMIN_LDFLAGS="@LDFLAGS@ -L${LTSMIN_LIB} ${LTSMIN_MOD_LDFLAGS} @LIBS@"
 LDFLAGS="${LTSMIN_LDFLAGS} -L$CADP/bin.$ARCH -lcaesar -lm"
 
 while true

@@ -53,6 +53,8 @@ extern void RTfree(void *rt_ptr);
 
 #define RT_NEW(sort) ((sort*)RTmallocZero(sizeof(sort)))
 
+extern void *RTdlsym (const char *libname, void *handle, const char *symbol);
+
 
 /**
 \brief Initialize the runtime library using popt.

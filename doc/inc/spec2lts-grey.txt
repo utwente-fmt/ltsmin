@@ -28,4 +28,5 @@ manpage:ltsmin-tracepp[1],
 http://www.cwi.nl/{tilde}mcrl/[muCRL],
 http://www.mcrl2.org/[mCRL2],
 http://fmt.cs.utwente.nl/{tilde}michaelw/nips/[NIPS],
+http://divine.fi.muni.cz/[DiVinE-cluster],
 http://www.mpi-forum.org/[MPI Forum]

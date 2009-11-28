@@ -98,6 +98,7 @@ DX_INIT_DOXYGEN([$PACKAGE_NAME])
 AC_CACHE_SAVE
 
 # Checks for libraries.
+AC_CHECK_LIB([dl], [dlsym],,[AC_MSG_FAILURE([libdl not found.])])
 AC_CHECK_LIB([popt],[poptGetContext],,[AC_MSG_FAILURE([popt not found.])])
 AC_CHECK_LIB([z], [inflateEnd],,
   [AC_MSG_FAILURE([zlib not found.])])
@@ -119,6 +120,8 @@ if test "x$acx_mcrl2" = xyes; then
     [acx_mcrl2=no
      AC_MSG_WARN([mcrl2 library not found.])])
 fi
+ACX_DVEC_LIBS([:],
+  [AC_MSG_WARN([DiVinE libraries not found.])])
 AC_SUBST([NIPS_LIBS],['${top_builddir}/nips-vm/libnips_vm.la'])
 AC_SUBST([NIPS_CPPFLAGS],['-I${top_srcdir}'])
 AC_SUBST([NIPS_LDFLAGS])
@@ -135,8 +138,9 @@ ACX_CADP_BCG_WRITE([have_bcg=yes],
 # Checks for header files.
 AC_HEADER_DIRENT
 AC_HEADER_STDC
-AC_CHECK_HEADERS([fcntl.h limits.h stdint.h stdlib.h string.h strings.h unistd.h])
-AC_CHECK_HEADERS([execinfo.h])
+AC_HEADER_STDBOOL
+AC_CHECK_HEADERS([fcntl.h limits.h stddef.h stdint.h stdlib.h sys/time.h string.h strings.h unistd.h])
+AC_CHECK_HEADERS([execinfo.h dlfcn.h])
 AC_CHECK_HEADER([popt.h],[], [AC_MSG_FAILURE([popt.h not found.])])
 AC_CACHE_SAVE
 
@@ -177,6 +181,7 @@ AM_CONDITIONAL([HAVE_ASCIIDOC], [test x"$ASCIIDOC" != x])
 AM_CONDITIONAL([HAVE_XMLTO], [test x"$XMLTO" != x])
 AM_CONDITIONAL([HAVE_LIBBCG], [test x"$have_bcg" = xyes])
 AM_CONDITIONAL([HAVE_CADP], [test x"$acx_cadp" = xyes])
+AM_CONDITIONAL([HAVE_DVEC], [test x"$acx_dvec_libs" = xyes])
 
 AC_CONFIG_COMMANDS_POST(
   [ac_configure_args="$ac_configure_args --enable-keep-terminated-procs dnl
@@ -213,6 +218,7 @@ Configuration:
     MCRL     = ${with_mcrl:-NOT FOUND, building without muCRL support}
     MCRL2    = ${with_mcrl2:-NOT FOUND, building without mCRL2 support}
     CADP     = ${CADP:-NOT FOUND, building without CADP support}
+    DiVinE   = ${with_divine:-NOT FOUND, building without DiVinE support}
 
     ASCIIDOC = ${ASCIIDOC:-NOT FOUND, not building documentation}
     XMLTO    = ${XMLTO:-NOT FOUND, not building manpages}

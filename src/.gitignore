@@ -26,6 +26,9 @@ mpi-event-test
 nips-reach
 nips2lts-grey
 nips2lts-mpi
+dve-reach
+dve2lts-grey
+dve2lts-mpi
 regroup
 test
 pins_open

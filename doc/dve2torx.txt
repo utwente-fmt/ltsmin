@@ -1,0 +1,24 @@
+//                           -*- mode: doc; outline-regexp: "==\(=*\) ." -*-
+dve2torx(1)
+============
+:Author:  Michael Weber
+:Email:   <michaelw@cs.utwente.nl>
+:Date:    2009-10-31
+
+== NAME
+
+dve2torx - TorX RPC interface for DVE models.
+
+== SYNOPSIS
+
+*{manname}* [OPTION]... 'input'[_.dve_|_.dveC_]
+
+== DESCRIPTION
+
+{manname} provides access to a labelled transition system from a
+specification provided in 'input'[_.dve_|_.dveC_] via the
+TorX-Explorer textual interface on _stdin_ and _stdout_.
+
+== OPTIONS
+
+include::inc/spec2torx.txt[]

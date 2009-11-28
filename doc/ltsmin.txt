@@ -33,7 +33,12 @@ http://www.mcrl2.org/[mCRL2 website].
 NIPS-VM(+nips+)::
 
 The NIPS Virtual Machine. See the
-http://www.ewi.utwente.nl/~michaelw/nips/[NIPS-VM website].
+http://fmt.cs.utwente.nl/~michaelw/nips/[NIPS-VM website].
+
+DVE(+dve+)::
+
+The DVE language.  See the
+http://divine.fi.muni.cz/[DiVinE-cluster website].
 
 ETF(+etf+)::
 
