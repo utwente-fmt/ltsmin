@@ -13,9 +13,7 @@ sets and relations.
 */
 //@{
 
-extern struct poptOption vset_setonly_options[];
-
-extern struct poptOption vset_full_options[];
+extern struct poptOption vset_options[];
 
 /**
 \brief Abstract type for a domain.
