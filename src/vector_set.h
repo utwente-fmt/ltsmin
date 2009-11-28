@@ -168,6 +168,12 @@ extern void vrel_count(vrel_t rel,long *nodes,long long *elements);
 */
 extern void vset_next(vset_t dst,vset_t src,vrel_t rel);
 
+/**
+\brief dst := { x | exists y in src : x rel y }
+*/
+extern void vset_prev(vset_t dst,vset_t src,vrel_t rel);
+
+
 //@}
 
 #endif

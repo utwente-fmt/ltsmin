@@ -30,6 +30,7 @@ struct vector_domain_shared {
 	vrel_t (*rel_create)(vdom_t dom,int k,int* proj);
 	void (*rel_add)(vrel_t rel,const int* src,const int* dst);
 	void (*set_next)(vset_t dst,vset_t src,vrel_t rel);
+	void (*set_prev)(vset_t dst,vset_t src,vrel_t rel);
 };
 
 /** Initialise the shared part of the domain. */

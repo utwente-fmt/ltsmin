@@ -70,7 +70,7 @@ struct vector_relation {
 
 static ATerm emptyset=NULL;
 static AFun cons;
-static AFun zip,min,sum,pi,reach;
+static AFun zip,min,sum,pi,reach,inv_reach;
 static ATerm atom;
 static ATerm Atom=NULL;
 static ATerm Empty=NULL;
@@ -106,6 +106,8 @@ static void set_init(){
 	ATprotectAFun(pi);
 	reach=ATmakeAFun("VSET_REACH",2,ATfalse);
 	ATprotectAFun(reach);
+    inv_reach=ATmakeAFun("VSET_INV_REACH",2,ATfalse);
+	ATprotectAFun(inv_reach);
 	// used for vector_set_tree:
 	Empty=ATmake("VSET_E");
 	ATprotect(&Empty);
@@ -769,6 +771,97 @@ void set_next_list(vset_t dst,vset_t src,vrel_t rel){
 	ATtableReset(global_ct);
 }
 
+static ATerm set_inv_reach(ATerm set, ATerm trans, int *proj, int p_len, int ofs, char lookup);
+
+static ATerm copy_level_inv(ATerm set, ATerm trans, int *proj, int p_len, int ofs) {
+    if (set==emptyset) {
+        return emptyset;
+    } else {
+        return MakeCons(ATgetArgument(set, 0),
+                        set_inv_reach(ATgetArgument(set, 1), trans, proj, p_len, ofs + 1, 1),
+                        copy_level_inv(ATgetArgument(set, 2), trans, proj, p_len, ofs)
+                       );
+    }
+}
+
+static ATerm trans_level_inv(ATerm trans_src, ATerm set, ATerm trans, int *proj, int p_len, int ofs)
+{
+    int c;
+    ATerm res = emptyset;
+    for(;(ATgetAFun(trans)==cons) && ATgetAFun(set)==cons;) {
+        // compare 2nd argument
+        c = ATcmp(ATgetArgument(set,0), ATgetArgument(trans,0));
+        if (c < 0) {
+            set = ATgetArgument(set, 2);
+        } else if (c > 0) {
+            trans=ATgetArgument(trans,2);
+        } else {
+            // equal, match rest and return
+            //ATprintf("match, %t -> %t\n", trans_src, ATgetArgument(trans, 0));
+            ATerm tail = set_inv_reach(ATgetArgument(set, 1), ATgetArgument(trans, 1), proj + 1, p_len - 1, ofs+1, 1);
+            res = set_union_2(res, MakeCons(trans_src, tail, emptyset), 0);
+
+            set=ATgetArgument(set,2);
+            trans=ATgetArgument(trans,2);
+        }
+    }
+    return res;
+}
+
+
+static ATerm apply_inv_reach(ATerm set, ATerm trans, int *proj, int p_len, int ofs){
+    ATerm res=emptyset;
+
+    for(;(ATgetAFun(trans)==cons);) {
+        res = set_union_2(
+            res,
+            trans_level_inv(ATgetArgument(trans, 0),
+                set,
+                ATgetArgument(trans,1),
+                proj,
+                p_len,
+                ofs),
+            0);
+        trans = ATgetArgument(trans, 2);
+    }
+    return res;
+}
+
+
+static ATerm set_inv_reach(ATerm set, ATerm trans, int *proj, int p_len, int ofs, char lookup)
+{
+    if (p_len == 0) {
+        return set;
+    } else {
+        ATerm key = NULL, res = NULL;
+        if (lookup) {
+            // do lookup
+            key = (ATerm)ATmakeAppl2(inv_reach, set, trans);
+            res = ATtableGet(global_ct, key);
+            if (res) return res;
+        }
+
+        if (proj[0] == ofs) {
+            // apply the relation backwards
+            res = apply_inv_reach(set, trans, proj, p_len, ofs);
+        } else {
+            // copy, nothing in projection
+            res = copy_level_inv(set, trans, proj, p_len, ofs);
+        }
+
+        if (lookup) {
+            // put in cache
+            ATtablePut(global_ct, key, res);
+        }
+        return res;
+    }
+}
+
+void set_prev_list(vset_t dst, vset_t src, vrel_t rel) {
+    dst->set=set_inv_reach(src->set, rel->rel, rel->proj, rel->p_len, 0, 0);
+    ATtableReset(global_ct);
+}
+
 vdom_t vdom_create_tree(int n){
 	Warning(info,"Creating an AtermDD tree domain.");
 	vdom_t dom=(vdom_t)RTmalloc(sizeof(struct vector_domain));
@@ -811,6 +904,7 @@ vdom_t vdom_create_list(int n){
 	dom->shared.rel_create=rel_create_both;
 	dom->shared.rel_add=rel_add_list;
 	dom->shared.set_next=set_next_list;
+	dom->shared.set_prev=set_prev_list;
 	return dom;
 }
 

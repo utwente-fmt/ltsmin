@@ -46,7 +46,6 @@ struct vector_domain {
 	int *vars;
 	BDD varset;
 	int *vars2;
-	bddPair *pairs;
 	int *proj;
 };
 
@@ -76,9 +75,12 @@ struct vector_relation {
 	vdom_t dom;
 	BDD bdd;
 	BDD p_set; // variables in the projection.
+	BDD p_prime_set; // primed variables in the projection
 	int p_len;
 	int* proj;
 	BDD rel_set; // variables + primed variables in the projection.
+	bddPair *pairs;
+	bddPair *inv_pairs;
 };
 
 static vset_t set_create_fdd(vdom_t dom,int k,int* proj){
@@ -116,28 +118,43 @@ static vset_t set_create_fdd(vdom_t dom,int k,int* proj){
 }
 
 static vrel_t rel_create_fdd(vdom_t dom,int k,int* proj){
-	vrel_t rel=(vrel_t)RTmalloc(sizeof(struct vector_relation));
-	rel->dom=dom;
-	rel->bdd=bddfalse;
-	if (k && k<dom->shared.size) {
-	        int vars[k];
-		int allvars[2*k];
-		rel->p_len=k;
-		rel->proj=(int*)RTmalloc(k*sizeof(int));
-		for(int i=0;i<k;i++) {
-			rel->proj[i]=proj[i];
-			vars[i]=dom->vars[proj[i]];
-	                allvars[2*i]=vars[i];
-                        allvars[2*i+1]=vars[i]+1; // hidden assumption on encoding
-		}
-		rel->p_set=bdd_addref(fdd_makeset(vars,k));
-                rel->rel_set=bdd_addref(fdd_makeset(allvars,2*k));
-
+    vrel_t rel=(vrel_t)RTmalloc(sizeof(struct vector_relation));
+    rel->dom=dom;
+    rel->bdd=bddfalse;
+    if (k && k<dom->shared.size) {
+        int vars[k];
+        int vars2[k];
+        int allvars[2*k];
+        rel->p_len=k;
+        rel->proj=(int*)RTmalloc(k*sizeof(int));
+        for(int i=0;i<k;i++) {
+            rel->proj[i]=proj[i];
+            vars[i] = dom->vars[proj[i]];
+            vars2[i]= dom->vars2[proj[i]];
+            allvars[2*i]=vars[i];
+            allvars[2*i+1]=vars2[i]; // hidden assumption on encoding
+        }
+        // for next function
+        rel->pairs=bdd_newpair();
+        int res=fdd_setpairs(rel->pairs,vars2,vars,k);
+        if (res<0){
+            Fatal(1,error,"BuDDy error: %s",bdd_errstring(res));
+        }
+        // for prev function
+        rel->inv_pairs=bdd_newpair();
+        res=fdd_setpairs(rel->inv_pairs,vars,vars2,k);
+        if (res<0){
+            Fatal(1,error,"BuDDy error: %s",bdd_errstring(res));
+        }
+        rel->p_set=bdd_addref(fdd_makeset(vars,k));
+        rel->rel_set=bdd_addref(fdd_makeset(allvars,2*k));
+        rel->p_prime_set=bdd_addref(bdd_replace(rel->p_set, rel->inv_pairs));
 	} else {
-	  fprintf(stderr,"NEVER\n"); abort();
-		rel->p_len=dom->shared.size;
-		rel->p_set=dom->varset;
-		rel->proj=dom->proj;
+        // TODO: why is this in here? is this correct?
+        fprintf(stderr,"NEVER\n"); abort();
+        rel->p_len=dom->shared.size;
+        rel->p_set=dom->varset;
+        rel->proj=dom->proj;
 	}
 	return rel;
 }
@@ -308,7 +325,7 @@ static void set_next_fdd(vset_t dst,vset_t src,vrel_t rel){
 	bdd_delref(dst->bdd);
 	BDD tmp2=bdd_addref(bdd_exist(tmp,rel->p_set));
 	bdd_delref(tmp);
-	dst->bdd=bdd_addref(bdd_replace(tmp2,rel->dom->pairs));
+	dst->bdd=bdd_addref(bdd_replace(tmp2,rel->pairs));
 	bdd_delref(tmp2);
 }
 */
@@ -316,8 +333,15 @@ static void set_next_fdd(vset_t dst,vset_t src,vrel_t rel){
 static void set_next_appex_fdd(vset_t dst,vset_t src,vrel_t rel){
   BDD tmp=bdd_addref(bdd_appex(src->bdd,rel->bdd,bddop_and,rel->p_set));
   bdd_delref(dst->bdd);
-  dst->bdd=bdd_addref(bdd_replace(tmp,rel->dom->pairs));
+  dst->bdd=bdd_addref(bdd_replace(tmp,rel->pairs));
   bdd_delref(tmp);
+}
+
+static void set_prev_appex_fdd(vset_t dst, vset_t src, vrel_t rel) {
+    BDD tmp1=bdd_addref(bdd_replace(src->bdd,rel->inv_pairs));
+    bdd_delref(dst->bdd);
+    dst->bdd=bdd_addref(bdd_appex(tmp1,rel->bdd,bddop_and,rel->p_prime_set));
+    bdd_delref(tmp1);
 }
 
 // JvdP: gaat dit goed met aliasing? (dst=src)
@@ -369,11 +393,6 @@ vdom_t vdom_create_fdd(int n){
 	if (dom->varset==bddfalse) {
 		Fatal(1,error,"fdd_makeset failed");
 	}
-	dom->pairs=bdd_newpair();
-	res=fdd_setpairs(dom->pairs,dom->vars2,dom->vars,n);
-	if (res<0){
-		Fatal(1,error,"BuDDy error: %s",bdd_errstring(res));
-	}
 	dom->shared.set_create=set_create_fdd;
 	dom->shared.set_add=set_add_fdd;
 	dom->shared.set_member=set_member_fdd;
@@ -392,5 +411,6 @@ vdom_t vdom_create_fdd(int n){
 	dom->shared.rel_add=rel_add_fdd;
 	dom->shared.rel_count=rel_count_fdd;
 	dom->shared.set_next=set_next_appex_fdd;
+	dom->shared.set_prev=set_prev_appex_fdd;
 	return dom;
 }
