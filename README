@@ -99,12 +99,16 @@ Download zlib from <http://www.zlib.net/>.
 *** GNU make
 Download GNU make from <http://www.gnu.org/software/make/>.
 
+*** Flex
+Download Flex (>= 2.5.35) from <http://flex.sourceforge.net/>.  We
+tested with flex 2.5.35.
+
 ** Optional Dependencies
 *** muCRL
-Download muCRL from <http://www.cwi.nl/~mcrl/mutool.html>.  We tested
-with muCRL-2.18.4.  Without muCRL, the distributed tool for state
-space generation (lpo2lts-mpi) will not be built, and neither will any
-NIPS-based tools.
+Download muCRL (>= 2.18.5) from <http://www.cwi.nl/~mcrl/mutool.html>.
+We tested with muCRL-2.18.5.  Without muCRL, the distributed tool for
+state space generation (lpo2lts-mpi) will not be built, and neither
+will any NIPS-based tools.
 
 *** mCRL2
 Download the latest released version of mCRL2 from
@@ -128,6 +132,11 @@ support for mcrl2 (instead of, e.g., system-provided Boost headers).
 See the CADP website <http://www.inrialpes.fr/vasy/cadp/> on how to
 obtain a licence and download the CADP toolkit.
 
+*** DiVinE(-cluster)
+Download the latest CVS version of DiVinE-cluster; instructions can be
+found at <http://divine.fi.muni.cz/trac/wiki/DevelopmentIntroduction>.
+We tested with the version from 2009-12-01.
+
 *** MPI
 In principle, any MPI library which supports MPI-IO should work.
 However, we tested only with Open MPI <http://www.open-mpi.org/>.
@@ -136,7 +145,7 @@ not be built.
 
 *** AsciiDoc
 Download AsciiDoc (>= 8) from <http://www.methods.co.nz/asciidoc/>.
-We tested with asciidoc-8.2.7.  Without asciidoc, documentation cannot
+We tested with asciidoc-8.4.4.  Without asciidoc, documentation cannot
 be rebuilt.  For convenience, release tarballs are shipping with
 pre-built man pages and HTML documentation.
 
