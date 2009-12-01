@@ -1,6 +1,8 @@
 #include "config.h"
 #include <stdlib.h>
+#include <stdio.h>
 #include <unistd.h>
+#include "unix.h"
 #include "runtime.h"
 #include "is-balloc.h"
 

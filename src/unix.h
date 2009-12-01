@@ -7,6 +7,9 @@
 #if defined(HAVE_DECL_STRNDUP) && !HAVE_DECL_STRNDUP
 extern char *strndup(const char *str, size_t n);
 #endif
+#if defined(HAVE_DECL_ASPRINTF) && !HAVE_DECL_ASPRINTF
+extern int asprintf(char **ret, const char *format, ...);
+#endif
 
 #if defined(__APPLE__)
 #include <libkern/OSByteOrder.h>

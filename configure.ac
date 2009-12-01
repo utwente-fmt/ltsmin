@@ -193,10 +193,9 @@ dnl AC_FUNC_MALLOC
 dnl AC_FUNC_REALLOC
 AC_FUNC_STRERROR_R
 AC_FUNC_VPRINTF
-AC_CHECK_FUNCS([atexit bzero ftruncate strdup strndup strchr strstr strtol])
-AC_CHECK_FUNCS([memset mkdir pow strcasecmp strrchr])
-AC_CHECK_FUNCS([backtrace backtrace_symbols])
-AC_CHECK_DECLS([strdup, strndup, strchr, strrchr, strstr],,,[
+AC_CHECK_FUNCS([atexit bzero ftruncate strdup strndup strchr strstr strtol dnl
+  asprintf memset mkdir pow strcasecmp strrchr backtrace backtrace_symbols])
+AC_CHECK_DECLS([strdup, strndup, strchr, strrchr, strstr, asprintf],,,[
 #include "${srcdir}/src/config.h"
 AC_INCLUDES_DEFAULT])
 
