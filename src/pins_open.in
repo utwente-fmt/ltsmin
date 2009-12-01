@@ -103,7 +103,7 @@ case "$FILE" in
     @HAVE_DVEC_FALSE@ echo "DiVinE support not installed"
     @HAVE_DVEC_FALSE@ exit 1
     echo "input is DVE"
-    LTSMIN_MOD_LDFLAGS="@DIVINE_LDFLAGS@ -ldve-open @DVEC_LIBS@"
+    LTSMIN_MOD_LDFLAGS="@DIVINE_LDFLAGS@ -ldve-open @DVEC_LIBS@ -lstdc++"
     ;;
  *)
     echo "Did not recognize type of $FILE"
