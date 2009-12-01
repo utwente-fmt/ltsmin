@@ -1,3 +1,11 @@
+December 1, 2009 - Release 1.5 of the LTSmin toolset.
+
+* New frontend DVE (requires DiVinE-cluster)
+* Bignum support for state counts in spec-reach tools
+  (Jeroen Ketema)
+* spec-reach clean-up
+* 'tree' vector set implementation based on AtermDD
+
 September 17, 2009 - Release 1.4 of the LTSmin toolset.
 
  * New tool ce-mpi for distributed cycle elimination
