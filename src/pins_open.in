@@ -99,11 +99,10 @@ case "$FILE" in
     echo "input is ETF"
     LTSMIN_MOD_LDFLAGS="@CADP_LDFLAGS@ -letf-open @CADP_LIBS@"
     ;;
- *.dveC)
+ *.dve|*.dveC)
     @HAVE_DVEC_FALSE@ echo "DiVinE support not installed"
     @HAVE_DVEC_FALSE@ exit 1
-    echo "input is DVE (precompiled)"
-    LTSMIN_MOD_LDFLAGS="@DIVINE_LDFLAGS@ -ldve-open @DVEC_LIBS@"
+    echo "input is DVE"
     ;;
  *)
     echo "Did not recognize type of $FILE"

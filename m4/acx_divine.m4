@@ -42,7 +42,7 @@ if test x"$acx_divine" = xyes; then
     AC_LANG_PUSH([C++])
     AX_LET([CPPFLAGS], ["$DIVINE_CPPFLAGS $CPPFLAGS"],
            [LIBS], ["$LIBS"],
-           [LDFLAGS], ["$DIVINE_LDFLAGS $LDFLAGS -dynamiclib"],
+           [LDFLAGS], ["$DIVINE_LDFLAGS $LDFLAGS"],
       [acx_dvec_libs=yes
        AC_CHECK_LIB([sevine], [main],
          [DVEC_LIBS="-lsevine $DVEC_LIBS"],
