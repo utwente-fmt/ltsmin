@@ -7,6 +7,9 @@
 #if defined(HAVE_DECL_STRNDUP) && !HAVE_DECL_STRNDUP
 extern char *strndup(const char *str, size_t n);
 #endif
+#if defined(HAVE_DECL_ASPRINTF) && !HAVE_DECL_ASPRINTF
+extern int asprintf(char **ret, const char *format, ...);
+#endif
 
 #if defined(__APPLE__)
 #include <libkern/OSByteOrder.h>
@@ -15,6 +18,10 @@ extern char *strndup(const char *str, size_t n);
 #define bswap_64 OSSwapInt64
 #elif defined(__linux__)
 #include <byteswap.h>
+#elif defined(__NetBSD__)
+#define bswap_16 bswap16
+#define bswap_32 bswap32
+#define bswap_64 bswap64
 #else
 #error "Don't know how to deal with endianness on this platform."
 #endif

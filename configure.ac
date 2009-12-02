@@ -1,5 +1,5 @@
 AC_PREREQ(2.60)
-AC_INIT([ltsmin],[1.4],[ltsmin-support@cs.utwente.nl])
+AC_INIT([ltsmin],[1.5],[ltsmin-support@cs.utwente.nl])
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_AUX_DIR([autotools])
 AM_INIT_AUTOMAKE([foreign])
@@ -30,6 +30,9 @@ dnl LT_INIT([disable-shared])
 AC_DISABLE_SHARED
 AC_PROG_LIBTOOL
 AC_PROG_RANLIB
+dnl automake 1.8 <= x <= 1.9.6 has broken AM_PROG_MKDIR_P
+AC_PROG_MKDIR_P
+AC_SUBST([MKDIR_P])
 
 AX_CHECK_FLEX([
 %option prefix="ltsmin_"
@@ -190,10 +193,9 @@ dnl AC_FUNC_MALLOC
 dnl AC_FUNC_REALLOC
 AC_FUNC_STRERROR_R
 AC_FUNC_VPRINTF
-AC_CHECK_FUNCS([atexit bzero ftruncate strdup strndup strchr strstr strtol])
-AC_CHECK_FUNCS([memset mkdir pow strcasecmp strrchr])
-AC_CHECK_FUNCS([backtrace backtrace_symbols])
-AC_CHECK_DECLS([strdup, strndup, strchr, strrchr, strstr],,,[
+AC_CHECK_FUNCS([atexit bzero ftruncate strdup strndup strchr strstr strtol dnl
+  asprintf memset mkdir pow strcasecmp strrchr backtrace backtrace_symbols])
+AC_CHECK_DECLS([strdup, strndup, strchr, strrchr, strstr, asprintf],,,[
 #include "${srcdir}/src/config.h"
 AC_INCLUDES_DEFAULT])
 
