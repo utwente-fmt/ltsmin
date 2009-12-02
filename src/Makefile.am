@@ -310,7 +310,7 @@ LEMON_FLAGS = -s
 	cd $(top_builddir)/lemon && $(MAKE) $(AM_MAKEFLAGS) lemon$(EXEEXT)
 	$(top_builddir)/lemon/lemon$(EXEEXT) $(LEMON_FLAGS) $<
 
-%.c: %.l
+%.c %.h: %.l
 	$(am__skiplex) $(LEX) $<
 
 runtime.c: git_version.h
