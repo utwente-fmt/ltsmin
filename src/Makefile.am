@@ -314,6 +314,7 @@ LEMON_FLAGS = -s
 	$(am__skiplex) $(LEX) $<
 
 runtime.c: git_version.h
+hre-popt.c: git_version.h
 
 GIT_DESCRIBE := $(shell git describe --tags --abbrev=6 HEAD 2>/dev/null)
 
