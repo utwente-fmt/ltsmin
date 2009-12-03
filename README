@@ -137,6 +137,16 @@ Download the latest CVS version of DiVinE-cluster; instructions can be
 found at <http://divine.fi.muni.cz/trac/wiki/DevelopmentIntroduction>.
 We tested with the version from 2009-12-01.
 
+Alternatively, download divine-cluster 0.8.3 from
+<http://divine.fi.muni.cz/page.php?page=download> and apply the patch
+from <contrib/divine-cluster-0.8.3-ltsmin.patch> to the divine-cluster
+source tree:
+
+  cd divine-0.8.3
+  patch -p1 < /path/to/ltsmin/contrib/divine-cluster-0.8.3-ltsmin.patch
+
+Then, build and install divine-cluster according to their documentation.
+
 *** MPI
 In principle, any MPI library which supports MPI-IO should work.
 However, we tested only with Open MPI <http://www.open-mpi.org/>.

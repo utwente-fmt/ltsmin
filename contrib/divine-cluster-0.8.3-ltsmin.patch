@@ -1,0 +1,2177 @@
+From 39f4053b844dfca781dc473d399d437c85068733 Mon Sep 17 00:00:00 2001
+From: Elwin Pater <e.pater@student.utwente.nl>
+Date: Fri, 16 Oct 2009 00:18:31 +0200
+Subject: [PATCH] Added changes to divine.precompile
+
+---
+ src/system/dveC/dveC_explicit_system.cc | 1510 +++++++++++++++++++++++++++++--
+ src/system/dveC/dveC_explicit_system.hh |   19 +-
+ 2 files changed, 1461 insertions(+), 68 deletions(-)
+
+diff --git a/src/system/dveC/dveC_explicit_system.cc b/src/system/dveC/dveC_explicit_system.cc
+index 1ada483..390d757 100644
+--- a/src/system/dveC/dveC_explicit_system.cc
++++ b/src/system/dveC/dveC_explicit_system.cc
+@@ -24,7 +24,6 @@ using namespace std;
+ #endif
+ using std::ostream;
+ using std::vector;
+-                                
+ 
+ struct ext_transition_t
+   {
+@@ -44,6 +43,105 @@ static void (*lib_print_state)(divine::state_t, std::ostream & );
+ // =================================================================================================================================
+ // Protected methods:
+ // =================================================================================================================================
++void dveC_explicit_system_t::get_expr_deps(dve_expression_t & expr, std::vector<int> & proj, std::string state_name)
++{
++  //DEBFUNC(cerr << "BEGIN of dve_expression_t::write" << endl;)
++ dve_symbol_table_t * parent_table = expr.get_symbol_table();
++ if (!parent_table) gerr << "Writing expression: Symbol table not set" << thr();
++ switch (expr.get_operator())
++  {
++   case T_ID:
++    { if(parent_table->get_variable(expr.get_ident_gid())->is_const())
++      {
++        //ostr << parent_table->get_variable(expr.get_ident_gid())->get_name();
++      }
++      else{
++        //ostr<<state_name<<".";
++        if(parent_table->get_variable(expr.get_ident_gid())->get_process_gid() != NO_ID)
++        {
++         // ostr << parent_table->get_process(parent_table->get_variable(expr.get_ident_gid())->get_process_gid())->get_name(); //name of process
++          //ostr<<".";
++        }
++        //ostr << parent_table->get_variable(expr.get_ident_gid())->get_name();
++        mark_projection(expr.get_ident_gid(), state_creator_t::VARIABLE, -1, proj);
++      }
++      break; }
++   case T_FOREIGN_ID:
++    { //ostr << parent_table->get_process(parent_table->get_variable(expr.get_ident_gid())->get_process_gid())->get_name(); //name of process
++      //ostr<<"->";
++      //ostr << parent_table->get_variable(expr.get_ident_gid())->get_name();
++      mark_projection(expr.get_ident_gid(), state_creator_t::VARIABLE, -1, proj);
++      break; }
++   case T_NAT:
++      break;
++   case T_PARENTHESIS:
++    {  get_expr_deps(*expr.left(), proj, state_name); break; }
++   case T_SQUARE_BRACKETS:
++    { //ostr<<state_name<<".";
++      if(parent_table->get_variable(expr.get_ident_gid())->get_process_gid() != NO_ID)
++      {
++        //ostr << parent_table->get_process(parent_table->get_variable(expr.get_ident_gid())->get_process_gid())->get_name(); //name of process
++        //ostr<<".";
++      }
++      //ostr << parent_table->get_variable(expr.get_ident_gid())->get_name();
++      //ostr<<"[";
++      if ((*expr.left()).get_operator() == T_NAT)
++      {
++        //char * aux_char = create_string_from<all_values_t>((*expr.left()).get_value());
++        //ostr << aux_char; dispose_string(aux_char);
++        mark_projection(expr.get_ident_gid(), state_creator_t::VARIABLE, (*expr.left()).get_value(), proj);
++      } else {
++        //ostr << "ALL";
++        mark_projection(expr.get_ident_gid(), state_creator_t::VARIABLE, -1, proj);
++        get_expr_deps(*expr.left(),proj, state_name); // continue with sub expression
++      }
++      //ostr<<"]";
++      break; }
++   case T_FOREIGN_SQUARE_BRACKETS:
++    {
++      /* TODO: elwin
++      ostr << parent_table->get_process(parent_table->get_variable(expr.get_ident_gid())->get_process_gid())->get_name(); //name of preocess
++      ostr<<"->";
++      ostr << parent_table->get_variable(expr.get_ident_gid())->get_name();
++      ostr<<"["; get_expr_deps(*expr.left(), ostr, state_name); ostr<<"]" ;break;
++      */
++      cout << "ERR: using unimplemented code.. FOREIGN_SQUARE_BRACKETS in get_expr_deps" << endl;
++      break;
++    }
++   case T_LT: { get_expr_deps(*expr.left(), proj, state_name); get_expr_deps(*expr.right(), proj, state_name); break; }
++   case T_LEQ: { get_expr_deps(*expr.left(), proj, state_name); get_expr_deps(*expr.right(), proj, state_name); break; }
++   case T_EQ: { get_expr_deps(*expr.left(), proj, state_name); get_expr_deps(*expr.right(), proj, state_name); break; }
++   case T_NEQ: { get_expr_deps(*expr.left(), proj, state_name); get_expr_deps(*expr.right(), proj, state_name); break; }
++   case T_GT: { get_expr_deps(*expr.left(), proj, state_name); get_expr_deps(*expr.right(), proj, state_name); break; }
++   case T_GEQ: { get_expr_deps(*expr.left(), proj, state_name); get_expr_deps(*expr.right(), proj, state_name); break; }
++   case T_PLUS: { get_expr_deps(*expr.left(), proj, state_name); get_expr_deps(*expr.right(), proj, state_name); break; }
++   case T_MINUS: { get_expr_deps(*expr.left(), proj, state_name); get_expr_deps(*expr.right(), proj, state_name); break; }
++   case T_MULT: { get_expr_deps(*expr.left(), proj, state_name); get_expr_deps(*expr.right(), proj, state_name); break; }
++   case T_DIV: { get_expr_deps(*expr.left(), proj, state_name); get_expr_deps(*expr.right(), proj, state_name); break; }
++   case T_MOD: { get_expr_deps(*expr.left(), proj, state_name); get_expr_deps(*expr.right(), proj, state_name); break; }
++   case T_AND: { get_expr_deps(*expr.left(), proj, state_name); get_expr_deps(*expr.right(), proj, state_name); break; }
++   case T_OR: { get_expr_deps(*expr.left(), proj, state_name); get_expr_deps(*expr.right(), proj, state_name); break; }
++   case T_XOR: { get_expr_deps(*expr.left(), proj, state_name); get_expr_deps(*expr.right(), proj, state_name); break; }
++   case T_LSHIFT: { get_expr_deps(*expr.left(), proj, state_name); get_expr_deps(*expr.right(), proj, state_name); break; }
++   case T_RSHIFT: { get_expr_deps(*expr.left(), proj, state_name); get_expr_deps(*expr.right(), proj, state_name); break; }
++   case T_BOOL_AND: {get_expr_deps(*expr.left(), proj, state_name); get_expr_deps(*expr.right(), proj, state_name); break;}
++   case T_BOOL_OR: {get_expr_deps(*expr.left(), proj, state_name); get_expr_deps(*expr.right(), proj, state_name); break;}
++   case T_DOT:
++    {
++      mark_projection(parent_table->get_state(expr.get_ident_gid())->get_process_gid(),
++                      state_creator_t::PROCESS_STATE, -1, proj);
++      break;
++    }
++   case T_IMPLY: { get_expr_deps(*expr.left(), proj, state_name); get_expr_deps(*expr.right(), proj, state_name); break; }
++   case T_UNARY_MINUS: { get_expr_deps(*expr.right(), proj, state_name); break; }
++   case T_TILDE: { get_expr_deps(*expr.right(), proj, state_name); break; }
++   case T_BOOL_NOT: { get_expr_deps(*expr.right(), proj, state_name); break; }
++   case T_ASSIGNMENT: { get_expr_deps(*expr.left(), proj, state_name); get_expr_deps(*expr.right(), proj, state_name); break; }
++   default: { gerr << "Problem in expression - unknown operator"
++                      " number " << expr.get_operator() << psh(); }
++  }
++}
++
+ 
+ 
+ void dveC_explicit_system_t::write_C(dve_expression_t & expr, std::ostream & ostr, std::string state_name)
+@@ -157,7 +255,7 @@ slong_int_t dveC_explicit_system_t::read(const char * const filename)
+     ofstream ofstr;
+     int len = sysconf(_SC_HOST_NAME_MAX) + 1;
+     char host_name[len];
+-    gethostname(host_name,len); 
++    gethostname(host_name,len);
+     string file_template = host_name + string(create_string_from(getpid()));
+     name = name + file_template;
+     ofstr.open((name + ".cc").c_str());
+@@ -218,19 +316,19 @@ slong_int_t dveC_explicit_system_t::read(const char * const filename)
+ 
+    //library opening
+    handle = dlopen ((name + "dveC").c_str(), RTLD_LAZY);
+-   if (!handle) 
++   if (!handle)
+    {
+      fputs (dlerror(), stderr);
+      return 1;
+    }
+  }
+- 
++
+   lib_get_succ = (int (*)(state_t, succ_container_t &)) dlsym(handle, "lib_get_succ");
+   lib_is_accepting = (bool (*)(state_t)) dlsym(handle, "lib_is_accepting");
+   lib_get_initial_state = (state_t (*)()) dlsym(handle, "lib_get_initial_state");
+   lib_print_state  = (void (*)(state_t, ostream & outs)) dlsym(handle, "lib_print_state");
+ 
+- if ((error = dlerror()) != NULL)  
++ if ((error = dlerror()) != NULL)
+   {
+      fputs(error, stderr);
+      return 1;
+@@ -281,6 +379,62 @@ dveC_explicit_system_t::~dveC_explicit_system_t()
+ // =================================================================================================================================
+ // Functions for generating C code
+ // =================================================================================================================================
++void dveC_explicit_system_t::mark_projection(size_int_t gid, int type, int idx, std::vector<int> & proj)
++{
++ size_int_t size = 0;
++ bool mark;
++ for (size_int_t i=0; i<state_creators_count; ++i)
++  {
++   mark = state_creators[i].gid == gid && type == state_creators[i].type;
++   switch (state_creators[i].type)
++    {
++     case state_creator_t::VARIABLE:
++      {
++       if (state_creators[i].array_size)
++        {
++         // for loop
++         for(size_int_t j=0; j < state_creators[i].array_size; ++j)
++         {
++            if (mark && (idx == -1 || idx == j)) proj[size]=1;
++            size++;
++         }
++        }
++        //if (mark) return;
++       else
++        {
++          if (mark) { proj[size]=1; }//return; }
++          size++;
++        }
++      }
++     break;
++     case state_creator_t::PROCESS_STATE:
++      {
++        if (mark) { proj[size]=1; }//return; }
++        size++;
++      }
++     break;
++     case state_creator_t::CHANNEL_BUFFER:
++      {
++        if (mark) proj[size]=1; // number_of_items
++        size++;
++        dve_symbol_t * symbol =
++          get_symbol_table()->get_channel(state_creators[i].gid);
++        size_int_t item_count = symbol->get_channel_type_list_size();
++        size_int_t chan_size = symbol->get_channel_buffer_size();
++        for(size_int_t i=0; i < chan_size; ++i) {
++          for (size_int_t j=0; j<item_count; ++j) {
++            if (mark) proj[size]=1;
++              size++;
++          }
++        }
++      }
++     break;
++     default: gerr << "Unexpected error" << thr();
++     break;
++    };
++  }
++}
++
+ 
+ 
+ void dveC_explicit_system_t::print_include(ostream & ostr)
+@@ -370,7 +524,7 @@ void dveC_explicit_system_t::print_state_struct(ostream & ostr)
+        ostr << orig_spaces << " {" << endl;
+        process_name=
+          get_symbol_table()->get_process(state_creators[i].gid)->get_name();
+-       ostr << spaces << "ushort_int_t state;" << endl; 
++       ostr << spaces << "ushort_int_t state;" << endl;
+       }
+      break;
+      case state_creator_t::CHANNEL_BUFFER:
+@@ -405,6 +559,498 @@ void dveC_explicit_system_t::print_state_struct(ostream & ostr)
+   }
+  ostr << " } __attribute__((__packed__));" << endl;
+  ostr << endl;
++
++ // todo: add this somewhere else
++ print_state_description(ostr);
++}
++
++size_int_t dveC_explicit_system_t::get_state_length()
++{
++ size_int_t size = 0;
++ for (size_int_t i=0; i<state_creators_count; ++i)
++  {
++   switch (state_creators[i].type)
++    {
++     case state_creator_t::VARIABLE:
++      {
++       if (state_creators[i].array_size)
++        {
++          size += state_creators[i].array_size;
++        }
++       else
++        {
++          size++;
++        }
++      }
++     break;
++     case state_creator_t::PROCESS_STATE:
++      {
++        size++;
++      }
++     break;
++     case state_creator_t::CHANNEL_BUFFER:
++      {
++       dve_symbol_t * symbol =
++         get_symbol_table()->get_channel(state_creators[i].gid);
++       size_int_t item_count = symbol->get_channel_type_list_size();
++       size_int_t chan_size = symbol->get_channel_buffer_size();
++       size += (chan_size * item_count) + 1;
++      }
++     break;
++     default: gerr << "Unexpected error" << thr();
++     break;
++    };
++  }
++  return size;
++}
++
++void dveC_explicit_system_t::print_state_description(ostream & ostr)
++{
++ // todo: note: state creators count has vectors & therefore is too less
++ // todo: global  variables are not in the state => these are only const
++ // count variables
++ ostr << "extern "<< '"' << "C" << '"' << " bool lib_system_with_property()" <<endl;
++ ostr << " {"<<endl;
++ ostr << "   return (" << (this->get_with_property()?"true":"false") << ");" << endl;
++ ostr << " }"<<endl;
++ ostr <<endl;
++
++ ostr << "extern "<< '"' << "C" << '"' << " size_t lib_get_state_variable_count()" <<endl;
++ ostr << " {"<<endl;
++ ostr << "   return (" << get_state_length() << ");" << endl;
++ ostr << " }"<<endl;
++ ostr <<endl;
++
++ {
++ ostr << "extern "<< '"' << "C" << '"' << " const char* lib_get_state_variable_name(int var)" <<endl;
++ ostr << " {"<<endl;
++ ostr << "   switch (var)"<<endl;
++ ostr << "   {"<<endl;
++
++ bool global = true;
++ string name = "UNINITIALIZED";
++ string process_name = "UNINITIALIZED";
++ int k=0;
++ for (size_int_t i=0; i<state_creators_count; ++i, ++k)
++  {
++    ostr << "   case " << k << ":" <<endl;
++
++    switch (state_creators[i].type)
++    {
++     case state_creator_t::VARIABLE:
++       if (global) {
++         name=get_symbol_table()->get_variable(state_creators[i].gid)->get_name();
++       } else {
++         name=process_name + "." +
++              get_symbol_table()->get_variable(state_creators[i].gid)->get_name();
++       }
++       if (state_creators[i].array_size)
++        {
++          int j=0;
++          for(; j < state_creators[i].array_size; ++j)
++          {
++            ostr << "     return \"" << name << "[" << j << "]\";" <<endl;
++            if (j < state_creators[i].array_size - 1)
++            ostr << "   case " << ++k << ":" <<endl;
++          }
++          continue;
++        }
++     break;
++     case state_creator_t::PROCESS_STATE:
++       if (global) global=false;
++       name=get_symbol_table()->get_process(state_creators[i].gid)->get_name();
++       process_name=name;
++     break;
++     case state_creator_t::CHANNEL_BUFFER:
++       name=get_symbol_table()->get_channel(state_creators[i].gid)->get_name();
++
++       ostr << "     return \"" << name << ".number_of_items\";" <<endl;
++       ostr << "   case " << ++k << ":" <<endl;
++       dve_symbol_t * symbol =
++         get_symbol_table()->get_channel(state_creators[i].gid);
++       size_int_t item_count = symbol->get_channel_type_list_size();
++       size_int_t chan_size = symbol->get_channel_buffer_size();
++       for(size_int_t i=0; i < chan_size; ++i)
++       {
++         for (size_int_t j=0; j<item_count; ++j)
++         {
++           ostr << "     return \"" << name << "[" << i << "].x" << j << "\";" <<endl;
++           if (i < chan_size - 1 || j < item_count - 1)
++             ostr << "   case " << ++k << ":" <<endl;
++         }
++       }
++       continue;
++     break;
++   }
++   ostr << "     return \"" << name << "\";" <<endl;
++  }
++
++ ostr << "   default:" << endl;
++ ostr << "     return NULL;" <<endl;
++ ostr << "   }"<<endl;
++ ostr << " }"<<endl;
++ ostr <<endl;
++ }
++
++ // gather type information
++ std::map<string, int> typeno;
++ std::map<string, std::vector<string> > typevalue;
++ int ntypes = 0;
++ {
++   for (size_int_t i=0; i<state_creators_count; ++i)
++    {
++      vector<string> values;
++      values.clear();
++      string name = "UNINITIALIZED";
++      switch (state_creators[i].type)
++      {
++       case state_creator_t::VARIABLE:
++         {
++           dve_symbol_t * var = get_symbol_table()->get_variable(state_creators[i].gid);
++           if (var->is_byte()) { name = "byte"; } else { name = "int"; };
++         }
++       break;
++       case state_creator_t::PROCESS_STATE:
++         name=get_symbol_table()->get_process(state_creators[i].gid)->get_name();
++         for(size_int_t j = 0;
++             j < dynamic_cast<dve_process_t*>(this->get_process(state_creators[i].gid))->get_state_count();
++             j++)
++         {
++            values.push_back(
++              get_symbol_table()->get_state(
++                dynamic_cast<dve_process_t*>(this->get_process(state_creators[i].gid))->get_state_gid(j))->get_name()
++              );
++         }
++       break;
++       case state_creator_t::CHANNEL_BUFFER:
++         name = "byte";
++         dve_symbol_t * symbol =
++           get_symbol_table()->get_channel(state_creators[i].gid);
++         size_int_t item_count = symbol->get_channel_type_list_size();
++         for (size_int_t j=0; j<item_count; ++j)
++         {
++           if (symbol->get_channel_type_list_item(j)==VAR_BYTE)
++           {
++             // check existence of byte type
++             if (typeno.find(name) == typeno.end()) {
++               typeno[name] = ntypes++;
++               typevalue[name] = vector<string>();
++               break; // if byte exists, the only other possible type is int, which is added by default
++             }
++           }
++         }
++         name = "int"; // for number_of_items
++       break;
++     }
++
++     // add type?
++     if (typeno.find(name) == typeno.end())
++     {
++        typeno[name] = ntypes++;
++        typevalue[name] = values;
++     }
++    }
++ }
++
++ ostr << "extern "<< '"' << "C" << '"' << " size_t lib_get_state_variable_type_count()" <<endl;
++ ostr << " {"<<endl;
++ ostr << "   return (" << ntypes << ");" <<endl;
++ ostr << " }"<<endl;
++ ostr << endl;
++
++ {
++ ostr << "extern "<< '"' << "C" << '"' << " const char* lib_get_state_variable_type_name(int type)" <<endl;
++ ostr << " {"<<endl;
++ ostr << "   switch (type)"<<endl;
++ ostr << "   {"<<endl;
++
++ for(std::map<string, int>::iterator ix = typeno.begin(); ix != typeno.end(); ++ix)
++  {
++    ostr << "   case " << ix->second << ":" <<endl;
++    ostr << "     return \"" << ix->first << "\";" <<endl;
++  }
++
++ ostr << "   default:" << endl;
++ ostr << "     return NULL;" <<endl;
++ ostr << "   }"<<endl;
++ ostr << " }"<<endl;
++ ostr <<endl;
++ }
++
++ {
++ ostr << "extern "<< '"' << "C" << '"' << " const int lib_get_state_variable_type(int var)" <<endl;
++ ostr << " {"<<endl;
++ ostr << "   switch (var)"<<endl;
++ ostr << "   {"<<endl;
++
++ int k=0;
++ for (size_int_t i=0; i<state_creators_count; ++i, ++k)
++  {
++    ostr << "   case " << k << ":" <<endl;
++
++    string name = "UNINITIALIZED";
++    switch (state_creators[i].type)
++    {
++     case state_creator_t::VARIABLE:
++      {
++       dve_symbol_t * var = get_symbol_table()->get_variable(state_creators[i].gid);
++       if (var->is_byte()) { name = "byte"; } else { name = "int"; };
++       if (state_creators[i].array_size)
++        {
++          for(int j=0; j < state_creators[i].array_size - 1; ++j)
++          {
++            ostr << "     return " << typeno[name] << ";" <<endl;
++            ostr << "   case " << ++k << ":" <<endl;
++          }
++        }
++      }
++     break;
++     case state_creator_t::PROCESS_STATE:
++       name=get_symbol_table()->get_process(state_creators[i].gid)->get_name();
++     break;
++     case state_creator_t::CHANNEL_BUFFER:
++     {
++       ostr << "     return " << typeno["int"] << ";" <<endl; // for number_of_items return int
++       dve_symbol_t * symbol =
++         get_symbol_table()->get_channel(state_creators[i].gid);
++       size_int_t item_count = symbol->get_channel_type_list_size();
++       size_int_t chan_size = symbol->get_channel_buffer_size();
++       for(size_int_t i=0; i < chan_size; ++i)
++       {
++         for (size_int_t j=0; j<item_count; ++j)
++         {
++           if (symbol->get_channel_type_list_item(j)==VAR_BYTE)
++           {
++             ostr << "   case " << ++k << ":" <<endl;
++             ostr << "     return " << typeno["byte"] << ";" <<endl;
++           } else {
++             ostr << "   case " << ++k << ":" <<endl;
++             ostr << "     return " << typeno["int"] << ";" <<endl;
++           }
++         }
++       }
++       continue;
++     }
++     break;
++     default: gerr << "Unexpected error" << thr();
++     break;
++   }
++   ostr << "     return " << typeno[name] << ";" <<endl;
++  }
++
++ ostr << "   default:" << endl;
++ ostr << "     return -1;" <<endl;
++ ostr << "   }"<<endl;
++ ostr << " }"<<endl;
++ ostr <<endl;
++
++ }
++
++
++ {
++ ostr << "extern "<< '"' << "C" << '"' << " size_t lib_get_state_variable_type_value_count(int type)" <<endl;
++ ostr << " {"<<endl;
++ ostr << "   switch (type)"<<endl;
++ ostr << "   {"<<endl;
++
++ for(std::map<string, int>::iterator ix = typeno.begin(); ix != typeno.end(); ++ix)
++  {
++    ostr << "   case " << ix->second << ":" << "// " << ix->first << endl;
++    ostr << "     return " << typevalue[ix->first].size() << ";" <<endl;
++  }
++
++ ostr << "   default:" << endl;
++ ostr << "     return -1;" <<endl;
++ ostr << "   }"<<endl;
++
++ ostr << " }"<<endl;
++ ostr <<endl;
++ }
++
++
++ {
++ ostr << "extern "<< '"' << "C" << '"' << " const char* lib_get_state_variable_type_value(int type, int value)" <<endl;
++ ostr << " {"<<endl;
++
++ ostr << "   switch (type)"<<endl;
++ ostr << "   {"<<endl;
++
++ for(std::map<string, int>::iterator ix = typeno.begin(); ix != typeno.end(); ++ix)
++  {
++    ostr << "   case " << ix->second << ":" <<endl;
++
++    if (typevalue[ix->first].size()) {
++      ostr << "     switch ( value )" << endl ;
++      ostr << "     {" <<endl;
++      for(int i=0; i < typevalue[ix->first].size(); ++i)
++      {
++        ostr << "       case " << i << ":" <<endl;
++        ostr << "         return \"" << typevalue[ix->first][i] << "\";" <<endl;
++      }
++      ostr << "     }" <<endl;
++    }
++    ostr << "     return NULL;" <<endl;
++  }
++
++ ostr << "   default:" << endl;
++ ostr << "     return NULL;" <<endl;
++ ostr << "   }"<<endl;
++
++ ostr << " }"<<endl;
++ ostr <<endl;
++ }
++
++
++ // projections to int[]
++ ostr << "extern "<< '"' << "C" << '"' << " void lib_project_state_to_int_array(state_t state, int* proj)" <<endl;
++ ostr << " {"<<endl;
++
++ {
++ ostr << "  state_struct_t *p_proj_state = reinterpret_cast<state_struct_t*>(state.ptr);"<<endl;
++ bool global = true;
++ int k = 0;
++ string spaces = "  ";
++ string orig_spaces = spaces;
++ string name;
++ string process_name = "UNINITIALIZED";
++
++ for (size_int_t i=0; i!=state_creators_count; ++i, ++k)
++  {
++   switch (state_creators[i].type)
++    {
++     case state_creator_t::VARIABLE:
++      {
++       name=get_symbol_table()->get_variable(state_creators[i].gid)->get_name();
++       if (state_creators[i].array_size)
++        {
++         for(size_int_t j=0; j<state_creators[i].array_size; j++,k++)
++         {
++            if(global)
++               ostr << spaces << "proj["<<k<<"] = (*p_proj_state)."<<name <<"["<<j<<"];" << endl;
++            else
++                ostr << spaces << "proj["<<k<<"] = (*p_proj_state)."<<process_name<<"."<<name <<"["<<j<<"];" << endl;
++         }
++         --k; // whoops, one too much
++        }
++       else
++        {
++          if(global)
++              ostr << spaces << "proj[" << k << "] = (*p_proj_state)."<<name <<";" << endl;
++           else
++               ostr << spaces << "proj[" << k << "] = (*p_proj_state)."<<process_name<<"."<<name <<";" << endl;
++        }
++      }
++     break;
++     case state_creator_t::PROCESS_STATE:
++      {
++       if (global)
++        {
++         global = false;
++        }
++       process_name = get_symbol_table()->get_process(state_creators[i].gid)->get_name();
++       ostr << spaces << "proj[" << k << "] = (*p_proj_state)."<<process_name<<".state;"<<endl;
++      }
++     break;
++     case state_creator_t::CHANNEL_BUFFER:
++      {
++       name=get_symbol_table()->get_channel(state_creators[i].gid)->get_name();
++       ostr << spaces << "proj[" << k << "] = (*p_proj_state)."<<name<<".number_of_items;"<<endl;
++       dve_symbol_t * symbol =
++         get_symbol_table()->get_channel(state_creators[i].gid);
++       size_int_t item_count = symbol->get_channel_type_list_size();
++       size_int_t chan_size = symbol->get_channel_buffer_size();
++       ++k;
++       for(size_int_t i=0; i < chan_size; ++i)
++       {
++         for (size_int_t j=0; j<item_count; ++j,++k) {
++           ostr << spaces << "proj[" << k << "] = (*p_proj_state)."<<name<<".content[" << i << "].x" << j <<";"<<endl;
++         }
++       }
++       --k;
++      }
++     break;
++    };
++  }
++  //--------------------------------------------------
++ }
++
++ ostr << " }"<<endl;
++ ostr << endl;
++
++ ostr << "extern "<< '"' << "C" << '"' << " void lib_project_int_array_to_state(int* proj, state_t state)" <<endl;
++ ostr << " {"<<endl;
++
++ {
++ ostr << "  state_struct_t *p_proj_state = reinterpret_cast<state_struct_t*>(state.ptr);"<<endl;
++ bool global = true;
++ int k = 0;
++ string spaces = "  ";
++ string orig_spaces = spaces;
++ string name;
++ string process_name = "UNINITIALIZED";
++
++ for (size_int_t i=0; i!=state_creators_count; ++i, ++k)
++  {
++   switch (state_creators[i].type)
++    {
++     case state_creator_t::VARIABLE:
++      {
++       name=get_symbol_table()->get_variable(state_creators[i].gid)->get_name();
++       if (state_creators[i].array_size)
++        {
++         for(size_int_t j=0; j<state_creators[i].array_size; j++,k++)
++         {
++            if(global)
++               ostr << spaces << "(*p_proj_state)."<<name <<"["<<j<<"] = proj["<< k <<"];" << endl;
++            else
++                ostr << spaces << "(*p_proj_state)."<<process_name<<"."<<name <<"["<<j<<"] = proj[" << k <<"];" << endl;
++         }
++         --k; // whoops, one too much
++        }
++       else
++        {
++          if(global)
++              ostr << spaces << "(*p_proj_state)."<<name <<" = proj[" << k << "];" << endl;
++           else
++               ostr << spaces << "(*p_proj_state)."<<process_name<<"."<<name <<"= proj[" << k << "];" << endl;
++        }
++      }
++     break;
++     case state_creator_t::PROCESS_STATE:
++      {
++       if (global)
++        {
++         global = false;
++        }
++       process_name = get_symbol_table()->get_process(state_creators[i].gid)->get_name();
++       ostr << spaces << "(*p_proj_state)."<<process_name<<".state = proj["<< k <<"];"<<endl;
++      }
++     break;
++     case state_creator_t::CHANNEL_BUFFER:
++      {
++       name=get_symbol_table()->get_channel(state_creators[i].gid)->get_name();
++       ostr << spaces << "(*p_proj_state)."<<name<<".number_of_items = proj[" << k <<"];"<<endl;
++       dve_symbol_t * symbol =
++         get_symbol_table()->get_channel(state_creators[i].gid);
++       size_int_t item_count = symbol->get_channel_type_list_size();
++       size_int_t chan_size = symbol->get_channel_buffer_size();
++       ++k;
++       for(size_int_t i=0; i < chan_size; ++i)
++       {
++         for (size_int_t j=0; j<item_count; ++j,++k) {
++           ostr << spaces << "(*p_proj_state)."<<name<<".content[" << i << "].x" << j <<" = proj[" << k <<"];"<<endl;
++         }
++       }
++       --k;
++      }
++     break;
++    };
++  }
++  //--------------------------------------------------
++  }
++
++ ostr << " }"<<endl;
++ ostr << endl;
+ }
+ 
+ void dveC_explicit_system_t::print_dveC_compiler(ostream & ostr)
+@@ -457,16 +1103,19 @@ void dveC_explicit_system_t::print_dveC_compiler(ostream & ostr)
+     transition = dynamic_cast<dve_transition_t*>(this->get_transition(i));
+     if(!transition->is_sync_exclaim() && (!sytem_with_property || transition->get_process_gid() != this->get_property_gid()) )
+     {
++       // not syncronized sender without buffer and not a property transition
+       iter_transition_map = transition_map.find(transition->get_process_gid());
+       if( iter_transition_map == transition_map.end()) //new process it means that new state in process is also new
+       {
+-
++         // new process, add to transition map
+          map<size_int_t,vector<ext_transition_t> >  process_transition_map;
+          vector<ext_transition_t> ext_transition_vector;
+          if(!transition->is_sync_ask())
+          {
++           // transition not of type SYNC_ASK
+            if(!sytem_with_property)
+-           { 
++           {
++             // no properties, just add to ext_transition vector
+              ext_transition_t ext_transition;
+              ext_transition.synchronized = false;
+              ext_transition.first = transition;
+@@ -474,6 +1123,8 @@ void dveC_explicit_system_t::print_dveC_compiler(ostream & ostr)
+            }
+            else
+            {
++             // this transition is not a property, but there are properties
++             // forall properties, add this transition to ext_transition_vector
+              for(iter_property_transitions = property_transitions.begin();iter_property_transitions != property_transitions.end();
+                  iter_property_transitions++)
+              {
+@@ -487,14 +1138,19 @@ void dveC_explicit_system_t::print_dveC_compiler(ostream & ostr)
+          }
+          else
+          {
++           // transition of type SYNC_ASK
+            iter_channel_map = channel_map.find(transition->get_channel_gid());
+            if(iter_channel_map != channel_map.end())
+            {
+-             for(iter_transition_vector = iter_channel_map->second.begin();iter_transition_vector != 
++             // channel of this transition is found (strange test, no else part for if statement)
++             // assume: channel should always be present
++             // forall transitions that also use this channel, add to ext_transitions
++             for(iter_transition_vector = iter_channel_map->second.begin();iter_transition_vector !=
+                  iter_channel_map->second.end();iter_transition_vector++)
+              {
+                if(!sytem_with_property)
+                {
++                 // system has no properties, so add only once without property
+                  ext_transition_t ext_transition;
+                  ext_transition.synchronized = true;
+                  ext_transition.first = transition;
+@@ -503,6 +1159,8 @@ void dveC_explicit_system_t::print_dveC_compiler(ostream & ostr)
+                }
+                else
+                {
++                 // system has properties, so forall properties, add the combination if this transition,
++                 // the transition that also uses this channel and the property
+                  for(iter_property_transitions = property_transitions.begin();iter_property_transitions != property_transitions.end();
+                     iter_property_transitions++)
+                  {
+@@ -517,19 +1175,23 @@ void dveC_explicit_system_t::print_dveC_compiler(ostream & ostr)
+              }
+            }
+          }
++         // for this process state, add the ext transitions
+          process_transition_map.insert(pair<size_int_t,vector<ext_transition_t> >(transition->get_state1_lid(),ext_transition_vector));
++         // then add this vector to the transition map for this process
+          transition_map.insert(pair<size_int_t,map<size_int_t,vector<ext_transition_t> > >(transition->get_process_gid(),process_transition_map));
+       }
+       else{
+-
++        // existing process, find process_transition_map
+          iter_process_transition_map = iter_transition_map->second.find(transition->get_state1_lid());
+          if( iter_process_transition_map == iter_transition_map->second.end()) //new state in current process
+          {
+            vector<ext_transition_t> ext_transition_vector;
+            if(!transition->is_sync_ask())
+            {
++             // transition is not SYNC_ASK
+              if(!sytem_with_property)
+-             { 
++             {
++               // no properties
+                ext_transition_t ext_transition;
+                ext_transition.synchronized = false;
+                ext_transition.first = transition;
+@@ -537,6 +1199,7 @@ void dveC_explicit_system_t::print_dveC_compiler(ostream & ostr)
+              }
+              else
+              {
++               // forall properties, add this transition
+                for(iter_property_transitions = property_transitions.begin();iter_property_transitions != property_transitions.end();
+                    iter_property_transitions++)
+                {
+@@ -550,14 +1213,16 @@ void dveC_explicit_system_t::print_dveC_compiler(ostream & ostr)
+            }
+            else
+            {
++            // transition is SYNC_ASK -> add all transitions that fill the channel
+              iter_channel_map = channel_map.find(transition->get_channel_gid());
+              if(iter_channel_map != channel_map.end())
+              {
+-               for(iter_transition_vector = iter_channel_map->second.begin();iter_transition_vector != 
++               for(iter_transition_vector = iter_channel_map->second.begin();iter_transition_vector !=
+                    iter_channel_map->second.end();iter_transition_vector++)
+                {
+                  if(!sytem_with_property)
+                  {
++                   // no properties, just add all transitions that fill the channel
+                    ext_transition_t ext_transition;
+                    ext_transition.synchronized = true;
+                    ext_transition.first = transition;
+@@ -566,6 +1231,7 @@ void dveC_explicit_system_t::print_dveC_compiler(ostream & ostr)
+                  }
+                  else
+                  {
++                   // for all properties, add the transitions that fill the channel
+                    for(iter_property_transitions = property_transitions.begin();iter_property_transitions != property_transitions.end();
+                       iter_property_transitions++)
+                    {
+@@ -580,19 +1246,24 @@ void dveC_explicit_system_t::print_dveC_compiler(ostream & ostr)
+                }
+              }
+            }
++           // and reinsert result
+            iter_transition_map->second.insert(pair<size_int_t,vector<ext_transition_t> >(transition->get_state1_lid(),ext_transition_vector));
+          }
+          else{
++           // existing state
+            if(!transition->is_sync_ask())
+            {
++             // NOT SYNC_ASK
+              if(!sytem_with_property)
+              { 
++               // no properties, just add transition
+                ext_transition_t ext_transition;
+                ext_transition.synchronized = false;
+                ext_transition.first = transition;
+                iter_process_transition_map->second.push_back(ext_transition);
+              }
+              else{
++              // forall properties, add transition
+                for(iter_property_transitions = property_transitions.begin();iter_property_transitions != property_transitions.end();
+                    iter_property_transitions++)
+                {
+@@ -606,14 +1277,18 @@ void dveC_explicit_system_t::print_dveC_compiler(ostream & ostr)
+            }
+            else
+            {
++             // lookup channel in channel_map
+              iter_channel_map = channel_map.find(transition->get_channel_gid());
+              if(iter_channel_map != channel_map.end())
+              {
+-               for(iter_transition_vector = iter_channel_map->second.begin();iter_transition_vector != 
++               // assume channel is found
++               // forall transitions with SYNC_EXCLAIM (in channel_map)
++               for(iter_transition_vector = iter_channel_map->second.begin();iter_transition_vector !=
+                    iter_channel_map->second.end();iter_transition_vector++)
+                {
+                  if(!sytem_with_property)
+                  {
++                   // no property, just add transition * all transitions with SYNC_EXCLAIM
+                    ext_transition_t ext_transition;
+                    ext_transition.synchronized = true;
+                    ext_transition.first = transition;
+@@ -621,6 +1296,7 @@ void dveC_explicit_system_t::print_dveC_compiler(ostream & ostr)
+                    iter_process_transition_map->second.push_back(ext_transition);
+                  }
+                  else{
++                   // system has properties, forall properties, add transition * all transitions with SYNC_EXCLAIM
+                    for(iter_property_transitions = property_transitions.begin();iter_property_transitions != property_transitions.end();
+                        iter_property_transitions++)
+                    {
+@@ -696,6 +1372,8 @@ void dveC_explicit_system_t::print_dveC_compiler(ostream & ostr)
+   ostr << space << "bool processes_in_deadlock = true;"<<endl;
+   ostr << space << "state_struct_t *p_state_struct = reinterpret_cast<state_struct_t*>(state.ptr);"<<endl;
+   ostr << space << "state_struct_t "<<state_name<<" = *p_state_struct;"<<endl;
++  // find some commited state in any process.
++  // build to find out currently any process is in a committed state
+   ostr << space << "if( ";
+   for(size_int_t i = 0; i < this->get_process_count(); i++)
+    for(size_int_t j = 0; j < dynamic_cast<dve_process_t*>(this->get_process(i))->get_state_count(); j++)
+@@ -709,23 +1387,27 @@ void dveC_explicit_system_t::print_dveC_compiler(ostream & ostr)
+        ostr << state_name << "." << get_symbol_table()->get_process(i)->get_name() << ".state" << " == "<<j;
+      }
+    }
+-   if(some_commited_state) 
++   if(some_commited_state)
+     ostr << " )" << endl;
+    else
+     ostr << "false )" << endl;
+    ostr << space << " { " << endl;  // in commited state
+    space = space + "    ";
+ 
++   // forall processes
+    for(size_int_t i = 0; i < this->get_process_count(); i++)
+    {
+      if(!sytem_with_property || i != this->get_property_gid())
+      {
++       // process that is not a property
+        ostr << space <<"switch ( "<< state_name <<"." << get_symbol_table()->get_process(i)->get_name() << ".state )" <<endl;
+        ostr << space <<" {"<<endl;
++       // find transitions for this process
+        if(transition_map.find(i) != transition_map.end())
+          for(iter_process_transition_map = transition_map.find(i)->second.begin();
+              iter_process_transition_map != transition_map.find(i)->second.end();iter_process_transition_map++)
+          {
++           // it the transition of this process is commited, use it
+            if(dynamic_cast<dve_process_t*>(this->get_process(i))->get_commited(iter_process_transition_map->first))
+            {
+              ostr << space << "    case " << iter_process_transition_map->first<<" : "<<endl;
+@@ -733,7 +1415,7 @@ void dveC_explicit_system_t::print_dveC_compiler(ostream & ostr)
+              for(iter_ext_transition_vector = iter_process_transition_map->second.begin();
+                iter_ext_transition_vector != iter_process_transition_map->second.end();iter_ext_transition_vector++)
+              {
+-               if( !iter_ext_transition_vector->synchronized || 
++               if( !iter_ext_transition_vector->synchronized ||
+                   dynamic_cast<dve_process_t*>(this->get_process(iter_ext_transition_vector->second->get_process_gid()))->
+                   get_commited(iter_ext_transition_vector->second->get_state1_lid()) ) // !! jak je to s property synchronizaci v comitted stavech !!
+                {
+@@ -749,7 +1431,7 @@ void dveC_explicit_system_t::print_dveC_compiler(ostream & ostr)
+                  if(iter_ext_transition_vector->synchronized)
+                  {
+                    if(has_guard)
+-                     ostr <<" && "; 
++                     ostr <<" && ";
+                    else
+                      has_guard = true;
+                    ostr << state_name << "." << get_symbol_table()->get_process(iter_ext_transition_vector->second->get_process_gid())->get_name()
+@@ -757,7 +1439,7 @@ void dveC_explicit_system_t::print_dveC_compiler(ostream & ostr)
+                    if(iter_ext_transition_vector->second->get_guard()!= 0 )
+                    {
+                      if(has_guard)
+-                       ostr <<" && "; 
++                       ostr <<" && ";
+                      else
+                        has_guard = true;
+                     ostr << "( ";
+@@ -770,11 +1452,11 @@ void dveC_explicit_system_t::print_dveC_compiler(ostream & ostr)
+                    if(iter_ext_transition_vector->first->get_sync_mode() == SYNC_EXCLAIM_BUFFER)
+                    {
+                      if(has_guard)
+-                       ostr <<" && "; 
++                       ostr <<" && ";
+                      else
+                        has_guard = true;
+                      ostr << "( ";
+-                     ostr << state_name << "." <<get_symbol_table()->get_channel(iter_ext_transition_vector->first->get_channel_gid())->get_name() 
++                     ostr << state_name << "." <<get_symbol_table()->get_channel(iter_ext_transition_vector->first->get_channel_gid())->get_name()
+                           << "." <<"number_of_items != "
+                           << get_symbol_table()->get_channel(iter_ext_transition_vector->first->get_channel_gid())->get_channel_buffer_size();
+                      ostr << ") ";
+@@ -782,11 +1464,11 @@ void dveC_explicit_system_t::print_dveC_compiler(ostream & ostr)
+                    if(iter_ext_transition_vector->first->get_sync_mode() == SYNC_ASK_BUFFER)
+                    {
+                      if(has_guard)
+-                       ostr <<" && "; 
++                       ostr <<" && ";
+                      else
+                        has_guard = true;
+                      ostr << "( ";
+-                     ostr << state_name << "." <<get_symbol_table()->get_channel(iter_ext_transition_vector->first->get_channel_gid())->get_name() 
++                     ostr << state_name << "." <<get_symbol_table()->get_channel(iter_ext_transition_vector->first->get_channel_gid())->get_name()
+                           << "." <<"number_of_items != 0";
+                      ostr << ") ";
+                    }
+@@ -794,7 +1476,7 @@ void dveC_explicit_system_t::print_dveC_compiler(ostream & ostr)
+                  if(sytem_with_property)
+                  {
+                    if(has_guard)
+-                     ostr <<" && "; 
++                     ostr <<" && ";
+                    else
+                      has_guard = true;
+                    ostr << state_name << "." << get_symbol_table()->get_process(iter_ext_transition_vector->property->get_process_gid())->get_name()
+@@ -802,7 +1484,7 @@ void dveC_explicit_system_t::print_dveC_compiler(ostream & ostr)
+                    if(iter_ext_transition_vector->property->get_guard()!= 0 )
+                    {
+                      if(has_guard)
+-                       ostr <<" && "; 
++                       ostr <<" && ";
+                      else
+                       has_guard = true;
+                     ostr << "( ";
+@@ -811,12 +1493,12 @@ void dveC_explicit_system_t::print_dveC_compiler(ostream & ostr)
+                    }
+                  }
+                  if(has_guard)
+-                   ostr <<" )"<<endl; 
++                   ostr <<" )"<<endl;
+                  else
+                    ostr <<"true )"<<endl;
+                  ostr << space << "          {" <<endl;
+ 
+-               /*  // for debuging 
++               /*  // for debuging
+                  ostr << space << "             cout << " << '"' << "------------------------------------------------------------------" << '"' << " << endl;" <<endl;
+                  ostr << space << "             cout << " << '"';
+                  ostringstream p_ostr;
+@@ -844,7 +1526,7 @@ void dveC_explicit_system_t::print_dveC_compiler(ostream & ostr)
+                      s.replace(i,crlf.size(),"");
+                      i=s.find(crlf);
+                    }
+-                   ostr << s;  
++                   ostr << s;
+                    ostr << '"' << "<< endl;" << endl;
+                  }
+                  if(sytem_with_property)
+@@ -860,7 +1542,7 @@ void dveC_explicit_system_t::print_dveC_compiler(ostream & ostr)
+                      s.replace(i,crlf.size(),"");
+                      i=s.find(crlf);
+                    }
+-                   ostr << s;  
++                   ostr << s;
+                    ostr << '"' << "<< endl;" << endl;
+                  }
+                  ostr << space << "             cout << " << '"' << "------------------------------------------------------------------" << '"' << " << endl;" <<endl;
+@@ -889,13 +1571,13 @@ void dveC_explicit_system_t::print_dveC_compiler(ostream & ostr)
+                      {
+                         ostr << space << "             ";
+                         ostr << "(*p_new_c_state)." << get_symbol_table()->get_channel(iter_ext_transition_vector->first->get_channel_gid())->get_name()
+-                             << ".content[(c_state)."<< get_symbol_table()->get_channel(iter_ext_transition_vector->first->get_channel_gid())->get_name() 
++                             << ".content[(c_state)."<< get_symbol_table()->get_channel(iter_ext_transition_vector->first->get_channel_gid())->get_name()
+                              << ".number_of_items - 1].x" << s << " = ";
+                         write_C(*iter_ext_transition_vector->first->get_sync_expr_list_item(s), ostr, "(c_state)");
+                         ostr << ";" << endl;
+                      }
+                      ostr << space << "             ";
+-                     ostr << "(*p_new_c_state)." << get_symbol_table()->get_channel(iter_ext_transition_vector->first->get_channel_gid())->get_name() 
++                     ostr << "(*p_new_c_state)." << get_symbol_table()->get_channel(iter_ext_transition_vector->first->get_channel_gid())->get_name()
+                           << ".number_of_items++;"<<endl;
+                    }
+                    if(iter_ext_transition_vector->first->get_sync_mode() == SYNC_ASK_BUFFER)
+@@ -908,7 +1590,7 @@ void dveC_explicit_system_t::print_dveC_compiler(ostream & ostr)
+                              << ".content[0].x" << s <<";" <<endl;
+                      }
+                      ostr << space << "             ";
+-                     ostr << "(*p_new_c_state)." << get_symbol_table()->get_channel(iter_ext_transition_vector->first->get_channel_gid())->get_name() 
++                     ostr << "(*p_new_c_state)." << get_symbol_table()->get_channel(iter_ext_transition_vector->first->get_channel_gid())->get_name()
+                           << ".number_of_items--;"<<endl;
+                      ostr << space << "             ";
+                      ostr << "for(size_int_t i = 1 ; i <= (*p_new_c_state)." << get_symbol_table()->get_channel(iter_ext_transition_vector->first->get_channel_gid())->get_name() 
+@@ -926,7 +1608,7 @@ void dveC_explicit_system_t::print_dveC_compiler(ostream & ostr)
+                      ostr << space << "               }" <<endl;
+                    }
+                  }
+-                 //first transition effect 
++                 //first transition effect
+                  ostr << space << "             (*p_new_c_state)."<<get_symbol_table()->get_process(iter_ext_transition_vector->first->get_process_gid())->get_name()
+                       << ".state = "<< iter_ext_transition_vector->first->get_state2_lid()<< ";" <<endl;
+                  for(size_int_t e = 0;e < iter_ext_transition_vector->first->get_effect_count();e++)
+@@ -966,7 +1648,7 @@ void dveC_explicit_system_t::print_dveC_compiler(ostream & ostr)
+    ostr << space << " } " <<endl;
+ 
+ 
+-   ostr << space << " else" << endl; // no in commited state
++   ostr << space << " else" << endl; // not in commited state
+    ostr << space << " {" << endl;
+    space = space + "    ";
+ 
+@@ -997,7 +1679,7 @@ void dveC_explicit_system_t::print_dveC_compiler(ostream & ostr)
+              if(iter_ext_transition_vector->synchronized)
+              {
+                if(has_guard)
+-                 ostr <<" && "; 
++                 ostr <<" && ";
+                else
+                  has_guard = true;
+                ostr << state_name << "." << get_symbol_table()->get_process(iter_ext_transition_vector->second->get_process_gid())->get_name()
+@@ -1005,7 +1687,7 @@ void dveC_explicit_system_t::print_dveC_compiler(ostream & ostr)
+                if(iter_ext_transition_vector->second->get_guard()!= 0 )
+                {
+                  if(has_guard)
+-                   ostr <<" && "; 
++                   ostr <<" && ";
+                  else
+                    has_guard = true;
+                  ostr << "( ";
+@@ -1018,11 +1700,11 @@ void dveC_explicit_system_t::print_dveC_compiler(ostream & ostr)
+                if(iter_ext_transition_vector->first->get_sync_mode() == SYNC_EXCLAIM_BUFFER)
+                {
+                  if(has_guard)
+-                   ostr <<" && "; 
++                   ostr <<" && ";
+                  else
+                    has_guard = true;
+                  ostr << "( ";
+-                 ostr << state_name << "." <<get_symbol_table()->get_channel(iter_ext_transition_vector->first->get_channel_gid())->get_name() 
++                 ostr << state_name << "." <<get_symbol_table()->get_channel(iter_ext_transition_vector->first->get_channel_gid())->get_name()
+                       << "." <<"number_of_items != "
+                       << get_symbol_table()->get_channel(iter_ext_transition_vector->first->get_channel_gid())->get_channel_buffer_size();
+                  ostr << ") ";
+@@ -1030,11 +1712,11 @@ void dveC_explicit_system_t::print_dveC_compiler(ostream & ostr)
+                if(iter_ext_transition_vector->first->get_sync_mode() == SYNC_ASK_BUFFER)
+                {
+                  if(has_guard)
+-                   ostr <<" && "; 
++                   ostr <<" && ";
+                  else
+                    has_guard = true;
+                  ostr << "( ";
+-                 ostr << state_name << "." <<get_symbol_table()->get_channel(iter_ext_transition_vector->first->get_channel_gid())->get_name() 
++                 ostr << state_name << "." <<get_symbol_table()->get_channel(iter_ext_transition_vector->first->get_channel_gid())->get_name()
+                       << "." <<"number_of_items != 0";
+                  ostr << ") ";
+                }
+@@ -1042,7 +1724,7 @@ void dveC_explicit_system_t::print_dveC_compiler(ostream & ostr)
+              if(sytem_with_property)
+              {
+                if(has_guard)
+-                 ostr <<" && "; 
++                 ostr <<" && ";
+                else
+                  has_guard = true;
+                ostr << state_name << "." << get_symbol_table()->get_process(iter_ext_transition_vector->property->get_process_gid())->get_name()
+@@ -1050,7 +1732,7 @@ void dveC_explicit_system_t::print_dveC_compiler(ostream & ostr)
+                if(iter_ext_transition_vector->property->get_guard()!= 0 )
+                {
+                  if(has_guard)
+-                   ostr <<" && "; 
++                   ostr <<" && ";
+                  else
+                    has_guard = true;
+                 ostr << "( ";
+@@ -1059,12 +1741,12 @@ void dveC_explicit_system_t::print_dveC_compiler(ostream & ostr)
+                }
+              }
+              if(has_guard)
+-               ostr <<" )"<<endl; 
++               ostr <<" )"<<endl;
+              else
+                ostr <<"true )"<<endl;
+              ostr << space << "          {" <<endl;
+ 
+-           /*  // for debuging 
++           /*  // for debuging
+              ostr << space << "             cout << " << '"' << "------------------------------------------------------------------" << '"' << " << endl;" <<endl;
+              ostr << space << "             cout << " << '"';
+              ostringstream p_ostr;
+@@ -1092,7 +1774,7 @@ void dveC_explicit_system_t::print_dveC_compiler(ostream & ostr)
+                  s.replace(i,crlf.size(),"");
+                  i=s.find(crlf);
+                }
+-               ostr << s;  
++               ostr << s;
+                ostr << '"' << "<< endl;" << endl;
+              }
+              if(sytem_with_property)
+@@ -1108,7 +1790,7 @@ void dveC_explicit_system_t::print_dveC_compiler(ostream & ostr)
+                  s.replace(i,crlf.size(),"");
+                  i=s.find(crlf);
+                }
+-               ostr << s;  
++               ostr << s;
+                ostr << '"' << "<< endl;" << endl;
+              }
+              ostr << space << "             cout << " << '"' << "------------------------------------------------------------------" << '"' << " << endl;" <<endl;
+@@ -1137,13 +1819,13 @@ void dveC_explicit_system_t::print_dveC_compiler(ostream & ostr)
+                  {
+                     ostr << space << "             ";
+                     ostr << "(*p_new_c_state)." << get_symbol_table()->get_channel(iter_ext_transition_vector->first->get_channel_gid())->get_name()
+-                         << ".content[(c_state)."<< get_symbol_table()->get_channel(iter_ext_transition_vector->first->get_channel_gid())->get_name() 
++                         << ".content[(c_state)."<< get_symbol_table()->get_channel(iter_ext_transition_vector->first->get_channel_gid())->get_name()
+                          << ".number_of_items].x" << s << " = ";
+                     write_C(*iter_ext_transition_vector->first->get_sync_expr_list_item(s), ostr, "(c_state)");
+                     ostr << ";" << endl;
+                  }
+                  ostr << space << "             ";
+-                 ostr << "(*p_new_c_state)." << get_symbol_table()->get_channel(iter_ext_transition_vector->first->get_channel_gid())->get_name() 
++                 ostr << "(*p_new_c_state)." << get_symbol_table()->get_channel(iter_ext_transition_vector->first->get_channel_gid())->get_name()
+                          << ".number_of_items++;"<<endl;
+                }
+                if(iter_ext_transition_vector->first->get_sync_mode() == SYNC_ASK_BUFFER)
+@@ -1156,10 +1838,10 @@ void dveC_explicit_system_t::print_dveC_compiler(ostream & ostr)
+                          << ".content[0].x" << s <<";" <<endl;
+                  }
+                  ostr << space << "             ";
+-                 ostr << "(*p_new_c_state)." << get_symbol_table()->get_channel(iter_ext_transition_vector->first->get_channel_gid())->get_name() 
++                 ostr << "(*p_new_c_state)." << get_symbol_table()->get_channel(iter_ext_transition_vector->first->get_channel_gid())->get_name()
+                       << ".number_of_items--;"<<endl;
+                  ostr << space << "             ";
+-                 ostr << "for(size_int_t i = 1 ; i <= (*p_new_c_state)." << get_symbol_table()->get_channel(iter_ext_transition_vector->first->get_channel_gid())->get_name() 
++                 ostr << "for(size_int_t i = 1 ; i <= (*p_new_c_state)." << get_symbol_table()->get_channel(iter_ext_transition_vector->first->get_channel_gid())->get_name()
+                       << ".number_of_items; i++)"<<endl;
+                  ostr << space << "               {" <<endl;
+                  for(size_int_t s = 0;s < iter_ext_transition_vector->first->get_sync_expr_list_size();s++)
+@@ -1174,7 +1856,7 @@ void dveC_explicit_system_t::print_dveC_compiler(ostream & ostr)
+                  ostr << space << "               }" <<endl;
+                }
+              }
+-             //first transition effect 
++             //first transition effect
+              ostr << space << "             (*p_new_c_state)."<<get_symbol_table()->get_process(iter_ext_transition_vector->first->get_process_gid())->get_name()
+                   << ".state = "<< iter_ext_transition_vector->first->get_state2_lid()<< ";" <<endl;
+              for(size_int_t e = 0;e < iter_ext_transition_vector->first->get_effect_count();e++)
+@@ -1264,6 +1946,712 @@ void dveC_explicit_system_t::print_dveC_compiler(ostream & ostr)
+ 
+   ostr<<endl;
+ 
++
++  // *******************************************************************************************
++  // ADDED TRANSITIONS PER GROUP FUNCTIONS
++  // *******************************************************************************************
++  std::map<int, std::vector<int> > trans_proj;
++
++  // get_transition_succ
++  {
++  size_int_t state_len = get_state_length();
++  std::vector<int> default_proj(state_len);
++  size_int_t all_trans_count = 0;
++  string space = "   ";
++  bool some_commited_state = false;
++  ostr << "extern "<< '"' << "C" << '"' << " int lib_get_transition_succ(size_int_t transition, state_t state, succ_container_t & succ_container)" <<endl;
++  ostr << " {"<<endl;
++  ostr << space << "succ_container.clear();"<<endl;
++  ostr << space << "bool processes_in_deadlock = true;"<<endl;
++  ostr << space << "state_struct_t *p_state_struct = reinterpret_cast<state_struct_t*>(state.ptr);"<<endl;
++  ostr << space << "state_struct_t "<<state_name<<" = *p_state_struct;"<<endl;
++  // find some commited state in any process.
++  // build to find out currently any process is in a committed state
++  ostr << space << "if( ";
++  for(size_int_t i = 0; i < this->get_process_count(); i++)
++   for(size_int_t j = 0; j < dynamic_cast<dve_process_t*>(this->get_process(i))->get_state_count(); j++)
++   {
++     if(dynamic_cast<dve_process_t*>(this->get_process(i))->get_commited(j))
++     {
++       if(some_commited_state)
++         ostr << " || ";
++       else
++         some_commited_state = true;
++       ostr << state_name << "." << get_symbol_table()->get_process(i)->get_name() << ".state" << " == "<<j;
++       mark_projection(i, state_creator_t::PROCESS_STATE, -1, default_proj);
++     }
++   }
++   if(some_commited_state)
++    ostr << " )" << endl;
++   else
++    ostr << "false )" << endl;
++   ostr << space << " { " << endl;  // in commited state
++   space = space + "    ";
++
++   // forall processes
++   for(size_int_t i = 0; i < this->get_process_count(); i++)
++   {
++     if(!sytem_with_property || i != this->get_property_gid())
++     {
++       // process that is not a property
++       ostr << space <<"switch ( "<< state_name <<"." << get_symbol_table()->get_process(i)->get_name() << ".state )" <<endl;
++       ostr << space <<" {"<<endl;
++       // find transitions for this process
++       if(transition_map.find(i) != transition_map.end())
++         for(iter_process_transition_map = transition_map.find(i)->second.begin();
++             iter_process_transition_map != transition_map.find(i)->second.end();iter_process_transition_map++)
++         {
++           // it the transition of this process is commited, use it
++           if(dynamic_cast<dve_process_t*>(this->get_process(i))->get_commited(iter_process_transition_map->first))
++           {
++             std::vector<int> proj(default_proj);
++             mark_projection(i, state_creator_t::PROCESS_STATE, -1, proj);
++             ostr << space << "    case " << iter_process_transition_map->first<<" : "<< " // trans: " << all_trans_count << endl;
++             ostr << space << "      if (transition == " << (all_trans_count) << ") {"<<endl; // added transition condition
++             for(iter_ext_transition_vector = iter_process_transition_map->second.begin();
++               iter_ext_transition_vector != iter_process_transition_map->second.end();iter_ext_transition_vector++)
++             {
++               if( !iter_ext_transition_vector->synchronized ||
++                  dynamic_cast<dve_process_t*>(this->get_process(iter_ext_transition_vector->second->get_process_gid()))->
++                  get_commited(iter_ext_transition_vector->second->get_state1_lid()) ) // !! jak je to s property synchronizaci v comitted stavech !!
++               {
++                // TODO: elwin: should iter_ext_t>second->proced_gid be marked here already?
++                 ostr << space << "        if( ";
++                 bool has_guard = false;
++                 if(iter_ext_transition_vector->first->get_guard()!= 0 )
++                 {
++                   ostr << "( ";
++                   write_C(*iter_ext_transition_vector->first->get_guard(), ostr, state_name);
++                   // evaluate state usage on guard
++                   get_expr_deps(*iter_ext_transition_vector->first->get_guard(), proj, state_name);
++                   has_guard = true;
++                   ostr << ") ";
++                 }
++                 if(iter_ext_transition_vector->synchronized)
++                 {
++                   if(has_guard)
++                     ostr <<" && ";
++                   else
++                     has_guard = true;
++                   ostr << state_name << "." << get_symbol_table()->get_process(iter_ext_transition_vector->second->get_process_gid())->get_name()
++                        << ".state == "<< iter_ext_transition_vector->second->get_state1_lid();
++                   // mark sync process in state vector
++                   mark_projection(iter_ext_transition_vector->second->get_process_gid(),
++                                   state_creator_t::PROCESS_STATE, -1, proj);
++                   if(iter_ext_transition_vector->second->get_guard()!= 0 )
++                   {
++                     if(has_guard)
++                       ostr <<" && ";
++                     else
++                       has_guard = true;
++                    ostr << "( ";
++                    write_C(*iter_ext_transition_vector->second->get_guard(), ostr, state_name);
++                    ostr << ") ";
++                    // evaluate state usage on guard
++                    get_expr_deps(*iter_ext_transition_vector->second->get_guard(), proj, state_name);
++                   }
++                 }
++                 else
++                 {
++                   if(iter_ext_transition_vector->first->get_sync_mode() == SYNC_EXCLAIM_BUFFER)
++                   {
++                     if(has_guard)
++                       ostr <<" && ";
++                     else
++                       has_guard = true;
++                     ostr << "( ";
++                     ostr << state_name << "." <<get_symbol_table()->get_channel(iter_ext_transition_vector->first->get_channel_gid())->get_name()
++                          << "." <<"number_of_items != "
++                          << get_symbol_table()->get_channel(iter_ext_transition_vector->first->get_channel_gid())->get_channel_buffer_size();
++                     ostr << ") ";
++                     mark_projection(iter_ext_transition_vector->first->get_channel_gid(),
++                                     state_creator_t::CHANNEL_BUFFER, -1, proj);
++                   }
++                   if(iter_ext_transition_vector->first->get_sync_mode() == SYNC_ASK_BUFFER)
++                   {
++                     if(has_guard)
++                       ostr <<" && ";
++                     else
++                       has_guard = true;
++                     ostr << "( ";
++                     ostr << state_name << "." <<get_symbol_table()->get_channel(iter_ext_transition_vector->first->get_channel_gid())->get_name()
++                          << "." <<"number_of_items != 0";
++                     ostr << ") ";
++                     mark_projection(iter_ext_transition_vector->first->get_channel_gid(),
++                                     state_creator_t::CHANNEL_BUFFER, -1, proj);
++                   }
++                 }
++                 if(sytem_with_property)
++                 {
++                   if(has_guard)
++                     ostr <<" && ";
++                   else
++                     has_guard = true;
++                   ostr << state_name << "." << get_symbol_table()->get_process(iter_ext_transition_vector->property->get_process_gid())->get_name()
++                        << ".state == "<< iter_ext_transition_vector->property->get_state1_lid();
++                   // mark property in state vector
++                   mark_projection(iter_ext_transition_vector->property->get_process_gid(),
++                                   state_creator_t::PROCESS_STATE, -1, proj);
++                   if(iter_ext_transition_vector->property->get_guard()!= 0 )
++                   {
++                     if(has_guard)
++                       ostr <<" && ";
++                     else
++                      has_guard = true;
++                    ostr << "( ";
++                    write_C(*iter_ext_transition_vector->property->get_guard(), ostr, state_name);
++                    ostr << ") ";
++                    // evaluate state usage on guard
++                    get_expr_deps(*iter_ext_transition_vector->property->get_guard(), proj, state_name);
++                   }
++                 }
++                 if(has_guard)
++                   ostr <<" )"<<endl;
++                 else
++                   ostr <<"true )"<<endl;
++                 ostr << space << "          {" <<endl;
++
++               /*  // for debuging
++                 ostr << space << "             cout << " << '"' << "------------------------------------------------------------------" << '"' << " << endl;" <<endl;
++                 ostr << space << "             cout << " << '"';
++                 ostringstream p_ostr;
++                 iter_ext_transition_vector->first->write(p_ostr);
++                 string s = p_ostr.str();
++                 const string crlf = "\n";
++                 unsigned int i=s.find(crlf);
++                 while(i != string::npos)
++                 {
++                   s.replace(i,crlf.size(),"");
++                   i=s.find(crlf);
++                 }
++                 ostr << s;
++                 ostr << '"' << "<< endl;" << endl;
++                 if(iter_ext_transition_vector->synchronized)
++                 {
++                   ostr << space << "             cout << " << '"';
++                   ostringstream p_ostr;
++                   iter_ext_transition_vector->second->write(p_ostr);
++                   string s = p_ostr.str();
++                   const string crlf = "\n";
++                   unsigned int i=s.find(crlf);
++                   while(i != string::npos)
++                   {
++                     s.replace(i,crlf.size(),"");
++                     i=s.find(crlf);
++                   }
++                   ostr << s;
++                   ostr << '"' << "<< endl;" << endl;
++                 }
++                 if(sytem_with_property)
++                 {
++                   ostr << space << "             cout << " << '"';
++                   ostringstream p_ostr;
++                   iter_ext_transition_vector->property->write(p_ostr);
++                   string s = p_ostr.str();
++                   const string crlf = "\n";
++                   unsigned int i=s.find(crlf);
++                   while(i != string::npos)
++                   {
++                     s.replace(i,crlf.size(),"");
++                     i=s.find(crlf);
++                   }
++                   ostr << s;
++                   ostr << '"' << "<< endl;" << endl;
++                 }
++                 ostr << space << "             cout << " << '"' << "------------------------------------------------------------------" << '"' << " << endl;" <<endl;
++                 // for debuging */
++
++                 ostr << space << "             processes_in_deadlock = false;" <<endl;
++                 ostr << space << "             state_t new_state = duplicate_state(state);" <<endl;
++                 ostr << space << "             state_struct_t *p_new_c_state = reinterpret_cast<state_struct_t*>(new_state.ptr);"<<endl;
++                 //synchronization effect
++                 if(iter_ext_transition_vector->synchronized)
++                 {
++                    for(size_int_t s = 0;s < iter_ext_transition_vector->first->get_sync_expr_list_size();s++)
++                    {
++                      ostr << space << "             ";
++                      write_C(*iter_ext_transition_vector->first->get_sync_expr_list_item(s), ostr, "(*p_new_c_state)");
++                      ostr << " = ";
++                      write_C(*iter_ext_transition_vector->second->get_sync_expr_list_item(s), ostr, "(c_state)");
++                      ostr << ";" <<endl;
++                      // evaluate effect expression state usage
++                      get_expr_deps(*iter_ext_transition_vector->first->get_sync_expr_list_item(s),proj, "(*p_new_c_state)");
++                      get_expr_deps(*iter_ext_transition_vector->second->get_sync_expr_list_item(s), proj, "(c_state)");
++                    }
++                 }
++                 else
++                 {
++                   if(iter_ext_transition_vector->first->get_sync_mode() == SYNC_EXCLAIM_BUFFER)
++                   {
++                     for(size_int_t s = 0;s < iter_ext_transition_vector->first->get_sync_expr_list_size();s++)
++                     {
++                        ostr << space << "             ";
++                        ostr << "(*p_new_c_state)." << get_symbol_table()->get_channel(iter_ext_transition_vector->first->get_channel_gid())->get_name()
++                             << ".content[(c_state)."<< get_symbol_table()->get_channel(iter_ext_transition_vector->first->get_channel_gid())->get_name()
++                             << ".number_of_items - 1].x" << s << " = ";
++                        write_C(*iter_ext_transition_vector->first->get_sync_expr_list_item(s), ostr, "(c_state)");
++                        ostr << ";" << endl;
++                        // evaluate effect expression state usage
++                        get_expr_deps(*iter_ext_transition_vector->first->get_sync_expr_list_item(s),proj, "(c_state)");
++                     }
++                     ostr << space << "             ";
++                     ostr << "(*p_new_c_state)." << get_symbol_table()->get_channel(iter_ext_transition_vector->first->get_channel_gid())->get_name()
++                          << ".number_of_items++;"<<endl;
++                     mark_projection(iter_ext_transition_vector->first->get_channel_gid(),
++                                     state_creator_t::CHANNEL_BUFFER, -1, proj);
++                   }
++                   if(iter_ext_transition_vector->first->get_sync_mode() == SYNC_ASK_BUFFER)
++                   {
++                     for(size_int_t s = 0;s < iter_ext_transition_vector->first->get_sync_expr_list_size();s++)
++                     {
++                        ostr << space << "             ";
++                        write_C(*iter_ext_transition_vector->first->get_sync_expr_list_item(s), ostr, "(*p_new_c_state)");
++                        ostr << " = (c_state)." << get_symbol_table()->get_channel(iter_ext_transition_vector->first->get_channel_gid())->get_name()
++                             << ".content[0].x" << s <<";" <<endl;
++                        // evaluate effect expression state usage
++                        get_expr_deps(*iter_ext_transition_vector->first->get_sync_expr_list_item(s),
++                                      proj,"(*p_new_c_state)");
++                     }
++                     ostr << space << "             ";
++                     ostr << "(*p_new_c_state)." << get_symbol_table()->get_channel(iter_ext_transition_vector->first->get_channel_gid())->get_name()
++                          << ".number_of_items--;"<<endl;
++                     ostr << space << "             ";
++                     ostr << "for(size_int_t i = 1 ; i <= (*p_new_c_state)." << get_symbol_table()->get_channel(iter_ext_transition_vector->first->get_channel_gid())->get_name()
++                          << ".number_of_items; i++)"<<endl;
++                     ostr << space << "               {" <<endl;
++                     for(size_int_t s = 0;s < iter_ext_transition_vector->first->get_sync_expr_list_size();s++)
++                     {
++                       ostr << space << "                 ";
++                       ostr <<  "(*p_new_c_state)." << get_symbol_table()->get_channel(iter_ext_transition_vector->first->get_channel_gid())->get_name() << ".content[i-1].x" << s
++                            << " = (c_state)." << get_symbol_table()->get_channel(iter_ext_transition_vector->first->get_channel_gid())->get_name() << ".content[i].x" << s << ";" <<endl;
++                       ostr << space << "                 ";
++                       ostr <<  "(*p_new_c_state)." << get_symbol_table()->get_channel(iter_ext_transition_vector->first->get_channel_gid())->get_name() << ".content[i].x" << s
++                            << " = 0;" <<endl;
++                     }
++                     ostr << space << "               }" <<endl;
++                     mark_projection(iter_ext_transition_vector->first->get_channel_gid(),
++                                     state_creator_t::CHANNEL_BUFFER, -1, proj);
++                   }
++                 }
++                 //first transition effect
++                 ostr << space << "             (*p_new_c_state)."<<get_symbol_table()->get_process(iter_ext_transition_vector->first->get_process_gid())->get_name()
++                      << ".state = "<< iter_ext_transition_vector->first->get_state2_lid()<< ";" <<endl;
++                 for(size_int_t e = 0;e < iter_ext_transition_vector->first->get_effect_count();e++)
++                 {
++                    ostr << space << "             ";
++                    write_C(*iter_ext_transition_vector->first->get_effect(e), ostr, "(*p_new_c_state)");
++                    ostr <<";"<< endl;
++                    // evaluate effect expression state usage
++                    get_expr_deps(*iter_ext_transition_vector->first->get_effect(e), proj, "(*p_new_c_state)");
++                 }
++                 if(iter_ext_transition_vector->synchronized) //second transiton effect
++                 {
++                   ostr << space << "             (*p_new_c_state)."<<get_symbol_table()->get_process(iter_ext_transition_vector->second->get_process_gid())->get_name()
++                        << ".state = "<< iter_ext_transition_vector->second->get_state2_lid()<< ";" <<endl;
++                   for(size_int_t e = 0;e < iter_ext_transition_vector->second->get_effect_count();e++)
++                   {
++                      ostr << space << "             ";
++                      write_C(*iter_ext_transition_vector->second->get_effect(e), ostr, "(*p_new_c_state)");
++                      ostr <<";"<< endl;
++                      // evaluate effect expression state usage
++                      get_expr_deps(*iter_ext_transition_vector->second->get_effect(e), proj, "(*p_new_c_state)");
++                   }
++                 }
++                 if(sytem_with_property) //change of the property process state
++                 {
++                   ostr << space << "             (*p_new_c_state)."<<get_symbol_table()->get_process(iter_ext_transition_vector->property->get_process_gid())->get_name()
++                        << ".state = "<< iter_ext_transition_vector->property->get_state2_lid()<< ";" <<endl;
++                   // mark in state usage
++                   mark_projection(iter_ext_transition_vector->property->get_process_gid(),
++                                   state_creator_t::PROCESS_STATE, -1, proj);
++                 }
++                 ostr << space << "             succ_container.push_back(new_state);"<<endl;
++                 ostr << space << "          }" <<endl;
++               }
++             }
++             ostr << space << "        break;"<<endl;
++             ostr << space << "      }; break;"<<endl; // added break for if (transition == n) block
++
++             // count transition & store usage information
++             trans_proj[all_trans_count] = proj;
++             // output proj
++             ostr << space << "     // proj: " ;
++             for(size_int_t proj_i = 0; proj_i < state_len; proj_i++)
++               ostr << proj[proj_i];
++             ostr << endl;
++             all_trans_count++;
++           }
++         }
++       ostr << space <<" }"<<endl;
++     }
++   }
++   space = "   ";
++   ostr << space << " } " <<endl;
++
++
++   ostr << space << " else" << endl; // not in commited state
++   ostr << space << " {" << endl;
++   space = space + "    ";
++
++   for(size_int_t i = 0; i < this->get_process_count(); i++)
++   {
++     if(!sytem_with_property || i != this->get_property_gid())
++     {
++       ostr << space <<"switch ( "<< state_name <<"." << get_symbol_table()->get_process(i)->get_name() << ".state )" <<endl;
++       ostr << space <<" {"<<endl;
++       if(transition_map.find(i) != transition_map.end())
++         for(iter_process_transition_map = transition_map.find(i)->second.begin();
++             iter_process_transition_map != transition_map.find(i)->second.end();iter_process_transition_map++)
++         {
++           // gather information on state usage for this transition group
++           std::vector<int> proj(default_proj);
++           mark_projection(i, state_creator_t::PROCESS_STATE, -1, proj);
++           ostr << space << "    case " << iter_process_transition_map->first<<" : " << " // trans: " << all_trans_count << endl;
++           ostr << space << "      if (transition == " << (all_trans_count) << ") {"<<endl; // added transition condition
++           for(iter_ext_transition_vector = iter_process_transition_map->second.begin();
++               iter_ext_transition_vector != iter_process_transition_map->second.end();iter_ext_transition_vector++)
++           {
++             ostr << space << "        if( ";
++             bool has_guard = false;
++             if(iter_ext_transition_vector->first->get_guard()!= 0 )
++             {
++               ostr << "( ";
++               write_C(*iter_ext_transition_vector->first->get_guard(), ostr, state_name);
++               // evaluate state usage on guard
++               get_expr_deps(*iter_ext_transition_vector->first->get_guard(), proj, state_name);
++               has_guard = true;
++               ostr << " ) ";
++             }
++             if(iter_ext_transition_vector->synchronized)
++             {
++               if(has_guard)
++                 ostr <<" && ";
++               else
++                 has_guard = true;
++               ostr << state_name << "." << get_symbol_table()->get_process(iter_ext_transition_vector->second->get_process_gid())->get_name()
++                    << ".state == "<< iter_ext_transition_vector->second->get_state1_lid();
++               // mark sync process in state vector
++               mark_projection(iter_ext_transition_vector->second->get_process_gid(),
++                               state_creator_t::PROCESS_STATE, -1, proj);
++               if(iter_ext_transition_vector->second->get_guard()!= 0 )
++               {
++                 if(has_guard)
++                   ostr <<" && ";
++                 else
++                   has_guard = true;
++                 ostr << "( ";
++                 write_C(*iter_ext_transition_vector->second->get_guard(), ostr, state_name);
++                 ostr << ") ";
++                 // evaluate state usage on guard
++                 get_expr_deps(*iter_ext_transition_vector->second->get_guard(), proj, state_name);
++               }
++             }
++             else
++             {
++               if(iter_ext_transition_vector->first->get_sync_mode() == SYNC_EXCLAIM_BUFFER)
++               {
++                 if(has_guard)
++                   ostr <<" && ";
++                 else
++                   has_guard = true;
++                 ostr << "( ";
++                 ostr << state_name << "." <<get_symbol_table()->get_channel(iter_ext_transition_vector->first->get_channel_gid())->get_name()
++                      << "." <<"number_of_items != "
++                      << get_symbol_table()->get_channel(iter_ext_transition_vector->first->get_channel_gid())->get_channel_buffer_size();
++                 ostr << ") ";
++                 mark_projection(iter_ext_transition_vector->first->get_channel_gid(),
++                                 state_creator_t::CHANNEL_BUFFER, -1, proj);
++               }
++               if(iter_ext_transition_vector->first->get_sync_mode() == SYNC_ASK_BUFFER)
++               {
++                 if(has_guard)
++                   ostr <<" && ";
++                 else
++                   has_guard = true;
++                 ostr << "( ";
++                 ostr << state_name << "." <<get_symbol_table()->get_channel(iter_ext_transition_vector->first->get_channel_gid())->get_name()
++                      << "." <<"number_of_items != 0";
++                 ostr << ") ";
++                 mark_projection(iter_ext_transition_vector->first->get_channel_gid(),
++                                 state_creator_t::CHANNEL_BUFFER, -1, proj);
++               }
++             }
++             if(sytem_with_property)
++             {
++               if(has_guard)
++                 ostr <<" && ";
++               else
++                 has_guard = true;
++               ostr << state_name << "." << get_symbol_table()->get_process(iter_ext_transition_vector->property->get_process_gid())->get_name()
++                    << ".state == "<< iter_ext_transition_vector->property->get_state1_lid();
++               // mark property in state vector
++               mark_projection(iter_ext_transition_vector->property->get_process_gid(),
++                               state_creator_t::PROCESS_STATE, -1, proj);
++               if(iter_ext_transition_vector->property->get_guard()!= 0 )
++               {
++                 if(has_guard)
++                   ostr <<" && ";
++                 else
++                   has_guard = true;
++                ostr << "( ";
++                write_C(*iter_ext_transition_vector->property->get_guard(), ostr, state_name);
++                ostr << ") ";
++                // evaluate state usage on guard
++                get_expr_deps(*iter_ext_transition_vector->property->get_guard(), proj, state_name);
++               }
++             }
++             if(has_guard)
++               ostr <<" )"<<endl;
++             else
++               ostr <<"true )"<<endl;
++             ostr << space << "          {" <<endl;
++
++           /*  // for debuging
++             ostr << space << "             cout << " << '"' << "------------------------------------------------------------------" << '"' << " << endl;" <<endl;
++             ostr << space << "             cout << " << '"';
++             ostringstream p_ostr;
++             iter_ext_transition_vector->first->write(p_ostr);
++             string s = p_ostr.str();
++             const string crlf = "\n";
++             unsigned int i=s.find(crlf);
++             while(i != string::npos)
++             {
++               s.replace(i,crlf.size(),"");
++               i=s.find(crlf);
++             }
++             ostr << s;
++             ostr << '"' << "<< endl;" << endl;
++             if(iter_ext_transition_vector->synchronized)
++             {
++               ostr << space << "             cout << " << '"';
++               ostringstream p_ostr;
++               iter_ext_transition_vector->second->write(p_ostr);
++               string s = p_ostr.str();
++               const string crlf = "\n";
++               unsigned int i=s.find(crlf);
++               while(i != string::npos)
++               {
++                 s.replace(i,crlf.size(),"");
++                 i=s.find(crlf);
++               }
++               ostr << s;
++               ostr << '"' << "<< endl;" << endl;
++             }
++             if(sytem_with_property)
++             {
++               ostr << space << "             cout << " << '"';
++               ostringstream p_ostr;
++               iter_ext_transition_vector->property->write(p_ostr);
++               string s = p_ostr.str();
++               const string crlf = "\n";
++               unsigned int i=s.find(crlf);
++               while(i != string::npos)
++               {
++                 s.replace(i,crlf.size(),"");
++                 i=s.find(crlf);
++               }
++               ostr << s;
++               ostr << '"' << "<< endl;" << endl;
++             }
++             ostr << space << "             cout << " << '"' << "------------------------------------------------------------------" << '"' << " << endl;" <<endl;
++             // for debuging */
++
++             ostr << space << "             processes_in_deadlock = false;" <<endl;
++             ostr << space << "             state_t new_state = duplicate_state(state);" <<endl;
++             ostr << space << "             state_struct_t *p_new_c_state = reinterpret_cast<state_struct_t*>(new_state.ptr);"<<endl;
++             //synchronization effect
++             if(iter_ext_transition_vector->synchronized)
++             {
++                for(size_int_t s = 0;s < iter_ext_transition_vector->first->get_sync_expr_list_size();s++)
++                {
++                  ostr << space << "             ";
++                  write_C(*iter_ext_transition_vector->first->get_sync_expr_list_item(s), ostr, "(*p_new_c_state)");
++                  ostr << " = ";
++                  write_C(*iter_ext_transition_vector->second->get_sync_expr_list_item(s), ostr, "(c_state)");
++                  ostr << ";" <<endl;
++                  // evaluate effect expression state usage
++                  get_expr_deps(*iter_ext_transition_vector->first->get_sync_expr_list_item(s), proj, "(*p_new_c_state)");
++                  get_expr_deps(*iter_ext_transition_vector->second->get_sync_expr_list_item(s), proj, "(c_state)");
++                }
++             }
++             else
++             {
++               if(iter_ext_transition_vector->first->get_sync_mode() == SYNC_EXCLAIM_BUFFER)
++               {
++                 for(size_int_t s = 0;s < iter_ext_transition_vector->first->get_sync_expr_list_size();s++)
++                 {
++                    ostr << space << "             ";
++                    ostr << "(*p_new_c_state)." << get_symbol_table()->get_channel(iter_ext_transition_vector->first->get_channel_gid())->get_name()
++                         << ".content[(c_state)."<< get_symbol_table()->get_channel(iter_ext_transition_vector->first->get_channel_gid())->get_name()
++                         << ".number_of_items].x" << s << " = ";
++                    write_C(*iter_ext_transition_vector->first->get_sync_expr_list_item(s), ostr, "(c_state)");
++                    ostr << ";" << endl;
++                    // evaluate effect expression state usage
++                    get_expr_deps(*iter_ext_transition_vector->first->get_sync_expr_list_item(s),proj, "(c_state)");
++                 }
++                 ostr << space << "             ";
++                 ostr << "(*p_new_c_state)." << get_symbol_table()->get_channel(iter_ext_transition_vector->first->get_channel_gid())->get_name()
++                         << ".number_of_items++;"<<endl;
++                 mark_projection(iter_ext_transition_vector->first->get_channel_gid(),
++                                 state_creator_t::CHANNEL_BUFFER, -1, proj);
++               }
++               if(iter_ext_transition_vector->first->get_sync_mode() == SYNC_ASK_BUFFER)
++               {
++                 for(size_int_t s = 0;s < iter_ext_transition_vector->first->get_sync_expr_list_size();s++)
++                 {
++                    ostr << space << "             ";
++                    write_C(*iter_ext_transition_vector->first->get_sync_expr_list_item(s), ostr, "(*p_new_c_state)");
++                    ostr << " = (c_state)." << get_symbol_table()->get_channel(iter_ext_transition_vector->first->get_channel_gid())->get_name()
++                         << ".content[0].x" << s <<";" <<endl;
++                    // evaluate effect expression state usage
++                    get_expr_deps(*iter_ext_transition_vector->first->get_sync_expr_list_item(s),
++                                  proj,"(*p_new_c_state)");
++                 }
++                 ostr << space << "             ";
++                 ostr << "(*p_new_c_state)." << get_symbol_table()->get_channel(iter_ext_transition_vector->first->get_channel_gid())->get_name()
++                      << ".number_of_items--;"<<endl;
++                 ostr << space << "             ";
++                 ostr << "for(size_int_t i = 1 ; i <= (*p_new_c_state)." << get_symbol_table()->get_channel(iter_ext_transition_vector->first->get_channel_gid())->get_name()
++                      << ".number_of_items; i++)"<<endl;
++                 ostr << space << "               {" <<endl;
++                 for(size_int_t s = 0;s < iter_ext_transition_vector->first->get_sync_expr_list_size();s++)
++                 {
++                   ostr << space << "                 ";
++                   ostr <<  "(*p_new_c_state)." << get_symbol_table()->get_channel(iter_ext_transition_vector->first->get_channel_gid())->get_name() << ".content[i-1].x" << s
++                        << " = (c_state)." << get_symbol_table()->get_channel(iter_ext_transition_vector->first->get_channel_gid())->get_name() << ".content[i].x" << s << ";" <<endl;
++                   ostr << space << "                 ";
++                   ostr <<  "(*p_new_c_state)." << get_symbol_table()->get_channel(iter_ext_transition_vector->first->get_channel_gid())->get_name() << ".content[i].x" << s
++                        << " = 0;" <<endl;
++                 }
++                 ostr << space << "               }" <<endl;
++                 mark_projection(iter_ext_transition_vector->first->get_channel_gid(),
++                                 state_creator_t::CHANNEL_BUFFER, -1, proj);
++               }
++             }
++             //first transition effect
++             ostr << space << "             (*p_new_c_state)."<<get_symbol_table()->get_process(iter_ext_transition_vector->first->get_process_gid())->get_name()
++                  << ".state = "<< iter_ext_transition_vector->first->get_state2_lid()<< ";" <<endl;
++             for(size_int_t e = 0;e < iter_ext_transition_vector->first->get_effect_count();e++)
++             {
++                ostr << space << "             ";
++                write_C(*iter_ext_transition_vector->first->get_effect(e), ostr, "(*p_new_c_state)");
++                ostr <<";"<< endl;
++                // evaluate effect expression state usage
++                get_expr_deps(*iter_ext_transition_vector->first->get_effect(e), proj, "(*p_new_c_state)");
++             }
++             if(iter_ext_transition_vector->synchronized) //second transiton effect
++             {
++               ostr << space << "             (*p_new_c_state)."<<get_symbol_table()->get_process(iter_ext_transition_vector->second->get_process_gid())->get_name()
++                    << ".state = "<< iter_ext_transition_vector->second->get_state2_lid()<< ";" <<endl;
++               for(size_int_t e = 0;e < iter_ext_transition_vector->second->get_effect_count();e++)
++               {
++                  ostr << space << "             ";
++                  write_C(*iter_ext_transition_vector->second->get_effect(e), ostr, "(*p_new_c_state)");
++                  ostr <<";"<< endl;
++                  // evaluate effect expression state usage
++                  get_expr_deps(*iter_ext_transition_vector->second->get_effect(e), proj, "(*p_new_c_state)");
++               }
++             }
++             if(sytem_with_property) //change of the property process state
++             {
++               ostr << space << "             (*p_new_c_state)."<<get_symbol_table()->get_process(iter_ext_transition_vector->property->get_process_gid())->get_name()
++                    << ".state = "<< iter_ext_transition_vector->property->get_state2_lid()<< ";" <<endl;
++               // mark in state usage
++               mark_projection(iter_ext_transition_vector->property->get_process_gid(),
++                               state_creator_t::PROCESS_STATE, -1, proj);
++             }
++             ostr << space << "             succ_container.push_back(new_state);"<<endl;
++             ostr << space << "          }" <<endl;
++           }
++           ostr << space << "        break;"<<endl;
++           ostr << space << "      }; break;"<<endl; // added break for if (transition == n) block
++
++           // count transition & store usage information
++           trans_proj[all_trans_count] = proj;
++           // output proj
++           ostr << space << "     // proj: " ;
++           for(size_int_t proj_i = 0; proj_i < state_len; proj_i++)
++             ostr << proj[proj_i];
++           ostr << endl;
++           all_trans_count++;
++         }
++       ostr << space <<" }"<<endl;
++     }
++   }
++   space = "   ";
++   ostr << space << " } " <<endl;
++   ostr << space << "if( processes_in_deadlock )" <<endl;
++   ostr << space << " {" <<endl;
++   for(iter_property_transitions = property_transitions.begin();iter_property_transitions != property_transitions.end();
++       iter_property_transitions++)
++   {
++        ostr << space << "   if( ";
++        ostr << state_name << "." << get_symbol_table()->get_process((*iter_property_transitions)->get_process_gid())->get_name()
++                    << ".state == "<< (*iter_property_transitions)->get_state1_lid();
++        if( (*iter_property_transitions)->get_guard()!= 0 )
++        {
++          ostr << space << " && ( ";
++          write_C(*(*iter_property_transitions)->get_guard(), ostr, state_name);
++          ostr << " )"<<endl;
++        }
++        ostr << " )"<<endl;
++
++        ostr << space << "    {" <<endl;
++        ostr << space << "      state_t new_state = duplicate_state(state);" <<endl;
++        ostr << space << "      state_struct_t *p_new_c_state = reinterpret_cast<state_struct_t*>(new_state.ptr);"<<endl;
++        ostr << space << "      (*p_new_c_state)."<<get_symbol_table()->get_process((*iter_property_transitions)->get_process_gid())->get_name()
++                    << ".state = "<< (*iter_property_transitions)->get_state2_lid()<< ";" <<endl;
++        ostr << space << "      succ_container.push_back(new_state);"<<endl;
++        ostr << space << "    }"<<endl;
++   }
++   ostr << space << " }" <<endl;
++   ostr << space << "return 0;" << endl;
++   ostr << " }"<<endl;
++
++   ostr<<endl;
++
++  // transition part
++  {
++  ostr << "extern "<< '"' << "C" << '"' << " int lib_get_transition_count()" <<endl;
++  ostr << " {"<<endl;
++  ostr << "   return (" << all_trans_count << ");" << endl;
++  ostr << " }"<<endl;
++  ostr << endl;
++  }
++
++  {
++  ostr << "int trans_proj[" << all_trans_count << "][" <<state_len << "] = {" << endl;
++  for(int i=0; i < all_trans_count; i++)
++  {
++      ostr << "\t{";
++      for(int j=0; j < state_len; ++j) {
++        ostr << (j==0?"":", ") << trans_proj[i][j];
++      }
++      ostr << "}" << (i<all_trans_count-1?",":"};") << endl;
++  }
++  ostr << endl;
++  ostr << "extern "<< '"' << "C" << '"' << " int* lib_get_transition_proj(int trans)" << endl;
++  ostr << " {"<<endl;
++  ostr << "   if (trans >=0 && trans < " << all_trans_count << ") return trans_proj[trans];" << endl;
++  ostr << "   return NULL;" << endl;
++  ostr << " }"<<endl;
++  ostr << endl;
++  }
++
++
++  // lib_new_state()
++  ostr << "extern "<< '"' << "C" << '"' << " state_t lib_new_state()" <<endl;
++  ostr << " {"<<endl;
++  ostr << "  return new_state(" <<this->get_space_sum()<< ");"<<endl;
++  ostr << " }"<<endl;
++
++  }
++
++
++  // *******************************************************************************************
++  // END ADDED TRANSITIONS PER GROUP FUNCTIONS
++  // *******************************************************************************************
++
+   // get_initial_state
+   ostr << "extern "<< '"' << "C" << '"' << " state_t lib_get_initial_state()" <<endl;
+   ostr << " {"<<endl;
+@@ -1311,7 +2699,7 @@ void dveC_explicit_system_t::print_dveC_compiler(ostream & ostr)
+               if (initial_values_counts[state_creators[i].gid])
+                ostr << spaces << "(*p_initial_state)."<<process_name<<"."<<name <<"= "<<initial_values[state_creators[i].gid].all_value<<";" << endl;
+               else
+-               ostr << spaces << "(*p_initial_state)."<<process_name<<"."<<name <<"= 0;" << endl; 
++               ostr << spaces << "(*p_initial_state)."<<process_name<<"."<<name <<"= 0;" << endl;
+         }
+       }
+      break;
+@@ -1349,7 +2737,7 @@ void dveC_explicit_system_t::print_dveC_compiler(ostream & ostr)
+     {
+       if ( decomposition->get_scc_type_for_gid(i) )
+       {
+-         ostr << space << "if(" << state_name << "." << get_symbol_table()->get_process(this->get_property_gid())->get_name() << ".state == " 
++         ostr << space << "if(" << state_name << "." << get_symbol_table()->get_process(this->get_property_gid())->get_name() << ".state == "
+               <<  i  <<" ) return true;" << endl;
+       }
+     }
+@@ -1381,9 +2769,9 @@ void dveC_explicit_system_t::print_print_state(ostream & ostr)
+     {
+      case state_creator_t::VARIABLE:
+       {
+-       if (i) 
++       if (i)
+          ostr << space <<" outs << "<< '"' << ", " << '"' << ";" <<endl;
+-       else 
++       else
+ 	 ostr << space <<" outs << "<< '"' << "[" << '"'<< ";" <<endl;
+        name=get_symbol_table()->get_variable(state_creators[i].gid)->get_name();
+        ostr << space << " outs << " << '"' << name << '"' << " << " << '"' << ":" << '"' << ";" << endl;
+@@ -1393,7 +2781,7 @@ void dveC_explicit_system_t::print_print_state(ostream & ostr)
+           for(size_int_t j=0; j!= state_creators[i].array_size; j++)
+           {
+             ostr << space << " outs << (int)" << state_name << name << "[" <<  j << "]" << ";" <<endl;
+-            if (j!=(state_creators[i].array_size-1)) 
++            if (j!=(state_creators[i].array_size-1))
+               ostr << space << " outs << "<< '"' << "|" << '"' << ";" <<endl;
+           }
+          ostr << space <<" outs << "<< '"' << "}" << '"' << ";" << endl;
+@@ -1407,15 +2795,15 @@ void dveC_explicit_system_t::print_print_state(ostream & ostr)
+      case state_creator_t::PROCESS_STATE:
+       {
+        state_name = "c_state." +  string(get_symbol_table()->get_process(state_creators[i].gid)->get_name()) + ".";
+-       if (i) 
++       if (i)
+          ostr << space << " outs << "<< '"' << "]" << '"' << " << endl;" <<endl;
+-       else 
++       else
+ 	 ostr << space <<" outs << "<< '"' << "[]"  << '"' << " << endl;"<<endl;
+        ostr << space <<" outs << "<< '"' << get_symbol_table()->get_process(state_creators[i].gid)->get_name() << ":[" << '"' <<";"<<endl;
+        ostr << space << " switch ( " << state_name <<"state )" << endl ;
+        ostr << space << "   {" <<endl;
+        for(size_int_t j = 0; j < dynamic_cast<dve_process_t*>(this->get_process(state_creators[i].gid))->get_state_count(); j++)
+-       {  
++       {
+          ostr << space << "     case " << j << " : " <<  "{ outs << " <<  '"'
+               << get_symbol_table()->get_state(dynamic_cast<dve_process_t*>(this->get_process(state_creators[i].gid))->get_state_gid(j))->get_name()
+               << '"' << "; break; }"<<endl;
+@@ -1425,9 +2813,9 @@ void dveC_explicit_system_t::print_print_state(ostream & ostr)
+      break;
+      case state_creator_t::CHANNEL_BUFFER:
+       {
+-        if (i) 
++        if (i)
+          ostr << space <<" outs << "<< '"' << ", " << '"' << ";" <<endl;
+-       else 
++       else
+         ostr << space <<" outs << "<< '"' << "[" << '"'<< ";" <<endl;
+        name=get_symbol_table()->get_channel(state_creators[i].gid)->get_name();
+        ostr << space << " outs << " << '"' << name << '"' << " << " << '"' << ":" << '"' << ";" << endl;
+@@ -1436,8 +2824,8 @@ void dveC_explicit_system_t::print_print_state(ostream & ostr)
+        ostr << space << "      outs << "<< '"' << "{" << '"' << ";" <<endl;
+        ostr << space << "      for(size_int_t j=0; j!= c_state." << name << ".number_of_items; j++)" <<endl;
+        ostr << space << "      {" <<endl;
+-       ostr << space << "         outs << (int)c_state." << name << ".content[j].x0 ; " <<endl; // only one value 
+-       ostr << space << "         if (j!=c_state." << name << ".number_of_items-1)" <<endl; 
++       ostr << space << "         outs << (int)c_state." << name << ".content[j].x0 ; " <<endl; // only one value
++       ostr << space << "         if (j!=c_state." << name << ".number_of_items-1)" <<endl;
+        ostr << space << "           outs << "<< '"' << "|" << '"' << ";" <<endl;
+        ostr << space << "      }" <<endl;
+        ostr << space << "      outs << "<< '"' << "}" << '"' << ";" << endl;
+diff --git a/src/system/dveC/dveC_explicit_system.hh b/src/system/dveC/dveC_explicit_system.hh
+index 4804c4e..7a63029 100644
+--- a/src/system/dveC/dveC_explicit_system.hh
++++ b/src/system/dveC/dveC_explicit_system.hh
+@@ -39,16 +39,17 @@ private:
+ 
+  protected:
+   //!Auxiliary method to prints C-source of a the current system.
++  void get_expr_deps(dve_expression_t &, std::vector<int> &, std::string);
+   static void write_C(dve_expression_t &, std::ostream &, std::string);
+-    
++
+  public:
+   slong_int_t read(const char * const filename);
+- 
++
+   //!A constructor
+   /*!\param evect = \evector used for reporting of error messages*/
+   dveC_explicit_system_t(error_vector_t & evect);
+- 
+-  //!Function to test whether the given state is accepting. 
++
++  //!Function to test whether the given state is accepting.
+   /*!Calls dynamically linked library for Buchi acceptance, and dve_explicit_system_t::is_accepting otherwise.
+    */
+   virtual bool is_accepting(state_t state, size_int_t acc_group=0, size_int_t pair_member=1);
+@@ -63,11 +64,15 @@ private:
+ 
+   //!A destructor
+   virtual ~dveC_explicit_system_t();//!<A destructor.
+-  
++
++  void mark_projection(size_int_t gid, int type, int idx, std::vector<int> & proj);
+   //!Auxiliary method to print and compile C-source of a the current system.
+   void print_dveC_compiler(std::ostream & ostr);
+   //!Auxiliary method to print and compile C-source of a the current system.
+   void print_state_struct(std::ostream & ostr);
++  //!Auxiliary method to print functions to describe the state
++  size_int_t get_state_length();
++  void print_state_description(std::ostream & ostr);
+   //!Auxiliary method to print and compile of a the current system.
+   void print_include(std::ostream & ostr);
+   //!Auxiliary method to print and compile C-source of a the current system.
+@@ -75,12 +80,12 @@ private:
+ 
+   //!Auxiliary method to print and compile C-source of a the current system.
+   slong_int_t pure_read(const char * const filename);
+-   
++
+ }; //END of class dveC_explicit_system_t
+ 
+ 
+ 
+-#ifndef DOXYGEN_PROCESSING  
++#ifndef DOXYGEN_PROCESSING
+ } //END of namespace DVE
+ #include "common/undeb.hh"
+ 
+-- 
+1.6.0.3.3.g214bef
+
+
+From 98c8468900ed10962ac91380df9bfbad8af6eb7b Mon Sep 17 00:00:00 2001
+From: Michael Weber <michaelw@foldr.org>
+Date: Wed, 4 Nov 2009 10:10:54 +0100
+Subject: [PATCH] Remove duplicate mentioning of header file
+
+Some versions of autotools die with an error with dups.
+---
+ src/Makefile.am |    1 -
+ 1 files changed, 0 insertions(+), 1 deletions(-)
+
+diff --git a/src/Makefile.am b/src/Makefile.am
+index 05aa84b..d4fff6c 100644
+--- a/src/Makefile.am
++++ b/src/Makefile.am
+@@ -81,7 +81,6 @@ nobase_pkginclude_HEADERS = sevine.h divine.h \
+ 			 common/hash_function.hh \
+                          por/spor.hh \
+ 			 por/por.hh \
+-                         common/deb.hh \
+                          distributed/message.hh \
+                          distributed/network.hh \
+                          distributed/distributed.hh \
+-- 
+1.6.0.3.3.g214bef
+
+
+From cd70b8119d6ead5b9fd2e309dc488881d7e96b53 Mon Sep 17 00:00:00 2001
+From: Michael Weber <michaelw@foldr.org>
+Date: Wed, 4 Nov 2009 10:12:40 +0100
+Subject: [PATCH] Fix compiler command line
+
+* works for OSX
+* some tools don't handle spaces between -I and argument
+  (likewise -L)
+* -lbymoc_vm is not needed
+
+similar changes should perhaps be made in
+  system/dveC/dveC_explicit_system.cc
+---
+ tool/model_manipulation/precompilation.cc |   30 ++++++++++++++++++++--------
+ 1 files changed, 21 insertions(+), 9 deletions(-)
+
+diff --git a/tool/model_manipulation/precompilation.cc b/tool/model_manipulation/precompilation.cc
+index a7553d6..e8aeea3 100644
+--- a/tool/model_manipulation/precompilation.cc
++++ b/tool/model_manipulation/precompilation.cc
+@@ -120,23 +120,35 @@ int main(int argc, char ** argv)
+ #define CPP_MakeString_aux(s) #s
+ #define CPP_MakeString(s) CPP_MakeString_aux(s)
+ 
+-  system((string("g++ -O2 -g -shared -fPIC ")
++  string cmdline = string("g++ $CPPFLAGS $CFLAGS $LDFLAGS -O2 -g ")
++#ifdef __APPLE__
++          + string("-dynamiclib ")
++#else
++          + string("-shared ")
++#endif
+ #ifdef INSTALL_PREFIX
+-	  + string("-I ") + string(CPP_MakeString(INSTALL_PREFIX)) + string("/include/divine-cluster ")
++	  + string("-I") + string(CPP_MakeString(INSTALL_PREFIX)) + string("/include/divine-cluster ")
+ #else
+-	  + string("-I ~/divine/src/ ")
++	  + string("-I$HOME/divine/src/ ")
+ #endif
+ 	  + cc_filename + " -o " + dveC_filename + " -lc " 
+ #ifdef INSTALL_PREFIX
+-	  + string("-L ") + string(CPP_MakeString(INSTALL_PREFIX)) + string("/lib/ ")
++	  + string("-L") + string(CPP_MakeString(INSTALL_PREFIX)) + string("/lib/ ")
+ #else
+-	  + string("-L ~/divine/lib/ ")
++	  + string("-L$HOME/divine/lib/ ")
+ #endif
+-	  + string("-lsevine -lbymoc_vm")).c_str());
+-  cout <<" done, "<<dveC_filename<<" created."<<endl;
+-  return 0;
+-
++	  + string("-lsevine");
++
++  int syserr;
++  if ((syserr = system(cmdline.c_str())) == 0) {
++      cout <<" done, "<<dveC_filename<<" created."<<endl;
++  } else {
++      cout << endl
++           << "Command failed with exit code " << int(syserr) << ": " << cmdline << endl;
++      exit (syserr > 0 ? syserr : EXIT_FAILURE);
++  }
+ 
++  return 0;
+ }
+ 
+ 
+-- 
+1.6.0.3.3.g214bef
+
