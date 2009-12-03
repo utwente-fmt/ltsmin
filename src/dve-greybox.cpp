@@ -160,8 +160,9 @@ void DVEcompileGreyboxModel(model_t model, const char *filename){
     if ((ret = stat (filename, &st)) != 0)
         FatalCall (1, error, "%s", filename);
 
-    char *abs_filename = realpath (filename, NULL);
-    if (abs_filename == NULL)
+    char abs_filename[PATH_MAX];
+    char *ret_filename = realpath (filename, abs_filename);
+    if (ret_filename == NULL)
         FatalCall (1, error, "Cannot determine absolute path of %s", filename);
     
     // get temporary directory
@@ -218,10 +219,10 @@ void DVEloadGreyboxModel(model_t model, const char *filename){
 	GBsetContext(model,ctx);
 
     // Open dveC file
-    char* abs_filename = realpath(filename, NULL);
-    if (abs_filename) {
+    char abs_filename[PATH_MAX];
+	char *ret_filename = realpath(filename, abs_filename);
+    if (ret_filename) {
         dlHandle = dlopen(abs_filename, RTLD_LAZY);
-        free(abs_filename);
         if (dlHandle == NULL)
         {
             Fatal (1, error, "%s, Library \"%s\" is not reachable", dlerror(), filename);
