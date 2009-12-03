@@ -144,7 +144,7 @@ Without MPI, the distributed tools (xxx2lts-mpi, ltsmin-mpi) will
 not be built.
 
 *** AsciiDoc
-Download AsciiDoc (>= 8) from <http://www.methods.co.nz/asciidoc/>.
+Download AsciiDoc (>= 8.4.4) from <http://www.methods.co.nz/asciidoc/>.
 We tested with asciidoc-8.4.4.  Without asciidoc, documentation cannot
 be rebuilt.  For convenience, release tarballs are shipping with
 pre-built man pages and HTML documentation.
