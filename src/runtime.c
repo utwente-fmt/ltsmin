@@ -20,15 +20,9 @@ int linear_search(si_map_entry map[],const char*key){
 	return -1;
 }
 
-static void* stackbottom=NULL;
-void* RTstackBottom(){
-	return stackbottom;
-}
-
 void (*RThandleFatal)(const char*file,int line,int errnum,int code);
 
 void RTinit(int *argcp,char**argvp[]){
-	stackbottom=argcp;
     RThandleFatal=NULL;
     HREinitBare(argcp,argvp);
 }

@@ -55,4 +55,12 @@ extern void HRErequireMPI();
 */
 extern void HREinitBare(int *argc,char **argv[]);
 
+/**
+\brief Return the bottom of the stack.
+
+The current implementation returns the bottom of the stack of the main thread,
+regardsless of which thread calls this function.
+ */
+extern void* HREstackBottom();
+
 #endif

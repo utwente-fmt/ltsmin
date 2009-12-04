@@ -35,13 +35,7 @@ extern int linear_search(si_map_entry map[],const char*key);
  */
 extern void RTparseOptions(const char* argline,int *argc_p,char***argv_p);
 
-/**
-\brief Return the bottom of the stack.
-
-The current implementation returns the bottom of the stack of the main thread,
-regardsless of which thread calls this function.
- */
-extern void* RTstackBottom();
+#define RTstackBottom HREstackBottom
 
 extern void* RTmalloc(size_t size);
 

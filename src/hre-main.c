@@ -51,8 +51,7 @@ char* get_label(){
     return ctx->label;
 }
 
-static void* stack_bottom;
-
+static void* stack_bottom=NULL;
 void* HREstackBottom(){
     return stack_bottom;
 }
