@@ -158,7 +158,7 @@ static int state_labels;
 static int edge_labels;
 static int visited=1;
 static int explored=0;
-static int trans=0;
+static size_t ntransitions = 0;
 
 static void
 maybe_write_state (model_t model, const int *idx, const int *state)
@@ -196,7 +196,7 @@ vector_next (void *arg, int *lbl, int *dst)
         vset_add (next_set, dst);
     }
     if (write_lts) enum_seg_vec (output_handle, 0, src_ofs, dst, lbl);
-    trans++;
+    ++ntransitions;
 }
 
 static void
@@ -212,7 +212,7 @@ index_next (void *arg, int *lbl, int *dst)
         }
     }
     if (write_lts) enum_seg_seg (output_handle, 0, src_ofs, 0, idx, lbl);
-    trans++;
+    ++ntransitions;
 }
 
 static inline void get_state(int state_no, int *state)
@@ -382,7 +382,7 @@ vector_next_dfs (void *arg, int *lbl, int *dst)
         dfs_stack_push (stack, dst);
     }
     if (write_lts) enum_seg_vec (output_handle, 0, src_ofs, dst, lbl);
-    ++trans;
+    ++ntransitions;
 }
 
 static void
@@ -396,7 +396,7 @@ index_next_dfs (void *arg, int *lbl, int *dst)
         bitset_set (dfs_open_set, idx);
     }
     if (write_lts) enum_seg_seg (output_handle, 0, src_ofs, 0, idx, lbl);
-    ++trans;
+    ++ntransitions;
 }
 
 
@@ -437,7 +437,8 @@ bfs_explore_state_index (void *context, int idx, int *src, int level)
 
     explored++;
     if (explored % 1000 == 0 && RTverbosity >= 2)
-        Warning (info, "explored %d visited %d trans %d", explored, visited, trans);
+        Warning (info, "explored %d visited %d trans %zu",
+                 explored, visited, ntransitions);
 }
 
 static void
@@ -462,7 +463,8 @@ bfs_explore_state_vector (void *context, int *src)
 	}
     explored++;
     if (explored % 1000 == 0 && RTverbosity >= 2)
-        Warning (info, "explored %d visited %d trans %d", explored, visited, trans);
+        Warning (info, "explored %d visited %d trans %zu",
+                 explored, visited, ntransitions);
 }
 
 static void
@@ -505,7 +507,8 @@ dfs_explore_state_vector (model_t model, int src_idx, const int *src,
     if (i == K) {
         ++explored;
         if (explored % 1000 == 0 && RTverbosity >= 2)
-            Warning (info, "explored %d visited %d trans %d", explored, visited, trans);
+            Warning (info, "explored %d visited %d trans %zu",
+                     explored, visited, ntransitions);
     }
     *o_next_group = i;
 }
@@ -551,7 +554,8 @@ dfs_explore_state_index (model_t model, int idx, int *o_next_group)
     if (i == K) {
         ++explored;
         if (explored % 1000 == 0 && RTverbosity >= 2)
-            Warning (info, "explored %d visited %d trans %d", explored, visited, trans);
+            Warning (info, "explored %d visited %d trans %zu",
+                     explored, visited, ntransitions);
     }
     *o_next_group = i;
 }
@@ -597,8 +601,8 @@ dfs_explore (model_t model, int *src, size_t *o_depth)
                 if (dfs_stack_nframes (stack) > depth) {
                     depth = dfs_stack_nframes (stack);
                     if (RTverbosity >= 1)
-                        Warning (info, "new depth reached %d. Visited %d states and %d trans",
-                                 depth, visited, trans);
+                        Warning (info, "new depth reached %d. Visited %d states and %zu transitions",
+                                 depth, visited, ntransitions);
                 }
             } else {
                 dfs_stack_pop (stack);
@@ -639,8 +643,8 @@ dfs_explore (model_t model, int *src, size_t *o_depth)
                 if (dfs_stack_nframes (stack) > depth) {
                     depth = dfs_stack_nframes (stack);
                     if (RTverbosity >= 1)
-                        Warning (info, "new depth reached %d. Visited %d states and %d trans",
-                                 depth, visited, trans);
+                        Warning (info, "new depth reached %d. Visited %d states and %zu transitions",
+                                 depth, visited, ntransitions);
                 }
             } else {
                 dfs_stack_pop (stack);
@@ -748,8 +752,8 @@ int main(int argc, char *argv[]){
 		vset_t current_set=vset_create(domain,0,NULL);
 		while (!vset_is_empty(next_set)){
 		  if (RTverbosity >= 1)
-		    Warning(info,"level %d has %d states, explored %d states %d trans",
-			    level,(visited-explored),explored,trans);
+		    Warning(info,"level %d has %d states, explored %d states %zu transitions",
+			    level,(visited-explored),explored,ntransitions);
 		  if (level == max) break;
 		  level++;
 		  vset_copy(current_set,next_set);
@@ -775,8 +779,8 @@ int main(int argc, char *argv[]){
                 while(explored<visited){
                   if (limit==explored){
                     if (RTverbosity >= 1)
-                      Warning(info,"level %d has %d states, explored %d states %d trans",
-                          level,(visited-explored),explored,trans);
+                      Warning(info,"level %d has %d states, explored %d states %zu transitions",
+                          level,(visited-explored),explored,ntransitions);
                     limit=visited;
                     level++;
                     if (level == max) break;
@@ -789,14 +793,14 @@ int main(int argc, char *argv[]){
                 Fatal (1, error, "Unsupported combination: strategy=%s, state=%s",
                        strategies[strategy].key, db_types[state_db].key);
             }
-            Warning(info,"state space has %zu levels %d states %d transitions",
-                    level,visited,trans);
+            Warning(info,"state space has %zu levels %d states %zu transitions",
+                    level,visited,ntransitions);
             break;
         case Strat_DFS: {
             size_t depth = 0;
             dfs_explore (model, src, &depth);
-            Warning (info, "state space has depth %zu, %d states %d transitions",
-                    depth, visited, trans);
+            Warning (info, "state space has depth %zu, %d states %zu transitions",
+                    depth, visited, ntransitions);
             break;
         }
 	}
