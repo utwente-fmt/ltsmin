@@ -16,7 +16,7 @@ struct stream_s {
 };
 
 static size_t buf_read_max(stream_t stream,void*buf,size_t count){
-	if (stream->rd_next + count < stream->rd_used){
+	if (stream->rd_next + count <= stream->rd_used){
 		// if we already have the data just copy
 		memcpy(buf,stream->rd_buf+stream->rd_next,count);
 		stream->rd_next+=count;
