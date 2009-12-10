@@ -101,7 +101,7 @@ extern void (*RThandleFatal)(const char*file,int line,int errnum,int code);
 	log_message(log,__FILE__,__LINE__,0,__VA_ARGS__);\
 	if (RThandleFatal) RThandleFatal(__FILE__,__LINE__,0,code);\
 	if (code==0) {\
-		log_message(log,__FILE__,__LINE__,errno,"exit with FAILURE instead of 0");\
+		log_message(log,__FILE__,__LINE__,0,"exit with FAILURE instead of 0");\
 		exit(EXIT_FAILURE);\
 	} else {\
 		exit(code);\
