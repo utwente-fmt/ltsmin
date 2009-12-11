@@ -3,7 +3,7 @@ ACLOCAL_AMFLAGS = -I m4
 SUBDIRS = @subdirs@ lemon src doc
 EXTRA_DIST = ltsminreconf Doxyfile contrib/bash-completion/ltsmin
 
-doc_DATA = AUTHORS COPYING README
+doc_DATA = AUTHORS COPYING README CODING-STANDARDS
 
 if DX_COND_doc
 mostlyclean-local: doxygen-clean
