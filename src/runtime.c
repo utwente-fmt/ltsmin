@@ -1,4 +1,4 @@
-#include <amconfig.h>
+#include <config.h>
 #include "runtime.h"
 #include <stdlib.h>
 #include <errno.h>

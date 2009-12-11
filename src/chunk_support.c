@@ -1,3 +1,4 @@
+#include <config.h>
 #include <ctype.h>
 #include "chunk_support.h"
 #include "runtime.h"

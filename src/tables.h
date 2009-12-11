@@ -7,7 +7,6 @@
 #ifndef LTSMIN_TABLES_H
 #define LTSMIN_TABLES_H
 
-#include "config.h"
 #include <stdarg.h>
 #include <stdint.h>
 #include <chunk_support.h>

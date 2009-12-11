@@ -1,3 +1,4 @@
+#include <config.h>
 #include <popt.h>
 #include <mpi.h>
 #include <hre-main.h>

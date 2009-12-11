@@ -1,3 +1,4 @@
+#include <config.h>
 #include "fast_hash.h"
 #include <stdlib.h>
 #undef get16bits

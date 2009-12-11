@@ -1,3 +1,4 @@
+#include <config.h>
 #include "dm.h"
 
 #ifdef DMDEBUG

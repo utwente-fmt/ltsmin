@@ -1,5 +1,4 @@
-#include <amconfig.h>
-#include "hre-config.h"
+#include <config.h>
 #include <hre-main.h>
 #ifdef HAVE_EXECINFO_H
 #include <execinfo.h>

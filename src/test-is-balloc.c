@@ -5,9 +5,10 @@
  *      Author: laarman
  */
 
-#include "config.h"
+#include <config.h>
 #include <stdlib.h>
-#include "is-balloc.c"
+#include <stdio.h> 
+#include "is-balloc.h"
 
 static const size_t NUM = 10*1024*1024;
 static const int N = 5;

@@ -1,5 +1,4 @@
-#include <amconfig.h>
-#include "hre-config.h"
+#include <config.h>
 #include <hre-main.h>
 #include "hre-internal.h"
 #include <libgen.h>

@@ -1,3 +1,4 @@
+#include <config.h>
 #include "system/state.hh"
 #include <iostream>
 #include <fstream>

@@ -1,3 +1,4 @@
+#include <config.h>
 #include "archive.h"
 #include <fnmatch.h>
 #include <string-map.h>

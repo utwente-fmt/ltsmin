@@ -1,3 +1,4 @@
+#include <config.h>
 #include <runtime.h>
 #include <string-map.h>
 #include <string.h>

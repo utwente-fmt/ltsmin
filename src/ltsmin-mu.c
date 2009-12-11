@@ -1,3 +1,4 @@
+#include <config.h>
 #include <ltsmin-mu.h>
 #include <runtime.h>
 #include <ltsmin-grammar.h>

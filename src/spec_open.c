@@ -1,5 +1,5 @@
 #define CAESAR_GRAPH_IMPLEMENTATION 1
-#include "config.h"
+#include <config.h>
 #include <stdarg.h>
 #include <caesar_standard.h>
 #include <caesar_graph.h>

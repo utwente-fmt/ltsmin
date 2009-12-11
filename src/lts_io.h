@@ -3,7 +3,6 @@
 
 #include <popt.h>
 #include <stdint.h>
-#include <amconfig.h>
 #include <archive.h>
 #include <greybox.h>
 #include <lts_enum.h>

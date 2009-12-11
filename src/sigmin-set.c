@@ -1,3 +1,4 @@
+#include <config.h>
 #include <runtime.h>
 #include <sigmin-types.h>
 #include <sigmin-set.h>

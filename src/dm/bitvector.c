@@ -1,3 +1,4 @@
+#include <config.h>
 #include "bitvector.h"
 #include <limits.h>
 

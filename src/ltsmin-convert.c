@@ -1,8 +1,8 @@
+#include <config.h>
 #include <popt.h>
 #include <archive.h>
 #include <stdio.h>
 #include <runtime.h>
-#include <amconfig.h>
 #include "treedbs.h"
 
 #include <lts_enum.h>

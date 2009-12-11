@@ -1,4 +1,5 @@
 
+#include <config.h>
 #include "packet_stream.h"
 #include "stream_object.h"
 #include "runtime.h"

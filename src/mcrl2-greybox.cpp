@@ -1,3 +1,4 @@
+#include <config.h>
 #include <algorithm>
 #include <iterator>
 #include <iostream>

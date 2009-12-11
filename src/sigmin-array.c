@@ -1,3 +1,4 @@
+#include <config.h>
 #include <mpi.h>
 #include <mpi-runtime.h>
 #include <stddef.h>

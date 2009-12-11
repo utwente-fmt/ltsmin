@@ -1,3 +1,4 @@
+#include <config.h>
 #include <stdio.h>
 #include "bitvector.h"
 #include "dm.h"

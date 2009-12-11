@@ -1,3 +1,4 @@
+#include <config.h>
 #include "raf_object.h"
 #include "runtime.h"
 #include <mpi.h>

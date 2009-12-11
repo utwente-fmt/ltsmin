@@ -1,4 +1,4 @@
-#include "config.h"
+#include <config.h>
 #include "stream_object.h"
 #include "runtime.h"
 #include <string.h>

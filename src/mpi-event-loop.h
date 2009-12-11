@@ -3,7 +3,6 @@
 #ifndef MPI_EVENT_LOOP_H
 #define MPI_EVENT_LOOP_H
 
-#include "config.h"
 #include <mpi.h>
 
 /**

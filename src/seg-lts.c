@@ -1,3 +1,4 @@
+#include <config.h>
 #include <runtime.h>
 #include <seg-lts.h>
 #include <string.h>

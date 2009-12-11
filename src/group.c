@@ -1,3 +1,4 @@
+#include <config.h>
 #include <stdio.h>
 #include <assert.h>
 #include "greybox.h"

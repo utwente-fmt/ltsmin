@@ -6,7 +6,7 @@
 .depend
 .depend.bak
 .deps/
-amconfig.h
+config.h
 etf-convert
 etf-reach
 etf2lts-grey

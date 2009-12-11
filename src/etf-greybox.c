@@ -1,4 +1,5 @@
 
+#include <config.h>
 #include "runtime.h"
 #include "etf-util.h"
 #include "etf-greybox.h"

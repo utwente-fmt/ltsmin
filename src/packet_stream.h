@@ -3,7 +3,6 @@
 
 #include <unistd.h>
 
-#include "config.h"
 #include "stream.h"
 
 /**

@@ -2,7 +2,6 @@
 #define UNIX_H
 
 #include <stdlib.h>
-#include "amconfig.h"
 
 #if defined(HAVE_DECL_STRNDUP) && !HAVE_DECL_STRNDUP
 extern char *strndup(const char *str, size_t n);

@@ -3,7 +3,6 @@
 #define ARCHIVE_H
 
 #include <string-map.h>
-#include "config.h"
 #include "stream.h"
 #include "raf.h"
 typedef struct archive_s *archive_t;

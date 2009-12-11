@@ -1,8 +1,6 @@
 #ifndef DIR_OPS_H
 #define DIR_OPS_H
 
-#include "config.h"
-
 /** @name Directory creation.
   */
 //@{

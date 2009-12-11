@@ -6,8 +6,6 @@
 #ifndef STRING_INDEX_H
 #define STRING_INDEX_H
 
-#include "config.h"
-
 /// String index handle.
 typedef struct stringindex *string_index_t;
 
