@@ -49,6 +49,7 @@ extern "C" {
 #include "dve-greybox.h"
 #include "dm/dm.h"
 #include "chunk_support.h"
+#include "unix.h"
 #include <dlfcn.h>
 #include <stdlib.h>
 #include <sys/types.h>

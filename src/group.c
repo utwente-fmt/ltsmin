@@ -1,9 +1,12 @@
 #include <config.h>
 #include <stdio.h>
+#include <string.h>
+#include <strings.h>
 #include <assert.h>
 #include "greybox.h"
 #include "runtime.h"
 #include "dm/dm.h"
+#include "unix.h"
 
 // this part should be encapsulated in greybox.h
 #include "dynamic-array.h"

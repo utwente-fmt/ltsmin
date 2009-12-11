@@ -221,10 +221,10 @@ dnl AC_FUNC_REALLOC
 AC_FUNC_STRERROR_R
 AC_FUNC_VPRINTF
 AC_CHECK_FUNCS([atexit bzero ftruncate strdup strndup strchr strstr strtol dnl
-  asprintf memset mkdir pow strcasecmp strrchr backtrace backtrace_symbols])
-AC_CHECK_DECLS([strdup, strndup, strchr, strrchr, strstr, asprintf],,,[
-#include "${srcdir}/src/config.h"
-AC_INCLUDES_DEFAULT])
+  asprintf memset mkdir pow strcasecmp strrchr backtrace backtrace_symbols dnl
+  strsep mkdtemp])
+AC_CHECK_DECLS([strdup, strndup, strchr, strrchr, strstr, asprintf,dnl
+mkdtemp, strsep])
 
 AM_CONDITIONAL([HAVE_MPI], [test x"$have_mpi" != "x"])
 AM_CONDITIONAL([HAVE_LIBGMP], 
