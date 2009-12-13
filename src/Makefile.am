@@ -309,6 +309,7 @@ LEMON_FLAGS = -s
 %.c %.h: %.lemon lempar.c
 	cd $(top_builddir)/lemon && $(MAKE) $(AM_MAKEFLAGS) lemon$(EXEEXT)
 	$(top_builddir)/lemon/lemon$(EXEEXT) $(LEMON_FLAGS) $<
+	@if test -f $@; then touch $@; fi
 
 %.c %.h: %.l
 	$(am__skiplex) $(LEX) $<

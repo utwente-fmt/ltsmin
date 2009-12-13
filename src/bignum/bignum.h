@@ -6,8 +6,6 @@
 \brief Wrapper for bignum libraries
 */
 
-#include "amconfig.h"
-
 #if defined(HAVE_GMP_H)
 #include <gmp.h>
 typedef mpz_t bn_int_t;

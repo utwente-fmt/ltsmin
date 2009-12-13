@@ -1,4 +1,4 @@
-#include "config.h"
+#include <config.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -8,7 +8,6 @@
 #include <archive.h>
 #include <dir_ops.h>
 #include <inttypes.h>
-#include "amconfig.h"
 #include <lts_count.h>
 
 

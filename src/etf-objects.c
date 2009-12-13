@@ -1,3 +1,4 @@
+#include <config.h>
 #include <runtime.h>
 #include <etf-objects.h>
 #include <treedbs.h>

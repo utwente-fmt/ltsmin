@@ -1,7 +1,8 @@
+#include <config.h>
 #include <string.h>
 #include "unix.h"
 
-#if !defined(HAVE_STRNDUP)
+#if !defined(HAVE_STRNDUP) && !(defined(HAVE_DECL_STRNDUP) && HAVE_DECL_STRNDUP)
 char *
 strndup(const char *str, size_t n)
 {

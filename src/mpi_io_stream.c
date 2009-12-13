@@ -1,3 +1,4 @@
+#include <config.h>
 #include "mpi_io_stream.h"
 #include "stream_object.h"
 #include "runtime.h"

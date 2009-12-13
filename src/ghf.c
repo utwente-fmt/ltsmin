@@ -1,3 +1,4 @@
+#include <config.h>
 #include "ghf.h"
 #include <stdlib.h>
 #include "runtime.h"

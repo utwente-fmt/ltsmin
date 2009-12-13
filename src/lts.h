@@ -1,7 +1,6 @@
 #ifndef LTS_H
 #define LTS_H
 
-#include "config.h"
 #include <sys/types.h>
 
 #ifdef USE_SVC

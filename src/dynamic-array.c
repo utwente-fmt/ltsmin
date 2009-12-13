@@ -1,3 +1,4 @@
+#include <config.h>
 #include "dynamic-array.h"
 #include <stdlib.h>
 #include "runtime.h"

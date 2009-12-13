@@ -36,6 +36,7 @@
  *
  */
 
+#include <config.h>
 #include "set.h"
 #include "runtime.h"
 #include <stdlib.h>

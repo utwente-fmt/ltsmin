@@ -1,4 +1,5 @@
 
+#include <config.h>
 #include "lts.h"
 #include <unistd.h>
 #include "runtime.h"

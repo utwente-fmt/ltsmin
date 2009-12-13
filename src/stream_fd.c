@@ -1,4 +1,4 @@
-#include "config.h"
+#include <config.h>
 #include <stdlib.h>
 #include <unistd.h>
 
@@ -27,8 +27,11 @@ void fd_write(stream_t stream,void*buf,size_t count){
 }
 void fd_flush(stream_t stream){
     if (fsync(stream->fd_out)){ /* might be unneeded, check with TCP sockets */
-        FatalCall(1,error,"fdatasync failed");
+        FatalCall(1,error,"fsync failed");
     }
+}
+void fd_no_flush(stream_t stream){
+    (void)stream;
 }
 void fd_close(stream_t *stream){
     if (((*stream)->fd_in)>=0 && close((*stream)->fd_in)){
@@ -41,6 +44,21 @@ void fd_close(stream_t *stream){
     }
     RTfree(*stream);
     *stream=NULL;
+}
+
+static void setup_flush(stream_t stream){
+    if(stream->fd_out>=0) {
+        if (fsync(stream->fd_out)){
+            if (errno==EINVAL) {
+                /** stream cannot be flushed, no need to try every time */
+                stream->procs.flush=fd_no_flush;
+            } else {
+                FatalCall(1,error,"fsync failed");
+            }
+        } else {
+            stream->procs.flush=fd_flush;
+        }   
+    }
 }
 
 stream_t fd_input(int fd){
@@ -60,7 +78,7 @@ stream_t fd_output(int fd){
     stream->fd_in=-1;
     stream->fd_out=fd;
     stream->procs.write=fd_write;
-    stream->procs.flush=fd_flush;
+    setup_flush(stream);
     stream->procs.close=fd_close;
     return stream;
 }
@@ -73,7 +91,7 @@ stream_t fd_stream(int fd){
     stream->procs.read_max=fd_read_max;
     stream->procs.read=stream_default_read;
     stream->procs.write=fd_write;
-    stream->procs.flush=fd_flush;
+    setup_flush(stream);
     stream->procs.close=fd_close;
     return stream;
 }
@@ -86,7 +104,7 @@ stream_t fd_stream_pair(int fd_in,int fd_out){
     stream->procs.read_max=fd_read_max;
     stream->procs.read=stream_default_read;
     stream->procs.write=fd_write;
-    stream->procs.flush=fd_flush;
+    setup_flush(stream);
     stream->procs.close=fd_close;
     return stream;
 }

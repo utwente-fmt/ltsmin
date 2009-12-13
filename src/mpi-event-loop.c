@@ -1,3 +1,4 @@
+#include <config.h>
 #include "mpi-event-loop.h"
 #include "runtime.h"
 #include "dynamic-array.h"

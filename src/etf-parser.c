@@ -1,3 +1,4 @@
+#include <config.h>
 #include "etf-internal.h"
 #include <etf-util.h>
 #include <ltsmin-syntax.h>

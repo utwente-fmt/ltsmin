@@ -1,3 +1,4 @@
+#include <config.h>
 #include <hre-main.h>
 #include <hre-internal.h>
 #include <stdlib.h>

@@ -1,4 +1,4 @@
-#include "config.h"
+#include <config.h>
 #include <sys/types.h>
 #include <sys/times.h>
 #include <stdlib.h>

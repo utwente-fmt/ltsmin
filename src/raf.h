@@ -8,7 +8,6 @@ The lowest level of IO for single file archives is the random acces file.
 #ifndef RAF_H
 #define RAF_H
 
-#include "config.h"
 #include "runtime.h"
 #include <unistd.h>
 

@@ -1,7 +1,6 @@
 #ifndef GHF_H
 #define GHF_H
 
-#include "config.h"
 #include "stream.h"
 
 /**

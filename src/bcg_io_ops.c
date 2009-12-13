@@ -1,3 +1,4 @@
+#include <config.h>
 #include <string.h>
 #include <bcg_user.h>
 #include <lts_io_internal.h>

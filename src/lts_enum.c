@@ -1,3 +1,4 @@
+#include <config.h>
 #include <lts_enum.h>
 #include <runtime.h>
 

@@ -1,3 +1,4 @@
+#include <config.h>
 #include <tables.h>
 #include <stringindex.h>
 

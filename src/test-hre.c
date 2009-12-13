@@ -1,3 +1,4 @@
+#include <config.h>
 #include <hre-main.h>
 #include <pthread.h>
 #include <unistd.h>

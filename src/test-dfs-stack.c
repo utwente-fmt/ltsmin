@@ -5,6 +5,7 @@
  *      Author: laarman
  */
 
+#include <config.h>
 #include "dfs-stack.c"
 #include <stdlib.h>
 

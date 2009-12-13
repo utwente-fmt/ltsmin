@@ -1,3 +1,4 @@
+#include <config.h>
 #include <task-queue.h>
 #include <mpi-runtime.h>
 #include <dynamic-array.h>

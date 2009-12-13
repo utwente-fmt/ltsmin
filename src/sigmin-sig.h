@@ -1,8 +1,7 @@
 #ifndef SIGMIN_SIG_H
 #define SIGMIN_SIG_H
 
-#include "config.h"
-#include  <chunk_support.h>
+#include <chunk_support.h>
 #include <inttypes.h>
 
 /**

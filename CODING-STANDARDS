@@ -1,0 +1,104 @@
+Language
+========
+
+* No C/C++ header file may reference config.h.
+
+* All C/C++ source files must include config.h before any other included file:
+  #include <config.h>
+
+* Keep #include directives ordered like this:
+    system headers
+    external dependencies
+    ltsmin headers
+
+  Each block should be separated by a blank line.
+
+* Ensure that all C/C++ source code compiles under "-W -Wall -Werror".
+
+  Unused variables will cause warnings, and thus should be flagged
+  explicitly at the end of a function, like this: 
+
+    // ...
+    return;
+    (void)a; (void)b;
+
+* Prefer "static const" over #define whenever possible.  Use enums for
+  logically-connected groups of constants.
+
+* Use asserts to document and enforce invariants.  Remember to
+  #include <assert.h>.  Assert expressions must be free of function
+  calls and side effects, e.g.: use "int max = f(); assert (i < max); i++;"
+  instead of "assert (i++ < f());".
+
+* Functions which can fail should return 0 on success, and a non-zero
+  error code to indicate failure.  For functions which return pointers
+  and have only a single failure mode, NULL can be returned to
+  indicate failure.
+
+* Boolean negation (!b) should not be used to test for NULL pointers
+  or (non-)zero error codes.  Instead, use (ptr != NULL) or (ret != 0).
+
+* Use size_t or ssize_t to represent counters.  They can be printf()ed
+  with "%zu" or "%zd" directives.
+
+
+Source Organization
+===================
+
+* External subsystems (e.g., libraries, parser generators) should be kept in
+  separate sub-directories below the top-level directory.
+
+* Subsystems should be kept in separate sub-directories below src/.
+
+
+Style
+=====
+
+* No Tab (ASCII 9) maybe be introduced in any source file.  It is
+  advisable to configure the editor to ensure this.
+
+* Indentation is 4 spaces per level.
+
+* Avoid more than 80 characters per line.
+
+* Avoid long functions (> 100 lines of code) and deep nesting.
+  Instead, break up code into smaller logical units; use meaningful
+  names.
+
+* Avoid writing functions with long parameter lists.  Avoid passing
+  more than two logically-connected parameters separately.  Instead
+  consider boxing them into a struct.
+
+* Code layout for new files (or substantial changes to existing code)
+  follows GNU Indent with the following options:
+
+======================== ~/.indent.pro =========================
+-orig -nut -i4 -bs -br -ce -cdw -ncdb -pcs -ncs -cd40 -c40 -di20
+================================================================
+
+  In particular, opening braces should be placed on the same line,
+  with the exception of function definitions.  Note that the function
+  name should be placed on the first column:
+
+static int *
+foo (int x, int y, int z)
+{
+    if (x < 0) {
+        // statements
+    } else if (x > 0) {
+        // statements
+    } else {
+        // statements
+    }
+
+    switch (y) {
+    case 0:
+        // statements
+    default:
+        // statements
+    }
+
+    return NULL;
+}
+
+* To improve code readability, use whitespace between tokens.

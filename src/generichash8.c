@@ -1,6 +1,6 @@
 /* $Id: generichash8.c,v 1.1 2007/11/07 16:48:07 sccblom Exp $ */
 #ifdef HAVE_CONFIG_H
-#include "config.h"
+#include <config.h>
 #endif
 
 #include "generichash.h"

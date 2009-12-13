@@ -1,4 +1,4 @@
-#include <amconfig.h>
+#include <config.h>
 #include <hre-main.h>
 #include <git_version.h>
 #include <hre-internal.h>

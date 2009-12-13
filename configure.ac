@@ -4,9 +4,36 @@ AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_AUX_DIR([autotools])
 AM_INIT_AUTOMAKE([foreign])
 AC_CONFIG_SRCDIR([src/spec-reach.c])
-AC_CONFIG_HEADERS([src/amconfig.h])
+AC_CONFIG_HEADERS([src/config.h])
 
 AC_SUBST([pkglibdir], "\${libdir}/${PACKAGE_NAME}-${PACKAGE_VERSION}")
+
+AC_USE_SYSTEM_EXTENSIONS
+AH_VERBATIM([_XOPEN_SOURCE],[
+/* Define if you have POSIX and XPG specifications */
+#ifndef _XOPEN_SOURCE
+# undef _XOPEN_SOURCE
+#endif])
+AC_DEFINE([_XOPEN_SOURCE], 500)
+AH_VERBATIM([_LARGEFILE_SOURCE],[
+/* Define for large file support */
+#ifndef _LARGEFILE_SOURCE
+# undef _LARGEFILE_SOURCE
+#endif
+#ifndef _LARGEFILE64_SOURCE
+# undef _LARGEFILE64_SOURCE
+#endif
+#ifndef _FILE_OFFSET_BITS
+# undef _FILE_OFFSET_BITS
+#endif
+])
+AC_DEFINE([_LARGEFILE_SOURCE])
+AC_DEFINE([_LARGEFILE64_SOURCE])
+AC_DEFINE([_FILE_OFFSET_BITS], 64)
+
+AC_DEFINE([LTSMIN_PATHNAME_MAX], 1024, [Define maximal length of pathnames])
+AC_DEFINE([DEFFILEMODE], 0666, [Define default file mode])
+
 
 # Checks for programs.
 AC_SUBST(AM_CXXFLAGS,["-Wno-inline -ftemplate-depth-128 -finline-functions"])
@@ -194,10 +221,10 @@ dnl AC_FUNC_REALLOC
 AC_FUNC_STRERROR_R
 AC_FUNC_VPRINTF
 AC_CHECK_FUNCS([atexit bzero ftruncate strdup strndup strchr strstr strtol dnl
-  asprintf memset mkdir pow strcasecmp strrchr backtrace backtrace_symbols])
-AC_CHECK_DECLS([strdup, strndup, strchr, strrchr, strstr, asprintf],,,[
-#include "${srcdir}/src/config.h"
-AC_INCLUDES_DEFAULT])
+  asprintf memset mkdir pow strcasecmp strrchr backtrace backtrace_symbols dnl
+  strsep mkdtemp])
+AC_CHECK_DECLS([strdup, strndup, strchr, strrchr, strstr, asprintf,dnl
+mkdtemp, strsep])
 
 AM_CONDITIONAL([HAVE_MPI], [test x"$have_mpi" != "x"])
 AM_CONDITIONAL([HAVE_LIBGMP], 
