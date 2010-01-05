@@ -35,18 +35,21 @@
 static char* etf_output=NULL;
 static char* trc_output=NULL;
 static int dlk_detect=0;
+static int G=1;
 
 static lts_enum_cb_t trace_handle=NULL;
 static lts_output_t trace_output=NULL;
 
-static enum { BFS , BFS2 , Chain , Sat} strategy = BFS;
+static enum { BFS , BFS2 , Chain , Sat1, Sat2, Sat3} strategy = BFS;
 
 static char* order="bfs";
 static si_map_entry strategies[]={
 	{"bfs",BFS},
 	{"bfs2",BFS2},
 	{"chain",Chain},
-	{"sat",Sat},
+	{"sat1",Sat1},
+	{"sat2",Sat2},
+	{"sat3",Sat3},
 	{NULL,0}
 };
 
@@ -80,10 +83,11 @@ static void reach_popt(poptContext con,
 
 static  struct poptOption options[] = {
 	{ NULL, 0 , POPT_ARG_CALLBACK|POPT_CBFLAG_POST|POPT_CBFLAG_SKIPOPTION , (void*)reach_popt , 0 , NULL , NULL },
-	{ "order" , 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &order , 0 , "select the exploration strategy to a specific order" ,"<bfs|bfs2|chain|sat>" },
+	{ "order" , 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &order , 0 , "select the exploration strategy to a specific order" ,"<bfs|bfs2|chain|sat{1|2|3}>" },
 	{ "deadlock" , 'd' , POPT_ARG_VAL , &dlk_detect , 1 , "detect deadlocks" , NULL },
 	{ "trace" , 0 , POPT_ARG_STRING , &trc_output , 0 , "file to write trace to" , "<lts-file>.gcf" },
 #if defined(MCRL)
+	{ "G" , 0 , POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &G , 0 , "set saturation granularity","<number>"},
 	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, mcrl_options , 0 , "mCRL options",NULL},
 #endif
 #if defined(MCRL2)
@@ -545,7 +549,7 @@ static void Closure(vset_t visited,bitvector_t *groups) {
 }
 
 
-void reach_sat(){
+void reach_sat1(){
   int* level = (int*)RTmalloc( nGrps * sizeof(int) );
   int* back  = (int*)RTmalloc( (N+1) * sizeof(int) );
   bitvector_t **groups = (bitvector_t**)RTmalloc( (N+1) * sizeof(bitvector_t*));
@@ -614,18 +618,18 @@ void reach_sat2(){
 
   // groups: i=0..nGrps-1
   // vars  : j=0..N-1
-  // BDD levels:  k = N..1
+  // BDD levels:  k = N..1   (k = N-j)
 
   for (int k=1;k<N+1;k++) {
     groups[k] = (bitvector_t*)RTmalloc(sizeof(bitvector_t));
     bitvector_create(groups[k],nGrps);
   }
   
-  // level[i] = first (highest) + of group i
+  // level[i] = first '+' in row (highest in BDD) of group i
   for (int i=0;i<nGrps;i++) {
     for (int j=0;j<N;j++) {
       if (dm_is_set(GBgetDMInfo(model),i,j)) {
-	level[i]=(N-j) / 10 + 1;
+	level[i]=(N-j) / G + 1;
 	break;
       }
     }
@@ -642,7 +646,7 @@ void reach_sat2(){
   
   int k=1, last=0;
   vset_t old_vis=vset_create(domain,0,NULL);
-  while (k <= N/10 +1) {
+  while (k <= N/G +1) {
     if (k==last) k++;
     fprintf(stderr,"Saturating level: %d\n",k);
     vset_copy(old_vis,visited);
@@ -674,7 +678,7 @@ void reach_sat3(){
   for (int i=0;i<nGrps;i++) {
     for (int j=0;j<N;j++) {
       if (dm_is_set(GBgetDMInfo(model),i,j)) {
-	level[i]=(N-j) / 10 + 1;
+	level[i]=(N-j) / G + 1;
 	break;
       }
     }
@@ -692,7 +696,7 @@ void reach_sat3(){
   vset_t old_vis=vset_create(domain,0,NULL);
   while (!vset_equal(old_vis,visited)) {
     vset_copy(old_vis,visited);
-    for (int k=1; k <= N/10 + 1 ; k++) {
+    for (int k=1; k <= N/G + 1 ; k++) {
       fprintf(stderr,"Saturating level: %d\n",k);
       Closure(visited,groups[k]);
     }
@@ -952,7 +956,13 @@ int main(int argc, char *argv[]){
 	case Chain:
 		reach_chain();
 		break;
-	case Sat:
+	case Sat1:
+		reach_sat1();
+		break;
+	case Sat2:
+		reach_sat2();
+		break;
+	case Sat3:
 		reach_sat3();
 		break;
 	}
