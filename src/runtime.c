@@ -77,6 +77,12 @@ void* RTmallocZero(size_t size){
 	return p;
 }
 
+void* RTrealloc(void *rt_ptr, size_t size){
+    void *tmp=realloc(rt_ptr,size);
+    if (tmp==NULL) Fatal(0,error,"out of memory trying to resize to %d",size);
+    return tmp;
+}
+
 char* RTstrdup(const char *str){
     if (str == NULL) return NULL;
     char *tmp = strdup (str);
