@@ -378,9 +378,22 @@ static void reach_bfs(){
 	vset_t temp=vset_create(domain,0,NULL);
 	vset_t deadlocks=dlk_detect?vset_create(domain,0,NULL):NULL;
 	vset_t dlk_temp=dlk_detect?vset_create(domain,0,NULL):NULL;
+
+	vset_t *levels = NULL;
+	int max_levels = 0;
+
 	vset_copy(current_level,visited);
 	for(;;){
 		if(vset_is_empty(current_level)) break;
+          if (trc_output) {
+	    if (level == max_levels) {
+	      max_levels += 1024;
+	      levels = RTrealloc(levels, max_levels * sizeof(vset_t));
+	      for(int i=level;i<max_levels;i++)
+		levels[i] = vset_create(domain,0,NULL);
+	    }
+	    vset_copy(levels[level],current_level);
+	  }
 	        stats_and_progress_report(current_level,visited,level);
 		level++;
 		for(i=0;i<nGrps;i++){
@@ -424,7 +437,21 @@ void reach_bfs2(){
 	vset_t temp=vset_create(domain,0,NULL);
 	vset_t deadlocks=dlk_detect?vset_create(domain,0,NULL):NULL;
 	vset_t dlk_temp=dlk_detect?vset_create(domain,0,NULL):NULL;
+
+	vset_t *levels = NULL;
+	int max_levels = 0;
+
 	for(;;){
+          if (trc_output) {
+	    if (level == max_levels) {
+	      max_levels += 1024;
+	      levels = RTrealloc(levels, max_levels * sizeof(vset_t));
+	      for(int i=level;i<max_levels;i++)
+		levels[i] = vset_create(domain,0,NULL);
+	    }
+	    vset_copy(levels[level],visited);
+	    if (level != 0) vset_minus(levels[level],levels[level - 1]);
+	  }
 		vset_copy(old_vis,visited);
 		stats_and_progress_report(NULL,visited,level);
 		level++;
@@ -469,7 +496,21 @@ void reach_chain(){
 	vset_t temp=vset_create(domain,0,NULL);
 	vset_t deadlocks=dlk_detect?vset_create(domain,0,NULL):NULL;
 	vset_t dlk_temp=dlk_detect?vset_create(domain,0,NULL):NULL;
+
+	vset_t *levels = NULL;
+        int max_levels = 0;
+
 	for(;;){
+          if (trc_output) {
+	    if (level == max_levels) {
+	      max_levels += 1024;
+	      levels = RTrealloc(levels, max_levels * sizeof(vset_t));
+	      for(int i=level;i<max_levels;i++)
+		levels[i] = vset_create(domain,0,NULL);
+	    }
+	    vset_copy(levels[level],visited);
+	    if (level != 0) vset_minus(levels[level],levels[level - 1]);
+	  }
 		vset_copy(old_vis,visited);
 		stats_and_progress_report(NULL,visited,level);
 		level++;
