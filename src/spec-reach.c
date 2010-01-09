@@ -227,6 +227,9 @@ static void find_trace_to(int *dst,int level,vset_t *levels){
 
         // search backwards from states[current_state-1] to prev_level
         do {
+            vset_copy(temp,internal_levels[int_level]);
+            vset_minus(temp,levels[prev_level+1]);
+            vset_minus(internal_levels[int_level],temp);
             int_level++;
 
             if(int_level == max_int_level) {
@@ -246,10 +249,6 @@ static void find_trace_to(int *dst,int level,vset_t *levels){
             vset_minus(temp,internal_levels[int_level]);
         } while(vset_equal(levels[prev_level],temp));
 
-        // here: temp = levels[prev_level] - internal_levels[int_level]
-        // next operation is destructive on levels[prev_level]
-        vset_minus(levels[prev_level],temp);
-
         if(current_state+int_level >= max_states) {
             int old_max_states=max_states;
             max_states = current_state+int_level+1024;
@@ -258,7 +257,11 @@ static void find_trace_to(int *dst,int level,vset_t *levels){
                 states[i] = RTmalloc(sizeof(int)*N);
         }
 
-        vset_example(levels[prev_level],states[current_state+int_level-1]);
+        // here: temp = levels[prev_level] - internal_levels[int_level]
+        vset_copy(src_set,levels[prev_level]);
+        vset_minus(src_set,temp);
+        vset_example(src_set,states[current_state+int_level-1]);
+        vset_clear(src_set);
 
         // find the states that give us a trace to states[current_state-1]
         for(int i=1;i<int_level;i++) {
@@ -275,7 +278,6 @@ static void find_trace_to(int *dst,int level,vset_t *levels){
             vset_example(dst_set,states[current_state+int_level-i-1]);
             vset_clear(src_set);
             vset_clear(dst_set);
-            vset_clear(temp);
         }
 
         current_state += int_level;
@@ -283,6 +285,7 @@ static void find_trace_to(int *dst,int level,vset_t *levels){
 
         for(int i=0;i<=int_level;i++)
             vset_clear(internal_levels[i]);
+        vset_clear(temp);
     }
 
     write_trace(states, current_state);
