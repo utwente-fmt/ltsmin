@@ -264,8 +264,8 @@ static void find_trace_to(int *dst,int level,vset_t *levels){
         vset_clear(src_set);
 
         // find the states that give us a trace to states[current_state-1]
-        for(int i=1;i<int_level;i++) {
-            vset_add(src_set,states[current_state+int_level-i]);
+        for(int i=(int_level-1);i>0;i--) {
+            vset_add(src_set,states[current_state+i]);
 
             for(int j=0;j<nGrps;j++) {
                 vset_next(temp,src_set,group_next[j]);
@@ -273,9 +273,9 @@ static void find_trace_to(int *dst,int level,vset_t *levels){
             }
 
             vset_copy(temp,dst_set);
-            vset_minus(temp,internal_levels[int_level-i]);
+            vset_minus(temp,internal_levels[i]);
             vset_minus(dst_set,temp);
-            vset_example(dst_set,states[current_state+int_level-i-1]);
+            vset_example(dst_set,states[current_state+i-1]);
             vset_clear(src_set);
             vset_clear(dst_set);
         }
