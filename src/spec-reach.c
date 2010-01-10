@@ -412,7 +412,7 @@ static void reach_bfs(){
 	      for(int i=level;i<max_levels;i++)
 		levels[i] = vset_create(domain,0,NULL);
 	    }
-	    vset_copy(levels[level],current_level);
+	    vset_copy(levels[level],visited);
 	  }
 	        stats_and_progress_report(current_level,visited,level);
 		level++;
@@ -470,7 +470,6 @@ void reach_bfs2(){
 		levels[i] = vset_create(domain,0,NULL);
 	    }
 	    vset_copy(levels[level],visited);
-	    if (level != 0) vset_minus(levels[level],levels[level - 1]);
 	  }
 		vset_copy(old_vis,visited);
 		stats_and_progress_report(NULL,visited,level);
@@ -529,7 +528,6 @@ void reach_chain(){
 		levels[i] = vset_create(domain,0,NULL);
 	    }
 	    vset_copy(levels[level],visited);
-	    if (level != 0) vset_minus(levels[level],levels[level - 1]);
 	  }
 		vset_copy(old_vis,visited);
 		stats_and_progress_report(NULL,visited,level);
