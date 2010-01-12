@@ -1,6 +1,7 @@
 #include <config.h>
-#include "fast_hash.h"
 #include <stdlib.h>
+#include <fast_hash.h>
+
 #undef get16bits
 #if (defined(__GNUC__) && defined(__i386__)) || defined(__WATCOMC__) \
   || defined(_MSC_VER) || defined (__BORLANDC__) || defined (__TURBOC__)
@@ -12,9 +13,12 @@
                        +(uint32_t)(((const uint8_t *)(d))[0]) )
 #endif
 
-uint32_t SuperFastHash (const char * data, int len, uint32_t hash) {
-uint32_t tmp;
-int rem;
+uint32_t 
+SuperFastHash (const void *data_, int len, uint32_t hash) 
+{
+    const unsigned char *data = data_;
+    uint32_t tmp;
+    int rem;
 
     if (len <= 0 || data == NULL) return 0;
 
@@ -55,4 +59,37 @@ int rem;
     hash += hash >> 6;
 
     return hash;
+}
+
+/*
+ * Bob Jenkins, <http://burtleburtle.net/bob/hash/doobs.html>
+ * One-at-a-Time hash
+ */
+uint32_t
+oat_hash (const void *data_, int len, uint32_t seed)
+{
+    const unsigned char *data = data_;
+    unsigned             h = seed;
+    for (int i = 0; i < len; i++) {
+        h += data[i];
+        h += (h << 10);
+        h ^= (h >> 6);
+    }
+    h += (h << 3);
+    h ^= (h >> 11);
+    h += (h << 15);
+    return h;
+}
+
+int
+mix (int a, int b, int c)
+{
+    a = a - b; a = a - c; a = a ^ (((uint32_t) c) >> 13);
+    b = b - c; b = b - a; b = b ^ (a << 8);
+    c = c - a; c = c - b; c = c ^ (((uint32_t) b) >> 13);
+    a = a - b; a = a - c; a = a ^ (((uint32_t) c) >> 12);
+    b = b - c; b = b - a; b = b ^ (a << 16);
+    c = c - a; c = c - b; c = c ^ (((uint32_t) b) >> 5);
+    c = c - a; c = c - b; c = c ^ (((uint32_t) b) >> 15);
+    return c;
 }
