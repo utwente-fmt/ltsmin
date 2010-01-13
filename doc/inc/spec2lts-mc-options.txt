@@ -1,0 +1,11 @@
+*--state*='TYPE'::
+        Select type of data structure for storing visited states.
+        'TYPE' can be one of the following options:
+
+table;;
+  use a lockless hash table (default).
+
+tree;;
+  use a lockless tree-compressed hash table (default).
+
+include::reachability-options.txt[]
