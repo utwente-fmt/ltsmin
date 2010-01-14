@@ -55,6 +55,7 @@ extern "C" {
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <limits.h>
 
 static void dve_popt(poptContext con,
                enum poptCallbackReason reason,
