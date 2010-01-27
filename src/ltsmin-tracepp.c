@@ -5,7 +5,7 @@
 #include <stdio.h>
 #include <chunk_support.h>
 
-#define  BUFLEN 1024
+#define  BUFLEN 4096
 
 static int arg_all=0;
 static int arg_table=0;
