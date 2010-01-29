@@ -5,6 +5,7 @@
 #include "etf-greybox.h"
 #include <tables.h>
 #include "dm/dm.h"
+#include <stringindex.h>
 
 static void etf_popt(poptContext con,
  		enum poptCallbackReason reason,
@@ -29,26 +30,25 @@ struct poptOption etf_options[]= {
 };
 
 typedef struct grey_box_context {
-	treedbs_t label_db;
+	string_index_t label_idx;
 	int edge_labels;
-	treedbs_t* trans_db;
+    string_index_t* trans_key_idx;
 	matrix_table_t* trans_table;
-	treedbs_t* label_key;
+	string_index_t* label_key_idx;
 	int** label_data;
 } *gb_context_t;
 
 static int etf_short(model_t self,int group,int*src,TransitionCB cb,void*user_context){
     gb_context_t ctx=(gb_context_t)GBgetContext(self);
-    uint32_t src_no=(uint32_t)TreeFold(ctx->trans_db[group],src);
-    int dst[dm_ones_in_row(GBgetDMInfo(self), group)];
-    //Warning(info,"group %d, state %d",group,src_no);
+    int len=dm_ones_in_row(GBgetDMInfo(self), group);
+    uint32_t src_no=(uint32_t)SIlookupC(ctx->trans_key_idx[group],(char*)src,len<<2);
     matrix_table_t mt=ctx->trans_table[group];
     if ((src_no)>=MTclusterCount(mt)) return 0;
     int K=MTclusterSize(mt,src_no);
     for(int i=0;i<K;i++){
         uint32_t row[3];
         MTclusterGetRow(mt,src_no,i,row);
-        TreeUnfold(ctx->trans_db[group],(int)row[1],dst);
+        int *dst=(int*)SIgetC(ctx->trans_key_idx[group],(int)row[1],NULL);
         switch(ctx->edge_labels){
             case 0:
                 cb(user_context,NULL,dst);
@@ -59,8 +59,7 @@ static int etf_short(model_t self,int group,int*src,TransitionCB cb,void*user_co
                 break;
             }
             default: {
-                int lbl[ctx->edge_labels];
-                TreeUnfold(ctx->label_db,(int)row[2],lbl);
+                int *lbl=(int*)SIgetC(ctx->label_idx,(int)row[2],NULL);
                 cb(user_context,lbl,dst);
                 break;
             }
@@ -71,7 +70,9 @@ static int etf_short(model_t self,int group,int*src,TransitionCB cb,void*user_co
 
 static int etf_state_short(model_t self,int label,int *state){
     gb_context_t ctx=(gb_context_t)GBgetContext(self);
-    return ctx->label_data[label][TreeFold(ctx->label_key[label],state)];
+    matrix_t *sl_info = GBgetStateLabelInfo(self);
+    int len=dm_ones_in_row(sl_info,label);
+    return ctx->label_data[label][SIlookupC(ctx->label_key_idx[label],(char*)state,len<<2)];
 }
 
 void ETFloadGreyboxModel(model_t model,const char*name){
@@ -82,15 +83,15 @@ void ETFloadGreyboxModel(model_t model,const char*name){
 	int state_length=lts_type_get_state_length(ltstype);
 	ctx->edge_labels=lts_type_get_edge_label_count(ltstype);
 	if (ctx->edge_labels>1) {
-		ctx->label_db=TreeDBScreate(ctx->edge_labels);
+		ctx->label_idx=SIcreate();
 	} else {
-		ctx->label_db=NULL;
+		ctx->label_idx=NULL;
 	}
 	GBsetLTStype(model,ltstype);
 	matrix_t* p_dm_info = (matrix_t*)RTmalloc(sizeof(matrix_t));
 	dm_create(p_dm_info, etf_trans_section_count(etf), state_length);
-	ctx->trans_db=(treedbs_t*)RTmalloc(dm_nrows(p_dm_info)*sizeof(treedbs_t));
-        ctx->trans_table=(matrix_table_t*)RTmalloc(dm_nrows(p_dm_info)*sizeof(matrix_table_t));
+    ctx->trans_key_idx=(string_index_t*)RTmalloc(dm_nrows(p_dm_info)*sizeof(string_index_t));
+    ctx->trans_table=(matrix_table_t*)RTmalloc(dm_nrows(p_dm_info)*sizeof(matrix_table_t));
 	for(int i=0; i < dm_nrows(p_dm_info); i++) {
 		Warning(info,"parsing table %d",i);
 		etf_rel_t trans=etf_trans_section(etf,i);
@@ -116,11 +117,11 @@ void ETFloadGreyboxModel(model_t model,const char*name){
 			}
 		}
 		Warning(info,"length is %d",len);
-		ctx->trans_db[i]=TreeDBScreate(len);
-                ctx->trans_table[i]=MTcreate(3);
-		int src_short[len];
-		int dst_short[len];
-                uint32_t row[3];
+        ctx->trans_key_idx[i]=SIcreate();
+        ctx->trans_table[i]=MTcreate(3);
+        int src_short[len];
+        int dst_short[len];
+        uint32_t row[3];
 		do {
 			for(int k=0;k<state_length;k++) {
 				if(used[k]?(src[k]==0):(src[k]!=0)){
@@ -134,7 +135,7 @@ void ETFloadGreyboxModel(model_t model,const char*name){
 				}
 			}
 			for(int k=0;k<len;k++) dst_short[k]=dst[proj[k]]-1;
-			row[0]=(uint32_t)TreeFold(ctx->trans_db[i],src_short);
+			row[0]=(uint32_t)SIputC(ctx->trans_key_idx[i],(char*)src_short,len<<2);
 			switch(ctx->edge_labels){
 				case 0:
 					row[2]=0;
@@ -143,23 +144,23 @@ void ETFloadGreyboxModel(model_t model,const char*name){
 					row[2]=(uint32_t)lbl[0];
 					break;
 				default:
-                                        row[2]=(uint32_t)TreeFold(ctx->label_db,lbl);
+                    row[2]=(uint32_t)SIputC(ctx->label_idx,(char*)lbl,(ctx->edge_labels)<<2);
 					break;
 			}
-			row[1]=(int32_t)TreeFold(ctx->trans_db[i],dst_short);
-                        MTaddRow(ctx->trans_table[i],row);
+            row[1]=(int32_t)SIputC(ctx->trans_key_idx[i],(char*)dst_short,len<<2);
+            MTaddRow(ctx->trans_table[i],row);
 		} while(ETFrelNext(trans,src,dst,lbl));
 		Warning(info,"table %d has %d states and %d transitions",
-                        i,TreeCount(ctx->trans_db[i]),ETFrelCount(trans));
+                        i,SIgetCount(ctx->trans_key_idx[i]),ETFrelCount(trans));
 		ETFrelDestroy(&trans);
-        MTclusterBuild(ctx->trans_table[i],0,TreeCount(ctx->trans_db[i]));
+        MTclusterBuild(ctx->trans_table[i],0,SIgetCount(ctx->trans_key_idx[i]));
 	}
 	GBsetDMInfo(model, p_dm_info);
 	GBsetNextStateShort(model,etf_short);
 
 	matrix_t *p_sl_info = RTmalloc(sizeof *p_sl_info);
 	dm_create(p_sl_info, etf_map_section_count(etf), state_length);
-	ctx->label_key=(treedbs_t*)RTmalloc(dm_nrows(p_sl_info)*sizeof(treedbs_t));
+	ctx->label_key_idx=(string_index_t*)RTmalloc(dm_nrows(p_sl_info)*sizeof(string_index_t));
 	ctx->label_data=(int**)RTmalloc(dm_nrows(p_sl_info)*sizeof(int*));
 	for(int i=0;i<dm_nrows(p_sl_info);i++){
 		Warning(info,"parsing map %d",i);
@@ -182,7 +183,7 @@ void ETFloadGreyboxModel(model_t model,const char*name){
 		int*proj=(int*)RTmalloc(len*sizeof(int));
 		for(int j=0;j<len;j++) proj[j]=used[j];
 		for(int j=0;j<state_length;j++) used[j]=state[j];
-		treedbs_t key_db=TreeDBScreate(len);
+		string_index_t key_idx=SIcreate();
 		int *data=(int*)RTmalloc(ETFmapCount(map)*sizeof(int));
 		int key[len];
 		do {
@@ -192,9 +193,9 @@ void ETFloadGreyboxModel(model_t model,const char*name){
 				}
 			}
 			for(int k=0;k<len;k++) key[k]=state[proj[k]]-1;
-			data[TreeFold(key_db,key)]=value;
+			data[SIputC(key_idx,(char*)key,len<<2)]=value;
 		} while(ETFmapNext(map,state,&value));
-		ctx->label_key[i]=key_db;
+		ctx->label_key_idx[i]=key_idx;
 		ctx->label_data[i]=data;
 	}
     GBsetStateLabelInfo(model, p_sl_info);
