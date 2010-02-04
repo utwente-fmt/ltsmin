@@ -81,10 +81,10 @@ void group_information::gather(mcrl2::lps::specification const& l) {
     std::set< variable > used_variables;
 
     find_variables(i->condition(), std::inserter(used_variables, used_variables.end()));
-    find_variables(i->multi_action().actions(), std::inserter(used_variables, used_variables.end()));
+    lps::find_variables(i->multi_action().actions(), std::inserter(used_variables, used_variables.end()));
 
     if (i->multi_action().has_time()) {
-      find_variables(i->multi_action().time(), std::inserter(used_variables, used_variables.end()));
+      data::find_variables(i->multi_action().time(), std::inserter(used_variables, used_variables.end()));
     }
 
     data::assignment_list assignments(i->assignments());
