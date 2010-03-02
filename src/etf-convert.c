@@ -3,6 +3,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <runtime.h>
+#include <hre-main.h>
 #include <etf-util.h>
 #include <popt.h>
 
@@ -79,15 +80,41 @@ void dve_write(const char*name,etf_model_t model){
 	fclose(dve);	
 }
 
+void btf_write(const char*name,etf_model_t model){
+	Warning(info,"faking write to %s",name);
+	lts_type_t ltstype=etf_type(model);
+	int N=lts_type_get_state_length(ltstype);
+	int K=lts_type_get_edge_label_count(ltstype);
+	int L=lts_type_get_state_label_count(ltstype);
+	
+}
+
 int main(int argc,char *argv[]){
 	char* files[2];
-	RTinitPopt(&argc,&argv,options,2,2,files,NULL,"<input> <output>","Convert ETF to DVE");
+	RTinitPopt(&argc,&argv,options,2,2,files,NULL,"<input> <output>",
+	"Convert ETF models from ETF/BTF to ETF/BTF/DVE");
 
-	Warning(info,"parsing %s",files[0]);
-	etf_model_t model=etf_parse_file(files[0]);
+	etf_model_t (*read_model)(const char *name)=NULL;
+	void (*write_model)(const char *name,etf_model_t model)=NULL;
+	int len;
+	len=strlen(files[0]);
+	if (len>4) {
+		if (strcmp(files[0]+(len-4),".etf")==0) read_model=etf_parse_file;
+		if (strcmp(files[0]+(len-4),".btf")==0) Abort("BTF reader TODO");
+	}
+	if (read_model==NULL) Abort("extension of input file not recognized");
+	len=strlen(files[1]);
+	if (len>4) {
+		if (strcmp(files[1]+(len-4),".etf")==0) Abort("ETF writer TODO");
+		if (strcmp(files[1]+(len-4),".btf")==0) write_model=btf_write;
+		if (strcmp(files[1]+(len-4),".dve")==0) write_model=dve_write;
+	}
+	if (write_model==NULL) Abort("extension of input file not recognized");
 
+	Warning(info,"reading %s",files[0]);
+	etf_model_t model=read_model(files[0]);
 	Warning(info,"writing %s",files[1]);
-	dve_write(files[1],model);
+	write_model(files[1],model);
 	Warning(info,"done");
 	return 0;
 }
