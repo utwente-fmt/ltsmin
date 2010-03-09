@@ -291,7 +291,7 @@ libutil_la_CPPFLAGS += $(CADP_CPPFLAGS)
 endif
 libutil_la_CPPFLAGS += $(AM_CPPFLAGS)
 
-libutil_la_SOURCES += hre-config.h hre-context.c hre-context.h \
+libutil_la_SOURCES += hre-context.c hre-context.h \
 	hre-feedback.c hre-feedback.h hre-internal.h \
 	hre-main.c hre-main.h hre-malloc.c hre-malloc.h \
 	hre-popt.c hre-popt.h hre-pthread.c
