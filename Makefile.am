@@ -1,7 +1,7 @@
 ACLOCAL_AMFLAGS = -I m4
 
 SUBDIRS = @subdirs@ lemon src doc
-EXTRA_DIST = ltsminreconf Doxyfile contrib/bash-completion/ltsmin
+EXTRA_DIST = ltsminreconf Doxyfile contrib/bash-completion/ltsmin CODING-STANDARDS
 
 doc_DATA = AUTHORS COPYING README CODING-STANDARDS
 
