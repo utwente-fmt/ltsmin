@@ -45,6 +45,8 @@ static int N;
 static int K;
 static int state_labels;
 static int edge_labels;
+static int edge_size;
+static int edge_encode=0;
 
 static void ltsminopen_popt(poptContext con,
  		enum poptCallbackReason reason,
@@ -79,6 +81,7 @@ static  struct poptOption options[] = {
 #if defined(DIVINE)
 	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, dve_options , 0 , "DiVinE options", NULL },
 #endif
+    { "edge-encode" , 0 , POPT_ARG_VAL, &edge_encode , 1 , "encode the state labels on edges" , NULL },
 /*
 	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, greybox_options , 0 , "Greybox options", NULL },
 	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, vset_setonly_options , 0 , "Vector set options", NULL },
@@ -206,38 +209,95 @@ CAESAR_TYPE_STRING CAESAR_STRING_LABEL(CAESAR_TYPE_LABEL l) {
 		p = s+u;
 		b = s + u+n;
 	}
-	if (edge_labels > 1) {
-		sprintf(p, "<");
-		p += strlen(p);
-	}
-	for(i=0; i < edge_labels; i++) {
-		c=GBchunkGet(model,lts_type_get_edge_label_typeno(ltstype,i),l->label[i]);
-		if (c.len==3 && strncmp(c.data, "tau", c.len)==0)
-			clen=strlen(tau);
-		else
-			clen=c.len*2+3;
-		n = clen+1+1+1; /* for c, ';',  '>', '\0' */
-		if (b-p < n) { 
-			u = p-s;
-			s = realloc(s, u+n); /* TODO: check s!=0 */
-			p = s+u;
-			b = s + u+n;
-		}
-		if (i>0) {
-			sprintf(p, ";");
-			p += strlen(p);
-		}
-		if (c.len==3 && strncmp(c.data, "tau", c.len)==0)
-			sprintf(p, "%s", tau);
-		else
-			chunk2string(c,b-p,p);
-		p += strlen(p);
-	}
-	if (edge_labels > 1) {
-		sprintf(p, ">");
-		p += strlen(p);
-	}
-	return s;
+    if (edge_labels > 0 && l->label[0]<0){
+        n = 6;
+        if (b-p < n) { 
+            u = p-s;
+            s = realloc(s, u+n); /* TODO: check s!=0 */
+            p = s+u;
+            b = s + u+n;
+        }
+        sprintf(p, "delta");
+        p+=strlen(p);
+    } else {
+        if (edge_labels > 1 || edge_encode) {
+                sprintf(p, "|");
+                p += strlen(p);
+        }
+        for(i=0; i < edge_labels; i++) {
+            char *name=lts_type_get_edge_label_name(ltstype,i);
+            c=GBchunkGet(model,lts_type_get_edge_label_typeno(ltstype,i),l->label[i]);
+            if (c.len==3 && strncmp(c.data, "tau", c.len)==0)
+                clen=strlen(tau);
+            else
+                clen=c.len*2+3;
+            n = strlen(name)+ 1 + clen+1+1+1; /* for name , '=' , c, ';',  '>', '\0' */
+            if (b-p < n) { 
+                u = p-s;
+                s = realloc(s, u+n); /* TODO: check s!=0 */
+                p = s+u;
+                b = s + u+n;
+            }
+            if (i>0) {
+                sprintf(p, "|");
+                p += strlen(p);
+            }
+            if (edge_labels > 1 || edge_encode ) {
+                sprintf(p, "%s=",name);
+                p += strlen(p);
+            }
+            if (c.len==3 && strncmp(c.data, "tau", c.len)==0)
+                sprintf(p, "%s", tau);
+            else
+                chunk2string(c,b-p,p);
+            p += strlen(p);
+        }
+    }
+    if (edge_labels > 1 || edge_encode ) {
+        sprintf(p, "|");
+        p += strlen(p);
+    }
+    if (edge_encode){
+        int ofs=edge_labels;
+        /*
+        for(i=0;i<N;i++){
+            char*name=lts_type_get_state_name(ltstype,i);
+            c=GBchunkGet(model,lts_type_get_state_typeno(ltstype,i),l->label[ofs+i]);
+            n=strlen(name)+c.len*2+7;
+            if (b-p < n) { 
+                u = p-s;
+                s = realloc(s, u+n); // TODO: check s!=0
+                p = s+u;
+                b = s + u+n;
+            }
+            sprintf(p, "%s=",name);
+            p+=strlen(p);
+            chunk2string(c,b-p,p);
+            p+=strlen(p);
+            sprintf(p, "|");
+            p +=strlen(p);
+        }
+        */
+        ofs+=N;
+        for(i=0;i<state_labels;i++){
+            char*name=lts_type_get_state_label_name(ltstype,i);
+            c=GBchunkGet(model,lts_type_get_state_label_typeno(ltstype,i),l->label[ofs+i]);
+            n=strlen(name)+c.len*2+7;
+            if (b-p < n) { 
+                u = p-s;
+                s = realloc(s, u+n); /* TODO: check s!=0 */
+                p = s+u;
+                b = s + u+n;
+            }
+            sprintf(p, "%s=",name);
+            p+=strlen(p);
+            chunk2string(c,b-p,p);
+            p+=strlen(p);
+            sprintf(p, "|");
+            p +=strlen(p);
+       }
+    }
+    return s;
 }
 
 CAESAR_TYPE_STRING CAESAR_INFORMATION_LABEL(CAESAR_TYPE_LABEL l) {
@@ -350,6 +410,7 @@ typedef struct callback_context_t {
 	CAESAR_TYPE_STATE src;
 	CAESAR_TYPE_LABEL lbl;
 	CAESAR_TYPE_STATE dst;
+        int *labels;
 	void (*callback)(CAESAR_TYPE_STATE, CAESAR_TYPE_LABEL, CAESAR_TYPE_STATE);
 } callback_struct_t;
 
@@ -361,6 +422,12 @@ static void iterate_transition(void*arg,int*lbl,int*dst){
 		context->dst->state[i] = dst[i];
 	for(i=0; i<edge_labels; i++)
 		context->lbl->label[i] = lbl[i];
+        if (edge_encode){
+            int ofs=edge_labels;
+            for(i=0;i<N;i++) context->lbl->label[ofs+i] = context->src->state[i];
+            ofs+=N;
+            for(i=0;i<state_labels;i++) context->lbl->label[ofs+i] = context->labels[i];
+        }
 	context->callback(context->src, context->lbl, context->dst);
 }
 
@@ -370,10 +437,34 @@ void CAESAR_ITERATE_STATE(CAESAR_TYPE_STATE s1,
 			CAESAR_TYPE_STATE s2, 
 			void (*callback) 
 				(CAESAR_TYPE_STATE, CAESAR_TYPE_LABEL, CAESAR_TYPE_STATE)) {
-	int c;
-	
-	callback_struct_t context = { s1, l, s2, callback };
+    int i,c;
+    if (edge_encode && s1->state[0]<0) return;
+    if (edge_encode){
+        int labels[state_labels];
+        GBgetStateLabelsAll(model,s1->state,labels);
+        {
+            callback_struct_t context = { s1, l, s2, labels, callback };
+            c=GBgetTransitionsAll(model,s1->state,iterate_transition,&context);
+            if (c==0){
+                int ofs=edge_labels;
+                for(i=0;i<edge_labels;i++) l->label[i]=-1;
+                for(i=0;i<N;i++) {
+                    l->label[ofs+i] = s1->state[i];
+                    /* for dummy deadlock
+                    s2->state[i] = - 1;
+                    */
+                    /* for selfloop deadlock */
+                    s2->state[i]=s1->state[i];
+                }
+                ofs+=N;
+                for(i=0;i<state_labels;i++) l->label[ofs+i] = labels[i];
+                callback(s1,l,s2);
+            }
+        }
+    } else {
+        callback_struct_t context = { s1, l, s2, NULL, callback };
 	c=GBgetTransitionsAll(model,s1->state,iterate_transition,&context);
+    }
 }
 
 void CAESAR_START_STATE(CAESAR_TYPE_STATE s) {
@@ -397,7 +488,7 @@ CAESAR_TYPE_NATURAL CAESAR_HASH_STATE(CAESAR_TYPE_STATE s,CAESAR_TYPE_NATURAL m)
 }
 
 CAESAR_TYPE_NATURAL CAESAR_HASH_LABEL(CAESAR_TYPE_LABEL l,CAESAR_TYPE_NATURAL m) {
-	return SuperFastHash((char*)l->label,edge_labels*sizeof(int),0) % m;
+	return SuperFastHash((char*)l->label,edge_size*sizeof(int),0) % m;
 }
 
 
@@ -438,7 +529,6 @@ CAESAR_TYPE_NATURAL CAESAR_CARDINAL_LABEL(CAESAR_TYPE_LABEL l) {
 
 static void *new_string_index(void* context){
 	(void)context;
-	Warning(info,"creating a new string index");
 	return SIcreate();
 }
 
@@ -484,9 +574,17 @@ void CAESAR_INIT_GRAPH(void) {
 	state_labels=lts_type_get_state_label_count(ltstype);
 	edge_labels=lts_type_get_edge_label_count(ltstype);
 	Warning(info,"There are %d state labels and %d edge labels",state_labels,edge_labels);
+        if (edge_encode){
+            edge_size=edge_labels+N+state_labels;
+            Warning(info,"encoding state information on edges");
+        } else {
+            edge_size=edge_labels;
+            Warning(info,"state information is hidden");
+        } 
 	CAESAR_HINT_SIZE_STATE = N*sizeof(int);
 	CAESAR_HINT_HASH_SIZE_STATE = CAESAR_HINT_SIZE_STATE;
-	CAESAR_HINT_SIZE_LABEL = edge_labels*sizeof(int);
+	CAESAR_HINT_SIZE_LABEL = edge_size*sizeof(int);
 	CAESAR_HINT_HASH_SIZE_LABEL = CAESAR_HINT_SIZE_LABEL;
-	Warning(info,"CAESAR_HINT_SIZE_STATE=%d CAESAR_HINT_SIZE_LABEL=%d",CAESAR_HINT_SIZE_STATE,CAESAR_HINT_SIZE_LABEL);
+	Warning(info,"CAESAR_HINT_SIZE_STATE=%d CAESAR_HINT_SIZE_LABEL=%d",
+                CAESAR_HINT_SIZE_STATE,CAESAR_HINT_SIZE_LABEL);
 }
