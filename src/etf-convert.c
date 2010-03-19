@@ -7,19 +7,54 @@
 #include <etf-util.h>
 #include <popt.h>
 
+static char* pvars=NULL;
 
 static  struct poptOption options[] = {
+    { "pvars" , 0 , POPT_ARG_STRING , &pvars , 0 , "list of independent variables" , NULL },
 	POPT_TABLEEND
 };
 
+static int analyze_rel(etf_rel_t trans,int N,int K,int*status){
+    int transitions=0;
+    int src[N];
+    int dst[N];
+    int lbl[K];
+    for(int i=0;i<N;i++) status[i]=0;
+    ETFrelIterate(trans);
+    while(ETFrelNext(trans,src,dst,lbl)){
+        transitions++;
+        for(int j=0;j<N;j++){
+            if (src[j]) {
+                if (!dst[j]) Abort("inconsistent ETF");
+                if (src[j]==dst[j]) {
+                    status[j]|=1; // read
+                } else {
+                    status[j]|=2; // change
+                }
+            } else {
+                if (dst[j]) Abort("inconsistent ETF");
+            }
+        }
+    }
+    return transitions;
+}
 
 #define ETF_BUF 4096
 
 void dve_write(const char*name,etf_model_t model){
-    FILE* dve=fopen(name,"w");
-
     int N=lts_type_get_state_length(etf_type(model));
     int K=lts_type_get_edge_label_count(etf_type(model));
+    int G=etf_trans_section_count(model);
+    int owner[G];
+    int p_count;
+    if (pvars) {
+        
+    } else {
+        p_count=1;
+        for(int i=0;i<G;i++) owner[i]=0;
+    }
+    
+    FILE* dve=fopen(name,"w");
     int initial_state[N];
     etf_get_initial(model,initial_state);
 
@@ -79,6 +114,7 @@ void dve_write(const char*name,etf_model_t model){
     fprintf(dve,"system async;\n");
     fclose(dve);    
 }
+
 void dep_write(const char*name,etf_model_t model){
     FILE* dep=fopen(name,"w");
 
@@ -91,28 +127,10 @@ void dep_write(const char*name,etf_model_t model){
     }
     for(int section=0;section<etf_trans_section_count(model);section++){
         etf_rel_t trans=etf_trans_section(model,section);
-        int src[N];
-        int dst[N];
-        int lbl[K];
-        int transitions=0;
         int status[N];
-        for(int i=0;i<N;i++) status[i]=0;
-        ETFrelIterate(trans);
-        while(ETFrelNext(trans,src,dst,lbl)){
-            transitions++;
-            for(int j=0;j<N;j++){
-                if (src[j]) {
-                    if (!dst[j]) Abort("inconsistent ETF");
-                    if (src[j]==dst[j]) {
-                        status[j]|=1; // read
-                    } else {
-                        status[j]|=2; // change
-                    }
-                } else {
-                    if (dst[j]) Abort("inconsistent ETF");
-                }
-            }
-        }
+        if (0==analyze_rel(trans,N,K,status)){
+            continue;
+        }       
         for (int i=0;i<N;i++){
             if (status[i]==1) { // read only
                 fprintf(dep,"%s ",lts_type_get_state_name(ltstype,i));
