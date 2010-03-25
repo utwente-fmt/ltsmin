@@ -1245,6 +1245,8 @@ void set_prev_tree(vset_t dst,vset_t src,vrel_t rel){
 }
 
 
+static void reorder() {}
+
 
 vdom_t vdom_create_tree(int n){
 	Warning(info,"Creating an AtermDD tree domain.");
@@ -1271,6 +1273,7 @@ vdom_t vdom_create_tree(int n){
 	dom->shared.rel_add=rel_add_tree;
 	dom->shared.set_next=set_next_tree;
 	dom->shared.set_prev=set_prev_tree;
+	dom->shared.reorder=reorder;
 
 	return dom;
 }
@@ -1300,6 +1303,7 @@ vdom_t vdom_create_list(int n){
 	dom->shared.rel_add=rel_add_list;
 	dom->shared.set_next=set_next_list;
 	dom->shared.set_prev=set_prev_list;
+	dom->shared.reorder=reorder;
 	return dom;
 }
 

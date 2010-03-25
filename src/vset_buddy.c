@@ -10,6 +10,8 @@ static int fdd_bits=16;
 static int cacheratio=64;
 static int maxincrease=1000000;
 static int minfreenodes=20;
+static char* fdd_reorder_opt="none";
+static int fdd_order_strat=BDD_REORDER_NONE;
 
 static void vset_fdd_gbchandler(int pre, bddGbcStat *s) {
   if (!pre && RTverbosity>=2) {
@@ -33,11 +35,45 @@ static void buddy_init(){
 	}
 }
 
+static void reach_popt(poptContext con,
+			enum poptCallbackReason reason,
+			const struct poptOption * opt,
+			const char * arg, void * data) {
+  (void)con;(void)opt;(void)arg;(void)data;
+  if (reason != POPT_CALLBACK_REASON_POST) 
+    Fatal(1,error,"unexpected call to buddy reach_popt");
+  
+  if (!strcmp(fdd_reorder_opt,"none"))
+    fdd_order_strat=BDD_REORDER_NONE;
+  else if (!strcmp(fdd_reorder_opt,"win2"))
+    fdd_order_strat=BDD_REORDER_WIN2;
+  else if (!strcmp(fdd_reorder_opt,"win2ite"))
+    fdd_order_strat=BDD_REORDER_WIN2ITE;
+  else if (!strcmp(fdd_reorder_opt,"win3"))
+    fdd_order_strat=BDD_REORDER_WIN3;
+  else if (!strcmp(fdd_reorder_opt,"win3ite"))
+    fdd_order_strat=BDD_REORDER_WIN3ITE;
+  else if (!strcmp(fdd_reorder_opt,"sift"))
+    fdd_order_strat=BDD_REORDER_SIFT;
+  else if (!strcmp(fdd_reorder_opt,"siftite"))
+    fdd_order_strat=BDD_REORDER_SIFTITE;
+  else if (!strcmp(fdd_reorder_opt,"random"))
+    fdd_order_strat=BDD_REORDER_RANDOM;
+  else
+    Fatal(1,error,"BuDDy reordering strategy not recognized: %s",fdd_reorder_opt);
+  
+  Warning(info,"Buddy dynamic reordering strategy: %s",fdd_reorder_opt);
+  return;
+}
+
 struct poptOption buddy_options[]= {
+	{ NULL, 0 , POPT_ARG_CALLBACK|POPT_CBFLAG_POST|POPT_CBFLAG_SKIPOPTION , (void*)reach_popt , 0 , NULL , NULL },
+
 	{ "cache-ratio",0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &cacheratio , 0 , "set cache ratio","<nodes/slot>"},
 	{ "max-increase" , 0 , POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &maxincrease , 0 , "set maximum increase","<number>"},
 	{ "min-free-nodes", 0 , POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &minfreenodes , 0 , "set minimum free node percentage","<percentage>"},
 	{ "fdd-bits" , 0 , POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &fdd_bits , 0 , "set the number of bits for each fdd variable","<number>"},
+	{ "fdd-reorder", 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT, &fdd_reorder_opt, 0 , "set the dynamic reordering strategy","<none|win2|win2ite|win3|win3ite|sift|siftite|random>" },
 	POPT_TABLEEND
 };
 
@@ -368,6 +404,14 @@ static void rel_add_fdd(vrel_t rel,const int* src,const int *dst){
 	bdd_delref(tmp);
 }
 
+static void vset_fdd_reorder() {
+  if (fdd_order_strat!=BDD_REORDER_NONE) {
+      bdd_gbc();
+      Warning(info,"  Active nodes: %d",bdd_getnodenum());
+      bdd_reorder(fdd_order_strat);
+      Warning(info,"  Active nodes: %d",bdd_getnodenum());
+  }
+}
 
 vdom_t vdom_create_fdd(int n){
 	Warning(info,"Creating a BuDDy fdd domain.");
@@ -389,7 +433,11 @@ vdom_t vdom_create_fdd(int n){
 		dom->vars[i]=res;
 		dom->vars2[i]=res+1;
 		dom->proj[i]=i;
+		fdd_intaddvarblock(res,res+1,BDD_REORDER_FREE); // requires patch in buddy/src/fdd.c
 	}
+	//bdd_varblockall();                  // alternative to fdd_intaddvarblock above
+	//bdd_autoreorder(fdd_order_strat);  // this doesn't seem to have any effect; why not??
+	//bdd_reorder_verbose(2);           // for more information on the dynamic reordering
 	dom->varset=bdd_addref(fdd_makeset(dom->vars,n));
 	if (dom->varset==bddfalse) {
 		Fatal(1,error,"fdd_makeset failed");
@@ -413,5 +461,7 @@ vdom_t vdom_create_fdd(int n){
 	dom->shared.rel_count=rel_count_fdd;
 	dom->shared.set_next=set_next_appex_fdd;
 	dom->shared.set_prev=set_prev_appex_fdd;
+	dom->shared.reorder=vset_fdd_reorder;
 	return dom;
 }
+

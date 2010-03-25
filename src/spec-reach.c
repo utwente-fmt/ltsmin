@@ -441,6 +441,7 @@ static void reach_bfs(){
 		if (dlk_detect) deadlock_check(deadlocks,level,levels);
 		vset_union(visited,next_level);
 		vset_copy(current_level,next_level);
+		vset_reorder(domain);
 	}
 	Warning(info,"Exploration took %ld group checks and %ld next state calls",eg_count,next_count);
 	if (dlk_detect)
@@ -495,6 +496,7 @@ void reach_bfs2(){
 		if (RTverbosity >= 2) fprintf(stderr,"\rlocal next complete       \n");
 		if (dlk_detect) deadlock_check(deadlocks,level,levels);
 		if (vset_equal(visited,old_vis)) break;
+		vset_reorder(domain);
 	}
 	Warning(info,"Exploration took %ld group checks and %ld next state calls",eg_count,next_count);
 	if (dlk_detect)
@@ -549,6 +551,7 @@ void reach_chain(){
 		if (RTverbosity >= 2) fprintf(stderr,"\rround %d complete       \n",level);
 		if (dlk_detect) deadlock_check(deadlocks,level,levels); // no deadlocks in old_vis.
 		if (vset_equal(visited,old_vis)) break;
+		vset_reorder(domain);
 	}
 	Warning(info,"Exploration took %ld group checks and %ld next state calls",eg_count,next_count);
 	if (dlk_detect)

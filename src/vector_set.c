@@ -95,6 +95,7 @@ void vdom_init_shared(vdom_t dom,int n){
 	dom->shared.rel_count=NULL;
 	dom->shared.set_next=NULL;
 	dom->shared.set_prev=NULL;
+	dom->shared.reorder=NULL;
 }
 
 vset_t vset_create(vdom_t dom,int k,int* proj){
@@ -177,3 +178,6 @@ void vrel_add(vrel_t rel,const int* src, const int* dst){
 	rel->dom->shared.rel_add(rel,src,dst);
 }
 
+void vset_reorder(vdom_t dom) {
+  dom->shared.reorder();
+}
