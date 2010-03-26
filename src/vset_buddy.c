@@ -405,11 +405,15 @@ static void rel_add_fdd(vrel_t rel,const int* src,const int *dst){
 }
 
 static void vset_fdd_reorder() {
+  static int lastnum = 1000;
   if (fdd_order_strat!=BDD_REORDER_NONE) {
-      bdd_gbc();
-      Warning(info,"  Active nodes: %d",bdd_getnodenum());
+    bdd_gbc();
+    if (bdd_getnodenum()>2*lastnum) {
+      lastnum = bdd_getnodenum();
+      Warning(info,"Starting dynamic reordering: %d",bdd_getnodenum());
       bdd_reorder(fdd_order_strat);
-      Warning(info,"  Active nodes: %d",bdd_getnodenum());
+      Warning(info,"Finished dynamic reordering: %d",bdd_getnodenum());
+    }
   }
 }
 
@@ -435,9 +439,6 @@ vdom_t vdom_create_fdd(int n){
 		dom->proj[i]=i;
 		fdd_intaddvarblock(res,res+1,BDD_REORDER_FREE); // requires patch in buddy/src/fdd.c
 	}
-	//bdd_varblockall();                  // alternative to fdd_intaddvarblock above
-	//bdd_autoreorder(fdd_order_strat);  // this doesn't seem to have any effect; why not??
-	//bdd_reorder_verbose(2);           // for more information on the dynamic reordering
 	dom->varset=bdd_addref(fdd_makeset(dom->vars,n));
 	if (dom->varset==bddfalse) {
 		Fatal(1,error,"fdd_makeset failed");
