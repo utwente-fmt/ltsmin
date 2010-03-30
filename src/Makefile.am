@@ -275,6 +275,7 @@ libutil_la_SOURCES := unix.c runtime.c stream.c archive.c			\
                     ltsmin-grammar.lemon ltsmin-parse-env.h \
                     ltsmin-mu.c ltsmin-mu.h \
                     lts-type.h vset_buddy.c vector_set.c vector_set.h	\
+                    vset_listdd.c \
                     vdom_object.h lts_io.c lts_io.h lts_io_internal.h \
                     lts_enum.c lts_enum.h lts_count.c lts_count.h \
                     archive_io_ops.c fifo.c fifo.h \

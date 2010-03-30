@@ -7,8 +7,9 @@
 
 extern struct poptOption atermdd_options[];
 extern struct poptOption buddy_options[];
+extern struct poptOption listdd_options[];
 
-typedef enum { AtermDD_list=1 , AtermDD_tree=2, BuDDy_fdd=3 } vset_implementation_t;
+typedef enum { AtermDD_list=1 , AtermDD_tree=2, BuDDy_fdd=3, ListDD=4 } vset_implementation_t;
 
 static vset_implementation_t vset_default_domain=AtermDD_list;
 
@@ -40,16 +41,20 @@ static si_map_entry vset_table[]={
 	{"list",AtermDD_list},
 	{"tree",AtermDD_tree},
 	{"fdd",BuDDy_fdd},
+	{"ldd",ListDD},
 	{NULL,0}
 };
 
 
 struct poptOption vset_options[]={
 	{ NULL, 0 , POPT_ARG_CALLBACK , (void*)vset_popt , 0 , (void*)vset_table ,NULL },
-	{ "vset" , 0 , POPT_ARG_STRING , NULL , 0 , "select a vector set implementation from ATermDD with *list* encoding,"
-		" ATermDD with *tree* encoding, or BuDDy using the *fdd* feature  (default: list)" , "<list|tree|fdd>" },
+	{ "vset" , 0 , POPT_ARG_STRING , NULL , 0 ,
+		"select a vector set implementation from ATermDD with *list* encoding,"
+		" ATermDD with *tree* encoding, BuDDy using the *fdd* feature, or"
+		" native ListDD (default: list)" , "<list|tree|fdd|ldd>" },
 	{ NULL,0 , POPT_ARG_INCLUDE_TABLE , atermdd_options , 0 , "ATermDD options" , NULL},
 	{ NULL,0 , POPT_ARG_INCLUDE_TABLE , buddy_options , 0 , "BuDDy options" , NULL},
+	{ NULL,0 , POPT_ARG_INCLUDE_TABLE , listdd_options , 0 , "ListDD options" , NULL},
 	POPT_TABLEEND
 };
 
@@ -58,6 +63,7 @@ vdom_t vdom_create_default(int n){
 	case AtermDD_list: return vdom_create_list(n);
 	case AtermDD_tree: return vdom_create_tree(n);
 	case BuDDy_fdd: return vdom_create_fdd(n);
+	case ListDD: return vdom_create_list_native(n);
 	}
 	return NULL;
 }
