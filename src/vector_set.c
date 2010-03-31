@@ -80,6 +80,11 @@ struct vector_relation {
 	vdom_t dom;
 };
 
+static void default_zip(vset_t dst,vset_t src){
+    dst->dom->shared.set_minus(src,dst);
+    dst->dom->shared.set_union(dst,src);
+}
+
 void vdom_init_shared(vdom_t dom,int n){
 	dom->shared.size=n;
 	dom->shared.set_create=NULL;
@@ -94,7 +99,7 @@ void vdom_init_shared(vdom_t dom,int n){
 	dom->shared.set_count=NULL;
 	dom->shared.set_union=NULL;
 	dom->shared.set_minus=NULL;
-	dom->shared.set_zip=NULL;
+	dom->shared.set_zip=default_zip;
 	dom->shared.set_project=NULL;
 	dom->shared.rel_create=NULL;
 	dom->shared.rel_add=NULL;
