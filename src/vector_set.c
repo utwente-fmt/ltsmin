@@ -85,6 +85,10 @@ static void default_zip(vset_t dst,vset_t src){
     dst->dom->shared.set_union(dst,src);
 }
 
+static void default_reorder(){
+    Warning(info,"reorder request ignored");
+}
+
 void vdom_init_shared(vdom_t dom,int n){
 	dom->shared.size=n;
 	dom->shared.set_create=NULL;
@@ -106,7 +110,7 @@ void vdom_init_shared(vdom_t dom,int n){
 	dom->shared.rel_count=NULL;
 	dom->shared.set_next=NULL;
 	dom->shared.set_prev=NULL;
-	dom->shared.reorder=NULL;
+	dom->shared.reorder=default_reorder;
 }
 
 vset_t vset_create(vdom_t dom,int k,int* proj){
