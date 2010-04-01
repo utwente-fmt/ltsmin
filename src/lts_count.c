@@ -36,6 +36,6 @@ void lts_count_fini(lts_count_t *count){
 	free(count->in);
 	free(count->out);
 	free(count->cross);
-	bzero(count,sizeof(lts_count_t));
+	memset(count,0,sizeof(lts_count_t));
 }
 
