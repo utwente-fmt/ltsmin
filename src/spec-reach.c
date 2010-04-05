@@ -86,8 +86,8 @@ static  struct poptOption options[] = {
 	{ "order" , 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &order , 0 , "select the exploration strategy to a specific order" ,"<bfs|bfs2|chain|sat{1|2|3}>" },
 	{ "deadlock" , 'd' , POPT_ARG_VAL , &dlk_detect , 1 , "detect deadlocks" , NULL },
 	{ "trace" , 0 , POPT_ARG_STRING , &trc_output , 0 , "file to write trace to" , "<lts-file>.gcf" },
-#if defined(MCRL)
 	{ "G" , 0 , POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &G , 0 , "set saturation granularity","<number>"},
+#if defined(MCRL)
 	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, mcrl_options , 0 , "mCRL options",NULL},
 #endif
 #if defined(MCRL2)
@@ -626,10 +626,11 @@ void reach_sat2(){
   }
   
   // level[i] = first '+' in row (highest in BDD) of group i
+  // recast 1..N down to equal groups 1..N/G  (more precisely: (N-1)/G + 1)a
   for (int i=0;i<nGrps;i++) {
     for (int j=0;j<N;j++) {
       if (dm_is_set(GBgetDMInfo(model),i,j)) {
-	level[i]=(N-j) / G + 1;
+	level[i]=(N-1-j) / G + 1;
 	break;
       }
     }
@@ -646,7 +647,7 @@ void reach_sat2(){
   
   int k=1, last=0;
   vset_t old_vis=vset_create(domain,0,NULL);
-  while (k <= N/G +1) {
+  while (k <= (N-1)/G +1) {
     if (k==last) k++;
     fprintf(stderr,"Saturating level: %d\n",k);
     vset_copy(old_vis,visited);
@@ -678,7 +679,7 @@ void reach_sat3(){
   for (int i=0;i<nGrps;i++) {
     for (int j=0;j<N;j++) {
       if (dm_is_set(GBgetDMInfo(model),i,j)) {
-	level[i]=(N-j) / G + 1;
+	level[i]=(N-1-j) / G + 1;
 	break;
       }
     }
@@ -696,7 +697,7 @@ void reach_sat3(){
   vset_t old_vis=vset_create(domain,0,NULL);
   while (!vset_equal(old_vis,visited)) {
     vset_copy(old_vis,visited);
-    for (int k=1; k <= N/G + 1 ; k++) {
+    for (int k=1; k <= (N-1)/G + 1 ; k++) {
       fprintf(stderr,"Saturating level: %d\n",k);
       Closure(visited,groups[k]);
     }
