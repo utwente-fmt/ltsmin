@@ -7,14 +7,59 @@
 #include <etf-util.h>
 #include <popt.h>
 
+static int pv_count;
 static char* pvars=NULL;
+static char** pvar_name=NULL;
+static int*   pvar_idx=NULL;
 
 static  struct poptOption options[] = {
     { "pvars" , 0 , POPT_ARG_STRING , &pvars , 0 , "list of independent variables" , NULL },
 	POPT_TABLEEND
 };
 
-static int analyze_rel(etf_rel_t trans,int N,int K,int*status){
+static void pvar_slice(lts_type_t ltstype){
+    if (pvars==NULL) {
+        pv_count=0;
+        return;
+    }
+    int N=lts_type_get_state_length(ltstype);
+    char *tmp=pvars;
+    pv_count=0;
+    while(tmp){
+        pv_count++;
+        int i=0;
+        while(tmp[i]&&tmp[i]!=' ') {
+            i++;
+        }
+        if (tmp[i]) {
+            tmp[i]=0;
+            tmp=&tmp[i+1];
+        } else {
+            tmp=NULL;
+        }
+    }
+    pvar_name=RTmalloc(pv_count*sizeof(char*));
+    pvar_idx=RTmalloc(pv_count*sizeof(int));
+    tmp=pvars;
+    Warning(info,"state length is %d",N);
+    for(int j=0;j<N;j++) Warning(info,"state %d is %s",j,
+        lts_type_get_state_name(ltstype,j));
+    for(int i=0;i<pv_count;i++){
+        pvar_name[i]=tmp;
+        pvar_idx[i]=-1;
+        for(int j=0;j<N;j++){
+            if (strcmp(tmp,lts_type_get_state_name(ltstype,j))!=0) continue;
+            pvar_idx[i]=j;
+            break;
+        }
+        tmp=tmp+strlen(tmp)+1;
+    }
+    for(int i=0;i<pv_count;i++){
+        Warning(info,"variable %d is %s, idx %d",i,pvar_name[i],pvar_idx[i]);
+    }
+}
+
+static int analyze_rel(etf_rel_t trans,int N,int K,int*status,int*max){
     int transitions=0;
     int src[N];
     int dst[N];
@@ -24,6 +69,10 @@ static int analyze_rel(etf_rel_t trans,int N,int K,int*status){
     while(ETFrelNext(trans,src,dst,lbl)){
         transitions++;
         for(int j=0;j<N;j++){
+            if (max) {
+                if (src[j]>max[j]) max[j]=src[j]-1;
+                if (dst[j]>max[j]) max[j]=dst[j]-1;
+            }
             if (src[j]) {
                 if (!dst[j]) Abort("inconsistent ETF");
                 if (src[j]==dst[j]) {
@@ -46,71 +95,118 @@ void dve_write(const char*name,etf_model_t model){
     int K=lts_type_get_edge_label_count(etf_type(model));
     int G=etf_trans_section_count(model);
     int owner[G];
-    int p_count;
-    if (pvars) {
-        
+    pvar_slice(etf_type(model));
+    int g_count[pv_count+1];
+    for(int i=0;i<=pv_count;i++){
+        g_count[i]=0;
+    }
+    int max[N];
+    etf_get_initial(model,max);
+    if (pv_count) {
+        for(int i=0;i<G;i++) {
+            etf_rel_t trans=etf_trans_section(model,i);
+            int status[N];
+            int count=analyze_rel(trans,N,K,status,max);
+            owner[i]=-1;
+            if(count==0) continue;
+            for(int j=0;j<N;j++){
+                if(status[j]&0x2){
+                    for(int k=0;k<pv_count;k++){
+                        if (pvar_idx[k]==j){
+                            if (owner[i]==-1){
+                                owner[i]=k;
+                            } else {
+                                Abort("group %d belongs to two processes",i);
+                            }
+                        }
+                    }
+                }
+            }
+            if (owner[i]==-1) owner[i]=pv_count;
+            g_count[owner[i]]++;
+            Warning(info,"group %d belongs to proc %d",i,owner[i]);
+        }
     } else {
-        p_count=1;
-        for(int i=0;i<G;i++) owner[i]=0;
+        for(int i=0;i<G;i++) {
+            owner[i]=0;
+            g_count[owner[i]]++;
+        }
     }
     
     FILE* dve=fopen(name,"w");
     int initial_state[N];
     etf_get_initial(model,initial_state);
-
     fprintf(dve,"int x[%d] = {",N);
     for(int i=0;i<N;i++){
         fprintf(dve,"%s%d",i?",":"",initial_state[i]);
     }
     fprintf(dve,"};\n");
-    fprintf(dve,"process P {\n");
-    fprintf(dve,"  state s0;\n");
-    fprintf(dve,"  init s0;\n");
-    fprintf(dve,"  trans\n");
-    int transitions=0;
-    for(int section=0;section<etf_trans_section_count(model);section++){
-        etf_rel_t trans=etf_trans_section(model,section);
-        int src[N];
-        int dst[N];
-        int lbl[K];
-        ETFrelIterate(trans);
-        while(ETFrelNext(trans,src,dst,lbl)){
-            if (transitions) {
-                fprintf(dve,",\n"); 
-            }
-            transitions++;
-            fprintf(dve,"    s0 -> s0 { guard ");
-            for(int j=0;j<N;j++){
-                if (src[j]) {
-                    fprintf(dve,"x[%d]==%d && ",j,src[j]-1);
-                }
-            }
-            fprintf(dve," 1 ; ");
-            int first=1;
-            for(int j=0;j<N;j++){
-                if (dst[j]) {
-                    if (!first) {
-                        fprintf(dve,", ");
-                    } else {
-                        fprintf(dve,"effect ");
-                        first=0;
-                    }
-                    fprintf(dve,"x[%d]=%d",j,dst[j]-1);
-                }
-            }
-            if(!first) {
-                fprintf(dve,"; ");
-            }
-            fprintf(dve,"}");
+    for(int p=0;p<=pv_count;p++){
+        if(g_count[p]==0) {
+            continue;
         }
-    }
-    if (transitions) {
+        Warning(info,"generating process %d",p);
+        fprintf(dve,"process P%d {\n",p);
+        fprintf(dve,"  state s0");
+        if (p<pv_count){
+            for(int i=1;i<=max[pvar_idx[p]];i++){
+                fprintf(dve,",s%d",i);
+            }
+        }
         fprintf(dve,";\n");
-        Warning(info,"model has %d transitions",transitions);
-    } else {
-        Fatal(1,error,"model without transitions");
+        fprintf(dve,"  init s%d;\n",p<pv_count?initial_state[p]:0);
+        fprintf(dve,"  trans\n");
+        int transitions=0;
+        for(int section=0;section<etf_trans_section_count(model);section++){
+            if (owner[section]!=p) continue;
+            etf_rel_t trans=etf_trans_section(model,section);
+            int src[N];
+            int dst[N];
+            int lbl[K];
+            ETFrelIterate(trans);
+            while(ETFrelNext(trans,src,dst,lbl)){
+                if (transitions) {
+                    fprintf(dve,",\n"); 
+                }
+                transitions++;
+                if (p<pv_count){
+                    fprintf(dve,"    s%d -> s%d { guard ",
+                            src[pvar_idx[p]]-1,dst[pvar_idx[p]]-1);
+                } else {
+                    fprintf(dve,"    s0 -> s0 { guard ");
+                }
+                for(int j=0;j<N;j++){
+                    if (src[j] && (p==pv_count || pvar_idx[p]!=j)) {
+                        fprintf(dve,"x[%d]==%d && ",j,src[j]-1);
+                    }
+                }
+                fprintf(dve," 1 ; ");
+                int first=1;
+                for(int j=0;j<N;j++){
+                    if (dst[j]) {
+                        if (!first) {
+                            fprintf(dve,", ");
+                        } else {
+                            fprintf(dve,"effect ");
+                            first=0;
+                        }
+                        fprintf(dve,"x[%d]=%d",j,dst[j]-1);
+                    }
+                }
+                if(!first) {
+                    fprintf(dve,"; ");
+                }
+                fprintf(dve,"}");
+            }
+        }
+        if (transitions) {
+            fprintf(dve,";\n");
+            Warning(info,"process %d has %d transitions",p,transitions);
+        } else {
+            Fatal(1,error,"model without transitions");
+        }
+        fprintf(dve,"}\n");
     }
-    fprintf(dve,"}\n");
     fprintf(dve,"system async;\n");
     fclose(dve);    
 }
@@ -128,7 +224,7 @@ void dep_write(const char*name,etf_model_t model){
     for(int section=0;section<etf_trans_section_count(model);section++){
         etf_rel_t trans=etf_trans_section(model,section);
         int status[N];
-        if (0==analyze_rel(trans,N,K,status)){
+        if (0==analyze_rel(trans,N,K,status,NULL)){
             continue;
         }       
         for (int i=0;i<N;i++){
