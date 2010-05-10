@@ -102,7 +102,7 @@ void group_information::gather(mcrl2::lps::specification const& l) {
     std::set_intersection(used_variables.begin(), used_variables.end(),
                           parameters.begin(), parameters.end(), std::inserter(used_parameters, used_parameters.begin()));
 
-    std::vector< variable > parameters_list = data::convert< std::vector< variable > >(specification.process_parameters());
+    std::vector< variable > parameters_list = atermpp::convert< std::vector< variable > >(specification.process_parameters());
 
     for (std::vector< variable >::const_iterator j = parameters_list.begin(); j != parameters_list.end(); ++j) {
       if (used_parameters.find(*j) != used_parameters.end()) {
@@ -345,7 +345,7 @@ void MCRL2loadGreyboxModel(model_t m,const char*model_name){
 	GBsetLTStype(m,ltstype);
 
         ctx->rewriter_object = legacy_rewriter(model.data(),
-          mcrl2::data::used_data_equation_selector(model.data(), mcrl2::lps::specification_to_aterm(model, false)),
+          mcrl2::data::used_data_equation_selector(model.data(), mcrl2::lps::specification_to_aterm(model)),
           mcrl2_rewriter);
         ctx->rewriter = &ctx->rewriter_object.get_rewriter();
 
