@@ -414,7 +414,9 @@ void dve_write(const char*name,etf_model_t model){
 			}
 		    }
                 }
-                fprintf(dve,"; ");
+                if (!first) {
+                    fprintf(dve,"; ");
+                }
                 first=1;
                 for(int j=0;j<N;j++){
                     if (dst[j] && dst[j]!=src[j] && (p==pv_count || j!=idx)) {
