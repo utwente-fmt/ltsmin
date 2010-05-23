@@ -11,9 +11,11 @@ static int pv_count;
 static char* pvars=NULL;
 static char** pvar_name=NULL;
 static int*   pvar_idx=NULL;
+static int output_bytes=0;
 
 static  struct poptOption options[] = {
     { "pvars" , 0 , POPT_ARG_STRING , &pvars , 0 , "list of independent variables" , NULL },
+    { "byte" , 0 , POPT_ARG_NONE , &output_bytes , 0 , "output bytes instead of ints" , NULL },
 	POPT_TABLEEND
 };
 
@@ -70,8 +72,8 @@ static int analyze_rel(etf_rel_t trans,int N,int K,int*status,int*max){
         transitions++;
         for(int j=0;j<N;j++){
             if (max) {
-                if (src[j]>max[j]) max[j]=src[j]-1;
-                if (dst[j]>max[j]) max[j]=dst[j]-1;
+                if (src[j]-1>max[j]) max[j]=src[j]-1;
+                if (dst[j]-1>max[j]) max[j]=dst[j]-1;
             }
             if (src[j]) {
                 if (!dst[j]) Abort("inconsistent ETF");
@@ -88,18 +90,151 @@ static int analyze_rel(etf_rel_t trans,int N,int K,int*status,int*max){
     return transitions;
 }
 
-#define ETF_BUF 4096
+/**
+ * Turns a string into a valid identifier.
+ * When the string is "-delimited, it strips the " delimiters
+ * Replaces all characters not in [_A-Za-z0-9] with '_'
+ * If the string starts with a number, prepends a _
+ */
+char * sanitize_ID(const char *src, size_t dst_size, char *dst) {
+    unsigned int out=0;
+    int quote_mode=0;
+    for (int i=0; src[i] && out<dst_size-1; i++) {
+	if (i==0 && src[i] == '"') {
+	    quote_mode=1;
+	    continue;
+	}
+	if (src[i] == '"' && quote_mode) break;
+	// FIXME: there's probably a better way
+	if (src[i] == '_' || (src[i] >= '0' && src[i] <= '9') || (src[i] >= 'A' && src[i] <= 'Z') || (src[i] >= 'a' && src[i] <= 'z')) {
+	    if (out==0 && src[i] >= '0' && src[i] <= '9') {
+		dst[out++] = '_';
+	    }
+	    dst[out++] = src[i];
+	} else {
+	    dst[out++] = '_';
+	}
+    }
+    dst[out++] = 0;
+    return dst;
+}
+
+char ***sanitized_types=NULL;
+char **sanitized_variables=NULL;
+
+/*
+ * Sanitizes and caches all type symbols of an etf_model_t. Should only be
+ * called once.
+ */
+void sanitize_types(etf_model_t model) {
+    lts_type_t ltstype = etf_type(model);
+    int n_types = lts_type_get_type_count(ltstype);
+    sanitized_types = (char***)RTmallocZero(n_types*sizeof(char**));
+    for (int i=0;i<n_types;i++) {
+	int v_count = etf_get_value_count(model, i);
+	if (v_count) {
+	    sanitized_types[i] = (char**)RTmalloc(v_count*sizeof(char*));
+	    for (int j=0;j<v_count;j++) {
+		chunk ch = etf_get_value(model, i, j);
+		char tmp[ch.len+1];
+		strncpy(tmp,ch.data,ch.len);
+		tmp[ch.len] = '\0';
+		int len = ch.len+2;
+		sanitized_types[i][j] = (char*)RTmalloc(len);
+		sanitize_ID(tmp,len,sanitized_types[i][j]);
+		Debug("Sanitizing type %s to %s", tmp, sanitized_types[i][j]);
+	    }
+	}
+    }
+}
+
+/*
+ * Sanitizes and caches all the variable names of an lts_type_t. Should only be
+ * called once.
+ */
+void sanitize_variables(lts_type_t ltstype) {
+    int n_vars = lts_type_get_state_length(ltstype);
+    sanitized_variables = (char**)RTmalloc(n_vars*sizeof(char*));
+    for (int i=0;i<n_vars;i++) {
+	char *name = lts_type_get_state_name(ltstype,i);
+	int len = strlen(name)+2;
+	sanitized_variables[i] = (char*)RTmalloc(len);
+	sanitize_ID(name,len,sanitized_variables[i]);
+	Debug("Sanitizing variable %s to %s", name, sanitized_variables[i]);
+    }
+}
+
+char **state_names=NULL;
+int n_state_names=0;
+
+/*
+ * Returns a cached version of a state number (e.g.: s20). Used internally by
+ * etf_state_value().
+ */
+char * get_state_name(int idx) {
+    while (idx >= n_state_names) {
+	state_names = (char**)RTrealloc(state_names,(n_state_names+10)*sizeof(char*));
+	char tmp[20];
+	for (int i=n_state_names;i<n_state_names+10;i++) {
+	    snprintf(tmp,20,"s%d",i);
+	    state_names[i]=RTstrdup(tmp);
+	}
+	n_state_names += 10;
+    }
+    return state_names[idx];
+}
+
+/*
+ * Returns a state name identifier. Uses the symbolic name if it exists,
+ * otherwise it will return the value with an "s" in front.
+ */
+char * etf_state_value(etf_model_t model, int state, int value) {
+    if (sanitized_types==NULL)
+	sanitize_types(model);
+    int type_no = lts_type_get_state_typeno(etf_type(model), state);
+    int v_count = etf_get_value_count(model, type_no);
+    if (v_count > value) {
+	return sanitized_types[type_no][value];
+    } else {
+	return get_state_name(value);
+    }
+}
+
+/*
+ * Returns a sanitized version of the variable name.
+ */
+char * lts_variable_name(lts_type_t ltstype, int idx) {
+    if (sanitized_variables==NULL)
+	sanitize_variables(ltstype);
+    return sanitized_variables[idx];
+}
+
+#define VAR_TYPE_UNKNOWN 0
+#define VAR_TYPE_STATE 1
+#define VAR_TYPE_LOCAL 2
+#define VAR_TYPE_GLOBAL 3
 
 void dve_write(const char*name,etf_model_t model){
-    int N=lts_type_get_state_length(etf_type(model));
-    int K=lts_type_get_edge_label_count(etf_type(model));
+    lts_type_t ltstype=etf_type(model);
+    int N=lts_type_get_state_length(ltstype);
+    int K=lts_type_get_edge_label_count(ltstype);
     int G=etf_trans_section_count(model);
+    // mapping section => pvar
     int owner[G];
-    pvar_slice(etf_type(model));
+    // default ownership if no state variable is written to
+    // this is so that self-transitions on state variables go in their own process
+    int defowner[G];
+    // mapping variable => type
+    int types[N];
+    pvar_slice(ltstype);
+    // count of sections per pvar
     int g_count[pv_count+1];
     for(int i=0;i<=pv_count;i++){
         g_count[i]=0;
     }
+
+    /* Analyze sections: find out which sections belong to which pvar */
+    // maximum value per variable
     int max[N];
     etf_get_initial(model,max);
     if (pv_count) {
@@ -108,20 +243,28 @@ void dve_write(const char*name,etf_model_t model){
             int status[N];
             int count=analyze_rel(trans,N,K,status,max);
             owner[i]=-1;
+            defowner[i]=-1;
             if(count==0) continue;
             for(int j=0;j<N;j++){
-                if(status[j]&0x2){
-                    for(int k=0;k<pv_count;k++){
-                        if (pvar_idx[k]==j){
-                            if (owner[i]==-1){
-                                owner[i]=k;
-                            } else {
-                                Abort("group %d belongs to two processes",i);
-                            }
-                        }
-                    }
-                }
+		for(int k=0;k<pv_count;k++){
+		    if (pvar_idx[k]==j){
+			if(status[j]&0x2){
+			    if (owner[i]==-1){
+				owner[i]=k;
+			    } else {
+				Abort("group %d belongs to two processes",i);
+			    }
+			} else if (status[j]&0x1) {
+			    if (defowner[i]==-1) {
+				defowner[i]=k;
+			    } else {
+				defowner[i]=pv_count;
+			    }
+			}
+		    }
+		}
             }
+	    if (owner[i]==-1) owner[i]=defowner[i];
             if (owner[i]==-1) owner[i]=pv_count;
             g_count[owner[i]]++;
             Warning(info,"group %d belongs to proc %d",i,owner[i]);
@@ -132,29 +275,104 @@ void dve_write(const char*name,etf_model_t model){
             g_count[owner[i]]++;
         }
     }
-    
+
+    /* Analyze variables: find out what type each variable is */
+    // pvar with at least one nonempty section: state variable
+    // always same owner: local variable
+    // otherwise: global
+    int var_owner[N];
+    for (int i=0;i<N;i++) {
+    	types[i]=VAR_TYPE_UNKNOWN;
+	var_owner[i]=-1;
+    }
+    for (int i=0;i<pv_count;i++) {
+    	types[pvar_idx[i]] = g_count[i]?VAR_TYPE_STATE:VAR_TYPE_GLOBAL;
+    }
+    if (pv_count) {
+	for (int i=0;i<G;i++) {
+            etf_rel_t trans=etf_trans_section(model,i);
+            int status[N];
+            int count=analyze_rel(trans,N,K,status,NULL);
+	    if (!count) continue;
+	    for (int j=0;j<N;j++) {
+		if (types[j]==VAR_TYPE_STATE) continue;
+		if (status[j]) {
+		    if (var_owner[j]==-1) {
+			var_owner[j]=owner[i];
+			types[j]=VAR_TYPE_LOCAL;
+		    } else {
+			if (var_owner[j]!=owner[i]) {
+			    types[j]=VAR_TYPE_GLOBAL;
+			}
+		    }
+		}
+	    }
+	}
+	for (int i=0;i<N;i++) {
+	    char *typename;
+	    switch(types[i]) {
+		case VAR_TYPE_STATE: typename="state"; break;
+		case VAR_TYPE_LOCAL: typename="local"; break;
+		case VAR_TYPE_GLOBAL: typename="global"; break;
+		default: typename="unknown"; break;
+	    }
+	    Warning(info,"variable %s is %s",lts_variable_name(ltstype,i),typename);
+	}
+    } else {
+	for(int i=0;i<N;i++) {
+	    types[i] = VAR_TYPE_GLOBAL;
+	}
+    }
+
+    char *outtype;
+    if (output_bytes)
+    	outtype = "byte";
+    else
+	outtype = "int";
+
     FILE* dve=fopen(name,"w");
     int initial_state[N];
     etf_get_initial(model,initial_state);
-    fprintf(dve,"int x[%d] = {",N);
-    for(int i=0;i<N;i++){
-        fprintf(dve,"%s%d",i?",":"",initial_state[i]);
+    // Global variables
+    for(int i=0;i<N;i++) {
+	if (types[i] == VAR_TYPE_GLOBAL) {
+	    fprintf(dve,"%s %s = %d;\n",outtype,lts_variable_name(ltstype,i),initial_state[i]);
+	}
     }
-    fprintf(dve,"};\n");
+
+    // Processes
     for(int p=0;p<=pv_count;p++){
+	int idx=-1;
+	if (p<pv_count) {
+	    idx=pvar_idx[p];
+	}
         if(g_count[p]==0) {
             continue;
         }
+	// process
         Warning(info,"generating process %d",p);
-        fprintf(dve,"process P%d {\n",p);
-        fprintf(dve,"  state s0");
-        if (p<pv_count){
-            for(int i=1;i<=max[pvar_idx[p]];i++){
-                fprintf(dve,",s%d",i);
+	if (p<pv_count) {
+	    fprintf(dve,"process %s {\n",lts_variable_name(ltstype,pvar_idx[p]));
+	} else {
+	    fprintf(dve,"process __bucket {\n");
+	}
+	// local variables
+	for(int i=0;i<N;i++) {
+	    if (types[i] == VAR_TYPE_LOCAL && var_owner[i] == p) {
+		fprintf(dve,"  %s %s = %d;\n",outtype,lts_variable_name(ltstype,i),initial_state[i]);
+	    }
+	}
+	// states
+	if (p<pv_count) {
+	    fprintf(dve,"  state ");
+            for(int i=0;i<=max[idx];i++){
+                fprintf(dve,"%s%s",i==0?"":",",etf_state_value(model,idx,i));
             }
-        }
+	} else {
+	    fprintf(dve,"  state s0");
+	}
         fprintf(dve,";\n");
-        fprintf(dve,"  init s%d;\n",p<pv_count?initial_state[p]:0);
+        fprintf(dve,"  init %s;\n",p<pv_count?etf_state_value(model,idx,initial_state[pvar_idx[p]]):"s0");
         fprintf(dve,"  trans\n");
         int transitions=0;
         for(int section=0;section<etf_trans_section_count(model);section++){
@@ -170,27 +388,43 @@ void dve_write(const char*name,etf_model_t model){
                 }
                 transitions++;
                 if (p<pv_count){
-                    fprintf(dve,"    s%d -> s%d { guard ",
-                            src[pvar_idx[p]]-1,dst[pvar_idx[p]]-1);
+		    fprintf(dve,"    %s",
+			    etf_state_value(model,idx,src[idx]-1));
+		    fprintf(dve," -> %s { ",
+			    etf_state_value(model,idx,dst[idx]-1));
                 } else {
-                    fprintf(dve,"    s0 -> s0 { guard ");
+                    fprintf(dve,"    s0 -> s0 { ");
                 }
+		int first;
+		first=1;
                 for(int j=0;j<N;j++){
-                    if (src[j] && (p==pv_count || pvar_idx[p]!=j)) {
-                        fprintf(dve,"x[%d]==%d && ",j,src[j]-1);
-                    }
+		    if (src[j] && (p==pv_count || j!=idx)) {
+			if (!first) {
+			    fprintf(dve," && ");   
+			} else {
+			    fprintf(dve,"guard ");   
+			    first=0;
+			}
+			if (types[j] == VAR_TYPE_STATE) {
+			    fprintf(dve,"%s.%s",
+				    lts_variable_name(ltstype,j),
+				    etf_state_value(model,j,src[j]-1));
+			} else {
+			    fprintf(dve,"%s==%d",lts_variable_name(ltstype,j),src[j]-1);
+			}
+		    }
                 }
-                fprintf(dve," 1 ; ");
-                int first=1;
+                fprintf(dve,"; ");
+                first=1;
                 for(int j=0;j<N;j++){
-                    if (dst[j]) {
+                    if (dst[j] && dst[j]!=src[j] && (p==pv_count || j!=idx)) {
                         if (!first) {
                             fprintf(dve,", ");
                         } else {
                             fprintf(dve,"effect ");
                             first=0;
                         }
-                        fprintf(dve,"x[%d]=%d",j,dst[j]-1);
+                        fprintf(dve,"%s=%d",lts_variable_name(ltstype,j),dst[j]-1);
                     }
                 }
                 if(!first) {
@@ -224,9 +458,11 @@ void dep_write(const char*name,etf_model_t model){
     for(int section=0;section<etf_trans_section_count(model);section++){
         etf_rel_t trans=etf_trans_section(model,section);
         int status[N];
-        if (0==analyze_rel(trans,N,K,status,NULL)){
+	int transitions=analyze_rel(trans,N,K,status,NULL);
+        if (transitions==0){
             continue;
-        }       
+        }
+	fprintf(dep,"%d ", transitions);
         for (int i=0;i<N;i++){
             if (status[i]==1) { // read only
                 fprintf(dep,"%s ",lts_type_get_state_name(ltstype,i));
