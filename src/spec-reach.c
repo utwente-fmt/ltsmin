@@ -649,15 +649,17 @@ void reach_sat2(){
   vset_t old_vis=vset_create(domain,0,NULL);
   while (k <= (N-1)/G +1) {
     if (k==last) k++;
-    fprintf(stderr,"Saturating level: %d\n",k);
-    vset_copy(old_vis,visited);
-    Closure(visited,groups[k]);
-    if (vset_equal(old_vis,visited))
-      k++;
     else {
-      last=k;
-      vset_clear(old_vis);
-      k=1;
+      fprintf(stderr,"Saturating level: %d\n",k);
+      vset_copy(old_vis,visited);
+      Closure(visited,groups[k]);
+      if (vset_equal(old_vis,visited))
+	k++;
+      else {
+	last=k;
+	vset_clear(old_vis);
+	k=1;
+      }
     }
   }
 }
