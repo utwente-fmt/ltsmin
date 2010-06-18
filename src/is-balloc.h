@@ -25,7 +25,7 @@ extern void isba_destroy(isb_allocator_t isb_alloc);
 
 extern char *isba_to_string(isb_allocator_t isb_alloc);
 
-extern void isba_push_int(isb_allocator_t isb_alloc, const int *element);
+extern int *isba_push_int(isb_allocator_t isb_alloc, const int *element);
 
 extern int *isba_pop_int(isb_allocator_t isb_alloc);
 

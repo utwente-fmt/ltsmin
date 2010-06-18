@@ -6,7 +6,7 @@
 #include "runtime.h"
 #include "is-balloc.h"
 
-#define MAX_MEM (128ULL*1024*1024*1024)
+#define INIT_MAX_BLOCKS (1024)
 
 struct isb_allocator {
     size_t el_size;
@@ -32,15 +32,18 @@ struct isb_allocator {
  Sensible index calculations should thus be done wrt the the stack size
  (see peek_int).
 
+NOTE: shrinkage of blocks pointer array is not implemented
+
  */
 
-static const size_t BLOCK_ELT_SIZE = 10000; //blocksize in el_size
+static const size_t BLOCK_ELT_POW = 14;
+static const size_t BLOCK_ELT_SIZE = 1<<14; //blocksize in el_size
 
 static void
 add_block(isb_allocator_t buf)
 {
     Debug("adding block %zu", buf->num_block-1);
-    int size = buf->el_size*sizeof(int)*BLOCK_ELT_SIZE;
+    int size = ((buf->el_size+1)*sizeof(int))<<BLOCK_ELT_POW; //allocates an extra overflow element
     int *block = RTmalloc(size);
     buf->blocks[buf->num_block] = block;
     buf->num_block++;
@@ -56,7 +59,7 @@ remove_block(isb_allocator_t buf)
 {
     Debug("freeing block %zu", buf->num_block-1);
     buf->num_block--;
-    free(buf->blocks[buf->num_block]);
+    RTfree(buf->blocks[buf->num_block]);
 }
 
 isb_allocator_t
@@ -64,7 +67,7 @@ isba_create(int element_size)
 {
     isb_allocator_t res = RTmalloc(sizeof *res);
     res->el_size = element_size;
-    res->max_blocks = MAX_MEM/(BLOCK_ELT_SIZE*element_size);
+    res->max_blocks = INIT_MAX_BLOCKS;
     res->blocks = RTmalloc(res->max_blocks*sizeof(int*));
     res->num_block = 0;
     add_block(res);
@@ -81,23 +84,28 @@ void
 isba_destroy(isb_allocator_t buf)
 {
     do {remove_block(buf);} while (buf->num_block > 0);
-    free(buf->blocks);
-    free(buf);
+    RTfree(buf->blocks);
+    RTfree(buf);
 }
 
 /*
  \brief pushes an array of ints on this stack as one operation
  */
-void
+int *
 isba_push_int(isb_allocator_t buf, const int *element)
 {
     if (buf->cur_index == BLOCK_ELT_SIZE) {
-        if (buf->num_block == buf->max_blocks)
-            Fatal(1, error, "isb_allocator mem size of %zu exceeded", MAX_MEM/1024/1024/1024);
+        if (buf->num_block == buf->max_blocks) {
+            buf->max_blocks += INIT_MAX_BLOCKS; 
+            realloc(buf->blocks, buf->max_blocks);
+        }
         add_block(buf);
     }
-    memcpy(&buf->blocks[buf->num_block-1][buf->cur_index*buf->el_size], element, buf->el_size*sizeof(int));
+    //size_t x;
+    int *b = &buf->blocks[buf->num_block-1][buf->cur_index*buf->el_size];
+    memcpy(b, element, buf->el_size*sizeof(int));
     buf->cur_index++;
+    return b;
 }
 
 /*
@@ -138,13 +146,15 @@ isba_to_string(isb_allocator_t buf)
 void
 isba_discard_int(isb_allocator_t buf, size_t amount)
 {
-    if (buf->cur_index < amount) {
-        size_t blocks = amount/BLOCK_ELT_SIZE;
+   if (amount > isba_size_int ( buf ) ) 
+       Warning(info, "too highdiscard: %zu > %zu", amount, isba_size_int( buf ) );
+   if (buf->cur_index < amount) {
+        size_t blocks = amount>>BLOCK_ELT_POW;
         if (buf->num_block == 1 || buf->num_block <= blocks)
             Fatal(1, error, "Discard %zu on buffer of size %zu elements", amount, isba_size_int(buf));
         size_t x;
         for (x = 0; x <= blocks; x++) remove_block(buf);
-        buf->cur_index = BLOCK_ELT_SIZE-(amount%BLOCK_ELT_SIZE)+buf->cur_index;
+        buf->cur_index = BLOCK_ELT_SIZE-(amount&(BLOCK_ELT_SIZE-1))+buf->cur_index;
     } else {
         buf->cur_index -= amount;
     }
@@ -153,7 +163,7 @@ isba_discard_int(isb_allocator_t buf, size_t amount)
 size_t
 isba_size_int(isb_allocator_t buf)
 {
-    return (buf->num_block-1) * BLOCK_ELT_SIZE + buf->cur_index;
+    return ((buf->num_block-1) << BLOCK_ELT_POW) + buf->cur_index;
 }
 
 /**
@@ -177,7 +187,7 @@ isba_peek_int(isb_allocator_t buf, size_t offset_top)
     if (offset_top >= size)
         Fatal(1, error, "peeks offset %zu is too large for a buffer with size %zu", offset_top, size);
     size_t newsize = size - (offset_top+1);
-    size_t block = newsize/BLOCK_ELT_SIZE;
-    size_t rest = newsize%BLOCK_ELT_SIZE;
+    size_t block = newsize>>BLOCK_ELT_POW;
+    size_t rest = newsize&(BLOCK_ELT_SIZE-1);
     return &buf->blocks[block][rest * buf->el_size];
 }
