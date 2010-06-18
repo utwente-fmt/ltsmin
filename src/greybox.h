@@ -55,11 +55,15 @@ extern void GBprintDependencyMatrix(FILE* file, model_t model);
 \brief Get the dependency matrix of the model
 */
 extern matrix_t *GBgetDMInfo(model_t model);
+extern matrix_t *GBgetDMInfoRead(model_t model);
+extern matrix_t *GBgetDMInfoWrite(model_t model);
 
 /**
 \brief Set the dependency matrix of the model
 */
 extern void GBsetDMInfo(model_t model, matrix_t *dm_info);
+extern void GBsetDMInfoRead(model_t model, matrix_t *dm_info);
+extern void GBsetDMInfoWrite(model_t model, matrix_t *dm_info);
 
 extern void GBgetInitialState(model_t model,int *state);
 /**< @brief Write the initial state of model into state. */
