@@ -2,6 +2,7 @@
 TAGS
 \#*\#
 *~
+*.exe
 *.in
 .libs/
 .metadata/

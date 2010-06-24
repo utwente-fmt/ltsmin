@@ -1,8 +1,10 @@
 #include <config.h>
-#include <stdlib.h>
-#include <math.h>
-#include <fdd.h>
 #include <assert.h>
+#include <math.h>
+#include <stdlib.h>
+#include <time.h>
+
+#include <fdd.h>
 
 #include <runtime.h>
 #include <vdom_object.h>

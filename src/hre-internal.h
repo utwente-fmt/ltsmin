@@ -4,11 +4,14 @@
 #include <popt.h>
 #include <stream.h>
 #include <pthread.h>
+#include <sys/time.h>
+
 /*
 Internal details of HRE.
 Should not be installed!
 Should be used by HRE modules only!
 */
+
 
 #define MAX_OPTION_GROUPS 31
 
