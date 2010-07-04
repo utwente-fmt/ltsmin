@@ -49,11 +49,16 @@ void fd_close(stream_t *stream){
 static void setup_flush(stream_t stream){
     if(stream->fd_out>=0) {
         if (fsync(stream->fd_out)){
-            if (errno==EINVAL) {
+        	switch(errno){
+        	case EINVAL:
+#ifdef ENOTSUP
+			case ENOTSUP:
+#endif
                 /** stream cannot be flushed, no need to try every time */
                 stream->procs.flush=fd_no_flush;
-            } else {
-                FatalCall(1,error,"fsync failed");
+                break;
+            default:
+                FatalCall(1,error,"fsync failed during setup");
             }
         } else {
             stream->procs.flush=fd_flush;
