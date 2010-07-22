@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <fdd.h>
+#include <assert.h>
 
 #include <runtime.h>
 #include <vdom_object.h>
@@ -122,41 +123,44 @@ static vrel_t rel_create_fdd(vdom_t dom,int k,int* proj){
     vrel_t rel=(vrel_t)RTmalloc(sizeof(struct vector_relation));
     rel->dom=dom;
     rel->bdd=bddfalse;
-    if (k && k<dom->shared.size) {
-        int vars[k];
-        int vars2[k];
-        int allvars[2*k];
-        rel->p_len=k;
+
+    assert (k > 0 && k<=dom->shared.size);
+
+    int vars[k];
+    int vars2[k];
+    int allvars[2*k];
+    rel->p_len=k;
+    if (k==dom->shared.size) {
+        rel->proj = dom->proj;
+    } else {
         rel->proj=(int*)RTmalloc(k*sizeof(int));
-        for(int i=0;i<k;i++) {
-            rel->proj[i]=proj[i];
-            vars[i] = dom->vars[proj[i]];
-            vars2[i]= dom->vars2[proj[i]];
-            allvars[2*i]=vars[i];
-            allvars[2*i+1]=vars2[i]; // hidden assumption on encoding
-        }
-        // for next function
-        rel->pairs=bdd_newpair();
-        int res=fdd_setpairs(rel->pairs,vars2,vars,k);
-        if (res<0){
-            Fatal(1,error,"BuDDy error: %s",bdd_errstring(res));
-        }
-        // for prev function
-        rel->inv_pairs=bdd_newpair();
-        res=fdd_setpairs(rel->inv_pairs,vars,vars2,k);
-        if (res<0){
-            Fatal(1,error,"BuDDy error: %s",bdd_errstring(res));
-        }
+    }
+    for(int i=0;i<k;i++) {
+        if (k!=dom->shared.size) rel->proj[i]=proj[i];
+        vars[i] = dom->vars[proj[i]];
+        vars2[i]= dom->vars2[proj[i]];
+        allvars[2*i]=vars[i];
+        allvars[2*i+1]=vars2[i]; // hidden assumption on encoding
+    }
+    // for next function
+    rel->pairs=bdd_newpair();
+    int res=fdd_setpairs(rel->pairs,vars2,vars,k);
+    if (res<0){
+        Fatal(1,error,"BuDDy error: %s",bdd_errstring(res));
+    }
+    // for prev function
+    rel->inv_pairs=bdd_newpair();
+    res=fdd_setpairs(rel->inv_pairs,vars,vars2,k);
+    if (res<0){
+        Fatal(1,error,"BuDDy error: %s",bdd_errstring(res));
+    }
+    if (k==dom->shared.size) {
+        rel->p_set = dom->varset;
+    } else {
         rel->p_set=bdd_addref(fdd_makeset(vars,k));
-        rel->rel_set=bdd_addref(fdd_makeset(allvars,2*k));
-        rel->p_prime_set=bdd_addref(bdd_replace(rel->p_set, rel->inv_pairs));
-	} else {
-        // TODO: why is this in here? is this correct?
-        fprintf(stderr,"NEVER\n"); abort();
-        rel->p_len=dom->shared.size;
-        rel->p_set=dom->varset;
-        rel->proj=dom->proj;
-	}
+    }
+    rel->rel_set=bdd_addref(fdd_makeset(allvars,2*k));
+    rel->p_prime_set=bdd_addref(bdd_replace(rel->p_set, rel->inv_pairs));
 	return rel;
 }
 
