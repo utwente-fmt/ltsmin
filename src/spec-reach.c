@@ -541,11 +541,11 @@ static void Closure(vset_t visited,bitvector_t *groups) {
       vset_clear(temp);
     }
     if (RTverbosity >= 2) fprintf(stderr,"\rconf-local next complete       \n");
-    vset_minus(next,visited);
-    vset_union(visited,next);
     vset_copy(current,next);
     vset_clear(next);
+    vset_zip(visited,current);
   }
+  vset_clear(current);
 }
 
 
