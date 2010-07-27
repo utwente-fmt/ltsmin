@@ -1254,3 +1254,73 @@ dm_bitvector_col(bitvector_t *bv, const matrix_t *m, int col)
     }
     return 0;
 }
+
+int**
+dm_rows_to_idx_table(const matrix_t* m)
+{
+    int ** result = NULL;
+    // count memory needed
+    int memcnt = 0;
+    for(int i=0; i < dm_nrows(m); i++) {
+        memcnt++;
+        for(int j=0; j < dm_ncols(m); j++) {
+            if (dm_is_set(m, i, j)) memcnt++;
+        }
+    }
+    // allocate memory
+    result = malloc( dm_nrows(m) * sizeof(int*) + memcnt * sizeof(int) );
+    if (result) {
+        // skip table header
+        int* data = (int*)(result + dm_nrows(m));
+        int* count;
+
+        for(int i=0; i < dm_nrows(m); i++) {
+            count = data++;
+            *count = 0;
+            for(int j=0; j < dm_ncols(m); j++) {
+                if (dm_is_set(m, i, j)) {
+                    *data++ = j;
+                    (*count) ++;
+                }
+            }
+            // fill idx table
+            result[i] = count;
+        }
+    }
+    return result;
+}
+
+int**
+dm_cols_to_idx_table(const matrix_t* m)
+{
+    int ** result = NULL;
+    // count memory needed
+    int memcnt = 0;
+    for(int j=0; j < dm_ncols(m); j++) {
+        memcnt++;
+        for(int i=0; i < dm_nrows(m); i++) {
+            if (dm_is_set(m, i, j)) memcnt++;
+        }
+    }
+    // allocate memory
+    result = malloc( dm_ncols(m) * sizeof(int*) + memcnt * sizeof(int) );
+    if (result) {
+        // skip table header
+        int* data = (int*)(result + dm_ncols(m));
+        int* count;
+
+        for(int j=0; j < dm_ncols(m); j++) {
+            count = data++;
+            *count = 0;
+            for(int i=0; i < dm_nrows(m); i++) {
+                if (dm_is_set(m, i, j)) {
+                    *data++ = i;
+                    (*count) ++;
+                }
+            }
+            // fill idx table
+            result[j] = count;
+        }
+    }
+    return result;
+}
