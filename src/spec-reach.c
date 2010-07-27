@@ -35,7 +35,7 @@
 static char* etf_output=NULL;
 static char* trc_output=NULL;
 static int dlk_detect=0;
-static int G=1;
+static int G=10;
 
 static lts_enum_cb_t trace_handle=NULL;
 static lts_output_t trace_output=NULL;
