@@ -244,6 +244,8 @@ DVE2loadGreyboxModel(model_t model, const char *filename)
 {
     lts_type_t ltstype;
     matrix_t *dm_info = RTmalloc(sizeof(matrix_t));
+    matrix_t *dm_read_info = RTmalloc(sizeof(matrix_t));
+    matrix_t *dm_write_info = RTmalloc(sizeof(matrix_t));
     matrix_t *sl_info = RTmalloc(sizeof(matrix_t));
    
     //assume sequential use:
@@ -330,18 +332,28 @@ DVE2loadGreyboxModel(model_t model, const char *filename)
     lts_type_validate(ltstype);
 
     int ngroups = get_transition_count();
-    dm_create(dm_info, ngroups, state_length);
+	dm_create(dm_info, ngroups, state_length);
+	dm_create(dm_read_info, ngroups, state_length);
+	dm_create(dm_write_info, ngroups, state_length);
     for(int i=0; i < dm_nrows(dm_info); i++) {
-        const int *proj = get_transition_read_dependencies(i);
-        for(int j=0; j<state_length; j++) {
-            if (proj[j]) dm_set(dm_info, i, j);
+        int* proj = (int*)get_transition_read_dependencies(i);
+		for(int j=0; j<state_length; j++) {
+            if (proj[j]) {
+                dm_set(dm_info, i, j);
+                dm_set(dm_read_info, i, j);
+            }
         }
-        proj = get_transition_write_dependencies(i);
-        for(int j=0; j<state_length; j++) {
-            if (proj[j]) dm_set(dm_info, i, j);
+        proj = (int*)get_transition_write_dependencies(i);
+		for(int j=0; j<state_length; j++) {
+            if (proj[j]) {
+                dm_set(dm_info, i, j);
+                dm_set(dm_write_info, i, j);
+            }
         }
     }
     GBsetDMInfo(model, dm_info);
+    GBsetDMInfoRead(model, dm_read_info);
+    GBsetDMInfoWrite(model, dm_write_info);
 
     // get initial state
     int state[state_length];
