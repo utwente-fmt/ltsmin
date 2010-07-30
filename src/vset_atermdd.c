@@ -615,6 +615,7 @@ static ATerm set_union_2(ATerm s1, ATerm s2,char lookup) {
   if (s1==atom) return atom;
   else if (s1==emptyset) return s2;
   else if (s2==emptyset) return s1;
+  else if (s1==s2) return s1;
   else { ATerm key=NULL,res=NULL;
     if (lookup) {
       key = (ATerm)ATmakeAppl2(sum,s1,s2);
@@ -646,6 +647,7 @@ static ATerm set_minus_2(ATerm a,ATerm b, char lookup) {
   if (b==emptyset) return a;
   else if (a==emptyset) return emptyset;
   else if (b==atom) return emptyset;
+  else if (a==b) return emptyset;
   else {
     ATerm key=NULL, res=NULL;
     if (lookup) {
@@ -680,6 +682,7 @@ static void set_zip_2(ATerm in1,ATerm in2,ATerm *out1,ATerm *out2, char lookup){
   if (in1==atom) {*out1=atom; *out2=emptyset; return;}
   else if (in1==emptyset) {*out1=*out2=in2; return;}
   else if (in2==emptyset) {*out1=in1; *out2=in2; return;}
+  else if (in1==in2) {*out1=in1,*out2=emptyset; return;}
   else {
     ATerm key=NULL, res=NULL;
     if (lookup) {
