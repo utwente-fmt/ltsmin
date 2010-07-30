@@ -317,7 +317,7 @@ LEMON_FLAGS = -s
 runtime.c: git_version.h
 hre-popt.c: git_version.h
 
-GIT_DESCRIBE := $(shell git describe --tags --abbrev=6 HEAD 2>/dev/null)
+GIT_DESCRIBE := $(shell cd $(top_srcdir) ; git describe --tags --abbrev=6 HEAD 2>/dev/null)
 
 git_version.h: git_version.h.tmp
 	@if cmp $< $@ 2>/dev/null; then $(RM) $<; else mv $< $@; fi
