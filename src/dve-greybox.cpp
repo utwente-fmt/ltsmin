@@ -200,7 +200,7 @@ void DVEcompileGreyboxModel(model_t model, const char *filename){
     ++basename;                         // skip '/'
     
     if (snprintf(command, sizeof command, "divine.precompile '%s/%s'", tmpdir, basename) >= (ssize_t)sizeof command)
-        Fatal (1, error, "Cannot copy `%s' to `%s', paths too long", abs_filename, tmpdir);
+        Fatal (1, error, "Cannot compile `%s' to `%s', paths too long", abs_filename, tmpdir);
         
     if ((ret = system(command)) != 0)
         SYSFAIL(ret < 0, 1, error, "Command failed with exit code %d: %s", ret, command);
