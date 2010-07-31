@@ -232,6 +232,8 @@ char* lts_type_get_type(lts_type_t  t,int typeno){
 }
 
 void lts_type_validate(lts_type_t t){
+    if (t->state_length <= 0)
+        Abort("unsupported state vector of size %d", t->state_length);
     for(int i=0;i<t->state_length;i++){
         if (t->state_name[i]==NULL) Abort("name of state variable %d undefined",i);
         if (t->state_type[i]<0) Abort("type of state variable %d undefined",i);
