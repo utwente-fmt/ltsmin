@@ -6,7 +6,7 @@
 #   AX_CHECK_FLEX([LEX-SPEC, [ACTION-IF-OK[, ACTION-IF-NOT-OK]]])
 #
 AC_DEFUN([AX_CHECK_FLEX],
-[AC_PROG_LEX
+[AM_PROG_LEX
 AC_CACHE_CHECK([whether lexer generator is compatible], [ax_cv_check_flex_compat],
 [
 cat > conftest.lex <<AXEOF
