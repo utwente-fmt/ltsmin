@@ -219,7 +219,7 @@ void GBsetDMInfoRead(model_t model, matrix_t *dm_info) {
 
 matrix_t *GBgetDMInfoRead(model_t model) {
 	if (model->dm_read_info == NULL) {
-        Warning(error, "read dependency matrix not set, returning general dm");
+        Warning(info, "read dependency matrix not set, returning combined matrix");
         return model->dm_info;
     }
 	return model->dm_read_info;
@@ -232,7 +232,7 @@ void GBsetDMInfoWrite(model_t model, matrix_t *dm_info) {
 
 matrix_t *GBgetDMInfoWrite(model_t model) {
 	if (model->dm_write_info == NULL) {
-        Warning(error, "write dependency matrix not set, returning general dm");
+        Warning(info, "write dependency matrix not set, returning combined matrix");
         return model->dm_info;
     }
 	return model->dm_write_info;
