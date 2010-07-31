@@ -9,6 +9,8 @@
 struct grey_box_model {
 	lts_type_t ltstype;
 	matrix_t *dm_info;
+	matrix_t *dm_read_info;
+	matrix_t *dm_write_info;
 	matrix_t *sl_info;
 	int *s0;
 	void*context;
@@ -118,6 +120,8 @@ model_t GBcreateBase(){
 	model_t model=(model_t)RTmalloc(sizeof(struct grey_box_model));
 	model->ltstype=NULL;
 	model->dm_info=NULL;
+	model->dm_read_info=NULL;
+	model->dm_write_info=NULL;
 	model->sl_info=NULL;
 	model->s0=NULL;
 	model->context=0;
@@ -145,6 +149,10 @@ void GBinitModelDefaults (model_t *p_model, model_t default_src)
     }
 	if (model->dm_info == NULL)
 		GBsetDMInfo(model, GBgetDMInfo(default_src));
+	if (model->dm_read_info == NULL)
+		GBsetDMInfoRead(model, GBgetDMInfoRead(default_src));
+	if (model->dm_write_info == NULL)
+		GBsetDMInfoWrite(model, GBgetDMInfoWrite(default_src));
     if (model->sl_info == NULL)
         GBsetStateLabelInfo(model, GBgetStateLabelInfo(default_src));
     if (model->s0 == NULL) {
@@ -202,6 +210,32 @@ void GBsetDMInfo(model_t model, matrix_t *dm_info) {
 
 matrix_t *GBgetDMInfo(model_t model) {
 	return model->dm_info;
+}
+
+void GBsetDMInfoRead(model_t model, matrix_t *dm_info) {
+	if (model->dm_read_info != NULL) Fatal(1, error, "dependency matrix already set");
+	model->dm_read_info=dm_info;
+}
+
+matrix_t *GBgetDMInfoRead(model_t model) {
+	if (model->dm_read_info == NULL) {
+        Warning(error, "read dependency matrix not set, returning general dm");
+        return model->dm_info;
+    }
+	return model->dm_read_info;
+}
+
+void GBsetDMInfoWrite(model_t model, matrix_t *dm_info) {
+	if (model->dm_write_info != NULL) Fatal(1, error, "dependency matrix already set");
+	model->dm_write_info=dm_info;
+}
+
+matrix_t *GBgetDMInfoWrite(model_t model) {
+	if (model->dm_write_info == NULL) {
+        Warning(error, "write dependency matrix not set, returning general dm");
+        return model->dm_info;
+    }
+	return model->dm_write_info;
 }
 
 void GBsetStateLabelInfo(model_t model, matrix_t *info){
