@@ -54,8 +54,8 @@ do
                 echo "$COMMAND (LTSmin) $LTSMIN_VERSION"
                 exit 0
                 ;;
-        --help )
-                echo "$COMMAND model[.b|.etf|.lps|.tbf] [cc_options] app[.a|.c|.o] [app_options]..."
+        --help | -h )
+                echo "$COMMAND [ltsmin_options] model[.b|.etf|.lps|.tbf] [cc_options] app[.a|.c|.o] [app_options]..."
                 echo "  where \`\`app'' is an OPEN/CAESAR application"
                 exit 0
                 ;;
