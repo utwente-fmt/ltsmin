@@ -69,7 +69,7 @@ static void segv_handle(int signum){
 #else
     fprintf (stderr, "not available.\n");
 #endif
-    exit(EXIT_FAILURE);
+    _exit (EXIT_FAILURE);
 }
 static void segv_setup(){
     memset(&segv_sa, 0, sizeof(segv_sa));
