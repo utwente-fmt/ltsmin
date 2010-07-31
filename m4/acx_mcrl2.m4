@@ -27,12 +27,12 @@ if test x"$acx_mcrl2" = xyes; then
     if test x"$ac_cv_sizeof_void_p" = x8; then
         MCRL2_CPPFLAGS="-DAT_64BIT"
     fi
-    AC_SUBST(MCRL2_CPPFLAGS, ["$MCRL2_CPPFLAGS -DBOOST_MPL_CFG_NO_PREPROCESSED_HEADERS=1 -I$with_mcrl2/include -I$with_mcrl2/include/mcrl2/aterm"])
+    AC_SUBST(MCRL2_CPPFLAGS, ["$MCRL2_CPPFLAGS -DBOOST_MPL_CFG_NO_PREPROCESSED_HEADERS=1 -I$with_mcrl2/include -I$with_mcrl2/include/aterm"])
     AC_SUBST(MCRL2_LDFLAGS,  ["-L${with_mcrl2}/lib/mcrl2"])
     AX_LET([CPPFLAGS], ["$MCRL2_CPPFLAGS $CPPFLAGS"],
       [AC_CHECK_HEADER([mcrl2/atermpp/aterm.h],,
-         [AC_MSG_FAILURE([cannot find mCRL2 Boost headers,
-see README on how to install mCRL2 properly (--install-boost-headers).])]
+         [AC_MSG_FAILURE([cannot find mCRL2 headers,
+see README on how to install mCRL2 properly.])]
          )])
     AC_LANG_POP([C++])
     $1
@@ -55,10 +55,22 @@ if test x"$acx_mcrl2" = xyes; then
            [LIBS], ["$LIBS"],
            [LDFLAGS], ["$MCRL2_LDFLAGS $LDFLAGS"],
       [acx_mcrl2_libs=yes
-       AC_CHECK_LIB([mcrl2], [ATinit],
-         [MCRL2_LIBS="-lmcrl2 $MCRL2_LIBS"],
-         [acx_mcrl2_libs=no],
-         [$MCRL2_LIBS])])
+       AX_CXX_CHECK_LIB([aterm], [ATinit],
+         [LIBS="-laterm $LIBS"
+          MCRL2_LIBS="-laterm $MCRL2_LIBS"],
+         [acx_mcrl2_libs=no])
+       AX_CXX_CHECK_LIB([mcrl2_core], [ATinit],  # XXX what to test for?
+         [LIBS="-lmcrl2_core $LIBS"
+          MCRL2_LIBS="-lmcrl2_core $MCRL2_LIBS"],
+         [acx_mcrl2_libs=no])
+       AX_CXX_CHECK_LIB([mcrl2_data], [ATinit],  # XXX what to test for?
+         [LIBS="-lmcrl2_data $LIBS"
+          MCRL2_LIBS="-lmcrl2_data $MCRL2_LIBS"],
+         [acx_mcrl2_libs=no])
+       AX_CXX_CHECK_LIB([mcrl2_lps], [ATinit],   # XXX what to test for?
+         [LIBS="-lmcrl2_lps $LIBS"
+          MCRL2_LIBS="-lmcrl2_lps $MCRL2_LIBS"],
+         [acx_mcrl2_libs=no])])
     AC_LANG_POP([C++])
     AC_SUBST(MCRL2_LIBS)
 fi
