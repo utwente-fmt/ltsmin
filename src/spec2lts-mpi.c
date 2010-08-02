@@ -3,7 +3,6 @@
 #include <strings.h>
 #include <unistd.h>
 #include <stdio.h>
-#include <string.h>
 #include <mpi.h>
 #include <stdlib.h>
 #include <task-queue.h>
@@ -318,7 +317,7 @@ struct src_info {
 	int ofs;
 };
 
-static void callback(void*context,int*labels,int*dst){
+static void callback(void*context,transition_info_t*ti,int*dst){
 	int who=owner(dst);
     uint32_t trans[trans_len];
     trans[0]=((struct src_info*)context)->ofs;
@@ -326,7 +325,7 @@ static void callback(void*context,int*labels,int*dst){
         trans[dst_ofs+i]=dst[i];
     }
     for(int i=0;i<edge_labels;i++){
-        trans[lbl_ofs+i]=labels[i];
+        trans[lbl_ofs+i]=ti->labels[i];
     }
     TaskSubmitFixed(new_trans,who,trans);
 /*
@@ -445,7 +444,7 @@ int main(int argc, char*argv[]){
     task_queue_t task_queue=TQcreateMPI(mpi_queue);
 
 	tcount=(int*)RTmalloc(mpi_nodes*sizeof(int));
-	bzero(tcount,mpi_nodes*sizeof(int));
+	memset(tcount,0,mpi_nodes*sizeof(int));
 
 	model_t model=GBcreateBase();
 	GBsetChunkMethods(model,mpi_newmap,mpi_index_pool_create(MPI_COMM_WORLD,mpi_queue,MAX_TERM_LEN),

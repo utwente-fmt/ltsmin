@@ -73,7 +73,7 @@ static int          edge_labels;
 static treedbs_t    dbs;
 
 static void
-torx_transition (void *arg, int *lbl, int *dst)
+torx_transition (void *arg, transition_info_t *ti, int *dst)
 {
 
     torx_ctx_t         *ctx = (torx_ctx_t *)arg;
@@ -82,7 +82,7 @@ torx_transition (void *arg, int *lbl, int *dst)
     chunk               c =
         GBchunkGet (ctx->model,
                     lts_type_get_edge_label_typeno (ctx->ltstype, 0),
-                    lbl[0]);
+                    ti->labels[0]);
 
     int                 vis = 1;
     if (c.len == 3 && strncmp (c.data, "tau", c.len) == 0)

@@ -131,7 +131,7 @@ struct group_add_info {
 	int *src;
 };
 
-static void group_add(void*context,int*labels,int*dst){
+static void group_add(void*context,transition_info_t*labels,int*dst){
 	(void)labels;
 	struct group_add_info* ctx=(struct group_add_info*)context;
 	vrel_add(group_next[ctx->group],ctx->src,dst);
@@ -171,14 +171,14 @@ struct write_trace_step_s {
     int found;
 };
 
-static void write_trace_next(void*arg,int*lbl,int*dst){
+static void write_trace_next(void*arg,transition_info_t*ti,int*dst){
 	struct write_trace_step_s*ctx=(struct write_trace_step_s*)arg;
 	if(ctx->found) return;
 	for(int i=0;i<N;i++){
 	    if (ctx->dst[i]!=dst[i]) return;
 	}
 	ctx->found=1;
-	enum_seg_seg(trace_handle,0,ctx->src_no,0,ctx->dst_no,lbl);
+	enum_seg_seg(trace_handle,0,ctx->src_no,0,ctx->dst_no,ti->labels);
 }
 
 static void write_trace_step(int src_no,int*src,int dst_no,int*dst){
@@ -506,7 +506,7 @@ typedef struct {
 	int *src;
 } output_context;
 
-static void etf_edge(void*context,int*labels,int*dst){
+static void etf_edge(void*context,transition_info_t*ti,int*dst){
 	output_context* ctx=(output_context*)context;
 	table_count++;
 	int k=0;
@@ -519,7 +519,7 @@ static void etf_edge(void*context,int*labels,int*dst){
 		}
 	}
 	for(int i=0;i<eLbls;i++) {
-		fprintf(table_file," %d",labels[i]);
+		fprintf(table_file," %d",ti->labels[i]);
 	}
 	fprintf(table_file,"\n");
 }

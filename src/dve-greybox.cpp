@@ -98,11 +98,11 @@ static matrix_t sl_info;
 static divine::succ_container_t cb_cont;
 static void* dlHandle = NULL;
 static char templatename[4096];
+transition_info_t transition_info = {NULL, -1};
 
 static int
 succ_callback(TransitionCB cb, void* context)
 {
-    int dummy = 42; // dummy to work with --cache
     int result = cb_cont.size();
     for(size_t i=0; i < (size_t)result;++i)
     {
@@ -110,7 +110,7 @@ succ_callback(TransitionCB cb, void* context)
         divine::state_t s = cb_cont.pop_back();
         lib_project_state_to_int_array(s, dst);
         divine::delete_state(s);
-        cb(context, &dummy, dst);
+        cb(context, &transition_info, dst);
     }
     return result;
 }

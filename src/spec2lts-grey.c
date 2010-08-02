@@ -185,7 +185,7 @@ new_string_index (void *context)
 
 /* Transition Callbacks */
 static void
-vector_next (void *arg, int *lbl, int *dst)
+vector_next (void *arg, transition_info_t *ti, int *dst)
 {
     int                 src_ofs = *(int *)arg;
     if (!vset_member (visited_set, dst)) {
@@ -193,12 +193,12 @@ vector_next (void *arg, int *lbl, int *dst)
         vset_add (visited_set, dst);
         vset_add (next_set, dst);
     }
-    if (write_lts) enum_seg_vec (output_handle, 0, src_ofs, dst, lbl);
+    if (write_lts) enum_seg_vec (output_handle, 0, src_ofs, dst, ti->labels);
     ++ntransitions;
 }
 
 static void
-index_next (void *arg, int *lbl, int *dst)
+index_next (void *arg, transition_info_t *ti, int *dst)
 {
     int                 src_ofs = *(int *)arg;
     int                 idx = TreeFold (dbs, dst);
@@ -209,7 +209,7 @@ index_next (void *arg, int *lbl, int *dst)
             parent_ofs[idx]=src_ofs;
         }
     }
-    if (write_lts) enum_seg_seg (output_handle, 0, src_ofs, 0, idx, lbl);
+    if (write_lts) enum_seg_seg (output_handle, 0, src_ofs, 0, idx, ti->labels);
     ++ntransitions;
 }
 
@@ -232,14 +232,14 @@ struct write_trace_step_s {
     int found;
 };
 
-static void write_trace_next(void*arg,int*lbl,int*dst){
+static void write_trace_next(void*arg,transition_info_t*ti,int*dst){
     struct write_trace_step_s*ctx=(struct write_trace_step_s*)arg;
     if(ctx->found) return;
     for(int i=0;i<N;i++) {
         if (ctx->dst[i]!=dst[i]) return;
     }
     ctx->found=1;
-    enum_seg_seg(trace_handle,0,ctx->src_no,0,ctx->dst_no,lbl);
+    enum_seg_seg(trace_handle,0,ctx->src_no,0,ctx->dst_no,ti->labels);
 }
 
 static void write_trace_step(model_t model, int src_no,int*src,int dst_no,int*dst){
@@ -373,19 +373,19 @@ find_dfs_stack_trace_vset(model_t model, dfs_stack_t stack)
 
 
 static void
-vector_next_dfs (void *arg, int *lbl, int *dst)
+vector_next_dfs (void *arg, transition_info_t *ti, int *dst)
 {
     int                 src_ofs = *(int *)arg;
     if (!vset_member (being_explored_set, dst)) {
         ++visited;
         dfs_stack_push (stack, dst);
     }
-    if (write_lts) enum_seg_vec (output_handle, 0, src_ofs, dst, lbl);
+    if (write_lts) enum_seg_vec (output_handle, 0, src_ofs, dst, ti->labels);
     ++ntransitions;
 }
 
 static void
-index_next_dfs (void *arg, int *lbl, int *dst)
+index_next_dfs (void *arg, transition_info_t *ti, int *dst)
 {
     int                 src_ofs = *(int *)arg;
     int                 before = TreeCount (dbs);
@@ -398,7 +398,7 @@ index_next_dfs (void *arg, int *lbl, int *dst)
     if (idx >= visited) {
         visited = idx + 1;
     }
-    if (write_lts) enum_seg_seg (output_handle, 0, src_ofs, 0, idx, lbl);
+    if (write_lts) enum_seg_seg (output_handle, 0, src_ofs, 0, idx, ti->labels);
     ++ntransitions;
 }
 

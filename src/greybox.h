@@ -22,6 +22,14 @@ typedef struct grey_box_model* model_t;
 */
 
 /**
+\brief Struct to describe a transition. Holds edge label and group information
+ */
+typedef struct transition_info {
+    int* labels;                    // edge labels, NULL, or pointer to the edge label(s)
+    int  group;                     // holds transition group or -1 if unknown
+} transition_info_t;
+
+/**
 \brief Options for greybox management module.
  */
 extern struct poptOption greybox_options[];
@@ -68,7 +76,7 @@ extern void GBsetDMInfoWrite(model_t model, matrix_t *dm_info);
 extern void GBgetInitialState(model_t model,int *state);
 /**< @brief Write the initial state of model into state. */
 
-typedef void(*TransitionCB)(void*context,int*labels,int*dst);
+typedef void(*TransitionCB)(void*context,transition_info_t*transition_info,int*dst);
 /**< @brief Type of the callback function for returning lists of transitions.
 
 We produce the list of transitions by means of a call back, which
