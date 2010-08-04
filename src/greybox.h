@@ -142,6 +142,11 @@ extern model_t GBcreateBase();
 typedef void(*pins_loader_t)(model_t model,const char*filename);
 
 /**
+\brief Get a parent model (or NULL, if none);
+*/
+extern model_t GBgetParent(model_t model);
+
+/**
 \brief Register a loader for an extension.
  */
 extern void GBregisterLoader(const char*extension,pins_loader_t loader);

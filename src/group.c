@@ -13,7 +13,6 @@
 #include "lts-type.h"
 
 typedef struct group_context {
-    model_t             parent;
     int                 len;
     int                *transbegin;
     int                *transmap;
@@ -39,7 +38,7 @@ group_long (model_t self, int group, int *newsrc, TransitionCB cb,
             void *user_context)
 {
     group_context_t     ctx = (group_context_t)GBgetContext (self);
-    model_t             parent = ctx->parent;
+    model_t             parent = GBgetParent (self);
     int                 len = ctx->len;
     int                 oldsrc[len];
     int                 Ntrans = 0;
@@ -64,7 +63,7 @@ group_all (model_t self, int *newsrc, TransitionCB cb,
             void *user_context)
 {
     group_context_t     ctx = (group_context_t)GBgetContext (self);
-    model_t             parent = ctx->parent;
+    model_t             parent = GBgetParent (self);
     int                 len = ctx->len;
     int                 oldsrc[len];
     ctx->cb = cb;
@@ -81,7 +80,7 @@ static int
 group_state_labels_short(model_t self, int label, int *state)
 {
     group_context_t     ctx = (group_context_t)GBgetContext (self);
-    model_t             parent = ctx->parent;
+    model_t             parent = GBgetParent (self);
 
     // this needs to be rewritten
     int len = dm_ones_in_row(GBgetStateLabelInfo(self), label);
@@ -110,7 +109,7 @@ static int
 group_state_labels_long(model_t self, int label, int *state)
 {
     group_context_t     ctx = (group_context_t)GBgetContext (self);
-    model_t             parent = ctx->parent;
+    model_t             parent = GBgetParent (self);
     int                 len = ctx->len;
     int                 oldstate[len];
 
@@ -124,7 +123,7 @@ static void
 group_state_labels_all(model_t self, int *state, int *labels)
 {
     group_context_t     ctx = (group_context_t)GBgetContext (self);
-    model_t             parent = ctx->parent;
+    model_t             parent = GBgetParent (self);
     int                 len = ctx->len;
     int                 oldstate[len];
 
@@ -251,7 +250,6 @@ GBregroup (model_t model, const char *regroup_spec)
            
     struct group_context *ctx = RTmalloc (sizeof *ctx);
 
-    ctx->parent = model;
     GBsetContext (group, ctx);
     
     GBsetNextStateLong (group, group_long);
@@ -328,6 +326,10 @@ GBregroup (model_t model, const char *regroup_spec)
 
     GBsetStateLabelInfo(group, s);
 
+    GBsetStateLabelShort (group, group_state_labels_short);
+    GBsetStateLabelLong (group, group_state_labels_long);
+    GBsetStateLabelsAll (group, group_state_labels_all);
+
     GBinitModelDefaults (&group, model);
 
     // permute initial state
@@ -340,10 +342,6 @@ GBregroup (model_t model, const char *regroup_spec)
             news0[i] = s0[ctx->statemap[i]];
         GBsetInitialState (group, news0);
     }
-
-    GBsetStateLabelShort (group, group_state_labels_short);
-    GBsetStateLabelLong (group, group_state_labels_long);
-    GBsetStateLabelsAll (group, group_state_labels_all);
 
     // who is responsible for freeing matrix_t dm_info in group?
     // probably needed until program termination

@@ -35,7 +35,6 @@ struct group_cache {
 };
 
 struct cache_context {
-    model_t             parent;
     struct group_cache *cache;
 };
 
@@ -86,7 +85,7 @@ cached_short (model_t self, int group, int *src, TransitionCB cb,
             ensure_access (cache->begin_man, cache->explored);
             cache->begin[cache->explored] =
                 cache->begin[cache->explored - 1];
-            GBgetTransitionsShort (ctx->parent, group, tmp,
+            GBgetTransitionsShort (GBgetParent(self), group, tmp,
                                    add_cache_entry, cache);
         }
     }
@@ -127,7 +126,6 @@ GBaddCache (model_t model)
     struct cache_context *ctx = RTmalloc (sizeof *ctx);
     model_t             cached = GBcreateBase ();
     ctx->cache = cache;
-    ctx->parent = model;
 
     GBsetDMInfo (cached, p_dm);
     GBsetContext (cached, ctx);
