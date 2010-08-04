@@ -8,6 +8,7 @@
  */
 
 #include <config.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <limits.h>
@@ -23,11 +24,12 @@ struct dfs_stack {
 };
 
 char *
-dfs_stack_to_string (dfs_stack_t stack)
+dfs_stack_to_string (dfs_stack_t stack, char *r, ssize_t *sz_)
 {
-    char* r = NULL;
-    asprintf(&r, "FrameStack[%zu | %zu / %zu]", isba_elt_size(stack->states),
-             isba_size_int(stack->states), isba_size_int(stack->frames));
+    ssize_t sz = *sz_;
+    *sz_ = snprintf(r, sz, "FrameStack[%zu | %zu / %zu]",
+                    isba_elt_size(stack->states),
+                    isba_size_int(stack->states), isba_size_int(stack->frames));
     return r;
 }
 
