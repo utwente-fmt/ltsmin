@@ -1,6 +1,8 @@
 #include <config.h>
 #include <unistd.h>
+#include <stdio.h>
 #include <string.h>
+#include <strings.h>
 #include <runtime.h>
 #include <lts_io_internal.h>
 #include <archive.h>
