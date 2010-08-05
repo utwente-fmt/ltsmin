@@ -1,5 +1,6 @@
 #include <config.h>
 #include <stdlib.h>
+#include <strings.h>
 #include <lts_count.h>
 #include <runtime.h>
 

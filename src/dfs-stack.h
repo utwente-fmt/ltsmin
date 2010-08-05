@@ -23,7 +23,7 @@ typedef struct dfs_stack *dfs_stack_t;
 extern dfs_stack_t dfs_stack_create(size_t element_size);
 extern void dfs_stack_destroy(dfs_stack_t stack);
 
-extern char *dfs_stack_to_string(dfs_stack_t stack);
+extern char *dfs_stack_to_string(dfs_stack_t stack, char *, ssize_t *);
 
 extern void dfs_stack_enter(dfs_stack_t stack);
 extern void dfs_stack_leave(dfs_stack_t stack);

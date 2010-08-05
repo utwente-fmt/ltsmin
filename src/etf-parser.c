@@ -30,6 +30,8 @@ static etf_parse_env_t ETFparseEnvCreate(){
 
 etf_model_t etf_parse_file(const char *file){
     FILE *in=fopen( file, "r" );
+    if (in == NULL)
+        FatalCall (1, error, "Unable to open file ``%s''", file);
     ltsmin_parse_env_t env=LTSminParseEnvCreate();
     LTSminKeyword(env,TOKEN_BEGIN,"begin");
     LTSminKeyword(env,TOKEN_END,"end");

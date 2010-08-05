@@ -27,7 +27,9 @@ int main() {
 			dfs_stack_enter(stack);
 		}
 	}
-	printf("%s\n", dfs_stack_to_string(stack));
+        char tmp[256];
+        ssize_t tmpsz = sizeof tmp;
+        printf("%s\n", dfs_stack_to_string(stack, tmp, &tmpsz));
 
 
 	for (x = 0; x<=FRAMES; x++) {

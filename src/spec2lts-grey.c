@@ -351,8 +351,9 @@ find_dfs_stack_trace_vset(model_t model, dfs_stack_t stack)
 
     // initial state should be idx 0
     dbs=TreeDBScreate(N);
-    if(TreeFold(dbs,init_state)!=0){
-        Fatal(1,error,"expected 0");
+    int idx;
+    if((idx=TreeFold(dbs,init_state))!=0){
+        Fatal(1,error,"unexpected index for initial state: %d", idx);
     }
 
     // gather trace
@@ -769,8 +770,9 @@ int main(int argc, char *argv[]){
 		break;
             case DB_TreeDBS:
                 dbs=TreeDBScreate(N);
-                if(TreeFold(dbs,src)!=0){
-                    Fatal(1,error,"expected 0");
+                int idx;
+                if((idx=TreeFold(dbs,src))!=0){
+                    Fatal(1,error,"unexpected index for initial state: %d", idx);
                 }
                 int limit=explored;
                 while(explored<visited){
