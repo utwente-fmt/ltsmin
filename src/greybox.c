@@ -7,6 +7,7 @@
 #include "dm/dm.h"
 
 struct grey_box_model {
+	model_t parent;
 	lts_type_t ltstype;
 	matrix_t *dm_info;
 	matrix_t *dm_read_info;
@@ -116,8 +117,46 @@ state_labels_default_all(model_t model, int *state, int *labels)
 	}
 }
 
+int
+wrapped_default_short (model_t self,int group,int*src,TransitionCB cb,void*context)
+{
+    return GBgetTransitionsShort (GBgetParent(self), group, src, cb, context);
+}
+
+int
+wrapped_default_long (model_t self,int group,int*src,TransitionCB cb,void*context)
+{
+    return GBgetTransitionsLong (GBgetParent(self), group, src, cb, context);
+}
+
+int
+wrapped_default_all (model_t self,int*src,TransitionCB cb,void*context)
+{
+    return GBgetTransitionsAll(GBgetParent(self), src, cb, context);
+}
+
+static int
+wrapped_state_labels_default_short (model_t model, int label, int *state)
+{
+    return GBgetStateLabelShort(GBgetParent(model), label, state);
+}
+
+static int
+wrapped_state_labels_default_long(model_t model, int label, int *state)
+{
+    return GBgetStateLabelLong(GBgetParent(model), label, state);
+}
+
+static void
+wrapped_state_labels_default_all(model_t model, int *state, int *labels)
+{
+    return GBgetStateLabelsAll(GBgetParent(model), state, labels);
+}
+
+
 model_t GBcreateBase(){
 	model_t model=(model_t)RTmalloc(sizeof(struct grey_box_model));
+        model->parent=NULL;
 	model->ltstype=NULL;
 	model->dm_info=NULL;
 	model->dm_read_info=NULL;
@@ -140,9 +179,16 @@ model_t GBcreateBase(){
 	return model;
 }
 
+model_t
+GBgetParent(model_t model)
+{
+    return model->parent;
+}
+
 void GBinitModelDefaults (model_t *p_model, model_t default_src)
 {
     model_t model = *p_model;
+    model->parent = default_src;
     if (model->ltstype == NULL) {
         GBcopyChunkMaps(model, default_src);
         GBsetLTStype(model, GBgetLTStype(default_src));
@@ -164,19 +210,41 @@ void GBinitModelDefaults (model_t *p_model, model_t default_src)
     if (model->context == NULL)
         GBsetContext(model, GBgetContext(default_src));
 
-    if (model->next_short == NULL)
-        GBsetNextStateShort(model, default_src->next_short);
-    if (model->next_long == NULL)
-        GBsetNextStateLong(model, default_src->next_long);
-    if (model->next_all == NULL)
-        GBsetNextStateAll(model, default_src->next_all);
+    /* Since the model->next_{short,long,all} functions have mutually
+     * recursive implementations, at least one needs to be overridden,
+     * and the others need to call the overridden one (and not the
+     * ones in the parent layer).
+     *
+     * If neither function is overridden, we pass through to the
+     * parent layer.  However, we need to strip down the passed
+     * model_t parameter, hence the wrapped_* functions.
+     *
+     * This scheme has subtle consequences: Assume a wrapper which
+     * only implements a next_short function, but no next_long or
+     * next_all.  If next_all is called, it will end up in the
+     * next_short call (via the mutually recursive default
+     * implementations), and eventually call through to the parent
+     * layer's next_short.
+     *
+     * Hence, even if the parent layer also provides an optimized
+     * next_all, it will never be called, unless the wrapper also
+     * implements a next_all.
+     */
+    if (model->next_short == default_short &&
+        model->next_long == default_long &&
+        model->next_all == default_all) {
+        GBsetNextStateShort (model, wrapped_default_short);
+        GBsetNextStateLong (model, wrapped_default_long);
+        GBsetNextStateAll (model, wrapped_default_all);
+    }
 
-    if (model->state_labels_short == NULL)
-        GBsetStateLabelShort(model, default_src->state_labels_short);
-    if (model->state_labels_long == NULL)
-        GBsetStateLabelLong(model, default_src->state_labels_long);
-    if (model->state_labels_all == NULL)
-        GBsetStateLabelsAll(model, default_src->state_labels_all);
+    if (model->state_labels_short == state_labels_default_short &&
+        model->state_labels_long == state_labels_default_long &&
+        model->state_labels_all == state_labels_default_all) {
+        GBsetStateLabelShort (model, wrapped_state_labels_default_short);
+        GBsetStateLabelLong (model, wrapped_state_labels_default_long);
+        GBsetStateLabelsAll (model, wrapped_state_labels_default_all);
+    }
 }
 
 void* GBgetContext(model_t model){
