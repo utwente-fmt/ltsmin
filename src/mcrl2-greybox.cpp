@@ -334,10 +334,10 @@ void MCRL2loadGreyboxModel(model_t m,const char*model_name){
 	lts_type_t ltstype=lts_type_create();
 	lts_type_set_state_length(ltstype,state_length);
 	for(int i=0;i<state_length;i++) {
-        char name[64];
-        sprintf(name,"x%d",i);
-        lts_type_set_state_name(ltstype,i,name);
-		lts_type_set_state_type(ltstype,i,"leaf");
+            char name[64];
+            snprintf(name,sizeof name,"x%d",i);
+            lts_type_set_state_name(ltstype,i,name);
+            lts_type_set_state_type(ltstype,i,"leaf");
 	}
 	lts_type_set_edge_label_count(ltstype,1);
 	lts_type_set_edge_label_name(ltstype,0,"action");

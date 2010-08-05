@@ -1,10 +1,13 @@
 #include <config.h>
 #include <stdlib.h>
+#include <assert.h>
 
 #include "greybox.h"
 #include "runtime.h"
 #include "dynamic-array.h"
 #include "stringindex.h"
+
+static const int EL_OFFSET = 1;
 
 struct group_cache {
     int                 len;
@@ -14,8 +17,18 @@ struct group_cache {
     array_manager_t     begin_man;
     int                *begin;
     array_manager_t     dest_man;
-    int                *label;
+    int                 Nedge_labels;
     int                *dest;
+    /* Data layout:
+     * dest[begin[i]]...dest[begin[i+1]-1]: successor info for state i
+     * k := Nedge_labels
+     * transitions i --l_x1,...,l_xk--> j_x
+     * dest[begin[i]+x*(EL_OFFSET+k)]   := j_x
+     * dest[begin[i]+x*(EL_OFFSET+k)+1] := l_x1
+     * ...
+     * dest[begin[i]+x*(EL_OFFSET+k)+k] := l_xk
+     */
+
     /* int len; */
     /* TransitionCB cb; */
     /* void*user_context; */
@@ -26,34 +39,29 @@ struct cache_context {
     struct group_cache *cache;
 };
 
+static inline int
+edge_info_sz (struct group_cache *cache)
+{
+    return EL_OFFSET + cache->Nedge_labels;
+}
+
 static void
-add_cache_entry (void *context, int *label, int *dst)
+add_cache_entry (void *context, int *labels, int *dst)
 {
     struct group_cache *ctx = (struct group_cache *)context;
     int                 dst_index =
         SIputC (ctx->idx, (char *)dst, ctx->len);
     if (dst_index >= ctx->visited)
         ctx->visited = dst_index + 1;
-    ensure_access (ctx->dest_man, ctx->begin[ctx->explored]);
-    ctx->label[ctx->begin[ctx->explored]] = label[0];
-    ctx->dest[ctx->begin[ctx->explored]] = dst_index;
-    ctx->begin[ctx->explored]++;
-}
+    ensure_access (ctx->dest_man, ctx->begin[ctx->explored]+edge_info_sz(ctx));
 
-#if 0
-static void
-check_cache (void *context, int *label, int *dst)
-{
-    struct
-    group_cache        *ctx = (struct group_cache *)context;
-    int                 dst_index = TreeFold (ctx->dbs, dst);
-    Warning (info, "==%d=>%d", label[0], dst_index);
-    for (int i = 0; i < ctx->len; i++)
-        printf ("%3d", dst[i]);
-    printf ("\n");
-    ctx->cb (ctx->user_context, label, dst);
+    int *pe_info = &ctx->dest[ctx->begin[ctx->explored]];
+    *pe_info = dst_index;
+    if (labels != NULL)
+        memcpy(pe_info + EL_OFFSET, labels, ctx->Nedge_labels * sizeof *pe_info);
+
+    ctx->begin[ctx->explored] += edge_info_sz(ctx);
 }
-#endif
 
 static int
 cached_short (model_t self, int group, int *src, TransitionCB cb,
@@ -71,6 +79,7 @@ cached_short (model_t self, int group, int *src, TransitionCB cb,
     if (src_idx == cache->visited) {
         cache->visited++;
         while (cache->explored < cache->visited) {
+            // MW: remove if edge label becomes "const int *"?
             memcpy (tmp, SIgetC (cache->idx, cache->explored, NULL),
                     cache->len);
             cache->explored++;
@@ -81,17 +90,22 @@ cached_short (model_t self, int group, int *src, TransitionCB cb,
                                    add_cache_entry, cache);
         }
     }
-    for (int i = cache->begin[src_idx]; i < cache->begin[src_idx + 1]; i++) {
+    for (int i = cache->begin[src_idx]; i < cache->begin[src_idx + 1];
+         i += edge_info_sz (cache)) {
+        // MW: remove if edge label becomes "const int *"?
         memcpy (tmp, SIgetC (cache->idx, cache->dest[i], NULL),
                 cache->len);
-        cb (user_context, &(cache->label[i]), tmp);
+        int *labels = cache->Nedge_labels == 0 ? NULL : &(cache->dest[i+EL_OFFSET]);
+        cb (user_context, labels, tmp);
     }
-    return (cache->begin[src_idx + 1] - cache->begin[src_idx]);
+    return (cache->begin[src_idx + 1] - cache->begin[src_idx]) /
+        edge_info_sz (cache);
 }
 
 model_t
 GBaddCache (model_t model)
 {
+    assert (model != NULL);
     matrix_t           *p_dm = GBgetDMInfo (model);
     int                 N = dm_nrows (p_dm);
     struct group_cache *cache = RTmalloc (N * sizeof (struct group_cache));
@@ -106,8 +120,7 @@ GBaddCache (model_t model)
         ADD_ARRAY (cache[i].begin_man, cache[i].begin, int);
         cache[i].begin[0] = 0;
         cache[i].dest_man = create_manager (256);
-        cache[i].label = NULL;
-        ADD_ARRAY (cache[i].dest_man, cache[i].label, int);
+        cache[i].Nedge_labels = lts_type_get_edge_label_count(GBgetLTStype(model));
         cache[i].dest = NULL;
         ADD_ARRAY (cache[i].dest_man, cache[i].dest, int);
     }

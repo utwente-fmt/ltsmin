@@ -1,6 +1,7 @@
 #include <config.h>
 #include "dynamic-array.h"
 #include <stdlib.h>
+#include <strings.h>
 #include "runtime.h"
 
 #define MBLOCK 16

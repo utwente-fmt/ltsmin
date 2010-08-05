@@ -322,8 +322,8 @@ static uint32_t MTsort(matrix_table_t mt,uint32_t *next,uint32_t offset,uint32_t
     uint32_t half=size/2;
     uint32_t list1=MTsort(mt,next,offset,half);
     uint32_t list2=MTsort(mt,next,offset+half,size-half);
-    uint32_t head;
-    uint32_t tail;
+    uint32_t head = ~0;
+    uint32_t tail = ~0;
     uint32_t tmp;
     switch(lex_cmp(mt,list1,list2)){
     case Lt:
