@@ -12,6 +12,7 @@ extern void SCCstartTimer(mytimer_t timer);
 extern void SCCstopTimer(mytimer_t timer);
 extern void SCCreportTimer(mytimer_t timer,char *msg);
 extern void SCClogTimer(log_t log,mytimer_t timer,char *msg);
+extern float SCCrealTime(mytimer_t timer);
 
 #endif
 
