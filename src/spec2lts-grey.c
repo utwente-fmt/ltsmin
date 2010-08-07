@@ -21,6 +21,7 @@
 #include "is-balloc.h"
 #include "bitset.h"
 #include "scctimer.h"
+#include "dbs-ll.h"
 
 #if defined(MCRL)
 #include "mcrl-greybox.h"
@@ -64,7 +65,7 @@ static mode_t call_mode=UseBlackBox;
 static char *arg_strategy = "bfs";
 static enum { Strat_BFS, Strat_DFS } strategy = Strat_BFS;
 static char *arg_state_db = "tree";
-static enum { DB_TreeDBS, DB_Vset } state_db = DB_TreeDBS;
+static enum { DB_DBSLL, DB_TreeDBS, DB_Vset } state_db = DB_TreeDBS;
 
 static si_map_entry strategies[] = {
     {"bfs",  Strat_BFS},
@@ -73,6 +74,7 @@ static si_map_entry strategies[] = {
 };
 
 static si_map_entry db_types[]={
+    {"table", DB_DBSLL},
     {"tree", DB_TreeDBS},
     {"vset", DB_Vset},
     {NULL, 0}
@@ -123,7 +125,7 @@ static  struct poptOption options[] = {
 	{ "deadlock" , 'd' , POPT_ARG_VAL , &dlk_detect , 1 , "detect deadlocks" , NULL },
 	{ "trace" , 0 , POPT_ARG_STRING , &trc_output , 0 , "file to write trace to" , "<lts output>" },
 	{ "state" , 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &arg_state_db , 0 ,
-		"select the data structure for storing states", "<tree|vset>"},
+		"select the data structure for storing states", "<table|tree|vset>"},
 	{ "strategy" , 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &arg_strategy , 0 ,
 		"select the search strategy", "<bfs|dfs>"},
 	{ "max" , 0 , POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT , &max , 0 ,"maximum search depth", "<int>"},
@@ -380,6 +382,14 @@ find_dfs_stack_trace_vset(model_t model, dfs_stack_t stack)
     RTfree(trace);
 }
 
+static void
+vector_next_dfs2 (void *arg, transition_info_t *ti, int *dst)
+{
+    int                 *src = (int *)arg;
+    dfs_stack_push (stack, dst);
+    if (write_lts) enum_vec_vec (output_handle, src, dst, ti->labels);
+    ++ntransitions;
+}
 
 static void
 vector_next_dfs (void *arg, transition_info_t *ti, int *dst)
@@ -473,6 +483,51 @@ bfs_explore_state_vector (void *context, int *src)
     if (explored % 1000 == 0 && RTverbosity >= 2)
         Warning (info, "explored %d visited %d trans %zu",
                  explored, visited, ntransitions);
+}
+
+static void
+dfs_explore_state_vector2 (model_t model, const int *src, int *o_next_group)
+{
+	int                 count = 0;
+    if (*o_next_group == 0)
+        maybe_write_state (model, NULL, src);
+    int                 i = *o_next_group;
+    switch (call_mode) {
+    case UseBlackBox:
+        count = GBgetTransitionsAll (model, (int *)src, vector_next_dfs2, (void *)src);
+        i = K;
+        break;
+    case UseGreyBox:
+        /* try to find at least one transition */
+        for (; i < K && !dfs_stack_frame_size(stack); ++i) {
+            count += GBgetTransitionsLong (model, i, (int *)src, vector_next_dfs2, (void *)src);
+        }
+        break;
+    }
+    if (count == 0 && *o_next_group == 0 && dlk_detect) {
+        Warning(info,"deadlock found!");
+        if (trc_output) {
+            trace_output=lts_output_open(trc_output,model,1,0,1,"vsi",NULL);
+            {
+                int init_state[N];
+                GBgetInitialState(model, init_state);
+                lts_output_set_root_vec(trace_output,(uint32_t*)init_state);
+                lts_output_set_root_idx(trace_output,0,0);
+            }
+            trace_handle=lts_output_begin(trace_output,0,0,0);
+            find_dfs_stack_trace_vset(model, stack);
+            lts_output_end(trace_output,trace_handle);
+            lts_output_close(&trace_output);
+        }
+        Fatal(1,info, "exiting now");
+    }
+    if (i == K) {
+        ++explored;
+        if (explored % 1000 == 0 && RTverbosity >= 2)
+            Warning (info, "explored %d visited %d trans %zu",
+                     explored, visited, ntransitions);
+    }
+    *o_next_group = i;
 }
 
 static void
@@ -577,6 +632,7 @@ dfs_explore (model_t model, int *src, size_t *o_depth)
     int                 next_group = 0;
     int                 write_idx = 0;
     int                 src_idx = 0;
+    int                *fvec;
     switch (state_db) {
     case DB_Vset:
         buffer = isba_create (SD__SIZE);
@@ -627,7 +683,7 @@ dfs_explore (model_t model, int *src, size_t *o_depth)
         dfs_open_set = bitset_create (128,128);
         dbs = TreeDBScreate (N);
         int                 idx = TreeFold (dbs, src);
-        int                *fvec = &idx;
+        fvec = &idx;
         dfs_stack_push (stack, fvec);
         bitset_set (dfs_open_set, *fvec);
         while ((fvec = dfs_stack_top (stack)) || dfs_stack_nframes (stack)) {
@@ -660,7 +716,48 @@ dfs_explore (model_t model, int *src, size_t *o_depth)
             next_group = 0;
         }
         break;
-
+    case DB_DBSLL:
+        stack = dfs_stack_create (N);
+        dbs_ll_t dbsll = DBSLLcreate(N);
+        buffer = isba_create (1);
+        int                 index;
+        fvec = src;
+        dfs_stack_push (stack, fvec);//dummy
+                isba_push_int (buffer, &next_group);
+        dfs_stack_enter (stack);
+        dfs_stack_push (stack, fvec);
+        while (dfs_stack_nframes (stack)) {
+            while ((fvec = dfs_stack_top (stack))) {
+                if (next_group) break;
+                /* explore stack frame for an new state */
+                if (!DBSLLlookup_ret(dbsll, fvec, &index)) {
+                    ++visited;
+                    break;
+                } else {
+                    dfs_stack_pop (stack);
+                }
+            }
+            if (fvec == NULL) {
+                dfs_stack_leave (stack);
+                next_group = *isba_pop_int (buffer);
+                continue;
+            }
+            if (next_group < K) {
+                dfs_stack_enter (stack);
+                dfs_explore_state_vector2 (model, fvec, &next_group);
+                isba_push_int (buffer, &next_group);
+                if (dfs_stack_nframes (stack) > depth) {
+                    depth = dfs_stack_nframes (stack);
+                    if (RTverbosity >= 1)
+                        Warning (info, "new depth reached %d. Visited %d states and %zu transitions",
+                                 depth, visited, ntransitions);
+                }
+            } else {
+                dfs_stack_pop (stack);
+            }
+            next_group = 0;
+        }
+    break;
     default:
         Fatal (1, error, "Unsupported combination: strategy=%s, state=%s",
                strategies[strategy].key, db_types[state_db].key);
@@ -778,6 +875,8 @@ int main(int argc, char *argv[]){
 	    	Warning(info,"%s reachable states represented symbolically with %ld nodes",string,nodes);
                 bn_clear(&e_count);
 		break;
+            case DB_DBSLL:
+                Fatal(1, error, "State storage and search strategy combination not implemented");
             case DB_TreeDBS:
                 dbs=TreeDBScreate(N);
                 int idx;
