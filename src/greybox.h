@@ -146,6 +146,11 @@ extern model_t GBcreateBase();
 typedef void(*pins_loader_t)(model_t model,const char*filename);
 
 /**
+\brief Get a parent model (or NULL, if none);
+*/
+extern model_t GBgetParent(model_t model);
+
+/**
 \brief Register a loader for an extension.
  */
 extern void GBregisterLoader(const char*extension,pins_loader_t loader);
@@ -288,7 +293,7 @@ extern int GBchunkCount(model_t model,int type_no);
 This call translates a chunk to an integer.
 These integers must be from a range 0..count-1.
 */
-extern int GBchunkPut(model_t model,int type_no,chunk c);
+extern int GBchunkPut(model_t model,int type_no, const chunk c);
 
 /**
 \brief Get the a chunk in a type.

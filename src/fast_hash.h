@@ -1,9 +1,14 @@
-
 #ifndef FAST_HASH_H
 #define FAST_HASH_H
 
 #include <stdint.h>
 
-extern uint32_t SuperFastHash (const char * data, int len, uint32_t hash);
+typedef uint32_t (*hash32_f)(const char *key, int len, uint32_t seed);
+
+extern uint32_t SuperFastHash (const void *data, int len, uint32_t hash);
+
+extern uint32_t oat_hash(const void *data, int len, uint32_t seed);
+
+extern int mix (int a, int b, int c);
 
 #endif
