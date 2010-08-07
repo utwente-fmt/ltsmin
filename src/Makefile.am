@@ -32,6 +32,9 @@ bin_PROGRAMS += nips2lts-mpi
 if HAVE_DVEC
 bin_PROGRAMS += dve2lts-mpi
 endif
+#if HAVE_DVEC2
+#bin_PROGRAMS += dve22lts-mpi
+#endif
 endif
 if HAVE_LIBSTEP_INFO
 bin_PROGRAMS +=  lpo2lts-grey lpo-reach
@@ -57,6 +60,13 @@ if HAVE_DVEC
 bin_PROGRAMS += dve2lts-grey dve-reach
 if HAVE_CADP
 pkglib_LTLIBRARIES += libdve-open.la
+endif
+endif
+
+if HAVE_DVEC2
+bin_PROGRAMS += dve22lts-grey dve2-reach
+if HAVE_CADP
+pkglib_LTLIBRARIES += libdve2-open.la
 endif
 endif
 
@@ -89,6 +99,13 @@ endif
 # ltsmin-parse
 ltsmin_parse_SOURCES = ltsmin-parse.c
 ltsmin_parse_LDADD = libltsmin.la
+
+# dve22lts-grey
+dve22lts_grey_SOURCES  = spec2lts-grey.c dve2-greybox.c dve2-greybox.h    \
+                         lts.c lts.h vset_atermdd.c
+dve22lts_grey_LDADD    = libltsmin.la -lATerm $(DVEC2_LIBS) $(BUDDY_LIBS) $(CADP_LIBS)
+dve22lts_grey_CPPFLAGS = -DDIVINE2 $(MCRL_CPPFLAGS) $(DIVINE2_CPPFLAGS) $(AM_CPPFLAGS)
+dve22lts_grey_LDFLAGS  = $(DIVINE2_LDFLAGS) $(MCRL_LDFLAGS) $(BUDDY_LDFLAGS) $(AM_LDFLAGS) $(CADP_LDFLAGS)
 
 # dve2lts-grey
 dve2lts_grey_SOURCES  = spec2lts-grey.c dve-greybox.cpp dve-greybox.h    \
@@ -125,6 +142,14 @@ nips2lts_grey_SOURCES  = spec2lts-grey.c nips-greybox.c nips-greybox.h   \
 nips2lts_grey_LDADD    = libltsmin.la -lATerm $(NIPS_LIBS) $(BUDDY_LIBS) $(CADP_LIBS)
 nips2lts_grey_CPPFLAGS = -DNIPS $(NIPS_CPPFLAGS) $(MCRL_CPPFLAGS) $(AM_CPPFLAGS)
 nips2lts_grey_LDFLAGS  = $(NIPS_LDFLAGS) $(BUDDY_LDFLAGS) $(MCRL_LDFLAGS) $(AM_LDFLAGS) $(CADP_LDFLAGS)
+
+# dve2-reach
+dve2_reach_SOURCES  = spec-reach.c dve2-greybox.c dve2-greybox.h  \
+                     lts.c lts.h vset_atermdd.c
+dve2_reach_LDADD    = libltsmin.la -lATerm $(DVEC2_LIBS) $(BUDDY_LIBS) $(CADP_LIBS)
+dve2_reach_CPPFLAGS = -DDIVINE2 $(DIVINE2_CPPFLAGS) $(MCRL_CPPFLAGS) $(AM_CPPFLAGS)
+dve2_reach_LDFLAGS  = $(DIVINE2_LDFLAGS) $(BUDDY_LDFLAGS) $(MCRL_LDFLAGS) $(AM_LDFLAGS) $(CADP_LDFLAGS)
+
 
 # dve-reach
 dve_reach_SOURCES  = spec-reach.c dve-greybox.cpp dve-greybox.h  \
@@ -168,6 +193,13 @@ dve2lts_mpi_LDADD    = libltsmin-mpi.la $(DVEC_LIBS) $(CADP_LIBS)
 dve2lts_mpi_CPPFLAGS = -DDIVINE $(DIVINE_CPPFLAGS) $(AM_CPPFLAGS)
 dve2lts_mpi_LDFLAGS  = $(DIVINE_LDFLAGS) $(AM_LDFLAGS) $(CADP_LDFLAGS)
 
+## dve22lts-mpi
+#dve22lts_mpi_SOURCES  = spec2lts-mpi.c dve2-greybox.cpp dve2-greybox.h config.h
+#dve22lts_mpi_LDADD    = libltsmin-mpi.la $(DVEC2_LIBS) $(CADP_LIBS)
+#dve22lts_mpi_CPPFLAGS = -DDIVINE2 $(DIVINE2_CPPFLAGS) \
+#                          $(AM_CPPFLAGS)
+#dve22lts_mpi_LDFLAGS  = $(DIVINE2_LDFLAGS) $(AM_LDFLAGS) $(CADP_LDFLAGS)
+
 # lpo2lts-mpi
 lpo2lts_mpi_SOURCES  = spec2lts-mpi.c mcrl-greybox.c mcrl-greybox.h \
                        at-map.c at-map.h config.h
@@ -199,6 +231,11 @@ etf2lts_mpi_LDFLAGS  = $(AM_LDFLAGS) $(MCRL_LDFLAGS) $(CADP_LDFLAGS)
 libdve_open_la_SOURCES = spec_open.c dve-greybox.cpp dve-greybox.h
 libdve_open_la_CPPFLAGS = -DDIVINE $(DIVINE_CPPFLAGS) $(AM_CPPFLAGS) $(CADP_CPPFLAGS)
 libdve_open_la_LIBADD = libltsmin.la
+
+# libdve2-open.la
+libdve2_open_la_SOURCES = spec_open.c dve2-greybox.c dve2-greybox.h
+libdve2_open_la_CPPFLAGS = -DDIVINE2 $(DIVINE2_CPPFLAGS) $(AM_CPPFLAGS) $(CADP_CPPFLAGS)
+libdve2_open_la_LIBADD = libltsmin.la
 
 # liblpo-open.la
 liblpo_open_la_SOURCES = spec_open.c mcrl-greybox.c mcrl-greybox.h \

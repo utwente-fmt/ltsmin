@@ -35,6 +35,9 @@
 #if defined(DIVINE)
 #include "dve-greybox.h"
 #endif
+#if defined(DIVINE2)
+#include "dve2-greybox.h"
+#endif
 
 #include "fast_hash.h"
 
@@ -80,6 +83,9 @@ static  struct poptOption options[] = {
 #endif
 #if defined(DIVINE)
 	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, dve_options , 0 , "DiVinE options", NULL },
+#endif
+#if defined(DIVINE2)
+        { NULL, 0 , POPT_ARG_INCLUDE_TABLE, dve2_options , 0 , "DiVinE 2.2 options", NULL },
 #endif
     { "edge-encode" , 0 , POPT_ARG_VAL, &edge_encode , 1 , "encode the state labels on edges" , NULL },
 /*

@@ -18,6 +18,10 @@ if HAVE_DVEC
 bin_PROGRAMS += dve2torx
 endif
 
+if HAVE_DVEC2
+bin_PROGRAMS += dve22torx
+endif
+
 
 # etf2torx
 etf2torx_SOURCES  = \
@@ -35,6 +39,15 @@ dve2torx_SOURCES  = \
 dve2torx_LDADD    = ../libltsmin.la $(DVEC_LIBS)
 dve2torx_CPPFLAGS = -DDIVINE $(TORX_CPPFLAGS) $(DIVINE_CPPFLAGS) $(AM_CPPFLAGS)
 dve2torx_LDFLAGS  = $(DIVINE_LDFLAGS) $(AM_LDFLAGS)
+
+# dve22torx
+dve22torx_SOURCES  = \
+	../dve2-greybox.c ../dve2-greybox.h \
+	../lts.c ../lts.h \
+	spec2torx.c
+dve22torx_LDADD    = ../libltsmin.la $(DVEC2_LIBS)
+dve22torx_CPPFLAGS = -DDIVINE2 $(TORX_CPPFLAGS) $(DIVINE2_CPPFLAGS) $(AM_CPPFLAGS)
+dve22torx_LDFLAGS  = $(DIVINE2_LDFLAGS) $(AM_LDFLAGS)
 
 # lpo2torx
 lpo2torx_SOURCES  = \
