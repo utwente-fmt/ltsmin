@@ -1,5 +1,5 @@
 bin_PROGRAMS = ltsmin-convert gcf etf-convert ltsmin-tracepp
-noinst_PROGRAMS = test-bitset test-is-balloc test-dfs-stack test-hre ltsmin-parse
+noinst_PROGRAMS = test-bitset test-is-balloc test-dfs-stack test-hre ltsmin-parse test-dbs
 noinst_LTLIBRARIES = libutil.la libltsmin.la
 pkglib_LTLIBRARIES =
 
@@ -270,6 +270,10 @@ test_is_balloc_LDADD   = libltsmin.la
 # test-dfs-stack
 test_dfs_stack_SOURCES = test-dfs-stack.c
 test_dfs_stack_LDADD   = libltsmin.la
+
+# test-dbs
+test_dbs_SOURCES = test-dbs.c
+test_dbs_LDADD   = libltsmin.la
 
 # ltsmin-mpi
 ltsmin_mpi_SOURCES = sigmin-mpi.c sigmin-sig.h config.h seg-lts.c seg-lts.h \
