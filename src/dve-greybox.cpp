@@ -167,6 +167,10 @@ void DVEcompileGreyboxModel(model_t model, const char *filename){
     char *ret_filename = realpath (filename, abs_filename);
     if (ret_filename == NULL)
         FatalCall (1, error, "Cannot determine absolute path of %s", filename);
+    const char *basename = strrchr (abs_filename, '/');
+    if (basename == NULL)
+        Fatal (1, error, "Could not extract basename of file: %s", abs_filename);
+    ++basename;                         // skip '/'
     
     // get temporary directory
     const char *tmpdir = getenv("TMPDIR");
@@ -194,11 +198,6 @@ void DVEcompileGreyboxModel(model_t model, const char *filename){
         SYSFAIL(ret < 0, 1, error, "Command failed with exit code %d: %s", ret, command);
 
     // compile dve model
-    char *basename = strrchr (abs_filename, '/');
-    if (basename == NULL)
-        Fatal (1, error, "Could not extract basename of file: %s", abs_filename);
-    ++basename;                         // skip '/'
-    
     if (snprintf(command, sizeof command, "divine.precompile '%s/%s'", tmpdir, basename) >= (ssize_t)sizeof command)
         Fatal (1, error, "Cannot compile `%s' to `%s', paths too long", abs_filename, tmpdir);
         
@@ -320,8 +319,8 @@ void DVEloadGreyboxModel(model_t model, const char *filename){
         int type_value_count = lib_get_state_variable_type_value_count(i);
         if (type_value_count > 0) {
             for(int j=0; j < type_value_count; ++j) {
-                const char* type_value = lib_get_state_variable_type_value(i, j);
-                GBchunkPut(model, i, (chunk){strlen(type_value),(char*)type_value});
+                char *type_value = (char *)lib_get_state_variable_type_value(i, j);
+                GBchunkPut(model, i, chunk_str(type_value));
             }
         }
     }

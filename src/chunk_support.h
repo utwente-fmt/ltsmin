@@ -35,12 +35,12 @@ typedef struct {
 /**
 Convert a standard C string to a chunk.
 */
-#define chunk_str(s) ((chunk){.len=strlen(s),.data=(s)})
+#define chunk_str(s) ((chunk){strlen(s),(s)})
 
 /**
 Wrap a length and a pointer as a chunk.
 */
-#define chunk_ld(l,d) ((chunk){.len=l,.data=d})
+#define chunk_ld(l,d) ((chunk){l,d})
 
 /**
 \brief Copy the given binary source chunk and encode it as a string chunk.
