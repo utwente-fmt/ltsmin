@@ -85,6 +85,7 @@ void DVEexit()
 void DVE2compileGreyboxModel(model_t model, const char *filename){
     struct stat st;
     int ret;
+
     // check file exists
     if ((ret = stat (filename, &st)) != 0)
         FatalCall (1, error, "%s", filename);
@@ -93,6 +94,10 @@ void DVE2compileGreyboxModel(model_t model, const char *filename){
     char *ret_filename = realpath (filename, abs_filename);
     if (ret_filename == NULL)
         FatalCall (1, error, "Cannot determine absolute path of %s", filename);
+    const char *basename = strrchr (abs_filename, '/');
+    if (basename == NULL)
+        Fatal (1, error, "Could not extract basename of file: %s", abs_filename);
+    ++basename;                         // skip '/'
 
     // get temporary directory
     const char *tmpdir = getenv("TMPDIR");
@@ -103,7 +108,8 @@ void DVE2compileGreyboxModel(model_t model, const char *filename){
         FatalCall(1, error, "Cannot access `%s' for temporary compilation",
                   tmpdir);
 
-    if (snprintf (templatename, sizeof templatename, "%s/ltsmin-XXXXXX", tmpdir) >= (ssize_t)sizeof templatename)
+    int len = snprintf (templatename, sizeof templatename, "%s/ltsmin-XXXXXX", tmpdir);
+    if (len >= (ssize_t)sizeof templatename)
         Fatal (1, error, "Path too long: %s", tmpdir);
 
     atexit (DVEexit);                   // cleanup
@@ -121,11 +127,6 @@ void DVE2compileGreyboxModel(model_t model, const char *filename){
         FatalCall(1, error, "Cannot change directory: %s", tmpdir);
     
     // compile dve model
-    char *basename = strrchr (abs_filename, '/');
-    if (basename == NULL)
-        Fatal (1, error, "Could not extract basename of file: %s", abs_filename);
-    ++basename;                         // skip '/'
-
     char command[4096];
     if (snprintf(command, sizeof command, "divine compile --ltsmin '%s'", abs_filename) >= (ssize_t)sizeof command)
         Fatal (1, error, "Cannot compile `%s', paths too long", abs_filename);
@@ -228,13 +229,11 @@ void DVE2loadGreyboxModel(model_t model, const char *filename){
     GBsetLTStype(model, ltstype);
 
     // setting values for types
-    // chunk_str doesn't work?
     for(int i=0; i < ntypes; i++) {
         int type_value_count = get_state_variable_type_value_count(i);
         if (type_value_count > 0) {
             for(int j=0; j < type_value_count; ++j) {
                 const char* type_value = get_state_variable_type_value(i, j);
-                //GBchunkPut(model, i, (chunk){strlen(type_value),(char*)type_value});
                 GBchunkPut(model, i, chunk_str(type_value));
             }
         }
