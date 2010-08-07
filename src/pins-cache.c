@@ -45,7 +45,7 @@ edge_info_sz (struct group_cache *cache)
 }
 
 static void
-add_cache_entry (void *context, int *labels, int *dst)
+add_cache_entry (void *context, transition_info_t *ti, int *dst)
 {
     struct group_cache *ctx = (struct group_cache *)context;
     int                 dst_index =
@@ -56,8 +56,8 @@ add_cache_entry (void *context, int *labels, int *dst)
 
     int *pe_info = &ctx->dest[ctx->begin[ctx->explored]];
     *pe_info = dst_index;
-    if (labels != NULL)
-        memcpy(pe_info + EL_OFFSET, labels, ctx->Nedge_labels * sizeof *pe_info);
+    if (ti->labels != NULL)
+        memcpy(pe_info + EL_OFFSET, ti->labels, ctx->Nedge_labels * sizeof *pe_info);
 
     ctx->begin[ctx->explored] += edge_info_sz(ctx);
 }
@@ -95,7 +95,8 @@ cached_short (model_t self, int group, int *src, TransitionCB cb,
         memcpy (tmp, SIgetC (cache->idx, cache->dest[i], NULL),
                 cache->len);
         int *labels = cache->Nedge_labels == 0 ? NULL : &(cache->dest[i+EL_OFFSET]);
-        cb (user_context, labels, tmp);
+        transition_info_t cbti = {labels, group}; 
+        cb (user_context, &cbti, tmp);
     }
     return (cache->begin[src_idx + 1] - cache->begin[src_idx]) /
         edge_info_sz (cache);
