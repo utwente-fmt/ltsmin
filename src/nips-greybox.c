@@ -37,10 +37,6 @@ struct poptOption nips_options[]= {
 static const size_t MAX_INITIAL_STATE_COUNT = 10000;
 static const size_t MAX_NIPSVM_STATE_SIZE   = 65536;
 
-static lts_type_t ltstype;
-static matrix_t dm_info;
-static matrix_t sl_info;
-
 int ILABEL_TAU  = -1;
 
 static t_pid        NIPSgroupPID (int, nipsvm_state_t *);
@@ -520,7 +516,10 @@ NIPSloadGreyboxModel (model_t m, const char *filename)
     state_parts (initial, Cpart_glob_callback, Cpart_proc_callback,
                  Cpart_chan_callback, &Cpart_ctx);
 
-    ltstype=lts_type_create();
+    matrix_t *dm_info = RTmalloc(sizeof *dm_info);
+    matrix_t *sl_info =  RTmalloc(sizeof *sl_info);
+
+    lts_type_t ltstype=lts_type_create();
     if (lts_type_add_type(ltstype,"globals",NULL) != 0) {
         Fatal(1,error,"wrong type number");
     }
@@ -571,18 +570,18 @@ NIPSloadGreyboxModel (model_t m, const char *filename)
                  part_chan_callback, &part_ctx);
     GBsetInitialState (m, ivec);
 
-    dm_create (&dm_info, Cpart_ctx.nprocs, state_length);
-    for (int i = 0; i < dm_nrows(&dm_info); i++) {
+    dm_create (dm_info, Cpart_ctx.nprocs, state_length);
+    for (int i = 0; i < dm_nrows(dm_info); i++) {
         int                 temp[state_length];
         int                 len;
         len = NIPSgetProjection (vm, &Cpart_ctx, temp, i);
         for (int j = 0; j < len; j++)
-            dm_set (&dm_info, i, temp[j]);
+            dm_set (dm_info, i, temp[j]);
     }
 
-    GBsetDMInfo (m, &dm_info);
-    dm_create (&sl_info, 0, state_length);
-    GBsetStateLabelInfo (m, &sl_info);
+    GBsetDMInfo (m, dm_info);
+    dm_create (sl_info, 0, state_length);
+    GBsetStateLabelInfo(m, sl_info);
     GBsetNextStateLong (m, NIPSgetTransitionsLong);
     GBsetNextStateAll (m, NIPSgetTransitionsAll);
 }
