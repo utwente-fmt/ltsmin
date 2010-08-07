@@ -13,6 +13,8 @@ Language
 
   Each block should be separated by a blank line.
 
+* Always use #include <...>, never use #include "...".
+
 * Ensure that all C/C++ source code compiles under "-W -Wall -Werror".
 
   Unused variables will cause warnings, and thus should be flagged
