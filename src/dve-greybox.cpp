@@ -167,6 +167,10 @@ void DVEcompileGreyboxModel(model_t model, const char *filename){
     char *ret_filename = realpath (filename, abs_filename);
     if (ret_filename == NULL)
         FatalCall (1, error, "Cannot determine absolute path of %s", filename);
+    const char *basename = strrchr (abs_filename, '/');
+    if (basename == NULL)
+        Fatal (1, error, "Could not extract basename of file: %s", abs_filename);
+    ++basename;                         // skip '/'
     
     // get temporary directory
     const char *tmpdir = getenv("TMPDIR");
@@ -194,11 +198,6 @@ void DVEcompileGreyboxModel(model_t model, const char *filename){
         SYSFAIL(ret < 0, 1, error, "Command failed with exit code %d: %s", ret, command);
 
     // compile dve model
-    char *basename = strrchr (abs_filename, '/');
-    if (basename == NULL)
-        Fatal (1, error, "Could not extract basename of file: %s", abs_filename);
-    ++basename;                         // skip '/'
-    
     if (snprintf(command, sizeof command, "divine.precompile '%s/%s'", tmpdir, basename) >= (ssize_t)sizeof command)
         Fatal (1, error, "Cannot compile `%s' to `%s', paths too long", abs_filename, tmpdir);
         
