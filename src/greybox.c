@@ -371,7 +371,7 @@ void GBcopyChunkMaps(model_t dst, model_t src)
     dst->map = src->map;
 }
 
-int GBchunkPut(model_t model,int type_no,chunk c){
+int GBchunkPut(model_t model,int type_no,const chunk c){
 	return model->chunk2int(model->map[type_no],c.data,c.len);
 }
 

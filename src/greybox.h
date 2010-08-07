@@ -289,7 +289,7 @@ extern int GBchunkCount(model_t model,int type_no);
 This call translates a chunk to an integer.
 These integers must be from a range 0..count-1.
 */
-extern int GBchunkPut(model_t model,int type_no,chunk c);
+extern int GBchunkPut(model_t model,int type_no, const chunk c);
 
 /**
 \brief Get the a chunk in a type.
