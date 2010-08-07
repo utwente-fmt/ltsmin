@@ -434,6 +434,9 @@ void GBprintDependencyMatrix(FILE* file, model_t model) {
 static char* model_type[MAX_TYPES];
 static pins_loader_t model_loader[MAX_TYPES];
 static int registered=0;
+static char* model_type_pre[MAX_TYPES];
+static pins_loader_t model_preloader[MAX_TYPES];
+static int registered_pre=0;
 static int cache=0;
 static const char *regroup_options = NULL;
 
@@ -444,7 +447,7 @@ GBloadFile (model_t model, const char *filename, model_t *wrapped)
     if (extension) {
         extension++;
         for (int i = 0; i < registered; i++) {
-            if (!strcmp (model_type[i], extension)) {
+            if (0==strcmp (model_type[i], extension)) {
                 model_loader[i] (model, filename);
                 if (wrapped) {
                     if (regroup_options != NULL)
@@ -464,6 +467,23 @@ GBloadFile (model_t model, const char *filename, model_t *wrapped)
     }
 }
 
+void
+GBloadFileShared (model_t model, const char *filename)
+{
+    char               *extension = strrchr (filename, '.');
+    if (extension) {
+        extension++;
+        for (int i = 0; i < registered_pre; i++) {
+            if (0==strcmp (model_type_pre[i], extension)) {
+                model_preloader[i] (model, filename);
+                return;
+            }
+        }
+    } else {
+        Fatal (1, error, "filename %s doesn't have an extension", filename);
+    }
+}
+
 void GBregisterLoader(const char*extension,pins_loader_t loader){
 	if (registered<MAX_TYPES){
 		model_type[registered]=strdup(extension);
@@ -472,6 +492,16 @@ void GBregisterLoader(const char*extension,pins_loader_t loader){
 	} else {
 		Fatal(1,error,"model type registry overflow");
 	}
+}
+
+void GBregisterPreLoader(const char*extension,pins_loader_t loader){
+    if (registered_pre<MAX_TYPES){
+        model_type_pre[registered_pre]=strdup(extension);
+        model_preloader[registered_pre]=loader;
+        registered_pre++;
+    } else {
+        Fatal(1,error,"model type registry overflow");
+    }
 }
 
 struct poptOption greybox_options[]={

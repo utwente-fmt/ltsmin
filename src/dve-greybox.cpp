@@ -1,13 +1,20 @@
 #include <config.h>
-#include "system/state.hh"
 #include <iostream>
 #include <fstream>
+#include <assert.h>
+#include <errno.h>
+#include <limits.h>
+#include <stdio.h>
+#include <unistd.h>
+// DiVinE
 #include "common/array.hh"
+#include "system/state.hh"
+
+#include <tls.h>
 
 using namespace divine;
 
 namespace divine {
-
     class succ_container_t: public divine::array_t<state_t>
     {
     public:
@@ -26,7 +33,7 @@ size_t      (*lib_get_state_variable_count)();
 const char* (*lib_get_state_variable_name)(int var);
 size_t      (*lib_get_state_variable_type_count)();
 const char* (*lib_get_state_variable_type_name)(int type);
-const int   (*lib_get_state_variable_type)(int var);
+int         (*lib_get_state_variable_type)(int var);
 size_t      (*lib_get_state_variable_type_value_count)(int type);
 const char* (*lib_get_state_variable_type_value)(int type, int value);
 void        (*lib_project_state_to_int_array)(state_t state, int* proj);
@@ -57,51 +64,52 @@ extern "C" {
 #include <unistd.h>
 #include <limits.h>
 
-static void dve_popt(poptContext con,
-               enum poptCallbackReason reason,
-                            const struct poptOption * opt,
-                             const char * arg, void * data){
-	(void)con;(void)opt;(void)arg;(void)data;
-	switch(reason){
-	case POPT_CALLBACK_REASON_PRE:
-		break;
-	case POPT_CALLBACK_REASON_POST:
-		GBregisterLoader("dve", DVEcompileGreyboxModel);
-		GBregisterLoader("dveC",DVEloadGreyboxModel);
-		Warning(info,"Precompiled divine module initialized");
-		return;
-	case POPT_CALLBACK_REASON_OPTION:
-		break;
-	}
-	Fatal(1,error,"unexpected call to dve_popt");
+static void
+dve_popt(poptContext con,
+         enum poptCallbackReason reason,
+         const struct poptOption* opt,
+         const char* arg, void* data)
+{
+    (void)con;(void)opt;(void)arg;(void)data;
+    switch (reason) {
+    case POPT_CALLBACK_REASON_PRE:
+        break;
+    case POPT_CALLBACK_REASON_POST:
+        GBregisterPreLoader("dve", DVEcompileGreyboxModel);
+        GBregisterPreLoader("dveC", DVEloadDynamicLib);
+        GBregisterLoader("dve", DVEloadGreyboxModel);
+        GBregisterLoader("dveC", DVEloadGreyboxModel);
+        Warning(info,"Precompiled divine module initialized");
+        return;
+    case POPT_CALLBACK_REASON_OPTION:
+        break;
+    }
+    Fatal(1,error,"unexpected call to dve_popt");
 }
 
-struct poptOption dve_options[]= {
+struct poptOption dve_options[] = {
 	{ NULL, 0 , POPT_ARG_CALLBACK|POPT_CBFLAG_POST|POPT_CBFLAG_SKIPOPTION , (void*)&dve_popt, 0 , NULL , NULL },
 	POPT_TABLEEND
 };
 
 typedef struct grey_box_context {
-    int todo;
+    divine::succ_container_t cb_cont;
 } *gb_context_t;
 
-static void divine_get_initial_state(int* state)
+static void
+divine_get_initial_state (int* state)
 {
     divine::state_t s = lib_get_initial_state();
     lib_project_state_to_int_array(s, state);
     divine::delete_state(s);
 }
 
-static lts_type_t ltstype;
-static matrix_t dm_info;
-static matrix_t sl_info;
-static divine::succ_container_t cb_cont;
 static void* dlHandle = NULL;
-static char templatename[4096];
+static char templatename[PATH_MAX];
 transition_info_t transition_info = {NULL, -1};
 
 static int
-succ_callback(TransitionCB cb, void* context)
+succ_callback (TransitionCB cb, void* context, divine::succ_container_t& cb_cont)
 {
     int result = cb_cont.size();
     for(size_t i=0; i < (size_t)result;++i)
@@ -118,26 +126,27 @@ succ_callback(TransitionCB cb, void* context)
 static int
 divine_get_transitions_all(model_t self, int*src, TransitionCB cb, void*context)
 {
-    (void)self;
+    gb_context_t dve_ctx = (gb_context_t)GBgetContext(self);
     divine::state_t s = lib_new_state();
     lib_project_int_array_to_state(src, s);
-    lib_get_succ(s, cb_cont);
+    lib_get_succ(s, dve_ctx->cb_cont);
     divine::delete_state(s);
-    return succ_callback(cb, context);
+    return succ_callback(cb, context, dve_ctx->cb_cont);
 }
 
 static int
 divine_get_transitions_long(model_t self, int group, int*src, TransitionCB cb, void*context)
 {
-    (void)self;
+    gb_context_t dve_ctx = (gb_context_t)GBgetContext(self);
     divine::state_t s = lib_new_state();
     lib_project_int_array_to_state(src, s);
-    lib_get_transition_succ(group, s, cb_cont);
+    lib_get_transition_succ(group, s, dve_ctx->cb_cont);
     divine::delete_state(s);
-    return succ_callback(cb, context);
+    return succ_callback(cb, context, dve_ctx->cb_cont);
 }
 
-void DVEexit()
+void
+DVEexit()
 {
     // close dveC library
     if (dlHandle == NULL)
@@ -156,9 +165,12 @@ void DVEexit()
 
 #define SYSFAIL(cond,...)                                               \
     do { if (cond) FatalCall(__VA_ARGS__) Fatal(__VA_ARGS__); } while (0)
-void DVEcompileGreyboxModel(model_t model, const char *filename){
+void
+DVEcompileGreyboxModel(model_t model, const char *filename)
+{
     struct stat st;
     int ret;
+
     // check file exists
     if ((ret = stat (filename, &st)) != 0)
         FatalCall (1, error, "%s", filename);
@@ -171,25 +183,26 @@ void DVEcompileGreyboxModel(model_t model, const char *filename){
     if (basename == NULL)
         Fatal (1, error, "Could not extract basename of file: %s", abs_filename);
     ++basename;                         // skip '/'
-    
+
     // get temporary directory
-    const char *tmpdir = getenv("TMPDIR");
+    char *tmpdir = getenv("TMPDIR");
     if (tmpdir == NULL)
-        tmpdir = "/tmp";
+        tmpdir = (char*)"/tmp";
 
     if ((ret = stat (tmpdir, &st)) != 0)
         FatalCall(1, error, "Cannot access `%s' for temporary compilation",
                   tmpdir);
 
-    if (snprintf (templatename, sizeof templatename, "%s/ltsmin-XXXXXX", tmpdir) >= (ssize_t)sizeof templatename)
+    int len = snprintf (templatename, sizeof templatename, "%s/ltsmin-XXXXXX", tmpdir);
+    if (len >= (ssize_t)sizeof templatename)
         Fatal (1, error, "Path too long: %s", tmpdir);
-        
+
     atexit (DVEexit);                   // cleanup
     if ((tmpdir = mkdtemp(templatename)) == NULL)
         FatalCall(1, error, "Cannot create temporary directory for compilation: %s", tmpdir);
 
     // copy
-    char command[4096];
+    char command[PATH_MAX];
     // XXX shell escape filename
     if (snprintf (command, sizeof command, "cp '%s' '%s'", abs_filename, tmpdir) >= (ssize_t)sizeof command)
         Fatal (1, error, "Paths to long: cannot copy `%s' to `%s'", abs_filename, tmpdir);
@@ -199,30 +212,30 @@ void DVEcompileGreyboxModel(model_t model, const char *filename){
 
     // compile dve model
     if (snprintf(command, sizeof command, "divine.precompile '%s/%s'", tmpdir, basename) >= (ssize_t)sizeof command)
-        Fatal (1, error, "Cannot compile `%s' to `%s', paths too long", abs_filename, tmpdir);
-        
+        Fatal (1, error, "Cannot copy `%s' to `%s', paths too long", abs_filename, tmpdir);
+
     if ((ret = system(command)) != 0)
         SYSFAIL(ret < 0, 1, error, "Command failed with exit code %d: %s", ret, command);
 
     // check existence of dveC file
-    char dveC_fname[4096];
-    if (snprintf (dveC_fname, sizeof dveC_fname, "%s/%sC", tmpdir, basename) >= (ssize_t)sizeof dveC_fname)
+    char dveC[PATH_MAX];
+    if (snprintf (dveC, sizeof dveC, "%s/%sC", tmpdir, basename) >= (ssize_t)sizeof dveC)
         Fatal (1, error, "Path too long: %s", tmpdir);
-    
-    if ((ret = stat (dveC_fname, &st)) != 0)
-        SYSFAIL(ret < 0, 1, error, "File not found: %s", dveC_fname);
 
-    DVEloadGreyboxModel(model, dveC_fname);
+    if ((ret = stat (dveC, &st)) != 0)
+        SYSFAIL(ret < 0, 1, error, "File not found: %s", dveC);
+
+    DVEloadDynamicLib(model, dveC);
 }
 #undef SYSFAIL
 
-void DVEloadGreyboxModel(model_t model, const char *filename){
-	gb_context_t ctx=(gb_context_t)RTmalloc(sizeof(struct grey_box_context));
-	GBsetContext(model,ctx);
-
+void
+DVEloadDynamicLib (model_t model, const char *filename)
+{
+    (void)model;
     // Open dveC file
     char abs_filename[PATH_MAX];
-	char *ret_filename = realpath(filename, abs_filename);
+    char *ret_filename = realpath(filename, abs_filename);
     if (ret_filename) {
         dlHandle = dlopen(abs_filename, RTLD_LAZY);
         if (dlHandle == NULL)
@@ -263,7 +276,7 @@ void DVEloadGreyboxModel(model_t model, const char *filename){
         RTdlsym (filename, dlHandle, "lib_get_state_variable_type_count");
     lib_get_state_variable_type_name = (const char* (*)(int type))
         RTdlsym (filename, dlHandle, "lib_get_state_variable_type_name");
-    lib_get_state_variable_type  = (const int (*)(int var))
+    lib_get_state_variable_type  = (int (*)(int var))
         RTdlsym (filename, dlHandle, "lib_get_state_variable_type");
     lib_get_state_variable_type_value_count = (size_t (*)(int))
         RTdlsym (filename, dlHandle, "lib_get_state_variable_type_value_count");
@@ -286,6 +299,30 @@ void DVEloadGreyboxModel(model_t model, const char *filename){
     if (lib_system_with_property()) {
         Fatal(1,error,"DVE models with properties are currently not supported!");
     }
+}
+
+void
+DVEloadGreyboxModel (model_t model, const char *filename)
+{
+
+    lts_type_t ltstype;
+    matrix_t *dm_info = (matrix_t*) RTmalloc(sizeof(matrix_t));
+    matrix_t *sl_info = (matrix_t*) RTmalloc(sizeof(matrix_t));
+    
+    //assume sequential use:
+    if (NULL == dlHandle) {
+        char *extension = strrchr ((char*)filename, '.');
+        assert (extension != NULL);
+        ++extension;
+        if (0==strcmp (extension, "dveC")) {
+            DVEloadDynamicLib(model, filename);
+        } else {
+            DVEcompileGreyboxModel(model, filename);
+        }
+    }
+
+    gb_context_t ctx=new grey_box_context();
+    GBsetContext(model,ctx);
 
     // get ltstypes
     int state_length = lib_get_state_variable_count();
@@ -327,18 +364,18 @@ void DVEloadGreyboxModel(model_t model, const char *filename){
     lts_type_validate(ltstype);
 
     int ngroups = lib_get_transition_count();
-	dm_create(&dm_info, ngroups, state_length);
-    for(int i=0; i < dm_nrows(&dm_info); i++) {
+	dm_create(dm_info, ngroups, state_length);
+    for(int i=0; i < dm_nrows(dm_info); i++) {
         int* proj = lib_get_transition_proj(i);
 		for(int j=0; j<state_length; j++) {
-            if (proj[j]) dm_set(&dm_info, i, j);
+            if (proj[j]) dm_set(dm_info, i, j);
         }
     }
-    GBsetDMInfo(model, &dm_info);
+    GBsetDMInfo(model, dm_info);
 
     // there are no state labels
-    dm_create(&sl_info, 0, state_length);
-    GBsetStateLabelInfo(model, &sl_info);
+    dm_create(sl_info, 0, state_length);
+    GBsetStateLabelInfo(model, sl_info);
 
     // get initial state
 	int state[state_length];
