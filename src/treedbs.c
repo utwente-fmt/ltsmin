@@ -10,15 +10,10 @@
 #define INIT_HASH_SIZE 256
 #define INIT_HASH_MASK 0x0ff
 
-//static inline int hashvalue(int left,int right) { return (236487217*left+677435677*right) ; }
-/*
+
 static inline uint32_t hashvalue(int left,int right) {
-	return SuperFastHash(&left,4,SuperFastHash(&right,4,0));
+    return SuperFastHash(&left, sizeof left, SuperFastHash(&right, sizeof right, 0));
 }
-*/
-
-#define hashvalue(left,right) SuperFastHash((void*)&(left),4,SuperFastHash((void*)&(right),4,0))
-
 
 struct treedbs_s {
 	int nPars;
@@ -69,8 +64,9 @@ static void resize_data(treedbs_t dbs,int node){
 	//ATwarning("resize of %d to %d succesful",node,db_size[node]);
 }
 
-static int db_insert(treedbs_t dbs,int node,int left, int right){
+static int db_insert(treedbs_t dbs,int node,int left, int right, int * seen){
 	int result,hash;
+    *seen=1;
 
 	hash=hashvalue(left,right)&dbs->db_mask[node];
 	result=dbs->db_hash[node][hash];
@@ -90,6 +86,7 @@ static int db_insert(treedbs_t dbs,int node,int left, int right){
 		dbs->db_right[node][result]=right;
 		dbs->db_bucket[node][result]=dbs->db_hash[node][hash];
 		dbs->db_hash[node][hash]=result;
+        *seen = 0;
 	}
 	return result;
 }
@@ -103,7 +100,21 @@ int TreeCount(treedbs_t dbs){
 	}
 }
 
-int TreeFold(treedbs_t dbs,int *vector){
+int TreeDBSlookup_ret(treedbs_t dbs, int *vector, int *ret) {
+    return TreeFold_ret(dbs, vector, ret);
+}
+
+int TreeDBSlookup(treedbs_t dbs, int *vector) {
+    return TreeFold(dbs, vector);
+}
+
+int TreeFold(treedbs_t dbs,int *vector) {
+    int *idx = RTmalloc(sizeof *idx);
+    TreeFold_ret(dbs,vector,idx);
+    return *idx;
+}
+
+int TreeFold_ret(treedbs_t dbs,int *vector, int *idx){
 	int nPars=dbs->nPars;
 	if (nPars==1) {
 		//Warning(info,"insert %d",vector[0]);
@@ -130,15 +141,18 @@ int TreeFold(treedbs_t dbs,int *vector){
 		//Warning(info,"insert %d as %d",vector[0],dbs->map[vector[0]]);
 		return dbs->map[vector[0]];
 	} else {
+        int seen = 0;
 		int tmp[nPars];
 		for(int i=nPars-1;i>0;i--) {
 			int left=dbs->db_tree_left[i];
 			int right=dbs->db_tree_right[i];
 			tmp[i]=db_insert(dbs,i,
 				(left<nPars)?tmp[left]:vector[left-nPars],
-				(right<nPars)?tmp[right]:vector[right-nPars]);
+				(right<nPars)?tmp[right]:vector[right-nPars],
+                &seen);
 		}
-		return tmp[1];
+        *idx=tmp[1];
+		return seen;
 	}
 }
 
@@ -259,6 +273,9 @@ void TreeDBSfree(treedbs_t dbs){
 	}
 }
 
+void TreeDBSstats(treedbs_t dbs) {
+    TreeInfo(dbs);
+}
 
 static void TreeInfoPrint(int depth,int node,treedbs_t dbs){
 	if (node>=dbs->nPars) return;
