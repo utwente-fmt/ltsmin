@@ -9,6 +9,7 @@
 #include <libgen.h>
 #include <git_version.h>
 #include <hre-main.h>
+#include <assert.h>
 
 int RTverbosity=1;
 
@@ -75,6 +76,25 @@ void* RTmallocZero(size_t size){
 	void *p=RTmalloc(size);
 	memset(p, 0, size);
 	return p;
+}
+
+void* RTalign(size_t align, size_t size)
+{
+    void *ret;
+    errno = posix_memalign(&ret, align, size);
+    if (errno) {
+    switch (errno) {
+        case ENOMEM:
+            Fatal(0,error,"out of memory on allocating %d bytes aligned at %d", 
+                  size, align);
+        case EINVAL:
+            Fatal(0,error,"invalid alignment %d", align);
+        default:
+            Fatal(0,error,"unknown error allocating %d bytes aligned at %d", 
+                  size, align);
+    }}
+    assert(NULL != ret);
+    return ret;
 }
 
 void* RTrealloc(void *rt_ptr, size_t size){

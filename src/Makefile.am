@@ -318,6 +318,7 @@ libutil_la_SOURCES := unix.c runtime.c stream.c archive.c			\
                     archive_io_ops.c fifo.c fifo.h \
                     is-balloc.c is-balloc.h \
                     dfs-stack.c dfs-stack.h \
+                    tls.c tls.h \
                     balloc.c balloc.h bitset.c bitset.h
 
 libutil_la_LIBADD = ltsmin-grammar.lo dm/libdm.la
