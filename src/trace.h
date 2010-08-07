@@ -1,21 +1,31 @@
 #ifndef TRACE_H
 #define TRACE_H
 
-#include <treedbs.h>
 #include <lts-type.h>
-#include <stringindex.h>
+#include <greybox.h>
 
-typedef struct trace_s {
-    int len;
-    lts_type_t ltstype;
-    string_index_t* values;
-    treedbs_t state_db;
-    treedbs_t map_db; // NULL als aantal defined state labels == 0
-    treedbs_t edge_db; // NULL als aantal edges labels == 0
-    int *state_lbl; // NULL als geen definined state labels
-    int *edge_lbl; // NULL als geen edge labels
-} *trace_t;
+typedef struct trc_s *trc_t;
+typedef void *(*trc_get_state_f)(int state_no, int *state);
+typedef struct trc_env_s trc_env_t;
 
-extern trace_t read_trace(const char *name);
+extern int trc_get_length(trc_t trace);
+
+extern lts_type_t trc_get_ltstype(trc_t trace);
+
+extern int trc_get_type(trc_t trace, int type, int label, size_t dst_size, 
+                        char* dst);
+
+extern int trc_get_edge_label(trc_t trace, int i, int *dst);
+
+extern int trc_get_state_label(trc_t trace, int i, int *dst);
+
+extern void trc_get_state(trc_t trace, int i, int *dst);
+
+extern trc_t trc_read(const char *name);
+
+extern trc_env_t *trc_create(model_t model, trc_get_state_f get, int start_idx);
+
+extern void trc_find_and_write (trc_env_t *env, char *trc_output, 
+                                int dst_idx, int level, int *parent_ofs);
 
 #endif

@@ -6,6 +6,7 @@
 #include <string.h>
 #include "runtime.h"
 #include <dir_ops.h>
+#include <lts_io.h>
 
 /********************************************************************************/
 
@@ -61,8 +62,6 @@ static void archive_copy(archive_t src,char*decode,archive_t dst,string_map_t en
 #define GCF_EXTRACT 2
 
 static char* policy="gzip";
-static int blocksize=32768;
-static int blockcount=32;
 static int operation=GCF_FILE;
 static int force=0;
 
@@ -71,8 +70,8 @@ static  struct poptOption options[] = {
 	{ "create-dz",0, POPT_ARG_VAL , &operation , GCF_DIR , "create a compressed directory instead of an archive file" , NULL },
 	{ "extract",'x', POPT_ARG_VAL , &operation , GCF_EXTRACT , "extract files from an archive" , NULL },
 	{ "force",'f' ,  POPT_ARG_VAL , &force , 1 , "force creation of a directory for output" , NULL },
-	{ "block-size" , 0 , POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT , &blocksize , 0 , "set the size of a block in bytes" , "<bytes>" },
-	{ "cluster-size" , 0 , POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT , &blockcount , 0 , "set the number of blocks in a cluster" , "<blocks>"},
+	{ "block-size" , 0 , POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT , &IO_BLOCKSIZE , 0 , "set the size of a block in bytes" , "<bytes>" },
+	{ "cluster-size" , 0 , POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT , &IO_BLOCKCOUNT , 0 , "set the number of blocks in a cluster" , "<blocks>"},
 	{ "compression",'z',POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT,
 		&policy,0,"set the compression policy used in the archive","<policy>"},
 	POPT_TABLEEND
@@ -92,44 +91,44 @@ int main(int argc, char *argv[]){
 				Fatal(1,error,"extraction uses gcf -x <gcf> [<dir>|<pattern>]");
 			}
 			if (strstr(out_name,"%s")) {
-				dir=arch_fmt(out_name,file_input,file_output,blocksize);
+				dir=arch_fmt(out_name,file_input,file_output,IO_BLOCKSIZE);
 			} else {
-				dir=arch_dir_create(out_name,blocksize,force?DELETE_ALL:DELETE_NONE);
+				dir=arch_dir_create(out_name,IO_BLOCKSIZE,force?DELETE_ALL:DELETE_NONE);
 			}
 		} else {
-			dir=arch_dir_open(".",blocksize);
+			dir=arch_dir_open(".",IO_BLOCKSIZE);
 		}
 		if (is_a_dir(gcf_name)){
-			gcf=arch_dir_open(gcf_name,blocksize);
+			gcf=arch_dir_open(gcf_name,IO_BLOCKSIZE);
 		} else {
 			gcf=arch_gcf_read(raf_unistd(gcf_name));
 		}
-		archive_copy(gcf,"auto",dir,NULL,blocksize);
+		archive_copy(gcf,"auto",dir,NULL,IO_BLOCKSIZE);
 		arch_close(&dir);
 		arch_close(&gcf);
 	} else {
 		if (operation==GCF_FILE){
-			gcf=arch_gcf_create(raf_unistd(gcf_name),blocksize,blocksize*blockcount,0,1);
+			gcf=arch_gcf_create(raf_unistd(gcf_name),IO_BLOCKSIZE,IO_BLOCKSIZE*IO_BLOCKCOUNT,0,1);
 		} else {
-			gcf=arch_dir_create(gcf_name,blocksize,force?DELETE_ALL:DELETE_NONE);
+			gcf=arch_dir_create(gcf_name,IO_BLOCKSIZE,force?DELETE_ALL:DELETE_NONE);
 		}
 		for(;;){
 			char *input_name=RTinitNextArg();
 			if (!input_name) break;
 			if (is_a_dir(input_name)){
 				Warning(info,"copying contents of %s",input_name);
-				archive_t dir=arch_dir_open(input_name,blocksize);
-				archive_copy(dir,NULL,gcf,compression_policy,blocksize);
+				archive_t dir=arch_dir_open(input_name,IO_BLOCKSIZE);
+				archive_copy(dir,NULL,gcf,compression_policy,IO_BLOCKSIZE);
 				arch_close(&dir);
 			} else {
 				Warning(info,"copying %s",input_name);
 				stream_t is=file_input(input_name);
 				stream_t os=arch_write(gcf,input_name,SSMcall(compression_policy,input_name),1);
-				char buf[blocksize];
+				char buf[IO_BLOCKSIZE];
 				for(;;){
-					int len=stream_read_max(is,buf,blocksize);
+					int len=stream_read_max(is,buf,IO_BLOCKSIZE);
 					if (len) stream_write(os,buf,len);
-					if(len<blocksize) break;
+					if(len<IO_BLOCKSIZE) break;
 				}
 				stream_close(&is);
 				stream_close(&os);	

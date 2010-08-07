@@ -10,6 +10,9 @@
 #include <inttypes.h>
 #include <lts_count.h>
 
+int IO_PLAIN=0;
+int IO_BLOCKSIZE=32768;
+int IO_BLOCKCOUNT=32;
 
 #ifdef HAVE_BCG_USER_H
 #include <bcg_user.h>

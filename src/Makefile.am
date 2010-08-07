@@ -75,7 +75,7 @@ etf_convert_SOURCES = etf-convert.c
 etf_convert_LDADD = libltsmin.la
 
 # ltsmin-tracepp
-ltsmin_tracepp_SOURCES = ltsmin-tracepp.c trace.h
+ltsmin_tracepp_SOURCES = ltsmin-tracepp.c
 ltsmin_tracepp_LDADD = libltsmin.la $(CADP_LIBS)
 ltsmin_tracepp_LDFLAGS = $(AM_LDFLAGS) $(CADP_LDFLAGS)
 
@@ -320,6 +320,7 @@ libutil_la_SOURCES := unix.c runtime.c stream.c archive.c			\
                     vdom_object.h lts_io.c lts_io.h lts_io_internal.h \
                     lts_enum.c lts_enum.h lts_count.c lts_count.h \
                     archive_io_ops.c fifo.c fifo.h \
+                    trace.c trace.h \
                     is-balloc.c is-balloc.h \
                     dfs-stack.c dfs-stack.h \
                     tls.c tls.h \
