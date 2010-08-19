@@ -330,6 +330,21 @@ static void set_enum_match_fdd(vset_t set,int p_len,int* proj,int*match,vset_ele
 	vset_enum_do_fdd(set->dom,subset,set->proj,vec,N-1,cb,context);
 }
 
+static void set_copy_match_fdd(vset_t dst,vset_t src,int p_len,int* proj,int*match){
+    // delete reference to dst
+    bdd_delref(dst->bdd);
+    // use dst->bdd as subset
+    dst->bdd=src->bdd;
+    bdd_addref(dst->bdd);
+    for(int i=0;i<p_len;i++){
+        BDD val=mkvar(src->dom,proj[i],match[i]);
+        BDD tmp=bdd_addref(bdd_and(dst->bdd,val));
+        bdd_delref(dst->bdd);
+        dst->bdd=tmp;
+        rmvar(val);
+    }
+}
+
 static void count_fdd(BDD bdd, BDD p_set,long *nodes,bn_int_t *elements)
 {
     *nodes=bdd_nodecount(bdd);
@@ -461,6 +476,7 @@ vdom_t vdom_create_fdd(int n){
 	dom->shared.set_copy=set_copy_all;
 	dom->shared.set_enum=set_enum_fdd;
 	dom->shared.set_enum_match=set_enum_match_fdd;
+	dom->shared.set_copy_match=set_copy_match_fdd;
 	dom->shared.set_count=set_count_fdd;
 	dom->shared.set_union=set_union_fdd;
 	dom->shared.set_minus=set_minus_fdd;

@@ -19,6 +19,7 @@ struct vector_domain_shared {
 	void (*set_clear)(vset_t set);
 	void (*set_enum)(vset_t set,vset_element_cb cb,void* context);
 	void (*set_enum_match)(vset_t set,int p_len,int* proj,int*match,vset_element_cb cb,void* context);
+	void (*set_copy_match)(vset_t src,vset_t dst,int p_len,int* proj,int*match);
 	void (*set_example)(vset_t set,int *e);
 	void (*set_copy)(vset_t dst,vset_t src);
 	void (*set_project)(vset_t dst,vset_t src);

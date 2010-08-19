@@ -120,6 +120,11 @@ the given context and the set element.
 extern void vset_enum_match(vset_t set,int p_len,int* proj,int*match,vset_element_cb cb,void* context);
 
 /**
+\brief Copy the elements of a set that match the given projection.
+*/
+extern void vset_copy_match(vset_t dst, vset_t src, int p_len,int* proj,int*match);
+
+/**
 \brief Produce a member of a non-empty set.
 */
 extern void vset_example(vset_t set,int *e);

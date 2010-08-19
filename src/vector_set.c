@@ -100,6 +100,7 @@ void vdom_init_shared(vdom_t dom,int n){
 	dom->shared.set_copy=NULL;
 	dom->shared.set_enum=NULL;
 	dom->shared.set_enum_match=NULL;
+	dom->shared.set_copy_match=NULL;
 	dom->shared.set_count=NULL;
 	dom->shared.set_union=NULL;
 	dom->shared.set_minus=NULL;
@@ -151,6 +152,10 @@ void vset_enum(vset_t set,vset_element_cb cb,void* context){
 
 void vset_enum_match(vset_t set,int p_len,int* proj,int*match,vset_element_cb cb,void* context){
 	set->dom->shared.set_enum_match(set,p_len,proj,match,cb,context);
+}
+
+void vset_copy_match(vset_t dst,vset_t src,int p_len,int* proj,int*match){
+	dst->dom->shared.set_copy_match(dst,src,p_len,proj,match);
 }
 
 void vset_example(vset_t set,int *e){
