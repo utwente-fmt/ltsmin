@@ -1250,6 +1250,24 @@ void set_prev_tree(vset_t dst,vset_t src,vrel_t rel){
 
 static void reorder() {}
 
+static void set_enum_match_tree(vset_t set,int p_len,int* proj,int*match,vset_element_cb cb,void* context){
+    (void)set;
+    (void)p_len;
+    (void)proj;
+    (void)match;
+    (void)cb;
+    (void)context;
+    Fatal(1, error, "Set enum match tree not implemented!");
+}
+
+static void set_copy_match_tree(vset_t dst,vset_t src, int p_len,int* proj,int*match){
+    (void)dst;
+    (void)src;
+    (void)p_len;
+    (void)proj;
+    (void)match;
+    Fatal(1, error, "Set copy match tree not implemented!");
+}
 
 vdom_t vdom_create_tree(int n){
 	Warning(info,"Creating an AtermDD tree domain.");
@@ -1264,7 +1282,8 @@ vdom_t vdom_create_tree(int n){
 	dom->shared.set_clear=set_clear_both;
 	dom->shared.set_copy=set_copy_both;
 	dom->shared.set_enum=set_enum_tree;
-	dom->shared.set_enum_match=set_enum_match_list; // TODO
+	dom->shared.set_enum_match=set_enum_match_tree;
+	dom->shared.set_copy_match=set_copy_match_tree;
 	dom->shared.set_example=set_example_tree;
 	dom->shared.set_count=set_count_tree;
 	dom->shared.rel_count=rel_count_tree;
