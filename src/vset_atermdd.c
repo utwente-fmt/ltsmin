@@ -72,7 +72,7 @@ struct vector_relation {
 
 static ATerm emptyset=NULL;
 static AFun cons;
-static AFun zip,min,sum,pi,reach,inv_reach;
+static AFun zip,min,sum,pi,reach,inv_reach,match;
 static ATerm atom;
 static ATerm Atom=NULL;
 static ATerm Empty=NULL;
@@ -104,6 +104,8 @@ static void set_init(){
 	ATprotectAFun(min);
 	sum=ATmakeAFun("VSET_UNION",2,ATfalse);
 	ATprotectAFun(sum);
+	match=ATmakeAFun("VSET_MATCH",1,ATfalse);
+	ATprotectAFun(match);
 	pi=ATmakeAFun("VSET_PI",1,ATfalse);
 	ATprotectAFun(pi);
 	reach=ATmakeAFun("VSET_REACH",2,ATfalse);
@@ -609,6 +611,60 @@ static void set_enum_match_list(vset_t set,int p_len,int* proj,int*match,vset_el
 	ATermIndexedSet dead_branches=ATindexedSetCreate(HASH_INIT,HASH_LOAD);
 	set_enum_match_2(dead_branches,set->set,vec,N,pattern,proj,p_len,vset_match_wrap,0);
 	ATindexedSetDestroy(dead_branches);
+}
+
+/* return NULL : error, or matched vset */
+static ATerm
+set_copy_match_2(ATerm set, int len, ATerm*pattern, int *proj, int p_len, int ofs) {
+    ATerm key, res, tmp = emptyset;
+
+    // lookup in cache
+    key = (ATerm)ATmakeAppl1(match,set);
+    res = ATtableGet(global_ct,key);
+    if (res) return res;
+
+    res = emptyset;
+
+    if (ATgetAFun(set) == cons) {
+        ATerm el=ATgetArgument(set,0);
+        if (ofs<len) {
+            // if still matching and this offset matches,
+            // compare the aterm and return it if it matches
+            if (p_len && proj[0]==ofs) {
+                // does it match?
+                if (ATisEqual(pattern[0],el)) {
+                    // try to match the next element, return the result
+                    tmp=set_copy_match_2(ATgetArgument(set,1),len,pattern+1, proj+1, p_len-1,ofs+1);
+                }
+            // not matching anymore or the offset doesn't match
+            } else {
+                tmp=set_copy_match_2(ATgetArgument(set,1),len,pattern, proj, p_len,ofs+1);
+            }
+        }
+        // test matches in second argument
+        if (ofs<=len) {
+            res=set_copy_match_2(ATgetArgument(set,2),len,pattern, proj, p_len,ofs);
+        }
+        // combine results
+        res = MakeCons(el, tmp, res);
+    } else {
+        if (ATisEqual(set,atom) && ofs==len) {
+            res=set;
+        } else {
+            res=emptyset;
+        }
+    }
+    ATtablePut(global_ct,key,res);
+    return res;
+}
+
+static void set_copy_match_list(vset_t dst,vset_t src,int p_len,int* proj,int*match) {
+	int N=src->p_len?src->p_len:src->dom->shared.size;
+	ATerm pattern[p_len];
+	for(int i=0;i<p_len;i++) pattern[i]=(ATerm)ATmakeInt(match[i]);
+	dst->set = set_copy_match_2(src->set,N,pattern,proj,p_len,0);
+
+	ATtableReset(global_ct);
 }
 
 static ATerm set_union_2(ATerm s1, ATerm s2,char lookup) {
@@ -1314,6 +1370,7 @@ vdom_t vdom_create_list(int n){
 	dom->shared.set_copy=set_copy_both;
 	dom->shared.set_enum=set_enum_list;
 	dom->shared.set_enum_match=set_enum_match_list;
+	dom->shared.set_copy_match=set_copy_match_list;
 	dom->shared.set_example=set_example_list;
 	dom->shared.set_count=set_count_list;
 	dom->shared.rel_count=rel_count_list;
