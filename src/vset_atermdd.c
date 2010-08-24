@@ -1316,13 +1316,67 @@ static void set_enum_match_tree(vset_t set,int p_len,int* proj,int*match,vset_el
     Fatal(1, error, "Set enum match tree not implemented!");
 }
 
+
+static ATerm
+set_copy_match_tree_2(ATerm set, int len,int *matchv, int *proj, int p_len, int ofs, int shift, int cur) {
+    ATerm key, res;
+
+    // lookup in cache
+    key = (ATerm)ATmakeAppl1(match,set);
+    res = ATtableGet(global_ct,key);
+    if (res) return res;
+
+    res = Empty;
+
+    if (ATgetAFun(set) == cons) {
+        // should always be true, check anyway
+        if (ofs<=len) {
+            // if still matching and this offset matches,
+            // compare the match to the computed current-1
+            if (p_len && proj[0]==ofs) {
+                // does it match?
+                if (matchv[0] == shift+cur-1) { // remember: can't store zero, thus -1
+                    // try to match the next element, return the result
+                    res = MCons(
+                            set_copy_match_tree_2(Down(set), len, matchv+1, proj+1, p_len-1, ofs+1, 1, 0),
+                            Empty,
+                            Empty
+                          );
+                } else {
+                    res = MCons(
+                            Empty,
+                            set_copy_match_tree_2(Left(set), len, matchv, proj, p_len, ofs, shift<<1, cur),
+                            set_copy_match_tree_2(Right(set), len, matchv, proj, p_len, ofs, shift<<1, shift|cur)
+                          );
+                }
+            // not matching anymore or the offset doesn't match
+            } else {
+                res = MCons(
+                        set_copy_match_tree_2(Down(set), len, matchv, proj, p_len, ofs+1, 1, 0),
+                        set_copy_match_tree_2(Left(set), len, matchv, proj, p_len, ofs, shift<<1, cur),
+                        set_copy_match_tree_2(Right(set), len, matchv, proj, p_len, ofs, shift<<1, shift|cur)
+                      );
+            }
+        }
+    } else {
+        if (ATisEqual(set,Atom) && ofs>=len) {
+            res=set;
+        } else {
+            res=Empty;
+        }
+    }
+    ATtablePut(global_ct,key,res);
+    return res;
+}
+
 static void set_copy_match_tree(vset_t dst,vset_t src, int p_len,int* proj,int*match){
-    (void)dst;
-    (void)src;
-    (void)p_len;
-    (void)proj;
-    (void)match;
-    Fatal(1, error, "Set copy match tree not implemented!");
+    int N=src->p_len?src->p_len:src->dom->shared.size;
+    if (p_len == 0) {
+        dst->set = Empty;
+    } else {
+        dst->set = set_copy_match_tree_2(src->set,N,match,proj,p_len,0, 1, 0);
+        ATtableReset(global_ct);
+    }
 }
 
 vdom_t vdom_create_tree(int n){
