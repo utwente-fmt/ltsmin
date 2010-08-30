@@ -72,7 +72,7 @@ struct vector_relation {
 
 static ATerm emptyset=NULL;
 static AFun cons;
-static AFun zip,min,sum,pi,reach,inv_reach,match;
+static AFun zip,min,sum,intersect,pi,reach,inv_reach,match;
 static ATerm atom;
 static ATerm Atom=NULL;
 static ATerm Empty=NULL;
@@ -104,6 +104,8 @@ static void set_init(){
 	ATprotectAFun(min);
 	sum=ATmakeAFun("VSET_UNION",2,ATfalse);
 	ATprotectAFun(sum);
+    intersect=ATmakeAFun("VSET_INTERSECT",2,ATfalse);
+    ATprotectAFun(intersect);
 	match=ATmakeAFun("VSET_MATCH",1,ATfalse);
 	ATprotectAFun(match);
 	pi=ATmakeAFun("VSET_PI",1,ATfalse);
@@ -128,6 +130,14 @@ static vset_t set_create_both(vdom_t dom,int k,int* proj){
 	set->p_len=k;
 	for(int i=0;i<k;i++) set->proj[i]=proj[i];
 	return set;
+}
+
+static void set_destroy_both(vset_t set) {
+    // not sure what to do, give it a try
+    free(set->dom);
+    ATunprotect(&set->set);
+    set->p_len = 0;
+    free(set);
 }
 
 static vrel_t rel_create_both(vdom_t dom,int k,int* proj){
@@ -699,6 +709,37 @@ static void set_union_list(vset_t dst,vset_t src){
 	ATtableReset(global_ct);
 }
 
+static ATerm set_intersect_2(ATerm s1, ATerm s2,char lookup) {
+  if (s1==atom && s2==atom) return atom;
+  else if (s1==emptyset) return emptyset;
+  else if (s2==emptyset) return emptyset;
+  else { ATerm key=NULL,res=NULL;
+    if (lookup) {
+      key = (ATerm)ATmakeAppl2(intersect,s1,s2);
+      res = ATtableGet(global_ct,key);
+      if (res) return res;
+    }
+    { // either not looked up, or not found in cache: compute
+      ATerm x = ATgetArgument(s1,0);
+      ATerm y = ATgetArgument(s2,0);
+      int c = ATcmp(x,y);
+      if (c==0)     res=MakeCons(x, set_intersect_2(ATgetArgument(s1,1),ATgetArgument(s2,1),1),
+			            set_intersect_2(ATgetArgument(s1,2),ATgetArgument(s2,2),1));
+      // x < y
+      else if (c<0) res=set_intersect_2(ATgetArgument(s1,2),s2,1);
+      else          res = set_intersect_2(s1, ATgetArgument(s2,2),1);
+
+      if (lookup) ATtablePut(global_ct,key,res);
+      return res;
+    }
+  }
+}
+
+static void set_intersect_list(vset_t dst,vset_t src){
+	dst->set=set_intersect_2(dst->set,src->set,0);
+	ATtableReset(global_ct);
+}
+
 static ATerm set_minus_2(ATerm a,ATerm b, char lookup) {
   if (b==emptyset) return a;
   else if (a==emptyset) return emptyset;
@@ -1007,6 +1048,39 @@ static void set_union_tree(vset_t dst, vset_t src) {
 	ATtableReset(global_ct);
 }
 
+
+#if 0
+intersect Atom Atom = Atom
+intersect Empty _   = Empty
+intersect _ Empty = Empty
+intersect (Cons dstdown dstleft dstright) (Cons srcdown srcleft srcright) = Cons (intersect dstdown srcdown) (intersect dstleft srcleft) (intersect dstright srcright)
+#endif
+
+static ATerm set_intersect_tree_2(ATerm s1, ATerm s2) {
+    if (s1==Atom && s2==Atom) return Atom;
+    else if (s1==Empty) return Empty;
+    else if (s2==Empty) return Empty;
+    else {
+        ATerm key=NULL,res=NULL;
+        key = (ATerm)ATmakeAppl2(intersect,s1,s2);
+        res = ATtableGet(global_ct,key);
+        if (res) return res;
+        // either not looked up, or not found in cache: compute
+        res = MCons(
+                set_intersect_tree_2(Down(s1),  Down(s2)),
+                set_intersect_tree_2(Left(s1),  Left(s2)),
+                set_intersect_tree_2(Right(s1), Right(s2))
+              );
+        ATtablePut(global_ct,key,res);
+        return res;
+    }
+}
+
+static void set_intersect_tree(vset_t dst, vset_t src) {
+    Warning(info, "Intersect tree not implemented, performing union instead! :(");
+	dst->set=set_intersect_tree_2(dst->set,src->set);
+	ATtableReset(global_ct);
+}
 
 #if 0
 project Empty _ _ = Empty
@@ -1398,6 +1472,7 @@ vdom_t vdom_create_tree(int n){
 	dom->shared.set_count=set_count_tree;
 	dom->shared.rel_count=rel_count_tree;
     dom->shared.set_union=set_union_tree;
+    dom->shared.set_intersect=set_intersect_tree;
     dom->shared.set_minus=set_minus_tree;
 	dom->shared.set_zip=set_zip_tree;
 	dom->shared.set_project=set_project_tree;
@@ -1406,7 +1481,7 @@ vdom_t vdom_create_tree(int n){
 	dom->shared.set_next=set_next_tree;
 	dom->shared.set_prev=set_prev_tree;
 	dom->shared.reorder=reorder;
-
+    dom->shared.set_destroy=set_destroy_both;
 	return dom;
 }
 
@@ -1429,6 +1504,7 @@ vdom_t vdom_create_list(int n){
 	dom->shared.set_count=set_count_list;
 	dom->shared.rel_count=rel_count_list;
 	dom->shared.set_union=set_union_list;
+    dom->shared.set_intersect=set_intersect_list;
 	dom->shared.set_minus=set_minus_list;
 	dom->shared.set_zip=set_zip_list;
 	dom->shared.set_project=set_project_list;
@@ -1437,6 +1513,7 @@ vdom_t vdom_create_list(int n){
 	dom->shared.set_next=set_next_list;
 	dom->shared.set_prev=set_prev_list;
 	dom->shared.reorder=reorder;
+    dom->shared.set_destroy=set_destroy_both;
 	return dom;
 }
 

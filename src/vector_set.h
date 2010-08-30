@@ -145,6 +145,11 @@ extern void vset_project(vset_t dst,vset_t src);
 extern void vset_union(vset_t dst,vset_t src);
 
 /**
+\brief dst := (a | a \in dst and a \in src)
+*/
+extern void vset_intersect(vset_t dst,vset_t src);
+
+/**
 \brief dst := dst \\ src
 */
 extern void vset_minus(vset_t dst,vset_t src);
@@ -191,6 +196,11 @@ extern void vset_next(vset_t dst,vset_t src,vrel_t rel);
 extern void vset_prev(vset_t dst,vset_t src,vrel_t rel);
 
 extern void vset_reorder(vdom_t dom);
+
+/**
+\brief Destroy a vset
+*/
+extern void vset_destroy(vset_t set);
 
 //@}
 

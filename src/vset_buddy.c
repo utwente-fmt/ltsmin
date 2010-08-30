@@ -155,6 +155,26 @@ static vset_t set_create_fdd(vdom_t dom,int k,int* proj){
 	return set;
 }
 
+static void set_destroy_fdd(vset_t set) {
+    // hmm, not sure what needs to be done here, but give it a try
+    // clear domain? here?
+    free(set->dom->vars);
+    free(set->dom->vars2);
+    free(set->dom->proj);
+    bdd_delref(set->dom->varset);
+    // free domain
+    free(set->dom);
+    // free bdd ref
+    bdd_delref(set->bdd);
+    bdd_delref(set->p_set);
+    bdd_delref(set->c_set);
+    // free projection complement variables
+    set->p_len = 0;
+    free(set->proj);
+    // free set
+    free(set);
+}
+
 static vrel_t rel_create_fdd(vdom_t dom,int k,int* proj){
     vrel_t rel=(vrel_t)RTmalloc(sizeof(struct vector_relation));
     rel->dom=dom;
@@ -374,6 +394,12 @@ static void set_union_fdd(vset_t dst,vset_t src){
 	bdd_delref(tmp);
 }
 
+static void set_intersect_fdd(vset_t dst,vset_t src){
+	BDD tmp=dst->bdd;
+	dst->bdd=bdd_addref(bdd_apply(tmp,src->bdd,bddop_and));
+	bdd_delref(tmp);
+}
+
 static void set_minus_fdd(vset_t dst,vset_t src){
 	BDD tmp=dst->bdd;
 	dst->bdd=bdd_addref(bdd_apply(tmp,src->bdd,bddop_diff));
@@ -479,6 +505,7 @@ vdom_t vdom_create_fdd(int n){
 	dom->shared.set_copy_match=set_copy_match_fdd;
 	dom->shared.set_count=set_count_fdd;
 	dom->shared.set_union=set_union_fdd;
+    dom->shared.set_intersect=set_intersect_fdd;
 	dom->shared.set_minus=set_minus_fdd;
 	dom->shared.set_zip=set_zip_fdd;
 	dom->shared.set_project=set_project_fdd;
@@ -488,6 +515,7 @@ vdom_t vdom_create_fdd(int n){
 	dom->shared.set_next=set_next_appex_fdd;
 	dom->shared.set_prev=set_prev_appex_fdd;
 	dom->shared.reorder=vset_fdd_reorder;
+    dom->shared.set_destroy=set_destroy_fdd;
 	return dom;
 }
 
