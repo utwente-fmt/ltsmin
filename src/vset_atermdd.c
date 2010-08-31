@@ -72,7 +72,7 @@ struct vector_relation {
 
 static ATerm emptyset=NULL;
 static AFun cons;
-static AFun zip,min,sum,intersect,pi,reach,inv_reach,match;
+static AFun zip,min,sum,intersect,pi,reach,inv_reach,match,match3;
 static ATerm atom;
 static ATerm Atom=NULL;
 static ATerm Empty=NULL;
@@ -108,6 +108,8 @@ static void set_init(){
     ATprotectAFun(intersect);
 	match=ATmakeAFun("VSET_MATCH",1,ATfalse);
 	ATprotectAFun(match);
+	match3=ATmakeAFun("VSET_MATCH3",3,ATfalse);
+	ATprotectAFun(match3);
 	pi=ATmakeAFun("VSET_PI",1,ATfalse);
 	ATprotectAFun(pi);
 	reach=ATmakeAFun("VSET_REACH",2,ATfalse);
@@ -1077,7 +1079,6 @@ static ATerm set_intersect_tree_2(ATerm s1, ATerm s2) {
 }
 
 static void set_intersect_tree(vset_t dst, vset_t src) {
-    Warning(info, "Intersect tree not implemented, performing union instead! :(");
 	dst->set=set_intersect_tree_2(dst->set,src->set);
 	ATtableReset(global_ct);
 }
@@ -1396,7 +1397,7 @@ set_copy_match_tree_2(ATerm set, int len,int *matchv, int *proj, int p_len, int 
     ATerm key, res;
 
     // lookup in cache
-    key = (ATerm)ATmakeAppl1(match,set);
+    key = (ATerm)ATmakeAppl3(match3,set, (ATerm)ATmakeInt(p_len), (ATerm)ATmakeInt(shift+cur-1));
     res = ATtableGet(global_ct,key);
     if (res) return res;
 
