@@ -146,14 +146,39 @@ static void *new_string_index(void* context){
 }
 
 struct group_add_info {
-	int group;
-	int *src;
+  int group;
+  int *src;
+  vset_t set;
 };
 
-static void group_add(void*context,transition_info_t*labels,int*dst){
-	(void)labels;
+static void find_action_cb(void* context, int* src){
+  Warning(info,"found action %s",act_detect);
+  Fatal(1,info,"exiting now");
+}
+
+static void find_action(transition_info_t* ti,struct group_add_info* ctx){
+  // Is the next constant throughout a run?
+  eLbls=lts_type_get_edge_label_count(ltstype);
+  for(int i=0;i<eLbls;i++){
+    int typeno=lts_type_get_edge_label_typeno(ltstype,i);
+    chunk c=GBchunkGet(model,typeno,ti->labels[i]);
+    size_t len=c.len*2+3;
+    char str[len];
+    chunk2string(c,len,str);
+    if(strcmp(act_detect,str)==0) {
+      int group=ctx->group;
+      vset_enum_match(ctx->set,projs[group].len,projs[group].proj,ctx->src,
+		      find_action_cb,ctx);
+    }
+  }
+}
+
+static void group_add(void*context,transition_info_t* ti,int*dst){
 	struct group_add_info* ctx=(struct group_add_info*)context;
 	vrel_add(group_next[ctx->group],ctx->src,dst);
+
+	if (act_detect!=NULL)
+	  find_action(ti,ctx);
 }
 
 static void explore_cb(void*context,int *src){
@@ -170,6 +195,7 @@ static inline void expand_group_next(int group,vset_t set){
 	struct group_add_info ctx;
 	explored=0;
 	ctx.group=group;
+	ctx.set=set;
 	vset_project(group_tmp[group],set);
 	vset_zip(group_explored[group],group_tmp[group]);
 	vset_enum(group_tmp[group],explore_cb,&ctx);
