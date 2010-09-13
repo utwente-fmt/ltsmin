@@ -527,6 +527,8 @@ static void reach_bfs(){
 	Warning(info,"Exploration took %ld group checks and %ld next state calls",eg_count,next_count);
 	if (dlk_detect)
 	  Warning(info,"No deadlocks found");
+	if (act_detect)
+	  Warning(info,"Action %s not found", act_detect);
 }
 
 void reach_bfs2(){
@@ -582,6 +584,8 @@ void reach_bfs2(){
 	Warning(info,"Exploration took %ld group checks and %ld next state calls",eg_count,next_count);
 	if (dlk_detect)
 	  Warning(info,"No deadlocks found");
+	if (act_detect)
+	  Warning(info,"Action %s not found", act_detect);
 }
 
 /**
@@ -833,6 +837,8 @@ void reach_chain(){
 	Warning(info,"Exploration took %ld group checks and %ld next state calls",eg_count,next_count);
 	if (dlk_detect)
 	  Warning(info,"No deadlocks found");
+	if (act_detect)
+	  Warning(info,"Action %s not found", act_detect);
 }
 
 static FILE* table_file;
