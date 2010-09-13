@@ -114,11 +114,17 @@ static  struct poptOption options[] = {
 	POPT_TABLEEND
 };
 
+typedef struct proj_info {
+  int len;
+  int* proj;
+} proj_info;
+
 static lts_type_t ltstype;
 static int N;
 static int eLbls;
 static int sLbls;
 static int nGrps;
+static proj_info* projs;
 static vdom_t domain;
 static vset_t visited;
 static long max_lev_count=0;
@@ -939,19 +945,19 @@ int main(int argc, char *argv[]){
 	group_next=(vrel_t*)RTmalloc(nGrps*sizeof(vrel_t));
 	group_explored=(vset_t*)RTmalloc(nGrps*sizeof(vset_t));
 	group_tmp=(vset_t*)RTmalloc(nGrps*sizeof(vset_t));
+	projs=(proj_info*)RTmalloc(nGrps*sizeof(proj_info));
 	for(int i=0;i<nGrps;i++){
-		int len = dm_ones_in_row(GBgetDMInfo(model), i);
-		// get indices
-		int tmp[len];
+		projs[i].len=dm_ones_in_row(GBgetDMInfo(model), i);
+		projs[i].proj=(int*)RTmalloc(projs[i].len*sizeof(int));
 		// temporary replacement for e_info->indices[i]
 		for(int j=0, k=0; j < dm_ncols(GBgetDMInfo(model)); j++) {
 			if (dm_is_set(GBgetDMInfo(model), i,j))
-				tmp[k++] = j;
+				projs[i].proj[k++] = j;
 		}
 
-		group_next[i]=vrel_create(domain,len,tmp);
-		group_explored[i]=vset_create(domain,len,tmp);
-		group_tmp[i]=vset_create(domain,len,tmp);
+		group_next[i]=vrel_create(domain,projs[i].len,projs[i].proj);
+		group_explored[i]=vset_create(domain,projs[i].len,projs[i].proj);
+		group_tmp[i]=vset_create(domain,projs[i].len,projs[i].proj);
 	}
 	Warning(info,"length is %d, there are %d groups",N,nGrps);
 	int src[N];
