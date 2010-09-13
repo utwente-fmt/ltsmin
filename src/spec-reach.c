@@ -284,8 +284,6 @@ static void find_trace(int *dst,int level,vset_t *levels){
   lts_output_set_root_vec(trace_output,(uint32_t*)init_state);
   lts_output_set_root_idx(trace_output,0,0);
   trace_handle=lts_output_begin(trace_output,0,0,0);
-  eLbls=lts_type_get_edge_label_count(ltstype);
-  sLbls=lts_type_get_state_label_count(ltstype);
   mytimer_t timer=SCCcreateTimer();
   SCCstartTimer(timer);
   find_trace_to(dst,level,levels);
@@ -342,8 +340,6 @@ struct group_add_info {
 };
 
 static void find_action(struct group_add_info*ctx,transition_info_t*ti,int*dst){
-  // Is the next constant throughout a run?
-  eLbls=lts_type_get_edge_label_count(ltstype);
   for(int i=0;i<eLbls;i++){
     int typeno=lts_type_get_edge_label_typeno(ltstype,i);
     chunk c=GBchunkGet(model,typeno,ti->labels[i]);
@@ -897,7 +893,6 @@ static void enum_map(void*context,int *src){
 
 
 void do_output(){
-	eLbls=lts_type_get_edge_label_count(ltstype);
 	int state[N];
 	GBgetInitialState(model,state);
 	table_file=fopen(etf_output,"w");
@@ -1018,6 +1013,8 @@ int main(int argc, char *argv[]){
 
 	ltstype=GBgetLTStype(model);
 	N=lts_type_get_state_length(ltstype);
+	eLbls=lts_type_get_edge_label_count(ltstype);
+	sLbls=lts_type_get_state_label_count(ltstype);
 	nGrps=dm_nrows(GBgetDMInfo(model));
 	domain=vdom_create_default(N);
 	visited=vset_create(domain,0,NULL);
