@@ -303,7 +303,7 @@ struct find_action_info {
 };
 
 static void find_action_cb(void* context, int* src){
-  Warning(info,"found action %s",act_detect);
+  Warning(info,"found action: %s",act_detect);
   if (trc_output!=NULL) {
     // The following is destructive on levels and has a memory leak
     struct find_action_info* ctx=(struct find_action_info*)context;
@@ -342,22 +342,15 @@ struct group_add_info {
 };
 
 static void find_action(struct group_add_info*ctx,transition_info_t*ti,int*dst){
-  for(int i=0;i<eLbls;i++){
-    int typeno=lts_type_get_edge_label_typeno(ltstype,i);
-    chunk c=GBchunkGet(model,typeno,ti->labels[i]);
-    size_t len=c.len*2+3;
-    char str[len];
-    chunk2string(c,len,str);
-    if(strcmp(act_detect,str)==0) {
-      int group=ctx->group;
-      struct find_action_info action_ctx;
-      action_ctx.group=group;
-      action_ctx.dst=dst;
-      action_ctx.level=ctx->level;
-      action_ctx.levels=ctx->levels;
-      vset_enum_match(ctx->set,projs[group].len,projs[group].proj,ctx->src,
-		      find_action_cb,&action_ctx);
-    }
+  if (ti->labels[0]==act_detect_index) {
+    int group=ctx->group;
+    struct find_action_info action_ctx;
+    action_ctx.group=group;
+    action_ctx.dst=dst;
+    action_ctx.level=ctx->level;
+    action_ctx.levels=ctx->levels;
+    vset_enum_match(ctx->set,projs[group].len,projs[group].proj,ctx->src,
+		    find_action_cb,&action_ctx);
   }
 }
 
@@ -1024,14 +1017,12 @@ int main(int argc, char *argv[]){
 		group_tmp[i]=vset_create(domain,projs[i].len,projs[i].proj);
 	}
 	Warning(info,"length is %d, there are %d groups",N,nGrps);
-	
+
 	if (act_detect!=NULL) {
 	  if (eLbls!=1) Abort("action detection assumes precisely one edge label");
 	  chunk c = chunk_str(act_detect);
-	  size_t len=c.len*2+3;
-	  act_detect=(char*)RTmalloc(len);
-	  chunk2string(c,len,act_detect);
-	  act_detect_table=lts_type_get_edge_label_typeno(ltstype,0);//table number of first edge label.
+	  //table number of first edge label.
+	  act_detect_table=lts_type_get_edge_label_typeno(ltstype,0);
 	  act_detect_index=GBchunkPut(model,act_detect_table,c);
 	  Warning(info, "Detecting action: %s", act_detect);
 	}
@@ -1065,7 +1056,7 @@ int main(int argc, char *argv[]){
 	if (dlk_detect)
 	  Warning(info,"No deadlocks found");
 	if (act_detect)
-	  Warning(info,"Action %s not found", act_detect);
+	  Warning(info,"Action not found: %s", act_detect);
 	SCCstopTimer(timer);
 	SCCreportTimer(timer,"reachability took");
 	final_stat_reporting(visited);
