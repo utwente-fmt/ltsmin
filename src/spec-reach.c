@@ -75,8 +75,9 @@ static void reach_popt(poptContext con,
 		}
 		strategy = res;
 
-                if (trc_output!=NULL && act_detect==NULL)
-                    dlk_detect = 1;
+                if (trc_output && !dlk_detect && act_detect==NULL) {
+		  Warning(info, "Ignoring trace output");
+		}
 		return;
 	}
 	case POPT_CALLBACK_REASON_OPTION:
@@ -1002,7 +1003,6 @@ int main(int argc, char *argv[]){
 
 	if (act_detect!=NULL) {
 	  chunk c = chunk_str(act_detect);
-	  RTfree(act_detect);
 	  size_t len=c.len*2+3;
 	  act_detect=(char*)RTmalloc(len);
 	  chunk2string(c,len,act_detect);
