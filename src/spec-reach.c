@@ -119,7 +119,7 @@ static  struct poptOption options[] = {
 	POPT_TABLEEND
 };
 
-typedef struct proj_info {
+typedef struct {
   int len;
   int* proj;
 } proj_info;
