@@ -39,6 +39,8 @@ static char* etf_output=NULL;
 static char* trc_output=NULL;
 static int dlk_detect=0;
 static char* act_detect=NULL;
+static int act_detect_table;
+static int act_detect_index;
 static int G=10;
 
 static lts_enum_cb_t trace_handle=NULL;
@@ -990,14 +992,6 @@ int main(int argc, char *argv[]){
 	    Fatal(1,error,"trace generation not supported for saturation");
 	  }
 
-	if (act_detect!=NULL) {
-	  chunk c = chunk_str(act_detect);
-	  size_t len=c.len*2+3;
-	  act_detect=(char*)RTmalloc(len);
-	  chunk2string(c,len,act_detect);
-	  Warning(info, "Detecting action: %s", act_detect);
-	}
-
 	GBloadFile(model,files[0],&model);
 
 	if (RTverbosity >=2) {
@@ -1030,6 +1024,18 @@ int main(int argc, char *argv[]){
 		group_tmp[i]=vset_create(domain,projs[i].len,projs[i].proj);
 	}
 	Warning(info,"length is %d, there are %d groups",N,nGrps);
+	
+	if (act_detect!=NULL) {
+	  if (eLbls!=1) Abort("action detection assumes precisely one edge label");
+	  chunk c = chunk_str(act_detect);
+	  size_t len=c.len*2+3;
+	  act_detect=(char*)RTmalloc(len);
+	  chunk2string(c,len,act_detect);
+	  act_detect_table=lts_type_get_edge_label_typeno(ltstype,0);//table number of first edge label.
+	  act_detect_index=GBchunkPut(model,act_detect_table,c);
+	  Warning(info, "Detecting action: %s", act_detect);
+	}
+
 	int src[N];
 	GBgetInitialState(model,src);
 	vset_add(visited,src);
