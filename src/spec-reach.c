@@ -75,7 +75,7 @@ static void reach_popt(poptContext con,
 		}
 		strategy = res;
 
-                if (trc_output)
+                if (trc_output!=NULL && act_detect==NULL)
                     dlk_detect = 1;
 		return;
 	}
