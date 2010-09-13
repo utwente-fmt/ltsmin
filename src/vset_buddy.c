@@ -74,7 +74,7 @@ struct poptOption buddy_options[]= {
 	{ "max-increase" , 0 , POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &maxincrease , 0 , "set maximum increase","<number>"},
 	{ "min-free-nodes", 0 , POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &minfreenodes , 0 , "set minimum free node percentage","<percentage>"},
 	{ "fdd-bits" , 0 , POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &fdd_bits , 0 , "set the number of bits for each fdd variable","<number>"},
-	{ "fdd-reorder", 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT, &fdd_reorder_opt, 0 , "set the dynamic reordering strategy","<none|win2|win2ite|win3|win3ite|sift|siftite|random>" },
+	{ "fdd-reorder", 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT, &fdd_reorder_opt, 0 , "set the dynamic reordering strategy","<none | win2 | win2ite | win3 | win3ite | sift | siftite | random>" },
 	POPT_TABLEEND
 };
 
