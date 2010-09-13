@@ -38,6 +38,7 @@
 static char* etf_output=NULL;
 static char* trc_output=NULL;
 static int dlk_detect=0;
+static char* act_detect=NULL;
 static int G=10;
 
 static lts_enum_cb_t trace_handle=NULL;
@@ -88,6 +89,7 @@ static  struct poptOption options[] = {
 	{ NULL, 0 , POPT_ARG_CALLBACK|POPT_CBFLAG_POST|POPT_CBFLAG_SKIPOPTION , (void*)reach_popt , 0 , NULL , NULL },
 	{ "order" , 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &order , 0 , "select the exploration strategy to a specific order" ,"<bfs|bfs2|chain|sat{1|2|3}>" },
 	{ "deadlock" , 'd' , POPT_ARG_VAL , &dlk_detect , 1 , "detect deadlocks" , NULL },
+	{ "action" , 0 , POPT_ARG_STRING , &act_detect , 0 , "detect action" , "<action>" },
 	{ "trace" , 0 , POPT_ARG_STRING , &trc_output , 0 , "file to write trace to" , "<lts-file>.gcf" },
 	{ "G" , 0 , POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &G , 0 , "set saturation granularity","<number>"},
 #if defined(MCRL)
@@ -929,6 +931,15 @@ int main(int argc, char *argv[]){
 	  } else if (trc_output != NULL) {
 	    Fatal(1,error,"trace generation not supported for saturation");
 	  }
+
+	if (act_detect!=NULL) {
+	  chunk c = chunk_str(act_detect);
+	  RTfree(act_detect);
+	  size_t len=c.len*2+3;
+	  act_detect=(char*)RTmalloc(len);
+	  chunk2string(c,len,act_detect);
+	  Warning(info, "Detecting action: %s", act_detect);
+	}
 
 	GBloadFile(model,files[0],&model);
 
