@@ -525,10 +525,6 @@ static void reach_bfs(){
 		vset_reorder(domain);
 	}
 	Warning(info,"Exploration took %ld group checks and %ld next state calls",eg_count,next_count);
-	if (dlk_detect)
-	  Warning(info,"No deadlocks found");
-	if (act_detect)
-	  Warning(info,"Action %s not found", act_detect);
 }
 
 void reach_bfs2(){
@@ -582,10 +578,6 @@ void reach_bfs2(){
 		vset_reorder(domain);
 	}
 	Warning(info,"Exploration took %ld group checks and %ld next state calls",eg_count,next_count);
-	if (dlk_detect)
-	  Warning(info,"No deadlocks found");
-	if (act_detect)
-	  Warning(info,"Action %s not found", act_detect);
 }
 
 /**
@@ -835,10 +827,6 @@ void reach_chain(){
 		vset_reorder(domain);
 	}
 	Warning(info,"Exploration took %ld group checks and %ld next state calls",eg_count,next_count);
-	if (dlk_detect)
-	  Warning(info,"No deadlocks found");
-	if (act_detect)
-	  Warning(info,"Action %s not found", act_detect);
 }
 
 static FILE* table_file;
@@ -1068,6 +1056,10 @@ int main(int argc, char *argv[]){
 		reach_sat3();
 		break;
 	}
+	if (dlk_detect)
+	  Warning(info,"No deadlocks found");
+	if (act_detect)
+	  Warning(info,"Action %s not found", act_detect);
 	SCCstopTimer(timer);
 	SCCreportTimer(timer,"reachability took");
 	final_stat_reporting(visited);
