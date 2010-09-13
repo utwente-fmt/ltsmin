@@ -303,7 +303,7 @@ struct find_action_info {
 static void find_action_cb(void* context, int* src){
   Warning(info,"found action %s",act_detect);
   if (trc_output!=NULL) {
-    // The following is destructive and levels and has a memory leak
+    // The following is destructive on levels and has a memory leak
     struct find_action_info* ctx=(struct find_action_info*)context;
     int group=ctx->group;
     int dst[N];
