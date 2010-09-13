@@ -447,7 +447,7 @@ static void reach_bfs(){
 	vset_copy(current_level,visited);
 	for(;;){
 		if(vset_is_empty(current_level)) break;
-          if (trc_output) {
+          if (trc_output != NULL) {
 	    if (level == max_levels) {
 	      max_levels += 1024;
 	      levels = RTrealloc(levels, max_levels * sizeof(vset_t));
@@ -505,7 +505,7 @@ void reach_bfs2(){
 	int max_levels = 0;
 
 	for(;;){
-          if (trc_output) {
+          if (trc_output != NULL) {
 	    if (level == max_levels) {
 	      max_levels += 1024;
 	      levels = RTrealloc(levels, max_levels * sizeof(vset_t));
@@ -760,7 +760,7 @@ void reach_chain(){
         int max_levels = 0;
 
 	for(;;){
-          if (trc_output) {
+          if (trc_output != NULL) {
 	    if (level == max_levels) {
 	      max_levels += 1024;
 	      levels = RTrealloc(levels, max_levels * sizeof(vset_t));
