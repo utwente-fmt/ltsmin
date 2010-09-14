@@ -78,6 +78,45 @@ static int etf_state_short(model_t self,int label,int *state){
     return ctx->label_data[label][SIlookupC(ctx->label_key_idx[label],(char*)state,len<<2)];
 }
 
+
+static int
+etf_transition_in_group(model_t self, int *labels, int group)
+{
+    gb_context_t ctx  = (gb_context_t)GBgetContext(self);
+    matrix_table_t mt = ctx->trans_table[group];
+    int K = MTgetCount(mt);
+
+    for(int i = 0; i < K; i++){
+        uint32_t row[3];
+        MTgetRow(mt, i, row);
+        switch(ctx->edge_labels){
+        case 0: {
+            return 1;
+        }
+        case 1: {
+            if(labels[0]==(int)row[2])
+                return 1;
+            else
+                break;
+        }
+        default: {
+            int* tl = (int*)SIgetC(ctx->label_idx,(int)row[2],NULL);
+            int i = 0;
+            int correct = 1;
+            while(correct && i < ctx->edge_labels) {
+                correct = (tl[i] == labels[i]);
+                i++;
+            }
+            if(correct)
+                return 1;
+            else
+                break;
+        }
+        }
+    }
+    return 0;
+}
+
 void
 ETFloadGreyboxModel(model_t model, const char *name)
 {
@@ -224,6 +263,7 @@ ETFloadGreyboxModel(model_t model, const char *name)
     }
     GBsetStateLabelInfo(model, p_sl_info);
     GBsetStateLabelShort(model,etf_state_short);
+    GBsetTransitionInGroup(model,etf_transition_in_group);
 
     int type_count=lts_type_get_type_count(ltstype);
     for(int i=0;i<type_count;i++){
