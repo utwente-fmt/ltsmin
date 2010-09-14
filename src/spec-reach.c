@@ -317,16 +317,21 @@ static void find_action_cb(void* context, int* src){
     for(int i=0;i<projs[group].len;i++)
       dst[projs[group].proj[i]]=ctx->dst[i];
 
-    if(vset_member(ctx->levels[ctx->level - 1],src))
+    if(vset_member(ctx->levels[ctx->level-1],src)) {
+      Warning(debug, "source found at level %d", ctx->level-1);
       level=ctx->level+1;
-    else
+    } else {
+      Warning(debug, "source not found at level %d", ctx->level-1);
       level=ctx->level+2;
+    }
 
     levels = RTrealloc(ctx->levels,level * sizeof(vset_t));
     levels[level-2] = vset_create(domain,0,NULL);
     vset_add(levels[level-2],src);
+    Warning(debug, "source added at level %d", level-2);
     levels[level-1] = vset_create(domain,0,NULL);
     vset_add(levels[level-1],dst);
+    Warning(debug, "destination added at level %d", level-1);
 
     find_trace(dst,level,levels);
   }
@@ -341,25 +346,20 @@ struct group_add_info {
   vset_t* levels;
 };
 
-static void find_action(struct group_add_info*ctx,transition_info_t*ti,int*dst){
-  if (ti->labels[0]==act_detect_index) {
-    int group=ctx->group;
-    struct find_action_info action_ctx;
-    action_ctx.group=group;
-    action_ctx.dst=dst;
-    action_ctx.level=ctx->level;
-    action_ctx.levels=ctx->levels;
-    vset_enum_match(ctx->set,projs[group].len,projs[group].proj,ctx->src,
-		    find_action_cb,&action_ctx);
-  }
-}
-
 static void group_add(void*context,transition_info_t* ti,int*dst){
 	struct group_add_info* ctx=(struct group_add_info*)context;
 	vrel_add(group_next[ctx->group],ctx->src,dst);
 
-	if (act_detect!=NULL)
-	  find_action(ctx,ti,dst);
+	if (act_detect!=NULL && ti->labels[0]==act_detect_index){
+	    int group=ctx->group;
+	    struct find_action_info action_ctx;
+	    action_ctx.group=group;
+	    action_ctx.dst=dst;
+	    action_ctx.level=ctx->level;
+	    action_ctx.levels=ctx->levels;
+	    vset_enum_match(ctx->set,projs[group].len,projs[group].proj,
+			    ctx->src, find_action_cb,&action_ctx);
+	}
 }
 
 static void explore_cb(void*context,int *src){
