@@ -28,6 +28,7 @@ struct grey_box_model {
 	get_label_method_t state_labels_long;
 	get_label_group_method_t state_labels_group;
 	get_label_all_method_t state_labels_all;
+	transition_in_group_t transition_in_group;
 	void* newmap_context;
 	newmap_t newmap;
 	int2chunk_t int2chunk;
@@ -211,6 +212,7 @@ model_t GBcreateBase(){
 	model->state_labels_long=state_labels_default_long;
 	model->state_labels_group=state_labels_default_group;
 	model->state_labels_all=state_labels_default_all;
+	model->transition_in_group=NULL;
 	model->newmap_context=NULL;
 	model->newmap=NULL;
 	model->int2chunk=NULL;
@@ -524,6 +526,14 @@ matrix_t *GBgetGuardNDSInfo(model_t model) {
     return model->gnds_info;
 }
 
+
+void GBsetTransitionInGroup(model_t model,transition_in_group_t method){
+	model->transition_in_group=method;
+}
+
+int GBtransitionInGroup(model_t model,int* labels,int group){
+	return model->transition_in_group(model,labels,group);
+}
 
 void GBsetChunkMethods(model_t model,newmap_t newmap,void*newmap_context,
 	int2chunk_t int2chunk,chunk2int_t chunk2int,get_count_t get_count){
