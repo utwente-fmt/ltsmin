@@ -145,6 +145,13 @@ state_labels_default_all(model_t model, int *state, int *labels)
 	}
 }
 
+static int
+transition_in_group_default(model_t model, int* labels, int group)
+{
+    (void)model; (void)labels; (void)group;
+    return 1;
+}
+
 int
 wrapped_default_short (model_t self,int group,int*src,TransitionCB cb,void*context)
 {
@@ -212,7 +219,7 @@ model_t GBcreateBase(){
 	model->state_labels_long=state_labels_default_long;
 	model->state_labels_group=state_labels_default_group;
 	model->state_labels_all=state_labels_default_all;
-	model->transition_in_group=NULL;
+	model->transition_in_group=transition_in_group_default;
 	model->newmap_context=NULL;
 	model->newmap=NULL;
 	model->int2chunk=NULL;
