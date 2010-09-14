@@ -1346,6 +1346,11 @@ init_action()
     act_detect_table=lts_type_get_edge_label_typeno(ltstype,0);
     act_detect_index=GBchunkPut(model,act_detect_table,c);
     Warning(info, "Detecting action \"%s\"", act_detect);
+
+    for (int i = 0; i < nGrps; i++) {
+        if (GBtransitionInGroup(model, &act_detect_index, i))
+            Warning(info, "Found \"%s\" potentially in group %d", act_detect,i);
+    }
 }
 
 static vset_t
