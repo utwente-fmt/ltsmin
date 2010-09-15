@@ -300,17 +300,19 @@ struct find_action_info {
   int *dst;
   int level;
   vset_t* levels;
+  int max_levels;
 };
 
 static void find_action_cb(void* context, int* src){
   Warning(info,"found action: %s",act_detect);
   if (trc_output!=NULL) {
-    // The following is destructive on levels and has a memory leak
+    // The following is destructive on levels
     struct find_action_info* ctx=(struct find_action_info*)context;
     int group=ctx->group;
     int dst[N];
     int level;
     vset_t* levels;
+    int max_levels=ctx->max_levels;
 
     for(int i=0;i<N;i++)
       dst[i]=src[i];
@@ -325,11 +327,16 @@ static void find_action_cb(void* context, int* src){
       level=ctx->level+2;
     }
 
-    levels = RTrealloc(ctx->levels,level * sizeof(vset_t));
-    levels[level-2] = vset_create(domain,0,NULL);
+    if (level>max_levels) {
+      max_levels=level;
+      levels = RTrealloc(ctx->levels,max_levels * sizeof(vset_t));
+      for(int i=ctx->level;i<max_levels;i++)
+	levels[i] = vset_create(domain,0,NULL);
+    } else
+      levels = ctx->levels;
+
     vset_add(levels[level-2],src);
     Warning(debug, "source added at level %d", level-2);
-    levels[level-1] = vset_create(domain,0,NULL);
     vset_add(levels[level-1],dst);
     Warning(debug, "destination added at level %d", level-1);
 
@@ -344,6 +351,7 @@ struct group_add_info {
   vset_t set;
   int level;
   vset_t* levels;
+  int max_levels;
 };
 
 static void group_add(void*context,transition_info_t* ti,int*dst){
@@ -357,6 +365,7 @@ static void group_add(void*context,transition_info_t* ti,int*dst){
 	    action_ctx.dst=dst;
 	    action_ctx.level=ctx->level;
 	    action_ctx.levels=ctx->levels;
+            action_ctx.max_levels=ctx->max_levels;
 	    vset_enum_match(ctx->set,projs[group].len,projs[group].proj,
 			    ctx->src, find_action_cb,&action_ctx);
 	}
@@ -372,13 +381,14 @@ static void explore_cb(void*context,int *src){
 	}
 }
 
-static inline void expand_group_next(int group,vset_t set,int level,vset_t* levels){
+static inline void expand_group_next(int group,vset_t set,int level,vset_t* levels,int max_levels){
 	struct group_add_info ctx;
 	explored=0;
 	ctx.group=group;
 	ctx.set=set;
 	ctx.level=level;
 	ctx.levels=levels;
+        ctx.max_levels=max_levels;
 	vset_project(group_tmp[group],set);
 	vset_zip(group_explored[group],group_tmp[group]);
 	vset_enum(group_tmp[group],explore_cb,&ctx);
@@ -494,7 +504,7 @@ static void reach_bfs(){
 		level++;
 		for(i=0;i<nGrps;i++){
 			if (RTverbosity >= 2) fprintf(stderr,"\rexploring group %4d/%d",i+1,nGrps);
-			expand_group_next(i,current_level,level,levels);
+			expand_group_next(i,current_level,level,levels,max_levels);
 			eg_count++;
 		}
 		if (RTverbosity >= 2) fprintf(stderr,"\rexploration complete             \n");
@@ -551,7 +561,7 @@ void reach_bfs2(){
 		level++;
 		for(i=0;i<nGrps;i++){
 			if (RTverbosity >= 2) fprintf(stderr,"\rexploring group %4d/%d",i+1,nGrps);
-			expand_group_next(i,visited,level,levels);
+			expand_group_next(i,visited,level,levels,max_levels);
 			eg_count++;
 		}
 		if (RTverbosity >= 2) fprintf(stderr,"\rexploration complete             \n");
@@ -597,7 +607,7 @@ static void Closure(vset_t visited,bitvector_t* groups) {
     for (int i=0;i<nGrps;i++) {
       if (!bitvector_is_set(groups,i)) continue;
       if (RTverbosity >= 2) fprintf(stderr,"\rconf-exploring group %4d/%d",i+1,nGrps);
-      expand_group_next(i,current,level,NULL);
+      expand_group_next(i,current,level,NULL,0);
     }
     if (RTverbosity >= 2) fprintf(stderr,"\rconf-exploration complete             \n");
     for(int i=0;i<nGrps;i++){
@@ -805,7 +815,7 @@ void reach_chain(){
 		if (dlk_detect) vset_copy(deadlocks,visited);
 		for(i=0;i<nGrps;i++){
 			if (RTverbosity >= 2) fprintf(stderr,"\rgroup %4d/%d",i+1,nGrps);
-			expand_group_next(i,visited,level,levels);
+			expand_group_next(i,visited,level,levels,max_levels);
 			eg_count++;
 			next_count++;
 			vset_next(temp,visited,group_next[i]);
