@@ -1281,6 +1281,39 @@ unguided(sat_proc_t sat_proc, reach_proc_t reach_proc, vset_t visited)
                 eg_count, next_count);
 }
 
+static int find_overlapping_group(bitvector_t *found_groups, int *group){
+  bitvector_t row_found, row_new;
+
+  bitvector_create(&row_found,dm_ncols(GBgetDMInfo(model)));
+  bitvector_create(&row_new,dm_ncols(GBgetDMInfo(model)));
+
+  for(int i=0;i<nGrps;i++){
+    if (!bitvector_is_set(found_groups, i))
+      continue;
+
+    dm_bitvector_row(&row_found, GBgetDMInfo(model), i);
+
+    for(int j=0;j<nGrps;j++) {
+      if (bitvector_is_set(found_groups, j))
+	continue;
+
+      dm_bitvector_row(&row_new, GBgetDMInfo(model), j);
+      bitvector_intersect(&row_new,&row_found);
+
+      if(!bitvector_is_empty(&row_new)) {
+	*group=j;
+	bitvector_free(&row_found);
+	bitvector_free(&row_new);
+	return 1;
+      }
+    }
+  }
+
+  bitvector_free(&row_found);
+  bitvector_free(&row_new);
+  return 0;
+}
+
 static void
 init_model(char *file)
 {
@@ -1347,10 +1380,34 @@ init_action()
     act_detect_index=GBchunkPut(model,act_detect_table,c);
     Warning(info, "Detecting action \"%s\"", act_detect);
 
+    int *group_order = RTmalloc(nGrps * sizeof(int));
+    int group_total = 0;
+    bitvector_t found_groups;
+    bitvector_create(&found_groups,nGrps);
+
     for (int i = 0; i < nGrps; i++) {
-        if (GBtransitionInGroup(model, &act_detect_index, i))
+        if (GBtransitionInGroup(model, &act_detect_index, i)) {
             Warning(info, "Found \"%s\" potentially in group %d", act_detect,i);
+            group_order[group_total] = i;
+            group_total++;
+            bitvector_set(&found_groups,i);
+        } else {
+            bitvector_unset(&found_groups, i);
+        }
     }
+
+    int new_group;
+
+    while(find_overlapping_group(&found_groups, &new_group)){
+        group_order[group_total] = new_group;
+        group_total++;
+        bitvector_set(&found_groups,new_group);
+    }
+
+    fprintf(stderr, "Group exploration order: ");
+    for (int i=0;i<group_total;i++)
+        fprintf(stderr, " %d", group_order[i]);
+    fprintf(stderr, "\n");
 }
 
 static vset_t
