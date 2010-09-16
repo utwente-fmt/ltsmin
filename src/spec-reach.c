@@ -422,19 +422,33 @@ expand_group_next(int group, vset_t set)
 }
 
 static void
-deadlock_check(vset_t deadlocks)
+deadlock_check(vset_t deadlocks, bitvector_t *reach_groups)
 {
+    vset_t next_temp = vset_create(domain,0,NULL);
+    vset_t prev_temp = vset_create(domain,0,NULL);
+
+    Warning(debug, "Potential deadlocks found");
+
+    for (int i = 0; i < nGrps; i++) {
+        if (bitvector_is_set(reach_groups, i)) continue;
+        expand_group_next(i, deadlocks);
+        vset_next(next_temp, deadlocks, group_next[i]);
+        vset_prev(prev_temp, next_temp, group_next[i]);
+        vset_minus(deadlocks, prev_temp);
+    }
+
+    vset_clear(next_temp);
+    vset_clear(prev_temp);
+
     if (vset_is_empty(deadlocks))
         return;
 
-    Warning(info,"deadlock found");
-
+    Warning(info, "deadlock found");
     if (trc_output) {
         int dlk_state[1][N];
         vset_example(deadlocks, dlk_state[0]);
         find_trace(dlk_state, 1, global_level, levels);
     }
-
     Fatal(1,info,"exiting now");
 }
 
@@ -541,7 +555,7 @@ reach_bfs(bitvector_t *reach_groups, long *eg_count, long *next_count)
             vset_union(next_level, temp);
         }
         diagnostic("\rlocal next complete       \n");
-        if (dlk_detect) deadlock_check(deadlocks);
+        if (dlk_detect) deadlock_check(deadlocks, reach_groups);
         vset_zip(visited, next_level);
         vset_copy(current_level, next_level);
         vset_clear(next_level);
@@ -591,7 +605,7 @@ reach_bfs2(bitvector_t *reach_groups, long *eg_count, long *next_count)
             }
         }
         diagnostic("\rlocal next complete       \n");
-        if (dlk_detect) deadlock_check(deadlocks);
+        if (dlk_detect) deadlock_check(deadlocks, reach_groups);
         vset_reorder(domain);
     }
 
@@ -804,7 +818,7 @@ reach_chain(bitvector_t *reach_groups, long *eg_count, long *next_count)
             }
         }
         diagnostic("\rround %d complete       \n", level);
-        if (dlk_detect) deadlock_check(deadlocks); // no deadlocks in old_vis
+        if (dlk_detect) deadlock_check(deadlocks, reach_groups); // no deadlocks in old_vis
         vset_reorder(domain);
     }
 
@@ -988,14 +1002,6 @@ int main(int argc, char *argv[]){
 	model=GBcreateBase();
 	GBsetChunkMethods(model,new_string_index,NULL,
 		(int2chunk_t)SIgetC,(chunk2int_t)SIputC,(get_count_t)SIgetCount);
-
-	if (strategy==Sat1 || strategy==Sat2 || strategy==Sat3) {
-	  if (dlk_detect) {
-	    Fatal(1,error,"deadlock detection not supported for saturation");
-	  } else if (trc_output != NULL) {
-	    Fatal(1,error,"trace generation not supported for saturation");
-          }
-        }
 
 	GBloadFile(model,files[0],&model);
 
