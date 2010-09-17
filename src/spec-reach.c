@@ -1415,7 +1415,6 @@ forward_guided(sat_proc_t sat_proc, reach_proc_t reach_proc, vset_t visited,
         sat_proc(reach_proc, visited, &reach_groups, &eg_count, &next_count);
     }
 
-    Warning(info, "Action search done without finding action");
     Warning(info, "Exploration took %ld group checks and %ld next state calls",
             eg_count, next_count);
     bitvector_free(&reach_groups);
