@@ -552,18 +552,19 @@ reach_bfs(bitvector_t *reach_groups, long *eg_count, long *next_count)
                 vset_minus(deadlocks, dlk_temp);
                 vset_clear(dlk_temp);
             }
+            vset_minus(temp, visited);
             vset_union(next_level, temp);
         }
         diagnostic("\rlocal next complete       \n");
         if (dlk_detect) deadlock_check(deadlocks, reach_groups);
-        vset_zip(visited, next_level);
+        vset_clear(temp);
+        vset_union(visited, next_level);
         vset_copy(current_level, next_level);
         vset_clear(next_level);
         vset_reorder(domain);
     }
 
     vset_clear(current_level);
-    vset_clear(temp);
     if (dlk_detect) {
         vset_clear(deadlocks);
         vset_clear(dlk_temp);
@@ -606,11 +607,11 @@ reach_bfs2(bitvector_t *reach_groups, long *eg_count, long *next_count)
         }
         diagnostic("\rlocal next complete       \n");
         if (dlk_detect) deadlock_check(deadlocks, reach_groups);
+        vset_clear(temp);
         vset_reorder(domain);
     }
 
     vset_clear(old_vis);
-    vset_clear(temp);
     if (dlk_detect) {
         vset_clear(deadlocks);
         vset_clear(dlk_temp);
@@ -818,7 +819,8 @@ reach_chain(bitvector_t *reach_groups, long *eg_count, long *next_count)
             }
         }
         diagnostic("\rround %d complete       \n", level);
-        if (dlk_detect) deadlock_check(deadlocks, reach_groups); // no deadlocks in old_vis
+        // no deadlocks in old_vis
+        if (dlk_detect) deadlock_check(deadlocks, reach_groups);
         vset_reorder(domain);
     }
 
