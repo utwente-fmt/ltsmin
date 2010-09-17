@@ -57,6 +57,15 @@ static const si_map_entry SATURATION[] = {
     {NULL, 0}
 };
 
+static enum { UNGUIDED, FORWARD_GUIDED } guidance = UNGUIDED;
+
+static char *guided = "unguided";
+static const si_map_entry GUIDED[] = {
+    {"unguided", UNGUIDED},
+    {"forward", FORWARD_GUIDED},
+    {NULL, 0}
+};
+
 static void
 reach_popt(poptContext con, enum poptCallbackReason reason,
                const struct poptOption * opt, const char * arg, void * data)
@@ -87,6 +96,15 @@ reach_popt(poptContext con, enum poptCallbackReason reason,
         }
         sat_strategy = res;
 
+        res = linear_search(GUIDED, guided);
+        if (res < 0) {
+            Warning(error, "unknown guided search strategy %s", guided);
+            RTexitUsage(EXIT_FAILURE);
+        } else {
+            Warning(info, "Guided search strategy is %s", guided);
+        }
+        guidance = res;
+
         if (trc_output != NULL && !dlk_detect && act_detect == NULL)
             Warning(info, "Ignoring trace output");
 
@@ -103,6 +121,7 @@ static  struct poptOption options[] = {
     { "saturation" , 0, POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &saturation , 0 , "select the saturation strategy" , "<none|sat-like|sat-loop|sat-ddd>" },
     { "sat-granularity" , 0 , POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &sat_granularity , 0 , "set saturation granularity","<number>" },
     { "save-levels", 0, POPT_ARG_VAL, &save_levels, 1, "save previous states seen at saturation levels", NULL },
+    {"guidance", 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &guided, 0 , "select the guided search strategy" , "<unguided|forward>" },
     { "deadlock" , 'd' , POPT_ARG_VAL , &dlk_detect , 1 , "detect deadlocks" , NULL },
     { "action" , 0 , POPT_ARG_STRING , &act_detect , 0 , "detect action" , "<action>" },
     { "trace" , 0 , POPT_ARG_STRING , &trc_output , 0 , "file to write trace to" , "<lts-file>.gcf" },
@@ -149,7 +168,7 @@ typedef void (*sat_proc_t)(reach_proc_t reach_proc, vset_t visited,
                            long *eg_count, long *next_count);
 
 typedef void (*guided_proc_t)(sat_proc_t sat_proc, reach_proc_t reach_proc,
-                              vset_t visited);
+                              vset_t visited, char *etf_output);
 
 static void *
 new_string_index (void *context)
@@ -1267,8 +1286,11 @@ do_output(char *etf_output, vset_t visited)
 }
 
 static void
-unguided(sat_proc_t sat_proc, reach_proc_t reach_proc, vset_t visited)
+unguided(sat_proc_t sat_proc, reach_proc_t reach_proc, vset_t visited,
+             char *etf_output)
 {
+    (void)etf_output;
+
     bitvector_t reach_groups;
     long eg_count = 0;
     long next_count = 0;
@@ -1281,37 +1303,122 @@ unguided(sat_proc_t sat_proc, reach_proc_t reach_proc, vset_t visited)
                 eg_count, next_count);
 }
 
-static int find_overlapping_group(bitvector_t *found_groups, int *group){
-  bitvector_t row_found, row_new;
+/**
+ * Find a group that overlaps with at least one of the groups in found_groups.
+ * If a group is found, 1 is returned and the group argument is set to this
+ * group. If no group is found, 0 is returned.
+ */
+static int
+find_overlapping_group(bitvector_t *found_groups, int *group)
+{
+    bitvector_t row_found, row_new;
 
-  bitvector_create(&row_found,dm_ncols(GBgetDMInfo(model)));
-  bitvector_create(&row_new,dm_ncols(GBgetDMInfo(model)));
+    bitvector_create(&row_found, dm_ncols(GBgetDMInfo(model)));
+    bitvector_create(&row_new, dm_ncols(GBgetDMInfo(model)));
 
-  for(int i=0;i<nGrps;i++){
-    if (!bitvector_is_set(found_groups, i))
-      continue;
+    for (int i = 0; i < nGrps; i++) {
+        if (!bitvector_is_set(found_groups, i)) continue;
+        dm_bitvector_row(&row_found, GBgetDMInfo(model), i);
 
-    dm_bitvector_row(&row_found, GBgetDMInfo(model), i);
+        for(int j = 0; j < nGrps; j++) {
+            if (bitvector_is_set(found_groups, j)) continue;
+            dm_bitvector_row(&row_new, GBgetDMInfo(model), j);
+            bitvector_intersect(&row_new, &row_found);
 
-    for(int j=0;j<nGrps;j++) {
-      if (bitvector_is_set(found_groups, j))
-	continue;
-
-      dm_bitvector_row(&row_new, GBgetDMInfo(model), j);
-      bitvector_intersect(&row_new,&row_found);
-
-      if(!bitvector_is_empty(&row_new)) {
-	*group=j;
-	bitvector_free(&row_found);
-	bitvector_free(&row_new);
-	return 1;
-      }
+            if (!bitvector_is_empty(&row_new)) {
+                *group=j;
+                bitvector_free(&row_found);
+                bitvector_free(&row_new);
+                return 1;
+            }
+        }
     }
-  }
 
-  bitvector_free(&row_found);
-  bitvector_free(&row_new);
-  return 0;
+    bitvector_free(&row_found);
+    bitvector_free(&row_new);
+    return 0;
+}
+
+static int
+establish_group_order(int *group_order, int *initial_count)
+{
+    int group_total = 0;
+    bitvector_t found_groups;
+
+    bitvector_create(&found_groups, nGrps);
+
+    for (int i = 0; i < nGrps; i++){
+        if (GBtransitionInGroup(model, &act_detect_index, i)) {
+            Warning(info, "Found \"%s\" potentially in group %d", act_detect,i);
+            group_order[group_total] = i;
+            group_total++;
+            bitvector_set(&found_groups, i);
+        }
+    }
+
+    *initial_count = group_total;
+
+    int new_group;
+
+    while(find_overlapping_group(&found_groups, &new_group)){
+        group_order[group_total] = new_group;
+        group_total++;
+        bitvector_set(&found_groups, new_group);
+    }
+
+    diagnostic("Group exploration order:");
+    for (int i=0;i<group_total;i++)
+        diagnostic(" %d", group_order[i]);
+    diagnostic("\n");
+    return group_total;
+}
+
+static void
+forward_guided(sat_proc_t sat_proc, reach_proc_t reach_proc, vset_t visited,
+                   char *etf_output)
+{
+    int *group_order = RTmalloc(nGrps * sizeof(int));
+    int initial_count, total_count;
+    bitvector_t reach_groups;
+
+    if (act_detect == NULL)
+        Abort("Guided forward search requires action");
+
+    total_count = establish_group_order(group_order, &initial_count);
+
+    if (total_count == 0)
+        Abort("Action %s does not occur", act_detect);
+
+    bitvector_create(&reach_groups, nGrps);
+    for (int i = 0; i < initial_count; i++)
+        bitvector_set(&reach_groups, group_order[i]);
+
+    long eg_count = 0;
+    long next_count = 0;
+
+    // Assumption: reach_proc does not return in case action is found
+    Warning(info, "Searching for action using initial groups");
+    reach_proc(visited, NULL, &reach_groups, &eg_count, &next_count);
+
+    for (int i = initial_count; i < total_count; i++) {
+        Warning(info, "Extending action search with one group");
+        bitvector_set(&reach_groups, group_order[i]);
+        reach_proc(visited, NULL, &reach_groups, &eg_count, &next_count);
+    }
+
+    if (etf_output != NULL) {
+        Warning(info, "Continuing exploration for etf construction");
+
+        for(int i = 0; i < nGrps; i++)
+            bitvector_set(&reach_groups, i);
+
+        sat_proc(reach_proc, visited, &reach_groups, &eg_count, &next_count);
+    }
+
+    Warning(info, "Action search done without finding action");
+    Warning(info, "Exploration took %ld group checks and %ld next state calls",
+            eg_count, next_count);
+    bitvector_free(&reach_groups);
 }
 
 static void
@@ -1379,35 +1486,6 @@ init_action()
     act_detect_table=lts_type_get_edge_label_typeno(ltstype,0);
     act_detect_index=GBchunkPut(model,act_detect_table,c);
     Warning(info, "Detecting action \"%s\"", act_detect);
-
-    int *group_order = RTmalloc(nGrps * sizeof(int));
-    int group_total = 0;
-    bitvector_t found_groups;
-    bitvector_create(&found_groups,nGrps);
-
-    for (int i = 0; i < nGrps; i++) {
-        if (GBtransitionInGroup(model, &act_detect_index, i)) {
-            Warning(info, "Found \"%s\" potentially in group %d", act_detect,i);
-            group_order[group_total] = i;
-            group_total++;
-            bitvector_set(&found_groups,i);
-        } else {
-            bitvector_unset(&found_groups, i);
-        }
-    }
-
-    int new_group;
-
-    while(find_overlapping_group(&found_groups, &new_group)){
-        group_order[group_total] = new_group;
-        group_total++;
-        bitvector_set(&found_groups,new_group);
-    }
-
-    fprintf(stderr, "Group exploration order: ");
-    for (int i=0;i<group_total;i++)
-        fprintf(stderr, " %d", group_order[i]);
-    fprintf(stderr, "\n");
 }
 
 static vset_t
@@ -1595,7 +1673,7 @@ main (int argc, char *argv[])
 
     sat_proc_t sat_proc = NULL;
     reach_proc_t reach_proc = NULL;
-    guided_proc_t guided_proc = unguided;
+    guided_proc_t guided_proc = NULL;
 
     switch (strategy) {
     case BFS_P:
@@ -1633,6 +1711,15 @@ main (int argc, char *argv[])
     init_domain(vset_impl, &visited);
     if (act_detect != NULL) init_action();
 
+    switch (guidance) {
+    case UNGUIDED:
+        guided_proc = unguided;
+        break;
+    case FORWARD_GUIDED:
+        guided_proc = forward_guided;
+        break;
+    }
+
     // temporal logics
     if (mu_formula) {
         mu_expr = mu_parse_file(ltstype, mu_formula);
@@ -1656,7 +1743,7 @@ main (int argc, char *argv[])
     mytimer_t timer = SCCcreateTimer();
 
     SCCstartTimer(timer);
-    guided_proc(sat_proc, reach_proc, visited);
+    guided_proc(sat_proc, reach_proc, visited, files[1]);
     SCCstopTimer(timer);
 
     if (mu_expr) {
