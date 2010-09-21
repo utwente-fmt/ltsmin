@@ -135,8 +135,6 @@ static vset_t set_create_both(vdom_t dom,int k,int* proj){
 }
 
 static void set_destroy_both(vset_t set) {
-    // not sure what to do, give it a try
-    free(set->dom);
     ATunprotect(&set->set);
     set->p_len = 0;
     free(set);

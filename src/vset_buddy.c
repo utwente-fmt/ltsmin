@@ -156,23 +156,19 @@ static vset_t set_create_fdd(vdom_t dom,int k,int* proj){
 }
 
 static void set_destroy_fdd(vset_t set) {
-    // hmm, not sure what needs to be done here, but give it a try
-    // clear domain? here?
-    free(set->dom->vars);
-    free(set->dom->vars2);
-    free(set->dom->proj);
-    bdd_delref(set->dom->varset);
-    // free domain
-    free(set->dom);
-    // free bdd ref
+    // the domain is a public object, don't clear
     bdd_delref(set->bdd);
-    bdd_delref(set->p_set);
-    bdd_delref(set->c_set);
+    if (set->p_set != set->dom->varset)
+        bdd_delref(set->p_set);
+    if (set->c_set != bddtrue)
+        bdd_delref(set->c_set);
     // free projection complement variables
     set->p_len = 0;
-    free(set->proj);
+    if (set->proj != set->dom->proj)
+        free(set->proj);
     // free set
     free(set);
+    return;
 }
 
 static vrel_t rel_create_fdd(vdom_t dom,int k,int* proj){
