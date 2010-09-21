@@ -14,7 +14,7 @@ AH_VERBATIM([_XOPEN_SOURCE],[
 #ifndef _XOPEN_SOURCE
 # undef _XOPEN_SOURCE
 #endif])
-AC_DEFINE([_XOPEN_SOURCE], 500)
+AC_DEFINE([_XOPEN_SOURCE], 600L)
 AH_VERBATIM([_LARGEFILE_SOURCE],[
 /* Define for large file support */
 #ifndef _LARGEFILE_SOURCE
