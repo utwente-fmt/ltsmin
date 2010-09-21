@@ -19,6 +19,7 @@
 #include "vector_set.h"
 #include "dfs-stack.h"
 #include "is-balloc.h"
+#include "bitset.h"
 #include "scctimer.h"
 
 #if defined(MCRL)
@@ -155,6 +156,7 @@ static vdom_t domain;
 static vset_t visited_set;
 static vset_t being_explored_set;
 static vset_t next_set;
+static bitset_t dfs_open_set;
 static dfs_stack_t stack;
 
 static int N;
@@ -395,15 +397,11 @@ static void
 index_next_dfs (void *arg, transition_info_t *ti, int *dst)
 {
     int                 src_ofs = *(int *)arg;
-    int                 before = TreeCount (dbs);
     int                 idx = TreeFold (dbs, dst);
     dfs_stack_push (stack, &idx);
-    // if already in treedbs, don't reexplore
-    if (before == TreeCount (dbs) ) {
-        dfs_stack_pop (stack);
-    }
     if (idx >= visited) {
         visited = idx + 1;
+        bitset_set (dfs_open_set, idx);
     }
     if (write_lts) enum_seg_seg (output_handle, 0, src_ofs, 0, idx, ti->labels);
     ++ntransitions;
@@ -626,10 +624,12 @@ dfs_explore (model_t model, int *src, size_t *o_depth)
         /* Store folded states on the stack, at the cost of having to
            unfold them */
         stack = dfs_stack_create (1);
+        dfs_open_set = bitset_create (128,128);
         dbs = TreeDBScreate (N);
         int                 idx = TreeFold (dbs, src);
         int                *fvec = &idx;
         dfs_stack_push (stack, fvec);
+        bitset_set (dfs_open_set, *fvec);
         while ((fvec = dfs_stack_top (stack)) || dfs_stack_nframes (stack)) {
             if (fvec == NULL) {
                 dfs_stack_leave (stack);
@@ -637,8 +637,11 @@ dfs_explore (model_t model, int *src, size_t *o_depth)
                 continue;
             }
             if (next_group == 0) {
-                if (dfs_stack_nframes (stack) > max)
+                if (!bitset_test (dfs_open_set, *fvec) ||
+                    dfs_stack_nframes (stack) > max)
                     next_group = K;
+                else
+                    bitset_clear (dfs_open_set, *fvec);
             }
 
             if (next_group < K) {
