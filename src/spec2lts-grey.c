@@ -876,9 +876,7 @@ ndfs_report_cycle(model_t model)
             lts_output_set_root_idx(trace_output,0,0);
         }
         trace_handle=lts_output_begin(trace_output,0,0,0);
-        // TODO: might need to pop off one state of the blue stack here, when red_stack is not empty
-        find_dfs_stack_trace_tree(model, blue_stack);
-        //find_dfs_stack_trace_tree(model, red_stack);
+        find_dfs_stack_trace_tree(model, stack);
         lts_output_end(trace_output,trace_handle);
         lts_output_close(&trace_output);
     }
@@ -949,10 +947,9 @@ ndfs_tree_expand (model_t model, int idx, int *o_next_group, TransitionCB red_bl
 static void
 ndfs_tree_red(model_t model, isb_allocator_t buffer)
 {
-    /* is it possible to use one stack for both implementations ? far easier with trace generation i guess */
-    /* first give the two implemenations a try */
     int                 next_group = 0;
     int*                fvec = NULL;
+    int*                fvec_start = dfs_stack_top(red_stack);
 
     while ((fvec = dfs_stack_top (red_stack)) || dfs_stack_nframes (red_stack)) {
         if (fvec == NULL) {
@@ -974,6 +971,8 @@ ndfs_tree_red(model_t model, isb_allocator_t buffer)
         } else {
             ndfs_set_color(*fvec, NDFS_RED);
             dfs_stack_pop (red_stack);
+            // does this work correctly on cycles?
+            if (fvec == fvec_start) break;
         }
         next_group = 0;
     }
@@ -1021,15 +1020,14 @@ ndfs_tree_blue(model_t model, size_t *o_depth)
                 int state[N];
                 TreeUnfold(dbs, *fvec, state);
                 if (ltl_is_accepting(state)) {
-                    // this is set in the wrong place
-                    //ndfs_set_color(*fvec, NDFS_RED);
-                    dfs_stack_push (red_stack, fvec);
+                    // note red_stack == blue_stack, state
+                    // is popped by red search
                     ndfs_tree_red(model, buffer);
                 } else {
                     ndfs_set_color(*fvec, NDFS_BLUE);
+                    dfs_stack_pop (blue_stack);
                 }
             }
-            dfs_stack_pop (blue_stack);
         }
         next_group = 0;
     }
@@ -1055,8 +1053,7 @@ ndfs_explore (model_t model, int *src, size_t *o_depth)
         break;
 
     case DB_TreeDBS: {
-        blue_stack = dfs_stack_create (1);
-        red_stack  = dfs_stack_create (1);
+        stack = blue_stack = red_stack = dfs_stack_create (1);
         ndfs_state_color = bitset_create (128,128);
         dbs = TreeDBScreate (N);
         int                 idx = TreeFold (dbs, src);
