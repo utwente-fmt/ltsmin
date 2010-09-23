@@ -227,7 +227,7 @@ ltl_textbook_all (model_t self, int *src, TransitionCB cb,
 int
 ltl_is_accepting(int *state)
 {
-    return ctx->ba->states[state[ctx->ltl_idx]]->accept;
+    return state[ctx->ltl_idx] == -1 || ctx->ba->states[state[ctx->ltl_idx]]->accept;
 }
 
 model_t
@@ -276,7 +276,7 @@ GBaddLTL (model_t model, char* ltl_file, pins_ltl_type_t type)
     // set in context for later use in function
     ctx->ltl_idx = ltl_idx;
     ctx->len = ltl_idx + 1;
-    GBcopyChunkMaps(ltlmodel, model);
+    GBcopyChunkMaps(ltlmodel, model); // This messes up the trace, the chunk maps now is one index short!
     lts_type_t ltstype_new = lts_type_clone(ltstype);
     // set new length
     lts_type_set_state_length(ltstype_new, ltl_idx+1);
