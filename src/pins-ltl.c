@@ -107,11 +107,9 @@ ltl_spin_long (model_t self, int group, int *src, TransitionCB cb,
            void *user_context)
 {
     (void)self;
-    (void)group;
-    (void)src;
-    (void)cb;
-    (void)user_context;
-    Fatal(1,error,"Using LTL layer --grey? --reach? ? Still on todo list ;)");
+    // TODO: Stefan: use src in new_ctx instead of transition_info...
+    cb_context new_ctx = {cb, user_context};
+    return GBgetTransitionsLong(ctx->parent, group, src, ltl_spin_cb, &new_ctx);
 }
 
 static int
@@ -227,6 +225,8 @@ ltl_textbook_all (model_t self, int *src, TransitionCB cb,
 int
 ltl_is_accepting(int *state)
 {
+    // problem, this is called from anywhere, and regrouping, for example, is not
+    // in here -> hence wrong ltl index is used
     return state[ctx->ltl_idx] == -1 || ctx->ba->states[state[ctx->ltl_idx]]->accept;
 }
 
@@ -315,6 +315,27 @@ GBaddLTL (model_t model, char* ltl_file, pins_ltl_type_t type)
     }
     GBsetDMInfo(ltlmodel, p_new_dm);
     // TODO DMReadInfo, DMWriteInfo
+
+    // create new state label matrix
+    matrix_t       *p_new_sl = (matrix_t*) RTmalloc(sizeof(matrix_t));
+    matrix_t       *p_sl = GBgetStateLabelInfo (model);
+
+    int sl_groups = dm_nrows( p_sl );
+    int sl_len = dm_ncols( p_sl );
+
+    dm_create(p_new_sl, sl_groups, sl_len+1);
+    for(int i=0; i < sl_groups; i++) {
+        for(int j=0; j < sl_len+1; j++) {
+            // add buchi as independent
+            if (j == sl_len) {
+                //dm_unset(p_new_sl, i, j);
+            } else {
+                if (dm_is_set(p_sl, i, j))
+                    dm_set(p_new_sl, i, j);
+            }
+        }
+    }
+    GBsetStateLabelInfo(ltlmodel, p_new_sl);
 
     if (type == PINS_LTL_SPIN) {
         GBsetNextStateLong  (ltlmodel, ltl_spin_long);

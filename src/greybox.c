@@ -471,12 +471,12 @@ GBloadFile (model_t model, const char *filename, model_t *wrapped)
             if (0==strcmp (model_type[i], extension)) {
                 model_loader[i] (model, filename);
                 if (wrapped) {
+                    if (check_ltl)
+                        model = GBaddLTL (model, check_ltl, ltl_type);
                     if (regroup_options != NULL)
                         model = GBregroup (model, regroup_options);
                     if (cache)
                         model = GBaddCache (model);
-                    if (check_ltl)
-                        model = GBaddLTL (model, check_ltl, ltl_type);
                     *wrapped = model;
                 }
                 return;
