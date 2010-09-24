@@ -1043,6 +1043,7 @@ ndfs_tree_blue(model_t model, size_t *o_depth)
 static void
 ndfs_explore (model_t model, int *src, size_t *o_depth)
 {
+    if (max != UINT_MAX) Fatal(1, error, "undefined behaviour for max with NDFS");
     switch (state_db) {
     case DB_Vset:
         /*
