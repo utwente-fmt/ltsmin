@@ -917,10 +917,8 @@ ndfs_tree_blue_next (void *arg, transition_info_t *ti, int *dst)
 }
 
 static void
-ndfs_tree_expand (model_t model, int idx, int *o_next_group, TransitionCB red_blue_cb, int count)
+ndfs_tree_expand (model_t model, int* state, int *o_next_group, TransitionCB red_blue_cb, int count)
 {
-    int                 state[N];
-    TreeUnfold (dbs, idx, state);
     ndfs_context_t ctx = {model, state};
     int                 i = *o_next_group;
     switch (call_mode) {
@@ -965,8 +963,10 @@ ndfs_tree_red(model_t model, isb_allocator_t buffer)
         }
 
         if (next_group < K) {
+            int                 state[N];
+            TreeUnfold(dbs, *fvec, state);
             dfs_stack_enter (red_stack);
-            ndfs_tree_expand(model, *fvec, &next_group, ndfs_tree_red_next, 0);
+            ndfs_tree_expand(model, state, &next_group, ndfs_tree_red_next, 0);
             isba_push_int (buffer, &next_group);
         } else {
             ndfs_set_color(*fvec, NDFS_RED);
@@ -986,6 +986,7 @@ ndfs_tree_blue(model_t model, size_t *o_depth)
     int                 next_group = 0;
     buffer = isba_create (1);
     int*                fvec = NULL;
+    int                 state[N];
 
     /* Store folded states on the stack, at the cost of having to
        unfold them */
@@ -1004,9 +1005,11 @@ ndfs_tree_blue(model_t model, size_t *o_depth)
             }
         }
 
+        // unfold here
+        TreeUnfold(dbs, *fvec, state);
         if (next_group < K) {
             dfs_stack_enter (blue_stack);
-            ndfs_tree_expand(model, *fvec, &next_group, ndfs_tree_blue_next, 1);
+            ndfs_tree_expand(model, state, &next_group, ndfs_tree_blue_next, 1);
             isba_push_int (buffer, &next_group);
             if (dfs_stack_nframes (blue_stack) > depth) {
                 depth = dfs_stack_nframes (blue_stack);
@@ -1017,8 +1020,6 @@ ndfs_tree_blue(model_t model, size_t *o_depth)
         } else {
             // state is popped
             {
-                int state[N];
-                TreeUnfold(dbs, *fvec, state);
                 if (ltl_is_accepting(state)) {
                     // note red_stack == blue_stack, state
                     // is popped by red search
