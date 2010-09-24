@@ -115,6 +115,11 @@ state_db_popt (poptContext con, enum poptCallbackReason reason,
                 Warning (error, "unknown search mode %s", arg_strategy);
                 RTexitUsage (EXIT_FAILURE);
             }
+            // exception for Strat_NDFS, only works in combination with ltl formula
+            if (s == Strat_NDFS && !ltl_file) {
+                Warning (error, "NDFS search only works in combination with --ltl");
+                RTexitUsage (EXIT_FAILURE);
+            }
             strategy = s;
 
             int l = linear_search (db_ltl_semantics, ltl_semantics);
@@ -149,7 +154,7 @@ static  struct poptOption options[] = {
 	{ "state" , 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &arg_state_db , 0 ,
 		"select the data structure for storing states", "<table|tree|vset>"},
 	{ "strategy" , 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &arg_strategy , 0 ,
-		"select the search strategy", "<bfs|dfs>"},
+		"select the search strategy", "<bfs|dfs|ndfs>"},
 	{ "ltl" , 0 , POPT_ARG_STRING , &ltl_file , 0 , "file with a ltl formula" , "<ltl-file>.ltl" },
 	{ "ltl-semantics" , 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT, &ltl_semantics, 0,
         "choose ltl semantics" , "<spin|textbook>" },
@@ -189,6 +194,10 @@ static dfs_stack_t stack;
 static bitset_t    ndfs_state_color;
 static dfs_stack_t blue_stack;
 static dfs_stack_t red_stack;
+
+static vset_t ndfs_cyan;
+static vset_t ndfs_blue;
+static vset_t ndfs_red;
 
 static int N;
 static int K;
@@ -917,7 +926,43 @@ ndfs_tree_blue_next (void *arg, transition_info_t *ti, int *dst)
 }
 
 static void
-ndfs_tree_expand (model_t model, int* state, int *o_next_group, TransitionCB red_blue_cb, int count)
+ndfs_vset_red_next (void *arg, transition_info_t *ti, int *dst)
+{
+    (void)ti;
+    ndfs_context_t*     ctx = (ndfs_context_t*) arg;
+    (void) ctx;
+    if (vset_member(ndfs_blue, dst)) {
+        if (!vset_member(ndfs_red, dst)) {
+            vset_add(ndfs_blue, dst); // needed ?
+            vset_add(ndfs_red, dst);
+            dfs_stack_push (red_stack, dst);
+        }
+    } else {
+        if (vset_member(ndfs_cyan, dst)) {
+            Fatal(1, error, "accepting cycle found!");
+        }
+    }
+}
+
+static void
+ndfs_vset_blue_next (void *arg, transition_info_t *ti, int *dst)
+{
+    (void)ti;
+    ndfs_context_t*     ctx = (ndfs_context_t*) arg;
+    if (!vset_member (ndfs_cyan, dst)) {
+        dfs_stack_push (blue_stack, dst);
+    } else {
+        // if not blue, it is cyan
+        if (!vset_member(ndfs_blue, dst) &&
+            (ltl_is_accepting(ctx->src) || ltl_is_accepting(dst))) {
+            Fatal(1, error, "accepting cycle found!");
+        }
+    }
+    ++ntransitions;
+}
+
+static void
+ndfs_expand (model_t model, int* state, int *o_next_group, TransitionCB red_blue_cb, int count)
 {
     ndfs_context_t ctx = {model, state};
     int                 i = *o_next_group;
@@ -966,7 +1011,7 @@ ndfs_tree_red(model_t model, isb_allocator_t buffer)
             int                 state[N];
             TreeUnfold(dbs, *fvec, state);
             dfs_stack_enter (red_stack);
-            ndfs_tree_expand(model, state, &next_group, ndfs_tree_red_next, 0);
+            ndfs_expand(model, state, &next_group, ndfs_tree_red_next, 0);
             isba_push_int (buffer, &next_group);
         } else {
             ndfs_set_color(*fvec, NDFS_RED);
@@ -1009,7 +1054,7 @@ ndfs_tree_blue(model_t model, size_t *o_depth)
         TreeUnfold(dbs, *fvec, state);
         if (next_group < K) {
             dfs_stack_enter (blue_stack);
-            ndfs_tree_expand(model, state, &next_group, ndfs_tree_blue_next, 1);
+            ndfs_expand(model, state, &next_group, ndfs_tree_blue_next, 1);
             isba_push_int (buffer, &next_group);
             if (dfs_stack_nframes (blue_stack) > depth) {
                 depth = dfs_stack_nframes (blue_stack);
@@ -1035,6 +1080,92 @@ ndfs_tree_blue(model_t model, size_t *o_depth)
     *o_depth = depth;
 }
 
+static void
+ndfs_vset_red(model_t model, isb_allocator_t buffer)
+{
+    int                 next_group = 0;
+    int*                src = NULL;
+    int*                src_start = dfs_stack_top(red_stack);
+
+    while ((src = dfs_stack_top (red_stack)) || dfs_stack_nframes (red_stack)) {
+        if (src == NULL) {
+            dfs_stack_leave (red_stack);
+            next_group = *isba_pop_int (buffer);
+            continue;
+        }
+        if (next_group == 0) {
+            if (vset_member(ndfs_red, src) ||
+                dfs_stack_nframes (blue_stack) > max) {
+                next_group = K;
+            }
+        }
+
+        if (next_group < K) {
+            dfs_stack_enter (red_stack);
+            ndfs_expand(model, src, &next_group, ndfs_vset_red_next, 0);
+            isba_push_int (buffer, &next_group);
+        } else {
+            vset_add (ndfs_red, src);
+            vset_add (ndfs_blue, src);
+            dfs_stack_pop (red_stack);
+            // does this work correctly on cycles?
+            if (src == src_start) break;
+        }
+        next_group = 0;
+    }
+}
+
+static void
+ndfs_vset_blue(model_t model, int* src, size_t *o_depth)
+{
+    size_t              depth = 0;
+    int                 next_group = 0;
+    isb_allocator_t     buffer = isba_create (1);
+    while ((src = dfs_stack_top (blue_stack)) || dfs_stack_nframes (blue_stack)) {
+        if (src == NULL) {
+            dfs_stack_leave (blue_stack);
+            next_group = *isba_pop_int (buffer);
+            continue;
+        }
+        if (next_group == 0) {
+            // vset_member (ndfs_red) implies vset_member(ndfs_blue)
+            // which implies vset_member(ndfs_cyan), hence not white
+            if (vset_member (ndfs_cyan, src))
+                next_group = K;
+            else {
+                vset_add (ndfs_cyan, src);
+                visited++;
+            }
+        }
+
+        if (next_group < K) {
+            dfs_stack_enter (blue_stack);
+            ndfs_expand(model, src, &next_group, ndfs_vset_blue_next, 1);
+            isba_push_int (buffer, &next_group);
+            if (dfs_stack_nframes (blue_stack) > depth) {
+                depth = dfs_stack_nframes (blue_stack);
+                if (RTverbosity >= 1)
+                    Warning (info, "new depth reached %d. Visited %d states and %zu transitions",
+                             depth, visited, ntransitions);
+            }
+        } else {
+            {
+                if (ltl_is_accepting(src)) {
+                    // note red_stack == blue_stack, state
+                    // is popped by red search
+                    ndfs_vset_red(model, buffer);
+                } else {
+                    vset_add (ndfs_blue, src);
+                    //vset_add (ndfs_cyan) state must already be in cyan
+                    dfs_stack_pop (blue_stack);
+                }
+            }
+        }
+        next_group = 0;
+    }
+    *o_depth = depth;
+}
+
 /* NDFS exploration for checking ltl properties
  * Algorithm taken from:
  * A Note on On-The-Fly Verification Algorithms
@@ -1046,12 +1177,20 @@ ndfs_explore (model_t model, int *src, size_t *o_depth)
     if (max != UINT_MAX) Fatal(1, error, "undefined behaviour for max with NDFS");
     switch (state_db) {
     case DB_Vset:
-        /*
-        enum { SD_NEXT_GROUP, SD_SRC_IDX, SD__SIZE };
-        int                 write_idx = 0;
-        int                 src_idx = 0;
-        */
-        Fatal(1, error, "vset not yet supported for ndfs");
+        // vset ndfs_cyan, ndfs_blue, ndfs_red
+        // encoding ([..] = optional check)
+        // white = !vset_member(cyan) [ && !vset_member(blue) && !vset_member(red) ]
+        // blue  = !vset_member(red) && vset_member(blue) [ && vset_member(cyan) ]
+        // cyan  = !vset_member(blue) && vset_member(cyan) [ && !vset_member(red) ]
+        // red  == vset_member(red) [ && vset_member(blue) && vset_member(cyan) ]
+        visited = 0;
+        domain = vdom_create_default (N);
+        ndfs_cyan = vset_create (domain, 0, NULL);
+        ndfs_blue = vset_create (domain, 0, NULL);
+        ndfs_red = vset_create (domain, 0, NULL);
+        stack = blue_stack = red_stack = dfs_stack_create (N);
+        dfs_stack_push (blue_stack, src);
+        ndfs_vset_blue(model, src, o_depth);
         break;
 
     case DB_TreeDBS: {
