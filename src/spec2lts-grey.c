@@ -67,7 +67,7 @@ typedef enum { UseGreyBox , UseBlackBox } mode_t;
 static mode_t call_mode=UseBlackBox;
 
 static char *arg_strategy = "bfs";
-static enum { Strat_BFS, Strat_DFS, Strat_NDFS } strategy = Strat_BFS;
+static enum { Strat_BFS, Strat_DFS, Strat_NDFS, Strat_SCC } strategy = Strat_BFS;
 static char *arg_state_db = "tree";
 static enum { DB_DBSLL, DB_TreeDBS, DB_Vset } state_db = DB_TreeDBS;
 
@@ -75,6 +75,7 @@ static si_map_entry strategies[] = {
     {"bfs",  Strat_BFS},
     {"dfs",  Strat_DFS},
     {"ndfs", Strat_NDFS},
+    {"scc", Strat_SCC}, // couvreur
     {NULL, 0}
 };
 
@@ -116,8 +117,8 @@ state_db_popt (poptContext con, enum poptCallbackReason reason,
                 RTexitUsage (EXIT_FAILURE);
             }
             // exception for Strat_NDFS, only works in combination with ltl formula
-            if (s == Strat_NDFS && !ltl_file) {
-                Warning (error, "NDFS search only works in combination with --ltl");
+            if ((s == Strat_NDFS || s == Strat_SCC) && !ltl_file) {
+                Warning (error, "NDFS/SCC search only works in combination with --ltl");
                 RTexitUsage (EXIT_FAILURE);
             }
             strategy = s;
@@ -154,7 +155,7 @@ static  struct poptOption options[] = {
 	{ "state" , 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &arg_state_db , 0 ,
 		"select the data structure for storing states", "<table|tree|vset>"},
 	{ "strategy" , 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &arg_strategy , 0 ,
-		"select the search strategy", "<bfs|dfs|ndfs>"},
+		"select the search strategy", "<bfs|dfs|ndfs|scc>"},
 	{ "ltl" , 0 , POPT_ARG_STRING , &ltl_file , 0 , "file with a ltl formula" , "<ltl-file>.ltl" },
 	{ "ltl-semantics" , 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT, &ltl_semantics, 0,
         "choose ltl semantics" , "<spin|textbook>" },
@@ -198,6 +199,13 @@ static dfs_stack_t red_stack;
 static vset_t ndfs_cyan;
 static vset_t ndfs_blue;
 static vset_t ndfs_red;
+
+static bitset_t         scc_current;
+static dfs_stack_t      scc_remove;
+static dfs_stack_t      scc_roots;
+static array_manager_t  scc_dfsnum_man = NULL;
+static int             *scc_dfsnum = NULL;
+static int              scc_count = 0;
 
 static int N;
 static int K;
@@ -1208,6 +1216,151 @@ ndfs_explore (model_t model, int *src, size_t *o_depth)
     }
 }
 
+static void
+scc_tree_remove (void *arg, transition_info_t *ti, int *dst)
+{
+    (void)ti;
+    (void)arg;
+    int                 idx = TreeFold (dbs, dst);
+    if (bitset_test(scc_current, idx)) {
+        bitset_clear(scc_current, idx);
+        dfs_stack_push(scc_remove, &idx);
+    }
+}
+
+static void
+scc_tree_next (void *arg, transition_info_t *ti, int *dst)
+{
+    (void)ti;
+    (void)arg;
+    int                 idx = TreeFold (dbs, dst);
+    ensure_access(scc_dfsnum_man, idx);
+    int                 dfsnum = scc_dfsnum[idx];
+    if (dfsnum == 0) {
+        dfs_stack_push (stack, &idx);
+    } else {
+        if (bitset_test(scc_current, idx)) {
+            // fix roots
+            int *root;
+            do {
+                root = dfs_stack_pop(scc_roots);
+                // if accepting?
+                if (scc_dfsnum[*root] & 0x01)
+                    Fatal(1, error, "accepting cycle found!");
+            } while (scc_dfsnum[*root] > dfsnum);
+            dfs_stack_push(scc_roots, root);
+        }
+    }
+    if (idx >= visited) visited = idx + 1;
+    ++ntransitions;
+}
+
+static void
+scc_tree(model_t model, size_t *o_depth)
+{
+    isb_allocator_t     buffer;
+    size_t              depth = 0;
+    int                 next_group = 0;
+    buffer = isba_create (1);
+    int*                fvec = NULL;
+    int                 state[N];
+
+    /* Store folded states on the stack, at the cost of having to
+       unfold them */
+    while ((fvec = dfs_stack_top (stack)) || dfs_stack_nframes (stack)) {
+        if (fvec == NULL) {
+            dfs_stack_leave (stack);
+            next_group = *isba_pop_int (buffer);
+            continue;
+        }
+        ensure_access(scc_dfsnum_man, *fvec);
+        if (next_group == 0) {
+            if (scc_dfsnum[*fvec] ||
+                dfs_stack_nframes (stack) > max) {
+                next_group = K;
+            } else {
+                scc_count+=2;
+                scc_dfsnum[*fvec] = scc_count;
+                bitset_set(scc_current, *fvec);
+                dfs_stack_push(scc_roots, fvec);
+            }
+        }
+
+        if (next_group < K) {
+            // unfold here
+            TreeUnfold(dbs, *fvec, state);
+            // check accepting, encode using 1 bit of scc_dfsnum
+            if (next_group ==0)
+                if (ltl_is_accepting(state)) scc_dfsnum[*fvec]++;
+            dfs_stack_enter (stack);
+            ndfs_expand(model, state, &next_group, scc_tree_next, 1);
+            isba_push_int (buffer, &next_group);
+            if (dfs_stack_nframes (stack) > depth) {
+                depth = dfs_stack_nframes (stack);
+                if (RTverbosity >= 1)
+                    Warning (info, "new depth reached %d. Visited %d states and %zu transitions",
+                             depth, visited, ntransitions);
+            }
+        } else {
+            if (bitset_test(scc_current, *fvec)) {
+                bitset_clear(scc_current, *fvec);
+                int *root;
+                if ((root = dfs_stack_top(scc_roots))) {
+                    if (*root == *fvec) {
+                        dfs_stack_pop(scc_roots);
+                        dfs_stack_push(scc_remove, root);
+                        while ((root = dfs_stack_top(scc_remove))) {
+                            dfs_stack_pop(scc_remove);
+                            int next_grp = 0;
+                            TreeUnfold(dbs, *root, state);
+                            // note: not in dfs order, but should work anyway
+                            while(next_grp != K) {
+                                ndfs_expand(model, state, &next_grp, scc_tree_remove, 0);
+                            }
+                        }
+                    }
+                }
+            }
+            dfs_stack_pop (stack);
+        }
+        next_group = 0;
+    }
+    *o_depth = depth;
+}
+
+/* SCC exploration for checking ltl properties
+ * Algorithm taken from:
+ * A Note on On-The-Fly Verification Algorithms
+ * Stefan Schwoon and Javier Esparza
+ */
+static void
+scc_explore (model_t model, int *src, size_t *o_depth)
+{
+    // adding test in scc_remove and bailing out when scc_dfsnum[idx] == 0 should be enought to fix max param
+    if (max != UINT_MAX) Fatal(1, error, "undefined behaviour for max with SCC");
+    switch (state_db) {
+    case DB_Vset:
+        Fatal(1, error, "scc not implemented for vset");
+        break;
+
+    case DB_TreeDBS: {
+        stack = dfs_stack_create (1);
+        scc_remove = dfs_stack_create (1);
+        scc_roots = dfs_stack_create (1);
+        scc_current = bitset_create (128,128);
+        scc_dfsnum_man=create_manager(65536);
+        ADD_ARRAY(scc_dfsnum_man, scc_dfsnum, int);
+        dbs = TreeDBScreate (N);
+        int                 idx = TreeFold (dbs, src);
+        dfs_stack_push (stack, &idx);
+        scc_tree(model, o_depth);
+        } break;
+
+    default:
+        Fatal (1, error, "Unsupported combination: strategy=%s, state=%s",
+               strategies[strategy].key, db_types[state_db].key);
+    }
+}
 /* Main */
 static void
 init_write_lts (lts_output_t *p_output,
@@ -1357,6 +1510,13 @@ int main(int argc, char *argv[]){
         case Strat_NDFS: {
             size_t depth = 0;
             ndfs_explore(model, src, &depth);
+            Warning (info, "state space has depth %zu, %d states %zu transitions",
+                    depth, visited, ntransitions);
+            break;
+        }
+        case Strat_SCC: {
+            size_t depth = 0;
+            scc_explore(model, src, &depth);
             Warning (info, "state space has depth %zu, %d states %zu transitions",
                     depth, visited, ntransitions);
             break;
