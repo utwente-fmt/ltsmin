@@ -309,7 +309,7 @@ static uint32_t mdd_minus(uint32_t a,uint32_t b){
 }
 
 
-static uint32_t mdd_member(uint32_t mdd,uint32_t *vec,int len){
+static uint32_t mdd_member(uint32_t mdd,const uint32_t *vec,int len){
     if (len==0) {
         while(mdd>1) mdd=node_table[mdd].right;
         return mdd;
@@ -326,7 +326,7 @@ static uint32_t mdd_member(uint32_t mdd,uint32_t *vec,int len){
     return 0;
 }
 
-static uint32_t mdd_put(uint32_t mdd,uint32_t *vec,int len,int* is_new){
+static uint32_t mdd_put(uint32_t mdd,const uint32_t *vec,int len,int* is_new){
     if (len==0) {
         if (mdd==0) {
             if(is_new) *is_new=1;
