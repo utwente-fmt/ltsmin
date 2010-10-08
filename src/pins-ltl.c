@@ -107,8 +107,7 @@ ltl_spin_long (model_t self, int group, int *src, TransitionCB cb,
            void *user_context)
 {
     (void)self;
-    // TODO: Stefan: use src in new_ctx instead of transition_info...
-    cb_context new_ctx = {cb, user_context};
+    cb_context new_ctx = {cb, user_context, src};
     return GBgetTransitionsLong(ctx->parent, group, src, ltl_spin_cb, &new_ctx);
 }
 
@@ -130,7 +129,6 @@ ltl_spin_all (model_t self, int *src, TransitionCB cb,
          void *user_context)
 {
     (void)self;
-    // TODO: Stefan: use src in new_ctx instead of transition_info...
     cb_context new_ctx = {cb, user_context, src};
     return GBgetTransitionsAll(ctx->parent, src, ltl_spin_cb, &new_ctx);
 }
@@ -207,7 +205,6 @@ ltl_textbook_all (model_t self, int *src, TransitionCB cb,
          void *user_context)
 {
     (void)self;
-    // TODO: Stefan: use src in new_ctx instead of transition_info...
     cb_context new_ctx = {cb, user_context, src};
     if (src[ctx->ltl_idx] == -1) {
         transition_info_t ti = {NULL, -1};
