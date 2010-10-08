@@ -299,6 +299,13 @@ extern void GBsetChunkMethods(model_t model,newmap_t newmap,void*newmap_context,
 extern void GBcopyChunkMaps(model_t dst, model_t src);
 
 /**
+\brief Adds extra chunk maps besides the existing ones
+
+Used in the pins ltl layer to when the lts type is appended with the buchi automaton type
+*/
+extern void GBgrowChunkMaps(model_t model, int old_n);
+
+/**
 \brief Initializes unset model parameters from default_src.
 */
 extern void GBinitModelDefaults (model_t *p_model, model_t default_src);

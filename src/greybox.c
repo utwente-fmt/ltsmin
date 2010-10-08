@@ -424,6 +424,20 @@ void GBcopyChunkMaps(model_t dst, model_t src)
     dst->map = src->map;
 }
 
+void GBgrowChunkMaps(model_t model, int old_n)
+{
+    void **old_map = model->map;
+    int N=lts_type_get_type_count(GBgetLTStype(model));
+    model->map=RTmalloc(N*sizeof(void*));
+    for(int i=0;i<N;i++){
+        if (i < old_n) {
+            model->map[i] = old_map[i];
+        } else {
+            model->map[i]=model->newmap(model->newmap_context);
+        }
+    }
+}
+
 int GBchunkPut(model_t model,int type_no,const chunk c){
 	return model->chunk2int(model->map[type_no],c.data,c.len);
 }

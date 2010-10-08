@@ -276,7 +276,8 @@ GBaddLTL (model_t model, char* ltl_file, pins_ltl_type_t type)
     // set in context for later use in function
     ctx->ltl_idx = ltl_idx;
     ctx->len = ltl_idx + 1;
-    GBcopyChunkMaps(ltlmodel, model); // This messes up the trace, the chunk maps now is one index short!
+    // This messes up the trace, the chunk maps now is one index short! Fixed below
+    GBcopyChunkMaps(ltlmodel, model);
     lts_type_t ltstype_new = lts_type_clone(ltstype);
     // set new length
     lts_type_set_state_length(ltstype_new, ltl_idx+1);
@@ -292,6 +293,9 @@ GBaddLTL (model_t model, char* ltl_file, pins_ltl_type_t type)
 
     // set new type
     GBsetLTStype(ltlmodel, ltstype_new);
+
+    // extend the chunk maps
+    GBgrowChunkMaps(ltlmodel, type_count);
 
     matrix_t           *p_new_dm = (matrix_t*) RTmalloc(sizeof(matrix_t));
     matrix_t           *p_dm = GBgetDMInfo (model);
