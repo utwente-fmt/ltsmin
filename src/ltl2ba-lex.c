@@ -38,8 +38,8 @@
 #include <ltsmin-syntax.h>
 #include <ltsmin-tl.h>
 #include <ltsmin-buchi.h>
+#include <runtime.h>
 
-char* ltsmin_expr_print_ltl(ltsmin_expr_t, char*);
 
 typedef struct ltsmin_expr_list_t {
     char* text;
@@ -153,7 +153,7 @@ tl_lex(void)
             }
             return PREDICATE;
         default:
-            printf("unhandled LTL_TOKEN: %d\n", e->token);
+            Abort("unhandled LTL_TOKEN: %d\n", e->token);
             break;
     }
     tl_yyerror("expected something...");
@@ -165,13 +165,8 @@ add_lin_expr(ltsmin_expr_t e)
 {
     // fill le_expr
     if (le->count >= le->size) {
-        ltsmin_lin_expr_t* le_r = realloc(le, sizeof(ltsmin_lin_expr_t) + (le->size << 1) * sizeof(ltsmin_expr_t));
-        if (le_r) {
-            le = le_r;
-            le_r->size = le->size << 1;
-        } else {
-            printf("error in add_lin_expr:realloc\n");
-        }
+        le->size *= 2;
+        le = RTrealloc(le, sizeof(ltsmin_lin_expr_t) + le->size * sizeof(ltsmin_expr_t));
     }
     le->lin_expr[le->count++] = e;
 }
@@ -214,7 +209,7 @@ ltsmin_ltl2ba(ltsmin_expr_t e)
     set_uform("");
     const int le_size = 64;
     // linearized expression
-    le = malloc(sizeof(ltsmin_lin_expr_t) + le_size * sizeof(ltsmin_expr_t));
+    le = RTmalloc(sizeof(ltsmin_lin_expr_t) + le_size * sizeof(ltsmin_expr_t));
     le->size = le_size;
     le->count = 0;
 
@@ -271,11 +266,11 @@ ltsmin_buchi()
     }
 
     // allocate buchi struct
-    res = malloc(sizeof(ltsmin_buchi_t) + state_count * sizeof(ltsmin_buchi_state_t*));
+    res = RTmalloc(sizeof(ltsmin_buchi_t) + state_count * sizeof(ltsmin_buchi_state_t*));
     res->predicate_count = n_sym;
-    res->predicates = malloc(n_sym * sizeof(ltsmin_expr_t));
-    if (res->predicates)
-        for(int i=0; i < n_sym; i++) res->predicates[i] = ltsmin_expr_lookup(NULL, sym_table[i]);
+    res->predicates = RTmalloc(n_sym * sizeof(ltsmin_expr_t));
+    for (int i=0; i < n_sym; i++)
+        res->predicates[i] = ltsmin_expr_lookup(NULL, sym_table[i]);
     res->state_count = state_count;
 
     state_count = 0;
@@ -286,7 +281,7 @@ ltsmin_buchi()
         for(t = s->trans->nxt; t != s->trans; t = t->nxt)
             transition_count++;
         // allocate memory for transitions
-        bs = malloc(sizeof(ltsmin_buchi_state_t) + transition_count * sizeof(ltsmin_buchi_transition_t));
+        bs = RTmalloc(sizeof(ltsmin_buchi_state_t) + transition_count * sizeof(ltsmin_buchi_transition_t));
         bs->accept = (s->final == accept);
         bs->transition_count = transition_count;
 

@@ -50,10 +50,6 @@ static int dlk_detect=0;
 static lts_enum_cb_t trace_handle=NULL;
 static lts_output_t trace_output=NULL;
 
-static char *ltl_semantics = "spin";
-static int   ltl_type = PINS_LTL_SPIN;
-static char *ltl_file=NULL;
-
 static array_manager_t state_man=NULL;
 static uint32_t *parent_ofs=NULL;
 
@@ -86,12 +82,6 @@ static si_map_entry db_types[]={
     {NULL, 0}
 };
 
-static si_map_entry db_ltl_semantics[]={
-    {"spin",     PINS_LTL_SPIN},
-    {"textbook", PINS_LTL_TEXTBOOK},
-    {NULL, 0}
-};
-
 static void
 state_db_popt (poptContext con, enum poptCallbackReason reason,
                const struct poptOption *opt, const char *arg, void *data)
@@ -116,23 +106,7 @@ state_db_popt (poptContext con, enum poptCallbackReason reason,
                 Warning (error, "unknown search mode %s", arg_strategy);
                 RTexitUsage (EXIT_FAILURE);
             }
-            // exception for Strat_NDFS, only works in combination with ltl formula
-            if ((s == Strat_NDFS || s == Strat_SCC) && !ltl_file) {
-                Warning (error, "NDFS/SCC search only works in combination with --ltl");
-                RTexitUsage (EXIT_FAILURE);
-            }
             strategy = s;
-
-            int l = linear_search (db_ltl_semantics, ltl_semantics);
-            if (l < 0) {
-                Warning (error, "unknown ltl semantic %s", ltl_semantics);
-                RTexitUsage (EXIT_FAILURE);
-            }
-            ltl_type = l;
-
-            if (ltl_file) {
-                GBsetLTL(ltl_file, ltl_type);
-            }
         }
         return;
     case POPT_CALLBACK_REASON_OPTION:
@@ -156,9 +130,6 @@ static  struct poptOption options[] = {
 		"select the data structure for storing states", "<table|tree|vset>"},
 	{ "strategy" , 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &arg_strategy , 0 ,
 		"select the search strategy", "<bfs|dfs|ndfs|scc>"},
-	{ "ltl" , 0 , POPT_ARG_STRING , &ltl_file , 0 , "file with a ltl formula" , "<ltl-file>.ltl" },
-	{ "ltl-semantics" , 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT, &ltl_semantics, 0,
-        "choose ltl semantics" , "<spin|textbook>" },
 	{ "max" , 0 , POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT , &max , 0 ,"maximum search depth", "<int>"},
 #if defined(MCRL)
 	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, mcrl_options , 0 , "mCRL options", NULL },
@@ -924,7 +895,8 @@ ndfs_tree_blue_next (void *arg, transition_info_t *ti, int *dst)
     int                 idx = TreeFold (dbs, dst);
     ndfs_color_t        idx_color = ndfs_get_color(idx);
     if (idx_color == NDFS_CYAN &&
-       (ltl_is_accepting(ctx->src) || ltl_is_accepting(dst))) {
+       (GBbuchiIsAccepting(ctx->model, ctx->src) ||
+        GBbuchiIsAccepting(ctx->model, dst))) {
         ndfs_report_cycle(ctx->model);
     } else if (idx_color == NDFS_WHITE) {
         dfs_stack_push (blue_stack, &idx);
@@ -962,7 +934,8 @@ ndfs_vset_blue_next (void *arg, transition_info_t *ti, int *dst)
     } else {
         // if not blue, it is cyan
         if (!vset_member(ndfs_blue, dst) &&
-            (ltl_is_accepting(ctx->src) || ltl_is_accepting(dst))) {
+           (GBbuchiIsAccepting(ctx->model, ctx->src) ||
+            GBbuchiIsAccepting(ctx->model, dst))) {
             Fatal(1, error, "accepting cycle found!");
         }
     }
@@ -1073,7 +1046,7 @@ ndfs_tree_blue(model_t model, size_t *o_depth)
         } else {
             // state is popped
             {
-                if (ltl_is_accepting(state)) {
+                if (GBbuchiIsAccepting(model, state)) {
                     // note red_stack == blue_stack, state
                     // is popped by red search
                     ndfs_tree_red(model, buffer);
@@ -1158,7 +1131,7 @@ ndfs_vset_blue(model_t model, int* src, size_t *o_depth)
             }
         } else {
             {
-                if (ltl_is_accepting(src)) {
+                if (GBbuchiIsAccepting(model, src)) {
                     // note red_stack == blue_stack, state
                     // is popped by red search
                     ndfs_vset_red(model, buffer);
@@ -1291,7 +1264,7 @@ scc_tree(model_t model, size_t *o_depth)
             TreeUnfold(dbs, *fvec, state);
             // check accepting, encode using 1 bit of scc_dfsnum
             if (next_group ==0)
-                if (ltl_is_accepting(state)) scc_dfsnum[*fvec]++;
+                if (GBbuchiIsAccepting(model, state)) scc_dfsnum[*fvec]++;
             dfs_stack_enter (stack);
             ndfs_expand(model, state, &next_group, scc_tree_next, 1);
             isba_push_int (buffer, &next_group);
@@ -1508,6 +1481,11 @@ int main(int argc, char *argv[]){
             break;
         }
         case Strat_NDFS: {
+            // exception for Strat_NDFS, only works in combination with ltl formula
+            if (GBgetAcceptingStateLabelIndex(model) < 0) {
+                Abort("NDFS search only works in combination with an accepting state label"
+                      " (see LTL options)");
+            }
             size_t depth = 0;
             ndfs_explore(model, src, &depth);
             Warning (info, "state space has depth %zu, %d states %zu transitions",
@@ -1515,6 +1493,11 @@ int main(int argc, char *argv[]){
             break;
         }
         case Strat_SCC: {
+            // exception for Strat_SCC, only works in combination with ltl formula
+            if (GBgetAcceptingStateLabelIndex(model) < 0) {
+                Abort("NDFS search only works in combination with an accepting state label"
+                      " (see LTL options)");
+            }
             size_t depth = 0;
             scc_explore(model, src, &depth);
             Warning (info, "state space has depth %zu, %d states %zu transitions",

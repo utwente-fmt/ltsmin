@@ -13,6 +13,7 @@ struct grey_box_model {
 	matrix_t *dm_read_info;
 	matrix_t *dm_write_info;
 	matrix_t *sl_info;
+        int sl_idx_buchi_accept;
 	int *s0;
 	void*context;
 	next_method_grey_t next_short;
@@ -162,6 +163,7 @@ model_t GBcreateBase(){
 	model->dm_read_info=NULL;
 	model->dm_write_info=NULL;
 	model->sl_info=NULL;
+        model->sl_idx_buchi_accept = -1;
 	model->s0=NULL;
 	model->context=0;
 	model->next_short=default_short;
@@ -220,6 +222,10 @@ void GBinitModelDefaults (model_t *p_model, model_t default_src)
 
     if (model->sl_info == NULL)
         GBsetStateLabelInfo(model, GBgetStateLabelInfo(default_src));
+
+    if (model->sl_idx_buchi_accept < 0)
+        GBsetAcceptingStateLabelIndex(model, GBgetAcceptingStateLabelIndex (default_src));
+
     if (model->s0 == NULL) {
         int N = lts_type_get_state_length (GBgetLTStype (default_src));
         int s0[N];
@@ -472,8 +478,41 @@ static pins_loader_t model_preloader[MAX_TYPES];
 static int registered_pre=0;
 static int cache=0;
 static const char *regroup_options = NULL;
-static char *check_ltl = NULL;
+
+static char *ltl_file = NULL;
+static const char *ltl_semantics = "spin";
 static pins_ltl_type_t ltl_type = PINS_LTL_SPIN;
+
+static si_map_entry db_ltl_semantics[]={
+    {"spin",     PINS_LTL_SPIN},
+    {"textbook", PINS_LTL_TEXTBOOK},
+    {NULL, 0}
+};
+
+static void
+ltl_popt (poptContext con, enum poptCallbackReason reason,
+          const struct poptOption *opt, const char *arg, void *data)
+{
+    (void)con; (void)opt; (void)arg; (void)data;
+    switch (reason) {
+    case POPT_CALLBACK_REASON_PRE:
+        break;
+    case POPT_CALLBACK_REASON_POST:
+        {
+            int l = linear_search (db_ltl_semantics, ltl_semantics);
+            if (l < 0) {
+                Warning (error, "unknown ltl semantic %s", ltl_semantics);
+                RTexitUsage (EXIT_FAILURE);
+            }
+            ltl_type = l;
+        }
+        return;
+    case POPT_CALLBACK_REASON_OPTION:
+        break;
+    }
+    Fatal (1, error, "unexpected call to state_db_popt");
+}
+
 
 void
 GBloadFile (model_t model, const char *filename, model_t *wrapped)
@@ -485,8 +524,8 @@ GBloadFile (model_t model, const char *filename, model_t *wrapped)
             if (0==strcmp (model_type[i], extension)) {
                 model_loader[i] (model, filename);
                 if (wrapped) {
-                    if (check_ltl)
-                        model = GBaddLTL (model, check_ltl, ltl_type);
+                    if (ltl_file)
+                        model = GBaddLTL (model, ltl_file, ltl_type);
                     if (regroup_options != NULL)
                         model = GBregroup (model, regroup_options);
                     if (cache)
@@ -541,12 +580,41 @@ void GBregisterPreLoader(const char*extension,pins_loader_t loader){
     }
 }
 
-void GBsetLTL(char* ltl_formula, pins_ltl_type_t type) { ltl_type = type; check_ltl = ltl_formula; /* should strdup? */ }
+int
+GBgetAcceptingStateLabelIndex (model_t model)
+{
+    return model->sl_idx_buchi_accept;
+}
+
+int
+GBsetAcceptingStateLabelIndex (model_t model, int idx)
+{
+    int oldidx = model->sl_idx_buchi_accept;
+    model->sl_idx_buchi_accept = idx;
+    return oldidx;
+}
+
+int
+GBbuchiIsAccepting (model_t model, int *state)
+{
+    return GBgetAcceptingStateLabelIndex(model) >= 0 &&
+        GBgetStateLabelLong(model, GBgetAcceptingStateLabelIndex(model), state);
+}
+
+struct poptOption ltl_options[] = {
+    {NULL, 0, POPT_ARG_CALLBACK | POPT_CBFLAG_POST | POPT_CBFLAG_SKIPOPTION, (void *)ltl_popt, 0, NULL, NULL},
+    {"ltl", 0, POPT_ARG_STRING, &ltl_file, 0, "file with LTL formula",
+     "<ltl-file>.ltl"},
+    {"ltl-semantics", 0, POPT_ARG_STRING | POPT_ARGFLAG_SHOW_DEFAULT, &ltl_semantics, 0,
+     "LTL semantics", "<spin|textbook>"},
+    POPT_TABLEEND
+};
 
 struct poptOption greybox_options[]={
 	{ "cache" , 'c' , POPT_ARG_VAL , &cache , 1 , "Enable caching of grey box calls." , NULL },
 	{ "regroup" , 'r' , POPT_ARG_STRING, &regroup_options , 0 ,
           "Enable regrouping; available transformations T: "
           "gs, ga, gc, gr, cs, cn, cw, ca, rs, rn, ru", "<(T,)+>" },
+	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, ltl_options , 0 , "LTL options", NULL },
 	POPT_TABLEEND	
 };

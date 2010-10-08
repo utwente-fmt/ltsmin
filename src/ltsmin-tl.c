@@ -1,7 +1,7 @@
 #include <config.h>
 #include <ltsmin-tl.h>
 #include <runtime.h>
-#include "dynamic-array.h"
+#include <dynamic-array.h>
 #include <ltsmin-grammar.h>
 #include <ltsmin-parse-env.h>
 #include <ltsmin-lexer.h>
