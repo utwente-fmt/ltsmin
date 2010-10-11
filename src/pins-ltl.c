@@ -61,6 +61,28 @@ eval_predicate(ltsmin_expr_t e, transition_info_t* ti, int* state)
     (void)ti;
 }
 
+static void
+mark_predicate(ltsmin_expr_t e, matrix_t *m)
+{
+    switch(e->token) {
+        case LTL_TRUE:
+        case LTL_FALSE:
+        case LTL_NUM:
+        case LTL_VAR:
+            break;
+        case LTL_EQ:
+            mark_predicate(e->arg1, m);
+            mark_predicate(e->arg2, m);
+            break;
+        case LTL_SVAR: {
+            for(int i=0; i < dm_nrows(m); i++)
+                dm_set(m, i, e->idx);
+            } break;
+        default:
+            Fatal(1, error, "unhandled predicate expression in mark_predicate");
+    }
+}
+
 /*********************************
  * TYPE SPIN
  *********************************/
@@ -295,27 +317,45 @@ GBaddLTL (model_t model, char* ltl_file, pins_ltl_type_t type)
     GBgrowChunkMaps(ltlmodel, type_count);
 
     matrix_t           *p_new_dm = (matrix_t*) RTmalloc(sizeof(matrix_t));
+    matrix_t           *p_new_dm_r = (matrix_t*) RTmalloc(sizeof(matrix_t));
+    matrix_t           *p_new_dm_w = (matrix_t*) RTmalloc(sizeof(matrix_t));
     matrix_t           *p_dm = GBgetDMInfo (model);
+    matrix_t           *p_dm_r = GBgetDMInfoRead (model);
+    matrix_t           *p_dm_w = GBgetDMInfoWrite (model);
 
     // add one column to the matrix
     int groups = dm_nrows( p_dm );
     int len = dm_ncols( p_dm );
 
-    // TODO: mark the parts used for reading?
+    // copy matrix, add buchi automaton
     dm_create(p_new_dm, groups, len+1);
+    dm_create(p_new_dm_r, groups, len+1);
+    dm_create(p_new_dm_w, groups, len+1);
     for(int i=0; i < groups; i++) {
         for(int j=0; j < len+1; j++) {
             // add buchi as dependent
             if (j == len) {
                 dm_set(p_new_dm, i, j);
+                dm_set(p_new_dm_r, i, j);
+                dm_set(p_new_dm_w, i, j);
             } else {
                 if (dm_is_set(p_dm, i, j))
                     dm_set(p_new_dm, i, j);
+                if (dm_is_set(p_dm_r, i, j))
+                    dm_set(p_new_dm_r, i, j);
+                if (dm_is_set(p_dm_w, i, j))
+                    dm_set(p_new_dm_w, i, j);
             }
         }
     }
+    // mark the parts the buchi automaton uses for reading
+    for(int k=0; k < ba->predicate_count; k++) {
+        mark_predicate(ba->predicates[k], p_new_dm);
+        mark_predicate(ba->predicates[k], p_new_dm_r);
+    }
     GBsetDMInfo(ltlmodel, p_new_dm);
-    // TODO DMReadInfo, DMWriteInfo
+    GBsetDMInfoRead(ltlmodel, p_new_dm_r);
+    GBsetDMInfoWrite(ltlmodel, p_new_dm_w);
 
     // create new state label matrix
     matrix_t       *p_new_sl = (matrix_t*) RTmalloc(sizeof(matrix_t));
