@@ -1,3 +1,4 @@
+// -*- tab-width:4 ; indent-tabs-mode:nil -*-
 #include <config.h>
 #include <stdio.h>
 #include <string.h>
@@ -6,16 +7,19 @@
 #include <hre-main.h>
 #include <etf-util.h>
 #include <popt.h>
+#include <ltsmin-syntax.h>
 
 static int pv_count;
 static char* pvars=NULL;
 static char** pvar_name=NULL;
 static int*   pvar_idx=NULL;
 static int output_bytes=0;
+static int constelm=0;
 
 static  struct poptOption options[] = {
     { "pvars" , 0 , POPT_ARG_STRING , &pvars , 0 , "list of independent variables" , NULL },
     { "byte" , 0 , POPT_ARG_NONE , &output_bytes , 0 , "output bytes instead of ints" , NULL },
+    { "ce" , 0 , POPT_ARG_NONE , &constelm , 1 , "eliminate constants while writing ETF " , NULL },
 	POPT_TABLEEND
 };
 
@@ -61,12 +65,11 @@ static void pvar_slice(lts_type_t ltstype){
     }
 }
 
-static int analyze_rel(etf_rel_t trans,int N,int K,int*status,int*max){
+static int analyze_rel_add(etf_rel_t trans,int N,int K,int*status,int*max){
     int transitions=0;
     int src[N];
     int dst[N];
     int lbl[K];
-    for(int i=0;i<N;i++) status[i]=0;
     ETFrelIterate(trans);
     while(ETFrelNext(trans,src,dst,lbl)){
         transitions++;
@@ -88,6 +91,11 @@ static int analyze_rel(etf_rel_t trans,int N,int K,int*status,int*max){
         }
     }
     return transitions;
+}
+
+static int analyze_rel(etf_rel_t trans,int N,int K,int*status,int*max){
+    for(int i=0;i<N;i++) status[i]=0;
+    return analyze_rel_add(trans,N,K,status,max);
 }
 
 /**
@@ -460,11 +468,11 @@ void dep_write(const char*name,etf_model_t model){
     for(int section=0;section<etf_trans_section_count(model);section++){
         etf_rel_t trans=etf_trans_section(model,section);
         int status[N];
-	int transitions=analyze_rel(trans,N,K,status,NULL);
+    	int transitions=analyze_rel(trans,N,K,status,NULL);
         if (transitions==0){
             continue;
         }
-	fprintf(dep,"%d ", transitions);
+	    fprintf(dep,"%d ", transitions);
         for (int i=0;i<N;i++){
             if (status[i]==1) { // read only
                 fprintf(dep,"%s ",lts_type_get_state_name(ltstype,i));
@@ -479,6 +487,99 @@ void dep_write(const char*name,etf_model_t model){
         fprintf(dep,"\n");
     }
     fclose(dep);
+}
+
+void etf_write(const char*name,etf_model_t model){
+    FILE* out=fopen(name,"w");
+
+    lts_type_t ltstype=etf_type(model);
+    int N=lts_type_get_state_length(ltstype);
+    int K=lts_type_get_edge_label_count(ltstype);
+    int init[N];
+    int global[N];
+    int keep[N];
+    if (constelm){
+        int count;
+        for(int i=0;i<N;i++){
+            global[i]=0;
+        }
+        for(int section=0;section<etf_trans_section_count(model);section++){
+            etf_rel_t trans=etf_trans_section(model,section);
+        	analyze_rel_add(trans,N,K,global,NULL);
+        }
+        count=0;
+        for(int i=0;i<N;i++){
+            if(global[i]<=1){
+                count++;
+                keep[i]=0;
+            } else {
+                keep[i]=1;
+            }
+        }
+        Print(info,"eliminating %d constant(s)",count);
+    } else {
+        for(int i=0;i<N;i++){
+            keep[i]=1;
+        }
+    }
+    fprintf(out,"begin state\n");
+    for(int i=0;i<N;i++){
+        if (keep[i]) {
+            fprintf(out," ");
+            fprint_ltsmin_ident(out,lts_type_get_state_name(ltstype,i));
+            fprintf(out,":");
+            fprint_ltsmin_ident(out,lts_type_get_state_type(ltstype,i));
+        }
+    }
+    fprintf(out,"\n");
+    fprintf(out,"end state\n");
+    fprintf(out,"begin edge\n");
+    for(int i=0;i<K;i++){
+        fprintf(out," ");
+        fprint_ltsmin_ident(out,lts_type_get_edge_label_name(ltstype,i));
+        fprintf(out,":");
+        fprint_ltsmin_ident(out,lts_type_get_edge_label_type(ltstype,i));
+    }
+    fprintf(out,"\n");
+    fprintf(out,"end edge\n");
+    
+    etf_get_initial(model,init);
+    fprintf(out,"begin init\n");
+    for(int i=0;i<N;i++){
+        if (keep[i]) fprintf(out," %d",init[i]);
+    }
+    fprintf(out,"\n");
+    fprintf(out,"end init\n");
+    for(int section=0;section<etf_trans_section_count(model);section++){
+        etf_rel_t trans=etf_trans_section(model,section);
+        int src[N];
+        int dst[N];
+        int lbl[K];
+		fprintf(out,"begin trans\n");
+        ETFrelIterate(trans);
+        while(ETFrelNext(trans,src,dst,lbl)){
+            int valid=1;
+            for(int j=0;j<N && valid;j++){
+                if (keep[j] || src[j]==0) continue;
+                if((src[j]-1)!=init[j]) valid=0;
+            }
+            if (!valid) continue;
+            for(int j=0;j<N;j++){
+                if (!keep[j]) continue;
+                if (src[j]) {
+                    fprintf(out," %d/%d",src[j]-1,dst[j]-1);
+                } else {
+                    fprintf(out," *");
+                }
+            }
+            for(int j=0;j<K;j++){
+                fprintf(out," %d",lbl[j]);
+            }
+            fprintf(out,"\n");
+        }
+		fprintf(out,"end trans\n");
+    }
+    fclose(out);
 }
 
 
@@ -503,6 +604,7 @@ int main(int argc,char *argv[]){
 	if (len>4) {
 		if (strcmp(files[1]+(len-4),".dep")==0) write_model=dep_write;
 		if (strcmp(files[1]+(len-4),".dve")==0) write_model=dve_write;
+		if (strcmp(files[1]+(len-4),".etf")==0) write_model=etf_write;
 	}
 	if (write_model==NULL) Abort("extension of input file not recognized");
 

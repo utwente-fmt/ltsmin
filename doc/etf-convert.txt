@@ -21,8 +21,19 @@ is a very simple one, that produces relatively inefficient DVE code.
 
 == OPTIONS
 
-include::inc/general-options.txt[]
+*--pvars=STRING*::
+    Give a list of independent variables that is used while generating
+    multiple process DVE models.
 
+*--byte*::
+    Write the DVE output using the type byte rather than the type int.
+
+*--ce*::
+    When writing ETF, this option eliminates constant state vector elements.
+    Note that the values of the eliminated variables are lost because
+    ETF has no way of defining constants.
+
+include::inc/general-options.txt[]
 
 == EXIT STATUS
 0::
