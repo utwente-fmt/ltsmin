@@ -15,6 +15,7 @@ typedef enum {
     AtermDD_list,
     AtermDD_tree,
     BuDDy_fdd,
+    DDD,
     ListDD,
 } vset_implementation_t;
 
@@ -50,6 +51,9 @@ static si_map_entry vset_table[]={
 	{"tree",AtermDD_tree},
 #endif
 	{"fdd",BuDDy_fdd},
+#ifdef HAVE_DDD_H
+	{"ddd",DDD},
+#endif
 	{"ldd",ListDD},
 	{NULL,0}
 };
@@ -60,7 +64,7 @@ struct poptOption vset_options[]={
 	{ "vset" , 0 , POPT_ARG_STRING , NULL , 0 ,
 		"select a vector set implementation from ATermDD with *list* encoding,"
 		" ATermDD with *tree* encoding, BuDDy using the *fdd* feature, or"
-		" native ListDD (default: first available)" , "<list|tree|fdd|ldd>" },
+		" native ListDD, or DDD (default: first available)" , "<list|tree|fdd|ddd|ldd>" },
 #ifdef HAVE_ATERM2_H
 	{ NULL,0 , POPT_ARG_INCLUDE_TABLE , atermdd_options , 0 , "ATermDD options" , NULL},
 #endif
@@ -78,6 +82,9 @@ vdom_t vdom_create_default(int n){
 	case AtermDD_tree: return vdom_create_tree(n);
 #endif
 	case BuDDy_fdd: return vdom_create_fdd(n);
+#ifdef HAVE_DDD_H
+	case DDD: return vdom_create_ddd(n);
+#endif
 	case ListDD: return vdom_create_list_native(n);
         default:
             return NULL;
