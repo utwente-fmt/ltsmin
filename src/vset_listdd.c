@@ -661,7 +661,7 @@ vdom_t vdom_create_list_native(int n){
 		node_table=RTmalloc(mdd_nodes*sizeof(struct mdd_node));
 		op_cache=RTmalloc(mdd_nodes*sizeof(struct op_rec));
 
-		for(int i=0;i<mdd_nodes;i++){
+		for(uint32_t i=0;i<mdd_nodes;i++){
 			unique_table[i]=0;
 			node_table[i].next=i+1;
 			op_cache[i].op=0;
