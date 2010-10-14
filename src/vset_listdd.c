@@ -466,7 +466,6 @@ static int set_member_mdd(vset_t set,const int* e){
 }
 
 static void set_count_mdd(vset_t set,long *nodes,bn_int_t *elements){
-    int len=(set->p_len)?set->p_len:set->dom->shared.size;
     uint64_t e_count=mdd_count(set->mdd);
     uint32_t n_count=mdd_node_count(set->mdd);
     double ed=e_count;
@@ -475,7 +474,6 @@ static void set_count_mdd(vset_t set,long *nodes,bn_int_t *elements){
 }
 
 static void rel_count_mdd(vrel_t rel,long *nodes,bn_int_t *elements){
-    int len=2*((rel->p_len)?rel->p_len:rel->dom->shared.size);
     uint64_t e_count=mdd_count(rel->mdd);
     uint32_t n_count=mdd_node_count(rel->mdd);
     double ed=e_count;
