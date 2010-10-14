@@ -51,17 +51,18 @@ static int G=10;
 static lts_enum_cb_t trace_handle=NULL;
 static lts_output_t trace_output=NULL;
 
-static enum { BFS , BFS2 , Chain , Sat1, Sat2, Sat3} strategy = BFS;
+static enum { BFS , BFS2 , Chain , Chain2, Sat1, Sat2, Sat3} strategy = BFS;
 
 static char* order="bfs";
 static si_map_entry strategies[]={
-	{"bfs",BFS},
-	{"bfs2",BFS2},
-	{"chain",Chain},
-	{"sat1",Sat1},
-	{"sat2",Sat2},
-	{"sat3",Sat3},
-	{NULL,0}
+    {"bfs",BFS},
+    {"bfs2",BFS2},
+    {"chain",Chain},
+    {"chain2",Chain2},
+    {"sat1",Sat1},
+    {"sat2",Sat2},
+    {"sat3",Sat3},
+    {NULL,0}
 };
 
 static void reach_popt(poptContext con,
@@ -95,7 +96,7 @@ static void reach_popt(poptContext con,
 
 static  struct poptOption options[] = {
 	{ NULL, 0 , POPT_ARG_CALLBACK|POPT_CBFLAG_POST|POPT_CBFLAG_SKIPOPTION , (void*)reach_popt , 0 , NULL , NULL },
-	{ "order" , 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &order , 0 , "select the exploration strategy to a specific order" ,"<bfs|bfs2|chain|sat{1|2|3}>" },
+	{ "order" , 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &order , 0 , "select the exploration strategy to a specific order" ,"<bfs|bfs2|chain|chain2|sat{1|2|3}>" },
 	{ "deadlock" , 'd' , POPT_ARG_VAL , &dlk_detect , 1 , "detect deadlocks" , NULL },
 	{ "action" , 0 , POPT_ARG_STRING , &act_detect , 0 , "detect action" , "<action>" },
 	{ "trace" , 0 , POPT_ARG_STRING , &trc_output , 0 , "file to write trace to" , "<lts-file>.gcf" },
@@ -832,6 +833,50 @@ reach_chain(bitvector_t *reach_groups, long *eg_count, long *next_count)
     }
 }
 
+static void
+reach_chain2(bitvector_t *reach_groups, long *eg_count, long *next_count)
+{
+    int level = 0;
+    vset_t new_states = vset_create(domain, 0, NULL);
+    vset_t temp = vset_create(domain, 0, NULL);
+    vset_t deadlocks = dlk_detect?vset_create(domain, 0, NULL):NULL;
+    vset_t dlk_temp = dlk_detect?vset_create(domain, 0, NULL):NULL;
+
+    vset_copy(new_states, visited);
+    while (!vset_is_empty(new_states)) {
+        if (trc_output != NULL) save_level();
+        stats_and_progress_report(new_states, visited, level);
+        level++;
+        if (dlk_detect) vset_copy(deadlocks, new_states);
+        for(int i = 0; i < nGrps; i++) {
+            if (!bitvector_is_set(reach_groups, i)) continue;
+            diagnostic("\rgroup %4d/%d", i+1, nGrps);
+            expand_group_next(i, new_states);
+            (*eg_count)++;
+            (*next_count)++;
+            vset_next(temp, new_states, group_next[i]);
+            if (dlk_detect) {
+                vset_prev(dlk_temp, temp, group_next[i]);
+                vset_minus(deadlocks, dlk_temp);
+                vset_clear(dlk_temp);
+            }
+            vset_minus(temp, visited);
+            vset_union(new_states, temp);
+            vset_clear(temp);
+        }
+        diagnostic("\rround %d complete       \n", level);
+        if (dlk_detect) deadlock_check(deadlocks, reach_groups);
+        vset_zip(visited, new_states);
+        // no deadlocks in old new_states
+        vset_reorder(domain);
+    }
+
+    if (dlk_detect) {
+        vset_clear(deadlocks);
+        vset_clear(dlk_temp);
+    }
+}
+
 static FILE* table_file;
 
 static int table_count=0;
@@ -1054,25 +1099,28 @@ int main(int argc, char *argv[]){
 	mytimer_t timer=SCCcreateTimer();
 	SCCstartTimer(timer);
 	switch(strategy){
-	case BFS:
+        case BFS:
             unguided(reach_bfs);
             break;
-	case BFS2:
+        case BFS2:
             unguided(reach_bfs2);
             break;
-	case Chain:
+        case Chain:
             unguided(reach_chain);
             break;
-	case Sat1:
+        case Chain2:
+            unguided(reach_chain2);
+            break;
+        case Sat1:
             unguided(reach_sat1);
             break;
-	case Sat2:
+        case Sat2:
             unguided(reach_sat2);
             break;
-	case Sat3:
+        case Sat3:
             unguided(reach_sat3);
             break;
-	}
+        }
 	if (dlk_detect)
 	  Warning(info,"No deadlocks found");
 	if (act_detect)
