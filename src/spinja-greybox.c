@@ -23,6 +23,8 @@ next_method_grey_t spinja_get_successor;
 
 int         (*spinja_get_state_size)();
 int         (*spinja_get_transition_groups)();
+const int*  (*spinja_get_transition_read_dependencies)(int t);
+const int*  (*spinja_get_transition_write_dependencies)(int t);
 
 static void spinja_popt(poptContext con,
                enum poptCallbackReason reason,
@@ -95,6 +97,11 @@ void SpinJaloadGreyboxModel(model_t model, const char *filename){
     spinja_get_transition_groups = (int(*)())
     RTdlsym( filename, dlHandle, "spinja_get_transition_groups" );
 
+    spinja_get_transition_read_dependencies = (const int*(*)(int))
+    RTdlsym( filename, dlHandle, "spinja_get_transition_read_dependencies" );
+    spinja_get_transition_write_dependencies = (const int*(*)(int))
+    RTdlsym( filename, dlHandle, "spinja_get_transition_write_dependencies" );
+
     // get ltstypes
     int state_length = spinja_get_state_size();
     ltstype=lts_type_create();
@@ -125,10 +132,22 @@ void SpinJaloadGreyboxModel(model_t model, const char *filename){
 
     int ngroups = spinja_get_transition_groups();
 	dm_create(&dm_info, ngroups, state_length);
+    printf("ngroups:            %2i\n",ngroups);
+    printf("dm_nrows(&dm_info): %2i\n",dm_nrows(&dm_info));
     for(int i=0; i < dm_nrows(&dm_info); i++) {
+        int* proj = (int*)spinja_get_transition_read_dependencies(i);
+        if(!proj) { printf("ERROR at read dependency row %i\n",i); exit(-1); }
 		for(int j=0; j<state_length; j++) {
-            dm_set(&dm_info, i, j);
+            if (proj[j]) dm_set(&dm_info, i, j);
         }
+        proj = (int*)spinja_get_transition_write_dependencies(i);
+        if(!proj) { printf("ERROR at write dependency row %i\n",i); exit(-1); }
+		for(int j=0; j<state_length; j++) {
+            if (proj[j]) dm_set(&dm_info, i, j);
+        }
+//		for(int j=0; j<state_length; j++) {
+//            dm_set(&dm_info, i, j);
+//        }
     }
     GBsetDMInfo(model, &dm_info);
 
@@ -140,9 +159,6 @@ void SpinJaloadGreyboxModel(model_t model, const char *filename){
 	int state[state_length];
     spinja_get_initial_state(state);
     GBsetInitialState(model,state);
-
-	printf("INIT STATE SET:\n"); fflush(stdout);
-	print_state((char*)state);
 
 //  GBsetNextStateAll  (model, spinja_get_successor_all);
     GBsetNextStateLong (model, spinja_get_successor);
