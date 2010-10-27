@@ -988,12 +988,13 @@ int main(int argc, char *argv[]){
 	GBsetChunkMethods(model,new_string_index,NULL,
 		(int2chunk_t)SIgetC,(chunk2int_t)SIputC,(get_count_t)SIgetCount);
 
-	if (strategy==Sat1 || strategy==Sat2 || strategy==Sat3)
+	if (strategy==Sat1 || strategy==Sat2 || strategy==Sat3) {
 	  if (dlk_detect) {
 	    Fatal(1,error,"deadlock detection not supported for saturation");
 	  } else if (trc_output != NULL) {
 	    Fatal(1,error,"trace generation not supported for saturation");
-	  }
+          }
+        }
 
 	GBloadFile(model,files[0],&model);
 
