@@ -111,19 +111,17 @@ state space generation (lpo2lts-mpi) will not be built, and neither
 will any NIPS-based tools.
 
 *** mCRL2
-Download the latest released version of mCRL2 from
-<http://www.mcrl2.org/>.  We tested with mcrl2-200901.
+Download the latest development version of mCRL2 from
+<http://www.mcrl2.org/>.  We tested with mcrl2 SVN rev.8002.  Note
+that all versions before SVN rev.7354 are insufficient (in particular,
+all versions of mcrl2 released before September 2010).
 
-Build and install mCRL2 as usual:
+Build and install mCRL2.  If the internal boost libraries are used
+(which is the default) then the boost headers must be installed:
 
-  ./configure <options>
+  cmake -DMCRL2_INSTALL_BOOST_HEADERS=ON
   make
   make install
-
-Unless mcrl2 is configured to use an external Boost library instead of
-its own copy, the headers have to be installed as well:
-
-  ./build/bin/bjam --install --install-boost-headers
 
 Ensure that these headers are actually used to compile the PINS
 support for mcrl2 (instead of, e.g., system-provided Boost headers).
