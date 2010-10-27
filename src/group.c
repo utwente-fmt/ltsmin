@@ -17,20 +17,24 @@ typedef struct group_context {
     int                *transbegin;
     int                *transmap;
     int                *statemap;
+    int                *groupmap;
     TransitionCB        cb;
     void               *user_context;
 }                  *group_context_t;
 
 
 static void
-group_cb (void *context, int *labels, int *olddst)
+group_cb (void *context, transition_info_t *ti, int *olddst)
 {
     group_context_t     ctx = (group_context_t)(context);
     int                 len = ctx->len;
     int                 newdst[len];
     for (int i = 0; i < len; i++)
         newdst[i] = olddst[ctx->statemap[i]];
-    ctx->cb (ctx->user_context, labels, newdst);
+    // possibly fix group in case it is merged
+    if (ti->group != -1)
+        ti->group = ctx->groupmap[ti->group];
+    ctx->cb (ctx->user_context, ti, newdst);
 }
 
 static int
@@ -277,23 +281,18 @@ GBregroup (model_t model, const char *regroup_spec)
                  newNgroups);
         ctx->transbegin = RTmalloc ((1 + newNgroups) * sizeof (int));
         ctx->transmap = RTmalloc (oldNgroups * sizeof (int));
+        // maps old group to new group
+        ctx->groupmap = RTmalloc (oldNgroups * sizeof (int));
         int                 p = 0;
         for (int i = 0; i < newNgroups; i++) {
             int                 first = m->row_perm.data[i].becomes;
             int                 all_in_group = first;
-            // count
+            ctx->transbegin[i] = p;
             int                 n = 0;
             do {
+                ctx->groupmap[all_in_group] = i;
+                ctx->transmap[p + n] = all_in_group;
                 n++;
-                all_in_group = m->row_perm.data[all_in_group].group;
-            }
-            while (all_in_group != first);
-
-            ctx->transbegin[i] = p;
-            int                 j = 0;
-            do {
-                ctx->transmap[p + j] = all_in_group;
-                j++;
                 all_in_group = m->row_perm.data[all_in_group].group;
             } while (all_in_group != first);
             p = p + n;

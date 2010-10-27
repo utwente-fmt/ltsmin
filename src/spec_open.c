@@ -35,6 +35,9 @@
 #if defined(DIVINE)
 #include "dve-greybox.h"
 #endif
+#if defined(DIVINE2)
+#include "dve2-greybox.h"
+#endif
 
 #include "fast_hash.h"
 
@@ -80,6 +83,9 @@ static  struct poptOption options[] = {
 #endif
 #if defined(DIVINE)
 	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, dve_options , 0 , "DiVinE options", NULL },
+#endif
+#if defined(DIVINE2)
+        { NULL, 0 , POPT_ARG_INCLUDE_TABLE, dve2_options , 0 , "DiVinE 2.2 options", NULL },
 #endif
     { "edge-encode" , 0 , POPT_ARG_VAL, &edge_encode , 1 , "encode the state labels on edges" , NULL },
 /*
@@ -414,14 +420,14 @@ typedef struct callback_context_t {
 	void (*callback)(CAESAR_TYPE_STATE, CAESAR_TYPE_LABEL, CAESAR_TYPE_STATE);
 } callback_struct_t;
 
-static void iterate_transition(void*arg,int*lbl,int*dst){
+static void iterate_transition(void*arg,transition_info_t*ti,int*dst){
 	int i;
 	callback_struct_t *context=(callback_struct_t*)arg;
 	
 	for(i=0; i<N; i++)
 		context->dst->state[i] = dst[i];
 	for(i=0; i<edge_labels; i++)
-		context->lbl->label[i] = lbl[i];
+		context->lbl->label[i] = ti->labels[i];
         if (edge_encode){
             int ofs=edge_labels;
             for(i=0;i<N;i++) context->lbl->label[ofs+i] = context->src->state[i];

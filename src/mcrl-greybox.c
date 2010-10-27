@@ -134,6 +134,7 @@ static ATerm parse_term(void *dummy,char*str){
 
 static void callback(void){
 	int lbl=ATfindIndex(actionmap,label);
+    transition_info_t ti = {&lbl, -1};
 	int dst_p[state_length];
 	for(int i=0;i<state_length;i++){
 		if(ATisEqual(src_term[i],dst[i])){
@@ -142,7 +143,7 @@ static void callback(void){
 			dst_p[i]=ATfindIndex(termmap,dst[i]);
 		}
 	}
-	user_cb(user_context,&lbl,dst_p);
+	user_cb(user_context,&ti,dst_p);
 }
 
 

@@ -37,12 +37,12 @@ struct nested_cb {
 	void* user_ctx;
 };
 
-void project_dest(void*context,int*labels,int*dst){
+void project_dest(void*context,transition_info_t*ti,int*dst){
 #define info ((struct nested_cb*)context)
 	int len = dm_ones_in_row(GBgetDMInfo(info->model), info->group);
 	int short_dst[len];
 	dm_project_vector(GBgetDMInfo(info->model), info->group, dst, short_dst);
-	info->cb(info->user_ctx,labels,short_dst);
+	info->cb(info->user_ctx,ti,short_dst);
 #undef info
 }
 
@@ -59,11 +59,11 @@ int default_short(model_t self,int group,int*src,TransitionCB cb,void*context){
 	return self->next_long(self,group,long_src,project_dest,&info);
 }
 
-void expand_dest(void*context,int*labels,int*dst){
+void expand_dest(void*context,transition_info_t*ti,int*dst){
 #define info ((struct nested_cb*)context)
 	int long_dst[dm_ncols(GBgetDMInfo(info->model))];
 	dm_expand_vector(GBgetDMInfo(info->model), info->group, info->src, dst, long_dst);
-	info->cb(info->user_ctx,labels,long_dst);
+	info->cb(info->user_ctx,ti,long_dst);
 #undef info
 }
 

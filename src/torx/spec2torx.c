@@ -28,6 +28,9 @@
 #if defined(DIVINE)
 #include "dve-greybox.h"
 #endif
+#if defined(DIVINE2)
+#include "dve2-greybox.h"
+#endif
 
 static struct poptOption options[] = {
 #if defined(MCRL)
@@ -47,6 +50,9 @@ static struct poptOption options[] = {
 #endif
 #if defined(DIVINE)
     { NULL, 0 , POPT_ARG_INCLUDE_TABLE, dve_options, 0, "DiVinE options", NULL },
+#endif
+#if defined(DIVINE2)
+    { NULL, 0 , POPT_ARG_INCLUDE_TABLE, dve2_options, 0, "DiVinE2 options", NULL },
 #endif
     {NULL, 0, POPT_ARG_INCLUDE_TABLE, greybox_options, 0,
      "Greybox options", NULL},
@@ -73,7 +79,7 @@ static int          edge_labels;
 static treedbs_t    dbs;
 
 static void
-torx_transition (void *arg, int *lbl, int *dst)
+torx_transition (void *arg, transition_info_t *ti, int *dst)
 {
 
     torx_ctx_t         *ctx = (torx_ctx_t *)arg;
@@ -82,7 +88,7 @@ torx_transition (void *arg, int *lbl, int *dst)
     chunk               c =
         GBchunkGet (ctx->model,
                     lts_type_get_edge_label_typeno (ctx->ltstype, 0),
-                    lbl[0]);
+                    ti->labels[0]);
 
     int                 vis = 1;
     if (c.len == 3 && strncmp (c.data, "tau", c.len) == 0)

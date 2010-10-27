@@ -172,6 +172,8 @@ if test "x$acx_mcrl2" = xyes; then
 fi
 ACX_DVEC_LIBS([:],
   [AC_MSG_WARN([DiVinE libraries not found.])])
+ACX_DVEC2_LIBS([:],
+  [AC_MSG_WARN([DiVinE 2.2 libraries not found.])])
 AC_SUBST([NIPS_LIBS],['${top_builddir}/nips-vm/libnips_vm.la'])
 AC_SUBST([NIPS_CPPFLAGS],['-I${top_srcdir}'])
 AC_SUBST([NIPS_LDFLAGS])
@@ -239,6 +241,7 @@ AM_CONDITIONAL([HAVE_XMLTO], [test x"$XMLTO" != x])
 AM_CONDITIONAL([HAVE_LIBBCG], [test x"$have_bcg" = xyes])
 AM_CONDITIONAL([HAVE_CADP], [test x"$acx_cadp" = xyes])
 AM_CONDITIONAL([HAVE_DVEC], [test x"$acx_dvec_libs" = xyes])
+AM_CONDITIONAL([HAVE_DVEC2], [test x"$acx_dvec2_libs" = xyes])
 
 AC_CONFIG_COMMANDS_POST(
   [ac_configure_args="$ac_configure_args --enable-keep-terminated-procs dnl
@@ -277,6 +280,7 @@ Configuration:
     MCRL2    = ${with_mcrl2:-NOT FOUND, building without mCRL2 support}
     CADP     = ${CADP:-NOT FOUND, building without CADP support}
     DiVinE   = ${with_divine:-NOT FOUND, building without DiVinE support}
+    DiVinE2  = ${with_divine2:-NOT FOUND, building without DiVinE 2.2 support}
 
     ASCIIDOC = ${ASCIIDOC:-NOT FOUND, not building documentation}
     XMLTO    = ${XMLTO:-NOT FOUND, not building manpages}

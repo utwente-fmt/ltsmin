@@ -29,6 +29,13 @@ nips2lts-mpi
 dve-reach
 dve2lts-grey
 dve2lts-mpi
+dve2lts-mc
+dve2-reach
+dve22lts-grey
+dve22lts-mpi
+dve22lts-mc
+nips2lts-mc
+etf2lts-mc
 regroup
 test
 pins_open
@@ -44,4 +51,6 @@ test-is-balloc
 test-dfs-stack
 test-hre
 test-hre-mpi
+test-dbs
+test-cache
 ltsmin-tracepp
