@@ -178,6 +178,7 @@ extern void vset_next(vset_t dst,vset_t src,vrel_t rel);
 */
 extern void vset_prev(vset_t dst,vset_t src,vrel_t rel);
 
+extern void vset_reorder(vdom_t dom);
 
 //@}
 
