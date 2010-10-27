@@ -13,3 +13,9 @@
 *--fdd-bits*='BITS'::
         Sets the number of bits for each FDD variable.  Defaults to
         16.
+
+*--fdd-reorder*='STRATEGY'::
+        Sets the strategy for dynamic variable reordering.  Valid
+        options are 'win2', 'win2ite', 'win3', 'win3ite', 'sift',
+        'siftite', 'random'.  Refer to the http://buddy.sourceforge.net/manual/group__reorder.html[BuDDy manual]
+        for details.  Defaults to 'none'.
