@@ -38,17 +38,21 @@
 static char* etf_output=NULL;
 static char* trc_output=NULL;
 static int dlk_detect=0;
+static int G=10;
 
 static lts_enum_cb_t trace_handle=NULL;
 static lts_output_t trace_output=NULL;
 
-static enum { BFS , BFS2 , Chain } strategy = BFS;
+static enum { BFS , BFS2 , Chain , Sat1, Sat2, Sat3} strategy = BFS;
 
 static char* order="bfs";
 static si_map_entry strategies[]={
 	{"bfs",BFS},
 	{"bfs2",BFS2},
 	{"chain",Chain},
+	{"sat1",Sat1},
+	{"sat2",Sat2},
+	{"sat3",Sat3},
 	{NULL,0}
 };
 
@@ -82,9 +86,10 @@ static void reach_popt(poptContext con,
 
 static  struct poptOption options[] = {
 	{ NULL, 0 , POPT_ARG_CALLBACK|POPT_CBFLAG_POST|POPT_CBFLAG_SKIPOPTION , (void*)reach_popt , 0 , NULL , NULL },
-	{ "order" , 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &order , 0 , "select the exploration strategy to a specific order" ,"<bfs|bfs2|chain>" },
+	{ "order" , 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &order , 0 , "select the exploration strategy to a specific order" ,"<bfs|bfs2|chain|sat{1|2|3}>" },
 	{ "deadlock" , 'd' , POPT_ARG_VAL , &dlk_detect , 1 , "detect deadlocks" , NULL },
 	{ "trace" , 0 , POPT_ARG_STRING , &trc_output , 0 , "file to write trace to" , "<lts-file>.gcf" },
+	{ "G" , 0 , POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &G , 0 , "set saturation granularity","<number>"},
 #if defined(MCRL)
 	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, mcrl_options , 0 , "mCRL options",NULL},
 #endif
@@ -506,9 +511,205 @@ void reach_bfs2(){
 	  Warning(info,"No deadlocks found");
 }
 
-void reach_sat(){
-	Fatal(1,error,"Saturation not implemented yet");
+/**
+ * Closure
+ *  Compute the transitive closure with respect to a subset of groups
+ *   1) the set of initial states I
+ *   2) the set of groups to consider, defining a relation R
+ *  The result is the transitive closure of R on I is returned
+ *  As a side effect, the group tables (group_next) will be extended
+ **/
+
+static void Closure(vset_t visited,bitvector_t* groups) {
+  int level=0;
+  vset_t current=vset_create(domain,0,NULL);
+  vset_t next=vset_create(domain,0,NULL);
+  vset_t temp=vset_create(domain,0,NULL);
+
+  vset_copy(current,visited);
+  while (!vset_is_empty(current)) {
+    stats_and_progress_report(current,visited,level);
+    level++;
+    for (int i=0;i<nGrps;i++) {
+      if (!bitvector_is_set(groups,i)) continue;
+      if (RTverbosity >= 2) fprintf(stderr,"\rconf-exploring group %4d/%d",i+1,nGrps);
+      expand_group_next(i,current);
+    }
+    if (RTverbosity >= 2) fprintf(stderr,"\rconf-exploration complete             \n");
+    for(int i=0;i<nGrps;i++){
+      if (!bitvector_is_set(groups,i)) continue;
+      if (RTverbosity >= 2) fprintf(stderr,"\rconf-local next %4d/%d",i+1,nGrps);
+      vset_next(temp,current,group_next[i]);
+      vset_union(next,temp);
+      vset_clear(temp);
+    }
+    if (RTverbosity >= 2) fprintf(stderr,"\rconf-local next complete       \n");
+    vset_copy(current,next);
+    vset_clear(next);
+    vset_zip(visited,current);
+  }
+  vset_clear(current);
 }
+
+
+void reach_sat1(){
+  int level[nGrps];
+  int back[N+1];
+  bitvector_t* groups[N+1];
+
+  // groups: i=0..nGrps-1
+  // vars  : j=0..N-1
+  // BDD levels:  k = N..1
+
+  for (int k=1;k<N+1;k++) {
+    groups[k] = (bitvector_t*)RTmalloc(sizeof(bitvector_t));
+    bitvector_create(groups[k],nGrps);
+  }
+  
+  // level[i] = first (highest) + of group i
+  for (int i=0;i<nGrps;i++) {
+    for (int j=0;j<N;j++) {
+      if (dm_is_set(GBgetDMInfo(model),i,j)) {
+	level[i]=N-j;
+	break;
+      }
+    }
+  }
+
+  for (int i=0;i<nGrps;i++) {
+    bitvector_set(groups[level[i]],i);
+  }
+
+  // back[k] = last + in any group of level k
+  for (int k=1;k<=N;k++) back[k]=N+1;
+  for (int i=0;i<nGrps;i++) {
+    for (int k=1;k<=N;k++)
+      if (dm_is_set(GBgetDMInfo(model),i,N-k)) {
+	if (k<back[level[i]]) back[level[i]]=k;
+	break;
+      }
+  }
+  
+   // test
+  fprintf(stderr,"level: ");
+  for (int i=0; i<nGrps;i++)
+    fprintf(stderr,"%d ",level[i]);
+  fprintf(stderr,"\nback: ");
+  for (int j=1; j<=N; j++)
+    fprintf(stderr,"%d ",back[j]);
+  fprintf(stderr,"\n");
+
+  int k=1;
+  vset_t old_vis=vset_create(domain,0,NULL);
+  while (k <= N) {
+    fprintf(stderr,"Saturating level: %d\n",k);
+    vset_copy(old_vis,visited);
+    Closure(visited,groups[k]);
+    if (vset_equal(old_vis,visited))
+      k++;
+    else {
+      vset_clear(old_vis);
+      k=back[k];
+    }
+  }
+}
+
+void reach_sat2(){
+  int level[nGrps];
+  bitvector_t* groups[N+1];
+
+  // groups: i=0..nGrps-1
+  // vars  : j=0..N-1
+  // BDD levels:  k = N..1   (k = N-j)
+
+  for (int k=1;k<N+1;k++) {
+    groups[k] = (bitvector_t*)RTmalloc(sizeof(bitvector_t));
+    bitvector_create(groups[k],nGrps);
+  }
+  
+  // level[i] = first '+' in row (highest in BDD) of group i
+  // recast 1..N down to equal groups 1..N/G  (more precisely: (N-1)/G + 1)a
+  for (int i=0;i<nGrps;i++) {
+    for (int j=0;j<N;j++) {
+      if (dm_is_set(GBgetDMInfo(model),i,j)) {
+	level[i]=(N-1-j) / G + 1;
+	break;
+      }
+    }
+  }
+
+  for (int i=0;i<nGrps;i++) {
+    bitvector_set(groups[level[i]],i);
+  }
+
+   // test
+  fprintf(stderr,"level: ");
+  for (int i=0; i<nGrps;i++)
+    fprintf(stderr,"%d ",level[i]);
+  fprintf(stderr,"\n");
+  
+  int k=1, last=0;
+  vset_t old_vis=vset_create(domain,0,NULL);
+  while (k <= (N-1)/G +1) {
+    if (k==last) k++;
+    else {
+      fprintf(stderr,"Saturating level: %d\n",k);
+      vset_copy(old_vis,visited);
+      Closure(visited,groups[k]);
+      if (vset_equal(old_vis,visited))
+	k++;
+      else {
+	last=k;
+	vset_clear(old_vis);
+	k=1;
+      }
+    }
+  }
+}
+
+void reach_sat3(){
+  int level[nGrps];
+  bitvector_t* groups[N+1];
+
+  // groups: i=0..nGrps-1
+  // vars  : j=0..N-1
+  // BDD levels:  k = N..1
+
+  for (int k=1;k<N+1;k++) {
+    groups[k] = (bitvector_t*)RTmalloc(sizeof(bitvector_t));
+    bitvector_create(groups[k],nGrps);
+  }
+  
+  // level[i] = first (highest) + of group i
+  for (int i=0;i<nGrps;i++) {
+    for (int j=0;j<N;j++) {
+      if (dm_is_set(GBgetDMInfo(model),i,j)) {
+	level[i]=(N-1-j) / G + 1;
+	break;
+      }
+    }
+  }
+
+  for (int i=0;i<nGrps;i++) {
+    bitvector_set(groups[level[i]],i);
+  }
+
+   // test
+  fprintf(stderr,"level: ");
+  for (int i=0; i<nGrps;i++)
+    fprintf(stderr,"%d ",level[i]);
+  fprintf(stderr,"\n");
+  
+  vset_t old_vis=vset_create(domain,0,NULL);
+  while (!vset_equal(old_vis,visited)) {
+    vset_copy(old_vis,visited);
+    for (int k=1; k <= (N-1)/G + 1 ; k++) {
+      fprintf(stderr,"Saturating level: %d\n",k);
+      Closure(visited,groups[k]);
+    }
+  }
+}
+
 
 void reach_chain(){
 	int level,i;
@@ -716,6 +917,13 @@ int main(int argc, char *argv[]){
 	GBsetChunkMethods(model,new_string_index,NULL,
 		(int2chunk_t)SIgetC,(chunk2int_t)SIputC,(get_count_t)SIgetCount);
 
+	if (strategy==Sat1 || strategy==Sat2 || strategy==Sat3)
+	  if (dlk_detect) {
+	    Fatal(1,error,"deadlock detection not supported for saturation");
+	  } else if (trc_output != NULL) {
+	    Fatal(1,error,"trace generation not supported for saturation");
+	  }
+
 	GBloadFile(model,files[0],&model);
 
 	if (RTverbosity >=2) {
@@ -761,6 +969,15 @@ int main(int argc, char *argv[]){
 		break;
 	case Chain:
 		reach_chain();
+		break;
+	case Sat1:
+		reach_sat1();
+		break;
+	case Sat2:
+		reach_sat2();
+		break;
+	case Sat3:
+		reach_sat3();
 		break;
 	}
 	SCCstopTimer(timer);
