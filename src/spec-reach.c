@@ -233,9 +233,6 @@ static void find_trace_to(int *dst,int level,vset_t *levels){
 
         // search backwards from states[current_state-1] to prev_level
         do {
-            vset_copy(temp,internal_levels[int_level]);
-            vset_minus(temp,levels[prev_level+1]);
-            vset_minus(internal_levels[int_level],temp);
             int_level++;
 
             if(int_level == max_int_level) {
