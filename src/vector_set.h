@@ -59,6 +59,13 @@ extern vdom_t vdom_create_list(int n);
 extern vdom_t vdom_create_tree(int n);
 
 /**
+\brief Create a domain that uses the native implementation of the list MDD type.
+
+\param n The length of vectors in the domain.
+*/
+extern vdom_t vdom_create_list_native(int n);
+
+/**
 \brief Create a set.
 
 \param k If non-zero this indicates the length of the sub-domain.
