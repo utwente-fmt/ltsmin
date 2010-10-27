@@ -111,10 +111,10 @@ state space generation (lpo2lts-mpi) will not be built, and neither
 will any NIPS-based tools.
 
 *** mCRL2
-Download the latest released version of mCRL2 from
+Download the latest development version of mCRL2 from
 <http://www.mcrl2.org/>.  We tested with mcrl2 SVN rev.8002.  Note
-that any version before SVN rev.7354 (in particular the released
-mcrl2-200901) is insufficient.
+that all versions before SVN rev.7354 are insufficient (in particular,
+all versions of mcrl2 released before September 2010).
 
 Build and install mCRL2.  If the internal boost libraries are used
 (which is the default) then the boost headers must be installed:
