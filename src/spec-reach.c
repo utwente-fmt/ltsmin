@@ -38,6 +38,9 @@
 static char* etf_output=NULL;
 static char* trc_output=NULL;
 static int dlk_detect=0;
+static char* act_detect=NULL;
+static int act_detect_table;
+static int act_detect_index;
 static int G=10;
 
 static lts_enum_cb_t trace_handle=NULL;
@@ -74,8 +77,9 @@ static void reach_popt(poptContext con,
 		}
 		strategy = res;
 
-                if (trc_output)
-                    dlk_detect = 1;
+                if (trc_output && !dlk_detect && act_detect==NULL) {
+		  Warning(info, "Ignoring trace output");
+		}
 		return;
 	}
 	case POPT_CALLBACK_REASON_OPTION:
@@ -88,6 +92,7 @@ static  struct poptOption options[] = {
 	{ NULL, 0 , POPT_ARG_CALLBACK|POPT_CBFLAG_POST|POPT_CBFLAG_SKIPOPTION , (void*)reach_popt , 0 , NULL , NULL },
 	{ "order" , 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &order , 0 , "select the exploration strategy to a specific order" ,"<bfs|bfs2|chain|sat{1|2|3}>" },
 	{ "deadlock" , 'd' , POPT_ARG_VAL , &dlk_detect , 1 , "detect deadlocks" , NULL },
+	{ "action" , 0 , POPT_ARG_STRING , &act_detect , 0 , "detect action" , "<action>" },
 	{ "trace" , 0 , POPT_ARG_STRING , &trc_output , 0 , "file to write trace to" , "<lts-file>.gcf" },
 	{ "G" , 0 , POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &G , 0 , "set saturation granularity","<number>"},
 #if defined(MCRL)
@@ -114,11 +119,17 @@ static  struct poptOption options[] = {
 	POPT_TABLEEND
 };
 
+typedef struct {
+  int len;
+  int* proj;
+} proj_info;
+
 static lts_type_t ltstype;
 static int N;
 static int eLbls;
 static int sLbls;
 static int nGrps;
+static proj_info* projs;
 static vdom_t domain;
 static vset_t visited;
 static long max_lev_count=0;
@@ -137,42 +148,11 @@ static void *new_string_index(void* context){
 	return SIcreate();
 }
 
-struct group_add_info {
-	int group;
-	int *src;
-};
-
-static void group_add(void*context,transition_info_t*labels,int*dst){
-	(void)labels;
-	struct group_add_info* ctx=(struct group_add_info*)context;
-	vrel_add(group_next[ctx->group],ctx->src,dst);
-}
-
-static void explore_cb(void*context,int *src){
-	struct group_add_info* ctx=(struct group_add_info*)context;
-	ctx->src=src;
-	GBgetTransitionsShort(model,ctx->group,src,group_add,context);
-	explored++;
-	if (explored%1000 ==0 && RTverbosity >=2) {
-		Warning(info,"explored %d short vectors for group %d",explored,ctx->group);
-	}
-}
-
-static inline void expand_group_next(int group,vset_t set){
-	struct group_add_info ctx;
-	explored=0;
-	ctx.group=group;
-	vset_project(group_tmp[group],set);
-	vset_zip(group_explored[group],group_tmp[group]);
-	vset_enum(group_tmp[group],explore_cb,&ctx);
-	vset_clear(group_tmp[group]);
-}
-
 static void write_trace_state(int src_no, int*state){
-	Warning(debug,"dumping state %d",src_no);
-    int labels[sLbls];
-	if (sLbls) GBgetStateLabelsAll(model,state,labels);
-    enum_state(trace_handle,0,state,labels);
+  Warning(debug,"dumping state %d",src_no);
+  int labels[sLbls];
+  if (sLbls) GBgetStateLabelsAll(model,state,labels);
+  enum_state(trace_handle,0,state,labels);
 }
 
 struct write_trace_step_s {
@@ -211,7 +191,7 @@ static void write_trace(int **states, int total_states)
         write_trace_state(current_step,states[i]);
         write_trace_step(current_step,states[i],current_step+1,states[i-1]);
     }
-    write_trace_state(total_states,states[0]);
+    write_trace_state(total_states-1,states[0]);
 }
 
 static void find_trace_to(int *dst,int level,vset_t *levels){
@@ -300,30 +280,128 @@ static void find_trace_to(int *dst,int level,vset_t *levels){
 }
 
 static void find_trace(int *dst,int level,vset_t *levels){
-	eLbls=lts_type_get_edge_label_count(ltstype);
-	sLbls=lts_type_get_state_label_count(ltstype);
-	mytimer_t timer=SCCcreateTimer();
-	SCCstartTimer(timer);
-	find_trace_to(dst,level,levels);
-	SCCstopTimer(timer);
-	SCCreportTimer(timer,"constructing the trace took");
+  int init_state[N];
+  GBgetInitialState(model,init_state);
+  trace_output=lts_output_open(trc_output,model,1,0,1,"vsi",NULL);
+  lts_output_set_root_vec(trace_output,(uint32_t*)init_state);
+  lts_output_set_root_idx(trace_output,0,0);
+  trace_handle=lts_output_begin(trace_output,0,0,0);
+  mytimer_t timer=SCCcreateTimer();
+  SCCstartTimer(timer);
+  find_trace_to(dst,level,levels);
+  SCCstopTimer(timer);
+  SCCreportTimer(timer,"constructing the trace took");
+  lts_output_end(trace_output,trace_handle);
+  lts_output_close(&trace_output);
+}
+
+struct find_action_info {
+  int group;
+  int *dst;
+  int level;
+  vset_t* levels;
+  int max_levels;
+};
+
+static void find_action_cb(void* context, int* src){
+  Warning(info,"found action: %s",act_detect);
+  if (trc_output!=NULL) {
+    // The following is destructive on levels
+    struct find_action_info* ctx=(struct find_action_info*)context;
+    int group=ctx->group;
+    int dst[N];
+    int level;
+    vset_t* levels;
+    int max_levels=ctx->max_levels;
+
+    for(int i=0;i<N;i++)
+      dst[i]=src[i];
+    for(int i=0;i<projs[group].len;i++)
+      dst[projs[group].proj[i]]=ctx->dst[i];
+
+    if(vset_member(ctx->levels[ctx->level-1],src)) {
+      Warning(debug, "source found at level %d", ctx->level-1);
+      level=ctx->level+1;
+    } else {
+      Warning(debug, "source not found at level %d", ctx->level-1);
+      level=ctx->level+2;
+    }
+
+    if (level>max_levels) {
+      max_levels=level;
+      levels = RTrealloc(ctx->levels,max_levels * sizeof(vset_t));
+      for(int i=ctx->level;i<max_levels;i++)
+	levels[i] = vset_create(domain,0,NULL);
+    } else
+      levels = ctx->levels;
+
+    vset_add(levels[level-2],src);
+    Warning(debug, "source added at level %d", level-2);
+    vset_add(levels[level-1],dst);
+    Warning(debug, "destination added at level %d", level-1);
+
+    find_trace(dst,level,levels);
+  }
+  Fatal(1,info,"exiting now");
+}
+
+struct group_add_info {
+  int group;
+  int *src;
+  vset_t set;
+  int level;
+  vset_t* levels;
+  int max_levels;
+};
+
+static void group_add(void*context,transition_info_t* ti,int*dst){
+	struct group_add_info* ctx=(struct group_add_info*)context;
+	vrel_add(group_next[ctx->group],ctx->src,dst);
+
+	if (act_detect!=NULL && ti->labels[0]==act_detect_index){
+	    int group=ctx->group;
+	    struct find_action_info action_ctx;
+	    action_ctx.group=group;
+	    action_ctx.dst=dst;
+	    action_ctx.level=ctx->level;
+	    action_ctx.levels=ctx->levels;
+            action_ctx.max_levels=ctx->max_levels;
+	    vset_enum_match(ctx->set,projs[group].len,projs[group].proj,
+			    ctx->src, find_action_cb,&action_ctx);
+	}
+}
+
+static void explore_cb(void*context,int *src){
+	struct group_add_info* ctx=(struct group_add_info*)context;
+	ctx->src=src;
+	GBgetTransitionsShort(model,ctx->group,src,group_add,context);
+	explored++;
+	if (explored%1000 ==0 && RTverbosity >=2) {
+		Warning(info,"explored %d short vectors for group %d",explored,ctx->group);
+	}
+}
+
+static inline void expand_group_next(int group,vset_t set,int level,vset_t* levels,int max_levels){
+	struct group_add_info ctx;
+	explored=0;
+	ctx.group=group;
+	ctx.set=set;
+	ctx.level=level;
+	ctx.levels=levels;
+        ctx.max_levels=max_levels;
+	vset_project(group_tmp[group],set);
+	vset_zip(group_explored[group],group_tmp[group]);
+	vset_enum(group_tmp[group],explore_cb,&ctx);
+	vset_clear(group_tmp[group]);
 }
 
 static void deadlock_check(vset_t deadlocks,int level,vset_t *levels){
     if (vset_is_empty(deadlocks)) return;
     Warning(info,"deadlock found");
     if (trc_output){
-        int init_state[N];
-        GBgetInitialState(model,init_state);
         int dlk_state[N];
         vset_example(deadlocks,dlk_state);
-        trace_output=lts_output_open(trc_output,model,1,0,1,"vsi",NULL);
-        lts_output_set_root_vec(trace_output,(uint32_t*)init_state);
-        lts_output_set_root_idx(trace_output,0,0);
-        trace_handle=lts_output_begin(trace_output,0,0,0);	
         find_trace(dlk_state,level,levels);
-        lts_output_end(trace_output,trace_handle);
-        lts_output_close(&trace_output);
     }
     Fatal(1,info,"exiting now");
 }
@@ -413,7 +491,7 @@ static void reach_bfs(){
 	vset_copy(current_level,visited);
 	for(;;){
 		if(vset_is_empty(current_level)) break;
-          if (trc_output) {
+          if (trc_output != NULL) {
 	    if (level == max_levels) {
 	      max_levels += 1024;
 	      levels = RTrealloc(levels, max_levels * sizeof(vset_t));
@@ -426,7 +504,7 @@ static void reach_bfs(){
 		level++;
 		for(i=0;i<nGrps;i++){
 			if (RTverbosity >= 2) fprintf(stderr,"\rexploring group %4d/%d",i+1,nGrps);
-			expand_group_next(i,current_level);
+			expand_group_next(i,current_level,level,levels,max_levels);
 			eg_count++;
 		}
 		if (RTverbosity >= 2) fprintf(stderr,"\rexploration complete             \n");
@@ -452,8 +530,6 @@ static void reach_bfs(){
 		vset_reorder(domain);
 	}
 	Warning(info,"Exploration took %ld group checks and %ld next state calls",eg_count,next_count);
-	if (dlk_detect)
-	  Warning(info,"No deadlocks found");
 }
 
 void reach_bfs2(){
@@ -471,7 +547,7 @@ void reach_bfs2(){
 	int max_levels = 0;
 
 	for(;;){
-          if (trc_output) {
+          if (trc_output != NULL) {
 	    if (level == max_levels) {
 	      max_levels += 1024;
 	      levels = RTrealloc(levels, max_levels * sizeof(vset_t));
@@ -485,7 +561,7 @@ void reach_bfs2(){
 		level++;
 		for(i=0;i<nGrps;i++){
 			if (RTverbosity >= 2) fprintf(stderr,"\rexploring group %4d/%d",i+1,nGrps);
-			expand_group_next(i,visited);
+			expand_group_next(i,visited,level,levels,max_levels);
 			eg_count++;
 		}
 		if (RTverbosity >= 2) fprintf(stderr,"\rexploration complete             \n");
@@ -507,8 +583,6 @@ void reach_bfs2(){
 		vset_reorder(domain);
 	}
 	Warning(info,"Exploration took %ld group checks and %ld next state calls",eg_count,next_count);
-	if (dlk_detect)
-	  Warning(info,"No deadlocks found");
 }
 
 /**
@@ -533,7 +607,7 @@ static void Closure(vset_t visited,bitvector_t* groups) {
     for (int i=0;i<nGrps;i++) {
       if (!bitvector_is_set(groups,i)) continue;
       if (RTverbosity >= 2) fprintf(stderr,"\rconf-exploring group %4d/%d",i+1,nGrps);
-      expand_group_next(i,current);
+      expand_group_next(i,current,level,NULL,0);
     }
     if (RTverbosity >= 2) fprintf(stderr,"\rconf-exploration complete             \n");
     for(int i=0;i<nGrps;i++){
@@ -726,7 +800,7 @@ void reach_chain(){
         int max_levels = 0;
 
 	for(;;){
-          if (trc_output) {
+          if (trc_output != NULL) {
 	    if (level == max_levels) {
 	      max_levels += 1024;
 	      levels = RTrealloc(levels, max_levels * sizeof(vset_t));
@@ -741,7 +815,7 @@ void reach_chain(){
 		if (dlk_detect) vset_copy(deadlocks,visited);
 		for(i=0;i<nGrps;i++){
 			if (RTverbosity >= 2) fprintf(stderr,"\rgroup %4d/%d",i+1,nGrps);
-			expand_group_next(i,visited);
+			expand_group_next(i,visited,level,levels,max_levels);
 			eg_count++;
 			next_count++;
 			vset_next(temp,visited,group_next[i]);
@@ -758,8 +832,6 @@ void reach_chain(){
 		vset_reorder(domain);
 	}
 	Warning(info,"Exploration took %ld group checks and %ld next state calls",eg_count,next_count);
-	if (dlk_detect)
-	  Warning(info,"No deadlocks found");
 }
 
 static FILE* table_file;
@@ -820,7 +892,6 @@ static void enum_map(void*context,int *src){
 
 
 void do_output(){
-	eLbls=lts_type_get_edge_label_count(ltstype);
 	int state[N];
 	GBgetInitialState(model,state);
 	table_file=fopen(etf_output,"w");
@@ -917,12 +988,13 @@ int main(int argc, char *argv[]){
 	GBsetChunkMethods(model,new_string_index,NULL,
 		(int2chunk_t)SIgetC,(chunk2int_t)SIputC,(get_count_t)SIgetCount);
 
-	if (strategy==Sat1 || strategy==Sat2 || strategy==Sat3)
+	if (strategy==Sat1 || strategy==Sat2 || strategy==Sat3) {
 	  if (dlk_detect) {
 	    Fatal(1,error,"deadlock detection not supported for saturation");
 	  } else if (trc_output != NULL) {
 	    Fatal(1,error,"trace generation not supported for saturation");
-	  }
+          }
+        }
 
 	GBloadFile(model,files[0],&model);
 
@@ -933,27 +1005,39 @@ int main(int argc, char *argv[]){
 
 	ltstype=GBgetLTStype(model);
 	N=lts_type_get_state_length(ltstype);
+	eLbls=lts_type_get_edge_label_count(ltstype);
+	sLbls=lts_type_get_state_label_count(ltstype);
 	nGrps=dm_nrows(GBgetDMInfo(model));
 	domain=vdom_create_default(N);
 	visited=vset_create(domain,0,NULL);
 	group_next=(vrel_t*)RTmalloc(nGrps*sizeof(vrel_t));
 	group_explored=(vset_t*)RTmalloc(nGrps*sizeof(vset_t));
 	group_tmp=(vset_t*)RTmalloc(nGrps*sizeof(vset_t));
+	projs=(proj_info*)RTmalloc(nGrps*sizeof(proj_info));
 	for(int i=0;i<nGrps;i++){
-		int len = dm_ones_in_row(GBgetDMInfo(model), i);
-		// get indices
-		int tmp[len];
+		projs[i].len=dm_ones_in_row(GBgetDMInfo(model), i);
+		projs[i].proj=(int*)RTmalloc(projs[i].len*sizeof(int));
 		// temporary replacement for e_info->indices[i]
 		for(int j=0, k=0; j < dm_ncols(GBgetDMInfo(model)); j++) {
 			if (dm_is_set(GBgetDMInfo(model), i,j))
-				tmp[k++] = j;
+				projs[i].proj[k++] = j;
 		}
 
-		group_next[i]=vrel_create(domain,len,tmp);
-		group_explored[i]=vset_create(domain,len,tmp);
-		group_tmp[i]=vset_create(domain,len,tmp);
+		group_next[i]=vrel_create(domain,projs[i].len,projs[i].proj);
+		group_explored[i]=vset_create(domain,projs[i].len,projs[i].proj);
+		group_tmp[i]=vset_create(domain,projs[i].len,projs[i].proj);
 	}
 	Warning(info,"length is %d, there are %d groups",N,nGrps);
+
+	if (act_detect!=NULL) {
+	  if (eLbls!=1) Abort("action detection assumes precisely one edge label");
+	  chunk c = chunk_str(act_detect);
+	  //table number of first edge label.
+	  act_detect_table=lts_type_get_edge_label_typeno(ltstype,0);
+	  act_detect_index=GBchunkPut(model,act_detect_table,c);
+	  Warning(info, "Detecting action: %s", act_detect);
+	}
+
 	int src[N];
 	GBgetInitialState(model,src);
 	vset_add(visited,src);
@@ -980,6 +1064,10 @@ int main(int argc, char *argv[]){
 		reach_sat3();
 		break;
 	}
+	if (dlk_detect)
+	  Warning(info,"No deadlocks found");
+	if (act_detect)
+	  Warning(info,"Action not found: %s", act_detect);
 	SCCstopTimer(timer);
 	SCCreportTimer(timer,"reachability took");
 	final_stat_reporting(visited);

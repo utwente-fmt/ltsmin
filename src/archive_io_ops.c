@@ -78,18 +78,18 @@ static lts_enum_cb_t dir_write_begin(lts_output_t output,int which_state,int whi
 	out->src_ofs=(stream_t**)RTmalloc(segment_count*sizeof(stream_t*));
 	out->lbl_one=(stream_t**)RTmalloc(segment_count*sizeof(stream_t*));
 	out->dst_ofs=(stream_t**)RTmalloc(segment_count*sizeof(stream_t*));
-	bzero(out->src_ofs,segment_count*sizeof(stream_t*));
-	bzero(out->lbl_one,segment_count*sizeof(stream_t*));
-	bzero(out->dst_ofs,segment_count*sizeof(stream_t*));
+	memset(out->src_ofs,0,segment_count*sizeof(stream_t*));
+	memset(out->lbl_one,0,segment_count*sizeof(stream_t*));
+	memset(out->dst_ofs,0,segment_count*sizeof(stream_t*));
 	int i_from=(which_src==segment_count)?0:which_src;
 	int i_to=(which_src==segment_count)?segment_count:(which_src+1);
 	for(int i=i_from;i<i_to;i++){
 		out->src_ofs[i]=(stream_t*)RTmalloc(segment_count*sizeof(stream_t));
 		out->lbl_one[i]=(stream_t*)RTmalloc(segment_count*sizeof(stream_t));
 		out->dst_ofs[i]=(stream_t*)RTmalloc(segment_count*sizeof(stream_t));
-		bzero(out->src_ofs[i],segment_count*sizeof(stream_t));
-		bzero(out->lbl_one[i],segment_count*sizeof(stream_t));
-		bzero(out->dst_ofs[i],segment_count*sizeof(stream_t));
+		memset(out->src_ofs[i],0,segment_count*sizeof(stream_t));
+		memset(out->lbl_one[i],0,segment_count*sizeof(stream_t));
+		memset(out->dst_ofs[i],0,segment_count*sizeof(stream_t));
 		int j_from=(which_dst==segment_count)?0:which_dst;
 		int j_to=(which_dst==segment_count)?segment_count:(which_dst+1);
 		for(int j=j_from;j<j_to;j++){

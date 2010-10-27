@@ -14,4 +14,8 @@ states, then apply next-state for the second group to the result,
 etc..  Thus, a chaining analysis can be completed in much less
 iterations than a BFS analysis.
 
+*--action*='ACTION'::
+        Find a transition labelled with 'ACTION'. Returns with exit code 1
+        if such a transition is found, otherwise 0.
+
 include::reachability-options.txt[]

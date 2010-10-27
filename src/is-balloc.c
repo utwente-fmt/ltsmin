@@ -96,7 +96,6 @@ isba_push_int(isb_allocator_t buf, const int *element)
             Fatal(1, error, "isb_allocator mem size of %zu exceeded", MAX_MEM/1024/1024/1024);
         add_block(buf);
     }
-    size_t x;
     memcpy(&buf->blocks[buf->num_block-1][buf->cur_index*buf->el_size], element, buf->el_size*sizeof(int));
     buf->cur_index++;
 }
