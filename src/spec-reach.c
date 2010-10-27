@@ -508,7 +508,8 @@ deadlock_check(vset_t deadlocks, bitvector_t *reach_groups)
 }
 
 static inline void
-get_vset_size(vset_t set, long *node_count, char *elem_str, ssize_t str_len)
+get_vset_size(vset_t set, long *node_count, double *elem_approximation,
+                  char *elem_str, ssize_t str_len)
 {
     bn_int_t elem_count;
     int      len;
@@ -519,11 +520,14 @@ get_vset_size(vset_t set, long *node_count, char *elem_str, ssize_t str_len)
     if (len >= str_len)
         Fatal(1, error, "Error converting number to string");
 
+    *elem_approximation = bn_int2double(&elem_count);
+
     bn_clear(&elem_count);
 }
 
 static inline void
-get_vrel_size(vrel_t rel, long *node_count, char *elem_str, ssize_t str_len)
+get_vrel_size(vrel_t rel, long *node_count, double *elem_approximation,
+                  char *elem_str, ssize_t str_len)
 {
     bn_int_t elem_count;
     int      len;
@@ -534,28 +538,31 @@ get_vrel_size(vrel_t rel, long *node_count, char *elem_str, ssize_t str_len)
     if (len >= str_len)
         Fatal(1, error, "Error converting number to string");
 
+    *elem_approximation = bn_int2double(&elem_count);
+
     bn_clear(&elem_count);
 }
 
 static void
 stats_and_progress_report(vset_t current, vset_t visited, int level)
 {
-    long     node_count;
-    char     elem_str[1024];
-    int      str_len = sizeof(elem_str);
+    long   node_count;
+    char   elem_str[1024];
+    int    str_len = sizeof(elem_str);
+    double elem_count;
 
     if (current != NULL) {
-        get_vset_size(current, &node_count, elem_str, str_len);
-        Warning(info, "level %d has %s states ( %ld nodes )",
-                    level, elem_str, node_count);
+        get_vset_size(current, &node_count, &elem_count, elem_str, str_len);
+        Warning(info, "level %d has %s (~%1.2e) states ( %ld nodes )",
+                    level, elem_str, elem_count, node_count);
 
         if (node_count > max_lev_count)
             max_lev_count = node_count;
     }
 
-    get_vset_size(visited, &node_count, elem_str, str_len);
-    Warning(info, "visited %d has %s states ( %ld nodes )",
-                level, elem_str, node_count);
+    get_vset_size(visited, &node_count, &elem_count, elem_str, str_len);
+    Warning(info, "visited %d has %s (~%1.2e) states ( %ld nodes )",
+                level, elem_str, elem_count, node_count);
 
     if (node_count > max_vis_count)
         max_vis_count = node_count;
@@ -564,7 +571,8 @@ stats_and_progress_report(vset_t current, vset_t visited, int level)
         fprintf(stderr, "transition caches ( grp nds elts ): ");
 
         for (int i = 0; i < nGrps; i++) {
-            get_vrel_size(group_next[i], &node_count, elem_str, str_len);
+            get_vrel_size(group_next[i], &node_count, &elem_count,
+                              elem_str, str_len);
             fprintf(stderr, "( %d %ld %s ) ", i, node_count, elem_str);
 
             if (node_count > max_trans_count)
@@ -574,7 +582,8 @@ stats_and_progress_report(vset_t current, vset_t visited, int level)
         fprintf(stderr,"\ngroup explored    ( grp nds elts ): ");
 
         for (int i = 0; i < nGrps; i++) {
-            get_vset_size(group_explored[i], &node_count, elem_str, str_len);
+            get_vset_size(group_explored[i], &node_count, &elem_count,
+                              elem_str, str_len);
             fprintf(stderr, "( %d %ld %s ) ", i, node_count, elem_str);
 
             if (node_count > max_grp_count)
@@ -588,8 +597,10 @@ stats_and_progress_report(vset_t current, vset_t visited, int level)
 static void
 final_stat_reporting(vset_t visited, mytimer_t timer)
 {
-    long node_count;
-    char elem_str[1024];
+    long   node_count;
+    char   elem_str[1024];
+    int    str_len = sizeof(elem_str);
+    double elem_count;
 
     SCCreportTimer(timer, "reachability took");
 
@@ -599,8 +610,8 @@ final_stat_reporting(vset_t visited, mytimer_t timer)
     if (act_detect != NULL)
         Warning(info, "Action \"%s\" not found", act_detect);
 
-    get_vset_size(visited, &node_count, elem_str, sizeof(elem_str));
-    Warning(info, "state space has %s states", elem_str);
+    get_vset_size(visited, &node_count, &elem_count, elem_str, str_len);
+    Warning(info, "state space has %s (~%1.2e) states", elem_str, elem_count);
 
     if (max_lev_count == 0) {
         Warning(info, "( %ld final BDD nodes; %ld peak nodes )",
@@ -1518,12 +1529,14 @@ main (int argc, char *argv[])
         vset_t x = mu_compute(mu_expr, visited);
 
         if (x) {
-            long node_count;
-            char elem_str[1024];
-            int  str_len = sizeof(elem_str);
+            long   node_count;
+            char   elem_str[1024];
+            int    str_len = sizeof(elem_str);
+            double elem_count;
 
-            get_vset_size(x, &node_count, elem_str, str_len);
-            fprintf(stderr, "mu formula holds for %s states\n", elem_str);
+            get_vset_size(x, &node_count, &elem_count, elem_str, str_len);
+            fprintf(stderr, "mu formula holds for %s (~%1.2e) states\n",
+                    elem_str, elem_count);
             fprintf(stderr, " s0 is %sin the set\n",
                         vset_member(x, src) ? "" : "not ");
             vset_destroy(x);
