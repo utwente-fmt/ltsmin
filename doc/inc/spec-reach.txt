@@ -25,4 +25,4 @@ http://www.cwi.nl/{tilde}mcrl/[muCRL],
 http://www.mcrl2.org/[mCRL2],
 http://fmt.cs.utwente.nl/{tilde}michaelw/nips/[NIPS],
 http://www.mpi-forum.org/[MPI Forum]
-
+http://buddy.sourceforge.net/[BuDDy]
