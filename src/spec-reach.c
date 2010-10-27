@@ -520,7 +520,7 @@ void reach_bfs2(){
  *  As a side effect, the group tables (group_next) will be extended
  **/
 
-static void Closure(vset_t visited,bitvector_t *groups) {
+static void Closure(vset_t visited,bitvector_t* groups) {
   int level=0;
   vset_t current=vset_create(domain,0,NULL);
   vset_t next=vset_create(domain,0,NULL);
@@ -553,9 +553,9 @@ static void Closure(vset_t visited,bitvector_t *groups) {
 
 
 void reach_sat1(){
-  int* level = (int*)RTmalloc( nGrps * sizeof(int) );
-  int* back  = (int*)RTmalloc( (N+1) * sizeof(int) );
-  bitvector_t **groups = (bitvector_t**)RTmalloc( (N+1) * sizeof(bitvector_t*));
+  int level[nGrps];
+  int back[N+1];
+  bitvector_t* groups[N+1];
 
   // groups: i=0..nGrps-1
   // vars  : j=0..N-1
@@ -598,7 +598,6 @@ void reach_sat1(){
   for (int j=1; j<=N; j++)
     fprintf(stderr,"%d ",back[j]);
   fprintf(stderr,"\n");
-  
 
   int k=1;
   vset_t old_vis=vset_create(domain,0,NULL);
@@ -616,8 +615,8 @@ void reach_sat1(){
 }
 
 void reach_sat2(){
-  int* level = (int*)RTmalloc( nGrps * sizeof(int) );
-  bitvector_t **groups = (bitvector_t**)RTmalloc( (N+1) * sizeof(bitvector_t*));
+  int level[nGrps];
+  bitvector_t* groups[N+1];
 
   // groups: i=0..nGrps-1
   // vars  : j=0..N-1
@@ -647,6 +646,7 @@ void reach_sat2(){
   fprintf(stderr,"level: ");
   for (int i=0; i<nGrps;i++)
     fprintf(stderr,"%d ",level[i]);
+  fprintf(stderr,"\n");
   
   int k=1, last=0;
   vset_t old_vis=vset_create(domain,0,NULL);
@@ -668,8 +668,8 @@ void reach_sat2(){
 }
 
 void reach_sat3(){
-  int* level = (int*)RTmalloc( nGrps * sizeof(int) );
-  bitvector_t **groups = (bitvector_t**)RTmalloc( (N+1) * sizeof(bitvector_t*));
+  int level[nGrps];
+  bitvector_t* groups[N+1];
 
   // groups: i=0..nGrps-1
   // vars  : j=0..N-1
@@ -698,6 +698,7 @@ void reach_sat3(){
   fprintf(stderr,"level: ");
   for (int i=0; i<nGrps;i++)
     fprintf(stderr,"%d ",level[i]);
+  fprintf(stderr,"\n");
   
   vset_t old_vis=vset_create(domain,0,NULL);
   while (!vset_equal(old_vis,visited)) {
@@ -915,6 +916,13 @@ int main(int argc, char *argv[]){
 	model=GBcreateBase();
 	GBsetChunkMethods(model,new_string_index,NULL,
 		(int2chunk_t)SIgetC,(chunk2int_t)SIputC,(get_count_t)SIgetCount);
+
+	if (strategy==Sat1 || strategy==Sat2 || strategy==Sat3)
+	  if (dlk_detect) {
+	    Fatal(1,error,"deadlock detection not supported for saturation");
+	  } else if (trc_output != NULL) {
+	    Fatal(1,error,"trace generation not supported for saturation");
+	  }
 
 	GBloadFile(model,files[0],&model);
 
