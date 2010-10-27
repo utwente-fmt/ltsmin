@@ -37,6 +37,12 @@ bn_int2string (char *string, size_t size, long long *a)
     return snprintf (string, size, "%lld", *a);
 }
 
+double
+bn_int2double (long long *a)
+{
+    return (double)(*a);
+}
+
 void
 bn_add (long long *a, long long *b, long long *c)
 {
