@@ -42,7 +42,7 @@ static void fix_array(void**ar,int oldsize,int size,int e_size){
 	if (tmp) {
 		DEBUG(info,"%x -> %x",*ar,tmp);
 		*ar=tmp;
-		bzero(tmp+(oldsize*e_size),(size-oldsize)*e_size);
+		memset(tmp+(oldsize*e_size), 0, (size-oldsize)*e_size);
 	} else {
 		// size is never 0, so tmp==NULL is an error.
 		Fatal(1,error,"realloc from %d to %d * %d failed",oldsize,size,e_size);

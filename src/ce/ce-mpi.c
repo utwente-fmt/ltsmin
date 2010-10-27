@@ -3,7 +3,6 @@
 #include <stdlib.h>
 
 #include <mpi-runtime.h>
-#include "lts.h"
 #include <mpi.h>
 #include "Dtaudlts.h"
 #include "paint.h"

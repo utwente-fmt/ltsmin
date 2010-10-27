@@ -7,6 +7,7 @@
 void
 bn_init (long long *a)
 {
+    (void)a;
     return;
 }
 

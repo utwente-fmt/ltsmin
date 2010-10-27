@@ -45,7 +45,7 @@ static void MCRLinitGreybox(int argc,char *argv[],void* stack_bottom){
          *   fake it to work by pretending to be mcrl's rewr
          *   executable.
          */
-        char *const tmp = argv[0];
+        char *tmp = argv[0]; // const char* ? - Stefan
         argv[0] = "/fake/path/to/rewr";
 	RWsetArguments(&argc, &argv);
         argv[0] = tmp;
