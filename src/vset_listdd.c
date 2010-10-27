@@ -309,7 +309,7 @@ static uint32_t mdd_minus(uint32_t a,uint32_t b){
 }
 
 
-static uint32_t mdd_member(uint32_t mdd,uint32_t *vec,int len){
+static uint32_t mdd_member(uint32_t mdd,const uint32_t *vec,int len){
     if (len==0) {
         while(mdd>1) mdd=node_table[mdd].right;
         return mdd;
@@ -326,7 +326,7 @@ static uint32_t mdd_member(uint32_t mdd,uint32_t *vec,int len){
     return 0;
 }
 
-static uint32_t mdd_put(uint32_t mdd,uint32_t *vec,int len,int* is_new){
+static uint32_t mdd_put(uint32_t mdd,const uint32_t *vec,int len,int* is_new){
     if (len==0) {
         if (mdd==0) {
             if(is_new) *is_new=1;
@@ -466,7 +466,6 @@ static int set_member_mdd(vset_t set,const int* e){
 }
 
 static void set_count_mdd(vset_t set,long *nodes,bn_int_t *elements){
-    int len=(set->p_len)?set->p_len:set->dom->shared.size;
     uint64_t e_count=mdd_count(set->mdd);
     uint32_t n_count=mdd_node_count(set->mdd);
     double ed=e_count;
@@ -475,7 +474,6 @@ static void set_count_mdd(vset_t set,long *nodes,bn_int_t *elements){
 }
 
 static void rel_count_mdd(vrel_t rel,long *nodes,bn_int_t *elements){
-    int len=2*((rel->p_len)?rel->p_len:rel->dom->shared.size);
     uint64_t e_count=mdd_count(rel->mdd);
     uint32_t n_count=mdd_node_count(rel->mdd);
     double ed=e_count;
@@ -663,7 +661,7 @@ vdom_t vdom_create_list_native(int n){
 		node_table=RTmalloc(mdd_nodes*sizeof(struct mdd_node));
 		op_cache=RTmalloc(mdd_nodes*sizeof(struct op_rec));
 
-		for(int i=0;i<mdd_nodes;i++){
+		for(uint32_t i=0;i<mdd_nodes;i++){
 			unique_table[i]=0;
 			node_table[i].next=i+1;
 			op_cache[i].op=0;
