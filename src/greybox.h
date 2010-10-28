@@ -29,6 +29,9 @@ typedef struct transition_info {
     int  group;                     // holds transition group or -1 if unknown
 } transition_info_t;
 
+#define GB_UNKNOWN_GROUP -1
+static const transition_info_t GB_NO_TRANSITION = {NULL, GB_UNKNOWN_GROUP};
+
 /**
 \brief Options for greybox management module.
  */
@@ -48,6 +51,16 @@ the parameter wrapped is not NULL then the default wrappers are applied to
 the model and the result is put in wrapped.
 */
 extern void GBloadFile(model_t model,const char *filename,model_t *wrapped);
+/**
+\brief Factory method for loading models concurrently.
+
+Given a model that has been initialized with data synchronization functions,
+this method determines the type by the extension of the file and initializes
+the read-only variables of model.
+
+\see GBregisterPreLoader
+*/
+extern void GBloadFileShared(model_t model,const char *filename);
 
 /**
 \brief Get the basic LTS type or structure of the model.
@@ -162,6 +175,11 @@ extern model_t GBgetParent(model_t model);
 \brief Register a loader for an extension.
  */
 extern void GBregisterLoader(const char*extension,pins_loader_t loader);
+
+/**
+\brief Register a loader for an extension.
+ */
+extern void GBregisterPreLoader(const char*extension,pins_loader_t loader);
 
 /**
 \brief Set a pointer to the user context;

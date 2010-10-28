@@ -70,39 +70,20 @@ static  struct poptOption options[] = {
     POPT_TABLEEND
 };
 
-static inline int
-trace_get_type(trace_t trace, int type, int label, size_t dst_size, char* dst)
-{
-    // in case this is not a type
-    if (type == -1)
-        return -1;
-
-    // otherwise, read the value
-    char tmp[BUFLEN];
-    chunk c;
-    c.data = SIgetC(trace->values[type], label, (int*)&c.len);
-    if (c.data) {
-        chunk2string(c, BUFLEN, tmp);
-        strncpy(dst, tmp, dst_size);
-        return 0;
-    } else {
-        return -1;
-    }
-}
-
 static void
-trace_get_type_str(trace_t trace, int typeno, int type_idx, size_t dst_size, char* dst) {
-    int notype = trace_get_type(trace, typeno, type_idx, dst_size, dst);
+trace_get_type_str(trc_t trace, int typeno, int type_idx, size_t dst_size, char* dst) {
+    int notype = trc_get_type(trace, typeno, type_idx, dst_size, dst);
     if (notype || output_value == IDX) {
         snprintf(dst, dst_size, "%d", type_idx);
     }
 }
 
 void
-output_text(trace_t trace, FILE* output_file) {
-    int N = lts_type_get_state_length(trace->ltstype);
-    int eLbls = lts_type_get_edge_label_count(trace->ltstype);
-    int sLbls = lts_type_get_state_label_count(trace->ltstype);
+output_text(trc_t trace, FILE* output_file) {
+    lts_type_t ltstype = trc_get_ltstype(trace);
+    int N = lts_type_get_state_length(ltstype);
+    int eLbls = lts_type_get_edge_label_count(ltstype);
+    int sLbls = lts_type_get_state_label_count(ltstype);
     uint32_t align = 0;  // maximal width of state header/state label header
     char tmp[BUFLEN];
     char tmp2[BUFLEN];
@@ -110,20 +91,21 @@ output_text(trace_t trace, FILE* output_file) {
     // calculate width
     for(int j=0; j<N; ++j) {
         // state header
-        char *name = lts_type_get_state_name(trace->ltstype, j);
-        char *type = lts_type_get_state_type(trace->ltstype, j);
+        char *name = lts_type_get_state_name(ltstype, j);
+        char *type = lts_type_get_state_type(ltstype, j);
         snprintf(tmp, BUFLEN, "%s:%s[%d]", name == NULL ? "_" : name, type == NULL ? "_" : type, j);
         if (align < strlen(tmp)) align = strlen(tmp);
     }
     for(int j=0; j<sLbls; ++j) {
-        char *name = lts_type_get_state_label_name(trace->ltstype, j);
-        char *type = lts_type_get_state_label_type(trace->ltstype, j);
+        char *name = lts_type_get_state_label_name(ltstype, j);
+        char *type = lts_type_get_state_label_type(ltstype, j);
         snprintf(tmp, BUFLEN, "%s:%s[%d]", name == NULL ? "_" : name, type == NULL ? "_" : type, j);
         if (align < strlen(tmp)) align = strlen(tmp);
     }
 
     // output trace
-    for(int i=0; i<trace->len; ++i) {
+    int len = trc_get_length(trace);
+    for(int i=0; i<len; ++i) {
         int prev_state[N];
         int state[N];
         int prev_state_lbls[sLbls];
@@ -142,16 +124,16 @@ output_text(trace_t trace, FILE* output_file) {
         }
 
         // get state
-        TreeUnfold(trace->state_db, i, state);
+        trc_get_state(trace, i, state);
 
         // output state
         for(int j=0; j<N; ++j) {
             if (arg_all || state[j] != prev_state[j]) {
-                char *name = lts_type_get_state_name(trace->ltstype, j);
-                char *type = lts_type_get_state_type(trace->ltstype, j);
+                char *name = lts_type_get_state_name(ltstype, j);
+                char *type = lts_type_get_state_type(ltstype, j);
                 snprintf(tmp, BUFLEN, "%s:%s[%d]", name == NULL ? "_" : name, type == NULL ? "_" : type, j);
 
-                int typeno = lts_type_get_state_typeno(trace->ltstype, j);
+                int typeno = lts_type_get_state_typeno(ltstype, j);
                 trace_get_type_str(trace, typeno, state[j], BUFLEN, tmp2);
 
                 fprintf(output_file, "\t%*s = %s\n", align, tmp, tmp2);
@@ -159,15 +141,15 @@ output_text(trace_t trace, FILE* output_file) {
         }
 
         // output state labels
-        if (trace->state_lbl != NULL) {
-            TreeUnfold(trace->state_db, trace->state_lbl[i], state_lbls);
+        if (trc_get_state_label(trace, 0, NULL)) {
+            trc_get_state_label(trace, i, state_lbls);
             for(int j=0; j<sLbls; ++j) {
                 if (arg_all || state_lbls[j] != prev_state_lbls[j]) {
-                    char *name = lts_type_get_state_label_name(trace->ltstype, j);
-                    char *type = lts_type_get_state_label_type(trace->ltstype, j);
+                    char *name = lts_type_get_state_label_name(ltstype, j);
+                    char *type = lts_type_get_state_label_type(ltstype, j);
                     snprintf(tmp, BUFLEN, "%s:%s[%d]", name == NULL ? "_" : name, type == NULL ? "_" : type, j);
 
-                    int typeno = lts_type_get_state_label_typeno(trace->ltstype, j);
+                    int typeno = lts_type_get_state_label_typeno(ltstype, j);
                     trace_get_type_str(trace, typeno, state_lbls[j], BUFLEN, tmp2);
 
                     fprintf(output_file, "\t%*s = %s\n", align, tmp, tmp2);
@@ -176,15 +158,15 @@ output_text(trace_t trace, FILE* output_file) {
         }
 
         // output edge labels
-        if ((i+1)<trace->len) {
-            if (trace->edge_lbl != NULL) {
-                TreeUnfold(trace->edge_db, trace->edge_lbl[i], edge_lbls);
+        if ((i+1)<len) {
+            if (trc_get_state_label(trace, 0, NULL)) {
+                trc_get_state_label(trace, i, edge_lbls);
                 for(int j=0; j<eLbls; ++j) {
-                    char *name = lts_type_get_edge_label_name(trace->ltstype, j);
-                    char *type = lts_type_get_edge_label_type(trace->ltstype, j);
+                    char *name = lts_type_get_edge_label_name(ltstype, j);
+                    char *type = lts_type_get_edge_label_type(ltstype, j);
                     snprintf(tmp, BUFLEN, "%s:%s[%d]", name == NULL ? "_" : name, type == NULL ? "_" : type, j);
 
-                    int typeno = lts_type_get_edge_label_typeno(trace->ltstype, j);
+                    int typeno = lts_type_get_edge_label_typeno(ltstype, j);
                     trace_get_type_str(trace, typeno, edge_lbls[j], BUFLEN, tmp2);
 
                     fprintf(output_file, "%s%s = %s",j==0?"":", ", tmp, tmp2);
@@ -201,10 +183,11 @@ output_text(trace_t trace, FILE* output_file) {
 }
 
 void
-output_text_table(trace_t trace, FILE* output_file) {
-    int N = lts_type_get_state_length(trace->ltstype);
-    int eLbls = lts_type_get_edge_label_count(trace->ltstype);
-    int sLbls = lts_type_get_state_label_count(trace->ltstype);
+output_text_table(trc_t trace, FILE* output_file) {
+    lts_type_t ltstype = trc_get_ltstype(trace);
+    int N = lts_type_get_state_length(ltstype);
+    int eLbls = lts_type_get_edge_label_count(ltstype);
+    int sLbls = lts_type_get_state_label_count(ltstype);
     int width_s[N];      // width of state item column
     int width_el[eLbls]; // width of edge label column
     int width_sl[sLbls]; // width of state label column
@@ -213,49 +196,48 @@ output_text_table(trace_t trace, FILE* output_file) {
     // calculate width
     for(int j=0; j<N; ++j) {
         // state header
-        char *name = lts_type_get_state_name(trace->ltstype, j);
-        char *type = lts_type_get_state_type(trace->ltstype, j);
+        char *name = lts_type_get_state_name(ltstype, j);
+        char *type = lts_type_get_state_type(ltstype, j);
         snprintf(tmp, BUFLEN, "%s:%s", name == NULL ? "_" : name, type == NULL ? "_" : type);
         width_s[j] = strlen(tmp);
 
     }
     for(int j=0; j<sLbls; ++j) {
-        char *name = lts_type_get_state_label_name(trace->ltstype, j);
-        char *type = lts_type_get_state_label_type(trace->ltstype, j);
+        char *name = lts_type_get_state_label_name(ltstype, j);
+        char *type = lts_type_get_state_label_type(ltstype, j);
         snprintf(tmp, BUFLEN, "%s:%s", name == NULL ? "_" : name, type == NULL ? "_" : type);
         width_sl[j] = strlen(tmp);
     }
     for(int j=0; j<eLbls; ++j) {
-        char *name = lts_type_get_edge_label_name(trace->ltstype, j);
-        char *type = lts_type_get_edge_label_type(trace->ltstype, j);
+        char *name = lts_type_get_edge_label_name(ltstype, j);
+        char *type = lts_type_get_edge_label_type(ltstype, j);
         snprintf(tmp, BUFLEN, "%s:%s", name == NULL ? "_" : name, type == NULL ? "_" : type);
         width_el[j] = strlen(tmp);
     }
-    for(int i=0; i<trace->len; ++i) {
+    int len = trc_get_length(trace);
+    int state_lbls[sLbls];
+    int edge_lbls[eLbls];
+    for(int i=0; i<len; ++i) {
         int state[N];
-        TreeUnfold(trace->state_db, i, state);
+        trc_get_state(trace, i, state);
 
         for(int j=0; j<N; ++j) {
-            int typeno = lts_type_get_state_typeno(trace->ltstype, j);
+            int typeno = lts_type_get_state_typeno(ltstype, j);
             trace_get_type_str(trace, typeno, state[j], BUFLEN, tmp);
             int len = strlen(tmp);
             if (width_s[j] < len) width_s[j] = len;
         }
-        if (trace->state_lbl != NULL) {
-            int state_lbls[sLbls];
-            TreeUnfold(trace->state_db, trace->state_lbl[i], state_lbls);
+        if (trc_get_state_label(trace, i, state_lbls)) {
             for(int j=0; j<sLbls; ++j) {
-                int typeno = lts_type_get_state_label_typeno(trace->ltstype, j);
+                int typeno = lts_type_get_state_label_typeno(ltstype, j);
                 trace_get_type_str(trace, typeno, state_lbls[j], BUFLEN, tmp);
                 int len = strlen(tmp);
                 if (width_sl[j] < len) width_sl[j] = len;
             }
         }
-        if ((i+1) < trace->len && trace->edge_lbl != NULL) {
-            int edge_lbls[eLbls];
-            TreeUnfold(trace->edge_db, trace->edge_lbl[i], edge_lbls);
+        if ((i+1) < len && trc_get_edge_label(trace, i, edge_lbls)) {
             for(int j=0; j<eLbls; ++j) {
-                int typeno = lts_type_get_edge_label_typeno(trace->ltstype, j);
+                int typeno = lts_type_get_edge_label_typeno(ltstype, j);
                 trace_get_type_str(trace, typeno, edge_lbls[j], BUFLEN, tmp);
                 int len = strlen(tmp);
                 if (width_el[j] < len) width_el[j] = len;
@@ -266,27 +248,27 @@ output_text_table(trace_t trace, FILE* output_file) {
     // print header
     fprintf(output_file, "      ");
     for(int j=0; j<N; ++j) {
-        char *name = lts_type_get_state_name(trace->ltstype, j);
-        char *type = lts_type_get_state_type(trace->ltstype, j);
+        char *name = lts_type_get_state_name(ltstype, j);
+        char *type = lts_type_get_state_type(ltstype, j);
         snprintf(tmp, BUFLEN, "%s:%s", name == NULL ? "_" : name, type == NULL ? "_" : type);
 
         fprintf(output_file, "%s%*s", j==0?"":" ", -width_s[j], tmp);
     }
-    if (trace->state_lbl != NULL) {
+    if (trc_get_state_label(trace, 0, NULL)) {
         fprintf(output_file, "   ");
         for(int j=0; j<sLbls; ++j) {
-            char *name = lts_type_get_state_label_name(trace->ltstype, j);
-            char *type = lts_type_get_state_label_type(trace->ltstype, j);
+            char *name = lts_type_get_state_label_name(ltstype, j);
+            char *type = lts_type_get_state_label_type(ltstype, j);
             snprintf(tmp, BUFLEN, "%s:%s", name == NULL ? "_" : name, type == NULL ? "_" : type);
 
             fprintf(output_file, "%s%*s", j==0?"":" ", -width_sl[j], tmp);
         }
     }
-    if (trace->edge_lbl != NULL) {
+    if (trc_get_edge_label(trace, 0, NULL)) {
         fprintf(output_file, "   ");
         for(int j=0; j<eLbls; ++j) {
-            char *name = lts_type_get_edge_label_name(trace->ltstype, j);
-            char *type = lts_type_get_edge_label_type(trace->ltstype, j);
+            char *name = lts_type_get_edge_label_name(ltstype, j);
+            char *type = lts_type_get_edge_label_type(ltstype, j);
             snprintf(tmp, BUFLEN, "%s:%s", name == NULL ? "_" : name, type == NULL ? "_" : type);
 
             fprintf(output_file, "%s%*s", j==0?"":" ", -width_el[j], tmp);
@@ -296,7 +278,7 @@ output_text_table(trace_t trace, FILE* output_file) {
 
 
     // print the state / state labels / edge labels
-    for(int i=0; i<trace->len; ++i) {
+    for(int i=0; i<len; ++i) {
         int prev_state[N];
         int state[N];
         int prev_state_lbls[sLbls];
@@ -304,11 +286,11 @@ output_text_table(trace_t trace, FILE* output_file) {
         int prev_edge_lbls[eLbls];
         int edge_lbls[eLbls];
         for(int j=0; j<N; ++j) prev_state[j] = (i == 0 ? -1 : state[j]);
-        TreeUnfold(trace->state_db, i, state);
+        trc_get_state(trace, i, state);
         fprintf(output_file, "%.3d: [",i);
         for(int j=0; j<N; ++j) {
             if (arg_all || state[j] != prev_state[j]) {
-                int typeno = lts_type_get_state_typeno(trace->ltstype, j);
+                int typeno = lts_type_get_state_typeno(ltstype, j);
                 trace_get_type_str(trace, typeno, state[j], BUFLEN, tmp);
             } else {
                 snprintf(tmp, BUFLEN, "...");
@@ -319,13 +301,13 @@ output_text_table(trace_t trace, FILE* output_file) {
         fprintf(output_file, "]");
 
         // print state labels
-        if (trace->state_lbl != NULL) {
+        if (trc_get_state_label(trace, 0, NULL)) {
             fprintf(output_file, " [");
             for(int j=0; j<sLbls; ++j) prev_state_lbls[j] = (i == 0 ? -1 : state_lbls[j]);
-            TreeUnfold(trace->state_db, trace->state_lbl[i], state_lbls);
+            trc_get_state_label(trace, i, state_lbls);
             for(int j=0; j<sLbls; ++j) {
                 if (arg_all || state_lbls[j] != prev_state_lbls[j]) {
-                    int typeno = lts_type_get_state_label_typeno(trace->ltstype, j);
+                    int typeno = lts_type_get_state_label_typeno(ltstype, j);
                     trace_get_type_str(trace, typeno, state_lbls[j], BUFLEN, tmp);
                 } else {
                     snprintf(tmp, BUFLEN, "...");
@@ -337,14 +319,14 @@ output_text_table(trace_t trace, FILE* output_file) {
         }
 
         // print edge labels
-        if ((i+1)<trace->len) {
-            if (trace->edge_lbl != NULL) {
+        if ((i+1)<len) {
+            if (trc_get_edge_label(trace, 0, NULL)) {
                 fprintf(output_file, " [");
                 for(int j=0; j<eLbls; ++j) prev_edge_lbls[j] = (i == 0 ? -1 : edge_lbls[j]);
-                TreeUnfold(trace->edge_db, trace->edge_lbl[i], edge_lbls);
+                trc_get_edge_label(trace, i, edge_lbls);
                 for(int j=0; j<eLbls; ++j) {
                     if (arg_all || edge_lbls[j] != prev_edge_lbls[j]) {
-                        int typeno = lts_type_get_edge_label_typeno(trace->ltstype, j);
+                        int typeno = lts_type_get_edge_label_typeno(ltstype, j);
                         trace_get_type_str(trace, typeno, edge_lbls[j], BUFLEN, tmp);
                     } else {
                         snprintf(tmp, BUFLEN, "...");
@@ -360,62 +342,62 @@ output_text_table(trace_t trace, FILE* output_file) {
 }
 
 void
-output_csv(trace_t trace, FILE* output_file) {
-    int N = lts_type_get_state_length(trace->ltstype);
-    int eLbls = lts_type_get_edge_label_count(trace->ltstype);
-    int sLbls = lts_type_get_state_label_count(trace->ltstype);
+output_csv(trc_t trace, FILE* output_file) {
+    lts_type_t ltstype = trc_get_ltstype(trace);
+    int N = lts_type_get_state_length(ltstype);
+    int eLbls = lts_type_get_edge_label_count(ltstype);
+    int sLbls = lts_type_get_state_label_count(ltstype);
 
     // add header
     for(int j=0; j<N; ++j) {
-        char *name = lts_type_get_state_name(trace->ltstype, j);
-        char *type = lts_type_get_state_type(trace->ltstype, j);
+        char *name = lts_type_get_state_name(ltstype, j);
+        char *type = lts_type_get_state_type(ltstype, j);
         fprintf(output_file, "%s%s:%s", j==0 ? "" : arg_sep, name == NULL ? "_" : name, type == NULL ? "_" : type);
     }
-    if (trace->state_lbl != NULL) {
+    if (trc_get_state_label(trace,0,NULL)) {
         for(int j=0; j<sLbls; ++j) {
-            char *name = lts_type_get_state_label_name(trace->ltstype, j);
-            char *type = lts_type_get_state_label_type(trace->ltstype, j);
+            char *name = lts_type_get_state_label_name(ltstype, j);
+            char *type = lts_type_get_state_label_type(ltstype, j);
             fprintf(output_file, "%s%s:%s", arg_sep, name == NULL ? "_" : name, type == NULL ? "_" : type);
         }
     }
-    if (trace->edge_lbl != NULL) {
+    if (trc_get_edge_label(trace,0,NULL)) {
         for(int j=0; j<eLbls; ++j) {
-            char *name = lts_type_get_edge_label_name(trace->ltstype, j);
-            char *type = lts_type_get_edge_label_type(trace->ltstype, j);
+            char *name = lts_type_get_edge_label_name(ltstype, j);
+            char *type = lts_type_get_edge_label_type(ltstype, j);
             fprintf(output_file, "%s%s:%s", arg_sep, name == NULL ? "_" : name, type == NULL ? "_" : type);
         }
     }
     fprintf(output_file, "\n");
 
+    int edge_lbls[eLbls];
+    int state_lbls[sLbls];
+    int state[N];
+    int len = trc_get_length(trace);
     // print the state / state labels / edge labels
-    for(int i=0; i<trace->len; ++i) {
-        int state[N];
+    for(int i=0; i<len; ++i) {
         char tmp[BUFLEN];
-        TreeUnfold(trace->state_db, i, state);
+        trc_get_state(trace, i, state);
         for(int j=0; j<N; ++j) {
-            int typeno = lts_type_get_state_typeno(trace->ltstype, j);
+            int typeno = lts_type_get_state_typeno(ltstype, j);
             trace_get_type_str(trace, typeno, state[j], BUFLEN, tmp);
             fprintf(output_file, "%s%s", j==0 ? "" : arg_sep, tmp);
         }
 
         // print state labels
-        if (trace->state_lbl != NULL) {
-            int state_lbls[sLbls];
-            TreeUnfold(trace->state_db, trace->state_lbl[i], state_lbls);
+        if (trc_get_edge_label(trace, i, edge_lbls)) {
             for(int j=0; j<sLbls; ++j) {
-                int typeno = lts_type_get_state_label_typeno(trace->ltstype, j);
+                int typeno = lts_type_get_state_label_typeno(ltstype, j);
                 trace_get_type_str(trace, typeno, state_lbls[j], BUFLEN, tmp);
                 fprintf(output_file, "%s%s", arg_sep, tmp);
             }
         }
 
         // printf edge labels
-        if (trace->edge_lbl != NULL) {
-            int edge_lbls[eLbls];
-            TreeUnfold(trace->edge_db, trace->edge_lbl[i], edge_lbls);
+        if (trc_get_edge_label(trace, i, edge_lbls)) {
             for(int j=0; j<eLbls; ++j) {
-                if ((i+1)<trace->len) {
-                    int typeno = lts_type_get_edge_label_typeno(trace->ltstype, j);
+                if ((i+1)<len) {
+                    int typeno = lts_type_get_edge_label_typeno(ltstype, j);
                     trace_get_type_str(trace, typeno, edge_lbls[j], BUFLEN, tmp);
                     fprintf(output_file, "%s%s", arg_sep, tmp);
                 } else {
@@ -428,28 +410,30 @@ output_csv(trace_t trace, FILE* output_file) {
 }
 
 void
-output_aut(trace_t trace, FILE* output_file) {
-    int eLbls = lts_type_get_edge_label_count(trace->ltstype);
+output_aut(trc_t trace, FILE* output_file) {
+    lts_type_t ltstype = trc_get_ltstype(trace);
+    int eLbls = lts_type_get_edge_label_count( ltstype );
+    int edge_lbls[eLbls];
 
     // print header
-    fprintf(output_file, "des (%d, %d, %d)\n", 0, trace->len - 1, trace->len);
+    int len = trc_get_length(trace);
+    fprintf(output_file, "des (%d, %d, %d)\n", 0, len - 1, len);
 
     // print edges
     char tmp[BUFLEN];
     char typestr[BUFLEN];
-    for(int i=0; i < trace->len - 1; ++i) {
+    for(int i=0; i < len - 1; ++i) {
         // initialize tmp
         tmp[0] = '\0';
 
         // todo: escape string when value contains quote (")?
 
         // get edge label
-        if (trace->edge_lbl != NULL) {
-            int edge_lbls[eLbls];
-            TreeUnfold(trace->edge_db, trace->edge_lbl[i], edge_lbls);
+        int has_labels = trc_get_edge_label(trace, i, edge_lbls);
+        if (has_labels) {
             for(int j=0; j<eLbls; ++j) {
-                int typeno = lts_type_get_edge_label_typeno(trace->ltstype, j);
-                int notype = trace_get_type(trace, typeno, edge_lbls[j], BUFLEN, typestr);
+                int typeno = lts_type_get_edge_label_typeno(ltstype, j);
+                int notype = trc_get_type(trace, typeno, edge_lbls[j], BUFLEN, typestr);
                 if (notype || output_value == IDX) {
                     snprintf(&tmp[strlen(tmp)], BUFLEN - strlen(tmp) - 1, "%s%d", j==0 ? "": " ", edge_lbls[j]);
                 } else {
@@ -496,8 +480,8 @@ main(int argc,char*argv[]){
         }
     }
 
-    trace_t trace=read_trace(files[0]);
-    Warning(info,"length of trace is %d",trace->len);
+    trc_t trace=trc_read(files[0]);
+    Warning(info,"length of trace is %d",trc_get_length(trace));
 
     switch (file_format) {
         case FF_TXT:

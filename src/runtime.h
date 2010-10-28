@@ -41,6 +41,8 @@ extern void* RTmalloc(size_t size);
 
 extern void* RTmallocZero(size_t size);
 
+extern void* RTalign(size_t alignment, size_t size);
+
 extern void* RTrealloc(void *rt_ptr, size_t size);
 
 extern char* RTstrdup(const char *str);

@@ -21,6 +21,9 @@ extern treedbs_t TreeDBScreate(int len);
 Fold a vector with respect to a database.
 */
 extern int TreeFold(treedbs_t dbs,int *vector);
+extern int TreeFold_ret(treedbs_t dbs,int *vector, int *idx);
+extern int TreeDBSlookup(treedbs_t dbs,int *vector);
+extern int TreeDBSlookup_ret(treedbs_t dbs,int *vector, int *idx);
 
 /**
 Unfold an element to a tree,
@@ -41,6 +44,8 @@ extern void TreeInfo(treedbs_t dbs);
 \brief Free the memory used by a tree dbs.
 */
 extern void TreeDBSfree(treedbs_t dbs);
+
+extern void TreeDBSstats(treedbs_t dbs);
 
 #endif
 

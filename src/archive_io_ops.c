@@ -10,11 +10,6 @@
 #include <struct_io.h>
 #include <fifo.h>
 
-/* Global I/O parameters */
-static int plain=0;
-static int blocksize=32768;
-static int blockcount=32;
-
 /* common data types for archive based formats */
 
 struct archive_io {
@@ -941,7 +936,7 @@ static void dir_write_open(lts_output_t output){
 			usleep(10000);
 		}
 	}
-	ctx->archive=arch_dir_open(output->name,blocksize);
+	ctx->archive=arch_dir_open(output->name,IO_BLOCKSIZE);
 	ctx->plain=1;
 	ctx->plain_code=NULL;
 	output->ops_context=ctx;
@@ -961,7 +956,7 @@ static void dz_write_open(lts_output_t output){
 			usleep(10000);
 		}
 	}
-	ctx->archive=arch_dir_open(output->name,blocksize);
+	ctx->archive=arch_dir_open(output->name,IO_BLOCKSIZE);
 	ctx->plain=0;
 	output->ops_context=ctx;
 	dir_or_vec_write(output);
@@ -973,8 +968,8 @@ static void dz_write_open(lts_output_t output){
 static void gcf_write_open(lts_output_t output){
 	struct archive_io *ctx=RT_NEW(struct archive_io);
 	Warning(info,"opening share %d of %d",output->share,output->share_count);
-	ctx->archive=arch_gcf_create(raf_unistd(output->name),blocksize,blocksize*blockcount,output->share,output->share_count);
-	ctx->plain=plain;
+	ctx->archive=arch_gcf_create(raf_unistd(output->name),IO_BLOCKSIZE,IO_BLOCKSIZE*IO_BLOCKCOUNT,output->share,output->share_count);
+	ctx->plain=IO_PLAIN;
 	ctx->plain_code="";
 	output->ops_context=ctx;
 	dir_or_vec_write(output);
@@ -1036,7 +1031,7 @@ static void load_headers(lts_input_t input,const char *requested_mode,char **act
 static void dir_read_open(lts_input_t input,const char *requested_mode,char **actual_mode){
 	Warning(debug,"opening %s",input->name);
 	struct archive_io *ctx=RT_NEW(struct archive_io);
-	ctx->archive=arch_dir_open(input->name,blocksize);
+	ctx->archive=arch_dir_open(input->name,IO_BLOCKSIZE);
 	ctx->decode=NULL;
 	input->ops_context=ctx;
 	load_headers(input,requested_mode,actual_mode);
@@ -1046,7 +1041,7 @@ static void dir_read_open(lts_input_t input,const char *requested_mode,char **ac
 static void dz_read_open(lts_input_t input,const char *requested_mode,char **actual_mode){
 	Warning(debug,"opening %s",input->name);
 	struct archive_io *ctx=RT_NEW(struct archive_io);
-	ctx->archive=arch_dir_open(input->name,blocksize);
+	ctx->archive=arch_dir_open(input->name,IO_BLOCKSIZE);
 	ctx->decode="auto";
 	input->ops_context=ctx;
 	load_headers(input,requested_mode,actual_mode);
@@ -1088,185 +1083,8 @@ static void archive_popt(poptContext con,
 /* Options for archive based file formats. */
 struct poptOption archive_io_options[]= {
 	{ NULL, 0 , POPT_ARG_CALLBACK|POPT_CBFLAG_POST|POPT_CBFLAG_SKIPOPTION , archive_popt , 0 , NULL , NULL },
-	{ "block-size" , 0 , POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT , &blocksize , 0 , "set the size of a block in bytes" , "<bytes>" },
-	{ "cluster-size" , 0 , POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT , &blockcount , 0 , "set the number of blocks in a GCF cluster" , "<blocks>"},
-	{ "plain" , 0 , POPT_ARG_VAL , &plain , 1 , "disable compression of GCF containers" , NULL },
+	{ "block-size" , 0 , POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT , &IO_BLOCKSIZE , 0 , "set the size of a block in bytes" , "<bytes>" },
+	{ "cluster-size" , 0 , POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT , &IO_BLOCKCOUNT , 0 , "set the number of blocks in a GCF cluster" , "<blocks>"},
+	{ "plain" , 0 , POPT_ARG_VAL , &IO_PLAIN , 1 , "disable compression of GCF containers" , NULL },
 	POPT_TABLEEND
 };
-
-
-#include <trace.h>
-
-trace_t read_trace(const char *name){
-    trace_t trace=RT_NEW(struct trace_s);
-    archive_t arch;
-    char *decode;
-    if (is_a_dir(name)){
-        Warning(info,"open dir %s",name);
-        arch=arch_dir_open((char*)name,blocksize);
-        decode=NULL;
-    } else {
-        Warning(info,"open gcf %s",name);
-        arch=arch_gcf_read(raf_unistd((char*)name));
-        decode="auto";
-    }
-    stream_t ds=arch_read(arch,"info",decode);
-    char description[1024];
-    DSreadS(ds,description,1024);
-    if(strncmp(description,"vsi",3)){
-        Fatal(1,error,"input has to be vsi");
-    }
-    int N;
-    fifo_t fifo=FIFOcreate(4096);
-    if (strcmp(description+4,"1.0")){ // check version
-        Fatal(1,error,"unknown version %s",description+4);
-    }
-    char *comment=DSreadSA(ds);
-    Warning(info,"comment is %s",comment);
-    N=DSreadU32(ds);
-    if (N!=1) Fatal(1,error,"more than one segment");
-    N=DSreadVL(ds);
-    {
-        stream_t fs=FIFOstream(fifo);
-        char data[N];
-        DSread(ds,data,N);
-        DSwrite(fs,data,N);
-        if(DSreadU32(fs)) Fatal(1,error,"root seg not 0");
-        if(DSreadU32(fs)) Fatal(1,error,"root ofs not 0");
-        N=DSreadU32(fs);
-        if (N) {
-            for(int i=0;i<N;i++){
-                DSreadU32(fs);
-            }
-        }
-        if (FIFOsize(fifo)) Fatal(1,error,"Too much data in initial state (%d bytes)",FIFOsize(fifo));
-    }
-    N=DSreadVL(ds);
-    {
-        stream_t fs=FIFOstream(fifo);
-        char data[N];
-        DSread(ds,data,N);
-        DSwrite(fs,data,N);
-        trace->ltstype=lts_type_deserialize(fs);
-        if (FIFOsize(fifo)) Fatal(1,error,"Too much data in lts type (%d bytes)",FIFOsize(fifo));
-    }
-    Warning(info,"got the ltstype, skipping the rest");
-    DSclose(&ds);
-
-    int type_count=lts_type_get_type_count(trace->ltstype);
-    trace->values=RTmallocZero(type_count*sizeof(string_index_t));
-    for(int i=0;i<type_count;i++){
-        Warning(info,"loading type %s",lts_type_get_type(trace->ltstype,i));
-        char stream_name[1024];
-        sprintf(stream_name,"CT-%d",i);
-        ds=arch_read(arch,stream_name,decode);
-        trace->values[i]=SIcreate();
-        int L;
-        for(L=0;;L++){
-            if (DSempty(ds)) break;
-            int len=DSreadVL(ds);
-            char data[len];
-            DSread(ds,data,len);
-            SIputCAt(trace->values[i],data,len,L);
-        }
-        Warning(info,"%d elements",L);
-        DSclose(&ds);
-    }
-    Warning(info,"reading states");
-    N=lts_type_get_state_length(trace->ltstype);
-    trace->state_db=TreeDBScreate(N);
-    struct_stream_t vec=arch_read_vec_U32(arch,"SV-0-%d",N,decode);
-    while(!DSstructEmpty(vec)){
-        uint32_t state[N];
-        DSreadStruct(vec,state);
-        if (trace->len!=TreeFold(trace->state_db,(int*)state)){
-            Fatal(1,error,"duplicate state");
-        }
-        trace->len++;
-    }
-    DSstructClose(&vec);
-    Warning(info,"length of trace is %d",trace->len);
-    // should be one less then the length of the trace
-    uint32_t edge_count = trace->len - 1;
-    N=lts_type_get_state_label_count(trace->ltstype);
-    if (N) {
-        Warning(info,"reading defined state labels");
-        trace->map_db=TreeDBScreate(N);
-        trace->state_lbl=RTmallocZero(edge_count*sizeof(int));
-        struct_stream_t map=arch_read_vec_U32(arch, "SL-0-%d",N,decode);
-        for(uint32_t j=0;j<edge_count;++j) {
-            int map_vec[N];
-            DSreadStruct(map, map_vec);
-            trace->state_lbl[j] = TreeFold(trace->map_db, map_vec);
-        }
-        if (!DSstructEmpty(map)) {
-            Warning(info,"too much state label information found");
-        }
-        DSstructClose(&map);
-    } else {
-        trace->map_db = NULL;
-        trace->state_lbl = NULL;
-    }
-    N=lts_type_get_edge_label_count(trace->ltstype);
-    if (N) {
-        Warning(info,"reading edge labels");
-        int lbl_vec[N];
-        trace->edge_db=TreeDBScreate(N);
-        trace->edge_lbl=RTmallocZero(edge_count*sizeof(int));
-        struct_stream_t lbl=arch_read_vec_U32(arch,"EL-0-%d",N,decode);
-        for (uint32_t j=0;j<edge_count;j++){
-            if (DSstructEmpty(lbl)) {
-                Fatal(1,error,"not enough edge labels found");
-            }
-            DSreadStruct(lbl,lbl_vec);
-            trace->edge_lbl[j] = TreeFold(trace->edge_db, lbl_vec);
-        }
-        if (!DSstructEmpty(lbl)) {
-            Warning(info,"too much edge label information found");
-        }
-        DSstructClose(&lbl);
-
-    } else {
-            trace->edge_db = NULL;
-            trace->edge_lbl = NULL;
-    }
-    Warning(info,"checking transitions");
-	{
-        char* ofs[1]={"ofs"};
-        char* segofs[2]={"seg","ofs"};
-        int src_vec[2];
-        int dst_ofs[1];
-        struct_stream_t src=arch_read_vec_U32_named(arch,"ES-0-%s",2,segofs,decode);
-        struct_stream_t dst=arch_read_vec_U32_named(arch,"ED-0-%s",1,ofs,decode);
-        for (uint32_t j=0;j<edge_count;j++){
-            if (DSstructEmpty(src) || DSstructEmpty(dst)) {
-                Fatal(1,error,"not enough tranitions found");
-            }
-            DSreadStruct(src,src_vec);
-            DSreadStruct(dst,dst_ofs);
-            // check src/dst
-            if (src_vec[0] != 0){
-                Fatal(1,error,"transition source segment != 0");
-            }
-            if (src_vec[1] != dst_ofs[0] - 1 && src_vec[1] != (int)j) {
-                Fatal(1,error,"transition src/dst is not straight sequence");
-            }
-        }
-        if (!(DSstructEmpty(src) || DSstructEmpty(dst))) {
-            Warning(info,"too many transitions found");
-        } else {
-            Warning(info,"read %d transitions", edge_count);
-        }
-        // Note that:
-        // 1. We should test what was requested.
-        // 2. We should return the requested info in one pass. (ltsmin-convert will break)
-        DSstructClose(&src);
-        DSstructClose(&dst);
-    }
-
-    Warning(info,"closing %s",name);
-    arch_close(&arch);
-    return trace;
-}
-
-

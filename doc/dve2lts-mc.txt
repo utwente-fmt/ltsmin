@@ -1,0 +1,29 @@
+//                           -*- mode: doc; outline-regexp: "==\(=*\) ." -*-
+dve2lts-mc(1)
+==============
+:Author:  Alfons Laarman
+:Email:   <a.w.laarman@ewi.utwente.nl>
+:Date:    2010-08-26
+
+== NAME
+
+nips2lts-mc - Concurrent state space generator for DIVINE (cluster) models.
+
+== SYNOPSIS
+
+*dve2lts-mc* [OPTION]... 'input.dve' ['output']
+
+== DESCRIPTION
+
+dve2lts-mc generates a labelled transition system from a
+specification provided in 'input.dve'. It does this concurrently
+any given number of threads.
+
+== CONTEXT
+
+include::inc/spec2lts-mc.txt[]
+
+== OPTIONS
+
+include::inc/spec2lts-mc-options.txt[]
+

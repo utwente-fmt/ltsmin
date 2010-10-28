@@ -10,6 +10,11 @@
 #include <tables.h>
 #include <lts-type.h>
 
+/* Global I/O parameters */
+extern int IO_PLAIN;
+extern int IO_BLOCKSIZE;
+extern int IO_BLOCKCOUNT;
+
 /**
 \file lts_io.h
 \brief Producers and consumers for LTS files.

@@ -1,0 +1,29 @@
+//                           -*- mode: doc; outline-regexp: "==\(=*\) ." -*-
+etf2lts-mc(1)
+==============
+:Author:  Alfons Laarman
+:Email:   <a.w.laarman@ewi.utwente.nl>
+:Date:    2010-08-26
+
+== NAME
+
+etf2lts-mc - Concurrent state space generator for ETF models.
+
+== SYNOPSIS
+
+*etf2lts-mc* [OPTION]... 'input.etf' ['output']
+
+== DESCRIPTION
+
+etf2lts-mc generates a labelled transition system from a compiled
+specification provided in 'input.etf'. It does this concurrently
+any given number of threads.
+
+== CONTEXT
+
+include::inc/spec2lts-mc.txt[]
+
+== OPTIONS
+
+include::inc/spec2lts-mc-options.txt[]
+
