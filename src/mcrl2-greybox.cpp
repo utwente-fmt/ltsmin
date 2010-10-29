@@ -374,7 +374,7 @@ void MCRL2loadGreyboxModel(model_t m,const char*model_name){
 
 	for(int i=0; i < dm_nrows(p_dm_info); i++) {
 		std::vector< size_t > const & vec = ctx->info->get_group(i);
-		for(int j=0; j < vec.size(); j++)
+		for(size_t j=0; j < vec.size(); j++)
 			dm_set (p_dm_info, i, vec[j]);
 	}
 
