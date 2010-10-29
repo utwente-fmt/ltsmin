@@ -221,9 +221,9 @@ typedef struct grey_box_context {
 	int atPars;
 	int atGrps;
 	NextState* explorer;
-	legacy_rewriter rewriter_object;
+	legacy_rewriter* rewriter_object;
 	mcrl2::data::detail::Rewriter* rewriter;
-        mcrl2::data::enumerator_factory< mcrl2::data::classic_enumerator< > > enumerator_factory;
+        mcrl2::data::enumerator_factory< mcrl2::data::classic_enumerator< > > *enumerator_factory;
 	AFun StateFun;
 	group_information *info;
 	ATerm s0;
@@ -346,15 +346,15 @@ void MCRL2loadGreyboxModel(model_t m,const char*model_name){
 	lts_type_set_edge_label_type(ltstype,0,"action");
 	GBsetLTStype(m,ltstype);
 
-        ctx->rewriter_object = legacy_rewriter(model.data(),
+        ctx->rewriter_object = new legacy_rewriter(model.data(),
           mcrl2::data::used_data_equation_selector(model.data(), mcrl2::lps::specification_to_aterm(model)),
           mcrl2_rewriter);
-        ctx->rewriter = &ctx->rewriter_object.get_rewriter();
+        ctx->rewriter = &ctx->rewriter_object->get_rewriter();
 
-        ctx->enumerator_factory = mcrl2::data::enumerator_factory< mcrl2::data::classic_enumerator< > >(model.data(), ctx->rewriter_object);
+        ctx->enumerator_factory = new mcrl2::data::enumerator_factory< mcrl2::data::classic_enumerator< > >(model.data(), *(ctx->rewriter_object));
 
 	// Note the second argument that specifies that don't care variables are not treated specially
-	ctx->explorer = createNextState(model, ctx->enumerator_factory, false);
+	ctx->explorer = createNextState(model, *(ctx->enumerator_factory), false);
 	ctx->info=new group_information(model);
 	ctx->termmap=ATmapCreate(m,lts_type_add_type(ltstype,"leaf",NULL),ctx->rewriter,print_term,parse_term);
 	ctx->actionmap=ATmapCreate(m,lts_type_add_type(ltstype,"action",NULL),ctx->rewriter,print_label,NULL);
