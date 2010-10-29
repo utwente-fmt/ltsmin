@@ -1398,12 +1398,12 @@ forward_guided(sat_proc_t sat_proc, reach_proc_t reach_proc, vset_t visited,
 
     // Assumption: reach_proc does not return in case action is found
     Warning(info, "Searching for action using initial groups");
-    reach_proc(visited, NULL, &reach_groups, &eg_count, &next_count);
+    sat_proc(reach_proc, visited, &reach_groups, &eg_count, &next_count);
 
     for (int i = initial_count; i < total_count; i++) {
         Warning(info, "Extending action search with one group");
         bitvector_set(&reach_groups, group_order[i]);
-        reach_proc(visited, NULL, &reach_groups, &eg_count, &next_count);
+        sat_proc(reach_proc, visited, &reach_groups, &eg_count, &next_count);
     }
 
     if (etf_output != NULL) {
