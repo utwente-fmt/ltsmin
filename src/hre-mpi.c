@@ -1,10 +1,11 @@
 #include <config.h>
-#include <hre-main.h>
-#include <hre-internal.h>
+#include <limits.h>
 #include <stdlib.h>
 #include <string.h>
 #include <pthread.h>
 #include <mpi.h>
+#include <hre-main.h>
+#include <hre-internal.h>
 
 void HRErequireMPI(){
     hre_force_mpi=1;
@@ -71,9 +72,11 @@ void HREmpirun(int argc,char*argv[],const char *mpi_args){
 
 static hre_context_t HREctxMPI(MPI_Comm comm){
     int me,peers;
+    char label[PATH_MAX];
     MPI_Comm_size(comm, &peers);
     MPI_Comm_rank(comm, &me);
-    set_label("%s(%2d/%2d)",strdup(get_label()),me,peers);
+    strncpy(label, get_label(), sizeof(label));
+    set_label("%s(%2d/%2d)",label,me,peers);
     hre_context_t ctx=HREctxCreate(me,peers,sizeof(struct hre_context_s));
     ctx->comm=comm;
     HREsetCheckAny(ctx,mpi_check_any);
