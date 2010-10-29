@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
+#include <signal.h>
 
 #include "runtime.h"
 #include "treedbs-ll.h"
@@ -40,6 +41,7 @@ struct treedbs_ll_s {
     int                 k;
     size_t              size;
     size_t              threshold;
+    int                 full;
     uint32_t            mask;
 };
 
@@ -76,7 +78,7 @@ table_lookup (const treedbs_ll_t dbs, const node_u_t *data, int index, int *res,
         hash = mix (data->i.left, data->i.right, hash);
     uint32_t            WAIT = hash & WRITE_BIT_R;
     uint32_t            DONE = hash | WRITE_BIT;
-    for (size_t probes = 0; probes < dbs->threshold; probes++) {
+    for (size_t probes = 0; probes < dbs->threshold && !dbs->full; probes++) {
         uint32_t            idx = h & dbs->mask;
         size_t              line_end = (idx & CL_MASK) + CACHE_LINE_INT;
         for (size_t i = 0; i < CACHE_LINE_INT; i++) {
@@ -104,7 +106,12 @@ table_lookup (const treedbs_ll_t dbs, const node_u_t *data, int index, int *res,
         h = mix (data->i.left, data->i.right, h);
         stat->rehashes++;
     }
-    Fatal(1, error, "Tree database full");
+    if ( cas (&dbs->full, 0, 1) ) {
+        kill(0, SIGINT);
+        Warning(info, "ERROR: Hash table full (size: %zu nodes)", dbs->size);
+    }
+    *res = 0; //incorrect, does not matter anymore
+    return 1;
 }
 
 static inline node_u_t *
@@ -258,6 +265,7 @@ TreeDBSLLcreate_dm (int nNodes, int size, matrix_t * m)
     dbs->nbit_mask = -(1 << dbs->nbits);
     dbs->nNodes = nNodes;
     pthread_key_create(&dbs->local_key, LOCALfree);
+    dbs->full = 0;
     dbs->size = 1L << size;
     dbs->threshold = dbs->size / 50;
     dbs->mask = dbs->size - 1;

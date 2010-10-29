@@ -6,6 +6,7 @@
 #include <assert.h>
 #include <string.h>
 #include <time.h>
+#include <signal.h>
 
 #include <runtime.h>
 #include <dbs-ll.h>
@@ -27,6 +28,7 @@ struct dbs_ll_s {
     int                *data;
     uint32_t           *table;
     hash32_f            hash32;
+    int                 full;
     pthread_key_t       local_key;
 };
 
@@ -67,7 +69,7 @@ DBSLLlookup_hash (const dbs_ll_t dbs, const int *v, int *ret, uint32_t *hash)
         hash_memo = dbs->hash32 ((char *)v, b, ++seed);
     uint32_t            WAIT = hash_memo & WRITE_BIT_R;
     uint32_t            DONE = hash_memo | WRITE_BIT;
-    while (seed < dbs->threshold) {
+    while (seed < dbs->threshold && !dbs->full) {
         size_t              idx = hash_rehash & dbs->mask;
         size_t              line_end = (idx & CL_MASK) + CACHE_LINE_SIZE;
         for (size_t i = 0; i < CACHE_LINE_SIZE; i++) {
@@ -95,7 +97,12 @@ DBSLLlookup_hash (const dbs_ll_t dbs, const int *v, int *ret, uint32_t *hash)
         hash_rehash = dbs->hash32 ((char *)v, b, hash_rehash + (seed++));
         stat->rehashes++;
     }
-    Fatal(1, error, "Hash table full"); 
+    if ( cas (&dbs->full, 0, 1) ) {
+        kill(0, SIGINT);
+        Warning(info, "ERROR: Hash table full (size: %zu el)", dbs->size);
+    }
+    *ret = 0; //incorrect, but does not matter anymore
+    return 1;
 }
 
 int *
@@ -131,6 +138,7 @@ DBSLLcreate_sized (int length, int size, hash32_f hash32)
     dbs_ll_t            dbs = RTalign (CACHE_LINE_SIZE, sizeof (struct dbs_ll_s));
     dbs->length = length;
     dbs->hash32 = hash32;
+    dbs->full = 0;
     dbs->bytes = length * sizeof (int);
     dbs->size = 1 << size;
     dbs->threshold = dbs->size / 100;
