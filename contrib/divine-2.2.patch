@@ -1,0 +1,3609 @@
+From 893f4e2a562995fea02b5d9db8a0ec17b36e8787 Mon Sep 17 00:00:00 2001
+From: Elwin Pater <e.pater@student.utwente.nl>
+Date: Fri, 26 Feb 2010 18:03:54 +0100
+Subject: [PATCH] Added --analysis option
+
+---
+ tools/compile.h |   20 ++++++++++++++++++++
+ 1 files changed, 20 insertions(+), 0 deletions(-)
+
+diff --git a/tools/compile.h b/tools/compile.h
+index 8d6abc3..d02f298 100644
+--- a/tools/compile.h
++++ b/tools/compile.h
+@@ -5,9 +5,17 @@
+ #include "dvecompile.h"
+ 
+ struct Compile {
++    BoolOption *o_analysis;
+     Engine *cmd_compile;
+     commandline::StandardParserWithMandatoryCommand &opts;
+ 
++    void die_help( std::string bla )
++    {
++        opts.outputHelp( std::cerr );
++        die( bla );
++    }
++
++
+     void die( std::string bla ) __attribute__((noreturn))
+     {
+         std::cerr << bla << std::endl;
+@@ -34,7 +42,14 @@ struct Compile {
+     }
+ 
+     void main() {
++        if ( !opts.hasNext() )
++            die_help( "FATAL: No input file specified." );
+         std::string input = opts.next();
++
++        if ( o_analysis->boolValue() ) {
++            std::cout << "extra func!" << std::endl;
++        }
++
+         if ( access( input.c_str(), R_OK ) )
+             die( "FATAL: cannot open input file " + input + " for reading" );
+         if ( str::endsWith( input, ".dve" ) ) {
+@@ -50,6 +65,11 @@ struct Compile {
+         cmd_compile = _opts.addEngine( "compile",
+                                        "<input>",
+                                        "model compiler");
++        o_analysis = cmd_compile->add< BoolOption >(
++            "analysis", 'a', "analysis", "",
++            "analyse transitions, add extra functionalty" );
++
++
+     }
+ 
+ };
+-- 
+1.6.0.3.3.g214bef
+
+
+From 0e72dad15051199966508cc06b67e8c2a87dba51 Mon Sep 17 00:00:00 2001
+From: Elwin Pater <e.pater@student.utwente.nl>
+Date: Fri, 26 Feb 2010 21:30:25 +0100
+Subject: [PATCH] Added --ltsmin option instead of --analysis
+
+---
+ tools/CMakeLists.txt |    2 +-
+ tools/compile.h      |   41 ++++++++++++++++++++++++++++++-----------
+ 2 files changed, 31 insertions(+), 12 deletions(-)
+
+diff --git a/tools/CMakeLists.txt b/tools/CMakeLists.txt
+index 3ca2bd3..6575ad2 100644
+--- a/tools/CMakeLists.txt
++++ b/tools/CMakeLists.txt
+@@ -22,7 +22,7 @@ set( JARS "${CMAKE_SOURCE_DIR}/nips-compiler-jars/pml2s.jar"
+ set( PML_C "${CMAKE_CURRENT_BINARY_DIR}/divine.compile-pml" )
+ set( NIPS_ASM "${CMAKE_CURRENT_SOURCE_DIR}/compile-pml.pl" )
+ 
+-add_executable( divine divine.cpp dvecompile.cpp combine.h ${COMBINE_M4_H} )
++add_executable( divine divine.cpp dvecompile.cpp dveltsmincompile.cpp combine.h ${COMBINE_M4_H} )
+ add_executable( divine.simulate simulator.cpp )
+ 
+ if( WIN32 )
+diff --git a/tools/compile.h b/tools/compile.h
+index d02f298..3b62b12 100644
+--- a/tools/compile.h
++++ b/tools/compile.h
+@@ -2,10 +2,11 @@
+ 
+ #include <wibble/commandline/parser.h>
+ #include <wibble/string.h>
+-#include "dvecompile.h"
++//#include "dvecompile.h" // ehh, hmm, no ifndef in header .. included via dveltsmincompile.h
++#include "dveltsmincompile.h"
+ 
+ struct Compile {
+-    BoolOption *o_analysis;
++    BoolOption *o_ltsmin;
+     Engine *cmd_compile;
+     commandline::StandardParserWithMandatoryCommand &opts;
+ 
+@@ -41,19 +42,38 @@ struct Compile {
+ #endif
+     }
+ 
++    void compileDveLtsmin( std::string in ) {
++        dve_ltsmin_compiler compiler;
++        compiler.read( in.c_str() );
++        compiler.analyse();
++
++        std::string outfile = str::basename( in ) + ".c";
++        std::ofstream out( outfile.c_str() );
++        compiler.setOutput( out );
++        compiler.print_generator();
++
++        std::stringstream cmd;
++        cmd << "g++ -O2 -shared -fPIC -o " << str::basename( in ) + ".so" << " " << outfile;
++        int status = system( cmd.str().c_str() );
++#ifdef POSIX
++        if ( status != -1 && WEXITSTATUS( status ) != 0 )
++            die( "Error compiling intermediate C++ code." );
++#endif
++    }
++
+     void main() {
+         if ( !opts.hasNext() )
+             die_help( "FATAL: No input file specified." );
+         std::string input = opts.next();
+ 
+-        if ( o_analysis->boolValue() ) {
+-            std::cout << "extra func!" << std::endl;
+-        }
+-
+         if ( access( input.c_str(), R_OK ) )
+             die( "FATAL: cannot open input file " + input + " for reading" );
+         if ( str::endsWith( input, ".dve" ) ) {
+-            compileDve( input );
++            if ( o_ltsmin->boolValue() ) {
++                compileDveLtsmin( input );
++            } else {
++                compileDve( input );
++            }
+         } else {
+             std::cerr << "Do not know how to compile this file type." << std::endl;
+         }
+@@ -65,10 +85,9 @@ struct Compile {
+         cmd_compile = _opts.addEngine( "compile",
+                                        "<input>",
+                                        "model compiler");
+-        o_analysis = cmd_compile->add< BoolOption >(
+-            "analysis", 'a', "analysis", "",
+-            "analyse transitions, add extra functionalty" );
+-
++        o_ltsmin = cmd_compile->add< BoolOption >(
++            "ltsmin", 'l', "ltsmin", "",
++            "ltsmin interface" );
+ 
+     }
+ 
+-- 
+1.6.0.3.3.g214bef
+
+
+From 12b8091b860931f5f483801385debce7f56c7f0c Mon Sep 17 00:00:00 2001
+From: Elwin Pater <e.pater@student.utwente.nl>
+Date: Sat, 27 Feb 2010 22:09:49 +0100
+Subject: [PATCH] Added get_successors with callback function
+
+---
+ tools/CMakeLists.txt |    2 +-
+ tools/compile.h      |   34 +------
+ tools/dvecompile.cpp |  252 ++++++++++++++++++++++++++++++--------------------
+ tools/dvecompile.h   |    7 +-
+ 4 files changed, 163 insertions(+), 132 deletions(-)
+
+diff --git a/tools/CMakeLists.txt b/tools/CMakeLists.txt
+index 6575ad2..3ca2bd3 100644
+--- a/tools/CMakeLists.txt
++++ b/tools/CMakeLists.txt
+@@ -22,7 +22,7 @@ set( JARS "${CMAKE_SOURCE_DIR}/nips-compiler-jars/pml2s.jar"
+ set( PML_C "${CMAKE_CURRENT_BINARY_DIR}/divine.compile-pml" )
+ set( NIPS_ASM "${CMAKE_CURRENT_SOURCE_DIR}/compile-pml.pl" )
+ 
+-add_executable( divine divine.cpp dvecompile.cpp dveltsmincompile.cpp combine.h ${COMBINE_M4_H} )
++add_executable( divine divine.cpp dvecompile.cpp combine.h ${COMBINE_M4_H} )
+ add_executable( divine.simulate simulator.cpp )
+ 
+ if( WIN32 )
+diff --git a/tools/compile.h b/tools/compile.h
+index 3b62b12..81d5f3b 100644
+--- a/tools/compile.h
++++ b/tools/compile.h
+@@ -2,8 +2,7 @@
+ 
+ #include <wibble/commandline/parser.h>
+ #include <wibble/string.h>
+-//#include "dvecompile.h" // ehh, hmm, no ifndef in header .. included via dveltsmincompile.h
+-#include "dveltsmincompile.h"
++#include "dvecompile.h"
+ 
+ struct Compile {
+     BoolOption *o_ltsmin;
+@@ -23,8 +22,8 @@ struct Compile {
+         exit( 1 );
+     }
+ 
+-    void compileDve( std::string in ) {
+-        dve_compiler compiler;
++    void compileDve( std::string in, bool ltsmin ) {
++        dve_compiler compiler(ltsmin);
+         compiler.read( in.c_str() );
+         compiler.analyse();
+ 
+@@ -34,26 +33,7 @@ struct Compile {
+         compiler.print_generator();
+ 
+         std::stringstream cmd;
+-        cmd << "g++ -O2 -shared -fPIC -o " << str::basename( in ) + ".so" << " " << outfile;
+-        int status = system( cmd.str().c_str() );
+-#ifdef POSIX
+-        if ( status != -1 && WEXITSTATUS( status ) != 0 )
+-            die( "Error compiling intermediate C++ code." );
+-#endif
+-    }
+-
+-    void compileDveLtsmin( std::string in ) {
+-        dve_ltsmin_compiler compiler;
+-        compiler.read( in.c_str() );
+-        compiler.analyse();
+-
+-        std::string outfile = str::basename( in ) + ".c";
+-        std::ofstream out( outfile.c_str() );
+-        compiler.setOutput( out );
+-        compiler.print_generator();
+-
+-        std::stringstream cmd;
+-        cmd << "g++ -O2 -shared -fPIC -o " << str::basename( in ) + ".so" << " " << outfile;
++        cmd << "g++ -O2 -shared -fPIC -o " << str::basename( in ) + (ltsmin?".ltsmin":"") + ".so" << " " << outfile;
+         int status = system( cmd.str().c_str() );
+ #ifdef POSIX
+         if ( status != -1 && WEXITSTATUS( status ) != 0 )
+@@ -69,11 +49,7 @@ struct Compile {
+         if ( access( input.c_str(), R_OK ) )
+             die( "FATAL: cannot open input file " + input + " for reading" );
+         if ( str::endsWith( input, ".dve" ) ) {
+-            if ( o_ltsmin->boolValue() ) {
+-                compileDveLtsmin( input );
+-            } else {
+-                compileDve( input );
+-            }
++            compileDve( input, o_ltsmin->boolValue() );
+         } else {
+             std::cerr << "Do not know how to compile this file type." << std::endl;
+         }
+diff --git a/tools/dvecompile.cpp b/tools/dvecompile.cpp
+index 9c97ecf..1b8bd4f 100644
+--- a/tools/dvecompile.cpp
++++ b/tools/dvecompile.cpp
+@@ -146,16 +146,20 @@ void dve_compiler::gen_header()
+     line( "#define assert_neq(a,b) assert(a != b)" );
+     line( "#define assert_leq(a,b) assert(a <= b)" );
+     line( "#define assert_die() assert(false)" );
+-    line( "#define BLOB_NO_HASH" );
++    if (ltsmin) {
++        line();
++    } else {
++        line( "#define BLOB_NO_HASH" );
+ 
+-    line( divine::pool_h_str );
+-    line();
++        line( divine::pool_h_str );
++        line();
+ 
+-    line( divine::circular_h_str );
+-    line();
++        line( divine::circular_h_str );
++        line();
+ 
+-    line( divine::blob_h_str );
+-    line();
++        line( divine::blob_h_str );
++        line();
++    }
+ }
+ 
+ void dve_compiler::gen_state_struct()
+@@ -166,7 +170,7 @@ void dve_compiler::gen_state_struct()
+         if (var->is_const())
+         {
+             append( "const " );
+-            if ( var->is_byte() )
++            if ( !ltsmin && var->is_byte() )
+                 append( "byte_t " );
+             else
+                 append( "sshort_int_t " );
+@@ -208,20 +212,34 @@ void dve_compiler::gen_state_struct()
+                 name=get_symbol_table()->get_variable(state_creators[i].gid)->get_name();
+                 if (state_creators[i].array_size)
+                 {
+-                    if (state_creators[i].var_type==VAR_BYTE)
+-                        append( "byte_t " );
+-                    else if (state_creators[i].var_type==VAR_INT)
+-                        append( "sshort_int_t " );
+-                    else gerr << "Unexpected error" << thr();
++                    if (ltsmin) {
++                        if (state_creators[i].var_type==VAR_BYTE ||
++                            state_creators[i].var_type==VAR_INT)
++                            append( "sshort_int_t " );
++                        else gerr << "Unexpected error" << thr();
++                    } else {
++                        if (state_creators[i].var_type==VAR_BYTE)
++                            append( "byte_t " );
++                        else if (state_creators[i].var_type==VAR_INT)
++                            append( "sshort_int_t " );
++                        else gerr << "Unexpected error" << thr();
++                    }
+                     line( name + "[" + fmt( state_creators[i].array_size ) + "];" );
+                 }
+                 else
+                 {
+-                    if (state_creators[i].var_type==VAR_BYTE)
+-                        line( "byte_t " + name + ";" );
+-                    else if (state_creators[i].var_type==VAR_INT)
+-                        line( "sshort_int_t" + name + ";" );
+-                    else gerr << "Unexpected error" << thr();
++                    if (ltsmin) {
++                        if (state_creators[i].var_type==VAR_BYTE ||
++                            state_creators[i].var_type==VAR_INT)
++                            line( "sshort_int_t " + name + ";" );
++                        else gerr << "Unexpected error" << thr();
++                    } else {
++                        if (state_creators[i].var_type==VAR_BYTE)
++                            line( "byte_t " + name + ";" );
++                        else if (state_creators[i].var_type==VAR_INT)
++                            line( "sshort_int_t " + name + ";" ); // todo: report as divine bug, fogotten whitespace?
++                        else gerr << "Unexpected error" << thr();
++                    }
+                 }
+             }
+             break;
+@@ -257,11 +275,18 @@ void dve_compiler::gen_state_struct()
+                 size_int_t item_count = symbol->get_channel_type_list_size();
+ 
+                 for (size_int_t j=0; j<item_count; ++j)
+-                    if (symbol->get_channel_type_list_item(j)==VAR_BYTE)
+-                        line( "byte_t x" + fmt( j ) + ";" );
+-                    else if (symbol->get_channel_type_list_item(j)==VAR_INT)
+-                        line( "sshort_int_t x" + fmt( j ) + ";" );
+-                    else gerr << "Unexpected error" << thr();
++                    if (ltsmin) {
++                        if (symbol->get_channel_type_list_item(j)==VAR_BYTE || 
++                            symbol->get_channel_type_list_item(j)==VAR_INT)
++                            line( "sshort_int_t x" + fmt( j ) + ";" );
++                        else gerr << "Unexpected error" << thr();
++                    } else {
++                        if (symbol->get_channel_type_list_item(j)==VAR_BYTE)
++                            line( "byte_t x" + fmt( j ) + ";" );
++                        else if (symbol->get_channel_type_list_item(j)==VAR_INT)
++                            line( "sshort_int_t x" + fmt( j ) + ";" );
++                        else gerr << "Unexpected error" << thr();
++                    }
+                 block_end();
+                 line( "content[" + fmt( symbol->get_channel_buffer_size() ) + "];" );
+                 block_end();
+@@ -541,25 +566,34 @@ void dve_compiler::transition_effect( ext_transition_t *et, std::string in, std:
+ }
+ 
+ void dve_compiler::new_output_state() {
+-    if ( many ) {
+-        line( "divine::Blob blob_out( *pool, slack + state_size );" );
+-        line( "state_struct_t *out = (state_struct_t *)(blob_out.data() + slack);" );
+-        line( "blob_out.clear( 0, slack );" );
+-        line( "*out = *in;" );
++    if (ltsmin) {
++            line( "*out = *in;" );
++    } else {
++        if ( many ) {
++            line( "divine::Blob blob_out( *pool, slack + state_size );" );
++            line( "state_struct_t *out = (state_struct_t *)(blob_out.data() + slack);" );
++            line( "blob_out.clear( 0, slack );" );
++            line( "*out = *in;" );
++        }
+     }
+ }
+ 
+ void dve_compiler::yield_state() {
+-    if ( many ) {
+-        line( "if (buf_out->space() < 2) {" );
+-        line( "    buf_out->unadd( states_emitted );" );
+-        line( "    return;" );
+-        line( "}");
+-        line( "buf_out->add( (*buf_in)[ 0 ] );" );
+-        line( "buf_out->add( blob_out );" );
++    if (ltsmin) {
++        line( "callback(out, arg);" );
+         line( "++states_emitted;" );
+     } else {
+-        line( "return " + fmt( current_label ) + ";" );
++        if ( many ) {
++            line( "if (buf_out->space() < 2) {" );
++            line( "    buf_out->unadd( states_emitted );" );
++            line( "    return;" );
++            line( "}");
++            line( "buf_out->add( (*buf_in)[ 0 ] );" );
++            line( "buf_out->add( blob_out );" );
++            line( "++states_emitted;" );
++        } else {
++            line( "return " + fmt( current_label ) + ";" );
++        }
+     }
+ }
+ 
+@@ -646,7 +680,7 @@ void dve_compiler::gen_successors()
+                     block_begin();
+                     new_output_state();
+                     transition_effect( &*iter_ext_transition_vector, in, out );
+-                    line( "system_in_deadlock = false;" );
++                    if (!ltsmin) line( "system_in_deadlock = false;" );
+                     yield_state();
+                     block_end();
+                 }
+@@ -655,33 +689,36 @@ void dve_compiler::gen_successors()
+     }
+     block_end();
+ 
+-    new_label();
+-
+-    if_begin( true );
+-    if_clause( "system_in_deadlock" );
+-    if_end(); block_begin();
+-
+-    for(iter_property_transitions = property_transitions.begin();
+-        iter_property_transitions != property_transitions.end();
+-        iter_property_transitions++)
++    if (!ltsmin)
+     {
+         new_label();
+-        if_begin( false );
+-
+-        if_clause( in_state( (*iter_property_transitions)->get_process_gid(),
+-                             (*iter_property_transitions)->get_state1_lid(), in ) );
+-        if_cexpr_clause( (*iter_property_transitions)->get_guard(), in );
+ 
++        if_begin( true );
++        if_clause( "system_in_deadlock" );
+         if_end(); block_begin();
+-        new_output_state();
+ 
+-        assign( process_state( (*iter_property_transitions)->get_process_gid(), in ),
+-                fmt( (*iter_property_transitions)->get_state2_lid() ) );
++        for(iter_property_transitions = property_transitions.begin();
++            iter_property_transitions != property_transitions.end();
++            iter_property_transitions++)
++        {
++            new_label();
++            if_begin( false );
++
++            if_clause( in_state( (*iter_property_transitions)->get_process_gid(),
++                                 (*iter_property_transitions)->get_state1_lid(), in ) );
++            if_cexpr_clause( (*iter_property_transitions)->get_guard(), in );
++
++            if_end(); block_begin();
++            new_output_state();
++
++            assign( process_state( (*iter_property_transitions)->get_process_gid(), in ),
++                    fmt( (*iter_property_transitions)->get_state2_lid() ) );
+ 
+-        yield_state();
++            yield_state();
++            block_end();
++        }
+         block_end();
+     }
+-    block_end();
+ }
+ 
+ void dve_compiler::gen_is_accepting()
+@@ -726,56 +763,71 @@ void dve_compiler::print_generator()
+     line( "}" );
+     line();
+ 
+-    many = false;
+-    current_label = 0;
++    if (ltsmin) {
++        many = true;
+ 
+-    gen_is_accepting();
++        line( "extern \"C\" int get_successors( state_struct_t *in, void (*callback)(state_struct_t *out, void *arg), void *arg ) " );
++        block_begin();
++        line( "int states_emitted = 0;" );
++        line( "state_struct_t tmp;" );
++        line( "state_struct_t *out = &tmp;" );
+ 
+-    line( "extern \"C\" int get_successor( int next_state, char* from, char* to ) " );
+-    block_begin();
+-    line( "state_struct_t *in = (state_struct_t*)from;" );
+-    line( "state_struct_t *out = (state_struct_t*)to;" );
+-    line( "*out = *in;" );
+-    line( "bool system_in_deadlock = false;" );
+-    line( "goto switch_state;" );
++        gen_successors();
+ 
+-    gen_successors();
++        line( "return states_emitted;" );
++        block_end();
++    } else {
++        many = false;
++        current_label = 0;
+ 
+-    new_label();
+-    line( "return 0;" );
++        gen_is_accepting();
+ 
+-    line( "switch_state: switch( next_state )" );
+-    block_begin();
+-    for(int i=1; i < current_label; i++)
+-        if (i==1)
+-            line( "case " + fmt( i ) + ": system_in_deadlock = true; goto l" + fmt( i ) + ";" );
+-        else
+-            line( "case " + fmt( i ) + ": goto l" + fmt( i ) + ";" );
+-    block_end();
++        line( "extern \"C\" int get_successor( int next_state, char* from, char* to ) " );
++        block_begin();
++        line( "state_struct_t *in = (state_struct_t*)from;" );
++        line( "state_struct_t *out = (state_struct_t*)to;" );
++        line( "*out = *in;" );
++        line( "bool system_in_deadlock = false;" );
++        line( "goto switch_state;" );
+ 
+-    block_end();
++        gen_successors();
+ 
+-    many = true;
+-    current_label = 0;
++        new_label();
++        line( "return 0;" );
+ 
+-    line( "extern \"C\" void get_many_successors( int slack, char *_pool, char *," );
+-    line( "                                       char *_buf_in, char *_buf_out ) " );
+-    block_begin();
+-    line( "divine::Pool *pool = (divine::Pool *) _pool;" );
+-    line( "typedef divine::Circular< divine::Blob, 0 > Buffer;" );
+-    line( "Buffer *buf_in = (Buffer *) _buf_in;" );
+-    line( "Buffer *buf_out = (Buffer *) _buf_out;" );
+-    line( "int states_emitted;" );
+-    line( "bool system_in_deadlock;" );
+-    line( "state_struct_t *in;" );
+-
+-    line( "next:" );
+-    line( "system_in_deadlock = true;" );
+-    line( "states_emitted = 0;" );
+-    line( "in = (state_struct_t*) ((*buf_in)[ 0 ].data() + slack);" );
+-    gen_successors();
+-    line( "buf_in->drop( 1 );" );
+-    line( "if ( buf_in->empty() ) return;" );
+-    line( "goto next;" );
+-    block_end();
++        line( "switch_state: switch( next_state )" );
++        block_begin();
++        for(int i=1; i < current_label; i++)
++            if (i==1)
++                line( "case " + fmt( i ) + ": system_in_deadlock = true; goto l" + fmt( i ) + ";" );
++            else
++                line( "case " + fmt( i ) + ": goto l" + fmt( i ) + ";" );
++        block_end();
++
++        block_end();
++
++        many = true;
++        current_label = 0;
++
++        line( "extern \"C\" void get_many_successors( int slack, char *_pool, char *," );
++        line( "                                       char *_buf_in, char *_buf_out ) " );
++        block_begin();
++        line( "divine::Pool *pool = (divine::Pool *) _pool;" );
++        line( "typedef divine::Circular< divine::Blob, 0 > Buffer;" );
++        line( "Buffer *buf_in = (Buffer *) _buf_in;" );
++        line( "Buffer *buf_out = (Buffer *) _buf_out;" );
++        line( "int states_emitted;" );
++        line( "bool system_in_deadlock;" );
++        line( "state_struct_t *in;" );
++
++        line( "next:" );
++        line( "system_in_deadlock = true;" );
++        line( "states_emitted = 0;" );
++        line( "in = (state_struct_t*) ((*buf_in)[ 0 ].data() + slack);" );
++        gen_successors();
++        line( "buf_in->drop( 1 );" );
++        line( "if ( buf_in->empty() ) return;" );
++        line( "goto next;" );
++        block_end();
++    }
+ }
+diff --git a/tools/dvecompile.h b/tools/dvecompile.h
+index efe2d0c..a1b453b 100644
+--- a/tools/dvecompile.h
++++ b/tools/dvecompile.h
+@@ -15,10 +15,13 @@ struct ext_transition_t
+     dve_transition_t *first;
+     dve_transition_t *second; //only when first transition is synchronized;
+     dve_transition_t *property; // transition of property automaton
++    char* sv_read;              // mark variables in state vector as read
++    char* sv_write;             // mark variables in state vector as write
+ };
+ 
+ struct dve_compiler: public dve_explicit_system_t
+ {
++    bool ltsmin;
+     bool many;
+     int current_label;
+ 
+@@ -57,8 +60,8 @@ struct dve_compiler: public dve_explicit_system_t
+         outline();
+     }
+ 
+-    dve_compiler(error_vector_t & evect=gerr)
+-        : explicit_system_t(evect), dve_explicit_system_t(evect), current_label(0), m_indent( 0 )
++    dve_compiler(bool ltsmin, error_vector_t & evect=gerr)
++        : explicit_system_t(evect), dve_explicit_system_t(evect), current_label(0), m_indent( 0 ), ltsmin(ltsmin)
+     {}
+     virtual ~dve_compiler() {}
+ 
+-- 
+1.6.0.3.3.g214bef
+
+
+From 7f61eec4de77f7400ac4a5004f96341844d41579 Mon Sep 17 00:00:00 2001
+From: Elwin Pater <e.pater@student.utwente.nl>
+Date: Mon, 1 Mar 2010 15:00:32 +0100
+Subject: [PATCH] Working get_initial_state for ltsmin
+
+---
+ tools/dvecompile.cpp |  127 ++++++++++++++++++++++++++++++++++++++++++++------
+ tools/dvecompile.h   |    7 ++-
+ 2 files changed, 118 insertions(+), 16 deletions(-)
+
+diff --git a/tools/dvecompile.cpp b/tools/dvecompile.cpp
+index 1b8bd4f..7e6f92f 100644
+--- a/tools/dvecompile.cpp
++++ b/tools/dvecompile.cpp
+@@ -312,17 +312,99 @@ void dve_compiler::gen_state_struct()
+ 
+ void dve_compiler::gen_initial_state()
+ {
+-    setAllocator( new generator::Allocator );
+-    state_t initial_state =  dve_explicit_system_t::get_initial_state();
+-    append( "char initial_state[] = {" );
+-    for(int i = 0; i < initial_state.size; i++)
+-    {
+-        append( fmt( (unsigned int)(unsigned char)initial_state.ptr[i] ) );
+-        if(i != initial_state.size - 1)
+-            append( ", " );
++    if (!ltsmin) {
++        setAllocator( new generator::Allocator );
++        state_t initial_state =  dve_explicit_system_t::get_initial_state();
++        append( "char initial_state[] = {" );
++        for(int i = 0; i < initial_state.size; i++)
++        {
++            append( fmt( (unsigned int)(unsigned char)initial_state.ptr[i] ) );
++            if(i != initial_state.size - 1)
++                append( ", " );
++        }
++        line( "};" );
++        line();
++    } else {
++
++        char sep[2] = "";
++        char buf[10];
++        append( "state_struct_t initial_state = { " );
++        for (size_int_t i=0; i!=state_creators_count; ++i)
++        {
++            switch (state_creators[i].type)
++            {
++                case state_creator_t::VARIABLE:
++                {
++                    if (state_creators[i].array_size)
++                    {
++                         for(size_int_t j=0; j<state_creators[i].array_size; j++)
++                         {
++                            if (initial_values_counts[state_creators[i].gid]) {
++                                append(sep); sprintf(sep,",");
++                                sprintf(buf, "%d", initial_values[state_creators[i].gid].all_values[j]);
++                                append(buf);
++                            } else {
++                                append(sep); sprintf(sep,",");
++                                append("0");
++                            }
++                         }
++                    }
++                    else
++                    {
++                            if (initial_values_counts[state_creators[i].gid]) {
++                                append(sep); sprintf(sep,",");
++                                sprintf(buf, "%d", initial_values[state_creators[i].gid].all_value);
++                                append(buf);
++                            } else {
++                                append(sep); sprintf(sep,",");
++                                append("0");
++                            }
++                    }
++                }
++                break;
++                case state_creator_t::PROCESS_STATE:
++                {
++                    append(sep); sprintf(sep,",");
++                    sprintf(buf, "%d", initial_states[state_creators[i].gid]);
++                    append(buf);
++                }
++                break;
++                case state_creator_t::CHANNEL_BUFFER:
++                {
++                    append(sep); sprintf(sep,",");
++                    append( "cx"); // todo
++                }
++                break;
++                default: gerr << "Unexpected error" << thr();
++                    break;
++            };
++        }
++        line( " };" );
++        line();
+     }
+-    line( "};" );
+-    line();
++}
++
++void dve_compiler::output_dependency_comment( ext_transition_t &ext_transition )
++{
++    // only for ltsmin
++    if (!ltsmin)
++        return;
++ 
++    line(" // read: " );
++    line(" // write: " );
++}
++
++void dve_compiler::analyse_transition_dependencies( ext_transition_t &ext_transition )
++{
++    // only for ltsmin
++    if (!ltsmin)
++        return;
++    
++    // initialize read/write dependency vector
++    // analyse ext_transition->first
++    
++    // analyse ext_transition->second?
++    if (ext_transition.synchronized); // do something usefull
+ }
+ 
+ void dve_compiler::analyse_transition(
+@@ -338,6 +420,7 @@ void dve_compiler::analyse_transition(
+             ext_transition_t ext_transition;
+             ext_transition.synchronized = false;
+             ext_transition.first = transition;
++            analyse_transition_dependencies(ext_transition);
+             ext_transition_vector.push_back(ext_transition);
+         }
+         else
+@@ -352,6 +435,8 @@ void dve_compiler::analyse_transition(
+                 ext_transition.synchronized = false;
+                 ext_transition.first = transition;
+                 ext_transition.property = (*iter_property_transitions);
++                // ltsmin doesn't work with properties, but analyse anyway
++                analyse_transition_dependencies(ext_transition);
+                 ext_transition_vector.push_back(ext_transition);
+             }
+         }
+@@ -379,6 +464,7 @@ void dve_compiler::analyse_transition(
+                         ext_transition.synchronized = true;
+                         ext_transition.first = transition;
+                         ext_transition.second = (*iter_transition_vector);
++                        analyse_transition_dependencies(ext_transition);
+                         ext_transition_vector.push_back(ext_transition);
+                     }
+                     else
+@@ -394,6 +480,8 @@ void dve_compiler::analyse_transition(
+                             ext_transition.first = transition;
+                             ext_transition.second = (*iter_transition_vector);
+                             ext_transition.property = (*iter_property_transitions);
++                            // ltsmin does't work with properties, but analyse anyway
++                            analyse_transition_dependencies(ext_transition);
+                             ext_transition_vector.push_back(ext_transition);
+                         }
+                     }
+@@ -563,6 +651,9 @@ void dve_compiler::transition_effect( ext_transition_t *et, std::string in, std:
+     if(have_property) //change of the property process state
+         assign( process_state( et->property->get_process_gid(), out ),
+                 fmt( et->property->get_state2_lid() ) );
++
++    // show dependency information in the source
++    output_dependency_comment(*et);
+ }
+ 
+ void dve_compiler::new_output_state() {
+@@ -758,10 +849,18 @@ void dve_compiler::print_generator()
+     line( "}" );
+     line();
+ 
+-    line( "extern \"C\" void get_initial_state( char *to ) {" );
+-    line( "    memcpy(to, initial_state, state_size);" );
+-    line( "}" );
+-    line();
++    if (ltsmin)
++    {
++        line( "extern \"C\" void get_initial_state( char *to ) {" );
++        line( "    memcpy(to, (char*)&initial_state, state_size);" );
++        line( "}" );
++        line();
++    } else {
++        line( "extern \"C\" void get_initial_state( char *to ) {" );
++        line( "    memcpy(to, initial_state, state_size);" );
++        line( "}" );
++        line();
++    }
+ 
+     if (ltsmin) {
+         many = true;
+diff --git a/tools/dvecompile.h b/tools/dvecompile.h
+index a1b453b..6ccc5fd 100644
+--- a/tools/dvecompile.h
++++ b/tools/dvecompile.h
+@@ -15,8 +15,8 @@ struct ext_transition_t
+     dve_transition_t *first;
+     dve_transition_t *second; //only when first transition is synchronized;
+     dve_transition_t *property; // transition of property automaton
+-    char* sv_read;              // mark variables in state vector as read
+-    char* sv_write;             // mark variables in state vector as write
++    std::vector<int> sv_read;
++    std::vector<int> sv_write;
+ };
+ 
+ struct dve_compiler: public dve_explicit_system_t
+@@ -65,6 +65,9 @@ struct dve_compiler: public dve_explicit_system_t
+     {}
+     virtual ~dve_compiler() {}
+ 
++    void output_dependency_comment( ext_transition_t &ext_transition );
++    void mark_dependency ();
++    void analyse_transition_dependencies( ext_transition_t &ext_transition );
+     void analyse_transition( dve_transition_t * transition,
+                              vector<ext_transition_t> &ext_transition_vector );
+     void analyse();
+-- 
+1.6.0.3.3.g214bef
+
+
+From 717bf5ca41980d71689b304a4557e54f21359158 Mon Sep 17 00:00:00 2001
+From: Elwin Pater <e.pater@student.utwente.nl>
+Date: Mon, 1 Mar 2010 15:43:45 +0100
+Subject: [PATCH] Added mark_dependency function
+
+---
+ tools/dvecompile.cpp |   58 ++++++++++++++++++++++++++++++++++++++++++++++++++
+ tools/dvecompile.h   |    2 +-
+ 2 files changed, 59 insertions(+), 1 deletions(-)
+
+diff --git a/tools/dvecompile.cpp b/tools/dvecompile.cpp
+index 7e6f92f..a87513b 100644
+--- a/tools/dvecompile.cpp
++++ b/tools/dvecompile.cpp
+@@ -930,3 +930,61 @@ void dve_compiler::print_generator()
+         block_end();
+     }
+ }
++
++
++void dve_compiler::mark_dependency( size_int_t gid, int type, int idx, std::vector<int> &dep )
++{
++    size_int_t size = 0;
++    bool mark = false;
++    for (size_int_t i=0; i!=state_creators_count; ++i)
++    {
++        mark = state_creators[i].gid == gid && type == state_creators[i].type;
++        switch (state_creators[i].type)
++        {
++            case state_creator_t::VARIABLE:
++            {
++                if (state_creators[i].array_size)
++                {
++                     for(size_int_t j=0; j<state_creators[i].array_size; j++)
++                     {
++                        if (mark && (idx == -1 || idx == j)) dep[size]=1;
++                        size++;
++                     }
++                }
++                else
++                {
++                    if (mark) { dep[size]=1; }
++                    size++;
++                }
++            }
++            break;
++            case state_creator_t::PROCESS_STATE:
++            {
++                if (mark) { dep[size]=1; }
++                size++;
++            }
++            break;
++            case state_creator_t::CHANNEL_BUFFER:
++            {
++                // mark number of items
++                if (mark) dep[size]=1;
++                size++;
++
++                // mark channel
++                dve_symbol_t * symbol =
++                  get_symbol_table()->get_channel(state_creators[i].gid);
++                size_int_t item_count = symbol->get_channel_type_list_size();
++                size_int_t chan_size = symbol->get_channel_buffer_size();
++                for(size_int_t i=0; i < chan_size; ++i) {
++                    for (size_int_t j=0; j<item_count; ++j) {
++                        if (mark) dep[size]=1;
++                        size++;
++                    }
++                }
++            }
++            break;
++            default: gerr << "Unexpected error" << thr();
++                break;
++        };
++    }
++}
+diff --git a/tools/dvecompile.h b/tools/dvecompile.h
+index 6ccc5fd..ad88c09 100644
+--- a/tools/dvecompile.h
++++ b/tools/dvecompile.h
+@@ -66,7 +66,7 @@ struct dve_compiler: public dve_explicit_system_t
+     virtual ~dve_compiler() {}
+ 
+     void output_dependency_comment( ext_transition_t &ext_transition );
+-    void mark_dependency ();
++    void mark_dependency ( size_int_t gid, int type, int idx, std::vector<int> &dep);
+     void analyse_transition_dependencies( ext_transition_t &ext_transition );
+     void analyse_transition( dve_transition_t * transition,
+                              vector<ext_transition_t> &ext_transition_vector );
+-- 
+1.6.0.3.3.g214bef
+
+
+From 25ec8d3af59a676a4789af6f25307b5c7a436770 Mon Sep 17 00:00:00 2001
+From: Elwin Pater <e.pater@student.utwente.nl>
+Date: Mon, 1 Mar 2010 15:53:45 +0100
+Subject: [PATCH] Added state variables count
+
+---
+ tools/dvecompile.cpp |   28 ++++++++++++++++++++++++++++
+ tools/dvecompile.h   |    1 +
+ 2 files changed, 29 insertions(+), 0 deletions(-)
+
+diff --git a/tools/dvecompile.cpp b/tools/dvecompile.cpp
+index a87513b..986a91d 100644
+--- a/tools/dvecompile.cpp
++++ b/tools/dvecompile.cpp
+@@ -988,3 +988,31 @@ void dve_compiler::mark_dependency( size_int_t gid, int type, int idx, std::vect
+         };
+     }
+ }
++
++int dve_compiler::count_state_variables()
++{
++    size_int_t size = 0;
++    for (size_int_t i=0; i!=state_creators_count; ++i)
++    {
++        switch (state_creators[i].type)
++        {
++            case state_creator_t::VARIABLE:
++                size += (state_creators[i].array_size)?state_creators[i].array_size:1;
++            break;
++            case state_creator_t::PROCESS_STATE:
++                size++;
++            break;
++            case state_creator_t::CHANNEL_BUFFER:
++                dve_symbol_t * symbol =
++                  get_symbol_table()->get_channel(state_creators[i].gid);
++                size_int_t item_count = symbol->get_channel_type_list_size();
++                size_int_t chan_size = symbol->get_channel_buffer_size();
++                size += (chan_size * item_count) + 1;
++            }
++            break;
++            default: gerr << "Unexpected error" << thr();
++                break;
++        };
++    }
++    return size;
++}
+diff --git a/tools/dvecompile.h b/tools/dvecompile.h
+index ad88c09..34cc7ff 100644
+--- a/tools/dvecompile.h
++++ b/tools/dvecompile.h
+@@ -65,6 +65,7 @@ struct dve_compiler: public dve_explicit_system_t
+     {}
+     virtual ~dve_compiler() {}
+ 
++    int  count_state_variables();
+     void output_dependency_comment( ext_transition_t &ext_transition );
+     void mark_dependency ( size_int_t gid, int type, int idx, std::vector<int> &dep);
+     void analyse_transition_dependencies( ext_transition_t &ext_transition );
+-- 
+1.6.0.3.3.g214bef
+
+
+From 4445ddefa137d63e47e869801bf588c6737b16b1 Mon Sep 17 00:00:00 2001
+From: Elwin Pater <e.pater@student.utwente.nl>
+Date: Mon, 1 Mar 2010 16:21:02 +0100
+Subject: [PATCH] Added dependency output comments
+
+---
+ tools/dvecompile.cpp |   41 ++++++++++++++++++++++++++++++++++++-----
+ 1 files changed, 36 insertions(+), 5 deletions(-)
+
+diff --git a/tools/dvecompile.cpp b/tools/dvecompile.cpp
+index 986a91d..600dabe 100644
+--- a/tools/dvecompile.cpp
++++ b/tools/dvecompile.cpp
+@@ -389,9 +389,25 @@ void dve_compiler::output_dependency_comment( ext_transition_t &ext_transition )
+     // only for ltsmin
+     if (!ltsmin)
+         return;
++
++    int count = count_state_variables();
++    char buf[1024];
++
++    append("// read : " );
++    for(size_int_t i = 0; i < count; i++)
++    {
++        sprintf(buf, "%s%d", ((i==0)?"":","), ext_transition.sv_read[i]);
++        append(buf);
++    }
++    line();
+  
+-    line(" // read: " );
+-    line(" // write: " );
++    append("// write: " );
++    for(size_int_t i = 0; i < count; i++)
++    {
++        sprintf(buf, "%s%d", ((i==0)?"":","), ext_transition.sv_write[i]);
++        append(buf);
++    }
++    line();
+ }
+ 
+ void dve_compiler::analyse_transition_dependencies( ext_transition_t &ext_transition )
+@@ -401,6 +417,10 @@ void dve_compiler::analyse_transition_dependencies( ext_transition_t &ext_transi
+         return;
+     
+     // initialize read/write dependency vector
++    int count = count_state_variables();
++    ext_transition.sv_read.resize(count);
++    ext_transition.sv_write.resize(count);
++
+     // analyse ext_transition->first
+     
+     // analyse ext_transition->second?
+@@ -863,6 +883,7 @@ void dve_compiler::print_generator()
+     }
+ 
+     if (ltsmin) {
++        char buf[1024];
+         many = true;
+ 
+         line( "extern \"C\" int get_successors( state_struct_t *in, void (*callback)(state_struct_t *out, void *arg), void *arg ) " );
+@@ -875,6 +896,15 @@ void dve_compiler::print_generator()
+ 
+         line( "return states_emitted;" );
+         block_end();
++
++        // state descriptors
++        line();
++        line( "extern \"C\" int state_variable_count() " );
++        block_begin();
++        sprintf(buf, "return %d;", count_state_variables());
++        line(buf);
++        block_end();
++
+     } else {
+         many = false;
+         current_label = 0;
+@@ -998,18 +1028,19 @@ int dve_compiler::count_state_variables()
+         {
+             case state_creator_t::VARIABLE:
+                 size += (state_creators[i].array_size)?state_creators[i].array_size:1;
+-            break;
++                break;
+             case state_creator_t::PROCESS_STATE:
+                 size++;
+-            break;
++                break;
+             case state_creator_t::CHANNEL_BUFFER:
++            {
+                 dve_symbol_t * symbol =
+                   get_symbol_table()->get_channel(state_creators[i].gid);
+                 size_int_t item_count = symbol->get_channel_type_list_size();
+                 size_int_t chan_size = symbol->get_channel_buffer_size();
+                 size += (chan_size * item_count) + 1;
++                break;
+             }
+-            break;
+             default: gerr << "Unexpected error" << thr();
+                 break;
+         };
+-- 
+1.6.0.3.3.g214bef
+
+
+From 75bf1c67ecbb86344e2be8edd8924d83644eda6b Mon Sep 17 00:00:00 2001
+From: Elwin Pater <e.pater@student.utwente.nl>
+Date: Tue, 2 Mar 2010 11:30:44 +0100
+Subject: [PATCH] Analyse expressions, mark in state vector
+
+    * Fixed channel initialization
+    * Added transition effect read/write mark
+    * Added transition guard read/write mark
+    * Todo: mark channels read/write
+---
+ tools/dvecompile.cpp |  219 +++++++++++++++++++++++++++++++++++++++++++++-----
+ tools/dvecompile.h   |    1 +
+ 2 files changed, 199 insertions(+), 21 deletions(-)
+
+diff --git a/tools/dvecompile.cpp b/tools/dvecompile.cpp
+index 600dabe..7be6e0b 100644
+--- a/tools/dvecompile.cpp
++++ b/tools/dvecompile.cpp
+@@ -339,26 +339,18 @@ void dve_compiler::gen_initial_state()
+                     {
+                          for(size_int_t j=0; j<state_creators[i].array_size; j++)
+                          {
+-                            if (initial_values_counts[state_creators[i].gid]) {
+-                                append(sep); sprintf(sep,",");
+-                                sprintf(buf, "%d", initial_values[state_creators[i].gid].all_values[j]);
+-                                append(buf);
+-                            } else {
+-                                append(sep); sprintf(sep,",");
+-                                append("0");
+-                            }
++                            append(sep); sprintf(sep,",");
++                            sprintf(buf, "%d", (initial_values_counts[state_creators[i].gid]?
++                                                initial_values[state_creators[i].gid].all_values[j]:0));
++                            append(buf);
+                          }
+                     }
+                     else
+                     {
+-                            if (initial_values_counts[state_creators[i].gid]) {
+-                                append(sep); sprintf(sep,",");
+-                                sprintf(buf, "%d", initial_values[state_creators[i].gid].all_value);
+-                                append(buf);
+-                            } else {
+-                                append(sep); sprintf(sep,",");
+-                                append("0");
+-                            }
++                            append(sep); sprintf(sep,",");
++                            sprintf(buf, "%d", (initial_values_counts[state_creators[i].gid]?
++                                                initial_values[state_creators[i].gid].all_value:0));
++                            append(buf);
+                     }
+                 }
+                 break;
+@@ -371,8 +363,20 @@ void dve_compiler::gen_initial_state()
+                 break;
+                 case state_creator_t::CHANNEL_BUFFER:
+                 {
++                    // initialize channel to 0
+                     append(sep); sprintf(sep,",");
+-                    append( "cx"); // todo
++                    append("0"); // number_of_items 
++
++                    dve_symbol_t * symbol =
++                        get_symbol_table()->get_channel(state_creators[i].gid);
++                    size_int_t item_count = symbol->get_channel_type_list_size();
++                    size_int_t chan_size = symbol->get_channel_buffer_size();
++                    for(size_int_t i=0; i < chan_size; ++i) {
++                        for (size_int_t j=0; j<item_count; ++j) {
++                            append(sep);
++                            append("0");
++                        }
++                    }
+                 }
+                 break;
+                 default: gerr << "Unexpected error" << thr();
+@@ -400,7 +404,7 @@ void dve_compiler::output_dependency_comment( ext_transition_t &ext_transition )
+         append(buf);
+     }
+     line();
+- 
++
+     append("// write: " );
+     for(size_int_t i = 0; i < count; i++)
+     {
+@@ -410,21 +414,194 @@ void dve_compiler::output_dependency_comment( ext_transition_t &ext_transition )
+     line();
+ }
+ 
++void dve_compiler::analyse_expression( dve_expression_t & expr, ext_transition_t &ext_transition, std::vector<int> &dep)
++{
++    dve_symbol_table_t * parent_table = expr.get_symbol_table();
++    if (!parent_table) gerr << "Writing expression: Symbol table not set" << thr();
++    switch (expr.get_operator())
++    {
++        case T_ID:
++            //if (!(parent_table->get_variable(expr.get_ident_gid())->is_const())) // should this be here?
++            mark_dependency(expr.get_ident_gid(), state_creator_t::VARIABLE, -1, dep);
++            break;
++        case T_FOREIGN_ID:
++            mark_dependency(expr.get_ident_gid(), state_creator_t::VARIABLE, -1, dep);
++            break;
++        case T_NAT:
++            break;
++        case T_PARENTHESIS:
++            analyse_expression(*expr.left(), ext_transition, dep);
++            break;
++        case T_SQUARE_BRACKETS:
++            if ((*expr.left()).get_operator() == T_NAT)
++            {
++                mark_dependency(expr.get_ident_gid(), state_creator_t::VARIABLE, (*expr.left()).get_value(), dep);
++            } else {
++                // some expression, mark all & continue analysis
++                mark_dependency(expr.get_ident_gid(), state_creator_t::VARIABLE, -1, dep);
++                analyse_expression(*expr.left(), ext_transition, dep);
++            }
++            break;
++        case T_FOREIGN_SQUARE_BRACKETS:
++            // todo
++            /*
++            ostr << parent_table->get_process(parent_table->get_variable(expr.get_ident_gid())->
++                                              get_process_gid())->get_name(); //name of preocess
++            ostr<<"->";
++            ostr << parent_table->get_variable(expr.get_ident_gid())->get_name();
++            ostr<<"["; write_C(*expr.left(), ostr, state_name); ostr<<"]";
++            */
++            break;
++
++        case T_LT: case T_LEQ: case T_EQ: case T_NEQ: case T_GT: case T_GEQ:
++        case T_PLUS: case T_MINUS: case T_MULT: case T_DIV: case T_MOD:
++        case T_AND: case T_OR: case T_XOR: case T_LSHIFT: case T_RSHIFT:
++        case T_BOOL_AND: case T_BOOL_OR:
++            analyse_expression( *expr.left(), ext_transition, ext_transition.sv_read );
++            analyse_expression( *expr.right(), ext_transition, ext_transition.sv_read );
++            break;
++        case T_ASSIGNMENT:
++            analyse_expression( *expr.left(), ext_transition, ext_transition.sv_write );
++            analyse_expression( *expr.right(), ext_transition, ext_transition.sv_read );
++            break;
++
++        case T_DOT:
++            // dot addes an explicit == (see code), thus must be read
++            mark_dependency(parent_table->get_state(expr.get_ident_gid())->get_process_gid(),
++                            state_creator_t::PROCESS_STATE, -1, ext_transition.sv_read);
++        /* todo: fix this, mark lid??
++            ostr<<state_name<<".";
++            ostr<<parent_table->get_process(parent_table->get_state(expr.get_ident_gid())->
++                                            get_process_gid())->get_name(); ostr<<".state"<<" == ";
++            ostr<<parent_table->get_state(expr.get_ident_gid())->get_lid();
++        */
++            break;
++
++        case T_IMPLY:
++            analyse_expression( *expr.left(), ext_transition, dep );
++            analyse_expression( *expr.right(), ext_transition, dep );
++            break;
++        case T_UNARY_MINUS:
++            analyse_expression( *expr.right(), ext_transition, dep);
++            break;
++        case T_TILDE:
++            analyse_expression( *expr.right(), ext_transition, dep );
++            break;
++        case T_BOOL_NOT:
++            analyse_expression( *expr.right(), ext_transition, dep );
++            break;
++        default:
++            gerr << "Problem in expression - unknown operator"
++                 << " number " << expr.get_operator() << psh();
++    }
++}
++
+ void dve_compiler::analyse_transition_dependencies( ext_transition_t &ext_transition )
+ {
+     // only for ltsmin
+     if (!ltsmin)
+         return;
+-    
++
+     // initialize read/write dependency vector
+     int count = count_state_variables();
+     ext_transition.sv_read.resize(count);
+     ext_transition.sv_write.resize(count);
+ 
++    // guard
++
++    // mark process as read
++    mark_dependency(ext_transition.first->get_process_gid(),
++                    state_creator_t::PROCESS_STATE, -1, ext_transition.sv_read);
++
++    if (ext_transition.first->get_guard())
++    analyse_expression( *(ext_transition.first->get_guard()), ext_transition,
++                        ext_transition.sv_read);
++
++    if (ext_transition.synchronized)
++    {
++        // mark process as read
++        mark_dependency(ext_transition.first->get_process_gid(),
++                        state_creator_t::PROCESS_STATE, -1, ext_transition.sv_read);
++
++        // analyse ext_transition->second->get_guard
++        if (ext_transition.first->get_guard())
++            analyse_expression( *(ext_transition.second->get_guard()), ext_transition,
++            ext_transition.sv_read);
++    }
++
++    if (have_property) // doesn't work for ltsmin, but mark anyway
++    {
++        // mark process as read/write?
++        mark_dependency(ext_transition.property->get_process_gid(),
++                        state_creator_t::PROCESS_STATE, -1, ext_transition.sv_write);
++
++        // analyse ext_transition->property->get_guard
++        if (ext_transition.property->get_guard())
++            analyse_expression( *(ext_transition.property->get_guard()), ext_transition,
++            ext_transition.sv_read);
++    }
++
++    /*
++    if_begin( false );
++    if_cexpr_clause( et->first->get_guard(), in );
++
++    if( et->synchronized )
++    {
++        if_clause( in_state( et->second->get_process_gid(),
++                             et->second->get_state1_lid(), in ) );
++        if_cexpr_clause( et->second->get_guard(), in );
++    }
++    else
++    {
++        int chan = et->first->get_channel_gid();
++        if(et->first->get_sync_mode() == SYNC_EXCLAIM_BUFFER)
++            if_clause( relate( channel_items( chan, in ), "!=",
++                               fmt( channel_capacity( chan ) ) ) );
++
++        if(et->first->get_sync_mode() == SYNC_ASK_BUFFER)
++            if_clause( relate( channel_items( chan, in ), "!=", "0" ) );
++    }
++    if(have_property)
++    {
++        if_clause( in_state( et->property->get_process_gid(),
++                             et->property->get_state1_lid(), in ) );
++        if_cexpr_clause( et->property->get_guard(), in );
++    }
++
++    if_end();
++    */
++
++    // effect
++    // todo: synchronized & channel effects...
++
++    // mark process as read (write is probably in transition effect)
++    mark_dependency(ext_transition.first->get_process_gid(),
++                    state_creator_t::PROCESS_STATE, -1, ext_transition.sv_write);
++
+     // analyse ext_transition->first
+-    
++    for(size_int_t e = 0;e < ext_transition.first->get_effect_count();e++)
++        analyse_expression( *(ext_transition.first->get_effect(e)), ext_transition,
++        ext_transition.sv_read);
++
+     // analyse ext_transition->second?
+-    if (ext_transition.synchronized); // do something usefull
++    if (ext_transition.synchronized)
++    {
++        // mark process as read (write is probably in transition effect)
++        mark_dependency(ext_transition.first->get_process_gid(),
++                        state_creator_t::PROCESS_STATE, -1, ext_transition.sv_write);
++
++        // analyse ext_transition->second
++        for(size_int_t e = 0;e < ext_transition.second->get_effect_count();e++)
++            analyse_expression( *(ext_transition.second->get_effect(e)), ext_transition,
++            ext_transition.sv_read);
++    }
++
++    if (have_property) // doesn't work for ltsmin, but mark anyway
++    {
++        // mark process as read/write?
++        mark_dependency(ext_transition.property->get_process_gid(),
++                        state_creator_t::PROCESS_STATE, -1, ext_transition.sv_write);
++    }
+ }
+ 
+ void dve_compiler::analyse_transition(
+diff --git a/tools/dvecompile.h b/tools/dvecompile.h
+index 34cc7ff..fc4be40 100644
+--- a/tools/dvecompile.h
++++ b/tools/dvecompile.h
+@@ -66,6 +66,7 @@ struct dve_compiler: public dve_explicit_system_t
+     virtual ~dve_compiler() {}
+ 
+     int  count_state_variables();
++    void analyse_expression( dve_expression_t & expr, ext_transition_t &ext_transition, std::vector<int> &dep );
+     void output_dependency_comment( ext_transition_t &ext_transition );
+     void mark_dependency ( size_int_t gid, int type, int idx, std::vector<int> &dep);
+     void analyse_transition_dependencies( ext_transition_t &ext_transition );
+-- 
+1.6.0.3.3.g214bef
+
+
+From 4ec872544c98d3c2618cce34cdca7278098e4423 Mon Sep 17 00:00:00 2001
+From: Elwin Pater <e.pater@student.utwente.nl>
+Date: Tue, 2 Mar 2010 11:59:21 +0100
+Subject: [PATCH] Added modifications for channels (read/write)
+
+    * Untested
+---
+ tools/dvecompile.cpp |   76 +++++++++++++++++++++++++++++++-------------------
+ 1 files changed, 47 insertions(+), 29 deletions(-)
+
+diff --git a/tools/dvecompile.cpp b/tools/dvecompile.cpp
+index 7be6e0b..1663d93 100644
+--- a/tools/dvecompile.cpp
++++ b/tools/dvecompile.cpp
+@@ -527,6 +527,13 @@ void dve_compiler::analyse_transition_dependencies( ext_transition_t &ext_transi
+         if (ext_transition.first->get_guard())
+             analyse_expression( *(ext_transition.second->get_guard()), ext_transition,
+             ext_transition.sv_read);
++    } else {
++        int sm = ext_transition.first->get_sync_mode();
++        if (sm == SYNC_EXCLAIM_BUFFER || sm == SYNC_ASK_BUFFER)
++        {
++            mark_dependency(ext_transition.first->get_channel_gid(),
++                            state_creator_t::CHANNEL_BUFFER, -1, ext_transition.sv_read);
++        }
+     }
+ 
+     if (have_property) // doesn't work for ltsmin, but mark anyway
+@@ -541,38 +548,49 @@ void dve_compiler::analyse_transition_dependencies( ext_transition_t &ext_transi
+             ext_transition.sv_read);
+     }
+ 
+-    /*
+-    if_begin( false );
+-    if_cexpr_clause( et->first->get_guard(), in );
+-
+-    if( et->synchronized )
+-    {
+-        if_clause( in_state( et->second->get_process_gid(),
+-                             et->second->get_state1_lid(), in ) );
+-        if_cexpr_clause( et->second->get_guard(), in );
+-    }
+-    else
+-    {
+-        int chan = et->first->get_channel_gid();
+-        if(et->first->get_sync_mode() == SYNC_EXCLAIM_BUFFER)
+-            if_clause( relate( channel_items( chan, in ), "!=",
+-                               fmt( channel_capacity( chan ) ) ) );
+-
+-        if(et->first->get_sync_mode() == SYNC_ASK_BUFFER)
+-            if_clause( relate( channel_items( chan, in ), "!=", "0" ) );
+-    }
+-    if(have_property)
++    // effect
++    // todo: synchronized & channel effects...
++    if (ext_transition.synchronized)
+     {
+-        if_clause( in_state( et->property->get_process_gid(),
+-                             et->property->get_state1_lid(), in ) );
+-        if_cexpr_clause( et->property->get_guard(), in );
+-    }
++        for(size_int_t s = 0;s < ext_transition.first->get_sync_expr_list_size();s++)
++        {
++            // todo: test  :)
++            analyse_expression( *(ext_transition.first->get_sync_expr_list_item(s)), ext_transition,
++                                ext_transition.sv_write);
++            analyse_expression( *(ext_transition.second->get_sync_expr_list_item(s)), ext_transition,
++                                ext_transition.sv_read);
++        }
++    } else {
++        int sm = ext_transition.first->get_sync_mode();
++        if (sm == SYNC_EXCLAIM_BUFFER)
++        {
++            // mark entire channel
++            mark_dependency(ext_transition.first->get_channel_gid(),
++                            state_creator_t::CHANNEL_BUFFER, -1, ext_transition.sv_write);
++            // mark sync expressions
++            for(size_int_t s = 0;s < ext_transition.first->get_sync_expr_list_size();s++)
++            {
++                analyse_expression( *(ext_transition.first->get_sync_expr_list_item(s)), ext_transition,
++                                    ext_transition.sv_read);
++            }
++        }
++        if (sm == SYNC_ASK_BUFFER)
++        {
++            // mark entire channel
++            mark_dependency(ext_transition.first->get_channel_gid(),
++                            state_creator_t::CHANNEL_BUFFER, -1, ext_transition.sv_read);
++            mark_dependency(ext_transition.first->get_channel_gid(),
++                            state_creator_t::CHANNEL_BUFFER, -1, ext_transition.sv_write);
++            // mark sync expressions
++            for(size_int_t s = 0;s < ext_transition.first->get_sync_expr_list_size();s++)
++            {
++                analyse_expression( *(ext_transition.first->get_sync_expr_list_item(s)), ext_transition,
++                                    ext_transition.sv_write);
++            }
+ 
+-    if_end();
+-    */
++        }
+ 
+-    // effect
+-    // todo: synchronized & channel effects...
++    }
+ 
+     // mark process as read (write is probably in transition effect)
+     mark_dependency(ext_transition.first->get_process_gid(),
+-- 
+1.6.0.3.3.g214bef
+
+
+From 3ca771024b15a2bfbf9abcb147efb1b5ddd0acc9 Mon Sep 17 00:00:00 2001
+From: Elwin Pater <e.pater@student.utwente.nl>
+Date: Tue, 2 Mar 2010 18:19:48 +0100
+Subject: [PATCH] Added transition read/write dependency output
+
+---
+ tools/dvecompile.cpp |  155 ++++++++++++++++++++++++++++++++++++++------------
+ tools/dvecompile.h   |    2 +
+ 2 files changed, 121 insertions(+), 36 deletions(-)
+
+diff --git a/tools/dvecompile.cpp b/tools/dvecompile.cpp
+index 1663d93..b7334b7 100644
+--- a/tools/dvecompile.cpp
++++ b/tools/dvecompile.cpp
+@@ -432,6 +432,7 @@ void dve_compiler::analyse_expression( dve_expression_t & expr, ext_transition_t
+         case T_PARENTHESIS:
+             analyse_expression(*expr.left(), ext_transition, dep);
+             break;
++        case T_FOREIGN_SQUARE_BRACKETS:
+         case T_SQUARE_BRACKETS:
+             if ((*expr.left()).get_operator() == T_NAT)
+             {
+@@ -442,17 +443,6 @@ void dve_compiler::analyse_expression( dve_expression_t & expr, ext_transition_t
+                 analyse_expression(*expr.left(), ext_transition, dep);
+             }
+             break;
+-        case T_FOREIGN_SQUARE_BRACKETS:
+-            // todo
+-            /*
+-            ostr << parent_table->get_process(parent_table->get_variable(expr.get_ident_gid())->
+-                                              get_process_gid())->get_name(); //name of preocess
+-            ostr<<"->";
+-            ostr << parent_table->get_variable(expr.get_ident_gid())->get_name();
+-            ostr<<"["; write_C(*expr.left(), ostr, state_name); ostr<<"]";
+-            */
+-            break;
+-
+         case T_LT: case T_LEQ: case T_EQ: case T_NEQ: case T_GT: case T_GEQ:
+         case T_PLUS: case T_MINUS: case T_MULT: case T_DIV: case T_MOD:
+         case T_AND: case T_OR: case T_XOR: case T_LSHIFT: case T_RSHIFT:
+@@ -464,19 +454,11 @@ void dve_compiler::analyse_expression( dve_expression_t & expr, ext_transition_t
+             analyse_expression( *expr.left(), ext_transition, ext_transition.sv_write );
+             analyse_expression( *expr.right(), ext_transition, ext_transition.sv_read );
+             break;
+-
+         case T_DOT:
+             // dot addes an explicit == (see code), thus must be read
+             mark_dependency(parent_table->get_state(expr.get_ident_gid())->get_process_gid(),
+                             state_creator_t::PROCESS_STATE, -1, ext_transition.sv_read);
+-        /* todo: fix this, mark lid??
+-            ostr<<state_name<<".";
+-            ostr<<parent_table->get_process(parent_table->get_state(expr.get_ident_gid())->
+-                                            get_process_gid())->get_name(); ostr<<".state"<<" == ";
+-            ostr<<parent_table->get_state(expr.get_ident_gid())->get_lid();
+-        */
+             break;
+-
+         case T_IMPLY:
+             analyse_expression( *expr.left(), ext_transition, dep );
+             analyse_expression( *expr.right(), ext_transition, dep );
+@@ -1064,43 +1046,54 @@ void dve_compiler::print_generator()
+     line( "}" );
+     line();
+ 
+-    if (ltsmin)
+-    {
++    if (ltsmin) {
+         line( "extern \"C\" void get_initial_state( char *to ) {" );
+         line( "    memcpy(to, (char*)&initial_state, state_size);" );
+         line( "}" );
+         line();
+-    } else {
+-        line( "extern \"C\" void get_initial_state( char *to ) {" );
+-        line( "    memcpy(to, initial_state, state_size);" );
+-        line( "}" );
++
++        many = false;
++        current_label = 0;
++        line( "extern \"C\" int get_successor( state_struct_t *in, int t, void (*callback)(state_struct_t *out, void *arg), void *arg ) " );
++        block_begin();
++        line( "int states_emitted = 0;" );
++        line( "state_struct_t tmp;" );
++        line( "state_struct_t *out = &tmp;" );
++        line( "goto switch_state;" );
++        //gen_successors();
++        // switch block
++        line( "switch_state: switch( t )" );
++        block_begin();
++        for(int i=1; i < current_label; i++)
++                line( "case " + fmt( i ) + ": goto l" + fmt( i ) + ";" );
++        block_end();
++        line("return 0;");
++        // end switch block
++        block_end();
+         line();
+-    }
+ 
+-    if (ltsmin) {
+-        char buf[1024];
+         many = true;
++        current_label = 0;
+ 
+         line( "extern \"C\" int get_successors( state_struct_t *in, void (*callback)(state_struct_t *out, void *arg), void *arg ) " );
+         block_begin();
+         line( "int states_emitted = 0;" );
+         line( "state_struct_t tmp;" );
+         line( "state_struct_t *out = &tmp;" );
+-
+         gen_successors();
+-
+         line( "return states_emitted;" );
+         block_end();
++        line();
+ 
+         // state descriptors
++        gen_state_info();
++        gen_transition_info();
++    } else {
++        line( "extern \"C\" void get_initial_state( char *to ) {" );
++        line( "    memcpy(to, initial_state, state_size);" );
++        line( "}" );
+         line();
+-        line( "extern \"C\" int state_variable_count() " );
+-        block_begin();
+-        sprintf(buf, "return %d;", count_state_variables());
+-        line(buf);
+-        block_end();
+ 
+-    } else {
+         many = false;
+         current_label = 0;
+ 
+@@ -1156,6 +1149,96 @@ void dve_compiler::print_generator()
+     }
+ }
+ 
++void dve_compiler::gen_state_info()
++{
++    char buf[1024];
++    // number of variables in the state
++    line( "extern \"C\" int state_variable_count() " );
++    block_begin();
++    sprintf(buf, "return %d;", count_state_variables());
++    line(buf);
++    block_end();
++    line();
++}
++
++void dve_compiler::gen_transition_info()
++{
++    // TODO: this doens't work with committed transitions
++    int sv_count = count_state_variables();
++    int trans_count = 0;
++    bool first = true;
++    char buf[1024];
++
++    // output transition vectors
++    sprintf(buf, "int transition_dependency[][2][%d] = ", sv_count);
++    line(buf);
++    block_begin();
++    line("// { ... read ...}, { ... write ...}");
++
++    for(size_int_t i = 0; i < get_process_count(); i++)
++    {
++        if(transition_map.find(i) != transition_map.end() && !is_property( i ))
++            for(iter_process_transition_map = transition_map.find(i)->second.begin();
++                iter_process_transition_map != transition_map.find(i)->second.end();
++                iter_process_transition_map++)
++            {
++                for(iter_ext_transition_vector = iter_process_transition_map->second.begin();
++                    iter_ext_transition_vector != iter_process_transition_map->second.end();
++                    iter_ext_transition_vector++)
++                {
++                    trans_count++;
++                    if (first) { first = false; } else { line(","); }
++                    append("{{" );
++                    for(size_int_t i = 0; i < sv_count; i++)
++                    {
++                        sprintf(buf, "%s%d", ((i==0)?"":","), iter_ext_transition_vector->sv_read[i]);
++                        append(buf);
++                    }
++                    append("},{" );
++                    for(size_int_t i = 0; i < sv_count; i++)
++                    {
++                        sprintf(buf, "%s%d", ((i==0)?"":","), iter_ext_transition_vector->sv_write[i]);
++                        append(buf);
++                    }
++                    append("}}");
++                }
++            }
++    }
++    line();
++    block_end();
++    line(";");
++    line();
++
++    // number of transitions
++    line( "extern \"C\" int transition_count() " );
++    block_begin();
++    sprintf(buf, "return %d;", trans_count);
++    line(buf);
++    block_end();
++    line();
++
++    // read dependencies
++    line( "extern \"C\" const int* get_transition_read_dependencies(int t) " );
++    block_begin();
++    sprintf(buf, "if (t>=0 && t < %d) return transition_dependency[t][0];", trans_count);
++    line(buf);
++    sprintf(buf, "return NULL;");
++    line(buf);
++    block_end();
++    line();
++
++    // write dependencies
++    line( "extern \"C\" const int* get_transition_write_dependencies(int t) " );
++    block_begin();
++    sprintf(buf, "if (t>=0 && t < %d) return transition_dependency[t][1];", trans_count);
++    line(buf);
++    sprintf(buf, "return NULL;");
++    line(buf);
++    block_end();
++    line();
++
++}
++
+ 
+ void dve_compiler::mark_dependency( size_int_t gid, int type, int idx, std::vector<int> &dep )
+ {
+diff --git a/tools/dvecompile.h b/tools/dvecompile.h
+index fc4be40..519124c 100644
+--- a/tools/dvecompile.h
++++ b/tools/dvecompile.h
+@@ -186,6 +186,8 @@ struct dve_compiler: public dve_explicit_system_t
+     void gen_header();
+     void gen_state_struct();
+     void gen_initial_state();
++    void gen_state_info();
++    void gen_transition_info();
+ 
+     void print_generator();
+ };
+-- 
+1.6.0.3.3.g214bef
+
+
+From 8b4c970224afc416456e353ac4c60b946574226a Mon Sep 17 00:00:00 2001
+From: Elwin Pater <e.pater@student.utwente.nl>
+Date: Wed, 3 Mar 2010 15:11:54 +0100
+Subject: [PATCH] Added has_property function
+
+---
+ tools/dvecompile.cpp |   17 ++++++++++++++---
+ 1 files changed, 14 insertions(+), 3 deletions(-)
+
+diff --git a/tools/dvecompile.cpp b/tools/dvecompile.cpp
+index b7334b7..edcf3eb 100644
+--- a/tools/dvecompile.cpp
++++ b/tools/dvecompile.cpp
+@@ -1047,9 +1047,20 @@ void dve_compiler::print_generator()
+     line();
+ 
+     if (ltsmin) {
+-        line( "extern \"C\" void get_initial_state( char *to ) {" );
+-        line( "    memcpy(to, (char*)&initial_state, state_size);" );
+-        line( "}" );
++        line( "extern \"C\" void get_initial_state( char *to )" );
++        block_begin();
++        line( "memcpy(to, (char*)&initial_state, state_size);" );
++        block_end();
++        line();
++
++        line( "extern \"C\" bool has_property()" );
++        block_begin();
++        if (have_property) {
++            line("return true;");
++        } else {
++            line("return false;");
++        }
++        block_end();
+         line();
+ 
+         many = false;
+-- 
+1.6.0.3.3.g214bef
+
+
+From 427844cb69f8f206d841a7dcf4c49b4da87c3eaf Mon Sep 17 00:00:00 2001
+From: Elwin Pater <e.pater@student.utwente.nl>
+Date: Wed, 3 Mar 2010 16:01:18 +0100
+Subject: [PATCH] Added export of state variable names
+
+---
+ tools/dvecompile.cpp |   83 ++++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 83 insertions(+), 0 deletions(-)
+
+diff --git a/tools/dvecompile.cpp b/tools/dvecompile.cpp
+index edcf3eb..6c0ed20 100644
+--- a/tools/dvecompile.cpp
++++ b/tools/dvecompile.cpp
+@@ -1170,6 +1170,89 @@ void dve_compiler::gen_state_info()
+     line(buf);
+     block_end();
+     line();
++
++    // name of state variables
++    line( "extern \"C\" const char* state_variable_name(int var)" );
++    block_begin();
++
++    line("switch (var)");
++    block_begin();
++
++    // iterate over state variables, output name per variable
++    bool global = true;
++    string name = "UNINITIALIZED";
++    string process_name = "UNINITIALIZED";
++    int k=0;
++    for (size_int_t i=0; i<state_creators_count; ++i, ++k)
++    {
++        sprintf(buf, "case %d:", k);
++        line(buf);
++
++        switch (state_creators[i].type)
++        {
++            case state_creator_t::VARIABLE:
++                name = (global?"":process_name + ".") + 
++                        get_symbol_table()->get_variable(state_creators[i].gid)->get_name();
++
++                if (state_creators[i].array_size)
++                {
++                    for(size_int_t j=0; j < state_creators[i].array_size; ++j)
++                    {
++                        sprintf(buf, "    return \"%s[%d]\";", name.c_str(), j);
++                        line(buf);
++                        if (j < state_creators[i].array_size - 1) {
++                            sprintf(buf, "case %d:", ++k);
++                            line(buf);
++                        }
++                    }
++                    continue;
++                }
++                break;
++            case state_creator_t::PROCESS_STATE:
++                global = false;
++                name = get_symbol_table()->get_process(state_creators[i].gid)->get_name();
++                process_name = name;
++                break;
++            case state_creator_t::CHANNEL_BUFFER:
++            {
++                name = get_symbol_table()->get_channel(state_creators[i].gid)->get_name();
++                sprintf(buf, "    return \"%s.number_of_items\";", name.c_str());
++                line(buf);
++
++                dve_symbol_t * symbol =
++                  get_symbol_table()->get_channel(state_creators[i].gid);
++                size_int_t item_count = symbol->get_channel_type_list_size();
++                size_int_t chan_size = symbol->get_channel_buffer_size();
++                for(size_int_t i=0; i < chan_size; ++i)
++                {
++                    for (size_int_t j=0; j<item_count; ++j)
++                    {
++                    sprintf(buf, "    return \"%s[%d].x%d\";", name.c_str(), i,j);
++                    line(buf);
++                    if (i < chan_size - 1 || j < item_count - 1)
++                        sprintf(buf, "case %d:", ++k);
++                        line(buf);
++                    }
++                }
++                continue;
++            }
++            default: gerr << "Unexpected error" << thr();
++                break;
++        };
++
++        sprintf(buf, "    return \"%s\";", name.c_str());
++        line(buf);
++    }
++
++    line("default:");
++    line("    return NULL;");
++    block_end();
++
++    block_end();
++    line();
++
++    // next fn
++
+ }
+ 
+ void dve_compiler::gen_transition_info()
+-- 
+1.6.0.3.3.g214bef
+
+
+From e6878fcded020eaeb5bc0f5a6ffb6d74ccf8b473 Mon Sep 17 00:00:00 2001
+From: Elwin Pater <e.pater@student.utwente.nl>
+Date: Wed, 3 Mar 2010 18:22:14 +0100
+Subject: [PATCH] Added export of type names and values
+
+---
+ tools/dvecompile.cpp |  144 +++++++++++++++++++++++++++++++++++++++++++++++++-
+ 1 files changed, 143 insertions(+), 1 deletions(-)
+
+diff --git a/tools/dvecompile.cpp b/tools/dvecompile.cpp
+index 6c0ed20..30ab5a8 100644
+--- a/tools/dvecompile.cpp
++++ b/tools/dvecompile.cpp
+@@ -1251,7 +1251,149 @@ void dve_compiler::gen_state_info()
+     block_end();
+     line();
+ 
+-    // next fn
++    // gather type information
++    std::map<string, int> type_no;
++    std::map<string, std::vector<string> > type_value;
++    int type_count = 0;
++    for (size_int_t i=0; i<state_creators_count; ++i, ++k)
++    {
++        vector<string> values;
++        values.clear();
++        string type_name = "UNINITIALIZED";
++
++        switch (state_creators[i].type)
++        {
++            case state_creator_t::VARIABLE:
++            {
++                dve_symbol_t * var = get_symbol_table()->get_variable(state_creators[i].gid);
++                if (var->is_byte()) { type_name = "byte"; } else { type_name = "int"; };
++                break;
++            }
++            case state_creator_t::PROCESS_STATE:
++            {
++                type_name = get_symbol_table()->get_process(state_creators[i].gid)->get_name();
++                for(size_int_t j = 0;
++                    j < dynamic_cast<dve_process_t*>(this->get_process(state_creators[i].gid))->get_state_count();
++                    j++)
++                {
++                    // add to possible process values
++                    values.push_back(
++                        get_symbol_table()->get_state(
++                        dynamic_cast<dve_process_t*>(this->get_process(state_creators[i].gid))->get_state_gid(j))->get_name()
++                    );
++                }
++                break;
++            }
++            case state_creator_t::CHANNEL_BUFFER:
++            {
++                // the int type is added for the channel by default (number of items is int)
++                // iterate over the channel, if type byte is used, add it also
++                type_name = "byte";
++
++                dve_symbol_t * symbol =
++                    get_symbol_table()->get_channel(state_creators[i].gid);
++                size_int_t item_count = symbol->get_channel_type_list_size();
++                for (size_int_t j=0; j<item_count; ++j)
++                {
++                    if (symbol->get_channel_type_list_item(j)==VAR_BYTE)
++                    {
++                        // check existence of byte type
++                        if (type_no.find(type_name) == type_no.end()) {
++                            type_no[type_name] = type_count++;
++                            type_value[type_name] = values;
++                            // if byte exists, the only other possibility is int, which is added
++                            // by default
++                            break;
++                        }
++                    }
++                }
++                // byte migth be added ab
++                type_name = "int";
++            }
++            default: gerr << "Unexpected error" << thr();
++                break;
++        }
++        if (type_no.find(type_name) == type_no.end())
++        {
++            type_no[type_name] = type_count++;
++            type_value[type_name] = values;
++        }
++    }
++
++    // number of different types in the state
++    line( "extern \"C\" int state_variable_type_count() " );
++    block_begin();
++    sprintf(buf, "return %d;", type_count);
++    line(buf);
++    block_end();
++    line();
++
++    // names of types
++    line( "extern \"C\" const char* state_variable_type_name(int type) " );
++    block_begin();
++        line("switch (type)");
++        block_begin();
++        for(std::map<string, int>::iterator ix = type_no.begin(); ix != type_no.end(); ++ix)
++        {
++            sprintf(buf, "case %d:", ix->second);
++            line(buf);
++            sprintf(buf, "    return \"%s\";", ix->first.c_str());
++            line(buf);
++        }
++        line("default:");
++        line("    return NULL;");
++        block_end();
++    block_end();
++    line();
++
++    // number of different values of a type
++    line( "extern \"C\" int state_variable_type_value_count(int type)" );
++    block_begin();
++        line("switch (type)");
++        block_begin();
++        for(std::map<string, int>::iterator ix = type_no.begin(); ix != type_no.end(); ++ix)
++        {
++            sprintf(buf, "case %d: // %s", ix->second, ix->first.c_str());
++            line(buf);
++            sprintf(buf, "    return %d;", type_value[ix->first].size());
++            line(buf);
++        }
++        line("default:");
++        line("    return -1;");
++        block_end();
++    block_end();
++    line();
++
++    // values of types
++    line( "extern \"C\" const char* state_variable_type_value(int type, int value) " );
++    block_begin();
++        line("switch (type)");
++        block_begin();
++        for(std::map<string, int>::iterator ix = type_no.begin(); ix != type_no.end(); ++ix)
++        {
++            if (type_value[ix->first].size())
++            {
++                sprintf(buf, "case %d:", ix->second);
++                line(buf);
++                block_begin();
++                    line("switch (value)");
++                    block_begin();
++                    for(int i=0; i < type_value[ix->first].size(); ++i)
++                    {
++                        sprintf(buf, "case %d:", i);
++                        line(buf);
++                        sprintf(buf, "    return \"%s\";", type_value[ix->first][i].c_str());
++                        line(buf);
++                    }
++                    block_end();
++                block_end();
++            }
++        }
++        block_end();
++        line("return NULL;");
++    block_end();
++    line();
++
+ 
+ }
+ 
+-- 
+1.6.0.3.3.g214bef
+
+
+From 51c3280e4aa0d4869bc6826d40812cd59a42fa80 Mon Sep 17 00:00:00 2001
+From: Elwin Pater <e.pater@student.utwente.nl>
+Date: Thu, 4 Mar 2010 21:34:13 +0100
+Subject: [PATCH] Added state_variable_type function
+
+---
+ tools/dvecompile.cpp |   81 ++++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 81 insertions(+), 0 deletions(-)
+
+diff --git a/tools/dvecompile.cpp b/tools/dvecompile.cpp
+index 30ab5a8..bacab22 100644
+--- a/tools/dvecompile.cpp
++++ b/tools/dvecompile.cpp
+@@ -1320,6 +1320,87 @@ void dve_compiler::gen_state_info()
+         }
+     }
+ 
++    // name of state variables
++    line( "extern \"C\" int state_variable_type(int var)" );
++    block_begin();
++
++    line("switch (var)");
++    block_begin();
++
++    // iterate over state variables, output name per variable
++    k = 0;
++    for (size_int_t i=0; i<state_creators_count; ++i, ++k)
++    {
++        string type_name = "UNINITIALIZED";
++
++        sprintf(buf, "case %d:", k);
++        line(buf);
++
++        switch (state_creators[i].type)
++        {
++            case state_creator_t::VARIABLE:
++            {
++                dve_symbol_t * var = get_symbol_table()->get_variable(state_creators[i].gid);
++                if (var->is_byte()) { type_name = "byte"; } else { type_name = "int"; };
++
++                if (state_creators[i].array_size)
++                {
++                    for(size_int_t j=0; j < state_creators[i].array_size - 1; ++j)
++                    {
++                        sprintf(buf, "    return %d;", type_no[type_name], j);
++                        line(buf);
++                        sprintf(buf, "case %d:", ++k);
++                        line(buf);
++                    }
++                }
++                break;
++            }
++            case state_creator_t::PROCESS_STATE:
++                type_name = get_symbol_table()->get_process(state_creators[i].gid)->get_name();
++                break;
++            case state_creator_t::CHANNEL_BUFFER:
++            {
++                sprintf(buf, "    return %d;", type_no["int"]);
++                line(buf);
++
++                dve_symbol_t * symbol =
++                  get_symbol_table()->get_channel(state_creators[i].gid);
++                size_int_t item_count = symbol->get_channel_type_list_size();
++                size_int_t chan_size = symbol->get_channel_buffer_size();
++                for(size_int_t i=0; i < chan_size; ++i)
++                {
++                    for (size_int_t j=0; j<item_count; ++j)
++                    {
++                        sprintf(buf, "case %d:", ++k);
++                        line(buf);
++                        if (symbol->get_channel_type_list_item(j) == VAR_BYTE)
++                        {
++                            sprintf(buf, "    return %d;", type_no["byte"]);
++                            line(buf);
++                        } else {
++                            sprintf(buf, "    return %d;", type_no["int"]);
++                            line(buf);
++                        }
++                    }
++                }
++                continue;
++            }
++            default: gerr << "Unexpected error" << thr();
++                break;
++        };
++
++        sprintf(buf, "    return %d;", type_no[type_name]);
++        line(buf);
++    }
++
++    line("default:");
++    line("    return -1;");
++    block_end();
++
++    block_end();
++    line();
++
++
+     // number of different types in the state
+     line( "extern \"C\" int state_variable_type_count() " );
+     block_begin();
+-- 
+1.6.0.3.3.g214bef
+
+
+From c0155be029b6f85abfc219251fb54b8f3271c4fa Mon Sep 17 00:00:00 2001
+From: Elwin Pater <e.pater@student.utwente.nl>
+Date: Thu, 4 Mar 2010 21:53:07 +0100
+Subject: [PATCH] Unified library function names
+
+    * added get_ to some function names
+---
+ tools/dvecompile.cpp |   18 +++++++++---------
+ 1 files changed, 9 insertions(+), 9 deletions(-)
+
+diff --git a/tools/dvecompile.cpp b/tools/dvecompile.cpp
+index bacab22..25e4bfd 100644
+--- a/tools/dvecompile.cpp
++++ b/tools/dvecompile.cpp
+@@ -1053,7 +1053,7 @@ void dve_compiler::print_generator()
+         block_end();
+         line();
+ 
+-        line( "extern \"C\" bool has_property()" );
++        line( "extern \"C\" bool have_property()" );
+         block_begin();
+         if (have_property) {
+             line("return true;");
+@@ -1164,7 +1164,7 @@ void dve_compiler::gen_state_info()
+ {
+     char buf[1024];
+     // number of variables in the state
+-    line( "extern \"C\" int state_variable_count() " );
++    line( "extern \"C\" int get_state_variable_count() " );
+     block_begin();
+     sprintf(buf, "return %d;", count_state_variables());
+     line(buf);
+@@ -1172,7 +1172,7 @@ void dve_compiler::gen_state_info()
+     line();
+ 
+     // name of state variables
+-    line( "extern \"C\" const char* state_variable_name(int var)" );
++    line( "extern \"C\" const char* get_state_variable_name(int var)" );
+     block_begin();
+ 
+     line("switch (var)");
+@@ -1321,7 +1321,7 @@ void dve_compiler::gen_state_info()
+     }
+ 
+     // name of state variables
+-    line( "extern \"C\" int state_variable_type(int var)" );
++    line( "extern \"C\" int get_state_variable_type(int var)" );
+     block_begin();
+ 
+     line("switch (var)");
+@@ -1402,7 +1402,7 @@ void dve_compiler::gen_state_info()
+ 
+ 
+     // number of different types in the state
+-    line( "extern \"C\" int state_variable_type_count() " );
++    line( "extern \"C\" int get_state_variable_type_count() " );
+     block_begin();
+     sprintf(buf, "return %d;", type_count);
+     line(buf);
+@@ -1410,7 +1410,7 @@ void dve_compiler::gen_state_info()
+     line();
+ 
+     // names of types
+-    line( "extern \"C\" const char* state_variable_type_name(int type) " );
++    line( "extern \"C\" const char* get_state_variable_type_name(int type) " );
+     block_begin();
+         line("switch (type)");
+         block_begin();
+@@ -1428,7 +1428,7 @@ void dve_compiler::gen_state_info()
+     line();
+ 
+     // number of different values of a type
+-    line( "extern \"C\" int state_variable_type_value_count(int type)" );
++    line( "extern \"C\" int get_state_variable_type_value_count(int type)" );
+     block_begin();
+         line("switch (type)");
+         block_begin();
+@@ -1446,7 +1446,7 @@ void dve_compiler::gen_state_info()
+     line();
+ 
+     // values of types
+-    line( "extern \"C\" const char* state_variable_type_value(int type, int value) " );
++    line( "extern \"C\" const char* get_state_variable_type_value(int type, int value) " );
+     block_begin();
+         line("switch (type)");
+         block_begin();
+@@ -1527,7 +1527,7 @@ void dve_compiler::gen_transition_info()
+     line();
+ 
+     // number of transitions
+-    line( "extern \"C\" int transition_count() " );
++    line( "extern \"C\" int get_transition_count() " );
+     block_begin();
+     sprintf(buf, "return %d;", trans_count);
+     line(buf);
+-- 
+1.6.0.3.3.g214bef
+
+
+From d99b7054599583b3f9f3705f7ac3e629d66a941a Mon Sep 17 00:00:00 2001
+From: Elwin Pater <e.pater@student.utwente.nl>
+Date: Thu, 4 Mar 2010 22:03:01 +0100
+Subject: [PATCH] Changed output extension to dve2C
+
+---
+ tools/compile.h |    6 +++++-
+ 1 files changed, 5 insertions(+), 1 deletions(-)
+
+diff --git a/tools/compile.h b/tools/compile.h
+index 81d5f3b..f4e0ceb 100644
+--- a/tools/compile.h
++++ b/tools/compile.h
+@@ -33,7 +33,11 @@ struct Compile {
+         compiler.print_generator();
+ 
+         std::stringstream cmd;
+-        cmd << "g++ -O2 -shared -fPIC -o " << str::basename( in ) + (ltsmin?".ltsmin":"") + ".so" << " " << outfile;
++        if (ltsmin) {
++            cmd << "g++ -O2 -shared -fPIC -o " << str::basename( in ) + "2C" << " " << outfile;
++        } else {
++            cmd << "g++ -O2 -shared -fPIC -o " << str::basename( in ) + (ltsmin?".ltsmin":"") + ".so" << " " << outfile;
++        }
+         int status = system( cmd.str().c_str() );
+ #ifdef POSIX
+         if ( status != -1 && WEXITSTATUS( status ) != 0 )
+-- 
+1.6.0.3.3.g214bef
+
+
+From 76a7de78a352707553e53e7ec759ab3b5c8135a2 Mon Sep 17 00:00:00 2001
+From: Elwin Pater <e.pater@student.utwente.nl>
+Date: Thu, 4 Mar 2010 22:36:50 +0100
+Subject: [PATCH] Output 32 bit struct
+
+    * Note: this introduces a bug, for example a byte
+      should wrap and now it doens't
+---
+ tools/dvecompile.cpp |   92 ++++++++++++++++++++++++--------------------------
+ 1 files changed, 44 insertions(+), 48 deletions(-)
+
+diff --git a/tools/dvecompile.cpp b/tools/dvecompile.cpp
+index 25e4bfd..c2f74de 100644
+--- a/tools/dvecompile.cpp
++++ b/tools/dvecompile.cpp
+@@ -130,17 +130,34 @@ void dve_compiler::gen_header()
+     line( "#include <stdint.h>" );
+     line();
+ 
+-    line( "typedef uint64_t ulong_long_int_t;" );
+-    line( "typedef int64_t slong_long_int_t;" );
+-    line( "typedef uint32_t ulong_int_t;" );
+-    line( "typedef int32_t slong_int_t;" );
+-    line( "typedef uint16_t ushort_int_t;" );
+-    line( "typedef int16_t sshort_int_t;" );
+-    line( "typedef uint8_t byte_t;" );
+-    line( "typedef uint8_t ubyte_t;" );
+-    line( "typedef int8_t sbyte_t;" );
+-    line( "typedef size_t size_int_t;" );
+-    line();
++    if (ltsmin) {
++        // note: everything is 32 bit, this introduces a bug
++        // for example when byte value should wrap, now it doesn't
++        // thus it should be a 32 bit aligned byte instead of a 32 bit int
++        line( "typedef uint64_t ulong_long_int_t;" );
++        line( "typedef int64_t slong_long_int_t;" );
++        line( "typedef uint32_t ulong_int_t;" );
++        line( "typedef int32_t slong_int_t;" );
++        line( "typedef uint32_t ushort_int_t;" );
++        line( "typedef int32_t sshort_int_t;" );
++        line( "typedef uint32_t byte_t;" );
++        line( "typedef uint32_t ubyte_t;" );
++        line( "typedef int32_t sbyte_t;" );
++        line( "typedef size_t size_int_t;" );
++        line();
++    } else {
++        line( "typedef uint64_t ulong_long_int_t;" );
++        line( "typedef int64_t slong_long_int_t;" );
++        line( "typedef uint32_t ulong_int_t;" );
++        line( "typedef int32_t slong_int_t;" );
++        line( "typedef uint16_t ushort_int_t;" );
++        line( "typedef int16_t sshort_int_t;" );
++        line( "typedef uint8_t byte_t;" );
++        line( "typedef uint8_t ubyte_t;" );
++        line( "typedef int8_t sbyte_t;" );
++        line( "typedef size_t size_int_t;" );
++        line();
++    }
+ 
+     line( "#define assert_eq(a,b) assert(a == b)" );
+     line( "#define assert_neq(a,b) assert(a != b)" );
+@@ -170,7 +187,7 @@ void dve_compiler::gen_state_struct()
+         if (var->is_const())
+         {
+             append( "const " );
+-            if ( !ltsmin && var->is_byte() )
++            if ( var->is_byte() )
+                 append( "byte_t " );
+             else
+                 append( "sshort_int_t " );
+@@ -212,34 +229,20 @@ void dve_compiler::gen_state_struct()
+                 name=get_symbol_table()->get_variable(state_creators[i].gid)->get_name();
+                 if (state_creators[i].array_size)
+                 {
+-                    if (ltsmin) {
+-                        if (state_creators[i].var_type==VAR_BYTE ||
+-                            state_creators[i].var_type==VAR_INT)
+-                            append( "sshort_int_t " );
+-                        else gerr << "Unexpected error" << thr();
+-                    } else {
+-                        if (state_creators[i].var_type==VAR_BYTE)
+-                            append( "byte_t " );
+-                        else if (state_creators[i].var_type==VAR_INT)
+-                            append( "sshort_int_t " );
+-                        else gerr << "Unexpected error" << thr();
+-                    }
++                    if (state_creators[i].var_type==VAR_BYTE)
++                        append( "byte_t " );
++                    else if (state_creators[i].var_type==VAR_INT)
++                        append( "sshort_int_t " );
++                    else gerr << "Unexpected error" << thr();
+                     line( name + "[" + fmt( state_creators[i].array_size ) + "];" );
+                 }
+                 else
+                 {
+-                    if (ltsmin) {
+-                        if (state_creators[i].var_type==VAR_BYTE ||
+-                            state_creators[i].var_type==VAR_INT)
+-                            line( "sshort_int_t " + name + ";" );
+-                        else gerr << "Unexpected error" << thr();
+-                    } else {
+-                        if (state_creators[i].var_type==VAR_BYTE)
+-                            line( "byte_t " + name + ";" );
+-                        else if (state_creators[i].var_type==VAR_INT)
+-                            line( "sshort_int_t " + name + ";" ); // todo: report as divine bug, fogotten whitespace?
+-                        else gerr << "Unexpected error" << thr();
+-                    }
++                    if (state_creators[i].var_type==VAR_BYTE)
++                        line( "byte_t " + name + ";" );
++                    else if (state_creators[i].var_type==VAR_INT)
++                        line( "sshort_int_t " + name + ";" ); // todo: report as divine bug, fogotten whitespace?
++                    else gerr << "Unexpected error" << thr();
+                 }
+             }
+             break;
+@@ -275,18 +278,11 @@ void dve_compiler::gen_state_struct()
+                 size_int_t item_count = symbol->get_channel_type_list_size();
+ 
+                 for (size_int_t j=0; j<item_count; ++j)
+-                    if (ltsmin) {
+-                        if (symbol->get_channel_type_list_item(j)==VAR_BYTE || 
+-                            symbol->get_channel_type_list_item(j)==VAR_INT)
+-                            line( "sshort_int_t x" + fmt( j ) + ";" );
+-                        else gerr << "Unexpected error" << thr();
+-                    } else {
+-                        if (symbol->get_channel_type_list_item(j)==VAR_BYTE)
+-                            line( "byte_t x" + fmt( j ) + ";" );
+-                        else if (symbol->get_channel_type_list_item(j)==VAR_INT)
+-                            line( "sshort_int_t x" + fmt( j ) + ";" );
+-                        else gerr << "Unexpected error" << thr();
+-                    }
++                    if (symbol->get_channel_type_list_item(j)==VAR_BYTE)
++                        line( "byte_t x" + fmt( j ) + ";" );
++                    else if (symbol->get_channel_type_list_item(j)==VAR_INT)
++                        line( "sshort_int_t x" + fmt( j ) + ";" );
++                    else gerr << "Unexpected error" << thr();
+                 block_end();
+                 line( "content[" + fmt( symbol->get_channel_buffer_size() ) + "];" );
+                 block_end();
+-- 
+1.6.0.3.3.g214bef
+
+
+From 27e0a6fb74d52188166431bd02ba455ca0070901 Mon Sep 17 00:00:00 2001
+From: Elwin Pater <e.pater@student.utwente.nl>
+Date: Sat, 6 Mar 2010 16:06:48 +0100
+Subject: [PATCH] Added ltsmin implementation of get_successor
+
+    TODO: bug: all non-committed transitions can still be active after
+          a committed transition.
+---
+ tools/dvecompile.cpp |  196 +++++++++++++++++++++++++++++++++++++++++++++++++-
+ tools/dvecompile.h   |    1 +
+ 2 files changed, 194 insertions(+), 3 deletions(-)
+
+diff --git a/tools/dvecompile.cpp b/tools/dvecompile.cpp
+index c2f74de..3266e77 100644
+--- a/tools/dvecompile.cpp
++++ b/tools/dvecompile.cpp
+@@ -760,6 +760,12 @@ void dve_compiler::analyse()
+ void dve_compiler::transition_guard( ext_transition_t *et, std::string in )
+ {
+     if_begin( false );
++
++    // ltsmin guard extension
++    if ( ltsmin && !many) {
++        if_clause( in_state( et->first->get_process_gid(), et->first->get_state1_lid(), in) );
++    }
++
+     if_cexpr_clause( et->first->get_guard(), in );
+ 
+     if( et->synchronized )
+@@ -881,6 +887,109 @@ void dve_compiler::yield_state() {
+     }
+ }
+ 
++void dve_compiler::gen_ltsmin_successors()
++{
++    string in = "(*in)", out = "(*out)", space = "";
++    bool some_commited_state = false;
++
++    // find some commited state
++    for(size_int_t i = 0; i < get_process_count(); i++)
++        for(size_int_t j = 0; j < dynamic_cast<dve_process_t*>(get_process(i))->get_state_count(); j++)
++            if(dynamic_cast<dve_process_t*>(get_process(i))->get_commited(j))
++                some_commited_state = true;
++
++    if (some_commited_state)
++    {
++        for(size_int_t i = 0; i < this->get_process_count(); i++)
++        {
++            if( transition_map.find(i) != transition_map.end() && !is_property( i ) )
++                for(iter_process_transition_map = transition_map.find(i)->second.begin();
++                    iter_process_transition_map != transition_map.find(i)->second.end();
++                    iter_process_transition_map++)
++                {
++                    if(dynamic_cast<dve_process_t*>(get_process(i))->get_commited(
++                           iter_process_transition_map->first))
++                    {
++                        new_label();
++
++                        // committed state
++                        if_begin( true );
++
++                        for(size_int_t p = 0; p < get_process_count(); p++)
++                            for(size_int_t c = 0; c < dynamic_cast<dve_process_t*>(get_process(p))->get_state_count(); c++)
++                                if(dynamic_cast<dve_process_t*>(get_process(p))->get_commited(c))
++                                    if_clause( in_state( p, c, in ) );
++
++                        if_end(); // otherwise this condition is disjoint with the new condition
++
++                        if_begin(true);
++                        if_clause( in_state( i, iter_process_transition_map->first, in ) );
++                        if_end(); block_begin();
++
++                        new_output_state();
++
++                        for(iter_ext_transition_vector = iter_process_transition_map->second.begin();
++                            iter_ext_transition_vector != iter_process_transition_map->second.end();
++                            iter_ext_transition_vector++)
++                        {
++                            // !! jak je to s property synchronizaci v comitted stavech !!
++                            if( !iter_ext_transition_vector->synchronized ||
++                                dynamic_cast<dve_process_t*>(
++                                    get_process(iter_ext_transition_vector->second->get_process_gid()))->
++                                get_commited(iter_ext_transition_vector->second->get_state1_lid()) )
++                            {
++                                transition_guard( &*iter_ext_transition_vector, in );
++                                block_begin();
++                                transition_effect( &*iter_ext_transition_vector, in, out );
++                                block_end();
++                            }
++                        }
++
++                        yield_state();
++                        block_end();
++                        line("return states_emitted;");
++                    }
++                }
++        }
++    }
++
++    for(size_int_t i = 0; i < get_process_count(); i++)
++    {
++        if(transition_map.find(i) != transition_map.end() && !is_property( i ))
++            for(iter_process_transition_map = transition_map.find(i)->second.begin();
++                iter_process_transition_map != transition_map.find(i)->second.end();
++                iter_process_transition_map++)
++            {
++                /*
++                new_label();
++                if_begin( true );
++                if_clause( in_state( i, iter_process_transition_map->first, in ) );
++
++                if_end(); block_begin();
++                */
++
++                for(iter_ext_transition_vector = iter_process_transition_map->second.begin();
++                    iter_ext_transition_vector != iter_process_transition_map->second.end();
++                    iter_ext_transition_vector++)
++                {
++                    new_label();
++
++                    transition_guard( &*iter_ext_transition_vector, in );
++                    block_begin();
++                    new_output_state();
++                    transition_effect( &*iter_ext_transition_vector, in, out );
++                    yield_state();
++                    block_end();
++                    line("return states_emitted;");
++                }
++                /*
++                block_end();
++                */
++            }
++    }
++}
++
++
+ void dve_compiler::gen_successors()
+ {
+     string in = "(*in)", out = "(*out)", space = "";
+@@ -1067,11 +1176,11 @@ void dve_compiler::print_generator()
+         line( "state_struct_t tmp;" );
+         line( "state_struct_t *out = &tmp;" );
+         line( "goto switch_state;" );
+-        //gen_successors();
++        gen_ltsmin_successors();
+         // switch block
+         line( "switch_state: switch( t )" );
+         block_begin();
+-        for(int i=1; i < current_label; i++)
++        for(int i=0; i < current_label; i++)
+                 line( "case " + fmt( i ) + ": goto l" + fmt( i ) + ";" );
+         block_end();
+         line("return 0;");
+@@ -1476,7 +1585,6 @@ void dve_compiler::gen_state_info()
+ 
+ void dve_compiler::gen_transition_info()
+ {
+-    // TODO: this doens't work with committed transitions
+     int sv_count = count_state_variables();
+     int trans_count = 0;
+     bool first = true;
+@@ -1488,6 +1596,88 @@ void dve_compiler::gen_transition_info()
+     block_begin();
+     line("// { ... read ...}, { ... write ...}");
+ 
++
++    /////////////////////////////////
++    /////////////////////////////////
++    bool some_commited_state = false;
++
++    // find some commited state
++    for(size_int_t i = 0; i < get_process_count(); i++)
++        for(size_int_t j = 0; j < dynamic_cast<dve_process_t*>(get_process(i))->get_state_count(); j++)
++            if(dynamic_cast<dve_process_t*>(get_process(i))->get_commited(j))
++                some_commited_state = true;
++
++    if (some_commited_state)
++    {
++        // initialize read/write dependency vector
++        std::vector<int> c_base_sv_read(sv_count);
++        std::vector<int> c_base_sv_write(sv_count);
++
++        // mark commited processes as read
++        for(size_int_t i = 0; i < get_process_count(); i++)
++            for(size_int_t j = 0; j < dynamic_cast<dve_process_t*>(get_process(i))->get_state_count(); j++)
++                if(dynamic_cast<dve_process_t*>(get_process(i))->get_commited(j))
++                    mark_dependency(dynamic_cast<dve_process_t*>(get_process(i))->get_gid(),
++                                    state_creator_t::PROCESS_STATE, -1, c_base_sv_read);
++
++        for(size_int_t i = 0; i < this->get_process_count(); i++)
++        {
++            if( transition_map.find(i) != transition_map.end() && !is_property( i ) )
++                for(iter_process_transition_map = transition_map.find(i)->second.begin();
++                    iter_process_transition_map != transition_map.find(i)->second.end();
++                    iter_process_transition_map++)
++                {
++                    if(dynamic_cast<dve_process_t*>(get_process(i))->get_commited(
++                           iter_process_transition_map->first))
++                    {
++                        std::vector<int> c_sv_read(c_base_sv_read);
++                        std::vector<int> c_sv_write(c_base_sv_write);
++
++
++                        for(iter_ext_transition_vector = iter_process_transition_map->second.begin();
++                            iter_ext_transition_vector != iter_process_transition_map->second.end();
++                            iter_ext_transition_vector++)
++                        {
++                            // !! jak je to s property synchronizaci v comitted stavech !!
++                            if( !iter_ext_transition_vector->synchronized ||
++                                dynamic_cast<dve_process_t*>(
++                                    get_process(iter_ext_transition_vector->second->get_process_gid()))->
++                                get_commited(iter_ext_transition_vector->second->get_state1_lid()) )
++                            {
++                                // merge sv_read and sv_write vectors 
++                                for(size_int_t i = 0; i < sv_count; i++)
++                                {
++                                    if (iter_ext_transition_vector->sv_read[i])
++                                        c_sv_read[i] = 1;
++                                    if (iter_ext_transition_vector->sv_write[i])
++                                        c_sv_write[i] = 1;
++                                }
++                            }
++                        }
++
++                        trans_count++;
++                        if (first) { first = false; } else { line(","); }
++                        append("{{" );
++                        for(size_int_t i = 0; i < sv_count; i++)
++                        {
++                            sprintf(buf, "%s%d", ((i==0)?"":","), c_sv_read[i]);
++                            append(buf);
++                        }
++                        append("},{" );
++                        for(size_int_t i = 0; i < sv_count; i++)
++                        {
++                            sprintf(buf, "%s%d", ((i==0)?"":","), c_sv_write[i]);
++                            append(buf);
++                        }
++                        append("}}");
++
++                    }
++                }
++        }
++    }
++    /////////////////////////////////
++    /////////////////////////////////
++
+     for(size_int_t i = 0; i < get_process_count(); i++)
+     {
+         if(transition_map.find(i) != transition_map.end() && !is_property( i ))
+diff --git a/tools/dvecompile.h b/tools/dvecompile.h
+index 519124c..373dd8d 100644
+--- a/tools/dvecompile.h
++++ b/tools/dvecompile.h
+@@ -182,6 +182,7 @@ struct dve_compiler: public dve_explicit_system_t
+     void new_output_state();
+ 
+     void gen_successors();
++    void gen_ltsmin_successors();
+     void gen_is_accepting();
+     void gen_header();
+     void gen_state_struct();
+-- 
+1.6.0.3.3.g214bef
+
+
+From 76895897e7b931a6c0c194e2f1827a9213e5255a Mon Sep 17 00:00:00 2001
+From: Elwin Pater <e.pater@student.utwente.nl>
+Date: Sat, 6 Mar 2010 17:03:42 +0100
+Subject: [PATCH] Fixed bug in analyse_transition
+
+    Use ext_trans->second instead of ext_trans->first
+    for synchonized transitions
+---
+ tools/dvecompile.cpp |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/tools/dvecompile.cpp b/tools/dvecompile.cpp
+index 3266e77..52ff285 100644
+--- a/tools/dvecompile.cpp
++++ b/tools/dvecompile.cpp
+@@ -498,11 +498,11 @@ void dve_compiler::analyse_transition_dependencies( ext_transition_t &ext_transi
+     if (ext_transition.synchronized)
+     {
+         // mark process as read
+-        mark_dependency(ext_transition.first->get_process_gid(),
++        mark_dependency(ext_transition.second->get_process_gid(),
+                         state_creator_t::PROCESS_STATE, -1, ext_transition.sv_read);
+ 
+         // analyse ext_transition->second->get_guard
+-        if (ext_transition.first->get_guard())
++        if (ext_transition.second->get_guard())
+             analyse_expression( *(ext_transition.second->get_guard()), ext_transition,
+             ext_transition.sv_read);
+     } else {
+-- 
+1.6.0.3.3.g214bef
+
+
+From e1e3c4bd8a51ec578e07647054b56062d45ffa2d Mon Sep 17 00:00:00 2001
+From: Elwin Pater <e.pater@student.utwente.nl>
+Date: Sat, 6 Mar 2010 23:30:02 +0100
+Subject: [PATCH] Committed states working
+
+    todo: remove some junk code
+---
+ tools/dvecompile.cpp |   28 +++++++++++++++++++++++-----
+ 1 files changed, 23 insertions(+), 5 deletions(-)
+
+diff --git a/tools/dvecompile.cpp b/tools/dvecompile.cpp
+index 52ff285..b2e53db 100644
+--- a/tools/dvecompile.cpp
++++ b/tools/dvecompile.cpp
+@@ -976,6 +976,21 @@ void dve_compiler::gen_ltsmin_successors()
+ 
+                     transition_guard( &*iter_ext_transition_vector, in );
+                     block_begin();
++                    if (some_commited_state)
++                    {
++                        // committed state
++                        if_begin( true );
++
++                        for(size_int_t p = 0; p < get_process_count(); p++)
++                            for(size_int_t c = 0; c < dynamic_cast<dve_process_t*>(get_process(p))->get_state_count(); c++)
++                                if(dynamic_cast<dve_process_t*>(get_process(p))->get_commited(c))
++                                    if_clause( in_state( p, c, in ) );
++
++                        if_end();
++                        line("    return 0;"); // bail out early
++                    }
++
++
+                     new_output_state();
+                     transition_effect( &*iter_ext_transition_vector, in, out );
+                     yield_state();
+@@ -1590,6 +1605,11 @@ void dve_compiler::gen_transition_info()
+     bool first = true;
+     char buf[1024];
+ 
++    // initialize read/write dependency vector
++    std::vector<int> c_base_sv_read(sv_count);
++    std::vector<int> c_base_sv_write(sv_count);
++
++
+     // output transition vectors
+     sprintf(buf, "int transition_dependency[][2][%d] = ", sv_count);
+     line(buf);
+@@ -1609,10 +1629,6 @@ void dve_compiler::gen_transition_info()
+ 
+     if (some_commited_state)
+     {
+-        // initialize read/write dependency vector
+-        std::vector<int> c_base_sv_read(sv_count);
+-        std::vector<int> c_base_sv_write(sv_count);
+-
+         // mark commited processes as read
+         for(size_int_t i = 0; i < get_process_count(); i++)
+             for(size_int_t j = 0; j < dynamic_cast<dve_process_t*>(get_process(i))->get_state_count(); j++)
+@@ -1694,7 +1710,9 @@ void dve_compiler::gen_transition_info()
+                     append("{{" );
+                     for(size_int_t i = 0; i < sv_count; i++)
+                     {
+-                        sprintf(buf, "%s%d", ((i==0)?"":","), iter_ext_transition_vector->sv_read[i]);
++                        sprintf(buf, "%s%d", ((i==0)?"":","),
++                            iter_ext_transition_vector->sv_read[i]!=0 ||
++                            c_base_sv_read[i]!=0 ? 1 : 0); // add not in committed state
+                         append(buf);
+                     }
+                     append("},{" );
+-- 
+1.6.0.3.3.g214bef
+
+
+From eabdc82f644e7102293a5dba7f7c594451553267 Mon Sep 17 00:00:00 2001
+From: Elwin Pater <e.pater@student.utwente.nl>
+Date: Sun, 7 Mar 2010 00:28:18 +0100
+Subject: [PATCH] Removed generated unused code
+
+---
+ tools/compile.h      |    2 +-
+ tools/dvecompile.cpp |  134 +++++++++++++++++++++++++++-----------------------
+ 2 files changed, 73 insertions(+), 63 deletions(-)
+
+diff --git a/tools/compile.h b/tools/compile.h
+index f4e0ceb..96191cb 100644
+--- a/tools/compile.h
++++ b/tools/compile.h
+@@ -36,7 +36,7 @@ struct Compile {
+         if (ltsmin) {
+             cmd << "g++ -O2 -shared -fPIC -o " << str::basename( in ) + "2C" << " " << outfile;
+         } else {
+-            cmd << "g++ -O2 -shared -fPIC -o " << str::basename( in ) + (ltsmin?".ltsmin":"") + ".so" << " " << outfile;
++            cmd << "g++ -O2 -shared -fPIC -o " << str::basename( in ) + ".so" << " " << outfile;
+         }
+         int status = system( cmd.str().c_str() );
+ #ifdef POSIX
+diff --git a/tools/dvecompile.cpp b/tools/dvecompile.cpp
+index b2e53db..04c2d04 100644
+--- a/tools/dvecompile.cpp
++++ b/tools/dvecompile.cpp
+@@ -960,46 +960,43 @@ void dve_compiler::gen_ltsmin_successors()
+                 iter_process_transition_map != transition_map.find(i)->second.end();
+                 iter_process_transition_map++)
+             {
+-                /*
+-                new_label();
+-                if_begin( true );
+-                if_clause( in_state( i, iter_process_transition_map->first, in ) );
+-
+-                if_end(); block_begin();
+-                */
+-
+                 for(iter_ext_transition_vector = iter_process_transition_map->second.begin();
+                     iter_ext_transition_vector != iter_process_transition_map->second.end();
+                     iter_ext_transition_vector++)
+                 {
+-                    new_label();
+-
+-                    transition_guard( &*iter_ext_transition_vector, in );
+-                    block_begin();
+-                    if (some_commited_state)
++                    // make sure this transition is not a committed one
++                    if (!
++                        dynamic_cast<dve_process_t*>(
++                            get_process(iter_ext_transition_vector->first->get_process_gid()))->
++                        get_commited(iter_ext_transition_vector->first->get_state1_lid()) )
+                     {
+-                        // committed state
+-                        if_begin( true );
+ 
+-                        for(size_int_t p = 0; p < get_process_count(); p++)
+-                            for(size_int_t c = 0; c < dynamic_cast<dve_process_t*>(get_process(p))->get_state_count(); c++)
+-                                if(dynamic_cast<dve_process_t*>(get_process(p))->get_commited(c))
+-                                    if_clause( in_state( p, c, in ) );
++                        new_label();
+ 
+-                        if_end();
+-                        line("    return 0;"); // bail out early
+-                    }
++                        transition_guard( &*iter_ext_transition_vector, in );
++                        block_begin();
++                        if (some_commited_state)
++                        {
++                            // committed state
++                            if_begin( true );
+ 
++                            for(size_int_t p = 0; p < get_process_count(); p++)
++                                for(size_int_t c = 0; c < dynamic_cast<dve_process_t*>(get_process(p))->get_state_count(); c++)
++                                    if(dynamic_cast<dve_process_t*>(get_process(p))->get_commited(c))
++                                        if_clause( in_state( p, c, in ) );
+ 
+-                    new_output_state();
+-                    transition_effect( &*iter_ext_transition_vector, in, out );
+-                    yield_state();
+-                    block_end();
+-                    line("return states_emitted;");
++                            if_end();
++                            line("    return 0;"); // bail out early
++                        }
++
++
++                        new_output_state();
++                        transition_effect( &*iter_ext_transition_vector, in, out );
++                        yield_state();
++                        block_end();
++                        line("return states_emitted;");
++                    }
+                 }
+-                /*
+-                block_end();
+-                */
+             }
+     }
+ }
+@@ -1072,27 +1069,34 @@ void dve_compiler::gen_successors()
+                 iter_process_transition_map != transition_map.find(i)->second.end();
+                 iter_process_transition_map++)
+             {
+-                new_label();
+-                if_begin( true );
+-                if_clause( in_state( i, iter_process_transition_map->first, in ) );
+-
+-                if_end(); block_begin();
+-
+-                for(iter_ext_transition_vector = iter_process_transition_map->second.begin();
+-                    iter_ext_transition_vector != iter_process_transition_map->second.end();
+-                    iter_ext_transition_vector++)
++                // make sure this transition is not a committed one
++                if (!
++                    dynamic_cast<dve_process_t*>(
++                        get_process(i))->get_commited(iter_process_transition_map->first) )
+                 {
++
+                     new_label();
++                    if_begin( true );
++                    if_clause( in_state( i, iter_process_transition_map->first, in ) );
+ 
+-                    transition_guard( &*iter_ext_transition_vector, in );
+-                    block_begin();
+-                    new_output_state();
+-                    transition_effect( &*iter_ext_transition_vector, in, out );
+-                    if (!ltsmin) line( "system_in_deadlock = false;" );
+-                    yield_state();
++                    if_end(); block_begin();
++
++                    for(iter_ext_transition_vector = iter_process_transition_map->second.begin();
++                        iter_ext_transition_vector != iter_process_transition_map->second.end();
++                        iter_ext_transition_vector++)
++                    {
++                        new_label();
++
++                        transition_guard( &*iter_ext_transition_vector, in );
++                        block_begin();
++                        new_output_state();
++                        transition_effect( &*iter_ext_transition_vector, in, out );
++                        if (!ltsmin) line( "system_in_deadlock = false;" );
++                        yield_state();
++                        block_end();
++                    }
+                     block_end();
+                 }
+-                block_end();
+             }
+     }
+     block_end();
+@@ -1693,7 +1697,6 @@ void dve_compiler::gen_transition_info()
+     }
+     /////////////////////////////////
+     /////////////////////////////////
+-
+     for(size_int_t i = 0; i < get_process_count(); i++)
+     {
+         if(transition_map.find(i) != transition_map.end() && !is_property( i ))
+@@ -1705,23 +1708,30 @@ void dve_compiler::gen_transition_info()
+                     iter_ext_transition_vector != iter_process_transition_map->second.end();
+                     iter_ext_transition_vector++)
+                 {
+-                    trans_count++;
+-                    if (first) { first = false; } else { line(","); }
+-                    append("{{" );
+-                    for(size_int_t i = 0; i < sv_count; i++)
+-                    {
+-                        sprintf(buf, "%s%d", ((i==0)?"":","),
+-                            iter_ext_transition_vector->sv_read[i]!=0 ||
+-                            c_base_sv_read[i]!=0 ? 1 : 0); // add not in committed state
+-                        append(buf);
+-                    }
+-                    append("},{" );
+-                    for(size_int_t i = 0; i < sv_count; i++)
++                    // make sure this transition is not a committed one
++                    if (!
++                        dynamic_cast<dve_process_t*>(
++                            get_process(iter_ext_transition_vector->first->get_process_gid()))->
++                        get_commited(iter_ext_transition_vector->first->get_state1_lid()) )
+                     {
+-                        sprintf(buf, "%s%d", ((i==0)?"":","), iter_ext_transition_vector->sv_write[i]);
+-                        append(buf);
++                        trans_count++;
++                        if (first) { first = false; } else { line(","); }
++                        append("{{" );
++                        for(size_int_t i = 0; i < sv_count; i++)
++                        {
++                            sprintf(buf, "%s%d", ((i==0)?"":","),
++                                iter_ext_transition_vector->sv_read[i]!=0 ||
++                                c_base_sv_read[i]!=0 ? 1 : 0); // add not in committed state
++                            append(buf);
++                        }
++                        append("},{" );
++                        for(size_int_t i = 0; i < sv_count; i++)
++                        {
++                            sprintf(buf, "%s%d", ((i==0)?"":","), iter_ext_transition_vector->sv_write[i]);
++                            append(buf);
++                        }
++                        append("}}");
+                     }
+-                    append("}}");
+                 }
+             }
+     }
+-- 
+1.6.0.3.3.g214bef
+
+
+From 0415caa9e694635d336144f947b9e5dce6204d32 Mon Sep 17 00:00:00 2001
+From: Elwin Pater <e.pater@student.utwente.nl>
+Date: Sun, 7 Mar 2010 22:38:59 +0100
+Subject: [PATCH] Fixed divine bug (global const not working)
+
+---
+ tools/dvecompile.cpp |   13 ++++++++-----
+ 1 files changed, 8 insertions(+), 5 deletions(-)
+
+diff --git a/tools/dvecompile.cpp b/tools/dvecompile.cpp
+index 04c2d04..76b752c 100644
+--- a/tools/dvecompile.cpp
++++ b/tools/dvecompile.cpp
+@@ -26,12 +26,15 @@ void dve_compiler::write_C(dve_expression_t & expr, std::ostream & ostr, std::st
+     switch (expr.get_operator())
+     {
+         case T_ID:
+-            ostr<<state_name<<".";
+-            if(parent_table->get_variable(expr.get_ident_gid())->get_process_gid() != NO_ID)
++            if(!parent_table->get_variable(expr.get_ident_gid())->is_const())
+             {
+-                ostr << parent_table->get_process(parent_table->get_variable(expr.get_ident_gid())->
+-                                                  get_process_gid())->get_name(); //name of process
+-                ostr<<".";
++                ostr<<state_name<<".";
++                if(parent_table->get_variable(expr.get_ident_gid())->get_process_gid() != NO_ID)
++                {
++                    ostr << parent_table->get_process(parent_table->get_variable(expr.get_ident_gid())->
++                                                      get_process_gid())->get_name(); //name of process
++                    ostr<<".";
++                }
+             }
+             ostr << parent_table->get_variable(expr.get_ident_gid())->get_name();
+             break;
+-- 
+1.6.0.3.3.g214bef
+
+
+From 25f671ef0db412a52113ef2246b60a8994b92c94 Mon Sep 17 00:00:00 2001
+From: Elwin Pater <e.pater@student.utwente.nl>
+Date: Sun, 28 Mar 2010 17:26:43 +0200
+Subject: [PATCH] Fix wrapping bug
+
+---
+ tools/dvecompile.cpp |   41 +++++++++++++++++++++++++++++++++--------
+ tools/dvecompile.h   |    6 +++---
+ 2 files changed, 36 insertions(+), 11 deletions(-)
+
+diff --git a/tools/dvecompile.cpp b/tools/dvecompile.cpp
+index 76b752c..91cf007 100644
+--- a/tools/dvecompile.cpp
++++ b/tools/dvecompile.cpp
+@@ -37,12 +37,14 @@ void dve_compiler::write_C(dve_expression_t & expr, std::ostream & ostr, std::st
+                 }
+             }
+             ostr << parent_table->get_variable(expr.get_ident_gid())->get_name();
++            if (ltsmin) ostr << ".var";
+             break;
+         case T_FOREIGN_ID:
+             ostr << parent_table->get_process(parent_table->get_variable(expr.get_ident_gid())->
+                                               get_process_gid())->get_name(); //name of process
+             ostr<<"->";
+             ostr << parent_table->get_variable(expr.get_ident_gid())->get_name();
++            if (ltsmin) ostr << ".var";
+             break;
+         case T_NAT:
+             ostr << expr.get_value();
+@@ -62,6 +64,7 @@ void dve_compiler::write_C(dve_expression_t & expr, std::ostream & ostr, std::st
+             }
+             ostr << parent_table->get_variable(expr.get_ident_gid())->
+                 get_name(); ostr<<"["; write_C(*expr.left(), ostr, state_name); ostr<<"]" ;
++            if (ltsmin) ostr << ".var";
+             break;
+         case T_FOREIGN_SQUARE_BRACKETS:
+             ostr << parent_table->get_process(parent_table->get_variable(expr.get_ident_gid())->
+@@ -69,6 +72,7 @@ void dve_compiler::write_C(dve_expression_t & expr, std::ostream & ostr, std::st
+             ostr<<"->";
+             ostr << parent_table->get_variable(expr.get_ident_gid())->get_name();
+             ostr<<"["; write_C(*expr.left(), ostr, state_name); ostr<<"]";
++            if (ltsmin) ostr << ".var";
+             break;
+ 
+         case T_LT: case T_LEQ: case T_EQ: case T_NEQ: case T_GT: case T_GEQ:
+@@ -83,7 +87,7 @@ void dve_compiler::write_C(dve_expression_t & expr, std::ostream & ostr, std::st
+         case T_DOT:
+             ostr<<state_name<<".";
+             ostr<<parent_table->get_process(parent_table->get_state(expr.get_ident_gid())->
+-                                            get_process_gid())->get_name(); ostr<<".state"<<" == ";
++                                            get_process_gid())->get_name(); ostr<<".state"<<(ltsmin?".var":"")<<" == ";
+             ostr<<parent_table->get_state(expr.get_ident_gid())->get_lid();
+             break;
+ 
+@@ -141,11 +145,27 @@ void dve_compiler::gen_header()
+         line( "typedef int64_t slong_long_int_t;" );
+         line( "typedef uint32_t ulong_int_t;" );
+         line( "typedef int32_t slong_int_t;" );
+-        line( "typedef uint32_t ushort_int_t;" );
+-        line( "typedef int32_t sshort_int_t;" );
+-        line( "typedef uint32_t byte_t;" );
+-        line( "typedef uint32_t ubyte_t;" );
+-        line( "typedef int32_t sbyte_t;" );
++        line( "typedef union" );
++        line( "{" );
++        line( "    uint16_t var;" );
++        line( "    uint32_t __padding__;" );
++        line( "} ushort_int_t;" );
++        line( "typedef union" );
++        line( "{" );
++        line( "    int16_t var;" );
++        line( "    uint32_t __padding__;" );
++        line( "} sshort_int_t;" );
++        line( "typedef union" );
++        line( "{" );
++        line( "    uint8_t var;" );
++        line( "    uint32_t __padding__;" );
++        line( "} ubyte_t;" );
++        line( "typedef ubyte_t byte_t;" );
++        line( "typedef union" );
++        line( "{" );
++        line( "    int8_t var;" );
++        line( "    uint32_t __padding__;" );
++        line( "} sbyte_t;" );
+         line( "typedef size_t size_int_t;" );
+         line();
+     } else {
+@@ -204,14 +224,19 @@ void dve_compiler::gen_state_struct()
+                 if ( var->get_init_expr_count() ) append( " = {" );
+                 for (size_int_t j=0; j!=var->get_init_expr_count(); j++)
+                 {
+-                    append( var->get_init_expr(j)->to_string() );
++                    if (ltsmin) append("{");
++                    append( cexpr( *((dve_expression_t*)var->get_init_expr(j)), "") );
++                    if (ltsmin) append("}");
+                     if (j!=(var->get_init_expr_count()-1))
+                         append( ", " );
+                     else
+                         append( "}" );
+                 }
+             } else if ( var->get_init_expr() ) {
+-                append( string( " = " ) + var->get_init_expr()->to_string() );
++                append( string( " = " ) );
++                if (ltsmin) append(" {");
++                append( cexpr( *((dve_expression_t*) var->get_init_expr()), "") );
++                if (ltsmin) append("}");
+             }
+             line( ";" );
+         }
+diff --git a/tools/dvecompile.h b/tools/dvecompile.h
+index 373dd8d..901f31b 100644
+--- a/tools/dvecompile.h
++++ b/tools/dvecompile.h
+@@ -132,15 +132,15 @@ struct dve_compiler: public dve_explicit_system_t
+     }
+ 
+     std::string process_state( int i, std::string state ) {
+-        return state + "." + process_name( i ) + ".state";
++        return state + "." + process_name( i ) + ".state" + (ltsmin?".var":"");
+     }
+ 
+     std::string channel_items( int i, std::string state ) {
+-        return state + "." + channel_name( i ) + ".number_of_items";
++        return state + "." + channel_name( i ) + ".number_of_items" + (ltsmin?".var":"");
+     }
+ 
+     std::string channel_item_at( int i, std::string pos, int x, std::string state ) {
+-        return state + "." + channel_name( i ) + ".content[" + pos + "].x" + wibble::str::fmt( x );
++        return state + "." + channel_name( i ) + ".content[" + pos + "].x" + (ltsmin?".var":"") + wibble::str::fmt( x );
+     }
+ 
+     int channel_capacity( int i ) {
+-- 
+1.6.0.3.3.g214bef
+
+
+From ee6697c5192aa24f17026e26c49065a78c19ca79 Mon Sep 17 00:00:00 2001
+From: Michael Weber <michaelw@foldr.org>
+Date: Sat, 27 Mar 2010 01:01:34 +0100
+Subject: [PATCH] OSX has POSIX strerror_r (and doesn't declare it?).
+
+---
+ wibble/exception.cpp |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/wibble/exception.cpp b/wibble/exception.cpp
+index 6768d09..5096bdd 100644
+--- a/wibble/exception.cpp
++++ b/wibble/exception.cpp
+@@ -90,7 +90,7 @@ string System::desc() const throw ()
+ {
+ 	const int buf_size = 500;
+ 	char buf[buf_size];
+-#if (_POSIX_C_SOURCE >= 200112L || _XOPEN_SOURCE >= 600) && ! _GNU_SOURCE
++#if (_POSIX_C_SOURCE >= 200112L || _XOPEN_SOURCE >= 600 || __APPLE__) && ! _GNU_SOURCE
+ 	if (strerror_r(m_errno, buf, buf_size))
+ 	{
+ 		buf[buf_size - 1] = 0;
+-- 
+1.6.0.3.3.g214bef
+
+
+From 046f9abb9478ca3097a95dcce352aaaae652aa6c Mon Sep 17 00:00:00 2001
+From: Elwin Pater <elwin.pater@gmail.com>
+Date: Sat, 10 Jul 2010 16:30:22 +0200
+Subject: [PATCH] Fixed read/write matrix bug on sync trans
+
+---
+ tools/dvecompile.cpp |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/tools/dvecompile.cpp b/tools/dvecompile.cpp
+index 91cf007..cb7d9a9 100644
+--- a/tools/dvecompile.cpp
++++ b/tools/dvecompile.cpp
+@@ -611,7 +611,7 @@ void dve_compiler::analyse_transition_dependencies( ext_transition_t &ext_transi
+     if (ext_transition.synchronized)
+     {
+         // mark process as read (write is probably in transition effect)
+-        mark_dependency(ext_transition.first->get_process_gid(),
++        mark_dependency(ext_transition.second->get_process_gid(),
+                         state_creator_t::PROCESS_STATE, -1, ext_transition.sv_write);
+ 
+         // analyse ext_transition->second
+-- 
+1.6.0.3.3.g214bef
+
+
+From 627315e51a7550305cd4b939c8660543f1a43a6d Mon Sep 17 00:00:00 2001
+From: Alfons Laarman <laarman@twickel.ewi.utwente.nl>
+Date: Wed, 31 Mar 2010 18:33:34 +0200
+Subject: [PATCH] fix init absolute table size.\n\n also in divine darcs
+
+---
+ tools/divine.cpp |    3 ++-
+ 1 files changed, 2 insertions(+), 1 deletions(-)
+
+diff --git a/tools/divine.cpp b/tools/divine.cpp
+index fc9e485..726da15 100644
+--- a/tools/divine.cpp
++++ b/tools/divine.cpp
+@@ -236,7 +236,8 @@ struct Main {
+             die( "FATAL: no command specified" );
+ 
+         config.setWorkers( o_workers->intValue() );
+-        config.setInitialTableSize( 2 << (o_initable->intValue()) );
++        config.setInitialTableSize( (2 << (o_initable->intValue())) 
++                                    / o_workers->intValue() );
+         config.setInput( input );
+         config.setVerbose( o_verbose->boolValue() );
+         config.setReport( o_report->boolValue() );
+-- 
+1.6.0.3.3.g214bef
+
+
+From f1e3d055d8eb11cdbce108979459142438b1e398 Mon Sep 17 00:00:00 2001
+From: Elwin Pater <elwin.pater@gmail.com>
+Date: Mon, 2 Aug 2010 14:28:08 +0200
+Subject: [PATCH] Fixed problems with channels
+
+    * Fixed bug in generating transition effect
+    * Fixed bug in generating channel names
+    * Slightly better error messages
+    * Fixed printf %d warnings
+---
+ tools/dvecompile.cpp |   32 ++++++++++++++++----------------
+ tools/dvecompile.h   |    2 +-
+ 2 files changed, 17 insertions(+), 17 deletions(-)
+
+diff --git a/tools/dvecompile.cpp b/tools/dvecompile.cpp
+index cb7d9a9..5728d11 100644
+--- a/tools/dvecompile.cpp
++++ b/tools/dvecompile.cpp
+@@ -261,7 +261,7 @@ void dve_compiler::gen_state_struct()
+                         append( "byte_t " );
+                     else if (state_creators[i].var_type==VAR_INT)
+                         append( "sshort_int_t " );
+-                    else gerr << "Unexpected error" << thr();
++                    else gerr << "Unexpected error generating state struct array" << thr();
+                     line( name + "[" + fmt( state_creators[i].array_size ) + "];" );
+                 }
+                 else
+@@ -270,7 +270,7 @@ void dve_compiler::gen_state_struct()
+                         line( "byte_t " + name + ";" );
+                     else if (state_creators[i].var_type==VAR_INT)
+                         line( "sshort_int_t " + name + ";" ); // todo: report as divine bug, fogotten whitespace?
+-                    else gerr << "Unexpected error" << thr();
++                    else gerr << "Unexpected error generating state struct" << thr();
+                 }
+             }
+             break;
+@@ -310,14 +310,14 @@ void dve_compiler::gen_state_struct()
+                         line( "byte_t x" + fmt( j ) + ";" );
+                     else if (symbol->get_channel_type_list_item(j)==VAR_INT)
+                         line( "sshort_int_t x" + fmt( j ) + ";" );
+-                    else gerr << "Unexpected error" << thr();
++                    else gerr << "Unexpected error generating state struc channel" << thr();
+                 block_end();
+                 line( "content[" + fmt( symbol->get_channel_buffer_size() ) + "];" );
+                 block_end();
+                 line( "__attribute__((__packed__)) " + name + ";" );
+             }
+             break;
+-            default: gerr << "Unexpected error" << thr();
++            default: gerr << "Unexpected error generating state struct" << thr();
+                 break;
+         };
+     }
+@@ -381,7 +381,7 @@ void dve_compiler::gen_initial_state()
+                 case state_creator_t::PROCESS_STATE:
+                 {
+                     append(sep); sprintf(sep,",");
+-                    sprintf(buf, "%d", initial_states[state_creators[i].gid]);
++                    sprintf(buf, "%zu", initial_states[state_creators[i].gid]);
+                     append(buf);
+                 }
+                 break;
+@@ -403,7 +403,7 @@ void dve_compiler::gen_initial_state()
+                     }
+                 }
+                 break;
+-                default: gerr << "Unexpected error" << thr();
++                default: gerr << "Unexpected error generating initial state" << thr();
+                     break;
+             };
+         }
+@@ -1350,7 +1350,7 @@ void dve_compiler::gen_state_info()
+                 {
+                     for(size_int_t j=0; j < state_creators[i].array_size; ++j)
+                     {
+-                        sprintf(buf, "    return \"%s[%d]\";", name.c_str(), j);
++                        sprintf(buf, "    return \"%s[%zu]\";", name.c_str(), j);
+                         line(buf);
+                         if (j < state_creators[i].array_size - 1) {
+                             sprintf(buf, "case %d:", ++k);
+@@ -1379,16 +1379,15 @@ void dve_compiler::gen_state_info()
+                 {
+                     for (size_int_t j=0; j<item_count; ++j)
+                     {
+-                    sprintf(buf, "    return \"%s[%d].x%d\";", name.c_str(), i,j);
+-                    line(buf);
+-                    if (i < chan_size - 1 || j < item_count - 1)
+                         sprintf(buf, "case %d:", ++k);
+                         line(buf);
++                        sprintf(buf, "    return \"%s[%zu].x%zu\";", name.c_str(), i,j);
++                        line(buf);
+                     }
+                 }
+                 continue;
+             }
+-            default: gerr << "Unexpected error" << thr();
++            default: gerr << "Unexpected error generating variable names" << thr();
+                 break;
+         };
+ 
+@@ -1461,8 +1460,9 @@ void dve_compiler::gen_state_info()
+                 }
+                 // byte migth be added ab
+                 type_name = "int";
++                break;
+             }
+-            default: gerr << "Unexpected error" << thr();
++            default: gerr << "Unexpected error while gathering type information" << thr();
+                 break;
+         }
+         if (type_no.find(type_name) == type_no.end())
+@@ -1537,7 +1537,7 @@ void dve_compiler::gen_state_info()
+                 }
+                 continue;
+             }
+-            default: gerr << "Unexpected error" << thr();
++            default: gerr << "Unexpected error while writing name per variable" << thr();
+                 break;
+         };
+ 
+@@ -1588,7 +1588,7 @@ void dve_compiler::gen_state_info()
+         {
+             sprintf(buf, "case %d: // %s", ix->second, ix->first.c_str());
+             line(buf);
+-            sprintf(buf, "    return %d;", type_value[ix->first].size());
++            sprintf(buf, "    return %zu;", type_value[ix->first].size());
+             line(buf);
+         }
+         line("default:");
+@@ -1850,7 +1850,7 @@ void dve_compiler::mark_dependency( size_int_t gid, int type, int idx, std::vect
+                 }
+             }
+             break;
+-            default: gerr << "Unexpected error" << thr();
++            default: gerr << "Unexpected error while marking dependency" << thr();
+                 break;
+         };
+     }
+@@ -1878,7 +1878,7 @@ int dve_compiler::count_state_variables()
+                 size += (chan_size * item_count) + 1;
+                 break;
+             }
+-            default: gerr << "Unexpected error" << thr();
++            default: gerr << "Unexpected error while counting length of state" << thr();
+                 break;
+         };
+     }
+diff --git a/tools/dvecompile.h b/tools/dvecompile.h
+index 901f31b..63bbe16 100644
+--- a/tools/dvecompile.h
++++ b/tools/dvecompile.h
+@@ -140,7 +140,7 @@ struct dve_compiler: public dve_explicit_system_t
+     }
+ 
+     std::string channel_item_at( int i, std::string pos, int x, std::string state ) {
+-        return state + "." + channel_name( i ) + ".content[" + pos + "].x" + (ltsmin?".var":"") + wibble::str::fmt( x );
++        return state + "." + channel_name( i ) + ".content[" + pos + "].x" + wibble::str::fmt( x ) + (ltsmin?".var":"");
+     }
+ 
+     int channel_capacity( int i ) {
+-- 
+1.6.0.3.3.g214bef
+
+
+From 48e6b4277ee94cb93eb551a2630a425521ec882d Mon Sep 17 00:00:00 2001
+From: Elwin Pater <elwin.pater@gmail.com>
+Date: Mon, 2 Aug 2010 14:50:04 +0200
+Subject: [PATCH] Added transition_info to callback
+
+    * Modified callback arguments to match ltsmin
+    * Added transition info to return a group
+---
+ tools/dvecompile.cpp |   19 ++++++++++++++++---
+ 1 files changed, 16 insertions(+), 3 deletions(-)
+
+diff --git a/tools/dvecompile.cpp b/tools/dvecompile.cpp
+index 5728d11..a5e027b 100644
+--- a/tools/dvecompile.cpp
++++ b/tools/dvecompile.cpp
+@@ -168,6 +168,14 @@ void dve_compiler::gen_header()
+         line( "} sbyte_t;" );
+         line( "typedef size_t size_int_t;" );
+         line();
++        line( "typedef struct transition_info" );
++        line( "{" );
++        line( "    int* label;" );
++        line( "    int  group;" );
++        line( "} transition_info_t;" );
++        line();
++        line( "transition_info_t transition_info = { NULL, -1 };" );
++        line();
+     } else {
+         line( "typedef uint64_t ulong_long_int_t;" );
+         line( "typedef int64_t slong_long_int_t;" );
+@@ -898,7 +906,12 @@ void dve_compiler::new_output_state() {
+ 
+ void dve_compiler::yield_state() {
+     if (ltsmin) {
+-        line( "callback(out, arg);" );
++        if (many) {
++            line ("transition_info.group = " + fmt( current_label++) + ";");
++        } else {
++            line ("transition_info.group = " + fmt( current_label -1 ) + ";");
++        }
++        line( "callback(arg, &transition_info, out);" );
+         line( "++states_emitted;" );
+     } else {
+         if ( many ) {
+@@ -1217,7 +1230,7 @@ void dve_compiler::print_generator()
+ 
+         many = false;
+         current_label = 0;
+-        line( "extern \"C\" int get_successor( state_struct_t *in, int t, void (*callback)(state_struct_t *out, void *arg), void *arg ) " );
++        line( "extern \"C\" int get_successor( state_struct_t *in, int t, void (*callback)(void* arg, transition_info_t *transition_info, state_struct_t *out), void *arg ) " );
+         block_begin();
+         line( "int states_emitted = 0;" );
+         line( "state_struct_t tmp;" );
+@@ -1238,7 +1251,7 @@ void dve_compiler::print_generator()
+         many = true;
+         current_label = 0;
+ 
+-        line( "extern \"C\" int get_successors( state_struct_t *in, void (*callback)(state_struct_t *out, void *arg), void *arg ) " );
++        line( "extern \"C\" int get_successors( state_struct_t *in, void (*callback)(void *arg, transition_info_t *transition_info, state_struct_t *out), void *arg ) " );
+         block_begin();
+         line( "int states_emitted = 0;" );
+         line( "state_struct_t tmp;" );
+-- 
+1.6.0.3.3.g214bef
+
+
+From 74199027a075514d3712dca7d623fb5d9fba2feb Mon Sep 17 00:00:00 2001
+From: Elwin Pater <elwin.pater@gmail.com>
+Date: Wed, 4 Aug 2010 17:07:27 +0200
+Subject: [PATCH] Made get_successor(s) compatible to all/long calls
+
+---
+ tools/dvecompile.cpp |    6 ++++--
+ 1 files changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/tools/dvecompile.cpp b/tools/dvecompile.cpp
+index a5e027b..0559d35 100644
+--- a/tools/dvecompile.cpp
++++ b/tools/dvecompile.cpp
+@@ -1230,8 +1230,9 @@ void dve_compiler::print_generator()
+ 
+         many = false;
+         current_label = 0;
+-        line( "extern \"C\" int get_successor( state_struct_t *in, int t, void (*callback)(void* arg, transition_info_t *transition_info, state_struct_t *out), void *arg ) " );
++        line( "extern \"C\" int get_successor( void* model, int t, state_struct_t *in, void (*callback)(void* arg, transition_info_t *transition_info, state_struct_t *out), void *arg ) " );
+         block_begin();
++        line( "(void)model; // ignore model" );
+         line( "int states_emitted = 0;" );
+         line( "state_struct_t tmp;" );
+         line( "state_struct_t *out = &tmp;" );
+@@ -1251,8 +1252,9 @@ void dve_compiler::print_generator()
+         many = true;
+         current_label = 0;
+ 
+-        line( "extern \"C\" int get_successors( state_struct_t *in, void (*callback)(void *arg, transition_info_t *transition_info, state_struct_t *out), void *arg ) " );
++        line( "extern \"C\" int get_successors( void *model, state_struct_t *in, void (*callback)(void *arg, transition_info_t *transition_info, state_struct_t *out), void *arg ) " );
+         block_begin();
++        line( "(void)model; // ignore model" );
+         line( "int states_emitted = 0;" );
+         line( "state_struct_t tmp;" );
+         line( "state_struct_t *out = &tmp;" );
+-- 
+1.6.0.3.3.g214bef
+
+
+From 7b861c8fd7f96ac8291fe90f9af4aef280a6ff1d Mon Sep 17 00:00:00 2001
+From: Elwin Pater <elwin.pater@gmail.com>
+Date: Fri, 13 Aug 2010 20:07:24 +0200
+Subject: [PATCH] Made transition_info thread-safe
+
+---
+ tools/dvecompile.cpp |    6 ++----
+ 1 files changed, 2 insertions(+), 4 deletions(-)
+
+diff --git a/tools/dvecompile.cpp b/tools/dvecompile.cpp
+index 0559d35..eb0d4fd 100644
+--- a/tools/dvecompile.cpp
++++ b/tools/dvecompile.cpp
+@@ -174,8 +174,6 @@ void dve_compiler::gen_header()
+         line( "    int  group;" );
+         line( "} transition_info_t;" );
+         line();
+-        line( "transition_info_t transition_info = { NULL, -1 };" );
+-        line();
+     } else {
+         line( "typedef uint64_t ulong_long_int_t;" );
+         line( "typedef int64_t slong_long_int_t;" );
+@@ -908,8 +906,6 @@ void dve_compiler::yield_state() {
+     if (ltsmin) {
+         if (many) {
+             line ("transition_info.group = " + fmt( current_label++) + ";");
+-        } else {
+-            line ("transition_info.group = " + fmt( current_label -1 ) + ";");
+         }
+         line( "callback(arg, &transition_info, out);" );
+         line( "++states_emitted;" );
+@@ -1232,6 +1228,7 @@ void dve_compiler::print_generator()
+         current_label = 0;
+         line( "extern \"C\" int get_successor( void* model, int t, state_struct_t *in, void (*callback)(void* arg, transition_info_t *transition_info, state_struct_t *out), void *arg ) " );
+         block_begin();
++        line( "transition_info_t transition_info = { NULL, t };" );
+         line( "(void)model; // ignore model" );
+         line( "int states_emitted = 0;" );
+         line( "state_struct_t tmp;" );
+@@ -1255,6 +1252,7 @@ void dve_compiler::print_generator()
+         line( "extern \"C\" int get_successors( void *model, state_struct_t *in, void (*callback)(void *arg, transition_info_t *transition_info, state_struct_t *out), void *arg ) " );
+         block_begin();
+         line( "(void)model; // ignore model" );
++        line( "transition_info_t transition_info = { NULL, -1 };" );
+         line( "int states_emitted = 0;" );
+         line( "state_struct_t tmp;" );
+         line( "state_struct_t *out = &tmp;" );
+-- 
+1.6.0.3.3.g214bef
+
