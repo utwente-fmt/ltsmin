@@ -36,7 +36,6 @@ struct lb_s {
 typedef struct lb_status_s lb_status_t;
 
 static const size_t LOAD_ZERO = 0;
-static size_t       MAX_HANDOFF_DEFAULT = 100;
 
 lb_t                *
 lb_create (size_t threads, algo_f alg, split_problem_f split,

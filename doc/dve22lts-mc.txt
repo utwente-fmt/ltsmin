@@ -11,19 +11,16 @@ dve22lts-mc - Concurrent state space generator for DIVINE 2.2 models.
 
 == SYNOPSIS
 
-*dve22lts-mc* [OPTION]... 'input.dve2C' ['output']
+*dve22lts-mc* [OPTION]... 'input'[_.dve_|_.dve2C_] ['output']
 
 == DESCRIPTION
 
 dve22lts-mc generates a labelled transition system from a compiled
-specification provided in 'input.dve2C'. It does this concurrently
-any given number of threads.
-
-== CONTEXT
-
-include::inc/spec2lts-mc.txt[]
+specification provided in 'input.dve' or 'input.dve2C' (precompiled).
+It does this concurrently for any given number of threads.
 
 == OPTIONS
 
 include::inc/spec2lts-mc-options.txt[]
 
+include::inc/spec2lts-mc.txt[]

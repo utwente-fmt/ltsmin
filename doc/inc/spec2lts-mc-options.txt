@@ -1,3 +1,20 @@
+*--threads*='NUMBER'::
+        Number of threads to use for state space exploration
+        (default: NUMBER=NUM_CORES). Maximum is 64.
+
+
+*--strategy*='TYPE'::
+        Select exploration strategy (strict exploration orders
+        are not guaranteed by the multicore version).
+        'TYPE' can be one of the following options:
+
+bfs;;
+  explore state space in breadth-first order (default).
+
+dfs;;
+  explore state space in depth-first order.
+
+
 *--state*='TYPE'::
         Select type of data structure for storing visited states.
         'TYPE' can be one of the following options:
@@ -6,6 +23,60 @@ table;;
   use a lockless hash table (default).
 
 tree;;
-  use a lockless tree-compressed hash table (default).
+  use a lockless tree-compressed hash table.
+
+
+*--size*='NUMBER'::
+        Log_2 hash table size in elements (default: NUMBER=24).
+        This is also used for the internal node table of the tree.
+
+
+*--lb*='TYPE'::
+        Select load-balancing strategy.  'TYPE' can be one of the
+        following options:
+
+srp;;
+  synchronous random polling (default).
+
+static;;
+  initial BFS run, with static hand-off to all threads.
+
+combined;;
+  not implemented. Experiments show that SRP overhead is minimal (<5%).
+
+
+*--handoff*='NUMBER'::
+        Maximum number of states to hand off to a thread requesting load
+        (default: NUMBER=100). The operation may be expensive, depending
+        on the size of the states.
+
+
+*--gran*='NUMBER'::
+        Granularity at which control is handed back to the load balancer
+        (default: NUMBER=100). Higher values may reduce runtime
+        overhead, but decrease the performance of the load balancer.
+        The state space explorer uses the number of transitions as work
+        counter.
+
+
+*--ref*::
+        Save space by storing references to table/tree on the stack/queue.
+        Normally full states are stored.
+
+
+*--zobrist*='NUMBER'::
+        Save time by using zobrist incremental state hashing.
+        NUMBER defines the (log_2) size of the random number table
+        (default: 0=OFF). Large tables mean better hash distributions,
+        but more cache misses due to memory size.
+        Experiments have shown that small tables (2^6) suffice for
+        good distributions (equal or better than Jenkin's hash).
+        Improvements are only noticable for fast state generators, like
+        DiVinE 2.2( manpage:dve22lts-mc[1]).
+
+
+*--max*='NUMBER'::
+        Maximum search depth.
+
 
 include::reachability-options.txt[]

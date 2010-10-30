@@ -71,13 +71,14 @@ static dbs_get_f    get;
 static TransitionCB succ_cb;
 static char        *state_repr = "table";
 static db_type_t    db_type = UseDBSLL;
-static char        *arg_strategy = "dfs";
+static char        *arg_strategy = "bfs";
 static strategy_t   strategy = Strat_BFS;
 static char        *arg_lb = "srp";
 static lb_method_t  lb_method = LB_SRP;
 static char*        trc_output=NULL;
 static int          dlk_detect = 0;
 static size_t       G = 100;
+static size_t       H = MAX_HANDOFF_DEFAULT;
 static int          ZOBRIST = 0;
 static int         *parent_idx=NULL;
 static int          start_idx=0;
@@ -133,26 +134,26 @@ state_db_popt (poptContext con, enum poptCallbackReason reason,
 static struct poptOption options[] = {
     {NULL, 0, POPT_ARG_CALLBACK | POPT_CBFLAG_POST | POPT_CBFLAG_SKIPOPTION,
      (void *)state_db_popt, 0, NULL, NULL},
-    {"deadlock", 'd', POPT_ARG_VAL, &dlk_detect, 1, "detect deadlocks", NULL },
-    {"trace", 0, POPT_ARG_STRING, &trc_output, 0, "file to write trace to", "<lts output>" },
+    {"threads", 0, POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &W, 0, "number of threads", "<int>"},
     {"state", 0, POPT_ARG_STRING | POPT_ARGFLAG_SHOW_DEFAULT, &state_repr,
       0, "select the data structure for storing states", "<tree|table>"},
-    {"threads", 0, POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &W, 0, "number of threads", "<int>"},
-    {"max", 0, POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &max, 0, "maximum search depth", "<int>"},
+    {"size", 's', POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &dbs_size, 0,
+     "size of the state store (log2(size))", NULL},
     {"strategy", 0, POPT_ARG_STRING | POPT_ARGFLAG_SHOW_DEFAULT,
      &arg_strategy, 0, "select the search strategy", "<bfs|dfs>"},
     {"lb", 0, POPT_ARG_STRING | POPT_ARGFLAG_SHOW_DEFAULT,
       &arg_lb, 0, "select the load balancing method", "<srp|static|combined>"},
-    {"size", 's', POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &dbs_size, 20,
-     "size of the state store (log2(size))", NULL},
     {"gran", 'g', POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &G,
-     100, "subproblem granularity ( T( work(P,g) )=min( T(P), g ) )", NULL},
+     0, "subproblem granularity ( T( work(P,g) )=min( T(P), g ) )", NULL},
+    {"handoff", 'h', POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &H,
+     0, "maximum balancing handoff (handoff=min(max, stack_size/2))", NULL},
     {"zobrist", 'z', POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &ZOBRIST,
-     10,"log2 size of zobrist random table (6 or 8 is good enough)", NULL},
-    {"handoff", 'h', POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &dbs_size,
-     100, "maximum balancing handoff (handoff=min(max, stack_size/2))", NULL},
+     0,"log2 size of zobrist random table (6 or 8 is good enough; 0 is no zobrist)", NULL},
     {"grey", 0, POPT_ARG_VAL, &call_mode, UseGreyBox, "make use of GetTransitionsLong calls", NULL},
     {"ref", 0, POPT_ARG_VAL, &refs, 1, "store references on the stack/queue instead of full states", NULL},
+    {"max", 0, POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &max, 0, "maximum search depth", "<int>"},
+    {"deadlock", 'd', POPT_ARG_VAL, &dlk_detect, 1, "detect deadlocks", NULL },
+    {"trace", 0, POPT_ARG_STRING, &trc_output, 0, "file to write trace to", "<lts output>" },
     {"matrix", 'm', POPT_ARG_VAL, &matrix, 1, "Print the dependency matrix for the model and exit", NULL},
 #if defined(MCRL)
     {NULL, 0, POPT_ARG_INCLUDE_TABLE, mcrl_options, 0, "mCRL options", NULL},
@@ -351,10 +352,10 @@ init_globals (int argc, char *argv[])
         break;
     }
     lb = ( strategy == Strat_BFS
-         ?   lb_create(W, (algo_f)bfs,      split_bfs, G, lb_method)
+         ?   lb_create_max(W, (algo_f)bfs,      split_bfs, G, lb_method, H)
          : ( call_mode == UseGreyBox //strategy == Strat_DFS
-           ? lb_create(W, (algo_f)dfs_grey, split_dfs, G, lb_method)
-           : lb_create(W, (algo_f)dfs,      split_dfs, G, lb_method) ) );
+           ? lb_create_max(W, (algo_f)dfs_grey, split_dfs, G, lb_method, H)
+           : lb_create_max(W, (algo_f)dfs,      split_dfs, G, lb_method, H) ) );
     contexts = RTmalloc (sizeof (thread_ctx_t *[W]));
     for (size_t i = 0; i < W; i++)
         contexts[i] = create_context (i);

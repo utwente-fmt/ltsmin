@@ -22,11 +22,11 @@ include::support.txt[]
 
 == SEE ALSO
 manpage:ltsmin[7],
-manpage:ltsmin-mpi[1],
 manpage:ltsmin-convert[1],
 manpage:ltsmin-tracepp[1],
+manpage:etf[5],
 http://www.cwi.nl/{tilde}mcrl/[muCRL],
 http://www.mcrl2.org/[mCRL2],
 http://fmt.cs.utwente.nl/{tilde}michaelw/nips/[NIPS],
 http://divine.fi.muni.cz/[DiVinE-cluster],
-http://www.mpi-forum.org/[MPI Forum]
+http://divine.fi.muni.cz/[DiVinE-2.2],

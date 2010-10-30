@@ -7,23 +7,20 @@ dve2lts-mc(1)
 
 == NAME
 
-nips2lts-mc - Concurrent state space generator for DIVINE (cluster) models.
+dve2lts-mc - Concurrent state space generator for DiVinE (cluster) models.
 
 == SYNOPSIS
 
-*dve2lts-mc* [OPTION]... 'input.dve' ['output']
+*dve2lts-mc* [OPTION]... 'input'[_.dve_|_.dveC_] ['output']
 
 == DESCRIPTION
 
 dve2lts-mc generates a labelled transition system from a
-specification provided in 'input.dve'. It does this concurrently
-any given number of threads.
-
-== CONTEXT
-
-include::inc/spec2lts-mc.txt[]
+specification provided in 'input.dve' or 'intput.dveC' (precompiled).
+It does this concurrently for any given number of threads.
 
 == OPTIONS
 
 include::inc/spec2lts-mc-options.txt[]
 
+include::inc/spec2lts-mc.txt[]
