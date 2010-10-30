@@ -139,7 +139,7 @@ Build with:
 
     cd divine2
     mkdir _build && cd _build
-    cmake .. -DGUI=OFF -DRX_PATH= -DCMAKE_INSTALL_PREFIX=...
+    cmake .. -DHOARD=OFF -DGUI=OFF -DRX_PATH= -DCMAKE_INSTALL_PREFIX=...
     make
     make install
 
