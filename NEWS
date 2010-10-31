@@ -1,3 +1,12 @@
+November 1, 2010 - Release 1.6 of the LTSmin toolset.
+
+ * New frontend DVE2 (requires DiVinE 2.2)
+ * Enumerative Multi-Core backend
+ * Finding error actions symbolically (<spec>-reach --action)
+ * Symbolic saturation-like strategies
+ * Faster trace generation for <spec>-reach
+ * BDD reordering for BuDDy vset
+
 December 1, 2009 - Release 1.5 of the LTSmin toolset.
 
  * New frontend DVE (requires DiVinE-cluster)
