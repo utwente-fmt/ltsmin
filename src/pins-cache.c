@@ -107,6 +107,8 @@ GBaddCache (model_t model)
 {
     assert (model != NULL);
     matrix_t           *p_dm = GBgetDMInfo (model);
+    matrix_t           *p_dm_read = GBgetDMInfoRead (model);
+    matrix_t           *p_dm_write = GBgetDMInfoWrite (model);
     int                 N = dm_nrows (p_dm);
     struct group_cache *cache = RTmalloc (N * sizeof (struct group_cache));
     for (int i = 0; i < N; i++) {
@@ -129,6 +131,8 @@ GBaddCache (model_t model)
     ctx->cache = cache;
 
     GBsetDMInfo (cached, p_dm);
+    GBsetDMInfoRead (cached, p_dm_read);
+    GBsetDMInfoWrite (cached, p_dm_write);
     GBsetContext (cached, ctx);
 
     GBsetNextStateShort (cached, cached_short);
