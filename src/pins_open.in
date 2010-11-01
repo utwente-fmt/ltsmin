@@ -31,12 +31,7 @@ export OPEN_CAESAR_COMMAND
 
 # the following variables are initialised by "configure"
 LTSMIN_VERSION="@VERSION@"
-prefix="@prefix@"
-LTSMIN_PREFIX="$prefix"
-exec_prefix="@exec_prefix@"
-datarootdir="@datarootdir@"
-datadir="@datadir@"
-libdir="@libdir@"
+LTSMIN_PREFIX="@prefix@"
 LTSMIN_LIB="@pkglibdir@"
 
 # phase 1: parsing the options
@@ -99,11 +94,25 @@ case "$FILE" in
     echo "input is ETF"
     LTSMIN_MOD_LDFLAGS="@CADP_LDFLAGS@ -letf-open @CADP_LIBS@"
     ;;
- *.dve|*.dveC)
+ *.dve)
+    @HAVE_DVEC_FALSE@ @HAVE_DVEC2_FALSE@ echo "DiVinE support not installed"
+    @HAVE_DVEC_FALSE@ @HAVE_DVEC2_FALSE@ exit 1
+    echo "input is DVE"
+    # prefer DiVinE 2 over divine-cluster
+    @HAVE_DVEC_TRUE@ LTSMIN_MOD_LDFLAGS="@DIVINE_LDFLAGS@ -ldve-open @DVEC_LIBS@ -lstdc++"
+    @HAVE_DVEC2_TRUE@ LTSMIN_MOD_LDFLAGS="@DIVINE2_LDFLAGS@ -ldve2-open @DVEC2_LIBS@"
+    ;;
+ *.dveC)
     @HAVE_DVEC_FALSE@ echo "DiVinE support not installed"
     @HAVE_DVEC_FALSE@ exit 1
     echo "input is DVE"
     LTSMIN_MOD_LDFLAGS="@DIVINE_LDFLAGS@ -ldve-open @DVEC_LIBS@ -lstdc++"
+    ;;
+ *.dve2C)
+    @HAVE_DVEC2_FALSE@ echo "DiVinE 2 support not installed"
+    @HAVE_DVEC2_FALSE@ exit 1
+    echo "input is DVE2"
+    LTSMIN_MOD_LDFLAGS="@DIVINE2_LDFLAGS@ -ldve-open @DVEC2_LIBS@"
     ;;
  *)
     echo "Did not recognize type of $FILE"

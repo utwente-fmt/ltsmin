@@ -5,7 +5,7 @@ pkglib_LTLIBRARIES =
 
 SUBDIRS = dm bignum . ce torx
 
-EXTRA_DIST = ltsmin-lexer.c ltsmin-lexer.h
+EXTRA_DIST = ltsmin-lexer.c ltsmin-lexer.h pins_open
 BUILT_SOURCES = ltsmin-grammar.c ltsmin-grammar.h ltsmin-lexer.c ltsmin-lexer.h
 
 # pins_open
@@ -423,7 +423,7 @@ git_version.h.tmp:
 .PHONY: git_version.h.tmp
 
 DISTCLEANFILES = git_version.h git_version.h.tmp
-CLEANFILES = ltsmin-grammar.c ltsmin-grammar.h ltsmin-grammar.out
+CLEANFILES = ltsmin-grammar.c ltsmin-grammar.h ltsmin-grammar.out pins_open
 MAINTAINERCLEANFILES = ltsmin-tokens.c ltsmin-tokens.h
 
 # make
