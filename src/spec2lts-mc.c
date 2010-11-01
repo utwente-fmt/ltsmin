@@ -63,7 +63,7 @@ static int          refs = 0;
 static int          matrix = 0;
 static box_t        call_mode = UseBlackBox;
 static size_t       max = UINT_MAX;
-static size_t       W = 0;
+static size_t       W = 2;
 static lb_t        *lb;
 static void        *dbs;
 static dbs_stats_f  statistics;
@@ -217,7 +217,7 @@ static int          K;
 static int          Q;                  // queueing length of states
 static int          IDX_LOC;            // location of database index on queue
 static int          MAX_SUCC;           // max succ. count to expand at once
-static size_t       treshold;
+static size_t       threshold;
 static pthread_attr_t *attr = NULL;
 static thread_ctx_t **contexts;
 static zobrist_t    zobrist = NULL;
@@ -302,14 +302,12 @@ init_globals (int argc, char *argv[])
         parent_idx = RTmalloc(sizeof(int[1<<dbs_size]));
         dlk_detect = 1;
     }
-    if (!W)
-        W = tls_get_cpu_count ();
 #ifndef __APPLE__
     pthread_barrier_init(&start_barrier, NULL, W);
 #endif
     Warning (info, "Using %d cores.", W);
     Warning (info, "loading model from %s", files[0]);
-    treshold = 100000 / W;
+    threshold = 100000 / W;
     program = get_label ();
     if (ZOBRIST && db_type == UseTreeDBSLL)
         Fatal (1, error, "Zobrist and treedbs is not implemented");
@@ -380,9 +378,9 @@ print_state_space_total (char *name, thread_ctx_t * ctx)
 static inline void
 maybe_report (thread_ctx_t * ctx, char *msg)
 {
-    if (RTverbosity < 1 || ctx->visited < treshold)
+    if (RTverbosity < 1 || ctx->visited < threshold)
         return;
-    if (!cas (&treshold, treshold, treshold << 1))
+    if (!cas (&threshold, threshold, threshold << 1))
         return;
     if (W == 1)
         print_state_space_total (msg, ctx);
