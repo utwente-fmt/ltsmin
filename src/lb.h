@@ -21,6 +21,8 @@ typedef enum { LB_Static,   //Statically partition results of an initial run
                LB_Combined  //TODO: start static switch to SRP when unbalanced
 } lb_method_t;
 
+#define MAX_HANDOFF_DEFAULT 100
+
 typedef int         (*algo_f) (void * ctx, size_t granularity);
 typedef size_t      (*split_problem_f) (size_t source_id, size_t target_id,
                                         size_t handoff);

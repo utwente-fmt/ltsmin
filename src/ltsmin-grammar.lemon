@@ -55,10 +55,8 @@ etf_spec ::= etf_spec map_section.
 etf_spec ::= etf_spec sort_section.
 
 etf_spec ::= error . {
-    HREprintf(error,"ETF syntax has changed. Possible causes for syntax errors are:\n");
-    HREprintf(error," - keywords must be escaped when used as identifiers e.g. \\state\n");
-    HREprintf(error," - every variable name and type must be defined (don't use \"_\")\n");
-    HREprintf(error," - you can escape illegal identifier characters with '\\'\n");
+    HREprintf (error, "ETF syntax error.  For a description of the ETF syntax, "
+                      "refer to the etf(5) man page.\n");
     HREabort(0);
 }
 

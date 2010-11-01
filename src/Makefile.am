@@ -1,11 +1,11 @@
 bin_PROGRAMS = ltsmin-convert gcf etf-convert ltsmin-tracepp
-noinst_PROGRAMS = test-bitset test-is-balloc test-dfs-stack test-hre ltsmin-parse test-dbs
-noinst_LTLIBRARIES = libutil.la libltsmin.la
+check_PROGRAMS = test-bitset test-is-balloc test-dfs-stack test-hre ltsmin-parse test-dbs
+check_LTLIBRARIES = libutil.la libltsmin.la
 pkglib_LTLIBRARIES =
 
 SUBDIRS = dm bignum . ce torx
 
-EXTRA_DIST = ltsmin-lexer.c ltsmin-lexer.h
+EXTRA_DIST = ltsmin-lexer.c ltsmin-lexer.h pins_open
 BUILT_SOURCES = ltsmin-grammar.c ltsmin-grammar.h ltsmin-lexer.c ltsmin-lexer.h
 
 # pins_open
@@ -18,8 +18,8 @@ endif
 
 if HAVE_MPI
 bin_PROGRAMS += ltsmin-mpi etf2lts-mpi
-noinst_PROGRAMS += mpi-event-test test-hre-mpi
-noinst_LTLIBRARIES += libmpi.la libltsmin-mpi.la
+check_PROGRAMS += mpi-event-test test-hre-mpi
+check_LTLIBRARIES += libmpi.la libltsmin-mpi.la
 if HAVE_LIBSTEP_INFO
 bin_PROGRAMS += lpo2lts-mpi
 endif
@@ -423,7 +423,7 @@ git_version.h.tmp:
 .PHONY: git_version.h.tmp
 
 DISTCLEANFILES = git_version.h git_version.h.tmp
-CLEANFILES = ltsmin-grammar.c ltsmin-grammar.h ltsmin-grammar.out
+CLEANFILES = ltsmin-grammar.c ltsmin-grammar.h ltsmin-grammar.out pins_open
 MAINTAINERCLEANFILES = ltsmin-tokens.c ltsmin-tokens.h
 
 # make

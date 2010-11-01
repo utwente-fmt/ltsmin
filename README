@@ -130,6 +130,31 @@ support for mcrl2 (instead of, e.g., system-provided Boost headers).
 See the CADP website <http://www.inrialpes.fr/vasy/cadp/> on how to
 obtain a licence and download the CADP toolkit.
 
+*** DiVinE 2
+Download a patched version of DiVinE 2.2 <http://divine.fi.muni.cz/>:
+
+    git clone http://fmt.cs.utwente.nl/tools/scm/divine2.git
+
+Build with:
+
+    cd divine2
+    mkdir _build && cd _build
+    cmake .. -DHOARD=OFF -DGUI=OFF -DRX_PATH= -DCMAKE_INSTALL_PREFIX=...
+    make
+    make install
+
+The LTSmin configure script will find the DiVinE installation
+automatically, if the ``divine'' binary is in the search path.
+
+The ``divine compile'' DVE compiler produces LTSmin compatible
+libraries with:
+
+    divine compile -l model.dve
+
+This produces a file ``model.dve2C'', which can also be passed to
+LTSmin tools.  (This is done automatically by the LTSmin tools when
+passing a ``.dve'' model, doing it manually is rarely needed.)
+
 *** DiVinE(-cluster)
 Download the latest CVS version of DiVinE-cluster; instructions can be
 found at <http://divine.fi.muni.cz/trac/wiki/DevelopmentIntroduction>.
