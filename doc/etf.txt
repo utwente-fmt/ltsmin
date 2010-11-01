@@ -48,6 +48,7 @@ opt_decl    ::= (ident | "_") ":" (ident | "_")
 declaration ::= ident ":" ident
 mapentry    ::= ( number | "*" ) * ( value | number )
 transentry  ::= ((number "/" number)|"*")* ( value | number )*
+ident       ::= '_'*[':print:'] ([':print:']*
 number      ::= ['0'..'9']+
 value       ::= 'see below'
 ----
@@ -55,12 +56,9 @@ value       ::= 'see below'
 Note that the current parser is line based and requires that every section entry is one line and
 that the begins and end are also lines. This version supports three kinds of values:
 
-* A string of printable characters that contains no white space, is not a number and which does not
-  both start and end with `{hash}`. E.g. `abc`.
-* Many strings of printable characters can be quoted.
-  E.g. `"12"`, `"x y z"`. (No escape rules are implemented. We expect a future version to support C style escape rules.)
-* A hex encoding of a byte string. That is, `{hash}` followed by pairs of hex digits encoding chars followed by `{hash}`.
-  E.g. `{hash}616263{hash}`.
+* A quoted string, e.g., +"foo bar"+ (contained double quotes and backward slashes must be escaped with a backward slash)
+* A hex encoding of a byte string. That is, +{hash}+ followed by pairs of hex digits encoding chars followed by +{hash}+.
+  E.g., +{hash}61FF62FF63{hash}+.
 
 == EXAMPLE
 
@@ -85,7 +83,7 @@ The LTS
 with initial state 00 is represented by the ETF specification:
 ----
 begin state
-_:_  _:_
+shape:shape  multiplicity:multiplicity
 end state
 begin edge
 action:action
@@ -100,8 +98,8 @@ begin trans
 * 0/1 1
 end trans
 begin map shape:shape
-0 * square
-1 * circle
+0 * "square" 
+1 * "circle" 
 end map
 begin map multiplicity:multiplicity
 0 0 1
@@ -110,12 +108,12 @@ begin map multiplicity:multiplicity
 1 1 1
 end map
 begin sort action
-a
-b
+"a" 
+"b" 
 end sort
 begin sort multiplicity
-single
-double
+"single" 
+"double" 
 end sort
 ----
 
@@ -125,4 +123,3 @@ manpage:etf2lts-mpi[1],
 manpage:etf2lts-grey[1],
 manpage:etf-reach[1],
 manpage:etf-convert[1]
-
