@@ -233,12 +233,46 @@ apply_regroup_spec (matrix_t *m, const char *spec_)
     }
 }
 
+void
+combine_rows(matrix_t *matrix_new, matrix_t *matrix_old, int new_rows,
+                 int *transbegin, int *transmap)
+{
+    bitvector_t row_new, row_old;
+
+    bitvector_create(&row_old, dm_ncols(matrix_old));
+
+    for (int i = 0; i < new_rows; i++) {
+        int begin = transbegin[i];
+        int end   = transbegin[i + 1];
+
+        bitvector_create(&row_new, dm_ncols(matrix_old));
+
+        for (int j = begin; j < end; j++) {
+            dm_bitvector_row(&row_old, matrix_old, transmap[j]);
+            bitvector_union(&row_new, &row_old);
+        }
+
+        for (int k = 0; k < dm_ncols(matrix_old); k++) {
+            if (bitvector_is_set(&row_new, k))
+                dm_set(matrix_new, i, k);
+            else
+                dm_unset(matrix_new, i, k);
+        }
+
+        bitvector_free(&row_new);
+    }
+
+    bitvector_free(&row_old);
+}
+
 model_t
 GBregroup (model_t model, const char *regroup_spec)
 {
     // note: context information is available via matrix, doesn't need to
     // be stored again
-    matrix_t           *m = RTmalloc (sizeof (matrix_t));
+    matrix_t           *m  = RTmalloc (sizeof (matrix_t));
+    matrix_t           *mr = RTmalloc (sizeof (matrix_t));
+    matrix_t           *mw = RTmalloc (sizeof (matrix_t));
 
     dm_copy (GBgetDMInfo (model), m);
 
@@ -251,11 +285,11 @@ GBregroup (model_t model, const char *regroup_spec)
     // create new model
     model_t             group = GBcreateBase ();
     GBcopyChunkMaps (group, model);
-           
+
     struct group_context *ctx = RTmalloc (sizeof *ctx);
 
     GBsetContext (group, ctx);
-    
+
     GBsetNextStateLong (group, group_long);
     GBsetNextStateAll (group, group_all);
 
@@ -299,25 +333,34 @@ GBregroup (model_t model, const char *regroup_spec)
         }
         ctx->transbegin[newNgroups] = p;
     }
-    
+
     lts_type_t ltstype=GBgetLTStype (model);
     lts_type_print(debug,ltstype);
     Warning(debug,"permuting ltstype");
     ltstype=lts_type_permute(ltstype,ctx->statemap);
     lts_type_print(debug,ltstype);
     GBsetLTStype (group, ltstype);
- 
+
+    // Permute read and write matrices
+    dm_create(mr, dm_nrows (m), dm_ncols (m));
+    dm_create(mw, dm_nrows (m), dm_ncols (m));
+    combine_rows(mr, GBgetDMInfoRead (model), dm_nrows (m), ctx->transbegin,
+                     ctx->transmap);
+    combine_rows(mw, GBgetDMInfoWrite (model), dm_nrows (m), ctx->transbegin,
+                     ctx->transmap);
+    dm_copy_header(&(m->col_perm), &(mr->col_perm));
+    dm_copy_header(&(m->col_perm), &(mw->col_perm));
+
     // fill edge_info
     GBsetDMInfo (group, m);
+    GBsetDMInfoRead (group, mr);
+    GBsetDMInfoWrite (group, mw);
 
     // copy state label matrix and apply the same permutation
     matrix_t           *s = RTmalloc (sizeof (matrix_t));
 
     dm_copy (GBgetStateLabelInfo (model), s);
-    if (dm_ncols(m) != dm_ncols(s))
-            Fatal (-1, error,
-                   "Dependency Matrix and State label matrix"
-                   " have the same number of columns?!");
+    assert (dm_ncols(m) == dm_ncols(s));
 
     // probably better to write some functions to do this,
     // i.e. dm_get_column_permutation
