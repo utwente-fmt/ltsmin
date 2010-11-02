@@ -109,51 +109,57 @@ int TreeDBSlookup(treedbs_t dbs, int *vector) {
 }
 
 int TreeFold(treedbs_t dbs,int *vector) {
-    int *idx = RTmalloc(sizeof *idx);
-    TreeFold_ret(dbs,vector,idx);
-    return *idx;
+    int idx = 0;
+    TreeFold_ret(dbs, vector, &idx);
+    return idx;
 }
 
-int TreeFold_ret(treedbs_t dbs,int *vector, int *idx){
-	int nPars=dbs->nPars;
-	if (nPars==1) {
-		//Warning(info,"insert %d",vector[0]);
-		if(vector[0]>=dbs->range){
-			int old=dbs->range;
-			while(vector[0]>=dbs->range) {
-				int blk_count=dbs->range/BLOCKSIZE;
-				dbs->range+=BLOCKSIZE*((blk_count/2)+1);
-			}
-			//Warning(info,"resize from %d to %d",old,dbs->range);
-			dbs->map=realloc(dbs->map,dbs->range*sizeof(int));
-			dbs->rev=realloc(dbs->rev,dbs->range*sizeof(int));
-			while(old<dbs->range){
-				dbs->map[old]=-1;
-				dbs->rev[old]=-1;
-				old++;
-			}
-		}
-		if (dbs->map[vector[0]]==-1) {
-			dbs->map[vector[0]]=dbs->count;
-			dbs->rev[dbs->count]=vector[0];
-			dbs->count++;
-		}
-		//Warning(info,"insert %d as %d",vector[0],dbs->map[vector[0]]);
-		return dbs->map[vector[0]];
-	} else {
-        int seen = 0;
-		int tmp[nPars];
-		for(int i=nPars-1;i>0;i--) {
-			int left=dbs->db_tree_left[i];
-			int right=dbs->db_tree_right[i];
-			tmp[i]=db_insert(dbs,i,
-				(left<nPars)?tmp[left]:vector[left-nPars],
-				(right<nPars)?tmp[right]:vector[right-nPars],
-                &seen);
-		}
-        *idx=tmp[1];
-		return seen;
-	}
+int
+TreeFold_ret(treedbs_t dbs,int *vector, int *idx)
+{
+    int nPars=dbs->nPars;
+    int seen = -1;
+    if (nPars==1) {
+        seen = 1;
+        //Warning(info,"insert %d",vector[0]);
+        if(vector[0]>=dbs->range){
+            int old=dbs->range;
+            while(vector[0]>=dbs->range) {
+                int blk_count=dbs->range/BLOCKSIZE;
+                dbs->range+=BLOCKSIZE*((blk_count/2)+1);
+            }
+            //Warning(info,"resize from %d to %d",old,dbs->range);
+            dbs->map=realloc(dbs->map,dbs->range*sizeof(int));
+            dbs->rev=realloc(dbs->rev,dbs->range*sizeof(int));
+            while(old<dbs->range){
+                dbs->map[old]=-1;
+                dbs->rev[old]=-1;
+                old++;
+            }
+        }
+        if (dbs->map[vector[0]]==-1) {
+            dbs->map[vector[0]]=dbs->count;
+            dbs->rev[dbs->count]=vector[0];
+            dbs->count++;
+            seen = 0;
+        }
+        //Warning(info,"insert %d as %d",vector[0],dbs->map[vector[0]]);
+        *idx = dbs->map[vector[0]];
+        return seen;
+    } else {
+        seen = 0;
+        int tmp[nPars];
+        for(int i=nPars-1;i>0;i--) {
+            int left=dbs->db_tree_left[i];
+            int right=dbs->db_tree_right[i];
+            tmp[i]=db_insert(dbs,i,
+                             (left<nPars)?tmp[left]:vector[left-nPars],
+                             (right<nPars)?tmp[right]:vector[right-nPars],
+                             &seen);
+        }
+        *idx = tmp[1];
+        return seen;
+    }
 }
 
 void TreeUnfold(treedbs_t dbs,int index,int*vector){
