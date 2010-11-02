@@ -247,16 +247,15 @@ dve2lts_mc_CPPFLAGS = -DDIVINE $(DIVINE_CPPFLAGS) $(AM_CPPFLAGS)
 dve2lts_mc_LDFLAGS  = $(DIVINE_LDFLAGS) $(AM_LDFLAGS) $(CADP_LDFLAGS)
 
 # dve22lts-mc
-dve22lts_mc_SOURCES  = spec2lts-mc.c dve2-greybox.c dve2-greybox.h    \
-                       lts.c lts.h
-dve22lts_mc_LDADD    = libltsmin.la  $(DVEC2_LIBS)
+dve22lts_mc_SOURCES  = spec2lts-mc.c dve2-greybox.c dve2-greybox.h config.h
+dve22lts_mc_LDADD    = libltsmin.la $(DVEC2_LIBS)
 dve22lts_mc_CPPFLAGS = -DDIVINE2 $(DIVINE2_CPPFLAGS) $(AM_CPPFLAGS)
 dve22lts_mc_LDFLAGS  = $(DIVINE2_LDFLAGS) $(AM_LDFLAGS)
 
 # etf2lts-mc
-etf2lts_mc_SOURCES  = spec2lts-mc.c etf-greybox.c etf-greybox.h lts.c lts.h \
-                        vset_atermdd.c
-etf2lts_mc_LDADD    = libltsmin.la -lATerm $(BUDDY_LIBS) $(CADP_LIBS)
+etf2lts_mc_SOURCES  = spec2lts-mc.c etf-greybox.c etf-greybox.h config.h \
+                      lts.c lts.h
+etf2lts_mc_LDADD    = libltsmin.la $(BUDDY_LIBS) $(CADP_LIBS)
 etf2lts_mc_CPPFLAGS = -DETF $(MCRL_CPPFLAGS) $(AM_CPPFLAGS)
 etf2lts_mc_LDFLAGS  = $(MCRL_LDFLAGS) $(BUDDY_LDFLAGS) $(AM_LDFLAGS) $(CADP_LDFLAGS)
 
