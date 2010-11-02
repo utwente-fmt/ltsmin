@@ -58,8 +58,7 @@ bin_PROGRAMS += nips2lts-grey nips-reach etf2lts-grey etf-reach \
 endif
 
 if HAVE_DVEC
-bin_PROGRAMS += dve2lts-grey dve-reach \
-  dve2lts-mc dve22lts-mc
+bin_PROGRAMS += dve2lts-grey dve-reach dve2lts-mc
 if HAVE_CADP
 pkglib_LTLIBRARIES += libdve-open.la
 endif
