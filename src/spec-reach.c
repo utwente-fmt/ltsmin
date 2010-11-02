@@ -34,6 +34,9 @@
 #if defined(DIVINE2)
 #include "dve2-greybox.h"
 #endif
+#if defined(SPINJA)
+#include "spinja-greybox.h"
+#endif
 
 static char* etf_output=NULL;
 static char* trc_output=NULL;
@@ -112,6 +115,9 @@ static  struct poptOption options[] = {
 #endif
 #if defined(DIVINE2)
 	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, dve2_options , 0 , "DiVinE 2 options", NULL },
+#endif
+#if defined(SPINJA)
+	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, spinja_options , 0 , "SPINJA options", NULL },
 #endif
 	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, greybox_options , 0 , "Greybox options",NULL},
 	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, vset_options , 0 , "Vector set options",NULL},

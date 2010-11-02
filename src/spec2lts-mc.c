@@ -49,6 +49,9 @@
 #if defined(DIVINE2)
 #include "dve2-greybox.h"
 #endif
+#if defined(SPINJA)
+#include "spinja-greybox.h"
+#endif
 
 static const int    THREAD_STACK_SIZE = 400 * 4096; //pthread_attr_setstacksize
 
@@ -172,6 +175,9 @@ static struct poptOption options[] = {
 #endif
 #if defined(DIVINE2)
     {NULL, 0, POPT_ARG_INCLUDE_TABLE, dve2_options, 0, "DiVinE 2.2 options", NULL},
+#endif
+#if defined(SPINJA)
+    {NULL, 0, POPT_ARG_INCLUDE_TABLE, spinja_options, 0, "SPINJA options", NULL},
 #endif
     {NULL, 0, POPT_ARG_INCLUDE_TABLE, greybox_options, 0, "Greybox options", NULL},
     {NULL, 0, POPT_ARG_INCLUDE_TABLE, lts_io_options, 0, NULL, NULL},
