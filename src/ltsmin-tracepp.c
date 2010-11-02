@@ -159,8 +159,8 @@ output_text(trc_t trace, FILE* output_file) {
 
         // output edge labels
         if ((i+1)<len) {
-            if (trc_get_state_label(trace, 0, NULL)) {
-                trc_get_state_label(trace, i, edge_lbls);
+            if (trc_get_edge_label(trace, 0, NULL)) {
+                trc_get_edge_label(trace, i, edge_lbls);
                 for(int j=0; j<eLbls; ++j) {
                     char *name = lts_type_get_edge_label_name(ltstype, j);
                     char *type = lts_type_get_edge_label_type(ltstype, j);
@@ -178,8 +178,6 @@ output_text(trc_t trace, FILE* output_file) {
 
         }
     }
-
-
 }
 
 void
