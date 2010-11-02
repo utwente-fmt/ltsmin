@@ -1318,11 +1318,11 @@ find_overlapping_group(bitvector_t *found_groups, int *group)
 
     for (int i = 0; i < nGrps; i++) {
         if (!bitvector_is_set(found_groups, i)) continue;
-        dm_bitvector_row(&row_found, GBgetDMInfo(model), i);
+        dm_bitvector_row(&row_found, GBgetDMInfoRead(model), i);
 
         for(int j = 0; j < nGrps; j++) {
             if (bitvector_is_set(found_groups, j)) continue;
-            dm_bitvector_row(&row_new, GBgetDMInfo(model), j);
+            dm_bitvector_row(&row_new, GBgetDMInfoWrite(model), j);
             bitvector_intersect(&row_new, &row_found);
 
             if (!bitvector_is_empty(&row_new)) {
