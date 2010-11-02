@@ -1,28 +1,42 @@
 ltsmin - minimization and instantiation of labelled transition systems 
 
 * Introduction
-LTSmin is a toolset for manipulating labelled transition systems. The
-main tool in this release is ltsmin-mpi, which is a distributed
-implementation of signature-based bisimulation reduction for strong
-bisimulation and branching bisimulation. The input for this tool is a
-labelled transition system (LTS) in DIR format.
+LTSmin is a toolset for manipulating labelled transition
+systems. LTSmin already connects a sizeable number of existing
+(verification) tools: muCRL, mcrl2, DiVinE, SPIN, NIPS,
+CADP. Moreover, it allows to reuse existing tools with new state space
+generation techniques.
 
-Various sequential, symbolic and distributed tools are provided for
-the creation of LTSs, for example from muCRL, mCRL2 and PROMELA (via
-NIPS) specifications. Alternatively, LTSs in DIR format can be created
-by third-party tools, for example instantiators and dmp2dir from the
-muCRL toolset.
+The synergy effects in the LTSmin implementation are enabled by a
+clean interface: all LTSmin modules work with a unifying state
+representation of integer vectors of fixed size, and the PINS
+dependency matrix which exploits the combinatorial nature of model
+checking problems. This splits model checking tools into three mostly
+independent parts: language modules, PINS optimizations, and model
+checking algorithms.
 
-The tools in this release support compression of DIR files as well as
-putting a DIR in an archive file. The ltsmin-convert utility can
-convert files from one DIR variant to another, and to the BCG file
-format from the CADP toolset.
+For example, implementing support for a new language module is in the
+order of 200--600 lines of C "glue" code, and automatically yields
+tools for standard reachability checking (e.g., for state space
+generation and verification of safety properties), reachability with
+symbolic state storage (vector set), fully symbolic (BDD-based)
+reachability, distributed reachability (MPI-based), and multi-core
+reachability (including multi-core compression and incremental
+hashing).
+
+On the other hand, the implementation of a verification algorithm
+based on the PINS matrix automatically has access to muCRL, mcrl2,
+DVE, PROMELA and ETF language modules.
+
+Finally, all tools benefit from PINS2PINS optimizations, like local
+transition caching (which speeds up slow state space generators),
+matrix regrouping (which can drastically reduce run-time and memory
+consumption of symbolic algorithms).
 
 * Supported Systems
- - GNU/Linux (tested on Debian, Fedora, OpenSuSE 10.2)
+ - GNU/Linux (tested on Debian, OpenSuSE 11.2)
  - MacOS X, version 10.6 "Snow Leopard"
  - MacOS X, version 10.5 "Leopard"
- - MacOS X, version 10.4 "Tiger"
 
 * Installation Instructions
 If you are building the software from a Git repository rather than a
