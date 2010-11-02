@@ -73,7 +73,7 @@ endif
 endif
 
 #if HAVE_SPINJA
-bin_PROGRAMS += spinja2lts-grey spinja-reach
+bin_PROGRAMS += spinja2lts-grey spinja-reach spinja2lts-mc
 #endif
 
 # etf-convert
@@ -269,6 +269,12 @@ dve22lts_mc_SOURCES  = spec2lts-mc.c dve2-greybox.c dve2-greybox.h config.h
 dve22lts_mc_LDADD    = libltsmin.la $(DVEC2_LIBS)
 dve22lts_mc_CPPFLAGS = -DDIVINE2 $(DIVINE2_CPPFLAGS) $(AM_CPPFLAGS)
 dve22lts_mc_LDFLAGS  = $(DIVINE2_LDFLAGS) $(AM_LDFLAGS)
+
+# spinja2lts-mc
+spinja2lts_mc_SOURCES  = spec2lts-mc.c spinja-greybox.c spinja-greybox.h config.h
+spinja2lts_mc_LDADD    = libltsmin.la $(SPINJA_LIBS)
+spinja2lts_mc_CPPFLAGS = -DSPINJA $(SPINJA_CPPFLAGS) $(AM_CPPFLAGS)
+spinja2lts_mc_LDFLAGS  = $(SPINJA_LDFLAGS) $(AM_LDFLAGS)
 
 # etf2lts-mc
 etf2lts_mc_SOURCES  = spec2lts-mc.c etf-greybox.c etf-greybox.h config.h \

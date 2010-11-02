@@ -6,13 +6,14 @@
 */
 
 #include <popt.h>
-#include "greybox.h"
+#include <greybox.h>
 
 extern struct poptOption spinja_options[];
 
 /**
-Load an spinja model.
+Load a spinja model.
 */
+extern void SpinJaloadDynamicLib(model_t model, const char *name);
 extern void SpinJaloadGreyboxModel(model_t model,const char*name);
 extern void SpinJacompileGreyboxModel(model_t model,const char*name);
 
