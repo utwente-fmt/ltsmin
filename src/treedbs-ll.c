@@ -140,18 +140,18 @@ TreeDBSLLlookup (const treedbs_ll_t dbs, const int *vector)
 
 
 int
-TreeDBSLLlookup_incr (const treedbs_ll_t dbs, const int *v, internal_t *arg)
+TreeDBSLLlookup_incr (const treedbs_ll_t dbs, const int *v, tree_t prev, 
+                      tree_t next)
 {
     loc_t              *loc = get_local (dbs);
-    if ( !*arg ) {//first call
-        *arg = loc->storage;
-        return TreeDBSLLlookup (dbs, v);
+    size_t              n = dbs->nNodes;
+    if ( NULL == prev ) { //first call
+        int seen = TreeDBSLLlookup (dbs, v);
+        memcpy (next, loc->storage, sizeof(int[n<<1]));
+        return seen;
     }
     stats_t            *stat = &loc->stat;
-    size_t              n = dbs->nNodes;
     int                 seen = 1;
-    int                *prev = *arg;                // in
-    int                *next = *arg = loc->storage; // out
     memcpy (next, prev, sizeof (int[n]));
     memcpy (next + n, v, sizeof (int[n]));
     for (size_t i = n - 1; i > 0; i--)
@@ -161,25 +161,24 @@ TreeDBSLLlookup_incr (const treedbs_ll_t dbs, const int *v, internal_t *arg)
 }
 
 int
-TreeDBSLLlookup_dm (const treedbs_ll_t dbs, const int *v, internal_t *a, int g)
+TreeDBSLLlookup_dm (const treedbs_ll_t dbs, const int *v, tree_t prev, 
+                    tree_t next, int group)
 {
-    if ( g == -1 || !*a )
-        return TreeDBSLLlookup_incr (dbs, v, a);
+    if ( group == -1 || NULL == prev )
+        return TreeDBSLLlookup_incr (dbs, v, prev, next);
     loc_t              *loc = get_local (dbs);
     stats_t            *stat = &loc->stat;
     int                 seen = 1;
-    int                *prev = *a;                  // in
-    int                *next = *a = loc->storage;   // out
     memcpy (next, prev, sizeof (int[dbs->nNodes]));
     memcpy (next + dbs->nNodes, v, sizeof (int[dbs->nNodes]));
     int                 idx;
-    for (size_t i = 0; (idx = dbs->todo[g][i]) != -1; i++)
+    for (size_t i = 0; (idx = dbs->todo[group][i]) != -1; i++)
     if ( !cmp_i64(prev, next, idx) )
         seen = table_lookup (dbs, i64(next, idx), idx-1, next+idx, stat);
     return seen;
 }
 
-internal_t
+tree_t
 TreeDBSLLget (const treedbs_ll_t dbs, const int idx, int *d)
 {
     uint32_t           *dst = (uint32_t*)d;
@@ -187,16 +186,16 @@ TreeDBSLLget (const treedbs_ll_t dbs, const int idx, int *d)
     dst[1] = (uint32_t)idx;
     for (int i = 1; i < dbs->nNodes; i++)
         dst64[i] = dbs->data[dst[i]];
-    return (internal_t)dst;
+    return (tree_t)dst;
 }
 
 int *
-TreeDBSLLdata (const treedbs_ll_t dbs, internal_t data) {
+TreeDBSLLdata (const treedbs_ll_t dbs, tree_t data) {
     return data + dbs->nNodes;
 }
 
-int
-TreeDBSLLindex (internal_t data) {
+uint32_t
+TreeDBSLLindex (tree_t data) {
     return data[1];
 }
 
@@ -222,13 +221,13 @@ TreeDBSLLcreate_sized (int nNodes, int size)
 * The dependency matrix is projected in the tree:
 *
 * Binary tree:
-*           +
+*           +                  1
 *
-*       +       +
-*     -   +   +   -
+*       +       +          2       3
+*     -   +   +   -      4   5   6   7
 *    / \ / \ / \ / \
-* DM row:
-*    - - - + + - - -
+* DM row:                   1 1 1 1 1 1
+*    - - - + + - - -    8 9 0 1 2 3 4 5
 */
 void
 project_matrix_to_tree (treedbs_ll_t dbs, matrix_t *m)

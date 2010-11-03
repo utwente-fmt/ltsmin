@@ -70,7 +70,7 @@ lb_create_max (size_t threads, algo_f alg, split_problem_f split,
 void
 lb_local_init(lb_t *lb, int id, void *arg, size_t *load)
 {
-    if ( lb->method == LB_SRP )
+    if ( lb->method == LB_SRP || lb->method == LB_None )
         return;
     if (id != 0) {
         //wait
@@ -197,9 +197,11 @@ void
 lb_balance (lb_t *lb, int id, void *arg, size_t *load)
 {
     switch ( lb->method ) {
+    case LB_None:
     case LB_Static:
         lb_balance_static( lb, id, arg, load ); break;
     case LB_Combined:
+        Warning (info, "Combined load balancing (static+SRP) is not implemented");
     case LB_SRP:
         lb_balance_SRP( lb, id, arg, load ); break;
     }

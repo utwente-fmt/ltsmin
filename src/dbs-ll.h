@@ -51,7 +51,7 @@ und.
 extern int          DBSLLlookup_ret (const dbs_ll_t dbs, const int *v,
                                      int *ret);
 extern int          DBSLLlookup_hash (const dbs_ll_t dbs, const int *v,
-                                      int *ret, uint32_t * hh);
+                                      uint32_t *ret, uint32_t * hh);
 
 extern int         *DBSLLget (const dbs_ll_t dbs, const int idx, int *dst);
 

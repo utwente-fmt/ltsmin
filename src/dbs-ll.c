@@ -55,7 +55,7 @@ DBSLLmemoized_hash (const dbs_ll_t dbs, const int idx)
 }
 
 int
-DBSLLlookup_hash (const dbs_ll_t dbs, const int *v, int *ret, uint32_t *hash)
+DBSLLlookup_hash (const dbs_ll_t dbs, const int *v, uint32_t *ret, uint32_t *hash)
 {
     local_t            *loc = get_local (dbs);
     stats_t            *stat = &loc->stat;

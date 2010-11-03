@@ -5,7 +5,7 @@
 #include <greybox.h>
 
 typedef struct trc_s *trc_t;
-typedef void *(*trc_get_state_f)(int state_no, int *state);
+typedef void *(*trc_get_state_f)(int state_no, void *arg);
 typedef struct trc_env_s trc_env_t;
 
 extern int trc_get_length(trc_t trace);
@@ -25,7 +25,8 @@ extern void trc_get_state(trc_t trace, int i, int *dst);
 
 extern trc_t trc_read(const char *name);
 
-extern trc_env_t *trc_create(model_t model, trc_get_state_f get, int start_idx);
+extern trc_env_t *trc_create(model_t model, trc_get_state_f get, int start_idx,
+                             void *get_state_arg);
 
 extern void trc_find_and_write (trc_env_t *env, char *trc_output, 
                                 int dst_idx, int level, int *parent_ofs);

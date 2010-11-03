@@ -18,43 +18,45 @@
 #include <struct_io.h>
 
 struct trc_s {
-    int len;
-    lts_type_t ltstype;
-    string_index_t* values;
-    treedbs_t state_db;
-    treedbs_t map_db; // NULL als aantal defined state labels == 0
-    treedbs_t edge_db; // NULL als aantal edges labels == 0
-    int *state_lbl; // NULL als geen definined state labels
-    int *edge_lbl; // NULL als geen edge labels
-    int *trace_idx_map; // maps n-th step of the trace to state_db idx
+    int                 len;
+    lts_type_t          ltstype;
+    string_index_t*     values;
+    treedbs_t           state_db;
+    treedbs_t           map_db; // NULL als aantal defined state labels == 0
+    treedbs_t           edge_db; // NULL als aantal edges labels == 0
+    int                *state_lbl; // NULL als geen definined state labels
+    int                *edge_lbl; // NULL als geen edge labels
+    int                *trace_idx_map; // maps n-th step of the trace to state_db idx
 };
 
 static lts_enum_cb_t trace_handle=NULL;
 
 typedef struct write_trace_step_s {
-    int src_no;
-    int dst_no;
-    int* dst;
-    int found;
+    int                 src_no;
+    int                 dst_no;
+    int                *dst;
+    int                 found;
     int                 N;
 } write_trace_step_t;
 
 struct trc_env_s {
     int                 N;
     model_t             model;
-    trc_get_state_f         get_state;
+    trc_get_state_f     get_state;
+    void               *get_state_arg;
     int                 state_labels;
     int                 start_idx;
 };
 
 trc_env_t *
-trc_create(model_t model, trc_get_state_f get, int start_idx)
+trc_create(model_t model, trc_get_state_f get, int start_idx, void *arg)
 {
     trc_env_t        *trace = RTmalloc(sizeof(trc_env_t));
     lts_type_t          ltstype = GBgetLTStype (model);
     trace->N = lts_type_get_state_length (ltstype);
     trace->state_labels = lts_type_get_state_label_count (ltstype);
     trace->get_state = get;
+    trace->get_state_arg = arg;
     trace->model = model;
     trace->start_idx = start_idx;
     return trace;
@@ -154,14 +156,13 @@ write_trace(trc_env_t *env, size_t trace_size, uint32_t *trace)
     size_t i = 0;
     int step = 0;
     int src[env->N];
-    int store[env->N * 2]; //reserve extra for tree TODO: breaks interfaces
-    int *dst = env->get_state(env->start_idx, store);
+    int *dst = env->get_state(env->start_idx, env->get_state_arg);
     write_trace_state(env, env->start_idx, dst);
     i++;
     while(i < trace_size) {
         for(int j=0; j < env->N; ++j)
             src[j] = dst[j];
-        dst = env->get_state(trace[i], store);
+        dst = env->get_state(trace[i], env->get_state_arg);
         write_trace_step(env, step, src, step + 1, dst);  // write step
         write_trace_state(env, trace[i], dst);            // write dst_idx
         i++;
@@ -196,8 +197,7 @@ trc_find_and_write (trc_env_t *env, char *trc_output, int dst_idx,
     lts_output_t trace_output=lts_output_open(trc_output,
                                               env->model,1,0,1,"vsi",NULL);
     {
-       int store[env->N * 2]; //reserve extra for tree TODO: breaks interfaces
-       int *init_state = env->get_state(env->start_idx, store);
+       int *init_state = env->get_state(env->start_idx, env->get_state_arg);
        lts_output_set_root_vec(trace_output,(uint32_t*)init_state);
        lts_output_set_root_idx(trace_output,0,0);
     }

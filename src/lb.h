@@ -17,13 +17,14 @@
 typedef struct lb_s lb_t;
 
 typedef enum { LB_Static,   //Statically partition results of an initial run
-               LB_SRP,      //Synchronized random pollin
-               LB_Combined  //TODO: start static switch to SRP when unbalanced
+               LB_SRP,      //Synchronized random polling
+               LB_Combined, //TODO: start static switch to SRP when unbalanced
+               LB_None      //Non-interfering with the search algorithm
 } lb_method_t;
 
 #define MAX_HANDOFF_DEFAULT 100
 
-typedef int         (*algo_f) (void * ctx, size_t granularity);
+typedef void        (*algo_f) (void * ctx, size_t granularity);
 typedef size_t      (*split_problem_f) (size_t source_id, size_t target_id,
                                         size_t handoff);
 
