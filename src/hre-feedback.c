@@ -145,8 +145,10 @@ struct poptOption hre_feedback_options[]={
     "enable debugging feedback" , "level" },
     { stats_long , 0 , POPT_ARG_NONE , NULL, 481,
     "enable statistics gathering/printing" , "level" },
+#ifdef LTSMIN_DEBUG
     { where_long , 0 , POPT_ARG_NONE , NULL , 481 ,
     "include file and line number in debug messages", NULL},
+#endif
     { when_long , 0 , POPT_ARG_NONE , NULL , 481 ,
     "include the wall time since program start in all messages" , NULL },
     POPT_TABLEEND
