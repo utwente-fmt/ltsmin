@@ -78,145 +78,166 @@ static int etf_state_short(model_t self,int label,int *state){
     return ctx->label_data[label][SIlookupC(ctx->label_key_idx[label],(char*)state,len<<2)];
 }
 
-void ETFloadGreyboxModel(model_t model,const char*name){
-	gb_context_t ctx=(gb_context_t)RTmalloc(sizeof(struct grey_box_context));
-	GBsetContext(model,ctx);
-	etf_model_t etf=etf_parse_file(name);
-	lts_type_t ltstype=etf_type(etf);
-	int state_length=lts_type_get_state_length(ltstype);
-	ctx->edge_labels=lts_type_get_edge_label_count(ltstype);
-	if (ctx->edge_labels>1) {
-		ctx->label_idx=SIcreate();
-	} else {
-		ctx->label_idx=NULL;
-	}
-	GBsetLTStype(model,ltstype);
-	matrix_t* p_dm_info = (matrix_t*)RTmalloc(sizeof(matrix_t));
-	dm_create(p_dm_info, etf_trans_section_count(etf), state_length);
+void
+ETFloadGreyboxModel(model_t model, const char *name)
+{
+    gb_context_t ctx=(gb_context_t)RTmalloc(sizeof(struct grey_box_context));
+    GBsetContext(model,ctx);
+    etf_model_t etf=etf_parse_file(name);
+    lts_type_t ltstype=etf_type(etf);
+    int state_length=lts_type_get_state_length(ltstype);
+    ctx->edge_labels=lts_type_get_edge_label_count(ltstype);
+    if (ctx->edge_labels>1) {
+        ctx->label_idx=SIcreate();
+    } else {
+        ctx->label_idx=NULL;
+    }
+    GBsetLTStype(model,ltstype);
+    matrix_t* p_dm_info = (matrix_t*)RTmalloc(sizeof(matrix_t));
+    matrix_t* p_dm_read_info = (matrix_t*)RTmalloc(sizeof(matrix_t));
+    matrix_t* p_dm_write_info = (matrix_t*)RTmalloc(sizeof(matrix_t));
+    dm_create(p_dm_info, etf_trans_section_count(etf), state_length);
+    dm_create(p_dm_read_info, etf_trans_section_count(etf), state_length);
+    dm_create(p_dm_write_info, etf_trans_section_count(etf), state_length);
     ctx->trans_key_idx=(string_index_t*)RTmalloc(dm_nrows(p_dm_info)*sizeof(string_index_t));
     ctx->trans_table=(matrix_table_t*)RTmalloc(dm_nrows(p_dm_info)*sizeof(matrix_table_t));
-	for(int i=0; i < dm_nrows(p_dm_info); i++) {
-		Warning(info,"parsing table %d",i);
-		etf_rel_t trans=etf_trans_section(etf,i);
-		int used[state_length];
-		int src[state_length];
-		int dst[state_length];
-		int lbl[ctx->edge_labels];
-		int proj[state_length];
-		ETFrelIterate(trans);
-		if (!ETFrelNext(trans,src,dst,lbl)){
-			Fatal(1,error,"unexpected empty transition section");
-		}
-		int len=0;
-		for(int j=0;j<state_length;j++){
-			if (src[j]) {
-				proj[len]=j;
-				Warning(debug,"pi[%d]=%d",len,proj[len]);
-				len++;
-				dm_set(p_dm_info, i, j);
-			    used[j]=1;
-			} else {
-			    used[j]=0;
-			}
-		}
-		Warning(info,"length is %d",len);
+    for(int i=0; i < dm_nrows(p_dm_info); i++) {
+        Warning(info,"parsing table %d",i);
+        etf_rel_t trans=etf_trans_section(etf,i);
+        int used[state_length];
+        int src[state_length];
+        int dst[state_length];
+        int lbl[ctx->edge_labels];
+        int proj[state_length];
+        ETFrelIterate(trans);
+        if (!ETFrelNext(trans,src,dst,lbl)){
+            Fatal(1,error,"unexpected empty transition section");
+        }
+        int len=0;
+        for(int j=0;j<state_length;j++){
+            if (src[j]) {
+                proj[len]=j;
+                Warning(debug,"pi[%d]=%d",len,proj[len]);
+                len++;
+                dm_set(p_dm_info, i, j);
+                used[j]=1;
+            } else {
+                used[j]=0;
+            }
+        }
+        Warning(info,"length is %d",len);
         ctx->trans_key_idx[i]=SIcreate();
         ctx->trans_table[i]=MTcreate(3);
         int src_short[len];
         int dst_short[len];
         uint32_t row[3];
-		do {
-			for(int k=0;k<state_length;k++) {
-				if(used[k]?(src[k]==0):(src[k]!=0)){
-					Fatal(1,error,"inconsistent section in src vector");
-				}
-			}
-			for(int k=0;k<len;k++) src_short[k]=src[proj[k]]-1;
-			for(int k=0;k<state_length;k++) {
-				if(used[k]?(dst[k]==0):(dst[k]!=0)){
-					Fatal(1,error,"inconsistent section in dst vector");
-				}
-			}
-			for(int k=0;k<len;k++) dst_short[k]=dst[proj[k]]-1;
-			row[0]=(uint32_t)SIputC(ctx->trans_key_idx[i],(char*)src_short,len<<2);
-			switch(ctx->edge_labels){
-				case 0:
-					row[2]=0;
-					break;
-				case 1:
-					row[2]=(uint32_t)lbl[0];
-					break;
-				default:
-                    row[2]=(uint32_t)SIputC(ctx->label_idx,(char*)lbl,(ctx->edge_labels)<<2);
-					break;
-			}
+        do {
+            /*
+             * If an element is non-zero, we always consider it a read. If the
+             * value is changed for at least one transition in a group then
+             * we also consider it a write. Note that this could be slightly
+             * optimized by omitting those elements from read where the value
+             * varies over all possible inputs.
+             */
+            for(int k=0;k<state_length;k++) {
+                if (src[k] != 0) {
+                    dm_set(p_dm_read_info, i, k);
+                    if (src[k] != dst[k]) dm_set(p_dm_write_info, i, k);
+                }
+            }
+            for(int k=0;k<state_length;k++) {
+                if(used[k]?(src[k]==0):(src[k]!=0)){
+                    Fatal(1,error,"inconsistent section in src vector");
+                }
+            }
+            for(int k=0;k<len;k++) src_short[k]=src[proj[k]]-1;
+            for(int k=0;k<state_length;k++) {
+                if(used[k]?(dst[k]==0):(dst[k]!=0)){
+                    Fatal(1,error,"inconsistent section in dst vector");
+                }
+            }
+            for(int k=0;k<len;k++) dst_short[k]=dst[proj[k]]-1;
+            row[0]=(uint32_t)SIputC(ctx->trans_key_idx[i],(char*)src_short,len<<2);
+            switch(ctx->edge_labels){
+            case 0:
+                row[2]=0;
+                break;
+            case 1:
+                row[2]=(uint32_t)lbl[0];
+                break;
+            default:
+                row[2]=(uint32_t)SIputC(ctx->label_idx,(char*)lbl,(ctx->edge_labels)<<2);
+                break;
+            }
             row[1]=(int32_t)SIputC(ctx->trans_key_idx[i],(char*)dst_short,len<<2);
             MTaddRow(ctx->trans_table[i],row);
-		} while(ETFrelNext(trans,src,dst,lbl));
-		Warning(info,"table %d has %d states and %d transitions",
-                        i,SIgetCount(ctx->trans_key_idx[i]),ETFrelCount(trans));
-		ETFrelDestroy(&trans);
+        } while(ETFrelNext(trans,src,dst,lbl));
+        Warning(info,"table %d has %d states and %d transitions",
+                i,SIgetCount(ctx->trans_key_idx[i]),ETFrelCount(trans));
+        ETFrelDestroy(&trans);
         MTclusterBuild(ctx->trans_table[i],0,SIgetCount(ctx->trans_key_idx[i]));
-	}
-	GBsetDMInfo(model, p_dm_info);
-	GBsetNextStateShort(model,etf_short);
+    }
+    GBsetDMInfo(model, p_dm_info);
+    GBsetDMInfoRead(model, p_dm_read_info);
+    GBsetDMInfoWrite(model, p_dm_write_info);
+    GBsetNextStateShort(model,etf_short);
 
-	matrix_t *p_sl_info = RTmalloc(sizeof *p_sl_info);
-	dm_create(p_sl_info, etf_map_section_count(etf), state_length);
-	ctx->label_key_idx=(string_index_t*)RTmalloc(dm_nrows(p_sl_info)*sizeof(string_index_t));
-	ctx->label_data=(int**)RTmalloc(dm_nrows(p_sl_info)*sizeof(int*));
-	for(int i=0;i<dm_nrows(p_sl_info);i++){
-		Warning(info,"parsing map %d",i);
-		etf_map_t map=etf_get_map(etf,i);
-		int used[state_length];
-		int state[state_length];
-		int value;
-		ETFmapIterate(map);
-		if (!ETFmapNext(map,state,&value)){
-			Fatal(1,error,"Unexpected empty map");
-		}
-		int len=0;
-		for(int j=0;j<state_length;j++){
-			if (state[j]) {
-				used[len]=j;
-				len++;
-				dm_set(p_sl_info, i, j);
-			}
-		}
-		int*proj=(int*)RTmalloc(len*sizeof(int));
-		for(int j=0;j<len;j++) proj[j]=used[j];
-		for(int j=0;j<state_length;j++) used[j]=state[j];
-		string_index_t key_idx=SIcreate();
-		int *data=(int*)RTmalloc(ETFmapCount(map)*sizeof(int));
-		int key[len];
-		do {
-			for(int k=0;k<state_length;k++) {
-				if(used[k]?(state[k]==0):(state[k]!=0)){
-					Fatal(1,error,"inconsistent map section");
-				}
-			}
-			for(int k=0;k<len;k++) key[k]=state[proj[k]]-1;
-			data[SIputC(key_idx,(char*)key,len<<2)]=value;
-		} while(ETFmapNext(map,state,&value));
-		ctx->label_key_idx[i]=key_idx;
-		ctx->label_data[i]=data;
-	}
+    matrix_t *p_sl_info = RTmalloc(sizeof *p_sl_info);
+    dm_create(p_sl_info, etf_map_section_count(etf), state_length);
+    ctx->label_key_idx=(string_index_t*)RTmalloc(dm_nrows(p_sl_info)*sizeof(string_index_t));
+    ctx->label_data=(int**)RTmalloc(dm_nrows(p_sl_info)*sizeof(int*));
+    for(int i=0;i<dm_nrows(p_sl_info);i++){
+        Warning(info,"parsing map %d",i);
+        etf_map_t map=etf_get_map(etf,i);
+        int used[state_length];
+        int state[state_length];
+        int value;
+        ETFmapIterate(map);
+        if (!ETFmapNext(map,state,&value)){
+            Fatal(1,error,"Unexpected empty map");
+        }
+        int len=0;
+        for(int j=0;j<state_length;j++){
+            if (state[j]) {
+                used[len]=j;
+                len++;
+                dm_set(p_sl_info, i, j);
+            }
+        }
+        int*proj=(int*)RTmalloc(len*sizeof(int));
+        for(int j=0;j<len;j++) proj[j]=used[j];
+        for(int j=0;j<state_length;j++) used[j]=state[j];
+        string_index_t key_idx=SIcreate();
+        int *data=(int*)RTmalloc(ETFmapCount(map)*sizeof(int));
+        int key[len];
+        do {
+            for(int k=0;k<state_length;k++) {
+                if(used[k]?(state[k]==0):(state[k]!=0)){
+                    Fatal(1,error,"inconsistent map section");
+                }
+            }
+            for(int k=0;k<len;k++) key[k]=state[proj[k]]-1;
+            data[SIputC(key_idx,(char*)key,len<<2)]=value;
+        } while(ETFmapNext(map,state,&value));
+        ctx->label_key_idx[i]=key_idx;
+        ctx->label_data[i]=data;
+    }
     GBsetStateLabelInfo(model, p_sl_info);
-	GBsetStateLabelShort(model,etf_state_short);
+    GBsetStateLabelShort(model,etf_state_short);
 
-	int type_count=lts_type_get_type_count(ltstype);
-	for(int i=0;i<type_count;i++){
-		Warning(info,"Setting values for type %d (%s)",i,lts_type_get_type(ltstype,i));
-		int count=etf_get_value_count(etf,i);
-		for(int j=0;j<count;j++){
-			if (j!=GBchunkPut(model,i,etf_get_value(etf,i,j))){
-				Fatal(1,error,"etf-greybox does not support remapping of values");
-			}
-		}
-	}
+    int type_count=lts_type_get_type_count(ltstype);
+    for(int i=0;i<type_count;i++){
+        Warning(info,"Setting values for type %d (%s)",i,lts_type_get_type(ltstype,i));
+        int count=etf_get_value_count(etf,i);
+        for(int j=0;j<count;j++){
+            if (j!=GBchunkPut(model,i,etf_get_value(etf,i,j))){
+                Fatal(1,error,"etf-greybox does not support remapping of values");
+            }
+        }
+    }
 
-	int state[state_length];
-	etf_get_initial(etf,state);
-	GBsetInitialState(model,state);
+    int state[state_length];
+    etf_get_initial(etf,state);
+    GBsetInitialState(model,state);
 }
 

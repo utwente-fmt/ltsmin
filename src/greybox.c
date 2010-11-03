@@ -426,6 +426,14 @@ void GBprintDependencyMatrix(FILE* file, model_t model) {
 	dm_print(file, GBgetDMInfo(model));
 }
 
+void GBprintDependencyMatrixRead(FILE* file, model_t model) {
+	dm_print(file, GBgetDMInfoRead(model));
+}
+
+void GBprintDependencyMatrixWrite(FILE* file, model_t model) {
+	dm_print(file, GBgetDMInfoWrite(model));
+}
+
 /**********************************************************************
  * Grey box factory functionality
  */
