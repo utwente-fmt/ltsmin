@@ -40,7 +40,7 @@ fi
 AC_DEFUN([ACX_DVEC2_LIBS], [
 AC_REQUIRE([ACX_DIVINE2])dnl
 if test x"$acx_divine2" = xyes; then
-    AC_LANG_PUSH([C++])
+    AC_LANG_PUSH([C])
     AX_LET([CPPFLAGS], ["$DIVINE2_CPPFLAGS $CPPFLAGS"],
            [LIBS], ["$LIBS"],
            [LDFLAGS], ["$DIVINE2_LDFLAGS $LDFLAGS"],
@@ -49,11 +49,8 @@ if test x"$acx_divine2" = xyes; then
          [MCRL_LIBS="-ldl $MCRL_LIBS"],
          [acx_dvec2_libs=no],
          [$DVEC2_LIBS])
-       AC_CHECK_LIB([divine], [main],
-         [DVEC2_LIBS="-ldivine $DVEC2_LIBS"],
-         [acx_dvec2_libs=no],
-         [$DVEC2_LIBS])])
-    AC_LANG_POP([C++])
+       ])
+    AC_LANG_POP([C])
     AC_SUBST(DVEC2_LIBS)
 fi
 if test x"$acx_dvec2_libs" = xyes; then
