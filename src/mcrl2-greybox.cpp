@@ -23,8 +23,9 @@ class group_information {
   private:
 
     mcrl2::lps::specification     m_model;
-
     std::vector< std::vector< size_t > > m_group_indices;
+    std::vector< std::vector< size_t > > m_group_read_indices;
+    std::vector< std::vector< size_t > > m_group_write_indices;
 
   private:
 
@@ -59,6 +60,24 @@ class group_information {
     inline std::vector< size_t > const& get_group(size_t index) const {
       return m_group_indices[index];
     }
+
+    /**
+     * \brief Indices of process parameters that influence event or next state of a summand by being read
+     * \param[in] index the selected summand
+     * \returns reference to a vector of indices of parameters
+     **/
+    inline std::vector< size_t > const& get_read_group(size_t index) const {
+      return m_group_read_indices[index];
+    }
+
+    /**
+     * \brief Indices of process parameters that influence event or next state of a summand by being written
+     * \param[in] index the selected summand
+     * \returns reference to a vector of indices of parameters
+     **/
+    inline std::vector< size_t > const& get_write_group(size_t index) const {
+      return m_group_write_indices[index];
+    }
 };
 
 void group_information::gather(mcrl2::lps::specification const& l) {
@@ -76,36 +95,55 @@ void group_information::gather(mcrl2::lps::specification const& l) {
   std::vector< lps::action_summand > const& summands = specification.action_summands();
 
   m_group_indices.resize(summands.size());
+  m_group_read_indices.resize(summands.size());
+  m_group_write_indices.resize(summands.size());
 
   for (std::vector< lps::action_summand >::const_iterator i = summands.begin(); i != summands.end(); ++i) {
-    std::set< variable > used_variables;
+    std::set< variable > used_read_variables;
+    std::set< variable > used_write_variables;
 
-    find_variables(i->condition(), std::inserter(used_variables, used_variables.end()));
-    lps::find_variables(i->multi_action().actions(), std::inserter(used_variables, used_variables.end()));
+    find_variables(i->condition(), std::inserter(used_read_variables, used_read_variables.end()));
+    lps::find_variables(i->multi_action().actions(), std::inserter(used_read_variables, used_read_variables.end()));
 
     if (i->multi_action().has_time()) {
-      data::find_variables(i->multi_action().time(), std::inserter(used_variables, used_variables.end()));
+      data::find_variables(i->multi_action().time(), std::inserter(used_read_variables, used_read_variables.end()));
     }
 
     data::assignment_list assignments(i->assignments());
 
     for (data::assignment_list::const_iterator j = assignments.begin(); j != assignments.end(); ++j) {
       if(j->lhs() != j->rhs()) {
-        find_variables(j->lhs(), std::inserter(used_variables, used_variables.end()));
-        find_variables(j->rhs(), std::inserter(used_variables, used_variables.end()));
+        find_variables(j->lhs(), std::inserter(used_write_variables, used_write_variables.end()));
+        find_variables(j->rhs(), std::inserter(used_read_variables, used_read_variables.end()));
       }
     }
 
     // process parameters used in condition or action of summand
-    std::set< variable > used_parameters;
+    std::set< variable > used_read_parameters;
+    std::set< variable > used_write_parameters;
 
-    std::set_intersection(used_variables.begin(), used_variables.end(),
-                          parameters.begin(), parameters.end(), std::inserter(used_parameters, used_parameters.begin()));
+    std::set_intersection(used_read_variables.begin(),
+                          used_read_variables.end(),
+                          parameters.begin(),
+                          parameters.end(),
+                          std::inserter(used_read_parameters,
+                                        used_read_parameters.begin()));
+    std::set_intersection(used_write_variables.begin(),
+                          used_write_variables.end(),
+                          parameters.begin(),
+                          parameters.end(),
+                          std::inserter(used_write_parameters,
+                                        used_write_parameters.begin()));
 
     std::vector< variable > parameters_list = atermpp::convert< std::vector< variable > >(specification.process_parameters());
 
     for (std::vector< variable >::const_iterator j = parameters_list.begin(); j != parameters_list.end(); ++j) {
-      if (used_parameters.find(*j) != used_parameters.end()) {
+        if (!used_read_parameters.empty() && used_read_parameters.find(*j) != used_read_parameters.end()) {
+        m_group_read_indices[i - summands.begin()].push_back(j - parameters_list.begin());
+        m_group_indices[i - summands.begin()].push_back(j - parameters_list.begin());
+      }
+      if (!used_read_parameters.empty() && used_write_parameters.find(*j) != used_write_parameters.end()) {
+        m_group_write_indices[i - summands.begin()].push_back(j - parameters_list.begin());
         m_group_indices[i - summands.begin()].push_back(j - parameters_list.begin());
       }
     }
@@ -370,15 +408,27 @@ void MCRL2loadGreyboxModel(model_t m,const char*model_name){
 	GBsetInitialState(m,temp);
 
 	matrix_t * p_dm_info = (matrix_t*)RTmalloc(sizeof(matrix_t));
+	matrix_t * p_dm_read_info = (matrix_t*)RTmalloc(sizeof(matrix_t));
+	matrix_t * p_dm_write_info = (matrix_t*)RTmalloc(sizeof(matrix_t));
 	dm_create(p_dm_info, ctx->atGrps, state_length);
+	dm_create(p_dm_read_info, ctx->atGrps, state_length);
+	dm_create(p_dm_write_info, ctx->atGrps, state_length);
 
 	for(int i=0; i < dm_nrows(p_dm_info); i++) {
-		std::vector< size_t > const & vec = ctx->info->get_group(i);
-		for(size_t j=0; j < vec.size(); j++)
-			dm_set (p_dm_info, i, vec[j]);
+            std::vector< size_t > const & vec = ctx->info->get_group(i);
+            for(size_t j=0; j < vec.size(); j++)
+                dm_set (p_dm_info, i, vec[j]);
+            std::vector< size_t > const & vec_r = ctx->info->get_read_group(i);
+            for(size_t j=0; j < vec_r.size(); j++)
+                dm_set (p_dm_read_info, i, vec_r[j]);
+            std::vector< size_t > const & vec_w = ctx->info->get_write_group(i);
+            for(size_t j=0; j < vec_w.size(); j++)
+                dm_set (p_dm_write_info, i, vec_w[j]);
 	}
 
 	GBsetDMInfo(m, p_dm_info);
+	GBsetDMInfoRead(m, p_dm_read_info);
+	GBsetDMInfoWrite(m, p_dm_write_info);
 	dm_create(&sl_info, 0, state_length);
 	GBsetStateLabelInfo(m,&sl_info);
 	GBsetNextStateLong(m,MCRL2getTransitionsLong);
