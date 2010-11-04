@@ -196,9 +196,9 @@ void GBinitModelDefaults (model_t *p_model, model_t default_src)
 
     /* Copy dependency matrices. We cannot use the GBgetDMInfoRead and
      * GBgetDMInfoWrite calls here, as these default to the combined
-     * matrix of the parent, which can be the wrong matrix in case
+     * matrix of the parent, which can be the wrong matrices in case
      * a certain pins2pins layer has restricted functionality and only
-     * over writes the combined matrix (like the regrouping layer before
+     * overwrites the combined matrix (like the regrouping layer before
      * becoming aware of the read and write matrices).  In this degenerated
      * case do the conservative thing and use the combined matrix that was
      * set.
@@ -217,7 +217,6 @@ void GBinitModelDefaults (model_t *p_model, model_t default_src)
     }
     if (model->dm_info == NULL)
         model->dm_info = default_src->dm_info;
-}
 
     if (model->sl_info == NULL)
         GBsetStateLabelInfo(model, GBgetStateLabelInfo(default_src));
