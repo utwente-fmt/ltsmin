@@ -57,12 +57,12 @@ static const si_map_entry SATURATION[] = {
     {NULL, 0}
 };
 
-static enum { UNGUIDED, FORWARD_GUIDED } guidance = UNGUIDED;
+static enum { UNGUIDED, DIRECTED } guide_strategy = UNGUIDED;
 
-static char *guided = "unguided";
+static char *guidance = "unguided";
 static const si_map_entry GUIDED[] = {
     {"unguided", UNGUIDED},
-    {"forward", FORWARD_GUIDED},
+    {"directed", DIRECTED},
     {NULL, 0}
 };
 
@@ -74,7 +74,7 @@ reach_popt(poptContext con, enum poptCallbackReason reason,
 
     switch (reason) {
     case POPT_CALLBACK_REASON_PRE:
-        Fatal(1, error, "unexpected call to vset_popt");
+        Fatal(1, error, "unexpected call to reach_popt");
     case POPT_CALLBACK_REASON_POST: {
         int res;
 
@@ -96,14 +96,14 @@ reach_popt(poptContext con, enum poptCallbackReason reason,
         }
         sat_strategy = res;
 
-        res = linear_search(GUIDED, guided);
+        res = linear_search(GUIDED, guidance);
         if (res < 0) {
-            Warning(error, "unknown guided search strategy %s", guided);
+            Warning(error, "unknown guided search strategy %s", guidance);
             RTexitUsage(EXIT_FAILURE);
         } else {
-            Warning(info, "Guided search strategy is %s", guided);
+            Warning(info, "Guided search strategy is %s", guidance);
         }
-        guidance = res;
+        guide_strategy = res;
 
         if (trc_output != NULL && !dlk_detect && act_detect == NULL)
             Warning(info, "Ignoring trace output");
@@ -121,7 +121,7 @@ static  struct poptOption options[] = {
     { "saturation" , 0, POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &saturation , 0 , "select the saturation strategy" , "<none|sat-like|sat-loop|sat-ddd>" },
     { "sat-granularity" , 0 , POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &sat_granularity , 0 , "set saturation granularity","<number>" },
     { "save-levels", 0, POPT_ARG_VAL, &save_levels, 1, "save previous states seen at saturation levels", NULL },
-    {"guidance", 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &guided, 0 , "select the guided search strategy" , "<unguided|forward>" },
+    {"guidance", 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &guidance, 0 , "select the guided search strategy" , "<unguided|directed>" },
     { "deadlock" , 'd' , POPT_ARG_VAL , &dlk_detect , 1 , "detect deadlocks" , NULL },
     { "action" , 0 , POPT_ARG_STRING , &act_detect , 0 , "detect action" , "<action>" },
     { "trace" , 0 , POPT_ARG_STRING , &trc_output , 0 , "file to write trace to" , "<lts-file>.gcf" },
@@ -198,15 +198,16 @@ save_level(vset_t visited)
 }
 
 static void
-write_trace_state(lts_enum_cb_t trace_handle, int src_no, int *state) {
+write_trace_state(lts_enum_cb_t trace_handle, int src_no, int *state)
+{
   int labels[sLbls];
 
   Warning(debug, "dumping state %d", src_no);
 
   if (sLbls != 0)
-      GBgetStateLabelsAll(model,state,labels);
+      GBgetStateLabelsAll(model, state, labels);
 
-  enum_state(trace_handle, 0, state,labels);
+  enum_state(trace_handle, 0, state, labels);
 }
 
 struct write_trace_step_s {
@@ -249,7 +250,7 @@ write_trace_step(lts_enum_cb_t trace_handle, int src_no, int *src,
 
     GBgetTransitionsAll(model, src, write_trace_next, &ctx);
 
-    if (ctx.found ==0)
+    if (!ctx.found)
         Fatal(1, error, "no matching transition found");
 }
 
@@ -259,11 +260,11 @@ write_trace(lts_enum_cb_t trace_handle, int **states, int total_states)
     // output starting from initial state, which is in states[total_states-1]
 
     for(int i = total_states - 1; i > 0; i--) {
-        int current_step = total_states-i-1;
+        int current_step = total_states - i - 1;
 
         write_trace_state(trace_handle, current_step, states[i]);
         write_trace_step(trace_handle, current_step, states[i],
-                             current_step + 1, states[i-1]);
+                             current_step + 1, states[i - 1]);
     }
 
     write_trace_state(trace_handle, total_states - 1, states[0]);
@@ -303,13 +304,13 @@ find_trace_to(int trace_end[][N], int end_count, int level, vset_t *levels,
             continue;
         }
 
-        vset_add(int_levels[0], states[current_state-1]);
+        vset_add(int_levels[0], states[current_state - 1]);
 
-        // search backwards from states[current_state-1] to prev_level
+        // search backwards from states[current_state - 1] to prev_level
         do {
             int_level++;
 
-            if(int_level == max_int_level) {
+            if (int_level == max_int_level) {
                 max_int_level += 32;
                 int_levels = RTrealloc(int_levels,
                                            sizeof(vset_t[max_int_level]));
@@ -343,9 +344,9 @@ find_trace_to(int trace_end[][N], int end_count, int level, vset_t *levels,
         vset_example(src_set, states[current_state + int_level - 1]);
         vset_clear(src_set);
 
-        // find the states that give us a trace to states[current_state-1]
+        // find the states that give us a trace to states[current_state - 1]
         for(int i = int_level - 1; i > 0; i--) {
-            vset_add(src_set, states[current_state+i]);
+            vset_add(src_set, states[current_state + i]);
 
             for(int j = 0; j < nGrps; j++) {
                 vset_next(temp, src_set, group_next[j]);
@@ -708,7 +709,7 @@ static void
 reach_bfs(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
               long *eg_count, long *next_count)
 {
-    (void) visited_old;
+    (void)visited_old;
 
     int level = 0;
     vset_t old_vis = vset_create(domain, 0, NULL);
@@ -808,7 +809,7 @@ static void
 reach_chain(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
                 long *eg_count, long *next_count)
 {
-    (void) visited_old;
+    (void)visited_old;
 
     int level = 0;
     vset_t old_vis = vset_create(domain, 0, NULL);
@@ -1313,8 +1314,8 @@ find_overlapping_group(bitvector_t *found_groups, int *group)
 {
     bitvector_t row_found, row_new;
 
-    bitvector_create(&row_found, dm_ncols(GBgetDMInfo(model)));
-    bitvector_create(&row_new, dm_ncols(GBgetDMInfo(model)));
+    bitvector_create(&row_found, N);
+    bitvector_create(&row_new, N);
 
     for (int i = 0; i < nGrps; i++) {
         if (!bitvector_is_set(found_groups, i)) continue;
@@ -1374,7 +1375,7 @@ establish_group_order(int *group_order, int *initial_count)
 }
 
 static void
-forward_guided(sat_proc_t sat_proc, reach_proc_t reach_proc, vset_t visited,
+directed(sat_proc_t sat_proc, reach_proc_t reach_proc, vset_t visited,
                    char *etf_output)
 {
     int *group_order = RTmalloc(nGrps * sizeof(int));
@@ -1447,7 +1448,7 @@ init_model(char *file)
 static void
 init_domain(vset_implementation_t impl, vset_t *visited)
 {
-    domain = vdom_create_domain(N,impl);
+    domain = vdom_create_domain(N, impl);
     *visited = vset_create(domain, 0, NULL);
 
     group_next     = (vrel_t*)RTmalloc(nGrps * sizeof(vrel_t));
@@ -1479,11 +1480,13 @@ init_domain(vset_implementation_t impl, vset_t *visited)
 static void
 init_action()
 {
-    if (eLbls!=1) Abort("action detection assumes precisely one edge label");
+    if (eLbls != 1)
+        Abort("action detection assumes precisely one edge label");
+
     chunk c = chunk_str(act_detect);
     //table number of first edge label.
-    act_detect_table=lts_type_get_edge_label_typeno(ltstype,0);
-    act_detect_index=GBchunkPut(model,act_detect_table,c);
+    act_detect_table=lts_type_get_edge_label_typeno(ltstype, 0);
+    act_detect_index=GBchunkPut(model,act_detect_table, c);
     Warning(info, "Detecting action \"%s\"", act_detect);
 }
 
@@ -1669,6 +1672,11 @@ main (int argc, char *argv[])
                            "representation of the input\n\nOptions");
 
     vset_implementation_t vset_impl = VSET_IMPL_AUTOSELECT;
+    vset_t visited;
+
+    init_model(files[0]);
+    init_domain(vset_impl, &visited);
+    if (act_detect != NULL) init_action();
 
     sat_proc_t sat_proc = NULL;
     reach_proc_t reach_proc = NULL;
@@ -1704,18 +1712,12 @@ main (int argc, char *argv[])
         break;
     }
 
-    vset_t visited;
-
-    init_model(files[0]);
-    init_domain(vset_impl, &visited);
-    if (act_detect != NULL) init_action();
-
-    switch (guidance) {
+    switch (guide_strategy) {
     case UNGUIDED:
         guided_proc = unguided;
         break;
-    case FORWARD_GUIDED:
-        guided_proc = forward_guided;
+    case DIRECTED:
+        guided_proc = directed;
         break;
     }
 
