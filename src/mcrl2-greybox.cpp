@@ -22,7 +22,7 @@ class group_information {
 
   private:
 
-    mcrl2::lps::specification const&     m_model;
+    mcrl2::lps::specification     m_model;
 
     std::vector< std::vector< size_t > > m_group_indices;
 
