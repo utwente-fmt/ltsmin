@@ -193,12 +193,32 @@ void GBinitModelDefaults (model_t *p_model, model_t default_src)
         GBcopyChunkMaps(model, default_src);
         GBsetLTStype(model, GBgetLTStype(default_src));
     }
-	if (model->dm_info == NULL)
-		GBsetDMInfo(model, GBgetDMInfo(default_src));
-	if (model->dm_read_info == NULL)
-		GBsetDMInfoRead(model, GBgetDMInfoRead(default_src));
-	if (model->dm_write_info == NULL)
-		GBsetDMInfoWrite(model, GBgetDMInfoWrite(default_src));
+
+    /* Copy dependency matrices. We cannot use the GBgetDMInfoRead and
+     * GBgetDMInfoWrite calls here, as these default to the combined
+     * matrix of the parent, which can be the wrong matrix in case
+     * a certain pins2pins layer has restricted functionality and only
+     * over writes the combined matrix (like the regrouping layer before
+     * becoming aware of the read and write matrices).  In this degenerated
+     * case do the conservative thing and use the combined matrix that was
+     * set.
+     */
+    if (model->dm_read_info == NULL) {
+        if (model->dm_info == NULL)
+            model->dm_read_info = default_src->dm_read_info;
+        else
+            model->dm_read_info = model->dm_info;
+    }
+    if (model->dm_write_info == NULL) {
+        if (model->dm_info == NULL)
+            model->dm_write_info = default_src->dm_write_info;
+        else
+            model->dm_write_info = model->dm_info;
+    }
+    if (model->dm_info == NULL)
+        model->dm_info = default_src->dm_info;
+}
+
     if (model->sl_info == NULL)
         GBsetStateLabelInfo(model, GBgetStateLabelInfo(default_src));
     if (model->s0 == NULL) {
