@@ -27,6 +27,8 @@ Language
 * Prefer "static const" over #define whenever possible.  Use enums for
   logically-connected groups of constants.
 
+* Declare all functions local to a compilation unit as "static".
+
 * Use asserts to document and enforce invariants.  Remember to
   #include <assert.h>.  Assert expressions must be free of function
   calls and side effects, e.g.: use "int max = f(); assert (i < max); i++;"
@@ -42,6 +44,36 @@ Language
 
 * Use size_t or ssize_t to represent counters.  They can be printf()ed
   with "%zu" or "%zd" directives.
+
+
+Naming
+======
+
+* For identifiers generally follow the usual C conventions of
+  lower-case letters and underscores, e.g., trc_get_edge_label.
+
+* For identifiers which are part of a submodule, use a (short but
+  mnemonic) unique prefix which distinguishes them from other
+  submodules, e.g., "log_printf" (prefix "log_" for all logging
+  related functions and structs).
+
+* Ensure that exported identifiers do not clash with system or
+  third-party code, e.g., by making them suitably long or using
+  prefixes.
+
+* For global variables use identifiers consisting of three or more
+  letters, with the first letter capitalized.  For global constants,
+  use identifiers in all upper-case.  For macros, use all upper-case,
+  except if they replace a function (in which case they should follow
+  function naming conventions).
+
+* Avoid unnecessary and ambiguous abbreviations of identifiers (like
+  "ex_program" for "exit_program"; a shorter identifier would be
+  "die").  However, idiomatic abbreviations are allowed (e.g., "buf"
+  for "buffer", "xlate" for "translate", etc.).
+
+* For typedefs use names ending with "_t", e.g.,
+  "typedef struct foo foo_t;"
 
 
 Source Organization

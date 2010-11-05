@@ -332,12 +332,17 @@ static void set_enum_match_fdd(vset_t set,int p_len,int* proj,int*match,vset_ele
 
 static void count_fdd(BDD bdd, BDD p_set,long *nodes,bn_int_t *elements)
 {
-	*nodes=bdd_nodecount(bdd);
-	double count=bdd_satcountlnset(bdd,p_set);
-	//Warning(info,"log of satcount is %f",count);
-	count=pow(2.0,count);
-	//Warning(info,"satcount is %f",count);
-	bn_double2int(count,elements);
+    *nodes=bdd_nodecount(bdd);
+    double count=bdd_satcountlnset(bdd,p_set);
+    //Warning(info,"log of satcount is %f",count);
+    if (count == 0.0) {
+        // count is zero or one
+        count=bdd_satcountset(bdd, p_set);
+    } else {
+        count=pow(2.0,count);
+    }
+    //Warning(info,"satcount is %f",count);
+    bn_double2int(count,elements);
 }
 
 static void set_count_fdd(vset_t set,long *nodes,bn_int_t *elements){
