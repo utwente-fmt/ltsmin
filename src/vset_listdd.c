@@ -379,6 +379,78 @@ static void mdd_enum(uint32_t mdd,uint32_t *vec,int idx,int len,vset_element_cb 
     }
 }
 
+
+/*
+static void mdd_enum_match(uint32_t mdd, int p_len, int* proj, int *match, vset_element_cb cb, void *context)
+{
+}
+
+static void mdd_copy_match(uint32_t mdd, uint32_t mdd, int p_len, int *proj, int *match)
+{
+}
+
+static void mdd_intersect(uint32_t dst, uint32_t src)
+{
+}
+
+static void mdd_zip(uint32_t dst, uint32_t src)
+{
+}
+
+static void mdd_reorder()
+{
+}
+
+static void mdd_destroy(uint32_t set)
+{
+}
+*/
+
+static void set_enum_match_mdd(vset_t set, int p_len, int* proj, int *match, vset_element_cb cb, void *context)
+{
+    (void)set;
+    (void)p_len;
+    (void)proj;
+    (void)match;
+    (void)cb;
+    (void)context;
+    Fatal(1, error, "set_enum_match not implemented");
+}
+
+static void set_copy_match_mdd(vset_t src, vset_t dst, int p_len, int *proj, int *match)
+{
+    (void)src;
+    (void)dst;
+    (void)p_len;
+    (void)proj;
+    (void)match;
+    Fatal(1, error, "set_copy_match not implemented");
+}
+
+static void set_intersect_mdd(vset_t dst, vset_t src)
+{
+    (void)dst;
+    (void)src;
+    Fatal(1, error, "set_intersect not implemented");
+}
+
+/*
+static void set_zip_mdd(vset_t dst, vset_t src)
+{
+    (void)dst;
+    (void)src;
+    Warning(info, "set_zip not implemented");
+}
+*/
+
+static void set_reorder_mdd() { }
+
+static void set_destroy_mdd(vset_t set)
+{
+    (void)set;
+    Fatal(1, error, "set_destroy not implemented");
+}
+
 /*
 static uint32_t mdd_take(uint32_t mdd,int len,uint32_t count){
 	if (mdd==0 || count==0) return 0;
@@ -687,6 +759,12 @@ vdom_t vdom_create_list_native(int n){
     dom->shared.set_next=set_next_mdd;
     dom->shared.set_prev=set_prev_mdd;
     dom->shared.set_example=set_example_mdd;
+    dom->shared.set_enum_match=set_enum_match_mdd;
+    dom->shared.set_copy_match=set_copy_match_mdd;
+    dom->shared.set_intersect=set_intersect_mdd;
+    //dom->shared.set_zip=set_zip_mdd;
+    dom->shared.reorder=set_reorder_mdd;
+    dom->shared.set_destroy=set_destroy_mdd;
     return dom;
 }
 

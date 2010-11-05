@@ -100,8 +100,10 @@ void vdom_init_shared(vdom_t dom,int n){
 	dom->shared.set_copy=NULL;
 	dom->shared.set_enum=NULL;
 	dom->shared.set_enum_match=NULL;
+	dom->shared.set_copy_match=NULL;
 	dom->shared.set_count=NULL;
 	dom->shared.set_union=NULL;
+	dom->shared.set_intersect=NULL;
 	dom->shared.set_minus=NULL;
 	dom->shared.set_zip=default_zip;
 	dom->shared.set_project=NULL;
@@ -111,6 +113,7 @@ void vdom_init_shared(vdom_t dom,int n){
 	dom->shared.set_next=NULL;
 	dom->shared.set_prev=NULL;
 	dom->shared.reorder=default_reorder;
+	dom->shared.set_destroy=NULL;
 }
 
 vset_t vset_create(vdom_t dom,int k,int* proj){
@@ -153,6 +156,10 @@ void vset_enum_match(vset_t set,int p_len,int* proj,int*match,vset_element_cb cb
 	set->dom->shared.set_enum_match(set,p_len,proj,match,cb,context);
 }
 
+void vset_copy_match(vset_t dst,vset_t src,int p_len,int* proj,int*match){
+	dst->dom->shared.set_copy_match(dst,src,p_len,proj,match);
+}
+
 void vset_example(vset_t set,int *e){
 	set->dom->shared.set_example(set,e);
 }
@@ -167,6 +174,10 @@ void vrel_count(vrel_t rel,long *nodes,bn_int_t *elements){
 
 void vset_union(vset_t dst,vset_t src){
 	dst->dom->shared.set_union(dst,src);
+}
+
+void vset_intersect(vset_t dst, vset_t src) {
+    dst->dom->shared.set_intersect(dst,src);
 }
 
 void vset_minus(vset_t dst,vset_t src){
@@ -195,4 +206,8 @@ void vrel_add(vrel_t rel,const int* src, const int* dst){
 
 void vset_reorder(vdom_t dom) {
   dom->shared.reorder();
+}
+
+void vset_destroy(vset_t set) {
+    set->dom->shared.set_destroy(set);
 }

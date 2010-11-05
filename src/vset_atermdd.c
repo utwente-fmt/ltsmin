@@ -72,7 +72,7 @@ struct vector_relation {
 
 static ATerm emptyset=NULL;
 static AFun cons;
-static AFun zip,min,sum,pi,reach,inv_reach;
+static AFun zip,min,sum,intersect,pi,reach,inv_reach,match,match3;
 static ATerm atom;
 static ATerm Atom=NULL;
 static ATerm Empty=NULL;
@@ -104,6 +104,12 @@ static void set_init(){
 	ATprotectAFun(min);
 	sum=ATmakeAFun("VSET_UNION",2,ATfalse);
 	ATprotectAFun(sum);
+    intersect=ATmakeAFun("VSET_INTERSECT",2,ATfalse);
+    ATprotectAFun(intersect);
+	match=ATmakeAFun("VSET_MATCH",1,ATfalse);
+	ATprotectAFun(match);
+	match3=ATmakeAFun("VSET_MATCH3",3,ATfalse);
+	ATprotectAFun(match3);
 	pi=ATmakeAFun("VSET_PI",1,ATfalse);
 	ATprotectAFun(pi);
 	reach=ATmakeAFun("VSET_REACH",2,ATfalse);
@@ -126,6 +132,12 @@ static vset_t set_create_both(vdom_t dom,int k,int* proj){
 	set->p_len=k;
 	for(int i=0;i<k;i++) set->proj[i]=proj[i];
 	return set;
+}
+
+static void set_destroy_both(vset_t set) {
+    ATunprotect(&set->set);
+    set->p_len = 0;
+    free(set);
 }
 
 static vrel_t rel_create_both(vdom_t dom,int k,int* proj){
@@ -611,6 +623,60 @@ static void set_enum_match_list(vset_t set,int p_len,int* proj,int*match,vset_el
 	ATindexedSetDestroy(dead_branches);
 }
 
+/* return NULL : error, or matched vset */
+static ATerm
+set_copy_match_2(ATerm set, int len, ATerm*pattern, int *proj, int p_len, int ofs) {
+    ATerm key, res, tmp = emptyset;
+
+    // lookup in cache
+    key = (ATerm)ATmakeAppl1(match,set);
+    res = ATtableGet(global_ct,key);
+    if (res) return res;
+
+    res = emptyset;
+
+    if (ATgetAFun(set) == cons) {
+        ATerm el=ATgetArgument(set,0);
+        if (ofs<len) {
+            // if still matching and this offset matches,
+            // compare the aterm and return it if it matches
+            if (p_len && proj[0]==ofs) {
+                // does it match?
+                if (ATisEqual(pattern[0],el)) {
+                    // try to match the next element, return the result
+                    tmp=set_copy_match_2(ATgetArgument(set,1),len,pattern+1, proj+1, p_len-1,ofs+1);
+                }
+            // not matching anymore or the offset doesn't match
+            } else {
+                tmp=set_copy_match_2(ATgetArgument(set,1),len,pattern, proj, p_len,ofs+1);
+            }
+        }
+        // test matches in second argument
+        if (ofs<=len) {
+            res=set_copy_match_2(ATgetArgument(set,2),len,pattern, proj, p_len,ofs);
+        }
+        // combine results
+        res = MakeCons(el, tmp, res);
+    } else {
+        if (ATisEqual(set,atom) && ofs==len) {
+            res=set;
+        } else {
+            res=emptyset;
+        }
+    }
+    ATtablePut(global_ct,key,res);
+    return res;
+}
+
+static void set_copy_match_list(vset_t dst,vset_t src,int p_len,int* proj,int*match) {
+	int N=src->p_len?src->p_len:src->dom->shared.size;
+	ATerm pattern[p_len];
+	for(int i=0;i<p_len;i++) pattern[i]=(ATerm)ATmakeInt(match[i]);
+	dst->set = set_copy_match_2(src->set,N,pattern,proj,p_len,0);
+
+	ATtableReset(global_ct);
+}
+
 static ATerm set_union_2(ATerm s1, ATerm s2,char lookup) {
   if (s1==atom) return atom;
   else if (s1==emptyset) return s2;
@@ -640,6 +706,37 @@ static ATerm set_union_2(ATerm s1, ATerm s2,char lookup) {
 
 static void set_union_list(vset_t dst,vset_t src){
 	dst->set=set_union_2(dst->set,src->set,0);
+	ATtableReset(global_ct);
+}
+
+static ATerm set_intersect_2(ATerm s1, ATerm s2,char lookup) {
+  if (s1==atom && s2==atom) return atom;
+  else if (s1==emptyset) return emptyset;
+  else if (s2==emptyset) return emptyset;
+  else { ATerm key=NULL,res=NULL;
+    if (lookup) {
+      key = (ATerm)ATmakeAppl2(intersect,s1,s2);
+      res = ATtableGet(global_ct,key);
+      if (res) return res;
+    }
+    { // either not looked up, or not found in cache: compute
+      ATerm x = ATgetArgument(s1,0);
+      ATerm y = ATgetArgument(s2,0);
+      int c = ATcmp(x,y);
+      if (c==0)     res=MakeCons(x, set_intersect_2(ATgetArgument(s1,1),ATgetArgument(s2,1),1),
+			            set_intersect_2(ATgetArgument(s1,2),ATgetArgument(s2,2),1));
+      // x < y
+      else if (c<0) res=set_intersect_2(ATgetArgument(s1,2),s2,1);
+      else          res = set_intersect_2(s1, ATgetArgument(s2,2),1);
+
+      if (lookup) ATtablePut(global_ct,key,res);
+      return res;
+    }
+  }
+}
+
+static void set_intersect_list(vset_t dst,vset_t src){
+	dst->set=set_intersect_2(dst->set,src->set,0);
 	ATtableReset(global_ct);
 }
 
@@ -953,6 +1050,38 @@ static void set_union_tree(vset_t dst, vset_t src) {
 
 
 #if 0
+intersect Atom Atom = Atom
+intersect Empty _   = Empty
+intersect _ Empty = Empty
+intersect (Cons dstdown dstleft dstright) (Cons srcdown srcleft srcright) = Cons (intersect dstdown srcdown) (intersect dstleft srcleft) (intersect dstright srcright)
+#endif
+
+static ATerm set_intersect_tree_2(ATerm s1, ATerm s2) {
+    if (s1==Atom && s2==Atom) return Atom;
+    else if (s1==Empty) return Empty;
+    else if (s2==Empty) return Empty;
+    else {
+        ATerm key=NULL,res=NULL;
+        key = (ATerm)ATmakeAppl2(intersect,s1,s2);
+        res = ATtableGet(global_ct,key);
+        if (res) return res;
+        // either not looked up, or not found in cache: compute
+        res = MCons(
+                set_intersect_tree_2(Down(s1),  Down(s2)),
+                set_intersect_tree_2(Left(s1),  Left(s2)),
+                set_intersect_tree_2(Right(s1), Right(s2))
+              );
+        ATtablePut(global_ct,key,res);
+        return res;
+    }
+}
+
+static void set_intersect_tree(vset_t dst, vset_t src) {
+	dst->set=set_intersect_tree_2(dst->set,src->set);
+	ATtableReset(global_ct);
+}
+
+#if 0
 project Empty _ _ = Empty
 project _ _ [] = Atom
 project (Cons x s t) i (j:l) | i == j = Cons (project x (i+1) (l)) (project s i (j:l)) (project t i (j:l))
@@ -1250,6 +1379,78 @@ void set_prev_tree(vset_t dst,vset_t src,vrel_t rel){
 
 static void reorder() {}
 
+static void set_enum_match_tree(vset_t set,int p_len,int* proj,int*match,vset_element_cb cb,void* context){
+    (void)set;
+    (void)p_len;
+    (void)proj;
+    (void)match;
+    (void)cb;
+    (void)context;
+    Fatal(1, error, "Set enum match tree not implemented!");
+}
+
+
+static ATerm
+set_copy_match_tree_2(ATerm set, int len,int *matchv, int *proj, int p_len, int ofs, int shift, int cur) {
+    ATerm key, res;
+
+    // lookup in cache
+    key = (ATerm)ATmakeAppl3(match3,set, (ATerm)ATmakeInt(p_len), (ATerm)ATmakeInt(shift+cur-1));
+    res = ATtableGet(global_ct,key);
+    if (res) return res;
+
+    res = Empty;
+
+    if (ATgetAFun(set) == cons) {
+        // should always be true, check anyway
+        if (ofs<=len) {
+            // if still matching and this offset matches,
+            // compare the match to the computed current-1
+            if (p_len && proj[0]==ofs) {
+                // does it match?
+                if (matchv[0] == shift+cur-1) { // remember: can't store zero, thus -1
+                    // try to match the next element, return the result
+                    res = MCons(
+                            set_copy_match_tree_2(Down(set), len, matchv+1, proj+1, p_len-1, ofs+1, 1, 0),
+                            Empty,
+                            Empty
+                          );
+                } else {
+                    res = MCons(
+                            Empty,
+                            set_copy_match_tree_2(Left(set), len, matchv, proj, p_len, ofs, shift<<1, cur),
+                            set_copy_match_tree_2(Right(set), len, matchv, proj, p_len, ofs, shift<<1, shift|cur)
+                          );
+                }
+            // not matching anymore or the offset doesn't match
+            } else {
+                res = MCons(
+                        set_copy_match_tree_2(Down(set), len, matchv, proj, p_len, ofs+1, 1, 0),
+                        set_copy_match_tree_2(Left(set), len, matchv, proj, p_len, ofs, shift<<1, cur),
+                        set_copy_match_tree_2(Right(set), len, matchv, proj, p_len, ofs, shift<<1, shift|cur)
+                      );
+            }
+        }
+    } else {
+        if (ATisEqual(set,Atom) && ofs>=len) {
+            res=set;
+        } else {
+            res=Empty;
+        }
+    }
+    ATtablePut(global_ct,key,res);
+    return res;
+}
+
+static void set_copy_match_tree(vset_t dst,vset_t src, int p_len,int* proj,int*match){
+    int N=src->p_len?src->p_len:src->dom->shared.size;
+    if (p_len == 0) {
+        dst->set = Empty;
+    } else {
+        dst->set = set_copy_match_tree_2(src->set,N,match,proj,p_len,0, 1, 0);
+        ATtableReset(global_ct);
+    }
+}
 
 vdom_t vdom_create_tree(int n){
 	Warning(info,"Creating an AtermDD tree domain.");
@@ -1264,11 +1465,13 @@ vdom_t vdom_create_tree(int n){
 	dom->shared.set_clear=set_clear_both;
 	dom->shared.set_copy=set_copy_both;
 	dom->shared.set_enum=set_enum_tree;
-	dom->shared.set_enum_match=set_enum_match_list; // TODO
+	dom->shared.set_enum_match=set_enum_match_tree;
+	dom->shared.set_copy_match=set_copy_match_tree;
 	dom->shared.set_example=set_example_tree;
 	dom->shared.set_count=set_count_tree;
 	dom->shared.rel_count=rel_count_tree;
     dom->shared.set_union=set_union_tree;
+    dom->shared.set_intersect=set_intersect_tree;
     dom->shared.set_minus=set_minus_tree;
 	dom->shared.set_zip=set_zip_tree;
 	dom->shared.set_project=set_project_tree;
@@ -1277,7 +1480,7 @@ vdom_t vdom_create_tree(int n){
 	dom->shared.set_next=set_next_tree;
 	dom->shared.set_prev=set_prev_tree;
 	dom->shared.reorder=reorder;
-
+    dom->shared.set_destroy=set_destroy_both;
 	return dom;
 }
 
@@ -1295,10 +1498,12 @@ vdom_t vdom_create_list(int n){
 	dom->shared.set_copy=set_copy_both;
 	dom->shared.set_enum=set_enum_list;
 	dom->shared.set_enum_match=set_enum_match_list;
+	dom->shared.set_copy_match=set_copy_match_list;
 	dom->shared.set_example=set_example_list;
 	dom->shared.set_count=set_count_list;
 	dom->shared.rel_count=rel_count_list;
 	dom->shared.set_union=set_union_list;
+    dom->shared.set_intersect=set_intersect_list;
 	dom->shared.set_minus=set_minus_list;
 	dom->shared.set_zip=set_zip_list;
 	dom->shared.set_project=set_project_list;
@@ -1307,6 +1512,7 @@ vdom_t vdom_create_list(int n){
 	dom->shared.set_next=set_next_list;
 	dom->shared.set_prev=set_prev_list;
 	dom->shared.reorder=reorder;
+    dom->shared.set_destroy=set_destroy_both;
 	return dom;
 }
 

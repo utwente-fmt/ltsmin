@@ -155,6 +155,22 @@ static vset_t set_create_fdd(vdom_t dom,int k,int* proj){
 	return set;
 }
 
+static void set_destroy_fdd(vset_t set) {
+    // the domain is a public object, don't clear
+    bdd_delref(set->bdd);
+    if (set->p_set != set->dom->varset)
+        bdd_delref(set->p_set);
+    if (set->c_set != bddtrue)
+        bdd_delref(set->c_set);
+    // free projection complement variables
+    set->p_len = 0;
+    if (set->proj != set->dom->proj)
+        free(set->proj);
+    // free set
+    free(set);
+    return;
+}
+
 static vrel_t rel_create_fdd(vdom_t dom,int k,int* proj){
     vrel_t rel=(vrel_t)RTmalloc(sizeof(struct vector_relation));
     rel->dom=dom;
@@ -330,13 +346,27 @@ static void set_enum_match_fdd(vset_t set,int p_len,int* proj,int*match,vset_ele
 	vset_enum_do_fdd(set->dom,subset,set->proj,vec,N-1,cb,context);
 }
 
+static void set_copy_match_fdd(vset_t dst,vset_t src,int p_len,int* proj,int*match){
+    // delete reference to dst
+    bdd_delref(dst->bdd);
+    // use dst->bdd as subset
+    dst->bdd=src->bdd;
+    bdd_addref(dst->bdd);
+    for(int i=0;i<p_len;i++){
+        BDD val=mkvar(src->dom,proj[i],match[i]);
+        BDD tmp=bdd_addref(bdd_and(dst->bdd,val));
+        bdd_delref(dst->bdd);
+        dst->bdd=tmp;
+        rmvar(val);
+    }
+}
+
 static void count_fdd(BDD bdd, BDD p_set,long *nodes,bn_int_t *elements)
 {
     *nodes=bdd_nodecount(bdd);
     double count=bdd_satcountlnset(bdd,p_set);
     //Warning(info,"log of satcount is %f",count);
-    if (count == 0.0) {
-        // count is zero or one
+    if (count < 30.0) {
         count=bdd_satcountset(bdd, p_set);
     } else {
         count=pow(2.0,count);
@@ -356,6 +386,12 @@ static void rel_count_fdd(vrel_t rel,long *nodes,bn_int_t *elements){
 static void set_union_fdd(vset_t dst,vset_t src){
 	BDD tmp=dst->bdd;
 	dst->bdd=bdd_addref(bdd_apply(tmp,src->bdd,bddop_or));
+	bdd_delref(tmp);
+}
+
+static void set_intersect_fdd(vset_t dst,vset_t src){
+	BDD tmp=dst->bdd;
+	dst->bdd=bdd_addref(bdd_apply(tmp,src->bdd,bddop_and));
 	bdd_delref(tmp);
 }
 
@@ -461,8 +497,10 @@ vdom_t vdom_create_fdd(int n){
 	dom->shared.set_copy=set_copy_all;
 	dom->shared.set_enum=set_enum_fdd;
 	dom->shared.set_enum_match=set_enum_match_fdd;
+	dom->shared.set_copy_match=set_copy_match_fdd;
 	dom->shared.set_count=set_count_fdd;
 	dom->shared.set_union=set_union_fdd;
+    dom->shared.set_intersect=set_intersect_fdd;
 	dom->shared.set_minus=set_minus_fdd;
 	dom->shared.set_zip=set_zip_fdd;
 	dom->shared.set_project=set_project_fdd;
@@ -472,6 +510,7 @@ vdom_t vdom_create_fdd(int n){
 	dom->shared.set_next=set_next_appex_fdd;
 	dom->shared.set_prev=set_prev_appex_fdd;
 	dom->shared.reorder=vset_fdd_reorder;
+    dom->shared.set_destroy=set_destroy_fdd;
 	return dom;
 }
 
