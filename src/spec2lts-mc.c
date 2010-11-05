@@ -385,7 +385,7 @@ maybe_report (thread_ctx_t * ctx, char *msg)
     if (W == 1)
         print_state_space_total (msg, ctx);
     else
-        Warning (info, "%s%d levels ±%d states ±%d transitions", msg,
+        Warning (info, "%s%d levels ~%d states ~%d transitions", msg,
                  ctx->level, W * ctx->visited,  W * ctx->trans);
 }
 
