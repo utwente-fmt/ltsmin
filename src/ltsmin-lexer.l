@@ -40,7 +40,7 @@ ident       [_]*([a-zA-Z]|\\[[:print:]])([a-zA-Z0-9_']|\\[[:print:]])*
 number      [0-9]+
 string      \"(([[:print:]]{-}[\\\"])|"\\\\"|"\\\"")*\"
 chunk       #([0-9a-fA-F][0-9a-fA-F])*#
-operator    [~!@<>=\-+/?&\\|*]+
+operator    [~!@<>=\-+/?&\\|*\[\]]+
 
 %%
 
@@ -89,7 +89,7 @@ operator    [~!@<>=\-+/?&\\|*]+
     int idx;
     yyextra->linepos+=strlen(yytext);
     if ((idx=SIlookup(yyextra->keywords,yytext))!=SI_INDEX_FAILED) {
-        Parse(yyextra->parser,idx,0,yyextra);
+        Parse(yyextra->parser,idx,idx,yyextra);
     } else {
         int N=strlen(yytext);
         char decoded[N+1];
@@ -104,7 +104,14 @@ operator    [~!@<>=\-+/?&\\|*]+
             j++;
         }
         decoded[j]=0;
-        if ((idx=SIlookup(yyextra->state_vars,decoded))!=SI_INDEX_FAILED) {
+
+        if ((idx=SIlookup(yyextra->constant_ops,decoded))!=SI_INDEX_FAILED) {
+            Parse(yyextra->parser,TOKEN_CONSTANT,idx,yyextra);
+        } else if ((idx=SIlookup(yyextra->unary_ops,decoded))!=SI_INDEX_FAILED) {
+            Parse(yyextra->parser,yyextra->unary_info[idx].pattern,idx,yyextra);
+        } else if((idx=SIlookup(yyextra->binary_ops,decoded))!=SI_INDEX_FAILED){
+            Parse(yyextra->parser,yyextra->binary_info[idx].pattern,idx,yyextra);
+        } else if ((idx=SIlookup(yyextra->state_vars,decoded))!=SI_INDEX_FAILED) {
             Parse(yyextra->parser,TOKEN_STATE_VAR,idx,yyextra);
         } else if ((idx=SIlookup(yyextra->edge_vars,decoded))!=SI_INDEX_FAILED) {
             Parse(yyextra->parser,TOKEN_EDGE_VAR,idx,yyextra);
@@ -127,16 +134,33 @@ operator    [~!@<>=\-+/?&\\|*]+
 
 {operator} {
     int idx;
-    yyextra->linepos+=strlen(yytext);
-    if ((idx=SIlookup(yyextra->keywords,yytext))!=SI_INDEX_FAILED) {
-        Parse(yyextra->parser,idx,0,yyextra);
-    } else if((idx=SIlookup(yyextra->unary_ops,yytext))!=SI_INDEX_FAILED){
-        Parse(yyextra->parser,yyextra->unary_info[idx].token,idx,yyextra);
-    } else if((idx=SIlookup(yyextra->binary_ops,yytext))!=SI_INDEX_FAILED){
-        Parse(yyextra->parser,yyextra->binary_info[idx].token,idx,yyextra);
-    } else {
-        Fatal(1,error,"Unknown operator %s",yytext);
+    char yybuf[strlen(yytext)+1];
+    int matched = 0;
+    // find longest match
+    // note: this is quite expensive like this, improve?
+    for(int i=strlen(yytext); i>0 && !matched; i--) {
+        memset(yybuf, 0, i+1);
+        memcpy(yybuf, yytext, i);
+
+        if ((idx=SIlookup(yyextra->keywords,yybuf))!=SI_INDEX_FAILED) {
+            yyless(i);
+            yyextra->linepos+=i;
+            Parse(yyextra->parser,idx,0,yyextra);
+            matched = 1;
+        } else if((idx=SIlookup(yyextra->unary_ops,yybuf))!=SI_INDEX_FAILED){
+            yyless(i);
+            yyextra->linepos+=i;
+            Parse(yyextra->parser,yyextra->unary_info[idx].pattern,idx,yyextra);
+            matched = 1;
+        } else if((idx=SIlookup(yyextra->binary_ops,yybuf))!=SI_INDEX_FAILED){
+            yyless(i);
+            yyextra->linepos+=i;
+            Parse(yyextra->parser,yyextra->binary_info[idx].pattern,idx,yyextra);
+            matched = 1;
+        }
     }
+    if (!matched)
+        Fatal(1,error,"Unknown operator %s at line %d, pos %d",yytext,yyextra->lineno+1,yyextra->linepos+1);
 }
 
 . {

@@ -4,6 +4,7 @@
 #include <runtime.h>
 #include <stringindex.h>
 #include <stream.h>
+#include <fast_hash.h>
 
 /**
 \brief Operator types.
@@ -24,8 +25,9 @@ typedef struct ltsmin_parse_env_s *ltsmin_parse_env_t;
 extern void ltsmin_parse_stream(int select,ltsmin_parse_env_t env,stream_t stream);
 
 extern ltsmin_parse_env_t LTSminParseEnvCreate();
+extern void LTSminParseEnvDestroy();
 
-extern void LTSminKeyword(ltsmin_parse_env_t env,int token,const char* keyword);
+extern void LTSminKeyword(ltsmin_parse_env_t env, int token,const char* keyword);
 
 extern int LTSminEdgeVarIndex(ltsmin_parse_env_t env,const char* name);
 extern const char* LTSminEdgeVarName(ltsmin_parse_env_t env,int idx);
@@ -33,27 +35,63 @@ extern const char* LTSminEdgeVarName(ltsmin_parse_env_t env,int idx);
 extern int LTSminStateVarIndex(ltsmin_parse_env_t env,const char* name);
 extern const char* LTSminStateVarName(ltsmin_parse_env_t env,int idx);
 
-extern int LTSminPrefixOperator(ltsmin_parse_env_t env,const char* name,int prio);
-extern int LTSminPostfixOperator(ltsmin_parse_env_t env,const char* name,int prio);
-extern const char* LTSminUnaryName(ltsmin_parse_env_t env,int idx);
+extern int LTSminValueIndex(ltsmin_parse_env_t env,const char* name);
 
-extern int LTSminBinaryOperator(ltsmin_parse_env_t env,const char* name,int prio);
+extern int LTSminConstant (ltsmin_parse_env_t env, int token, const char* name);
+extern const char* LTSminConstantName (ltsmin_parse_env_t env, int idx);
+extern int LTSminConstantToken(ltsmin_parse_env_t env, int idx);
+
+extern int LTSminPrefixOperator (ltsmin_parse_env_t env, int token, const char* name, int prio);
+extern int LTSminPostfixOperator(ltsmin_parse_env_t env, int token, const char* name, int prio);
+extern const char* LTSminUnaryName(ltsmin_parse_env_t env, int idx);
+extern int LTSminUnaryToken(ltsmin_parse_env_t env, int idx);
+
+extern int LTSminBinaryOperator(ltsmin_parse_env_t env,int token, const char* name,int prio);
 extern const char* LTSminBinaryName(ltsmin_parse_env_t env,int idx);
+extern int LTSminBinaryToken(ltsmin_parse_env_t env,int idx);
 
 extern void Parse(void*,int,int,ltsmin_parse_env_t);
 extern void *ParseAlloc(void *(*mallocProc)(size_t));
 extern void ParseFree(void *p,void (*freeProc)(void*));
 
 typedef struct ltsmin_expr_s *ltsmin_expr_t;
-typedef enum {SVAR,EVAR,INT,CHUNK,BINARY_OP,UNARY_OP,VAR,MU_FIX,NU_FIX,
-EXISTS_STEP,FORALL_STEP} ltsmin_expr_case;
+typedef enum {
+    /* common symbols */
+    SVAR,
+    EVAR,
+    INT,
+    CHUNK,
+    VAR,
+
+    /* special symbols */
+    MU_FIX,
+    NU_FIX,
+    EXISTS_STEP,
+    FORALL_STEP,
+    EDGE_EXIST,
+    EDGE_ALL,
+
+    /* unary and binary operations */
+    BINARY_OP,
+    UNARY_OP,
+    CONSTANT,
+} ltsmin_expr_case;
+
 struct ltsmin_expr_s {
     ltsmin_expr_case node_type;
     int idx;
+    int token;
     ltsmin_expr_t arg1;
     ltsmin_expr_t arg2;
+    uint32_t hash;
 };
 extern void LTSminPrintExpr(log_t log,ltsmin_parse_env_t env,ltsmin_expr_t expr);
+
+ltsmin_expr_t LTSminExpr(ltsmin_expr_case node_type, int token, int idx, ltsmin_expr_t arg1, ltsmin_expr_t arg2);
+int           LTSminExprEq(ltsmin_expr_t expr1, ltsmin_expr_t expr2);
+ltsmin_expr_t LTSminExprRehash(ltsmin_expr_t expr);
+ltsmin_expr_t LTSminExprClone(ltsmin_expr_t expr);
+void          LTSminExprDestroy(ltsmin_expr_t);
 
 /**
 \brief Print the given string as a legal ETF identifier.
