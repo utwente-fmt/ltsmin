@@ -16,6 +16,12 @@
 #include <lts_enum.h>
 #include <lts_io.h>
 
+#include <dynamic-array.h>
+
+#include <ltsmin-syntax.h>
+#include <ltsmin-grammar.h>
+#include <ltsmin-tl.h>
+
 #if defined(MCRL)
 #include "mcrl-greybox.h"
 #endif
@@ -37,6 +43,9 @@
 
 static char* etf_output=NULL;
 static char* trc_output=NULL;
+static char* ctl_formula=NULL;
+static char* mu_formula=NULL;
+static ltsmin_expr_t mu_expr=NULL;
 static int dlk_detect=0;
 static char* act_detect=NULL;
 static int act_detect_table;
@@ -95,6 +104,8 @@ static  struct poptOption options[] = {
 	{ "action" , 0 , POPT_ARG_STRING , &act_detect , 0 , "detect action" , "<action>" },
 	{ "trace" , 0 , POPT_ARG_STRING , &trc_output , 0 , "file to write trace to" , "<lts-file>.gcf" },
 	{ "G" , 0 , POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &G , 0 , "set saturation granularity","<number>"},
+	{ "mu" , 0 , POPT_ARG_STRING , &mu_formula , 0 , "file with a mu formula" , "<mu-file>.mu" },
+	{ "ctl*" , 0 , POPT_ARG_STRING , &ctl_formula , 0 , "file with a ctl* formula" , "<ctl*-file>.ctl" },
 #if defined(MCRL)
 	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, mcrl_options , 0 , "mCRL options",NULL},
 #endif
@@ -471,6 +482,16 @@ static void final_stat_reporting(vset_t visited) {
   if (RTverbosity >=2)
     fprintf(stderr,"( peak transition cache: %ld nodes; peak group explored: %ld nodes )\n",
 	    max_trans_count,max_grp_count);
+}
+
+static vset_t get_svar_eq_int_set(int state_idx, int state_match, vset_t visited) {
+  vset_t result=vset_create(domain,0,NULL);
+  int proj[1] = {state_idx};
+  int match[1] = {state_match};
+
+  vset_copy_match(result, visited, 1, proj, match);
+
+  return result;
 }
 
 static void reach_bfs(){
@@ -976,6 +997,166 @@ void do_output(){
 	fclose(table_file);
 }
 
+static array_manager_t mu_var_man = NULL;
+static vset_t* mu_var = NULL;
+
+/* Naive textbook mu-calculus algorithm
+ * Taken from:
+ * Model Checking and the mu-calculus, E. Allen Emerson
+ * DIMACS Series in Discrete Mathematics, 1997 - Citeseer
+ */
+static vset_t mu_compute(ltsmin_expr_t mu_expr, vset_t visited)
+{
+    vset_t result = NULL;
+    switch(mu_expr->token) {
+        case MU_TRUE:
+            result = vset_create(domain, 0, NULL);
+            vset_copy(result, visited);
+            return result;
+        case MU_FALSE:
+            return vset_create(domain, 0, NULL);
+        case MU_EQ: { // svar == int
+            /* Currently MU_EQ works only in the context of an SVAR/INTEGER pair */
+            if (!mu_expr->arg1->token == MU_SVAR)
+                Fatal(1,error, "Expecting == with state variable on the left side!\n");
+            if (!mu_expr->arg1->token == MU_NUM)
+                Fatal(1,error, "Expecting == with int on the right side!\n");
+            result = get_svar_eq_int_set(mu_expr->arg1->idx, mu_expr->arg2->idx, visited);
+            } break;
+        case MU_OR: { // OR
+            result = mu_compute(mu_expr->arg1, visited);
+            vset_t mc = mu_compute(mu_expr->arg2, visited);
+            vset_union(result, mc);
+            vset_destroy(mc);
+            } break;
+        case MU_AND: { // AND
+            result = mu_compute(mu_expr->arg1, visited);
+            vset_t mc = mu_compute(mu_expr->arg2, visited);
+            vset_intersect(result, mc);
+            vset_destroy(mc);
+            } break;
+        case MU_NOT: { // NEGATION
+            result = vset_create(domain, 0, NULL);
+            vset_copy(result, visited);
+            vset_t mc = mu_compute(mu_expr->arg1, visited);
+            vset_minus(result, mc);
+            vset_destroy(mc);
+            } break;
+        case MU_NEXT: // X
+            Fatal(1,error, "unhandled MU_NEXT");
+            break;
+        case MU_EXIST: { // E
+            if (mu_expr->arg1->token == MU_NEXT) {
+                vset_t temp = vset_create(domain, 0, NULL);
+                result = vset_create(domain, 0, NULL);
+                vset_t g = mu_compute(mu_expr->arg1->arg1, visited);
+
+                for(int i=0;i<nGrps;i++){
+                    vset_prev(temp,g,group_next[i]);
+                    vset_union(result,temp);
+                    vset_clear(temp);
+                }
+                // destroy..
+                vset_destroy(temp);
+                // this is somewhat strange, but it appears that vset_prev generates
+                // states that are never visited before? can this happen or is this a bug?
+                // when?
+                // in order to prevent this, intersect with visited
+                vset_intersect(result, visited);
+            } else {
+                Fatal(1,error, "invalid operator following MU_EXIST, expecting MU_NEXT");
+            }
+            } break;
+        case MU_NUM:
+            Fatal(1,error, "unhandled MU_NUM");
+            break;
+        case MU_SVAR:
+            Fatal(1,error, "unhandled MU_SVAR");
+            break;
+        case MU_EVAR:
+            Fatal(1, error, "unhandled MU_EVAR");
+            break;
+        case MU_VAR:
+            ensure_access(mu_var_man, mu_expr->idx);
+            result = vset_create(domain, 0, NULL);
+            vset_copy(result, mu_var[mu_expr->idx]);
+            break;
+        case MU_ALL:
+            if (mu_expr->arg1->token == MU_NEXT) {
+                // implemented as AX phi = ! EX ! phi
+
+                result = vset_create(domain, 0, NULL);
+                vset_copy(result, visited);
+
+                // compute ! phi
+                vset_t notphi = vset_create(domain, 0, NULL);
+                vset_copy(notphi, visited);
+                vset_t phi = mu_compute(mu_expr->arg1->arg1, visited);
+                vset_minus(notphi, phi);
+                vset_destroy(phi);
+
+                vset_t temp = vset_create(domain, 0, NULL);
+                vset_t prev = vset_create(domain, 0, NULL);
+
+                // EX !phi
+                for(int i=0;i<nGrps;i++){
+                    vset_prev(temp,notphi,group_next[i]);
+                    vset_union(prev,temp);
+                    vset_clear(temp);
+                }
+                vset_destroy(temp);
+                // intersect: see EX
+                vset_intersect(prev, visited);
+
+                // and negate result again
+                vset_minus(result, prev);
+                vset_destroy(prev);
+                vset_destroy(notphi);
+            } else {
+                Fatal(1,error, "invalid operator following MU_ALL, expecting MU_NEXT");
+            }
+            break;
+        case MU_MU:
+            {
+                ensure_access(mu_var_man, mu_expr->idx);
+                // backup old var reference
+                vset_t old = mu_var[mu_expr->idx];
+                result = mu_var[mu_expr->idx] = vset_create(domain, 0, NULL);
+                vset_t tmp = vset_create(domain, 0, NULL);
+                do {
+                    vset_copy(mu_var[mu_expr->idx], tmp);
+                    vset_clear(tmp);
+                    tmp = mu_compute(mu_expr->arg1, visited);
+                } while (!vset_equal(mu_var[mu_expr->idx], tmp));
+                vset_destroy(tmp);
+                // new var reference
+                mu_var[mu_expr->idx] = old;
+            }
+            break;
+        case MU_NU:
+            {
+                ensure_access(mu_var_man, mu_expr->idx);
+                // backup old var reference
+                vset_t old = mu_var[mu_expr->idx];
+                result = mu_var[mu_expr->idx] = vset_create(domain, 0, NULL);
+                vset_t tmp = vset_create(domain, 0, NULL);
+                vset_copy(tmp, visited);
+                do {
+                    vset_copy(mu_var[mu_expr->idx], tmp);
+                    vset_clear(tmp);
+                    tmp = mu_compute(mu_expr->arg1, visited);
+                } while (!vset_equal(mu_var[mu_expr->idx], tmp));
+                vset_destroy(tmp);
+                // new var reference
+                mu_var[mu_expr->idx] = old;
+            }
+            break;
+        default:
+            Fatal(1,error, "encountered unhandled mu operator");
+    }
+    return result;
+}
+
 int main(int argc, char *argv[]){
 	char* files[2];
 	RTinitPopt(&argc,&argv,options,1,2,files,NULL,"<model> [<etf>]",
@@ -1042,6 +1223,21 @@ int main(int argc, char *argv[]){
 	GBgetInitialState(model,src);
 	vset_add(visited,src);
 	Warning(info,"got initial state");
+
+    // temporal logics
+    if (mu_formula) {
+        mu_expr = mu_parse_file(ltstype, mu_formula);
+        /*
+        char buf[1024];
+        ltsmin_expr_print_mu(mu_expr, buf);
+        printf("computing: %s\n",buf);
+        */
+    } else if (ctl_formula) {
+        ltsmin_expr_t ctl = ctl_parse_file(ltstype, ctl_formula);
+        mu_expr = ctl_star_to_mu(ctl);
+        mu_formula = ctl_formula;
+    }
+
 	mytimer_t timer=SCCcreateTimer();
 	SCCstartTimer(timer);
 	switch(strategy){
@@ -1070,6 +1266,30 @@ int main(int argc, char *argv[]){
 	  Warning(info,"Action not found: %s", act_detect);
 	SCCstopTimer(timer);
 	SCCreportTimer(timer,"reachability took");
+    if (mu_expr) {
+        // setup var manager
+        mu_var_man = create_manager(65535);
+        ADD_ARRAY(mu_var_man, mu_var, vset_t);
+
+        vset_t x = mu_compute(mu_expr, visited);
+
+        if (x) {
+            bn_int_t e_count;
+            long n_count;
+            char string[1024];
+            int size;
+
+            vset_count(x,&n_count,&e_count);
+            size = bn_int2string(string,sizeof string,&e_count);
+            if(size >= (ssize_t)sizeof string) Fatal(1,error,"Error converting number to string");
+            fprintf(stderr,"mu formula holds for %s states\n",string);
+            fprintf(stderr, " s0 is %sin the set\n", vset_member(x, src) ? "" : "not ");
+            bn_clear(&e_count);
+
+            // destroy vset x, doesn't exist
+            vset_clear(x);
+        }
+    }
 	final_stat_reporting(visited);
 	if (etf_output) {
 		SCCresetTimer(timer);
