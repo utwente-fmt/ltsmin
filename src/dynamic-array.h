@@ -18,6 +18,11 @@ typedef struct array_manager *array_manager_t;
 extern array_manager_t create_manager(int block_size);
 
 /**
+\brief Destroy an array manager.
+*/
+extern void destroy_manager(array_manager_t);
+
+/**
 \brief Add an array to be managed.
 
 This function will give warnings when it is compiled.

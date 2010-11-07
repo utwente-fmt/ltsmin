@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <strings.h>
 #include "runtime.h"
+#include <strings.h>
 
 #define MBLOCK 16
 
@@ -31,6 +32,18 @@ array_manager_t create_manager(int block_size){
 	man->arrays=NULL;
 	return man;
 }
+
+void destroy_manager(array_manager_t man)
+{
+    // destroy managed arrays
+    for(int i=0; i < man->managed; i++)
+    {
+        RTfree(*man->arrays[i].ar);
+    }
+    RTfree(man->arrays);
+    RTfree(man);
+}
+
 
 int array_size(array_manager_t man){
 	return man->size;
