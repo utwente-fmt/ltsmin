@@ -36,6 +36,10 @@ dve22lts-mpi
 dve22lts-mc
 nips2lts-mc
 etf2lts-mc
+spinja2lts-grey
+spinja2lts-mc
+spinja2lts-mpi
+spinja-reach
 regroup
 test
 pins_open
