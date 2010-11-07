@@ -13,7 +13,7 @@
 
 int RTverbosity=1;
 
-int linear_search(si_map_entry map[],const char*key){
+int linear_search(const si_map_entry map[],const char*key){
 	while(map[0].key){
 		if(!strcmp(map[0].key,key)) return map[0].val;
 		map++;
