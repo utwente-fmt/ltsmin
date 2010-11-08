@@ -320,6 +320,7 @@ AC_CONFIG_COMMANDS_POST(
 AC_CONFIG_FILES([
        Makefile
        src/Makefile
+       src/hre/Makefile
        src/dm/Makefile
        src/bignum/Makefile
        src/ce/Makefile

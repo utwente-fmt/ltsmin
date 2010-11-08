@@ -510,6 +510,7 @@ INPUT                  = $(SRCDIR)/src \
                          $(SRCDIR)/src/bignum \
                          $(SRCDIR)/src/ce \
                          $(SRCDIR)/src/dm \
+                         $(SRCDIR)/src/hre \
                          $(SRCDIR)/src/torx
 
 # This tag can be used to specify the character encoding of the source files

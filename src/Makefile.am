@@ -24,6 +24,7 @@ pkglib_LTLIBRARIES =
 SUBDIRS  = dm
 SUBDIRS += bignum
 SUBDIRS += .
+SUBDIRS += hre
 SUBDIRS += ce
 SUBDIRS += torx
 
