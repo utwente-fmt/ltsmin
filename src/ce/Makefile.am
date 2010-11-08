@@ -16,6 +16,8 @@ ce_mpi_SOURCES = \
     groups.c groups.h \
     paint.c paint.h	\
     seglts.c seglts.h \
-    sortcount.c sortcount.h
+    sortcount.c sortcount.h \
+    mpi-runtime.c mpi-runtime.h
 
-ce_mpi_LDADD = ../libltsmin-mpi.la
+ce_mpi_LDADD = ../libltsmin.la
+
