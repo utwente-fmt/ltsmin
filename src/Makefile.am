@@ -1,6 +1,6 @@
 bin_PROGRAMS = ltsmin-convert gcf etf-convert ltsmin-tracepp
 check_PROGRAMS = test-bitset test-is-balloc test-dfs-stack test-hre ltsmin-parse test-dbs
-check_LTLIBRARIES = libutil.la libltsmin.la
+noinst_LTLIBRARIES = libutil.la libltsmin.la
 pkglib_LTLIBRARIES =
 
 SUBDIRS = dm bignum . ce torx
@@ -19,7 +19,7 @@ endif
 if HAVE_MPI
 bin_PROGRAMS += ltsmin-mpi etf2lts-mpi
 check_PROGRAMS += mpi-event-test test-hre-mpi
-check_LTLIBRARIES += libmpi.la libltsmin-mpi.la
+noinst_LTLIBRARIES += libmpi.la libltsmin-mpi.la
 if HAVE_LIBSTEP_INFO
 bin_PROGRAMS += lpo2lts-mpi
 endif
