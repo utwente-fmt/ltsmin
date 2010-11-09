@@ -29,14 +29,14 @@ void RTinit(int *argcp,char**argvp[]){
 }
 
 void RTparseOptions(const char* argline,int *argc_p,char***argv_p){
-	char* cmd=get_label();
-	int len=strlen(argline)+strlen(cmd);
-	char cmdline[len+4];
-	sprintf(cmdline,"%s %s",cmd,argline);
+	int len=strlen(argline)+8;
+	char cmdline[len];
+	sprintf(cmdline,"fake %s",argline);
 	int res=poptParseArgvString(cmdline,argc_p,(const char ***)argv_p);
 	if (res){
 		Fatal(1,error,"could not parse %s: %s",cmdline,poptStrerror(res));
 	}
+    (*argv_p)[0]=strdup(get_label());
 }
 
 void RTexitUsage(int exit_code){
