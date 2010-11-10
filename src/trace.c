@@ -28,6 +28,7 @@ struct trc_s {
     treedbs_t edge_db; // NULL als aantal edges labels == 0
     int *state_lbl; // NULL als geen definined state labels
     int *edge_lbl; // NULL als geen edge labels
+    int *trace_idx_map; // maps n-th step of the trace to state_db idx
 };
 
 static lts_enum_cb_t trace_handle=NULL;
@@ -88,7 +89,7 @@ int trc_get_state_label(trc_t trace, int i, int *dst) {
 }
 
 void trc_get_state(trc_t trace, int i, int *dst) {
-    TreeUnfold(trace->state_db, i, dst);
+    TreeUnfold(trace->state_db, trace->trace_idx_map[i], dst);
 }
 
 int
@@ -288,15 +289,21 @@ trc_t trc_read(const char *name){
     Warning(info,"reading states");
     N=lts_type_get_state_length(trace->ltstype);
     trace->state_db=TreeDBScreate(N);
+    int trc_size = 1<<7;
+    trace->trace_idx_map=RTmalloc(trc_size * sizeof(int));
     struct_stream_t vec=arch_read_vec_U32(arch,"SV-0-%d",N,decode);
     while(!DSstructEmpty(vec)){
         uint32_t state[N];
         DSreadStruct(vec,state);
-        if (trace->len!=TreeFold(trace->state_db,(int*)state)){
-            Fatal(1,error,"duplicate state");
+        if (trace->len >= trc_size) {
+            trc_size = trc_size << 1;
+            trace->trace_idx_map = RTrealloc(trace->trace_idx_map, trc_size * sizeof(int) );
         }
+        trace->trace_idx_map[trace->len] = TreeFold(trace->state_db,(int*)state);
         trace->len++;
     }
+    // realloc to proper length
+    trace->trace_idx_map = RTrealloc(trace->trace_idx_map, trace->len * sizeof(int) );
     DSstructClose(&vec);
     Warning(info,"length of trace is %d",trace->len);
     // should be one less then the length of the trace
