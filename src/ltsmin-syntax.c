@@ -176,7 +176,7 @@ int LTSminUnaryToken(ltsmin_parse_env_t env, int idx)
     return env->unary_info[idx].token;
 }
 
-const int LTSminUnaryIsPrefix(ltsmin_parse_env_t env, int idx) {
+int LTSminUnaryIsPrefix(ltsmin_parse_env_t env, int idx) {
     ensure_access(env->unary_man,idx);
     return (env->unary_info[idx].pattern==TOKEN_PREFIX1 ||
             env->unary_info[idx].pattern==TOKEN_PREFIX2 ||
@@ -315,7 +315,7 @@ void LTSminPrintExpr(log_t log,ltsmin_parse_env_t env,ltsmin_expr_t expr){
 
 ltsmin_expr_t LTSminExpr(ltsmin_expr_case node_type, int token, int idx, ltsmin_expr_t arg1, ltsmin_expr_t arg2)
 {
-    uint32_t hash[4];
+    uint32_t hash[5];
     ltsmin_expr_t E = RT_NEW(struct ltsmin_expr_s);
     hash[0] = E->node_type = node_type;
     hash[1] = E->token = token;
@@ -330,7 +330,7 @@ ltsmin_expr_t LTSminExpr(ltsmin_expr_case node_type, int token, int idx, ltsmin_
 
 ltsmin_expr_t LTSminExprRehash(ltsmin_expr_t expr)
 {
-    uint32_t hash[4];
+    uint32_t hash[5];
     hash[0] = expr->node_type;
     hash[1] = expr->token;
     hash[2] = expr->idx;
