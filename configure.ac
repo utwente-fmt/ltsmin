@@ -171,9 +171,11 @@ if test "x$acx_mcrl2" = xyes; then
      AC_MSG_WARN([mcrl2 library not found.])])
 fi
 ACX_DVEC_LIBS([:],
-  [AC_MSG_WARN([DiVinE libraries not found.])])
+  [have_divine=no
+   AC_MSG_WARN([DiVinE libraries not found.])])
 ACX_DVEC2_LIBS([:],
-  [AC_MSG_WARN([DiVinE 2.2 libraries not found.])])
+  [have_divine2=no
+   AC_MSG_WARN([DiVinE 2.2 libraries not found.])])
 AC_SUBST([NIPS_LIBS],['${top_builddir}/nips-vm/libnips_vm.la'])
 AC_SUBST([NIPS_CPPFLAGS],['-I${top_srcdir}'])
 AC_SUBST([NIPS_LDFLAGS])

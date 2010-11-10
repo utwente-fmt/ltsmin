@@ -1176,8 +1176,8 @@ static ATerm copy_level_prev_tree(ATerm set, ATerm trans, int *proj, int p_len, 
         return Empty;
     } else {
         return MCons(set_prev_tree_2(     Down(set) , trans, proj, p_len, ofs+1, 1),
-                     copy_level_next_tree(Left(set) , trans, proj, p_len, ofs),
-                     copy_level_next_tree(Right(set), trans, proj, p_len, ofs));
+                     copy_level_prev_tree(Left(set) , trans, proj, p_len, ofs),
+                     copy_level_prev_tree(Right(set), trans, proj, p_len, ofs));
     }
 }
 

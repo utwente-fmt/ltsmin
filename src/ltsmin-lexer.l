@@ -135,7 +135,7 @@ operator    [~!@<>=\-+/?&\\|*]+
     } else if((idx=SIlookup(yyextra->binary_ops,yytext))!=SI_INDEX_FAILED){
         Parse(yyextra->parser,yyextra->binary_info[idx].token,idx,yyextra);
     } else {
-        Fatal(1,error,"Unknown operator %s",yytext);
+        Fatal(1,error,"Unknown operator %s at line %d, pos %d",yytext,yyextra->lineno+1,yyextra->linepos+1);
     }
 }
 

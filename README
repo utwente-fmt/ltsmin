@@ -7,15 +7,7 @@ systems. LTSmin already connects a sizeable number of existing
 CADP. Moreover, it allows to reuse existing tools with new state space
 generation techniques.
 
-The synergy effects in the LTSmin implementation are enabled by a
-clean interface: all LTSmin modules work with a unifying state
-representation of integer vectors of fixed size, and the PINS
-dependency matrix which exploits the combinatorial nature of model
-checking problems. This splits model checking tools into three mostly
-independent parts: language modules, PINS optimizations, and model
-checking algorithms.
-
-For example, implementing support for a new language module is in the
+Implementing support for a new language module is in the
 order of 200--600 lines of C "glue" code, and automatically yields
 tools for standard reachability checking (e.g., for state space
 generation and verification of safety properties), reachability with
@@ -23,6 +15,14 @@ symbolic state storage (vector set), fully symbolic (BDD-based)
 reachability, distributed reachability (MPI-based), and multi-core
 reachability (including multi-core compression and incremental
 hashing).
+
+The synergy effects in the LTSmin implementation are enabled by a
+clean interface: all LTSmin modules work with a unifying state
+representation of integer vectors of fixed size, and the PINS
+dependency matrix which exploits the combinatorial nature of model
+checking problems. This splits model checking tools into three mostly
+independent parts: language modules, PINS optimizations, and model
+checking algorithms.
 
 On the other hand, the implementation of a verification algorithm
 based on the PINS matrix automatically has access to muCRL, mcrl2,
@@ -145,7 +145,14 @@ See the CADP website <http://www.inrialpes.fr/vasy/cadp/> on how to
 obtain a licence and download the CADP toolkit.
 
 *** DiVinE 2
-Download a patched version of DiVinE 2.2 <http://divine.fi.muni.cz/>:
+Download the latest released version of DiVinE from
+<http://divine.fi.muni.cz/>.  We tested with the version 2.4.  Apply
+the patch from <contrib/divine-2.4.patch> to the DiVinE source tree:
+
+  cd divine-2.4
+  patch -p1 < /path/to/ltsmin/contrib/divine-2.4.patch
+
+Alternatively, download a LTSmin-enabled version of DiVinE via git:
 
     git clone http://fmt.cs.utwente.nl/tools/scm/divine2.git
 
@@ -153,15 +160,18 @@ Build with:
 
     cd divine2
     mkdir _build && cd _build
-    cmake .. -DHOARD=OFF -DGUI=OFF -DRX_PATH= -DCMAKE_INSTALL_PREFIX=...
+    cmake .. -DGUI=OFF -DRX_PATH= -DCMAKE_INSTALL_PREFIX=...
     make
     make install
+
+(On MacOS X, option ``-DHOARD=OFF'' might have to be added to the
+cmake command line to make it compile without errors.)
 
 The LTSmin configure script will find the DiVinE installation
 automatically, if the ``divine'' binary is in the search path.
 
-The ``divine compile'' DVE compiler produces LTSmin compatible
-libraries with:
+With suitable options, the ``divine compile'' DVE compiler produces
+LTSmin compatible libraries:
 
     divine compile -l model.dve
 
