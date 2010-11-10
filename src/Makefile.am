@@ -108,9 +108,9 @@ ltsmin_parse_LDADD = libltsmin.la
 # spinja2lts-grey
 spinja2lts_grey_SOURCES  = spec2lts-grey.c spinja-greybox.c spinja-greybox.h    \
                          lts.c lts.h vset_atermdd.c
-spinja2lts_grey_LDADD    = libltsmin.la -lATerm $(SPINJA_LIBS) $(BUDDY_LIBS) $(CADP_LIBS)
+spinja2lts_grey_LDADD    = libltsmin.la -lATerm $(SPINJA_LIBS) $(BUDDY_LIBS)
 spinja2lts_grey_CPPFLAGS = -DSPINJA $(MCRL_CPPFLAGS) $(SPINJA_CPPFLAGS) $(AM_CPPFLAGS)
-spinja2lts_grey_LDFLAGS  = $(SPINJA_LDFLAGS) $(MCRL_LDFLAGS) $(BUDDY_LDFLAGS) $(AM_LDFLAGS) $(CADP_LDFLAGS)
+spinja2lts_grey_LDFLAGS  = $(SPINJA_LDFLAGS) $(MCRL_LDFLAGS) $(BUDDY_LDFLAGS) $(AM_LDFLAGS)
 
 
 # dve22lts-grey
@@ -159,9 +159,9 @@ nips2lts_grey_LDFLAGS  = $(NIPS_LDFLAGS) $(BUDDY_LDFLAGS) $(MCRL_LDFLAGS) $(AM_L
 # spinja-reach
 spinja_reach_SOURCES  = spec-reach.c spinja-greybox.c spinja-greybox.h  \
                       lts.c lts.h vset_atermdd.c
-spinja_reach_LDADD    = libltsmin.la -lATerm $(SPINJA_LIBS) $(BUDDY_LIBS) $(CADP_LIBS)
+spinja_reach_LDADD    = libltsmin.la -lATerm $(SPINJA_LIBS) $(BUDDY_LIBS)
 spinja_reach_CPPFLAGS = -DSPINJA $(SPINJA_CPPFLAGS) $(MCRL_CPPFLAGS) $(AM_CPPFLAGS)
-spinja_reach_LDFLAGS  = $(SPINJA_LDFLAGS) $(BUDDY_LDFLAGS) $(MCRL_LDFLAGS) $(AM_LDFLAGS) $(CADP_LDFLAGS)
+spinja_reach_LDFLAGS  = $(SPINJA_LDFLAGS) $(BUDDY_LDFLAGS) $(MCRL_LDFLAGS) $(AM_LDFLAGS)
 
 # dve2-reach
 dve2_reach_SOURCES  = spec-reach.c dve2-greybox.c dve2-greybox.h  \
