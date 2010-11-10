@@ -25,7 +25,7 @@ typedef struct ltsmin_parse_env_s *ltsmin_parse_env_t;
 extern void ltsmin_parse_stream(int select,ltsmin_parse_env_t env,stream_t stream);
 
 extern ltsmin_parse_env_t LTSminParseEnvCreate();
-extern void LTSminParseEnvDestroy();
+extern void LTSminParseEnvDestroy(ltsmin_parse_env_t);
 
 extern void LTSminKeyword(ltsmin_parse_env_t env, int token,const char* keyword);
 
@@ -45,6 +45,7 @@ extern int LTSminPrefixOperator (ltsmin_parse_env_t env, int token, const char* 
 extern int LTSminPostfixOperator(ltsmin_parse_env_t env, int token, const char* name, int prio);
 extern const char* LTSminUnaryName(ltsmin_parse_env_t env, int idx);
 extern int LTSminUnaryToken(ltsmin_parse_env_t env, int idx);
+extern int LTSminUnaryIsPrefix(ltsmin_parse_env_t env, int idx);
 
 extern int LTSminBinaryOperator(ltsmin_parse_env_t env,int token, const char* name,int prio);
 extern const char* LTSminBinaryName(ltsmin_parse_env_t env,int idx);
