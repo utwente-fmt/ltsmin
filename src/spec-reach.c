@@ -230,6 +230,12 @@ static void find_trace_to(int *dst,int level,vset_t *levels){
         internal_levels[i] = vset_create(domain,0,NULL);
 
     while (prev_level >= 0) {
+        if (vset_member(levels[prev_level], states[current_state - 1])) {
+            Warning(debug, "Skipping level %d in trace generation", prev_level);
+            prev_level--;
+            continue;
+        }
+
         int int_level = 0;
         vset_add(internal_levels[0],states[current_state-1]);
 
