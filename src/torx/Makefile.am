@@ -1,4 +1,4 @@
-TORX_CPPFLAGS = -I${top_srcdir}/src
+AM_CPPFLAGS = -I${top_srcdir}/src
 
 bin_PROGRAMS = etf2torx
 
@@ -53,7 +53,7 @@ lpo2torx_SOURCES  = \
 	../at-map.c ../at-map.h \
 	spec2torx.c
 lpo2torx_LDADD    = ../libltsmin.la $(MCRL_LIBS)
-lpo2torx_CPPFLAGS = -DMCRL $(TORX_CPPFLAGS) $(MCRL_CPPFLAGS) $(AM_CPPFLAGS)
+lpo2torx_CPPFLAGS = -DMCRL $(TORX_CPPFLAGS) $(AM_CPPFLAGS) $(MCRL_CPPFLAGS)
 lpo2torx_LDFLAGS  = $(MCRL_LDFLAGS) $(AM_LDFLAGS)
 
 # lps2torx
