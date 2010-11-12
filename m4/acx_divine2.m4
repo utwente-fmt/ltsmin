@@ -1,4 +1,4 @@
-#serial 1
+#serial 2
 # Author: Alfons Laarman <a.w.laarman@cs.utwente.nl>
 # Author: Michael Weber <michaelw@cs.utwente.nl>
 #
@@ -23,7 +23,7 @@ esac
 
 if test x"$acx_divine2" = xyes; then
     AC_SUBST(DIVINE2_CPPFLAGS, 
-      ["$DIVINE2_CPPFLAGS -I${with_divine2}/include/divine -I${with_divine2}/include"])
+      ["$DIVINE2_CPPFLAGS -I${with_divine2}/include"])
     AC_SUBST(DIVINE2_LDFLAGS,  ["$DIVINE2_LDFLAGS -L${with_divine2}/lib"])
     $1
 else
