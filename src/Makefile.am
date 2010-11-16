@@ -35,6 +35,7 @@ SUBDIRS += lts-io
 SUBDIRS += lts-lib
 SUBDIRS += gcf-tool
 SUBDIRS += lts-tracepp
+SUBDIRS += pins2lts-hre
 if HAVE_MPI
 SUBDIRS += sigmin-mpi
 endif
