@@ -35,6 +35,9 @@ SUBDIRS += lts-io
 SUBDIRS += lts-lib
 SUBDIRS += gcf-tool
 SUBDIRS += lts-tracepp
+if HAVE_MPI
+SUBDIRS += sigmin-mpi
+endif
 SUBDIRS += ce
 SUBDIRS += torx
 

@@ -363,6 +363,7 @@ AC_CONFIG_FILES([
        src/lts-lib/Makefile
        src/lts-tracepp/Makefile
        src/gcf-tool/Makefile
+       src/sigmin-mpi/Makefile
        src/dm/Makefile
        src/bignum/Makefile
        src/ce/Makefile
