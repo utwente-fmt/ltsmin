@@ -364,6 +364,7 @@ AC_CONFIG_FILES([
        src/lts-tracepp/Makefile
        src/gcf-tool/Makefile
        src/pins2lts-hre/Makefile
+       src/sigmin-one/Makefile
        src/sigmin-mpi/Makefile
        src/dm/Makefile
        src/bignum/Makefile
