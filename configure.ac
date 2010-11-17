@@ -362,6 +362,7 @@ AC_CONFIG_FILES([
        src/lts-io/Makefile
        src/lts-lib/Makefile
        src/lts-tracepp/Makefile
+       src/ltstrans/Makefile
        src/gcf-tool/Makefile
        src/pins2lts-hre/Makefile
        src/sigmin-one/Makefile
