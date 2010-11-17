@@ -15,6 +15,7 @@ MANPAGES += ltsmin-mpi.1
 MANPAGES += ltsmin-mu.5
 MANPAGES += ltsmin-tracepp.1
 MANPAGES += ltsmin-convert.1
+MANPAGES += lts-tracepp.1
 MANPAGES += etf-convert.1
 MANPAGES += etf.5
 MANPAGES += gcf.1
@@ -66,7 +67,6 @@ MANPAGES += dve22lts-gsea.1
 MANPAGES += dve22lts-mc.1
 MANPAGES += dve22lts-mpi.1
 MANPAGES += dve22torx.1
-
 
 doc_ASCIIDOC = $(addsuffix .txt, $(basename $(MANPAGES)))
 

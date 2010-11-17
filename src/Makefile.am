@@ -34,6 +34,7 @@ SUBDIRS += hre-test
 SUBDIRS += lts-io
 SUBDIRS += lts-lib
 SUBDIRS += gcf-tool
+SUBDIRS += lts-tracepp
 SUBDIRS += ce
 SUBDIRS += torx
 
