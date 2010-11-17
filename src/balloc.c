@@ -1,8 +1,8 @@
 #include <config.h>
-#include "balloc.h"
 #include <stdio.h>
 #include <stdlib.h>
-#include <pthread.h>
+
+#include <balloc.h>
 #include <runtime.h>
 
 struct block;
@@ -11,7 +11,6 @@ struct block {
 };
 
 struct block_allocator {
-  pthread_mutex_t mut;
   size_t element_size;
   size_t block_size;
   struct block *block_list;
@@ -21,11 +20,10 @@ struct block_allocator {
 
 allocater_t BAcreate(size_t element_size,size_t block_size){
 	if (element_size<sizeof(void*)) {
-		Fatal(1,error,"element size less than pointer size");
+		Abort("element size less than pointer size");
 	}
 	allocater_t a = (allocater_t)malloc(sizeof(struct block_allocator));
 	if (a!=NULL) {
-		pthread_mutex_init(&a->mut,NULL);
 		a->element_size=element_size;
 		a->block_size=block_size;
 		a->block_list=NULL;
@@ -40,10 +38,10 @@ static void BAdestroy(allocater_t a){
 	p1=a->block_list;
 	while(p1!=NULL){
 		p2=*((void**)p1);
-		free(p1);
+		RTfree(p1);
 		p1=p2;
 	}
-	free(a);
+	RTfree(a);
 }
 
 void BAaddref(allocater_t a){
@@ -63,13 +61,11 @@ void BAderef(allocater_t a){
 
 void* BAget(allocater_t a){
 	void *e;
-	pthread_mutex_lock(&a->mut);
 	if(a->free_list == NULL){
 		struct block *blk;
 		int i;
-		blk=(struct block*)malloc(a->block_size);
+		blk=(struct block*)RTmalloc(a->block_size);
 		if (blk==NULL) {
-			pthread_mutex_unlock(&a->mut);
 			return NULL;
 		}
 		for(i=1;(i+1)*a->element_size <= a->block_size;i++){
@@ -84,7 +80,6 @@ void* BAget(allocater_t a){
 	e=a->free_list;
 	a->free_list=*((void**)e);
 	//fprintf(stderr,"BAget(%d): alloc %8x\n",a->element_size,e);
-	pthread_mutex_unlock(&a->mut);
 	return e;
 }
 
@@ -94,9 +89,6 @@ void BAfree(allocater_t a,void* e){
 	void *p;
 	struct block *blk;
 	int i;
-#endif
-	pthread_mutex_lock(&a->mut);
-#ifdef FREE_CHECK
 	fprintf(stderr,"BAfree(%d): free %8x\n",a->element_size,e);
 	for(p=a->free_list;p!=NULL;p=*((void**)p)){
 		if (e==p) {
@@ -112,7 +104,6 @@ void BAfree(allocater_t a,void* e){
 #endif
 				*((void**)e)=a->free_list;
 				a->free_list=e;
-				pthread_mutex_unlock(&a->mut);
 
 #ifdef FREE_CHECK
 				return;
@@ -123,4 +114,3 @@ void BAfree(allocater_t a,void* e){
 	exit(1);
 #endif
 }
-
