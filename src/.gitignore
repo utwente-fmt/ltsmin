@@ -61,6 +61,7 @@ test-mpi-hre
 test-dbs
 test-cache
 ltsmin-tracepp
+ltscmp-one
 ltstrans
 lts-tracepp
 dve22lts-gsea
