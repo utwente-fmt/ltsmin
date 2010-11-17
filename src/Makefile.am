@@ -32,6 +32,7 @@ SUBDIRS += hre-mpi
 endif
 SUBDIRS += hre-test
 SUBDIRS += lts-io
+SUBDIRS += lts-lib
 SUBDIRS += gcf-tool
 SUBDIRS += ce
 SUBDIRS += torx

@@ -360,6 +360,7 @@ AC_CONFIG_FILES([
        src/hre-mpi/Makefile
        src/hre-test/Makefile
        src/lts-io/Makefile
+       src/lts-lib/Makefile
        src/gcf-tool/Makefile
        src/dm/Makefile
        src/bignum/Makefile
