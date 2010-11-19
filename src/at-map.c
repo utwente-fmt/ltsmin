@@ -50,7 +50,7 @@ int ATfindIndex(at_map_t map,ATerm t){
 			int N=map->size;
 			map->size=N*2;
 			map->int2aterm=(ATerm*)realloc(map->int2aterm,map->size*sizeof(ATerm));
-			for(int i=0;i<map->size;i++) map->int2aterm[i]=NULL;
+			for(int i=N;i<map->size;i++) map->int2aterm[i]=NULL;
 		}
 		map->int2aterm[idx]=t;
 	}
@@ -81,7 +81,7 @@ ATerm ATfindTerm(at_map_t map,int idx){
 		int N=map->size;
 		map->size=N*2;
 		map->int2aterm=(ATerm*)realloc(map->int2aterm,map->size*sizeof(ATerm));
-		for(int i=0;i<map->size;i++) map->int2aterm[i]=NULL;
+		for(int i=N;i<map->size;i++) map->int2aterm[i]=NULL;
 	}
 	map->int2aterm[idx]=t;
 	return t;
