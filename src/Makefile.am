@@ -32,9 +32,9 @@ bin_PROGRAMS += nips2lts-mpi
 if HAVE_DVEC
 bin_PROGRAMS += dve2lts-mpi
 endif
-#if HAVE_DVEC2
-#bin_PROGRAMS += dve22lts-mpi
-#endif
+if HAVE_DVEC2
+bin_PROGRAMS += dve22lts-mpi
+endif
 endif
 if HAVE_LIBSTEP_INFO
 bin_PROGRAMS +=  lpo2lts-grey lpo-reach
@@ -213,11 +213,11 @@ dve2lts_mpi_LDADD    = libltsmin-mpi.la $(DVEC_LIBS)
 dve2lts_mpi_CPPFLAGS = -DDIVINE $(DIVINE_CPPFLAGS) $(AM_CPPFLAGS)
 dve2lts_mpi_LDFLAGS  = $(DIVINE_LDFLAGS) $(AM_LDFLAGS)
 
-## dve22lts-mpi
-#dve22lts_mpi_SOURCES  = spec2lts-mpi.c dve2-greybox.cpp dve2-greybox.h config.h
-#dve22lts_mpi_LDADD    = libltsmin-mpi.la $(DVEC2_LIBS)
-#dve22lts_mpi_CPPFLAGS = -DDIVINE2 $(DIVINE2_CPPFLAGS) $(AM_CPPFLAGS)
-#dve22lts_mpi_LDFLAGS  = $(DIVINE2_LDFLAGS) $(AM_LDFLAGS)
+# dve22lts-mpi
+dve22lts_mpi_SOURCES  = spec2lts-mpi.c dve2-greybox.c dve2-greybox.h config.h
+dve22lts_mpi_LDADD    = libltsmin-mpi.la $(DVEC2_LIBS)
+dve22lts_mpi_CPPFLAGS = -DDIVINE2 $(DIVINE2_CPPFLAGS) $(AM_CPPFLAGS)
+dve22lts_mpi_LDFLAGS  = $(DIVINE2_LDFLAGS) $(AM_LDFLAGS)
 
 # lpo2lts-mpi
 lpo2lts_mpi_SOURCES  = spec2lts-mpi.c mcrl-greybox.c mcrl-greybox.h \
