@@ -25,6 +25,9 @@ SUBDIRS  = dm
 SUBDIRS += bignum
 SUBDIRS += .
 SUBDIRS += hre
+if HAVE_MPI
+SUBDIRS += hre-mpi
+endif
 SUBDIRS += ce
 SUBDIRS += torx
 
