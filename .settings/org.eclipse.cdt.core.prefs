@@ -1,6 +1,11 @@
-#Wed Jun 09 14:19:56 CEST 2010
+#Sun Nov 21 15:59:45 CET 2010
 eclipse.preferences.version=1
-environment/project/0.2100364509=<?xml version\="1.0" encoding\="UTF-8" standalone\="no"?>\n<environment append\="true" appendContributed\="true">\n<variable delimiter\=";" name\="PATH" operation\="replace" value\="/opt/local/bin\:/opt/local/sbin\:/usr/bin\:/bin\:/usr/sbin\:/sbin\:/usr/local/bin\:/usr/X11/bin;/opt/local/bin"/>\n</environment>\n
+environment/project/0.2100364509=
+environment/project/0.2100364509/PATH/delimiter=;
+environment/project/0.2100364509/PATH/operation=replace
+environment/project/0.2100364509/PATH/value=/opt/local/bin\:/opt/local/sbin\:/usr/bin\:/bin\:/usr/sbin\:/sbin\:/usr/local/bin\:/usr/X11/bin;/opt/local/bin
+environment/project/0.2100364509/append=true
+environment/project/0.2100364509/appendContributed=true
 org.eclipse.cdt.core.formatter.alignment_for_arguments_in_method_invocation=18
 org.eclipse.cdt.core.formatter.alignment_for_base_clause_in_type_declaration=80
 org.eclipse.cdt.core.formatter.alignment_for_compact_if=0
