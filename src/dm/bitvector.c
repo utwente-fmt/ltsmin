@@ -9,12 +9,14 @@ utrunc (size_t x, size_t m)
 }
 
 static const size_t WORD_BITS = sizeof (size_t) * 8;
+static const size_t WORD_BITS_MASK = sizeof (size_t) * 8 - 1;
+static const size_t WORD_SHIFT = sizeof (size_t) == 4 ? 5 : 6;
 
 static inline size_t
-bv_seg (size_t i) { return i / WORD_BITS; }
+bv_seg (size_t i) { return i >> WORD_SHIFT; }
 
 static inline size_t
-bv_ofs (size_t i) { return i % WORD_BITS; }
+bv_ofs (size_t i) { return i & WORD_BITS_MASK; }
 
 int
 bitvector_create (bitvector_t *bv, int n_bits)
@@ -28,6 +30,19 @@ bitvector_create (bitvector_t *bv, int n_bits)
         bv->n_bits = n_bits;
         return 0;
     }
+}
+
+void
+bitvector_create_large (bitvector_t *bv, int n_bits)
+{
+    size_t              n_words = utrunc (n_bits, WORD_BITS);
+    bv->data = malloc (sizeof (size_t[n_words]));
+    if (bv->data==NULL) {
+        printf("out of memory trying to allocate large bitvector\n");
+        exit(0);
+    }
+    memset (bv->data, 0, sizeof (size_t[n_words]));
+    bv->n_bits = n_bits;
 }
 
 void
@@ -62,6 +77,56 @@ size_t
 bitvector_size (const bitvector_t *bv)
 {
     return bv->n_bits;
+}
+
+int
+bitvector_isset_or_set (bitvector_t *bv, int idx)
+{
+    // isset_or_set
+    size_t              mask = 1UL << bv_ofs (idx);
+    size_t              word = bv_seg (idx);
+    int                 res = (bv->data[word] & mask) != 0;
+    bv->data[word] |= mask;
+    return res;
+}
+
+void
+bitvector_set2 (bitvector_t *bv, int idx, size_t v)
+{
+    // isset_or_set2
+    size_t              mask = 3UL << bv_ofs (idx);
+    size_t              value = v << bv_ofs (idx);
+    size_t              word = bv_seg (idx);
+    bv->data[word] &= ~mask;
+    bv->data[word] |= value;
+}
+
+int
+bitvector_isset_or_set2 (bitvector_t *bv, int idx, size_t v)
+{
+    // isset_or_set2
+    size_t              mask = 3UL << bv_ofs (idx);
+    size_t              value = v << bv_ofs (idx);
+    size_t              word = bv_seg (idx);
+    int                 res = (bv->data[word] & mask) == value;
+    bv->data[word] &= ~mask;
+    bv->data[word] |= value;
+    return res;
+}
+
+int
+bitvector_get2 (const bitvector_t *bv, int idx)
+{
+    size_t              mask = 3UL << bv_ofs (idx);
+    return (bv->data[bv_seg (idx)] & mask) >> bv_ofs (idx);
+}
+
+void
+bitvector_set_atomic (bitvector_t *bv, int idx)
+{
+    // set bit
+    size_t              mask = 1UL << bv_ofs (idx);
+    __sync_fetch_and_or (bv->data + bv_seg(idx), mask);
 }
 
 void

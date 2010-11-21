@@ -24,6 +24,16 @@ typedef struct bitvector {
 extern int          bitvector_create (bitvector_t *, int);
 
 /**
+ * bitvector_create
+ *  Create a large bitvector
+ *   1) unused bitvector_t struct
+ *   2) number of bits in the vector
+ *   
+ * Data is SSE aligned by malloc
+ */
+extern void         bitvector_create_large (bitvector_t *bv, int n_bits);
+
+/**
  * bitvector_free
  *  Free memory used by a bitvector
  *   1) the bitvector to free
@@ -56,15 +66,63 @@ extern int          bitvector_copy (bitvector_t *, const bitvector_t *);
 extern size_t       bitvector_size (const bitvector_t *);
 
 /**
+ * bitvector_isset_or_set
+ *  Set a bit in the bitvector to one return 1 if it was set
+ *   1) the bitvector to set the bit in
+ *   2) the index of the bit that must be set to one
+ *
+ *  result:
+ *   the bit in the bitvector is set to one & the previous value is returned
+ */
+extern int          bitvector_isset_or_set (bitvector_t *bv, int idx);
+
+/**
+ * bitvector_set2
+ *  Sets two consecutive and 2-aligned bit in the bitvector to a value
+ *  
+ *   1) the bitvector to test the bits in
+ *   2) the 2-aligned index idx of the bit that must be set/tested
+ *   3) the value v to test/set
+ *   
+ *  result:
+ *   the bits at idx in the bitvector are set to v
+ */
+extern void         bitvector_set2 (bitvector_t *bv, int idx, size_t v);
+
+/**
+ * bitvector_isset_or_set2
+ *  Test two consecutive and 2-aligned bit in the bitvector for a value and
+ *  return 1 if the bitvector was modified
+ *   1) the bitvector to test the bits in
+ *   2) the 2-aligned index of the bit that must be set/tested
+ *   3) the value to test/set
+ *
+ *  result:
+ *   true:  the bits equal v
+ *   false: the bits not equal v
+ */
+extern int          bitvector_isset_or_set2 (bitvector_t *bv, int idx, size_t v);
+
+/**
+ * bitvector_get
+ *  Return two consecutive and 2-aligned bits in the bitvector
+ *   1) the bitvector to test the bits in
+ *   2) the 2-aligned index of the bit to return
+ *
+ *  result:
+ *   the two bits
+ */
+extern int          bitvector_get2 (const bitvector_t *, int);
+
+/**
  * bitvector_set
  *  Set a bit in the bitvector to one
  *   1) the bitvector to set the bit in
  *   2) the index of the bit that must be set to one
  *
- *  result:
- *   the bit in the bitvector is set to one
  */
 extern void         bitvector_set (bitvector_t *, int);
+extern void         bitvector_set_atomic (bitvector_t *, int);
 
 /**
  * bitvector_unset
