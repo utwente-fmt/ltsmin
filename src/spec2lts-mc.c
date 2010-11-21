@@ -37,7 +37,7 @@ static const int    THREAD_STACK_SIZE = 400 * 4096; //pthread_attr_setstacksize
 typedef uint32_t    idx_t;
 typedef int        *state_data_t;
 static const state_data_t   state_data_dummy;
-static const size_t         STATE_DATA_SIZE = sizeof(*state_data_dummy);
+static const size_t         SLOT_SIZE = sizeof(*state_data_dummy);
 typedef int        *raw_data_t;
 typedef struct state_info_s {
     state_data_t        data;
@@ -169,9 +169,20 @@ void swap_pointer(void **a, void **b) {
     void *old = *a; *a = *b; *b = old;
 }
 
+typedef struct counter_s {
+    double              runtime;        // measured exploration time
+    size_t              visited;        // counter: visited states
+    size_t              explored;       // counter: explored states
+    size_t              trans;          // counter: transitions
+    size_t              level_max;      // counter: (BFS) level / (DFS) max level
+    size_t              level_cur;      // counter: current (DFS) level
+    size_t              stack_sizes;    // max combined stack sizes
+    size_t              touched_red;    // visited-before accepting states
+    stats_t            *stats;          // running state storage statistics
+} counter_t;
+
 typedef struct thread_ctx_s {
     pthread_t           me;             // currently executing thread
-    stats_t            *stats;          // running statitics
     size_t              id;             // thread id (0..NUM_THREADS)
     stream_t            out;            // raw file output stream
     model_t             model;          // Greybox model
@@ -181,15 +192,13 @@ typedef struct thread_ctx_s {
     dfs_stack_t         stack;          // Successor stack (for BFS and DFS)
     dfs_stack_t         in_stack;       // Input stack (for BFS)
     dfs_stack_t         out_stack;      // Output stack (for BFS)
+    bitvector_t         color;          // Local NDFS coloring of states (idx-based)
     isb_allocator_t     group_stack;    // last explored group per frame (grey)
-    size_t              visited;        // counter: visited states
-    size_t              explored;       // counter: explored states
-    size_t              trans;          // counter: transitions
-    size_t              level_max;      // counter: (BFS) level / (DFS) max level
-    size_t              level_cur;      // counter: current (DFS) level
-    size_t              stack_sizes;    // max combined stack sizes
-    float               runtime;        // measured exploration time
+    counter_t           counters;       // reachability/NDFS_blue counters
+    counter_t           red;            // NDFS_red counters
     size_t              load;           // queue load (for balancing)
+    int                 COLOR;          // current NDFS color
+    idx_t               SEED;          // current NDFS seed
 } thread_ctx_t;
 
 /* predecessor --(transition_group)--> successor */
@@ -208,7 +217,7 @@ extern void state_info_serialize(state_info_t *state, raw_data_t data);
 extern void state_info_deserialize(state_info_t *state, raw_data_t data,
                                    raw_data_t store);
 extern void         dfs_grey (thread_ctx_t *ctx, size_t work);
-extern void         ndfs (thread_ctx_t *ctx, size_t work);
+extern void         ndfs_blue (thread_ctx_t *ctx, size_t work);
 extern void         dfs (thread_ctx_t *ctx, size_t work);
 extern void         bfs (thread_ctx_t *ctx, size_t work);
 extern size_t       split_bfs (size_t src_id, size_t dst_id, size_t handoff);
@@ -220,6 +229,7 @@ static int          N;
 static int          K;
 static int          MAX_SUCC;           // max succ. count to expand at once
 static size_t       threshold;
+static size_t       red_threshold;
 static pthread_attr_t  *attr = NULL;
 static thread_ctx_t   **contexts;
 static zobrist_t    zobrist = NULL;
@@ -228,23 +238,23 @@ static pthread_barrier_t start_barrier;       // synchronize starting point
 #endif
 
 void
-add_results(thread_ctx_t *res, thread_ctx_t *ctx)
+add_results(counter_t *res, counter_t *cnt)
 {
-    res->runtime += ctx->runtime;
-    res->visited += ctx->visited;
-    res->explored += ctx->explored;
-    res->trans += ctx->trans;
-    res->level_max += ctx->level_max;
-    res->stack_sizes += ctx->stack_sizes;
-    add_stats(res->stats, ctx->stats);
+    res->runtime += cnt->runtime;
+    res->visited += cnt->visited;
+    res->explored += cnt->explored;
+    res->trans += cnt->trans;
+    res->level_max += cnt->level_max;
+    res->stack_sizes += cnt->stack_sizes;
+    add_stats(res->stats, cnt->stats);
 }
 
 static inline void
-increase_level(thread_ctx_t *ctx)
+increase_level(counter_t *cnt)
 {
-    ctx->level_cur++;
-    if(ctx->level_cur > ctx->level_max)
-        ctx->level_max = ctx->level_cur;
+    cnt->level_cur++;
+    if(cnt->level_cur > cnt->level_max)
+        cnt->level_max = cnt->level_cur;
 }
 
 static              model_t
@@ -279,6 +289,8 @@ create_context (size_t id)
     ctx->out_stack = ctx->in_stack = ctx->stack;
     if (strategy == Strat_BFS)
         ctx->in_stack = dfs_stack_create (state_info_int_size());
+    if (strategy == Strat_NDFS) //allocate two bits for NDFS colorings
+        bitvector_create_large(&ctx->color, 2<<dbs_size);
     else if ( UseGreyBox == call_mode )
         ctx->group_stack = isba_create (1);
     if (files[1]) {
@@ -314,11 +326,11 @@ find_or_put_dbs(state_info_t *state, state_info_t *predecessor)
 }
 
 static int
-find_or_put_tree(state_info_t *state, state_info_t *pred)
+find_or_put_tree(state_info_t *s, state_info_t *pred)
 {
-    int ret = TreeDBSLLlookup_dm (dbs, state->data, pred->tree, state->tree, 
-                                  state->group);
-    state->idx = TreeDBSLLindex(state->tree);
+    int                 ret;
+    ret = TreeDBSLLlookup_dm (dbs, s->data, pred->tree, s->tree, s->group);
+    s->idx = TreeDBSLLindex(s->tree);
     return ret;
 }
 
@@ -346,7 +358,7 @@ init_globals (int argc, char *argv[])
         //if (!(GBhasProperty(model) == PROPERTY_LTL_SPIN || GBhasProperty(model) == PROPERTY_LTL_TEXTBOOK))
         //    Fatal(1, error, "NDFS search only works in combination with a never claim (use --ltl or supply a Buchi product from the language frontend)");
         if (W > 1) {
-            Warning (info, "NDFS is used, switching to on thread.");
+            Warning (info, "NDFS is used, switching to one thread.");
             W = 1;
         }
         lb_method = LB_None;
@@ -356,7 +368,7 @@ init_globals (int argc, char *argv[])
 #endif
     Warning (info, "Using %d cores.", W);
     Warning (info, "loading model from %s", files[0]);
-    threshold = 100000 / W;
+    threshold = red_threshold = 100000 / W;
     program = get_label ();
     lts_type_t          ltstype = GBgetLTStype (model);
     int                 state_labels = lts_type_get_state_label_count (ltstype);
@@ -398,7 +410,7 @@ init_globals (int argc, char *argv[])
     /* Load balancer assigned last, see exit_ltsmin */
     switch (strategy) {
     case Strat_NDFS:
-        lb = lb_create_max(W, (algo_f)ndfs, NULL,     G, lb_method, H); break;
+        lb = lb_create_max(W, (algo_f)ndfs_blue, NULL,G, lb_method, H); break;
     case Strat_BFS:
         lb = lb_create_max(W, (algo_f)bfs, split_bfs, G, lb_method, H); break;
     case Strat_DFS: {
@@ -415,49 +427,65 @@ init_globals (int argc, char *argv[])
 }
 
 static inline void
-print_state_space_total (char *name, thread_ctx_t * ctx)
+print_state_space_total (char *name, counter_t *cnt)
 {
-    Warning (info, "%s%d levels %d states %d transitions",
-             name, ctx->level_max, ctx->visited, ctx->trans);
+    Warning (info, "%s%zu levels %zu states %zu transitions",
+             name, cnt->level_max, cnt->explored, cnt->trans);
 }
 
 static inline void
-maybe_report (thread_ctx_t * ctx, char *msg)
+maybe_report (counter_t *cnt, char *msg, size_t *threshold)
 {
-    if (RTverbosity < 1 || ctx->visited < threshold)
+    if (RTverbosity < 1 || cnt->explored < *threshold)
         return;
-    if (!cas (&threshold, threshold, threshold << 1))
+    if (!cas (threshold, *threshold, *threshold << 1))
         return;
     if (W == 1)
-        print_state_space_total (msg, ctx);
+        print_state_space_total (msg, cnt);
     else
-        Warning (info, "%s%d levels ±%d states ±%d transitions", msg,
-                 ctx->level_max, W * ctx->visited,  W * ctx->trans);
+        Warning (info, "%s%zu levels ±%zu states ±%zu transitions", msg,
+                 cnt->level_max, W * cnt->explored,  W * cnt->trans);
 }
 
 void
-print_statistics(thread_ctx_t *total, float tot)
+print_statistics(counter_t *reach, counter_t *red, mytimer_t timer)
 {
+    float               tot = SCCrealTime(timer);
+    size_t              states = reach->explored + red->explored;
+    size_t              db_elts = reach->stats->elts;
     char               *name;
     double              mem1, mem2, compr, ratio;
     size_t              el_size = db_type == UseTreeDBSLL ? 3 : N;
     size_t              s = state_info_size();
-    mem1 = (double)s * total->stack_sizes / (1 << 10);
+    mem1 = (double)s * reach->stack_sizes / (1 << 10);
+
+    Warning(info, "")
+    print_state_space_total ("State space has ", reach);
+    SCCreportTimer (timer, "Total exploration time");
+
+    if (Strat_NDFS == strategy) {
+        Warning(info, "")
+        Warning (info, "NDFS stats:")
+        Warning (info, "red states: %zu, accepting states: %zu, red transitions: %zu "
+                 "touched: %zu", red->explored, red->visited, red->trans, red->touched_red);
+    }
+
+    Warning(info, "")
     Warning (info, "Queue width: %zuB, total height: %zu, memory: %.0fKB",
-             s, total->stack_sizes, mem1);
-    mem2 = (double)(1 << dbs_size) * sizeof (int[el_size]) / (1 << 10);
-    compr = 1 - (double)(el_size * total->stats->elts) / (N * total->explored);
-    ratio = (double)((total->stats->elts * 100) / (1 << dbs_size));
+             s, reach->stack_sizes, mem1);
+    mem2 = (double)(1UL << (dbs_size-20)) * sizeof (int[el_size]);
+    compr = (double)(db_elts * el_size) / (N * states) * 100;
+    ratio = (double)((db_elts * 100) / (1UL << dbs_size));
     name = db_type == UseTreeDBSLL ? "Tree" : "Table";
     Warning (info, "DB: %s, memory: %.1fMB, compression: %.1f%%, "
-             "fill-ratio: %.1f%%", name, mem2 / 1024, 100 * compr, ratio);
+             "fill-ratio: %.1f%%", name, mem2, compr, ratio);
     if (RTverbosity >= 2) {        // detailed output for scripts
         Warning (info, "time:{{{%.2f}}}, elts:{{{%zu}}}, trans:{{{%zu}}}, misses"
                  ":{{{%zu}}}, tests:{{{%zu}}}, rehashes:{{{%zu}}} memq:{{{%.0f}}} "
                  "tt:{{{%.2f}}} explored:{{{%zu}}}, incr:{{{%zu}}} memdb:{{{%.0f}}}",
-                 total->runtime, total->stats->elts, total->trans, total->stats->misses,
-                 total->stats->tests, total->stats->rehashes, mem1, tot,
-                 total->explored, total->stats->cache_misses, mem2);
+                 reach->runtime, db_elts, reach->trans, reach->stats->misses,
+                 reach->stats->tests, reach->stats->rehashes, mem1, tot,
+                 reach->explored, reach->stats->cache_misses, mem2);
     }
 }
 
@@ -465,7 +493,7 @@ void
 conf_thread (thread_ctx_t * ctx)
 {
     char               *lbl = RTmalloc (sizeof (char[20]));
-    snprintf (lbl, sizeof (char[20]), "%s[%zu]", program, ctx->id);
+    snprintf (lbl, sizeof (char[20]), W>1?"%s[%zu]":"%s", program, ctx->id);
     set_label (lbl);    // register print label and load model
     if (ctx->model == NULL)
         ctx->model = get_model (0);
@@ -497,7 +525,7 @@ handle_deadlock(thread_ctx_t *ctx)
         if (trc_output) {
             model_t     m = ctx->model; 
             idx_t       idx = ctx->state.idx; 
-            int         level = ctx->level_max;
+            int         level = ctx->counters.level_max;
             trc_env_t  *trace_env = trc_create(m, (trc_get_state_f)get_state,
                                                start_idx, ctx);
             trc_find_and_write(trace_env, trc_output, idx, level, parent_idx);
@@ -538,7 +566,8 @@ state_info_size ()
     size_t              idx_size = sizeof (idx_t);
     size_t              data_size = SLOT_SIZE * (UseDBSLL==db_type ? N : 2*N);
     size_t              state_info_size = refs ? idx_size : data_size;
-    if (!refs && UseDBSLL==db_type && (trc_output || ZOBRIST))
+    if (!refs && UseDBSLL==db_type &&
+                (strategy == Strat_NDFS || trc_output || ZOBRIST))
         state_info_size += idx_size;
     return state_info_size;
 }
@@ -581,44 +610,167 @@ state_info_deserialize(state_info_t *state, raw_data_t data, raw_data_t store)
     //ctx->state.hash32 = DBSLLmemoized_hash(dbs, ctx->state.idx);
 }
 
-void
-handle_ndfs (void *arg, transition_info_t *ti, state_data_t dst)
+static void
+ndfs_report_cycle(model_t model)
 {
-    thread_ctx_t       *ctx = (thread_ctx_t *) arg;
-    state_info_t        successor;
-    state_info_create(&successor, dst, ctx->store2, DUMMY_IDX, ti->group);
-    raw_data_t stack_loc = dfs_stack_push(ctx->stack, NULL);
-    state_info_serialize(&successor, stack_loc);
-    ctx->trans++;
+    Warning(info,"accepting cycle found!");
+    Warning(info, "exiting now");
+    pthread_exit( statistics (dbs) );
+}
+static const int BLUE = 0;
+static const int RED = 1;
+
+/*TODO: change idx_t to size_t and handle maximum for 32bit machines
+  this also requires changes to the data structures: tree, table, bitvector
+*/
+static inline int
+COLOR(idx_t idx, int color)
+{
+    return (int)((idx<<1) + color);
 }
 
 void
-ndfs (thread_ctx_t *ctx, size_t work)
+ndfs_state_info_serialize (state_info_t *state, raw_data_t data)
 {
-    int                 count;
-    raw_data_t          state_data; 
-    while (1) {
-        state_data = dfs_stack_top (ctx->stack); 
-        if (NULL != state_data) {
-            state_info_deserialize (&ctx->state, state_data, ctx->store);
-            if ( find_or_put_dbs(&ctx->state, NULL) ) {
-                dfs_stack_pop (ctx->stack);
-            } else {
-                dfs_stack_enter (ctx->stack);
-                increase_level (ctx);
-                count = GBgetTransitionsAll(ctx->model, ctx->state.data, handle_ndfs, ctx);
-                ctx->explored++; ctx->visited++;
-                maybe_report (ctx, "");
-            }
-        } else { //backtrack
-            if (0 == dfs_stack_nframes (ctx->stack)) return;
-            dfs_stack_leave (ctx->stack);
-            ctx->level_cur--;
-            dfs_stack_pop (ctx->stack);
+    if (refs) {
+        ((idx_t*)data)[0] = state->idx;
+    } else if ( UseDBSLL==db_type ) {
+        ((idx_t*)data+N)[0] = state->idx;
+        memcpy (data, state->data, sizeof (int[N]));
+    } else { // UseTreeDBSLL
+        memcpy (data, state->tree, sizeof (int[2*N]));
+    }
+}
+
+void
+ndfs_state_info_deserialize (state_info_t *state, raw_data_t data, state_data_t store)
+{
+    idx_t               idx = DUMMY_IDX;
+    state_data_t        tree_data = NULL;
+    if (data) {
+        if (refs) {
+            idx = ((idx_t*)data)[0];
+            data = get(dbs, idx, store);
+        } else if ( UseDBSLL==db_type ) {
+            idx = ((idx_t*)data+N)[0];
+        }
+        if (UseTreeDBSLL==db_type) {
+            tree_data = data;
+            idx = TreeDBSLLindex(data);
+            data = TreeDBSLLdata(dbs, data);
         }
     }
-    (void) work;
+    state_info_create(state, data, tree_data, idx, GB_UNKNOWN_GROUP);
 }
+
+void
+ndfs_handle (void *arg, transition_info_t *ti, state_data_t dst)
+{
+    thread_ctx_t       *ctx = (thread_ctx_t *) arg;
+    state_info_t        predecessor, successor;
+    state_info_create(&successor, dst, ctx->store2, DUMMY_IDX, ti->group);
+
+    /* retrieve IDX from state database */
+    if ( UseDBSLL==db_type )
+        find_or_put_dbs(&successor, NULL);
+    else { // UseTreeDBSLL
+        raw_data_t predecessor_data = dfs_stack_peek_top(ctx->stack, 1);
+        ndfs_state_info_deserialize(&predecessor, predecessor_data, ctx->store);
+        find_or_put_tree(&successor, &predecessor);
+    }
+    if (ctx->COLOR == RED)
+        if (successor.idx == ctx->SEED)
+           ndfs_report_cycle(ctx->model);
+
+    if ( !bitvector_is_set(&ctx->color, COLOR(successor.idx, ctx->COLOR)) ) {
+        raw_data_t stack_loc = dfs_stack_push(ctx->stack, NULL);
+        ndfs_state_info_serialize (&successor, stack_loc);
+    }
+}
+
+static inline void
+ndfs_explore_state (thread_ctx_t *ctx, counter_t *cnt)
+{
+    dfs_stack_enter (ctx->stack);
+    increase_level (cnt);
+    int count = GBgetTransitionsAll(ctx->model, ctx->state.data, ndfs_handle, ctx);
+    cnt->trans += count;
+    cnt->explored++;
+    if (ctx->COLOR == RED)
+        maybe_report (&ctx->red, "R ", &red_threshold);
+    else
+        maybe_report (&ctx->counters, "B ", &threshold);
+}
+
+/*
+ * NDFS algorithm by Courcoubetis et al.
+ */
+
+/* RED DFS */
+void
+ndfs_red (thread_ctx_t *ctx, idx_t seed)
+{
+    size_t              seed_level = dfs_stack_nframes (ctx->stack);
+    ctx->COLOR = RED;
+    ctx->SEED = seed;
+    ctx->red.visited++; //count accepting states
+
+    while (1) {
+        raw_data_t          state_data = dfs_stack_top (ctx->stack);
+        if (NULL != state_data) {
+            ndfs_state_info_deserialize (&ctx->state, state_data, ctx->store);
+            if ( bitvector_isset_or_set (&ctx->color, COLOR(ctx->state.idx, RED)) ) {
+                dfs_stack_pop (ctx->stack);
+            } else {
+                ndfs_explore_state(ctx, &ctx->red);
+            }
+        } else { //backtrack
+            dfs_stack_leave (ctx->stack);
+            ctx->red.level_cur--;
+            /* exit search if backtrack hits seed, leave stack the way it was */
+            if (seed_level == dfs_stack_nframes (ctx->stack))
+                break;
+            dfs_stack_pop (ctx->stack); 
+        }
+    }
+
+    ctx->COLOR = BLUE;
+}
+
+/* BLUE DFS TODO: interleave work, to support ltsmin-exit() */
+void
+ndfs_blue (thread_ctx_t *ctx, size_t work)
+{
+    while (1) {
+        raw_data_t          state_data = dfs_stack_top (ctx->stack);
+        if (NULL != state_data) {
+            ndfs_state_info_deserialize (&ctx->state, state_data, ctx->store);
+            if ( bitvector_isset_or_set (&ctx->color, COLOR(ctx->state.idx, BLUE)) ) {
+                dfs_stack_pop (ctx->stack);
+            } else {
+                ndfs_explore_state(ctx, &ctx->counters);
+            }
+        } else { //backtrack
+            if (0 == dfs_stack_nframes (ctx->stack))
+                return;
+            dfs_stack_leave (ctx->stack);
+            ctx->counters.level_cur--;
+
+            /* call red DFS for accepting states */ 
+            state_data = dfs_stack_top (ctx->stack); 
+            ndfs_state_info_deserialize (&ctx->state, state_data, ctx->store);
+            if( GBbuchiIsAccepting(ctx->model, ctx->state.data) )
+                ndfs_red(ctx, ctx->state.idx);
+
+            dfs_stack_pop (ctx->stack); 
+        }
+    }
+/*a*/(void) work;
+}
+
+/*
+ * Reachability algorithms
+ */
 
 void
 handle_state (void *arg, transition_info_t *ti, state_data_t dst)
@@ -632,17 +784,17 @@ handle_state (void *arg, transition_info_t *ti, state_data_t dst)
         if (trc_output) 
             parent_idx[successor.idx] = ctx->state.idx;
         ctx->load++;
-        ctx->visited++;
+        ctx->counters.visited++;
     }
     if (files[1])
         stream_write (ctx->out, dst, sizeof (int[N]));
-    ctx->trans++;
+    ctx->counters.trans++;
 }
 
 static inline int
 explore_state (thread_ctx_t *ctx, raw_data_t state, int next_index)
 {
-    if (0 == next_index && ctx->level_cur >= max)
+    if (0 == next_index && ctx->counters.level_cur >= max)
         return K;
     int                 count = 0;
     int                 i = K;
@@ -654,8 +806,8 @@ explore_state (thread_ctx_t *ctx, raw_data_t state, int next_index)
             count += GBgetTransitionsLong(ctx->model, i, ctx->state.data, handle_state, ctx);
     if ( dlk_detect && (0==count && 0==next_index) )
         handle_deadlock(ctx);
-    ctx->explored++;
-    maybe_report (ctx, "");
+    ctx->counters.explored++;
+    maybe_report (&ctx->counters, "", &threshold);
     return i;
 }
 
@@ -663,14 +815,14 @@ void
 dfs_grey (thread_ctx_t *ctx, size_t work)
 {
     int                 next_index = 0;
-    size_t              start_count = ctx->explored;
-    while (ctx->explored - start_count < work) {
+    size_t              start_count = ctx->counters.explored;
+    while (ctx->counters.explored - start_count < work) {
         raw_data_t      state_data = dfs_stack_top (ctx->stack);
         if (NULL == state_data) {
             if (0 == dfs_stack_nframes (ctx->stack))
                 return;
             dfs_stack_leave (ctx->stack);
-            ctx->level_cur--;
+            ctx->counters.level_cur--;
             next_index = isba_pop_int (ctx->group_stack)[0];
             continue;
         }
@@ -679,7 +831,7 @@ dfs_grey (thread_ctx_t *ctx, size_t work)
             ctx->load--;
         } else {
             dfs_stack_enter (ctx->stack);
-            increase_level (ctx);
+            increase_level (&ctx->counters);
             next_index = explore_state (ctx, state_data, next_index);
             isba_push_int (ctx->group_stack, &next_index);
         }
@@ -690,29 +842,29 @@ dfs_grey (thread_ctx_t *ctx, size_t work)
 void
 dfs (thread_ctx_t * ctx, size_t work)
 {
-    size_t              start_count = ctx->explored;
-    while (ctx->explored - start_count < work) {
+    size_t              start_count = ctx->counters.explored;
+    while (ctx->counters.explored - start_count < work) {
         raw_data_t      state_data = dfs_stack_top (ctx->stack);
         if (NULL == state_data) {
             if (0 == dfs_stack_nframes (ctx->stack))
                 break;
             dfs_stack_leave (ctx->stack);
-            ctx->level_cur--;
+            ctx->counters.level_cur--;
             dfs_stack_pop (ctx->stack);
             ctx->load--;
         } else {
             dfs_stack_enter (ctx->stack);
-            increase_level (ctx);
+            increase_level (&ctx->counters);
             explore_state (ctx, state_data, 0);
         }
     }
 }
 
 void
-bfs (thread_ctx_t * ctx, size_t work)
+bfs (thread_ctx_t *ctx, size_t work)
 {
-    size_t              start_count = ctx->explored;
-    while (ctx->explored - start_count < work) {
+    size_t              start_count = ctx->counters.explored;
+    while (ctx->counters.explored - start_count < work) {
         raw_data_t      state_data = dfs_stack_top (ctx->in_stack);
         if (NULL == state_data) {
             if (0 == dfs_stack_frame_size (ctx->out_stack))
@@ -720,7 +872,7 @@ bfs (thread_ctx_t * ctx, size_t work)
             dfs_stack_t         old = ctx->out_stack;
             ctx->stack = ctx->out_stack = ctx->in_stack;
             ctx->in_stack = old;
-            ctx->level_max++;
+            ctx->counters.level_max++;
         } else {
             dfs_stack_pop (ctx->in_stack);
             ctx->load--;
@@ -768,11 +920,11 @@ split_dfs (size_t source_id, size_t target_id, size_t handoff)
                 isba_push_int (target->group_stack, next_index);
             }
             dfs_stack_leave (source->stack);
-            source->level_cur--;
+            source->counters.level_cur--;
             one = dfs_stack_pop (source->stack);
             dfs_stack_push (target->stack, one);
             dfs_stack_enter (target->stack);
-            target->level_cur++;
+            target->counters.level_cur++;
         } else {
             dfs_stack_push (target->stack, one);
             dfs_stack_pop (source->stack);
@@ -791,7 +943,7 @@ explore (void *args)
     SCCstartTimer (timer);
     lb_balance( lb, ctx->id, ctx, &ctx->load );
     SCCstopTimer (timer);
-    ctx->runtime = SCCrealTime (timer);
+    ctx->counters.runtime = SCCrealTime (timer);
     return statistics (dbs);  // call results are thread dependent
 }
 
@@ -804,9 +956,10 @@ main (int argc, char *argv[])
     total->model = model;
     GBgetInitialState (model, total->store);
     transition_info_t start_trans_info = GB_NO_TRANSITION;
-    if (strategy == Strat_NDFS)
-        handle_ndfs (total, &start_trans_info, total->store);
-    else
+    if (strategy == Strat_NDFS) {
+        total->COLOR = BLUE;
+        ndfs_handle (total, &start_trans_info, total->store);
+    } else
         handle_state (total, &start_trans_info, total->store);
     raw_data_t          init_state = dfs_stack_top (total->stack);
     state_info_deserialize(&total->state, init_state, total->store);
@@ -814,30 +967,28 @@ main (int argc, char *argv[])
     int                 start_group = 0;
     if (UseGreyBox == call_mode && Strat_DFS == strategy)
         isba_push_int (total->group_stack, &start_group);
-    total->trans = 0;
+    total->counters.trans = 0;
     mytimer_t           timer = SCCcreateTimer ();
     SCCstartTimer (timer);
     for (size_t i = 0; i < W; i++)
         pthread_create (&contexts[i]->me, attr, explore, contexts[i]);
     for (size_t i = 0; i < W; i++)
-        pthread_join (contexts[i]->me, (void **)&contexts[i]->stats);
+        pthread_join (contexts[i]->me, (void **)&contexts[i]->counters.stats);
     SCCstopTimer (timer);
     for (size_t i = 0; i < W; i++) {
         thread_ctx_t   *ctx = contexts[i];
-        ctx->stack_sizes = dfs_stack_size_max (ctx->in_stack);
+        ctx->counters.stack_sizes = dfs_stack_size_max (ctx->in_stack);
         if (strategy == Strat_BFS)
-            ctx->stack_sizes += dfs_stack_size_max (ctx->out_stack);
+            ctx->counters.stack_sizes += dfs_stack_size_max (ctx->out_stack);
         if (total != ctx)
-            add_results (total, ctx);
-        snprintf (name, sizeof name, "[%zu] saw in %.2f sec ", i, ctx->runtime);
-        print_state_space_total (name, ctx);
+            add_results (&total->counters, &ctx->counters);
+        snprintf (name, sizeof name, "[%zu] saw in %.3f sec ", i, ctx->counters.runtime);
+        print_state_space_total (name, &ctx->counters);
         if (ctx->load) Warning (info, "Wrong load counter %zu", ctx->load);
         if (files[1]) stream_close (&ctx->out);
     }
-    total->level_max /= W; // not so meaningful for DFS
-    print_state_space_total ("State space has ", total);
-    SCCreportTimer (timer, "Total exploration time");
-    if (RTverbosity >= 1)
-        print_statistics(total, SCCrealTime (timer));
+    total->counters.level_max /= W; // not so meaningful for DFS
+    if (RTverbosity >= 1) 
+        print_statistics(&total->counters, &total->red, timer);
     return EXIT_SUCCESS;
 }
