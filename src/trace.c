@@ -88,6 +88,10 @@ int trc_get_state_label(trc_t trace, int i, int *dst) {
     return 1;
 }
 
+int  trc_get_state_idx(trc_t trace, int i) {
+    return trace->trace_idx_map[i];
+}
+
 void trc_get_state(trc_t trace, int i, int *dst) {
     TreeUnfold(trace->state_db, trace->trace_idx_map[i], dst);
 }

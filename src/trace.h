@@ -19,6 +19,8 @@ extern int trc_get_edge_label(trc_t trace, int i, int *dst);
 
 extern int trc_get_state_label(trc_t trace, int i, int *dst);
 
+extern int trc_get_state_idx(trc_t trace, int i);
+
 extern void trc_get_state(trc_t trace, int i, int *dst);
 
 extern trc_t trc_read(const char *name);
