@@ -190,7 +190,6 @@ static void *
 new_string_index (void *context)
 {
     (void)context;
-    Warning (info, "creating a new string index");
     return SIcreate ();
 }
 
