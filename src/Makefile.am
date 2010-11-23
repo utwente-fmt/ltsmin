@@ -28,6 +28,7 @@ SUBDIRS += hre
 if HAVE_MPI
 SUBDIRS += hre-mpi
 endif
+SUBDIRS += hre-test
 SUBDIRS += ce
 SUBDIRS += torx
 
