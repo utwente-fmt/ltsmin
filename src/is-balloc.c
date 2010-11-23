@@ -8,7 +8,7 @@
 #include <runtime.h>
 #include <is-balloc.h>
 
-#define INIT_MAX_BLOCKS (1024)
+#define INIT_MAX_BLOCKS (1024*64)
 
 struct isb_allocator {
     size_t el_size;
@@ -187,7 +187,8 @@ isba_peek_int(isb_allocator_t buf, size_t offset_top)
 {
     size_t size = isba_size_int(buf);
     if (offset_top >= size)
-        Fatal(1, error, "peeks offset %zu is too large for a buffer with size %zu", offset_top, size);
+        return NULL;
+        //Fatal(1, error, "peeks offset %zu is too large for a buffer with size %zu", offset_top, size);
     size_t newsize = size - (offset_top+1);
     size_t block = newsize>>BLOCK_ELT_POW;
     size_t rest = newsize&(BLOCK_ELT_SIZE-1);
