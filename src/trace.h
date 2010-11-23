@@ -25,6 +25,9 @@ extern void trc_get_state(trc_t trace, int i, int *dst);
 
 extern trc_t trc_read(const char *name);
 
+extern void trc_write_trace (trc_env_t *env, char *trc_output, int *trace,
+                             int level);
+
 extern trc_env_t *trc_create(model_t model, trc_get_state_f get, int start_idx,
                              void *get_state_arg);
 

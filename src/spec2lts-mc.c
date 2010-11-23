@@ -127,7 +127,7 @@ state_db_popt (poptContext con, enum poptCallbackReason reason,
     (void)con; (void)opt; (void)arg; (void)data;
 }
 
-static void 
+static void
 exit_ltsmin(int sig)
 {
     if ( !lb_stop(lb) ) {
@@ -239,7 +239,7 @@ typedef struct thread_ctx_s {
 } thread_ctx_t;
 
 /* predecessor --(transition_group)--> successor */
-typedef int         (*find_or_put_f)(state_info_t *successor, 
+typedef int         (*find_or_put_f)(state_info_t *successor,
                                      state_info_t *predecessor);
 
 /*TODO: change idx_t to size_t and handle maximum for 32bit machines
@@ -331,7 +331,7 @@ create_context (size_t id)
     if (strategy == Strat_BFS)
         ctx->in_stack = dfs_stack_create (state_info_int_size());
     //allocate two bits for NDFS colorings
-    if (strategy == Strat_NDFS || strategy == Strat_NNDFS) 
+    if (strategy == Strat_NDFS || strategy == Strat_NNDFS)
         bitvector_create_large(&ctx->color, 2<<dbs_size);
     else if ( UseGreyBox == call_mode )
         ctx->group_stack = isba_create (1);
@@ -420,7 +420,7 @@ init_globals (int argc, char *argv[])
     N = lts_type_get_state_length (ltstype);
     K = dm_nrows (m);
     Warning (info, "length is %d, there are %d groups", N, K);
-    
+
     MAX_SUCC = ( Strat_DFS == strategy ? 1 : INT_MAX );
     switch (db_type) {
     case UseDBSLL:
@@ -558,26 +558,6 @@ get_state(int idx, thread_ctx_t *ctx)
     return UseTreeDBSLL==db_type ? TreeDBSLLdata(dbs, state) : state;
 }
 
-static          int dl_found = 0;
-void
-handle_deadlock(thread_ctx_t *ctx)
-{
-    if ( cas (&dl_found, 0, 1) ) {
-        Warning(info,"Deadlock found in state");
-        lb_stop(lb);
-        if (trc_output) {
-            model_t     m = ctx->model; 
-            idx_t       idx = ctx->state.idx; 
-            int         level = ctx->counters.level_max;
-            trc_env_t  *trace_env = trc_create(m, (trc_get_state_f)get_state,
-                                               start_idx, ctx);
-            trc_find_and_write(trace_env, trc_output, idx, level, parent_idx);
-        }
-        Warning(info, "Exiting now");
-    }
-    pthread_exit( statistics (dbs) );
-}
-
 void
 state_info_create_empty(state_info_t *state)
 {
@@ -588,7 +568,7 @@ state_info_create_empty(state_info_t *state)
 }
 
 void
-state_info_create(state_info_t *state, state_data_t data, tree_t tree, 
+state_info_create(state_info_t *state, state_data_t data, tree_t tree,
                   idx_t idx, int group)
 {
     state->data = data;
@@ -619,7 +599,7 @@ void
 state_info_serialize(state_info_t *state, raw_data_t data)
 {
     if (refs) {
-        ((idx_t*)data)[0] = state->idx;  
+        ((idx_t*)data)[0] = state->idx;
     } else {
         if ( UseDBSLL==db_type ) {
             memcpy (data, state->data, sizeof (int[N]));
@@ -651,25 +631,6 @@ state_info_deserialize(state_info_t *state, raw_data_t data, raw_data_t store)
     }
     state->hash32 = idx;
     //ctx->state.hash32 = DBSLLmemoized_hash(dbs, ctx->state.idx);
-}
-
-static void
-ndfs_report_cycle(model_t model)
-{
-    Warning(info,"accepting cycle found!");
-    Warning(info, "exiting now");
-    pthread_exit( statistics (dbs) );
-}
-static const int BLUE = 0;
-static const int RED = 1;
-
-/*TODO: change idx_t to size_t and handle maximum for 32bit machines
-  this also requires changes to the data structures: tree, table, bitvector
-*/
-static inline int
-COLOR(idx_t idx, int color)
-{
-    return (int)((idx<<1) + color);
 }
 
 void
@@ -706,6 +667,65 @@ ndfs_state_info_deserialize (state_info_t *state, raw_data_t data, state_data_t 
     state_info_create(state, data, tree_data, idx, GB_UNKNOWN_GROUP);
 }
 
+static void
+find_dfs_stack_trace (thread_ctx_t *ctx, dfs_stack_t stack, int *trace)
+{
+    int                 i = dfs_stack_nframes(ctx->stack);
+    state_info_t        state;
+
+    // gather trace
+    raw_data_t data = dfs_stack_pop(stack);
+    ndfs_state_info_deserialize(&state, data, ctx->store);
+    trace[i] = state.idx;
+    while (i > 0) {
+        dfs_stack_leave(stack);
+        data = dfs_stack_pop(stack);
+        ndfs_state_info_deserialize(&state, data, ctx->store);
+        i--;
+        trace[i] = state.idx;
+    }
+}
+
+static void
+ndfs_report_cycle(thread_ctx_t *ctx, state_info_t *cycle_closing_state)
+{
+    Warning(info,"accepting cycle found!");
+    /* Write last state to stack to close cycle */
+    raw_data_t stack_loc = dfs_stack_push(ctx->stack, NULL);
+    ndfs_state_info_serialize (cycle_closing_state, stack_loc);
+    if (trc_output) {
+        size_t      level = dfs_stack_nframes(ctx->stack) + 1;
+        int        *trace = (int*)RTmalloc(sizeof(int) * level);
+        find_dfs_stack_trace(ctx, ctx->stack, trace);
+        trc_env_t  *trace_env = trc_create(ctx->model,
+                               (trc_get_state_f)get_state, trace[0], ctx);
+        trc_write_trace(trace_env, trc_output, trace, level);
+        RTfree (trace);
+    }
+    Warning(info,"exiting now!");
+    pthread_exit( statistics (dbs) );
+}
+
+static          int dl_found = 0;
+void
+handle_deadlock(thread_ctx_t *ctx)
+{
+    if ( cas (&dl_found, 0, 1) ) {
+        Warning(info,"Deadlock found in state");
+        lb_stop(lb);
+        if (trc_output) {
+            model_t     m = ctx->model;
+            idx_t       idx = ctx->state.idx;
+            int         level = ctx->counters.level_max;
+            trc_env_t  *trace_env = trc_create(m, (trc_get_state_f)get_state,
+                                               start_idx, ctx);
+            trc_find_and_write(trace_env, trc_output, (int)idx, level, (int*)parent_idx); //TODO: warning
+        }
+        Warning(info, "Exiting now");
+    }
+    pthread_exit( statistics (dbs) );
+}
+
 /*
  * NDFS algorithm by Courcoubetis et al.
  */
@@ -723,7 +743,8 @@ ndfs_handle (void *arg, transition_info_t *ti, state_data_t dst)
         find_or_put_tree(&successor, &ctx->state);
 
     if (ctx->COLOR == NDFS_RED && successor.idx == ctx->SEED)
-        ndfs_report_cycle(ctx->model);
+        /* Found cycle back to the seed */
+        ndfs_report_cycle(ctx, &successor);
 
     if ( ctx->COLOR != ndfs_get_color(&ctx->color, successor.idx) ) {
         raw_data_t stack_loc = dfs_stack_push(ctx->stack, NULL);
@@ -825,8 +846,8 @@ nndfs_red_handle (void *arg, transition_info_t *ti, state_data_t dst)
 
     ndfs_color_t color = nndfs_get_color(&ctx->color, successor.idx);
     if (color == NDFS_CYAN) {
-        /* found a way back to the stack */
-        ndfs_report_cycle(ctx->model);
+        /* Found cycle back to the stack */
+        ndfs_report_cycle(ctx, &successor);
     } else if (color == NDFS_BLUE) {
         nndfs_isset_or_set_color(&ctx->color, ctx->state.idx, NDFS_RED);
         raw_data_t stack_loc = dfs_stack_push(ctx->stack, NULL);
@@ -849,7 +870,8 @@ nndfs_blue_handle (void *arg, transition_info_t *ti, state_data_t dst)
     ndfs_color_t color = nndfs_get_color(&ctx->color, successor.idx);
     if (color == NDFS_CYAN && (GBbuchiIsAccepting(ctx->model,ctx->state.data) ||
                     GBbuchiIsAccepting(ctx->model, successor.data))) {
-        ndfs_report_cycle(ctx->model);
+        /* Found cycle in blue search */
+        ndfs_report_cycle(ctx, &successor);
     } else if (color == NDFS_WHITE) {
         raw_data_t stack_loc = dfs_stack_push(ctx->stack, NULL);
         ndfs_state_info_serialize (&successor, stack_loc);

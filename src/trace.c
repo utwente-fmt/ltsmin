@@ -211,6 +211,26 @@ trc_find_and_write (trc_env_t *env, char *trc_output, int dst_idx,
     lts_output_close(&trace_output);
 }
 
+void
+trc_write_trace (trc_env_t *env, char *trc_output, int *trace, int level)
+{
+    lts_output_t trace_output=lts_output_open(trc_output,
+                                              env->model,1,0,1,"vsi",NULL);
+    {
+       int *init_state = env->get_state(env->start_idx, env->get_state_arg);
+       lts_output_set_root_vec(trace_output,(uint32_t*)init_state);
+       lts_output_set_root_idx(trace_output,0,0);
+    }
+    trace_handle=lts_output_begin(trace_output,0,1,0);
+    mytimer_t timer = SCCcreateTimer();
+    SCCstartTimer(timer);
+    write_trace(env, level, trace);
+    SCCstopTimer(timer);
+    SCCreportTimer(timer,"constructing the trace took");
+    lts_output_end(trace_output,trace_handle);
+    lts_output_close(&trace_output);
+}
+
 trc_t trc_read(const char *name){
     trc_t trace=RT_NEW(struct trc_s);
     archive_t arch;
