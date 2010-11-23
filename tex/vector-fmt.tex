@@ -1,0 +1,231 @@
+\documentclass{article}
+\title{The vector file format for labeled transition systems.}
+\author{Stefan Blom}
+
+\usepackage{tabularx}
+\usepackage{fullpage}
+
+%% Set up theorems and such...
+
+\usepackage{theorem}
+\theoremstyle{plain}
+\theoremheaderfont{\bfseries\upshape}
+\theorembodyfont{\mdseries\upshape}
+
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{intermezzo}[theorem]{Intermezzo}
+\newtheorem{example}[theorem]{Example}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{corollary}[theorem]{Corollary}
+\newtheorem{conjecture}[theorem]{Conjecture}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{fact}[theorem]{Fact}
+\newtheorem{remark}[theorem]{Remark}
+\newenvironment{proof}[1][Proof.~]{{\bf #1}}{\mbox{}\hfill$\Box$\medskip}
+
+%% End theorem setup.
+
+\begin{document}
+
+\maketitle
+
+\section{Introduction.}
+
+One of the key purposes of the file format is the ability to support writing generic tools.
+Both integer types and arbitrary types are internally represented as integers.
+For the arbitrary types a serialization of the values is included. Using a human reqadable form is recommended because this enables generic tools to provide meaningful feedback.
+
+To support features like composition and quantification is generic tools, it is important to know
+if a type is finite or not. Thus we get four possibilities:
+
+\centerline{\begin{tabular}{lll}
+& integer & aribitrary
+\\
+finite & $[.,.]$ & enum
+\\
+possibly infinite & direct & chunk
+\end{tabular}}
+
+
+\section{Vector Format Files}
+
+The files, which are possible in the vector file format are:
+
+\par\noindent\begin{tabularx}{\textwidth}{lX}
+{\bf file} & {\bf description}
+\\
+\verb+info+ & Contains the meta information of the LTS.
+\\
+\verb+init+ & Contains the initial states of the LTS.
+\\
+\verb+SV-+$i$\verb+-+$k$ & Contains the State Vector values of slot $k$ for states in partition $i$.
+\\
+\verb+SL-+$i$\verb+-+$k$ & Contains the State Label values of label $k$ for states in partition $i$.
+State labels, which are also state slots are stored under the slot number.
+\\
+\verb+ES-+$i$\verb+-+$k$ & Contains the Edge Source values of slot $k$ for edges in partition $i$.
+\\
+\verb+ES-+$i$\verb+-seg+ & Contains the Edge Source segment for edges in partition $i$.
+\\
+\verb+ES-+$i$\verb+-ofs+ & Contains the Edge Source state number for edges in partition $i$.
+\\
+\verb+ED-+$i$\verb+-+$k$ & Contains the Edge Destination value of slot $k$ for edges in partition $i$.
+\\
+\verb+ED-+$i$\verb+-seg+ & Contains the Edge Destination segment for transitions in partition $i$.
+\\
+\verb+ED-+$i$\verb+-ofs+ & Contains the Edge Destination state number for transitions in partition $i$.
+\\
+\verb+EL-+$i$\verb+-+$k$ & Contain the Edge Label value of label $k$ for the edges in partition $i$.
+\\
+\verb+CT-+$k$ & Stores serialized values of the sort $k$.
+\end{tabularx}
+
+
+The format of the info file is:
+
+\par\noindent\begin{tabularx}{\textwidth}{lX}
+{\tt string} & A string describing the file format and version: "vector 1.0".
+\\
+{\tt string} & Comment string.
+\\
+{\tt chunk} & Serialization of the LTS type.
+\\
+{\tt chunk} & Contains the structural information of the file.
+\\
+{\tt chunk} & The state and transition counts of each partition, the number of elements in each chunk table.
+\\
+{\tt chunk} & A serialization of the compression tree. If the chunk size is 0 then
+tree compression was not used.
+\end{tabularx}
+
+The format for the structural information chunk is:
+\par\noindent\begin{tabularx}{\textwidth}{lX}
+{\tt int32} & The number of segments.
+\\
+{\tt string} & The representation if the initial states: "i", "v" , or "sv".
+Note that "i" means one integer (state number) if the segment count is 1 and two integers
+(segment,offset) if the segment count is more than 1.
+\\
+{\tt string} & the edge ownership: "src" or "dst".
+\\
+{\tt string} & The representation of the source states: "i", "v", or "sv".
+\\
+{\tt string} & The representation of the destination states: "i", "v", or "sv".
+\end{tabularx}
+
+\section{Compression and Archives}
+
+Managing a set of files is slightly more difficult and error prone than managing a single file.
+Unfortunately, existing archive file formats such as ZIP and tar cannot be used easily
+because multiple streams have to be written in parallel. This lead to the development of
+our own archive format: the Generic Container Format (GCF).
+
+An additional advantage of using our own format is that we can support various compression
+techniques:
+\\
+\begin{tabularx}{\textwidth}{lX}
+{\tt gzip[N]} & Apply gzip compression. The level $N$ is optional.
+\\
+{\tt diff32} & Assume that the stream contains 32bit integer and apply difference encoding.
+This is known to be useful for the source indices of transitions, which are often ascending sequences.
+The default strategy for compressing state indices is {\tt diff32|gzip}.
+\\
+{\tt rle32} & A version of run-length encoding that support runs of identical 32 bit integer
+and runs of always changing 32 bit integer. It adds a small overhead to random files,
+but compresses files with long runs of the same value very well.
+The default strategy for compressing state labels is {\tt rle32|gzip} and is very effective
+for Markov chains in TRA/LAB form.
+\end{tabularx}
+
+\section{Serialization of the LTS type.}
+
+A version 1.0 LTS type is serialized as follows:
+
+\par\noindent\begin{tabularx}{\textwidth}{lX}
+{\tt string} & A string describing the version: "lts signature 1.0".
+\\
+{\tt int32} & The length of the state vector: vlen.
+\\
+({\tt string} {\tt int32})${}^{\rm vlen}$ & For each state vector slot a string describing the name and an integer that describes the type.
+An empty string means undefined.
+\\
+{\tt int32} & The number of defined state labels: sl.
+\\
+({\tt string} {\tt int32})${}^{\rm sl}$ & For each defined state label a string describing the name and an integer that describes the type.
+\\
+{\tt int32} & The number of edge labels: el.
+\\
+({\tt string} {\tt int32})${}^{\rm el}$ & For each edge label a string describing the name and an integer that describes the type.
+\\
+{\tt int32} & The number of types: T.
+\\
+{\tt string}${}^{\rm T}$ & For each type a string describing the name of the type.
+\end{tabularx}
+
+It is assumed that every type uses a chunk representation.
+
+\bigskip
+
+A version 1.1 LTS type is serialized as follows:
+
+\par\noindent\begin{tabularx}{\textwidth}{lX}
+{\tt string} & A string describing the version: "lts signature 1.1".
+\\
+{\tt int32} & The length of the state vector: vlen.
+\\
+({\tt string} {\tt int32})${}^{\rm vlen}$ & For each state vector slot a string describing the name and an integer that describes the type.
+An empty string means undefined.
+\\
+{\tt int32} & The number of defined state labels: sl.
+\\
+({\tt string} {\tt int32})${}^{\rm sl}$ & For each defined state label a string describing the name and an integer that describes the type.
+\\
+{\tt int32} & The number of edge labels: el.
+\\
+({\tt string} {\tt int32})${}^{\rm el}$ & For each edge label a string describing the name and an integer that describes the type.
+\\
+{\tt int32} & The number of types: T.
+\\
+({\tt string} {\tt string})${}^{\rm T}$ & For each type a string describing the name of the type and a string describing how values are represented.
+\end{tabularx}
+
+Legal values representations are:
+\begin{description}
+\item[direct] Arbitrary 32 bit integer value.
+\item[\mbox{$[n,k]$}] Integer in the range $[n,k]$.
+\item[chunk] Every element is a chunk, from an unknown domain.
+\item[enum] Every element is a chunk, the entire domain is given.
+\end{description}
+
+
+\section{Serialization of basic data types.}
+
+\par\noindent\begin{tabularx}{\textwidth}{@{}lX@{}}
+Datatype & description
+\\
+{\tt int16} & 16 bit integer in network byte order.
+\\
+{\tt int32} & 32 bit integer in network byte order.
+\\
+{\tt int64} & 64 bit integer in network byte order.
+\\
+{\tt string} & Byte strings of less than $2^{16}$ bytes. A byte string of length $N$ is encoded as
+$N$ in {\tt int16} format followed by the $N$ bytes of the string. When used for printable strings the terminating $0$ is not included.
+\\
+{\tt length} & An unsigned integer with a variable length encoding.
+A length is encoded as a sequence of bytes. The last byte in the sequence has bit 7 set to 0, all other bytes have bit 7 set to 1. The byte order is little endian. For example:
+\\&
+\begin{tabular}{rr}
+$N$ & encoding
+\\
+16 & 0001\,0000
+\\
+256 & 1000\,0001~0000\,0000
+\end{tabular}
+\\
+{\tt chunk} & Byte strings of arbitrary length, represented as a {\tt length} followed by the bytes of the string.
+\end{tabularx}
+
+\end{document}
+

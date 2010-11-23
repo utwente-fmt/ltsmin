@@ -31,6 +31,7 @@ if HAVE_MPI
 SUBDIRS += hre-mpi
 endif
 SUBDIRS += hre-test
+SUBDIRS += lts-io
 SUBDIRS += gcf-tool
 SUBDIRS += ce
 SUBDIRS += torx
