@@ -111,6 +111,12 @@ lb_stop(lb_t *lb)
     return cas (&lb->all_done, 0, 1);
 }
 
+int
+lb_is_stopped (lb_t *lb)
+{
+    return lb->all_done;
+}
+
 static inline           size_t
 get_highest_load (lb_t *lb, size_t me)
 {

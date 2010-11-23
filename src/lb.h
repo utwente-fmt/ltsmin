@@ -43,4 +43,6 @@ extern void lb_balance (lb_t *lb, int id, void *arg, size_t *load);
 
 extern int lb_stop(lb_t *lb);
 
+extern int lb_is_stopped(lb_t *lb);
+
 #endif /* LB_H_ */

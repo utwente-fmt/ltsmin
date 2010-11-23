@@ -216,6 +216,7 @@ typedef struct counter_s {
     size_t              stack_sizes;    // max combined stack sizes
     size_t              touched_red;    // visited-before accepting states
     stats_t            *stats;          // running state storage statistics
+    size_t              max_load;      // last work-load, for work slicing
 } counter_t;
 
 typedef struct thread_ctx_s {
@@ -723,7 +724,7 @@ handle_deadlock(thread_ctx_t *ctx)
         }
         Warning(info, "Exiting now");
     }
-    pthread_exit( statistics (dbs) );
+    pthread_exit( statistics(dbs) );
 }
 
 /*
@@ -761,9 +762,14 @@ ndfs_explore_state (thread_ctx_t *ctx, counter_t *cnt)
     cnt->trans += count;
     cnt->explored++;
     if (ctx->COLOR == NDFS_RED)
-        maybe_report (&ctx->red, "R ", &red_threshold);
+        maybe_report (cnt, "R ", &red_threshold);
     else
-        maybe_report (&ctx->counters, "B ", &threshold);
+        maybe_report (cnt, "B ", &threshold);
+    if (cnt->explored > cnt->max_load) {
+        if (lb_is_stopped(lb))
+            pthread_exit( statistics(dbs) );
+        cnt->max_load += 1000;
+    }
 }
 
 /* RED DFS */
@@ -797,7 +803,7 @@ ndfs_red (thread_ctx_t *ctx, idx_t seed)
     ctx->COLOR = NDFS_BLUE;
 }
 
-/* BLUE DFS TODO: interleave work, to support ltsmin-exit() */
+/* BLUE DFS */
 void
 ndfs_blue (thread_ctx_t *ctx, size_t work)
 {
@@ -888,9 +894,14 @@ nndfs_explore_state (thread_ctx_t *ctx, counter_t *cnt)
     cnt->trans += count;
     cnt->explored++;
     if (ctx->COLOR == NDFS_RED)
-        maybe_report (&ctx->red, "R ", &red_threshold);
+        maybe_report (cnt, "R ", &red_threshold);
     else
-        maybe_report (&ctx->counters, "B ", &threshold);
+        maybe_report (cnt, "B ", &threshold);
+    if (cnt->explored > cnt->max_load) {
+        if (lb_is_stopped(lb))
+            pthread_exit( statistics(dbs) );
+        cnt->max_load += 1000;
+    }
 }
 
 /* RED DFS */
@@ -1005,8 +1016,8 @@ void
 dfs_grey (thread_ctx_t *ctx, size_t work)
 {
     int                 next_index = 0;
-    size_t              start_count = ctx->counters.explored;
-    while (ctx->counters.explored - start_count < work) {
+    ctx->counters.max_load = ctx->counters.explored + work;
+    while (ctx->counters.explored < ctx->counters.max_load) {
         raw_data_t      state_data = dfs_stack_top (ctx->stack);
         if (NULL == state_data) {
             if (0 == dfs_stack_nframes (ctx->stack))
@@ -1032,8 +1043,8 @@ dfs_grey (thread_ctx_t *ctx, size_t work)
 void
 dfs (thread_ctx_t * ctx, size_t work)
 {
-    size_t              start_count = ctx->counters.explored;
-    while (ctx->counters.explored - start_count < work) {
+    ctx->counters.max_load = ctx->counters.explored + work;
+    while (ctx->counters.explored < ctx->counters.max_load) {
         raw_data_t      state_data = dfs_stack_top (ctx->stack);
         if (NULL == state_data) {
             if (0 == dfs_stack_nframes (ctx->stack))
@@ -1053,8 +1064,8 @@ dfs (thread_ctx_t * ctx, size_t work)
 void
 bfs (thread_ctx_t *ctx, size_t work)
 {
-    size_t              start_count = ctx->counters.explored;
-    while (ctx->counters.explored - start_count < work) {
+    ctx->counters.max_load = ctx->counters.explored + work;
+    while (ctx->counters.explored < ctx->counters.max_load) {
         raw_data_t      state_data = dfs_stack_top (ctx->in_stack);
         if (NULL == state_data) {
             if (0 == dfs_stack_frame_size (ctx->out_stack))
