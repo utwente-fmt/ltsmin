@@ -28,7 +28,7 @@ at_map_t ATmapCreate(model_t model,int type_no,void* context,pretty_print_t prin
 	map->aterm2int=ATtableCreate(1024,50);
 	map->context=context;
 	map->print=print;
-	map->parse=parse?parse:((parse_t)ATreadFromString);
+	map->parse=parse;
 	return map;
 }
 
