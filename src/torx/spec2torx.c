@@ -85,15 +85,18 @@ torx_transition (void *arg, transition_info_t *ti, int *dst)
     torx_ctx_t         *ctx = (torx_ctx_t *)arg;
 
     int                 tmp = TreeFold (dbs, dst);
-    chunk               c =
-        GBchunkGet (ctx->model,
-                    lts_type_get_edge_label_typeno (ctx->ltstype, 0),
-                    ti->labels[0]);
-
-    int                 vis = 1;
-    if (c.len == 3 && strncmp (c.data, "tau", c.len) == 0)
-        vis = 0;
-
+    int                 vis = 0;
+    chunk               c;
+    if (edge_labels > 0) {
+        c = GBchunkGet (ctx->model,
+                        lts_type_get_edge_label_typeno (ctx->ltstype, 0),
+                        ti->labels[0]);
+        vis = (c.len == 3 && strncmp (c.data, "tau", c.len) == 0);
+    } else {
+        c.len  = 3;
+        c.data = "tau";
+    }    
+    
     /* tab-separated fields: edge vis sat lbl pred vars state */
     fprintf (stdout, "Ee\t\t%d\t1\t%.*s\t\t\t%d\n", vis, c.len, c.data, tmp);
 }
