@@ -69,13 +69,14 @@ typedef enum { UseGreyBox , UseBlackBox } mode_t;
 static mode_t call_mode=UseBlackBox;
 
 static char *arg_strategy = "bfs";
-static enum { Strat_BFS, Strat_DFS } strategy = Strat_BFS;
+static enum { Strat_BFS, Strat_DFS, Strat_SCC } strategy = Strat_BFS;
 static char *arg_state_db = "tree";
 static enum { DB_DBSLL, DB_TreeDBS, DB_Vset } state_db = DB_TreeDBS;
 
 static si_map_entry strategies[] = {
     {"bfs",  Strat_BFS},
     {"dfs",  Strat_DFS},
+    {"scc",  Strat_SCC},
     {NULL, 0}
 };
 
@@ -201,6 +202,16 @@ typedef union gsea_store {
     } vset;
     struct {
         dbs_ll_t dbs;
+
+        // this should probably go somewhere else
+        struct {
+            bitset_t         current;
+            dfs_stack_t      active;
+            dfs_stack_t      roots;
+            array_manager_t  dfsnum_man;
+            int             *dfsnum;
+            int              count;
+        } scc;
     } table;
 } gsea_store_t;
 
@@ -488,6 +499,68 @@ dfs_table_state_next(gsea_state_t* state, void* arg)
 
 
 
+
+/********************
+ *   __   __   __   *
+ *  /__` /  ` /  `  *
+ *  .__/ \__, \__,  *
+ ********************/
+
+/* scc table configuration */
+void scc_table_open_insert(gsea_state_t* state, void* arg)
+{
+    if (!DBSLLlookup_ret(gc.store.table.dbs, state->state, &(state->table.hash_idx))) {
+        visited++;
+    }
+
+    dfs_stack_push(gc.queue.filo.stack, &(state->table.hash_idx));
+}
+
+void scc_table_open_extract(gsea_state_t* state, void* arg)
+{
+    int* idx = NULL;
+    do {
+        idx = dfs_stack_top(gc.queue.filo.stack);
+        if (bitset_test(gc.queue.filo.closed, *idx)) {
+            dfs_stack_pop(gc.queue.filo.stack);
+            idx = NULL;
+        }
+    } while (idx == NULL);
+    state->table.hash_idx = *idx;
+    // index is known
+    int hash;
+
+    state->state = DBSLLget(gc.store.table.dbs, *idx, &hash);
+}
+
+void scc_table_closed_insert(gsea_state_t* state, void* arg) { explored++; bitset_set(gc.queue.filo.closed, state->table.hash_idx); }
+int scc_table_open_size(void* arg) { return visited - explored; }
+
+int scc_table_open(gsea_state_t* state, void* arg) { return 0; }
+int scc_table_closed(gsea_state_t* state, void* arg) { return 0; }
+
+void
+scc_table_state_next(gsea_state_t* state, void* arg)
+{
+    state->count = GBgetTransitionsAll (model, state->state, gsea_process, state);
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 /****************************************************
  *   __   __   ___          __   ___ ___       __   *
  *  / _` /__` |__   /\     /__` |__   |  |  | |__)  *
@@ -637,6 +710,37 @@ void gsea_setup()
                 Fatal(1, error, "unimplemented combination --strategy=%s, --state=%s", arg_strategy, arg_state_db );
         }
         break;
+
+    case Strat_SCC:
+        switch (state_db) {
+            case DB_DBSLL:
+                gc.open_insert = scc_table_open_insert;
+                gc.open_extract = scc_table_open_extract;
+                gc.open = scc_table_open;
+                gc.open_size = scc_table_open_size;
+                gc.closed_insert = scc_table_closed_insert;
+                gc.closed = scc_table_closed;
+                gc.state_next = scc_table_state_next;
+
+                gc.context = RTmalloc(sizeof(int) * N);
+                gc.store.table.dbs = DBSLLcreate(N);
+                gc.queue.filo.closed = bitset_create(128,128);
+                gc.queue.filo.stack = dfs_stack_create(1);
+
+                // scc init
+                gc.store.table.scc.current = bitset_create (128,128);
+                gc.store.table.scc.active = dfs_stack_create (1);
+                gc.store.table.scc.roots = dfs_stack_create (1);
+                gc.store.table.scc.dfsnum_man = create_manager(65536);
+                ADD_ARRAY(gc.store.table.scc.dfsnum_man, gc.store.table.scc.dfsnum, int);
+                gc.store.table.scc.count = 0;
+                break;
+
+            default:
+                Fatal(1, error, "unimplemented combination --strategy=%s, --state=%s", arg_strategy, arg_state_db );
+        }
+        break;
+
     default:
         Fatal(1, error, "unimplemented strategy");
     }
