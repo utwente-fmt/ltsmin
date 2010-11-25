@@ -24,10 +24,11 @@ static  struct poptOption options[] = {
 /*
 copied from spec2lts-grey.c
  */
-static void *new_string_index(void* context){
-	(void)context;
-	Warning(info,"creating a new string index");
-	return SIcreate();
+static void *
+new_string_index (void *context)
+{
+    (void)context;
+    return SIcreate ();
 }
 
 static void copy_seg_ofs(void*ctx,int seg,int ofs,int*vec){

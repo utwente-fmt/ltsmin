@@ -244,7 +244,7 @@ output_text_table(trc_t trace, FILE* output_file) {
     }
 
     // print header
-    fprintf(output_file, "      ");
+    fprintf(output_file, "step idx    ");
     for(int j=0; j<N; ++j) {
         char *name = lts_type_get_state_name(ltstype, j);
         char *type = lts_type_get_state_type(ltstype, j);
@@ -285,7 +285,8 @@ output_text_table(trc_t trace, FILE* output_file) {
         int edge_lbls[eLbls];
         for(int j=0; j<N; ++j) prev_state[j] = (i == 0 ? -1 : state[j]);
         trc_get_state(trace, i, state);
-        fprintf(output_file, "%.3d: [",i);
+        int sidx = trc_get_state_idx(trace, i);
+        fprintf(output_file, "%.3d (%.3d): [",i,sidx);
         for(int j=0; j<N; ++j) {
             if (arg_all || state[j] != prev_state[j]) {
                 int typeno = lts_type_get_state_typeno(ltstype, j);

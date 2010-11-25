@@ -159,10 +159,11 @@ static vset_t *group_explored;
 static vset_t *group_tmp;
 static int explored;
 
-static void *new_string_index(void* context){
-	(void)context;
-	Warning(info,"creating a new string index");
-	return SIcreate();
+static void *
+new_string_index (void *context)
+{
+    (void)context;
+    return SIcreate ();
 }
 
 static void write_trace_state(int src_no, int*state){
