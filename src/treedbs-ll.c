@@ -232,12 +232,10 @@ project_matrix_to_tree (treedbs_ll_t dbs, matrix_t *m)
     dbs->todo = RTalign(CACHE_LINE_SIZE, dbs->k * sizeof (dbs->todo[0]));
     for(int row = 0;row < dbs->k;++row){
         dbs->todo[row] = RTalign(CACHE_LINE_SIZE, sizeof (int[nNodes]));
-        for(int i = 0;i < nNodes;i++){
+        for(int i = 0; i < nNodes; i++)
             tmp[i + nNodes] = dm_is_set(m, row, i);
-            tmp[i + nNodes + 1] = dm_is_set(m, row, i + 1);
-        }
         int j = 0;
-        for(size_t i = nNodes - 1;i > 0;i--){
+        for(int i = nNodes - 1; i > 0; i--) {
             int l = (i << 1);
             int r = l + 1;
             tmp[i] = tmp[l] || tmp[r];
