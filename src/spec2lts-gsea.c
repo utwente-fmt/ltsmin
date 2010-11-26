@@ -244,6 +244,9 @@ typedef struct gsea_context {
     // foreach open function
     void (*foreach_open)( foreach_open_cb, void*);
 
+    // open insert
+    int (*open_insert_condition)(gsea_state_t*, void*);
+
     // open set
     void (*open_insert)(gsea_state_t*, void*);
     void (*open_delete)(gsea_state_t*, void*);
@@ -562,6 +565,10 @@ void* gsea_init_default(gsea_state_t* state)
     return NULL;
 }
 
+int gsea_open_insert_condition_default(gsea_state_t* state, void* arg) {
+    return (!gc.closed(state, arg) && !gc.open(state, arg));
+}
+
 void
 gsea_state_next_default(gsea_state_t* state, void* arg)
 {
@@ -595,6 +602,7 @@ void gsea_setup_default()
         // setup standard bfs/tree configuration
         gc.gsea_init = gsea_init_default;
         gc.foreach_open = gsea_foreach_open;
+        gc.open_insert_condition = gsea_open_insert_condition_default;
         gc.open_insert = error_state_arg;
         gc.open_delete = error_state_arg;
         gc.open = error_state_arg;
@@ -783,6 +791,7 @@ void gsea_foreach_open(foreach_open_cb open_cb, void* arg)
 
 void gsea_foreach_open_cb(gsea_state_t* s_open, void* arg)
 {
+    // insert in closed set
     gc.closed_insert(s_open, arg);
 
     // find goal state, reopen state.., a*
@@ -804,7 +813,7 @@ gsea_process(void* arg, transition_info_t *ti, int *dst)
     gsea_state_t s_next;
     s_next.state = dst;
     // this should be in here.
-    if (!gc.closed(&s_next, arg) && !gc.open(&s_next, arg))
+    if (gc.open_insert_condition(&s_next, arg))
         gc.open_insert(&s_next, arg);
     ntransitions++;
 }
