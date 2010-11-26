@@ -259,11 +259,12 @@ typedef struct gsea_context {
     int  (*closed_size)(void*);
 
     // state info
+    void (*pre_state_next)(gsea_state_t*, void*);
+    void (*post_state_next)(gsea_state_t*, void*);
     void (*state_next)(gsea_state_t*, void*);
 
     // search for state
-    int  (*goal_reached1)(gsea_state_t*, void*);
-    int  (*goal_reached2)(gsea_state_t*, void*);
+    int  (*goal_reached)(gsea_state_t*, void*);
     int  (*goal_trace)(gsea_state_t*, void*);
 
     void (*report_progress)(void*);
@@ -272,6 +273,10 @@ typedef struct gsea_context {
     gsea_store_t store;
     gsea_queue_t queue;
     void* context;
+
+    // placeholders
+    void (*dlk_placeholder)(gsea_state_t*, void*);
+
 } gsea_context_t;
 
 static gsea_context_t gc;
@@ -563,6 +568,21 @@ gsea_state_next_default(gsea_state_t* state, void* arg)
     state->count = GBgetTransitionsAll (model, state->state, gsea_process, state);
 }
 
+void* gsea_dlk_default(gsea_state_t* state, void* arg)
+{
+    // chain deadlock test after original code
+    if (gc.dlk_placeholder) gc.dlk_placeholder(state, arg);
+
+    // no outgoing transitions
+    if (state->count == 0) { // gc.is_goal(..) = return state->count == 0;
+        //gc.goal_trace(..);
+        threshold = visited-1;
+        gc.report_progress(arg);
+        Warning(info, "deadlock detected");
+        Fatal(1, info, "exiting now");
+    }
+}
+
 
 int
 gsea_goal_trace_default(gsea_state_t* state, void* arg)
@@ -584,9 +604,10 @@ void gsea_setup_default()
         gc.closed_delete = error_state_arg;
         gc.closed = error_state_arg;
         gc.closed_size = error_arg;
+        gc.pre_state_next = NULL;
         gc.state_next = gsea_state_next_default;
-        gc.goal_reached1 = NULL;
-        gc.goal_reached2 = NULL;
+        gc.post_state_next = NULL;
+        gc.goal_reached = error_state_arg;
         gc.goal_trace = gsea_goal_trace_default;
         gc.report_progress = gsea_progress;
         gc.report_finished = gsea_finished;
@@ -711,6 +732,12 @@ void gsea_setup()
     default:
         Fatal(1, error, "unimplemented strategy");
     }
+
+    // check deadlocks?
+    if (dlk_detect) {
+        gc.dlk_placeholder = gc.post_state_next;
+        gc.post_state_next = gsea_dlk_default;
+    }
 }
 
 
@@ -758,16 +785,14 @@ void gsea_foreach_open_cb(gsea_state_t* s_open, void* arg)
 {
     gc.closed_insert(s_open, arg);
 
-    // goal state
-    if (gc.goal_reached1 && gc.goal_reached1(s_open, arg))
-        gc.goal_trace(s_open, arg);
+    // find goal state, reopen state.., a*
+    if (gc.pre_state_next) gc.pre_state_next(s_open, arg);
 
     // expand, calls gsea_process
     gc.state_next(s_open, arg);
 
-    // goal state, after next
-    if (gc.goal_reached2 && gc.goal_reached2(s_open, arg))
-        gc.goal_trace(s_open, arg);
+    // find goal state, .. etc
+    if (gc.post_state_next) gc.post_state_next(s_open, arg);
 
     // progress
     gc.report_progress(arg);
