@@ -40,6 +40,7 @@ static void
 ensure_map_size (at_map_t map, size_t min)
 {
     size_t          N = map->size;
+    if (N > min) return;
     map->size = (min > N*2) ? min : N*2;
     map->int2aterm = RTrealloc (map->int2aterm, map->size * sizeof (ATerm));
     for (int i = N; i < map->size; i++)
