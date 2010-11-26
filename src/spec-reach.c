@@ -195,21 +195,27 @@ static void write_trace(int **states, int total_states)
     write_trace_state(total_states-1,states[0]);
 }
 
-static void find_trace_to(int *dst,int level,vset_t *levels){
+static void
+find_trace_to(int trace_end[][N], int end_count, int level, vset_t *levels)
+{
     int prev_level = level - 2;
     vset_t src_set = vset_create(domain,0,NULL);
     vset_t dst_set = vset_create(domain,0,NULL);
     vset_t temp = vset_create(domain,0,NULL);
 
-    int max_states = 1024;
-    int current_state = 1;
-    int **states = RTmalloc(max_states*sizeof(int*));
-    states[0] = dst;
-    for(int i=1;i<max_states;i++)
-        states[i] = RTmalloc(sizeof(int)*N);
+    int max_states = 1024 + end_count;
+    int current_state = end_count;
+    int **states = RTmalloc(sizeof(int*[max_states]));
+
+    for (int i = 0; i < end_count; i++)
+        states[i] = trace_end[i];
+
+    for(int i = end_count; i < max_states; i++)
+        states[i] = RTmalloc(sizeof(int[N]));
+
 
     int max_int_level = 32;
-    vset_t *internal_levels = RTmalloc(max_int_level*sizeof(vset_t));
+    vset_t *internal_levels = RTmalloc(sizeof(vset_t[max_int_level]));
     for(int i = 0;i < max_int_level;i++)
         internal_levels[i] = vset_create(domain,0,NULL);
 
@@ -230,7 +236,7 @@ static void find_trace_to(int *dst,int level,vset_t *levels){
             if(int_level == max_int_level) {
                 max_int_level += 32;
                 internal_levels = RTrealloc(internal_levels,
-                                                max_int_level*sizeof(vset_t));
+                                                sizeof(vset_t[max_int_level]));
                 for(int i=int_level;i<max_int_level;i++)
                     internal_levels[i] = vset_create(domain,0,NULL);
             }
@@ -247,7 +253,7 @@ static void find_trace_to(int *dst,int level,vset_t *levels){
         if(current_state+int_level >= max_states) {
             int old_max_states=max_states;
             max_states = current_state+int_level+1024;
-            states = RTrealloc(states,max_states*sizeof(int*));
+            states = RTrealloc(states,sizeof(int*[max_states]));
             for(int i=old_max_states;i<max_states;i++)
                 states[i] = RTmalloc(sizeof(int)*N);
         }
@@ -286,7 +292,9 @@ static void find_trace_to(int *dst,int level,vset_t *levels){
     write_trace(states, current_state);
 }
 
-static void find_trace(int *dst,int level,vset_t *levels){
+static void
+find_trace(int trace_end[][N], int end_count, int level, vset_t *levels)
+{
   int init_state[N];
   GBgetInitialState(model,init_state);
   trace_output=lts_output_open(trc_output,model,1,0,1,"vsi",NULL);
@@ -295,7 +303,7 @@ static void find_trace(int *dst,int level,vset_t *levels){
   trace_handle=lts_output_begin(trace_output,0,0,0);
   mytimer_t timer=SCCcreateTimer();
   SCCstartTimer(timer);
-  find_trace_to(dst,level,levels);
+  find_trace_to(trace_end,end_count,level,levels);
   SCCstopTimer(timer);
   SCCreportTimer(timer,"constructing the trace took");
   lts_output_end(trace_output,trace_handle);
@@ -310,46 +318,36 @@ struct find_action_info {
   int max_levels;
 };
 
-static void find_action_cb(void* context, int* src){
-  Warning(info,"found action: %s",act_detect);
-  if (trc_output!=NULL) {
-    // The following is destructive on levels
-    struct find_action_info* ctx=(struct find_action_info*)context;
-    int group=ctx->group;
-    int dst[N];
-    int level;
-    vset_t* levels;
-    int max_levels=ctx->max_levels;
+static void
+find_action_cb(void* context, int* src)
+{
+    Warning(info, "found action: %s", act_detect);
 
-    for(int i=0;i<N;i++)
-      dst[i]=src[i];
-    for(int i=0;i<projs[group].len;i++)
-      dst[projs[group].proj[i]]=ctx->dst[i];
+    if (trc_output != NULL) {
+        struct find_action_info* ctx = (struct find_action_info*)context;
+        int group=ctx->group;
+        int trace_end[2][N];
 
-    if(vset_member(ctx->levels[ctx->level-1],src)) {
-      Warning(debug, "source found at level %d", ctx->level-1);
-      level=ctx->level+1;
-    } else {
-      Warning(debug, "source not found at level %d", ctx->level-1);
-      level=ctx->level+2;
+        for (int i = 0; i < N; i++) {
+            trace_end[0][i] = src[i];
+            trace_end[1][i] = src[i];
+        }
+
+        // Set dst of the last step of the trace to its proper value
+        for (int i = 0; i < projs[group].len; i++)
+            trace_end[0][projs[group].proj[i]] = ctx->dst[i];
+
+        // src and dst may both be new, e.g. in case of chaining
+        if (vset_member(ctx->levels[ctx->level - 1], src)) {
+            Warning(debug, "source found at level %d", ctx->level-1);
+            find_trace(trace_end, 2, ctx->level, ctx->levels);
+        } else {
+            Warning(debug, "source not found at level %d", ctx->level-1);
+            find_trace(trace_end, 2, ctx->level + 1, ctx->levels);
+        }
     }
 
-    if (level>max_levels) {
-      max_levels=level;
-      levels = RTrealloc(ctx->levels,max_levels * sizeof(vset_t));
-      for(int i=ctx->level;i<max_levels;i++)
-	levels[i] = vset_create(domain,0,NULL);
-    } else
-      levels = ctx->levels;
-
-    vset_add(levels[level-2],src);
-    Warning(debug, "source added at level %d", level-2);
-    vset_add(levels[level-1],dst);
-    Warning(debug, "destination added at level %d", level-1);
-
-    find_trace(dst,level,levels);
-  }
-  Fatal(1,info,"exiting now");
+    Fatal(1, info, "exiting now");
 }
 
 struct group_add_info {
@@ -406,9 +404,9 @@ static void deadlock_check(vset_t deadlocks,int level,vset_t *levels){
     if (vset_is_empty(deadlocks)) return;
     Warning(info,"deadlock found");
     if (trc_output){
-        int dlk_state[N];
-        vset_example(deadlocks,dlk_state);
-        find_trace(dlk_state,level,levels);
+        int dlk_state[1][N];
+        vset_example(deadlocks,dlk_state[0]);
+        find_trace(dlk_state,1,level,levels);
     }
     Fatal(1,info,"exiting now");
 }
