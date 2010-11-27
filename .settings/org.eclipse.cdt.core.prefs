@@ -1,4 +1,4 @@
-#Sun Nov 21 15:59:45 CET 2010
+#Fri Nov 26 02:08:58 CET 2010
 eclipse.preferences.version=1
 environment/project/0.2100364509=
 environment/project/0.2100364509/PATH/delimiter=;
@@ -130,7 +130,7 @@ org.eclipse.cdt.core.formatter.insert_space_before_opening_paren_in_catch=insert
 org.eclipse.cdt.core.formatter.insert_space_before_opening_paren_in_exception_specification=insert
 org.eclipse.cdt.core.formatter.insert_space_before_opening_paren_in_for=insert
 org.eclipse.cdt.core.formatter.insert_space_before_opening_paren_in_if=insert
-org.eclipse.cdt.core.formatter.insert_space_before_opening_paren_in_method_declaration=do not insert
+org.eclipse.cdt.core.formatter.insert_space_before_opening_paren_in_method_declaration=insert
 org.eclipse.cdt.core.formatter.insert_space_before_opening_paren_in_method_invocation=insert
 org.eclipse.cdt.core.formatter.insert_space_before_opening_paren_in_parenthesized_expression=do not insert
 org.eclipse.cdt.core.formatter.insert_space_before_opening_paren_in_switch=insert
