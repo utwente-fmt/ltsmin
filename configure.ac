@@ -324,6 +324,7 @@ AC_CONFIG_FILES([
        src/hre/Makefile
        src/hre-mpi/Makefile
        src/hre-test/Makefile
+       src/gcf-tool/Makefile
        src/dm/Makefile
        src/bignum/Makefile
        src/ce/Makefile
