@@ -515,11 +515,12 @@ CAESAR_TYPE_STRING CAESAR_GATE_LABEL(CAESAR_TYPE_LABEL l) {
 		n = i;
 		if (b-p < n) { 
 			u = p-s;
-			s = realloc(s, u+n);/* TODO: check s!=0 */
+			s = RTrealloc(s, u+n);
 			p = s+u;
 			b = s + u+n;
 		}
 		strncpy(s, c.data, i);
+		if (i > 0) s[i-1] = '\0'; else s[0] = '\0';
 		return s;
 	} else
 		return "gate";

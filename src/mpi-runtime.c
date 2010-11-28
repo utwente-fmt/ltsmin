@@ -57,6 +57,7 @@ void RTinitPoptMPI(int *argc_p,char**argv_p[],const struct poptOption * options,
 	}
 	char label[PATH_MAX];
         strncpy(label, get_label(), sizeof(label));
+        label[PATH_MAX-1] = '\0';
 	set_label("%s(%2d/%2d)",label,mpi_me,mpi_nodes);
 }
 

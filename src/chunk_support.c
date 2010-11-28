@@ -1,7 +1,8 @@
 #include <config.h>
+#include <assert.h>
 #include <ctype.h>
-#include "chunk_support.h"
-#include "runtime.h"
+#include <chunk_support.h>
+#include <runtime.h>
 
 #define VALID_IDX(i,c) if (i>=c.len) Fatal(1,error,"chunk overflow")
 
@@ -66,70 +67,55 @@ void chunk_decode_copy(chunk dst,chunk src,char esc){
 	dst.len=j;
 }
 
-void chunk2string(chunk src,size_t dst_size,char*dst){
-	Warning(debug,"encoding chunk of length %d",src.len);
-/* verbatim disabled
-	int verbatim=src.len;
-	if (src.len==0 || (src.data[0]=='#' && src.data[src.len-1]=='#')) {
-		verbatim=0;
-	} else {
-		for(uint32_t i=0;i<src.len;i++){
-			if (!isprint(src.data[i]) || isspace(src.data[i])) {
-				verbatim=0;
-				break;
-			}
-		}
-		if (verbatim){
-			int number=1;
-			for(uint32_t i=0;i<src.len;i++){
-				if (!isdigit(src.data[i])){
-					number=0;
-					break;
-				}
-			}
-			if (number) verbatim=0;
-		}
-	}
-	if (verbatim) {
-		if (dst_size < src.len+1) Fatal(1,error,"chunk overflow");
-		for(uint32_t i=0;i<src.len;i++){
-			dst[i]=src.data[i];
-		}
-		dst[src.len]=0;
-		return;
-	}
-*/
-	int quotable=1;
-	for(uint32_t i=0;i<src.len;i++){
-		if (!isprint(src.data[i])) {
-			quotable=0;
-			break;
-		}
-	}
-	if (quotable){
-		unsigned int k=0;
-#define PUT_CHAR(c) { if ( dst_size <= k ) { Fatal(1,error,"chunk overflow"); } else { dst[k]=c; k++ ; } }
-		PUT_CHAR('"');
-		for(uint32_t i=0;i<src.len;i++){
-			switch(src.data[i]){
-			case '"': PUT_CHAR('\\'); PUT_CHAR('"'); continue;
-			case '\\': PUT_CHAR('\\'); PUT_CHAR('\\'); continue;
-			default: PUT_CHAR(src.data[i]);
-			}
-		}
-		PUT_CHAR('"');
-		PUT_CHAR(0);
-#undef PUT_CHAR
-	} else {
-		if (dst_size < 2*src.len+3) Fatal(1,error,"chunk overflow");
-		dst[0]='#';
-		for(uint32_t i=0;i<src.len;i++){
-			dst[2*i+1]=HEX[(src.data[i]>>4)&(char)0x0F];;
-			dst[2*i+2]=HEX[src.data[i]&(char)0x0F];
-		}
-		dst[2*src.len+1]='#';
-		dst[2*src.len+2]=0;
-	}
+void
+chunk2string (chunk src, size_t dst_size, char *dst) {
+    Warning (debug, "encoding chunk of length %d", src.len);
+
+    assert (dst_size >= sizeof "##...");
+
+    size_t k = 0;
+    for (size_t i = 0; i < src.len; ++i) {
+        if (!isprint (src.data[i]))
+            goto hex;
+    }
+
+ /* quotable: */
+    size_t dang_esc = 0;
+    dst[k++] = '"';
+    for (size_t i = 0; i < src.len && k+1 < dst_size; ++i) {
+        switch (src.data[i]) {
+        case '"': case '\\':
+            dst[k++] = '\\';
+            if (k == dst_size - sizeof "#...") dang_esc = 1;
+            break;
+        }
+        dst[k++] = src.data[i];
+    }
+    if (k+2 < dst_size) {
+        dst[k++] = '"';
+    } else {
+        Warning(info, "chunk overflow: truncating to %zu characters", dst_size-1);
+        k = dst_size - sizeof "\"...";
+        if (dang_esc) --k;          /* dangling escape: "\\"... */
+        dst[k++] = '"'; dst[k++] = '.'; dst[k++] = '.'; dst[k++] = '.';
+    }
+    dst[k++] = '\0';
+    return;
+hex:
+    dst[k++] = '#';
+    for (size_t i = 0; i < src.len && k+1 < dst_size; ++i) {
+        dst[k++] = HEX[(src.data[i]>>4)&(char)0x0F];
+        dst[k++] = HEX[src.data[i]&(char)0x0F];
+    }
+    if (k+2 < dst_size) {
+        dst[k++] = '#';
+    } else {
+        Warning(info, "chunk overflow: truncating to %zu characters", dst_size-1);
+        k = dst_size - sizeof "#...";
+        if (k % 2 == 0) --k;       /* dangling hex digit: #1#... */
+        dst[k++] = '#'; dst[k++] = '.'; dst[k++] = '.'; dst[k++] = '.';
+    }
+    dst[k++] = '\0';
 }
 
 void string2chunk(char*src,chunk *dst){
