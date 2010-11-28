@@ -1,7 +1,8 @@
 bin_PROGRAMS  = ltsmin-convert
 bin_PROGRAMS += etf-convert
 bin_PROGRAMS += ltsmin-tracepp
-bin_PROGRAMS += gcf
+bin_PROGRAMS += gcf-0.1
+
 
 check_PROGRAMS  = test-bitset
 check_PROGRAMS += test-is-balloc
@@ -151,9 +152,9 @@ etf_convert_LDADD = libltsmin.la
 ltsmin_tracepp_SOURCES = ltsmin-tracepp.c
 ltsmin_tracepp_LDADD = libltsmin.la
 
-# gcf
-gcf_SOURCES = gcf-rw.c
-gcf_LDADD = libltsmin.la
+# gcf-0.1
+gcf_0_1_SOURCES = gcf-rw.c
+gcf_0_1_LDADD = libltsmin.la
 
 # test-bitset
 test_bitset_SOURCES = test-bitset.c
