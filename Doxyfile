@@ -512,6 +512,7 @@ INPUT                  = $(SRCDIR)/src \
                          $(SRCDIR)/src/dm \
                          $(SRCDIR)/src/hre \
                          $(SRCDIR)/src/hre-mpi \
+                         $(SRCDIR)/src/hre-io \
                          $(SRCDIR)/src/torx
 
 # This tag can be used to specify the character encoding of the source files

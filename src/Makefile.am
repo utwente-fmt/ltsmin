@@ -24,6 +24,7 @@ pkglib_LTLIBRARIES =
 SUBDIRS  = dm
 SUBDIRS += bignum
 SUBDIRS += .
+SUBDIRS += hre-io
 SUBDIRS += hre
 if HAVE_MPI
 SUBDIRS += hre-mpi
