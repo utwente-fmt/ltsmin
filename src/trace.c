@@ -17,8 +17,6 @@
 #include <fifo.h>
 #include <struct_io.h>
 
-#define  BUFLEN 4096
-
 struct trc_s {
     int len;
     lts_type_t ltstype;
@@ -104,12 +102,10 @@ trc_get_type(trc_t trace, int type, int label, size_t dst_size, char* dst)
         return -1;
 
     // otherwise, read the value
-    char tmp[BUFLEN];
     chunk c;
     c.data = SIgetC(trace->values[type], label, (int*)&c.len);
     if (c.data) {
-        chunk2string(c, BUFLEN, tmp);
-        strncpy(dst, tmp, dst_size);
+        chunk2string(c, dst_size, dst);
         return 0;
     } else {
         return -1;

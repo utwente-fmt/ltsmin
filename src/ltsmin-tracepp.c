@@ -5,7 +5,7 @@
 #include <stdio.h>
 #include <chunk_support.h>
 
-#define  BUFLEN 4096
+static const size_t BUFLEN = 16384;
 
 static int arg_all=0;
 static int arg_table=0;
@@ -93,13 +93,13 @@ output_text(trc_t trace, FILE* output_file) {
         // state header
         char *name = lts_type_get_state_name(ltstype, j);
         char *type = lts_type_get_state_type(ltstype, j);
-        snprintf(tmp, BUFLEN, "%s:%s[%d]", name == NULL ? "_" : name, type == NULL ? "_" : type, j);
+        snprintf(tmp, sizeof tmp, "%s:%s[%d]", name == NULL ? "_" : name, type == NULL ? "_" : type, j);
         if (align < strlen(tmp)) align = strlen(tmp);
     }
     for(int j=0; j<sLbls; ++j) {
         char *name = lts_type_get_state_label_name(ltstype, j);
         char *type = lts_type_get_state_label_type(ltstype, j);
-        snprintf(tmp, BUFLEN, "%s:%s[%d]", name == NULL ? "_" : name, type == NULL ? "_" : type, j);
+        snprintf(tmp, sizeof tmp, "%s:%s[%d]", name == NULL ? "_" : name, type == NULL ? "_" : type, j);
         if (align < strlen(tmp)) align = strlen(tmp);
     }
 
@@ -131,10 +131,10 @@ output_text(trc_t trace, FILE* output_file) {
             if (arg_all || state[j] != prev_state[j]) {
                 char *name = lts_type_get_state_name(ltstype, j);
                 char *type = lts_type_get_state_type(ltstype, j);
-                snprintf(tmp, BUFLEN, "%s:%s[%d]", name == NULL ? "_" : name, type == NULL ? "_" : type, j);
+                snprintf(tmp, sizeof tmp, "%s:%s[%d]", name == NULL ? "_" : name, type == NULL ? "_" : type, j);
 
                 int typeno = lts_type_get_state_typeno(ltstype, j);
-                trace_get_type_str(trace, typeno, state[j], BUFLEN, tmp2);
+                trace_get_type_str(trace, typeno, state[j], sizeof tmp2, tmp2);
 
                 fprintf(output_file, "\t%*s = %s\n", align, tmp, tmp2);
             }
@@ -147,10 +147,10 @@ output_text(trc_t trace, FILE* output_file) {
                 if (arg_all || state_lbls[j] != prev_state_lbls[j]) {
                     char *name = lts_type_get_state_label_name(ltstype, j);
                     char *type = lts_type_get_state_label_type(ltstype, j);
-                    snprintf(tmp, BUFLEN, "%s:%s[%d]", name == NULL ? "_" : name, type == NULL ? "_" : type, j);
+                    snprintf(tmp, sizeof tmp, "%s:%s[%d]", name == NULL ? "_" : name, type == NULL ? "_" : type, j);
 
                     int typeno = lts_type_get_state_label_typeno(ltstype, j);
-                    trace_get_type_str(trace, typeno, state_lbls[j], BUFLEN, tmp2);
+                    trace_get_type_str(trace, typeno, state_lbls[j], sizeof tmp2, tmp2);
 
                     fprintf(output_file, "\t%*s = %s\n", align, tmp, tmp2);
                 }
@@ -164,10 +164,10 @@ output_text(trc_t trace, FILE* output_file) {
                 for(int j=0; j<eLbls; ++j) {
                     char *name = lts_type_get_edge_label_name(ltstype, j);
                     char *type = lts_type_get_edge_label_type(ltstype, j);
-                    snprintf(tmp, BUFLEN, "%s:%s[%d]", name == NULL ? "_" : name, type == NULL ? "_" : type, j);
+                    snprintf(tmp, sizeof tmp, "%s:%s[%d]", name == NULL ? "_" : name, type == NULL ? "_" : type, j);
 
                     int typeno = lts_type_get_edge_label_typeno(ltstype, j);
-                    trace_get_type_str(trace, typeno, edge_lbls[j], BUFLEN, tmp2);
+                    trace_get_type_str(trace, typeno, edge_lbls[j], sizeof tmp2, tmp2);
 
                     fprintf(output_file, "%s%s = %s",j==0?"":", ", tmp, tmp2);
                 }
@@ -196,20 +196,20 @@ output_text_table(trc_t trace, FILE* output_file) {
         // state header
         char *name = lts_type_get_state_name(ltstype, j);
         char *type = lts_type_get_state_type(ltstype, j);
-        snprintf(tmp, BUFLEN, "%s:%s", name == NULL ? "_" : name, type == NULL ? "_" : type);
+        snprintf(tmp, sizeof tmp, "%s:%s", name == NULL ? "_" : name, type == NULL ? "_" : type);
         width_s[j] = strlen(tmp);
 
     }
     for(int j=0; j<sLbls; ++j) {
         char *name = lts_type_get_state_label_name(ltstype, j);
         char *type = lts_type_get_state_label_type(ltstype, j);
-        snprintf(tmp, BUFLEN, "%s:%s", name == NULL ? "_" : name, type == NULL ? "_" : type);
+        snprintf(tmp, sizeof tmp, "%s:%s", name == NULL ? "_" : name, type == NULL ? "_" : type);
         width_sl[j] = strlen(tmp);
     }
     for(int j=0; j<eLbls; ++j) {
         char *name = lts_type_get_edge_label_name(ltstype, j);
         char *type = lts_type_get_edge_label_type(ltstype, j);
-        snprintf(tmp, BUFLEN, "%s:%s", name == NULL ? "_" : name, type == NULL ? "_" : type);
+        snprintf(tmp, sizeof tmp, "%s:%s", name == NULL ? "_" : name, type == NULL ? "_" : type);
         width_el[j] = strlen(tmp);
     }
     int len = trc_get_length(trace);
@@ -221,14 +221,14 @@ output_text_table(trc_t trace, FILE* output_file) {
 
         for(int j=0; j<N; ++j) {
             int typeno = lts_type_get_state_typeno(ltstype, j);
-            trace_get_type_str(trace, typeno, state[j], BUFLEN, tmp);
+            trace_get_type_str(trace, typeno, state[j], sizeof tmp, tmp);
             int len = strlen(tmp);
             if (width_s[j] < len) width_s[j] = len;
         }
         if (trc_get_state_label(trace, i, state_lbls)) {
             for(int j=0; j<sLbls; ++j) {
                 int typeno = lts_type_get_state_label_typeno(ltstype, j);
-                trace_get_type_str(trace, typeno, state_lbls[j], BUFLEN, tmp);
+                trace_get_type_str(trace, typeno, state_lbls[j], sizeof tmp, tmp);
                 int len = strlen(tmp);
                 if (width_sl[j] < len) width_sl[j] = len;
             }
@@ -236,7 +236,7 @@ output_text_table(trc_t trace, FILE* output_file) {
         if ((i+1) < len && trc_get_edge_label(trace, i, edge_lbls)) {
             for(int j=0; j<eLbls; ++j) {
                 int typeno = lts_type_get_edge_label_typeno(ltstype, j);
-                trace_get_type_str(trace, typeno, edge_lbls[j], BUFLEN, tmp);
+                trace_get_type_str(trace, typeno, edge_lbls[j], sizeof tmp, tmp);
                 int len = strlen(tmp);
                 if (width_el[j] < len) width_el[j] = len;
             }
@@ -248,7 +248,7 @@ output_text_table(trc_t trace, FILE* output_file) {
     for(int j=0; j<N; ++j) {
         char *name = lts_type_get_state_name(ltstype, j);
         char *type = lts_type_get_state_type(ltstype, j);
-        snprintf(tmp, BUFLEN, "%s:%s", name == NULL ? "_" : name, type == NULL ? "_" : type);
+        snprintf(tmp, sizeof tmp, "%s:%s", name == NULL ? "_" : name, type == NULL ? "_" : type);
 
         fprintf(output_file, "%s%*s", j==0?"":" ", -width_s[j], tmp);
     }
@@ -257,7 +257,7 @@ output_text_table(trc_t trace, FILE* output_file) {
         for(int j=0; j<sLbls; ++j) {
             char *name = lts_type_get_state_label_name(ltstype, j);
             char *type = lts_type_get_state_label_type(ltstype, j);
-            snprintf(tmp, BUFLEN, "%s:%s", name == NULL ? "_" : name, type == NULL ? "_" : type);
+            snprintf(tmp, sizeof tmp, "%s:%s", name == NULL ? "_" : name, type == NULL ? "_" : type);
 
             fprintf(output_file, "%s%*s", j==0?"":" ", -width_sl[j], tmp);
         }
@@ -267,7 +267,7 @@ output_text_table(trc_t trace, FILE* output_file) {
         for(int j=0; j<eLbls; ++j) {
             char *name = lts_type_get_edge_label_name(ltstype, j);
             char *type = lts_type_get_edge_label_type(ltstype, j);
-            snprintf(tmp, BUFLEN, "%s:%s", name == NULL ? "_" : name, type == NULL ? "_" : type);
+            snprintf(tmp, sizeof tmp, "%s:%s", name == NULL ? "_" : name, type == NULL ? "_" : type);
 
             fprintf(output_file, "%s%*s", j==0?"":" ", -width_el[j], tmp);
         }
@@ -290,9 +290,9 @@ output_text_table(trc_t trace, FILE* output_file) {
         for(int j=0; j<N; ++j) {
             if (arg_all || state[j] != prev_state[j]) {
                 int typeno = lts_type_get_state_typeno(ltstype, j);
-                trace_get_type_str(trace, typeno, state[j], BUFLEN, tmp);
+                trace_get_type_str(trace, typeno, state[j], sizeof tmp, tmp);
             } else {
-                snprintf(tmp, BUFLEN, "...");
+                snprintf(tmp, sizeof tmp, "...");
             }
 
             fprintf(output_file, "%s%*s", j==0?"":" ", width_s[j], tmp);
@@ -307,9 +307,9 @@ output_text_table(trc_t trace, FILE* output_file) {
             for(int j=0; j<sLbls; ++j) {
                 if (arg_all || state_lbls[j] != prev_state_lbls[j]) {
                     int typeno = lts_type_get_state_label_typeno(ltstype, j);
-                    trace_get_type_str(trace, typeno, state_lbls[j], BUFLEN, tmp);
+                    trace_get_type_str(trace, typeno, state_lbls[j], sizeof tmp, tmp);
                 } else {
-                    snprintf(tmp, BUFLEN, "...");
+                    snprintf(tmp, sizeof tmp, "...");
                 }
 
                 fprintf(output_file, "%s%*s", j==0?"":" ", width_sl[j], tmp);
@@ -326,9 +326,9 @@ output_text_table(trc_t trace, FILE* output_file) {
                 for(int j=0; j<eLbls; ++j) {
                     if (arg_all || edge_lbls[j] != prev_edge_lbls[j]) {
                         int typeno = lts_type_get_edge_label_typeno(ltstype, j);
-                        trace_get_type_str(trace, typeno, edge_lbls[j], BUFLEN, tmp);
+                        trace_get_type_str(trace, typeno, edge_lbls[j], sizeof tmp, tmp);
                     } else {
-                        snprintf(tmp, BUFLEN, "...");
+                        snprintf(tmp, sizeof tmp, "...");
                     }
 
                     fprintf(output_file, "%s%*s", j==0?"":" ", width_el[j], tmp);
@@ -379,7 +379,7 @@ output_csv(trc_t trace, FILE* output_file) {
         trc_get_state(trace, i, state);
         for(int j=0; j<N; ++j) {
             int typeno = lts_type_get_state_typeno(ltstype, j);
-            trace_get_type_str(trace, typeno, state[j], BUFLEN, tmp);
+            trace_get_type_str(trace, typeno, state[j], sizeof tmp, tmp);
             fprintf(output_file, "%s%s", j==0 ? "" : arg_sep, tmp);
         }
 
@@ -387,7 +387,7 @@ output_csv(trc_t trace, FILE* output_file) {
         if (trc_get_edge_label(trace, i, edge_lbls)) {
             for(int j=0; j<sLbls; ++j) {
                 int typeno = lts_type_get_state_label_typeno(ltstype, j);
-                trace_get_type_str(trace, typeno, state_lbls[j], BUFLEN, tmp);
+                trace_get_type_str(trace, typeno, state_lbls[j], sizeof tmp, tmp);
                 fprintf(output_file, "%s%s", arg_sep, tmp);
             }
         }
@@ -397,7 +397,7 @@ output_csv(trc_t trace, FILE* output_file) {
             for(int j=0; j<eLbls; ++j) {
                 if ((i+1)<len) {
                     int typeno = lts_type_get_edge_label_typeno(ltstype, j);
-                    trace_get_type_str(trace, typeno, edge_lbls[j], BUFLEN, tmp);
+                    trace_get_type_str(trace, typeno, edge_lbls[j], sizeof tmp, tmp);
                     fprintf(output_file, "%s%s", arg_sep, tmp);
                 } else {
                     fprintf(output_file, "%s", arg_sep);
@@ -432,15 +432,15 @@ output_aut(trc_t trace, FILE* output_file) {
         if (has_labels) {
             for(int j=0; j<eLbls; ++j) {
                 int typeno = lts_type_get_edge_label_typeno(ltstype, j);
-                int notype = trc_get_type(trace, typeno, edge_lbls[j], BUFLEN, typestr);
+                int notype = trc_get_type(trace, typeno, edge_lbls[j], sizeof typestr, typestr);
                 if (notype || output_value == IDX) {
-                    snprintf(&tmp[strlen(tmp)], BUFLEN - strlen(tmp) - 1, "%s%d", j==0 ? "": " ", edge_lbls[j]);
+                    snprintf(&tmp[strlen(tmp)], sizeof tmp - strlen(tmp) - 1, "%s%d", j==0 ? "": " ", edge_lbls[j]);
                 } else {
-                    snprintf(&tmp[strlen(tmp)], BUFLEN - strlen(tmp) - 1, "%s%s", j==0 ? "": " ", typestr);
+                    snprintf(&tmp[strlen(tmp)], sizeof tmp - strlen(tmp) - 1, "%s%s", j==0 ? "": " ", typestr);
                 }
             }
         } else {
-            snprintf(tmp, BUFLEN, "?");
+            snprintf(tmp, sizeof tmp, "?");
         }
         fprintf(output_file, "(%d, \"%s\", %d)\n", i, tmp, i + 1);
     }
