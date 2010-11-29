@@ -267,7 +267,7 @@ AC_CONFIG_FILES([
 
 AC_CONFIG_LINKS([src/lempar.c:lemon/lempar.c])
 
-AC_CONFIG_SUBDIRS([nips-vm buddy])
+AC_CONFIG_SUBDIRS([nips-vm buddy ltl2ba])
 
 AC_OUTPUT
 
