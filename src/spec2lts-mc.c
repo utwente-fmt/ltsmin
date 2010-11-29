@@ -56,7 +56,10 @@ typedef enum { Strat_BFS    = 1,
                Strat_NNDFS  = 8,
                Strat_GNDFS  = 16,
                Strat_GNNDFS = 32,
-               Strat_LTL    = Strat_NNDFS | Strat_NDFS | Strat_GNDFS | Strat_GNNDFS,
+               Strat_YNDFS  = 64,
+               Strat_YNNDFS = 128,
+               Strat_LTL    = Strat_NNDFS | Strat_NDFS | Strat_GNDFS |
+                              Strat_GNNDFS | Strat_YNDFS | Strat_YNNDFS,
                Strat_LTLG   = Strat_GNDFS | Strat_GNNDFS,
                Strat_Reach  = Strat_BFS | Strat_DFS
 } strategy_t;
@@ -118,6 +121,7 @@ static cct_map_t       *tables = NULL;
 static char            *files[2];
 static int              dbs_size = 24;
 static int              refs = 0;
+static int              no_red_perm = 0;
 static box_t            call_mode = UseBlackBox;
 static size_t           max = UINT_MAX;
 static size_t           W = 2;
@@ -135,6 +139,7 @@ static char            *arg_lb = "srp";
 static lb_method_t      lb_method = LB_SRP;
 static char            *arg_perm = "shift";
 static permutation_perm_t permutation = Perm_Shift;
+static permutation_perm_t permutation_red = Perm_Shift;
 static char*            trc_output=NULL;
 static int              dlk_detect = 0;
 static size_t           G = 100;
@@ -149,6 +154,8 @@ static si_map_entry strategies[] = {
     {"ndfs",    Strat_NDFS},
     {"nndfs",   Strat_NNDFS},
     {"gndfs",   Strat_GNDFS},
+    {"yndfs",   Strat_YNDFS},
+    {"yndfs",   Strat_YNNDFS},
     {"gnndfs",  Strat_GNNDFS},
     {NULL, 0}
 };
@@ -225,16 +232,17 @@ static struct poptOption options[] = {
      (void *)state_db_popt, 0, NULL, NULL},
     {"threads", 0, POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &W, 0, "number of threads", "<int>"},
     {"state", 0, POPT_ARG_STRING | POPT_ARGFLAG_SHOW_DEFAULT, &state_repr,
-      0, "select the data structure for storing states", "<tree|table>"},
+     0, "select the data structure for storing states", "<tree|table>"},
     {"size", 's', POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &dbs_size, 0,
      "size of the state store (log2(size))", NULL},
     {"strategy", 0, POPT_ARG_STRING | POPT_ARGFLAG_SHOW_DEFAULT,
      &arg_strategy, 0, "select the search strategy", "<bfs|dfs>"},
     {"lb", 0, POPT_ARG_STRING | POPT_ARGFLAG_SHOW_DEFAULT,
-      &arg_lb, 0, "select the load balancing method", "<srp|static|combined|none>"},
+     &arg_lb, 0, "select the load balancing method", "<srp|static|combined|none>"},
     {"perm", 'p', POPT_ARG_STRING | POPT_ARGFLAG_SHOW_DEFAULT,
-        &arg_perm, 0, "select the transition permutation method",
-        "<shift|shiftall|sort|random|none>"},
+     &arg_perm, 0, "select the transition permutation method",
+     "<shift|shiftall|sort|random|none>"},
+    {"no-red-perm", 0, POPT_ARG_VAL, &no_red_perm, 1, "turn off transition permutation for the red search", NULL},
     {"gran", 'g', POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &G,
      0, "subproblem granularity ( T( work(P,g) )=min( T(P), g ) )", NULL},
     {"handoff", 'h', POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &H,
@@ -540,6 +548,7 @@ init_globals (int argc, char *argv[])
                     "(use --ltl or supply a Buchi product as input model).");
         lb_method = LB_None;
         threshold = 100000;
+        permutation_red = no_red_perm ? Perm_None : permutation;
         refs = 1; //The permuter works with references only!
     } else {
         if (trc_output) {
@@ -607,6 +616,7 @@ init_globals (int argc, char *argv[])
         lb = lb_create_max(W, (algo_f)nndfs_blue, NULL,G, lb_method, H); break;
     case Strat_GNDFS:
         lb = lb_create_max(W, (algo_f)ndfs_green, NULL,G, lb_method, H); break;
+    case Strat_YNDFS:
     case Strat_NDFS:
         lb = lb_create_max(W, (algo_f)ndfs_blue,  NULL,G, lb_method, H); break;
     case Strat_BFS:
@@ -831,9 +841,6 @@ permute_one (void *arg, transition_info_t *ti, state_data_t dst)
     case Perm_Sort:
         store_todo (perm, dst, ti);
         break;
-    case Perm_None:
-        perm->real_cb (perm->ctx, ti, dst);
-        break;
     default:
         Fatal(1, error, "Unknown permutation!");
     }
@@ -843,6 +850,8 @@ int
 permute_all (permute_t *perm, state_data_t state, TransitionCB cb,
              void *ctx)
 {
+    if (Perm_None == perm->permutation)
+        return GBgetTransitionsAll(perm->model, state, cb, ctx);
     perm->ctx = ctx;
     perm->real_cb = cb;
     perm->nstored = 0;
@@ -867,8 +876,6 @@ permute_all (permute_t *perm, state_data_t state, TransitionCB cb,
             void           *succ = perm->get_state (perm->todos[j].idx, ctx);
             cb (ctx, &perm->todos[j].ti, succ);
         }
-        break;
-    case Perm_None:
         break;
     default:
         Fatal(1, error, "Unknown permutation!");
@@ -972,7 +979,7 @@ find_dfs_stack_trace (thread_ctx_t *ctx, dfs_stack_t stack, int *trace)
 }
 
 static void
-ndfs_report_cycle(thread_ctx_t *ctx, state_info_t *cycle_closing_state)
+ndfs_report_cycle (thread_ctx_t *ctx, state_info_t *cycle_closing_state)
 {
     /* Stop other workers, exit if some other worker was first here */
     if ( !lb_stop(lb) )
@@ -1047,10 +1054,7 @@ ndfs_explore_state (thread_ctx_t *ctx, counter_t *cnt)
     int                 count;
     dfs_stack_enter (ctx->stack);
     increase_level (cnt);
-    if ( ctx->search == NDFS_BLUE )
-        count = permute_all (ctx->permute, ctx->state.data, ndfs_handle, ctx);
-    else
-        count = GBgetTransitionsAll(ctx->model, ctx->state.data, ndfs_handle, ctx);
+    count = permute_all (ctx->permute, ctx->state.data, ndfs_handle, ctx);
     cnt->trans += count;
     cnt->explored++;
     ndfs_maybe_report(ctx->search, cnt);
@@ -1066,7 +1070,7 @@ ndfs_handle_green (void *arg, transition_info_t *ti, state_data_t dst)
     find_or_put (&successor, &ctx->state, ctx->store2);
 
     /* put on temporary stack to be sorted later */
-    if ( !global_try_color(successor.idx, GGREEN) &&
+    if ( !global_has_color(successor.idx, GGREEN) &&
          !ndfs_has_color (&ctx->color_map, successor.idx, NBLUE) ) {
         raw_data_t stack_loc = dfs_stack_push (ctx->stack, NULL);
         state_info_serialize (&successor, stack_loc);
@@ -1084,12 +1088,12 @@ ndfs_explore_state_green (thread_ctx_t *ctx)
     ndfs_maybe_report (ctx->search, &ctx->counters);
 }
 
-/* RED DFS */
+/* YELLOW DFS */
 static void
-ndfs_red (thread_ctx_t *ctx, idx_t seed)
+ndfs_yellow (thread_ctx_t *ctx, idx_t seed)
 {
     size_t              seed_level = dfs_stack_nframes (ctx->stack);
-    ctx->search = NRED;
+    ctx->search = NRED; ctx->permute->permutation = permutation_red;
     ctx->seed = seed;
     ctx->red.visited++; //count accepting states
 
@@ -1097,13 +1101,58 @@ ndfs_red (thread_ctx_t *ctx, idx_t seed)
         raw_data_t          state_data = dfs_stack_top (ctx->stack);
         if (NULL != state_data) {
             state_info_deserialize (&ctx->state, state_data, ctx->store);
-            if ( ndfs_try_color(&ctx->color_map, ctx->state.idx, NRED) )
+            if ( global_has_color(ctx->state.idx, GYELLOW) ||
+                 ndfs_try_color(&ctx->color_map, ctx->state.idx, NRED)) {
+                if (seed_level == dfs_stack_nframes (ctx->stack))
+                    break;
                 dfs_stack_pop (ctx->stack);
-            else
+            } else
+                ndfs_explore_state (ctx, &ctx->red);
+        } else { //backtrack
+            if (seed_level != dfs_stack_nframes (ctx->stack)) {
+                dfs_stack_leave (ctx->stack);
+                ctx->red.level_cur--;
+            }
+
+            /* mark state as YELLOW */
+            state_data = dfs_stack_top (ctx->stack);
+            state_info_deserialize (&ctx->state, state_data, ctx->store);
+            global_try_color (ctx->state.idx, GYELLOW);
+
+            /* exit search if backtrack hits seed, leave stack the way it was */
+            if (seed_level == dfs_stack_nframes (ctx->stack))
+                break;
+
+            dfs_stack_pop (ctx->stack);
+        }
+    }
+
+    ctx->search = NBLUE; ctx->permute->permutation = permutation;
+}
+
+/* RED DFS */
+static void
+ndfs_red (thread_ctx_t *ctx, idx_t seed)
+{
+    size_t              seed_level = dfs_stack_nframes (ctx->stack);
+    ctx->search = NRED; ctx->permute->permutation = permutation_red;
+    ctx->seed = seed;
+    ctx->red.visited++; //count accepting states
+
+    while ( !lb_is_stopped(lb) ) {
+        raw_data_t          state_data = dfs_stack_top (ctx->stack);
+        if (NULL != state_data) {
+            state_info_deserialize (&ctx->state, state_data, ctx->store);
+            if ( ndfs_try_color(&ctx->color_map, ctx->state.idx, NRED) ) {
+                if (seed_level == dfs_stack_nframes (ctx->stack))
+                    break;
+                dfs_stack_pop (ctx->stack);
+            } else
                 ndfs_explore_state (ctx, &ctx->red);
         } else { //backtrack
             dfs_stack_leave (ctx->stack);
             ctx->red.level_cur--;
+
             /* exit search if backtrack hits seed, leave stack the way it was */
             if (seed_level == dfs_stack_nframes (ctx->stack))
                 break;
@@ -1111,7 +1160,7 @@ ndfs_red (thread_ctx_t *ctx, idx_t seed)
         }
     }
 
-    ctx->search = NBLUE;
+    ctx->search = NBLUE; ctx->permute->permutation = permutation;
 }
 
 /* BLUE DFS */
@@ -1135,9 +1184,12 @@ ndfs_blue (thread_ctx_t *ctx, size_t work)
             /* call red DFS for accepting states */
             state_data = dfs_stack_top (ctx->stack);
             state_info_deserialize (&ctx->state, state_data, ctx->store);
-            if( GBbuchiIsAccepting(ctx->model, ctx->state.data) )
-                ndfs_red (ctx, ctx->state.idx);
-
+            if ( GBbuchiIsAccepting(ctx->model, ctx->state.data) ) {
+                if (Strat_YNDFS == strategy)
+                    ndfs_yellow (ctx, ctx->state.idx);
+                else
+                    ndfs_red (ctx, ctx->state.idx);
+            }
             dfs_stack_pop(ctx->stack);
         }
     }
@@ -1153,7 +1205,7 @@ ndfs_green (thread_ctx_t *ctx, size_t work)
         if (NULL != state_data) {
             state_info_deserialize (&ctx->state, state_data, ctx->store);
             if ( global_has_color(ctx->state.idx, GGREEN)  ||
-                ndfs_try_color(&ctx->color_map, ctx->state.idx, NBLUE) )
+                 ndfs_try_color(&ctx->color_map, ctx->state.idx, NBLUE) )
                 dfs_stack_pop (ctx->stack);
             else
                 ndfs_explore_state_green (ctx);
@@ -1167,8 +1219,8 @@ ndfs_green (thread_ctx_t *ctx, size_t work)
              * AND mark globally GREEN */
             state_data = dfs_stack_top (ctx->stack);
             state_info_deserialize (&ctx->state, state_data, ctx->store);
-            if( global_try_color(ctx->state.idx, GGREEN) &&
-                         GBbuchiIsAccepting(ctx->model, ctx->state.data) )
+            if ( global_try_color(ctx->state.idx, GGREEN) &&
+                 GBbuchiIsAccepting(ctx->model, ctx->state.data) )
                 ndfs_red (ctx, ctx->state.idx);
 
             dfs_stack_pop(ctx->stack);
@@ -1223,13 +1275,24 @@ nndfs_blue_handle (void *arg, transition_info_t *ti, state_data_t dst)
 }
 
 static inline void
-nndfs_explore_state (thread_ctx_t *ctx, counter_t *cnt)
+nndfs_explore_state_red (thread_ctx_t *ctx, counter_t *cnt)
 {
     int                 count;
     dfs_stack_enter (ctx->stack);
     increase_level (cnt);
-    TransitionCB cb = n_color_eq(ctx->search, NRED) ? nndfs_red_handle : nndfs_blue_handle;
-    count = permute_all (ctx->permute, ctx->state.data, cb, ctx);
+    count = permute_all (ctx->permute, ctx->state.data, nndfs_red_handle, ctx);
+    cnt->trans += count;
+    cnt->explored++;
+    ndfs_maybe_report(ctx->search, cnt);
+}
+
+static inline void
+nndfs_explore_state_blue (thread_ctx_t *ctx, counter_t *cnt)
+{
+    int                 count;
+    dfs_stack_enter (ctx->stack);
+    increase_level (cnt);
+    count = permute_all (ctx->permute, ctx->state.data, nndfs_blue_handle, ctx);
     cnt->trans += count;
     cnt->explored++;
     ndfs_maybe_report(ctx->search, cnt);
@@ -1240,7 +1303,7 @@ static void
 nndfs_red (thread_ctx_t *ctx)
 {
     size_t              start_level = dfs_stack_nframes (ctx->stack);
-    ctx->search = NRED;
+    ctx->search = NRED; ctx->permute->permutation = permutation_red;
     ctx->red.visited++; //count accepting states
 
     while ( !lb_is_stopped(lb) ) {
@@ -1248,10 +1311,12 @@ nndfs_red (thread_ctx_t *ctx)
         if (NULL != state_data) {
             state_info_deserialize (&ctx->state, state_data, ctx->store);
             nndfs_color_t color = nn_get_color (&ctx->color_map, ctx->state.idx);
-            if ( !nn_color_eq(color, NNRED)  )
-                nndfs_explore_state (ctx, &ctx->red);
-            else
+            if ( nn_color_eq(color, NNRED)  ) {
+                if (start_level == dfs_stack_nframes (ctx->stack))
+                     break;
                 dfs_stack_pop (ctx->stack);
+            } else
+                nndfs_explore_state_red (ctx, &ctx->red);
         } else { //backtrack
             dfs_stack_leave (ctx->stack);
             ctx->red.level_cur--;
@@ -1262,7 +1327,7 @@ nndfs_red (thread_ctx_t *ctx)
         }
     }
 
-    ctx->search = NBLUE;
+    ctx->search = NBLUE; ctx->permute->permutation = permutation;
 }
 
 /* BLUE DFS */
@@ -1276,7 +1341,7 @@ nndfs_blue (thread_ctx_t *ctx, size_t work)
             nndfs_color_t color = nn_get_color (&ctx->color_map, ctx->state.idx);
             if ( nn_color_eq(color, NNWHITE) ) {
                 nn_set_color (&ctx->color_map, ctx->state.idx, NNCYAN);
-                nndfs_explore_state (ctx, &ctx->counters);
+                nndfs_explore_state_blue (ctx, &ctx->counters);
             } else
                 dfs_stack_pop (ctx->stack);
         } else { //backtrack
