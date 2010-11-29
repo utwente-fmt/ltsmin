@@ -441,6 +441,55 @@ void* tableaux_table_lookup(tableaux_table_t *t, uint32_t hash, void* data)
     }
 }
 
+/* for debuggin only */
+char* ltsmin_expr_print_ltl(ltsmin_expr_t ltl, char* buf)
+{
+    // no equation
+    if (!ltl) return buf;
+
+    // left eq
+    switch(ltl->node_type) {
+        case BINARY_OP:
+            *buf++='(';
+            buf = ltsmin_expr_print_ltl(ltl->arg1, buf);
+        default:;
+    }
+    // middle
+    switch(ltl->token) {
+        case LTL_SVAR: sprintf(buf, "@S%d", ltl->idx); break;
+        case LTL_EVAR: sprintf(buf, "@E%d", ltl->idx); break;
+        case LTL_NUM: sprintf(buf, "%d", ltl->idx); break;
+        case LTL_VAR: sprintf(buf, "@V%d", ltl->idx); break;
+        case LTL_EQ: sprintf(buf, " == "); break;
+        case LTL_TRUE: sprintf(buf, "true"); break;
+        case LTL_OR: sprintf(buf, " or "); break;
+        case LTL_NOT: sprintf(buf, "!"); break;
+        case LTL_NEXT: sprintf(buf, "X "); break;
+        case LTL_UNTIL: sprintf(buf, " U "); break;
+        case LTL_FALSE: sprintf(buf, "false"); break;
+        case LTL_AND: sprintf(buf, " and "); break;
+        case LTL_EQUIV: sprintf(buf, " <-> "); break;
+        case LTL_IMPLY: sprintf(buf, " -> "); break;
+        case LTL_FUTURE: sprintf(buf, "F "); break;
+        case LTL_GLOBALLY: sprintf(buf, "G "); break;
+        default:
+            Fatal(1, error, "unknown LTL token");
+    }
+    buf += strlen(buf);
+    // right eq
+    switch(ltl->node_type) {
+        case UNARY_OP:
+            buf = ltsmin_expr_print_ltl(ltl->arg1, buf);
+            break;
+        case BINARY_OP:
+            buf = ltsmin_expr_print_ltl(ltl->arg2, buf);
+            *buf++=')';
+            break;
+        default:;
+    }
+    return buf;
+}
+
 /* print ctl/ctl* expression in a buffer
  * returns the buffer + size taken for the expression
  * assumes buffer is large enough */

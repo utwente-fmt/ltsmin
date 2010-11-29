@@ -176,7 +176,7 @@ int LTSminUnaryToken(ltsmin_parse_env_t env, int idx)
     return env->unary_info[idx].token;
 }
 
-const int LTSminUnaryIsPrefix(ltsmin_parse_env_t env, int idx) {
+int LTSminUnaryIsPrefix(ltsmin_parse_env_t env, int idx) {
     ensure_access(env->unary_man,idx);
     return (env->unary_info[idx].pattern==TOKEN_PREFIX1 ||
             env->unary_info[idx].pattern==TOKEN_PREFIX2 ||

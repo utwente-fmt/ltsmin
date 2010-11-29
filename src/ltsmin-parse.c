@@ -1,4 +1,7 @@
 #include <config.h>
+
+#include <ltl2ba.h>
+#undef Debug
 #include <runtime.h>
 #include <ltsmin-syntax.h>
 #include <ltsmin-grammar.h>
@@ -16,6 +19,8 @@ static  struct poptOption options[] = {
     POPT_TABLEEND
 };
 
+// XXX move to include file
+void ltsmin_ltl2ba(ltsmin_expr_t);
 
 int main(int argc, char *argv[]){
     char* file_name;
@@ -37,9 +42,14 @@ int main(int argc, char *argv[]){
             } break;
         case PARSE_LTL: {
             ltsmin_expr_t ltl = ltl_parse_file(ltstype, file_name);
+            ltsmin_ltl2ba(ltl);
+            /*
+            print_expr(ltl);
             ltsmin_expr_t ctl = ltl_to_ctl_star(ltl);
+            print_expr(ctl);
             ltsmin_expr_t mu = ctl_star_to_mu(ctl);
-            (void)mu;
+            print_expr(mu);
+            */
             } break;
         case PARSE_CTL: {
             ltsmin_expr_t ctl = ctl_parse_file(ltstype, file_name);
