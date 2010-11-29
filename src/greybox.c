@@ -458,6 +458,8 @@ static pins_loader_t model_preloader[MAX_TYPES];
 static int registered_pre=0;
 static int cache=0;
 static const char *regroup_options = NULL;
+static char *check_ltl = NULL;
+static pins_ltl_type_t ltl_type = PINS_LTL_SPIN;
 
 void
 GBloadFile (model_t model, const char *filename, model_t *wrapped)
@@ -473,6 +475,8 @@ GBloadFile (model_t model, const char *filename, model_t *wrapped)
                         model = GBregroup (model, regroup_options);
                     if (cache)
                         model = GBaddCache (model);
+                    if (check_ltl)
+                        model = GBaddLTL (model, check_ltl, ltl_type);
                     *wrapped = model;
                 }
                 return;
@@ -522,6 +526,8 @@ void GBregisterPreLoader(const char*extension,pins_loader_t loader){
         Fatal(1,error,"model type registry overflow");
     }
 }
+
+void GBsetLTL(char* ltl_formula, pins_ltl_type_t type) { ltl_type = type; check_ltl = ltl_formula; /* should strdup? */ }
 
 struct poptOption greybox_options[]={
 	{ "cache" , 'c' , POPT_ARG_VAL , &cache , 1 , "Enable caching of grey box calls." , NULL },

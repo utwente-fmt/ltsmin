@@ -344,7 +344,30 @@ extern chunk GBchunkGet(model_t model,int type_no,int chunk_no);
 */
 extern model_t GBaddCache(model_t model);
 
+/**
+\brief The behaviour of the ltl buchi product
 
+PINS_LTL_TEXTBOOK adds an initial state to the model and labels
+the incoming edges with the properties of in the buchi automaton
+PINS_LTL_SPIN labels the outgoing edges with the properties of
+the buchi automaton
+*/
+typedef enum {PINS_LTL_TEXTBOOK, PINS_LTL_SPIN} pins_ltl_type_t;
+
+/**
+\brief Add LTL layer on top all other pins layers
+*/
+extern model_t GBaddLTL(model_t model, char* ltl_formula, pins_ltl_type_t type);
+
+/**
+\brief Set ltl formula used for checking
+*/
+extern void GBsetLTL(char* ltl_formula, pins_ltl_type_t type);
+
+/**
+\brief Check whether a state is accepting or not
+*/
+extern int ltl_is_accepting(int* state);
 //@}
 
 //@{

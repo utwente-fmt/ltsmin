@@ -50,6 +50,10 @@ static int dlk_detect=0;
 static lts_enum_cb_t trace_handle=NULL;
 static lts_output_t trace_output=NULL;
 
+static char *ltl_semantics = "spin";
+static int   ltl_type = PINS_LTL_SPIN;
+static char *ltl_file=NULL;
+
 static array_manager_t state_man=NULL;
 static uint32_t *parent_ofs=NULL;
 
@@ -80,6 +84,12 @@ static si_map_entry db_types[]={
     {NULL, 0}
 };
 
+static si_map_entry db_ltl_semantics[]={
+    {"spin",     PINS_LTL_SPIN},
+    {"textbook", PINS_LTL_TEXTBOOK},
+    {NULL, 0}
+};
+
 static void
 state_db_popt (poptContext con, enum poptCallbackReason reason,
                const struct poptOption *opt, const char *arg, void *data)
@@ -105,6 +115,17 @@ state_db_popt (poptContext con, enum poptCallbackReason reason,
                 RTexitUsage (EXIT_FAILURE);
             }
             strategy = s;
+
+            int l = linear_search (db_ltl_semantics, ltl_semantics);
+            if (l < 0) {
+                Warning (error, "unknown ltl semantic %s", ltl_semantics);
+                RTexitUsage (EXIT_FAILURE);
+            }
+            ltl_type = l;
+
+            if (ltl_file) {
+                GBsetLTL(ltl_file, ltl_type);
+            }
         }
         return;
     case POPT_CALLBACK_REASON_OPTION:
@@ -128,6 +149,9 @@ static  struct poptOption options[] = {
 		"select the data structure for storing states", "<table|tree|vset>"},
 	{ "strategy" , 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &arg_strategy , 0 ,
 		"select the search strategy", "<bfs|dfs>"},
+	{ "ltl" , 0 , POPT_ARG_STRING , &ltl_file , 0 , "file with a ltl formula" , "<ltl-file>.ltl" },
+	{ "ltl-semantics" , 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT, &ltl_semantics, 0,
+        "choose ltl semantics" , "<spin|textbook>" },
 	{ "max" , 0 , POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT , &max , 0 ,"maximum search depth", "<int>"},
 #if defined(MCRL)
 	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, mcrl_options , 0 , "mCRL options", NULL },

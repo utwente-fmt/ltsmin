@@ -37,6 +37,15 @@ lts_type_t lts_type_create(){
 
 #define STRDUP(s) (s==NULL)?NULL:strdup(s);
 
+lts_type_t lts_type_clone(lts_type_t t0)
+{
+    int pi[t0->state_length];
+    // build permutation
+    for(int i=0; i < t0->state_length; i++)
+        pi[i] = i;
+    return lts_type_permute(t0, pi);
+}
+
 lts_type_t lts_type_permute(lts_type_t t0,int *pi){
     lts_type_t t=RT_NEW(struct lts_type_s);
     
@@ -106,10 +115,16 @@ void lts_type_destroy(lts_type_t *t){
 }
 
 void lts_type_set_state_length(lts_type_t  t,int length){
-	t->state_length=length;
-	t->state_name=(char**)RTmalloc(length*sizeof(char*));
-	t->state_type=(int*)RTmalloc(length*sizeof(int));
-	for(int i=0;i<length;i++){
+    int old_length = t->state_length;
+
+    // allow ltstype to grow
+    if (old_length < length) t->state_length=length;
+    else Fatal(1, error, "lts-type isn't allowed to shrink");
+
+    t->state_name=(char**)RTrealloc(t->state_name, length*sizeof(char*));
+    t->state_type=(int*)RTrealloc(t->state_type, length*sizeof(int));
+
+	for(int i=old_length;i<length;i++){
 		t->state_name[i]=NULL;
 		t->state_type[i]=SI_INDEX_FAILED;
 	}

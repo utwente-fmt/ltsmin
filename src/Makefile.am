@@ -390,6 +390,8 @@ libutil_la_SOURCES += ltsmin-buchi.h
 libutil_la_CPPFLAGS += -DNXT -I${top_srcdir}/ltl2ba
 libutil_la_LIBADD += ${top_srcdir}/ltl2ba/libltl2ba.la
 
+libutil_la_SOURCES += pins-ltl.c
+
 libutil_la_CPPFLAGS += $(AM_CPPFLAGS)
 
 libutil_la_SOURCES += hre-context.c hre-context.h \
