@@ -863,6 +863,7 @@ ndfs_report_cycle(model_t model)
             lts_output_set_root_vec(trace_output,(uint32_t*)init_state);
             lts_output_set_root_idx(trace_output,0,0);
         }
+        dfs_stack_enter(stack);
         trace_handle=lts_output_begin(trace_output,0,0,0);
         find_dfs_stack_trace_tree(model, stack);
         lts_output_end(trace_output,trace_handle);
@@ -880,6 +881,8 @@ ndfs_tree_red_next (void *arg, transition_info_t *ti, int *dst)
     int                 idx = TreeFold (dbs, dst);
     ndfs_color_t        idx_color = ndfs_get_color(idx);
     if (idx_color == NDFS_CYAN) {
+        // push this state on the stack for trace
+        dfs_stack_push (red_stack, &idx);
         ndfs_report_cycle(ctx->model);
     } else if (idx_color == NDFS_BLUE) {
         ndfs_set_color(idx, NDFS_RED);
@@ -897,6 +900,8 @@ ndfs_tree_blue_next (void *arg, transition_info_t *ti, int *dst)
     if (idx_color == NDFS_CYAN &&
        (GBbuchiIsAccepting(ctx->model, ctx->src) ||
         GBbuchiIsAccepting(ctx->model, dst))) {
+        // push last state on the stack for trace
+        dfs_stack_push (blue_stack, &idx);
         ndfs_report_cycle(ctx->model);
     } else if (idx_color == NDFS_WHITE) {
         dfs_stack_push (blue_stack, &idx);
