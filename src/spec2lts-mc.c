@@ -667,28 +667,36 @@ ndfs_maybe_report (ndfs_color_t color, counter_t *cnt)
 void
 print_statistics(counter_t *reach, counter_t *red, mytimer_t timer)
 {
-    float               tot = SCCrealTime(timer);
-    size_t              states = reach->explored + red->explored;
-    size_t              db_elts = reach->stats->elts;
     char               *name;
     double              mem1, mem2, compr, ratio;
+    float               tot = SCCrealTime(timer);
+    size_t              states = reach->explored + red->explored;
+    size_t              db_elts = reach->stats->elts+1; //TODO: WHY +1?? TODO:tree
     size_t              el_size = db_type == UseTreeDBSLL ? 3 : N;
     size_t              s = state_info_size();
     mem1 = (double)s * reach->stack_sizes / (1 << 10);
 
+    reach->level_max /= W; // not so meaningful for DFS
     if (Strat_LTL & strategy) {
         reach->explored /= W;
         reach->trans /= W;
         reach->level_max /= W;
-
-        Warning (info, "")
-        print_state_space_total ("State space has ", reach);
+        red->explored /= W;
+        red->trans /= W;
+        red->level_max /= W;
+        if ( 0 == (Strat_LTLG & strategy) ) {
+            red->visited /= W;
+        }
         SCCreportTimer (timer, "Total exploration time");
 
-        Warning (info, "")
-        Warning (info, "NDFS stats:")
-        Warning (info, "red states: %zu, accepting states: %zu, red transitions: %zu ",
-                 red->explored, red->visited, red->trans);
+        Warning (info, "");
+        Warning (info, "NDFS stats:");
+        Warning (info, "State space has %zu states, %zu are accepting", db_elts,
+                 red->visited);
+        Warning (info, "avg blue states/worker: %zu (%.2f%%), transitions: %zu ",
+                 reach->explored, ((double)reach->explored/db_elts)*100, reach->trans);
+        Warning (info, "avg red states/worker: %zu (%.2f%%), transitions: %zu ",
+                 red->explored, ((double)red->explored/db_elts)*100, red->trans);
     } else {
         Warning (info, "")
         print_state_space_total ("State space has ", reach);
@@ -712,6 +720,25 @@ print_statistics(counter_t *reach, counter_t *red, mytimer_t timer)
                  reach->stats->tests, reach->stats->rehashes, mem1, tot,
                  reach->explored, reach->stats->cache_misses, mem2);
     }
+}
+
+static void
+print_thread_statistics(thread_ctx_t *ctx)
+{
+    char                name[128];
+    char               *format = "[%zu%s] saw in %.3f sec ";
+    if (Strat_Reach & strategy) {
+        if (strategy == Strat_BFS)
+            ctx->counters.stack_sizes += dfs_stack_size_max (ctx->out_stack);
+        snprintf (name, sizeof name, format, ctx->id, "", ctx->counters.runtime);
+        print_state_space_total (name, &ctx->counters);
+    } else if (Strat_LTL & strategy) {
+        snprintf (name, sizeof name, format, ctx->id, " B", ctx->counters.runtime);
+        print_state_space_total (name, &ctx->counters);
+        snprintf (name, sizeof name, format, ctx->id, " R", ctx->counters.runtime);
+        print_state_space_total (name, &ctx->red);
+    }
+    if (ctx->load) Warning (info, "Wrong load counter %zu", ctx->load);
 }
 
 void        *
@@ -1685,7 +1712,6 @@ explore (void *args)
 int
 main (int argc, char *argv[])
 {
-    char                name[128];
     model_t             model = init_globals (argc, argv);
     thread_ctx_t       *total = contexts[0];
     total->model = model;
@@ -1713,26 +1739,14 @@ main (int argc, char *argv[])
     for (size_t i = 0; i < W; i++) {
         thread_ctx_t   *ctx = contexts[i];
         ctx->counters.stack_sizes = dfs_stack_size_max (ctx->in_stack);
-        if (total != ctx)
+        ctx->red.stats = NULL;
+        if (total != ctx) {
             add_results (&total->counters, &ctx->counters);
-        if (Strat_Reach & strategy) {
-            if (strategy == Strat_BFS)
-                ctx->counters.stack_sizes += dfs_stack_size_max (ctx->out_stack);
-            snprintf (name, sizeof name, "[%zu] saw in %.3f sec ", i, ctx->counters.runtime);
-            print_state_space_total (name, &ctx->counters);
-        } else if (Strat_LTL & strategy) {
-            snprintf (name, sizeof name, "[%zu B] saw in %.3f sec ", i, ctx->counters.runtime);
-            print_state_space_total (name, &ctx->counters);
-            snprintf (name, sizeof name, "[%zu R] saw in %.3f sec ", i, ctx->counters.runtime);
-            print_state_space_total (name, &ctx->red);
-            ctx->red.stats = NULL;
-            if (total != ctx)
-                add_results (&total->red, &ctx->red);
+            add_results (&total->red, &ctx->red);
         }
-        if (ctx->load) Warning (info, "Wrong load counter %zu", ctx->load);
+        print_thread_statistics (ctx);
         if (files[1]) stream_close (&ctx->out);
     }
-    total->counters.level_max /= W; // not so meaningful for DFS
     if (RTverbosity >= 1)
         print_statistics(&total->counters, &total->red, timer);
     return EXIT_SUCCESS;
