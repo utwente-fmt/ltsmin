@@ -184,9 +184,8 @@ void CAESAR_PRINT_STATE(CAESAR_TYPE_FILE f,CAESAR_TYPE_STATE s) {
 			if (i>0)
 				fprintf(f, ";");
 			c=GBchunkGet(model,lts_type_get_state_label_typeno(ltstype,i),labels[i]);
-			size_t len=c.len*2+3;
-			char str[len];
-			chunk2string(c,len,str);
+			char str[c.len*2+6];
+			chunk2string(c,sizeof str,str);
 			fprintf(f, "%s", str);
 		}
 		fprintf(f, ">");
@@ -236,7 +235,7 @@ CAESAR_TYPE_STRING CAESAR_STRING_LABEL(CAESAR_TYPE_LABEL l) {
             if (c.len==3 && strncmp(c.data, "tau", c.len)==0)
                 clen=strlen(tau);
             else
-                clen=c.len*2+3;
+                clen=c.len*2+6;
             n = strlen(name)+ 1 + clen+1+1+1; /* for name , '=' , c, ';',  '>', '\0' */
             if (b-p < n) { 
                 u = p-s;
@@ -384,17 +383,15 @@ void CAESAR_DELTA_STATE(CAESAR_TYPE_FILE f,CAESAR_TYPE_STATE s1,CAESAR_TYPE_STAT
 			else {
 				c=GBchunkGet(model,lts_type_get_state_label_typeno(ltstype,i),labels1[i]);
 				{
-					size_t len=c.len*2+3;
-					char str[len];
-					chunk2string(c,len,str);
+					char str[c.len*2+6];
+					chunk2string(c,sizeof str,str);
 					fprintf(f, "%s", str);
 				}
 				fprintf(f, ":=");
 				c=GBchunkGet(model,lts_type_get_state_label_typeno(ltstype,i),labels2[i]);
 				{
-					size_t len=c.len*2+3;
-					char str[len];
-					chunk2string(c,len,str);
+					char str[c.len*2+6];
+					chunk2string(c,sizeof str,str);
 					fprintf(f, "%s", str);
 				}
 			}
