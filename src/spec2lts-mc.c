@@ -807,8 +807,21 @@ sort_cmp (const void *a, const void *b)
     return ((permute_todo_t*)a)->idx - ((permute_todo_t*)b)->idx;
 }
 
+#if defined(__CYGWIN__)
+    #include <search.h>
+    #define qsortr(a,b,c,d,e) qsort_s (a,b,c,d,e)
+#elif defined(linux)
+    #define qsortr(a,b,c,d,e) qsort_r (a,b,c,d,e)
+#else //BSD
+    #define qsortr(a,b,c,d,e) qsort_r (a,b,c,e,d)
+#endif
+
 static int
-rand_cmp (const void *arg, const void *a, const void *b)
+#ifdef linux //See also: define for qsortr
+rand_cmp (const void *a, const void *b, void *arg)
+#else
+rand_cmp (void *arg, const void *a, const void *b)
+#endif
 {
     int                *rand = (int*)arg;
     return rand[((permute_todo_t*)a)->ti.group] -
@@ -886,11 +899,11 @@ permute_all (permute_t *perm, state_data_t state, TransitionCB cb,
     perm->start_group_index = 0;
     int count = GBgetTransitionsAll(perm->model, state, permute_one, perm);
     switch (perm->permutation) {
-    case Perm_Random:
-        qsort_r (perm->todos, perm->nstored, sizeof(permute_todo_t), perm->rand, rand_cmp);
+    case Perm_Random: //TODO: Knuth's shuffle
+        qsortr (perm->todos, perm->nstored, sizeof(permute_todo_t), rand_cmp, perm->rand);
         empty_todo (perm);
         break;
-    case Perm_Sort:
+    case Perm_Sort://TODO: fix different order per worker
         qsort (perm->todos, perm->nstored, sizeof(permute_todo_t), sort_cmp);
         empty_todo (perm);
         break;
