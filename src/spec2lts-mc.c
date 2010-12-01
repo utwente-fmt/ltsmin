@@ -81,6 +81,7 @@ typedef enum {
     Perm_Shift_All, /* eq. to Perm_Shift, but non-lazy */
     Perm_Sort,      /* order on the state index in the DB */
     Perm_Random,    /* generate a random fixed permutation */
+    Perm_Otf,       /* on-the-fly calculation of a random perm for num_succ */
     Perm_Unknown    /* not set yet */
 } permutation_perm_t;
 
@@ -91,11 +92,13 @@ typedef struct permute_todo_s {
 
 typedef struct permute_s {
     void               *ctx;
-    int                *rand;
+    int               **rand;
+    int                *otf;
     TransitionCB        real_cb;
     int                 start_group;
     int                 start_group_index;
     double              shift;
+    uint32_t            shiftorder;
     permute_todo_t     *todos;
     size_t              nstored;
     size_t              trans;
@@ -166,6 +169,7 @@ static si_map_entry permutations[] = {
     {"shift",   Perm_Shift},
     {"shiftall",Perm_Shift_All},
     {"sort",    Perm_Sort},
+    {"otf",     Perm_Otf},
     {"random",  Perm_Random},
     {"none",    Perm_None},
     {"unknown", Perm_Unknown},
@@ -796,12 +800,6 @@ randperm (int n, uint32_t seed)
     return perm;
 }
 
-static int
-sort_cmp (const void *a, const void *b)
-{
-    return ((permute_todo_t*)a)->idx - ((permute_todo_t*)b)->idx;
-}
-
 #if defined(__CYGWIN__)
     #include <search.h>
     #define qsortr(a,b,c,d,e) qsort_s (a,b,c,d,e)
@@ -810,6 +808,16 @@ sort_cmp (const void *a, const void *b)
 #else //BSD
     #define qsortr(a,b,c,d,e) qsort_r (a,b,c,e,d)
 #endif
+
+static int
+#ifdef linux //See also: define for qsortr
+sort_cmp (const void *a, const void *b, void *arg)
+#else
+sort_cmp (void *arg, const void *a, const void *b)
+#endif
+{
+    return ((permute_todo_t*)a)->idx - (((permute_todo_t*)b)->idx + (*(uint32_t*)arg));
+}
 
 static int
 #ifdef linux //See also: define for qsortr
@@ -847,17 +855,39 @@ permute_create (permutation_perm_t permutation, model_t model,
                 size_t workers, size_t trans, int worker_index)
 {
     permute_t          *perm = RTalign (CACHE_LINE_SIZE, sizeof(permute_t));
-    perm->todos = RTalign(CACHE_LINE_SIZE, sizeof(int[trans+TODO_MAX]));
+    perm->todos = RTalign (CACHE_LINE_SIZE, sizeof(permute_todo_t[trans+TODO_MAX]));
     perm->shift = ((double)trans)/workers;
+    perm->shiftorder = INT_MAX/workers * worker_index;
     perm->start_group = perm->shift * worker_index;
     perm->trans = trans;
     perm->get_idx = get_idx;
     perm->get_state = get_state;
-    perm->permutation = permutation;
     perm->model = model;
-    if (Perm_Random == perm->permutation)
-        perm->rand = randperm (trans, (time(NULL) + 9876*worker_index));
+    perm->permutation = permutation;
+    perm->otf = RTalign (CACHE_LINE_SIZE, sizeof(int[trans+TODO_MAX]));
+    perm->rand = RTalignZero (CACHE_LINE_SIZE, sizeof(int*[trans+TODO_MAX]));
+    for (size_t i = 1; i < perm->trans+TODO_MAX; i++) {
+        perm->rand[i] = RTalign(CACHE_LINE_SIZE, sizeof(int[ i ]));
+        randperm (perm->rand[i], i, i+perm->shiftorder);
+    }
     return perm;
+}
+
+void
+permute_set_model (permute_t *perm, model_t model)
+{
+    perm->model = model;
+}
+
+void
+permute_free (permute_t *perm)
+{
+    RTfree (perm->todos);
+    RTfree (perm->otf);
+    for (size_t i = 0; i < perm->trans+TODO_MAX; i++) if (NULL != perm->rand)
+        RTfree (perm->rand[i]);
+    RTfree (perm->rand);
+    RTfree (perm);
 }
 
 static void
@@ -875,6 +905,7 @@ permute_one (void *arg, transition_info_t *ti, state_data_t dst)
         if (0 == perm->start_group_index && ti->group >= perm->start_group)
             perm->start_group_index = perm->nstored;
     case Perm_Random:
+    case Perm_Otf:
     case Perm_Sort:
         store_todo (perm, dst, ti);
         break;
@@ -884,8 +915,7 @@ permute_one (void *arg, transition_info_t *ti, state_data_t dst)
 }
 
 int
-permute_trans (permute_t *perm, state_data_t state, TransitionCB cb,
-             void *ctx)
+permute_trans (permute_t *perm, state_data_t state, TransitionCB cb, void *ctx)
 {
     if (Perm_None == perm->permutation)
         return GBgetTransitionsAll(perm->model, state, cb, ctx);
@@ -894,13 +924,27 @@ permute_trans (permute_t *perm, state_data_t state, TransitionCB cb,
     perm->nstored = 0;
     perm->start_group_index = 0;
     int count = GBgetTransitionsAll(perm->model, state, permute_one, perm);
+    size_t                  n = perm->nstored,
+                            j;
+    void                   *succ;
     switch (perm->permutation) {
-    case Perm_Random: //TODO: Knuth's shuffle
-        qsortr (perm->todos, perm->nstored, sizeof(permute_todo_t), rand_cmp, perm->rand);
-        empty_todo (perm);
+    case Perm_Otf:
+        randperm (perm->otf, n, ((wctx_t*)ctx)->state.idx + perm->shiftorder);
+        for (size_t i = 0; i < perm->nstored; i++) {
+            size_t          j = perm->otf[i];
+            void           *succ = perm->get_state (perm->todos[j].idx, ctx);
+            cb (ctx, &perm->todos[j].ti, succ);
+        }
         break;
-    case Perm_Sort://TODO: fix different order per worker
-        qsort (perm->todos, perm->nstored, sizeof(permute_todo_t), sort_cmp);
+    case Perm_Random:
+        for (size_t i = 0; i < perm->nstored; i++) {
+            j = perm->rand[n][i];
+            succ = perm->get_state (perm->todos[j].idx, ctx);
+            cb (ctx, &perm->todos[j].ti, succ);
+        }
+        break;
+    case Perm_Sort:
+        qsortr (perm->todos, n, sizeof(permute_todo_t), sort_cmp, &perm->shiftorder);
         empty_todo (perm);
         break;
     case Perm_Shift:
@@ -908,9 +952,9 @@ permute_trans (permute_t *perm, state_data_t state, TransitionCB cb,
         break;
     case Perm_Shift_All:
         for (size_t i = 0; i < perm->nstored; i++) {
-            size_t          j = (perm->start_group_index + i);
+            j = (perm->start_group_index + i);
             j = j < perm->nstored ? j : 0;
-            void           *succ = perm->get_state (perm->todos[j].idx, ctx);
+            succ = perm->get_state (perm->todos[j].idx, ctx);
             cb (ctx, &perm->todos[j].ti, succ);
         }
         break;
