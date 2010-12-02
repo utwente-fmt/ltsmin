@@ -365,8 +365,9 @@ bfs_vset_foreach_open(foreach_open_cb open_cb, void* arg)
         vset_copy(gc.store.vset.current_set, gc.store.vset.next_set);
         vset_clear(gc.store.vset.next_set);
         if (RTverbosity > 1) Warning(info, "level %zu, has %zu states, explored %zu states %zu transitions", max_depth, visited - explored, explored, ntransitions);
+        depth++;
         vset_enum(gc.store.vset.current_set, (void(*)(void*,int*)) bfs_vset_foreach_open_enum_cb, &args);
-        depth=++max_depth;
+        max_depth++;
     }
 }
 
