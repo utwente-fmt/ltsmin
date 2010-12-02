@@ -270,6 +270,7 @@ typedef struct gsea_context {
     void (*pre_state_next)(gsea_state_t*, void*);
     void (*post_state_next)(gsea_state_t*, void*);
     void (*state_next)(gsea_state_t*, void*);
+    void (*state_backtrack)(gsea_state_t*, void*);
 
     // search for state
     int  (*goal_reached)(gsea_state_t*, void*);
@@ -840,6 +841,7 @@ gsea_setup_default()
         } else {
             gc.state_next = gsea_state_next_all_default;
         }
+        gc.state_backtrack = NULL;
         gc.post_state_next = NULL;
         gc.goal_reached = (gsea_int) error_state_arg;
         gc.goal_trace = gsea_goal_trace_default;
