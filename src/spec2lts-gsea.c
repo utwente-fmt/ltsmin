@@ -130,6 +130,7 @@ static  struct poptOption options[] = {
 		"select the data structure for storing states", "<table|tree|vset>"},
 	{ "strategy" , 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &arg_strategy , 0 ,
 		"select the search strategy", "<bfs|dfs>"},
+	{ "max" , 0 , POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT , &max , 0 ,"maximum search depth", "<int>"},
 #if defined(MCRL)
 	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, mcrl_options , 0 , "mCRL options", NULL },
 #endif
@@ -283,6 +284,7 @@ typedef struct gsea_context {
 
     // placeholders
     void (*dlk_placeholder)(gsea_state_t*, void*);
+    int  (*max_placeholder)(gsea_state_t*, void*);
 
 } gsea_context_t;
 
@@ -438,6 +440,8 @@ dfs_tree_open_extract(gsea_state_t* state, void* arg)
             dfs_stack_leave(gc.queue.filo.stack);
             // pop, because the backtrack state must be closed (except if reopened, which is unsupported)
             idx = dfs_stack_pop(gc.queue.filo.stack);
+            // less depth
+            depth--;
             //printf("backtrack %d:\n", *idx);
             idx = NULL;
         } else {
@@ -485,6 +489,7 @@ static void
 dfs_tree_state_next(gsea_state_t* state, void* arg)
 {
     // wrap with enter stack frame
+    depth++;
     dfs_stack_enter(gc.queue.filo.stack);
     // original call (call old.state_next for wrapping with grey)
     state->count = GBgetTransitionsAll (model, state->state, gsea_process, state);
@@ -549,6 +554,8 @@ static void dfs_table_open_extract(gsea_state_t* state, void* arg)
         if (dfs_stack_frame_size(gc.queue.filo.stack) == 0) {
             // gc.backtrack(state, arg);
             dfs_stack_leave(gc.queue.filo.stack);
+            // less depth
+            depth--;
             // pop, because the backtrack state must be closed (except if reopened, which is unsupported)
             idx = dfs_stack_pop(gc.queue.filo.stack);
             //printf("backtrack %d:\n", *idx);
@@ -599,6 +606,8 @@ static int dfs_table_open_insert_condition(gsea_state_t* state, void* arg) { ret
 static void
 dfs_table_state_next(gsea_state_t* state, void* arg)
 {
+    // depth
+    depth++;
     // wrap with enter stack frame
     dfs_stack_enter(gc.queue.filo.stack);
     // original call (call old.state_next for wrapping with grey)
@@ -735,6 +744,14 @@ gsea_dlk_default(gsea_state_t* state, void* arg)
         Fatal(1, info, "exiting now");
     }
 }
+
+static int
+gsea_max_wrapper(gsea_state_t* state, void* arg)
+{
+    // (depth < max_depth) with chain original condition
+    return (depth < max) && gc.max_placeholder(state,arg);
+}
+
 
 
 static int
@@ -904,6 +921,12 @@ gsea_setup()
     if (dlk_detect) {
         gc.dlk_placeholder = gc.post_state_next;
         gc.post_state_next = gsea_dlk_default;
+    }
+
+    // maximum search depth?
+    if (max != UINT_MAX) {
+        gc.max_placeholder = gc.open_insert_condition;
+        gc.open_insert_condition = gsea_max_wrapper;
     }
 }
 
