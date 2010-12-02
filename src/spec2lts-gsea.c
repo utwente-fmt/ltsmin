@@ -437,7 +437,7 @@ dfs_tree_open_extract(gsea_state_t* state, void* arg)
     int* idx = NULL;
     do {
         // detect backtrack
-        if (dfs_stack_frame_size(gc.queue.filo.stack) == 0) {
+        while (dfs_stack_frame_size(gc.queue.filo.stack) == 0) {
             // gc.backtrack(state, arg);
             dfs_stack_leave(gc.queue.filo.stack);
             // pop, because the backtrack state must be closed (except if reopened, which is unsupported)
@@ -446,15 +446,9 @@ dfs_tree_open_extract(gsea_state_t* state, void* arg)
             depth--;
             //printf("backtrack %d:\n", *idx);
             idx = NULL;
-        } else {
-            idx = dfs_stack_top(gc.queue.filo.stack);
-            if (bitset_test(gc.queue.filo.closed, *idx)) {
-                //printf("pop %d\n",*idx);
-                dfs_stack_pop(gc.queue.filo.stack);
-                idx = NULL;
-            }
         }
-    } while (idx == NULL);
+        idx = dfs_stack_top(gc.queue.filo.stack);
+    } while (bitset_test(gc.queue.filo.closed, *idx) && dfs_stack_pop(gc.queue.filo.stack));
     state->tree.tree_idx = *idx;
     state->state = gc.context;
     // stote.get(state, arg)
@@ -521,7 +515,7 @@ static void dfs_vset_open_extract(gsea_state_t* state, void* arg)
     // queue.get(state, arg)
     do {
         // detect backtrack
-        if (dfs_stack_frame_size(gc.queue.filo.stack) == 0) {
+        while (dfs_stack_frame_size(gc.queue.filo.stack) == 0) {
             // gc.backtrack(state, arg);
             dfs_stack_leave(gc.queue.filo.stack);
             // less depth
@@ -530,10 +524,8 @@ static void dfs_vset_open_extract(gsea_state_t* state, void* arg)
             state->state = dfs_stack_pop(gc.queue.filo.stack);
         }
         // as long as visited - explored > 0, we should still have an open state on the stack
-    //    if (dfs_stack_size(gc.queue.filo.stack) > 0) // for now, just check
         state->state = dfs_stack_top(gc.queue.filo.stack);
-    //    if (state->state == NULL) Fatal(1, error, "null");
-    } while (state->state == NULL || (dfs_vset_closed(state, arg) && dfs_stack_pop(gc.queue.filo.stack)));
+    } while (dfs_vset_closed(state, arg) && dfs_stack_pop(gc.queue.filo.stack));
 
     // update max depth
     if (dfs_stack_nframes(gc.queue.filo.stack) > max_depth) {
@@ -595,7 +587,7 @@ static void dfs_table_open_extract(gsea_state_t* state, void* arg)
     int* idx = NULL;
     do {
         // detect backtrack
-        if (dfs_stack_frame_size(gc.queue.filo.stack) == 0) {
+        while (dfs_stack_frame_size(gc.queue.filo.stack) == 0) {
             // gc.backtrack(state, arg);
             dfs_stack_leave(gc.queue.filo.stack);
             // less depth
@@ -604,15 +596,9 @@ static void dfs_table_open_extract(gsea_state_t* state, void* arg)
             idx = dfs_stack_pop(gc.queue.filo.stack);
             //printf("backtrack %d:\n", *idx);
             idx = NULL;
-        } else {
-            idx = dfs_stack_top(gc.queue.filo.stack);
-            if (bitset_test(gc.queue.filo.closed, *idx)) {
-                //printf("pop %d\n",*idx);
-                dfs_stack_pop(gc.queue.filo.stack);
-                idx = NULL;
-            }
         }
-    } while (idx == NULL);
+        idx = dfs_stack_top(gc.queue.filo.stack);
+    } while (bitset_test(gc.queue.filo.closed, *idx) && dfs_stack_pop(gc.queue.filo.stack));
     state->table.hash_idx = *idx;
     // index is known
     int hash;
