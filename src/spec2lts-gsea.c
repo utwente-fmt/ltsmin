@@ -160,6 +160,7 @@ static size_t N;
 static size_t K;
 static size_t state_labels;
 static size_t edge_labels;
+static size_t max_depth=0;
 static size_t depth=0;
 static size_t visited=0;
 static size_t explored=0;
@@ -330,9 +331,9 @@ static void
 bfs_tree_closed_insert(gsea_state_t* state, void* arg) {
     // count depth
     if (gc.store.tree.level_bound == explored) {
-        if (RTverbosity > 1) Warning(info, "level %zu, has %zu states, explored %zu states %zu transitions", depth, visited - explored, explored, ntransitions);
+        if (RTverbosity > 1) Warning(info, "level %zu, has %zu states, explored %zu states %zu transitions", max_depth, visited - explored, explored, ntransitions);
 
-        depth++;
+        depth=++max_depth;
         gc.store.tree.level_bound = visited;
     }
     explored++;
@@ -361,9 +362,9 @@ bfs_vset_foreach_open(foreach_open_cb open_cb, void* arg)
     while(!vset_is_empty(gc.store.vset.next_set)) {
         vset_copy(gc.store.vset.current_set, gc.store.vset.next_set);
         vset_clear(gc.store.vset.next_set);
-        if (RTverbosity > 1) Warning(info, "level %zu, has %zu states, explored %zu states %zu transitions", depth, visited - explored, explored, ntransitions);
+        if (RTverbosity > 1) Warning(info, "level %zu, has %zu states, explored %zu states %zu transitions", max_depth, visited - explored, explored, ntransitions);
         vset_enum(gc.store.vset.current_set, (void(*)(void*,int*)) bfs_vset_foreach_open_enum_cb, &args);
-        depth++;
+        depth=++max_depth;
     }
 }
 
@@ -454,9 +455,9 @@ dfs_tree_open_extract(gsea_state_t* state, void* arg)
     TreeUnfold(gc.store.tree.dbs, *idx, gc.context);
 
     // update max depth
-    if (dfs_stack_nframes(gc.queue.filo.stack) > depth) {
-        depth++;
-        if (RTverbosity > 1) Warning(info, "new level %zu, visited %zu states, %zu transitions", depth, visited, ntransitions);
+    if (dfs_stack_nframes(gc.queue.filo.stack) > max_depth) {
+        max_depth++;
+        if (RTverbosity > 1) Warning(info, "new level %zu, visited %zu states, %zu transitions", max_depth, visited, ntransitions);
     }
     //printf("state %d:", state->tree.tree_idx); print_state(state);
     return;
@@ -946,8 +947,8 @@ gsea_progress(void* arg) {
     if (!cas (&threshold, threshold, threshold << 1))
         return;
     Warning (info, "explored %zu levels ~%zu states ~%zu transitions",
-             depth, visited, ntransitions);
-             //depth, explored, ntransitions); // more clear?
+             max_depth, visited, ntransitions);
+             //max_depth, explored, ntransitions); // more clear?
     return;
     (void)arg;
 }
@@ -955,7 +956,7 @@ gsea_progress(void* arg) {
 static void
 gsea_finished(void* arg) {
     Warning (info, "state space %zu levels, %zu states %zu transitions",
-             depth, visited, ntransitions);
+             max_depth, visited, ntransitions);
     return;
     (void)arg;
 }
