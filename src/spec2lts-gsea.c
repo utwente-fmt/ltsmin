@@ -498,38 +498,80 @@ dfs_tree_state_next(gsea_state_t* state, void* arg)
 }
 
 /* dfs vset configuration */
-static int dfs_vset_closed(gsea_state_t* state, void* arg);
+static int dfs_vset_closed(gsea_state_t* state, void* arg) { return vset_member(gc.store.vset.visited_set, state->state); (void)arg; }
 
 static void
 dfs_vset_open_insert(gsea_state_t* state, void* arg)
 {
+    // this is not necessary, but do this for now
+    // hmm, open insert conditoin should forbid this situation
+    if (!dfs_vset_closed(state, arg) && !vset_member(gc.store.vset.next_set, state->state) && !vset_member(gc.store.vset.current_set, state->state))
+        visited++;
+
     dfs_stack_push(gc.queue.filo.stack, state->state);
     vset_add(gc.store.vset.current_set, state->state);
     return;
     (void)arg;
 }
 
-static void
-dfs_vset_open_extract(gsea_state_t* state, void* arg)
+static void dfs_vset_open_extract(gsea_state_t* state, void* arg)
 {
+    // queue.get(state, arg)
     do {
+        // detect backtrack
+        if (dfs_stack_frame_size(gc.queue.filo.stack) == 0) {
+            // gc.backtrack(state, arg);
+            dfs_stack_leave(gc.queue.filo.stack);
+            // less depth
+            depth--;
+            // pop, because the backtrack state must be closed (except if reopened, which is unsupported)
+            state->state = dfs_stack_pop(gc.queue.filo.stack);
+        }
+        // as long as visited - explored > 0, we should still have an open state on the stack
+    //    if (dfs_stack_size(gc.queue.filo.stack) > 0) // for now, just check
         state->state = dfs_stack_top(gc.queue.filo.stack);
-    // get new state if already closed, pop it off the stack
-    } while (dfs_vset_closed(state, arg) && dfs_stack_pop(gc.queue.filo.stack));
+    //    if (state->state == NULL) Fatal(1, error, "null");
+    } while (state->state == NULL || (dfs_vset_closed(state, arg) && dfs_stack_pop(gc.queue.filo.stack)));
+
+    // update max depth
+    if (dfs_stack_nframes(gc.queue.filo.stack) > max_depth) {
+        max_depth++;
+        if (RTverbosity > 1) Warning(info, "new level %zu, visited %zu states, %zu transitions", max_depth, visited, ntransitions);
+    }
+    //printf("state %d:", state->tree.tree_idx); print_state(state);
+    return;
+    (void)arg;
 }
 
 static void
 dfs_vset_closed_insert(gsea_state_t* state, void* arg) {
     vset_add(gc.store.vset.visited_set, state->state);
-    visited=++explored;
+    explored++;
     return;
     (void)arg;
 }
+// the visited - explored condition prevents backtracking from being called
+// problem, stack can be filled without open states..
+// solution, has_open should be adapted for this, to backtrack to the latest state
+static int dfs_vset_open_size(void* arg) { return visited - explored; (void)arg;}
 
-static int dfs_vset_open_size(void* arg) { return vset_equal(gc.store.vset.current_set, gc.store.vset.visited_set)?0:1; (void)arg; }
+static int dfs_vset_open(gsea_state_t* state, void* arg) { return 0; (void)state; (void)arg; }
 
-static int dfs_vset_open(gsea_state_t* state, void* arg) { return 0; (void)state; (void)arg;} //determined elsewhere
-static int dfs_vset_closed(gsea_state_t* state, void* arg) { return vset_member(gc.store.vset.visited_set, state->state); (void)arg; }
+
+static int dfs_vset_open_insert_condition(gsea_state_t* state, void* arg) { return !dfs_vset_closed(state,arg); (void)state; (void)arg; }
+
+static void
+dfs_vset_state_next(gsea_state_t* state, void* arg)
+{
+    // depth
+    depth++;
+    // wrap with enter stack frame
+    dfs_stack_enter(gc.queue.filo.stack);
+    // original call (call old.state_next for wrapping with grey)
+    state->count = GBgetTransitionsAll (model, state->state, gsea_process, state);
+    return;
+    (void)arg;
+}
 
 
 
@@ -855,9 +897,12 @@ gsea_setup()
                 gc.open_size = dfs_vset_open_size;
                 gc.closed_insert = dfs_vset_closed_insert;
                 gc.closed = dfs_vset_closed;
+                gc.open_insert_condition = dfs_vset_open_insert_condition;
+                gc.state_next = dfs_vset_state_next;
 
                 gc.context = RTmalloc(sizeof(int) * N);
                 gc.store.vset.domain = vdom_create_default (N);
+                // this should actually be closed_set
                 gc.store.vset.visited_set = vset_create(gc.store.vset.domain, 0, NULL);
                 gc.store.vset.next_set = vset_create(gc.store.vset.domain, 0, NULL);
                 gc.store.vset.current_set = vset_create(gc.store.vset.domain, 0, NULL);
