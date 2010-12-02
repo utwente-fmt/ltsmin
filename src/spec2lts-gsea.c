@@ -765,9 +765,20 @@ gsea_open_insert_condition_default(gsea_state_t* state, void* arg) {
 }
 
 static void
-gsea_state_next_default(gsea_state_t* state, void* arg)
+gsea_state_next_all_default(gsea_state_t* state, void* arg)
 {
     state->count = GBgetTransitionsAll (model, state->state, gsea_process, state);
+    return;
+    (void)arg;
+}
+
+static void
+gsea_state_next_grey_default(gsea_state_t* state, void* arg)
+{
+    state->count = 0;
+    for (size_t i = 0; i < K; i++) {
+        state->count += GBgetTransitionsLong (model, i, state->state, gsea_process, state);
+    }
     return;
     (void)arg;
 }
@@ -824,7 +835,11 @@ gsea_setup_default()
         gc.closed = (gsea_int) error_state_arg;
         gc.closed_size = (int(*)(void*)) error_arg;
         gc.pre_state_next = NULL;
-        gc.state_next = gsea_state_next_default;
+        if (call_mode = UseGreyBox) {
+            gc.state_next = gsea_state_next_grey_default;
+        } else {
+            gc.state_next = gsea_state_next_all_default;
+        }
         gc.post_state_next = NULL;
         gc.goal_reached = (gsea_int) error_state_arg;
         gc.goal_trace = gsea_goal_trace_default;
