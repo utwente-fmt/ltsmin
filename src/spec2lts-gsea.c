@@ -465,7 +465,7 @@ dfs_tree_open_extract(gsea_state_t* state, void* arg)
 }
 
 static void dfs_tree_closed_insert(gsea_state_t* state, void* arg) { explored++; bitset_set(gc.queue.filo.closed, state->tree.tree_idx); return; (void)arg;}
-// the fisited - explored condition prevents backtracking from being called
+// the visited - explored condition prevents backtracking from being called
 // problem, stack can be filled without open states..
 // solution, has_open should be adapted for this, to backtrack to the latest state
 static int dfs_tree_open_size(void* arg) { return visited - explored; (void)arg; }
@@ -542,12 +542,24 @@ static void dfs_table_open_insert(gsea_state_t* state, void* arg)
 
 static void dfs_table_open_extract(gsea_state_t* state, void* arg)
 {
+    // queue.get(state, arg)
     int* idx = NULL;
     do {
-        idx = dfs_stack_top(gc.queue.filo.stack);
-        if (bitset_test(gc.queue.filo.closed, *idx)) {
-            dfs_stack_pop(gc.queue.filo.stack);
+        // detect backtrack
+        if (dfs_stack_frame_size(gc.queue.filo.stack) == 0) {
+            // gc.backtrack(state, arg);
+            dfs_stack_leave(gc.queue.filo.stack);
+            // pop, because the backtrack state must be closed (except if reopened, which is unsupported)
+            idx = dfs_stack_pop(gc.queue.filo.stack);
+            //printf("backtrack %d:\n", *idx);
             idx = NULL;
+        } else {
+            idx = dfs_stack_top(gc.queue.filo.stack);
+            if (bitset_test(gc.queue.filo.closed, *idx)) {
+                //printf("pop %d\n",*idx);
+                dfs_stack_pop(gc.queue.filo.stack);
+                idx = NULL;
+            }
         }
     } while (idx == NULL);
     state->table.hash_idx = *idx;
@@ -555,17 +567,45 @@ static void dfs_table_open_extract(gsea_state_t* state, void* arg)
     int hash;
 
     state->state = DBSLLget(gc.store.table.dbs, *idx, &hash);
+
+    // update max depth
+    if (dfs_stack_nframes(gc.queue.filo.stack) > max_depth) {
+        max_depth++;
+        if (RTverbosity > 1) Warning(info, "new level %zu, visited %zu states, %zu transitions", max_depth, visited, ntransitions);
+    }
+    //printf("state %d:", state->tree.tree_idx); print_state(state);
     return;
     (void)arg;
 }
 
 static void dfs_table_closed_insert(gsea_state_t* state, void* arg) { explored++; bitset_set(gc.queue.filo.closed, state->table.hash_idx); (void)arg;}
+// the visited - explored condition prevents backtracking from being called
+// problem, stack can be filled without open states..
+// solution, has_open should be adapted for this, to backtrack to the latest state
 static int dfs_table_open_size(void* arg) { return visited - explored; (void)arg;}
 
 static int dfs_table_open(gsea_state_t* state, void* arg) { return 0; (void)state; (void)arg; }
-static int dfs_table_closed(gsea_state_t* state, void* arg) { return 0; (void)state; (void)arg; }
 
+static int dfs_table_closed(gsea_state_t* state, void* arg) {
+    // state is not yet serialized at this point, hence, this must be done here -> error in framework
+    if (!DBSLLlookup_ret(gc.store.table.dbs, state->state, &(state->table.hash_idx))) {
+        visited++;
+    }
+    return bitset_test(gc.queue.filo.closed, state->table.hash_idx); (void)state; (void)arg;
+}
 
+static int dfs_table_open_insert_condition(gsea_state_t* state, void* arg) { return !dfs_table_closed(state,arg); (void)state; (void)arg; }
+
+static void
+dfs_table_state_next(gsea_state_t* state, void* arg)
+{
+    // wrap with enter stack frame
+    dfs_stack_enter(gc.queue.filo.stack);
+    // original call (call old.state_next for wrapping with grey)
+    state->count = GBgetTransitionsAll (model, state->state, gsea_process, state);
+    return;
+    (void)arg;
+}
 
 
 
@@ -813,6 +853,8 @@ gsea_setup()
                 gc.open_size = dfs_table_open_size;
                 gc.closed_insert = dfs_table_closed_insert;
                 gc.closed = dfs_table_closed;
+                gc.open_insert_condition = dfs_table_open_insert_condition;
+                gc.state_next = dfs_table_state_next;
 
                 gc.context = RTmalloc(sizeof(int) * N);
                 gc.store.table.dbs = DBSLLcreate(N);
