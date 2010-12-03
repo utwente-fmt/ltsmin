@@ -48,7 +48,7 @@ static struct {
     //lts_enum_cb_t output_handle=NULL;
 
     model_t model;
-    //char* trc_output=NULL;
+    char* trc_output;
     int dlk_detect;
     //int dlk_all_detect=0;
     //FILE* dlk_all_file=NULL;
@@ -78,6 +78,7 @@ static struct {
     enum { DB_DBSLL, DB_TreeDBS, DB_Vset } state_db;
 } opt = {
     .model = NULL,
+    .trc_output = NULL,
     .dlk_detect = 0,
     .ltl_semantics = "spin",
     .ltl_type = PINS_LTL_SPIN,
@@ -147,6 +148,7 @@ static  struct poptOption development_options[] = {
 static  struct poptOption options[] = {
 	{ NULL, 0 , POPT_ARG_CALLBACK|POPT_CBFLAG_POST|POPT_CBFLAG_SKIPOPTION  , (void*)state_db_popt , 0 , NULL , NULL },
 	{ "deadlock" , 'd' , POPT_ARG_VAL , &opt.dlk_detect , 1 , "detect deadlocks" , NULL },
+	{ "trace" , 0 , POPT_ARG_STRING , &opt.trc_output , 0 , "file to write trace to" , "<lts output>" },
 	{ "state" , 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &opt.arg_state_db , 0 ,
 		"select the data structure for storing states", "<table|tree|vset>"},
 	{ "strategy" , 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &opt.arg_strategy , 0 ,
@@ -316,7 +318,7 @@ typedef struct gsea_context {
 
     // search for state
     int  (*goal_reached)(gsea_state_t*, void*);
-    int  (*goal_trace)(gsea_state_t*, void*);
+    void (*goal_trace)(gsea_state_t*, void*);
 
     void (*report_progress)(void*);
     void (*report_finished)(void*);
@@ -459,6 +461,30 @@ bfs_vset_closed(gsea_state_t* state, void* arg)
  ********************/
 
 /* dfs framework configuration */
+static int
+dfs_goal_trace_cb(int* stack_element)
+{
+    printf("state %p, %d\n", stack_element, *stack_element);
+    gsea_state_t state;
+    // todo: this needs some assign functon instead of peek?
+    // assign(state, arg, *queue); -> do what's needed to assign
+    // replaces peek
+    state.tree.tree_idx = *stack_element;
+    state.state=stack_element;
+    gc.queue.filo.stack_to_state(&state, NULL);
+    // this is the state..
+    print_state(&state);
+    return 1;
+}
+
+static void
+dfs_goal_trace(gsea_state_t* state, void* arg)
+{
+    dfs_stack_walk(gc.queue.filo.stack, dfs_goal_trace_cb);
+    (void)state;
+    (void)arg;
+}
+
 static void
 dfs_open_insert(gsea_state_t* state, void* arg)
 {
@@ -823,10 +849,10 @@ gsea_dlk_default(gsea_state_t* state, void* arg)
 
     // no outgoing transitions
     if (state->count == 0) { // gc.is_goal(..) = return state->count == 0;
-        //gc.goal_trace(..);
         opt.threshold = global.visited-1;
         gc.report_progress(arg);
         Warning(info, "deadlock detected");
+        if (opt.trc_output && gc.goal_trace) gc.goal_trace(state, arg);
         Fatal(1, info, "exiting now");
     }
 }
@@ -840,11 +866,10 @@ gsea_max_wrapper(gsea_state_t* state, void* arg)
 
 
 
-static int
+static void
 gsea_goal_trace_default(gsea_state_t* state, void* arg)
 {
     Fatal(1, error, "goal state reached");
-    return 0;
     (void)state;
     (void)arg;
 }
@@ -886,6 +911,7 @@ gsea_setup_default()
             gc.open_size = dfs_open_size;
             gc.open_extract = dfs_open_extract;
             gc.state_next = dfs_state_next_all;
+            gc.goal_trace = dfs_goal_trace;
 
             // init filo  queue
             gc.queue.filo.push = error_state_arg;
