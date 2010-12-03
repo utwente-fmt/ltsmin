@@ -198,7 +198,7 @@ typedef union gsea_store {
     } tree;
     struct {
         vdom_t domain;
-        vset_t visited_set;
+        vset_t closed_set;
         vset_t current_set;
         vset_t next_set;
     } vset;
@@ -220,16 +220,29 @@ typedef union gsea_store {
 typedef union gsea_queue {
     struct {
         dfs_stack_t stack;
-        union {
-            bitset_t open;
-            bitset_t closed;
-        };
+        bitset_t closed_set;
+
+        // queue/store specific callbacks
+        void (*push)(gsea_state_t*, void*);
+        void (*pop)(gsea_state_t*, void*);
+        void (*peek)(gsea_state_t*, void*);
+            // peeks a state representation from the stack
+        // closed test for the stack
+        int (*closed)(gsea_state_t*, int is_backtrack, void*);
+            // defaults to return is_backtrack || bitset_test(gc.queue.filo.closed_set, .._idx)
+        // stack representation to state representation
+        void (*stack_to_state)(gsea_state_t*, void*);
+            // defaults to treeunfold on idx
+        // state representation to stack representation
+        void (*state_to_stack)(gsea_state_t*, void*);
+            // defaults to treefold, set idx
     } filo;
     /*
     struct {
         queue_t queue;
     } fifo;
     */
+
 } gsea_queue_t;
 
 typedef void(*gsea_void)(gsea_state_t*,void*);
@@ -384,7 +397,7 @@ bfs_vset_open_insert(gsea_state_t* state, void* arg)
 static void
 bfs_vset_closed_insert(gsea_state_t* state, void* arg)
 {
-    vset_add(gc.store.vset.visited_set, state->state);
+    vset_add(gc.store.vset.closed_set, state->state);
     explored++;
     return;
     (void)arg;
@@ -400,7 +413,7 @@ bfs_vset_open(gsea_state_t* state, void* arg)
 static int
 bfs_vset_closed(gsea_state_t* state, void* arg)
 {
-    return vset_member(gc.store.vset.visited_set, state->state);
+    return vset_member(gc.store.vset.closed_set, state->state);
     (void)arg;
 }
 
@@ -416,85 +429,152 @@ bfs_vset_closed(gsea_state_t* state, void* arg)
  *  |__/ |    .__/  *
  ********************/
 
-
-/* dfs tree configuration */
+/* dfs framework configuration */
 static void
-dfs_tree_open_insert(gsea_state_t* state, void* arg)
+dfs_open_insert(gsea_state_t* state, void* arg)
 {
-    state->tree.tree_idx = TreeFold(gc.store.tree.dbs, state->state);
-    dfs_stack_push(gc.queue.filo.stack, &(state->tree.tree_idx));
-    if ((size_t)state->tree.tree_idx >= visited)
-        visited++;
-
+    gc.queue.filo.state_to_stack(state, arg);
+    gc.queue.filo.push(state, arg);
     return;
-    (void)arg;
 }
 
 static void
-dfs_tree_open_extract(gsea_state_t* state, void* arg)
+dfs_open_extract(gsea_state_t* state, void* arg)
 {
-    // queue.get(state, arg)
-    int* idx = NULL;
+    int is_backtrack;
     do {
+        is_backtrack = 0;
         // detect backtrack
         while (dfs_stack_frame_size(gc.queue.filo.stack) == 0) {
             // gc.backtrack(state, arg);
             dfs_stack_leave(gc.queue.filo.stack);
             // pop, because the backtrack state must be closed (except if reopened, which is unsupported)
-            idx = dfs_stack_pop(gc.queue.filo.stack);
+            // printf("backtrack %d:\n", * dfs_stack_top(gc.queue.filo.stack));
             // less depth
             depth--;
-            //printf("backtrack %d:\n", *idx);
-            idx = NULL;
+            is_backtrack = 1;
         }
-        idx = dfs_stack_top(gc.queue.filo.stack);
-    } while (bitset_test(gc.queue.filo.closed, *idx) && dfs_stack_pop(gc.queue.filo.stack));
-    state->tree.tree_idx = *idx;
-    state->state = gc.context;
-    // stote.get(state, arg)
-    TreeUnfold(gc.store.tree.dbs, *idx, gc.context);
+        gc.queue.filo.peek(state, arg);
+    } while (gc.queue.filo.closed(state, is_backtrack, arg) && dfs_stack_pop(gc.queue.filo.stack));
+    gc.queue.filo.stack_to_state(state, arg);
 
     // update max depth
     if (dfs_stack_nframes(gc.queue.filo.stack) > max_depth) {
         max_depth++;
         if (RTverbosity > 1) Warning(info, "new level %zu, visited %zu states, %zu transitions", max_depth, visited, ntransitions);
     }
-    //printf("state %d:", state->tree.tree_idx); print_state(state);
+    // printf("state %d:", state->tree.tree_idx); print_state(state);
     return;
     (void)arg;
 }
 
-static void dfs_tree_closed_insert(gsea_state_t* state, void* arg) { explored++; bitset_set(gc.queue.filo.closed, state->tree.tree_idx); return; (void)arg;}
 // the visited - explored condition prevents backtracking from being called
 // problem, stack can be filled without open states..
 // solution, has_open should be adapted for this, to backtrack to the latest state
-static int dfs_tree_open_size(void* arg) { return visited - explored; (void)arg; }
-
-
-static int dfs_tree_open(gsea_state_t* state, void* arg) { return 0; (void)state; (void)arg; }
-static int dfs_tree_closed(gsea_state_t* state, void* arg)
-{
-    // state is not yet serialized at this point, hence, this must be done here -> error in framework
-    state->tree.tree_idx = TreeFold(gc.store.tree.dbs, state->state);
-    return bitset_test(gc.queue.filo.closed, state->tree.tree_idx); (void)state; (void)arg;
+static int
+dfs_open_size(void* arg) {
+    size_t open_size = visited-explored;
+    if (open_size) return open_size;
+    //if (gc.queue.filo.backtrack == NULL) return; // or gc.state_backtrack fn
+    if (gc.state_backtrack == NULL) return 0;
+    // pop the stack, backtrack
+    // note: this isn't correct for grey
+    // might need to pop / backtrack first
+    do {
+        // detect backtrack
+        while (dfs_stack_size(gc.queue.filo.stack) && dfs_stack_frame_size(gc.queue.filo.stack) == 0) {
+            // gc.backtrack(state, arg);
+            dfs_stack_leave(gc.queue.filo.stack);
+            // pop, because the backtrack state must be closed (except if reopened, which is unsupported)
+            dfs_stack_pop(gc.queue.filo.stack);
+            // less depth
+            depth--;
+        }
+    } while (dfs_stack_size(gc.queue.filo.stack) && dfs_stack_pop(gc.queue.filo.stack));
+    return 0;
+    (void)arg;
 }
-//static int dfs_tree_closed(gsea_state_t* state, void* arg) { return 0; (void)state; (void)arg; }
-static int dfs_tree_open_insert_condition(gsea_state_t* state, void* arg) { return !dfs_tree_closed(state,arg); (void)state; (void)arg; }
+
+static int dfs_open_insert_condition(gsea_state_t* state, void* arg) { return !gc.closed(state,arg); }
 
 static void
-dfs_tree_state_next(gsea_state_t* state, void* arg)
+dfs_state_next_all(gsea_state_t* state, void* arg)
 {
-    // wrap with enter stack frame
+    // new search depth
     depth++;
+    // wrap with enter stack frame
     dfs_stack_enter(gc.queue.filo.stack);
-    // original call (call old.state_next for wrapping with grey)
+    // original call
     state->count = GBgetTransitionsAll (model, state->state, gsea_process, state);
     return;
     (void)arg;
 }
 
+
+
+
+/* dfs tree configuration */
+static int
+dfs_tree_stack_closed(gsea_state_t* state, int is_backtrack, void* arg)
+{ return is_backtrack || bitset_test(gc.queue.filo.closed_set, state->tree.tree_idx); (void)arg; }
+
+static void
+dfs_tree_stack_peek(gsea_state_t* state, void* arg)
+{ state->tree.tree_idx = *dfs_stack_top(gc.queue.filo.stack); return; (void)arg; }
+
+static void
+dfs_tree_state_to_stack(gsea_state_t* state, void* arg)
+{
+    state->tree.tree_idx = TreeFold(gc.store.tree.dbs, state->state);
+    if ((size_t)state->tree.tree_idx >= visited) visited++;
+    return;
+    (void)arg;
+}
+
+static void
+dfs_tree_stack_to_state(gsea_state_t* state, void* arg)
+{ state->state = gc.context; TreeUnfold(gc.store.tree.dbs, state->tree.tree_idx, gc.context); return; (void)arg; }
+
+static void
+dfs_tree_open_insert(gsea_state_t* state, void* arg)
+{
+    // extract
+    state->tree.tree_idx = TreeFold(gc.store.tree.dbs, state->state);
+    if ((size_t)state->tree.tree_idx >= visited)
+        visited++;
+    // insert
+    dfs_stack_push(gc.queue.filo.stack, &(state->tree.tree_idx));
+    return;
+    (void)arg;
+}
+
+static void dfs_tree_closed_insert(gsea_state_t* state, void* arg)
+{ explored++; bitset_set(gc.queue.filo.closed_set, state->tree.tree_idx); return; (void)arg;}
+
+
+static int dfs_tree_closed(gsea_state_t* state, void* arg)
+{
+    // state is not yet serialized at this point, hence, this must be done here -> error in framework
+    state->tree.tree_idx = TreeFold(gc.store.tree.dbs, state->state);
+    return bitset_test(gc.queue.filo.closed_set, state->tree.tree_idx); (void)state; (void)arg;
+}
+static int dfs_tree_open_insert_condition(gsea_state_t* state, void* arg) { return !dfs_tree_closed(state,arg); (void)state; (void)arg; }
+
+
 /* dfs vset configuration */
-static int dfs_vset_closed(gsea_state_t* state, void* arg) { return vset_member(gc.store.vset.visited_set, state->state); (void)arg; }
+static int dfs_vset_closed(gsea_state_t* state, void* arg) { return vset_member(gc.store.vset.closed_set, state->state); (void)arg; }
+
+static int
+dfs_vset_stack_closed(gsea_state_t* state, int is_backtrack, void* arg)
+{ return is_backtrack ||dfs_vset_closed(state, arg); }
+
+static void
+dfs_vset_stack_peek(gsea_state_t* state, void* arg)
+{ state->state = dfs_stack_top(gc.queue.filo.stack); return; (void)arg; }
+
+static void dfs_vset_state_to_stack(gsea_state_t* state, void* arg) { (void)state; (void)arg; }
+static void dfs_vset_stack_to_state(gsea_state_t* state, void* arg) { (void)state; (void)arg; }
+
 
 static void
 dfs_vset_open_insert(gsea_state_t* state, void* arg)
@@ -510,66 +590,45 @@ dfs_vset_open_insert(gsea_state_t* state, void* arg)
     (void)arg;
 }
 
-static void dfs_vset_open_extract(gsea_state_t* state, void* arg)
-{
-    // queue.get(state, arg)
-    do {
-        // detect backtrack
-        while (dfs_stack_frame_size(gc.queue.filo.stack) == 0) {
-            // gc.backtrack(state, arg);
-            dfs_stack_leave(gc.queue.filo.stack);
-            // less depth
-            depth--;
-            // pop, because the backtrack state must be closed (except if reopened, which is unsupported)
-            state->state = dfs_stack_pop(gc.queue.filo.stack);
-        }
-        // as long as visited - explored > 0, we should still have an open state on the stack
-        state->state = dfs_stack_top(gc.queue.filo.stack);
-    } while (dfs_vset_closed(state, arg) && dfs_stack_pop(gc.queue.filo.stack));
-
-    // update max depth
-    if (dfs_stack_nframes(gc.queue.filo.stack) > max_depth) {
-        max_depth++;
-        if (RTverbosity > 1) Warning(info, "new level %zu, visited %zu states, %zu transitions", max_depth, visited, ntransitions);
-    }
-    //printf("state %d:", state->tree.tree_idx); print_state(state);
-    return;
-    (void)arg;
-}
-
 static void
 dfs_vset_closed_insert(gsea_state_t* state, void* arg) {
-    vset_add(gc.store.vset.visited_set, state->state);
+    vset_add(gc.store.vset.closed_set, state->state);
     explored++;
     return;
     (void)arg;
 }
-// the visited - explored condition prevents backtracking from being called
-// problem, stack can be filled without open states..
-// solution, has_open should be adapted for this, to backtrack to the latest state
-static int dfs_vset_open_size(void* arg) { return visited - explored; (void)arg;}
-
-static int dfs_vset_open(gsea_state_t* state, void* arg) { return 0; (void)state; (void)arg; }
-
 
 static int dfs_vset_open_insert_condition(gsea_state_t* state, void* arg) { return !dfs_vset_closed(state,arg); (void)state; (void)arg; }
-
-static void
-dfs_vset_state_next(gsea_state_t* state, void* arg)
-{
-    // depth
-    depth++;
-    // wrap with enter stack frame
-    dfs_stack_enter(gc.queue.filo.stack);
-    // original call (call old.state_next for wrapping with grey)
-    state->count = GBgetTransitionsAll (model, state->state, gsea_process, state);
-    return;
-    (void)arg;
-}
 
 
 
 /* dfs table configuration */
+static int
+dfs_table_stack_closed(gsea_state_t* state, int is_backtrack, void* arg)
+{ return is_backtrack || bitset_test(gc.queue.filo.closed_set, state->table.hash_idx); (void)arg; }
+
+static void
+dfs_table_stack_peek(gsea_state_t* state, void* arg)
+{ state->table.hash_idx = *dfs_stack_top(gc.queue.filo.stack); return; (void)arg; }
+
+static void
+dfs_table_state_to_stack(gsea_state_t* state, void* arg)
+{
+    if (!DBSLLlookup_ret(gc.store.table.dbs, state->state, &(state->table.hash_idx))) {
+        visited++;
+    }
+    return;
+    (void)arg;
+}
+
+static void
+dfs_table_stack_to_state(gsea_state_t* state, void* arg)
+{
+    int hash;
+    state->state = DBSLLget(gc.store.table.dbs, state->table.hash_idx, &hash);
+    (void)arg;
+}
+
 static void dfs_table_open_insert(gsea_state_t* state, void* arg)
 {
     if (!DBSLLlookup_ret(gc.store.table.dbs, state->state, &(state->table.hash_idx))) {
@@ -581,70 +640,19 @@ static void dfs_table_open_insert(gsea_state_t* state, void* arg)
     (void)arg;
 }
 
-static void dfs_table_open_extract(gsea_state_t* state, void* arg)
-{
-    // queue.get(state, arg)
-    int* idx = NULL;
-    do {
-        // detect backtrack
-        while (dfs_stack_frame_size(gc.queue.filo.stack) == 0) {
-            // gc.backtrack(state, arg);
-            dfs_stack_leave(gc.queue.filo.stack);
-            // less depth
-            depth--;
-            // pop, because the backtrack state must be closed (except if reopened, which is unsupported)
-            idx = dfs_stack_pop(gc.queue.filo.stack);
-            //printf("backtrack %d:\n", *idx);
-            idx = NULL;
-        }
-        idx = dfs_stack_top(gc.queue.filo.stack);
-    } while (bitset_test(gc.queue.filo.closed, *idx) && dfs_stack_pop(gc.queue.filo.stack));
-    state->table.hash_idx = *idx;
-    // index is known
-    int hash;
 
-    state->state = DBSLLget(gc.store.table.dbs, *idx, &hash);
-
-    // update max depth
-    if (dfs_stack_nframes(gc.queue.filo.stack) > max_depth) {
-        max_depth++;
-        if (RTverbosity > 1) Warning(info, "new level %zu, visited %zu states, %zu transitions", max_depth, visited, ntransitions);
-    }
-    //printf("state %d:", state->tree.tree_idx); print_state(state);
-    return;
-    (void)arg;
-}
-
-static void dfs_table_closed_insert(gsea_state_t* state, void* arg) { explored++; bitset_set(gc.queue.filo.closed, state->table.hash_idx); (void)arg;}
-// the visited - explored condition prevents backtracking from being called
-// problem, stack can be filled without open states..
-// solution, has_open should be adapted for this, to backtrack to the latest state
-static int dfs_table_open_size(void* arg) { return visited - explored; (void)arg;}
-
-static int dfs_table_open(gsea_state_t* state, void* arg) { return 0; (void)state; (void)arg; }
+static void dfs_table_closed_insert(gsea_state_t* state, void* arg) { explored++; bitset_set(gc.queue.filo.closed_set, state->table.hash_idx); (void)arg;}
 
 static int dfs_table_closed(gsea_state_t* state, void* arg) {
     // state is not yet serialized at this point, hence, this must be done here -> error in framework
     if (!DBSLLlookup_ret(gc.store.table.dbs, state->state, &(state->table.hash_idx))) {
         visited++;
     }
-    return bitset_test(gc.queue.filo.closed, state->table.hash_idx); (void)state; (void)arg;
+    return bitset_test(gc.queue.filo.closed_set, state->table.hash_idx); (void)state; (void)arg;
 }
 
 static int dfs_table_open_insert_condition(gsea_state_t* state, void* arg) { return !dfs_table_closed(state,arg); (void)state; (void)arg; }
 
-static void
-dfs_table_state_next(gsea_state_t* state, void* arg)
-{
-    // depth
-    depth++;
-    // wrap with enter stack frame
-    dfs_stack_enter(gc.queue.filo.stack);
-    // original call (call old.state_next for wrapping with grey)
-    state->count = GBgetTransitionsAll (model, state->state, gsea_process, state);
-    return;
-    (void)arg;
-}
 
 
 
@@ -672,7 +680,7 @@ static void scc_table_open_extract(gsea_state_t* state, void* arg)
     int* idx = NULL;
     do {
         idx = dfs_stack_top(gc.queue.filo.stack);
-        if (bitset_test(gc.queue.filo.closed, *idx)) {
+        if (bitset_test(gc.queue.filo.closed_set, *idx)) {
             dfs_stack_pop(gc.queue.filo.stack);
             idx = NULL;
         }
@@ -686,7 +694,7 @@ static void scc_table_open_extract(gsea_state_t* state, void* arg)
     (void)arg;
 }
 
-static void scc_table_closed_insert(gsea_state_t* state, void* arg) { explored++; bitset_set(gc.queue.filo.closed, state->table.hash_idx); (void)arg;}
+static void scc_table_closed_insert(gsea_state_t* state, void* arg) { explored++; bitset_set(gc.queue.filo.closed_set, state->table.hash_idx); (void)arg;}
 static int scc_table_open_size(void* arg) { return visited - explored; (void)arg; }
 
 static int scc_table_open(gsea_state_t* state, void* arg) { return 0; (void)state; (void)arg; }
@@ -717,6 +725,7 @@ static int scc_table_closed(gsea_state_t* state, void* arg) { return 0; (void)st
 
 
 /* GSEA setup code */
+
 static void
 error_state_arg(gsea_state_t* state, void* arg)
 {
@@ -724,6 +733,14 @@ error_state_arg(gsea_state_t* state, void* arg)
     return;
     (void)state;
     (void)arg;
+}
+
+static int
+error_state_int_arg(gsea_state_t* state, int i, void* arg)
+{
+    error_state_arg(state, arg);
+    (void)i;
+    return 0;
 }
 
 static void
@@ -822,7 +839,7 @@ gsea_setup_default()
         gc.closed = (gsea_int) error_state_arg;
         gc.closed_size = (int(*)(void*)) error_arg;
         gc.pre_state_next = NULL;
-        if (call_mode = UseGreyBox) {
+        if (call_mode == UseGreyBox) {
             gc.state_next = gsea_state_next_grey_default;
         } else {
             gc.state_next = gsea_state_next_all_default;
@@ -833,6 +850,25 @@ gsea_setup_default()
         gc.goal_trace = gsea_goal_trace_default;
         gc.report_progress = gsea_progress;
         gc.report_finished = gsea_finished;
+
+        // setup dfs framework
+        if (strategy == Strat_DFS) {
+            gc.open_insert_condition = dfs_open_insert_condition;
+            gc.open_insert = dfs_open_insert;
+            gc.open_size = dfs_open_size;
+            gc.open_extract = dfs_open_extract;
+            gc.state_next = dfs_state_next_all;
+
+            // init filo  queue
+            gc.queue.filo.push = error_state_arg;
+            gc.queue.filo.pop = error_state_arg;
+            gc.queue.filo.peek = error_state_arg;
+            gc.queue.filo.stack_to_state = error_state_arg;
+            gc.queue.filo.state_to_stack = error_state_arg;
+            gc.queue.filo.closed = error_state_int_arg;
+            if (call_mode == UseGreyBox)
+                Fatal(1, error, "--grey not implemented for dfs");
+        }
 }
 
 static void
@@ -865,7 +901,7 @@ gsea_setup()
 
                 gc.context = RTmalloc(sizeof(int) * N);
                 gc.store.vset.domain = vdom_create_default (N);
-                gc.store.vset.visited_set = vset_create(gc.store.vset.domain, 0, NULL);
+                gc.store.vset.closed_set = vset_create(gc.store.vset.domain, 0, NULL);
                 gc.store.vset.next_set = vset_create(gc.store.vset.domain, 0, NULL);
                 gc.store.vset.current_set = vset_create(gc.store.vset.domain, 0, NULL);
                 break;
@@ -879,52 +915,53 @@ gsea_setup()
             case DB_TreeDBS:
                 // setup dfs/tree configuration
                 gc.open_insert = dfs_tree_open_insert;
-                gc.open_extract = dfs_tree_open_extract;
-                gc.open = dfs_tree_open;
-                gc.open_size = dfs_tree_open_size;
                 gc.closed_insert = dfs_tree_closed_insert;
                 gc.closed = dfs_tree_closed;
                 gc.open_insert_condition = dfs_tree_open_insert_condition;
-                gc.state_next = dfs_tree_state_next;
+
+                gc.queue.filo.closed = dfs_tree_stack_closed;
+                gc.queue.filo.peek = dfs_tree_stack_peek;
+                gc.queue.filo.stack_to_state = dfs_tree_stack_to_state;
+                gc.queue.filo.state_to_stack = dfs_tree_state_to_stack;
 
                 gc.store.tree.dbs = TreeDBScreate(N);
-                //gc.queue.filo.open = bitset_create(128,128);
-                gc.queue.filo.closed = bitset_create(128,128);
                 gc.queue.filo.stack = dfs_stack_create(1);
+                gc.queue.filo.closed_set = bitset_create(128,128);
                 gc.context = RTmalloc(sizeof(int) * N);
                 break;
             case DB_Vset:
                 // dfs/vset configuration
                 gc.open_insert = dfs_vset_open_insert;
-                gc.open_extract = dfs_vset_open_extract;
-                gc.open = dfs_vset_open;
-                gc.open_size = dfs_vset_open_size;
                 gc.closed_insert = dfs_vset_closed_insert;
                 gc.closed = dfs_vset_closed;
                 gc.open_insert_condition = dfs_vset_open_insert_condition;
-                gc.state_next = dfs_vset_state_next;
+
+                gc.queue.filo.closed = dfs_vset_stack_closed;
+                gc.queue.filo.peek = dfs_vset_stack_peek;
+                gc.queue.filo.stack_to_state = dfs_vset_stack_to_state;
+                gc.queue.filo.state_to_stack = dfs_vset_state_to_stack;
 
                 gc.context = RTmalloc(sizeof(int) * N);
                 gc.store.vset.domain = vdom_create_default (N);
-                // this should actually be closed_set
-                gc.store.vset.visited_set = vset_create(gc.store.vset.domain, 0, NULL);
+                gc.store.vset.closed_set = vset_create(gc.store.vset.domain, 0, NULL);
                 gc.store.vset.next_set = vset_create(gc.store.vset.domain, 0, NULL);
                 gc.store.vset.current_set = vset_create(gc.store.vset.domain, 0, NULL);
                 gc.queue.filo.stack = dfs_stack_create(N);
                 break;
             case DB_DBSLL:
                 gc.open_insert = dfs_table_open_insert;
-                gc.open_extract = dfs_table_open_extract;
-                gc.open = dfs_table_open;
-                gc.open_size = dfs_table_open_size;
                 gc.closed_insert = dfs_table_closed_insert;
                 gc.closed = dfs_table_closed;
                 gc.open_insert_condition = dfs_table_open_insert_condition;
-                gc.state_next = dfs_table_state_next;
+
+                gc.queue.filo.closed = dfs_table_stack_closed;
+                gc.queue.filo.peek = dfs_table_stack_peek;
+                gc.queue.filo.stack_to_state = dfs_table_stack_to_state;
+                gc.queue.filo.state_to_stack = dfs_table_state_to_stack;
 
                 gc.context = RTmalloc(sizeof(int) * N);
                 gc.store.table.dbs = DBSLLcreate(N);
-                gc.queue.filo.closed = bitset_create(128,128);
+                gc.queue.filo.closed_set = bitset_create(128,128);
                 gc.queue.filo.stack = dfs_stack_create(1);
                 break;
 
@@ -945,7 +982,7 @@ gsea_setup()
 
                 gc.context = RTmalloc(sizeof(int) * N);
                 gc.store.table.dbs = DBSLLcreate(N);
-                gc.queue.filo.closed = bitset_create(128,128);
+                gc.queue.filo.closed_set = bitset_create(128,128);
                 gc.queue.filo.stack = dfs_stack_create(1);
 
                 // scc init
