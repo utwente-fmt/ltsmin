@@ -177,3 +177,18 @@ dfs_stack_pop_bottom (dfs_stack_t stack)
     stack->frame_bottom++;
     return isba_peek_int(stack->states, stack->frame_size - stack->frame_bottom);
 }
+
+void
+dfs_stack_walk(dfs_stack_t stack, int(*cb)(int*))
+{
+    int offset = 0;
+    int res = cb( isba_peek_int(stack->states, offset) );
+    if (res && stack->frame_size != 0) {
+        offset += stack->frame_size;
+        res = cb( isba_peek_int(stack->states, offset) );
+    }
+    for(size_t i=0; i < stack->nframes-1 &&  res; i++) {
+        offset += isba_peek_int(stack->frames, i)[0];
+        res = cb( isba_peek_int(stack->states, offset) );
+    }
+}
