@@ -57,11 +57,11 @@ typedef enum { Strat_BFS    = 1,
                Strat_GNDFS  = 16,
                Strat_GNNDFS = 32,
                Strat_YNDFS  = 64,
-               Strat_LTL    = Strat_NNDFS | Strat_NDFS | Strat_GNDFS |
-                              Strat_GNNDFS | Strat_YNDFS,
-               Strat_LTLG   = Strat_GNDFS | Strat_GNNDFS,
+               Strat_YNNDFS  = 128,
+               Strat_LTLG   = Strat_GNDFS | Strat_GNNDFS | Strat_YNNDFS,
                Strat_LTLY   = Strat_YNDFS,
                Strat_LTLS   = Strat_LTLG | Strat_LTLY,
+               Strat_LTL    = Strat_NNDFS | Strat_NDFS | Strat_LTLS,
                Strat_Reach  = Strat_BFS | Strat_DFS
 } strategy_t;
 
@@ -157,6 +157,7 @@ static si_map_entry strategies[] = {
     {"gndfs",   Strat_GNDFS},
     {"yndfs",   Strat_YNDFS},
     {"gnndfs",  Strat_GNNDFS},
+    {"ynndfs",  Strat_YNNDFS},
     {NULL, 0}
 };
 
@@ -613,6 +614,7 @@ init_globals (int argc, char *argv[])
     switch (strategy) {
     case Strat_GNNDFS:
         lb = lb_create_max(W, (algo_f)gnn_blue,   NULL,G, lb_method, H); break;
+    case Strat_YNNDFS:
     case Strat_NNDFS:
         lb = lb_create_max(W, (algo_f)nndfs_blue, NULL,G, lb_method, H); break;
     case Strat_GNDFS:
@@ -1338,6 +1340,47 @@ nndfs_explore_state_blue (thread_ctx_t *ctx, counter_t *cnt)
     ndfs_maybe_report(ctx->search, cnt);
 }
 
+/* YELLOW (NN)DFS */
+static void
+nndfs_yellow (thread_ctx_t *ctx)
+{
+    size_t              start_level = dfs_stack_nframes (ctx->stack);
+    ctx->search = NRED; ctx->permute->permutation = permutation_red;
+    ctx->red.visited++; //count accepting states
+
+    while ( !lb_is_stopped(lb) ) {
+        raw_data_t          state_data = dfs_stack_top (ctx->stack);
+        if (NULL != state_data) {
+            state_info_deserialize (&ctx->state, state_data, ctx->store);
+            nndfs_color_t color = nn_get_color (&ctx->color_map, ctx->state.idx);
+            if ( nn_color_eq(color, NNRED) ||
+                 global_has_color(ctx->state.idx, GYELLOW) ) {
+                if (start_level == dfs_stack_nframes (ctx->stack)) {
+                     break; ctx->red.max_load++;
+                }
+                dfs_stack_pop (ctx->stack);
+            } else
+                nndfs_explore_state_red (ctx, &ctx->red);
+        } else { //backtrack
+            dfs_stack_leave (ctx->stack);
+            ctx->red.level_cur--;
+
+            /* mark state as YELLOW */
+            state_data = dfs_stack_top (ctx->stack);
+            state_info_deserialize (&ctx->state, state_data, ctx->store);
+            global_try_color (ctx->state.idx, GYELLOW);
+            
+            /* exit search if backtrack hits seed, leave stack the way it was */
+            if (start_level == dfs_stack_nframes (ctx->stack))
+                break;
+            dfs_stack_pop (ctx->stack);
+        }
+    }
+
+    ctx->search = NBLUE; ctx->permute->permutation = permutation;
+}
+
+
 /* RED DFS */
 static void
 nndfs_red (thread_ctx_t *ctx)
@@ -1379,7 +1422,8 @@ nndfs_blue (thread_ctx_t *ctx, size_t work)
         if (NULL != state_data) {
             state_info_deserialize (&ctx->state, state_data, ctx->store);
             nndfs_color_t color = nn_get_color (&ctx->color_map, ctx->state.idx);
-            if ( nn_color_eq(color, NNWHITE) ) {
+            if ( nn_color_eq(color, NNWHITE) && (strategy != Strat_YNNDFS ||
+                 !global_has_color(ctx->state.idx, GYELLOW)) ) {
                 nn_set_color (&ctx->color_map, ctx->state.idx, NNCYAN);
                 nndfs_explore_state_blue (ctx, &ctx->counters);
             } else
@@ -1394,7 +1438,10 @@ nndfs_blue (thread_ctx_t *ctx, size_t work)
             state_data = dfs_stack_top (ctx->stack);
             state_info_deserialize (&ctx->state, state_data, ctx->store);
             if( GBbuchiIsAccepting(ctx->model, ctx->state.data) ) {
-                nndfs_red (ctx);
+                if (strategy == Strat_YNNDFS)
+                    nndfs_yellow (ctx);
+                else
+                    nndfs_red (ctx);
                 nn_set_color(&ctx->color_map, ctx->state.idx, NNRED);
             } else
                 nn_set_color(&ctx->color_map, ctx->state.idx, NNBLUE);
