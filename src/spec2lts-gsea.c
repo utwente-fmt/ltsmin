@@ -42,35 +42,56 @@
 #include "dve2-greybox.h"
 #endif
 
-
-static lts_enum_cb_t output_handle=NULL;
-
-static model_t model=NULL;
-static char* trc_output=NULL;
-static int dlk_detect=0;
-static int dlk_all_detect=0;
-static FILE* dlk_all_file=NULL;
-static int dlk_count=0;
-static lts_enum_cb_t trace_handle=NULL;
-static lts_output_t trace_output=NULL;
-
-static array_manager_t state_man=NULL;
-static uint32_t *parent_ofs=NULL;
-
-static size_t       threshold = 100000;
-
-static int write_lts;
-static int matrix=0;
-static int write_state=0;
-static size_t max = UINT_MAX;
-
 typedef enum { UseGreyBox , UseBlackBox } mode_t;
-static mode_t call_mode=UseBlackBox;
 
-static char *arg_strategy = "bfs";
-static enum { Strat_BFS, Strat_DFS, Strat_SCC } strategy = Strat_BFS;
-static char *arg_state_db = "tree";
-static enum { DB_DBSLL, DB_TreeDBS, DB_Vset } state_db = DB_TreeDBS;
+static struct {
+    //lts_enum_cb_t output_handle=NULL;
+
+    model_t model;
+    //char* trc_output=NULL;
+    int dlk_detect;
+    //int dlk_all_detect=0;
+    //FILE* dlk_all_file=NULL;
+    //int dlk_count=0;
+    //lts_enum_cb_t trace_handle=NULL;
+    //lts_output_t trace_output=NULL;
+
+    char *ltl_semantics;
+    int   ltl_type;
+    char *ltl_file;
+
+    //array_manager_t state_man=NULL;
+    //uint32_t *parent_ofs=NULL;
+
+    size_t  threshold;
+
+    //int write_lts;
+    int matrix;
+    int write_state;
+    size_t max;
+
+    mode_t call_mode;
+
+    char *arg_strategy;
+    enum { Strat_BFS, Strat_DFS, Strat_SCC } strategy;
+    char *arg_state_db;
+    enum { DB_DBSLL, DB_TreeDBS, DB_Vset } state_db;
+} opt = {
+    .model = NULL,
+    .dlk_detect = 0,
+    .ltl_semantics = "spin",
+    .ltl_type = PINS_LTL_SPIN,
+    .ltl_file = NULL,
+    .threshold = 100000,
+    .matrix=0,
+    .write_state=0,
+    .max = UINT_MAX,
+    .call_mode = UseBlackBox,
+    .arg_strategy = "bfs",
+    .strategy = Strat_BFS,
+    .arg_state_db = "tree",
+    .state_db = DB_TreeDBS
+};
 
 static si_map_entry strategies[] = {
     {"bfs",  Strat_BFS},
@@ -88,26 +109,26 @@ static si_map_entry db_types[]={
 
 static void
 state_db_popt (poptContext con, enum poptCallbackReason reason,
-               const struct poptOption *opt, const char *arg, void *data)
+               const struct poptOption *popt, const char *arg, void *data)
 {
-    (void)con; (void)opt; (void)arg; (void)data;
+    (void)con; (void)popt; (void)arg; (void)data;
     switch (reason) {
     case POPT_CALLBACK_REASON_PRE:
         break;
     case POPT_CALLBACK_REASON_POST: {
-            int db = linear_search (db_types, arg_state_db);
+            int db = linear_search (db_types, opt.arg_state_db);
             if (db < 0) {
-                Warning (error, "unknown vector storage mode type %s", arg_state_db);
+                Warning (error, "unknown vector storage mode type %s", opt.arg_state_db);
                 RTexitUsage (EXIT_FAILURE);
             }
-            state_db = db;
+            opt.state_db = db;
 
-            int s = linear_search (strategies, arg_strategy);
+            int s = linear_search (strategies, opt.arg_strategy);
             if (s < 0) {
-                Warning (error, "unknown search mode %s", arg_strategy);
+                Warning (error, "unknown search mode %s", opt.arg_strategy);
                 RTexitUsage (EXIT_FAILURE);
             }
-            strategy = s;
+            opt.strategy = s;
         }
         return;
     case POPT_CALLBACK_REASON_OPTION:
@@ -117,20 +138,20 @@ state_db_popt (poptContext con, enum poptCallbackReason reason,
 }
 
 static  struct poptOption development_options[] = {
-	{ "grey", 0 , POPT_ARG_VAL , &call_mode , UseGreyBox , "make use of GetTransitionsLong calls" , NULL },
-	{ "matrix", 0 , POPT_ARG_VAL, &matrix,1,"Print the dependency matrix and quit",NULL},
-	{ "write-state" , 0 , POPT_ARG_VAL , &write_state, 1 , "write the full state vector" , NULL },
+	{ "grey", 0 , POPT_ARG_VAL , &opt.call_mode , UseGreyBox , "make use of GetTransitionsLong calls" , NULL },
+	{ "matrix", 0 , POPT_ARG_VAL, &opt.matrix,1,"Print the dependency matrix and quit",NULL},
+	{ "write-state" , 0 , POPT_ARG_VAL , &opt.write_state, 1 , "write the full state vector" , NULL },
 	POPT_TABLEEND
 };
 
 static  struct poptOption options[] = {
 	{ NULL, 0 , POPT_ARG_CALLBACK|POPT_CBFLAG_POST|POPT_CBFLAG_SKIPOPTION  , (void*)state_db_popt , 0 , NULL , NULL },
-	{ "deadlock" , 'd' , POPT_ARG_VAL , &dlk_detect , 1 , "detect deadlocks" , NULL },
-	{ "state" , 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &arg_state_db , 0 ,
+	{ "deadlock" , 'd' , POPT_ARG_VAL , &opt.dlk_detect , 1 , "detect deadlocks" , NULL },
+	{ "state" , 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &opt.arg_state_db , 0 ,
 		"select the data structure for storing states", "<table|tree|vset>"},
-	{ "strategy" , 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &arg_strategy , 0 ,
+	{ "strategy" , 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &opt.arg_strategy , 0 ,
 		"select the search strategy", "<bfs|dfs>"},
-	{ "max" , 0 , POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT , &max , 0 ,"maximum search depth", "<int>"},
+	{ "max" , 0 , POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT , &opt.max , 0 ,"maximum search depth", "<int>"},
 #if defined(MCRL)
 	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, mcrl_options , 0 , "mCRL options", NULL },
 #endif
@@ -166,7 +187,13 @@ static struct {
     size_t visited;
     size_t explored;
     size_t ntransitions;
-} global;
+} global = {
+    .visited = 0,
+    .explored = 0,
+    .depth = 0,
+    .max_depth = 0,
+    .ntransitions = 0,
+};
 
 
 static void *
@@ -507,7 +534,7 @@ dfs_state_next_all(gsea_state_t* state, void* arg)
     // wrap with enter stack frame
     dfs_stack_enter(gc.queue.filo.stack);
     // original call
-    state->count = GBgetTransitionsAll (model, state->state, gsea_process, state);
+    state->count = GBgetTransitionsAll (opt.model, state->state, gsea_process, state);
     return;
     (void)arg;
 }
@@ -772,7 +799,7 @@ gsea_open_insert_condition_default(gsea_state_t* state, void* arg) {
 static void
 gsea_state_next_all_default(gsea_state_t* state, void* arg)
 {
-    state->count = GBgetTransitionsAll (model, state->state, gsea_process, state);
+    state->count = GBgetTransitionsAll (opt.model, state->state, gsea_process, state);
     return;
     (void)arg;
 }
@@ -782,7 +809,7 @@ gsea_state_next_grey_default(gsea_state_t* state, void* arg)
 {
     state->count = 0;
     for (size_t i = 0; i < global.K; i++) {
-        state->count += GBgetTransitionsLong (model, i, state->state, gsea_process, state);
+        state->count += GBgetTransitionsLong (opt.model, i, state->state, gsea_process, state);
     }
     return;
     (void)arg;
@@ -797,7 +824,7 @@ gsea_dlk_default(gsea_state_t* state, void* arg)
     // no outgoing transitions
     if (state->count == 0) { // gc.is_goal(..) = return state->count == 0;
         //gc.goal_trace(..);
-        threshold = global.visited-1;
+        opt.threshold = global.visited-1;
         gc.report_progress(arg);
         Warning(info, "deadlock detected");
         Fatal(1, info, "exiting now");
@@ -808,7 +835,7 @@ static int
 gsea_max_wrapper(gsea_state_t* state, void* arg)
 {
     // (depth < max depth) with chain original condition
-    return (global.depth < max) && gc.max_placeholder(state,arg);
+    return (global.depth < opt.max) && gc.max_placeholder(state,arg);
 }
 
 
@@ -840,7 +867,7 @@ gsea_setup_default()
         gc.closed = (gsea_int) error_state_arg;
         gc.closed_size = (int(*)(void*)) error_arg;
         gc.pre_state_next = NULL;
-        if (call_mode == UseGreyBox) {
+        if (opt.call_mode == UseGreyBox) {
             gc.state_next = gsea_state_next_grey_default;
         } else {
             gc.state_next = gsea_state_next_all_default;
@@ -853,7 +880,7 @@ gsea_setup_default()
         gc.report_finished = gsea_finished;
 
         // setup dfs framework
-        if (strategy == Strat_DFS) {
+        if (opt.strategy == Strat_DFS) {
             gc.open_insert_condition = dfs_open_insert_condition;
             gc.open_insert = dfs_open_insert;
             gc.open_size = dfs_open_size;
@@ -867,7 +894,7 @@ gsea_setup_default()
             gc.queue.filo.stack_to_state = error_state_arg;
             gc.queue.filo.state_to_stack = error_state_arg;
             gc.queue.filo.closed = error_state_int_arg;
-            if (call_mode == UseGreyBox)
+            if (opt.call_mode == UseGreyBox)
                 Fatal(1, error, "--grey not implemented for dfs");
         }
 }
@@ -875,10 +902,10 @@ gsea_setup_default()
 static void
 gsea_setup()
 {
-    switch(strategy) {
+    switch(opt.strategy) {
 
     case Strat_BFS:
-        switch (state_db) {
+        switch (opt.state_db) {
             case DB_TreeDBS:
                 // setup standard bfs/tree configuration
                 gc.open_insert_condition = bfs_tree_open_insert_condition;
@@ -907,12 +934,12 @@ gsea_setup()
                 gc.store.vset.current_set = vset_create(gc.store.vset.domain, 0, NULL);
                 break;
             default:
-                Fatal(1, error, "unimplemented combination --strategy=%s, --state=%s", arg_strategy, arg_state_db );
+                Fatal(1, error, "unimplemented combination --strategy=%s, --state=%s", opt.arg_strategy, opt.arg_state_db );
         }
         break;
 
     case Strat_DFS:
-        switch (state_db) {
+        switch (opt.state_db) {
             case DB_TreeDBS:
                 // setup dfs/tree configuration
                 gc.open_insert = dfs_tree_open_insert;
@@ -967,12 +994,12 @@ gsea_setup()
                 break;
 
             default:
-                Fatal(1, error, "unimplemented combination --strategy=%s, --state=%s", arg_strategy, arg_state_db );
+                Fatal(1, error, "unimplemented combination --strategy=%s, --state=%s", opt.arg_strategy, opt.arg_state_db );
         }
         break;
 
     case Strat_SCC:
-        switch (state_db) {
+        switch (opt.state_db) {
             case DB_DBSLL:
                 gc.open_insert = scc_table_open_insert;
                 gc.open_extract = scc_table_open_extract;
@@ -996,7 +1023,7 @@ gsea_setup()
                 break;
 
             default:
-                Fatal(1, error, "unimplemented combination --strategy=%s, --state=%s", arg_strategy, arg_state_db );
+                Fatal(1, error, "unimplemented combination --strategy=%s, --state=%s", opt.arg_strategy, opt.arg_state_db );
         }
         break;
 
@@ -1005,13 +1032,13 @@ gsea_setup()
     }
 
     // check deadlocks?
-    if (dlk_detect) {
+    if (opt.dlk_detect) {
         gc.dlk_placeholder = gc.post_state_next;
         gc.post_state_next = gsea_dlk_default;
     }
 
     // maximum search depth?
-    if (max != UINT_MAX) {
+    if (opt.max != UINT_MAX) {
         gc.max_placeholder = gc.open_insert_condition;
         gc.open_insert_condition = gsea_max_wrapper;
     }
@@ -1094,9 +1121,9 @@ gsea_process(void* arg, transition_info_t *ti, int *dst)
 
 static void
 gsea_progress(void* arg) {
-    if (RTverbosity < 1 || global.visited < threshold)
+    if (RTverbosity < 1 || global.visited < opt.threshold)
         return;
-    if (!cas (&threshold, threshold, threshold << 1))
+    if (!cas (&opt.threshold, opt.threshold, opt.threshold << 1))
         return;
     Warning (info, "explored %zu levels ~%zu states ~%zu transitions",
              global.max_depth, global.visited, global.ntransitions);
@@ -1138,30 +1165,25 @@ int main(int argc, char *argv[]){
         "Options");
 
     Warning(info,"loading model from %s",files[0]);
-    model=GBcreateBase();
-    GBsetChunkMethods(model,new_string_index,NULL,
+    opt.model=GBcreateBase();
+    GBsetChunkMethods(opt.model,new_string_index,NULL,
         (int2chunk_t)SIgetC,(chunk2int_t)SIputC,(get_count_t)SIgetCount);
 
-    GBloadFile(model,files[0],&model);
+    GBloadFile(opt.model,files[0],&opt.model);
 
-    lts_type_t ltstype=GBgetLTStype(model);
+    lts_type_t ltstype=GBgetLTStype(opt.model);
     if (RTverbosity >=2) {
         lts_type_print(info,ltstype);
     }
     global.N=lts_type_get_state_length(ltstype);
-    global.K=dm_nrows(GBgetDMInfo(model));
+    global.K=dm_nrows(GBgetDMInfo(opt.model));
     Warning(info,"length is %d, there are %d groups",global.N,global.K);
     global.state_labels=lts_type_get_state_label_count(ltstype);
     global.edge_labels=lts_type_get_edge_label_count(ltstype);
     Warning(info,"There are %d state labels and %d edge labels",global.state_labels,global.edge_labels);
-    global.visited = 0;
-    global.explored = 0;
-    global.depth = 0;
-    global.max_depth = 0;
-    global.ntransitions = 0;
 
     int src[global.N];
-    GBgetInitialState(model,src);
+    GBgetInitialState(opt.model,src);
     Warning(info,"got initial state");
 
     gsea_setup_default();
