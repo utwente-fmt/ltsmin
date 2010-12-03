@@ -16,6 +16,7 @@
 // spinja ltsmin interface functions
 void        (*spinja_get_initial_state)(int *to);
 next_method_grey_t spinja_get_successor;
+next_method_black_t spinja_get_successor_all;
 
 int         (*spinja_get_state_size)();
 int         (*spinja_get_transition_groups)();
@@ -87,6 +88,8 @@ SpinJaloadDynamicLib(model_t model, const char *filename)
         RTdlsym( filename, dlHandle, "spinja_get_initial_state" );
     spinja_get_successor = (next_method_grey_t)
         RTdlsym( filename, dlHandle, "spinja_get_successor" );
+    spinja_get_successor_all = (next_method_black_t)
+        RTdlsym( filename, dlHandle, "spinja_get_successor_all" );
 
     spinja_get_state_size = (int(*)())
         RTdlsym( filename, dlHandle, "spinja_get_state_size" );
@@ -172,6 +175,6 @@ SpinJaloadGreyboxModel(model_t model, const char *filename)
     spinja_get_initial_state(state);
     GBsetInitialState(model,state);
 
-//  GBsetNextStateAll  (model, spinja_get_successors); /* FIXME */
+    GBsetNextStateAll  (model, spinja_get_successor_all);
     GBsetNextStateLong (model, spinja_get_successor);
 }
