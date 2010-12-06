@@ -49,12 +49,12 @@ static struct {
 
     model_t model;
     char* trc_output;
+    lts_enum_cb_t trace_handle;
+    lts_output_t trace_output;
     int dlk_detect;
     //int dlk_all_detect=0;
     //FILE* dlk_all_file=NULL;
     //int dlk_count=0;
-    //lts_enum_cb_t trace_handle=NULL;
-    //lts_output_t trace_output=NULL;
 
     char *ltl_semantics;
     int   ltl_type;
@@ -79,6 +79,8 @@ static struct {
 } opt = {
     .model = NULL,
     .trc_output = NULL,
+    .trace_handle = NULL,
+    .trace_output = NULL,
     .dlk_detect = 0,
     .ltl_semantics = "spin",
     .ltl_type = PINS_LTL_SPIN,
@@ -345,6 +347,56 @@ void print_state(gsea_state_t* state)
 }
 
 
+/****************************
+ * ___  __        __   ___  *
+ *  |  |__)  /\  /  ` |__   *
+ *  |  |  \ /~~\ \__, |___  *
+ ****************************/
+
+static void
+write_trace_state(model_t model, int src_no, int *state){
+    Warning(debug,"dumping state %d",src_no);
+    int labels[global.state_labels];
+    if (global.state_labels) GBgetStateLabelsAll(model,state,labels);
+    enum_state(opt.trace_handle,0,state,labels);
+}
+
+struct write_trace_step_s {
+    int* src_state;
+    int* dst_state;
+    int found;
+    int depth;
+};
+
+static void write_trace_next(void*arg,transition_info_t*ti,int*dst){
+    struct write_trace_step_s*ctx=(struct write_trace_step_s*)arg;
+    if(ctx->found) return;
+    for(size_t i=0;i<global.N;i++) {
+        if (ctx->dst_state[i]!=dst[i]) return;
+    }
+    ctx->found=1;
+    enum_seg_seg(opt.trace_handle,0,ctx->depth-1,0,ctx->depth,ti->labels);
+}
+
+static void write_trace_step(model_t model, int*src,int*dst, int depth){
+    //Warning(debug,"finding edge for state %d",src_no);
+    struct write_trace_step_s ctx;
+    ctx.src_state=src;
+    ctx.dst_state=dst;
+    ctx.found=0;
+    ctx.depth=depth;
+    GBgetTransitionsAll(model,src,write_trace_next,&ctx);
+    if (ctx.found==0) Fatal(1,error,"no matching transition found");
+}
+
+
+
+
+
+
+
+
+
 /* GSEA run configurations */
 
 /********************
@@ -462,9 +514,10 @@ bfs_vset_closed(gsea_state_t* state, void* arg)
 
 /* dfs framework configuration */
 static int
-dfs_goal_trace_cb(int* stack_element)
+dfs_goal_trace_cb(int* stack_element, void* ctx)
 {
-    printf("state %p, %d\n", stack_element, *stack_element);
+    struct write_trace_step_s* trace_ctx = (struct write_trace_step_s*)ctx;
+    // printf("state %p, %d\n", stack_element, *stack_element);
     gsea_state_t state;
     // todo: this needs some assign functon instead of peek?
     // assign(state, arg, *queue); -> do what's needed to assign
@@ -473,14 +526,48 @@ dfs_goal_trace_cb(int* stack_element)
     state.state=stack_element;
     gc.queue.filo.stack_to_state(&state, NULL);
     // this is the state..
-    print_state(&state);
+    // print_state(&state);
+
+    // last state
+    memcpy(trace_ctx->src_state, trace_ctx->dst_state, global.N * sizeof(int));
+    memcpy(trace_ctx->dst_state, state.state, global.N * sizeof(int));
+
+    // write transition, except on initial state
+    if (trace_ctx->depth != 0)
+        write_trace_step(opt.model, trace_ctx->src_state, trace_ctx->dst_state, trace_ctx->depth);
+
+    write_trace_state(opt.model, trace_ctx->depth, trace_ctx->dst_state);
+    trace_ctx->depth++;
     return 1;
 }
 
 static void
 dfs_goal_trace(gsea_state_t* state, void* arg)
 {
-    dfs_stack_walk(gc.queue.filo.stack, dfs_goal_trace_cb);
+    int src[global.N];
+    int dst[global.N];
+    struct write_trace_step_s ctx;
+    ctx.src_state = src;
+    ctx.dst_state = dst;
+    ctx.depth = 0;
+    ctx.found = 0;
+
+    // init trace output
+    opt.trace_output=lts_output_open(opt.trc_output,opt.model,1,0,1,"vsi",NULL);
+    {
+        int init_state[global.N];
+        GBgetInitialState(opt.model, init_state);
+        lts_output_set_root_vec(opt.trace_output,(uint32_t*)init_state);
+        lts_output_set_root_idx(opt.trace_output,0,0);
+    }
+    opt.trace_handle=lts_output_begin(opt.trace_output,0,1,0);
+
+    // init context, pass context to stackwalker
+    dfs_stack_walk_down(gc.queue.filo.stack, dfs_goal_trace_cb, &ctx);
+
+    lts_output_end(opt.trace_output,opt.trace_handle);
+    lts_output_close(&opt.trace_output);
+
     (void)state;
     (void)arg;
 }
@@ -1165,9 +1252,6 @@ gsea_finished(void* arg) {
     return;
     (void)arg;
 }
-
-
-
 
 
 
