@@ -103,7 +103,7 @@ ltsmin_parse_LDADD = libltsmin.la
 
 # dve22lts-grey
 dve22lts_grey_SOURCES  = spec2lts-grey.c dve2-greybox.c dve2-greybox.h    \
-                         lts.c lts.h vset_atermdd.c
+                         vset_atermdd.c
 dve22lts_grey_LDADD    = libltsmin.la -lATerm $(DVEC2_LIBS)
 dve22lts_grey_CPPFLAGS = -DDIVINE2 $(MCRL_CPPFLAGS) $(DIVINE2_CPPFLAGS) $(AM_CPPFLAGS)
 dve22lts_grey_LDFLAGS  = $(DIVINE2_LDFLAGS) $(MCRL_LDFLAGS) $(AM_LDFLAGS)
@@ -146,7 +146,7 @@ nips2lts_grey_LDFLAGS  = $(NIPS_LDFLAGS) $(MCRL_LDFLAGS) $(AM_LDFLAGS)
 
 # dve2-reach
 dve2_reach_SOURCES  = spec-reach.c dve2-greybox.c dve2-greybox.h  \
-                     lts.c lts.h vset_atermdd.c
+                      vset_atermdd.c
 dve2_reach_LDADD    = libltsmin.la -lATerm $(DVEC2_LIBS)
 dve2_reach_CPPFLAGS = -DDIVINE2 $(DIVINE2_CPPFLAGS) $(MCRL_CPPFLAGS) $(AM_CPPFLAGS)
 dve2_reach_LDFLAGS  = $(DIVINE2_LDFLAGS) $(MCRL_LDFLAGS) $(AM_LDFLAGS)
@@ -250,8 +250,7 @@ dve22lts_mc_CPPFLAGS = -DDIVINE2 $(DIVINE2_CPPFLAGS) $(AM_CPPFLAGS)
 dve22lts_mc_LDFLAGS  = $(DIVINE2_LDFLAGS) $(AM_LDFLAGS)
 
 # etf2lts-mc
-etf2lts_mc_SOURCES  = spec2lts-mc.c etf-greybox.c etf-greybox.h config.h \
-                      lts.c lts.h
+etf2lts_mc_SOURCES  = spec2lts-mc.c etf-greybox.c etf-greybox.h config.h
 etf2lts_mc_LDADD    = libltsmin.la
 etf2lts_mc_CPPFLAGS = -DETF $(MCRL_CPPFLAGS) $(AM_CPPFLAGS)
 etf2lts_mc_LDFLAGS  = $(MCRL_LDFLAGS) $(AM_LDFLAGS)

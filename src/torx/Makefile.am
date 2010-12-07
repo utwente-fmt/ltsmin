@@ -41,7 +41,6 @@ dve2torx_LDFLAGS  = $(DIVINE_LDFLAGS) $(AM_LDFLAGS)
 # dve22torx
 dve22torx_SOURCES  = \
 	../dve2-greybox.c ../dve2-greybox.h \
-	../lts.c ../lts.h \
 	spec2torx.c
 dve22torx_LDADD    = ../libltsmin.la $(DVEC2_LIBS)
 dve22torx_CPPFLAGS = -DDIVINE2 $(TORX_CPPFLAGS) $(DIVINE2_CPPFLAGS) $(AM_CPPFLAGS)
