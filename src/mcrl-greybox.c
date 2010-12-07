@@ -250,11 +250,6 @@ void MCRLloadGreyboxModel(model_t m,const char*model){
 	dm_create(&sl_info, 0, state_length);
 	GBsetStateLabelInfo(m, &sl_info);
 
-	if (RTverbosity >=2) {
-	  fprintf(stderr,"Regrouped dependency Matrix:\n");
-	  GBprintDependencyMatrix(stderr,m);
-	}
-
 	STsetInitialState();
 	int temp[state_length];
 	for(int i=0;i<state_length;i++) temp[i]=ATfindIndex(termmap,dst[i]);

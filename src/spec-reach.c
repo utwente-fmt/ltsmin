@@ -998,9 +998,8 @@ void do_output(){
 		int values=GBchunkCount(model,i);
 		for(int j=0;j<values;j++){
 			chunk c=GBchunkGet(model,i,j);
-			size_t len=c.len*2+3;
-			char str[len];
-			chunk2string(c,len,str);
+			char str[c.len*2+6];
+			chunk2string(c,sizeof str,str);
 			fprintf(table_file,"%s\n",str);
 		}
 		fprintf(table_file,"end sort\n");

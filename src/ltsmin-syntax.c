@@ -240,9 +240,8 @@ void LTSminPrintExpr(log_t log,ltsmin_parse_env_t env,ltsmin_expr_t expr){
         case CHUNK: {
             chunk c;
             c.data=SIgetC(env->values,expr->idx,(int*)&c.len);
-            int len=c.len*2+3;
-            char print[len];
-            chunk2string(c,len,print);
+            char print[c.len*2+6];
+            chunk2string(c,sizeof print,print);
             log_printf(info,"%s",print);
             break;
         }
