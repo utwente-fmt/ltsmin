@@ -56,13 +56,10 @@ lpo2torx_CPPFLAGS = -DMCRL $(TORX_CPPFLAGS) $(AM_CPPFLAGS) $(MCRL_CPPFLAGS)
 lpo2torx_LDFLAGS  = $(MCRL_LDFLAGS) $(AM_LDFLAGS)
 
 # lps2torx
-lps2torx_SOURCES  = \
-	../mcrl2-greybox.cpp ../mcrl2-greybox.h \
-	../at-map.c ../at-map.h \
-	spec2torx.c
-lps2torx_LDADD    = ../libltsmin.la $(MCRL2_LIBS)
-lps2torx_CPPFLAGS = -DMCRL2 $(TORX_CPPFLAGS) $(MCRL2_CPPFLAGS) $(AM_CPPFLAGS)
-lps2torx_LDFLAGS  = $(MCRL2_LDFLAGS) $(AM_LDFLAGS)
+lps2torx_SOURCES  = spec2torx.c
+lps2torx_LDADD    = ../libmcrl2-pins.la ../libltsmin.la
+lps2torx_CPPFLAGS = -DMCRL2 $(TORX_CPPFLAGS) $(AM_CPPFLAGS)
+nodist_EXTRA_lps2torx_SOURCES = ../automake-force-linker.cxx
 
 # nips2torx
 nips2torx_SOURCES  = \
