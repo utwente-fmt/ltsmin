@@ -28,7 +28,7 @@ typedef struct {
 /**
 \brief Find the value for a given key, or -1 if it does not exist.
  */
-extern int linear_search(si_map_entry map[],const char*key);
+extern int linear_search(const si_map_entry map[],const char*key);
 
 /**
 \brief Parse a string that represents command line options.
