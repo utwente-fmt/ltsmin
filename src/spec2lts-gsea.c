@@ -295,7 +295,7 @@ typedef struct gsea_context {
     void (*foreach_open)( foreach_open_cb, void*);
 
     // open insert
-    int (*has_open)(void*);
+    int (*has_open)(gsea_state_t*, void*);
     int (*open_insert_condition)(gsea_state_t*, void*);
 
     // open set
@@ -438,7 +438,7 @@ bfs_tree_closed_insert(gsea_state_t* state, void* arg) {
     global.explored++;
     return; (void)state; (void)arg;
 }
-static int bfs_tree_open_size(void* arg) { return global.visited - global.explored; (void)arg; }
+static int bfs_tree_has_open(gsea_state_t* state, void* arg) { return global.visited - global.explored; (void)state; (void)arg; }
 static int bfs_tree_open_insert_condition(gsea_state_t* state, void* arg) { return 1; (void)state; (void)arg; }
 
 
@@ -583,21 +583,6 @@ dfs_open_insert(gsea_state_t* state, void* arg)
 static void
 dfs_open_extract(gsea_state_t* state, void* arg)
 {
-    int is_backtrack;
-    do {
-        is_backtrack = 0;
-        // detect backtrack
-        while (dfs_stack_frame_size(gc.queue.filo.stack) == 0) {
-            // gc.backtrack(state, arg);
-            dfs_stack_leave(gc.queue.filo.stack);
-            // pop, because the backtrack state must be closed (except if reopened, which is unsupported)
-            // printf("backtrack %d:\n", * dfs_stack_top(gc.queue.filo.stack));
-            // less depth
-            global.depth--;
-            is_backtrack = 1;
-        }
-        gc.queue.filo.peek(state, arg);
-    } while (gc.queue.filo.closed(state, is_backtrack, arg) && dfs_stack_pop(gc.queue.filo.stack));
     gc.queue.filo.stack_to_state(state, arg);
 
     // update max depth
@@ -610,30 +595,26 @@ dfs_open_extract(gsea_state_t* state, void* arg)
     (void)arg;
 }
 
-// the visited - explored condition prevents backtracking from being called
-// problem, stack can be filled without open states..
-// solution, has_open should be adapted for this, to backtrack to the latest state
 static int
-dfs_open_size(void* arg) {
-    size_t open_size = global.visited-global.explored;
-    if (open_size) return open_size;
-    //if (gc.queue.filo.backtrack == NULL) return; // or gc.state_backtrack fn
-    if (gc.state_backtrack == NULL) return 0;
-    // pop the stack, backtrack
-    // note: this isn't correct for grey
-    // might need to pop / backtrack first
+dfs_has_open(gsea_state_t* state, void* arg) {
+    int is_backtrack;
     do {
+        if (dfs_stack_size(gc.queue.filo.stack) == 0) return 0;
+        is_backtrack = 0;
         // detect backtrack
-        while (dfs_stack_size(gc.queue.filo.stack) && dfs_stack_frame_size(gc.queue.filo.stack) == 0) {
+        while (dfs_stack_frame_size(gc.queue.filo.stack) == 0) {
             // gc.backtrack(state, arg);
             dfs_stack_leave(gc.queue.filo.stack);
             // pop, because the backtrack state must be closed (except if reopened, which is unsupported)
-            dfs_stack_pop(gc.queue.filo.stack);
+            // printf("backtrack %d:\n", * dfs_stack_top(gc.queue.filo.stack));
+            // if (gc.state_backtrack) gc.state_backtrack(state, arg);
             // less depth
             global.depth--;
+            is_backtrack = 1;
         }
-    } while (dfs_stack_size(gc.queue.filo.stack) && dfs_stack_pop(gc.queue.filo.stack));
-    return 0;
+        gc.queue.filo.peek(state, arg);
+    } while (gc.queue.filo.closed(state, is_backtrack, arg) && dfs_stack_pop(gc.queue.filo.stack));
+    return 1;
     (void)arg;
 }
 
@@ -900,8 +881,9 @@ gsea_init_default(gsea_state_t* state)
 }
 
 static int
-gsea_has_open_default(void* arg) {
+gsea_has_open_default(gsea_state_t* state, void* arg) {
     return (gc.open_size(arg) != 0);
+    (void)state;
 }
 
 static int
@@ -995,7 +977,7 @@ gsea_setup_default()
         if (opt.strategy == Strat_DFS) {
             gc.open_insert_condition = dfs_open_insert_condition;
             gc.open_insert = dfs_open_insert;
-            gc.open_size = dfs_open_size;
+            gc.has_open = dfs_has_open;
             gc.open_extract = dfs_open_extract;
             gc.state_next = dfs_state_next_all;
             gc.goal_trace = dfs_goal_trace;
@@ -1024,8 +1006,7 @@ gsea_setup()
                 gc.open_insert_condition = bfs_tree_open_insert_condition;
                 gc.open_insert = bfs_tree_open_insert;
                 gc.open_extract = bfs_tree_open_extract;
-                gc.has_open = bfs_tree_open_size;
-                gc.open_size = bfs_tree_open_size;
+                gc.has_open = bfs_tree_has_open;
                 gc.closed_insert = bfs_tree_closed_insert;
 
                 gc.store.tree.dbs = TreeDBScreate(global.N);
@@ -1194,7 +1175,7 @@ static void
 gsea_foreach_open(foreach_open_cb open_cb, void* arg)
 {
     gsea_state_t s_open;
-    while(gc.has_open(arg)) {
+    while(gc.has_open(&s_open, arg)) {
         gc.open_extract(&s_open, arg);
         open_cb(&s_open, arg);
     }
