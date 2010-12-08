@@ -254,7 +254,7 @@ typedef union gsea_queue {
 
         // queue/store specific callbacks
         void (*push)(gsea_state_t*, void*);
-        void (*pop)(gsea_state_t*, void*);
+        int* (*pop)(gsea_state_t*, void*);
         void (*peek)(gsea_state_t*, void*);
             // peeks a state representation from the stack
         // closed test for the stack
@@ -573,12 +573,12 @@ dfs_init(gsea_state_t* state)
     return NULL;
 }
 
-static void
-dfs_open_insert(gsea_state_t* state, void* arg)
+static int*
+dfs_pop(gsea_state_t* state, void* arg)
 {
-    gc.queue.filo.state_to_stack(state, arg);
-    gc.queue.filo.push(state, arg);
-    return;
+    return dfs_stack_pop(gc.queue.filo.stack);
+    (void)state;
+    (void)arg;
 }
 
 static void
@@ -617,7 +617,7 @@ dfs_has_open(gsea_state_t* state, void* arg) {
         gc.queue.filo.peek(state, arg);
     } while (gc.queue.filo.closed(state, is_backtrack, arg) &&
              (!is_backtrack || (!has_backtrack || gc.state_backtrack(state, arg)) ) &&
-             dfs_stack_pop(gc.queue.filo.stack)
+             gc.queue.filo.pop(state, arg)
             );
     return 1;
     (void)arg;
@@ -703,7 +703,7 @@ dfs_tree_stack_to_state(gsea_state_t* state, void* arg)
 { state->state = gc.context; TreeUnfold(gc.store.tree.dbs, state->tree.tree_idx, gc.context); return; (void)arg; }
 
 static void
-dfs_tree_open_insert(gsea_state_t* state, void* arg)
+dfs_tree_stack_push(gsea_state_t* state, void* arg)
 {
     dfs_stack_push(gc.queue.filo.stack, &(state->tree.tree_idx));
     return;
@@ -739,7 +739,7 @@ static void dfs_vset_stack_to_state(gsea_state_t* state, void* arg) { (void)stat
 
 
 static void
-dfs_vset_open_insert(gsea_state_t* state, void* arg)
+dfs_vset_stack_push(gsea_state_t* state, void* arg)
 {
     dfs_stack_push(gc.queue.filo.stack, state->state);
     return;
@@ -782,7 +782,7 @@ dfs_table_stack_to_state(gsea_state_t* state, void* arg)
     (void)arg;
 }
 
-static void dfs_table_open_insert(gsea_state_t* state, void* arg)
+static void dfs_table_stack_push(gsea_state_t* state, void* arg)
 {
     dfs_stack_push(gc.queue.filo.stack, &(state->table.hash_idx));
     return;
@@ -881,22 +881,6 @@ error_state_arg(gsea_state_t* state, void* arg)
     (void)arg;
 }
 
-static int
-error_state_int_arg(gsea_state_t* state, int i, void* arg)
-{
-    error_state_arg(state, arg);
-    (void)i;
-    return 0;
-}
-
-static void
-error_arg(void* arg)
-{
-    Fatal(1, error, "unimplemented functionality in gsea configuration");
-    return;
-    (void)arg;
-}
-
 static void*
 gsea_init_default(gsea_state_t* state)
 {
@@ -964,51 +948,72 @@ gsea_goal_trace_default(gsea_state_t* state, void* arg)
 static void
 gsea_setup_default()
 {
+    // general setup
+    if (!gc.foreach_open)               gc.foreach_open = gsea_foreach_open;
+    if (!gc.open_insert_condition)      gc.open_insert_condition = gsea_open_insert_condition_default;
+    if (!gc.goal_trace)                 gc.goal_trace = gsea_goal_trace_default;
+    if (!gc.report_progress)            gc.report_progress = gsea_progress;
+    if (!gc.report_finished)            gc.report_finished = gsea_finished;
+
+    switch (opt.strategy) {
+    case Strat_BFS:
+        // check required functions
+        if (!gc.has_open)               gc.has_open = (gsea_int) error_state_arg;
+        if (!gc.open_insert)            gc.open_insert = error_state_arg;
+        if (!gc.open_delete)            gc.open_delete = error_state_arg;
+        if (!gc.open)                   gc.open = (gsea_int) error_state_arg;
+        if (!gc.open_extract)           gc.open_extract = error_state_arg;
+        if (!gc.closed_insert)          gc.closed_insert = error_state_arg;
+        if (!gc.closed_delete)          gc.closed_delete = error_state_arg;
+        if (!gc.closed)                 gc.closed = (gsea_int) error_state_arg;
         // setup standard bfs/tree configuration
-        gc.init = gsea_init_default;
-        gc.foreach_open = gsea_foreach_open;
-        gc.has_open = (gsea_int) error_state_arg;
-        gc.open_insert_condition = gsea_open_insert_condition_default;
-        gc.open_insert = error_state_arg;
-        gc.open_delete = error_state_arg;
-        gc.open = (gsea_int) error_state_arg;
-        gc.open_extract = error_state_arg;
-        gc.closed_insert = error_state_arg;
-        gc.closed_delete = error_state_arg;
-        gc.closed = (gsea_int) error_state_arg;
-        gc.pre_state_next = NULL;
+        if (!gc.init)                   gc.init = gsea_init_default;
+
         if (opt.call_mode == UseGreyBox) {
-            gc.state_next = gsea_state_next_grey_default;
+            if (!gc.state_next)         gc.state_next = gsea_state_next_grey_default;
         } else {
-            gc.state_next = gsea_state_next_all_default;
+            if (!gc.state_next)         gc.state_next = gsea_state_next_all_default;
         }
-        gc.state_backtrack = NULL;
-        gc.post_state_next = NULL;
-        gc.goal_reached = (gsea_int) error_state_arg;
-        gc.goal_trace = gsea_goal_trace_default;
-        gc.report_progress = gsea_progress;
-        gc.report_finished = gsea_finished;
+        break;
+    case Strat_DFS:
+    case Strat_SCC:
+        // init filo  queue
+        if (!gc.queue.filo.push)        Fatal(1, error, "GSEA push() not implemented");
+        if (!gc.queue.filo.pop)         gc.queue.filo.pop = dfs_pop;
+        if (!gc.queue.filo.peek)        Fatal(1, error, "GSEA peek() not implemented");
+        if (!gc.queue.filo.stack_to_state)  Fatal(1, error, "GSEA stack_to_state() not implemented");
+        if (!gc.queue.filo.state_to_stack)  Fatal(1, error, "GSEA state_to_stack() not implemented");
+        if (!gc.queue.filo.closed)      Fatal(1, error, "GSEA stack closed() not implemented");
+
+        if (opt.call_mode == UseGreyBox) {
+            Fatal(1, error, "--grey not implemented for dfs");
+        } else {
+            if (!gc.state_next)             gc.state_next = dfs_state_next_all;
+        }
 
         // setup dfs framework
-        if (opt.strategy == Strat_DFS) {
-            gc.init = dfs_init;
-            gc.open_insert_condition = dfs_open_insert_condition;
-            gc.open_insert = dfs_open_insert;
-            gc.has_open = dfs_has_open;
-            gc.open_extract = dfs_open_extract;
-            gc.state_next = dfs_state_next_all;
-            gc.goal_trace = dfs_goal_trace;
+        if (!gc.init)                   gc.init = dfs_init;
+        if (!gc.open_insert_condition)  gc.open_insert_condition = dfs_open_insert_condition;
+        if (!gc.open_insert)            gc.open_insert = gc.queue.filo.push;
+        if (!gc.has_open)               gc.has_open = dfs_has_open;
+        if (!gc.open_extract)           gc.open_extract = dfs_open_extract;
+        if (!gc.goal_trace)             gc.goal_trace = dfs_goal_trace;
+        break;
+    }
 
-            // init filo  queue
-            gc.queue.filo.push = error_state_arg;
-            gc.queue.filo.pop = error_state_arg;
-            gc.queue.filo.peek = error_state_arg;
-            gc.queue.filo.stack_to_state = error_state_arg;
-            gc.queue.filo.state_to_stack = error_state_arg;
-            gc.queue.filo.closed = error_state_int_arg;
-            if (opt.call_mode == UseGreyBox)
-                Fatal(1, error, "--grey not implemented for dfs");
-        }
+    // options setup
+
+    // check deadlocks?
+    if (opt.dlk_detect) {
+        gc.dlk_placeholder = gc.post_state_next;
+        gc.post_state_next = gsea_dlk_default;
+    }
+
+    // maximum search depth?
+    if (opt.max != UINT_MAX) {
+        gc.max_placeholder = gc.open_insert_condition;
+        gc.open_insert_condition = gsea_max_wrapper;
+    }
 }
 
 static void
@@ -1053,12 +1058,12 @@ gsea_setup()
         switch (opt.state_db) {
             case DB_TreeDBS:
                 // setup dfs/tree configuration
-                gc.open_insert = dfs_tree_open_insert;
                 gc.closed_insert = dfs_tree_closed_insert;
                 gc.closed = dfs_tree_closed;
                 gc.open_insert_condition = dfs_tree_open_insert_condition;
 
                 gc.queue.filo.closed = dfs_tree_stack_closed;
+                gc.queue.filo.push = dfs_tree_stack_push;
                 gc.queue.filo.peek = dfs_tree_stack_peek;
                 gc.queue.filo.stack_to_state = dfs_tree_stack_to_state;
                 gc.queue.filo.state_to_stack = dfs_tree_state_to_stack;
@@ -1070,12 +1075,12 @@ gsea_setup()
                 break;
             case DB_Vset:
                 // dfs/vset configuration
-                gc.open_insert = dfs_vset_open_insert;
                 gc.closed_insert = dfs_vset_closed_insert;
                 gc.closed = dfs_vset_closed;
                 gc.open_insert_condition = dfs_vset_open_insert_condition;
 
                 gc.queue.filo.closed = dfs_vset_stack_closed;
+                gc.queue.filo.push = dfs_vset_stack_push;
                 gc.queue.filo.peek = dfs_vset_stack_peek;
                 gc.queue.filo.stack_to_state = dfs_vset_stack_to_state;
                 gc.queue.filo.state_to_stack = dfs_vset_state_to_stack;
@@ -1088,12 +1093,12 @@ gsea_setup()
                 gc.queue.filo.stack = dfs_stack_create(global.N);
                 break;
             case DB_DBSLL:
-                gc.open_insert = dfs_table_open_insert;
                 gc.closed_insert = dfs_table_closed_insert;
                 gc.closed = dfs_table_closed;
                 gc.open_insert_condition = dfs_table_open_insert_condition;
 
                 gc.queue.filo.closed = dfs_table_stack_closed;
+                gc.queue.filo.push = dfs_table_stack_push;
                 gc.queue.filo.peek = dfs_table_stack_peek;
                 gc.queue.filo.stack_to_state = dfs_table_stack_to_state;
                 gc.queue.filo.state_to_stack = dfs_table_state_to_stack;
@@ -1139,18 +1144,6 @@ gsea_setup()
 
     default:
         Fatal(1, error, "unimplemented strategy");
-    }
-
-    // check deadlocks?
-    if (opt.dlk_detect) {
-        gc.dlk_placeholder = gc.post_state_next;
-        gc.post_state_next = gsea_dlk_default;
-    }
-
-    // maximum search depth?
-    if (opt.max != UINT_MAX) {
-        gc.max_placeholder = gc.open_insert_condition;
-        gc.open_insert_condition = gsea_max_wrapper;
     }
 }
 
@@ -1295,8 +1288,9 @@ int main(int argc, char *argv[]){
     GBgetInitialState(opt.model,src);
     Warning(info,"got initial state");
 
-    gsea_setup_default();
+    memset(&gc, 0, sizeof(gsea_context_t));
     gsea_setup();
+    gsea_setup_default();
     gsea_search(src);
 
 	return 0;
