@@ -101,32 +101,14 @@ extern void (*RThandleFatal)(const char*file,int line,int errnum,int code);
 #define WarningCall(log,...) HREmessageCall(log,__VA_ARGS__)
 #define Log(log,...) HREmessage(log,__VA_ARGS__)
 #define LogCall(log,...) HREmessageCall(log,__VA_ARGS__)
-#define Fatal(code,log,...) {\
-	log_message(log,__FILE__,__LINE__,0,__VA_ARGS__);\
-	if (RThandleFatal) RThandleFatal(__FILE__,__LINE__,0,code);\
-	if (code==0) {\
-		log_message(log,__FILE__,__LINE__,0,"exit with FAILURE instead of 0");\
-		exit(EXIT_FAILURE);\
-	} else {\
-		exit(code);\
-	}\
-}
-#define FatalCall(code,log,...) {\
-	log_message(log,__FILE__,__LINE__,errno,__VA_ARGS__);\
-	if (RThandleFatal) RThandleFatal(__FILE__,__LINE__,errno,code);\
-	if (code==0) {\
-		log_message(log,__FILE__,__LINE__,errno,"exit with FAILURE instead of 0");\
-		exit(EXIT_FAILURE);\
-	} else {\
-		exit(code);\
-	}\
-}
+#define Fatal(code,log,...) Abort(__VA_ARGS__)
+#define FatalCall(code,log,...) AbortCall(__VA_ARGS__)
 
 /**
 \brief Check if an integer is between a minimum and a maximum.
 */
 #define RangeCheckInt(val,min,max) if ((val) < (min) || (val) > (max)) \
-    Fatal(1,error,"value %d is out of range [%d,%d]",val,min,max)
+    Abort("value %d is out of range [%d,%d]",val,min,max)
 
 ///@}
 
