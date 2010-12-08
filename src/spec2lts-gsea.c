@@ -758,10 +758,6 @@ dfs_table_stack_to_state(gsea_state_t* state, void* arg)
 
 static void dfs_table_open_insert(gsea_state_t* state, void* arg)
 {
-    if (!DBSLLlookup_ret(gc.store.table.dbs, state->state, &(state->table.hash_idx))) {
-        global.visited++;
-    }
-
     dfs_stack_push(gc.queue.filo.stack, &(state->table.hash_idx));
     return;
     (void)arg;
@@ -772,9 +768,7 @@ static void dfs_table_closed_insert(gsea_state_t* state, void* arg) { global.exp
 
 static int dfs_table_closed(gsea_state_t* state, void* arg) {
     // state is not yet serialized at this point, hence, this must be done here -> error in framework
-    if (!DBSLLlookup_ret(gc.store.table.dbs, state->state, &(state->table.hash_idx))) {
-        global.visited++;
-    }
+    dfs_table_state_to_stack(state, arg);
     return bitset_test(gc.queue.filo.closed_set, state->table.hash_idx); (void)state; (void)arg;
 }
 
