@@ -432,7 +432,6 @@ bfs_tree_closed_insert(gsea_state_t* state, void* arg) {
         global.depth=++global.max_depth;
         gc.store.tree.level_bound = global.visited;
     }
-    global.explored++;
     return; (void)state; (void)arg;
 }
 static int bfs_tree_has_open(gsea_state_t* state, void* arg) { return global.visited - global.explored; (void)state; (void)arg; }
@@ -478,7 +477,6 @@ static void
 bfs_vset_closed_insert(gsea_state_t* state, void* arg)
 {
     vset_add(gc.store.vset.closed_set, state->state);
-    global.explored++;
     return;
     (void)arg;
 }
@@ -676,7 +674,7 @@ dfs_tree_open_insert(gsea_state_t* state, void* arg)
 }
 
 static void dfs_tree_closed_insert(gsea_state_t* state, void* arg)
-{ global.explored++; bitset_set(gc.queue.filo.closed_set, state->tree.tree_idx); return; (void)arg;}
+{ bitset_set(gc.queue.filo.closed_set, state->tree.tree_idx); return; (void)arg;}
 
 
 static int dfs_tree_closed(gsea_state_t* state, void* arg)
@@ -720,7 +718,6 @@ dfs_vset_open_insert(gsea_state_t* state, void* arg)
 static void
 dfs_vset_closed_insert(gsea_state_t* state, void* arg) {
     vset_add(gc.store.vset.closed_set, state->state);
-    global.explored++;
     return;
     (void)arg;
 }
@@ -764,7 +761,7 @@ static void dfs_table_open_insert(gsea_state_t* state, void* arg)
 }
 
 
-static void dfs_table_closed_insert(gsea_state_t* state, void* arg) { global.explored++; bitset_set(gc.queue.filo.closed_set, state->table.hash_idx); (void)arg;}
+static void dfs_table_closed_insert(gsea_state_t* state, void* arg) { bitset_set(gc.queue.filo.closed_set, state->table.hash_idx); (void)arg;}
 
 static int dfs_table_closed(gsea_state_t* state, void* arg) {
     // state is not yet serialized at this point, hence, this must be done here -> error in framework
@@ -815,7 +812,7 @@ static void scc_table_open_extract(gsea_state_t* state, void* arg)
     (void)arg;
 }
 
-static void scc_table_closed_insert(gsea_state_t* state, void* arg) { global.explored++; bitset_set(gc.queue.filo.closed_set, state->table.hash_idx); (void)arg;}
+static void scc_table_closed_insert(gsea_state_t* state, void* arg) { bitset_set(gc.queue.filo.closed_set, state->table.hash_idx); (void)arg;}
 static int scc_table_open_size(void* arg) { return global.visited - global.explored; (void)arg; }
 
 static int scc_table_open(gsea_state_t* state, void* arg) { return 0; (void)state; (void)arg; }
@@ -1186,6 +1183,9 @@ gsea_foreach_open_cb(gsea_state_t* s_open, void* arg)
 {
     // insert in closed set
     gc.closed_insert(s_open, arg);
+
+    // count new explored state
+    global.explored++;
 
     // find goal state, reopen state.., a*
     if (gc.pre_state_next) gc.pre_state_next(s_open, arg);
