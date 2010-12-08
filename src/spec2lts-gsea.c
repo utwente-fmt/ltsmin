@@ -44,6 +44,13 @@
 
 typedef enum { UseGreyBox , UseBlackBox } mode_t;
 
+typedef struct grey_stack
+{
+    // use only int typed values in here
+    int count;
+    int group;
+} grey_stack_t;
+
 static struct {
     //lts_enum_cb_t output_handle=NULL;
 
@@ -250,6 +257,7 @@ typedef union gsea_store {
 typedef union gsea_queue {
     struct {
         dfs_stack_t stack;
+        dfs_stack_t grey;
         bitset_t closed_set;
 
         // queue/store specific callbacks
@@ -328,6 +336,10 @@ typedef struct gsea_context {
     void (*dlk_placeholder)(gsea_state_t*, void*);
     int  (*max_placeholder)(gsea_state_t*, void*);
 
+    // placeholders for dfs --grey stack functions
+    void (*dfs_grey_push)(gsea_state_t*, void*);
+    int* (*dfs_grey_pop)(gsea_state_t*, void*);
+    int  (*dfs_grey_closed)(gsea_state_t*, int is_backtrack, void*);
 } gsea_context_t;
 
 static gsea_context_t gc;
@@ -638,7 +650,31 @@ dfs_state_next_all(gsea_state_t* state, void* arg)
     (void)arg;
 }
 
-/* idea for dfs with --grey
+/* dfs --grey code */
+static void
+dfs_grey_push(gsea_state_t* state, void* arg)
+{
+    grey_stack_t gs = {0,0};
+    dfs_stack_push(gc.queue.filo.grey, (const int*) &gs);
+    gc.dfs_grey_push(state,arg);
+}
+
+static int*
+dfs_grey_pop(gsea_state_t* state, void* arg)
+{
+    dfs_stack_pop(gc.queue.filo.grey);
+    return gc.dfs_grey_pop(state, arg);
+    (void)state;
+    (void)arg;
+}
+
+static int
+dfs_grey_closed(gsea_state_t* state, int is_backtrack, void* arg)
+{
+    grey_stack_t* gs = (grey_stack_t*) dfs_stack_top(gc.queue.filo.grey);
+    if (gs->group != (int)global.K) return 0;
+    return gc.dfs_grey_closed(state, is_backtrack, arg);
+}
 
 static void
 dfs_state_next_grey(gsea_state_t* state, void* arg)
@@ -648,35 +684,20 @@ dfs_state_next_grey(gsea_state_t* state, void* arg)
     // wrap with enter stack frame
     dfs_stack_enter(gc.queue.filo.stack);
     // restore this states state count
-    int* grey = dfs_stack_peek(gc.queue.filo.stack_grey);
-    state->count = grey.count;
+    grey_stack_t* grey = (grey_stack_t*) dfs_stack_top(gc.queue.filo.grey);
     // original call
-    for(; grey.group < K && state->count == grey.count; grey.group++) {
-        state->count += GBgetTransitionsLong (opt.model, grey.group, state->state, gsea_process, state);
+    state->count = grey->count;
+    // hack: global.explored should be gc.closed_size()
+    // since the state is reexplored, it is counted more then once, so uncount again
+    if (state->count != 0) global.explored--;
+    for(; grey->group < (int)global.K && state->count == grey->count; grey->group++) {
+        state->count += GBgetTransitionsLong (opt.model, grey->group, state->state, gsea_process, state);
     }
-    // update this states count
-    grey.count = state->count;
+    // sync state count
+    grey->count = state->count;
     return;
     (void)arg;
 }
-
-// wrap stack push/pop/is_closed
-push()
-{
-    push {count = 0, group = 0}
-    original_push
-}
-pop()
-{
-    original_pop
-    pop {count, group)
-}
-stack_is_closed(state, backtrack, arg) {
-    if group != K return false;
-    explored-- ; // correct explored?
-    return original is closed;
-}
-*/
 
 
 
@@ -986,7 +1007,18 @@ gsea_setup_default()
         if (!gc.queue.filo.closed)      Fatal(1, error, "GSEA stack closed() not implemented");
 
         if (opt.call_mode == UseGreyBox) {
-            Fatal(1, error, "--grey not implemented for dfs");
+            // wrap stack functions
+            gc.dfs_grey_push = gc.queue.filo.push;
+            gc.dfs_grey_pop = gc.queue.filo.pop;
+            gc.dfs_grey_closed = gc.queue.filo.closed;
+            gc.queue.filo.push = dfs_grey_push;
+            gc.queue.filo.pop  = dfs_grey_pop;
+            gc.queue.filo.closed = dfs_grey_closed;
+            // modify next state function
+            if (gc.state_next)          Fatal(1, error, "state next filled before use of GSEA dfs_state_next_grey()");
+            gc.state_next = dfs_state_next_grey;
+            // init extra stack
+            gc.queue.filo.grey = dfs_stack_create(sizeof(grey_stack_t)/sizeof(int));
         } else {
             if (!gc.state_next)             gc.state_next = dfs_state_next_all;
         }
@@ -1197,6 +1229,9 @@ gsea_foreach_open_cb(gsea_state_t* s_open, void* arg)
     gc.closed_insert(s_open, arg);
 
     // count new explored state
+    // this should hold: global.explored == gc.closed_size()
+    // maybe nicer to count this in closed_insert function
+    // would work with --grey too
     global.explored++;
 
     // find goal state, reopen state.., a*
