@@ -591,7 +591,7 @@ dfs_open_extract(gsea_state_t* state, void* arg)
     // update max depth
     if (dfs_stack_nframes(gc.queue.filo.stack) > global.max_depth) {
         global.max_depth++;
-        if (RTverbosity > 1) Warning(info, "new level %zu, visited %zu states, %zu transitions", global.max_depth, global.visited, global.ntransitions);
+        if (RTverbosity > 1) Warning(info, "new level %zu, explored %zu states, %zu transitions", global.max_depth, global.explored, global.ntransitions);
     }
     // printf("state %d:", state->tree.tree_idx); print_state(state);
     return;
@@ -1220,8 +1220,7 @@ gsea_progress(void* arg) {
     if (!cas (&opt.threshold, opt.threshold, opt.threshold << 1))
         return;
     Warning (info, "explored %zu levels ~%zu states ~%zu transitions",
-             global.max_depth, global.visited, global.ntransitions);
-             //global.max_depth, global.explored, global.ntransitions); // more clear?
+             global.max_depth, global.explored, global.ntransitions);
     return;
     (void)arg;
 }
@@ -1229,7 +1228,7 @@ gsea_progress(void* arg) {
 static void
 gsea_finished(void* arg) {
     Warning (info, "state space %zu levels, %zu states %zu transitions",
-             global.max_depth, global.visited, global.ntransitions);
+             global.max_depth, global.explored, global.ntransitions);
     return;
     (void)arg;
 }
