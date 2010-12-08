@@ -94,8 +94,8 @@ static void set_reset_ct(){
 static void set_init(){
 	ATprotect(&emptyset);
 	ATprotect(&atom);
-	emptyset=ATmake("VSET_E");
-	atom=ATmake("VSET_A");
+	emptyset=ATparse("VSET_E");
+	atom=ATparse("VSET_A");
 	cons=ATmakeAFun("VSET_C",3,ATfalse);
 	ATprotectAFun(cons);
 	zip=ATmakeAFun("VSET_ZIP",2,ATfalse);
@@ -111,9 +111,9 @@ static void set_init(){
     inv_reach=ATmakeAFun("VSET_INV_REACH",2,ATfalse);
 	ATprotectAFun(inv_reach);
 	// used for vector_set_tree:
-	Empty=ATmake("VSET_E");
+	Empty=ATparse("VSET_E");
 	ATprotect(&Empty);
-	Atom=ATmake("VSET_A");
+	Atom=ATparse("VSET_A");
 	ATprotect(&Atom);
 	set_reset_ct();
 }
