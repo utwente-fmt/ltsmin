@@ -654,7 +654,6 @@ static void
 dfs_tree_state_to_stack(gsea_state_t* state, void* arg)
 {
     state->tree.tree_idx = TreeFold(gc.store.tree.dbs, state->state);
-    if ((size_t)state->tree.tree_idx >= global.visited) global.visited++;
     return;
     (void)arg;
 }
@@ -702,13 +701,7 @@ static void dfs_vset_stack_to_state(gsea_state_t* state, void* arg) { (void)stat
 static void
 dfs_vset_open_insert(gsea_state_t* state, void* arg)
 {
-    // this is not necessary, but do this for now
-    // hmm, open insert conditoin should forbid this situation
-    if (!dfs_vset_closed(state, arg) && !vset_member(gc.store.vset.next_set, state->state) && !vset_member(gc.store.vset.current_set, state->state))
-        global.visited++;
-
     dfs_stack_push(gc.queue.filo.stack, state->state);
-    vset_add(gc.store.vset.current_set, state->state);
     return;
     (void)arg;
 }
@@ -736,9 +729,7 @@ dfs_table_stack_peek(gsea_state_t* state, void* arg)
 static void
 dfs_table_state_to_stack(gsea_state_t* state, void* arg)
 {
-    if (!DBSLLlookup_ret(gc.store.table.dbs, state->state, &(state->table.hash_idx))) {
-        global.visited++;
-    }
+    DBSLLlookup_ret(gc.store.table.dbs, state->state, &(state->table.hash_idx));
     return;
     (void)arg;
 }
