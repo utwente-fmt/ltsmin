@@ -638,6 +638,46 @@ dfs_state_next_all(gsea_state_t* state, void* arg)
     (void)arg;
 }
 
+/* idea for dfs with --grey
+
+static void
+dfs_state_next_grey(gsea_state_t* state, void* arg)
+{
+    // new search depth
+    global.depth++;
+    // wrap with enter stack frame
+    dfs_stack_enter(gc.queue.filo.stack);
+    // restore this states state count
+    int* grey = dfs_stack_peek(gc.queue.filo.stack_grey);
+    state->count = grey.count;
+    // original call
+    for(; grey.group < K && state->count == grey.count; grey.group++) {
+        state->count += GBgetTransitionsLong (opt.model, grey.group, state->state, gsea_process, state);
+    }
+    // update this states count
+    grey.count = state->count;
+    return;
+    (void)arg;
+}
+
+// wrap stack push/pop/is_closed
+push()
+{
+    push {count = 0, group = 0}
+    original_push
+}
+pop()
+{
+    original_pop
+    pop {count, group)
+}
+stack_is_closed(state, backtrack, arg) {
+    if group != K return false;
+    explored-- ; // correct explored?
+    return original is closed;
+}
+*/
+
 
 
 
