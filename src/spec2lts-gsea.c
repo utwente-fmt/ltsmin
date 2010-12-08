@@ -300,14 +300,12 @@ typedef struct gsea_context {
     void (*open_delete)(gsea_state_t*, void*);
     int  (*open)(gsea_state_t*, void*);
     void (*open_extract)(gsea_state_t*, void*);
-    int  (*open_size)(void*);
 
     // closed set
     void (*closed_insert)(gsea_state_t*, void*);
     void (*closed_delete)(gsea_state_t*, void*);
     int  (*closed)(gsea_state_t*, void*);
     void (*closed_extract)(gsea_state_t*, void*);
-    int  (*closed_size)(void*);
 
     // state info
     void (*pre_state_next)(gsea_state_t*, void*);
@@ -813,7 +811,6 @@ static void scc_table_open_extract(gsea_state_t* state, void* arg)
 }
 
 static void scc_table_closed_insert(gsea_state_t* state, void* arg) { bitset_set(gc.queue.filo.closed_set, state->table.hash_idx); (void)arg;}
-static int scc_table_open_size(void* arg) { return global.visited - global.explored; (void)arg; }
 
 static int scc_table_open(gsea_state_t* state, void* arg) { return 0; (void)state; (void)arg; }
 static int scc_table_closed(gsea_state_t* state, void* arg) { return 0; (void)state; (void)arg; }
@@ -874,12 +871,6 @@ gsea_init_default(gsea_state_t* state)
 {
     gc.open_insert(state, NULL);
     return NULL;
-}
-
-static int
-gsea_has_open_default(gsea_state_t* state, void* arg) {
-    return (gc.open_size(arg) != 0);
-    (void)state;
 }
 
 static int
@@ -945,17 +936,15 @@ gsea_setup_default()
         // setup standard bfs/tree configuration
         gc.init = gsea_init_default;
         gc.foreach_open = gsea_foreach_open;
-        gc.has_open = gsea_has_open_default;
+        gc.has_open = (gsea_int) error_state_arg;
         gc.open_insert_condition = gsea_open_insert_condition_default;
         gc.open_insert = error_state_arg;
         gc.open_delete = error_state_arg;
         gc.open = (gsea_int) error_state_arg;
         gc.open_extract = error_state_arg;
-        gc.open_size = (int(*)(void*)) error_arg;
         gc.closed_insert = error_state_arg;
         gc.closed_delete = error_state_arg;
         gc.closed = (gsea_int) error_state_arg;
-        gc.closed_size = (int(*)(void*)) error_arg;
         gc.pre_state_next = NULL;
         if (opt.call_mode == UseGreyBox) {
             gc.state_next = gsea_state_next_grey_default;
@@ -1095,7 +1084,6 @@ gsea_setup()
                 gc.open_insert = scc_table_open_insert;
                 gc.open_extract = scc_table_open_extract;
                 gc.open = scc_table_open;
-                gc.open_size = scc_table_open_size;
                 gc.closed_insert = scc_table_closed_insert;
                 gc.closed = scc_table_closed;
 
