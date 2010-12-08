@@ -52,9 +52,6 @@ static struct {
     lts_enum_cb_t trace_handle;
     lts_output_t trace_output;
     int dlk_detect;
-    //int dlk_all_detect=0;
-    //FILE* dlk_all_file=NULL;
-    //int dlk_count=0;
 
     char *ltl_semantics;
     int   ltl_type;
@@ -289,7 +286,7 @@ static void gsea_progress(void* arg);
 
 typedef struct gsea_context {
     // init
-    void* (*gsea_init)(gsea_state_t*);
+    void* (*init)(gsea_state_t*);
 
     // foreach open function
     void (*foreach_open)( foreach_open_cb, void*);
@@ -316,7 +313,7 @@ typedef struct gsea_context {
     void (*pre_state_next)(gsea_state_t*, void*);
     void (*post_state_next)(gsea_state_t*, void*);
     void (*state_next)(gsea_state_t*, void*);
-    void (*state_backtrack)(gsea_state_t*, void*);
+    int  (*state_backtrack)(gsea_state_t*, void*);
 
     // search for state
     int  (*goal_reached)(gsea_state_t*, void*);
@@ -572,6 +569,14 @@ dfs_goal_trace(gsea_state_t* state, void* arg)
     (void)arg;
 }
 
+static void*
+dfs_init(gsea_state_t* state)
+{
+    gc.queue.filo.state_to_stack(state, NULL);
+    gc.open_insert(state, NULL);
+    return NULL;
+}
+
 static void
 dfs_open_insert(gsea_state_t* state, void* arg)
 {
@@ -597,6 +602,7 @@ dfs_open_extract(gsea_state_t* state, void* arg)
 
 static int
 dfs_has_open(gsea_state_t* state, void* arg) {
+    int has_backtrack = gc.state_backtrack != NULL;
     int is_backtrack;
     do {
         if (dfs_stack_size(gc.queue.filo.stack) == 0) return 0;
@@ -613,7 +619,10 @@ dfs_has_open(gsea_state_t* state, void* arg) {
             is_backtrack = 1;
         }
         gc.queue.filo.peek(state, arg);
-    } while (gc.queue.filo.closed(state, is_backtrack, arg) && dfs_stack_pop(gc.queue.filo.stack));
+    } while (gc.queue.filo.closed(state, is_backtrack, arg) &&
+             (!is_backtrack || (!has_backtrack || gc.state_backtrack(state, arg)) ) &&
+             dfs_stack_pop(gc.queue.filo.stack)
+            );
     return 1;
     (void)arg;
 }
@@ -661,10 +670,6 @@ dfs_tree_stack_to_state(gsea_state_t* state, void* arg)
 static void
 dfs_tree_open_insert(gsea_state_t* state, void* arg)
 {
-    // extract
-    state->tree.tree_idx = TreeFold(gc.store.tree.dbs, state->state);
-    if ((size_t)state->tree.tree_idx >= global.visited) global.visited++;
-    // insert
     dfs_stack_push(gc.queue.filo.stack, &(state->tree.tree_idx));
     return;
     (void)arg;
@@ -676,8 +681,8 @@ static void dfs_tree_closed_insert(gsea_state_t* state, void* arg)
 
 static int dfs_tree_closed(gsea_state_t* state, void* arg)
 {
-    // state is not yet serialized at this point, hence, this must be done here -> error in framework
-    state->tree.tree_idx = TreeFold(gc.store.tree.dbs, state->state);
+    // state is not yet serialized at this point, hence, this must be done here -> error in framework?
+    dfs_tree_state_to_stack(state, arg);
     return bitset_test(gc.queue.filo.closed_set, state->tree.tree_idx); (void)state; (void)arg;
 }
 static int dfs_tree_open_insert_condition(gsea_state_t* state, void* arg) { return !dfs_tree_closed(state,arg); (void)state; (void)arg; }
@@ -947,7 +952,7 @@ static void
 gsea_setup_default()
 {
         // setup standard bfs/tree configuration
-        gc.gsea_init = gsea_init_default;
+        gc.init = gsea_init_default;
         gc.foreach_open = gsea_foreach_open;
         gc.has_open = gsea_has_open_default;
         gc.open_insert_condition = gsea_open_insert_condition_default;
@@ -975,6 +980,7 @@ gsea_setup_default()
 
         // setup dfs framework
         if (opt.strategy == Strat_DFS) {
+            gc.init = dfs_init;
             gc.open_insert_condition = dfs_open_insert_condition;
             gc.open_insert = dfs_open_insert;
             gc.has_open = dfs_has_open;
@@ -1162,7 +1168,7 @@ gsea_search(int* src)
 {
     gsea_state_t s0;
     s0.state = src;
-    void* ctx = gc.gsea_init(&s0);
+    void* ctx = gc.init(&s0);
 
     // while open states, process
     gc.foreach_open(gsea_foreach_open_cb, ctx);
