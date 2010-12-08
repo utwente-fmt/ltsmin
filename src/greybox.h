@@ -331,6 +331,9 @@ will keep its contents forever. The user is not allowed to change the contents.
 */
 extern chunk GBchunkGet(model_t model,int type_no,int chunk_no);
 
+/** Retrieve the map used for a specific type. */
+extern void* GBgetChunkMap(model_t model,int type_no);
+
 //@}
 
 /**
