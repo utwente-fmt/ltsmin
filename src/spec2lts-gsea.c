@@ -228,30 +228,32 @@ typedef struct gsea_state {
     };
 } gsea_state_t;
 
-typedef union gsea_store {
-    struct {
-        treedbs_t dbs;
-        size_t level_bound;
-    } tree;
-    struct {
-        vdom_t domain;
-        vset_t closed_set;
-        vset_t current_set;
-        vset_t next_set;
-    } vset;
-    struct {
-        dbs_ll_t dbs;
-
-        // this should probably go somewhere else
+typedef struct gsea_store {
+    union {
         struct {
-            bitset_t         current;
-            dfs_stack_t      active;
-            dfs_stack_t      roots;
-            array_manager_t  dfsnum_man;
-            int             *dfsnum;
-            int              count;
-        } scc;
-    } table;
+            treedbs_t dbs;
+            size_t level_bound;
+        } tree;
+        struct {
+            vdom_t domain;
+            vset_t closed_set;
+            vset_t current_set;
+            vset_t next_set;
+        } vset;
+        struct {
+            dbs_ll_t dbs;
+
+        } table;
+    };
+    // couvreur wrapper
+    struct {
+        bitset_t         current;
+        dfs_stack_t      active;
+        dfs_stack_t      roots;
+        array_manager_t  dfsnum_man;
+        int             *dfsnum;
+        int              count;
+    } scc;
 } gsea_store_t;
 
 typedef union gsea_queue {
@@ -320,11 +322,13 @@ typedef struct gsea_context {
     void (*post_state_next)(gsea_state_t*, void*);
     void (*state_next)(gsea_state_t*, void*);
     int  (*state_backtrack)(gsea_state_t*, void*);
+    void (*state_matched)(gsea_state_t*, void*);
 
     // search for state
     int  (*goal_reached)(gsea_state_t*, void*);
     void (*goal_trace)(gsea_state_t*, void*);
 
+    // reporting
     void (*report_progress)(void*);
     void (*report_finished)(void*);
 
@@ -340,6 +344,12 @@ typedef struct gsea_context {
     void (*dfs_grey_push)(gsea_state_t*, void*);
     int* (*dfs_grey_pop)(gsea_state_t*, void*);
     int  (*dfs_grey_closed)(gsea_state_t*, int is_backtrack, void*);
+
+    // placeholders for scc couvreur wrappers
+    void (*scc_open_extract)(gsea_state_t*, void*);
+    int  (*scc_state_backtrack)(gsea_state_t*, void*);
+    void (*scc_state_matched)(gsea_state_t*, void*);
+
 } gsea_context_t;
 
 static gsea_context_t gc;
@@ -832,44 +842,67 @@ static int dfs_table_open_insert_condition(gsea_state_t* state, void* arg) { ret
  ********************/
 
 /* scc table configuration */
-static void scc_table_open_insert(gsea_state_t* state, void* arg)
+static void scc_open_extract(gsea_state_t* state, void* arg)
 {
-    if (!DBSLLlookup_ret(gc.store.table.dbs, state->state, &(state->table.hash_idx))) {
-        global.visited++;
+    gc.scc_open_extract(state, arg);
+    gc.store.scc.count++;
+    //Warning(info, "state %zu has dfs_num %d", state->tree.tree_idx, gc.store.scc.count);
+    ensure_access(gc.store.scc.dfsnum_man, state->tree.tree_idx);
+    gc.store.scc.dfsnum[state->tree.tree_idx] = gc.store.scc.count;
+    bitset_set(gc.store.scc.current, state->tree.tree_idx);
+
+    //if (accepting state) // there is precisely one accept set (NO GBA support)
+    // fiddle accepting/not accepting in as single a bit
+    int r = state->tree.tree_idx << 1;
+    if (GBbuchiIsAccepting(opt.model, state->state)) {
+        r |= 1;
     }
 
-    dfs_stack_push(gc.queue.filo.stack, &(state->table.hash_idx));
+    dfs_stack_push(gc.store.scc.roots, &r);
+
+    dfs_stack_push(gc.store.scc.active, &state->tree.tree_idx);
+
     return;
     (void)arg;
 }
 
-static void scc_table_open_extract(gsea_state_t* state, void* arg)
+static int scc_state_backtrack(gsea_state_t* state, void* arg)
 {
-    int* idx = NULL;
-    do {
-        idx = dfs_stack_top(gc.queue.filo.stack);
-        if (bitset_test(gc.queue.filo.closed_set, *idx)) {
-            dfs_stack_pop(gc.queue.filo.stack);
-            idx = NULL;
-        }
-    } while (idx == NULL);
-    state->table.hash_idx = *idx;
-    // index is known
-    int hash;
-
-    state->state = DBSLLget(gc.store.table.dbs, *idx, &hash);
-    return;
-    (void)arg;
+    //Warning(info, "backtracked state %d, dfsnum %d", state->tree.tree_idx, gc.store.scc.dfsnum[state->tree.tree_idx]);
+    if (((*dfs_stack_top(gc.store.scc.roots))>>1) == state->tree.tree_idx) {
+        dfs_stack_pop(gc.store.scc.roots);
+        int u;
+        do {
+            u = *dfs_stack_pop(gc.store.scc.active);
+            bitset_clear(gc.store.scc.current, u);
+        } while (u != state->tree.tree_idx);
+    }
+    if (gc.scc_state_backtrack) return gc.scc_state_backtrack(state, arg);
+    return 1;
 }
 
-static void scc_table_closed_insert(gsea_state_t* state, void* arg) { bitset_set(gc.queue.filo.closed_set, state->table.hash_idx); (void)arg;}
-
-static int scc_table_open(gsea_state_t* state, void* arg) { return 0; (void)state; (void)arg; }
-static int scc_table_closed(gsea_state_t* state, void* arg) { return 0; (void)state; (void)arg; }
-
-
-
-
+static void scc_state_matched(gsea_state_t* state, void* arg)
+{
+    if (bitset_test(gc.store.scc.current, state->tree.tree_idx)) {
+        int b = 0, r;
+        do {
+            r = *dfs_stack_pop(gc.store.scc.roots);
+            b |= (r&1);
+            if (b) {
+                opt.threshold = global.visited-1;
+                gc.report_progress(arg);
+                Warning(info, "accepting cycle found!");
+                if (opt.trc_output && gc.goal_trace) {
+                    gc.queue.filo.push(state, arg);
+                    gc.goal_trace(state, arg);
+                }
+                Fatal(1, info, "exiting now");
+            }
+        } while (gc.store.scc.dfsnum[r>>1] > gc.store.scc.dfsnum[state->tree.tree_idx]);
+        dfs_stack_push(gc.store.scc.roots, &r);
+    }
+    if (gc.scc_state_matched) return gc.scc_state_matched(state, arg);
+}
 
 
 
@@ -972,13 +1005,13 @@ gsea_setup_default()
     // general setup
     if (!gc.foreach_open)               gc.foreach_open = gsea_foreach_open;
     if (!gc.open_insert_condition)      gc.open_insert_condition = gsea_open_insert_condition_default;
-    if (!gc.goal_trace)                 gc.goal_trace = gsea_goal_trace_default;
     if (!gc.report_progress)            gc.report_progress = gsea_progress;
     if (!gc.report_finished)            gc.report_finished = gsea_finished;
 
     switch (opt.strategy) {
     case Strat_BFS:
         // check required functions
+        if (!gc.goal_trace)             gc.goal_trace = gsea_goal_trace_default;
         if (!gc.has_open)               gc.has_open = (gsea_int) error_state_arg;
         if (!gc.open_insert)            gc.open_insert = error_state_arg;
         if (!gc.open_delete)            gc.open_delete = error_state_arg;
@@ -996,8 +1029,13 @@ gsea_setup_default()
             if (!gc.state_next)         gc.state_next = gsea_state_next_all_default;
         }
         break;
-    case Strat_DFS:
     case Strat_SCC:
+        // exception for Strat_SCC, only works in combination with ltl formula
+        if (GBgetAcceptingStateLabelIndex(opt.model) < 0) {
+            Abort("NDFS search only works in combination with an accepting state label"
+                  " (see LTL options)");
+        }
+    case Strat_DFS:
         // init filo  queue
         if (!gc.queue.filo.push)        Fatal(1, error, "GSEA push() not implemented");
         if (!gc.queue.filo.pop)         gc.queue.filo.pop = dfs_pop;
@@ -1030,6 +1068,26 @@ gsea_setup_default()
         if (!gc.has_open)               gc.has_open = dfs_has_open;
         if (!gc.open_extract)           gc.open_extract = dfs_open_extract;
         if (!gc.goal_trace)             gc.goal_trace = dfs_goal_trace;
+
+        // scc specifics
+        if (opt.strategy == Strat_DFS) break;
+
+        /* scc wrapper functions */
+        gc.scc_open_extract = gc.open_extract;
+        gc.scc_state_backtrack = gc.state_backtrack;
+        gc.scc_state_matched = gc.state_matched;
+
+        gc.open_extract = scc_open_extract;
+        gc.state_backtrack = scc_state_backtrack;
+        gc.state_matched = scc_state_matched;
+
+        // scc init
+        gc.store.scc.current = bitset_create (128,128);
+        gc.store.scc.active = dfs_stack_create (1);
+        gc.store.scc.roots = dfs_stack_create (1);
+        gc.store.scc.dfsnum_man = create_manager(65536);
+        ADD_ARRAY(gc.store.scc.dfsnum_man, gc.store.scc.dfsnum, int);
+        gc.store.scc.count = 0;
         break;
     }
 
@@ -1086,6 +1144,7 @@ gsea_setup()
         }
         break;
 
+    case Strat_SCC:
     case Strat_DFS:
         switch (opt.state_db) {
             case DB_TreeDBS:
@@ -1139,34 +1198,6 @@ gsea_setup()
                 gc.store.table.dbs = DBSLLcreate(global.N);
                 gc.queue.filo.closed_set = bitset_create(128,128);
                 gc.queue.filo.stack = dfs_stack_create(1);
-                break;
-
-            default:
-                Fatal(1, error, "unimplemented combination --strategy=%s, --state=%s", opt.arg_strategy, opt.arg_state_db );
-        }
-        break;
-
-    case Strat_SCC:
-        switch (opt.state_db) {
-            case DB_DBSLL:
-                gc.open_insert = scc_table_open_insert;
-                gc.open_extract = scc_table_open_extract;
-                gc.open = scc_table_open;
-                gc.closed_insert = scc_table_closed_insert;
-                gc.closed = scc_table_closed;
-
-                gc.context = RTmalloc(sizeof(int) * global.N);
-                gc.store.table.dbs = DBSLLcreate(global.N);
-                gc.queue.filo.closed_set = bitset_create(128,128);
-                gc.queue.filo.stack = dfs_stack_create(1);
-
-                // scc init
-                gc.store.table.scc.current = bitset_create (128,128);
-                gc.store.table.scc.active = dfs_stack_create (1);
-                gc.store.table.scc.roots = dfs_stack_create (1);
-                gc.store.table.scc.dfsnum_man = create_manager(65536);
-                ADD_ARRAY(gc.store.table.scc.dfsnum_man, gc.store.table.scc.dfsnum, int);
-                gc.store.table.scc.count = 0;
                 break;
 
             default:
@@ -1253,8 +1284,11 @@ gsea_process(void* arg, transition_info_t *ti, int *dst)
     gsea_state_t s_next;
     s_next.state = dst;
     // this should be in here.
-    if (gc.open_insert_condition(&s_next, arg))
+    if (gc.open_insert_condition(&s_next, arg)) {
         gc.open_insert(&s_next, arg);
+    } else {
+        if (gc.state_matched) gc.state_matched(&s_next, arg);
+    }
     global.ntransitions++;
     return;
     (void)ti;
