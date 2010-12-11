@@ -149,8 +149,8 @@ int lts_type_get_state_typeno(lts_type_t  t,int idx){
 
 void lts_type_set_state_label_count(lts_type_t  t,int count){
 	t->state_label_count=count;
-	t->state_label_name=(char**)RTmalloc(count*sizeof(char*));
-	t->state_label_type=(int*)RTmalloc(count*sizeof(int));
+	t->state_label_name=RTrealloc(t->state_label_name, count*sizeof(char*));
+	t->state_label_type=RTrealloc(t->state_label_type, count*sizeof(int));
 }
 int lts_type_get_state_label_count(lts_type_t  t){
 	return t->state_label_count;
@@ -181,8 +181,8 @@ int lts_type_get_state_label_typeno(lts_type_t  t,int label){
 
 void lts_type_set_edge_label_count(lts_type_t  t,int count){
 	t->edge_label_count=count;
-	t->edge_label_name=(char**)RTmalloc(count*sizeof(char*));
-	t->edge_label_type=(int*)RTmalloc(count*sizeof(int));
+	t->edge_label_name=RTrealloc(t->edge_label_name, count*sizeof(char*));
+	t->edge_label_type=RTrealloc(t->edge_label_type, count*sizeof(int));
 }
 int lts_type_get_edge_label_count(lts_type_t  t){
 	return t->edge_label_count;
