@@ -385,6 +385,7 @@ typedef struct thread_ctx_s {
     ndfs_color_t        search;         // current NDFS color
     idx_t               seed;           // current NDFS seed
     permute_t          *permute;        // transition permutor
+    bitvector_t         not_all_red;    // all_red gaiser/Schwoon
 } thread_ctx_t;
 
 /* predecessor --(transition_group)--> successor */
@@ -482,8 +483,10 @@ create_context (size_t id)
     if (strategy == Strat_BFS)
         ctx->in_stack = dfs_stack_create (state_info_int_size());
     //allocate two bits for NDFS colorings
-    if (strategy & Strat_LTL)
+    if (strategy & Strat_LTL) {
         bitvector_create_large (&ctx->color_map, 2<<dbs_size);
+        bitvector_create_large (&ctx->not_all_red, 20000000); //magic number for the largest stack i've encountered.
+    }
     else if ( UseGreyBox == call_mode )
         ctx->group_stack = isba_create (1);
     if (files[1]) {
@@ -1310,7 +1313,8 @@ nndfs_blue_handle (void *arg, transition_info_t *ti, state_data_t dst)
              GBbuchiIsAccepting(ctx->model, successor.data)) ) {
         /* Found cycle in blue search */
         ndfs_report_cycle(ctx, &successor);
-    } else if ( nn_color_eq(color, NNWHITE) ) {
+    } else if ( !(nn_color_eq(color, NNRED) || (strategy == Strat_YNNDFS &&
+                  global_has_color(ctx->state.idx, GYELLOW))) ) {
         raw_data_t stack_loc = dfs_stack_push (ctx->stack, NULL);
         state_info_serialize (&successor, stack_loc);
     }
@@ -1426,25 +1430,34 @@ nndfs_blue (thread_ctx_t *ctx, size_t work)
                  !global_has_color(ctx->state.idx, GYELLOW)) ) {
                 nn_set_color (&ctx->color_map, ctx->state.idx, NNCYAN);
                 nndfs_explore_state_blue (ctx, &ctx->counters);
-            } else
+            } else {
+                if (!nn_color_eq(color, NNRED) && !global_has_color(ctx->state.idx, GYELLOW))
+                    bitvector_set ( &ctx->not_all_red, ctx->counters.level_cur );
                 dfs_stack_pop (ctx->stack);
+            }
         } else { //backtrack
             if (0 == dfs_stack_nframes (ctx->stack))
                 return;
+
             dfs_stack_leave (ctx->stack);
-            ctx->counters.level_cur--;
 
             /* call red DFS for accepting states */
             state_data = dfs_stack_top (ctx->stack);
             state_info_deserialize (&ctx->state, state_data, ctx->store);
-            if( GBbuchiIsAccepting(ctx->model, ctx->state.data) ) {
+            if ( !bitvector_is_set(&ctx->not_all_red, ctx->counters.level_cur) ) {
+                nn_set_color (&ctx->color_map, ctx->state.idx, NNRED);
+                global_try_color (ctx->state.idx, GYELLOW);
+                bitvector_unset ( &ctx->not_all_red, ctx->counters.level_cur );
+            } else if( GBbuchiIsAccepting(ctx->model, ctx->state.data) ) {
                 if (strategy == Strat_YNNDFS)
                     nndfs_yellow (ctx);
                 else
                     nndfs_red (ctx);
                 nn_set_color(&ctx->color_map, ctx->state.idx, NNRED);
-            } else
+            } else {
                 nn_set_color(&ctx->color_map, ctx->state.idx, NNBLUE);
+            }
+            ctx->counters.level_cur--;
 
             dfs_stack_pop (ctx->stack);
         }
