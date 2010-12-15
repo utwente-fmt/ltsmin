@@ -1,10 +1,12 @@
+// -*- tab-width:4 ; indent-tabs-mode:nil -*-
+
 #include <config.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
-#include "unix.h"
-#include "runtime.h"
-#include "is-balloc.h"
+#include <unix.h>
+#include <runtime.h>
+#include <is-balloc.h>
 
 #define INIT_MAX_BLOCKS (1024)
 
@@ -97,7 +99,7 @@ isba_push_int(isb_allocator_t buf, const int *element)
     if (buf->cur_index == BLOCK_ELT_SIZE) {
         if (buf->num_block == buf->max_blocks) {
             buf->max_blocks += INIT_MAX_BLOCKS; 
-            realloc(buf->blocks, buf->max_blocks);
+            buf->blocks=RTrealloc(buf->blocks, buf->max_blocks);
         }
         add_block(buf);
     }
