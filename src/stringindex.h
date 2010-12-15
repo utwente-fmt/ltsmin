@@ -1,3 +1,5 @@
+// -*- tab-width:4 ; indent-tabs-mode:nil -*-
+
 /**
 @file stringindex.h
 @brief Indexed set of strings.
@@ -5,6 +7,8 @@
 
 #ifndef STRING_INDEX_H
 #define STRING_INDEX_H
+
+#include <dynamic-array.h>
 
 /// String index handle.
 typedef struct stringindex *string_index_t;
@@ -57,5 +61,7 @@ extern int SIgetRange(string_index_t si);
 /// Get a count of the number of elements.
 extern int SIgetCount(string_index_t si);
 
+/// Get the underlying array manager for data elements.
+extern array_manager_t SImanager(string_index_t si);
 #endif
 
