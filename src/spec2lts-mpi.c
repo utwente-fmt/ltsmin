@@ -478,7 +478,7 @@ int main(int argc, char*argv[]){
 		if (write_state) {
 			output=lts_output_open(files[1],model,mpi_nodes,mpi_me,mpi_nodes,"vsi",NULL);
 		} else {
-			output=lts_output_open(files[1],model,mpi_nodes,mpi_me,mpi_nodes,"-ii",NULL);
+			output=lts_output_open(files[1],model,mpi_nodes,mpi_me,mpi_nodes,"-si",NULL);
 		}
 		lts_output_set_root_vec(output,(uint32_t*)src);
 		lts_output_set_root_idx(output,0,0);
