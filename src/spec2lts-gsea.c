@@ -80,6 +80,9 @@ static struct {
     enum { Strat_BFS, Strat_DFS, Strat_SCC } strategy;
     char *arg_state_db;
     enum { DB_DBSLL, DB_TreeDBS, DB_Vset } state_db;
+
+    char* dot_output;
+    FILE* dot_file;
 } opt = {
     .model = NULL,
     .trc_output = NULL,
@@ -154,6 +157,7 @@ static  struct poptOption development_options[] = {
 static  struct poptOption options[] = {
 	{ NULL, 0 , POPT_ARG_CALLBACK|POPT_CBFLAG_POST|POPT_CBFLAG_SKIPOPTION  , (void*)state_db_popt , 0 , NULL , NULL },
 	{ "deadlock" , 'd' , POPT_ARG_VAL , &opt.dlk_detect , 1 , "detect deadlocks" , NULL },
+	{ "dot" , 0 , POPT_ARG_STRING , &opt.dot_output , 0 , "file to dot graph to" , "<dot output>" },
 	{ "trace" , 0 , POPT_ARG_STRING , &opt.trc_output , 0 , "file to write trace to" , "<lts output>" },
 	{ "state" , 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &opt.arg_state_db , 0 ,
 		"select the data structure for storing states", "<table|tree|vset>"},
@@ -323,6 +327,7 @@ typedef struct gsea_context {
     void (*state_next)(gsea_state_t*, void*);
     int  (*state_backtrack)(gsea_state_t*, void*);
     void (*state_matched)(gsea_state_t*, void*);
+    void (*state_process)(gsea_state_t* src, transition_info_t *ti, gsea_state_t *dst);
 
     // search for state
     int  (*goal_reached)(gsea_state_t*, void*);
@@ -350,6 +355,10 @@ typedef struct gsea_context {
     int  (*scc_state_backtrack)(gsea_state_t*, void*);
     void (*scc_state_matched)(gsea_state_t*, void*);
 
+    // placeholders for dot
+    void (*dot_state_process)(gsea_state_t* src, transition_info_t *ti, gsea_state_t *dst);
+    void (*dot_report_finished)(void*);
+
 } gsea_context_t;
 
 static gsea_context_t gc;
@@ -363,6 +372,35 @@ void print_state(gsea_state_t* state)
     } printf("\n");
 }
 
+/*****************
+ *  __   __  ___ *
+ * |  \ /  \  |  *
+ * |__/ \__/  |  *
+ *****************/
+static void
+gsea_report_finished_dot(void* arg) {
+    fputs("}\n", opt.dot_file);
+    fclose(opt.dot_file);
+    if (gc.dot_report_finished) gc.dot_report_finished(arg);
+}
+
+static void
+gsea_process_dot(gsea_state_t* src, transition_info_t *ti, gsea_state_t *dst)
+{
+    char buf[global.N * 18 + 1024];
+    sprintf(buf, "\"");
+    for(size_t i=0; i < global.N; i++) sprintf(&buf[i*9]+1, "%.8X ", src->state[i]);
+    sprintf(&buf[global.N*9], "\" -> \"");
+    for(size_t i=0; i < global.N; i++) sprintf(&buf[global.N * 9 + 6 + i*9], "%.8X ", dst->state[i]);
+    sprintf(&buf[global.N * 18 + 5], "\"");
+    // just the index (tree/hash)
+    //sprintf(buf, "%d -> %d", src->tree.tree_idx, dst->tree.tree_idx);
+    //sprintf(buf, "%d -> %d", src->table.hash_idx, dst->table.hash_idx);
+
+    fputs(buf, opt.dot_file);
+    fputs("\n", opt.dot_file);
+    if (gc.dot_state_process) gc.dot_state_process(src, ti, dst);
+}
 
 /****************************
  * ___  __        __   ___  *
@@ -1104,6 +1142,21 @@ gsea_setup_default()
         gc.max_placeholder = gc.open_insert_condition;
         gc.open_insert_condition = gsea_max_wrapper;
     }
+
+    // output dot
+    if (opt.dot_output) {
+        opt.dot_file = fopen(opt.dot_output, "w+");
+        if (!opt.dot_file) {
+            Warning(info, "Failed to open DOT output file %s", opt.dot_output);
+        } else {
+            Warning(info, "Writing DOT output to %s", opt.dot_output);
+            fputs("digraph {\n", opt.dot_file);
+            gc.dot_state_process = gc.state_process;
+            gc.dot_report_finished = gc.report_finished;
+            gc.state_process = gsea_process_dot;
+            gc.report_finished = gsea_report_finished_dot;
+        }
+    }
 }
 
 static void
@@ -1290,6 +1343,7 @@ gsea_process(void* arg, transition_info_t *ti, int *dst)
         if (gc.state_matched) gc.state_matched(&s_next, arg);
     }
     global.ntransitions++;
+    if (gc.state_process) gc.state_process((gsea_state_t*)arg, ti, &s_next);
     return;
     (void)ti;
 }
