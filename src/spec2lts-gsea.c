@@ -1354,7 +1354,7 @@ gsea_process(void* arg, transition_info_t *ti, int *dst)
 
 static void
 gsea_progress(void* arg) {
-    if (RTverbosity < 1 || global.visited < opt.threshold)
+    if (RTverbosity < 1 || global.explored < opt.threshold)
         return;
     if (!cas (&opt.threshold, opt.threshold, opt.threshold << 1))
         return;
