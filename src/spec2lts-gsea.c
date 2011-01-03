@@ -439,9 +439,10 @@ write_trace_step (model_t model, int *src, int *dst, int depth)
 static void
 bfs_tree_open_insert(gsea_state_t *state, void *arg)
 {
-    state->tree.tree_idx = TreeFold(gc.store.tree.dbs, state->state);
     if ((size_t)state->tree.tree_idx >= global.visited)
         global.visited++;
+    else if (gc.state_matched) gc.state_matched(state, arg);
+    return;
     (void)arg;
 }
 
@@ -467,19 +468,19 @@ bfs_tree_closed_insert(gsea_state_t *state, void *arg) {
 }
 
 static int
-bfs_tree_has_open (gsea_state_t * state, void *arg)
+bfs_tree_has_open (gsea_state_t *state, void *arg)
 {
     return global.visited - global.explored;
     (void)state; (void)arg;
 }
 
 static int
-bfs_tree_open_insert_condition (gsea_state_t * state, void *arg)
+bfs_tree_open_insert_condition (gsea_state_t *state, void *arg)
 {
-    return 1;
-    (void)state; (void)arg;
+    state->tree.tree_idx = TreeFold(gc.store.tree.dbs, state->state);
+    return ((size_t)state->tree.tree_idx >= global.explored);
+    (void)arg;
 }
-
 
 /* VSET configuration */
 
@@ -602,14 +603,6 @@ dfs_goal_trace(gsea_state_t *state, void *arg)
 
     (void)state;
     (void)arg;
-}
-
-static void*
-dfs_init(gsea_state_t *state)
-{
-    gc.queue.filo.state_to_stack(state, NULL);
-    gc.open_insert(state, NULL);
-    return NULL;
 }
 
 static int*
@@ -992,7 +985,8 @@ error_state_arg(gsea_state_t *state, void *arg)
 static void *
 gsea_init_default(gsea_state_t *state)
 {
-    gc.open_insert(state, NULL);
+    if (gc.open_insert_condition(state, NULL))
+        gc.open_insert(state, NULL);
     return NULL;
 }
 
@@ -1055,6 +1049,7 @@ static void
 gsea_setup_default()
 {
     // general setup
+    if (!gc.init)                       gc.init = gsea_init_default;
     if (!gc.foreach_open)               gc.foreach_open = gsea_foreach_open;
     if (!gc.open_insert_condition)      gc.open_insert_condition = gsea_open_insert_condition_default;
     if (!gc.report_progress)            gc.report_progress = gsea_progress;
@@ -1073,7 +1068,6 @@ gsea_setup_default()
         if (!gc.closed_delete)          gc.closed_delete = error_state_arg;
         if (!gc.closed)                 gc.closed = (gsea_int) error_state_arg;
         // setup standard bfs/tree configuration
-        if (!gc.init)                   gc.init = gsea_init_default;
 
         if (opt.call_mode == UseGreyBox) {
             if (!gc.state_next)         gc.state_next = gsea_state_next_grey_default;
@@ -1114,7 +1108,6 @@ gsea_setup_default()
         }
 
         // setup dfs framework
-        if (!gc.init)                   gc.init = dfs_init;
         if (!gc.open_insert_condition)  gc.open_insert_condition = dfs_open_insert_condition;
         if (!gc.open_insert)            gc.open_insert = gc.queue.filo.push;
         if (!gc.has_open)               gc.has_open = dfs_has_open;
@@ -1327,8 +1320,10 @@ gsea_process(void *arg, transition_info_t *ti, int *dst)
     s_next.state = dst;
     // this should be in here.
     if (gc.open_insert_condition(&s_next, arg)) {
+        ti->por_proviso = 1;
         gc.open_insert(&s_next, arg);
     } else {
+        ti->por_proviso = 0;
         if (gc.state_matched) gc.state_matched(&s_next, arg);
     }
     global.ntransitions++;
