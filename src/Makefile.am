@@ -124,6 +124,7 @@ endif
 
 # ltsmin-parse
 ltsmin_parse_SOURCES = ltsmin-parse.c
+ltsmin_parse_CPPFLAGS = -DNXT -I${top_srcdir}/ltl2ba
 ltsmin_parse_LDADD = libltsmin.la
 
 # spinja2lts-grey
@@ -424,12 +425,22 @@ libutil_la_CPPFLAGS = $(BUDDY_CPPFLAGS) $(CADP_CPPFLAGS)
 libutil_la_LDFLAGS  = $(BUDDY_LDFLAGS) $(CADP_LDFLAGS)
 libutil_la_LIBADD   = ltsmin-grammar.lo dm/libdm.la $(BUDDY_LIBS) $(CADP_LIBS)
 
-libutil_la_CPPFLAGS += $(AM_CPPFLAGS)
+libutil_la_SOURCES += ltl2ba-lex.c
+libutil_la_SOURCES += ltsmin-buchi.h
+libutil_la_CPPFLAGS += -DNXT -I${top_srcdir}/ltl2ba
+libutil_la_LIBADD += ${top_srcdir}/ltl2ba/libltl2ba.la
+
+libutil_la_SOURCES += pins-ltl.c
+
 
 libutil_la_SOURCES += hre-context.c hre-context.h \
 	hre-feedback.c hre-feedback.h hre-internal.h \
 	hre-main.c hre-main.h hre-malloc.c hre-malloc.h \
 	hre-popt.c hre-popt.h hre-pthread.c
+
+
+libutil_la_CPPFLAGS += $(AM_CPPFLAGS)
+
 
 libltsmin_la_SOURCES = hre-nompi.c
 libltsmin_la_LIBADD = libutil.la bignum/libbignum.la

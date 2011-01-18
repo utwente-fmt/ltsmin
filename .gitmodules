@@ -7,3 +7,6 @@
 [submodule "spinja"]
 	path = spinja
 	url = http://fmt.cs.utwente.nl/tools/scm/spinja.git
+[submodule "ltl2ba"]
+	path = ltl2ba
+	url = http://fmt.cs.utwente.nl/tools/scm/ltl2ba.git

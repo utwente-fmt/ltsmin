@@ -48,6 +48,9 @@ LTStypeEnum} data_format_t;
 /// Create a new empty lts type.
 extern lts_type_t lts_type_create();
 
+/// Clone an lts type
+extern lts_type_t lts_type_clone(lts_type_t);
+
 /// Create a new lts type by permuting the state vector of an existing type.
 extern lts_type_t lts_type_permute(lts_type_t t,int *pi);
 
