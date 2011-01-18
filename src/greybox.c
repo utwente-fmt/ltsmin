@@ -538,3 +538,10 @@ struct poptOption greybox_options[]={
           "gs, ga, gc, gr, cs, cn, cw, ca, rs, rn, ru", "<(T,)+>" },
 	POPT_TABLEEND	
 };
+
+void*
+GBgetChunkMap(model_t model,int type_no)
+{
+	return model->map[type_no];
+}
+

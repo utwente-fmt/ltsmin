@@ -1,3 +1,4 @@
+// -*- tab-width:4 ; indent-tabs-mode:nil -*-
 #ifndef LTS_TYPE_H
 #define LTS_TYPE_H
 
@@ -15,7 +16,34 @@
 - What are the types used in the LTS?
 */
 
+/**
+ * opaque type lts_type_t
+ */
 typedef struct lts_type_s *lts_type_t;
+
+/**
+ * enumeration of datatype representations
+ */
+typedef enum {
+/// A direct type deal with any type that can be represented as a 32 bit integer. 
+LTStypeDirect,
+/**
+A range type is used for an integer type from a (small) range of values.
+*/
+LTStypeRange,
+/**
+A chunk type is a type with a possibly infinite domain where each value is serialized.
+
+Because it is not guearanteed that all values can be enumerated, unused values may be garbage collected
+and the order of the numbering may be changed.
+*/
+LTStypeChunk,
+/**
+An enumerated type is a finite chunk type.
+
+It is not allowed to remove values and it is not allowed to change the numering.
+*/
+LTStypeEnum} data_format_t;
 
 /// Create a new empty lts type.
 extern lts_type_t lts_type_create();
@@ -71,9 +99,47 @@ extern char* lts_type_get_edge_label_name(lts_type_t  t,int label);
 extern char* lts_type_get_edge_label_type(lts_type_t  t,int label);
 extern int lts_type_get_edge_label_typeno(lts_type_t  t,int label);
 
+/**
+ * Get the number of data types used.
+ */
 extern int lts_type_get_type_count(lts_type_t  t);
+/**
+\deprecated Use lts_type_put_type instead.
+\brief Add a new type with format LTStypeChunk.
+*/
 extern int lts_type_add_type(lts_type_t  t,const char *name,int* is_new);
+/**
+Get the string representation of a type.
+*/
 extern char* lts_type_get_type(lts_type_t  t,int typeno);
+/**
+ * Test if a type is defined in the give LTS type.
+ */
+extern int lts_type_has_type(lts_type_t  t,const char *name);
+/**
+ * Get the representation of a type.
+ */
+extern data_format_t lts_type_get_format(lts_type_t  t,int typeno);
+
+/**
+ * Set the representation of a type.
+ */
+extern void lts_type_set_format(lts_type_t  t,int typeno,data_format_t format);
+
+/** Get the maximum of a range type.
+ */
+extern int lts_type_get_max(lts_type_t  t,int typeno);
+/** Get the minimum of a range type.
+ */
+extern int lts_type_get_min(lts_type_t  t,int typeno);
+/** Set the range of a range type.
+ */
+extern void lts_type_set_range(lts_type_t  t,int typeno,int min,int max);
+/**
+Add a type with a given representation to the LTS type.
+*/
+extern int lts_type_put_type(lts_type_t  t,const char *name,data_format_t format,int* is_new);
+
 
 extern void lts_type_serialize(lts_type_t t,stream_t s);
 extern lts_type_t lts_type_deserialize(stream_t s);

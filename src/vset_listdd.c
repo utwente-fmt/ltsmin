@@ -368,7 +368,7 @@ static void mdd_enum(uint32_t mdd,uint32_t *vec,int idx,int len,vset_element_cb 
     if (idx==len) {
         if (mdd!=1) Abort("non-uniform length");
         while(mdd>1) mdd=node_table[mdd].right;
-        if (mdd) callback(context,vec);
+        if (mdd) callback(context,(int*)vec);
     } else {
         while(mdd>1){
             vec[idx]=node_table[mdd].val;
@@ -507,7 +507,7 @@ static vrel_t rel_create_mdd(vdom_t dom,int k,int* proj){
 
 static void set_add_mdd(vset_t set,const int* e){
 	int len=(set->p_len)?set->p_len:set->dom->shared.size;
-	set->mdd=mdd_put(set->mdd,e,len,NULL);
+	set->mdd=mdd_put(set->mdd,(uint32_t*)e,len,NULL);
 }
 
 static int set_is_empty_mdd(vset_t set){
@@ -534,7 +534,7 @@ static void set_enum_mdd(vset_t set,vset_element_cb cb,void* context){
 
 static int set_member_mdd(vset_t set,const int* e){
 	int len=(set->p_len)?set->p_len:set->dom->shared.size;
-	return mdd_member(set->mdd,e,len);
+	return mdd_member(set->mdd,(uint32_t*)e,len);
 }
 
 static void set_count_mdd(vset_t set,long *nodes,bn_int_t *elements){

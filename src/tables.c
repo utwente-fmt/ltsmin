@@ -1,3 +1,4 @@
+// -*- tab-width:4 ; indent-tabs-mode:nil -*-
 #include <config.h>
 #include <tables.h>
 #include <runtime.h>
@@ -5,8 +6,7 @@
 #include <stdlib.h>
 #include <dynamic-array.h>
 
-
-typedef struct object {
+struct value_table_s {
     char *type_name;
     size_t user_size;
     user_destroy_t destroy;
@@ -15,40 +15,43 @@ typedef struct object {
     put_chunk_t put_chunk;
     get_chunk_t get_chunk;
     vt_get_count_t get_count;
-} *object_t;
+};
+
+static const size_t system_size=((sizeof(struct value_table_s)+7)/8)*8;
+#define SYS2USR(var) ((value_table_t)(((char*)(var))+system_size))
+#define USR2SYS(var) ((value_table_t)(((char*)(var))-system_size))
 
 static value_index_t missing_put_native(value_table_t vt,va_list args){
     (void)vt;(void)args;
-    Fatal(1,error,"method put_native has not been set");
+    Abort("method put_native has not been set");
     return (value_index_t)0;
 }
 
 static void missing_get_native(value_table_t vt,value_index_t idx,va_list args){
     (void)vt;(void)idx;(void)args;
-    Fatal(1,error,"method get_native has not been set");
+    Abort("method get_native has not been set");
 }
 
 static value_index_t missing_put_chunk(value_table_t vt,chunk item){
     (void)vt;(void)item;
-    Fatal(1,error,"method put_chunk has not been set");
+    Abort("method put_chunk has not been set");
     return (value_index_t)0;
 }
 
 static chunk missing_get_chunk(value_table_t vt,value_index_t idx){
     (void)vt;(void)idx;
-    Fatal(1,error,"method get_chunk has not been set");
+    Abort("method get_chunk has not been set");
     return chunk_str("");
 }
 
 static int missing_get_count(value_table_t vt){
     (void)vt;
-    Fatal(1,error,"method get_count has not been set");
+    Abort("method get_count has not been set");
     return -1;
 }
 
-#define USER_OFFSET sizeof(struct object)
 value_table_t VTcreateBase(char*type_name,size_t user_size){
-    object_t object=(object_t)RTmalloc(USER_OFFSET+user_size);
+    value_table_t object=(value_table_t)RTmallocZero(system_size+user_size);
     object->type_name=strdup(type_name);
     object->user_size=user_size;
     object->destroy=NULL;
@@ -57,11 +60,11 @@ value_table_t VTcreateBase(char*type_name,size_t user_size){
     object->put_chunk=missing_put_chunk;
     object->get_chunk=missing_get_chunk;
     object->get_count=missing_get_count;
-    return ((void*)object)+USER_OFFSET;
+    return SYS2USR(object);
 }
 
 void VTdestroy(value_table_t vt){
-    object_t object=(object_t)(vt-USER_OFFSET);
+    value_table_t object=USR2SYS(vt);
     if (object->destroy) object->destroy(vt);
     free(object->type_name);
     RTfree(object);
@@ -73,42 +76,42 @@ void VTdestroyZ(value_table_t *vt_ptr){
 }
 
 char* VTgetType(value_table_t vt){
-    object_t object=(object_t)(vt-USER_OFFSET);
+    value_table_t object=USR2SYS(vt);
     return object->type_name;
 }
 
 void VTdestroySet(value_table_t vt,user_destroy_t method){
-    object_t object=(object_t)(vt-USER_OFFSET);
+    value_table_t object=USR2SYS(vt);
     object->destroy=method;
 }
 
 value_index_t VTputChunk(value_table_t vt,chunk item){
-    object_t object=(object_t)(vt-USER_OFFSET);
+    value_table_t object=USR2SYS(vt);
     return object->put_chunk(vt,item);
 }
 
 void VTputChunkSet(value_table_t vt,put_chunk_t method){
-    object_t object=(object_t)(vt-USER_OFFSET);
+    value_table_t object=USR2SYS(vt);
     object->put_chunk=method?method:missing_put_chunk;
 }
 
 chunk VTgetChunk(value_table_t vt,value_index_t idx){
-    object_t object=(object_t)(vt-USER_OFFSET);
+    value_table_t object=USR2SYS(vt);
     return object->get_chunk(vt,idx);
 }
 
 void VTgetChunkSet(value_table_t vt,get_chunk_t method){
-    object_t object=(object_t)(vt-USER_OFFSET);
+    value_table_t object=USR2SYS(vt);
     object->get_chunk=method?method:missing_get_chunk;
 }
 
 int VTgetCount(value_table_t vt){
-    object_t object=(object_t)(vt-USER_OFFSET);
+    value_table_t object=USR2SYS(vt);
     return object->get_count(vt);
 }
 
 void VTgetCountSet(value_table_t vt,vt_get_count_t method){
-    object_t object=(object_t)(vt-USER_OFFSET);
+    value_table_t object=USR2SYS(vt);
     object->get_count=method?method:missing_get_count;
 }
 
@@ -124,7 +127,7 @@ struct matrix_table_struct{
 };
 
 matrix_table_t MTcreate(int width){
-    if (width<=0) Fatal(1,error,"illegal argument");
+    if (width<=0) Abort("illegal argument");
     matrix_table_t mt=RT_NEW(struct matrix_table_struct);
     mt->width=width;
     mt->man=create_manager(65536);
@@ -191,8 +194,8 @@ void MTupdate(matrix_table_t mt,int row,int col,uint32_t val){
 }
 
 void MTclusterSort(matrix_table_t mt,int col){
-    if (mt->cluster_col==-1) Fatal(1,error,"please cluster first");
-    if (mt->cluster_col==col) Fatal(1,error,"cannot sort on clustered column");
+    if (mt->cluster_col==-1) Abort("please cluster first");
+    if (mt->cluster_col==col) Abort("cannot sort on clustered column");
     uint32_t row[mt->width];
     for(uint32_t i=0;i<mt->cluster_count;i++){
         for(uint32_t j=mt->begin[i]+1;j<mt->begin[i+1];j++){
@@ -211,12 +214,12 @@ void MTclusterSort(matrix_table_t mt,int col){
 
 
 void MTclusterBuild(matrix_table_t mt,int col,uint32_t count){
-    if (mt->cluster_col!=-1) Fatal(1,error,"can only cluster once");
+    if (mt->cluster_col!=-1) Abort("can only cluster once");
     mt->cluster_count=count;
     mt->begin=(uint32_t*)RTmallocZero((count+1)*sizeof(uint32_t));
     Warning(debug,"counting cluster sizes");
     for(uint32_t i=0;i<mt->count;i++){
-        if(mt->column[col][i]>=count) Fatal(1,error,"value exceeds cluster count");
+        if(mt->column[col][i]>=count) Abort("value exceeds cluster count");
         mt->begin[mt->column[col][i]]++;
     }
     Warning(debug,"summing up");
@@ -379,7 +382,7 @@ static uint32_t MTsort(matrix_table_t mt,uint32_t *next,uint32_t offset,uint32_t
 
 void MTsimplify(matrix_table_t dst, matrix_table_t src){
     dst->count=0;
-    if(dst->width!=src->width) Fatal(1,error,"different widths");
+    if(dst->width!=src->width) Abort("different widths");
     if (src->count==0) return;
     uint32_t *next=RTmalloc(src->count*4);
     for(uint32_t i=0;i<src->count;i++){
