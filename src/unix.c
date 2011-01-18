@@ -1,6 +1,7 @@
 #include <config.h>
 #include <string.h>
-#include "unix.h"
+
+#include <unix.h>
 
 #if !defined(HAVE_STRNDUP) && !(defined(HAVE_DECL_STRNDUP) && HAVE_DECL_STRNDUP)
 char *
