@@ -1,16 +1,20 @@
+// -*- tab-width:4 ; indent-tabs-mode:nil -*-
 #include <config.h>
-#include "dynamic-array.h"
 #include <stdlib.h>
 #include <strings.h>
-#include "runtime.h"
+
+#include <dynamic-array.h>
+#include <runtime.h>
 
 #define MBLOCK 16
 
-
 #define DEBUG(...) {}
+//define DEBUG Debug
 
 struct array {
 	int e_size;
+	array_resize_cb callback;
+	void *cbarg;
 	void **ar;
 };
 
@@ -36,29 +40,39 @@ int array_size(array_manager_t man){
 	return man->size;
 }
 
-static void fix_array(void**ar,int oldsize,int size,int e_size){
+static void fix_array(struct array ref,int old_size,int new_size){
 	void*tmp;
-	tmp=realloc(*ar,size*e_size);
+	void*old=*ref.ar;
+	tmp=RTrealloc(*ref.ar,new_size*ref.e_size);
 	if (tmp) {
-		DEBUG(info,"%x -> %x",*ar,tmp);
-		*ar=tmp;
-		memset(tmp+(oldsize*e_size), 0, (size-oldsize)*e_size);
+		DEBUG("%x -> %x",*ref.ar,tmp);
+		*ref.ar=tmp;
+		if (ref.callback) {
+			ref.callback(ref.cbarg,old,old_size,tmp,new_size);
+		} else if (new_size>old_size) {
+			memset(tmp+(old_size*ref.e_size), 0, (new_size-old_size)*ref.e_size);
+		}
 	} else {
 		// size is never 0, so tmp==NULL is an error.
-		Fatal(1,error,"realloc from %d to %d * %d failed",oldsize,size,e_size);
+		Abort("realloc from %d to %d * %d failed",old_size,new_size,ref.e_size);
 	}
 }
 
-void add_array(array_manager_t man,void**ar,int e_size){
+void add_array(array_manager_t man,void**ar,int e_size,array_resize_cb callback,void*cbarg){
 	if(man->managed>=man->managed_size){
 		int old=man->managed_size;
 		man->managed_size+=MBLOCK;
-		struct array **ptr=&(man->arrays);
-		fix_array((void**)ptr,old,man->managed_size,sizeof(struct array));
+		struct array self_ar;
+		self_ar.e_size=sizeof(struct array);
+		self_ar.ar=(void**)&(man->arrays);
+		self_ar.callback=NULL;
+		fix_array(self_ar,old,man->managed_size);
 	}
-	fix_array(ar,0,man->size,e_size);
 	man->arrays[man->managed].e_size=e_size;
 	man->arrays[man->managed].ar=ar;
+	man->arrays[man->managed].callback=callback;
+	man->arrays[man->managed].cbarg=cbarg;
+	fix_array(man->arrays[man->managed],0,man->size);
 	man->managed++;
 	DEBUG("added array with e_size %d",e_size);
 }
@@ -70,7 +84,7 @@ void ensure_access(array_manager_t man,int index){
 	man->size=((index+man->block)/man->block)*man->block;
 	DEBUG("resize from %d to %d",old,man->size);
 	for(int i=0;i<man->managed;i++){
-		fix_array(man->arrays[i].ar,old,man->size,man->arrays[i].e_size);
+		fix_array(man->arrays[i],old,man->size);
 	}
 }
 
