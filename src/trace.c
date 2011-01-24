@@ -307,14 +307,14 @@ trc_t trc_read(const char *name){
     DSstructClose(&vec);
     Warning(info,"length of trace is %d",trace->len);
     // should be one less then the length of the trace
-    uint32_t edge_count = trace->len - 1;
+    uint32_t sl_count = trace->len;
     N=lts_type_get_state_label_count(trace->ltstype);
     if (N) {
         Warning(info,"reading defined state labels");
         trace->map_db=TreeDBScreate(N);
-        trace->state_lbl=RTmallocZero(edge_count*sizeof(int));
+        trace->state_lbl=RTmallocZero(sl_count*sizeof(int));
         struct_stream_t map=arch_read_vec_U32(arch, "SL-0-%d",N,decode);
-        for(uint32_t j=0;j<edge_count;++j) {
+        for(uint32_t j=0;j<sl_count;++j) {
             int map_vec[N];
             DSreadStruct(map, map_vec);
             trace->state_lbl[j] = TreeFold(trace->map_db, map_vec);
@@ -327,6 +327,7 @@ trc_t trc_read(const char *name){
         trace->map_db = NULL;
         trace->state_lbl = NULL;
     }
+    uint32_t edge_count = trace->len - 1;
     N=lts_type_get_edge_label_count(trace->ltstype);
     if (N) {
         Warning(info,"reading edge labels");
