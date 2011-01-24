@@ -493,6 +493,8 @@ libutil_la_LIBADD += $(top_builddir)/ltl2ba/libltl2ba.la
 
 libutil_la_SOURCES += pins-ltl.c
 
+libutil_la_SOURCES += pins-por.c
+
 
 libutil_la_SOURCES += hre-context.c hre-context.h \
 	hre-feedback.c hre-feedback.h hre-internal.h \

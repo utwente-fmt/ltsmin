@@ -392,6 +392,11 @@ typedef enum {PINS_LTL_TEXTBOOK, PINS_LTL_SPIN} pins_ltl_type_t;
 */
 extern model_t GBaddLTL(model_t model, const char *ltl_file, pins_ltl_type_t type);
 
+/**
+\brief Add POR layer before LTL layer
+*/
+extern model_t GBaddPOR(model_t model, const int has_ltl);
+
 //@{
 
 /**

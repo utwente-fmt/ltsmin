@@ -485,6 +485,7 @@ static char* model_type_pre[MAX_TYPES];
 static pins_loader_t model_preloader[MAX_TYPES];
 static int registered_pre=0;
 static int cache=0;
+static int por=0;
 static const char *regroup_options = NULL;
 
 static char *ltl_file = NULL;
@@ -532,6 +533,8 @@ GBloadFile (model_t model, const char *filename, model_t *wrapped)
             if (0==strcmp (model_type[i], extension)) {
                 model_loader[i] (model, filename);
                 if (wrapped) {
+                    if (por)
+                        model = GBaddPOR (model, ltl_file != NULL);
                     if (ltl_file)
                         model = GBaddLTL (model, ltl_file, ltl_type);
                     if (regroup_options != NULL)
@@ -619,6 +622,7 @@ struct poptOption ltl_options[] = {
 };
 
 struct poptOption greybox_options[]={
+	{ "por" , 'p' , POPT_ARG_VAL , &por , 1 , "Enable partial order reduction." , NULL },
 	{ "cache" , 'c' , POPT_ARG_VAL , &cache , 1 , "Enable caching of grey box calls." , NULL },
 	{ "regroup" , 'r' , POPT_ARG_STRING, &regroup_options , 0 ,
           "Enable regrouping; available transformations T: "
