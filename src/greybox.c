@@ -15,6 +15,8 @@ struct grey_box_model {
 	matrix_t *sl_info;
     guard_t** guards;
     matrix_t *gce_info; // guard co-enabled info
+    matrix_t *gnes_info; // guard necessary enabling set
+    matrix_t *gnds_info; // guard necessary disabling set
         int sl_idx_buchi_accept;
 	int *s0;
 	void*context;
@@ -167,6 +169,8 @@ model_t GBcreateBase(){
 	model->sl_info=NULL;
     model->guards=NULL;
     model->gce_info=NULL;
+    model->gnes_info=NULL;
+    model->gnds_info=NULL;
         model->sl_idx_buchi_accept = -1;
 	model->s0=NULL;
 	model->context=0;
@@ -232,6 +236,12 @@ void GBinitModelDefaults (model_t *p_model, model_t default_src)
 
     if (model->gce_info == NULL)
         GBsetGuardCoEnabledInfo(model, GBgetGuardCoEnabledInfo (default_src));
+
+    if (model->gnes_info == NULL)
+        GBsetGuardNESInfo(model, GBgetGuardNESInfo (default_src));
+
+    if (model->gnds_info == NULL)
+        GBsetGuardNDSInfo(model, GBgetGuardNDSInfo (default_src));
 
     if (model->sl_idx_buchi_accept < 0)
         GBsetAcceptingStateLabelIndex(model, GBgetAcceptingStateLabelIndex (default_src));
@@ -442,6 +452,24 @@ void GBsetGuardCoEnabledInfo(model_t model, matrix_t *info) {
 
 matrix_t *GBgetGuardCoEnabledInfo(model_t model) {
     return model->gce_info;
+}
+
+void GBsetGuardNESInfo(model_t model, matrix_t *info) {
+    if (model->gnes_info != NULL) Fatal(1, error, "guard NES info already set");
+    model->gnes_info = info;
+}
+
+matrix_t *GBgetGuardNESInfo(model_t model) {
+    return model->gnes_info;
+}
+
+void GBsetGuardNDSInfo(model_t model, matrix_t *info) {
+    if (model->gnds_info != NULL) Fatal(1, error, "guard NDS info already set");
+    model->gnds_info = info;
+}
+
+matrix_t *GBgetGuardNDSInfo(model_t model) {
+    return model->gnds_info;
 }
 
 

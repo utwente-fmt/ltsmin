@@ -270,6 +270,26 @@ extern matrix_t *GBgetGuardCoEnabledInfo(model_t model);
 extern guard_t* GBgetGuard(model_t model, int group);
 
 /**
+\brief Set the guard NES matrix to a model
+*/
+extern void GBsetGuardNESInfo(model_t model, matrix_t *info);
+
+/**
+\brief Get the guard NES matrix of a model.
+*/
+extern matrix_t *GBgetGuardNESInfo(model_t model);
+
+/**
+\brief Set the guard NDS matrix to a model
+*/
+extern void GBsetGuardNDSInfo(model_t model, matrix_t *info);
+
+/**
+\brief Get the guard NDS matrix of a model.
+*/
+extern matrix_t *GBgetGuardNDSInfo(model_t model);
+
+/**
 \brief Set the initial state.
 
 The initial state is needed if a short vector next state method
