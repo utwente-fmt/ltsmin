@@ -45,6 +45,14 @@ typedef int (*fn_buchi_is_accepting_t)(model_t model, int*src);
 extern struct poptOption greybox_options[];
 
 /**
+\brief A struct to store guards per transition group
+*/
+typedef struct guard {
+    int count;
+    int guard[];
+} guard_t ;
+
+/**
 \defgroup greybox_user The Greybox user interface.
 */
 //@{
@@ -224,6 +232,32 @@ extern void GBsetLTStype(model_t model,lts_type_t info);
 \brief Add state label information to a model.
 */
 extern void GBsetStateLabelInfo(model_t model, matrix_t *info);
+
+/**
+\brief Checks whether a transition group has guards
+ This method is used for partial order reduction
+*/
+extern int GBhasGuardsInfo(model_t model);
+
+/**
+\brief Set the guard array for a model
+*/
+extern void GBsetGuardsInfo(model_t model, guard_t** guard);
+
+/**
+\brief Get guard array for a model
+*/
+extern guard_t** GBgetGuardsInfo(model_t model);
+
+/**
+\brief Set guards for a transition group
+*/
+extern void GBsetGuard(model_t model, int group, guard_t* guard);
+
+/**
+\brief Get guards for a transition group
+*/
+extern guard_t* GBgetGuard(model_t model, int group);
 
 /**
 \brief Set the initial state.

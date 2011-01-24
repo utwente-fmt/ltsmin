@@ -13,6 +13,7 @@ struct grey_box_model {
 	matrix_t *dm_read_info;
 	matrix_t *dm_write_info;
 	matrix_t *sl_info;
+    guard_t** guards;
         int sl_idx_buchi_accept;
 	int *s0;
 	void*context;
@@ -163,6 +164,7 @@ model_t GBcreateBase(){
 	model->dm_read_info=NULL;
 	model->dm_write_info=NULL;
 	model->sl_info=NULL;
+    model->guards=NULL;
         model->sl_idx_buchi_accept = -1;
 	model->s0=NULL;
 	model->context=0;
@@ -222,6 +224,9 @@ void GBinitModelDefaults (model_t *p_model, model_t default_src)
 
     if (model->sl_info == NULL)
         GBsetStateLabelInfo(model, GBgetStateLabelInfo(default_src));
+
+    if (model->guards == NULL)
+        GBsetGuardsInfo(model, GBgetGuardsInfo(default_src));
 
     if (model->sl_idx_buchi_accept < 0)
         GBsetAcceptingStateLabelIndex(model, GBgetAcceptingStateLabelIndex (default_src));
@@ -406,6 +411,25 @@ int GBgetStateLabelLong(model_t model,int label,int *state){
 void GBgetStateLabelsAll(model_t model,int*state,int*labels){
 	model->state_labels_all(model,state,labels);
 }
+
+int GBhasGuardsInfo(model_t model) { return model->guards != NULL; }
+
+void GBsetGuardsInfo(model_t model, guard_t** guards) {
+    model->guards = guards;
+}
+
+guard_t** GBgetGuardsInfo(model_t model) {
+    return model->guards;
+}
+
+void GBsetGuard(model_t model, int group, guard_t* guard) {
+    model->guards[group] = guard;
+}
+
+guard_t* GBgetGuard(model_t model, int group) {
+    return model->guards[group];
+}
+
 
 void GBsetChunkMethods(model_t model,newmap_t newmap,void*newmap_context,
 	int2chunk_t int2chunk,chunk2int_t chunk2int,get_count_t get_count){
