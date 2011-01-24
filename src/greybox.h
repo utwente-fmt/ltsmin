@@ -255,6 +255,16 @@ extern guard_t** GBgetGuardsInfo(model_t model);
 extern void GBsetGuard(model_t model, int group, guard_t* guard);
 
 /**
+\brief Set the guard may be co-enabled matrix to a model
+*/
+extern void GBsetGuardCoEnabledInfo(model_t model, matrix_t *info);
+
+/**
+\brief Get the guard may be co-enabled matrix of a model.
+*/
+extern matrix_t *GBgetGuardCoEnabledInfo(model_t model);
+
+/**
 \brief Get guards for a transition group
 */
 extern guard_t* GBgetGuard(model_t model, int group);

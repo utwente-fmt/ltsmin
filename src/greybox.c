@@ -14,6 +14,7 @@ struct grey_box_model {
 	matrix_t *dm_write_info;
 	matrix_t *sl_info;
     guard_t** guards;
+    matrix_t *gce_info; // guard co-enabled info
         int sl_idx_buchi_accept;
 	int *s0;
 	void*context;
@@ -165,6 +166,7 @@ model_t GBcreateBase(){
 	model->dm_write_info=NULL;
 	model->sl_info=NULL;
     model->guards=NULL;
+    model->gce_info=NULL;
         model->sl_idx_buchi_accept = -1;
 	model->s0=NULL;
 	model->context=0;
@@ -227,6 +229,9 @@ void GBinitModelDefaults (model_t *p_model, model_t default_src)
 
     if (model->guards == NULL)
         GBsetGuardsInfo(model, GBgetGuardsInfo(default_src));
+
+    if (model->gce_info == NULL)
+        GBsetGuardCoEnabledInfo(model, GBgetGuardCoEnabledInfo (default_src));
 
     if (model->sl_idx_buchi_accept < 0)
         GBsetAcceptingStateLabelIndex(model, GBgetAcceptingStateLabelIndex (default_src));
@@ -428,6 +433,15 @@ void GBsetGuard(model_t model, int group, guard_t* guard) {
 
 guard_t* GBgetGuard(model_t model, int group) {
     return model->guards[group];
+}
+
+void GBsetGuardCoEnabledInfo(model_t model, matrix_t *info) {
+    if (model->gce_info != NULL) Fatal(1, error, "guard may be co-enabled info already set");
+    model->gce_info = info;
+}
+
+matrix_t *GBgetGuardCoEnabledInfo(model_t model) {
+    return model->gce_info;
 }
 
 
