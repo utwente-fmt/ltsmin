@@ -74,7 +74,7 @@ extern char* RTinitNextArg();
 Due to the fact that we may have different extra string for help and usage,
 the function poptPrintUsage should not be called directly.
  */
-extern void RTexitUsage(int exit_code);
+#define RTexitUsage(code) do {HREprintUsage();HREabort(code);} while(0)
 
 /**
 \brief Print help of tool.

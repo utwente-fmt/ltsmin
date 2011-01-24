@@ -40,11 +40,6 @@ void RTparseOptions(const char* argline,int *argc_p,char***argv_p){
     (*argv_p)[0]=strdup(get_label());
 }
 
-void RTexitUsage(int exit_code){
-    HREprintUsage();
-    exit(exit_code);
-}
-
 void RTexitHelp(int exit_code){
     HREprintHelp();
     exit(exit_code);
