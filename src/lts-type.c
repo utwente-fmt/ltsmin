@@ -169,6 +169,18 @@ void lts_type_set_state_length(lts_type_t  t,int length){
     if (old_length == length)
         return;
 
+    // allow state vector to be hidden
+    if (length==0) {
+        for(int i=0;i<t->state_length;i++){
+            RTfree(t->state_name[i]);
+        }
+        RTfree(t->state_name);
+        t->state_name=NULL;
+        RTfree(t->state_type);
+        t->state_type=NULL;
+        t->state_length=0;
+        return;
+    }
     // allow ltstype to grow
     if (old_length < length) t->state_length=length;
     else Fatal(1, error, "lts-type isn't allowed to shrink");
