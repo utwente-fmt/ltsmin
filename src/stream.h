@@ -40,6 +40,9 @@ extern stream_t fs_read(char *name);
 /// Create output stream from a FILE.
 extern stream_t stream_output(FILE*f);
 
+/// Create a bi-directional stream from a pair of streams.
+extern stream_t stream_pair(FILE* in,FILE* out);
+
 extern stream_t file_input(char *name);
 
 extern stream_t file_output(char*name);

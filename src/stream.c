@@ -8,7 +8,8 @@
 
 struct stream_s {
 	struct stream_obj procs;
-	FILE *f;
+	FILE *in;
+    FILE *out;
 };
 
 
@@ -105,21 +106,21 @@ void stream_init(stream_t s){
 /*************************************************************************/
 
 static void file_read(stream_t stream,void*buf,size_t count){
-	size_t res=fread(buf,1,count,stream->f);
+	size_t res=fread(buf,1,count,stream->in);
 	if (res<count) Fatal(0,error,"short read");
 }
 
 static size_t file_read_max(stream_t stream,void*buf,size_t count){
-	size_t res=fread(buf,1,count,stream->f);
+	size_t res=fread(buf,1,count,stream->in);
 	return res;
 }
 
 static int file_empty(stream_t stream){
-	int c=fgetc(stream->f);
+	int c=fgetc(stream->in);
 	if (c==EOF) {
 		return 1;
 	} else {
-		if (ungetc(c,stream->f)==EOF){
+		if (ungetc(c,stream->in)==EOF){
 			Fatal(0,error,"unexpected failure");
 		};
 		return 0;
@@ -127,25 +128,27 @@ static int file_empty(stream_t stream){
 }
 
 static void file_write(stream_t stream,void*buf,size_t count){
-	size_t res=fwrite(buf,1,count,stream->f);
+	size_t res=fwrite(buf,1,count,stream->out);
 	if (res<count) Fatal(0,error,"short write");
 }
 
 static void file_close(stream_t *stream){
-	fclose((*stream)->f);
+    if ((*stream)->in) fclose((*stream)->in);
+    if ((*stream)->out) fclose((*stream)->out);
 	free(*stream);
 	*stream=NULL;
 }
 
 static void file_flush(stream_t stream){
-	fflush(stream->f);
+	fflush(stream->out);
 }
 
 stream_t stream_input(FILE*f){
 	stream_t s=(stream_t)RTmalloc(sizeof(struct stream_s));
 	stream_init(s);
 	setbuf(f,NULL);
-	s->f=f;
+	s->in=f;
+    s->out=NULL;
 	s->procs.read_max=file_read_max;
 	s->procs.read=file_read;
 	s->procs.empty=file_empty;
@@ -163,12 +166,30 @@ stream_t stream_output(FILE*f){
 	stream_t s=(stream_t)RTmalloc(sizeof(struct stream_s));
 	stream_init(s);
 	setbuf(f,NULL);
-	s->f=f;
+    s->in=NULL;
+	s->out=f;
 	s->procs.write=file_write;
 	s->procs.flush=file_flush;
 	s->procs.close=file_close;
 	return s;
 }
+
+stream_t stream_pair(FILE* in,FILE* out){
+    stream_t s=(stream_t)RTmalloc(sizeof(struct stream_s));
+    stream_init(s);
+    setbuf(in,NULL);
+    setbuf(out,NULL);
+    s->in=in;
+    s->procs.read_max=file_read_max;
+    s->procs.read=file_read;
+    s->procs.empty=file_empty;
+    s->out=out;
+    s->procs.write=file_write;
+    s->procs.flush=file_flush;
+    s->procs.close=file_close;
+    return s;    
+}
+
 
 stream_t fs_write(char *name){
 	FILE*f=fopen(name,"w");
