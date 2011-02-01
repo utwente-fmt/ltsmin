@@ -71,36 +71,36 @@ get_local (treedbs_ll_t dbs)
 }
 
 uint16_t
-TreeDBSLLget_sat_bits (const treedbs_ll_t dbs, const int idx)
+TreeDBSLLget_sat_bits (const treedbs_ll_t dbs, const tree_ref_t ref)
 {
-    return atomic_read (dbs->table+idx) & dbs->sat_mask;
+    return atomic_read (dbs->table+ref) & dbs->sat_mask;
 }
 
 void
-TreeDBSLLset_sat_bits (const treedbs_ll_t dbs, const int idx, uint16_t value)
+TreeDBSLLset_sat_bits (const treedbs_ll_t dbs, const tree_ref_t ref, uint16_t value)
 {
-    uint32_t        hash = dbs->table[idx] & ~dbs->sat_mask;
-    atomic_write (dbs->table+idx, hash | (value & dbs->sat_mask));
+    uint32_t        hash = dbs->table[ref] & ~dbs->sat_mask;
+    atomic_write (dbs->table+ref, hash | (value & dbs->sat_mask));
 }
 
 int
-TreeDBSLLget_sat_bit (const treedbs_ll_t dbs, const int idx, int index)
+TreeDBSLLget_sat_bit (const treedbs_ll_t dbs, const tree_ref_t ref, int index)
 {
     uint32_t        bit = 1 << index;
-    uint32_t        hash_and_sat = atomic_read (dbs->table+idx);
+    uint32_t        hash_and_sat = atomic_read (dbs->table+ref);
     uint32_t        val = hash_and_sat & bit;
     return val >> index;
 }
 
 int
-TreeDBSLLtry_set_sat_bit (const treedbs_ll_t dbs, const int idx, int index)
+TreeDBSLLtry_set_sat_bit (const treedbs_ll_t dbs, const tree_ref_t ref, int index)
 {
     uint32_t        bit = 1 << index;
-    uint32_t        hash_and_sat = atomic_read (dbs->table+idx);
+    uint32_t        hash_and_sat = atomic_read (dbs->table+ref);
     uint32_t        val = hash_and_sat & bit;
     if (val)
         return 0; //bit was already set
-    return cas (dbs->table+idx, hash_and_sat, hash_and_sat | bit);
+    return cas (dbs->table+ref, hash_and_sat, hash_and_sat | bit);
 }
 
 static inline int
@@ -120,29 +120,29 @@ table_lookup (const treedbs_ll_t dbs, const node_u_t *data, int index, int *res,
     uint32_t            WAIT = hash & WRITE_BIT_R;
     uint32_t            DONE = hash | WRITE_BIT;
     for (size_t probes = 0; probes < dbs->threshold && !dbs->full; probes++) {
-        uint32_t            idx = h & dbs->mask;
-        size_t              line_end = (idx & CL_MASK) + CACHE_LINE_INT;
+        size_t              ref = h & dbs->mask;
+        size_t              line_end = (ref & CL_MASK) + CACHE_LINE_INT;
         for (size_t i = 0; i < CACHE_LINE_INT; i++) {
-            uint32_t           *bucket = &dbs->table[idx];
+            uint32_t           *bucket = &dbs->table[ref];
             if (EMPTY == atomic_read(bucket)) {
                 if (cas (bucket, EMPTY, WAIT)) {
-                    write_data_fenced (&dbs->data[idx], data->l.lr);
+                    write_data_fenced (&dbs->data[ref], data->l.lr);
                     atomic_write (bucket, DONE);
-                    *res = idx;
+                    *res = ref;
                     loc->node_count[index]++;
                     return 0;
                 }
             }
             if (DONE == ((atomic_read (bucket) & ~dbs->sat_mask) | WRITE_BIT)) {
                 while (WAIT == (atomic_read (bucket) & ~dbs->sat_mask)) {}
-                if (dbs->data[idx] == data->l.lr) {
-                    *res = idx;
+                if (dbs->data[ref] == data->l.lr) {
+                    *res = ref;
                     return 1;
                 }
                 stat->misses++;
             }
-            idx += 1;
-            idx = idx == line_end ? line_end - CACHE_LINE_INT : idx;
+            ref += 1;
+            ref = ref == line_end ? line_end - CACHE_LINE_INT : ref;
         }
         h = mix (data->i.left, data->i.right, h);
         stat->rehashes++;
@@ -156,13 +156,13 @@ table_lookup (const treedbs_ll_t dbs, const node_u_t *data, int index, int *res,
 }
 
 static inline node_u_t *
-i64(int *v, size_t idx) {
-    return (node_u_t *) (v + (idx<<1));
+i64(int *v, size_t ref) {
+    return (node_u_t *) (v + (ref<<1));
 }
 
 static inline int
-cmp_i64(int *v1, int *v2, size_t idx) {
-    return ((int64_t *)v1)[idx] == ((int64_t *)v2)[idx];
+cmp_i64(int *v1, int *v2, size_t ref) {
+    return ((int64_t *)v1)[ref] == ((int64_t *)v2)[ref];
 }
 
 int
@@ -217,11 +217,11 @@ TreeDBSLLlookup_dm (const treedbs_ll_t dbs, const int *v, tree_t prev,
 }
 
 tree_t
-TreeDBSLLget (const treedbs_ll_t dbs, const int idx, int *d)
+TreeDBSLLget (const treedbs_ll_t dbs, const tree_ref_t ref, int *d)
 {
     uint32_t           *dst = (uint32_t*)d;
     int64_t            *dst64 = (int64_t *)dst;
-    dst[1] = (uint32_t)idx;
+    dst[1] = (uint32_t)ref;
     for (int i = 1; i < dbs->nNodes; i++)
         dst64[i] = dbs->data[dst[i]];
     return (tree_t)dst;

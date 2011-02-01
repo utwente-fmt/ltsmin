@@ -5,7 +5,7 @@
 #include <greybox.h>
 
 typedef struct trc_s *trc_t;
-typedef void *(*trc_get_state_f)(int state_no, void *arg);
+typedef void *(*trc_get_state_f)(size_t state_no, void *arg);
 typedef struct trc_env_s trc_env_t;
 
 extern int trc_get_length(trc_t trace);

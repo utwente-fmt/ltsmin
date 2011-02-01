@@ -51,46 +51,46 @@ get_local (dbs_ll_t dbs)
 }
 
 uint16_t
-DBSLLget_sat_bits (const dbs_ll_t dbs, const int idx)
+DBSLLget_sat_bits (const dbs_ll_t dbs, const dbs_ref_t ref)
 {
-    return atomic_read (dbs->table+idx) & dbs->sat_mask;
+    return atomic_read (dbs->table+ref) & dbs->sat_mask;
 }
 
 int
-DBSLLget_sat_bit (const dbs_ll_t dbs, const int idx, int index)
+DBSLLget_sat_bit (const dbs_ll_t dbs, const dbs_ref_t ref, int index)
 {
     uint32_t        bit = 1 << index;
-    uint32_t        hash_and_sat = atomic_read (dbs->table+idx);
+    uint32_t        hash_and_sat = atomic_read (dbs->table+ref);
     uint32_t        val = hash_and_sat & bit;
     return val >> index;
 }
 
 int
-DBSLLtry_set_sat_bit (const dbs_ll_t dbs, const int idx, int index)
+DBSLLtry_set_sat_bit (const dbs_ll_t dbs, const dbs_ref_t ref, int index)
 {
     uint32_t        bit = 1 << index;
-    uint32_t        hash_and_sat = atomic_read (dbs->table+idx);
+    uint32_t        hash_and_sat = atomic_read (dbs->table+ref);
     uint32_t        val = hash_and_sat & bit;
     if (val)
         return 0; //bit was already set
-    return cas (dbs->table+idx, hash_and_sat, hash_and_sat | bit);
+    return cas (dbs->table+ref, hash_and_sat, hash_and_sat | bit);
 }
 
 void
-DBSLLset_sat_bits (const dbs_ll_t dbs, const int idx, uint16_t value)
+DBSLLset_sat_bits (const dbs_ll_t dbs, const dbs_ref_t ref, uint16_t value)
 {
-    uint32_t        hash = dbs->table[idx] & ~dbs->sat_mask;
-    atomic_write (dbs->table+idx, hash | (value & dbs->sat_mask));
+    uint32_t        hash = dbs->table[ref] & ~dbs->sat_mask;
+    atomic_write (dbs->table+ref, hash | (value & dbs->sat_mask));
 }
 
 uint32_t
-DBSLLmemoized_hash (const dbs_ll_t dbs, const int idx)
+DBSLLmemoized_hash (const dbs_ll_t dbs, const dbs_ref_t ref)
 {
-    return dbs->table[idx] & ~dbs->sat_mask;
+    return dbs->table[ref] & ~dbs->sat_mask;
 }
 
 int
-DBSLLlookup_hash (const dbs_ll_t dbs, const int *v, uint32_t *ret, uint32_t *hash)
+DBSLLlookup_hash (const dbs_ll_t dbs, const int *v, dbs_ref_t *ret, uint32_t *hash)
 {
     local_t            *loc = get_local (dbs);
     stats_t            *stat = &loc->stat;
@@ -105,29 +105,29 @@ DBSLLlookup_hash (const dbs_ll_t dbs, const int *v, uint32_t *ret, uint32_t *has
     uint32_t            WAIT = hash_memo & WRITE_BIT_R;
     uint32_t            DONE = hash_memo | WRITE_BIT;
     while (seed < dbs->threshold && !dbs->full) {
-        size_t              idx = hash_rehash & dbs->mask;
-        size_t              line_end = (idx & CL_MASK) + CACHE_LINE_SIZE;
+        size_t              ref = hash_rehash & dbs->mask;
+        size_t              line_end = (ref & CL_MASK) + CACHE_LINE_SIZE;
         for (size_t i = 0; i < CACHE_LINE_SIZE; i++) {
-            uint32_t           *bucket = &dbs->table[idx];
+            uint32_t           *bucket = &dbs->table[ref];
             if (EMPTY == *bucket) {
                 if (cas (bucket, EMPTY, WAIT)) {
-                    memcpy (&dbs->data[idx * l], v, b);
+                    memcpy (&dbs->data[ref * l], v, b);
                     atomic_write (bucket, DONE);
                     stat->elts++;
-                    *ret = idx;
+                    *ret = ref;
                     return 0;
                 }
             }
             if (DONE == ((atomic_read (bucket) | WRITE_BIT) & ~dbs->sat_mask)) {
                 while (WAIT == (atomic_read (bucket) & ~dbs->sat_mask)) {}
-                if (0 == memcmp (&dbs->data[idx * l], v, b)) {
-                    *ret = idx;
+                if (0 == memcmp (&dbs->data[ref * l], v, b)) {
+                    *ret = ref;
                     return 1;
                 }
                 stat->misses++;
             }
-            idx += 1;
-            idx = idx == line_end ? line_end - CACHE_LINE_SIZE : idx;
+            ref += 1;
+            ref = ref == line_end ? line_end - CACHE_LINE_SIZE : ref;
         }
         hash_rehash = dbs->hash32 ((char *)v, b, hash_rehash + (seed++));
         stat->rehashes++;
@@ -141,22 +141,22 @@ DBSLLlookup_hash (const dbs_ll_t dbs, const int *v, uint32_t *ret, uint32_t *has
 }
 
 int *
-DBSLLget (const dbs_ll_t dbs, const int idx, int *dst)
+DBSLLget (const dbs_ll_t dbs, const dbs_ref_t ref, int *dst)
 {
-    *dst = dbs->table[idx] & ~dbs->sat_mask;
-    return &dbs->data[idx * dbs->length];
+    *dst = dbs->table[ref] & ~dbs->sat_mask;
+    return &dbs->data[ref * dbs->length];
 }
 
 int
-DBSLLlookup_ret (const dbs_ll_t dbs, const int *v, uint32_t *ret)
+DBSLLlookup_ret (const dbs_ll_t dbs, const int *v, dbs_ref_t *ret)
 {
     return DBSLLlookup_hash (dbs, v, ret, NULL);
 }
 
-uint32_t
+dbs_ref_t
 DBSLLlookup (const dbs_ll_t dbs, const int *vector)
 {
-    uint32_t             ret;
+    dbs_ref_t             ret;
     DBSLLlookup_hash (dbs, vector, &ret, NULL);
     return ret;
 }

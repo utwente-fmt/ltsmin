@@ -20,11 +20,13 @@ Implementation uses lockless operations
 */
 typedef struct dbs_ll_s *dbs_ll_t;
 
+typedef size_t dbs_ref_t;
+
 typedef stats_t   *(*dbs_stats_f) (const void *dbs);
-typedef int       *(*dbs_get_f) (const void *dbs, int idx, int *dst);
-typedef int        (*dbs_try_set_sat_f) (const void *dbs, const int idx,
+typedef int       *(*dbs_get_f) (const void *dbs, dbs_ref_t ref, int *dst);
+typedef int        (*dbs_try_set_sat_f) (const void *dbs, const dbs_ref_t ref,
                                           int index);
-typedef int        (*dbs_get_sat_f) (const void *dbs, const int idx,
+typedef int        (*dbs_get_sat_f) (const void *dbs, const dbs_ref_t ref,
                                       int index);
 
 /**
@@ -42,17 +44,17 @@ und.
 \param vector The int vector
 \return the index of the vector in  one of the segments of the db
 */
-extern uint32_t     DBSLLlookup (const dbs_ll_t dbs, const int *vector);
+extern dbs_ref_t    DBSLLlookup (const dbs_ll_t dbs, const int *vector);
 
-extern uint16_t     DBSLLget_sat_bits (const dbs_ll_t dbs, const int idx);
+extern uint16_t     DBSLLget_sat_bits (const dbs_ll_t dbs, const dbs_ref_t ref);
 
-extern void         DBSLLset_sat_bits (const dbs_ll_t dbs, const int idx,
+extern void         DBSLLset_sat_bits (const dbs_ll_t dbs, const dbs_ref_t ref,
                                        uint16_t value);
 
-extern int          DBSLLtry_set_sat_bit (const dbs_ll_t dbs, const int idx,
+extern int          DBSLLtry_set_sat_bit (const dbs_ll_t dbs, const dbs_ref_t ref,
                                           int index);
    
-extern int          DBSLLget_sat_bit (const dbs_ll_t dbs, const int idx,
+extern int          DBSLLget_sat_bit (const dbs_ll_t dbs, const dbs_ref_t ref,
                                       int index);
 
 /**
@@ -64,13 +66,13 @@ und.
 \return 1 if the vector was present, 0 if it was added
 */
 extern int          DBSLLlookup_ret (const dbs_ll_t dbs, const int *v,
-                                     uint32_t *ret);
+                                     dbs_ref_t *ret);
 extern int          DBSLLlookup_hash (const dbs_ll_t dbs, const int *v,
-                                      uint32_t *ret, uint32_t * hh);
+                                      dbs_ref_t *ret, uint32_t * hh);
 
-extern int         *DBSLLget (const dbs_ll_t dbs, const int idx, int *dst);
+extern int         *DBSLLget (const dbs_ll_t dbs, const dbs_ref_t ref, int *dst);
 
-extern uint32_t     DBSLLmemoized_hash (const dbs_ll_t dbs, const int idx);
+extern uint32_t     DBSLLmemoized_hash (const dbs_ll_t dbs, const dbs_ref_t ref);
 
 /**
 \brief Free the memory used by a dbs.

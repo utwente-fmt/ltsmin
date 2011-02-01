@@ -15,6 +15,8 @@ Abstract type tree database.
 */
 typedef struct treedbs_ll_s *treedbs_ll_t;
 
+typedef size_t tree_ref_t;
+
 typedef int *tree_t;
 
 /**
@@ -31,11 +33,11 @@ extern treedbs_ll_t TreeDBSLLcreate_dm (int len, int size, matrix_t *m,
                                         int satellite_bits);
 
 extern int          TreeDBSLLtry_set_sat_bit (const treedbs_ll_t dbs,
-                                              const int idx, int index);
-extern int          TreeDBSLLget_sat_bit (const treedbs_ll_t dbs, const int idx,
+                                              const tree_ref_t ref, int index);
+extern int          TreeDBSLLget_sat_bit (const treedbs_ll_t dbs, const tree_ref_t ref,
                                           int index);
-extern uint16_t     TreeDBSLLget_sat_bits (const treedbs_ll_t dbs, const int idx);
-extern void         TreeDBSLLset_sat_bits (const treedbs_ll_t dbs, const int idx,
+extern uint16_t     TreeDBSLLget_sat_bits (const treedbs_ll_t dbs, const tree_ref_t ref);
+extern void         TreeDBSLLset_sat_bits (const treedbs_ll_t dbs, const tree_ref_t ref,
                                            uint16_t value);
 
 /**
@@ -55,7 +57,7 @@ extern int          TreeDBSLLlookup_incr (const treedbs_ll_t dbs, const int *v,
 extern int          TreeDBSLLlookup_dm (const treedbs_ll_t dbs, const int *v, 
                                         tree_t prev, tree_t next, int group);
 
-extern tree_t       TreeDBSLLget (const treedbs_ll_t dbs, const int idx, 
+extern tree_t       TreeDBSLLget (const treedbs_ll_t dbs, const tree_ref_t ref, 
                                   int *dst);
 
 extern uint32_t     TreeDBSLLindex (tree_t data);

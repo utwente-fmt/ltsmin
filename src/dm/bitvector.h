@@ -8,6 +8,8 @@
 
 typedef struct bitvector {
     size_t              n_bits;
+    size_t              n_words;
+
     size_t             *data;
 } bitvector_t;
 
@@ -21,17 +23,29 @@ typedef struct bitvector {
  *   0: n-bit bitvector has been allocated
  *  -1: error
  */
-extern int          bitvector_create (bitvector_t *, int);
+extern int          bitvector_create (bitvector_t *, size_t);
 
 /**
- * bitvector_create
- *  Create a large bitvector
+ * bitvector_create_large
+ *  Create a large bitvector WITHOUT initializing it!
  *   1) unused bitvector_t struct
  *   2) number of bits in the vector
  *   
  * Data is SSE aligned by malloc
+ * note: use bitvector_clar to set bits to 0
  */
-extern void         bitvector_create_large (bitvector_t *bv, int n_bits);
+extern void         bitvector_create_large (bitvector_t *bv, size_t n_bits);
+
+/**
+ * bitvector_clear
+ *  Set all bits in the bitvector to 0
+ *   1) the bitvector to clear
+ *
+ *  result:
+ *   All bits in bv are set to 0
+ */
+extern void         bitvector_clear(bitvector_t *bv);
+
 
 /**
  * bitvector_free
@@ -74,7 +88,7 @@ extern size_t       bitvector_size (const bitvector_t *);
  *  result:
  *   the bit in the bitvector is set to one & the previous value is returned
  */
-extern int          bitvector_isset_or_set (bitvector_t *bv, int idx);
+extern int          bitvector_isset_or_set (bitvector_t *bv, size_t idx);
 
 /**
  * bitvector_set2
@@ -87,7 +101,7 @@ extern int          bitvector_isset_or_set (bitvector_t *bv, int idx);
  *  result:
  *   the bits at idx in the bitvector are set to v
  */
-extern void         bitvector_set2 (bitvector_t *bv, int idx, size_t v);
+extern void         bitvector_set2 (bitvector_t *bv, size_t idx, size_t v);
 
 /**
  * bitvector_isset_or_set2
@@ -101,7 +115,7 @@ extern void         bitvector_set2 (bitvector_t *bv, int idx, size_t v);
  *   true:  the bits equal v
  *   false: the bits not equal v
  */
-extern int          bitvector_isset_or_set2 (bitvector_t *bv, int idx, size_t v);
+extern int          bitvector_isset_or_set2 (bitvector_t *bv, size_t idx, size_t v);
 
 /**
  * bitvector_get
@@ -112,7 +126,7 @@ extern int          bitvector_isset_or_set2 (bitvector_t *bv, int idx, size_t v)
  *  result:
  *   the two bits
  */
-extern int          bitvector_get2 (const bitvector_t *, int);
+extern int          bitvector_get2 (const bitvector_t *, size_t);
 
 /**
  * bitvector_set
@@ -121,8 +135,8 @@ extern int          bitvector_get2 (const bitvector_t *, int);
  *   2) the index of the bit that must be set to one
  *
  */
-extern void         bitvector_set (bitvector_t *, int);
-extern void         bitvector_set_atomic (bitvector_t *, int);
+extern void         bitvector_set (bitvector_t *, size_t);
+extern void         bitvector_set_atomic (bitvector_t *, size_t);
 
 /**
  * bitvector_unset
@@ -133,7 +147,7 @@ extern void         bitvector_set_atomic (bitvector_t *, int);
  *  result:
  *   the bit in the bitvector is cleared
  */
-extern void         bitvector_unset (bitvector_t *, int);
+extern void         bitvector_unset (bitvector_t *, size_t);
 
 /**
  * bitvector_is_set
@@ -145,7 +159,7 @@ extern void         bitvector_unset (bitvector_t *, int);
  *   true:  the bit is one
  *   false: the bit is not one
  */
-extern int          bitvector_is_set (const bitvector_t *, int);
+extern int          bitvector_is_set (const bitvector_t *, size_t);
 
 /**
  * bitvector_union
