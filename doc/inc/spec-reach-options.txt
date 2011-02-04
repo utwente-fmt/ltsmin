@@ -1,15 +1,15 @@
 *--order*='ORDER'::
-        Select the exploration strategy: 'bfs-previous', 'bfs',
-        'chain-previous' or 'chain'. With 'bfs-previous' and 'bfs',
-        breadth-first search is used. Here, 'bfs-previous' only considers
-        the states found at the previous level, while 'bfs' considers
-        the whole visited set. With 'chain-previous' and 'chain', a
-        chaining strategy is used. Here, 'chain-previous' at each level
-        starts from the states found at the previous level, while 'chain'
-        uses the whole visited set. Defaults to 'bfs-previous'.
+        Select the exploration strategy: 'bfs-prev', 'bfs', 'chain-prev',
+        or 'chain'. With 'bfs-prev' and 'bfs', breadth-first search is
+        used. Here, 'bfs-prev' only considers the states found at the
+        previous level, while 'bfs' considers the whole visited set. With
+        'chain-prev' and 'chain', a chaining strategy is used. Here,
+        'chain-prev' at each level starts from the states found at the
+        previous level, while 'chain' uses the whole cisited set. Defaults
+        to 'bfs-prev'.
 +
-When using BFS, the tool performs the next state computation for all
-edge groups on the current level or current set of visited states.
+When using breadth-frist search, the tool performs the next state computation
+for all edge groups on the current level or current set of visited states.
 Chaining means to apply next state for the first group to the visited
 states, then apply next-state for the second group to the result,
 etc.  Thus, a chaining analysis can be completed in much less

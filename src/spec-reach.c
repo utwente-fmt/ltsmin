@@ -1,38 +1,37 @@
 #include <config.h>
+
 #include <stdint.h>
-#include <string.h>
 #include <stdlib.h>
+#include <string.h>
 #include <strings.h>
+
+#include <dm/dm.h>
+#include <greybox.h>
 #include <ltsmin-syntax.h>
-
-#include "archive.h"
-#include <runtime.h>
-#include "treedbs.h"
-#include <stringindex.h>
-#include "vector_set.h"
-#include "scctimer.h"
-#include "dm/dm.h"
-
 #include <lts_enum.h>
 #include <lts_io.h>
+#include <runtime.h>
+#include <scctimer.h>
+#include <stringindex.h>
+#include <vector_set.h>
 
 #if defined(MCRL)
-#include "mcrl-greybox.h"
+#include <mcrl-greybox.h>
 #endif
 #if defined(MCRL2)
-#include "mcrl2-greybox.h"
+#include <mcrl2-greybox.h>
 #endif
 #if defined(NIPS)
-#include "nips-greybox.h"
+#include <nips-greybox.h>
 #endif
 #if defined(ETF)
-#include "etf-greybox.h"
+#include <etf-greybox.h>
 #endif
 #if defined(DIVINE)
-#include "dve-greybox.h"
+#include <dve-greybox.h>
 #endif
 #if defined(DIVINE2)
-#include "dve2-greybox.h"
+#include <dve2-greybox.h>
 #endif
 
 #define diagnostic(...) {\
@@ -40,51 +39,50 @@
         fprintf(stderr, __VA_ARGS__);\
 }
 
-static char* etf_output = NULL;
 static char* trc_output = NULL;
 static int   dlk_detect = 0;
 static char* act_detect = NULL;
 static int   act_detect_table;
 static int   act_detect_index;
-static int   G = 10;
+static int   sat_granularity = 10;
 
-static lts_enum_cb_t trace_handle=NULL;
-static lts_output_t trace_output=NULL;
+static lts_enum_cb_t trace_handle = NULL;
 
-static enum { BFSP , BFS , ChainP, Chain } strategy = BFS;
+static enum { BFS_P , BFS , CHAIN_P, CHAIN } strategy = BFS_P;
 
-static char* order = "bfs-previous";
-static si_map_entry strategies[] = {
-    {"bfs-previous", BFSP},
+static char* order = "bfs-prev";
+static const si_map_entry ORDER[] = {
+    {"bfs-prev", BFS_P},
     {"bfs", BFS},
-    {"chain-previous", ChainP},
-    {"chain", Chain},
+    {"chain-prev", CHAIN_P},
+    {"chain", CHAIN},
     {NULL, 0}
 };
 
-static enum { NoSat, Sat1, Sat2, Sat3 } sat_strategy = NoSat;
+static enum { NO_SAT, SAT_1, SAT_2, SAT_3 } sat_strategy = NO_SAT;
 
 static char* saturation = "none";
-static si_map_entry sat_strategies[] = {
-    {"none", NoSat},
-    {"sat1", Sat1},
-    {"sat2", Sat2},
-    {"sat3", Sat3},
+static const si_map_entry SATURATION[] = {
+    {"none", NO_SAT},
+    {"sat1", SAT_1},
+    {"sat2", SAT_2},
+    {"sat3", SAT_3},
     {NULL, 0}
 };
 
 static void
 reach_popt(poptContext con, enum poptCallbackReason reason,
-           const struct poptOption * opt, const char * arg, void * data)
+               const struct poptOption * opt, const char * arg, void * data)
 {
     (void)con; (void)opt; (void)arg; (void)data;
+
     switch (reason) {
     case POPT_CALLBACK_REASON_PRE:
         Fatal(1, error, "unexpected call to vset_popt");
     case POPT_CALLBACK_REASON_POST: {
         int res;
 
-        res = linear_search(strategies, order);
+        res = linear_search(ORDER, order);
         if (res < 0) {
             Warning(error, "unknown exploration order %s", order);
             RTexitUsage(EXIT_FAILURE);
@@ -93,7 +91,7 @@ reach_popt(poptContext con, enum poptCallbackReason reason,
         }
         strategy = res;
 
-        res = linear_search(sat_strategies, saturation);
+        res = linear_search(SATURATION, saturation);
         if (res < 0) {
             Warning(error, "unknown saturation strategy %s", saturation);
             RTexitUsage(EXIT_FAILURE);
@@ -102,9 +100,9 @@ reach_popt(poptContext con, enum poptCallbackReason reason,
         }
         sat_strategy = res;
 
-        if (trc_output && !dlk_detect && act_detect == NULL) {
+        if (trc_output != NULL && !dlk_detect && act_detect == NULL)
             Warning(info, "Ignoring trace output");
-        }
+
         return;
     }
     case POPT_CALLBACK_REASON_OPTION:
@@ -114,9 +112,9 @@ reach_popt(poptContext con, enum poptCallbackReason reason,
 
 static  struct poptOption options[] = {
     { NULL, 0 , POPT_ARG_CALLBACK|POPT_CBFLAG_POST|POPT_CBFLAG_SKIPOPTION , (void*)reach_popt , 0 , NULL , NULL },
-    { "order" , 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &order , 0 , "set the exploration strategy to a specific order" , "<bfs-previous|bfs|chain-previous|chain>" },
+    { "order" , 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &order , 0 , "set the exploration strategy to a specific order" , "<bfs-prev|bfs|chain-prev|chain>" },
     { "saturation" , 0, POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &saturation , 0 , "select the saturation strategy" , "<none|sat1|sat2|sat3>" },
-    { "G" , 0 , POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &G , 0 , "set saturation granularity","<number>" },
+    { "G" , 0 , POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &sat_granularity , 0 , "set saturation granularity","<number>" },
     { "deadlock" , 'd' , POPT_ARG_VAL , &dlk_detect , 1 , "detect deadlocks" , NULL },
     { "action" , 0 , POPT_ARG_STRING , &act_detect , 0 , "detect action" , "<action>" },
     { "trace" , 0 , POPT_ARG_STRING , &trc_output , 0 , "file to write trace to" , "<lts-file>.gcf" },
@@ -204,73 +202,112 @@ save_level()
     global_level++;
 }
 
-static void write_trace_state(int src_no, int*state){
-  Warning(debug,"dumping state %d",src_no);
+static void
+write_trace_state(lts_enum_cb_t trace_handle, int src_no, int *state) {
   int labels[sLbls];
-  if (sLbls) GBgetStateLabelsAll(model,state,labels);
-  enum_state(trace_handle,0,state,labels);
+
+  Warning(debug, "dumping state %d", src_no);
+
+  if (sLbls != 0)
+      GBgetStateLabelsAll(model,state,labels);
+
+  enum_state(trace_handle, 0, state,labels);
 }
 
 struct write_trace_step_s {
-    int src_no;
-    int dst_no;
-    int* dst;
-    int found;
+    lts_enum_cb_t trace_handle;
+    int           src_no;
+    int           dst_no;
+    int          *dst;
+    int           found;
 };
 
-static void write_trace_next(void*arg,transition_info_t*ti,int*dst){
-	struct write_trace_step_s*ctx=(struct write_trace_step_s*)arg;
-	if(ctx->found) return;
-	for(int i=0;i<N;i++){
-	    if (ctx->dst[i]!=dst[i]) return;
-	}
-	ctx->found=1;
-	enum_seg_seg(trace_handle,0,ctx->src_no,0,ctx->dst_no,ti->labels);
+static void
+write_trace_next(void *arg, transition_info_t *ti, int *dst)
+{
+    struct write_trace_step_s *ctx = (struct write_trace_step_s*)arg;
+
+    if (ctx->found)
+        return;
+
+    for(int i = 0; i < N; i++) {
+        if (ctx->dst[i] != dst[i])
+            return;
+    }
+
+    ctx->found = 1;
+    enum_seg_seg(ctx->trace_handle, 0, ctx->src_no, 0, ctx->dst_no, ti->labels);
 }
 
-static void write_trace_step(int src_no,int*src,int dst_no,int*dst){
-    Warning(debug,"finding edge for state %d",src_no);
+static void
+write_trace_step(lts_enum_cb_t trace_handle, int src_no, int *src,
+                     int dst_no, int *dst)
+{
     struct write_trace_step_s ctx;
-    ctx.src_no=src_no;
-    ctx.dst_no=dst_no;
-    ctx.dst=dst;
-    ctx.found=0;
-    GBgetTransitionsAll(model,src,write_trace_next,&ctx);
-    if (ctx.found==0) Fatal(1,error,"no matching transition found");
+
+    Warning(debug, "finding edge for state %d", src_no);
+    ctx.trace_handle = trace_handle;
+    ctx.src_no = src_no;
+    ctx.dst_no = dst_no;
+    ctx.dst = dst;
+    ctx.found = 0;
+
+    GBgetTransitionsAll(model, src, write_trace_next, &ctx);
+
+    if (ctx.found ==0)
+        Fatal(1, error, "no matching transition found");
 }
 
-static void write_trace(int **states, int total_states)
+static void
+write_trace(lts_enum_cb_t trace_handle, int **states, int total_states)
 {
     // output starting from initial state, which is in states[total_states-1]
-    for(int i=total_states-1;i>0;i--) {
-        int current_step=total_states-i-1;
-        write_trace_state(current_step,states[i]);
-        write_trace_step(current_step,states[i],current_step+1,states[i-1]);
+
+    for(int i = total_states - 1; i > 0; i--) {
+        int current_step = total_states-i-1;
+
+        write_trace_state(trace_handle, current_step, states[i]);
+        write_trace_step(trace_handle, current_step, states[i],
+                             current_step + 1, states[i-1]);
     }
-    write_trace_state(total_states-1,states[0]);
+
+    write_trace_state(trace_handle, total_states - 1, states[0]);
 }
 
-static void find_trace_to(int *dst,int level,vset_t *levels){
-    int prev_level = level - 2;
-    vset_t src_set = vset_create(domain,0,NULL);
-    vset_t dst_set = vset_create(domain,0,NULL);
-    vset_t temp = vset_create(domain,0,NULL);
+static void
+find_trace_to(int trace_end[][N], int end_count, int level, vset_t *levels)
+{
+    int    prev_level   = level - 2;
+    vset_t src_set      = vset_create(domain, 0, NULL);
+    vset_t dst_set      = vset_create(domain, 0, NULL);
+    vset_t temp         = vset_create(domain, 0, NULL);
 
-    int max_states = 1024;
-    int current_state = 1;
-    int **states = RTmalloc(max_states*sizeof(int*));
-    states[0] = dst;
-    for(int i=1;i<max_states;i++)
-        states[i] = RTmalloc(sizeof(int)*N);
+    int   max_states    = 1024 + end_count;
+    int   current_state = end_count;
+    int **states        = RTmalloc(sizeof(int*[max_states]));
 
-    int max_int_level = 32;
-    vset_t *internal_levels = RTmalloc(max_int_level*sizeof(vset_t));
-    for(int i = 0;i < max_int_level;i++)
-        internal_levels[i] = vset_create(domain,0,NULL);
+    for (int i = 0; i < end_count; i++)
+        states[i] = trace_end[i];
+
+    for(int i = end_count; i < max_states; i++)
+        states[i] = RTmalloc(sizeof(int[N]));
+
+    int     max_int_level  = 32;
+    vset_t *int_levels     = RTmalloc(sizeof(vset_t[max_int_level]));
+
+    for(int i = 0; i < max_int_level; i++)
+        int_levels[i] = vset_create(domain, 0, NULL);
 
     while (prev_level >= 0) {
         int int_level = 0;
-        vset_add(internal_levels[0],states[current_state-1]);
+
+        if (vset_member(levels[prev_level], states[current_state - 1])) {
+            Warning(debug, "Skipping level %d in trace generation", prev_level);
+            prev_level--;
+            continue;
+        }
+
+        vset_add(int_levels[0], states[current_state-1]);
 
         // search backwards from states[current_state-1] to prev_level
         do {
@@ -278,48 +315,51 @@ static void find_trace_to(int *dst,int level,vset_t *levels){
 
             if(int_level == max_int_level) {
                 max_int_level += 32;
-                internal_levels = RTrealloc(internal_levels,
-                                                max_int_level*sizeof(vset_t));
-                for(int i=int_level;i<max_int_level;i++)
-                    internal_levels[i] = vset_create(domain,0,NULL);
+                int_levels = RTrealloc(int_levels,
+                                           sizeof(vset_t[max_int_level]));
+
+                for(int i = int_level; i < max_int_level; i++)
+                    int_levels[i] = vset_create(domain, 0, NULL);
             }
 
-            for(int i=0;i<nGrps;i++) {
-                vset_prev(temp,internal_levels[int_level-1],group_next[i]);
-                vset_union(internal_levels[int_level], temp);
+            for (int i=0; i < nGrps; i++) {
+                vset_prev(temp, int_levels[int_level - 1], group_next[i]);
+                vset_union(int_levels[int_level], temp);
             }
 
-            vset_copy(temp,levels[prev_level]);
-            vset_minus(temp,internal_levels[int_level]);
-        } while(vset_equal(levels[prev_level],temp));
+            vset_copy(temp, levels[prev_level]);
+            vset_minus(temp, int_levels[int_level]);
+        } while (vset_equal(levels[prev_level], temp));
 
-        if(current_state+int_level >= max_states) {
-            int old_max_states=max_states;
-            max_states = current_state+int_level+1024;
-            states = RTrealloc(states,max_states*sizeof(int*));
-            for(int i=old_max_states;i<max_states;i++)
-                states[i] = RTmalloc(sizeof(int)*N);
+        if (current_state + int_level >= max_states) {
+            int old_max_states = max_states;
+
+            max_states = current_state + int_level + 1024;
+            states = RTrealloc(states,sizeof(int*[max_states]));
+
+            for(int i = old_max_states; i < max_states; i++)
+                states[i] = RTmalloc(sizeof(int[N]));
         }
 
-        // here: temp = levels[prev_level] - internal_levels[int_level]
-        vset_copy(src_set,levels[prev_level]);
-        vset_minus(src_set,temp);
-        vset_example(src_set,states[current_state+int_level-1]);
+        // here: temp = levels[prev_level] - int_levels[int_level]
+        vset_copy(src_set, levels[prev_level]);
+        vset_minus(src_set, temp);
+        vset_example(src_set, states[current_state + int_level - 1]);
         vset_clear(src_set);
 
         // find the states that give us a trace to states[current_state-1]
-        for(int i=(int_level-1);i>0;i--) {
-            vset_add(src_set,states[current_state+i]);
+        for(int i = int_level - 1; i > 0; i--) {
+            vset_add(src_set, states[current_state+i]);
 
-            for(int j=0;j<nGrps;j++) {
-                vset_next(temp,src_set,group_next[j]);
-                vset_union(dst_set,temp);
+            for(int j = 0; j < nGrps; j++) {
+                vset_next(temp, src_set, group_next[j]);
+                vset_union(dst_set, temp);
             }
 
-            vset_copy(temp,dst_set);
-            vset_minus(temp,internal_levels[i]);
-            vset_minus(dst_set,temp);
-            vset_example(dst_set,states[current_state+i-1]);
+            vset_copy(temp, dst_set);
+            vset_minus(temp, int_levels[i]);
+            vset_minus(dst_set, temp);
+            vset_example(dst_set, states[current_state + i - 1]);
             vset_clear(src_set);
             vset_clear(dst_set);
         }
@@ -327,39 +367,43 @@ static void find_trace_to(int *dst,int level,vset_t *levels){
         current_state += int_level;
         prev_level--;
 
-        for(int i=0;i<=int_level;i++)
-            vset_clear(internal_levels[i]);
+        for(int i = 0; i <= int_level; i++)
+            vset_clear(int_levels[i]);
+
         vset_clear(temp);
     }
 
-    write_trace(states, current_state);
+    write_trace(trace_handle, states, current_state);
 }
 
 static void
 find_trace(int trace_end[][N], int end_count, int level, vset_t *levels)
 {
     // Find initial state and open output file
-    int init_state[N];
+    lts_output_t  trace_output;
+    int           init_state[N];
+
     GBgetInitialState(model, init_state);
-    trace_output = lts_output_open(trc_output,model, 1, 0, 1, "vsi", NULL);
+    trace_output = lts_output_open(trc_output, model, 1, 0, 1, "vsi", NULL);
     lts_output_set_root_vec(trace_output, (uint32_t*)init_state);
     lts_output_set_root_idx(trace_output, 0, 0);
     trace_handle = lts_output_begin(trace_output, 0, 0, 0);
 
     // Generate trace
-    mytimer_t timer=SCCcreateTimer();
+    mytimer_t  timer = SCCcreateTimer();
+
     SCCstartTimer(timer);
     find_trace_to(trace_end, end_count, level, levels);
     SCCstopTimer(timer);
     SCCreportTimer(timer, "constructing trace took");
 
     // Close output file
-    lts_output_end(trace_output,trace_handle);
+    lts_output_end(trace_output, trace_handle);
     lts_output_close(&trace_output);
 }
 
 struct find_action_info {
-    int group;
+    int  group;
     int *dst;
 };
 
@@ -398,9 +442,9 @@ find_action_cb(void* context, int* src)
 }
 
 struct group_add_info {
-    int group;
-    int *src;
-    int *explored;
+    int    group;
+    int   *src;
+    int   *explored;
     vset_t set;
 };
 
@@ -408,16 +452,17 @@ static void
 group_add(void *context, transition_info_t *ti, int *dst)
 {
     struct group_add_info *ctx = (struct group_add_info*)context;
+
     vrel_add(group_next[ctx->group], ctx->src, dst);
 
-    if (act_detect!=NULL && ti->labels[0]==act_detect_index) {
-        int group = ctx->group;
+    if (act_detect != NULL && ti->labels[0] == act_detect_index) {
         struct find_action_info action_ctx;
+        int group = ctx->group;
 
         action_ctx.group = group;
         action_ctx.dst = dst;
-        vset_enum_match(ctx->set,projs[group].len, projs[group].proj, ctx->src,
-                        find_action_cb, &action_ctx);
+        vset_enum_match(ctx->set,projs[group].len, projs[group].proj,
+                            ctx->src, find_action_cb, &action_ctx);
     }
 }
 
@@ -426,13 +471,13 @@ explore_cb(void *context, int *src)
 {
     struct group_add_info *ctx = (struct group_add_info*)context;
 
-    ctx->src=src;
+    ctx->src = src;
     GBgetTransitionsShort(model, ctx->group, src, group_add, context);
     (*ctx->explored)++;
 
-    if ((*ctx->explored)%1000 == 0 && RTverbosity >= 2) {
-        Warning(info, "explored %d short vectors for group %d", *ctx->explored,
-                ctx->group);
+    if ((*ctx->explored) % 1000 == 0 && RTverbosity >= 2) {
+        Warning(info, "explored %d short vectors for group %d",
+                    *ctx->explored, ctx->group);
     }
 }
 
@@ -457,8 +502,8 @@ deadlock_check(vset_t deadlocks, bitvector_t *reach_groups)
     if (vset_is_empty(deadlocks))
         return;
 
-    vset_t next_temp = vset_create(domain,0,NULL);
-    vset_t prev_temp = vset_create(domain,0,NULL);
+    vset_t next_temp = vset_create(domain, 0, NULL);
+    vset_t prev_temp = vset_create(domain, 0, NULL);
 
     Warning(debug, "Potential deadlocks found");
 
@@ -477,64 +522,91 @@ deadlock_check(vset_t deadlocks, bitvector_t *reach_groups)
         return;
 
     Warning(info, "deadlock found");
+
     if (trc_output) {
         int dlk_state[1][N];
+
         vset_example(deadlocks, dlk_state[0]);
         find_trace(dlk_state, 1, global_level, levels);
     }
+
     Fatal(1,info,"exiting now");
+}
+
+static inline void
+get_vset_size(vset_t set, long *node_count, char *elem_str, ssize_t str_len)
+{
+    bn_int_t elem_count;
+    int      len;
+
+    vset_count(set, node_count, &elem_count);
+    len = bn_int2string(elem_str, str_len, &elem_count);
+
+    if (len >= str_len)
+        Fatal(1, error, "Error converting number to string");
+
+    bn_clear(&elem_count);
+}
+
+static inline void
+get_vrel_size(vrel_t rel, long *node_count, char *elem_str, ssize_t str_len)
+{
+    bn_int_t elem_count;
+    int      len;
+
+    vrel_count(rel, node_count, &elem_count);
+    len = bn_int2string(elem_str, str_len, &elem_count);
+
+    if (len >= str_len)
+        Fatal(1, error, "Error converting number to string");
+
+    bn_clear(&elem_count);
 }
 
 static void
 stats_and_progress_report(vset_t current, vset_t visited, int level)
 {
-    bn_int_t e_count;
-    long n_count;
-    char string[1024];
-    int size;
+    long     node_count;
+    char     elem_str[1024];
+    int      str_len = sizeof(elem_str);
 
-    if (current) {
-        vset_count(current, &n_count, &e_count);
-        size = bn_int2string(string, sizeof(string), &e_count);
-        if(size >= (ssize_t)sizeof(string))
-            Fatal(1, error, "Error converting number to string");
+    if (current != NULL) {
+        get_vset_size(current, &node_count, elem_str, str_len);
         Warning(info, "level %d has %s states ( %ld nodes )",
-                    level, string, n_count);
-        bn_clear(&e_count);
-        if (n_count > max_lev_count) max_lev_count = n_count;
+                    level, elem_str, node_count);
+
+        if (node_count > max_lev_count)
+            max_lev_count = node_count;
     }
 
-    vset_count(visited, &n_count, &e_count);
-    size = bn_int2string(string, sizeof(string), &e_count);
-    if(size >= (ssize_t)sizeof(string))
-        Fatal(1, error, "Error converting number to string");
+    get_vset_size(visited, &node_count, elem_str, str_len);
     Warning(info, "visited %d has %s states ( %ld nodes )",
-                level, string, n_count);
-    bn_clear(&e_count);
-    if (n_count > max_vis_count) max_vis_count = n_count;
+                level, elem_str, node_count);
+
+    if (node_count > max_vis_count)
+        max_vis_count = node_count;
 
     if (RTverbosity >= 2) {
         fprintf(stderr, "transition caches ( grp nds elts ): ");
+
         for (int i = 0; i < nGrps; i++) {
-            vrel_count(group_next[i], &n_count, &e_count);
-            size = bn_int2string(string, sizeof(string), &e_count);
-            if(size >= (ssize_t)sizeof(string))
-                Fatal(1, error, "Error converting number to string");
-            fprintf(stderr, "( %d %ld %s ) ", i, n_count, string);
-            bn_clear(&e_count);
-            if (n_count > max_trans_count) max_trans_count = n_count;
+            get_vrel_size(group_next[i], &node_count, elem_str, str_len);
+            fprintf(stderr, "( %d %ld %s ) ", i, node_count, elem_str);
+
+            if (node_count > max_trans_count)
+                max_trans_count = node_count;
         }
 
         fprintf(stderr,"\ngroup explored    ( grp nds elts ): ");
+
         for (int i = 0; i < nGrps; i++) {
-            vset_count(group_explored[i], &n_count, &e_count);
-            size = bn_int2string(string, sizeof(string), &e_count);
-            if(size >= (ssize_t)sizeof(string))
-                Fatal(1, error, "Error converting number to string");
-            fprintf(stderr, "( %d %ld %s ) ", i, n_count,string);
-            bn_clear(&e_count);
-            if (n_count > max_grp_count) max_grp_count = n_count;
+            get_vset_size(group_explored[i], &node_count, elem_str, str_len);
+            fprintf(stderr, "( %d %ld %s ) ", i, node_count, elem_str);
+
+            if (node_count > max_grp_count)
+                max_grp_count = node_count;
         }
+
         fprintf(stderr, "\n");
     }
 }
@@ -542,30 +614,27 @@ stats_and_progress_report(vset_t current, vset_t visited, int level)
 static void
 final_stat_reporting(vset_t visited, mytimer_t timer)
 {
-    bn_int_t e_count;
-    long n_count;
-    char string[1024];
-    int size;
+    long node_count;
+    char elem_str[1024];
 
     SCCreportTimer(timer, "reachability took");
 
-    if (dlk_detect) Warning(info, "No deadlocks found");
-    if (act_detect) Warning(info, "Action \"%s\" not found", act_detect);
+    if (dlk_detect)
+        Warning(info, "No deadlocks found");
 
-    vset_count(visited, &n_count, &e_count);
-    size = bn_int2string(string, sizeof(string), &e_count);
-    if( size >= (ssize_t)sizeof(string))
-        Fatal(1, error, "Error converting number to string");
-    Warning(info, "state space has %s states", string);
-    bn_clear(&e_count);
+    if (act_detect != NULL)
+        Warning(info, "Action \"%s\" not found", act_detect);
+
+    get_vset_size(visited, &node_count, elem_str, sizeof(elem_str));
+    Warning(info, "state space has %s states", elem_str);
 
     if (max_lev_count == 0) {
         Warning(info, "( %ld final BDD nodes; %ld peak nodes )",
-                    n_count, max_vis_count);
+                    node_count, max_vis_count);
     } else {
         Warning(info, "( %ld final BDD nodes; %ld peak nodes; "
                           "%ld peak nodes per level )",
-                    n_count, max_vis_count, max_lev_count);
+                    node_count, max_vis_count, max_lev_count);
     }
 
     diagnostic("( peak transition cache: %ld nodes; peak group explored: "
@@ -576,18 +645,19 @@ static void
 reach_bfs_prev(bitvector_t *reach_groups, long *eg_count, long *next_count)
 {
     int level = 0;
-    vset_t current_level = vset_create(domain,0,NULL);
-    vset_t next_level = vset_create(domain,0,NULL);
-    vset_t temp = vset_create(domain,0,NULL);
-    vset_t deadlocks = dlk_detect?vset_create(domain,0,NULL):NULL;
-    vset_t dlk_temp = dlk_detect?vset_create(domain,0,NULL):NULL;
+    vset_t current_level = vset_create(domain, 0, NULL);
+    vset_t next_level = vset_create(domain, 0, NULL);
+    vset_t temp = vset_create(domain, 0, NULL);
+    vset_t deadlocks = dlk_detect?vset_create(domain, 0, NULL):NULL;
+    vset_t dlk_temp = dlk_detect?vset_create(domain, 0 ,NULL):NULL;
 
     vset_copy(current_level, visited);
+
     while (!vset_is_empty(current_level)) {
         if (trc_output != NULL) save_level();
         stats_and_progress_report(current_level, visited, level);
         level++;
-        for(int i = 0; i < nGrps; i++){
+        for (int i = 0; i < nGrps; i++){
             if (!bitvector_is_set(reach_groups, i)) continue;
             diagnostic("\rexploring group %4d/%d", i+1, nGrps);
             expand_group_next(i, current_level);
@@ -595,7 +665,7 @@ reach_bfs_prev(bitvector_t *reach_groups, long *eg_count, long *next_count)
         }
         diagnostic("\rexploration complete             \n");
         if (dlk_detect) vset_copy(deadlocks, current_level);
-        for(int i=0;i<nGrps;i++) {
+        for (int i = 0; i < nGrps; i++) {
             if (!bitvector_is_set(reach_groups,i)) continue;
             diagnostic("\rlocal next %4d/%d", i+1, nGrps);
             (*next_count)++;
@@ -640,7 +710,7 @@ reach_bfs(bitvector_t *reach_groups, long *eg_count, long *next_count)
         vset_copy(old_vis, visited);
         stats_and_progress_report(NULL, visited, level);
         level++;
-        for(int i = 0; i < nGrps; i++) {
+        for (int i = 0; i < nGrps; i++) {
             if (!bitvector_is_set(reach_groups,i)) continue;
             diagnostic("\rexploring group %4d/%d", i+1, nGrps);
             expand_group_next(i, visited);
@@ -648,7 +718,7 @@ reach_bfs(bitvector_t *reach_groups, long *eg_count, long *next_count)
         }
         diagnostic("\rexploration complete             \n");
         if (dlk_detect) vset_copy(deadlocks, visited);
-        for(int i = 0; i < nGrps; i++) {
+        for (int i = 0; i < nGrps; i++) {
             if (!bitvector_is_set(reach_groups,i)) continue;
             diagnostic("\rlocal next %4d/%d", i+1, nGrps);
             (*next_count)++;
@@ -689,7 +759,7 @@ reach_chain_prev(bitvector_t *reach_groups, long *eg_count, long *next_count)
         stats_and_progress_report(new_states, visited, level);
         level++;
         if (dlk_detect) vset_copy(deadlocks, new_states);
-        for(int i = 0; i < nGrps; i++) {
+        for (int i = 0; i < nGrps; i++) {
             if (!bitvector_is_set(reach_groups, i)) continue;
             diagnostic("\rgroup %4d/%d", i+1, nGrps);
             expand_group_next(i, new_states);
@@ -735,7 +805,7 @@ reach_chain(bitvector_t *reach_groups, long *eg_count, long *next_count)
         stats_and_progress_report(NULL, visited, level);
         level++;
         if (dlk_detect) vset_copy(deadlocks, visited);
-        for(int i = 0; i < nGrps; i++) {
+        for (int i = 0; i < nGrps; i++) {
             if (!bitvector_is_set(reach_groups, i)) continue;
             diagnostic("\rgroup %4d/%d", i+1, nGrps);
             expand_group_next(i, visited);
@@ -765,7 +835,7 @@ reach_chain(bitvector_t *reach_groups, long *eg_count, long *next_count)
 
 static void
 reach_no_sat(reach_proc_t reach_proc, bitvector_t *reach_groups,
-             long *eg_count, long *next_count)
+                 long *eg_count, long *next_count)
 {
     reach_proc(reach_groups, eg_count, next_count);
 }
@@ -773,7 +843,7 @@ reach_no_sat(reach_proc_t reach_proc, bitvector_t *reach_groups,
 
 static void
 reach_sat1(reach_proc_t reach_proc, bitvector_t *reach_groups,
-           long *eg_count, long *next_count)
+               long *eg_count, long *next_count)
 {
     int level[nGrps];
     int back[N + 1];
@@ -837,7 +907,7 @@ reach_sat1(reach_proc_t reach_proc, bitvector_t *reach_groups,
 
 static void
 reach_sat2(reach_proc_t reach_proc, bitvector_t *reach_groups,
-           long *eg_count, long *next_count)
+               long *eg_count, long *next_count)
 {
     int level[nGrps];
     bitvector_t groups[N + 1];
@@ -854,7 +924,7 @@ reach_sat2(reach_proc_t reach_proc, bitvector_t *reach_groups,
     for (int i = 0; i < nGrps; i++)
         for (int j = 0; j < N; j++)
             if (dm_is_set(GBgetDMInfo(model), i, j)) {
-                level[i] = (N - 1 - j) / G + 1;
+                level[i] = (N - 1 - j) / sat_granularity + 1;
                 break;
             }
 
@@ -874,7 +944,7 @@ reach_sat2(reach_proc_t reach_proc, bitvector_t *reach_groups,
     int k = 1;
     int last = 0;
     vset_t old_vis = vset_create(domain, 0, NULL);
-    while (k <= (N - 1) / G + 1) {
+    while (k <= (N - 1) / sat_granularity + 1) {
         if (k == last)
             k++;
         else {
@@ -894,7 +964,7 @@ reach_sat2(reach_proc_t reach_proc, bitvector_t *reach_groups,
 
 static void
 reach_sat3(reach_proc_t reach_proc, bitvector_t *reach_groups,
-           long *eg_count, long *next_count)
+               long *eg_count, long *next_count)
 {
     int level[nGrps];
     bitvector_t groups[N+1];
@@ -910,7 +980,7 @@ reach_sat3(reach_proc_t reach_proc, bitvector_t *reach_groups,
     for (int i = 0; i < nGrps; i++)
         for (int j = 0; j < N; j++)
             if (dm_is_set(GBgetDMInfo(model), i, j)) {
-                level[i]=(N - 1 - j) / G + 1;
+                level[i]=(N - 1 - j) / sat_granularity + 1;
                 break;
             }
 
@@ -931,7 +1001,7 @@ reach_sat3(reach_proc_t reach_proc, bitvector_t *reach_groups,
     vset_t old_vis = vset_create(domain, 0, NULL);
     while (!vset_equal(old_vis, visited)) {
         vset_copy(old_vis, visited);
-        for (int k = 1; k <= (N - 1) / G + 1 ; k++) {
+        for (int k = 1; k <= (N - 1) / sat_granularity + 1 ; k++) {
             Warning(info, "Saturating level: %d", k);
             reach_proc(&groups[k], eg_count, next_count);
         }
@@ -939,149 +1009,209 @@ reach_sat3(reach_proc_t reach_proc, bitvector_t *reach_groups,
     vset_destroy(old_vis);
 }
 
-static FILE* table_file;
-
-static int table_count=0;
-
 typedef struct {
-	model_t model;
-	int group;
-	int *src;
+    model_t  model;
+    FILE    *tbl_file;
+    int      tbl_count;
+    int      group;
+    int     *src;
 } output_context;
 
-static void etf_edge(void*context,transition_info_t*ti,int*dst){
-	output_context* ctx=(output_context*)context;
-	table_count++;
-	int k=0;
-	for(int i=0;i<N;i++) {
-		if (dm_is_set(GBgetDMInfo(ctx->model), ctx->group, i)) {
-			fprintf(table_file," %d/%d",ctx->src[k],dst[k]);
-			k++;
-		} else {
-			fprintf(table_file," *");
-		}
-	}
-	for(int i=0;i<eLbls;i++) {
-		fprintf(table_file," %d",ti->labels[i]);
-	}
-	fprintf(table_file,"\n");
+static void
+etf_edge(void *context, transition_info_t *ti, int *dst)
+{
+    output_context* ctx = (output_context*)context;
+
+    ctx->tbl_count++;
+
+    for(int i = 0, k = 0 ; i < N; i++) {
+        if (dm_is_set(GBgetDMInfo(ctx->model), ctx->group, i)) {
+            fprintf(ctx->tbl_file, " %d/%d", ctx->src[k], dst[k]);
+            k++;
+        } else {
+            fprintf(ctx->tbl_file," *");
+        }
+    }
+
+    for(int i = 0; i < eLbls; i++)
+        fprintf(ctx->tbl_file, " %d", ti->labels[i]);
+
+    fprintf(ctx->tbl_file,"\n");
 }
 
-static void enum_edges(void*context,int *src){
-	output_context* ctx=(output_context*)context;
-	ctx->src=src;
-	GBgetTransitionsShort(model,ctx->group,ctx->src,etf_edge,context);
+static void enum_edges(void *context, int *src)
+{
+    output_context* ctx = (output_context*)context;
+
+    ctx->src = src;
+    GBgetTransitionsShort(model, ctx->group, ctx->src, etf_edge, context);
 }
 
 typedef struct {
-	int mapno;
-	int len;
-	int*used;
+    FILE *tbl_file;
+    int   mapno;
+    int   len;
+    int  *used;
 } map_context;
 
+static void
+enum_map(void *context, int *src){
+    map_context *ctx = (map_context*)context;
+    int val = GBgetStateLabelShort(model, ctx->mapno, src);
 
-static void enum_map(void*context,int *src){
-	map_context*ctx=(map_context*)context;
-	int val=GBgetStateLabelShort(model,ctx->mapno,src);
-	int k=0;
-	for(int i=0;i<N;i++){
-		if (k<ctx->len && ctx->used[k]==i){
-			fprintf(table_file,"%d ",src[k]);
-			k++;
-		} else {
-			fprintf(table_file,"* ");
-		}
-	}
-	fprintf(table_file,"%d\n",val);
+    for (int i = 0, k = 0; i < N; i++) {
+        if (k < ctx->len && ctx->used[k] == i){
+            fprintf(ctx->tbl_file, "%d ", src[k]);
+            k++;
+        } else {
+            fprintf(ctx->tbl_file, "* ");
+        }
+    }
+
+    fprintf(ctx->tbl_file, "%d\n", val);
 }
 
-
-static void do_output(){
-    mytimer_t timer=SCCcreateTimer();
+static void
+output_init(FILE *tbl_file)
+{
     int state[N];
+
+    GBgetInitialState(model, state);
+    fprintf(tbl_file, "begin state\n");
+
+    for (int i = 0; i < N; i++) {
+        fprint_ltsmin_ident(tbl_file, lts_type_get_state_name(ltstype, i));
+        fprintf(tbl_file, ":");
+        fprint_ltsmin_ident(tbl_file, lts_type_get_state_type(ltstype, i));
+        fprintf(tbl_file, (i == (N - 1))?"\n":" ");
+    }
+
+    fprintf(tbl_file,"end state\n");
+
+    fprintf(tbl_file,"begin edge\n");
+
+    for(int i = 0; i < eLbls; i++) {
+        fprint_ltsmin_ident(tbl_file, lts_type_get_edge_label_name(ltstype, i));
+        fprintf(tbl_file, ":");
+        fprint_ltsmin_ident(tbl_file, lts_type_get_edge_label_type(ltstype, i));
+        fprintf(tbl_file, (i == (eLbls - 1))?"\n":" ");
+    }
+
+    fprintf(tbl_file, "end edge\n");
+
+    fprintf(tbl_file, "begin init\n");
+
+    for(int i = 0; i < N; i++)
+        fprintf(tbl_file, "%d%s", state[i], (i == (N - 1))?"\n":" ");
+
+    fprintf(tbl_file,"end init\n");
+}
+
+static void
+output_trans(FILE *tbl_file)
+{
+    int tbl_count = 0;
+    output_context ctx;
+
+    ctx.model = model;
+    ctx.tbl_file = tbl_file;
+
+    for(int g = 0; g < nGrps; g++) {
+        ctx.group = g;
+        ctx.tbl_count = 0;
+        fprintf(tbl_file, "begin trans\n");
+        vset_enum(group_explored[g], enum_edges, &ctx);
+        fprintf(tbl_file, "end trans\n");
+        tbl_count += ctx.tbl_count;
+    }
+
+    Warning(info, "Symbolic tables have %d reachable transitions", tbl_count);
+}
+
+static void
+output_lbls(FILE *tbl_file)
+{
+    matrix_t *sl_info = GBgetStateLabelInfo(model);
+
+    sLbls = dm_nrows(sl_info);
+
+    if (dm_nrows(sl_info) != lts_type_get_state_label_count(ltstype))
+        Warning(error, "State label count mismatch!");
+
+    for (int i = 0; i < sLbls; i++){
+        int len = dm_ones_in_row(sl_info, i);
+        int used[len];
+
+        // get projection
+        for (int pi = 0, pk = 0; pi < dm_ncols (sl_info); pi++) {
+            if (dm_is_set (sl_info, i, pi))
+                used[pk++] = pi;
+        }
+
+        vset_t patterns = vset_create(domain, len, used);
+        map_context ctx;
+
+        vset_project(patterns, visited);
+        ctx.tbl_file = tbl_file;
+        ctx.mapno = i;
+        ctx.len = len;
+        ctx.used = used;
+        fprintf(tbl_file, "begin map ");
+        fprint_ltsmin_ident(tbl_file, lts_type_get_state_label_name(ltstype,i));
+        fprintf(tbl_file, ":");
+        fprint_ltsmin_ident(tbl_file, lts_type_get_state_label_type(ltstype,i));
+        fprintf(tbl_file,"\n");
+        vset_enum(patterns, enum_map, &ctx);
+        fprintf(tbl_file, "end map\n");
+        vset_destroy(patterns);
+    }
+}
+
+static void
+output_types(FILE *tbl_file)
+{
+    int type_count = lts_type_get_type_count(ltstype);
+
+    for (int i = 0; i < type_count; i++) {
+        Warning(info, "dumping type %s", lts_type_get_type(ltstype, i));
+        fprintf(tbl_file, "begin sort ");
+        fprint_ltsmin_ident(tbl_file, lts_type_get_type(ltstype, i));
+        fprintf(tbl_file, "\n");
+
+        int values = GBchunkCount(model,i);
+
+        for (int j = 0; j < values; j++) {
+            chunk c    = GBchunkGet(model, i, j);
+            size_t len = c.len * 2 + 6;
+            char str[len];
+
+            chunk2string(c, len, str);
+            fprintf(tbl_file, "%s\n", str);
+        }
+
+        fprintf(tbl_file,"end sort\n");
+    }
+}
+
+static void
+do_output(char *etf_output)
+{
+    FILE      *tbl_file;
+    mytimer_t  timer    = SCCcreateTimer();
+
     SCCstartTimer(timer);
     Warning(info, "writing output");
-	GBgetInitialState(model,state);
-	table_file=fopen(etf_output,"w");
-	if(!table_file){
-	    FatalCall(1,error,"could not open %s",etf_output);
-	}
-	fprintf(table_file,"begin state\n");
-	for(int i=0;i<N;i++){
-                fprint_ltsmin_ident(table_file,lts_type_get_state_name(ltstype,i));
-                fprintf(table_file,":");
-                fprint_ltsmin_ident(table_file,lts_type_get_state_type(ltstype,i));
-		fprintf(table_file,(i==(N-1))?"\n":" ");
-	}
-	fprintf(table_file,"end state\n");
-	fprintf(table_file,"begin edge\n");
-	for(int i=0;i<eLbls;i++){
-            fprint_ltsmin_ident(table_file,lts_type_get_edge_label_name(ltstype,i));
-            fprintf(table_file,":");
-            fprint_ltsmin_ident(table_file,lts_type_get_edge_label_type(ltstype,i));
-            fprintf(table_file,(i==(eLbls-1))?"\n":" ");
-	}
-	fprintf(table_file,"end edge\n");
-	fprintf(table_file,"begin init\n");
-	for(int i=0;i<N;i++) {
-		fprintf(table_file,"%d%s",state[i],(i==(N-1))?"\n":" ");
-	}
-	fprintf(table_file,"end init\n");
-	for(int g=0;g<nGrps;g++){
-		output_context ctx;
-		ctx.model = model;
-		ctx.group=g;
-		fprintf(table_file,"begin trans\n");
-		vset_enum(group_explored[g],enum_edges,&ctx);
-		fprintf(table_file,"end trans\n");
-	}
-	Warning(info,"Symbolic tables have %d reachable transitions",table_count);
-	matrix_t *sl_info = GBgetStateLabelInfo(model);
-	sLbls = dm_nrows(sl_info);
-	if (dm_nrows(sl_info) != lts_type_get_state_label_count(ltstype))
-		Warning(error,"State label count mismatch!");
-	for(int i=0;i<sLbls;i++){
-		int len = dm_ones_in_row(sl_info, i);
-		int used[len];
-		// get projection
-		for (int pi = 0, pk = 0; pi < dm_ncols (sl_info); pi++) {
-			if (dm_is_set (sl_info, i, pi)) {
-				used[pk++] = pi;
-			}
-		}
+    tbl_file = fopen(etf_output, "w");
 
-		vset_t patterns=vset_create(domain,len,used);
-		vset_project(patterns,visited);
-		map_context ctx;
-		ctx.mapno=i;
-		ctx.len=len;
-		ctx.used=used;
-		fprintf(table_file,"begin map ");
-                fprint_ltsmin_ident(table_file,lts_type_get_state_label_name(ltstype,i));
-                fprintf(table_file,":");
-                fprint_ltsmin_ident(table_file,lts_type_get_state_label_type(ltstype,i));
-                fprintf(table_file,"\n");
-		vset_enum(patterns,enum_map,&ctx);
-		fprintf(table_file,"end map\n");
-		vset_destroy(patterns);
-	}
-	int type_count=lts_type_get_type_count(ltstype);
-	for(int i=0;i<type_count;i++){
-		Warning(info,"dumping type %s",lts_type_get_type(ltstype,i));
-		fprintf(table_file,"begin sort ");
-                fprint_ltsmin_ident(table_file,lts_type_get_type(ltstype,i));
-                fprintf(table_file,"\n");
-		int values=GBchunkCount(model,i);
-		for(int j=0;j<values;j++){
-			chunk c=GBchunkGet(model,i,j);
-			size_t len=c.len*2+3;
-			char str[len];
-			chunk2string(c,len,str);
-			fprintf(table_file,"%s\n",str);
-		}
-		fprintf(table_file,"end sort\n");
-	}
-	fclose(table_file);
+    if (tbl_file == NULL)
+        FatalCall(1, error,"could not open %s", etf_output);
+
+    output_init(tbl_file);
+    output_trans(tbl_file);
+    output_lbls(tbl_file);
+    output_types(tbl_file);
+
+    fclose(tbl_file);
     SCCstopTimer(timer);
     SCCreportTimer(timer, "writing output took");
 }
@@ -1101,7 +1231,7 @@ unguided(sat_proc_t sat_proc, reach_proc_t reach_proc)
                 eg_count, next_count);
 }
 
-void
+static void
 init_model(char *file)
 {
     Warning(info, "opening %s", file);
@@ -1124,7 +1254,7 @@ init_model(char *file)
     Warning(info, "state vector length is %d; there are %d groups", N, nGrps);
 }
 
-void
+static void
 init_domain()
 {
     domain = vdom_create_default(N);
@@ -1151,7 +1281,7 @@ init_domain()
     }
 }
 
-void
+static void
 init_action()
 {
     if (eLbls!=1) Abort("action detection assumes precisely one edge label");
@@ -1171,58 +1301,59 @@ main(int argc, char *argv[])
                        "The optional output of this analysis is an ETF "
                            "representation of the input\n\nOptions");
 
-    etf_output=files[1];
     init_model(files[0]);
     init_domain();
-    if (act_detect!=NULL) init_action();
+    if (act_detect != NULL) init_action();
 
     sat_proc_t sat_proc = NULL;
     reach_proc_t reach_proc = NULL;
     guided_proc_t guided_proc = unguided;
 
     switch (strategy) {
-    case BFSP:
+    case BFS_P:
         reach_proc = reach_bfs_prev;
         break;
     case BFS:
         reach_proc = reach_bfs;
         break;
-    case ChainP:
+    case CHAIN_P:
         reach_proc = reach_chain_prev;
         break;
-    case Chain:
+    case CHAIN:
         reach_proc = reach_chain;
         break;
     }
 
     switch (sat_strategy) {
-    case NoSat:
+    case NO_SAT:
         sat_proc = reach_no_sat;
         break;
-    case Sat1:
+    case SAT_1:
         sat_proc = reach_sat1;
         break;
-    case Sat2:
+    case SAT_2:
         sat_proc = reach_sat2;
         break;
-    case Sat3:
+    case SAT_3:
         sat_proc = reach_sat3;
         break;
     }
 
     int src[N];
-    GBgetInitialState(model,src);
-    vset_add(visited,src);
-    Warning(info,"got initial state");
 
-    mytimer_t timer=SCCcreateTimer();
+    GBgetInitialState(model, src);
+    vset_add(visited, src);
+    Warning(info, "got initial state");
+
+    mytimer_t timer = SCCcreateTimer();
+
     SCCstartTimer(timer);
     guided_proc(sat_proc, reach_proc);
     SCCstopTimer(timer);
     final_stat_reporting(visited, timer);
 
-    if (etf_output)
-        do_output();
+    if (files[1] != NULL)
+        do_output(files[1]);
 
     return 0;
 }
