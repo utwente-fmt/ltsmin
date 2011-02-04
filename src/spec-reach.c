@@ -35,6 +35,11 @@
 #include "dve2-greybox.h"
 #endif
 
+#define diagnostic(...) {\
+    if (RTverbosity >= 2)\
+        fprintf(stderr, __VA_ARGS__);\
+}
+
 static char* etf_output=NULL;
 static char* trc_output=NULL;
 static int dlk_detect=0;
@@ -120,8 +125,8 @@ static  struct poptOption options[] = {
 };
 
 typedef struct {
-  int len;
-  int* proj;
+    int len;
+    int *proj;
 } proj_info;
 
 static lts_type_t ltstype;
@@ -129,23 +134,44 @@ static int N;
 static int eLbls;
 static int sLbls;
 static int nGrps;
-static proj_info* projs;
+static proj_info *projs;
 static vdom_t domain;
 static vset_t visited;
-static long max_lev_count=0;
-static long max_vis_count=0;
-static long max_grp_count=0;
-static long max_trans_count=0;
+static vset_t *levels = NULL;
+static int max_levels = 0;
+static int global_level;
+static long max_lev_count = 0;
+static long max_vis_count = 0;
+static long max_grp_count = 0;
+static long max_trans_count = 0;
 static model_t model;
 static vrel_t *group_next;
 static vset_t *group_explored;
 static vset_t *group_tmp;
-static int explored;
 
 static void *new_string_index(void* context){
 	(void)context;
 	Warning(info,"creating a new string index");
 	return SIcreate();
+}
+
+static inline void
+grow_levels(int new_levels)
+{
+    if (global_level == max_levels) {
+        max_levels += new_levels;
+        levels = RTrealloc(levels, max_levels * sizeof(vset_t));
+        for(int i = global_level; i < max_levels; i++)
+            levels[i] = vset_create(domain, 0, NULL);
+    }
+}
+
+static inline void
+save_level()
+{
+    grow_levels(1024);
+    vset_copy(levels[global_level], visited);
+    global_level++;
 }
 
 static void write_trace_state(int src_no, int*state){
@@ -279,130 +305,136 @@ static void find_trace_to(int *dst,int level,vset_t *levels){
     write_trace(states, current_state);
 }
 
-static void find_trace(int *dst,int level,vset_t *levels){
-  int init_state[N];
-  GBgetInitialState(model,init_state);
-  trace_output=lts_output_open(trc_output,model,1,0,1,"vsi",NULL);
-  lts_output_set_root_vec(trace_output,(uint32_t*)init_state);
-  lts_output_set_root_idx(trace_output,0,0);
-  trace_handle=lts_output_begin(trace_output,0,0,0);
-  mytimer_t timer=SCCcreateTimer();
-  SCCstartTimer(timer);
-  find_trace_to(dst,level,levels);
-  SCCstopTimer(timer);
-  SCCreportTimer(timer,"constructing the trace took");
-  lts_output_end(trace_output,trace_handle);
-  lts_output_close(&trace_output);
+static void
+find_trace(int trace_end[][N], int end_count, int level, vset_t *levels)
+{
+    // Find initial state and open output file
+    int init_state[N];
+    GBgetInitialState(model, init_state);
+    trace_output = lts_output_open(trc_output,model, 1, 0, 1, "vsi", NULL);
+    lts_output_set_root_vec(trace_output, (uint32_t*)init_state);
+    lts_output_set_root_idx(trace_output, 0, 0);
+    trace_handle = lts_output_begin(trace_output, 0, 0, 0);
+
+    // Generate trace
+    mytimer_t timer=SCCcreateTimer();
+    SCCstartTimer(timer);
+    find_trace_to(trace_end, end_count, level, levels);
+    SCCstopTimer(timer);
+    SCCreportTimer(timer,"constructing the trace took");
+
+    // Close output file
+    lts_output_end(trace_output,trace_handle);
+    lts_output_close(&trace_output);
 }
 
 struct find_action_info {
-  int group;
-  int *dst;
-  int level;
-  vset_t* levels;
-  int max_levels;
+    int group;
+    int *dst;
 };
 
-static void find_action_cb(void* context, int* src){
-  Warning(info,"found action: %s",act_detect);
-  if (trc_output!=NULL) {
-    // The following is destructive on levels
-    struct find_action_info* ctx=(struct find_action_info*)context;
+static void
+find_action_cb(void* context, int* src)
+{
+    diagnostic("\n");
+    Warning(info, "found action: %s", act_detect);
+
+    if (trc_output == NULL)
+        Fatal(1, info, "exiting now");
+
+    struct find_action_info* ctx = (struct find_action_info*)context;
     int group=ctx->group;
-    int dst[N];
-    int level;
-    vset_t* levels;
-    int max_levels=ctx->max_levels;
+    int trace_end[2][N];
 
-    for(int i=0;i<N;i++)
-      dst[i]=src[i];
-    for(int i=0;i<projs[group].len;i++)
-      dst[projs[group].proj[i]]=ctx->dst[i];
-
-    if(vset_member(ctx->levels[ctx->level-1],src)) {
-      Warning(debug, "source found at level %d", ctx->level-1);
-      level=ctx->level+1;
-    } else {
-      Warning(debug, "source not found at level %d", ctx->level-1);
-      level=ctx->level+2;
+    for (int i = 0; i < N; i++) {
+        trace_end[0][i] = src[i];
+        trace_end[1][i] = src[i];
     }
 
-    if (level>max_levels) {
-      max_levels=level;
-      levels = RTrealloc(ctx->levels,max_levels * sizeof(vset_t));
-      for(int i=ctx->level;i<max_levels;i++)
-	levels[i] = vset_create(domain,0,NULL);
-    } else
-      levels = ctx->levels;
+    // Set dst of the last step of the trace to its proper value
+    for (int i = 0; i < projs[group].len; i++)
+        trace_end[0][projs[group].proj[i]] = ctx->dst[i];
 
-    vset_add(levels[level-2],src);
-    Warning(debug, "source added at level %d", level-2);
-    vset_add(levels[level-1],dst);
-    Warning(debug, "destination added at level %d", level-1);
+    // src and dst may both be new, e.g. in case of chaining
+    if (vset_member(levels[global_level - 1], src)) {
+        Warning(debug, "source found at level %d", global_level - 1);
+        find_trace(trace_end, 2, global_level, levels);
+    } else {
+        Warning(debug, "source not found at level %d", global_level - 1);
+        find_trace(trace_end, 2, global_level + 1, levels);
+    }
 
-    find_trace(dst,level,levels);
-  }
-  Fatal(1,info,"exiting now");
+    Fatal(1, info, "exiting now");
 }
 
 struct group_add_info {
-  int group;
-  int *src;
-  vset_t set;
-  int level;
-  vset_t* levels;
-  int max_levels;
+    int group;
+    int *src;
+    int *explored;
+    vset_t set;
 };
 
-static void group_add(void*context,transition_info_t* ti,int*dst){
-	struct group_add_info* ctx=(struct group_add_info*)context;
-	vrel_add(group_next[ctx->group],ctx->src,dst);
+static void
+group_add(void *context, transition_info_t *ti, int *dst)
+{
+    struct group_add_info *ctx = (struct group_add_info*)context;
+    vrel_add(group_next[ctx->group], ctx->src, dst);
 
-	if (act_detect!=NULL && ti->labels[0]==act_detect_index){
-	    int group=ctx->group;
-	    struct find_action_info action_ctx;
-	    action_ctx.group=group;
-	    action_ctx.dst=dst;
-	    action_ctx.level=ctx->level;
-	    action_ctx.levels=ctx->levels;
-            action_ctx.max_levels=ctx->max_levels;
-	    vset_enum_match(ctx->set,projs[group].len,projs[group].proj,
-			    ctx->src, find_action_cb,&action_ctx);
-	}
-}
+    if (act_detect!=NULL && ti->labels[0]==act_detect_index) {
+        int group = ctx->group;
+        struct find_action_info action_ctx;
 
-static void explore_cb(void*context,int *src){
-	struct group_add_info* ctx=(struct group_add_info*)context;
-	ctx->src=src;
-	GBgetTransitionsShort(model,ctx->group,src,group_add,context);
-	explored++;
-	if (explored%1000 ==0 && RTverbosity >=2) {
-		Warning(info,"explored %d short vectors for group %d",explored,ctx->group);
-	}
-}
-
-static inline void expand_group_next(int group,vset_t set,int level,vset_t* levels,int max_levels){
-	struct group_add_info ctx;
-	explored=0;
-	ctx.group=group;
-	ctx.set=set;
-	ctx.level=level;
-	ctx.levels=levels;
-        ctx.max_levels=max_levels;
-	vset_project(group_tmp[group],set);
-	vset_zip(group_explored[group],group_tmp[group]);
-	vset_enum(group_tmp[group],explore_cb,&ctx);
-	vset_clear(group_tmp[group]);
-}
-
-static void deadlock_check(vset_t deadlocks,int level,vset_t *levels){
-    if (vset_is_empty(deadlocks)) return;
-    Warning(info,"deadlock found");
-    if (trc_output){
-        int dlk_state[N];
-        vset_example(deadlocks,dlk_state);
-        find_trace(dlk_state,level,levels);
+        action_ctx.group = group;
+        action_ctx.dst = dst;
+        vset_enum_match(ctx->set,projs[group].len, projs[group].proj, ctx->src,
+                        find_action_cb, &action_ctx);
     }
+}
+
+static void
+explore_cb(void *context, int *src)
+{
+    struct group_add_info *ctx = (struct group_add_info*)context;
+
+    ctx->src=src;
+    GBgetTransitionsShort(model, ctx->group, src, group_add, context);
+    (*ctx->explored)++;
+
+    if ((*ctx->explored)%1000 == 0 && RTverbosity >= 2) {
+        Warning(info, "explored %d short vectors for group %d", *ctx->explored,
+                ctx->group);
+    }
+}
+
+static inline void
+expand_group_next(int group, vset_t set)
+{
+    struct group_add_info ctx;
+    int explored = 0;
+
+    ctx.group = group;
+    ctx.set = set;
+    ctx.explored = &explored;
+    vset_project(group_tmp[group], set);
+    vset_zip(group_explored[group], group_tmp[group]);
+    vset_enum(group_tmp[group], explore_cb, &ctx);
+    vset_clear(group_tmp[group]);
+}
+
+static void
+deadlock_check(vset_t deadlocks)
+{
+    if (vset_is_empty(deadlocks))
+        return;
+
+    Warning(info,"deadlock found");
+
+    if (trc_output) {
+        int dlk_state[1][N];
+        vset_example(deadlocks, dlk_state[0]);
+        find_trace(dlk_state, 1, global_level, levels);
+    }
+
     Fatal(1,info,"exiting now");
 }
 
@@ -411,7 +443,7 @@ static void stats_and_progress_report(vset_t current, vset_t visited, int level)
   long n_count;
   char string[1024];
   int size;
-  
+
   if (current) {
     vset_count(current,&n_count,&e_count);
     if (n_count>max_lev_count) max_lev_count=n_count;
@@ -420,7 +452,7 @@ static void stats_and_progress_report(vset_t current, vset_t visited, int level)
     Warning(info,"level %d has %s states ( %ld nodes )",level,string,n_count);
     bn_clear(&e_count);
   }
-  
+
   vset_count(visited,&n_count,&e_count);
   if (n_count>max_vis_count) max_vis_count=n_count;
   size = bn_int2string(string,sizeof string,&e_count);
@@ -473,365 +505,315 @@ static void final_stat_reporting(vset_t visited) {
 	    max_trans_count,max_grp_count);
 }
 
-static void reach_bfs(){
-	int level,i;
-	long eg_count=0;
-	long next_count=0;
+static void
+reach_bfs(bitvector_t *reach_groups, long *eg_count, long *next_count)
+{
+    int level = 0;
+    vset_t current_level = vset_create(domain,0,NULL);
+    vset_t next_level = vset_create(domain,0,NULL);
+    vset_t temp = vset_create(domain,0,NULL);
+    vset_t deadlocks = dlk_detect?vset_create(domain,0,NULL):NULL;
+    vset_t dlk_temp = dlk_detect?vset_create(domain,0,NULL):NULL;
 
-	level=0;
-	vset_t current_level=vset_create(domain,0,NULL);
-	vset_t next_level=vset_create(domain,0,NULL);
-	vset_t temp=vset_create(domain,0,NULL);
-	vset_t deadlocks=dlk_detect?vset_create(domain,0,NULL):NULL;
-	vset_t dlk_temp=dlk_detect?vset_create(domain,0,NULL):NULL;
+    vset_copy(current_level, visited);
+    while (!vset_is_empty(current_level)) {
+        if (trc_output != NULL) save_level();
+        stats_and_progress_report(current_level, visited, level);
+        level++;
+        for(int i = 0; i < nGrps; i++){
+            if (!bitvector_is_set(reach_groups, i)) continue;
+            diagnostic("\rexploring group %4d/%d", i+1, nGrps);
+            expand_group_next(i, current_level);
+            (*eg_count)++;
+        }
+        diagnostic("\rexploration complete             \n");
+        if (dlk_detect) vset_copy(deadlocks, current_level);
+        for(int i=0;i<nGrps;i++) {
+            if (!bitvector_is_set(reach_groups,i)) continue;
+            diagnostic("\rlocal next %4d/%d", i+1, nGrps);
+            (*next_count)++;
+            vset_next(temp, current_level, group_next[i]);
+            if (dlk_detect) {
+                vset_prev(dlk_temp, temp, group_next[i]);
+                vset_minus(deadlocks, dlk_temp);
+                vset_clear(dlk_temp);
+            }
+            vset_union(next_level, temp);
+        }
+        diagnostic("\rlocal next complete       \n");
+        if (dlk_detect) deadlock_check(deadlocks);
+        vset_zip(visited, next_level);
+        vset_copy(current_level, next_level);
+        vset_clear(next_level);
+        vset_reorder(domain);
+    }
 
-	vset_t *levels = NULL;
-	int max_levels = 0;
-
-	vset_copy(current_level,visited);
-	for(;;){
-		if(vset_is_empty(current_level)) break;
-          if (trc_output != NULL) {
-	    if (level == max_levels) {
-	      max_levels += 1024;
-	      levels = RTrealloc(levels, max_levels * sizeof(vset_t));
-	      for(int i=level;i<max_levels;i++)
-		levels[i] = vset_create(domain,0,NULL);
-	    }
-	    vset_copy(levels[level],visited);
-	  }
-	        stats_and_progress_report(current_level,visited,level);
-		level++;
-		for(i=0;i<nGrps;i++){
-			if (RTverbosity >= 2) fprintf(stderr,"\rexploring group %4d/%d",i+1,nGrps);
-			expand_group_next(i,current_level,level,levels,max_levels);
-			eg_count++;
-		}
-		if (RTverbosity >= 2) fprintf(stderr,"\rexploration complete             \n");
-		vset_clear(next_level);
-		if (dlk_detect) vset_copy(deadlocks,current_level);
-		for(i=0;i<nGrps;i++){
-			if (RTverbosity >= 2) fprintf(stderr,"\rlocal next %4d/%d",i+1,nGrps);
-			next_count++;
-			vset_next(temp,current_level,group_next[i]);
-			if (dlk_detect) {
-				vset_prev(dlk_temp,temp,group_next[i]);
-				vset_minus(deadlocks,dlk_temp);
-				vset_clear(dlk_temp);
-			}
-			vset_minus(temp,visited);
-			vset_union(next_level,temp);
-			vset_clear(temp);
-		}
-		if (RTverbosity >= 2) fprintf(stderr,"\rlocal next complete       \n");
-		if (dlk_detect) deadlock_check(deadlocks,level,levels);
-		vset_union(visited,next_level);
-		vset_copy(current_level,next_level);
-		vset_reorder(domain);
-	}
-	Warning(info,"Exploration took %ld group checks and %ld next state calls",eg_count,next_count);
+    vset_clear(current_level);
+    vset_clear(temp);
+    if (dlk_detect) {
+        vset_clear(deadlocks);
+        vset_clear(dlk_temp);
+    }
 }
 
-void reach_bfs2(){
-	int level,i;
-	long eg_count=0;
-	long next_count=0;
+static void
+reach_bfs2(bitvector_t *reach_groups, long *eg_count, long *next_count)
+{
+    int level = 0;
+    vset_t old_vis = vset_create(domain, 0, NULL);
+    vset_t temp = vset_create(domain, 0, NULL);
+    vset_t deadlocks = dlk_detect?vset_create(domain, 0, NULL):NULL;
+    vset_t dlk_temp = dlk_detect?vset_create(domain, 0, NULL):NULL;
 
-	level=0;
-	vset_t old_vis=vset_create(domain,0,NULL);
-	vset_t temp=vset_create(domain,0,NULL);
-	vset_t deadlocks=dlk_detect?vset_create(domain,0,NULL):NULL;
-	vset_t dlk_temp=dlk_detect?vset_create(domain,0,NULL):NULL;
+    while (!vset_equal(visited, old_vis)) {
+        if (trc_output != NULL) save_level();
+        vset_copy(old_vis, visited);
+        stats_and_progress_report(NULL, visited, level);
+        level++;
+        for(int i = 0; i < nGrps; i++) {
+            if (!bitvector_is_set(reach_groups,i)) continue;
+            diagnostic("\rexploring group %4d/%d", i+1, nGrps);
+            expand_group_next(i, visited);
+            (*eg_count)++;
+        }
+        diagnostic("\rexploration complete             \n");
+        if (dlk_detect) vset_copy(deadlocks, visited);
+        for(int i = 0; i < nGrps; i++) {
+            if (!bitvector_is_set(reach_groups,i)) continue;
+            diagnostic("\rlocal next %4d/%d", i+1, nGrps);
+            (*next_count)++;
+            vset_next(temp, old_vis, group_next[i]);
+            vset_union(visited, temp);
+            if (dlk_detect) {
+                vset_prev(dlk_temp, temp, group_next[i]);
+                vset_minus(deadlocks, dlk_temp);
+                vset_clear(dlk_temp);
+            }
+        }
+        diagnostic("\rlocal next complete       \n");
+        if (dlk_detect) deadlock_check(deadlocks);
+        vset_reorder(domain);
+    }
 
-	vset_t *levels = NULL;
-	int max_levels = 0;
-
-	for(;;){
-          if (trc_output != NULL) {
-	    if (level == max_levels) {
-	      max_levels += 1024;
-	      levels = RTrealloc(levels, max_levels * sizeof(vset_t));
-	      for(int i=level;i<max_levels;i++)
-		levels[i] = vset_create(domain,0,NULL);
-	    }
-	    vset_copy(levels[level],visited);
-	  }
-		vset_copy(old_vis,visited);
-		stats_and_progress_report(NULL,visited,level);
-		level++;
-		for(i=0;i<nGrps;i++){
-			if (RTverbosity >= 2) fprintf(stderr,"\rexploring group %4d/%d",i+1,nGrps);
-			expand_group_next(i,visited,level,levels,max_levels);
-			eg_count++;
-		}
-		if (RTverbosity >= 2) fprintf(stderr,"\rexploration complete             \n");
-		if (dlk_detect) vset_copy(deadlocks,visited);
-		for(i=0;i<nGrps;i++){
-			if (RTverbosity >= 2) fprintf(stderr,"\rlocal next %4d/%d",i+1,nGrps);
-			next_count++;
-			vset_next(temp,old_vis,group_next[i]);
-			vset_union(visited,temp);
-			if (dlk_detect) {
-				vset_prev(dlk_temp,temp,group_next[i]);
-				vset_minus(deadlocks,dlk_temp);
-				vset_clear(dlk_temp);
-			}
-		}
-		if (RTverbosity >= 2) fprintf(stderr,"\rlocal next complete       \n");
-		if (dlk_detect) deadlock_check(deadlocks,level,levels);
-		if (vset_equal(visited,old_vis)) break;
-		vset_reorder(domain);
-	}
-	Warning(info,"Exploration took %ld group checks and %ld next state calls",eg_count,next_count);
+    vset_clear(old_vis);
+    vset_clear(temp);
+    if (dlk_detect) {
+        vset_clear(deadlocks);
+        vset_clear(dlk_temp);
+    }
 }
 
-/**
- * Closure
- *  Compute the transitive closure with respect to a subset of groups
- *   1) the set of initial states I
- *   2) the set of groups to consider, defining a relation R
- *  The result is the transitive closure of R on I is returned
- *  As a side effect, the group tables (group_next) will be extended
- **/
+static void
+reach_sat1(bitvector_t *reach_groups, long *eg_count, long *next_count)
+{
+    int level[nGrps];
+    int back[N + 1];
+    bitvector_t* groups[N + 1];
 
-static void Closure(vset_t visited,bitvector_t* groups) {
-  int level=0;
-  vset_t current=vset_create(domain,0,NULL);
-  vset_t next=vset_create(domain,0,NULL);
-  vset_t temp=vset_create(domain,0,NULL);
+    // groups: i=0..nGrps-1
+    // vars  : j=0..N-1
+    // BDD levels:  k = N..1
 
-  vset_copy(current,visited);
-  while (!vset_is_empty(current)) {
-    stats_and_progress_report(current,visited,level);
-    level++;
-    for (int i=0;i<nGrps;i++) {
-      if (!bitvector_is_set(groups,i)) continue;
-      if (RTverbosity >= 2) fprintf(stderr,"\rconf-exploring group %4d/%d",i+1,nGrps);
-      expand_group_next(i,current,level,NULL,0);
+    for (int k = 1; k <= N; k++) {
+        groups[k] = (bitvector_t*)RTmalloc(sizeof(bitvector_t));
+        bitvector_create(groups[k], nGrps);
     }
-    if (RTverbosity >= 2) fprintf(stderr,"\rconf-exploration complete             \n");
-    for(int i=0;i<nGrps;i++){
-      if (!bitvector_is_set(groups,i)) continue;
-      if (RTverbosity >= 2) fprintf(stderr,"\rconf-local next %4d/%d",i+1,nGrps);
-      vset_next(temp,current,group_next[i]);
-      vset_union(next,temp);
-      vset_clear(temp);
+
+    // level[i] = first (highest) + of group i
+    for (int i = 0; i < nGrps; i++)
+        for (int j = 0; j < N; j++)
+            if (dm_is_set(GBgetDMInfo(model), i, j)) {
+                level[i]=N-j;
+                break;
+            }
+
+    for (int i = 0; i < nGrps; i++)
+        bitvector_set(groups[level[i]], i);
+
+    // Limit the bit vectors to the groups we are interested in
+    for (int k = 1; k <= N; k++)
+        bitvector_intersect(groups[k], reach_groups);
+
+    // back[k] = last + in any group of level k
+    for (int k = 1; k <= N; k++)
+        back[k] = N + 1;
+
+    for (int i = 0; i < nGrps; i++)
+        for (int k = 1; k <= N; k++)
+            if (dm_is_set(GBgetDMInfo(model), i, N-k)) {
+                if (k < back[level[i]]) back[level[i]]=k;
+                break;
+            }
+
+    // Diagnostics
+    diagnostic("level: ");
+    for (int i = 0; i < nGrps; i++)
+        diagnostic("%d ", level[i]);
+    diagnostic("\nback: ");
+    for (int j=1; j<=N; j++)
+        diagnostic("%d ", back[j]);
+    diagnostic("\n");
+
+    int k = 1;
+    vset_t old_vis = vset_create(domain, 0, NULL);
+    while (k <= N) {
+      Warning(info, "Saturating level: %d", k);
+      vset_copy(old_vis, visited);
+      reach_bfs(groups[k], eg_count, next_count);
+      if (vset_equal(old_vis, visited))
+          k++;
+      else
+          k=back[k];
     }
-    if (RTverbosity >= 2) fprintf(stderr,"\rconf-local next complete       \n");
-    vset_copy(current,next);
-    vset_clear(next);
-    vset_zip(visited,current);
-  }
-  vset_clear(current);
+    vset_clear(old_vis);
 }
 
+static void
+reach_sat2(bitvector_t *reach_groups, long *eg_count, long *next_count)
+{
+    int level[nGrps];
+    bitvector_t* groups[N + 1];
 
-void reach_sat1(){
-  int level[nGrps];
-  int back[N+1];
-  bitvector_t* groups[N+1];
+    // groups: i=0..nGrps-1
+    // vars  : j=0..N-1
+    // BDD levels:  k = N..1   (k = N-j)
 
-  // groups: i=0..nGrps-1
-  // vars  : j=0..N-1
-  // BDD levels:  k = N..1
-
-  for (int k=1;k<N+1;k++) {
-    groups[k] = (bitvector_t*)RTmalloc(sizeof(bitvector_t));
-    bitvector_create(groups[k],nGrps);
-  }
-  
-  // level[i] = first (highest) + of group i
-  for (int i=0;i<nGrps;i++) {
-    for (int j=0;j<N;j++) {
-      if (dm_is_set(GBgetDMInfo(model),i,j)) {
-	level[i]=N-j;
-	break;
-      }
+    for (int k = 1; k <= N; k++) {
+        groups[k] = (bitvector_t*)RTmalloc(sizeof(bitvector_t));
+        bitvector_create(groups[k], nGrps);
     }
-  }
 
-  for (int i=0;i<nGrps;i++) {
-    bitvector_set(groups[level[i]],i);
-  }
+    // level[i] = first '+' in row (highest in BDD) of group i
+    // recast 1..N down to equal groups 1..N/G  (more precisely: (N-1)/G + 1)a
+    for (int i = 0; i < nGrps; i++)
+        for (int j = 0; j < N; j++)
+            if (dm_is_set(GBgetDMInfo(model), i, j)) {
+                level[i] = (N - 1 - j) / G + 1;
+                break;
+            }
 
-  // back[k] = last + in any group of level k
-  for (int k=1;k<=N;k++) back[k]=N+1;
-  for (int i=0;i<nGrps;i++) {
-    for (int k=1;k<=N;k++)
-      if (dm_is_set(GBgetDMInfo(model),i,N-k)) {
-	if (k<back[level[i]]) back[level[i]]=k;
-	break;
-      }
-  }
-  
-   // test
-  fprintf(stderr,"level: ");
-  for (int i=0; i<nGrps;i++)
-    fprintf(stderr,"%d ",level[i]);
-  fprintf(stderr,"\nback: ");
-  for (int j=1; j<=N; j++)
-    fprintf(stderr,"%d ",back[j]);
-  fprintf(stderr,"\n");
+    for (int i = 0; i < nGrps; i++)
+        bitvector_set(groups[level[i]], i);
 
-  int k=1;
-  vset_t old_vis=vset_create(domain,0,NULL);
-  while (k <= N) {
-    fprintf(stderr,"Saturating level: %d\n",k);
-    vset_copy(old_vis,visited);
-    Closure(visited,groups[k]);
-    if (vset_equal(old_vis,visited))
-      k++;
-    else {
-      vset_clear(old_vis);
-      k=back[k];
+    // Limit the bit vectors to the groups we are interested in
+    for (int k = 1; k <= N; k++)
+        bitvector_intersect(groups[k], reach_groups);
+
+    // Diagnostics
+    diagnostic("level: ");
+    for (int i = 0; i < nGrps; i++)
+        diagnostic("%d ", level[i]);
+    diagnostic("\n");
+
+    int k = 1;
+    int last = 0;
+    vset_t old_vis = vset_create(domain, 0, NULL);
+    while (k <= (N - 1) / G + 1) {
+        if (k == last)
+            k++;
+        else {
+            Warning(info, "Saturating level: %d", k);
+            vset_copy(old_vis, visited);
+            reach_bfs(groups[k], eg_count, next_count);
+            if (vset_equal(old_vis, visited))
+                k++;
+            else {
+                last = k;
+                k = 1;
+            }
+        }
     }
-  }
+    vset_clear(old_vis);
 }
 
-void reach_sat2(){
-  int level[nGrps];
-  bitvector_t* groups[N+1];
+static void
+reach_sat3(bitvector_t *reach_groups, long *eg_count, long *next_count)
+{
+    int level[nGrps];
+    bitvector_t* groups[N+1];
 
-  // groups: i=0..nGrps-1
-  // vars  : j=0..N-1
-  // BDD levels:  k = N..1   (k = N-j)
+    // groups: i=0..nGrps-1
+    // vars  : j=0..N-1
+    // BDD levels:  k = N..1
 
-  for (int k=1;k<N+1;k++) {
-    groups[k] = (bitvector_t*)RTmalloc(sizeof(bitvector_t));
-    bitvector_create(groups[k],nGrps);
-  }
-  
-  // level[i] = first '+' in row (highest in BDD) of group i
-  // recast 1..N down to equal groups 1..N/G  (more precisely: (N-1)/G + 1)a
-  for (int i=0;i<nGrps;i++) {
-    for (int j=0;j<N;j++) {
-      if (dm_is_set(GBgetDMInfo(model),i,j)) {
-	level[i]=(N-1-j) / G + 1;
-	break;
-      }
+    for (int k = 1; k <= N; k++) {
+        groups[k] = (bitvector_t*)RTmalloc(sizeof(bitvector_t));
+        bitvector_create(groups[k], nGrps);
     }
-  }
 
-  for (int i=0;i<nGrps;i++) {
-    bitvector_set(groups[level[i]],i);
-  }
+    // level[i] = first (highest) + of group i
+    for (int i = 0; i < nGrps; i++)
+        for (int j = 0; j < N; j++)
+            if (dm_is_set(GBgetDMInfo(model), i, j)) {
+                level[i]=(N - 1 - j) / G + 1;
+                break;
+            }
 
-   // test
-  fprintf(stderr,"level: ");
-  for (int i=0; i<nGrps;i++)
-    fprintf(stderr,"%d ",level[i]);
-  fprintf(stderr,"\n");
-  
-  int k=1, last=0;
-  vset_t old_vis=vset_create(domain,0,NULL);
-  while (k <= (N-1)/G +1) {
-    if (k==last) k++;
-    else {
-      fprintf(stderr,"Saturating level: %d\n",k);
-      vset_copy(old_vis,visited);
-      Closure(visited,groups[k]);
-      if (vset_equal(old_vis,visited))
-	k++;
-      else {
-	last=k;
-	vset_clear(old_vis);
-	k=1;
-      }
+    for (int i = 0; i < nGrps; i++)
+        bitvector_set(groups[level[i]], i);
+
+
+    // Limit the bit vectors to the groups we are interested in
+    for (int k = 1; k <= N; k++)
+        bitvector_intersect(groups[k], reach_groups);
+
+    // Diagnotics
+    diagnostic("level: ");
+    for (int i = 0; i < nGrps; i++)
+        diagnostic("%d ", level[i]);
+    diagnostic("\n");
+
+    vset_t old_vis = vset_create(domain, 0, NULL);
+    while (!vset_equal(old_vis, visited)) {
+        vset_copy(old_vis, visited);
+        for (int k = 1; k <= (N - 1) / G + 1 ; k++) {
+            Warning(info, "Saturating level: %d", k);
+            reach_bfs(groups[k], eg_count, next_count);
+        }
     }
-  }
+    vset_clear(old_vis);
 }
 
-void reach_sat3(){
-  int level[nGrps];
-  bitvector_t* groups[N+1];
+static void
+reach_chain(bitvector_t *reach_groups, long *eg_count, long *next_count)
+{
+    int level = 0;
+    vset_t old_vis = vset_create(domain, 0, NULL);
+    vset_t temp = vset_create(domain, 0, NULL);
+    vset_t deadlocks = dlk_detect?vset_create(domain, 0, NULL):NULL;
+    vset_t dlk_temp = dlk_detect?vset_create(domain, 0, NULL):NULL;
 
-  // groups: i=0..nGrps-1
-  // vars  : j=0..N-1
-  // BDD levels:  k = N..1
-
-  for (int k=1;k<N+1;k++) {
-    groups[k] = (bitvector_t*)RTmalloc(sizeof(bitvector_t));
-    bitvector_create(groups[k],nGrps);
-  }
-  
-  // level[i] = first (highest) + of group i
-  for (int i=0;i<nGrps;i++) {
-    for (int j=0;j<N;j++) {
-      if (dm_is_set(GBgetDMInfo(model),i,j)) {
-	level[i]=(N-1-j) / G + 1;
-	break;
-      }
+    while (!vset_equal(visited, old_vis)) {
+        if (trc_output != NULL) save_level();
+        vset_copy(old_vis, visited);
+        stats_and_progress_report(NULL, visited, level);
+        level++;
+        if (dlk_detect) vset_copy(deadlocks, visited);
+        for(int i = 0; i < nGrps; i++) {
+            if (!bitvector_is_set(reach_groups, i)) continue;
+            diagnostic("\rgroup %4d/%d", i+1, nGrps);
+            expand_group_next(i, visited);
+            (*eg_count)++;
+            (*next_count)++;
+            vset_next(temp, visited, group_next[i]);
+            vset_union(visited, temp);
+            if (dlk_detect) {
+                vset_prev(dlk_temp, temp, group_next[i]);
+                vset_minus(deadlocks, dlk_temp);
+                vset_clear(dlk_temp);
+            }
+        }
+        diagnostic("\rround %d complete       \n", level);
+        if (dlk_detect) deadlock_check(deadlocks); // no deadlocks in old_vis
+        vset_reorder(domain);
     }
-  }
 
-  for (int i=0;i<nGrps;i++) {
-    bitvector_set(groups[level[i]],i);
-  }
-
-   // test
-  fprintf(stderr,"level: ");
-  for (int i=0; i<nGrps;i++)
-    fprintf(stderr,"%d ",level[i]);
-  fprintf(stderr,"\n");
-  
-  vset_t old_vis=vset_create(domain,0,NULL);
-  while (!vset_equal(old_vis,visited)) {
-    vset_copy(old_vis,visited);
-    for (int k=1; k <= (N-1)/G + 1 ; k++) {
-      fprintf(stderr,"Saturating level: %d\n",k);
-      Closure(visited,groups[k]);
+    vset_clear(old_vis);
+    vset_clear(temp);
+    if (dlk_detect) {
+        vset_clear(deadlocks);
+        vset_clear(dlk_temp);
     }
-  }
-}
-
-
-void reach_chain(){
-	int level,i;
-	long eg_count=0;
-	long next_count=0;
-
-	level=0;
-	vset_t old_vis=vset_create(domain,0,NULL);
-	vset_t temp=vset_create(domain,0,NULL);
-	vset_t deadlocks=dlk_detect?vset_create(domain,0,NULL):NULL;
-	vset_t dlk_temp=dlk_detect?vset_create(domain,0,NULL):NULL;
-
-	vset_t *levels = NULL;
-        int max_levels = 0;
-
-	for(;;){
-          if (trc_output != NULL) {
-	    if (level == max_levels) {
-	      max_levels += 1024;
-	      levels = RTrealloc(levels, max_levels * sizeof(vset_t));
-	      for(int i=level;i<max_levels;i++)
-		levels[i] = vset_create(domain,0,NULL);
-	    }
-	    vset_copy(levels[level],visited);
-	  }
-		vset_copy(old_vis,visited);
-		stats_and_progress_report(NULL,visited,level);
-		level++;
-		if (dlk_detect) vset_copy(deadlocks,visited);
-		for(i=0;i<nGrps;i++){
-			if (RTverbosity >= 2) fprintf(stderr,"\rgroup %4d/%d",i+1,nGrps);
-			expand_group_next(i,visited,level,levels,max_levels);
-			eg_count++;
-			next_count++;
-			vset_next(temp,visited,group_next[i]);
-			vset_union(visited,temp);
-			if (dlk_detect) {
-				vset_prev(dlk_temp,temp,group_next[i]);
-				vset_minus(deadlocks,dlk_temp);
-				vset_clear(dlk_temp);
-			}
-		}
-		if (RTverbosity >= 2) fprintf(stderr,"\rround %d complete       \n",level);
-		if (dlk_detect) deadlock_check(deadlocks,level,levels); // no deadlocks in old_vis.
-		if (vset_equal(visited,old_vis)) break;
-		vset_reorder(domain);
-	}
-	Warning(info,"Exploration took %ld group checks and %ld next state calls",eg_count,next_count);
 }
 
 static FILE* table_file;
@@ -891,7 +873,7 @@ static void enum_map(void*context,int *src){
 }
 
 
-void do_output(){
+static void do_output(){
 	int state[N];
 	GBgetInitialState(model,state);
 	table_file=fopen(etf_output,"w");
@@ -976,6 +958,25 @@ void do_output(){
 	fclose(table_file);
 }
 
+typedef void (*reach_proc_t)(bitvector_t *reach_groups, long *eg_count, long *next_count);
+
+static void
+unguided(reach_proc_t reach_proc)
+{
+    bitvector_t reach_groups;
+    long eg_count = 0;
+    long next_count = 0;
+
+    bitvector_create(&reach_groups, nGrps);
+    for(int i=0; i<nGrps; i++)
+        bitvector_set(&reach_groups, i);
+
+    reach_proc(&reach_groups, &eg_count, &next_count);
+    Warning(info, "Exploration took %ld group checks and %ld next state calls",
+            eg_count, next_count);
+    bitvector_free(&reach_groups);
+}
+
 int main(int argc, char *argv[]){
 	char* files[2];
 	RTinitPopt(&argc,&argv,options,1,2,files,NULL,"<model> [<etf>]",
@@ -1046,23 +1047,23 @@ int main(int argc, char *argv[]){
 	SCCstartTimer(timer);
 	switch(strategy){
 	case BFS:
-		reach_bfs();
-		break;
+            unguided(reach_bfs);
+            break;
 	case BFS2:
-		reach_bfs2();
-		break;
+            unguided(reach_bfs2);
+            break;
 	case Chain:
-		reach_chain();
-		break;
+            unguided(reach_chain);
+            break;
 	case Sat1:
-		reach_sat1();
-		break;
+            unguided(reach_sat1);
+            break;
 	case Sat2:
-		reach_sat2();
-		break;
+            unguided(reach_sat2);
+            break;
 	case Sat3:
-		reach_sat3();
-		break;
+            unguided(reach_sat3);
+            break;
 	}
 	if (dlk_detect)
 	  Warning(info,"No deadlocks found");
