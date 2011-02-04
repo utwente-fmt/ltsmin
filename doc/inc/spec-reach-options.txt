@@ -1,18 +1,24 @@
 *--order*='ORDER'::
-
-        Select the exploration strategy: 'bfs', 'bfs2' or 'chain'.  In
-        addition, three experimental saturation-like strategies are
-        available: 'sat1', 'sat2', 'sat3'.  With 'bfs', breadth-first
-        search is used.  With 'bfs2', the visited set is always
-        extends the visited set.  With 'chain', a chaining strategy is
-        used for exploration.  Defaults to 'bfs'.
+        Select the exploration strategy: 'bfs-previous', 'bfs',
+        'chain-previous' or 'chain'. With 'bfs-previous' and 'bfs',
+        breadth-first search is used. Here, 'bfs-previous' only considers
+        the states found at the previous level, while 'bfs' considers
+        the whole visited set. With 'chain-previous' and 'chain', a
+        chaining strategy is used. Here, 'chain-previous' at each level
+        starts from the states found at the previous level, while 'chain'
+        uses the whole visited set. Defaults to 'bfs-previous'.
 +
 When using BFS, the tool performs the next state computation for all
 edge groups on the current level or current set of visited states.
 Chaining means to apply next state for the first group to the visited
 states, then apply next-state for the second group to the result,
-etc..  Thus, a chaining analysis can be completed in much less
+etc.  Thus, a chaining analysis can be completed in much less
 iterations than a BFS analysis.
+
+*--saturation*='SATURATION'::
+        Select an experimental saturation-like strategy: 'none', 'sat1',
+        'sat2', 'sat3'. The strategy works in combination with the order to
+        saturate BDD levels. Defaults to 'none', i.e. no saturation.
 
 *--action*='ACTION'::
         Find a transition labelled with 'ACTION'. Returns with exit code 1

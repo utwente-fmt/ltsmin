@@ -40,89 +40,108 @@
         fprintf(stderr, __VA_ARGS__);\
 }
 
-static char* etf_output=NULL;
-static char* trc_output=NULL;
-static int dlk_detect=0;
-static char* act_detect=NULL;
-static int act_detect_table;
-static int act_detect_index;
-static int G=10;
+static char* etf_output = NULL;
+static char* trc_output = NULL;
+static int   dlk_detect = 0;
+static char* act_detect = NULL;
+static int   act_detect_table;
+static int   act_detect_index;
+static int   G = 10;
 
 static lts_enum_cb_t trace_handle=NULL;
 static lts_output_t trace_output=NULL;
 
-static enum { BFS , BFS2 , Chain , Chain2, Sat1, Sat2, Sat3} strategy = BFS;
+static enum { BFSP , BFS , ChainP, Chain } strategy = BFS;
 
-static char* order="bfs";
-static si_map_entry strategies[]={
-    {"bfs",BFS},
-    {"bfs2",BFS2},
-    {"chain",Chain},
-    {"chain2",Chain2},
-    {"sat1",Sat1},
-    {"sat2",Sat2},
-    {"sat3",Sat3},
-    {NULL,0}
+static char* order = "bfs-previous";
+static si_map_entry strategies[] = {
+    {"bfs-previous", BFSP},
+    {"bfs", BFS},
+    {"chain-previous", ChainP},
+    {"chain", Chain},
+    {NULL, 0}
 };
 
-static void reach_popt(poptContext con,
- 		enum poptCallbackReason reason,
-                            const struct poptOption * opt,
-                             const char * arg, void * data){
-	(void)con;(void)opt;(void)arg;(void)data;
-	switch(reason){
-	case POPT_CALLBACK_REASON_PRE:
-		Fatal(1,error,"unexpected call to vset_popt");
-	case POPT_CALLBACK_REASON_POST: {
-		int res=linear_search(strategies,order);
-		if (res<0) {
-			Warning(error,"unknown exploration order %s",order);
-			RTexitUsage(EXIT_FAILURE);
-		} else {
-			Warning(info,"Exploration order is %s",order);
-		}
-		strategy = res;
+static enum { NoSat, Sat1, Sat2, Sat3 } sat_strategy = NoSat;
 
-                if (trc_output && !dlk_detect && act_detect==NULL) {
-		  Warning(info, "Ignoring trace output");
-		}
-		return;
-	}
-	case POPT_CALLBACK_REASON_OPTION:
-		Fatal(1,error,"unexpected call to reach_popt");
-	}
+static char* saturation = "none";
+static si_map_entry sat_strategies[] = {
+    {"none", NoSat},
+    {"sat1", Sat1},
+    {"sat2", Sat2},
+    {"sat3", Sat3},
+    {NULL, 0}
+};
+
+static void
+reach_popt(poptContext con, enum poptCallbackReason reason,
+           const struct poptOption * opt, const char * arg, void * data)
+{
+    (void)con; (void)opt; (void)arg; (void)data;
+    switch (reason) {
+    case POPT_CALLBACK_REASON_PRE:
+        Fatal(1, error, "unexpected call to vset_popt");
+    case POPT_CALLBACK_REASON_POST: {
+        int res;
+
+        res = linear_search(strategies, order);
+        if (res < 0) {
+            Warning(error, "unknown exploration order %s", order);
+            RTexitUsage(EXIT_FAILURE);
+        } else {
+            Warning(info, "Exploration order is %s", order);
+        }
+        strategy = res;
+
+        res = linear_search(sat_strategies, saturation);
+        if (res < 0) {
+            Warning(error, "unknown saturation strategy %s", saturation);
+            RTexitUsage(EXIT_FAILURE);
+        } else {
+            Warning(info, "Saturation strategy is %s", saturation);
+        }
+        sat_strategy = res;
+
+        if (trc_output && !dlk_detect && act_detect == NULL) {
+            Warning(info, "Ignoring trace output");
+        }
+        return;
+    }
+    case POPT_CALLBACK_REASON_OPTION:
+        Fatal(1, error, "unexpected call to reach_popt");
+    }
 }
 
-
 static  struct poptOption options[] = {
-	{ NULL, 0 , POPT_ARG_CALLBACK|POPT_CBFLAG_POST|POPT_CBFLAG_SKIPOPTION , (void*)reach_popt , 0 , NULL , NULL },
-	{ "order" , 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &order , 0 , "select the exploration strategy to a specific order" ,"<bfs|bfs2|chain|chain2|sat{1|2|3}>" },
-	{ "deadlock" , 'd' , POPT_ARG_VAL , &dlk_detect , 1 , "detect deadlocks" , NULL },
-	{ "action" , 0 , POPT_ARG_STRING , &act_detect , 0 , "detect action" , "<action>" },
-	{ "trace" , 0 , POPT_ARG_STRING , &trc_output , 0 , "file to write trace to" , "<lts-file>.gcf" },
-	{ "G" , 0 , POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &G , 0 , "set saturation granularity","<number>"},
+    { NULL, 0 , POPT_ARG_CALLBACK|POPT_CBFLAG_POST|POPT_CBFLAG_SKIPOPTION , (void*)reach_popt , 0 , NULL , NULL },
+    { "order" , 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &order , 0 , "set the exploration strategy to a specific order" , "<bfs-previous|bfs|chain-previous|chain>" },
+    { "saturation" , 0, POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &saturation , 0 , "select the saturation strategy" , "<none|sat1|sat2|sat3>" },
+    { "G" , 0 , POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &G , 0 , "set saturation granularity","<number>" },
+    { "deadlock" , 'd' , POPT_ARG_VAL , &dlk_detect , 1 , "detect deadlocks" , NULL },
+    { "action" , 0 , POPT_ARG_STRING , &act_detect , 0 , "detect action" , "<action>" },
+    { "trace" , 0 , POPT_ARG_STRING , &trc_output , 0 , "file to write trace to" , "<lts-file>.gcf" },
 #if defined(MCRL)
-	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, mcrl_options , 0 , "mCRL options",NULL},
+    { NULL, 0 , POPT_ARG_INCLUDE_TABLE, mcrl_options , 0 , "mCRL options" , NULL },
 #endif
 #if defined(MCRL2)
-	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, mcrl2_options , 0 , "mCRL2 options",NULL},
+    { NULL, 0 , POPT_ARG_INCLUDE_TABLE, mcrl2_options , 0 , "mCRL2 options" , NULL },
 #endif
 #if defined(NIPS)
-	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, nips_options , 0 , "NIPS options",NULL},
+    { NULL, 0 , POPT_ARG_INCLUDE_TABLE, nips_options , 0 , "NIPS options" , NULL },
 #endif
 #if defined(ETF)
-	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, etf_options , 0 , "ETF options",NULL},
+    { NULL, 0 , POPT_ARG_INCLUDE_TABLE, etf_options , 0 , "ETF options" , NULL },
 #endif
 #if defined(DIVINE)
-	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, dve_options , 0 , "DiVinE options", NULL },
+    { NULL, 0 , POPT_ARG_INCLUDE_TABLE, dve_options , 0 , "DiVinE options" , NULL },
 #endif
 #if defined(DIVINE2)
-	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, dve2_options , 0 , "DiVinE 2 options", NULL },
+    { NULL, 0 , POPT_ARG_INCLUDE_TABLE, dve2_options , 0 , "DiVinE 2 options" , NULL },
 #endif
-	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, greybox_options , 0 , "Greybox options",NULL},
-	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, vset_options , 0 , "Vector set options",NULL},
-	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, lts_io_options , 0 , NULL , NULL },
-	POPT_TABLEEND
+    { NULL, 0 , POPT_ARG_INCLUDE_TABLE, greybox_options , 0 , "Greybox options" , NULL },
+    { NULL, 0 , POPT_ARG_INCLUDE_TABLE, vset_options , 0 , "Vector set options" , NULL },
+    { NULL, 0 , POPT_ARG_INCLUDE_TABLE, lts_io_options , 0 , NULL , NULL },
+    POPT_TABLEEND
 };
 
 typedef struct {
@@ -150,10 +169,19 @@ static vrel_t *group_next;
 static vset_t *group_explored;
 static vset_t *group_tmp;
 
-static void *new_string_index(void* context){
-	(void)context;
-	Warning(info,"creating a new string index");
-	return SIcreate();
+typedef void (*reach_proc_t)(bitvector_t *reach_groups,
+                             long *eg_count, long *next_count);
+
+typedef void (*sat_proc_t)(reach_proc_t reach_proc, bitvector_t *reach_groups,
+                           long *eg_count, long *next_count);
+
+typedef void (*guided_proc_t)(sat_proc_t sat_proc, reach_proc_t reach_proc);
+
+static void *
+new_string_index (void *context)
+{
+    (void)context;
+    return SIcreate ();
 }
 
 static inline void
@@ -162,6 +190,7 @@ grow_levels(int new_levels)
     if (global_level == max_levels) {
         max_levels += new_levels;
         levels = RTrealloc(levels, max_levels * sizeof(vset_t));
+
         for(int i = global_level; i < max_levels; i++)
             levels[i] = vset_create(domain, 0, NULL);
     }
@@ -322,7 +351,7 @@ find_trace(int trace_end[][N], int end_count, int level, vset_t *levels)
     SCCstartTimer(timer);
     find_trace_to(trace_end, end_count, level, levels);
     SCCstopTimer(timer);
-    SCCreportTimer(timer,"constructing the trace took");
+    SCCreportTimer(timer, "constructing trace took");
 
     // Close output file
     lts_output_end(trace_output,trace_handle);
@@ -425,6 +454,9 @@ expand_group_next(int group, vset_t set)
 static void
 deadlock_check(vset_t deadlocks, bitvector_t *reach_groups)
 {
+    if (vset_is_empty(deadlocks))
+        return;
+
     vset_t next_temp = vset_create(domain,0,NULL);
     vset_t prev_temp = vset_create(domain,0,NULL);
 
@@ -438,8 +470,8 @@ deadlock_check(vset_t deadlocks, bitvector_t *reach_groups)
         vset_minus(deadlocks, prev_temp);
     }
 
-    vset_clear(next_temp);
-    vset_clear(prev_temp);
+    vset_destroy(next_temp);
+    vset_destroy(prev_temp);
 
     if (vset_is_empty(deadlocks))
         return;
@@ -453,75 +485,95 @@ deadlock_check(vset_t deadlocks, bitvector_t *reach_groups)
     Fatal(1,info,"exiting now");
 }
 
-static void stats_and_progress_report(vset_t current, vset_t visited, int level) {
-  bn_int_t e_count;
-  long n_count;
-  char string[1024];
-  int size;
+static void
+stats_and_progress_report(vset_t current, vset_t visited, int level)
+{
+    bn_int_t e_count;
+    long n_count;
+    char string[1024];
+    int size;
 
-  if (current) {
-    vset_count(current,&n_count,&e_count);
-    if (n_count>max_lev_count) max_lev_count=n_count;
-    size = bn_int2string(string,sizeof string,&e_count);
-    if(size >= (ssize_t)sizeof string) Fatal(1,error,"Error converting number to string");
-    Warning(info,"level %d has %s states ( %ld nodes )",level,string,n_count);
+    if (current) {
+        vset_count(current, &n_count, &e_count);
+        size = bn_int2string(string, sizeof(string), &e_count);
+        if(size >= (ssize_t)sizeof(string))
+            Fatal(1, error, "Error converting number to string");
+        Warning(info, "level %d has %s states ( %ld nodes )",
+                    level, string, n_count);
+        bn_clear(&e_count);
+        if (n_count > max_lev_count) max_lev_count = n_count;
+    }
+
+    vset_count(visited, &n_count, &e_count);
+    size = bn_int2string(string, sizeof(string), &e_count);
+    if(size >= (ssize_t)sizeof(string))
+        Fatal(1, error, "Error converting number to string");
+    Warning(info, "visited %d has %s states ( %ld nodes )",
+                level, string, n_count);
     bn_clear(&e_count);
-  }
+    if (n_count > max_vis_count) max_vis_count = n_count;
 
-  vset_count(visited,&n_count,&e_count);
-  if (n_count>max_vis_count) max_vis_count=n_count;
-  size = bn_int2string(string,sizeof string,&e_count);
-  if(size >= (ssize_t)sizeof string) Fatal(1,error,"Error converting number to string");
-  Warning(info,"visited %d has %s states ( %ld nodes )",level,string,n_count);
-  bn_clear(&e_count);
-  if (RTverbosity >= 2) {
-    int i;
-    fprintf(stderr,"transition caches (grp,nds,elts): ");
-    for (i=0;i<nGrps;i++) {
-      vrel_count(group_next[i],&n_count,&e_count);
-      size = bn_int2string(string,sizeof string,&e_count);
-      if(size >= (ssize_t)sizeof string) Fatal(1,error,"Error converting number to string");
-      fprintf(stderr,"( %d %ld %s ) ",i,n_count,string);
-      bn_clear(&e_count);
-      if (n_count>max_trans_count) max_trans_count=n_count;
+    if (RTverbosity >= 2) {
+        fprintf(stderr, "transition caches ( grp nds elts ): ");
+        for (int i = 0; i < nGrps; i++) {
+            vrel_count(group_next[i], &n_count, &e_count);
+            size = bn_int2string(string, sizeof(string), &e_count);
+            if(size >= (ssize_t)sizeof(string))
+                Fatal(1, error, "Error converting number to string");
+            fprintf(stderr, "( %d %ld %s ) ", i, n_count, string);
+            bn_clear(&e_count);
+            if (n_count > max_trans_count) max_trans_count = n_count;
+        }
+
+        fprintf(stderr,"\ngroup explored    ( grp nds elts ): ");
+        for (int i = 0; i < nGrps; i++) {
+            vset_count(group_explored[i], &n_count, &e_count);
+            size = bn_int2string(string, sizeof(string), &e_count);
+            if(size >= (ssize_t)sizeof(string))
+                Fatal(1, error, "Error converting number to string");
+            fprintf(stderr, "( %d %ld %s ) ", i, n_count,string);
+            bn_clear(&e_count);
+            if (n_count > max_grp_count) max_grp_count = n_count;
+        }
+        fprintf(stderr, "\n");
     }
-    fprintf(stderr,"\ngroup explored    (grp,nds,elts): ");
-    for (i=0;i<nGrps;i++) {
-      vset_count(group_explored[i],&n_count,&e_count);
-      size = bn_int2string(string,sizeof string,&e_count);
-      if(size >= (ssize_t)sizeof string) Fatal(1,error,"Error converting number to string");
-      fprintf(stderr,"( %d %ld %s ) ",i,n_count,string);
-      bn_clear(&e_count);
-      if (n_count>max_grp_count) max_grp_count=n_count;
-    }
-    fprintf(stderr,"\n");
-  }
-}
-
-static void final_stat_reporting(vset_t visited) {
-  bn_int_t e_count;
-  long n_count;
-  char string[1024];
-  int size;
-
-  vset_count(visited,&n_count,&e_count);
-  size = bn_int2string(string,sizeof string,&e_count);
-  if(size >= (ssize_t)sizeof string) Fatal(1,error,"Error converting number to string");
-  fprintf(stderr,"state space has %s states\n",string);
-  bn_clear(&e_count);
-  if (max_lev_count==0)
-    fprintf(stderr,"( %ld final BDD nodes; %ld peak nodes )\n",
-	    n_count,max_vis_count);
-  else
-    fprintf(stderr,"( %ld final BDD nodes; %ld peak nodes; %ld peak nodes per level )\n",
-	    n_count,max_vis_count,max_lev_count);
-  if (RTverbosity >=2)
-    fprintf(stderr,"( peak transition cache: %ld nodes; peak group explored: %ld nodes )\n",
-	    max_trans_count,max_grp_count);
 }
 
 static void
-reach_bfs(bitvector_t *reach_groups, long *eg_count, long *next_count)
+final_stat_reporting(vset_t visited, mytimer_t timer)
+{
+    bn_int_t e_count;
+    long n_count;
+    char string[1024];
+    int size;
+
+    SCCreportTimer(timer, "reachability took");
+
+    if (dlk_detect) Warning(info, "No deadlocks found");
+    if (act_detect) Warning(info, "Action \"%s\" not found", act_detect);
+
+    vset_count(visited, &n_count, &e_count);
+    size = bn_int2string(string, sizeof(string), &e_count);
+    if( size >= (ssize_t)sizeof(string))
+        Fatal(1, error, "Error converting number to string");
+    Warning(info, "state space has %s states", string);
+    bn_clear(&e_count);
+
+    if (max_lev_count == 0) {
+        Warning(info, "( %ld final BDD nodes; %ld peak nodes )",
+                    n_count, max_vis_count);
+    } else {
+        Warning(info, "( %ld final BDD nodes; %ld peak nodes; "
+                          "%ld peak nodes per level )",
+                    n_count, max_vis_count, max_lev_count);
+    }
+
+    diagnostic("( peak transition cache: %ld nodes; peak group explored: "
+                   "%ld nodes )\n", max_trans_count, max_grp_count);
+}
+
+static void
+reach_bfs_prev(bitvector_t *reach_groups, long *eg_count, long *next_count)
 {
     int level = 0;
     vset_t current_level = vset_create(domain,0,NULL);
@@ -555,25 +607,27 @@ reach_bfs(bitvector_t *reach_groups, long *eg_count, long *next_count)
             }
             vset_minus(temp, visited);
             vset_union(next_level, temp);
+            vset_clear(temp);
         }
         diagnostic("\rlocal next complete       \n");
         if (dlk_detect) deadlock_check(deadlocks, reach_groups);
-        vset_clear(temp);
         vset_union(visited, next_level);
         vset_copy(current_level, next_level);
         vset_clear(next_level);
         vset_reorder(domain);
     }
 
-    vset_clear(current_level);
+    vset_destroy(current_level);
+    vset_destroy(next_level);
+    vset_destroy(temp);
     if (dlk_detect) {
-        vset_clear(deadlocks);
-        vset_clear(dlk_temp);
+        vset_destroy(deadlocks);
+        vset_destroy(dlk_temp);
     }
 }
 
 static void
-reach_bfs2(bitvector_t *reach_groups, long *eg_count, long *next_count)
+reach_bfs(bitvector_t *reach_groups, long *eg_count, long *next_count)
 {
     int level = 0;
     vset_t old_vis = vset_create(domain, 0, NULL);
@@ -599,12 +653,12 @@ reach_bfs2(bitvector_t *reach_groups, long *eg_count, long *next_count)
             diagnostic("\rlocal next %4d/%d", i+1, nGrps);
             (*next_count)++;
             vset_next(temp, old_vis, group_next[i]);
-            vset_union(visited, temp);
             if (dlk_detect) {
                 vset_prev(dlk_temp, temp, group_next[i]);
                 vset_minus(deadlocks, dlk_temp);
                 vset_clear(dlk_temp);
             }
+            vset_union(visited, temp);
         }
         diagnostic("\rlocal next complete       \n");
         if (dlk_detect) deadlock_check(deadlocks, reach_groups);
@@ -612,182 +666,58 @@ reach_bfs2(bitvector_t *reach_groups, long *eg_count, long *next_count)
         vset_reorder(domain);
     }
 
-    vset_clear(old_vis);
+    vset_destroy(old_vis);
+    vset_destroy(temp);
     if (dlk_detect) {
-        vset_clear(deadlocks);
-        vset_clear(dlk_temp);
+        vset_destroy(deadlocks);
+        vset_destroy(dlk_temp);
     }
 }
 
 static void
-reach_sat1(bitvector_t *reach_groups, long *eg_count, long *next_count)
+reach_chain_prev(bitvector_t *reach_groups, long *eg_count, long *next_count)
 {
-    int level[nGrps];
-    int back[N + 1];
-    bitvector_t* groups[N + 1];
+    int level = 0;
+    vset_t new_states = vset_create(domain, 0, NULL);
+    vset_t temp = vset_create(domain, 0, NULL);
+    vset_t deadlocks = dlk_detect?vset_create(domain, 0, NULL):NULL;
+    vset_t dlk_temp = dlk_detect?vset_create(domain, 0, NULL):NULL;
 
-    // groups: i=0..nGrps-1
-    // vars  : j=0..N-1
-    // BDD levels:  k = N..1
-
-    for (int k = 1; k <= N; k++) {
-        groups[k] = (bitvector_t*)RTmalloc(sizeof(bitvector_t));
-        bitvector_create(groups[k], nGrps);
-    }
-
-    // level[i] = first (highest) + of group i
-    for (int i = 0; i < nGrps; i++)
-        for (int j = 0; j < N; j++)
-            if (dm_is_set(GBgetDMInfo(model), i, j)) {
-                level[i]=N-j;
-                break;
+    vset_copy(new_states, visited);
+    while (!vset_is_empty(new_states)) {
+        if (trc_output != NULL) save_level();
+        stats_and_progress_report(new_states, visited, level);
+        level++;
+        if (dlk_detect) vset_copy(deadlocks, new_states);
+        for(int i = 0; i < nGrps; i++) {
+            if (!bitvector_is_set(reach_groups, i)) continue;
+            diagnostic("\rgroup %4d/%d", i+1, nGrps);
+            expand_group_next(i, new_states);
+            (*eg_count)++;
+            (*next_count)++;
+            vset_next(temp, new_states, group_next[i]);
+            if (dlk_detect) {
+                vset_prev(dlk_temp, temp, group_next[i]);
+                vset_minus(deadlocks, dlk_temp);
+                vset_clear(dlk_temp);
             }
-
-    for (int i = 0; i < nGrps; i++)
-        bitvector_set(groups[level[i]], i);
-
-    // Limit the bit vectors to the groups we are interested in
-    for (int k = 1; k <= N; k++)
-        bitvector_intersect(groups[k], reach_groups);
-
-    // back[k] = last + in any group of level k
-    for (int k = 1; k <= N; k++)
-        back[k] = N + 1;
-
-    for (int i = 0; i < nGrps; i++)
-        for (int k = 1; k <= N; k++)
-            if (dm_is_set(GBgetDMInfo(model), i, N-k)) {
-                if (k < back[level[i]]) back[level[i]]=k;
-                break;
-            }
-
-    // Diagnostics
-    diagnostic("level: ");
-    for (int i = 0; i < nGrps; i++)
-        diagnostic("%d ", level[i]);
-    diagnostic("\nback: ");
-    for (int j=1; j<=N; j++)
-        diagnostic("%d ", back[j]);
-    diagnostic("\n");
-
-    int k = 1;
-    vset_t old_vis = vset_create(domain, 0, NULL);
-    while (k <= N) {
-      Warning(info, "Saturating level: %d", k);
-      vset_copy(old_vis, visited);
-      reach_bfs(groups[k], eg_count, next_count);
-      if (vset_equal(old_vis, visited))
-          k++;
-      else
-          k=back[k];
-    }
-    vset_clear(old_vis);
-}
-
-static void
-reach_sat2(bitvector_t *reach_groups, long *eg_count, long *next_count)
-{
-    int level[nGrps];
-    bitvector_t* groups[N + 1];
-
-    // groups: i=0..nGrps-1
-    // vars  : j=0..N-1
-    // BDD levels:  k = N..1   (k = N-j)
-
-    for (int k = 1; k <= N; k++) {
-        groups[k] = (bitvector_t*)RTmalloc(sizeof(bitvector_t));
-        bitvector_create(groups[k], nGrps);
-    }
-
-    // level[i] = first '+' in row (highest in BDD) of group i
-    // recast 1..N down to equal groups 1..N/G  (more precisely: (N-1)/G + 1)a
-    for (int i = 0; i < nGrps; i++)
-        for (int j = 0; j < N; j++)
-            if (dm_is_set(GBgetDMInfo(model), i, j)) {
-                level[i] = (N - 1 - j) / G + 1;
-                break;
-            }
-
-    for (int i = 0; i < nGrps; i++)
-        bitvector_set(groups[level[i]], i);
-
-    // Limit the bit vectors to the groups we are interested in
-    for (int k = 1; k <= N; k++)
-        bitvector_intersect(groups[k], reach_groups);
-
-    // Diagnostics
-    diagnostic("level: ");
-    for (int i = 0; i < nGrps; i++)
-        diagnostic("%d ", level[i]);
-    diagnostic("\n");
-
-    int k = 1;
-    int last = 0;
-    vset_t old_vis = vset_create(domain, 0, NULL);
-    while (k <= (N - 1) / G + 1) {
-        if (k == last)
-            k++;
-        else {
-            Warning(info, "Saturating level: %d", k);
-            vset_copy(old_vis, visited);
-            reach_bfs(groups[k], eg_count, next_count);
-            if (vset_equal(old_vis, visited))
-                k++;
-            else {
-                last = k;
-                k = 1;
-            }
+            vset_minus(temp, visited);
+            vset_union(new_states, temp);
+            vset_clear(temp);
         }
-    }
-    vset_clear(old_vis);
-}
-
-static void
-reach_sat3(bitvector_t *reach_groups, long *eg_count, long *next_count)
-{
-    int level[nGrps];
-    bitvector_t* groups[N+1];
-
-    // groups: i=0..nGrps-1
-    // vars  : j=0..N-1
-    // BDD levels:  k = N..1
-
-    for (int k = 1; k <= N; k++) {
-        groups[k] = (bitvector_t*)RTmalloc(sizeof(bitvector_t));
-        bitvector_create(groups[k], nGrps);
+        diagnostic("\rround %d complete       \n", level);
+        // no deadlocks in old new_states
+        if (dlk_detect) deadlock_check(deadlocks, reach_groups);
+        vset_zip(visited, new_states);
+        vset_reorder(domain);
     }
 
-    // level[i] = first (highest) + of group i
-    for (int i = 0; i < nGrps; i++)
-        for (int j = 0; j < N; j++)
-            if (dm_is_set(GBgetDMInfo(model), i, j)) {
-                level[i]=(N - 1 - j) / G + 1;
-                break;
-            }
-
-    for (int i = 0; i < nGrps; i++)
-        bitvector_set(groups[level[i]], i);
-
-
-    // Limit the bit vectors to the groups we are interested in
-    for (int k = 1; k <= N; k++)
-        bitvector_intersect(groups[k], reach_groups);
-
-    // Diagnotics
-    diagnostic("level: ");
-    for (int i = 0; i < nGrps; i++)
-        diagnostic("%d ", level[i]);
-    diagnostic("\n");
-
-    vset_t old_vis = vset_create(domain, 0, NULL);
-    while (!vset_equal(old_vis, visited)) {
-        vset_copy(old_vis, visited);
-        for (int k = 1; k <= (N - 1) / G + 1 ; k++) {
-            Warning(info, "Saturating level: %d", k);
-            reach_bfs(groups[k], eg_count, next_count);
-        }
+    vset_destroy(new_states);
+    vset_destroy(temp);
+    if (dlk_detect) {
+        vset_destroy(deadlocks);
+        vset_destroy(dlk_temp);
     }
-    vset_clear(old_vis);
 }
 
 static void
@@ -825,56 +755,188 @@ reach_chain(bitvector_t *reach_groups, long *eg_count, long *next_count)
         vset_reorder(domain);
     }
 
-    vset_clear(old_vis);
-    vset_clear(temp);
+    vset_destroy(old_vis);
+    vset_destroy(temp);
     if (dlk_detect) {
-        vset_clear(deadlocks);
-        vset_clear(dlk_temp);
+        vset_destroy(deadlocks);
+        vset_destroy(dlk_temp);
     }
 }
 
 static void
-reach_chain2(bitvector_t *reach_groups, long *eg_count, long *next_count)
+reach_no_sat(reach_proc_t reach_proc, bitvector_t *reach_groups,
+             long *eg_count, long *next_count)
 {
-    int level = 0;
-    vset_t new_states = vset_create(domain, 0, NULL);
-    vset_t temp = vset_create(domain, 0, NULL);
-    vset_t deadlocks = dlk_detect?vset_create(domain, 0, NULL):NULL;
-    vset_t dlk_temp = dlk_detect?vset_create(domain, 0, NULL):NULL;
+    reach_proc(reach_groups, eg_count, next_count);
+}
 
-    vset_copy(new_states, visited);
-    while (!vset_is_empty(new_states)) {
-        if (trc_output != NULL) save_level();
-        stats_and_progress_report(new_states, visited, level);
-        level++;
-        if (dlk_detect) vset_copy(deadlocks, new_states);
-        for(int i = 0; i < nGrps; i++) {
-            if (!bitvector_is_set(reach_groups, i)) continue;
-            diagnostic("\rgroup %4d/%d", i+1, nGrps);
-            expand_group_next(i, new_states);
-            (*eg_count)++;
-            (*next_count)++;
-            vset_next(temp, new_states, group_next[i]);
-            if (dlk_detect) {
-                vset_prev(dlk_temp, temp, group_next[i]);
-                vset_minus(deadlocks, dlk_temp);
-                vset_clear(dlk_temp);
+
+static void
+reach_sat1(reach_proc_t reach_proc, bitvector_t *reach_groups,
+           long *eg_count, long *next_count)
+{
+    int level[nGrps];
+    int back[N + 1];
+    bitvector_t groups[N + 1];
+
+    // groups: i=0..nGrps-1
+    // vars  : j=0..N-1
+    // BDD levels:  k = N..1
+
+    for (int k = 1; k <= N; k++)
+        bitvector_create(&groups[k], nGrps);
+
+    // level[i] = first (highest) + of group i
+    for (int i = 0; i < nGrps; i++)
+        for (int j = 0; j < N; j++)
+            if (dm_is_set(GBgetDMInfo(model), i, j)) {
+                level[i]=N-j;
+                break;
             }
-            vset_minus(temp, visited);
-            vset_union(new_states, temp);
-            vset_clear(temp);
-        }
-        diagnostic("\rround %d complete       \n", level);
-        if (dlk_detect) deadlock_check(deadlocks, reach_groups);
-        vset_zip(visited, new_states);
-        // no deadlocks in old new_states
-        vset_reorder(domain);
-    }
 
-    if (dlk_detect) {
-        vset_clear(deadlocks);
-        vset_clear(dlk_temp);
+    for (int i = 0; i < nGrps; i++)
+        bitvector_set(&groups[level[i]], i);
+
+    // Limit the bit vectors to the groups we are interested in
+    for (int k = 1; k <= N; k++)
+        bitvector_intersect(&groups[k], reach_groups);
+
+    // back[k] = last + in any group of level k
+    for (int k = 1; k <= N; k++)
+        back[k] = N + 1;
+
+    for (int i = 0; i < nGrps; i++)
+        for (int k = 1; k <= N; k++)
+            if (dm_is_set(GBgetDMInfo(model), i, N-k)) {
+                if (k < back[level[i]]) back[level[i]]=k;
+                break;
+            }
+
+    // Diagnostics
+    diagnostic("level: ");
+    for (int i = 0; i < nGrps; i++)
+        diagnostic("%d ", level[i]);
+    diagnostic("\nback: ");
+    for (int j=1; j<=N; j++)
+        diagnostic("%d ", back[j]);
+    diagnostic("\n");
+
+    int k = 1;
+    vset_t old_vis = vset_create(domain, 0, NULL);
+    while (k <= N) {
+      Warning(info, "Saturating level: %d", k);
+      vset_copy(old_vis, visited);
+      reach_proc(&groups[k], eg_count, next_count);
+      if (vset_equal(old_vis, visited))
+          k++;
+      else
+          k=back[k];
     }
+    vset_destroy(old_vis);
+}
+
+static void
+reach_sat2(reach_proc_t reach_proc, bitvector_t *reach_groups,
+           long *eg_count, long *next_count)
+{
+    int level[nGrps];
+    bitvector_t groups[N + 1];
+
+    // groups: i=0..nGrps-1
+    // vars  : j=0..N-1
+    // BDD levels:  k = N..1   (k = N-j)
+
+    for (int k = 1; k <= N; k++)
+        bitvector_create(&groups[k], nGrps);
+
+    // level[i] = first '+' in row (highest in BDD) of group i
+    // recast 1..N down to equal groups 1..N/G  (more precisely: (N-1)/G + 1)a
+    for (int i = 0; i < nGrps; i++)
+        for (int j = 0; j < N; j++)
+            if (dm_is_set(GBgetDMInfo(model), i, j)) {
+                level[i] = (N - 1 - j) / G + 1;
+                break;
+            }
+
+    for (int i = 0; i < nGrps; i++)
+        bitvector_set(&groups[level[i]], i);
+
+    // Limit the bit vectors to the groups we are interested in
+    for (int k = 1; k <= N; k++)
+        bitvector_intersect(&groups[k], reach_groups);
+
+    // Diagnostics
+    diagnostic("level: ");
+    for (int i = 0; i < nGrps; i++)
+        diagnostic("%d ", level[i]);
+    diagnostic("\n");
+
+    int k = 1;
+    int last = 0;
+    vset_t old_vis = vset_create(domain, 0, NULL);
+    while (k <= (N - 1) / G + 1) {
+        if (k == last)
+            k++;
+        else {
+            Warning(info, "Saturating level: %d", k);
+            vset_copy(old_vis, visited);
+            reach_proc(&groups[k], eg_count, next_count);
+            if (vset_equal(old_vis, visited))
+                k++;
+            else {
+                last = k;
+                k = 1;
+            }
+        }
+    }
+    vset_destroy(old_vis);
+}
+
+static void
+reach_sat3(reach_proc_t reach_proc, bitvector_t *reach_groups,
+           long *eg_count, long *next_count)
+{
+    int level[nGrps];
+    bitvector_t groups[N+1];
+
+    // groups: i=0..nGrps-1
+    // vars  : j=0..N-1
+    // BDD levels:  k = N..1
+
+    for (int k = 1; k <= N; k++)
+        bitvector_create(&groups[k], nGrps);
+
+    // level[i] = first (highest) + of group i
+    for (int i = 0; i < nGrps; i++)
+        for (int j = 0; j < N; j++)
+            if (dm_is_set(GBgetDMInfo(model), i, j)) {
+                level[i]=(N - 1 - j) / G + 1;
+                break;
+            }
+
+    for (int i = 0; i < nGrps; i++)
+        bitvector_set(&groups[level[i]], i);
+
+
+    // Limit the bit vectors to the groups we are interested in
+    for (int k = 1; k <= N; k++)
+        bitvector_intersect(&groups[k], reach_groups);
+
+    // Diagnostics
+    diagnostic("level: ");
+    for (int i = 0; i < nGrps; i++)
+        diagnostic("%d ", level[i]);
+    diagnostic("\n");
+
+    vset_t old_vis = vset_create(domain, 0, NULL);
+    while (!vset_equal(old_vis, visited)) {
+        vset_copy(old_vis, visited);
+        for (int k = 1; k <= (N - 1) / G + 1 ; k++) {
+            Warning(info, "Saturating level: %d", k);
+            reach_proc(&groups[k], eg_count, next_count);
+        }
+    }
+    vset_destroy(old_vis);
 }
 
 static FILE* table_file;
@@ -935,7 +997,10 @@ static void enum_map(void*context,int *src){
 
 
 static void do_output(){
-	int state[N];
+    mytimer_t timer=SCCcreateTimer();
+    int state[N];
+    SCCstartTimer(timer);
+    Warning(info, "writing output");
 	GBgetInitialState(model,state);
 	table_file=fopen(etf_output,"w");
 	if(!table_file){
@@ -998,7 +1063,7 @@ static void do_output(){
                 fprintf(table_file,"\n");
 		vset_enum(patterns,enum_map,&ctx);
 		fprintf(table_file,"end map\n");
-		vset_clear(patterns); // Should be vset_destroy, which doesn't exist.
+		vset_destroy(patterns);
 	}
 	int type_count=lts_type_get_type_count(ltstype);
 	for(int i=0;i<type_count;i++){
@@ -1017,123 +1082,147 @@ static void do_output(){
 		fprintf(table_file,"end sort\n");
 	}
 	fclose(table_file);
+    SCCstopTimer(timer);
+    SCCreportTimer(timer, "writing output took");
 }
 
-typedef void (*reach_proc_t)(bitvector_t *reach_groups, long *eg_count, long *next_count);
-
 static void
-unguided(reach_proc_t reach_proc)
+unguided(sat_proc_t sat_proc, reach_proc_t reach_proc)
 {
     bitvector_t reach_groups;
     long eg_count = 0;
     long next_count = 0;
 
     bitvector_create(&reach_groups, nGrps);
-    for(int i=0; i<nGrps; i++)
-        bitvector_set(&reach_groups, i);
-
-    reach_proc(&reach_groups, &eg_count, &next_count);
-    Warning(info, "Exploration took %ld group checks and %ld next state calls",
-            eg_count, next_count);
+    bitvector_invert(&reach_groups);
+    sat_proc(reach_proc, &reach_groups, &eg_count, &next_count);
     bitvector_free(&reach_groups);
+    Warning(info, "Exploration took %ld group checks and %ld next state calls",
+                eg_count, next_count);
 }
 
-int main(int argc, char *argv[]){
-	char* files[2];
-	RTinitPopt(&argc,&argv,options,1,2,files,NULL,"<model> [<etf>]",
-		"Perform a symbolic reachability analysis of <model>\n"
-		"The optional output of this analysis is an ETF representation of the input\n"
-		"\nOptions");
-	etf_output=files[1];
-	Warning(info,"opening %s",files[0]);
-	model=GBcreateBase();
-	GBsetChunkMethods(model,new_string_index,NULL,
-		(int2chunk_t)SIgetC,(chunk2int_t)SIputC,(get_count_t)SIgetCount);
+void
+init_model(char *file)
+{
+    Warning(info, "opening %s", file);
+    model = GBcreateBase();
+    GBsetChunkMethods(model, new_string_index, NULL, (int2chunk_t)SIgetC,
+                          (chunk2int_t)SIputC, (get_count_t)SIgetCount);
 
-	GBloadFile(model,files[0],&model);
+    GBloadFile(model, file, &model);
 
-	if (RTverbosity >=2) {
-	  fprintf(stderr,"Dependency Matrix:\n");
-	  GBprintDependencyMatrix(stderr,model);
-	}
+    if (RTverbosity >= 2) {
+        fprintf(stderr, "Dependency Matrix:\n");
+        GBprintDependencyMatrix(stderr, model);
+    }
 
-	ltstype=GBgetLTStype(model);
-	N=lts_type_get_state_length(ltstype);
-	eLbls=lts_type_get_edge_label_count(ltstype);
-	sLbls=lts_type_get_state_label_count(ltstype);
-	nGrps=dm_nrows(GBgetDMInfo(model));
-	domain=vdom_create_default(N);
-	visited=vset_create(domain,0,NULL);
-	group_next=(vrel_t*)RTmalloc(nGrps*sizeof(vrel_t));
-	group_explored=(vset_t*)RTmalloc(nGrps*sizeof(vset_t));
-	group_tmp=(vset_t*)RTmalloc(nGrps*sizeof(vset_t));
-	projs=(proj_info*)RTmalloc(nGrps*sizeof(proj_info));
-	for(int i=0;i<nGrps;i++){
-		projs[i].len=dm_ones_in_row(GBgetDMInfo(model), i);
-		projs[i].proj=(int*)RTmalloc(projs[i].len*sizeof(int));
-		// temporary replacement for e_info->indices[i]
-		for(int j=0, k=0; j < dm_ncols(GBgetDMInfo(model)); j++) {
-			if (dm_is_set(GBgetDMInfo(model), i,j))
-				projs[i].proj[k++] = j;
-		}
+    ltstype = GBgetLTStype(model);
+    N = lts_type_get_state_length(ltstype);
+    eLbls = lts_type_get_edge_label_count(ltstype);
+    sLbls = lts_type_get_state_label_count(ltstype);
+    nGrps = dm_nrows(GBgetDMInfo(model));
+    Warning(info, "state vector length is %d; there are %d groups", N, nGrps);
+}
 
-		group_next[i]=vrel_create(domain,projs[i].len,projs[i].proj);
-		group_explored[i]=vset_create(domain,projs[i].len,projs[i].proj);
-		group_tmp[i]=vset_create(domain,projs[i].len,projs[i].proj);
-	}
-	Warning(info,"length is %d, there are %d groups",N,nGrps);
+void
+init_domain()
+{
+    domain = vdom_create_default(N);
+    visited = vset_create(domain, 0, NULL);
 
-	if (act_detect!=NULL) {
-	  if (eLbls!=1) Abort("action detection assumes precisely one edge label");
-	  chunk c = chunk_str(act_detect);
-	  //table number of first edge label.
-	  act_detect_table=lts_type_get_edge_label_typeno(ltstype,0);
-	  act_detect_index=GBchunkPut(model,act_detect_table,c);
-	  Warning(info, "Detecting action: %s", act_detect);
-	}
+    group_next     = (vrel_t*)RTmalloc(nGrps * sizeof(vrel_t));
+    group_explored = (vset_t*)RTmalloc(nGrps * sizeof(vset_t));
+    group_tmp      = (vset_t*)RTmalloc(nGrps * sizeof(vset_t));
+    projs          = (proj_info*)RTmalloc(nGrps * sizeof(proj_info));
 
-	int src[N];
-	GBgetInitialState(model,src);
-	vset_add(visited,src);
-	Warning(info,"got initial state");
-	mytimer_t timer=SCCcreateTimer();
-	SCCstartTimer(timer);
-	switch(strategy){
-        case BFS:
-            unguided(reach_bfs);
-            break;
-        case BFS2:
-            unguided(reach_bfs2);
-            break;
-        case Chain:
-            unguided(reach_chain);
-            break;
-        case Chain2:
-            unguided(reach_chain2);
-            break;
-        case Sat1:
-            unguided(reach_sat1);
-            break;
-        case Sat2:
-            unguided(reach_sat2);
-            break;
-        case Sat3:
-            unguided(reach_sat3);
-            break;
+    for(int i = 0; i < nGrps; i++) {
+        projs[i].len  = dm_ones_in_row(GBgetDMInfo(model), i);
+        projs[i].proj = (int*)RTmalloc(projs[i].len * sizeof(int));
+
+        // temporary replacement for e_info->indices[i]
+        for(int j = 0, k = 0; j < dm_ncols(GBgetDMInfo(model)); j++) {
+            if (dm_is_set(GBgetDMInfo(model), i, j))
+                projs[i].proj[k++] = j;
         }
-	if (dlk_detect)
-	  Warning(info,"No deadlocks found");
-	if (act_detect)
-	  Warning(info,"Action not found: %s", act_detect);
-	SCCstopTimer(timer);
-	SCCreportTimer(timer,"reachability took");
-	final_stat_reporting(visited);
-	if (etf_output) {
-		SCCresetTimer(timer);
-		SCCstartTimer(timer);
-		do_output();
-		SCCstopTimer(timer);
-		SCCreportTimer(timer,"writing output took");
-	}
-	return 0;
+
+        group_next[i]     = vrel_create(domain,projs[i].len,projs[i].proj);
+        group_explored[i] = vset_create(domain,projs[i].len,projs[i].proj);
+        group_tmp[i]      = vset_create(domain,projs[i].len,projs[i].proj);
+    }
+}
+
+void
+init_action()
+{
+    if (eLbls!=1) Abort("action detection assumes precisely one edge label");
+    chunk c = chunk_str(act_detect);
+    //table number of first edge label.
+    act_detect_table=lts_type_get_edge_label_typeno(ltstype,0);
+    act_detect_index=GBchunkPut(model,act_detect_table,c);
+    Warning(info, "Detecting action \"%s\"", act_detect);
+}
+
+int
+main(int argc, char *argv[])
+{
+    char *files[2];
+    RTinitPopt(&argc, &argv, options, 1, 2, files, NULL, "<model> [<etf>]",
+                   "Perform a symbolic reachability analysis of <model>\n"
+                       "The optional output of this analysis is an ETF "
+                           "representation of the input\n\nOptions");
+
+    etf_output=files[1];
+    init_model(files[0]);
+    init_domain();
+    if (act_detect!=NULL) init_action();
+
+    sat_proc_t sat_proc = NULL;
+    reach_proc_t reach_proc = NULL;
+    guided_proc_t guided_proc = unguided;
+
+    switch (strategy) {
+    case BFSP:
+        reach_proc = reach_bfs_prev;
+        break;
+    case BFS:
+        reach_proc = reach_bfs;
+        break;
+    case ChainP:
+        reach_proc = reach_chain_prev;
+        break;
+    case Chain:
+        reach_proc = reach_chain;
+        break;
+    }
+
+    switch (sat_strategy) {
+    case NoSat:
+        sat_proc = reach_no_sat;
+        break;
+    case Sat1:
+        sat_proc = reach_sat1;
+        break;
+    case Sat2:
+        sat_proc = reach_sat2;
+        break;
+    case Sat3:
+        sat_proc = reach_sat3;
+        break;
+    }
+
+    int src[N];
+    GBgetInitialState(model,src);
+    vset_add(visited,src);
+    Warning(info,"got initial state");
+
+    mytimer_t timer=SCCcreateTimer();
+    SCCstartTimer(timer);
+    guided_proc(sat_proc, reach_proc);
+    SCCstopTimer(timer);
+    final_stat_reporting(visited, timer);
+
+    if (etf_output)
+        do_output();
+
+    return 0;
 }
