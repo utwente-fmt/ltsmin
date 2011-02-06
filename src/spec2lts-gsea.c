@@ -1,46 +1,26 @@
 #include <config.h>
-#include <stdint.h>
-#include <string.h>
-#include <stdlib.h>
-#include <strings.h>
-#include <ctype.h>
 #include <assert.h>
-
+#include <ctype.h>
+#include <limits.h>
 #include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
+#include <strings.h>
+
+#include <archive.h>
+#include <bitset.h>
+#include <dbs-ll.h>
+#include <dfs-stack.h>
+#include <dynamic-array.h>
+#include <is-balloc.h>
 #include <lts_enum.h>
 #include <lts_io.h>
+#include <runtime.h>
+#include <scctimer.h>
+#include <spec-greybox.h>
 #include <stringindex.h>
-#include <limits.h>
-#include "dynamic-array.h"
-
-#include "archive.h"
-#include "runtime.h"
-#include "treedbs.h"
-#include "vector_set.h"
-#include "dfs-stack.h"
-#include "is-balloc.h"
-#include "bitset.h"
-#include "scctimer.h"
-#include "dbs-ll.h"
-
-#if defined(MCRL)
-#include "mcrl-greybox.h"
-#endif
-#if defined(MCRL2)
-#include "mcrl2-greybox.h"
-#endif
-#if defined(NIPS)
-#include "nips-greybox.h"
-#endif
-#if defined(ETF)
-#include "etf-greybox.h"
-#endif
-#if defined(DIVINE)
-#include "dve-greybox.h"
-#endif
-#if defined(DIVINE2)
-#include "dve2-greybox.h"
-#endif
+#include <treedbs.h>
+#include <vector_set.h>
 
 typedef enum { UseGreyBox , UseBlackBox } mode_t;
 
@@ -84,36 +64,36 @@ static struct {
     char* dot_output;
     FILE* dot_file;
 } opt = {
-    .model = NULL,
-    .trc_output = NULL,
-    .trace_handle = NULL,
-    .trace_output = NULL,
-    .dlk_detect = 0,
+    .model         = NULL,
+    .trc_output    = NULL,
+    .trace_handle  = NULL,
+    .trace_output  = NULL,
+    .dlk_detect    = 0,
     .ltl_semantics = "spin",
-    .ltl_type = PINS_LTL_SPIN,
-    .ltl_file = NULL,
-    .threshold = 100000,
-    .matrix=0,
-    .write_state=0,
-    .max = UINT_MAX,
-    .call_mode = UseBlackBox,
-    .arg_strategy = "bfs",
-    .strategy = Strat_BFS,
-    .arg_state_db = "tree",
-    .state_db = DB_TreeDBS
+    .ltl_type      = PINS_LTL_SPIN,
+    .ltl_file      = NULL,
+    .threshold     = 100000,
+    .matrix        = 0,
+    .write_state   = 0,
+    .max           = UINT_MAX,
+    .call_mode     = UseBlackBox,
+    .arg_strategy  = "bfs",
+    .strategy      = Strat_BFS,
+    .arg_state_db  = "tree",
+    .state_db      = DB_TreeDBS
 };
 
 static si_map_entry strategies[] = {
-    {"bfs",  Strat_BFS},
-    {"dfs",  Strat_DFS},
-    {"scc",  Strat_SCC},
+    {"bfs", Strat_BFS},
+    {"dfs", Strat_DFS},
+    {"scc", Strat_SCC},
     {NULL, 0}
 };
 
 static si_map_entry db_types[]={
     {"table", DB_DBSLL},
-    {"tree", DB_TreeDBS},
-    {"vset", DB_Vset},
+    {"tree",  DB_TreeDBS},
+    {"vset",  DB_Vset},
     {NULL, 0}
 };
 
@@ -144,49 +124,32 @@ state_db_popt (poptContext con, enum poptCallbackReason reason,
     case POPT_CALLBACK_REASON_OPTION:
         break;
     }
-    Fatal (1, error, "unexpected call to state_db_popt");
+    Abort ("unexpected call to state_db_popt");
 }
 
-static  struct poptOption development_options[] = {
-	{ "grey", 0 , POPT_ARG_VAL , &opt.call_mode , UseGreyBox , "make use of GetTransitionsLong calls" , NULL },
-	{ "matrix", 0 , POPT_ARG_VAL, &opt.matrix,1,"Print the dependency matrix and quit",NULL},
-	{ "write-state" , 0 , POPT_ARG_VAL , &opt.write_state, 1 , "write the full state vector" , NULL },
-	POPT_TABLEEND
+static struct poptOption development_options[] = {
+    { "grey", 0 , POPT_ARG_VAL , &opt.call_mode , UseGreyBox , "make use of GetTransitionsLong calls" , NULL },
+    { "matrix", 0 , POPT_ARG_VAL, &opt.matrix,1,"Print the dependency matrix and quit",NULL},
+    { "write-state" , 0 , POPT_ARG_VAL , &opt.write_state, 1 , "write the full state vector" , NULL },
+    POPT_TABLEEND
 };
 
-static  struct poptOption options[] = {
-	{ NULL, 0 , POPT_ARG_CALLBACK|POPT_CBFLAG_POST|POPT_CBFLAG_SKIPOPTION  , (void*)state_db_popt , 0 , NULL , NULL },
-	{ "deadlock" , 'd' , POPT_ARG_VAL , &opt.dlk_detect , 1 , "detect deadlocks" , NULL },
-	{ "dot" , 0 , POPT_ARG_STRING , &opt.dot_output , 0 , "file to dot graph to" , "<dot output>" },
-	{ "trace" , 0 , POPT_ARG_STRING , &opt.trc_output , 0 , "file to write trace to" , "<lts output>" },
-	{ "state" , 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &opt.arg_state_db , 0 ,
-		"select the data structure for storing states", "<table|tree|vset>"},
-	{ "strategy" , 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &opt.arg_strategy , 0 ,
-		"select the search strategy", "<bfs|dfs>"},
-	{ "max" , 0 , POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT , &opt.max , 0 ,"maximum search depth", "<int>"},
-#if defined(MCRL)
-	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, mcrl_options , 0 , "mCRL options", NULL },
-#endif
-#if defined(MCRL2)
-	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, mcrl2_options , 0 , "mCRL2 options", NULL },
-#endif
-#if defined(NIPS)
-	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, nips_options , 0 , "NIPS options", NULL },
-#endif
-#if defined(ETF)
-	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, etf_options , 0 , "ETF options", NULL },
-#endif
-#if defined(DIVINE)
-	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, dve_options , 0 , "DiVinE options", NULL },
-#endif
-#if defined(DIVINE2)
-	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, dve2_options , 0 , "DiVinE 2.2 options", NULL },
-#endif
-	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, greybox_options , 0 , "Greybox options", NULL },
-	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, vset_options , 0 , "Vector set options", NULL },
-	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, lts_io_options , 0 , NULL , NULL },
-	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, development_options , 0 , "Development options" , NULL },
-	POPT_TABLEEND
+static struct poptOption options[] = {
+    { NULL, 0 , POPT_ARG_CALLBACK|POPT_CBFLAG_POST|POPT_CBFLAG_SKIPOPTION  , (void*)state_db_popt , 0 , NULL , NULL },
+    { "deadlock" , 'd' , POPT_ARG_VAL , &opt.dlk_detect , 1 , "detect deadlocks" , NULL },
+    { "dot" , 0 , POPT_ARG_STRING , &opt.dot_output , 0 , "file to dot graph to" , "<dot output>" },
+    { "trace" , 0 , POPT_ARG_STRING , &opt.trc_output , 0 , "file to write trace to" , "<lts output>" },
+    { "state" , 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &opt.arg_state_db , 0 ,
+      "select the data structure for storing states", "<table|tree|vset>"},
+    { "strategy" , 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &opt.arg_strategy , 0 ,
+      "select the search strategy", "<bfs|dfs|scc>"},
+    { "max" , 0 , POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT , &opt.max , 0 ,"maximum search depth", "<int>"},
+    SPEC_POPT_OPTIONS,
+    { NULL, 0 , POPT_ARG_INCLUDE_TABLE, greybox_options , 0 , "Greybox options", NULL },
+    { NULL, 0 , POPT_ARG_INCLUDE_TABLE, vset_options , 0 , "Vector set options", NULL },
+    { NULL, 0 , POPT_ARG_INCLUDE_TABLE, lts_io_options , 0 , NULL , NULL },
+    { NULL, 0 , POPT_ARG_INCLUDE_TABLE, development_options , 0 , "Development options" , NULL },
+    POPT_TABLEEND
 };
 
 static struct {
@@ -200,10 +163,10 @@ static struct {
     size_t explored;
     size_t ntransitions;
 } global = {
-    .visited = 0,
-    .explored = 0,
-    .depth = 0,
-    .max_depth = 0,
+    .visited      = 0,
+    .explored     = 0,
+    .depth        = 0,
+    .max_depth    = 0,
     .ntransitions = 0,
 };
 
@@ -212,7 +175,6 @@ static void *
 new_string_index (void *context)
 {
     (void)context;
-    Warning (info, "creating a new string index");
     return SIcreate ();
 }
 
@@ -293,14 +255,14 @@ typedef void(*gsea_void)(gsea_state_t*,void*);
 typedef int(*gsea_int)(gsea_state_t*,void*);
 typedef void (*foreach_open_cb)(gsea_state_t*, void*);
 
-static void gsea_process(void* arg, transition_info_t *ti, int *dst);
-static void gsea_foreach_open(foreach_open_cb open_cb, void* arg);
-static void gsea_finished(void* arg);
-static void gsea_progress(void* arg);
+static void gsea_process(void *arg, transition_info_t *ti, int *dst);
+static void gsea_foreach_open(foreach_open_cb open_cb, void *arg);
+static void gsea_finished(void *arg);
+static void gsea_progress(void *arg);
 
 typedef struct gsea_context {
     // init
-    void* (*init)(gsea_state_t*);
+    void *(*init)(gsea_state_t*);
 
     // foreach open function
     void (*foreach_open)( foreach_open_cb, void*);
@@ -339,7 +301,7 @@ typedef struct gsea_context {
 
     gsea_store_t store;
     gsea_queue_t queue;
-    void* context;
+    void *context;
 
     // placeholders
     void (*dlk_placeholder)(gsea_state_t*, void*);
@@ -364,28 +326,30 @@ typedef struct gsea_context {
 static gsea_context_t gc;
 
 
-/* debug */
-void print_state(gsea_state_t* state)
+#ifdef DEBUG
+static void
+print_state(gsea_state_t *state)
 {
     for(size_t i=0; i < global.N; i++) {
         printf("%d ", state->state[i]);
-    } printf("\n");
+    }
+    printf("\n");
 }
+#endif
 
-/*****************
- *  __   __  ___ *
- * |  \ /  \  |  *
- * |__/ \__/  |  *
- *****************/
+
+/*
+ * Graphviz Output
+ */
 static void
-gsea_report_finished_dot(void* arg) {
+gsea_report_finished_dot(void *arg) {
     fputs("}\n", opt.dot_file);
     fclose(opt.dot_file);
     if (gc.dot_report_finished) gc.dot_report_finished(arg);
 }
 
 static void
-gsea_process_dot(gsea_state_t* src, transition_info_t *ti, gsea_state_t *dst)
+gsea_process_dot(gsea_state_t *src, transition_info_t *ti, gsea_state_t *dst)
 {
     char buf[global.N * 18 + 1024];
     sprintf(buf, "\"");
@@ -402,12 +366,28 @@ gsea_process_dot(gsea_state_t* src, transition_info_t *ti, gsea_state_t *dst)
     if (gc.dot_state_process) gc.dot_state_process(src, ti, dst);
 }
 
-/****************************
- * ___  __        __   ___  *
- *  |  |__)  /\  /  ` |__   *
- *  |  |  \ /~~\ \__, |___  *
- ****************************/
+static void
+gsea_init_dot(const char *filename)
+{
+    assert (filename != NULL);
+    opt.dot_file = fopen(filename, "w+");
+    if (!opt.dot_file) {
+        Warning(info, "Failed to open DOT output file %s", filename);
+    } else {
+        Warning(info, "Writing DOT output to %s", filename);
+        fputs("digraph {\n", opt.dot_file);
+        gc.dot_state_process = gc.state_process;
+        gc.dot_report_finished = gc.report_finished;
+        gc.state_process = gsea_process_dot;
+        gc.report_finished = gsea_report_finished_dot;
+    }
+}
 
+
+
+/*
+ * Trace
+ */
 static void
 write_trace_state(model_t model, int src_no, int *state){
     Warning(debug,"dumping state %d",src_no);
@@ -423,7 +403,9 @@ struct write_trace_step_s {
     int depth;
 };
 
-static void write_trace_next(void*arg,transition_info_t*ti,int*dst){
+static void
+write_trace_next (void *arg, transition_info_t *ti, int *dst)
+{
     struct write_trace_step_s*ctx=(struct write_trace_step_s*)arg;
     if(ctx->found) return;
     for(size_t i=0;i<global.N;i++) {
@@ -433,7 +415,9 @@ static void write_trace_next(void*arg,transition_info_t*ti,int*dst){
     enum_seg_seg(opt.trace_handle,0,ctx->depth-1,0,ctx->depth,ti->labels);
 }
 
-static void write_trace_step(model_t model, int*src,int*dst, int depth){
+static void
+write_trace_step (model_t model, int *src, int *dst, int depth)
+{
     //Warning(debug,"finding edge for state %d",src_no);
     struct write_trace_step_s ctx;
     ctx.src_state=src;
@@ -441,48 +425,37 @@ static void write_trace_step(model_t model, int*src,int*dst, int depth){
     ctx.found=0;
     ctx.depth=depth;
     GBgetTransitionsAll(model,src,write_trace_next,&ctx);
-    if (ctx.found==0) Fatal(1,error,"no matching transition found");
+    if (ctx.found==0) Abort ("no matching transition found");
 }
 
-
-
-
-
-
-
-
-
+
 /* GSEA run configurations */
 
-/********************
- *   __   ___  __   *
- *  |__) |__  /__`  *
- *  |__) |    .__/  *
- ********************/
+/*
+ * BFS (GSEA run configurations)
+ */
 
 /* TREE configuration */
 static void
-bfs_tree_open_insert(gsea_state_t* state, void* arg)
+bfs_tree_open_insert(gsea_state_t *state, void *arg)
 {
     state->tree.tree_idx = TreeFold(gc.store.tree.dbs, state->state);
     if ((size_t)state->tree.tree_idx >= global.visited)
         global.visited++;
-    return;
     (void)arg;
 }
 
 static void
-bfs_tree_open_extract(gsea_state_t* state, void* arg)
+bfs_tree_open_extract(gsea_state_t *state, void *arg)
 {
     state->tree.tree_idx = global.explored;
     state->state = gc.context;
     TreeUnfold(gc.store.tree.dbs, global.explored, gc.context);
-    return;
     (void)arg;
 }
 
 static void
-bfs_tree_closed_insert(gsea_state_t* state, void* arg) {
+bfs_tree_closed_insert(gsea_state_t *state, void *arg) {
     // count depth
     if (gc.store.tree.level_bound == global.explored) {
         if (RTverbosity > 1) Warning(info, "level %zu, has %zu states, explored %zu states %zu transitions", global.max_depth, global.visited - global.explored, global.explored, global.ntransitions);
@@ -490,15 +463,30 @@ bfs_tree_closed_insert(gsea_state_t* state, void* arg) {
         global.depth=++global.max_depth;
         gc.store.tree.level_bound = global.visited;
     }
-    return; (void)state; (void)arg;
+    (void)state; (void)arg;
 }
-static int bfs_tree_has_open(gsea_state_t* state, void* arg) { return global.visited - global.explored; (void)state; (void)arg; }
-static int bfs_tree_open_insert_condition(gsea_state_t* state, void* arg) { return 1; (void)state; (void)arg; }
+
+static int
+bfs_tree_has_open (gsea_state_t * state, void *arg)
+{
+    return global.visited - global.explored;
+    (void)state; (void)arg;
+}
+
+static int
+bfs_tree_open_insert_condition (gsea_state_t * state, void *arg)
+{
+    return 1;
+    (void)state; (void)arg;
+}
 
 
 /* VSET configuration */
 
-typedef struct bfs_vset_arg_store { foreach_open_cb open_cb; void* ctx; } bfs_vset_arg_store_t;
+typedef struct bfs_vset_arg_store {
+    foreach_open_cb  open_cb;
+    void            *ctx;
+} bfs_vset_arg_store_t;
 
 static void
 bfs_vset_foreach_open_enum_cb (bfs_vset_arg_store_t *args, int *src)
@@ -509,7 +497,7 @@ bfs_vset_foreach_open_enum_cb (bfs_vset_arg_store_t *args, int *src)
 }
 
 static void
-bfs_vset_foreach_open(foreach_open_cb open_cb, void* arg)
+bfs_vset_foreach_open(foreach_open_cb open_cb, void *arg)
 {
     bfs_vset_arg_store_t args = { open_cb, arg };
     while(!vset_is_empty(gc.store.vset.next_set)) {
@@ -523,51 +511,42 @@ bfs_vset_foreach_open(foreach_open_cb open_cb, void* arg)
 }
 
 static void
-bfs_vset_open_insert(gsea_state_t* state, void* arg)
+bfs_vset_open_insert(gsea_state_t *state, void *arg)
 {
     vset_add(gc.store.vset.next_set, state->state);
     global.visited++;
-    return;
     (void)arg;
 }
 
 static void
-bfs_vset_closed_insert(gsea_state_t* state, void* arg)
+bfs_vset_closed_insert(gsea_state_t *state, void *arg)
 {
     vset_add(gc.store.vset.closed_set, state->state);
-    return;
     (void)arg;
 }
 
 static int
-bfs_vset_open(gsea_state_t* state, void* arg)
+bfs_vset_open(gsea_state_t *state, void *arg)
 {
     return vset_member(gc.store.vset.next_set, state->state);
     (void)arg;
 }
 
 static int
-bfs_vset_closed(gsea_state_t* state, void* arg)
+bfs_vset_closed(gsea_state_t *state, void *arg)
 {
     return vset_member(gc.store.vset.closed_set, state->state);
     (void)arg;
 }
 
-
-
-
-
-
-
-/********************
- *   __   ___  __   *
- *  |  \ |__  /__`  *
- *  |__/ |    .__/  *
- ********************/
+
+/*
+ * DFS (GSEA run configurations)
+ */
 
 /* dfs framework configuration */
 static int
-dfs_goal_trace_cb(int* stack_element, void* ctx)
+dfs_goal_trace_cb(int* stack_element, void *ctx)
 {
     struct write_trace_step_s* trace_ctx = (struct write_trace_step_s*)ctx;
     // printf("state %p, %d\n", stack_element, *stack_element);
@@ -595,7 +574,7 @@ dfs_goal_trace_cb(int* stack_element, void* ctx)
 }
 
 static void
-dfs_goal_trace(gsea_state_t* state, void* arg)
+dfs_goal_trace(gsea_state_t *state, void *arg)
 {
     int src[global.N];
     int dst[global.N];
@@ -626,7 +605,7 @@ dfs_goal_trace(gsea_state_t* state, void* arg)
 }
 
 static void*
-dfs_init(gsea_state_t* state)
+dfs_init(gsea_state_t *state)
 {
     gc.queue.filo.state_to_stack(state, NULL);
     gc.open_insert(state, NULL);
@@ -634,7 +613,7 @@ dfs_init(gsea_state_t* state)
 }
 
 static int*
-dfs_pop(gsea_state_t* state, void* arg)
+dfs_pop(gsea_state_t *state, void *arg)
 {
     return dfs_stack_pop(gc.queue.filo.stack);
     (void)state;
@@ -642,16 +621,15 @@ dfs_pop(gsea_state_t* state, void* arg)
 }
 
 static void
-dfs_open_extract(gsea_state_t* state, void* arg)
+dfs_open_extract(gsea_state_t *state, void *arg)
 {
     gc.queue.filo.stack_to_state(state, arg);
     // printf("state %d:", state->tree.tree_idx); print_state(state);
-    return;
     (void)arg;
 }
 
 static int
-dfs_has_open(gsea_state_t* state, void* arg) {
+dfs_has_open(gsea_state_t *state, void *arg) {
     int has_backtrack = gc.state_backtrack != NULL;
     int is_backtrack;
     do {
@@ -677,10 +655,14 @@ dfs_has_open(gsea_state_t* state, void* arg) {
     (void)arg;
 }
 
-static int dfs_open_insert_condition(gsea_state_t* state, void* arg) { return !gc.closed(state,arg); }
+static int
+dfs_open_insert_condition(gsea_state_t *state, void *arg)
+{
+    return !gc.closed(state,arg);
+}
 
 static void
-dfs_state_next_all(gsea_state_t* state, void* arg)
+dfs_state_next_all(gsea_state_t *state, void *arg)
 {
     // new search depth
     global.depth++;
@@ -693,13 +675,12 @@ dfs_state_next_all(gsea_state_t* state, void* arg)
     dfs_stack_enter(gc.queue.filo.stack);
     // original call
     state->count = GBgetTransitionsAll (opt.model, state->state, gsea_process, state);
-    return;
     (void)arg;
 }
 
 /* dfs --grey code */
 static void
-dfs_grey_push(gsea_state_t* state, void* arg)
+dfs_grey_push(gsea_state_t *state, void *arg)
 {
     grey_stack_t gs = {0,0};
     dfs_stack_push(gc.queue.filo.grey, (const int*) &gs);
@@ -707,7 +688,7 @@ dfs_grey_push(gsea_state_t* state, void* arg)
 }
 
 static int*
-dfs_grey_pop(gsea_state_t* state, void* arg)
+dfs_grey_pop(gsea_state_t *state, void *arg)
 {
     dfs_stack_pop(gc.queue.filo.grey);
     return gc.dfs_grey_pop(state, arg);
@@ -716,7 +697,7 @@ dfs_grey_pop(gsea_state_t* state, void* arg)
 }
 
 static int
-dfs_grey_closed(gsea_state_t* state, int is_backtrack, void* arg)
+dfs_grey_closed(gsea_state_t *state, int is_backtrack, void *arg)
 {
     grey_stack_t* gs = (grey_stack_t*) dfs_stack_top(gc.queue.filo.grey);
     if (gs->group != (int)global.K) return 0;
@@ -724,7 +705,7 @@ dfs_grey_closed(gsea_state_t* state, int is_backtrack, void* arg)
 }
 
 static void
-dfs_state_next_grey(gsea_state_t* state, void* arg)
+dfs_state_next_grey(gsea_state_t *state, void *arg)
 {
     // new search depth
     global.depth++;
@@ -747,144 +728,193 @@ dfs_state_next_grey(gsea_state_t* state, void* arg)
     }
     // sync state count
     grey->count = state->count;
-    return;
     (void)arg;
 }
-
-
 
 
 /* dfs tree configuration */
 static int
-dfs_tree_stack_closed(gsea_state_t* state, int is_backtrack, void* arg)
-{ return is_backtrack || bitset_test(gc.queue.filo.closed_set, state->tree.tree_idx); (void)arg; }
+dfs_tree_stack_closed(gsea_state_t *state, int is_backtrack, void *arg)
+{
+    return is_backtrack || bitset_test(gc.queue.filo.closed_set, state->tree.tree_idx);
+    (void)arg;
+}
 
 static void
-dfs_tree_stack_peek(gsea_state_t* state, void* arg)
-{ state->tree.tree_idx = *dfs_stack_top(gc.queue.filo.stack); return; (void)arg; }
+dfs_tree_stack_peek(gsea_state_t *state, void *arg)
+{
+    state->tree.tree_idx = *dfs_stack_top(gc.queue.filo.stack);
+    (void)arg;
+}
 
 static void
-dfs_tree_state_to_stack(gsea_state_t* state, void* arg)
+dfs_tree_state_to_stack(gsea_state_t *state, void *arg)
 {
     state->tree.tree_idx = TreeFold(gc.store.tree.dbs, state->state);
-    return;
     (void)arg;
 }
 
 static void
-dfs_tree_stack_to_state(gsea_state_t* state, void* arg)
-{ state->state = gc.context; TreeUnfold(gc.store.tree.dbs, state->tree.tree_idx, gc.context); return; (void)arg; }
+dfs_tree_stack_to_state(gsea_state_t *state, void *arg)
+{
+    state->state = gc.context;
+    TreeUnfold(gc.store.tree.dbs, state->tree.tree_idx, gc.context);
+    (void)arg;
+}
 
 static void
-dfs_tree_stack_push(gsea_state_t* state, void* arg)
+dfs_tree_stack_push(gsea_state_t *state, void *arg)
 {
     dfs_stack_push(gc.queue.filo.stack, &(state->tree.tree_idx));
-    return;
     (void)arg;
 }
 
-static void dfs_tree_closed_insert(gsea_state_t* state, void* arg)
-{ bitset_set(gc.queue.filo.closed_set, state->tree.tree_idx); return; (void)arg;}
+static void
+dfs_tree_closed_insert (gsea_state_t *state, void *arg)
+{
+    bitset_set (gc.queue.filo.closed_set, state->tree.tree_idx);
+    (void)arg;
+}
 
 
-static int dfs_tree_closed(gsea_state_t* state, void* arg)
+static int
+dfs_tree_closed (gsea_state_t *state, void *arg)
 {
     // state is not yet serialized at this point, hence, this must be done here -> error in framework?
     dfs_tree_state_to_stack(state, arg);
     return bitset_test(gc.queue.filo.closed_set, state->tree.tree_idx); (void)state; (void)arg;
 }
-static int dfs_tree_open_insert_condition(gsea_state_t* state, void* arg) { return !dfs_tree_closed(state,arg); (void)state; (void)arg; }
-
-
-/* dfs vset configuration */
-static int dfs_vset_closed(gsea_state_t* state, void* arg) { return vset_member(gc.store.vset.closed_set, state->state); (void)arg; }
 
 static int
-dfs_vset_stack_closed(gsea_state_t* state, int is_backtrack, void* arg)
-{ return is_backtrack ||dfs_vset_closed(state, arg); }
+dfs_tree_open_insert_condition (gsea_state_t *state, void *arg)
+{
+    return !dfs_tree_closed(state,arg);
+    (void)state; (void)arg;
+}
+
+/* dfs vset configuration */
+static int
+dfs_vset_closed (gsea_state_t *state, void *arg)
+{
+    return vset_member (gc.store.vset.closed_set, state->state);
+    (void)arg;
+}
+
+static int
+dfs_vset_stack_closed(gsea_state_t *state, int is_backtrack, void *arg)
+{
+    return is_backtrack ||dfs_vset_closed(state, arg);
+}
 
 static void
-dfs_vset_stack_peek(gsea_state_t* state, void* arg)
-{ state->state = dfs_stack_top(gc.queue.filo.stack); return; (void)arg; }
+dfs_vset_stack_peek(gsea_state_t *state, void *arg)
+{
+    state->state = dfs_stack_top(gc.queue.filo.stack);
+    (void)arg;
+}
 
-static void dfs_vset_state_to_stack(gsea_state_t* state, void* arg) { (void)state; (void)arg; }
-static void dfs_vset_stack_to_state(gsea_state_t* state, void* arg) { (void)state; (void)arg; }
+static void
+dfs_vset_state_to_stack (gsea_state_t *state, void *arg)
+{ (void)state; (void)arg; }
+
+static void
+dfs_vset_stack_to_state (gsea_state_t *state, void *arg)
+{ (void)state; (void)arg; }
 
 
 static void
-dfs_vset_stack_push(gsea_state_t* state, void* arg)
+dfs_vset_stack_push(gsea_state_t *state, void *arg)
 {
     dfs_stack_push(gc.queue.filo.stack, state->state);
-    return;
     (void)arg;
 }
 
 static void
-dfs_vset_closed_insert(gsea_state_t* state, void* arg) {
+dfs_vset_closed_insert(gsea_state_t *state, void *arg) {
     vset_add(gc.store.vset.closed_set, state->state);
-    return;
     (void)arg;
 }
 
-static int dfs_vset_open_insert_condition(gsea_state_t* state, void* arg) { return !dfs_vset_closed(state,arg); (void)state; (void)arg; }
+static int
+dfs_vset_open_insert_condition (gsea_state_t *state, void *arg)
+{
+    return !dfs_vset_closed (state, arg);
+    (void)state; (void)arg;
+}
 
 
 
 /* dfs table configuration */
 static int
-dfs_table_stack_closed(gsea_state_t* state, int is_backtrack, void* arg)
-{ return is_backtrack || bitset_test(gc.queue.filo.closed_set, state->table.hash_idx); (void)arg; }
-
-static void
-dfs_table_stack_peek(gsea_state_t* state, void* arg)
-{ state->table.hash_idx = *dfs_stack_top(gc.queue.filo.stack); return; (void)arg; }
-
-static void
-dfs_table_state_to_stack(gsea_state_t* state, void* arg)
+dfs_table_stack_closed (gsea_state_t *state, int is_backtrack, void *arg)
 {
-    DBSLLlookup_ret(gc.store.table.dbs, state->state, &(state->table.hash_idx));
-    return;
+    return is_backtrack
+        || bitset_test (gc.queue.filo.closed_set, state->table.hash_idx);
     (void)arg;
 }
 
 static void
-dfs_table_stack_to_state(gsea_state_t* state, void* arg)
+dfs_table_stack_peek (gsea_state_t *state, void *arg)
+{
+    state->table.hash_idx = *dfs_stack_top (gc.queue.filo.stack);
+    (void)arg;
+}
+
+static void
+dfs_table_state_to_stack(gsea_state_t *state, void *arg)
+{
+    DBSLLlookup_ret(gc.store.table.dbs, state->state, &(state->table.hash_idx));
+    (void)arg;
+}
+
+static void
+dfs_table_stack_to_state(gsea_state_t *state, void *arg)
 {
     int hash;
     state->state = DBSLLget(gc.store.table.dbs, state->table.hash_idx, &hash);
     (void)arg;
 }
 
-static void dfs_table_stack_push(gsea_state_t* state, void* arg)
+static void dfs_table_stack_push(gsea_state_t *state, void *arg)
 {
     dfs_stack_push(gc.queue.filo.stack, &(state->table.hash_idx));
-    return;
     (void)arg;
 }
 
 
-static void dfs_table_closed_insert(gsea_state_t* state, void* arg) { bitset_set(gc.queue.filo.closed_set, state->table.hash_idx); (void)arg;}
-
-static int dfs_table_closed(gsea_state_t* state, void* arg) {
-    // state is not yet serialized at this point, hence, this must be done here -> error in framework
-    dfs_table_state_to_stack(state, arg);
-    return bitset_test(gc.queue.filo.closed_set, state->table.hash_idx); (void)state; (void)arg;
+static void
+dfs_table_closed_insert (gsea_state_t *state, void *arg)
+{
+    bitset_set (gc.queue.filo.closed_set, state->table.hash_idx);
+    (void)arg;
 }
 
-static int dfs_table_open_insert_condition(gsea_state_t* state, void* arg) { return !dfs_table_closed(state,arg); (void)state; (void)arg; }
+static int
+dfs_table_closed (gsea_state_t *state, void *arg)
+{
+    // state is not yet serialized at this point, hence, this must be done 
+    // here -> error in framework
+    dfs_table_state_to_stack (state, arg);
+    return bitset_test (gc.queue.filo.closed_set, state->table.hash_idx);
+    (void)state; (void)arg;
+}
+
+static int
+dfs_table_open_insert_condition (gsea_state_t *state, void *arg)
+{
+    return !dfs_table_closed (state, arg);
+    (void)state; (void)arg;
+}
 
 
-
-
-
-/********************
- *   __   __   __   *
- *  /__` /  ` /  `  *
- *  .__/ \__, \__,  *
- ********************/
+
+/*
+ * SCC
+ */
 
 /* scc table configuration */
-static void scc_open_extract(gsea_state_t* state, void* arg)
+static void
+scc_open_extract(gsea_state_t *state, void *arg)
 {
     gc.scc_open_extract(state, arg);
     gc.store.scc.count++;
@@ -904,11 +934,11 @@ static void scc_open_extract(gsea_state_t* state, void* arg)
 
     dfs_stack_push(gc.store.scc.active, &state->tree.tree_idx);
 
-    return;
     (void)arg;
 }
 
-static int scc_state_backtrack(gsea_state_t* state, void* arg)
+static int
+scc_state_backtrack(gsea_state_t *state, void *arg)
 {
     //Warning(info, "backtracked state %d, dfsnum %d", state->tree.tree_idx, gc.store.scc.dfsnum[state->tree.tree_idx]);
     if (((*dfs_stack_top(gc.store.scc.roots))>>1) == state->tree.tree_idx) {
@@ -923,7 +953,8 @@ static int scc_state_backtrack(gsea_state_t* state, void* arg)
     return 1;
 }
 
-static void scc_state_matched(gsea_state_t* state, void* arg)
+static void
+scc_state_matched(gsea_state_t *state, void *arg)
 {
     if (bitset_test(gc.store.scc.current, state->tree.tree_idx)) {
         int b = 0, r;
@@ -946,70 +977,50 @@ static void scc_state_matched(gsea_state_t* state, void* arg)
     if (gc.scc_state_matched) return gc.scc_state_matched(state, arg);
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-/****************************************************
- *   __   __   ___          __   ___ ___       __   *
- *  / _` /__` |__   /\     /__` |__   |  |  | |__)  *
- *  \__> .__/ |___ /~~\    .__/ |___  |  \__/ |     *
- ****************************************************/
-
-
-/* GSEA setup code */
+
+/*
+ * GSEA setup
+ */
 
 static void
-error_state_arg(gsea_state_t* state, void* arg)
+error_state_arg(gsea_state_t *state, void *arg)
 {
-    Fatal(1, error, "unimplemented functionality in gsea configuration");
-    return;
-    (void)state;
-    (void)arg;
+    Abort ("unimplemented functionality in gsea configuration");
+    (void)state; (void)arg;
 }
 
-static void*
-gsea_init_default(gsea_state_t* state)
+static void *
+gsea_init_default(gsea_state_t *state)
 {
     gc.open_insert(state, NULL);
     return NULL;
 }
 
 static int
-gsea_open_insert_condition_default(gsea_state_t* state, void* arg) {
+gsea_open_insert_condition_default(gsea_state_t *state, void *arg)
+{
     return (!gc.closed(state, arg) && !gc.open(state, arg));
 }
 
 static void
-gsea_state_next_all_default(gsea_state_t* state, void* arg)
+gsea_state_next_all_default(gsea_state_t *state, void *arg)
 {
     state->count = GBgetTransitionsAll (opt.model, state->state, gsea_process, state);
-    return;
     (void)arg;
 }
 
 static void
-gsea_state_next_grey_default(gsea_state_t* state, void* arg)
+gsea_state_next_grey_default(gsea_state_t *state, void *arg)
 {
     state->count = 0;
     for (size_t i = 0; i < global.K; i++) {
         state->count += GBgetTransitionsLong (opt.model, i, state->state, gsea_process, state);
     }
-    return;
     (void)arg;
 }
 
 static void
-gsea_dlk_default(gsea_state_t* state, void* arg)
+gsea_dlk_default(gsea_state_t *state, void *arg)
 {
     // chain deadlock test after original code
     if (gc.dlk_placeholder) gc.dlk_placeholder(state, arg);
@@ -1025,7 +1036,7 @@ gsea_dlk_default(gsea_state_t* state, void* arg)
 }
 
 static int
-gsea_max_wrapper(gsea_state_t* state, void* arg)
+gsea_max_wrapper(gsea_state_t *state, void *arg)
 {
     // (depth < max depth) with chain original condition
     return (global.depth < opt.max) && gc.max_placeholder(state,arg);
@@ -1034,11 +1045,10 @@ gsea_max_wrapper(gsea_state_t* state, void* arg)
 
 
 static void
-gsea_goal_trace_default(gsea_state_t* state, void* arg)
+gsea_goal_trace_default(gsea_state_t *state, void *arg)
 {
-    Fatal(1, error, "goal state reached");
-    (void)state;
-    (void)arg;
+    Abort ("goal state reached");
+    (void)state; (void)arg;
 }
 
 static void
@@ -1079,12 +1089,12 @@ gsea_setup_default()
         }
     case Strat_DFS:
         // init filo  queue
-        if (!gc.queue.filo.push)        Fatal(1, error, "GSEA push() not implemented");
+        if (!gc.queue.filo.push)        Abort ("GSEA push() not implemented");
         if (!gc.queue.filo.pop)         gc.queue.filo.pop = dfs_pop;
-        if (!gc.queue.filo.peek)        Fatal(1, error, "GSEA peek() not implemented");
-        if (!gc.queue.filo.stack_to_state)  Fatal(1, error, "GSEA stack_to_state() not implemented");
-        if (!gc.queue.filo.state_to_stack)  Fatal(1, error, "GSEA state_to_stack() not implemented");
-        if (!gc.queue.filo.closed)      Fatal(1, error, "GSEA stack closed() not implemented");
+        if (!gc.queue.filo.peek)        Abort ("GSEA peek() not implemented");
+        if (!gc.queue.filo.stack_to_state)  Abort ("GSEA stack_to_state() not implemented");
+        if (!gc.queue.filo.state_to_stack)  Abort ("GSEA state_to_stack() not implemented");
+        if (!gc.queue.filo.closed)      Abort ("GSEA stack closed() not implemented");
 
         if (opt.call_mode == UseGreyBox) {
             // wrap stack functions
@@ -1095,7 +1105,7 @@ gsea_setup_default()
             gc.queue.filo.pop  = dfs_grey_pop;
             gc.queue.filo.closed = dfs_grey_closed;
             // modify next state function
-            if (gc.state_next)          Fatal(1, error, "state next filled before use of GSEA dfs_state_next_grey()");
+            if (gc.state_next)          Abort ("state next filled before use of GSEA dfs_state_next_grey()");
             gc.state_next = dfs_state_next_grey;
             // init extra stack
             gc.queue.filo.grey = dfs_stack_create(sizeof(grey_stack_t)/sizeof(int));
@@ -1148,150 +1158,125 @@ gsea_setup_default()
     }
 
     // output dot
-    if (opt.dot_output) {
-        opt.dot_file = fopen(opt.dot_output, "w+");
-        if (!opt.dot_file) {
-            Warning(info, "Failed to open DOT output file %s", opt.dot_output);
-        } else {
-            Warning(info, "Writing DOT output to %s", opt.dot_output);
-            fputs("digraph {\n", opt.dot_file);
-            gc.dot_state_process = gc.state_process;
-            gc.dot_report_finished = gc.report_finished;
-            gc.state_process = gsea_process_dot;
-            gc.report_finished = gsea_report_finished_dot;
-        }
-    }
+    if (opt.dot_output) gsea_init_dot(opt.dot_output);
 }
 
 static void
 gsea_setup()
 {
     switch(opt.strategy) {
-
     case Strat_BFS:
         switch (opt.state_db) {
-            case DB_TreeDBS:
-                // setup standard bfs/tree configuration
-                gc.open_insert_condition = bfs_tree_open_insert_condition;
-                gc.open_insert = bfs_tree_open_insert;
-                gc.open_extract = bfs_tree_open_extract;
-                gc.has_open = bfs_tree_has_open;
-                gc.closed_insert = bfs_tree_closed_insert;
+        case DB_TreeDBS:
+            // setup standard bfs/tree configuration
+            gc.open_insert_condition = bfs_tree_open_insert_condition;
+            gc.open_insert = bfs_tree_open_insert;
+            gc.open_extract = bfs_tree_open_extract;
+            gc.has_open = bfs_tree_has_open;
+            gc.closed_insert = bfs_tree_closed_insert;
 
-                gc.store.tree.dbs = TreeDBScreate(global.N);
-                gc.store.tree.level_bound = 0;
-                gc.context = RTmalloc(sizeof(int) * global.N);
-                break;
-            case DB_Vset:
-                // setup standard bfs/vset configuration
-                gc.foreach_open = bfs_vset_foreach_open;
-                gc.open_insert = bfs_vset_open_insert;
-                gc.open = bfs_vset_open;
-                gc.closed_insert = bfs_vset_closed_insert;
-                gc.closed = bfs_vset_closed;
+            gc.store.tree.dbs = TreeDBScreate(global.N);
+            gc.store.tree.level_bound = 0;
+            gc.context = RTmalloc(sizeof(int) * global.N);
+            break;
+        case DB_Vset:
+            // setup standard bfs/vset configuration
+            gc.foreach_open = bfs_vset_foreach_open;
+            gc.open_insert = bfs_vset_open_insert;
+            gc.open = bfs_vset_open;
+            gc.closed_insert = bfs_vset_closed_insert;
+            gc.closed = bfs_vset_closed;
 
-                gc.context = RTmalloc(sizeof(int) * global.N);
-                gc.store.vset.domain = vdom_create_default (global.N);
-                gc.store.vset.closed_set = vset_create(gc.store.vset.domain, 0, NULL);
-                gc.store.vset.next_set = vset_create(gc.store.vset.domain, 0, NULL);
-                gc.store.vset.current_set = vset_create(gc.store.vset.domain, 0, NULL);
-                break;
-            default:
-                Fatal(1, error, "unimplemented combination --strategy=%s, --state=%s", opt.arg_strategy, opt.arg_state_db );
+            gc.context = RTmalloc(sizeof(int) * global.N);
+            gc.store.vset.domain = vdom_create_default (global.N);
+            gc.store.vset.closed_set = vset_create(gc.store.vset.domain, 0, NULL);
+            gc.store.vset.next_set = vset_create(gc.store.vset.domain, 0, NULL);
+            gc.store.vset.current_set = vset_create(gc.store.vset.domain, 0, NULL);
+            break;
+        default:
+            Abort ("unimplemented combination --strategy=%s, --state=%s", opt.arg_strategy, opt.arg_state_db );
         }
         break;
 
     case Strat_SCC:
     case Strat_DFS:
         switch (opt.state_db) {
-            case DB_TreeDBS:
-                // setup dfs/tree configuration
-                gc.closed_insert = dfs_tree_closed_insert;
-                gc.closed = dfs_tree_closed;
-                gc.open_insert_condition = dfs_tree_open_insert_condition;
+        case DB_TreeDBS:
+            // setup dfs/tree configuration
+            gc.closed_insert = dfs_tree_closed_insert;
+            gc.closed = dfs_tree_closed;
+            gc.open_insert_condition = dfs_tree_open_insert_condition;
 
-                gc.queue.filo.closed = dfs_tree_stack_closed;
-                gc.queue.filo.push = dfs_tree_stack_push;
-                gc.queue.filo.peek = dfs_tree_stack_peek;
-                gc.queue.filo.stack_to_state = dfs_tree_stack_to_state;
-                gc.queue.filo.state_to_stack = dfs_tree_state_to_stack;
+            gc.queue.filo.closed = dfs_tree_stack_closed;
+            gc.queue.filo.push = dfs_tree_stack_push;
+            gc.queue.filo.peek = dfs_tree_stack_peek;
+            gc.queue.filo.stack_to_state = dfs_tree_stack_to_state;
+            gc.queue.filo.state_to_stack = dfs_tree_state_to_stack;
 
-                gc.store.tree.dbs = TreeDBScreate(global.N);
-                gc.queue.filo.stack = dfs_stack_create(1);
-                gc.queue.filo.closed_set = bitset_create(128,128);
-                gc.context = RTmalloc(sizeof(int) * global.N);
-                break;
-            case DB_Vset:
-                // dfs/vset configuration
-                gc.closed_insert = dfs_vset_closed_insert;
-                gc.closed = dfs_vset_closed;
-                gc.open_insert_condition = dfs_vset_open_insert_condition;
+            gc.store.tree.dbs = TreeDBScreate(global.N);
+            gc.queue.filo.stack = dfs_stack_create(1);
+            gc.queue.filo.closed_set = bitset_create(128,128);
+            gc.context = RTmalloc(sizeof(int) * global.N);
+            break;
+        case DB_Vset:
+            // dfs/vset configuration
+            gc.closed_insert = dfs_vset_closed_insert;
+            gc.closed = dfs_vset_closed;
+            gc.open_insert_condition = dfs_vset_open_insert_condition;
 
-                gc.queue.filo.closed = dfs_vset_stack_closed;
-                gc.queue.filo.push = dfs_vset_stack_push;
-                gc.queue.filo.peek = dfs_vset_stack_peek;
-                gc.queue.filo.stack_to_state = dfs_vset_stack_to_state;
-                gc.queue.filo.state_to_stack = dfs_vset_state_to_stack;
+            gc.queue.filo.closed = dfs_vset_stack_closed;
+            gc.queue.filo.push = dfs_vset_stack_push;
+            gc.queue.filo.peek = dfs_vset_stack_peek;
+            gc.queue.filo.stack_to_state = dfs_vset_stack_to_state;
+            gc.queue.filo.state_to_stack = dfs_vset_state_to_stack;
 
-                gc.context = RTmalloc(sizeof(int) * global.N);
-                gc.store.vset.domain = vdom_create_default (global.N);
-                gc.store.vset.closed_set = vset_create(gc.store.vset.domain, 0, NULL);
-                gc.store.vset.next_set = vset_create(gc.store.vset.domain, 0, NULL);
-                gc.store.vset.current_set = vset_create(gc.store.vset.domain, 0, NULL);
-                gc.queue.filo.stack = dfs_stack_create(global.N);
-                break;
-            case DB_DBSLL:
-                gc.closed_insert = dfs_table_closed_insert;
-                gc.closed = dfs_table_closed;
-                gc.open_insert_condition = dfs_table_open_insert_condition;
+            gc.context = RTmalloc(sizeof(int) * global.N);
+            gc.store.vset.domain = vdom_create_default (global.N);
+            gc.store.vset.closed_set = vset_create(gc.store.vset.domain, 0, NULL);
+            gc.store.vset.next_set = vset_create(gc.store.vset.domain, 0, NULL);
+            gc.store.vset.current_set = vset_create(gc.store.vset.domain, 0, NULL);
+            gc.queue.filo.stack = dfs_stack_create(global.N);
+            break;
+        case DB_DBSLL:
+            gc.closed_insert = dfs_table_closed_insert;
+            gc.closed = dfs_table_closed;
+            gc.open_insert_condition = dfs_table_open_insert_condition;
 
-                gc.queue.filo.closed = dfs_table_stack_closed;
-                gc.queue.filo.push = dfs_table_stack_push;
-                gc.queue.filo.peek = dfs_table_stack_peek;
-                gc.queue.filo.stack_to_state = dfs_table_stack_to_state;
-                gc.queue.filo.state_to_stack = dfs_table_state_to_stack;
+            gc.queue.filo.closed = dfs_table_stack_closed;
+            gc.queue.filo.push = dfs_table_stack_push;
+            gc.queue.filo.peek = dfs_table_stack_peek;
+            gc.queue.filo.stack_to_state = dfs_table_stack_to_state;
+            gc.queue.filo.state_to_stack = dfs_table_state_to_stack;
 
-                gc.context = RTmalloc(sizeof(int) * global.N);
-                gc.store.table.dbs = DBSLLcreate(global.N);
-                gc.queue.filo.closed_set = bitset_create(128,128);
-                gc.queue.filo.stack = dfs_stack_create(1);
-                break;
+            gc.context = RTmalloc(sizeof(int) * global.N);
+            gc.store.table.dbs = DBSLLcreate(global.N);
+            gc.queue.filo.closed_set = bitset_create(128,128);
+            gc.queue.filo.stack = dfs_stack_create(1);
+            break;
 
-            default:
-                Fatal(1, error, "unimplemented combination --strategy=%s, --state=%s", opt.arg_strategy, opt.arg_state_db );
+        default:
+            Abort ("unimplemented combination --strategy=%s, --state=%s", opt.arg_strategy, opt.arg_state_db );
         }
         break;
 
     default:
-        Fatal(1, error, "unimplemented strategy");
+        Abort ("unimplemented strategy");
     }
 }
 
+
+/*
+ * GSEA Algorithm
+ */
 
-
-
-
-
-
-
-
-
-
-
-/**********************************************************************
- *   __   __   ___                    __   __   __    ___             *
- *  / _` /__` |__   /\      /\  |    / _` /  \ |__) |  |  |__|  |\/|  *
- *  \__> .__/ |___ /~~\    /~~\ |___ \__> \__/ |  \ |  |  |  |  |  |  *
- **********************************************************************/
-
-static void gsea_foreach_open_cb(gsea_state_t* s_open, void* arg);
+static void gsea_foreach_open_cb(gsea_state_t *s_open, void *arg);
 
 static void
 gsea_search(int* src)
 {
     gsea_state_t s0;
     s0.state = src;
-    void* ctx = gc.init(&s0);
+    void *ctx = gc.init(&s0);
 
     // while open states, process
     gc.foreach_open(gsea_foreach_open_cb, ctx);
@@ -1301,7 +1286,7 @@ gsea_search(int* src)
 }
 
 static void
-gsea_foreach_open(foreach_open_cb open_cb, void* arg)
+gsea_foreach_open(foreach_open_cb open_cb, void *arg)
 {
     gsea_state_t s_open;
     while(gc.has_open(&s_open, arg)) {
@@ -1311,7 +1296,7 @@ gsea_foreach_open(foreach_open_cb open_cb, void* arg)
 }
 
 static void
-gsea_foreach_open_cb(gsea_state_t* s_open, void* arg)
+gsea_foreach_open_cb(gsea_state_t *s_open, void *arg)
 {
     // insert in closed set
     gc.closed_insert(s_open, arg);
@@ -1336,7 +1321,7 @@ gsea_foreach_open_cb(gsea_state_t* s_open, void* arg)
 }
 
 static void
-gsea_process(void* arg, transition_info_t *ti, int *dst)
+gsea_process(void *arg, transition_info_t *ti, int *dst)
 {
     gsea_state_t s_next;
     s_next.state = dst;
@@ -1348,47 +1333,33 @@ gsea_process(void* arg, transition_info_t *ti, int *dst)
     }
     global.ntransitions++;
     if (gc.state_process) gc.state_process((gsea_state_t*)arg, ti, &s_next);
-    return;
     (void)ti;
 }
 
 static void
-gsea_progress(void* arg) {
+gsea_progress(void *arg) {
     if (RTverbosity < 1 || global.explored < opt.threshold)
         return;
     if (!cas (&opt.threshold, opt.threshold, opt.threshold << 1))
         return;
     Warning (info, "explored %zu levels ~%zu states ~%zu transitions",
              global.max_depth, global.explored, global.ntransitions);
-    return;
     (void)arg;
 }
 
 static void
-gsea_finished(void* arg) {
+gsea_finished(void *arg) {
     Warning (info, "state space %zu levels, %zu states %zu transitions",
              global.max_depth, global.explored, global.ntransitions);
-    return;
     (void)arg;
 }
 
 
-
-
-
-
-
-
-
-
-
-/************************
- *   |\/|  /\  | |\ |   *
- *   |  | /~~\ | | \|   *
- ************************/
-
-int main(int argc, char *argv[]){
-    char           *files[2];
+
+int
+main (int argc, char *argv[])
+{
+    char *files[2];
     RTinitPopt(&argc,&argv,options,1,2,files,NULL,"<model> [<lts>]",
         "Perform an enumerative reachability analysis of <model>\n\n"
         "Options");
@@ -1415,10 +1386,9 @@ int main(int argc, char *argv[]){
     GBgetInitialState(opt.model,src);
     Warning(info,"got initial state");
 
-    memset(&gc, 0, sizeof(gsea_context_t));
     gsea_setup();
     gsea_setup_default();
     gsea_search(src);
 
-	return 0;
+    exit(EXIT_SUCCESS);
 }
