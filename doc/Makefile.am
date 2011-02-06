@@ -8,6 +8,7 @@ MANPAGES = ltsmin-mpi.1 ltsmin-convert.1 gcf.1 lpo-reach.1 lps-reach.1	\
         etf2lts-grey.1 etf2lts-mpi.1 etf-reach.1 ltsmin.7 etf-convert.1 \
         pins_open.1 ce-mpi.1 etf2torx.1 lpo2torx.1 lps2torx.1 nips2torx.1 \
         dve2torx.1 ltsmin-tracepp.1 dve2lts-grey.1 dve-reach.1 dve2lts-mpi.1 \
+	ltsmin-ltl.5 \
         nips2lts-mc.1 dve2lts-mc.1 dve22lts-mc.1 etf2lts-mc.1
 
 doc_ASCIIDOC = $(addsuffix .txt, $(basename $(MANPAGES)))
@@ -22,7 +23,8 @@ extra_ASCIIDOC = inc/spec2lts-mpi.txt inc/spec2lts-grey.txt		\
 	inc/spec2lts-mpi.txt inc/support.txt inc/vset-options.txt       \
 	inc/compression.txt inc/mcrl2-options.txt inc/spec2torx.txt     \
 	inc/reachability-options.txt inc/ltsmin-tracepp-options.txt     \
-    inc/spec2lts-mc.txt inc/spec2lts-mc-options.txt
+	inc/buchi.txt                                                   \
+	inc/spec2lts-mc.txt inc/spec2lts-mc-options.txt
 
 
 EXTRA_DIST = asciidoc.conf callouts.xsl $(doc_ASCIIDOC) $(extra_ASCIIDOC)

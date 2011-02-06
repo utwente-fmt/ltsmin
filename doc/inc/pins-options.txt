@@ -56,3 +56,30 @@ rn;;
 ru;;
   Row sUbsume; try to remove more rows than nubbing, thereby trading
   speed for memory.  Requires *rs*.
+
+*--ltl*='LTLFILE'::
+    Compute cross-product of a Buchi automaton and the specification
++
+'LTLFILE' is a file containing an Linear Temporal Logic formula (see
+manpage:ltsmin-ltl[5]). This formula will be converted to a Buchi
+automaton.  Then the synchronous cross product with the original
+specification is computed on-the-fly.  A state label is added to
+encode accepting states.
+
+*--ltl-semantics*='spin|textbook'::
+    Change the semantics of the crossproduct generated using '--ltl'
++
+Change the semantics to use incoming or outgoing edges.
+Two options are available, the default is 'spin'.
+
+spin;;
+    Use semantics similar to the spin model checker. From the 'source'
+    state all transitions are generated. Then, state predicates
+    are evaluated on the 'source' state. The Buchi automaton now
+    moves according to these predicates.
+
+textbook;;
+    Use textbook semantics. A new initial state is generated with an
+    outgoing transition to the initial state. Now, predicates
+    are evaluated on the 'target' state and the Buchi automaton
+    moves according to these predicates.
