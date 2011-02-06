@@ -177,3 +177,43 @@ dfs_stack_pop_bottom (dfs_stack_t stack)
     stack->frame_bottom++;
     return isba_peek_int(stack->states, stack->frame_size - stack->frame_bottom);
 }
+
+/* stack:
+ * [root] [frame 1  ..... ] [frame 2 .....  ]    .. [ last frame = stack->frame_size  .....
+ * [ 0  ] [1 ] ...      [n] [ n+1 ] ..        [m-1] [ m + 1] ...... [l-1] [l]
+ * result of walk up:
+ * l, m-1, n, ... , root
+ * down is the other way around..
+ */
+void
+dfs_stack_walk_up(dfs_stack_t stack, int(*cb)(int*, void*), void* ctx)
+{
+    int offset = 0;
+    int res = cb( isba_peek_int(stack->states, offset), ctx );
+    if (res && stack->frame_size != 0) {
+        offset += stack->frame_size;
+        res = cb( isba_peek_int(stack->states, offset), ctx );
+    }
+    for(size_t i=0; i < stack->nframes-1 &&  res; i++) {
+        offset += isba_peek_int(stack->frames, i)[0];
+        res = cb( isba_peek_int(stack->states, offset), ctx );
+    }
+}
+
+void
+dfs_stack_walk_down(dfs_stack_t stack, int(*cb)(int*, void*), void* ctx)
+{
+    // set offset of the root node
+    int offset = stack->ntotal;
+    int res;
+
+    for(size_t i=stack->nframes-1 ; i > 0 &&  res; i--) {
+        offset -= isba_peek_int(stack->frames, i)[0];
+        res = cb( isba_peek_int(stack->states, offset), ctx );
+    }
+    if (res && stack->frame_size != 0) {
+        offset = stack->frame_size;
+        res = cb( isba_peek_int(stack->states, offset), ctx );
+    }
+    if (res) res = cb( isba_peek_int(stack->states, 0), ctx );
+}

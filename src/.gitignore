@@ -58,3 +58,10 @@ test-hre-mpi
 test-dbs
 test-cache
 ltsmin-tracepp
+dve22lts-gsea
+dve2lts-gsea
+etf2lts-gsea
+lpo2lts-gsea
+lps2lts-gsea
+spinja2lts-gsea
+nips2lts-gsea
