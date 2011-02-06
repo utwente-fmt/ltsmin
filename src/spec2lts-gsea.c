@@ -22,6 +22,23 @@
 #include <treedbs.h>
 #include <vector_set.h>
 
+/*
+ * Exploration algorithms based on an extended version of the
+ * General State Exploring Algorithm (GSEA) framework:
+ *
+ * @article{DBLP:journals/sttt/BosnackiLL09,
+ *   author    = {Dragan Bosnacki and Stefan Leue and Alberto Lluch-Lafuente},
+ *   title     = {Partial-order reduction for general state exploring algorithms},
+ *   journal   = {STTT},
+ *   volume    = {11},
+ *   number    = {1},
+ *   year      = {2009},
+ *   pages     = {39-51},
+ *   ee        = {http://dx.doi.org/10.1007/s10009-008-0093-y},
+ *   bibsource = {DBLP, http://dblp.uni-trier.de}
+ * }
+ */
+
 typedef enum { UseGreyBox , UseBlackBox } mode_t;
 
 typedef struct grey_stack
@@ -1084,9 +1101,10 @@ gsea_setup_default()
     case Strat_SCC:
         // exception for Strat_SCC, only works in combination with ltl formula
         if (GBgetAcceptingStateLabelIndex(opt.model) < 0) {
-            Abort("NDFS search only works in combination with an accepting state label"
+            Abort("SCC search only works in combination with an accepting state label"
                   " (see LTL options)");
         }
+        /* fall-through */
     case Strat_DFS:
         // init filo  queue
         if (!gc.queue.filo.push)        Abort ("GSEA push() not implemented");
