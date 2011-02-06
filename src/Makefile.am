@@ -356,7 +356,8 @@ libutil_la_SOURCES := unix.c runtime.c stream.c archive.c			\
                     string-map.c string-map.h \
                     tables.c tables.h chunk_table_factory.c \
                     scctimer.h fast_hash.h runtime.h treedbs.h		\
-                    config.h greybox.c greybox.h pins-cache.c group.c   \
+                    config.h greybox.c greybox.h spec-greybox.h \
+                    pins-cache.c group.c   \
                     stringindex.c stringindex.h archive_gsf.c           \
                     dir_ops.c dir_ops.h	\
                     packet_stream.h packet_stream.c	\
