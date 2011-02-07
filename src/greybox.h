@@ -33,6 +33,23 @@ typedef struct transition_info {
 static const transition_info_t GB_NO_TRANSITION = {NULL, GB_UNKNOWN_GROUP};
 
 /**
+\brief Enum for state label groups (GBgetStateLabelGroup)
+ */
+typedef enum {
+    GB_SL_ALL = 0,          // same as GBgetStateLabelAll
+    GB_SL_GUARDS,           // get all labels used as guard
+    GB_SL_GROUP_COUNT       // count elements of enum, must be last
+} sl_group_enum_t;
+
+/**
+\brief A struct to store the indices of the state labels in a particular state label group
+*/
+typedef struct sl_group {
+    int count;
+    int sl_idx[];
+} sl_group_t ;
+
+/**
 \brief Enum to describe the type of property already in the model provided by the frondend
  */
 typedef enum { PROPERTY_NONE, PROPERTY_LTL_SPIN, PROPERTY_LTL_TEXTBOOK, PROPERTY_CTL, PROPERTY_CTL_STAR, PROPERTY_MU } property_enum_t;
@@ -152,11 +169,25 @@ extern int GBgetStateLabelLong(model_t model,int label,int *state);
 \brief Return the value of state label label given a long state
 */
 
+extern void GBgetStateLabelsGroup(model_t model, sl_group_enum_t group, int*state, int*labels);
+/**<
+\brief Retrieve a group of state labels
+*/
 
 extern void GBgetStateLabelsAll(model_t model,int*state,int*labels);
 /**<
 \brief retrieve all state labels in one call.
  */
+
+extern sl_group_t* GBgetStateLabelGroupInfo(model_t model, sl_group_enum_t group);
+/**<
+\brief Get the state labels indices (and count) beloning to a particular state label group
+*/
+
+extern void GBsetStateLabelGroupInfo(model_t model, sl_group_enum_t group, sl_group_t *group_info);
+/**<
+\brief Get the state labels indices (and count) beloning to a particular state label group
+*/
 
 extern int GBgetStateAll(model_t model,int*state,int*labels,TransitionCB cb,void*context);
 /**<
@@ -336,6 +367,14 @@ typedef void (*get_label_all_method_t)(model_t self,int*src,int *label);
 \brief Set the method that retrieves all state labels.
 */
 extern void GBsetStateLabelsAll(model_t model,get_label_all_method_t method);
+
+/// Type of label retrieval methods.
+typedef void (*get_label_group_method_t)(model_t self,sl_group_enum_t group, int*src,int *label);
+
+/**
+\brief Set the method that retrieves a group of state labels.
+*/
+extern void GBsetStateLabelsGroup(model_t model,get_label_group_method_t method);
 
 /// Type of label retrieval methods.
 typedef int (*get_label_method_t)(model_t self,int label,int*src);

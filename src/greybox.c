@@ -13,6 +13,7 @@ struct grey_box_model {
 	matrix_t *dm_read_info;
 	matrix_t *dm_write_info;
 	matrix_t *sl_info;
+    sl_group_t* sl_groups[GB_SL_GROUP_COUNT];
     guard_t** guards;
     matrix_t *gce_info; // guard co-enabled info
     matrix_t *gnes_info; // guard necessary enabling set
@@ -25,6 +26,7 @@ struct grey_box_model {
 	next_method_black_t next_all;
 	get_label_method_t state_labels_short;
 	get_label_method_t state_labels_long;
+	get_label_group_method_t state_labels_group;
 	get_label_all_method_t state_labels_all;
 	void* newmap_context;
 	newmap_t newmap;
@@ -115,6 +117,26 @@ state_labels_default_long(model_t model, int label, int *state)
 }
 
 static void
+state_labels_default_group(model_t model, sl_group_enum_t group, int *state, int *labels)
+{
+    switch (group)
+    {
+        case GB_SL_ALL:
+            GBgetStateLabelsAll(model, state, labels);
+            return;
+        case GB_SL_GUARDS:
+            /**
+             * This could potentially return a trivial guard for each transition group
+             * by calling state next, return 1 if a next state is found and 0 if not.
+             * This setup should be synchronized with the other guard functionality
+             */
+            Abort( "No default for guard group available in GBgetStateLabelsGroup" );
+        default:
+            Abort( "Unknown group in GBgetStateLabelsGroup" );
+    }
+}
+
+static void
 state_labels_default_all(model_t model, int *state, int *labels)
 {
 	for(int i=0;i<dm_nrows(GBgetStateLabelInfo(model));i++) {
@@ -153,6 +175,12 @@ wrapped_state_labels_default_long(model_t model, int label, int *state)
 }
 
 static void
+wrapped_state_labels_default_group(model_t model, sl_group_enum_t group, int *state, int *labels)
+{
+    GBgetStateLabelsGroup(GBgetParent(model), group, state, labels);
+}
+
+static void
 wrapped_state_labels_default_all(model_t model, int *state, int *labels)
 {
     return GBgetStateLabelsAll(GBgetParent(model), state, labels);
@@ -167,6 +195,8 @@ model_t GBcreateBase(){
 	model->dm_read_info=NULL;
 	model->dm_write_info=NULL;
 	model->sl_info=NULL;
+    for(int i=0; i < GB_SL_GROUP_COUNT; i++)
+        model->sl_groups[i]=NULL;
     model->guards=NULL;
     model->gce_info=NULL;
     model->gnes_info=NULL;
@@ -179,6 +209,7 @@ model_t GBcreateBase(){
 	model->next_all=default_all;
 	model->state_labels_short=state_labels_default_short;
 	model->state_labels_long=state_labels_default_long;
+	model->state_labels_group=state_labels_default_group;
 	model->state_labels_all=state_labels_default_all;
 	model->newmap_context=NULL;
 	model->newmap=NULL;
@@ -230,6 +261,9 @@ void GBinitModelDefaults (model_t *p_model, model_t default_src)
 
     if (model->sl_info == NULL)
         GBsetStateLabelInfo(model, GBgetStateLabelInfo(default_src));
+
+    for(int i=0; i < GB_SL_GROUP_COUNT; i++)
+        GBsetStateLabelGroupInfo(model, i, GBgetStateLabelGroupInfo(default_src, i));
 
     if (model->guards == NULL)
         GBsetGuardsInfo(model, GBgetGuardsInfo(default_src));
@@ -288,6 +322,7 @@ void GBinitModelDefaults (model_t *p_model, model_t default_src)
         model->state_labels_all == state_labels_default_all) {
         GBsetStateLabelShort (model, wrapped_state_labels_default_short);
         GBsetStateLabelLong (model, wrapped_state_labels_default_long);
+        GBsetStateLabelsGroup (model, wrapped_state_labels_default_group);
         GBsetStateLabelsAll (model, wrapped_state_labels_default_all);
     }
 }
@@ -407,6 +442,10 @@ void GBsetStateLabelsAll(model_t model,get_label_all_method_t method){
 	model->state_labels_all=method;
 }
 
+void GBsetStateLabelsGroup(model_t model,get_label_group_method_t method){
+	model->state_labels_group=method;
+}
+
 void GBsetStateLabelLong(model_t model,get_label_method_t method){
 	model->state_labels_long=method;
 }
@@ -423,8 +462,21 @@ int GBgetStateLabelLong(model_t model,int label,int *state){
 	return model->state_labels_long(model,label,state);
 }
 
+void GBgetStateLabelsGroup(model_t model,sl_group_enum_t group,int*state,int*labels){
+	model->state_labels_group(model,group,state,labels);
+}
+
 void GBgetStateLabelsAll(model_t model,int*state,int*labels){
 	model->state_labels_all(model,state,labels);
+}
+
+sl_group_t* GBgetStateLabelGroupInfo(model_t model, sl_group_enum_t group) {
+    return model->sl_groups[group];
+}
+
+void GBsetStateLabelGroupInfo(model_t model, sl_group_enum_t group, sl_group_t* group_info)
+{
+    model->sl_groups[group] = group_info;
 }
 
 int GBhasGuardsInfo(model_t model) { return model->guards != NULL; }
