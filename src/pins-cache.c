@@ -95,7 +95,7 @@ cached_short (model_t self, int group, int *src, TransitionCB cb,
         memcpy (tmp, SIgetC (cache->idx, cache->dest[i], NULL),
                 cache->len);
         int *labels = cache->Nedge_labels == 0 ? NULL : &(cache->dest[i+EL_OFFSET]);
-        transition_info_t cbti = {labels, group}; 
+        transition_info_t cbti = GB_TI(labels, group);
         cb (user_context, &cbti, tmp);
     }
     return (cache->begin[src_idx + 1] - cache->begin[src_idx]) /

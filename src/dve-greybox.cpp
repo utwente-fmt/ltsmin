@@ -106,7 +106,7 @@ divine_get_initial_state (int* state)
 
 static void* dlHandle = NULL;
 static char templatename[PATH_MAX];
-transition_info_t transition_info = {NULL, -1};
+transition_info_t transition_info = GB_TI(NULL, -1);
 
 static int
 succ_callback (TransitionCB cb, void* context, divine::succ_container_t& cb_cont)

@@ -248,7 +248,7 @@ ltl_textbook_all (model_t self, int *src, TransitionCB cb,
     (void)self;
     cb_context new_ctx = {cb, user_context, src, 0};
     if (src[ctx->ltl_idx] == -1) {         /* XXX textbook/spin not reversed? */
-        transition_info_t ti = {NULL, -1}; /* XXX int[nedge_labels] */
+        transition_info_t ti = GB_TI(NULL, -1); /* XXX int[nedge_labels] */
         ltl_textbook_cb(&new_ctx, &ti, src);
         return new_ctx.ntbtrans;
     } else {

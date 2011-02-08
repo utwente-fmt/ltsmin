@@ -316,7 +316,7 @@ static int MCRL2getTransitionsLong(model_t m,int group,int*src,TransitionCB cb,v
 			dst[i]=ATfindIndex(model->termmap,ATgetArgument(state,i));
 		}
 		pp_lbl[0]=ATfindIndex(model->actionmap,(ATerm)transition);
-        transition_info_t ti = {pp_lbl, group};
+        transition_info_t ti = GB_TI(pp_lbl, group);
 		cb(context,&ti,dst);
 		count++;
 	}
@@ -343,7 +343,7 @@ static int MCRL2getTransitionsAll(model_t m,int*src,TransitionCB cb,void*context
 			dst[i]=ATfindIndex(model->termmap,ATgetArgument(state,i));
 		}
 		pp_lbl[0]=ATfindIndex(model->actionmap,(ATerm)transition);
-        transition_info_t ti = {pp_lbl, -1};
+        transition_info_t ti = GB_TI(pp_lbl, -1);
 		cb(context,&ti,dst);
 		count++;
 	}

@@ -134,7 +134,7 @@ static ATerm parse_term(void *dummy,char*str){
 
 static void callback(void){
 	int lbl=ATfindIndex(actionmap,label);
-    transition_info_t ti = {&lbl, -1};
+    transition_info_t ti = GB_TI(&lbl, -1);
 	int dst_p[state_length];
 	for(int i=0;i<state_length;i++){
 		if(ATisEqual(src_term[i],dst[i])){
