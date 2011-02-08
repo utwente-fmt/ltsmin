@@ -495,12 +495,20 @@ typedef enum {PINS_LTL_TEXTBOOK, PINS_LTL_SPIN} pins_ltl_type_t;
 /**
 \brief Add LTL layer on top all other pins layers
 */
-extern model_t GBaddLTL(model_t model, const char *ltl_file, pins_ltl_type_t type);
+extern model_t GBaddLTL(model_t model, const char *ltl_file, pins_ltl_type_t type, model_t por_model);
 
 /**
 \brief Add POR layer before LTL layer
 */
 extern model_t GBaddPOR(model_t model, const int has_ltl);
+
+/**
+\brief connection from ltl to por layer
+
+Note: this is a hack because the layers are closely coupled
+      a better solution must be provided sometime in the future
+*/
+extern void por_visibility(model_t model, int group, int visibility);
 
 //@{
 

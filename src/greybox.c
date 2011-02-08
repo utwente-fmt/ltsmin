@@ -654,7 +654,7 @@ GBloadFile (model_t model, const char *filename, model_t *wrapped)
                     if (por)
                         model = GBaddPOR (model, ltl_file != NULL);
                     if (ltl_file)
-                        model = GBaddLTL (model, ltl_file, ltl_type);
+                        model = GBaddLTL (model, ltl_file, ltl_type, por ? model : NULL);
                     if (regroup_options != NULL)
                         model = GBregroup (model, regroup_options);
                     if (cache)
