@@ -312,6 +312,7 @@ GBaddLTL (model_t model, const char *ltl_file, pins_ltl_type_t type, model_t por
         Warning(info, " state %d: %s", i, ba->states[i]->accept ? "accepting" : "non-accepting");
         for(int j=0; j < ba->states[i]->transition_count; j++) {
             char buf[4096];
+            memset(buf, 0, sizeof(buf));
             char* at = buf;
             for(int k=0; k < ba->predicate_count; k++) {
                 if (ba->states[i]->transitions[j].pos[k/32] & (1<<(k%32))) {
