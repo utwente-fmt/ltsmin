@@ -395,8 +395,6 @@ bs_analyze(model_t model, por_context* pctx, int* src)
 
             // mark as selected and ready
             s[idx].emit_status[current_group] |= ES_SELECTED | ES_READY;
-            // increase the score                                           // FIXME: should not set score to n on disabled visible transition right?
-            s[idx].score += pctx->group_status[current_group] & GS_VISIBLE ? n : 0;
 
             // for a disabled transition we need to add the necessary enabling set
             // lookup which set has the lowest score on the heuristic function h(x)
