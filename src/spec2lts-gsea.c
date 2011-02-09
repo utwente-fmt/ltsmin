@@ -61,6 +61,9 @@ static struct {
     char *arg_state_db;
     enum { DB_DBSLL, DB_TreeDBS, DB_Vset } state_db;
 
+    char *arg_proviso;
+    enum { LTLP_ClosedSet } proviso;
+
     char* dot_output;
     FILE* dot_file;
 } opt = {
@@ -80,7 +83,9 @@ static struct {
     .arg_strategy  = "bfs",
     .strategy      = Strat_BFS,
     .arg_state_db  = "tree",
-    .state_db      = DB_TreeDBS
+    .state_db      = DB_TreeDBS,
+    .arg_proviso   = "closedset",
+    .proviso       = LTLP_ClosedSet,
 };
 
 static si_map_entry strategies[] = {
@@ -94,6 +99,11 @@ static si_map_entry db_types[]={
     {"table", DB_DBSLL},
     {"tree",  DB_TreeDBS},
     {"vset",  DB_Vset},
+    {NULL, 0}
+};
+
+static si_map_entry provisos[]={
+    {"closedset", LTLP_ClosedSet},
     {NULL, 0}
 };
 
@@ -119,6 +129,13 @@ state_db_popt (poptContext con, enum poptCallbackReason reason,
                 RTexitUsage (EXIT_FAILURE);
             }
             opt.strategy = s;
+
+            int p = linear_search (provisos, opt.arg_proviso);
+            if (p < 0) {
+                Warning(error, "unknown proviso %s", opt.arg_proviso);
+                RTexitUsage (EXIT_FAILURE);
+            }
+            opt.proviso = p;
         }
         return;
     case POPT_CALLBACK_REASON_OPTION:
@@ -143,6 +160,8 @@ static struct poptOption options[] = {
       "select the data structure for storing states", "<table|tree|vset>"},
     { "strategy" , 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &opt.arg_strategy , 0 ,
       "select the search strategy", "<bfs|dfs|scc>"},
+    { "proviso", 0, POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT, &opt.arg_proviso , 0 ,
+      "select proviso for ltl/por", "<closedset>"},
     { "max" , 0 , POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT , &opt.max , 0 ,"maximum search depth", "<int>"},
     SPEC_POPT_OPTIONS,
     { NULL, 0 , POPT_ARG_INCLUDE_TABLE, greybox_options , 0 , "Greybox options", NULL },
