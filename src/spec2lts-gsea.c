@@ -62,7 +62,7 @@ static struct {
     enum { DB_DBSLL, DB_TreeDBS, DB_Vset } state_db;
 
     char *arg_proviso;
-    enum { LTLP_ClosedSet } proviso;
+    enum { LTLP_ClosedSet, LTLP_Stack } proviso;
 
     char* dot_output;
     FILE* dot_file;
@@ -104,6 +104,7 @@ static si_map_entry db_types[]={
 
 static si_map_entry provisos[]={
     {"closedset", LTLP_ClosedSet},
+    {"stack",     LTLP_Stack},
     {NULL, 0}
 };
 
@@ -246,6 +247,12 @@ typedef union gsea_queue {
         dfs_stack_t stack;
         dfs_stack_t grey;
         bitset_t closed_set;
+        // proviso related
+        struct {
+            struct {
+                bitset_t off_stack_set;
+            } stack;
+        } proviso;
 
         // queue/store specific callbacks
         void (*push)(gsea_state_t*, void*);
@@ -309,6 +316,7 @@ typedef struct gsea_context {
     int  (*state_backtrack)(gsea_state_t*, void*);
     void (*state_matched)(gsea_state_t*, void*);
     void (*state_process)(gsea_state_t* src, transition_info_t *ti, gsea_state_t *dst);
+    int  (*state_proviso)(transition_info_t *ti, gsea_state_t *dst);
 
     // search for state
     int  (*goal_reached)(gsea_state_t*, void*);
@@ -744,6 +752,15 @@ dfs_state_next_grey(gsea_state_t *state, void *arg)
 }
 
 
+/* stack proviso for dfs tree */
+static int
+dfs_tree_state_backtrack(gsea_state_t* state, void* arg)
+{ return bitset_set(gc.queue.filo.proviso.stack.off_stack_set, state->tree.tree_idx); (void)arg; }
+
+static int
+dfs_tree_state_proviso(transition_info_t* ti, gsea_state_t* state)
+{ return bitset_test(gc.queue.filo.proviso.stack.off_stack_set, state->tree.tree_idx); (void)ti; }
+
 /* dfs tree configuration */
 static int
 dfs_tree_stack_closed(gsea_state_t *state, int is_backtrack, void *arg)
@@ -855,6 +872,15 @@ dfs_vset_open_insert_condition (gsea_state_t *state, void *arg)
 }
 
 
+
+/* stack proviso for dfs table */
+static int
+dfs_table_state_backtrack(gsea_state_t* state, void* arg)
+{ return bitset_set(gc.queue.filo.proviso.stack.off_stack_set, state->table.hash_idx); (void)arg; }
+
+static int
+dfs_table_state_proviso(transition_info_t* ti, gsea_state_t* state)
+{ return bitset_test(gc.queue.filo.proviso.stack.off_stack_set, state->table.hash_idx); (void)ti; }
 
 /* dfs table configuration */
 static int
@@ -1208,6 +1234,11 @@ gsea_setup()
         default:
             Abort ("unimplemented combination --strategy=%s, --state=%s", opt.arg_strategy, opt.arg_state_db );
         }
+
+        // proviso: doens't work here
+        if (opt.proviso != LTLP_ClosedSet)
+            Abort("proviso does not work for bfs, use --proviso=closedset");
+
         break;
 
     case Strat_SCC:
@@ -1229,6 +1260,17 @@ gsea_setup()
             gc.queue.filo.stack = dfs_stack_create(1);
             gc.queue.filo.closed_set = bitset_create(128,128);
             gc.context = RTmalloc(sizeof(int) * global.N);
+
+            // proviso: dfs tree specific
+            switch (opt.proviso) {
+                case LTLP_Stack:
+                    gc.queue.filo.proviso.stack.off_stack_set = bitset_create(128,128);
+                    gc.state_backtrack = dfs_tree_state_backtrack;
+                    gc.state_proviso = dfs_tree_state_proviso;
+                    break;
+                default:
+                    break;
+            }
             break;
         case DB_Vset:
             // dfs/vset configuration
@@ -1248,6 +1290,11 @@ gsea_setup()
             gc.store.vset.next_set = vset_create(gc.store.vset.domain, 0, NULL);
             gc.store.vset.current_set = vset_create(gc.store.vset.domain, 0, NULL);
             gc.queue.filo.stack = dfs_stack_create(global.N);
+
+            // proviso: doens't work here
+            if (opt.proviso != LTLP_ClosedSet)
+                Abort("proviso not implemented for dfs/vset combination");
+
             break;
         case DB_DBSLL:
             gc.closed_insert = dfs_table_closed_insert;
@@ -1264,6 +1311,17 @@ gsea_setup()
             gc.store.table.dbs = DBSLLcreate(global.N);
             gc.queue.filo.closed_set = bitset_create(128,128);
             gc.queue.filo.stack = dfs_stack_create(1);
+
+            // proviso: dfs table specific
+            switch (opt.proviso) {
+                case LTLP_Stack:
+                    gc.queue.filo.proviso.stack.off_stack_set = bitset_create(128,128);
+                    gc.state_backtrack = dfs_table_state_backtrack;
+                    gc.state_proviso = dfs_table_state_proviso;
+                    break;
+                default:
+                    break;
+            }
             break;
 
         default:
@@ -1342,7 +1400,7 @@ gsea_process(void *arg, transition_info_t *ti, int *dst)
         ti->por_proviso = 1;
         gc.open_insert(&s_next, arg);
     } else {
-        ti->por_proviso = 0;
+        ti->por_proviso = gc.state_proviso ? gc.state_proviso(ti, &s_next) : 0;
         if (gc.state_matched) gc.state_matched(&s_next, arg);
     }
     global.ntransitions++;
