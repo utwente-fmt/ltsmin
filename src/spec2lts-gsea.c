@@ -62,7 +62,7 @@ static struct {
     enum { DB_DBSLL, DB_TreeDBS, DB_Vset } state_db;
 
     char *arg_proviso;
-    enum { LTLP_ClosedSet, LTLP_Stack } proviso;
+    enum { LTLP_ClosedSet, LTLP_Stack, LTLP_Color } proviso;
 
     char* dot_output;
     FILE* dot_file;
@@ -105,6 +105,7 @@ static si_map_entry db_types[]={
 static si_map_entry provisos[]={
     {"closedset", LTLP_ClosedSet},
     {"stack",     LTLP_Stack},
+    {"color",     LTLP_Color},
     {NULL, 0}
 };
 
@@ -162,7 +163,7 @@ static struct poptOption options[] = {
     { "strategy" , 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &opt.arg_strategy , 0 ,
       "select the search strategy", "<bfs|dfs|scc>"},
     { "proviso", 0, POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT, &opt.arg_proviso , 0 ,
-      "select proviso for ltl/por", "<closedset>"},
+      "select proviso for ltl/por", "<closedset|stack|color>"},
     { "max" , 0 , POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT , &opt.max , 0 ,"maximum search depth", "<int>"},
     SPEC_POPT_OPTIONS,
     { NULL, 0 , POPT_ARG_INCLUDE_TABLE, greybox_options , 0 , "Greybox options", NULL },
@@ -252,6 +253,18 @@ typedef union gsea_queue {
             struct {
                 bitset_t off_stack_set;
             } stack;
+            struct {
+                bitset_t        nongreen_stack;
+                bitset_t        color;
+
+                int             fully_expanded;
+                array_manager_t expanded_man;
+                int             *expanded;
+
+                /* wrapper fn */
+                int (*closed)(gsea_state_t*, int is_backtrack, void*);
+                void (*state_next)(gsea_state_t*, void*);
+            } color;
         } proviso;
 
         // queue/store specific callbacks
@@ -751,6 +764,164 @@ dfs_state_next_grey(gsea_state_t *state, void *arg)
     (void)arg;
 }
 
+
+/* color proviso for dfs tree */
+
+/**
+ * data structure of proviso.color:
+ *   bitset_t nongreen_stack            marks a state as non green
+ *   bitset_t color                   = (red,green) per index (i.e. idx*2 = red, idx*2+1 = green)
+ *                                      if !red & !green -> state=orange
+ *
+ *   fully_expanded                     used to detect fully expanded states
+ *   expanded_man/expanded              assignes expanded number to a state
+ *
+ *   (*closed)(..)                      wrapper fn for gc.closed
+ *   (*state_next)(..)                  wrapper fn for gc.state_next
+ */
+
+/* overwrites the back tracking function to detect non-green successors */
+static int
+dfs_tree_stack_closed_color_proviso(gsea_state_t* state, int is_backtrack, void* arg) {
+    // call original function to see what sort of state this is
+    int original = gc.queue.filo.proviso.color.closed(state, is_backtrack, arg);
+
+    // is this state a green state?
+    int is_green = bitset_test(gc.queue.filo.proviso.color.color, state->tree.tree_idx * 2 + 1);
+    // if backtracking
+    if (is_backtrack) {
+        // if it is not green, the state can not be marked as red so it must be orange
+        if (!is_green) {
+            // it is still orange, check existence of non-green successor
+            int has_nongreen = bitset_test(gc.queue.filo.proviso.color.nongreen_stack, global.depth);
+            if (has_nongreen) {
+                // mark red if it has non green successor states
+                bitset_set(gc.queue.filo.proviso.color.color, state->tree.tree_idx * 2);
+            } else {
+                // mark green otherwise
+                bitset_set(gc.queue.filo.proviso.color.color, state->tree.tree_idx * 2 + 1);
+            }
+        }
+        // clear the nongreen bitset stack; invariant: all bits below depth are cleared..
+        bitset_clear(gc.queue.filo.proviso.color.nongreen_stack, global.depth);
+        // return original result
+        return original;
+    // if it is not backtracking this state might be closed
+    } else {
+        // if original backtrack function says not to backtrack, it is still open
+        // thus it still has the corect color
+        if (!original) return original;
+
+        // otherwise, backtracking, so this state is closed somewhere in some future execution.
+        // Its color might have changed and the persistent set might be invalid..
+        // We might need to explore all successors instead of just the persistent set: this we must check
+
+        // if the state was still orange at this point, the original stack closed function would return 0
+        // therefore, at this point a state is green or red. !green thus implies red
+
+        if (!is_green) {
+            // since !green -> red, we don't need to check this
+            // int is_red = bitset_test(gc.queue.filo.proviso.color.color, state->tree.tree_idx * 2);
+            // if (!is_red) Fatal(1, error, "is red assumption violated");
+
+            // check: parent color is orange
+            // known: this is not the top of the stack -> there is only one state there, so it will not be reexplored
+            // in the future, therefore it is always safe to assume a parent exists
+            int sidx = *dfs_stack_peek_top(gc.queue.filo.stack, 1);
+
+            // the parent node has not backtracked yet, i.e. it can't be red yet -> so it
+            // can only be orange or green. Therefore, if !green, it is orange.
+            int is_orange_parent = ! bitset_test(gc.queue.filo.proviso.color.color, sidx * 2 + 1);
+            if (is_orange_parent) {
+                // clear and leave stack frame
+                while(dfs_stack_frame_size(gc.queue.filo.stack)) {
+                    dfs_stack_pop(gc.queue.filo.stack);
+                }
+                dfs_stack_leave(gc.queue.filo.stack);
+
+                // get a the parent gsea state
+                gsea_state_t s_parent;
+                s_parent.tree.tree_idx = sidx;
+                gc.queue.filo.stack_to_state(&s_parent, arg);
+
+                // reexplore state nexts (to fully explore it)
+                gc.state_next(&s_parent, arg);
+
+                // since the original state was visited before, it is not popped on the stack again
+                // therefore we can push the original as if it was, and continue, the has_open code
+                // will pop it off handle the (possibly) newly pushed states
+
+                // FIXME: gc.queue.filo.push(state, arg); // this calls state_to_stack, what happened to state->state? nothing? only then this is correct
+                dfs_stack_push(gc.queue.filo.stack, &sidx); // TODO: should be handled by gc.queue.filo.push(state, arg), see above comment
+
+                // clear the nongreen bitset stack; invariant: all bits below depth are cleared..
+                bitset_clear(gc.queue.filo.proviso.color.nongreen_stack, global.depth - 1);
+
+                return original;
+            }
+        }
+    }
+    return original;
+}
+
+/* find value for por_proviso (detect states that should be fully expanded) */
+static int
+dfs_tree_color_proviso(transition_info_t* ti, gsea_state_t* state)
+{
+    // assume it is oke
+    int result = 1;
+
+    // oke if this is a green state
+    int is_green = bitset_test(gc.queue.filo.proviso.color.color, state->tree.tree_idx * 2 + 1);
+    if (!is_green) {
+        // this is not a green state, is it red?
+        int is_red = bitset_test(gc.queue.filo.proviso.color.color, state->tree.tree_idx * 2);
+        if (is_red) {
+            // if it is red, por_proviso must be false (red states must be fully expanded)
+            result = 0;
+        } else {
+            // otherwise, it must be orange, since it is matched, compare expanded
+            // of last state on the prelast stack frame (sidx) to the matched state (state)
+            int sidx = *dfs_stack_peek_top(gc.queue.filo.stack, 1);
+            result = gc.queue.filo.proviso.color.expanded[sidx] != gc.queue.filo.proviso.color.expanded[state->tree.tree_idx];
+            if (result) {
+                // state is not green, thus parent sidx has a nongreen successor, mark in nongreen_stack
+                bitset_set(gc.queue.filo.proviso.color.nongreen_stack, global.depth-1);
+            }
+        }
+    }
+
+    // set fully expanded if por_proviso doens't hold here
+    if (!result) gc.queue.filo.proviso.color.fully_expanded = 1;
+
+    return result;
+    (void)ti;
+}
+
+/* implementation of next state appended with color proviso checks */
+static void
+dfs_tree_state_next_color_proviso(gsea_state_t* state, void* arg)
+{
+    // use proviso.color.fully_expanded to detect fully expanded states
+    gc.queue.filo.proviso.color.fully_expanded = 0;
+    // call wrapped state next function
+    gc.queue.filo.proviso.color.state_next(state, arg);
+
+    // if fully expanded (state->count == por_enabled_count())
+    int expanded = gc.queue.filo.proviso.color.expanded[state->tree.tree_idx];
+    if (gc.queue.filo.proviso.color.fully_expanded) {
+        // mark state color green
+        bitset_set(gc.queue.filo.proviso.color.color, state->tree.tree_idx * 2 + 1);
+        expanded++;
+    }
+    // assign the expanded number to all states on the stack frame
+    for (int i=0; i < (int)dfs_stack_frame_size(gc.queue.filo.stack); i++) {
+        int s_prime = *dfs_stack_peek(gc.queue.filo.stack, i);
+        ensure_access(gc.queue.filo.proviso.color.expanded_man, s_prime);
+        gc.queue.filo.proviso.color.expanded[s_prime] = expanded;
+    }
+    return;
+}
 
 /* stack proviso for dfs tree */
 static int
@@ -1268,6 +1439,20 @@ gsea_setup()
                     gc.state_backtrack = dfs_tree_state_backtrack;
                     gc.state_proviso = dfs_tree_state_proviso;
                     break;
+                case LTLP_Color:
+                    gc.queue.filo.proviso.color.nongreen_stack = bitset_create(128,128);
+                    gc.queue.filo.proviso.color.color = bitset_create(128,128);
+                    gc.queue.filo.proviso.color.expanded_man = create_manager(65536);
+                    ADD_ARRAY(gc.queue.filo.proviso.color.expanded_man, gc.queue.filo.proviso.color.expanded, int);
+
+                    // set color proviso function
+                    gc.state_proviso = dfs_tree_color_proviso;
+                    // wrap filo.closed function
+                    gc.queue.filo.proviso.color.closed = gc.queue.filo.closed;
+                    gc.queue.filo.closed = dfs_tree_stack_closed_color_proviso;
+                    // wrap the next state call, force next_all to be used (instead of gc.state_next);
+                    gc.queue.filo.proviso.color.state_next = dfs_state_next_all;
+                    gc.state_next = dfs_tree_state_next_color_proviso;
                 default:
                     break;
             }
@@ -1319,6 +1504,8 @@ gsea_setup()
                     gc.state_backtrack = dfs_table_state_backtrack;
                     gc.state_proviso = dfs_table_state_proviso;
                     break;
+                case LTLP_Color:
+                    Abort("proviso not implemented for dfs/table combination");
                 default:
                     break;
             }
