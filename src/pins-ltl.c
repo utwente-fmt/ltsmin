@@ -284,6 +284,7 @@ GBaddLTL (model_t model, const char *ltl_file, pins_ltl_type_t type)
         for(int j=0; j < ba->states[i]->transition_count; j++) {
             char buf[4096];
             char* at = buf;
+            *at = '\0';
             for(int k=0; k < ba->predicate_count; k++) {
                 if (ba->states[i]->transitions[j].pos[k/32] & (1<<(k%32))) {
                     if (at != buf) { sprintf(at, " & "); at += strlen(at); }
