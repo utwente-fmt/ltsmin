@@ -42,11 +42,11 @@
  *     binary priority 1          : ==, !=, etc
  *     prefix priority 2          : !
  *     prefix priority 3          : G,F,X
- *     binary priority 3          : &
- *     binary priority 4          : |
- *     binary priority 5          : <->
+ *     binary priority 4          : &
+ *     binary priority 5          : |
  *     binary priority 6          : <->
- *     binary priority 7          : U,R
+ *     binary priority 7          : <->
+ *     binary priority 8          : U,R
  * LOW
  */
 ltsmin_expr_t ltl_parse_file(lts_type_t ltstype,const char *file){
@@ -81,15 +81,15 @@ ltsmin_expr_t ltl_parse_file(lts_type_t ltstype,const char *file){
     LTSminPrefixOperator(env, LTL_FUTURE,       "<>", 3);
     LTSminPrefixOperator(env, LTL_NEXT,         "X",  3);
 
-    LTSminBinaryOperator(env, LTL_AND,          "&",  3);
-    LTSminBinaryOperator(env, LTL_OR,           "|",  4);
+    LTSminBinaryOperator(env, LTL_AND,          "&",  4);
+    LTSminBinaryOperator(env, LTL_OR,           "|",  5);
 
-    LTSminBinaryOperator(env, LTL_EQUIV,        "<->",5);
-    LTSminBinaryOperator(env, LTL_IMPLY,        "->", 6);
+    LTSminBinaryOperator(env, LTL_EQUIV,        "<->",6);
+    LTSminBinaryOperator(env, LTL_IMPLY,        "->", 7);
 
-    LTSminBinaryOperator(env, LTL_UNTIL,        "U",  7);
-    LTSminBinaryOperator(env, LTL_WEAK_UNTIL,   "W",  7);
-    LTSminBinaryOperator(env, LTL_RELEASE,      "R",  7);
+    LTSminBinaryOperator(env, LTL_UNTIL,        "U",  8);
+    //LTSminBinaryOperator(env, LTL_WEAK_UNTIL,   "W",  8); // not supported by ltl2ba
+    LTSminBinaryOperator(env, LTL_RELEASE,      "R",  8);
 
     ltsmin_parse_stream(TOKEN_EXPR,env,stream_input(in));
     ltsmin_expr_t expr=env->expr;
@@ -152,13 +152,13 @@ ltsmin_expr_t ctl_parse_file(lts_type_t ltstype,const char *file){
     LTSminPrefixOperator(env, CTL_FUTURE,       "<>", 3);
     LTSminPrefixOperator(env, CTL_NEXT,         "X",  3);
 
-    LTSminBinaryOperator(env, CTL_AND,          "&",  3);
-    LTSminBinaryOperator(env, CTL_OR,           "|",  4);
+    LTSminBinaryOperator(env, CTL_AND,          "&",  4);
+    LTSminBinaryOperator(env, CTL_OR,           "|",  5);
 
-    LTSminBinaryOperator(env, CTL_EQUIV,        "<->",5);
-    LTSminBinaryOperator(env, CTL_IMPLY,        "->", 6);
+    LTSminBinaryOperator(env, CTL_EQUIV,        "<->",6);
+    LTSminBinaryOperator(env, CTL_IMPLY,        "->", 7);
 
-    LTSminBinaryOperator(env, CTL_UNTIL,        "U",  7);
+    LTSminBinaryOperator(env, CTL_UNTIL,        "U",  8);
 
     ltsmin_parse_stream(TOKEN_EXPR,env,stream_input(in));
     ltsmin_expr_t expr=env->expr;
@@ -173,6 +173,9 @@ ltsmin_expr_t ctl_parse_file(lts_type_t ltstype,const char *file){
  * For the concrete syntax, we shall assume that modal operators have higher
  * precedence than boolean, and that fixpoint operators have lowest precedence,
  * so that the scope of a fixpoint extends as far to the right as possible.
+ *
+ * note: when checking priorities, use ltsmin-grammer.lemon
+ * for priorities, notice that prefix 1 has a higher priority than bin 1
  */
 ltsmin_expr_t mu_parse_file(lts_type_t ltstype,const char *file){
     FILE *in=fopen( file, "r" );
