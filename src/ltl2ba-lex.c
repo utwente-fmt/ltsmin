@@ -235,7 +235,7 @@ ltsmin_ltl2ba(ltsmin_expr_t e)
 }
 
 // XXX make proper interface in ltl2ba
-extern int sym_size, n_sym;
+extern int sym_size, n_sym, sym_id;
 extern char **sym_table;
 
 ltsmin_buchi_t*
@@ -267,10 +267,12 @@ ltsmin_buchi()
 
     // allocate buchi struct
     res = RTmalloc(sizeof(ltsmin_buchi_t) + state_count * sizeof(ltsmin_buchi_state_t*));
-    res->predicate_count = n_sym;
-    res->predicates = RTmalloc(n_sym * sizeof(ltsmin_expr_t));
-    for (int i=0; i < n_sym; i++)
+    int n_symbols = sym_id;
+    res->predicate_count = n_symbols;
+    res->predicates = RTmalloc(n_symbols * sizeof(ltsmin_expr_t));
+    for (int i=0; i < n_symbols; i++) {
         res->predicates[i] = ltsmin_expr_lookup(NULL, sym_table[i]);
+    }
     res->state_count = state_count;
 
     state_count = 0;
