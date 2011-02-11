@@ -18,4 +18,17 @@ iterations than a BFS analysis.
         Find a transition labelled with 'ACTION'. Returns with exit code 1
         if such a transition is found, otherwise 0.
 
+*--mu*='MUFILE'::
+    After computing all reachable states, evaluate the mu-formula in 'MUFILE'
++
+'MUFILE' is a file containing an Mu Calculus formula (see
+manpage:ltsmin-mu[5]). This formula is a propositional formula with
+least and greatest fixpoint operator. It will be evaluated after generation
+of the complete state space.
+
+*--ctl**='CTLFILE'::
+    Convert a ctl* formula given in 'CTLFILE' (see manpage:ltsmin-ctl[5]) to
+    a mu-formula (see manpage:ltsmin-mu[5]), and evaluate the mu-formula after
+    computing all reachable states.
+
 include::reachability-options.txt[]

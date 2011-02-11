@@ -8,7 +8,7 @@ MANPAGES = ltsmin-mpi.1 ltsmin-convert.1 gcf.1 lpo-reach.1 lps-reach.1	\
         etf2lts-grey.1 etf2lts-mpi.1 etf-reach.1 ltsmin.7 etf-convert.1 \
         pins_open.1 ce-mpi.1 etf2torx.1 lpo2torx.1 lps2torx.1 nips2torx.1 \
         dve2torx.1 ltsmin-tracepp.1 dve2lts-grey.1 dve-reach.1 dve2lts-mpi.1 \
-	ltsmin-ltl.5 \
+	ltsmin-ltl.5 ltsmin-mu.5 ltsmin-ctl.5 \
         dve22lts-gsea.1 dve2lts-gsea.1 etf2lts-gsea.1 lpo2lts-gsea.1 lps2lts-gsea.1 \
         nips2lts-mc.1 dve2lts-mc.1 dve22lts-mc.1 etf2lts-mc.1
 

@@ -1,0 +1,48 @@
+//                           -*- mode: doc; outline-regexp: "==\(=*\) ." -*-
+ltsmin-ctl(5)
+=============
+:Author:  Elwin Pater
+:Email:   <e.pater@student.utwente.nl>
+:Date:    2011-02-10
+
+== NAME
+ltsmin-ctl - Computation Tree Logic
+
+== SYNOPSIS
+LTSmin syntax for Computation Tree Logic formulas
+
+== DESCRIPTION
+
+.CTL operators and priority
+[options="header"]
+
+|===================================================================
+|Priority | Operator | Meaning
+|0        | true     | constant true
+|0        | false    | constant false
+|1        | ==       | test operator ('state variable name'=='number')
+|2        | !        | Logical negation
+|3        | E        | Exist a successor
+|3        | A        | All successors
+|3        | []       | Globally (Always) operator
+|3        | <>       | Finally (Eventually) operator
+|3        | X        | neXt operator
+|4        | &        | Logical and
+|5        | \|       | Logical or
+|6        | $$<->$$  | Logical equivalence
+|7        | $$->$$   | Logical implication
+|8        | U        | Until operator
+|===================================================================
+
+CAUTION: Using the letters E,A,X or U as state label name might
+confuse the parser.
+
+== EXAMPLE
+
+----
+A ( [] ( (phil_0 == 1) -> <> phil_0 == 2) )
+----
+
+== SEE ALSO
+manpage:ltsmin[7],
+manpage:etf-reach[1]
