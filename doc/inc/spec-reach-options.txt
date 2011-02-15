@@ -20,6 +20,10 @@ iterations than a BFS analysis.
         'sat2', 'sat3'. The strategy works in combination with the order to
         saturate BDD levels. Defaults to 'none', i.e. no saturation.
 
+*--G*='GRANULARITY'::
+        Select the granularity of the saturation-like strategy. This works
+        in combination with 'sat2' and 'sat3'. Defaults to 10.
+
 *--action*='ACTION'::
         Find a transition labelled with 'ACTION'. Returns with exit code 1
         if such a transition is found, otherwise 0.
