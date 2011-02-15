@@ -1379,17 +1379,6 @@ void set_prev_tree(vset_t dst,vset_t src,vrel_t rel){
 
 static void reorder() {}
 
-static void set_enum_match_tree(vset_t set,int p_len,int* proj,int*match,vset_element_cb cb,void* context){
-    (void)set;
-    (void)p_len;
-    (void)proj;
-    (void)match;
-    (void)cb;
-    (void)context;
-    Fatal(1, error, "Set enum match tree not implemented!");
-}
-
-
 static ATerm
 set_copy_match_tree_2(ATerm set, int len,int *matchv, int *proj, int p_len, int ofs, int shift, int cur) {
     ATerm key, res;
@@ -1450,6 +1439,17 @@ static void set_copy_match_tree(vset_t dst,vset_t src, int p_len,int* proj,int*m
         dst->set = set_copy_match_tree_2(src->set,N,match,proj,p_len,0, 1, 0);
         ATtableReset(global_ct);
     }
+}
+
+static void set_enum_match_tree(vset_t set,int p_len,int* proj,int*match,vset_element_cb cb,void* context){
+    int N=set->p_len?set->p_len:set->dom->shared.size;
+    ATerm match_set = set_copy_match_tree_2(set->set, N, match, proj, p_len, 0, 1, 0);
+    ATtableReset(global_ct);
+
+    int vec[N];
+    global_cb=cb;
+    global_context=context;
+    set_enum_t2(match_set,vec,N,vset_enum_wrap_tree,0,1,0);
 }
 
 vdom_t vdom_create_tree(int n){

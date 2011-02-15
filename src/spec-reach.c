@@ -1,21 +1,17 @@
 #include <config.h>
 #include <stdint.h>
-#include <string.h>
 #include <stdlib.h>
+#include <string.h>
 #include <strings.h>
-#include <ltsmin-syntax.h>
 
-#include "archive.h"
-#include <runtime.h>
-#include "treedbs.h"
-#include <stringindex.h>
-#include "vector_set.h"
-#include "scctimer.h"
-#include "dm/dm.h"
-
+#include <dm/dm.h>
+#include <greybox.h>
 #include <lts_enum.h>
 #include <lts_io.h>
-
+#include <runtime.h>
+#include <scctimer.h>
+#include <stringindex.h>
+#include <vector_set.h>
 #include <dynamic-array.h>
 
 #include <ltsmin-syntax.h>
@@ -41,71 +37,94 @@
 #include "dve2-greybox.h"
 #endif
 
-static char* etf_output=NULL;
-static char* trc_output=NULL;
-static char* ctl_formula=NULL;
-static char* mu_formula=NULL;
-static ltsmin_expr_t mu_expr=NULL;
-static int dlk_detect=0;
-static char* act_detect=NULL;
-static int act_detect_table;
-static int act_detect_index;
-static int G=10;
-
-static lts_enum_cb_t trace_handle=NULL;
-static lts_output_t trace_output=NULL;
-
-static enum { BFS , BFS2 , Chain , Sat1, Sat2, Sat3} strategy = BFS;
-
-static char* order="bfs";
-static si_map_entry strategies[]={
-	{"bfs",BFS},
-	{"bfs2",BFS2},
-	{"chain",Chain},
-	{"sat1",Sat1},
-	{"sat2",Sat2},
-	{"sat3",Sat3},
-	{NULL,0}
-};
-
-static void reach_popt(poptContext con,
- 		enum poptCallbackReason reason,
-                            const struct poptOption * opt,
-                             const char * arg, void * data){
-	(void)con;(void)opt;(void)arg;(void)data;
-	switch(reason){
-	case POPT_CALLBACK_REASON_PRE:
-		Fatal(1,error,"unexpected call to vset_popt");
-	case POPT_CALLBACK_REASON_POST: {
-		int res=linear_search(strategies,order);
-		if (res<0) {
-			Warning(error,"unknown exploration order %s",order);
-			RTexitUsage(EXIT_FAILURE);
-		} else {
-			Warning(info,"Exploration order is %s",order);
-		}
-		strategy = res;
-
-                if (trc_output && !dlk_detect && act_detect==NULL) {
-		  Warning(info, "Ignoring trace output");
-		}
-		return;
-	}
-	case POPT_CALLBACK_REASON_OPTION:
-		Fatal(1,error,"unexpected call to reach_popt");
-	}
+#define diagnostic(...) {\
+    if (RTverbosity >= 2)\
+        fprintf(stderr, __VA_ARGS__);\
 }
 
+static ltsmin_expr_t mu_expr = NULL;
+static char* ctl_formula = NULL;
+static char* mu_formula  = NULL;
+
+static char* trc_output = NULL;
+static int   dlk_detect = 0;
+static char* act_detect = NULL;
+static int   act_detect_table;
+static int   act_detect_index;
+static int   sat_granularity = 10;
+
+static enum { BFS_P , BFS , CHAIN_P, CHAIN } strategy = BFS_P;
+
+static char* order = "bfs-prev";
+static const si_map_entry ORDER[] = {
+    {"bfs-prev", BFS_P},
+    {"bfs", BFS},
+    {"chain-prev", CHAIN_P},
+    {"chain", CHAIN},
+    {NULL, 0}
+};
+
+static enum { NO_SAT, SAT_1, SAT_2, SAT_3 } sat_strategy = NO_SAT;
+
+static char* saturation = "none";
+static const si_map_entry SATURATION[] = {
+    {"none", NO_SAT},
+    {"sat1", SAT_1},
+    {"sat2", SAT_2},
+    {"sat3", SAT_3},
+    {NULL, 0}
+};
+
+static void
+reach_popt(poptContext con, enum poptCallbackReason reason,
+               const struct poptOption * opt, const char * arg, void * data)
+{
+    (void)con; (void)opt; (void)arg; (void)data;
+
+    switch (reason) {
+    case POPT_CALLBACK_REASON_PRE:
+        Fatal(1, error, "unexpected call to vset_popt");
+    case POPT_CALLBACK_REASON_POST: {
+        int res;
+
+        res = linear_search(ORDER, order);
+        if (res < 0) {
+            Warning(error, "unknown exploration order %s", order);
+            RTexitUsage(EXIT_FAILURE);
+        } else {
+            Warning(info, "Exploration order is %s", order);
+        }
+        strategy = res;
+
+        res = linear_search(SATURATION, saturation);
+        if (res < 0) {
+            Warning(error, "unknown saturation strategy %s", saturation);
+            RTexitUsage(EXIT_FAILURE);
+        } else {
+            Warning(info, "Saturation strategy is %s", saturation);
+        }
+        sat_strategy = res;
+
+        if (trc_output != NULL && !dlk_detect && act_detect == NULL)
+            Warning(info, "Ignoring trace output");
+
+        return;
+    }
+    case POPT_CALLBACK_REASON_OPTION:
+        Fatal(1, error, "unexpected call to reach_popt");
+    }
+}
 
 static  struct poptOption options[] = {
-	{ NULL, 0 , POPT_ARG_CALLBACK|POPT_CBFLAG_POST|POPT_CBFLAG_SKIPOPTION , (void*)reach_popt , 0 , NULL , NULL },
-	{ "order" , 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &order , 0 , "select the exploration strategy to a specific order" ,"<bfs|bfs2|chain|sat{1|2|3}>" },
-	{ "deadlock" , 'd' , POPT_ARG_VAL , &dlk_detect , 1 , "detect deadlocks" , NULL },
-	{ "action" , 0 , POPT_ARG_STRING , &act_detect , 0 , "detect action" , "<action>" },
-	{ "trace" , 0 , POPT_ARG_STRING , &trc_output , 0 , "file to write trace to" , "<lts-file>.gcf" },
-	{ "G" , 0 , POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &G , 0 , "set saturation granularity","<number>"},
-	{ "mu" , 0 , POPT_ARG_STRING , &mu_formula , 0 , "file with a mu formula" , "<mu-file>.mu" },
-	{ "ctl*" , 0 , POPT_ARG_STRING , &ctl_formula , 0 , "file with a ctl* formula" , "<ctl*-file>.ctl" },
+    { NULL, 0 , POPT_ARG_CALLBACK|POPT_CBFLAG_POST|POPT_CBFLAG_SKIPOPTION , (void*)reach_popt , 0 , NULL , NULL },
+    { "order" , 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &order , 0 , "set the exploration strategy to a specific order" , "<bfs-prev|bfs|chain-prev|chain>" },
+    { "saturation" , 0, POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &saturation , 0 , "select the saturation strategy" , "<none|sat1|sat2|sat3>" },
+    { "G" , 0 , POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &sat_granularity , 0 , "set saturation granularity","<number>" },
+    { "deadlock" , 'd' , POPT_ARG_VAL , &dlk_detect , 1 , "detect deadlocks" , NULL },
+    { "action" , 0 , POPT_ARG_STRING , &act_detect , 0 , "detect action" , "<action>" },
+    { "trace" , 0 , POPT_ARG_STRING , &trc_output , 0 , "file to write trace to" , "<lts-file>.gcf" },
+    { "mu" , 0 , POPT_ARG_STRING , &mu_formula , 0 , "file with a mu formula" , "<mu-file>.mu" },
+    { "ctl*" , 0 , POPT_ARG_STRING , &ctl_formula , 0 , "file with a ctl* formula" , "<ctl*-file>.ctl" },
 #if defined(MCRL)
 	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, mcrl_options , 0 , "mCRL options",NULL},
 #endif
@@ -124,15 +143,15 @@ static  struct poptOption options[] = {
 #if defined(DIVINE2)
 	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, dve2_options , 0 , "DiVinE 2 options", NULL },
 #endif
-	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, greybox_options , 0 , "Greybox options",NULL},
-	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, vset_options , 0 , "Vector set options",NULL},
-	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, lts_io_options , 0 , NULL , NULL },
-	POPT_TABLEEND
+    { NULL, 0 , POPT_ARG_INCLUDE_TABLE, greybox_options , 0 , "Greybox options",NULL},
+    { NULL, 0 , POPT_ARG_INCLUDE_TABLE, vset_options , 0 , "Vector set options",NULL},
+    { NULL, 0 , POPT_ARG_INCLUDE_TABLE, lts_io_options , 0 , NULL , NULL },
+    POPT_TABLEEND
 };
 
 typedef struct {
-  int len;
-  int* proj;
+    int len;
+    int *proj;
 } proj_info;
 
 static lts_type_t ltstype;
@@ -140,92 +159,163 @@ static int N;
 static int eLbls;
 static int sLbls;
 static int nGrps;
-static proj_info* projs;
+static proj_info *projs;
 static vdom_t domain;
 static vset_t visited;
-static long max_lev_count=0;
-static long max_vis_count=0;
-static long max_grp_count=0;
-static long max_trans_count=0;
+static vset_t *levels = NULL;
+static int max_levels = 0;
+static int global_level;
+static long max_lev_count = 0;
+static long max_vis_count = 0;
+static long max_grp_count = 0;
+static long max_trans_count = 0;
 static model_t model;
 static vrel_t *group_next;
 static vset_t *group_explored;
 static vset_t *group_tmp;
-static int explored;
 
-static void *new_string_index(void* context){
-	(void)context;
-	Warning(info,"creating a new string index");
-	return SIcreate();
+typedef void (*reach_proc_t)(bitvector_t *reach_groups,
+                             long *eg_count, long *next_count);
+
+typedef void (*sat_proc_t)(reach_proc_t reach_proc, bitvector_t *reach_groups,
+                           long *eg_count, long *next_count);
+
+typedef void (*guided_proc_t)(sat_proc_t sat_proc, reach_proc_t reach_proc);
+
+static void *
+new_string_index (void *context)
+{
+    (void)context;
+    return SIcreate ();
 }
 
-static void write_trace_state(int src_no, int*state){
-  Warning(debug,"dumping state %d",src_no);
+static inline void
+grow_levels(int new_levels)
+{
+    if (global_level == max_levels) {
+        max_levels += new_levels;
+        levels = RTrealloc(levels, max_levels * sizeof(vset_t));
+
+        for(int i = global_level; i < max_levels; i++)
+            levels[i] = vset_create(domain, 0, NULL);
+    }
+}
+
+static inline void
+save_level()
+{
+    grow_levels(1024);
+    vset_copy(levels[global_level], visited);
+    global_level++;
+}
+
+static void
+write_trace_state(lts_enum_cb_t trace_handle, int src_no, int *state) {
   int labels[sLbls];
-  if (sLbls) GBgetStateLabelsAll(model,state,labels);
-  enum_state(trace_handle,0,state,labels);
+
+  Warning(debug, "dumping state %d", src_no);
+
+  if (sLbls != 0)
+      GBgetStateLabelsAll(model,state,labels);
+
+  enum_state(trace_handle, 0, state,labels);
 }
 
 struct write_trace_step_s {
-    int src_no;
-    int dst_no;
-    int* dst;
-    int found;
+    lts_enum_cb_t trace_handle;
+    int           src_no;
+    int           dst_no;
+    int          *dst;
+    int           found;
 };
 
-static void write_trace_next(void*arg,transition_info_t*ti,int*dst){
-	struct write_trace_step_s*ctx=(struct write_trace_step_s*)arg;
-	if(ctx->found) return;
-	for(int i=0;i<N;i++){
-	    if (ctx->dst[i]!=dst[i]) return;
-	}
-	ctx->found=1;
-	enum_seg_seg(trace_handle,0,ctx->src_no,0,ctx->dst_no,ti->labels);
+static void
+write_trace_next(void *arg, transition_info_t *ti, int *dst)
+{
+    struct write_trace_step_s *ctx = (struct write_trace_step_s*)arg;
+
+    if (ctx->found)
+        return;
+
+    for(int i = 0; i < N; i++) {
+        if (ctx->dst[i] != dst[i])
+            return;
+    }
+
+    ctx->found = 1;
+    enum_seg_seg(ctx->trace_handle, 0, ctx->src_no, 0, ctx->dst_no, ti->labels);
 }
 
-static void write_trace_step(int src_no,int*src,int dst_no,int*dst){
-    Warning(debug,"finding edge for state %d",src_no);
+static void
+write_trace_step(lts_enum_cb_t trace_handle, int src_no, int *src,
+                     int dst_no, int *dst)
+{
     struct write_trace_step_s ctx;
-    ctx.src_no=src_no;
-    ctx.dst_no=dst_no;
-    ctx.dst=dst;
-    ctx.found=0;
-    GBgetTransitionsAll(model,src,write_trace_next,&ctx);
-    if (ctx.found==0) Fatal(1,error,"no matching transition found");
+
+    Warning(debug, "finding edge for state %d", src_no);
+    ctx.trace_handle = trace_handle;
+    ctx.src_no = src_no;
+    ctx.dst_no = dst_no;
+    ctx.dst = dst;
+    ctx.found = 0;
+
+    GBgetTransitionsAll(model, src, write_trace_next, &ctx);
+
+    if (ctx.found ==0)
+        Fatal(1, error, "no matching transition found");
 }
 
-static void write_trace(int **states, int total_states)
+static void
+write_trace(lts_enum_cb_t trace_handle, int **states, int total_states)
 {
     // output starting from initial state, which is in states[total_states-1]
-    for(int i=total_states-1;i>0;i--) {
-        int current_step=total_states-i-1;
-        write_trace_state(current_step,states[i]);
-        write_trace_step(current_step,states[i],current_step+1,states[i-1]);
+
+    for(int i = total_states - 1; i > 0; i--) {
+        int current_step = total_states-i-1;
+
+        write_trace_state(trace_handle, current_step, states[i]);
+        write_trace_step(trace_handle, current_step, states[i],
+                             current_step + 1, states[i-1]);
     }
-    write_trace_state(total_states-1,states[0]);
+
+    write_trace_state(trace_handle, total_states - 1, states[0]);
 }
 
-static void find_trace_to(int *dst,int level,vset_t *levels){
-    int prev_level = level - 2;
-    vset_t src_set = vset_create(domain,0,NULL);
-    vset_t dst_set = vset_create(domain,0,NULL);
-    vset_t temp = vset_create(domain,0,NULL);
+static void
+find_trace_to(int trace_end[][N], int end_count, int level, vset_t *levels,
+                  lts_enum_cb_t trace_handle)
+{
+    int    prev_level   = level - 2;
+    vset_t src_set      = vset_create(domain, 0, NULL);
+    vset_t dst_set      = vset_create(domain, 0, NULL);
+    vset_t temp         = vset_create(domain, 0, NULL);
 
-    int max_states = 1024;
-    int current_state = 1;
-    int **states = RTmalloc(max_states*sizeof(int*));
-    states[0] = dst;
-    for(int i=1;i<max_states;i++)
-        states[i] = RTmalloc(sizeof(int)*N);
+    int   max_states    = 1024 + end_count;
+    int   current_state = end_count;
+    int **states        = RTmalloc(sizeof(int*[max_states]));
 
-    int max_int_level = 32;
-    vset_t *internal_levels = RTmalloc(max_int_level*sizeof(vset_t));
-    for(int i = 0;i < max_int_level;i++)
-        internal_levels[i] = vset_create(domain,0,NULL);
+    for (int i = 0; i < end_count; i++)
+        states[i] = trace_end[i];
+
+    for(int i = end_count; i < max_states; i++)
+        states[i] = RTmalloc(sizeof(int[N]));
+
+    int     max_int_level  = 32;
+    vset_t *int_levels     = RTmalloc(sizeof(vset_t[max_int_level]));
+
+    for(int i = 0; i < max_int_level; i++)
+        int_levels[i] = vset_create(domain, 0, NULL);
 
     while (prev_level >= 0) {
         int int_level = 0;
-        vset_add(internal_levels[0],states[current_state-1]);
+
+        if (vset_member(levels[prev_level], states[current_state - 1])) {
+            Warning(debug, "Skipping level %d in trace generation", prev_level);
+            prev_level--;
+            continue;
+        }
+
+        vset_add(int_levels[0], states[current_state-1]);
 
         // search backwards from states[current_state-1] to prev_level
         do {
@@ -233,48 +323,51 @@ static void find_trace_to(int *dst,int level,vset_t *levels){
 
             if(int_level == max_int_level) {
                 max_int_level += 32;
-                internal_levels = RTrealloc(internal_levels,
-                                                max_int_level*sizeof(vset_t));
-                for(int i=int_level;i<max_int_level;i++)
-                    internal_levels[i] = vset_create(domain,0,NULL);
+                int_levels = RTrealloc(int_levels,
+                                           sizeof(vset_t[max_int_level]));
+
+                for(int i = int_level; i < max_int_level; i++)
+                    int_levels[i] = vset_create(domain, 0, NULL);
             }
 
-            for(int i=0;i<nGrps;i++) {
-                vset_prev(temp,internal_levels[int_level-1],group_next[i]);
-                vset_union(internal_levels[int_level], temp);
+            for (int i=0; i < nGrps; i++) {
+                vset_prev(temp, int_levels[int_level - 1], group_next[i]);
+                vset_union(int_levels[int_level], temp);
             }
 
-            vset_copy(temp,levels[prev_level]);
-            vset_minus(temp,internal_levels[int_level]);
-        } while(vset_equal(levels[prev_level],temp));
+            vset_copy(temp, levels[prev_level]);
+            vset_minus(temp, int_levels[int_level]);
+        } while (vset_equal(levels[prev_level], temp));
 
-        if(current_state+int_level >= max_states) {
-            int old_max_states=max_states;
-            max_states = current_state+int_level+1024;
-            states = RTrealloc(states,max_states*sizeof(int*));
-            for(int i=old_max_states;i<max_states;i++)
-                states[i] = RTmalloc(sizeof(int)*N);
+        if (current_state + int_level >= max_states) {
+            int old_max_states = max_states;
+
+            max_states = current_state + int_level + 1024;
+            states = RTrealloc(states,sizeof(int*[max_states]));
+
+            for(int i = old_max_states; i < max_states; i++)
+                states[i] = RTmalloc(sizeof(int[N]));
         }
 
-        // here: temp = levels[prev_level] - internal_levels[int_level]
-        vset_copy(src_set,levels[prev_level]);
-        vset_minus(src_set,temp);
-        vset_example(src_set,states[current_state+int_level-1]);
+        // here: temp = levels[prev_level] - int_levels[int_level]
+        vset_copy(src_set, levels[prev_level]);
+        vset_minus(src_set, temp);
+        vset_example(src_set, states[current_state + int_level - 1]);
         vset_clear(src_set);
 
         // find the states that give us a trace to states[current_state-1]
-        for(int i=(int_level-1);i>0;i--) {
-            vset_add(src_set,states[current_state+i]);
+        for(int i = int_level - 1; i > 0; i--) {
+            vset_add(src_set, states[current_state+i]);
 
-            for(int j=0;j<nGrps;j++) {
-                vset_next(temp,src_set,group_next[j]);
-                vset_union(dst_set,temp);
+            for(int j = 0; j < nGrps; j++) {
+                vset_next(temp, src_set, group_next[j]);
+                vset_union(dst_set, temp);
             }
 
-            vset_copy(temp,dst_set);
-            vset_minus(temp,internal_levels[i]);
-            vset_minus(dst_set,temp);
-            vset_example(dst_set,states[current_state+i-1]);
+            vset_copy(temp, dst_set);
+            vset_minus(temp, int_levels[i]);
+            vset_minus(dst_set, temp);
+            vset_example(dst_set, states[current_state + i - 1]);
             vset_clear(src_set);
             vset_clear(dst_set);
         }
@@ -282,719 +375,940 @@ static void find_trace_to(int *dst,int level,vset_t *levels){
         current_state += int_level;
         prev_level--;
 
-        for(int i=0;i<=int_level;i++)
-            vset_clear(internal_levels[i]);
+        for(int i = 0; i <= int_level; i++)
+            vset_clear(int_levels[i]);
+
         vset_clear(temp);
     }
 
-    write_trace(states, current_state);
+    write_trace(trace_handle, states, current_state);
 }
 
-static void find_trace(int *dst,int level,vset_t *levels){
-  int init_state[N];
-  GBgetInitialState(model,init_state);
-  trace_output=lts_output_open(trc_output,model,1,0,1,"vsi",NULL);
-  lts_output_set_root_vec(trace_output,(uint32_t*)init_state);
-  lts_output_set_root_idx(trace_output,0,0);
-  trace_handle=lts_output_begin(trace_output,0,0,0);
-  mytimer_t timer=SCCcreateTimer();
-  SCCstartTimer(timer);
-  find_trace_to(dst,level,levels);
-  SCCstopTimer(timer);
-  SCCreportTimer(timer,"constructing the trace took");
-  lts_output_end(trace_output,trace_handle);
-  lts_output_close(&trace_output);
+static void
+find_trace(int trace_end[][N], int end_count, int level, vset_t *levels)
+{
+    // Find initial state and open output file
+    int           init_state[N];
+    lts_output_t  trace_output;
+    lts_enum_cb_t trace_handle;
+
+    GBgetInitialState(model, init_state);
+    trace_output = lts_output_open(trc_output, model, 1, 0, 1, "vsi", NULL);
+    lts_output_set_root_vec(trace_output, (uint32_t*)init_state);
+    lts_output_set_root_idx(trace_output, 0, 0);
+    trace_handle = lts_output_begin(trace_output, 0, 0, 0);
+
+    // Generate trace
+    mytimer_t  timer = SCCcreateTimer();
+
+    SCCstartTimer(timer);
+    find_trace_to(trace_end, end_count, level, levels, trace_handle);
+    SCCstopTimer(timer);
+    SCCreportTimer(timer, "constructing trace took");
+
+    // Close output file
+    lts_output_end(trace_output, trace_handle);
+    lts_output_close(&trace_output);
 }
 
 struct find_action_info {
-  int group;
-  int *dst;
-  int level;
-  vset_t* levels;
-  int max_levels;
+    int  group;
+    int *dst;
 };
 
-static void find_action_cb(void* context, int* src){
-  Warning(info,"found action: %s",act_detect);
-  if (trc_output!=NULL) {
-    // The following is destructive on levels
-    struct find_action_info* ctx=(struct find_action_info*)context;
+static void
+find_action_cb(void* context, int* src)
+{
+    diagnostic("\n");
+    Warning(info, "found action: %s", act_detect);
+
+    if (trc_output == NULL)
+        Fatal(1, info, "exiting now");
+
+    struct find_action_info* ctx = (struct find_action_info*)context;
     int group=ctx->group;
-    int dst[N];
-    int level;
-    vset_t* levels;
-    int max_levels=ctx->max_levels;
+    int trace_end[2][N];
 
-    for(int i=0;i<N;i++)
-      dst[i]=src[i];
-    for(int i=0;i<projs[group].len;i++)
-      dst[projs[group].proj[i]]=ctx->dst[i];
-
-    if(vset_member(ctx->levels[ctx->level-1],src)) {
-      Warning(debug, "source found at level %d", ctx->level-1);
-      level=ctx->level+1;
-    } else {
-      Warning(debug, "source not found at level %d", ctx->level-1);
-      level=ctx->level+2;
+    for (int i = 0; i < N; i++) {
+        trace_end[0][i] = src[i];
+        trace_end[1][i] = src[i];
     }
 
-    if (level>max_levels) {
-      max_levels=level;
-      levels = RTrealloc(ctx->levels,max_levels * sizeof(vset_t));
-      for(int i=ctx->level;i<max_levels;i++)
-	levels[i] = vset_create(domain,0,NULL);
-    } else
-      levels = ctx->levels;
+    // Set dst of the last step of the trace to its proper value
+    for (int i = 0; i < projs[group].len; i++)
+        trace_end[0][projs[group].proj[i]] = ctx->dst[i];
 
-    vset_add(levels[level-2],src);
-    Warning(debug, "source added at level %d", level-2);
-    vset_add(levels[level-1],dst);
-    Warning(debug, "destination added at level %d", level-1);
+    // src and dst may both be new, e.g. in case of chaining
+    if (vset_member(levels[global_level - 1], src)) {
+        Warning(debug, "source found at level %d", global_level - 1);
+        find_trace(trace_end, 2, global_level, levels);
+    } else {
+        Warning(debug, "source not found at level %d", global_level - 1);
+        find_trace(trace_end, 2, global_level + 1, levels);
+    }
 
-    find_trace(dst,level,levels);
-  }
-  Fatal(1,info,"exiting now");
+    Fatal(1, info, "exiting now");
 }
 
 struct group_add_info {
-  int group;
-  int *src;
-  vset_t set;
-  int level;
-  vset_t* levels;
-  int max_levels;
+    int    group;
+    int   *src;
+    int   *explored;
+    vset_t set;
 };
 
-static void group_add(void*context,transition_info_t* ti,int*dst){
-	struct group_add_info* ctx=(struct group_add_info*)context;
-	vrel_add(group_next[ctx->group],ctx->src,dst);
+static void
+group_add(void *context, transition_info_t *ti, int *dst)
+{
+    struct group_add_info *ctx = (struct group_add_info*)context;
 
-	if (act_detect!=NULL && ti->labels[0]==act_detect_index){
-	    int group=ctx->group;
-	    struct find_action_info action_ctx;
-	    action_ctx.group=group;
-	    action_ctx.dst=dst;
-	    action_ctx.level=ctx->level;
-	    action_ctx.levels=ctx->levels;
-            action_ctx.max_levels=ctx->max_levels;
-	    vset_enum_match(ctx->set,projs[group].len,projs[group].proj,
-			    ctx->src, find_action_cb,&action_ctx);
-	}
-}
+    vrel_add(group_next[ctx->group], ctx->src, dst);
 
-static void explore_cb(void*context,int *src){
-	struct group_add_info* ctx=(struct group_add_info*)context;
-	ctx->src=src;
-	GBgetTransitionsShort(model,ctx->group,src,group_add,context);
-	explored++;
-	if (explored%1000 ==0 && RTverbosity >=2) {
-		Warning(info,"explored %d short vectors for group %d",explored,ctx->group);
-	}
-}
+    if (act_detect != NULL && ti->labels[0] == act_detect_index) {
+        struct find_action_info action_ctx;
+        int group = ctx->group;
 
-static inline void expand_group_next(int group,vset_t set,int level,vset_t* levels,int max_levels){
-	struct group_add_info ctx;
-	explored=0;
-	ctx.group=group;
-	ctx.set=set;
-	ctx.level=level;
-	ctx.levels=levels;
-        ctx.max_levels=max_levels;
-	vset_project(group_tmp[group],set);
-	vset_zip(group_explored[group],group_tmp[group]);
-	vset_enum(group_tmp[group],explore_cb,&ctx);
-	vset_clear(group_tmp[group]);
-}
-
-static void deadlock_check(vset_t deadlocks,int level,vset_t *levels){
-    if (vset_is_empty(deadlocks)) return;
-    Warning(info,"deadlock found");
-    if (trc_output){
-        int dlk_state[N];
-        vset_example(deadlocks,dlk_state);
-        find_trace(dlk_state,level,levels);
+        action_ctx.group = group;
+        action_ctx.dst = dst;
+        vset_enum_match(ctx->set,projs[group].len, projs[group].proj,
+                            ctx->src, find_action_cb, &action_ctx);
     }
+}
+
+static void
+explore_cb(void *context, int *src)
+{
+    struct group_add_info *ctx = (struct group_add_info*)context;
+
+    ctx->src = src;
+    GBgetTransitionsShort(model, ctx->group, src, group_add, context);
+    (*ctx->explored)++;
+
+    if ((*ctx->explored) % 1000 == 0 && RTverbosity >= 2) {
+        Warning(info, "explored %d short vectors for group %d",
+                    *ctx->explored, ctx->group);
+    }
+}
+
+static inline void
+expand_group_next(int group, vset_t set)
+{
+    struct group_add_info ctx;
+    int explored = 0;
+
+    ctx.group = group;
+    ctx.set = set;
+    ctx.explored = &explored;
+    vset_project(group_tmp[group], set);
+    vset_zip(group_explored[group], group_tmp[group]);
+    vset_enum(group_tmp[group], explore_cb, &ctx);
+    vset_clear(group_tmp[group]);
+}
+
+static void
+deadlock_check(vset_t deadlocks, bitvector_t *reach_groups)
+{
+    if (vset_is_empty(deadlocks))
+        return;
+
+    vset_t next_temp = vset_create(domain, 0, NULL);
+    vset_t prev_temp = vset_create(domain, 0, NULL);
+
+    Warning(debug, "Potential deadlocks found");
+
+    for (int i = 0; i < nGrps; i++) {
+        if (bitvector_is_set(reach_groups, i)) continue;
+        expand_group_next(i, deadlocks);
+        vset_next(next_temp, deadlocks, group_next[i]);
+        vset_prev(prev_temp, next_temp, group_next[i]);
+        vset_minus(deadlocks, prev_temp);
+    }
+
+    vset_destroy(next_temp);
+    vset_destroy(prev_temp);
+
+    if (vset_is_empty(deadlocks))
+        return;
+
+    Warning(info, "deadlock found");
+
+    if (trc_output) {
+        int dlk_state[1][N];
+
+        vset_example(deadlocks, dlk_state[0]);
+        find_trace(dlk_state, 1, global_level, levels);
+    }
+
     Fatal(1,info,"exiting now");
 }
 
-static void stats_and_progress_report(vset_t current, vset_t visited, int level) {
-  bn_int_t e_count;
-  long n_count;
-  char string[1024];
-  int size;
-  
-  if (current) {
-    vset_count(current,&n_count,&e_count);
-    if (n_count>max_lev_count) max_lev_count=n_count;
-    size = bn_int2string(string,sizeof string,&e_count);
-    if(size >= (ssize_t)sizeof string) Fatal(1,error,"Error converting number to string");
-    Warning(info,"level %d has %s states ( %ld nodes )",level,string,n_count);
-    bn_clear(&e_count);
-  }
-  
-  vset_count(visited,&n_count,&e_count);
-  if (n_count>max_vis_count) max_vis_count=n_count;
-  size = bn_int2string(string,sizeof string,&e_count);
-  if(size >= (ssize_t)sizeof string) Fatal(1,error,"Error converting number to string");
-  Warning(info,"visited %d has %s states ( %ld nodes )",level,string,n_count);
-  bn_clear(&e_count);
-  if (RTverbosity >= 2) {
-    int i;
-    fprintf(stderr,"transition caches (grp,nds,elts): ");
-    for (i=0;i<nGrps;i++) {
-      vrel_count(group_next[i],&n_count,&e_count);
-      size = bn_int2string(string,sizeof string,&e_count);
-      if(size >= (ssize_t)sizeof string) Fatal(1,error,"Error converting number to string");
-      fprintf(stderr,"( %d %ld %s ) ",i,n_count,string);
-      bn_clear(&e_count);
-      if (n_count>max_trans_count) max_trans_count=n_count;
-    }
-    fprintf(stderr,"\ngroup explored    (grp,nds,elts): ");
-    for (i=0;i<nGrps;i++) {
-      vset_count(group_explored[i],&n_count,&e_count);
-      size = bn_int2string(string,sizeof string,&e_count);
-      if(size >= (ssize_t)sizeof string) Fatal(1,error,"Error converting number to string");
-      fprintf(stderr,"( %d %ld %s ) ",i,n_count,string);
-      bn_clear(&e_count);
-      if (n_count>max_grp_count) max_grp_count=n_count;
-    }
-    fprintf(stderr,"\n");
-  }
+static inline void
+get_vset_size(vset_t set, long *node_count, char *elem_str, ssize_t str_len)
+{
+    bn_int_t elem_count;
+    int      len;
+
+    vset_count(set, node_count, &elem_count);
+    len = bn_int2string(elem_str, str_len, &elem_count);
+
+    if (len >= str_len)
+        Fatal(1, error, "Error converting number to string");
+
+    bn_clear(&elem_count);
 }
 
-static void final_stat_reporting(vset_t visited) {
-  bn_int_t e_count;
-  long n_count;
-  char string[1024];
-  int size;
+static inline void
+get_vrel_size(vrel_t rel, long *node_count, char *elem_str, ssize_t str_len)
+{
+    bn_int_t elem_count;
+    int      len;
 
-  vset_count(visited,&n_count,&e_count);
-  size = bn_int2string(string,sizeof string,&e_count);
-  if(size >= (ssize_t)sizeof string) Fatal(1,error,"Error converting number to string");
-  fprintf(stderr,"state space has %s states\n",string);
-  bn_clear(&e_count);
-  if (max_lev_count==0)
-    fprintf(stderr,"( %ld final BDD nodes; %ld peak nodes )\n",
-	    n_count,max_vis_count);
-  else
-    fprintf(stderr,"( %ld final BDD nodes; %ld peak nodes; %ld peak nodes per level )\n",
-	    n_count,max_vis_count,max_lev_count);
-  if (RTverbosity >=2)
-    fprintf(stderr,"( peak transition cache: %ld nodes; peak group explored: %ld nodes )\n",
-	    max_trans_count,max_grp_count);
+    vrel_count(rel, node_count, &elem_count);
+    len = bn_int2string(elem_str, str_len, &elem_count);
+
+    if (len >= str_len)
+        Fatal(1, error, "Error converting number to string");
+
+    bn_clear(&elem_count);
 }
 
-static vset_t get_svar_eq_int_set(int state_idx, int state_match, vset_t visited) {
+static void
+stats_and_progress_report(vset_t current, vset_t visited, int level)
+{
+    long     node_count;
+    char     elem_str[1024];
+    int      str_len = sizeof(elem_str);
+
+    if (current != NULL) {
+        get_vset_size(current, &node_count, elem_str, str_len);
+        Warning(info, "level %d has %s states ( %ld nodes )",
+                    level, elem_str, node_count);
+
+        if (node_count > max_lev_count)
+            max_lev_count = node_count;
+    }
+
+    get_vset_size(visited, &node_count, elem_str, str_len);
+    Warning(info, "visited %d has %s states ( %ld nodes )",
+                level, elem_str, node_count);
+
+    if (node_count > max_vis_count)
+        max_vis_count = node_count;
+
+    if (RTverbosity >= 2) {
+        fprintf(stderr, "transition caches ( grp nds elts ): ");
+
+        for (int i = 0; i < nGrps; i++) {
+            get_vrel_size(group_next[i], &node_count, elem_str, str_len);
+            fprintf(stderr, "( %d %ld %s ) ", i, node_count, elem_str);
+
+            if (node_count > max_trans_count)
+                max_trans_count = node_count;
+        }
+
+        fprintf(stderr,"\ngroup explored    ( grp nds elts ): ");
+
+        for (int i = 0; i < nGrps; i++) {
+            get_vset_size(group_explored[i], &node_count, elem_str, str_len);
+            fprintf(stderr, "( %d %ld %s ) ", i, node_count, elem_str);
+
+            if (node_count > max_grp_count)
+                max_grp_count = node_count;
+        }
+
+        fprintf(stderr, "\n");
+    }
+}
+
+static void
+final_stat_reporting(vset_t visited, mytimer_t timer)
+{
+    long node_count;
+    char elem_str[1024];
+
+    SCCreportTimer(timer, "reachability took");
+
+    if (dlk_detect)
+        Warning(info, "No deadlocks found");
+
+    if (act_detect != NULL)
+        Warning(info, "Action \"%s\" not found", act_detect);
+
+    get_vset_size(visited, &node_count, elem_str, sizeof(elem_str));
+    Warning(info, "state space has %s states", elem_str);
+
+    if (max_lev_count == 0) {
+        Warning(info, "( %ld final BDD nodes; %ld peak nodes )",
+                    node_count, max_vis_count);
+    } else {
+        Warning(info, "( %ld final BDD nodes; %ld peak nodes; "
+                          "%ld peak nodes per level )",
+                    node_count, max_vis_count, max_lev_count);
+    }
+
+    diagnostic("( peak transition cache: %ld nodes; peak group explored: "
+                   "%ld nodes )\n", max_trans_count, max_grp_count);
+}
+
+static void
+reach_bfs_prev(bitvector_t *reach_groups, long *eg_count, long *next_count)
+{
+    int level = 0;
+    vset_t current_level = vset_create(domain, 0, NULL);
+    vset_t next_level = vset_create(domain, 0, NULL);
+    vset_t temp = vset_create(domain, 0, NULL);
+    vset_t deadlocks = dlk_detect?vset_create(domain, 0, NULL):NULL;
+    vset_t dlk_temp = dlk_detect?vset_create(domain, 0 ,NULL):NULL;
+
+    vset_copy(current_level, visited);
+
+    while (!vset_is_empty(current_level)) {
+        if (trc_output != NULL) save_level();
+        stats_and_progress_report(current_level, visited, level);
+        level++;
+        for (int i = 0; i < nGrps; i++){
+            if (!bitvector_is_set(reach_groups, i)) continue;
+            diagnostic("\rexploring group %4d/%d", i+1, nGrps);
+            expand_group_next(i, current_level);
+            (*eg_count)++;
+        }
+        diagnostic("\rexploration complete             \n");
+        if (dlk_detect) vset_copy(deadlocks, current_level);
+        for (int i = 0; i < nGrps; i++) {
+            if (!bitvector_is_set(reach_groups,i)) continue;
+            diagnostic("\rlocal next %4d/%d", i+1, nGrps);
+            (*next_count)++;
+            vset_next(temp, current_level, group_next[i]);
+            if (dlk_detect) {
+                vset_prev(dlk_temp, temp, group_next[i]);
+                vset_minus(deadlocks, dlk_temp);
+                vset_clear(dlk_temp);
+            }
+            vset_minus(temp, visited);
+            vset_union(next_level, temp);
+            vset_clear(temp);
+        }
+        diagnostic("\rlocal next complete       \n");
+        if (dlk_detect) deadlock_check(deadlocks, reach_groups);
+        vset_union(visited, next_level);
+        vset_copy(current_level, next_level);
+        vset_clear(next_level);
+        vset_reorder(domain);
+    }
+
+    vset_destroy(current_level);
+    vset_destroy(next_level);
+    vset_destroy(temp);
+    if (dlk_detect) {
+        vset_destroy(deadlocks);
+        vset_destroy(dlk_temp);
+    }
+}
+
+static void
+reach_bfs(bitvector_t *reach_groups, long *eg_count, long *next_count)
+{
+    int level = 0;
+    vset_t old_vis = vset_create(domain, 0, NULL);
+    vset_t temp = vset_create(domain, 0, NULL);
+    vset_t deadlocks = dlk_detect?vset_create(domain, 0, NULL):NULL;
+    vset_t dlk_temp = dlk_detect?vset_create(domain, 0, NULL):NULL;
+
+    while (!vset_equal(visited, old_vis)) {
+        if (trc_output != NULL) save_level();
+        vset_copy(old_vis, visited);
+        stats_and_progress_report(NULL, visited, level);
+        level++;
+        for (int i = 0; i < nGrps; i++) {
+            if (!bitvector_is_set(reach_groups,i)) continue;
+            diagnostic("\rexploring group %4d/%d", i+1, nGrps);
+            expand_group_next(i, visited);
+            (*eg_count)++;
+        }
+        diagnostic("\rexploration complete             \n");
+        if (dlk_detect) vset_copy(deadlocks, visited);
+        for (int i = 0; i < nGrps; i++) {
+            if (!bitvector_is_set(reach_groups,i)) continue;
+            diagnostic("\rlocal next %4d/%d", i+1, nGrps);
+            (*next_count)++;
+            vset_next(temp, old_vis, group_next[i]);
+            if (dlk_detect) {
+                vset_prev(dlk_temp, temp, group_next[i]);
+                vset_minus(deadlocks, dlk_temp);
+                vset_clear(dlk_temp);
+            }
+            vset_union(visited, temp);
+        }
+        diagnostic("\rlocal next complete       \n");
+        if (dlk_detect) deadlock_check(deadlocks, reach_groups);
+        vset_clear(temp);
+        vset_reorder(domain);
+    }
+
+    vset_destroy(old_vis);
+    vset_destroy(temp);
+    if (dlk_detect) {
+        vset_destroy(deadlocks);
+        vset_destroy(dlk_temp);
+    }
+}
+
+static void
+reach_chain_prev(bitvector_t *reach_groups, long *eg_count, long *next_count)
+{
+    int level = 0;
+    vset_t new_states = vset_create(domain, 0, NULL);
+    vset_t temp = vset_create(domain, 0, NULL);
+    vset_t deadlocks = dlk_detect?vset_create(domain, 0, NULL):NULL;
+    vset_t dlk_temp = dlk_detect?vset_create(domain, 0, NULL):NULL;
+
+    vset_copy(new_states, visited);
+    while (!vset_is_empty(new_states)) {
+        if (trc_output != NULL) save_level();
+        stats_and_progress_report(new_states, visited, level);
+        level++;
+        if (dlk_detect) vset_copy(deadlocks, new_states);
+        for (int i = 0; i < nGrps; i++) {
+            if (!bitvector_is_set(reach_groups, i)) continue;
+            diagnostic("\rgroup %4d/%d", i+1, nGrps);
+            expand_group_next(i, new_states);
+            (*eg_count)++;
+            (*next_count)++;
+            vset_next(temp, new_states, group_next[i]);
+            if (dlk_detect) {
+                vset_prev(dlk_temp, temp, group_next[i]);
+                vset_minus(deadlocks, dlk_temp);
+                vset_clear(dlk_temp);
+            }
+            vset_minus(temp, visited);
+            vset_union(new_states, temp);
+            vset_clear(temp);
+        }
+        diagnostic("\rround %d complete       \n", level);
+        // no deadlocks in old new_states
+        if (dlk_detect) deadlock_check(deadlocks, reach_groups);
+        vset_zip(visited, new_states);
+        vset_reorder(domain);
+    }
+
+    vset_destroy(new_states);
+    vset_destroy(temp);
+    if (dlk_detect) {
+        vset_destroy(deadlocks);
+        vset_destroy(dlk_temp);
+    }
+}
+
+static void
+reach_chain(bitvector_t *reach_groups, long *eg_count, long *next_count)
+{
+    int level = 0;
+    vset_t old_vis = vset_create(domain, 0, NULL);
+    vset_t temp = vset_create(domain, 0, NULL);
+    vset_t deadlocks = dlk_detect?vset_create(domain, 0, NULL):NULL;
+    vset_t dlk_temp = dlk_detect?vset_create(domain, 0, NULL):NULL;
+
+    while (!vset_equal(visited, old_vis)) {
+        if (trc_output != NULL) save_level();
+        vset_copy(old_vis, visited);
+        stats_and_progress_report(NULL, visited, level);
+        level++;
+        if (dlk_detect) vset_copy(deadlocks, visited);
+        for (int i = 0; i < nGrps; i++) {
+            if (!bitvector_is_set(reach_groups, i)) continue;
+            diagnostic("\rgroup %4d/%d", i+1, nGrps);
+            expand_group_next(i, visited);
+            (*eg_count)++;
+            (*next_count)++;
+            vset_next(temp, visited, group_next[i]);
+            vset_union(visited, temp);
+            if (dlk_detect) {
+                vset_prev(dlk_temp, temp, group_next[i]);
+                vset_minus(deadlocks, dlk_temp);
+                vset_clear(dlk_temp);
+            }
+        }
+        diagnostic("\rround %d complete       \n", level);
+        // no deadlocks in old_vis
+        if (dlk_detect) deadlock_check(deadlocks, reach_groups);
+        vset_reorder(domain);
+    }
+
+    vset_destroy(old_vis);
+    vset_destroy(temp);
+    if (dlk_detect) {
+        vset_destroy(deadlocks);
+        vset_destroy(dlk_temp);
+    }
+}
+
+static void
+reach_no_sat(reach_proc_t reach_proc, bitvector_t *reach_groups,
+                 long *eg_count, long *next_count)
+{
+    reach_proc(reach_groups, eg_count, next_count);
+}
+
+
+static void
+reach_sat1(reach_proc_t reach_proc, bitvector_t *reach_groups,
+               long *eg_count, long *next_count)
+{
+    int level[nGrps];
+    int back[N + 1];
+    bitvector_t groups[N + 1];
+
+    // groups: i=0..nGrps-1
+    // vars  : j=0..N-1
+    // BDD levels:  k = N..1
+
+    for (int k = 1; k <= N; k++)
+        bitvector_create(&groups[k], nGrps);
+
+    // level[i] = first (highest) + of group i
+    for (int i = 0; i < nGrps; i++)
+        for (int j = 0; j < N; j++)
+            if (dm_is_set(GBgetDMInfo(model), i, j)) {
+                level[i]=N-j;
+                break;
+            }
+
+    for (int i = 0; i < nGrps; i++)
+        bitvector_set(&groups[level[i]], i);
+
+    // Limit the bit vectors to the groups we are interested in
+    for (int k = 1; k <= N; k++)
+        bitvector_intersect(&groups[k], reach_groups);
+
+    // back[k] = last + in any group of level k
+    for (int k = 1; k <= N; k++)
+        back[k] = N + 1;
+
+    for (int i = 0; i < nGrps; i++)
+        for (int k = 1; k <= N; k++)
+            if (dm_is_set(GBgetDMInfo(model), i, N-k)) {
+                if (k < back[level[i]]) back[level[i]]=k;
+                break;
+            }
+
+    // Diagnostics
+    diagnostic("level: ");
+    for (int i = 0; i < nGrps; i++)
+        diagnostic("%d ", level[i]);
+    diagnostic("\nback: ");
+    for (int j=1; j<=N; j++)
+        diagnostic("%d ", back[j]);
+    diagnostic("\n");
+
+    int k = 1;
+    vset_t old_vis = vset_create(domain, 0, NULL);
+    while (k <= N) {
+      Warning(info, "Saturating level: %d", k);
+      vset_copy(old_vis, visited);
+      reach_proc(&groups[k], eg_count, next_count);
+      if (vset_equal(old_vis, visited))
+          k++;
+      else
+          k=back[k];
+    }
+    vset_destroy(old_vis);
+}
+
+static void
+reach_sat2(reach_proc_t reach_proc, bitvector_t *reach_groups,
+               long *eg_count, long *next_count)
+{
+    int level[nGrps];
+    bitvector_t groups[N + 1];
+
+    // groups: i=0..nGrps-1
+    // vars  : j=0..N-1
+    // BDD levels:  k = N..1   (k = N-j)
+
+    for (int k = 1; k <= N; k++)
+        bitvector_create(&groups[k], nGrps);
+
+    // level[i] = first '+' in row (highest in BDD) of group i
+    // recast 1..N down to equal groups 1..N/G  (more precisely: (N-1)/G + 1)a
+    for (int i = 0; i < nGrps; i++)
+        for (int j = 0; j < N; j++)
+            if (dm_is_set(GBgetDMInfo(model), i, j)) {
+                level[i] = (N - 1 - j) / sat_granularity + 1;
+                break;
+            }
+
+    for (int i = 0; i < nGrps; i++)
+        bitvector_set(&groups[level[i]], i);
+
+    // Limit the bit vectors to the groups we are interested in
+    for (int k = 1; k <= N; k++)
+        bitvector_intersect(&groups[k], reach_groups);
+
+    // Diagnostics
+    diagnostic("level: ");
+    for (int i = 0; i < nGrps; i++)
+        diagnostic("%d ", level[i]);
+    diagnostic("\n");
+
+    int k = 1;
+    int last = 0;
+    vset_t old_vis = vset_create(domain, 0, NULL);
+    while (k <= (N - 1) / sat_granularity + 1) {
+        if (k == last)
+            k++;
+        else {
+            Warning(info, "Saturating level: %d", k);
+            vset_copy(old_vis, visited);
+            reach_proc(&groups[k], eg_count, next_count);
+            if (vset_equal(old_vis, visited))
+                k++;
+            else {
+                last = k;
+                k = 1;
+            }
+        }
+    }
+    vset_destroy(old_vis);
+}
+
+static void
+reach_sat3(reach_proc_t reach_proc, bitvector_t *reach_groups,
+               long *eg_count, long *next_count)
+{
+    int level[nGrps];
+    bitvector_t groups[N+1];
+
+    // groups: i=0..nGrps-1
+    // vars  : j=0..N-1
+    // BDD levels:  k = N..1
+
+    for (int k = 1; k <= N; k++)
+        bitvector_create(&groups[k], nGrps);
+
+    // level[i] = first (highest) + of group i
+    for (int i = 0; i < nGrps; i++)
+        for (int j = 0; j < N; j++)
+            if (dm_is_set(GBgetDMInfo(model), i, j)) {
+                level[i]=(N - 1 - j) / sat_granularity + 1;
+                break;
+            }
+
+    for (int i = 0; i < nGrps; i++)
+        bitvector_set(&groups[level[i]], i);
+
+
+    // Limit the bit vectors to the groups we are interested in
+    for (int k = 1; k <= N; k++)
+        bitvector_intersect(&groups[k], reach_groups);
+
+    // Diagnostics
+    diagnostic("level: ");
+    for (int i = 0; i < nGrps; i++)
+        diagnostic("%d ", level[i]);
+    diagnostic("\n");
+
+    vset_t old_vis = vset_create(domain, 0, NULL);
+    while (!vset_equal(old_vis, visited)) {
+        vset_copy(old_vis, visited);
+        for (int k = 1; k <= (N - 1) / sat_granularity + 1 ; k++) {
+            Warning(info, "Saturating level: %d", k);
+            reach_proc(&groups[k], eg_count, next_count);
+        }
+    }
+    vset_destroy(old_vis);
+}
+
+typedef struct {
+    model_t  model;
+    FILE    *tbl_file;
+    int      tbl_count;
+    int      group;
+    int     *src;
+} output_context;
+
+static void
+etf_edge(void *context, transition_info_t *ti, int *dst)
+{
+    output_context* ctx = (output_context*)context;
+
+    ctx->tbl_count++;
+
+    for(int i = 0, k = 0 ; i < N; i++) {
+        if (dm_is_set(GBgetDMInfo(ctx->model), ctx->group, i)) {
+            fprintf(ctx->tbl_file, " %d/%d", ctx->src[k], dst[k]);
+            k++;
+        } else {
+            fprintf(ctx->tbl_file," *");
+        }
+    }
+
+    for(int i = 0; i < eLbls; i++)
+        fprintf(ctx->tbl_file, " %d", ti->labels[i]);
+
+    fprintf(ctx->tbl_file,"\n");
+}
+
+static void enum_edges(void *context, int *src)
+{
+    output_context* ctx = (output_context*)context;
+
+    ctx->src = src;
+    GBgetTransitionsShort(model, ctx->group, ctx->src, etf_edge, context);
+}
+
+typedef struct {
+    FILE *tbl_file;
+    int   mapno;
+    int   len;
+    int  *used;
+} map_context;
+
+static void
+enum_map(void *context, int *src){
+    map_context *ctx = (map_context*)context;
+    int val = GBgetStateLabelShort(model, ctx->mapno, src);
+
+    for (int i = 0, k = 0; i < N; i++) {
+        if (k < ctx->len && ctx->used[k] == i){
+            fprintf(ctx->tbl_file, "%d ", src[k]);
+            k++;
+        } else {
+            fprintf(ctx->tbl_file, "* ");
+        }
+    }
+
+    fprintf(ctx->tbl_file, "%d\n", val);
+}
+
+static void
+output_init(FILE *tbl_file)
+{
+    int state[N];
+
+    GBgetInitialState(model, state);
+    fprintf(tbl_file, "begin state\n");
+
+    for (int i = 0; i < N; i++) {
+        fprint_ltsmin_ident(tbl_file, lts_type_get_state_name(ltstype, i));
+        fprintf(tbl_file, ":");
+        fprint_ltsmin_ident(tbl_file, lts_type_get_state_type(ltstype, i));
+        fprintf(tbl_file, (i == (N - 1))?"\n":" ");
+    }
+
+    fprintf(tbl_file,"end state\n");
+
+    fprintf(tbl_file,"begin edge\n");
+    for(int i = 0; i < eLbls; i++) {
+        fprint_ltsmin_ident(tbl_file, lts_type_get_edge_label_name(ltstype, i));
+        fprintf(tbl_file, ":");
+        fprint_ltsmin_ident(tbl_file, lts_type_get_edge_label_type(ltstype, i));
+        fprintf(tbl_file, (i == (eLbls - 1))?"\n":" ");
+    }
+
+    fprintf(tbl_file, "end edge\n");
+
+    fprintf(tbl_file, "begin init\n");
+
+    for(int i = 0; i < N; i++)
+        fprintf(tbl_file, "%d%s", state[i], (i == (N - 1))?"\n":" ");
+
+    fprintf(tbl_file,"end init\n");
+}
+
+static void
+output_trans(FILE *tbl_file)
+{
+    int tbl_count = 0;
+    output_context ctx;
+
+    ctx.model = model;
+    ctx.tbl_file = tbl_file;
+
+    for(int g = 0; g < nGrps; g++) {
+        ctx.group = g;
+        ctx.tbl_count = 0;
+        fprintf(tbl_file, "begin trans\n");
+        vset_enum(group_explored[g], enum_edges, &ctx);
+        fprintf(tbl_file, "end trans\n");
+        tbl_count += ctx.tbl_count;
+    }
+
+    Warning(info, "Symbolic tables have %d reachable transitions", tbl_count);
+}
+
+static void
+output_lbls(FILE *tbl_file)
+{
+    matrix_t *sl_info = GBgetStateLabelInfo(model);
+
+    sLbls = dm_nrows(sl_info);
+
+    if (dm_nrows(sl_info) != lts_type_get_state_label_count(ltstype))
+        Warning(error, "State label count mismatch!");
+
+    for (int i = 0; i < sLbls; i++){
+        int len = dm_ones_in_row(sl_info, i);
+        int used[len];
+
+        // get projection
+        for (int pi = 0, pk = 0; pi < dm_ncols (sl_info); pi++) {
+            if (dm_is_set (sl_info, i, pi))
+                used[pk++] = pi;
+        }
+
+        vset_t patterns = vset_create(domain, len, used);
+        map_context ctx;
+
+        vset_project(patterns, visited);
+        ctx.tbl_file = tbl_file;
+        ctx.mapno = i;
+        ctx.len = len;
+        ctx.used = used;
+        fprintf(tbl_file, "begin map ");
+        fprint_ltsmin_ident(tbl_file, lts_type_get_state_label_name(ltstype,i));
+        fprintf(tbl_file, ":");
+        fprint_ltsmin_ident(tbl_file, lts_type_get_state_label_type(ltstype,i));
+        fprintf(tbl_file,"\n");
+        vset_enum(patterns, enum_map, &ctx);
+        fprintf(tbl_file, "end map\n");
+        vset_destroy(patterns);
+    }
+}
+
+static void
+output_types(FILE *tbl_file)
+{
+    int type_count = lts_type_get_type_count(ltstype);
+
+    for (int i = 0; i < type_count; i++) {
+        Warning(info, "dumping type %s", lts_type_get_type(ltstype, i));
+        fprintf(tbl_file, "begin sort ");
+        fprint_ltsmin_ident(tbl_file, lts_type_get_type(ltstype, i));
+        fprintf(tbl_file, "\n");
+
+        int values = GBchunkCount(model,i);
+
+        for (int j = 0; j < values; j++) {
+            chunk c    = GBchunkGet(model, i, j);
+            size_t len = c.len * 2 + 6;
+            char str[len];
+
+            chunk2string(c, len, str);
+            fprintf(tbl_file, "%s\n", str);
+        }
+
+        fprintf(tbl_file,"end sort\n");
+    }
+}
+
+static void
+do_output(char *etf_output)
+{
+    FILE      *tbl_file;
+    mytimer_t  timer    = SCCcreateTimer();
+
+    SCCstartTimer(timer);
+    Warning(info, "writing output");
+    tbl_file = fopen(etf_output, "w");
+
+    if (tbl_file == NULL)
+        FatalCall(1, error,"could not open %s", etf_output);
+
+    output_init(tbl_file);
+    output_trans(tbl_file);
+    output_lbls(tbl_file);
+    output_types(tbl_file);
+
+    fclose(tbl_file);
+    SCCstopTimer(timer);
+    SCCreportTimer(timer, "writing output took");
+}
+
+static void
+unguided(sat_proc_t sat_proc, reach_proc_t reach_proc)
+{
+    bitvector_t reach_groups;
+    long eg_count = 0;
+    long next_count = 0;
+
+    bitvector_create(&reach_groups, nGrps);
+    bitvector_invert(&reach_groups);
+    sat_proc(reach_proc, &reach_groups, &eg_count, &next_count);
+    bitvector_free(&reach_groups);
+    Warning(info, "Exploration took %ld group checks and %ld next state calls",
+                eg_count, next_count);
+}
+
+static void
+init_model(char *file)
+{
+    Warning(info, "opening %s", file);
+    model = GBcreateBase();
+    GBsetChunkMethods(model, new_string_index, NULL, (int2chunk_t)SIgetC,
+                          (chunk2int_t)SIputC, (get_count_t)SIgetCount);
+
+    GBloadFile(model, file, &model);
+
+    if (RTverbosity >= 2) {
+        fprintf(stderr, "Dependency Matrix:\n");
+        GBprintDependencyMatrix(stderr, model);
+    }
+
+    ltstype = GBgetLTStype(model);
+    N = lts_type_get_state_length(ltstype);
+    eLbls = lts_type_get_edge_label_count(ltstype);
+    sLbls = lts_type_get_state_label_count(ltstype);
+    nGrps = dm_nrows(GBgetDMInfo(model));
+    Warning(info, "state vector length is %d; there are %d groups", N, nGrps);
+}
+
+static void
+init_domain()
+{
+    domain = vdom_create_default(N);
+    visited = vset_create(domain, 0, NULL);
+
+    group_next     = (vrel_t*)RTmalloc(nGrps * sizeof(vrel_t));
+    group_explored = (vset_t*)RTmalloc(nGrps * sizeof(vset_t));
+    group_tmp      = (vset_t*)RTmalloc(nGrps * sizeof(vset_t));
+    projs          = (proj_info*)RTmalloc(nGrps * sizeof(proj_info));
+
+    for(int i = 0; i < nGrps; i++) {
+        projs[i].len  = dm_ones_in_row(GBgetDMInfo(model), i);
+        projs[i].proj = (int*)RTmalloc(projs[i].len * sizeof(int));
+
+        // temporary replacement for e_info->indices[i]
+        for(int j = 0, k = 0; j < dm_ncols(GBgetDMInfo(model)); j++) {
+            if (dm_is_set(GBgetDMInfo(model), i, j))
+                projs[i].proj[k++] = j;
+        }
+
+        group_next[i]     = vrel_create(domain,projs[i].len,projs[i].proj);
+        group_explored[i] = vset_create(domain,projs[i].len,projs[i].proj);
+        group_tmp[i]      = vset_create(domain,projs[i].len,projs[i].proj);
+    }
+}
+
+static void
+init_action()
+{
+    if (eLbls!=1) Abort("action detection assumes precisely one edge label");
+    chunk c = chunk_str(act_detect);
+    //table number of first edge label.
+    act_detect_table=lts_type_get_edge_label_typeno(ltstype,0);
+    act_detect_index=GBchunkPut(model,act_detect_table,c);
+    Warning(info, "Detecting action \"%s\"", act_detect);
+}
+
+static vset_t
+get_svar_eq_int_set (int state_idx, int state_match, vset_t visited)
+{
   vset_t result=vset_create(domain,0,NULL);
   int proj[1] = {state_idx};
   int match[1] = {state_match};
-
   vset_copy_match(result, visited, 1, proj, match);
 
   return result;
-}
-
-static void reach_bfs(){
-	int level,i;
-	long eg_count=0;
-	long next_count=0;
-
-	level=0;
-	vset_t current_level=vset_create(domain,0,NULL);
-	vset_t next_level=vset_create(domain,0,NULL);
-	vset_t temp=vset_create(domain,0,NULL);
-	vset_t deadlocks=dlk_detect?vset_create(domain,0,NULL):NULL;
-	vset_t dlk_temp=dlk_detect?vset_create(domain,0,NULL):NULL;
-
-	vset_t *levels = NULL;
-	int max_levels = 0;
-
-	vset_copy(current_level,visited);
-	for(;;){
-		if(vset_is_empty(current_level)) break;
-          if (trc_output != NULL) {
-	    if (level == max_levels) {
-	      max_levels += 1024;
-	      levels = RTrealloc(levels, max_levels * sizeof(vset_t));
-	      for(int i=level;i<max_levels;i++)
-		levels[i] = vset_create(domain,0,NULL);
-	    }
-	    vset_copy(levels[level],visited);
-	  }
-	        stats_and_progress_report(current_level,visited,level);
-		level++;
-		for(i=0;i<nGrps;i++){
-			if (RTverbosity >= 2) fprintf(stderr,"\rexploring group %4d/%d",i+1,nGrps);
-			expand_group_next(i,current_level,level,levels,max_levels);
-			eg_count++;
-		}
-		if (RTverbosity >= 2) fprintf(stderr,"\rexploration complete             \n");
-		vset_clear(next_level);
-		if (dlk_detect) vset_copy(deadlocks,current_level);
-		for(i=0;i<nGrps;i++){
-			if (RTverbosity >= 2) fprintf(stderr,"\rlocal next %4d/%d",i+1,nGrps);
-			next_count++;
-			vset_next(temp,current_level,group_next[i]);
-			if (dlk_detect) {
-				vset_prev(dlk_temp,temp,group_next[i]);
-				vset_minus(deadlocks,dlk_temp);
-				vset_clear(dlk_temp);
-			}
-			vset_minus(temp,visited);
-			vset_union(next_level,temp);
-			vset_clear(temp);
-		}
-		if (RTverbosity >= 2) fprintf(stderr,"\rlocal next complete       \n");
-		if (dlk_detect) deadlock_check(deadlocks,level,levels);
-		vset_union(visited,next_level);
-		vset_copy(current_level,next_level);
-		vset_reorder(domain);
-	}
-	Warning(info,"Exploration took %ld group checks and %ld next state calls",eg_count,next_count);
-}
-
-void reach_bfs2(){
-	int level,i;
-	long eg_count=0;
-	long next_count=0;
-
-	level=0;
-	vset_t old_vis=vset_create(domain,0,NULL);
-	vset_t temp=vset_create(domain,0,NULL);
-	vset_t deadlocks=dlk_detect?vset_create(domain,0,NULL):NULL;
-	vset_t dlk_temp=dlk_detect?vset_create(domain,0,NULL):NULL;
-
-	vset_t *levels = NULL;
-	int max_levels = 0;
-
-	for(;;){
-          if (trc_output != NULL) {
-	    if (level == max_levels) {
-	      max_levels += 1024;
-	      levels = RTrealloc(levels, max_levels * sizeof(vset_t));
-	      for(int i=level;i<max_levels;i++)
-		levels[i] = vset_create(domain,0,NULL);
-	    }
-	    vset_copy(levels[level],visited);
-	  }
-		vset_copy(old_vis,visited);
-		stats_and_progress_report(NULL,visited,level);
-		level++;
-		for(i=0;i<nGrps;i++){
-			if (RTverbosity >= 2) fprintf(stderr,"\rexploring group %4d/%d",i+1,nGrps);
-			expand_group_next(i,visited,level,levels,max_levels);
-			eg_count++;
-		}
-		if (RTverbosity >= 2) fprintf(stderr,"\rexploration complete             \n");
-		if (dlk_detect) vset_copy(deadlocks,visited);
-		for(i=0;i<nGrps;i++){
-			if (RTverbosity >= 2) fprintf(stderr,"\rlocal next %4d/%d",i+1,nGrps);
-			next_count++;
-			vset_next(temp,old_vis,group_next[i]);
-			vset_union(visited,temp);
-			if (dlk_detect) {
-				vset_prev(dlk_temp,temp,group_next[i]);
-				vset_minus(deadlocks,dlk_temp);
-				vset_clear(dlk_temp);
-			}
-		}
-		if (RTverbosity >= 2) fprintf(stderr,"\rlocal next complete       \n");
-		if (dlk_detect) deadlock_check(deadlocks,level,levels);
-		if (vset_equal(visited,old_vis)) break;
-		vset_reorder(domain);
-	}
-	Warning(info,"Exploration took %ld group checks and %ld next state calls",eg_count,next_count);
-}
-
-/**
- * Closure
- *  Compute the transitive closure with respect to a subset of groups
- *   1) the set of initial states I
- *   2) the set of groups to consider, defining a relation R
- *  The result is the transitive closure of R on I is returned
- *  As a side effect, the group tables (group_next) will be extended
- **/
-
-static void Closure(vset_t visited,bitvector_t* groups) {
-  int level=0;
-  vset_t current=vset_create(domain,0,NULL);
-  vset_t next=vset_create(domain,0,NULL);
-  vset_t temp=vset_create(domain,0,NULL);
-
-  vset_copy(current,visited);
-  while (!vset_is_empty(current)) {
-    stats_and_progress_report(current,visited,level);
-    level++;
-    for (int i=0;i<nGrps;i++) {
-      if (!bitvector_is_set(groups,i)) continue;
-      if (RTverbosity >= 2) fprintf(stderr,"\rconf-exploring group %4d/%d",i+1,nGrps);
-      expand_group_next(i,current,level,NULL,0);
-    }
-    if (RTverbosity >= 2) fprintf(stderr,"\rconf-exploration complete             \n");
-    for(int i=0;i<nGrps;i++){
-      if (!bitvector_is_set(groups,i)) continue;
-      if (RTverbosity >= 2) fprintf(stderr,"\rconf-local next %4d/%d",i+1,nGrps);
-      vset_next(temp,current,group_next[i]);
-      vset_union(next,temp);
-      vset_clear(temp);
-    }
-    if (RTverbosity >= 2) fprintf(stderr,"\rconf-local next complete       \n");
-    vset_copy(current,next);
-    vset_clear(next);
-    vset_zip(visited,current);
-  }
-  vset_clear(current);
-}
-
-
-void reach_sat1(){
-  int level[nGrps];
-  int back[N+1];
-  bitvector_t* groups[N+1];
-
-  // groups: i=0..nGrps-1
-  // vars  : j=0..N-1
-  // BDD levels:  k = N..1
-
-  for (int k=1;k<N+1;k++) {
-    groups[k] = (bitvector_t*)RTmalloc(sizeof(bitvector_t));
-    bitvector_create(groups[k],nGrps);
-  }
-  
-  // level[i] = first (highest) + of group i
-  for (int i=0;i<nGrps;i++) {
-    for (int j=0;j<N;j++) {
-      if (dm_is_set(GBgetDMInfo(model),i,j)) {
-	level[i]=N-j;
-	break;
-      }
-    }
-  }
-
-  for (int i=0;i<nGrps;i++) {
-    bitvector_set(groups[level[i]],i);
-  }
-
-  // back[k] = last + in any group of level k
-  for (int k=1;k<=N;k++) back[k]=N+1;
-  for (int i=0;i<nGrps;i++) {
-    for (int k=1;k<=N;k++)
-      if (dm_is_set(GBgetDMInfo(model),i,N-k)) {
-	if (k<back[level[i]]) back[level[i]]=k;
-	break;
-      }
-  }
-  
-   // test
-  fprintf(stderr,"level: ");
-  for (int i=0; i<nGrps;i++)
-    fprintf(stderr,"%d ",level[i]);
-  fprintf(stderr,"\nback: ");
-  for (int j=1; j<=N; j++)
-    fprintf(stderr,"%d ",back[j]);
-  fprintf(stderr,"\n");
-
-  int k=1;
-  vset_t old_vis=vset_create(domain,0,NULL);
-  while (k <= N) {
-    fprintf(stderr,"Saturating level: %d\n",k);
-    vset_copy(old_vis,visited);
-    Closure(visited,groups[k]);
-    if (vset_equal(old_vis,visited))
-      k++;
-    else {
-      vset_clear(old_vis);
-      k=back[k];
-    }
-  }
-}
-
-void reach_sat2(){
-  int level[nGrps];
-  bitvector_t* groups[N+1];
-
-  // groups: i=0..nGrps-1
-  // vars  : j=0..N-1
-  // BDD levels:  k = N..1   (k = N-j)
-
-  for (int k=1;k<N+1;k++) {
-    groups[k] = (bitvector_t*)RTmalloc(sizeof(bitvector_t));
-    bitvector_create(groups[k],nGrps);
-  }
-  
-  // level[i] = first '+' in row (highest in BDD) of group i
-  // recast 1..N down to equal groups 1..N/G  (more precisely: (N-1)/G + 1)a
-  for (int i=0;i<nGrps;i++) {
-    for (int j=0;j<N;j++) {
-      if (dm_is_set(GBgetDMInfo(model),i,j)) {
-	level[i]=(N-1-j) / G + 1;
-	break;
-      }
-    }
-  }
-
-  for (int i=0;i<nGrps;i++) {
-    bitvector_set(groups[level[i]],i);
-  }
-
-   // test
-  fprintf(stderr,"level: ");
-  for (int i=0; i<nGrps;i++)
-    fprintf(stderr,"%d ",level[i]);
-  fprintf(stderr,"\n");
-  
-  int k=1, last=0;
-  vset_t old_vis=vset_create(domain,0,NULL);
-  while (k <= (N-1)/G +1) {
-    if (k==last) k++;
-    else {
-      fprintf(stderr,"Saturating level: %d\n",k);
-      vset_copy(old_vis,visited);
-      Closure(visited,groups[k]);
-      if (vset_equal(old_vis,visited))
-	k++;
-      else {
-	last=k;
-	vset_clear(old_vis);
-	k=1;
-      }
-    }
-  }
-}
-
-void reach_sat3(){
-  int level[nGrps];
-  bitvector_t* groups[N+1];
-
-  // groups: i=0..nGrps-1
-  // vars  : j=0..N-1
-  // BDD levels:  k = N..1
-
-  for (int k=1;k<N+1;k++) {
-    groups[k] = (bitvector_t*)RTmalloc(sizeof(bitvector_t));
-    bitvector_create(groups[k],nGrps);
-  }
-  
-  // level[i] = first (highest) + of group i
-  for (int i=0;i<nGrps;i++) {
-    for (int j=0;j<N;j++) {
-      if (dm_is_set(GBgetDMInfo(model),i,j)) {
-	level[i]=(N-1-j) / G + 1;
-	break;
-      }
-    }
-  }
-
-  for (int i=0;i<nGrps;i++) {
-    bitvector_set(groups[level[i]],i);
-  }
-
-   // test
-  fprintf(stderr,"level: ");
-  for (int i=0; i<nGrps;i++)
-    fprintf(stderr,"%d ",level[i]);
-  fprintf(stderr,"\n");
-  
-  vset_t old_vis=vset_create(domain,0,NULL);
-  while (!vset_equal(old_vis,visited)) {
-    vset_copy(old_vis,visited);
-    for (int k=1; k <= (N-1)/G + 1 ; k++) {
-      fprintf(stderr,"Saturating level: %d\n",k);
-      Closure(visited,groups[k]);
-    }
-  }
-}
-
-
-void reach_chain(){
-	int level,i;
-	long eg_count=0;
-	long next_count=0;
-
-	level=0;
-	vset_t old_vis=vset_create(domain,0,NULL);
-	vset_t temp=vset_create(domain,0,NULL);
-	vset_t deadlocks=dlk_detect?vset_create(domain,0,NULL):NULL;
-	vset_t dlk_temp=dlk_detect?vset_create(domain,0,NULL):NULL;
-
-	vset_t *levels = NULL;
-        int max_levels = 0;
-
-	for(;;){
-          if (trc_output != NULL) {
-	    if (level == max_levels) {
-	      max_levels += 1024;
-	      levels = RTrealloc(levels, max_levels * sizeof(vset_t));
-	      for(int i=level;i<max_levels;i++)
-		levels[i] = vset_create(domain,0,NULL);
-	    }
-	    vset_copy(levels[level],visited);
-	  }
-		vset_copy(old_vis,visited);
-		stats_and_progress_report(NULL,visited,level);
-		level++;
-		if (dlk_detect) vset_copy(deadlocks,visited);
-		for(i=0;i<nGrps;i++){
-			if (RTverbosity >= 2) fprintf(stderr,"\rgroup %4d/%d",i+1,nGrps);
-			expand_group_next(i,visited,level,levels,max_levels);
-			eg_count++;
-			next_count++;
-			vset_next(temp,visited,group_next[i]);
-			vset_union(visited,temp);
-			if (dlk_detect) {
-				vset_prev(dlk_temp,temp,group_next[i]);
-				vset_minus(deadlocks,dlk_temp);
-				vset_clear(dlk_temp);
-			}
-		}
-		if (RTverbosity >= 2) fprintf(stderr,"\rround %d complete       \n",level);
-		if (dlk_detect) deadlock_check(deadlocks,level,levels); // no deadlocks in old_vis.
-		if (vset_equal(visited,old_vis)) break;
-		vset_reorder(domain);
-	}
-	Warning(info,"Exploration took %ld group checks and %ld next state calls",eg_count,next_count);
-}
-
-static FILE* table_file;
-
-static int table_count=0;
-
-typedef struct {
-	model_t model;
-	int group;
-	int *src;
-} output_context;
-
-static void etf_edge(void*context,transition_info_t*ti,int*dst){
-	output_context* ctx=(output_context*)context;
-	table_count++;
-	int k=0;
-	for(int i=0;i<N;i++) {
-		if (dm_is_set(GBgetDMInfo(ctx->model), ctx->group, i)) {
-			fprintf(table_file," %d/%d",ctx->src[k],dst[k]);
-			k++;
-		} else {
-			fprintf(table_file," *");
-		}
-	}
-	for(int i=0;i<eLbls;i++) {
-		fprintf(table_file," %d",ti->labels[i]);
-	}
-	fprintf(table_file,"\n");
-}
-
-static void enum_edges(void*context,int *src){
-	output_context* ctx=(output_context*)context;
-	ctx->src=src;
-	GBgetTransitionsShort(model,ctx->group,ctx->src,etf_edge,context);
-}
-
-typedef struct {
-	int mapno;
-	int len;
-	int*used;
-} map_context;
-
-
-static void enum_map(void*context,int *src){
-	map_context*ctx=(map_context*)context;
-	int val=GBgetStateLabelShort(model,ctx->mapno,src);
-	int k=0;
-	for(int i=0;i<N;i++){
-		if (k<ctx->len && ctx->used[k]==i){
-			fprintf(table_file,"%d ",src[k]);
-			k++;
-		} else {
-			fprintf(table_file,"* ");
-		}
-	}
-	fprintf(table_file,"%d\n",val);
-}
-
-
-void do_output(){
-	int state[N];
-	GBgetInitialState(model,state);
-	table_file=fopen(etf_output,"w");
-	if(!table_file){
-	    FatalCall(1,error,"could not open %s",etf_output);
-	}
-	fprintf(table_file,"begin state\n");
-	for(int i=0;i<N;i++){
-                fprint_ltsmin_ident(table_file,lts_type_get_state_name(ltstype,i));
-                fprintf(table_file,":");
-                fprint_ltsmin_ident(table_file,lts_type_get_state_type(ltstype,i));
-		fprintf(table_file,(i==(N-1))?"\n":" ");
-	}
-	fprintf(table_file,"end state\n");
-	fprintf(table_file,"begin edge\n");
-	for(int i=0;i<eLbls;i++){
-            fprint_ltsmin_ident(table_file,lts_type_get_edge_label_name(ltstype,i));
-            fprintf(table_file,":");
-            fprint_ltsmin_ident(table_file,lts_type_get_edge_label_type(ltstype,i));
-            fprintf(table_file,(i==(eLbls-1))?"\n":" ");
-	}
-	fprintf(table_file,"end edge\n");
-	fprintf(table_file,"begin init\n");
-	for(int i=0;i<N;i++) {
-		fprintf(table_file,"%d%s",state[i],(i==(N-1))?"\n":" ");
-	}
-	fprintf(table_file,"end init\n");
-	for(int g=0;g<nGrps;g++){
-		output_context ctx;
-		ctx.model = model;
-		ctx.group=g;
-		fprintf(table_file,"begin trans\n");
-		vset_enum(group_explored[g],enum_edges,&ctx);
-		fprintf(table_file,"end trans\n");
-	}
-	Warning(info,"Symbolic tables have %d reachable transitions",table_count);
-	matrix_t *sl_info = GBgetStateLabelInfo(model);
-	sLbls = dm_nrows(sl_info);
-	if (dm_nrows(sl_info) != lts_type_get_state_label_count(ltstype))
-		Warning(error,"State label count mismatch!");
-	for(int i=0;i<sLbls;i++){
-		int len = dm_ones_in_row(sl_info, i);
-		int used[len];
-		// get projection
-		for (int pi = 0, pk = 0; pi < dm_ncols (sl_info); pi++) {
-			if (dm_is_set (sl_info, i, pi)) {
-				used[pk++] = pi;
-			}
-		}
-
-		vset_t patterns=vset_create(domain,len,used);
-		vset_project(patterns,visited);
-		map_context ctx;
-		ctx.mapno=i;
-		ctx.len=len;
-		ctx.used=used;
-		fprintf(table_file,"begin map ");
-                fprint_ltsmin_ident(table_file,lts_type_get_state_label_name(ltstype,i));
-                fprintf(table_file,":");
-                fprint_ltsmin_ident(table_file,lts_type_get_state_label_type(ltstype,i));
-                fprintf(table_file,"\n");
-		vset_enum(patterns,enum_map,&ctx);
-		fprintf(table_file,"end map\n");
-		vset_clear(patterns); // Should be vset_destroy, which doesn't exist.
-	}
-	int type_count=lts_type_get_type_count(ltstype);
-	for(int i=0;i<type_count;i++){
-		Warning(info,"dumping type %s",lts_type_get_type(ltstype,i));
-		fprintf(table_file,"begin sort ");
-                fprint_ltsmin_ident(table_file,lts_type_get_type(ltstype,i));
-                fprintf(table_file,"\n");
-		int values=GBchunkCount(model,i);
-		for(int j=0;j<values;j++){
-			chunk c=GBchunkGet(model,i,j);
-			size_t len=c.len*2+3;
-			char str[len];
-			chunk2string(c,len,str);
-			fprintf(table_file,"%s\n",str);
-		}
-		fprintf(table_file,"end sort\n");
-	}
-	fclose(table_file);
 }
 
 static array_manager_t mu_var_man = NULL;
@@ -1005,267 +1319,232 @@ static vset_t* mu_var = NULL;
  * Model Checking and the mu-calculus, E. Allen Emerson
  * DIMACS Series in Discrete Mathematics, 1997 - Citeseer
  */
-static vset_t mu_compute(ltsmin_expr_t mu_expr, vset_t visited)
+static vset_t
+mu_compute (ltsmin_expr_t mu_expr, vset_t visited)
 {
     vset_t result = NULL;
     switch(mu_expr->token) {
-        case MU_TRUE:
+    case MU_TRUE:
+        result = vset_create(domain, 0, NULL);
+        vset_copy(result, visited);
+        return result;
+    case MU_FALSE:
+        return vset_create(domain, 0, NULL);
+    case MU_EQ: { // svar == int
+        /* Currently MU_EQ works only in the context of an SVAR/INTEGER pair */
+        if (!mu_expr->arg1->token == MU_SVAR)
+            Fatal(1,error, "Expecting == with state variable on the left side!\n");
+        if (!mu_expr->arg1->token == MU_NUM)
+            Fatal(1,error, "Expecting == with int on the right side!\n");
+        result = get_svar_eq_int_set(mu_expr->arg1->idx, mu_expr->arg2->idx, visited);
+    } break;
+    case MU_OR: { // OR
+        result = mu_compute(mu_expr->arg1, visited);
+        vset_t mc = mu_compute(mu_expr->arg2, visited);
+        vset_union(result, mc);
+        vset_destroy(mc);
+    } break;
+    case MU_AND: { // AND
+        result = mu_compute(mu_expr->arg1, visited);
+        vset_t mc = mu_compute(mu_expr->arg2, visited);
+        vset_intersect(result, mc);
+        vset_destroy(mc);
+    } break;
+    case MU_NOT: { // NEGATION
+        result = vset_create(domain, 0, NULL);
+        vset_copy(result, visited);
+        vset_t mc = mu_compute(mu_expr->arg1, visited);
+        vset_minus(result, mc);
+        vset_destroy(mc);
+    } break;
+    case MU_NEXT: // X
+        Fatal(1,error, "unhandled MU_NEXT");
+        break;
+    case MU_EXIST: { // E
+        if (mu_expr->arg1->token == MU_NEXT) {
+            vset_t temp = vset_create(domain, 0, NULL);
             result = vset_create(domain, 0, NULL);
-            vset_copy(result, visited);
-            return result;
-        case MU_FALSE:
-            return vset_create(domain, 0, NULL);
-        case MU_EQ: { // svar == int
-            /* Currently MU_EQ works only in the context of an SVAR/INTEGER pair */
-            if (!mu_expr->arg1->token == MU_SVAR)
-                Fatal(1,error, "Expecting == with state variable on the left side!\n");
-            if (!mu_expr->arg1->token == MU_NUM)
-                Fatal(1,error, "Expecting == with int on the right side!\n");
-            result = get_svar_eq_int_set(mu_expr->arg1->idx, mu_expr->arg2->idx, visited);
-            } break;
-        case MU_OR: { // OR
-            result = mu_compute(mu_expr->arg1, visited);
-            vset_t mc = mu_compute(mu_expr->arg2, visited);
-            vset_union(result, mc);
-            vset_destroy(mc);
-            } break;
-        case MU_AND: { // AND
-            result = mu_compute(mu_expr->arg1, visited);
-            vset_t mc = mu_compute(mu_expr->arg2, visited);
-            vset_intersect(result, mc);
-            vset_destroy(mc);
-            } break;
-        case MU_NOT: { // NEGATION
-            result = vset_create(domain, 0, NULL);
-            vset_copy(result, visited);
-            vset_t mc = mu_compute(mu_expr->arg1, visited);
-            vset_minus(result, mc);
-            vset_destroy(mc);
-            } break;
-        case MU_NEXT: // X
-            Fatal(1,error, "unhandled MU_NEXT");
-            break;
-        case MU_EXIST: { // E
-            if (mu_expr->arg1->token == MU_NEXT) {
-                vset_t temp = vset_create(domain, 0, NULL);
-                result = vset_create(domain, 0, NULL);
-                vset_t g = mu_compute(mu_expr->arg1->arg1, visited);
+            vset_t g = mu_compute(mu_expr->arg1->arg1, visited);
 
-                for(int i=0;i<nGrps;i++){
-                    vset_prev(temp,g,group_next[i]);
-                    vset_union(result,temp);
-                    vset_clear(temp);
-                }
-                // destroy..
-                vset_destroy(temp);
-                // this is somewhat strange, but it appears that vset_prev generates
-                // states that are never visited before? can this happen or is this a bug?
-                // when?
-                // in order to prevent this, intersect with visited
-                vset_intersect(result, visited);
-            } else {
-                Fatal(1,error, "invalid operator following MU_EXIST, expecting MU_NEXT");
+            for(int i=0;i<nGrps;i++){
+                vset_prev(temp,g,group_next[i]);
+                vset_union(result,temp);
+                vset_clear(temp);
             }
-            } break;
-        case MU_NUM:
-            Fatal(1,error, "unhandled MU_NUM");
-            break;
-        case MU_SVAR:
-            Fatal(1,error, "unhandled MU_SVAR");
-            break;
-        case MU_EVAR:
-            Fatal(1, error, "unhandled MU_EVAR");
-            break;
-        case MU_VAR:
+            // destroy..
+            vset_destroy(temp);
+            // this is somewhat strange, but it appears that vset_prev generates
+            // states that are never visited before? can this happen or is this a bug?
+            // when?
+            // in order to prevent this, intersect with visited
+            vset_intersect(result, visited);
+        } else {
+            Fatal(1,error, "invalid operator following MU_EXIST, expecting MU_NEXT");
+        }
+    } break;
+    case MU_NUM:
+        Fatal(1,error, "unhandled MU_NUM");
+        break;
+    case MU_SVAR:
+        Fatal(1,error, "unhandled MU_SVAR");
+        break;
+    case MU_EVAR:
+        Fatal(1, error, "unhandled MU_EVAR");
+        break;
+    case MU_VAR:
+        ensure_access(mu_var_man, mu_expr->idx);
+        result = vset_create(domain, 0, NULL);
+        vset_copy(result, mu_var[mu_expr->idx]);
+        break;
+    case MU_ALL:
+        if (mu_expr->arg1->token == MU_NEXT) {
+            // implemented as AX phi = ! EX ! phi
+
+            result = vset_create(domain, 0, NULL);
+            vset_copy(result, visited);
+
+            // compute ! phi
+            vset_t notphi = vset_create(domain, 0, NULL);
+            vset_copy(notphi, visited);
+            vset_t phi = mu_compute(mu_expr->arg1->arg1, visited);
+            vset_minus(notphi, phi);
+            vset_destroy(phi);
+
+            vset_t temp = vset_create(domain, 0, NULL);
+            vset_t prev = vset_create(domain, 0, NULL);
+
+            // EX !phi
+            for(int i=0;i<nGrps;i++){
+                vset_prev(temp,notphi,group_next[i]);
+                vset_union(prev,temp);
+                vset_clear(temp);
+            }
+            vset_destroy(temp);
+            // intersect: see EX
+            vset_intersect(prev, visited);
+
+            // and negate result again
+            vset_minus(result, prev);
+            vset_destroy(prev);
+            vset_destroy(notphi);
+        } else {
+            Fatal(1,error, "invalid operator following MU_ALL, expecting MU_NEXT");
+        }
+        break;
+    case MU_MU:
+        {
             ensure_access(mu_var_man, mu_expr->idx);
-            result = vset_create(domain, 0, NULL);
-            vset_copy(result, mu_var[mu_expr->idx]);
-            break;
-        case MU_ALL:
-            if (mu_expr->arg1->token == MU_NEXT) {
-                // implemented as AX phi = ! EX ! phi
-
-                result = vset_create(domain, 0, NULL);
-                vset_copy(result, visited);
-
-                // compute ! phi
-                vset_t notphi = vset_create(domain, 0, NULL);
-                vset_copy(notphi, visited);
-                vset_t phi = mu_compute(mu_expr->arg1->arg1, visited);
-                vset_minus(notphi, phi);
-                vset_destroy(phi);
-
-                vset_t temp = vset_create(domain, 0, NULL);
-                vset_t prev = vset_create(domain, 0, NULL);
-
-                // EX !phi
-                for(int i=0;i<nGrps;i++){
-                    vset_prev(temp,notphi,group_next[i]);
-                    vset_union(prev,temp);
-                    vset_clear(temp);
-                }
-                vset_destroy(temp);
-                // intersect: see EX
-                vset_intersect(prev, visited);
-
-                // and negate result again
-                vset_minus(result, prev);
-                vset_destroy(prev);
-                vset_destroy(notphi);
-            } else {
-                Fatal(1,error, "invalid operator following MU_ALL, expecting MU_NEXT");
-            }
-            break;
-        case MU_MU:
-            {
-                ensure_access(mu_var_man, mu_expr->idx);
-                // backup old var reference
-                vset_t old = mu_var[mu_expr->idx];
-                result = mu_var[mu_expr->idx] = vset_create(domain, 0, NULL);
-                vset_t tmp = vset_create(domain, 0, NULL);
-                do {
-                    vset_copy(mu_var[mu_expr->idx], tmp);
-                    vset_clear(tmp);
-                    tmp = mu_compute(mu_expr->arg1, visited);
-                } while (!vset_equal(mu_var[mu_expr->idx], tmp));
-                vset_destroy(tmp);
-                // new var reference
-                mu_var[mu_expr->idx] = old;
-            }
-            break;
-        case MU_NU:
-            {
-                ensure_access(mu_var_man, mu_expr->idx);
-                // backup old var reference
-                vset_t old = mu_var[mu_expr->idx];
-                result = mu_var[mu_expr->idx] = vset_create(domain, 0, NULL);
-                vset_t tmp = vset_create(domain, 0, NULL);
-                vset_copy(tmp, visited);
-                do {
-                    vset_copy(mu_var[mu_expr->idx], tmp);
-                    vset_clear(tmp);
-                    tmp = mu_compute(mu_expr->arg1, visited);
-                } while (!vset_equal(mu_var[mu_expr->idx], tmp));
-                vset_destroy(tmp);
-                // new var reference
-                mu_var[mu_expr->idx] = old;
-            }
-            break;
-        default:
-            Fatal(1,error, "encountered unhandled mu operator");
+            // backup old var reference
+            vset_t old = mu_var[mu_expr->idx];
+            result = mu_var[mu_expr->idx] = vset_create(domain, 0, NULL);
+            vset_t tmp = vset_create(domain, 0, NULL);
+            do {
+                vset_copy(mu_var[mu_expr->idx], tmp);
+                vset_clear(tmp);
+                tmp = mu_compute(mu_expr->arg1, visited);
+            } while (!vset_equal(mu_var[mu_expr->idx], tmp));
+            vset_destroy(tmp);
+            // new var reference
+            mu_var[mu_expr->idx] = old;
+        }
+        break;
+    case MU_NU:
+        {
+            ensure_access(mu_var_man, mu_expr->idx);
+            // backup old var reference
+            vset_t old = mu_var[mu_expr->idx];
+            result = mu_var[mu_expr->idx] = vset_create(domain, 0, NULL);
+            vset_t tmp = vset_create(domain, 0, NULL);
+            vset_copy(tmp, visited);
+            do {
+                vset_copy(mu_var[mu_expr->idx], tmp);
+                vset_clear(tmp);
+                tmp = mu_compute(mu_expr->arg1, visited);
+            } while (!vset_equal(mu_var[mu_expr->idx], tmp));
+            vset_destroy(tmp);
+            // new var reference
+            mu_var[mu_expr->idx] = old;
+        }
+        break;
+    default:
+        Fatal(1,error, "encountered unhandled mu operator");
     }
     return result;
 }
 
-int main(int argc, char *argv[]){
-	char* files[2];
-	RTinitPopt(&argc,&argv,options,1,2,files,NULL,"<model> [<etf>]",
-		"Perform a symbolic reachability analysis of <model>\n"
-		"The optional output of this analysis is an ETF representation of the input\n"
-		"\nOptions");
-	etf_output=files[1];
-	Warning(info,"opening %s",files[0]);
-	model=GBcreateBase();
-	GBsetChunkMethods(model,new_string_index,NULL,
-		(int2chunk_t)SIgetC,(chunk2int_t)SIputC,(get_count_t)SIgetCount);
+int
+main (int argc, char *argv[])
+{
+    char *files[2];
+    RTinitPopt(&argc, &argv, options, 1, 2, files, NULL, "<model> [<etf>]",
+                   "Perform a symbolic reachability analysis of <model>\n"
+                       "The optional output of this analysis is an ETF "
+                           "representation of the input\n\nOptions");
 
-	if (strategy==Sat1 || strategy==Sat2 || strategy==Sat3) {
-	  if (dlk_detect) {
-	    Fatal(1,error,"deadlock detection not supported for saturation");
-	  } else if (trc_output != NULL) {
-	    Fatal(1,error,"trace generation not supported for saturation");
-          }
-        }
+    init_model(files[0]);
+    init_domain();
+    if (act_detect != NULL) init_action();
 
-	GBloadFile(model,files[0],&model);
+    sat_proc_t sat_proc = NULL;
+    reach_proc_t reach_proc = NULL;
+    guided_proc_t guided_proc = unguided;
 
-	if (RTverbosity >=2) {
-	  fprintf(stderr,"Dependency Matrix:\n");
-	  GBprintDependencyMatrix(stderr,model);
-	}
+    switch (strategy) {
+    case BFS_P:
+        reach_proc = reach_bfs_prev;
+        break;
+    case BFS:
+        reach_proc = reach_bfs;
+        break;
+    case CHAIN_P:
+        reach_proc = reach_chain_prev;
+        break;
+    case CHAIN:
+        reach_proc = reach_chain;
+        break;
+    }
 
-	ltstype=GBgetLTStype(model);
-	N=lts_type_get_state_length(ltstype);
-	eLbls=lts_type_get_edge_label_count(ltstype);
-	sLbls=lts_type_get_state_label_count(ltstype);
-	nGrps=dm_nrows(GBgetDMInfo(model));
-	domain=vdom_create_default(N);
-	visited=vset_create(domain,0,NULL);
-	group_next=(vrel_t*)RTmalloc(nGrps*sizeof(vrel_t));
-	group_explored=(vset_t*)RTmalloc(nGrps*sizeof(vset_t));
-	group_tmp=(vset_t*)RTmalloc(nGrps*sizeof(vset_t));
-	projs=(proj_info*)RTmalloc(nGrps*sizeof(proj_info));
-	for(int i=0;i<nGrps;i++){
-		projs[i].len=dm_ones_in_row(GBgetDMInfo(model), i);
-		projs[i].proj=(int*)RTmalloc(projs[i].len*sizeof(int));
-		// temporary replacement for e_info->indices[i]
-		for(int j=0, k=0; j < dm_ncols(GBgetDMInfo(model)); j++) {
-			if (dm_is_set(GBgetDMInfo(model), i,j))
-				projs[i].proj[k++] = j;
-		}
-
-		group_next[i]=vrel_create(domain,projs[i].len,projs[i].proj);
-		group_explored[i]=vset_create(domain,projs[i].len,projs[i].proj);
-		group_tmp[i]=vset_create(domain,projs[i].len,projs[i].proj);
-	}
-	Warning(info,"length is %d, there are %d groups",N,nGrps);
-
-	if (act_detect!=NULL) {
-	  if (eLbls!=1) Abort("action detection assumes precisely one edge label");
-	  chunk c = chunk_str(act_detect);
-	  //table number of first edge label.
-	  act_detect_table=lts_type_get_edge_label_typeno(ltstype,0);
-	  act_detect_index=GBchunkPut(model,act_detect_table,c);
-	  Warning(info, "Detecting action: %s", act_detect);
-	}
-
-	int src[N];
-	GBgetInitialState(model,src);
-	vset_add(visited,src);
-	Warning(info,"got initial state");
+    switch (sat_strategy) {
+    case NO_SAT:
+        sat_proc = reach_no_sat;
+        break;
+    case SAT_1:
+        sat_proc = reach_sat1;
+        break;
+    case SAT_2:
+        sat_proc = reach_sat2;
+        break;
+    case SAT_3:
+        sat_proc = reach_sat3;
+        break;
+    }
 
     // temporal logics
     if (mu_formula) {
         mu_expr = mu_parse_file(ltstype, mu_formula);
-        /*
+#if 0
         char buf[1024];
         ltsmin_expr_print_mu(mu_expr, buf);
         printf("computing: %s\n",buf);
-        */
+#endif
     } else if (ctl_formula) {
         ltsmin_expr_t ctl = ctl_parse_file(ltstype, ctl_formula);
         mu_expr = ctl_star_to_mu(ctl);
         mu_formula = ctl_formula;
     }
 
-	mytimer_t timer=SCCcreateTimer();
-	SCCstartTimer(timer);
-	switch(strategy){
-	case BFS:
-		reach_bfs();
-		break;
-	case BFS2:
-		reach_bfs2();
-		break;
-	case Chain:
-		reach_chain();
-		break;
-	case Sat1:
-		reach_sat1();
-		break;
-	case Sat2:
-		reach_sat2();
-		break;
-	case Sat3:
-		reach_sat3();
-		break;
-	}
-	if (dlk_detect)
-	  Warning(info,"No deadlocks found");
-	if (act_detect)
-	  Warning(info,"Action not found: %s", act_detect);
-	SCCstopTimer(timer);
-	SCCreportTimer(timer,"reachability took");
+    int src[N];
+
+    GBgetInitialState(model, src);
+    vset_add(visited, src);
+    Warning(info, "got initial state");
+
+    mytimer_t timer = SCCcreateTimer();
+
+    SCCstartTimer(timer);
+    guided_proc(sat_proc, reach_proc);
+    SCCstopTimer(timer);
+
     if (mu_expr) {
         // setup var manager
         mu_var_man = create_manager(65535);
@@ -1274,29 +1553,22 @@ int main(int argc, char *argv[]){
         vset_t x = mu_compute(mu_expr, visited);
 
         if (x) {
-            bn_int_t e_count;
-            long n_count;
-            char string[1024];
-            int size;
+            long node_count;
+            char elem_str[1024];
+            int  str_len = sizeof(elem_str);
 
-            vset_count(x,&n_count,&e_count);
-            size = bn_int2string(string,sizeof string,&e_count);
-            if(size >= (ssize_t)sizeof string) Fatal(1,error,"Error converting number to string");
-            fprintf(stderr,"mu formula holds for %s states\n",string);
-            fprintf(stderr, " s0 is %sin the set\n", vset_member(x, src) ? "" : "not ");
-            bn_clear(&e_count);
-
-            // destroy vset x, doesn't exist
-            vset_clear(x);
+            get_vset_size(x, &node_count, elem_str, str_len);
+            fprintf(stderr, "mu formula holds for %s states\n", elem_str);
+            fprintf(stderr, " s0 is %sin the set\n",
+                        vset_member(x, src) ? "" : "not ");
+            vset_destroy(x);
         }
     }
-	final_stat_reporting(visited);
-	if (etf_output) {
-		SCCresetTimer(timer);
-		SCCstartTimer(timer);
-		do_output();
-		SCCstopTimer(timer);
-		SCCreportTimer(timer,"writing output took");
-	}
-	return 0;
+
+    final_stat_reporting(visited, timer);
+
+    if (files[1] != NULL)
+        do_output(files[1]);
+
+    exit (EXIT_SUCCESS);
 }
