@@ -22,6 +22,10 @@ int         (*spinja_get_state_size)();
 int         (*spinja_get_transition_groups)();
 const int*  (*spinja_get_transition_read_dependencies)(int t);
 const int*  (*spinja_get_transition_write_dependencies)(int t);
+const char* (*spinja_get_state_variable_name)(int var);
+int         (*spinja_get_state_variable_type)(int var);
+const char* (*spinja_get_type_name)(int type);
+int         (*spinja_get_type_count)();
 
 static void
 spinja_popt (poptContext con,
@@ -101,7 +105,16 @@ SpinJaloadDynamicLib(model_t model, const char *filename)
         RTdlsym( filename, dlHandle, "spinja_get_transition_read_dependencies" );
     spinja_get_transition_write_dependencies = (const int*(*)(int))
         RTdlsym( filename, dlHandle, "spinja_get_transition_write_dependencies" );
-    
+
+    spinja_get_state_variable_name = (const char*(*)(int))
+        RTdlsym( filename, dlHandle, "spinja_get_state_variable_name" );
+    spinja_get_state_variable_type = (int (*)(int))
+        RTdlsym( filename, dlHandle, "spinja_get_state_variable_type" );
+    spinja_get_type_name = (const char*(*)(int))
+        RTdlsym( filename, dlHandle, "spinja_get_type_name" );
+    spinja_get_type_count = (int(*)())
+        RTdlsym( filename, dlHandle, "spinja_get_type_count" );
+
     (void)model;
 }
 
@@ -127,8 +140,10 @@ SpinJaloadGreyboxModel(model_t model, const char *filename)
     // adding types
     int ntypes = state_length;
     for (int i=0; i < ntypes; i++) {
-        char type_name[1024];
-        sprintf(type_name, "dummy type %d", i); /* FIXME */
+        const char* type_name = spinja_get_type_name(i);
+        if(!type_name) {
+            Fatal(1,error,"invalid type name");
+        }
         if (lts_type_add_type(ltstype,type_name,NULL) != i) {
             Fatal(1,error,"wrong type number");
         }
@@ -138,9 +153,8 @@ SpinJaloadGreyboxModel(model_t model, const char *filename)
 
     // set state name & type
     for (int i=0; i < state_length; ++i) {
-        char name[1024];
-        sprintf(name, "sv%d", i);   /* FIXME */
-        const int type = i;
+        const char* name = spinja_get_state_variable_name(i);
+        const int   type = spinja_get_state_variable_type(i);
         lts_type_set_state_name(ltstype,i,name);
         lts_type_set_state_typeno(ltstype,i,type);
     }
