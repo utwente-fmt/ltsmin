@@ -784,7 +784,7 @@ print_statistics(counter_t *reach, counter_t *red, mytimer_t timer)
                  red->explored, ((double)red->explored/db_elts)*100, red->trans);
         Warning (info, "");
         if (red->touched_red)
-            Warning (info, "WARNING: red in red: %zu", red->touched_red);
+            Warning (info, "WARNING: all_red: %zu", red->touched_red);
         Warning (info, "Total memory used for local state coloring: %.1fMB", mem3);
     } else {
         Warning (info, "")
@@ -1536,7 +1536,8 @@ nndfs_blue (wctx_t *ctx, size_t work)
             if ( !bitvector_is_set(&ctx->not_all_red, ctx->counters.level_cur) ) {
                 nn_set_color (&ctx->color_map, ctx->state.ref, NNRED);
                 if (strategy == Strat_YNNDFS)
-                    global_try_color (ctx->state.ref, GYELLOW);
+                    if (global_try_color (ctx->state.ref, GYELLOW))
+                        ctx->red.touched_red++;
                 bitvector_unset ( &ctx->not_all_red, ctx->counters.level_cur );
             } else if ( GBbuchiIsAccepting(ctx->model, ctx->state.data) ) {
                 if (strategy == Strat_YNNDFS)
