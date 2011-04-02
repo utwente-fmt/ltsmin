@@ -16,6 +16,7 @@ static const uint32_t   EMPTY = 0;
 static const uint32_t   WRITE_BIT = 1 << 31;
 static const uint32_t   WRITE_BIT_R = ~(1 << 31);
 static const uint32_t   BITS_PER_INT = sizeof (int) * 8;
+static const size_t     CL_MASK = -(1 << CACHE_LINE);
 
 struct dbs_ll_s {
     size_t              length;
@@ -32,50 +33,6 @@ struct dbs_ll_s {
 typedef struct local_s {
     stats_t             stat;
 } local_t;
-
-
-size_t
-inc (size_t x)
-{
-    return x + 1;
-}
-size_t
-dec (size_t x)
-{
-    return x - 1;
-}
-int
-lt (size_t x, size_t y)
-{
-    return x < y;
-}
-int
-gte (size_t x, size_t y)
-{
-    return x >= y;
-}
-
-typedef                 size_t (*op_f) (size_t x);
-typedef int             (*comp_f) (size_t x, size_t y);
-
-/**
- * Returns operators to walk up or down a cache line, depending on the starting
- * location.
- */
-static inline int
-walk_the_line (int idx, op_f * op, comp_f * comp)
-{                                      // good movie
-    size_t              line = (idx & CACHE_LINE_INT_MASK);
-    if (idx - line < (CACHE_LINE_INT >> 1)) {
-        *op = inc;
-        *comp = lt;
-        line += CACHE_LINE_INT;
-    } else {
-        *op = dec;
-        *comp = gte;
-    }
-    return line;
-}
 
 local_t *
 get_local (dbs_ll_t dbs)
@@ -110,12 +67,10 @@ DBSLLlookup_hash (const dbs_ll_t dbs, const int *v, int *ret, uint32_t *hash)
         hash_memo = dbs->hash32 ((char *)v, b, ++seed);
     uint32_t            WAIT = hash_memo & WRITE_BIT_R;
     uint32_t            DONE = hash_memo | WRITE_BIT;
-    op_f                op;
-    comp_f              comp;
     while (seed < dbs->threshold) {
         size_t              idx = hash_rehash & dbs->mask;
-        size_t              line = walk_the_line (idx, &op, &comp);
-        for (; comp (idx, line); idx = op (idx) & dbs->mask) {
+        size_t              line_end = (idx & CL_MASK) + CACHE_LINE_SIZE;
+        for (size_t i = 0; i < CACHE_LINE_SIZE; i++) {
             uint32_t           *bucket = &dbs->table[idx];
             if (EMPTY == *bucket) {
                 if (cas (bucket, EMPTY, WAIT)) {
@@ -132,8 +87,10 @@ DBSLLlookup_hash (const dbs_ll_t dbs, const int *v, int *ret, uint32_t *hash)
                     *ret = idx;
                     return 1;
                 }
+                stat->misses++;
             }
-            stat->misses++;
+            idx += 1;
+            idx = idx == line_end ? line_end - CACHE_LINE_SIZE : idx;
         }
         hash_rehash = dbs->hash32 ((char *)v, b, hash_rehash + (seed++));
         stat->rehashes++;
