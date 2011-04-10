@@ -40,6 +40,7 @@ typedef enum {
     VSET_BuDDy_fdd,
     VSET_DDD,
     VSET_ListDD,
+    VSET_Sylvan,
 } vset_implementation_t;
 
 /**

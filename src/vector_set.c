@@ -20,6 +20,9 @@ extern vdom_t vdom_create_ddd(int n);
 extern struct poptOption listdd_options[];
 extern vdom_t vdom_create_list_native(int n);
 
+extern struct poptOption sylvan_options[];
+extern vdom_t vdom_create_sylvan(int n);
+
 vset_implementation_t vset_default_domain = VSET_IMPL_AUTOSELECT;
 
 static void vset_popt(poptContext con,
@@ -56,6 +59,7 @@ static si_map_entry vset_table[]={
 #ifdef HAVE_DDD_H
 	{"ddd",VSET_DDD},
 #endif
+    {"sylvan",VSET_Sylvan},
 	{NULL,0}
 };
 
@@ -66,12 +70,13 @@ struct poptOption vset_options[]={
       "select a vector set implementation from native ListDD,"
       " ATermDD with *list* encoding,"
       " ATermDD with *tree* encoding, BuDDy using the *fdd* feature, or"
-      " DDD (default: first available)" , "<ldd|list|tree|fdd|ddd>" },
+      " DDD, or Sylvan (default: first available)" , "<ldd|list|tree|fdd|ddd|sylvan>" },
     { NULL,0 , POPT_ARG_INCLUDE_TABLE , listdd_options , 0 , "ListDD options" , NULL},
 #ifdef HAVE_ATERM2_H
     { NULL,0 , POPT_ARG_INCLUDE_TABLE , atermdd_options , 0 , "ATermDD options" , NULL},
 #endif
     { NULL,0 , POPT_ARG_INCLUDE_TABLE , buddy_options , 0 , "BuDDy options" , NULL},
+	{ NULL,0 , POPT_ARG_INCLUDE_TABLE , sylvan_options , 0 , "Sylvan options" , NULL},
     POPT_TABLEEND
 };
 
@@ -92,6 +97,7 @@ vdom_create_domain(int n, vset_implementation_t impl)
 #ifdef HAVE_DDD_H
     case VSET_DDD: return vdom_create_ddd(n);
 #endif
+    case VSET_Sylvan: return vdom_create_sylvan(n);
         default:
             return NULL;
     }

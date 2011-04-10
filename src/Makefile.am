@@ -491,6 +491,11 @@ libvset_la_CPPFLAGS  = $(BUDDY_CPPFLAGS)
 libvset_la_LDFLAGS   = $(BUDDY_LDFLAGS)
 libvset_la_LIBADD    = $(BUDDY_LIBS)
 
+libvset_la_SOURCES  += vset_sylvan.c
+libvset_la_CPPFLAGS += $(SYLVAN_CPPFLAGS) 
+libvset_la_LDFLAGS  += $(SYLVAN_LDFLAGS) 
+libvset_la_LIBADD   += $(SYLVAN_LIBS)
+
 if HAVE_LIBMCRL
 libvset_la_SOURCES  += vset_atermdd.c
 libvset_la_CPPFLAGS += $(MCRL_CPPFLAGS)
