@@ -117,8 +117,7 @@ sl_long_p_g (model_t model, int label, int *state)
 static void
 sl_all_p_g (model_t model, int *state, int *labels)
 {
-    assert (labels != NULL);
-    get_guard_all(model, state, labels++);
+    get_guard_all(model, state, labels);
     labels[GBgetAcceptingStateLabelIndex(model)] = buchi_is_accepting(model, state);
 }
 
@@ -517,9 +516,7 @@ DVE2loadGreyboxModel(model_t model, const char *filename)
         for(int i=0; i < sl_group_all->count; i++) sl_group_all->sl_idx[i] = i;
         sl_group_t* sl_group_guards = RTmallocZero(sizeof(sl_group_t) + nguards * sizeof(int));
         sl_group_guards->count = nguards;
-        int guard_offset = have_property() ? 1 : 0;
-        for(int i=0; i < sl_group_guards->count; i++) sl_group_guards->sl_idx[i] = i + guard_offset;
-
+        for(int i=0; i < sl_group_guards->count; i++) sl_group_guards->sl_idx[i] = i;
         GBsetStateLabelGroupInfo(model, GB_SL_ALL, sl_group_all);
         GBsetStateLabelGroupInfo(model, GB_SL_GUARDS, sl_group_guards);
         GBsetStateLabelsGroup(model, sl_group);
