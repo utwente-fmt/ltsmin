@@ -264,7 +264,7 @@ static int bs_setup(model_t model, por_context* pctx, int* src)
     memset(pctx->nes_score, 0, (n_guards * 2) * sizeof(int));
 
     // fill guard status, request all guard values,
-    GBgetStateLabelsAll(model, src, pctx->guard_status);
+    GBgetStateLabelsGroup(model, GB_SL_GUARDS, src, pctx->guard_status);
 
     // fill group status
     for(int i=0; i<n; i++) {
