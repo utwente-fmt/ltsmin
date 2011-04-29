@@ -359,7 +359,7 @@ void MCRL2loadGreyboxModel(model_t m,const char*model_name){
 	ctx->termmap=ATmapCreate(m,lts_type_add_type(ltstype,"leaf",NULL),ctx->rewriter,print_term,parse_term);
 	ctx->actionmap=ATmapCreate(m,lts_type_add_type(ltstype,"action",NULL),ctx->rewriter,print_label,NULL);
 	ctx->atPars=state_length;
-	ctx->atGrps=model.process().summands().size();
+	ctx->atGrps=model.process().summand_count();
 	ATerm s0=ctx->explorer->getInitialState();
 	//s0=(ATerm)ctx->explorer->makeStateVector(s0);
 	ctx->StateFun=ATgetAFun(s0);
