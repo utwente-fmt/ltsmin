@@ -8,6 +8,7 @@
 #include <vector>
 #include <stack>
 
+#include "mcrl2/lps/detail/instantiate_global_variables.h"
 #include "mcrl2/lps/nextstate.h"
 #include "mcrl2/lps/nextstate/standard.h"
 #include "mcrl2/lps/specification.h"
@@ -261,7 +262,7 @@ typedef struct grey_box_context {
 	NextState* explorer;
 	legacy_rewriter* rewriter_object;
 	mcrl2::data::detail::Rewriter* rewriter;
-        mcrl2::data::enumerator_factory< mcrl2::data::classic_enumerator< > > *enumerator_factory;
+    mcrl2::data::enumerator_factory< mcrl2::data::classic_enumerator< > > *enumerator_factory;
 	AFun StateFun;
 	group_information *info;
 	ATerm s0;
@@ -362,7 +363,7 @@ void MCRL2loadGreyboxModel(model_t m,const char*model_name){
         try {
           model.load(model_name);
 
-          model.instantiate_global_variables();
+          lps::detail::instantiate_global_variables(model);
         }
         catch (...) {
           Fatal(1,error,"could not read specification from %s",model_name);
@@ -384,12 +385,10 @@ void MCRL2loadGreyboxModel(model_t m,const char*model_name){
 	lts_type_set_edge_label_type(ltstype,0,"action");
 	GBsetLTStype(m,ltstype);
 
-        ctx->rewriter_object = new legacy_rewriter(model.data(),
-          mcrl2::data::used_data_equation_selector(model.data(), mcrl2::lps::specification_to_aterm(model)),
-          mcrl2_rewriter);
-        ctx->rewriter = &ctx->rewriter_object->get_rewriter();
+    ctx->rewriter_object = new legacy_rewriter(model.data(), mcrl2::data::used_data_equation_selector(model.data(), mcrl2::lps::find_function_symbols(model), model.global_variables()), mcrl2_rewriter);
+    ctx->rewriter = &ctx->rewriter_object->get_rewriter();
 
-        ctx->enumerator_factory = new mcrl2::data::enumerator_factory< mcrl2::data::classic_enumerator< > >(model.data(), *(ctx->rewriter_object));
+    ctx->enumerator_factory = new mcrl2::data::enumerator_factory< mcrl2::data::classic_enumerator< > >(model.data(), *(ctx->rewriter_object));
 
 	// Note the second argument that specifies that don't care variables are not treated specially
 	ctx->explorer = createNextState(model, *(ctx->enumerator_factory), false);
