@@ -1,4 +1,4 @@
-#serial 1
+#serial 2
 # Author: Michael Weber <michaelw@cs.utwente.nl>
 # Modified by Stefan Blom.
 #
@@ -30,7 +30,7 @@ if test x"$acx_mcrl2" = xyes; then
     AC_SUBST(MCRL2_CPPFLAGS, ["$MCRL2_CPPFLAGS -DBOOST_MPL_CFG_NO_PREPROCESSED_HEADERS=1 -I$with_mcrl2/include -I$with_mcrl2/include/aterm"])
     AC_SUBST(MCRL2_LDFLAGS,  ["-L${with_mcrl2}/lib/mcrl2"])
     AX_LET([CPPFLAGS], ["$MCRL2_CPPFLAGS $CPPFLAGS"],
-      [AC_CHECK_HEADER([mcrl2/atermpp/aterm.h],,
+      [AC_CHECK_HEADER([mcrl2/lps/ltsmin.h],,
          [AC_MSG_FAILURE([cannot find mCRL2 headers,
 see README on how to install mCRL2 properly.])]
          )])
@@ -52,25 +52,14 @@ AC_REQUIRE([ACX_MCRL2])dnl
 if test x"$acx_mcrl2" = xyes; then
     AC_LANG_PUSH([C++])
     AX_LET([CPPFLAGS], ["$MCRL2_CPPFLAGS $CPPFLAGS"],
-           [LIBS], ["$LIBS"],
+           [LIBS], ["-lmcrl2_data -lmcrl2_core -lmcrl2_aterm $LIBS"],
            [LDFLAGS], ["$MCRL2_LDFLAGS $LDFLAGS"],
       [acx_mcrl2_libs=yes
-       AX_CXX_CHECK_LIB([aterm], [ATinit],
-         [LIBS="-laterm $LIBS"
-          MCRL2_LIBS="-laterm $MCRL2_LIBS"],
+       AX_CXX_CHECK_LIB([mcrl2_lps], [main], dnl XXX
+         [MCRL2_LIBS="-lmcrl2_lps -lmcrl2_data -lmcrl2_core -lmcrl2_aterm"
+          LIBS="-lmcrl2_lps $LIBS"],
          [acx_mcrl2_libs=no])
-       AX_CXX_CHECK_LIB([mcrl2_core], [ATinit],  # XXX what to test for?
-         [LIBS="-lmcrl2_core $LIBS"
-          MCRL2_LIBS="-lmcrl2_core $MCRL2_LIBS"],
-         [acx_mcrl2_libs=no])
-       AX_CXX_CHECK_LIB([mcrl2_data], [ATinit],  # XXX what to test for?
-         [LIBS="-lmcrl2_data $LIBS"
-          MCRL2_LIBS="-lmcrl2_data $MCRL2_LIBS"],
-         [acx_mcrl2_libs=no])
-       AX_CXX_CHECK_LIB([mcrl2_lps], [ATinit],   # XXX what to test for?
-         [LIBS="-lmcrl2_lps $LIBS"
-          MCRL2_LIBS="-lmcrl2_lps $MCRL2_LIBS"],
-         [acx_mcrl2_libs=no])])
+      ])
     AC_LANG_POP([C++])
     AC_SUBST(MCRL2_LIBS)
 fi
@@ -86,6 +75,3 @@ else
   :
 fi
 ])
-
-
-
