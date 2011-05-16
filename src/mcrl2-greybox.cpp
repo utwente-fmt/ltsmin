@@ -32,6 +32,7 @@ static char const* mcrl2_args="--rewriter=jitty";
 struct state_cb
 {
     typedef int *state_vector;
+    typedef int *label_vector;
     TransitionCB& cb;
     void* ctx;
     int& count;
@@ -40,10 +41,9 @@ struct state_cb
         : cb(cb_), ctx(ctx_), count(count_)
     {}
 
-    void operator()(int edge_label, state_vector& next_state, int group)
+    void operator()(state_vector const& next_state, label_vector const& edge_labels, int group = -1)
     {
-        // int labels[1] = { edge_label };
-        transition_info_t ti = { &edge_label, group };
+        transition_info_t ti = { edge_labels, group };
         cb (ctx, &ti, next_state);
         ++count;
     }
@@ -51,6 +51,7 @@ struct state_cb
 
 class mcrl2_index {
 public:
+    std::string buffer_;
     mcrl2_index(mcrl2::lps::pins* pins, int tag)
         : pins_(pins), tag_(tag) {}
     mcrl2::lps::pins* get_pins() const { return pins_; }
@@ -68,13 +69,13 @@ static void *
 mcrl2_newmap (void *ctx)
 {
     static int tag = 0; // XXX typemap
-    return (void*)new mcrl2_index((mcrl2::lps::pins*)ctx, tag++);
+    return (void*)new mcrl2_index(reinterpret_cast<mcrl2::lps::pins*>(ctx), tag++);
 }
 
 static int
 mcrl2_chunk2int (void *map_, void *chunk, int len)
 {
-    mcrl2_index *map = (mcrl2_index *)map_;
+    mcrl2_index *map = reinterpret_cast<mcrl2_index*>(map_);
     mcrl2::lps::pins& pins = *map->get_pins();
     return pins.data_type(map->tag()).deserialize(std::string((char*)chunk,len));
 }
@@ -82,17 +83,17 @@ mcrl2_chunk2int (void *map_, void *chunk, int len)
 static const void *
 mcrl2_int2chunk (void *map_, int idx, int *len)
 {
-    mcrl2_index *map = (mcrl2_index *)map_;
+    mcrl2_index *map = reinterpret_cast<mcrl2_index*>(map_);
     mcrl2::lps::pins& pins = *map->get_pins();
-    std::string const& buf = pins.data_type(map->tag()).print(idx); // XXX serialize
-    *len = buf.length();
-    return buf.data(); // XXX life-time
+    map->buffer_ = pins.data_type(map->tag()).print(idx); // XXX serialize
+    *len = map->buffer_.length();
+    return map->buffer_.data(); // XXX life-time
 }
 
 static int
 mcrl2_chunk_count(void *map_)
 {
-    mcrl2_index *map = (mcrl2_index *)map_;
+    mcrl2_index *map = reinterpret_cast<mcrl2_index*>(map_);
     return map->get_pins()->data_type(map->tag()).size();
 }
 
@@ -126,7 +127,7 @@ mcrl2_popt (poptContext con, enum poptCallbackReason reason,
             POPT_TABLEEND
         };
         Warning (debug,"options");
-        poptContext optCon = poptGetContext(NULL, argc,(const char **) argv, options, 0);
+        poptContext optCon = poptGetContext(NULL, argc,const_cast<const char**>(argv), options, 0);
         int res = poptGetNextOpt(optCon);
         if (res != -1 || poptPeekArg(optCon)!=NULL) {
             Fatal(1,error,"Bad mcrl2 options: %s",mcrl2_args);
@@ -164,36 +165,36 @@ MCRL2initGreybox (int argc,char *argv[],void* stack_bottom)
 static int
 MCRL2getTransitionsLong (model_t m, int group, int *src, TransitionCB cb, void *ctx)
 {
-    using namespace mcrl2;
-    lps::pins *pins = (lps::pins *)GBgetContext (m);
+    mcrl2::lps::pins *pins = (mcrl2::lps::pins *)GBgetContext (m);
     int count = 0;
+    int dst[pins->process_parameter_count()];
+    int labels[pins->edge_label_count()];
     state_cb f(cb, ctx, count);
-    pins->next_state_long(src, group, f);
+    pins->next_state_long(src, group, f, dst, labels);
     return count;
 }
 
 static int
 MCRL2getTransitionsAll (model_t m, int* src, TransitionCB cb, void *ctx)
 {
-    using namespace mcrl2;
-    lps::pins *pins = (lps::pins *)GBgetContext (m);
+    mcrl2::lps::pins *pins = (mcrl2::lps::pins *)GBgetContext (m);
     int count = 0;
+    int dst[pins->process_parameter_count()];
+    int labels[pins->edge_label_count()];
     state_cb f(cb, ctx, count);
-    pins->next_state_all(src, f);
+    pins->next_state_all(src, f, dst, labels);
     return count;
 }
 
 void
 MCRL2loadGreyboxModel (model_t m, const char *model_name)
 {
-    using namespace mcrl2;
     Warning(info, "mCRL2 rewriter: %s", mcrl2_rewriter_strategy.c_str());
-    lps::pins *pins = new lps::pins(std::string(model_name), mcrl2_rewriter_strategy);
-    assert (pins != 0);
+    mcrl2::lps::pins *pins = new mcrl2::lps::pins(std::string(model_name), mcrl2_rewriter_strategy);
     GBsetContext(m,pins);
 
-    lts_type_t ltstype=lts_type_create();
-    lts_type_set_state_length(ltstype, pins->process_parameter_count());
+    lts_type_t ltstype = lts_type_create();
+    lts_type_set_state_length (ltstype, pins->process_parameter_count());
 
     // create ltsmin type for each mcrl2-provided type
     for(size_t i = 0; i < pins->datatype_count(); ++i) {
@@ -217,13 +218,13 @@ MCRL2loadGreyboxModel (model_t m, const char *model_name)
     GBsetLTStype(m,ltstype);
 
     int s0[pins->process_parameter_count()];
-    lps::pins::ltsmin_state_type p_s0 = s0;
+    mcrl2::lps::pins::ltsmin_state_type p_s0 = s0;
     pins->get_initial_state(p_s0);
     GBsetInitialState(m, s0);
 
-    matrix_t *p_dm_info       = (matrix_t *)RTmalloc(sizeof *p_dm_info);
-    matrix_t *p_dm_read_info  = (matrix_t *)RTmalloc(sizeof *p_dm_read_info);
-    matrix_t *p_dm_write_info = (matrix_t *)RTmalloc(sizeof *p_dm_write_info);
+    matrix_t *p_dm_info       = reinterpret_cast<matrix_t *>(RTmalloc(sizeof *p_dm_info));
+    matrix_t *p_dm_read_info  = reinterpret_cast<matrix_t *>(RTmalloc(sizeof *p_dm_read_info));
+    matrix_t *p_dm_write_info = reinterpret_cast<matrix_t *>(RTmalloc(sizeof *p_dm_write_info));
     dm_create(p_dm_info, pins->group_count(),
               pins->process_parameter_count());
     dm_create(p_dm_read_info, pins->group_count(),
@@ -247,7 +248,7 @@ MCRL2loadGreyboxModel (model_t m, const char *model_name)
     GBsetDMInfo (m, p_dm_info);
     GBsetDMInfoRead (m, p_dm_read_info);
     GBsetDMInfoWrite (m, p_dm_write_info);
-    matrix_t *p_sl_info = (matrix_t *)RTmalloc(sizeof *p_sl_info);
+    matrix_t *p_sl_info = reinterpret_cast<matrix_t *>(RTmalloc(sizeof *p_sl_info));
     dm_create (p_sl_info, 0, pins->process_parameter_count());
     GBsetStateLabelInfo (m, p_sl_info);
     GBsetNextStateLong (m, MCRL2getTransitionsLong);
