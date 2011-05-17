@@ -1535,9 +1535,9 @@ main (int argc, char *argv[])
             double elem_count;
 
             get_vset_size(x, &node_count, &elem_count, elem_str, str_len);
-            fprintf(stderr, "mu formula holds for %s (~%1.2e) states\n",
-                    elem_str, elem_count);
-            fprintf(stderr, " s0 is %sin the set\n",
+            Warning(info, "mu formula holds for %s (~%1.2e) states\n",
+                        elem_str, elem_count);
+            Warning(info, " the initial state is %sin the set\n",
                         vset_member(x, src) ? "" : "not ");
             vset_destroy(x);
         }
