@@ -115,7 +115,7 @@ static  struct poptOption options[] = {
     { NULL, 0 , POPT_ARG_CALLBACK|POPT_CBFLAG_POST|POPT_CBFLAG_SKIPOPTION , (void*)reach_popt , 0 , NULL , NULL },
     { "order" , 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &order , 0 , "set the exploration strategy to a specific order" , "<bfs-prev|bfs|chain-prev|chain>" },
     { "saturation" , 0, POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &saturation , 0 , "select the saturation strategy" , "<none|sat1|sat2|sat3>" },
-    { "G" , 0 , POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &sat_granularity , 0 , "set saturation granularity","<number>" },
+    { "sat-granularity" , 0 , POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &sat_granularity , 0 , "set saturation granularity","<number>" },
     { "save-levels", 0, POPT_ARG_VAL, &save_levels, 1, "save previous states seen at saturation levels", NULL },
     { "deadlock" , 'd' , POPT_ARG_VAL , &dlk_detect , 1 , "detect deadlocks" , NULL },
     { "action" , 0 , POPT_ARG_STRING , &act_detect , 0 , "detect action" , "<action>" },
@@ -154,6 +154,7 @@ static int N;
 static int eLbls;
 static int sLbls;
 static int nGrps;
+static int max_sat_levels;
 static proj_info *projs;
 static vdom_t domain;
 static vset_t *levels = NULL;
@@ -902,12 +903,12 @@ reach_sat1(reach_proc_t reach_proc, vset_t visited, bitvector_t *reach_groups,
             }
 
     // Diagnostics
-    diagnostic("level: ");
+    diagnostic("level:");
     for (int i = 0; i < nGrps; i++)
-        diagnostic("%d ", level[i]);
-    diagnostic("\nback: ");
-    for (int k = 0; k < N; k++)
-        diagnostic("%d ", back[k]);
+        diagnostic(" %d", level[i]);
+    diagnostic("\nback:");
+    for (int k = 0; k < (N - 1) / sat_granularity + 1; k++)
+        diagnostic(" %d", back[k]);
     diagnostic("\n");
 
     int k = 0;
@@ -934,19 +935,16 @@ reach_sat1(reach_proc_t reach_proc, vset_t visited, bitvector_t *reach_groups,
 }
 
 static void
-initialize_levels(bitvector_t *groups, bitvector_t *reach_groups)
+initialize_levels(bitvector_t *groups, int *empty_groups, int *back,
+                      bitvector_t *reach_groups)
 {
     int level[nGrps];
 
-    // groups: i=0..nGrps-1
-    // vars  : j=0..N-1
-    // BDD levels:  k = N-1..0   (k = N-j-1)
-
-    for (int k = 0; k < N; k++)
-        bitvector_create(&groups[k], nGrps);
+    // groups: i = 0 .. nGrps - 1
+    // vars  : j = 0 .. N - 1
 
     // level[i] = first '+' in row (highest in BDD) of group i
-    // recast 0..N-1 down to equal groups 0..(N-1)/G
+    // recast 0 .. N - 1 down to equal groups 0 .. (N - 1) / sat_granularity
     for (int i = 0; i < nGrps; i++)
         for (int j = 0; j < N; j++)
             if (dm_is_set(GBgetDMInfo(model), i, j)) {
@@ -957,14 +955,64 @@ initialize_levels(bitvector_t *groups, bitvector_t *reach_groups)
     for (int i = 0; i < nGrps; i++)
         bitvector_set(&groups[level[i]], i);
 
-    // Limit the bit vectors to the groups we are interested in
-    for (int k = 0; k < N; k++)
+    // Limit the bit vectors to the groups we are interested in and establish
+    // which saturation levels are not used.
+    for (int k = 0; k < max_sat_levels; k++) {
         bitvector_intersect(&groups[k], reach_groups);
+        empty_groups[k] = bitvector_is_empty(&groups[k]);
+    }
 
-    // Diagnostics
-    diagnostic("level: ");
+    // Level diagnostic
+    diagnostic("level:");
     for (int i = 0; i < nGrps; i++)
-        diagnostic("%d ", level[i]);
+        diagnostic(" %d", level[i]);
+    diagnostic("\n");
+
+    if (back == NULL)
+        return;
+
+    // back[k] = last + in any group of level k
+    bitvector_t level_matrix[(N - 1) / sat_granularity + 1];
+
+    for (int k = 0; k < max_sat_levels; k++) {
+        bitvector_create(&level_matrix[k], N);
+        back[k] = max_sat_levels;
+    }
+
+    for (int i = 0; i < nGrps; i++) {
+        bitvector_t row;
+
+        bitvector_create(&row, N);
+        dm_bitvector_row(&row, GBgetDMInfo(model), i);
+        bitvector_union(&level_matrix[level[i]], &row);
+        bitvector_free(&row);
+    }
+
+    for (int k = 0; k < max_sat_levels; k++) {
+        for (int j = 0; j < k; j++) {
+            bitvector_t temp;
+            int empty;
+
+            bitvector_copy(&temp, &level_matrix[j]);
+            bitvector_intersect(&temp, &level_matrix[k]);
+            empty = bitvector_is_empty(&temp);
+            bitvector_free(&temp);
+
+            if (!empty)
+                if (j < back[k]) back[k] = j;
+        }
+
+        if (back[k] == max_sat_levels && !bitvector_is_empty(&level_matrix[k]))
+            back[k] = k + 1;
+    }
+
+    for (int k = 0; k < max_sat_levels; k++)
+        bitvector_free(&level_matrix[k]);
+
+    // Back diagnostic
+    diagnostic("back:");
+    for (int k = 0; k < max_sat_levels; k++)
+        diagnostic(" %d", back[k]);
     diagnostic("\n");
 }
 
@@ -972,33 +1020,42 @@ static void
 reach_sat2(reach_proc_t reach_proc, vset_t visited, bitvector_t *reach_groups,
                long *eg_count, long *next_count)
 {
-    bitvector_t groups[N];
+    bitvector_t groups[max_sat_levels];
+    int empty_groups[max_sat_levels];
+    int back[max_sat_levels];
     int k = 0;
     int last = -1;
     vset_t old_vis = vset_create(domain, 0, NULL);
     vset_t prev_vis[nGrps];
 
-    initialize_levels(groups, reach_groups);
+    for (int k = 0; k < max_sat_levels; k++)
+        bitvector_create(&groups[k], nGrps);
+
+    initialize_levels(groups, empty_groups, back, reach_groups);
 
     for (int i = 0; i < nGrps; i++)
         prev_vis[i] = save_levels?vset_create(domain, 0, NULL):NULL;
 
-    while (k < (N - 1) / sat_granularity + 1) {
-        if (k == last)
+    while (k < max_sat_levels) {
+        if (k == last || empty_groups[k]) {
+            k++;
+            continue;
+        }
+
+        Warning(info, "Saturating level: %d", k);
+        vset_copy(old_vis, visited);
+        reach_proc(visited, prev_vis[k], &groups[k], eg_count, next_count);
+        if (save_levels) vset_copy(prev_vis[k], visited);
+        if (vset_equal(old_vis, visited))
             k++;
         else {
-            Warning(info, "Saturating level: %d", k);
-            vset_copy(old_vis, visited);
-            reach_proc(visited, prev_vis[k], &groups[k], eg_count, next_count);
-            if (save_levels) vset_copy(prev_vis[k], visited);
-            if (vset_equal(old_vis, visited))
-                k++;
-            else {
-                last = k;
-                k = 0;
-            }
+            last = k;
+            k = back[k];
         }
     }
+
+    for (int k = 0; k < max_sat_levels; k++)
+        bitvector_free(&groups[k]);
 
     vset_destroy(old_vis);
     if (save_levels)
@@ -1009,23 +1066,31 @@ static void
 reach_sat3(reach_proc_t reach_proc, vset_t visited, bitvector_t *reach_groups,
                long *eg_count, long *next_count)
 {
-    bitvector_t groups[N];
+    bitvector_t groups[max_sat_levels];
+    int empty_groups[max_sat_levels];
     vset_t old_vis = vset_create(domain, 0, NULL);
     vset_t prev_vis[nGrps];
 
-    initialize_levels(groups, reach_groups);
+    for (int k = 0; k < max_sat_levels; k++)
+        bitvector_create(&groups[k], nGrps);
+
+    initialize_levels(groups, empty_groups, NULL, reach_groups);
 
     for (int i = 0; i < nGrps; i++)
         prev_vis[i] = save_levels?vset_create(domain, 0, NULL):NULL;
 
     while (!vset_equal(old_vis, visited)) {
         vset_copy(old_vis, visited);
-        for (int k = 0; k < (N - 1) / sat_granularity + 1 ; k++) {
+        for (int k = 0; k < max_sat_levels; k++) {
+            if (empty_groups[k]) continue;
             Warning(info, "Saturating level: %d", k);
             reach_proc(visited, prev_vis[k], &groups[k], eg_count, next_count);
             if (save_levels) vset_copy(prev_vis[k], visited);
         }
     }
+
+    for (int k = 0; k < max_sat_levels; k++)
+        bitvector_free(&groups[k]);
 
     vset_destroy(old_vis);
     if (save_levels)
@@ -1274,6 +1339,7 @@ init_model(char *file)
     eLbls = lts_type_get_edge_label_count(ltstype);
     sLbls = lts_type_get_state_label_count(ltstype);
     nGrps = dm_nrows(GBgetDMInfo(model));
+    max_sat_levels = (N - 1) / sat_granularity + 1;
     Warning(info, "state vector length is %d; there are %d groups", N, nGrps);
 }
 
