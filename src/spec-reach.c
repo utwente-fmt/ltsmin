@@ -45,6 +45,7 @@ static char* act_detect = NULL;
 static int   act_detect_table;
 static int   act_detect_index;
 static int   sat_granularity = 10;
+static int   save_levels = 0;
 
 static lts_enum_cb_t trace_handle = NULL;
 
@@ -115,6 +116,7 @@ static  struct poptOption options[] = {
     { "order" , 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &order , 0 , "set the exploration strategy to a specific order" , "<bfs-prev|bfs|chain-prev|chain>" },
     { "saturation" , 0, POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &saturation , 0 , "select the saturation strategy" , "<none|sat1|sat2|sat3>" },
     { "G" , 0 , POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &sat_granularity , 0 , "set saturation granularity","<number>" },
+    { "save-levels", 0, POPT_ARG_VAL, &save_levels, 1, "save previous states seen at saturation levels", NULL },
     { "deadlock" , 'd' , POPT_ARG_VAL , &dlk_detect , 1 , "detect deadlocks" , NULL },
     { "action" , 0 , POPT_ARG_STRING , &act_detect , 0 , "detect action" , "<action>" },
     { "trace" , 0 , POPT_ARG_STRING , &trc_output , 0 , "file to write trace to" , "<lts-file>.gcf" },
@@ -154,7 +156,6 @@ static int sLbls;
 static int nGrps;
 static proj_info *projs;
 static vdom_t domain;
-static vset_t visited;
 static vset_t *levels = NULL;
 static int max_levels = 0;
 static int global_level;
@@ -167,13 +168,16 @@ static vrel_t *group_next;
 static vset_t *group_explored;
 static vset_t *group_tmp;
 
-typedef void (*reach_proc_t)(bitvector_t *reach_groups,
+typedef void (*reach_proc_t)(vset_t visited, vset_t visited_old,
+                             bitvector_t *reach_groups,
                              long *eg_count, long *next_count);
 
-typedef void (*sat_proc_t)(reach_proc_t reach_proc, bitvector_t *reach_groups,
+typedef void (*sat_proc_t)(reach_proc_t reach_proc, vset_t visited,
+                           bitvector_t *reach_groups,
                            long *eg_count, long *next_count);
 
-typedef void (*guided_proc_t)(sat_proc_t sat_proc, reach_proc_t reach_proc);
+typedef void (*guided_proc_t)(sat_proc_t sat_proc, reach_proc_t reach_proc,
+                              vset_t visited);
 
 static void *
 new_string_index (void *context)
@@ -195,7 +199,7 @@ grow_levels(int new_levels)
 }
 
 static inline void
-save_level()
+save_level(vset_t visited)
 {
     grow_levels(1024);
     vset_copy(levels[global_level], visited);
@@ -642,7 +646,8 @@ final_stat_reporting(vset_t visited, mytimer_t timer)
 }
 
 static void
-reach_bfs_prev(bitvector_t *reach_groups, long *eg_count, long *next_count)
+reach_bfs_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
+                   long *eg_count, long *next_count)
 {
     int level = 0;
     vset_t current_level = vset_create(domain, 0, NULL);
@@ -652,9 +657,10 @@ reach_bfs_prev(bitvector_t *reach_groups, long *eg_count, long *next_count)
     vset_t dlk_temp = dlk_detect?vset_create(domain, 0 ,NULL):NULL;
 
     vset_copy(current_level, visited);
+    if (save_levels) vset_minus(current_level, visited_old);
 
     while (!vset_is_empty(current_level)) {
-        if (trc_output != NULL) save_level();
+        if (trc_output != NULL) save_level(visited);
         stats_and_progress_report(current_level, visited, level);
         level++;
         for (int i = 0; i < nGrps; i++){
@@ -697,8 +703,11 @@ reach_bfs_prev(bitvector_t *reach_groups, long *eg_count, long *next_count)
 }
 
 static void
-reach_bfs(bitvector_t *reach_groups, long *eg_count, long *next_count)
+reach_bfs(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
+              long *eg_count, long *next_count)
 {
+    (void) visited_old;
+
     int level = 0;
     vset_t old_vis = vset_create(domain, 0, NULL);
     vset_t temp = vset_create(domain, 0, NULL);
@@ -706,7 +715,7 @@ reach_bfs(bitvector_t *reach_groups, long *eg_count, long *next_count)
     vset_t dlk_temp = dlk_detect?vset_create(domain, 0, NULL):NULL;
 
     while (!vset_equal(visited, old_vis)) {
-        if (trc_output != NULL) save_level();
+        if (trc_output != NULL) save_level(visited);
         vset_copy(old_vis, visited);
         stats_and_progress_report(NULL, visited, level);
         level++;
@@ -745,7 +754,8 @@ reach_bfs(bitvector_t *reach_groups, long *eg_count, long *next_count)
 }
 
 static void
-reach_chain_prev(bitvector_t *reach_groups, long *eg_count, long *next_count)
+reach_chain_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
+                     long *eg_count, long *next_count)
 {
     int level = 0;
     vset_t new_states = vset_create(domain, 0, NULL);
@@ -754,8 +764,10 @@ reach_chain_prev(bitvector_t *reach_groups, long *eg_count, long *next_count)
     vset_t dlk_temp = dlk_detect?vset_create(domain, 0, NULL):NULL;
 
     vset_copy(new_states, visited);
+    if (save_levels) vset_minus(new_states, visited_old);
+
     while (!vset_is_empty(new_states)) {
-        if (trc_output != NULL) save_level();
+        if (trc_output != NULL) save_level(visited);
         stats_and_progress_report(new_states, visited, level);
         level++;
         if (dlk_detect) vset_copy(deadlocks, new_states);
@@ -791,8 +803,11 @@ reach_chain_prev(bitvector_t *reach_groups, long *eg_count, long *next_count)
 }
 
 static void
-reach_chain(bitvector_t *reach_groups, long *eg_count, long *next_count)
+reach_chain(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
+                long *eg_count, long *next_count)
 {
+    (void) visited_old;
+
     int level = 0;
     vset_t old_vis = vset_create(domain, 0, NULL);
     vset_t temp = vset_create(domain, 0, NULL);
@@ -800,7 +815,7 @@ reach_chain(bitvector_t *reach_groups, long *eg_count, long *next_count)
     vset_t dlk_temp = dlk_detect?vset_create(domain, 0, NULL):NULL;
 
     while (!vset_equal(visited, old_vis)) {
-        if (trc_output != NULL) save_level();
+        if (trc_output != NULL) save_level(visited);
         vset_copy(old_vis, visited);
         stats_and_progress_report(NULL, visited, level);
         level++;
@@ -834,15 +849,19 @@ reach_chain(bitvector_t *reach_groups, long *eg_count, long *next_count)
 }
 
 static void
-reach_no_sat(reach_proc_t reach_proc, bitvector_t *reach_groups,
+reach_no_sat(reach_proc_t reach_proc, vset_t visited, bitvector_t *reach_groups,
                  long *eg_count, long *next_count)
 {
-    reach_proc(reach_groups, eg_count, next_count);
+    vset_t old_visited = save_levels?vset_create(domain, 0, NULL):NULL;
+
+    reach_proc(visited, old_visited, reach_groups, eg_count, next_count);
+
+    if (save_levels) vset_destroy(old_visited);
 }
 
 
 static void
-reach_sat1(reach_proc_t reach_proc, bitvector_t *reach_groups,
+reach_sat1(reach_proc_t reach_proc, vset_t visited, bitvector_t *reach_groups,
                long *eg_count, long *next_count)
 {
     int level[nGrps];
@@ -893,20 +912,29 @@ reach_sat1(reach_proc_t reach_proc, bitvector_t *reach_groups,
 
     int k = 1;
     vset_t old_vis = vset_create(domain, 0, NULL);
+    vset_t prev_vis[nGrps];
+
+    for (int i = 0; i < nGrps; i++)
+        prev_vis[i] = save_levels?vset_create(domain, 0, NULL):NULL;
+
     while (k <= N) {
       Warning(info, "Saturating level: %d", k);
       vset_copy(old_vis, visited);
-      reach_proc(&groups[k], eg_count, next_count);
+      reach_proc(visited, prev_vis[k - 1], &groups[k], eg_count, next_count);
+      if (save_levels) vset_copy(prev_vis[k - 1], visited);
       if (vset_equal(old_vis, visited))
           k++;
       else
           k=back[k];
     }
+
     vset_destroy(old_vis);
+    if (save_levels)
+        for (int i = 0; i < nGrps; i++) vset_destroy(prev_vis[i]);
 }
 
 static void
-reach_sat2(reach_proc_t reach_proc, bitvector_t *reach_groups,
+reach_sat2(reach_proc_t reach_proc, vset_t visited, bitvector_t *reach_groups,
                long *eg_count, long *next_count)
 {
     int level[nGrps];
@@ -944,13 +972,19 @@ reach_sat2(reach_proc_t reach_proc, bitvector_t *reach_groups,
     int k = 1;
     int last = 0;
     vset_t old_vis = vset_create(domain, 0, NULL);
+    vset_t prev_vis[nGrps];
+
+    for (int i = 0; i < nGrps; i++)
+        prev_vis[i] = save_levels?vset_create(domain, 0, NULL):NULL;
+
     while (k <= (N - 1) / sat_granularity + 1) {
         if (k == last)
             k++;
         else {
             Warning(info, "Saturating level: %d", k);
             vset_copy(old_vis, visited);
-            reach_proc(&groups[k], eg_count, next_count);
+            reach_proc(visited, prev_vis[k - 1], &groups[k], eg_count, next_count);
+            if (save_levels) vset_copy(prev_vis[k - 1], visited);
             if (vset_equal(old_vis, visited))
                 k++;
             else {
@@ -959,11 +993,14 @@ reach_sat2(reach_proc_t reach_proc, bitvector_t *reach_groups,
             }
         }
     }
+
     vset_destroy(old_vis);
+    if (save_levels)
+        for (int i = 0; i < nGrps; i++) vset_destroy(prev_vis[i]);
 }
 
 static void
-reach_sat3(reach_proc_t reach_proc, bitvector_t *reach_groups,
+reach_sat3(reach_proc_t reach_proc, vset_t visited, bitvector_t *reach_groups,
                long *eg_count, long *next_count)
 {
     int level[nGrps];
@@ -999,14 +1036,23 @@ reach_sat3(reach_proc_t reach_proc, bitvector_t *reach_groups,
     diagnostic("\n");
 
     vset_t old_vis = vset_create(domain, 0, NULL);
+    vset_t prev_vis[nGrps];
+
+    for (int i = 0; i < nGrps; i++)
+        prev_vis[i] = save_levels?vset_create(domain, 0, NULL):NULL;
+
     while (!vset_equal(old_vis, visited)) {
         vset_copy(old_vis, visited);
         for (int k = 1; k <= (N - 1) / sat_granularity + 1 ; k++) {
             Warning(info, "Saturating level: %d", k);
-            reach_proc(&groups[k], eg_count, next_count);
+            reach_proc(visited, prev_vis[k - 1], &groups[k], eg_count, next_count);
+            if (save_levels) vset_copy(prev_vis[k - 1], visited);
         }
     }
+
     vset_destroy(old_vis);
+    if (save_levels)
+        for (int i = 0; i < nGrps; i++) vset_destroy(prev_vis[i]);
 }
 
 typedef struct {
@@ -1129,7 +1175,7 @@ output_trans(FILE *tbl_file)
 }
 
 static void
-output_lbls(FILE *tbl_file)
+output_lbls(FILE *tbl_file, vset_t visited)
 {
     matrix_t *sl_info = GBgetStateLabelInfo(model);
 
@@ -1194,7 +1240,7 @@ output_types(FILE *tbl_file)
 }
 
 static void
-do_output(char *etf_output)
+do_output(char *etf_output, vset_t visited)
 {
     FILE      *tbl_file;
     mytimer_t  timer    = SCCcreateTimer();
@@ -1208,7 +1254,7 @@ do_output(char *etf_output)
 
     output_init(tbl_file);
     output_trans(tbl_file);
-    output_lbls(tbl_file);
+    output_lbls(tbl_file, visited);
     output_types(tbl_file);
 
     fclose(tbl_file);
@@ -1217,7 +1263,7 @@ do_output(char *etf_output)
 }
 
 static void
-unguided(sat_proc_t sat_proc, reach_proc_t reach_proc)
+unguided(sat_proc_t sat_proc, reach_proc_t reach_proc, vset_t visited)
 {
     bitvector_t reach_groups;
     long eg_count = 0;
@@ -1225,7 +1271,7 @@ unguided(sat_proc_t sat_proc, reach_proc_t reach_proc)
 
     bitvector_create(&reach_groups, nGrps);
     bitvector_invert(&reach_groups);
-    sat_proc(reach_proc, &reach_groups, &eg_count, &next_count);
+    sat_proc(reach_proc, visited, &reach_groups, &eg_count, &next_count);
     bitvector_free(&reach_groups);
     Warning(info, "Exploration took %ld group checks and %ld next state calls",
                 eg_count, next_count);
@@ -1255,10 +1301,10 @@ init_model(char *file)
 }
 
 static void
-init_domain()
+init_domain(vset_t *visited)
 {
     domain = vdom_create_default(N);
-    visited = vset_create(domain, 0, NULL);
+    *visited = vset_create(domain, 0, NULL);
 
     group_next     = (vrel_t*)RTmalloc(nGrps * sizeof(vrel_t));
     group_explored = (vset_t*)RTmalloc(nGrps * sizeof(vset_t));
@@ -1301,8 +1347,10 @@ main(int argc, char *argv[])
                        "The optional output of this analysis is an ETF "
                            "representation of the input\n\nOptions");
 
+    vset_t visited;
+
     init_model(files[0]);
-    init_domain();
+    init_domain(&visited);
     if (act_detect != NULL) init_action();
 
     sat_proc_t sat_proc = NULL;
@@ -1348,12 +1396,12 @@ main(int argc, char *argv[])
     mytimer_t timer = SCCcreateTimer();
 
     SCCstartTimer(timer);
-    guided_proc(sat_proc, reach_proc);
+    guided_proc(sat_proc, reach_proc, visited);
     SCCstopTimer(timer);
     final_stat_reporting(visited, timer);
 
     if (files[1] != NULL)
-        do_output(files[1]);
+        do_output(files[1], visited);
 
     return 0;
 }
