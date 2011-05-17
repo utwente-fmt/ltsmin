@@ -60,14 +60,13 @@ static const si_map_entry ORDER[] = {
     {NULL, 0}
 };
 
-static enum { NO_SAT, SAT_1, SAT_2, SAT_3 } sat_strategy = NO_SAT;
+static enum { NO_SAT, SAT_LIKE, SAT_LOOP } sat_strategy = NO_SAT;
 
 static char* saturation = "none";
 static const si_map_entry SATURATION[] = {
     {"none", NO_SAT},
-    {"sat1", SAT_1},
-    {"sat2", SAT_2},
-    {"sat3", SAT_3},
+    {"sat-like", SAT_LIKE},
+    {"sat-loop", SAT_LOOP},
     {NULL, 0}
 };
 
@@ -114,7 +113,7 @@ reach_popt(poptContext con, enum poptCallbackReason reason,
 static  struct poptOption options[] = {
     { NULL, 0 , POPT_ARG_CALLBACK|POPT_CBFLAG_POST|POPT_CBFLAG_SKIPOPTION , (void*)reach_popt , 0 , NULL , NULL },
     { "order" , 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &order , 0 , "set the exploration strategy to a specific order" , "<bfs-prev|bfs|chain-prev|chain>" },
-    { "saturation" , 0, POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &saturation , 0 , "select the saturation strategy" , "<none|sat1|sat2|sat3>" },
+    { "saturation" , 0, POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &saturation , 0 , "select the saturation strategy" , "<none|sat-like|sat-loop>" },
     { "sat-granularity" , 0 , POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &sat_granularity , 0 , "set saturation granularity","<number>" },
     { "save-levels", 0, POPT_ARG_VAL, &save_levels, 1, "save previous states seen at saturation levels", NULL },
     { "deadlock" , 'd' , POPT_ARG_VAL , &dlk_detect , 1 , "detect deadlocks" , NULL },
@@ -860,80 +859,6 @@ reach_no_sat(reach_proc_t reach_proc, vset_t visited, bitvector_t *reach_groups,
     if (save_levels) vset_destroy(old_visited);
 }
 
-
-static void
-reach_sat1(reach_proc_t reach_proc, vset_t visited, bitvector_t *reach_groups,
-               long *eg_count, long *next_count)
-{
-    int level[nGrps];
-    int back[N];
-    bitvector_t groups[N];
-
-    // groups: i=0..nGrps-1
-    // vars  : j=0..N-1
-    // BDD levels:  k = N-1..0
-
-    for (int k = 0; k < N; k++)
-        bitvector_create(&groups[k], nGrps);
-
-    // level[i] = first (highest) + of group i
-    for (int i = 0; i < nGrps; i++)
-        for (int j = 0; j < N; j++)
-            if (dm_is_set(GBgetDMInfo(model), i, j)) {
-                level[i] = N - j - 1;
-                break;
-            }
-
-    for (int i = 0; i < nGrps; i++)
-        bitvector_set(&groups[level[i]], i);
-
-    // Limit the bit vectors to the groups we are interested in
-    for (int k = 0; k < N; k++)
-        bitvector_intersect(&groups[k], reach_groups);
-
-    // back[k] = last + in any group of level k
-    for (int k = 0; k < N; k++)
-        back[k] = N;
-
-    for (int i = 0; i < nGrps; i++)
-        for (int k = 0; k < N; k++)
-            if (dm_is_set(GBgetDMInfo(model), i, N - k - 1)) {
-                if (k < back[level[i]]) back[level[i]] = k;
-                break;
-            }
-
-    // Diagnostics
-    diagnostic("level:");
-    for (int i = 0; i < nGrps; i++)
-        diagnostic(" %d", level[i]);
-    diagnostic("\nback:");
-    for (int k = 0; k < (N - 1) / sat_granularity + 1; k++)
-        diagnostic(" %d", back[k]);
-    diagnostic("\n");
-
-    int k = 0;
-    vset_t old_vis = vset_create(domain, 0, NULL);
-    vset_t prev_vis[nGrps];
-
-    for (int i = 0; i < nGrps; i++)
-        prev_vis[i] = save_levels?vset_create(domain, 0, NULL):NULL;
-
-    while (k < N) {
-      Warning(info, "Saturating level: %d", k);
-      vset_copy(old_vis, visited);
-      reach_proc(visited, prev_vis[k], &groups[k], eg_count, next_count);
-      if (save_levels) vset_copy(prev_vis[k], visited);
-      if (vset_equal(old_vis, visited))
-          k++;
-      else
-          k=back[k];
-    }
-
-    vset_destroy(old_vis);
-    if (save_levels)
-        for (int i = 0; i < nGrps; i++) vset_destroy(prev_vis[i]);
-}
-
 static void
 initialize_levels(bitvector_t *groups, int *empty_groups, int *back,
                       bitvector_t *reach_groups)
@@ -1017,8 +942,8 @@ initialize_levels(bitvector_t *groups, int *empty_groups, int *back,
 }
 
 static void
-reach_sat2(reach_proc_t reach_proc, vset_t visited, bitvector_t *reach_groups,
-               long *eg_count, long *next_count)
+reach_sat_like(reach_proc_t reach_proc, vset_t visited,
+                   bitvector_t *reach_groups, long *eg_count, long *next_count)
 {
     bitvector_t groups[max_sat_levels];
     int empty_groups[max_sat_levels];
@@ -1063,8 +988,8 @@ reach_sat2(reach_proc_t reach_proc, vset_t visited, bitvector_t *reach_groups,
 }
 
 static void
-reach_sat3(reach_proc_t reach_proc, vset_t visited, bitvector_t *reach_groups,
-               long *eg_count, long *next_count)
+reach_sat_loop(reach_proc_t reach_proc, vset_t visited,
+                   bitvector_t *reach_groups, long *eg_count, long *next_count)
 {
     bitvector_t groups[max_sat_levels];
     int empty_groups[max_sat_levels];
@@ -1419,14 +1344,11 @@ main(int argc, char *argv[])
     case NO_SAT:
         sat_proc = reach_no_sat;
         break;
-    case SAT_1:
-        sat_proc = reach_sat1;
+    case SAT_LIKE:
+        sat_proc = reach_sat_like;
         break;
-    case SAT_2:
-        sat_proc = reach_sat2;
-        break;
-    case SAT_3:
-        sat_proc = reach_sat3;
+    case SAT_LOOP:
+        sat_proc = reach_sat_loop;
         break;
     }
 
