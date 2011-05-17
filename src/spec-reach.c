@@ -865,21 +865,21 @@ reach_sat1(reach_proc_t reach_proc, vset_t visited, bitvector_t *reach_groups,
                long *eg_count, long *next_count)
 {
     int level[nGrps];
-    int back[N + 1];
-    bitvector_t groups[N + 1];
+    int back[N];
+    bitvector_t groups[N];
 
     // groups: i=0..nGrps-1
     // vars  : j=0..N-1
-    // BDD levels:  k = N..1
+    // BDD levels:  k = N-1..0
 
-    for (int k = 1; k <= N; k++)
+    for (int k = 0; k < N; k++)
         bitvector_create(&groups[k], nGrps);
 
     // level[i] = first (highest) + of group i
     for (int i = 0; i < nGrps; i++)
         for (int j = 0; j < N; j++)
             if (dm_is_set(GBgetDMInfo(model), i, j)) {
-                level[i]=N-j;
+                level[i] = N - j - 1;
                 break;
             }
 
@@ -887,17 +887,17 @@ reach_sat1(reach_proc_t reach_proc, vset_t visited, bitvector_t *reach_groups,
         bitvector_set(&groups[level[i]], i);
 
     // Limit the bit vectors to the groups we are interested in
-    for (int k = 1; k <= N; k++)
+    for (int k = 0; k < N; k++)
         bitvector_intersect(&groups[k], reach_groups);
 
     // back[k] = last + in any group of level k
-    for (int k = 1; k <= N; k++)
-        back[k] = N + 1;
+    for (int k = 0; k < N; k++)
+        back[k] = N;
 
     for (int i = 0; i < nGrps; i++)
-        for (int k = 1; k <= N; k++)
-            if (dm_is_set(GBgetDMInfo(model), i, N-k)) {
-                if (k < back[level[i]]) back[level[i]]=k;
+        for (int k = 0; k < N; k++)
+            if (dm_is_set(GBgetDMInfo(model), i, N - k - 1)) {
+                if (k < back[level[i]]) back[level[i]] = k;
                 break;
             }
 
@@ -906,22 +906,22 @@ reach_sat1(reach_proc_t reach_proc, vset_t visited, bitvector_t *reach_groups,
     for (int i = 0; i < nGrps; i++)
         diagnostic("%d ", level[i]);
     diagnostic("\nback: ");
-    for (int j=1; j<=N; j++)
-        diagnostic("%d ", back[j]);
+    for (int k = 0; k < N; k++)
+        diagnostic("%d ", back[k]);
     diagnostic("\n");
 
-    int k = 1;
+    int k = 0;
     vset_t old_vis = vset_create(domain, 0, NULL);
     vset_t prev_vis[nGrps];
 
     for (int i = 0; i < nGrps; i++)
         prev_vis[i] = save_levels?vset_create(domain, 0, NULL):NULL;
 
-    while (k <= N) {
+    while (k < N) {
       Warning(info, "Saturating level: %d", k);
       vset_copy(old_vis, visited);
-      reach_proc(visited, prev_vis[k - 1], &groups[k], eg_count, next_count);
-      if (save_levels) vset_copy(prev_vis[k - 1], visited);
+      reach_proc(visited, prev_vis[k], &groups[k], eg_count, next_count);
+      if (save_levels) vset_copy(prev_vis[k], visited);
       if (vset_equal(old_vis, visited))
           k++;
       else
@@ -934,25 +934,23 @@ reach_sat1(reach_proc_t reach_proc, vset_t visited, bitvector_t *reach_groups,
 }
 
 static void
-reach_sat2(reach_proc_t reach_proc, vset_t visited, bitvector_t *reach_groups,
-               long *eg_count, long *next_count)
+initialize_levels(bitvector_t *groups, bitvector_t *reach_groups)
 {
     int level[nGrps];
-    bitvector_t groups[N + 1];
 
     // groups: i=0..nGrps-1
     // vars  : j=0..N-1
-    // BDD levels:  k = N..1   (k = N-j)
+    // BDD levels:  k = N-1..0   (k = N-j-1)
 
-    for (int k = 1; k <= N; k++)
+    for (int k = 0; k < N; k++)
         bitvector_create(&groups[k], nGrps);
 
     // level[i] = first '+' in row (highest in BDD) of group i
-    // recast 1..N down to equal groups 1..N/G  (more precisely: (N-1)/G + 1)a
+    // recast 0..N-1 down to equal groups 0..(N-1)/G
     for (int i = 0; i < nGrps; i++)
         for (int j = 0; j < N; j++)
             if (dm_is_set(GBgetDMInfo(model), i, j)) {
-                level[i] = (N - 1 - j) / sat_granularity + 1;
+                level[i] = (N - j - 1) / sat_granularity;
                 break;
             }
 
@@ -960,7 +958,7 @@ reach_sat2(reach_proc_t reach_proc, vset_t visited, bitvector_t *reach_groups,
         bitvector_set(&groups[level[i]], i);
 
     // Limit the bit vectors to the groups we are interested in
-    for (int k = 1; k <= N; k++)
+    for (int k = 0; k < N; k++)
         bitvector_intersect(&groups[k], reach_groups);
 
     // Diagnostics
@@ -968,28 +966,36 @@ reach_sat2(reach_proc_t reach_proc, vset_t visited, bitvector_t *reach_groups,
     for (int i = 0; i < nGrps; i++)
         diagnostic("%d ", level[i]);
     diagnostic("\n");
+}
 
-    int k = 1;
-    int last = 0;
+static void
+reach_sat2(reach_proc_t reach_proc, vset_t visited, bitvector_t *reach_groups,
+               long *eg_count, long *next_count)
+{
+    bitvector_t groups[N];
+    int k = 0;
+    int last = -1;
     vset_t old_vis = vset_create(domain, 0, NULL);
     vset_t prev_vis[nGrps];
+
+    initialize_levels(groups, reach_groups);
 
     for (int i = 0; i < nGrps; i++)
         prev_vis[i] = save_levels?vset_create(domain, 0, NULL):NULL;
 
-    while (k <= (N - 1) / sat_granularity + 1) {
+    while (k < (N - 1) / sat_granularity + 1) {
         if (k == last)
             k++;
         else {
             Warning(info, "Saturating level: %d", k);
             vset_copy(old_vis, visited);
-            reach_proc(visited, prev_vis[k - 1], &groups[k], eg_count, next_count);
-            if (save_levels) vset_copy(prev_vis[k - 1], visited);
+            reach_proc(visited, prev_vis[k], &groups[k], eg_count, next_count);
+            if (save_levels) vset_copy(prev_vis[k], visited);
             if (vset_equal(old_vis, visited))
                 k++;
             else {
                 last = k;
-                k = 1;
+                k = 0;
             }
         }
     }
@@ -1003,50 +1009,21 @@ static void
 reach_sat3(reach_proc_t reach_proc, vset_t visited, bitvector_t *reach_groups,
                long *eg_count, long *next_count)
 {
-    int level[nGrps];
-    bitvector_t groups[N+1];
-
-    // groups: i=0..nGrps-1
-    // vars  : j=0..N-1
-    // BDD levels:  k = N..1
-
-    for (int k = 1; k <= N; k++)
-        bitvector_create(&groups[k], nGrps);
-
-    // level[i] = first (highest) + of group i
-    for (int i = 0; i < nGrps; i++)
-        for (int j = 0; j < N; j++)
-            if (dm_is_set(GBgetDMInfo(model), i, j)) {
-                level[i]=(N - 1 - j) / sat_granularity + 1;
-                break;
-            }
-
-    for (int i = 0; i < nGrps; i++)
-        bitvector_set(&groups[level[i]], i);
-
-
-    // Limit the bit vectors to the groups we are interested in
-    for (int k = 1; k <= N; k++)
-        bitvector_intersect(&groups[k], reach_groups);
-
-    // Diagnostics
-    diagnostic("level: ");
-    for (int i = 0; i < nGrps; i++)
-        diagnostic("%d ", level[i]);
-    diagnostic("\n");
-
+    bitvector_t groups[N];
     vset_t old_vis = vset_create(domain, 0, NULL);
     vset_t prev_vis[nGrps];
+
+    initialize_levels(groups, reach_groups);
 
     for (int i = 0; i < nGrps; i++)
         prev_vis[i] = save_levels?vset_create(domain, 0, NULL):NULL;
 
     while (!vset_equal(old_vis, visited)) {
         vset_copy(old_vis, visited);
-        for (int k = 1; k <= (N - 1) / sat_granularity + 1 ; k++) {
+        for (int k = 0; k < (N - 1) / sat_granularity + 1 ; k++) {
             Warning(info, "Saturating level: %d", k);
-            reach_proc(visited, prev_vis[k - 1], &groups[k], eg_count, next_count);
-            if (save_levels) vset_copy(prev_vis[k - 1], visited);
+            reach_proc(visited, prev_vis[k], &groups[k], eg_count, next_count);
+            if (save_levels) vset_copy(prev_vis[k], visited);
         }
     }
 
