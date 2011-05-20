@@ -204,6 +204,14 @@ extern void vset_reorder(vdom_t dom);
 */
 extern void vset_destroy(vset_t set);
 
+/**
+\brief Do a least fixpoint using the argument rel on the source states.
+
+This computes the smallest set S inductively satisfying source in S
+and rel(S) in S.
+*/
+void vset_least_fixpoint(vset_t dst, vset_t src, vrel_t rels[], int rel_count);
+
 //@}
 
 #endif

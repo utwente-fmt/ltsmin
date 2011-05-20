@@ -6,120 +6,59 @@
 #include <gmpxx.h>
 #endif
 
+#include <SDD.h>
 #include <DDD.h>
 #include <Hom.h>
 #include <MemoryManager.h>
+#include <Hom_Basic.hh>
 
-class _projectVar:public StrongHom {
+static const int DEFAULT_VAR = 1;
+
+class _projectVar:public StrongShom {
     int var;
 
 public:
     _projectVar(int vr):var(vr) {};
 
-    GDDD phiOne() const {
-        return GDDD::top;
+    GSDD phiOne() const {
+        return GSDD::top;
     }
 
     bool skip_variable (int vr) const {
         return var != vr;
     }
 
-    GHom phi(int, int) const {
-        return GHom::id;
+    GShom phi(int, const DataSet &) const {
+        return GShom::id;
     }
 
     size_t hash() const {
         return 17 * var;
     }
 
-    bool operator==(const StrongHom &s) const {
+    bool operator==(const StrongShom &s) const {
         const _projectVar & ps = (const _projectVar&)s;
         return (var == ps.var);
     }
 
-    _GHom * clone () const { return new _projectVar(*this); }
+    _GShom * clone () const { return new _projectVar(*this); }
 
     void mark() {
         return;
     }
 };
 
-GHom projectVar(int vr) { return _projectVar(vr); };
-
-class _selectVarVal:public StrongHom {
-    int var, val;
-
-public:
-    _selectVarVal(int vr, int vl):var(vr),val(vl) {};
-
-    GDDD phiOne() const {
-        return GDDD::top;
-    }
-
-    bool skip_variable (int vr) const {
-        return var != vr;
-    }
-
-    GHom phi(int vr, int vl) const {
-        if (vl == val)
-            return GHom(vr, vl, GHom::id);
-        else
-            return GHom(GDDD::null);
-    }
-
-    size_t hash() const {
-        return 23 * var + 29 * val;
-    }
-
-    bool operator==(const StrongHom &s) const {
-        const _selectVarVal & ps = (const _selectVarVal&)s;
-        return (var == ps.var) && (val == ps.val);
-    }
-
-    _GHom * clone () const { return new _selectVarVal(*this); }
-
-    void mark() {
-        return;
-    }
+GShom projectVar(int vr) {
+    return _projectVar(vr);
 };
 
-GHom selectVarVal(int vr, int vl) { return _selectVarVal(vr, vl); };
+GShom selectVarVal (int vr, int vl) {
+    return localApply(varEqState(DEFAULT_VAR, vl), vr);
+}
 
-class _setVarVal:public StrongHom {
-    int var, val;
-
-public:
-    _setVarVal(int vr, int vl):var(vr),val(vl) {};
-
-    GDDD phiOne() const {
-        return GDDD::top;
-    }
-
-    bool skip_variable (int vr) const {
-        return var != vr;
-    }
-
-    GHom phi(int, int) const {
-        return GHom(var, val, GHom::id);
-    }
-
-    size_t hash() const {
-        return 31 * var + 37 * val;
-    }
-
-    bool operator==(const StrongHom &s) const {
-        const _setVarVal & ps = (const _setVarVal&)s;
-        return (var == ps.var) && (val == ps.val);
-    }
-
-    _GHom * clone () const { return new _setVarVal(*this); }
-
-    void mark() {
-        return;
-    }
-};
-
-GHom setVarVal(int vr, int vl) { return _setVarVal(vr, vl); };
+GShom setVarVal (int vr, int vl) {
+  return localApply(setVarConst(DEFAULT_VAR, vl), vr);
+}
 
 extern "C" {
 #include <vdom_object.h>
@@ -131,17 +70,17 @@ struct vector_domain {
 
 struct vector_set {
     vdom_t dom;
-    DDD *ddd;
-    Hom *projection;
+    SDD *ddd;
+    Shom *projection;
     int p_len;
     int proj[];
 };
 
 struct vector_relation {
     vdom_t dom;
-    DDD *ddd;
-    Hom *next;
-    Hom *prev;
+    SDD *ddd;
+    Shom *next;
+    Shom *prev;
     int p_len;
     int proj[];
 };
@@ -153,10 +92,10 @@ set_create_ddd(vdom_t dom, int k, int *proj)
                                                    + k * sizeof(int)));
 
     set->dom = dom;
-    set->ddd = new DDD;
+    set->ddd = new SDD;
     set->p_len = k;
 
-    Hom projection = Hom::id;
+    Shom projection = Shom::id;
     bool skip[dom->shared.size];
 
     for (int i = 0; i < dom->shared.size; i++)
@@ -172,35 +111,35 @@ set_create_ddd(vdom_t dom, int k, int *proj)
             projection = projectVar(i) & projection;
     }
 
-    set->projection = new Hom(projection);
+    set->projection = new Shom(projection);
     return set;
 }
 
 void
 set_add_ddd(vset_t set, const int *e)
 {
-    DDD element = DDD(DDD::one);
+    SDD element = SDD::one;
 
     if (set->p_len) {
         int len = set->p_len;
 
         for (int i = len - 1; i >= 0; i--)
-            element = DDD(set->proj[i], e[i], element);
+            element = SDD(set->proj[i], DDD(DEFAULT_VAR, e[i]), element);
     } else {
         int len = set->dom->shared.size;
 
         for (int i = len - 1; i >= 0; i--)
-            element = DDD(i, e[i], element);
+            element = SDD(i, DDD(DEFAULT_VAR, e[i]), element);
     }
 
     *set->ddd = *set->ddd + element;
-    assert(*set->ddd != DDD::top);
+    assert(*set->ddd != SDD::top);
 }
 
 int
 set_member_ddd(vset_t set, const int *e)
 {
-    Hom h = Hom::id;
+    Shom h = Shom::id;
 
     if (set->p_len) {
         int len = set->p_len;
@@ -214,7 +153,7 @@ set_member_ddd(vset_t set, const int *e)
             h = selectVarVal(i, e[i]) & h;
     }
 
-    DDD tmp = h(*set->ddd);
+    SDD tmp = h(*set->ddd);
     return !tmp.empty();
 }
 
@@ -233,22 +172,25 @@ set_is_empty_ddd(vset_t set)
 void
 set_clear_ddd(vset_t set)
 {
-    *set->ddd = DDD::null;
+    *set->ddd = SDD::null;
 }
 
 void
-enumerate(const GDDD *ddd, int idx, int *e, vset_element_cb cb, void *context)
+enumerate(const GSDD *ddd, int idx, int *e, vset_element_cb cb, void *context)
 {
-    assert(*ddd != GDDD::top && *ddd != GDDD::null);
+    assert(*ddd != SDD::top && *ddd != SDD::null);
 
-    if (*ddd == GDDD::one) {
+    if (*ddd == SDD::one) {
         cb(context, e);
         return;
     }
 
-    for (GDDD::const_iterator vi = (*ddd).begin(); vi != (*ddd).end(); vi++) {
-        e[idx] = vi->first;
-        enumerate(&vi->second, idx + 1, e, cb, context);
+    for (SDD::const_iterator vi = (*ddd).begin(); vi != (*ddd).end(); vi++) {
+        DDD * vals = (DDD*)vi->first;
+        for (DDD::const_iterator it = vals->begin() ; it != vals->end() ; it++){
+            e[idx] = it->first;
+            enumerate(&vi->second, idx + 1, e, cb, context);
+        }
     }
 }
 
@@ -258,7 +200,7 @@ set_enum_ddd(vset_t set, vset_element_cb cb, void *context)
     int len = (set->p_len) ? set->p_len : set->dom->shared.size;
     int e[len];
 
-    if (*set->ddd == DDD::null)
+    if (*set->ddd == SDD::null)
         return;
 
     enumerate(set->ddd, 0, e, cb, context);
@@ -268,9 +210,9 @@ void
 set_enum_match_ddd(vset_t set, int p_len, int *proj, int *match,
                        vset_element_cb cb, void *context)
 {
-    Hom h = Hom::id;
+    Shom h = Shom::id;
 
-    if (*set->ddd == DDD::null)
+    if (*set->ddd == SDD::null)
         return;
 
     for (int i = p_len - 1; i >= 0; i--)
@@ -278,7 +220,7 @@ set_enum_match_ddd(vset_t set, int p_len, int *proj, int *match,
 
     int len = (set->p_len) ? set->p_len : set->dom->shared.size;
     int e[len];
-    DDD tmp = h(*set->ddd);
+    SDD tmp = h(*set->ddd);
 
     enumerate(&tmp, 0, e, cb, context);
 }
@@ -286,7 +228,7 @@ set_enum_match_ddd(vset_t set, int p_len, int *proj, int *match,
 void
 set_copy_match_ddd(vset_t dst, vset_t src, int p_len, int *proj, int *match)
 {
-    Hom h = Hom::id;
+    Shom h = Shom::id;
 
     for (int i = p_len - 1; i >= 0; i--)
         h = selectVarVal(proj[i], match[i]) & h;
@@ -298,13 +240,15 @@ void
 set_example_ddd(vset_t set, int *e)
 {
     int len = (set->p_len) ? set->p_len : set->dom->shared.size;
-    const GDDD *ddd = set->ddd;
+    const GSDD *ddd = set->ddd;
 
-    assert(*ddd != GDDD::top && *ddd != GDDD::null);
+    assert(*ddd != SDD::top && *ddd != SDD::null);
 
     for (int i = 0; i < len; i++) {
-        GDDD::const_iterator vi = (*ddd).begin();
-        e[i] = vi->first;
+        SDD::const_iterator vi = (*ddd).begin();
+        DDD* vals = (DDD*)vi->first;
+        DDD::const_iterator it = vals->begin();
+        e[i] = it->first;
         ddd = &vi->second;
     }
 }
@@ -313,28 +257,28 @@ void
 set_copy_ddd(vset_t dst, vset_t src)
 {
     *dst->ddd = *src->ddd;
-    assert(*dst->ddd != DDD::top);
+    assert(*dst->ddd != SDD::top);
 }
 
 void
 set_project_ddd(vset_t dst, vset_t src)
 {
     *dst->ddd = (*dst->projection)(*src->ddd);
-    assert(*dst->ddd != DDD::top);
+    assert(*dst->ddd != SDD::top);
 }
 
 void
 set_union_ddd(vset_t dst, vset_t src)
 {
     *dst->ddd = *dst->ddd + *src->ddd;
-    assert(*dst->ddd != DDD::top);
+    assert(*dst->ddd != SDD::top);
 }
 
 void
 set_intersect_ddd(vset_t dst, vset_t src)
 {
     *dst->ddd = *dst->ddd * *src->ddd;
-    assert(*dst->ddd != DDD::top);
+    assert(*dst->ddd != SDD::top);
 }
 
 
@@ -342,7 +286,7 @@ void
 set_minus_ddd(vset_t dst, vset_t src)
 {
     *dst->ddd = *dst->ddd - *src->ddd;
-    assert(*dst->ddd != DDD::top);
+    assert(*dst->ddd != SDD::top);
 }
 
 void
@@ -360,11 +304,9 @@ rel_create_ddd(vdom_t dom, int k, int *proj)
                                                    + k * sizeof(int)));
 
     rel->dom = dom;
-    rel->ddd = new DDD;
-    rel->next = new Hom(DDD::null);
-    //rel->next = new Hom(Hom::id);
-    rel->prev = new Hom(DDD::null);
-    //rel->prev = new Hom(Hom::id);
+    rel->ddd = new SDD;
+    rel->next = new Shom(SDD::null);
+    rel->prev = new Shom(SDD::null);
     rel->p_len = k;
 
     for (int i = 0; i < k; i++)
@@ -376,37 +318,41 @@ rel_create_ddd(vdom_t dom, int k, int *proj)
 void
 rel_add_ddd(vrel_t rel, const int *src, const int *dst)
 {
-    DDD element = DDD(DDD::one);
-    Hom next = Hom::id;
-    Hom prev = Hom::id;
+    SDD element = SDD::one;
+    Shom next = Shom::id;
+    Shom prev = Shom::id;
 
     if (rel->p_len) {
         int len = rel->p_len;
 
         for (int i = len - 1; i >= 0; i--) {
-            element = DDD(rel->proj[i], dst[i], element);
-            element = DDD(rel->proj[i], src[i], element);
+            element = SDD(rel->proj[i], DDD(DEFAULT_VAR, dst[i]), element);
+            element = SDD(rel->proj[i], DDD(DEFAULT_VAR, src[i]), element);
             next = selectVarVal(rel->proj[i], src[i]) & next;
-            next = setVarVal(rel->proj[i], dst[i]) & next;
+            if (src[i] != dst[i])
+                next = setVarVal(rel->proj[i], dst[i]) & next;
             prev = selectVarVal(rel->proj[i], dst[i]) & prev;
-            prev = setVarVal(rel->proj[i], src[i]) & prev;
+            if (src[i] != dst[i])
+                prev = setVarVal(rel->proj[i], src[i]) & prev;
         }
     } else {
         int len = rel->dom->shared.size;
 
         for (int i = len - 1; i >= 0; i--) {
-            element = DDD(i, dst[i], element);
-            element = DDD(i, src[i], element);
+            element = SDD(i, DDD(DEFAULT_VAR, dst[i]), element);
+            element = SDD(i, DDD(DEFAULT_VAR, src[i]), element);
             next = selectVarVal(i, src[i]) & next;
-            next = setVarVal(i, dst[i]) & next;
+            if (src[i] != dst[i])
+                next = setVarVal(i, dst[i]) & next;
             prev = selectVarVal(i, dst[i]) & prev;
-            prev = setVarVal(i, src[i]) & prev;
+            if (src[i] != dst[i])
+                prev = setVarVal(i, src[i]) & prev;
         }
     }
 
-    DDD tmp = *rel->ddd;
+    SDD tmp = *rel->ddd;
     *rel->ddd = *rel->ddd + element;
-    assert(*rel->ddd != DDD::top);
+    assert(*rel->ddd != SDD::top);
 
     if (tmp != *rel->ddd) {
         *rel->next = next + *rel->next;
@@ -425,17 +371,15 @@ rel_count_ddd(vrel_t rel, long *nodes, bn_int_t *elements)
 void
 set_next_ddd(vset_t dst, vset_t src, vrel_t rel)
 {
-    // Hom fp = fixpoint(*rel->next);
-    // *dst->ddd = fp(*src->ddd);
     *dst->ddd = (*rel->next)(*src->ddd);
-    assert(*dst->ddd != DDD::top);
+    assert(*dst->ddd != SDD::top);
 }
 
 void
 set_prev_ddd(vset_t dst, vset_t src, vrel_t rel)
 {
     *dst->ddd = (*rel->prev)(*src->ddd);
-    assert(*dst->ddd != DDD::top);
+    assert(*dst->ddd != SDD::top);
 }
 
 void
@@ -446,6 +390,20 @@ set_destroy_ddd(vset_t set)
 {
     delete set->ddd;
     RTfree(set);
+}
+
+void set_least_fixpoint_ddd (vset_t dst, vset_t src, vrel_t rels[],
+                                 int rel_count)
+{
+    Shom relation = Shom::id;
+
+    for (int i = 0; i < rel_count; i++)
+        relation = relation + *rels[i]->next;
+
+    Shom fix = fixpoint(relation);
+
+    *dst->ddd = fix(*src->ddd);
+    MemoryManager::garbage();
 }
 
 vdom_t
@@ -478,6 +436,7 @@ vdom_create_ddd(int n)
     dom->shared.set_prev = set_prev_ddd;
     dom->shared.reorder = set_reorder_ddd;
     dom->shared.set_destroy = set_destroy_ddd;
+    dom->shared.set_least_fixpoint = set_least_fixpoint_ddd;
 
     return dom;
 }

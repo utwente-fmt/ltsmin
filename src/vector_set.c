@@ -137,6 +137,7 @@ void vdom_init_shared(vdom_t dom,int n){
 	dom->shared.set_prev=NULL;
 	dom->shared.reorder=default_reorder;
 	dom->shared.set_destroy=NULL;
+	dom->shared.set_least_fixpoint=NULL;
 }
 
 vset_t vset_create(vdom_t dom,int k,int* proj){
@@ -233,4 +234,8 @@ void vset_reorder(vdom_t dom) {
 
 void vset_destroy(vset_t set) {
     set->dom->shared.set_destroy(set);
+}
+
+void vset_least_fixpoint(vset_t dst, vset_t src, vrel_t rels[], int rel_count) {
+    src->dom->shared.set_least_fixpoint(dst, src, rels, rel_count);
 }
