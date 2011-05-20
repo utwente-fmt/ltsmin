@@ -120,7 +120,7 @@ mcrl2_popt (poptContext con, enum poptCallbackReason reason,
         char **argv;
         RTparseOptions (mcrl2_args,&argc,&argv);
         Warning (debug,"ATerm init");
-        MCRL2_ATERMPP_INIT(argc, argv);
+        MCRL2_ATERMPP_INIT_(argc, argv, RTstackBottom());
         char *rewriter = NULL;
         struct poptOption options[] = {
             { "rewriter", 0 , POPT_ARG_STRING , &rewriter , 0 , "select rewriter" , NULL },
@@ -158,7 +158,7 @@ void
 MCRL2initGreybox (int argc,char *argv[],void* stack_bottom)
 {
     Warning(debug,"ATerm init");
-    MCRL2_ATERMPP_INIT(argc, argv);
+    MCRL2_ATERMPP_INIT_(argc, argv, stack_bottom);
     (void)stack_bottom;
 }
 
