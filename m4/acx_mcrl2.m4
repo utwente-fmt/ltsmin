@@ -27,7 +27,7 @@ if test x"$acx_mcrl2" = xyes; then
     if test x"$ac_cv_sizeof_void_p" = x8; then
         MCRL2_CPPFLAGS="-DAT_64BIT"
     fi
-    AC_SUBST(MCRL2_CPPFLAGS, ["$MCRL2_CPPFLAGS -DBOOST_MPL_CFG_NO_PREPROCESSED_HEADERS=1 -I$with_mcrl2/include -I$with_mcrl2/include/aterm"])
+    AC_SUBST(MCRL2_CPPFLAGS, ["$MCRL2_CPPFLAGS -I$with_mcrl2/include"])
     AC_SUBST(MCRL2_LDFLAGS,  ["-L${with_mcrl2}/lib/mcrl2"])
     AX_LET([CPPFLAGS], ["$MCRL2_CPPFLAGS $CPPFLAGS"],
       [AC_CHECK_HEADER([mcrl2/lps/ltsmin.h],,
