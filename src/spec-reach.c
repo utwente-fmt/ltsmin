@@ -665,7 +665,7 @@ reach_bfs_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
         level++;
         for (int i = 0; i < nGrps; i++){
             if (!bitvector_is_set(reach_groups, i)) continue;
-            diagnostic("\rexploring group %4d/%d", i+1, nGrps);
+            diagnostic("\rexploring group %4d/%d", i, nGrps);
             expand_group_next(i, current_level);
             (*eg_count)++;
         }
@@ -673,7 +673,7 @@ reach_bfs_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
         if (dlk_detect) vset_copy(deadlocks, current_level);
         for (int i = 0; i < nGrps; i++) {
             if (!bitvector_is_set(reach_groups,i)) continue;
-            diagnostic("\rlocal next %4d/%d", i+1, nGrps);
+            diagnostic("\rlocal next %4d/%d", i, nGrps);
             (*next_count)++;
             vset_next(temp, current_level, group_next[i]);
             if (dlk_detect) {
@@ -721,7 +721,7 @@ reach_bfs(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
         level++;
         for (int i = 0; i < nGrps; i++) {
             if (!bitvector_is_set(reach_groups,i)) continue;
-            diagnostic("\rexploring group %4d/%d", i+1, nGrps);
+            diagnostic("\rexploring group %4d/%d", i, nGrps);
             expand_group_next(i, visited);
             (*eg_count)++;
         }
@@ -729,7 +729,7 @@ reach_bfs(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
         if (dlk_detect) vset_copy(deadlocks, visited);
         for (int i = 0; i < nGrps; i++) {
             if (!bitvector_is_set(reach_groups,i)) continue;
-            diagnostic("\rlocal next %4d/%d", i+1, nGrps);
+            diagnostic("\rlocal next %4d/%d", i, nGrps);
             (*next_count)++;
             vset_next(temp, old_vis, group_next[i]);
             if (dlk_detect) {
@@ -773,7 +773,7 @@ reach_chain_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
         if (dlk_detect) vset_copy(deadlocks, new_states);
         for (int i = 0; i < nGrps; i++) {
             if (!bitvector_is_set(reach_groups, i)) continue;
-            diagnostic("\rgroup %4d/%d", i+1, nGrps);
+            diagnostic("\rgroup %4d/%d", i, nGrps);
             expand_group_next(i, new_states);
             (*eg_count)++;
             (*next_count)++;
@@ -822,7 +822,7 @@ reach_chain(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
         if (dlk_detect) vset_copy(deadlocks, visited);
         for (int i = 0; i < nGrps; i++) {
             if (!bitvector_is_set(reach_groups, i)) continue;
-            diagnostic("\rgroup %4d/%d", i+1, nGrps);
+            diagnostic("\rgroup %4d/%d", i, nGrps);
             expand_group_next(i, visited);
             (*eg_count)++;
             (*next_count)++;
