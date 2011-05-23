@@ -80,6 +80,7 @@ endif
 if HAVE_CADP
 pkglib_LTLIBRARIES += libetf-open.la
 endif
+# endif
 
 if HAVE_DVEC
 bin_PROGRAMS += dve2lts-grey
@@ -115,7 +116,6 @@ endif
 #endif
 
 libmcrl2_pins_la_SOURCES  = mcrl2-greybox.cpp mcrl2-greybox.h
-libmcrl2_pins_la_SOURCES += at-map.c at-map.h
 libmcrl2_pins_la_CPPFLAGS = -DMCRL2 -DNDEBUG $(MCRL2_CPPFLAGS) $(AM_CPPFLAGS)
 libmcrl2_pins_la_LDFLAGS  = $(MCRL2_LDFLAGS) $(AM_LDFLAGS)
 libmcrl2_pins_la_LIBADD   = $(MCRL2_LIBS)
@@ -152,131 +152,131 @@ ltsmin_parse_LDADD = libltsmin.la
 
 # spinja2lts-grey
 spinja2lts_grey_SOURCES  = spec2lts-grey.c spinja-greybox.c spinja-greybox.h
-spinja2lts_grey_LDADD    = $(VSET_LIBS) libltsmin.la $(SPINJA_LIBS)
+spinja2lts_grey_LDADD    = libvset.la libltsmin.la $(SPINJA_LIBS)
 spinja2lts_grey_CPPFLAGS = -DSPINJA $(SPINJA_CPPFLAGS) $(AM_CPPFLAGS)
 spinja2lts_grey_LDFLAGS  = $(SPINJA_LDFLAGS) $(AM_LDFLAGS)
 
 # spinja2lts-gsea
 spinja2lts_gsea_SOURCES  = spec2lts-gsea.c spinja-greybox.c spinja-greybox.h
-spinja2lts_gsea_LDADD    = $(VSET_LIBS) libltsmin.la $(SPINJA_LIBS)
+spinja2lts_gsea_LDADD    = libvset.la libltsmin.la $(SPINJA_LIBS)
 spinja2lts_gsea_CPPFLAGS = -DSPINJA $(SPINJA_CPPFLAGS) $(AM_CPPFLAGS)
 spinja2lts_gsea_LDFLAGS  = $(SPINJA_LDFLAGS) $(AM_LDFLAGS)
 
 
 # dve22lts-grey
 dve22lts_grey_SOURCES  = spec2lts-grey.c dve2-greybox.c dve2-greybox.h
-dve22lts_grey_LDADD    = $(VSET_LIBS) libltsmin.la $(DVEC2_LIBS)
+dve22lts_grey_LDADD    = libvset.la libltsmin.la $(DVEC2_LIBS)
 dve22lts_grey_CPPFLAGS = -DDIVINE2 $(DIVINE2_CPPFLAGS) $(AM_CPPFLAGS)
 dve22lts_grey_LDFLAGS  = $(DIVINE2_LDFLAGS) $(AM_LDFLAGS)
 
 # dve22lts-gsea
 dve22lts_gsea_SOURCES  = spec2lts-gsea.c dve2-greybox.c dve2-greybox.h
-dve22lts_gsea_LDADD    = $(VSET_LIBS) libltsmin.la $(DVEC2_LIBS)
+dve22lts_gsea_LDADD    = libvset.la libltsmin.la $(DVEC2_LIBS)
 dve22lts_gsea_CPPFLAGS = -DDIVINE2 $(DIVINE2_CPPFLAGS) $(AM_CPPFLAGS)
 dve22lts_gsea_LDFLAGS  = $(DIVINE2_LDFLAGS) $(AM_LDFLAGS)
 
 # dve2lts-grey
 dve2lts_grey_SOURCES  = spec2lts-grey.c dve-greybox.cpp dve-greybox.h
-dve2lts_grey_LDADD    = $(VSET_LIBS) libltsmin.la $(DVEC_LIBS)
+dve2lts_grey_LDADD    = libvset.la libltsmin.la $(DVEC_LIBS)
 dve2lts_grey_CPPFLAGS = -DDIVINE $(DIVINE_CPPFLAGS) $(AM_CPPFLAGS)
 dve2lts_grey_LDFLAGS  = $(DIVINE_LDFLAGS) $(AM_LDFLAGS)
 
 # dve2lts-gsea
 dve2lts_gsea_SOURCES  = spec2lts-gsea.c dve-greybox.cpp dve-greybox.h
-dve2lts_gsea_LDADD    = $(VSET_LIBS) libltsmin.la $(DVEC_LIBS)
+dve2lts_gsea_LDADD    = libvset.la libltsmin.la $(DVEC_LIBS)
 dve2lts_gsea_CPPFLAGS = -DDIVINE $(DIVINE_CPPFLAGS) $(AM_CPPFLAGS)
 dve2lts_gsea_LDFLAGS  = $(DIVINE_LDFLAGS) $(AM_LDFLAGS)
 
 # etf2lts-grey
 etf2lts_grey_SOURCES  = spec2lts-grey.c etf-greybox.c etf-greybox.h
-etf2lts_grey_LDADD    = $(VSET_LIBS) libltsmin.la
+etf2lts_grey_LDADD    = libvset.la libltsmin.la
 etf2lts_grey_CPPFLAGS = -DETF $(AM_CPPFLAGS)
 
 # etf2lts-gsea
 etf2lts_gsea_SOURCES  = spec2lts-gsea.c etf-greybox.c etf-greybox.h
-etf2lts_gsea_LDADD    = $(VSET_LIBS) libltsmin.la
+etf2lts_gsea_LDADD    = libvset.la libltsmin.la
 etf2lts_gsea_CPPFLAGS = -DETF $(AM_CPPFLAGS)
 
 
 # lpo2lts-grey
 lpo2lts_grey_SOURCES  = spec2lts-grey.c mcrl-greybox.c mcrl-greybox.h
 lpo2lts_grey_SOURCES += at-map.c at-map.h
-lpo2lts_grey_LDADD    = libvset-mcrl.la libltsmin.la $(MCRL_LIBS)
+lpo2lts_grey_LDADD    = libvset.la libltsmin.la $(MCRL_LIBS)
 lpo2lts_grey_CPPFLAGS = -DMCRL $(MCRL_CPPFLAGS) $(AM_CPPFLAGS)
-lpo2lts_grey_LDFLAGS  = $(MCRL_LDFLAGS) $(AM_LDFLAGS)
+lpo2lts_grey_LDFLAGS  = -lATerm $(MCRL_LDFLAGS) $(AM_LDFLAGS)
 
 # lpo2lts-gsea
 lpo2lts_gsea_SOURCES  = spec2lts-gsea.c mcrl-greybox.c mcrl-greybox.h
 lpo2lts_gsea_SOURCES += at-map.c at-map.h
-lpo2lts_gsea_LDADD    = libvset-mcrl.la libltsmin.la $(MCRL_LIBS)
+lpo2lts_gsea_LDADD    = libvset.la libltsmin.la $(MCRL_LIBS)
 lpo2lts_gsea_CPPFLAGS = -DMCRL $(MCRL_CPPFLAGS) $(AM_CPPFLAGS)
-lpo2lts_gsea_LDFLAGS  = $(MCRL_LDFLAGS) $(AM_LDFLAGS)
+lpo2lts_gsea_LDFLAGS  = -lATerm $(MCRL_LDFLAGS) $(AM_LDFLAGS)
 
 # lps2lts-grey
 lps2lts_grey_SOURCES  = spec2lts-grey.c
-lps2lts_grey_LDADD    = $(VSET_LIBS) libmcrl2-pins.la libltsmin.la
+lps2lts_grey_LDADD    = libvset.la libmcrl2-pins.la libltsmin.la
 lps2lts_grey_CPPFLAGS = -DMCRL2 $(AM_CPPFLAGS)
 nodist_EXTRA_lps2lts_grey_SOURCES = automake-force-linker.cxx
 
 # lps2lts-gsea
 lps2lts_gsea_SOURCES  = spec2lts-gsea.c
-lps2lts_gsea_LDADD    = $(VSET_LIBS) libmcrl2-pins.la libltsmin.la
+lps2lts_gsea_LDADD    = libvset.la libmcrl2-pins.la libltsmin.la
 lps2lts_gsea_CPPFLAGS = -DMCRL2 $(AM_CPPFLAGS)
 nodist_EXTRA_lps2lts_gsea_SOURCES = automake-force-linker.cxx
 
 # nips2lts-grey
 nips2lts_grey_SOURCES  = spec2lts-grey.c nips-greybox.c nips-greybox.h
-nips2lts_grey_LDADD    = $(VSET_LIBS) libltsmin.la $(NIPS_LIBS)
+nips2lts_grey_LDADD    = libvset.la libltsmin.la $(NIPS_LIBS)
 nips2lts_grey_CPPFLAGS = -DNIPS $(NIPS_CPPFLAGS) $(AM_CPPFLAGS)
 nips2lts_grey_LDFLAGS  = $(NIPS_LDFLAGS) $(AM_LDFLAGS)
 
 # nips2lts-gsea
 nips2lts_gsea_SOURCES  = spec2lts-gsea.c nips-greybox.c nips-greybox.h
-nips2lts_gsea_LDADD    = $(VSET_LIBS) libltsmin.la $(NIPS_LIBS)
+nips2lts_gsea_LDADD    = libvset.la libltsmin.la $(NIPS_LIBS)
 nips2lts_gsea_CPPFLAGS = -DNIPS $(NIPS_CPPFLAGS) $(AM_CPPFLAGS)
 nips2lts_gsea_LDFLAGS  = $(NIPS_LDFLAGS) $(AM_LDFLAGS)
 
 # spinja-reach
 spinja_reach_SOURCES  = spec-reach.c spinja-greybox.c spinja-greybox.h
-spinja_reach_LDADD    = $(VSET_LIBS) libltsmin.la $(SPINJA_LIBS)
+spinja_reach_LDADD    = libvset.la libltsmin.la $(SPINJA_LIBS)
 spinja_reach_CPPFLAGS = -DSPINJA $(SPINJA_CPPFLAGS) $(AM_CPPFLAGS)
 spinja_reach_LDFLAGS  = $(SPINJA_LDFLAGS) $(AM_LDFLAGS)
 
 # dve2-reach
 dve2_reach_SOURCES  = spec-reach.c dve2-greybox.c dve2-greybox.h
-dve2_reach_LDADD    = $(VSET_LIBS) libltsmin.la $(DVEC2_LIBS)
+dve2_reach_LDADD    = libvset.la libltsmin.la $(DVEC2_LIBS)
 dve2_reach_CPPFLAGS = -DDIVINE2 $(DIVINE2_CPPFLAGS) $(AM_CPPFLAGS)
 dve2_reach_LDFLAGS  = $(DIVINE2_LDFLAGS) $(AM_LDFLAGS)
 
 
 # dve-reach
 dve_reach_SOURCES  = spec-reach.c dve-greybox.cpp dve-greybox.h
-dve_reach_LDADD    = $(VSET_LIBS) libltsmin.la $(DVEC_LIBS)
+dve_reach_LDADD    = libvset.la libltsmin.la $(DVEC_LIBS)
 dve_reach_CPPFLAGS = -DDIVINE $(DIVINE_CPPFLAGS) $(AM_CPPFLAGS)
 dve_reach_LDFLAGS  = $(DIVINE_LDFLAGS) $(AM_LDFLAGS)
 
 # lpo-reach
 lpo_reach_SOURCES  = spec-reach.c mcrl-greybox.c mcrl-greybox.h
 lpo_reach_SOURCES += at-map.c at-map.h
-lpo_reach_LDADD    = libvset-mcrl.la libltsmin.la $(MCRL_LIBS)
+lpo_reach_LDADD    = libvset.la libltsmin.la $(MCRL_LIBS)
 lpo_reach_CPPFLAGS = -DMCRL $(MCRL_CPPFLAGS) $(AM_CPPFLAGS)
-lpo_reach_LDFLAGS  = $(MCRL_LDFLAGS) $(AM_LDFLAGS)
+lpo_reach_LDFLAGS  = -lATerm $(MCRL_LDFLAGS) $(AM_LDFLAGS)
 
 # lps-reach
 lps_reach_SOURCES  = spec-reach.c
-lps_reach_LDADD    = $(VSET_LIBS) libmcrl2-pins.la libltsmin.la
+lps_reach_LDADD    = libvset.la libmcrl2-pins.la libltsmin.la
 lps_reach_CPPFLAGS = -DMCRL2 $(AM_CPPFLAGS)
 nodist_EXTRA_lps_reach_SOURCES = automake-force-linker.cxx
 
 # nips-reach
 nips_reach_SOURCES  = spec-reach.c nips-greybox.c nips-greybox.h
-nips_reach_LDADD    = $(VSET_LIBS) libltsmin.la $(NIPS_LIBS)
+nips_reach_LDADD    = libvset.la libltsmin.la $(NIPS_LIBS)
 nips_reach_CPPFLAGS = -DNIPS $(NIPS_CPPFLAGS) $(AM_CPPFLAGS)
 nips_reach_LDFLAGS  = $(NIPS_LDFLAGS) $(AM_LDFLAGS)
 
 # etf-reach
 etf_reach_SOURCES  = spec-reach.c etf-greybox.c etf-greybox.h
-etf_reach_LDADD    = $(VSET_LIBS) libltsmin.la
+etf_reach_LDADD    = libvset.la libltsmin.la
 etf_reach_CPPFLAGS = -DETF $(AM_CPPFLAGS)
 
 
@@ -297,7 +297,7 @@ lpo2lts_mpi_SOURCES  = spec2lts-mpi.c mcrl-greybox.c mcrl-greybox.h
 lpo2lts_mpi_SOURCES += at-map.c at-map.h
 lpo2lts_mpi_LDADD    = libltsmin-mpi.la $(MCRL_LIBS)
 lpo2lts_mpi_CPPFLAGS = -DMCRL $(MCRL_CPPFLAGS) $(AM_CPPFLAGS)
-lpo2lts_mpi_LDFLAGS  = $(MCRL_LDFLAGS) $(MCRL_LDFLAGS) $(AM_LDFLAGS)
+lpo2lts_mpi_LDFLAGS  = -lATerm $(MCRL_LDFLAGS) $(MCRL_LDFLAGS) $(AM_LDFLAGS)
 
 # lps2lts-mpi
 lps2lts_mpi_SOURCES  = spec2lts-mpi.c
@@ -356,7 +356,7 @@ etf2lts_mc_CPPFLAGS = -DETF $(AM_CPPFLAGS)
 #lpo2lts_mc_SOURCES += at-map.c at-map.h
 #lpo2lts_mc_LDADD    = libltsmin.la $(MCRL_LIBS)
 #lpo2lts_mc_CPPFLAGS = -DMCRL $(MCRL_CPPFLAGS) $(AM_CPPFLAGS)
-#lpo2lts_mc_LDFLAGS  = $(MCRL_LDFLAGS) $(AM_LDFLAGS)
+#lpo2lts_mc_LDFLAGS  = -lATerm $(MCRL_LDFLAGS) $(AM_LDFLAGS)
 
 ## lps2lts-mc
 #lps2lts_mc_SOURCES  = spec2lts-mc.c
@@ -375,7 +375,7 @@ nips2lts_mc_LDFLAGS  = $(NIPS_LDFLAGS) $(AM_LDFLAGS)
 liblpo_open_la_SOURCES  = spec_open.c mcrl-greybox.c mcrl-greybox.h
 liblpo_open_la_SOURCES += at-map.c at-map.h
 liblpo_open_la_CPPFLAGS = -DMCRL $(MCRL_CPPFLAGS) $(CADP_CPPFLAGS) $(AM_CPPFLAGS)
-liblpo_open_la_LIBADD = libltsmin.la
+liblpo_open_la_LIBADD = -lATerm libltsmin.la
 
 # liblps-open.la
 liblps_open_la_SOURCES = spec_open.c
@@ -421,34 +421,22 @@ ltsmin_convert_SOURCES = ltsmin-convert.c
 ltsmin_convert_LDADD = libltsmin.la
 
 # libraries
-if HAVE_LIBMCRL2
-noinst_LTLIBRARIES += libvset-mcrl2.la
-VSET_LIBS = libvset-mcrl2.la
-else
+libvset_la_SOURCES   = vector_set.c vector_set.h vdom_object.h
+libvset_la_SOURCES  += vset_listdd.c
+libvset_la_SOURCES  += vset_buddy.c
+libvset_la_CPPFLAGS  = $(BUDDY_CPPFLAGS)
+libvset_la_LDFLAGS   = $(BUDDY_LDFLAGS)
+libvset_la_LIBADD    = $(BUDDY_LIBS)
+
 if HAVE_LIBMCRL
-noinst_LTLIBRARIES += libvset-mcrl.la
-VSET_LIBS = libvset-mcrl.la
-else
-VSET_LIBS = libvset.la
+libvset_la_SOURCES  += vset_atermdd.c
+libvset_la_CPPFLAGS += $(MCRL_CPPFLAGS)
+libvset_la_LDFLAGS  += $(MCRL_LDFLAGS)
+libvset_la_LIBADD   += -lATerm
 endif
-endif
 
-libvset_la_SOURCES  = vector_set.c vector_set.h vdom_object.h
-libvset_la_SOURCES += vset_listdd.c
-libvset_la_SOURCES += vset_buddy.c
-libvset_la_CPPFLAGS = $(BUDDY_CPPFLAGS) $(AM_CPPFLAGS)
-libvset_la_LDFLAGS  = $(BUDDY_LDFLAGS) $(AM_LDFLAGS)
-libvset_la_LIBADD   = $(BUDDY_LIBS)
-
-libvset_mcrl_la_SOURCES  = vset_atermdd.c
-libvset_mcrl_la_CPPFLAGS = $(MCRL_CPPFLAGS) $(AM_CPPFLAGS)
-libvset_mcrl_la_LDFLAGS  = $(MCRL_LDFLAGS) $(AM_LDFLAGS)
-libvset_mcrl_la_LIBADD   = libvset.la -lATerm
-
-libvset_mcrl2_la_SOURCES  = vset_atermdd.c
-libvset_mcrl2_la_CPPFLAGS = $(MCRL2_CPPFLAGS) $(AM_CPPFLAGS)
-libvset_mcrl2_la_LDFLAGS  = $(MCRL2_LDFLAGS) $(AM_LDFLAGS)
-libvset_mcrl2_la_LIBADD   = libvset.la -laterm
+libvset_la_CPPFLAGS += $(AM_CPPFLAGS)
+libvset_la_LDFLAGS  += $(AM_LDFLAGS)
 
 
 libmpi_la_SOURCES = mpi_io_stream.c mpi_raf.c mpi_io_stream.h \
