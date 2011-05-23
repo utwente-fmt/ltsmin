@@ -54,7 +54,6 @@ bin_PROGRAMS += lps2lts-grey
 bin_PROGRAMS += lps2lts-gsea
 bin_PROGRAMS += lps-reach
 noinst_LTLIBRARIES += libmcrl2-pins.la
-noinst_LTLIBRARIES += libvset-mcrl2.la
 if HAVE_CADP
 pkglib_LTLIBRARIES += liblps-open.la
 endif
@@ -76,9 +75,8 @@ VSET_LIBS = libvset-mcrl.la
 else
 if HAVE_LIBMCRL2
 VSET_LIBS = libvset-mcrl2.la
-# else
-# VSET_LIBS = libvset.la
-# endif
+else
+VSET_LIBS = libvset.la
 endif
 endif
 
@@ -110,7 +108,7 @@ bin_PROGRAMS += spinja2lts-mc
 #endif
 
 libmcrl2_pins_la_SOURCES  = mcrl2-greybox.cpp mcrl2-greybox.h
-libmcrl2_pins_la_SOURCES += at-map.c at-map.h
+# libmcrl2_pins_la_SOURCES += at-map.c at-map.h
 libmcrl2_pins_la_CPPFLAGS = $(MCRL2_CPPFLAGS) $(AM_CPPFLAGS)
 libmcrl2_pins_la_LDFLAGS  = $(MCRL2_LDFLAGS) $(AM_LDFLAGS)
 libmcrl2_pins_la_LIBADD   = $(MCRL2_LIBS)
@@ -209,13 +207,13 @@ lpo2lts_gsea_LDFLAGS  = $(MCRL_LDFLAGS) $(AM_LDFLAGS)
 
 # lps2lts-grey
 lps2lts_grey_SOURCES  = spec2lts-grey.c
-lps2lts_grey_LDADD    = libvset-mcrl2.la libmcrl2-pins.la libltsmin.la
+lps2lts_grey_LDADD    = $(VSET_LIBS) libmcrl2-pins.la libltsmin.la
 lps2lts_grey_CPPFLAGS = -DMCRL2 $(AM_CPPFLAGS)
 nodist_EXTRA_lps2lts_grey_SOURCES = automake-force-linker.cxx
 
 # lps2lts-gsea
 lps2lts_gsea_SOURCES  = spec2lts-gsea.c
-lps2lts_gsea_LDADD    = libvset-mcrl2.la libmcrl2-pins.la libltsmin.la
+lps2lts_gsea_LDADD    = $(VSET_LIBS) libmcrl2-pins.la libltsmin.la
 lps2lts_gsea_CPPFLAGS = -DMCRL2 $(AM_CPPFLAGS)
 nodist_EXTRA_lps2lts_gsea_SOURCES = automake-force-linker.cxx
 
@@ -259,7 +257,7 @@ lpo_reach_LDFLAGS  = $(MCRL_LDFLAGS) $(AM_LDFLAGS)
 
 # lps-reach
 lps_reach_SOURCES  = spec-reach.c
-lps_reach_LDADD    = libvset-mcrl2.la libmcrl2-pins.la libltsmin.la
+lps_reach_LDADD    = $(VSET_LIBS) libmcrl2-pins.la libltsmin.la
 lps_reach_CPPFLAGS = -DMCRL2 $(AM_CPPFLAGS)
 nodist_EXTRA_lps_reach_SOURCES = automake-force-linker.cxx
 
@@ -427,13 +425,6 @@ libvset_mcrl_la_SOURCES  = vset_atermdd.c
 libvset_mcrl_la_CPPFLAGS = $(MCRL_CPPFLAGS) $(AM_CPPFLAGS)
 libvset_mcrl_la_LDFLAGS  = $(MCRL_LDFLAGS) $(AM_LDFLAGS)
 libvset_mcrl_la_LIBADD   = libvset.la -lATerm
-
-libvset_mcrl2_la_SOURCES  = vset_atermdd.c
-libvset_mcrl2_la_CPPFLAGS = $(MCRL2_CPPFLAGS) $(AM_CPPFLAGS)
-libvset_mcrl2_la_LDFLAGS  = $(MCRL2_LDFLAGS) $(AM_LDFLAGS)
-libvset_mcrl2_la_LIBADD   = libvset.la -laterm
-
-
 
 
 libmpi_la_SOURCES = mpi_io_stream.c mpi_raf.c mpi_io_stream.h \
