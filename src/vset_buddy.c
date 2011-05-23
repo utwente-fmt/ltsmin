@@ -366,7 +366,8 @@ static void count_fdd(BDD bdd, BDD p_set,long *nodes,bn_int_t *elements)
     *nodes=bdd_nodecount(bdd);
     double count=bdd_satcountlnset(bdd,p_set);
     //Warning(info,"log of satcount is %f",count);
-    if (count < 30.0) {
+    if (count == 0.0) {
+        // count is zero or one
         count=bdd_satcountset(bdd, p_set);
     } else {
         count=pow(2.0,count);
