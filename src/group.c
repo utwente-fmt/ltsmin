@@ -183,6 +183,7 @@ apply_regroup_spec (matrix_t *m, const char *spec_)
     // parse regrouping arguments
     if (spec_ != NULL) {
         char               *spec = strdup (spec_);
+        char               *spec_full = spec;
         assert (spec != NULL);
 
         char               *tok;
@@ -229,7 +230,7 @@ apply_regroup_spec (matrix_t *m, const char *spec_)
                        tok);
             }
         }
-        free (spec);
+        free(spec_full);
     }
 }
 
