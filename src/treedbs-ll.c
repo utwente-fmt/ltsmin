@@ -83,7 +83,7 @@ table_lookup (const treedbs_ll_t dbs, const node_u_t *data, int index, int *res,
             uint32_t           *bucket = &dbs->table[idx];
             if (EMPTY == *bucket) {
                 if (cas (bucket, EMPTY, WAIT)) {
-                    atomic64_write (&dbs->data[idx], data->l.lr);
+                    write_data_fenced (&dbs->data[idx], data->l.lr);
                     atomic_write (bucket, DONE);
                     *res = idx;
                     stat->elts++;
