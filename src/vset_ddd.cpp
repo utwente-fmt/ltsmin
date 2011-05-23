@@ -389,7 +389,9 @@ void
 set_destroy_ddd(vset_t set)
 {
     delete set->ddd;
+    delete set->projection;
     RTfree(set);
+    MemoryManager::garbage();
 }
 
 void set_least_fixpoint_ddd (vset_t dst, vset_t src, vrel_t rels[],
