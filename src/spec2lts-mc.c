@@ -81,6 +81,7 @@ typedef enum {
     Perm_Shift_All, /* eq. to Perm_Shift, but non-lazy */
     Perm_Sort,      /* order on the state index in the DB */
     Perm_Random,    /* generate a random fixed permutation */
+    Perm_SR,        /* sort according to a random fixed permutation */
     Perm_Otf,       /* on-the-fly calculation of a random perm for num_succ */
     Perm_Unknown    /* not set yet */
 } permutation_perm_t;
@@ -118,6 +119,7 @@ typedef struct permute_s {
 extern permute_t *permute_create (permutation_perm_t permutation, model_t model,
                                   trc_get_idx_f get_idx, trc_get_state_f get_state,
                                   size_t workers, size_t trans, int worker_index);
+extern void permute_free (permute_t *perm);
 extern int permute_trans (permute_t *perm, state_data_t state,
                                     TransitionCB cb, void *ctx);
 
@@ -171,6 +173,7 @@ static si_map_entry permutations[] = {
     {"sort",    Perm_Sort},
     {"otf",     Perm_Otf},
     {"random",  Perm_Random},
+    {"sr",      Perm_SR},
     {"none",    Perm_None},
     {"unknown", Perm_Unknown},
     {NULL, 0}
@@ -391,7 +394,7 @@ typedef struct thread_ctx_s {
     idx_t               seed;           // current NDFS seed
     permute_t          *permute;        // transition permutor
     bitvector_t         not_all_red;    // all_red gaiser/Schwoon
-} thread_ctx_t;
+} wctx_t;
 
 /* predecessor --(transition_group)--> successor */
 typedef int         (*find_or_put_f)(state_info_t *successor,
@@ -411,13 +414,13 @@ extern void state_info_create(state_info_t *state, state_data_t data,
 extern void state_info_serialize(state_info_t *state, raw_data_t data);
 extern void state_info_deserialize(state_info_t *state, raw_data_t data,
                                    raw_data_t store);
-extern void         dfs_grey (thread_ctx_t *ctx, size_t work);
-extern void         ndfs_blue (thread_ctx_t *ctx, size_t work);
-extern void         ndfs_green (thread_ctx_t *ctx, size_t work);
-extern void         nndfs_blue (thread_ctx_t *ctx, size_t work);
-extern void         gnn_blue (thread_ctx_t *ctx, size_t work);
-extern void         dfs (thread_ctx_t *ctx, size_t work);
-extern void         bfs (thread_ctx_t *ctx, size_t work);
+extern void         dfs_grey (wctx_t *ctx, size_t work);
+extern void         ndfs_blue (wctx_t *ctx, size_t work);
+extern void         ndfs_green (wctx_t *ctx, size_t work);
+extern void         nndfs_blue (wctx_t *ctx, size_t work);
+extern void         gnn_blue (wctx_t *ctx, size_t work);
+extern void         dfs (wctx_t *ctx, size_t work);
+extern void         bfs (wctx_t *ctx, size_t work);
 extern size_t       split_bfs (size_t src_id, size_t dst_id, size_t handoff);
 extern size_t       split_dfs (size_t src_id, size_t dst_id, size_t handoff);
 extern size_t       split_dfs_grey (size_t src_id, size_t dst_id, size_t handoff);
@@ -428,7 +431,7 @@ static int          K;
 static int          MAX_SUCC;           // max succ. count to expand at once
 static size_t       threshold;
 static pthread_attr_t  *attr = NULL;
-static thread_ctx_t   **contexts;
+static wctx_t     **contexts;
 static zobrist_t    zobrist = NULL;
 #ifndef __APPLE__
 static pthread_barrier_t start_barrier;       // synchronize starting point
@@ -456,6 +459,25 @@ increase_level(counter_t *cnt)
         cnt->level_max = cnt->level_cur;
 }
 
+void        *
+get_state (int idx, void *arg)
+{
+    wctx_t             *ctx = (wctx_t *) arg;
+    raw_data_t state = get (dbs, idx, ctx->store2);
+    return UseTreeDBSLL==db_type ? TreeDBSLLdata(dbs, state) : state;
+}
+
+idx_t
+get_idx (void *state, void *arg)
+{
+    wctx_t             *ctx = (wctx_t *) arg;
+    state_info_t        successor;
+    state_info_create (&successor, state, NULL, DUMMY_IDX, GB_UNKNOWN_GROUP);
+    /* retrieve IDX from state database */
+    find_or_put (&successor, &ctx->state, ctx->store2);
+    return successor.idx;
+}
+
 static              model_t
 get_model (int first)
 {
@@ -472,14 +494,15 @@ get_model (int first)
     return model;
 }
 
-thread_ctx_t *
-create_context (size_t id)
+wctx_t *
+wctx_create (size_t id)
 {
-    thread_ctx_t       *ctx = RTalign (CACHE_LINE_SIZE, sizeof (thread_ctx_t));
-    memset (ctx, 0, sizeof (thread_ctx_t));
+    assert (NULL == 0);
+    wctx_t             *ctx = RTalignZero (CACHE_LINE_SIZE, sizeof (wctx_t));
+    memset (ctx, 0, sizeof (wctx_t));
     ctx->id = id;
     ctx->model = NULL;
-    state_info_create_empty(&ctx->state);
+    state_info_create_empty (&ctx->state);
     ctx->store = RTalignZero (CACHE_LINE_SIZE, SLOT_SIZE * N * 2);
     ctx->store2 = RTalignZero (CACHE_LINE_SIZE, SLOT_SIZE * N * 2);
     ctx->stack = dfs_stack_create (state_info_int_size());
@@ -490,7 +513,7 @@ create_context (size_t id)
     if (strategy & Strat_LTL) {
         bitvector_create_large (&ctx->color_map, 2<<dbs_size);
         bitvector_create_large (&ctx->not_all_red, 20000000); //magic number for the largest stack i've encountered.
-    } else if ( UseGreyBox == call_mode )
+    } else if ( UseGreyBox == call_mode && Strat_DFS == strategy)
         ctx->group_stack = isba_create (1);
     if (files[1]) {
         char               name[PATH_MAX];
@@ -501,7 +524,33 @@ create_context (size_t id)
     }
     ctx->search = NBLUE;
     ctx->counters.threshold = ctx->red.threshold = threshold;
+    ctx->permute = permute_create (permutation, NULL, get_idx, get_state, W, K, id);
     return ctx;
+}
+
+void
+wctx_free (wctx_t *ctx)
+{
+    RTfree (ctx->store);
+    RTfree (ctx->store2);
+    dfs_stack_destroy (ctx->out_stack);
+    //if (NULL != ctx->model)
+    //    GBfree (ctx->model);
+    if (strategy & Strat_LTL) {
+        bitvector_free (&ctx->color_map);
+        bitvector_free (&ctx->not_all_red);
+    }
+    if (NULL != ctx->group_stack)
+        isba_destroy (ctx->group_stack);
+    if (strategy == Strat_BFS)
+        dfs_stack_destroy (ctx->in_stack);
+    if (files[1]) {
+        stream_flush (ctx->out);
+        stream_close (&ctx->out);
+    }
+    if (NULL != ctx->permute)
+        permute_free (ctx->permute);
+    RTfree (ctx);
 }
 
 static uint32_t
@@ -619,9 +668,9 @@ init_globals (int argc, char *argv[])
         try_set_sat_bit = (dbs_try_set_sat_f) TreeDBSLLtry_set_sat_bit;
         break;
     }
-    contexts = RTmalloc (sizeof (thread_ctx_t *[W]));
+    contexts = RTmalloc (sizeof (wctx_t *[W]));
     for (size_t i = 0; i < W; i++)
-        contexts[i] = create_context (i);
+        contexts[i] = wctx_create (i);
     contexts[0]->model = model;
 
     initial_state = RTmalloc (SLOT_SIZE * N);
@@ -653,6 +702,20 @@ init_globals (int argc, char *argv[])
         fprintf (stderr, "Dependency Matrix:\n");
         GBprintDependencyMatrixCombined (stderr, model);
     }
+}
+
+void
+deinit_globals ()
+{
+    if (db_type == UseDBSLL)
+        DBSLLfree (dbs);
+    else //TreeDBSLL
+        TreeDBSLLfree (dbs);
+    lb_destroy (lb);
+    RTfree (initial_state);
+    for (size_t i = 0; i < W; i++)
+        wctx_free (contexts[i]);
+    RTfree (contexts);
 }
 
 static inline void
@@ -744,7 +807,7 @@ print_statistics(counter_t *reach, counter_t *red, mytimer_t timer)
 }
 
 static void
-print_thread_statistics(thread_ctx_t *ctx)
+print_thread_statistics(wctx_t *ctx)
 {
     char                name[128];
     char               *format = "[%zu%s] saw in %.3f sec ";
@@ -762,33 +825,11 @@ print_thread_statistics(thread_ctx_t *ctx)
     if (ctx->load) Warning (info, "Wrong load counter %zu", ctx->load);
 }
 
-void        *
-get_state (int idx, void *arg)
-{
-    thread_ctx_t       *ctx = (thread_ctx_t *) arg;
-    raw_data_t state = get (dbs, idx, ctx->store2);
-    return UseTreeDBSLL==db_type ? TreeDBSLLdata(dbs, state) : state;
-}
-
-idx_t
-get_idx (void *state, void *arg)
-{
-    thread_ctx_t       *ctx = (thread_ctx_t *) arg;
-    state_info_t        successor;
-    state_info_create (&successor, state, NULL, DUMMY_IDX, GB_UNKNOWN_GROUP);
-    /* retrieve IDX from state database */
-    find_or_put (&successor, &ctx->state, ctx->store2);
-    return successor.idx;
-}
-
-/**
- * from: http://groups.csail.mit.edu/graphics/classes/6.838/S98/students/lebo/linprog/
- */
-static int *
-randperm (int n, uint32_t seed)
+/** Fisher / Yates GenRandPerm*/
+static void
+randperm (int *perm, int n, uint32_t seed)
 {
     srandom (seed);
-    int                *perm = RTmalloc (sizeof(int[n]));
     for (int i=0; i<n; i++)
         perm[i] = i;
     for (int i=0; i<n; i++) {
@@ -797,7 +838,6 @@ randperm (int n, uint32_t seed)
         perm[j] = perm[i];
         perm[i] = t;
     }
-    return perm;
 }
 
 #if defined(__CYGWIN__)
@@ -836,7 +876,7 @@ store_todo (permute_t *perm, state_data_t dst, transition_info_t *ti)
 {
     assert (perm->nstored < perm->trans+TODO_MAX);
     perm->todos[ perm->nstored ].idx = perm->get_idx (dst, perm->ctx);
-    perm->todos[ perm->nstored ].ti = *ti;
+    perm->todos[ perm->nstored ].ti.group = ti->group; //TODO: copy labels?
     perm->nstored++;
 }
 
@@ -864,11 +904,19 @@ permute_create (permutation_perm_t permutation, model_t model,
     perm->get_state = get_state;
     perm->model = model;
     perm->permutation = permutation;
-    perm->otf = RTalign (CACHE_LINE_SIZE, sizeof(int[trans+TODO_MAX]));
-    perm->rand = RTalignZero (CACHE_LINE_SIZE, sizeof(int*[trans+TODO_MAX]));
-    for (size_t i = 1; i < perm->trans+TODO_MAX; i++) {
-        perm->rand[i] = RTalign(CACHE_LINE_SIZE, sizeof(int[ i ]));
-        randperm (perm->rand[i], i, i+perm->shiftorder);
+    if (Perm_Otf == permutation)
+        perm->otf = RTalign (CACHE_LINE_SIZE, sizeof(int[trans+TODO_MAX]));
+    if (Perm_Random == permutation) {
+        perm->rand = RTalignZero (CACHE_LINE_SIZE, sizeof(int*[trans+TODO_MAX]));
+        for (size_t i = 1; i < perm->trans+TODO_MAX; i++) {
+            perm->rand[i] = RTalign(CACHE_LINE_SIZE, sizeof(int[ i ]));
+            randperm (perm->rand[i], i, i+perm->shiftorder);
+        }
+    }
+    if (Perm_SR == permutation) {
+        perm->rand = RTalignZero (CACHE_LINE_SIZE, sizeof(int*));
+        perm->rand[0] = RTalign(CACHE_LINE_SIZE, sizeof(int[trans]));
+        randperm (perm->rand[0], trans, (time(NULL) + 9876*worker_index));
     }
     return perm;
 }
@@ -883,10 +931,17 @@ void
 permute_free (permute_t *perm)
 {
     RTfree (perm->todos);
-    RTfree (perm->otf);
-    for (size_t i = 0; i < perm->trans+TODO_MAX; i++) if (NULL != perm->rand)
-        RTfree (perm->rand[i]);
-    RTfree (perm->rand);
+    if (Perm_Otf == permutation)
+        RTfree (perm->otf);
+    if (Perm_Random == perm->permutation) {
+        for (size_t i = 0; i < perm->trans+TODO_MAX; i++)
+            RTfree (perm->rand[i]);
+        RTfree (perm->rand);
+    }
+    if (Perm_SR == perm->permutation) {
+        RTfree (perm->rand[0]);
+        RTfree (perm->rand);
+    }
     RTfree (perm);
 }
 
@@ -905,6 +960,7 @@ permute_one (void *arg, transition_info_t *ti, state_data_t dst)
         if (0 == perm->start_group_index && ti->group >= perm->start_group)
             perm->start_group_index = perm->nstored;
     case Perm_Random:
+    case Perm_SR:
     case Perm_Otf:
     case Perm_Sort:
         store_todo (perm, dst, ti);
@@ -942,6 +998,10 @@ permute_trans (permute_t *perm, state_data_t state, TransitionCB cb, void *ctx)
             succ = perm->get_state (perm->todos[j].idx, ctx);
             cb (ctx, &perm->todos[j].ti, succ);
         }
+        break;
+    case Perm_SR:
+        qsortr (perm->todos, n, sizeof(permute_todo_t), rand_cmp, *perm->rand);
+        empty_todo (perm);
         break;
     case Perm_Sort:
         qsortr (perm->todos, n, sizeof(permute_todo_t), sort_cmp, &perm->shiftorder);
@@ -1041,39 +1101,30 @@ state_info_deserialize (state_info_t *state, raw_data_t data, state_data_t store
 }
 
 static void
-find_dfs_stack_trace (thread_ctx_t *ctx, dfs_stack_t stack, int *trace)
+find_dfs_stack_trace (wctx_t *ctx, dfs_stack_t stack, int *trace)
 {
-    int                 i = dfs_stack_nframes(ctx->stack);
-    state_info_t        state;
-
     // gather trace
-    raw_data_t data = dfs_stack_pop(stack);
-    state_info_deserialize(&state, data, ctx->store);
-    trace[i] = state.idx;
-    while (i > 0) {
-        dfs_stack_leave(stack);
-        data = dfs_stack_pop(stack);
-        state_info_deserialize(&state, data, ctx->store);
-        i--;
+    state_info_t        state;
+    for (int i = dfs_stack_nframes (ctx->stack)-1; i > 0; i--) {
+        dfs_stack_leave (stack);
+        raw_data_t          data = dfs_stack_pop (stack);
+        state_info_deserialize (&state, data, ctx->store);
         trace[i] = state.idx;
     }
 }
 
 static void
-ndfs_report_cycle (thread_ctx_t *ctx, state_info_t *cycle_closing_state)
+ndfs_report_cycle (wctx_t *ctx, state_info_t *cycle_closing_state)
 {
     /* Stop other workers, exit if some other worker was first here */
     if ( !lb_stop(lb) )
         return;
-
     size_t              level = dfs_stack_nframes (ctx->stack) + 1;
-    Warning (info,"Accepting cycle FOUND as depth %zu!", level);
-
-    /* Write last state to stack to close cycle */
-    raw_data_t stack_loc = dfs_stack_push(ctx->stack, NULL);
-    state_info_serialize (cycle_closing_state, stack_loc);
+    Warning (info, "Accepting cycle FOUND at depth %zu!", level);
     if (trc_output) {
-        int                *trace = (int*)RTmalloc(sizeof(int) * level);
+        int                *trace = (int*)RTmalloc(sizeof(int) * level*10);
+        /* Write last state to stack to close cycle */
+        trace[level-1] = cycle_closing_state->idx;
         find_dfs_stack_trace (ctx, ctx->stack, trace);
         trc_env_t          *trace_env = trc_create (ctx->model,
                                (trc_get_state_f)get_state, trace[0], ctx);
@@ -1081,16 +1132,14 @@ ndfs_report_cycle (thread_ctx_t *ctx, state_info_t *cycle_closing_state)
         RTfree (trace);
     }
     Warning (info,"Exiting now!");
-    //pthread_exit( statistics (dbs) ); --> NDFS loops take care of this
 }
 
 static void
-handle_deadlock (thread_ctx_t *ctx)
+handle_deadlock (wctx_t *ctx)
 {
     /* Stop other workers, exit if some other worker was first here */
     if ( !lb_stop(lb) )
         return;
-
     size_t              level = ctx->counters.level_cur;
     Warning (info,"Deadlock found in state at depth %zu!", level);
     if (trc_output) {
@@ -1099,7 +1148,6 @@ handle_deadlock (thread_ctx_t *ctx)
         trc_find_and_write (trace_env, trc_output, (int)ctx->state.idx, level, (int*)parent_idx);
     }
     Warning (info, "Exiting now!");
-    //pthread_exit( statistics(dbs) ); --> reachability use max_load
 }
 
 /*
@@ -1110,7 +1158,7 @@ handle_deadlock (thread_ctx_t *ctx)
 static void
 ndfs_handle (void *arg, transition_info_t *ti, state_data_t dst)
 {
-    thread_ctx_t       *ctx = (thread_ctx_t *) arg;
+    wctx_t             *ctx = (wctx_t *) arg;
     state_info_t        successor;
     state_info_create (&successor, dst, NULL, DUMMY_IDX, ti->group);
     /* retrieve IDX from state database */
@@ -1127,7 +1175,7 @@ ndfs_handle (void *arg, transition_info_t *ti, state_data_t dst)
 }
 
 static inline void
-ndfs_explore_state (thread_ctx_t *ctx, counter_t *cnt)
+ndfs_explore_state (wctx_t *ctx, counter_t *cnt)
 {
     int                 count;
     dfs_stack_enter (ctx->stack);
@@ -1141,7 +1189,7 @@ ndfs_explore_state (thread_ctx_t *ctx, counter_t *cnt)
 static void
 ndfs_handle_green (void *arg, transition_info_t *ti, state_data_t dst)
 {
-    thread_ctx_t       *ctx = (thread_ctx_t *) arg;
+    wctx_t             *ctx = (wctx_t *) arg;
     state_info_t        successor;
     state_info_create (&successor, dst, NULL, DUMMY_IDX, ti->group);
     /* retrieve IDX from state database */
@@ -1156,7 +1204,7 @@ ndfs_handle_green (void *arg, transition_info_t *ti, state_data_t dst)
 }
 
 static inline void
-ndfs_explore_state_green (thread_ctx_t *ctx)
+ndfs_explore_state_green (wctx_t *ctx)
 {
     dfs_stack_enter (ctx->stack);
     increase_level (&ctx->counters);
@@ -1168,7 +1216,7 @@ ndfs_explore_state_green (thread_ctx_t *ctx)
 
 /* YELLOW DFS */
 static void
-ndfs_yellow (thread_ctx_t *ctx, idx_t seed)
+ndfs_yellow (wctx_t *ctx, idx_t seed)
 {
     size_t              seed_level = dfs_stack_nframes (ctx->stack);
     ctx->search = NRED; ctx->permute->permutation = permutation_red;
@@ -1210,7 +1258,7 @@ ndfs_yellow (thread_ctx_t *ctx, idx_t seed)
 
 /* RED DFS */
 static void
-ndfs_red (thread_ctx_t *ctx, idx_t seed)
+ndfs_red (wctx_t *ctx, idx_t seed)
 {
     size_t              seed_level = dfs_stack_nframes (ctx->stack);
     ctx->search = NRED; ctx->permute->permutation = permutation_red;
@@ -1242,7 +1290,7 @@ ndfs_red (thread_ctx_t *ctx, idx_t seed)
 
 /* BLUE DFS */
 void
-ndfs_blue (thread_ctx_t *ctx, size_t work)
+ndfs_blue (wctx_t *ctx, size_t work)
 {
     while ( !lb_is_stopped(lb) ) {
         raw_data_t          state_data = dfs_stack_top (ctx->stack);
@@ -1275,7 +1323,7 @@ ndfs_blue (thread_ctx_t *ctx, size_t work)
 
 /* GREEN NDFS is BLUE DFS with GREEN (global) in the backtrack */
 void
-ndfs_green (thread_ctx_t *ctx, size_t work)
+ndfs_green (wctx_t *ctx, size_t work)
 {
     while ( !lb_is_stopped(lb) ) {
         raw_data_t          state_data = dfs_stack_top (ctx->stack);
@@ -1313,7 +1361,7 @@ ndfs_green (thread_ctx_t *ctx, size_t work)
 static void
 nndfs_red_handle (void *arg, transition_info_t *ti, state_data_t dst)
 {
-    thread_ctx_t       *ctx = (thread_ctx_t *) arg;
+    wctx_t             *ctx = (wctx_t *) arg;
     state_info_t        successor;
     state_info_create(&successor, dst, NULL, DUMMY_IDX, ti->group);
     /* retrieve IDX from state database */
@@ -1333,7 +1381,7 @@ nndfs_red_handle (void *arg, transition_info_t *ti, state_data_t dst)
 static void
 nndfs_blue_handle (void *arg, transition_info_t *ti, state_data_t dst)
 {
-    thread_ctx_t       *ctx = (thread_ctx_t *) arg;
+    wctx_t             *ctx = (wctx_t *) arg;
     state_info_t        successor;
     state_info_create (&successor, dst, NULL, DUMMY_IDX, ti->group);
     /* retrieve IDX from state database */
@@ -1353,7 +1401,7 @@ nndfs_blue_handle (void *arg, transition_info_t *ti, state_data_t dst)
 }
 
 static inline void
-nndfs_explore_state_red (thread_ctx_t *ctx, counter_t *cnt)
+nndfs_explore_state_red (wctx_t *ctx, counter_t *cnt)
 {
     int                 count;
     dfs_stack_enter (ctx->stack);
@@ -1365,7 +1413,7 @@ nndfs_explore_state_red (thread_ctx_t *ctx, counter_t *cnt)
 }
 
 static inline void
-nndfs_explore_state_blue (thread_ctx_t *ctx, counter_t *cnt)
+nndfs_explore_state_blue (wctx_t *ctx, counter_t *cnt)
 {
     int                 count;
     dfs_stack_enter (ctx->stack);
@@ -1378,7 +1426,7 @@ nndfs_explore_state_blue (thread_ctx_t *ctx, counter_t *cnt)
 
 /* YELLOW (NN)DFS */
 static void
-nndfs_yellow (thread_ctx_t *ctx)
+nndfs_yellow (wctx_t *ctx)
 {
     size_t              start_level = dfs_stack_nframes (ctx->stack);
     ctx->search = NRED; ctx->permute->permutation = permutation_red;
@@ -1419,7 +1467,7 @@ nndfs_yellow (thread_ctx_t *ctx)
 
 /* RED DFS */
 static void
-nndfs_red (thread_ctx_t *ctx)
+nndfs_red (wctx_t *ctx)
 {
     size_t              start_level = dfs_stack_nframes (ctx->stack);
     ctx->search = NRED; ctx->permute->permutation = permutation_red;
@@ -1452,7 +1500,7 @@ nndfs_red (thread_ctx_t *ctx)
 
 /* BLUE DFS */
 void
-nndfs_blue (thread_ctx_t *ctx, size_t work)
+nndfs_blue (wctx_t *ctx, size_t work)
 {
     while ( !lb_is_stopped(lb) ) {
         raw_data_t          state_data = dfs_stack_top (ctx->stack);
@@ -1507,7 +1555,7 @@ nndfs_blue (thread_ctx_t *ctx, size_t work)
 static void
 gnn_red_handle (void *arg, transition_info_t *ti, state_data_t dst)
 {
-    thread_ctx_t       *ctx = (thread_ctx_t *) arg;
+    wctx_t             *ctx = (wctx_t *) arg;
     state_info_t        successor;
     state_info_create(&successor, dst, NULL, DUMMY_IDX, ti->group);
     /* retrieve IDX from state database */
@@ -1527,7 +1575,7 @@ gnn_red_handle (void *arg, transition_info_t *ti, state_data_t dst)
 static void
 gnn_blue_handle (void *arg, transition_info_t *ti, state_data_t dst)
 {
-    thread_ctx_t       *ctx = (thread_ctx_t *) arg;
+    wctx_t             *ctx = (wctx_t *) arg;
     state_info_t        successor;
     state_info_create (&successor, dst, NULL, DUMMY_IDX, ti->group);
     /* retrieve IDX from state database */
@@ -1546,7 +1594,7 @@ gnn_blue_handle (void *arg, transition_info_t *ti, state_data_t dst)
 }
 
 static inline void
-gnn_explore_state_red (thread_ctx_t *ctx, counter_t *cnt)
+gnn_explore_state_red (wctx_t *ctx, counter_t *cnt)
 {
     int                 count;
     dfs_stack_enter (ctx->stack);
@@ -1558,7 +1606,7 @@ gnn_explore_state_red (thread_ctx_t *ctx, counter_t *cnt)
 }
 
 static inline void
-gnn_explore_state_blue (thread_ctx_t *ctx, counter_t *cnt)
+gnn_explore_state_blue (wctx_t *ctx, counter_t *cnt)
 {
     int                 count;
     dfs_stack_enter (ctx->stack);
@@ -1571,7 +1619,7 @@ gnn_explore_state_blue (thread_ctx_t *ctx, counter_t *cnt)
 
 /* RED DFS (of CYAN) */
 static void
-gnn_red (thread_ctx_t *ctx)
+gnn_red (wctx_t *ctx)
 {
     size_t              start_level = dfs_stack_nframes (ctx->stack);
     ctx->search = NRED; ctx->permute->permutation = permutation_red;
@@ -1603,7 +1651,7 @@ gnn_red (thread_ctx_t *ctx)
 
 /* BLUE DFS (of CYAN) */
 void
-gnn_blue (thread_ctx_t *ctx, size_t work)
+gnn_blue (wctx_t *ctx, size_t work)
 {
     while ( !lb_is_stopped(lb) ) {
         raw_data_t          state_data = dfs_stack_top (ctx->stack);
@@ -1645,7 +1693,7 @@ gnn_blue (thread_ctx_t *ctx, size_t work)
 static void
 handle_state (void *arg, transition_info_t *ti, state_data_t dst)
 {
-    thread_ctx_t       *ctx = (thread_ctx_t *) arg;
+    wctx_t             *ctx = (wctx_t *) arg;
     state_info_t        successor;
     state_info_create (&successor, dst, NULL, DUMMY_IDX, ti->group);
     if (!find_or_put (&successor, &ctx->state, ctx->store2)) {
@@ -1662,7 +1710,7 @@ handle_state (void *arg, transition_info_t *ti, state_data_t dst)
 }
 
 static inline int
-explore_state (thread_ctx_t *ctx, raw_data_t state, int next_index)
+explore_state (wctx_t *ctx, raw_data_t state, int next_index)
 {
     if (0 == next_index && ctx->counters.level_cur >= max)
         return K;
@@ -1681,7 +1729,7 @@ explore_state (thread_ctx_t *ctx, raw_data_t state, int next_index)
 }
 
 void
-dfs_grey (thread_ctx_t *ctx, size_t work)
+dfs_grey (wctx_t *ctx, size_t work)
 {
     int                 next_index = 0;
     size_t              max_load = ctx->counters.explored + work;
@@ -1710,7 +1758,7 @@ dfs_grey (thread_ctx_t *ctx, size_t work)
 }
 
 void
-dfs (thread_ctx_t * ctx, size_t work)
+dfs (wctx_t *ctx, size_t work)
 {
     size_t              max_load = ctx->counters.explored + work;
     while (ctx->counters.explored < max_load) {
@@ -1732,7 +1780,7 @@ dfs (thread_ctx_t * ctx, size_t work)
 }
 
 void
-bfs (thread_ctx_t *ctx, size_t work)
+bfs (wctx_t *ctx, size_t work)
 {
     size_t              max_load = ctx->counters.explored + work;
     while (ctx->counters.explored < max_load) {
@@ -1756,8 +1804,8 @@ bfs (thread_ctx_t *ctx, size_t work)
 size_t
 split_bfs (size_t source_id, size_t target_id, size_t handoff)
 {
-    thread_ctx_t       *source = contexts[source_id];
-    thread_ctx_t       *target = contexts[target_id];
+    wctx_t             *source = contexts[source_id];
+    wctx_t             *target = contexts[target_id];
     dfs_stack_t         source_stack = source->in_stack;
     size_t              in_size = dfs_stack_size (source_stack);
     if (in_size < 2) {
@@ -1778,8 +1826,8 @@ split_bfs (size_t source_id, size_t target_id, size_t handoff)
 size_t
 split_dfs (size_t source_id, size_t target_id, size_t handoff)
 {
-    thread_ctx_t       *source = contexts[source_id];
-    thread_ctx_t       *target = contexts[target_id];
+    wctx_t             *source = contexts[source_id];
+    wctx_t             *target = contexts[target_id];
     size_t              in_size = dfs_stack_size (source->stack);
     in_size >>= 1;
     handoff = in_size < handoff ? in_size : handoff;
@@ -1809,16 +1857,15 @@ split_dfs (size_t source_id, size_t target_id, size_t handoff)
 static void *
 explore (void *args)
 {
-    thread_ctx_t       *ctx = (thread_ctx_t *) args;
+    wctx_t             *ctx = (wctx_t *) args;
     mytimer_t           timer = SCCcreateTimer ();
-    char               *lbl = RTmalloc (sizeof (char[20]));
+    char                lbl[20];
     snprintf (lbl, sizeof (char[20]), W>1?"%s[%zu]":"%s", program, ctx->id);
     set_label (lbl);    // register print label and load model
 
     if (NULL == ctx->model)
         ctx->model = get_model (0);
-    ctx->permute = permute_create (permutation, ctx->model, get_idx, get_state,
-                                   W, K, ctx->id);
+    permute_set_model (ctx->permute, ctx->model);
 
     transition_info_t start_trans_info = GB_NO_TRANSITION;
     if ( Strat_LTL & strategy )
@@ -1843,6 +1890,7 @@ explore (void *args)
     lb_balance( lb, ctx->id, ctx, &ctx->load );
     SCCstopTimer (timer);
     ctx->counters.runtime = SCCrealTime (timer);
+    SCCdeleteTimer (timer);
     return statistics (dbs);
 }
 
@@ -1866,14 +1914,16 @@ main (int argc, char *argv[])
     counter_t          *red = RTmallocZero (sizeof(counter_t));
     reach->stats = RTmallocZero (sizeof(stats_t));
     for (size_t i = 0; i < W; i++) {
-        thread_ctx_t   *ctx = contexts[i];
+        wctx_t             *ctx = contexts[i];
         ctx->counters.stack_sizes = dfs_stack_size_max (ctx->in_stack);
         add_results (reach, &ctx->counters);
         add_results (red, &ctx->red);
         print_thread_statistics (ctx);
-        if (files[1]) stream_close (&ctx->out);
+        RTfree (ctx->counters.stats);
     }
     if (RTverbosity >= 1)
         print_statistics (reach, red, timer);
+    SCCdeleteTimer (timer); RTfree (reach->stats); RTfree (reach); RTfree (red);
+    deinit_globals ();
     return EXIT_SUCCESS;
 }
