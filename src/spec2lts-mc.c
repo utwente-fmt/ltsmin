@@ -253,7 +253,8 @@ typedef struct thread_ctx_s {
 
 /* predecessor --(transition_group)--> successor */
 typedef int         (*find_or_put_f)(state_info_t *successor,
-                                     state_info_t *predecessor);
+                                     state_info_t *predecessor,
+                                     state_data_t store);
 
 /*TODO: change idx_t to size_t and handle maximum for 32bit machines
   this also requires changes to the data structures: tree, table, bitvector
@@ -366,25 +367,27 @@ z_rehash (const void *v, int b, uint32_t seed)
 }
 
 static int
-find_or_put_zobrist(state_info_t *state, state_info_t *pred)
+find_or_put_zobrist (state_info_t *state, state_info_t *pred, state_data_t store)
 {
     state->hash32 = zobrist_hash_dm (zobrist, state->data, pred->data,
                                             pred->hash32, state->group);
     return DBSLLlookup_hash (dbs, state->data, &state->idx, &state->hash32);
+    (void) store;
 }
 
 static int
-find_or_put_dbs(state_info_t *state, state_info_t *predecessor)
+find_or_put_dbs (state_info_t *state, state_info_t *predecessor, state_data_t store)
 {
     return DBSLLlookup_hash (dbs, state->data, &state->idx, NULL);
-    (void) predecessor;
+    (void) predecessor; (void) store;
 }
 
 static int
-find_or_put_tree(state_info_t *s, state_info_t *pred)
+find_or_put_tree (state_info_t *s, state_info_t *pred, state_data_t store)
 {
     int                 ret;
-    ret = TreeDBSLLlookup_dm (dbs, s->data, pred->tree, s->tree, s->group);
+    ret = TreeDBSLLlookup_dm (dbs, s->data, pred->tree, store, s->group);
+    s->tree = store;
     s->idx = TreeDBSLLindex(s->tree);
     return ret;
 }
@@ -434,12 +437,13 @@ init_globals (int argc, char *argv[])
     switch (db_type) {
     case UseDBSLL:
         if (ZOBRIST) {
+            //TODO: fix zobrist with hash on stack, now memoized hash is broken
             zobrist = zobrist_create (N, ZOBRIST, m);
             find_or_put = find_or_put_zobrist;
-            dbs = DBSLLcreate_sized (N, dbs_size, (hash32_f)z_rehash);
+            dbs = DBSLLcreate_sized (N, dbs_size, (hash32_f)z_rehash, 2);
         } else {
             find_or_put = find_or_put_dbs;
-            dbs = DBSLLcreate_sized (N, dbs_size, (hash32_f)SuperFastHash);
+            dbs = DBSLLcreate_sized (N, dbs_size, (hash32_f)SuperFastHash, 2);
         }
         statistics = (dbs_stats_f) DBSLLstats;
         get = (dbs_get_f) DBSLLget;
@@ -678,6 +682,10 @@ static void
 ndfs_report_cycle(thread_ctx_t *ctx, state_info_t *cycle_closing_state)
 {
     Warning(info,"accepting cycle found!");
+
+    /* Stopping other threads */
+    lb_stop (lb);
+
     /* Write last state to stack to close cycle */
     raw_data_t stack_loc = dfs_stack_push(ctx->stack, NULL);
     state_info_serialize (cycle_closing_state, stack_loc);
@@ -723,13 +731,13 @@ ndfs_handle (void *arg, transition_info_t *ti, state_data_t dst)
 {
     thread_ctx_t       *ctx = (thread_ctx_t *) arg;
     state_info_t        successor;
-    state_info_create(&successor, dst, ctx->store2, DUMMY_IDX, ti->group);
+    state_info_create (&successor, dst, NULL, DUMMY_IDX, ti->group);
     /* retrieve IDX from state database */
-    find_or_put (&successor, &ctx->state);
+    find_or_put (&successor, &ctx->state, ctx->store2);
 
     if (ctx->search == NDFS_RED && successor.idx == ctx->seed)
         /* Found cycle back to the seed */
-        ndfs_report_cycle(ctx, &successor);
+        ndfs_report_cycle (ctx, &successor);
 
     if ( ctx->search != ndfs_get_color(&ctx->color_map, successor.idx) ) {
         raw_data_t stack_loc = dfs_stack_push(ctx->stack, NULL);
@@ -782,12 +790,21 @@ ndfs_red (thread_ctx_t *ctx, idx_t seed)
 void
 ndfs_blue (thread_ctx_t *ctx, size_t work)
 {
+    raw_data_t          state_data;
     while (1) {
-        raw_data_t          state_data = dfs_stack_top (ctx->stack);
+        if (ctx->id & 1)
+            state_data = dfs_stack_top (ctx->stack);
+        else
+            state_data = dfs_stack_bottom(ctx->stack);
         if (NULL != state_data) {
             state_info_deserialize (&ctx->state, state_data, ctx->store);
-            if (ndfs_isset_or_set_color(&ctx->color_map, ctx->state.idx, NDFS_BLUE))
-                dfs_stack_pop (ctx->stack);
+            ndfs_global_color_t global = DBSLLget_sat_bits(dbs, ctx->state.idx);
+            if (ndfs_isset_or_set_color(&ctx->color_map, ctx->state.idx, NDFS_BLUE)
+                || global == GLOBAL_GREEN)
+                if (ctx->id & 1)
+                    dfs_stack_pop(ctx->stack);
+                else
+                    dfs_stack_pop_bottom(ctx->stack);
             else
                 ndfs_explore_state(ctx, &ctx->counters);
         } else { //backtrack
@@ -800,9 +817,15 @@ ndfs_blue (thread_ctx_t *ctx, size_t work)
             state_data = dfs_stack_top (ctx->stack);
             state_info_deserialize (&ctx->state, state_data, ctx->store);
             if( GBbuchiIsAccepting(ctx->model, ctx->state.data) )
-                ndfs_red(ctx, ctx->state.idx);
+                ndfs_red (ctx, ctx->state.idx);
 
-            dfs_stack_pop (ctx->stack);
+            /* Mark globally green in the back track */
+            DBSLLset_sat_bits (dbs, ctx->state.idx, GLOBAL_GREEN);
+
+            if (ctx->id & 1)
+                dfs_stack_pop(ctx->stack);
+            else
+                dfs_stack_pop_bottom(ctx->stack);
         }
     }
 /*a*/(void) work;
@@ -817,12 +840,9 @@ nndfs_red_handle (void *arg, transition_info_t *ti, state_data_t dst)
 {
     thread_ctx_t       *ctx = (thread_ctx_t *) arg;
     state_info_t        successor;
-    state_info_create(&successor, dst, ctx->store2, DUMMY_IDX, ti->group);
+    state_info_create(&successor, dst, NULL, DUMMY_IDX, ti->group);
     /* retrieve IDX from state database */
-    if ( UseDBSLL==db_type )
-        find_or_put_dbs(&successor, NULL);
-    else // UseTreeDBSLL
-        find_or_put_tree(&successor, &ctx->state);
+    find_or_put (&successor, &ctx->state, ctx->store2);
 
     ndfs_color_t color = nndfs_get_color(&ctx->color_map, successor.idx);
     if (color == NDFS_CYAN) {
@@ -840,17 +860,17 @@ nndfs_blue_handle (void *arg, transition_info_t *ti, state_data_t dst)
 {
     thread_ctx_t       *ctx = (thread_ctx_t *) arg;
     state_info_t        successor;
-    state_info_create(&successor, dst, ctx->store2, DUMMY_IDX, ti->group);
+    state_info_create (&successor, dst, NULL, DUMMY_IDX, ti->group);
     /* retrieve IDX from state database */
-    find_or_put (&successor, &ctx->state);
+    find_or_put (&successor, &ctx->state, ctx->store2);
 
-    ndfs_color_t color = nndfs_get_color(&ctx->color_map, successor.idx);
+    ndfs_color_t color = nndfs_get_color (&ctx->color_map, successor.idx);
     if (color == NDFS_CYAN && (GBbuchiIsAccepting(ctx->model,ctx->state.data) ||
                     GBbuchiIsAccepting(ctx->model, successor.data))) {
         /* Found cycle in blue search */
         ndfs_report_cycle(ctx, &successor);
     } else if (color == NDFS_WHITE) {
-        raw_data_t stack_loc = dfs_stack_push(ctx->stack, NULL);
+        raw_data_t stack_loc = dfs_stack_push (ctx->stack, NULL);
         state_info_serialize (&successor, stack_loc);
     }
 }
@@ -941,10 +961,10 @@ handle_state (void *arg, transition_info_t *ti, state_data_t dst)
 {
     thread_ctx_t       *ctx = (thread_ctx_t *) arg;
     state_info_t        successor;
-    state_info_create(&successor, dst, ctx->store2, DUMMY_IDX, ti->group);
-    if (!find_or_put (&successor, &ctx->state)) {
-        raw_data_t stack_loc = dfs_stack_push(ctx->stack, NULL);
-        state_info_serialize(&successor, stack_loc);
+    state_info_create (&successor, dst, NULL, DUMMY_IDX, ti->group);
+    if (!find_or_put (&successor, &ctx->state, ctx->store2)) {
+        raw_data_t stack_loc = dfs_stack_push (ctx->stack, NULL);
+        state_info_serialize (&successor, stack_loc);
         if (trc_output)
             parent_idx[successor.idx] = ctx->state.idx;
         ctx->load++;
