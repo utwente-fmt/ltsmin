@@ -80,6 +80,7 @@ extern lts_type_t GBgetLTStype(model_t model);
 extern void GBprintDependencyMatrix(FILE* file, model_t model);
 extern void GBprintDependencyMatrixRead(FILE* file, model_t model);
 extern void GBprintDependencyMatrixWrite(FILE* file, model_t model);
+extern void GBprintDependencyMatrixCombined(FILE* file, model_t model);
 
 /**
 \brief Get the dependency matrix of the model

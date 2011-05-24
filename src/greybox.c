@@ -473,6 +473,27 @@ void GBprintDependencyMatrixWrite(FILE* file, model_t model) {
 	dm_print(file, GBgetDMInfoWrite(model));
 }
 
+void GBprintDependencyMatrixCombined(FILE* file, model_t model) {
+    matrix_t *dm   = GBgetDMInfo(model);
+    matrix_t *dm_r = GBgetDMInfoRead(model);
+    matrix_t *dm_w = GBgetDMInfoWrite(model);
+
+    for (int i = 0; i < dm_nrows(dm); i++) {
+        for (int j = 0; j < dm_ncols(dm); j++) {
+            if (dm_is_set(dm_r, i, j) && dm_is_set(dm_w, i, j)) {
+                fprintf(file, "+");
+            } else if (dm_is_set(dm_r, i, j)) {
+                fprintf(file, "r");
+            } else if (dm_is_set(dm_w, i, j)) {
+                fprintf(file, "w");
+            } else {
+                fprintf(file, "-");
+            }
+        }
+        fprintf(file, "\n");
+    }
+}
+
 /**********************************************************************
  * Grey box factory functionality
  */
