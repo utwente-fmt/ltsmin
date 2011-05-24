@@ -20,11 +20,11 @@ Implementation uses lockless operations
 */
 typedef struct dbs_ll_s *dbs_ll_t;
 
-typedef stats_t    *(*dbs_stats_f) (const void *dbs);
-typedef int        *(*dbs_get_f) (const void *dbs, int idx, int *dst);
-typedef int        *(*dbs_try_set_sat_f) (const void *dbs, const int idx,
+typedef stats_t   *(*dbs_stats_f) (const void *dbs);
+typedef int       *(*dbs_get_f) (const void *dbs, int idx, int *dst);
+typedef int        (*dbs_try_set_sat_f) (const void *dbs, const int idx,
                                           int index);
-typedef int        *(*dbs_get_sat_f) (const void *dbs, const int idx,
+typedef int        (*dbs_get_sat_f) (const void *dbs, const int idx,
                                       int index);
 
 /**
