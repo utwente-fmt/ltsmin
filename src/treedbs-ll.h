@@ -24,9 +24,19 @@ Create a new tree database.
 - sized
 - incremental using the dependency matrix
 */
-extern treedbs_ll_t TreeDBSLLcreate (int len);
-extern treedbs_ll_t TreeDBSLLcreate_sized (int len, int size);
-extern treedbs_ll_t TreeDBSLLcreate_dm (int len, int size, matrix_t *m);
+extern treedbs_ll_t TreeDBSLLcreate (int len, int satellite_bits);
+extern treedbs_ll_t TreeDBSLLcreate_sized (int len, int size,
+                                           int satellite_bits);
+extern treedbs_ll_t TreeDBSLLcreate_dm (int len, int size, matrix_t *m,
+                                        int satellite_bits);
+
+extern int          TreeDBSLLtry_set_sat_bit (const treedbs_ll_t dbs,
+                                              const int idx, int index);
+extern int          TreeDBSLLget_sat_bit (const treedbs_ll_t dbs, const int idx,
+                                          int index);
+extern uint16_t     TreeDBSLLget_sat_bits (const treedbs_ll_t dbs, const int idx);
+extern void         TreeDBSLLset_sat_bits (const treedbs_ll_t dbs, const int idx,
+                                           uint16_t value);
 
 /**
 \brief Find a vector with respect to a database and insert it if it cannot be fo

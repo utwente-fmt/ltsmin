@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <signal.h>
+#include <assert.h>
 
 #include "runtime.h"
 #include "treedbs-ll.h"
@@ -10,9 +11,9 @@
 
 static const int        TABLE_SIZE = 26;
 static const uint32_t   EMPTY = 0;
-static const uint32_t   WRITE_BIT = 1 << 31;
-static const uint32_t   WRITE_BIT_R = ~(1 << 31);
-static const uint32_t   BITS_PER_INT = sizeof (int) * 8;
+static uint32_t         WRITE_BIT = 1;
+static uint32_t         WRITE_BIT_R = ~((uint32_t)1);
+static const size_t     BITS_PER_INT = sizeof (int) * 8;
 static const size_t     CL_MASK = -((1 << CACHE_LINE) / sizeof (int));
 
 typedef struct int_s {
@@ -31,9 +32,12 @@ typedef union node_u {
 
 struct treedbs_ll_s {
     int                 nNodes;
-    int                 len_bits;
-    int                 nbits;         // hash bitsize
-    int                 nbit_mask;
+    uint32_t            sat_bits;
+    uint32_t            sat_mask;
+    uint32_t            idx_bits;
+    uint32_t            idx_mask;
+    uint32_t            hash_bits;
+    uint32_t            hash_mask;
     pthread_key_t       local_key;
     uint32_t           *table;
     int64_t            *data;
@@ -64,18 +68,52 @@ get_local (treedbs_ll_t dbs)
     return loc;
 }
 
+uint16_t
+TreeDBSLLget_sat_bits (const treedbs_ll_t dbs, const int idx)
+{
+    return atomic_read (dbs->table+idx) & dbs->sat_mask;
+}
+
+void
+TreeDBSLLset_sat_bits (const treedbs_ll_t dbs, const int idx, uint16_t value)
+{
+    uint32_t        hash = dbs->table[idx] & ~dbs->sat_mask;
+    atomic_write (dbs->table+idx, hash | (value & dbs->sat_mask));
+}
+
+int
+TreeDBSLLget_sat_bit (const treedbs_ll_t dbs, const int idx, int index)
+{
+    uint32_t        bit = 1 << index;
+    uint32_t        hash_and_sat = atomic_read (dbs->table+idx);
+    uint32_t        val = hash_and_sat & bit;
+    return val >> index;
+}
+
+int
+TreeDBSLLtry_set_sat_bit (const treedbs_ll_t dbs, const int idx, int index)
+{
+    uint32_t        bit = 1 << index;
+    uint32_t        hash_and_sat = atomic_read (dbs->table+idx);
+    uint32_t        val = hash_and_sat & bit;
+    if (val)
+        return 0; //bit was already set
+    return cas (dbs->table+idx, hash_and_sat, hash_and_sat | bit);
+}
+
 static inline int
 table_lookup (const treedbs_ll_t dbs, const node_u_t *data, int index, int *res,
               stats_t *stat)
 {
     uint32_t            hash,
-                        h;
-    h = hash = mix (data->i.left, data->i.right, index);
-    hash <<= dbs->len_bits;
-    hash ^= (h & dbs->nbit_mask) >> 1; // increases entropy
-    hash |= index;
-    while (EMPTY == hash || WRITE_BIT == hash)
-        hash = mix (data->i.left, data->i.right, hash);
+                        h = index;
+    do {
+        h = hash = mix (data->i.left, data->i.right, h);
+        hash &= dbs->hash_mask;
+        hash ^= (h & ~dbs->hash_mask) << (BITS_PER_INT - dbs->hash_bits); // increases entropy
+        hash |= index << dbs->sat_bits;
+    } while (EMPTY == hash || WRITE_BIT == hash);
+    
     uint32_t            WAIT = hash & WRITE_BIT_R;
     uint32_t            DONE = hash | WRITE_BIT;
     for (size_t probes = 0; probes < dbs->threshold && !dbs->full; probes++) {
@@ -83,7 +121,7 @@ table_lookup (const treedbs_ll_t dbs, const node_u_t *data, int index, int *res,
         size_t              line_end = (idx & CL_MASK) + CACHE_LINE_INT;
         for (size_t i = 0; i < CACHE_LINE_INT; i++) {
             uint32_t           *bucket = &dbs->table[idx];
-            if (EMPTY == *bucket) {
+            if (EMPTY == atomic_read(bucket)) {
                 if (cas (bucket, EMPTY, WAIT)) {
                     write_data_fenced (&dbs->data[idx], data->l.lr);
                     atomic_write (bucket, DONE);
@@ -92,8 +130,8 @@ table_lookup (const treedbs_ll_t dbs, const node_u_t *data, int index, int *res,
                     return 0;
                 }
             }
-            if (DONE == (atomic_read (bucket) | WRITE_BIT)) {
-                while (WAIT == atomic_read (bucket)) {}
+            if (DONE == ((atomic_read (bucket) & ~dbs->sat_mask) | WRITE_BIT)) {
+                while (WAIT == (atomic_read (bucket) & ~dbs->sat_mask)) {}
                 if (dbs->data[idx] == data->l.lr) {
                     *res = idx;
                     return 1;
@@ -206,15 +244,15 @@ LOCALfree (void *loc)
 }
 
 treedbs_ll_t
-TreeDBSLLcreate (int nNodes)
+TreeDBSLLcreate (int nNodes, int satellite_bits)
 {
-    return TreeDBSLLcreate_dm (nNodes, TABLE_SIZE, NULL);
+    return TreeDBSLLcreate_dm (nNodes, TABLE_SIZE, NULL, satellite_bits);
 }
 
 treedbs_ll_t
-TreeDBSLLcreate_sized (int nNodes, int size)
+TreeDBSLLcreate_sized (int nNodes, int size, int satellite_bits)
 {
-    return TreeDBSLLcreate_dm (nNodes, size, NULL);
+    return TreeDBSLLcreate_dm (nNodes, size, NULL, satellite_bits);
 }
 
 /**
@@ -253,26 +291,43 @@ project_matrix_to_tree (treedbs_ll_t dbs, matrix_t *m)
     }
 }
 
+/**
+ * Memorized hash bucket bits org.: <mem_hash> <lock_bit> <node_idx> <sat_bits> 
+ */
 treedbs_ll_t
-TreeDBSLLcreate_dm (int nNodes, int size, matrix_t * m)
+TreeDBSLLcreate_dm (int nNodes, int size, matrix_t * m, int satellite_bits)
 {
     treedbs_ll_t        dbs = RTalign (CACHE_LINE_SIZE, sizeof(struct treedbs_ll_s));
-    int                 pow = 0;
+    uint32_t            pow = 0;
     while ((1 << (++pow)) < nNodes) {}
-    dbs->len_bits = pow;
-    dbs->nbits = BITS_PER_INT - pow - 1;
-    dbs->nbit_mask = -(1 << dbs->nbits);
+    assert (satellite_bits < 16);
+    assert (satellite_bits + pow + 1 <= BITS_PER_INT);
+    dbs->idx_bits = pow;
+    dbs->sat_bits = satellite_bits;
+    dbs->hash_bits = BITS_PER_INT - dbs->idx_bits - dbs->sat_bits  - 1;
+    dbs->sat_mask  = ((1<<dbs->sat_bits) -1);
+    dbs->idx_mask  = ((1<<dbs->idx_bits) -1) << dbs->sat_bits;
+    dbs->hash_mask = ((1<<dbs->hash_bits)-1) << (dbs->idx_bits+dbs->sat_bits+1);
+    assert ( dbs->hash_mask==0 || (dbs->hash_mask & 1<<(BITS_PER_INT-1)) );
+    /* Lock bits are stored in the memoized hash.
+     * 
+     * The lower the lock bit is stored, the better.Since the lower bits are 
+     * used for indexing, they carry less information content than the higher
+     * bits, when applied for comparing hashes. 
+     */
+    WRITE_BIT <<= satellite_bits;
+    WRITE_BIT_R <<= satellite_bits;
     dbs->nNodes = nNodes;
-    pthread_key_create(&dbs->local_key, LOCALfree);
     dbs->full = 0;
     dbs->size = 1L << size;
     dbs->threshold = dbs->size / 50;
     dbs->mask = dbs->size - 1;
+    pthread_key_create(&dbs->local_key, LOCALfree);
     dbs->table = RTalign(CACHE_LINE_SIZE, sizeof (uint32_t) * dbs->size);
     dbs->data = RTalign(CACHE_LINE_SIZE, sizeof (node_u_t) * dbs->size);
     if (!dbs->data)
         Fatal (1, error, "Too large hash table allocated: %zu", dbs->size);
-    memset(dbs->table, 0, sizeof (uint32_t[dbs->size]));
+    dbs->todo = NULL;
     if(m != NULL)
         project_matrix_to_tree(dbs, m);
     return dbs;
@@ -283,6 +338,11 @@ TreeDBSLLfree (treedbs_ll_t dbs)
 {
     RTfree (dbs->data);
     RTfree (dbs->table);
+    if (NULL != dbs->todo) {
+        for(int row = 0;row < dbs->k;++row)
+            RTfree (dbs->todo[row]);
+        RTfree (dbs->todo);
+    }
     RTfree (dbs);
 }
 
