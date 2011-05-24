@@ -21,6 +21,14 @@ int linear_search(const si_map_entry map[],const char*key){
 	return -1;
 }
 
+char *key_search(si_map_entry map[],const int val){
+    while(map[0].key){
+        if(map[0].val == val) return map[0].key;
+        map++;
+    }
+    return "not found";
+}
+
 void (*RThandleFatal)(const char*file,int line,int errnum,int code);
 
 void RTinit(int *argcp,char**argvp[]){
@@ -102,6 +110,12 @@ void* RTrealloc(void *rt_ptr, size_t size){
     void *tmp=realloc(rt_ptr,size);
     if (tmp==NULL) Fatal(0,error,"out of memory trying to resize to %d",size);
     return tmp;
+}
+
+void* RTalignZero(size_t align, size_t size){
+    void *p=RTalign(align, size);
+    memset(p, 0, size);
+    return p;
 }
 
 char* RTstrdup(const char *str){
