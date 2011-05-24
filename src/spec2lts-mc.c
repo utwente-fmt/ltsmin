@@ -611,11 +611,6 @@ init_globals (int argc, char *argv[])
     if (Perm_Unknown == permutation) //default permutation depends on strategy
         permutation = strategy & Strat_Reach ? Perm_None : Perm_Shift;
     if (strategy & Strat_LTL) {
-        if ( !(GBhasProperty(model) == PROPERTY_LTL_SPIN ||
-               GBhasProperty(model) == PROPERTY_LTL_TEXTBOOK))
-            Warning(info, "No properties found.\n"
-                    "NDFS search only works in combination with a never claim\n"
-                    "(use --ltl or supply a Buchi product as input model).");
         if (call_mode == UseGreyBox)
             Warning(info, "Greybox not supported with strategy NDFS, ignored.");
         lb_method = LB_None;
