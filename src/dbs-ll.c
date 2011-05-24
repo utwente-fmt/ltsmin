@@ -14,13 +14,15 @@
 
 static const int        TABLE_SIZE = 24;
 static const uint32_t   EMPTY = 0;
-static const uint32_t   WRITE_BIT = 1 << 31;
-static const uint32_t   WRITE_BIT_R = ~(1 << 31);
+static uint32_t   WRITE_BIT = 1;
+static uint32_t   WRITE_BIT_R = ~((uint32_t)1);
 static const uint32_t   BITS_PER_INT = sizeof (int) * 8;
 static const size_t     CL_MASK = -(1 << CACHE_LINE);
 
 struct dbs_ll_s {
     size_t              length;
+    size_t              sat_bits;
+    size_t              sat_mask;
     size_t              bytes;
     size_t              size;
     size_t              threshold;
@@ -48,10 +50,43 @@ get_local (dbs_ll_t dbs)
     return loc;
 }
 
+uint16_t
+DBSLLget_sat_bits (const dbs_ll_t dbs, const int idx)
+{
+    return atomic_read (dbs->table+idx) & dbs->sat_mask;
+}
+
+int
+DBSLLget_sat_bit (const dbs_ll_t dbs, const int idx, int index)
+{
+    uint32_t        bit = 1 << index;
+    uint32_t        hash_and_sat = atomic_read (dbs->table+idx);
+    uint32_t        val = hash_and_sat & bit;
+    return val >> index;
+}
+
+int
+DBSLLtry_set_sat_bit (const dbs_ll_t dbs, const int idx, int index)
+{
+    uint32_t        bit = 1 << index;
+    uint32_t        hash_and_sat = atomic_read (dbs->table+idx);
+    uint32_t        val = hash_and_sat & bit;
+    if (val)
+        return 0; //bit was already set
+    return cas (dbs->table+idx, hash_and_sat, hash_and_sat | bit);
+}
+
+void
+DBSLLset_sat_bits (const dbs_ll_t dbs, const int idx, uint16_t value)
+{
+    uint32_t        hash = dbs->table[idx] & ~dbs->sat_mask;
+    atomic_write (dbs->table+idx, hash | (value & dbs->sat_mask));
+}
+
 uint32_t
 DBSLLmemoized_hash (const dbs_ll_t dbs, const int idx)
 {
-    return dbs->table[idx];
+    return dbs->table[idx] & ~dbs->sat_mask;
 }
 
 int
@@ -63,10 +98,10 @@ DBSLLlookup_hash (const dbs_ll_t dbs, const int *v, uint32_t *ret, uint32_t *has
     size_t              l = dbs->length;
     size_t              b = dbs->bytes;
     uint32_t            hash_rehash = hash ? *hash : dbs->hash32 ((char *)v, b, 0);
-    uint32_t            hash_memo = hash_rehash;
+    uint32_t            hash_memo = hash_rehash & ~dbs->sat_mask;
     //avoid collision of memoized hash with reserved values EMPTY and WRITE_BIT
     while (EMPTY == hash_memo || WRITE_BIT == hash_memo)
-        hash_memo = dbs->hash32 ((char *)v, b, ++seed);
+        hash_memo = dbs->hash32 ((char *)v, b, ++seed) & ~dbs->sat_mask;
     uint32_t            WAIT = hash_memo & WRITE_BIT_R;
     uint32_t            DONE = hash_memo | WRITE_BIT;
     while (seed < dbs->threshold && !dbs->full) {
@@ -83,8 +118,8 @@ DBSLLlookup_hash (const dbs_ll_t dbs, const int *v, uint32_t *ret, uint32_t *has
                     return 0;
                 }
             }
-            if (DONE == (atomic_read (bucket) | WRITE_BIT)) {
-                while (WAIT == atomic_read (bucket)) {}
+            if (DONE == ((atomic_read (bucket) | WRITE_BIT) & ~dbs->sat_mask)) {
+                while (WAIT == (atomic_read (bucket) & ~dbs->sat_mask)) {}
                 if (0 == memcmp (&dbs->data[idx * l], v, b)) {
                     *ret = idx;
                     return 1;
@@ -108,37 +143,42 @@ DBSLLlookup_hash (const dbs_ll_t dbs, const int *v, uint32_t *ret, uint32_t *has
 int *
 DBSLLget (const dbs_ll_t dbs, const int idx, int *dst)
 {
-    *dst = dbs->table[idx];
+    *dst = dbs->table[idx] & ~dbs->sat_mask;
     return &dbs->data[idx * dbs->length];
 }
 
 int
-DBSLLlookup_ret (const dbs_ll_t dbs, const int *v, int *ret)
+DBSLLlookup_ret (const dbs_ll_t dbs, const int *v, uint32_t *ret)
 {
     return DBSLLlookup_hash (dbs, v, ret, NULL);
 }
 
-int
+uint32_t
 DBSLLlookup (const dbs_ll_t dbs, const int *vector)
 {
-    int                *ret = RTmalloc (sizeof (*ret));
-    DBSLLlookup_hash (dbs, vector, ret, NULL);
-    return *ret;
+    uint32_t             ret;
+    DBSLLlookup_hash (dbs, vector, &ret, NULL);
+    return ret;
 }
 
 dbs_ll_t
 DBSLLcreate (int length)
 {
-    return DBSLLcreate_sized (length, TABLE_SIZE, (hash32_f)SuperFastHash);
+    return DBSLLcreate_sized (length, TABLE_SIZE, (hash32_f)SuperFastHash, 0);
 }
 
 dbs_ll_t
-DBSLLcreate_sized (int length, int size, hash32_f hash32)
+DBSLLcreate_sized (int length, int size, hash32_f hash32, int satellite_bits)
 {
     dbs_ll_t            dbs = RTalign (CACHE_LINE_SIZE, sizeof (struct dbs_ll_s));
     dbs->length = length;
     dbs->hash32 = hash32;
     dbs->full = 0;
+    assert(satellite_bits < 32);
+    dbs->sat_bits = satellite_bits;
+    dbs->sat_mask = (1<<satellite_bits) - 1;
+    WRITE_BIT <<= satellite_bits;
+    WRITE_BIT_R <<= satellite_bits;
     dbs->bytes = length * sizeof (int);
     dbs->size = 1 << size;
     dbs->threshold = dbs->size / 100;
