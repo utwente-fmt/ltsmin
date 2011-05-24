@@ -106,8 +106,8 @@ void
 add_stats(stats_t *res, stats_t *stat)
 {
     res->elts += stat->elts;
+    res->nodes += stat->nodes;
     res->tests += stat->tests;
     res->misses += stat->misses;
     res->rehashes += stat->rehashes;
-    res->cache_misses += stat->cache_misses;
 }

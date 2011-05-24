@@ -183,9 +183,8 @@ DBSLLcreate_sized (int length, int size, hash32_f hash32, int satellite_bits)
     dbs->size = 1 << size;
     dbs->threshold = dbs->size / 100;
     dbs->mask = dbs->size - 1;
-    dbs->table = RTalign (CACHE_LINE_SIZE, sizeof (uint32_t[dbs->size]));
+    dbs->table = RTalignZero (CACHE_LINE_SIZE, sizeof (uint32_t[dbs->size]));
     dbs->data = RTalign (CACHE_LINE_SIZE, sizeof (int[dbs->size * length]));
-    memset (dbs->table, 0, sizeof (uint32_t[dbs->size]));
     pthread_key_create (&dbs->local_key, RTfree);
     return dbs;
 }
@@ -201,7 +200,7 @@ DBSLLfree (dbs_ll_t dbs)
 stats_t *
 DBSLLstats (dbs_ll_t dbs)
 {
-    stats_t            *res = RTmalloc (sizeof (*res));
+    stats_t            *res = RTmallocZero (sizeof (*res));
     stats_t            *stat = &get_local (dbs)->stat;
     memcpy (res, stat, sizeof (*res));
     return res;

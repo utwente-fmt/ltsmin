@@ -52,6 +52,7 @@ struct treedbs_ll_s {
 typedef struct loc_s {
     int                *storage;
     stats_t             stat;
+    size_t             *node_count;
 } loc_t;
 
 static inline loc_t *
@@ -62,6 +63,7 @@ get_local (treedbs_ll_t dbs)
         loc = RTalign (CACHE_LINE_SIZE, sizeof (loc_t));
         memset (loc, 0, sizeof (loc_t));
         loc->storage = RTalign (CACHE_LINE_SIZE, sizeof (int[dbs->nNodes * 2]));
+        loc->node_count = RTalignZero (CACHE_LINE_SIZE, sizeof (size_t[dbs->nNodes]));
         memset (loc->storage, -1, sizeof (loc->storage));
         pthread_setspecific (dbs->local_key, loc);
     }
@@ -103,8 +105,9 @@ TreeDBSLLtry_set_sat_bit (const treedbs_ll_t dbs, const int idx, int index)
 
 static inline int
 table_lookup (const treedbs_ll_t dbs, const node_u_t *data, int index, int *res,
-              stats_t *stat)
+              loc_t *loc)
 {
+    stats_t            *stat = &loc->stat;
     uint32_t            hash,
                         h = index;
     do {
@@ -126,7 +129,7 @@ table_lookup (const treedbs_ll_t dbs, const node_u_t *data, int index, int *res,
                     write_data_fenced (&dbs->data[idx], data->l.lr);
                     atomic_write (bucket, DONE);
                     *res = idx;
-                    stat->elts++;
+                    loc->node_count[index]++;
                     return 0;
                 }
             }
@@ -166,19 +169,18 @@ int
 TreeDBSLLlookup (const treedbs_ll_t dbs, const int *vector)
 {
     loc_t              *loc = get_local (dbs);
-    stats_t            *stat = &loc->stat;
     size_t              n = dbs->nNodes;
     int                 seen = 0;
     int                *next = loc->storage;
     memcpy (next + n, vector, sizeof (int[n]));
     for (size_t i = n - 1; i > 0; i--)
-        seen = table_lookup (dbs, i64(next, i), i-1, next+i, stat);
+        seen = table_lookup (dbs, i64(next, i), i-1, next+i, loc);
     return seen;
 }
 
 
 int
-TreeDBSLLlookup_incr (const treedbs_ll_t dbs, const int *v, tree_t prev, 
+TreeDBSLLlookup_incr (const treedbs_ll_t dbs, const int *v, tree_t prev,
                       tree_t next)
 {
     loc_t              *loc = get_local (dbs);
@@ -188,31 +190,29 @@ TreeDBSLLlookup_incr (const treedbs_ll_t dbs, const int *v, tree_t prev,
         memcpy (next, loc->storage, sizeof(int[n<<1]));
         return seen;
     }
-    stats_t            *stat = &loc->stat;
     int                 seen = 1;
     memcpy (next, prev, sizeof (int[n]));
     memcpy (next + n, v, sizeof (int[n]));
     for (size_t i = n - 1; i > 0; i--)
     if ( !cmp_i64(prev, next, i) )
-        seen = table_lookup (dbs, i64(next, i), i-1, next+i, stat);
+        seen = table_lookup (dbs, i64(next, i), i-1, next+i, loc);
     return seen;
 }
 
 int
-TreeDBSLLlookup_dm (const treedbs_ll_t dbs, const int *v, tree_t prev, 
+TreeDBSLLlookup_dm (const treedbs_ll_t dbs, const int *v, tree_t prev,
                     tree_t next, int group)
 {
     if ( group == -1 || NULL == prev )
         return TreeDBSLLlookup_incr (dbs, v, prev, next);
     loc_t              *loc = get_local (dbs);
-    stats_t            *stat = &loc->stat;
     int                 seen = 1;
     memcpy (next, prev, sizeof (int[dbs->nNodes]));
     memcpy (next + dbs->nNodes, v, sizeof (int[dbs->nNodes]));
     int                 idx;
     for (size_t i = 0; (idx = dbs->todo[group][i]) != -1; i++)
     if ( !cmp_i64(prev, next, idx) )
-        seen = table_lookup (dbs, i64(next, idx), idx-1, next+idx, stat);
+        seen = table_lookup (dbs, i64(next, idx), idx-1, next+idx, loc);
     return seen;
 }
 
@@ -238,8 +238,11 @@ TreeDBSLLindex (tree_t data) {
 }
 
 void
-LOCALfree (void *loc)
+LOCALfree (void *arg)
 {
+    loc_t              *loc=  (loc_t*) arg;
+    RTfree (loc->node_count);
+    RTfree (loc->storage);
     RTfree (loc);
 }
 
@@ -292,7 +295,7 @@ project_matrix_to_tree (treedbs_ll_t dbs, matrix_t *m)
 }
 
 /**
- * Memorized hash bucket bits org.: <mem_hash> <lock_bit> <node_idx> <sat_bits> 
+ * Memorized hash bucket bits org.: <mem_hash> <lock_bit> <node_idx> <sat_bits>
  */
 treedbs_ll_t
 TreeDBSLLcreate_dm (int nNodes, int size, matrix_t * m, int satellite_bits)
@@ -310,10 +313,10 @@ TreeDBSLLcreate_dm (int nNodes, int size, matrix_t * m, int satellite_bits)
     dbs->hash_mask = ((1<<dbs->hash_bits)-1) << (dbs->idx_bits+dbs->sat_bits+1);
     assert ( dbs->hash_mask==0 || (dbs->hash_mask & 1<<(BITS_PER_INT-1)) );
     /* Lock bits are stored in the memoized hash.
-     * 
-     * The lower the lock bit is stored, the better.Since the lower bits are 
+     *
+     * The lower the lock bit is stored, the better. Since the lower bits are
      * used for indexing, they carry less information content than the higher
-     * bits, when applied for comparing hashes. 
+     * bits, when applied for comparing hashes.
      */
     WRITE_BIT <<= satellite_bits;
     WRITE_BIT_R <<= satellite_bits;
@@ -323,8 +326,8 @@ TreeDBSLLcreate_dm (int nNodes, int size, matrix_t * m, int satellite_bits)
     dbs->threshold = dbs->size / 50;
     dbs->mask = dbs->size - 1;
     pthread_key_create(&dbs->local_key, LOCALfree);
-    dbs->table = RTalign(CACHE_LINE_SIZE, sizeof (uint32_t) * dbs->size);
-    dbs->data = RTalign(CACHE_LINE_SIZE, sizeof (node_u_t) * dbs->size);
+    dbs->table = RTalignZero (CACHE_LINE_SIZE, sizeof (uint32_t) * dbs->size);
+    dbs->data = RTalign (CACHE_LINE_SIZE, sizeof (node_u_t) * dbs->size);
     if (!dbs->data)
         Fatal (1, error, "Too large hash table allocated: %zu", dbs->size);
     dbs->todo = NULL;
@@ -349,6 +352,12 @@ TreeDBSLLfree (treedbs_ll_t dbs)
 stats_t *
 TreeDBSLLstats (treedbs_ll_t dbs)
 {
+
+    stats_t            *res = RTmalloc (sizeof (*res));
     loc_t              *loc = get_local (dbs);
-    return &loc->stat;
+    for(int i = 0; i < dbs->nNodes; i++)
+        loc->stat.nodes += loc->node_count[i];
+    loc->stat.elts = loc->node_count[0];
+    memcpy (res, &loc->stat, sizeof (*res));
+    return res;
 }

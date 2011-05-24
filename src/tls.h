@@ -103,14 +103,10 @@ static const size_t CACHE_LINE_INT_MASK =
 */
 typedef struct stats_s {
     size_t              elts;
+    size_t              nodes;
     size_t              misses;
     size_t              tests;
     size_t              rehashes;
-    long long           compressed;
-    size_t              mincomp;
-    size_t              maxcomp;
-    size_t              cache_hits;
-    size_t              cache_misses;
 } stats_t;
 
 extern void add_stats(stats_t *res, stats_t *stat);
