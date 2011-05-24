@@ -38,6 +38,7 @@ extern int *dfs_stack_pop(dfs_stack_t stack);
 extern int *dfs_stack_top(dfs_stack_t stack);
 extern int *dfs_stack_peek_top(dfs_stack_t stack, size_t frame_offset);
 
+extern int * dfs_stack_bottom (dfs_stack_t stack);
 /**
  * Virtually pops some elements from the bottom of the bottom frame
  * The are lazily thrown away so memory usage increases
