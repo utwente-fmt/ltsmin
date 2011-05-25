@@ -701,7 +701,6 @@ void ex_program(int sig) {
     } else {
         Warning(info, "PREMATURE EXIT (caught signal: %d)", sig);
     }
-    (void) sig;
 }
 
 int

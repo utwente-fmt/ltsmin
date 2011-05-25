@@ -139,7 +139,7 @@ dfs_stack_top (dfs_stack_t stack)
 int *
 dfs_stack_peek_top (dfs_stack_t stack, size_t frame_offset)
 {
-    if (!frame_offset && stack->frame_size != stack->frame_bottom)
+    if (!frame_offset && stack->frame_size == stack->frame_bottom)
         Fatal(1, error, "Peek top on empty frame");
     size_t offset = frame_offset ? stack->frame_size : 0;
     size_t x;
