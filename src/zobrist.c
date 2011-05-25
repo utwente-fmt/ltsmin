@@ -68,6 +68,7 @@ zobrist_create (int length, int z_length, matrix_t * m)
     z->mask = z->key_length - 1;
     z->length = length;
     z->keys = RTmalloc (sizeof (int32_t *[length]));
+    srandom (time(NULL));
     for (int j = 0; j < length; j++) {
         z->keys[j] = RTmalloc (sizeof (int32_t[z->key_length]));
         for (int i = 0; i < z->key_length; i++) {

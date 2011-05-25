@@ -34,13 +34,35 @@ when creating the storage manager.
 \brief These constructs prevent the compiler from optimizing (reordering) reads
 and writes to memory location, which causes loss of atomicity properties.
 */
-#define atomic_read(v)      (*(volatile uint32_t *)v)
-#define atomic_write(v,a)   (*(volatile uint32_t *)v = (a))
+#define atomic_read(v)      (*(volatile uint32_t *)(v))
+#define atomic_write(v,a)   (*(volatile uint32_t *)(v) = (a))
+
+#define atomic16_read(v)      (*(volatile uint16_t *)(v))
+#define atomic16_write(v,a)   (*(volatile uint16_t *)(v) = (a))
 
 #ifdef __x86_64__
-#define atomic64_read(v)    (*(volatile uint64_t *)v)
-#define atomic64_write(v,a) (*(volatile uint64_t *)v = (a))
+#define atomic64_read(v)    (*(volatile uint64_t *)(v))
+#define atomic64_write(v,a) (*(volatile uint64_t *)(v) = (a))
 #endif
+
+/**
+ * Writes a quad-word value to a memory address loc.
+ * The write is not atomic, but guaranteed to be exempt
+ * from reordering.
+ * This can be viewed as an implicit memory fence.
+ */
+static inline void
+write_data_fenced (void *loc, int64_t value)
+{
+#ifdef __x86_64__
+    atomic64_write (loc, value);
+#else
+    uint32_t           *val_arr = (uint32_t*) &value;
+    uint32_t           *loc_arr = (uint32_t*) loc;
+    atomic_write (loc_arr, val_arr[0]);
+    atomic_write (&loc_arr[1], val_arr[1]);
+#endif
+}
 
 /**
 \def cache line size to optimize memory allocations for
