@@ -63,7 +63,9 @@ endif
 bin_PROGRAMS += nips2lts-grey
 bin_PROGRAMS += nips2lts-gsea
 bin_PROGRAMS += nips-reach
+if HAVE_ATOMICS
 bin_PROGRAMS += nips2lts-mc
+endif
 if HAVE_CADP
 pkglib_LTLIBRARIES += libnips-open.la
 endif
@@ -72,7 +74,9 @@ endif
 bin_PROGRAMS += etf2lts-grey
 bin_PROGRAMS += etf2lts-gsea
 bin_PROGRAMS += etf-reach
+if HAVE_ATOMICS
 bin_PROGRAMS += etf2lts-mc
+endif
 if HAVE_CADP
 pkglib_LTLIBRARIES += libetf-open.la
 endif
@@ -81,7 +85,9 @@ if HAVE_DVEC
 bin_PROGRAMS += dve2lts-grey
 bin_PROGRAMS += dve2lts-gsea
 bin_PROGRAMS += dve-reach
+if HAVE_ATOMICS
 bin_PROGRAMS += dve2lts-mc
+endif
 if HAVE_CADP
 pkglib_LTLIBRARIES += libdve-open.la
 endif
@@ -91,7 +97,9 @@ if HAVE_DVEC2
 bin_PROGRAMS += dve22lts-grey
 bin_PROGRAMS += dve22lts-gsea
 bin_PROGRAMS += dve2-reach
+if HAVE_ATOMICS
 bin_PROGRAMS += dve22lts-mc
+endif
 if HAVE_CADP
 pkglib_LTLIBRARIES += libdve2-open.la
 endif
@@ -101,7 +109,9 @@ endif
 bin_PROGRAMS += spinja2lts-grey
 bin_PROGRAMS += spinja2lts-gsea
 bin_PROGRAMS += spinja-reach
+if HAVE_ATOMICS
 bin_PROGRAMS += spinja2lts-mc
+endif
 #endif
 
 libmcrl2_pins_la_SOURCES  = mcrl2-greybox.cpp mcrl2-greybox.h
