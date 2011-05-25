@@ -79,13 +79,13 @@ endif
 if HAVE_ASCIIDOC
 -include ./$(DEPDIR)/asciidoc.d
 
-./$(DEPDIR)/asciidoc.d: $(doc_ASCIIDOC) $(extra_ASCIIDOC)
+./$(DEPDIR)/asciidoc.d: $(doc_ASCIIDOC) $(extra_ASCIIDOC) Makefile
 	@$(MKDIR_P) ./$(DEPDIR)
-	@grep 'include::' $^ |\
+	@grep 'include::' $(filter %.txt,$^) |\
 		sed 's/include::/ /;s/\[]//;s%\(.*inc/\).*: *%&\1%' > $@
 endif
 
-distclean-local:
+clean-local:
 	-$(RM) -r ./$(DEPDIR)
 
 define ASCIIDOC.xml

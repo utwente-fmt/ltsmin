@@ -14,6 +14,8 @@ bn_init (mpz_t *a)
 void
 bn_init_copy (mpz_t *a, mpz_t *b)
 {
+    if (a == b)
+        return;
     mpz_init (*a);
     mpz_set (*a, *b);
 }
@@ -43,6 +45,12 @@ bn_int2string (char *string, size_t size, mpz_t *a)
     else
         string[0] = '\0';
     return needed_size - 1;
+}
+
+double
+bn_int2double (mpz_t *a)
+{
+    return mpz_get_d(*a);
 }
 
 void

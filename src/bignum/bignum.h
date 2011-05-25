@@ -66,6 +66,13 @@ in the buffer in case its size would have been infinite.
 int                 bn_int2string (char *string, size_t size, bn_int_t *a);
 
 /**
+\brief Convert bignum to double.
+
+\param a Pointer to initialized bignum to be converted.
+*/
+double              bn_int2double (bn_int_t *a);
+
+/**
 \brief Add two bignums
 
 \param a Pointer to initialized bignum that is the to fist operand of the

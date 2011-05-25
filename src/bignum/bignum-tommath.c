@@ -16,7 +16,10 @@ bn_init (mp_int *a)
 void
 bn_init_copy (mp_int *a, mp_int *b)
 {
-    int                 ret = mp_init_copy (a, b);
+    int                 ret;
+    if (a == b)
+        return;
+    ret = mp_init_copy (a, b);
     if (ret != MP_OKAY)
         Fatal (1, error, "Error initializing number");
 }
@@ -47,7 +50,7 @@ bn_double2int (double a, mp_int *b)
     ret = mp_mul_2d (&upper, exp, &upper);
     if (ret != MP_OKAY)
         Fatal (1, error, "Error initializing number");
-    for (int i = 0; i < FRAC_BITS; i++) {
+    for (unsigned int i = 0; i < FRAC_BITS; i++) {
         frac = frac * 2;
         val = lround (floor (frac));
         assert (val == 0 || val == 1);
@@ -62,6 +65,31 @@ bn_double2int (double a, mp_int *b)
         }
     }
     mp_clear_multi (&number, &upper, NULL);
+}
+
+double
+bn_int2double (mp_int *a)
+{
+    double              value = 0,
+                        multiplier = 1;
+    int                 ret;
+    mp_int              dividend,
+                        remainder;
+
+    ret = mp_init_copy (&dividend, a);
+    if (ret != MP_OKAY)
+        Fatal (1, error, "Error initializing number");
+    ret = mp_init (&remainder);
+    if (ret != MP_OKAY)
+        Fatal (1, error, "Error initializing number");
+    while (!mp_iszero (&dividend)) {
+        mp_div_2d (&dividend, 1, &dividend, &remainder);
+        if (mp_isodd (&remainder))
+            value = value + multiplier;
+        multiplier = multiplier * 2;
+    }
+    mp_clear_multi (&dividend, &remainder, NULL);
+    return value;
 }
 
 int
