@@ -600,7 +600,7 @@ init_globals (int argc, char *argv[])
                 "Perform a parallel reachability analysis of <model>\n\nOptions");
     model_t             model = get_model (1);
     if (Perm_Unknown == permutation) //default permutation depends on strategy
-        permutation = strategy & Strat_Reach ? Perm_None : Perm_Shift;
+        permutation = strategy & Strat_Reach ? Perm_None : Perm_Dynamic;
     if (strategy & Strat_LTL) {
         if (call_mode == UseGreyBox)
             Warning(info, "Greybox not supported with strategy NDFS, ignored.");
