@@ -4,8 +4,18 @@
 
 
 *--strategy*='TYPE'::
-        Select exploration strategy (strict exploration orders
-        are not guaranteed by the multicore version).
+        Select an exploration strategy. Two kinds of algorithms
+        are avaliable: LTL model checking and reachability.
+        The multi-core LTL algorithms (Nested DFS) are implemented
+        in a swarmed fashion, however with a shared state storage.
+        On top of that, MCNDFS offers work sharing between threads
+        and can deliver linear speedups for some models.
+        Note that the LTL algorithms require buchi automata as input.
+        Such a model can be provided directly by the language frontend,
+        i.e., DiVinE property models are supported, or by the LTL
+        layer (see --ltl).
+        Note finally that strict reachability exploration orders
+        are not guaranteed by the multicore version.
         'TYPE' can be one of the following options:
 
 bfs;;
@@ -13,6 +23,53 @@ bfs;;
 
 dfs;;
   explore state space in depth-first order.
+
+ndfs;;
+  multi-core swarmed Nested Depth-First Search (Courcoubetis et al.).
+
+nndfs;;
+  multi-core swarmed New Nested Depth-First Search (Schwoon, Esparza).
+
+mcndfs;;
+  Multi-Core Nested Depth-First Search (Laarman, van der Pol, Weber).
+
+
+*--perm*='TYPE'::
+        Select the transition permutation, which is used to guide
+        different threads to different parts of the state space.
+        A good permutation can significantly speed up bug hunting.
+        'TYPE' can be one of the following options, each has
+        different properties in terms of performance and effectiveness
+        summarized as (perf./eff.) :
+
+dynamic;;
+    use heuristics from state colorings (decent/potentially very good).
+    We have indications that the heuristics can be improved further.
+
+sort;;
+    sort on the unique id of the successor state (decent/good)
+
+random;;
+    use multiple fixed random permutation schemes per worker (decent/good).
+
+sr;;
+    sort according to one fixed random permutation scheme per worker (decent/decent).
+
+shift;;
+   shift the order of transitions by a fixed value per worker (fast/decent).
+
+shiftall;;
+   as shift, but with a equal load for all workers (a bit slower/decent).
+
+otf;;
+    sort according to a dynamic permutation scheme (slow/perfect).
+
+none;;
+    use the same exploration order for all workers (default for reachability).
+
+
+*--no-red-perm*::
+    Turns the permutation layer of for the nested DFSs of the swarmed algorithms.
 
 
 *--state*='TYPE'::
@@ -44,6 +101,10 @@ static;;
 combined;;
   not implemented. Experiments show that SRP overhead is minimal (<5%).
 
+none;;
+  turn load balancer off. Default for swarmed algorithms, for which threads 
+  in principle explore the state space independently (see --strategy).
+
 
 *--handoff*='NUMBER'::
         Maximum number of states to hand off to a thread requesting load
@@ -61,7 +122,8 @@ combined;;
 
 *--ref*::
         Save space by storing references to table/tree on the stack/queue.
-        Normally full states are stored.
+        Normally full states are stored. The swarmed algorithms always use
+        references.
 
 
 *--zobrist*='NUMBER'::
@@ -72,7 +134,7 @@ combined;;
         Experiments have shown that small tables (2^6) suffice for
         good distributions (equal or better than Jenkin's hash).
         Improvements are only noticable for fast state generators, like
-        DiVinE 2.2( manpage:dve22lts-mc[1]).
+        DiVinE 2.2 (manpage:dve22lts-mc[1]).
 
 
 *--max*='NUMBER'::
