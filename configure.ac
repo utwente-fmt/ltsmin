@@ -230,10 +230,25 @@ mkdtemp, strsep])
 
 # check for fine-grained multi-core synchronization primitives
 acx_atomics=yes
-AX_CHECK_FUNC_INCLUDE([#include <pthread.h>],[__sync_bool_compare_and_swap],[],[acx_atomics=no])
-AX_CHECK_FUNC_INCLUDE([#include <pthread.h>],[__sync_fetch_and_and],[],[acx_atomics=no])
-AX_CHECK_FUNC_INCLUDE([#include <pthread.h>],[__sync_fetch_and_or],[],[acx_atomics=no])
-AX_CHECK_FUNC_INCLUDE([#include <pthread.h>],[__sync_synchronize],[],[acx_atomics=no])
+AX_CHECK_FUNC_INCLUDE([],[__sync_bool_compare_and_swap],
+  [int x = 0;
+   __sync_bool_compare_and_swap(&x,0,1)],
+  [],[acx_atomics=no])
+AX_CHECK_FUNC_INCLUDE([],[__sync_fetch_and_add],
+  [int x = 0;
+   __sync_fetch_and_add(&x,1)],
+  [],[acx_atomics=no])
+AX_CHECK_FUNC_INCLUDE([],[__sync_fetch_and_and],
+  [int x = 0;
+   __sync_fetch_and_and(&x,1)],
+  [],[acx_atomics=no])
+AX_CHECK_FUNC_INCLUDE([],[__sync_fetch_and_or],
+  [int x = 0;
+   __sync_fetch_and_or(&x,1)],
+  [],[acx_atomics=no])
+AX_CHECK_FUNC_INCLUDE([],[__sync_synchronize],
+  [__sync_synchronize()],
+  [],[acx_atomics=no])
 if test x"$acx_atomics" != "xyes"; then
   AC_MSG_WARN([no acceptable atomic operations found.])
 fi
