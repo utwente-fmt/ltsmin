@@ -221,6 +221,8 @@ static void mcrl2_popt(poptContext con,
 			Fatal(1,error,"Bad mcrl2 options: %s",mcrl2_args);
 		}
 		poptFreeContext(optCon);
+        free(argv[0]); // Overwritten by RTparseOptions
+        free(argv);    // Allocated as one block by RTparseOptions
 		if (rewriter) {
 			if (!strcmp(rewriter,"jitty")){
 				mcrl2_rewriter=mcrl2::data::rewriter::jitty;
@@ -233,6 +235,7 @@ static void mcrl2_popt(poptContext con,
 			} else {
 				Fatal(1,error,"unrecognized rewriter: %s (jitty, jittyc, inner and innerc supported)",rewriter);
 			}
+            free(rewriter);
 		}
 		GBregisterLoader("lps",MCRL2loadGreyboxModel);
 		Warning(info,"mCRL2 language module initialized");
