@@ -105,7 +105,7 @@ bin_PROGRAMS += spinja2lts-mc
 #endif
 
 libmcrl2_pins_la_SOURCES  = mcrl2-greybox.cpp mcrl2-greybox.h
-# libmcrl2_pins_la_SOURCES += at-map.c at-map.h
+libmcrl2_pins_la_SOURCES += at-map.c at-map.h
 libmcrl2_pins_la_CPPFLAGS = $(MCRL2_CPPFLAGS) $(AM_CPPFLAGS)
 libmcrl2_pins_la_LDFLAGS  = $(MCRL2_LDFLAGS) $(AM_LDFLAGS)
 libmcrl2_pins_la_LIBADD   = $(MCRL2_LIBS)
