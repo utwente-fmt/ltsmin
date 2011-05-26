@@ -228,7 +228,7 @@ dfs_stack_walk_down(dfs_stack_t stack, int(*cb)(int*, void*), void* ctx)
 {
     // set offset of the root node
     int offset = stack->ntotal;
-    int res;
+    int res = 1;
 
     for(size_t i=stack->nframes-1 ; i > 0 &&  res; i--) {
         offset -= isba_peek_int(stack->frames, i)[0];
