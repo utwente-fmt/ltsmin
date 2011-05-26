@@ -546,48 +546,47 @@ get_vrel_size(vrel_t rel, long *node_count, double *elem_approximation,
 static void
 stats_and_progress_report(vset_t current, vset_t visited, int level)
 {
-    long   node_count;
+    long   n_count;
     char   elem_str[1024];
-    int    str_len = sizeof(elem_str);
-    double elem_count;
+    double e_count;
 
     if (current != NULL) {
-        get_vset_size(current, &node_count, &elem_count, elem_str, str_len);
+        get_vset_size(current, &n_count, &e_count, elem_str, sizeof(elem_str));
         Warning(info, "level %d has %s (~%1.2e) states ( %ld nodes )",
-                    level, elem_str, elem_count, node_count);
+                    level, elem_str, e_count, n_count);
 
-        if (node_count > max_lev_count)
-            max_lev_count = node_count;
+        if (n_count > max_lev_count)
+            max_lev_count = n_count;
     }
 
-    get_vset_size(visited, &node_count, &elem_count, elem_str, str_len);
+    get_vset_size(visited, &n_count, &e_count, elem_str, sizeof(elem_str));
     Warning(info, "visited %d has %s (~%1.2e) states ( %ld nodes )",
-                level, elem_str, elem_count, node_count);
+                level, elem_str, e_count, n_count);
 
-    if (node_count > max_vis_count)
-        max_vis_count = node_count;
+    if (n_count > max_vis_count)
+        max_vis_count = n_count;
 
     if (RTverbosity >= 2) {
         fprintf(stderr, "transition caches ( grp nds elts ): ");
 
         for (int i = 0; i < nGrps; i++) {
-            get_vrel_size(group_next[i], &node_count, &elem_count,
-                              elem_str, str_len);
-            fprintf(stderr, "( %d %ld %s ) ", i, node_count, elem_str);
+            get_vrel_size(group_next[i], &n_count, &e_count, elem_str,
+                              sizeof(elem_str));
+            fprintf(stderr, "( %d %ld %s ) ", i, n_count, elem_str);
 
-            if (node_count > max_trans_count)
-                max_trans_count = node_count;
+            if (n_count > max_trans_count)
+                max_trans_count = n_count;
         }
 
         fprintf(stderr,"\ngroup explored    ( grp nds elts ): ");
 
         for (int i = 0; i < nGrps; i++) {
-            get_vset_size(group_explored[i], &node_count, &elem_count,
-                              elem_str, str_len);
-            fprintf(stderr, "( %d %ld %s ) ", i, node_count, elem_str);
+            get_vset_size(group_explored[i], &n_count, &e_count, elem_str,
+                              sizeof(elem_str));
+            fprintf(stderr, "( %d %ld %s ) ", i, n_count, elem_str);
 
-            if (node_count > max_grp_count)
-                max_grp_count = node_count;
+            if (n_count > max_grp_count)
+                max_grp_count = n_count;
         }
 
         fprintf(stderr, "\n");
@@ -597,10 +596,9 @@ stats_and_progress_report(vset_t current, vset_t visited, int level)
 static void
 final_stat_reporting(vset_t visited, mytimer_t timer)
 {
-    long   node_count;
+    long   n_count;
     char   elem_str[1024];
-    int    str_len = sizeof(elem_str);
-    double elem_count;
+    double e_count;
 
     SCCreportTimer(timer, "reachability took");
 
@@ -610,16 +608,16 @@ final_stat_reporting(vset_t visited, mytimer_t timer)
     if (act_detect != NULL)
         Warning(info, "Action \"%s\" not found", act_detect);
 
-    get_vset_size(visited, &node_count, &elem_count, elem_str, str_len);
-    Warning(info, "state space has %s (~%1.2e) states", elem_str, elem_count);
+    get_vset_size(visited, &n_count, &e_count, elem_str, sizeof(elem_str));
+    Warning(info, "state space has %s (~%1.2e) states", elem_str, e_count);
 
     if (max_lev_count == 0) {
         Warning(info, "( %ld final BDD nodes; %ld peak nodes )",
-                    node_count, max_vis_count);
+                    n_count, max_vis_count);
     } else {
         Warning(info, "( %ld final BDD nodes; %ld peak nodes; "
                           "%ld peak nodes per level )",
-                    node_count, max_vis_count, max_lev_count);
+                    n_count, max_vis_count, max_lev_count);
     }
 
     diagnostic("( peak transition cache: %ld nodes; peak group explored: "
@@ -1529,14 +1527,13 @@ main (int argc, char *argv[])
         vset_t x = mu_compute(mu_expr, visited);
 
         if (x) {
-            long   node_count;
+            long   n_count;
             char   elem_str[1024];
-            int    str_len = sizeof(elem_str);
-            double elem_count;
+            double e_count;
 
-            get_vset_size(x, &node_count, &elem_count, elem_str, str_len);
+            get_vset_size(x, &n_count, &e_count, elem_str, sizeof(elem_str));
             Warning(info, "mu formula holds for %s (~%1.2e) states\n",
-                        elem_str, elem_count);
+                        elem_str, e_count);
             Warning(info, " the initial state is %sin the set\n",
                         vset_member(x, src) ? "" : "not ");
             vset_destroy(x);
