@@ -54,14 +54,9 @@ typedef enum { Strat_BFS    = 1,
                Strat_DFS    = 2,
                Strat_NDFS   = 4,
                Strat_NNDFS  = 8,
-               Strat_GNDFS  = 16,
-               Strat_GNNDFS = 32,
-               Strat_YNDFS  = 64,
-               Strat_MCNDFS = 128,
-               Strat_LTLG   = Strat_GNDFS | Strat_GNNDFS | Strat_MCNDFS,
-               Strat_LTLY   = Strat_YNDFS,
-               Strat_LTLS   = Strat_LTLG | Strat_LTLY,
-               Strat_LTL    = Strat_NNDFS | Strat_NDFS | Strat_LTLS,
+               Strat_MCNDFS = 16,
+               Strat_LTLG   = Strat_MCNDFS,
+               Strat_LTL    = Strat_NDFS | Strat_NNDFS | Strat_MCNDFS,
                Strat_Reach  = Strat_BFS | Strat_DFS
 } strategy_t;
 
@@ -163,9 +158,6 @@ static si_map_entry strategies[] = {
     {"dfs",     Strat_DFS},
     {"ndfs",    Strat_NDFS},
     {"nndfs",   Strat_NNDFS},
-    {"gndfs",   Strat_GNDFS},
-    {"yndfs",   Strat_YNDFS},
-    {"gnndfs",  Strat_GNNDFS},
     {"mcndfs",  Strat_MCNDFS},
     {NULL, 0}
 };
@@ -250,12 +242,12 @@ static struct poptOption options[] = {
     {"size", 's', POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &dbs_size, 0,
      "size of the state store (log2(size))", NULL},
     {"strategy", 0, POPT_ARG_STRING | POPT_ARGFLAG_SHOW_DEFAULT,
-     &arg_strategy, 0, "select the search strategy", "<bfs|dfs>"},
+     &arg_strategy, 0, "select the search strategy", "<bfs|dfs|ndfs|nndfs|mcndfs>"},
     {"lb", 0, POPT_ARG_STRING | POPT_ARGFLAG_SHOW_DEFAULT,
      &arg_lb, 0, "select the load balancing method", "<srp|static|combined|none>"},
     {"perm", 'p', POPT_ARG_STRING | POPT_ARGFLAG_SHOW_DEFAULT,
      &arg_perm, 0, "select the transition permutation method",
-     "<shift|shiftall|sort|random|none>"},
+     "<dynamic,sort,sr,shift|shiftall|otf|none>"},
     {"no-red-perm", 0, POPT_ARG_VAL, &no_red_perm, 1, "turn off transition permutation for the red search", NULL},
     {"gran", 'g', POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &G,
      0, "subproblem granularity ( T( work(P,g) )=min( T(P), g ) )", NULL},
@@ -418,11 +410,10 @@ extern void state_info_create(state_info_t *state, state_data_t data,
 extern void state_info_serialize(state_info_t *state, raw_data_t data);
 extern void state_info_deserialize(state_info_t *state, raw_data_t data,
                                    raw_data_t store);
-extern void         dfs_grey (wctx_t *ctx, size_t work);
 extern void         ndfs_blue (wctx_t *ctx, size_t work);
-extern void         ndfs_green (wctx_t *ctx, size_t work);
 extern void         nndfs_blue (wctx_t *ctx, size_t work);
-extern void         gnn_blue (wctx_t *ctx, size_t work);
+extern void         mcndfs_blue (wctx_t *ctx, size_t work);
+extern void         dfs_grey (wctx_t *ctx, size_t work);
 extern void         dfs (wctx_t *ctx, size_t work);
 extern void         bfs (wctx_t *ctx, size_t work);
 extern size_t       split_bfs (size_t src_id, size_t dst_id, size_t handoff);
@@ -499,7 +490,7 @@ get_model (int first)
 }
 
 /* Magic number for the largest stack i've encountered.
- * Allocated as bits in a bitvector, but addressed in a stack-wise fashing
+ * Allocated as bits in a bitvector, but addressed in a stack-wise fashion
  */
 static const size_t MAX_STACK = 100000000;
 
@@ -645,7 +636,7 @@ init_globals (int argc, char *argv[])
     /* for --grey: */
     MAX_SUCC = ( Strat_DFS == strategy ? 1 : INT_MAX );
 
-    int                 global_bits = Strat_LTLS & strategy ? 2 : 0;
+    int                 global_bits = Strat_LTLG & strategy ? 2 : 0;
     switch (db_type) {
     case UseDBSLL:
         if (ZOBRIST) {
@@ -683,14 +674,10 @@ init_globals (int argc, char *argv[])
 
     /* Load balancer assigned last, see exit_ltsmin */
     switch (strategy) {
-    case Strat_GNNDFS:
-        lb = lb_create_max (W, (algo_f)gnn_blue,   NULL,G, lb_method, H); break;
     case Strat_MCNDFS:
+        lb = lb_create_max (W, (algo_f)mcndfs_blue,NULL,G, lb_method, H); break;
     case Strat_NNDFS:
         lb = lb_create_max (W, (algo_f)nndfs_blue, NULL,G, lb_method, H); break;
-    case Strat_GNDFS:
-        lb = lb_create_max (W, (algo_f)ndfs_green, NULL,G, lb_method, H); break;
-    case Strat_YNDFS:
     case Strat_NDFS:
         lb = lb_create_max (W, (algo_f)ndfs_blue,  NULL,G, lb_method, H); break;
     case Strat_BFS:
@@ -1036,7 +1023,6 @@ permute_trans (permute_t *perm, state_data_t state, perm_cb_f cb, void *ctx)
     int count = GBgetTransitionsAll(perm->model, state, permute_one, perm);
     size_t                  n = perm->nstored,
                             j;
-    size_t                  i_good = 0;
     switch (perm->permutation) {
     case Perm_Otf:
         randperm (perm->pad, n, ((wctx_t*)ctx)->state.ref + perm->shiftorder);
@@ -1052,17 +1038,6 @@ permute_trans (permute_t *perm, state_data_t state, perm_cb_f cb, void *ctx)
         void *pack[2] = {ctx, *perm->rand};
         qsortr (perm->todos, n, sizeof(permute_todo_t), dyn_cmp, pack);
         perm_do_all (perm);
-        break;
-        for (size_t i = 0; i < perm->nstored; i++) {
-            j = perm->rand[n][i];
-            if (!perm->todos[j].seen) {
-                perm->pad[i_good++] = j;
-            } else {
-                perm_do (perm, j);
-            }
-        }
-        for (size_t i = 0; i < i_good; i++)
-            perm_do (perm, perm->pad[i]);
         break;
     case Perm_SR:
         qsortr (perm->todos, n, sizeof(permute_todo_t), rand_cmp, *perm->rand);
@@ -1218,9 +1193,7 @@ handle_deadlock (wctx_t *ctx)
 }
 
 /*
- * NDFS algorithm by Courcoubetis et al.,
- * variant of NDFS with global red (GRED) in backtrack of dfs_red (incorrect), and
- * variant of NDFS with global green (GGREEN) in backtrack f dfs_blue (incorrect)
+ * NDFS algorithm by Courcoubetis et al.
  */
 
 /* ndfs_handle and ndfs_explore_state can be used by blue and red search */
@@ -1248,71 +1221,6 @@ ndfs_explore_state (wctx_t *ctx, counter_t *cnt)
     cnt->trans += count;
     cnt->explored++;
     ndfs_maybe_report(ctx->search, cnt);
-}
-
-static void
-ndfs_handle_green (void *arg, state_info_t *successor)
-{
-    wctx_t             *ctx = (wctx_t *) arg;
-    /* put on temporary stack to be sorted later */
-    if ( !global_has_color(successor->ref, GGREEN) &&
-         !ndfs_has_color (&ctx->color_map, successor->ref, NBLUE) ) {
-        raw_data_t stack_loc = dfs_stack_push (ctx->stack, NULL);
-        state_info_serialize (successor, stack_loc);
-    }
-}
-
-static inline void
-ndfs_explore_state_green (wctx_t *ctx)
-{
-    dfs_stack_enter (ctx->stack);
-    increase_level (&ctx->counters);
-    int count = permute_trans (ctx->permute, ctx->state.data, ndfs_handle_green, ctx);
-    ctx->counters.trans += count;
-    ctx->counters.explored++;
-    ndfs_maybe_report (ctx->search, &ctx->counters);
-}
-
-/* NDFS dfs_red + GRED */
-static void
-ndfs_gred (wctx_t *ctx, ref_t seed)
-{
-    size_t              seed_level = dfs_stack_nframes (ctx->stack);
-    ctx->search = NRED; ctx->permute->permutation = permutation_red;
-    ctx->seed = seed;
-    ctx->red.visited++; //count accepting states
-
-    while ( !lb_is_stopped(lb) ) {
-        raw_data_t          state_data = dfs_stack_top (ctx->stack);
-        if (NULL != state_data) {
-            state_info_deserialize (&ctx->state, state_data, ctx->store);
-            if ( global_has_color(ctx->state.ref, GRED) ||
-                 ndfs_try_color(&ctx->color_map, ctx->state.ref, NRED)) {
-                if (seed_level == dfs_stack_nframes (ctx->stack))
-                    break;
-                dfs_stack_pop (ctx->stack);
-            } else
-                ndfs_explore_state (ctx, &ctx->red);
-        } else { //backtrack
-            if (seed_level != dfs_stack_nframes (ctx->stack)) {
-                dfs_stack_leave (ctx->stack);
-                ctx->red.level_cur--;
-            }
-
-            /* mark state as RED */
-            state_data = dfs_stack_top (ctx->stack);
-            state_info_deserialize (&ctx->state, state_data, ctx->store);
-            global_try_color (ctx->state.ref, GRED);
-
-            /* exit search if backtrack hits seed, leave stack the way it was */
-            if (seed_level == dfs_stack_nframes (ctx->stack))
-                break;
-
-            dfs_stack_pop (ctx->stack);
-        }
-    }
-
-    ctx->search = NBLUE; ctx->permute->permutation = permutation;
 }
 
 /* NDFS dfs_red */
@@ -1368,45 +1276,8 @@ ndfs_blue (wctx_t *ctx, size_t work)
             /* call red DFS for accepting states */
             state_data = dfs_stack_top (ctx->stack);
             state_info_deserialize (&ctx->state, state_data, ctx->store);
-            if ( GBbuchiIsAccepting(ctx->model, ctx->state.data) ) {
-                if (Strat_YNDFS == strategy)
-                    ndfs_gred (ctx, ctx->state.ref);
-                else
-                    ndfs_red (ctx, ctx->state.ref);
-            }
-            dfs_stack_pop(ctx->stack);
-        }
-    }
-/*a*/(void) work;
-}
-
-/* NDFS dfs_blue + GGREEN */
-void
-ndfs_green (wctx_t *ctx, size_t work)
-{
-    while ( !lb_is_stopped(lb) ) {
-        raw_data_t          state_data = dfs_stack_top (ctx->stack);
-        if (NULL != state_data) {
-            state_info_deserialize (&ctx->state, state_data, ctx->store);
-            if ( global_has_color(ctx->state.ref, GGREEN)  ||
-                 ndfs_try_color(&ctx->color_map, ctx->state.ref, NBLUE) )
-                dfs_stack_pop (ctx->stack);
-            else
-                ndfs_explore_state_green (ctx);
-        } else { //backtrack
-            if (0 == dfs_stack_nframes (ctx->stack))
-                return;
-            dfs_stack_leave (ctx->stack);
-            ctx->counters.level_cur--;
-
-            /* call red DFS for accepting states
-             * AND mark globally GREEN */
-            state_data = dfs_stack_top (ctx->stack);
-            state_info_deserialize (&ctx->state, state_data, ctx->store);
-            if ( global_try_color(ctx->state.ref, GGREEN) &&
-                 GBbuchiIsAccepting(ctx->model, ctx->state.data) )
+            if ( GBbuchiIsAccepting(ctx->model, ctx->state.data) )
                 ndfs_red (ctx, ctx->state.ref);
-
             dfs_stack_pop(ctx->stack);
         }
     }
@@ -1414,8 +1285,7 @@ ndfs_green (wctx_t *ctx, size_t work)
 }
 
 /*
- * Swarmed New NDFS algorithm by Schwoon/Esparza/Gaiser, and
- * MC-NDFS by Laarman/vdPol/Weber/Wijs (correct)
+ * New NDFS algorithm by Schwoon/Esparza/Gaiser
  */
 
 static void
@@ -1557,20 +1427,17 @@ nndfs_blue (wctx_t *ctx, size_t work)
         if (NULL != state_data) {
             state_info_deserialize (&ctx->state, state_data, ctx->store);
             nndfs_color_t color = nn_get_color (&ctx->color_map, ctx->state.ref);
-            if ( nn_color_eq(color, NNWHITE) && (strategy != Strat_MCNDFS ||
-                 !global_has_color(ctx->state.ref, GRED)) ) {
+            if ( nn_color_eq(color, NNWHITE) ) {
                 nn_set_color (&ctx->color_map, ctx->state.ref, NNCYAN);
                 nndfs_explore_state_blue (ctx, &ctx->counters);
             } else {
-                if ( !(nn_color_eq(color, NNPINK) || (strategy == Strat_MCNDFS &&
-                       global_has_color(ctx->state.ref, GRED))) )
+                if ( !nn_color_eq(color, NNPINK) )
                     bitvector_set ( &ctx->not_all_red, ctx->counters.level_cur );
                 dfs_stack_pop (ctx->stack);
             }
         } else { //backtrack
             if (0 == dfs_stack_nframes (ctx->stack))
                 return;
-
             dfs_stack_leave (ctx->stack);
 
             /* call red DFS for accepting states */
@@ -1578,15 +1445,9 @@ nndfs_blue (wctx_t *ctx, size_t work)
             state_info_deserialize (&ctx->state, state_data, ctx->store);
             if ( !bitvector_is_set(&ctx->not_all_red, ctx->counters.level_cur) ) {
                 nn_set_color (&ctx->color_map, ctx->state.ref, NNPINK);
-                if (strategy == Strat_MCNDFS)
-                    if (global_try_color (ctx->state.ref, GRED))
-                        ctx->red.touched_red++;
                 bitvector_unset ( &ctx->not_all_red, ctx->counters.level_cur );
             } else if ( GBbuchiIsAccepting(ctx->model, ctx->state.data) ) {
-                if (strategy == Strat_MCNDFS)
-                    mcndfs_red (ctx);
-                else
-                    nndfs_red (ctx);
+                nndfs_red (ctx);
                 nn_set_color(&ctx->color_map, ctx->state.ref, NNPINK);
             } else {
                 nn_set_color(&ctx->color_map, ctx->state.ref, NNBLUE);
@@ -1600,100 +1461,12 @@ nndfs_blue (wctx_t *ctx, size_t work)
 }
 
 /*
- * Green NNDFS algorithm (incorrect, may miss cycles)
- * shares GGREEN in the backtrack of the blue search
+ * MC-NDFS by Laarman/vdPol/Weber/Wijs
  */
 
-static void
-gnn_red_handle (void *arg, state_info_t *successor)
-{
-    wctx_t             *ctx = (wctx_t *) arg;
-    nndfs_color_t color = nn_get_color(&ctx->color_map, successor->ref);
-    if ( nn_color_eq(color, NNCYAN) ) {
-        /* Found cycle back to the stack */
-        ndfs_report_cycle(ctx, successor);
-    } else if ( nn_color_eq(color, NNBLUE) ) {
-        nn_set_color(&ctx->color_map, ctx->state.ref, NNPINK);
-        raw_data_t stack_loc = dfs_stack_push(ctx->stack, NULL);
-        state_info_serialize (successor, stack_loc);
-    }
-}
-
-static void
-gnn_blue_handle (void *arg, state_info_t *successor)
-{
-    wctx_t             *ctx = (wctx_t *) arg;
-    nndfs_color_t color = nn_get_color (&ctx->color_map, successor->ref);
-    if ( nn_color_eq(color, NNCYAN) &&
-            (GBbuchiIsAccepting(ctx->model,ctx->state.data) ||
-             GBbuchiIsAccepting(ctx->model, successor->data)) ) {
-        /* Found cycle in blue search */
-        ndfs_report_cycle(ctx, successor);
-    } else if ( nn_color_eq(color, NNWHITE) ) {
-        raw_data_t stack_loc = dfs_stack_push (ctx->stack, NULL);
-        state_info_serialize (successor, stack_loc);
-    }
-}
-
-static inline void
-gnn_explore_state_red (wctx_t *ctx, counter_t *cnt)
-{
-    int                 count;
-    dfs_stack_enter (ctx->stack);
-    increase_level (cnt);
-    count = permute_trans (ctx->permute, ctx->state.data, gnn_red_handle, ctx);
-    cnt->trans += count;
-    cnt->explored++;
-    ndfs_maybe_report(ctx->search, cnt);
-}
-
-static inline void
-gnn_explore_state_blue (wctx_t *ctx, counter_t *cnt)
-{
-    int                 count;
-    dfs_stack_enter (ctx->stack);
-    increase_level (cnt);
-    count = permute_trans (ctx->permute, ctx->state.data, gnn_blue_handle, ctx);
-    cnt->trans += count;
-    cnt->explored++;
-    ndfs_maybe_report(ctx->search, cnt);
-}
-
-/* GNNDFS dfs_red */
-static void
-gnn_red (wctx_t *ctx)
-{
-    size_t              start_level = dfs_stack_nframes (ctx->stack);
-    ctx->search = NRED; ctx->permute->permutation = permutation_red;
-    ctx->red.visited++; //count accepting states
-
-    while ( !lb_is_stopped(lb) ) {
-        raw_data_t          state_data = dfs_stack_top (ctx->stack);
-        if (NULL != state_data) {
-            state_info_deserialize (&ctx->state, state_data, ctx->store);
-            nndfs_color_t color = nn_get_color (&ctx->color_map, ctx->state.ref);
-            if ( nn_color_eq(color, NNPINK)  ) {
-                if (start_level == dfs_stack_nframes (ctx->stack)) {
-                     break;  ctx->red.touched_red++; }
-                dfs_stack_pop (ctx->stack);
-            } else
-                gnn_explore_state_red (ctx, &ctx->red);
-        } else { //backtrack
-            dfs_stack_leave (ctx->stack);
-            ctx->red.level_cur--;
-            /* exit search if backtrack hits seed, leave stack the way it was */
-            if (start_level == dfs_stack_nframes (ctx->stack))
-                break;
-            dfs_stack_pop (ctx->stack);
-        }
-    }
-
-    ctx->search = NBLUE; ctx->permute->permutation = permutation;
-}
-
-/* GNNDFS dfs_blue */
+/* MCNDFS dfs_blue */
 void
-gnn_blue (wctx_t *ctx, size_t work)
+mcndfs_blue (wctx_t *ctx, size_t work)
 {
     while ( !lb_is_stopped(lb) ) {
         raw_data_t          state_data = dfs_stack_top (ctx->stack);
@@ -1701,26 +1474,35 @@ gnn_blue (wctx_t *ctx, size_t work)
             state_info_deserialize (&ctx->state, state_data, ctx->store);
             nndfs_color_t color = nn_get_color (&ctx->color_map, ctx->state.ref);
             if ( nn_color_eq(color, NNWHITE) &&
-                 !global_has_color(ctx->state.ref, GGREEN) ) {
+                 !global_has_color(ctx->state.ref, GRED) ) {
                 nn_set_color (&ctx->color_map, ctx->state.ref, NNCYAN);
-                gnn_explore_state_blue (ctx, &ctx->counters);
-            } else
+                nndfs_explore_state_blue (ctx, &ctx->counters);
+            } else {
+                if ( !(nn_color_eq(color, NNPINK) ||
+                       global_has_color(ctx->state.ref, GRED)) )
+                    bitvector_set ( &ctx->not_all_red, ctx->counters.level_cur );
                 dfs_stack_pop (ctx->stack);
+            }
         } else { //backtrack
             if (0 == dfs_stack_nframes (ctx->stack))
                 return;
             dfs_stack_leave (ctx->stack);
-            ctx->counters.level_cur--;
 
             /* call red DFS for accepting states */
             state_data = dfs_stack_top (ctx->stack);
             state_info_deserialize (&ctx->state, state_data, ctx->store);
-            if ( global_try_color(ctx->state.ref, GGREEN) && //mark green
-                 GBbuchiIsAccepting(ctx->model, ctx->state.data) ) {
-                gnn_red (ctx);
+            if ( !bitvector_is_set(&ctx->not_all_red, ctx->counters.level_cur) ) {
+                nn_set_color (&ctx->color_map, ctx->state.ref, NNPINK);
+                if (global_try_color (ctx->state.ref, GRED))
+                    ctx->red.touched_red++;
+                bitvector_unset ( &ctx->not_all_red, ctx->counters.level_cur );
+            } else if ( GBbuchiIsAccepting(ctx->model, ctx->state.data) ) {
+                mcndfs_red (ctx);
                 nn_set_color(&ctx->color_map, ctx->state.ref, NNPINK);
-            } else
+            } else {
                 nn_set_color(&ctx->color_map, ctx->state.ref, NNBLUE);
+            }
+            ctx->counters.level_cur--;
 
             dfs_stack_pop (ctx->stack);
         }
