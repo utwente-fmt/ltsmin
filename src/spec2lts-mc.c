@@ -1621,7 +1621,7 @@ bfs (wctx_t *ctx, size_t work)
             dfs_stack_t     old = ctx->out_stack;
             ctx->stack = ctx->out_stack = ctx->in_stack;
             ctx->in_stack = old;
-            ctx->counters.level_cur++;
+            increase_level (&ctx->counters);
         } else {
             dfs_stack_pop (ctx->in_stack);
             ctx->load--;
