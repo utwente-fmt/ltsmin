@@ -63,7 +63,7 @@ typedef enum { Strat_BFS    = 1,
 /* TODO: merge into trace.c
  * where to define ref_t/state_data_t/...
  */
-typedef ref_t (*trc_get_ref_f)(void *state, void *ctx, int *seen);
+typedef ref_t (*trc_get_ref_f)(void *state, int group, void *ctx, int *seen);
 
 /* permute_get_transitions is a replacement for GBgetTransitionsLong
  * TODO: move this to permute.c
@@ -463,11 +463,11 @@ get_state (ref_t ref, void *arg)
 }
 
 ref_t
-get_ref (void *state, void *arg, int *seen)
+get_ref (void *state, int group, void *arg, int *seen)
 {
     wctx_t             *ctx = (wctx_t *) arg;
     state_info_t        successor;
-    state_info_create (&successor, state, NULL, DUMMY_IDX, GB_UNKNOWN_GROUP);
+    state_info_create (&successor, state, NULL, DUMMY_IDX, group);
     /* retrieve IDX from state database */
     *seen = find_or_put (&successor, &ctx->state, ctx->store2);
     return successor.ref;
@@ -904,7 +904,7 @@ perm_todo (permute_t *perm, state_data_t dst, transition_info_t *ti)
 {
     assert (perm->nstored < perm->trans+TODO_MAX);
     permute_todo_t *next = perm->todos + perm->nstored;
-    next->ref = perm->get_ref (dst, perm->ctx, &next->seen);
+    next->ref = perm->get_ref (dst, ti->group,  perm->ctx, &next->seen);
     next->ti.group = ti->group; //TODO: copy labels?
     perm->nstored++;
 }
@@ -996,7 +996,7 @@ permute_one (void *arg, transition_info_t *ti, state_data_t dst)
         }
     case Perm_None:
         state_info_create (&successor, dst, NULL, DUMMY_IDX, ti->group);
-        successor.ref = perm->get_ref (dst, perm->ctx, &seen);
+        successor.ref = perm->get_ref (dst, ti->group, perm->ctx, &seen);
         perm->real_cb (perm->ctx, &successor);
         break;
     case Perm_Shift_All:
@@ -1020,7 +1020,7 @@ permute_trans (permute_t *perm, state_data_t state, perm_cb_f cb, void *ctx)
     perm->ctx = ctx;
     perm->real_cb = cb;
     perm->nstored = perm->start_group_index = 0;
-    int count = GBgetTransitionsAll(perm->model, state, permute_one, perm);
+    int count = GBgetTransitionsAll (perm->model, state, permute_one, perm);
     size_t                  n = perm->nstored,
                             j;
     switch (perm->permutation) {
@@ -1185,7 +1185,8 @@ handle_deadlock (wctx_t *ctx)
     size_t              level = ctx->counters.level_cur;
     Warning (info,"Deadlock found in state at depth %zu!", level);
     if (trc_output) {
-        ref_t       start_ref = get_ref (initial_state, ctx, &seen); //TODO: int <> ref
+        ref_t       start_ref = get_ref (initial_state, GB_UNKNOWN_GROUP, ctx, &seen);
+        //TODO: int <> ref
         trc_env_t  *trace_env = trc_create (ctx->model, (trc_get_state_f)get_state, start_ref, ctx);
         trc_find_and_write (trace_env, trc_output, (int)ctx->state.ref, level, (int*)parent_ref);
     }
@@ -1695,7 +1696,7 @@ explore (void *args)
     if ( Strat_LTL & strategy ) {
         state_info_t        successor;
         int seen;
-        ref_t ref = ctx->permute->get_ref (initial_state, ctx, &seen);
+        ref_t ref = ctx->permute->get_ref (initial_state, start_trans_info.group, ctx, &seen);
         state_info_create (&successor, initial_state, NULL, ref, start_trans_info.group);
         ndfs_handle (ctx, &successor);
     } else if (0 == ctx->id)
