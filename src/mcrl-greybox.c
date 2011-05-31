@@ -45,13 +45,12 @@ static void MCRLinitGreybox(int argc,char *argv[],void* stack_bottom){
          *   fake it to work by pretending to be mcrl's rewr
          *   executable.
          */
-        char *tmp = argv[0]; // const char* ? - Stefan
-        argv[0] = "/fake/path/to/rewr";
-	RWsetArguments(&argc, &argv);
-        argv[0] = tmp;
-#else
-	RWsetArguments(&argc, &argv);
+        const char *argv_[argc];
+        argv_[0] = "/fake/path/to/rewr";
+        for (int i = 1; i < argc; ++i) argv_[i] = argv[i];
+        argv = argv_;
 #endif
+	RWsetArguments(&argc, &argv);
 	STsetArguments(&argc, &argv);
 	MCRLsetArguments(&argc, &argv);
 	if (argc > 1) {
@@ -78,6 +77,8 @@ static void mcrl_popt(poptContext con,
 		}
 		RTparseOptions(mcrl_args,&argc,&argv);
 		MCRLinitGreybox(argc,argv,RTstackBottom());
+		free(argv[0]); // Overwritten by RTparseOptions
+		free(argv);    // Allocated as one block by RTparseOptions
 		GBregisterLoader("tbf",MCRLloadGreyboxModel);
 		Warning(debug,"mCRL language module initialized");
 		return;
