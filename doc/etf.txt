@@ -22,7 +22,7 @@ An ETF file is a sequence of sections.
 * There can be 0 or more sort sections, describing the values of sorts.
 * There can be 0 or more trans sections, describing a partition of the transition relation each.
 
-== GRAMMER
+== GRAMMAR
 
 ----
 etf         ::= state edge ( trans | map | sort )* init ( trans | map | sort )*
@@ -92,10 +92,10 @@ begin init
 0 0
 end init
 begin trans
-0/1 * 0
+0/1 * 1
 end trans
 begin trans
-* 0/1 1
+* 0/1 0
 end trans
 begin map shape:shape
 0 * "square" 
