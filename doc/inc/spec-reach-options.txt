@@ -16,13 +16,19 @@ etc.  Thus, a chaining analysis can be completed in much less
 iterations than a BFS analysis.
 
 *--saturation*='SATURATION'::
-        Select an experimental saturation-like strategy: 'none', 'sat1',
-        'sat2', 'sat3'. The strategy works in combination with the order to
-        saturate BDD levels. Defaults to 'none', i.e. no saturation.
+        Select an experimental saturation-like strategy: 'none', 'sat-like',
+        'sat-loop'. The 'sat-like' strategy goes up and down the levels of the
+        BDD used to represent the state space. The 'sat-loop' strategy loops
+        over the levels. The strategy works in combination with the 'order' to
+        saturate levels. Defaults to 'none', i.e. no saturation.
 
-*--G*='GRANULARITY'::
-        Select the granularity of the saturation-like strategy. This works
-        in combination with 'sat2' and 'sat3'. Defaults to 10.
+*--sat-granularity*='GRANULARITY'::
+        Select the granularity of the saturation-like strategy. Defaults to 10.
+
+*--save-levels*::
+        Save the previous states seen at saturation levels. This option has
+        effect for any of the saturation strategies in combination with either
+        'bfs-prev' or 'chain-prev'.
 
 *--action*='ACTION'::
         Find a transition labelled with 'ACTION'. Returns with exit code 1
