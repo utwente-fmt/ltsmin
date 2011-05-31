@@ -78,8 +78,6 @@ static void mcrl_popt(poptContext con,
 		}
 		RTparseOptions(mcrl_args,&argc,&argv);
 		MCRLinitGreybox(argc,argv,RTstackBottom());
-        free(argv[0]); // Overwritten by RTparseOptions
-        free(argv);    // Allocated as one block by RTparseOptions
 		GBregisterLoader("tbf",MCRLloadGreyboxModel);
 		Warning(debug,"mCRL language module initialized");
 		return;
