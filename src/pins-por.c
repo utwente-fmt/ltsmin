@@ -460,6 +460,14 @@ bs_analyze(model_t model, por_context* pctx, int* src)
             // update the search score
             s[idx].score += 1 + ( pctx->group_status[current_group] & GS_VISIBLE ? n : 0);
 
+            // quit the search when emit_limit is reached
+            // this block is just to skip useless work, everything is emitted anyway
+            if (s[idx].score >= pctx->emit_limit) {
+                s[idx].work_enabled = 0;
+                s[idx].work_disabled = n;
+                break;
+            }
+
             // push all dependent unselected groups
             por_context *ctx = (por_context*)GBgetContext(model);
             for (int j=0; j < *ctx->is_dependent_tg_tg[current_group]; j++) {
