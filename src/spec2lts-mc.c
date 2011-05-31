@@ -36,7 +36,6 @@
 
 static const int    THREAD_STACK_SIZE = 400 * 4096; //pthread_attr_setstacksize
 
-typedef size_t              ref_t;
 typedef int                *state_data_t;
 static const state_data_t   state_data_dummy;
 static const size_t         SLOT_SIZE = sizeof(*state_data_dummy);
@@ -643,8 +642,8 @@ init_globals (int argc, char *argv[])
     }
     Warning (info, "Using a %s with 2^%d elements", db_type==UseDBSLL?"hash table":"tree", dbs_size);
     MAX_SUCC = ( Strat_DFS == strategy ? 1 : INT_MAX );  /* for --grey: */
-    if (trc_output)
-        parent_ref = RTmalloc(sizeof(ref_t[1<<dbs_size]));
+    if (trc_output && !(strategy & Strat_LTL))
+        parent_ref = RTmalloc (sizeof(ref_t[1<<dbs_size]));
 
     int                 global_bits = Strat_LTLG & strategy ? 2 : 0;
     switch (db_type) {
@@ -1126,7 +1125,7 @@ state_info_serialize (state_info_t *state, raw_data_t data)
     if (refs) {
         ((ref_t*)data)[0] = state->ref;
     } else if ( UseDBSLL==db_type ) {
-        ((ref_t*)data+N)[0] = state->ref;
+        ((ref_t*)(data+N))[0] = state->ref;
         memcpy (data, state->data, sizeof (int[N]));
     } else { // UseTreeDBSLL
         memcpy (data, state->tree, sizeof (int[2*N]));
@@ -1142,7 +1141,7 @@ state_info_deserialize (state_info_t *state, raw_data_t data, state_data_t store
         ref = ((ref_t*)data)[0];
         data = get (dbs, ref, store);
     } else if (UseDBSLL == db_type) {
-        ref = ((ref_t*)data+N)[0];
+        ref = ((ref_t*)(data+N))[0];
     }
     if (UseTreeDBSLL==db_type) {
         tree_data = data;
@@ -1154,11 +1153,12 @@ state_info_deserialize (state_info_t *state, raw_data_t data, state_data_t store
 }
 
 static void
-find_dfs_stack_trace (wctx_t *ctx, dfs_stack_t stack, int *trace)
+find_dfs_stack_trace (wctx_t *ctx, dfs_stack_t stack, ref_t *trace, size_t level)
 {
     // gather trace
     state_info_t        state;
-    for (int i = dfs_stack_nframes (ctx->stack)-1; i > 0; i--) {
+    assert (level - 1 == dfs_stack_nframes (ctx->stack));
+    for (int i = dfs_stack_nframes (ctx->stack)-1; i >= 0; i--) {
         dfs_stack_leave (stack);
         raw_data_t          data = dfs_stack_pop (stack);
         state_info_deserialize (&state, data, ctx->store);
@@ -1175,12 +1175,12 @@ ndfs_report_cycle (wctx_t *ctx, state_info_t *cycle_closing_state)
     size_t              level = dfs_stack_nframes (ctx->stack) + 1;
     Warning (info, "Accepting cycle FOUND at depth %zu!", level);
     if (trc_output) {
-        int                *trace = (int*)RTmalloc(sizeof(int) * level*10);
+        ref_t              *trace = RTmalloc(sizeof(ref_t) * level);
         /* Write last state to stack to close cycle */
         trace[level-1] = cycle_closing_state->ref;
-        find_dfs_stack_trace (ctx, ctx->stack, trace);
-        trc_env_t          *trace_env = trc_create (ctx->model,
-                               (trc_get_state_f)get_state, trace[0], ctx);
+        find_dfs_stack_trace (ctx, ctx->stack, trace, level);
+        trc_env_t          *trace_env = trc_create (ctx->model, get_state,
+                                                    trace[0], ctx);
         trc_write_trace (trace_env, trc_output, trace, level);
         RTfree (trace);
     }
@@ -1198,9 +1198,8 @@ handle_deadlock (wctx_t *ctx)
     Warning (info,"Deadlock found in state at depth %zu!", level);
     if (trc_output) {
         ref_t       start_ref = get_ref (initial_state, GB_UNKNOWN_GROUP, ctx, &seen);
-        //TODO: int <> ref
-        trc_env_t  *trace_env = trc_create (ctx->model, (trc_get_state_f)get_state, start_ref, ctx);
-        trc_find_and_write (trace_env, trc_output, (int)ctx->state.ref, level, parent_ref);
+        trc_env_t  *trace_env = trc_create (ctx->model, get_state, start_ref, ctx);
+        trc_find_and_write (trace_env, trc_output, ctx->state.ref, level, parent_ref);
     }
     Warning (info, "Exiting now!");
 }
