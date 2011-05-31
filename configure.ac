@@ -223,6 +223,10 @@ ACX_CADP_BCG_WRITE([have_bcg=yes],
   [have_bcg=no
    AC_MSG_WARN([no acceptable BCG libraries found; building without.])])
 
+AC_CHECK_LIB([zip],[zip_open],[have_libzip=yes],
+  [have_libzip=no
+   AC_MSG_WARN([no acceptable zip library found; building without.])])
+
 # Checks for header files.
 AC_HEADER_DIRENT
 AC_HEADER_STDC
@@ -238,6 +242,10 @@ AS_IF([test x"$have_libtommath" = xyes],
   [AC_CHECK_HEADERS([tommath.h],,[AC_MSG_FAILURE([tommath.h not found.])])])
 
 AC_CHECK_HEADER([popt.h],[], [AC_MSG_FAILURE([popt.h not found.])])
+
+AS_IF([test x"$have_libzip" = xyes], 
+  [AC_CHECK_HEADER([zip.h],,[AC_MSG_FAILURE([zip.h not found.])])])
+
 AC_CACHE_SAVE
 
 # Checks for typedefs, structures, and compiler characteristics.
@@ -311,6 +319,7 @@ AM_CONDITIONAL([HAVE_DVEC], [test x"$acx_dvec_libs" = xyes])
 AM_CONDITIONAL([HAVE_DVEC2], [true])    dnl can be built unconditionally
 AM_CONDITIONAL([HAVE_ATOMICS], [test x"$acx_atomics" = xyes])
 AM_CONDITIONAL([HAVE_VERSION_CONTROL], [test -d "${srcdir}/.git"])
+AM_CONDITIONAL([HAVE_LIBZIP], [test x"$have_libzip" = xyes])
 
 AC_CONFIG_COMMANDS_POST(
   [ac_configure_args="$ac_configure_args --enable-keep-terminated-procs dnl

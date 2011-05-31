@@ -5,6 +5,10 @@
 #include <stdio.h>
 #include <string.h>
 
+#ifdef HAVE_ZIP_H
+#include <zip.h>
+#endif
+
 #include <hre/dir_ops.h>
 #include <hre-io/user.h>
 #include <string-map.h>
@@ -57,12 +61,15 @@ static void archive_copy(archive_t src,archive_t dst,string_map_t encode,int blo
 /* global variables and options                                           */
 /**************************************************************************/
 
-#define GCF_CREATE 1
-#define GCF_EXTRACT 2
-#define GCF_LIST 3
-#define GCF_COPY 4
-#define GCF_COMPRESS 5
-#define GCF_DECOMPRESS 6
+typedef enum {
+    GCF_CREATE=1,
+    GCF_EXTRACT=2,
+    GCF_LIST=3,
+    GCF_COPY=4,
+    GCF_COMPRESS=5,
+    GCF_DECOMPRESS=6,
+    GCF_TO_ZIP=7
+} gcf_op_t;
 
 static char* policy="gzip";
 static int blocksize=32768;
@@ -89,7 +96,10 @@ static  struct poptOption options[] = {
     { "copy" , 0 , POPT_ARG_VAL , &operation , GCF_COPY , "create a new archive by copying an existing archive" , NULL },
     { "compress" , 'c' , POPT_ARG_VAL , &operation , GCF_COMPRESS , "compress all arguments" , NULL},
     { "decompress" , 'd' , POPT_ARG_VAL , &operation , GCF_DECOMPRESS , "decompress all arguments" , NULL},
-    { NULL , 0 , POPT_ARG_INCLUDE_TABLE , parameters , 0 , "Parameters", NULL },
+#ifdef HAVE_ZIP_H
+    { "zip" , 0 , POPT_ARG_VAL , &operation , GCF_TO_ZIP , "copy given archive to a ZIP archive" , NULL},
+#endif
+    { NULL , 0 , POPT_ARG_INCLUDE_TABLE , parameters , 0 , "Options", NULL },
     POPT_TABLEEND
 };
 
@@ -169,6 +179,141 @@ static void gcf_copy(){
     arch_close(&arch_in);
     arch_close(&arch_out);
 }
+
+/**************************************************************************/
+/* copy archive to ZIP                                                    */
+/**************************************************************************/
+#ifdef HAVE_ZIP_H
+
+typedef struct copy_zip_context {
+    archive_t src;
+    char*name;
+    struct zip *dst;
+    stream_t is;
+    long long int rd;
+} *copy_zip_context_t;
+
+static copy_zip_context_t copy_zip_setup(struct zip *dst,archive_t src,char*name){
+    copy_zip_context_t ctx=RT_NEW(struct copy_zip_context);
+    ctx->src=src;
+    ctx->dst=dst;
+    ctx->name=HREstrdup(name);
+    ctx->is=NULL;
+    ctx->rd=0;
+    return ctx;
+}
+
+static ssize_t copy_zip_function(void *state, void *data, size_t len, enum zip_source_cmd cmd){
+    copy_zip_context_t ctx=(copy_zip_context_t)state;
+    switch(cmd){
+    case ZIP_SOURCE_OPEN:
+        Debug("open %s",ctx->name);
+        ctx->is=arch_read(ctx->src,ctx->name);
+        return 0;
+    case ZIP_SOURCE_READ:
+        if (ctx->is!=NULL) {
+            int res=stream_read_max(ctx->is,data,len);
+            ctx->rd+=res;
+            //Debug("read %d/%d from %s (%lld)",res,len,ctx->name,ctx->rd);
+            if (res<(ssize_t)len) {
+                // workaround:
+                // reading from empty stream returns data.
+                // libzip does not stop reading if res < len, but only is res=0!
+                Debug("close %s",ctx->name);
+                stream_close(&ctx->is);
+            }
+            return res;
+        } else {
+            return 0;
+        }
+    case ZIP_SOURCE_CLOSE:
+        if (ctx->is!=NULL) {
+            Debug("close %s",ctx->name);
+            stream_close(&ctx->is);
+        }
+        return 0;
+    case ZIP_SOURCE_STAT:
+    {
+        struct zip_stat *st=(struct zip_stat *)data;
+        zip_stat_init(st);
+        st->size=0;
+        st->mtime=time(NULL);
+        return sizeof(struct zip_stat);
+    }
+    case ZIP_SOURCE_ERROR:
+        Abort("error without error");
+    case ZIP_SOURCE_FREE:
+        RTfree(ctx->name);
+        RTfree(ctx);
+        return 0;
+    default:
+        Abort("missing case");
+    }
+}
+
+static int copy_zip_item(void*arg,int id,char*name){
+    (void)id;
+    copy_zip_context_t ctx=(copy_zip_context_t)arg;
+    Print(infoLong,"queueing %s",name);
+    copy_zip_context_t new_ctx=copy_zip_setup(ctx->dst,ctx->src,name);
+    struct zip_source* src=zip_source_function(ctx->dst,copy_zip_function,new_ctx);
+    if (zip_add(ctx->dst,name,src)<0){
+        Abort("cannot add to zip: %s\n", zip_strerror(ctx->dst));
+    }
+    return 0;
+}
+
+static void gcf_copy_zip(){
+    char* source=HREnextArg();
+    if (source==NULL) {
+        Abort("missing <source> argument");
+    }
+    char* target=HREnextArg();
+    if (target==NULL) {
+        Abort("missing <target> argument");
+    }
+    if (HREnextArg()){
+        Abort("too many arguments");
+    }
+    archive_t arch_in=arch_gcf_read(raf_unistd(source));
+    // clean old zip if any.
+    if (unlink(target)&&errno!=ENOENT){
+        AbortCall("could not remove existing %s",target);
+    }
+    int err;
+    struct zip *za;
+    if ((za=zip_open(target, ZIP_CREATE , &err)) == NULL) {
+        char errstr[1024];
+        zip_error_to_str(errstr, sizeof(errstr), err, errno);
+        Abort("cannot open zip archive `%s': %s\n",target , errstr);
+    }
+    // setup copy operations.
+    struct arch_enum_callbacks cb={.new_item=copy_zip_item};
+    struct copy_zip_context ctx;
+    ctx.src=arch_in;
+    ctx.dst=za;
+    ctx.is=NULL;
+    ctx.name=NULL;
+    arch_enum_t e=arch_enum(arch_in,NULL);
+    if (arch_enumerate(e,&cb,&ctx)){
+        Abort("unexpected non-zero return");
+    }
+    arch_enum_free(&e);
+    // execute copy.
+    if (zip_close(za) < 0) {
+        Abort("cannot write zip archive `%s': %s\n", target, zip_strerror(za));
+    }
+    arch_close(&arch_in);
+}
+
+#else
+
+static void gcf_copy_zip(){
+    Abort("zip creation not supported");
+}
+
+#endif
+
 
 /**************************************************************************/
 /* (de)compress files and directories                                     */
@@ -307,7 +452,7 @@ static void gcf_list(){
 
 int main(int argc, char *argv[]){
     HREinitBegin(argv[0]);
-    HREaddOptions(options,"Tool for creating and extracting GCF archives\n\nOptions");
+    HREaddOptions(options,"Tool for creating and extracting GCF archives\n\nOperations");
     HREinitStart(&argc,&argv,0,-1,NULL,"<operation> <arguments>");
     compression_policy=SSMcreateSWP(policy);
     switch(operation){
@@ -329,9 +474,11 @@ int main(int argc, char *argv[]){
     case GCF_DECOMPRESS:
         gcf_decompress();
         break;
+    case GCF_TO_ZIP:
+        gcf_copy_zip();
+        break;
     default:
-        Abort("unknown operation %d",operation);
+        Abort("Illegal arguments, type gcf -h for help");
     }
     HREexit(EXIT_SUCCESS);
 }
-
