@@ -116,6 +116,8 @@ void lts_type_destroy(lts_type_t *t){
 
 void lts_type_set_state_length(lts_type_t  t,int length){
     int old_length = t->state_length;
+    if (old_length == length)
+        return;
 
     // allow ltstype to grow
     if (old_length < length) t->state_length=length;
