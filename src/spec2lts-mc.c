@@ -750,7 +750,7 @@ void
 print_statistics(counter_t *reach, counter_t *red, mytimer_t timer)
 {
     char               *name;
-    double              mem1, mem2, mem3=0, compr, ratio;
+    double              mem1, mem2, mem3=0, mem4, compr, ratio;
     float               tot = SCCrealTime (timer);
     size_t              db_elts = reach->stats->elts;
     size_t              db_nodes = reach->stats->nodes;
@@ -793,13 +793,15 @@ print_statistics(counter_t *reach, counter_t *red, mytimer_t timer)
 
     Warning (info, "Queue width: %zuB, total height: %zu, memory: %.2fMB",
              s, reach->stack_sizes, mem1);
-    mem2 = ((double)(1UL << (dbs_size)) / (1<<20)) * sizeof (int[el_size]);
+    mem2 = ((double)(1UL << (dbs_size)) / (1<<20)) * SLOT_SIZE * el_size;
+    mem4 = ((double)(db_nodes * SLOT_SIZE * el_size)) / (1<<20);
     compr = (double)(db_nodes * el_size) / (N * db_elts) * 100;
-    ratio = (double)((db_elts * 100) / (1UL << dbs_size));
+    ratio = (double)((db_nodes * 100) / (1UL << dbs_size));
     name = db_type == UseTreeDBSLL ? "Tree" : "Table";
     Warning (info, "DB: %s, memory: %.1fMB, compr. ratio: %.1f%%, "
              "fill ratio: %.1f%%", name, mem2, compr, ratio);
-    Warning (info, "Est. total memory use: %.1fMB", mem1 + mem2 + mem3);
+    Warning (info, "Est. total memory use: %.1fMB (±%.1fMB paged-in)",
+             mem1 + mem4 + mem3, mem1 + mem2 + mem3);
     if (RTverbosity >= 2) {        // detailed output for scripts
         Warning (info, "time:{{{%.2f}}}, elts:{{{%zu}}}, nodes:{{{%zu}}}, "
                  "trans:{{{%zu}}}, misses:{{{%zu}}}, tests:{{{%zu}}}, "
