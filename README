@@ -117,6 +117,11 @@ Download GNU make from <http://www.gnu.org/software/make/>.
 Download Flex (>= 2.5.35) from <http://flex.sourceforge.net/>.  We
 tested with flex 2.5.35.
 
+*** Apache Ant
+Download Apache Ant from <http://ant.apache.org/>.  We tested with ant
+1.7.1.  Note that ant is not required for building from a distribution
+tarball (unless Java files were modified).
+
 ** Optional Dependencies
 *** muCRL
 Download muCRL (>= 2.18.5) from <http://www.cwi.nl/~mcrl/mutool.html>.

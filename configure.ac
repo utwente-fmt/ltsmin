@@ -51,6 +51,15 @@ ACX_PTHREAD(
    CC="$PTHREAD_CC"],
   [AC_MSG_FAILURE([no pthread support found.])])
 
+AC_ARG_VAR([ANT], [ANT command (Java build tool)])
+AC_PATH_TOOL(ANT, ["${ANT:-ant}"])
+if test -f "${top_srcdir}/spinja/spinja.jar" || \
+  command -v "$ANT" 2>/dev/null 2>&1
+then :
+else
+  AC_MSG_ERROR([Apache Ant (Java build tool) not found.])
+fi
+
 dnl Newer libtool allows this instead:
 dnl LT_PREREQ(2.2)
 dnl LT_INIT([disable-shared])

@@ -29,4 +29,4 @@ libtool: $(LIBTOOL_DEPS)
 	$(SHELL) ./config.status --recheck
 
 spinja/spinja.jar:
-	test -f $@ || (cd ${top_srcdir}/spinja/src && ant)
+	test -f $@ || (cd "${top_srcdir}/spinja/src" && $(ANT))
