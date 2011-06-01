@@ -63,7 +63,6 @@ static cct_map_t   *tables = NULL;
 static char        *files[2];
 static int          dbs_size = 24;
 static int          refs = 0;
-static int          matrix = 0;
 static box_t        call_mode = UseBlackBox;
 static size_t       max = UINT_MAX;
 static size_t       W = 2;
@@ -157,7 +156,6 @@ static struct poptOption options[] = {
     {"max", 0, POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &max, 0, "maximum search depth", "<int>"},
     {"deadlock", 'd', POPT_ARG_VAL, &dlk_detect, 1, "detect deadlocks", NULL },
     {"trace", 0, POPT_ARG_STRING, &trc_output, 0, "file to write trace to", "<lts output>" },
-    {"matrix", 'm', POPT_ARG_VAL, &matrix, 1, "Print the dependency matrix for the model and exit", NULL},
 #if defined(MCRL)
     {NULL, 0, POPT_ARG_INCLUDE_TABLE, mcrl_options, 0, "mCRL options", NULL},
 #endif
@@ -363,13 +361,9 @@ init_globals (int argc, char *argv[])
     contexts = RTmalloc (sizeof (thread_ctx_t *[W]));
     for (size_t i = 0; i < W; i++)
         contexts[i] = create_context (i);
-    if (matrix) {
-        GBprintDependencyMatrix (stdout, model);
-        exit (EXIT_SUCCESS);
-    }
     if (RTverbosity >= 3) {
         fprintf (stderr, "Dependency Matrix:\n");
-        GBprintDependencyMatrix (stderr, model);
+        GBprintDependencyMatrixCombined (stderr, model);
     }
     return model;
 }

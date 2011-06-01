@@ -505,6 +505,7 @@ static int registered=0;
 static char* model_type_pre[MAX_TYPES];
 static pins_loader_t model_preloader[MAX_TYPES];
 static int registered_pre=0;
+static int matrix=0;
 static int cache=0;
 static const char *regroup_options = NULL;
 
@@ -561,7 +562,12 @@ GBloadFile (model_t model, const char *filename, model_t *wrapped)
                         model = GBaddCache (model);
                     *wrapped = model;
                 }
-                return;
+
+                if (matrix) {
+                    GBprintDependencyMatrixCombined(stdout, model);
+                    exit (EXIT_SUCCESS);
+                } else
+                    return;
             }
         }
         Fatal (1, error, "No factory method has been registered for %s models",
@@ -640,6 +646,7 @@ struct poptOption ltl_options[] = {
 };
 
 struct poptOption greybox_options[]={
+    { "matrix" , 'm' , POPT_ARG_VAL , &matrix , 1 , "Print the dependency matrix for the model and exit" , NULL},
 	{ "cache" , 'c' , POPT_ARG_VAL , &cache , 1 , "Enable caching of grey box calls." , NULL },
 	{ "regroup" , 'r' , POPT_ARG_STRING, &regroup_options , 0 ,
           "Enable regrouping; available transformations T: "

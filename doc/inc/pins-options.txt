@@ -1,5 +1,8 @@
 === Greybox Options
 
+*--matrix*::
+        Print the dependency matrix and exit.
+
 *-c*, *--cache*::
     Enable caching of greybox calls.
 +
