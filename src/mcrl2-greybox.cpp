@@ -183,7 +183,6 @@ static void mcrl2_popt(poptContext con,
 			Fatal(1,error,"Bad mcrl2 options: %s",mcrl2_args);
 		}
 		poptFreeContext(optCon);
-        free(argv[0]); // Overwritten by RTparseOptions
         free(argv);    // Allocated as one block by RTparseOptions
 		if (rewriter) {
 			if (!strcmp(rewriter,"jitty")){
