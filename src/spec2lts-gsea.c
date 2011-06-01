@@ -67,7 +67,6 @@ static struct {
     size_t  threshold;
 
     //int write_lts;
-    int matrix;
     int write_state;
     size_t max;
 
@@ -90,7 +89,6 @@ static struct {
     .ltl_type      = PINS_LTL_SPIN,
     .ltl_file      = NULL,
     .threshold     = 100000,
-    .matrix        = 0,
     .write_state   = 0,
     .max           = UINT_MAX,
     .call_mode     = UseBlackBox,
@@ -146,7 +144,6 @@ state_db_popt (poptContext con, enum poptCallbackReason reason,
 
 static struct poptOption development_options[] = {
     { "grey", 0 , POPT_ARG_VAL , &opt.call_mode , UseGreyBox , "make use of GetTransitionsLong calls" , NULL },
-    { "matrix", 0 , POPT_ARG_VAL, &opt.matrix,1,"Print the dependency matrix and quit",NULL},
     { "write-state" , 0 , POPT_ARG_VAL , &opt.write_state, 1 , "write the full state vector" , NULL },
     POPT_TABLEEND
 };

@@ -1238,7 +1238,7 @@ init_model(char *file)
 
     if (RTverbosity >= 2) {
         fprintf(stderr, "Dependency Matrix:\n");
-        GBprintDependencyMatrix(stderr, model);
+        GBprintDependencyMatrixCombined(stderr, model);
     }
 
     ltstype = GBgetLTStype(model);
