@@ -413,10 +413,15 @@ ltsmin_convert_LDADD = libltsmin.la
 # libraries
 if HAVE_LIBMCRL2
 noinst_LTLIBRARIES += libvset-mcrl2.la
+endif
+if HAVE_LIBMCRL
+noinst_LTLIBRARIES += libvset-mcrl.la
+endif
+
+if HAVE_LIBMCRL2
 VSET_LIBS = libvset-mcrl2.la
 else
 if HAVE_LIBMCRL
-noinst_LTLIBRARIES += libvset-mcrl.la
 VSET_LIBS = libvset-mcrl.la
 else
 VSET_LIBS = libvset.la
