@@ -21,6 +21,8 @@ lts_file_t gcd_file_open(const char* name);
 lts_file_t gcf_file_create(const char* name,lts_type_t ltstype,int segments,lts_file_t settings);
 lts_file_t gcf_file_open(const char* name);
 
+lts_file_t fsm_file_create(const char* name,lts_type_t ltstype,int segments,lts_file_t settings);
+
 lts_file_t vector_open(archive_t arch);
 
 extern int lts_io_blocksize;

@@ -4,7 +4,7 @@
 #include <hre/user.h>
 #include <lts-io/internal.h>
 
-typedef enum {AUT_FMT, BCG_FMT, DIR_FMT, GCD_FMT, GCF_FMT} lts_format_t;
+typedef enum {AUT_FMT, BCG_FMT, DIR_FMT, GCD_FMT, GCF_FMT, FSM_FMT } lts_format_t;
 
 static lts_format_t get_fmt(const char*name){
     char *extension=strrchr(name,'.');
@@ -14,6 +14,7 @@ static lts_format_t get_fmt(const char*name){
     if (!strcmp(extension,"gcd")) return GCD_FMT;
     if (!strcmp(extension,"gcf")) return GCF_FMT;
     if (!strcmp(extension,"dir")) return DIR_FMT;
+    if (!strcmp(extension,"fsm")) return FSM_FMT;
     if (!strcmp(extension,"bcg"))  {
         #if HAVE_BCG_USER_H
         return BCG_FMT;
@@ -32,6 +33,7 @@ lts_file_t lts_file_create(const char* name,lts_type_t ltstype,int segments,lts_
         case GCF_FMT: return gcf_file_create(name,ltstype,segments,settings);
         case GCD_FMT: return gcd_file_create(name,ltstype,segments,settings);
         case DIR_FMT: return dir_file_create(name,ltstype,segments,settings);
+        case FSM_FMT: return fsm_file_create(name,ltstype,segments,settings);
         default: Abort("no submodule can create %s",name);
     }
 }
