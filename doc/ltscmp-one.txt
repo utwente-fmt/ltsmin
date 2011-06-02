@@ -1,0 +1,47 @@
+//                           -*- mode: doc; outline-regexp: "==\(=*\) ." -*-
+ltscmp-one(1)
+=============
+:Author:  Stefan Blom
+:Email:   <sccblom@ewi.utwente.nl>
+:Date:    2011-06-02
+
+== NAME
+
+ltscmp-one - comparison of labelled transition systems modulo bisimulation
+
+== SYNOPSIS
+
+ltscmp-one [OPTIONS] <input 1> <input 2>
+
+== OPTIONS
+
+*-s*::
+Compare modulo strong bisimulation using the default implementation.
+
+*--strong[='variant']*::
+Compare modulo strong bisimulation using the given 'variant' or the default implementation.
+
+*-b*::
+Compare modulo branching bisimulation using the default implementation.
+
+*--branching[='variant']*::
+Compare modulo branching bisimulation using the given 'variant' or the default implementation.
+
+*-l*, *--lump*::
+Compare modulo CTMC lumping.
+
+include::inc/lts-io-options.txt[]
+
+include::inc/hre-options.txt[]
+
+== EXIT STATUS
+0::
+        Successful termination: LTSs are equivalent.
+>0::
+        Some error occurred or LTSs are not equivalent.
+
+== SEE ALSO
+
+manpage:sigmin-mpi[1], manpage:sigmin-one[1]
+
+

@@ -1,0 +1,45 @@
+//                           -*- mode: doc; outline-regexp: "==\(=*\) ." -*-
+ltstrans(1)
+===========
+:Author:  Stefan Blom
+:Email:   <sccblom@ewi.utwente.nl>
+:Date:    2011-06-02
+
+== NAME
+
+ltstrans - conversion of labeled transition systems.
+
+== SYNOPSIS
+
+ltstrans [OPTIONS] <input> [<output>]
+
+== OPTIONS
+
+*--copy*::
+Perform a streaming copy from <input> to <output>.
+
+*--rdwr*::
+Perform a load/store copy from <input> to <output>.
+
+*--index*::
+Transform the vector based <input> to indexed <output>.
+
+*--segments='N'*::
+Set the number of segments for the output file.
+
+*--encode*::
+Encode any LTS as a single edge label LTS during a load/store copy.
+
+include::inc/lts-io-options.txt[]
+
+include::inc/hre-options.txt[]
+
+== EXIT STATUS
+0::
+        Successful termination.
+>0::
+        Some error occurred.
+
+== SEE ALSO
+
+manpage:ltscmp-one[1], manpage:ltstrans[1], manpage:sigmin-mpi[1], manpage:sigmin-one[1]

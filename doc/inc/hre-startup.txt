@@ -1,0 +1,35 @@
+=== Hybrid Runtime Options
+
+The Hybrid Runtime Environment provides startup options for several parallel architectures.
+
+==== Posix threads options
+
+If the application supports it and Posix threads are supported by the OS then
+the following option is available:
+
+*--threads[='count']*::
+Start 'count' worker threads. The default count is the number of CPU's in the system.
+
+==== Posix processes options
+
+If the application supports it and Posix shared memory is supported by the OS then
+the following option is available:
+
+*--procs[='count']*::
+Fork 'count' worker processes. The default count is the number of CPUs in the system.
+
+Note that MacOSX does not support Posix shared memory.
+
+==== MPI options
+
+If the application supports it and MPI support was compiled into the binary then
+the following options are available:
+
+*--workers='count'*::
+Start the program with 'count' MPI workers.
+
+*--mpirun='mpirun arguments'*::
+Invoke mpirun with the given arguments.
+
+*--mpi*::
+Ignore *--workers* and *--mpirun* options and start the MPI runtime.

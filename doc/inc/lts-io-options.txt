@@ -1,0 +1,8 @@
+=== LTS I/O Options
+
+*--block-size*='BYTES'::
+        Size of a block in bytes.  Defaults to 32,768.
+
+*--cluster-size*='BLOCKS'::
+        Number of blocks in a cluster.  Defaults to 32.
+
