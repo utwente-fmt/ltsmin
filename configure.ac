@@ -190,6 +190,31 @@ AC_SUBST([BUDDY_LIBS],['${top_builddir}/buddy/src/libbdd.la -lm'])
 AC_SUBST([BUDDY_CPPFLAGS],['-I${top_srcdir}/buddy/src'])
 AC_SUBST([BUDDY_LDFLAGS])
 
+AC_LANG_PUSH([C++])
+AX_CXX_CHECK_LIB([ddd],[GDDD::size() const],
+ [AC_SUBST([DDD_LIBS],[-lddd])
+  AX_LET([CPPFLAGS],["$CPPFLAGS"],
+   [dnl libddd should be used via #include <ddd/DDD.h>, but this does not work
+    dnl currently because internal libddd header files expect the "ddd" directory
+    dnl in the include path.  Hence, some hoops to autodetect where libddd is
+    dnl installed.  Note that this is still not foolproof, if e.g., headers are
+    dnl in some default location like /usr/local (user has to add path explicitly)
+    AC_CHECK_HEADER([ddd/DDD.h],
+      [for f in $CPPFLAGS; do
+         case "$f" in
+           -I*) if test -f "${f#-I}/ddd/DDD.h"; then
+                  AC_SUBST([DDD_CPPFLAGS],[$f/ddd])
+                  CPPFLAGS="$DDD_CPPFLAGS $CPPFLAGS"
+                  break
+                fi
+                ;;
+         esac
+       done])
+     AC_CHECK_HEADERS([DDD.h],, [AC_MSG_FAILURE([DDD.h not found.])])])
+     acx_libddd=yes
+   ])
+AC_LANG_POP([C++])
+
 AC_CHECK_LIB([rt], [aio_error])
 ACX_CADP_BCG_WRITE([have_bcg=yes],
   [have_bcg=no
@@ -201,7 +226,11 @@ AC_HEADER_STDC
 AC_CHECK_HEADERS([fcntl.h limits.h stdint.h stdlib.h string.h strings.h dnl
   unistd.h execinfo.h])
 AS_IF([test x"$have_libgmp" = xyes], 
-  [AC_CHECK_HEADERS([gmp.h],,[AC_MSG_FAILURE([gmp.h not found.])])])
+  [AC_CHECK_HEADERS([gmp.h],,[AC_MSG_FAILURE([gmp.h not found.])])
+   AC_LANG_PUSH([C++])
+   AC_CHECK_HEADERS([gmpxx.h],,[AC_MSG_FAILURE([gmpxx.h not found.])])
+   AC_LANG_POP([C++])
+  ])
 AS_IF([test x"$have_libtommath" = xyes], 
   [AC_CHECK_HEADERS([tommath.h],,[AC_MSG_FAILURE([tommath.h not found.])])])
 
@@ -270,6 +299,7 @@ AM_CONDITIONAL([HAVE_LIBTOMMATH],
 AM_CONDITIONAL([HAVE_LIBMCRL], [test x"$acx_mcrl" = xyes])
 AM_CONDITIONAL([HAVE_LIBMCRL2], [test x"$acx_mcrl2" = xyes])
 AM_CONDITIONAL([HAVE_LIBSTEP_INFO], [test x"$have_libstep_info" = xyes])
+AM_CONDITIONAL([HAVE_LIBDDD], [test x"$acx_libddd" = xyes])
 AM_CONDITIONAL([HAVE_ASCIIDOC], [test x"$ASCIIDOC" != x])
 AM_CONDITIONAL([HAVE_XMLTO], [test x"$XMLTO" != x])
 AM_CONDITIONAL([HAVE_LIBBCG], [test x"$have_bcg" = xyes])
