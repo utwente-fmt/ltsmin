@@ -656,7 +656,7 @@ dfs_explore (model_t model, int *src, size_t *o_depth)
     switch (state_db) {
     case DB_Vset:
         buffer = isba_create (SD__SIZE);
-        domain = vdom_create_default (N);
+        domain = vdom_create_domain (N,VSET_IMPL_AUTOSELECT);
         being_explored_set = vset_create (domain, 0, NULL);
         stack = dfs_stack_create (N);
         dfs_stack_push (stack, src);
@@ -1173,7 +1173,7 @@ ndfs_explore (model_t model, int *src, size_t *o_depth)
         // cyan  = !vset_member(blue) && vset_member(cyan) [ && !vset_member(red) ]
         // red  == vset_member(red) [ && vset_member(blue) && vset_member(cyan) ]
         visited = 0;
-        domain = vdom_create_default (N);
+        domain = vdom_create_domain (N,VSET_IMPL_AUTOSELECT);
         ndfs_cyan = vset_create (domain, 0, NULL);
         ndfs_blue = vset_create (domain, 0, NULL);
         ndfs_red = vset_create (domain, 0, NULL);
@@ -1422,7 +1422,7 @@ int main(int argc, char *argv[]){
             switch (state_db) {
             case DB_Vset:
 		if (trc_output) Fatal(1, error, "--trace not supported for vset, use tree");
-		domain=vdom_create_default(N);
+		domain=vdom_create_domain (N,VSET_IMPL_AUTOSELECT);
 		visited_set=vset_create(domain,0,NULL);
 		next_set=vset_create(domain,0,NULL);
 		vset_add(visited_set,src);

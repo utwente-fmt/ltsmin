@@ -31,41 +31,24 @@ typedef struct vector_set *vset_t;
 typedef struct vector_relation *vrel_t;
 
 /**
-\brief Create a domain that uses the default vector set implementation.
-
-\param n The length of vectors in the domain.
+\brief Vector set implementation identifier.
 */
-extern vdom_t vdom_create_default(int n);
+typedef enum {
+    VSET_IMPL_AUTOSELECT,
+    VSET_AtermDD_list,
+    VSET_AtermDD_tree,
+    VSET_BuDDy_fdd,
+    VSET_DDD,
+    VSET_ListDD,
+} vset_implementation_t;
 
 /**
-\brief Create a domain that uses the fdd form of BuDDy.
+\brief Create a domain that uses some vector set implementation.
 
 \param n The length of vectors in the domain.
+\param impl The particular vector set implementation identifier
 */
-extern vdom_t vdom_create_fdd(int n);
-
-#ifdef HAVE_ATERM2_H
-/**
-\brief Create a domain that uses the list variant of ATermDD.
-
-\param n The length of vectors in the domain.
-*/
-extern vdom_t vdom_create_list(int n);
-
-/**
-\brief Create a domain that uses the tree variant of ATermDD.
-
-\param n The length of vectors in the domain.
-*/
-extern vdom_t vdom_create_tree(int n);
-#endif
-
-/**
-\brief Create a domain that uses the native implementation of the list MDD type.
-
-\param n The length of vectors in the domain.
-*/
-extern vdom_t vdom_create_list_native(int n);
+extern vdom_t vdom_create_domain(int n, vset_implementation_t impl);
 
 /**
 \brief Create a set.

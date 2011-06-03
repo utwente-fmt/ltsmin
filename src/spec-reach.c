@@ -1280,9 +1280,9 @@ init_model(char *file)
 }
 
 static void
-init_domain(vset_t *visited)
+init_domain(vset_implementation_t impl, vset_t *visited)
 {
-    domain = vdom_create_default(N);
+    domain = vdom_create_domain(N,impl);
     *visited = vset_create(domain, 0, NULL);
 
     group_next     = (vrel_t*)RTmalloc(nGrps * sizeof(vrel_t));
@@ -1498,11 +1498,7 @@ main (int argc, char *argv[])
                        "The optional output of this analysis is an ETF "
                            "representation of the input\n\nOptions");
 
-    vset_t visited;
-
-    init_model(files[0]);
-    init_domain(&visited);
-    if (act_detect != NULL) init_action();
+    vset_implementation_t vset_impl = VSET_IMPL_AUTOSELECT;
 
     sat_proc_t sat_proc = NULL;
     reach_proc_t reach_proc = NULL;
@@ -1535,8 +1531,24 @@ main (int argc, char *argv[])
         break;
     case SAT_DDD:
         sat_proc = reach_sat_ddd;
+        extern vset_implementation_t vset_default_domain;
+        switch(vset_default_domain) {
+        case VSET_IMPL_AUTOSELECT:
+            vset_impl = VSET_DDD;
+            /* fall-through */
+        case VSET_DDD: break;
+        default:
+            Abort("Saturation with sat-ddd unsupported with"
+                  " selected vset implementation, use --vset=ddd.");
+        }
         break;
     }
+
+    vset_t visited;
+
+    init_model(files[0]);
+    init_domain(vset_impl, &visited);
+    if (act_detect != NULL) init_action();
 
     // temporal logics
     if (mu_formula) {
