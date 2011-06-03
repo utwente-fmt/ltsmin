@@ -47,13 +47,14 @@ static const si_map_entry ORDER[] = {
     {NULL, 0}
 };
 
-static enum { NO_SAT, SAT_LIKE, SAT_LOOP } sat_strategy = NO_SAT;
+static enum { NO_SAT, SAT_LIKE, SAT_LOOP, SAT_DDD } sat_strategy = NO_SAT;
 
 static char* saturation = "none";
 static const si_map_entry SATURATION[] = {
     {"none", NO_SAT},
     {"sat-like", SAT_LIKE},
     {"sat-loop", SAT_LOOP},
+    {"sat-ddd", SAT_DDD},
     {NULL, 0}
 };
 
@@ -100,7 +101,7 @@ reach_popt(poptContext con, enum poptCallbackReason reason,
 static  struct poptOption options[] = {
     { NULL, 0 , POPT_ARG_CALLBACK|POPT_CBFLAG_POST|POPT_CBFLAG_SKIPOPTION , (void*)reach_popt , 0 , NULL , NULL },
     { "order" , 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &order , 0 , "set the exploration strategy to a specific order" , "<bfs-prev|bfs|chain-prev|chain>" },
-    { "saturation" , 0, POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &saturation , 0 , "select the saturation strategy" , "<none|sat-like|sat-loop>" },
+    { "saturation" , 0, POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &saturation , 0 , "select the saturation strategy" , "<none|sat-like|sat-loop|sat-ddd>" },
     { "sat-granularity" , 0 , POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &sat_granularity , 0 , "set saturation granularity","<number>" },
     { "save-levels", 0, POPT_ARG_VAL, &save_levels, 1, "save previous states seen at saturation levels", NULL },
     { "deadlock" , 'd' , POPT_ARG_VAL , &dlk_detect , 1 , "detect deadlocks" , NULL },
@@ -843,6 +844,34 @@ reach_no_sat(reach_proc_t reach_proc, vset_t visited, bitvector_t *reach_groups,
 }
 
 static void
+reach_sat_ddd(reach_proc_t reach_proc, vset_t visited,
+                 bitvector_t *reach_groups, long *eg_count, long *next_count)
+{
+    (void) reach_proc;
+    int level      = 0;
+    vset_t old_vis = vset_create(domain, 0, NULL);
+
+    while (!vset_equal(visited, old_vis)) {
+        vset_copy(old_vis, visited);
+        stats_and_progress_report(NULL, visited, level);
+        level++;
+
+        for(int i = 0; i < nGrps; i++){
+            diagnostic("\rexploring group %4d/%d", i, nGrps);
+            expand_group_next(i, visited);
+        }
+        diagnostic("\rexploration complete             \n");
+
+        (*eg_count)++;
+        (*next_count)++;
+        vset_least_fixpoint(visited, visited, group_next, nGrps);
+    }
+
+    vset_destroy(old_vis);
+    (void)reach_groups;
+}
+
+static void
 initialize_levels(bitvector_t *groups, int *empty_groups, int *back,
                       bitvector_t *reach_groups)
 {
@@ -1251,9 +1280,9 @@ init_model(char *file)
 }
 
 static void
-init_domain(vset_t *visited)
+init_domain(vset_implementation_t impl, vset_t *visited)
 {
-    domain = vdom_create_default(N);
+    domain = vdom_create_domain(N,impl);
     *visited = vset_create(domain, 0, NULL);
 
     group_next     = (vrel_t*)RTmalloc(nGrps * sizeof(vrel_t));
@@ -1469,11 +1498,7 @@ main (int argc, char *argv[])
                        "The optional output of this analysis is an ETF "
                            "representation of the input\n\nOptions");
 
-    vset_t visited;
-
-    init_model(files[0]);
-    init_domain(&visited);
-    if (act_detect != NULL) init_action();
+    vset_implementation_t vset_impl = VSET_IMPL_AUTOSELECT;
 
     sat_proc_t sat_proc = NULL;
     reach_proc_t reach_proc = NULL;
@@ -1504,7 +1529,26 @@ main (int argc, char *argv[])
     case SAT_LOOP:
         sat_proc = reach_sat_loop;
         break;
+    case SAT_DDD:
+        sat_proc = reach_sat_ddd;
+        extern vset_implementation_t vset_default_domain;
+        switch(vset_default_domain) {
+        case VSET_IMPL_AUTOSELECT:
+            vset_impl = VSET_DDD;
+            /* fall-through */
+        case VSET_DDD: break;
+        default:
+            Abort("Saturation with sat-ddd unsupported with"
+                  " selected vset implementation, use --vset=ddd.");
+        }
+        break;
     }
+
+    vset_t visited;
+
+    init_model(files[0]);
+    init_domain(vset_impl, &visited);
+    if (act_detect != NULL) init_action();
 
     // temporal logics
     if (mu_formula) {
