@@ -73,21 +73,21 @@ get_local (treedbs_ll_t dbs)
 uint16_t
 TreeDBSLLget_sat_bits (const treedbs_ll_t dbs, const tree_ref_t ref)
 {
-    return atomic_read (dbs->table+ref) & dbs->sat_mask;
+    return atomic32_read (dbs->table+ref) & dbs->sat_mask;
 }
 
 void
 TreeDBSLLset_sat_bits (const treedbs_ll_t dbs, const tree_ref_t ref, uint16_t value)
 {
     uint32_t        hash = dbs->table[ref] & ~dbs->sat_mask;
-    atomic_write (dbs->table+ref, hash | (value & dbs->sat_mask));
+    atomic32_write (dbs->table+ref, hash | (value & dbs->sat_mask));
 }
 
 int
 TreeDBSLLget_sat_bit (const treedbs_ll_t dbs, const tree_ref_t ref, int index)
 {
     uint32_t        bit = 1 << index;
-    uint32_t        hash_and_sat = atomic_read (dbs->table+ref);
+    uint32_t        hash_and_sat = atomic32_read (dbs->table+ref);
     uint32_t        val = hash_and_sat & bit;
     return val >> index;
 }
@@ -96,7 +96,7 @@ int
 TreeDBSLLtry_set_sat_bit (const treedbs_ll_t dbs, const tree_ref_t ref, int index)
 {
     uint32_t        bit = 1 << index;
-    uint32_t        hash_and_sat = atomic_read (dbs->table+ref);
+    uint32_t        hash_and_sat = atomic32_read (dbs->table+ref);
     uint32_t        val = hash_and_sat & bit;
     if (val)
         return 0; //bit was already set
@@ -124,17 +124,17 @@ table_lookup (const treedbs_ll_t dbs, const node_u_t *data, int index, int *res,
         size_t              line_end = (ref & CL_MASK) + CACHE_LINE_INT;
         for (size_t i = 0; i < CACHE_LINE_INT; i++) {
             uint32_t           *bucket = &dbs->table[ref];
-            if (EMPTY == atomic_read(bucket)) {
+            if (EMPTY == atomic32_read(bucket)) {
                 if (cas (bucket, EMPTY, WAIT)) {
                     write_data_fenced (&dbs->data[ref], data->l.lr);
-                    atomic_write (bucket, DONE);
+                    atomic32_write (bucket, DONE);
                     *res = ref;
                     loc->node_count[index]++;
                     return 0;
                 }
             }
-            if (DONE == ((atomic_read (bucket) & ~dbs->sat_mask) | WRITE_BIT)) {
-                while (WAIT == (atomic_read (bucket) & ~dbs->sat_mask)) {}
+            if (DONE == ((atomic32_read (bucket) & ~dbs->sat_mask) | WRITE_BIT)) {
+                while (WAIT == (atomic32_read (bucket) & ~dbs->sat_mask)) {}
                 if (dbs->data[ref] == data->l.lr) {
                     *res = ref;
                     return 1;

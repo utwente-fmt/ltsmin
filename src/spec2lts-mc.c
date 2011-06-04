@@ -36,6 +36,10 @@
 
 static const int    THREAD_STACK_SIZE = 400 * 4096; //pthread_attr_setstacksize
 
+static inline size_t min (size_t a, size_t b) {
+    return a < b ? a : b;
+}
+
 typedef int                *state_data_t;
 static const state_data_t   state_data_dummy;
 static const size_t         SLOT_SIZE = sizeof(*state_data_dummy);
@@ -134,8 +138,8 @@ static char            *state_repr = "table";
 static db_type_t        db_type = UseDBSLL;
 static char            *arg_strategy = "bfs";
 static strategy_t       strategy = Strat_BFS;
-static char            *arg_lb = "srp";
-static lb_method_t      lb_method = LB_SRP;
+static char            *arg_lb = "combined";
+static lb_method_t      lb_method = LB_Combined;
 static char            *arg_perm = "unknown";
 static permutation_perm_t permutation = Perm_Unknown;
 static permutation_perm_t permutation_red = Perm_Unknown;
@@ -415,9 +419,8 @@ extern void         mcndfs_blue (wctx_t *ctx, size_t work);
 extern void         dfs_grey (wctx_t *ctx, size_t work);
 extern void         dfs (wctx_t *ctx, size_t work);
 extern void         bfs (wctx_t *ctx, size_t work);
-extern size_t       split_bfs (size_t src_id, size_t dst_id, size_t handoff);
-extern size_t       split_dfs (size_t src_id, size_t dst_id, size_t handoff);
-extern size_t       split_dfs_grey (size_t src_id, size_t dst_id, size_t handoff);
+extern size_t       split_bfs (void *arg_src, void *arg_tgt, size_t handoff);
+extern size_t       split_dfs (void *arg_src, void *arg_tgt, size_t handoff);
 
 static find_or_put_f find_or_put;
 static int          N;
@@ -427,9 +430,6 @@ static size_t       threshold;
 static pthread_attr_t  *attr = NULL;
 static wctx_t     **contexts;
 static zobrist_t    zobrist = NULL;
-#ifndef __APPLE__
-static pthread_barrier_t start_barrier;       // synchronize starting point
-#endif
 
 void
 add_results(counter_t *res, counter_t *cnt)
@@ -598,10 +598,7 @@ init_globals (int argc, char *argv[])
     } else {
         threshold = 100000 / W;
     }
-#ifndef __APPLE__
-    pthread_barrier_init (&start_barrier, NULL, W);
-#endif
-    Warning (info, "Using %d cores", W);
+    Warning (info, "Using %d cores (lb: %s)", W, arg_lb);
     Warning (info, "loading model from %s", files[0]);
     program = get_label ();
     lts_type_t          ltstype = GBgetLTStype (model);
@@ -623,7 +620,7 @@ init_globals (int argc, char *argv[])
     Warning (info, "Using a %s with 2^%d elements", db_type==UseDBSLL?"hash table":"tree", dbs_size);
     MAX_SUCC = ( Strat_DFS == strategy ? 1 : INT_MAX );  /* for --grey: */
     if (trc_output && !(strategy & Strat_LTL))
-        parent_ref = RTmalloc (sizeof(ref_t[1<<dbs_size]));
+        parent_ref = RTmalloc (sizeof(ref_t[1L<<dbs_size]));
 
     int                 global_bits = Strat_LTLG & strategy ? 2 : 0;
     switch (db_type) {
@@ -737,7 +734,7 @@ print_statistics(counter_t *reach, counter_t *red, mytimer_t timer)
     db_nodes = db_nodes == 0 ? db_elts : db_nodes;
     size_t              el_size = db_type == UseTreeDBSLL ? 3 : N;
     size_t              s = state_info_size();
-    mem1 = ((double)(s * reach->stack_sizes)) / (1 << 20);
+    mem1 = ((double)(s * reach->load_max)) / (1 << 20);
 
     reach->level_max /= W; // not so meaningful for DFS
     if (Strat_LTL & strategy) {
@@ -765,6 +762,17 @@ print_statistics(counter_t *reach, counter_t *red, mytimer_t timer)
             Warning (info, "WARNING: all_red: %zu", red->touched_red);
         Warning (info, "Total memory used for local state coloring: %.1fMB", mem3);
     } else {
+        size_t              dev, state_dev = 0, trans_dev = 0;
+        for (size_t i = 0; i< W; i++) {
+            dev = (contexts[i]->counters.explored - (reach->explored/W));
+            state_dev += dev * dev;
+            dev = (contexts[i]->counters.trans - (reach->trans/W));
+            trans_dev += dev * dev;
+        }
+        if (W > 1)
+            Warning (info, "mean standard work distribution: %.1f%% (states) %.1f%% (transitions)",
+                     100*(sqrt(((double)state_dev / W)) / (double)(reach->explored/(W)) ),
+                     100*(sqrt(((double)trans_dev / W))) / (double)(reach->trans/(W)) );
         Warning (info, "")
         print_state_space_total ("State space has ", reach);
         SCCreportTimer (timer, "Total exploration time");
@@ -923,7 +931,7 @@ permute_create (permutation_perm_t permutation, model_t model,
     perm->todos = RTalign (CACHE_LINE_SIZE, sizeof(permute_todo_t[trans+TODO_MAX]));
     perm->tosort = RTalign (CACHE_LINE_SIZE, sizeof(int[trans+TODO_MAX]));
     perm->shift = ((double)trans)/workers;
-    perm->shiftorder = (1<<dbs_size) / workers * worker_index;
+    perm->shiftorder = (1L<<dbs_size) / workers * worker_index;
     perm->start_group = perm->shift * worker_index;
     perm->trans = trans;
     perm->model = model;
@@ -1651,21 +1659,19 @@ bfs (wctx_t *ctx, size_t work)
 }
 
 size_t
-split_bfs (size_t source_id, size_t target_id, size_t handoff)
+split_bfs (void *arg_src, void *arg_tgt, size_t handoff)
 {
-    wctx_t             *source = contexts[source_id];
-    wctx_t             *target = contexts[target_id];
+    wctx_t             *source = arg_src;
+    wctx_t             *target = arg_tgt;
     dfs_stack_t         source_stack = source->in_stack;
     size_t              in_size = dfs_stack_size (source_stack);
     if (in_size < 2) {
         in_size = dfs_stack_size (source->out_stack);
         source_stack = source->out_stack;
     }
-    in_size >>= 1;
-    handoff = in_size < handoff ? in_size : handoff;
-    target->load += handoff;
+    handoff = min (in_size >> 1 , handoff);
     for (size_t i = 0; i < handoff; i++) {
-        int                *one = dfs_stack_peek (source_stack, i);
+        state_data_t        one = dfs_stack_peek (source_stack, i);
         dfs_stack_push (target->stack, one);
     }
     dfs_stack_discard (source_stack, handoff);
@@ -1673,16 +1679,14 @@ split_bfs (size_t source_id, size_t target_id, size_t handoff)
 }
 
 size_t
-split_dfs (size_t source_id, size_t target_id, size_t handoff)
+split_dfs (void *arg_src, void *arg_tgt, size_t handoff)
 {
-    wctx_t             *source = contexts[source_id];
-    wctx_t             *target = contexts[target_id];
+    wctx_t             *source = arg_src;
+    wctx_t             *target = arg_tgt;
     size_t              in_size = dfs_stack_size (source->stack);
-    in_size >>= 1;
-    handoff = in_size < handoff ? in_size : handoff;
-    target->load += handoff;
+    handoff = min (in_size >> 1, handoff);
     for (size_t i = 0; i < handoff; i++) {
-        int                *one = dfs_stack_top (source->stack);
+        state_data_t        one = dfs_stack_top (source->stack);
         if (!one) {
             if (UseGreyBox == call_mode) {
                 int *next_index = isba_pop_int (source->group_stack);
@@ -1724,20 +1728,10 @@ explore (void *args)
         reach_handle (ctx, &initial_state, &ti, 0);
     ctx->counters.trans = 0; //reset trans count
 
-#ifndef __APPLE__
-    /* lock thread to one core */
-    cpu_set_t          *set = RTmalloc (sizeof (cpu_set_t));
-    CPU_ZERO (set);
-    CPU_SET (ctx->id, set);
-    sched_setaffinity (0, sizeof (cpu_set_t), set);
-    /* synchronize exploration */
-    pthread_barrier_wait(&start_barrier);
-#endif
-
     /* The load balancer starts the right algorithm, see init_globals */
-    lb_local_init(lb, ctx->id, ctx, &ctx->load);
+    lb_local_init (lb, ctx->id, ctx, &ctx->load);
     SCCstartTimer (timer);
-    lb_balance( lb, ctx->id, ctx, &ctx->load );
+    lb_balance ( lb, ctx->id );
     SCCstopTimer (timer);
     ctx->counters.runtime = SCCrealTime (timer);
     SCCdeleteTimer (timer);

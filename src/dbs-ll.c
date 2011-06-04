@@ -53,14 +53,14 @@ get_local (dbs_ll_t dbs)
 uint16_t
 DBSLLget_sat_bits (const dbs_ll_t dbs, const dbs_ref_t ref)
 {
-    return atomic_read (dbs->table+ref) & dbs->sat_mask;
+    return atomic32_read (dbs->table+ref) & dbs->sat_mask;
 }
 
 int
 DBSLLget_sat_bit (const dbs_ll_t dbs, const dbs_ref_t ref, int index)
 {
     uint32_t        bit = 1 << index;
-    uint32_t        hash_and_sat = atomic_read (dbs->table+ref);
+    uint32_t        hash_and_sat = atomic32_read (dbs->table+ref);
     uint32_t        val = hash_and_sat & bit;
     return val >> index;
 }
@@ -69,7 +69,7 @@ int
 DBSLLtry_set_sat_bit (const dbs_ll_t dbs, const dbs_ref_t ref, int index)
 {
     uint32_t        bit = 1 << index;
-    uint32_t        hash_and_sat = atomic_read (dbs->table+ref);
+    uint32_t        hash_and_sat = atomic32_read (dbs->table+ref);
     uint32_t        val = hash_and_sat & bit;
     if (val)
         return 0; //bit was already set
@@ -80,7 +80,7 @@ void
 DBSLLset_sat_bits (const dbs_ll_t dbs, const dbs_ref_t ref, uint16_t value)
 {
     uint32_t        hash = dbs->table[ref] & ~dbs->sat_mask;
-    atomic_write (dbs->table+ref, hash | (value & dbs->sat_mask));
+    atomic32_write (dbs->table+ref, hash | (value & dbs->sat_mask));
 }
 
 uint32_t
@@ -112,14 +112,14 @@ DBSLLlookup_hash (const dbs_ll_t dbs, const int *v, dbs_ref_t *ret, uint32_t *ha
             if (EMPTY == *bucket) {
                 if (cas (bucket, EMPTY, WAIT)) {
                     memcpy (&dbs->data[ref * l], v, b);
-                    atomic_write (bucket, DONE);
+                    atomic32_write (bucket, DONE);
                     stat->elts++;
                     *ret = ref;
                     return 0;
                 }
             }
-            if (DONE == ((atomic_read (bucket) | WRITE_BIT) & ~dbs->sat_mask)) {
-                while (WAIT == (atomic_read (bucket) & ~dbs->sat_mask)) {}
+            if (DONE == ((atomic32_read (bucket) | WRITE_BIT) & ~dbs->sat_mask)) {
+                while (WAIT == (atomic32_read (bucket) & ~dbs->sat_mask)) {}
                 if (0 == memcmp (&dbs->data[ref * l], v, b)) {
                     *ret = ref;
                     return 1;
