@@ -6,7 +6,8 @@ extern "C" {
 #endif
 
 #include <popt.h>
-#include "greybox.h"
+
+#include <greybox.h>
 
 extern struct poptOption mcrl2_options[];
 

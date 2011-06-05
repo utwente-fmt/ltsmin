@@ -29,82 +29,151 @@ static char const* mcrl2_args="--rewriter=jittyc";
 static char const* mcrl2_args="--rewriter=jitty";
 #endif
 
+namespace ltsmin {
+
+class pins : public mcrl2::lps::pins {
+public:
+    typedef ltsmin_state_type state_vector;
+    typedef int *label_vector;
+
+    pins(model_t& model, std::string lpsfilename, std::string rewr_args)
+        : mcrl2::lps::pins(lpsfilename, rewr_args), model_(model) {
+        map_.resize(datatype_count());
+        rmap_.resize(datatype_count());
+    }
+
+    template <typename callback>
+    void next_state_long(state_vector const& src, std::size_t group, callback& f,
+                         state_vector const& dest, label_vector const& labels)
+    {
+        int state[process_parameter_count()];
+        for (size_t i = 0; i < process_parameter_count(); ++i) {
+            int mt = process_parameter_type (i);
+            int pt = lts_type_get_state_typeno (GBgetLTStype (model_), i);
+            state[i] = find_mcrl2_index (mt, pt, src[i]);
+        }
+        mcrl2::lps::pins::next_state_long (state, group, f, dest, labels);
+    }
+
+    template <typename callback>
+    void next_state_all(state_vector const& src, callback& f,
+                        state_vector const& dest, label_vector const& labels)
+    {
+        int state[process_parameter_count()];
+        for (size_t i = 0; i < process_parameter_count(); ++i) {
+            int mt = process_parameter_type (i);
+            int pt = lts_type_get_state_typeno (GBgetLTStype (model_), i);
+            state[i] = find_mcrl2_index (mt, pt, src[i]);
+        }
+        mcrl2::lps::pins::next_state_all (state, f, dest, labels);
+    }
+
+    void make_pins_edge_labels(label_vector const& src, label_vector const& dst)
+    {
+        for (size_t i = 0; i < edge_label_count(); ++i) {
+            int mt = edge_label_type (i);
+            int pt = lts_type_get_edge_label_typeno (GBgetLTStype (model_), i);
+            dst[i] = find_pins_index (mt, pt, src[i]);
+        }
+    }
+
+    void make_pins_state (state_vector const& src, state_vector const& dst)
+    {
+        for (size_t i = 0; i < process_parameter_count(); ++i) {
+            int mt = process_parameter_type (i);
+            int pt = lts_type_get_state_typeno (GBgetLTStype (model_), i);
+            dst[i] = find_pins_index (mt, pt, src[i]);
+        }
+    }
+
+    inline int find_pins_index (int mt, int pt, int idx)
+    {
+        switch (lts_type_get_format (GBgetLTStype (model_),pt)){
+        case LTStypeDirect:
+        case LTStypeRange:
+            return idx;
+        case LTStypeChunk:
+        case LTStypeEnum:
+            break;
+        }
+
+        std::map<int,int>::iterator it = rmap_[mt].find(idx);
+        if (it != rmap_[mt].end())
+            return it->second;
+
+        std::string c = data_type(mt).print(idx); // XXX serialize
+        int pidx = GBchunkPut (model_, pt, chunk_str(const_cast<char*>(c.c_str())));
+        map_[mt].resize (pidx+1, IDX_NOT_FOUND);
+        map_[mt][pidx] = idx;
+        return rmap_[mt][idx] = pidx;
+    }
+
+    inline int find_mcrl2_index (int mt, int pt, int idx)
+    {
+        switch (lts_type_get_format (GBgetLTStype (model_),pt)){
+        case LTStypeDirect:
+        case LTStypeRange:
+            return idx;
+        case LTStypeChunk:
+        case LTStypeEnum:
+            break;
+        }
+
+        if (idx < static_cast<ssize_t>(map_[mt].size()) && map_[mt][idx] != IDX_NOT_FOUND)
+            return map_[mt][idx];
+
+        chunk c = GBchunkGet (model_, pt, idx);
+        if (c.len == 0) {
+            Abort ("lookup of %d failed", idx);
+        }
+        std::string s = std::string(reinterpret_cast<char*>(c.data), c.len);
+        int midx = data_type(mt).deserialize (s);
+        rmap_[mt][midx] = idx;
+        map_[mt].resize (idx+1, IDX_NOT_FOUND);
+        return map_[mt][idx] = midx;
+    }
+
+private:
+    static const int IDX_NOT_FOUND = -1;
+    model_t model_;
+    std::vector< std::map<int,int> > rmap_;
+    std::vector< std::vector<int> > map_;
+};
+
 struct state_cb
 {
-    typedef int *state_vector;
-    typedef int *label_vector;
+    typedef ltsmin::pins::state_vector state_vector;
+    typedef ltsmin::pins::label_vector label_vector;
+    ltsmin::pins *pins;
     TransitionCB& cb;
     void* ctx;
-    int& count;
+    size_t count;
 
-    state_cb (TransitionCB& cb_, void *ctx_, int& count_)
-        : cb(cb_), ctx(ctx_), count(count_)
+    state_cb (ltsmin::pins *pins_, TransitionCB& cb_, void *ctx_)
+        : pins(pins_), cb(cb_), ctx(ctx_), count(0)
     {}
 
     void operator()(state_vector const& next_state, label_vector const& edge_labels, int group = -1)
     {
-        transition_info_t ti = { edge_labels, group };
-        cb (ctx, &ti, next_state);
+        int lbl[pins->edge_label_count()];
+        pins->make_pins_edge_labels(edge_labels, lbl);
+        int dst[pins->process_parameter_count()];
+        pins->make_pins_state(next_state, dst);
+        transition_info_t ti = { lbl, group };
+        cb (ctx, &ti, dst);
         ++count;
     }
+
+    size_t get_count() const
+    {
+        return count;
+    }
+
 };
 
-class mcrl2_index {
-public:
-    std::string buffer_;
-    mcrl2_index(mcrl2::lps::pins* pins, int tag)
-        : pins_(pins), tag_(tag) {}
-    mcrl2::lps::pins* get_pins() const { return pins_; }
-    int tag() const { return tag_; }
-protected:
-    mcrl2::lps::pins* pins_;
-    // crucially relies on that tag == typeno, although they
-    // are created separately
-    int tag_;
-};
+}
 
 extern "C" {
-
-static void *
-mcrl2_newmap (void *ctx)
-{
-    static int tag = 0; // XXX typemap
-    return (void*)new mcrl2_index(reinterpret_cast<mcrl2::lps::pins*>(ctx), tag++);
-}
-
-static int
-mcrl2_chunk2int (void *map_, void *chunk, int len)
-{
-    mcrl2_index *map = reinterpret_cast<mcrl2_index*>(map_);
-    mcrl2::lps::pins& pins = *map->get_pins();
-    return pins.data_type(map->tag()).deserialize(std::string((char*)chunk,len));
-}
-
-static const void *
-mcrl2_int2chunk (void *map_, int idx, int *len)
-{
-    mcrl2_index *map = reinterpret_cast<mcrl2_index*>(map_);
-    mcrl2::lps::pins& pins = *map->get_pins();
-    map->buffer_ = pins.data_type(map->tag()).print(idx); // XXX serialize
-    *len = map->buffer_.length();
-    return map->buffer_.data(); // XXX life-time
-}
-
-static int
-mcrl2_chunk_count(void *map_)
-{
-    mcrl2_index *map = reinterpret_cast<mcrl2_index*>(map_);
-    return map->get_pins()->data_type(map->tag()).size();
-}
-
-static void
-override_chunk_methods(model_t model, mcrl2::lps::pins* pins)
-{
-    Warning(info, "This mcrl2 language module does not work with the MPI backend.");
-    GBsetChunkMethods(model, mcrl2_newmap, pins,
-                      (int2chunk_t)mcrl2_int2chunk,
-                      mcrl2_chunk2int, mcrl2_chunk_count);
-}
 
 static void
 mcrl2_popt (poptContext con, enum poptCallbackReason reason,
@@ -119,24 +188,22 @@ mcrl2_popt (poptContext con, enum poptCallbackReason reason,
         int argc;
         char **argv;
         RTparseOptions (mcrl2_args,&argc,&argv);
-        Warning (debug,"ATerm init");
-        MCRL2_ATERMPP_INIT_(argc, argv, RTstackBottom());
+        MCRL2initGreybox (argc, argv, RTstackBottom());
         char *rewriter = NULL;
         struct poptOption options[] = {
             { "rewriter", 0 , POPT_ARG_STRING , &rewriter , 0 , "select rewriter" , NULL },
             POPT_TABLEEND
         };
-        Warning (debug,"options");
-        poptContext optCon = poptGetContext(NULL, argc,const_cast<const char**>(argv), options, 0);
+        poptContext optCon = poptGetContext(NULL, argc, const_cast<const char**>(argv), options, 0);
         int res = poptGetNextOpt(optCon);
         if (res != -1 || poptPeekArg(optCon)!=NULL) {
-            Fatal(1,error,"Bad mcrl2 options: %s",mcrl2_args);
+            Abort ("Bad mcrl2 options: %s",mcrl2_args);
         }
         poptFreeContext(optCon);
         if (rewriter) {
             mcrl2_rewriter_strategy = std::string(rewriter);
         } else {
-            Fatal(1,error,"unrecognized rewriter: %s (jitty, jittyc, inner and innerc supported)",rewriter);
+            Abort ("unrecognized rewriter: %s (jitty, jittyc, inner and innerc supported)",rewriter);
         }
         GBregisterLoader("lps",MCRL2loadGreyboxModel);
         Warning(info,"mCRL2 language module initialized");
@@ -145,7 +212,7 @@ mcrl2_popt (poptContext con, enum poptCallbackReason reason,
     case POPT_CALLBACK_REASON_OPTION:
         break;
     }
-    Fatal(1,error,"unexpected call to mcrl2_popt");
+    Abort ("unexpected call to mcrl2_popt");
 }
 
 struct poptOption mcrl2_options[] = {
@@ -165,32 +232,30 @@ MCRL2initGreybox (int argc,char *argv[],void* stack_bottom)
 static int
 MCRL2getTransitionsLong (model_t m, int group, int *src, TransitionCB cb, void *ctx)
 {
-    mcrl2::lps::pins *pins = (mcrl2::lps::pins *)GBgetContext (m);
-    int count = 0;
+    ltsmin::pins *pins = reinterpret_cast<ltsmin::pins*>(GBgetContext (m));
     int dst[pins->process_parameter_count()];
     int labels[pins->edge_label_count()];
-    state_cb f(cb, ctx, count);
+    ltsmin::state_cb f(pins, cb, ctx);
     pins->next_state_long(src, group, f, dst, labels);
-    return count;
+    return f.get_count();
 }
 
 static int
 MCRL2getTransitionsAll (model_t m, int* src, TransitionCB cb, void *ctx)
 {
-    mcrl2::lps::pins *pins = (mcrl2::lps::pins *)GBgetContext (m);
-    int count = 0;
+    ltsmin::pins *pins = reinterpret_cast<ltsmin::pins*>(GBgetContext (m));
     int dst[pins->process_parameter_count()];
     int labels[pins->edge_label_count()];
-    state_cb f(cb, ctx, count);
+    ltsmin::state_cb f(pins, cb, ctx);
     pins->next_state_all(src, f, dst, labels);
-    return count;
+    return f.get_count();
 }
 
 void
 MCRL2loadGreyboxModel (model_t m, const char *model_name)
 {
     Warning(info, "mCRL2 rewriter: %s", mcrl2_rewriter_strategy.c_str());
-    mcrl2::lps::pins *pins = new mcrl2::lps::pins(std::string(model_name), mcrl2_rewriter_strategy);
+    ltsmin::pins *pins = new ltsmin::pins(m, std::string(model_name), mcrl2_rewriter_strategy);
     GBsetContext(m,pins);
 
     lts_type_t ltstype = lts_type_create();
@@ -214,17 +279,18 @@ MCRL2loadGreyboxModel (model_t m, const char *model_name)
         lts_type_set_edge_label_type(ltstype, i, pins->data_type(pins->edge_label_type(i)).name().c_str());
     }
 
-    override_chunk_methods(m, pins);
     GBsetLTStype(m,ltstype);
 
     int s0[pins->process_parameter_count()];
-    mcrl2::lps::pins::ltsmin_state_type p_s0 = s0;
+    ltsmin::pins::state_vector p_s0 = s0;
     pins->get_initial_state(p_s0);
-    GBsetInitialState(m, s0);
+    int tmp[pins->process_parameter_count()];
+    pins->make_pins_state(s0,tmp);
+    GBsetInitialState(m, tmp);
 
-    matrix_t *p_dm_info       = reinterpret_cast<matrix_t *>(RTmalloc(sizeof *p_dm_info));
-    matrix_t *p_dm_read_info  = reinterpret_cast<matrix_t *>(RTmalloc(sizeof *p_dm_read_info));
-    matrix_t *p_dm_write_info = reinterpret_cast<matrix_t *>(RTmalloc(sizeof *p_dm_write_info));
+    matrix_t *p_dm_info       = new matrix_t;
+    matrix_t *p_dm_read_info  = new matrix_t;
+    matrix_t *p_dm_write_info = new matrix_t;
     dm_create(p_dm_info, pins->group_count(),
               pins->process_parameter_count());
     dm_create(p_dm_read_info, pins->group_count(),
@@ -248,7 +314,7 @@ MCRL2loadGreyboxModel (model_t m, const char *model_name)
     GBsetDMInfo (m, p_dm_info);
     GBsetDMInfoRead (m, p_dm_read_info);
     GBsetDMInfoWrite (m, p_dm_write_info);
-    matrix_t *p_sl_info = reinterpret_cast<matrix_t *>(RTmalloc(sizeof *p_sl_info));
+    matrix_t *p_sl_info = new matrix_t;
     dm_create (p_sl_info, 0, pins->process_parameter_count());
     GBsetStateLabelInfo (m, p_sl_info);
     GBsetNextStateLong (m, MCRL2getTransitionsLong);
