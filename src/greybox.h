@@ -27,10 +27,29 @@ typedef struct grey_box_model* model_t;
 typedef struct transition_info {
     int* labels;                    // edge labels, NULL, or pointer to the edge label(s)
     int  group;                     // holds transition group or -1 if unknown
+    int  por_proviso;               // provides infomation on the cycle proviso (ltl) to the por layer
 } transition_info_t;
 
 #define GB_UNKNOWN_GROUP -1
-static const transition_info_t GB_NO_TRANSITION = {NULL, GB_UNKNOWN_GROUP};
+#define GB_TI(A,B) {(A),(B), 0}     // transition_info_t initialization macro
+static const transition_info_t GB_NO_TRANSITION = GB_TI(NULL, GB_UNKNOWN_GROUP);
+
+/**
+\brief Enum for state label groups (GBgetStateLabelGroup)
+ */
+typedef enum {
+    GB_SL_ALL = 0,          // same as GBgetStateLabelAll
+    GB_SL_GUARDS,           // get all labels used as guard
+    GB_SL_GROUP_COUNT       // count elements of enum, must be last
+} sl_group_enum_t;
+
+/**
+\brief A struct to store the indices of the state labels in a particular state label group
+*/
+typedef struct sl_group {
+    int count;
+    int sl_idx[];
+} sl_group_t ;
 
 /**
 \brief Enum to describe the type of property already in the model provided by the frondend
@@ -43,6 +62,14 @@ typedef int (*fn_buchi_is_accepting_t)(model_t model, int*src);
 \brief Options for greybox management module.
  */
 extern struct poptOption greybox_options[];
+
+/**
+\brief A struct to store guards per transition group
+*/
+typedef struct guard {
+    int count;
+    int guard[];
+} guard_t ;
 
 /**
 \defgroup greybox_user The Greybox user interface.
@@ -145,11 +172,25 @@ extern int GBgetStateLabelLong(model_t model,int label,int *state);
 \brief Return the value of state label label given a long state
 */
 
+extern void GBgetStateLabelsGroup(model_t model, sl_group_enum_t group, int*state, int*labels);
+/**<
+\brief Retrieve a group of state labels
+*/
 
 extern void GBgetStateLabelsAll(model_t model,int*state,int*labels);
 /**<
 \brief retrieve all state labels in one call.
  */
+
+extern sl_group_t* GBgetStateLabelGroupInfo(model_t model, sl_group_enum_t group);
+/**<
+\brief Get the state labels indices (and count) beloning to a particular state label group
+*/
+
+extern void GBsetStateLabelGroupInfo(model_t model, sl_group_enum_t group, sl_group_t *group_info);
+/**<
+\brief Get the state labels indices (and count) beloning to a particular state label group
+*/
 
 extern int GBgetStateAll(model_t model,int*state,int*labels,TransitionCB cb,void*context);
 /**<
@@ -227,6 +268,62 @@ extern void GBsetLTStype(model_t model,lts_type_t info);
 extern void GBsetStateLabelInfo(model_t model, matrix_t *info);
 
 /**
+\brief Checks whether a transition group has guards
+ This method is used for partial order reduction
+*/
+extern int GBhasGuardsInfo(model_t model);
+
+/**
+\brief Set the guard array for a model
+*/
+extern void GBsetGuardsInfo(model_t model, guard_t** guard);
+
+/**
+\brief Get guard array for a model
+*/
+extern guard_t** GBgetGuardsInfo(model_t model);
+
+/**
+\brief Set guards for a transition group
+*/
+extern void GBsetGuard(model_t model, int group, guard_t* guard);
+
+/**
+\brief Set the guard may be co-enabled matrix to a model
+*/
+extern void GBsetGuardCoEnabledInfo(model_t model, matrix_t *info);
+
+/**
+\brief Get the guard may be co-enabled matrix of a model.
+*/
+extern matrix_t *GBgetGuardCoEnabledInfo(model_t model);
+
+/**
+\brief Get guards for a transition group
+*/
+extern guard_t* GBgetGuard(model_t model, int group);
+
+/**
+\brief Set the guard NES matrix to a model
+*/
+extern void GBsetGuardNESInfo(model_t model, matrix_t *info);
+
+/**
+\brief Get the guard NES matrix of a model.
+*/
+extern matrix_t *GBgetGuardNESInfo(model_t model);
+
+/**
+\brief Set the guard NDS matrix to a model
+*/
+extern void GBsetGuardNDSInfo(model_t model, matrix_t *info);
+
+/**
+\brief Get the guard NDS matrix of a model.
+*/
+extern matrix_t *GBgetGuardNDSInfo(model_t model);
+
+/**
 \brief Set the initial state.
 
 The initial state is needed if a short vector next state method
@@ -273,6 +370,14 @@ typedef void (*get_label_all_method_t)(model_t self,int*src,int *label);
 \brief Set the method that retrieves all state labels.
 */
 extern void GBsetStateLabelsAll(model_t model,get_label_all_method_t method);
+
+/// Type of label retrieval methods.
+typedef void (*get_label_group_method_t)(model_t self,sl_group_enum_t group, int*src,int *label);
+
+/**
+\brief Set the method that retrieves a group of state labels.
+*/
+extern void GBsetStateLabelsGroup(model_t model,get_label_group_method_t method);
 
 /// Type of label retrieval methods.
 typedef int (*get_label_method_t)(model_t self,int label,int*src);
@@ -391,7 +496,20 @@ typedef enum {PINS_LTL_TEXTBOOK, PINS_LTL_SPIN} pins_ltl_type_t;
 /**
 \brief Add LTL layer on top all other pins layers
 */
-extern model_t GBaddLTL(model_t model, const char *ltl_file, pins_ltl_type_t type);
+extern model_t GBaddLTL(model_t model, const char *ltl_file, pins_ltl_type_t type, model_t por_model);
+
+/**
+\brief Add POR layer before LTL layer
+*/
+extern model_t GBaddPOR(model_t model, const int has_ltl);
+
+/**
+\brief connection from ltl to por layer
+
+Note: this is a hack because the layers are closely coupled
+      a better solution must be provided sometime in the future
+*/
+extern void por_visibility(model_t model, int group, int visibility);
 
 //@{
 

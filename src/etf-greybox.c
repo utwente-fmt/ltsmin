@@ -51,18 +51,18 @@ static int etf_short(model_t self,int group,int*src,TransitionCB cb,void*user_co
         int *dst=(int*)SIgetC(ctx->trans_key_idx[group],(int)row[1],NULL);
         switch(ctx->edge_labels){
             case 0: {
-                transition_info_t ti = {NULL, group};
+                transition_info_t ti = GB_TI(NULL, group);
                 cb(user_context,&ti,dst);
                 break;
             }
             case 1: {
                 int lbl=(int)row[2];
-                transition_info_t ti = {&lbl, group};
+                transition_info_t ti = GB_TI(&lbl, group);
                 cb(user_context,&ti,dst);
                 break;
             }
             default: {
-                transition_info_t ti = {(int*)SIgetC(ctx->label_idx,(int)row[2],NULL), group};
+                transition_info_t ti = GB_TI((int*)SIgetC(ctx->label_idx,(int)row[2],NULL), group);
                 cb(user_context,&ti,dst);
                 break;
             }

@@ -53,6 +53,7 @@ extern void RTfree(void *rt_ptr);
 
 extern void *RTdlsym (const char *libname, void *handle, const char *symbol);
 
+extern void *RTopt_dlsym (void *handle, const char *symbol);
 
 /**
 \brief Initialize the runtime library using popt.

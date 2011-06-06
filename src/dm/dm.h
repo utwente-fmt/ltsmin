@@ -93,6 +93,12 @@ extern int          dm_print (FILE *, const matrix_t *);
 extern int          dm_optimize (matrix_t *);
 extern int          dm_all_perm (matrix_t *);
 
+/**
+ * return the matrix as index table per row/col
+ * result[row/col] = pointer to struct (count, index0, .. , index_[count])
+ */
+extern int**        dm_rows_to_idx_table(const matrix_t*);
+extern int**        dm_cols_to_idx_table(const matrix_t*);
 
 typedef struct dm_row_iterator {
     matrix_t           *m;

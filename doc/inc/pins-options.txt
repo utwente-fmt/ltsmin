@@ -86,3 +86,34 @@ textbook;;
     outgoing transition to the initial state. Now, predicates
     are evaluated on the 'target' state and the Buchi automaton
     moves according to these predicates.
+
+*--por*::
+    Activate partial order reduction
++
+Partial Order Reduction can reduce the state space when searching
+for deadlocks (-d) of accepting cycles (--ltl).
+
+*--proviso*='closedset|stack|color'::
+    Change the proviso implementation for partial order reduction (ltl)
++
+Change the proviso used to detect that an accepting cycle is closed.
+Three options are available, the default is 'closedset'.
+
+closedset;;
+    The closed set proviso is the default proviso which requires
+    almost no extra work/memory. It might however result in less
+    reduction than the 'stack' or 'color' proviso. It works with both
+    the dfs- and bfs exploration strategy.
+
+stack;;
+    The stack proviso is the proviso used for example by the spin
+    model checker. It requires some extra work/memory but may
+    result in a better reduction than 'closedset'. It works only
+    for a dfs/scc search strategy (since bfs has no stack).
+
+color;;
+    The color proviso requires a lot of extra work and memory
+    but can significantly improve the reduction. It too works
+    only with the dfs/scc search strategies.
+
+NOTE: The proviso option might be used to produce shorter error traces.
