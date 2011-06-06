@@ -8,7 +8,7 @@
         previous level, while 'chain' uses the whole cisited set. Defaults
         to 'bfs-prev'.
 +
-When using breadth-frist search, the tool performs the next state computation
+When using breadth-first search, the tool performs the next state computation
 for all edge groups on the current level or current set of visited states.
 Chaining means to apply next state for the first group to the visited
 states, then apply next-state for the second group to the result,
@@ -17,10 +17,12 @@ iterations than a BFS analysis.
 
 *--saturation*='SATURATION'::
         Select an experimental saturation-like strategy: 'none', 'sat-like',
-        'sat-loop'. The 'sat-like' strategy goes up and down the levels of the
-        BDD used to represent the state space. The 'sat-loop' strategy loops
-        over the levels. The strategy works in combination with the 'order' to
-        saturate levels. Defaults to 'none', i.e. no saturation.
+        'sat-loop', 'sat-ddd'. The 'sat-like' strategy goes up and down the
+        levels of the BDD used to represent the state space. The 'sat-loop'
+        strategy loops over the levels. The 'sat-ddd' strategy repeatedly
+        performs a fixpoint computation. All strategies except 'sat-ddd' work
+        in combination with the 'order' to saturate levels. Defaults to 'none',
+        i.e. no saturation.
 
 *--sat-granularity*='GRANULARITY'::
         Select the granularity of the saturation-like strategy. Defaults to 10.

@@ -1,8 +1,8 @@
 === Vector Set Options
 
 *--vset*='TYPE'::
-        Select type of vector set: 'list', 'tree', 'fdd', or 'ldd'.  With
-        'list', ATermDD with list encoding are used.  With 'tree',
-        ATermDD with tree encoding are used.  With 'fdd', BuDDy FDDs
-        are used.  With 'ldd', a non-ATermDD vector set with list
-        encoding is used.  Defaults to 'list'.
+        Select type of vector set: 'list', 'tree', 'fdd', 'ddd', 'ldd'. With
+        'list', ATermDD with list encoding are used. With 'tree', ATermDD with
+        tree encoding are used. With 'fdd', BuDDy FDDs are used. With 'ldd',
+        a non-ATermDD vector set with list encoding is used. With 'ddd',
+        libDDD SDDs are used. Defaults to first available type in the list.
