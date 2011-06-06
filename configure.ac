@@ -191,8 +191,8 @@ AC_SUBST([BUDDY_CPPFLAGS],['-I${top_srcdir}/buddy/src'])
 AC_SUBST([BUDDY_LDFLAGS])
 
 AC_LANG_PUSH([C++])
-AX_CXX_CHECK_LIB([ddd],[GDDD::size() const],
- [AC_SUBST([DDD_LIBS],[-lddd])
+AX_CXX_CHECK_LIB([DDD],[GDDD::size() const],
+ [AC_SUBST([DDD_LIBS],[-lDDD])
   AX_LET([CPPFLAGS],["$CPPFLAGS"],
    [dnl libddd should be used via #include <ddd/DDD.h>, but this does not work
     dnl currently because internal libddd header files expect the "ddd" directory
