@@ -2,10 +2,9 @@
 #include <stdlib.h>
 #include <limits.h>
 
-#include "dm/dm.h"
-#include "greybox.h"
-#include "runtime.h"
-#include "limits.h"
+#include <dm/dm.h>
+#include <greybox.h>
+#include <runtime.h>
 
 
 /**
@@ -23,7 +22,7 @@ por_long (model_t self, int group, int *src, TransitionCB cb,
     (void)src;
     (void)cb;
     (void)user_context;
-    Fatal(1,error,"Using Partial Order Reduction in combination with --grey or --reach? Long call failed.");
+    Abort ("Using Partial Order Reduction in combination with --grey or --reach? Long call failed.");
 }
 
 static int
@@ -35,7 +34,7 @@ por_short (model_t self, int group, int *src, TransitionCB cb,
     (void)src;
     (void)cb;
     (void)user_context;
-    Fatal(1,error,"Using Partial Order Reduction in combination with --reach or --cached? Short call failed.");
+    Abort ("Using Partial Order Reduction in combination with --reach or --cached? Short call failed.");
 }
 
 
@@ -419,7 +418,7 @@ bs_analyze(model_t model, por_context* pctx, int* src)
                 }
             }
             // add nes
-            if (selected_nes == -1) Fatal(1, error, "selected nes -1");
+            if (selected_nes == -1) Abort ("selected nes -1");
             // add the selected nes to work
             ci_list* cil = pctx->ns[selected_nes];
             for(int k=0; k < cil->count; k++) {
@@ -756,7 +755,7 @@ GBaddPOR (model_t model, int por_check_ltl )
                 dm_set(&gg_matrix, i, g->guard[j]);
             }
         } else {
-            Fatal(1,error,"GUARD RETURNED NULL %d", i);
+            Abort ("GUARD RETURNED NULL %d", i);
         }
     }
 
