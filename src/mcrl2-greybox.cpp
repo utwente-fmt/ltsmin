@@ -10,6 +10,7 @@
 #include <stack>
 
 #include <mcrl2/atermpp/aterm_init.h>
+#include <mcrl2/utilities/logger.h>
 #include <mcrl2/lps/ltsmin.h>
 
 extern "C" {
@@ -22,12 +23,12 @@ extern "C" {
 #include <runtime.h>
 }
 
-static std::string mcrl2_rewriter_strategy;
 #ifdef MCRL2_JITTYC_AVAILABLE
-static char const* mcrl2_args="--rewriter=jittyc";
+static std::string mcrl2_rewriter_strategy = "jittyc";
 #else
-static char const* mcrl2_args="--rewriter=jitty";
+static std::string mcrl2_rewriter_strategy = "jitty";
 #endif
+static char const* mcrl2_args = "";
 
 namespace ltsmin {
 
@@ -186,26 +187,36 @@ mcrl2_popt (poptContext con, enum poptCallbackReason reason,
     case POPT_CALLBACK_REASON_POST: {
         Warning(debug,"mcrl2 init");
         int argc;
-        char **argv;
+        const char **argv;
         RTparseOptions (mcrl2_args,&argc,&argv);
+        argv[0] = "--mcrl2";
         MCRL2initGreybox (argc, argv, RTstackBottom());
-        char *rewriter = NULL;
+        const char *opt_rewriter = mcrl2_rewriter_strategy.c_str();
+        int opt_verbosity = 0;
         struct poptOption options[] = {
-            { "rewriter", 0 , POPT_ARG_STRING , &rewriter , 0 , "select rewriter" , NULL },
+            { "rewriter", 'r' , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &opt_rewriter , 0 , "select rewriter: jittyc, jitty, ..." , NULL },
+            { "verbose" , 'v' , POPT_ARG_INT , &opt_verbosity , 1 , "increase verbosity", "INT" },
+            POPT_AUTOHELP
             POPT_TABLEEND
         };
-        poptContext optCon = poptGetContext(NULL, argc, const_cast<const char**>(argv), options, 0);
-        int res = poptGetNextOpt(optCon);
-        if (res != -1 || poptPeekArg(optCon)!=NULL) {
-            Abort ("Bad mcrl2 options: %s",mcrl2_args);
+        poptContext optCon = poptGetContext(NULL, argc, argv, options, 0);
+        int res;
+        while ((res = poptGetNextOpt (optCon)) >= 0) {};
+        if (res < -1) {
+            Abort ("Bad mcrl2 option %s: %s (try --mcrl2=--help)",
+                   poptBadOption (optCon, POPT_BADOPTION_NOALIAS),
+                   poptStrerror (res));
+        } else if (poptPeekArg (optCon) != NULL) {
+            Abort ("Unknown mcrl2 option %s (try --mcrl2=--help)", poptPeekArg (optCon));
         }
         poptFreeContext(optCon);
-        if (rewriter) {
-            mcrl2_rewriter_strategy = std::string(rewriter);
-        } else {
-            Abort ("unrecognized rewriter: %s (jitty, jittyc, inner and innerc supported)",rewriter);
-        }
+        mcrl2_rewriter_strategy = std::string(opt_rewriter);
         GBregisterLoader("lps",MCRL2loadGreyboxModel);
+        if (opt_verbosity > 0) {
+            Warning(info, "increasing mcrl2 verbosity level by %d", opt_verbosity);
+            mcrl2_log_level_t level = static_cast<mcrl2_log_level_t>(static_cast<size_t>(mcrl2_logger::get_reporting_level()) + opt_verbosity);
+            mcrl2_logger::set_reporting_level (level);
+        }
         Warning(info,"mCRL2 language module initialized");
         return;
     }
@@ -217,15 +228,15 @@ mcrl2_popt (poptContext con, enum poptCallbackReason reason,
 
 struct poptOption mcrl2_options[] = {
     { NULL, 0 , POPT_ARG_CALLBACK|POPT_CBFLAG_POST|POPT_CBFLAG_SKIPOPTION , (void*)mcrl2_popt , 0 , NULL , NULL},
-    { "mcrl2" , 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &mcrl2_args , 0, "Pass options to the mcrl2 library.","<mcrl2 options>" },
+    { "mcrl2" , 0 , POPT_ARG_STRING , &mcrl2_args , 0, "Pass options to the mcrl2 library.","<mcrl2 options>" },
     POPT_TABLEEND
 };
 
 void
-MCRL2initGreybox (int argc,char *argv[],void* stack_bottom)
+MCRL2initGreybox (int argc,const char *argv[],void* stack_bottom)
 {
     Warning(debug,"ATerm init");
-    MCRL2_ATERMPP_INIT_(argc, argv, stack_bottom);
+    MCRL2_ATERMPP_INIT_(argc, const_cast<char**>(argv), stack_bottom);
     (void)stack_bottom;
 }
 

@@ -11,7 +11,7 @@ extern "C" {
 
 extern struct poptOption mcrl2_options[];
 
-extern void MCRL2initGreybox(int argc,char *argv[],void* stack_bottom);
+extern void MCRL2initGreybox(int argc,const char *argv[],void *stack_bottom);
 /**< Initialize ATerm library and MCRL2 library up to the loading of a specification. */
 
 extern void MCRL2loadGreyboxModel(model_t model,const char*name);

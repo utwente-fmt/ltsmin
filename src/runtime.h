@@ -33,7 +33,7 @@ extern int linear_search(const si_map_entry map[],const char*key);
 /**
 \brief Parse a string that represents command line options.
  */
-extern void RTparseOptions(const char* argline,int *argc_p,char***argv_p);
+extern void RTparseOptions(const char* argline,int *argc_p,const char***argv_p);
 
 #define RTstackBottom HREstackBottom
 

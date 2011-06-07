@@ -28,12 +28,12 @@ void RTinit(int *argcp,char**argvp[]){
     HREinitBare(argcp,argvp);
 }
 
-void RTparseOptions(const char* argline,int *argc_p,char***argv_p){
+void RTparseOptions(const char* argline,int *argc_p,const char***argv_p){
 	int len=strlen(argline)+8;
 	char cmdline[len];
 	sprintf(cmdline,"fake %s",argline);
     // argv is allocated as one block by poptParseArgvString
-	int res=poptParseArgvString(cmdline,argc_p,(const char ***)argv_p);
+	int res=poptParseArgvString(cmdline,argc_p,argv_p);
 	if (res){
 		Fatal(1,error,"could not parse %s: %s",cmdline,poptStrerror(res));
 	}
