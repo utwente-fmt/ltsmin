@@ -102,7 +102,7 @@ public:
         if (it != rmap_[mt].end())
             return it->second;
 
-        std::string c = data_type(mt).print(idx); // XXX serialize
+        std::string c = data_type(mt).serialize(idx);
         int pidx = GBchunkPut (model_, pt, chunk_str(const_cast<char*>(c.c_str())));
         map_[mt].resize (pidx+1, IDX_NOT_FOUND);
         map_[mt][pidx] = idx;
