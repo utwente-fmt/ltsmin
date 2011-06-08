@@ -48,7 +48,7 @@ static void MCRLinitGreybox(int argc,char *argv[],void* stack_bottom){
         const char *argv_[argc];
         argv_[0] = "/fake/path/to/rewr";
         for (int i = 1; i < argc; ++i) argv_[i] = argv[i];
-        argv = argv_;
+        argv = (char **)argv_;
 #endif
 	RWsetArguments(&argc, &argv);
 	STsetArguments(&argc, &argv);
