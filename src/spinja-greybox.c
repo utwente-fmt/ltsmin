@@ -319,7 +319,7 @@ SpinJaloadGreyboxModel(model_t model, const char *filename)
 		}
 	}
 	
-	GBsetStateLabelInfo(model, &sl_info);
+	GBsetStateLabelInfo(model, sl_info);
 
 	lts_type_validate(ltstype);
 
