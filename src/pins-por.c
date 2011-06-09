@@ -65,6 +65,25 @@ typedef struct ci_list
     int data[];
 } ci_list;
 
+/*
+ * The partial order reduction algorithm used here is an
+ * extension of the stubborn set algorithm (Valmari) as
+ * described in the Ph.d. thesis of Godefroid, using
+ * necessary disabling sets and a heuristic function
+ * to select a good necessary enabling set.
+ *
+ * Details can be found in:
+ *
+ * @mastersthesis{por4pins:thesis:2011,
+ *      AUTHOR = {Elwin Pater},
+ *      TITLE = {Partial Order Reduction for PINS},
+ *      YEAR = {2011},
+ *      NOTE = {fmt.cs.utwente.nl/files/sprojects/17.pdf},
+ *      SCHOOL = {University of Twente},
+ *      ADDRESS = {the Netherlands}
+ * }
+ */
+
 /**
  * The analysis has global context (por_context)
  * and multiple search contexts (search_context).
