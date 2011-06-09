@@ -365,8 +365,8 @@ typedef struct counter_s {
     size_t              explored;       // counter: explored states
     size_t              trans;          // counter: transitions
     size_t              level_max;      // counter: (BFS) level / (DFS) max level
+    size_t              load_max;       // max stack/queue load
     size_t              level_cur;      // counter: current (DFS) level
-    size_t              stack_sizes;    // max combined stack sizes
     size_t              touched_red;    // visited-before accepting states
     stats_t            *stats;          // running state storage statistics
     size_t              threshold;      // report threshold
@@ -432,25 +432,27 @@ static wctx_t     **contexts;
 static zobrist_t    zobrist = NULL;
 
 void
-add_results(counter_t *res, counter_t *cnt)
+add_results (counter_t *res, counter_t *cnt)
 {
     res->runtime += cnt->runtime;
     res->visited += cnt->visited;
     res->explored += cnt->explored;
     res->trans += cnt->trans;
     res->level_max += cnt->level_max;
-    res->stack_sizes += cnt->stack_sizes;
+    res->load_max += cnt->load_max;
     res->touched_red += cnt->touched_red;
     if (NULL != res->stats && NULL != cnt->stats)
-    add_stats(res->stats, cnt->stats);
+        add_stats(res->stats, cnt->stats);
 }
 
 static inline void
-increase_level(counter_t *cnt)
+increase_level (wctx_t *ctx, counter_t *cnt)
 {
     cnt->level_cur++;
     if(cnt->level_cur > cnt->level_max)
         cnt->level_max = cnt->level_cur;
+    if(ctx->load > cnt->load_max)
+        cnt->load_max = ctx->load;
 }
 
 static              model_t
@@ -743,7 +745,7 @@ print_statistics(counter_t *reach, counter_t *red, mytimer_t timer)
         if ( 0 == (Strat_LTLG & strategy) )
             red->visited /= W;
         SCCreportTimer (timer, "Total exploration time");
-        mem3 = ((double)(((2UL<<dbs_size))/8*W + reach->stack_sizes/8)) / (1UL<<20);
+        mem3 = ((double)(((2UL<<dbs_size))/8*W + reach->load_max/8)) / (1UL<<20);
 
         Warning (info, "");
         Warning (info, "%s(%s/%s) stats:", key_search(strategies, strategy),
@@ -777,7 +779,7 @@ print_statistics(counter_t *reach, counter_t *red, mytimer_t timer)
     }
 
     Warning (info, "Queue width: %zuB, total height: %zu, memory: %.2fMB",
-             s, reach->stack_sizes, mem1);
+             s, reach->load_max, mem1);
     mem2 = ((double)(1UL << (dbs_size)) / (1<<20)) * SLOT_SIZE * el_size;
     mem4 = ((double)(db_nodes * SLOT_SIZE * el_size)) / (1<<20);
     compr = (double)(db_nodes * el_size) / (N * db_elts) * 100;
@@ -799,13 +801,11 @@ print_statistics(counter_t *reach, counter_t *red, mytimer_t timer)
 }
 
 static void
-print_thread_statistics(wctx_t *ctx)
+print_thread_statistics (wctx_t *ctx)
 {
     char                name[128];
     char               *format = "[%zu%s] saw in %.3f sec ";
     if (Strat_Reach & strategy) {
-        if (strategy == Strat_BFS)
-            ctx->counters.stack_sizes += dfs_stack_size_max (ctx->out_stack);
         snprintf (name, sizeof name, format, ctx->id, "", ctx->counters.runtime);
         print_state_space_total (name, &ctx->counters);
     } else if (Strat_LTL & strategy) {
@@ -1232,7 +1232,7 @@ ndfs_explore_state (wctx_t *ctx, counter_t *cnt)
 {
     int                 count;
     dfs_stack_enter (ctx->stack);
-    increase_level (cnt);
+    increase_level (ctx, cnt);
     count = permute_trans (ctx->permute, &ctx->state, ndfs_handle, ctx);
     cnt->trans += count;
     cnt->explored++;
@@ -1346,7 +1346,7 @@ nndfs_explore_state_red (wctx_t *ctx, counter_t *cnt)
     //We color red over cyan (seed), because this cas should be handled by early cycle detection
     nn_set_color(&ctx->color_map, ctx->state.ref, NNPINK);
     dfs_stack_enter (ctx->stack);
-    increase_level (cnt);
+    increase_level (ctx, cnt);
     count = permute_trans (ctx->permute, &ctx->state, nndfs_red_handle, ctx);
     cnt->trans += count;
     cnt->explored++;
@@ -1358,7 +1358,7 @@ nndfs_explore_state_blue (wctx_t *ctx, counter_t *cnt)
 {
     int                 count;
     dfs_stack_enter (ctx->stack);
-    increase_level (cnt);
+    increase_level (ctx, cnt);
     count = permute_trans (ctx->permute, &ctx->state, nndfs_blue_handle, ctx);
     cnt->trans += count;
     cnt->explored++;
@@ -1380,9 +1380,8 @@ mcndfs_red (wctx_t *ctx)
             nndfs_color_t color = nn_get_color (&ctx->color_map, ctx->state.ref);
             if ( nn_color_eq(color, NNPINK) ||
                  global_has_color(ctx->state.ref, GRED) ) {
-                if (start_level == dfs_stack_nframes (ctx->stack)) {
-                     break; ctx->red.touched_red++;
-                }
+                if (start_level == dfs_stack_nframes (ctx->stack))
+                     break;
                 dfs_stack_pop (ctx->stack);
             } else
                 nndfs_explore_state_red (ctx, &ctx->red);
@@ -1604,7 +1603,7 @@ dfs_grey (wctx_t *ctx, size_t work)
             ctx->load--;
         } else {
             dfs_stack_enter (ctx->stack);
-            increase_level (&ctx->counters);
+            increase_level (ctx, &ctx->counters);
             next_index = explore_state (ctx, state_data, next_index);
             isba_push_int (ctx->group_stack, &next_index);
         }
@@ -1620,14 +1619,14 @@ dfs (wctx_t *ctx, size_t work)
         raw_data_t          state_data = dfs_stack_top (ctx->stack);
         if (NULL == state_data) {
             if (0 == dfs_stack_nframes (ctx->stack))
-                break;
+                return;
             dfs_stack_leave (ctx->stack);
             ctx->counters.level_cur--;
             dfs_stack_pop (ctx->stack);
             ctx->load--;
         } else {
             dfs_stack_enter (ctx->stack);
-            increase_level (&ctx->counters);
+            increase_level (ctx, &ctx->counters);
             explore_state (ctx, state_data, 0);
             ctx->counters.explored++;
         }
@@ -1646,7 +1645,7 @@ bfs (wctx_t *ctx, size_t work)
             dfs_stack_t     old = ctx->out_stack;
             ctx->stack = ctx->out_stack = ctx->in_stack;
             ctx->in_stack = old;
-            increase_level (&ctx->counters);
+            increase_level (ctx, &ctx->counters);
         } else {
             dfs_stack_pop (ctx->in_stack);
             ctx->load--;
@@ -1757,7 +1756,6 @@ main (int argc, char *argv[])
     reach->stats = RTmallocZero (sizeof(stats_t));
     for (size_t i = 0; i < W; i++) {
         wctx_t             *ctx = contexts[i];
-        ctx->counters.stack_sizes = dfs_stack_size_max (ctx->in_stack);
         add_results (reach, &ctx->counters);
         add_results (red, &ctx->red);
         print_thread_statistics (ctx);

@@ -31,7 +31,6 @@ extern void dfs_stack_leave(dfs_stack_t stack);
 extern size_t dfs_stack_nframes (const dfs_stack_t stack);
 extern size_t dfs_stack_frame_size(dfs_stack_t stack);
 extern size_t dfs_stack_size(dfs_stack_t stack);
-extern size_t dfs_stack_size_max (dfs_stack_t stack);
 
 extern int *dfs_stack_push(dfs_stack_t stack, const int *state);
 extern int *dfs_stack_pop(dfs_stack_t stack);
