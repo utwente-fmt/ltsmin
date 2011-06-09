@@ -274,23 +274,23 @@ DVE2loadDynamicLib(model_t model, const char *filename)
 
     // optional, guard support (used for por)
     get_guard_count = (int(*)())
-    RTopt_dlsym( dlHandle, "get_guard_count" );
+    RTdlsym( filename, dlHandle, "get_guard_count" );
     get_guard_matrix = (const int*(*)(int))
-    RTopt_dlsym( dlHandle, "get_guard_matrix" );
+    RTdlsym( filename, dlHandle, "get_guard_matrix" );
     get_guards = (const int*(*)(int))
-    RTopt_dlsym( dlHandle, "get_guards" );
+    RTdlsym( filename, dlHandle, "get_guards" );
     get_all_guards = (const int**(*)())
-    RTopt_dlsym( dlHandle, "get_all_guards" );
+    RTdlsym( filename, dlHandle, "get_all_guards" );
     get_guard = (int(*)(void*,int,int*))
-    RTopt_dlsym( dlHandle, "get_guard" );
+    RTdlsym( filename, dlHandle, "get_guard" );
     get_guard_all = (void(*)(void*,int*,int*))
-    RTopt_dlsym( dlHandle, "get_guard_all" );
+    RTdlsym( filename, dlHandle, "get_guard_all" );
     get_guard_may_be_coenabled_matrix = (const int*(*)(int))
-    RTopt_dlsym( dlHandle, "get_guard_may_be_coenabled_matrix" );
+    RTdlsym( filename, dlHandle, "get_guard_may_be_coenabled_matrix" );
     get_guard_nes_matrix = (const int*(*)(int))
-    RTopt_dlsym( dlHandle, "get_guard_nes_matrix" );
+    RTdlsym( filename, dlHandle, "get_guard_nes_matrix" );
     get_guard_nds_matrix = (const int*(*)(int))
-    RTopt_dlsym( dlHandle, "get_guard_nds_matrix" );
+    RTdlsym( filename, dlHandle, "get_guard_nds_matrix" );
 
     // check system_with_property
     if (have_property()) {
@@ -320,20 +320,6 @@ DVE2loadGreyboxModel(model_t model, const char *filename)
             DVE2loadDynamicLib(model, filename);
         } else {
             DVE2compileGreyboxModel(model, filename);
-        }
-    }
-
-    // check for guards
-    int model_has_guards = 0;
-    if (get_guard_count != NULL || get_guard_matrix != NULL ||
-        get_guards != NULL || get_all_guards != NULL ||
-        get_guard != NULL || get_guard_all != NULL ) {
-        if (get_guard_count == NULL || get_guard_matrix == NULL ||
-            get_guards == NULL || get_all_guards == NULL ||
-            get_guard == NULL || get_guard_all == NULL) {
-            Warning(info,"DVE guard functionality only partially available in model, ignoring guards!");
-        } else {
-            model_has_guards = 1;
         }
     }
 
@@ -367,20 +353,18 @@ DVE2loadGreyboxModel(model_t model, const char *filename)
     // compute state label names
     int nguards = get_guard_count(); // TODO: should be in model has guards block..?
     int sl_size = 0 +
-                  (model_has_guards ? nguards : 0) +
+                  nguards +
                   (have_property() ? 1 : 0);
 
     // assumption on state labels:
     // state labels (idx): 0 - nguards-1 = guard state labels
     // state label  (idx): nguards = property state label
     lts_type_set_state_label_count (ltstype, sl_size);
-    if (model_has_guards) {
-        char buf[256];
-        for(int i=0; i < nguards; i++) {
-            snprintf(buf, 256, "guard_%d", i);
-            lts_type_set_state_label_name (ltstype, i, buf);
-            lts_type_set_state_label_typeno (ltstype, i, bool_type);
-        }
+    char buf[256];
+    for(int i=0; i < nguards; i++) {
+        snprintf(buf, 256, "guard_%d", i);
+        lts_type_set_state_label_name (ltstype, i, buf);
+        lts_type_set_state_label_typeno (ltstype, i, bool_type);
     }
     if (have_property()) {
         lts_type_set_state_label_name (ltstype, nguards,
@@ -451,76 +435,74 @@ DVE2loadGreyboxModel(model_t model, const char *filename)
     }
 
     // if the model has guards, add guards as state labels
-    if (model_has_guards) {
-        if (have_property()) {
-            // filter the property
-            sl_long = sl_long_p_g;
-            sl_all = sl_all_p_g;
-        } else {
-            // pass request directly to dynamic lib
-            sl_long = (get_label_method_t)     get_guard;
-            sl_all =  (get_label_all_method_t) get_guard_all;
-        }
-
-        // set the guards per transition group
-        GBsetGuardsInfo(model, (guard_t**) get_all_guards());
-
-        // initialize state label matrix
-        // assumption, guards come first (0-nguards)
-        for(int i=0; i < nguards; i++) {
-            int* guards = (int*)get_guard_matrix(i);
-            for(int j=0; j<state_length; j++) {
-                if (guards[j]) dm_set(sl_info, i, j);
-            }
-        }
-
-        // set guard may be co-enabled relation
-        if (get_guard_may_be_coenabled_matrix) {
-            dm_create(gce_info, nguards, nguards);
-            for(int i=0; i < nguards; i++) {
-                int* guardce = (int*)get_guard_may_be_coenabled_matrix(i);
-                for(int j=0; j<nguards; j++) {
-                    if (guardce[j]) dm_set(gce_info, i, j);
-                }
-            }
-            GBsetGuardCoEnabledInfo(model, gce_info);
-        }
-
-        // set guard necessary enabling set info
-        if (get_guard_nes_matrix) {
-            dm_create(gnes_info, nguards, ngroups);
-            for(int i=0; i < nguards; i++) {
-                int* guardnes = (int*)get_guard_nes_matrix(i);
-                for(int j=0; j<ngroups; j++) {
-                    if (guardnes[j]) dm_set(gnes_info, i, j);
-                }
-            }
-            GBsetGuardNESInfo(model, gnes_info);
-        }
-
-        // set guard necessary disabling set info
-        if (get_guard_nds_matrix) {
-            dm_create(gnds_info, nguards, ngroups);
-            for(int i=0; i < nguards; i++) {
-                int* guardnds = (int*)get_guard_nds_matrix(i);
-                for(int j=0; j<ngroups; j++) {
-                    if (guardnds[j]) dm_set(gnds_info, i, j);
-                }
-            }
-            GBsetGuardNDSInfo(model, gnds_info);
-        }
-
-        // set the group implementation
-        sl_group_t* sl_group_all = RTmallocZero(sizeof(sl_group_t) + sl_size * sizeof(int));
-        sl_group_all->count = sl_size;
-        for(int i=0; i < sl_group_all->count; i++) sl_group_all->sl_idx[i] = i;
-        sl_group_t* sl_group_guards = RTmallocZero(sizeof(sl_group_t) + nguards * sizeof(int));
-        sl_group_guards->count = nguards;
-        for(int i=0; i < sl_group_guards->count; i++) sl_group_guards->sl_idx[i] = i;
-        GBsetStateLabelGroupInfo(model, GB_SL_ALL, sl_group_all);
-        GBsetStateLabelGroupInfo(model, GB_SL_GUARDS, sl_group_guards);
-        GBsetStateLabelsGroup(model, sl_group);
+    if (have_property()) {
+        // filter the property
+        sl_long = sl_long_p_g;
+        sl_all = sl_all_p_g;
+    } else {
+        // pass request directly to dynamic lib
+        sl_long = (get_label_method_t)     get_guard;
+        sl_all =  (get_label_all_method_t) get_guard_all;
     }
+
+    // set the guards per transition group
+    GBsetGuardsInfo(model, (guard_t**) get_all_guards());
+
+    // initialize state label matrix
+    // assumption, guards come first (0-nguards)
+    for(int i=0; i < nguards; i++) {
+        int* guards = (int*)get_guard_matrix(i);
+        for(int j=0; j<state_length; j++) {
+            if (guards[j]) dm_set(sl_info, i, j);
+        }
+    }
+
+    // set guard may be co-enabled relation
+    if (get_guard_may_be_coenabled_matrix) {
+        dm_create(gce_info, nguards, nguards);
+        for(int i=0; i < nguards; i++) {
+            int* guardce = (int*)get_guard_may_be_coenabled_matrix(i);
+            for(int j=0; j<nguards; j++) {
+                if (guardce[j]) dm_set(gce_info, i, j);
+            }
+        }
+        GBsetGuardCoEnabledInfo(model, gce_info);
+    }
+
+    // set guard necessary enabling set info
+    if (get_guard_nes_matrix) {
+        dm_create(gnes_info, nguards, ngroups);
+        for(int i=0; i < nguards; i++) {
+            int* guardnes = (int*)get_guard_nes_matrix(i);
+            for(int j=0; j<ngroups; j++) {
+                if (guardnes[j]) dm_set(gnes_info, i, j);
+            }
+        }
+        GBsetGuardNESInfo(model, gnes_info);
+    }
+
+    // set guard necessary disabling set info
+    if (get_guard_nds_matrix) {
+        dm_create(gnds_info, nguards, ngroups);
+        for(int i=0; i < nguards; i++) {
+            int* guardnds = (int*)get_guard_nds_matrix(i);
+            for(int j=0; j<ngroups; j++) {
+                if (guardnds[j]) dm_set(gnds_info, i, j);
+            }
+        }
+        GBsetGuardNDSInfo(model, gnds_info);
+    }
+
+    // set the group implementation
+    sl_group_t* sl_group_all = RTmallocZero(sizeof(sl_group_t) + sl_size * sizeof(int));
+    sl_group_all->count = sl_size;
+    for(int i=0; i < sl_group_all->count; i++) sl_group_all->sl_idx[i] = i;
+    sl_group_t* sl_group_guards = RTmallocZero(sizeof(sl_group_t) + nguards * sizeof(int));
+    sl_group_guards->count = nguards;
+    for(int i=0; i < sl_group_guards->count; i++) sl_group_guards->sl_idx[i] = i;
+    GBsetStateLabelGroupInfo(model, GB_SL_ALL, sl_group_all);
+    GBsetStateLabelGroupInfo(model, GB_SL_GUARDS, sl_group_guards);
+    GBsetStateLabelsGroup(model, sl_group);
 
     GBsetStateLabelInfo(model, sl_info);
     if (sl_long != NULL) GBsetStateLabelLong(model, sl_long);

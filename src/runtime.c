@@ -130,9 +130,3 @@ RTdlsym (const char *libname, void *handle, const char *symbol)
     }
     return ret;
 }
-
-void *
-RTopt_dlsym(void *handle, const char *symbol)
-{
-    return dlsym (handle, symbol);
-}
