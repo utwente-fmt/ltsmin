@@ -22,7 +22,10 @@ bfs;;
   explore state space in breadth-first order (default).
 
 dfs;;
-  explore state space in depth-first order.
+  explore state space in relaxed depth-first order. Relaxed meaning that
+  the inclusion check on the set of visited states is executed immediately
+  after generating a state. This saves stack space and improves performance
+  of the parallel reachability analysis.
 
 ndfs;;
   multi-core swarmed Nested Depth-First Search (Courcoubetis et al.).
@@ -93,13 +96,13 @@ tree;;
         following options:
 
 srp;;
-  synchronous random polling (default).
+  synchronous random polling.
 
 static;;
   initial BFS run, with static hand-off to all threads.
 
 combined;;
-  not implemented. Experiments show that SRP overhead is minimal (<5%).
+  Starts with static balancing and moves to SRP when needed (default).
 
 none;;
   turn load balancer off. Default for swarmed algorithms, for which threads 
