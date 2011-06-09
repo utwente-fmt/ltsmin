@@ -52,11 +52,11 @@ AC_REQUIRE([ACX_MCRL2])dnl
 if test x"$acx_mcrl2" = xyes; then
     AC_LANG_PUSH([C++])
     AX_LET([CPPFLAGS], ["$MCRL2_CPPFLAGS $CPPFLAGS"],
-           [LIBS], ["-lmcrl2_data -lmcrl2_core -lmcrl2_aterm $LIBS"],
+           [LIBS], ["-lmcrl2_utilities_command_line -lmcrl2_process -lmcrl2_data -lmcrl2_core -lmcrl2_aterm $LIBS"],
            [LDFLAGS], ["$MCRL2_LDFLAGS $LDFLAGS"],
       [acx_mcrl2_libs=yes
        AX_CXX_CHECK_LIB([mcrl2_lps], [main], dnl XXX
-         [MCRL2_LIBS="-lmcrl2_lps -lmcrl2_data -lmcrl2_core -lmcrl2_aterm"
+         [MCRL2_LIBS="-lmcrl2_lps -lmcrl2_utilities_command_line -lmcrl2_process -lmcrl2_data -lmcrl2_core -lmcrl2_aterm"
           LIBS="-lmcrl2_lps $LIBS"],
          [acx_mcrl2_libs=no])
       ])
