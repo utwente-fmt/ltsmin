@@ -367,7 +367,6 @@ typedef struct counter_s {
     size_t              level_max;      // counter: (BFS) level / (DFS) max level
     size_t              load_max;       // max stack/queue load
     size_t              level_cur;      // counter: current (DFS) level
-    size_t              touched_red;    // visited-before accepting states
     stats_t            *stats;          // running state storage statistics
     size_t              threshold;      // report threshold
 } counter_t;
@@ -440,7 +439,6 @@ add_results (counter_t *res, counter_t *cnt)
     res->trans += cnt->trans;
     res->level_max += cnt->level_max;
     res->load_max += cnt->load_max;
-    res->touched_red += cnt->touched_red;
     if (NULL != res->stats && NULL != cnt->stats)
         add_stats(res->stats, cnt->stats);
 }
@@ -756,8 +754,6 @@ print_statistics(counter_t *reach, counter_t *red, mytimer_t timer)
         Warning (info, "avg red states/worker: %zu (%.2f%%), transitions: %zu ",
                  red->explored, ((double)red->explored/db_elts)*100, red->trans);
         Warning (info, "");
-        if (red->touched_red)
-            Warning (info, "WARNING: all_red: %zu", red->touched_red);
         Warning (info, "Total memory used for local state coloring: %.1fMB", mem3);
     } else {
         size_t              dev, state_dev = 0, trans_dev = 0;
@@ -1424,9 +1420,8 @@ nndfs_red (wctx_t *ctx)
             state_info_deserialize (&ctx->state, state_data, ctx->store);
             nndfs_color_t color = nn_get_color (&ctx->color_map, ctx->state.ref);
             if ( nn_color_eq(color, NNPINK)  ) {
-                if (start_level == dfs_stack_nframes (ctx->stack)) {
-                     break; ctx->red.touched_red++;
-                }
+                if (start_level == dfs_stack_nframes (ctx->stack))
+                     break;
                 dfs_stack_pop (ctx->stack);
             } else
                 nndfs_explore_state_red (ctx, &ctx->red);
@@ -1518,8 +1513,7 @@ mcndfs_blue (wctx_t *ctx, size_t work)
             state_info_deserialize (&ctx->state, state_data, ctx->store);
             if ( !bitvector_is_set(&ctx->not_all_red, ctx->counters.level_cur) ) {
                 nn_set_color (&ctx->color_map, ctx->state.ref, NNPINK);
-                if (global_try_color (ctx->state.ref, GRED))
-                    ctx->red.touched_red++;
+                global_try_color (ctx->state.ref, GRED);
                 bitvector_unset ( &ctx->not_all_red, ctx->counters.level_cur );
             } else if ( GBbuchiIsAccepting(ctx->model, ctx->state.data) ) {
                 mcndfs_red (ctx);
