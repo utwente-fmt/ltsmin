@@ -25,24 +25,31 @@
 
 #if defined(MCRL)
 #define SPEC_POPT_OPTIONS { NULL, 0, POPT_ARG_INCLUDE_TABLE, mcrl_options, 0, "mCRL options", NULL }
+#define SPEC_MT_SAFE 0
 #endif
 #if defined(MCRL2)
 #define SPEC_POPT_OPTIONS { NULL, 0, POPT_ARG_INCLUDE_TABLE, mcrl2_options, 0, "mCRL2 options", NULL }
+#define SPEC_MT_SAFE 0
 #endif
 #if defined(NIPS)
 #define SPEC_POPT_OPTIONS { NULL, 0, POPT_ARG_INCLUDE_TABLE, nips_options, 0, "NIPS options", NULL }
+#define SPEC_MT_SAFE 1
 #endif
 #if defined(ETF)
 #define SPEC_POPT_OPTIONS { NULL, 0, POPT_ARG_INCLUDE_TABLE, etf_options, 0, "ETF options", NULL }
+#define SPEC_MT_SAFE 1
 #endif
 #if defined(DIVINE)
 #define SPEC_POPT_OPTIONS { NULL, 0, POPT_ARG_INCLUDE_TABLE, dve_options, 0, "DiVinE options", NULL }
+#define SPEC_MT_SAFE 1
 #endif
 #if defined(DIVINE2)
 #define SPEC_POPT_OPTIONS { NULL, 0, POPT_ARG_INCLUDE_TABLE, dve2_options, 0, "DiVinE 2 options", NULL }
+#define SPEC_MT_SAFE 1
 #endif
 #if defined(SPINJA)
 #define SPEC_POPT_OPTIONS { NULL, 0, POPT_ARG_INCLUDE_TABLE, spinja_options, 0, "SPINJA options", NULL }
+#define SPEC_MT_SAFE 1
 #endif
 
 #endif
