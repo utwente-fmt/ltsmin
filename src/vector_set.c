@@ -20,7 +20,7 @@ extern vdom_t vdom_create_ddd(int n);
 extern struct poptOption listdd_options[];
 extern vdom_t vdom_create_list_native(int n);
 
-extern vset_implementation_t vset_default_domain = VSET_IMPL_AUTOSELECT;
+vset_implementation_t vset_default_domain = VSET_IMPL_AUTOSELECT;
 
 static void vset_popt(poptContext con,
  		enum poptCallbackReason reason,
