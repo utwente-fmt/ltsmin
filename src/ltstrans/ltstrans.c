@@ -12,6 +12,7 @@ static task_t task=Undefined;
 static int wr_seg=0;
 static int rd_seg;
 static int encode=0;
+static int bfs_reorder=0;
 
 static  struct poptOption options[] = {
     { "copy" , 0 , POPT_ARG_VAL , &task , LTScopy ,
@@ -24,9 +25,10 @@ static  struct poptOption options[] = {
       "set the number of segments for the output file" , "<N>" },
     { "encode" , 0 , POPT_ARG_VAL , &encode , 1 ,
       "encode any LTS as a single edge label LTS during a load/store copy" , NULL },
+    { "bfs" , 0 , POPT_ARG_VAL , &bfs_reorder , 1 ,
+      "renumber the states to conform to BFS order during a load/store copy" , NULL },
     POPT_TABLEEND
 };
-
 
 int main(int argc, char *argv[]){
     char* files[2];
@@ -83,6 +85,10 @@ int main(int argc, char *argv[]){
             if (encode) {
                 Print(infoShort,"single edge label encoding");
                 lts=lts_encode_edge(lts);
+            }
+            if (bfs_reorder) {
+                Print(infoShort,"reindexing LTS in BFS order");
+                lts_bfs_reorder(lts);
             }
             Print(infoShort,"storing in %s",files[1]);
             if(wr_seg==0) wr_seg=1;

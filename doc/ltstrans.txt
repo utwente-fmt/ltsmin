@@ -30,6 +30,10 @@ Set the number of segments for the output file.
 *--encode*::
 Encode any LTS as a single edge label LTS during a load/store copy.
 
+*--bfs*::
+Change the indexing of the LTS to match BFS exploration order during a load/store copy.
+Note that the current version cannot reorder the LTS if it has state vectors.
+
 include::inc/lts-io-options.txt[]
 
 include::inc/hre-options.txt[]
