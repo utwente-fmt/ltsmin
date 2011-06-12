@@ -11,15 +11,13 @@ dve2lts-gsea - Sequential state space generator for DIVINE models.
 
 == SYNOPSIS
 
-*{manname}* [OPTION]... 'input'[_.dve_|_.dveC_] ['output.fmt']
+*{manname}* [OPTION]... 'input'[_.dve_|_.dveC_]
 
 == DESCRIPTION
 
 {manname} generates a labelled transition system from a specification
 provided in 'input.dve/input.dveC' by enumerative reachability
-analysis using a general state expanding algorithm. 'output.fmt'
-specifies the name of the output archive.  The desired format is
-deduced from the filename extension.
+analysis using a general state expanding algorithm.
 
 == OPTIONS
 
