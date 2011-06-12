@@ -1633,8 +1633,8 @@ gsea_finished(void *arg) {
 int
 main (int argc, char *argv[])
 {
-    char *files[2];
-    RTinitPopt(&argc,&argv,options,1,2,files,NULL,"<model> [<lts>]",
+    char *files[1];
+    RTinitPopt(&argc,&argv,options,1,1,files,NULL,"<model>",
         "Perform an enumerative reachability analysis of <model>\n\n"
         "Options");
 
