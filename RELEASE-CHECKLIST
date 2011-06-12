@@ -28,3 +28,7 @@ Release Checklist
 * Upload website:
   cd staging-area &&
     rsync --delete -avuz . ewi1057:~fmt/public_html/tools/ltsmin/
+
+* Close all bugs marked as "resolved" in Redmine
+  (ensure that Redmine's view on the FMT repository is current, e.g.,
+  by visiting to "Repository" view.)
