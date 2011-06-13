@@ -1,45 +1,24 @@
-#define CAESAR_GRAPH_IMPLEMENTATION 1
 #include <config.h>
+#include <ctype.h>
 #include <stdarg.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <strings.h>
+
+#define CAESAR_GRAPH_IMPLEMENTATION 1
 #include <caesar_standard.h>
 #include <caesar_graph.h>
-#include <stdio.h>
 
-#include <stdint.h>
-#include <string.h>
-#include <stdlib.h>
-#include <strings.h>
-#include <ctype.h>
-
-
+#include <archive.h>
+#include <fast_hash.h>
 #include <lts_enum.h>
 #include <lts_io.h>
+#include <runtime.h>
+#include <spec-greybox.h>
 #include <stringindex.h>
-
-#include "archive.h"
-#include "runtime.h"
-#include "treedbs.h"
-
-#if defined(MCRL)
-#include "mcrl-greybox.h"
-#endif
-#if defined(MCRL2)
-#include "mcrl2-greybox.h"
-#endif
-#if defined(NIPS)
-#include "nips-greybox.h"
-#endif
-#if defined(ETF)
-#include "etf-greybox.h"
-#endif
-#if defined(DIVINE)
-#include "dve-greybox.h"
-#endif
-#if defined(DIVINE2)
-#include "dve2-greybox.h"
-#endif
-
-#include "fast_hash.h"
+#include <treedbs.h>
 
 static model_t model;
 static lts_type_t ltstype;
@@ -69,25 +48,8 @@ static void ltsminopen_popt(poptContext con,
 
 static  struct poptOption options[] = {
 	{ NULL, 0 , POPT_ARG_CALLBACK|POPT_CBFLAG_POST|POPT_CBFLAG_SKIPOPTION  , (void*)ltsminopen_popt , 0 , NULL , NULL },
-#if defined(MCRL)
-	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, mcrl_options , 0 , "mCRL options", NULL },
-#endif
-#if defined(MCRL2)
-	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, mcrl2_options , 0 , "mCRL2 options", NULL },
-#endif
-#if defined(NIPS)
-	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, nips_options , 0 , "NIPS options", NULL },
-#endif
-#if defined(ETF)
-	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, etf_options , 0 , "ETF options", NULL },
-#endif
-#if defined(DIVINE)
-	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, dve_options , 0 , "DiVinE options", NULL },
-#endif
-#if defined(DIVINE2)
-        { NULL, 0 , POPT_ARG_INCLUDE_TABLE, dve2_options , 0 , "DiVinE 2.2 options", NULL },
-#endif
-    { "edge-encode" , 0 , POPT_ARG_VAL, &edge_encode , 1 , "encode the state labels on edges" , NULL },
+	SPEC_POPT_OPTIONS,
+        { "edge-encode" , 0 , POPT_ARG_VAL, &edge_encode , 1 , "encode the state labels on edges" , NULL },
 /*
 	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, greybox_options , 0 , "Greybox options", NULL },
 	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, vset_setonly_options , 0 , "Vector set options", NULL },

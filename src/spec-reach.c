@@ -5,19 +5,18 @@
 #include <strings.h>
 
 #include <dm/dm.h>
+#include <dynamic-array.h>
 #include <greybox.h>
-#include <spec-greybox.h>
 #include <lts_enum.h>
 #include <lts_io.h>
+#include <ltsmin-grammar.h>
+#include <ltsmin-syntax.h>
+#include <ltsmin-tl.h>
 #include <runtime.h>
 #include <scctimer.h>
+#include <spec-greybox.h>
 #include <stringindex.h>
 #include <vector_set.h>
-#include <dynamic-array.h>
-
-#include <ltsmin-syntax.h>
-#include <ltsmin-grammar.h>
-#include <ltsmin-tl.h>
 
 #define diagnostic(...) {\
     if (RTverbosity >= 2)\

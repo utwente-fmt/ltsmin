@@ -1,57 +1,36 @@
-#include "config.h"
+#include <config.h>
 #include <assert.h>
-#include <stdlib.h>
-#include <stdint.h>
-#include <string.h>
 #include <ctype.h>
-#include <time.h>
+#include <limits.h>
 #include <lts_enum.h>
 #include <lts_io.h>
 #include <pthread.h>
-#include <sys/types.h>
-#include <limits.h>
 #include <sched.h>
 #include <signal.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/types.h>
+#include <time.h>
 
-#include <runtime.h>
 #include <archive.h>
-#include <treedbs.h>
-#include <treedbs-ll.h>
+#include <cctables.h>
 #include <dbs-ll.h>
 #include <dbs.h>
-#include <vector_set.h>
 #include <dfs-stack.h>
-#include <is-balloc.h>
-#include <scctimer.h>
-#include <stream.h>
-#include <cctables.h>
-#include <zobrist.h>
 #include <fast_hash.h>
-#include <stringindex.h>
+#include <is-balloc.h>
 #include <lb.h>
+#include <runtime.h>
+#include <scctimer.h>
+#include <spec-greybox.h>
+#include <stream.h>
+#include <stringindex.h>
 #include <trace.h>
-
-#if defined(MCRL)
-#include "mcrl-greybox.h"
-#endif
-#if defined(MCRL2)
-#include "mcrl2-greybox.h"
-#endif
-#if defined(NIPS)
-#include "nips-greybox.h"
-#endif
-#if defined(ETF)
-#include "etf-greybox.h"
-#endif
-#if defined(DIVINE)
-#include "dve-greybox.h"
-#endif
-#if defined(DIVINE2)
-#include "dve2-greybox.h"
-#endif
-#if defined(SPINJA)
-#include "spinja-greybox.h"
-#endif
+#include <treedbs-ll.h>
+#include <treedbs.h>
+#include <vector_set.h>
+#include <zobrist.h>
 
 static const int    THREAD_STACK_SIZE = 400 * 4096; //pthread_attr_setstacksize
 
@@ -156,27 +135,7 @@ static struct poptOption options[] = {
     {"max", 0, POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &max, 0, "maximum search depth", "<int>"},
     {"deadlock", 'd', POPT_ARG_VAL, &dlk_detect, 1, "detect deadlocks", NULL },
     {"trace", 0, POPT_ARG_STRING, &trc_output, 0, "file to write trace to", "<lts output>" },
-#if defined(MCRL)
-    {NULL, 0, POPT_ARG_INCLUDE_TABLE, mcrl_options, 0, "mCRL options", NULL},
-#endif
-#if defined(MCRL2)
-    {NULL, 0, POPT_ARG_INCLUDE_TABLE, mcrl2_options, 0, "mCRL2 options", NULL},
-#endif
-#if defined(NIPS)
-    {NULL, 0, POPT_ARG_INCLUDE_TABLE, nips_options, 0, "NIPS options", NULL},
-#endif
-#if defined(ETF)
-    {NULL, 0, POPT_ARG_INCLUDE_TABLE, etf_options, 0, "ETF options", NULL},
-#endif
-#if defined(DIVINE)
-    {NULL, 0, POPT_ARG_INCLUDE_TABLE, dve_options, 0, "DiVinE options", NULL},
-#endif
-#if defined(DIVINE2)
-    {NULL, 0, POPT_ARG_INCLUDE_TABLE, dve2_options, 0, "DiVinE 2.2 options", NULL},
-#endif
-#if defined(SPINJA)
-    {NULL, 0, POPT_ARG_INCLUDE_TABLE, spinja_options, 0, "SPINJA options", NULL},
-#endif
+    SPEC_POPT_OPTIONS,
     {NULL, 0, POPT_ARG_INCLUDE_TABLE, greybox_options, 0, "Greybox options", NULL},
     {NULL, 0, POPT_ARG_INCLUDE_TABLE, lts_io_options, 0, NULL, NULL},
     POPT_TABLEEND

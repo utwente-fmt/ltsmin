@@ -1,24 +1,25 @@
 #include <config.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <strings.h>
 #include <unistd.h>
-#include <stdio.h>
-#include <mpi.h>
-#include <stdlib.h>
-#include <task-queue.h>
 
+#include <mpi.h>
+
+#include <archive.h>
+#include <dynamic-array.h>
+#include <fast_hash.h>
 #include <lts_enum.h>
 #include <lts_io.h>
-
-#include "fast_hash.h"
-#include "treedbs.h"
-#include "stream.h"
+#include <mpi-event-loop.h>
 #include <mpi-runtime.h>
-#include "archive.h"
-#include "mpi_io_stream.h"
-#include "stringindex.h"
-#include "dynamic-array.h"
-#include "mpi-event-loop.h"
+#include <mpi_io_stream.h>
+#include <spec-greybox.h>
+#include <stream.h>
+#include <stringindex.h>
+#include <task-queue.h>
+#include <treedbs.h>
 
 static lts_enum_cb_t output_handle=NULL;
 static lts_output_t output=NULL;
@@ -170,49 +171,13 @@ static treedbs_t dbs;
 static event_queue_t mpi_queue;
 static event_barrier_t barrier;
 
-#if defined(MCRL)
-#include "mcrl-greybox.h"
-#endif
-#if defined(MCRL2)
-#include "mcrl2-greybox.h"
-#endif
-#if defined(NIPS)
-#include "nips-greybox.h"
-#endif
-#if defined(ETF)
-#include "etf-greybox.h"
-#endif
-#if defined(DIVINE)
-#include "dve-greybox.h"
-#endif
-#if defined(DIVINE2)
-#include "dve2-greybox.h"
-#endif
-
 static int write_state=0;
 
 static  struct poptOption options[] = {
 	{ "nice" , 0 , POPT_ARG_INT , &nice_value , 0 , "set the nice level of all workers"
 		" (useful when running on other peoples workstations)" , NULL},
 	{ "write-state" , 0 , POPT_ARG_VAL , &write_state, 1 , "write the full state vector" , NULL },
-#if defined(MCRL)
-	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, mcrl_options , 0 , "mCRL options", NULL},
-#endif
-#if defined(MCRL2)
-	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, mcrl2_options , 0 , "mCRL2 options", NULL},
-#endif
-#if defined(NIPS)
-	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, nips_options , 0 , "NIPS options", NULL},
-#endif
-#if defined(ETF)
-	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, etf_options , 0 , "ETF options", NULL},
-#endif
-#if defined(DIVINE)
-	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, dve_options , 0 , "DiVinE options", NULL },
-#endif
-#if defined(DIVINE2)
-        { NULL, 0 , POPT_ARG_INCLUDE_TABLE, dve2_options , 0 , "DiVinE 2.2 options", NULL },
-#endif
+        SPEC_POPT_OPTIONS,
 	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, greybox_options , 0 , "Greybox options", NULL },
 	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, lts_io_options , 0 , NULL, NULL},
 	POPT_TABLEEND
