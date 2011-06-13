@@ -1,0 +1,28 @@
+//                           -*- mode: doc; outline-regexp: "==\(=*\) ." -*-
+spinja2lts-mc(1)
+================
+:Author:  Alfons Laarman
+:Email:   <a.w.laarman@ewi.utwente.nl>
+:Date:    2011-06-13
+
+== NAME
+
+spinja2lts-mc - Concurrent state space generator for SpinJa models.
+
+== SYNOPSIS
+
+*{manname}* [OPTION]... 'input.spinja' ['output']
+
+== DESCRIPTION
+
+{manname} generates a labelled transition system from a compiled
+specification provided in 'input.spinja'.  It does this concurrently
+for any given number of threads.
+
+include::inc/spinja.txt[]
+
+== OPTIONS
+
+include::inc/spec2lts-mc-options.txt[]
+
+include::inc/spec2lts-mc.txt[]

@@ -1,9 +1,16 @@
 ACLOCAL_AMFLAGS = -I m4
 
 SUBDIRS = @subdirs@ lemon src doc
-EXTRA_DIST = ltsminreconf Doxyfile contrib/bash-completion/ltsmin CODING-STANDARDS
+EXTRA_DIST  = ltsminreconf
+EXTRA_DIST += Doxyfile
+EXTRA_DIST += contrib/bash-completion/ltsmin
+EXTRA_DIST += CODING-STANDARDS
 
 doc_DATA = AUTHORS COPYING README CODING-STANDARDS
+
+dist_pkgdata_DATA = spinja/spinja.jar
+
+MAINTAINERCLEANFILES = spinja/spinja.jar
 
 if DX_COND_doc
 mostlyclean-local: doxygen-clean
@@ -20,3 +27,6 @@ distcheck-hook:
 
 libtool: $(LIBTOOL_DEPS)
 	$(SHELL) ./config.status --recheck
+
+spinja/spinja.jar:
+	test -f $@ || (cd "${top_srcdir}/spinja/src" && $(ANT))

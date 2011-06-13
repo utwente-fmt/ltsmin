@@ -1,0 +1,30 @@
+//                           -*- mode: doc; outline-regexp: "==\(=*\) ." -*-
+spinja2lts-grey(1)
+==================
+:Author:  Stefan Blom
+:Email:   <sccblom@cs.utwente.nl>
+:Date:    2009-03-16
+
+== NAME
+
+spinja2lts-grey - Sequential state space generator for SpinJa models.
+
+== SYNOPSIS
+
+*{manname}* [OPTION]... 'input.spinja' ['output.fmt']
+
+== DESCRIPTION
+
+{manname} generates a labelled transition system from a specification
+provided in 'input.spinja' by enumerative reachability analysis.
+Specifications are compiled with SpinJa from PROMELA input models.
+'output.fmt' specifies the name of the output archive.  The desired
+format is deduced from the filename extension.
+
+include::inc/spinja.txt[]
+
+== OPTIONS
+
+include::inc/spec2lts-grey-options.txt[]
+
+include::inc/spec2lts-grey.txt[]

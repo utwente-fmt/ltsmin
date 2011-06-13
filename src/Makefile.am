@@ -87,6 +87,10 @@ pkglib_LTLIBRARIES += libdve2-open.la
 endif
 endif
 
+#if HAVE_SPINJA
+bin_PROGRAMS += spinja2lts-grey spinja-reach spinja2lts-mc
+#endif
+
 libmcrl2_pins_la_SOURCES  = mcrl2-greybox.cpp mcrl2-greybox.h
 libmcrl2_pins_la_SOURCES += at-map.c at-map.h
 libmcrl2_pins_la_CPPFLAGS = $(MCRL2_CPPFLAGS) $(AM_CPPFLAGS)
@@ -122,6 +126,13 @@ endif
 ltsmin_parse_SOURCES = ltsmin-parse.c
 ltsmin_parse_CPPFLAGS = -DNXT -I${top_srcdir}/ltl2ba
 ltsmin_parse_LDADD = libltsmin.la
+
+# spinja2lts-grey
+spinja2lts_grey_SOURCES  = spec2lts-grey.c spinja-greybox.c spinja-greybox.h
+spinja2lts_grey_LDADD    = $(VSET_LIBS) libltsmin.la $(SPINJA_LIBS)
+spinja2lts_grey_CPPFLAGS = -DSPINJA $(SPINJA_CPPFLAGS) $(AM_CPPFLAGS)
+spinja2lts_grey_LDFLAGS  = $(SPINJA_LDFLAGS) $(AM_LDFLAGS)
+
 
 # dve22lts-grey
 dve22lts_grey_SOURCES  = spec2lts-grey.c dve2-greybox.c dve2-greybox.h
@@ -159,6 +170,12 @@ nips2lts_grey_SOURCES  = spec2lts-grey.c nips-greybox.c nips-greybox.h
 nips2lts_grey_LDADD    = $(VSET_LIBS) libltsmin.la $(NIPS_LIBS)
 nips2lts_grey_CPPFLAGS = -DNIPS $(NIPS_CPPFLAGS) $(AM_CPPFLAGS)
 nips2lts_grey_LDFLAGS  = $(NIPS_LDFLAGS) $(AM_LDFLAGS)
+
+# spinja-reach
+spinja_reach_SOURCES  = spec-reach.c spinja-greybox.c spinja-greybox.h
+spinja_reach_LDADD    = $(VSET_LIBS) libltsmin.la $(SPINJA_LIBS)
+spinja_reach_CPPFLAGS = -DSPINJA $(SPINJA_CPPFLAGS) $(AM_CPPFLAGS)
+spinja_reach_LDFLAGS  = $(SPINJA_LDFLAGS) $(AM_LDFLAGS)
 
 # dve2-reach
 dve2_reach_SOURCES  = spec-reach.c dve2-greybox.c dve2-greybox.h
@@ -256,6 +273,12 @@ dve22lts_mc_SOURCES  = spec2lts-mc.c dve2-greybox.c dve2-greybox.h
 dve22lts_mc_LDADD    = libltsmin.la $(DVEC2_LIBS)
 dve22lts_mc_CPPFLAGS = -DDIVINE2 $(DIVINE2_CPPFLAGS) $(AM_CPPFLAGS)
 dve22lts_mc_LDFLAGS  = $(DIVINE2_LDFLAGS) $(AM_LDFLAGS)
+
+# spinja2lts-mc
+spinja2lts_mc_SOURCES  = spec2lts-mc.c spinja-greybox.c spinja-greybox.h
+spinja2lts_mc_LDADD    = libltsmin.la $(SPINJA_LIBS)
+spinja2lts_mc_CPPFLAGS = -DSPINJA $(SPINJA_CPPFLAGS) $(AM_CPPFLAGS)
+spinja2lts_mc_LDFLAGS  = $(SPINJA_LDFLAGS) $(AM_LDFLAGS)
 
 # etf2lts-mc
 etf2lts_mc_SOURCES  = spec2lts-mc.c etf-greybox.c etf-greybox.h
