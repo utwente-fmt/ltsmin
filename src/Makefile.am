@@ -120,6 +120,7 @@ endif
 
 # ltsmin-parse
 ltsmin_parse_SOURCES = ltsmin-parse.c
+ltsmin_parse_CPPFLAGS = -DNXT -I${top_srcdir}/ltl2ba
 ltsmin_parse_LDADD = libltsmin.la
 
 # dve22lts-grey
@@ -395,13 +396,20 @@ libutil_la_SOURCES := unix.c runtime.c stream.c archive.c			\
                     lb.c lb.h \
                     balloc.c balloc.h bitset.c bitset.h
 
+libutil_la_LIBADD = ltsmin-grammar.lo dm/libdm.la
+
+libutil_la_CPPFLAGS = $(BUDDY_CPPFLAGS)
 if HAVE_LIBBCG
 libutil_la_SOURCES  += bcg_io_ops.c
+libutil_la_CPPFLAGS += $(CADP_CPPFLAGS)
 endif
 
-libutil_la_CPPFLAGS = $(BUDDY_CPPFLAGS) $(CADP_CPPFLAGS)
-libutil_la_LDFLAGS  = $(BUDDY_LDFLAGS) $(CADP_LDFLAGS)
-libutil_la_LIBADD   = ltsmin-grammar.lo dm/libdm.la $(BUDDY_LIBS) $(CADP_LIBS)
+libutil_la_SOURCES += ltl2ba-lex.c
+libutil_la_SOURCES += ltsmin-buchi.h
+libutil_la_CPPFLAGS += -DNXT -I${top_srcdir}/ltl2ba
+libutil_la_LIBADD += $(top_builddir)/ltl2ba/libltl2ba.la
+
+libutil_la_SOURCES += pins-ltl.c
 
 libutil_la_CPPFLAGS += $(AM_CPPFLAGS)
 

@@ -1,7 +1,7 @@
 #include <config.h>
 #include <ltsmin-tl.h>
 #include <runtime.h>
-#include "dynamic-array.h"
+#include <dynamic-array.h>
 #include <ltsmin-grammar.h>
 #include <ltsmin-parse-env.h>
 #include <ltsmin-lexer.h>
@@ -42,11 +42,11 @@
  *     binary priority 1          : ==, !=, etc
  *     prefix priority 2          : !
  *     prefix priority 3          : G,F,X
- *     binary priority 3          : &
- *     binary priority 4          : |
- *     binary priority 5          : <->
+ *     binary priority 4          : &
+ *     binary priority 5          : |
  *     binary priority 6          : <->
- *     binary priority 7          : U,R
+ *     binary priority 7          : <->
+ *     binary priority 8          : U,R
  * LOW
  */
 ltsmin_expr_t ltl_parse_file(lts_type_t ltstype,const char *file){
@@ -81,15 +81,15 @@ ltsmin_expr_t ltl_parse_file(lts_type_t ltstype,const char *file){
     LTSminPrefixOperator(env, LTL_FUTURE,       "<>", 3);
     LTSminPrefixOperator(env, LTL_NEXT,         "X",  3);
 
-    LTSminBinaryOperator(env, LTL_AND,          "&",  3);
-    LTSminBinaryOperator(env, LTL_OR,           "|",  4);
+    LTSminBinaryOperator(env, LTL_AND,          "&",  4);
+    LTSminBinaryOperator(env, LTL_OR,           "|",  5);
 
-    LTSminBinaryOperator(env, LTL_EQUIV,        "<->",5);
-    LTSminBinaryOperator(env, LTL_IMPLY,        "->", 6);
+    LTSminBinaryOperator(env, LTL_EQUIV,        "<->",6);
+    LTSminBinaryOperator(env, LTL_IMPLY,        "->", 7);
 
-    LTSminBinaryOperator(env, LTL_UNTIL,        "U",  7);
-    LTSminBinaryOperator(env, LTL_WEAK_UNTIL,   "W",  7);
-    LTSminBinaryOperator(env, LTL_RELEASE,      "R",  7);
+    LTSminBinaryOperator(env, LTL_UNTIL,        "U",  8);
+    //LTSminBinaryOperator(env, LTL_WEAK_UNTIL,   "W",  8); // not supported by ltl2ba
+    LTSminBinaryOperator(env, LTL_RELEASE,      "R",  8);
 
     ltsmin_parse_stream(TOKEN_EXPR,env,stream_input(in));
     ltsmin_expr_t expr=env->expr;
@@ -152,13 +152,13 @@ ltsmin_expr_t ctl_parse_file(lts_type_t ltstype,const char *file){
     LTSminPrefixOperator(env, CTL_FUTURE,       "<>", 3);
     LTSminPrefixOperator(env, CTL_NEXT,         "X",  3);
 
-    LTSminBinaryOperator(env, CTL_AND,          "&",  3);
-    LTSminBinaryOperator(env, CTL_OR,           "|",  4);
+    LTSminBinaryOperator(env, CTL_AND,          "&",  4);
+    LTSminBinaryOperator(env, CTL_OR,           "|",  5);
 
-    LTSminBinaryOperator(env, CTL_EQUIV,        "<->",5);
-    LTSminBinaryOperator(env, CTL_IMPLY,        "->", 6);
+    LTSminBinaryOperator(env, CTL_EQUIV,        "<->",6);
+    LTSminBinaryOperator(env, CTL_IMPLY,        "->", 7);
 
-    LTSminBinaryOperator(env, CTL_UNTIL,        "U",  7);
+    LTSminBinaryOperator(env, CTL_UNTIL,        "U",  8);
 
     ltsmin_parse_stream(TOKEN_EXPR,env,stream_input(in));
     ltsmin_expr_t expr=env->expr;
@@ -173,6 +173,9 @@ ltsmin_expr_t ctl_parse_file(lts_type_t ltstype,const char *file){
  * For the concrete syntax, we shall assume that modal operators have higher
  * precedence than boolean, and that fixpoint operators have lowest precedence,
  * so that the scope of a fixpoint extends as far to the right as possible.
+ *
+ * note: when checking priorities, use ltsmin-grammer.lemon
+ * for priorities, notice that prefix 1 has a higher priority than bin 1
  */
 ltsmin_expr_t mu_parse_file(lts_type_t ltstype,const char *file){
     FILE *in=fopen( file, "r" );
@@ -439,6 +442,55 @@ void* tableaux_table_lookup(tableaux_table_t *t, uint32_t hash, void* data)
         // linear probing
         key = (key+1) % t->size;
     }
+}
+
+/* for debuggin only */
+char* ltsmin_expr_print_ltl(ltsmin_expr_t ltl, char* buf)
+{
+    // no equation
+    if (!ltl) return buf;
+
+    // left eq
+    switch(ltl->node_type) {
+        case BINARY_OP:
+            *buf++='(';
+            buf = ltsmin_expr_print_ltl(ltl->arg1, buf);
+        default:;
+    }
+    // middle
+    switch(ltl->token) {
+        case LTL_SVAR: sprintf(buf, "@S%d", ltl->idx); break;
+        case LTL_EVAR: sprintf(buf, "@E%d", ltl->idx); break;
+        case LTL_NUM: sprintf(buf, "%d", ltl->idx); break;
+        case LTL_VAR: sprintf(buf, "@V%d", ltl->idx); break;
+        case LTL_EQ: sprintf(buf, " == "); break;
+        case LTL_TRUE: sprintf(buf, "true"); break;
+        case LTL_OR: sprintf(buf, " or "); break;
+        case LTL_NOT: sprintf(buf, "!"); break;
+        case LTL_NEXT: sprintf(buf, "X "); break;
+        case LTL_UNTIL: sprintf(buf, " U "); break;
+        case LTL_FALSE: sprintf(buf, "false"); break;
+        case LTL_AND: sprintf(buf, " and "); break;
+        case LTL_EQUIV: sprintf(buf, " <-> "); break;
+        case LTL_IMPLY: sprintf(buf, " -> "); break;
+        case LTL_FUTURE: sprintf(buf, "F "); break;
+        case LTL_GLOBALLY: sprintf(buf, "G "); break;
+        default:
+            Fatal(1, error, "unknown LTL token");
+    }
+    buf += strlen(buf);
+    // right eq
+    switch(ltl->node_type) {
+        case UNARY_OP:
+            buf = ltsmin_expr_print_ltl(ltl->arg1, buf);
+            break;
+        case BINARY_OP:
+            buf = ltsmin_expr_print_ltl(ltl->arg2, buf);
+            *buf++=')';
+            break;
+        default:;
+    }
+    return buf;
 }
 
 /* print ctl/ctl* expression in a buffer

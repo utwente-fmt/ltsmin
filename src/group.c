@@ -378,8 +378,7 @@ GBregroup (model_t model, const char *regroup_spec)
     // permute initial state
     {
         int                 len = ctx->len;
-        int                 s0[len],
-            news0[len];
+        int                 s0[len], news0[len];
         GBgetInitialState (model, s0);
         for (int i = 0; i < len; i++)
             news0[i] = s0[ctx->statemap[i]];

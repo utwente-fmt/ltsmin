@@ -6,7 +6,7 @@
 */
 
 #include <popt.h>
-#include "greybox.h"
+#include <greybox.h>
 
 extern struct poptOption dve2_options[];
 

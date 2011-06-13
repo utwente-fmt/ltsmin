@@ -18,6 +18,7 @@
 // dve2 ltsmin interface functions
 void        (*get_initial_state)(char *to);
 int         (*have_property)(); // bool not defined, todo
+int         (*buchi_is_accepting)(void* m, int* in);
 int         (*get_successor)( void* m, int t, int *in, TransitionCB, void *arg );
 int         (*get_successors)( void* m, int *in, TransitionCB, void *arg );
 
@@ -31,6 +32,10 @@ const char* (*get_state_variable_type_value)(int type, int value);
 int         (*get_transition_count)();
 const int*  (*get_transition_read_dependencies)(int t);
 const int*  (*get_transition_write_dependencies)(int t);
+
+enum {
+    SL_IDX_BUCHI_ACCEPT = 0,
+};
 
 static void
 dve_popt(poptContext con,
@@ -68,6 +73,28 @@ typedef struct grey_box_context {
 
 static void* dlHandle = NULL;
 static char templatename[PATH_MAX];
+
+/* XXX missing sl_short, need way to check acceptance based only on
+   Buchi state */
+
+static int
+sl_long (model_t model, int label, int *state)
+{
+    switch (label) {
+    case SL_IDX_BUCHI_ACCEPT:
+        return buchi_is_accepting(model, state);
+    default:
+        Abort("unexpected state label requested: %d", label);
+    }
+}
+
+static void
+sl_all (model_t model, int *state, int *labels)
+{
+    assert (labels != NULL);
+    labels[SL_IDX_BUCHI_ACCEPT] = buchi_is_accepting(model, state);
+}
+
 
 void
 DVEexit()
@@ -207,7 +234,8 @@ DVE2loadDynamicLib(model_t model, const char *filename)
 
     // check system_with_property
     if (have_property()) {
-        Fatal(1,error,"DVE models with properties are currently not supported!");
+        buchi_is_accepting = (int(*)(void*,int*))
+        RTdlsym( filename, dlHandle, "buchi_is_accepting" );
     }
 }
 
@@ -245,6 +273,7 @@ DVE2loadGreyboxModel(model_t model, const char *filename)
             Fatal(1,error,"wrong type number");
         }
     }
+    int bool_is_new, bool_type = lts_type_add_type (ltstype, "bool", &bool_is_new);
 
     lts_type_set_state_length(ltstype, state_length);
 
@@ -256,41 +285,66 @@ DVE2loadGreyboxModel(model_t model, const char *filename)
         lts_type_set_state_name(ltstype,i,name);
         lts_type_set_state_typeno(ltstype,i,type);
     }
+    if (have_property()) {
+        lts_type_set_state_label_count (ltstype, 1);
+        lts_type_set_state_label_name (ltstype, SL_IDX_BUCHI_ACCEPT,
+                                       "buchi_accept_dve2");
+        lts_type_set_state_label_typeno (ltstype, SL_IDX_BUCHI_ACCEPT, bool_type);
+        GBsetAcceptingStateLabelIndex (model,SL_IDX_BUCHI_ACCEPT);
+    }
 
     GBsetLTStype(model, ltstype);
 
     // setting values for types
     for(int i=0; i < ntypes; i++) {
         int type_value_count = get_state_variable_type_value_count(i);
-        if (type_value_count > 0) {
-            for(int j=0; j < type_value_count; ++j) {
-                const char* type_value = get_state_variable_type_value(i, j);
-                GBchunkPut(model, i, chunk_str((char*)type_value));
-            }
+        for(int j=0; j < type_value_count; ++j) {
+            const char* type_value = get_state_variable_type_value(i, j);
+            GBchunkPut(model, i, chunk_str((char*)type_value));
         }
     }
+
+    if (bool_is_new) {
+        int idx_false = GBchunkPut(model, bool_type, chunk_str("false"));
+        int idx_true  = GBchunkPut(model, bool_type, chunk_str("true"));
+        assert (idx_false == 0);
+        assert (idx_true == 1);
+        (void)idx_false; (void)idx_true;
+    }
+
+    if (have_property()) {
+        dm_create(sl_info, 1, state_length);
+        for (int i=0; i<state_length; ++i) {
+            if (strcmp ("LTL_property", lts_type_get_state_name(ltstype, i)) == 0) {
+                dm_set(sl_info, SL_IDX_BUCHI_ACCEPT, i);
+            }
+        }
+        GBsetStateLabelLong(model, sl_long);
+        GBsetStateLabelsAll(model, sl_all);
+    } else {
+        // there are no state labels
+        dm_create(sl_info, 0, state_length);
+    }
+    GBsetStateLabelInfo(model, sl_info);
+
     lts_type_validate(ltstype);
 
     int ngroups = get_transition_count();
-	dm_create(dm_info, ngroups, state_length);
+    dm_create(dm_info, ngroups, state_length);
     for(int i=0; i < dm_nrows(dm_info); i++) {
-        int* proj = (int*)get_transition_read_dependencies(i);
-		for(int j=0; j<state_length; j++) {
+        const int *proj = get_transition_read_dependencies(i);
+        for(int j=0; j<state_length; j++) {
             if (proj[j]) dm_set(dm_info, i, j);
         }
-        proj = (int*)get_transition_write_dependencies(i);
-		for(int j=0; j<state_length; j++) {
+        proj = get_transition_write_dependencies(i);
+        for(int j=0; j<state_length; j++) {
             if (proj[j]) dm_set(dm_info, i, j);
         }
     }
     GBsetDMInfo(model, dm_info);
 
-    // there are no state labels
-    dm_create(sl_info, 0, state_length);
-    GBsetStateLabelInfo(model, sl_info);
-
     // get initial state
-	int state[state_length];
+    int state[state_length];
     get_initial_state((char*)state);
     GBsetInitialState(model,state);
 

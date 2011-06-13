@@ -8,6 +8,16 @@ bfs;;
 dfs;;
   explore state space in depth-first order.
 
+ndfs;;
+  perform LTL model checking based on Buchi automata with Nested-DFS
+  algorithm.  This requires an accepting state label to be present.
+  See below.
+
+scc;;
+  perform LTL model checking based on Buchi automata with Couvreur's
+  algorithm (accepting cycle detection).  This requires an accepting
+  state label to be present.  See below.
+
 *--state*='TYPE'::
         Select type of data structure for storing visited states.
         'TYPE' can be one of the following options:

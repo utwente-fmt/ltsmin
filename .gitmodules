@@ -4,3 +4,6 @@
 [submodule "buddy"]
 	path = buddy
 	url = http://fmt.cs.utwente.nl/tools/scm/buddy.git
+[submodule "ltl2ba"]
+	path = ltl2ba
+	url = http://fmt.cs.utwente.nl/tools/scm/ltl2ba.git

@@ -33,6 +33,13 @@ typedef struct transition_info {
 static const transition_info_t GB_NO_TRANSITION = {NULL, GB_UNKNOWN_GROUP};
 
 /**
+\brief Enum to describe the type of property already in the model provided by the frondend
+ */
+typedef enum { PROPERTY_NONE, PROPERTY_LTL_SPIN, PROPERTY_LTL_TEXTBOOK, PROPERTY_CTL, PROPERTY_CTL_STAR, PROPERTY_MU } property_enum_t;
+typedef property_enum_t (*fn_has_property_t)();
+typedef int (*fn_buchi_is_accepting_t)(model_t model, int*src);
+
+/**
 \brief Options for greybox management module.
  */
 extern struct poptOption greybox_options[];
@@ -146,6 +153,21 @@ extern void GBgetStateLabelsAll(model_t model,int*state,int*labels);
 extern int GBgetStateAll(model_t model,int*state,int*labels,TransitionCB cb,void*context);
 /**<
 \brief Get the state labels and all transitions in one call.
+*/
+
+extern int GBgetAcceptingStateLabelIndex(model_t model);
+/**<
+\brief Get index of accepting state label
+*/
+
+extern int GBsetAcceptingStateLabelIndex(model_t model, int index);
+/**<
+\brief Set index of accepting state label
+*/
+
+extern int GBbuchiIsAccepting(model_t model, int* src);
+/**<
+\brief Return accepting/not-accepting for a given state
 */
 
 //@}
@@ -263,7 +285,6 @@ extern void GBsetStateLabelLong(model_t model,get_label_method_t method);
 \brief Set the method that retrieves labels given short vectors.
 */
 extern void GBsetStateLabelShort(model_t model,get_label_method_t method);
-
 //@}
 
 /**
@@ -299,6 +320,13 @@ extern void GBsetChunkMethods(model_t model,newmap_t newmap,void*newmap_context,
 \brief Copy map factory methods, lookup methods AND chunk maps.
 */
 extern void GBcopyChunkMaps(model_t dst, model_t src);
+
+/**
+\brief Adds extra chunk maps besides the existing ones
+
+Used in the pins ltl layer to when the lts type is appended with the buchi automaton type
+*/
+extern void GBgrowChunkMaps(model_t model, int old_n);
 
 /**
 \brief Initializes unset model parameters from default_src.
@@ -349,8 +377,20 @@ extern void* GBgetChunkMap(model_t model,int type_no);
 */
 extern model_t GBaddCache(model_t model);
 
+/**
+\brief The behaviour of the ltl buchi product
 
-//@}
+PINS_LTL_TEXTBOOK adds an initial state to the model and labels
+the incoming edges with the properties of in the buchi automaton
+PINS_LTL_SPIN labels the outgoing edges with the properties of
+the buchi automaton
+*/
+typedef enum {PINS_LTL_TEXTBOOK, PINS_LTL_SPIN} pins_ltl_type_t;
+
+/**
+\brief Add LTL layer on top all other pins layers
+*/
+extern model_t GBaddLTL(model_t model, const char *ltl_file, pins_ltl_type_t type);
 
 //@{
 
