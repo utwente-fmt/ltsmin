@@ -1,0 +1,24 @@
+== SPINJA
+
+Use SpinJa (distributed with LTSmin) to compile PROMELA model
+'leader.pm' to 'leader.spinja':
+
+----
+java -cp /usr/share/ltsmin-1.7/spinja.jar Compile -o3 -l leader.pm
+gcc -g -O2 -fPIC -shared leader.spinja.c -o leader.spinja
+
+----
+
+Note that options +-o3+ and +-l+ are currently mandatory.
+
+On the resulting compiled SpinJa module, all SpinJa-related LTSmin
+tools can be used:
+
+----
+spinja-reach -rgs --order=chain leader.spinja leader.etf
+spinja2lts-mc --threads=16 leader.spinja
+spinja2lts-gsea leader.spinja
+...
+----
+
+See the man pages of the respective tools for further options.
