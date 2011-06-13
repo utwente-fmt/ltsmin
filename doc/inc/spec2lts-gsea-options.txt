@@ -1,0 +1,42 @@
+*--strategy*='TYPE'::
+        Select exploration strategy.  'TYPE' can be one of the
+        following options:
+
+bfs;;
+  explore state space in breadth-first order (default).
+
+dfs;;
+  explore state space in depth-first order.
+
+scc;;
+  perform LTL model checking based on Buchi automata with Couvreur's
+  algorithm (accepting cycle detection).  This requires an accepting
+  state label to be present.  See below.
+
+*--state*='TYPE'::
+        Select type of data structure for storing visited states.
+        'TYPE' can be one of the following options:
+
+tree;;
+  use a tree-compressed hash table (default).
+
+table;;
+  use a hash table.
+ 
+vset;;
+  use a vector set (decision diagram).
+
+*--max*='LEVEL'::
+    Search until level 'LEVEL'
+
+*--dot*='DOTFILE'::
+
+    Export the generated state space in Dot format, suitable for
+    processing with GraphViz tools (e.g., manpage:dot[1]).
++
+'DOTFILE' designates the filename to output the Dot specification to.
++
+WARNING: Using Dot export on state spaces larger thousand
+         states will likely overwhelm the manpage:dot[1] tool.
+
+include::reachability-options.txt[]

@@ -81,7 +81,7 @@ endif
 
 if HAVE_DVEC2
 bin_PROGRAMS += dve22lts-grey dve2-reach \
-  dve22lts-mc
+  dve22lts-mc dve22lts-gsea
 if HAVE_CADP
 pkglib_LTLIBRARIES += libdve2-open.la
 endif
@@ -139,6 +139,13 @@ dve22lts_grey_SOURCES  = spec2lts-grey.c dve2-greybox.c dve2-greybox.h
 dve22lts_grey_LDADD    = $(VSET_LIBS) libltsmin.la $(DVEC2_LIBS)
 dve22lts_grey_CPPFLAGS = -DDIVINE2 $(DIVINE2_CPPFLAGS) $(AM_CPPFLAGS)
 dve22lts_grey_LDFLAGS  = $(DIVINE2_LDFLAGS) $(AM_LDFLAGS)
+
+# dve22lts-gsea
+dve22lts_gsea_SOURCES  = spec2lts-gsea.c dve2-greybox.c dve2-greybox.h    \
+                         lts.c lts.h vset_atermdd.c
+dve22lts_gsea_LDADD    = libltsmin.la -lATerm $(DVEC2_LIBS) $(BUDDY_LIBS) $(CADP_LIBS)
+dve22lts_gsea_CPPFLAGS = -DDIVINE2 $(MCRL_CPPFLAGS) $(DIVINE2_CPPFLAGS) $(AM_CPPFLAGS)
+dve22lts_gsea_LDFLAGS  = $(DIVINE2_LDFLAGS) $(MCRL_LDFLAGS) $(BUDDY_LDFLAGS) $(AM_LDFLAGS) $(CADP_LDFLAGS)
 
 # dve2lts-grey
 dve2lts_grey_SOURCES  = spec2lts-grey.c dve-greybox.cpp dve-greybox.h
