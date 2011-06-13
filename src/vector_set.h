@@ -120,6 +120,11 @@ the given context and the set element.
 extern void vset_enum_match(vset_t set,int p_len,int* proj,int*match,vset_element_cb cb,void* context);
 
 /**
+\brief Copy the elements of a set that match the given projection.
+*/
+extern void vset_copy_match(vset_t dst, vset_t src, int p_len,int* proj,int*match);
+
+/**
 \brief Produce a member of a non-empty set.
 */
 extern void vset_example(vset_t set,int *e);
@@ -138,6 +143,11 @@ extern void vset_project(vset_t dst,vset_t src);
 \brief dst := dst U src
 */
 extern void vset_union(vset_t dst,vset_t src);
+
+/**
+\brief dst := (a | a \in dst and a \in src)
+*/
+extern void vset_intersect(vset_t dst,vset_t src);
 
 /**
 \brief dst := dst \\ src
@@ -186,6 +196,11 @@ extern void vset_next(vset_t dst,vset_t src,vrel_t rel);
 extern void vset_prev(vset_t dst,vset_t src,vrel_t rel);
 
 extern void vset_reorder(vdom_t dom);
+
+/**
+\brief Destroy a vset
+*/
+extern void vset_destroy(vset_t set);
 
 //@}
 
