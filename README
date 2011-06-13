@@ -120,7 +120,8 @@ tested with flex 2.5.35.
 *** Apache Ant
 Download Apache Ant from <http://ant.apache.org/>.  We tested with ant
 1.7.1.  Note that ant is not required for building from a distribution
-tarball (unless Java files were modified).
+tarball (unless Java files were modified).  Note that we require
+JavaCC task support for Ant.
 
 ** Optional Dependencies
 *** muCRL
