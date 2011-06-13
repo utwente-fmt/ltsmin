@@ -510,12 +510,15 @@ libutil_la_SOURCES := unix.c runtime.c stream.c archive.c			\
                     lb.c lb.h \
                     balloc.c balloc.h bitset.c bitset.h
 
-libutil_la_LIBADD = ltsmin-grammar.lo dm/libdm.la
+libutil_la_CPPFLAGS =
+libutil_la_LIBADD   = ltsmin-grammar.lo dm/libdm.la
+libutil_la_LDFLAGS  =
 
-libutil_la_CPPFLAGS = $(BUDDY_CPPFLAGS)
 if HAVE_LIBBCG
 libutil_la_SOURCES  += bcg_io_ops.c
 libutil_la_CPPFLAGS += $(CADP_CPPFLAGS)
+libutil_la_LDFLAGS  += $(CADP_LDFLAGS)
+libutil_la_LIBADD   += $(CADP_LIBS)
 endif
 
 libutil_la_SOURCES += ltl2ba-lex.c
