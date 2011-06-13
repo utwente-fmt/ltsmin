@@ -236,6 +236,32 @@ AC_CHECK_FUNCS([atexit bzero ftruncate strdup strndup strchr strstr strtol dnl
 AC_CHECK_DECLS([strdup, strndup, strchr, strrchr, strstr, asprintf,dnl
 mkdtemp, strsep])
 
+
+# check for fine-grained multi-core synchronization primitives
+acx_atomics=yes
+AX_CHECK_FUNC_INCLUDE([],[__sync_bool_compare_and_swap],
+  [int x = 0;
+   __sync_bool_compare_and_swap(&x,0,1)],
+  [],[acx_atomics=no])
+AX_CHECK_FUNC_INCLUDE([],[__sync_fetch_and_add],
+  [int x = 0;
+   __sync_fetch_and_add(&x,1)],
+  [],[acx_atomics=no])
+AX_CHECK_FUNC_INCLUDE([],[__sync_fetch_and_and],
+  [int x = 0;
+   __sync_fetch_and_and(&x,1)],
+  [],[acx_atomics=no])
+AX_CHECK_FUNC_INCLUDE([],[__sync_fetch_and_or],
+  [int x = 0;
+   __sync_fetch_and_or(&x,1)],
+  [],[acx_atomics=no])
+AX_CHECK_FUNC_INCLUDE([],[__sync_synchronize],
+  [__sync_synchronize()],
+  [],[acx_atomics=no])
+if test x"$acx_atomics" != "xyes"; then
+  AC_MSG_WARN([no acceptable atomic operations found.])
+fi
+
 AM_CONDITIONAL([HAVE_MPI], [test x"$have_mpi" != "x"])
 AM_CONDITIONAL([HAVE_LIBGMP], 
   [test x"$with_bignum" != xno && test x"$have_libgmp" = xyes])
@@ -250,6 +276,7 @@ AM_CONDITIONAL([HAVE_LIBBCG], [test x"$have_bcg" = xyes])
 AM_CONDITIONAL([HAVE_CADP], [test x"$acx_cadp" = xyes])
 AM_CONDITIONAL([HAVE_DVEC], [test x"$acx_dvec_libs" = xyes])
 AM_CONDITIONAL([HAVE_DVEC2], [true])    dnl can be built unconditionally
+AM_CONDITIONAL([HAVE_ATOMICS], [test x"$acx_atomics" = xyes])
 
 AC_CONFIG_COMMANDS_POST(
   [ac_configure_args="$ac_configure_args --enable-keep-terminated-procs dnl
