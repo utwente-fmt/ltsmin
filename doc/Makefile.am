@@ -9,14 +9,20 @@ MANPAGES = ltsmin-mpi.1 ltsmin-convert.1 gcf.1 lpo-reach.1 lps-reach.1	\
         pins_open.1 ce-mpi.1 etf2torx.1 lpo2torx.1 lps2torx.1 nips2torx.1 \
         dve2torx.1 ltsmin-tracepp.1 dve2lts-grey.1 dve-reach.1 dve2lts-mpi.1 \
 	ltsmin-ltl.5 ltsmin-mu.5 ltsmin-ctl.5 \
-        dve22lts-gsea.1 dve2lts-gsea.1 etf2lts-gsea.1 lpo2lts-gsea.1 lps2lts-gsea.1 \
-        nips2lts-mc.1 dve2lts-mc.1 dve22lts-mc.1 etf2lts-mc.1
+        dve2lts-gsea.1 etf2lts-gsea.1 lpo2lts-gsea.1 lps2lts-gsea.1 \
+        nips2lts-mc.1 dve2lts-mc.1 etf2lts-mc.1
 
 MANPAGES += spinja2lts-grey.1
 MANPAGES += spinja2lts-mc.1
 MANPAGES += spinja2lts-mpi.1
 MANPAGES += spinja2torx.1
 MANPAGES += spinja-reach.1
+
+MANPAGES += dve22lts-grey.1
+MANPAGES += dve22lts-mc.1
+MANPAGES += dve22lts-mpi.1
+MANPAGES += dve22torx.1
+MANPAGES += dve2-reach.1
 
 doc_ASCIIDOC = $(addsuffix .txt, $(basename $(MANPAGES)))
 
@@ -35,6 +41,7 @@ extra_ASCIIDOC = inc/spec2lts-mpi.txt inc/spec2lts-grey.txt		\
 	inc/spec2lts-mc.txt inc/spec2lts-mc-options.txt
 
 extra_ASCIIDOC += inc/spinja.txt
+extra_ASCIIDOC += inc/dve2.txt
 
 EXTRA_DIST = asciidoc.conf callouts.xsl $(doc_ASCIIDOC) $(extra_ASCIIDOC)
 
