@@ -6,19 +6,21 @@
 
 #ifdef HAVE_ATERM2_H
 extern struct poptOption atermdd_options[];
+extern vdom_t vdom_create_list(int n);
+extern vdom_t vdom_create_tree(int n);
 #endif
+
 extern struct poptOption buddy_options[];
+extern vdom_t vdom_create_fdd(int n);
+
+#ifdef HAVE_DDD_H
+extern vdom_t vdom_create_ddd(int n);
+#endif
+
 extern struct poptOption listdd_options[];
+extern vdom_t vdom_create_list_native(int n);
 
-typedef enum {
-    VSET_IMPL_AUTOSELECT,
-    AtermDD_list,
-    AtermDD_tree,
-    BuDDy_fdd,
-    ListDD,
-} vset_implementation_t;
-
-static vset_implementation_t vset_default_domain=VSET_IMPL_AUTOSELECT;
+vset_implementation_t vset_default_domain = VSET_IMPL_AUTOSELECT;
 
 static void vset_popt(poptContext con,
  		enum poptCallbackReason reason,
@@ -46,11 +48,14 @@ static void vset_popt(poptContext con,
 
 static si_map_entry vset_table[]={
 #ifdef HAVE_ATERM2_H
-	{"list",AtermDD_list},
-	{"tree",AtermDD_tree},
+	{"list",VSET_AtermDD_list},
+	{"tree",VSET_AtermDD_tree},
 #endif
-	{"fdd",BuDDy_fdd},
-	{"ldd",ListDD},
+	{"fdd",VSET_BuDDy_fdd},
+#ifdef HAVE_DDD_H
+	{"ddd",VSET_DDD},
+#endif
+	{"ldd",VSET_ListDD},
 	{NULL,0}
 };
 
@@ -60,7 +65,7 @@ struct poptOption vset_options[]={
 	{ "vset" , 0 , POPT_ARG_STRING , NULL , 0 ,
 		"select a vector set implementation from ATermDD with *list* encoding,"
 		" ATermDD with *tree* encoding, BuDDy using the *fdd* feature, or"
-		" native ListDD (default: first available)" , "<list|tree|fdd|ldd>" },
+		" native ListDD, or DDD (default: first available)" , "<list|tree|fdd|ddd|ldd>" },
 #ifdef HAVE_ATERM2_H
 	{ NULL,0 , POPT_ARG_INCLUDE_TABLE , atermdd_options , 0 , "ATermDD options" , NULL},
 #endif
@@ -69,16 +74,21 @@ struct poptOption vset_options[]={
 	POPT_TABLEEND
 };
 
-vdom_t vdom_create_default(int n){
-	switch(vset_default_domain){
+vdom_t vdom_create_domain(int n, vset_implementation_t impl){
+        if (impl == VSET_IMPL_AUTOSELECT)
+            impl = vset_default_domain;
+	switch(impl){
         case VSET_IMPL_AUTOSELECT:
             /* fall-through */
 #ifdef HAVE_ATERM2_H
-	case AtermDD_list: return vdom_create_list(n);
-	case AtermDD_tree: return vdom_create_tree(n);
+	case VSET_AtermDD_list: return vdom_create_list(n);
+	case VSET_AtermDD_tree: return vdom_create_tree(n);
 #endif
-	case BuDDy_fdd: return vdom_create_fdd(n);
-	case ListDD: return vdom_create_list_native(n);
+	case VSET_BuDDy_fdd: return vdom_create_fdd(n);
+#ifdef HAVE_DDD_H
+	case VSET_DDD: return vdom_create_ddd(n);
+#endif
+	case VSET_ListDD: return vdom_create_list_native(n);
         default:
             return NULL;
 	}
@@ -130,6 +140,7 @@ void vdom_init_shared(vdom_t dom,int n){
 	dom->shared.set_prev=NULL;
 	dom->shared.reorder=default_reorder;
 	dom->shared.set_destroy=NULL;
+	dom->shared.set_least_fixpoint=NULL;
 }
 
 vset_t vset_create(vdom_t dom,int k,int* proj){
@@ -226,4 +237,8 @@ void vset_reorder(vdom_t dom) {
 
 void vset_destroy(vset_t set) {
     set->dom->shared.set_destroy(set);
+}
+
+void vset_least_fixpoint(vset_t dst, vset_t src, vrel_t rels[], int rel_count) {
+    src->dom->shared.set_least_fixpoint(dst, src, rels, rel_count);
 }
