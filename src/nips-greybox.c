@@ -272,7 +272,7 @@ scheduler_callback (size_t succ_size, nipsvm_state_t *succ,
     size_t          ilen = gb_context->state_length;
     int             ivec[ilen];
     int             ilabel[] = { ILABEL_TAU };
-    transition_info_t cb_ti = {ilabel, gb_context->group}; // GB_NO_GROUP == -1
+    transition_info_t cb_ti = GB_TI(ilabel, gb_context->group); // GB_NO_GROUP == -1
     init_part_context (&part_ctx, gb_context->model, ivec, ilen);
     state_parts (succ, part_glob_callback, part_proc_callback,
                  part_chan_callback, &part_ctx);

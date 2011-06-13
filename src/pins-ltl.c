@@ -31,6 +31,7 @@ typedef struct ltl_context {
     int             sl_idx_accept;
     int             len;
     const ltsmin_buchi_t *ba;
+    int            *visibility;
 } ltl_context_t;
 
 static ltl_context_t *ctx;
@@ -84,6 +85,32 @@ mark_predicate(ltsmin_expr_t e, matrix_t *m)
             Fatal(1, error, "unhandled predicate expression in mark_predicate");
     }
 }
+
+static void
+mark_visible(ltsmin_expr_t e, matrix_t *m, int* group_visibility)
+{
+    switch(e->token) {
+        case LTL_TRUE:
+        case LTL_FALSE:
+        case LTL_NUM:
+        case LTL_VAR:
+            break;
+        case LTL_EQ:
+            mark_visible(e->arg1, m, group_visibility);
+            mark_visible(e->arg2, m, group_visibility);
+            break;
+        case LTL_SVAR: {
+            for(int i=0; i < dm_nrows(m); i++) {
+                if (dm_is_set(m, i, e->idx)) {
+                    group_visibility[i] = 1;
+                }
+            }
+            } break;
+        default:
+            Fatal(1, error, "unhandled predicate expression in mark_visible");
+    }
+}
+
 
 static int
 ltl_sl_short(model_t model, int label, int *state)
@@ -248,7 +275,7 @@ ltl_textbook_all (model_t self, int *src, TransitionCB cb,
     (void)self;
     cb_context new_ctx = {cb, user_context, src, 0};
     if (src[ctx->ltl_idx] == -1) {         /* XXX textbook/spin not reversed? */
-        transition_info_t ti = {NULL, -1}; /* XXX int[nedge_labels] */
+        transition_info_t ti = GB_TI(NULL, -1); /* XXX int[nedge_labels] */
         ltl_textbook_cb(&new_ctx, &ti, src);
         return new_ctx.ntbtrans;
     } else {
@@ -258,9 +285,11 @@ ltl_textbook_all (model_t self, int *src, TransitionCB cb,
 
 /*
  * SHARED
+ * por_model: if por layer is added por_model points to the model returned by the layer,
+ *            otherwise this parameter should be NULL
  */
 model_t
-GBaddLTL (model_t model, const char *ltl_file, pins_ltl_type_t type)
+GBaddLTL (model_t model, const char *ltl_file, pins_ltl_type_t type, model_t por_model)
 {
     Warning(info,"Initializing LTL layer.., formula file %s", ltl_file);
 
@@ -283,6 +312,7 @@ GBaddLTL (model_t model, const char *ltl_file, pins_ltl_type_t type)
         Warning(info, " state %d: %s", i, ba->states[i]->accept ? "accepting" : "non-accepting");
         for(int j=0; j < ba->states[i]->transition_count; j++) {
             char buf[4096];
+            memset(buf, 0, sizeof(buf));
             char* at = buf;
             *at = '\0';
             for(int k=0; k < ba->predicate_count; k++) {
@@ -425,6 +455,26 @@ GBaddLTL (model_t model, const char *ltl_file, pins_ltl_type_t type)
     GBsetStateLabelsAll (ltlmodel, ltl_sl_all);
 
     lts_type_validate(ltstype_new);
+
+    // mark visible groups
+    ctx->visibility = RTmallocZero( groups * sizeof(int) );
+    for(int k=0; k < ba->predicate_count; k++) {
+        mark_visible(ba->predicates[k], p_new_dm_w, ctx->visibility);
+    }
+
+    // communicate visible groups to the partial order reduction layer
+    // note: this tightly couples the LTL and POR layer, which
+    //       isn't the correct way to handle this situation.
+    //       currently however this is the only use case in which this
+    //       problem occurs and it might be solved later
+    //       The proper way to do this would be to set up communication
+    //       infrastructure throughout the PINS interface which is
+    //       is a lot of work for a single use case.
+    //       Using a shared datastructure is not possible because
+    //       initialization is not possible (createBase, requires #groups beforehand)
+    //       Therefore: the following (hack) is used
+    if (por_model)
+        for(int i=0; i < groups; i++) por_visibility(por_model, i, ctx->visibility[i]);
 
     if (type == PINS_LTL_SPIN) {
         GBsetNextStateLong  (ltlmodel, ltl_spin_long);

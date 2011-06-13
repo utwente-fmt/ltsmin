@@ -13,6 +13,11 @@ struct grey_box_model {
 	matrix_t *dm_read_info;
 	matrix_t *dm_write_info;
 	matrix_t *sl_info;
+    sl_group_t* sl_groups[GB_SL_GROUP_COUNT];
+    guard_t** guards;
+    matrix_t *gce_info; // guard co-enabled info
+    matrix_t *gnes_info; // guard necessary enabling set
+    matrix_t *gnds_info; // guard necessary disabling set
         int sl_idx_buchi_accept;
 	int *s0;
 	void*context;
@@ -21,6 +26,7 @@ struct grey_box_model {
 	next_method_black_t next_all;
 	get_label_method_t state_labels_short;
 	get_label_method_t state_labels_long;
+	get_label_group_method_t state_labels_group;
 	get_label_all_method_t state_labels_all;
 	void* newmap_context;
 	newmap_t newmap;
@@ -111,6 +117,26 @@ state_labels_default_long(model_t model, int label, int *state)
 }
 
 static void
+state_labels_default_group(model_t model, sl_group_enum_t group, int *state, int *labels)
+{
+    switch (group)
+    {
+        case GB_SL_ALL:
+            GBgetStateLabelsAll(model, state, labels);
+            return;
+        case GB_SL_GUARDS:
+            /**
+             * This could potentially return a trivial guard for each transition group
+             * by calling state next, return 1 if a next state is found and 0 if not.
+             * This setup should be synchronized with the other guard functionality
+             */
+            Abort( "No default for guard group available in GBgetStateLabelsGroup" );
+        default:
+            Abort( "Unknown group in GBgetStateLabelsGroup" );
+    }
+}
+
+static void
 state_labels_default_all(model_t model, int *state, int *labels)
 {
 	for(int i=0;i<dm_nrows(GBgetStateLabelInfo(model));i++) {
@@ -149,6 +175,12 @@ wrapped_state_labels_default_long(model_t model, int label, int *state)
 }
 
 static void
+wrapped_state_labels_default_group(model_t model, sl_group_enum_t group, int *state, int *labels)
+{
+    GBgetStateLabelsGroup(GBgetParent(model), group, state, labels);
+}
+
+static void
 wrapped_state_labels_default_all(model_t model, int *state, int *labels)
 {
     return GBgetStateLabelsAll(GBgetParent(model), state, labels);
@@ -163,6 +195,12 @@ model_t GBcreateBase(){
 	model->dm_read_info=NULL;
 	model->dm_write_info=NULL;
 	model->sl_info=NULL;
+    for(int i=0; i < GB_SL_GROUP_COUNT; i++)
+        model->sl_groups[i]=NULL;
+    model->guards=NULL;
+    model->gce_info=NULL;
+    model->gnes_info=NULL;
+    model->gnds_info=NULL;
         model->sl_idx_buchi_accept = -1;
 	model->s0=NULL;
 	model->context=0;
@@ -171,6 +209,7 @@ model_t GBcreateBase(){
 	model->next_all=default_all;
 	model->state_labels_short=state_labels_default_short;
 	model->state_labels_long=state_labels_default_long;
+	model->state_labels_group=state_labels_default_group;
 	model->state_labels_all=state_labels_default_all;
 	model->newmap_context=NULL;
 	model->newmap=NULL;
@@ -223,6 +262,21 @@ void GBinitModelDefaults (model_t *p_model, model_t default_src)
     if (model->sl_info == NULL)
         GBsetStateLabelInfo(model, GBgetStateLabelInfo(default_src));
 
+    for(int i=0; i < GB_SL_GROUP_COUNT; i++)
+        GBsetStateLabelGroupInfo(model, i, GBgetStateLabelGroupInfo(default_src, i));
+
+    if (model->guards == NULL)
+        GBsetGuardsInfo(model, GBgetGuardsInfo(default_src));
+
+    if (model->gce_info == NULL)
+        GBsetGuardCoEnabledInfo(model, GBgetGuardCoEnabledInfo (default_src));
+
+    if (model->gnes_info == NULL)
+        GBsetGuardNESInfo(model, GBgetGuardNESInfo (default_src));
+
+    if (model->gnds_info == NULL)
+        GBsetGuardNDSInfo(model, GBgetGuardNDSInfo (default_src));
+
     if (model->sl_idx_buchi_accept < 0)
         GBsetAcceptingStateLabelIndex(model, GBgetAcceptingStateLabelIndex (default_src));
 
@@ -268,6 +322,7 @@ void GBinitModelDefaults (model_t *p_model, model_t default_src)
         model->state_labels_all == state_labels_default_all) {
         GBsetStateLabelShort (model, wrapped_state_labels_default_short);
         GBsetStateLabelLong (model, wrapped_state_labels_default_long);
+        GBsetStateLabelsGroup (model, wrapped_state_labels_default_group);
         GBsetStateLabelsAll (model, wrapped_state_labels_default_all);
     }
 }
@@ -387,6 +442,10 @@ void GBsetStateLabelsAll(model_t model,get_label_all_method_t method){
 	model->state_labels_all=method;
 }
 
+void GBsetStateLabelsGroup(model_t model,get_label_group_method_t method){
+	model->state_labels_group=method;
+}
+
 void GBsetStateLabelLong(model_t model,get_label_method_t method){
 	model->state_labels_long=method;
 }
@@ -403,9 +462,68 @@ int GBgetStateLabelLong(model_t model,int label,int *state){
 	return model->state_labels_long(model,label,state);
 }
 
+void GBgetStateLabelsGroup(model_t model,sl_group_enum_t group,int*state,int*labels){
+	model->state_labels_group(model,group,state,labels);
+}
+
 void GBgetStateLabelsAll(model_t model,int*state,int*labels){
 	model->state_labels_all(model,state,labels);
 }
+
+sl_group_t* GBgetStateLabelGroupInfo(model_t model, sl_group_enum_t group) {
+    return model->sl_groups[group];
+}
+
+void GBsetStateLabelGroupInfo(model_t model, sl_group_enum_t group, sl_group_t* group_info)
+{
+    model->sl_groups[group] = group_info;
+}
+
+int GBhasGuardsInfo(model_t model) { return model->guards != NULL; }
+
+void GBsetGuardsInfo(model_t model, guard_t** guards) {
+    model->guards = guards;
+}
+
+guard_t** GBgetGuardsInfo(model_t model) {
+    return model->guards;
+}
+
+void GBsetGuard(model_t model, int group, guard_t* guard) {
+    model->guards[group] = guard;
+}
+
+guard_t* GBgetGuard(model_t model, int group) {
+    return model->guards[group];
+}
+
+void GBsetGuardCoEnabledInfo(model_t model, matrix_t *info) {
+    if (model->gce_info != NULL) Fatal(1, error, "guard may be co-enabled info already set");
+    model->gce_info = info;
+}
+
+matrix_t *GBgetGuardCoEnabledInfo(model_t model) {
+    return model->gce_info;
+}
+
+void GBsetGuardNESInfo(model_t model, matrix_t *info) {
+    if (model->gnes_info != NULL) Fatal(1, error, "guard NES info already set");
+    model->gnes_info = info;
+}
+
+matrix_t *GBgetGuardNESInfo(model_t model) {
+    return model->gnes_info;
+}
+
+void GBsetGuardNDSInfo(model_t model, matrix_t *info) {
+    if (model->gnds_info != NULL) Fatal(1, error, "guard NDS info already set");
+    model->gnds_info = info;
+}
+
+matrix_t *GBgetGuardNDSInfo(model_t model) {
+    return model->gnds_info;
+}
+
 
 void GBsetChunkMethods(model_t model,newmap_t newmap,void*newmap_context,
 	int2chunk_t int2chunk,chunk2int_t chunk2int,get_count_t get_count){
@@ -507,6 +625,7 @@ static pins_loader_t model_preloader[MAX_TYPES];
 static int registered_pre=0;
 static int matrix=0;
 static int cache=0;
+static int por=0;
 static const char *regroup_options = NULL;
 
 static char *ltl_file = NULL;
@@ -554,8 +673,10 @@ GBloadFile (model_t model, const char *filename, model_t *wrapped)
             if (0==strcmp (model_type[i], extension)) {
                 model_loader[i] (model, filename);
                 if (wrapped) {
+                    if (por)
+                        model = GBaddPOR (model, ltl_file != NULL);
                     if (ltl_file)
-                        model = GBaddLTL (model, ltl_file, ltl_type);
+                        model = GBaddLTL (model, ltl_file, ltl_type, por ? model : NULL);
                     if (regroup_options != NULL)
                         model = GBregroup (model, regroup_options);
                     if (cache)
@@ -646,7 +767,8 @@ struct poptOption ltl_options[] = {
 };
 
 struct poptOption greybox_options[]={
-    { "matrix" , 'm' , POPT_ARG_VAL , &matrix , 1 , "Print the dependency matrix for the model and exit" , NULL},
+	{ "matrix" , 'm' , POPT_ARG_VAL , &matrix , 1 , "Print the dependency matrix for the model and exit" , NULL},
+	{ "por" , 'p' , POPT_ARG_VAL , &por , 1 , "Enable partial order reduction." , NULL },
 	{ "cache" , 'c' , POPT_ARG_VAL , &cache , 1 , "Enable caching of grey box calls." , NULL },
 	{ "regroup" , 'r' , POPT_ARG_STRING, &regroup_options , 0 ,
           "Enable regrouping; available transformations T: "
