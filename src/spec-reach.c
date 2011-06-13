@@ -1005,6 +1005,10 @@ int main(int argc, char *argv[]){
 	if (RTverbosity >=2) {
 	  fprintf(stderr,"Dependency Matrix:\n");
 	  GBprintDependencyMatrix(stderr,model);
+	  fprintf(stderr,"Read Dependency Matrix:\n");
+          GBprintDependencyMatrixRead(stderr,model);
+	  fprintf(stderr,"Write Dependency Matrix:\n");
+          GBprintDependencyMatrixWrite(stderr,model);
 	}
 
 	ltstype=GBgetLTStype(model);
