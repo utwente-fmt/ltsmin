@@ -31,6 +31,7 @@
 #include <trace.h>
 #include <treedbs-ll.h>
 #include <treedbs.h>
+#include <unix.h>
 #include <vector_set.h>
 #include <zobrist.h>
 
@@ -828,21 +829,8 @@ randperm (int *perm, int n, uint32_t seed)
     }
 }
 
-#if defined(__CYGWIN__)
-    #include <search.h>
-    #define qsortr(a,b,c,d,e) qsort_s (a,b,c,d,e)
-#elif defined(linux)
-    #define qsortr(a,b,c,d,e) qsort_r (a,b,c,d,e)
-#else //BSD
-    #define qsortr(a,b,c,d,e) qsort_r (a,b,c,e,d)
-#endif
-
 static int
-#ifdef linux //See also: define for qsortr
 sort_cmp (const void *a, const void *b, void *arg)
-#else
-sort_cmp (void *arg, const void *a, const void *b)
-#endif
 {
     permute_t          *perm = (permute_t *) arg;
     const permute_todo_t     *A = &perm->todos[*((int*)a)];
@@ -851,11 +839,7 @@ sort_cmp (void *arg, const void *a, const void *b)
 }
 
 static int
-#ifdef linux //See also: define for qsortr
 rand_cmp (const void *a, const void *b, void *arg)
-#else
-rand_cmp (void *arg, const void *a, const void *b)
-#endif
 {
     permute_t          *perm = (permute_t *) arg;
     int                *rand = *perm->rand;
@@ -865,11 +849,7 @@ rand_cmp (void *arg, const void *a, const void *b)
 }
 
 static int
-#ifdef linux //See also: define for qsortr
 dyn_cmp (const void *a, const void *b, void *arg)
-#else
-dyn_cmp (void *arg, const void *a, const void *b)
-#endif
 {
     permute_t          *perm = (permute_t *) arg;
     wctx_t             *ctx = perm->ctx;

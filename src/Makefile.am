@@ -551,6 +551,7 @@ libutil_la_SOURCES += ltsmin-syntax.c ltsmin-syntax.h
 libutil_la_SOURCES += ltsmin-tl.c ltsmin-tl.h
 libutil_la_SOURCES += packet_stream.c packet_stream.h
 libutil_la_SOURCES += pins-cache.c
+libutil_la_SOURCES += qsortex.c
 libutil_la_SOURCES += raf.c raf.h
 libutil_la_SOURCES += raf_object.h
 libutil_la_SOURCES += runtime.c runtime.h
