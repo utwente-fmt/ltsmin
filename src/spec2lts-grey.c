@@ -57,7 +57,6 @@ static uint32_t *parent_ofs=NULL;
 
 static treedbs_t dbs=NULL;
 static int write_lts;
-static int matrix=0;
 static int write_state=0;
 static size_t max = UINT_MAX;
 
@@ -119,7 +118,6 @@ state_db_popt (poptContext con, enum poptCallbackReason reason,
 
 static  struct poptOption development_options[] = {
 	{ "grey", 0 , POPT_ARG_VAL , &call_mode , UseGreyBox , "make use of GetTransitionsLong calls" , NULL },
-	{ "matrix", 0 , POPT_ARG_VAL, &matrix,1,"Print the dependency matrix and quit",NULL},
 	{ "write-state" , 0 , POPT_ARG_VAL , &write_state, 1 , "write the full state vector" , NULL },
 	POPT_TABLEEND
 };
@@ -1389,17 +1387,9 @@ int main(int argc, char *argv[]){
 
 	GBloadFile(model,files[0],&model);
 
-	if (matrix) {
-	  GBprintDependencyMatrix(stdout,model);
-	  exit (EXIT_SUCCESS);
-	}
 	if (RTverbosity >=2) {
 	  fprintf(stderr,"Dependency Matrix:\n");
-	  GBprintDependencyMatrix(stderr,model);
-	  fprintf(stderr,"Read Dependency Matrix:\n");
-	  GBprintDependencyMatrixRead(stderr,model);
-	  fprintf(stderr,"Write Dependency Matrix:\n");
-	  GBprintDependencyMatrixWrite(stderr,model);
+	  GBprintDependencyMatrixCombined(stderr,model);
 	}
     if (trc_output && strategy == Strat_BFS)
     {
