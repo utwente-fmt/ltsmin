@@ -4,14 +4,21 @@
 #include <vdom_object.h>
 #include <runtime.h>
 
-
+#ifdef HAVE_ATERM2_H
 extern struct poptOption atermdd_options[];
+#endif
 extern struct poptOption buddy_options[];
 extern struct poptOption listdd_options[];
 
-typedef enum { AtermDD_list=1 , AtermDD_tree=2, BuDDy_fdd=3, ListDD=4 } vset_implementation_t;
+typedef enum {
+    VSET_IMPL_AUTOSELECT,
+    AtermDD_list,
+    AtermDD_tree,
+    BuDDy_fdd,
+    ListDD,
+} vset_implementation_t;
 
-static vset_implementation_t vset_default_domain=AtermDD_list;
+static vset_implementation_t vset_default_domain=VSET_IMPL_AUTOSELECT;
 
 static void vset_popt(poptContext con,
  		enum poptCallbackReason reason,
@@ -38,8 +45,10 @@ static void vset_popt(poptContext con,
 
 
 static si_map_entry vset_table[]={
+#ifdef HAVE_ATERM2_H
 	{"list",AtermDD_list},
 	{"tree",AtermDD_tree},
+#endif
 	{"fdd",BuDDy_fdd},
 	{"ldd",ListDD},
 	{NULL,0}
@@ -51,8 +60,10 @@ struct poptOption vset_options[]={
 	{ "vset" , 0 , POPT_ARG_STRING , NULL , 0 ,
 		"select a vector set implementation from ATermDD with *list* encoding,"
 		" ATermDD with *tree* encoding, BuDDy using the *fdd* feature, or"
-		" native ListDD (default: list)" , "<list|tree|fdd|ldd>" },
+		" native ListDD (default: first available)" , "<list|tree|fdd|ldd>" },
+#ifdef HAVE_ATERM2_H
 	{ NULL,0 , POPT_ARG_INCLUDE_TABLE , atermdd_options , 0 , "ATermDD options" , NULL},
+#endif
 	{ NULL,0 , POPT_ARG_INCLUDE_TABLE , buddy_options , 0 , "BuDDy options" , NULL},
 	{ NULL,0 , POPT_ARG_INCLUDE_TABLE , listdd_options , 0 , "ListDD options" , NULL},
 	POPT_TABLEEND
@@ -60,12 +71,17 @@ struct poptOption vset_options[]={
 
 vdom_t vdom_create_default(int n){
 	switch(vset_default_domain){
+        case VSET_IMPL_AUTOSELECT:
+            /* fall-through */
+#ifdef HAVE_ATERM2_H
 	case AtermDD_list: return vdom_create_list(n);
 	case AtermDD_tree: return vdom_create_tree(n);
+#endif
 	case BuDDy_fdd: return vdom_create_fdd(n);
 	case ListDD: return vdom_create_list_native(n);
+        default:
+            return NULL;
 	}
-	return NULL;
 }
 
 struct vector_domain {

@@ -44,6 +44,7 @@ extern vdom_t vdom_create_default(int n);
 */
 extern vdom_t vdom_create_fdd(int n);
 
+#ifdef HAVE_ATERM2_H
 /**
 \brief Create a domain that uses the list variant of ATermDD.
 
@@ -57,6 +58,7 @@ extern vdom_t vdom_create_list(int n);
 \param n The length of vectors in the domain.
 */
 extern vdom_t vdom_create_tree(int n);
+#endif
 
 /**
 \brief Create a domain that uses the native implementation of the list MDD type.

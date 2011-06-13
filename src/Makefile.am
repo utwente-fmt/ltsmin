@@ -17,7 +17,6 @@ if HAVE_CADP
 CADPCC = $(CADP)/src/com/cadp_cc
 CADPINCLUDES = -I$(CADP)/incl
 bin_SCRIPTS = pins_open
-pkglib_LTLIBRARIES += libnips-open.la libetf-open.la
 endif
 
 if HAVE_MPI
@@ -40,6 +39,7 @@ if HAVE_DVEC2
 bin_PROGRAMS += dve22lts-mpi
 endif
 endif
+
 if HAVE_LIBSTEP_INFO
 bin_PROGRAMS += lpo2lts-grey
 bin_PROGRAMS += lpo2lts-gsea
@@ -54,32 +54,27 @@ bin_PROGRAMS += lps2lts-grey
 bin_PROGRAMS += lps2lts-gsea
 bin_PROGRAMS += lps-reach
 noinst_LTLIBRARIES += libmcrl2-pins.la
-noinst_LTLIBRARIES += libvset-mcrl2.la
 if HAVE_CADP
 pkglib_LTLIBRARIES += liblps-open.la
 endif
 endif
 
-if HAVE_LIBMCRL
 # if HAVE_LIBNIPS
 bin_PROGRAMS += nips2lts-grey
 bin_PROGRAMS += nips2lts-gsea
 bin_PROGRAMS += nips-reach
+bin_PROGRAMS += nips2lts-mc
+if HAVE_CADP
+pkglib_LTLIBRARIES += libnips-open.la
+endif
+#endif
+
 bin_PROGRAMS += etf2lts-grey
 bin_PROGRAMS += etf2lts-gsea
 bin_PROGRAMS += etf-reach
-bin_PROGRAMS += nips2lts-mc
 bin_PROGRAMS += etf2lts-mc
-# endif
-noinst_LTLIBRARIES += libvset-mcrl.la
-VSET_LIBS = libvset-mcrl.la
-else
-if HAVE_LIBMCRL2
-VSET_LIBS = libvset-mcrl2.la
-# else
-# VSET_LIBS = libvset.la
-# endif
-endif
+if HAVE_CADP
+pkglib_LTLIBRARIES += libetf-open.la
 endif
 
 if HAVE_DVEC
@@ -111,7 +106,7 @@ bin_PROGRAMS += spinja2lts-mc
 
 libmcrl2_pins_la_SOURCES  = mcrl2-greybox.cpp mcrl2-greybox.h
 libmcrl2_pins_la_SOURCES += at-map.c at-map.h
-libmcrl2_pins_la_CPPFLAGS = $(MCRL2_CPPFLAGS) $(AM_CPPFLAGS)
+libmcrl2_pins_la_CPPFLAGS = -DMCRL2 -DNDEBUG $(MCRL2_CPPFLAGS) $(AM_CPPFLAGS)
 libmcrl2_pins_la_LDFLAGS  = $(MCRL2_LDFLAGS) $(AM_LDFLAGS)
 libmcrl2_pins_la_LIBADD   = $(MCRL2_LIBS)
 
@@ -209,13 +204,13 @@ lpo2lts_gsea_LDFLAGS  = $(MCRL_LDFLAGS) $(AM_LDFLAGS)
 
 # lps2lts-grey
 lps2lts_grey_SOURCES  = spec2lts-grey.c
-lps2lts_grey_LDADD    = libvset-mcrl2.la libmcrl2-pins.la libltsmin.la
+lps2lts_grey_LDADD    = $(VSET_LIBS) libmcrl2-pins.la libltsmin.la
 lps2lts_grey_CPPFLAGS = -DMCRL2 $(AM_CPPFLAGS)
 nodist_EXTRA_lps2lts_grey_SOURCES = automake-force-linker.cxx
 
 # lps2lts-gsea
 lps2lts_gsea_SOURCES  = spec2lts-gsea.c
-lps2lts_gsea_LDADD    = libvset-mcrl2.la libmcrl2-pins.la libltsmin.la
+lps2lts_gsea_LDADD    = $(VSET_LIBS) libmcrl2-pins.la libltsmin.la
 lps2lts_gsea_CPPFLAGS = -DMCRL2 $(AM_CPPFLAGS)
 nodist_EXTRA_lps2lts_gsea_SOURCES = automake-force-linker.cxx
 
@@ -253,13 +248,13 @@ dve_reach_LDFLAGS  = $(DIVINE_LDFLAGS) $(AM_LDFLAGS)
 # lpo-reach
 lpo_reach_SOURCES  = spec-reach.c mcrl-greybox.c mcrl-greybox.h
 lpo_reach_SOURCES += at-map.c at-map.h
-lpo_reach_LDADD    = $(VSET_LIBS) libltsmin.la $(MCRL_LIBS)
+lpo_reach_LDADD    = libvset-mcrl.la libltsmin.la $(MCRL_LIBS)
 lpo_reach_CPPFLAGS = -DMCRL $(MCRL_CPPFLAGS) $(AM_CPPFLAGS)
 lpo_reach_LDFLAGS  = $(MCRL_LDFLAGS) $(AM_LDFLAGS)
 
 # lps-reach
 lps_reach_SOURCES  = spec-reach.c
-lps_reach_LDADD    = libvset-mcrl2.la libmcrl2-pins.la libltsmin.la
+lps_reach_LDADD    = $(VSET_LIBS) libmcrl2-pins.la libltsmin.la
 lps_reach_CPPFLAGS = -DMCRL2 $(AM_CPPFLAGS)
 nodist_EXTRA_lps_reach_SOURCES = automake-force-linker.cxx
 
@@ -416,6 +411,23 @@ ltsmin_convert_SOURCES = ltsmin-convert.c
 ltsmin_convert_LDADD = libltsmin.la
 
 # libraries
+if HAVE_LIBMCRL2
+noinst_LTLIBRARIES += libvset-mcrl2.la
+endif
+if HAVE_LIBMCRL
+noinst_LTLIBRARIES += libvset-mcrl.la
+endif
+
+if HAVE_LIBMCRL2
+VSET_LIBS = libvset-mcrl2.la
+else
+if HAVE_LIBMCRL
+VSET_LIBS = libvset-mcrl.la
+else
+VSET_LIBS = libvset.la
+endif
+endif
+
 libvset_la_SOURCES  = vector_set.c vector_set.h vdom_object.h
 libvset_la_SOURCES += vset_listdd.c
 libvset_la_SOURCES += vset_buddy.c
@@ -432,8 +444,6 @@ libvset_mcrl2_la_SOURCES  = vset_atermdd.c
 libvset_mcrl2_la_CPPFLAGS = $(MCRL2_CPPFLAGS) $(AM_CPPFLAGS)
 libvset_mcrl2_la_LDFLAGS  = $(MCRL2_LDFLAGS) $(AM_LDFLAGS)
 libvset_mcrl2_la_LIBADD   = libvset.la -laterm
-
-
 
 
 libmpi_la_SOURCES = mpi_io_stream.c mpi_raf.c mpi_io_stream.h \

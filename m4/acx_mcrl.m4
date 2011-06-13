@@ -29,6 +29,8 @@ if test x"$acx_mcrl" = xyes; then
 
     AC_SUBST(MCRL_CPPFLAGS, ["$MCRL_CPPFLAGS -I$with_mcrl/include"])
     AC_SUBST(MCRL_LDFLAGS,  ["$acx_cv_cc_export_dynamic -L$with_mcrl/lib"])
+    AX_LET([CPPFLAGS], ["$MCRL_CPPFLAGS $CPPFLAGS"],
+      [AC_CHECK_HEADERS([aterm2.h])])
     $1
 else
     $2

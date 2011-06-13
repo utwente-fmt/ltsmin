@@ -6,6 +6,7 @@
 
 #include <dm/dm.h>
 #include <greybox.h>
+#include <spec-greybox.h>
 #include <lts_enum.h>
 #include <lts_io.h>
 #include <runtime.h>
@@ -17,28 +18,6 @@
 #include <ltsmin-syntax.h>
 #include <ltsmin-grammar.h>
 #include <ltsmin-tl.h>
-
-#if defined(MCRL)
-#include "mcrl-greybox.h"
-#endif
-#if defined(MCRL2)
-#include "mcrl2-greybox.h"
-#endif
-#if defined(NIPS)
-#include "nips-greybox.h"
-#endif
-#if defined(ETF)
-#include "etf-greybox.h"
-#endif
-#if defined(DIVINE)
-#include "dve-greybox.h"
-#endif
-#if defined(DIVINE2)
-#include "dve2-greybox.h"
-#endif
-#if defined(SPINJA)
-#include "spinja-greybox.h"
-#endif
 
 #define diagnostic(...) {\
     if (RTverbosity >= 2)\
@@ -129,31 +108,11 @@ static  struct poptOption options[] = {
     { "trace" , 0 , POPT_ARG_STRING , &trc_output , 0 , "file to write trace to" , "<lts-file>.gcf" },
     { "mu" , 0 , POPT_ARG_STRING , &mu_formula , 0 , "file with a mu formula" , "<mu-file>.mu" },
     { "ctl*" , 0 , POPT_ARG_STRING , &ctl_formula , 0 , "file with a ctl* formula" , "<ctl*-file>.ctl" },
-#if defined(MCRL)
-	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, mcrl_options , 0 , "mCRL options",NULL},
-#endif
-#if defined(MCRL2)
-	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, mcrl2_options , 0 , "mCRL2 options",NULL},
-#endif
-#if defined(NIPS)
-	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, nips_options , 0 , "NIPS options",NULL},
-#endif
-#if defined(ETF)
-	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, etf_options , 0 , "ETF options",NULL},
-#endif
-#if defined(DIVINE)
-	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, dve_options , 0 , "DiVinE options", NULL },
-#endif
-#if defined(DIVINE2)
-	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, dve2_options , 0 , "DiVinE 2 options", NULL },
-#endif
-#if defined(SPINJA)
-	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, spinja_options , 0 , "SPINJA options", NULL },
-#endif
-	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, greybox_options , 0 , "Greybox options",NULL},
-	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, vset_options , 0 , "Vector set options",NULL},
-	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, lts_io_options , 0 , NULL , NULL },
-	POPT_TABLEEND
+    SPEC_POPT_OPTIONS,
+    { NULL, 0 , POPT_ARG_INCLUDE_TABLE, greybox_options , 0 , "Greybox options",NULL},
+    { NULL, 0 , POPT_ARG_INCLUDE_TABLE, vset_options , 0 , "Vector set options",NULL},
+    { NULL, 0 , POPT_ARG_INCLUDE_TABLE, lts_io_options , 0 , NULL , NULL },
+    POPT_TABLEEND
 };
 
 typedef struct {

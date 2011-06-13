@@ -19,7 +19,8 @@
 // Remove when LTSmin has RT_optdlsym() again
 #define RT_optdlsym(f,h,s) dlsym(h,s)
 
-// spinja ltsmin interface functionsif(!get_guard_count) Warning(info,"missing guard function: get_guard_count");
+// spinja ltsmin interface functions
+// if(!get_guard_count) Warning(info,"missing guard function: get_guard_count");
 void        (*spinja_get_initial_state)(int *to);
 next_method_grey_t spinja_get_successor;
 next_method_black_t spinja_get_successor_all;
@@ -328,7 +329,6 @@ SpinJaloadGreyboxModel(model_t model, const char *filename)
     spinja_get_initial_state(state);
     GBsetInitialState(model,state);
 
-	// set callbacks
     GBsetNextStateAll  (model, spinja_get_successor_all);
     GBsetNextStateLong (model, spinja_get_successor);
 	if(model_has_property) {

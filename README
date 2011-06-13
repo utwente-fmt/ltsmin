@@ -126,9 +126,9 @@ JavaCC task support for Ant.
 ** Optional Dependencies
 *** muCRL
 Download muCRL (>= 2.18.5) from <http://www.cwi.nl/~mcrl/mutool.html>.
-We tested with muCRL-2.18.5.  Without muCRL, the distributed tool for
-state space generation (lpo2lts-mpi) will not be built, and neither
-will any NIPS-based tools.
+We tested with muCRL-2.18.5.  Without muCRL, several tools will not be
+built.  Also, the symbolic tools (<spec>-reach) might have degraded
+performance due to the absense of the AtermDD decision diagram package.
 
 *** mCRL2
 Download the latest development version of mCRL2 from
