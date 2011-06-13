@@ -1,0 +1,30 @@
+//                           -*- mode: doc; outline-regexp: "==\(=*\) ." -*-
+dve22lts-grey(1)
+================
+:Author:  Michael Weber
+:Email:   <michaelw@cs.utwente.nl>
+:Date:    2011-06-13
+
+== NAME
+
+dve22lts-grey - Sequential state space generator for DiVinE DVE models.
+
+== SYNOPSIS
+
+*{manname}* [OPTION]... 'input'[_.dve_|_.dve2C_] ['output.fmt']
+
+== DESCRIPTION
+
+{manname} generates a labelled transition system from a specification
+provided in 'input.dve' or 'input.dve2C' by enumerative reachability
+analysis.  'output.fmt' specifies the name of the output archive.  The
+desired format is deduced from the filename extension.
+
+include::inc/dve2.txt[]
+
+== OPTIONS
+
+include::inc/spec2lts-grey-options.txt[]
+
+include::inc/spec2lts-grey.txt[]
+
