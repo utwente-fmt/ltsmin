@@ -189,6 +189,7 @@ static int state_labels;
 static int edge_labels;
 static int visited=1;
 static int explored=0;
+static int threshold = 100000;
 static size_t ntransitions = 0;
 
 static void
@@ -682,12 +683,12 @@ dfs_explore (model_t model, int *src, size_t *o_depth)
             if (next_group < K) {
                 dfs_stack_enter (stack);
                 dfs_explore_state_vector (model, src_idx, src, &next_group);
+                if (RTverbosity >= 1 && explored >= threshold) {
+                    Warning (info, "Explored %d states and %zu transitions",
+                             depth, explored, ntransitions); threshold<<=1;}
                 isba_push_int (buffer, (int[SD__SIZE]){next_group, src_idx});
                 if (dfs_stack_nframes (stack) > depth) {
                     depth = dfs_stack_nframes (stack);
-                    if (RTverbosity >= 1)
-                        Warning (info, "new depth reached %d. Visited %d states and %zu transitions",
-                                 depth, visited, ntransitions);
                 }
             } else {
                 dfs_stack_pop (stack);
@@ -724,12 +725,12 @@ dfs_explore (model_t model, int *src, size_t *o_depth)
             if (next_group < K) {
                 dfs_stack_enter (stack);
                 dfs_explore_state_index (model, *fvec, &next_group);
+                if (RTverbosity >= 1 && explored >= threshold) {
+                    Warning (info, "Depth %d, Explored %d states and %zu transitions",
+                             depth, explored, ntransitions); threshold<<=1;}
                 isba_push_int (buffer, &next_group);
                 if (dfs_stack_nframes (stack) > depth) {
                     depth = dfs_stack_nframes (stack);
-                    if (RTverbosity >= 1)
-                        Warning (info, "new depth reached %d. Visited %d states and %zu transitions",
-                                 depth, visited, ntransitions);
                 }
             } else {
                 dfs_stack_pop (stack);
@@ -766,12 +767,12 @@ dfs_explore (model_t model, int *src, size_t *o_depth)
             if (next_group < K) {
                 dfs_stack_enter (stack);
                 dfs_explore_state_vector2 (model, fvec, &next_group);
+                if (RTverbosity >= 1 && explored >= threshold) {
+                    Warning (info, "Depth %d, explored %d states and %zu transitions",
+                             depth, explored, ntransitions); threshold<<=1;}
                 isba_push_int (buffer, &next_group);
                 if (dfs_stack_nframes (stack) > depth) {
                     depth = dfs_stack_nframes (stack);
-                    if (RTverbosity >= 1)
-                        Warning (info, "new depth reached %d. Visited %d states and %zu transitions",
-                                 depth, visited, ntransitions);
                 }
             } else {
                 dfs_stack_pop (stack);
@@ -1045,12 +1046,12 @@ ndfs_tree_blue(model_t model, size_t *o_depth)
         if (next_group < K) {
             dfs_stack_enter (blue_stack);
             ndfs_expand(model, state, &next_group, ndfs_tree_blue_next, 1);
+            if (RTverbosity >= 1 && explored >= threshold) {
+                Warning (info, "Depth %d, explored %d states and %zu transitions",
+                         depth, explored, ntransitions); threshold<<=1;}
             isba_push_int (buffer, &next_group);
             if (dfs_stack_nframes (blue_stack) > depth) {
                 depth = dfs_stack_nframes (blue_stack);
-                if (RTverbosity >= 1)
-                    Warning (info, "new depth reached %d. Visited %d states and %zu transitions",
-                             depth, visited, ntransitions);
             }
         } else {
             // state is popped
@@ -1131,12 +1132,12 @@ ndfs_vset_blue(model_t model, int* src, size_t *o_depth)
         if (next_group < K) {
             dfs_stack_enter (blue_stack);
             ndfs_expand(model, src, &next_group, ndfs_vset_blue_next, 1);
+            if (RTverbosity >= 1 && explored >= threshold) {
+                Warning (info, "Depth %d, explored %d states and %zu transitions",
+                         depth, explored, ntransitions); threshold<<=1;}
             isba_push_int (buffer, &next_group);
             if (dfs_stack_nframes (blue_stack) > depth) {
                 depth = dfs_stack_nframes (blue_stack);
-                if (RTverbosity >= 1)
-                    Warning (info, "new depth reached %d. Visited %d states and %zu transitions",
-                             depth, visited, ntransitions);
             }
         } else {
             {
@@ -1276,12 +1277,12 @@ scc_tree(model_t model, size_t *o_depth)
                 if (GBbuchiIsAccepting(model, state)) scc_dfsnum[*fvec]++;
             dfs_stack_enter (stack);
             ndfs_expand(model, state, &next_group, scc_tree_next, 1);
+            if (RTverbosity >= 1 && explored >= threshold) {
+                Warning (info, "Depth %d, explored %d states and %zu transitions",
+                         depth, explored, ntransitions); threshold<<=1;}
             isba_push_int (buffer, &next_group);
             if (dfs_stack_nframes (stack) > depth) {
                 depth = dfs_stack_nframes (stack);
-                if (RTverbosity >= 1)
-                    Warning (info, "new depth reached %d. Visited %d states and %zu transitions",
-                             depth, visited, ntransitions);
             }
         } else {
             if (bitset_test(scc_current, *fvec)) {
