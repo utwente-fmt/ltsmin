@@ -10,50 +10,13 @@
 #include <stringindex.h>
 #include <limits.h>
 
-#include "runtime.h"
-#include "treedbs.h"
+#include <spec-greybox.h>
+#include <runtime.h>
+#include <treedbs.h>
 
-#if defined(MCRL)
-#include "mcrl-greybox.h"
-#endif
-#if defined(MCRL2)
-#include "mcrl2-greybox.h"
-#endif
-#if defined(NIPS)
-#include "nips-greybox.h"
-#endif
-#if defined(ETF)
-#include "etf-greybox.h"
-#endif
-#if defined(DIVINE)
-#include "dve-greybox.h"
-#endif
-#if defined(DIVINE2)
-#include "dve2-greybox.h"
-#endif
 
 static struct poptOption options[] = {
-#if defined(MCRL)
-    {NULL, 0, POPT_ARG_INCLUDE_TABLE, mcrl_options, 0, "mCRL options",
-     NULL},
-#endif
-#if defined(MCRL2)
-    {NULL, 0, POPT_ARG_INCLUDE_TABLE, mcrl2_options, 0, "mCRL2 options",
-     NULL},
-#endif
-#if defined(NIPS)
-    {NULL, 0, POPT_ARG_INCLUDE_TABLE, nips_options, 0, "NIPS options",
-     NULL},
-#endif
-#if defined(ETF)
-    {NULL, 0, POPT_ARG_INCLUDE_TABLE, etf_options, 0, "ETF options", NULL},
-#endif
-#if defined(DIVINE)
-    { NULL, 0 , POPT_ARG_INCLUDE_TABLE, dve_options, 0, "DiVinE options", NULL },
-#endif
-#if defined(DIVINE2)
-    { NULL, 0 , POPT_ARG_INCLUDE_TABLE, dve2_options, 0, "DiVinE2 options", NULL },
-#endif
+    SPEC_POPT_OPTIONS,
     {NULL, 0, POPT_ARG_INCLUDE_TABLE, greybox_options, 0,
      "Greybox options", NULL},
     POPT_TABLEEND
