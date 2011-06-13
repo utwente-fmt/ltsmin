@@ -41,14 +41,18 @@ bin_PROGRAMS += dve22lts-mpi
 endif
 endif
 if HAVE_LIBSTEP_INFO
-bin_PROGRAMS +=  lpo2lts-grey lpo-reach
+bin_PROGRAMS += lpo2lts-grey
+bin_PROGRAMS += lpo2lts-gsea
+bin_PROGRAMS += lpo-reach
 if HAVE_CADP
 pkglib_LTLIBRARIES += liblpo-open.la
 endif
 endif
 
 if HAVE_LIBMCRL2
-bin_PROGRAMS += lps2lts-grey lps-reach
+bin_PROGRAMS += lps2lts-grey
+bin_PROGRAMS += lps2lts-gsea
+bin_PROGRAMS += lps-reach
 noinst_LTLIBRARIES += libmcrl2-pins.la
 noinst_LTLIBRARIES += libvset-mcrl2.la
 if HAVE_CADP
@@ -58,8 +62,14 @@ endif
 
 if HAVE_LIBMCRL
 # if HAVE_LIBNIPS
-bin_PROGRAMS += nips2lts-grey nips-reach etf2lts-grey etf-reach \
-  nips2lts-mc etf2lts-mc
+bin_PROGRAMS += nips2lts-grey
+bin_PROGRAMS += nips2lts-gsea
+bin_PROGRAMS += nips-reach
+bin_PROGRAMS += etf2lts-grey
+bin_PROGRAMS += etf2lts-gsea
+bin_PROGRAMS += etf-reach
+bin_PROGRAMS += nips2lts-mc
+bin_PROGRAMS += etf2lts-mc
 # endif
 noinst_LTLIBRARIES += libvset-mcrl.la
 VSET_LIBS = libvset-mcrl.la
@@ -73,22 +83,30 @@ endif
 endif
 
 if HAVE_DVEC
-bin_PROGRAMS += dve2lts-grey dve-reach dve2lts-mc
+bin_PROGRAMS += dve2lts-grey
+bin_PROGRAMS += dve2lts-gsea
+bin_PROGRAMS += dve-reach
+bin_PROGRAMS += dve2lts-mc
 if HAVE_CADP
 pkglib_LTLIBRARIES += libdve-open.la
 endif
 endif
 
 if HAVE_DVEC2
-bin_PROGRAMS += dve22lts-grey dve2-reach \
-  dve22lts-mc dve22lts-gsea
+bin_PROGRAMS += dve22lts-grey
+bin_PROGRAMS += dve22lts-gsea
+bin_PROGRAMS += dve2-reach
+bin_PROGRAMS += dve22lts-mc
 if HAVE_CADP
 pkglib_LTLIBRARIES += libdve2-open.la
 endif
 endif
 
 #if HAVE_SPINJA
-bin_PROGRAMS += spinja2lts-grey spinja-reach spinja2lts-mc
+bin_PROGRAMS += spinja2lts-grey
+bin_PROGRAMS += spinja2lts-gsea
+bin_PROGRAMS += spinja-reach
+bin_PROGRAMS += spinja2lts-mc
 #endif
 
 libmcrl2_pins_la_SOURCES  = mcrl2-greybox.cpp mcrl2-greybox.h
@@ -133,6 +151,12 @@ spinja2lts_grey_LDADD    = $(VSET_LIBS) libltsmin.la $(SPINJA_LIBS)
 spinja2lts_grey_CPPFLAGS = -DSPINJA $(SPINJA_CPPFLAGS) $(AM_CPPFLAGS)
 spinja2lts_grey_LDFLAGS  = $(SPINJA_LDFLAGS) $(AM_LDFLAGS)
 
+# spinja2lts-gsea
+spinja2lts_gsea_SOURCES  = spec2lts-gsea.c spinja-greybox.c spinja-greybox.h
+spinja2lts_gsea_LDADD    = $(VSET_LIBS) libltsmin.la $(SPINJA_LIBS)
+spinja2lts_gsea_CPPFLAGS = -DSPINJA $(SPINJA_CPPFLAGS) $(AM_CPPFLAGS)
+spinja2lts_gsea_LDFLAGS  = $(SPINJA_LDFLAGS) $(AM_LDFLAGS)
+
 
 # dve22lts-grey
 dve22lts_grey_SOURCES  = spec2lts-grey.c dve2-greybox.c dve2-greybox.h
@@ -141,11 +165,10 @@ dve22lts_grey_CPPFLAGS = -DDIVINE2 $(DIVINE2_CPPFLAGS) $(AM_CPPFLAGS)
 dve22lts_grey_LDFLAGS  = $(DIVINE2_LDFLAGS) $(AM_LDFLAGS)
 
 # dve22lts-gsea
-dve22lts_gsea_SOURCES  = spec2lts-gsea.c dve2-greybox.c dve2-greybox.h    \
-                         lts.c lts.h vset_atermdd.c
-dve22lts_gsea_LDADD    = libltsmin.la -lATerm $(DVEC2_LIBS) $(BUDDY_LIBS) $(CADP_LIBS)
-dve22lts_gsea_CPPFLAGS = -DDIVINE2 $(MCRL_CPPFLAGS) $(DIVINE2_CPPFLAGS) $(AM_CPPFLAGS)
-dve22lts_gsea_LDFLAGS  = $(DIVINE2_LDFLAGS) $(MCRL_LDFLAGS) $(BUDDY_LDFLAGS) $(AM_LDFLAGS) $(CADP_LDFLAGS)
+dve22lts_gsea_SOURCES  = spec2lts-gsea.c dve2-greybox.c dve2-greybox.h
+dve22lts_gsea_LDADD    = $(VSET_LIBS) libltsmin.la $(DVEC2_LIBS)
+dve22lts_gsea_CPPFLAGS = -DDIVINE2 $(DIVINE2_CPPFLAGS) $(AM_CPPFLAGS)
+dve22lts_gsea_LDFLAGS  = $(DIVINE2_LDFLAGS) $(AM_LDFLAGS)
 
 # dve2lts-grey
 dve2lts_grey_SOURCES  = spec2lts-grey.c dve-greybox.cpp dve-greybox.h
@@ -153,10 +176,21 @@ dve2lts_grey_LDADD    = $(VSET_LIBS) libltsmin.la $(DVEC_LIBS)
 dve2lts_grey_CPPFLAGS = -DDIVINE $(DIVINE_CPPFLAGS) $(AM_CPPFLAGS)
 dve2lts_grey_LDFLAGS  = $(DIVINE_LDFLAGS) $(AM_LDFLAGS)
 
+# dve2lts-gsea
+dve2lts_gsea_SOURCES  = spec2lts-gsea.c dve-greybox.cpp dve-greybox.h
+dve2lts_gsea_LDADD    = $(VSET_LIBS) libltsmin.la $(DVEC_LIBS)
+dve2lts_gsea_CPPFLAGS = -DDIVINE $(DIVINE_CPPFLAGS) $(AM_CPPFLAGS)
+dve2lts_gsea_LDFLAGS  = $(DIVINE_LDFLAGS) $(AM_LDFLAGS)
+
 # etf2lts-grey
 etf2lts_grey_SOURCES  = spec2lts-grey.c etf-greybox.c etf-greybox.h
 etf2lts_grey_LDADD    = $(VSET_LIBS) libltsmin.la
 etf2lts_grey_CPPFLAGS = -DETF $(AM_CPPFLAGS)
+
+# etf2lts-gsea
+etf2lts_gsea_SOURCES  = spec2lts-gsea.c etf-greybox.c etf-greybox.h
+etf2lts_gsea_LDADD    = $(VSET_LIBS) libltsmin.la
+etf2lts_gsea_CPPFLAGS = -DETF $(AM_CPPFLAGS)
 
 
 # lpo2lts-grey
@@ -166,17 +200,36 @@ lpo2lts_grey_LDADD    = libvset-mcrl.la libltsmin.la $(MCRL_LIBS)
 lpo2lts_grey_CPPFLAGS = -DMCRL $(MCRL_CPPFLAGS) $(AM_CPPFLAGS)
 lpo2lts_grey_LDFLAGS  = $(MCRL_LDFLAGS) $(AM_LDFLAGS)
 
+# lpo2lts-gsea
+lpo2lts_gsea_SOURCES  = spec2lts-gsea.c mcrl-greybox.c mcrl-greybox.h
+lpo2lts_gsea_SOURCES += at-map.c at-map.h
+lpo2lts_gsea_LDADD    = libvset-mcrl.la libltsmin.la $(MCRL_LIBS)
+lpo2lts_gsea_CPPFLAGS = -DMCRL $(MCRL_CPPFLAGS) $(AM_CPPFLAGS)
+lpo2lts_gsea_LDFLAGS  = $(MCRL_LDFLAGS) $(AM_LDFLAGS)
+
 # lps2lts-grey
 lps2lts_grey_SOURCES  = spec2lts-grey.c
 lps2lts_grey_LDADD    = libvset-mcrl2.la libmcrl2-pins.la libltsmin.la
 lps2lts_grey_CPPFLAGS = -DMCRL2 $(AM_CPPFLAGS)
 nodist_EXTRA_lps2lts_grey_SOURCES = automake-force-linker.cxx
 
+# lps2lts-gsea
+lps2lts_gsea_SOURCES  = spec2lts-gsea.c
+lps2lts_gsea_LDADD    = libvset-mcrl2.la libmcrl2-pins.la libltsmin.la
+lps2lts_gsea_CPPFLAGS = -DMCRL2 $(AM_CPPFLAGS)
+nodist_EXTRA_lps2lts_gsea_SOURCES = automake-force-linker.cxx
+
 # nips2lts-grey
 nips2lts_grey_SOURCES  = spec2lts-grey.c nips-greybox.c nips-greybox.h
 nips2lts_grey_LDADD    = $(VSET_LIBS) libltsmin.la $(NIPS_LIBS)
 nips2lts_grey_CPPFLAGS = -DNIPS $(NIPS_CPPFLAGS) $(AM_CPPFLAGS)
 nips2lts_grey_LDFLAGS  = $(NIPS_LDFLAGS) $(AM_LDFLAGS)
+
+# nips2lts-gsea
+nips2lts_gsea_SOURCES  = spec2lts-gsea.c nips-greybox.c nips-greybox.h
+nips2lts_gsea_LDADD    = $(VSET_LIBS) libltsmin.la $(NIPS_LIBS)
+nips2lts_gsea_CPPFLAGS = -DNIPS $(NIPS_CPPFLAGS) $(AM_CPPFLAGS)
+nips2lts_gsea_LDFLAGS  = $(NIPS_LDFLAGS) $(AM_LDFLAGS)
 
 # spinja-reach
 spinja_reach_SOURCES  = spec-reach.c spinja-greybox.c spinja-greybox.h
@@ -409,9 +462,8 @@ libutil_la_SOURCES := unix.c runtime.c stream.c archive.c			\
                     ltsmin-lexer.l ltsmin-syntax.c ltsmin-syntax.h \
                     ltsmin-grammar.lemon ltsmin-parse-env.h \
                     ltsmin-tl.c ltsmin-tl.h \
-                    lts-type.h vset_buddy.c vector_set.c vector_set.h	\
-                    vset_listdd.c \
-                    vdom_object.h lts_io.c lts_io.h lts_io_internal.h \
+                    lts-type.h \
+                    lts_io.c lts_io.h lts_io_internal.h \
                     lts_enum.c lts_enum.h lts_count.c lts_count.h \
                     archive_io_ops.c fifo.c fifo.h \
                     trace.c trace.h \
@@ -441,12 +493,15 @@ libutil_la_LIBADD += $(top_builddir)/ltl2ba/libltl2ba.la
 
 libutil_la_SOURCES += pins-ltl.c
 
-libutil_la_CPPFLAGS += $(AM_CPPFLAGS)
 
 libutil_la_SOURCES += hre-context.c hre-context.h \
 	hre-feedback.c hre-feedback.h hre-internal.h \
 	hre-main.c hre-main.h hre-malloc.c hre-malloc.h \
 	hre-popt.c hre-popt.h hre-pthread.c
+
+
+libutil_la_CPPFLAGS += $(AM_CPPFLAGS)
+
 
 libltsmin_la_SOURCES = hre-nompi.c
 libltsmin_la_LIBADD = libutil.la bignum/libbignum.la

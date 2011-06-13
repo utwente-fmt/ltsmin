@@ -1,0 +1,48 @@
+//                           -*- mode: doc; outline-regexp: "==\(=*\) ." -*-
+ltsmin-mu(5)
+=============
+:Author:  Elwin Pater
+:Email:   <e.pater@student.utwente.nl>
+:Date:    2011-02-10
+
+== NAME
+ltsmin-mu - Mu Calculus
+
+== SYNOPSIS
+LTSmin syntax for Mu Calculus formulas
+
+== DESCRIPTION
+
+.Mu Calculus operators and priority
+[options="header"]
+
+|===================================================================
+|Priority | Operator   | Meaning
+|0        | true       | constant true
+|0        | false      | constant false
+|1        | ==         | test operator ('state variable name'=='number')
+|2        | !          | Logical negation
+|3        | &,/\       | Logical and
+|4        | \|,\/      | Logical or
+|5        | X          | neXt operator
+|5        | E          | Exist a successor
+|5        | A          | All successors
+|6        | [edgevar]* | Globally (Always) operator
+|6        | <edgevar>* | Finally (Eventually) operator
+|6        | nu         | greatest fixpoint operator
+|6        | mu         | least fixpoint operator
+|===================================================================
+$$*$$ not implemented
+
+CAUTION: Using the letters X,E or A as state label name might
+confuse the parser.
+
+== EXAMPLE
+
+----
+nu Z. (A X Z) /\ (E X true)
+----
+
+== SEE ALSO
+manpage:ltsmin[7],
+manpage:etf-reach[1]
