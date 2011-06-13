@@ -319,90 +319,173 @@ input ::= EXPR expr(E) . {
     env->expr=E;
 }
 
+%left CONSTANT .
 %right QUANTIFIER .
+%left PREFIX9  .
+%right POSTFIX9 .
+%left BIN8 .
+%left PREFIX8  .
+%right POSTFIX8 .
+%left BIN7 .
+%left PREFIX7  .
+%right POSTFIX7 .
+%left BIN6 .
+%left PREFIX6  .
+%right POSTFIX6 .
+%left BIN5 .
+%left PREFIX5  .
+%right POSTFIX5 .
+%left BIN4 .
+%left PREFIX4  .
+%right POSTFIX4 .
 %left BIN3 .
+%left PREFIX3 .
+%right POSTFIX3 .
 %left BIN2 .
+%left PREFIX2 .
+%right POSTFIX2 .
 %left BIN1 .
+%left PREFIX1 .
+%right POSTFIX1.
 
 expr(E) ::= LPAR expr(EE) RPAR . { E=EE; }
 expr(E) ::= STATE_VAR(ID) . {
-    E=RT_NEW(struct ltsmin_expr_s );
-    E->node_type=SVAR;
-    E->idx=ID;
+    E = LTSminExpr(SVAR, SVAR, ID, NULL, NULL);
 }
 expr(E) ::= IDENT(ID) . {
-    E=RT_NEW(struct ltsmin_expr_s );
-    E->node_type=VAR;
-    E->idx=ID;
+    E = LTSminExpr(VAR, VAR, ID, NULL, NULL);
 }
 expr(E) ::= EDGE_VAR(ID) . {
-    E=RT_NEW(struct ltsmin_expr_s );
-    E->node_type=EVAR;
-    E->idx=ID;
+    E = LTSminExpr(EVAR, EVAR, ID, NULL, NULL);
 }
 expr(E) ::= VALUE(ID) . {
-    E=RT_NEW(struct ltsmin_expr_s );
-    E->node_type=CHUNK;
-    E->idx=ID;
+    E = LTSminExpr(CHUNK, CHUNK, ID, NULL, NULL);
 }
 expr(E) ::= NUMBER(N) . {
-    E=RT_NEW(struct ltsmin_expr_s );
-    E->node_type=INT;
-    E->idx=N;
+    E = LTSminExpr(INT, INT, N, NULL, NULL);
+}
+expr(E) ::= CONSTANT(OP) . {
+    E = LTSminExpr(CONSTANT, LTSminConstantToken(env, OP), OP, NULL, NULL);
 }
 
 expr(E) ::= expr(E1) BIN1(OP) expr(E2) . {
-    E=RT_NEW(struct ltsmin_expr_s );
-    E->node_type=BINARY_OP;
-    E->idx=OP;
-    E->arg1=E1;
-    E->arg2=E2;
+    E = LTSminExpr(BINARY_OP, LTSminBinaryToken(env, OP), OP, E1, E2);
 }
 expr(E) ::= expr(E1) BIN2(OP) expr(E2) . {
-    E=RT_NEW(struct ltsmin_expr_s );
-    E->node_type=BINARY_OP;
-    E->idx=OP;
-    E->arg1=E1;
-    E->arg2=E2;
+    E = LTSminExpr(BINARY_OP, LTSminBinaryToken(env, OP), OP, E1, E2);
 }
 expr(E) ::= expr(E1) BIN3(OP) expr(E2) . {
-    E=RT_NEW(struct ltsmin_expr_s );
-    E->node_type=BINARY_OP;
-    E->idx=OP;
-    E->arg1=E1;
-    E->arg2=E2;
+    E = LTSminExpr(BINARY_OP, LTSminBinaryToken(env, OP), OP, E1, E2);
+}
+expr(E) ::= expr(E1) BIN4(OP) expr(E2) . {
+    E = LTSminExpr(BINARY_OP, LTSminBinaryToken(env, OP), OP, E1, E2);
+}
+expr(E) ::= expr(E1) BIN5(OP) expr(E2) . {
+    E = LTSminExpr(BINARY_OP, LTSminBinaryToken(env, OP), OP, E1, E2);
+}
+expr(E) ::= expr(E1) BIN6(OP) expr(E2) . {
+    E = LTSminExpr(BINARY_OP, LTSminBinaryToken(env, OP), OP, E1, E2);
+}
+expr(E) ::= expr(E1) BIN7(OP) expr(E2) . {
+    E = LTSminExpr(BINARY_OP, LTSminBinaryToken(env, OP), OP, E1, E2);
+}
+expr(E) ::= expr(E1) BIN8(OP) expr(E2) . {
+    E = LTSminExpr(BINARY_OP, LTSminBinaryToken(env, OP), OP, E1, E2);
 }
 
-expr(E) ::= MU_SYM IDENT(ID) DOT expr(E1) . [QUANTIFIER] {
-    E=RT_NEW(struct ltsmin_expr_s );
-    E->node_type=MU_FIX;
-    E->idx=ID;
-    E->arg1=E1;
+expr(E) ::= PREFIX1(OP) expr(E1) . {
+    E = LTSminExpr(UNARY_OP, LTSminUnaryToken(env, OP), OP, E1, NULL);
 }
 
-expr(E) ::= NU_SYM IDENT(ID) DOT expr(E1) . [QUANTIFIER] {
-    E=RT_NEW(struct ltsmin_expr_s );
-    E->node_type=NU_FIX;
-    E->idx=ID;
-    E->arg1=E1;
+expr(E) ::= PREFIX2(OP) expr(E1) . {
+    E = LTSminExpr(UNARY_OP, LTSminUnaryToken(env, OP), OP, E1, NULL);
 }
 
-expr(E) ::= EXISTS_SYM expr(E1) DOT expr(E2) . [QUANTIFIER]  {
-    E=RT_NEW(struct ltsmin_expr_s );
-    E->node_type=EXISTS_STEP;
-    E->idx=0;
-    E->arg1=E1;
-    E->arg2=E2;  
+expr(E) ::= PREFIX3(OP) expr(E1) . {
+    E = LTSminExpr(UNARY_OP, LTSminUnaryToken(env, OP), OP, E1, NULL);
 }
 
-expr(E) ::= ALL_SYM expr(E1) DOT expr(E2) . [QUANTIFIER] {
-    E=RT_NEW(struct ltsmin_expr_s );
-    E->node_type=FORALL_STEP;
-    E->idx=0;
-    E->arg1=E1;
-    E->arg2=E2;  
+expr(E) ::= PREFIX4(OP) expr(E1) . {
+    E = LTSminExpr(UNARY_OP, LTSminUnaryToken(env, OP), OP, E1, NULL);
+}
+
+expr(E) ::= PREFIX5(OP) expr(E1) . {
+    E = LTSminExpr(UNARY_OP, LTSminUnaryToken(env, OP), OP, E1, NULL);
+}
+
+expr(E) ::= PREFIX6(OP) expr(E1) . {
+    E = LTSminExpr(UNARY_OP, LTSminUnaryToken(env, OP), OP, E1, NULL);
+}
+
+expr(E) ::= PREFIX7(OP) expr(E1) . {
+    E = LTSminExpr(UNARY_OP, LTSminUnaryToken(env, OP), OP, E1, NULL);
+}
+expr(E) ::= PREFIX8(OP) expr(E1) . {
+    E = LTSminExpr(UNARY_OP, LTSminUnaryToken(env, OP), OP, E1, NULL);
+}
+expr(E) ::= PREFIX9(OP) expr(E1) . {
+    E = LTSminExpr(UNARY_OP, LTSminUnaryToken(env, OP), OP, E1, NULL);
+}
+
+expr(E) ::= expr(E1) POSTFIX1(OP) . {
+    E = LTSminExpr(UNARY_OP, LTSminUnaryToken(env, OP), OP, E1, NULL);
+}
+
+expr(E) ::= expr(E1) POSTFIX2(OP) . {
+    E = LTSminExpr(UNARY_OP, LTSminUnaryToken(env, OP), OP, E1, NULL);
+}
+
+expr(E) ::= expr(E1) POSTFIX3(OP) . {
+    E = LTSminExpr(UNARY_OP, LTSminUnaryToken(env, OP), OP, E1, NULL);
+}
+
+expr(E) ::= expr(E1) POSTFIX4(OP) . {
+    E = LTSminExpr(UNARY_OP, LTSminUnaryToken(env, OP), OP, E1, NULL);
+}
+expr(E) ::= expr(E1) POSTFIX5(OP) . {
+    E = LTSminExpr(UNARY_OP, LTSminUnaryToken(env, OP), OP, E1, NULL);
+}
+expr(E) ::= expr(E1) POSTFIX6(OP) . {
+    E = LTSminExpr(UNARY_OP, LTSminUnaryToken(env, OP), OP, E1, NULL);
+}
+expr(E) ::= expr(E1) POSTFIX7(OP) . {
+    E = LTSminExpr(UNARY_OP, LTSminUnaryToken(env, OP), OP, E1, NULL);
+}
+expr(E) ::= expr(E1) POSTFIX8(OP) . {
+    E = LTSminExpr(UNARY_OP, LTSminUnaryToken(env, OP), OP, E1, NULL);
+}
+expr(E) ::= expr(E1) POSTFIX9(OP) . {
+    E = LTSminExpr(UNARY_OP, LTSminUnaryToken(env, OP), OP, E1, NULL);
+}
+
+expr(E) ::= MU_SYM(OP) IDENT(ID) DOT expr(E1) . [QUANTIFIER] {
+    E = LTSminExpr(MU_FIX, OP, ID, E1, NULL);
+}
+
+expr(E) ::= NU_SYM(OP) IDENT(ID) DOT expr(E1) . [QUANTIFIER] {
+    E = LTSminExpr(NU_FIX, OP, ID, E1, NULL);
+}
+
+expr(E) ::= EXISTS_SYM(OP) expr(E1) DOT expr(E2) . [QUANTIFIER]  {
+    E = LTSminExpr(EXISTS_STEP, OP, 0, E1, E2);
+}
+
+expr(E) ::= ALL_SYM(OP) expr(E1) DOT expr(E2) . [QUANTIFIER] {
+    E = LTSminExpr(FORALL_STEP, OP, 0, E1, E2);
 }
 
 expr(E) ::= IF IDENT THEN expr(EE) . [QUANTIFIER] {
     E = EE ;
 }
+
+expr(E) ::= EDGE_EXIST_LEFT EDGE_VAR(ID) EDGE_EXIST_RIGHT expr(E1) . [QUANTIFIER] {
+    E = LTSminExpr(EDGE_EXIST, EDGE_EXIST, ID, E1, NULL);
+}
+
+expr(E) ::= EDGE_ALL_LEFT EDGE_VAR(ID) EDGE_ALL_RIGHT expr(E1) . [QUANTIFIER] {
+    E = LTSminExpr(EDGE_ALL, EDGE_ALL, ID, E1, NULL);
+}
+
+/* generates a special USER token so that the user knows the value of the last reserved token */
+/* must be at the end of the file */
+%left USER

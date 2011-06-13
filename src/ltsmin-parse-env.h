@@ -11,6 +11,7 @@
 #include <etf-util.h>
 
 struct op_info{
+    int pattern;
     int token;
     int prio;
 };
@@ -23,6 +24,9 @@ struct ltsmin_parse_env_s{
     string_index_t edge_vars; // integer <-> edge variable name mapping
     string_index_t keywords; // token <-> keywords mapping
     string_index_t idents; // other identifiers
+    string_index_t constant_ops; // integer <-> operator mapping
+    array_manager_t constant_man;
+    struct op_info *constant_info;
     string_index_t unary_ops; // integer <-> operator mapping
     array_manager_t unary_man;
     struct op_info *unary_info;
@@ -39,5 +43,36 @@ struct ltsmin_parse_env_s{
 };
 
 
+/* Parser Priorities:
+ * HIGH
+ *     postfix priority 1
+ *     prefix priority 1
+ *     binary priority 1
+ *     postfix priority 2
+ *     prefix priority 2
+ *     binary priority 2
+ *     postfix priority 3
+ *     prefix priority 3
+ *     binary priority 3
+ *     postfix priority 4
+ *     prefix priority 4
+ *     binary priority 4
+ *     postfix priority 5
+ *     prefix priority 5
+ *     binary priority 5
+ *     postfix priority 6
+ *     prefix priority 6
+ *     binary priority 6
+ *     postfix priority 7
+ *     prefix priority 7
+ *     binary priority 7
+ *     postfix priority 8
+ *     prefix priority 8
+ *     binary priority 8
+ *     postfix priority 9
+ *     prefix priority 9
+ *     Quantifier
+ * LOW
+ */
 
 #endif
