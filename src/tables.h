@@ -1,3 +1,4 @@
+// -*- tab-width:4 ; indent-tabs-mode:nil -*-
 /**
 \file tables.h
 
@@ -9,8 +10,8 @@
 
 #include <stdarg.h>
 #include <stdint.h>
-#include <chunk_support.h>
 #include <unistd.h>
+#include <chunk_support.h>
 
 /**
 \brief type of a value index
@@ -24,7 +25,7 @@ A value table is a pointer to the user area of the object.
 Note that this area is preceeded by a system area, so do not
 use free and realloc directly!
 */
-typedef void* value_table_t;
+typedef struct value_table_s* value_table_t;
 
 /**
 \brief Type of a value table factory function.
