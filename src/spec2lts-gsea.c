@@ -11,6 +11,7 @@
 #include <bitset.h>
 #include <dbs-ll.h>
 #include <dfs-stack.h>
+#include <trace.h>
 #include <dynamic-array.h>
 #include <is-balloc.h>
 #include <lts_enum.h>
@@ -19,6 +20,7 @@
 #include <scctimer.h>
 #include <spec-greybox.h>
 #include <stringindex.h>
+#include <trace.h>
 #include <treedbs.h>
 #include <vector_set.h>
 
@@ -218,7 +220,7 @@ typedef struct gsea_state {
     int  count;
     union {
         struct {
-            int hash_idx;
+            ref_t hash_idx;
         } table;
         struct {
             int tree_idx;
@@ -1079,7 +1081,7 @@ dfs_table_stack_closed (gsea_state_t *state, int is_backtrack, void *arg)
 static void
 dfs_table_stack_peek (gsea_state_t *state, void *arg)
 {
-    state->table.hash_idx = *dfs_stack_top (gc.queue.filo.stack);
+    state->table.hash_idx = *((ref_t *)dfs_stack_top (gc.queue.filo.stack));
     (void)arg;
 }
 
@@ -1100,7 +1102,7 @@ dfs_table_stack_to_state(gsea_state_t *state, void *arg)
 
 static void dfs_table_stack_push(gsea_state_t *state, void *arg)
 {
-    dfs_stack_push(gc.queue.filo.stack, &(state->table.hash_idx));
+    dfs_stack_push(gc.queue.filo.stack, (int*)&(state->table.hash_idx));
     (void)arg;
 }
 
@@ -1510,7 +1512,7 @@ gsea_setup()
             gc.context = RTmalloc(sizeof(int) * global.N);
             gc.store.table.dbs = DBSLLcreate(global.N);
             gc.queue.filo.closed_set = bitset_create(128,128);
-            gc.queue.filo.stack = dfs_stack_create(1);
+            gc.queue.filo.stack = dfs_stack_create(sizeof(ref_t)/sizeof(int));
 
             // proviso: dfs table specific
             switch (opt.proviso) {

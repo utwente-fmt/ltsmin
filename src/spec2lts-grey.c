@@ -20,6 +20,7 @@
 #include <scctimer.h>
 #include <spec-greybox.h>
 #include <stringindex.h>
+#include <trace.h>
 #include <treedbs.h>
 #include <vector_set.h>
 
@@ -698,7 +699,7 @@ dfs_explore (model_t model, int *src, size_t *o_depth)
         stack = dfs_stack_create (N);
         dbs_ll_t dbsll = DBSLLcreate(N);
         buffer = isba_create (1);
-        int                 index;
+        ref_t               index;
         fvec = src;
         dfs_stack_push (stack, fvec);//dummy
                 isba_push_int (buffer, &next_group);
