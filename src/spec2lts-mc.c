@@ -479,7 +479,6 @@ wctx_create (size_t id)
 {
     assert (NULL == 0);
     wctx_t             *ctx = RTalignZero (CACHE_LINE_SIZE, sizeof (wctx_t));
-    memset (ctx, 0, sizeof (wctx_t));
     ctx->id = id;
     ctx->model = NULL;
     state_info_create_empty (&ctx->state);
@@ -515,8 +514,6 @@ wctx_free (wctx_t *ctx)
     RTfree (ctx->store);
     RTfree (ctx->store2);
     dfs_stack_destroy (ctx->out_stack);
-    //if (NULL != ctx->model)
-    //    GBfree (ctx->model);
     if (strategy & Strat_LTL) {
         bitvector_free (&ctx->color_map);
         bitvector_free (&ctx->not_all_red);
@@ -963,6 +960,7 @@ void
 permute_free (permute_t *perm)
 {
     RTfree (perm->todos);
+    RTfree (perm->tosort);
     if (Perm_Otf == perm->permutation)
         RTfree (perm->pad);
     if (Perm_Random == perm->permutation) {
