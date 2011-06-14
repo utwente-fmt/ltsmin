@@ -101,7 +101,7 @@ typedef struct permute_s {
     int                 start_group_index;  /* recorded index higher than start*/
     permute_todo_t     *todos;  /* records states that require late permutation */
     int                *tosort; /* indices of todos */
-    size_t              nstored;/* number of states stored in todo */
+    size_t              nstored;/* number of states stored in to-do */
     size_t              trans;  /* number of transition groups */
     permutation_perm_t  permutation;        /* kind of permuation */
     model_t             model;  /* GB model */
@@ -597,7 +597,7 @@ init_globals (int argc, char *argv[])
     } else {
         threshold = 100000 / W;
     }
-    Warning (info, "Using %d cores (lb: %s)", W, arg_lb);
+    Warning (info, "Using %d cores (lb: %s)", W, key_search(lb_methods, lb_method));
     Warning (info, "loading model from %s", files[0]);
     program = get_label ();
     lts_type_t          ltstype = GBgetLTStype (model);
@@ -625,7 +625,6 @@ init_globals (int argc, char *argv[])
     switch (db_type) {
     case UseDBSLL:
         if (ZOBRIST) {
-            //TODO: fix zobrist with hash on stack, now memoized hash is broken
             zobrist = zobrist_create (N, ZOBRIST, m);
             find_or_put = find_or_put_zobrist;
             dbs = DBSLLcreate_sized (N, dbs_size, (hash32_f)z_rehash, global_bits);
@@ -1090,6 +1089,8 @@ state_info_size ()
     size_t              state_info_size = refs ? ref_size : data_size;
     if (!refs && UseDBSLL==db_type)
         state_info_size += ref_size;
+    if (ZOBRIST)
+        state_info_size += sizeof (uint32_t);
     return state_info_size;
 }
 
@@ -1101,9 +1102,7 @@ state_info_initialize (state_info_t *state, state_data_t data,
                        transition_info_t *ti, state_info_t *src, wctx_t *ctx)
 {
     state->data = data;
-    int                 seen = find_or_put (state, ti, src, ctx->store2);
-    if (ZOBRIST) state->hash32 = DBSLLmemoized_hash (dbs, state->ref);
-    return seen;
+    return find_or_put (state, ti, src, ctx->store2);
 }
 
 /**
@@ -1112,6 +1111,10 @@ state_info_initialize (state_info_t *state, state_data_t data,
 void
 state_info_serialize (state_info_t *state, raw_data_t data)
 {
+    if (ZOBRIST) {
+        ((uint32_t*)data)[0] = state->hash32;
+        data++;
+    }
     if (refs) {
         ((ref_t*)data)[0] = state->ref;
     } else if ( UseDBSLL==db_type ) {
@@ -1128,6 +1131,10 @@ state_info_serialize (state_info_t *state, raw_data_t data)
 void
 state_info_deserialize (state_info_t *state, raw_data_t data, state_data_t store)
 {
+    if (ZOBRIST) {
+        state->hash32 = ((uint32_t*)data)[0];
+        data++;
+    }
     if (refs) {
         state->ref  = ((ref_t*)data)[0];
         state->data = data = get (dbs, state->ref, store);
@@ -1145,7 +1152,6 @@ state_info_deserialize (state_info_t *state, raw_data_t data, state_data_t store
             state->ref  = TreeDBSLLindex (data);
         }
     }
-    if (ZOBRIST) state->hash32 = DBSLLmemoized_hash (dbs, state->ref);
 }
 
 static void *
