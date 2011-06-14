@@ -18,8 +18,8 @@
 #include <cctables.h>
 #include <dbs-ll.h>
 #include <dbs.h>
-#include <dm/bitvector.h>
 #include <dfs-stack.h>
+#include <dm/bitvector.h>
 #include <fast_hash.h>
 #include <is-balloc.h>
 #include <lb.h>
