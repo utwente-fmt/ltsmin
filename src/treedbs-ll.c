@@ -300,6 +300,7 @@ project_matrix_to_tree (treedbs_ll_t dbs, matrix_t *m)
 treedbs_ll_t
 TreeDBSLLcreate_dm (int nNodes, int size, matrix_t * m, int satellite_bits)
 {
+    assert (size <= DB_SIZE_MAX);
     treedbs_ll_t        dbs = RTalign (CACHE_LINE_SIZE, sizeof(struct treedbs_ll_s));
     uint32_t            pow = 0;
     while ((1 << (++pow)) < nNodes) {}

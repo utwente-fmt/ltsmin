@@ -10,6 +10,8 @@
 \brief Implementation of tree compression using lockless hashtables.
 */
 
+static const int    DB_SIZE_MAX = 32;
+
 /**
 Abstract type tree database.
 */

@@ -1,3 +1,7 @@
+#if defined(__APPLE__)
+#include <sys/types.h>
+#include <sys/sysctl.h>
+#endif
 #include <config.h>
 #include "runtime.h"
 #include <stdlib.h>
@@ -131,7 +135,6 @@ void RTfree(void *rt_ptr){
             free (rt_ptr);
 }
 
-
 void *
 RTdlsym (const char *libname, void *handle, const char *symbol)
 {
@@ -144,3 +147,38 @@ RTdlsym (const char *libname, void *handle, const char *symbol)
     }
     return ret;
 }
+
+/* From stefan's HRE code: */
+#if defined(__APPLE__)
+
+size_t RTmemSize() {
+    int mib[4];
+    int64_t physical_memory;
+    size_t len = sizeof(int64_t);
+    mib[0] = CTL_HW;
+    mib[1] = HW_MEMSIZE;
+    len = sizeof(int64_t);
+    sysctl(mib, 2, &physical_memory, &len, NULL, 0);
+    return physical_memory;
+}
+
+#else
+
+size_t RTmemSize() {
+    long res=sysconf(_SC_PHYS_PAGES);
+    size_t pagesz=RTpageSize();
+    return pagesz*((size_t)res);
+}
+
+#endif
+
+int RTnumCPUs() {
+    long res=sysconf(_SC_NPROCESSORS_ONLN);
+    return (size_t)res;
+}
+
+size_t RTpageSize() {
+    long res=sysconf(_SC_PAGESIZE);
+    return (size_t)res;
+}
+

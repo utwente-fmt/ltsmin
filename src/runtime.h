@@ -115,6 +115,19 @@ extern void (*RThandleFatal)(const char*file,int line,int errnum,int code);
 
 ///@}
 
+/** \defgroup rt_sysinfo Functions for retrieving system information. */
+/*@{*/
+
+/// Get the number of CPUs.
+extern int RTnumCPUs();
+
+/// Get the amount of memory.
+extern size_t RTmemSize();
+
+/// Get the page size.
+extern size_t RTpageSize();
+
+/*}@*/
 
 #endif
 

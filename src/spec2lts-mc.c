@@ -12,6 +12,7 @@
 #include <string.h>
 #include <sys/types.h>
 #include <time.h>
+#include <math.h>
 
 #include <archive.h>
 #include <cctables.h>
@@ -124,7 +125,7 @@ extern int permute_trans (permute_t *perm, state_data_t state,
 static char            *program;
 static cct_map_t       *tables = NULL;
 static char            *files[2];
-static int              dbs_size = 24;
+static int              dbs_size = 0;
 static int              refs = 0;
 static int              no_red_perm = 0;
 static box_t            call_mode = UseBlackBox;
@@ -611,16 +612,12 @@ init_globals (int argc, char *argv[])
     } else {
         if (permutation != Perm_None)
             Fatal(1, error, "Transition permutation is not supported for reachability algorithms");
-        if (trc_output) {
-            parent_ref = RTmalloc(sizeof(int[1<<dbs_size]));
-            dlk_detect = 1;
-        }
         threshold = 100000 / W;
     }
 #ifndef __APPLE__
     pthread_barrier_init (&start_barrier, NULL, W);
 #endif
-    Warning (info, "Using %d cores.", W);
+    Warning (info, "Using %d cores", W);
     Warning (info, "loading model from %s", files[0]);
     program = get_label ();
     lts_type_t          ltstype = GBgetLTStype (model);
@@ -631,10 +628,18 @@ init_globals (int argc, char *argv[])
     matrix_t           *m = GBgetDMInfo (model);
     N = lts_type_get_state_length (ltstype);
     K = dm_nrows (m);
-    Warning (info, "length is %d, there are %d groups", N, K);
+    Warning (info, "State length is %d, there are %d groups", N, K);
 
-    /* for --grey: */
-    MAX_SUCC = ( Strat_DFS == strategy ? 1 : INT_MAX );
+    if (0 == dbs_size) {
+        size_t              el_size = db_type == UseTreeDBSLL ? 3 : N;
+        size_t              db_el_size = (RTmemSize() / 3) / (el_size * SLOT_SIZE);
+        dbs_size = (int) (log(db_el_size) / log(2));
+        dbs_size = dbs_size > DB_SIZE_MAX ? DB_SIZE_MAX : dbs_size;
+    }
+    Warning (info, "Using a %s with 2^%d elements", db_type==UseDBSLL?"hash table":"tree", dbs_size);
+    MAX_SUCC = ( Strat_DFS == strategy ? 1 : INT_MAX );  /* for --grey: */
+    if (trc_output)
+        parent_ref = RTmalloc(sizeof(ref_t[1<<dbs_size]));
 
     int                 global_bits = Strat_LTLG & strategy ? 2 : 0;
     switch (db_type) {
