@@ -54,14 +54,14 @@ static struct {
     //lts_enum_cb_t output_handle=NULL;
 
     model_t model;
-    char* trc_output;
+    const char* trc_output;
     lts_enum_cb_t trace_handle;
     lts_output_t trace_output;
     int dlk_detect;
 
-    char *ltl_semantics;
+    const char *ltl_semantics;
     int   ltl_type;
-    char *ltl_file;
+    const char *ltl_file;
 
     //array_manager_t state_man=NULL;
     //uint32_t *parent_ofs=NULL;
@@ -74,12 +74,12 @@ static struct {
 
     mode_t call_mode;
 
-    char *arg_strategy;
+    const char *arg_strategy;
     enum { Strat_BFS, Strat_DFS, Strat_SCC } strategy;
-    char *arg_state_db;
+    const char *arg_state_db;
     enum { DB_DBSLL, DB_TreeDBS, DB_Vset } state_db;
 
-    char *arg_proviso;
+    const char *arg_proviso;
     enum { LTLP_ClosedSet, LTLP_Stack, LTLP_Color } proviso;
 
     char* dot_output;
@@ -642,7 +642,7 @@ dfs_goal_trace(gsea_state_t *state, void *arg)
     ctx.found = 0;
 
     // init trace output
-    opt.trace_output=lts_output_open(opt.trc_output,opt.model,1,0,1,"vsi",NULL);
+    opt.trace_output=lts_output_open((char*)opt.trc_output,opt.model,1,0,1,"vsi",NULL);
     {
         int init_state[global.N];
         GBgetInitialState(opt.model, init_state);
@@ -1635,8 +1635,8 @@ gsea_finished(void *arg) {
 int
 main (int argc, char *argv[])
 {
-    char *files[1];
-    RTinitPopt(&argc,&argv,options,1,1,files,NULL,"<model>",
+    const char *files[1];
+    RTinitPopt(&argc,&argv,options,1,1,(char **)files,NULL,"<model>",
         "Perform an enumerative reachability analysis of <model>\n\n"
         "Options");
 
