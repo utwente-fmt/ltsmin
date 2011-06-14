@@ -13,7 +13,7 @@ static int fdd_bits=16;
 static int cacheratio=64;
 static int maxincrease=1000000;
 static int minfreenodes=20;
-static char* fdd_reorder_opt="none";
+static const char *fdd_reorder_opt="none";
 static int fdd_order_strat=BDD_REORDER_NONE;
 
 static void vset_fdd_gbchandler(int pre, bddGbcStat *s) {
@@ -29,6 +29,7 @@ static void buddy_init(){
 	static int initialized=0;
 	if (!initialized) {
 		bdd_init(1000000, 100000);
+		Warning (info,"Buddy dynamic reordering strategy: %s",fdd_reorder_opt);
 		Warning(info,"ratio %d, maximum increase %d, minimum free %d",cacheratio,maxincrease,minfreenodes);
 		bdd_setcacheratio(cacheratio);
 		bdd_setmaxincrease(maxincrease);
@@ -65,7 +66,6 @@ static void reach_popt(poptContext con,
   else
     Fatal(1,error,"BuDDy reordering strategy not recognized: %s",fdd_reorder_opt);
   
-  Warning(info,"Buddy dynamic reordering strategy: %s",fdd_reorder_opt);
   return;
 }
 
