@@ -183,19 +183,26 @@ write_trace (trc_env_t *env, size_t trace_size, ref_t *trace)
 static void
 find_trace_to (trc_env_t *env, int dst_idx, int level, ref_t *parent_ofs)
 {
-    ref_t              *trace = RTmalloc(sizeof(ref_t) * level);
+    /* Other workers may have influenced the trace, writing to parent_ofs.
+     * we artificially limit the length of the trace to 10 times that of the
+     * found one */
+    size_t              max_length = level * 10;
+    ref_t              *trace = RTmalloc(sizeof(ref_t) * max_length);
     if (trace == NULL)
         Fatal(1, error, "unable to allocate memory for trace");
-    int                 i = level - 1;
+    int                 i = max_length - 1;
     ref_t               curr_idx = dst_idx;
     trace[i] = curr_idx;
     while(curr_idx != env->start_idx) {
         i--;
+        if (i < 0)
+            Fatal (1, error, "Trace length 10x longer than initially found trace. Giving up.");
         curr_idx = parent_ofs[curr_idx];
         trace[i] = curr_idx;
     }
+    Warning (info, "reconstructed trace length: %zu", max_length - i);
     // write trace
-    write_trace (env, level - i, &trace[i]);
+    write_trace (env, max_length - i, &trace[i]);
     RTfree (trace);
 }
 
