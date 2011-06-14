@@ -53,14 +53,15 @@ typedef struct state_info_s {
 
 typedef enum { UseGreyBox, UseBlackBox } box_t;
 typedef enum { UseDBSLL, UseTreeDBSLL } db_type_t;
-typedef enum { Strat_BFS    = 1,
-               Strat_DFS    = 2,
-               Strat_NDFS   = 4,
-               Strat_NNDFS  = 8,
-               Strat_MCNDFS = 16,
-               Strat_LTLG   = Strat_MCNDFS,
-               Strat_LTL    = Strat_NDFS | Strat_NNDFS | Strat_MCNDFS,
-               Strat_Reach  = Strat_BFS | Strat_DFS
+typedef enum {
+    Strat_BFS    = 1,
+    Strat_DFS    = 2,
+    Strat_NDFS   = 4,
+    Strat_NNDFS  = 8,
+    Strat_MCNDFS = 16,
+    Strat_LTLG   = Strat_MCNDFS,
+    Strat_LTL    = Strat_NDFS | Strat_NNDFS | Strat_MCNDFS,
+    Strat_Reach  = Strat_BFS | Strat_DFS
 } strategy_t;
 
 /* permute_get_transitions is a replacement for GBgetTransitionsLong
