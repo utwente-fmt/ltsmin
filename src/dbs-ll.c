@@ -143,8 +143,8 @@ DBSLLlookup_hash (const dbs_ll_t dbs, const int *v, dbs_ref_t *ret, uint32_t *ha
 int *
 DBSLLget (const dbs_ll_t dbs, const dbs_ref_t ref, int *dst)
 {
-    *dst = dbs->table[ref] & ~dbs->sat_mask;
     return &dbs->data[ref * dbs->length];
+    (void) dst;
 }
 
 int
