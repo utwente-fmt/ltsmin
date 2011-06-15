@@ -172,12 +172,13 @@ static event_queue_t mpi_queue;
 static event_barrier_t barrier;
 
 static int write_state=0;
+static int print_stats=0;
 
 static  struct poptOption options[] = {
 	{ "nice" , 0 , POPT_ARG_INT , &nice_value , 0 , "set the nice level of all workers"
 		" (useful when running on other peoples workstations)" , NULL},
 	{ "write-state" , 0 , POPT_ARG_VAL , &write_state, 1 , "write the full state vector" , NULL },
-        SPEC_POPT_OPTIONS,
+    SPEC_POPT_OPTIONS,
 	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, greybox_options , 0 , "Greybox options", NULL },
 	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, lts_io_options , 0 , NULL, NULL},
 	POPT_TABLEEND
@@ -595,7 +596,13 @@ int main(int argc, char*argv[]){
 	//char dir[16];
 	//sprintf(dir,"gmon-%d",mpi_me);
 	//chdir(dir);
-	event_barrier_wait(barrier);
+    if (print_stats) {
+        for(int i=0;i<mpi_nodes;i++) {
+	    event_barrier_wait(barrier);
+    	    if (i==mpi_me) TreeInfo(dbs);
+    	}
+    }
+    event_barrier_wait(barrier);
 	RTfiniMPI();
 	MPI_Finalize();
 	return 0;
