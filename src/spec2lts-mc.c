@@ -711,7 +711,7 @@ maybe_report (counter_t *cnt, char *msg, size_t *threshold)
     if (W == 1 || strategy & Strat_LTL)
         print_state_space_total (msg, cnt);
     else
-        Warning (info, "%s%zu levels ±%zu states ±%zu transitions", msg,
+        Warning (info, "%s%zu levels ~%zu states ~%zu transitions", msg,
                  cnt->level_max, W * cnt->explored,  W * cnt->trans);
 }
 
@@ -784,7 +784,7 @@ print_statistics(counter_t *reach, counter_t *red, mytimer_t timer)
     name = db_type == UseTreeDBSLL ? "Tree" : "Table";
     Warning (info, "DB: %s, memory: %.1fMB, compr. ratio: %.1f%%, "
              "fill ratio: %.1f%%", name, mem2, compr, ratio);
-    Warning (info, "Est. total memory use: %.1fMB (±%.1fMB paged-in)",
+    Warning (info, "Est. total memory use: %.1fMB (~%.1fMB paged-in)",
              mem1 + mem4 + mem3, mem1 + mem2 + mem3);
     if (RTverbosity >= 2) {        // detailed output for scripts
         Warning (info, "time:{{{%.2f}}}, elts:{{{%zu}}}, nodes:{{{%zu}}}, "
@@ -1746,5 +1746,5 @@ main (int argc, char *argv[])
         print_statistics (reach, red, timer);
     SCCdeleteTimer (timer); RTfree (reach->stats); RTfree (reach); RTfree (red);
     deinit_globals ();
-    return EXIT_SUCCESS;
+    exit (EXIT_SUCCESS);
 }
