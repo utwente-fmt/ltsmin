@@ -49,7 +49,7 @@ extern char* RTstrdup(const char *str);
 
 extern void RTfree(void *rt_ptr);
 
-#define RT_NEW(sort) ((sort*)RTmallocZero(sizeof(sort)))
+#define RT_NEW(sort) RTmallocZero(sizeof(sort))
 
 extern void *RTdlsym (const char *libname, void *handle, const char *symbol);
 
