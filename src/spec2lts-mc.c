@@ -1310,8 +1310,8 @@ nndfs_blue_handle (void *arg, state_info_t *successor, transition_info_t *ti,
     wctx_t             *ctx = (wctx_t *) arg;
     nndfs_color_t color = nn_get_color (&ctx->color_map, successor->ref);
     if ( nn_color_eq(color, NNCYAN) &&
-            (GBbuchiIsAccepting(ctx->model,ctx->state.data) ||
-             GBbuchiIsAccepting(ctx->model, successor->data)) ) {
+            (GBbuchiIsAccepting(ctx->model, ctx->state.data) ||
+             GBbuchiIsAccepting(ctx->model, get(dbs, successor->ref, ctx->store2))) ) {
         /* Found cycle in blue search */
         ndfs_report_cycle(ctx, successor);
     } else if ( !(nn_color_eq(color, NNPINK) || (strategy == Strat_MCNDFS &&
@@ -1346,45 +1346,6 @@ nndfs_explore_state_blue (wctx_t *ctx, counter_t *cnt)
     cnt->trans += count;
     cnt->explored++;
     ndfs_maybe_report(ctx->search, cnt);
-}
-
-/* MC-NDFS dfs_red */
-static void
-mcndfs_red (wctx_t *ctx)
-{
-    size_t              start_level = dfs_stack_nframes (ctx->stack);
-    ctx->search = NRED; ctx->permute->permutation = permutation_red;
-    ctx->red.visited++; //count accepting states
-
-    while ( !lb_is_stopped(lb) ) {
-        raw_data_t          state_data = dfs_stack_top (ctx->stack);
-        if (NULL != state_data) {
-            state_info_deserialize (&ctx->state, state_data, ctx->store);
-            nndfs_color_t color = nn_get_color (&ctx->color_map, ctx->state.ref);
-            if ( nn_color_eq(color, NNPINK) ||
-                 global_has_color(ctx->state.ref, GRED) ) {
-                if (start_level == dfs_stack_nframes (ctx->stack))
-                     break;
-                dfs_stack_pop (ctx->stack);
-            } else
-                nndfs_explore_state_red (ctx, &ctx->red);
-        } else { //backtrack
-            dfs_stack_leave (ctx->stack);
-            ctx->red.level_cur--;
-
-            /* mark state as RED */
-            state_data = dfs_stack_top (ctx->stack);
-            state_info_deserialize (&ctx->state, state_data, ctx->store);
-            global_try_color (ctx->state.ref, GRED);
-
-            /* exit search if backtrack hits seed, leave stack the way it was */
-            if (start_level == dfs_stack_nframes (ctx->stack))
-                break;
-            dfs_stack_pop (ctx->stack);
-        }
-    }
-
-    ctx->search = NBLUE; ctx->permute->permutation = permutation;
 }
 
 /* NNDFS dfs_red */
@@ -1464,6 +1425,45 @@ nndfs_blue (wctx_t *ctx, size_t work)
 /*
  * MC-NDFS by Laarman/vdPol/Weber/Wijs
  */
+
+/* MC-NDFS dfs_red */
+static void
+mcndfs_red (wctx_t *ctx)
+{
+    size_t              start_level = dfs_stack_nframes (ctx->stack);
+    ctx->search = NRED; ctx->permute->permutation = permutation_red;
+    ctx->red.visited++; //count accepting states
+
+    while ( !lb_is_stopped(lb) ) {
+        raw_data_t          state_data = dfs_stack_top (ctx->stack);
+        if (NULL != state_data) {
+            state_info_deserialize (&ctx->state, state_data, ctx->store);
+            nndfs_color_t color = nn_get_color (&ctx->color_map, ctx->state.ref);
+            if ( nn_color_eq(color, NNPINK) ||
+                 global_has_color(ctx->state.ref, GRED) ) {
+                if (start_level == dfs_stack_nframes (ctx->stack))
+                     break;
+                dfs_stack_pop (ctx->stack);
+            } else
+                nndfs_explore_state_red (ctx, &ctx->red);
+        } else { //backtrack
+            dfs_stack_leave (ctx->stack);
+            ctx->red.level_cur--;
+
+            /* mark state as RED */
+            state_data = dfs_stack_top (ctx->stack);
+            state_info_deserialize (&ctx->state, state_data, ctx->store);
+            global_try_color (ctx->state.ref, GRED);
+
+            /* exit search if backtrack hits seed, leave stack the way it was */
+            if (start_level == dfs_stack_nframes (ctx->stack))
+                break;
+            dfs_stack_pop (ctx->stack);
+        }
+    }
+
+    ctx->search = NBLUE; ctx->permute->permutation = permutation;
+}
 
 /* MCNDFS dfs_blue */
 void
