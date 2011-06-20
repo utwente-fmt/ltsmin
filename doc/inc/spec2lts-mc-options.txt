@@ -34,7 +34,7 @@ nndfs;;
   multi-core swarmed New Nested Depth-First Search (Schwoon, Esparza).
 
 mcndfs;;
-  Multi-Core Nested Depth-First Search (Laarman, van der Pol, Weber).
+  Multi-Core Nested Depth-First Search (Laarman, van de Pol, Weber).
 
 
 *--perm*='TYPE'::
