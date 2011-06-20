@@ -29,14 +29,4 @@ vset;;
 *--max*='LEVEL'::
     Search until level 'LEVEL'
 
-*--dot*='DOTFILE'::
-
-    Export the generated state space in Dot format, suitable for
-    processing with GraphViz tools (e.g., manpage:dot[1]).
-+
-'DOTFILE' designates the filename to output the Dot specification to.
-+
-WARNING: Using Dot export on state spaces larger thousand
-         states will likely overwhelm the manpage:dot[1] tool.
-
 include::reachability-options.txt[]

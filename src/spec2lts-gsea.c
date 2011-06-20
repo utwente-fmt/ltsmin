@@ -170,7 +170,7 @@ static struct poptOption development_options[] = {
 static struct poptOption options[] = {
     { NULL, 0 , POPT_ARG_CALLBACK|POPT_CBFLAG_POST|POPT_CBFLAG_SKIPOPTION  , (void*)state_db_popt , 0 , NULL , NULL },
     { "deadlock" , 'd' , POPT_ARG_VAL , &opt.dlk_detect , 1 , "detect deadlocks" , NULL },
-    { "dot" , 0 , POPT_ARG_STRING , &opt.dot_output , 0 , "file to dot graph to" , "<dot output>" },
+    { "dot" , 0 , POPT_ARG_STRING|POPT_ARGFLAG_DOC_HIDDEN, &opt.dot_output , 0 , "file to dot graph to" , "<dot output>" },
     { "trace" , 0 , POPT_ARG_STRING , &opt.trc_output , 0 , "file to write trace to" , "<lts output>" },
     { "state" , 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &opt.arg_state_db , 0 ,
       "select the data structure for storing states", "<table|tree|vset>"},
