@@ -847,27 +847,41 @@ reach_sat_ddd(reach_proc_t reach_proc, vset_t visited,
                  bitvector_t *reach_groups, long *eg_count, long *next_count)
 {
     (void) reach_proc;
-    int level      = 0;
+    int level = 0;
     vset_t old_vis = vset_create(domain, 0, NULL);
+    vset_t deadlocks = dlk_detect?vset_create(domain, 0, NULL):NULL;
+    vset_t dlk_temp = dlk_detect?vset_create(domain, 0, NULL):NULL;
 
     while (!vset_equal(visited, old_vis)) {
+        if (trc_output != NULL) save_level(visited);
         vset_copy(old_vis, visited);
         stats_and_progress_report(NULL, visited, level);
         level++;
-
         for(int i = 0; i < nGrps; i++){
             diagnostic("\rexploring group %4d/%d", i, nGrps);
             expand_group_next(i, visited);
+            (*eg_count)++;
         }
         diagnostic("\rexploration complete             \n");
-
-        (*eg_count)++;
-        (*next_count)++;
+        if (dlk_detect) vset_copy(deadlocks, visited);
         vset_least_fixpoint(visited, visited, group_next, nGrps);
+        (*next_count)++;
+        if (dlk_detect) {
+            for (int i = 0; i < nGrps; i++) {
+                vset_prev(dlk_temp, visited, group_next[i]);
+                vset_minus(deadlocks, dlk_temp);
+                vset_clear(dlk_temp);
+            }
+            deadlock_check(deadlocks, reach_groups);
+        }
+        vset_reorder(domain);
     }
 
     vset_destroy(old_vis);
-    (void)reach_groups;
+    if (dlk_detect) {
+        vset_destroy(deadlocks);
+        vset_destroy(dlk_temp);
+    }
 }
 
 static void
