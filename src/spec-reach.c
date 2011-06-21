@@ -1545,16 +1545,6 @@ main (int argc, char *argv[])
         break;
     case SAT_DDD:
         sat_proc = reach_sat_ddd;
-        extern vset_implementation_t vset_default_domain;
-        switch(vset_default_domain) {
-        case VSET_IMPL_AUTOSELECT:
-            vset_impl = VSET_DDD;
-            /* fall-through */
-        case VSET_DDD: break;
-        default:
-            Abort("Saturation with sat-ddd unsupported with"
-                  " selected vset implementation, use --vset=ddd.");
-        }
         break;
     }
 
