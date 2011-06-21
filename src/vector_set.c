@@ -74,24 +74,26 @@ struct poptOption vset_options[]={
 	POPT_TABLEEND
 };
 
-vdom_t vdom_create_domain(int n, vset_implementation_t impl){
-        if (impl == VSET_IMPL_AUTOSELECT)
-            impl = vset_default_domain;
-	switch(impl){
-        case VSET_IMPL_AUTOSELECT:
-            /* fall-through */
+vdom_t
+vdom_create_domain(int n, vset_implementation_t impl)
+{
+    if (impl == VSET_IMPL_AUTOSELECT)
+        impl = vset_default_domain;
+    switch(impl){
+    case VSET_IMPL_AUTOSELECT:
+        /* fall-through */
 #ifdef HAVE_ATERM2_H
-	case VSET_AtermDD_list: return vdom_create_list(n);
-	case VSET_AtermDD_tree: return vdom_create_tree(n);
+    case VSET_AtermDD_list: return vdom_create_list(n);
+    case VSET_AtermDD_tree: return vdom_create_tree(n);
 #endif
-	case VSET_BuDDy_fdd: return vdom_create_fdd(n);
+    case VSET_BuDDy_fdd: return vdom_create_fdd(n);
 #ifdef HAVE_DDD_H
-	case VSET_DDD: return vdom_create_ddd(n);
+    case VSET_DDD: return vdom_create_ddd(n);
 #endif
-	case VSET_ListDD: return vdom_create_list_native(n);
+    case VSET_ListDD: return vdom_create_list_native(n);
         default:
             return NULL;
-	}
+    }
 }
 
 struct vector_domain {
@@ -106,13 +108,40 @@ struct vector_relation {
 	vdom_t dom;
 };
 
-static void default_zip(vset_t dst,vset_t src){
-    dst->dom->shared.set_minus(src,dst);
-    dst->dom->shared.set_union(dst,src);
+static void
+default_zip(vset_t dst, vset_t src)
+{
+    dst->dom->shared.set_minus(src, dst);
+    dst->dom->shared.set_union(dst, src);
 }
 
-static void default_reorder(){
+static void
+default_reorder()
+{
     Warning(info,"reorder request ignored");
+}
+
+static void
+default_least_fixpoint(vset_t dst, vset_t src, vrel_t rels[], int rel_count)
+{
+    vset_t temp = dst->dom->shared.set_create(dst->dom, 0, NULL);
+    vset_t fix  = dst->dom->shared.set_create(dst->dom, 0, NULL);
+    vset_t old  = dst->dom->shared.set_create(dst->dom, 0, NULL);
+
+    dst->dom->shared.set_copy(fix, src);
+
+    while (!dst->dom->shared.set_equal(fix, old)) {
+        dst->dom->shared.set_copy(old, fix);
+        for (int i = 0; i < rel_count; i++) {
+            dst->dom->shared.set_next(temp, fix, rels[i]);
+            dst->dom->shared.set_union(fix, temp);
+        }
+    }
+
+    dst->dom->shared.set_copy(dst, fix);
+    dst->dom->shared.set_destroy(temp);
+    dst->dom->shared.set_destroy(fix);
+    dst->dom->shared.set_destroy(old);
 }
 
 void vdom_init_shared(vdom_t dom,int n){
@@ -140,7 +169,7 @@ void vdom_init_shared(vdom_t dom,int n){
 	dom->shared.set_prev=NULL;
 	dom->shared.reorder=default_reorder;
 	dom->shared.set_destroy=NULL;
-	dom->shared.set_least_fixpoint=NULL;
+	dom->shared.set_least_fixpoint=default_least_fixpoint;
 }
 
 vset_t vset_create(vdom_t dom,int k,int* proj){
