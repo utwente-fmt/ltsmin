@@ -23,7 +23,6 @@ SUBDIRS += ce
 SUBDIRS += torx
 
 EXTRA_DIST  = ltsmin-lexer.c ltsmin-lexer.h
-EXTRA_DIST += pins_open
 
 BUILT_SOURCES  = ltsmin-grammar.c ltsmin-grammar.h
 BUILT_SOURCES += ltsmin-lexer.c ltsmin-lexer.h
@@ -620,7 +619,19 @@ CLEANFILES += ltsmin-grammar.out
 CLEANFILES += pins_open
 
 MAINTAINERCLEANFILES = ltsmin-tokens.c ltsmin-tokens.h
+MAINTAINERCLEANFILES += subst_pins_open.mk
 
+
+EXTRA_DIST += config.munge.pl subst_pins_open.mk
+
+-include subst_pins_open.mk
+
+pins_open: pins_open.in Makefile subst_pins_open.mk
+	$(subst_pins_open) < $< > $@
+	chmod +x $@
+
+subst_pins_open.mk: pins_open.in Makefile config.munge.pl
+	perl $(srcdir)/config.munge.pl subst_pins_open < $< > $@
 
 
 LEMON_FLAGS = -s
