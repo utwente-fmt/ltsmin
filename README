@@ -34,7 +34,7 @@ matrix regrouping (which can drastically reduce run-time and memory
 consumption of symbolic algorithms).
 
 * Supported Systems
- - GNU/Linux (tested on Debian, OpenSuSE 11.2)
+ - GNU/Linux (tested on Ubuntu, Debian, OpenSuSE 11.2)
  - MacOS X, version 10.6 "Snow Leopard"
  - MacOS X, version 10.5 "Leopard"
 
@@ -248,12 +248,12 @@ automake-1.10.
 *** GNU autoconf
 Download autoconf (>= 2.60) from
 <http://www.gnu.org/software/autoconf/>.  We tested with
-autoconf-2.61.
+autoconf-2.68.
 
 *** GNU libtool
-Download libtool (>= 1.5.26) from
+Download libtool (>= 2.2.6) from
 <http://www.gnu.org/software/libtool/>.  We tested with
-libtool-1.5.26.
+libtool-2.4.
 
 *** AsciiDoc
 See above.  Note that AsciiDoc is a required dependency unless
@@ -263,6 +263,8 @@ building from source tarballs.
 See above.  Note that xmlto is a required dependency unless building
 from source tarballs.
 
+*** Apache Ant
+See above.
 
 * Contact
 Send questions, bug reports, comments and feature suggestions to
