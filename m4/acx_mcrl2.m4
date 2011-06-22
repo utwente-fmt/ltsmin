@@ -51,27 +51,44 @@ AC_DEFUN([ACX_MCRL2_LIBS],[
 AC_REQUIRE([ACX_MCRL2])dnl
 if test x"$acx_mcrl2" = xyes; then
     AC_LANG_PUSH([C++])
-    AX_LET([CPPFLAGS], ["$MCRL2_CPPFLAGS $CPPFLAGS"],
-           [LIBS], ["-lmcrl2_utilities -lmcrl2_data -lmcrl2_core -lmcrl2_aterm $LIBS"],
+    AX_LET([LIBS], ["$LIBS"],
            [LDFLAGS], ["$MCRL2_LDFLAGS $LDFLAGS"],
       [acx_mcrl2_libs=yes
-       AX_CXX_CHECK_LIB([mcrl2_lps], [main], dnl XXX
-         [MCRL2_LIBS="-lmcrl2_lps -lmcrl2_utilities -lmcrl2_process -lmcrl2_data -lmcrl2_core -lmcrl2_aterm"
+       AX_CXX_CHECK_LIB([mcrl2_aterm], [main],
+         [MCRL2_LIBS="-lmcrl2_aterm $MCRL2_LIBS"
+          LIBS="-lmcrl2_aterm $LIBS"],
+         [acx_mcrl2_libs=no])
+       AX_CXX_CHECK_LIB([mcrl2_core], [main],
+         [MCRL2_LIBS="-lmcrl2_core $MCRL2_LIBS"
+          LIBS="-lmcrl2_core $LIBS"],
+         [acx_mcrl2_libs=no])
+       AX_CXX_CHECK_LIB([mcrl2_data], [main],
+         [MCRL2_LIBS="-lmcrl2_data $MCRL2_LIBS"
+          LIBS="-lmcrl2_data $LIBS"],
+         [acx_mcrl2_libs=no])
+       AX_CXX_CHECK_LIB([mcrl2_process], [main],
+         [MCRL2_LIBS="-lmcrl2_process $MCRL2_LIBS"
+          LIBS="-lmcrl2_process $LIBS"],
+         [acx_mcrl2_libs=no])
+       AX_CXX_CHECK_LIB([mcrl2_utilities], [main],
+         [MCRL2_LIBS="-lmcrl2_utilities $MCRL2_LIBS"
+          LIBS="-lmcrl2_utilities $LIBS"],
+         [acx_mcrl2_libs=no])
+       AX_CXX_CHECK_LIB([mcrl2_lps], [main],
+         [MCRL2_LIBS="-lmcrl2_lps $MCRL2_LIBS"
           LIBS="-lmcrl2_lps $LIBS"],
          [acx_mcrl2_libs=no])
       ])
     AC_LANG_POP([C++])
     AC_SUBST(MCRL2_LIBS)
 fi
-if test x"$acx_mcrl2_libs" = xyes; then
+if test x"$acx_mcrl2_libs" = xyes; then :
   ifelse([$1],,
          [AC_SUBST(CPPFLAGS, ["$MCRL2_CPPFLAGS $CPPFLAGS"])
           AC_SUBST(LDFLAGS,  ["$MCRL2_LDFLAGS $LDFLAGS"])
           AC_SUBST(LIBS,     ["$MCRL2_LIBS $LIBS"])],
          [$1])
-  :
-else
+else :
   $2
-  :
 fi
 ])
