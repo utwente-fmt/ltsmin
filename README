@@ -120,25 +120,36 @@ tested with flex 2.5.35.
 ** Optional Dependencies
 *** muCRL
 Download muCRL (>= 2.18.5) from <http://www.cwi.nl/~mcrl/mutool.html>.
-We tested with muCRL-2.18.5.  Without muCRL, several tools will not be
-built.  Also, the symbolic tools (<spec>-reach) might have degraded
-performance due to the absense of the AtermDD decision diagram package.
+We tested with muCRL-2.18.5.  Without muCRL, the symbolic tools
+(<spec>-reach) might have degraded performance due to the absense of
+the AtermDD decision diagram package.
+
+Note that for 64-bit builds, you have to explicitly configure muCRL
+for this (otherwise, a faulty version is silently build):
+
+    ./configure --with-64bit
+
+For best performance, we advise to configure muCRL like this:
+
+    ./configure CC='gcc -O2' --with-64bit
 
 *** mCRL2
-Download the latest development version of mCRL2 from
-<http://www.mcrl2.org/>.  We tested with mcrl2 SVN rev.8002.  Note
-that all versions before SVN rev.7354 are insufficient (in particular,
-all versions of mcrl2 released before September 2010).
+Download the latest version of mCRL2 from <http://www.mcrl2.org/>.  We
+tested with mcrl2 SVN rev.9377.  Note that all versions before SVN
+rev.9377 are insufficient (in particular, all versions of mcrl2
+released before July 2011).
 
 Build and install mCRL2.  If the internal boost libraries are used
 (which is the default) then the boost headers must be installed:
 
-  cmake -DMCRL2_INSTALL_BOOST_HEADERS=ON
+  cmake
   make
   make install
 
-Ensure that these headers are actually used to compile the PINS
-support for mcrl2 (instead of, e.g., system-provided Boost headers).
+The graphical tools of mCRL2 are not required for ltsmin to work,
+hence you can also build mCRL2 without:
+
+  cmake -DMCRL2_ENABLE_GUI_TOOLS=OFF
 
 *** CADP
 See the CADP website <http://www.inrialpes.fr/vasy/cadp/> on how to
@@ -176,8 +187,8 @@ LTSmin compatible libraries:
     divine compile -l model.dve
 
 This produces a file ``model.dve2C'', which can also be passed to
-LTSmin tools.  (This is done automatically by the LTSmin tools when
-passing a ``.dve'' model, doing it manually is rarely needed.)
+LTSmin tools.  (This step is done automatically by the LTSmin tools
+when passing in a ``.dve'' model, doing it manually is rarely needed.)
 
 *** DiVinE(-cluster)
 Download the latest CVS version of DiVinE-cluster; instructions can be
