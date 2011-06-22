@@ -68,7 +68,9 @@ inline void *
 cct_map_get(void*ctx,int idx,int*len) 
 {
     table_t *table = ctx;
+    pthread_rwlock_rdlock(&table->rwlock);
     char *res = SIgetC(table->string_index, idx, len);
+    pthread_rwlock_unlock(&table->rwlock);
     return res;
 }
 
