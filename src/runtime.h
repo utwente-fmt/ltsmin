@@ -30,6 +30,8 @@ typedef struct {
  */
 extern int linear_search(const si_map_entry map[],const char*key);
 
+extern char *key_search(si_map_entry map[],const int val);
+
 /**
 \brief Parse a string that represents command line options.
  */
@@ -42,6 +44,8 @@ extern void* RTmalloc(size_t size);
 extern void* RTmallocZero(size_t size);
 
 extern void* RTalign(size_t alignment, size_t size);
+
+extern void* RTalignZero(size_t align, size_t size);
 
 extern void* RTrealloc(void *rt_ptr, size_t size);
 
@@ -111,6 +115,19 @@ extern void (*RThandleFatal)(const char*file,int line,int errnum,int code);
 
 ///@}
 
+/** \defgroup rt_sysinfo Functions for retrieving system information. */
+/*@{*/
+
+/// Get the number of CPUs.
+extern int RTnumCPUs();
+
+/// Get the amount of memory.
+extern size_t RTmemSize();
+
+/// Get the page size.
+extern size_t RTpageSize();
+
+/*}@*/
 
 #endif
 

@@ -11,6 +11,7 @@
 #include <bitset.h>
 #include <dbs-ll.h>
 #include <dfs-stack.h>
+#include <trace.h>
 #include <dynamic-array.h>
 #include <is-balloc.h>
 #include <lts_enum.h>
@@ -19,6 +20,7 @@
 #include <scctimer.h>
 #include <spec-greybox.h>
 #include <stringindex.h>
+#include <trace.h>
 #include <treedbs.h>
 #include <vector_set.h>
 
@@ -52,14 +54,14 @@ static struct {
     //lts_enum_cb_t output_handle=NULL;
 
     model_t model;
-    char* trc_output;
+    const char* trc_output;
     lts_enum_cb_t trace_handle;
     lts_output_t trace_output;
     int dlk_detect;
 
-    char *ltl_semantics;
+    const char *ltl_semantics;
     int   ltl_type;
-    char *ltl_file;
+    const char *ltl_file;
 
     //array_manager_t state_man=NULL;
     //uint32_t *parent_ofs=NULL;
@@ -72,12 +74,12 @@ static struct {
 
     mode_t call_mode;
 
-    char *arg_strategy;
+    const char *arg_strategy;
     enum { Strat_BFS, Strat_DFS, Strat_SCC } strategy;
-    char *arg_state_db;
+    const char *arg_state_db;
     enum { DB_DBSLL, DB_TreeDBS, DB_Vset } state_db;
 
-    char *arg_proviso;
+    const char *arg_proviso;
     enum { LTLP_ClosedSet, LTLP_Stack, LTLP_Color } proviso;
 
     char* dot_output;
@@ -218,7 +220,7 @@ typedef struct gsea_state {
     int  count;
     union {
         struct {
-            int hash_idx;
+            ref_t hash_idx;
         } table;
         struct {
             int tree_idx;
@@ -640,7 +642,7 @@ dfs_goal_trace(gsea_state_t *state, void *arg)
     ctx.found = 0;
 
     // init trace output
-    opt.trace_output=lts_output_open(opt.trc_output,opt.model,1,0,1,"vsi",NULL);
+    opt.trace_output=lts_output_open((char*)opt.trc_output,opt.model,1,0,1,"vsi",NULL);
     {
         int init_state[global.N];
         GBgetInitialState(opt.model, init_state);
@@ -1079,7 +1081,7 @@ dfs_table_stack_closed (gsea_state_t *state, int is_backtrack, void *arg)
 static void
 dfs_table_stack_peek (gsea_state_t *state, void *arg)
 {
-    state->table.hash_idx = *dfs_stack_top (gc.queue.filo.stack);
+    state->table.hash_idx = *((ref_t *)dfs_stack_top (gc.queue.filo.stack));
     (void)arg;
 }
 
@@ -1100,7 +1102,7 @@ dfs_table_stack_to_state(gsea_state_t *state, void *arg)
 
 static void dfs_table_stack_push(gsea_state_t *state, void *arg)
 {
-    dfs_stack_push(gc.queue.filo.stack, &(state->table.hash_idx));
+    dfs_stack_push(gc.queue.filo.stack, (int*)&(state->table.hash_idx));
     (void)arg;
 }
 
@@ -1510,7 +1512,7 @@ gsea_setup()
             gc.context = RTmalloc(sizeof(int) * global.N);
             gc.store.table.dbs = DBSLLcreate(global.N);
             gc.queue.filo.closed_set = bitset_create(128,128);
-            gc.queue.filo.stack = dfs_stack_create(1);
+            gc.queue.filo.stack = dfs_stack_create(sizeof(ref_t)/sizeof(int));
 
             // proviso: dfs table specific
             switch (opt.proviso) {
@@ -1633,8 +1635,8 @@ gsea_finished(void *arg) {
 int
 main (int argc, char *argv[])
 {
-    char *files[1];
-    RTinitPopt(&argc,&argv,options,1,1,files,NULL,"<model>",
+    const char *files[1];
+    RTinitPopt(&argc,&argv,options,1,1,(char **)files,NULL,"<model>",
         "Perform an enumerative reachability analysis of <model>\n\n"
         "Options");
 

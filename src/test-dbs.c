@@ -135,7 +135,7 @@ void *fill(void *c) {
     } else if (SHARED_DB==4) {
         readfile(id);
         fetch_add(&dones, 1);
-        while (atomic_read(&dones) != NUM_THREADS) {}
+        while (atomic32_read(&dones) != NUM_THREADS) {}
         start = 0;
         end = n[id];
         str = id;    

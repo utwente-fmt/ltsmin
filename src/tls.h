@@ -34,8 +34,8 @@ when creating the storage manager.
 \brief These constructs prevent the compiler from optimizing (reordering) reads
 and writes to memory location, which causes loss of atomicity properties.
 */
-#define atomic_read(v)      (*(volatile uint32_t *)(v))
-#define atomic_write(v,a)   (*(volatile uint32_t *)(v) = (a))
+#define atomic32_read(v)      (*(volatile uint32_t *)(v))
+#define atomic32_write(v,a)   (*(volatile uint32_t *)(v) = (a))
 
 #define atomic16_read(v)      (*(volatile uint16_t *)(v))
 #define atomic16_write(v,a)   (*(volatile uint16_t *)(v) = (a))
@@ -43,6 +43,11 @@ and writes to memory location, which causes loss of atomicity properties.
 #ifdef __x86_64__
 #define atomic64_read(v)    (*(volatile uint64_t *)(v))
 #define atomic64_write(v,a) (*(volatile uint64_t *)(v) = (a))
+#define atomic_read atomic64_read
+#define atomic_write atomic64_write
+#else
+#define atomic_read atomic32_read
+#define atomic_write atomic32_write
 #endif
 
 /**
@@ -59,8 +64,8 @@ write_data_fenced (void *loc, int64_t value)
 #else
     uint32_t           *val_arr = (uint32_t*) &value;
     uint32_t           *loc_arr = (uint32_t*) loc;
-    atomic_write (loc_arr, val_arr[0]);
-    atomic_write (&loc_arr[1], val_arr[1]);
+    atomic32_write (loc_arr, val_arr[0]);
+    atomic32_write (&loc_arr[1], val_arr[1]);
 #endif
 }
 
@@ -83,10 +88,10 @@ static const size_t CACHE_LINE_INT_MASK =
 #define sub_fetch(a, b) __sync_sub_and_fetch(a,b)
 
 #ifdef __x86_64__
-#define atomic_ptr_read(v)      ((void*)(*(volatile uint64_t *)v)
-#define atomic_ptr_write(v,a)   (*(volatile uint32_t *)v = (uint64_t)(a))
+#define atomic_ptr_read(v)      ((void*)(*(volatile uint64_t *)v))
+#define atomic_ptr_write(v,a)   (*(volatile uint64_t *)v = (uint64_t)(a))
 #else
-#define atomic_ptr_read(v)      ((void*)(*(volatile uint32_t *)v)
+#define atomic_ptr_read(v)      ((void*)(*(volatile uint32_t *)v))
 #define atomic_ptr_write(v,a)   (*(volatile uint32_t *)v = (uint32_t)(a))
 #endif
 
@@ -103,14 +108,10 @@ static const size_t CACHE_LINE_INT_MASK =
 */
 typedef struct stats_s {
     size_t              elts;
+    size_t              nodes;
     size_t              misses;
     size_t              tests;
     size_t              rehashes;
-    long long           compressed;
-    size_t              mincomp;
-    size_t              maxcomp;
-    size_t              cache_hits;
-    size_t              cache_misses;
 } stats_t;
 
 extern void add_stats(stats_t *res, stats_t *stat);

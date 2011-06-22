@@ -11,7 +11,7 @@ nips2lts-mc - Concurrent state space generator
 
 == SYNOPSIS
 
-*nips2lts-mc* [OPTION]... 'input.b' ['output']
+*nips2lts-mc* [OPTION]... 'input.b'
 
 == DESCRIPTION
 

@@ -11,7 +11,7 @@ etf2lts-mc - Concurrent state space generator for ETF models.
 
 == SYNOPSIS
 
-*etf2lts-mc* [OPTION]... 'input.etf' ['output']
+*etf2lts-mc* [OPTION]... 'input.etf'
 
 == DESCRIPTION
 

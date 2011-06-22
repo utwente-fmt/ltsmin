@@ -11,7 +11,7 @@ dve22lts-mc - Concurrent state space generator for DiVinE DVE models.
 
 == SYNOPSIS
 
-*dve22lts-mc* [OPTION]... 'input'[_.dve_|_.dve2C_] ['output']
+*dve22lts-mc* [OPTION]... 'input'[_.dve_|_.dve2C_]
 
 == DESCRIPTION
 

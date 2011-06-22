@@ -5,9 +5,10 @@
 #include <string.h>
 #include <time.h>
 
-#include "zobrist.h"
-#include "runtime.h"
+#include <zobrist.h>
+#include <runtime.h>
 
+static const uint32_t   INITIAL_HASH = 0;
 
 struct zobrist_s {
     int32_t           **keys;
@@ -24,7 +25,7 @@ uint32_t
 zobrist_hash (const zobrist_t z, int *v, int *prev, uint32_t h)
 {
     if (NULL == prev)
-        return z->start = random ();   // start the random sequence
+        return INITIAL_HASH;   // start the random sequence
     uint32_t            zhash = h;
     for (int i = 0; i < z->length; i++) {
         if (prev[i] != v[i]) {
@@ -42,7 +43,7 @@ zobrist_hash_dm (const zobrist_t z, int *v, int *prev, uint32_t h, int g)
     if (g == -1)
         return zobrist_hash(z, v, prev, h);
     if (NULL == prev)
-        return z->start = random ();   // start the random sequence
+        return INITIAL_HASH;   // start the random sequence
     uint32_t            zhash = h;
     for (size_t i = 0; z->ones[g][i] != -1; i++) {
         int                 idx = z->ones[g][i];

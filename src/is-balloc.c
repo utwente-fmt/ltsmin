@@ -105,7 +105,8 @@ isba_push_int(isb_allocator_t buf, const int *element)
     }
     //size_t x;
     int *b = &buf->blocks[buf->num_block-1][buf->cur_index*buf->el_size];
-    memcpy(b, element, buf->el_size*sizeof(int));
+    if (element)
+        memcpy(b, element, buf->el_size*sizeof(int));
     buf->cur_index++;
     return b;
 }
