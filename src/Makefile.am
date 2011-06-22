@@ -128,7 +128,6 @@ endif
 
 
 libmcrl2_pins_la_SOURCES  = mcrl2-greybox.cpp mcrl2-greybox.h
-libmcrl2_pins_la_SOURCES += at-map.c at-map.h
 libmcrl2_pins_la_CPPFLAGS = -DMCRL2 -DNDEBUG $(MCRL2_CPPFLAGS) $(AM_CPPFLAGS)
 libmcrl2_pins_la_LDFLAGS  = $(MCRL2_LDFLAGS) $(AM_LDFLAGS)
 libmcrl2_pins_la_LIBADD   = $(MCRL2_LIBS)
@@ -172,7 +171,7 @@ etf2lts_grey_CPPFLAGS = -DETF $(AM_CPPFLAGS)
 # lpo2lts-grey
 lpo2lts_grey_SOURCES  = spec2lts-grey.c mcrl-greybox.c mcrl-greybox.h
 lpo2lts_grey_SOURCES += at-map.c at-map.h
-lpo2lts_grey_LDADD    = libvset-mcrl.la libltsmin.la $(MCRL_LIBS)
+lpo2lts_grey_LDADD    = $(VSET_LIBS) libltsmin.la $(MCRL_LIBS)
 lpo2lts_grey_CPPFLAGS = -DMCRL $(MCRL_CPPFLAGS) $(AM_CPPFLAGS)
 lpo2lts_grey_LDFLAGS  = $(MCRL_LDFLAGS) $(AM_LDFLAGS)
 
@@ -215,7 +214,7 @@ etf2lts_gsea_CPPFLAGS = -DETF $(AM_CPPFLAGS)
 # lpo2lts-gsea
 lpo2lts_gsea_SOURCES  = spec2lts-gsea.c mcrl-greybox.c mcrl-greybox.h
 lpo2lts_gsea_SOURCES += at-map.c at-map.h
-lpo2lts_gsea_LDADD    = libvset-mcrl.la libltsmin.la $(MCRL_LIBS)
+lpo2lts_gsea_LDADD    = $(VSET_LIBS) libltsmin.la $(MCRL_LIBS)
 lpo2lts_gsea_CPPFLAGS = -DMCRL $(MCRL_CPPFLAGS) $(AM_CPPFLAGS)
 lpo2lts_gsea_LDFLAGS  = $(MCRL_LDFLAGS) $(AM_LDFLAGS)
 
@@ -258,7 +257,7 @@ etf_reach_CPPFLAGS = -DETF $(AM_CPPFLAGS)
 # lpo-reach
 lpo_reach_SOURCES  = spec-reach.c mcrl-greybox.c mcrl-greybox.h
 lpo_reach_SOURCES += at-map.c at-map.h
-lpo_reach_LDADD    = libvset-mcrl.la libltsmin.la $(MCRL_LIBS)
+lpo_reach_LDADD    = $(VSET_LIBS) libltsmin.la $(MCRL_LIBS)
 lpo_reach_CPPFLAGS = -DMCRL $(MCRL_CPPFLAGS) $(AM_CPPFLAGS)
 lpo_reach_LDFLAGS  = $(MCRL_LDFLAGS) $(AM_LDFLAGS)
 
@@ -451,22 +450,7 @@ ltsmin_convert_LDADD = libltsmin.la
 
 
 # libraries
-if HAVE_LIBMCRL2
-noinst_LTLIBRARIES += libvset-mcrl2.la
-endif
-if HAVE_LIBMCRL
-noinst_LTLIBRARIES += libvset-mcrl.la
-endif
-
-if HAVE_LIBMCRL2
-VSET_LIBS = libvset-mcrl2.la
-else
-if HAVE_LIBMCRL
-VSET_LIBS = libvset-mcrl.la
-else
 VSET_LIBS = libvset.la
-endif
-endif
 
 libvset_la_SOURCES   = vector_set.c vector_set.h vdom_object.h
 libvset_la_SOURCES  += vset_listdd.c
@@ -474,6 +458,13 @@ libvset_la_SOURCES  += vset_buddy.c
 libvset_la_CPPFLAGS  = $(BUDDY_CPPFLAGS)
 libvset_la_LDFLAGS   = $(BUDDY_LDFLAGS)
 libvset_la_LIBADD    = $(BUDDY_LIBS)
+
+if HAVE_LIBMCRL
+libvset_la_SOURCES  += vset_atermdd.c
+libvset_la_CPPFLAGS += $(MCRL_CPPFLAGS)
+libvset_la_LDFLAGS  += $(MCRL_LDFLAGS)
+libvset_la_LIBADD   += -lATerm
+endif
 
 if HAVE_LIBDDD
 CCLD = $(CXXLD)
@@ -485,17 +476,6 @@ endif
 
 libvset_la_CPPFLAGS += $(AM_CPPFLAGS)
 libvset_la_LDFLAGS  += $(AM_LDFLAGS)
-
-
-libvset_mcrl_la_SOURCES  = vset_atermdd.c
-libvset_mcrl_la_CPPFLAGS = $(MCRL_CPPFLAGS) $(AM_CPPFLAGS)
-libvset_mcrl_la_LDFLAGS  = $(MCRL_LDFLAGS) $(AM_LDFLAGS)
-libvset_mcrl_la_LIBADD   = libvset.la -lATerm
-
-libvset_mcrl2_la_SOURCES  = vset_atermdd.c
-libvset_mcrl2_la_CPPFLAGS = $(MCRL2_CPPFLAGS) $(AM_CPPFLAGS)
-libvset_mcrl2_la_LDFLAGS  = $(MCRL2_LDFLAGS) $(AM_LDFLAGS)
-libvset_mcrl2_la_LIBADD   = libvset.la -laterm
 
 
 libmpi_la_SOURCES  = mpi_io_stream.c
