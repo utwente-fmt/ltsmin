@@ -215,6 +215,8 @@ pre-built man pages and HTML documentation.
 *** xmlto
 Download xmlto from <http://cyberelk.net/tim/software/xmlto/>.  We
 tested with xmlto-0.0.18.  Without xmlto, man pages cannot be rebuilt.
+Note that xmlto in turn requires docbook-xsl to be installed.  We
+tested with docbook-xsl-1.76.1.
 
 *** Doxygen
 Download Doxygen from <http://www.doxygen.org/>.  We tested with
