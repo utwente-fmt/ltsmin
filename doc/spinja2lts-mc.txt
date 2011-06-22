@@ -11,7 +11,7 @@ spinja2lts-mc - Concurrent state space generator for SpinJa models.
 
 == SYNOPSIS
 
-*{manname}* [OPTION]... 'input.spinja' ['output']
+*{manname}* [OPTION]... 'input.spinja'
 
 == DESCRIPTION
 

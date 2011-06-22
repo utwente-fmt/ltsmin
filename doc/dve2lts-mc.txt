@@ -11,7 +11,7 @@ dve2lts-mc - Concurrent state space generator for DiVinE (cluster) models.
 
 == SYNOPSIS
 
-*dve2lts-mc* [OPTION]... 'input'[_.dve_|_.dveC_] ['output']
+*dve2lts-mc* [OPTION]... 'input'[_.dve_|_.dveC_]
 
 == DESCRIPTION
 

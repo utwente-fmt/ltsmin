@@ -497,13 +497,6 @@ wctx_create (size_t id)
         bitvector_create_large (&ctx->not_all_red, MAX_STACK);
     } else if ( UseGreyBox == call_mode && Strat_DFS == strategy)
         ctx->group_stack = isba_create (1);
-    if (files[1]) {
-        char               name[PATH_MAX];
-        int ret = snprintf (name, sizeof name, "%s-%zu", files[1], id);
-        assert (ret < (int)sizeof name);
-        ctx->out = file_output (name);
-        stream_write (ctx->out, &K, 4);
-    }
     ctx->search = NBLUE;
     ctx->counters.threshold = ctx->red.threshold = threshold;
     ctx->permute = permute_create (permutation, NULL, W, K, id);
@@ -524,10 +517,6 @@ wctx_free (wctx_t *ctx)
         isba_destroy (ctx->group_stack);
     if (strategy == Strat_BFS)
         dfs_stack_destroy (ctx->in_stack);
-    if (files[1]) {
-        stream_flush (ctx->out);
-        stream_close (&ctx->out);
-    }
     if (NULL != ctx->permute)
         permute_free (ctx->permute);
     RTfree (ctx);
@@ -578,7 +567,7 @@ init_globals (int argc, char *argv[])
     pthread_attr_setstacksize (attr, THREAD_STACK_SIZE);
 #endif
     // parse command line parameters
-    RTinitPopt (&argc, &argv, options, 1, 2, files, NULL, "<model> [<raw>]",
+    RTinitPopt (&argc, &argv, options, 1, 1, files, NULL, "<model> [<raw>]",
                 "Perform a parallel reachability analysis of <model>\n\nOptions");
     model_t             model = get_model (1);
     if (Perm_Unknown == permutation) //default permutation depends on strategy
@@ -1527,8 +1516,6 @@ reach_handle (void *arg, state_info_t *successor, transition_info_t *ti,
         ctx->load++;
         ctx->counters.visited++;
     }
-    if (files[1])
-        stream_write (ctx->out, successor->data, sizeof (int[N]));
     ctx->counters.trans++;
     (void) ti;
 }
