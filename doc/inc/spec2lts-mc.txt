@@ -1,12 +1,8 @@
 include::pins-options.txt[]
 
-include::io-options.txt[]
-
 include::devel-options.txt[]
 
 include::general-options.txt[]
-
-include::file-formats.txt[]
 
 == EXIT STATUS
 *0*::
@@ -18,7 +14,6 @@ include::support.txt[]
 
 == SEE ALSO
 manpage:ltsmin[7],
-manpage:ltsmin-convert[1],
 manpage:ltsmin-tracepp[1],
 manpage:etf[5],
 http://fmt.cs.utwente.nl/{tilde}michaelw/nips/[NIPS],
