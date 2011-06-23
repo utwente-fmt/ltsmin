@@ -567,7 +567,7 @@ init_globals (int argc, char *argv[])
     pthread_attr_setstacksize (attr, THREAD_STACK_SIZE);
 #endif
     // parse command line parameters
-    RTinitPopt (&argc, &argv, options, 1, 1, files, NULL, "<model> [<raw>]",
+    RTinitPopt (&argc, &argv, options, 1, 1, files, NULL, "<model>",
                 "Perform a parallel reachability analysis of <model>\n\nOptions");
     model_t             model = get_model (1);
     if (Perm_Unknown == permutation) //default permutation depends on strategy

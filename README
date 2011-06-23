@@ -76,7 +76,7 @@ building, to enable more optimizations and force a 64-bit build (for
 the GCC C compiler).  Furthermore, the MPI compiler wrapper is set
 explicitly instead of searching it in the current shell PATH.
 
-Note that for libraries installed in non-standard places need special
+Note that libraries installed in non-standard places need special
 attention: to be picked up by the configure script, library and header
 search paths must be added, e.g.:
 
@@ -145,17 +145,16 @@ tested with mcrl2 SVN rev.9377.  Note that all versions before SVN
 rev.9377 are insufficient (in particular, all versions of mcrl2
 released before July 2011).
 
-Build and install mCRL2.  If the internal boost libraries are used
-(which is the default) then the boost headers must be installed:
+Build and install mCRL2:
 
-  cmake
+  cmake . -DCMAKE_INSTALL_PREFIX=...
   make
   make install
 
 The graphical tools of mCRL2 are not required for ltsmin to work,
 hence you can also build mCRL2 without:
 
-  cmake -DMCRL2_ENABLE_GUI_TOOLS=OFF
+  cmake . -DMCRL2_ENABLE_GUI_TOOLS=OFF -DCMAKE_INSTALL_PREFIX=...
 
 *** CADP
 See the CADP website <http://www.inrialpes.fr/vasy/cadp/> on how to
