@@ -1,19 +1,18 @@
-#if defined(__APPLE__)
+#include <config.h>
+#undef _XOPEN_SOURCE
+#include <assert.h>
+#include <dlfcn.h>
+#include <errno.h>
+#include <libgen.h>
+#include <stdarg.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <sys/types.h>
 #include <sys/sysctl.h>
-#endif
-#include <config.h>
-#include "runtime.h"
-#include <stdlib.h>
-#include <errno.h>
-#include <stdio.h>
-#include <stdarg.h>
-#include <dlfcn.h>
-#include "unix.h"
-#include <libgen.h>
-#include <git_version.h>
+
 #include <hre-main.h>
-#include <assert.h>
+#include <runtime.h>
+#include <unix.h>
 
 int RTverbosity=1;
 
