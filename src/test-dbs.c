@@ -281,10 +281,7 @@ int main(const int argc, const char **args) {
     float tot = 0;
     int tests = 0;
     int misses = 0;
-    size_t min = 0;
-    size_t max = 0;
     int rehashes = 0;
-    double ratio=0;
     for(size_t i = 0; i < NUM_THREADS; i++) {
         float **ret=RTmalloc(sizeof *ret);
         pthread_join(threads[i], (void**)ret);
@@ -295,12 +292,8 @@ int main(const int argc, const char **args) {
         tests += res->stats->tests;
         misses+=res->stats->misses;
         rehashes+=res->stats->rehashes;
-        if (max < res->stats->maxcomp) max = res->stats->maxcomp;
-        if (!min || min > res->stats->mincomp) min = res->stats->mincomp;
-        ratio += ((double)res->stats->compressed)/((double)(ARRAY_SIZE*n[i]*4));
     }
     float tot_norm = SHARED_DB==1||SHARED_DB==4 ? tot : tot/((float)NUM_THREADS); 
     Warning(info, "time:{{{%.2f}}}, elts:{{{%d}}}, misses:{{{%d}}}, tests:{{{%d}}}, rehashes:{{{%d}}}, %d", tot_norm, count, misses, tests, rehashes, elements);
-    Warning(info, "mincomp:%f, maxcomp:%f", ((double)min)/(ARRAY_SIZE*4), ((double)max)/(ARRAY_SIZE*4));
     return 0;
 }
