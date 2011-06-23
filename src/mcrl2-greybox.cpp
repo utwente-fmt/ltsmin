@@ -160,7 +160,7 @@ struct state_cb
         pins->make_pins_edge_labels(edge_labels, lbl);
         int dst[pins->process_parameter_count()];
         pins->make_pins_state(next_state, dst);
-        transition_info_t ti = { lbl, group };
+        transition_info_t ti = GB_TI(lbl,group);
         cb (ctx, &ti, dst);
         ++count;
     }
