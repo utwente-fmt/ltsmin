@@ -53,7 +53,7 @@ ACX_PTHREAD(
 
 AC_ARG_VAR([ANT], [ANT command (Java build tool)])
 AC_PATH_TOOL(ANT, ["${ANT:-ant}"])
-if test -f "${top_srcdir}/spinja/spinja.jar" || \
+if test -f "${srcdir}/spinja/spinja.jar" || \
   command -v "$ANT" 2>/dev/null 2>&1
 then :
 else
@@ -310,6 +310,7 @@ AM_CONDITIONAL([HAVE_CADP], [test x"$acx_cadp" = xyes])
 AM_CONDITIONAL([HAVE_DVEC], [test x"$acx_dvec_libs" = xyes])
 AM_CONDITIONAL([HAVE_DVEC2], [true])    dnl can be built unconditionally
 AM_CONDITIONAL([HAVE_ATOMICS], [test x"$acx_atomics" = xyes])
+AM_CONDITIONAL([HAVE_VERSION_CONTROL], [test -d "${srcdir}/.git"])
 
 AC_CONFIG_COMMANDS_POST(
   [ac_configure_args="$ac_configure_args --enable-keep-terminated-procs dnl
