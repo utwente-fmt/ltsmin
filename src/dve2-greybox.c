@@ -152,7 +152,7 @@ DVEexit()
     char rmcmd[PATH_MAX];
     if (snprintf(rmcmd, sizeof rmcmd, "rm -rf %s", templatename) < (ssize_t)sizeof rmcmd) {
         // remove!
-        system(rmcmd);
+        (void)system(rmcmd);
     }
 }
 
