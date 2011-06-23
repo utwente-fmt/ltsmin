@@ -97,6 +97,7 @@ extra_ASCIIDOC += inc/spec2lts-mpi.txt
 extra_ASCIIDOC += inc/spec2lts-mpi.txt
 extra_ASCIIDOC += inc/spec2torx.txt
 extra_ASCIIDOC += inc/spinja.txt
+extra_ASCIIDOC += inc/state-storage-options.txt
 extra_ASCIIDOC += inc/support.txt
 extra_ASCIIDOC += inc/vset-options.txt
 
