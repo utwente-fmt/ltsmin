@@ -592,17 +592,15 @@ libltsmin_mpi_la_SOURCES = hre-mpi.c
 libltsmin_mpi_la_LIBADD = libutil.la libmpi.la
 
 
+CLEANFILES =
+DISTCLEANFILES =
+MAINTAINERCLEANFILES =
 
-DISTCLEANFILES = git_version.h git_version.h.tmp
 
-CLEANFILES  = ltsmin-grammar.c ltsmin-grammar.h
-CLEANFILES += ltsmin-grammar.out
 CLEANFILES += pins_open
+DISTCLEANFILES += subst_pins_open.mk
 
-MAINTAINERCLEANFILES = ltsmin-tokens.c ltsmin-tokens.h
-MAINTAINERCLEANFILES += subst_pins_open.mk
-
-
+EXTRA_DIST += pins_open.in
 EXTRA_DIST += config.munge.pl subst_pins_open.mk
 
 -include subst_pins_open.mk
@@ -615,6 +613,10 @@ subst_pins_open.mk: pins_open.in Makefile config.munge.pl
 	perl $(srcdir)/config.munge.pl subst_pins_open < $< > $@
 
 
+CLEANFILES += ltsmin-grammar.c ltsmin-grammar.h
+CLEANFILES += ltsmin-grammar.out
+MAINTAINERCLEANFILES += ltsmin-tokens.c ltsmin-tokens.h
+
 LEMON_FLAGS = -s
 
 %.c %.h: %.lemon lempar.c
@@ -625,17 +627,23 @@ LEMON_FLAGS = -s
 %.c %.h: %.l
 	$(am__skiplex) $(LEX) $<
 
-runtime.c: git_version.h
-hre-popt.c: git_version.h
 
-GIT_DESCRIBE := $(shell cd $(top_srcdir) ; git describe --tags --abbrev=6 HEAD 2>/dev/null)
+EXTRA_DIST += git_version.h
+DISTCLEANFILES += git_version.h.tmp
+MAINTAINERCLEANFILES += git_version.h
+
+BUILT_SOURCES += git_version.h
+
+if HAVE_VERSION_CONTROL
+GIT_DESCRIBE := $(shell cd $(top_srcdir) && git describe --tags --abbrev=6 --dirty 2>/dev/null)
 
 git_version.h: git_version.h.tmp
 	@if cmp $< $@ 2>/dev/null; then $(RM) $<; else mv $< $@; fi
 
 git_version.h.tmp:
-	@echo "#define GIT_VERSION \"$(GIT_DESCRIBE)\"" > git_version.h.tmp
+	@echo "#define GIT_VERSION \"$(GIT_DESCRIBE)\"" > $@
 .PHONY: git_version.h.tmp
+endif
 
 # make
 .DELETE_ON_ERROR:
