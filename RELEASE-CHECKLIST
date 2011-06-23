@@ -3,6 +3,9 @@ Release Checklist
 
 * Bump version in configure.ac and commit to master
 
+* Tag release
+  git tag ltsmin-<version>
+
 * make distcheck (creates tarball and checks whether it builds)
   To test specific configurations:
     make distcheck DISTCHECK_CONFIGURE_FLAGS='...'
@@ -13,9 +16,6 @@ Release Checklist
 * Copy tarball and symlink to unversioned tar.gz to website (staging
   area); Update link to tarball on website; Regenerate website (staging
   area)
-
-* Tag release
-  git tag ltsmin-<version>
 
 * merge 'master' branch into 'next'
   git checkout next && git pull . master
