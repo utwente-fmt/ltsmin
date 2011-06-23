@@ -137,10 +137,13 @@ DX_INIT_DOXYGEN([$PACKAGE_NAME])
 AC_CACHE_SAVE
 
 # Checks for libraries.
+dnl workaround:
+dnl some autotools/libtool versions appear to lose dependencies to -lm
+dnl when linking .la files with CXXLD, hence add it here
+AC_SEARCH_LIBS([pow], [m])
 AC_CHECK_LIB([dl], [dlsym],,[AC_MSG_FAILURE([libdl not found.])])
 AC_CHECK_LIB([popt],[poptGetContext],,[AC_MSG_FAILURE([popt not found.])])
-AC_CHECK_LIB([z], [inflateEnd],,
-  [AC_MSG_FAILURE([zlib not found.])])
+AC_CHECK_LIB([z], [inflateEnd],,[AC_MSG_FAILURE([zlib not found.])])
 
 AC_ARG_WITH([bignum],
   [AS_HELP_STRING([--with-bignum=<type>], 
