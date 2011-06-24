@@ -4,9 +4,8 @@ Use SpinJa (distributed with LTSmin) to compile PROMELA model
 'leader.pm' to 'leader.spinja':
 
 ----
-java -cp /usr/share/ltsmin-1.7/spinja.jar Compile -o3 -l leader.pm
+java -cp <prefix>/share/ltsmin/spinja.jar spinja.Compile -o3 -l leader.pm
 gcc -g -O2 -fPIC -shared leader.spinja.c -o leader.spinja
-
 ----
 
 Note that options +-o3+ and +-l+ are currently mandatory.
