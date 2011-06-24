@@ -50,7 +50,7 @@ do
                 exit 0
                 ;;
         --help | -h )
-                echo "$COMMAND [ltsmin_options] model[.b|.etf|.lps|.tbf] [cc_options] app[.a|.c|.o] [app_options]..."
+                echo "$COMMAND [ltsmin_options] model[.b|.etf|.lps|.tbf|.dve|.dve2C|.spinja] [cc_options] app[.a|.c|.o] [app_options]..."
                 echo "  where \`\`app'' is an OPEN/CAESAR application"
                 exit 0
                 ;;
@@ -65,7 +65,7 @@ do
 done
 export LTSMIN_OPTIONS
 
-# phase 2: parsing the TBF filename (TODO: the value of $FILE may contain spaces)
+# phase 2: parsing the model filename (TODO: the value of $FILE may contain spaces)
 
 FILE="$1"
 if test ! -f "$FILE"
@@ -75,16 +75,12 @@ then
 fi
 case "$FILE" in
  *.tbf)
-    @HAVE_LIBSTEP_INFO_FALSE@ echo "muCRL support (> 2.18.3) not installed"
-    @HAVE_LIBSTEP_INFO_FALSE@ exit 1
-    echo "input is mCRL"
-    LTSMIN_MOD_LDFLAGS="@MCRL_LDFLAGS@ @CADP_LDFLAGS@ -llpo-open @BUDDY_LIBS@ @MCRL_LIBS@ @CADP_LIBS@"
+    echo "input is muCRL"
+    LTSMIN_MOD_LDFLAGS="@MCRL_LDFLAGS@ @CADP_LDFLAGS@ -llpo-open @MCRL_LIBS@ @CADP_LIBS@"
     ;;
  *.lps)
-    @HAVE_LIBMCRL2_FALSE@ echo "mCRL2 support not installed"
-    @HAVE_LIBMCRL2_FALSE@ exit 1
     echo "input is mCRL2"
-    LTSMIN_MOD_LDFLAGS="@MCRL2_LDFLAGS@ @CADP_LDFLAGS@ -llps-open @BUDDY_LIBS@ @MCRL2_LIBS@ @CADP_LIBS@"
+    LTSMIN_MOD_LDFLAGS="@MCRL2_LDFLAGS@ @CADP_LDFLAGS@ -llps-open @MCRL2_LIBS@ @CADP_LIBS@"
     ;;
  *.b)
     echo "input is NIPS byte-code"
@@ -95,24 +91,16 @@ case "$FILE" in
     LTSMIN_MOD_LDFLAGS="@CADP_LDFLAGS@ -letf-open @CADP_LIBS@"
     ;;
  *.dve)
-    @HAVE_DVEC_FALSE@ @HAVE_DVEC2_FALSE@ echo "DiVinE support not installed"
-    @HAVE_DVEC_FALSE@ @HAVE_DVEC2_FALSE@ exit 1
-    echo "input is DVE"
-    # prefer DiVinE 2 over divine-cluster
-    @HAVE_DVEC_TRUE@ LTSMIN_MOD_LDFLAGS="@DIVINE_LDFLAGS@ -ldve-open @DVEC_LIBS@ -lstdc++"
-    @HAVE_DVEC2_TRUE@ LTSMIN_MOD_LDFLAGS="@DIVINE2_LDFLAGS@ -ldve2-open @DVEC2_LIBS@"
-    ;;
- *.dveC)
-    @HAVE_DVEC_FALSE@ echo "DiVinE support not installed"
-    @HAVE_DVEC_FALSE@ exit 1
-    echo "input is DVE"
-    LTSMIN_MOD_LDFLAGS="@DIVINE_LDFLAGS@ -ldve-open @DVEC_LIBS@ -lstdc++"
+    echo "input is DVE2"
+    LTSMIN_MOD_LDFLAGS="@DIVINE2_LDFLAGS@ -ldve2-open @DVEC2_LIBS@"
     ;;
  *.dve2C)
-    @HAVE_DVEC2_FALSE@ echo "DiVinE 2 support not installed"
-    @HAVE_DVEC2_FALSE@ exit 1
-    echo "input is DVE2"
-    LTSMIN_MOD_LDFLAGS="@DIVINE2_LDFLAGS@ -ldve-open @DVEC2_LIBS@"
+    echo "input is DVE2 (compiled)"
+    LTSMIN_MOD_LDFLAGS="@DIVINE2_LDFLAGS@ -ldve2-open @DVEC2_LIBS@"
+    ;;
+ *.spinja)
+    echo "input is SpinJa (compiled)"
+    LTSMIN_MOD_LDFLAGS="@SPINJA_LDFLAGS@ -lspinja-open @SPINJA_LIBS@"
     ;;
  *)
     echo "Did not recognize type of $FILE"
@@ -140,7 +128,7 @@ do
 		echo "$COMMAND: missing C filename argument"
 		exit 1
 	fi
-	case $1 in
+	case "$1" in
 		-[DI]* ) CPPFLAGS="$CPPFLAGS $1"
 			 shift
 			 ;;

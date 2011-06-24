@@ -78,6 +78,7 @@ void add_array(array_manager_t man,void**ar,int e_size,array_resize_cb callback,
 		self_ar.e_size=sizeof(struct array);
 		self_ar.ar=(void**)&(man->arrays);
 		self_ar.callback=NULL;
+		self_ar.cbarg=NULL;
 		fix_array(self_ar,old,man->managed_size);
 	}
 	man->arrays[man->managed].e_size=e_size;

@@ -31,13 +31,13 @@ extern void dfs_stack_leave(dfs_stack_t stack);
 extern size_t dfs_stack_nframes (const dfs_stack_t stack);
 extern size_t dfs_stack_frame_size(dfs_stack_t stack);
 extern size_t dfs_stack_size(dfs_stack_t stack);
-extern size_t dfs_stack_size_max (dfs_stack_t stack);
 
 extern int *dfs_stack_push(dfs_stack_t stack, const int *state);
 extern int *dfs_stack_pop(dfs_stack_t stack);
 extern int *dfs_stack_top(dfs_stack_t stack);
 extern int *dfs_stack_peek_top(dfs_stack_t stack, size_t frame_offset);
 
+extern int * dfs_stack_bottom (dfs_stack_t stack);
 /**
  * Virtually pops some elements from the bottom of the bottom frame
  * The are lazily thrown away so memory usage increases

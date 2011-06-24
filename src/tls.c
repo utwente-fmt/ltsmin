@@ -1,7 +1,6 @@
 #include <config.h>
-#ifndef _DARWIN_C_SOURCE
-# define _DARWIN_C_SOURCE
-#endif
+#undef _POSIX_C_SOURCE
+#undef _XOPEN_SOURCE
 #include <assert.h>
 #include <pthread.h>
 #include <sys/types.h>
@@ -60,7 +59,7 @@ int tls_get_cpu_count() {
 
     /* set the mib for hw.ncpu */
     mib[0] = CTL_HW;
-    mib[1] = HW_AVAILCPU;  // alternatively, try HW_AVAILCPU;
+    mib[1] = HW_AVAILCPU;
 
     /* get the number of CPUs from the system */
     sysctl(mib, 2, &numCPU, &len, NULL, 0);
@@ -107,8 +106,8 @@ void
 add_stats(stats_t *res, stats_t *stat)
 {
     res->elts += stat->elts;
+    res->nodes += stat->nodes;
     res->tests += stat->tests;
     res->misses += stat->misses;
     res->rehashes += stat->rehashes;
-    res->cache_misses += stat->cache_misses;
 }

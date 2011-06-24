@@ -340,7 +340,7 @@ void GBsetLTStype(model_t model,lts_type_t info){
 	model->ltstype=info;
     if (model->map==NULL){
 	    int N=lts_type_get_type_count(info);
-	    model->map=RTmalloc(N*sizeof(void*));
+	    model->map=RTmallocZero(N*sizeof(void*));
 	    for(int i=0;i<N;i++){
 		    model->map[i]=model->newmap(model->newmap_context);
 	    }
@@ -552,7 +552,7 @@ void GBgrowChunkMaps(model_t model, int old_n)
 {
     void **old_map = model->map;
     int N=lts_type_get_type_count(GBgetLTStype(model));
-    model->map=RTmalloc(N*sizeof(void*));
+    model->map=RTmallocZero(N*sizeof(void*));
     for(int i=0;i<N;i++){
         if (i < old_n) {
             model->map[i] = old_map[i];
@@ -560,6 +560,7 @@ void GBgrowChunkMaps(model_t model, int old_n)
             model->map[i]=model->newmap(model->newmap_context);
         }
     }
+    RTfree (old_map);
 }
 
 int GBchunkPut(model_t model,int type_no,const chunk c){

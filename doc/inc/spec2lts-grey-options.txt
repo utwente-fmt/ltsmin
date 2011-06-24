@@ -18,14 +18,9 @@ scc;;
   algorithm (accepting cycle detection).  This requires an accepting
   state label to be present.  See below.
 
-*--state*='TYPE'::
-        Select type of data structure for storing visited states.
-        'TYPE' can be one of the following options:
-
-tree;;
-  use a tree-compressed hash table (default).
-
-vset;;
-  use a vector set (decision diagram).
+include::state-storage-options.txt[]
 
 include::reachability-options.txt[]
+
+*--max*='DEPTH'::
+        Maximum search depth, search until 'DEPTH'.

@@ -1,49 +1,28 @@
 #include <config.h>
-#include <stdint.h>
-#include <string.h>
-#include <stdlib.h>
-#include <strings.h>
-#include <ctype.h>
 #include <assert.h>
-
+#include <ctype.h>
 #include <stdint.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
+#include <strings.h>
+
+#include <archive.h>
+#include <bitset.h>
+#include <dbs-ll.h>
+#include <dfs-stack.h>
+#include <dynamic-array.h>
+#include <is-balloc.h>
+#include <limits.h>
 #include <lts_enum.h>
 #include <lts_io.h>
+#include <runtime.h>
+#include <scctimer.h>
+#include <spec-greybox.h>
 #include <stringindex.h>
-#include <limits.h>
-#include "dynamic-array.h"
-
-#include "archive.h"
-#include "runtime.h"
-#include "treedbs.h"
-#include "vector_set.h"
-#include "dfs-stack.h"
-#include "is-balloc.h"
-#include "bitset.h"
-#include "scctimer.h"
-#include "dbs-ll.h"
-
-#if defined(MCRL)
-#include "mcrl-greybox.h"
-#endif
-#if defined(MCRL2)
-#include "mcrl2-greybox.h"
-#endif
-#if defined(NIPS)
-#include "nips-greybox.h"
-#endif
-#if defined(ETF)
-#include "etf-greybox.h"
-#endif
-#if defined(DIVINE)
-#include "dve-greybox.h"
-#endif
-#if defined(DIVINE2)
-#include "dve2-greybox.h"
-#endif
-#if defined(SPINJA)
-#include "spinja-greybox.h"
-#endif
+#include <trace.h>
+#include <treedbs.h>
+#include <vector_set.h>
 
 static lts_enum_cb_t output_handle=NULL;
 
@@ -131,27 +110,7 @@ static  struct poptOption options[] = {
 	{ "strategy" , 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &arg_strategy , 0 ,
 		"select the search strategy", "<bfs|dfs|ndfs|scc>"},
 	{ "max" , 0 , POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT , &max , 0 ,"maximum search depth", "<int>"},
-#if defined(MCRL)
-	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, mcrl_options , 0 , "mCRL options", NULL },
-#endif
-#if defined(MCRL2)
-	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, mcrl2_options , 0 , "mCRL2 options", NULL },
-#endif
-#if defined(NIPS)
-	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, nips_options , 0 , "NIPS options", NULL },
-#endif
-#if defined(ETF)
-	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, etf_options , 0 , "ETF options", NULL },
-#endif
-#if defined(DIVINE)
-	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, dve_options , 0 , "DiVinE options", NULL },
-#endif
-#if defined(DIVINE2)
-	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, dve2_options , 0 , "DiVinE 2.2 options", NULL },
-#endif
-#if defined(SPINJA)
-	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, spinja_options , 0 , "SPINJA options", NULL },
-#endif
+        SPEC_POPT_OPTIONS,
 	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, greybox_options , 0 , "Greybox options", NULL },
 	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, vset_options , 0 , "Vector set options", NULL },
 	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, lts_io_options , 0 , NULL , NULL },
@@ -740,7 +699,7 @@ dfs_explore (model_t model, int *src, size_t *o_depth)
         stack = dfs_stack_create (N);
         dbs_ll_t dbsll = DBSLLcreate(N);
         buffer = isba_create (1);
-        int                 index;
+        ref_t               index;
         fvec = src;
         dfs_stack_push (stack, fvec);//dummy
                 isba_push_int (buffer, &next_group);

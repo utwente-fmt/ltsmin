@@ -9,18 +9,20 @@ utrunc (size_t x, size_t m)
 }
 
 static const size_t WORD_BITS = sizeof (size_t) * 8;
+static const size_t WORD_BITS_MASK = sizeof (size_t) * 8 - 1;
+static const size_t WORD_SHIFT = sizeof (size_t) == 4 ? 5 : 6;
 
 static inline size_t
-bv_seg (size_t i) { return i / WORD_BITS; }
+bv_seg (size_t i) { return i >> WORD_SHIFT; }
 
 static inline size_t
-bv_ofs (size_t i) { return i % WORD_BITS; }
+bv_ofs (size_t i) { return i & WORD_BITS_MASK; }
 
 int
-bitvector_create (bitvector_t *bv, int n_bits)
+bitvector_create (bitvector_t *bv, size_t n_bits)
 {
-    size_t              n_words = utrunc (n_bits, WORD_BITS);
-    bv->data = calloc (n_words, sizeof (size_t));
+    bv->n_words = utrunc (n_bits, WORD_BITS);
+    bv->data = calloc (bv->n_words, sizeof (size_t));
     if (bv->data == NULL) {
         bv->n_bits = 0;
         return -1;
@@ -28,6 +30,24 @@ bitvector_create (bitvector_t *bv, int n_bits)
         bv->n_bits = n_bits;
         return 0;
     }
+}
+
+void
+bitvector_create_large (bitvector_t *bv, size_t n_bits)
+{
+    bv->n_words = utrunc (n_bits, WORD_BITS);
+    bv->data = malloc (sizeof (size_t[bv->n_words]));
+    if (bv->data==NULL) {
+        printf("out of memory trying to allocate large bitvector\n");
+        exit(0);
+    }
+    bv->n_bits = n_bits;
+}
+
+void
+bitvector_clear (bitvector_t *bv)
+{
+    memset (bv->data, 0, sizeof (size_t[bv->n_words]));
 }
 
 void
@@ -64,8 +84,58 @@ bitvector_size (const bitvector_t *bv)
     return bv->n_bits;
 }
 
+int
+bitvector_isset_or_set (bitvector_t *bv, size_t idx)
+{
+    // isset_or_set
+    size_t              mask = 1UL << bv_ofs (idx);
+    size_t              word = bv_seg (idx);
+    int                 res = (bv->data[word] & mask) != 0;
+    bv->data[word] |= mask;
+    return res;
+}
+
 void
-bitvector_set (bitvector_t *bv, int idx)
+bitvector_set2 (bitvector_t *bv, size_t idx, size_t v)
+{
+    // isset_or_set2
+    size_t              mask = 3UL << bv_ofs (idx);
+    size_t              value = v << bv_ofs (idx);
+    size_t              word = bv_seg (idx);
+    bv->data[word] &= ~mask;
+    bv->data[word] |= value;
+}
+
+int
+bitvector_isset_or_set2 (bitvector_t *bv, size_t idx, size_t v)
+{
+    // isset_or_set2
+    size_t              mask = 3UL << bv_ofs (idx);
+    size_t              value = v << bv_ofs (idx);
+    size_t              word = bv_seg (idx);
+    int                 res = (bv->data[word] & mask) == value;
+    bv->data[word] &= ~mask;
+    bv->data[word] |= value;
+    return res;
+}
+
+int
+bitvector_get2 (const bitvector_t *bv, size_t idx)
+{
+    size_t              mask = 3UL << bv_ofs (idx);
+    return (bv->data[bv_seg (idx)] & mask) >> bv_ofs (idx);
+}
+
+void
+bitvector_set_atomic (bitvector_t *bv, size_t idx)
+{
+    // set bit
+    size_t              mask = 1UL << bv_ofs (idx);
+    __sync_fetch_and_or (bv->data + bv_seg(idx), mask);
+}
+
+void
+bitvector_set (bitvector_t *bv, size_t idx)
 {
     // set bit
     size_t              mask = 1UL << bv_ofs (idx);
@@ -73,7 +143,7 @@ bitvector_set (bitvector_t *bv, int idx)
 }
 
 void
-bitvector_unset (bitvector_t *bv, int idx)
+bitvector_unset (bitvector_t *bv, size_t idx)
 {
     // set bit
     size_t              mask = ~(1UL << bv_ofs (idx));
@@ -81,7 +151,7 @@ bitvector_unset (bitvector_t *bv, int idx)
 }
 
 int
-bitvector_is_set (const bitvector_t *bv, int idx)
+bitvector_is_set (const bitvector_t *bv, size_t idx)
 {
     size_t              mask = 1UL << bv_ofs (idx);
     return (bv->data[bv_seg (idx)] & mask) != 0;
@@ -94,8 +164,7 @@ bitvector_union(bitvector_t *bv, const bitvector_t *bv2)
     if (bv->n_bits != bv2->n_bits) return;
 
     // calculate number of words in the bitvector, union wordwise
-    size_t              n_words = utrunc (bv->n_bits, WORD_BITS);
-    for(size_t i=0; i < n_words; ++i) {
+    for(size_t i=0; i < bv->n_words; ++i) {
         bv->data[i] |= bv2->data[i];
     }
 }
@@ -107,8 +176,7 @@ bitvector_intersect(bitvector_t *bv, const bitvector_t *bv2)
     if (bv->n_bits != bv2->n_bits) return;
 
     // calculate number of words in the bitvector, union wordwise
-    size_t              n_words = utrunc (bv->n_bits, WORD_BITS);
-    for(size_t i=0; i < n_words; ++i) {
+    for(size_t i=0; i < bv->n_words; ++i) {
         bv->data[i] &= bv2->data[i];
     }
 }
@@ -121,8 +189,7 @@ bitvector_is_empty(const bitvector_t *bv)
     if (bv->n_bits == 0) return 1;
 
     // calculate number of words in the bitvector, union wordwise
-    size_t              n_words = utrunc (bv->n_bits, WORD_BITS);
-    for(size_t i=0; i < n_words; ++i) {
+    for(size_t i=0; i < bv->n_words; ++i) {
         result |= bv->data[i];
     }
     return (result == 0);
@@ -136,8 +203,7 @@ bitvector_is_disjoint(const bitvector_t *bv1, const bitvector_t *bv2)
     if (bv1->n_bits != bv2->n_bits) return 0;
 
     // calculate number of words in the bitvector, union wordwise
-    size_t              n_words = utrunc (bv1->n_bits, WORD_BITS);
-    for(size_t i=0; i < n_words; ++i) {
+    for(size_t i=0; i < bv1->n_words; ++i) {
         result |= (bv1->data[i] & bv2->data[i]);
     }
     return (result == 0);
@@ -150,13 +216,12 @@ bitvector_invert(bitvector_t *bv)
     if (bv->n_bits == 0) return;
 
     // calculate number of words in the bitvector, union wordwise
-    size_t              n_words = utrunc (bv->n_bits, WORD_BITS);
-    for(size_t i=0; i < n_words; ++i) {
+    for(size_t i=0; i < bv->n_words; ++i) {
         bv->data[i] = ~bv->data[i];
     }
 
     // don't invert the unused bits!
-    int                 used_bits = WORD_BITS - (n_words * WORD_BITS - bv->n_bits);
+    int                 used_bits = WORD_BITS - (bv->n_words * WORD_BITS - bv->n_bits);
     size_t              mask = (1UL << (used_bits))-1;
-    bv->data[n_words-1] &= mask;
+    bv->data[bv->n_words-1] &= mask;
 }

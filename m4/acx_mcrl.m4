@@ -1,4 +1,4 @@
-#serial 2
+#serial 3
 # Author: Michael Weber <michaelw@cs.utwente.nl>
 #
 # SYNOPSIS
@@ -8,7 +8,7 @@
 AC_DEFUN([ACX_MCRL], [
 AC_REQUIRE([ACX_EXPORT_DYNAMIC])
 AC_ARG_WITH([mcrl],
-  [AS_HELP_STRING([--with-mcrl=<prefix>],[mCRL prefix directory])])
+  [AS_HELP_STRING([--with-mcrl=<prefix>],[muCRL prefix directory])])
 AC_ARG_VAR([MCRL], [muCRL command])
 case "$with_mcrl" in
   no) acx_mcrl=no ;;
@@ -18,7 +18,13 @@ case "$with_mcrl" in
         with_mcrl="$(dirname $MCRL)/../mCRL"
       fi
       ;;
-   *) acx_mcrl=yes;;
+   *) acx_mcrl=yes
+      dnl be backwards compatible with including the
+      dnl /mCRL/ subdir in the prefix
+      if test "$with_mcrl/mCRL"; then
+        with_mcrl="$with_mcrl/mCRL"
+      fi
+      ;;
 esac
 
 if test x"$acx_mcrl" = xyes; then

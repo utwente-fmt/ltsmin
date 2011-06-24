@@ -223,10 +223,9 @@ void MTclusterBuild(matrix_table_t mt,int col,uint32_t count){
         mt->begin[mt->column[col][i]]++;
     }
     Warning(debug,"summing up");
-    for(uint32_t i=1;i<count;i++){
+    for(uint32_t i=1;i<=count;i++){
         mt->begin[i]+=mt->begin[i-1];
     }
-    mt->begin[count]=mt->begin[count-1];
     Warning(debug,"replace column value with position in array");
     for(uint32_t i=0;i<mt->count;i++){
         mt->column[col][i]=--mt->begin[mt->column[col][i]];

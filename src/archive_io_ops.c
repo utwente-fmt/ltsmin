@@ -1,3 +1,4 @@
+// -*- tab-width:4 ; indent-tabs-mode:nil -*-
 #include <config.h>
 #include <unistd.h>
 #include <stdio.h>
@@ -23,6 +24,8 @@ static void arch_read_close(lts_input_t input){
 	struct archive_io *ctx=(struct archive_io *)input->ops_context;
 	arch_close(&(ctx->archive));
 }
+
+static int LEGACY_IO=1;
 
 /* DIR format I/O */
 /* The DIR I/O code is capable of writing multiple partitions at once */
@@ -395,6 +398,15 @@ static void si_write_edge(void*context,int src_seg,int src_ofs,int dst_seg,int d
 	(void)dst_seg;
 	DSwriteStruct(out->dst,&dst_ofs);
 }
+static void ii_write_edge(void*context,int src_seg,int src_ofs,int dst_seg,int dst_ofs,int*labels){
+	struct vec_output_struct *out=(struct vec_output_struct *)context;
+	LTS_CHECK_STATE((*(out->count_p)),src_seg,(uint32_t)src_ofs);
+	LTS_INCR_IN((*(out->count_p)),(uint32_t)src_seg);
+	DSwriteStruct(out->src,&src_ofs);
+	DSwriteStruct(out->e_lbl,labels);
+	(void)dst_seg;
+	DSwriteStruct(out->dst,&dst_ofs);
+}
 
 static lts_enum_cb_t vec_write_begin(lts_output_t output,int which_state,int which_src,int which_dst){
 	Warning(info,"begin write");
@@ -453,6 +465,36 @@ static lts_enum_cb_t vec_write_begin(lts_output_t output,int which_state,int whi
 		out->dst=arch_write_vec_U32_named(ctx->archive,base,1,ofs,ctx->plain?ctx->plain_code:"diff32|gzip",1);
 		Warning(info,"begin write done");
 		return lts_enum_vii(N,out,vec_write_state,si_write_edge);
+	}
+	if (!strcmp(output->mode,"-si")){
+		if (output->segment_count>1) {
+			if (which_src!=segment_count) Fatal(1,error,"src selection assumption failed");
+			if (which_state!=which_dst) Fatal(1,error,"state == dst selection assumption failed");
+		}
+		sprintf(base,"ES-%d-%%s",which_state);
+		out->src=arch_write_vec_U32_named(ctx->archive,base,2,segofs,ctx->plain?ctx->plain_code:"diff32|gzip",1);
+		sprintf(base,"EL-%d-%%d",which_state);
+		out->e_lbl=arch_write_vec_U32(ctx->archive,base,eLbls,ctx->plain?ctx->plain_code:"gzip",1);
+		sprintf(base,"ED-%d-%%s",which_state);
+		out->dst=arch_write_vec_U32_named(ctx->archive,base,1,ofs,ctx->plain?ctx->plain_code:"diff32|gzip",1);
+		Warning(info,"begin write done");
+		return lts_enum_vii(N,out,vec_write_state,si_write_edge);
+	}
+	if (!strcmp(output->mode,"-ii")){
+		if (output->segment_count>1) {
+			if (which_src!=segment_count) Fatal(1,error,"src selection assumption failed");
+			if (which_state!=which_dst) Fatal(1,error,"state == dst selection assumption failed");
+		}
+		output->count.state[which_state]=0;
+		output->count.in[which_state]=0;
+		sprintf(base,"ES-%d-%%s",which_state);
+		out->src=arch_write_vec_U32_named(ctx->archive,base,1,ofs,ctx->plain?ctx->plain_code:"diff32|gzip",1);
+		sprintf(base,"EL-%d-%%d",which_state);
+		out->e_lbl=arch_write_vec_U32(ctx->archive,base,eLbls,ctx->plain?ctx->plain_code:"gzip",1);
+		sprintf(base,"ED-%d-%%s",which_state);
+		out->dst=arch_write_vec_U32_named(ctx->archive,base,1,ofs,ctx->plain?ctx->plain_code:"diff32|gzip",1);
+		Warning(info,"begin write done");
+		return lts_enum_vii(N,out,vec_write_state,ii_write_edge);
 	}
 	(void)idx_write_state; //needed for -si and -is
 	Fatal(1,error,"unknown mode %s",output->mode);
@@ -554,7 +596,7 @@ static void vec_write_header(lts_output_t output){
 			DSwriteU32(fs,output->count.out[i]);
 		}
 	}
-	if (!strcmp(output->mode,"vsi")){
+	if (!strcmp(output->mode,"vsi") || !strcmp(output->mode,"-ii") || !strcmp(output->mode,"-si")){
 		for(int i=0;i<N;i++){
 			DSwriteU32(fs,output->count.in[i]);
 		}
@@ -580,7 +622,8 @@ static void vec_write_close(lts_output_t output){
 }
 
 static void vec_write_open(lts_output_t output){
-	if (!strcmp(output->mode,"viv") || !strcmp(output->mode,"vsi")){
+	if (!strcmp(output->mode,"viv") || !strcmp(output->mode,"vsi")
+	|| !strcmp(output->mode,"-ii")  || !strcmp(output->mode,"-si")){
 		output->ops.write_begin=vec_write_begin;
 		output->ops.write_end=vec_write_end;
 		output->ops.write_close=vec_write_close;
@@ -907,6 +950,7 @@ static void load_vec_headers(lts_input_t input,stream_t ds){
 
 
 static void dir_or_vec_write(lts_output_t output){
+   if(LEGACY_IO){
 	lts_type_t ltstype=GBgetLTStype(output->model);
 	if (	   (lts_type_get_state_label_count(ltstype)!=0)
 		|| (lts_type_get_edge_label_count(ltstype)!=1)
@@ -920,6 +964,10 @@ static void dir_or_vec_write(lts_output_t output){
 		Warning(debug,"writing legacy DIR");
 		dir_write_open_ops(output);
 	}
+    } else {
+    	Debug("writing vector format.");
+    	vec_write_open(output);
+    }
 }
 
 /* Open a directory for writing. (detect format) */
@@ -1086,5 +1134,6 @@ struct poptOption archive_io_options[]= {
 	{ "block-size" , 0 , POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT , &IO_BLOCKSIZE , 0 , "set the size of a block in bytes" , "<bytes>" },
 	{ "cluster-size" , 0 , POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT , &IO_BLOCKCOUNT , 0 , "set the number of blocks in a GCF cluster" , "<blocks>"},
 	{ "plain" , 0 , POPT_ARG_VAL , &IO_PLAIN , 1 , "disable compression of GCF containers" , NULL },
+	{ "vec" , 0 , POPT_ARG_VAL , &LEGACY_IO , 0 , "write vector format even if DIR format is possible" , NULL },
 	POPT_TABLEEND
 };

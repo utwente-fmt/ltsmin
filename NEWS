@@ -1,7 +1,30 @@
+June, 24, 2011 - Release 1.7 of the LTSmin toolset
+
+ * New tools <spec>2lts-gsea
+   (General State Exploring Algorithms)
+ * PINS LTL layer
+ * Several multi-core LTL search algorithms
+   (<spec>2lts-mc)
+ * Several sequential LTL search algorithms
+   (<spec>2lts-grey, <spec>2lts-gsea)
+ * PINS Partial-Order Reduction Layer
+   (<spec>2lts-gsea)
+ * Bare-bones symbolic model checker for state-based mu-calculus
+ * New SpinJa frontend
+ * Patched DiVinE 2.4 frontend required
+ * Reimplementation of mcrl2 PINS frontend
+ * Read/Write dependency matrices and combined printing
+ * vector set improvements and clean-up
+ * Connection to the libDDD decision diagram package
+ * Conversion from ETF to DVE (etf-convert)
+
 November 1, 2010 - Release 1.6 of the LTSmin toolset.
 
  * New frontend DVE2 (requires DiVinE 2.2)
  * Enumerative Multi-Core backend
+   (<spec>2lts-mc)
+ * Multi-Core TreeDBS compression for state vectors
+   (<spec>2lts-mc)
  * Finding error actions symbolically (<spec>-reach --action)
  * Symbolic saturation-like strategies
  * Faster trace generation for <spec>-reach

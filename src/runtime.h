@@ -30,10 +30,12 @@ typedef struct {
  */
 extern int linear_search(const si_map_entry map[],const char*key);
 
+extern char *key_search(si_map_entry map[],const int val);
+
 /**
 \brief Parse a string that represents command line options.
  */
-extern void RTparseOptions(const char* argline,int *argc_p,char***argv_p);
+extern void RTparseOptions(const char* argline,int *argc_p,const char***argv_p);
 
 #define RTstackBottom HREstackBottom
 
@@ -43,13 +45,15 @@ extern void* RTmallocZero(size_t size);
 
 extern void* RTalign(size_t alignment, size_t size);
 
+extern void* RTalignZero(size_t align, size_t size);
+
 extern void* RTrealloc(void *rt_ptr, size_t size);
 
 extern char* RTstrdup(const char *str);
 
 extern void RTfree(void *rt_ptr);
 
-#define RT_NEW(sort) ((sort*)RTmallocZero(sizeof(sort)))
+#define RT_NEW(sort) RTmallocZero(sizeof(sort))
 
 extern void *RTdlsym (const char *libname, void *handle, const char *symbol);
 
@@ -74,7 +78,7 @@ extern char* RTinitNextArg();
 Due to the fact that we may have different extra string for help and usage,
 the function poptPrintUsage should not be called directly.
  */
-extern void RTexitUsage(int exit_code);
+#define RTexitUsage(code) do {HREprintUsage();HREabort(code);} while(0)
 
 /**
 \brief Print help of tool.
@@ -111,6 +115,19 @@ extern void (*RThandleFatal)(const char*file,int line,int errnum,int code);
 
 ///@}
 
+/** \defgroup rt_sysinfo Functions for retrieving system information. */
+/*@{*/
+
+/// Get the number of CPUs.
+extern int RTnumCPUs();
+
+/// Get the amount of memory.
+extern size_t RTmemSize();
+
+/// Get the page size.
+extern size_t RTpageSize();
+
+/*}@*/
 
 #endif
 

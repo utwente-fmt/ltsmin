@@ -18,66 +18,74 @@
 #include <struct_io.h>
 
 struct trc_s {
-    int len;
-    lts_type_t ltstype;
-    string_index_t* values;
-    treedbs_t state_db;
-    treedbs_t map_db; // NULL als aantal defined state labels == 0
-    treedbs_t edge_db; // NULL als aantal edges labels == 0
-    int *state_lbl; // NULL als geen definined state labels
-    int *edge_lbl; // NULL als geen edge labels
-    int *trace_idx_map; // maps n-th step of the trace to state_db idx
+    int                 len;
+    lts_type_t          ltstype;
+    string_index_t*     values;
+    treedbs_t           state_db;
+    treedbs_t           map_db; // NULL als aantal defined state labels == 0
+    treedbs_t           edge_db; // NULL als aantal edges labels == 0
+    int                *state_lbl; // NULL als geen definined state labels
+    int                *edge_lbl; // NULL als geen edge labels
+    int                *trace_idx_map; // maps n-th step of the trace to state_db idx
 };
 
-static lts_enum_cb_t trace_handle=NULL;
+static lts_enum_cb_t    trace_handle=NULL;
 
 typedef struct write_trace_step_s {
-    int src_no;
-    int dst_no;
-    int* dst;
-    int found;
+    int                 src_no;
+    int                 dst_no;
+    int                *dst;
+    int                 found;
     int                 N;
 } write_trace_step_t;
 
 struct trc_env_s {
     int                 N;
     model_t             model;
-    trc_get_state_f         get_state;
+    trc_get_state_f     get_state;
+    void               *get_state_arg;
     int                 state_labels;
-    int                 start_idx;
+    ref_t               start_idx;
 };
 
 trc_env_t *
-trc_create(model_t model, trc_get_state_f get, int start_idx)
+trc_create (model_t model, trc_get_state_f get, ref_t start_idx, void *arg)
 {
-    trc_env_t        *trace = RTmalloc(sizeof(trc_env_t));
+    trc_env_t          *trace = RTmalloc(sizeof(trc_env_t));
     lts_type_t          ltstype = GBgetLTStype (model);
     trace->N = lts_type_get_state_length (ltstype);
     trace->state_labels = lts_type_get_state_label_count (ltstype);
     trace->get_state = get;
+    trace->get_state_arg = arg;
     trace->model = model;
     trace->start_idx = start_idx;
     return trace;
 }
 
-int trc_get_length(trc_t trace) {
+int
+trc_get_length (trc_t trace)
+{
     return trace->len;
 }
 
-lts_type_t trc_get_ltstype(trc_t trace) {
+lts_type_t trc_get_ltstype (trc_t trace) {
     return trace->ltstype;
 }
 
-int trc_get_edge_label(trc_t trace, int i, int *dst) {
+int
+trc_get_edge_label (trc_t trace, int i, int *dst)
+{
     if (trace->edge_lbl == NULL)
         return 0;
     if (dst==NULL)
         return 1;
-    TreeUnfold(trace->edge_db, trace->edge_lbl[i], dst);
+    TreeUnfold (trace->edge_db, trace->edge_lbl[i], dst);
     return 1;
 }
 
-int trc_get_state_label(trc_t trace, int i, int *dst) {
+int
+trc_get_state_label (trc_t trace, int i, int *dst)
+{
     if (trace->map_db == NULL)
         return 0;
     if (dst==NULL)
@@ -86,16 +94,20 @@ int trc_get_state_label(trc_t trace, int i, int *dst) {
     return 1;
 }
 
-int  trc_get_state_idx(trc_t trace, int i) {
+int
+trc_get_state_idx (trc_t trace, int i)
+{
     return trace->trace_idx_map[i];
 }
 
-void trc_get_state(trc_t trace, int i, int *dst) {
-    TreeUnfold(trace->state_db, trace->trace_idx_map[i], dst);
+void
+trc_get_state (trc_t trace, int i, int *dst)
+{
+    TreeUnfold (trace->state_db, trace->trace_idx_map[i], dst);
 }
 
 int
-trc_get_type(trc_t trace, int type, int label, size_t dst_size, char* dst)
+trc_get_type (trc_t trace, int type, int label, size_t dst_size, char* dst)
 {
     // in case this is not a type
     if (type == -1)
@@ -103,9 +115,9 @@ trc_get_type(trc_t trace, int type, int label, size_t dst_size, char* dst)
 
     // otherwise, read the value
     chunk c;
-    c.data = SIgetC(trace->values[type], label, (int*)&c.len);
+    c.data = SIgetC (trace->values[type], label, (int*)&c.len);
     if (c.data) {
-        chunk2string(c, dst_size, dst);
+        chunk2string (c, dst_size, dst);
         return 0;
     } else {
         return -1;
@@ -115,103 +127,127 @@ trc_get_type(trc_t trace, int type, int label, size_t dst_size, char* dst)
 static void 
 write_trace_state(trc_env_t *env, int src_no, int *state)
 {
-    Warning(debug,"dumping state %d",src_no);
-    int labels[env->state_labels];
-    if (env->state_labels) GBgetStateLabelsAll(env->model,state,labels);
-    enum_state(trace_handle,0,state,labels);
+    Warning (debug,"dumping state %d", src_no);
+    int                 labels[env->state_labels];
+    if (env->state_labels) GBgetStateLabelsAll(env->model, state, labels);
+    enum_state (trace_handle, 0, state, labels);
 }
 
 
 static void 
-write_trace_next(void*arg,transition_info_t *ti,int*dst)
+write_trace_next (void *arg, transition_info_t *ti, int *dst)
 {
-    write_trace_step_t     *ctx=(write_trace_step_t*)arg;
-    if(ctx->found) return;
-    for(int i=0;i<ctx->N;i++)
-        if (ctx->dst[i]!=dst[i]) return;
-    ctx->found=1;
-    enum_seg_seg(trace_handle,0,ctx->src_no,0,ctx->dst_no,ti->labels);
+    write_trace_step_t *ctx = (write_trace_step_t*)arg;
+    if (ctx->found) return;
+    for (int i = 0; i < ctx->N; i++)
+        if (ctx->dst[i] != dst[i]) return;
+    ctx->found = 1;
+    enum_seg_seg (trace_handle, 0, ctx->src_no, 0, ctx->dst_no, ti->labels);
 }
 
 static void
-write_trace_step(trc_env_t *env, int src_no,int*src,int dst_no,int*dst)
+write_trace_step (trc_env_t *env, int src_no, int *src, int dst_no, int *dst)
 {
-    Warning(debug,"finding edge for state %d",src_no);
+    Warning (debug,"finding edge for state %d", src_no);
     struct write_trace_step_s ctx;
-    ctx.src_no=src_no;
-    ctx.dst_no=dst_no;
-    ctx.dst=dst;
-    ctx.found=0;
+    ctx.src_no = src_no;
+    ctx.dst_no = dst_no;
+    ctx.dst = dst;
+    ctx.found = 0;
     ctx.N = env->N;
-    GBgetTransitionsAll(env->model,src,write_trace_next,&ctx);
-    if (ctx.found==0) Fatal(1,error,"no matching transition found");
+    GBgetTransitionsAll (env->model, src, write_trace_next, &ctx);
+    if (ctx.found==0) Fatal (1, error, "no matching transition found");
 }
 
 static void
-write_trace(trc_env_t *env, size_t trace_size, uint32_t *trace)
+write_trace (trc_env_t *env, size_t trace_size, ref_t *trace)
 {
     // write initial state
-    size_t i = 0;
-    int step = 0;
-    int src[env->N];
-    int store[env->N * 2]; //reserve extra for tree TODO: breaks interfaces
-    int *dst = env->get_state(env->start_idx, store);
-    write_trace_state(env, env->start_idx, dst);
+    size_t              i = 0;
+    int                 step = 0;
+    int                 src[env->N];
+    int                *dst = env->get_state (env->start_idx, env->get_state_arg);
+    write_trace_state (env, env->start_idx, dst);
     i++;
-    while(i < trace_size) {
-        for(int j=0; j < env->N; ++j)
+    while (i < trace_size) {
+        for (int j=0; j < env->N; ++j)
             src[j] = dst[j];
-        dst = env->get_state(trace[i], store);
-        write_trace_step(env, step, src, step + 1, dst);  // write step
-        write_trace_state(env, trace[i], dst);            // write dst_idx
+        dst = env->get_state (trace[i], env->get_state_arg);
+        write_trace_step (env, step, src, step + 1, dst);  // write step
+        write_trace_state (env, trace[i], dst);            // write dst_idx
         i++;
         step++;
     }
 }
 
 static void
-find_trace_to(trc_env_t *env, int dst_idx, int level, int *parent_ofs)
+find_trace_to (trc_env_t *env, int dst_idx, int level, ref_t *parent_ofs)
 {
-    uint32_t *trace = (uint32_t*)RTmalloc(sizeof(uint32_t) * level);
+    /* Other workers may have influenced the trace, writing to parent_ofs.
+     * we artificially limit the length of the trace to 10 times that of the
+     * found one */
+    size_t              max_length = level * 10;
+    ref_t              *trace = RTmalloc(sizeof(ref_t) * max_length);
     if (trace == NULL)
         Fatal(1, error, "unable to allocate memory for trace");
-    int i = level - 1;
-    int curr_idx = dst_idx;
+    int                 i = max_length - 1;
+    ref_t               curr_idx = dst_idx;
     trace[i] = curr_idx;
     while(curr_idx != env->start_idx) {
         i--;
+        if (i < 0)
+            Fatal (1, error, "Trace length 10x longer than initially found trace. Giving up.");
         curr_idx = parent_ofs[curr_idx];
         trace[i] = curr_idx;
     }
+    Warning (info, "reconstructed trace length: %zu", max_length - i);
     // write trace
-    write_trace(env, level - i, &trace[i]);
-    RTfree(trace);
-    return;
+    write_trace (env, max_length - i, &trace[i]);
+    RTfree (trace);
 }
 
 void
-trc_find_and_write (trc_env_t *env, char *trc_output, int dst_idx, 
-                      int level, int *parent_ofs)
+trc_find_and_write (trc_env_t *env, char *trc_output, ref_t dst_idx, 
+                      int level, ref_t *parent_ofs)
 {
     lts_output_t trace_output=lts_output_open(trc_output,
                                               env->model,1,0,1,"vsi",NULL);
     {
-       int store[env->N * 2]; //reserve extra for tree TODO: breaks interfaces
-       int *init_state = env->get_state(env->start_idx, store);
+       int *init_state = env->get_state(env->start_idx, env->get_state_arg);
        lts_output_set_root_vec(trace_output,(uint32_t*)init_state);
        lts_output_set_root_idx(trace_output,0,0);
     }
-    trace_handle=lts_output_begin(trace_output,0,1,0);
-    mytimer_t timer = SCCcreateTimer();
-    SCCstartTimer(timer);
-    find_trace_to(env, dst_idx, level, parent_ofs);
-    SCCstopTimer(timer);
-    SCCreportTimer(timer,"constructing the trace took");
-    lts_output_end(trace_output,trace_handle);
-    lts_output_close(&trace_output);
+    trace_handle = lts_output_begin (trace_output, 0, 1, 0);
+    mytimer_t timer = SCCcreateTimer ();
+    SCCstartTimer (timer);
+    find_trace_to (env, dst_idx, level, parent_ofs);
+    SCCstopTimer (timer);
+    SCCreportTimer (timer, "constructing the trace took");
+    lts_output_end (trace_output, trace_handle);
+    lts_output_close (&trace_output);
 }
 
-trc_t trc_read(const char *name){
+void
+trc_write_trace (trc_env_t *env, char *trc_output, ref_t *trace, int level)
+{
+    lts_output_t trace_output=lts_output_open (trc_output,
+                                               env->model,1,0,1,"vsi",NULL);
+    {
+       int *init_state = env->get_state (env->start_idx, env->get_state_arg);
+       lts_output_set_root_vec (trace_output, (uint32_t*)init_state);
+       lts_output_set_root_idx (trace_output, 0, 0);
+    }
+    trace_handle=lts_output_begin (trace_output, 0, 1, 0);
+    mytimer_t timer = SCCcreateTimer ();
+    SCCstartTimer (timer);
+    write_trace (env, level, trace);
+    SCCstopTimer (timer);
+    SCCreportTimer (timer, "constructing the trace took");
+    lts_output_end (trace_output, trace_handle);
+    lts_output_close (&trace_output);
+}
+
+trc_t trc_read (const char *name){
     trc_t trace=RT_NEW(struct trc_s);
     archive_t arch;
     char *decode;

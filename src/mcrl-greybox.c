@@ -33,8 +33,8 @@ static void ErrorHandler(const char *format, va_list args) {
 }
 
 
-static void MCRLinitGreybox(int argc,char *argv[],void* stack_bottom){
-	ATinit(argc, argv, stack_bottom);
+static void MCRLinitGreybox(int argc,const char *argv[],void* stack_bottom){
+	ATinit(argc, (char **)argv, stack_bottom);
 	ATsetWarningHandler(WarningHandler);
 	ATsetErrorHandler(ErrorHandler);
 #if defined(__APPLE__)
@@ -48,11 +48,11 @@ static void MCRLinitGreybox(int argc,char *argv[],void* stack_bottom){
         const char *argv_[argc];
         argv_[0] = "/fake/path/to/rewr";
         for (int i = 1; i < argc; ++i) argv_[i] = argv[i];
-        argv = (char **)argv_;
+        argv = argv_;
 #endif
-	RWsetArguments(&argc, &argv);
-	STsetArguments(&argc, &argv);
-	MCRLsetArguments(&argc, &argv);
+	RWsetArguments(&argc, (char ***)&argv);
+	STsetArguments(&argc, (char ***)&argv);
+	MCRLsetArguments(&argc, (char ***)&argv);
 	if (argc > 1) {
 		for(int i=1;i<argc;i++){
 			Warning(error,"unparsed mCRL option %s",argv[i]);
@@ -71,7 +71,7 @@ static void mcrl_popt(poptContext con,
 		break;
 	case POPT_CALLBACK_REASON_POST: {
 		int argc;
-		char **argv;
+		const char **argv;
 		if (strstr(mcrl_args,"-confluent")||strstr(mcrl_args,"-conf-table")||strstr(mcrl_args,"-conf-compute")){
 			Fatal(1,error,"This tool does not support tau confluence reduction.");
 		}

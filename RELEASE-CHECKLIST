@@ -1,7 +1,12 @@
 Release Checklist
 =================
 
+* Update NEWS with release notes
+
 * Bump version in configure.ac and commit to master
+
+* Tag release
+  git tag ltsmin-<version>
 
 * make distcheck (creates tarball and checks whether it builds)
   To test specific configurations:
@@ -13,9 +18,6 @@ Release Checklist
 * Copy tarball and symlink to unversioned tar.gz to website (staging
   area); Update link to tarball on website; Regenerate website (staging
   area)
-
-* Tag release
-  git tag ltsmin-<version>
 
 * merge 'master' branch into 'next'
   git checkout next && git pull . master
@@ -32,3 +34,6 @@ Release Checklist
 * Close all bugs marked as "resolved" in Redmine
   (ensure that Redmine's view on the FMT repository is current, e.g.,
   by visiting to "Repository" view.)
+
+* Announce new release in Redmine's News section for the LTSmin project,
+  upload tarball to Files section

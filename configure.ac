@@ -1,5 +1,5 @@
 AC_PREREQ(2.60)
-AC_INIT([ltsmin],[1.6],[ltsmin-support@cs.utwente.nl])
+AC_INIT([ltsmin],[1.7],[ltsmin-support@cs.utwente.nl])
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_AUX_DIR([autotools])
 AM_INIT_AUTOMAKE([foreign])
@@ -53,7 +53,7 @@ ACX_PTHREAD(
 
 AC_ARG_VAR([ANT], [ANT command (Java build tool)])
 AC_PATH_TOOL(ANT, ["${ANT:-ant}"])
-if test -f "${top_srcdir}/spinja/spinja.jar" || \
+if test -f "${srcdir}/spinja/spinja.jar" || \
   command -v "$ANT" 2>/dev/null 2>&1
 then :
 else
@@ -137,10 +137,13 @@ DX_INIT_DOXYGEN([$PACKAGE_NAME])
 AC_CACHE_SAVE
 
 # Checks for libraries.
+dnl workaround:
+dnl some autotools/libtool versions appear to lose dependencies to -lm
+dnl when linking .la files with CXXLD, hence add it here
+AC_SEARCH_LIBS([pow], [m])
 AC_CHECK_LIB([dl], [dlsym],,[AC_MSG_FAILURE([libdl not found.])])
 AC_CHECK_LIB([popt],[poptGetContext],,[AC_MSG_FAILURE([popt not found.])])
-AC_CHECK_LIB([z], [inflateEnd],,
-  [AC_MSG_FAILURE([zlib not found.])])
+AC_CHECK_LIB([z], [inflateEnd],,[AC_MSG_FAILURE([zlib not found.])])
 
 AC_ARG_WITH([bignum],
   [AS_HELP_STRING([--with-bignum=<type>], 
@@ -307,15 +310,12 @@ AM_CONDITIONAL([HAVE_CADP], [test x"$acx_cadp" = xyes])
 AM_CONDITIONAL([HAVE_DVEC], [test x"$acx_dvec_libs" = xyes])
 AM_CONDITIONAL([HAVE_DVEC2], [true])    dnl can be built unconditionally
 AM_CONDITIONAL([HAVE_ATOMICS], [test x"$acx_atomics" = xyes])
+AM_CONDITIONAL([HAVE_VERSION_CONTROL], [test -d "${srcdir}/.git"])
 
 AC_CONFIG_COMMANDS_POST(
   [ac_configure_args="$ac_configure_args --enable-keep-terminated-procs dnl
                                          --disable-shared dnl
                                          --libdir='$(eval echo "$pkglibdir")'"])
-
-if test x"$acx_cadp" = xyes; then
-   AC_CONFIG_FILES([src/pins_open])
-fi
 
 AC_CONFIG_FILES([
        Makefile

@@ -26,8 +26,8 @@ struct cct_cont_s {
 cct_map_t *
 cct_create_map()
 {
-    cct_map_t *map = RTmalloc(sizeof(cct_map_t));
-    map->table = RTmalloc(sizeof(table_t[MAX_TABLES]));
+    cct_map_t *map = RTmallocZero(sizeof(cct_map_t));
+    map->table = RTmallocZero(sizeof(table_t[MAX_TABLES]));
     for ( size_t i = 0; i < MAX_TABLES; i++ )
         map->table[i].string_index = NULL;
     return map;
@@ -68,7 +68,9 @@ inline void *
 cct_map_get(void*ctx,int idx,int*len) 
 {
     table_t *table = ctx;
+    pthread_rwlock_rdlock(&table->rwlock);
     char *res = SIgetC(table->string_index, idx, len);
+    pthread_rwlock_unlock(&table->rwlock);
     return res;
 }
 

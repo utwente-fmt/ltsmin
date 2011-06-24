@@ -22,7 +22,7 @@ extern char *mkdtemp(char *);
 #define bswap_16 OSSwapInt16
 #define bswap_32 OSSwapInt32
 #define bswap_64 OSSwapInt64
-#elif defined(__linux__)
+#elif defined(__linux__) || defined(__CYGWIN__) 
 #include <byteswap.h>
 #elif defined(__NetBSD__)
 #define bswap_16 bswap16
@@ -31,6 +31,10 @@ extern char *mkdtemp(char *);
 #else
 #error "Don't know how to deal with endianness on this platform."
 #endif
+
+extern void qsortr(void *base, size_t num, size_t width,
+                   int (*comp)(const void *, const void *,void *ExtraArgs),
+                   void *ExtraArgs);
 
 #endif
 

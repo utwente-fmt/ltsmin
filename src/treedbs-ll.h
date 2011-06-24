@@ -10,12 +10,16 @@
 \brief Implementation of tree compression using lockless hashtables.
 */
 
+static const int    DB_SIZE_MAX = 32;
+
 /**
 Abstract type tree database.
 */
 typedef struct treedbs_ll_s *treedbs_ll_t;
 
-typedef int *internal_t;
+typedef size_t tree_ref_t;
+
+typedef int *tree_t;
 
 /**
 Create a new tree database.
@@ -24,9 +28,19 @@ Create a new tree database.
 - sized
 - incremental using the dependency matrix
 */
-extern treedbs_ll_t TreeDBSLLcreate (int len);
-extern treedbs_ll_t TreeDBSLLcreate_sized (int len, int size);
-extern treedbs_ll_t TreeDBSLLcreate_dm (int len, int size, matrix_t * m);
+extern treedbs_ll_t TreeDBSLLcreate (int len, int satellite_bits);
+extern treedbs_ll_t TreeDBSLLcreate_sized (int len, int size,
+                                           int satellite_bits);
+extern treedbs_ll_t TreeDBSLLcreate_dm (int len, int size, matrix_t *m,
+                                        int satellite_bits);
+
+extern int          TreeDBSLLtry_set_sat_bit (const treedbs_ll_t dbs,
+                                              const tree_ref_t ref, int index);
+extern int          TreeDBSLLget_sat_bit (const treedbs_ll_t dbs, const tree_ref_t ref,
+                                          int index);
+extern uint16_t     TreeDBSLLget_sat_bits (const treedbs_ll_t dbs, const tree_ref_t ref);
+extern void         TreeDBSLLset_sat_bits (const treedbs_ll_t dbs, const tree_ref_t ref,
+                                           uint16_t value);
 
 /**
 \brief Find a vector with respect to a database and insert it if it cannot be fo
@@ -41,14 +55,15 @@ und.
 */
 extern int          TreeDBSLLlookup (const treedbs_ll_t dbs, const int *v);
 extern int          TreeDBSLLlookup_incr (const treedbs_ll_t dbs, const int *v, 
-                                          internal_t *prev);
+                                          tree_t prev, tree_t next);
 extern int          TreeDBSLLlookup_dm (const treedbs_ll_t dbs, const int *v, 
-                                        internal_t *prev, int g);
+                                        tree_t prev, tree_t next, int group);
 
-extern internal_t   TreeDBSLLget (const treedbs_ll_t dbs, const int idx, int *dst);
+extern tree_t       TreeDBSLLget (const treedbs_ll_t dbs, const tree_ref_t ref, 
+                                  int *dst);
 
-extern int          TreeDBSLLindex (internal_t data);
-extern int         *TreeDBSLLdata (const treedbs_ll_t dbs, internal_t data);
+extern uint32_t     TreeDBSLLindex (tree_t data);
+extern int         *TreeDBSLLdata (const treedbs_ll_t dbs, tree_t data);
 
 /**
 \brief Free the memory used by a tree dbs.

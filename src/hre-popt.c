@@ -1,13 +1,14 @@
 #include <config.h>
-#include <hre-main.h>
-#include <git_version.h>
-#include <hre-internal.h>
-#include <stdlib.h>
 #include <errno.h>
-#include <stdio.h>
 #include <stdarg.h>
-#include "unix.h"
+#include <stdio.h>
+#include <stdlib.h>
+
+#include <git_version.h>
+#include <hre-main.h>
+#include <hre-internal.h>
 #include <runtime.h>
+#include <unix.h>
 
 enum {
     PRINT_VERSION = 1,

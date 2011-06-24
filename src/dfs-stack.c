@@ -22,8 +22,6 @@ struct dfs_stack {
     int frame_size; //size of current stack frame
     int frame_bottom;   
     size_t nframes;
-    size_t max_size;
-    ssize_t ntotal; //total elements on all frames
 };
 
 char *
@@ -41,12 +39,10 @@ dfs_stack_create (size_t element_size)
 {
     dfs_stack_t result = RTmalloc(sizeof(struct dfs_stack));
     result->states = isba_create(element_size);
-    result->frames = isba_create(1);
+    result->frames = isba_create(2);
     result->frame_size = 0;
     result->frame_bottom = 0;
     result->nframes = 0;
-    result->ntotal = 0;
-    result->max_size = 0;
     return result;
 }
 
@@ -68,10 +64,14 @@ dfs_stack_size (dfs_stack_t stack)
     return isba_size_int ( stack->states );
 }
 
-size_t
-dfs_stack_size_max (dfs_stack_t stack)
+static void
+clean_frame(dfs_stack_t stack)
 {
-    return stack->max_size;
+    if(stack->frame_bottom){
+        isba_discard_int(stack->states, stack->frame_bottom);
+        stack->frame_bottom = 0;
+        stack->frame_size = 0;
+    }
 }
 
 void
@@ -85,9 +85,9 @@ dfs_stack_destroy (dfs_stack_t stack)
 void
 dfs_stack_enter (dfs_stack_t stack)
 {
-    if (stack->frame_size == stack->frame_bottom) Fatal(1, error, "Enter on empty frame %zu == %zu ", stack->frame_size, stack->frame_bottom);
-    assert(stack->frame_size < INT_MAX);
-    isba_push_int(stack->frames, &stack->frame_size); //TODO: store frame bottom
+    if (stack->frame_size == stack->frame_bottom) Fatal(1, error, "Enter on empty frame %d == %d ", stack->frame_size, stack->frame_bottom);
+    int t[2] = {stack->frame_size, stack->frame_bottom};
+    isba_push_int(stack->frames, t);
     stack->frame_size = 0;
     stack->frame_bottom = 0;
     stack->nframes++;
@@ -98,8 +98,10 @@ dfs_stack_leave (dfs_stack_t stack)
 {
     if (stack->nframes == 0) Fatal(1, error, "Leave on empty stack");
     isba_discard_int(stack->states, stack->frame_size);
-    stack->ntotal -= stack->frame_size; 
-    stack->frame_size = *isba_pop_int(stack->frames);
+    int         *top = isba_top_int(stack->frames);
+    stack->frame_size = top[0];
+    stack->frame_bottom = top[1];
+    isba_pop_int(stack->frames);
     stack->nframes--;
 }
 
@@ -107,17 +109,16 @@ int *
 dfs_stack_push (dfs_stack_t stack, const int *state)
 {
     stack->frame_size++;
-    stack->ntotal++;// = isba_size_int ( stack->states );
-    size_t ntotal = (size_t)stack->ntotal;
-    stack->max_size = ntotal > stack->max_size ? ntotal : stack->max_size;
     return isba_push_int(stack->states, state);
 }
 
 int *
 dfs_stack_pop (dfs_stack_t stack)
 {
-    if (stack->frame_size == stack->frame_bottom) return NULL;
-    stack->ntotal--;
+    if (stack->frame_size == stack->frame_bottom) {
+        clean_frame(stack);
+        return NULL;
+    }
     stack->frame_size--;
     return isba_pop_int(stack->states);
 }
@@ -126,11 +127,7 @@ int *
 dfs_stack_top (dfs_stack_t stack)
 {
     if (stack->frame_size == stack->frame_bottom) {
-        if (stack->frame_bottom) {
-            isba_discard_int(stack->states, stack->frame_bottom);
-            stack->frame_bottom = 0;
-            stack->frame_size = 0;
-        }
+        clean_frame(stack);
         return NULL;
     }
     return isba_top_int(stack->states);
@@ -158,7 +155,6 @@ dfs_stack_peek (dfs_stack_t stack, size_t offset)
 void
 dfs_stack_discard (dfs_stack_t stack, size_t num)
 {
-    stack->ntotal -= num;
     size_t frame_size;
     while ( (frame_size = dfs_stack_frame_size (stack)) < num ) {
         dfs_stack_leave( stack );
@@ -169,11 +165,20 @@ dfs_stack_discard (dfs_stack_t stack, size_t num)
 }
 
 int *
+dfs_stack_bottom (dfs_stack_t stack)
+{
+    if (stack->frame_size == stack->frame_bottom) {
+        clean_frame(stack);
+        return NULL;
+    }
+    return isba_peek_int(stack->states, stack->frame_size - stack->frame_bottom - 1);
+}
+
+int *
 dfs_stack_pop_bottom (dfs_stack_t stack)
 {
     if (stack->frame_size == stack->frame_bottom)
         Fatal(1, error, "pop bottom empty frame");
-    stack->ntotal--;
     stack->frame_bottom++;
     return isba_peek_int(stack->states, stack->frame_size - stack->frame_bottom);
 }
@@ -204,8 +209,8 @@ void
 dfs_stack_walk_down(dfs_stack_t stack, int(*cb)(int*, void*), void* ctx)
 {
     // set offset of the root node
-    int offset = stack->ntotal;
-    int res;
+    int offset = isba_size_int ( stack->states );
+    int res = 1;
 
     for(size_t i=stack->nframes-1 ; i > 0 &&  res; i--) {
         offset -= isba_peek_int(stack->frames, i)[0];

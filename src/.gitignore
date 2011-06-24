@@ -16,6 +16,7 @@ ltsmin-mpi
 stamp-h1
 gcf
 git_version.h
+subst_pins_open.mk
 lpo-reach
 lpo2lts-grey
 lpo2lts-mpi

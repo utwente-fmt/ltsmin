@@ -1,4 +1,4 @@
-=== Greybox Options
+=== PINS Options
 
 *--matrix*::
         Print the dependency matrix and exit.

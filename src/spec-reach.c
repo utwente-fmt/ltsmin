@@ -5,19 +5,18 @@
 #include <strings.h>
 
 #include <dm/dm.h>
+#include <dynamic-array.h>
 #include <greybox.h>
-#include <spec-greybox.h>
 #include <lts_enum.h>
 #include <lts_io.h>
+#include <ltsmin-grammar.h>
+#include <ltsmin-syntax.h>
+#include <ltsmin-tl.h>
 #include <runtime.h>
 #include <scctimer.h>
+#include <spec-greybox.h>
 #include <stringindex.h>
 #include <vector_set.h>
-#include <dynamic-array.h>
-
-#include <ltsmin-syntax.h>
-#include <ltsmin-grammar.h>
-#include <ltsmin-tl.h>
 
 #define diagnostic(...) {\
     if (RTverbosity >= 2)\
@@ -859,6 +858,7 @@ reach_sat_ddd(reach_proc_t reach_proc, vset_t visited,
         stats_and_progress_report(NULL, visited, level);
         level++;
         for(int i = 0; i < nGrps; i++){
+            if (!bitvector_is_set(reach_groups, i)) continue;
             diagnostic("\rexploring group %4d/%d", i, nGrps);
             expand_group_next(i, visited);
             (*eg_count)++;
@@ -867,6 +867,7 @@ reach_sat_ddd(reach_proc_t reach_proc, vset_t visited,
         if (dlk_detect) vset_copy(deadlocks, visited);
         vset_least_fixpoint(visited, visited, group_next, nGrps);
         (*next_count)++;
+        diagnostic("\rround %d complete       \n", level);
         if (dlk_detect) {
             for (int i = 0; i < nGrps; i++) {
                 vset_prev(dlk_temp, visited, group_next[i]);

@@ -61,9 +61,11 @@ dve_popt(poptContext con,
         GBregisterPreLoader("dve", DVE2compileGreyboxModel);
         GBregisterPreLoader("so",DVE2loadDynamicLib);
         GBregisterPreLoader("dve2C",DVE2loadDynamicLib);
+        GBregisterPreLoader("dll",DVE2loadDynamicLib);
         GBregisterLoader("dve", DVE2loadGreyboxModel);
         GBregisterLoader("so",DVE2loadGreyboxModel);
         GBregisterLoader("dve2C",DVE2loadGreyboxModel);
+        GBregisterLoader("dll",DVE2loadGreyboxModel);
         Warning(info,"Precompiled divine module initialized");
         return;
     case POPT_CALLBACK_REASON_OPTION:
@@ -150,7 +152,7 @@ DVEexit()
     char rmcmd[PATH_MAX];
     if (snprintf(rmcmd, sizeof rmcmd, "rm -rf %s", templatename) < (ssize_t)sizeof rmcmd) {
         // remove!
-        system(rmcmd);
+        (void)system(rmcmd);
     }
 }
 
