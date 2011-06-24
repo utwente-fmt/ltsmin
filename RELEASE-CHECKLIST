@@ -32,3 +32,6 @@ Release Checklist
 * Close all bugs marked as "resolved" in Redmine
   (ensure that Redmine's view on the FMT repository is current, e.g.,
   by visiting to "Repository" view.)
+
+* Announce new release in Redmine's News section for the LTSmin project,
+  upload tarball to Files section
