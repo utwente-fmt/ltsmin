@@ -19,6 +19,7 @@ MANPAGES += etf-convert.1
 MANPAGES += etf.5
 MANPAGES += gcf.1
 MANPAGES += ce-mpi.1
+MANPAGES += pins_open.1
 
 MANPAGES += dve-reach.1
 MANPAGES += dve2lts-grey.1
@@ -51,19 +52,20 @@ MANPAGES += nips2lts-grey.1
 MANPAGES += nips2lts-mc.1
 MANPAGES += nips2lts-mpi.1
 MANPAGES += nips2torx.1
-MANPAGES += pins_open.1
 
+MANPAGES += spinja-reach.1
 MANPAGES += spinja2lts-grey.1
+MANPAGES += spinja2lts-gsea.1
 MANPAGES += spinja2lts-mc.1
 MANPAGES += spinja2lts-mpi.1
 MANPAGES += spinja2torx.1
-MANPAGES += spinja-reach.1
 
+MANPAGES += dve2-reach.1
 MANPAGES += dve22lts-grey.1
+MANPAGES += dve22lts-gsea.1
 MANPAGES += dve22lts-mc.1
 MANPAGES += dve22lts-mpi.1
 MANPAGES += dve22torx.1
-MANPAGES += dve2-reach.1
 
 
 doc_ASCIIDOC = $(addsuffix .txt, $(basename $(MANPAGES)))
