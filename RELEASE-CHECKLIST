@@ -1,6 +1,8 @@
 Release Checklist
 =================
 
+* Update NEWS with release notes
+
 * Bump version in configure.ac and commit to master
 
 * Tag release
