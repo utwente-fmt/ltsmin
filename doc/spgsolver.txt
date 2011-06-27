@@ -1,0 +1,28 @@
+//                           -*- mode: doc; outline-regexp: "==\(=*\) ." -*-
+spgsolver(1)
+===========
+:Author:  Gijs Kant
+:Email:   <kant@cs.utwente.nl>
+:Date:    2012-02-20
+
+== NAME
+
+spgsolver - symbolic parity game solver.
+
+== SYNOPSIS
+
+spgsolver [OPTIONS] <input>
+
+== OPTIONS
+
+include::inc/listdd-options.txt[]
+
+== EXIT STATUS
+0::
+        Successful termination.
+>0::
+        Some error occurred.
+
+== SEE ALSO
+
+manpage:pbes-reach[1]

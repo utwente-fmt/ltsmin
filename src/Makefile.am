@@ -20,6 +20,8 @@ noinst_LTLIBRARIES += libltsmin.la
 noinst_LTLIBRARIES += libltsmin-hre-util.la
 noinst_LTLIBRARIES += libltsmin-hre.la
 
+noinst_LTLIBRARIES += libspg.la
+
 pkglib_LTLIBRARIES =
 
 SUBDIRS  = dm
@@ -44,6 +46,7 @@ SUBDIRS += sigmin-mpi
 endif
 SUBDIRS += ce
 SUBDIRS += torx
+SUBDIRS += spg
 
 EXTRA_DIST  = ltsmin-lexer.c ltsmin-lexer.h
 
@@ -65,6 +68,13 @@ bin_PROGRAMS += lps2lts-grey
 bin_PROGRAMS += lps2lts-gsea
 bin_PROGRAMS += lps-reach
 noinst_LTLIBRARIES += libmcrl2-pins.la
+endif
+
+if HAVE_LIBMCRL2
+bin_PROGRAMS += pbes2lts-grey 
+bin_PROGRAMS += pbes2lts-gsea
+bin_PROGRAMS += pbes-reach
+noinst_LTLIBRARIES += libpbes-pins.la
 endif
 
 # if HAVE_LIBNIPS
@@ -114,6 +124,9 @@ endif
 if HAVE_LIBMCRL2
 bin_PROGRAMS += lps2lts-mpi
 endif
+if HAVE_LIBMCRL2
+bin_PROGRAMS += pbes2lts-mpi
+endif
 if HAVE_DVEC
 bin_PROGRAMS += dve2lts-mpi
 endif
@@ -154,6 +167,11 @@ libmcrl2_pins_la_SOURCES  = mcrl2-greybox.cpp mcrl2-greybox.h
 libmcrl2_pins_la_CPPFLAGS = -DMCRL2 -DNDEBUG $(MCRL2_PINS_CPPFLAGS) $(AM_CPPFLAGS)
 libmcrl2_pins_la_LDFLAGS  = $(MCRL2_PINS_LDFLAGS) $(MCRL2_LDFLAGS) $(AM_LDFLAGS)
 libmcrl2_pins_la_LIBADD   = $(MCRL2_PINS_LIBS)
+
+libpbes_pins_la_SOURCES  = pbes-greybox.cpp pbes-greybox.h
+libpbes_pins_la_CPPFLAGS = -DPBES -DNDEBUG $(MCRL2_PINS_CPPFLAGS) $(AM_CPPFLAGS)
+libpbes_pins_la_LDFLAGS  = $(MCRL2_PINS_LDFLAGS) $(MCRL2_LDFLAGS) $(AM_LDFLAGS)
+libpbes_pins_la_LIBADD   = $(MCRL2_PINS_LIBS)
 
 # etf-convert
 etf_convert_SOURCES = etf-convert.c
@@ -205,6 +223,12 @@ lps2lts_grey_CPPFLAGS = -DMCRL2 $(AM_CPPFLAGS)
 lps2lts_grey_LDFLAGS  = $(MCRL2_LDFLAGS) $(AM_LDFLAGS)
 nodist_EXTRA_lps2lts_grey_SOURCES = automake-force-linker.cxx
 
+# pbes2lts-grey
+pbes2lts_grey_SOURCES  = spec2lts-grey.c
+pbes2lts_grey_LDADD    = libvset.la libpbes-pins.la libltsmin.la
+pbes2lts_grey_CPPFLAGS = -DPBES $(AM_CPPFLAGS)
+nodist_EXTRA_pbes2lts_grey_SOURCES = automake-force-linker.cxx
+
 # nips2lts-grey
 nips2lts_grey_SOURCES  = spec2lts-grey.c nips-greybox.c nips-greybox.h
 nips2lts_grey_LDADD    = $(VSET_LIBS) libltsmin.la $(NIPS_LIBS)
@@ -248,6 +272,12 @@ lps2lts_gsea_LDADD    = $(VSET_LIBS) libmcrl2-pins.la libltsmin.la
 lps2lts_gsea_CPPFLAGS = -DMCRL2 $(AM_CPPFLAGS)
 lps2lts_gsea_LDFLAGS  = $(MCRL2_LDFLAGS) $(AM_LDFLAGS)
 nodist_EXTRA_lps2lts_gsea_SOURCES = automake-force-linker.cxx
+
+# pbes2lts-gsea
+pbes2lts_gsea_SOURCES  = spec2lts-gsea.c
+pbes2lts_gsea_LDADD    = libvset.la libpbes-pins.la libltsmin.la
+pbes2lts_gsea_CPPFLAGS = -DPBES $(AM_CPPFLAGS)
+nodist_EXTRA_pbes2lts_gsea_SOURCES = automake-force-linker.cxx
 
 # nips2lts-gsea
 nips2lts_gsea_SOURCES  = spec2lts-gsea.c nips-greybox.c nips-greybox.h
@@ -293,6 +323,12 @@ lps_reach_CPPFLAGS = -DMCRL2 $(AM_CPPFLAGS)
 lps_reach_LDFLAGS  = $(MCRL2_LDFLAGS) $(AM_LDFLAGS)
 nodist_EXTRA_lps_reach_SOURCES = automake-force-linker.cxx
 
+# pbes-reach
+pbes_reach_SOURCES  = spec-reach.c
+pbes_reach_LDADD    = libvset.la libpbes-pins.la libltsmin.la libspg.la
+pbes_reach_CPPFLAGS = -DPBES $(AM_CPPFLAGS)
+nodist_EXTRA_pbes_reach_SOURCES = automake-force-linker.cxx
+
 # nips-reach
 nips_reach_SOURCES  = spec-reach.c nips-greybox.c nips-greybox.h
 nips_reach_LDADD    = $(VSET_LIBS) libltsmin.la $(NIPS_LIBS)
@@ -336,6 +372,12 @@ lps2lts_mpi_LDADD    = libmcrl2-pins.la libltsmin-mpi.la
 lps2lts_mpi_CPPFLAGS = -DMCRL2 $(AM_CPPFLAGS)
 lps2lts_mpi_LDFLAGS  = $(MCRL2_LDFLAGS) $(AM_LDFLAGS)
 nodist_EXTRA_lps2lts_mpi_SOURCES = automake-force-linker.cxx
+
+# pbes2lts-mpi
+pbes2lts_mpi_SOURCES  = spec2lts-mpi.c
+pbes2lts_mpi_LDADD    = libpbes-pins.la libltsmin-mpi.la
+pbes2lts_mpi_CPPFLAGS = -DPBES $(AM_CPPFLAGS)
+nodist_EXTRA_pbes2lts_mpi_SOURCES = automake-force-linker.cxx
 
 # nips2lts-mpi
 nips2lts_mpi_SOURCES  = spec2lts-mpi.c nips-greybox.c nips-greybox.h
@@ -526,6 +568,7 @@ libutil_la_SOURCES += archive_format.c
 libutil_la_SOURCES += archive_gcf.c
 libutil_la_SOURCES += archive_gsf.c
 libutil_la_SOURCES += archive_io_ops.c
+libutil_la_SOURCES += pg_io_ops.c
 libutil_la_SOURCES += balloc.c balloc.h
 libutil_la_SOURCES += bitset.c bitset.h
 libutil_la_SOURCES += cctables.c cctables.h
@@ -662,6 +705,10 @@ libltsmin_hre_la_LIBADD   = libltsmin-hre-util.la
 libltsmin_hre_la_LIBADD  += ltsmin-grammar.lo dm/libdm.la
 libltsmin_hre_la_LIBADD  += $(top_builddir)/ltl2ba/libltl2ba.la
 
+libspg_la_SOURCES  = spg-solve.c spg-solve.h
+libspg_la_CPPFLAGS = -DNDEBUG $(AM_CPPFLAGS)
+libspg_la_LDFLAGS  = $(AM_LDFLAGS)
+libspg_la_LIBADD   = libvset.la libltsmin.la bignum/libbignum.la
 
 CLEANFILES =
 DISTCLEANFILES =

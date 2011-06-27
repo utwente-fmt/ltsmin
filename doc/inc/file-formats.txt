@@ -8,6 +8,7 @@ The following file formats are supported:
 * Aldebaran Format ('{ast}.aut')
 * FSM Format ('{ast}.fsm')
 * MRMC/Prism ('{ast}.tra'+'{ast}.lab')
+* PGSolver format ('{ast].pg')
 
 If a tool operates in streaming mode then support for file formats is limited,
 as can be seen in the following table:
@@ -21,6 +22,7 @@ as can be seen in the following table:
 |AUT    |W              |R/W
 |FSM    |W              |W
 |TRA    |-              |R/W
+|PG     |-              |W
 |=======================================
 
 

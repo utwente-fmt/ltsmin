@@ -170,6 +170,7 @@ static void lts_read_dir(archive_t archive,lts_t lts){
 #define LTS_DMP 10
 #define LTS_TRA 11
 #define LTS_GCD 12
+#define LTS_PG  13
 
 static int lts_guess_format(char *name){
     char *lastdot=strrchr(name,'.');
@@ -186,6 +187,8 @@ static int lts_guess_format(char *name){
     if (!strcmp(lastdot,"dmp")) return LTS_DMP;
     if (!strcmp(lastdot,"tra")) return LTS_TRA;
     if (!strcmp(lastdot,"gcd")) return LTS_GCD;
+    if (!strcmp(lastdot,"pg")) return LTS_PG;
+    if (!strcmp(lastdot,"gm")) return LTS_PG;
     Abort("unknown extension %s",lastdot);
 }
 
@@ -240,6 +243,9 @@ void lts_write(char *name,lts_t lts,int segments){
     switch(format){
     case LTS_TRA:
         lts_write_tra(name,lts);
+        break;
+    case LTS_PG:
+        lts_write_pg(name,lts);
         break;
     case LTS_DIR: {
         archive_t archive=arch_dir_create(name,65536,DELETE_ALL);

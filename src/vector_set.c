@@ -135,6 +135,8 @@ default_least_fixpoint(vset_t dst, vset_t src, vrel_t rels[], int rel_count)
 void vdom_init_shared(vdom_t dom,int n){
 	dom->shared.size=n;
 	dom->shared.set_create=NULL;
+	dom->shared.set_save=NULL;
+	dom->shared.set_load=NULL;
 	dom->shared.set_add=NULL;
 	dom->shared.set_member=NULL;
 	dom->shared.set_is_empty=NULL;
@@ -151,6 +153,10 @@ void vdom_init_shared(vdom_t dom,int n){
 	dom->shared.set_zip=default_zip;
 	dom->shared.set_project=NULL;
 	dom->shared.rel_create=NULL;
+	dom->shared.rel_save_proj=NULL;
+    dom->shared.rel_save=NULL;
+    dom->shared.rel_load_proj=NULL;
+    dom->shared.rel_load=NULL;
 	dom->shared.rel_add=NULL;
 	dom->shared.rel_count=NULL;
 	dom->shared.set_next=NULL;
@@ -164,11 +170,59 @@ vset_t vset_create(vdom_t dom,int k,int* proj){
 	return dom->shared.set_create(dom,k,proj);
 }
 
+void vset_save(FILE* f, vset_t set){
+    if (set->dom->shared.set_save==NULL){
+        Abort("Saving of sets not supported by the current BDD implementation.")
+    } else {
+        set->dom->shared.set_save(f,set);
+    }
+}
+
+vset_t vset_load(FILE* f, vdom_t dom){
+    if (dom->shared.set_load==NULL){
+        Abort("Loading of sets not supported by the current BDD implementation.")
+    } else {
+        return dom->shared.set_load(f,dom);
+    }
+}
+
 vrel_t vrel_create(vdom_t dom,int k,int* proj){
 	vrel_t rel = dom->shared.rel_create(dom,k,proj);
     rel->expand = NULL;
     rel->expand_ctx = NULL;
     return rel;
+}
+
+void vrel_save_proj(FILE* f, vrel_t rel){
+    if (rel->dom->shared.rel_save_proj==NULL){
+        Abort("Saving of relations not supported by the current BDD implementation.")
+    } else {
+        rel->dom->shared.rel_save_proj(f,rel);
+    }
+}
+
+void vrel_save(FILE* f, vrel_t rel){
+    if (rel->dom->shared.rel_save==NULL){
+        Abort("Saving of relations not supported by the current BDD implementation.")
+    } else {
+        rel->dom->shared.rel_save(f,rel);
+    }
+}
+
+vrel_t vrel_load_proj(FILE* f, vdom_t dom){
+    if (dom->shared.rel_load_proj==NULL){
+        Abort("Loading of relations not supported by the current BDD implementation.")
+    } else {
+        return dom->shared.rel_load_proj(f,dom);
+    }
+}
+
+void vrel_load(FILE* f, vrel_t rel){
+    if (rel->dom->shared.rel_load==NULL){
+        Abort("Loading of relations not supported by the current BDD implementation.")
+    } else {
+        return rel->dom->shared.rel_load(f,rel);
+    }
 }
 
 void vset_add(vset_t set,const int* e){

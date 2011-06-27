@@ -7,6 +7,9 @@
 #if defined(MCRL2)
 #include <mcrl2-greybox.h>
 #endif
+#if defined(PBES)
+#include "pbes-greybox.h"
+#endif
 #if defined(NIPS)
 #include <nips-greybox.h>
 #endif
@@ -29,6 +32,10 @@
 #endif
 #if defined(MCRL2)
 #define SPEC_POPT_OPTIONS { NULL, 0, POPT_ARG_INCLUDE_TABLE, mcrl2_options, 0, "mCRL2 options", NULL }
+#define SPEC_MT_SAFE 0
+#endif
+#if defined(PBES)
+#define SPEC_POPT_OPTIONS { NULL, 0 , POPT_ARG_INCLUDE_TABLE, pbes_options , 0 , "PBES options", NULL }
 #define SPEC_MT_SAFE 0
 #endif
 #if defined(NIPS)

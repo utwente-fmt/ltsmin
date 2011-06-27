@@ -688,6 +688,67 @@ static uint32_t mdd_take(uint32_t mdd,int len,uint32_t count){
 }
 */
 
+//TODO: Use DSwrite* here
+static void mdd_clear_and_write(FILE* f, uint32_t mdd, uint32_t* n_count, uint32_t* node_ids){
+    if (mdd<=1) return;
+    if (node_table[mdd].val&0x80000000) {
+        node_table[mdd].val=node_table[mdd].val&0x7fffffff;
+        mdd_clear_and_write(f,node_table[mdd].down, n_count, node_ids);
+        mdd_clear_and_write(f,node_table[mdd].right, n_count, node_ids);
+        node_ids[mdd] = (uint32_t)*n_count;
+        fprintf(f, "%u %u %u %u\n",
+            (uint32_t)*n_count,
+            node_table[mdd].val,
+            node_ids[node_table[mdd].down],
+            node_ids[node_table[mdd].right]
+        );
+        (*n_count)++;
+    }
+}
+
+static void
+mdd_save(FILE* f, uint32_t mdd)
+{
+    uint32_t n_count = mdd_node_count(mdd);
+    //Warning(info,"mdd_save: %u", n_count);
+    fprintf(f,"n=%u\n", n_count);
+    mdd_mark(mdd);
+    uint32_t* node_ids = RTmalloc(mdd_nodes*sizeof(uint32_t));
+    node_ids[0] = 0;
+    node_ids[1] = 1;
+    uint32_t count = 2;
+    mdd_clear_and_write(f, mdd, &count, node_ids);
+    RTfree(node_ids);
+}
+
+static uint32_t
+mdd_load(FILE* f)
+{
+    uint32_t n_count;
+    int res = fscanf(f,"n=%u\n", &n_count);
+    (void)res;
+    //Warning(info,"mdd_load: %u", n_count);
+    uint32_t node_ids[n_count];
+    node_ids[0] = 0;
+    node_ids[1] = 1;
+    uint32_t count = 2;
+    uint32_t mdd = 0;
+    uint32_t id;
+    uint32_t val;
+    uint32_t down;
+    uint32_t right;
+    while (count < n_count && fscanf(f,"%u %u %u %u\n", &id, &val, &down, &right) != EOF) {
+        //printf("TEST: %u %u %u %u\n", id, val, down, right);
+        assert(down==0 || node_ids[down]!=0);
+        assert(right==0 || node_ids[right]!=0);
+        mdd = mdd_create_node(val, node_ids[down], node_ids[right]);
+        //printf("TEST: mdd=%u\n", mdd);
+        node_ids[id] = mdd;
+        count++;
+    }
+    return mdd;
+}
+
 static vset_t
 set_create_mdd(vdom_t dom, int k, int *proj)
 {
@@ -707,6 +768,20 @@ set_create_mdd(vdom_t dom, int k, int *proj)
         set->p_id    = mdd_create_node(proj[i], set->p_id, 0);
     }
     return set;
+}
+
+static void
+set_save_mdd(FILE* f, vset_t set)
+{
+    mdd_save(f, set->mdd);
+}
+
+static vset_t
+set_load_mdd(FILE* f, vdom_t dom)
+{
+    vset_t result = set_create_mdd(dom, -1, NULL);
+    result->mdd = mdd_load(f);
+    return result;
 }
 
 static void set_destroy_mdd(vset_t set)
@@ -739,8 +814,49 @@ rel_create_mdd(vdom_t dom, int k, int *proj)
         rel->p_id    = mdd_create_node(proj[i], rel->p_id, 0);
         // The p_id of a relation is shifted in hash keys; check this is ok
         if ((rel->p_id >> 16) > 0) Abort("projection identifier too large");
+        //FIXME: what does the previous line do?!? GK
     }
     return rel;
+}
+
+static void
+rel_save_proj(FILE* f, vrel_t rel)
+{
+    fprintf(f,"len=%d\n", rel->p_len);
+    fprintf(f,"proj=");
+    for(int i=0; i<rel->p_len; i++){
+        fprintf(f,((i < rel->p_len-1)?"%d ":"%d"), rel->proj[i]);
+    }
+    fprintf(f,"\n");
+}
+
+static void
+rel_save_mdd(FILE* f, vrel_t rel)
+{
+    mdd_save(f, rel->mdd);
+}
+
+static vrel_t
+rel_load_proj(FILE* f, vdom_t dom)
+{
+    int p_len;
+    int res = fscanf(f,"len=%d\n", &p_len);
+    res &= fscanf(f,"proj=");
+    int proj[p_len];
+    for(int i=0; i<p_len; i++){
+        res &= fscanf(f,((i < p_len-1)?"%d ":"%d"), &(proj[i]));
+        Warning(info, "rel_load_mdd: proj[%d]=%d", i, proj[i]);
+    }
+    res &= fscanf(f,"\n");
+    Warning(info, "rel_load_proj: p_len=%d", p_len);
+    vrel_t result = rel_create_mdd(dom, p_len, proj);
+    return result;
+}
+
+static void
+rel_load_mdd(FILE* f, vrel_t rel)
+{
+    rel->mdd = mdd_load(f);
 }
 
 static void
@@ -1397,6 +1513,8 @@ vdom_t vdom_create_list_native(int n){
         mdd_create_stack();
     }
     dom->shared.set_create=set_create_mdd;
+    dom->shared.set_save=set_save_mdd;
+    dom->shared.set_load=set_load_mdd;
     dom->shared.set_member=set_member_mdd;
     dom->shared.set_add=set_add_mdd;
     dom->shared.set_is_empty=set_is_empty_mdd;
@@ -1408,6 +1526,10 @@ vdom_t vdom_create_list_native(int n){
     dom->shared.set_union=set_union_mdd;
     dom->shared.set_minus=set_minus_mdd;
     dom->shared.rel_create=rel_create_mdd;
+    dom->shared.rel_save_proj=rel_save_proj;
+    dom->shared.rel_save=rel_save_mdd;
+    dom->shared.rel_load_proj=rel_load_proj;
+    dom->shared.rel_load=rel_load_mdd;
     dom->shared.rel_add=rel_add_mdd;
     dom->shared.rel_count=rel_count_mdd;
     dom->shared.set_project=set_project_mdd;

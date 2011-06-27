@@ -368,6 +368,7 @@ AC_CONFIG_FILES([
        src/pins2lts-hre/Makefile
        src/sigmin-one/Makefile
        src/sigmin-mpi/Makefile
+       src/spg/Makefile
        src/dm/Makefile
        src/bignum/Makefile
        src/ce/Makefile

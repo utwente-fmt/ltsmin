@@ -17,6 +17,8 @@
 #include <spec-greybox.h>
 #include <stringindex.h>
 #include <vector_set.h>
+#include <spg-solve.h>
+#include <limits.h>
 
 #define diagnostic(...) {\
     if (RTverbosity >= 2)\
@@ -34,6 +36,11 @@ static int   act_detect_table;
 static int   act_detect_index;
 static int   sat_granularity = 10;
 static int   save_sat_levels = 0;
+
+#if defined(PBES)
+static int   pgsolve_flag = 0;
+static char* pg_output = NULL;
+#endif
 
 static enum { BFS_P , BFS , CHAIN_P, CHAIN } strategy = BFS_P;
 
@@ -128,6 +135,11 @@ static  struct poptOption options[] = {
     { "trace" , 0 , POPT_ARG_STRING , &trc_output , 0 , "file to write trace to" , "<lts-file>.gcf" },
     { "mu" , 0 , POPT_ARG_STRING , &mu_formula , 0 , "file with a mu formula" , "<mu-file>.mu" },
     { "ctl*" , 0 , POPT_ARG_STRING , &ctl_formula , 0 , "file with a ctl* formula" , "<ctl*-file>.ctl" },
+#if defined(PBES)
+    { "pgsolve" , 0 , POPT_ARG_NONE , &pgsolve_flag, 0, "Solve the generated parity game (only for symbolic tool).","" },
+    { NULL, 0 , POPT_ARG_INCLUDE_TABLE, spg_solve_options , 0, "Symbolic parity game solver options", NULL},
+    { "write-pg" , 0 , POPT_ARG_STRING , &pg_output, 0, "file to write symbolic parity game to","<pg-file>.spg" },
+#endif
     SPEC_POPT_OPTIONS,
     { NULL, 0 , POPT_ARG_INCLUDE_TABLE, greybox_options , 0 , "Greybox options",NULL},
     { NULL, 0 , POPT_ARG_INCLUDE_TABLE, vset_options , 0 , "Vector set options",NULL},
@@ -1721,6 +1733,128 @@ mu_compute (ltsmin_expr_t mu_expr, vset_t visited)
     return result;
 }
 
+
+/**
+ * \brief Computes the subset of v that belongs to player <tt>player</tt>.
+ * \param vars the indices of variables of player <tt>player</tt>.
+ */
+void add_variable_subset(vset_t dst, vset_t src, const parity_game* g, int var_pos, int var_index)
+{
+    int p_len = 1;
+    int proj[1] = {var_pos}; // position 0 encodes the variable
+    int match[1] = {var_index}; // the variable
+    vset_t u = vset_create(g->domain, -1, NULL);
+    vset_copy_match(u, src, p_len, proj, match);
+    vset_union(dst, u);
+    vset_destroy(u);
+}
+
+#if defined(PBES)
+/**
+ * \brief Creates a symbolic parity game
+ */
+parity_game* compute_symbolic_parity_game(vset_t visited, int* src)
+{
+    lts_type_t type = GBgetLTStype(model);
+    int var_type_no = 0;
+    int var_pos = 0;
+    for(int i=0; i<N; i++)
+    {
+        //printf("%d: %s (%d [%s])\n", i, lts_type_get_state_name(type, i), lts_type_get_state_typeno(type, i), lts_type_get_state_type(type, i));
+        char* str1 = "string";
+        size_t strlen1 = strlen(str1);
+        char* str2 = lts_type_get_state_type(type, i);
+        size_t strlen2 = strlen(str2);
+        if (strlen1==strlen2 && strncmp(str1, str2, strlen1)==0)
+        {
+            var_pos = i;
+            var_type_no = lts_type_get_state_typeno(type, i);
+            //printf("Variable: %d [%d].\n", var_pos, var_type_no);
+        }
+    }
+    int num_vars = GBchunkCount(model, 0); // number of propositional variables
+    int priority[num_vars]; // priorities of variables
+    int min_priority = INT_MAX;
+    int max_priority = INT_MIN;
+    int player[num_vars]; // players of variables
+    for(int i=0; i<num_vars; i++)
+    {
+        chunk c = GBchunkGet(model, var_type_no, i);
+        if (c.len == 0) {
+            Fatal(1, error, "lookup of %d failed", i);
+        }
+        char s[c.len + 1];
+        for (unsigned int i = 0; i < c.len; i++) {
+            s[i] = c.data[i];
+        }
+        s[c.len] = 0;
+        Warning(info, "Variable %d: %s", i, s);
+        lts_type_t type = GBgetLTStype(model);
+        int state_length = lts_type_get_state_length(type);
+        // create dummy state with variable i:
+        int state[state_length];
+        for(int j=0; j < state_length; j++)
+        {
+            state[j] = 0;
+        }
+        state[var_pos] = i;
+        int label = GBgetStateLabelLong(model, 0, state); // priority
+        priority[i] = label;
+        if (label < min_priority)
+        {
+            min_priority = label;
+        }
+        if (label > max_priority)
+        {
+            max_priority = label;
+        }
+        Warning(info, "  label %d (priority): %d", 0, label);
+        label = GBgetStateLabelLong(model, 1, state); // player
+        player[i] = label;
+        Warning(info, "  label %d (player): %d", 1, label);
+    }
+    parity_game* g = spg_create(domain, N, nGrps, min_priority, max_priority);
+    for(int i=0; i < N; i++)
+    {
+        g->src[i] = src[i];
+    }
+    vset_copy(g->v, visited);
+    for(int i = 0; i < num_vars; i++)
+    {
+        // players
+        Warning(info, "Adding nodes for var %d (player %d).", i, player[i]);
+        add_variable_subset(g->v_player[player[i]], g->v, g, var_pos, i);
+        // priorities
+        add_variable_subset(g->v_priority[priority[i]], g->v, g, var_pos, i);
+    }
+    for(int p = 0; p < 2; p++)
+    {
+        long   n_count;
+        bn_int_t elem_count;
+        size_t size = 20;
+        char s[size];
+        vset_count(g->v_player[p], &n_count, &elem_count);
+        bn_int2string(s, size, &elem_count);
+        Warning(info, "player %d: %d nodes, %s elements.", p, n_count, s);
+    }
+    for(int p = min_priority; p <= max_priority; p++)
+    {
+        long   n_count;
+        bn_int_t elem_count;
+        size_t size = 20;
+        char s[size];
+        vset_count(g->v_priority[p], &n_count, &elem_count);
+        bn_int2string(s, size, &elem_count);
+        Warning(info, "priority %d: %d nodes, %s elements.", p, n_count, s);
+    }
+    for(int i = 0; i < g->num_groups; i++)
+    {
+        g->e[i] = group_next[i];
+    }
+    return g;
+}
+#endif
+
 int
 main (int argc, char *argv[])
 {
@@ -1834,6 +1968,30 @@ main (int argc, char *argv[])
 
     if (files[1] != NULL)
         do_output(files[1], visited);
+
+#if defined(PBES)
+    parity_game * g = compute_symbolic_parity_game(visited, src);
+    if (pg_output) {
+        Warning(info,"Writing symbolic parity game to %s",pg_output);
+        FILE *f = fopen(pg_output, "w");
+        spg_save(f, g);
+        fclose(f);
+    }
+    if (pgsolve_flag)
+    {
+        spgsolver_options* spg_options = spg_get_solver_options();
+        mytimer_t pgsolve_timer = SCCcreateTimer();
+        SCCstartTimer(pgsolve_timer);
+        bool result = spg_solve(g, spg_options);
+        Warning(info, "");
+        Warning(info, "The result is: %s", result ? "true":"false");
+        SCCstopTimer(pgsolve_timer);
+        Warning(info, "");
+        SCCreportTimer(timer, "generation took");
+        SCCreportTimer(pgsolve_timer, "solving took");
+    }
+    spg_destroy(g);
+#endif
 
     exit (EXIT_SUCCESS);
 }

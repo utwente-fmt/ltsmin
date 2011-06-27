@@ -21,6 +21,8 @@ extern struct poptOption bcg_io_options[];
 
 extern struct poptOption archive_io_options[];
 
+extern struct poptOption pg_io_options[];
+
 static struct poptOption dummy_options[]={
 	POPT_TABLEEND
 };
@@ -31,6 +33,7 @@ struct poptOption lts_io_options[]= {
 	#ifdef HAVE_BCG_USER_H
 	"\n * Binary Coded Graphs (*.bcg)"
 	#endif
+	"\n * Parity Games (*.pg)"
 	,NULL},
 	#ifdef HAVE_BCG_USER_H
 	{ NULL,0 , POPT_ARG_INCLUDE_TABLE , bcg_io_options , 0 , NULL , NULL }, 
@@ -41,6 +44,7 @@ struct poptOption lts_io_options[]= {
 "into a single archive with optional compression.\n"
 "\n"
 "Container I/O options",NULL},
+    { NULL,0, POPT_ARG_INCLUDE_TABLE , pg_io_options, 0, NULL, NULL },
 	POPT_TABLEEND
 };
 

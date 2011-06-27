@@ -16,6 +16,10 @@ if HAVE_LIBMCRL2
 bin_PROGRAMS += lps2lts-hre
 endif
 
+if HAVE_LIBMCRL2
+bin_PROGRAMS += pbes2lts-hre
+endif
+
 bin_PROGRAMS += nips2lts-hre
 
 if HAVE_DVEC
@@ -50,6 +54,14 @@ lps2lts_hre_LDADD    +=  ../libmcrl2-pins.la
 lps2lts_hre_CPPFLAGS  = -DMCRL2 $(DIST_CPPFLAGS)
 lps2lts_hre_LDFLAGS   = $(MCRL2_LDFLAGS) $(AM_LDFLAGS)
 nodist_EXTRA_lps2lts_hre_SOURCES = ../automake-force-linker.cxx
+
+# pbes2lts-hre
+pbes2lts_hre_SOURCES   = spec2lts-hre.c
+pbes2lts_hre_LDADD     = ../lts-io/liblts-io.la $(HRE_LIB) ../libltsmin-hre.la
+pbes2lts_hre_LDADD    +=  ../libpbes-pins.la
+pbes2lts_hre_CPPFLAGS  = -DPBES $(DIST_CPPFLAGS)
+pbes2lts_hre_LDFLAGS   = $(MCRL2_LDFLAGS) $(AM_LDFLAGS)
+nodist_EXTRA_pbes2lts_hre_SOURCES = ../automake-force-linker.cxx
 
 # nips2lts-hre
 nips2lts_hre_SOURCES   = spec2lts-hre.c

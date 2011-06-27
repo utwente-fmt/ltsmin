@@ -12,6 +12,8 @@ Object structure and helper functions for vector sets.
 struct vector_domain_shared {
 	int size;
 	vset_t (*set_create)(vdom_t dom,int k,int* proj);
+	void (*set_save)(FILE* f, vset_t set);
+	vset_t (*set_load)(FILE* f, vdom_t dom);
 	void  (*set_add)(vset_t set,const int* e);
 	int (*set_member)(vset_t set,const int* e);
 	int (*set_equal)(vset_t set1,vset_t set2);
@@ -30,6 +32,10 @@ struct vector_domain_shared {
 	void (*set_count)(vset_t set,long *nodes,bn_int_t *elements);
 	void (*rel_count)(vrel_t rel,long *nodes,bn_int_t *elements);
 	vrel_t (*rel_create)(vdom_t dom,int k,int* proj);
+	void (*rel_save_proj)(FILE* f, vrel_t rel);
+	void (*rel_save)(FILE* f, vrel_t rel);
+	vrel_t (*rel_load_proj)(FILE* f, vdom_t dom);
+    void (*rel_load)(FILE* f, vrel_t rel);
 	void (*rel_add)(vrel_t rel,const int* src,const int* dst);
 	void (*set_next)(vset_t dst,vset_t src,vrel_t rel);
 	void (*set_prev)(vset_t dst,vset_t src,vrel_t rel);

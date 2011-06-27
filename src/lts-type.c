@@ -166,8 +166,6 @@ void lts_type_destroy(lts_type_t *t){
 
 void lts_type_set_state_length(lts_type_t  t,int length){
     int old_length = t->state_length;
-    if (old_length == length)
-        return;
 
     // allow state vector to be hidden
     if (length==0) {

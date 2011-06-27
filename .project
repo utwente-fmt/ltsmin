@@ -3,6 +3,7 @@
 	<name>ltsmin</name>
 	<comment></comment>
 	<projects>
+		<project>mcrl2</project>
 	</projects>
 	<buildSpec>
 		<buildCommand>
@@ -77,5 +78,35 @@
 		<nature>org.eclipse.cdt.core.cnature</nature>
 		<nature>org.eclipse.cdt.managedbuilder.core.managedBuildNature</nature>
 		<nature>org.eclipse.cdt.managedbuilder.core.ScannerConfigNature</nature>
+		<nature>org.eclipse.cdt.core.ccnature</nature>
 	</natures>
+	<filteredResources>
+		<filter>
+			<id>1289822302359</id>
+			<name></name>
+			<type>22</type>
+			<matcher>
+				<id>org.eclipse.ui.ide.multiFilter</id>
+				<arguments>1.0-name-matches-false-false-*.o</arguments>
+			</matcher>
+		</filter>
+		<filter>
+			<id>1289822302374</id>
+			<name></name>
+			<type>22</type>
+			<matcher>
+				<id>org.eclipse.ui.ide.multiFilter</id>
+				<arguments>1.0-name-matches-false-false-*.lo</arguments>
+			</matcher>
+		</filter>
+		<filter>
+			<id>1289822302384</id>
+			<name></name>
+			<type>22</type>
+			<matcher>
+				<id>org.eclipse.ui.ide.multiFilter</id>
+				<arguments>1.0-name-matches-false-false-*.la</arguments>
+			</matcher>
+		</filter>
+	</filteredResources>
 </projectDescription>

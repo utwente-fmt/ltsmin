@@ -80,6 +80,13 @@ MANPAGES += dve22lts-mc.1
 MANPAGES += dve22lts-mpi.1
 MANPAGES += dve22torx.1
 
+MANPAGES += pbes-reach.1
+MANPAGES += pbes2lts-gsea.1
+MANPAGES += pbes2lts-hre.1
+MANPAGES += pbes2lts-mpi.1
+
+MANPAGES += spgsolver.1
+
 doc_ASCIIDOC = $(addsuffix .txt, $(basename $(MANPAGES)))
 
 extra_ASCIIDOC  = inc/buchi.txt
@@ -116,6 +123,11 @@ extra_ASCIIDOC += inc/spinja.txt
 extra_ASCIIDOC += inc/state-storage-options.txt
 extra_ASCIIDOC += inc/support.txt
 extra_ASCIIDOC += inc/vset-options.txt
+
+extra_ASCIIDOC += inc/hre-options.txt
+extra_ASCIIDOC += inc/hre-startup.txt
+extra_ASCIIDOC += inc/lts-io-options.txt
+extra_ASCIIDOC += inc/pbes-options.txt
 
 EXTRA_DIST  = asciidoc.conf
 EXTRA_DIST += manpage-base.xsl

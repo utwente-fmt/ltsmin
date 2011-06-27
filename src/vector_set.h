@@ -59,6 +59,20 @@ extern vdom_t vdom_create_domain(int n, vset_implementation_t impl);
 extern vset_t vset_create(vdom_t dom,int k,int* proj);
 
 /**
+ * \brief Saves a set to a file.
+ * \param f the file
+ * \param set the set
+ */
+extern void vset_save(FILE* f, vset_t set);
+
+/**
+ * \brief Reads a set from a file.
+ * \param f the file
+ * \return the set
+ */
+extern vset_t vset_load(FILE* f, vdom_t dom);
+
+/**
 \brief Add an element to a set.
 */
 extern void vset_add(vset_t set,const int* e);
@@ -156,6 +170,35 @@ extern void vset_count(vset_t set,long *nodes,bn_int_t *elements);
 \brief Create a relation
 */
 extern vrel_t vrel_create(vdom_t dom,int k,int* proj);
+
+/**
+ * \brief Saves the projection of a relation to a file.
+ * \param f the file
+ * \param rel the relation
+ */
+extern void vrel_save_proj(FILE* f, vrel_t rel);
+
+/**
+ * \brief Saves a relation to a file.
+ * \param f the file
+ * \param rel the relation
+ */
+extern void vrel_save(FILE* f, vrel_t rel);
+
+/**
+ * \brief Reads a projection from file and creates a relation based on the projection.
+ * \param f the file
+ * \param dom the domain
+ * \return the relation
+ */
+extern vrel_t vrel_load_proj(FILE* f, vdom_t dom);
+
+/**
+ * \brief Reads a relation from a file.
+ * \param f the file
+ * \param rel the relation
+ */
+extern void vrel_load(FILE* f, vrel_t rel);
 
 /**
 \brief Add an element to a relation.
