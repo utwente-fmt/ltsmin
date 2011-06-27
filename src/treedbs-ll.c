@@ -70,7 +70,7 @@ get_local (treedbs_ll_t dbs)
     return loc;
 }
 
-uint16_t
+uint32_t
 TreeDBSLLget_sat_bits (const treedbs_ll_t dbs, const tree_ref_t ref)
 {
     return atomic32_read (dbs->table+ref) & dbs->sat_mask;
@@ -101,6 +101,30 @@ TreeDBSLLtry_set_sat_bit (const treedbs_ll_t dbs, const tree_ref_t ref, int inde
     if (val)
         return 0; //bit was already set
     return cas (dbs->table+ref, hash_and_sat, hash_and_sat | bit);
+}
+
+uint32_t
+TreeDBSLLinc_sat_bits (const treedbs_ll_t dbs, const tree_ref_t ref)
+{
+    uint32_t        val, newval;
+    do {
+        val = atomic32_read (dbs->table+ref);
+        assert ((val & dbs->sat_mask) != dbs->sat_mask);
+        newval = val + 1;
+    } while ( ! cas (dbs->table+ref, val, newval) );
+    return newval;
+}
+
+uint32_t
+TreeDBSLLdec_sat_bits (const treedbs_ll_t dbs, const tree_ref_t ref)
+{
+    uint32_t        val, newval;
+    do {
+        val = atomic32_read (dbs->table+ref);
+        assert ((val & dbs->sat_mask) != 0);
+        newval = val - 1;
+    } while ( ! cas (dbs->table+ref, val, newval) );
+    return newval;
 }
 
 static inline int

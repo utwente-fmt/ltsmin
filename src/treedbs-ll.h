@@ -38,9 +38,11 @@ extern int          TreeDBSLLtry_set_sat_bit (const treedbs_ll_t dbs,
                                               const tree_ref_t ref, int index);
 extern int          TreeDBSLLget_sat_bit (const treedbs_ll_t dbs, const tree_ref_t ref,
                                           int index);
-extern uint16_t     TreeDBSLLget_sat_bits (const treedbs_ll_t dbs, const tree_ref_t ref);
 extern void         TreeDBSLLset_sat_bits (const treedbs_ll_t dbs, const tree_ref_t ref,
                                            uint16_t value);
+extern uint32_t     TreeDBSLLget_sat_bits (const treedbs_ll_t dbs, const tree_ref_t ref);
+extern uint32_t     TreeDBSLLinc_sat_bits (const treedbs_ll_t dbs, const tree_ref_t ref);
+extern uint32_t     TreeDBSLLdec_sat_bits (const treedbs_ll_t dbs, const tree_ref_t ref);
 
 /**
 \brief Find a vector with respect to a database and insert it if it cannot be fo
