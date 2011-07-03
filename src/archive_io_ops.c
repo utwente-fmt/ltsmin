@@ -1124,7 +1124,7 @@ static void archive_popt(poptContext con,
 		return;
 		}
 	case POPT_CALLBACK_REASON_OPTION:
-		Fatal(1,error,"unexpected call to bcg_popt");
+		Fatal(1,error,"unexpected call to archive_popt");
 	}
 }
 

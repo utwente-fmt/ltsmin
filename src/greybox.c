@@ -660,7 +660,7 @@ ltl_popt (poptContext con, enum poptCallbackReason reason,
     case POPT_CALLBACK_REASON_OPTION:
         break;
     }
-    Fatal (1, error, "unexpected call to state_db_popt");
+    Fatal (1, error, "unexpected call to ltl_popt");
 }
 
 
