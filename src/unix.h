@@ -22,7 +22,7 @@ extern char *mkdtemp(char *);
 #define bswap_16 OSSwapInt16
 #define bswap_32 OSSwapInt32
 #define bswap_64 OSSwapInt64
-#elif defined(__linux__) || defined(__CYGWIN__) 
+#elif defined(__linux__) || defined(__CYGWIN__)
 #include <byteswap.h>
 #elif defined(__NetBSD__)
 #define bswap_16 bswap16
