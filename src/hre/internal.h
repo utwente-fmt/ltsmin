@@ -3,6 +3,7 @@
 #define HRE_INTERNAL_H
 
 #include <pthread.h>
+#include <sys/time.h>
 /* Do not change to hre/provider.h:
    include is supposed to fail if current dir is not hre.
 */

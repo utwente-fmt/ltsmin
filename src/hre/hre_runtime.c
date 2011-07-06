@@ -72,10 +72,20 @@ size_t RTmemSize(){
     return pagesz*((size_t)res);
 }
 
+#if defined(__linux__)
+
 int RTcacheLineSize(){
     long res=sysconf(_SC_LEVEL1_DCACHE_LINESIZE);
     return (int)res;
 }
+
+#else
+
+int RTcacheLineSize(){
+    Abort("generic implementation for RTcacheLineSize needed");
+}
+
+#endif
 
 #endif
 

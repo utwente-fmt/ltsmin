@@ -29,7 +29,7 @@ extern char *mkdtemp(char *);
 #define ntoh_32(x) OSSwapBigToHostInt32(x)
 #define hton_64(x) OSSwapHostToBigInt64(x)
 #define ntoh_64(x) OSSwapBigToHostInt64(x)
-#elif defined(__linux__)
+#elif defined(__linux__) || defined(__CYGWIN__)
 #include <endian.h>
 #include <byteswap.h>
 # if __BYTE_ORDER == __LITTLE_ENDIAN
