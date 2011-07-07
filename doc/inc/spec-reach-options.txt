@@ -5,7 +5,7 @@
         previous level, while 'bfs' considers the whole visited set. With
         'chain-prev' and 'chain', a chaining strategy is used. Here,
         'chain-prev' at each level starts from the states found at the
-        previous level, while 'chain' uses the whole cisited set. Defaults
+        previous level, while 'chain' uses the whole visited set. Defaults
         to 'bfs-prev'.
 +
 When using breadth-first search, the tool performs the next state computation
@@ -33,8 +33,14 @@ iterations than a BFS analysis.
         'bfs-prev' or 'chain-prev'.
 
 *--action*='ACTION'::
-        Find a transition labelled with 'ACTION'. Returns with exit code 1
+        Find a transition labeled with 'ACTION'. Returns with exit code 1
         if such a transition is found, otherwise 0.
+
+*--guidance*='STRATEGY'::
+        Select a search strategy for searching for actions: 'unguided',
+        'directed'. The 'unguided' strategy considers all transition
+        groups. The 'directed' strategy focuses the search on the transition
+        groups in which the action occurs. Defaults to 'unguided'.
 
 *--mu*='MUFILE'::
     After computing all reachable states, evaluate the mu-formula in 'MUFILE'
