@@ -14,54 +14,87 @@ ltsmin - Overview of the LTSmin toolset.
 
 This man page provides an overview of the tools in the LTSmin toolset.
 
-== Language Modules.
+== Language Modules
 
-The LTSmin toolset was designed to support multiple languages.
-Thus all tools for a specific language start with a prefix that
-indicates the language. Below, we list the languages and the prefixes that are supported in this release:
+The LTSmin toolset was designed to support multiple languages. All tools for
+a specific language start with a prefix that indicates the language. Below,
+we list the languages and the prefixes that are supported in this release:
 
-mCRL(+lpo+)::
+DVE(+dve+,+dve2+)::
 
-The first version of the mCRL language. See the
-http://www.cwi.nl/~mcrl/[mCRL website].
+The DVE language.  See the
+http://divine.fi.muni.cz/[DiVinE website].
+
+ETF(+etf+)::
+
+The Enumerated Table Format is an intermediate format for models in the LTSmin
+toolset. See manpage:etf[5].
 
 mCRL2(+lps+)::
 
-The second edition of the mCRL language. See the
+The mCRL2 language. See the
 http://www.mcrl2.org/[mCRL2 website].
+
+muCRL(+lpo+)::
+
+The muCRL language. See the
+http://www.cwi.nl/~mcrl/[muCRL website].
 
 NIPS-VM(+nips+)::
 
 The NIPS Virtual Machine. See the
 http://fmt.cs.utwente.nl/~michaelw/nips/[NIPS-VM website].
 
-DVE(+dve+)::
+PROMELA(+spinja+)::
 
-The DVE language.  See the
-http://divine.fi.muni.cz/[DiVinE-cluster website].
+The PROMELA language. See the
+http://spinroot.com/[Spin website]
+and the
+http://code.google.com/p/spinja/[SpinJa website].
 
-ETF(+etf+)::
+== State Space Exploration Tools
 
-The Enumerated Table Format is an intermediate format for models in the LTSmin toolset.
-See manpage:etf[5].
-
-== State Space Exploration Tools.
-
-The LTSmin toolset has three tools for reachability analysis:
+The LTSmin toolset has five tools for reachability analysis:
 
 <prefix>-reach::
-Symbolic reachability tools that use decision diagrams for
-manipulating sets of states. The optional output produced by these tools is an ETF model.
+Symbolic reachability tools that use decision diagrams for manipulating sets
+of states. The optional output produced by these tools is an ETF model.
 +
-See manpage:lps-reach[1], manpage:lpo-reach[1], manpage:nips-reach[1], and manpage:etf-reach[1].
+See manpage:dve-reach[1], manpage:dve2-reach[1], manpage:etf-reach[1],
+manpage:lps-reach[1], manpage:lpo-reach[1], manpage:nips-reach[1],
+and manpage:spinja-reach[1].
 
 <prefix>2lts-grey::
 
-Sequential state space explorers that enumerate states and can use
-both decision diagrams and hash tables to represent sets of states.
-The optional output produced by these tools is an explicit LTS.
+Sequential state space generators that enumerate states and can use
+both decision diagrams and (tree-compressed) hash tables to represent sets of
+states. The optional output produced by these tools is an explicit LTS.
 +
-See manpage:lps2lts-grey[1], manpage:lpo2lts-grey[1], manpage:nips2lts-grey[1], and manpage:etf2lts-grey[1].
+See manpage:dve2lts-grey[1], manpage:dve22lts-grey[1], manpage:etf2lts-grey[1],
+manpage:lps2lts-grey[1], manpage:lpo2lts-grey[1], manpage:nips2lts-grey[1],
+and manpage:spinja2lts-grey[1].
+
+<prefix>2lts-gsea::
+
+Sequential state space generators that enumerate states and can use
+both decision diagrams and (tree-compressed) hash tables to represent sets of
+states. The optional output produced by these tools is an explicit LTS.
+These tools are based on an extended version of the
+http://dx.doi.org/10.1007/s10009-008-0093-y[General State Exploring
+Algorithm (GSEA)].
++
+See manpage:dve2lts-gsea[1], manpage:dve22lts-gsea[1], manpage:etf2lts-gsea[1],
+manpage:lps2lts-gsea[1], manpage:lpo2lts-gsea[1], manpage:nips2lts-gsea[1],
+and manpage:spinja2lts-gsea[1].
+
+
+<prefix>2lts-mc::
+
+Concurrent (multi-core) state space generators that enumerate states and
+can use (tree-compressed) hash tables to represent sets of states.
++
+See manpage:dve2lts-mc[1], manpage:dve22lts-mc[1], manpage:etf2lts-mc[1],
+manpage:nips2lts-mc[1], and manpage:spinja2lts-mc[1].
 
 <prefix>2lts-mpi::
 
@@ -69,20 +102,44 @@ Distributed state space generators that enumerate states and use
 distributed hash tables for storing sets of states.
 The optional output produced by these tools is an explicit LTS.
 +
-See manpage:lps2lts-mpi[1], manpage:lpo2lts-mpi[1], manpage:nips2lts-mpi[1], and manpage:etf2lts-mpi[1].
+See manpage:dve2lts-mpi[1], manpage:dve22lts-mpi[1], manpage:etf2lts-mpi[1],
+manpage:lps2lts-mpi[1], manpage:lpo2lts-mpi[1], manpage:nips2lts-mpi[1],
+and manpage:spinja2lts-mpi[1].
 
-== State Space Reduction Tool.
+== State Space Reduction Tool
 
-The LTSmin toolset provides distributed minimisation modulo strong and branching bisimulation.
+The LTSmin toolset provides distributed minimization modulo strong and
+branching bisimulation.
 
 ltsmin-mpi::
-Distributed minimisation modulo strong and branching bisimulation.
+Distributed minimization modulo strong and branching bisimulation.
 See manpage:ltsmin-mpi[1].
 
+== Tau Cycle Elimination Tool
+
+The LTSmin toolset provides distributed tau cycle elimination.
+
+ce-mpi::
+Distributed tau cycle elimination.
+See manpage:ce-mpi[1].
+
+== TorX RPC interfaces
+
+The LTSmin toolset provides TorX RPC interfaces.
+
+<prefix>2torx::
+TorX RPC interface.
++
+See manpage:dve2torx[1], manpage:dve22torx[1], manpage:etf2torx[1],
+manpage:lps2torx[1], manpage:lpo2torx[1], manpage:nips2torx[1],
+and manpage:spinja2torx[1].
+
+== Trace Pretty Printing
+
+ltsmin-tracepp::
+Pretty print traces. See manpage:ltsmin-tracepp[1].
 
 == Conversion Tools
-
-=== basic use
 
 etf-convert::
 Translate ETF to DVE. See manpage:etf-convert[1].
@@ -91,7 +148,8 @@ ltsmin-convert::
 Convert LTS file formats. See manpage:ltsmin-convert[1].
 
 gcf::
-Utility for creating and extracting 'Generic Container Format' archives. See manpage:gcf[1].
+Utility for creating and extracting 'Generic Container Format' archives.
+See manpage:gcf[1].
 
 include::inc/file-formats.txt[]
 
@@ -146,7 +204,7 @@ If we want to know the number of states, we can give the command:
 lpo-reach brp.tbf
 ----
 
-This command will compute the necessary part of the transition relation and the 
+This command will compute the necessary part of the transition relation and the
 set of reachable states. If we want to record the necessary part of the transition relation
 then we can do so in the form of an ETF file:
 
