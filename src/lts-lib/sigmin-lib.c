@@ -213,7 +213,11 @@ void lts_read(char *name,lts_t lts){
     lts_file_t src=lts_file_open(name);
     int segments=lts_file_get_segments(src);
     lts_type_t ltstype=lts_file_get_type(src);
-    lts_set_sig(lts,ltstype);
+    if (lts->ltstype==NULL){
+        lts_set_sig(lts,ltstype);
+    } else {
+        Print(info,"** warning ** omitting signature check");
+    }
     lts_file_t dst=lts_writer(lts,segments,src);
     int T=lts_type_get_type_count(ltstype);
     for(int i=0;i<T;i++){

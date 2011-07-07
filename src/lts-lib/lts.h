@@ -33,6 +33,8 @@ typedef struct lts {
 
 extern void lts_set_sig(lts_t lts,lts_type_t type);
 
+extern void lts_set_sig_given(lts_t lts,lts_type_t type,value_table_t *values);
+
 extern lts_t lts_create();
 
 extern void lts_free(lts_t lts);

@@ -198,7 +198,7 @@ static void lts_realloc(lts_t lts){
     if (size && lts->label==NULL) Abort("out of memory");
 }
 
-void lts_set_sig(lts_t lts,lts_type_t type){
+void lts_set_sig_given(lts_t lts,lts_type_t type,value_table_t *values){
     if (lts->ltstype) Abort("type change unimplemented");
     lts->ltstype=type;
     int V=lts_type_get_state_length(type);
@@ -216,20 +216,29 @@ void lts_set_sig(lts_t lts,lts_type_t type){
     int T=lts_type_get_type_count(type);
     lts->values=(value_table_t*)RTmalloc(T*sizeof(value_table_t));
     for(int i=0;i<T;i++){
+        lts->values[i]=values[i];
+    }
+    Print(infoShort,"realloc");
+    lts_realloc(lts);
+}
+
+void lts_set_sig(lts_t lts,lts_type_t type){
+    int T=lts_type_get_type_count(type);
+    value_table_t values[T];
+    for(int i=0;i<T;i++){
         char *sort=lts_type_get_type(type,i);
         switch(lts_type_get_format(type,i)){
         case LTStypeDirect:
         case LTStypeRange:
-            lts->values[i]=NULL;
+            values[i]=NULL;
             break;
         case LTStypeChunk:
         case LTStypeEnum:
-            lts->values[i]=chunk_table_create(NULL,sort);
+            values[i]=chunk_table_create(NULL,sort);
             break;
         }
     }
-    Print(infoShort,"realloc");
-    lts_realloc(lts);
+    lts_set_sig_given(lts,type,values);
 }
 
 void lts_set_size(lts_t lts,u_int32_t roots,u_int32_t states,u_int32_t transitions){
