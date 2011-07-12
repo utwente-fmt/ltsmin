@@ -72,6 +72,23 @@ static void fsm_pull(lts_file_t dst,lts_file_t src){
         }
         fprintf(dst->f,"\n");
     }
+    // write state label specs.
+    for(int i=0;i<N1;i++){
+        char* name=lts_type_get_state_label_name(ltstype,i);
+        char* sort=lts_type_get_state_label_type(ltstype,i);
+        int type_no=lts_type_get_state_label_typeno(ltstype,i);
+        value_table_t table=lts_file_get_table(dst,type_no);
+        int C=VTgetCount(table);
+        fprintf(dst->f,"%s(%d) %s",name,C,sort);
+        for(int j=0;j<C;j++){
+            chunk label_c=VTgetChunk(table,j);
+            char label_s[label_c.len*2+6];
+            chunk2string(label_c,sizeof label_s,label_s);
+            fix_double_quote(label_s);
+            fprintf(dst->f," %s",label_s);
+        }
+        fprintf(dst->f,"\n");
+    }
     fprintf(dst->f,"---\n");
     if (N1+N2>0){
         int src_seg;
