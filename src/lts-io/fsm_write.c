@@ -73,7 +73,7 @@ static void fsm_pull(lts_file_t dst,lts_file_t src){
         fprintf(dst->f,"\n");
     }
     // write state label specs.
-    for(int i=0;i<N1;i++){
+    for(int i=0;i<N2;i++){
         char* name=lts_type_get_state_label_name(ltstype,i);
         char* sort=lts_type_get_state_label_type(ltstype,i);
         int type_no=lts_type_get_state_label_typeno(ltstype,i);
