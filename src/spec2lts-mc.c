@@ -396,6 +396,7 @@ typedef struct counter_s {
     double              runtime;        // measured exploration time
     size_t              visited;        // counter: visited states
     size_t              explored;       // counter: explored states
+    size_t              allred;         // counter: allred states
     size_t              trans;          // counter: transitions
     size_t              level_max;      // counter: (BFS) level / (DFS) max level
     size_t              load_max;       // max stack/queue load
@@ -470,6 +471,7 @@ add_results (counter_t *res, counter_t *cnt)
     res->runtime += cnt->runtime;
     res->visited += cnt->visited;
     res->explored += cnt->explored;
+    res->allred += cnt->allred;
     res->trans += cnt->trans;
     res->level_max += cnt->level_max;
     res->load_max += cnt->load_max;
@@ -786,8 +788,11 @@ print_statistics(counter_t *reach, counter_t *red, mytimer_t timer)
                  red->visited);
         Warning (info, "avg blue states/worker: %zu (%.2f%%), transitions: %zu ",
                  reach->explored, ((double)reach->explored/db_elts)*100, reach->trans);
-        Warning (info, "avg red states/worker: %zu (%.2f%%), transitions: %zu ",
-                 red->explored, ((double)red->explored/db_elts)*100, red->trans);
+        Warning (info, "avg red states/worker: %zu (%.2f%%), transitions: %zu, waits: %zu",
+                 red->explored, ((double)red->explored/db_elts)*100, red->trans, red->waits);
+        Warning (info, "avg allred states/worker: %zu (%.2f%%), bogus %zu (%.2f%%)",
+                 reach->allred, ((double)reach->allred/db_elts)*100,
+                 red->allred, ((double)red->allred/db_elts)*100);
         Warning (info, "");
         Warning (info, "Total memory used for local state coloring: %.1fMB", mem3);
     } else {
@@ -1547,7 +1552,10 @@ mcndfs_blue (wctx_t *ctx, size_t work)
             state_info_deserialize (&ctx->state, state_data, ctx->store);
             if ( !bitvector_is_set(&ctx->not_all_red, ctx->counters.level_cur) ) {
                 nn_set_color (&ctx->color_map, ctx->state.ref, NNPINK);
-                global_try_color (ctx->state.ref, GRED);
+                if (global_try_color (ctx->state.ref, GRED))
+                    ctx->counters.allred++;
+                else
+                    ctx->red.allred++;
                 bitvector_unset ( &ctx->not_all_red, ctx->counters.level_cur );
             } else if ( GBbuchiIsAccepting(ctx->model, ctx->state.data) ) {
                 mcndfs_red (ctx);
