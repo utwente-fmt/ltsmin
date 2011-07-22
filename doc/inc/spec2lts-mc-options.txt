@@ -33,9 +33,16 @@ ndfs;;
 nndfs;;
   multi-core swarmed New Nested Depth-First Search (Schwoon, Esparza).
 
-mcndfs;;
-  Multi-Core Nested Depth-First Search (Laarman, van de Pol, Weber).
+mcnndfs;;
+  Multi-Core Nested Depth-First Search (Laarman, Langerak, van de Pol, Weber, Wijs).
 
+mcndfs;;
+  Idem. No difference with MCNNDFS.
+  Multi-Core Nested Depth-First Search (Laarman, Langerak, van de Pol, Weber, Wijs).
+
+
+*--nar*::
+        No All Red. Turn off all-red optimization in NNDFS/MCNDFS.
 
 *--perm*='TYPE'::
         Select the transition permutation, which is used to guide

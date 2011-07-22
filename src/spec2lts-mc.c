@@ -127,6 +127,7 @@ static char            *files[2];
 static int              dbs_size = 0;
 static int              refs = 0;
 static int              no_red_perm = 0;
+static int              all_red = 1;
 static box_t            call_mode = UseBlackBox;
 static size_t           max = UINT_MAX;
 static size_t           W = 2;
@@ -165,6 +166,7 @@ static si_map_entry strategies[] = {
     {"ndfs",    Strat_NDFS},
     {"nndfs",   Strat_NNDFS},
     {"mcndfs",  Strat_MCNDFS},
+    {"mcnndfs",  Strat_MCNDFS},
     {NULL, 0}
 };
 
@@ -255,6 +257,7 @@ static struct poptOption options[] = {
      &arg_perm, 0, "select the transition permutation method",
      "<dynamic,sort,sr,shift|shiftall|otf|none>"},
     {"no-red-perm", 0, POPT_ARG_VAL, &no_red_perm, 1, "turn off transition permutation for the red search", NULL},
+    {"nar", 1, POPT_ARG_VAL, &all_red, 0, "turn off red coloring in the blue search (NNDFS/MCNNDFS)", NULL},
     {"gran", 'g', POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &G,
      0, "subproblem granularity ( T( work(P,g) )=min( T(P), g ) )", NULL},
     {"handoff", 'h', POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &H,
@@ -1521,7 +1524,7 @@ nndfs_blue (wctx_t *ctx, size_t work)
             ctx->counters.level_cur--;
             state_data = dfs_stack_top (ctx->stack);
             state_info_deserialize (&ctx->state, state_data, ctx->store);
-            if ( bitvector_is_set(&ctx->all_red, ctx->counters.level_cur) ) {
+            if ( all_red && bitvector_is_set(&ctx->all_red, ctx->counters.level_cur) ) {
                 /* exit if backtrack hits seed, leave stack the way it was */
                 nn_set_color (&ctx->color_map, ctx->state.ref, NNPINK);
                 ctx->counters.allred++;
@@ -1616,7 +1619,7 @@ mcndfs_blue (wctx_t *ctx, size_t work)
             ctx->counters.level_cur--;
             state_data = dfs_stack_top (ctx->stack);
             state_info_deserialize (&ctx->state, state_data, ctx->store);
-            if ( bitvector_is_set(&ctx->all_red, ctx->counters.level_cur) ) {
+            if ( all_red && bitvector_is_set(&ctx->all_red, ctx->counters.level_cur) ) {
                 /* all successors are red */
                 set_all_red (ctx, &ctx->state);
             } else if ( GBbuchiIsAccepting(ctx->model, ctx->state.data) ) {
