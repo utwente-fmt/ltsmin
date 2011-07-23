@@ -60,8 +60,9 @@ typedef enum {
     Strat_NDFS   = 4,
     Strat_NNDFS  = 8,
     Strat_MCNDFS = 16,
-    Strat_LTLG   = Strat_MCNDFS,
-    Strat_LTL    = Strat_NDFS | Strat_NNDFS | Strat_MCNDFS,
+    Strat_ENDFS  = 32,
+    Strat_LTLG   = Strat_MCNDFS | Strat_ENDFS,
+    Strat_LTL    = Strat_NDFS | Strat_NNDFS | Strat_LTLG,
     Strat_Reach  = Strat_BFS | Strat_DFS
 } strategy_t;
 
@@ -144,7 +145,9 @@ static dbs_get_sat_bits_f   get_sat_bits;
 static char            *state_repr = "table";
 static db_type_t        db_type = UseDBSLL;
 static char            *arg_strategy = "bfs";
+static char            *arg_strat_rec = "ndfs";
 static strategy_t       strategy = Strat_BFS;
+static strategy_t       strat_rec = Strat_NDFS;
 static char            *arg_lb = "combined";
 static lb_method_t      lb_method = LB_Combined;
 static char            *arg_perm = "unknown";
@@ -158,8 +161,8 @@ static int              ZOBRIST = 0;
 static ref_t           *parent_ref = NULL;
 static state_data_t     state_data;
 static state_info_t     initial_state;
-static int              sat_bits = 0;
-static int              red_sat_bit;
+static int              count_bits = 0;
+static int              count_mask;
 
 static si_map_entry strategies[] = {
     {"bfs",     Strat_BFS},
@@ -167,7 +170,8 @@ static si_map_entry strategies[] = {
     {"ndfs",    Strat_NDFS},
     {"nndfs",   Strat_NNDFS},
     {"mcndfs",  Strat_MCNDFS},
-    {"mcnndfs",  Strat_MCNDFS},
+    {"mcnndfs", Strat_MCNDFS},
+    {"endfs",   Strat_ENDFS},
     {NULL, 0}
 };
 
@@ -216,6 +220,10 @@ state_db_popt (poptContext con, enum poptCallbackReason reason,
         if (res < 0)
             Fatal (1, error, "unknown search strategy %s", arg_strategy);
         strategy = res;
+        res = linear_search (strategies, arg_strat_rec);
+        if (res < 0)
+            Fatal (1, error, "unknown search strategy %s", arg_strat_rec);
+        strat_rec = res;
         res = linear_search (lb_methods, arg_lb);
         if (res < 0)
             Fatal (1, error, "unknown load balance method %s", arg_lb);
@@ -252,7 +260,9 @@ static struct poptOption options[] = {
     {"size", 's', POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &dbs_size, 0,
      "size of the state store (log2(size))", NULL},
     {"strategy", 0, POPT_ARG_STRING | POPT_ARGFLAG_SHOW_DEFAULT,
-     &arg_strategy, 0, "select the search strategy", "<bfs|dfs|ndfs|nndfs|mcndfs>"},
+     &arg_strategy, 0, "select the search strategy", "<bfs|dfs|ndfs|nndfs|mcndfs|endfs>"},
+     {"rec", 0, POPT_ARG_STRING | POPT_ARGFLAG_SHOW_DEFAULT,
+      &arg_strat_rec, 0, "select the search strategy", "<ndfs|nndfs|mcndfs|endfs>"},
     {"lb", 0, POPT_ARG_STRING | POPT_ARGFLAG_SHOW_DEFAULT,
      &arg_lb, 0, "select the load balancing method", "<srp|static|combined|none>"},
     {"perm", 'p', POPT_ARG_STRING | POPT_ARGFLAG_SHOW_DEFAULT,
@@ -353,44 +363,42 @@ typedef struct {
   int g;
 } global_color_t;
 
-enum { GREEN=0, RED=1 };
+enum { RED=0, GREEN=1, DANGEROUS=2 };
 #define GCOLOR(c)  (global_color_t){ .g = (c) }
-#define GGREEN     GCOLOR(GREEN)    // bit 0
-#define GRED       GCOLOR(RED)      // bit 1
+#define GRED       GCOLOR(RED)      // bit 0
+#define GGREEN     GCOLOR(GREEN)    // bit 1
+#define GDANGEROUS GCOLOR(DANGEROUS)// bit 2
 
 //TODO: REMOVE GREEN
 
 static inline int
 global_has_color (ref_t ref, global_color_t color)
 {
-    assert (color.g == RED);
-    return get_sat_bit (dbs, ref, red_sat_bit);
+    return get_sat_bit (dbs, ref, count_bits+color.g);
 }
 
 static inline int //RED and BLUE are independent
 global_try_color (ref_t ref, global_color_t color)
 {
-    assert (color.g == RED);
-    return try_set_sat_bit (dbs, ref, red_sat_bit);
+    return try_set_sat_bit (dbs, ref, count_bits+color.g);
 }
 
 static inline uint32_t
 inc_wip (ref_t ref)
 {
-    uint32_t res = inc_sat_bits (dbs, ref);
-    return res;
+    return inc_sat_bits (dbs, ref) & count_mask;
 }
 
 static inline uint32_t
 dec_wip (ref_t ref)
 {
-    return dec_sat_bits (dbs, ref);
+    return dec_sat_bits (dbs, ref) & count_mask;
 }
 
 static inline uint32_t
 get_wip (ref_t ref)
 {
-    return get_sat_bits (dbs, ref) & ((1L << (red_sat_bit)) - 1);
+    return get_sat_bits (dbs, ref) & count_mask;
 }
 
 static inline int
@@ -410,6 +418,7 @@ typedef struct counter_s {
     size_t              threshold;      // report threshold
     size_t              waits;          // number of waits for WIP
     size_t              bogus_red;      // number of bogus red colorings
+    size_t              rec;            //recursive ndfss
 } counter_t;
 
 typedef struct thread_ctx_s {
@@ -430,7 +439,8 @@ typedef struct thread_ctx_s {
     size_t              load;           // queue load (for balancing)
     ref_t               seed;           // current NDFS seed
     permute_t          *permute;        // transition permutor
-    bitvector_t         all_red;    // all_red gaiser/Schwoon
+    bitvector_t         all_red;        // all_red gaiser/Schwoon
+    void               *ndfs_rec;       // ctx for Evangelista's ndfs_p
 } wctx_t;
 
 /* predecessor --(transition_info)--> successor */
@@ -455,6 +465,7 @@ extern int state_info_initialize (state_info_t *state, state_data_t data,
 extern void         ndfs_blue (wctx_t *ctx, size_t work);
 extern void         nndfs_blue (wctx_t *ctx, size_t work);
 extern void         mcndfs_blue (wctx_t *ctx, size_t work);
+extern void         endfs_blue (wctx_t *ctx, size_t work);
 extern void         dfs_grey (wctx_t *ctx, size_t work);
 extern void         dfs (wctx_t *ctx, size_t work);
 extern void         bfs (wctx_t *ctx, size_t work);
@@ -481,9 +492,10 @@ add_results (counter_t *res, counter_t *cnt)
     res->level_max += cnt->level_max;
     res->load_max += cnt->load_max;
     res->waits += cnt->waits;
+    res->rec += cnt->rec;
     res->bogus_red += cnt->bogus_red;
     if (NULL != res->stats && NULL != cnt->stats)
-        add_stats(res->stats, cnt->stats);
+        add_stats (res->stats, cnt->stats);
 }
 
 static inline void
@@ -552,7 +564,7 @@ get_model (int first)
 static const size_t MAX_STACK = 100000000;
 
 wctx_t *
-wctx_create (size_t id)
+wctx_create (size_t id, int strategy)
 {
     assert (NULL == 0);
     wctx_t             *ctx = RTalignZero (CACHE_LINE_SIZE, sizeof (wctx_t));
@@ -563,22 +575,25 @@ wctx_create (size_t id)
     ctx->store2 = RTalignZero (CACHE_LINE_SIZE, SLOT_SIZE * N * 2);
     ctx->stack = dfs_stack_create (state_info_int_size());
     ctx->out_stack = ctx->in_stack = ctx->stack;
-    if (strategy == Strat_BFS)
+    if (strategy & (Strat_BFS | Strat_ENDFS))
         ctx->in_stack = dfs_stack_create (state_info_int_size());
     //allocate two bits for NDFS colorings
     if (strategy & Strat_LTL) {
         bitvector_create_large (&ctx->color_map, 2UL<<dbs_size);
         bitvector_clear (&ctx->color_map);
         bitvector_create_large (&ctx->all_red, MAX_STACK);
-    } else if ( UseGreyBox == call_mode && Strat_DFS == strategy)
+    } else if (UseGreyBox == call_mode && Strat_DFS == strategy)
         ctx->group_stack = isba_create (1);
     ctx->counters.threshold = ctx->red.threshold = threshold;
     ctx->permute = permute_create (permutation, NULL, W, K, id);
+    ctx->ndfs_rec = NULL;
+    if (strategy == Strat_ENDFS) 
+        ctx->ndfs_rec = wctx_create (id, Strat_NNDFS);
     return ctx;
 }
 
 void
-wctx_free (wctx_t *ctx)
+wctx_free (wctx_t *ctx, int strategy)
 {
     RTfree (ctx->store);
     RTfree (ctx->store2);
@@ -593,6 +608,8 @@ wctx_free (wctx_t *ctx)
         dfs_stack_destroy (ctx->in_stack);
     if (NULL != ctx->permute)
         permute_free (ctx->permute);
+    if ( NULL != ctx->ndfs_rec )
+        wctx_free (ctx->ndfs_rec, Strat_NNDFS);
     RTfree (ctx);
 }
 
@@ -686,9 +703,10 @@ init_globals (int argc, char *argv[])
 
     int                 log2W = 0;
     while ((1L << ++log2W) < (int)W+1)  {}
-    sat_bits = log2W + 1; // wip (numworkers) + 1 (RED)
-    red_sat_bit = sat_bits - 1;
-    int                 global_bits = Strat_LTLG & strategy ? sat_bits : 0;
+    count_bits = log2W; // log2( wip (numworkers) + 1 (zero) )
+    count_mask = (1<<count_bits) - 1;
+    int global_bits = Strat_MCNDFS & strategy ? count_bits+1 : 
+                      (Strat_ENDFS & strategy ? count_bits+3 : 0);
     switch (db_type) {
     case UseDBSLL:
         if (ZOBRIST) {
@@ -723,7 +741,7 @@ init_globals (int argc, char *argv[])
     }
     contexts = RTmalloc (sizeof (wctx_t *[W]));
     for (size_t i = 0; i < W; i++)
-        contexts[i] = wctx_create (i);
+        contexts[i] = wctx_create (i, strategy);
     contexts[0]->model = model;
 
     state_data = RTmalloc (SLOT_SIZE * N);
@@ -731,6 +749,8 @@ init_globals (int argc, char *argv[])
 
     /* Load balancer assigned last, see exit_ltsmin */
     switch (strategy) {
+    case Strat_ENDFS:
+        lb = lb_create_max (W, (algo_f)endfs_blue, NULL,G, lb_method, H); break;
     case Strat_MCNDFS:
         lb = lb_create_max (W, (algo_f)mcndfs_blue,NULL,G, lb_method, H); break;
     case Strat_NNDFS:
@@ -743,9 +763,9 @@ init_globals (int argc, char *argv[])
         algo_f algo = call_mode == UseGreyBox ? (algo_f)dfs_grey : (algo_f)dfs;
         lb = lb_create_max (W, algo,        split_dfs,  G, lb_method, H); break;}
     default:
-        Fatal(1, error, "Unknown strategy.");
+        Fatal (1, error, "Unknown strategy.");
     }
-    (void) signal(SIGINT, exit_ltsmin);
+    (void) signal (SIGINT, exit_ltsmin);
 
     if (RTverbosity >= 3) {
         fprintf (stderr, "Dependency Matrix:\n");
@@ -763,7 +783,7 @@ deinit_globals ()
     RTfree (state_data);
     lb_destroy (lb);
     for (size_t i = 0; i < W; i++)
-        wctx_free (contexts[i]);
+        wctx_free (contexts[i], strategy);
     RTfree (contexts);
 }
 
@@ -795,7 +815,7 @@ ndfs_maybe_report (char *prefix, counter_t *cnt)
 }
 
 void
-print_statistics (counter_t *reach, counter_t *red, mytimer_t timer)
+print_statistics (counter_t *reach, counter_t *red, mytimer_t timer, int stop)
 {
     char               *name;
     double              mem1, mem2, mem3=0, mem4, compr, ratio;
@@ -818,22 +838,29 @@ print_statistics (counter_t *reach, counter_t *red, mytimer_t timer)
             red->explored /= W;
             reach->allred /= W;
         }
-        SCCreportTimer (timer, "Total exploration time");
+        if (stop)
+            SCCreportTimer (timer, "Total exploration time");
         mem3 = ((double)(((2UL<<dbs_size))/8*W)) / (1UL<<20);
 
-        Warning (info, "");
+        if (stop)
+            Warning (info, "");
+        if (stop)
         Warning (info, "%s(%s/%s) stats:", key_search(strategies, strategy),
                  key_search(permutations, permutation), key_search(permutations, permutation_red));
+        if (stop)
         Warning (info, "State space has %zu states, %zu are accepting", db_elts,
                  red->visited);
-        Warning (info, "blue states: %zu (%.2f%%), transitions: %zu (per worker)",
+        Warning (info, "%sblue states: %zu (%.2f%%), transitions: %zu (per worker)", stop?"rec_":"",
                  reach->explored, ((double)reach->explored/db_elts)*100, reach->trans);
-        Warning (info, "red states: %zu (%.2f%%), bogus: %zu  (%.2f%%), transitions: %zu, waits: %zu",
+        Warning (info, "%sred states: %zu (%.2f%%), bogus: %zu  (%.2f%%), transitions: %zu, waits: %zu", stop?"rec_":"",
                  red->explored, ((double)red->explored/db_elts)*100, red->bogus_red,
                  ((double)red->bogus_red/db_elts), red->trans, red->waits);
+        if (strategy == Strat_MCNDFS)
         Warning (info, "all-red states: %zu (%.2f%%), bogus %zu (%.2f%%)",
                  reach->allred, ((double)reach->allred/db_elts)*100,
                  red->allred, ((double)red->allred/db_elts)*100);
+        if (stop)
+            return;
         Warning (info, "");
         Warning (info, "Total memory used for local state coloring: %.1fMB", mem3);
     } else {
@@ -869,11 +896,11 @@ print_statistics (counter_t *reach, counter_t *red, mytimer_t timer)
         Warning (info, "time:{{{%.2f}}}, elts:{{{%zu}}}, nodes:{{{%zu}}}, "
                  "trans:{{{%zu}}}, misses:{{{%zu}}}, tests:{{{%zu}}}, "
                  "rehashes:{{{%zu}}}, memq:{{{%.0f}}}, tt:{{{%.2f}}}, "
-                 "explored:{{{%zu}}}, memdb:{{{%.0f}}}, waits:{{{%zu}}}",
+                 "explored:{{{%zu}}}, memdb:{{{%.0f}}}, waits:{{{%zu}}}, rec:{{{%zu}}}",
                  reach->runtime, db_elts, db_nodes, reach->trans,
                  reach->stats->misses, reach->stats->tests,
                  reach->stats->rehashes, mem1, tot, reach->explored, mem2,
-                 red->waits);
+                 red->waits, reach->rec);
     }
 }
 
@@ -1537,7 +1564,7 @@ nndfs_blue (wctx_t *ctx, size_t work)
                 nn_set_color (&ctx->color_map, ctx->state.ref, NNCYAN);
                 nndfs_explore_state_blue (ctx);
             } else {
-                if ( !nn_color_eq(color, NNPINK) )
+                if ( ctx->counters.level_cur != 0 && !nn_color_eq(color, NNPINK) )
                     bitvector_unset ( &ctx->all_red, ctx->counters.level_cur - 1);
                 dfs_stack_pop (ctx->stack);
                 ctx->load--;
@@ -1632,7 +1659,7 @@ mcndfs_blue (wctx_t *ctx, size_t work)
                 nn_set_color (&ctx->color_map, ctx->state.ref, NNCYAN);
                 nndfs_explore_state_blue (ctx);
             } else {
-                if ( !global_has_color(ctx->state.ref, GRED) )
+                if ( ctx->counters.level_cur != 0 && !global_has_color(ctx->state.ref, GRED) )
                     bitvector_unset (&ctx->all_red, ctx->counters.level_cur - 1);
                 dfs_stack_pop (ctx->stack);
                 ctx->load--;
@@ -1661,6 +1688,162 @@ mcndfs_blue (wctx_t *ctx, size_t work)
         }
     }
     (void) work;
+}
+
+/*
+ * Evangelista's MC-NDFS
+ */
+
+static void
+endfs_handle_red (void *arg, state_info_t *successor, transition_info_t *ti, int seen)
+{
+    wctx_t             *ctx = (wctx_t *) arg;
+    /* Find cycle back to the seed */
+    if (successor->ref == ctx->seed )
+        ndfs_report_cycle (ctx, successor);
+    
+    /* Mark states dangerous if necessary */
+    if ( GBbuchiIsAccepting(ctx->model, successor->data)  &&
+         !ndfs_has_color(&ctx->color_map, successor->ref, NRED) )
+        global_try_color(successor->ref, GDANGEROUS);
+   
+    if ( !ndfs_has_color(&ctx->color_map, successor->ref, NRED) &&
+         !global_has_color(successor->ref, GRED) ) {
+        raw_data_t stack_loc = dfs_stack_push (ctx->stack, NULL);
+        state_info_serialize (successor, stack_loc);
+        ctx->load += 1;
+    }
+    (void) seen; (void) ti;
+}
+
+static void
+endfs_handle_blue (void *arg, state_info_t *successor, transition_info_t *ti, int seen)
+{
+    wctx_t             *ctx = (wctx_t *) arg;
+    if ( !ndfs_has_color(&ctx->color_map, successor->ref, NBLUE) &&
+         !global_has_color(successor->ref, GGREEN) ) {
+        raw_data_t stack_loc = dfs_stack_push (ctx->stack, NULL);
+        state_info_serialize (successor, stack_loc);
+        ctx->load += 1;
+    }
+    (void) seen; (void) ti;
+}
+
+static inline void
+endfs_explore_state_red (wctx_t *ctx, counter_t *cnt)
+{
+    dfs_stack_enter (ctx->stack);
+    increase_level (ctx, cnt);
+    ctx->permute->permutation = permutation_red;
+    cnt->trans += permute_trans (ctx->permute, &ctx->state, endfs_handle_red, ctx);
+    ndfs_maybe_report ("[R] ", cnt);
+}
+
+static inline void
+endfs_explore_state_blue (wctx_t *ctx, counter_t *cnt)
+{
+    dfs_stack_enter (ctx->stack);
+    increase_level (ctx, cnt);
+    ctx->permute->permutation = permutation;
+    cnt->trans += permute_trans (ctx->permute, &ctx->state, endfs_handle_blue, ctx);
+    cnt->explored++;
+    ndfs_maybe_report ("[B] ", cnt);
+}
+
+/* ENDFS dfs_red */
+static void
+endfs_red (wctx_t *ctx, ref_t seed)
+{
+    size_t              seed_level = dfs_stack_nframes (ctx->stack);
+    ctx->seed = seed;
+    while ( !lb_is_stopped(lb) ) {
+        raw_data_t          state_data = dfs_stack_top (ctx->stack);
+        if (NULL != state_data) {
+            state_info_deserialize (&ctx->state, state_data, ctx->store);
+            if ( global_has_color(ctx->state.ref, GRED) ||
+                 ndfs_try_color(&ctx->color_map, ctx->state.ref, NRED) ) {
+                if (seed_level == dfs_stack_nframes (ctx->stack))
+                    break;
+                dfs_stack_pop (ctx->stack);
+                ctx->load -= 1;
+            } else {
+                raw_data_t stack_loc = dfs_stack_push (ctx->in_stack, NULL);
+                state_info_serialize (&ctx->state, stack_loc);
+                endfs_explore_state_red (ctx, &ctx->red);
+            }
+        } else { //backtrack
+            dfs_stack_leave (ctx->stack);
+            ctx->red.level_cur--;
+
+            /* exit search if backtrack hits seed, leave stack the way it was */
+            if (seed_level == dfs_stack_nframes(ctx->stack))
+                break;
+            dfs_stack_pop (ctx->stack);
+            ctx->load -= 1;
+        }
+    }
+}
+
+/* ENDFS dfs_blue */
+void
+endfs_blue (wctx_t *ctx, size_t work)
+{
+    size_t              max_load = ctx->counters.explored + work;
+    while ( ctx->counters.explored < max_load && !lb_is_stopped(lb) ) {
+        raw_data_t          state_data = dfs_stack_top (ctx->stack);
+        if (NULL != state_data) {
+            state_info_deserialize (&ctx->state, state_data, ctx->store);
+            if ( global_has_color(ctx->state.ref, GGREEN) ||
+                 ndfs_try_color(&ctx->color_map, ctx->state.ref, NBLUE) ) {
+                dfs_stack_pop (ctx->stack);
+                ctx->load -= 1;
+            } else
+                endfs_explore_state_blue (ctx, &ctx->counters);
+        } else { //backtrack
+            if (0 == dfs_stack_nframes(ctx->stack))
+                return;
+            dfs_stack_leave (ctx->stack);
+            ctx->counters.level_cur--;
+            
+            /* Mark state GGREEN on backtrack */
+            global_try_color (ctx->state.ref, GGREEN);
+
+            /* call red DFS for accepting states */
+            state_data = dfs_stack_top (ctx->stack);
+            state_info_deserialize (&ctx->state, state_data, ctx->store);
+            if ( GBbuchiIsAccepting(ctx->model, ctx->state.data) ) {
+                ref_t           seed = ctx->state.ref;
+                endfs_red (ctx, seed);
+                ctx->red.visited++;
+                while ( dfs_stack_size(ctx->in_stack) ) {
+                    state_data = dfs_stack_pop (ctx->in_stack);
+                    state_info_deserialize_cheap (&ctx->state, state_data);
+                    if ( !global_has_color(ctx->state.ref, GDANGEROUS) ||
+                          ctx->state.ref == seed )
+                        if (global_try_color (ctx->state.ref, GRED))
+                            ctx->red.explored++;
+                }
+                if ( global_has_color(seed, GDANGEROUS) ) {
+                    dfs_stack_push (((wctx_t*)ctx->ndfs_rec)->stack, (int*)&seed);
+                    ctx->counters.rec++;
+                    switch (strat_rec) {
+                    case Strat_ENDFS:
+                        endfs_blue (ctx->ndfs_rec, 0); break;
+                    case Strat_MCNDFS:
+                        mcndfs_blue (ctx->ndfs_rec, 0); break;
+                    case Strat_NNDFS:
+                        nndfs_blue (ctx->ndfs_rec, 0); break;
+                    case Strat_NDFS:
+                        ndfs_blue (ctx->ndfs_rec, 0); break;
+                    default:
+                        Fatal (1, error, "Invalid recursive strategy.");
+                    }
+                }
+            }
+            dfs_stack_pop (ctx->stack);
+            ctx->load -= 1;
+        }
+    }
 }
 
 /*
@@ -1848,6 +2031,10 @@ explore (void *args)
     if (NULL == ctx->model)
         ctx->model = get_model (0);
     permute_set_model (ctx->permute, ctx->model);
+    if (strategy == Strat_ENDFS) {
+        ((wctx_t*)ctx->ndfs_rec)->model = ctx->model;
+        permute_set_model (((wctx_t*)ctx->ndfs_rec)->permute, ctx->model);
+    }
 
     transition_info_t   ti = GB_NO_TRANSITION;
     state_info_initialize (&initial_state, state_data, &ti, &ctx->state, ctx);
@@ -1885,16 +2072,27 @@ main (int argc, char *argv[])
     /* Gather results */
     counter_t          *reach = RTmallocZero (sizeof(counter_t));
     counter_t          *red = RTmallocZero (sizeof(counter_t));
+    counter_t          *rreach = RTmallocZero (sizeof(counter_t));
+    counter_t          *rred = RTmallocZero (sizeof(counter_t));
     reach->stats = RTmallocZero (sizeof(stats_t));
     for (size_t i = 0; i < W; i++) {
         wctx_t             *ctx = contexts[i];
         add_results (reach, &ctx->counters);
         add_results (red, &ctx->red);
+        if (strategy == Strat_ENDFS) {
+            rreach->stats = reach->stats;
+            rred->stats = red->stats;
+            add_results (rreach, &((wctx_t*)ctx->ndfs_rec)->counters);
+            add_results (rred, &((wctx_t*)ctx->ndfs_rec)->red);
+        }
         print_thread_statistics (ctx);
         RTfree (ctx->counters.stats);
     }
-    if (RTverbosity >= 1)
-        print_statistics (reach, red, timer);
+    if (RTverbosity >= 1) {
+        if (strategy == Strat_ENDFS)
+            print_statistics (rreach, rred, timer, 1);
+        print_statistics (reach, red, timer, 0);
+    }
     SCCdeleteTimer (timer); RTfree (reach->stats); RTfree (reach); RTfree (red);
     deinit_globals ();
     exit (EXIT_SUCCESS);
