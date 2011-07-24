@@ -1,3 +1,10 @@
+July, 24, 2011 - Release 1.7.1 of the LTSmin toolset
+
+ * Fix for Multi-Core NDFS algorithm: introduced wait counter
+   (<spec>2lts-mc)
+ * Introduced/improved color counters and option no-all-red
+   (<spec>2lts-mc)
+
 June, 24, 2011 - Release 1.7 of the LTSmin toolset
 
  * New tools <spec>2lts-gsea
