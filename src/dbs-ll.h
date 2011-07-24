@@ -28,6 +28,10 @@ typedef int        (*dbs_try_set_sat_f) (const void *dbs, const dbs_ref_t ref,
                                           int index);
 typedef int        (*dbs_get_sat_f) (const void *dbs, const dbs_ref_t ref,
                                       int index);
+typedef uint32_t   (*dbs_inc_sat_bits_f) (const void *dbs, const dbs_ref_t ref);
+typedef uint32_t   (*dbs_dec_sat_bits_f) (const void *dbs, const dbs_ref_t ref);
+typedef uint32_t   (*dbs_get_sat_bits_f) (const void *dbs, const dbs_ref_t ref);
+
 
 /**
 \brief Create a new database.
@@ -46,7 +50,7 @@ und.
 */
 extern dbs_ref_t    DBSLLlookup (const dbs_ll_t dbs, const int *vector);
 
-extern uint16_t     DBSLLget_sat_bits (const dbs_ll_t dbs, const dbs_ref_t ref);
+extern uint32_t     DBSLLget_sat_bits (const dbs_ll_t dbs, const dbs_ref_t ref);
 
 extern void         DBSLLset_sat_bits (const dbs_ll_t dbs, const dbs_ref_t ref,
                                        uint16_t value);
@@ -56,6 +60,11 @@ extern int          DBSLLtry_set_sat_bit (const dbs_ll_t dbs, const dbs_ref_t re
    
 extern int          DBSLLget_sat_bit (const dbs_ll_t dbs, const dbs_ref_t ref,
                                       int index);
+
+
+extern uint32_t     DBSLLinc_sat_bits (const dbs_ll_t dbs, const dbs_ref_t ref);
+
+extern uint32_t     DBSLLdec_sat_bits (const dbs_ll_t dbs, const dbs_ref_t ref);
 
 /**
 \brief Find a vector with respect to a database and insert it if it cannot be fo

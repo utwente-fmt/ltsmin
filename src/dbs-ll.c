@@ -50,7 +50,7 @@ get_local (dbs_ll_t dbs)
     return loc;
 }
 
-uint16_t
+uint32_t
 DBSLLget_sat_bits (const dbs_ll_t dbs, const dbs_ref_t ref)
 {
     return atomic32_read (dbs->table+ref) & dbs->sat_mask;
@@ -74,6 +74,30 @@ DBSLLtry_set_sat_bit (const dbs_ll_t dbs, const dbs_ref_t ref, int index)
     if (val)
         return 0; //bit was already set
     return cas (dbs->table+ref, hash_and_sat, hash_and_sat | bit);
+}
+
+uint32_t
+DBSLLinc_sat_bits (const dbs_ll_t dbs, const dbs_ref_t ref)
+{
+    uint32_t        val, newval;
+    do {
+        val = atomic32_read (dbs->table+ref);
+        assert ((val & dbs->sat_mask) != dbs->sat_mask);
+        newval = val + 1;
+    } while ( ! cas (dbs->table+ref, val, newval) );
+    return newval;
+}
+
+uint32_t
+DBSLLdec_sat_bits (const dbs_ll_t dbs, const dbs_ref_t ref)
+{
+    uint32_t        val, newval;
+    do {
+        val = atomic32_read (dbs->table+ref);
+        assert ((val & dbs->sat_mask) != 0);
+        newval = val - 1;
+    } while ( ! cas (dbs->table+ref, val, newval) );
+    return newval;
 }
 
 void
