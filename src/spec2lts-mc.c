@@ -76,6 +76,7 @@ typedef enum {
     Perm_Shift_All, /* eq. to Perm_Shift, but non-lazy */
     Perm_Sort,      /* order on the state index in the DB */
     Perm_Random,    /* generate a random fixed permutation */
+    Perm_RR,        /* more random */
     Perm_SR,        /* sort according to a random fixed permutation */
     Perm_Otf,       /* on-the-fly calculation of a random perm for num_succ */
     Perm_Dynamic,   /* generate a dynamic permutation based on color feedback */
@@ -176,6 +177,7 @@ static si_map_entry permutations[] = {
     {"sort",    Perm_Sort},
     {"otf",     Perm_Otf},
     {"random",  Perm_Random},
+    {"rr",      Perm_RR},
     {"sr",      Perm_SR},
     {"none",    Perm_None},
     {"dynamic", Perm_Dynamic},
@@ -919,6 +921,17 @@ sort_cmp (const void *a, const void *b, void *arg)
 }
 
 static int
+rr_cmp (const void *a, const void *b, void *arg)
+{
+    permute_t          *perm = (permute_t *) arg;
+    int                *rand = *perm->rand;
+    ref_t               A = perm->todos[*((int*)a)].si.ref;
+    ref_t               B = perm->todos[*((int*)b)].si.ref;
+    return ((((1<<dbs_size)-1)&rand[A & ((1<<16)-1)])^A) -
+           ((((1<<dbs_size)-1)&rand[B & ((1<<16)-1)])^B);
+}
+
+static int
 rand_cmp (const void *a, const void *b, void *arg)
 {
     permute_t          *perm = (permute_t *) arg;
@@ -994,13 +1007,20 @@ permute_create (permutation_perm_t permutation, model_t model,
     if (Perm_Random == perm->permutation) {
         perm->rand = RTalignZero (CACHE_LINE_SIZE, sizeof(int*[trans+TODO_MAX]));
         for (size_t i = 1; i < perm->trans+TODO_MAX; i++) {
-            perm->rand[i] = RTalign(CACHE_LINE_SIZE, sizeof(int[ i ]));
+            perm->rand[i] = RTalign (CACHE_LINE_SIZE, sizeof(int[ i ]));
             randperm (perm->rand[i], i, perm->shiftorder);
         }
     }
+    if (Perm_RR == perm->permutation) {
+        perm->rand = RTalignZero (CACHE_LINE_SIZE, sizeof(int*));
+        perm->rand[0] = RTalign (CACHE_LINE_SIZE, sizeof(int[1<<16]));
+        srandom (time(NULL) + 9876432*worker_index);
+        for (int i =0; i<1<<16; i++)
+            perm->rand[0][i] = random();
+    }
     if (Perm_SR == perm->permutation || Perm_Dynamic == perm->permutation) {
         perm->rand = RTalignZero (CACHE_LINE_SIZE, sizeof(int*));
-        perm->rand[0] = RTalign(CACHE_LINE_SIZE, sizeof(int[trans+TODO_MAX]));
+        perm->rand[0] = RTalign (CACHE_LINE_SIZE, sizeof(int[trans+TODO_MAX]));
         randperm (perm->rand[0], trans+TODO_MAX, (time(NULL) + 9876*worker_index));
     }
     return perm;
@@ -1024,7 +1044,7 @@ permute_free (permute_t *perm)
             RTfree (perm->rand[i]);
         RTfree (perm->rand);
     }
-    if (Perm_SR == perm->permutation || Perm_Dynamic == perm->permutation) {
+    if (((Perm_SR | Perm_RR) & perm->permutation) || Perm_Dynamic == perm->permutation) {
         RTfree (perm->rand[0]);
         RTfree (perm->rand);
     }
@@ -1053,6 +1073,7 @@ permute_one (void *arg, transition_info_t *ti, state_data_t dst)
     case Perm_Dynamic:
     case Perm_Random:
     case Perm_SR:
+    case Perm_RR:
     case Perm_Otf:
     case Perm_Sort:
         perm_todo (perm, dst, ti);
@@ -1082,6 +1103,10 @@ permute_trans (permute_t *perm, state_info_t *state, perm_cb_f cb, void *ctx)
         break;
     case Perm_Dynamic:
         qsortr (perm->tosort, perm->nstored, sizeof(int), dyn_cmp, perm);
+        perm_do_all (perm);
+        break;
+    case Perm_RR:
+        qsortr (perm->tosort, perm->nstored, sizeof(int), rr_cmp, perm);
         perm_do_all (perm);
         break;
     case Perm_SR:
