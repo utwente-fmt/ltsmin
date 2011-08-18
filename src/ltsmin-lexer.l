@@ -41,12 +41,13 @@ number      [0-9]+
 string      \"(([[:print:]]{-}[\\\"])|"\\\\"|"\\\"")*\"
 chunk       #([0-9a-fA-F][0-9a-fA-F])*#
 operator    [~!@<>=\-+/?&\\|*\[\]]+
+endofline   (\n|\r|\n\r|\r\n)
 
 %%
 
 {white_space}  {yyextra->linepos+=strlen(yytext);} //white space, but not end of line.
 
-"\n" {
+{endofline} {
     yyextra->lineno++;
     yyextra->linepos=0;
     if(yyextra->linebased) {
