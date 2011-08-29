@@ -1712,13 +1712,14 @@ endfs_handle_red (void *arg, state_info_t *successor, transition_info_t *ti, int
 {
     wctx_t             *ctx = (wctx_t *) arg;
     /* Find cycle back to the seed */
-    if (successor->ref == ctx->seed )
+    nndfs_color_t color = nn_get_color (&ctx->color_map, successor->ref);
+    if ( nn_color_eq(color, NNCYAN) )
         ndfs_report_cycle (ctx, successor);
     /* Mark states dangerous if necessary */
     if ( GBbuchiIsAccepting(ctx->model, successor->data) &&
          !global_has_color(successor->ref, GRED, ctx->rec_bits) )
-        global_try_color(successor->ref, GDANGEROUS, ctx->rec_bits);   
-    if ( !ndfs_has_color(&ctx->color_map, successor->ref, NRED) &&
+        global_try_color(successor->ref, GDANGEROUS, ctx->rec_bits);
+    if ( !nn_color_eq(color, NNPINK) &&
          !global_has_color(successor->ref, GRED, ctx->rec_bits) ) {
         raw_data_t stack_loc = dfs_stack_push (ctx->stack, NULL);
         state_info_serialize (successor, stack_loc);
@@ -1731,7 +1732,13 @@ static void
 endfs_handle_blue (void *arg, state_info_t *successor, transition_info_t *ti, int seen)
 {
     wctx_t             *ctx = (wctx_t *) arg;
-    if ( !ndfs_has_color(&ctx->color_map, successor->ref, NBLUE) &&
+    nndfs_color_t color = nn_get_color (&ctx->color_map, successor->ref);
+    if ( nn_color_eq(color, NNCYAN) &&
+         (GBbuchiIsAccepting(ctx->model, ctx->state.data) ||
+         GBbuchiIsAccepting(ctx->model, get(dbs, successor->ref, ctx->store2))) ) {
+        /* Found cycle in blue search */
+        ndfs_report_cycle(ctx, successor);
+    } else if ( !nn_color_eq(color, NNCYAN) && !nn_color_eq(color, NNBLUE) &&
          !global_has_color(successor->ref, GGREEN, ctx->rec_bits) ) {
         raw_data_t stack_loc = dfs_stack_push (ctx->stack, NULL);
         state_info_serialize (successor, stack_loc);
@@ -1771,16 +1778,18 @@ endfs_red (wctx_t *ctx, ref_t seed)
         raw_data_t          state_data = dfs_stack_top (ctx->stack);
         if (NULL != state_data) {
             state_info_deserialize (&ctx->state, state_data, ctx->store);
-            if ( global_has_color(ctx->state.ref, GRED, ctx->rec_bits) ||
-                 ndfs_try_color(&ctx->color_map, ctx->state.ref, NRED) ) {
+            nndfs_color_t color = nn_get_color (&ctx->color_map, ctx->state.ref);
+            if ( !nn_color_eq(color, NNPINK) &&
+                 !global_has_color(ctx->state.ref, GRED, ctx->rec_bits) ) {
+                nn_set_color (&ctx->color_map, ctx->state.ref, NNPINK);
+                raw_data_t stack_loc = dfs_stack_push (ctx->in_stack, NULL);
+                state_info_serialize (&ctx->state, stack_loc);
+                endfs_explore_state_red (ctx, &ctx->red);
+            } else {
                 if (seed_level == dfs_stack_nframes (ctx->stack))
                     break;
                 dfs_stack_pop (ctx->stack);
                 ctx->load -= 1;
-            } else {
-                raw_data_t stack_loc = dfs_stack_push (ctx->in_stack, NULL);
-                state_info_serialize (&ctx->state, stack_loc);
-                endfs_explore_state_red (ctx, &ctx->red);
             }
         } else { //backtrack
             dfs_stack_leave (ctx->stack);
@@ -1803,12 +1812,15 @@ endfs_blue (wctx_t *ctx, size_t work)
         raw_data_t          state_data = dfs_stack_top (ctx->stack);
         if (NULL != state_data) {
             state_info_deserialize (&ctx->state, state_data, ctx->store);
-            if ( global_has_color(ctx->state.ref, GGREEN, ctx->rec_bits) ||
-                 ndfs_try_color(&ctx->color_map, ctx->state.ref, NBLUE) ) {
+            nndfs_color_t color = nn_get_color (&ctx->color_map, ctx->state.ref);
+            if ( !nn_color_eq(color, NNCYAN) && !nn_color_eq(color, NNBLUE) &&
+                 !global_has_color(ctx->state.ref, GGREEN, ctx->rec_bits) ) {
+                nn_set_color (&ctx->color_map, ctx->state.ref, NNCYAN);
+                endfs_explore_state_blue (ctx, &ctx->counters);
+            } else {
                 dfs_stack_pop (ctx->stack);
                 ctx->load -= 1;
-            } else
-                endfs_explore_state_blue (ctx, &ctx->counters);
+            }
         } else { //backtrack
             if (0 == dfs_stack_nframes(ctx->stack))
                 return;
@@ -1819,6 +1831,7 @@ endfs_blue (wctx_t *ctx, size_t work)
             state_info_deserialize (&ctx->state, state_data, ctx->store);
             /* Mark state GGREEN on backtrack */
             global_try_color (ctx->state.ref, GGREEN, ctx->rec_bits);
+            nn_set_color (&ctx->color_map, ctx->state.ref, NNBLUE);
             if ( GBbuchiIsAccepting(ctx->model, ctx->state.data) ) {
                 ref_t           seed = ctx->state.ref;
                 endfs_red (ctx, seed);
