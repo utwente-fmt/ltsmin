@@ -441,6 +441,8 @@ typedef struct thread_ctx_s {
     bitvector_t         all_red;        // all_red gaiser/Schwoon
     void               *ndfs_rec;       // ctx for Evangelista's ndfs_p
     int                 rec_bits;       // bit depth of recursive ndfs
+    ref_t               work;           // ENDFS work for loadbalancer
+    int                 done;           // ENDFS done for loadbalancer
 } wctx_t;
 
 /* predecessor --(transition_info)--> successor */
@@ -1808,6 +1810,8 @@ endfs_red (wctx_t *ctx, ref_t seed)
 void
 endfs_blue (wctx_t *ctx, size_t work)
 {
+    ctx->done = 0;
+    ctx->work = SIZE_MAX;
     while ( !lb_is_stopped(lb) ) {
         raw_data_t          state_data = dfs_stack_top (ctx->stack);
         if (NULL != state_data) {
@@ -1823,7 +1827,7 @@ endfs_blue (wctx_t *ctx, size_t work)
             }
         } else { //backtrack
             if (0 == dfs_stack_nframes(ctx->stack))
-                return;
+                break;
             dfs_stack_leave (ctx->stack);
             ctx->counters.level_cur--;
             /* call red DFS for accepting states */
@@ -1834,6 +1838,7 @@ endfs_blue (wctx_t *ctx, size_t work)
             nn_set_color (&ctx->color_map, ctx->state.ref, NNBLUE);
             if ( GBbuchiIsAccepting(ctx->model, ctx->state.data) ) {
                 ref_t           seed = ctx->state.ref;
+                ctx->work = seed;
                 endfs_red (ctx, seed);
                 while ( dfs_stack_size(ctx->in_stack) ) {
                     state_data = dfs_stack_pop (ctx->in_stack);
@@ -1864,10 +1869,33 @@ endfs_blue (wctx_t *ctx, size_t work)
                         Fatal (1, error, "Invalid recursive strategy.");
                     }
                 }
+                ctx->work = SIZE_MAX;
             }
             dfs_stack_pop (ctx->stack);
             ctx->load -= 1;
         }
+    }
+    if (strat_rec != Strat_MCNDFS)
+        return;
+    atomic32_write(&ctx->done, 1);
+    size_t workers[W];
+    int idle_count = W-1;
+    for (size_t i = 0; i<((size_t)W); i++)
+        workers[i] = (i==ctx->id ? 0 : 1);
+    while (0 != idle_count)
+    for (size_t i=0; i<W; i++) {
+        if (0==workers[i])
+            continue;
+        if (1 == atomic32_read(&(contexts[i]->done))) {
+            workers[i] = 0;
+            idle_count--;
+            continue;
+        }
+        ref_t work = atomic_ptr_read (&(contexts[i]->work));
+        if (SIZE_MAX == work)
+            continue;
+        dfs_stack_push (((wctx_t*)ctx->ndfs_rec)->stack, (int*)&work);
+        mcndfs_blue (ctx->ndfs_rec, 0);
     }
     (void) work;
 }
