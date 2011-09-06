@@ -127,7 +127,7 @@ JavaCC task support for Ant.
 *** muCRL
 Download muCRL (>= 2.18.5) from <http://www.cwi.nl/~mcrl/mutool.html>.
 We tested with muCRL-2.18.5.  Without muCRL, the symbolic tools
-(<spec>-reach) might have degraded performance due to the absense of
+(<spec>-reach) might have degraded performance due to the absence of
 the AtermDD decision diagram package.
 
 Note that for 64-bit builds, you have to explicitly configure muCRL
@@ -158,7 +158,7 @@ hence you can also build mCRL2 without:
 
 *** CADP
 See the CADP website <http://www.inrialpes.fr/vasy/cadp/> on how to
-obtain a licence and download the CADP toolkit.
+obtain a license and download the CADP toolkit.
 
 *** DiVinE 2
 Download the latest released version of DiVinE from
@@ -209,6 +209,10 @@ source tree:
   patch -p1 < /path/to/ltsmin/contrib/divine-cluster-0.8.3-ltsmin.patch
 
 Then, build and install divine-cluster according to their documentation.
+
+*** libDDD
+Download libDDD (>= 1.7) from <http://move.lip6.fr/software/DDD/>.
+We tested with libDDD 1.7.
 
 *** MPI
 In principle, any MPI library which supports MPI-IO should work.

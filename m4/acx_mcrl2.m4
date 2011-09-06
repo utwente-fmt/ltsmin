@@ -58,6 +58,10 @@ if test x"$acx_mcrl2" = xyes; then
          [MCRL2_LIBS="-lmcrl2_aterm $MCRL2_LIBS"
           LIBS="-lmcrl2_aterm $LIBS"],
          [acx_mcrl2_libs=no])
+       AX_CXX_CHECK_LIB([mcrl2_utilities], [main],
+         [MCRL2_LIBS="-lmcrl2_utilities $MCRL2_LIBS"
+          LIBS="-lmcrl2_utilities $LIBS"],
+         [acx_mcrl2_libs=no])
        AX_CXX_CHECK_LIB([mcrl2_core], [main],
          [MCRL2_LIBS="-lmcrl2_core $MCRL2_LIBS"
           LIBS="-lmcrl2_core $LIBS"],
@@ -69,10 +73,6 @@ if test x"$acx_mcrl2" = xyes; then
        AX_CXX_CHECK_LIB([mcrl2_process], [main],
          [MCRL2_LIBS="-lmcrl2_process $MCRL2_LIBS"
           LIBS="-lmcrl2_process $LIBS"],
-         [acx_mcrl2_libs=no])
-       AX_CXX_CHECK_LIB([mcrl2_utilities], [main],
-         [MCRL2_LIBS="-lmcrl2_utilities $MCRL2_LIBS"
-          LIBS="-lmcrl2_utilities $LIBS"],
          [acx_mcrl2_libs=no])
        AX_CXX_CHECK_LIB([mcrl2_lps], [main],
          [MCRL2_LIBS="-lmcrl2_lps $MCRL2_LIBS"
