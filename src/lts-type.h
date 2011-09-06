@@ -25,25 +25,33 @@ typedef struct lts_type_s *lts_type_t;
  * enumeration of datatype representations
  */
 typedef enum {
-/// A direct type deal with any type that can be represented as a 32 bit integer. 
+/**
+A direct type to deal with any type that can be represented as a 32 bit integer.
+*/
 LTStypeDirect,
+
 /**
 A range type is used for an integer type from a (small) range of values.
 */
 LTStypeRange,
-/**
-A chunk type is a type with a possibly infinite domain where each value is serialized.
 
-Because it is not guearanteed that all values can be enumerated, unused values may be garbage collected
-and the order of the numbering may be changed.
+/**
+A chunk type is a type with a possibly infinite domain where each value is
+serialized.
+
+Because it is not guaranteed that all values can be enumerated, unused values
+may be garbage collected and the order of the numbering may be changed.
 */
 LTStypeChunk,
+
 /**
 An enumerated type is a finite chunk type.
 
-It is not allowed to remove values and it is not allowed to change the numering.
+It is not allowed to remove values and it is not allowed to change the
+numbering.
 */
-LTStypeEnum} data_format_t;
+LTStypeEnum
+} data_format_t;
 
 /// Create a new empty lts type.
 extern lts_type_t lts_type_create();

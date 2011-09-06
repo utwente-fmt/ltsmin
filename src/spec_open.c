@@ -43,7 +43,6 @@ static void ltsminopen_popt(poptContext con,
 	case POPT_CALLBACK_REASON_OPTION:
 		break;
 	}
-	//Fatal(1,error,"unexpected call to state_db_popt");
 }
 
 static  struct poptOption options[] = {

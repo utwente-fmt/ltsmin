@@ -36,16 +36,20 @@ etf_model_t ETFmodelCreate(){
 }
 
 
-int ETFgetType(etf_model_t model,const char*sort){
-	int is_new;
-	int type_no=lts_type_add_type(model->ltstype,sort,&is_new);
-	Warning(debug,"type %s %s (%d)",sort,is_new?"created":"present",type_no);
-	if (is_new) {
-		ensure_access(model->type_manager,type_no);
-		model->type_names[type_no]=strdup(sort);
-		model->type_values[type_no]=SIcreate();
-	}
-	return type_no;
+int ETFgetType(etf_model_t model,const char*sort)
+{
+    int is_new;
+    int type_no = lts_type_put_type(model->ltstype, sort, LTStypeEnum, &is_new);
+
+    Warning(debug, "type %s %s (%d)", sort, is_new?"created":"present",type_no);
+
+    if (is_new) {
+        ensure_access(model->type_manager, type_no);
+        model->type_names[type_no]  = strdup(sort);
+        model->type_values[type_no] = SIcreate();
+    }
+
+    return type_no;
 }
 
 etf_map_t etf_get_map(etf_model_t model,int map){

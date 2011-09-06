@@ -151,8 +151,10 @@ DVEexit()
 
     char rmcmd[PATH_MAX];
     if (snprintf(rmcmd, sizeof rmcmd, "rm -rf %s", templatename) < (ssize_t)sizeof rmcmd) {
-        // remove!
-        (void)system(rmcmd);
+        // remove temporary files
+        int status = system(rmcmd);
+        if (status == -1 || !WIFEXITED(status) || WEXITSTATUS(status) != 0)
+            Warning(info, "Could not remove %s.", templatename);
     }
 }
 

@@ -39,13 +39,13 @@ static void buddy_init(){
 	}
 }
 
-static void reach_popt(poptContext con,
+static void buddy_popt(poptContext con,
 			enum poptCallbackReason reason,
 			const struct poptOption * opt,
 			const char * arg, void * data) {
   (void)con;(void)opt;(void)arg;(void)data;
   if (reason != POPT_CALLBACK_REASON_POST) 
-    Fatal(1,error,"unexpected call to buddy reach_popt");
+    Fatal(1,error,"unexpected call to buddy_popt");
   
   if (!strcmp(fdd_reorder_opt,"none"))
     fdd_order_strat=BDD_REORDER_NONE;
@@ -70,7 +70,7 @@ static void reach_popt(poptContext con,
 }
 
 struct poptOption buddy_options[]= {
-	{ NULL, 0 , POPT_ARG_CALLBACK|POPT_CBFLAG_POST|POPT_CBFLAG_SKIPOPTION , (void*)reach_popt , 0 , NULL , NULL },
+	{ NULL, 0 , POPT_ARG_CALLBACK|POPT_CBFLAG_POST|POPT_CBFLAG_SKIPOPTION , (void*)buddy_popt , 0 , NULL , NULL },
 
 	{ "cache-ratio",0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &cacheratio , 0 , "set cache ratio","<nodes/slot>"},
 	{ "max-increase" , 0 , POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &maxincrease , 0 , "set maximum increase","<number>"},
