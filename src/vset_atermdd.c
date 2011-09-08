@@ -77,6 +77,7 @@ static ATerm atom;
 static ATerm Atom=NULL;
 static ATerm Empty=NULL;
 static ATermTable global_ct=NULL;
+static AFun composite;
 
 #define ATcmp ATcompare
 //define ATcmp(t1,t2) (((long)t1)-((long)t2))
@@ -121,6 +122,8 @@ static void set_init(){
 	ATprotect(&Empty);
 	Atom=ATparse("VSET_A");
 	ATprotect(&Atom);
+    composite = ATmakeAFun("VSET_COMPOSITE", 4, ATfalse);
+    ATprotectAFun(composite);
 	set_reset_ct();
 }
 
@@ -1452,6 +1455,214 @@ static void set_enum_match_tree(vset_t set,int p_len,int* proj,int*match,vset_el
     set_enum_t2(match_set,vec,N,vset_enum_wrap_tree,0,1,0);
 }
 
+// Global hash-tables for storing intermediate Saturation results.
+// SC: Saturation cache - RC: Relational Product cache
+static ATermTable global_SC, global_RC;
+
+// Container for storing transition groups at top levels.
+typedef struct {
+    int tg_len;
+    int *top_groups;
+} top_groups_info;
+
+static vrel_t *rel_set;
+static top_groups_info *top_groups;
+
+static ATerm saturate(int level, ATerm set);
+static ATerm set_reach_2_sat(ATerm set, ATerm trans, int *proj, int p_len, int ofs, int grp);
+
+// Initialize a global hash-table.
+static ATermTable init_table(ATermTable table) {
+    ATermTable new_table = table;
+    if (new_table != NULL) {
+        ATtableDestroy(new_table);
+    }
+    new_table = ATtableCreate(HASH_INIT, HASH_LOAD);
+    return new_table;
+}
+
+// Get value from hash-table using composite key consisting of level and group numbers, and key1 and key2.
+static ATerm get_composite_value(ATermTable table, int level, int group, ATerm key1, ATerm key2) {
+    ATerm lvlNode = (ATerm) ATmakeInt(level);
+    ATerm grpNode = (ATerm) ATmakeInt(group);
+    ATerm key = (ATerm) ATmakeAppl4(composite, lvlNode, grpNode, key1, key2);
+    return ATtableGet(table, key);
+}
+
+// Put (key,value) into hash-table using composite key consisting of level and group numbers, and key1 and key2.
+static void put_composite_value(ATermTable table, int level, int group, ATerm key1, ATerm key2, ATerm value) {
+    ATerm lvlNode = (ATerm) ATmakeInt(level);
+    ATerm grpNode = (ATerm) ATmakeInt(group);
+    ATerm key = (ATerm) ATmakeAppl4(composite, lvlNode, grpNode, key1, key2);
+    ATtablePut(table, key, value);
+}
+
+static ATerm copy_level_sat(ATerm set,ATerm trans,int *proj,int p_len,int ofs, int grp){
+    if (set==emptyset)
+        return emptyset;
+    else
+        return MakeCons(ATgetArgument(set,0),
+                        set_reach_2_sat(ATgetArgument(set,1),trans,proj,p_len,ofs+1,grp),
+                        copy_level_sat(ATgetArgument(set,2),trans,proj,p_len,ofs,grp));
+}
+
+static ATerm trans_level_sat(ATerm set,ATerm trans,int *proj,int p_len,int ofs, int grp){
+    if (trans==emptyset)
+        return emptyset;
+    else
+        return MakeCons(ATgetArgument(trans,0),
+                        set_reach_2_sat(set,ATgetArgument(trans,1),proj+1,p_len-1,ofs+1,grp),
+                        trans_level_sat(set,ATgetArgument(trans,2),proj,p_len,ofs,grp));
+}
+
+static ATerm apply_reach_sat(ATerm set,ATerm trans,int *proj,int p_len,int ofs, int grp){
+    int c;
+    ATerm res=emptyset;
+    for(;(ATgetAFun(set)==cons)&&(ATgetAFun(trans)==cons);){
+        c=ATcmp(ATgetArgument(set,0),ATgetArgument(trans,0));
+        if (c<0)
+            set=ATgetArgument(set,2);
+        else if (c>0)
+            trans=ATgetArgument(trans,2);
+        else {
+            res=set_union_2(res,trans_level_sat(ATgetArgument(set,1),
+                            ATgetArgument(trans,1),proj,p_len,ofs,grp),1);
+            set=ATgetArgument(set,2);
+            trans=ATgetArgument(trans,2);
+        }
+    }
+    return res;
+}
+
+static ATerm set_reach_2_sat(ATerm set,ATerm trans,int *proj,int p_len,int ofs, int grp){
+    if (p_len==0)
+        return set;
+    else {
+        ATerm res = get_composite_value(global_RC, ofs, grp, set, trans);
+        if (res) return res;
+        {   if (proj[0]==ofs)
+                res = apply_reach_sat(set,trans,proj,p_len,ofs,grp);
+            else
+                res = copy_level_sat(set,trans,proj,p_len,ofs,grp);
+            res = saturate(ofs, res);
+            put_composite_value(global_RC, ofs, grp, set, trans, res);
+            return res;
+        }
+    }
+}
+
+static ATerm apply_reach_fixpoint(ATerm set,ATerm trans,int *proj,int p_len,int ofs, int grp){
+    int c;
+    ATerm res=set;
+    for(;(ATgetAFun(set)==cons)&&(ATgetAFun(trans)==cons);){
+        c=ATcmp(ATgetArgument(set,0),ATgetArgument(trans,0));
+        if (c<0)
+            set=ATgetArgument(set,2);
+        else if (c>0)
+            trans=ATgetArgument(trans,2);
+        else {
+            ATerm new_res = res;
+            ATerm trans_value = ATgetArgument(trans,0);
+            ATerm res_value = ATgetArgument(res, 0);
+            while (!ATisEqual(res_value, trans_value)) {
+                new_res = ATgetArgument(new_res, 2);
+                res_value = ATgetArgument(new_res, 0);
+            }
+            res=set_union_2(res,trans_level_sat(ATgetArgument(new_res,1),
+                            ATgetArgument(trans,1),proj,p_len,ofs,grp),1);
+            set=ATgetArgument(set,2);
+            trans=ATgetArgument(trans,2);
+        }
+    }
+    return res;
+}
+
+// Start fixpoint calculations on (sub) MDD tree at given level for transition groups on leftmost level.
+// Continue performing fixpoint calculations until (sub) MDD tree does not change anymore.
+static ATerm sat_fixpoint(int level, ATerm set) {
+    if (ATisEqual(set, emptyset) || ATisEqual(set, atom)) {
+        return set;
+    }
+    ATerm old_set = emptyset;
+    ATerm new_set = set;
+    while (!ATisEqual(old_set, new_set)) {
+        old_set = new_set;
+        top_groups_info groups_info = top_groups[level];
+        for (int i = 0; i < groups_info.tg_len; i++) {
+            int grp = groups_info.top_groups[i];
+            new_set = apply_reach_fixpoint(new_set, rel_set[grp]->rel,
+                                           rel_set[grp]->proj, rel_set[grp]->p_len, level, grp);
+        }
+    }
+    return new_set;
+}
+
+// Traverse the local state values of an MDD node recursively (within function saturate).
+// Entries of MDD node are traversed recursively:
+// - Base case: end of MDD node is reached OR MDD node is True node.
+// - Inductive case: construct new MDD node with link to next entry of MDD node handled recursively.
+static ATerm saturate_locals(int level, ATerm node_set) {
+    if (ATisEqual(node_set, emptyset) || ATisEqual(node_set, atom)) {
+        return node_set;
+    }
+    ATerm sat_set = saturate(level + 1, ATgetArgument(node_set, 1));
+    ATerm new_node_set = saturate_locals(level, ATgetArgument(node_set, 2));
+    return MakeCons(ATgetArgument(node_set, 0), sat_set, new_node_set);
+}
+
+// Start Saturation process for (sub) MDD-tree at given level.
+static ATerm saturate(int level, ATerm set) {
+    ATerm new_set = ATtableGet(global_SC, set);
+    if (new_set) {
+        return new_set;
+    }
+    new_set = saturate_locals(level, set);
+    new_set = sat_fixpoint(level, new_set);
+    ATtablePut(global_SC, set, new_set);
+    return new_set;
+}
+
+// Perform fixpoint calculations with General Basic Saturation algorithm.
+// Levels of an MDD tree are traversed from 0 (at root) and onwards.
+static void set_least_fixpoint_list(vset_t dst, vset_t src, vrel_t rels[], int rel_count) {
+    // Initialize global hash tables.
+    global_ct = init_table(global_ct);
+    global_SC = init_table(global_SC);
+    global_RC = init_table(global_RC);
+
+    // Initialize partitioned transition relations.
+    rel_set = rels;
+
+    // Retrieve initial state vector and its length.
+    int init_state_len = src->dom->shared.size;
+    ATerm init_state_set = src->set;
+
+    // Initialize array of top_groups_info: store per (topmost/leftmost) level a set of transition groups.
+    top_groups = RTmalloc(sizeof(top_groups_info[init_state_len]));
+    for (int lvl = 0; lvl < init_state_len; lvl++) {
+        top_groups[lvl].top_groups = RTmalloc(sizeof(int[rel_count]));
+        top_groups[lvl].tg_len = 0;
+    }
+    for (int grp = 0; grp < rel_count; grp++) {
+        int top_lvl = rels[grp]->proj[0];
+        top_groups[top_lvl].top_groups[top_groups[top_lvl].tg_len] = grp;
+        top_groups[top_lvl].tg_len++;
+    }
+
+    // Perform Saturation on initial state vector (starting at level 0) and store result.
+    dst->set = saturate(0, init_state_set);
+
+    // Free unused (global) variables.
+    rel_set = NULL;
+    for (int lvl = 0; lvl < init_state_len; lvl++) {
+        RTfree(top_groups[lvl].top_groups);
+    }
+    RTfree(top_groups);
+    ATtableReset(global_ct);
+    ATtableReset(global_SC);
+    ATtableReset(global_RC);
+}
+
 vdom_t vdom_create_tree(int n){
 	Warning(info,"Creating an AtermDD tree domain.");
 	vdom_t dom=(vdom_t)RTmalloc(sizeof(struct vector_domain));
@@ -1513,6 +1724,7 @@ vdom_t vdom_create_list(int n){
 	dom->shared.set_prev=set_prev_list;
 	dom->shared.reorder=reorder;
     dom->shared.set_destroy=set_destroy_both;
+    dom->shared.set_least_fixpoint= set_least_fixpoint_list;
 	return dom;
 }
 
