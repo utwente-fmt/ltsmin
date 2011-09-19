@@ -41,6 +41,7 @@ static inline size_t min (size_t a, size_t b) {
     return a < b ? a : b;
 }
 
+#define                     MAX_STRATEGIES 5
 typedef int                *state_data_t;
 static const state_data_t   state_data_dummy;
 static const size_t         SLOT_SIZE = sizeof(*state_data_dummy);
@@ -55,6 +56,7 @@ typedef struct state_info_s {
 typedef enum { UseGreyBox, UseBlackBox } box_t;
 typedef enum { UseDBSLL, UseTreeDBSLL } db_type_t;
 typedef enum {
+    Strat_None   = 0,
     Strat_BFS    = 1,
     Strat_DFS    = 2,
     Strat_NDFS   = 4,
@@ -69,7 +71,7 @@ typedef enum {
 /* permute_get_transitions is a replacement for GBgetTransitionsLong
  * TODO: move this to permute.c
  */
-#define                 TODO_MAX 20
+#define                     TODO_MAX 20
 
 typedef enum {
     Perm_None,      /* normal group order */
@@ -145,9 +147,7 @@ static dbs_get_sat_bits_f   get_sat_bits;
 static char            *state_repr = "table";
 static db_type_t        db_type = UseDBSLL;
 static char            *arg_strategy = "bfs";
-static char            *arg_strat_rec = "ndfs";
-static strategy_t       strategy = Strat_BFS;
-static strategy_t       strat_rec = Strat_NDFS;
+static strategy_t       strategy[MAX_STRATEGIES] = {Strat_BFS, Strat_None, Strat_None, Strat_None, Strat_None};
 static char            *arg_lb = "combined";
 static lb_method_t      lb_method = LB_Combined;
 static char            *arg_perm = "unknown";
@@ -163,6 +163,7 @@ static state_data_t     state_data;
 static state_info_t     initial_state;
 static int              count_bits = 0;
 static int              global_bits = 0;
+static int              local_bits = 0;
 static int              count_mask;
 
 static si_map_entry strategies[] = {
@@ -217,14 +218,29 @@ state_db_popt (poptContext con, enum poptCallbackReason reason,
         if (res < 0)
             Fatal (1, error, "unknown vector storage mode type %s", state_repr);
         db_type = res;
-        res = linear_search (strategies, arg_strategy);
-        if (res < 0)
-            Fatal (1, error, "unknown search strategy %s", arg_strategy);
-        strategy = res;
-        res = linear_search (strategies, arg_strat_rec);
-        if (res < 0)
-            Fatal (1, error, "unknown search strategy %s", arg_strat_rec);
-        strat_rec = res;
+        int i = 0, begin = 0, end = 0;
+        char strat[1024];
+        memcpy (strat, arg_strategy, 1024);
+        char last;
+        do {
+            if (i > 0 && Strat_ENDFS != strategy[i-1])
+                Fatal (1, error, "Only ENDFS supports recursive repair procedures.");
+            while (',' != arg_strategy[end] && '\0' != arg_strategy[end]) ++end;
+            last = strat[end];
+            strat[end] = '\0';
+            res = linear_search (strategies, &strat[begin]);
+            if (res < 0)
+                Fatal (1, error, "unknown search strategy %s", &strat[begin]);
+            strategy[i++] = res;
+            end += 1;
+            begin = end;
+        } while ('\0' != last && i < MAX_STRATEGIES);
+        if (Strat_ENDFS == strategy[i-1]) {
+            if (MAX_STRATEGIES == i)
+                Fatal (1, error, "Open-ended recursion in ENDFS repair strategies.");
+            Warning (info, "Choosing default NNDFS repair procedure for ENDFS.");
+            strategy[i-1] = Strat_NNDFS;
+        }
         res = linear_search (lb_methods, arg_lb);
         if (res < 0)
             Fatal (1, error, "unknown load balance method %s", arg_lb);
@@ -262,8 +278,6 @@ static struct poptOption options[] = {
      "size of the state store (log2(size))", NULL},
     {"strategy", 0, POPT_ARG_STRING | POPT_ARGFLAG_SHOW_DEFAULT,
      &arg_strategy, 0, "select the search strategy", "<bfs|dfs|ndfs|nndfs|mcndfs|endfs>"},
-     {"rec", 0, POPT_ARG_STRING | POPT_ARGFLAG_SHOW_DEFAULT,
-      &arg_strat_rec, 0, "select the search strategy", "<ndfs|nndfs|mcndfs|endfs>"},
     {"lb", 0, POPT_ARG_STRING | POPT_ARGFLAG_SHOW_DEFAULT,
      &arg_lb, 0, "select the load balancing method", "<srp|static|combined|none>"},
     {"perm", 'p', POPT_ARG_STRING | POPT_ARGFLAG_SHOW_DEFAULT,
@@ -350,7 +364,6 @@ static inline int
 n_color_eq (const ndfs_color_t a, const ndfs_color_t b)
 { return a.n == b.n; };
 
-
 /* Global state colors are encoded in the state database as independent bits.
  * All threads are sensitive too them.
  *
@@ -413,14 +426,16 @@ typedef struct counter_s {
     size_t              level_max;      // counter: (BFS) level / (DFS) max level
     size_t              load_max;       // max stack/queue load
     size_t              level_cur;      // counter: current (DFS) level
-    stats_t            *stats;          // running state storage statistics
     size_t              threshold;      // report threshold
     size_t              waits;          // number of waits for WIP
     size_t              bogus_red;      // number of bogus red colorings
     size_t              rec;            // recursive ndfss
 } counter_t;
 
-typedef struct thread_ctx_s {
+typedef struct thread_ctx_s wctx_t;
+
+struct thread_ctx_s {
+    strategy_t          strategy;
     pthread_t           me;             // currently executing thread
     size_t              id;             // thread id (0..NUM_THREADS)
     stream_t            out;            // raw file output stream
@@ -439,11 +454,11 @@ typedef struct thread_ctx_s {
     ref_t               seed;           // current NDFS seed
     permute_t          *permute;        // transition permutor
     bitvector_t         all_red;        // all_red gaiser/Schwoon
-    void               *ndfs_rec;       // ctx for Evangelista's ndfs_p
+    wctx_t             *rec_ctx;       // ctx for Evangelista's ndfs_p
     int                 rec_bits;       // bit depth of recursive ndfs
     ref_t               work;           // ENDFS work for loadbalancer
     int                 done;           // ENDFS done for loadbalancer
-} wctx_t;
+};
 
 /* predecessor --(transition_info)--> successor */
 typedef int         (*find_or_put_f)(state_info_t *successor,
@@ -483,7 +498,7 @@ static pthread_attr_t  *attr = NULL;
 static wctx_t     **contexts;
 static zobrist_t    zobrist = NULL;
 
-void
+static void
 add_results (counter_t *res, counter_t *cnt)
 {
     res->runtime += cnt->runtime;
@@ -496,8 +511,21 @@ add_results (counter_t *res, counter_t *cnt)
     res->waits += cnt->waits;
     res->rec += cnt->rec;
     res->bogus_red += cnt->bogus_red;
-    if (NULL != res->stats && NULL != cnt->stats)
-        add_stats (res->stats, cnt->stats);
+}
+
+static void
+ctx_add_counters (wctx_t *ctx, counter_t **cnt, counter_t **red)
+{
+    if (NULL == cnt[0]) {
+        cnt[0] = &ctx->counters;
+        red[0] = &ctx->red;
+    } else {
+        add_results(cnt[0], &ctx->counters);
+        add_results(red[0], &ctx->red);
+    }
+    if (NULL != ctx->rec_ctx) {
+        ctx_add_counters (ctx->rec_ctx, cnt+1, red+1);
+    }
 }
 
 static inline void
@@ -565,54 +593,66 @@ get_model (int first)
  */
 static const size_t MAX_STACK = 100000000;
 
+static int num_global_bits (strategy_t s) {
+   return  (Strat_ENDFS & s     ? 3 :
+           (Strat_MCNDFS & s    ? 1 : 0));
+}
+
 wctx_t *
-wctx_create (size_t id, int strategy, int bit_depth)
+wctx_create (size_t id, int depth, wctx_t *shared)
 {
     assert (NULL == 0);
     wctx_t             *ctx = RTalignZero (CACHE_LINE_SIZE, sizeof (wctx_t));
     ctx->id = id;
+    ctx->strategy = strategy[depth];
     ctx->model = NULL;
     state_info_create_empty (&ctx->state);
     ctx->store = RTalignZero (CACHE_LINE_SIZE, SLOT_SIZE * N * 2);
     ctx->store2 = RTalignZero (CACHE_LINE_SIZE, SLOT_SIZE * N * 2);
     ctx->stack = dfs_stack_create (state_info_int_size());
     ctx->out_stack = ctx->in_stack = ctx->stack;
-    if (strategy & (Strat_BFS | Strat_ENDFS))
+    if (strategy[depth] & (Strat_BFS | Strat_ENDFS))
         ctx->in_stack = dfs_stack_create (state_info_int_size());
     //allocate two bits for NDFS colorings
-    if (strategy & Strat_LTL) {
-        bitvector_create_large (&ctx->color_map, 2UL<<dbs_size);
+    if (strategy[depth] & Strat_LTL) {
+        size_t local_bits = 2;
+        bitvector_create_large (&ctx->color_map, local_bits<<dbs_size);
         bitvector_clear (&ctx->color_map);
-        bitvector_create_large (&ctx->all_red, MAX_STACK);
-    } else if (UseGreyBox == call_mode && Strat_DFS == strategy)
+        if ((Strat_NNDFS | Strat_MCNDFS) & strategy[depth]) {
+            bitvector_create_large (&ctx->all_red, MAX_STACK);
+        }
+    } else if (UseGreyBox == call_mode && Strat_DFS == strategy[depth]) {
         ctx->group_stack = isba_create (1);
+    }
     ctx->counters.threshold = ctx->red.threshold = threshold;
     ctx->permute = permute_create (permutation, NULL, W, K, id);
-    ctx->rec_bits = bit_depth;
-    ctx->ndfs_rec = NULL;
-    if (strategy == Strat_ENDFS)
-        ctx->ndfs_rec = wctx_create (id, strat_rec, ctx->rec_bits + 3); //ENDFS uses three bits!
+    ctx->rec_bits = (depth ? shared->rec_bits + num_global_bits(strategy[depth-1]) : 0) ;
+    ctx->rec_ctx = NULL;
+    if (Strat_None != strategy[depth+1])
+        ctx->rec_ctx = wctx_create (id, depth+1, ctx);
     return ctx;
 }
 
 void
-wctx_free (wctx_t *ctx, int strategy)
+wctx_free (wctx_t *ctx, int depth)
 {
     RTfree (ctx->store);
     RTfree (ctx->store2);
     dfs_stack_destroy (ctx->out_stack);
-    if (strategy & Strat_LTL) {
+    if (strategy[depth] & Strat_LTL) {  
         bitvector_free (&ctx->color_map);
-        bitvector_free (&ctx->all_red);
+        if ((Strat_NNDFS | Strat_MCNDFS) & strategy[depth]) {
+            bitvector_free (&ctx->all_red);
+        }
     }
     if (NULL != ctx->group_stack)
         isba_destroy (ctx->group_stack);
-    if (strategy == Strat_BFS)
+    if (strategy[depth] == Strat_BFS)
         dfs_stack_destroy (ctx->in_stack);
     if (NULL != ctx->permute)
         permute_free (ctx->permute);
-    if ( NULL != ctx->ndfs_rec )
-        wctx_free (ctx->ndfs_rec, strat_rec);
+    if ( NULL != ctx->rec_ctx )
+        wctx_free (ctx->rec_ctx, depth+1);
     RTfree (ctx);
 }
 
@@ -665,13 +705,13 @@ init_globals (int argc, char *argv[])
                 "Perform a parallel reachability analysis of <model>\n\nOptions");
     model_t             model = get_model (1);
     if (Perm_Unknown == permutation) //default permutation depends on strategy
-        permutation = strategy & Strat_Reach ? Perm_None : Perm_Dynamic;
+        permutation = strategy[0] & Strat_Reach ? Perm_None : Perm_Dynamic;
     if (Perm_None != permutation) {
          if (call_mode == UseGreyBox)
             Fatal (1, error, "Greybox not supported with state permutation.");
         refs = 1; //The permuter works with references only!
     }
-    if (strategy & Strat_LTL) {
+    if (strategy[0] & Strat_LTL) {
         if (call_mode == UseGreyBox)
             Warning(info, "Greybox not supported with strategy NDFS, ignored.");
         lb_method = LB_None;
@@ -700,17 +740,23 @@ init_globals (int argc, char *argv[])
         dbs_size = dbs_size > DB_SIZE_MAX ? DB_SIZE_MAX : dbs_size;
     }
     Warning (info, "Using a %s with 2^%d elements", db_type==UseDBSLL?"hash table":"tree", dbs_size);
-    MAX_SUCC = ( Strat_DFS == strategy ? 1 : INT_MAX );  /* for --grey: */
-    if (trc_output && !(strategy & Strat_LTL))
+    MAX_SUCC = ( Strat_DFS == strategy[0] ? 1 : INT_MAX );  /* for --grey: */
+    if (trc_output && !(strategy[0] & Strat_LTL))
         parent_ref = RTmalloc (sizeof(ref_t[1L<<dbs_size]));
 
     int                 log2W = 0;
     while ((1L << ++log2W) < (int)W+1)  {}
     count_bits = log2W; // log2( wip (numworkers) + 1 (zero) )
     count_mask = (1<<count_bits) - 1;
-    global_bits = Strat_MCNDFS & strategy ? count_bits+1 : 
-                  (Strat_ENDFS & strategy ? count_bits+4 : 0);
-    Warning (info, "Global bits: %d", global_bits);
+    int i = 0;
+    while (Strat_None != strategy[i] && i < MAX_STRATEGIES)
+        global_bits += num_global_bits(strategy[i++]);
+    global_bits += (Strat_MCNDFS == strategy[i-1] ? count_bits : 0);
+    i = 0;
+    while (Strat_None != strategy[i] && i < MAX_STRATEGIES)
+        local_bits += (Strat_LTL & strategy[i++] ? 2 : 0);
+    Warning (info, "Global bits: %d, count bits: %d, local bits: %d.",
+             global_bits-count_bits, count_bits, local_bits);
     switch (db_type) {
     case UseDBSLL:
         if (ZOBRIST) {
@@ -745,14 +791,14 @@ init_globals (int argc, char *argv[])
     }
     contexts = RTmalloc (sizeof (wctx_t *[W]));
     for (size_t i = 0; i < W; i++)
-        contexts[i] = wctx_create (i, strategy, 0);
+        contexts[i] = wctx_create (i, 0, NULL);
     contexts[0]->model = model;
 
     state_data = RTmalloc (SLOT_SIZE * N);
     GBgetInitialState (model, state_data);
 
     /* Load balancer assigned last, see exit_ltsmin */
-    switch (strategy) {
+    switch (strategy[0]) {
     case Strat_ENDFS:
         lb = lb_create_max (W, (algo_f)endfs_blue, NULL,G, lb_method, H); break;
     case Strat_MCNDFS:
@@ -787,7 +833,7 @@ deinit_globals ()
     RTfree (state_data);
     lb_destroy (lb);
     for (size_t i = 0; i < W; i++)
-        wctx_free (contexts[i], strategy);
+        wctx_free (contexts[i], 0);
     RTfree (contexts);
 }
 
@@ -805,7 +851,7 @@ maybe_report (counter_t *cnt, char *msg, size_t *threshold)
         return;
     if (!cas (threshold, *threshold, *threshold << 1))
         return;
-    if (W == 1 || strategy & Strat_LTL)
+    if (W == 1 || strategy[0] & Strat_LTL)
         print_state_space_total (msg, cnt);
     else
         Warning (info, "%s%zu levels ~%zu states ~%zu transitions", msg,
@@ -818,64 +864,57 @@ ndfs_maybe_report (char *prefix, counter_t *cnt)
     maybe_report (cnt, prefix, &cnt->threshold);
 }
 
-void
-print_statistics (counter_t *reach, counter_t *red,
-                  counter_t *rreach, counter_t *rred, mytimer_t timer, int stop)
+static void
+print_totals (counter_t **ar_reach, counter_t **ar_red, int d, size_t db_elts)
 {
+    counter_t          *reach = ar_reach[0];
+    counter_t          *red = ar_red[0];
+    reach->explored /= W;
+    reach->trans /= W;
+    red->trans /= W;
+    if ( 0 == (Strat_LTLG & strategy[d]) ) {
+        red->visited /= W;
+        red->explored /= W;
+    }
+    Warning (info, "%s_%d (%s/%s) stats:", key_search(strategies, strategy[d]), d+1,
+             key_search(permutations, permutation), key_search(permutations, permutation_red));
+    Warning (info, "blue states: %zu (%.2f%%), transitions: %zu (per worker)",
+             reach->explored, ((double)reach->explored/db_elts)*100, reach->trans);
+    Warning (info, "red states: %zu (%.2f%%), bogus: %zu  (%.2f%%), transitions: %zu, waits: %zu",
+             red->explored, ((double)red->explored/db_elts)*100, red->bogus_red,
+             ((double)red->bogus_red/db_elts), red->trans, red->waits);
+    if  ( all_red && strategy[d] & (Strat_MCNDFS | Strat_NNDFS) )
+        Warning (info, "all-red states: %zu (%.2f%%), bogus %zu (%.2f%%)",
+             reach->allred, ((double)reach->allred/db_elts)*100,
+             red->allred, ((double)red->allred/db_elts)*100);
+    if (NULL != ar_reach[1]) {
+        print_totals (ar_reach + 1, ar_red + 1, d+1, db_elts);
+    }
+}
+
+static void
+print_statistics (counter_t **ar_reach, counter_t **ar_red, mytimer_t timer,
+                  stats_t *stats)
+{
+    counter_t          *reach = ar_reach[0];
+    counter_t          *red = ar_red[0];
     char               *name;
     double              mem1, mem2, mem3=0, mem4, compr, ratio;
     float               tot = SCCrealTime (timer);
-    size_t              db_elts = reach->stats->elts;
-    size_t              db_nodes = reach->stats->nodes;
+    size_t              db_elts = stats->elts;
+    size_t              db_nodes = stats->nodes;
     db_nodes = db_nodes == 0 ? db_elts : db_nodes;
     size_t              el_size = db_type == UseTreeDBSLL ? 3 : N;
     size_t              s = state_info_size();
     mem1 = ((double)(s * (reach->load_max+red->load_max))) / (1 << 20);
 
-    if (Strat_LTL & strategy) {
-        reach->explored /= W;
-        reach->trans /= W;
-        red->trans /= W;
-        if ( 0 == (Strat_LTLG & strategy) ) {
-            red->visited /= W;
-            red->explored /= W;
-        }
-        if (stop)
-            SCCreportTimer (timer, "Total exploration time");
-        mem3 = ((double)(((2UL<<dbs_size))/8*W)) / (1UL<<20);
-
+    if (Strat_LTL & strategy[0]) {
+        SCCreportTimer (timer, "Total exploration time");
         Warning (info, "");
-        Warning (info, "%s(%s/%s) stats:", key_search(strategies, strategy),
-                 key_search(permutations, permutation), key_search(permutations, permutation_red));
         Warning (info, "State space has %zu states, %zu are accepting", db_elts,
                  red->visited);
-        Warning (info, "blue states: %zu (%.2f%%), transitions: %zu (per worker)",
-                 reach->explored, ((double)reach->explored/db_elts)*100, reach->trans);
-        Warning (info, "red states: %zu (%.2f%%), bogus: %zu  (%.2f%%), transitions: %zu, waits: %zu",
-                 red->explored, ((double)red->explored/db_elts)*100, red->bogus_red,
-                 ((double)red->bogus_red/db_elts), red->trans, red->waits);
-        if (strategy == Strat_MCNDFS)
-            Warning (info, "all-red states: %zu (%.2f%%), bogus %zu (%.2f%%)",
-                 reach->allred, ((double)reach->allred/db_elts)*100,
-                 red->allred, ((double)red->allred/db_elts)*100);
-        if (strategy == Strat_ENDFS) {
-            rreach->explored /= W;
-            rreach->trans /= W;
-            rred->trans /= W;
-            if ( 0 == (Strat_LTLG & strat_rec) ) {
-                rred->visited /= W;
-                rred->explored /= W;
-            }
-            Warning (info, "rec_blue states: %zu (%.2f%%), transitions: %zu (per worker)",
-                     rreach->explored, ((double)rreach->explored/db_elts)*100, rreach->trans);
-            Warning (info, "rec_red states: %zu (%.2f%%), bogus: %zu  (%.2f%%), transitions: %zu, waits: %zu",
-                     rred->explored, ((double)rred->explored/db_elts)*100, rred->bogus_red,
-                     ((double)rred->bogus_red/db_elts), rred->trans, rred->waits);
-            if (strat_rec == Strat_MCNDFS)
-                Warning (info, "rec_all-red states: %zu (%.2f%%), bogus %zu (%.2f%%)",
-                     rreach->allred, ((double)rreach->allred/db_elts)*100,
-                     rred->allred, ((double)rred->allred/db_elts)*100);
-        }
+        print_totals (ar_reach, ar_red, 0, db_elts);
+        mem3 = ((double)(((((size_t)local_bits)<<dbs_size))/8*W)) / (1UL<<20);
         Warning (info, "");
         Warning (info, "Total memory used for local state coloring: %.1fMB", mem3);
     } else {
@@ -890,10 +929,10 @@ print_statistics (counter_t *reach, counter_t *red,
             Warning (info, "mean standard work distribution: %.1f%% (states) %.1f%% (transitions)",
                      100*(sqrt(((double)state_dev / W)) / (double)(reach->explored/(W)) ),
                      100*(sqrt(((double)trans_dev / W))) / (double)(reach->trans/(W)) );
-        Warning (info, "")
+        Warning (info, "");
         print_state_space_total ("State space has ", reach);
         SCCreportTimer (timer, "Total exploration time");
-        Warning(info, "")
+        Warning(info, "");
     }
 
     Warning (info, "Queue width: %zuB, total height: %zu, memory: %.2fMB",
@@ -913,8 +952,8 @@ print_statistics (counter_t *reach, counter_t *red,
                  "rehashes:{{{%zu}}}, memq:{{{%.0f}}}, tt:{{{%.2f}}}, "
                  "explored:{{{%zu}}}, memdb:{{{%.0f}}}, waits:{{{%zu}}}, rec:{{{%zu}}}",
                  reach->runtime, db_elts, db_nodes, reach->trans,
-                 reach->stats->misses, reach->stats->tests,
-                 reach->stats->rehashes, mem1, tot, reach->explored, mem2,
+                 stats->misses, stats->tests,
+                 stats->rehashes, mem1, tot, reach->explored, mem2,
                  red->waits, reach->rec);
     }
 }
@@ -924,10 +963,10 @@ print_thread_statistics (wctx_t *ctx)
 {
     char                name[128];
     char               *format = "[%zu%s] saw in %.3f sec ";
-    if (Strat_Reach & strategy) {
+    if (Strat_Reach & strategy[0]) {
         snprintf (name, sizeof name, format, ctx->id, "", ctx->counters.runtime);
         print_state_space_total (name, &ctx->counters);
-    } else if (Strat_LTL & strategy) {
+    } else if (Strat_LTL & strategy[0]) {
         snprintf (name, sizeof name, format, ctx->id, " B", ctx->counters.runtime);
         print_state_space_total (name, &ctx->counters);
         snprintf (name, sizeof name, format, ctx->id, " R", ctx->counters.runtime);
@@ -992,7 +1031,7 @@ dyn_cmp (const void *a, const void *b, void *arg)
     const permute_todo_t     *A = &perm->todos[*((int*)a)];
     const permute_todo_t     *B = &perm->todos[*((int*)b)];
   
-    if (!(Strat_LTL & strategy) || A->seen != B->seen) {
+    if (!(Strat_LTL & strategy[0]) || A->seen != B->seen) {
         return B->seen - A->seen;
     } else {
         int Awhite = nn_color_eq(nn_get_color(&ctx->color_map, A->si.ref), NNWHITE);
@@ -1478,7 +1517,7 @@ nndfs_red_handle (void *arg, state_info_t *successor, transition_info_t *ti,
     if ( nn_color_eq(color, NNCYAN) ) {
         /* Found cycle back to the stack */
         ndfs_report_cycle(ctx, successor);
-    } else if ( nn_color_eq(color, NNBLUE) && (strategy != Strat_MCNDFS ||
+    } else if ( nn_color_eq(color, NNBLUE) && (ctx->strategy != Strat_MCNDFS ||
             !global_has_color(ctx->state.ref, GRED, ctx->rec_bits)) ) {
         raw_data_t stack_loc = dfs_stack_push (ctx->stack, NULL);
         state_info_serialize (successor, stack_loc);
@@ -1498,8 +1537,8 @@ nndfs_blue_handle (void *arg, state_info_t *successor, transition_info_t *ti,
              GBbuchiIsAccepting(ctx->model, get(dbs, successor->ref, ctx->store2))) ) {
         /* Found cycle in blue search */
         ndfs_report_cycle(ctx, successor);
-    } else if ((strategy == Strat_MCNDFS && !global_has_color(ctx->state.ref, GRED, ctx->rec_bits)) ||
-               (strategy != Strat_MCNDFS && !nn_color_eq(color, NNPINK))) {
+    } else if ((ctx->strategy == Strat_MCNDFS && !global_has_color(ctx->state.ref, GRED, ctx->rec_bits)) ||
+               (ctx->strategy != Strat_MCNDFS && !nn_color_eq(color, NNPINK))) {
         raw_data_t stack_loc = dfs_stack_push (ctx->stack, NULL);
         state_info_serialize (successor, stack_loc);
         ctx->load++;
@@ -1806,6 +1845,50 @@ endfs_red (wctx_t *ctx, ref_t seed)
     }
 }
 
+inline void
+rec_ndfs_call (wctx_t *ctx, ref_t state)
+{
+    dfs_stack_push (ctx->rec_ctx->stack, (int*)&state);
+    ctx->rec_ctx->load++;
+    ctx->counters.rec++;
+    switch (ctx->rec_ctx->strategy) {
+    case Strat_ENDFS:
+       endfs_blue (ctx->rec_ctx, 0); break;
+    case Strat_MCNDFS:
+       mcndfs_blue (ctx->rec_ctx, 0); break;
+    case Strat_NNDFS:
+       nndfs_blue (ctx->rec_ctx, 0); break;
+    case Strat_NDFS:
+       ndfs_blue (ctx->rec_ctx, 0); break;
+    default:
+       Fatal (1, error, "Invalid recursive strategy.");
+    }
+}
+
+static void
+endfs_lb (wctx_t *ctx)
+{
+    atomic32_write(&ctx->done, 1);
+    size_t workers[W];
+    int idle_count = W-1;
+    for (size_t i = 0; i<((size_t)W); i++)
+        workers[i] = (i==ctx->id ? 0 : 1);
+    while (0 != idle_count)
+    for (size_t i=0; i<W; i++) {
+        if (0==workers[i])
+            continue;
+        if (1 == atomic32_read(&(contexts[i]->done))) {
+            workers[i] = 0;
+            idle_count--;
+            continue;
+        }
+        ref_t work = atomic_read (&contexts[i]->work);
+        if (SIZE_MAX == work)
+            continue;
+        rec_ndfs_call (ctx, work);
+    }
+}
+
 /* ENDFS dfs_blue */
 void
 endfs_blue (wctx_t *ctx, size_t work)
@@ -1852,51 +1935,16 @@ endfs_blue (wctx_t *ctx, size_t work)
                     ctx->red.explored++;
                     ctx->red.visited++;
                 }
-                if ( global_has_color(seed, GDANGEROUS, ctx->rec_bits) ) {
-                    dfs_stack_push (((wctx_t*)ctx->ndfs_rec)->stack, (int*)&seed);
-                    ((wctx_t*)ctx->ndfs_rec)->load++;
-                    ctx->counters.rec++;
-                    switch (strat_rec) {
-                    case Strat_ENDFS:
-                        endfs_blue (ctx->ndfs_rec, 0); break;
-                    case Strat_MCNDFS:
-                        mcndfs_blue (ctx->ndfs_rec, 0); break;
-                    case Strat_NNDFS:
-                        nndfs_blue (ctx->ndfs_rec, 0); break;
-                    case Strat_NDFS:
-                        ndfs_blue (ctx->ndfs_rec, 0); break;
-                    default:
-                        Fatal (1, error, "Invalid recursive strategy.");
-                    }
-                }
+                if ( global_has_color(seed, GDANGEROUS, ctx->rec_bits) )
+                    rec_ndfs_call (ctx, seed);
                 ctx->work = SIZE_MAX;
             }
             dfs_stack_pop (ctx->stack);
             ctx->load -= 1;
         }
     }
-    if (strat_rec != Strat_MCNDFS)
-        return;
-    atomic32_write(&ctx->done, 1);
-    size_t workers[W];
-    int idle_count = W-1;
-    for (size_t i = 0; i<((size_t)W); i++)
-        workers[i] = (i==ctx->id ? 0 : 1);
-    while (0 != idle_count)
-    for (size_t i=0; i<W; i++) {
-        if (0==workers[i])
-            continue;
-        if (1 == atomic32_read(&(contexts[i]->done))) {
-            workers[i] = 0;
-            idle_count--;
-            continue;
-        }
-        ref_t work = atomic_ptr_read (&(contexts[i]->work));
-        if (SIZE_MAX == work)
-            continue;
-        dfs_stack_push (((wctx_t*)ctx->ndfs_rec)->stack, (int*)&work);
-        mcndfs_blue (ctx->ndfs_rec, 0);
-    }
+    if ( ctx == contexts[ctx->id] && Strat_LTLG & ctx->rec_ctx->strategy )
+        endfs_lb (ctx);
     (void) work;
 }
 
@@ -2072,10 +2120,21 @@ split_dfs (void *arg_src, void *arg_tgt, size_t handoff)
     return handoff;
 }
 
+void
+wctx_init (wctx_t *ctx)
+{
+    permute_set_model (ctx->permute, ctx->model);
+    if (ctx->rec_ctx) {
+        ctx->rec_ctx->model = ctx->model;
+        wctx_init (ctx->rec_ctx);
+    }
+}
+
 /* explore is started for each thread (worker) */
 static void *
 explore (void *args)
 {
+    assert (GRED.g == 0);
     wctx_t             *ctx = (wctx_t *) args;
     mytimer_t           timer = SCCcreateTimer ();
     char                lbl[20];
@@ -2084,15 +2143,10 @@ explore (void *args)
 
     if (NULL == ctx->model)
         ctx->model = get_model (0);
-    permute_set_model (ctx->permute, ctx->model);
-    if (strategy == Strat_ENDFS) {
-        ((wctx_t*)ctx->ndfs_rec)->model = ctx->model;
-        permute_set_model (((wctx_t*)ctx->ndfs_rec)->permute, ctx->model);
-    }
-
+    wctx_init (ctx);
     transition_info_t   ti = GB_NO_TRANSITION;
     state_info_initialize (&initial_state, state_data, &ti, &ctx->state, ctx);
-    if ( Strat_LTL & strategy )
+    if ( Strat_LTL & strategy[0] )
         ndfs_handle_blue (ctx, &initial_state, &ti, 0);
     else if (0 == ctx->id)
         reach_handle (ctx, &initial_state, &ti, 0);
@@ -2116,35 +2170,29 @@ main (int argc, char *argv[])
 
     /* Start workers */
     mytimer_t           timer = SCCcreateTimer ();
+    stats_t             stats;
+    memset (&stats, 0 , sizeof(stats_t));
     SCCstartTimer (timer);
     for (size_t i = 0; i < W; i++)
         pthread_create (&contexts[i]->me, attr, explore, contexts[i]);
-    for (size_t i = 0; i < W; i++)
-        pthread_join (contexts[i]->me, (void **)&contexts[i]->counters.stats);
+    for (size_t i = 0; i < W; i++) {
+        stats_t            *stats_i;
+        pthread_join (contexts[i]->me, (void **)&stats_i);
+        add_stats (&stats, stats_i);
+    }
     SCCstopTimer (timer);
 
     /* Gather results */
-    counter_t          *reach = RTmallocZero (sizeof(counter_t));
-    counter_t          *red = RTmallocZero (sizeof(counter_t));
-    counter_t          *rreach = RTmallocZero (sizeof(counter_t));
-    counter_t          *rred = RTmallocZero (sizeof(counter_t));
-    reach->stats = RTmallocZero (sizeof(stats_t));
+    counter_t         **reach = RTmallocZero (sizeof(counter_t[(1<<MAX_STRATEGIES) - 1]));
+    counter_t         **red = RTmallocZero (sizeof(counter_t[(1<<MAX_STRATEGIES) - 1]));
     for (size_t i = 0; i < W; i++) {
         wctx_t             *ctx = contexts[i];
-        add_results (reach, &ctx->counters);
-        add_results (red, &ctx->red);
-        if (strategy == Strat_ENDFS) {
-            rreach->stats = reach->stats;
-            rred->stats = red->stats;
-            add_results (rreach, &((wctx_t*)ctx->ndfs_rec)->counters);
-            add_results (rred, &((wctx_t*)ctx->ndfs_rec)->red);
-        }
+        ctx_add_counters (ctx, reach, red);
         print_thread_statistics (ctx);
-        RTfree (ctx->counters.stats);
     }
     if (RTverbosity >= 1)
-        print_statistics (reach, red, rreach, rred, timer, 1);
-    SCCdeleteTimer (timer); RTfree (reach->stats); RTfree (reach); RTfree (red);
+        print_statistics (reach, red, timer, &stats);
+    SCCdeleteTimer (timer); RTfree (reach); RTfree (red);
     deinit_globals ();
     exit (EXIT_SUCCESS);
 }
