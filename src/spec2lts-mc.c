@@ -172,7 +172,6 @@ static si_map_entry strategies[] = {
     {"ndfs",    Strat_NDFS},
     {"nndfs",   Strat_NNDFS},
     {"mcndfs",  Strat_MCNDFS},
-    {"mcnndfs", Strat_MCNDFS},
     {"endfs",   Strat_ENDFS},
     {NULL, 0}
 };
@@ -219,8 +218,7 @@ state_db_popt (poptContext con, enum poptCallbackReason reason,
             Fatal (1, error, "unknown vector storage mode type %s", state_repr);
         db_type = res;
         int i = 0, begin = 0, end = 0;
-        char strat[1024];
-        memcpy (strat, arg_strategy, 1024);
+        char *strat = strdup (arg_strategy);
         char last;
         do {
             if (i > 0 && Strat_ENDFS != strategy[i-1])
@@ -235,11 +233,12 @@ state_db_popt (poptContext con, enum poptCallbackReason reason,
             end += 1;
             begin = end;
         } while ('\0' != last && i < MAX_STRATEGIES);
+        free (strat);
         if (Strat_ENDFS == strategy[i-1]) {
             if (MAX_STRATEGIES == i)
                 Fatal (1, error, "Open-ended recursion in ENDFS repair strategies.");
-            Warning (info, "Choosing default NNDFS repair procedure for ENDFS.");
-            strategy[i-1] = Strat_NNDFS;
+            Warning (info, "Defaulting to NNDFS as ENDFS repair procedure.");
+            strategy[i] = Strat_NNDFS;
         }
         res = linear_search (lb_methods, arg_lb);
         if (res < 0)
@@ -277,14 +276,14 @@ static struct poptOption options[] = {
     {"size", 's', POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &dbs_size, 0,
      "size of the state store (log2(size))", NULL},
     {"strategy", 0, POPT_ARG_STRING | POPT_ARGFLAG_SHOW_DEFAULT,
-     &arg_strategy, 0, "select the search strategy", "<bfs|dfs|ndfs|nndfs|mcndfs|endfs>"},
+     &arg_strategy, 0, "select the search strategy", "<bfs|dfs|ndfs|nndfs|mcndfs|endfs|endfs,mcndfs|endfs,endfs,nndfs>"},
     {"lb", 0, POPT_ARG_STRING | POPT_ARGFLAG_SHOW_DEFAULT,
      &arg_lb, 0, "select the load balancing method", "<srp|static|combined|none>"},
     {"perm", 'p', POPT_ARG_STRING | POPT_ARGFLAG_SHOW_DEFAULT,
      &arg_perm, 0, "select the transition permutation method",
-     "<dynamic,sort,sr,shift|shiftall|otf|none>"},
+     "<dynamic|random|rr|sort|sr|shift|shiftall|otf|none>"},
     {"no-red-perm", 0, POPT_ARG_VAL, &no_red_perm, 1, "turn off transition permutation for the red search", NULL},
-    {"nar", 1, POPT_ARG_VAL, &all_red, 0, "turn off red coloring in the blue search (NNDFS/MCNNDFS)", NULL},
+    {"nar", 1, POPT_ARG_VAL, &all_red, 0, "turn off red coloring in the blue search (NNDFS/MCNDFS)", NULL},
     {"gran", 'g', POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &G,
      0, "subproblem granularity ( T( work(P,g) )=min( T(P), g ) )", NULL},
     {"handoff", 'h', POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &H,
@@ -742,7 +741,7 @@ init_globals (int argc, char *argv[])
     Warning (info, "Using a %s with 2^%d elements", db_type==UseDBSLL?"hash table":"tree", dbs_size);
     MAX_SUCC = ( Strat_DFS == strategy[0] ? 1 : INT_MAX );  /* for --grey: */
     if (trc_output && !(strategy[0] & Strat_LTL))
-        parent_ref = RTmalloc (sizeof(ref_t[1L<<dbs_size]));
+        parent_ref = RTmalloc (sizeof(ref_t[1UL<<dbs_size]));
 
     int                 log2W = 0;
     while ((1L << ++log2W) < (int)W+1)  {}
@@ -1001,6 +1000,8 @@ sort_cmp (const void *a, const void *b, void *arg)
     return A->si.ref - B->si.ref + perm->shiftorder;
 }
 
+static const int            RR_ARRAY_SIZE = 16;
+
 static int
 rr_cmp (const void *a, const void *b, void *arg)
 {
@@ -1008,8 +1009,8 @@ rr_cmp (const void *a, const void *b, void *arg)
     int                *rand = *perm->rand;
     ref_t               A = perm->todos[*((int*)a)].si.ref;
     ref_t               B = perm->todos[*((int*)b)].si.ref;
-    return ((((1<<dbs_size)-1)&rand[A & ((1<<16)-1)])^A) -
-           ((((1<<dbs_size)-1)&rand[B & ((1<<16)-1)])^B);
+    return ((((1UL<<dbs_size)-1)&rand[A & ((1<<RR_ARRAY_SIZE)-1)])^A) -
+           ((((1UL<<dbs_size)-1)&rand[B & ((1<<RR_ARRAY_SIZE)-1)])^B);
 }
 
 static int
@@ -1078,7 +1079,7 @@ permute_create (permutation_perm_t permutation, model_t model,
     perm->todos = RTalign (CACHE_LINE_SIZE, sizeof(permute_todo_t[trans+TODO_MAX]));
     perm->tosort = RTalign (CACHE_LINE_SIZE, sizeof(int[trans+TODO_MAX]));
     perm->shift = ((double)trans)/workers;
-    perm->shiftorder = (1L<<dbs_size) / workers * worker_index;
+    perm->shiftorder = (1UL<<dbs_size) / workers * worker_index;
     perm->start_group = perm->shift * worker_index;
     perm->trans = trans;
     perm->model = model;
@@ -1094,9 +1095,9 @@ permute_create (permutation_perm_t permutation, model_t model,
     }
     if (Perm_RR == perm->permutation) {
         perm->rand = RTalignZero (CACHE_LINE_SIZE, sizeof(int*));
-        perm->rand[0] = RTalign (CACHE_LINE_SIZE, sizeof(int[1<<16]));
+        perm->rand[0] = RTalign (CACHE_LINE_SIZE, sizeof(int[1<<RR_ARRAY_SIZE]));
         srandom (time(NULL) + 9876432*worker_index);
-        for (int i =0; i<1<<16; i++)
+        for (int i =0; i < (1<<RR_ARRAY_SIZE); i++)
             perm->rand[0][i] = random();
     }
     if (Perm_SR == perm->permutation || Perm_Dynamic == perm->permutation) {
@@ -1845,7 +1846,7 @@ endfs_red (wctx_t *ctx, ref_t seed)
     }
 }
 
-inline void
+static inline void
 rec_ndfs_call (wctx_t *ctx, ref_t state)
 {
     dfs_stack_push (ctx->rec_ctx->stack, (int*)&state);

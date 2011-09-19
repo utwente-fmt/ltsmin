@@ -3,9 +3,9 @@
         (default: NUMBER=NUM_CORES). Maximum is 64.
 
 
-*--strategy*='TYPE[,TYPE]*'::
+*--strategy*='TYPE'::
         Select an exploration strategy. Two kinds of algorithms
-        are avaliable: LTL model checking and reachability.
+        are available: LTL model checking and reachability.
         The multi-core LTL algorithms (Nested DFS) are implemented
         in a swarmed fashion, however with a shared state storage.
         On top of that, MCNDFS and ENDFS offer work sharing between threads
@@ -15,7 +15,7 @@
         i.e., DiVinE property models are supported, or by the LTL
         layer (see --ltl).
         Note finally that strict reachability exploration orders
-        are not guaranteed by the multicore version.
+        are not guaranteed by the multi-core version.
         'TYPE' can be one of the following options:
 
 bfs;;
@@ -45,11 +45,12 @@ endfs;;
   been adapted with the cyan color encoding and early cycle detection, as
   described in "Variations on Multi-Core Nested Depth-First Search"
   (Laarman, van de Pol).
-  Note that ENDFS requires a repair procedure, which has to be chosen by
-  providing a list of strategies, for example: "endfs,nndfs" yields the
-  default algorithm as described in the Variations paper, and "endfs,mcndfs",
-  yields the NMC-NDFS algortithm (with load balancing).
-  Finally, we allow multiple levels of ENDFS to be combined: "endfs,endfs,nndfs". 
+  Note that ENDFS requires a repair procedure, NNDFS is chosen by default.
+  Alternatives can be chosen by  providing a list of strategies, for example: 
+  "endfs,mcndfs", yields the NMC-NDFS algorithm as described in the Variations
+  paper (with load balancing).
+  Finally, we also allow multiple levels of ENDFS to be combined:
+  "endfs,endfs,nndfs". 
 
 *--nar*::
         No All Red. Turn off all-red optimization in NNDFS/MCNDFS.
@@ -65,7 +66,7 @@ endfs;;
 dynamic;;
     use "fresh successor heuristics" described in
     "Variations on Multi-Core Nested Depth-First Search" (Laarman, van de Pol).
-    (decent/very good for bug hunting).
+    (decent/very good for bug hunting). Default for LTL.
 
 sort;;
     sort on the unique id of the successor state (decent/good)
@@ -74,7 +75,9 @@ random;;
     use multiple fixed random permutation schemes per worker (decent/good).
 
 rr;;
-	truly randomized 
+	randomized using a full random sort order on the states. This is more random
+	than the previous option, but requires more pre-computation time for the
+	random array (decent/almost perfect).
 
 sr;;
     sort according to one fixed random permutation scheme per worker (decent/decent).
@@ -89,7 +92,7 @@ otf;;
     sort according to a dynamic permutation scheme (slow/perfect).
 
 none;;
-    use the same exploration order for all workers (default for reachability).
+    use the same exploration order for all workers. Default for reachability.
 
 
 *--no-red-perm*::
