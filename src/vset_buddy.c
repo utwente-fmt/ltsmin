@@ -5,6 +5,8 @@
 #include <time.h>
 
 #include <fdd.h>
+#include <assert.h>
+#include <time.h>
 
 #include <runtime.h>
 #include <vdom_object.h>

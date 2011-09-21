@@ -4,7 +4,9 @@
 #include <assert.h>
 #include <pthread.h>
 #include <sys/types.h>
+#ifdef __APPLE__
 #include <sys/sysctl.h>
+#endif
 
 #include <runtime.h>
 #include <tls.h>
