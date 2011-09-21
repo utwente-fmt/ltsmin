@@ -17,7 +17,7 @@ static const uint32_t   EMPTY = 0;
 static uint32_t   WRITE_BIT = 1;
 static uint32_t   WRITE_BIT_R = ~((uint32_t)1);
 static const uint32_t   BITS_PER_INT = sizeof (int) * 8;
-static const size_t     CL_MASK = -(1 << CACHE_LINE);
+static const size_t     CL_MASK = -(1UL << CACHE_LINE);
 
 struct dbs_ll_s {
     size_t              length;
@@ -59,7 +59,7 @@ DBSLLget_sat_bits (const dbs_ll_t dbs, const dbs_ref_t ref)
 int
 DBSLLget_sat_bit (const dbs_ll_t dbs, const dbs_ref_t ref, int index)
 {
-    uint32_t        bit = 1 << index;
+    uint32_t        bit = 1U << index;
     uint32_t        hash_and_sat = atomic32_read (dbs->table+ref);
     uint32_t        val = hash_and_sat & bit;
     return val >> index;
@@ -68,7 +68,7 @@ DBSLLget_sat_bit (const dbs_ll_t dbs, const dbs_ref_t ref, int index)
 int
 DBSLLtry_set_sat_bit (const dbs_ll_t dbs, const dbs_ref_t ref, int index)
 {
-    uint32_t        bit = 1 << index;
+    uint32_t        bit = 1U << index;
     uint32_t        hash_and_sat = atomic32_read (dbs->table+ref);
     uint32_t        val = hash_and_sat & bit;
     if (val)
@@ -200,11 +200,11 @@ DBSLLcreate_sized (int length, int size, hash32_f hash32, int satellite_bits)
     dbs->full = 0;
     assert(satellite_bits < 32);
     dbs->sat_bits = satellite_bits;
-    dbs->sat_mask = (1<<satellite_bits) - 1;
+    dbs->sat_mask = (1UL<<satellite_bits) - 1;
     WRITE_BIT <<= satellite_bits;
     WRITE_BIT_R <<= satellite_bits;
     dbs->bytes = length * sizeof (int);
-    dbs->size = 1 << size;
+    dbs->size = 1UL << size;
     dbs->threshold = dbs->size / 100;
     dbs->mask = dbs->size - 1;
     dbs->table = RTalignZero (CACHE_LINE_SIZE, sizeof (uint32_t[dbs->size]));
