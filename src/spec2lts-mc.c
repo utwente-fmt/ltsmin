@@ -751,21 +751,21 @@ init_globals (int argc, char *argv[])
     int i = 0;
     while (Strat_None != strategy[i] && i < MAX_STRATEGIES)
         global_bits += num_global_bits(strategy[i++]);
-    global_bits += (Strat_MCNDFS == strategy[i-1] ? count_bits : 0);
+    count_bits = (Strat_MCNDFS == strategy[i-1] ? count_bits : 0);
     i = 0;
     while (Strat_None != strategy[i] && i < MAX_STRATEGIES)
         local_bits += (Strat_LTL & strategy[i++] ? 2 : 0);
     Warning (info, "Global bits: %d, count bits: %d, local bits: %d.",
-             global_bits-count_bits, count_bits, local_bits);
+             global_bits, count_bits, local_bits);
     switch (db_type) {
     case UseDBSLL:
         if (ZOBRIST) {
             zobrist = zobrist_create (N, ZOBRIST, m);
             find_or_put = find_or_put_zobrist;
-            dbs = DBSLLcreate_sized (N, dbs_size, (hash32_f)z_rehash, global_bits);
+            dbs = DBSLLcreate_sized (N, dbs_size, (hash32_f)z_rehash, global_bits + count_bits);
         } else {
             find_or_put = find_or_put_dbs;
-            dbs = DBSLLcreate_sized (N, dbs_size, (hash32_f)SuperFastHash, global_bits);
+            dbs = DBSLLcreate_sized (N, dbs_size, (hash32_f)SuperFastHash, global_bits + count_bits);
         }
         statistics = (dbs_stats_f) DBSLLstats;
         get = (dbs_get_f) DBSLLget;
@@ -781,7 +781,7 @@ init_globals (int argc, char *argv[])
         statistics = (dbs_stats_f) TreeDBSLLstats;
         get = (dbs_get_f) TreeDBSLLget;
         find_or_put = find_or_put_tree;
-        dbs = TreeDBSLLcreate_dm (N, dbs_size, m, global_bits);
+        dbs = TreeDBSLLcreate_dm (N, dbs_size, m, global_bits + count_bits);
         get_sat_bit = (dbs_get_sat_f) TreeDBSLLget_sat_bit;
         try_set_sat_bit = (dbs_try_set_sat_f) TreeDBSLLtry_set_sat_bit;
         inc_sat_bits = (dbs_inc_sat_bits_f) TreeDBSLLinc_sat_bits;
