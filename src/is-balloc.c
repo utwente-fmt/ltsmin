@@ -98,7 +98,7 @@ isba_push_int(isb_allocator_t buf, const int *element)
 {
     if (buf->cur_index == BLOCK_ELT_SIZE) {
         if (buf->num_block == buf->max_blocks) {
-            buf->max_blocks += INIT_MAX_BLOCKS; 
+            buf->max_blocks += INIT_MAX_BLOCKS;
             buf->blocks=RTrealloc(buf->blocks, buf->max_blocks);
         }
         add_block(buf);
@@ -138,8 +138,12 @@ isba_to_string(isb_allocator_t buf)
     char* res;
     int ar[1];
     ar[0] = isba_size_int(buf) ? isba_top_int(buf)[0] : -1;
-    asprintf(&res, "LIFOBuffer[%zu | %zu * %zu + %zu | top1(%d)]", buf->el_size,
-             buf->num_block, BLOCK_ELT_SIZE, buf->cur_index, ar[0]);
+    int status = asprintf(&res, "LIFOBuffer[%zu | %zu * %zu + %zu | top1(%d)]",
+                          buf->el_size, buf->num_block, BLOCK_ELT_SIZE,
+                          buf->cur_index, ar[0]);
+    if (status == -1)
+        Fatal(1, error, "Could not allocate string.");
+
     return res;
 }
 
@@ -149,8 +153,8 @@ isba_to_string(isb_allocator_t buf)
 void
 isba_discard_int(isb_allocator_t buf, size_t amount)
 {
-   if (amount > isba_size_int ( buf ) ) 
-       Warning(info, "too highdiscard: %zu > %zu", amount, isba_size_int( buf ) );
+   if (amount > isba_size_int ( buf ) )
+       Warning(info, "too high discard: %zu > %zu", amount, isba_size_int( buf ) );
    if (buf->cur_index < amount) {
         size_t blocks = amount>>BLOCK_ELT_POW;
         if (buf->num_block == 1 || buf->num_block <= blocks)
