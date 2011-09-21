@@ -472,97 +472,142 @@ int set_member_tree(vset_t set,const int* e){
   return set_member_tree_2(set->set,e);
 }
 
+union enum_context {
+    // Used by set_enum and enum_wrap functions:
+    struct {
+        vset_element_cb cb;
+        void *context;
+    } enum_cb;
+    // Used by set_example and enum_first functions:
+    int *enum_elem;
+};
 
+static int
+vset_enum_wrap(ATerm *a, int len, union enum_context *ctx)
+{
+    int vec[len];
 
-static vset_element_cb global_cb;
-static void* global_context;
-static int* global_elem;
+    for(int i = 0; i < len; i++)
+        vec[i] = ATgetInt((ATermInt)a[i]);
 
-
-static int vset_enum_wrap(ATerm *a,int len){
-	int vec[len];
-	for(int i=0;i<len;i++) vec[i]=ATgetInt((ATermInt)a[i]);
-	global_cb(global_context,vec);
-	return 0;
+    ctx->enum_cb.cb(ctx->enum_cb.context, vec);
+    return 0;
 }
 
-static int vset_enum_first(ATerm *a,int len){
-	for(int i=0;i<len;i++) global_elem[i]=ATgetInt((ATermInt)a[i]);
-	return 1;
+static int
+vset_enum_first(ATerm *a, int len, union enum_context *ctx)
+{
+    for(int i = 0; i < len; i++)
+        ctx->enum_elem[i] = ATgetInt((ATermInt)a[i]);
+
+    return 1;
 }
 
-static int set_enum_2(ATerm set,ATerm *a,int len,int (*callback)(ATerm *,int),int ofs){
-	int tmp;
-	while(ATgetAFun(set)==cons){
-		if (ofs<len){
-			a[ofs]=ATgetArgument(set,0);
-			tmp=set_enum_2(ATgetArgument(set,1),a,len,callback,ofs+1);
-			if (tmp) return tmp;
-		}
-		set=ATgetArgument(set,2);
-	}
-	if (ATisEqual(set,atom)) {
-		return callback(a,ofs);
-	}
-	return 0;
+static int
+set_enum_2(ATerm set, ATerm *a, int len,
+               int (*callback)(ATerm*, int, union enum_context*), int ofs,
+               union enum_context *ctx)
+{
+    int tmp;
+    while(ATgetAFun(set) == cons){
+        if (ofs < len) {
+            a[ofs] = ATgetArgument(set, 0);
+            tmp = set_enum_2(ATgetArgument(set, 1), a, len, callback,
+                                 ofs + 1, ctx);
+            if (tmp) return tmp;
+        }
+
+        set = ATgetArgument(set, 2);
+    }
+
+    if (ATisEqual(set, atom)) {
+        return callback(a, ofs, ctx);
+    }
+
+    return 0;
 }
 
-static void set_enum_list(vset_t set,vset_element_cb cb,void* context){
-	int N=set->p_len?set->p_len:set->dom->shared.size;
-	ATerm vec[N];
-	global_cb=cb;
-	global_context=context;
-	set_enum_2(set->set,vec,N,vset_enum_wrap,0);
+static void
+set_enum_list(vset_t set, vset_element_cb cb, void* context)
+{
+    union enum_context ctx = {enum_cb : {cb, context}};
+    int N = set->p_len?set->p_len:set->dom->shared.size;
+    ATerm vec[N];
+
+    set_enum_2(set->set, vec, N, vset_enum_wrap, 0, &ctx);
 }
 
-static void set_example_list(vset_t set,int *e){
-	int N=set->p_len?set->p_len:set->dom->shared.size;
-	ATerm vec[N];
-	global_elem=e;
-	set_enum_2(set->set,vec,N,vset_enum_first,0);
+static void
+set_example_list(vset_t set, int *e)
+{
+    union enum_context ctx = {enum_elem : e};
+    int N = set->p_len?set->p_len:set->dom->shared.size;
+    ATerm vec[N];
+
+    set_enum_2(set->set, vec, N, vset_enum_first, 0, &ctx);
 }
 
-int vset_enum_wrap_tree(int *a,int len){
+static int
+vset_enum_wrap_tree(int *a, int len, union enum_context *ctx)
+{
   (void)len;
-  global_cb(global_context,a);
+
+  ctx->enum_cb.cb(ctx->enum_cb.context, a);
   return 0;
 }
 
-int vset_enum_tree_first(int *a,int len){
-  for(int i=0; i<len; i++) global_elem[i]=a[i];
+static int
+vset_enum_tree_first(int *a, int len, union enum_context *ctx)
+{
+  for (int i = 0; i < len; i++)
+      ctx->enum_elem[i] = a[i];
+
   return 1;
 }
 
 
-static int set_enum_t2(ATerm set,int *a,int len,int (*callback)(int*,int),int ofs,int shift, int cur){
+static
+int set_enum_t2(ATerm set, int *a, int len,
+                    int (*callback)(int*, int, union enum_context*),
+                    int ofs, int shift, int cur, union enum_context *ctx)
+{
   int tmp;
-  if (set==Atom) return callback(a,ofs);
-  else if (set==Empty) return 0;
+
+  if (set == Atom)
+      return callback(a, ofs, ctx);
+  else if (set == Empty)
+      return 0;
   else {
-    if (ofs<len) {
-      a[ofs]=shift+cur-1; // Recall that 0 cannot be stored
-      tmp=set_enum_t2(Down(set),a,len,callback,ofs+1,1,0);
+    if (ofs < len) {
+      a[ofs] = shift + cur - 1; // Recall that 0 cannot be stored
+      tmp = set_enum_t2(Down(set), a, len, callback, ofs + 1, 1, 0, ctx);
       if (tmp) return tmp;
     }
-    set_enum_t2(Left(set),a,len,callback,ofs,shift<<1,cur);
-    set_enum_t2(Right(set),a,len,callback,ofs,shift<<1,shift|cur);
+
+    set_enum_t2(Left(set), a, len, callback, ofs, shift<<1, cur, ctx);
+    set_enum_t2(Right(set), a, len, callback, ofs, shift<<1, shift|cur, ctx);
     return 0;
   }
 }
 
-static void set_enum_tree(vset_t set,vset_element_cb cb,void* context){
-	int N=set->p_len?set->p_len:set->dom->shared.size;
-	int vec[N];
-	global_cb=cb;
-	global_context=context;
-	set_enum_t2(set->set,vec,N,vset_enum_wrap_tree,0,1,0);
+static void
+set_enum_tree(vset_t set, vset_element_cb cb, void* context)
+{
+    union enum_context ctx = {enum_cb : {cb, context}};
+    int N = set->p_len?set->p_len:set->dom->shared.size;
+    int vec[N];
+
+    set_enum_t2(set->set, vec, N, vset_enum_wrap_tree, 0, 1, 0, &ctx);
 }
 
-static void set_example_tree(vset_t set,int *e){
-	int N=set->p_len?set->p_len:set->dom->shared.size;
-	int vec[N];
-	global_elem=e;
-	set_enum_t2(set->set,vec,N,vset_enum_tree_first,0,1,0);
+static void
+set_example_tree(vset_t set, int *e)
+{
+    union enum_context ctx = {enum_elem : e};
+    int N = set->p_len?set->p_len:set->dom->shared.size;
+    int vec[N];
+
+    set_enum_t2(set->set,vec,N,vset_enum_tree_first, 0, 1, 0, &ctx);
 }
 
 static vset_element_cb match_cb;
@@ -1447,15 +1492,19 @@ static void set_copy_match_tree(vset_t dst,vset_t src, int p_len,int* proj,int*m
     }
 }
 
-static void set_enum_match_tree(vset_t set,int p_len,int* proj,int*match,vset_element_cb cb,void* context){
-    int N=set->p_len?set->p_len:set->dom->shared.size;
-    ATerm match_set = set_copy_match_tree_2(set->set, N, match, proj, p_len, 0, 1, 0);
+static void
+set_enum_match_tree(vset_t set, int p_len, int *proj, int *match,
+                        vset_element_cb cb, void *context)
+{
+    int N = set->p_len?set->p_len:set->dom->shared.size;
+    ATerm match_set = set_copy_match_tree_2(set->set, N, match, proj, p_len,
+                                                0, 1, 0);
     ATtableReset(global_ct);
 
+    union enum_context ctx = {enum_cb : {cb, context}};
     int vec[N];
-    global_cb=cb;
-    global_context=context;
-    set_enum_t2(match_set,vec,N,vset_enum_wrap_tree,0,1,0);
+
+    set_enum_t2(match_set, vec, N, vset_enum_wrap_tree, 0, 1, 0, &ctx);
 }
 
 // Structure for storing transition groups at top levels.

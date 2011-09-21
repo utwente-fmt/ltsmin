@@ -36,6 +36,8 @@ static struct op_rec *op_cache=NULL;
 #define OP_PROJECT 4
 #define OP_NEXT 5
 #define OP_PREV 6
+#define OP_COPY_MATCH 7
+#define OP_INTERSECT 8
 
 struct vector_domain {
 	struct vector_domain_shared shared;
@@ -179,11 +181,13 @@ static void mdd_collect(uint32_t a,uint32_t b){
                     continue;
                 }
                 continue;
-            }               
+            }
 			case OP_UNION:
 			case OP_MINUS:
             case OP_NEXT:
             case OP_PREV:
+            case OP_COPY_MATCH:
+            case OP_INTERSECT:
 			{
 				uint32_t mdd=op_cache[i].arg1;
 				if (!(node_table[mdd].val&0x80000000)) {
@@ -230,7 +234,7 @@ static uint32_t mdd_create_node(uint32_t val,uint32_t down,uint32_t right){
 	uint32_t res=unique_table[slot];
 	while(res){
 		if (node_table[res].val==val
-            && node_table[res].down==down 
+            && node_table[res].down==down
             && node_table[res].right==right) {
             return res;
         }
@@ -379,76 +383,97 @@ static void mdd_enum(uint32_t mdd,uint32_t *vec,int idx,int len,vset_element_cb 
     }
 }
 
-
-/*
-static void mdd_enum_match(uint32_t mdd, int p_len, int* proj, int *match, vset_element_cb cb, void *context)
+static uint32_t
+mdd_copy_match(uint32_t mdd, int len, uint32_t pattern, int *proj,
+                   int p_len, int ofs)
 {
+    uint32_t slot = hash(OP_COPY_MATCH, mdd, pattern) % mdd_nodes;
+
+    if (op_cache[slot].op == OP_COPY_MATCH && op_cache[slot].arg1 == mdd
+            && op_cache[slot].res.other.arg2 == pattern) {
+        return op_cache[slot].res.other.res;
+    }
+
+    uint32_t tmp;
+
+    if (mdd != 0 && mdd != 1) {
+        tmp = 0;
+
+        if (ofs < len) {
+            // if still matching and this offset matches,
+            // compare the value and return it if it matches
+            if (p_len > 0 && proj[0] == ofs) {
+                // does it match?
+                if (node_table[mdd].val == node_table[pattern].val) {
+                    // try to match the next element, return the result
+                    tmp = mdd_copy_match(node_table[mdd].down, len,
+                                             node_table[pattern].down,
+                                             proj + 1, p_len - 1, ofs + 1);
+                }
+            // not matching anymore or the offset doesn't match
+            } else {
+                tmp = mdd_copy_match(node_table[mdd].down, len, pattern, proj,
+                                         p_len, ofs + 1);
+            }
+        }
+        mdd_push(tmp);
+        tmp = 0;
+        // test matches in the second argument
+        if (ofs <= len) {
+            tmp = mdd_copy_match(node_table[mdd].right, len, pattern, proj,
+                                     p_len, ofs);
+        }
+        // combine results
+        tmp = mdd_create_node(node_table[mdd].val, mdd_pop(), tmp);
+    } else {
+        if (mdd == 1 && ofs == len) {
+            tmp = mdd;
+        } else {
+            tmp = 0;
+        }
+    }
+
+    op_cache[slot].op = OP_COPY_MATCH;
+    op_cache[slot].arg1 = mdd;
+    op_cache[slot].res.other.arg2 = pattern;
+    op_cache[slot].res.other.res  = tmp;
+
+    return tmp;
 }
 
-static void mdd_copy_match(uint32_t mdd, uint32_t mdd, int p_len, int *proj, int *match)
+static uint32_t
+mdd_intersect(uint32_t a, uint32_t b)
 {
-}
+    if (a == b) return a;
+    if (a == 0 || b == 0) return 0;
+    if (a == 1 || b == 1) Abort("missing case in intersect");
 
-static void mdd_intersect(uint32_t dst, uint32_t src)
-{
-}
+    uint32_t slot = hash(OP_INTERSECT, a, b) % mdd_nodes;
 
-static void mdd_zip(uint32_t dst, uint32_t src)
-{
-}
+    if (op_cache[slot].op == OP_INTERSECT && op_cache[slot].arg1 == a
+            && op_cache[slot].res.other.arg2 == b) {
+        return op_cache[slot].res.other.res;
+    }
 
-static void mdd_reorder()
-{
-}
+    uint32_t tmp;
 
-static void mdd_destroy(uint32_t set)
-{
-}
-*/
+    if (node_table[a].val == node_table[b].val) {
+        tmp = mdd_intersect(node_table[a].down, node_table[b].down);
+        mdd_push(tmp);
+        tmp = mdd_intersect(node_table[a].right, node_table[b].right);
+        tmp = mdd_create_node(node_table[a].val, mdd_pop(), tmp);
+    } else if (node_table[a].val < node_table[b].val) {
+        tmp = mdd_intersect(node_table[a].right, b);
+    } else { /* node_table[a].val > node_table[b].val */
+        tmp = mdd_intersect(a, node_table[b].right);
+    }
 
-static void set_enum_match_mdd(vset_t set, int p_len, int* proj, int *match, vset_element_cb cb, void *context)
-{
-    (void)set;
-    (void)p_len;
-    (void)proj;
-    (void)match;
-    (void)cb;
-    (void)context;
-    Fatal(1, error, "set_enum_match not implemented");
-}
+    op_cache[slot].op = OP_INTERSECT;
+    op_cache[slot].arg1 = a;
+    op_cache[slot].res.other.arg2 = b;
+    op_cache[slot].res.other.res = tmp;
 
-static void set_copy_match_mdd(vset_t src, vset_t dst, int p_len, int *proj, int *match)
-{
-    (void)src;
-    (void)dst;
-    (void)p_len;
-    (void)proj;
-    (void)match;
-    Fatal(1, error, "set_copy_match not implemented");
-}
-
-static void set_intersect_mdd(vset_t dst, vset_t src)
-{
-    (void)dst;
-    (void)src;
-    Fatal(1, error, "set_intersect not implemented");
-}
-
-/*
-static void set_zip_mdd(vset_t dst, vset_t src)
-{
-    (void)dst;
-    (void)src;
-    Warning(info, "set_zip not implemented");
-}
-*/
-
-static void set_reorder_mdd() { }
-
-static void set_destroy_mdd(vset_t set)
-{
-    (void)set;
-    Fatal(1, error, "set_destroy not implemented");
+    return tmp;
 }
 
 /*
@@ -481,7 +506,8 @@ static vset_t set_create_mdd(vdom_t dom,int k,int* proj){
     set->mdd=0;
     set->setid=next_setid++;
     set->next=protected_sets;
-    if (protected_sets) protected_sets->prev=set;
+    set->prev=NULL;
+    if (protected_sets != NULL) protected_sets->prev=set;
     protected_sets=set;
     set->p_len=k;
     for(int i=0;i<k;i++) {
@@ -490,19 +516,31 @@ static vset_t set_create_mdd(vdom_t dom,int k,int* proj){
     return set;
 }
 
+static void set_destroy_mdd(vset_t set)
+{
+    if (protected_sets == set) protected_sets = set->next;
+    if (set->prev != NULL) set->prev->next = set->next;
+    if (set->next != NULL) set->next->prev = set->prev;
+
+    RTfree(set);
+}
+
+static void set_reorder_mdd() { }
+
 static vrel_t rel_create_mdd(vdom_t dom,int k,int* proj){
-	vrel_t rel=(vrel_t)RTmalloc(sizeof(struct vector_relation)+k*sizeof(int));
-	rel->dom=dom;
-	rel->mdd=0;
+    vrel_t rel=(vrel_t)RTmalloc(sizeof(struct vector_relation)+k*sizeof(int));
+    rel->dom=dom;
+    rel->mdd=0;
     rel->relid=next_relid++;
-	rel->next=protected_rels;
-	if (protected_rels) protected_rels->prev=rel;
-	protected_rels=rel;
-	rel->p_len=k;
-	for(int i=0;i<k;i++) {
+    rel->next=protected_rels;
+    rel->prev=NULL;
+    if (protected_rels != NULL) protected_rels->prev=rel;
+    protected_rels=rel;
+    rel->p_len=k;
+    for(int i=0;i<k;i++) {
         rel->proj[i]=proj[i];
     }
-	return rel;
+    return rel;
 }
 
 static void set_add_mdd(vset_t set,const int* e){
@@ -561,6 +599,40 @@ static void set_minus_mdd(vset_t dst,vset_t src){
     dst->mdd=mdd_minus(dst->mdd,src->mdd);
 }
 
+static void
+set_intersect_mdd(vset_t dst, vset_t src)
+{
+    dst->mdd = mdd_intersect(dst->mdd, src->mdd);
+}
+
+static void
+set_copy_match_mdd(vset_t src, vset_t dst, int p_len, int *proj, int *match)
+{
+    int len = (src->p_len)?src->p_len:src->dom->shared.size;
+    uint32_t singleton = mdd_put(0, (uint32_t*)match, p_len, NULL);
+
+    mdd_push(singleton);
+    dst->mdd = mdd_copy_match(src->mdd, len, singleton, proj, p_len, 0);
+    mdd_pop();
+}
+
+static void
+set_enum_match_mdd(vset_t set, int p_len, int *proj, int *match,
+                       vset_element_cb cb, void *context)
+{
+    int len = (set->p_len)?set->p_len:set->dom->shared.size;
+    uint32_t singleton, tmp;
+
+    singleton = mdd_put(0, (uint32_t*)match, p_len, NULL);
+    mdd_push(singleton);
+    tmp = mdd_copy_match(set->mdd, len, singleton, proj, p_len, 0);
+    mdd_pop();
+
+    uint32_t vec[len];
+
+    mdd_enum(tmp, vec, 0, len, cb, context);
+}
+
 static void rel_add_mdd(vrel_t rel,const int* src, const int* dst){
     int N=rel->p_len?rel->p_len:rel->dom->shared.size;
     uint32_t vec[2*N];
@@ -616,7 +688,7 @@ static uint32_t mdd_next(int relid,uint32_t set,uint32_t rel,int idx,int*proj,in
 		        rel=node_table[rel].right;
 		        if (rel<=1) return 0;
 		    }
-		}      
+		}
     }
     uint32_t op=OP_NEXT|(relid<<16);
     uint32_t slot=hash(op,set,rel)%mdd_nodes;
@@ -708,7 +780,7 @@ static uint32_t mdd_prev(int relid,uint32_t set,uint32_t rel,int idx,int*proj,in
         mdd_push(mdd_prev(relid,node_table[set].right,rel,idx,proj,len));
         res=mdd_prev(relid,node_table[set].down,rel,idx+1,proj,len);
         res=mdd_create_node(node_table[set].val,res,mdd_pop());
-    }        
+    }
     op_cache[slot].op=op;
     op_cache[slot].arg1=set;
     op_cache[slot].res.other.arg2=rel;
@@ -762,7 +834,7 @@ vdom_t vdom_create_list_native(int n){
     dom->shared.set_enum_match=set_enum_match_mdd;
     dom->shared.set_copy_match=set_copy_match_mdd;
     dom->shared.set_intersect=set_intersect_mdd;
-    //dom->shared.set_zip=set_zip_mdd;
+    // default implementation for dom->shared.set_zip
     dom->shared.reorder=set_reorder_mdd;
     dom->shared.set_destroy=set_destroy_mdd;
     return dom;
