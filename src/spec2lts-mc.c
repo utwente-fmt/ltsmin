@@ -646,7 +646,7 @@ wctx_free (wctx_t *ctx, int depth)
     }
     if (NULL != ctx->group_stack)
         isba_destroy (ctx->group_stack);
-    if (strategy[depth] == Strat_BFS)
+    if (strategy[depth] ==  (Strat_BFS | Strat_ENDFS))
         dfs_stack_destroy (ctx->in_stack);
     if (NULL != ctx->permute)
         permute_free (ctx->permute);
