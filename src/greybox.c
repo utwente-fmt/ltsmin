@@ -545,7 +545,11 @@ void GBcopyChunkMaps(model_t dst, model_t src)
     dst->int2chunk = src->int2chunk;
     dst->chunk2int = src->chunk2int;
     dst->get_count = src->get_count;
-    dst->map = src->map;
+
+    int N    = lts_type_get_type_count(GBgetLTStype(src));
+    dst->map = RTmallocZero(N*sizeof(void*));
+    for(int i = 0; i < N; i++)
+        dst->map[i] = src->map[i];
 }
 
 void GBgrowChunkMaps(model_t model, int old_n)
