@@ -42,7 +42,8 @@ int main(int argc, char *argv[]){
             } break;
         case PARSE_LTL: {
             ltsmin_expr_t ltl = ltl_parse_file(ltstype, file_name);
-            ltsmin_ltl2ba(ltl);
+            ltsmin_expr_t notltl = LTSminExpr(UNARY_OP, LTL_NOT, 0, ltl, NULL);
+            ltsmin_ltl2ba(notltl);
             /*
             print_expr(ltl);
             ltsmin_expr_t ctl = ltl_to_ctl_star(ltl);

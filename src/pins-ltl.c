@@ -304,7 +304,8 @@ GBaddLTL (model_t model, const char *ltl_file, pins_ltl_type_t type, model_t por
     }
 
     ltsmin_expr_t ltl = ltl_parse_file(ltstype, ltl_file);
-    ltsmin_ltl2ba(ltl);
+    ltsmin_expr_t notltl = LTSminExpr(UNARY_OP, LTL_NOT, 0, ltl, NULL);
+    ltsmin_ltl2ba(notltl);
     const ltsmin_buchi_t* ba = ltsmin_buchi();
 
     Warning(info, "buchi has %d states", ba->state_count);
