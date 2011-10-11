@@ -646,22 +646,21 @@ static void rel_add_mdd(vrel_t rel,const int* src, const int* dst){
 static uint32_t mdd_project(uint32_t setid,uint32_t mdd,int idx,int*proj,int len){
     if(mdd==0) return 0; //projection of empty is empty.
     if(len==0) return 1; //projection of non-empty is epsilon.
+
+    uint32_t slot=hash(OP_PROJECT,mdd,setid)%mdd_nodes;
+    if(op_cache[slot].op==OP_PROJECT && op_cache[slot].arg1==mdd
+       && op_cache[slot].res.other.arg2==setid) {
+        return op_cache[slot].res.other.res;
+    }
+
+    uint32_t res = 0;
+    uint32_t mdd_original = mdd;
+
     if (proj[0]==idx){
-        uint32_t slot=hash(OP_PROJECT,mdd,setid)%mdd_nodes;
-        if(op_cache[slot].op==OP_PROJECT && op_cache[slot].arg1==mdd
-           && op_cache[slot].res.other.arg2==setid) {
-            return op_cache[slot].res.other.res;
-        }
         mdd_push(mdd_project(setid,node_table[mdd].right,idx,proj,len));
         uint32_t tmp=mdd_project(setid,node_table[mdd].down,idx+1,proj+1,len-1);
-        tmp=mdd_create_node(node_table[mdd].val,tmp,mdd_pop());
-        op_cache[slot].op=OP_PROJECT;
-        op_cache[slot].arg1=mdd;
-        op_cache[slot].res.other.arg2=setid;
-        op_cache[slot].res.other.res=tmp;
-        return tmp;
+        res=mdd_create_node(node_table[mdd].val,tmp,mdd_pop());
     } else {
-        uint32_t res=0;
         while(mdd>1){
             mdd_push(res);
             uint32_t tmp=mdd_project(setid,node_table[mdd].down,idx+1,proj,len);
@@ -670,8 +669,13 @@ static uint32_t mdd_project(uint32_t setid,uint32_t mdd,int idx,int*proj,int len
             mdd_pop();mdd_pop();
             mdd=node_table[mdd].right;
         }
-        return res;
     }
+
+    op_cache[slot].op=OP_PROJECT;
+    op_cache[slot].arg1=mdd_original;
+    op_cache[slot].res.other.arg2=setid;
+    op_cache[slot].res.other.res=res;
+    return res;
 }
 
 static uint32_t mdd_next(int relid,uint32_t set,uint32_t rel,int idx,int*proj,int len){
