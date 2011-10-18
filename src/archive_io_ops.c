@@ -268,13 +268,9 @@ static void dir_load(lts_input_t input){
 			    Warning(info,"read %d labels",L);
 			    break;
 		    }
-		    char*str;
 		    if (lbl[0]=='"' && lbl[len-1]=='"') {
 			    Warning(info,"stripping double quotes from %s",lbl);
 			    lbl[len-1]=0;
-			    str=lbl+1;
-		    } else {
-			    str=lbl;
 		    }
 		    if ((int)VTputChunk(input->value_table[0],chunk_str(lbl))!=L){
 			    Fatal(1,error,"position of label %d was not %d",L,L);
@@ -330,13 +326,9 @@ static void load_dir_headers(lts_input_t input,stream_t ds){
 			Warning(info,"read %d labels",L);
 			break;
 		}
-		char*str;
 		if (lbl[0]=='"' && lbl[len-1]=='"') {
 			Warning(info,"stripping double quotes from %s",lbl);
 			lbl[len-1]=0;
-			str=lbl+1;
-		} else {
-			str=lbl;
 		}
 		if (GBchunkPut(input->model,action_type,chunk_str(lbl))!=L){
 			Fatal(1,error,"position of label %d was not %d",L,L);
