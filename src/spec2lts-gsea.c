@@ -41,7 +41,7 @@
  * }
  */
 
-typedef enum { UseGreyBox , UseBlackBox } mode_t;
+typedef enum { UseGreyBox , UseBlackBox } box_mode_t;
 
 typedef struct grey_stack
 {
@@ -72,7 +72,7 @@ static struct {
     int write_state;
     size_t max;
 
-    mode_t call_mode;
+    box_mode_t call_mode;
 
     const char *arg_strategy;
     enum { Strat_BFS, Strat_DFS, Strat_SCC } strategy;
