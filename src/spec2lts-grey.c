@@ -2,7 +2,6 @@
 #include <assert.h>
 #include <ctype.h>
 #include <stdint.h>
-#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
@@ -39,8 +38,8 @@ static int write_lts;
 static int write_state=0;
 static size_t max = UINT_MAX;
 
-typedef enum { UseGreyBox , UseBlackBox } mode_t;
-static mode_t call_mode=UseBlackBox;
+typedef enum { UseGreyBox , UseBlackBox } box_mode_t;
+static box_mode_t call_mode=UseBlackBox;
 
 static char *arg_strategy = "bfs";
 static enum { Strat_BFS, Strat_DFS, Strat_NDFS, Strat_SCC } strategy = Strat_BFS;
