@@ -50,7 +50,7 @@ struct op_rec {
 	uint32_t op;
 	uint32_t arg1;
 	union {
-		uint64_t count;
+		double count;
 		struct {
 			uint32_t arg2;
 			uint32_t res;
@@ -348,13 +348,13 @@ static void mdd_collect(uint32_t a,uint32_t b){
 	}
 }
 
-static uint64_t mdd_count(uint32_t mdd){
+static double mdd_count(uint32_t mdd){
     if (mdd<=1) return mdd;
     uint32_t slot=hash(OP_COUNT,mdd,0)%cache_size;
     if (op_cache[slot].op==OP_COUNT && op_cache[slot].arg1==mdd){
         return op_cache[slot].res.count;
     }
-    uint64_t res=mdd_count(node_table[mdd].down);
+    double res=mdd_count(node_table[mdd].down);
     res+=mdd_count(node_table[mdd].right);
     op_cache[slot].op=OP_COUNT;
     op_cache[slot].arg1=mdd;
@@ -714,18 +714,16 @@ static int set_member_mdd(vset_t set,const int* e){
 }
 
 static void set_count_mdd(vset_t set,long *nodes,bn_int_t *elements){
-    uint64_t e_count=mdd_count(set->mdd);
+    double e_count=mdd_count(set->mdd);
     uint32_t n_count=mdd_node_count(set->mdd);
-    double ed=e_count;
-    bn_double2int(ed,elements);
+    bn_double2int(e_count,elements);
     *nodes=n_count;
 }
 
 static void rel_count_mdd(vrel_t rel,long *nodes,bn_int_t *elements){
-    uint64_t e_count=mdd_count(rel->mdd);
+    double e_count=mdd_count(rel->mdd);
     uint32_t n_count=mdd_node_count(rel->mdd);
-    double ed=e_count;
-    bn_double2int(ed,elements);
+    bn_double2int(e_count,elements);
     *nodes=n_count;
 }
 
