@@ -81,6 +81,7 @@ static ATerm Empty=NULL;
 static ATermTable global_ct=NULL;
 static ATermTable global_rc=NULL; // Used in saturation - relational product
 static ATermTable global_sc=NULL; // Used in saturation - saturation results
+static ATermTable global_uc=NULL; // Used in saturation - union results
 
 #define ATcmp ATcompare
 //define ATcmp(t1,t2) (((long)t1)-((long)t2))
@@ -1467,6 +1468,7 @@ typedef struct {
 } top_groups_info;
 
 static vrel_t *rel_set;
+static vset_t *proj_set;
 static top_groups_info *top_groups;
 
 static ATerm saturate(int level, ATerm set);
@@ -1483,6 +1485,41 @@ reset_table(ATermTable table)
         ATtableDestroy(new_table);
 
     return ATtableCreate(HASH_INIT, HASH_LOAD);
+}
+
+static ATerm
+set_union_sat(ATerm s1, ATerm s2, int lookup)
+{
+    if (s1 == atom) return atom;
+    if (s1 == emptyset) return s2;
+    if (s2 == emptyset) return s1;
+    if (s1 == s2) return s1;
+
+    ATerm key = NULL, res = NULL;
+
+    if (lookup) {
+        key = (ATerm)ATmakeAppl2(sum, s1, s2);
+        res = ATtableGet(global_uc, key);
+        if (res) return res;
+    }
+
+    // not looked up or not found in cache: compute
+    ATerm x = ATgetArgument(s1, 0);
+    ATerm y = ATgetArgument(s2, 0);
+    int c = ATcmp(x, y);
+
+    if (c==0)
+        res=Cons(x, set_union_sat(ATgetArgument(s1,1),ATgetArgument(s2,1),1),
+                 set_union_sat(ATgetArgument(s1,2),ATgetArgument(s2,2),0));
+    else if (c<0)
+        res=Cons(x, ATgetArgument(s1,1),
+                 set_union_sat(ATgetArgument(s1,2),s2,0));
+    else
+        res = Cons(y, ATgetArgument(s2,1),
+                   set_union_sat(s1,ATgetArgument(s2,2),0));
+
+    if (lookup) ATtablePut(global_uc, key, res);
+    return res;
 }
 
 static ATerm
@@ -1524,9 +1561,9 @@ apply_rel_prod(ATerm set, ATerm trans, int *proj, int p_len, int ofs, int grp)
         else if (c > 0)
             trans = ATgetArgument(trans, 2);
         else {
-            res = set_union_2(res, trans_level_sat(ATgetArgument(set,1),
-                                                    ATgetArgument(trans,1),
-                                                    proj, p_len, ofs, grp), 0);
+            res = set_union_sat(res, trans_level_sat(ATgetArgument(set,1),
+                                                     ATgetArgument(trans,1),
+                                                     proj, p_len, ofs, grp), 0);
             set = ATgetArgument(set,2);
             trans = ATgetArgument(trans,2);
         }
@@ -1599,7 +1636,7 @@ apply_rel_fixpoint(ATerm set, ATerm trans, int *proj, int p_len,
                 res_value = ATgetArgument(new_res, 0);
             }
 
-            res = set_union_2(res, trans_level_sat(ATgetArgument(new_res, 1),
+            res = set_union_sat(res, trans_level_sat(ATgetArgument(new_res, 1),
                                                      ATgetArgument(trans, 1),
                                                      proj, p_len, ofs, grp), 0);
             set = ATgetArgument(set,2);
@@ -1627,6 +1664,17 @@ sat_fixpoint(int level, ATerm set)
         old_set = new_set;
         for (int i = 0; i < groups_info.tg_len; i++) {
             int grp = groups_info.top_groups[i];
+
+            // Update transition relations
+            if (rel_set[grp]->expand != NULL) {
+                proj_set[grp]->set = set_project_2(new_set, level,
+                                                   proj_set[grp]->proj,
+                                                   proj_set[grp]->p_len, 0);
+                rel_set[grp]->expand(rel_set[grp], proj_set[grp],
+                                     rel_set[grp]->expand_ctx);
+                proj_set[grp]->set = emptyset;
+                ATtableReset(global_ct);
+            }
 
             new_set = apply_rel_fixpoint(new_set, rel_set[grp]->rel,
                                          rel_set[grp]->proj,
@@ -1672,24 +1720,22 @@ static void
 set_least_fixpoint_list(vset_t dst, vset_t src, vrel_t rels[], int rel_count)
 {
     // Only implemented if not projected
-    assert (src->p_len == 0 && dst->p_len == 0);
+    assert(src->p_len == 0 && dst->p_len == 0);
 
     // Initialize global hash tables.
     global_ct = reset_table(global_ct);
     global_sc = reset_table(global_sc);
     global_rc = reset_table(global_rc);
+    global_uc = reset_table(global_uc);
 
-    // Initialize partitioned transition relations.
+    // Initialize partitioned transition relations and expansions.
     rel_set = rels;
 
-    // Retrieve initial state vector and its length.
-    int   init_state_len = src->dom->shared.size;
-    ATerm init_state_set = src->set;
-
     // Initialize top_groups_info array
-    // This stores transitions groups per topmost level
-
+    // This stores transition groups per topmost level
+    int  init_state_len = src->dom->shared.size;
     top_groups = RTmalloc(sizeof(top_groups_info[init_state_len]));
+    proj_set = RTmalloc(sizeof(vset_t[rel_count]));
 
     for (int lvl = 0; lvl < init_state_len; lvl++) {
         top_groups[lvl].top_groups = RTmalloc(sizeof(int[rel_count]));
@@ -1700,21 +1746,28 @@ set_least_fixpoint_list(vset_t dst, vset_t src, vrel_t rels[], int rel_count)
         int top_lvl = rels[grp]->proj[0];
         top_groups[top_lvl].top_groups[top_groups[top_lvl].tg_len] = grp;
         top_groups[top_lvl].tg_len++;
+        proj_set[grp] = set_create_both(rels[grp]->dom, rels[grp]->p_len,
+                                        rels[grp]->proj);
     }
 
     // Saturation on initial state set
-    dst->set = saturate(0, init_state_set);
+    dst->set = saturate(0, src->set);
 
     // Clean-up
     rel_set = NULL;
 
+    for (int grp = 0; grp < rel_count; grp++)
+        vset_destroy(proj_set[grp]);
+
     for (int lvl = 0; lvl < init_state_len; lvl++)
         RTfree(top_groups[lvl].top_groups);
 
+    RTfree(proj_set);
     RTfree(top_groups);
     ATtableReset(global_ct);
     ATtableReset(global_sc);
     ATtableReset(global_rc);
+    ATtableReset(global_uc);
 }
 
 vdom_t vdom_create_tree(int n){
