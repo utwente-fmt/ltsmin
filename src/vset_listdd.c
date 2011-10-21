@@ -956,26 +956,32 @@ static uint32_t rels_tot;
 static top_groups_info *top_groups;
 
 static uint32_t saturate(int level, uint32_t mdd);
-static uint32_t set_reach_sat(uint32_t relid, uint32_t set, uint32_t rel,
-                                int idx, int *proj, int len);
+static uint32_t sat_rel_prod(uint32_t relid, uint32_t set, uint32_t rel,
+                             int idx, int *proj, int len);
 
 static uint32_t
 copy_level_sat(uint32_t relid, uint32_t set, uint32_t rel, int idx,
                int *proj, int len)
 {
-    if (set == 0) return 0;
-    if (set == 1) Abort("missing case in copy_level");
+    uint32_t res = 0;
 
-    uint32_t tmp = set_reach_sat(relid, node_table[set].down, rel, idx + 1,
-                                   proj, len);
-    mdd_push(tmp);
-    tmp = copy_level_sat(relid, node_table[set].right, rel, idx, proj, len);
-    return mdd_create_node(node_table[set].val, mdd_pop(), tmp);
+    while (set > 0) {
+        mdd_push(res);
+        uint32_t tmp = sat_rel_prod(relid, node_table[set].down, rel, idx + 1,
+                                    proj, len);
+        tmp = mdd_create_node(node_table[set].val, tmp, 0);
+        mdd_push(tmp);
+        res = mdd_union(res, tmp);
+        mdd_pop(); mdd_pop();
+        set = node_table[set].right;
+    }
+
+    return res;
 }
 
 static uint32_t
-apply_reach_sat(uint32_t relid, uint32_t set, uint32_t rel, int idx,
-                int *proj, int len)
+apply_rel_prod(uint32_t relid, uint32_t set, uint32_t rel, int idx,
+               int *proj, int len)
 {
     uint32_t res = 0;
 
@@ -989,9 +995,9 @@ apply_reach_sat(uint32_t relid, uint32_t set, uint32_t rel, int idx,
 
             while (rel_down > 1) {
                 mdd_push(res);
-                uint32_t tmp = set_reach_sat(relid, node_table[set].down,
-                                               node_table[rel_down].down,
-                                               idx + 1, proj + 1, len - 1);
+                uint32_t tmp = sat_rel_prod(relid, node_table[set].down,
+                                            node_table[rel_down].down,
+                                            idx + 1, proj + 1, len - 1);
                 tmp = mdd_create_node(node_table[rel_down].val, tmp, 0);
                 mdd_push(tmp);
                 res = mdd_union(res, tmp);
@@ -1008,7 +1014,7 @@ apply_reach_sat(uint32_t relid, uint32_t set, uint32_t rel, int idx,
 }
 
 static uint32_t
-set_reach_sat(uint32_t relid, uint32_t set, uint32_t rel, int idx,
+sat_rel_prod(uint32_t relid, uint32_t set, uint32_t rel, int idx,
                 int *proj, int len)
 {
     if (len == 0) return set;
@@ -1027,7 +1033,7 @@ set_reach_sat(uint32_t relid, uint32_t set, uint32_t rel, int idx,
     uint32_t res = 0;
 
     if (proj[0] == idx)
-        res = apply_reach_sat(relid, set, rel, idx, proj, len);
+        res = apply_rel_prod(relid, set, rel, idx, proj, len);
     else
         res = copy_level_sat(relid, set, rel, idx, proj, len);
 
@@ -1044,8 +1050,8 @@ set_reach_sat(uint32_t relid, uint32_t set, uint32_t rel, int idx,
 }
 
 static uint32_t
-apply_reach_fixpoint(uint32_t relid, uint32_t set, uint32_t rel, int idx,
-                     int *proj, int len)
+apply_rel_fixpoint(uint32_t relid, uint32_t set, uint32_t rel, int idx,
+                   int *proj, int len)
 {
     uint32_t res = set;
 
@@ -1063,9 +1069,9 @@ apply_reach_fixpoint(uint32_t relid, uint32_t set, uint32_t rel, int idx,
 
             while (rel_down > 1) {
                 mdd_push(res);
-                uint32_t tmp = set_reach_sat(relid, node_table[new_res].down,
-                                               node_table[rel_down].down,
-                                               idx + 1, proj + 1, len - 1);
+                uint32_t tmp = sat_rel_prod(relid, node_table[new_res].down,
+                                            node_table[rel_down].down,
+                                            idx + 1, proj + 1, len - 1);
                 tmp = mdd_create_node(node_table[rel_down].val, tmp, 0);
                 mdd_push(tmp);
                 res = mdd_union(res, tmp);
@@ -1100,10 +1106,10 @@ sat_fixpoint(int level, uint32_t set)
         for (uint32_t i = 0; i < groups_info.tg_len; i++) {
             uint32_t grp = groups_info.top_groups[i];
             mdd_push(new_set);
-            new_set = apply_reach_fixpoint(rel_set[grp]->relid, new_set,
-                                           rel_set[grp]->mdd, level,
-                                           rel_set[grp]->proj,
-                                           rel_set[grp]->p_len);
+            new_set = apply_rel_fixpoint(rel_set[grp]->relid, new_set,
+                                         rel_set[grp]->mdd, level,
+                                         rel_set[grp]->proj,
+                                         rel_set[grp]->p_len);
             mdd_pop();
         }
     }
@@ -1111,24 +1117,9 @@ sat_fixpoint(int level, uint32_t set)
     return new_set;
 }
 
-// Traverse the local state values of an MDD node recursively:
-// - Base case: end of MDD node is reached OR MDD node is atom node.
-// - Induction: construct a new MDD node with the link to next entry of the
-//   MDD node handled recursively
-static uint32_t
-saturate_locals(int level, uint32_t node_set)
-{
-    if (node_set == 0) return node_set;
-    if (node_set == 1) Abort("missing case in saturate_locals");
-
-    mdd_push(saturate(level + 1, node_table[node_set].down));
-    uint32_t new_node_set = saturate_locals(level, node_table[node_set].right);
-    return mdd_create_node(node_table[node_set].val, mdd_pop(), new_node_set);
-}
-
 // Saturation process for the MDD at a given level
 static uint32_t
-saturate(int level, uint32_t mdd)
+saturate(int idx, uint32_t mdd)
 {
     if (mdd == 0 || mdd == 1) return mdd;
 
@@ -1140,17 +1131,29 @@ saturate(int level, uint32_t mdd)
           && op_cache[slot].res.other.arg2 == rels_tot)
         return op_cache[slot].res.other.res;
 
-    uint32_t new_set = saturate_locals(level, mdd);
-    mdd_push(new_set);
-    new_set = sat_fixpoint(level, new_set);
+    uint32_t res = 0;
+    uint32_t mdd_right = mdd;
+
+    while (mdd_right > 1) {
+        mdd_push(res);
+        uint32_t tmp = saturate(idx + 1, node_table[mdd_right].down);
+        tmp = mdd_create_node(node_table[mdd_right].val, tmp, 0);
+        mdd_push(tmp);
+        res = mdd_union(res, tmp);
+        mdd_pop(); mdd_pop();
+        mdd_right = node_table[mdd_right].right;
+    }
+
+    mdd_push(res);
+    res = sat_fixpoint(idx, res);
     mdd_pop();
 
     slot = slot_hash % cache_size;
     op_cache[slot].op = OP_SAT;
     op_cache[slot].arg1 = mdd;
     op_cache[slot].res.other.arg2 = rels_tot;
-    op_cache[slot].res.other.res = new_set;
-    return new_set;
+    op_cache[slot].res.other.res = res;
+    return res;
 }
 
 // Perform fixpoint calculations using the "General Basic Saturation" algorithm
@@ -1173,13 +1176,9 @@ set_least_fixpoint_mdd(vset_t dst, vset_t src, vrel_t rels[], int rel_count)
     mdd_push(rels_tmp);
     rels_tot = rels_tmp;
 
-    // Retrieve initial state vector and its length.
-    uint32_t init_state_len = src->dom->shared.size;
-    uint32_t init_state_set = src->mdd;
-
     // Initialize top_groups_info array
     // This stores transitions groups per topmost level
-
+    uint32_t init_state_len = src->dom->shared.size;
     top_groups = RTmalloc(sizeof(top_groups_info[init_state_len]));
 
     for (uint32_t lvl = 0; lvl < init_state_len; lvl++) {
@@ -1194,7 +1193,7 @@ set_least_fixpoint_mdd(vset_t dst, vset_t src, vrel_t rels[], int rel_count)
     }
 
     // Saturation on initial state set
-    dst->mdd = saturate(0, init_state_set);
+    dst->mdd = saturate(0, src->mdd);
 
     // Clean-up
     rel_set = NULL;
