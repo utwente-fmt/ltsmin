@@ -1468,8 +1468,8 @@ static vrel_t *rel_set;
 static top_groups_info *top_groups;
 
 static ATerm saturate(int level, ATerm set);
-static ATerm set_reach_2_sat(ATerm set, ATerm trans, int *proj, int p_len,
-                                 int ofs, int grp);
+static ATerm sat_rel_prod(ATerm set, ATerm trans, int *proj, int p_len,
+                          int ofs, int grp);
 
 // Initialize a global memoization table
 static ATermTable
@@ -1490,10 +1490,10 @@ copy_level_sat(ATerm set, ATerm trans, int *proj, int p_len, int ofs, int grp)
         return emptyset;
     else
         return MakeCons(ATgetArgument(set, 0),
-                          set_reach_2_sat(ATgetArgument(set, 1), trans, proj,
-                                            p_len, ofs + 1, grp),
+                          sat_rel_prod(ATgetArgument(set, 1), trans, proj,
+                                       p_len, ofs + 1, grp),
                           copy_level_sat(ATgetArgument(set, 2), trans, proj,
-                                            p_len, ofs, grp));
+                                         p_len, ofs, grp));
 }
 
 static ATerm
@@ -1503,14 +1503,14 @@ trans_level_sat(ATerm set, ATerm trans, int *proj, int p_len, int ofs, int grp)
         return emptyset;
     else
         return MakeCons(ATgetArgument(trans, 0),
-                            set_reach_2_sat(set, ATgetArgument(trans, 1),
-                                              proj + 1, p_len-1, ofs + 1, grp),
+                            sat_rel_prod(set, ATgetArgument(trans, 1),
+                                         proj + 1, p_len-1, ofs + 1, grp),
                             trans_level_sat(set, ATgetArgument(trans, 2),
-                                              proj, p_len, ofs, grp));
+                                            proj, p_len, ofs, grp));
 }
 
 static ATerm
-apply_reach_sat(ATerm set, ATerm trans, int *proj, int p_len, int ofs, int grp)
+apply_rel_prod(ATerm set, ATerm trans, int *proj, int p_len, int ofs, int grp)
 {
     ATerm res = emptyset;
 
@@ -1522,7 +1522,7 @@ apply_reach_sat(ATerm set, ATerm trans, int *proj, int p_len, int ofs, int grp)
         else if (c > 0)
             trans = ATgetArgument(trans, 2);
         else {
-            res = set_union_2(res,trans_level_sat(ATgetArgument(set,1),
+            res = set_union_2(res, trans_level_sat(ATgetArgument(set,1),
                                                     ATgetArgument(trans,1),
                                                     proj, p_len, ofs, grp), 0);
             set = ATgetArgument(set,2);
@@ -1554,7 +1554,7 @@ put_rel_prod_value(int lvl, int grp, ATerm set, ATerm trans, ATerm value)
 }
 
 static ATerm
-set_reach_2_sat(ATerm set, ATerm trans, int *proj, int p_len, int ofs, int grp)
+sat_rel_prod(ATerm set, ATerm trans, int *proj, int p_len, int ofs, int grp)
 {
     if (p_len == 0)
         return set;
@@ -1564,7 +1564,7 @@ set_reach_2_sat(ATerm set, ATerm trans, int *proj, int p_len, int ofs, int grp)
             return res;
 
         if (proj[0] == ofs)
-            res = apply_reach_sat(set,trans,proj,p_len,ofs,grp);
+            res = apply_rel_prod(set,trans,proj,p_len,ofs,grp);
         else
             res = copy_level_sat(set,trans,proj,p_len,ofs,grp);
 
@@ -1575,8 +1575,8 @@ set_reach_2_sat(ATerm set, ATerm trans, int *proj, int p_len, int ofs, int grp)
 }
 
 static ATerm
-apply_reach_fixpoint(ATerm set, ATerm trans, int *proj, int p_len,
-                         int ofs, int grp)
+apply_rel_fixpoint(ATerm set, ATerm trans, int *proj, int p_len,
+                   int ofs, int grp)
 {
     ATerm res=set;
 
@@ -1626,9 +1626,9 @@ sat_fixpoint(int level, ATerm set)
         for (int i = 0; i < groups_info.tg_len; i++) {
             int grp = groups_info.top_groups[i];
 
-            new_set = apply_reach_fixpoint(new_set, rel_set[grp]->rel,
-                                               rel_set[grp]->proj,
-                                               rel_set[grp]->p_len, level, grp);
+            new_set = apply_rel_fixpoint(new_set, rel_set[grp]->rel,
+                                         rel_set[grp]->proj,
+                                         rel_set[grp]->p_len, level, grp);
         }
     }
 
@@ -1640,25 +1640,26 @@ sat_fixpoint(int level, ATerm set)
 // - Induction: construct a new MDD node with the link to next entry of the
 //   MDD node handled recursively
 static ATerm
-saturate_locals(int level, ATerm node_set)
+saturate_level(int level, ATerm node_set)
 {
     if (ATisEqual(node_set, emptyset) || ATisEqual(node_set, atom))
         return node_set;
 
     ATerm sat_set = saturate(level + 1, ATgetArgument(node_set, 1));
-    ATerm new_node_set = saturate_locals(level, ATgetArgument(node_set, 2));
+    ATerm new_node_set = saturate_level(level, ATgetArgument(node_set, 2));
     return MakeCons(ATgetArgument(node_set, 0), sat_set, new_node_set);
 }
 
 // Saturation process for the MDD at a given level
 static ATerm
-saturate(int level, ATerm set) {
+saturate(int level, ATerm set)
+{
     ATerm new_set = ATtableGet(global_sc, set);
 
     if (new_set)
         return new_set;
 
-    new_set = saturate_locals(level, set);
+    new_set = saturate_level(level, set);
     new_set = sat_fixpoint(level, new_set);
     ATtablePut(global_sc, set, new_set);
     return new_set;
