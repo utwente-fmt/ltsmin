@@ -6,7 +6,36 @@
 #include <runtime.h>
 #include <stdint.h>
 
-static uint32_t mdd_nodes=1000000;
+static uint32_t mdd_nodes;
+static uint32_t uniq_size;
+static uint32_t cache_size;
+
+/** fibonacci number of the size of the node table. */
+static uint32_t nodes_fib=30;
+/** difference between the fibonacci numbers of the sizes of the node table and the cache. */
+static int cache_fib=0;
+
+static uint32_t fib(uint32_t n){
+    uint32_t tmp1=0;
+    uint32_t tmp2=1;
+    while(n>0){
+        uint32_t tmp=tmp1;
+        tmp1=tmp2;
+        tmp2+=tmp;
+        n--;
+    }
+    return tmp1;
+}
+
+struct poptOption listdd_options[]= {
+	{ "ldd-nodes",0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &nodes_fib , 0 , "set intial step in node size","<step>"},
+/* The following code is present as a hook for tuning the cache implementation,
+   which is future work.
+	{ "ldd-cache",0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &cache_fib , 0 , "set difference between cache and nodes","<diff>"},
+ */
+	POPT_TABLEEND
+};
+
 static uint32_t free_node=1;
 static uint32_t* unique_table=NULL;
 struct mdd_node {
@@ -128,18 +157,18 @@ static uint32_t mdd_node_count(uint32_t mdd){
 	return res+2; // real nodes plus emptyset(0) and singleton epsilon(1).
 }
 
-static uint32_t mdd_sweep(uint32_t mdd){
+static uint32_t mdd_sweep_bucket(uint32_t mdd){
 	if (mdd==0) return 0;
 	if (mdd==1) Abort("data corruption");
 	if (node_table[mdd].val&0x80000000){
         node_table[mdd].val=node_table[mdd].val&0x7fffffff;
-		node_table[mdd].next=mdd_sweep(node_table[mdd].next);
+		node_table[mdd].next=mdd_sweep_bucket(node_table[mdd].next);
 		return mdd;
 	} else {
 		uint32_t tmp=node_table[mdd].next;
 		node_table[mdd].next=free_node;
 		free_node=mdd;
-		return mdd_sweep(tmp);
+		return mdd_sweep_bucket(tmp);
 	}
 }
 
@@ -160,27 +189,93 @@ static void mdd_collect(uint32_t a,uint32_t b){
 	for(int i=0;i<mdd_top;i++){
 		mdd_mark(mdd_stack[i]);
 	}
-	for(uint32_t i=0;i<mdd_nodes;i++){
-		switch(op_cache[i].op&0xffff){
+	/* The following code marks results of projection and
+	   next, to allow them to remain in the cache. On the
+	   few tests done, there did not seem to be a speedup
+	   but the memory use went up considerably.
+	   Still it may be useful for saturation.
+	for(uint32_t i=0;i<cache_size;i++){
+	    uint32_t slot,op,arg1,arg2,res;
+	    op=op_cache[i].op&0xffff;
+		switch(op){
+			case OP_PROJECT:
+            {
+                arg1=op_cache[i].arg1;
+                if (!(node_table[arg1].val&0x80000000)) {
+                    op_cache[i].op=OP_UNUSED;
+                    continue;
+                }
+                res=op_cache[i].res.other.res;
+                mdd_mark(res);
+                continue;
+            }
+            case OP_NEXT:
+            case OP_PREV:
+			{
+				arg1=op_cache[i].arg1;
+				if (!(node_table[arg1].val&0x80000000)) {
+					op_cache[i].op=OP_UNUSED;
+					continue;
+				}
+				arg2=op_cache[i].res.other.arg2;
+				if (!(node_table[arg2].val&0x80000000)) {
+					op_cache[i].op=OP_UNUSED;
+					continue;
+				}
+				res=op_cache[i].res.other.res;
+                mdd_mark(res);
+				continue;
+			}
+			default: continue;
+		}
+	}
+	*/
+	Warning(info,"ListDD garbage collection: %d of %d nodes used",mdd_used,mdd_nodes);
+	int resize=0;
+	uint32_t new_cache_size;
+	struct op_rec *new_cache;
+	uint32_t copy_count=0;
+	if (mdd_used > fib(nodes_fib-1)){
+	    Warning(info,"insufficient free nodes, resizing");
+	    resize=1;
+        new_cache_size=fib(nodes_fib+cache_fib);
+        new_cache=RTmalloc(new_cache_size*sizeof(struct op_rec));
+		for(uint32_t i=0;i<new_cache_size;i++){
+			new_cache[i].op=0;
+		}
+		if (new_cache_size < cache_size) Abort("cache size overflow");
+		Warning(info,"new cache has %u entries",new_cache_size);
+	}
+	for(uint32_t i=0;i<cache_size;i++){
+	    uint32_t slot,op,arg1,arg2,res;
+	    op=op_cache[i].op&0xffff;
+		switch(op){
 			case OP_UNUSED: continue;
 			case OP_COUNT: {
-				uint32_t mdd=op_cache[i].arg1;
-				if (!(node_table[mdd].val&0x80000000)) op_cache[i].op=OP_UNUSED;
-				continue;
+				arg1=op_cache[i].arg1;
+				arg2=0;
+				if (!(node_table[arg1].val&0x80000000)){
+				    op_cache[i].op=OP_UNUSED;
+				    continue;
+			    }
+				if (resize) break;
+                else continue;
 			}
 			case OP_PROJECT:
             {
-                uint32_t mdd=op_cache[i].arg1;
-                if (!(node_table[mdd].val&0x80000000)) {
+                arg1=op_cache[i].arg1;
+                if (!(node_table[arg1].val&0x80000000)) {
                     op_cache[i].op=OP_UNUSED;
                     continue;
                 }
-                mdd=op_cache[i].res.other.res;
-                if (!(node_table[mdd].val&0x80000000)) {
+                arg2=op_cache[i].res.other.arg2;
+                res=op_cache[i].res.other.res;
+                if (!(node_table[res].val&0x80000000)) {
                     op_cache[i].op=OP_UNUSED;
                     continue;
                 }
-                continue;
+                if (resize) break;
+                else continue;
             }
 			case OP_UNION:
 			case OP_MINUS:
@@ -189,34 +284,73 @@ static void mdd_collect(uint32_t a,uint32_t b){
             case OP_COPY_MATCH:
             case OP_INTERSECT:
 			{
-				uint32_t mdd=op_cache[i].arg1;
-				if (!(node_table[mdd].val&0x80000000)) {
+				arg1=op_cache[i].arg1;
+				if (!(node_table[arg1].val&0x80000000)) {
 					op_cache[i].op=OP_UNUSED;
 					continue;
 				}
-				mdd=op_cache[i].res.other.arg2;
-				if (!(node_table[mdd].val&0x80000000)) {
+				arg2=op_cache[i].res.other.arg2;
+				if (!(node_table[arg2].val&0x80000000)) {
 					op_cache[i].op=OP_UNUSED;
 					continue;
 				}
-				mdd=op_cache[i].res.other.res;
-				if (!(node_table[mdd].val&0x80000000)) {
+				res=op_cache[i].res.other.res;
+				if (!(node_table[res].val&0x80000000)) {
 					op_cache[i].op=OP_UNUSED;
 					continue;
 				}
-				continue;
+				if (resize) break;
+                else continue;
 			}
 			default: Abort("missing case");
 		}
+		slot=hash(op,arg1,arg2)%new_cache_size;
+		copy_count++;
+		new_cache[slot]=op_cache[i];
 	}
-	for(uint32_t i=0;i<mdd_nodes;i++){
-		unique_table[i]=mdd_sweep(unique_table[i]);
+	if (!resize){
+    	for(uint32_t i=0;i<uniq_size;i++){
+    		unique_table[i]=mdd_sweep_bucket(unique_table[i]);
+    	}
+	} else {
+	    Warning(info,"copied %u cache nodes",copy_count);
+	    RTfree(op_cache);
+	    op_cache=new_cache;
+	    cache_size=new_cache_size;
+	    nodes_fib++;
+		uint32_t old_size=mdd_nodes;
+		mdd_nodes=fib(nodes_fib);
+	    uniq_size=fib(nodes_fib+1);
+	    if (uniq_size<mdd_nodes) Abort("overflow in node table resize");
+	    unique_table=RTrealloc(unique_table,uniq_size*sizeof(int));
+	    node_table=RTrealloc(node_table,mdd_nodes*sizeof(struct mdd_node));
+	    for(uint32_t i=0;i<uniq_size;i++){
+			unique_table[i]=0;
+		}
+		free_node=old_size;
+		for(uint32_t i=old_size;i<mdd_nodes;i++){
+		    node_table[i].val=0;
+			node_table[i].next=i+1;
+		}
+		node_table[mdd_nodes-1].next=0;
+		for(uint32_t i=2;i<old_size;i++){
+	        if (node_table[i].val&0x80000000){
+                node_table[i].val=node_table[i].val&0x7fffffff;
+	            uint32_t slot=hash(node_table[i].val,node_table[i].down,node_table[i].right)%uniq_size;
+		        node_table[i].next=unique_table[slot];
+		        unique_table[slot]=i;
+	        } else {
+	            node_table[i].next=free_node;
+	            free_node=i;
+	        }
+		}
+	    Warning(info,"node/unique tables have %u/%u entries",mdd_nodes,uniq_size);
 	}
 }
 
 static uint64_t mdd_count(uint32_t mdd){
     if (mdd<=1) return mdd;
-    uint32_t slot=hash(OP_COUNT,mdd,0)%mdd_nodes;
+    uint32_t slot=hash(OP_COUNT,mdd,0)%cache_size;
     if (op_cache[slot].op==OP_COUNT && op_cache[slot].arg1==mdd){
         return op_cache[slot].res.count;
     }
@@ -230,7 +364,9 @@ static uint64_t mdd_count(uint32_t mdd){
 
 static uint32_t mdd_create_node(uint32_t val,uint32_t down,uint32_t right){
     if (down==0) return right;
-	uint32_t slot=hash(val,down,right)%mdd_nodes;
+	if (right>1 && val>=node_table[right].val) Abort("bad order %d %d",*((int*)1),node_table[right].val);
+	uint32_t slot_hash=hash(val,down,right);
+	uint32_t slot=slot_hash%uniq_size;
 	uint32_t res=unique_table[slot];
 	while(res){
 		if (node_table[res].val==val
@@ -240,10 +376,10 @@ static uint32_t mdd_create_node(uint32_t val,uint32_t down,uint32_t right){
         }
 		res=node_table[res].next;
 	}
-	if (right>1 && val>=node_table[right].val) Abort("bad order %d %d",*((int*)1),node_table[right].val);
 	if (free_node==0) {
 		mdd_collect(down,right);
-		if (free_node==0) Abort("%d mdd nodes are not enough",mdd_nodes);
+		// recompute slot in case of resize...
+		slot=slot_hash%uniq_size;
 	}
 	res=free_node;
 	free_node=node_table[free_node].next;
@@ -261,7 +397,8 @@ static uint32_t mdd_union(uint32_t a,uint32_t b){
 	if(b==0) return a;
 	if(a==1 || b==1) Abort("missing case in union");
 	if (b<a) { uint32_t tmp=a;a=b;b=tmp; }
-	uint32_t slot=hash(OP_UNION,a,b)%mdd_nodes;
+	uint32_t slot_hash=hash(OP_UNION,a,b);
+	uint32_t slot=slot_hash%cache_size;
 	if(op_cache[slot].op==OP_UNION && op_cache[slot].arg1==a && op_cache[slot].res.other.arg2==b) {
 		return op_cache[slot].res.other.res;
 	}
@@ -278,6 +415,7 @@ static uint32_t mdd_union(uint32_t a,uint32_t b){
 		tmp=mdd_union(a,node_table[b].right);
 		tmp=mdd_create_node(node_table[b].val,node_table[b].down,tmp);
 	}
+	slot=slot_hash%cache_size;
 	op_cache[slot].op=OP_UNION;
 	op_cache[slot].arg1=a;
 	op_cache[slot].res.other.arg2=b;
@@ -290,7 +428,8 @@ static uint32_t mdd_minus(uint32_t a,uint32_t b){
 	if(a==0) return 0;
 	if(b==0) return a;
 	if(a==1||b==1) Abort("missing case in minus");
-	uint32_t slot=hash(OP_MINUS,a,b)%mdd_nodes;
+	uint32_t slot_hash=hash(OP_MINUS,a,b);
+	uint32_t slot=slot_hash%cache_size;
 	if(op_cache[slot].op==OP_MINUS && op_cache[slot].arg1==a && op_cache[slot].res.other.arg2==b) {
 		return op_cache[slot].res.other.res;
 	}
@@ -305,6 +444,7 @@ static uint32_t mdd_minus(uint32_t a,uint32_t b){
 	} else { //(node_table[a].val>node_table[b].val)
 		tmp=mdd_minus(a,node_table[b].right);
 	}
+	slot=slot_hash%cache_size;
 	op_cache[slot].op=OP_MINUS;
 	op_cache[slot].arg1=a;
 	op_cache[slot].res.other.arg2=b;
@@ -387,7 +527,8 @@ static uint32_t
 mdd_copy_match(uint32_t mdd, int len, uint32_t pattern, int *proj,
                    int p_len, int ofs)
 {
-    uint32_t slot = hash(OP_COPY_MATCH, mdd, pattern) % mdd_nodes;
+    uint32_t slot_hash=hash(OP_COPY_MATCH, mdd, pattern);
+    uint32_t slot=slot_hash%cache_size;
 
     if (op_cache[slot].op == OP_COPY_MATCH && op_cache[slot].arg1 == mdd
             && op_cache[slot].res.other.arg2 == pattern) {
@@ -433,6 +574,7 @@ mdd_copy_match(uint32_t mdd, int len, uint32_t pattern, int *proj,
         }
     }
 
+    slot = slot_hash % cache_size;
     op_cache[slot].op = OP_COPY_MATCH;
     op_cache[slot].arg1 = mdd;
     op_cache[slot].res.other.arg2 = pattern;
@@ -448,7 +590,8 @@ mdd_intersect(uint32_t a, uint32_t b)
     if (a == 0 || b == 0) return 0;
     if (a == 1 || b == 1) Abort("missing case in intersect");
 
-    uint32_t slot = hash(OP_INTERSECT, a, b) % mdd_nodes;
+    uint32_t slot_hash = hash(OP_INTERSECT, a, b);
+    uint32_t slot = slot_hash % cache_size;
 
     if (op_cache[slot].op == OP_INTERSECT && op_cache[slot].arg1 == a
             && op_cache[slot].res.other.arg2 == b) {
@@ -468,6 +611,7 @@ mdd_intersect(uint32_t a, uint32_t b)
         tmp = mdd_intersect(a, node_table[b].right);
     }
 
+    slot = slot_hash % cache_size;
     op_cache[slot].op = OP_INTERSECT;
     op_cache[slot].arg1 = a;
     op_cache[slot].res.other.arg2 = b;
@@ -493,12 +637,6 @@ static uint32_t mdd_take(uint32_t mdd,int len,uint32_t count){
 	}
 }
 */
-
-struct poptOption listdd_options[]= {
-	{ "ldd-nodes",0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &mdd_nodes , 0 , "set number of nodes","<nodes>"},
-	POPT_TABLEEND
-};
-
 
 static vset_t set_create_mdd(vdom_t dom,int k,int* proj){
     vset_t set=(vset_t)RTmalloc(sizeof(struct vector_set)+k*sizeof(int));
@@ -647,7 +785,8 @@ static uint32_t mdd_project(uint32_t setid,uint32_t mdd,int idx,int*proj,int len
     if(mdd==0) return 0; //projection of empty is empty.
     if(len==0) return 1; //projection of non-empty is epsilon.
 
-    uint32_t slot=hash(OP_PROJECT,mdd,setid)%mdd_nodes;
+    uint32_t slot_hash=hash(OP_PROJECT,mdd,setid);
+    uint32_t slot=slot_hash%cache_size;
     if(op_cache[slot].op==OP_PROJECT && op_cache[slot].arg1==mdd
        && op_cache[slot].res.other.arg2==setid) {
         return op_cache[slot].res.other.res;
@@ -671,6 +810,7 @@ static uint32_t mdd_project(uint32_t setid,uint32_t mdd,int idx,int*proj,int len
         }
     }
 
+    slot=slot_hash%cache_size;
     op_cache[slot].op=OP_PROJECT;
     op_cache[slot].arg1=mdd_original;
     op_cache[slot].res.other.arg2=setid;
@@ -695,7 +835,8 @@ static uint32_t mdd_next(int relid,uint32_t set,uint32_t rel,int idx,int*proj,in
 		}
     }
     uint32_t op=OP_NEXT|(relid<<16);
-    uint32_t slot=hash(op,set,rel)%mdd_nodes;
+    uint32_t slot_hash=hash(op,set,rel);
+    uint32_t slot=slot_hash%cache_size;
     if(op_cache[slot].op==op && op_cache[slot].arg1==set && op_cache[slot].res.other.arg2==rel) {
         return op_cache[slot].res.other.res;
     }
@@ -717,6 +858,8 @@ static uint32_t mdd_next(int relid,uint32_t set,uint32_t rel,int idx,int*proj,in
         res=mdd_next(relid,node_table[set].down,rel,idx+1,proj,len);
         res=mdd_create_node(node_table[set].val,res,mdd_pop());
     }
+
+    slot=slot_hash%cache_size;
     op_cache[slot].op=op;
     op_cache[slot].arg1=set;
     op_cache[slot].res.other.arg2=rel;
@@ -752,7 +895,8 @@ static uint32_t mdd_prev(int relid,uint32_t set,uint32_t rel,int idx,int*proj,in
     if (rel==0||set==0) return 0;
     if (rel==1||set==1) Abort("missing case in prev");
     uint32_t op=OP_PREV|(relid<<16);
-    uint32_t slot=hash(op,set,rel)%mdd_nodes;
+    uint32_t slot_hash=hash(op,set,rel);
+    uint32_t slot=slot_hash%cache_size;
     if(op_cache[slot].op==op && op_cache[slot].arg1==set && op_cache[slot].res.other.arg2==rel) {
         return op_cache[slot].res.other.res;
     }
@@ -785,6 +929,8 @@ static uint32_t mdd_prev(int relid,uint32_t set,uint32_t rel,int idx,int*proj,in
         res=mdd_prev(relid,node_table[set].down,rel,idx+1,proj,len);
         res=mdd_create_node(node_table[set].val,res,mdd_pop());
     }
+
+    slot=slot_hash%cache_size;
     op_cache[slot].op=op;
     op_cache[slot].arg1=set;
     op_cache[slot].res.other.arg2=rel;
@@ -804,18 +950,31 @@ vdom_t vdom_create_list_native(int n){
 	vdom_t dom=(vdom_t)RTmalloc(sizeof(struct vector_domain));
 	vdom_init_shared(dom,n);
 	if (unique_table==NULL) {
-		if (mdd_nodes==0) Abort("please set mdd_nodes");	
-		unique_table=RTmalloc(mdd_nodes*sizeof(int));
-		node_table=RTmalloc(mdd_nodes*sizeof(struct mdd_node));
-		op_cache=RTmalloc(mdd_nodes*sizeof(struct op_rec));
+	    mdd_nodes=fib(nodes_fib);
+	    Warning(info,"initial node table has %u entries",mdd_nodes);
+	    uniq_size=fib(nodes_fib+1);
+	    Warning(info,"initial uniq table has %u entries",uniq_size);
+        cache_size=fib(nodes_fib+cache_fib);
+        Warning(info,"initial operation cache has %u entries",cache_size);
 
-		for(uint32_t i=0;i<mdd_nodes;i++){
+		unique_table=RTmalloc(uniq_size*sizeof(int));
+		node_table=RTmalloc(mdd_nodes*sizeof(struct mdd_node));
+		op_cache=RTmalloc(cache_size*sizeof(struct op_rec));
+
+		for(uint32_t i=0;i<uniq_size;i++){
 			unique_table[i]=0;
+		}
+		node_table[0].val=0;
+		node_table[1].val=0;
+		for(uint32_t i=2;i<mdd_nodes;i++){
+		    node_table[i].val=0;
 			node_table[i].next=i+1;
-			op_cache[i].op=0;
 		}
 		node_table[mdd_nodes-1].next=0;
 		free_node=2;
+		for(uint32_t i=0;i<cache_size;i++){
+			op_cache[i].op=0;
+		}
 	}
 	dom->shared.set_create=set_create_mdd;
 	dom->shared.set_member=set_member_mdd;
