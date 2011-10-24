@@ -1,0 +1,6 @@
+=== ListDD Options
+
+*--ldd-step*='STEP'::
+        The internal tables of ListDD resize according to the Fibonacci series.
+        This option sets the initial size to the Fibonacci number 'STEP'.
+        Defaults to 30.

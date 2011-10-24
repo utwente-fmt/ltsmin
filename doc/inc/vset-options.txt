@@ -6,3 +6,8 @@
         tree encoding are used. With 'fdd', BuDDy FDDs are used. With 'ldd',
         a non-ATermDD vector set with list encoding is used. With 'ddd',
         libDDD SDDs are used. Defaults to first available type in the list.
+
+include::listdd-options.txt[]
+
+include::buddy-options.txt[]
+
