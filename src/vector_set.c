@@ -47,6 +47,7 @@ static void vset_popt(poptContext con,
 
 
 static si_map_entry vset_table[]={
+	{"ldd",VSET_ListDD},
 #ifdef HAVE_ATERM2_H
 	{"list",VSET_AtermDD_list},
 	{"tree",VSET_AtermDD_tree},
@@ -55,7 +56,6 @@ static si_map_entry vset_table[]={
 #ifdef HAVE_DDD_H
 	{"ddd",VSET_DDD},
 #endif
-	{"ldd",VSET_ListDD},
 	{NULL,0}
 };
 
@@ -65,12 +65,12 @@ struct poptOption vset_options[]={
 	{ "vset" , 0 , POPT_ARG_STRING , NULL , 0 ,
 		"select a vector set implementation from ATermDD with *list* encoding,"
 		" ATermDD with *tree* encoding, BuDDy using the *fdd* feature, or"
-		" native ListDD, or DDD (default: first available)" , "<list|tree|fdd|ddd|ldd>" },
+		" native ListDD, or DDD (default: first available)" , "<ldd|list|tree|fdd|ddd>" },
+	{ NULL,0 , POPT_ARG_INCLUDE_TABLE , listdd_options , 0 , "ListDD options" , NULL},
 #ifdef HAVE_ATERM2_H
 	{ NULL,0 , POPT_ARG_INCLUDE_TABLE , atermdd_options , 0 , "ATermDD options" , NULL},
 #endif
 	{ NULL,0 , POPT_ARG_INCLUDE_TABLE , buddy_options , 0 , "BuDDy options" , NULL},
-	{ NULL,0 , POPT_ARG_INCLUDE_TABLE , listdd_options , 0 , "ListDD options" , NULL},
 	POPT_TABLEEND
 };
 
@@ -82,6 +82,7 @@ vdom_create_domain(int n, vset_implementation_t impl)
     switch(impl){
     case VSET_IMPL_AUTOSELECT:
         /* fall-through */
+    case VSET_ListDD: return vdom_create_list_native(n);
 #ifdef HAVE_ATERM2_H
     case VSET_AtermDD_list: return vdom_create_list(n);
     case VSET_AtermDD_tree: return vdom_create_tree(n);
@@ -90,7 +91,6 @@ vdom_create_domain(int n, vset_implementation_t impl)
 #ifdef HAVE_DDD_H
     case VSET_DDD: return vdom_create_ddd(n);
 #endif
-    case VSET_ListDD: return vdom_create_list_native(n);
         default:
             return NULL;
     }
