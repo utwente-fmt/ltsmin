@@ -872,6 +872,7 @@ static uint32_t mdd_next(int relid,uint32_t set,uint32_t rel,int idx,int*proj,in
 }
 
 static void set_project_mdd(vset_t dst,vset_t src){
+    if (dst->p_len==0) Abort("project requires strict subvector");
     dst->mdd=0;
     dst->mdd=mdd_project(dst->setid,src->mdd,0,dst->proj,dst->p_len);
 }
@@ -1107,6 +1108,7 @@ sat_fixpoint(int level, uint32_t set)
         for (uint32_t i = 0; i < groups_info.tg_len; i++) {
             uint32_t grp = groups_info.top_groups[i];
             mdd_push(new_set);
+            assert(rel_set[grp]->p_len != 0);
             new_set = apply_rel_fixpoint(rel_set[grp]->relid, new_set,
                                          rel_set[grp]->mdd, level,
                                          rel_set[grp]->proj,
@@ -1164,7 +1166,7 @@ set_least_fixpoint_mdd(vset_t dst, vset_t src, vrel_t rels[], int rel_count)
     uint32_t count = (uint32_t)rel_count;
 
     // Only implemented if not projected
-    assert (src->p_len == 0 && dst->p_len == 0);
+    assert(src->p_len == 0 && dst->p_len == 0);
 
     // Initialize partitioned transition relations.
     rel_set = rels;
