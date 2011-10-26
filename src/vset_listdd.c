@@ -968,6 +968,7 @@ typedef struct {
 } top_groups_info;
 
 static vrel_t *rel_set;
+static vset_t *proj_set;
 static uint32_t rels_tot;
 static top_groups_info *top_groups;
 
@@ -1125,6 +1126,16 @@ sat_fixpoint(int level, uint32_t set)
             uint32_t grp = groups_info.top_groups[i];
             mdd_push(new_set);
             assert(rel_set[grp]->p_len != 0);
+
+            if (rel_set[grp]->expand != NULL) {
+                proj_set[grp]->mdd = mdd_project(rel_set[grp]->p_id, new_set,
+                                                 level, proj_set[grp]->proj,
+                                                 proj_set[grp]->p_len);
+                rel_set[grp]->expand(rel_set[grp], proj_set[grp],
+                                     rel_set[grp]->expand_ctx);
+                proj_set[grp]->mdd = 0;
+            }
+
             new_set = apply_rel_fixpoint(rel_set[grp]->p_id, new_set,
                                          rel_set[grp]->mdd, level,
                                          rel_set[grp]->proj,
@@ -1196,9 +1207,10 @@ set_least_fixpoint_mdd(vset_t dst, vset_t src, vrel_t rels[], int rel_count)
     rels_tot = rels_tmp;
 
     // Initialize top_groups_info array
-    // This stores transitions groups per topmost level
+    // This stores transition groups per topmost level
     uint32_t init_state_len = src->dom->shared.size;
     top_groups = RTmalloc(sizeof(top_groups_info[init_state_len]));
+    proj_set = RTmalloc(sizeof(vset_t[count]));
 
     for (uint32_t lvl = 0; lvl < init_state_len; lvl++) {
         top_groups[lvl].top_groups = RTmalloc(sizeof(uint32_t[count]));
@@ -1209,6 +1221,8 @@ set_least_fixpoint_mdd(vset_t dst, vset_t src, vrel_t rels[], int rel_count)
         uint32_t top_lvl = rels[grp]->proj[0];
         top_groups[top_lvl].top_groups[top_groups[top_lvl].tg_len] = grp;
         top_groups[top_lvl].tg_len++;
+        proj_set[grp] = set_create_mdd(rels[grp]->dom, rels[grp]->p_len,
+                                       rels[grp]->proj);
     }
 
     // Saturation on initial state set
@@ -1219,9 +1233,13 @@ set_least_fixpoint_mdd(vset_t dst, vset_t src, vrel_t rels[], int rel_count)
     rels_tot = 0;
     mdd_pop();
 
+    for (uint32_t grp = 0; grp < count; grp++)
+        vset_destroy(proj_set[grp]);
+
     for (uint32_t lvl = 0; lvl < init_state_len; lvl++)
         RTfree(top_groups[lvl].top_groups);
 
+    RTfree(proj_set);
     RTfree(top_groups);
 }
 
