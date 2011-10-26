@@ -65,6 +65,8 @@ struct vector_set {
 
 struct vector_relation {
 	vdom_t dom;
+    expand_cb expand;
+    void *expand_ctx;
 	ATerm rel;
 	int p_len;
 	int proj[];

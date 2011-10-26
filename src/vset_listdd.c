@@ -57,13 +57,15 @@ struct vector_set {
 static uint32_t next_relid=0;
 
 struct vector_relation {
-	vdom_t dom;
-	vrel_t next; // double linked list of protected mdd's;
-	vrel_t prev; //
-	uint32_t relid;
-	uint32_t mdd;
-	int p_len;
-	int proj[];
+    vdom_t dom;
+    expand_cb expand;
+    void *expand_ctx;
+    vrel_t next; // double linked list of protected mdd's;
+    vrel_t prev; //
+    uint32_t relid;
+    uint32_t mdd;
+    int p_len;
+    int proj[];
 };
 
 static inline uint32_t hash(uint32_t a,uint32_t b,uint32_t c){
