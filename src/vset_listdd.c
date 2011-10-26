@@ -75,26 +75,22 @@ struct vector_domain {
     // single global structure for now.
 };
 
-static uint32_t next_setid=0;
-
 struct vector_set {
     vdom_t dom;
     vset_t next; // double linked list of protected mdd's;
     vset_t prev; //
-    uint32_t setid;
     uint32_t mdd;
+    uint32_t p_id;
     int p_len;
     int proj[];
 };
-
-static uint32_t next_relid=0;
 
 struct vector_relation {
     vdom_t dom;
     vrel_t next; // double linked list of protected mdd's;
     vrel_t prev; //
-    uint32_t relid;
     uint32_t mdd;
+    uint32_t p_id;
     int p_len;
     int proj[];
 };
@@ -181,11 +177,13 @@ static void mdd_collect(uint32_t a,uint32_t b){
     vset_t set=protected_sets;
     while(set!=NULL){
         mdd_mark(set->mdd);
+        mdd_mark(set->p_id);
         set=set->next;
     }
     vrel_t rel=protected_rels;
     while(rel!=NULL){
         mdd_mark(rel->mdd);
+        mdd_mark(rel->p_id);
         rel=rel->next;
     }
     for(int i=0;i<mdd_top;i++){
@@ -648,14 +646,15 @@ static vset_t set_create_mdd(vdom_t dom,int k,int* proj){
     vset_t set=(vset_t)RTmalloc(sizeof(struct vector_set)+k*sizeof(int));
     set->dom=dom;
     set->mdd=0;
-    set->setid=next_setid++;
     set->next=protected_sets;
     set->prev=NULL;
     if (protected_sets != NULL) protected_sets->prev=set;
     protected_sets=set;
     set->p_len=k;
-    for(int i=0;i<k;i++) {
+    set->p_id = 1;
+    for(int i=k - 1;i >= 0;i--) {
         set->proj[i]=proj[i];
+        set->p_id = mdd_create_node(proj[i], set->p_id, 0);
     }
     return set;
 }
@@ -675,14 +674,17 @@ static vrel_t rel_create_mdd(vdom_t dom,int k,int* proj){
     vrel_t rel=(vrel_t)RTmalloc(sizeof(struct vector_relation)+k*sizeof(int));
     rel->dom=dom;
     rel->mdd=0;
-    rel->relid=next_relid++;
     rel->next=protected_rels;
     rel->prev=NULL;
     if (protected_rels != NULL) protected_rels->prev=rel;
     protected_rels=rel;
     rel->p_len=k;
-    for(int i=0;i<k;i++) {
+    rel->p_id = 1;
+    for(int i=k - 1;i >= 0;i--) {
         rel->proj[i]=proj[i];
+        rel->p_id = mdd_create_node(proj[i], rel->p_id, 0);
+        // The p_id of a relation is shifted in hash keys; check this is ok
+        if ((rel->p_id >> 16) > 0) Abort("projection identifier too large");
     }
     return rel;
 }
@@ -785,14 +787,16 @@ static void rel_add_mdd(vrel_t rel,const int* src, const int* dst){
     rel->mdd=mdd_put(rel->mdd,vec,2*N,NULL);
 }
 
-static uint32_t mdd_project(uint32_t setid,uint32_t mdd,int idx,int*proj,int len){
+static uint32_t
+mdd_project(uint32_t p_id, uint32_t mdd, int idx, int *proj, int len)
+{
     if(mdd==0) return 0; //projection of empty is empty.
     if(len==0) return 1; //projection of non-empty is epsilon.
 
-    uint32_t slot_hash=hash(OP_PROJECT,mdd,setid);
+    uint32_t slot_hash=hash(OP_PROJECT,mdd,p_id);
     uint32_t slot=slot_hash%cache_size;
     if(op_cache[slot].op==OP_PROJECT && op_cache[slot].arg1==mdd
-       && op_cache[slot].res.other.arg2==setid) {
+       && op_cache[slot].res.other.arg2==p_id) {
         return op_cache[slot].res.other.res;
     }
 
@@ -800,13 +804,14 @@ static uint32_t mdd_project(uint32_t setid,uint32_t mdd,int idx,int*proj,int len
     uint32_t mdd_original = mdd;
 
     if (proj[0]==idx){
-        mdd_push(mdd_project(setid,node_table[mdd].right,idx,proj,len));
-        uint32_t tmp=mdd_project(setid,node_table[mdd].down,idx+1,proj+1,len-1);
+        mdd_push(mdd_project(p_id,node_table[mdd].right,idx,proj,len));
+        uint32_t tmp=mdd_project(node_table[p_id].down, node_table[mdd].down,
+                                 idx+1, proj+1, len-1);
         res=mdd_create_node(node_table[mdd].val,tmp,mdd_pop());
     } else {
         while(mdd>1){
             mdd_push(res);
-            uint32_t tmp=mdd_project(setid,node_table[mdd].down,idx+1,proj,len);
+            uint32_t tmp=mdd_project(p_id,node_table[mdd].down,idx+1,proj,len);
             mdd_push(tmp);
             res=mdd_union(res,tmp);
             mdd_pop();mdd_pop();
@@ -817,12 +822,14 @@ static uint32_t mdd_project(uint32_t setid,uint32_t mdd,int idx,int*proj,int len
     slot=slot_hash%cache_size;
     op_cache[slot].op=OP_PROJECT;
     op_cache[slot].arg1=mdd_original;
-    op_cache[slot].res.other.arg2=setid;
+    op_cache[slot].res.other.arg2=p_id;
     op_cache[slot].res.other.res=res;
     return res;
 }
 
-static uint32_t mdd_next(int relid,uint32_t set,uint32_t rel,int idx,int*proj,int len){
+static uint32_t
+mdd_next(uint32_t p_id, uint32_t set, uint32_t rel, int idx, int *proj, int len)
+{
     if (len==0) return set;
     if (rel==0||set==0) return 0;
     if (rel==1||set==1) Abort("missing case in next");
@@ -838,7 +845,7 @@ static uint32_t mdd_next(int relid,uint32_t set,uint32_t rel,int idx,int*proj,in
             }
         }
     }
-    uint32_t op=OP_NEXT|(relid<<16);
+    uint32_t op=OP_NEXT|(p_id<<16);
     uint32_t slot_hash=hash(op,set,rel);
     uint32_t slot=slot_hash%cache_size;
     if(op_cache[slot].op==op && op_cache[slot].arg1==set && op_cache[slot].res.other.arg2==rel) {
@@ -846,11 +853,13 @@ static uint32_t mdd_next(int relid,uint32_t set,uint32_t rel,int idx,int*proj,in
     }
     uint32_t res=0;
     if (proj[0]==idx){
-        res=mdd_next(relid,node_table[set].right,node_table[rel].right,idx,proj,len);
+        res = mdd_next(p_id, node_table[set].right, node_table[rel].right,
+                       idx, proj, len);
         rel=node_table[rel].down;
         while(rel>1){
             mdd_push(res);
-            uint32_t tmp=mdd_next(relid,node_table[set].down,node_table[rel].down,idx+1,proj+1,len-1);
+            uint32_t tmp = mdd_next(node_table[p_id].down, node_table[set].down,
+                                    node_table[rel].down, idx+1, proj+1, len-1);
             tmp=mdd_create_node(node_table[rel].val,tmp,0);
             mdd_push(tmp);
             res=mdd_union(res,tmp);
@@ -858,8 +867,8 @@ static uint32_t mdd_next(int relid,uint32_t set,uint32_t rel,int idx,int*proj,in
             rel=node_table[rel].right;
         }
     } else {
-        mdd_push(mdd_next(relid,node_table[set].right,rel,idx,proj,len));
-        res=mdd_next(relid,node_table[set].down,rel,idx+1,proj,len);
+        mdd_push(mdd_next(p_id,node_table[set].right,rel,idx,proj,len));
+        res=mdd_next(p_id,node_table[set].down,rel,idx+1,proj,len);
         res=mdd_create_node(node_table[set].val,res,mdd_pop());
     }
 
@@ -874,12 +883,12 @@ static uint32_t mdd_next(int relid,uint32_t set,uint32_t rel,int idx,int*proj,in
 static void set_project_mdd(vset_t dst,vset_t src){
     if (dst->p_len==0) Abort("project requires strict subvector");
     dst->mdd=0;
-    dst->mdd=mdd_project(dst->setid,src->mdd,0,dst->proj,dst->p_len);
+    dst->mdd=mdd_project(dst->p_id,src->mdd,0,dst->proj,dst->p_len);
 }
 
 static void set_next_mdd(vset_t dst,vset_t src,vrel_t rel){
     if (rel->p_len==0) Abort("next requires strict subvector");
-    dst->mdd=mdd_next(rel->relid,src->mdd,rel->mdd,0,rel->proj,rel->p_len);
+    dst->mdd=mdd_next(rel->p_id,src->mdd,rel->mdd,0,rel->proj,rel->p_len);
 }
 
 
@@ -895,11 +904,13 @@ static void set_example_mdd(vset_t set,int *e){
 }
 
 
-static uint32_t mdd_prev(int relid,uint32_t set,uint32_t rel,int idx,int*proj,int len){
+static uint32_t
+mdd_prev(uint32_t p_id, uint32_t set, uint32_t rel, int idx, int *proj, int len)
+{
     if (len==0) return set;
     if (rel==0||set==0) return 0;
     if (rel==1||set==1) Abort("missing case in prev");
-    uint32_t op=OP_PREV|(relid<<16);
+    uint32_t op=OP_PREV|(p_id<<16);
     uint32_t slot_hash=hash(op,set,rel);
     uint32_t slot=slot_hash%cache_size;
     if(op_cache[slot].op==op && op_cache[slot].arg1==set && op_cache[slot].res.other.arg2==rel) {
@@ -907,7 +918,7 @@ static uint32_t mdd_prev(int relid,uint32_t set,uint32_t rel,int idx,int*proj,in
     }
     uint32_t res=0;
     if (proj[0]==idx){
-        uint32_t right=mdd_prev(relid,set,node_table[rel].right,idx,proj,len);
+        uint32_t right=mdd_prev(p_id,set,node_table[rel].right,idx,proj,len);
         mdd_push(right);
         uint32_t val=node_table[rel].val;
         rel=node_table[rel].down;
@@ -921,7 +932,8 @@ static uint32_t mdd_prev(int relid,uint32_t set,uint32_t rel,int idx,int*proj,in
                 continue;
             }
             mdd_push(res);
-            uint32_t tmp=mdd_prev(relid,node_table[set].down,node_table[rel].down,idx+1,proj+1,len-1);
+            uint32_t tmp=mdd_prev(node_table[p_id].down, node_table[set].down,
+                                  node_table[rel].down, idx+1, proj+1, len-1);
             mdd_push(tmp);
             res=mdd_union(res,tmp);
             mdd_pop();mdd_pop();
@@ -930,8 +942,8 @@ static uint32_t mdd_prev(int relid,uint32_t set,uint32_t rel,int idx,int*proj,in
         }
         res=mdd_create_node(val,res,mdd_pop());
     } else {
-        mdd_push(mdd_prev(relid,node_table[set].right,rel,idx,proj,len));
-        res=mdd_prev(relid,node_table[set].down,rel,idx+1,proj,len);
+        mdd_push(mdd_prev(p_id,node_table[set].right,rel,idx,proj,len));
+        res=mdd_prev(p_id,node_table[set].down,rel,idx+1,proj,len);
         res=mdd_create_node(node_table[set].val,res,mdd_pop());
     }
 
@@ -945,7 +957,7 @@ static uint32_t mdd_prev(int relid,uint32_t set,uint32_t rel,int idx,int*proj,in
 
 static void set_prev_mdd(vset_t dst,vset_t src,vrel_t rel){
     if (rel->p_len==0) Abort("prev requires strict subvector");
-    dst->mdd=mdd_prev(rel->relid,src->mdd,rel->mdd,0,rel->proj,rel->p_len);
+    dst->mdd=mdd_prev(rel->p_id,src->mdd,rel->mdd,0,rel->proj,rel->p_len);
 }
 
 typedef struct {
@@ -958,18 +970,18 @@ static uint32_t rels_tot;
 static top_groups_info *top_groups;
 
 static uint32_t saturate(int level, uint32_t mdd);
-static uint32_t sat_rel_prod(uint32_t relid, uint32_t set, uint32_t rel,
+static uint32_t sat_rel_prod(uint32_t p_id, uint32_t set, uint32_t rel,
                              int idx, int *proj, int len);
 
 static uint32_t
-copy_level_sat(uint32_t relid, uint32_t set, uint32_t rel, int idx,
+copy_level_sat(uint32_t p_id, uint32_t set, uint32_t rel, int idx,
                int *proj, int len)
 {
     uint32_t res = 0;
 
     while (set > 0) {
         mdd_push(res);
-        uint32_t tmp = sat_rel_prod(relid, node_table[set].down, rel, idx + 1,
+        uint32_t tmp = sat_rel_prod(p_id, node_table[set].down, rel, idx + 1,
                                     proj, len);
         tmp = mdd_create_node(node_table[set].val, tmp, 0);
         mdd_push(tmp);
@@ -982,7 +994,7 @@ copy_level_sat(uint32_t relid, uint32_t set, uint32_t rel, int idx,
 }
 
 static uint32_t
-apply_rel_prod(uint32_t relid, uint32_t set, uint32_t rel, int idx,
+apply_rel_prod(uint32_t p_id, uint32_t set, uint32_t rel, int idx,
                int *proj, int len)
 {
     uint32_t res = 0;
@@ -997,7 +1009,8 @@ apply_rel_prod(uint32_t relid, uint32_t set, uint32_t rel, int idx,
 
             while (rel_down > 1) {
                 mdd_push(res);
-                uint32_t tmp = sat_rel_prod(relid, node_table[set].down,
+                uint32_t tmp = sat_rel_prod(node_table[p_id].down,
+                                            node_table[set].down,
                                             node_table[rel_down].down,
                                             idx + 1, proj + 1, len - 1);
                 tmp = mdd_create_node(node_table[rel_down].val, tmp, 0);
@@ -1016,14 +1029,14 @@ apply_rel_prod(uint32_t relid, uint32_t set, uint32_t rel, int idx,
 }
 
 static uint32_t
-sat_rel_prod(uint32_t relid, uint32_t set, uint32_t rel, int idx,
+sat_rel_prod(uint32_t p_id, uint32_t set, uint32_t rel, int idx,
                 int *proj, int len)
 {
     if (len == 0) return set;
     if (set == 0 || rel == 0) return 0;
     if (set == 1 || rel == 1) Abort("missing case in set_reach_sat");
 
-    uint32_t op = OP_RELPROD | (relid << 16);
+    uint32_t op = OP_RELPROD | (p_id << 16);
     uint32_t slot_hash = hash(op, set, rel);
     uint32_t slot = slot_hash % cache_size;
 
@@ -1035,9 +1048,9 @@ sat_rel_prod(uint32_t relid, uint32_t set, uint32_t rel, int idx,
     uint32_t res = 0;
 
     if (proj[0] == idx)
-        res = apply_rel_prod(relid, set, rel, idx, proj, len);
+        res = apply_rel_prod(p_id, set, rel, idx, proj, len);
     else
-        res = copy_level_sat(relid, set, rel, idx, proj, len);
+        res = copy_level_sat(p_id, set, rel, idx, proj, len);
 
     mdd_push(res);
     res = saturate(idx, res);
@@ -1052,7 +1065,7 @@ sat_rel_prod(uint32_t relid, uint32_t set, uint32_t rel, int idx,
 }
 
 static uint32_t
-apply_rel_fixpoint(uint32_t relid, uint32_t set, uint32_t rel, int idx,
+apply_rel_fixpoint(uint32_t p_id, uint32_t set, uint32_t rel, int idx,
                    int *proj, int len)
 {
     uint32_t res = set;
@@ -1071,7 +1084,8 @@ apply_rel_fixpoint(uint32_t relid, uint32_t set, uint32_t rel, int idx,
 
             while (rel_down > 1) {
                 mdd_push(res);
-                uint32_t tmp = sat_rel_prod(relid, node_table[new_res].down,
+                uint32_t tmp = sat_rel_prod(node_table[p_id].down,
+                                            node_table[new_res].down,
                                             node_table[rel_down].down,
                                             idx + 1, proj + 1, len - 1);
                 tmp = mdd_create_node(node_table[rel_down].val, tmp, 0);
@@ -1109,7 +1123,7 @@ sat_fixpoint(int level, uint32_t set)
             uint32_t grp = groups_info.top_groups[i];
             mdd_push(new_set);
             assert(rel_set[grp]->p_len != 0);
-            new_set = apply_rel_fixpoint(rel_set[grp]->relid, new_set,
+            new_set = apply_rel_fixpoint(rel_set[grp]->p_id, new_set,
                                          rel_set[grp]->mdd, level,
                                          rel_set[grp]->proj,
                                          rel_set[grp]->p_len);
