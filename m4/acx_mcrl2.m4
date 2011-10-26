@@ -78,8 +78,21 @@ if test x"$acx_mcrl2" = xyes; then
          [MCRL2_LIBS="-lmcrl2_lps $MCRL2_LIBS"
           LIBS="-lmcrl2_lps $LIBS"],
          [acx_mcrl2_libs=no])
+       AX_CXX_CHECK_LIB([mcrl2_syntax], [main],
+         [MCRL2_LIBS="-lmcrl2_syntax $MCRL2_LIBS"
+          LIBS="-lmcrl2_syntax $LIBS"])
       ])
     AC_LANG_POP([C++])
+
+    AC_LANG_PUSH([C])
+        AX_LET([CFLAGS], ["$MCRL2_CFLAGS $CFLAGS"],
+           [LIBS], ["$LIBS"],
+           [LDFLAGS], ["$MCRL2_LDFLAGS $LDFLAGS"],
+      [AC_CHECK_LIB([dparser], [main],
+         [MCRL2_LIBS="-ldparser $MCRL2_LIBS"
+          LIBS="-ldparser $LIBS"])
+      ])
+    AC_LANG_POP([C])
     AC_SUBST(MCRL2_LIBS)
 fi
 if test x"$acx_mcrl2_libs" = xyes; then :
