@@ -231,14 +231,14 @@ static void mdd_collect(uint32_t a,uint32_t b){
         }
     }
     */
-    Warning(info,"ListDD garbage collection: %d of %d nodes used",mdd_used,mdd_nodes);
+    Warning(debug,"ListDD garbage collection: %d of %d nodes used",mdd_used,mdd_nodes);
     int resize=0;
     // The two assignments below are not needed, but silence compiler warnings
     uint32_t new_cache_size = cache_size;
     struct op_rec *new_cache = op_cache;
     uint32_t copy_count=0;
     if (mdd_used > fib(nodes_fib-1)){
-        Warning(info,"insufficient free nodes, resizing");
+        Warning(debug,"insufficient free nodes, resizing");
         resize=1;
         new_cache_size=fib(nodes_fib+cache_fib);
         new_cache=RTmalloc(new_cache_size*sizeof(struct op_rec));
@@ -246,7 +246,7 @@ static void mdd_collect(uint32_t a,uint32_t b){
             new_cache[i].op=0;
         }
         if (new_cache_size < cache_size) Abort("cache size overflow");
-        Warning(info,"new cache has %u entries",new_cache_size);
+        Warning(debug,"new cache has %u entries",new_cache_size);
     }
     for(uint32_t i=0;i<cache_size;i++){
         uint32_t slot,op,arg1,arg2,res;
@@ -317,7 +317,7 @@ static void mdd_collect(uint32_t a,uint32_t b){
             unique_table[i]=mdd_sweep_bucket(unique_table[i]);
         }
     } else {
-        Warning(info,"copied %u cache nodes",copy_count);
+        Warning(debug,"copied %u cache nodes",copy_count);
         RTfree(op_cache);
         op_cache=new_cache;
         cache_size=new_cache_size;
@@ -348,7 +348,7 @@ static void mdd_collect(uint32_t a,uint32_t b){
                 free_node=i;
             }
         }
-        Warning(info,"node/unique tables have %u/%u entries",mdd_nodes,uniq_size);
+        Warning(debug,"node/unique tables have %u/%u entries",mdd_nodes,uniq_size);
     }
 }
 
