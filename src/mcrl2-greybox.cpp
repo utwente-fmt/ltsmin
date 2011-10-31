@@ -89,7 +89,8 @@ public:
 
     inline int find_pins_index (int mt, int pt, int idx)
     {
-        switch (lts_type_get_format (GBgetLTStype (model_),pt)){
+        data_format_t format = lts_type_get_format (GBgetLTStype (model_), pt);
+        switch (format){
         case LTStypeDirect:
         case LTStypeRange:
             return idx;
@@ -102,16 +103,21 @@ public:
         if (it != rmap_[mt].end())
             return it->second;
 
+        if (format == LTStypeEnum)
+            Abort("lookup of %d failed", idx);
+
         std::string c = data_type(mt).serialize(idx);
-        int pidx = GBchunkPut (model_, pt, chunk_str(const_cast<char*>(c.c_str())));
-        map_[mt].resize (pidx+1, IDX_NOT_FOUND);
+        int pidx = GBchunkPut (model_, pt,
+                               chunk_str(const_cast<char*>(c.c_str())));
+        map_[mt].resize (pidx + 1, IDX_NOT_FOUND);
         map_[mt][pidx] = idx;
         return rmap_[mt][idx] = pidx;
     }
 
     inline int find_mcrl2_index (int mt, int pt, int idx)
     {
-        switch (lts_type_get_format (GBgetLTStype (model_),pt)){
+        data_format_t format = lts_type_get_format (GBgetLTStype (model_), pt);
+        switch (format) {
         case LTStypeDirect:
         case LTStypeRange:
             return idx;
@@ -120,18 +126,54 @@ public:
             break;
         }
 
-        if (idx < static_cast<ssize_t>(map_[mt].size()) && map_[mt][idx] != IDX_NOT_FOUND)
+        if (idx < static_cast<ssize_t>(map_[mt].size())
+            && map_[mt][idx] != IDX_NOT_FOUND)
             return map_[mt][idx];
 
+        if (format == LTStypeEnum)
+            Abort ("lookup %d failed", idx);
+
         chunk c = GBchunkGet (model_, pt, idx);
-        if (c.len == 0) {
+        if (c.len == 0)
             Abort ("lookup of %d failed", idx);
-        }
+
         std::string s = std::string(reinterpret_cast<char*>(c.data), c.len);
         int midx = data_type(mt).deserialize (s);
         rmap_[mt][midx] = idx;
         map_[mt].resize (idx+1, IDX_NOT_FOUND);
         return map_[mt][idx] = midx;
+    }
+
+    void populate_type_index(int mt, int pt)
+    {
+        switch (lts_type_get_format (GBgetLTStype (model_), pt)) {
+        case LTStypeDirect:
+        case LTStypeRange:
+            return; // Direct and range types are automatically prefilled
+        case LTStypeChunk:
+            return; // Chunk types cannot be prefilled
+        case LTStypeEnum:
+            break;
+        }
+
+        std::vector<std::string> values
+            = data_type(mt).generate_values(SIZE_MAX);
+        std::vector<std::string>::const_iterator i;
+
+        for (i = values.begin(); i != values.end(); ++i) {
+            int midx = data_type(mt).deserialize (*i);
+
+            std::map<int,int>::iterator it = rmap_[mt].find(midx);
+            if (it != rmap_[mt].end())
+                continue;
+
+            int pidx = GBchunkPut(model_, pt,
+                                  chunk_str(const_cast<char*>((*i).c_str())));
+
+            map_[mt].resize (pidx + 1, IDX_NOT_FOUND);
+            map_[mt][pidx] = midx;
+            rmap_[mt][midx] = pidx;
+        }
     }
 
 private:
@@ -154,7 +196,8 @@ struct state_cb
         : pins(pins_), cb(cb_), ctx(ctx_), count(0)
     {}
 
-    void operator()(state_vector const& next_state, label_vector const& edge_labels, int group = -1)
+    void operator()(state_vector const& next_state,
+                    label_vector const& edge_labels, int group = -1)
     {
         int lbl[pins->edge_label_count()];
         pins->make_pins_edge_labels(edge_labels, lbl);
@@ -194,8 +237,10 @@ mcrl2_popt (poptContext con, enum poptCallbackReason reason,
         const char *opt_rewriter = mcrl2_rewriter_strategy.c_str();
         int opt_verbosity = 0;
         struct poptOption options[] = {
-            { "rewriter", 'r' , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &opt_rewriter , 0 , "select rewriter: jittyc, jitty, ..." , NULL },
-            { "verbose" , 'v' , POPT_ARG_INT , &opt_verbosity , 1 , "increase verbosity", "INT" },
+            { "rewriter", 'r', POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT,
+              &opt_rewriter, 0, "select rewriter: jittyc, jitty, ...", NULL },
+            { "verbose", 'v', POPT_ARG_INT, &opt_verbosity, 1,
+              "increase verbosity", "INT" },
             POPT_AUTOHELP
             POPT_TABLEEND
         };
@@ -207,13 +252,15 @@ mcrl2_popt (poptContext con, enum poptCallbackReason reason,
                    poptBadOption (optCon, POPT_BADOPTION_NOALIAS),
                    poptStrerror (res));
         } else if (poptPeekArg (optCon) != NULL) {
-            Abort ("Unknown mcrl2 option %s (try --mcrl2=--help)", poptPeekArg (optCon));
+            Abort ("Unknown mcrl2 option %s (try --mcrl2=--help)",
+                   poptPeekArg (optCon));
         }
         poptFreeContext(optCon);
         mcrl2_rewriter_strategy = std::string(opt_rewriter);
         GBregisterLoader("lps",MCRL2loadGreyboxModel);
         if (opt_verbosity > 0) {
-            Warning(info, "increasing mcrl2 verbosity level by %d", opt_verbosity);
+            Warning(info, "increasing mcrl2 verbosity level by %d",
+                    opt_verbosity);
             mcrl2_log_level_t level = static_cast<mcrl2_log_level_t>(static_cast<size_t>(mcrl2_logger::get_reporting_level()) + opt_verbosity);
             mcrl2_logger::set_reporting_level (level);
         }
@@ -227,8 +274,8 @@ mcrl2_popt (poptContext con, enum poptCallbackReason reason,
 }
 
 struct poptOption mcrl2_options[] = {
-    { NULL, 0 , POPT_ARG_CALLBACK|POPT_CBFLAG_POST|POPT_CBFLAG_SKIPOPTION , (void*)mcrl2_popt , 0 , NULL , NULL},
-    { "mcrl2" , 0 , POPT_ARG_STRING , &mcrl2_args , 0, "Pass options to the mcrl2 library.","<mcrl2 options>" },
+    { NULL, 0, POPT_ARG_CALLBACK|POPT_CBFLAG_POST|POPT_CBFLAG_SKIPOPTION, (void*)mcrl2_popt, 0 , NULL , NULL},
+    { "mcrl2", 0, POPT_ARG_STRING, &mcrl2_args, 0, "Pass options to the mcrl2 library.", "<mcrl2 options>" },
     POPT_TABLEEND
 };
 
@@ -282,7 +329,11 @@ MCRL2loadGreyboxModel (model_t m, const char *model_name)
 
     // create ltsmin type for each mcrl2-provided type
     for(size_t i = 0; i < pins->datatype_count(); ++i) {
-        lts_type_add_type(ltstype, pins->data_type(i).name().c_str(), NULL);
+        std::string n = pins->data_type(i).name();
+        if (pins->data_type(i).is_bounded())
+            lts_type_put_type(ltstype, n.c_str(), LTStypeEnum, NULL);
+        else
+            lts_type_put_type(ltstype, n.c_str(), LTStypeChunk, NULL);
     }
 
     // process parameters
@@ -299,6 +350,14 @@ MCRL2loadGreyboxModel (model_t m, const char *model_name)
     }
 
     GBsetLTStype(m,ltstype);
+
+    for(size_t i = 0; i < pins->datatype_count(); ++i) {
+        if (pins->data_type(i).is_bounded()) {
+            std::string n = pins->data_type(i).name();
+            int pt = lts_type_put_type(ltstype, n.c_str(), LTStypeEnum, NULL);
+            pins->populate_type_index(i, pt);
+        }
+    }
 
     int s0[pins->process_parameter_count()];
     ltsmin::pins::state_vector p_s0 = s0;
