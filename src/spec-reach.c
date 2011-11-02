@@ -65,7 +65,7 @@ reach_popt(poptContext con, enum poptCallbackReason reason,
 
     switch (reason) {
     case POPT_CALLBACK_REASON_PRE:
-        Fatal(1, error, "unexpected call to vset_popt");
+        Fatal(1, error, "unexpected call to reach_popt");
     case POPT_CALLBACK_REASON_POST: {
         int res;
 
