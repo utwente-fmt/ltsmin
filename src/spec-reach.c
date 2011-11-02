@@ -1187,22 +1187,33 @@ output_lbls(FILE *tbl_file, vset_t visited)
                 used[pk++] = pi;
         }
 
-        vset_t patterns = vset_create(domain, len, used);
         map_context ctx;
 
-        vset_project(patterns, visited);
         ctx.tbl_file = tbl_file;
         ctx.mapno = i;
         ctx.len = len;
         ctx.used = used;
+
         fprintf(tbl_file, "begin map ");
         fprint_ltsmin_ident(tbl_file, lts_type_get_state_label_name(ltstype,i));
         fprintf(tbl_file, ":");
         fprint_ltsmin_ident(tbl_file, lts_type_get_state_label_type(ltstype,i));
         fprintf(tbl_file,"\n");
-        vset_enum(patterns, enum_map, &ctx);
+
+        if (len == 0) {
+            /* The state label does not depend on state vector. This case is
+               treated separately, as vset_create(domain, 0, used) has the
+               semantics of "no projection".
+            */
+            enum_map(&ctx, NULL);
+        } else {
+            vset_t patterns = vset_create(domain, len, used);
+            vset_project(patterns, visited);
+            vset_enum(patterns, enum_map, &ctx);
+            vset_destroy(patterns);
+        }
+
         fprintf(tbl_file, "end map\n");
-        vset_destroy(patterns);
     }
 }
 
@@ -1310,10 +1321,15 @@ init_domain(vset_implementation_t impl, vset_t *visited)
         projs[i].proj = (int*)RTmalloc(projs[i].len * sizeof(int));
 
         // temporary replacement for e_info->indices[i]
-        for(int j = 0, k = 0; j < dm_ncols(GBgetDMInfo(model)); j++) {
+        int j, k;
+
+        for(j = 0, k = 0; j < dm_ncols(GBgetDMInfo(model)); j++) {
             if (dm_is_set(GBgetDMInfo(model), i, j))
                 projs[i].proj[k++] = j;
         }
+
+        if (k == 0)
+            Abort("Transition groups independent of state space not supported");
 
         group_next[i]     = vrel_create(domain,projs[i].len,projs[i].proj);
         group_explored[i] = vset_create(domain,projs[i].len,projs[i].proj);
