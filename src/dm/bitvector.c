@@ -223,5 +223,6 @@ bitvector_invert(bitvector_t *bv)
     // don't invert the unused bits!
     int                 used_bits = WORD_BITS - (bv->n_words * WORD_BITS - bv->n_bits);
     size_t              mask = (1UL << (used_bits))-1;
-    bv->data[bv->n_words-1] &= mask;
+    if (used_bits < WORD_BITS)
+        bv->data[bv->n_words-1] &= mask;
 }

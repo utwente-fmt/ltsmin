@@ -32,7 +32,7 @@ extern int          bitvector_create (bitvector_t *, size_t);
  *   2) number of bits in the vector
  *   
  * Data is SSE aligned by malloc
- * note: use bitvector_clar to set bits to 0
+ * note: use bitvector_clear to set bits to 0
  */
 extern void         bitvector_create_large (bitvector_t *bv, size_t n_bits);
 
