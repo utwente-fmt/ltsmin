@@ -149,11 +149,14 @@ static void mdd_clear_and_count(uint32_t mdd,uint32_t *count){
     }
 }
 
-static uint32_t mdd_node_count(uint32_t mdd){
-    if (mdd==0) return 1; // just emptyset
-    uint32_t res=0;
+static uint32_t
+mdd_node_count(uint32_t mdd)
+{
+    if (mdd <= 1) return 1; // emptyset or singleton
+
+    uint32_t res = 0;
     mdd_mark(mdd);
-    mdd_clear_and_count(mdd,&res);
+    mdd_clear_and_count(mdd, &res);
     return res+2; // real nodes plus emptyset(0) and singleton epsilon(1).
 }
 
@@ -459,16 +462,19 @@ static uint32_t mdd_minus(uint32_t a,uint32_t b){
 }
 
 
-static uint32_t mdd_member(uint32_t mdd,const uint32_t *vec,int len){
-    if (len==0) {
-        while(mdd>1) mdd=node_table[mdd].right;
+static uint32_t
+mdd_member(uint32_t mdd, const uint32_t *vec, int len)
+{
+    if (len == 0) {
+        if (mdd > 1) Abort("non-uniform length");
         return mdd;
     }
-    while(mdd>1){
-        if (node_table[mdd].val<vec[0]) {
-            mdd=node_table[mdd].right;
-        } else if (node_table[mdd].val==vec[0]) {
-            return mdd_member(node_table[mdd].down,vec+1,len-1);
+
+    while(mdd > 1) {
+        if (node_table[mdd].val < vec[0]) {
+            mdd = node_table[mdd].right;
+        } else if (node_table[mdd].val == vec[0]) {
+            return mdd_member(node_table[mdd].down, vec+1, len-1);
         } else {
             return 0;
         }
@@ -514,79 +520,74 @@ static uint32_t mdd_put(uint32_t mdd,const uint32_t *vec,int len,int* is_new){
     return mdd_create_node(vec[0],mdd_put(0,vec+1,len-1,is_new),mdd);
 }
 
-static void mdd_enum(uint32_t mdd,uint32_t *vec,int idx,int len,vset_element_cb callback,void* context){
-    if (idx==len) {
-        if (mdd!=1) Abort("non-uniform length");
-        while(mdd>1) mdd=node_table[mdd].right;
-        if (mdd) callback(context,(int*)vec);
+static void
+mdd_enum(uint32_t mdd, uint32_t *vec, int idx, int len,
+         vset_element_cb callback, void *context)
+{
+    if (idx == len) {
+        if (len != 0 && mdd != 1) Abort("non-uniform length");
+        if (mdd > 1) Abort("non-uniform length");
+        if (mdd) callback(context, (int*)vec);
     } else {
-        while(mdd>1){
-            vec[idx]=node_table[mdd].val;
-            mdd_enum(node_table[mdd].down,vec,idx+1,len,callback,context);
-            mdd=node_table[mdd].right;
+        while (mdd > 1) {
+            vec[idx] = node_table[mdd].val;
+            mdd_enum(node_table[mdd].down, vec, idx+1, len, callback, context);
+            mdd = node_table[mdd].right;
         }
-        if (mdd!=0) Abort("non-uniform length");
+        if (mdd != 0) Abort("non-uniform length");
     }
 }
 
 static uint32_t
-mdd_copy_match(uint32_t mdd, int len, uint32_t pattern, int *proj,
-                   int p_len, int ofs)
+mdd_copy_match(uint32_t p_id, uint32_t mdd, uint32_t pattern, int idx,
+               int *proj, int len)
 {
-    uint32_t slot_hash=hash(OP_COPY_MATCH, mdd, pattern);
-    uint32_t slot=slot_hash%cache_size;
+    if (mdd == 0) return 0;
+    if (mdd == 1) return 1;
+    if (len == 0) return mdd;
 
-    if (op_cache[slot].op == OP_COPY_MATCH && op_cache[slot].arg1 == mdd
-            && op_cache[slot].res.other.arg2 == pattern) {
+    uint32_t op        = OP_COPY_MATCH | (p_id << 16);
+    uint32_t slot_hash = hash(op, mdd, pattern);
+    uint32_t slot      = slot_hash % cache_size;
+
+    if (op_cache[slot].op == op && op_cache[slot].arg1 == mdd
+        && op_cache[slot].res.other.arg2 == pattern) {
         return op_cache[slot].res.other.res;
     }
 
+    uint32_t res = 0;
     uint32_t tmp;
+    uint32_t mdd_original = mdd;
 
-    if (mdd != 0 && mdd != 1) {
-        tmp = 0;
+    if (proj[0] == idx) {
+        while (mdd > 1 && node_table[mdd].val < node_table[pattern].val)
+            mdd = node_table[mdd].right;
 
-        if (ofs < len) {
-            // if still matching and this offset matches,
-            // compare the value and return it if it matches
-            if (p_len > 0 && proj[0] == ofs) {
-                // does it match?
-                if (node_table[mdd].val == node_table[pattern].val) {
-                    // try to match the next element, return the result
-                    tmp = mdd_copy_match(node_table[mdd].down, len,
-                                             node_table[pattern].down,
-                                             proj + 1, p_len - 1, ofs + 1);
-                }
-            // not matching anymore or the offset doesn't match
-            } else {
-                tmp = mdd_copy_match(node_table[mdd].down, len, pattern, proj,
-                                         p_len, ofs + 1);
-            }
+        if (mdd > 1 && node_table[mdd].val == node_table[pattern].val) {
+            tmp = mdd_copy_match(node_table[p_id].down, node_table[mdd].down,
+                                 node_table[pattern].down,idx+1, proj+1, len-1);
+            res = mdd_create_node(node_table[mdd].val, tmp, 0);
         }
-        mdd_push(tmp);
-        tmp = 0;
-        // test matches in the second argument
-        if (ofs <= len) {
-            tmp = mdd_copy_match(node_table[mdd].right, len, pattern, proj,
-                                     p_len, ofs);
-        }
-        // combine results
-        tmp = mdd_create_node(node_table[mdd].val, mdd_pop(), tmp);
     } else {
-        if (mdd == 1 && ofs == len) {
-            tmp = mdd;
-        } else {
-            tmp = 0;
+        while (mdd > 1) {
+            mdd_push(res);
+            tmp = mdd_copy_match(p_id, node_table[mdd].down, pattern, idx+1,
+                                 proj, len);
+            tmp = mdd_create_node(node_table[mdd].val, tmp, 0);
+            mdd_push(tmp);
+            res = mdd_union(res, tmp);
+            mdd_pop(); mdd_pop();
+            mdd =  node_table[mdd].right;
         }
     }
 
     slot = slot_hash % cache_size;
-    op_cache[slot].op = OP_COPY_MATCH;
-    op_cache[slot].arg1 = mdd;
+    op_cache[slot].op = op;
+    op_cache[slot].arg1 = mdd_original;
     op_cache[slot].res.other.arg2 = pattern;
-    op_cache[slot].res.other.res  = tmp;
+    op_cache[slot].res.other.res  = res;
 
-    return tmp;
+    return res;
 }
 
 static uint32_t
@@ -644,19 +645,23 @@ static uint32_t mdd_take(uint32_t mdd,int len,uint32_t count){
 }
 */
 
-static vset_t set_create_mdd(vdom_t dom,int k,int* proj){
-    vset_t set=(vset_t)RTmalloc(sizeof(struct vector_set)+k*sizeof(int));
-    set->dom=dom;
-    set->mdd=0;
-    set->next=protected_sets;
-    set->prev=NULL;
-    if (protected_sets != NULL) protected_sets->prev=set;
-    protected_sets=set;
-    set->p_len=k;
-    set->p_id = 1;
-    for(int i=k - 1;i >= 0;i--) {
-        set->proj[i]=proj[i];
-        set->p_id = mdd_create_node(proj[i], set->p_id, 0);
+static vset_t
+set_create_mdd(vdom_t dom, int k, int *proj)
+{
+    assert(k <= dom->shared.size);
+    int l = (k < 0)?0:k;
+    vset_t set = (vset_t)RTmalloc(sizeof(struct vector_set) + sizeof(int[l]));
+    set->dom  = dom;
+    set->mdd  = 0;
+    set->next = protected_sets;
+    set->prev = NULL;
+    if (protected_sets != NULL) protected_sets->prev = set;
+    protected_sets = set;
+    set->p_len = k;
+    set->p_id  = 1;
+    for(int i = k - 1; i >= 0; i--) {
+        set->proj[i] = proj[i];
+        set->p_id    = mdd_create_node(proj[i], set->p_id, 0);
     }
     return set;
 }
@@ -672,128 +677,169 @@ static void set_destroy_mdd(vset_t set)
 
 static void set_reorder_mdd() { }
 
-static vrel_t rel_create_mdd(vdom_t dom,int k,int* proj){
-    vrel_t rel=(vrel_t)RTmalloc(sizeof(struct vector_relation)+k*sizeof(int));
-    rel->dom=dom;
-    rel->mdd=0;
-    rel->next=protected_rels;
-    rel->prev=NULL;
-    if (protected_rels != NULL) protected_rels->prev=rel;
-    protected_rels=rel;
-    rel->p_len=k;
-    rel->p_id = 1;
-    for(int i=k - 1;i >= 0;i--) {
-        rel->proj[i]=proj[i];
-        rel->p_id = mdd_create_node(proj[i], rel->p_id, 0);
+static vrel_t
+rel_create_mdd(vdom_t dom, int k, int *proj)
+{
+    assert(0 <= k && k <= dom->shared.size);
+    vrel_t rel = (vrel_t)RTmalloc(sizeof(struct vector_relation)
+                                                         + sizeof(int[k]));
+    rel->dom  = dom;
+    rel->mdd  = 0;
+    rel->next = protected_rels;
+    rel->prev = NULL;
+    if (protected_rels != NULL) protected_rels->prev = rel;
+    protected_rels = rel;
+    rel->p_len = k;
+    rel->p_id  = 1;
+    for(int i = k - 1; i >= 0; i--) {
+        rel->proj[i] = proj[i];
+        rel->p_id    = mdd_create_node(proj[i], rel->p_id, 0);
         // The p_id of a relation is shifted in hash keys; check this is ok
         if ((rel->p_id >> 16) > 0) Abort("projection identifier too large");
     }
     return rel;
 }
 
-static void set_add_mdd(vset_t set,const int* e){
-    int len=(set->p_len)?set->p_len:set->dom->shared.size;
-    set->mdd=mdd_put(set->mdd,(uint32_t*)e,len,NULL);
+static void
+set_add_mdd(vset_t set, const int* e)
+{
+    int len = (set->p_len < 0)?set->dom->shared.size:set->p_len;
+    set->mdd = mdd_put(set->mdd, (uint32_t*)e, len, NULL);
 }
 
-static int set_is_empty_mdd(vset_t set){
-    return (set->mdd==0);
+static int
+set_is_empty_mdd(vset_t set)
+{
+    return (set->mdd == 0);
 }
 
-static int set_equal_mdd(vset_t set1,vset_t set2){
-    return (set1->mdd==set2->mdd);
+static int
+set_equal_mdd(vset_t set1, vset_t set2)
+{
+    return (set1->mdd == set2->mdd);
 }
 
 static void set_clear_mdd(vset_t set){
     set->mdd=0;
 }
 
-static void set_copy_mdd(vset_t dst,vset_t src){
-    dst->mdd=src->mdd;
+static void
+set_copy_mdd(vset_t dst, vset_t src)
+{
+    assert(dst->p_id == src->p_id);
+    dst->mdd = src->mdd;
 }
 
-static void set_enum_mdd(vset_t set,vset_element_cb cb,void* context){
-    int len=(set->p_len)?set->p_len:set->dom->shared.size;
+static void
+set_enum_mdd(vset_t set, vset_element_cb cb, void* context)
+{
+    int len = (set->p_len < 0)?set->dom->shared.size:set->p_len;
     uint32_t vec[len];
-    mdd_enum(set->mdd,vec,0,len,cb,context);
+    mdd_enum(set->mdd, vec, 0, len, cb, context);
 }
 
-static int set_member_mdd(vset_t set,const int* e){
-    int len=(set->p_len)?set->p_len:set->dom->shared.size;
-    return mdd_member(set->mdd,(uint32_t*)e,len);
+static int set_member_mdd(vset_t set, const int* e)
+{
+    int len = (set->p_len < 0)?set->dom->shared.size:set->p_len;
+    return mdd_member(set->mdd, (uint32_t*)e, len);
 }
 
-static void set_count_mdd(vset_t set,long *nodes,bn_int_t *elements){
-    double e_count=mdd_count(set->mdd);
-    uint32_t n_count=mdd_node_count(set->mdd);
-    bn_double2int(e_count,elements);
-    *nodes=n_count;
+static void
+set_count_mdd(vset_t set, long *nodes, bn_int_t *elements)
+{
+    double e_count   = mdd_count(set->mdd);
+    uint32_t n_count = mdd_node_count(set->mdd);
+
+    bn_double2int(e_count, elements);
+    *nodes = n_count;
 }
 
-static void rel_count_mdd(vrel_t rel,long *nodes,bn_int_t *elements){
-    double e_count=mdd_count(rel->mdd);
-    uint32_t n_count=mdd_node_count(rel->mdd);
-    bn_double2int(e_count,elements);
-    *nodes=n_count;
+static void
+rel_count_mdd(vrel_t rel, long *nodes, bn_int_t *elements)
+{
+    double e_count   = mdd_count(rel->mdd);
+    uint32_t n_count = mdd_node_count(rel->mdd);
+
+    bn_double2int(e_count, elements);
+    *nodes = n_count;
 }
 
-static void set_union_mdd(vset_t dst,vset_t src){
-    dst->mdd=mdd_union(dst->mdd,src->mdd);
+static void
+set_union_mdd(vset_t dst, vset_t src)
+{
+    assert(dst->p_id == src->p_id);
+    dst->mdd = mdd_union(dst->mdd, src->mdd);
 }
 
-static void set_minus_mdd(vset_t dst,vset_t src){
-    dst->mdd=mdd_minus(dst->mdd,src->mdd);
+static void
+set_minus_mdd(vset_t dst, vset_t src)
+{
+    assert(dst->p_id == src->p_id);
+    dst->mdd = mdd_minus(dst->mdd, src->mdd);
 }
 
 static void
 set_intersect_mdd(vset_t dst, vset_t src)
 {
+    assert(dst->p_id == src->p_id);
     dst->mdd = mdd_intersect(dst->mdd, src->mdd);
 }
 
 static void
-set_copy_match_mdd(vset_t src, vset_t dst, int p_len, int *proj, int *match)
+set_copy_match_mdd(vset_t dst, vset_t src, int p_len, int *proj, int *match)
 {
-    int len = (src->p_len)?src->p_len:src->dom->shared.size;
+    assert(src->p_len == -1 && dst->p_len == -1 && p_len >= 0);
     uint32_t singleton = mdd_put(0, (uint32_t*)match, p_len, NULL);
-
     mdd_push(singleton);
-    dst->mdd = mdd_copy_match(src->mdd, len, singleton, proj, p_len, 0);
-    mdd_pop();
+
+    uint32_t p_id = mdd_put(0, (uint32_t*)proj, p_len, NULL);
+    // The p_id of is shifted in hash keys; check this is ok
+    if ((p_id >> 16) > 0) Abort("projection identifier too large");
+    mdd_push(p_id);
+
+    dst->mdd = mdd_copy_match(p_id, src->mdd, singleton, 0, proj, p_len);
+    mdd_pop(); mdd_pop();
 }
 
 static void
 set_enum_match_mdd(vset_t set, int p_len, int *proj, int *match,
                        vset_element_cb cb, void *context)
 {
-    int len = (set->p_len)?set->p_len:set->dom->shared.size;
-    uint32_t singleton, tmp;
-
-    singleton = mdd_put(0, (uint32_t*)match, p_len, NULL);
+    assert(set->p_len == -1 && p_len >= 0);
+    uint32_t singleton = mdd_put(0, (uint32_t*)match, p_len, NULL);
     mdd_push(singleton);
-    tmp = mdd_copy_match(set->mdd, len, singleton, proj, p_len, 0);
-    mdd_pop();
 
+    uint32_t p_id = mdd_put(0, (uint32_t*)proj, p_len, NULL);
+    // The p_id of is shifted in hash keys; check this is ok
+    if ((p_id >> 16) > 0) Abort("projection identifier too large");
+    mdd_push(p_id);
+
+    uint32_t tmp = mdd_copy_match(p_id, set->mdd, singleton, 0, proj, p_len);
+    mdd_pop(); mdd_pop();
+
+    int len = set->dom->shared.size;
     uint32_t vec[len];
-
-    mdd_enum(tmp, vec, 0, len, cb, context);
+    mdd_enum(tmp, vec, 0, len , cb, context);
 }
 
-static void rel_add_mdd(vrel_t rel,const int* src, const int* dst){
-    int N=rel->p_len?rel->p_len:rel->dom->shared.size;
+static void
+rel_add_mdd(vrel_t rel, const int *src, const int *dst)
+{
+    int N = (rel->p_len < 0)?rel->dom->shared.size:rel->p_len;
     uint32_t vec[2*N];
-    for(int i=0;i<N;i++) {
-        vec[i+i]=src[i];
-        vec[i+i+1]=dst[i];
+    for(int i = 0; i < N; i++) {
+        vec[i+i]   = src[i];
+        vec[i+i+1] = dst[i];
     }
-    rel->mdd=mdd_put(rel->mdd,vec,2*N,NULL);
+
+    rel->mdd = mdd_put(rel->mdd, vec, 2*N, NULL);
 }
 
 static uint32_t
 mdd_project(uint32_t p_id, uint32_t mdd, int idx, int *proj, int len)
 {
-    if(mdd==0) return 0; //projection of empty is empty.
-    if(len==0) return 1; //projection of non-empty is epsilon.
+    if(mdd == 0) return 0; //projection of empty is empty.
+    if(len == 0) return 1; //projection of non-empty is epsilon.
 
     uint32_t slot_hash=hash(OP_PROJECT,mdd,p_id);
     uint32_t slot=slot_hash%cache_size;
@@ -832,8 +878,8 @@ mdd_project(uint32_t p_id, uint32_t mdd, int idx, int *proj, int len)
 static uint32_t
 mdd_next(uint32_t p_id, uint32_t set, uint32_t rel, int idx, int *proj, int len)
 {
-    if (len==0) return set;
     if (rel==0||set==0) return 0;
+    if (len==0) return set;
     if (rel==1||set==1) Abort("missing case in next");
     if (proj[0]==idx){ // current level is affected => find match.
         while(node_table[set].val!=node_table[rel].val){
@@ -850,7 +896,8 @@ mdd_next(uint32_t p_id, uint32_t set, uint32_t rel, int idx, int *proj, int len)
     uint32_t op=OP_NEXT|(p_id<<16);
     uint32_t slot_hash=hash(op,set,rel);
     uint32_t slot=slot_hash%cache_size;
-    if(op_cache[slot].op==op && op_cache[slot].arg1==set && op_cache[slot].res.other.arg2==rel) {
+    if (op_cache[slot].op==op && op_cache[slot].arg1==set
+        && op_cache[slot].res.other.arg2==rel) {
         return op_cache[slot].res.other.res;
     }
     uint32_t res=0;
@@ -882,40 +929,56 @@ mdd_next(uint32_t p_id, uint32_t set, uint32_t rel, int idx, int *proj, int len)
     return res;
 }
 
-static void set_project_mdd(vset_t dst,vset_t src){
-    if (dst->p_len==0) Abort("project requires strict subvector");
-    dst->mdd=0;
-    dst->mdd=mdd_project(dst->p_id,src->mdd,0,dst->proj,dst->p_len);
-}
-
-static void set_next_mdd(vset_t dst,vset_t src,vrel_t rel){
-    if (rel->p_len==0) Abort("next requires strict subvector");
-    dst->mdd=mdd_next(rel->p_id,src->mdd,rel->mdd,0,rel->proj,rel->p_len);
-}
-
-
-static void set_example_mdd(vset_t set,int *e){
-    int len=(set->p_len)?set->p_len:set->dom->shared.size;
-    uint32_t mdd=set->mdd;
-    for(int i=0;i<len;i++){
-        if (mdd<=1) Abort("empty set??");
-        e[i]=node_table[mdd].val;
-        mdd=node_table[mdd].down;
+static void
+set_project_mdd(vset_t dst, vset_t src)
+{
+    assert(src->p_len == -1);
+    if (dst->p_len == -1) {
+        dst->mdd = src->mdd;
+    } else {
+        dst->mdd = 0;
+        dst->mdd = mdd_project(dst->p_id, src->mdd, 0, dst->proj, dst->p_len);
     }
-    if (mdd!=1) Abort("non-uniform length");
+}
+
+static void
+set_next_mdd(vset_t dst, vset_t src, vrel_t rel)
+{
+    assert(src->p_len == -1 && dst->p_len == -1);
+
+    dst->mdd = mdd_next(rel->p_id, src->mdd, rel->mdd, 0, rel->proj,rel->p_len);
+}
+
+
+static void
+set_example_mdd(vset_t set, int *e)
+{
+    int len = (set->p_len < 0)?set->dom->shared.size:set->p_len;
+    uint32_t mdd = set->mdd;
+
+    if (mdd == 0) Abort("empty set");
+
+    for(int i = 0; i < len; i++){
+        if (mdd == 1) Abort("non-uniform length");
+        e[i] = node_table[mdd].val;
+        mdd  = node_table[mdd].down;
+    }
+
+    if (mdd != 1) Abort("non-uniform length");
 }
 
 
 static uint32_t
 mdd_prev(uint32_t p_id, uint32_t set, uint32_t rel, int idx, int *proj, int len)
 {
-    if (len==0) return set;
     if (rel==0||set==0) return 0;
+    if (len==0) return set;
     if (rel==1||set==1) Abort("missing case in prev");
     uint32_t op=OP_PREV|(p_id<<16);
     uint32_t slot_hash=hash(op,set,rel);
     uint32_t slot=slot_hash%cache_size;
-    if(op_cache[slot].op==op && op_cache[slot].arg1==set && op_cache[slot].res.other.arg2==rel) {
+    if (op_cache[slot].op==op && op_cache[slot].arg1==set
+        && op_cache[slot].res.other.arg2==rel) {
         return op_cache[slot].res.other.res;
     }
     uint32_t res=0;
@@ -957,14 +1020,17 @@ mdd_prev(uint32_t p_id, uint32_t set, uint32_t rel, int idx, int *proj, int len)
     return res;
 }
 
-static void set_prev_mdd(vset_t dst,vset_t src,vrel_t rel){
-    if (rel->p_len==0) Abort("prev requires strict subvector");
-    dst->mdd=mdd_prev(rel->p_id,src->mdd,rel->mdd,0,rel->proj,rel->p_len);
+static void
+set_prev_mdd(vset_t dst, vset_t src, vrel_t rel)
+{
+    assert(src->p_len == -1 && dst->p_len == -1);
+
+    dst->mdd = mdd_prev(rel->p_id, src->mdd, rel->mdd, 0, rel->proj,rel->p_len);
 }
 
 typedef struct {
-    uint32_t tg_len;
-    uint32_t *top_groups;
+    int tg_len;
+    int *top_groups;
 } top_groups_info;
 
 static vrel_t *rel_set;
@@ -1122,8 +1188,8 @@ sat_fixpoint(int level, uint32_t set)
 
     while (new_set != mdd_pop()) {
         mdd_push(new_set);
-        for (uint32_t i = 0; i < groups_info.tg_len; i++) {
-            uint32_t grp = groups_info.top_groups[i];
+        for (int i = 0; i < groups_info.tg_len; i++) {
+            int grp = groups_info.top_groups[i];
             mdd_push(new_set);
             assert(rel_set[grp]->p_len != 0);
 
@@ -1190,54 +1256,64 @@ saturate(int idx, uint32_t mdd)
 static void
 set_least_fixpoint_mdd(vset_t dst, vset_t src, vrel_t rels[], int rel_count)
 {
-    uint32_t count = (uint32_t)rel_count;
-
     // Only implemented if not projected
-    assert(src->p_len == 0 && dst->p_len == 0);
+    assert(src->p_len == -1 && dst->p_len == -1);
 
     // Initialize partitioned transition relations.
     rel_set = rels;
 
     uint32_t rels_tmp = 0;
 
-    for (uint32_t i = 0; i < count; i++)
-        rels_tmp = mdd_create_node(count - i, rels[i]->mdd, rels_tmp);
+    for (int i = 0; i < rel_count; i++)
+        rels_tmp = mdd_create_node(rel_count - i, rels[i]->mdd, rels_tmp);
 
     mdd_push(rels_tmp);
     rels_tot = rels_tmp;
 
     // Initialize top_groups_info array
     // This stores transition groups per topmost level
-    uint32_t init_state_len = src->dom->shared.size;
+    int init_state_len = src->dom->shared.size;
     top_groups = RTmalloc(sizeof(top_groups_info[init_state_len]));
-    proj_set = RTmalloc(sizeof(vset_t[count]));
+    proj_set = RTmalloc(sizeof(vset_t[rel_count]));
 
-    for (uint32_t lvl = 0; lvl < init_state_len; lvl++) {
-        top_groups[lvl].top_groups = RTmalloc(sizeof(uint32_t[count]));
+    for (int lvl = 0; lvl < init_state_len; lvl++) {
+        top_groups[lvl].top_groups = RTmalloc(sizeof(int[rel_count]));
         top_groups[lvl].tg_len = 0;
     }
 
-    for (uint32_t grp = 0; grp < count; grp++) {
-        uint32_t top_lvl = rels[grp]->proj[0];
-        top_groups[top_lvl].top_groups[top_groups[top_lvl].tg_len] = grp;
-        top_groups[top_lvl].tg_len++;
+    for (int grp = 0; grp < rel_count; grp++) {
         proj_set[grp] = set_create_mdd(rels[grp]->dom, rels[grp]->p_len,
                                        rels[grp]->proj);
+
+        if (rels[grp]->p_len == 0)
+            continue;
+
+        int top_lvl = rels[grp]->proj[0];
+        top_groups[top_lvl].top_groups[top_groups[top_lvl].tg_len] = grp;
+        top_groups[top_lvl].tg_len++;
     }
 
     // Saturation on initial state set
     dst->mdd = saturate(0, src->mdd);
 
     // Clean-up
+    for (int grp = 0; grp < rel_count; grp++) {
+        if (rels[grp]->p_len == 0 && rels[grp]->expand != NULL) {
+            proj_set[grp]->mdd = mdd_project(rels[grp]->p_id, dst->mdd,
+                                             0, NULL, 0);
+            rel_set[grp]->expand(rel_set[grp], proj_set[grp],
+                                 rel_set[grp]->expand_ctx);
+        }
+
+        vset_destroy(proj_set[grp]);
+    }
+
+    for (int lvl = 0; lvl < init_state_len; lvl++)
+        RTfree(top_groups[lvl].top_groups);
+
     rel_set = NULL;
     rels_tot = 0;
     mdd_pop();
-
-    for (uint32_t grp = 0; grp < count; grp++)
-        vset_destroy(proj_set[grp]);
-
-    for (uint32_t lvl = 0; lvl < init_state_len; lvl++)
-        RTfree(top_groups[lvl].top_groups);
 
     RTfree(proj_set);
     RTfree(top_groups);

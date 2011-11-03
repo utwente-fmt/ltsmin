@@ -53,7 +53,7 @@ extern vdom_t vdom_create_domain(int n, vset_implementation_t impl);
 /**
 \brief Create a set.
 
-\param k If non-zero this indicates the length of the sub-domain.
+\param k If non-negative this indicates the length of the sub-domain.
 \param proj If non-NULL this is a sorted list of the indices of the sub-domain.
 */
 extern vset_t vset_create(vdom_t dom,int k,int* proj);
