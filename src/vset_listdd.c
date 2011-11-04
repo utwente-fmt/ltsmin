@@ -12,6 +12,8 @@ static uint32_t cache_size;
 
 /** fibonacci number of the size of the node table. */
 static uint32_t nodes_fib=30;
+/** Maximum fibonacci number before overflow. */
+static const uint32_t FIB_MAX = 47;
 /** difference between the fibonacci numbers of the sizes of the node table and the cache. */
 static int cache_fib=0;
 
@@ -242,7 +244,9 @@ static void mdd_collect(uint32_t a,uint32_t b){
     uint32_t new_cache_size = cache_size;
     struct op_rec *new_cache = op_cache;
     uint32_t copy_count=0;
-    if (mdd_used > fib(nodes_fib-1)){
+    if (mdd_used == UINT32_MAX)
+        Abort("Node table full at maximum size");
+    if (mdd_used > fib(nodes_fib-1) && mdd_nodes != UINT32_MAX) {
         Warning(debug,"insufficient free nodes, resizing");
         resize=1;
         new_cache_size=fib(nodes_fib+cache_fib);
@@ -250,8 +254,11 @@ static void mdd_collect(uint32_t a,uint32_t b){
         for(uint32_t i=0;i<new_cache_size;i++){
             new_cache[i].op=0;
         }
-        if (new_cache_size < cache_size) Abort("cache size overflow");
-        Warning(debug,"new cache has %u entries",new_cache_size);
+        if (new_cache_size < cache_size) {
+            Warning(debug, "op cache reached maximum size");
+            new_cache_size = UINT32_MAX;
+        }
+        Warning(debug, "new op cache has %u entries", new_cache_size);
     }
     for(uint32_t i=0;i<cache_size;i++){
         uint32_t slot,op,arg1,arg2,res;
@@ -322,16 +329,25 @@ static void mdd_collect(uint32_t a,uint32_t b){
             unique_table[i]=mdd_sweep_bucket(unique_table[i]);
         }
     } else {
-        Warning(debug,"copied %u cache nodes",copy_count);
+        Warning(debug,"copied %u op cache nodes",copy_count);
         RTfree(op_cache);
         op_cache=new_cache;
         cache_size=new_cache_size;
         nodes_fib++;
         uint32_t old_size=mdd_nodes;
         mdd_nodes=fib(nodes_fib);
-        uniq_size=fib(nodes_fib+1);
-        if (uniq_size<mdd_nodes) Abort("overflow in node table resize");
-        unique_table=RTrealloc(unique_table,uniq_size*sizeof(int));
+
+        if (uniq_size != UINT32_MAX) {
+            uniq_size = fib(nodes_fib + 1);
+            if (uniq_size < mdd_nodes) {
+                Warning(debug, "unique table reached maximum size");
+                uniq_size = UINT32_MAX;
+            }
+            unique_table = RTrealloc(unique_table, uniq_size*sizeof(int));
+        } else if (mdd_nodes < old_size) {
+            Warning(debug, "node table reached maximum size");
+            mdd_nodes = UINT32_MAX;
+        }
         node_table=RTrealloc(node_table,mdd_nodes*sizeof(struct mdd_node));
         for(uint32_t i=0;i<uniq_size;i++){
             unique_table[i]=0;
@@ -1325,12 +1341,12 @@ vdom_t vdom_create_list_native(int n){
     vdom_t dom=(vdom_t)RTmalloc(sizeof(struct vector_domain));
     vdom_init_shared(dom,n);
     if (unique_table==NULL) {
-        mdd_nodes=fib(nodes_fib);
+        mdd_nodes=(nodes_fib <= FIB_MAX)?fib(nodes_fib):UINT32_MAX;
         Warning(info,"initial node table has %u entries",mdd_nodes);
-        uniq_size=fib(nodes_fib+1);
+        uniq_size=(nodes_fib + 1 <= FIB_MAX)?fib(nodes_fib+1):UINT32_MAX;
         Warning(info,"initial uniq table has %u entries",uniq_size);
-        cache_size=fib(nodes_fib+cache_fib);
-        Warning(info,"initial operation cache has %u entries",cache_size);
+        cache_size=(nodes_fib+cache_fib <= FIB_MAX)?fib(nodes_fib+cache_fib):UINT32_MAX;
+        Warning(info,"initial op cache has %u entries",cache_size);
 
         unique_table=RTmalloc(uniq_size*sizeof(int));
         node_table=RTmalloc(mdd_nodes*sizeof(struct mdd_node));
