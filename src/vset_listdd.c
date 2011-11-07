@@ -238,7 +238,8 @@ static void mdd_collect(uint32_t a,uint32_t b){
         }
     }
     */
-    Warning(debug,"ListDD garbage collection: %d of %d nodes used",mdd_used,mdd_nodes);
+    Warning(debug, "ListDD garbage collection: %u of %u nodes used",
+            mdd_used, mdd_nodes);
     int resize=0;
     // The two assignments below are not needed, but silence compiler warnings
     uint32_t new_cache_size = cache_size;
@@ -389,7 +390,8 @@ static double mdd_count(uint32_t mdd){
 
 static uint32_t mdd_create_node(uint32_t val,uint32_t down,uint32_t right){
     if (down==0) return right;
-    if (right>1 && val>=node_table[right].val) Abort("bad order %d %d",*((int*)1),node_table[right].val);
+    if (right > 1 && val >= node_table[right].val)
+        Abort("bad order %u %u", val, node_table[right].val);
     uint32_t slot_hash=hash(val,down,right);
     uint32_t slot=slot_hash%uniq_size;
     uint32_t res=unique_table[slot];
@@ -403,7 +405,7 @@ static uint32_t mdd_create_node(uint32_t val,uint32_t down,uint32_t right){
     }
     if (free_node==0) {
         mdd_collect(down,right);
-        // recompute slot in case of resize...
+        // recompute slot in case of resize.
         slot=slot_hash%uniq_size;
     }
     res=free_node;
