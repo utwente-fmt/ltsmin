@@ -65,7 +65,8 @@ typedef enum {
     Strat_NNDFS  = 8,
     Strat_MCNDFS = 16,
     Strat_ENDFS  = 32,
-    Strat_LTLG   = Strat_MCNDFS | Strat_ENDFS,
+    Strat_CNDFS  = 64,
+    Strat_LTLG   = Strat_MCNDFS | Strat_ENDFS | Strat_CNDFS,
     Strat_LTL    = Strat_NDFS | Strat_NNDFS | Strat_LTLG,
     Strat_Reach  = Strat_BFS | Strat_DFS
 } strategy_t;
@@ -177,6 +178,7 @@ static si_map_entry strategies[] = {
     {"nndfs",   Strat_NNDFS},
     {"mcndfs",  Strat_MCNDFS},
     {"endfs",   Strat_ENDFS},
+    {"cndfs",   Strat_CNDFS},
     {NULL, 0}
 };
 
@@ -593,8 +595,12 @@ get_model (int first)
 static const size_t MAX_STACK = 100000000;
 
 static int num_global_bits (strategy_t s) {
-   return  (Strat_ENDFS & s     ? 3 :
-           (Strat_MCNDFS & s    ? 1 : 0));
+    assert (GRED.g == 0);
+    assert (GGREEN.g == 1);
+    assert (GDANGEROUS.g == 2);
+    return (Strat_ENDFS  & s ? 3 :
+           (Strat_CNDFS  & s ? 2 :
+           (Strat_MCNDFS & s ? 1 : 0)));
 }
 
 wctx_t *
@@ -610,8 +616,10 @@ wctx_create (size_t id, int depth, wctx_t *shared)
     ctx->store2 = RTalignZero (CACHE_LINE_SIZE, SLOT_SIZE * N * 2);
     ctx->stack = dfs_stack_create (state_info_int_size());
     ctx->out_stack = ctx->in_stack = ctx->stack;
-    if (strategy[depth] & (Strat_BFS | Strat_ENDFS))
+    if (strategy[depth] & (Strat_BFS | Strat_ENDFS | Strat_CNDFS))
         ctx->in_stack = dfs_stack_create (state_info_int_size());
+    if (strategy[depth] & (Strat_CNDFS)) //third stack for accepting states
+        ctx->out_stack = dfs_stack_create (state_info_int_size());
     //allocate two bits for NDFS colorings
     if (strategy[depth] & Strat_LTL) {
         size_t local_bits = 2;
@@ -646,8 +654,10 @@ wctx_free (wctx_t *ctx, int depth)
     }
     if (NULL != ctx->group_stack)
         isba_destroy (ctx->group_stack);
-    if (strategy[depth] ==  (Strat_BFS | Strat_ENDFS))
+    if (strategy[depth] & (Strat_BFS | Strat_ENDFS | Strat_CNDFS))
         dfs_stack_destroy (ctx->in_stack);
+    if (strategy[depth] & (Strat_CNDFS))
+        dfs_stack_destroy (ctx->stack); 
     if (NULL != ctx->permute)
         permute_free (ctx->permute);
     if ( NULL != ctx->rec_ctx )
@@ -811,6 +821,7 @@ init_globals (int argc, char *argv[])
 
     /* Load balancer assigned last, see exit_ltsmin */
     switch (strategy[0]) {
+    case Strat_CNDFS:
     case Strat_ENDFS:
         lb = lb_create_max (W, (algo_f)endfs_blue, NULL,G, lb_method, H); break;
     case Strat_MCNDFS:
@@ -1774,7 +1785,8 @@ endfs_handle_red (void *arg, state_info_t *successor, transition_info_t *ti, int
     if ( nn_color_eq(color, NNCYAN) )
         ndfs_report_cycle (ctx, successor);
     /* Mark states dangerous if necessary */
-    if ( GBbuchiIsAccepting(ctx->model, successor->data) &&
+    if ( Strat_CNDFS != strategy[0] && 
+         GBbuchiIsAccepting(ctx->model, successor->data) &&
          !global_has_color(successor->ref, GRED, ctx->rec_bits) )
         global_try_color(successor->ref, GDANGEROUS, ctx->rec_bits);
     if ( !nn_color_eq(color, NNPINK) &&
@@ -1831,7 +1843,6 @@ static void
 endfs_red (wctx_t *ctx, ref_t seed)
 {
     size_t              seed_level = dfs_stack_nframes (ctx->stack);
-    ctx->seed = seed;
     while ( !lb_is_stopped(lb) ) {
         raw_data_t          state_data = dfs_stack_top (ctx->stack);
         if (NULL != state_data) {
@@ -1840,8 +1851,10 @@ endfs_red (wctx_t *ctx, ref_t seed)
             if ( !nn_color_eq(color, NNPINK) &&
                  !global_has_color(ctx->state.ref, GRED, ctx->rec_bits) ) {
                 nn_set_color (&ctx->color_map, ctx->state.ref, NNPINK);
-                raw_data_t stack_loc = dfs_stack_push (ctx->in_stack, NULL);
-                state_info_serialize (&ctx->state, stack_loc);
+                dfs_stack_push (ctx->in_stack, state_data);
+                if ( Strat_CNDFS == strategy[0] && ctx->state.ref != seed && 
+                     GBbuchiIsAccepting(ctx->model, ctx->state.data) )
+                    dfs_stack_push (ctx->out_stack, state_data);
                 endfs_explore_state_red (ctx, &ctx->red);
             } else {
                 if (seed_level == dfs_stack_nframes (ctx->stack))
@@ -1906,6 +1919,54 @@ endfs_lb (wctx_t *ctx)
     }
 }
 
+static void
+handle_dangerous (wctx_t *ctx)
+{
+    while ( dfs_stack_size(ctx->in_stack) ) {
+        state_data = dfs_stack_pop (ctx->in_stack);
+        state_info_deserialize_cheap (&ctx->state, state_data);
+        if ( !global_has_color(ctx->state.ref, GDANGEROUS, ctx->rec_bits) &&
+              ctx->state.ref != ctx->seed )
+            if (global_try_color(ctx->state.ref, GRED, ctx->rec_bits))
+                ctx->red.explored++;
+    }
+    if (global_try_color(ctx->seed, GRED, ctx->rec_bits)) {
+        ctx->red.explored++;
+        ctx->red.visited++;
+    }
+    if ( global_has_color(ctx->seed, GDANGEROUS, ctx->rec_bits) ) {
+        rec_ndfs_call (ctx, ctx->seed);
+    }
+}
+
+static void
+handle_nonseed_accepting (wctx_t *ctx)
+{
+    size_t nonred, accs;
+    nonred = accs = dfs_stack_size(ctx->out_stack);
+    if (nonred) {
+        ctx->red.waits++;
+        ctx->counters.rec += accs;
+    }
+    while ( nonred && !lb_is_stopped(lb) ) {
+        nonred = 0;
+        for (size_t i = 0; i < accs; i++) {
+            state_data = dfs_stack_peek (ctx->out_stack, i); 
+            state_info_deserialize_cheap (&ctx->state, state_data);
+            if (!global_has_color(ctx->state.ref, GRED, ctx->rec_bits))
+                nonred++;
+        }
+    }
+    for (size_t i = 0; i < accs; i++)
+        dfs_stack_pop (ctx->out_stack);
+    while ( dfs_stack_size(ctx->in_stack) ) {
+        state_data = dfs_stack_pop (ctx->in_stack);
+        state_info_deserialize_cheap (&ctx->state, state_data);
+        if (global_try_color(ctx->state.ref, GRED, ctx->rec_bits))
+            ctx->red.explored++;
+    }
+}
+
 /* ENDFS dfs_blue */
 void
 endfs_blue (wctx_t *ctx, size_t work)
@@ -1938,29 +1999,20 @@ endfs_blue (wctx_t *ctx, size_t work)
             nn_set_color (&ctx->color_map, ctx->state.ref, NNBLUE);
             if ( GBbuchiIsAccepting(ctx->model, ctx->state.data) ) {
                 ref_t           seed = ctx->state.ref;
-                ctx->work = seed;
+                ctx->seed = ctx->work = seed;
                 endfs_red (ctx, seed);
-                while ( dfs_stack_size(ctx->in_stack) ) {
-                    state_data = dfs_stack_pop (ctx->in_stack);
-                    state_info_deserialize_cheap (&ctx->state, state_data);
-                    if ( !global_has_color(ctx->state.ref, GDANGEROUS, ctx->rec_bits) &&
-                          ctx->state.ref != seed )
-                        if (global_try_color(ctx->state.ref, GRED, ctx->rec_bits))
-                            ctx->red.explored++;
-                }
-                if (global_try_color(seed, GRED, ctx->rec_bits)) {
-                    ctx->red.explored++;
-                    ctx->red.visited++;
-                }
-                if ( global_has_color(seed, GDANGEROUS, ctx->rec_bits) )
-                    rec_ndfs_call (ctx, seed);
+                if (Strat_ENDFS == strategy[0])
+                    handle_dangerous (ctx);
+                else
+                    handle_nonseed_accepting (ctx);
                 ctx->work = SIZE_MAX;
             }
             dfs_stack_pop (ctx->stack);
             ctx->load -= 1;
         }
     }
-    if ( ctx == contexts[ctx->id] && (Strat_LTLG & ctx->rec_ctx->strategy) )
+    if ( Strat_ENDFS == strategy[0] && 
+         ctx == contexts[ctx->id] && (Strat_LTLG & ctx->rec_ctx->strategy) )
         endfs_lb (ctx);
     (void) work;
 }
