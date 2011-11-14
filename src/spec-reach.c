@@ -1378,15 +1378,10 @@ init_domain(vset_implementation_t impl, vset_t *visited)
         projs[i].proj = (int*)RTmalloc(projs[i].len * sizeof(int));
 
         // temporary replacement for e_info->indices[i]
-        int j, k;
-
-        for(j = 0, k = 0; j < dm_ncols(GBgetDMInfo(model)); j++) {
+        for(int j = 0, k = 0; j < dm_ncols(GBgetDMInfo(model)); j++) {
             if (dm_is_set(GBgetDMInfo(model), i, j))
                 projs[i].proj[k++] = j;
         }
-
-        if (k == 0)
-            Abort("Transition groups independent of state space not supported");
 
         group_next[i]     = vrel_create(domain,projs[i].len,projs[i].proj);
         group_explored[i] = vset_create(domain,projs[i].len,projs[i].proj);
