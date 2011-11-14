@@ -78,6 +78,8 @@ struct vector_set {
 
 struct vector_relation {
     vdom_t dom;
+    expand_cb expand;
+    void *expand_ctx;
     SDD *ddd;
     Shom *next;
     Shom *prev;
@@ -399,8 +401,12 @@ void set_least_fixpoint_ddd (vset_t dst, vset_t src, vrel_t rels[],
 {
     Shom relation = Shom::id;
 
-    for (int i = 0; i < rel_count; i++)
+    for (int i = 0; i < rel_count; i++) {
+        if (rels[i]->expand != NULL)
+            Abort("DDD does not support least fixpoint with expansion");
+
         relation = relation + *rels[i]->next;
+    }
 
     Shom fix = fixpoint(relation);
 

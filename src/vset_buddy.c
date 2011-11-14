@@ -113,6 +113,8 @@ struct vector_set {
 
 struct vector_relation {
 	vdom_t dom;
+    expand_cb expand;
+    void *expand_ctx;
 	BDD bdd;
 	BDD p_set; // variables in the projection.
 	BDD p_prime_set; // primed variables in the projection

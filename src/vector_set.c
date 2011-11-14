@@ -105,7 +105,9 @@ struct vector_set {
 };
 
 struct vector_relation {
-	vdom_t dom;
+    vdom_t dom;
+    expand_cb expand;
+    void *expand_ctx;
 };
 
 static void
@@ -124,24 +126,9 @@ default_reorder()
 static void
 default_least_fixpoint(vset_t dst, vset_t src, vrel_t rels[], int rel_count)
 {
-    vset_t temp = dst->dom->shared.set_create(dst->dom, 0, NULL);
-    vset_t fix  = dst->dom->shared.set_create(dst->dom, 0, NULL);
-    vset_t old  = dst->dom->shared.set_create(dst->dom, 0, NULL);
+    (void)dst;  (void)src; (void)rels; (void)rel_count;
 
-    dst->dom->shared.set_copy(fix, src);
-
-    while (!dst->dom->shared.set_equal(fix, old)) {
-        dst->dom->shared.set_copy(old, fix);
-        for (int i = 0; i < rel_count; i++) {
-            dst->dom->shared.set_next(temp, fix, rels[i]);
-            dst->dom->shared.set_union(fix, temp);
-        }
-    }
-
-    dst->dom->shared.set_copy(dst, fix);
-    dst->dom->shared.set_destroy(temp);
-    dst->dom->shared.set_destroy(fix);
-    dst->dom->shared.set_destroy(old);
+    Abort("Decision diagram package does not support least fixpoint");
 }
 
 void vdom_init_shared(vdom_t dom,int n){
@@ -177,7 +164,10 @@ vset_t vset_create(vdom_t dom,int k,int* proj){
 }
 
 vrel_t vrel_create(vdom_t dom,int k,int* proj){
-	return dom->shared.rel_create(dom,k,proj);
+	vrel_t rel = dom->shared.rel_create(dom,k,proj);
+    rel->expand = NULL;
+    rel->expand_ctx = NULL;
+    return rel;
 }
 
 void vset_add(vset_t set,const int* e){
@@ -266,6 +256,11 @@ void vset_reorder(vdom_t dom) {
 
 void vset_destroy(vset_t set) {
     set->dom->shared.set_destroy(set);
+}
+
+void vrel_set_expand(vrel_t rel, expand_cb cb, void *context) {
+    rel->expand = cb;
+    rel->expand_ctx = context;
 }
 
 void vset_least_fixpoint(vset_t dst, vset_t src, vrel_t rels[], int rel_count) {

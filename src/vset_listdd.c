@@ -87,6 +87,8 @@ struct vector_set {
 
 struct vector_relation {
     vdom_t dom;
+    expand_cb expand;
+    void *expand_ctx;
     vrel_t next; // double linked list of protected mdd's;
     vrel_t prev; //
     uint32_t mdd;
