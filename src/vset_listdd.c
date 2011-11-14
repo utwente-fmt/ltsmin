@@ -117,16 +117,41 @@ static vrel_t protected_rels=NULL;
 
 static uint32_t mdd_used;
 
-static uint32_t mdd_stack[20480];
-static int mdd_top=0;
+/** fibonacci number of the size of the stack. */
+static uint32_t stack_fib=22;
 
-static void mdd_push(uint32_t mdd){
-    if (mdd_top==20480) Abort("stack overflow");
+static uint32_t stack_size;
+static uint32_t *mdd_stack = NULL;
+static uint32_t mdd_top=0;
+
+static void
+mdd_create_stack()
+{
+    stack_size = fib(stack_fib);
+    mdd_stack = RTmalloc(sizeof(uint32_t[stack_size]));
+    Warning(info, "initial stack size %u", stack_size);
+}
+
+static void
+mdd_push(uint32_t mdd)
+{
+    if (mdd_top==stack_size) {
+        uint32_t stack_size_new = fib(++stack_fib);
+
+        if (stack_size_new < stack_size)
+            Abort("stack overflow");
+
+        mdd_stack = RTrealloc(mdd_stack, sizeof(uint32_t[stack_size_new]));
+        stack_size = stack_size_new;
+        Warning(debug, "new stack size %u", stack_size);
+    }
     mdd_stack[mdd_top]=mdd;
     mdd_top++;
 }
 
-static uint32_t mdd_pop(){
+static uint32_t
+mdd_pop()
+{
     if (mdd_top==0) Abort("stack underflow");
     mdd_top--;
     return mdd_stack[mdd_top];
@@ -193,7 +218,7 @@ static void mdd_collect(uint32_t a,uint32_t b){
         mdd_mark(rel->p_id);
         rel=rel->next;
     }
-    for(int i=0;i<mdd_top;i++){
+    for(uint32_t i=0;i<mdd_top;i++){
         mdd_mark(mdd_stack[i]);
     }
     /* The following code marks results of projection and
@@ -1368,6 +1393,8 @@ vdom_t vdom_create_list_native(int n){
         for(uint32_t i=0;i<cache_size;i++){
             op_cache[i].op=0;
         }
+
+        mdd_create_stack();
     }
     dom->shared.set_create=set_create_mdd;
     dom->shared.set_member=set_member_mdd;
