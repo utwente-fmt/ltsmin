@@ -194,6 +194,9 @@ apply_regroup_spec (matrix_t *m, const char *spec_)
             } else if (strcasecmp (tok, "cn") == 0) {
                 Warning (info, "Regroup Column Nub");
                 dm_nub_cols (m);
+            } else if (strcasecmp (tok, "csa") == 0) {
+                Warning (info, "Regroup Column swap with Simulated Annealing");
+                dm_anneal (m);
             } else if (strcasecmp (tok, "cw") == 0) {
                 Warning (info, "Regroup Column sWaps");
                 dm_optimize (m);
@@ -209,6 +212,10 @@ apply_regroup_spec (matrix_t *m, const char *spec_)
             } else if (strcasecmp (tok, "ru") == 0) {
                 Warning (info, "Regroup Row sUbsume");
                 dm_subsume_rows (m);
+            } else if (strcasecmp (tok, "gsa") == 0) {
+                const char         *macro = "gc,gr,csa,rs";
+                Warning (info, "Regroup macro Simulated Annealing: %s", macro);
+                apply_regroup_spec (m, macro);
             } else if (strcasecmp (tok, "gs") == 0) {
                 const char         *macro = "gc,gr,cw,rs";
                 Warning (info, "Regroup macro Group Safely: %s", macro);

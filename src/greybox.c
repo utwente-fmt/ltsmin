@@ -777,7 +777,7 @@ struct poptOption greybox_options[]={
 	{ "cache" , 'c' , POPT_ARG_VAL , &cache , 1 , "Enable caching of grey box calls." , NULL },
 	{ "regroup" , 'r' , POPT_ARG_STRING, &regroup_options , 0 ,
           "Enable regrouping; available transformations T: "
-          "gs, ga, gc, gr, cs, cn, cw, ca, rs, rn, ru", "<(T,)+>" },
+          "gs, ga, gsa, gc, gr, cs, cn, cw, ca, csa, rs, rn, ru", "<(T,)+>" },
 	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, ltl_options , 0 , "LTL options", NULL },
 	POPT_TABLEEND	
 };
