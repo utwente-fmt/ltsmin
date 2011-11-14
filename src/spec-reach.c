@@ -1255,33 +1255,22 @@ output_lbls(FILE *tbl_file, vset_t visited)
                 used[pk++] = pi;
         }
 
+        vset_t patterns = vset_create(domain, len, used);
         map_context ctx;
 
+        vset_project(patterns, visited);
         ctx.tbl_file = tbl_file;
         ctx.mapno = i;
         ctx.len = len;
         ctx.used = used;
-
         fprintf(tbl_file, "begin map ");
         fprint_ltsmin_ident(tbl_file, lts_type_get_state_label_name(ltstype,i));
         fprintf(tbl_file, ":");
         fprint_ltsmin_ident(tbl_file, lts_type_get_state_label_type(ltstype,i));
         fprintf(tbl_file,"\n");
-
-        if (len == 0) {
-            /* The state label does not depend on state vector. This case is
-               treated separately, as vset_create(domain, 0, used) has the
-               semantics of "no projection".
-            */
-            enum_map(&ctx, NULL);
-        } else {
-            vset_t patterns = vset_create(domain, len, used);
-            vset_project(patterns, visited);
-            vset_enum(patterns, enum_map, &ctx);
-            vset_destroy(patterns);
-        }
-
+        vset_enum(patterns, enum_map, &ctx);
         fprintf(tbl_file, "end map\n");
+        vset_destroy(patterns);
     }
 }
 
