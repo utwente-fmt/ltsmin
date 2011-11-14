@@ -583,16 +583,11 @@ bfs_vset_closed_insert(gsea_state_t *state, void *arg)
 }
 
 static int
-bfs_vset_open(gsea_state_t *state, void *arg)
+bfs_vset_open_insert_condition(gsea_state_t *state, void *arg)
 {
-    return vset_member(gc.store.vset.next_set, state->state);
-    (void)arg;
-}
-
-static int
-bfs_vset_closed(gsea_state_t *state, void *arg)
-{
-    return vset_member(gc.store.vset.closed_set, state->state);
+    return !vset_member(gc.store.vset.next_set, state->state)
+        && !vset_member(gc.store.vset.current_set, state->state)
+        && !vset_member(gc.store.vset.closed_set, state->state);
     (void)arg;
 }
 
@@ -1408,10 +1403,9 @@ gsea_setup()
         case DB_Vset:
             // setup standard bfs/vset configuration
             gc.foreach_open = bfs_vset_foreach_open;
+            gc.open_insert_condition = bfs_vset_open_insert_condition;
             gc.open_insert = bfs_vset_open_insert;
-            gc.open = bfs_vset_open;
             gc.closed_insert = bfs_vset_closed_insert;
-            gc.closed = bfs_vset_closed;
 
             gc.context = RTmalloc(sizeof(int) * global.N);
             gc.store.vset.domain = vdom_create_domain (global.N,VSET_IMPL_AUTOSELECT);

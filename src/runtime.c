@@ -77,7 +77,7 @@ char* RTinitNextArg(){
 void* RTmalloc(size_t size){
 	if(size==0) return NULL;
 	void *tmp=malloc(size);
-	if (tmp==NULL) Fatal(0,error,"out of memory trying to get %d",size);
+	if (tmp==NULL) Fatal(0,error,"out of memory trying to get %zu bytes",size);
 	return tmp;
 }
 
@@ -94,12 +94,12 @@ void* RTalign(size_t align, size_t size)
     if (errno) {
     switch (errno) {
         case ENOMEM:
-            Fatal(0,error,"out of memory on allocating %d bytes aligned at %d", 
+            Fatal(0,error,"out of memory on allocating %zu bytes aligned at %d",
                   size, align);
         case EINVAL:
             Fatal(0,error,"invalid alignment %d", align);
         default:
-            Fatal(0,error,"unknown error allocating %d bytes aligned at %d", 
+            Fatal(0,error,"unknown error allocating %zu bytes aligned at %d",
                   size, align);
     }}
     assert(NULL != ret);
@@ -108,7 +108,8 @@ void* RTalign(size_t align, size_t size)
 
 void* RTrealloc(void *rt_ptr, size_t size){
     void *tmp=realloc(rt_ptr,size);
-    if (tmp==NULL) Fatal(0,error,"out of memory trying to resize to %d",size);
+    if (tmp==NULL) Fatal(0,error,"out of memory trying to resize to %zu bytes",
+                         size);
     return tmp;
 }
 
@@ -121,7 +122,7 @@ void* RTalignZero(size_t align, size_t size){
 char* RTstrdup(const char *str){
     if (str == NULL) return NULL;
     char *tmp = strdup (str);
-    if (tmp == NULL) Fatal(0, error, "out of memory trying to get %d",
+    if (tmp == NULL) Fatal(0, error, "out of memory trying to get %zu bytes",
                            strlen (str)+1);
     return tmp;
 }

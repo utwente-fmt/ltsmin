@@ -262,11 +262,19 @@ MCRL2getTransitionsAll (model_t m, int* src, TransitionCB cb, void *ctx)
     return f.get_count();
 }
 
+ltsmin::pins *pins;
+
+void
+MCRL2exit ()
+{
+    delete pins;
+}
+
 void
 MCRL2loadGreyboxModel (model_t m, const char *model_name)
 {
     Warning(info, "mCRL2 rewriter: %s", mcrl2_rewriter_strategy.c_str());
-    ltsmin::pins *pins = new ltsmin::pins(m, std::string(model_name), mcrl2_rewriter_strategy);
+    pins = new ltsmin::pins(m, std::string(model_name), mcrl2_rewriter_strategy);
     GBsetContext(m,pins);
 
     lts_type_t ltstype = lts_type_create();
@@ -330,6 +338,8 @@ MCRL2loadGreyboxModel (model_t m, const char *model_name)
     GBsetStateLabelInfo (m, p_sl_info);
     GBsetNextStateLong (m, MCRL2getTransitionsLong);
     GBsetNextStateAll (m, MCRL2getTransitionsAll);
+
+    atexit(MCRL2exit);
 }
 
 }
