@@ -47,6 +47,7 @@ static void vset_popt(poptContext con,
 
 
 static si_map_entry vset_table[]={
+	{"ldd",VSET_ListDD},
 #ifdef HAVE_ATERM2_H
 	{"list",VSET_AtermDD_list},
 	{"tree",VSET_AtermDD_tree},
@@ -55,7 +56,6 @@ static si_map_entry vset_table[]={
 #ifdef HAVE_DDD_H
 	{"ddd",VSET_DDD},
 #endif
-	{"ldd",VSET_ListDD},
 	{NULL,0}
 };
 
@@ -65,12 +65,12 @@ struct poptOption vset_options[]={
 	{ "vset" , 0 , POPT_ARG_STRING , NULL , 0 ,
 		"select a vector set implementation from ATermDD with *list* encoding,"
 		" ATermDD with *tree* encoding, BuDDy using the *fdd* feature, or"
-		" native ListDD, or DDD (default: first available)" , "<list|tree|fdd|ddd|ldd>" },
+		" native ListDD, or DDD (default: first available)" , "<ldd|list|tree|fdd|ddd>" },
+	{ NULL,0 , POPT_ARG_INCLUDE_TABLE , listdd_options , 0 , "ListDD options" , NULL},
 #ifdef HAVE_ATERM2_H
 	{ NULL,0 , POPT_ARG_INCLUDE_TABLE , atermdd_options , 0 , "ATermDD options" , NULL},
 #endif
 	{ NULL,0 , POPT_ARG_INCLUDE_TABLE , buddy_options , 0 , "BuDDy options" , NULL},
-	{ NULL,0 , POPT_ARG_INCLUDE_TABLE , listdd_options , 0 , "ListDD options" , NULL},
 	POPT_TABLEEND
 };
 
@@ -82,6 +82,7 @@ vdom_create_domain(int n, vset_implementation_t impl)
     switch(impl){
     case VSET_IMPL_AUTOSELECT:
         /* fall-through */
+    case VSET_ListDD: return vdom_create_list_native(n);
 #ifdef HAVE_ATERM2_H
     case VSET_AtermDD_list: return vdom_create_list(n);
     case VSET_AtermDD_tree: return vdom_create_tree(n);
@@ -90,7 +91,6 @@ vdom_create_domain(int n, vset_implementation_t impl)
 #ifdef HAVE_DDD_H
     case VSET_DDD: return vdom_create_ddd(n);
 #endif
-    case VSET_ListDD: return vdom_create_list_native(n);
         default:
             return NULL;
     }
@@ -105,7 +105,9 @@ struct vector_set {
 };
 
 struct vector_relation {
-	vdom_t dom;
+    vdom_t dom;
+    expand_cb expand;
+    void *expand_ctx;
 };
 
 static void
@@ -124,24 +126,9 @@ default_reorder()
 static void
 default_least_fixpoint(vset_t dst, vset_t src, vrel_t rels[], int rel_count)
 {
-    vset_t temp = dst->dom->shared.set_create(dst->dom, 0, NULL);
-    vset_t fix  = dst->dom->shared.set_create(dst->dom, 0, NULL);
-    vset_t old  = dst->dom->shared.set_create(dst->dom, 0, NULL);
+    (void)dst;  (void)src; (void)rels; (void)rel_count;
 
-    dst->dom->shared.set_copy(fix, src);
-
-    while (!dst->dom->shared.set_equal(fix, old)) {
-        dst->dom->shared.set_copy(old, fix);
-        for (int i = 0; i < rel_count; i++) {
-            dst->dom->shared.set_next(temp, fix, rels[i]);
-            dst->dom->shared.set_union(fix, temp);
-        }
-    }
-
-    dst->dom->shared.set_copy(dst, fix);
-    dst->dom->shared.set_destroy(temp);
-    dst->dom->shared.set_destroy(fix);
-    dst->dom->shared.set_destroy(old);
+    Abort("Decision diagram package does not support least fixpoint");
 }
 
 void vdom_init_shared(vdom_t dom,int n){
@@ -177,7 +164,10 @@ vset_t vset_create(vdom_t dom,int k,int* proj){
 }
 
 vrel_t vrel_create(vdom_t dom,int k,int* proj){
-	return dom->shared.rel_create(dom,k,proj);
+	vrel_t rel = dom->shared.rel_create(dom,k,proj);
+    rel->expand = NULL;
+    rel->expand_ctx = NULL;
+    return rel;
 }
 
 void vset_add(vset_t set,const int* e){
@@ -266,6 +256,11 @@ void vset_reorder(vdom_t dom) {
 
 void vset_destroy(vset_t set) {
     set->dom->shared.set_destroy(set);
+}
+
+void vrel_set_expand(vrel_t rel, expand_cb cb, void *context) {
+    rel->expand = cb;
+    rel->expand_ctx = context;
 }
 
 void vset_least_fixpoint(vset_t dst, vset_t src, vrel_t rels[], int rel_count) {

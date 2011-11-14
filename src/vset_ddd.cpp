@@ -78,6 +78,8 @@ struct vector_set {
 
 struct vector_relation {
     vdom_t dom;
+    expand_cb expand;
+    void *expand_ctx;
     SDD *ddd;
     Shom *next;
     Shom *prev;
@@ -88,8 +90,9 @@ struct vector_relation {
 vset_t
 set_create_ddd(vdom_t dom, int k, int *proj)
 {
+    int l = (k < 0) ? 0 : k;
     vset_t set = reinterpret_cast<vset_t>(RTmalloc(sizeof(struct vector_set)
-                                                   + k * sizeof(int)));
+                                                   + sizeof(int[l])));
 
     set->dom = dom;
     set->ddd = new SDD;
@@ -120,7 +123,7 @@ set_add_ddd(vset_t set, const int *e)
 {
     SDD element = SDD::one;
 
-    if (set->p_len) {
+    if (set->p_len >= 0) {
         int len = set->p_len;
 
         for (int i = len - 1; i >= 0; i--)
@@ -141,7 +144,7 @@ set_member_ddd(vset_t set, const int *e)
 {
     Shom h = Shom::id;
 
-    if (set->p_len) {
+    if (set->p_len >= 0) {
         int len = set->p_len;
 
         for (int i = len - 1; i >= 0; i--)
@@ -197,7 +200,7 @@ enumerate(const GSDD *ddd, int idx, int *e, vset_element_cb cb, void *context)
 void
 set_enum_ddd(vset_t set, vset_element_cb cb, void *context)
 {
-    int len = (set->p_len) ? set->p_len : set->dom->shared.size;
+    int len = (set->p_len < 0) ? set->dom->shared.size : set->p_len;
     int e[len];
 
     if (*set->ddd == SDD::null)
@@ -210,6 +213,7 @@ void
 set_enum_match_ddd(vset_t set, int p_len, int *proj, int *match,
                        vset_element_cb cb, void *context)
 {
+    assert(p_len >= 0);
     Shom h = Shom::id;
 
     if (*set->ddd == SDD::null)
@@ -218,9 +222,12 @@ set_enum_match_ddd(vset_t set, int p_len, int *proj, int *match,
     for (int i = p_len - 1; i >= 0; i--)
         h = selectVarVal(proj[i], match[i]) & h;
 
-    int len = (set->p_len) ? set->p_len : set->dom->shared.size;
+    int len = (set->p_len < 0) ? set->dom->shared.size : set->p_len;
     int e[len];
     SDD tmp = h(*set->ddd);
+
+    if (tmp == SDD::null)
+        return;
 
     enumerate(&tmp, 0, e, cb, context);
 }
@@ -228,6 +235,7 @@ set_enum_match_ddd(vset_t set, int p_len, int *proj, int *match,
 void
 set_copy_match_ddd(vset_t dst, vset_t src, int p_len, int *proj, int *match)
 {
+    assert(p_len >= 0);
     Shom h = Shom::id;
 
     for (int i = p_len - 1; i >= 0; i--)
@@ -239,7 +247,7 @@ set_copy_match_ddd(vset_t dst, vset_t src, int p_len, int *proj, int *match)
 void
 set_example_ddd(vset_t set, int *e)
 {
-    int len = (set->p_len) ? set->p_len : set->dom->shared.size;
+    int len = (set->p_len < 0) ? set->dom->shared.size : set->p_len;
     const GSDD *ddd = set->ddd;
 
     assert(*ddd != SDD::top && *ddd != SDD::null);
@@ -256,6 +264,7 @@ set_example_ddd(vset_t set, int *e)
 void
 set_copy_ddd(vset_t dst, vset_t src)
 {
+    assert(dst->p_len == src->p_len);
     *dst->ddd = *src->ddd;
     assert(*dst->ddd != SDD::top);
 }
@@ -270,6 +279,7 @@ set_project_ddd(vset_t dst, vset_t src)
 void
 set_union_ddd(vset_t dst, vset_t src)
 {
+    assert(dst->p_len == src->p_len);
     *dst->ddd = *dst->ddd + *src->ddd;
     assert(*dst->ddd != SDD::top);
 }
@@ -277,6 +287,7 @@ set_union_ddd(vset_t dst, vset_t src)
 void
 set_intersect_ddd(vset_t dst, vset_t src)
 {
+    assert(dst->p_len == src->p_len);
     *dst->ddd = *dst->ddd * *src->ddd;
     assert(*dst->ddd != SDD::top);
 }
@@ -285,6 +296,7 @@ set_intersect_ddd(vset_t dst, vset_t src)
 void
 set_minus_ddd(vset_t dst, vset_t src)
 {
+    assert(dst->p_len == src->p_len);
     *dst->ddd = *dst->ddd - *src->ddd;
     assert(*dst->ddd != SDD::top);
 }
@@ -293,15 +305,16 @@ void
 set_count_ddd(vset_t set, long *nodes, bn_int_t *elements)
 {
     *nodes = set->ddd->size();
-    long double count = set->ddd->nbStates();
+    double count = set->ddd->nbStates();
     bn_double2int(count, elements);
 }
 
 vrel_t
 rel_create_ddd(vdom_t dom, int k, int *proj)
 {
+    assert(k >= 0);
     vrel_t rel = reinterpret_cast<vrel_t>(RTmalloc(sizeof(struct vector_relation)
-                                                   + k * sizeof(int)));
+                                                   + sizeof(int[k])));
 
     rel->dom = dom;
     rel->ddd = new SDD;
@@ -322,7 +335,7 @@ rel_add_ddd(vrel_t rel, const int *src, const int *dst)
     Shom next = Shom::id;
     Shom prev = Shom::id;
 
-    if (rel->p_len) {
+    if (rel->p_len >= 0) {
         int len = rel->p_len;
 
         for (int i = len - 1; i >= 0; i--) {
@@ -364,7 +377,7 @@ void
 rel_count_ddd(vrel_t rel, long *nodes, bn_int_t *elements)
 {
     *nodes = rel->ddd->size();
-    long double count = rel->ddd->nbStates();
+    double count = rel->ddd->nbStates();
     bn_double2int(count, elements);
 }
 
@@ -399,8 +412,12 @@ void set_least_fixpoint_ddd (vset_t dst, vset_t src, vrel_t rels[],
 {
     Shom relation = Shom::id;
 
-    for (int i = 0; i < rel_count; i++)
+    for (int i = 0; i < rel_count; i++) {
+        if (rels[i]->expand != NULL)
+            Abort("DDD does not support least fixpoint with expansion");
+
         relation = relation + *rels[i]->next;
+    }
 
     Shom fix = fixpoint(relation);
 

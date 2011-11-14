@@ -1408,10 +1408,10 @@ gsea_setup()
             gc.closed_insert = bfs_vset_closed_insert;
 
             gc.context = RTmalloc(sizeof(int) * global.N);
-            gc.store.vset.domain = vdom_create_domain (global.N,VSET_IMPL_AUTOSELECT);
-            gc.store.vset.closed_set = vset_create(gc.store.vset.domain, 0, NULL);
-            gc.store.vset.next_set = vset_create(gc.store.vset.domain, 0, NULL);
-            gc.store.vset.current_set = vset_create(gc.store.vset.domain, 0, NULL);
+            gc.store.vset.domain = vdom_create_domain (global.N, VSET_IMPL_AUTOSELECT);
+            gc.store.vset.closed_set = vset_create(gc.store.vset.domain, -1, NULL);
+            gc.store.vset.next_set = vset_create(gc.store.vset.domain, -1, NULL);
+            gc.store.vset.current_set = vset_create(gc.store.vset.domain, -1, NULL);
             break;
         default:
             Abort ("unimplemented combination --strategy=%s, --state=%s", opt.arg_strategy, opt.arg_state_db );
@@ -1481,10 +1481,10 @@ gsea_setup()
             gc.queue.filo.state_to_stack = dfs_vset_state_to_stack;
 
             gc.context = RTmalloc(sizeof(int) * global.N);
-            gc.store.vset.domain = vdom_create_domain (global.N,VSET_IMPL_AUTOSELECT);
-            gc.store.vset.closed_set = vset_create(gc.store.vset.domain, 0, NULL);
-            gc.store.vset.next_set = vset_create(gc.store.vset.domain, 0, NULL);
-            gc.store.vset.current_set = vset_create(gc.store.vset.domain, 0, NULL);
+            gc.store.vset.domain = vdom_create_domain (global.N, VSET_IMPL_AUTOSELECT);
+            gc.store.vset.closed_set = vset_create(gc.store.vset.domain, -1, NULL);
+            gc.store.vset.next_set = vset_create(gc.store.vset.domain, -1, NULL);
+            gc.store.vset.current_set = vset_create(gc.store.vset.domain, -1, NULL);
             gc.queue.filo.stack = dfs_stack_create(global.N);
 
             // proviso: doens't work here

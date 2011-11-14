@@ -2,8 +2,6 @@ include::pins-options.txt[]
 
 include::vset-options.txt[]
 
-include::buddy-options.txt[]
-
 include::general-options.txt[]
 
 == EXIT STATUS

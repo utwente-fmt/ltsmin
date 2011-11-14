@@ -53,7 +53,7 @@ extern vdom_t vdom_create_domain(int n, vset_implementation_t impl);
 /**
 \brief Create a set.
 
-\param k If non-zero this indicates the length of the sub-domain.
+\param k If non-negative this indicates the length of the sub-domain.
 \param proj If non-NULL this is a sorted list of the indices of the sub-domain.
 */
 extern vset_t vset_create(vdom_t dom,int k,int* proj);
@@ -188,13 +188,24 @@ extern void vset_reorder(vdom_t dom);
 extern void vset_destroy(vset_t set);
 
 /**
+\brief Callback for expanding a relation
+*/
+typedef void (*expand_cb)(vrel_t rel, vset_t set, void *context);
+
+/**
+\brief Set the method for expanding a relation
+*/
+void vrel_set_expand(vrel_t rel, expand_cb cb, void *context);
+
+/**
 \brief Do a least fixpoint using the argument rels on the source states.
 
 This computes the smallest set S inductively satisfying source in S
 and rels(S) in S.
 
 Both dst and src arguments must be defined over the complete domain and
-not over sub-domains.
+not over sub-domains. A relation in rels is expanded on-the-fly in case
+an expand callback is set.
 */
 void vset_least_fixpoint(vset_t dst, vset_t src, vrel_t rels[], int rel_count);
 
