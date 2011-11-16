@@ -817,7 +817,7 @@ set_union_mdd(vset_t dst, vset_t src)
 static void
 set_minus_mdd(vset_t dst, vset_t src)
 {
-    assert(dst->p_id == src->p_id);
+    assert(dst->p_id == src->p_id && dst->p_len == src->p_len);
     dst->mdd = mdd_minus(dst->mdd, src->mdd);
 }
 
