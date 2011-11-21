@@ -1,6 +1,6 @@
-#serial 2
+#serial 3
 # Author: Michael Weber <michaelw@cs.utwente.nl>
-# Modified by Stefan Blom.
+# Modified by Stefan Blom and Jeroen Ketema.
 #
 # SYNOPSIS
 #
@@ -25,11 +25,12 @@ if test x"$acx_mcrl2" = xyes; then
     AC_LANG_PUSH([C++])
     AC_CHECK_SIZEOF([void *])
     if test x"$ac_cv_sizeof_void_p" = x8; then
-        MCRL2_CPPFLAGS="-DAT_64BIT"
+        MCRL2_PINS_CPPFLAGS="-DAT_64BIT"
     fi
-    AC_SUBST(MCRL2_CPPFLAGS, ["$MCRL2_CPPFLAGS -I$with_mcrl2/include"])
-    AC_SUBST(MCRL2_LDFLAGS,  ["-L${with_mcrl2}/lib/mcrl2"])
-    AX_LET([CPPFLAGS], ["$MCRL2_CPPFLAGS $CPPFLAGS"],
+    AC_SUBST(MCRL2_PINS_CPPFLAGS, ["$MCRL2_PINS_CPPFLAGS -I$with_mcrl2/include"])
+    AC_SUBST(MCRL2_PINS_LDFLAGS,  ["-L${with_mcrl2}/lib/mcrl2"])
+    AC_SUBST(MCRL2_LDFLAGS, ["$acx_cv_cc_export_dynamic"])
+    AX_LET([CPPFLAGS], ["$MCRL2_PINS_CPPFLAGS $CPPFLAGS"],
       [AC_CHECK_HEADER([mcrl2/lps/ltsmin.h],,
          [AC_MSG_FAILURE([cannot find mCRL2 headers,
 see README on how to install mCRL2 properly.])]
@@ -52,7 +53,7 @@ AC_REQUIRE([ACX_MCRL2])dnl
 if test x"$acx_mcrl2" = xyes; then
     AC_LANG_PUSH([C++])
     AX_LET([LIBS], ["$LIBS"],
-           [LDFLAGS], ["$MCRL2_LDFLAGS $LDFLAGS"],
+           [LDFLAGS], ["$MCRL2_PINS_LDFLAGS $LDFLAGS"],
       [acx_mcrl2_libs=yes
        AX_CXX_CHECK_LIB([mcrl2_aterm], [main],
          [MCRL2_LIBS="-lmcrl2_aterm $MCRL2_LIBS"
@@ -85,9 +86,8 @@ if test x"$acx_mcrl2" = xyes; then
     AC_LANG_POP([C++])
 
     AC_LANG_PUSH([C])
-        AX_LET([CFLAGS], ["$MCRL2_CFLAGS $CFLAGS"],
-           [LIBS], ["$LIBS"],
-           [LDFLAGS], ["$MCRL2_LDFLAGS $LDFLAGS"],
+        AX_LET([LIBS], ["$LIBS"],
+           [LDFLAGS], ["$MCRL2_PINS_LDFLAGS $LDFLAGS"],
       [AC_CHECK_LIB([dparser], [main],
          [MCRL2_LIBS="-ldparser $MCRL2_LIBS"
           LIBS="-ldparser $LIBS"])
@@ -97,7 +97,8 @@ if test x"$acx_mcrl2" = xyes; then
 fi
 if test x"$acx_mcrl2_libs" = xyes; then :
   ifelse([$1],,
-         [AC_SUBST(CPPFLAGS, ["$MCRL2_CPPFLAGS $CPPFLAGS"])
+         [AC_SUBST(CPPFLAGS, ["$MCRL2_PINS_CPPFLAGS $CPPFLAGS"])
+          AC_SUBST(LDFLAGS,  ["$MCRL2_PINS_LDFLAGS $LDFLAGS"])
           AC_SUBST(LDFLAGS,  ["$MCRL2_LDFLAGS $LDFLAGS"])
           AC_SUBST(LIBS,     ["$MCRL2_LIBS $LIBS"])],
          [$1])
