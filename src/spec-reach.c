@@ -927,7 +927,7 @@ initialize_levels(bitvector_t *groups, int *empty_groups, int *back,
         return;
 
     // back[k] = last + in any group of level k
-    bitvector_t level_matrix[(N - 1) / sat_granularity + 1];
+    bitvector_t level_matrix[max_sat_levels];
 
     for (int k = 0; k < max_sat_levels; k++) {
         bitvector_create(&level_matrix[k], N);
@@ -988,7 +988,7 @@ reach_sat_like(reach_proc_t reach_proc, vset_t visited,
 
     initialize_levels(groups, empty_groups, back, reach_groups);
 
-    for (int i = 0; i < nGrps; i++)
+    for (int i = 0; i < max_sat_levels; i++)
         prev_vis[i] = save_sat_levels?vset_create(domain, -1, NULL):NULL;
 
     while (k < max_sat_levels) {
@@ -1014,7 +1014,7 @@ reach_sat_like(reach_proc_t reach_proc, vset_t visited,
 
     vset_destroy(old_vis);
     if (save_sat_levels)
-        for (int i = 0; i < nGrps; i++) vset_destroy(prev_vis[i]);
+        for (int i = 0; i < max_sat_levels; i++) vset_destroy(prev_vis[i]);
 }
 
 static void
@@ -1031,7 +1031,7 @@ reach_sat_loop(reach_proc_t reach_proc, vset_t visited,
 
     initialize_levels(groups, empty_groups, NULL, reach_groups);
 
-    for (int i = 0; i < nGrps; i++)
+    for (int i = 0; i < max_sat_levels; i++)
         prev_vis[i] = save_sat_levels?vset_create(domain, -1, NULL):NULL;
 
     while (!vset_equal(old_vis, visited)) {
@@ -1049,7 +1049,7 @@ reach_sat_loop(reach_proc_t reach_proc, vset_t visited,
 
     vset_destroy(old_vis);
     if (save_sat_levels)
-        for (int i = 0; i < nGrps; i++) vset_destroy(prev_vis[i]);
+        for (int i = 0; i < max_sat_levels; i++) vset_destroy(prev_vis[i]);
 }
 
 struct expand_info {
@@ -1358,7 +1358,7 @@ init_model(char *file)
     eLbls = lts_type_get_edge_label_count(ltstype);
     sLbls = lts_type_get_state_label_count(ltstype);
     nGrps = dm_nrows(GBgetDMInfo(model));
-    max_sat_levels = (N - 1) / sat_granularity + 1;
+    max_sat_levels = (N / sat_granularity) + 1;
     Warning(info, "state vector length is %d; there are %d groups", N, nGrps);
 }
 

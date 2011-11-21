@@ -129,8 +129,8 @@ endif
 
 
 libmcrl2_pins_la_SOURCES  = mcrl2-greybox.cpp mcrl2-greybox.h
-libmcrl2_pins_la_CPPFLAGS = -DMCRL2 -DNDEBUG $(MCRL2_CPPFLAGS) $(AM_CPPFLAGS)
-libmcrl2_pins_la_LDFLAGS  = $(MCRL2_LDFLAGS) $(AM_LDFLAGS)
+libmcrl2_pins_la_CPPFLAGS = -DMCRL2 -DNDEBUG $(MCRL2_PINS_CPPFLAGS) $(AM_CPPFLAGS)
+libmcrl2_pins_la_LDFLAGS  = $(MCRL2_PINS_LDFLAGS) $(MCRL2_LDFLAGS) $(AM_LDFLAGS)
 libmcrl2_pins_la_LIBADD   = $(MCRL2_LIBS)
 
 # etf-convert
@@ -180,6 +180,7 @@ lpo2lts_grey_LDFLAGS  = $(MCRL_LDFLAGS) $(AM_LDFLAGS)
 lps2lts_grey_SOURCES  = spec2lts-grey.c
 lps2lts_grey_LDADD    = $(VSET_LIBS) libmcrl2-pins.la libltsmin.la
 lps2lts_grey_CPPFLAGS = -DMCRL2 $(AM_CPPFLAGS)
+lps2lts_grey_LDFLAGS  = $(MCRL2_LDFLAGS) $(AM_LDFLAGS)
 nodist_EXTRA_lps2lts_grey_SOURCES = automake-force-linker.cxx
 
 # nips2lts-grey
@@ -223,6 +224,7 @@ lpo2lts_gsea_LDFLAGS  = $(MCRL_LDFLAGS) $(AM_LDFLAGS)
 lps2lts_gsea_SOURCES  = spec2lts-gsea.c
 lps2lts_gsea_LDADD    = $(VSET_LIBS) libmcrl2-pins.la libltsmin.la
 lps2lts_gsea_CPPFLAGS = -DMCRL2 $(AM_CPPFLAGS)
+lps2lts_gsea_LDFLAGS  = $(MCRL2_LDFLAGS) $(AM_LDFLAGS)
 nodist_EXTRA_lps2lts_gsea_SOURCES = automake-force-linker.cxx
 
 # nips2lts-gsea
@@ -266,6 +268,7 @@ lpo_reach_LDFLAGS  = $(MCRL_LDFLAGS) $(AM_LDFLAGS)
 lps_reach_SOURCES  = spec-reach.c
 lps_reach_LDADD    = $(VSET_LIBS) libmcrl2-pins.la libltsmin.la
 lps_reach_CPPFLAGS = -DMCRL2 $(AM_CPPFLAGS)
+lps_reach_LDFLAGS  = $(MCRL2_LDFLAGS) $(AM_LDFLAGS)
 nodist_EXTRA_lps_reach_SOURCES = automake-force-linker.cxx
 
 # nips-reach
@@ -309,6 +312,7 @@ lpo2lts_mpi_LDFLAGS  = $(MCRL_LDFLAGS) $(MCRL_LDFLAGS) $(AM_LDFLAGS)
 lps2lts_mpi_SOURCES  = spec2lts-mpi.c
 lps2lts_mpi_LDADD    = libmcrl2-pins.la libltsmin-mpi.la
 lps2lts_mpi_CPPFLAGS = -DMCRL2 $(AM_CPPFLAGS)
+lps2lts_mpi_LDFLAGS  = $(MCRL2_LDFLAGS) $(AM_LDFLAGS)
 nodist_EXTRA_lps2lts_mpi_SOURCES = automake-force-linker.cxx
 
 # nips2lts-mpi
@@ -353,6 +357,7 @@ etf2lts_mc_CPPFLAGS = -DETF $(AM_CPPFLAGS)
 #lps2lts_mc_SOURCES  = spec2lts-mc.c
 #lps2lts_mc_LDADD    = libmcrl2-pins.la libltsmin.la
 #lps2lts_mc_CPPFLAGS = -DMCRL2 $(AM_CPPFLAGS)
+#lps2lts_mc_LDFLAGS  = $(MCRL2_LDFLAGS) $(AM_LDFLAGS)
 #nodist_EXTRA_lps2lts_mc_SOURCES = automake-force-linker.cxx
 
 # nips2lts-mc
