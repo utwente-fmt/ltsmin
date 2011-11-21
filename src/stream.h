@@ -153,7 +153,7 @@ extern char* DSreadLN(stream_t ds);
 
 extern uint64_t DSreadVL(stream_t ds);
 
-/*}@*/
+/*@}*/
 
 #endif
 

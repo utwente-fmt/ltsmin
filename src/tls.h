@@ -95,9 +95,10 @@ static const size_t CACHE_LINE_INT_MASK =
 
 
 /**
-\def maximum number of instances per storage supported by instance manager
+\def TLS_MAX_INSTANCES
+Maximum number of instances per storage supported by instance manager.
 
-\par enlarging this increases memory usage for the tls
+\par Enlarging this increases memory usage for the tls.
 */
 #define TLS_MAX_INSTANCES 128
 

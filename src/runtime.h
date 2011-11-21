@@ -127,7 +127,7 @@ extern size_t RTmemSize();
 /// Get the page size.
 extern size_t RTpageSize();
 
-/*}@*/
+/*@}*/
 
 #endif
 

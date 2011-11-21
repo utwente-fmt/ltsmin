@@ -130,7 +130,7 @@ extern void vset_project(vset_t dst,vset_t src);
 extern void vset_union(vset_t dst,vset_t src);
 
 /**
-\brief dst := (a | a \in dst and a \in src)
+\brief dst := (a | a in dst and a in src)
 */
 extern void vset_intersect(vset_t dst,vset_t src);
 
