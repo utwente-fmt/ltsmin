@@ -133,7 +133,26 @@ void RTfree(void *rt_ptr){
 }
 
 void *
+RTtrydlsym (void *handle, const char *symbol)
+{
+    return dlsym (handle, symbol);
+}
+
+void *
 RTdlsym (const char *libname, void *handle, const char *symbol)
+{
+    void *ret = RTtrydlsym (handle, symbol);
+    if (ret == NULL) {
+        const char *dlerr = dlerror ();
+        Fatal (1, error, "dynamically loading from `%s': %s",
+               libname,
+               dlerr != NULL ? dlerr : "unknown error");
+    }
+    return ret;
+}
+
+void *
+RTtryedlsym (const char *libname, void *handle, const char *symbol)
 {
     void *ret = dlsym (handle, symbol);
     if (ret == NULL) {

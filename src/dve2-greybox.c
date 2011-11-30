@@ -42,6 +42,8 @@ const char* (*get_state_variable_type_value)(int type, int value);
 int         (*get_transition_count)();
 const int*  (*get_transition_read_dependencies)(int t);
 const int*  (*get_transition_write_dependencies)(int t);
+covered_by_grey_t   covered_by;
+covered_by_grey_t   covered_by_short;
 
 enum {
     SL_IDX_BUCHI_ACCEPT = 0,
@@ -296,6 +298,12 @@ DVE2loadDynamicLib(model_t model, const char *filename)
     get_guard_nds_matrix = (const int*(*)(int))
     RTdlsym( filename, dlHandle, "get_guard_nds_matrix" );
 
+    // optionally load the covered_by method for partly symbolic states
+    covered_by = (covered_by_grey_t)
+        RTtrydlsym(dlHandle, "covered_by");
+    covered_by_short = (covered_by_grey_t)
+        RTtrydlsym(dlHandle, "covered_by_short");
+
     // check system_with_property
     if (have_property()) {
         buchi_is_accepting = (int(*)(void*,int*))
@@ -519,4 +527,6 @@ DVE2loadGreyboxModel(model_t model, const char *filename)
 
     GBsetNextStateAll  (model, (next_method_black_t) get_successors);
     GBsetNextStateLong (model, (next_method_grey_t)  get_successor);
+    GBsetIsCoveredBy (model, covered_by);
+    GBsetIsCoveredByShort (model, covered_by_short);
 }

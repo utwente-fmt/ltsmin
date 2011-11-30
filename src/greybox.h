@@ -156,6 +156,27 @@ but for MCRL(2) it is more efficient if this call is implemented directly in the
 it avoids having to initialize the rewriter several times for the same state.
  */
 
+typedef int (*covered_by_grey_t)(int*,int*);
+/**< @brief Type of the isCoveredBy function.
+*/
+
+extern void GBsetIsCoveredBy(model_t model,covered_by_grey_t covered_by);
+/**
+\brief Set the covered_by method.
+*/
+
+extern void GBsetIsCoveredByShort(model_t model,covered_by_grey_t covered_by);
+/**
+\brief Set the covered_by_short method.
+*/
+
+extern int GBisCoveredByShort(model_t model,int*a,int*b);
+/**< @brief Symbolic state a is covered by symbolic state b
+ */
+
+extern int GBisCoveredBy(model_t model,int*a,int*b);
+/**< @brief Symbolic part of state a is covered by symbolic part of state b
+ */
 
 extern matrix_t *GBgetStateLabelInfo(model_t model);
 /**<

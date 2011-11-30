@@ -57,6 +57,8 @@ extern void RTfree(void *rt_ptr);
 
 extern void *RTdlsym (const char *libname, void *handle, const char *symbol);
 
+extern void *RTtrydlsym (void *handle, const char *symbol);
+
 /**
 \brief Initialize the runtime library using popt.
 \param min_args The minimum number of arguments allowed.

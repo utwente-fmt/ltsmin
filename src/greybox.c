@@ -29,6 +29,8 @@ struct grey_box_model {
 	get_label_group_method_t state_labels_group;
 	get_label_all_method_t state_labels_all;
 	transition_in_group_t transition_in_group;
+	covered_by_grey_t covered_by;
+    covered_by_grey_t covered_by_short;
 	void* newmap_context;
 	newmap_t newmap;
 	int2chunk_t int2chunk;
@@ -438,6 +440,25 @@ int GBgetTransitionsLong(model_t model,int group,int*src,TransitionCB cb,void*co
 	return model->next_long(model,group,src,cb,context);
 }
 
+void GBsetIsCoveredBy(model_t model,covered_by_grey_t covered_by){
+    model->covered_by = covered_by;
+}
+
+void GBsetIsCoveredByShort(model_t model,covered_by_grey_t covered_by_short){
+    model->covered_by_short = covered_by_short;
+}
+
+int GBisCoveredByShort(model_t model,int*a,int*b) {
+    if (NULL == model->covered_by_short)
+        Fatal (1,error,"No symbolic comparison function (isCoveredBy) present for loaded model.");
+    return model->covered_by_short(a,b);
+}
+
+int GBisCoveredBy(model_t model,int*a,int*b) {
+    if (NULL == model->covered_by)
+        Fatal (1,error,"No symbolic comparison function (isCoveredBy) present for loaded model.");
+    return model->covered_by(a,b);
+}
 
 void GBsetNextStateAll(model_t model,next_method_black_t method){
 	model->next_all=method;
