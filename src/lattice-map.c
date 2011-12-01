@@ -161,7 +161,7 @@ lmap_create (size_t key_size, size_t data_size, int size)
     map->data_size = sizeof (uint64_t);
     map->length = map->key_size + map->data_size;
     map->size = 1UL << size;
-    map->mask = map->size - 1;
+    map->mask = (map->size * map->length) - 1;
     map->hash32 = (hash32_f)SuperFastHash;
     map->table = RTalignZero (CACHE_LINE_SIZE, (map->length) * map->size);
     pthread_key_create (&map->local_key, RTfree);

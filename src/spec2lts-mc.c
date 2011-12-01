@@ -775,8 +775,9 @@ init_globals (int argc, char *argv[])
     }
 
     if (0 == dbs_size) {
-        size_t              el_size = db_type == UseTreeDBSLL ? 3 : D;
-        size_t              db_el_size = (RTmemSize() / 3) / (el_size * SLOT_SIZE);
+        size_t el_size = (db_type == UseTreeDBSLL ? 3 : D) * SLOT_SIZE;
+        size_t map_el_size = (Strat_TA & strategy[0] ? sizeof(lmap_store_t)*4 : 0);
+        size_t db_el_size = (RTmemSize() / 3) / (el_size + map_el_size);
         dbs_size = (int) (log(db_el_size) / log(2));
         dbs_size = dbs_size > DB_SIZE_MAX ? DB_SIZE_MAX : dbs_size;
     }
@@ -799,7 +800,7 @@ init_globals (int argc, char *argv[])
     Warning (info, "Global bits: %d, count bits: %d, local bits: %d.",
              global_bits, count_bits, local_bits);
 
-    lmap = lmap_create (63, 64, dbs_size << 3);
+    lmap = lmap_create (63, 64, dbs_size + 2);
     switch (db_type) {
     case UseDBSLL:
         if (ZOBRIST) {
