@@ -1223,7 +1223,15 @@ permute_trans (permute_t *perm, state_info_t *state, perm_cb_f cb, void *ctx)
     perm->real_cb = cb;
     perm->state = state;
     perm->nstored = perm->start_group_index = 0;
-    int count = GBgetTransitionsAll (perm->model, state->data, permute_one, perm);
+    int v[N];
+    int count;
+    if (Strat_TA & strategy[0]) {
+        memcpy (v, state->data, D<<2);
+        ((lattice_t*)(v + D))[0] = state->lattice;
+        count = GBgetTransitionsAll (perm->model, v, permute_one, perm);
+    } else {
+        count = GBgetTransitionsAll (perm->model, state->data, permute_one, perm);
+    }
     switch (perm->permutation) {
     case Perm_Otf:
         randperm (perm->pad, perm->nstored, state->ref + perm->shiftorder);
