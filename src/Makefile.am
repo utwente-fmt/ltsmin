@@ -598,6 +598,7 @@ libutil_la_SOURCES += greybox.c greybox.h
 libutil_la_SOURCES += group.c
 libutil_la_SOURCES += gzstream.c
 libutil_la_SOURCES += is-balloc.c is-balloc.h
+libutil_la_SOURCES += lattice-map.c lattice-map.h
 libutil_la_SOURCES += lb.c lb.h
 libutil_la_SOURCES += lts-type.c lts-type.h
 libutil_la_SOURCES += lts_count.c lts_count.h
