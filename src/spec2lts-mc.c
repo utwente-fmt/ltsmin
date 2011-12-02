@@ -2302,8 +2302,8 @@ lmap_cb_t
 covered (void *arg, lmap_store_t *stored, lmap_loc_t loc)
 {
     wctx_t         *ctx = (wctx_t*) arg;
-    lattice_t *succ_lattice = (lattice_t*)ctx->successor->data + N - 2;
-    if ( GBisCoveredBy(ctx->model, (int*)succ_lattice, (int*)&stored->lattice)) {
+    lattice_t *succ_lattice = (lattice_t*)&ctx->successor->lattice;
+    if ( GBisCoveredByShort(ctx->model, (int*)succ_lattice, (int*)&stored->lattice)) {
         ctx->done = 1;
         return LMAP_CB_STOP;
     }
@@ -2320,7 +2320,8 @@ ta_handle_cover (void *arg, state_info_t *successor, transition_info_t *ti, int 
     wctx_t         *ctx = (wctx_t*) arg;
     ctx->done = 0;
     ctx->successor = successor;
-    lmap_iterate (lmap, successor->ref, covered, successor);
+
+    lmap_iterate (lmap, successor->ref, covered, ctx);
     if (!ctx->done) {
         lmap_insert (lmap, successor->ref, successor->lattice, WAITING);
         raw_data_t stack_loc = dfs_stack_push (ctx->stack, NULL);

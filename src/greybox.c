@@ -450,7 +450,7 @@ void GBsetIsCoveredByShort(model_t model,covered_by_grey_t covered_by_short){
 
 int GBisCoveredByShort(model_t model,int*a,int*b) {
     if (NULL == model->covered_by_short)
-        Fatal (1,error,"No symbolic comparison function (isCoveredBy) present for loaded model.");
+        Fatal (1,error,"No symbolic comparison function (isCoveredByShort) present for loaded model.");
     return model->covered_by_short(a,b);
 }
 
