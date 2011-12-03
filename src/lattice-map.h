@@ -16,7 +16,7 @@
 \typedef
     Associates a reference with a set of lattices and a status.
 */
-typedef struct lmap_ll_s   *lmap_t;
+typedef struct lmap_ll_s lmap_t;
 
 /**
 \brief Status attached to each lattice location.
@@ -26,16 +26,16 @@ typedef struct lmap_ll_s   *lmap_t;
  * status) elsewhere outside this class.
  */
 typedef enum lmap_status_e {
-    LMAP_STATUS_EMPTY           = 0,    /* *internal* no lattice stored here */
-    LMAP_STATUS_TOMBSTONE       = 1,    /* *internal* lattice delete, can be reused */
-    LMAP_STATUS_OCCUPIED1       = 2,    /* *external* lattice stored */
-    LMAP_STATUS_OCCUPIED2       = 3     /* *external* lattice stored */
+    LMAP_STATUS_EMPTY     = 0, // *internal* no lattice stored here
+    LMAP_STATUS_TOMBSTONE = 1, // *internal* lattice deleted, store can be reused
+    LMAP_STATUS_OCCUPIED1 = 2, // *external* lattice stored
+    LMAP_STATUS_OCCUPIED2 = 3  // *external* lattice stored
 } lmap_status_t;
 
 /**
 \brief A lattice is assumed to be represented by a 64bit pointer.
  */
-typedef uint64_t            lattice_t;
+typedef uint64_t        lattice_t;
 
 /**
 \typedef The buckets for storing lattices.
@@ -64,7 +64,7 @@ typedef uint64_t       lmap_loc_t;
 \param len The length of the vectors to be stored here
 \return the hashtable
 */
-extern lmap_t       lmap_create (size_t key_size, size_t data_size, int size);
+extern lmap_t      *lmap_create (size_t key_size, size_t data_size, int size);
 
 typedef lmap_cb_t   (*lmap_iterate_f)(void *ctx, lmap_store_t *ld, lmap_loc_t h);
 
@@ -78,31 +78,31 @@ typedef lmap_cb_t   (*lmap_iterate_f)(void *ctx, lmap_store_t *ld, lmap_loc_t h)
 \retval The last hash index to iterate over
 \return 1 if the vector was present, 0 if it was added
 */
-extern lmap_loc_t   lmap_iterate_hash (const lmap_t map, ref_t k,
+extern lmap_loc_t   lmap_iterate_from (const lmap_t *map, ref_t k,
                                        lmap_loc_t *start, lmap_iterate_f cb,
                                        void *ctx);
 
-extern lmap_status_t lmap_lookup (const lmap_t map, ref_t k, lattice_t l);
+extern lmap_loc_t   lmap_lookup (const lmap_t *map, ref_t k, lattice_t l);
 
-extern lmap_loc_t   lmap_insert_hash (const lmap_t map, ref_t k,
+extern lmap_loc_t   lmap_insert_from (const lmap_t *map, ref_t k,
                                       lattice_t l, lmap_status_t status,
                                       lmap_loc_t *start);
 
-extern lmap_status_t lmap_get (const lmap_t map, lmap_loc_t hash);
+extern lmap_store_t*lmap_get (const lmap_t *map, lmap_loc_t loc);
 
-extern void         lmap_set (const lmap_t map, lmap_status_t status,
-                              lmap_loc_t hash);
+extern void         lmap_set (const lmap_t *map, lmap_loc_t loc,
+                              lmap_status_t status);
 
-extern lmap_loc_t   lmap_insert (const lmap_t map, ref_t k, lattice_t l,
+extern lmap_loc_t   lmap_insert (const lmap_t *map, ref_t k, lattice_t l,
                                  lmap_status_t status);
 
-extern lmap_loc_t   lmap_iterate (const lmap_t map, ref_t k,
+extern lmap_loc_t   lmap_iterate (const lmap_t *map, ref_t k,
                                   lmap_iterate_f cb, void *ctx);
 
 /**
 \brief Free the memory used by a map.
 */
-extern void         lmap_free (lmap_t map);
+extern void         lmap_free (lmap_t *map);
 
 /**
 \brief return a copy of internal statistics
@@ -110,6 +110,6 @@ extern void         lmap_free (lmap_t map);
 \param map The map
 \returns a copy of the statistics, to be freed with free
 */
-extern stats_t     *lmap_stats (lmap_t map);
+extern stats_t     *lmap_stats (lmap_t *map);
 
 #endif

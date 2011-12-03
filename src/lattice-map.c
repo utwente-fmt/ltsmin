@@ -11,8 +11,13 @@
 #include <runtime.h>
 #include <lattice-map.h>
 
-
-static const size_t     CL_MASK = -(1UL << CACHE_LINE);
+/**
+ * Internally this multimap does sequential probing within a certain block
+ * (cyclic). After that it rehashes to another block.
+ */
+static const size_t     BLOCK_SIZE = 16; // nr of stores in a block
+static const size_t     BLOCK_LOG2 = 4; // log2 BLOCK_SIZE
+static const size_t     BLOCK_MASK = -16; // Mask to get index in block
 
 struct lmap_ll_s {
     size_t              size;
@@ -20,7 +25,7 @@ struct lmap_ll_s {
     size_t              key_size;
     size_t              data_size;
     size_t              mask;
-    char               *table;
+    lmap_store_t       *table;
     hash32_f            hash32;
     pthread_key_t       local_key;
 };
@@ -29,14 +34,29 @@ typedef struct local_s {
     stats_t             stat;
 } local_t;
 
-
+/**
+ *
+ */
 typedef struct lmap_loc_s {
     ref_t               loop : 16;
     ref_t               ref  : 48;
 } lmap_loc_int_t;
 
+static inline lmap_loc_t
+i2e (lmap_loc_int_t loc)
+{
+    return *(lmap_loc_t*)&loc;
+}
+
+static inline lmap_loc_int_t
+e2i (lmap_loc_t loc)
+{
+    return *(lmap_loc_int_t*)&loc;
+}
+
+
 static inline local_t *
-get_local (lmap_t map)
+get_local (lmap_t *map)
 {
     local_t            *loc = pthread_getspecific (map->local_key);
     if (loc == NULL) {
@@ -47,148 +67,135 @@ get_local (lmap_t map)
     return loc;
 }
 
+static inline lmap_loc_int_t
+get_location (const lmap_t *map, lmap_loc_t *start, ref_t k)
+{
+    lmap_loc_int_t loc = {.loop = 0, .ref = 0};
+    if(start)
+        loc = e2i(*start);
+    else
+        loc.ref = map->hash32((char*)&k, sizeof (ref_t), 0) & map->mask;
+    return loc;
+}
+
 lmap_loc_t
-lmap_iterate_hash (const lmap_t map, const ref_t k, lmap_loc_t *start,
+lmap_iterate_from (const lmap_t *map, ref_t k, lmap_loc_t *start,
                    lmap_iterate_f cb, void *ctx)
 {
-    lmap_loc_int_t              loc = { .loop = 0, .ref = 0 };
-    if (start)
-        loc = *(lmap_loc_int_t*)start;
-    else
-        loc.ref = map->hash32 ((char *)&k, sizeof(ref_t), 0) & map->mask;
-    assert (loc.ref < map->size);
+    lmap_loc_int_t          loc = get_location(map, start, k);
     while (1) {
-        size_t              line_begin = ((uint64_t)loc.ref) & CL_MASK;
-        size_t              line_end = line_begin + CACHE_LINE_SIZE;
-        assert (line_end <= map->size);
-        for (; loc.loop < CACHE_LINE_SIZE; loc.loop++) {
-            lmap_store_t        *bucket = (lmap_store_t*)&map->table[loc.ref * map->length];
+        size_t              line_begin = ((uint64_t)loc.ref) & BLOCK_MASK;
+        for (; loc.loop < BLOCK_SIZE; loc.loop++) {
+            lmap_store_t        *bucket = &map->table[loc.ref];
             if (LMAP_STATUS_EMPTY == bucket->status)
-                return *(lmap_loc_t*)&loc;
-            loc.ref += 1;
-            loc.ref = loc.ref == line_end ? line_end - CACHE_LINE_SIZE : loc.ref;
-            if (   (LMAP_STATUS_OCCUPIED1 == bucket->status ||
-                    LMAP_STATUS_OCCUPIED2 == bucket->status) &&
+                return i2e(loc);
+            loc.ref = ((loc.ref + 1) & ~BLOCK_MASK) | line_begin;
+            if (    LMAP_STATUS_TOMBSTONE != bucket->status &&
                     k == bucket->ref) {
-                if (LMAP_CB_STOP == cb (ctx, bucket, *(lmap_loc_t*)&loc))
-                    return *(lmap_loc_t*)&loc;
+                if (LMAP_CB_STOP == cb (ctx, bucket, i2e(loc))) {
+                    return i2e (loc);
+                }
             }
         }
-        size_t seed = loc.ref;
-        do {
-            loc.ref = map->hash32 ((char *)&k, map->length, seed++) & map->mask;
-        } while (line_begin == ((uint64_t)loc.ref) & CL_MASK);
+        loc.ref = (loc.ref + (primes[loc.ref&~BLOCK_MASK]<<BLOCK_LOG2)) & map->mask;
         loc.loop = 0;
     }
 }
 
-lmap_status_t
-lmap_lookup (const lmap_t map, const ref_t k, lattice_t l)
+lmap_loc_t
+lmap_lookup (const lmap_t *map, ref_t k, lattice_t l)
 {
-    uint64_t            h = map->hash32 ((char *)&k, sizeof(ref_t), 0);
+    lmap_loc_int_t          loc = get_location(map, NULL, k);
     while (1) {
-        size_t              ref = h & map->mask;
-        size_t              line_begin = ((uint64_t)ref) & CL_MASK;
-        size_t              line_end = line_begin + CACHE_LINE_SIZE;
-        for (size_t i = 0; i < CACHE_LINE_SIZE; i++) {
-            lmap_store_t        *bucket = (lmap_store_t*)&map->table[ref * map->length];
-            if ((LMAP_STATUS_OCCUPIED1 == bucket->status || LMAP_STATUS_OCCUPIED2 == bucket->status)
-                    && k == bucket->ref && l == bucket->lattice)
-                return bucket->status;
-            ref += 1;
-            ref = ref == line_end ? line_end - CACHE_LINE_SIZE : ref;
+        size_t              line_begin = ((uint64_t)loc.ref) & BLOCK_MASK;
+        for (; loc.loop < BLOCK_SIZE; loc.loop++) {
+            lmap_store_t        *bucket = &map->table[loc.ref];
+            if (LMAP_STATUS_EMPTY == bucket->status)
+                return i2e (loc);
+            if (    LMAP_STATUS_TOMBSTONE != bucket->status &&
+                    k == bucket->ref && l == bucket->lattice)
+                return i2e (loc);
+            loc.ref = ((loc.ref + 1) & ~BLOCK_MASK) | line_begin;
         }
-        size_t seed = ref;
-        do {
-            ref = map->hash32 ((char *)&k, map->length, seed++) & map->mask;
-        } while (line_begin == ((uint64_t)ref) & CL_MASK);
+        loc.ref = (loc.ref + (primes[loc.ref&~BLOCK_MASK]<<BLOCK_LOG2)) & map->mask;
+        loc.loop = 0;
     }
 }
 
 lmap_loc_t
-lmap_insert_hash (const lmap_t map, const ref_t k, lattice_t l,
-                lmap_status_t status, lmap_loc_t *start)
+lmap_insert_from (const lmap_t *map, ref_t k, lattice_t l,
+                  lmap_status_t status, lmap_loc_t *start)
 {
-    lmap_loc_int_t              loc = { .ref = 0, .loop = 0 };
-    if (start)
-        loc = *(lmap_loc_int_t*)start;
-    else
-        loc.ref = map->hash32 ((char *)&k, sizeof(ref_t), 0) & map->mask;
+    lmap_loc_int_t          loc = get_location(map, start, k);
     while (1) {
-        size_t              line_begin = ((uint64_t)loc.ref) & CL_MASK;
-        size_t              line_end = line_begin + CACHE_LINE_SIZE;
-        for (; loc.loop < CACHE_LINE_SIZE; loc.loop++) {
-            lmap_store_t        *bucket = (lmap_store_t*)&map->table[loc.ref * map->length];
-            loc.ref += 1;
-            loc.ref = loc.ref == line_end ? line_end - CACHE_LINE_SIZE : loc.ref;
-            if (LMAP_STATUS_EMPTY == bucket->status || LMAP_STATUS_TOMBSTONE == bucket->status) {
+        size_t              block = ((uint64_t)loc.ref) & BLOCK_MASK;
+        for (; loc.loop < BLOCK_SIZE; loc.loop++) {
+            lmap_store_t        *bucket = &map->table[loc.ref];
+            if (    LMAP_STATUS_EMPTY == bucket->status ||
+                    LMAP_STATUS_TOMBSTONE == bucket->status) {
                 bucket->ref = k;
                 bucket->status = status;
                 bucket->lattice = l;
-                return *(lmap_loc_t*)&loc;
+                return i2e (loc);
             }
+            loc.ref = ((loc.ref + 1) & ~BLOCK_MASK) | block;
         }
-        size_t seed = loc.ref;
-        do {
-            loc.ref = map->hash32 ((char *)&k, map->length, seed++) & map->mask;
-        } while (line_begin == ((uint64_t)loc.ref) & CL_MASK);
+        loc.ref = (loc.ref + (primes[loc.ref&~BLOCK_MASK]<<BLOCK_LOG2)) & map->mask;
         loc.loop = 0;
     }
 }
 
-lmap_status_t
-lmap_get (const lmap_t map, lmap_loc_t start)
+lmap_store_t *
+lmap_get (const lmap_t *map, lmap_loc_t location)
 {
-    lmap_loc_int_t       loc = *(lmap_loc_int_t*)&start;
-    lmap_store_t        *bucket = (lmap_store_t*)&map->table[loc.ref * map->length];
-    return bucket->status;
+    lmap_loc_int_t       loc = e2i (location);
+    return &map->table[loc.ref];
 }
 
 void
-lmap_set (const lmap_t map, lmap_status_t status, lmap_loc_t start)
+lmap_set (const lmap_t *map, lmap_loc_t location, lmap_status_t status)
 {
-    lmap_loc_int_t       loc = *(lmap_loc_int_t*)&start;
-    lmap_store_t        *bucket = (lmap_store_t*)&map->table[loc.ref * map->length];
-    bucket->status = status;
+    lmap_loc_int_t       loc = e2i (location);
+    map->table[loc.ref].status = status;
 }
 
 lmap_loc_t
-lmap_insert (const lmap_t map, ref_t k, lattice_t l, lmap_status_t status)
+lmap_insert (const lmap_t *map, ref_t k, lattice_t l, lmap_status_t status)
 {
-    return lmap_insert_hash (map, k, l, status, NULL);
+    return lmap_insert_from (map, k, l, status, NULL);
 }
 
 lmap_loc_t
-lmap_iterate (const lmap_t map, ref_t k, lmap_iterate_f cb, void *ctx)
+lmap_iterate (const lmap_t *map, ref_t k, lmap_iterate_f cb, void *ctx)
 {
-    return lmap_iterate_hash (map, k, NULL, cb, ctx);
+    return lmap_iterate_from (map, k, NULL, cb, ctx);
 }
 
-lmap_t
+lmap_t *
 lmap_create (size_t key_size, size_t data_size, int size)
 {
     assert (63 == key_size && 64 == data_size);
-    lmap_t            map = RTalign (CACHE_LINE_SIZE, sizeof (struct lmap_ll_s));
+    lmap_t           *map = RTalign (CACHE_LINE_SIZE, sizeof (struct lmap_ll_s));
     map->key_size = sizeof (uint64_t);
     map->data_size = sizeof (uint64_t);
     map->length = map->key_size + map->data_size;
     map->size = 1UL << size;
     map->mask = map->size - 1;
     map->hash32 = (hash32_f)SuperFastHash;
-    map->table = RTalignZero (CACHE_LINE_SIZE, (map->length) * map->size);
+    map->table = RTalignZero (CACHE_LINE_SIZE, sizeof(lmap_store_t[map->size]));
     pthread_key_create (&map->local_key, RTfree);
     return map;
 }
 
 void
-lmap_free (lmap_t map)
+lmap_free (lmap_t *map)
 {
     RTfree (map->table);
     RTfree (map);
 }
 
 stats_t *
-lmap_stats (lmap_t map)
+lmap_stats (lmap_t *map)
 {
     stats_t            *res = RTmallocZero (sizeof (*res));
     stats_t            *stat = &get_local (map)->stat;
