@@ -55,6 +55,7 @@ typedef struct state_info_s {
     ref_t               ref;
     uint32_t            hash32;
     lattice_t           lattice;
+    lmap_loc_t          loc;
 } state_info_t;
 
 typedef enum { UseGreyBox, UseBlackBox } box_t;
@@ -68,7 +69,9 @@ typedef enum {
     Strat_LNDFS  = 16,
     Strat_ENDFS  = 32,
     Strat_CNDFS  = 64,
-    Strat_TA     = 128,
+    Strat_TA_DFS = 128,
+    Strat_TA_BFS = 256,
+    Strat_TA     = Strat_TA_DFS | Strat_TA_BFS,
     Strat_LTLG   = Strat_LNDFS | Strat_ENDFS | Strat_CNDFS,
     Strat_LTL    = Strat_NDFS | Strat_NNDFS | Strat_LTLG,
     Strat_Reach  = Strat_BFS | Strat_DFS | Strat_TA
@@ -143,7 +146,7 @@ static size_t           max = SIZE_MAX;
 static size_t           W = 2;
 static lb_t            *lb;
 static void            *dbs;
-static lmap_t           lmap;
+static lmap_t          *lmap;
 static dbs_stats_f      statistics;
 static dbs_get_f        get;
 static dbs_get_sat_f    get_sat_bit;
@@ -167,8 +170,9 @@ static int              assert_index = -1;
 static size_t           G = 100;
 static size_t           H = MAX_HANDOFF_DEFAULT;
 static int              ZOBRIST = 0;
+static int              UPDATE = 1;
 static ref_t           *parent_ref = NULL;
-static state_data_t     state_data;
+static state_data_t     initial_data;
 static state_info_t     initial_state;
 static int              count_bits = 0;
 static int              global_bits = 0;
@@ -183,7 +187,8 @@ static si_map_entry strategies[] = {
     {"lndfs",   Strat_LNDFS},
     {"endfs",   Strat_ENDFS},
     {"cndfs",   Strat_CNDFS},
-    {"ta",      Strat_TA},
+    {"ta_dfs",   Strat_TA_DFS},
+    {"ta_bfs",   Strat_TA_BFS},
     {NULL, 0}
 };
 
@@ -301,6 +306,8 @@ static struct poptOption options[] = {
      0, "maximum balancing handoff (handoff=min(max, stack_size/2))", NULL},
     {"zobrist", 'z', POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &ZOBRIST,
      0,"log2 size of zobrist random table (6 or 8 is good enough; 0 is no zobrist)", NULL},
+    {"update", 'u', POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &UPDATE,
+      0,"cover update strategy: 0 = simple, 1 = update waiting, 2 = update passed (may break traces).", NULL},
     {"grey", 0, POPT_ARG_VAL, &call_mode, UseGreyBox, "make use of GetTransitionsLong calls", NULL},
     {"ref", 0, POPT_ARG_VAL, &refs, 1, "store references on the stack/queue instead of full states", NULL},
     {"max", 0, POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &max, 0, "maximum search depth", "<int>"},
@@ -469,6 +476,7 @@ struct thread_ctx_s {
     int                 rec_bits;       // bit depth of recursive ndfs
     ref_t               work;           // ENDFS work for loadbalancer
     int                 done;           // ENDFS done for loadbalancer
+    lmap_loc_t          last;           // TA last tombstone location
 };
 
 /* predecessor --(transition_info)--> successor */
@@ -497,7 +505,8 @@ extern void         endfs_blue (wctx_t *ctx, size_t work);
 extern void         dfs_grey (wctx_t *ctx, size_t work);
 extern void         dfs (wctx_t *ctx, size_t work);
 extern void         bfs (wctx_t *ctx, size_t work);
-extern void         ta_reach (wctx_t *ctx, size_t work);
+extern void         ta_dfs (wctx_t *ctx, size_t work);
+extern void         ta_bfs (wctx_t *ctx, size_t work);
 extern size_t       split_bfs (void *arg_src, void *arg_tgt, size_t handoff);
 extern size_t       split_dfs (void *arg_src, void *arg_tgt, size_t handoff);
 
@@ -757,7 +766,7 @@ init_globals (int argc, char *argv[])
              state_labels, edge_labels);
     matrix_t           *m = GBgetDMInfo (model);
     N = lts_type_get_state_length (ltstype);
-    D = strategy[0] == Strat_TA ? N - 2 : N;
+    D = (strategy[0] & Strat_TA ? N - 2 : N);
     K = dm_nrows (m);
     Warning (info, "State length is %d, there are %d groups", N, K);
 
@@ -838,13 +847,15 @@ init_globals (int argc, char *argv[])
         contexts[i] = wctx_create (i, 0, NULL);
     contexts[0]->model = model;
 
-    state_data = RTmalloc (SLOT_SIZE * N);
-    GBgetInitialState (model, state_data);
+    initial_data = RTmalloc (SLOT_SIZE * N);
+    GBgetInitialState (model, initial_data);
 
     /* Load balancer assigned last, see exit_ltsmin */
     switch (strategy[0]) {
-    case Strat_TA:
-        lb = lb_create_max (W, (algo_f)ta_reach,split_dfs,G, lb_method, H); break;
+    case Strat_TA_BFS:
+        lb = lb_create_max (W, (algo_f)ta_bfs,split_bfs,G, lb_method, H); break;
+    case Strat_TA_DFS:
+        lb = lb_create_max (W, (algo_f)ta_dfs,split_dfs,G, lb_method, H); break;
     case Strat_CNDFS:
     case Strat_ENDFS:
         lb = lb_create_max (W, (algo_f)endfs_blue, NULL,G, lb_method, H); break;
@@ -877,7 +888,7 @@ deinit_globals ()
         DBSLLfree (dbs);
     else //TreeDBSLL
         TreeDBSLLfree (dbs);
-    RTfree (state_data);
+    RTfree (initial_data);
     lb_destroy (lb);
     for (size_t i = 0; i < W; i++)
         wctx_free (contexts[i], 0);
@@ -1316,7 +1327,7 @@ state_info_size ()
     if (ZOBRIST)
         state_info_size += sizeof (uint32_t);
     if (Strat_TA & strategy[0])
-        state_info_size += sizeof (lattice_t);
+        state_info_size += sizeof (lattice_t) + sizeof (lmap_loc_t);
     return state_info_size;
 }
 
@@ -1328,8 +1339,10 @@ state_info_initialize (state_info_t *state, state_data_t data,
                        transition_info_t *ti, state_info_t *src, wctx_t *ctx)
 {
     state->data = data;
-    if (Strat_TA & strategy[0])
+    if (Strat_TA & strategy[0]) {
         state->lattice = *(lattice_t*)(data + D);
+        state->loc = -1;
+    }
     return find_or_put (state, ti, src, ctx->store2);
 }
 
@@ -1345,6 +1358,8 @@ state_info_serialize (state_info_t *state, raw_data_t data)
     }
     if (Strat_TA & strategy[0]) {
         ((lattice_t*)data)[0] = state->lattice;
+        data += 2;
+        ((lmap_loc_t*)data)[0] = state->loc;
         data += 2;
     }
     if (refs) {
@@ -1369,6 +1384,8 @@ state_info_deserialize (state_info_t *state, raw_data_t data, state_data_t store
     }
     if (Strat_TA & strategy[0]) {
         state->lattice = ((lattice_t*)data)[0];
+        data += 2;
+        state->loc = ((lmap_loc_t*)data)[0];
         data += 2;
     }
     if (refs) {
@@ -1400,6 +1417,8 @@ state_info_deserialize_cheap (state_info_t *state, raw_data_t data)
     }
     if (Strat_TA & strategy[0]) {
         state->lattice = ((lattice_t*)data)[0];
+        data += 2;
+        state->loc = ((lmap_loc_t*)data)[0];
         data += 2;
     }
     state->ref  = ((ref_t*)data)[0];
@@ -2202,18 +2221,18 @@ dfs (wctx_t *ctx, size_t work)
     size_t              max_load = ctx->counters.explored + work;
     while (ctx->counters.explored < max_load) {
         raw_data_t          state_data = dfs_stack_top (ctx->stack);
-        if (NULL == state_data) {
+        if (NULL != state_data) {
+            dfs_stack_enter (ctx->stack);
+            increase_level (ctx, &ctx->counters);
+            explore_state (ctx, state_data, 0);
+            ctx->counters.explored++;
+        } else {
             if (0 == dfs_stack_nframes (ctx->stack))
                 return;
             dfs_stack_leave (ctx->stack);
             ctx->counters.level_cur--;
             dfs_stack_pop (ctx->stack);
             ctx->load--;
-        } else {
-            dfs_stack_enter (ctx->stack);
-            increase_level (ctx, &ctx->counters);
-            explore_state (ctx, state_data, 0);
-            ctx->counters.explored++;
         }
     }
 }
@@ -2223,19 +2242,18 @@ bfs (wctx_t *ctx, size_t work)
 {
     size_t              max_load = ctx->counters.explored + work;
     while (ctx->counters.explored < max_load) {
-        raw_data_t          state_data = dfs_stack_top (ctx->in_stack);
-        if (NULL == state_data) {
+        raw_data_t          state_data = dfs_stack_pop (ctx->in_stack);
+        if (NULL != state_data) {
+            ctx->load--;
+            explore_state (ctx, state_data, 0);
+            ctx->counters.explored++;
+        } else {
             if (0 == dfs_stack_frame_size (ctx->out_stack))
                 return;
             dfs_stack_t     old = ctx->out_stack;
             ctx->stack = ctx->out_stack = ctx->in_stack;
             ctx->in_stack = old;
             increase_level (ctx, &ctx->counters);
-        } else {
-            dfs_stack_pop (ctx->in_stack);
-            ctx->load--;
-            explore_state (ctx, state_data, 0);
-            ctx->counters.explored++;
         }
     }
 }
@@ -2298,32 +2316,47 @@ split_dfs (void *arg_src, void *arg_tgt, size_t handoff)
  * a DBM.
  */
 
+typedef enum ta_set_e {
+    TA_WAITING = LMAP_STATUS_OCCUPIED1,
+    TA_PASSED  = LMAP_STATUS_OCCUPIED2,
+} ta_set_e_t;
+
+typedef enum ta_update_e {
+    TA_UPDATE_NONE = 0,
+    TA_UPDATE_WAITING = 1,
+    TA_UPDATE_PASSED = 2,
+} ta_update_e_t;
+
 lmap_cb_t
-covered (void *arg, lmap_store_t *stored, lmap_loc_t loc)
+ta_covered (void *arg, lmap_store_t *stored, lmap_loc_t loc)
 {
     wctx_t         *ctx = (wctx_t*) arg;
-    lattice_t *succ_lattice = (lattice_t*)&ctx->successor->lattice;
-    if ( GBisCoveredByShort(ctx->model, (int*)succ_lattice, (int*)&stored->lattice)) {
+    int *succ_l = (int*)&ctx->successor->lattice;
+    if ( GBisCoveredByShort(ctx->model, succ_l, (int*)&stored->lattice) ) {
         ctx->done = 1;
-        return LMAP_CB_STOP;
+        return LMAP_CB_STOP; //Al':(E(s,l)eL:l>=l')=>(forall(s,l)eL:l>=l')
+    } else if ( TA_UPDATE_NONE != UPDATE &&
+            (TA_UPDATE_PASSED == UPDATE || TA_WAITING == stored->status) &&
+            GBisCoveredByShort(ctx->model, (int*)&stored->lattice, succ_l)) {
+        lmap_set (lmap, loc, LMAP_STATUS_TOMBSTONE);
+        ctx->last = (ctx->last == UINT64_MAX ? loc : ctx->last);
+        ctx->red.waits++;
     }
     return LMAP_CB_NEXT;
-    (void) loc;
 }
 
-static const int      WAITING = LMAP_STATUS_OCCUPIED1;
-//static const int      PASSED = LMAP_STATUS_OCCUPIED2;
-
 static void
-ta_handle_cover (void *arg, state_info_t *successor, transition_info_t *ti, int seen)
+ta_handle (void *arg, state_info_t *successor, transition_info_t *ti, int seen)
 {
     wctx_t         *ctx = (wctx_t*) arg;
     ctx->done = 0;
+    ctx->last = UINT64_MAX;
     ctx->successor = successor;
-
-    lmap_iterate (lmap, successor->ref, covered, ctx);
+    lmap_loc_t last = lmap_iterate (lmap, successor->ref, ta_covered, ctx);
     if (!ctx->done) {
-        lmap_insert (lmap, successor->ref, successor->lattice, WAITING);
+        last = (ctx->last == UINT64_MAX ? last : ctx->last);
+        successor->loc = lmap_insert_from (lmap, successor->ref,
+                                        successor->lattice, TA_WAITING, &last);
         raw_data_t stack_loc = dfs_stack_push (ctx->stack, NULL);
         state_info_serialize (successor, stack_loc);
         if (trc_output)
@@ -2335,28 +2368,44 @@ ta_handle_cover (void *arg, state_info_t *successor, transition_info_t *ti, int 
     (void) ti; (void) seen;
 }
 
+static inline int
+is_waiting (wctx_t *ctx, raw_data_t state_data)
+{
+    state_info_deserialize (&ctx->state, state_data, ctx->store);
+    if (TA_UPDATE_NONE != UPDATE &&
+        TA_WAITING != lmap_get(lmap, ctx->state.loc)->status) {
+        return 0;
+    }
+    lmap_set (lmap, ctx->state.loc, TA_PASSED);
+    return 1;
+}
+
 static inline void
-explore_state_ta (wctx_t *ctx, raw_data_t state)
+ta_explore_state (wctx_t *ctx)
 {
     int                 count = 0;
-    state_info_deserialize (&ctx->state, state, ctx->store);
-    count = permute_trans (ctx->permute, &ctx->state, ta_handle_cover, ctx);
+    count = permute_trans (ctx->permute, &ctx->state, ta_handle, ctx);
     if ( dlk_detect && (0 == count) )
         handle_deadlock (ctx);
     maybe_report (&ctx->counters, "", &threshold);
+    ctx->counters.explored++;
 }
 
 void
-ta_reach (wctx_t *ctx, size_t work)
+ta_dfs (wctx_t *ctx, size_t work)
 {
     size_t              max_load = ctx->counters.explored + work;
     while (ctx->counters.explored < max_load) {
         raw_data_t          state_data = dfs_stack_top (ctx->stack);
         if (NULL != state_data) {
-            dfs_stack_enter (ctx->stack);
-            increase_level (ctx, &ctx->counters);
-            explore_state_ta (ctx, state_data);
-            ctx->counters.explored++;
+            if (is_waiting(ctx, state_data)) {
+                dfs_stack_enter (ctx->stack);
+                increase_level (ctx, &ctx->counters);
+                ta_explore_state (ctx);
+            } else {
+                dfs_stack_pop (ctx->stack);
+                ctx->load--;
+            }
         } else {
             if (0 == dfs_stack_nframes (ctx->stack))
                 return;
@@ -2364,6 +2413,28 @@ ta_reach (wctx_t *ctx, size_t work)
             ctx->counters.level_cur--;
             dfs_stack_pop (ctx->stack);
             ctx->load--;
+        }
+    }
+}
+
+void
+ta_bfs (wctx_t *ctx, size_t work)
+{
+    size_t              max_load = ctx->counters.explored + work;
+    while (ctx->counters.explored < max_load) {
+        raw_data_t          state_data = dfs_stack_pop (ctx->in_stack);
+        if (NULL != state_data) {
+            ctx->load--;
+            if (is_waiting(ctx, state_data)) {
+                ta_explore_state (ctx);
+            }
+        } else {
+            if (0 == dfs_stack_frame_size (ctx->out_stack))
+                return;
+            dfs_stack_t     old = ctx->out_stack;
+            ctx->stack = ctx->out_stack = ctx->in_stack;
+            ctx->in_stack = old;
+            increase_level (ctx, &ctx->counters);
         }
     }
 }
@@ -2393,8 +2464,10 @@ explore (void *args)
         ctx->model = get_model (0);
     wctx_init (ctx);
     transition_info_t   ti = GB_NO_TRANSITION;
-    state_info_initialize (&initial_state, state_data, &ti, &ctx->state, ctx);
-    if ( Strat_LTL & strategy[0] )
+    state_info_initialize (&initial_state, initial_data, &ti, &ctx->state, ctx);
+    if ( Strat_TA & strategy[0] )
+        ta_handle (ctx, &initial_state, &ti, 0);
+    else if ( Strat_LTL & strategy[0] )
         ndfs_handle_blue (ctx, &initial_state, &ti, 0);
     else if (0 == ctx->id)
         reach_handle (ctx, &initial_state, &ti, 0);
