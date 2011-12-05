@@ -159,6 +159,13 @@ lmap_set (const lmap_t *map, lmap_loc_t location, lmap_status_t status)
     map->table[loc.ref].status = status;
 }
 
+void
+lmap_delete (const lmap_t *map, lmap_loc_t location)
+{
+    lmap_loc_int_t       loc = e2i (location);
+    map->table[loc.ref].status = LMAP_STATUS_TOMBSTONE;
+}
+
 lmap_loc_t
 lmap_insert (const lmap_t *map, ref_t k, lattice_t l, lmap_status_t status)
 {

@@ -2338,7 +2338,7 @@ ta_covered (void *arg, lmap_store_t *stored, lmap_loc_t loc)
     } else if ( TA_UPDATE_NONE != UPDATE &&
             (TA_UPDATE_PASSED == UPDATE || TA_WAITING == stored->status) &&
             GBisCoveredByShort(ctx->model, (int*)&stored->lattice, succ_l)) {
-        lmap_set (lmap, loc, LMAP_STATUS_TOMBSTONE);
+        lmap_delete (lmap, loc);
         ctx->last = (ctx->last == UINT64_MAX ? loc : ctx->last);
         ctx->red.waits++;
     }

@@ -93,6 +93,8 @@ extern lmap_store_t*lmap_get (const lmap_t *map, lmap_loc_t loc);
 extern void         lmap_set (const lmap_t *map, lmap_loc_t loc,
                               lmap_status_t status);
 
+extern void         lmap_delete (const lmap_t *map, lmap_loc_t loc);
+
 extern lmap_loc_t   lmap_insert (const lmap_t *map, ref_t k, lattice_t l,
                                  lmap_status_t status);
 
