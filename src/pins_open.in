@@ -76,19 +76,19 @@ fi
 case "$FILE" in
  *.tbf)
     echo "input is muCRL"
-    LTSMIN_MOD_LDFLAGS="@MCRL_LDFLAGS@ @CADP_LDFLAGS@ -llpo-open @MCRL_LIBS@ @CADP_LIBS@"
+    LTSMIN_MOD_LDFLAGS="@MCRL_LDFLAGS@ -llpo-open @MCRL_LIBS@"
     ;;
  *.lps)
     echo "input is mCRL2"
-    LTSMIN_MOD_LDFLAGS="@MCRL2_LDFLAGS@ @CADP_LDFLAGS@ -llps-open @MCRL2_LIBS@ @CADP_LIBS@"
+    LTSMIN_MOD_LDFLAGS="@MCRL2_LDFLAGS@ @MCRL2_PINS_LDFLAGS@ -llps-open @MCRL2_LIBS@ @MCRL2_PINS_LIBS@ -lstdc++"
     ;;
  *.b)
     echo "input is NIPS byte-code"
-    LTSMIN_MOD_LDFLAGS="@NIPS_LDFLAGS@ @CADP_LDFLAGS@ -lnips-open @CADP_LIBS@"
+    LTSMIN_MOD_LDFLAGS="@NIPS_LDFLAGS@ -lnips-open"
     ;;
  *.etf)
     echo "input is ETF"
-    LTSMIN_MOD_LDFLAGS="@CADP_LDFLAGS@ -letf-open @CADP_LIBS@"
+    LTSMIN_MOD_LDFLAGS="-letf-open"
     ;;
  *.dve)
     echo "input is DVE2"
@@ -210,10 +210,10 @@ fi
 
 case "$USER" in
 	*.c )
-		CPPFLAGS_AUX=`grep '@(#)CPPFLAGS' $USER | sed -e 's/.*".*=\(.*\)".*/\1/'`
-		CFLAGS_AUX=`grep '@(#)CFLAGS' $USER | sed -e 's/.*".*=\(.*\)".*/\1/'`
-		LDFLAGS_AUX=`grep '@(#)LDFLAGS' $USER | sed -e 's/.*".*=\(.*\)".*/\1/'`
-		LD_LIBRARY_PATH_AUX=`grep '@(#)LD_LIBRARY_PATH' $USER | sed -e 's/.*".*=\(.*\)".*/\1/'`
+		CPPFLAGS_AUX=`grep '@(#)CPPFLAGS' $USER | sed -e 's/.*".*=\(.*\)".*/\1/' | sed -e 's/\\\"/"/g'`
+		CFLAGS_AUX=`grep '@(#)CFLAGS' $USER | sed -e 's/.*".*=\(.*\)".*/\1/' | sed -e 's/\\\"/"/g'`
+		LDFLAGS_AUX=`grep '@(#)LDFLAGS' $USER | sed -e 's/.*".*=\(.*\)".*/\1/' | sed -e 's/\\\"/"/g'`
+		LD_LIBRARY_PATH_AUX=`grep '@(#)LD_LIBRARY_PATH' $USER | sed -e 's/.*".*=\(.*\)".*/\1/' | sed -e 's/\\\"/"/g'`
 		;;
 	*.o | *.a )
 		LC_CTYPE="C" ; export LC_CTYPE

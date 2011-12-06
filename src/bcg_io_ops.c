@@ -21,12 +21,13 @@ static void bcg_write_state(void* lts_output,int seg,int ofs,int* labels){
 }
 
 static void bcg_write_edge(void* lts_output,int src_seg,int src_ofs,int dst_seg,int dst_ofs,int*labels){
-	//Warning(debug,"edge");
-	struct bcg_output* out=(struct bcg_output*)lts_output;
-	char buffer[1024];
-	chunk c=chunk_ld(1024,buffer);
-	chunk_encode_copy(c,GBchunkGet(out->model,out->typeno,labels[0]),'\\');
-	BCG_IO_WRITE_BCG_EDGE ((src_ofs*out->segment_count)+src_seg,strcmp(buffer,"tau")?buffer:"i",(dst_ofs*out->segment_count)+dst_seg);
+    //Warning(debug,"edge");
+    struct bcg_output* out=(struct bcg_output*)lts_output;
+    chunk c_in = GBchunkGet(out->model, out->typeno, labels[0]);
+    char buffer[c_in.len * 2 + 6];
+    chunk c_out = chunk_ld(sizeof buffer, buffer);
+    chunk_encode_copy(c_out, c_in,'\\');
+    BCG_IO_WRITE_BCG_EDGE ((src_ofs*out->segment_count)+src_seg,strcmp(buffer,"tau")?buffer:"i",(dst_ofs*out->segment_count)+dst_seg);
 }
 
 static lts_enum_cb_t bcg_write_begin(lts_output_t output,int which_state,int which_src,int which_dst){
