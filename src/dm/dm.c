@@ -1,4 +1,10 @@
 #include <config.h>
+
+#include <limits.h>
+#include <math.h>
+#include <stdlib.h>
+#include <time.h>
+
 #include "dm.h"
 
 #ifdef DMDEBUG
@@ -247,7 +253,7 @@ dm_apply_permutation_group (matrix_header_t *p, const permutation_group_t *o)
     if (o->size == 0)
         return -1;
 
-    // store first 
+    // store first
     last = o->data[0];
     tmp = p->data[last];
 
@@ -926,6 +932,80 @@ cost_ (matrix_t *m)
     return result;
 }
 
+// Simulated annealing routine taken from Skiena's Algorithm Design Manual
+static int    COOL_STEPS = 500;
+static int    TEMP_STEPS = 1000;
+static double INIT_TEMP  = 1;
+static double COOL_FRAC  = 0.97;
+static double E          = 2.71828;
+static double K          = 0.01;
+
+int
+dm_anneal (matrix_t *m)
+{
+    int ncols = dm_ncols(m);
+    double cur_cost = cost_(m);
+    double temp = INIT_TEMP;
+
+    srandom(time(NULL));
+
+    for (int cool_step = 0; cool_step < COOL_STEPS; cool_step++) {
+        double start_cost = cur_cost;
+        temp *= COOL_FRAC;
+
+        for (int temp_step = 0; temp_step < TEMP_STEPS; temp_step++) {
+            int i = random() % ncols;
+            int j = random() % ncols;
+
+            if (i != j) {
+                int d_rot[ncols];
+                permutation_group_t rot;
+                int d = i < j ? 1 : -1;
+
+                dm_create_permutation_group(&rot, ncols, d_rot);
+                for (int k = i; k != j; k += d)
+                    dm_add_to_permutation_group(&rot, k);
+                dm_add_to_permutation_group(&rot, j);
+                dm_permute_cols(m, &rot);
+                dm_free_permutation_group(&rot);
+            }
+
+            double delta = cost_(m) - cur_cost;
+
+            if (delta < 0) {
+                cur_cost += delta;
+            } else {
+                double rand  = random();
+                double flip  = rand / LONG_MAX;
+                double exp   = (-delta / cur_cost) / (K * temp);
+                double merit = pow(E, exp);
+
+                if (merit > flip) {
+                    cur_cost += delta;
+                } else if (i != j) {
+                    int d_rot[ncols];
+                    permutation_group_t rot;
+                    int d = i < j ? 1 : -1;
+
+                    dm_create_permutation_group(&rot, ncols, d_rot);
+                    for (int k = j; k != i; k += -d)
+                        dm_add_to_permutation_group(&rot, k);
+                    dm_add_to_permutation_group(&rot, i);
+                    dm_permute_cols(m, &rot);
+                    dm_free_permutation_group(&rot);
+                }
+            }
+        }
+
+        if (cur_cost - start_cost < 0.0)
+            temp /= COOL_FRAC;
+    }
+
+    DMDBG (printf ("cost: %d ", cost_ (m)));
+
+    return 0;
+}
+
 int
 dm_optimize (matrix_t *m)
 {
@@ -1002,6 +1082,9 @@ dm_optimize (matrix_t *m)
 
         best_i = best_j = 0;
     }
+
+    DMDBG (printf ("cost: %d ", cost_ (m)));
+
     return 0;
 }
 
