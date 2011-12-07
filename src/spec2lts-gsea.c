@@ -408,15 +408,13 @@ static void
 gsea_process_dot(gsea_state_t *src, transition_info_t *ti, gsea_state_t *dst)
 {
     char buf[global.N * 18 + 1024];
-    sprintf(buf, "\"");
-    for(size_t i=0; i < global.N; i++) sprintf(&buf[i*9]+1, "%.8X ", src->state[i]);
-    sprintf(&buf[global.N*9], "\" -> \"");
-    for(size_t i=0; i < global.N; i++) sprintf(&buf[global.N * 9 + 6 + i*9], "%.8X ", dst->state[i]);
-    sprintf(&buf[global.N * 18 + 5], "\"");
-    // just the index (tree/hash)
-    //sprintf(buf, "%d -> %d", src->tree.tree_idx, dst->tree.tree_idx);
-    //sprintf(buf, "%d -> %d", src->table.hash_idx, dst->table.hash_idx);
-
+    int chars = sprintf(buf, "\"");
+    for(size_t i=0; i < global.N; i++) chars += sprintf(&buf[chars], "%d ", src->state[i]);
+    chars--; //skip white space
+    chars += sprintf(&buf[chars], "\" -> \"");
+    for(size_t i=0; i < global.N; i++) chars += sprintf(&buf[chars], "%d ", dst->state[i]);
+    chars--; //skip white space
+    chars += sprintf(&buf[chars], "\"");
     fputs(buf, opt.dot_file);
     fputs("\n", opt.dot_file);
     if (gc.dot_state_process) gc.dot_state_process(src, ti, dst);
