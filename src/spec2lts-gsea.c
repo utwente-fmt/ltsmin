@@ -937,7 +937,7 @@ dfs_tree_state_next_color_proviso(gsea_state_t* state, void* arg)
 /* stack proviso for dfs tree */
 static int
 dfs_tree_state_backtrack(gsea_state_t* state, void* arg)
-{ return bitset_set(gc.queue.filo.proviso.stack.off_stack_set, state->tree.tree_idx); (void)arg; }
+{ bitset_set(gc.queue.filo.proviso.stack.off_stack_set, state->tree.tree_idx); (void)arg; return 1; }
 
 static int
 dfs_tree_state_proviso(transition_info_t* ti, gsea_state_t* state)
@@ -1058,7 +1058,7 @@ dfs_vset_open_insert_condition (gsea_state_t *state, void *arg)
 /* stack proviso for dfs table */
 static int
 dfs_table_state_backtrack(gsea_state_t* state, void* arg)
-{ return bitset_set(gc.queue.filo.proviso.stack.off_stack_set, state->table.hash_idx); (void)arg; }
+{ bitset_set(gc.queue.filo.proviso.stack.off_stack_set, state->table.hash_idx); (void)arg; return 1;}
 
 static int
 dfs_table_state_proviso(transition_info_t* ti, gsea_state_t* state)
