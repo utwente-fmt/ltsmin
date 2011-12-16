@@ -4,6 +4,7 @@ liblts_lib_la_SOURCES  = bfs_reorder.c
 liblts_lib_la_SOURCES += dir-info.c dir-info.h
 liblts_lib_la_SOURCES += lts.c lts.h
 liblts_lib_la_SOURCES += lts-io.c
+liblts_lib_la_SOURCES += lts_print.c
 liblts_lib_la_SOURCES += lts-tra-io.c
 liblts_lib_la_SOURCES += lts-pg-io.h lts-pg-io.c
 liblts_lib_la_SOURCES += lts_uniq.c

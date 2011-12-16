@@ -27,6 +27,7 @@ void lts_free(lts_t lts){
 }
 
 static void build_block(uint32_t states,uint32_t transitions,u_int32_t *begin,u_int32_t *block,u_int32_t *label,u_int32_t *other){
+    int has_label=(label!=NULL);
     uint32_t i;
     uint32_t loc1,loc2;
     u_int32_t tmp_label1,tmp_label2;
@@ -45,32 +46,32 @@ static void build_block(uint32_t states,uint32_t transitions,u_int32_t *begin,u_
             continue;
         }
         loc1=block[i];
-        tmp_label1=label[i];
+        if(has_label) tmp_label1=label[i];
         tmp_other1=other[i];
         for(;;){
             if (loc1==i) {
                 block[i]=i;
-                label[i]=tmp_label1;
+                if(has_label) label[i]=tmp_label1;
                 other[i]=tmp_other1;
                 break;
             }
             loc2=block[loc1];
-            tmp_label2=label[loc1];
+            if(has_label) tmp_label2=label[loc1];
             tmp_other2=other[loc1];
             block[loc1]=loc1;
-            label[loc1]=tmp_label1;
+            if(has_label) label[loc1]=tmp_label1;
             other[loc1]=tmp_other1;
             if (loc2==i) {
                 block[i]=i;
-                label[i]=tmp_label2;
+                if(has_label) label[i]=tmp_label2;
                 other[i]=tmp_other2;
                 break;
             }
             loc1=block[loc2];
-            tmp_label1=label[loc2];
+            if(has_label) tmp_label1=label[loc2];
             tmp_other1=other[loc2];
             block[loc2]=loc2;
-            label[loc2]=tmp_label2;
+            if(has_label) label[loc2]=tmp_label2;
             other[loc2]=tmp_other2;
         }
     }
@@ -80,8 +81,7 @@ void lts_set_type(lts_t lts,LTS_TYPE type){
     uint32_t i,j;
 
     if (lts->type==type) return; /* no type change */
-
-    /* first change to LTS_LIST */
+    Debug("first change to LTS_LIST");
     switch(lts->type){
         case LTS_LIST:
             lts->begin=(u_int32_t*)RTmalloc(sizeof(u_int32_t)*(lts->states+1));
@@ -103,8 +103,7 @@ void lts_set_type(lts_t lts,LTS_TYPE type){
             }
             break;
     }
-// MEMSTAT_CHECK;
-    /* then change to required type */
+    Debug("then change to required type");
     lts->type=type;
     switch(type){
         case LTS_LIST:
@@ -286,31 +285,63 @@ void lts_sort_dest(lts_t lts){
     }
 }
 
-static void pass1_dfs(lts_t lts,uint32_t tau,uint32_t *e_time,uint32_t *time,uint32_t state,uint32_t *count){
+int tau_step(void*context,lts_t lts,uint32_t src,uint32_t edge,uint32_t dest){
+    return lts->label[edge]==(uint32_t)(lts->tau);
+}
+
+int stutter_step(void*context,lts_t lts,uint32_t src,uint32_t edge,uint32_t dest){
+    return lts->properties[src]==lts->properties[dest];
+}
+
+struct cycle_elim_context {
+    silent_predicate silent;
+    void* silent_ctx;
+};
+
+static void pass1_dfs(lts_t lts,struct cycle_elim_context *ctx,uint32_t *e_time,uint32_t *time,uint32_t state,uint32_t *count){
     if (e_time[state]>0) return;
     (*count)++;
     e_time[state]=1;
     for(uint32_t i=lts->begin[state];i<lts->begin[state+1];i++){
-        if (lts->label[i]==tau) pass1_dfs(lts,tau,e_time,time,lts->dest[i],count);
+        if (ctx->silent(ctx->silent_ctx,lts,state,i,lts->dest[i])){
+            pass1_dfs(lts,ctx,e_time,time,lts->dest[i],count);
+        }
     }
     (*time)++;
     e_time[state]=(*time);
 }
 
-static void pass2_dfs(lts_t lts,uint32_t tau,uint32_t *map,uint32_t component,uint32_t state){
+static void pass2_dfs(lts_t lts,struct cycle_elim_context *ctx,uint32_t *map,uint32_t component,uint32_t state){
     if(map[state]>0) return;
     map[state]=component;
     for(uint32_t i=lts->begin[state];i<lts->begin[state+1];i++){
-        if (lts->label[i]==tau) pass2_dfs(lts,tau,map,component,lts->dest[i]);
+        if (ctx->silent(ctx->silent_ctx,lts,state,i,lts->dest[i])){
+            pass2_dfs(lts,ctx,map,component,lts->dest[i]);
+        }
     }
 }
 
-void lts_tau_cycle_elim(lts_t lts){
+void lts_silent_cycle_elim(lts_t lts,silent_predicate silent,void*silent_ctx,bitset_t diverging){
+    if (diverging!=NULL) Abort("cannot do diverence yet");
+    if (lts->state_db!=NULL){
+        Warning(error,"illegally wiping out state vectors");
+        lts->state_db=NULL;
+    }
+    struct cycle_elim_context context;
+    context.silent=silent;
+    context.silent_ctx=silent_ctx;
+    int has_props=lts->properties!=NULL;
+    int has_labels=lts->label!=NULL;
+    uint32_t *temp_props;
+
+    if(has_props){
+        temp_props=(uint32_t*)RTmalloc(sizeof(uint32_t)*lts->states);
+    }
+
     uint32_t i,time,tmp,component,count,s,l,d,max;
     uint32_t *map;
 
-    uint32_t tau=(unsigned int)lts->tau;
-    /* mark with exit times */
+    Debug("mark with exit times");
     lts_set_type(lts,LTS_BLOCK);
     map=(uint32_t*)RTmalloc(sizeof(uint32_t)*lts->states);
     for(i=0;i<lts->states;i++) {
@@ -320,7 +351,7 @@ void lts_tau_cycle_elim(lts_t lts){
     max=0;
     for(i=0;i<lts->states;i++){
         uint32_t pass1_dfs_count=0;
-        pass1_dfs(lts,tau,map,&time,i,&pass1_dfs_count);
+        pass1_dfs(lts,&context,map,&time,i,&pass1_dfs_count);
         if (pass1_dfs_count>max) max=pass1_dfs_count;
     }
     Print(infoLong,"worst tau component has size %d",max);
@@ -335,7 +366,15 @@ void lts_tau_cycle_elim(lts_t lts){
         lts->src[i]=time-map[lts->dest[i]];
         lts->dest[i]=time-map[tmp];
     }
-    /* mark components */
+    if(has_props){
+        for(i=0;i<lts->states;i++){
+            temp_props[time-map[i]]=lts->properties[i];
+        }
+        uint32_t tmp=lts->properties;
+        lts->properties=temp_props;
+        temp_props=tmp;
+    }
+    Debug("mark components");
     lts_set_type(lts,LTS_BLOCK);
     for(i=0;i<lts->states;i++){
         map[i]=0;
@@ -344,33 +383,44 @@ void lts_tau_cycle_elim(lts_t lts){
     for(i=0;i<lts->states;i++){
         if(map[i]==0){
             component++;
-            pass2_dfs(lts,tau,map,component,i);
+            pass2_dfs(lts,&context,map,component,i);
         }
     }
-    /* divide out equivalence classes reverse direction of edges again */
+    Debug("divide out equivalence classes reverse direction of edges again");
     lts_set_type(lts,LTS_LIST);
+    Debug("initial states");
     for(i=0;i<lts->root_count;i++){
         lts->root_list[i]=map[lts->root_list[i]]-1;
     }
     count=0;
+    Debug("transitions");
     for(i=0;i<lts->transitions;i++){
         d=map[lts->src[i]]-1;
         s=map[lts->dest[i]]-1;
-        l=lts->label[i];
-        if ((l==tau)&&(s==d)) {
+        if (has_labels) l=lts->label[i];
+        if (silent(silent_ctx,lts,lts->src[i],i,lts->dest[i])&&(s==d)) {
+            if (s>d) Abort("silent step from high to low");
             continue;
         }
         lts->src[count]=s;
-        lts->label[count]=l;
+        if (has_labels) lts->label[count]=l;
         lts->dest[count]=d;
         count++;
-        if ((l==tau)&&(s>d)){
-            Abort("tau from high to low");
+    }
+    if(has_props){
+        Debug("dividing properties");
+        for(i=0;i<lts->states;i++){
+            temp_props[map[i]-1]=lts->properties[i];
         }
+        uint32_t tmp=lts->properties;
+        lts->properties=temp_props;
+        temp_props=tmp;
     }
     lts_set_size(lts,lts->root_count,component,count);
     free(map);
+    Debug("uniq");
     lts_uniq(lts);
+    Debug("cycle elim done");
 }
 
 void lts_merge(lts_t lts1,lts_t lts2){
