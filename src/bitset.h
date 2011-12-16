@@ -44,20 +44,29 @@ extern void bitset_destroy(bitset_t set);
 /**
 \brief Assign the empty set,
 */
-extern int bitset_clear_all(bitset_t set);
+extern void bitset_clear_all(bitset_t set);
 
 /**
 \brief Assign the set of all natural numbers.
 */
-extern int bitset_set_all(bitset_t set);
+extern void bitset_set_all(bitset_t set);
+
+/**
+\brief Add a range of elements.
+
+This functions adds the interval [low,high] in the set.
+*/
+extern void bitset_set_range(bitset_t set,element_t low,element_t high);
 
 /**
 \brief Remove one element.
 */
-extern int bitset_clear(bitset_t set,element_t e);
+extern void bitset_clear(bitset_t set,element_t e);
 
 /**
 \brief Add one element.
+
+Return 1 if the element is new, and 0 otherwise.
 */
 extern int bitset_set(bitset_t set,element_t e);
 

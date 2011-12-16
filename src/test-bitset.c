@@ -8,44 +8,86 @@ static void setclear(){
 	int i;
 	bitset_t set=bitset_create(16,16);
 
-	int N=10;
-	printf("%d in set is %d\n",N,bitset_test(set,N));
-	printf("set is %d\n",bitset_set(set,N));
-	printf("%d in set is %d\n",N,bitset_test(set,N));
-	printf("clear is %d\n",bitset_clear(set,N));
-	printf("%d in set is %d\n",N,bitset_test(set,N));
-
-	N=100;
-	printf("%d in set is %d\n",N,bitset_test(set,N));
-	printf("set is %d\n",bitset_set(set,N));
-	printf("%d in set is %d\n",10,bitset_test(set,10));
-	printf("%d in set is %d\n",N,bitset_test(set,N));
-	printf("clear is %d\n",bitset_clear(set,N));
-	printf("%d in set is %d\n",N,bitset_test(set,N));
-
-	N=1000000;
-	printf("%d in set is %d\n",N,bitset_test(set,N));
-	printf("set is %d\n",bitset_set(set,N));
-	printf("%d in set is %d\n",10,bitset_test(set,10));
-	printf("%d in set is %d\n",N,bitset_test(set,N));
-	printf("clear is %d\n",bitset_clear(set,N));
-	printf("%d in set is %d\n",N,bitset_test(set,N));
-
-	N=10000;
-	printf("%d in set is %d\n",N,bitset_test(set,N));
-	printf("set is %d\n",bitset_set(set,N));
-	printf("%d in set is %d\n",10,bitset_test(set,10));
-	printf("%d in set is %d\n",N,bitset_test(set,N));
-	printf("clear is %d\n",bitset_clear(set,N));
-	printf("%d in set is %d\n",N,bitset_test(set,N));
-
+    printf("setting 5 and 60\n");
 	bitset_set(set,5);
 	bitset_set(set,60);
 	for(i=0;i<80;i++) printf("%s",bitset_test(set,i)?"1":"0");
 	printf("\n");
+	
+	int N=10;
+	printf("%d in set is %d\n",N,bitset_test(set,N));
+	printf("set %d\n",N);
+    bitset_set(set,N);
+	printf("%d in set is %d\n",N,bitset_test(set,N));
+	printf("clear %d\n",N);
+	bitset_clear(set,N);
+	printf("%d in set is %d\n",N,bitset_test(set,N));
+
+	N=100;
+	printf("%d in set is %d\n",N,bitset_test(set,N));
+	printf("set %d\n",N);
+	bitset_set(set,N);
+	printf("%d in set is %d\n",10,bitset_test(set,10));
+	printf("%d in set is %d\n",N,bitset_test(set,N));
+	printf("clear %d\n",N);
+	bitset_clear(set,N);
+	printf("%d in set is %d\n",N,bitset_test(set,N));
+
+	N=200;
+	printf("%d in set is %d\n",N,bitset_test(set,N));
+	bitset_fprint(stdout,set);
+	printf("set %d\n",N);
+	bitset_set(set,N);
+	bitset_fprint(stdout,set);
+	printf("%d in set is %d\n",10,bitset_test(set,10));
+	printf("%d in set is %d\n",N,bitset_test(set,N));
+	printf("clear %d\n",N);
+	bitset_clear(set,N);
+	printf("%d in set is %d\n",N,bitset_test(set,N));
+	bitset_fprint(stdout,set);
+	printf("\n");
+
+	N=1000000;
+	printf("%d in set is %d\n",N,bitset_test(set,N));
+	printf("set %d\n",N);
+	bitset_set(set,N);
+	printf("%d in set is %d\n",10,bitset_test(set,10));
+	printf("%d in set is %d\n",N,bitset_test(set,N));
+	printf("clear %d\n",N);
+	bitset_clear(set,N);
+	printf("%d in set is %d\n",N,bitset_test(set,N));
+
+	N=10000;
+	printf("%d in set is %d\n",N,bitset_test(set,N));
+	printf("set %d\n",N);
+	bitset_set(set,N);
+	printf("%d in set is %d\n",10,bitset_test(set,10));
+	printf("%d in set is %d\n",N,bitset_test(set,N));
+	printf("clear %d\n",N);
+	bitset_clear(set,N);
+	printf("%d in set is %d\n",N,bitset_test(set,N));
+
+    printf("setting 5 and 60\n");
+	bitset_set(set,5);
+	bitset_set(set,60);
+	for(i=0;i<80;i++) printf("%s",bitset_test(set,i)?"1":"0");
+	printf("\n");
+	
+	
+	N=1222333;
+	printf("set %d\n",N);
+	bitset_set(set,N);
+	
+	printf("set:{");
+	for(element_t e=0;bitset_next_set(set,&e);e++){
+	    printf(" %u",e);
+	}
+	printf(" }\n");
+	
 	bitset_destroy(set);
 }
 
+/*
 static void prevnext(){
 	bitset_t set=bitset_create(16,16);
 	element_t e;
@@ -184,9 +226,55 @@ static void ops(){
 	
 }
 
+static void range(){
+    printf("** range test **\n");
+    bitset_t set=bitset_create(32,16);
+    bitset_set(set,4);
+	printf("{4}:\n");
+	bitset_fprint(stdout,set);
+
+    bitset_clear_all(set);
+    bitset_set_range(set,4,7);
+	printf("[4,7]:\n");
+	bitset_fprint(stdout,set);
+
+	bitset_clear_all(set);
+    bitset_set_range(set,4,80);
+	printf("[4,80]:\n");
+	bitset_fprint(stdout,set);
+	
+	bitset_clear_all(set);
+    bitset_set_range(set,66,80);
+	printf("[66,80]:\n");
+	bitset_fprint(stdout,set);
+
+	bitset_clear_all(set);
+    bitset_set_range(set,4,150);
+	printf("[4,150]:\n");
+	bitset_fprint(stdout,set);
+		
+	bitset_clear_all(set);
+    bitset_set_range(set,4,450);
+	printf("[4,450]:\n");
+	bitset_fprint(stdout,set);
+		
+    bitset_destroy(set);
+    
+    set=bitset_create(32,32);
+    
+	bitset_clear_all(set);
+    bitset_set_range(set,4,450);
+	printf("[4,450]:\n");
+	bitset_fprint(stdout,set);
+    
+    bitset_destroy(set);
+}
+*/
+
 int main(){
 	setclear();
-	prevnext();
-	ops();
+//	prevnext();
+//	ops();
+//	range();
 	return 0;
 }
