@@ -15,7 +15,6 @@
 
 extern "C" {
 #include <assert.h>
-#include <limits.h>
 #include <popt.h>
 
 #include <mcrl2-greybox.h>
@@ -172,7 +171,7 @@ public:
         }
 
         std::vector<std::string> values
-            = data_type(mt).generate_values(SIZE_MAX);
+            = data_type(mt).generate_values(std::numeric_limits<std::size_t>::max());
         std::vector<std::string>::const_iterator i;
 
         for (i = values.begin(); i != values.end(); ++i) {
