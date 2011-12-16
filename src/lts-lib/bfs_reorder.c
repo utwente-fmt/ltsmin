@@ -27,7 +27,7 @@ void lts_bfs_reorder(lts_t lts) {
         map[lts->root_list[i]]=i;
     }
     i=0;
-    j=1;
+    j=lts->root_count;
     while(i<j){
         for(k=lts->begin[repr[i]];k<lts->begin[repr[i]+1];k++){
             if (map[lts->dest[k]]==MAP_UNDEF) {

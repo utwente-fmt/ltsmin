@@ -7,62 +7,6 @@
 #include <hre/user.h>
 #include <lts-lib/lts.h>
 
-/*
-void lts_uniq_sort(lts_t lts){
-	uint32_t i,j,k,q,l,d,count,found;
-	lts_set_type(lts,LTS_BLOCK);
-	count=0;
-	for(i=0;i<lts->states;i++){
-		j=lts->begin[i];
-		lts->begin[i]=count;
-		for(;j<lts->begin[i+1];j++){
-			l=lts->label[j];
-			d=lts->dest[j];
-			found=0;
-			for(k=count;k>lts->begin[i];k--){
-				if (l<lts->label[k-1]) continue;
-				if (l==lts->label[k-1]) {
-					if (d<lts->dest[k-1]) continue;
-					if (d==lts->dest[k-1]) {
-						found=1;
-						break;
-					}
-				}
-				break;
-			}
-			if(found) continue;
-			for(q=count;q>k;q--){
-				lts->label[q]=lts->label[q-1];
-				lts->dest[q]=lts->dest[q-1];
-			}
-			lts->label[k]=l;
-			lts->dest[k]=d;
-			count++;
-		}
-	}
-	//Warning(1,"count is %d",count);
-	lts->begin[lts->states]=count;
-	count=0;
-	for(i=0;i<lts->root_count;i++){
-	    found=0;
-	    for(j=0;j<count;j++){
-	        if (lts->root_list[j]>lts->root_list[i]) break;
-	        if (lts->root_list[j]==lts->root_list[i]) {
-	            found=1;
-                break;
-	        }
-	    }
-	    if (found) continue;
-	    for(k=count;k>j;k--){
-	        lts->root_list[k]=lts->root_list[k-1];
-	    }
-	    lts->root_list[j]=lts->root_list[i];
-	    count++;
-	}
-	lts_set_size(lts,count,lts->states,lts->begin[lts->states]);
-}
-*/
-
 static uint32_t merge_uniq(
     uint32_t *dst1,uint32_t *dst2,
     uint32_t *a1,uint32_t *a2,uint32_t a_size,
