@@ -14,9 +14,20 @@ static char* branching=UNDEFINED_METHOD;
 static int copy=0;
 static char* lump=UNDEFINED_METHOD;
 static int segments=1;
+static int silent=0;
 
 static void no_op(lts_t lts){
     (void)lts;
+}
+
+static void silent_compression(lts_t lts){
+    if (lts->label!=NULL && lts->properties==NULL){
+        lts_silent_compress(lts,tau_step,NULL);
+    } else if (lts->label==NULL && lts->properties!=NULL) {
+        lts_silent_compress(lts,stutter_step,NULL);
+    } else {
+        Abort("silent step compression requires either state labels or edge labels");
+    }
 }
 
 static  struct poptOption options[] = {
@@ -28,6 +39,7 @@ static  struct poptOption options[] = {
       &branching , 0 , "The short option uses the default variant lowmem." , "<variant>" },
     { "copy" , 'c' , POPT_ARG_VAL , &copy , 1 , "perform a load/store copy"  , NULL },
     { "lump" , 'l' , POPT_ARG_VAL , &lump , 0 , "minimize module lumping of CTMC" , NULL },
+    { "silent" , 0 , POPT_ARG_VAL , &silent , 1 , "silent step bisimulation" , NULL },
     { "segments" , 0 , POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT , &segments , 0 ,
       "set the number of segment for the output file" , "<N>" },
     POPT_TABLEEND
@@ -61,6 +73,10 @@ int main(int argc, char *argv[]){
         if (reduce!=NULL) Abort("reduction specifed twice");
         reduce=no_op;
     }
+    if (silent){
+        if (reduce!=NULL) Abort("reduction specifed twice");
+        reduce=silent_compression;
+    }
     if (reduce==NULL){
         Abort("please specify reduction");
     }
@@ -69,17 +85,9 @@ int main(int argc, char *argv[]){
     lts_read(files[0],lts);
     Print(infoShort,"input has %u states and %u transitions",
                           lts->states,lts->transitions);
-    for(unsigned int i=0;i<lts->root_count;i++){
-        Debug("root %d is %u",i,lts->root_list[i]);
-    }
-    Print(info,"the lts type is:");
-    lts_type_print(info,lts->ltstype);
     reduce(lts);
     Print(infoShort,"reduced LTS has %u states and %u transitions",
                           lts->states,lts->transitions);
-    for(unsigned int i=0;i<lts->root_count;i++){
-        Debug("root %d is %u",i,lts->root_list[i]);
-    }
     if (files[1]){
         Debug("writing %s",files[1]);
         lts_write(files[1],lts,segments);

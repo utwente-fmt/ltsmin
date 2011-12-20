@@ -33,6 +33,10 @@ Perform a load/store copy.
 *-l*, *--lump*::
 Minimize modulo CTMC lumping.
 
+*--silent*::
+Minimize modulo silent step bisimulation.
+This bisimulation is a generalization of tau * a bisimulation to arbitrary LTSs.
+
 *--segments='N'*::
 Use 'N' segments in the output file.
 
