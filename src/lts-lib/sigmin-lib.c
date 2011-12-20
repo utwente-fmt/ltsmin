@@ -241,6 +241,7 @@ void lts_read(char *name,lts_t lts){
 
 void lts_write(char *name,lts_t lts,int segments){
     int format=lts_guess_format(name);
+    lts_type_t ltstype=lts->ltstype;
     switch(format){
     case LTS_TRA:
         lts_write_tra(name,lts);
@@ -248,11 +249,15 @@ void lts_write(char *name,lts_t lts,int segments){
     case LTS_PG:
         lts_write_pg(name,lts);
         break;
-    case LTS_DIR: {
-        archive_t archive=arch_dir_create(name,65536,DELETE_ALL);
-        lts_write_dir(archive,NULL,lts,segments);
-        arch_close(&archive);
-        break;
+    case LTS_DIR:
+        if (lts_type_get_state_length(ltstype)==0
+            && lts_type_get_state_label_count(ltstype)==0
+            && lts_type_get_edge_label_count(ltstype)==1
+        ){
+            archive_t archive=arch_dir_create(name,65536,DELETE_ALL);
+            lts_write_dir(archive,NULL,lts,segments);
+            arch_close(&archive);
+            break;
         }
     default: {
         lts_file_t src=lts_reader(lts,segments,NULL);
