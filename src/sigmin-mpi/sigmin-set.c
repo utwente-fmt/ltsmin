@@ -4,7 +4,7 @@
 #include <bitset.h>
 #include <hre/runtime.h>
 #include <hre-mpi/user.h>
-#include <sigmin-mpi/set.h>
+#include <lts-lib/set.h>
 #include <sigmin-mpi/sigmin-types.h>
 #include <sigmin-mpi/sigmin-set.h>
 

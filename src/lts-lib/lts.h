@@ -151,6 +151,13 @@ extern int tau_step(void*context,lts_t lts,uint32_t src,uint32_t edge,uint32_t d
 extern int stutter_step(void*context,lts_t lts,uint32_t src,uint32_t edge,uint32_t dest);
 
 /**
+\brief Compress silent steps in LTS.
+
+This is tau*a equialence for an edge label LTS.
+ */
+extern void lts_silent_compress(lts_t lts,silent_predicate silent,void*silent_context);
+
+/**
  Open the given file and write the results to the given lts.
  The given LTS must be uninitialized.
  */
