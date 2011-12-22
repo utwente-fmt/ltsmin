@@ -158,6 +158,11 @@ This is tau*a equialence for an edge label LTS.
 extern void lts_silent_compress(lts_t lts,silent_predicate silent,void*silent_context);
 
 /**
+\brief Determinize the given LTS.
+*/
+extern void lts_mkdet(lts_t lts);
+
+/**
  Open the given file and write the results to the given lts.
  The given LTS must be uninitialized.
  */

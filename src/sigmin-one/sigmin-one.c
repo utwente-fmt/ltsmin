@@ -15,6 +15,7 @@ static int copy=0;
 static char* lump=UNDEFINED_METHOD;
 static int segments=1;
 static int silent=0;
+static int mkdet=0;
 
 static void no_op(lts_t lts){
     (void)lts;
@@ -40,6 +41,7 @@ static  struct poptOption options[] = {
     { "copy" , 'c' , POPT_ARG_VAL , &copy , 1 , "perform a load/store copy"  , NULL },
     { "lump" , 'l' , POPT_ARG_VAL , &lump , 0 , "minimize module lumping of CTMC" , NULL },
     { "silent" , 0 , POPT_ARG_VAL , &silent , 1 , "silent step bisimulation" , NULL },
+    { "determinize" , 0 , POPT_ARG_VAL , &mkdet , 1 , "compute deterministic variant" , NULL },
     { "segments" , 0 , POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT , &segments , 0 ,
       "set the number of segment for the output file" , "<N>" },
     POPT_TABLEEND
@@ -76,6 +78,10 @@ int main(int argc, char *argv[]){
     if (silent){
         if (reduce!=NULL) Abort("reduction specifed twice");
         reduce=silent_compression;
+    }
+    if (mkdet){
+        if (reduce!=NULL) Abort("reduction specifed twice");
+        reduce=lts_mkdet;
     }
     if (reduce==NULL){
         Abort("please specify reduction");
