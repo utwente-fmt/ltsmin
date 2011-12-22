@@ -52,7 +52,7 @@ static void mkdet_dfs_lab(lts_t orig,int S,lts_t lts,int*scount,int*tcount,int*t
 		            mkdet_dfs_lab(orig,U,lts,scount,tcount,tmax);
 				    if ((*tcount)==(*tmax)) {
 					    (*tmax)+=MKDET_BLOCK_SIZE;
-					    lts_set_size(lts,1,1,(*tmax));
+					    lts_set_size(lts,lts->root_count,1,(*tmax));
 				    }
     				lts->src[*tcount]=SetGetTag(S);
     				lts->label[*tcount]=orig->label[i];
@@ -90,7 +90,7 @@ static void mkdet_dfs_prop(lts_t orig,int S,lts_t lts,int*scount,int*tcount,int*
 		SetSetTag(S,*scount);
 	    if ((*scount)==(*smax)) {
 		    (*smax)+=MKDET_BLOCK_SIZE;
-		    lts_set_size(lts,1,(*smax),(*tmax));
+		    lts_set_size(lts,lts->root_count,(*smax),(*tmax));
 	    }
 		lts->properties[*scount]=orig->properties[SetGetDest(S)];
 		(*scount)++;
@@ -107,7 +107,7 @@ static void mkdet_dfs_prop(lts_t orig,int S,lts_t lts,int*scount,int*tcount,int*
 		            mkdet_dfs_prop(orig,U,lts,scount,tcount,smax,tmax);
 				    if ((*tcount)==(*tmax)) {
 					    (*tmax)+=MKDET_BLOCK_SIZE;
-					    lts_set_size(lts,1,(*smax),(*tmax));
+					    lts_set_size(lts,lts->root_count,(*smax),(*tmax));
 				    }
     				lts->src[*tcount]=SetGetTag(S);
     				lts->dest[*tcount]=SetGetTag(U);		            
@@ -157,7 +157,7 @@ void lts_mkdet(lts_t lts){
 	tcount=0;
 	scount=0;
 	lts_set_type(lts,LTS_LIST);
-	lts_set_size(lts,1,1,tmax);
+	lts_set_size(lts,lts->root_count,1,tmax);
 	fully_expored=0;
 	int S=EMPTY_SET;
 	for(i=0;i<orig->root_count;i++){
@@ -165,15 +165,24 @@ void lts_mkdet(lts_t lts){
 	}
 	Debug("performing reachability");
 	if (has_labels && has_props) Abort("cannot deal with both labels and properties");
-	if(has_labels) mkdet_dfs_lab(orig,S,lts,&scount,&tcount,&tmax);
+	if(has_labels){
+	    for(i=0;i<orig->root_count;i++){
+	        int S=SetInsert(EMPTY_SET,0,orig->root_list[i]);
+	        mkdet_dfs_lab(orig,S,lts,&scount,&tcount,&tmax);
+	        lts->root_list[i]=SetGetTag(S);
+	    }
+    }
 	if(has_props) {
 	    smax=tmax;
-	    lts_set_size(lts,1,smax,tmax);
-	    mkdet_dfs_prop(orig,S,lts,&scount,&tcount,&smax,&tmax);
+	    lts_set_size(lts,lts->root_count,smax,tmax);
+	    for(i=0;i<orig->root_count;i++){
+	        int S=SetInsert(EMPTY_SET,0,orig->root_list[i]);
+	        mkdet_dfs_prop(orig,S,lts,&scount,&tcount,&smax,&tmax);
+	        lts->root_list[i]=SetGetTag(S);
+	    }
     }
     Debug("found %u states and %u transitions",scount,tcount);
-	lts->root_list[0]=SetGetTag(S);
-	lts_set_size(lts,1,scount,tcount);
+	lts_set_size(lts,lts->root_count,scount,tcount);
 	lts_free(orig);
 	SetFree();
 	bitset_destroy(master);
