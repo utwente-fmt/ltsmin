@@ -30,6 +30,12 @@ Compare modulo branching bisimulation using the given 'variant' or the default i
 *-l*, *--lump*::
 Compare modulo CTMC lumping.
 
+*--trace[='stutter']*::
+Compare the two LTSs modulo (optionally stuttering) trace equivalence. This happens in multiple steps.
+First, the LTSs are compared modulo strong bisimulation (or silent step bisimulation
+if the stutter option is given). If the resulting LTSs are not equal, the LTSs are made deterministic and
+compared modulo strong bisimulation.
+
 include::inc/lts-io-options.txt[]
 
 include::inc/hre-options.txt[]
