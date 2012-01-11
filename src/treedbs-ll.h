@@ -28,11 +28,11 @@ Create a new tree database.
 - sized
 - incremental using the dependency matrix
 */
-extern treedbs_ll_t TreeDBSLLcreate (int len, int satellite_bits);
-extern treedbs_ll_t TreeDBSLLcreate_sized (int len, int size,
+extern treedbs_ll_t TreeDBSLLcreate (int len, int ratio, int satellite_bits);
+extern treedbs_ll_t TreeDBSLLcreate_sized (int len, int size, int ratio,
                                            int satellite_bits);
-extern treedbs_ll_t TreeDBSLLcreate_dm (int len, int size, matrix_t *m,
-                                        int satellite_bits);
+extern treedbs_ll_t TreeDBSLLcreate_dm (int len, int size, int ratio,
+                                        matrix_t *m, int satellite_bits);
 
 extern int          TreeDBSLLtry_set_sat_bit (const treedbs_ll_t dbs,
                                               const tree_ref_t ref, int index);
@@ -64,7 +64,7 @@ extern int          TreeDBSLLlookup_dm (const treedbs_ll_t dbs, const int *v,
 extern tree_t       TreeDBSLLget (const treedbs_ll_t dbs, const tree_ref_t ref, 
                                   int *dst);
 
-extern uint32_t     TreeDBSLLindex (tree_t data);
+extern tree_ref_t   TreeDBSLLindex (tree_t data);
 extern int         *TreeDBSLLdata (const treedbs_ll_t dbs, tree_t data);
 
 /**

@@ -1,6 +1,8 @@
 #ifndef THREADED_H
 #define THREADED_H
 
+#include <stdint.h>
+
 /**
 \file tls.h
 \brief Thread local storage management

@@ -134,6 +134,7 @@ static int              no_red_perm = 0;
 static int              all_red = 1;
 static box_t            call_mode = UseBlackBox;
 static size_t           max = UINT_MAX;
+static size_t           ratio = 2;
 static size_t           W = 2;
 static lb_t            *lb;
 static void            *dbs;
@@ -293,6 +294,7 @@ static struct poptOption options[] = {
     {"grey", 0, POPT_ARG_VAL, &call_mode, UseGreyBox, "make use of GetTransitionsLong calls", NULL},
     {"ref", 0, POPT_ARG_VAL, &refs, 1, "store references on the stack/queue instead of full states", NULL},
     {"max", 0, POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &max, 0, "maximum search depth", "<int>"},
+    {"ratio", 0, POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &ratio, 0, "tree root to leaf ratio", "<int>"},
     {"deadlock", 'd', POPT_ARG_VAL, &dlk_detect, 1, "detect deadlocks", NULL },
     {"trace", 0, POPT_ARG_STRING, &trc_output, 0, "file to write trace to", "<lts output>" },
     SPEC_POPT_OPTIONS,
@@ -780,7 +782,7 @@ init_globals (int argc, char *argv[])
         statistics = (dbs_stats_f) TreeDBSLLstats;
         get = (dbs_get_f) TreeDBSLLget;
         find_or_put = find_or_put_tree;
-        dbs = TreeDBSLLcreate_dm (N, dbs_size, m, global_bits + count_bits);
+        dbs = TreeDBSLLcreate_dm (N, dbs_size, ratio,  m, global_bits + count_bits);
         get_sat_bit = (dbs_get_sat_f) TreeDBSLLget_sat_bit;
         try_set_sat_bit = (dbs_try_set_sat_f) TreeDBSLLtry_set_sat_bit;
         inc_sat_bits = (dbs_inc_sat_bits_f) TreeDBSLLinc_sat_bits;
@@ -1397,6 +1399,10 @@ static void
 ndfs_handle_red (void *arg, state_info_t *successor, transition_info_t *ti, int seen)
 {
     wctx_t             *ctx = (wctx_t *) arg;
+    if (seen == -1) {
+        lb_stop (lb); Warning (info, "Error: Hash table full!");
+        return;
+    }
     if ( successor->ref == ctx->seed )
         /* Found cycle back to the seed */
         ndfs_report_cycle (ctx, successor);
@@ -1405,19 +1411,23 @@ ndfs_handle_red (void *arg, state_info_t *successor, transition_info_t *ti, int 
         state_info_serialize (successor, stack_loc);
         ctx->load++;
     }
-    (void) seen; (void) ti;
+    (void) ti;
 }
 
 static void
 ndfs_handle_blue (void *arg, state_info_t *successor, transition_info_t *ti, int seen)
 {
     wctx_t             *ctx = (wctx_t *) arg;
+    if (seen == -1) {
+        lb_stop (lb); Warning (info, "Error: Hash table full!");
+        return;
+    }
     if ( !ndfs_has_color(&ctx->color_map, successor->ref, NBLUE) ) {
         raw_data_t stack_loc = dfs_stack_push (ctx->stack, NULL);
         state_info_serialize (successor, stack_loc);
         ctx->load++;
     }
-    (void) seen; (void) ti;
+    (void) ti;
 }
 
 static inline void
@@ -1514,6 +1524,10 @@ nndfs_red_handle (void *arg, state_info_t *successor, transition_info_t *ti,
                   int seen)
 {
     wctx_t             *ctx = (wctx_t *) arg;
+    if (seen == -1) {
+        lb_stop (lb); Warning (info, "Error: Hash table full!");
+        return;
+    }
     nndfs_color_t color = nn_get_color(&ctx->color_map, successor->ref);
     if ( nn_color_eq(color, NNCYAN) ) {
         /* Found cycle back to the stack */
@@ -1524,7 +1538,7 @@ nndfs_red_handle (void *arg, state_info_t *successor, transition_info_t *ti,
         state_info_serialize (successor, stack_loc);
         ctx->load++;
     }
-    (void) seen; (void) ti;
+    (void) ti;
 }
 
 static void
@@ -1532,6 +1546,10 @@ nndfs_blue_handle (void *arg, state_info_t *successor, transition_info_t *ti,
                    int seen)
 {
     wctx_t             *ctx = (wctx_t *) arg;
+    if (seen == -1) {
+        lb_stop (lb); Warning (info, "Error: Hash table full!");
+        return;
+    }
     nndfs_color_t color = nn_get_color (&ctx->color_map, successor->ref);
     if ( nn_color_eq(color, NNCYAN) &&
             (GBbuchiIsAccepting(ctx->model, ctx->state.data) ||
@@ -1544,7 +1562,7 @@ nndfs_blue_handle (void *arg, state_info_t *successor, transition_info_t *ti,
         state_info_serialize (successor, stack_loc);
         ctx->load++;
     }
-    (void) seen; (void) ti;
+    (void) ti;
 }
 
 static inline void
@@ -1753,6 +1771,10 @@ static void
 endfs_handle_red (void *arg, state_info_t *successor, transition_info_t *ti, int seen)
 {
     wctx_t             *ctx = (wctx_t *) arg;
+    if (seen == -1) {
+        lb_stop (lb); Warning (info, "Error: Hash table full!");
+        return;
+    }
     /* Find cycle back to the seed */
     nndfs_color_t color = nn_get_color (&ctx->color_map, successor->ref);
     if ( nn_color_eq(color, NNCYAN) )
@@ -1767,13 +1789,17 @@ endfs_handle_red (void *arg, state_info_t *successor, transition_info_t *ti, int
         state_info_serialize (successor, stack_loc);
         ctx->load += 1;
     }
-    (void) seen; (void) ti;
+    (void) ti;
 }
 
 static void
 endfs_handle_blue (void *arg, state_info_t *successor, transition_info_t *ti, int seen)
 {
     wctx_t             *ctx = (wctx_t *) arg;
+    if (seen == -1) {
+        lb_stop (lb); Warning (info, "Error: Hash table full!");
+        return;
+    }
     nndfs_color_t color = nn_get_color (&ctx->color_map, successor->ref);
     if ( nn_color_eq(color, NNCYAN) &&
          (GBbuchiIsAccepting(ctx->model, ctx->state.data) ||
@@ -1786,7 +1812,7 @@ endfs_handle_blue (void *arg, state_info_t *successor, transition_info_t *ti, in
         state_info_serialize (successor, stack_loc);
         ctx->load += 1;
     }
-    (void) seen; (void) ti;
+    (void) ti;
 }
 
 static inline void
@@ -1957,6 +1983,10 @@ static void
 reach_handle (void *arg, state_info_t *successor, transition_info_t *ti,
               int seen)
 {
+    if (seen == -1) {
+        lb_stop (lb); Warning (info, "Error: Hash table full!");
+        return;
+    }
     wctx_t             *ctx = (wctx_t *) arg;
     if (!seen) {
         raw_data_t stack_loc = dfs_stack_push (ctx->stack, NULL);
