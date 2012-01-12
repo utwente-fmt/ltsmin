@@ -5,31 +5,38 @@
 #include <signal.h>
 #include <assert.h>
 
-#include "runtime.h"
-#include "treedbs-ll.h"
-#include "fast_hash.h"
+#include <clt_table.h>
+#include <fast_hash.h>
+#include <runtime.h>
+#include <treedbs-ll.h>
+
 
 static const int        TABLE_SIZE = 26;
 static const uint64_t   EMPTY = -1UL;
 static const size_t     CACHE_LINE_64 = (1 << CACHE_LINE) / sizeof (uint64_t);
 static const size_t     CL_MASK = -((1 << CACHE_LINE) / sizeof (uint64_t));
 
+typedef struct node_table_s {
+    uint64_t           *table;
+    size_t              log_size;
+    size_t              size;
+    size_t              thres;
+    uint64_t            mask;
+    int                 error_num;
+} node_table_t;
+
 struct treedbs_ll_s {
     int                 nNodes;
     uint32_t            sat_bits;
     uint32_t            sat_mask;
     pthread_key_t       local_key;
-    uint64_t           *root;
-    uint64_t           *data;
+    clt_dbs_t          *clt;
+    node_table_t        root;
+    node_table_t        data;
     int               **todo;
     int                 k;
-    size_t              size;
     size_t              ratio;
-    size_t              thres;
-    uint32_t            mask;
-    size_t              dsize;
-    size_t              dthresh;
-    uint32_t            dmask;
+    int                 slim;
 };
 
 typedef struct loc_s {
@@ -56,21 +63,21 @@ get_local (treedbs_ll_t dbs)
 uint32_t
 TreeDBSLLget_sat_bits (const treedbs_ll_t dbs, const tree_ref_t ref)
 {
-    return atomic32_read (dbs->root+ref) & dbs->sat_mask;
+    return atomic32_read (dbs->root.table+ref) & dbs->sat_mask;
 }
 
 void
 TreeDBSLLset_sat_bits (const treedbs_ll_t dbs, const tree_ref_t ref, uint16_t value)
 {
-    uint32_t        hash = dbs->root[ref] & ~dbs->sat_mask;
-    atomic32_write (dbs->root+ref, hash | (value & dbs->sat_mask));
+    uint32_t        hash = dbs->root.table[ref] & ~dbs->sat_mask;
+    atomic32_write (dbs->root.table+ref, hash | (value & dbs->sat_mask));
 }
 
 int
 TreeDBSLLget_sat_bit (const treedbs_ll_t dbs, const tree_ref_t ref, int index)
 {
     uint32_t        bit = 1 << index;
-    uint32_t        hash_and_sat = atomic32_read (dbs->root+ref);
+    uint32_t        hash_and_sat = atomic32_read (dbs->root.table+ref);
     uint32_t        val = hash_and_sat & bit;
     return val >> index;
 }
@@ -79,11 +86,11 @@ int
 TreeDBSLLtry_set_sat_bit (const treedbs_ll_t dbs, const tree_ref_t ref, int index)
 {
     uint32_t        bit = 1 << index;
-    uint32_t        hash_and_sat = atomic32_read (dbs->root+ref);
+    uint32_t        hash_and_sat = atomic32_read (dbs->root.table+ref);
     uint32_t        val = hash_and_sat & bit;
     if (val)
         return 0; //bit was already set
-    return cas (dbs->root+ref, hash_and_sat, hash_and_sat | bit);
+    return cas (dbs->root.table+ref, hash_and_sat, hash_and_sat | bit);
 }
 
 uint32_t
@@ -91,10 +98,10 @@ TreeDBSLLinc_sat_bits (const treedbs_ll_t dbs, const tree_ref_t ref)
 {
     uint32_t        val, newval;
     do {
-        val = atomic32_read (dbs->root+ref);
+        val = atomic32_read (dbs->root.table+ref);
         assert ((val & dbs->sat_mask) != dbs->sat_mask);
         newval = val + 1;
-    } while ( ! cas (dbs->root+ref, val, newval) );
+    } while ( ! cas (dbs->root.table+ref, val, newval) );
     return newval;
 }
 
@@ -103,10 +110,10 @@ TreeDBSLLdec_sat_bits (const treedbs_ll_t dbs, const tree_ref_t ref)
 {
     uint32_t        val, newval;
     do {
-        val = atomic32_read (dbs->root+ref);
+        val = atomic32_read (dbs->root.table+ref);
         assert ((val & dbs->sat_mask) != 0);
         newval = val - 1;
-    } while ( ! cas (dbs->root+ref, val, newval) );
+    } while ( ! cas (dbs->root.table+ref, val, newval) );
     return newval;
 }
 
@@ -119,17 +126,17 @@ prime_rehash (uint64_t h, uint64_t v)
 }
 
 static inline int
-lookup (uint64_t *table, uint64_t mask, uint64_t threshold,
+lookup (node_table_t *table,
         const uint64_t data, int index, uint64_t *res, loc_t *loc)
 {
     stats_t            *stat = &loc->stat;
     uint64_t            mem, hash, a;
     mem = hash = MurmurHash64 (&data, sizeof(uint64_t), 0);
-    for (size_t probes = 0; probes < threshold; probes++) {
-        size_t              ref = hash & mask;
+    for (size_t probes = 0; probes < table->thres; probes++) {
+        size_t              ref = hash & table->mask;
         size_t              line_end = (ref & CL_MASK) + CACHE_LINE_64;
         for (size_t i = 0; i < CACHE_LINE_64; i++) {
-            uint64_t           *bucket = &table[ref];
+            uint64_t           *bucket = &table->table[ref];
             if (EMPTY == atomic_read(bucket) && cas(bucket, EMPTY, data)) {
                 *res = ref;
                 loc->node_count[index]++;
@@ -149,7 +156,7 @@ lookup (uint64_t *table, uint64_t mask, uint64_t threshold,
 //            Warning (info, "h=%zu m=%zu p=%zu", hash, mem, primes[mem & ((1<<9)-1)]);
         stat->rehashes++;
     }
-    return -1;
+    return table->error_num;
 }
 
 static inline uint64_t
@@ -162,6 +169,18 @@ cmp_i64(int *v1, int *v2, size_t ref) {
     return ((int64_t *)v1)[ref] == ((int64_t *)v2)[ref];
 }
 
+static inline
+int clt_lookup (const treedbs_ll_t dbs, int *next)
+{
+    uint64_t key = next[2];
+    uint64_t left = next[3];
+    left <<= dbs->data.log_size;
+    key |= left;
+    int seen = clt_find_or_put (dbs->clt, key);
+    ((uint64_t*)next)[0] = ((uint64_t*)next)[1];
+    return seen;
+}
+
 int
 TreeDBSLLlookup (const treedbs_ll_t dbs, const int *vector)
 {
@@ -171,12 +190,17 @@ TreeDBSLLlookup (const treedbs_ll_t dbs, const int *vector)
     int                *next = loc->storage;
     memcpy (next + n, vector, sizeof (int[n]));
     uint64_t res = 0;
-    for (size_t i = n - 1; seen != -1 && i > 1; i--) {
-        seen = lookup (dbs->data, dbs->dmask, dbs->dthresh, i64(next, i), i-1, &res, loc);
+    for (size_t i = n - 1; seen >= 0 && i > 1; i--) {
+        seen = lookup (&dbs->data, i64(next, i), i-1, &res, loc);
         next[i] = res;
     }
-    if (seen != -1)
-        seen = lookup (dbs->root, dbs->mask, dbs->thres, i64(next, 1), 0, (uint64_t*)next, loc);
+    if (seen >= 0) {
+        if (dbs->slim) {
+            seen = clt_lookup (dbs, next);
+        } else {
+            seen = lookup (&dbs->root, i64(next, 1), 0, (uint64_t*)next, loc);
+        }
+    }
     return seen;
 }
 
@@ -197,14 +221,19 @@ TreeDBSLLlookup_incr (const treedbs_ll_t dbs, const int *v, tree_t prev,
     memcpy (next + n, v, sizeof (int[n]));
 
     uint64_t res = 0;
-    for (size_t i = n - 1; seen != -1 && i > 1; i--) {
+    for (size_t i = n - 1; seen >= 0 && i > 1; i--) {
         if ( !cmp_i64(prev, next, i) ) {
-            seen = lookup (dbs->data, dbs->dmask, dbs->dthresh, i64(next, i), i-1, &res, loc);
+            seen = lookup (&dbs->data, i64(next, i), i-1, &res, loc);
             next[i] = res;
         }
     }
-    if ( seen != -1 && !cmp_i64(prev, next, 1) )
-        seen = lookup (dbs->root, dbs->mask, dbs->thres, i64(next, 1), 0, (uint64_t*)next, loc);
+    if ( seen >= 0 && !cmp_i64(prev, next, 1) ) {
+        if (dbs->slim) {
+            seen = clt_lookup (dbs, next);
+        } else {
+            seen = lookup (&dbs->root, i64(next, 1), 0, (uint64_t*)next, loc);
+        }
+    }
     return seen;
 }
 
@@ -221,14 +250,19 @@ TreeDBSLLlookup_dm (const treedbs_ll_t dbs, const int *v, tree_t prev,
     int                 i;
 
     uint64_t res = 0;
-    for (size_t j = 0; seen != -1 && (i = dbs->todo[group][j]) != -1; j++) {
+    for (size_t j = 0; seen >= 0 && (i = dbs->todo[group][j]) != -1; j++) {
         if ( !cmp_i64(prev, next, i) ) {
-            seen = lookup (dbs->data, dbs->dmask, dbs->dthresh, i64(next, i), i-1, &res, loc);
+            seen = lookup (&dbs->data, i64(next, i), i-1, &res, loc);
             next[i] = res;
         }
     }
-    if ( seen != -1 && !cmp_i64(prev, next, 1) )
-        seen = lookup (dbs->root, dbs->mask, dbs->thres, i64(next, 1), 0, (uint64_t*)next, loc);
+    if ( seen >= 0 && !cmp_i64(prev, next, 1) ) {
+        if (dbs->slim) {
+            seen = clt_lookup (dbs, next);
+        } else {
+            seen = lookup (&dbs->root, i64(next, 1), 0, (uint64_t*)next, loc);
+        }
+    }
     return seen;
 }
 
@@ -238,9 +272,9 @@ TreeDBSLLget (const treedbs_ll_t dbs, const tree_ref_t ref, int *d)
     uint32_t           *dst = (uint32_t*)d;
     int64_t            *dst64 = (int64_t *)dst;
     dst64[0] = ref;
-    dst64[1] = dbs->root[ref];
+    dst64[1] = ref;
     for (int i = 2; i < dbs->nNodes; i++)
-        dst64[i] = dbs->data[dst[i]];
+        dst64[i] = dbs->data.table[dst[i]];
     return (tree_t)dst;
 }
 
@@ -264,15 +298,15 @@ LOCALfree (void *arg)
 }
 
 treedbs_ll_t
-TreeDBSLLcreate (int nNodes, int ratio, int satellite_bits)
+TreeDBSLLcreate (int nNodes, int ratio, int satellite_bits, int slim)
 {
-    return TreeDBSLLcreate_dm (nNodes, TABLE_SIZE, ratio, NULL, satellite_bits);
+    return TreeDBSLLcreate_dm (nNodes, TABLE_SIZE, ratio, NULL, satellite_bits, slim);
 }
 
 treedbs_ll_t
-TreeDBSLLcreate_sized (int nNodes, int size, int ratio, int satellite_bits)
+TreeDBSLLcreate_sized (int nNodes, int size, int ratio, int satellite_bits, int slim)
 {
-    return TreeDBSLLcreate_dm (nNodes, size, ratio, NULL, satellite_bits);
+    return TreeDBSLLcreate_dm (nNodes, size, ratio, NULL, satellite_bits, slim);
 }
 
 /**
@@ -315,7 +349,7 @@ project_matrix_to_tree (treedbs_ll_t dbs, matrix_t *m)
  * Memorized hash bucket bits org.: <mem_hash> <lock_bit> <node_idx> <sat_bits>
  */
 treedbs_ll_t
-TreeDBSLLcreate_dm (int nNodes, int size, int ratio, matrix_t * m, int satellite_bits)
+TreeDBSLLcreate_dm (int nNodes, int size, int ratio, matrix_t * m, int satellite_bits, int slim)
 {
     assert (sizeof(uint64_t) == 8); //see hardcoded 3
     assert (size <= DB_SIZE_MAX);
@@ -324,24 +358,34 @@ TreeDBSLLcreate_dm (int nNodes, int size, int ratio, matrix_t * m, int satellite
     dbs->sat_bits = satellite_bits;
     dbs->sat_mask  = 3<<30;
     dbs->nNodes = nNodes;
-    dbs->size = 1L << size;
     dbs->ratio = ratio;
-    dbs->thres = dbs->size / 64;
-    dbs->mask = dbs->size - 1;
+    dbs->slim = slim;
 
-    dbs->dsize = dbs->size >> dbs->ratio;
-    dbs->dthresh = dbs->dsize / 64;
-    dbs->dmask = dbs->dsize - 1;
+    dbs->root.size = 1L << size;
+    dbs->root.log_size = size;
+    dbs->root.thres = dbs->root.size / 64;
+    dbs->root.mask = dbs->root.size - 1;
+
+    dbs->data.log_size = size - dbs->ratio;
+    dbs->data.size = dbs->root.size >> dbs->ratio;
+    dbs->data.thres = dbs->data.size / 64;
+    dbs->data.mask = dbs->data.size - 1;
 
     pthread_key_create(&dbs->local_key, LOCALfree);
-    dbs->root = RTalign (CACHE_LINE_SIZE, sizeof (uint64_t) * dbs->size);
-    dbs->data = RTalign (CACHE_LINE_SIZE, sizeof (uint64_t) * dbs->dsize);
-    if (!dbs->data || !dbs->root)
-        Fatal (1, error, "Too large hash table allocated: %zu", dbs->size);
-    for (size_t i = 0; i < dbs->size; i++)
-        dbs->root[i] = EMPTY;
-    for (size_t i = 0; i < dbs->dsize; i++)
-        dbs->data[i] = EMPTY;
+    if (dbs->slim) {
+        dbs->clt = clt_create (dbs->data.log_size*2, dbs->root.log_size);
+    } else {
+        dbs->root.table = RTalign (CACHE_LINE_SIZE, sizeof (uint64_t) * dbs->root.size);
+    }
+
+    dbs->data.table = RTalign (CACHE_LINE_SIZE, sizeof (uint64_t) * dbs->root.size);
+    if (!dbs->data.table || (!dbs->root.table && !dbs->clt))
+        Fatal (1, error, "Too large hash table allocated: %zu", dbs->root.size);
+    if (!dbs->slim)
+    for (size_t i = 0; i < dbs->root.size; i++)
+        dbs->root.table[i] = EMPTY;
+    for (size_t i = 0; i < dbs->data.size; i++)
+        dbs->data.table[i] = EMPTY;
     dbs->todo = NULL;
     if(m != NULL)
         project_matrix_to_tree(dbs, m);
@@ -351,8 +395,12 @@ TreeDBSLLcreate_dm (int nNodes, int size, int ratio, matrix_t * m, int satellite
 void
 TreeDBSLLfree (treedbs_ll_t dbs)
 {
-    RTfree (dbs->data);
-    RTfree (dbs->root);
+    RTfree (dbs->data.table);
+    if (dbs->slim) {
+        clt_free (dbs->clt);
+    } else {
+        RTfree (dbs->root.table);
+    }
     if (NULL != dbs->todo) {
         for(int row = 0;row < dbs->k;++row)
             RTfree (dbs->todo[row]);

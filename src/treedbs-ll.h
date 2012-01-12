@@ -10,7 +10,7 @@
 \brief Implementation of tree compression using lockless hashtables.
 */
 
-static const int    DB_SIZE_MAX = 32;
+static const int    DB_SIZE_MAX = 40;
 
 /**
 Abstract type tree database.
@@ -28,11 +28,11 @@ Create a new tree database.
 - sized
 - incremental using the dependency matrix
 */
-extern treedbs_ll_t TreeDBSLLcreate (int len, int ratio, int satellite_bits);
+extern treedbs_ll_t TreeDBSLLcreate (int len, int ratio, int satellite_bits, int slim);
 extern treedbs_ll_t TreeDBSLLcreate_sized (int len, int size, int ratio,
-                                           int satellite_bits);
+                                           int satellite_bits, int slim);
 extern treedbs_ll_t TreeDBSLLcreate_dm (int len, int size, int ratio,
-                                        matrix_t *m, int satellite_bits);
+                                        matrix_t *m, int satellite_bits, int slim);
 
 extern int          TreeDBSLLtry_set_sat_bit (const treedbs_ll_t dbs,
                                               const tree_ref_t ref, int index);

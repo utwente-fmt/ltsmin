@@ -135,6 +135,7 @@ static int              all_red = 1;
 static box_t            call_mode = UseBlackBox;
 static size_t           max = UINT_MAX;
 static size_t           ratio = 2;
+static int              slim = 0;
 static size_t           W = 2;
 static lb_t            *lb;
 static void            *dbs;
@@ -295,6 +296,7 @@ static struct poptOption options[] = {
     {"ref", 0, POPT_ARG_VAL, &refs, 1, "store references on the stack/queue instead of full states", NULL},
     {"max", 0, POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &max, 0, "maximum search depth", "<int>"},
     {"ratio", 0, POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &ratio, 0, "tree root to leaf ratio", "<int>"},
+    {"slim", 0, POPT_ARG_VAL, &slim, 1, "slim tree, beware: size <= 28 + 2 * ratio", NULL},
     {"deadlock", 'd', POPT_ARG_VAL, &dlk_detect, 1, "detect deadlocks", NULL },
     {"trace", 0, POPT_ARG_STRING, &trc_output, 0, "file to write trace to", "<lts output>" },
     SPEC_POPT_OPTIONS,
@@ -782,7 +784,7 @@ init_globals (int argc, char *argv[])
         statistics = (dbs_stats_f) TreeDBSLLstats;
         get = (dbs_get_f) TreeDBSLLget;
         find_or_put = find_or_put_tree;
-        dbs = TreeDBSLLcreate_dm (N, dbs_size, ratio,  m, global_bits + count_bits);
+        dbs = TreeDBSLLcreate_dm (N, dbs_size, ratio,  m, global_bits + count_bits, slim);
         get_sat_bit = (dbs_get_sat_f) TreeDBSLLget_sat_bit;
         try_set_sat_bit = (dbs_try_set_sat_f) TreeDBSLLtry_set_sat_bit;
         inc_sat_bits = (dbs_inc_sat_bits_f) TreeDBSLLinc_sat_bits;
@@ -852,7 +854,7 @@ maybe_report (counter_t *cnt, char *msg, size_t *threshold)
         return;
     if (!cas (threshold, *threshold, *threshold << 1))
         return;
-    if (W == 1 || strategy[0] & Strat_LTL)
+    if (W == 1 || (strategy[0] & Strat_LTL))
         print_state_space_total (msg, cnt);
     else
         Warning (info, "%s%zu levels ~%zu states ~%zu transitions", msg,
@@ -884,7 +886,7 @@ print_totals (counter_t **ar_reach, counter_t **ar_red, int d, size_t db_elts)
     Warning (info, "red states: %zu (%.2f%%), bogus: %zu  (%.2f%%), transitions: %zu, waits: %zu",
              red->explored, ((double)red->explored/db_elts)*100, red->bogus_red,
              ((double)red->bogus_red/db_elts), red->trans, red->waits);
-    if  ( all_red && strategy[d] & (Strat_MCNDFS | Strat_NNDFS) )
+    if  ( all_red && (strategy[d] & (Strat_MCNDFS | Strat_NNDFS)) )
         Warning (info, "all-red states: %zu (%.2f%%), bogus %zu (%.2f%%)",
              reach->allred, ((double)reach->allred/db_elts)*100,
              red->allred, ((double)red->allred/db_elts)*100);
@@ -900,12 +902,13 @@ print_statistics (counter_t **ar_reach, counter_t **ar_red, mytimer_t timer,
     counter_t          *reach = ar_reach[0];
     counter_t          *red = ar_red[0];
     char               *name;
-    double              mem1, mem2, mem3=0, mem4, compr, ratio;
+    double              mem1, mem2, mem3=0, mem4, compr, fill;
     float               tot = SCCrealTime (timer);
     size_t              db_elts = stats->elts;
     size_t              db_nodes = stats->nodes;
     db_nodes = db_nodes == 0 ? db_elts : db_nodes;
-    size_t              el_size = db_type == UseTreeDBSLL ? 3 : N;
+    double              el_size = db_type == UseTreeDBSLL ?
+                (slim ? 1 + (2.0 / (1UL<<ratio)) : 2 + (2.0 / (1UL<<ratio))) : N;
     size_t              s = state_info_size();
     mem1 = ((double)(s * (reach->load_max+red->load_max))) / (1 << 20);
 
@@ -941,10 +944,10 @@ print_statistics (counter_t **ar_reach, counter_t **ar_red, mytimer_t timer,
     mem2 = ((double)(1UL << (dbs_size)) / (1<<20)) * SLOT_SIZE * el_size;
     mem4 = ((double)(db_nodes * SLOT_SIZE * el_size)) / (1<<20);
     compr = (double)(db_nodes * el_size) / (N * db_elts) * 100;
-    ratio = (double)((db_nodes * 100) / (1UL << dbs_size));
+    fill = (double)((db_nodes * 100) / (1UL << dbs_size));
     name = db_type == UseTreeDBSLL ? "Tree" : "Table";
     Warning (info, "DB: %s, memory: %.1fMB, compr. ratio: %.1f%%, "
-             "fill ratio: %.1f%%", name, mem2, compr, ratio);
+             "fill ratio: %.1f%%", name, mem2, compr, fill);
     Warning (info, "Est. total memory use: %.1fMB (~%.1fMB paged-in)",
              mem1 + mem4 + mem3, mem1 + mem2 + mem3);
     if (RTverbosity >= 2) {        // detailed output for scripts
@@ -1400,7 +1403,7 @@ ndfs_handle_red (void *arg, state_info_t *successor, transition_info_t *ti, int 
 {
     wctx_t             *ctx = (wctx_t *) arg;
     if (seen == -1) {
-        lb_stop (lb); Warning (info, "Error: Hash table full!");
+        if(lb_stop (lb)) Warning (info, "Error: Hash table full! %d", seen);
         return;
     }
     if ( successor->ref == ctx->seed )
@@ -1419,7 +1422,7 @@ ndfs_handle_blue (void *arg, state_info_t *successor, transition_info_t *ti, int
 {
     wctx_t             *ctx = (wctx_t *) arg;
     if (seen == -1) {
-        lb_stop (lb); Warning (info, "Error: Hash table full!");
+        if(lb_stop (lb)) Warning (info, "Error: Hash table full! %d", seen);
         return;
     }
     if ( !ndfs_has_color(&ctx->color_map, successor->ref, NBLUE) ) {
@@ -1525,7 +1528,7 @@ nndfs_red_handle (void *arg, state_info_t *successor, transition_info_t *ti,
 {
     wctx_t             *ctx = (wctx_t *) arg;
     if (seen == -1) {
-        lb_stop (lb); Warning (info, "Error: Hash table full!");
+        if(lb_stop (lb)) Warning (info, "Error: Hash table full! %d", seen);
         return;
     }
     nndfs_color_t color = nn_get_color(&ctx->color_map, successor->ref);
@@ -1547,7 +1550,7 @@ nndfs_blue_handle (void *arg, state_info_t *successor, transition_info_t *ti,
 {
     wctx_t             *ctx = (wctx_t *) arg;
     if (seen == -1) {
-        lb_stop (lb); Warning (info, "Error: Hash table full!");
+        if(lb_stop (lb)) Warning (info, "Error: Hash table full! %d", seen);
         return;
     }
     nndfs_color_t color = nn_get_color (&ctx->color_map, successor->ref);
@@ -1772,7 +1775,7 @@ endfs_handle_red (void *arg, state_info_t *successor, transition_info_t *ti, int
 {
     wctx_t             *ctx = (wctx_t *) arg;
     if (seen == -1) {
-        lb_stop (lb); Warning (info, "Error: Hash table full!");
+        if(lb_stop (lb)) Warning (info, "Error: Hash table full! %d", seen);
         return;
     }
     /* Find cycle back to the seed */
@@ -1797,7 +1800,7 @@ endfs_handle_blue (void *arg, state_info_t *successor, transition_info_t *ti, in
 {
     wctx_t             *ctx = (wctx_t *) arg;
     if (seen == -1) {
-        lb_stop (lb); Warning (info, "Error: Hash table full!");
+        if(lb_stop (lb)) Warning (info, "Error: Hash table full! %d", seen);
         return;
     }
     nndfs_color_t color = nn_get_color (&ctx->color_map, successor->ref);
@@ -1970,7 +1973,7 @@ endfs_blue (wctx_t *ctx, size_t work)
             ctx->load -= 1;
         }
     }
-    if ( ctx == contexts[ctx->id] && Strat_LTLG & ctx->rec_ctx->strategy )
+    if ( ctx == contexts[ctx->id] && (Strat_LTLG & ctx->rec_ctx->strategy) )
         endfs_lb (ctx);
     (void) work;
 }
@@ -1984,7 +1987,7 @@ reach_handle (void *arg, state_info_t *successor, transition_info_t *ti,
               int seen)
 {
     if (seen == -1) {
-        lb_stop (lb); Warning (info, "Error: Hash table full!");
+        if(lb_stop (lb)) Warning (info, "Error: Hash table full! %d", seen);
         return;
     }
     wctx_t             *ctx = (wctx_t *) arg;
