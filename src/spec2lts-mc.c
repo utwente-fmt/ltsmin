@@ -138,6 +138,7 @@ static char            *program;
 static cct_map_t       *tables = NULL;
 static char            *files[2];
 static int              dbs_size = 0;
+static int              lmap_size = 0;
 static int              refs = 0;
 static int              no_red_perm = 0;
 static int              all_red = 1;
@@ -809,7 +810,8 @@ init_globals (int argc, char *argv[])
     Warning (info, "Global bits: %d, count bits: %d, local bits: %d.",
              global_bits, count_bits, local_bits);
 
-    lmap = lmap_create (63, 64, dbs_size + 2);
+    lmap_size = dbs_size + 2;
+    lmap = lmap_create (63, 64, lmap_size);
     switch (db_type) {
     case UseDBSLL:
         if (ZOBRIST) {
@@ -2311,7 +2313,8 @@ split_dfs (void *arg_src, void *arg_tgt, size_t handoff)
 }
 
 /**
- * Reachability for timed automata.     Olensen/
+ * Reachability for timed automata.
+ * Dalsgaard, Hansen, Jorgensen, Larsen, Olensen, Olsen and Srba
  * States consist out of an explicit part and a symbolic part, (a pointer to)
  * a DBM.
  */
@@ -2327,6 +2330,8 @@ typedef enum ta_update_e {
     TA_UPDATE_PASSED = 2,
 } ta_update_e_t;
 
+static const lmap_loc_t TA_NONE = UINT64_MAX;
+
 lmap_cb_t
 ta_covered (void *arg, lmap_store_t *stored, lmap_loc_t loc)
 {
@@ -2334,12 +2339,12 @@ ta_covered (void *arg, lmap_store_t *stored, lmap_loc_t loc)
     int *succ_l = (int*)&ctx->successor->lattice;
     if ( GBisCoveredByShort(ctx->model, succ_l, (int*)&stored->lattice) ) {
         ctx->done = 1;
-        return LMAP_CB_STOP; //Al':(E(s,l)eL:l>=l')=>(forall(s,l)eL:l>=l')
+        return LMAP_CB_STOP; //A l' : (E (s,l)eL : l>=l')=>(A (s,l)eL : l>=l')
     } else if ( TA_UPDATE_NONE != UPDATE &&
             (TA_UPDATE_PASSED == UPDATE || TA_WAITING == stored->status) &&
             GBisCoveredByShort(ctx->model, (int*)&stored->lattice, succ_l)) {
         lmap_delete (lmap, loc);
-        ctx->last = (ctx->last == UINT64_MAX ? loc : ctx->last);
+        ctx->last = (TA_NONE == ctx->last ? loc : ctx->last);
         ctx->red.waits++;
     }
     return LMAP_CB_NEXT;
@@ -2350,11 +2355,11 @@ ta_handle (void *arg, state_info_t *successor, transition_info_t *ti, int seen)
 {
     wctx_t         *ctx = (wctx_t*) arg;
     ctx->done = 0;
-    ctx->last = UINT64_MAX;
+    ctx->last = TA_NONE;
     ctx->successor = successor;
     lmap_loc_t last = lmap_iterate (lmap, successor->ref, ta_covered, ctx);
     if (!ctx->done) {
-        last = (ctx->last == UINT64_MAX ? last : ctx->last);
+        last = (TA_NONE == ctx->last ? last : ctx->last);
         successor->loc = lmap_insert_from (lmap, successor->ref,
                                         successor->lattice, TA_WAITING, &last);
         raw_data_t stack_loc = dfs_stack_push (ctx->stack, NULL);
