@@ -432,6 +432,9 @@ typedef struct counter_s {
     size_t              transfer;       // load transfered by LB
     size_t              deadlocks;      // deadlock count
     size_t              errors;         // assertion error count
+    size_t              exit;           // recursive ndfss
+    mytimer_t           timer;
+    double              time;
 } counter_t;
 
 typedef struct thread_ctx_s wctx_t;
@@ -517,6 +520,8 @@ add_results (counter_t *res, counter_t *cnt)
     res->transfer += cnt->transfer;
     res->deadlocks += cnt->deadlocks;
     res->errors += cnt->errors;
+    res->exit += cnt->exit;
+    res->time += SCCrealTime (cnt->timer);
 }
 
 static void
@@ -635,6 +640,9 @@ wctx_create (size_t id, int depth, wctx_t *shared)
     ctx->permute = permute_create (permutation, NULL, W, K, id);
     ctx->rec_bits = (depth ? shared->rec_bits + num_global_bits(strategy[depth-1]) : 0) ;
     ctx->rec_ctx = NULL;
+    ctx->red.timer = SCCcreateTimer ();
+    ctx->counters.timer = SCCcreateTimer ();
+    ctx->red.time = 0;
     if (Strat_None != strategy[depth+1])
         ctx->rec_ctx = wctx_create (id, depth+1, ctx);
     return ctx;
@@ -654,8 +662,8 @@ wctx_free (wctx_t *ctx, int depth)
     }
     if (NULL != ctx->group_stack)
         isba_destroy (ctx->group_stack);
-    if (strategy[depth] & (Strat_BFS | Strat_ENDFS | Strat_CNDFS))
-        dfs_stack_destroy (ctx->in_stack);
+    //if (strategy[depth] & (Strat_BFS | Strat_ENDFS | Strat_CNDFS))
+    //    dfs_stack_destroy (ctx->in_stack);
     if (strategy[depth] & (Strat_CNDFS))
         dfs_stack_destroy (ctx->stack); 
     if (NULL != ctx->permute)
@@ -903,9 +911,9 @@ print_totals (counter_t *ar_reach, counter_t *ar_red, int d, size_t db_elts)
              key_search(permutations, permutation), key_search(permutations, permutation_red));
     Warning (info, "blue states: %zu (%.2f%%), transitions: %zu (per worker)",
              reach->explored, ((double)reach->explored/db_elts)*100, reach->trans);
-    Warning (info, "red states: %zu (%.2f%%), bogus: %zu  (%.2f%%), transitions: %zu, waits: %zu",
+    Warning (info, "red states: %zu (%.2f%%), bogus: %zu  (%.2f%%), transitions: %zu, waits: %zu (%.2f sec)",
              red->explored, ((double)red->explored/db_elts)*100, red->bogus_red,
-             ((double)red->bogus_red/db_elts), red->trans, red->waits);
+             ((double)red->bogus_red/db_elts), red->trans, red->waits, red->time);
     if  ( all_red && (strategy[d] & (Strat_MCNDFS | Strat_NNDFS | Strat_CNDFS  | Strat_ENDFS)) )
         Warning (info, "all-red states: %zu (%.2f%%), bogus %zu (%.2f%%)",
              reach->allred, ((double)reach->allred/db_elts)*100,
@@ -1948,6 +1956,7 @@ handle_nonseed_accepting (wctx_t *ctx)
         ctx->red.waits++;
         ctx->counters.rec += accs;
     }
+    SCCstartTimer (ctx->red.timer);
     while ( nonred && !lb_is_stopped(lb) ) {
         nonred = 0;
         for (size_t i = 0; i < accs; i++) {
@@ -1957,6 +1966,7 @@ handle_nonseed_accepting (wctx_t *ctx)
                 nonred++;
         }
     }
+    SCCstopTimer (ctx->red.timer);
     for (size_t i = 0; i < accs; i++)
         dfs_stack_pop (ctx->out_stack);
     while ( dfs_stack_size(ctx->in_stack) ) {
