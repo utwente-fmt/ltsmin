@@ -61,17 +61,18 @@ static si_map_entry vset_table[]={
 
 
 struct poptOption vset_options[]={
-	{ NULL, 0 , POPT_ARG_CALLBACK , (void*)vset_popt , 0 , (void*)vset_table ,NULL },
-	{ "vset" , 0 , POPT_ARG_STRING , NULL , 0 ,
-		"select a vector set implementation from ATermDD with *list* encoding,"
-		" ATermDD with *tree* encoding, BuDDy using the *fdd* feature, or"
-		" native ListDD, or DDD (default: first available)" , "<ldd|list|tree|fdd|ddd>" },
-	{ NULL,0 , POPT_ARG_INCLUDE_TABLE , listdd_options , 0 , "ListDD options" , NULL},
+    { NULL, 0 , POPT_ARG_CALLBACK , (void*)vset_popt , 0 , (void*)vset_table ,NULL },
+    { "vset" , 0 , POPT_ARG_STRING , NULL , 0 ,
+      "select a vector set implementation from native ListDD,"
+      " ATermDD with *list* encoding,"
+      " ATermDD with *tree* encoding, BuDDy using the *fdd* feature, or"
+      " DDD (default: first available)" , "<ldd|list|tree|fdd|ddd>" },
+    { NULL,0 , POPT_ARG_INCLUDE_TABLE , listdd_options , 0 , "ListDD options" , NULL},
 #ifdef HAVE_ATERM2_H
-	{ NULL,0 , POPT_ARG_INCLUDE_TABLE , atermdd_options , 0 , "ATermDD options" , NULL},
+    { NULL,0 , POPT_ARG_INCLUDE_TABLE , atermdd_options , 0 , "ATermDD options" , NULL},
 #endif
-	{ NULL,0 , POPT_ARG_INCLUDE_TABLE , buddy_options , 0 , "BuDDy options" , NULL},
-	POPT_TABLEEND
+    { NULL,0 , POPT_ARG_INCLUDE_TABLE , buddy_options , 0 , "BuDDy options" , NULL},
+    POPT_TABLEEND
 };
 
 vdom_t

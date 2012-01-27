@@ -772,11 +772,11 @@ struct poptOption ltl_options[] = {
 };
 
 struct poptOption greybox_options[]={
-	{ "matrix" , 'm' , POPT_ARG_VAL , &matrix , 1 , "Print the dependency matrix for the model and exit" , NULL},
-	{ "por" , 'p' , POPT_ARG_VAL , &por , 1 , "Enable partial order reduction." , NULL },
-	{ "cache" , 'c' , POPT_ARG_VAL , &cache , 1 , "Enable caching of grey box calls." , NULL },
+	{ "matrix" , 'm' , POPT_ARG_VAL , &matrix , 1 , "print the dependency matrix for the model and exit" , NULL},
+	{ "por" , 'p' , POPT_ARG_VAL , &por , 1 , "enable partial order reduction" , NULL },
+	{ "cache" , 'c' , POPT_ARG_VAL , &cache , 1 , "enable caching of grey box calls" , NULL },
 	{ "regroup" , 'r' , POPT_ARG_STRING, &regroup_options , 0 ,
-          "Enable regrouping; available transformations T: "
+          "enable regrouping; available transformations T: "
           "gs, ga, gsa, gc, gr, cs, cn, cw, ca, csa, rs, rn, ru", "<(T,)+>" },
 	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, ltl_options , 0 , "LTL options", NULL },
 	POPT_TABLEEND	
