@@ -29,6 +29,8 @@ static std::string mcrl2_rewriter_strategy = "jittyc";
 static std::string mcrl2_rewriter_strategy = "jitty";
 #endif
 static char const* mcrl2_args = "";
+static int         finite_types = 0;
+static int         readable_edge_labels = 0;
 
 namespace ltsmin {
 
@@ -74,7 +76,7 @@ public:
         for (size_t i = 0; i < edge_label_count(); ++i) {
             int mt = edge_label_type (i);
             int pt = lts_type_get_edge_label_typeno (GBgetLTStype (model_), i);
-            dst[i] = find_pins_index (mt, pt, src[i]);
+            dst[i] = find_pins_index (mt, pt, src[i], readable_edge_labels);
         }
     }
 
@@ -87,7 +89,7 @@ public:
         }
     }
 
-    inline int find_pins_index (int mt, int pt, int idx)
+    inline int find_pins_index (int mt, int pt, int idx, int pretty = 0)
     {
         data_format_t format = lts_type_get_format (GBgetLTStype (model_), pt);
         switch (format){
@@ -103,10 +105,16 @@ public:
         if (it != rmap_[mt].end())
             return it->second;
 
-        if (format == LTStypeEnum)
-            Abort("lookup of %d failed", idx);
+        std::string c;
 
-        std::string c = data_type(mt).serialize(idx);
+        if (!pretty)
+            c = data_type(mt).serialize(idx);
+        else
+            c = data_type(mt).print(idx);
+
+        if (finite_types && format == LTStypeEnum)
+            Abort("lookup of %s failed", c.c_str());
+
         int pidx = GBchunkPut (model_, pt,
                                chunk_str(const_cast<char*>(c.c_str())));
         map_[mt].resize (pidx + 1, IDX_NOT_FOUND);
@@ -114,7 +122,7 @@ public:
         return rmap_[mt][idx] = pidx;
     }
 
-    inline int find_mcrl2_index (int mt, int pt, int idx)
+    inline int find_mcrl2_index (int mt, int pt, int idx, int pretty = 0)
     {
         data_format_t format = lts_type_get_format (GBgetLTStype (model_), pt);
         switch (format) {
@@ -130,21 +138,28 @@ public:
             && map_[mt][idx] != IDX_NOT_FOUND)
             return map_[mt][idx];
 
-        if (format == LTStypeEnum)
-            Abort ("lookup %d failed", idx);
-
         chunk c = GBchunkGet (model_, pt, idx);
         if (c.len == 0)
             Abort ("lookup of %d failed", idx);
 
         std::string s = std::string(reinterpret_cast<char*>(c.data), c.len);
-        int midx = data_type(mt).deserialize (s);
+
+        if (finite_types && format == LTStypeEnum)
+            Abort ("lookup of %s failed", s.c_str());
+
+        int midx;
+
+        if (!pretty)
+            midx = data_type(mt).deserialize(s);
+        else
+            midx = data_type(mt).parse(s);
+
         rmap_[mt][midx] = idx;
         map_[mt].resize (idx+1, IDX_NOT_FOUND);
         return map_[mt][idx] = midx;
     }
 
-    void populate_type_index(int mt, int pt)
+    void populate_type_index(int mt, int pt, int pretty = 0)
     {
         switch (lts_type_get_format (GBgetLTStype (model_), pt)) {
         case LTStypeDirect:
@@ -161,7 +176,12 @@ public:
         std::vector<std::string>::const_iterator i;
 
         for (i = values.begin(); i != values.end(); ++i) {
-            int midx = data_type(mt).deserialize (*i);
+            int midx;
+
+            if (!pretty)
+                midx = data_type(mt).deserialize(*i);
+            else
+                midx = data_type(mt).parse(*i);
 
             std::map<int,int>::iterator it = rmap_[mt].find(midx);
             if (it != rmap_[mt].end())
@@ -275,7 +295,9 @@ mcrl2_popt (poptContext con, enum poptCallbackReason reason,
 
 struct poptOption mcrl2_options[] = {
     { NULL, 0, POPT_ARG_CALLBACK|POPT_CBFLAG_POST|POPT_CBFLAG_SKIPOPTION, (void*)mcrl2_popt, 0 , NULL , NULL},
-    { "mcrl2", 0, POPT_ARG_STRING, &mcrl2_args, 0, "Pass options to the mcrl2 library.", "<mcrl2 options>" },
+    { "mcrl2", 0, POPT_ARG_STRING, &mcrl2_args, 0, "pass options to the mCRL2 library", "<mCRL2 options>" },
+    { "mcrl2-finite-types", 0, POPT_ARG_VAL, &finite_types, 1, "use mCRL2 finite type information", NULL },
+    { "mcrl2-readable-edge-labels", 0, POPT_ARG_VAL, &readable_edge_labels, 1, "use human readable edge labels", NULL },
     POPT_TABLEEND
 };
 
@@ -352,7 +374,7 @@ MCRL2loadGreyboxModel (model_t m, const char *model_name)
     GBsetLTStype(m,ltstype);
 
     for(size_t i = 0; i < pins->datatype_count(); ++i) {
-        if (pins->data_type(i).is_bounded()) {
+        if (finite_types && pins->data_type(i).is_bounded()) {
             std::string n = pins->data_type(i).name();
             int pt = lts_type_put_type(ltstype, n.c_str(), LTStypeEnum, NULL);
             pins->populate_type_index(i, pt);
