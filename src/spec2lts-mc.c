@@ -422,6 +422,8 @@ typedef struct counter_s {
     size_t              waits;          // number of waits for WIP
     size_t              bogus_red;      // number of bogus red colorings
     size_t              rec;            // recursive ndfss
+    size_t              splits;         // Splits by LB
+    size_t              transfer;       // load transfered by LB
 } counter_t;
 
 typedef struct thread_ctx_s wctx_t;
@@ -503,18 +505,15 @@ add_results (counter_t *res, counter_t *cnt)
     res->waits += cnt->waits;
     res->rec += cnt->rec;
     res->bogus_red += cnt->bogus_red;
+    res->splits += cnt->splits;
+    res->transfer += cnt->transfer;
 }
 
 static void
-ctx_add_counters (wctx_t *ctx, counter_t **cnt, counter_t **red)
+ctx_add_counters (wctx_t *ctx, counter_t *cnt, counter_t *red)
 {
-    if (NULL == cnt[0]) {
-        cnt[0] = &ctx->counters;
-        red[0] = &ctx->red;
-    } else {
-        add_results(cnt[0], &ctx->counters);
-        add_results(red[0], &ctx->red);
-    }
+    add_results(cnt, &ctx->counters);
+    add_results(red, &ctx->red);
     if (NULL != ctx->rec_ctx) {
         ctx_add_counters (ctx->rec_ctx, cnt+1, red+1);
     }
@@ -857,10 +856,10 @@ ndfs_maybe_report (char *prefix, counter_t *cnt)
 }
 
 static void
-print_totals (counter_t **ar_reach, counter_t **ar_red, int d, size_t db_elts)
+print_totals (counter_t *ar_reach, counter_t *ar_red, int d, size_t db_elts)
 {
-    counter_t          *reach = ar_reach[0];
-    counter_t          *red = ar_red[0];
+    counter_t          *reach = ar_reach;
+    counter_t          *red = ar_red;
     reach->explored /= W;
     reach->trans /= W;
     red->trans /= W;
@@ -879,17 +878,17 @@ print_totals (counter_t **ar_reach, counter_t **ar_red, int d, size_t db_elts)
         Warning (info, "all-red states: %zu (%.2f%%), bogus %zu (%.2f%%)",
              reach->allred, ((double)reach->allred/db_elts)*100,
              red->allred, ((double)red->allred/db_elts)*100);
-    if (NULL != ar_reach[1]) {
+    if (Strat_None != strategy[d+1]) {
         print_totals (ar_reach + 1, ar_red + 1, d+1, db_elts);
     }
 }
 
 static void
-print_statistics (counter_t **ar_reach, counter_t **ar_red, mytimer_t timer,
+print_statistics (counter_t *ar_reach, counter_t *ar_red, mytimer_t timer,
                   stats_t *stats)
 {
-    counter_t          *reach = ar_reach[0];
-    counter_t          *red = ar_red[0];
+    counter_t          *reach = ar_reach;
+    counter_t          *red = ar_red;
     char               *name;
     double              mem1, mem2, mem3=0, mem4, compr, ratio;
     float               tot = SCCrealTime (timer);
@@ -910,17 +909,19 @@ print_statistics (counter_t **ar_reach, counter_t **ar_red, mytimer_t timer,
         Warning (info, "");
         Warning (info, "Total memory used for local state coloring: %.1fMB", mem3);
     } else {
-        size_t              dev, state_dev = 0, trans_dev = 0;
+        ssize_t              dev, state_dev = 0, trans_dev = 0;
+        ssize_t              state_mean = reach->explored/W;
+        ssize_t              trans_mean = reach->trans/W;
         for (size_t i = 0; i< W; i++) {
-            dev = (contexts[i]->counters.explored - (reach->explored/W));
+            dev = ((ssize_t)contexts[i]->counters.explored) - state_mean;
             state_dev += dev * dev;
             dev = (contexts[i]->counters.trans - (reach->trans/W));
             trans_dev += dev * dev;
         }
         if (W > 1)
             Warning (info, "mean standard work distribution: %.1f%% (states) %.1f%% (transitions)",
-                     100*(sqrt(((double)state_dev / W)) / (double)(reach->explored/(W)) ),
-                     100*(sqrt(((double)trans_dev / W))) / (double)(reach->trans/(W)) );
+                     (100 * sqrt((double)state_dev / W) / state_mean),
+                     (100 * sqrt((double)trans_dev / W) / trans_mean));
         Warning (info, "");
         print_state_space_total ("State space has ", reach);
         SCCreportTimer (timer, "Total exploration time");
@@ -935,18 +936,20 @@ print_statistics (counter_t **ar_reach, counter_t **ar_red, mytimer_t timer,
     ratio = (double)((db_nodes * 100) / (1UL << dbs_size));
     name = db_type == UseTreeDBSLL ? "Tree" : "Table";
     Warning (info, "DB: %s, memory: %.1fMB, compr. ratio: %.1f%%, "
-             "fill ratio: %.1f%%", name, mem2, compr, ratio);
+             "fill ratio: %.1f%%", name, mem4, compr, ratio);
     Warning (info, "Est. total memory use: %.1fMB (~%.1fMB paged-in)",
              mem1 + mem4 + mem3, mem1 + mem2 + mem3);
-    if (RTverbosity >= 2) {        // detailed output for scripts
-        Warning (info, "time:{{{%.2f}}}, elts:{{{%zu}}}, nodes:{{{%zu}}}, "
-                 "trans:{{{%zu}}}, misses:{{{%zu}}}, tests:{{{%zu}}}, "
-                 "rehashes:{{{%zu}}}, memq:{{{%.0f}}}, tt:{{{%.2f}}}, "
-                 "explored:{{{%zu}}}, memdb:{{{%.0f}}}, waits:{{{%zu}}}, rec:{{{%zu}}}",
-                 reach->runtime, db_elts, db_nodes, reach->trans,
-                 stats->misses, stats->tests,
-                 stats->rehashes, mem1, tot, reach->explored, mem2,
-                 red->waits, reach->rec);
+    if (RTverbosity >= 2) {        // internal counters
+        Warning (info, "Internal statistics:\n\n"
+        		 "Algorithm:\nWork time: %.2f sec\nUser time: %.2f sec\nExplored: %zu\n"
+        		 	 "Transitions: %zu\nWaits: %zu\nRec. calls: %zu\n\n"
+                 "Database:\nElements: %zu\nNodes: %zu\nMisses: %zu\nEq. tests: %zu\nRehashes: %zu\n\n"
+                 "Memory:\nQueue: %.1f MB\nDB: %.1f MB\nDB alloc.: %.1f MB\nColors: %.1f MB\n\n"
+                 "Load balancer:\nSplits: %zu\nLoad transfer: %zu",
+                 tot, reach->runtime, reach->explored, reach->trans, red->waits, reach->rec,
+                 db_elts, db_nodes, stats->misses, stats->tests, stats->rehashes,
+                 mem1, mem4, mem2, mem3,
+                 reach->splits, reach->transfer);
     }
 }
 
@@ -2083,6 +2086,8 @@ split_bfs (void *arg_src, void *arg_tgt, size_t handoff)
         dfs_stack_push (target->stack, one);
     }
     dfs_stack_discard (source_stack, handoff);
+    source->counters.splits++;
+    source->counters.transfer += handoff;
     return handoff;
 }
 
@@ -2111,6 +2116,8 @@ split_dfs (void *arg_src, void *arg_tgt, size_t handoff)
             dfs_stack_pop (source->stack);
         }
     }
+    source->counters.splits++;
+    source->counters.transfer += handoff;
     return handoff;
 }
 
@@ -2177,8 +2184,8 @@ main (int argc, char *argv[])
     SCCstopTimer (timer);
 
     /* Gather results */
-    counter_t         **reach = RTmallocZero (sizeof(counter_t[(1<<MAX_STRATEGIES) - 1]));
-    counter_t         **red = RTmallocZero (sizeof(counter_t[(1<<MAX_STRATEGIES) - 1]));
+    counter_t         reach[MAX_STRATEGIES]; memset (reach, 0, sizeof(reach));
+    counter_t         red[MAX_STRATEGIES]; memset (red, 0, sizeof(red));
     for (size_t i = 0; i < W; i++) {
         wctx_t             *ctx = contexts[i];
         ctx_add_counters (ctx, reach, red);
@@ -2186,7 +2193,7 @@ main (int argc, char *argv[])
     }
     if (RTverbosity >= 1)
         print_statistics (reach, red, timer, &stats);
-    SCCdeleteTimer (timer); RTfree (reach); RTfree (red);
+    SCCdeleteTimer (timer);
     deinit_globals ();
     exit (EXIT_SUCCESS);
 }
