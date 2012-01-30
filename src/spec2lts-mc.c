@@ -488,7 +488,7 @@ static inline void
 wait_seed (wctx_t *ctx, ref_t seed)
 {
     int didwait = 0;
-    while (get_wip(seed) > 0) { didwait = 1;} //wait
+    while (get_wip(seed) > 0 && !lb_is_stopped(lb)) { didwait = 1;} //wait
     if (didwait) {
         ctx->red.waits++;
     }
