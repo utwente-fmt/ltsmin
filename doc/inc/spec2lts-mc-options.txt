@@ -5,17 +5,17 @@
 
 *--strategy*='TYPE'::
         Select an exploration strategy. Two kinds of algorithms
-        are avaliable: LTL model checking and reachability.
+        are available: LTL model checking and reachability.
         The multi-core LTL algorithms (Nested DFS) are implemented
         in a swarmed fashion, however with a shared state storage.
-        On top of that, MCNDFS offers work sharing between threads
-        and can deliver linear speedups for some models.
+        On top of that, MCNDFS and ENDFS offer work sharing between threads
+        and can deliver speedups for some models.  
         Note that the LTL algorithms require buchi automata as input.
         Such a model can be provided directly by the language frontend,
         i.e., DiVinE property models are supported, or by the LTL
         layer (see --ltl).
         Note finally that strict reachability exploration orders
-        are not guaranteed by the multicore version.
+        are not guaranteed by the multi-core version.
         'TYPE' can be one of the following options:
 
 bfs;;
@@ -40,6 +40,17 @@ mcndfs;;
   Idem. No difference with MCNNDFS.
   Multi-Core Nested Depth-First Search (Laarman, Langerak, van de Pol, Weber, Wijs).
 
+endfs;;
+  Multi-Core Nested Depth-First Search by Evangelista er al. The algorithm has
+  been adapted with the cyan color encoding and early cycle detection, as
+  described in "Variations on Multi-Core Nested Depth-First Search"
+  (Laarman, van de Pol).
+  Note that ENDFS requires a repair procedure, NNDFS is chosen by default.
+  Alternatives can be chosen by  providing a list of strategies, for example: 
+  "endfs,mcndfs", yields the NMC-NDFS algorithm as described in the Variations
+  paper (with load balancing).
+  Finally, we also allow multiple levels of ENDFS to be combined:
+  "endfs,endfs,nndfs". 
 
 *--nar*::
         No All Red. Turn off all-red optimization in NNDFS/MCNDFS.
@@ -53,14 +64,20 @@ mcndfs;;
         summarized as (perf./eff.) :
 
 dynamic;;
-    use heuristics from state colorings (decent/potentially very good).
-    We have indications that the heuristics can be improved further.
+    use "fresh successor heuristics" described in
+    "Variations on Multi-Core Nested Depth-First Search" (Laarman, van de Pol).
+    (decent/very good for bug hunting). Default for LTL.
 
 sort;;
     sort on the unique id of the successor state (decent/good)
 
 random;;
     use multiple fixed random permutation schemes per worker (decent/good).
+
+rr;;
+	randomized using a full random sort order on the states. This is more random
+	than the previous option, but requires more pre-computation time for the
+	random array (decent/almost perfect).
 
 sr;;
     sort according to one fixed random permutation scheme per worker (decent/decent).
@@ -75,7 +92,7 @@ otf;;
     sort according to a dynamic permutation scheme (slow/perfect).
 
 none;;
-    use the same exploration order for all workers (default for reachability).
+    use the same exploration order for all workers. Default for reachability.
 
 
 *--no-red-perm*::

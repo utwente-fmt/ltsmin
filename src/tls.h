@@ -43,12 +43,10 @@ and writes to memory location, which causes loss of atomicity properties.
 #ifdef __x86_64__
 #define atomic64_read(v)    (*(volatile uint64_t *)(v))
 #define atomic64_write(v,a) (*(volatile uint64_t *)(v) = (a))
-#define atomic_read atomic64_read
-#define atomic_write atomic64_write
-#else
-#define atomic_read atomic32_read
-#define atomic_write atomic32_write
 #endif
+
+#define atomic_read(v)    (*(volatile size_t *)(v))
+#define atomic_write(v,a) (*(volatile size_t *)(v) = (a))
 
 /**
  * Writes a quad-word value to a memory address loc.
@@ -88,11 +86,11 @@ static const size_t CACHE_LINE_INT_MASK =
 #define sub_fetch(a, b) __sync_sub_and_fetch(a,b)
 
 #ifdef __x86_64__
-#define atomic_ptr_read(v)      ((void*)(*(volatile uint64_t *)v))
-#define atomic_ptr_write(v,a)   (*(volatile uint64_t *)v = (uint64_t)(a))
+#define atomic_ptr_read(v)      ((void*)(*(volatile uint64_t *)(v)))
+#define atomic_ptr_write(v,a)   (*(volatile uint64_t *)(v) = (uint64_t)(a))
 #else
-#define atomic_ptr_read(v)      ((void*)(*(volatile uint32_t *)v))
-#define atomic_ptr_write(v,a)   (*(volatile uint32_t *)v = (uint32_t)(a))
+#define atomic_ptr_read(v)      ((void*)(*(volatile uint32_t *)(v)))
+#define atomic_ptr_write(v,a)   (*(volatile uint32_t *)(v) = (uint32_t)(a))
 #endif
 
 
