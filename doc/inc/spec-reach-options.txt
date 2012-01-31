@@ -5,7 +5,7 @@
         previous level, while 'bfs' considers the whole visited set. With
         'chain-prev' and 'chain', a chaining strategy is used. Here,
         'chain-prev' at each level starts from the states found at the
-        previous level, while 'chain' uses the whole cisited set. Defaults
+        previous level, while 'chain' uses the whole visited set. Defaults
         to 'bfs-prev'.
 +
 When using breadth-first search, the tool performs the next state computation
@@ -16,18 +16,23 @@ etc.  Thus, a chaining analysis can be completed in much less
 iterations than a BFS analysis.
 
 *--saturation*='SATURATION'::
-        Select an experimental saturation-like strategy: 'none', 'sat-like',
-        'sat-loop', 'sat-ddd'. The 'sat-like' strategy goes up and down the
-        levels of the BDD used to represent the state space. The 'sat-loop'
-        strategy loops over the levels. The 'sat-ddd' strategy repeatedly
-        performs a fixpoint computation. All strategies except 'sat-ddd' work
-        in combination with the 'order' to saturate levels. Defaults to 'none',
-        i.e. no saturation.
+        Select a saturation strategy: 'none', 'sat-like', 'sat-loop', 'sat-fix',
+        'sat'. The 'sat-like' strategy goes up and down the levels of the BDD
+        used to represent the state space. The 'sat-loop' strategy loops over
+        the levels. The 'sat-fix' strategy repeatedly performs a fixpoint
+        computation using saturation. The 'sat' strategy does saturation as
+        described in the literature with on-the-fly expansion of the transition
+        relations. Defaults to 'none', i.e. no saturation.
++
+All strategies except 'sat-fix' and 'sat' work in combination with the 'order'
+to saturate levels.
 
 *--sat-granularity*='GRANULARITY'::
-        Select the granularity of the saturation-like strategy. Defaults to 10.
+        Select the granularity of 'sat-like' and 'sat-loop' strategies. The
+        granularity indicates how many BDD levels are considered at the same
+        time. Defaults to 10.
 
-*--save-levels*::
+*--save-sat-levels*::
         Save the previous states seen at saturation levels. This option has
         effect for any of the saturation strategies in combination with either
         'bfs-prev' or 'chain-prev'.
@@ -39,7 +44,7 @@ iterations than a BFS analysis.
 *--mu*='MUFILE'::
     After computing all reachable states, evaluate the mu-formula in 'MUFILE'
 +
-'MUFILE' is a file containing an Mu Calculus formula (see
+'MUFILE' is a file containing a Mu Calculus formula (see
 manpage:ltsmin-mu[5]). This formula is a propositional formula with
 least and greatest fixpoint operator. It will be evaluated after generation
 of the complete state space.

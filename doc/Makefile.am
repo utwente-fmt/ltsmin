@@ -78,6 +78,7 @@ extra_ASCIIDOC += inc/dve2.txt
 extra_ASCIIDOC += inc/file-formats.txt
 extra_ASCIIDOC += inc/general-options.txt
 extra_ASCIIDOC += inc/io-options.txt
+extra_ASCIIDOC += inc/listdd-options.txt
 extra_ASCIIDOC += inc/ltsmin-tracepp-options.txt
 extra_ASCIIDOC += inc/mcrl-options.txt
 extra_ASCIIDOC += inc/mcrl2-options.txt

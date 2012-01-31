@@ -67,7 +67,7 @@ static void buddy_popt(poptContext con,
     fdd_order_strat=BDD_REORDER_RANDOM;
   else
     Fatal(1,error,"BuDDy reordering strategy not recognized: %s",fdd_reorder_opt);
-  
+
   return;
 }
 
@@ -115,6 +115,8 @@ struct vector_set {
 
 struct vector_relation {
 	vdom_t dom;
+    expand_cb expand;
+    void *expand_ctx;
 	BDD bdd;
 	BDD p_set; // variables in the projection.
 	BDD p_prime_set; // primed variables in the projection
@@ -129,15 +131,15 @@ static vset_t set_create_fdd(vdom_t dom,int k,int* proj){
 	vset_t set=(vset_t)RTmalloc(sizeof(struct vector_set));
 	set->dom=dom;
 	set->bdd=bddfalse;
-	if (k && k<dom->shared.size) {
+	if (k >= 0 && k<dom->shared.size) {
 		int vars[k];
 		int complement[dom->shared.size-k];
 		set->p_len=k;
-		set->proj=(int*)RTmalloc(k*sizeof(int));
+		set->proj=(int*)RTmalloc(sizeof(int[k]));
 		int i=0;
 		int j=0;
 		for(int v=0;v<dom->shared.size;v++){
-			if (v==proj[i] && i<k) {
+			if (i < k && v == proj[i]) {
 				// influenced
 				vars[i]=dom->vars[v];
 				set->proj[i]=v;
@@ -180,7 +182,7 @@ static vrel_t rel_create_fdd(vdom_t dom,int k,int* proj){
     rel->dom=dom;
     rel->bdd=bddfalse;
 
-    assert (k > 0 && k<=dom->shared.size);
+    assert (0 <= k && k <= dom->shared.size);
 
     int vars[k];
     int vars2[k];
@@ -189,7 +191,7 @@ static vrel_t rel_create_fdd(vdom_t dom,int k,int* proj){
     if (k==dom->shared.size) {
         rel->proj = dom->proj;
     } else {
-        rel->proj=(int*)RTmalloc(k*sizeof(int));
+        rel->proj=(int*)RTmalloc(sizeof(int[k]));
     }
     for(int i=0;i<k;i++) {
         if (k!=dom->shared.size) rel->proj[i]=proj[i];
@@ -223,8 +225,7 @@ static vrel_t rel_create_fdd(vdom_t dom,int k,int* proj){
 static inline BDD fdd_element(vset_t set,const int* e){
 	int N=set->p_len;
 	BDD bdd=bddtrue;
-	//for(int i=0;i<N;i++){
-	  for(int i=N-1;i>=0;i--){
+	for(int i=N-1;i>=0;i--){
 		BDD val=mkvar(set->dom,set->proj[i],e[i]);
 		BDD tmp=bdd;
 		bdd=bdd_addref(bdd_and(bdd,val));
@@ -242,8 +243,7 @@ static BDD fdd_pair(vrel_t rel,const int* e1,const int*e2){
 	int N=rel->p_len;
 //	Warning(info,"N: %d %d",N,rel->p_len);
 	BDD bdd=bddtrue;
-	//for(int i=0;i<N;i++){
-	  for(int i=N-1;i>=0;i--){
+	for(int i=N-1;i>=0;i--){
 		BDD val=mkvar2(rel->dom,rel->proj[i],e2[i]);
 		BDD tmp=bdd;
 		bdd=bdd_addref(bdd_and(bdd,val));
@@ -309,7 +309,9 @@ static void set_copy_all(vset_t dst,vset_t src){
 }
 
 static void vset_enum_do_fdd(vdom_t dom,BDD set,int* proj,int *vec,int i,vset_element_cb cb,void* context){
-	if (i==-1) {
+    if (set == bddfalse) {
+        return;
+	} else if (i == -1 || set == bddtrue) {
 		cb(context,vec);
 	} else {
 		for(;;){
@@ -329,10 +331,10 @@ static void vset_enum_do_fdd(vdom_t dom,BDD set,int* proj,int *vec,int i,vset_el
 }
 
 static void set_enum_fdd(vset_t set,vset_element_cb cb,void* context){
-	int N=set->p_len;
-	int vec[N];
-	bdd_addref(set->bdd);
-	vset_enum_do_fdd(set->dom,set->bdd,set->proj,vec,N-1,cb,context);
+    int N=set->p_len;
+    int vec[N];
+    bdd_addref(set->bdd);
+    vset_enum_do_fdd(set->dom,set->bdd,set->proj,vec,N-1,cb,context);
 }
 
 static void vset_example_do_fdd(vdom_t dom, BDD set, int *proj, int *vec, int i){
@@ -351,6 +353,7 @@ static void vset_example_do_fdd(vdom_t dom, BDD set, int *proj, int *vec, int i)
 }
 
 static void set_example_fdd(vset_t set, int *e){
+    assert(set->bdd != bddfalse);
     int N = set->p_len;
     bdd_addref(set->bdd);
     vset_example_do_fdd(set->dom, set->bdd, set->proj, e, N-1);
@@ -358,25 +361,33 @@ static void set_example_fdd(vset_t set, int *e){
 }
 
 static void set_enum_match_fdd(vset_t set,int p_len,int* proj,int*match,vset_element_cb cb,void* context){
-	BDD subset=set->bdd;
-	bdd_addref(subset);
-	for(int i=0;i<p_len;i++){
-		BDD val=mkvar(set->dom,proj[i],match[i]);
-		BDD tmp=bdd_addref(bdd_and(subset,val));
-		bdd_delref(subset);
-		subset=tmp;
-		rmvar(val);
-	}
-	int N=set->p_len;
-	int vec[N];
-	vset_enum_do_fdd(set->dom,subset,set->proj,vec,N-1,cb,context);
+    BDD subset;
+    if (p_len == 0 && set->bdd != bddfalse)
+        subset = bddtrue;
+    else
+        subset = set->bdd;
+    bdd_addref(subset);
+    for(int i=0;i<p_len;i++){
+        BDD val=mkvar(set->dom,proj[i],match[i]);
+        BDD tmp=bdd_addref(bdd_and(subset,val));
+        bdd_delref(subset);
+        subset=tmp;
+        rmvar(val);
+    }
+    int N=set->p_len;
+    int vec[N];
+    vset_enum_do_fdd(set->dom,subset,set->proj,vec,N-1,cb,context);
 }
 
 static void set_copy_match_fdd(vset_t dst,vset_t src,int p_len,int* proj,int*match){
+    assert(p_len >= 0);
     // delete reference to dst
     bdd_delref(dst->bdd);
     // use dst->bdd as subset
-    dst->bdd=src->bdd;
+    if (p_len == 0 && src->bdd != bddfalse)
+        dst->bdd = bddtrue;
+    else
+        dst->bdd=src->bdd;
     bdd_addref(dst->bdd);
     for(int i=0;i<p_len;i++){
         BDD val=mkvar(src->dom,proj[i],match[i]);
@@ -392,11 +403,11 @@ static void count_fdd(BDD bdd, BDD p_set,long *nodes,bn_int_t *elements)
     *nodes=bdd_nodecount(bdd);
     double count=bdd_satcountlnset(bdd,p_set);
     //Warning(info,"log of satcount is %f",count);
-    if (count == 0.0) {
+    if (count == 0.0 && bdd != bddtrue) {
         // count is zero or one
         count=bdd_satcountset(bdd, p_set);
     } else {
-        count=pow(2.0,count);
+        count=pow(2.0, count);
     }
     //Warning(info,"satcount is %f",count);
     bn_double2int(count,elements);
@@ -453,10 +464,10 @@ static void set_prev_appex_fdd(vset_t dst, vset_t src, vrel_t rel) {
     bdd_delref(tmp1);
 }
 
-// JvdP: gaat dit goed met aliasing? (dst=src)
 static void set_project_fdd(vset_t dst,vset_t src){
-	bdd_delref(dst->bdd);
-	dst->bdd=bdd_addref(bdd_exist(src->bdd,dst->c_set));
+    BDD tmp = dst->bdd;
+    dst->bdd=bdd_addref(bdd_exist(src->bdd,dst->c_set));
+    bdd_delref(tmp);
 }
 
 static void set_zip_fdd(vset_t dst,vset_t src){

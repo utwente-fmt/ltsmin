@@ -126,9 +126,8 @@ JavaCC task support for Ant.
 ** Optional Dependencies
 *** muCRL
 Download muCRL (>= 2.18.5) from <http://www.cwi.nl/~mcrl/mutool.html>.
-We tested with muCRL-2.18.5.  Without muCRL, the symbolic tools
-(<spec>-reach) might have degraded performance due to the absence of
-the AtermDD decision diagram package.
+We tested with muCRL-2.18.5.  Without muCRL, the AtermDD decision
+diagram package will not be built.
 
 Note that for 64-bit builds, you have to explicitly configure muCRL
 for this (otherwise, a faulty version is silently build):

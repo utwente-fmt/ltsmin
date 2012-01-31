@@ -65,6 +65,8 @@ struct vector_set {
 
 struct vector_relation {
 	vdom_t dom;
+    expand_cb expand;
+    void *expand_ctx;
 	ATerm rel;
 	int p_len;
 	int proj[];
@@ -72,11 +74,14 @@ struct vector_relation {
 
 static ATerm emptyset=NULL;
 static AFun cons;
-static AFun zip,min,sum,intersect,pi,reach,inv_reach,match,match3;
+static AFun zip,min,sum,intersect,pi,reach,inv_reach,match,match3,rel_prod;
 static ATerm atom;
 static ATerm Atom=NULL;
 static ATerm Empty=NULL;
 static ATermTable global_ct=NULL;
+static ATermTable global_rc=NULL; // Used in saturation - relational product
+static ATermTable global_sc=NULL; // Used in saturation - saturation results
+static ATermTable global_uc=NULL; // Used in saturation - union results
 
 #define ATcmp ATcompare
 //define ATcmp(t1,t2) (((long)t1)-((long)t2))
@@ -91,7 +96,9 @@ static void set_reset_ct(){
 	global_ct=ATtableCreate(HASH_INIT,HASH_LOAD);
 }
 
-static void set_init(){
+static void
+set_init()
+{
 	ATprotect(&emptyset);
 	ATprotect(&atom);
 	emptyset=ATparse("VSET_E");
@@ -116,6 +123,8 @@ static void set_init(){
 	ATprotectAFun(reach);
     inv_reach=ATmakeAFun("VSET_INV_REACH",2,ATfalse);
 	ATprotectAFun(inv_reach);
+    rel_prod = ATmakeAFun("VSET_REL_PROD", 4, ATfalse);
+    ATprotectAFun(rel_prod);
 	// used for vector_set_tree:
 	Empty=ATparse("VSET_E");
 	ATprotect(&Empty);
@@ -125,7 +134,8 @@ static void set_init(){
 }
 
 static vset_t set_create_both(vdom_t dom,int k,int* proj){
-	vset_t set=(vset_t)RTmalloc(sizeof(struct vector_set)+k*sizeof(int));
+    int l = (k < 0)?0:k;
+	vset_t set=(vset_t)RTmalloc(sizeof(struct vector_set)+sizeof(int[l]));
 	set->dom=dom;
 	set->set=emptyset;
 	ATprotect(&set->set);
@@ -141,7 +151,8 @@ static void set_destroy_both(vset_t set) {
 }
 
 static vrel_t rel_create_both(vdom_t dom,int k,int* proj){
-	vrel_t rel=(vrel_t)RTmalloc(sizeof(struct vector_relation)+k*sizeof(int));
+    assert(k >= 0);
+	vrel_t rel=(vrel_t)RTmalloc(sizeof(struct vector_relation)+sizeof(int[k]));
 	rel->dom=dom;
 	rel->rel=emptyset;
 	ATprotect(&rel->rel);
@@ -163,7 +174,7 @@ static void set_clear_both(vset_t set){
 }
 
 static void set_copy_both(vset_t dst,vset_t src){
-	//Maybe we should check if the lengths match!
+	assert(dst->p_len == src->p_len);
 	dst->set=src->set;
 }
 
@@ -201,7 +212,9 @@ static long count_set_t2(ATerm set){
     return idx;
 }
 
-static void set_count_t(ATerm set,long *nodes,bn_int_t *elements){
+static void
+set_count_t(ATerm set, long *nodes, bn_int_t *elements)
+{
   long idx;
 
   count_is=ATindexedSetCreate(HASH_INIT,HASH_LOAD);
@@ -220,7 +233,12 @@ static void set_count_t(ATerm set,long *nodes,bn_int_t *elements){
   ATindexedSetDestroy(count_is);
   for(int i=0;i<elem_size;i++) bn_clear(&elem_count[i]);
   free(elem_count);
-  *nodes=node_count;}
+
+  if (set == Atom || set == Empty)
+      node_count = 1;
+
+  *nodes=node_count;
+}
 
 static void set_count_tree(vset_t set,long *nodes,bn_int_t *elements){
   set_count_t(set->set,nodes,elements);
@@ -253,7 +271,9 @@ static long count_set_2(ATerm set){
     return idx;
 }
 
-static void count_set(ATerm set,long *nodes,bn_int_t *elements){
+static void
+count_set(ATerm set, long *nodes, bn_int_t *elements)
+{
   long idx;
 
   count_is=ATindexedSetCreate(HASH_INIT,HASH_LOAD);
@@ -272,7 +292,12 @@ static void count_set(ATerm set,long *nodes,bn_int_t *elements){
   ATindexedSetDestroy(count_is);
   for(int i=0;i<elem_size;i++) bn_clear(&elem_count[i]);
   free(elem_count);
-  *nodes=node_count;}
+
+  if (set == atom || set == emptyset)
+      node_count = 1;
+
+  *nodes=node_count;
+}
 
 static void set_count_list(vset_t set,long *nodes,bn_int_t *elements){
   count_set(set->set,nodes,elements);
@@ -342,22 +367,22 @@ static ATerm set_add(ATerm set,ATerm *a,int len){
       ATerm set1 = ATgetArgument(set,1);
       ATerm set2 = ATgetArgument(set,2);
       if (c==0)
-	return Cons(x,set_add(set1,a+1,len-1),set2);
+        return Cons(x,set_add(set1,a+1,len-1),set2);
       else
-	return Cons(x,set1,set_add(set2,a,len));
+        return Cons(x,set1,set_add(set2,a,len));
     }
   }
 }
 
 static void set_add_list(vset_t set,const int* e){
-	int N=set->p_len?set->p_len:set->dom->shared.size;
+	int N=(set->p_len < 0)?set->dom->shared.size:set->p_len;
 	ATerm vec[N];
 	for(int i=0;i<N;i++) vec[i]=(ATerm)ATmakeInt(e[i]);
 	set->set=set_add(set->set,vec,N);
 }
 
 static void rel_add_list(vrel_t rel,const int* src, const int* dst){
-	int N=rel->p_len?rel->p_len:rel->dom->shared.size;
+	int N=(rel->p_len < 0)?rel->dom->shared.size:rel->p_len;
 	ATerm vec[2*N];
 	for(int i=0;i<N;i++) {
 		vec[i+i]=(ATerm)ATmakeInt(src[i]);
@@ -367,7 +392,7 @@ static void rel_add_list(vrel_t rel,const int* src, const int* dst){
 }
 
 static int set_member_list(vset_t set,const int* e){
-	int N=set->p_len?set->p_len:set->dom->shared.size;
+	int N=(set->p_len < 0)?set->dom->shared.size:set->p_len;
 	ATerm vec[N];
 	for(int i=0;i<N;i++) vec[i]=(ATerm)ATmakeInt(e[i]);
 	return set_member(set->set,vec);
@@ -380,7 +405,7 @@ static ATerm singleton_tree(const int *a,int len);
 static ATerm set_add_tree_2(ATerm set, const int *a,int len,ATbool *new);
 
 static void rel_add_tree(vrel_t rel,const int* src, const int* dst){
-	int N=rel->p_len?rel->p_len:rel->dom->shared.size;
+	int N=(rel->p_len < 0)?rel->dom->shared.size:rel->p_len;
 	int vec[2*N];
 	for(int i=0;i<N;i++) {
 		vec[i+i]=src[i];
@@ -393,7 +418,7 @@ static void rel_add_tree(vrel_t rel,const int* src, const int* dst){
 static ATbool set_member_tree_2(ATerm set, const int *a) {
   for (;;) {
     if (set==Empty) return ATfalse;
-    else if (set==Atom ) return ATtrue;
+    else if (set==Atom) return ATtrue;
     else {
       int x=a++[0]+1;
       while (x!=1) {
@@ -457,7 +482,7 @@ static ATerm set_add_tree_2(ATerm set,const int *a,int len,ATbool *new){
 
 
 void set_add_tree(vset_t set,const int* e){
-  int N=set->p_len?set->p_len:set->dom->shared.size;
+    int N=(set->p_len < 0)?set->dom->shared.size:set->p_len;
   // ATbool new;
   set->set=set_add_tree_2(set->set,e,N,NULL);
 }
@@ -466,97 +491,142 @@ int set_member_tree(vset_t set,const int* e){
   return set_member_tree_2(set->set,e);
 }
 
+union enum_context {
+    // Used by set_enum and enum_wrap functions:
+    struct {
+        vset_element_cb cb;
+        void *context;
+    } enum_cb;
+    // Used by set_example and enum_first functions:
+    int *enum_elem;
+};
 
+static int
+vset_enum_wrap(ATerm *a, int len, union enum_context *ctx)
+{
+    int vec[len];
 
-static vset_element_cb global_cb;
-static void* global_context;
-static int* global_elem;
+    for(int i = 0; i < len; i++)
+        vec[i] = ATgetInt((ATermInt)a[i]);
 
-
-static int vset_enum_wrap(ATerm *a,int len){
-	int vec[len];
-	for(int i=0;i<len;i++) vec[i]=ATgetInt((ATermInt)a[i]);
-	global_cb(global_context,vec);
-	return 0;
+    ctx->enum_cb.cb(ctx->enum_cb.context, vec);
+    return 0;
 }
 
-static int vset_enum_first(ATerm *a,int len){
-	for(int i=0;i<len;i++) global_elem[i]=ATgetInt((ATermInt)a[i]);
-	return 1;
+static int
+vset_enum_first(ATerm *a, int len, union enum_context *ctx)
+{
+    for(int i = 0; i < len; i++)
+        ctx->enum_elem[i] = ATgetInt((ATermInt)a[i]);
+
+    return 1;
 }
 
-static int set_enum_2(ATerm set,ATerm *a,int len,int (*callback)(ATerm *,int),int ofs){
-	int tmp;
-	while(ATgetAFun(set)==cons){
-		if (ofs<len){
-			a[ofs]=ATgetArgument(set,0);
-			tmp=set_enum_2(ATgetArgument(set,1),a,len,callback,ofs+1);
-			if (tmp) return tmp;
-		}
-		set=ATgetArgument(set,2);
-	}
-	if (ATisEqual(set,atom)) {
-		return callback(a,ofs);
-	}
-	return 0;
+static int
+set_enum_2(ATerm set, ATerm *a, int len,
+               int (*callback)(ATerm*, int, union enum_context*), int ofs,
+               union enum_context *ctx)
+{
+    int tmp;
+    while(ATgetAFun(set) == cons){
+        if (ofs < len) {
+            a[ofs] = ATgetArgument(set, 0);
+            tmp = set_enum_2(ATgetArgument(set, 1), a, len, callback,
+                                 ofs + 1, ctx);
+            if (tmp) return tmp;
+        }
+
+        set = ATgetArgument(set, 2);
+    }
+
+    if (ATisEqual(set, atom)) {
+        return callback(a, ofs, ctx);
+    }
+
+    return 0;
 }
 
-static void set_enum_list(vset_t set,vset_element_cb cb,void* context){
-	int N=set->p_len?set->p_len:set->dom->shared.size;
-	ATerm vec[N];
-	global_cb=cb;
-	global_context=context;
-	set_enum_2(set->set,vec,N,vset_enum_wrap,0);
+static void
+set_enum_list(vset_t set, vset_element_cb cb, void* context)
+{
+    union enum_context ctx = {enum_cb : {cb, context}};
+    int N = (set->p_len < 0)?set->dom->shared.size:set->p_len;
+    ATerm vec[N];
+
+    set_enum_2(set->set, vec, N, vset_enum_wrap, 0, &ctx);
 }
 
-static void set_example_list(vset_t set,int *e){
-	int N=set->p_len?set->p_len:set->dom->shared.size;
-	ATerm vec[N];
-	global_elem=e;
-	set_enum_2(set->set,vec,N,vset_enum_first,0);
+static void
+set_example_list(vset_t set, int *e)
+{
+    union enum_context ctx = {enum_elem : e};
+    int N = (set->p_len < 0)?set->dom->shared.size:set->p_len;
+    ATerm vec[N];
+
+    set_enum_2(set->set, vec, N, vset_enum_first, 0, &ctx);
 }
 
-int vset_enum_wrap_tree(int *a,int len){
+static int
+vset_enum_wrap_tree(int *a, int len, union enum_context *ctx)
+{
   (void)len;
-  global_cb(global_context,a);
+
+  ctx->enum_cb.cb(ctx->enum_cb.context, a);
   return 0;
 }
 
-int vset_enum_tree_first(int *a,int len){
-  for(int i=0; i<len; i++) global_elem[i]=a[i];
+static int
+vset_enum_tree_first(int *a, int len, union enum_context *ctx)
+{
+  for (int i = 0; i < len; i++)
+      ctx->enum_elem[i] = a[i];
+
   return 1;
 }
 
 
-static int set_enum_t2(ATerm set,int *a,int len,int (*callback)(int*,int),int ofs,int shift, int cur){
+static
+int set_enum_t2(ATerm set, int *a, int len,
+                    int (*callback)(int*, int, union enum_context*),
+                    int ofs, int shift, int cur, union enum_context *ctx)
+{
   int tmp;
-  if (set==Atom) return callback(a,ofs);
-  else if (set==Empty) return 0;
+
+  if (set == Atom)
+      return callback(a, ofs, ctx);
+  else if (set == Empty)
+      return 0;
   else {
-    if (ofs<len) {
-      a[ofs]=shift+cur-1; // Recall that 0 cannot be stored
-      tmp=set_enum_t2(Down(set),a,len,callback,ofs+1,1,0);
+    if (ofs < len) {
+      a[ofs] = shift + cur - 1; // Recall that 0 cannot be stored
+      tmp = set_enum_t2(Down(set), a, len, callback, ofs + 1, 1, 0, ctx);
       if (tmp) return tmp;
     }
-    set_enum_t2(Left(set),a,len,callback,ofs,shift<<1,cur);
-    set_enum_t2(Right(set),a,len,callback,ofs,shift<<1,shift|cur);
+
+    set_enum_t2(Left(set), a, len, callback, ofs, shift<<1, cur, ctx);
+    set_enum_t2(Right(set), a, len, callback, ofs, shift<<1, shift|cur, ctx);
     return 0;
   }
 }
 
-static void set_enum_tree(vset_t set,vset_element_cb cb,void* context){
-	int N=set->p_len?set->p_len:set->dom->shared.size;
-	int vec[N];
-	global_cb=cb;
-	global_context=context;
-	set_enum_t2(set->set,vec,N,vset_enum_wrap_tree,0,1,0);
+static void
+set_enum_tree(vset_t set, vset_element_cb cb, void* context)
+{
+    union enum_context ctx = {enum_cb : {cb, context}};
+    int N = (set->p_len < 0)?set->dom->shared.size:set->p_len;
+    int vec[N];
+
+    set_enum_t2(set->set, vec, N, vset_enum_wrap_tree, 0, 1, 0, &ctx);
 }
 
-static void set_example_tree(vset_t set,int *e){
-	int N=set->p_len?set->p_len:set->dom->shared.size;
-	int vec[N];
-	global_elem=e;
-	set_enum_t2(set->set,vec,N,vset_enum_tree_first,0,1,0);
+static void
+set_example_tree(vset_t set, int *e)
+{
+    union enum_context ctx = {enum_elem : e};
+    int N = (set->p_len < 0)?set->dom->shared.size:set->p_len;
+    int vec[N];
+
+    set_enum_t2(set->set,vec,N,vset_enum_tree_first, 0, 1, 0, &ctx);
 }
 
 static vset_element_cb match_cb;
@@ -612,7 +682,7 @@ static int set_enum_match_2(ATermIndexedSet dead,ATerm set,ATerm *a,int len,ATer
 }
 
 static void set_enum_match_list(vset_t set,int p_len,int* proj,int*match,vset_element_cb cb,void* context){
-	int N=set->p_len?set->p_len:set->dom->shared.size;
+	int N=(set->p_len < 0)?set->dom->shared.size:set->p_len;
 	ATerm vec[N];
 	ATerm pattern[p_len];
 	for(int i=0;i<p_len;i++) pattern[i]=(ATerm)ATmakeInt(match[i]);
@@ -669,7 +739,7 @@ set_copy_match_2(ATerm set, int len, ATerm*pattern, int *proj, int p_len, int of
 }
 
 static void set_copy_match_list(vset_t dst,vset_t src,int p_len,int* proj,int*match) {
-	int N=src->p_len?src->p_len:src->dom->shared.size;
+	int N=(src->p_len < 0)?src->dom->shared.size:src->p_len;
 	ATerm pattern[p_len];
 	for(int i=0;i<p_len;i++) pattern[i]=(ATerm)ATmakeInt(match[i]);
 	dst->set = set_copy_match_2(src->set,N,pattern,proj,p_len,0);
@@ -705,6 +775,7 @@ static ATerm set_union_2(ATerm s1, ATerm s2,char lookup) {
 }
 
 static void set_union_list(vset_t dst,vset_t src){
+    assert(dst->p_len == src->p_len);
 	dst->set=set_union_2(dst->set,src->set,0);
 	ATtableReset(global_ct);
 }
@@ -736,6 +807,7 @@ static ATerm set_intersect_2(ATerm s1, ATerm s2,char lookup) {
 }
 
 static void set_intersect_list(vset_t dst,vset_t src){
+    assert(dst->p_len == src->p_len);
 	dst->set=set_intersect_2(dst->set,src->set,0);
 	ATtableReset(global_ct);
 }
@@ -771,6 +843,7 @@ static ATerm set_minus_2(ATerm a,ATerm b, char lookup) {
 }
 
 static void set_minus_list(vset_t dst,vset_t src){
+    assert(dst->p_len == src->p_len);
 	dst->set=set_minus_2(dst->set,src->set,0);
 	ATtableReset(global_ct);
 }
@@ -851,6 +924,7 @@ static ATerm set_project_2(ATerm set,int ofs,int *proj,int len,char lookup) {
 
 
 static void set_project_list(vset_t dst,vset_t src){
+    assert(dst->p_len >= 0 && src->p_len < 0);
 	dst->set=set_project_2(src->set,0,dst->proj,dst->p_len,0);
 	ATtableReset(global_ct);
 }
@@ -878,7 +952,7 @@ static ATerm trans_level(ATerm set,ATerm trans,int *proj,int p_len,int ofs){
 static ATerm apply_reach(ATerm set,ATerm trans,int *proj,int p_len,int ofs){
   int c;
   ATerm res=emptyset;
-  for(;(ATgetAFun(set)==cons)&&(ATgetAFun(trans)==cons);){
+  while ((ATgetAFun(set)==cons)&&(ATgetAFun(trans)==cons)){
     c=ATcmp(ATgetArgument(set,0),ATgetArgument(trans,0));
     if (c<0)
       set=ATgetArgument(set,2);
@@ -897,7 +971,9 @@ static ATerm apply_reach(ATerm set,ATerm trans,int *proj,int p_len,int ofs){
 static ATerm set_reach_2(ATerm set,ATerm trans,int *proj,int p_len,int ofs, char lookup){
   // WARNING: cache results may never be reused from different toplevel calls to project!!
   // TO CHECK: why add 'trans' to cache? Just caching set should probably work as well
-  if (p_len==0)
+  if (set == emptyset || trans == emptyset)
+    return emptyset;
+  else if (p_len==0)
     return set;
   else {
     ATerm key=NULL, res=NULL;
@@ -907,17 +983,18 @@ static ATerm set_reach_2(ATerm set,ATerm trans,int *proj,int p_len,int ofs, char
       if (res) return res;
     }
     { if (proj[0]==ofs)
-	res = apply_reach(set,trans,proj,p_len,ofs);
+        res = apply_reach(set,trans,proj,p_len,ofs);
       else
-	res = copy_level(set,trans,proj,p_len,ofs);
+        res = copy_level(set,trans,proj,p_len,ofs);
       if (lookup)
-	ATtablePut(global_ct,key,res);
+        ATtablePut(global_ct,key,res);
       return res;
     }
   }
 }
 
 void set_next_list(vset_t dst,vset_t src,vrel_t rel){
+    assert(dst->p_len < 0 && src->p_len < 0);
 	dst->set=set_reach_2(src->set,rel->rel,rel->proj,rel->p_len,0,0);
 	ATtableReset(global_ct);
 }
@@ -939,7 +1016,7 @@ static ATerm trans_level_inv(ATerm trans_src, ATerm set, ATerm trans, int *proj,
 {
     int c;
     ATerm res = emptyset;
-    for(;(ATgetAFun(trans)==cons) && ATgetAFun(set)==cons;) {
+    while ((ATgetAFun(trans)==cons) && ATgetAFun(set)==cons) {
         // compare 2nd argument
         c = ATcmp(ATgetArgument(set,0), ATgetArgument(trans,0));
         if (c < 0) {
@@ -981,7 +1058,9 @@ static ATerm apply_inv_reach(ATerm set, ATerm trans, int *proj, int p_len, int o
 
 static ATerm set_inv_reach(ATerm set, ATerm trans, int *proj, int p_len, int ofs, char lookup)
 {
-    if (p_len == 0) {
+    if (set == emptyset || trans == emptyset) {
+        return emptyset;
+    } if (p_len == 0) {
         return set;
     } else {
         ATerm key = NULL, res = NULL;
@@ -1009,6 +1088,7 @@ static ATerm set_inv_reach(ATerm set, ATerm trans, int *proj, int p_len, int ofs
 }
 
 void set_prev_list(vset_t dst, vset_t src, vrel_t rel) {
+    assert(dst->p_len < 0 && src->p_len < 0);
     dst->set=set_inv_reach(src->set, rel->rel, rel->proj, rel->p_len, 0, 0);
     ATtableReset(global_ct);
 }
@@ -1044,6 +1124,7 @@ static ATerm set_union_tree_2(ATerm s1, ATerm s2, char lookup) {
 }
 
 static void set_union_tree(vset_t dst, vset_t src) {
+    assert(dst->p_len == src->p_len);
 	dst->set=set_union_tree_2(dst->set,src->set,0);
 	ATtableReset(global_ct);
 }
@@ -1077,6 +1158,7 @@ static ATerm set_intersect_tree_2(ATerm s1, ATerm s2) {
 }
 
 static void set_intersect_tree(vset_t dst, vset_t src) {
+    assert(dst->p_len == src->p_len);
 	dst->set=set_intersect_tree_2(dst->set,src->set);
 	ATtableReset(global_ct);
 }
@@ -1121,6 +1203,7 @@ static ATerm set_project_tree_2(ATerm set,int ofs,int *proj,int len,char lookup)
 
 
 static void set_project_tree(vset_t dst,vset_t src){
+    assert(dst->p_len >= 0 && src->p_len < 0);
 	dst->set=set_project_tree_2(src->set,0,dst->proj,dst->p_len,0);
 	ATtableReset(global_ct);
 }
@@ -1155,6 +1238,7 @@ static ATerm set_minus_tree_2(ATerm a, ATerm b, char lookup) {
 }
 
 static void set_minus_tree(vset_t dst,vset_t src){
+    assert(dst->p_len == src->p_len);
 	dst->set=set_minus_tree_2(dst->set,src->set,0);
 	ATtableReset(global_ct);
 }
@@ -1289,6 +1373,7 @@ static ATerm set_reach_tree_2(ATerm set, ATerm trans, int *proj, int p_len, int 
 
 
 void set_next_tree(vset_t dst,vset_t src,vrel_t rel){
+    assert(dst->p_len < 0 && src->p_len < 0);
     dst->set=set_reach_tree_2(src->set, rel->rel, rel->proj, rel->p_len, 0, 0);
     ATtableReset(global_ct);
 }
@@ -1372,6 +1457,7 @@ static ATerm set_prev_tree_2(ATerm set, ATerm trans, int *proj, int p_len, int o
 }
 
 void set_prev_tree(vset_t dst,vset_t src,vrel_t rel){
+    assert(dst->p_len < 0 && src->p_len < 0);
     dst->set=set_prev_tree_2(src->set, rel->rel, rel->proj, rel->p_len, 0, 0);
     ATtableReset(global_ct);
 }
@@ -1432,24 +1518,356 @@ set_copy_match_tree_2(ATerm set, int len,int *matchv, int *proj, int p_len, int 
 }
 
 static void set_copy_match_tree(vset_t dst,vset_t src, int p_len,int* proj,int*match){
-    int N=src->p_len?src->p_len:src->dom->shared.size;
+    assert(dst->p_len == src->p_len);
+    int N=(src->p_len < 0)?src->dom->shared.size:src->p_len;
     if (p_len == 0) {
-        dst->set = Empty;
+        dst->set = src->set;
     } else {
         dst->set = set_copy_match_tree_2(src->set,N,match,proj,p_len,0, 1, 0);
         ATtableReset(global_ct);
     }
 }
 
-static void set_enum_match_tree(vset_t set,int p_len,int* proj,int*match,vset_element_cb cb,void* context){
-    int N=set->p_len?set->p_len:set->dom->shared.size;
-    ATerm match_set = set_copy_match_tree_2(set->set, N, match, proj, p_len, 0, 1, 0);
-    ATtableReset(global_ct);
+static void
+set_enum_match_tree(vset_t set, int p_len, int *proj, int *match,
+                        vset_element_cb cb, void *context)
+{
+    int N = (set->p_len < 0)?set->dom->shared.size:set->p_len;
+    ATerm match_set;
 
+    if (p_len == 0) {
+        match_set = set->set;
+    } else {
+        match_set = set_copy_match_tree_2(set->set, N, match, proj, p_len,
+                                              0, 1, 0);
+        ATtableReset(global_ct);
+    }
+
+    union enum_context ctx = {enum_cb : {cb, context}};
     int vec[N];
-    global_cb=cb;
-    global_context=context;
-    set_enum_t2(match_set,vec,N,vset_enum_wrap_tree,0,1,0);
+
+    set_enum_t2(match_set, vec, N, vset_enum_wrap_tree, 0, 1, 0, &ctx);
+}
+
+// Structure for storing transition groups at top levels.
+typedef struct {
+    int tg_len;
+    int *top_groups;
+} top_groups_info;
+
+static vrel_t *rel_set;
+static vset_t *proj_set;
+static top_groups_info *top_groups;
+
+static ATerm saturate(int level, ATerm set);
+static ATerm sat_rel_prod(ATerm set, ATerm trans, int *proj, int p_len,
+                          int ofs, int grp);
+
+// Initialize a global memoization table
+static ATermTable
+reset_table(ATermTable table)
+{
+    ATermTable new_table = table;
+
+    if (new_table != NULL)
+        ATtableDestroy(new_table);
+
+    return ATtableCreate(HASH_INIT, HASH_LOAD);
+}
+
+static ATerm
+set_union_sat(ATerm s1, ATerm s2, int lookup)
+{
+    if (s1 == atom) return atom;
+    if (s1 == emptyset) return s2;
+    if (s2 == emptyset) return s1;
+    if (s1 == s2) return s1;
+
+    ATerm key = NULL, res = NULL;
+
+    if (lookup) {
+        key = (ATerm)ATmakeAppl2(sum, s1, s2);
+        res = ATtableGet(global_uc, key);
+        if (res) return res;
+    }
+
+    // not looked up or not found in cache: compute
+    ATerm x = ATgetArgument(s1, 0);
+    ATerm y = ATgetArgument(s2, 0);
+    int c = ATcmp(x, y);
+
+    if (c==0)
+        res=Cons(x, set_union_sat(ATgetArgument(s1,1),ATgetArgument(s2,1),1),
+                 set_union_sat(ATgetArgument(s1,2),ATgetArgument(s2,2),0));
+    else if (c<0)
+        res=Cons(x, ATgetArgument(s1,1),
+                 set_union_sat(ATgetArgument(s1,2),s2,0));
+    else
+        res = Cons(y, ATgetArgument(s2,1),
+                   set_union_sat(s1,ATgetArgument(s2,2),0));
+
+    if (lookup) ATtablePut(global_uc, key, res);
+    return res;
+}
+
+static ATerm
+copy_level_sat(ATerm set, ATerm trans, int *proj, int p_len, int ofs, int grp)
+{
+    if (set==emptyset)
+        return emptyset;
+    else
+        return MakeCons(ATgetArgument(set, 0),
+                          sat_rel_prod(ATgetArgument(set, 1), trans, proj,
+                                       p_len, ofs + 1, grp),
+                          copy_level_sat(ATgetArgument(set, 2), trans, proj,
+                                         p_len, ofs, grp));
+}
+
+static ATerm
+trans_level_sat(ATerm set, ATerm trans, int *proj, int p_len, int ofs, int grp)
+{
+    if (trans == emptyset)
+        return emptyset;
+    else
+        return MakeCons(ATgetArgument(trans, 0),
+                            sat_rel_prod(set, ATgetArgument(trans, 1),
+                                         proj + 1, p_len-1, ofs + 1, grp),
+                            trans_level_sat(set, ATgetArgument(trans, 2),
+                                            proj, p_len, ofs, grp));
+}
+
+static ATerm
+apply_rel_prod(ATerm set, ATerm trans, int *proj, int p_len, int ofs, int grp)
+{
+    ATerm res = emptyset;
+
+    while((ATgetAFun(set) == cons) && (ATgetAFun(trans) == cons)) {
+        int c = ATcmp(ATgetArgument(set, 0), ATgetArgument(trans, 0));
+
+        if (c < 0)
+            set = ATgetArgument(set, 2);
+        else if (c > 0)
+            trans = ATgetArgument(trans, 2);
+        else {
+            res = set_union_sat(res, trans_level_sat(ATgetArgument(set,1),
+                                                     ATgetArgument(trans,1),
+                                                     proj, p_len, ofs, grp), 0);
+            set = ATgetArgument(set,2);
+            trans = ATgetArgument(trans,2);
+        }
+    }
+
+    return res;
+}
+
+// Get memoized rel_prod value
+static inline ATerm
+get_rel_prod_value(int lvl, int grp, ATerm set, ATerm trans)
+{
+    ATerm lvlNode = (ATerm) ATmakeInt(lvl);
+    ATerm grpNode = (ATerm) ATmakeInt(grp);
+    ATerm key = (ATerm) ATmakeAppl4(rel_prod, lvlNode, grpNode, set, trans);
+    return ATtableGet(global_rc, key);
+}
+
+// Memoize rel_prod value
+static inline void
+put_rel_prod_value(int lvl, int grp, ATerm set, ATerm trans, ATerm value)
+{
+    ATerm lvlNode = (ATerm) ATmakeInt(lvl);
+    ATerm grpNode = (ATerm) ATmakeInt(grp);
+    ATerm key = (ATerm) ATmakeAppl4(rel_prod, lvlNode, grpNode, set, trans);
+    ATtablePut(global_rc, key, value);
+}
+
+static ATerm
+sat_rel_prod(ATerm set, ATerm trans, int *proj, int p_len, int ofs, int grp)
+{
+    if (p_len == 0)
+        return set;
+    else {
+        ATerm res = get_rel_prod_value(ofs, grp, set, trans);
+        if (res)
+            return res;
+
+        if (proj[0] == ofs)
+            res = apply_rel_prod(set,trans,proj,p_len,ofs,grp);
+        else
+            res = copy_level_sat(set,trans,proj,p_len,ofs,grp);
+
+        res = saturate(ofs, res);
+        put_rel_prod_value(ofs, grp, set, trans, res);
+        return res;
+    }
+}
+
+static ATerm
+apply_rel_fixpoint(ATerm set, ATerm trans, int *proj, int p_len,
+                   int ofs, int grp)
+{
+    ATerm res=set;
+
+    while((ATgetAFun(set) == cons) && (ATgetAFun(trans) == cons)) {
+        int c = ATcmp(ATgetArgument(set, 0), ATgetArgument(trans, 0));
+
+        if (c < 0)
+            set = ATgetArgument(set, 2);
+        else if (c > 0)
+            trans = ATgetArgument(trans, 2);
+        else {
+            ATerm new_res     = res;
+            ATerm trans_value = ATgetArgument(trans, 0);
+            ATerm res_value   = ATgetArgument(res, 0);
+
+            while (!ATisEqual(res_value, trans_value)) {
+                new_res   = ATgetArgument(new_res, 2);
+                res_value = ATgetArgument(new_res, 0);
+            }
+
+            res = set_union_sat(res, trans_level_sat(ATgetArgument(new_res, 1),
+                                                     ATgetArgument(trans, 1),
+                                                     proj, p_len, ofs, grp), 0);
+            set = ATgetArgument(set,2);
+            trans = ATgetArgument(trans,2);
+        }
+    }
+
+    return res;
+}
+
+// Start fixpoint calculations on the MDD at a given level for transition groups
+// whose top is at that level. Continue performing fixpoint calculations until
+// the MDD does not change anymore.
+static ATerm
+sat_fixpoint(int level, ATerm set)
+{
+    if (ATisEqual(set, emptyset) || ATisEqual(set, atom))
+        return set;
+
+    top_groups_info groups_info = top_groups[level];
+    ATerm old_set = emptyset;
+    ATerm new_set = set;
+
+    while (!ATisEqual(old_set, new_set)) {
+        old_set = new_set;
+        for (int i = 0; i < groups_info.tg_len; i++) {
+            int grp = groups_info.top_groups[i];
+
+            // Update transition relations
+            if (rel_set[grp]->expand != NULL) {
+                proj_set[grp]->set = set_project_2(new_set, level,
+                                                   proj_set[grp]->proj,
+                                                   proj_set[grp]->p_len, 0);
+                rel_set[grp]->expand(rel_set[grp], proj_set[grp],
+                                     rel_set[grp]->expand_ctx);
+                proj_set[grp]->set = emptyset;
+                ATtableReset(global_ct);
+            }
+
+            new_set = apply_rel_fixpoint(new_set, rel_set[grp]->rel,
+                                         rel_set[grp]->proj,
+                                         rel_set[grp]->p_len, level, grp);
+        }
+    }
+
+    return new_set;
+}
+
+// Traverse the local state values of an MDD node recursively:
+// - Base case: end of MDD node is reached OR MDD node is atom node.
+// - Induction: construct a new MDD node with the link to next entry of the
+//   MDD node handled recursively
+static ATerm
+saturate_level(int level, ATerm node_set)
+{
+    if (ATisEqual(node_set, emptyset) || ATisEqual(node_set, atom))
+        return node_set;
+
+    ATerm sat_set = saturate(level + 1, ATgetArgument(node_set, 1));
+    ATerm new_node_set = saturate_level(level, ATgetArgument(node_set, 2));
+    return MakeCons(ATgetArgument(node_set, 0), sat_set, new_node_set);
+}
+
+// Saturation process for the MDD at a given level
+static ATerm
+saturate(int level, ATerm set)
+{
+    ATerm new_set = ATtableGet(global_sc, set);
+
+    if (new_set)
+        return new_set;
+
+    new_set = saturate_level(level, set);
+    new_set = sat_fixpoint(level, new_set);
+    ATtablePut(global_sc, set, new_set);
+    return new_set;
+}
+
+// Perform fixpoint calculations using the "General Basic Saturation" algorithm
+static void
+set_least_fixpoint_list(vset_t dst, vset_t src, vrel_t rels[], int rel_count)
+{
+    // Only implemented if not projected
+    assert(src->p_len < 0 && dst->p_len < 0);
+
+    // Initialize global hash tables.
+    global_ct = reset_table(global_ct);
+    global_sc = reset_table(global_sc);
+    global_rc = reset_table(global_rc);
+    global_uc = reset_table(global_uc);
+
+    // Initialize partitioned transition relations and expansions.
+    rel_set = rels;
+
+    // Initialize top_groups_info array
+    // This stores transition groups per topmost level
+    int  init_state_len = src->dom->shared.size;
+    top_groups = RTmalloc(sizeof(top_groups_info[init_state_len]));
+    proj_set = RTmalloc(sizeof(vset_t[rel_count]));
+
+    for (int lvl = 0; lvl < init_state_len; lvl++) {
+        top_groups[lvl].top_groups = RTmalloc(sizeof(int[rel_count]));
+        top_groups[lvl].tg_len = 0;
+    }
+
+    for (int grp = 0; grp < rel_count; grp++) {
+        proj_set[grp] = set_create_both(rels[grp]->dom, rels[grp]->p_len,
+                                        rels[grp]->proj);
+
+        if (rels[grp]->p_len == 0)
+            continue;
+
+        int top_lvl = rels[grp]->proj[0];
+        top_groups[top_lvl].top_groups[top_groups[top_lvl].tg_len] = grp;
+        top_groups[top_lvl].tg_len++;
+    }
+
+    // Saturation on initial state set
+    dst->set = saturate(0, src->set);
+
+    // Clean-up
+    for (int grp = 0; grp < rel_count; grp++) {
+        if (rels[grp]->p_len == 0 && rels[grp]->expand != NULL) {
+            proj_set[grp]->set = set_project_2(dst->set, 0, NULL, 0, 0);
+            rel_set[grp]->expand(rel_set[grp], proj_set[grp],
+                                 rel_set[grp]->expand_ctx);
+            ATtableReset(global_ct);
+        }
+
+        vset_destroy(proj_set[grp]);
+    }
+
+    for (int lvl = 0; lvl < init_state_len; lvl++)
+        RTfree(top_groups[lvl].top_groups);
+
+    rel_set = NULL;
+
+    RTfree(proj_set);
+    RTfree(top_groups);
+    ATtableReset(global_ct);
+    ATtableReset(global_sc);
+    ATtableReset(global_rc);
+    ATtableReset(global_uc);
 }
 
 vdom_t vdom_create_tree(int n){
@@ -1513,6 +1931,7 @@ vdom_t vdom_create_list(int n){
 	dom->shared.set_prev=set_prev_list;
 	dom->shared.reorder=reorder;
     dom->shared.set_destroy=set_destroy_both;
+    dom->shared.set_least_fixpoint= set_least_fixpoint_list;
 	return dom;
 }
 

@@ -9,6 +9,7 @@ check_PROGRAMS += test-dfs-stack
 check_PROGRAMS += test-hre
 check_PROGRAMS += ltsmin-parse
 check_PROGRAMS += test-dbs
+check_PROGRAMS += test-vset
 
 noinst_LTLIBRARIES  = libutil.la
 noinst_LTLIBRARIES += libvset.la
@@ -437,6 +438,10 @@ test_dfs_stack_LDADD   = libltsmin.la
 # test-dbs
 test_dbs_SOURCES = test-dbs.c
 test_dbs_LDADD   = libltsmin.la
+
+# test-vset
+test_vset_SOURCES = test-vset.c
+test_vset_LDADD   = $(VSET_LIBS) libltsmin.la
 
 # ltsmin-mpi
 ltsmin_mpi_SOURCES  = sigmin-mpi.c sigmin-sig.h
