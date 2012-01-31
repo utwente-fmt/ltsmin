@@ -8,7 +8,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
+#ifdef __APPLE__
 #include <sys/sysctl.h>
+#endif
 
 #include <hre-main.h>
 #include <runtime.h>
