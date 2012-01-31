@@ -95,7 +95,7 @@ static struct {
     .ltl_file      = NULL,
     .threshold     = 100000,
     .write_state   = 0,
-    .max           = UINT_MAX,
+    .max           = SIZE_MAX,
     .call_mode     = UseBlackBox,
     .arg_strategy  = "bfs",
     .strategy      = Strat_BFS,
@@ -1373,7 +1373,7 @@ gsea_setup_default()
     }
 
     // maximum search depth?
-    if (opt.max != UINT_MAX) {
+    if (opt.max != SIZE_MAX) {
         gc.max_placeholder = gc.open_insert_condition;
         gc.open_insert_condition = gsea_max_wrapper;
     }
