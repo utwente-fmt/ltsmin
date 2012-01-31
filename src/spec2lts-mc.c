@@ -4,6 +4,7 @@
 #include <limits.h>
 #include <lts_enum.h>
 #include <lts_io.h>
+#include <popt.h>
 #include <pthread.h>
 #include <sched.h>
 #include <signal.h>
@@ -133,7 +134,7 @@ static int              refs = 0;
 static int              no_red_perm = 0;
 static int              all_red = 1;
 static box_t            call_mode = UseBlackBox;
-static size_t           max = UINT_MAX;
+static size_t           max = SIZE_MAX;
 static size_t           W = 2;
 static lb_t            *lb;
 static void            *dbs;
@@ -359,10 +360,6 @@ static inline int
 ndfs_try_color (bitvector_t *set, ref_t ref, ndfs_color_t color)
 { return bitvector_isset_or_set (set, (ref<<1)|color.n); }
 
-static inline int
-n_color_eq (const ndfs_color_t a, const ndfs_color_t b)
-{ return a.n == b.n; };
-
 /* Global state colors are encoded in the state database as independent bits.
  * All threads are sensitive too them.
  *
@@ -411,10 +408,6 @@ get_wip (ref_t ref)
 {
     return get_sat_bits (dbs, ref) & count_mask;
 }
-
-static inline int
-g_color_eq (const global_color_t a, const global_color_t b)
-{ return a.g == b.g; };
 
 typedef struct counter_s {
     double              runtime;        // measured exploration time
@@ -465,7 +458,7 @@ typedef int         (*find_or_put_f)(state_info_t *successor,
                                      state_info_t *predecessor,
                                      state_data_t store);
 
-static const ref_t DUMMY_IDX = UINT_MAX;
+static const ref_t DUMMY_IDX = SIZE_MAX;
 
 extern size_t state_info_size ();
 extern size_t state_info_int_size ();
@@ -489,9 +482,9 @@ extern size_t       split_bfs (void *arg_src, void *arg_tgt, size_t handoff);
 extern size_t       split_dfs (void *arg_src, void *arg_tgt, size_t handoff);
 
 static find_or_put_f find_or_put;
-static int          N;
-static int          K;
-static int          MAX_SUCC;           // max succ. count to expand at once
+static size_t       N;
+static size_t       K;
+static size_t       MAX_SUCC;           // max succ. count to expand at once
 static size_t       threshold;
 static pthread_attr_t  *attr = NULL;
 static wctx_t     **contexts;
@@ -739,7 +732,7 @@ init_globals (int argc, char *argv[])
         dbs_size = dbs_size > DB_SIZE_MAX ? DB_SIZE_MAX : dbs_size;
     }
     Warning (info, "Using a %s with 2^%d elements", db_type==UseDBSLL?"hash table":"tree", dbs_size);
-    MAX_SUCC = ( Strat_DFS == strategy[0] ? 1 : INT_MAX );  /* for --grey: */
+    MAX_SUCC = ( Strat_DFS == strategy[0] ? 1 : SIZE_MAX );  /* for --grey: */
     if (trc_output && !(strategy[0] & Strat_LTL))
         parent_ref = RTmalloc (sizeof(ref_t[1UL<<dbs_size]));
 
@@ -850,7 +843,7 @@ maybe_report (counter_t *cnt, char *msg, size_t *threshold)
         return;
     if (!cas (threshold, *threshold, *threshold << 1))
         return;
-    if (W == 1 || strategy[0] & Strat_LTL)
+    if (W == 1 || (strategy[0] & Strat_LTL))
         print_state_space_total (msg, cnt);
     else
         Warning (info, "%s%zu levels ~%zu states ~%zu transitions", msg,
@@ -882,7 +875,7 @@ print_totals (counter_t **ar_reach, counter_t **ar_red, int d, size_t db_elts)
     Warning (info, "red states: %zu (%.2f%%), bogus: %zu  (%.2f%%), transitions: %zu, waits: %zu",
              red->explored, ((double)red->explored/db_elts)*100, red->bogus_red,
              ((double)red->bogus_red/db_elts), red->trans, red->waits);
-    if  ( all_red && strategy[d] & (Strat_MCNDFS | Strat_NNDFS) )
+    if  ( all_red && (strategy[d] & (Strat_MCNDFS | Strat_NNDFS)) )
         Warning (info, "all-red states: %zu (%.2f%%), bogus %zu (%.2f%%)",
              reach->allred, ((double)reach->allred/db_elts)*100,
              red->allred, ((double)red->allred/db_elts)*100);
@@ -1944,7 +1937,7 @@ endfs_blue (wctx_t *ctx, size_t work)
             ctx->load -= 1;
         }
     }
-    if ( ctx == contexts[ctx->id] && Strat_LTLG & ctx->rec_ctx->strategy )
+    if ( ctx == contexts[ctx->id] && (Strat_LTLG & ctx->rec_ctx->strategy) )
         endfs_lb (ctx);
     (void) work;
 }
@@ -1985,8 +1978,8 @@ explore_state (wctx_t *ctx, raw_data_t state, int next_index)
 {
     if (0 == next_index && ctx->counters.level_cur >= max)
         return K;
-    int                 count = 0;
-    int                 i = K;
+    size_t              count = 0;
+    size_t              i = K;
     state_info_deserialize (&ctx->state, state, ctx->store);
     if ( UseBlackBox == call_mode )
         count = permute_trans (ctx->permute, &ctx->state, reach_handle, ctx);
@@ -2003,7 +1996,7 @@ explore_state (wctx_t *ctx, raw_data_t state, int next_index)
 void
 dfs_grey (wctx_t *ctx, size_t work)
 {
-    int                 next_index = 0;
+    uint32_t            next_index = 0;
     size_t              max_load = ctx->counters.explored + work;
     while (ctx->counters.explored < max_load) {
         raw_data_t          state_data = dfs_stack_top (ctx->stack);
@@ -2023,7 +2016,7 @@ dfs_grey (wctx_t *ctx, size_t work)
             dfs_stack_enter (ctx->stack);
             increase_level (ctx, &ctx->counters);
             next_index = explore_state (ctx, state_data, next_index);
-            isba_push_int (ctx->group_stack, &next_index);
+            isba_push_int (ctx->group_stack, (int *)&next_index);
         }
         next_index = 0;
     }
