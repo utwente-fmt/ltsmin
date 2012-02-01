@@ -40,14 +40,14 @@ struct bitset {
 	/** The number of bits of a node index. */
 	int node_class;
 	/** The number of chiuldren of a node. */
-	int node_size;
+	unsigned int node_size;
 	
 	/** The leaf nodes of the tree are managed with this allocater. */
 	allocater_t base_alloc;	
 	/** The number of bits for indexing a bit in a leaf node. */
 	int base_class;
 	/** The number of words in a leaf node. */
-	int base_words;
+	unsigned int base_words;
 };
 
 /** The emtpy set. */
@@ -146,7 +146,7 @@ static void free_set(bitset_t main,int depth,void *set){
 	if (set==ALL_ONES) return;
 	if (depth){ // internal node
 	    void **node=(void**)set;
-		for(int i=0;i<main->node_size;i++){
+		for(unsigned int i=0;i<main->node_size;i++){
 			free_set(main,depth-1,node[i]);
 		}
 		BAfree(main->node_alloc,set);
@@ -182,7 +182,7 @@ void bitset_set_all(bitset_t set){
 static void expand(bitset_t set){
 	void **newnode=(void**)BAget(set->node_alloc);
 	newnode[0]=set->set;
-	for(int i=1;i<set->node_size;i++){
+	for(unsigned int i=1;i<set->node_size;i++){
 		newnode[i]=set->default_value;
 	}
 	set->set=(void*)newnode;
@@ -193,7 +193,7 @@ static void expand(bitset_t set){
 /** collapse a full or empty internal node */
 static void* simplify_node(bitset_t main,void**node){
     if(node[0]!=ALL_ZERO && node[0]!=ALL_ONES) return node;
-    for(int i=1;i<main->node_size;i++){
+    for(unsigned int i=1;i<main->node_size;i++){
         if (node[i]!=node[0]) return node;
     }
     void* result=node[0];
@@ -205,13 +205,13 @@ static void* simplify_node(bitset_t main,void**node){
 static void* simplify_leaf(bitset_t main,word_t*node){
     switch(node[0]){
     case WORD_EMPTY:
-        for(int i=1;i<main->base_words;i++){
+        for(unsigned int i=1;i<main->base_words;i++){
             if (node[i]!=WORD_EMPTY) return node;
         }
         BAfree(main->base_alloc,node);
         return ALL_ZERO;
     case WORD_FULL:
-        for(int i=1;i<main->base_words;i++){
+        for(unsigned int i=1;i<main->base_words;i++){
             if (node[i]!=WORD_FULL) return node;
         }
         BAfree(main->base_alloc,node);
@@ -224,7 +224,7 @@ static void* simplify_leaf(bitset_t main,word_t*node){
 static void** expand_node(bitset_t main,void*node){
     if(node!=ALL_ZERO && node!=ALL_ONES) return node;
     void**res=(void**)BAget(main->node_alloc);
-    for(int i=0;i<main->node_size;i++){
+    for(unsigned int i=0;i<main->node_size;i++){
         res[i]=node;
     }
     return res;
@@ -240,7 +240,7 @@ static word_t* expand_leaf(bitset_t main,void*node){
         return node;
     }
     word_t* res=(word_t*)BAget(main->base_alloc);
-    for(int i=0;i<main->base_words;i++){
+    for(unsigned int i=0;i<main->base_words;i++){
         res[i]=w;
     }
     return res;
@@ -436,14 +436,16 @@ static void* invert(bitset_t main,void* set,int depth){
     if (set==ALL_ZERO) return ALL_ONES;
     if (depth) {
         void**node=expand_node(main,set);
-        for(int i=0;i<main->node_size;i++){
+        for(unsigned int i=0;i<main->node_size;i++){
             node[i]=invert(main,node[i],depth-1);
         }
+        return node;
     } else {
         word_t *node=expand_leaf(main,set);
-        for(int i=0;i<main->base_words;i++){
+        for(unsigned int i=0;i<main->base_words;i++){
             node[i]=~node[i];
         }
+        return node;
     }
 }
 
