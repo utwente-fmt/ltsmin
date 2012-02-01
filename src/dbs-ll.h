@@ -27,7 +27,9 @@ typedef int       *(*dbs_get_f) (const void *dbs, dbs_ref_t ref, int *dst);
 typedef int        (*dbs_try_set_sat_f) (const void *dbs, const dbs_ref_t ref,
                                          int index);
 typedef int        (*dbs_get_sat_f) (const void *dbs, const dbs_ref_t ref,
-                                     int index);
+                                      int index);
+typedef void       (*dbs_unset_sat_f) (const void *dbs, const dbs_ref_t ref,
+                                       int index);
 typedef uint32_t   (*dbs_inc_sat_bits_f) (const void *dbs, const dbs_ref_t ref);
 typedef uint32_t   (*dbs_dec_sat_bits_f) (const void *dbs, const dbs_ref_t ref);
 typedef uint32_t   (*dbs_get_sat_bits_f) (const void *dbs, const dbs_ref_t ref);
@@ -63,6 +65,9 @@ extern int          DBSLLtry_unset_sat_bit (const dbs_ll_t dbs, const dbs_ref_t 
    
 extern int          DBSLLget_sat_bit (const dbs_ll_t dbs, const dbs_ref_t ref,
                                       int index);
+
+extern void         DBSLLunset_sat_bit (const dbs_ll_t dbs, const dbs_ref_t ref,
+                                        int index);
 
 
 extern uint32_t     DBSLLinc_sat_bits (const dbs_ll_t dbs, const dbs_ref_t ref);

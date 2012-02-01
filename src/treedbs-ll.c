@@ -92,6 +92,15 @@ TreeDBSLLget_sat_bit (const treedbs_ll_t dbs, const tree_ref_t ref, int index)
     return val >> index;
 }
 
+void
+TreeDBSLLunset_sat_bit (const treedbs_ll_t dbs, const tree_ref_t ref, int index)
+{
+    uint32_t        bit = 1 << index;
+    uint32_t        hash_and_sat = atomic32_read (dbs->table+ref);
+    uint32_t        val = hash_and_sat & ~bit;
+    atomic32_write (dbs->table+ref, val);
+}
+
 int
 TreeDBSLLtry_set_sat_bit (const treedbs_ll_t dbs, const tree_ref_t ref, int index)
 {

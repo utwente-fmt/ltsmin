@@ -65,6 +65,15 @@ DBSLLget_sat_bit (const dbs_ll_t dbs, const dbs_ref_t ref, int index)
     return val >> index;
 }
 
+void
+DBSLLunset_sat_bit (const dbs_ll_t dbs, const dbs_ref_t ref, int index)
+{
+    uint32_t        bit = 1U << index;
+    uint32_t        hash_and_sat = atomic32_read (dbs->table+ref);
+    uint32_t        val = hash_and_sat & ~bit;
+    atomic32_write (dbs->table+ref, val);
+}
+
 int
 DBSLLtry_set_sat_bit (const dbs_ll_t dbs, const dbs_ref_t ref, int index)
 {
