@@ -38,8 +38,8 @@ typedef struct local_s {
  *
  */
 typedef struct lmap_loc_s {
-    ref_t               loop : 16;
     ref_t               ref  : 48;
+    ref_t               loop : 16;
 } lmap_loc_int_t;
 
 static inline lmap_loc_t
@@ -71,18 +71,24 @@ static inline lmap_loc_int_t
 get_location (const lmap_t *map, lmap_loc_t *start, ref_t k)
 {
     lmap_loc_int_t loc = {.loop = 0, .ref = 0};
-    if(start)
+    if (start)
         loc = e2i(*start);
     else
-        loc.ref = map->hash32((char*)&k, sizeof (ref_t), 0) & map->mask;
+        loc.ref = map->hash32 ((char*)&k, sizeof (ref_t), 0) & map->mask;
     return loc;
+}
+
+static inline ref_t
+rehash (ref_t h, ref_t v)
+{
+    return h + (primes[v & 511]<<BLOCK_LOG2);
 }
 
 lmap_loc_t
 lmap_iterate_from (const lmap_t *map, ref_t k, lmap_loc_t *start,
                    lmap_iterate_f cb, void *ctx)
 {
-    lmap_loc_int_t          loc = get_location(map, start, k);
+    lmap_loc_int_t          loc = get_location (map, start, k);
     while (1) {
         size_t              line_begin = ((uint64_t)loc.ref) & BLOCK_MASK;
         for (; loc.loop < BLOCK_SIZE; loc.loop++) {
@@ -97,7 +103,7 @@ lmap_iterate_from (const lmap_t *map, ref_t k, lmap_loc_t *start,
                 }
             }
         }
-        loc.ref = (loc.ref + (primes[loc.ref&~BLOCK_MASK]<<BLOCK_LOG2)) & map->mask;
+        loc.ref = rehash (loc.ref, k) & map->mask;
         loc.loop = 0;
     }
 }
@@ -105,7 +111,7 @@ lmap_iterate_from (const lmap_t *map, ref_t k, lmap_loc_t *start,
 lmap_loc_t
 lmap_lookup (const lmap_t *map, ref_t k, lattice_t l)
 {
-    lmap_loc_int_t          loc = get_location(map, NULL, k);
+    lmap_loc_int_t          loc = get_location (map, NULL, k);
     while (1) {
         size_t              line_begin = ((uint64_t)loc.ref) & BLOCK_MASK;
         for (; loc.loop < BLOCK_SIZE; loc.loop++) {
@@ -117,7 +123,7 @@ lmap_lookup (const lmap_t *map, ref_t k, lattice_t l)
                 return i2e (loc);
             loc.ref = ((loc.ref + 1) & ~BLOCK_MASK) | line_begin;
         }
-        loc.ref = (loc.ref + (primes[loc.ref&~BLOCK_MASK]<<BLOCK_LOG2)) & map->mask;
+        loc.ref = rehash (loc.ref, k) & map->mask;
         loc.loop = 0;
     }
 }
@@ -140,7 +146,7 @@ lmap_insert_from (const lmap_t *map, ref_t k, lattice_t l,
             }
             loc.ref = ((loc.ref + 1) & ~BLOCK_MASK) | block;
         }
-        loc.ref = (loc.ref + (primes[loc.ref&~BLOCK_MASK]<<BLOCK_LOG2)) & map->mask;
+        loc.ref = rehash (loc.ref, k) & map->mask;
         loc.loop = 0;
     }
 }
@@ -181,6 +187,9 @@ lmap_iterate (const lmap_t *map, ref_t k, lmap_iterate_f cb, void *ctx)
 lmap_t *
 lmap_create (size_t key_size, size_t data_size, int size)
 {
+    lmap_loc_int_t t1 = { .loop =0, .ref = 1 };
+    ref_t t2 = 1;
+    assert ( t2 == *(ref_t*)&t1 );
     assert (63 == key_size && 64 == data_size);
     lmap_t           *map = RTalign (CACHE_LINE_SIZE, sizeof (struct lmap_ll_s));
     map->key_size = sizeof (uint64_t);
