@@ -151,6 +151,7 @@ static lmap_t          *lmap;
 static dbs_stats_f      statistics;
 static dbs_get_f        get;
 static dbs_get_sat_f    get_sat_bit;
+static dbs_unset_sat_f  unset_sat_bit;
 static dbs_try_set_sat_f try_set_sat_bit;
 static dbs_inc_sat_bits_f   inc_sat_bits;
 static dbs_dec_sat_bits_f   dec_sat_bits;
@@ -402,6 +403,12 @@ static int
 global_has_color (ref_t ref, global_color_t color, int rec_bits)
 {
     return get_sat_bit (dbs, ref, rec_bits+count_bits+color.g);
+}
+
+static void
+global_unset_color (ref_t ref, global_color_t color, int rec_bits)
+{
+    unset_sat_bit (dbs, ref, rec_bits+count_bits+color.g);
 }
 
 static int //RED and BLUE are independent
@@ -825,6 +832,7 @@ init_globals (int argc, char *argv[])
         statistics = (dbs_stats_f) DBSLLstats;
         get = (dbs_get_f) DBSLLget;
         get_sat_bit = (dbs_get_sat_f) DBSLLget_sat_bit;
+        unset_sat_bit = (dbs_get_sat_f) DBSLLunset_sat_bit;
         try_set_sat_bit = (dbs_try_set_sat_f) DBSLLtry_set_sat_bit;
         inc_sat_bits = (dbs_inc_sat_bits_f) DBSLLinc_sat_bits;
         dec_sat_bits = (dbs_dec_sat_bits_f) DBSLLdec_sat_bits;
@@ -837,6 +845,7 @@ init_globals (int argc, char *argv[])
         get = (dbs_get_f) TreeDBSLLget;
         find_or_put = find_or_put_tree;
         dbs = TreeDBSLLcreate_dm (D, dbs_size, m, global_bits + count_bits);
+        unset_sat_bit = (dbs_get_sat_f) TreeDBSLLunset_sat_bit;
         get_sat_bit = (dbs_get_sat_f) TreeDBSLLget_sat_bit;
         try_set_sat_bit = (dbs_try_set_sat_f) TreeDBSLLtry_set_sat_bit;
         inc_sat_bits = (dbs_inc_sat_bits_f) TreeDBSLLinc_sat_bits;
@@ -2358,16 +2367,20 @@ ta_handle (void *arg, state_info_t *successor, transition_info_t *ti, int seen)
     ctx->last = TA_NONE;
     ctx->successor = successor;
     lmap_loc_t last = lmap_iterate (lmap, successor->ref, ta_covered, ctx);
+    while (!global_try_color(ctx->state.ref, GRED, 0)) {} //lock
     if (!ctx->done) {
         last = (TA_NONE == ctx->last ? last : ctx->last);
         successor->loc = lmap_insert_from (lmap, successor->ref,
                                         successor->lattice, TA_WAITING, &last);
+        global_unset_color (ctx->state.ref, GRED, 0); //unlock
         raw_data_t stack_loc = dfs_stack_push (ctx->stack, NULL);
         state_info_serialize (successor, stack_loc);
         if (trc_output)
             parent_ref[successor->ref] = ctx->state.ref;
         ctx->load++;
         ctx->counters.visited++;
+    } else {
+        global_unset_color (ctx->state.ref, GRED, 0); //unlock
     }
     ctx->counters.trans++;
     (void) ti; (void) seen;
@@ -2377,12 +2390,17 @@ static inline int
 is_waiting (wctx_t *ctx, raw_data_t state_data)
 {
     state_info_deserialize (&ctx->state, state_data, ctx->store);
-    if (TA_UPDATE_NONE != UPDATE &&
-        TA_WAITING != lmap_get(lmap, ctx->state.loc)->status) {
-        return 0;
+    while (!global_try_color(ctx->state.ref, GRED, 0)) {} //lock
+    int ret_val = 0;
+    if (TA_UPDATE_NONE == UPDATE ||
+        TA_WAITING == lmap_get(lmap, ctx->state.loc)->status) {
+        lmap_set (lmap, ctx->state.loc, TA_PASSED);
+        ret_val = 1;
+    } else {
+        ret_val = 0;
     }
-    lmap_set (lmap, ctx->state.loc, TA_PASSED);
-    return 1;
+    global_unset_color (ctx->state.ref, GRED, 0); //unlock
+    return ret_val;
 }
 
 static inline void
