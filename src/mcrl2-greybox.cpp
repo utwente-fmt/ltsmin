@@ -195,6 +195,31 @@ public:
         }
     }
 
+    int transition_in_group (label_vector const& labels, int group)
+    {
+        for (size_t i = 0; i < edge_label_count(); ++i) {
+            int mt = edge_label_type(i);
+            int pt = lts_type_get_edge_label_typeno (GBgetLTStype (model_), i);
+            int id = find_mcrl2_index (mt, pt, labels[i], readable_edge_labels);
+
+            std::string c;
+
+            if (!readable_edge_labels)
+                c = data_type(mt).serialize(id);
+            else
+                c = data_type(mt).print(id);
+
+            std::set<std::string> s = summand_action_names(group);
+
+            for (std::set<std::string>::iterator j = s.begin(); j != s.end(); ++j) {
+                if (c.find(*j) == std::string::npos)
+                    return 0;
+            }
+        }
+
+        return 1;
+    }
+
 private:
     static const int IDX_NOT_FOUND = -1;
     model_t model_;
@@ -330,6 +355,13 @@ MCRL2getTransitionsAll (model_t m, int* src, TransitionCB cb, void *ctx)
     return f.get_count();
 }
 
+static int
+MCRL2transitionInGroup (model_t m, int* labels, int group)
+{
+    ltsmin::pins *pins = reinterpret_cast<ltsmin::pins*>(GBgetContext (m));
+    return pins->transition_in_group(labels, group);
+}
+
 ltsmin::pins *pins;
 
 void
@@ -418,6 +450,7 @@ MCRL2loadGreyboxModel (model_t m, const char *model_name)
     GBsetStateLabelInfo (m, p_sl_info);
     GBsetNextStateLong (m, MCRL2getTransitionsLong);
     GBsetNextStateAll (m, MCRL2getTransitionsAll);
+    GBsetTransitionInGroup(m, MCRL2transitionInGroup);
 
     atexit(MCRL2exit);
 }
