@@ -172,6 +172,7 @@ static int              assert_index = -1;
 static size_t           G = 100;
 static size_t           H = MAX_HANDOFF_DEFAULT;
 static int              ZOBRIST = 0;
+static int              LATTICE_RATIO = 0;
 static int              UPDATE = 1;
 static ref_t           *parent_ref = NULL;
 static state_data_t     initial_data;
@@ -308,6 +309,8 @@ static struct poptOption options[] = {
      0, "maximum balancing handoff (handoff=min(max, stack_size/2))", NULL},
     {"zobrist", 'z', POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &ZOBRIST,
      0,"log2 size of zobrist random table (6 or 8 is good enough; 0 is no zobrist)", NULL},
+    {"lattice-ratio", 'l', POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &LATTICE_RATIO,
+      0,"log2 ratio between symbolic states and explicit states", NULL},
     {"update", 'u', POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &UPDATE,
       0,"cover update strategy: 0 = simple, 1 = update waiting, 2 = update passed (may break traces).", NULL},
     {"grey", 0, POPT_ARG_VAL, &call_mode, UseGreyBox, "make use of GetTransitionsLong calls", NULL},
@@ -455,6 +458,8 @@ typedef struct counter_s {
     size_t              exit;           // recursive ndfss
     mytimer_t           timer;
     double              time;
+    size_t              deletes;        // lattice deletes
+    size_t              updates;        // lattice updates
 } counter_t;
 
 typedef struct thread_ctx_s wctx_t;
@@ -817,7 +822,7 @@ init_globals (int argc, char *argv[])
     Warning (info, "Global bits: %d, count bits: %d, local bits: %d.",
              global_bits, count_bits, local_bits);
 
-    lmap_size = dbs_size + 2;
+    lmap_size = dbs_size + LATTICE_RATIO;
     lmap = lmap_create (63, 64, lmap_size);
     switch (db_type) {
     case UseDBSLL:
@@ -832,7 +837,7 @@ init_globals (int argc, char *argv[])
         statistics = (dbs_stats_f) DBSLLstats;
         get = (dbs_get_f) DBSLLget;
         get_sat_bit = (dbs_get_sat_f) DBSLLget_sat_bit;
-        unset_sat_bit = (dbs_get_sat_f) DBSLLunset_sat_bit;
+        unset_sat_bit = (dbs_unset_sat_f) DBSLLunset_sat_bit;
         try_set_sat_bit = (dbs_try_set_sat_f) DBSLLtry_set_sat_bit;
         inc_sat_bits = (dbs_inc_sat_bits_f) DBSLLinc_sat_bits;
         dec_sat_bits = (dbs_dec_sat_bits_f) DBSLLdec_sat_bits;
@@ -845,7 +850,7 @@ init_globals (int argc, char *argv[])
         get = (dbs_get_f) TreeDBSLLget;
         find_or_put = find_or_put_tree;
         dbs = TreeDBSLLcreate_dm (D, dbs_size, m, global_bits + count_bits);
-        unset_sat_bit = (dbs_get_sat_f) TreeDBSLLunset_sat_bit;
+        unset_sat_bit = (dbs_unset_sat_f) TreeDBSLLunset_sat_bit;
         get_sat_bit = (dbs_get_sat_f) TreeDBSLLget_sat_bit;
         try_set_sat_bit = (dbs_try_set_sat_f) TreeDBSLLtry_set_sat_bit;
         inc_sat_bits = (dbs_inc_sat_bits_f) TreeDBSLLinc_sat_bits;
@@ -1023,11 +1028,14 @@ print_statistics (counter_t *ar_reach, counter_t *ar_red, mytimer_t timer,
         		 	 "Transitions: %zu\nDeadlocks: %zu\nAssertion errors: %zu\nWaits: %zu\nRec. calls: %zu\n\n"
                  "Database:\nElements: %zu\nNodes: %zu\nMisses: %zu\nEq. tests: %zu\nRehashes: %zu\n\n"
                  "Memory:\nQueue: %.1f MB\nDB: %.1f MB\nDB alloc.: %.1f MB\nColors: %.1f MB\n\n"
-                 "Load balancer:\nSplits: %zu\nLoad transfer: %zu",
-                 tot, reach->runtime, reach->explored, reach->trans, reach->deadlocks, reach->errors, red->waits, reach->rec,
+                 "Load balancer:\nSplits: %zu\nLoad transfer: %zu\n\n"
+                 "Lattice MAP:\nRatio: %.2f\nUpdates: %zu\nDeletes: %zu",
+                 tot, reach->runtime, reach->explored, reach->trans, reach->deadlocks,
+                        reach->errors, red->waits, reach->rec,
                  db_elts, db_nodes, stats->misses, stats->tests, stats->rehashes,
                  mem1, mem4, mem2, mem3,
-                 reach->splits, reach->transfer);
+                 reach->splits, reach->transfer,
+                 ((double)reach->explored/db_elts), reach->updates, reach->deletes);
     }
 }
 
@@ -2360,7 +2368,7 @@ ta_covered (void *arg, lmap_store_t *stored, lmap_loc_t loc)
             GBisCoveredByShort(ctx->model, (int*)&stored->lattice, succ_l)) {
         lmap_delete (lmap, loc);
         ctx->last = (TA_NONE == ctx->last ? loc : ctx->last);
-        ctx->red.waits++;
+        ctx->counters.deletes++;
     }
     return LMAP_CB_NEXT;
 }
@@ -2383,6 +2391,7 @@ ta_handle (void *arg, state_info_t *successor, transition_info_t *ti, int seen)
         state_info_serialize (successor, stack_loc);
         if (trc_output)
             parent_ref[successor->ref] = ctx->state.ref;
+        ctx->counters.updates += TA_NONE != ctx->last;
         ctx->load++;
         ctx->counters.visited++;
     } else {
