@@ -1248,7 +1248,7 @@ permute_trans (permute_t *perm, state_info_t *state, perm_cb_f cb, void *ctx)
     perm->nstored = perm->start_group_index = 0;
     int v[N];
     int count;
-    if (Strat_TA & strategy[0]) {
+    if ((Strat_TA & strategy[0]) && (refs || UseTreeDBSLL==db_type)) {
         memcpy (v, state->data, D<<2);
         ((lattice_t*)(v + D))[0] = state->lattice;
         count = GBgetTransitionsAll (perm->model, v, permute_one, perm);
@@ -1367,19 +1367,22 @@ state_info_serialize (state_info_t *state, raw_data_t data)
         ((uint32_t*)data)[0] = state->hash32;
         data++;
     }
+    if (refs) {
+        ((ref_t*)data)[0] = state->ref;
+        data += 2;
+    } else if ( UseDBSLL==db_type ) {
+        ((ref_t*)data)[0] = state->ref;
+        data += 2;
+        memcpy (data, state->data, (SLOT_SIZE * D));
+        data += D;
+    } else { // UseTreeDBSLL
+        memcpy (data, state->tree, (2 * SLOT_SIZE * D));
+        data += D<<1;
+    }
     if (Strat_TA & strategy[0]) {
         ((lattice_t*)data)[0] = state->lattice;
         data += 2;
         ((lmap_loc_t*)data)[0] = state->loc;
-        data += 2;
-    }
-    if (refs) {
-        ((ref_t*)data)[0] = state->ref;
-    } else if ( UseDBSLL==db_type ) {
-        ((ref_t*)(data+N))[0] = state->ref;
-        memcpy (data, state->data, (SLOT_SIZE * D));
-    } else { // UseTreeDBSLL
-        memcpy (data, state->tree, (2 * SLOT_SIZE * D));
     }
 }
 
@@ -1393,28 +1396,31 @@ state_info_deserialize (state_info_t *state, raw_data_t data, state_data_t store
         state->hash32 = ((uint32_t*)data)[0];
         data++;
     }
-    if (Strat_TA & strategy[0]) {
-        state->lattice = ((lattice_t*)data)[0];
-        data += 2;
-        state->loc = ((lmap_loc_t*)data)[0];
-        data += 2;
-    }
     if (refs) {
         state->ref  = ((ref_t*)data)[0];
-        state->data = data = get (dbs, state->ref, store);
+        data += 2;
+        state->data = get (dbs, state->ref, store);
         if (UseTreeDBSLL == db_type) {
-            state->tree = data;
-            state->data = TreeDBSLLdata (dbs, data);
+            state->tree = state->data;
+            state->data = TreeDBSLLdata (dbs, state->data);
         }
     } else {
         if (UseDBSLL == db_type) {
-            state->ref  = ((ref_t*)(data+N))[0];
+            state->ref  = ((ref_t*)data)[0];
+            data += 2;
             state->data = data;
+            data += D;
         } else { // UseTreeDBSLL == db_type
             state->tree = data;
             state->data = TreeDBSLLdata (dbs, data);
             state->ref  = TreeDBSLLindex (data);
+            data += D<<1;
         }
+    }
+    if (Strat_TA & strategy[0]) {
+        state->lattice = ((lattice_t*)data)[0];
+        data += 2;
+        state->loc = ((lmap_loc_t*)data)[0];
     }
 }
 
@@ -1426,13 +1432,13 @@ state_info_deserialize_cheap (state_info_t *state, raw_data_t data)
         state->hash32 = ((uint32_t*)data)[0];
         data++;
     }
+    state->ref  = ((ref_t*)data)[0];
+    data += 2;
     if (Strat_TA & strategy[0]) {
         state->lattice = ((lattice_t*)data)[0];
         data += 2;
         state->loc = ((lmap_loc_t*)data)[0];
-        data += 2;
     }
-    state->ref  = ((ref_t*)data)[0];
 }
 
 static void *
