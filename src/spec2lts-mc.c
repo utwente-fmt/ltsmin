@@ -2519,6 +2519,7 @@ wctx_init (wctx_t *ctx)
 }
 
 /* explore is started for each thread (worker) */
+static pthread_mutex_t mutex;
 static void *
 explore (void *args)
 {
@@ -2529,8 +2530,11 @@ explore (void *args)
     snprintf (lbl, sizeof (char[20]), W>1?"%s[%zu]":"%s", program, ctx->id);
     set_label (lbl);    // register print label and load model
 
-    if (NULL == ctx->model)
+    if (NULL == ctx->model) {
+        pthread_mutex_lock (&mutex);
         ctx->model = get_model (0);
+        pthread_mutex_unlock (&mutex);
+    }
     wctx_init (ctx);
     transition_info_t   ti = GB_NO_TRANSITION;
     state_info_initialize (&initial_state, initial_data, &ti, &ctx->state, ctx);
@@ -2557,6 +2561,7 @@ main (int argc, char *argv[])
 {
     /* Init structures */
     init_globals (argc, argv);
+    pthread_mutex_init (&mutex, NULL);
 
     /* Start workers */
     mytimer_t           timer = SCCcreateTimer ();
