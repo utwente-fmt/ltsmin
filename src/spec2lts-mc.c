@@ -174,6 +174,7 @@ static size_t           H = MAX_HANDOFF_DEFAULT;
 static int              ZOBRIST = 0;
 static int              LATTICE_RATIO = 0;
 static int              UPDATE = 1;
+static int              BACKOFF = 0;
 static ref_t           *parent_ref = NULL;
 static state_data_t     initial_data;
 static state_info_t     initial_state;
@@ -314,6 +315,7 @@ static struct poptOption options[] = {
     {"update", 'u', POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &UPDATE,
       0,"cover update strategy: 0 = simple, 1 = update waiting, 2 = update passed (may break traces).", NULL},
     {"grey", 0, POPT_ARG_VAL, &call_mode, UseGreyBox, "make use of GetTransitionsLong calls", NULL},
+    {"backoff", 'b', POPT_ARG_VAL, &BACKOFF, 0, "Backoff algorithm for TA exploration", NULL},
     {"ref", 0, POPT_ARG_VAL, &refs, 1, "store references on the stack/queue instead of full states", NULL},
     {"max", 0, POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &max, 0, "maximum search depth", "<int>"},
     {"deadlock", 'd', POPT_ARG_VAL, &dlk_detect, 1, "detect deadlocks", NULL },
@@ -460,6 +462,7 @@ typedef struct counter_s {
     double              time;
     size_t              deletes;        // lattice deletes
     size_t              updates;        // lattice updates
+    size_t              delayed;        // lattice backoff delays
 } counter_t;
 
 typedef struct thread_ctx_s wctx_t;
@@ -490,6 +493,7 @@ struct thread_ctx_s {
     ref_t               work;           // ENDFS work for loadbalancer
     int                 done;           // ENDFS done for loadbalancer
     lmap_loc_t          last;           // TA last tombstone location
+    dfs_stack_t         backoff;        // Backoff stack (for TA)
 };
 
 /* predecessor --(transition_info)--> successor */
@@ -651,10 +655,12 @@ wctx_create (size_t id, int depth, wctx_t *shared)
     ctx->store2 = RTalignZero (CACHE_LINE_SIZE, SLOT_SIZE * N * 2);
     ctx->stack = dfs_stack_create (state_info_int_size());
     ctx->out_stack = ctx->in_stack = ctx->stack;
-    if (strategy[depth] & (Strat_BFS | Strat_ENDFS | Strat_CNDFS | Strat_TA))
+    if (strategy[depth] & (Strat_BFS | Strat_ENDFS | Strat_CNDFS | Strat_TA_BFS))
         ctx->in_stack = dfs_stack_create (state_info_int_size());
     if (strategy[depth] & (Strat_CNDFS)) //third stack for accepting states
         ctx->out_stack = dfs_stack_create (state_info_int_size());
+    if (strategy[depth] & (Strat_TA))
+        ctx->backoff = dfs_stack_create (state_info_int_size());
     //allocate two bits for NDFS colorings
     if (strategy[depth] & Strat_LTL) {
         size_t local_bits = 2;
@@ -690,13 +696,15 @@ wctx_free (wctx_t *ctx, int depth)
             bitvector_free (&ctx->all_red);
         }
     }
+    if (strategy[depth] & (Strat_TA))
+        dfs_stack_destroy (ctx->backoff);
     if (NULL != ctx->group_stack)
         isba_destroy (ctx->group_stack);
     //if (strategy[depth] & (Strat_BFS | Strat_ENDFS | Strat_CNDFS))
     //    dfs_stack_destroy (ctx->in_stack);
     if (strategy[depth] & (Strat_CNDFS))
         dfs_stack_destroy (ctx->stack); 
-    if (strategy[depth] ==  (Strat_BFS | Strat_ENDFS | Strat_TA))
+    if (strategy[depth] ==  (Strat_BFS | Strat_ENDFS | Strat_TA_BFS))
         dfs_stack_destroy (ctx->in_stack);
     if (NULL != ctx->permute)
         permute_free (ctx->permute);
@@ -1029,13 +1037,13 @@ print_statistics (counter_t *ar_reach, counter_t *ar_red, mytimer_t timer,
                  "Database:\nElements: %zu\nNodes: %zu\nMisses: %zu\nEq. tests: %zu\nRehashes: %zu\n\n"
                  "Memory:\nQueue: %.1f MB\nDB: %.1f MB\nDB alloc.: %.1f MB\nColors: %.1f MB\n\n"
                  "Load balancer:\nSplits: %zu\nLoad transfer: %zu\n\n"
-                 "Lattice MAP:\nRatio: %.2f\nUpdates: %zu\nDeletes: %zu",
+                 "Lattice MAP:\nRatio: %.2f\nUpdates: %zu\nDeletes: %zu\nDelayed: %zu",
                  tot, reach->runtime, reach->explored, reach->trans, reach->deadlocks,
                         reach->errors, red->waits, reach->rec,
                  db_elts, db_nodes, stats->misses, stats->tests, stats->rehashes,
                  mem1, mem4, mem2, mem3,
                  reach->splits, reach->transfer,
-                 ((double)reach->explored/db_elts), reach->updates, reach->deletes);
+                 ((double)reach->explored/db_elts), reach->updates, reach->deletes, reach->delayed);
     }
 }
 
@@ -2405,6 +2413,11 @@ static inline int
 is_waiting (wctx_t *ctx, raw_data_t state_data)
 {
     state_info_deserialize (&ctx->state, state_data, ctx->store);
+    if (BACKOFF && !global_try_color(ctx->state.ref, GRED, 0)) {
+        dfs_stack_push (ctx->backoff, state_data);
+        ctx->load++;
+        return 0;
+    }
     while (!global_try_color(ctx->state.ref, GRED, 0)) {} //lock
     int ret_val = 0;
     if (TA_UPDATE_NONE == UPDATE ||
@@ -2445,8 +2458,17 @@ ta_dfs (wctx_t *ctx, size_t work)
                 ctx->load--;
             }
         } else {
-            if (0 == dfs_stack_nframes (ctx->stack))
-                return;
+            if (0 == dfs_stack_size (ctx->stack)) {
+                if (0 == dfs_stack_frame_size (ctx->backoff)) {
+                    return;
+                } else {
+                    while (0 != dfs_stack_frame_size (ctx->backoff)) {
+                        dfs_stack_push (ctx->stack, dfs_stack_pop(ctx->backoff));
+                        ctx->counters.delayed++;
+                    }
+                    continue;
+                }
+            }
             dfs_stack_leave (ctx->stack);
             ctx->counters.level_cur--;
             dfs_stack_pop (ctx->stack);
@@ -2467,8 +2489,17 @@ ta_bfs (wctx_t *ctx, size_t work)
                 ta_explore_state (ctx);
             }
         } else {
-            if (0 == dfs_stack_frame_size (ctx->out_stack))
-                return;
+            if (0 == dfs_stack_frame_size (ctx->out_stack)) {
+                if (0 == dfs_stack_frame_size (ctx->backoff)) {
+                    return;
+                } else {
+                    while (0 != dfs_stack_frame_size (ctx->backoff)) {
+                        dfs_stack_push (ctx->in_stack, dfs_stack_pop(ctx->backoff));
+                        ctx->counters.delayed++;
+                    }
+                    continue;
+                }
+            }
             dfs_stack_t     old = ctx->out_stack;
             ctx->stack = ctx->out_stack = ctx->in_stack;
             ctx->in_stack = old;
