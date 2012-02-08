@@ -1402,13 +1402,13 @@ directed(sat_proc_t sat_proc, reach_proc_t reach_proc, vset_t visited,
     sat_proc(reach_proc, visited, &reach_groups, &eg_count, &next_count);
 
     for (int i = initial_count; i < total_count; i++) {
-        Warning(info, "Extending action search with one group");
+        Warning(info, "Extending action search with group %d", group_order[i]);
         bitvector_set(&reach_groups, group_order[i]);
         sat_proc(reach_proc, visited, &reach_groups, &eg_count, &next_count);
     }
 
-    if (etf_output != NULL) {
-        Warning(info, "Continuing exploration for etf construction");
+    if (etf_output != NULL || dlk_detect) {
+        Warning(info, "Continuing for etf output or deadlock detection");
 
         for(int i = 0; i < nGrps; i++)
             bitvector_set(&reach_groups, i);
