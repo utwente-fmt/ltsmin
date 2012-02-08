@@ -900,12 +900,19 @@ initialize_levels(bitvector_t *groups, int *empty_groups, int *back,
 
     // level[i] = first '+' in row (highest in BDD) of group i
     // recast 0 .. N - 1 down to equal groups 0 .. (N - 1) / sat_granularity
-    for (int i = 0; i < nGrps; i++)
-        for (int j = 0; j < N; j++)
+    for (int i = 0; i < nGrps; i++) {
+        level[i] = -1;
+
+        for (int j = 0; j < N; j++) {
             if (dm_is_set(GBgetDMInfo(model), i, j)) {
                 level[i] = (N - j - 1) / sat_granularity;
                 break;
             }
+        }
+
+        if (level[i] == -1)
+            level[i] = 0;
+    }
 
     for (int i = 0; i < nGrps; i++)
         bitvector_set(&groups[level[i]], i);

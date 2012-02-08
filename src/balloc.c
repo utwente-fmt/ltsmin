@@ -22,13 +22,11 @@ allocater_t BAcreate(size_t element_size,size_t block_size){
 	if (element_size<sizeof(void*)) {
 		Abort("element size less than pointer size");
 	}
-	allocater_t a = (allocater_t)malloc(sizeof(struct block_allocator));
-	if (a!=NULL) {
-		a->element_size=element_size;
-		a->block_size=block_size;
-		a->block_list=NULL;
-		a->free_list=NULL;
-	}
+	allocater_t a = RT_NEW(struct block_allocator);
+	a->element_size=element_size;
+	a->block_size=block_size;
+	a->block_list=NULL;
+	a->free_list=NULL;
 	a->ref_count=1;
 	return a;
 }

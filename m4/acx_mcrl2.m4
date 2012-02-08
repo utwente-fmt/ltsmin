@@ -24,9 +24,11 @@ esac
 if test x"$acx_mcrl2" = xyes; then
     AC_LANG_PUSH([C++])
     AC_CHECK_SIZEOF([void *])
-    if test x"$ac_cv_sizeof_void_p" = x8; then
-        MCRL2_PINS_CPPFLAGS="-DAT_64BIT"
-    fi
+    case "$ac_cv_sizeof_void_p" in
+      4) MCRL2_PINS_CPPFLAGS="-DAT_32BIT" ;;
+      8) MCRL2_PINS_CPPFLAGS="-DAT_64BIT" ;;
+      *) AC_MSG_FAILURE([can only compile mCRL2 on 32- and 64-bit machines.]) ;;
+    esac
     AC_SUBST(MCRL2_PINS_CPPFLAGS, ["$MCRL2_PINS_CPPFLAGS -I$with_mcrl2/include"])
     AC_SUBST(MCRL2_PINS_LDFLAGS,  ["-L${with_mcrl2}/lib/mcrl2"])
     AC_SUBST(MCRL2_LIBS, [""])

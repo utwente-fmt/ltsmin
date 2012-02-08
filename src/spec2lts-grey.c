@@ -36,7 +36,7 @@ static uint32_t *parent_ofs=NULL;
 static treedbs_t dbs=NULL;
 static int write_lts;
 static int write_state=0;
-static size_t max = UINT_MAX;
+static size_t max = SIZE_MAX;
 
 typedef enum { UseGreyBox , UseBlackBox } box_mode_t;
 static box_mode_t call_mode=UseBlackBox;
@@ -1121,7 +1121,7 @@ ndfs_vset_blue(model_t model, int* src, size_t *o_depth)
 static void
 ndfs_explore (model_t model, int *src, size_t *o_depth)
 {
-    if (max != UINT_MAX) Fatal(1, error, "undefined behaviour for max with NDFS");
+    if (max != SIZE_MAX) Fatal(1, error, "undefined behaviour for max with NDFS");
     switch (state_db) {
     case DB_Vset:
         // vset ndfs_cyan, ndfs_blue, ndfs_red
@@ -1276,7 +1276,7 @@ static void
 scc_explore (model_t model, int *src, size_t *o_depth)
 {
     // adding test in scc_remove and bailing out when scc_dfsnum[idx] == 0 should be enought to fix max param
-    if (max != UINT_MAX) Fatal(1, error, "undefined behaviour for max with SCC");
+    if (max != SIZE_MAX) Fatal(1, error, "undefined behaviour for max with SCC");
     switch (state_db) {
     case DB_Vset:
         Fatal(1, error, "scc not implemented for vset");
