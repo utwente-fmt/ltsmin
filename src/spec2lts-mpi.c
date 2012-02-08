@@ -432,7 +432,8 @@ int main(int argc, char*argv[]){
 	 */
 	if (nice_value) {
 		if (mpi_me==0) Warning(info,"setting nice to %d\n",nice_value);
-		nice(nice_value);
+		int rv = nice(nice_value);
+		if (rv==-1) Warning(info, "failed to set nice\n");
 	}
 	/***************************************************/
 	if (find_dlk) {
