@@ -15,7 +15,6 @@
 
 extern "C" {
 #include <assert.h>
-#include <limits.h>
 #include <popt.h>
 
 #include <mcrl2-greybox.h>
@@ -29,6 +28,8 @@ static std::string mcrl2_rewriter_strategy = "jittyc";
 static std::string mcrl2_rewriter_strategy = "jitty";
 #endif
 static char const* mcrl2_args = "";
+static int         finite_types = 0;
+static int         readable_edge_labels = 0;
 
 namespace ltsmin {
 
@@ -74,7 +75,7 @@ public:
         for (size_t i = 0; i < edge_label_count(); ++i) {
             int mt = edge_label_type (i);
             int pt = lts_type_get_edge_label_typeno (GBgetLTStype (model_), i);
-            dst[i] = find_pins_index (mt, pt, src[i]);
+            dst[i] = find_pins_index (mt, pt, src[i], readable_edge_labels);
         }
     }
 
@@ -87,9 +88,10 @@ public:
         }
     }
 
-    inline int find_pins_index (int mt, int pt, int idx)
+    inline int find_pins_index (int mt, int pt, int idx, int pretty = 0)
     {
-        switch (lts_type_get_format (GBgetLTStype (model_),pt)){
+        data_format_t format = lts_type_get_format (GBgetLTStype (model_), pt);
+        switch (format){
         case LTStypeDirect:
         case LTStypeRange:
             return idx;
@@ -102,16 +104,27 @@ public:
         if (it != rmap_[mt].end())
             return it->second;
 
-        std::string c = data_type(mt).serialize(idx);
-        int pidx = GBchunkPut (model_, pt, chunk_str(const_cast<char*>(c.c_str())));
-        map_[mt].resize (pidx+1, IDX_NOT_FOUND);
+        std::string c;
+
+        if (!pretty)
+            c = data_type(mt).serialize(idx);
+        else
+            c = data_type(mt).print(idx);
+
+        if (finite_types && format == LTStypeEnum)
+            Abort("lookup of %s failed", c.c_str());
+
+        int pidx = GBchunkPut (model_, pt,
+                               chunk_str(const_cast<char*>(c.c_str())));
+        map_[mt].resize (pidx + 1, IDX_NOT_FOUND);
         map_[mt][pidx] = idx;
         return rmap_[mt][idx] = pidx;
     }
 
-    inline int find_mcrl2_index (int mt, int pt, int idx)
+    inline int find_mcrl2_index (int mt, int pt, int idx, int pretty = 0)
     {
-        switch (lts_type_get_format (GBgetLTStype (model_),pt)){
+        data_format_t format = lts_type_get_format (GBgetLTStype (model_), pt);
+        switch (format) {
         case LTStypeDirect:
         case LTStypeRange:
             return idx;
@@ -120,18 +133,91 @@ public:
             break;
         }
 
-        if (idx < static_cast<ssize_t>(map_[mt].size()) && map_[mt][idx] != IDX_NOT_FOUND)
+        if (idx < static_cast<ssize_t>(map_[mt].size())
+            && map_[mt][idx] != IDX_NOT_FOUND)
             return map_[mt][idx];
 
         chunk c = GBchunkGet (model_, pt, idx);
-        if (c.len == 0) {
+        if (c.len == 0)
             Abort ("lookup of %d failed", idx);
-        }
+
         std::string s = std::string(reinterpret_cast<char*>(c.data), c.len);
-        int midx = data_type(mt).deserialize (s);
+
+        if (finite_types && format == LTStypeEnum)
+            Abort ("lookup of %s failed", s.c_str());
+
+        int midx;
+
+        if (!pretty)
+            midx = data_type(mt).deserialize(s);
+        else
+            midx = data_type(mt).parse(s);
+
         rmap_[mt][midx] = idx;
         map_[mt].resize (idx+1, IDX_NOT_FOUND);
         return map_[mt][idx] = midx;
+    }
+
+    void populate_type_index(int mt, int pt, int pretty = 0)
+    {
+        switch (lts_type_get_format (GBgetLTStype (model_), pt)) {
+        case LTStypeDirect:
+        case LTStypeRange:
+            return; // Direct and range types are automatically prefilled
+        case LTStypeChunk:
+            return; // Chunk types cannot be prefilled
+        case LTStypeEnum:
+            break;
+        }
+
+        std::vector<std::string> values
+            = data_type(mt).generate_values(std::numeric_limits<std::size_t>::max());
+        std::vector<std::string>::const_iterator i;
+
+        for (i = values.begin(); i != values.end(); ++i) {
+            int midx;
+
+            if (!pretty)
+                midx = data_type(mt).deserialize(*i);
+            else
+                midx = data_type(mt).parse(*i);
+
+            std::map<int,int>::iterator it = rmap_[mt].find(midx);
+            if (it != rmap_[mt].end())
+                continue;
+
+            int pidx = GBchunkPut(model_, pt,
+                                  chunk_str(const_cast<char*>((*i).c_str())));
+
+            map_[mt].resize (pidx + 1, IDX_NOT_FOUND);
+            map_[mt][pidx] = midx;
+            rmap_[mt][midx] = pidx;
+        }
+    }
+
+    int transition_in_group (label_vector const& labels, int group)
+    {
+        for (size_t i = 0; i < edge_label_count(); ++i) {
+            int mt = edge_label_type(i);
+            int pt = lts_type_get_edge_label_typeno (GBgetLTStype (model_), i);
+            int id = find_mcrl2_index (mt, pt, labels[i], readable_edge_labels);
+
+            std::string c;
+
+            if (!readable_edge_labels)
+                c = data_type(mt).serialize(id);
+            else
+                c = data_type(mt).print(id);
+
+            std::set<std::string> s = summand_action_names(group);
+
+            for (std::set<std::string>::iterator j = s.begin(); j != s.end(); ++j) {
+                if (c.find(*j) == std::string::npos)
+                    return 0;
+            }
+        }
+
+        return 1;
     }
 
 private:
@@ -154,7 +240,8 @@ struct state_cb
         : pins(pins_), cb(cb_), ctx(ctx_), count(0)
     {}
 
-    void operator()(state_vector const& next_state, label_vector const& edge_labels, int group = -1)
+    void operator()(state_vector const& next_state,
+                    label_vector const& edge_labels, int group = -1)
     {
         int lbl[pins->edge_label_count()];
         pins->make_pins_edge_labels(edge_labels, lbl);
@@ -194,8 +281,10 @@ mcrl2_popt (poptContext con, enum poptCallbackReason reason,
         const char *opt_rewriter = mcrl2_rewriter_strategy.c_str();
         int opt_verbosity = 0;
         struct poptOption options[] = {
-            { "rewriter", 'r' , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &opt_rewriter , 0 , "select rewriter: jittyc, jitty, ..." , NULL },
-            { "verbose" , 'v' , POPT_ARG_INT , &opt_verbosity , 1 , "increase verbosity", "INT" },
+            { "rewriter", 'r', POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT,
+              &opt_rewriter, 0, "select rewriter: jittyc, jitty, ...", NULL },
+            { "verbose", 'v', POPT_ARG_INT, &opt_verbosity, 1,
+              "increase verbosity", "INT" },
             POPT_AUTOHELP
             POPT_TABLEEND
         };
@@ -207,13 +296,15 @@ mcrl2_popt (poptContext con, enum poptCallbackReason reason,
                    poptBadOption (optCon, POPT_BADOPTION_NOALIAS),
                    poptStrerror (res));
         } else if (poptPeekArg (optCon) != NULL) {
-            Abort ("Unknown mcrl2 option %s (try --mcrl2=--help)", poptPeekArg (optCon));
+            Abort ("Unknown mcrl2 option %s (try --mcrl2=--help)",
+                   poptPeekArg (optCon));
         }
         poptFreeContext(optCon);
         mcrl2_rewriter_strategy = std::string(opt_rewriter);
         GBregisterLoader("lps",MCRL2loadGreyboxModel);
         if (opt_verbosity > 0) {
-            Warning(info, "increasing mcrl2 verbosity level by %d", opt_verbosity);
+            Warning(info, "increasing mcrl2 verbosity level by %d",
+                    opt_verbosity);
             mcrl2_log_level_t level = static_cast<mcrl2_log_level_t>(static_cast<size_t>(mcrl2_logger::get_reporting_level()) + opt_verbosity);
             mcrl2_logger::set_reporting_level (level);
         }
@@ -227,8 +318,10 @@ mcrl2_popt (poptContext con, enum poptCallbackReason reason,
 }
 
 struct poptOption mcrl2_options[] = {
-    { NULL, 0 , POPT_ARG_CALLBACK|POPT_CBFLAG_POST|POPT_CBFLAG_SKIPOPTION , (void*)mcrl2_popt , 0 , NULL , NULL},
-    { "mcrl2" , 0 , POPT_ARG_STRING , &mcrl2_args , 0, "Pass options to the mcrl2 library.","<mcrl2 options>" },
+    { NULL, 0, POPT_ARG_CALLBACK|POPT_CBFLAG_POST|POPT_CBFLAG_SKIPOPTION, (void*)mcrl2_popt, 0 , NULL , NULL},
+    { "mcrl2", 0, POPT_ARG_STRING, &mcrl2_args, 0, "pass options to the mCRL2 library", "<mCRL2 options>" },
+    { "mcrl2-finite-types", 0, POPT_ARG_VAL, &finite_types, 1, "use mCRL2 finite type information", NULL },
+    { "mcrl2-readable-edge-labels", 0, POPT_ARG_VAL, &readable_edge_labels, 1, "use human readable edge labels", NULL },
     POPT_TABLEEND
 };
 
@@ -262,6 +355,13 @@ MCRL2getTransitionsAll (model_t m, int* src, TransitionCB cb, void *ctx)
     return f.get_count();
 }
 
+static int
+MCRL2transitionInGroup (model_t m, int* labels, int group)
+{
+    ltsmin::pins *pins = reinterpret_cast<ltsmin::pins*>(GBgetContext (m));
+    return pins->transition_in_group(labels, group);
+}
+
 ltsmin::pins *pins;
 
 void
@@ -282,7 +382,11 @@ MCRL2loadGreyboxModel (model_t m, const char *model_name)
 
     // create ltsmin type for each mcrl2-provided type
     for(size_t i = 0; i < pins->datatype_count(); ++i) {
-        lts_type_add_type(ltstype, pins->data_type(i).name().c_str(), NULL);
+        std::string n = pins->data_type(i).name();
+        if (pins->data_type(i).is_bounded())
+            lts_type_put_type(ltstype, n.c_str(), LTStypeEnum, NULL);
+        else
+            lts_type_put_type(ltstype, n.c_str(), LTStypeChunk, NULL);
     }
 
     // process parameters
@@ -299,6 +403,14 @@ MCRL2loadGreyboxModel (model_t m, const char *model_name)
     }
 
     GBsetLTStype(m,ltstype);
+
+    for(size_t i = 0; i < pins->datatype_count(); ++i) {
+        if (finite_types && pins->data_type(i).is_bounded()) {
+            std::string n = pins->data_type(i).name();
+            int pt = lts_type_put_type(ltstype, n.c_str(), LTStypeEnum, NULL);
+            pins->populate_type_index(i, pt);
+        }
+    }
 
     int s0[pins->process_parameter_count()];
     ltsmin::pins::state_vector p_s0 = s0;
@@ -338,6 +450,7 @@ MCRL2loadGreyboxModel (model_t m, const char *model_name)
     GBsetStateLabelInfo (m, p_sl_info);
     GBsetNextStateLong (m, MCRL2getTransitionsLong);
     GBsetNextStateAll (m, MCRL2getTransitionsAll);
+    GBsetTransitionInGroup(m, MCRL2transitionInGroup);
 
     atexit(MCRL2exit);
 }

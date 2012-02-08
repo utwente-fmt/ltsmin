@@ -137,6 +137,23 @@ group_state_labels_all(model_t self, int *state, int *labels)
     return GBgetStateLabelsAll(parent, oldstate, labels);
 }
 
+static int
+group_transition_in_group (model_t self, int* labels, int group)
+{
+    group_context_t  ctx    = (group_context_t)GBgetContext (self);
+    model_t          parent = GBgetParent (self);
+    int              begin  = ctx->transbegin[group];
+    int              end    = ctx->transbegin[group + 1];
+
+    for (int i = begin; i < end; i++) {
+        int g = ctx->transmap[i];
+        if (GBtransitionInGroup(parent, labels, g))
+            return 1;
+    }
+
+    return 0;
+}
+
 int
 max_row_first (matrix_t *m, int rowa, int rowb)
 {
@@ -379,6 +396,7 @@ GBregroup (model_t model, const char *regroup_spec)
     GBsetStateLabelShort (group, group_state_labels_short);
     GBsetStateLabelLong (group, group_state_labels_long);
     GBsetStateLabelsAll (group, group_state_labels_all);
+    GBsetTransitionInGroup (group, group_transition_in_group);
 
     GBinitModelDefaults (&group, model);
 

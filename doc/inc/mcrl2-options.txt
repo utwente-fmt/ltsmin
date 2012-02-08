@@ -1,10 +1,25 @@
-=== mcrl2 Options
+=== mCRL2 Options
 
 
 *--mcrl2*='OPTIONS'::
-	Set options of the mcrl2 language module.
+	Pass options to the mCRL2 library.
         Defaults to "+--rewriter=jittyc+".
 +
 The "+--rewriter=<rewriter>+" option is the only recognized option.
-Possible rewriters are +jitty+, +jittyc+, +inner+ and +innerc+.
+Possible rewriters are +jitty+ and +jittyc+.
+
+*--mcrl2-finite-types*::
+	Use mCRL2 finite type information.
++
+Enabling this option may cause premature termination in case non-normal-form
+instances of finite types occur in the state space. This will be the case,
+e.g., when the specification has been pre-processed using
+manpage:lpsparunfold[1].
+
+*--mcrl2-readable-edge-labels*::
+	Use human readable edge labels.
++
+Enabling this option may cause problems during bisimulation reduction, e.g.,
+the edge labels l(0) with 0 of type Nat and l(0) with 0 of type Pos will be
+mapped to the same string.
 
