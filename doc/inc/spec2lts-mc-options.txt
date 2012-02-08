@@ -104,10 +104,10 @@ none;;
         'TYPE' can be one of the following options:
 
 table;;
-  use a lockless hash table (default).
+  use a lockless hash table.
 
 tree;;
-  use a lockless tree-compressed hash table.
+  use a lockless tree-compressed hash table (default).
 
 
 *--size*='NUMBER'::
