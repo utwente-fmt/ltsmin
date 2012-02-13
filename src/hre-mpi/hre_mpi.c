@@ -47,19 +47,19 @@ void HREenableAllMPI(){
 
 void mpi_send_ready(void* context,MPI_Status *status){
     hre_msg_t msg=(hre_msg_t)context;
-    Debug("completed send %d -> %d on comm %d tag %d (%llx)",msg->source,msg->target,msg->comm,msg->tag,msg);
+    Debug("completed send %d -> %d on comm %d tag %d (%p)",msg->source,msg->target,msg->comm,msg->tag,msg);
     HREmsgReady(msg);
     (void)status;
 }
 
 static void mpi_send(hre_context_t context,hre_msg_t msg){
-    Debug("posting send %d -> %d on comm %d tag %d (%llx)",msg->source,msg->target,msg->comm,msg->tag,msg);
+    Debug("posting send %d -> %d on comm %d tag %d (%p)",msg->source,msg->target,msg->comm,msg->tag,msg);
     event_Isend(context->mpi_queue,msg->buffer,msg->tail,MPI_CHAR,msg->target,msg->tag,
         context->action_comm[msg->comm],mpi_send_ready,msg);
 }
 
 static void mpi_thread_send(hre_context_t context,hre_msg_t msg){
-    Debug("posting send %d -> %d on comm %d tag %d (%llx)",msg->source,msg->target,msg->comm,msg->tag,msg);
+    Debug("posting send %d -> %d on comm %d tag %d (%p)",msg->source,msg->target,msg->comm,msg->tag,msg);
     assert(msg->source==(unsigned int)HREme(context));
     assert(msg->target!=(unsigned int)HREme(context));
     int host=context->shared->addr[msg->target].host;
@@ -73,7 +73,7 @@ static void mpi_thread_send(hre_context_t context,hre_msg_t msg){
 
 void mpi_recv_ready(void* context,MPI_Status *status){
     hre_msg_t msg=(hre_msg_t)context;
-    Debug("completed recv %d -> %d on comm %d tag %d (%llx)",msg->source,msg->target,msg->comm,msg->tag,msg);
+    Debug("completed recv %d -> %d on comm %d tag %d (%p)",msg->source,msg->target,msg->comm,msg->tag,msg);
     MPI_Get_count(status,MPI_CHAR,(int*)&msg->tail);
     HREdeliverMessage(msg);
 }
@@ -85,13 +85,13 @@ static void mpi_recv(hre_context_t context,hre_msg_t msg){
 
 void mpi_thread_recv_ready(void* context,MPI_Status *status){
     hre_msg_t msg=(hre_msg_t)context;
-    Debug("completed recv %d -> %d on comm %d tag %d (%llx)",msg->source,msg->target,msg->comm,msg->tag,msg);
+    Debug("completed recv %d -> %d on comm %d tag %d (%p)",msg->source,msg->target,msg->comm,msg->tag,msg);
     MPI_Get_count(status,MPI_CHAR,(int*)&msg->tail);
     HREdeliverMessage(msg);
 }
 
 static void mpi_thread_recv(hre_context_t context,hre_msg_t msg){
-    Debug("posting %d -> %d recv on comm %d tag %d (%llx)",msg->source,msg->target,msg->comm,msg->tag,msg);
+    Debug("posting %d -> %d recv on comm %d tag %d (%p)",msg->source,msg->target,msg->comm,msg->tag,msg);
     assert(msg->target==(unsigned int)HREme(context));
     assert(msg->source!=(unsigned int)HREme(context));
     int source=context->shared->addr[msg->source].host;
