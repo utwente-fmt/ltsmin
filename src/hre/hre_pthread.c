@@ -1,6 +1,7 @@
 // -*- tab-width:4 ; indent-tabs-mode:nil -*-
 #include <config.h>
 
+#include <assert.h>
 #include <fcntl.h>
 #include <pthread.h>
 #include <signal.h>
@@ -43,6 +44,11 @@ struct shm_template {
     void *shm;
 };
 
+union shm_pointer {
+    uint64_t val;
+    void* ptr;
+};
+
 static void* area_malloc(void* ptr,size_t size){
     struct shared_area* area=(struct shared_area*)ptr;
     pthread_mutex_lock(&area->mutex);
@@ -72,10 +78,10 @@ static void area_free(void*area,void *rt_ptr){
 
 static void queue_put(hre_context_t context,hre_msg_t msg,int queue){
     if (msg->comm >= QUEUE_SIZE) Abort("number of communicators exceeds maximum of %d",QUEUE_SIZE);
-	pthread_mutex_lock(&context->queues[queue].lock);
+    pthread_mutex_lock(&context->queues[queue].lock);
     hre_put_msg(&context->queues[queue].comm[msg->comm],msg);
-  	pthread_cond_broadcast(&context->queues[queue].cond);
-	pthread_mutex_unlock(&context->queues[queue].lock);
+    pthread_cond_broadcast(&context->queues[queue].cond);
+    pthread_mutex_unlock(&context->queues[queue].lock);
 }
 
 static void queue_send(hre_context_t context,hre_msg_t msg){
@@ -88,7 +94,7 @@ static void queue_while(hre_context_t ctx,int*condition){
     int max_comm=array_size(HREcommManager(ctx));
     int comm;
     for(;;){
-    	pthread_mutex_lock(&ctx->queues[me].lock);
+        pthread_mutex_lock(&ctx->queues[me].lock);
         //Print(infoShort,"scanning queue %d below %d",me,max_comm);
         for(comm=0;comm<max_comm;comm++){
             msg=hre_get_msg(&ctx->queues[me].comm[comm]);
@@ -103,7 +109,7 @@ static void queue_while(hre_context_t ctx,int*condition){
                 if (msg) break;
             }
         }
-	    pthread_mutex_unlock(&ctx->queues[me].lock);
+        pthread_mutex_unlock(&ctx->queues[me].lock);
         if (!msg) break;
         /* Messages are put in the queue with the sending context.
            They have to be processed with respect to the receiving context.
@@ -150,8 +156,8 @@ static void* thread_main(void*arg){
     Debug("calling main...");
     int argc=1;
     char *argv[2]={strdup(HREpathName()),NULL};
-	main(argc,argv);
-	return NULL;
+    main(argc,argv);
+    return NULL;
 }
 
 void hre_thread_exit(hre_context_t ctx,int code){
@@ -161,16 +167,15 @@ void hre_thread_exit(hre_context_t ctx,int code){
 }
 
 static void * pthread_shm_get(hre_context_t context,size_t size){
-    void* shm;
-    uint64_t temp=0;
+    assert(sizeof(union shm_pointer) == sizeof(uint64_t));
+    union shm_pointer shm;
+    shm.val=0;
     if (HREme(context)==0){
-        shm=malloc(size);
-        temp=(uint64_t)shm;
+        shm.ptr=malloc(size);
     }
-    HREreduce(context,1,&temp,&temp,UInt64,Max);
-    shm=(void*)temp;
-    Debug("pthread shared area is %llx",shm);
-    return shm;
+    HREreduce(context,1,&shm,&shm,UInt64,Max);
+    Debug("pthread shared area is %p",shm.ptr);
+    return shm.ptr;
 }
 
 static const char* pthread_class="Posix threads";
@@ -252,8 +257,9 @@ static const char* process_class="HRE multi-process";
 #define FILE_MODE (S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)
 
 void* hre_posix_shm_get(hre_context_t context,size_t size){
+    assert(sizeof(union shm_pointer) == sizeof(uint64_t));
     Debug("Creating posix SHM");
-    uint64_t template[4]={0,0,0,0};
+    union shm_pointer template[4]={{.val=0},{.val=0},{.val=0},{.val=0}};
     void* shm=NULL;
     if (HREme(context)==0){
         strcpy((char*)template,"HREprocessXXXXXX");
@@ -263,27 +269,27 @@ void* hre_posix_shm_get(hre_context_t context,size_t size){
         if(fd==-1){
             AbortCall("shm_open");
         }
-        if(ftruncate(fd, size )==-1){
+        if(ftruncate(fd, size)==-1){
             shm_unlink(shm_name);
             AbortCall("ftruncate");
         }
-        shm=(struct shared_area*)mmap(NULL,size,PROT_READ|PROT_WRITE,MAP_SHARED,fd,0);
+        shm=mmap(NULL,size,PROT_READ|PROT_WRITE,MAP_SHARED,fd,0);
         if(shm==MAP_FAILED){
             shm_unlink(shm_name);
             AbortCall("mmap");
         }
         Debug("open shared memory %s at %llx",shm_name,shm);
-        template[3]=(uint64_t)shm;
+        template[3].ptr=shm;
     }
     HREreduce(context,4,&template,&template,UInt64,Max);
     if (HREme(context)!=0){
-        shm=(void*)template[3];
-        Debug("trying shared memory %s at %llx",(char*)template,shm);
+        shm=template[3].ptr;
+        Debug("trying shared memory %s at %p",(char*)template,shm);
         int fd=shm_open((char*)template,O_RDWR,FILE_MODE);
         if(fd==-1){
             AbortCall("shm_open");
         }
-        void*tmp=(struct shared_area*)mmap(shm,size,PROT_READ|PROT_WRITE,MAP_SHARED|MAP_FIXED,fd,0);
+        void*tmp=mmap(shm,size,PROT_READ|PROT_WRITE,MAP_SHARED|MAP_FIXED,fd,0);
         if(tmp==MAP_FAILED){
             shm_unlink((char*)template);
             AbortCall("mmap");
@@ -353,7 +359,7 @@ static void fork_start(int* argc,char **argv[],int run_threads){
     if(fd==-1){
         AbortCall("shm_open");
     }
-	if(ftruncate(fd, SHARED_SIZE )==-1){
+    if(ftruncate(fd, SHARED_SIZE)==-1){
         shm_unlink(shm_name);
         AbortCall("ftruncate");
     }
@@ -474,4 +480,3 @@ void HREenableFork(int procs){
     fork_count=procs;
     HREregisterRuntime(&fork_runtime);
 }
-
