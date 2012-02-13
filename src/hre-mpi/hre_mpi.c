@@ -103,6 +103,11 @@ static void mpi_thread_recv(hre_context_t context,hre_msg_t msg){
         context->action_comm[msg->comm],mpi_thread_recv_ready,msg);
 }
 
+static void * mpi_shm_get(hre_context_t context,size_t size){
+    (void)context; (void)size;
+    Abort("MPI processes not all local");
+}
+
 static int mpi_force=0;
 static char* hre_mpirun=NULL;
 static char mpirun_workers[16];
@@ -346,6 +351,7 @@ static hre_context_t HREctxMPIshared(MPI_Comm parent,hre_context_t local){
     HREsendSet(ctx,mpi_thread_send);
     HRErecvSet(ctx,mpi_thread_recv,HRErecvPassive);
     if (temp[3].val) HREshmGetSet(ctx,hre_posix_shm_get);
+    else HREshmGetSet(ctx,mpi_shm_get);
     ctx->action_comm=NULL;
     ADD_ARRAY_CB(HREcommManager(ctx),ctx->action_comm,MPI_Comm,action_comm_thread_resize,ctx);
     HREctxComplete(ctx);
@@ -376,6 +382,7 @@ static hre_context_t HREctxMPI(MPI_Comm comm){
     HREsendSet(ctx,mpi_send);
     HRErecvSet(ctx,mpi_recv,HRErecvPassive);
     if (shm) HREshmGetSet(ctx,hre_posix_shm_get);
+    else HREshmGetSet(ctx,mpi_shm_get);
     ctx->action_comm=NULL;
     ADD_ARRAY_CB(HREcommManager(ctx),ctx->action_comm,MPI_Comm,action_comm_resize,ctx);
     HREctxComplete(ctx);
