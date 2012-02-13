@@ -281,7 +281,7 @@ void* hre_posix_shm_get(hre_context_t context,size_t size){
         Debug("open shared memory %s at %llx",shm_name,shm);
         template[3].ptr=shm;
     }
-    HREreduce(context,4,&template,&template,UInt64,Max);
+    HREreduce(context,4,template,template,UInt64,Max);
     if (HREme(context)!=0){
         shm=template[3].ptr;
         Debug("trying shared memory %s at %p",(char*)template,shm);
