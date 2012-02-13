@@ -35,6 +35,11 @@ struct hre_context_s {
     mpi_shared_t shared;
 };
 
+union mpi_pointer {
+    uint64_t val;
+    mpi_shared_t ptr;
+};
+
 void HREenableAllMPI(){
     HREenableStandard();
     HREenableMPI();
@@ -124,7 +129,7 @@ static void hre_popt(poptContext con,
                     Abort("mpirun already set.");
                 }
                 if (!arg) {
-                	Abort("--mpirun needs an argument");
+                    Abort("--mpirun needs an argument");
                 }
                 hre_mpirun=strdup(arg);
                 mpi_runtime.selected=1;
@@ -135,7 +140,7 @@ static void hre_popt(poptContext con,
                     Abort("mpirun already set.");
                 }
                 if (!arg) {
-                	Abort("--workers needs an argument");
+                    Abort("--workers needs an argument");
                 }
                 int workers=atoi(arg);
                 if (workers<=0) {
@@ -314,18 +319,19 @@ static hre_context_t HREctxMPIshared(MPI_Comm parent,hre_context_t local){
             }
         }
     }
-    uint64_t temp[4]={0,0,0,0};
+    assert(sizeof(union mpi_pointer) == sizeof(uint64_t));
+    union mpi_pointer temp[4]={{.val=0},{.val=0},{.val=0},{.val=0}};
     if (local_me==0){
-        temp[0]=global_peers;
-        temp[1]=global_me;
-        temp[2]=(uint64_t)shared;
-        temp[3]=single_host(parent);
+        temp[0].val=global_peers;
+        temp[1].val=global_me;
+        temp[2].ptr=shared;
+        temp[3].val=single_host(parent);
         HREreduce(local,4,temp,temp,UInt64,Max);
     } else {
         HREreduce(local,4,temp,temp,UInt64,Max);
-        global_peers=(int)temp[0];
-        global_me=(int)temp[1]+local_me;
-        shared=(mpi_shared_t)temp[2];
+        global_peers=(int)temp[0].val;
+        global_me=(int)temp[1].val+local_me;
+        shared=temp[2].ptr;
     }
     set_label("%s[%2d/%2d](%2d/%2d)",HREappName(),main_me,local_me,global_me,global_peers);
     Debug("identity established");
@@ -339,7 +345,7 @@ static hre_context_t HREctxMPIshared(MPI_Comm parent,hre_context_t local){
     HREyieldWhileSet(ctx,hre_event_while);
     HREsendSet(ctx,mpi_thread_send);
     HRErecvSet(ctx,mpi_thread_recv,HRErecvPassive);
-    if (temp[3]) HREshmGetSet(ctx,hre_posix_shm_get);
+    if (temp[3].val) HREshmGetSet(ctx,hre_posix_shm_get);
     ctx->action_comm=NULL;
     ADD_ARRAY_CB(HREcommManager(ctx),ctx->action_comm,MPI_Comm,action_comm_thread_resize,ctx);
     HREctxComplete(ctx);
