@@ -75,12 +75,14 @@ static void event_loop(event_queue_t queue,int block){
         int completed;
         MPI_Status status[queue->pending];
         if (block) {
-            MPI_Waitsome(queue->pending,queue->request,&completed,index,status);
+            int res = MPI_Waitsome(queue->pending,queue->request,&completed,index,status);
+            if (res != MPI_SUCCESS) Abort("MPI_Waitsome");
             queue->wait_some_calls++;
             if (completed>1) queue->wait_some_multi++;
             block=0;
         } else {
-            MPI_Testsome(queue->pending,queue->request,&completed,index,status);
+            int res = MPI_Testsome(queue->pending,queue->request,&completed,index,status);
+            if (res != MPI_SUCCESS) Abort("MPI_Testsome");
             queue->test_some_calls++;
             if (completed==0) {
                 queue->test_some_none++;
@@ -128,7 +130,8 @@ void event_while(event_queue_t queue,int *condition){
         int index[queue->pending];
         int completed;
         MPI_Status status[queue->pending];
-        MPI_Waitsome(queue->pending,queue->request,&completed,index,status);
+        int res = MPI_Waitsome(queue->pending,queue->request,&completed,index,status);
+        if (res != MPI_SUCCESS) Abort("MPI_Waitsome");
         queue->wait_some_calls++;
         if (completed>1) queue->wait_some_multi++;
         event_callback cb[completed];
@@ -180,7 +183,8 @@ void event_Send(event_queue_t queue,void *buf, int count, MPI_Datatype datatype,
     int dest, int tag, MPI_Comm comm){
     MPI_Request request;
     MPI_Status status;
-    MPI_Isend(buf,count,datatype,dest,tag,comm,&request);
+    int res = MPI_Isend(buf,count,datatype,dest,tag,comm,&request);
+    if (res != MPI_SUCCESS) Abort("MPI_Isend");
     event_wait(queue,&request,&status);
 }
 
@@ -188,14 +192,16 @@ void event_Ssend(event_queue_t queue,void *buf, int count, MPI_Datatype datatype
     int dest, int tag, MPI_Comm comm){
     MPI_Request request;
     MPI_Status status;
-    MPI_Issend(buf,count,datatype,dest,tag,comm,&request);
+    int res = MPI_Issend(buf,count,datatype,dest,tag,comm,&request);
+    if (res != MPI_SUCCESS) Abort("MPI_Issend");
     event_wait(queue,&request,&status);
 }
 
 void event_Isend(event_queue_t queue,void *buf, int count, MPI_Datatype datatype,
     int dest, int tag, MPI_Comm comm,event_callback cb,void*context){
     ensure_access(queue->man,queue->pending);
-    MPI_Isend(buf,count,datatype,dest,tag,comm,&queue->request[queue->pending]);
+    int res = MPI_Isend(buf,count,datatype,dest,tag,comm,&queue->request[queue->pending]);
+    if (res != MPI_SUCCESS) Abort("MPI_Isend");
     queue->cb[queue->pending]=cb?cb:null_cb; // we cannot allow NULL as a call-back.
     queue->context[queue->pending]=context;
     queue->pending++;
@@ -204,7 +210,8 @@ void event_Isend(event_queue_t queue,void *buf, int count, MPI_Datatype datatype
 void event_Issend(event_queue_t queue,void *buf, int count, MPI_Datatype datatype,
     int dest, int tag, MPI_Comm comm,event_callback cb,void*context){
     ensure_access(queue->man,queue->pending);
-    MPI_Issend(buf,count,datatype,dest,tag,comm,&queue->request[queue->pending]);
+    int res = MPI_Issend(buf,count,datatype,dest,tag,comm,&queue->request[queue->pending]);
+    if (res != MPI_SUCCESS) Abort("MPI_Issend");
     queue->cb[queue->pending]=cb?cb:null_cb; // we cannot allow NULL as a call-back.
     queue->context[queue->pending]=context;
     queue->pending++;
@@ -213,14 +220,16 @@ void event_Issend(event_queue_t queue,void *buf, int count, MPI_Datatype datatyp
 void event_Recv(event_queue_t queue, void *buf, int count, MPI_Datatype datatype,
             int source, int tag, MPI_Comm comm, MPI_Status *status){
     MPI_Request request;
-    MPI_Irecv(buf,count,datatype,source,tag,comm,&request);
+    int res = MPI_Irecv(buf,count,datatype,source,tag,comm,&request);
+    if (res != MPI_SUCCESS) Abort("MPI_Irecv");
     event_wait(queue,&request,status);
 }
 
 void event_Irecv(event_queue_t queue,void *buf, int count, MPI_Datatype datatype,
     int source, int tag, MPI_Comm comm,event_callback cb,void*context){
     ensure_access(queue->man,queue->pending);
-    MPI_Irecv(buf,count,datatype,source,tag,comm,&queue->request[queue->pending]);
+    int res = MPI_Irecv(buf,count,datatype,source,tag,comm,&queue->request[queue->pending]);
+    if (res != MPI_SUCCESS) Abort("MPI_Irecv");
     queue->cb[queue->pending]=cb?cb:null_cb; // we cannot allow NULL as a call-back.
     queue->context[queue->pending]=context;
     queue->pending++;
