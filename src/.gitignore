@@ -15,6 +15,7 @@ ltsmin-convert
 ltsmin-mpi
 stamp-h1
 gcf
+gcf-0.1
 git_version.h
 subst_pins_open.mk
 lpo-reach
@@ -56,6 +57,7 @@ test-is-balloc
 test-dfs-stack
 test-hre
 test-hre-mpi
+test-mpi-hre
 test-dbs
 test-cache
 ltsmin-tracepp
