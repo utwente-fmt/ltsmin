@@ -145,13 +145,13 @@ int HREdoOptions(int argc,char *argv[],int min_args,int max_args,char*args[],con
 }
 
 void RTparseOptions(const char* argline,int *argc_p,char***argv_p){
-	int len=strlen(argline)+8;
-	char cmdline[len];
-	sprintf(cmdline,"fake %s",argline);
-	int res=poptParseArgvString(cmdline,argc_p,(const char ***)argv_p);
-	if (res){
-		Fatal(1,error,"could not parse %s: %s",cmdline,poptStrerror(res));
-	}
+    int len=strlen(argline)+8;
+    char cmdline[len];
+    sprintf(cmdline,"fake %s",argline);
+    int res=poptParseArgvString(cmdline,argc_p,(const char ***)argv_p);
+    if (res){
+        Fatal(1,error,"could not parse %s: %s",cmdline,poptStrerror(res));
+    }
     (*argv_p)[0]=strdup(HREgetApplication());
 }
 

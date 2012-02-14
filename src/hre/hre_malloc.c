@@ -9,30 +9,30 @@
 #include <hre/internal.h>
 
 void* RTmalloc(size_t size){
-	if(size==0) return NULL;
-	void *tmp=malloc(size);
-	if (tmp==NULL) Abort("out of memory trying to get %d",size);
-	return tmp;
+    if(size==0) return NULL;
+    void *tmp=malloc(size);
+    if (tmp==NULL) Abort("out of memory trying to get %d",size);
+    return tmp;
 }
 
 void* RTmallocZero(size_t size){
-	void *p=RTmalloc(size);
-	memset(p, 0, size);
-	return p;
+    void *p=RTmalloc(size);
+    memset(p, 0, size);
+    return p;
 }
 
 void* RTrealloc(void *rt_ptr, size_t size){
     if (size==0) { // macosx realloc(??.0) does not return NULL!
         free(rt_ptr);
         return NULL;
-	}
+    }
     void *tmp=realloc(rt_ptr,size);
     if (tmp==NULL) Abort("out of memory trying to resize to %d",size);
     return tmp;
 }
 
 void RTfree(void *rt_ptr){
-	if(rt_ptr != NULL) free (rt_ptr);
+    if(rt_ptr != NULL) free (rt_ptr);
 }
 
 struct hre_region_s {
