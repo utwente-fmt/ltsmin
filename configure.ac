@@ -223,9 +223,38 @@ ACX_CADP_BCG_WRITE([have_bcg=yes],
   [have_bcg=no
    AC_MSG_WARN([no acceptable BCG libraries found; building without.])])
 
-AC_CHECK_LIB([zip],[zip_open],[have_libzip=yes],
-  [have_libzip=no
-   AC_MSG_WARN([no acceptable zip library found; building without.])])
+AC_CHECK_LIB([zip],[zip_open],
+  [AC_SUBST([LIBZIP_LIBS],[-lzip])
+   AX_LET([CPPFLAGS],["$CPPFLAGS"],
+    [dnl Version 0.10 of libzip needs a zipconf.h in the lib directory.
+     dnl The assumption here is that this directory is known relative
+     dnl to the include directory. Note that this is not foolproof, if
+     dnl e.g. zipconf.h is in some default location (other than /usr
+     dnl /lib/libzip/include); in which case the user has to add the
+     dnl path explicitly.
+     for f in $CPPFLAGS; do
+       case "$f" in
+         -I*) if test -f "${f#-I}/zip.h"; then
+                if test -f "${f#-I}/../lib/libzip/include/zipconf.h"; then
+                  AC_SUBST([LIBZIP_CPPFLAGS],[$f/../lib/libzip/include])
+                  CPPFLAGS="$LIBZIP_CPPFLAGS $CPPFLAGS"
+                  break
+                fi
+              fi
+              ;;
+       esac
+     done
+     if test -f "/usr/lib/ziplib/zipconf.h"; then
+         AC_SUBST([LIBZIP_CPPFLAGS],[-I/usr/lib/libzip/include])
+         CPPFLAGS="$LIBZIP_CPPFLAGS $CPPFLAGS"
+         break
+     fi
+     AC_CHECK_HEADER([zip.h],,[AC_MSG_FAILURE([zip.h not found.])])])
+     acx_libzip=yes
+  ],
+  [acx_libzip=no
+   AC_MSG_WARN([no acceptable zip library found; building without.])
+  ])
 
 # Checks for header files.
 AC_HEADER_DIRENT
@@ -242,9 +271,6 @@ AS_IF([test x"$have_libtommath" = xyes],
   [AC_CHECK_HEADERS([tommath.h],,[AC_MSG_FAILURE([tommath.h not found.])])])
 
 AC_CHECK_HEADER([popt.h],[], [AC_MSG_FAILURE([popt.h not found.])])
-
-AS_IF([test x"$have_libzip" = xyes], 
-  [AC_CHECK_HEADER([zip.h],,[AC_MSG_FAILURE([zip.h not found.])])])
 
 AC_CACHE_SAVE
 
@@ -319,7 +345,7 @@ AM_CONDITIONAL([HAVE_DVEC], [test x"$acx_dvec_libs" = xyes])
 AM_CONDITIONAL([HAVE_DVEC2], [true])    dnl can be built unconditionally
 AM_CONDITIONAL([HAVE_ATOMICS], [test x"$acx_atomics" = xyes])
 AM_CONDITIONAL([HAVE_VERSION_CONTROL], [test -d "${srcdir}/.git"])
-AM_CONDITIONAL([HAVE_LIBZIP], [test x"$have_libzip" = xyes])
+AM_CONDITIONAL([HAVE_LIBZIP], [test x"$acx_libzip" = xyes])
 
 AC_CONFIG_COMMANDS_POST(
   [ac_configure_args="$ac_configure_args --enable-keep-terminated-procs dnl
