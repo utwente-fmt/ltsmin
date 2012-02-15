@@ -30,13 +30,13 @@ struct lb_s {
          int                idle;
          size_t             requests;
          char               pad[(1<<CACHE_LINE) - sizeof(int) - sizeof(size_t)];
-     }                 *local;
+     } __attribute__((__packed__)) *local;
      int                all_done;
      int                one_done;
      int                initialized;
 };
 
-typedef struct lb_status_s lb_status_t;
+typedef struct __attribute__((__packed__)) lb_status_s lb_status_t;
 
 static const size_t LOAD_ZERO = 0;
 
@@ -103,6 +103,7 @@ lb_create_max (size_t threads, algo_f alg, split_problem_f split,
     lb->args = RTalign (CACHE_LINE_SIZE, sizeof(void   *[threads]) );
     lb->load = RTalign (CACHE_LINE_SIZE, sizeof(size_t *[threads]) );
     lb->local = RTalign (CACHE_LINE_SIZE, sizeof(lb_status_t[threads]) );
+    assert (CACHE_LINE_SIZE == sizeof(lb_status_t));
     for (size_t i = 0; i < threads; i++) {
         lb->load[i] = (size_t *) &LOAD_ZERO;
         lb->local[i].idle = 0;
@@ -239,14 +240,15 @@ lb_balance_SRP (lb_t *lb, int id)
     while ( !all_done(lb) ) {
         lb->algorithm ( lb->args[id], lb->granularity );
         set_idle (lb, id, 0 == get_load(lb, id));
-        size_t          idle_count = 0;
-        for (size_t oid = 0; oid < lb->threads; oid++)
-            idle_count += get_idle (lb, oid);
-        if ( lb->threads == idle_count )
-            break;
         int             wait_reply = 0;
-        if ( get_idle(lb, id) )
+        size_t          all_idle = 1;
+        if ( get_idle(lb, id) ) {
+            for (size_t oid = 0; oid < lb->threads && all_idle; oid++)
+                all_idle &= get_idle (lb, oid);
+            if ( all_idle )
+                break;
             wait_reply = request_highest_load (lb, id);
+        }
         size_t          requests = fetch_and (&status->requests, 0);
         if ( requests )
             handoff (lb, id, requests);

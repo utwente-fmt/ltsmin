@@ -36,6 +36,8 @@ extern treedbs_ll_t TreeDBSLLcreate_dm (int len, int size, matrix_t *m,
 
 extern int          TreeDBSLLtry_set_sat_bit (const treedbs_ll_t dbs,
                                               const tree_ref_t ref, int index);
+extern int          TreeDBSLLtry_unset_sat_bit (const treedbs_ll_t dbs,
+                                                const tree_ref_t ref, int index);
 extern int          TreeDBSLLget_sat_bit (const treedbs_ll_t dbs, const tree_ref_t ref,
                                           int index);
 extern void         TreeDBSLLset_sat_bits (const treedbs_ll_t dbs, const tree_ref_t ref,
