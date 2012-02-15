@@ -95,12 +95,29 @@ TreeDBSLLget_sat_bit (const treedbs_ll_t dbs, const tree_ref_t ref, int index)
 int
 TreeDBSLLtry_set_sat_bit (const treedbs_ll_t dbs, const tree_ref_t ref, int index)
 {
-    uint32_t        bit = 1 << index;
-    uint32_t        hash_and_sat = atomic32_read (dbs->table+ref);
-    uint32_t        val = hash_and_sat & bit;
-    if (val)
-        return 0; //bit was already set
-    return cas (dbs->table+ref, hash_and_sat, hash_and_sat | bit);
+    uint32_t        bit = 1U << index;
+    do {
+        uint32_t        hash_and_sat = atomic32_read (dbs->table+ref);
+        uint32_t        val = hash_and_sat & bit;
+        if (val)
+            return 0; // bit was already set
+        if (cas(dbs->table+ref, hash_and_sat, hash_and_sat | bit))
+            return 1; // success
+    } while ( 1 ); // another bit was set
+}
+
+int
+TreeDBSLLtry_unset_sat_bit (const treedbs_ll_t dbs, const tree_ref_t ref, int index)
+{
+    uint32_t        bit = (1U << index);
+    do {
+        uint32_t        hash_and_sat = atomic32_read (dbs->table+ref);
+        uint32_t        val = hash_and_sat & bit;
+        if (!val)
+            return 0; // bit was already set
+        if (cas(dbs->table+ref, hash_and_sat, hash_and_sat & ~bit))
+            return 1; // success
+    } while ( 1 ); // another bit was set
 }
 
 uint32_t
