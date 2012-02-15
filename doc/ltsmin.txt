@@ -54,7 +54,7 @@ http://code.google.com/p/spinja/[SpinJa website].
 
 == State Space Exploration Tools
 
-The LTSmin toolset has five tools for reachability analysis:
+The LTSmin toolset has six tools for reachability analysis:
 
 <prefix>-reach::
 Symbolic reachability tools that use decision diagrams for manipulating sets
@@ -87,7 +87,6 @@ See manpage:dve2lts-gsea[1], manpage:dve22lts-gsea[1], manpage:etf2lts-gsea[1],
 manpage:lps2lts-gsea[1], manpage:lpo2lts-gsea[1], manpage:nips2lts-gsea[1],
 and manpage:spinja2lts-gsea[1].
 
-
 <prefix>2lts-mc::
 
 Concurrent (multi-core) state space generators that enumerate states and
@@ -101,19 +100,49 @@ manpage:nips2lts-mc[1], and manpage:spinja2lts-mc[1].
 Distributed state space generators that enumerate states and use
 distributed hash tables for storing sets of states.
 The optional output produced by these tools is an explicit LTS.
+These tools do not work without MPI.
 +
 See manpage:dve2lts-mpi[1], manpage:dve22lts-mpi[1], manpage:etf2lts-mpi[1],
 manpage:lps2lts-mpi[1], manpage:lpo2lts-mpi[1], manpage:nips2lts-mpi[1],
 and manpage:spinja2lts-mpi[1].
 
-== State Space Reduction Tool
+<prefix>2lts-hre::
 
-The LTSmin toolset provides distributed minimization modulo strong and
-branching bisimulation.
+Distributed state space generators that enumerate states and use
+distributed hash tables for storing sets of states.
+The optional output produced by these tools is an explicit LTS.
+These tools work with MPI, multiple threads or multiple process whenever possible and available.
+For example:
+* MacOSX does not support the multiple process architecture at this time.
+* Neither mCRL nor mCRL2 supports multi threading.
++
+See manpage:dve2lts-hre[1], manpage:dve22lts-hre[1], manpage:etf2lts-hre[1],
+manpage:lps2lts-hre[1], manpage:lpo2lts-hre[1], manpage:nips2lts-hre[1],
+and manpage:spinja2lts-hre[1]
+
+== State Space Reduction Tools
+
+The LTSmin toolset provides distributed minimization various bisimulations.
 
 ltsmin-mpi::
 Distributed minimization modulo strong and branching bisimulation.
 See manpage:ltsmin-mpi[1].
+
+sigmin-mpi::
+Distributed minimization modulo strong and branching bisimulation.
+This tool has an implementation of the new inductive signature algorithms
+that work on tau-cycle free LTSs.
+See manpage:sigmin-mpi[1].
+
+sigmin-one::
+Sequential minimization modulo strong and branching bisimulation, as well as
+modulo lumping of CTMCs.
+See manpage:sigmin-one[1].
+
+ltscmp-one::
+Compare two transitions systems, using the same equivalences as supported by
+sigmine-one.
+See manpage:ltscmp-one[1].
 
 == Tau Cycle Elimination Tool
 
@@ -140,6 +169,9 @@ ltsmin-tracepp::
 Pretty print traces. See manpage:ltsmin-tracepp[1].
 
 == Conversion Tools
+
+ltstrans::
+Convert LTS file formats. See manpage:ltstrans[1].
 
 etf-convert::
 Translate ETF to DVE. See manpage:etf-convert[1].

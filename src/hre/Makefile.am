@@ -1,0 +1,22 @@
+noinst_LTLIBRARIES = libhre.la
+
+libhre_la_SOURCES  = user.h internal.h provider.h
+libhre_la_SOURCES += hre_context.c context.h
+libhre_la_SOURCES += hre_dir_ops.c dir_ops.h
+libhre_la_SOURCES += hre_feedback.c feedback.h
+libhre_la_SOURCES += hre_main.c
+libhre_la_SOURCES += hre_malloc.c
+libhre_la_SOURCES += hre_messaging.c
+libhre_la_SOURCES += hre_popt.c
+libhre_la_SOURCES += hre_pthread.c
+libhre_la_SOURCES += hre_queue.c queue.h
+libhre_la_SOURCES += hre_table.c table.h
+libhre_la_SOURCES += hre_reduce.c
+libhre_la_SOURCES += hre_runtime.c runtime.h
+libhre_la_SOURCES += hre_timer.c
+libhre_la_SOURCES += hre_unix.c unix.h
+libhre_la_SOURCES += hre_utils.c
+
+libhre_la_CPPFLAGS = -I ${top_srcdir}/src $(AM_CPPFLAGS)
+
+libhre_la_LIBADD   = ../hre-io/libhre-io.la

@@ -15,6 +15,7 @@ ltsmin-convert
 ltsmin-mpi
 stamp-h1
 gcf
+gcf-0.1
 git_version.h
 subst_pins_open.mk
 lpo-reach
@@ -56,9 +57,13 @@ test-is-balloc
 test-dfs-stack
 test-hre
 test-hre-mpi
+test-mpi-hre
 test-dbs
 test-cache
 ltsmin-tracepp
+ltscmp-one
+ltstrans
+lts-tracepp
 dve22lts-gsea
 dve2lts-gsea
 etf2lts-gsea
@@ -66,3 +71,12 @@ lpo2lts-gsea
 lps2lts-gsea
 spinja2lts-gsea
 nips2lts-gsea
+sigmin-one
+sigmin-mpi
+dve22lts-hre
+dve2lts-hre
+etf2lts-hre
+lpo2lts-hre
+lps2lts-hre
+spinja2lts-hre
+nips2lts-hre

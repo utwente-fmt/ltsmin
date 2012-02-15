@@ -1,0 +1,45 @@
+//                           -*- mode: doc; outline-regexp: "==\(=*\) ." -*-
+sigmin-one(1)
+=============
+:Author:  Stefan Blom
+:Email:   <sccblom@ewi.utwente.nl>
+:Date:    2011-06-02
+
+== NAME
+
+sigmin-one - sequential reduction of labelled transition systems modulo bisimulation
+
+== SYNOPSIS
+
+sigmin-one [OPTIONS] <input> [<output>]
+
+== OPTIONS
+
+*-s*::
+Minimize modulo strong bisimulation using the default implementation.
+
+*--strong[='variant']*::
+Minimize modulo strong bisimulation using the given 'variant' or the default implementation.
+
+*-b*::
+Minimize modulo branching bisimulation using the default implementation.
+
+*--branching[='variant']*::
+Minimize modulo branching bisimulation using the given 'variant' or the default implementation.
+
+*-c*, *--copy*::
+Perform a load/store copy.
+
+*-l*, *--lump*::
+Minimize modulo CTMC lumping.
+
+*--segments='N'*::
+Use 'N' segments in the output file.
+
+include::inc/lts-io-options.txt[]
+
+include::inc/hre-options.txt[]
+
+== SEE ALSO
+
+manpage:ltscmp-one[1], manpage:sigmin-mpi[1]

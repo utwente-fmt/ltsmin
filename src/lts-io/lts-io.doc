@@ -1,0 +1,35 @@
+/** \page lib-io lts-io - a library for reading/writing labeled transition systems.
+
+@author Stefan Blom
+
+The main types of this library is lts_file_t.
+
+Currently a file can be written or read. We use a single file type to
+allow expansion with e.g. an operation like append, which would be
+useful for on-disk generation.
+
+Some file formats will impose restrictions on the order in which
+the LTS can be written. For example, the FSM format has three sections:
+the first section contains the possible values for all types used;
+the second section contains the state vectors and the third section contains the edges.
+This means that the write order is fixed. But the read order can be arbitrary.
+(Simply read the values until the first state and scan ahead to the first edge.)
+
+The AUT format has a different problem: it cannot store state labels directly.
+Thus, the state labels have to be encoded as edges. This still allows any order of reading
+as long as the state have been written in order. However, if the states
+are written out of order then worst case every state read involves
+scanning the entire input to find it.
+
+
+Thus, we support two IO orders: file order and application order.
+The implementation of application order IO uses reads and writes as its interface.
+The implementation of file order IO uses two copy operations:
+push, where the source pushes the LTS to the application order destination
+and pull, where the destination pull the LTS from the application order source.
+
+If both source and destination are disk order then the LTS has to be copied
+to an application order temporary location: either in memory or on disk.
+
+*/
+
