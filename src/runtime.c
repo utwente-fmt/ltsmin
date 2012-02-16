@@ -108,7 +108,7 @@ void* RTalign(size_t align, size_t size)
 
 void* RTrealloc(void *rt_ptr, size_t size){
     void *tmp=realloc(rt_ptr,size);
-    if (tmp==NULL) Fatal(0,error,"out of memory trying to resize to %zu bytes",
+    if (tmp==NULL && size !=0) Fatal(0,error,"out of memory trying to resize to %zu bytes",
                          size);
     return tmp;
 }
