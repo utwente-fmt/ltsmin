@@ -44,13 +44,20 @@ static void aut_write_edge(lts_file_t file,int src_seg,void* src_state,
     if (dst>=file->states) file->states=dst+1;
     file->trans++;
     value_table_t table=lts_file_get_table(file,file->type_no);
-    chunk label_c=VTgetChunk(table,lbl);
-    char label_s[label_c.len*2+6];
-    chunk2string(label_c,sizeof label_s,label_s);
-    fprintf(file->f,"(%llu,%s,%llu)\n",
-            (long long unsigned int)src,
-            label_s,
-            (long long unsigned int)dst);
+    if (table==NULL) {
+        fprintf(file->f,"(%llu,%llu,%llu)\n",
+                (long long unsigned int)src,
+                (long long unsigned int)lbl,
+                (long long unsigned int)dst);
+    } else {
+        chunk label_c=VTgetChunk(table,lbl);
+        char label_s[label_c.len*2+6];
+        chunk2string(label_c,sizeof label_s,label_s);
+        fprintf(file->f,"(%llu,%s,%llu)\n",
+                (long long unsigned int)src,
+                label_s,
+                (long long unsigned int)dst);
+    }
 }
 
 static void aut_write_close(lts_file_t file){
