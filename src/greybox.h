@@ -212,6 +212,14 @@ extern int GBbuchiIsAccepting(model_t model, int* src);
 \brief Return accepting/not-accepting for a given state
 */
 
+extern int GBtransitionInGroup(model_t model, int* labels, int group);
+/**<
+\brief Return if a transition labelled with labels potentially occurs in group
+
+The number of labels in the labels parameter should be equal to the number of
+labels with with each transition is labelled.
+*/
+
 //@}
 
 /**
@@ -391,6 +399,15 @@ extern void GBsetStateLabelLong(model_t model,get_label_method_t method);
 \brief Set the method that retrieves labels given short vectors.
 */
 extern void GBsetStateLabelShort(model_t model,get_label_method_t method);
+
+/// Type of transition group retrieval method
+typedef int (*transition_in_group_t)(model_t self,int *labels,int group);
+
+/**
+\brief Set the method for transition group retrieval
+*/
+extern void GBsetTransitionInGroup(model_t model,transition_in_group_t method);
+
 //@}
 
 /**

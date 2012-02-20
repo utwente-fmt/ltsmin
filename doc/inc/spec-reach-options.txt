@@ -38,8 +38,14 @@ to saturate levels.
         'bfs-prev' or 'chain-prev'.
 
 *--action*='ACTION'::
-        Find a transition labelled with 'ACTION'. Returns with exit code 1
+        Find a transition labeled with 'ACTION'. Returns with exit code 1
         if such a transition is found, otherwise 0.
+
+*--guidance*='STRATEGY'::
+        Select a search strategy for searching for actions: 'unguided',
+        'directed'. The 'unguided' strategy considers all transition
+        groups. The 'directed' strategy focuses the search on the transition
+        groups in which the action occurs. Defaults to 'unguided'.
 
 *--mu*='MUFILE'::
     After computing all reachable states, evaluate the mu-formula in 'MUFILE'
