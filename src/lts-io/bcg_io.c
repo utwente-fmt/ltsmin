@@ -132,9 +132,18 @@ static void bcg_write_edge(lts_file_t file,int src_seg,void* src_state,
         int type_no=lts_type_get_edge_label_typeno(lts_file_get_type(file),0);
         file->labels=lts_file_get_table(file,type_no);
     }
-    chunk label_c=VTgetChunk(file->labels,lbl);
+    chunk label_c;
+    if (file->labels==NULL){
+      label_c.len=6;
+    } else {
+      label_c=VTgetChunk(file->labels,lbl);
+    }
     char label_s[label_c.len*2+6];
-    chunk2string(label_c,sizeof label_s,label_s);
+    if (file->labels==NULL){
+        sprintf(label_s,"%u",lbl);
+    } else {
+        chunk2string(label_c,sizeof label_s,label_s);
+    }
     char *bcg_label;
     if (strcmp(label_s,"tau") && strcmp(label_s,"\"tau\"")){
         bcg_label=label_s;

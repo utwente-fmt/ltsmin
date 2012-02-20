@@ -39,6 +39,13 @@ static void lts_write_dir(archive_t archive,string_map_t map,lts_t lts,int segme
     lts_set_type(lts,LTS_BLOCK);
     info->label_tau=lts->tau;
     int type_no=lts_type_get_edge_label_typeno(lts->ltstype,0);
+    switch(lts_type_get_format(lts->ltstype,type_no)){
+        case LTStypeChunk:
+        case LTStypeEnum:
+            break;
+        default:
+            Abort("DIR is limited to Chunk/Enum edge labels.");
+    }
     info->label_count=VTgetCount(lts->values[type_no]);
     info->initial_seg=lts->root_list[0]%segments;
     info->initial_ofs=lts->root_list[0]/segments;

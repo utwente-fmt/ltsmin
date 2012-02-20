@@ -34,7 +34,7 @@ static void fsm_pull(lts_file_t dst,lts_file_t src){
     int N1=lts_type_get_state_length(ltstype);
     int N2=lts_type_get_state_label_count(ltstype);
     int K=lts_type_get_edge_label_count(ltstype);
-    // check src requirements.
+    Debug("check src requirements.");
     if(lts_file_init_mode(src)!=Index){
         Abort("init mode is not index");
     }
@@ -55,13 +55,18 @@ static void fsm_pull(lts_file_t dst,lts_file_t src){
     if (root!=0){
         Abort("initial state is not 0");
     }
-    // write state vectors specs.
+    Debug("write state vectors specs.");
     for(int i=0;i<N1;i++){
         char* name=lts_type_get_state_name(ltstype,i);
         char* sort=lts_type_get_state_type(ltstype,i);
         int type_no=lts_type_get_state_typeno(ltstype,i);
         value_table_t table=lts_file_get_table(dst,type_no);
-        int C=VTgetCount(table);
+        int C;
+        if (table==NULL){
+            C=0;
+        } else {
+            C=VTgetCount(table);
+        }
         fprintf(dst->f,"%s(%d) %s",name,C,sort);
         for(int j=0;j<C;j++){
             chunk label_c=VTgetChunk(table,j);
@@ -72,13 +77,18 @@ static void fsm_pull(lts_file_t dst,lts_file_t src){
         }
         fprintf(dst->f,"\n");
     }
-    // write state label specs.
+    Debug("write state label specs.");
     for(int i=0;i<N2;i++){
         char* name=lts_type_get_state_label_name(ltstype,i);
         char* sort=lts_type_get_state_label_type(ltstype,i);
         int type_no=lts_type_get_state_label_typeno(ltstype,i);
         value_table_t table=lts_file_get_table(dst,type_no);
-        int C=VTgetCount(table);
+        int C;
+        if (table==NULL){
+            C=0;
+        } else {
+            C=VTgetCount(table);
+        }
         fprintf(dst->f,"%s(%d) %s",name,C,sort);
         for(int j=0;j<C;j++){
             chunk label_c=VTgetChunk(table,j);
@@ -90,6 +100,7 @@ static void fsm_pull(lts_file_t dst,lts_file_t src){
         fprintf(dst->f,"\n");
     }
     fprintf(dst->f,"---\n");
+    Debug("writing state vector and/or labels.");
     if (N1+N2>0){
         int src_seg;
         uint32_t src_state[N1];
@@ -116,11 +127,15 @@ static void fsm_pull(lts_file_t dst,lts_file_t src){
             for(int i=0;i<K;i++){
                 int type_no=lts_type_get_edge_label_typeno(ltstype,i);
                 value_table_t table=lts_file_get_table(dst,type_no);
-                chunk label_c=VTgetChunk(table,edge_labels[i]);
-                char label_s[label_c.len*2+6];
-                chunk2string(label_c,sizeof label_s,label_s);
-                fix_double_quote(label_s);
-                fprintf(dst->f," %s",label_s);
+                if (table==NULL){
+                    fprintf(dst->f," %d",edge_labels[i]);
+                } else {
+                    chunk label_c=VTgetChunk(table,edge_labels[i]);
+                    char label_s[label_c.len*2+6];
+                    chunk2string(label_c,sizeof label_s,label_s);
+                    fix_double_quote(label_s);
+                    fprintf(dst->f," %s",label_s);
+                }
             }
             fprintf(dst->f,"\n");
         }

@@ -18,7 +18,7 @@ the following option is available:
 *--procs[='count']*::
 Fork 'count' worker processes. The default count is the number of CPUs in the system.
 
-Note that MacOSX does not support Posix shared memory.
+Note that MacOS X does not support Posix shared memory.
 
 ==== MPI options
 
