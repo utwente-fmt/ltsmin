@@ -5,12 +5,12 @@
 #include <hre-io/user.h>
 
 struct raf_object {
-	void(*read)(raf_t raf,void*buf,size_t len,off_t ofs);
-	void(*write)(raf_t raf,void*buf,size_t len,off_t ofs);
-	off_t(*size)(raf_t raf);
-	void(*resize)(raf_t raf,off_t size);
-	void(*close)(raf_t *raf);
-	char*name;
+    void(*read)(raf_t raf,void*buf,size_t len,off_t ofs);
+    void(*write)(raf_t raf,void*buf,size_t len,off_t ofs);
+    off_t(*size)(raf_t raf);
+    void(*resize)(raf_t raf,off_t size);
+    void(*close)(raf_t *raf);
+    char*name;
 };
 
 extern void raf_illegal_read(raf_t raf,void*buf,size_t len,off_t ofs);
