@@ -506,15 +506,23 @@ WARN_LOGFILE           =
 # directories like "/usr/src/myproject". Separate the files or directories
 # with spaces.
 
-INPUT                  = $(SRCDIR)/src \
-                         $(SRCDIR)/src/bignum \
-                         $(SRCDIR)/src/ce \
-                         $(SRCDIR)/src/dm \
-                         $(SRCDIR)/src/hre \
-                         $(SRCDIR)/src/hre-mpi \
-                         $(SRCDIR)/src/hre-io \
-                         $(SRCDIR)/src/lts-io \
-                         $(SRCDIT)/src/lts-lib \
+INPUT                  = $(SRCDIR)/src  \
+                         $(SRCDIR)/src/bignum  \
+                         $(SRCDIR)/src/ce  \
+                         $(SRCDIR)/src/dm  \
+                         $(SRCDIR)/src/gcf-tool  \
+                         $(SRCDIR)/src/hre  \
+                         $(SRCDIR)/src/hre-io  \
+                         $(SRCDIR)/src/hre-mpi  \
+                         $(SRCDIR)/src/hre-test  \
+                         $(SRCDIR)/src/lts-io  \
+                         $(SRCDIR)/src/lts-lib  \
+                         $(SRCDIR)/src/lts-tracepp  \
+                         $(SRCDIR)/src/ltscmp-one  \
+                         $(SRCDIR)/src/ltstrans  \
+                         $(SRCDIR)/src/pins2lts-hre  \
+                         $(SRCDIR)/src/sigmin-mpi  \
+                         $(SRCDIR)/src/sigmin-one  \
                          $(SRCDIR)/src/torx
 
 # This tag can be used to specify the character encoding of the source files
