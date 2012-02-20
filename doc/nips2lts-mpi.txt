@@ -15,7 +15,7 @@ mpirun _<nodespec>_ *nips2lts-mpi* [OPTION]... 'input.b' ['output.fmt']
 
 == DESCRIPTION
 
-nips-reach performs a reachability analysis on a specification
+nips2lts-mpi performs a reachability analysis on a specification
 provided in 'input.b'.  'output.fmt' specifies the name
 of the output archive.  The desired format is deduced from the
 filename extension.
