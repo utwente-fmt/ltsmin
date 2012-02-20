@@ -272,11 +272,13 @@ SpinJaloadGreyboxModel(model_t model, const char *filename)
         assert (proj != NULL);
         for(int j=0; j<state_length; j++) {
             if (proj[j]) dm_set(dm_info, i, j);
+            if (proj[j]) dm_set(dm_read_info, i, j);
         }
         proj = (int*)spinja_get_transition_write_dependencies(i);
         assert (proj != NULL);
         for(int j=0; j<state_length; j++) {
             if (proj[j]) dm_set(dm_info, i, j);
+            if (proj[j]) dm_set(dm_write_info, i, j);
         }
     }
     GBsetDMInfo(model, dm_info);
