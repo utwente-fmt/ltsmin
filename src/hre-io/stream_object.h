@@ -11,13 +11,13 @@
 #include <hre-io/user.h>
 
 struct stream_obj {
-	size_t(*read_max)(stream_t stream,void*buf,size_t count);
-	void(*read)(stream_t stream,void*buf,size_t count);
-	int(*empty)(stream_t stream);
-	void(*write)(stream_t stream,void*buf,size_t count);
-	void(*flush)(stream_t stream);
-	void(*close)(stream_t *stream);
-	void(*close_z)(stream_t *stream,uint64_t orig_size);
+    size_t(*read_max)(stream_t stream,void*buf,size_t count);
+    void(*read)(stream_t stream,void*buf,size_t count);
+    int(*empty)(stream_t stream);
+    void(*write)(stream_t stream,void*buf,size_t count);
+    void(*flush)(stream_t stream);
+    void(*close)(stream_t *stream);
+    void(*close_z)(stream_t *stream,uint64_t orig_size);
 };
 
 extern size_t stream_illegal_read_max(stream_t stream,void*buf,size_t count);
@@ -34,4 +34,3 @@ extern void stream_close_z(stream_t *stream,uint64_t orig_size);
 extern void stream_init(stream_t s);
 
 #endif
-
