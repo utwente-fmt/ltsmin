@@ -249,7 +249,7 @@ AC_CHECK_LIB([zip],[zip_open],
          CPPFLAGS="$LIBZIP_CPPFLAGS $CPPFLAGS"
          break
      fi
-     AC_CHECK_HEADER([zip.h],,[AC_MSG_FAILURE([zip.h not found.])])])
+     AC_CHECK_HEADERS([zip.h],,[AC_MSG_FAILURE([zip.h not found.])])])
      acx_libzip=yes
   ],
   [acx_libzip=no
