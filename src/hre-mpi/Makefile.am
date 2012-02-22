@@ -4,7 +4,7 @@ noinst_LTLIBRARIES = libhre.la
 
 libhre_la_SOURCES  = user.h
 libhre_la_SOURCES += hre_mpi.c
-libhre_la_SOURCES += mpi_event_loop.c mpi-event-loop.h
+libhre_la_SOURCES += mpi_event_loop.c mpi_event_loop.h
 
 libhre_la_CPPFLAGS = $(HRE_CPPFLAGS)
 libhre_la_LIBADD = ../hre/libhre.la
