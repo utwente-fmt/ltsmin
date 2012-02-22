@@ -203,7 +203,18 @@ static copy_zip_context_t copy_zip_setup(struct zip *dst,archive_t src,char*name
     return ctx;
 }
 
-static ssize_t copy_zip_function(void *state, void *data, size_t len, enum zip_source_cmd cmd){
+#ifdef LIBZIP_VERSION
+#if LIBZIP_VERSION_MAJOR == 0 && LIBZIP_VERSION_MINOR == 10
+static zip_int64_t
+copy_zip_function(void *state, void *data, zip_uint64_t len, enum zip_source_cmd cmd)
+#else
+#error "libzip version not supported"
+#endif
+#else
+static ssize_t
+copy_zip_function(void *state, void *data, size_t len, enum zip_source_cmd cmd)
+#endif
+{
     copy_zip_context_t ctx=(copy_zip_context_t)state;
     switch(cmd){
     case ZIP_SOURCE_OPEN:
