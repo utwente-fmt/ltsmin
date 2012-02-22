@@ -1,7 +1,8 @@
 bin_PROGRAMS  = ltsmin-convert
 bin_PROGRAMS += etf-convert
 bin_PROGRAMS += ltsmin-tracepp
-bin_PROGRAMS += gcf
+bin_PROGRAMS += gcf-0.1
+
 
 check_PROGRAMS  = test-bitset
 check_PROGRAMS += test-is-balloc
@@ -15,11 +16,32 @@ noinst_LTLIBRARIES  = libutil.la
 noinst_LTLIBRARIES += libvset.la
 noinst_LTLIBRARIES += libltsmin.la
 
+# the ltsmin-hre library recompiles all code that is reused by the new runtime.
+noinst_LTLIBRARIES += libltsmin-hre-util.la
+noinst_LTLIBRARIES += libltsmin-hre.la
+
 pkglib_LTLIBRARIES =
 
 SUBDIRS  = dm
 SUBDIRS += bignum
 SUBDIRS += .
+SUBDIRS += hre-io
+SUBDIRS += hre
+if HAVE_MPI
+SUBDIRS += hre-mpi
+endif
+SUBDIRS += hre-test
+SUBDIRS += lts-io
+SUBDIRS += lts-lib
+SUBDIRS += gcf-tool
+SUBDIRS += lts-tracepp
+SUBDIRS += ltscmp-one
+SUBDIRS += ltstrans
+SUBDIRS += pins2lts-hre
+SUBDIRS += sigmin-one
+if HAVE_MPI
+SUBDIRS += sigmin-mpi
+endif
 SUBDIRS += ce
 SUBDIRS += torx
 
@@ -141,9 +163,9 @@ etf_convert_LDADD = libltsmin.la
 ltsmin_tracepp_SOURCES = ltsmin-tracepp.c
 ltsmin_tracepp_LDADD = libltsmin.la
 
-# gcf
-gcf_SOURCES = gcf-rw.c
-gcf_LDADD = libltsmin.la
+# gcf-0.1
+gcf_0_1_SOURCES = gcf-rw.c
+gcf_0_1_LDADD = libltsmin.la
 
 # test-bitset
 test_bitset_SOURCES = test-bitset.c
@@ -600,6 +622,45 @@ libltsmin_la_LIBADD = libutil.la bignum/libbignum.la
 
 libltsmin_mpi_la_SOURCES = hre-mpi.c
 libltsmin_mpi_la_LIBADD = libutil.la libmpi.la
+
+
+# ltsmin-hre settings
+libltsmin_hre_util_la_SOURCES  = balloc.c balloc.h
+libltsmin_hre_util_la_SOURCES += bitset.c bitset.h
+libltsmin_hre_util_la_SOURCES += chunk_support.c chunk_support.h
+libltsmin_hre_util_la_SOURCES += chunk_table_factory.c
+libltsmin_hre_util_la_SOURCES += config.h
+libltsmin_hre_util_la_SOURCES += dynamic-array.c dynamic-array.h
+libltsmin_hre_util_la_SOURCES += etf-internal.h
+libltsmin_hre_util_la_SOURCES += etf-objects.c etf-objects.h
+libltsmin_hre_util_la_SOURCES += etf-parser.c
+libltsmin_hre_util_la_SOURCES += etf-util.c etf-util.h
+libltsmin_hre_util_la_SOURCES += fast_hash.c fast_hash.h
+libltsmin_hre_util_la_SOURCES += greybox.c greybox.h
+libltsmin_hre_util_la_SOURCES += group.c
+libltsmin_hre_util_la_SOURCES += ltl2ba-lex.c
+libltsmin_hre_util_la_SOURCES += lts-type.c lts-type.h
+libltsmin_hre_util_la_SOURCES += ltsmin-buchi.h
+libltsmin_hre_util_la_SOURCES += ltsmin-grammar.lemon
+libltsmin_hre_util_la_SOURCES += ltsmin-lexer.l
+libltsmin_hre_util_la_SOURCES += ltsmin-parse-env.h
+libltsmin_hre_util_la_SOURCES += ltsmin-syntax.c ltsmin-syntax.h
+libltsmin_hre_util_la_SOURCES += ltsmin-tl.c ltsmin-tl.h
+libltsmin_hre_util_la_SOURCES += string-map.c string-map.h
+libltsmin_hre_util_la_SOURCES += stringindex.c stringindex.h
+libltsmin_hre_util_la_SOURCES += tables.c tables.h
+libltsmin_hre_util_la_SOURCES += treedbs.c treedbs.h
+libltsmin_hre_util_la_SOURCES += pins-cache.c
+libltsmin_hre_util_la_SOURCES += pins-ltl.c
+libltsmin_hre_util_la_SOURCES += pins-por.c
+
+libltsmin_hre_util_la_CPPFLAGS  = -DNXT -DLTSMIN_HRE
+libltsmin_hre_util_la_CPPFLAGS += -I${top_srcdir}/ltl2ba $(AM_CPPFLAGS)
+
+libltsmin_hre_la_SOURCES  =
+libltsmin_hre_la_LIBADD   = libltsmin-hre-util.la
+libltsmin_hre_la_LIBADD  += ltsmin-grammar.lo dm/libdm.la
+libltsmin_hre_la_LIBADD  += $(top_builddir)/ltl2ba/libltl2ba.la
 
 
 CLEANFILES =

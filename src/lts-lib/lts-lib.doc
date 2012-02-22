@@ -1,0 +1,8 @@
+/** \page lib-lib lts-lib - a library for manipulating labeled transition systems.
+
+@author Stefan Blom
+
+The main type of this library is lts_t.
+
+*/
+

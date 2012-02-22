@@ -1,0 +1,10 @@
+*--nice*='LEVEL'::
+        Set the nice level of all worker processes. This is useful
+        when running on other people's workstations.
+
+*--write-state*::
+        Write the full state vector.
+
+*-d, --deadlock*::
+        Find state with no outgoing transitions. Returns with exit code 1
+        if deadlock is found, otherwise 0.

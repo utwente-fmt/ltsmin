@@ -14,7 +14,7 @@ etf2lts-mpi
 ltsmin-convert
 ltsmin-mpi
 stamp-h1
-gcf
+gcf-0.1
 git_version.h
 subst_pins_open.mk
 lpo-reach
@@ -66,3 +66,18 @@ lpo2lts-gsea
 lps2lts-gsea
 spinja2lts-gsea
 nips2lts-gsea
+gcf-tool/gcf
+hre-test/test-hre
+hre-test/test-mpi-hre
+ltscmp-one/ltscmp-one
+ltstrans/ltstrans
+lts-tracepp/lts-tracepp
+pins2lts-hre/dve22lts-hre
+pins2lts-hre/dve2lts-hre
+pins2lts-hre/etf2lts-hre
+pins2lts-hre/lpo2lts-hre
+pins2lts-hre/lps2lts-hre
+pins2lts-hre/spinja2lts-hre
+pins2lts-hre/nips2lts-hre
+sigmin-one/sigmin-one
+sigmin-mpi/sigmin-mpi
