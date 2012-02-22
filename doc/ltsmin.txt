@@ -113,8 +113,11 @@ distributed hash tables for storing sets of states.
 The optional output produced by these tools is an explicit LTS.
 These tools work with MPI, multiple threads or multiple process whenever possible and available.
 For example:
-* MacOSX does not support the multiple process architecture at this time.
++
+--
+* MacOS X does not support the multiple process architecture at this time.
 * Neither mCRL nor mCRL2 supports multi threading.
+--
 +
 See manpage:dve2lts-hre[1], manpage:dve22lts-hre[1], manpage:etf2lts-hre[1],
 manpage:lps2lts-hre[1], manpage:lpo2lts-hre[1], manpage:nips2lts-hre[1],

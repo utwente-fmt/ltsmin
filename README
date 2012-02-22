@@ -141,7 +141,7 @@ For best performance, we advise to configure muCRL like this:
 *** mCRL2
 Download the latest version of mCRL2 from <http://www.mcrl2.org/>.  We
 tested with mCRL2 release 201202.0.  Note that all versions before SVN
-rev.10225 are insufficient (in particular, all versions of mMCRL2
+rev.10225 are insufficient (in particular, all versions of mCRL2
 up to and including the July 2011 release).
 
 Build and install mCRL2:
