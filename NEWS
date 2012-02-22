@@ -1,4 +1,22 @@
-July, 24, 2011 - Release 1.7.1 of the LTSmin toolset
+February 22, 2012 - Release 1.8 of the LTSmin toolset
+
+ * Implementation of Evangelista et al.'s parallel nested depth-first
+   search and a number of variations
+ * Native implementations of Ciardo et al.'s saturation algorithms for
+   AtermDD and ListDD (<spec>-reach --saturation=sat) (Tien-Loong Siaw)
+ * Dependency matrix regrouping using simulated annealing (-rgsa, -rcsa)
+ * SpinJa support for channel operations, run expressions with arguments,
+   and preprocessor defines
+ * New experimental I/O library and run-time environment
+ * New tools employing the new I/O library and run-time environment:
+   o lts-tracepp for pretty printing traces
+   o sigmin-mpi for distributed reduction of labeled transition systems
+   o sigmin-one for sequential reduction of labeled transition systems
+   o ltstrans for conversion of labeled transition systems
+   o ltscmp-one for sequential comparison of labeled transition systems
+   o <spec>2lts-hre for distributed state space generation
+
+July 24, 2011 - Release 1.7.1 of the LTSmin toolset
 
  * Fix for Multi-Core NDFS algorithm: introduced wait counter
    (<spec>2lts-mc)
@@ -21,7 +39,7 @@ June, 24, 2011 - Release 1.7 of the LTSmin toolset
  * Patched DiVinE 2.4 frontend required
  * Reimplementation of mcrl2 PINS frontend
  * Read/Write dependency matrices and combined printing
- * vector set improvements and clean-up
+ * Vector set improvements and clean-up
  * Connection to the libDDD decision diagram package
  * Conversion from ETF to DVE (etf-convert)
 
