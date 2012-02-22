@@ -1,6 +1,8 @@
 Release Checklist
 =================
 
+* If first release of the year, update the copyright data in COPYING
+
 * Update NEWS with release notes
 
 * Bump version in configure.ac and commit to master
