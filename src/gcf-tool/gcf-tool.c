@@ -5,10 +5,6 @@
 #include <stdio.h>
 #include <string.h>
 
-#ifdef HAVE_ZIP_H
-#include <zip.h>
-#endif
-
 #include <hre/dir_ops.h>
 #include <hre-io/user.h>
 #include <string-map.h>
@@ -68,23 +64,32 @@ typedef enum {
     GCF_COPY=4,
     GCF_COMPRESS=5,
     GCF_DECOMPRESS=6,
-    GCF_TO_ZIP=7
+    GCF_TO_ZIP=7,
+    ZIP_TO_GCF=8
 } gcf_op_t;
 
-static char* policy="gzip";
+static char* gcf_policy="gzip";
+static char* zip_policy="";
 static int blocksize=32768;
 static int blockcount=32;
 static int operation=0;
 static int force=0;
 static string_map_t compression_policy=NULL;
+static string_map_t coding_policy=NULL;
 static char* outputdir=NULL;
+static int keep=0;
 
 static struct poptOption parameters[] = {
     { "force",'f' ,  POPT_ARG_VAL , &force , 1 , "force creation of a directory for output" , NULL },
     { "block-size" , 0 , POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT , &blocksize , 0 , "set the size of a block in bytes" , "<bytes>" },
     { "cluster-size" , 0 , POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT , &blockcount , 0 , "set the number of blocks in a cluster" , "<blocks>"},
     { "compression",'z',POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT,
-        &policy,0,"set the compression policy used in the archive","<policy>"},
+        &gcf_policy,0,"set the compression policy used in the archive","<policy>"},
+    { "keep",'k' , POPT_ARG_VAL , &keep , 1 , "keep original after (de)compression" , NULL },
+#ifdef HAVE_ZIP_H
+    { "zip-code",0, POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT,
+        &zip_policy,0,"set the compression policy used when writing a ZIP archive","<policy>"},
+#endif
     { "output", 'o' , POPT_ARG_STRING , &outputdir , 0, "change the extraction directory" , NULL },
     POPT_TABLEEND
 };
@@ -97,7 +102,8 @@ static  struct poptOption options[] = {
     { "compress" , 'c' , POPT_ARG_VAL , &operation , GCF_COMPRESS , "compress all arguments" , NULL},
     { "decompress" , 'd' , POPT_ARG_VAL , &operation , GCF_DECOMPRESS , "decompress all arguments" , NULL},
 #ifdef HAVE_ZIP_H
-    { "zip" , 0 , POPT_ARG_VAL , &operation , GCF_TO_ZIP , "copy given archive to a ZIP archive" , NULL},
+    { "to-zip" , 0 , POPT_ARG_VAL , &operation , GCF_TO_ZIP , "copy given GCF archive to a ZIP archive" , NULL},
+    { "from-zip" , 0 , POPT_ARG_VAL , &operation , ZIP_TO_GCF , "copy given ZIP archive to a GCF archive" , NULL},    
 #endif
     { NULL , 0 , POPT_ARG_INCLUDE_TABLE , parameters , 0 , "Options", NULL },
     POPT_TABLEEND
@@ -183,96 +189,6 @@ static void gcf_copy(){
 /**************************************************************************/
 /* copy archive to ZIP                                                    */
 /**************************************************************************/
-#ifdef HAVE_ZIP_H
-
-typedef struct copy_zip_context {
-    archive_t src;
-    char*name;
-    struct zip *dst;
-    stream_t is;
-    long long int rd;
-} *copy_zip_context_t;
-
-static copy_zip_context_t copy_zip_setup(struct zip *dst,archive_t src,char*name){
-    copy_zip_context_t ctx=RT_NEW(struct copy_zip_context);
-    ctx->src=src;
-    ctx->dst=dst;
-    ctx->name=HREstrdup(name);
-    ctx->is=NULL;
-    ctx->rd=0;
-    return ctx;
-}
-
-#ifdef LIBZIP_VERSION
-#if LIBZIP_VERSION_MAJOR == 0 && LIBZIP_VERSION_MINOR == 10
-static zip_int64_t
-copy_zip_function(void *state, void *data, zip_uint64_t len, enum zip_source_cmd cmd)
-#else
-#error "libzip version not supported"
-#endif
-#else
-static ssize_t
-copy_zip_function(void *state, void *data, size_t len, enum zip_source_cmd cmd)
-#endif
-{
-    copy_zip_context_t ctx=(copy_zip_context_t)state;
-    switch(cmd){
-    case ZIP_SOURCE_OPEN:
-        Debug("open %s",ctx->name);
-        ctx->is=arch_read(ctx->src,ctx->name);
-        return 0;
-    case ZIP_SOURCE_READ:
-        if (ctx->is!=NULL) {
-            int res=stream_read_max(ctx->is,data,len);
-            ctx->rd+=res;
-            //Debug("read %d/%d from %s (%lld)",res,len,ctx->name,ctx->rd);
-            if (res<(ssize_t)len) {
-                // workaround:
-                // reading from empty stream returns data.
-                // libzip does not stop reading if res < len, but only is res=0!
-                Debug("close %s",ctx->name);
-                stream_close(&ctx->is);
-            }
-            return res;
-        } else {
-            return 0;
-        }
-    case ZIP_SOURCE_CLOSE:
-        if (ctx->is!=NULL) {
-            Debug("close %s",ctx->name);
-            stream_close(&ctx->is);
-        }
-        return 0;
-    case ZIP_SOURCE_STAT:
-    {
-        struct zip_stat *st=(struct zip_stat *)data;
-        zip_stat_init(st);
-        st->size=0;
-        st->mtime=time(NULL);
-        return sizeof(struct zip_stat);
-    }
-    case ZIP_SOURCE_ERROR:
-        Abort("error without error");
-    case ZIP_SOURCE_FREE:
-        RTfree(ctx->name);
-        RTfree(ctx);
-        return 0;
-    default:
-        Abort("missing case");
-    }
-}
-
-static int copy_zip_item(void*arg,int id,char*name){
-    (void)id;
-    copy_zip_context_t ctx=(copy_zip_context_t)arg;
-    Print(infoLong,"queueing %s",name);
-    copy_zip_context_t new_ctx=copy_zip_setup(ctx->dst,ctx->src,name);
-    struct zip_source* src=zip_source_function(ctx->dst,copy_zip_function,new_ctx);
-    if (zip_add(ctx->dst,name,src)<0){
-        Abort("cannot add to zip: %s\n", zip_strerror(ctx->dst));
-    }
-    return 0;
-}
 
 static void gcf_copy_zip(){
     char* source=HREnextArg();
@@ -287,44 +203,9 @@ static void gcf_copy_zip(){
         Abort("too many arguments");
     }
     archive_t arch_in=arch_gcf_read(raf_unistd(source));
-    // clean old zip if any.
-    if (unlink(target)&&errno!=ENOENT){
-        AbortCall("could not remove existing %s",target);
-    }
-    int err;
-    struct zip *za;
-    if ((za=zip_open(target, ZIP_CREATE , &err)) == NULL) {
-        char errstr[1024];
-        zip_error_to_str(errstr, sizeof(errstr), err, errno);
-        Abort("cannot open zip archive `%s': %s\n",target , errstr);
-    }
-    // setup copy operations.
-    struct arch_enum_callbacks cb={.new_item=copy_zip_item};
-    struct copy_zip_context ctx;
-    ctx.src=arch_in;
-    ctx.dst=za;
-    ctx.is=NULL;
-    ctx.name=NULL;
-    arch_enum_t e=arch_enum(arch_in,NULL);
-    if (arch_enumerate(e,&cb,&ctx)){
-        Abort("unexpected non-zero return");
-    }
-    arch_enum_free(&e);
-    // execute copy.
-    if (zip_close(za) < 0) {
-        Abort("cannot write zip archive `%s': %s\n", target, zip_strerror(za));
-    }
+    arch_zip_create(target,blocksize,coding_policy,arch_in);
     arch_close(&arch_in);
 }
-
-#else
-
-static void gcf_copy_zip(){
-    Abort("zip creation not supported");
-}
-
-#endif
-
 
 /**************************************************************************/
 /* (de)compress files and directories                                     */
@@ -349,7 +230,7 @@ static void gcf_compress(){
             }
             stream_close(&is);
             stream_close(&os);
-            recursive_erase(source);
+            if (!keep) recursive_erase(source);
         } else if (is_a_dir(source)){
             sprintf(target,"%s.gcf",source);
             archive_t arch_in=arch_dir_open(source,blocksize);
@@ -357,7 +238,7 @@ static void gcf_compress(){
             archive_copy(arch_in,arch_out,compression_policy,blocksize,NULL);
             arch_close(&arch_in);
             arch_close(&arch_out);
-            recursive_erase(source);
+            if (!keep) recursive_erase(source);
         } else {
             Abort("source %s is neither a file nor a directory",source);
         }
@@ -388,18 +269,23 @@ static void gcf_decompress(){
             }
             stream_close(&is);
             stream_close(&os);
-            recursive_erase(source);
-        } else if (has_extension(source,".gcf")){
+            if (!keep) recursive_erase(source);
+        } else if (has_extension(source,".gcf")||has_extension(source,".zip")){
             strncpy(target,source,strlen(source)-4);
             target[strlen(source)-4]=0;
-            archive_t arch_in=arch_gcf_read(raf_unistd(source));
+            archive_t arch_in;
+            if (has_extension(source,".gcf")){
+                arch_in=arch_gcf_read(raf_unistd(source));
+            } else {
+                arch_in=arch_zip_read(source,blocksize);
+            }
             archive_t arch_out=arch_dir_create(target,blocksize,force?DELETE_ALL:DELETE_NONE);
             archive_copy(arch_in,arch_out,NULL,blocksize,NULL);
             arch_close(&arch_in);
             arch_close(&arch_out);
-            recursive_erase(source);
+            if (!keep) recursive_erase(source);
         } else {
-            Abort("source %s does not have .gzf or .gcf extension",source);
+            Abort("source %s does not have known extension",source);
         }
     }
 }
@@ -420,9 +306,17 @@ static int list_item(void*arg,int no,archive_item_t item){
     ((struct list_count*)arg)->total_orig+=item->length;
     ((struct list_count*)arg)->total_compressed+=item->compressed;
     if (item->code==NULL || strlen(item->code)==0) {
-        Printf(infoShort,"%12lld %12s %s\n",item->length,"",item->name);
+        if (item->compressed<item->length && item->compressed>0) {
+            Printf(infoShort,"%12lld %12lld %s\n",item->length,item->compressed,item->name);
+        } else {
+            Printf(infoShort,"%12lld %12s %s\n",item->length,"",item->name);
+        }
     } else {
-        Printf(infoShort,"%12lld %12lld %s (%s)\n",item->length,item->compressed,item->name,item->code);
+        if (item->compressed==item->length || item->compressed==0) {
+            Printf(infoShort,"%12lld %12s %s (%s)\n",item->length,"",item->name,item->code);
+        } else {
+            Printf(infoShort,"%12lld %12lld %s (%s)\n",item->length,item->compressed,item->name,item->code);
+        }
     }
     return 0;
 }
@@ -457,6 +351,33 @@ static void gcf_list(){
     arch_close(&gcf);
 }
 
+
+static void zip_copy_gcf(){
+    char *gcf_name=HREnextArg();
+    if (gcf_name==NULL) {
+        Abort("missing <gcf archive> argument");
+    }
+    if (HREnextArg()){
+        Abort("too many arguments");
+    }
+    Printf(infoShort,"Archive %s contains:\n",gcf_name);
+    archive_t gcf=arch_zip_read(gcf_name,65536);
+    struct arch_enum_callbacks cb={.stat=list_item};
+    struct list_count totals={0,0,0};
+    Printf(infoShort," stream size   compressed stream name (compression)\n",gcf_name);
+    arch_enum_t e=arch_enum(gcf,NULL);
+    if (arch_enumerate(e,&cb,&totals)){
+        Abort("unexpected non-zero return");
+    }
+    Printf(infoShort,"totals:\n");
+    Printf(infoShort,"%12lld %12lld files: %d (%3.2f%%)\n",
+        totals.total_orig,totals.total_compressed,totals.files,
+        100.0*((float)(totals.total_orig-totals.total_compressed))/((float)totals.total_orig));
+    arch_enum_free(&e);
+    arch_close(&gcf);
+}
+
+
 /**************************************************************************/
 /* main                                                                   */
 /**************************************************************************/
@@ -465,7 +386,8 @@ int main(int argc, char *argv[]){
     HREinitBegin(argv[0]);
     HREaddOptions(options,"Tool for creating and extracting GCF archives\n\nOperations");
     HREinitStart(&argc,&argv,0,-1,NULL,"<operation> <arguments>");
-    compression_policy=SSMcreateSWP(policy);
+    compression_policy=SSMcreateSWP(gcf_policy);
+    coding_policy=SSMcreateSWP(zip_policy);
     switch(operation){
     case GCF_CREATE:
         gcf_create();
@@ -488,8 +410,13 @@ int main(int argc, char *argv[]){
     case GCF_TO_ZIP:
         gcf_copy_zip();
         break;
+    case ZIP_TO_GCF:
+        zip_copy_gcf();
+        break;
     default:
         Abort("Illegal arguments, type gcf -h for help");
     }
     HREexit(EXIT_SUCCESS);
 }
+
+
