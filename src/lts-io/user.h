@@ -6,6 +6,7 @@
 #include <hre-io/user.h>
 #include <lts-type.h>
 #include <tables.h>
+#include <string-map.h>
 
 /**
 \file lts-io/user.h
@@ -79,10 +80,14 @@ lts_file_t lts_file_create(const char* name,lts_type_t ltstype,int segments,lts_
 \brief Create a new LTS file that hides state vectors on-the-fly. (collective)
 
 This function adds a filter that hides the state vector.
-Eventually it will be a special case of a generic filter that can change vectors into
-state labels and hide arbitrary subsets of labels.
 */
 lts_file_t lts_file_create_nostate(const char* name,lts_type_t ltstype,int segments,lts_file_t settings);
+
+/**
+\brief Create a new LTS file that writes only the filtered state and edge labels. (collective)
+
+*/
+lts_file_t lts_file_create_filter(const char* name,lts_type_t ltstype,string_set_t filter,int segments,lts_file_t settings);
 
 /**
 \brief Open an existing LTS file. (collective)
