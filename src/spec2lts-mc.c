@@ -2372,7 +2372,7 @@ ta_covered (void *arg, lmap_store_t *stored, lmap_loc_t loc)
         ctx->done = 1;
         return LMAP_CB_STOP; //A l' : (E (s,l)eL : l>=l')=>(A (s,l)eL : l>=l')
     } else if ( TA_UPDATE_NONE != UPDATE &&
-            (TA_UPDATE_PASSED == UPDATE || TA_WAITING == stored->status) &&
+            (TA_UPDATE_PASSED == UPDATE || TA_WAITING == (ta_set_e_t)stored->status) &&
             GBisCoveredByShort(ctx->model, (int*)&stored->lattice, succ_l)) {
         lmap_delete (lmap, loc);
         ctx->last = (TA_NONE == ctx->last ? loc : ctx->last);
@@ -2421,7 +2421,7 @@ is_waiting (wctx_t *ctx, raw_data_t state_data)
     while (!global_try_color(ctx->state.ref, GRED, 0)) {} //lock
     int ret_val = 0;
     if (TA_UPDATE_NONE == UPDATE ||
-        TA_WAITING == lmap_get(lmap, ctx->state.loc)->status) {
+        TA_WAITING == (ta_set_e_t)lmap_get(lmap, ctx->state.loc)->status) {
         lmap_set (lmap, ctx->state.loc, TA_PASSED);
         ret_val = 1;
     } else {
