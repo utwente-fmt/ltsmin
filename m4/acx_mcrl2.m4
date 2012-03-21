@@ -29,7 +29,7 @@ if test x"$acx_mcrl2" = xyes; then
       8) MCRL2_PINS_CPPFLAGS="-DAT_64BIT" ;;
       *) AC_MSG_FAILURE([can only compile mCRL2 on 32- and 64-bit machines.]) ;;
     esac
-    AC_SUBST(MCRL2_PINS_CPPFLAGS, ["$MCRL2_PINS_CPPFLAGS -I$with_mcrl2/include"])
+    AC_SUBST(MCRL2_PINS_CPPFLAGS, ["$MCRL2_PINS_CPPFLAGS -I$with_mcrl2/include -I$with_mcrl2/include/dparser"])
     AC_SUBST(MCRL2_PINS_LDFLAGS,  ["-L${with_mcrl2}/lib/mcrl2"])
     AC_SUBST(MCRL2_LIBS, [""])
     AC_SUBST(MCRL2_LDFLAGS, ["$acx_cv_cc_export_dynamic"])
