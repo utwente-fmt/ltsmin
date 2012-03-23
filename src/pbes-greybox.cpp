@@ -19,6 +19,12 @@ extern "C" {
 
 } // end of extern "C"
 
+#ifdef MCRL2_JITTYC_AVAILABLE
+static std::string mcrl2_rewriter_strategy = "jittyc";
+#else
+static std::string mcrl2_rewriter_strategy = "jitty";
+#endif
+
 using namespace mcrl2;
 using namespace mcrl2::core;
 using namespace mcrl2::data;
@@ -34,7 +40,7 @@ private:
     std::vector<std::map<int,int> > global2local_maps;
 
 public:
-    explorer(model_t& model, const std::string& filename, data::rewrite_strategy rewrite_strategy = jitty_compiling, bool reset = false) :
+    explorer(model_t& model, const std::string& filename, const std::string& rewrite_strategy, bool reset = false) :
         mcrl2::pbes_system::explorer(filename, rewrite_strategy, reset),
         model_(model)
     {
@@ -331,9 +337,8 @@ void PBESloadGreyboxModel(model_t model, const char*name)
     log::log_level_t log_level = debug_flag ? log::debug1 : log::quiet;
     log::mcrl2_logger::set_reporting_level(log_level);
 
-    data::rewrite_strategy rewrite_strategy = jitty_compiling;
     bool reset = (reset_flag==1);
-    ltsmin::explorer* pbes_explorer = new ltsmin::explorer(model, std::string(name), rewrite_strategy, reset);
+    ltsmin::explorer* pbes_explorer = new ltsmin::explorer(model, std::string(name), mcrl2_rewriter_strategy, reset);
     ctx->pbes_explorer = pbes_explorer;
     lts_info* info = pbes_explorer->get_info();
     lts_type_t ltstype = PBESgetLTSType(info->get_lts_type());
