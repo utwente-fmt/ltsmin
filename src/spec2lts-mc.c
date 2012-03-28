@@ -156,6 +156,8 @@ static permutation_perm_t permutation = Perm_Unknown;
 static permutation_perm_t permutation_red = Perm_Unknown;
 static char*            trc_output = NULL;
 static int              dlk_detect = 0;
+static int              assert_detect = 0;
+static int              assert_index = -1;
 static size_t           G = 100;
 static size_t           H = MAX_HANDOFF_DEFAULT;
 static int              ZOBRIST = 0;
@@ -295,6 +297,7 @@ static struct poptOption options[] = {
     {"ref", 0, POPT_ARG_VAL, &refs, 1, "store references on the stack/queue instead of full states", NULL},
     {"max", 0, POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &max, 0, "maximum search depth", "<int>"},
     {"deadlock", 'd', POPT_ARG_VAL, &dlk_detect, 1, "detect deadlocks", NULL },
+    {"assert", 'a', POPT_ARG_VAL, &assert_detect, 1, "detect assertion errors (SpinJa)", NULL },
     {"trace", 0, POPT_ARG_STRING, &trc_output, 0, "file to write trace to", "<lts output>" },
     SPEC_POPT_OPTIONS,
     {NULL, 0, POPT_ARG_INCLUDE_TABLE, greybox_options, 0, "Greybox options", NULL},
@@ -424,6 +427,8 @@ typedef struct counter_s {
     size_t              rec;            // recursive ndfss
     size_t              splits;         // Splits by LB
     size_t              transfer;       // load transfered by LB
+    size_t              deadlocks;      // deadlock count
+    size_t              errors;         // assertion error count
 } counter_t;
 
 typedef struct thread_ctx_s wctx_t;
@@ -507,6 +512,8 @@ add_results (counter_t *res, counter_t *cnt)
     res->bogus_red += cnt->bogus_red;
     res->splits += cnt->splits;
     res->transfer += cnt->transfer;
+    res->deadlocks += cnt->deadlocks;
+    res->errors += cnt->errors;
 }
 
 static void
@@ -523,7 +530,7 @@ static inline void
 wait_seed (wctx_t *ctx, ref_t seed)
 {
     int didwait = 0;
-    while (get_wip(seed) > 0 && !lb_is_stopped(lb)) { didwait = 1;} //wait
+    while (get_wip(seed) > 0 && !lb_is_stopped(lb)) { didwait = 1; } //wait
     if (didwait) {
         ctx->red.waits++;
     }
@@ -723,6 +730,19 @@ init_globals (int argc, char *argv[])
     N = lts_type_get_state_length (ltstype);
     K = dm_nrows (m);
     Warning (info, "State length is %d, there are %d groups", N, K);
+
+    if (assert_detect) {
+        for (int i = 0; i < edge_labels; i++) {
+            char *name = lts_type_get_edge_label_name(ltstype, i);
+            if (0 == strcmp(name, "assert")) {
+                assert_index = lts_type_get_edge_label_typeno(ltstype, i);
+            }
+        }
+        if (-1 == assert_index) {
+            Warning (info, "Cannot find assertion errors, no such edge label is defined!");
+            assert_detect = 0;
+        }
+    }
 
     if (0 == dbs_size) {
         size_t              el_size = db_type == UseTreeDBSLL ? 3 : N;
@@ -942,11 +962,11 @@ print_statistics (counter_t *ar_reach, counter_t *ar_red, mytimer_t timer,
     if (RTverbosity >= 2) {        // internal counters
         Warning (info, "Internal statistics:\n\n"
         		 "Algorithm:\nWork time: %.2f sec\nUser time: %.2f sec\nExplored: %zu\n"
-        		 	 "Transitions: %zu\nWaits: %zu\nRec. calls: %zu\n\n"
+        		 	 "Transitions: %zu\nDeadlocks: %zu\nAssertion errors: %zu\nWaits: %zu\nRec. calls: %zu\n\n"
                  "Database:\nElements: %zu\nNodes: %zu\nMisses: %zu\nEq. tests: %zu\nRehashes: %zu\n\n"
                  "Memory:\nQueue: %.1f MB\nDB: %.1f MB\nDB alloc.: %.1f MB\nColors: %.1f MB\n\n"
                  "Load balancer:\nSplits: %zu\nLoad transfer: %zu",
-                 tot, reach->runtime, reach->explored, reach->trans, red->waits, reach->rec,
+                 tot, reach->runtime, reach->explored, reach->trans, reach->deadlocks, reach->errors, red->waits, reach->rec,
                  db_elts, db_nodes, stats->misses, stats->tests, stats->rehashes,
                  mem1, mem4, mem2, mem3,
                  reach->splits, reach->transfer);
@@ -1369,13 +1389,12 @@ ndfs_report_cycle (wctx_t *ctx, state_info_t *cycle_closing_state)
 }
 
 static void
-handle_deadlock (wctx_t *ctx)
+handle_error_trace (wctx_t *ctx)
 {
     /* Stop other workers, exit if some other worker was first here */
     if ( !lb_stop(lb) )
         return;
     size_t              level = ctx->counters.level_cur;
-    Warning (info,"Deadlock found in state at depth %zu!", level);
     if (trc_output) {
         ref_t               start_ref = initial_state.ref;
         trc_env_t  *trace_env = trc_create (ctx->model, get_state, start_ref, ctx);
@@ -1962,6 +1981,14 @@ reach_handle (void *arg, state_info_t *successor, transition_info_t *ti,
         ctx->load++;
         ctx->counters.visited++;
     }
+    if (NULL != ti->labels && 0 != ti->labels[0] && !lb_is_stopped(lb)) {
+        ctx->counters.errors++;
+        if (assert_detect) {
+            chunk c = GBchunkGet (ctx->model, assert_index, ti->labels[0]);
+            Warning (info, "Assertion error (%s) found at depth %zu!", c.data, ctx->counters.level_cur);
+            handle_error_trace (ctx);
+        }
+    }
     ctx->counters.trans++;
     (void) ti;
 }
@@ -1990,8 +2017,13 @@ explore_state (wctx_t *ctx, raw_data_t state, int next_index)
         for (i = next_index; i<K && count<MAX_SUCC; i++)
             count += GBgetTransitionsLong (ctx->model, i, ctx->state.data,
                                            reach_handle_wrap, ctx);
-    if ( dlk_detect && (0==count && 0==next_index) )
-        handle_deadlock (ctx);
+    if (0 == count && 0 == next_index && !lb_is_stopped(lb)) {
+        ctx->counters.deadlocks++;
+        if (dlk_detect) {
+            Warning (info,"Deadlock found in state at depth %zu!", ctx->counters.level_cur);
+            handle_error_trace (ctx);
+        }
+    }
     maybe_report (&ctx->counters, "", &threshold);
     return i;
 }
