@@ -35,6 +35,8 @@ const char* (*spinja_get_type_name)(int type);
 int         (*spinja_get_type_count)();
 const char* (*spinja_get_type_value_name)(int type, int value);
 int         (*spinja_get_type_value_count)(int type);
+const char* (*spinja_get_edge_name)(int type);
+int         (*spinja_get_edge_count)();
 
 int         (*spinja_buchi_is_accepting)(void* model, int* state);
 
@@ -105,6 +107,40 @@ static void sl_all_p (model_t model, int *state, int *labels) {
 	labels[GBgetAcceptingStateLabelIndex(model)] = spinja_buchi_is_accepting(model, state);
 }
 
+static int
+sl_long_p_g (model_t model, int label, int *state)
+{
+    assert (0 == GBgetAcceptingStateLabelIndex(model));
+    if (label == 0) {
+        return spinja_buchi_is_accepting(model, state);
+    } else {
+        return get_guard(model, label - 1, state);
+    }
+}
+
+static void
+sl_all_p_g (model_t model, int *state, int *labels)
+{
+    assert (0 == GBgetAcceptingStateLabelIndex(model));
+    get_guard_all(model, state, labels+1);
+    labels[0] = spinja_buchi_is_accepting(model, state);
+}
+
+static void
+sl_group (model_t model, sl_group_enum_t group, int *state, int *labels)
+{
+    switch (group) {
+        case GB_SL_ALL:
+            GBgetStateLabelsAll(model, state, labels);
+            return;
+        case GB_SL_GUARDS:
+            get_guard_all(model, state, labels);
+            return;
+        default:
+            return;
+    }
+}
+
 void
 SpinJaloadDynamicLib(model_t model, const char *filename)
 {
@@ -154,6 +190,11 @@ SpinJaloadDynamicLib(model_t model, const char *filename)
         RTdlsym( filename, dlHandle, "spinja_get_type_value_count" );
     spinja_buchi_is_accepting = (int(*)())
         RT_optdlsym( filename, dlHandle, "spinja_buchi_is_accepting" );
+
+    spinja_get_edge_name = (const char*(*)(int))
+        RT_optdlsym( filename, dlHandle, "spinja_get_edge_name" );
+    spinja_get_edge_count = (int(*)())
+        RT_optdlsym( filename, dlHandle, "spinja_get_edge_count" );
 
     // optional, guard support (used for por)
     get_guard_count = (int(*)())
@@ -210,6 +251,7 @@ SpinJaloadGreyboxModel(model_t model, const char *filename)
             Fatal(1,error,"wrong type number");
         }
     }
+
     int bool_is_new, bool_type = lts_type_add_type (ltstype, "bool", &bool_is_new);
 
     lts_type_set_state_length(ltstype, state_length);
@@ -222,7 +264,18 @@ SpinJaloadGreyboxModel(model_t model, const char *filename)
         lts_type_set_state_typeno(ltstype,i,type);
     }
 
+    int assert_type = 0;
+    if (NULL != spinja_get_edge_count)
+         assert_type = lts_type_add_type(ltstype, "assert", NULL);
     GBsetLTStype(model, ltstype);
+
+    if (bool_is_new) {
+        int idx_false = GBchunkPut(model, bool_type, chunk_str("false"));
+        int idx_true  = GBchunkPut(model, bool_type, chunk_str("true"));
+        assert (idx_false == 0);
+        assert (idx_true == 1);
+        (void)idx_false; (void)idx_true;
+    }
 
     // setting values for types
     for(int i=0; i < ntypes; i++) {
@@ -231,6 +284,18 @@ SpinJaloadGreyboxModel(model_t model, const char *filename)
             const char* type_value = spinja_get_type_value_name(i, j);
             GBchunkPut(model, i, chunk_str((char*)type_value));
         }
+    }
+
+    if (NULL != spinja_get_edge_count) {
+         for (int i = 0; i < spinja_get_edge_count(); i++) {
+             const char* edge_value = spinja_get_edge_name(i);
+             int num = GBchunkPut(model, assert_type, chunk_str((char*)edge_value));
+             assert (i == num);
+         }
+         lts_type_set_edge_label_count(ltstype, 1);
+         lts_type_set_edge_label_name(ltstype, 0, "assert");
+         lts_type_set_edge_label_type(ltstype, 0, "assert");
+         lts_type_set_edge_label_typeno(ltstype, 0, assert_type);
     }
 
     // check for guards
@@ -255,10 +320,13 @@ SpinJaloadGreyboxModel(model_t model, const char *filename)
     
     // check for property
     int model_has_property = 0;
+    int property_index = 0;
     if ( spinja_buchi_is_accepting ) {
         for(int i=state_length; i--;) {
-            if(!strcmp("never.pc",lts_type_get_state_name(ltstype,i))) {
+            if(!strcmp("never._pc",lts_type_get_state_name(ltstype,i))) {
+                printf("found property: %i\n",i);
                 model_has_property = 1;
+                property_index = i;
             }
         }
     }
@@ -313,28 +381,48 @@ SpinJaloadGreyboxModel(model_t model, const char *filename)
 
 	dm_create(sl_info, sl_size, state_length);
 	
-	if(model_has_property) {
-		for(int i=state_length; i--;) {
-			if(!strcmp("never.pc",lts_type_get_state_name(ltstype,i))) {
-				printf("found property: %i\n",i);
-				dm_set(sl_info, GBgetAcceptingStateLabelIndex(model), i);
-			}
-		}
-	}
-	
+	if (model_has_property)
+	    dm_set(sl_info, GBgetAcceptingStateLabelIndex(model), property_index);
+
 	GBsetStateLabelInfo(model, sl_info);
 
 	lts_type_validate(ltstype);
+
+    // set the group implementation
+    sl_group_t* sl_group_all = RTmallocZero(sizeof(sl_group_t) + sl_size * sizeof(int));
+    sl_group_all->count = sl_size;
+    if (model_has_guards) {
+        for(int i=0; i < sl_group_all->count; i++) sl_group_all->sl_idx[i] = i;
+        sl_group_t* sl_group_guards = RTmallocZero(sizeof(sl_group_t) + get_guard_count() * sizeof(int));
+        sl_group_guards->count = get_guard_count();
+        for(int i=0; i < sl_group_guards->count; i++) sl_group_guards->sl_idx[i] = i;
+        GBsetStateLabelGroupInfo(model, GB_SL_GUARDS, sl_group_guards);
+    }
+    GBsetStateLabelGroupInfo(model, GB_SL_ALL, sl_group_all);
+    GBsetStateLabelsGroup(model, sl_group);
+
 
     // get initial state
     int state[state_length];
     spinja_get_initial_state(state);
     GBsetInitialState(model,state);
 
+    // get next state
     GBsetNextStateAll  (model, spinja_get_successor_all);
     GBsetNextStateLong (model, spinja_get_successor);
+
+    // get state labels
 	if(model_has_property) {
-		GBsetStateLabelLong(model, sl_long_p);
-		GBsetStateLabelsAll(model, sl_all_p);
-	}
+	    if (model_has_guards) {
+            GBsetStateLabelLong(model, sl_long_p);
+            GBsetStateLabelsAll(model, sl_all_p);
+	    } else {
+            GBsetStateLabelLong(model, sl_long_p_g);
+            GBsetStateLabelsAll(model, sl_all_p_g);
+	    }
+	} else if (model_has_guards) {
+        // pass request directly to dynamic lib
+	    GBsetStateLabelLong(model, (get_label_method_t) get_guard);
+	    GBsetStateLabelsAll(model, (get_label_all_method_t) get_guard_all);
+    }
 }
