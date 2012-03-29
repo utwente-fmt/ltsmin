@@ -188,7 +188,7 @@ SpinJaloadDynamicLib(model_t model, const char *filename)
         RTdlsym( filename, dlHandle, "spinja_get_type_value_name" );
     spinja_get_type_value_count = (int(*)(int))
         RTdlsym( filename, dlHandle, "spinja_get_type_value_count" );
-    spinja_buchi_is_accepting = (int(*)())
+    spinja_buchi_is_accepting = (int(*)(void*arg,int*state))
         RT_optdlsym( filename, dlHandle, "spinja_buchi_is_accepting" );
 
     spinja_get_edge_name = (const char*(*)(int))
@@ -324,7 +324,6 @@ SpinJaloadGreyboxModel(model_t model, const char *filename)
     if ( spinja_buchi_is_accepting ) {
         for(int i=state_length; i--;) {
             if(!strcmp("never._pc",lts_type_get_state_name(ltstype,i))) {
-                printf("found property: %i\n",i);
                 model_has_property = 1;
                 property_index = i;
             }
