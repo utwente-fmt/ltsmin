@@ -570,7 +570,7 @@ bs_emit_dlk(model_t model, por_context* pctx, int* src, TransitionCB cb, void* c
             // enabled && selected
             if (!pctx->group_status[i]&GS_DISABLED &&
                  pctx->search[pctx->search_order[0]].emit_status[i]&ES_SELECTED) {
-                 res+=GBgetTransitionsLong(pctx->parent,i,src,cb,ctx);
+                res+=GBgetTransitionsLong(pctx->parent,i,src,cb,ctx);
             }
         }
         return res;
@@ -757,7 +757,7 @@ GBaddPOR (model_t model, int por_check_ltl )
         for(int j=0; j < groups; j++) {
             for(int k=0; k < len; k++) {
                 if (dm_is_set( p_sl, sl_guards->sl_idx[i], k ) && dm_is_set( p_dm_w, j, k )) {
-                    dm_set( &ctx->guard_is_dependent, sl_guards->sl_idx[i], j );
+                    dm_set( &ctx->guard_is_dependent, i, j );
                     break;
                 }
             }
