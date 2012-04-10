@@ -103,14 +103,12 @@ static int sl_long_p (model_t model, int label, int *state) {
 }
 
 static void sl_all_p (model_t model, int *state, int *labels) {
-	assert (labels != NULL);
-	labels[GBgetAcceptingStateLabelIndex(model)] = spinja_buchi_is_accepting(model, state);
+	labels[0] = spinja_buchi_is_accepting(model, state);
 }
 
 static int
 sl_long_p_g (model_t model, int label, int *state)
 {
-    assert (0 == GBgetAcceptingStateLabelIndex(model));
     if (label == 0) {
         return spinja_buchi_is_accepting(model, state);
     } else {
@@ -121,9 +119,8 @@ sl_long_p_g (model_t model, int label, int *state)
 static void
 sl_all_p_g (model_t model, int *state, int *labels)
 {
-    assert (0 == GBgetAcceptingStateLabelIndex(model));
-    get_guard_all(model, state, labels+1);
     labels[0] = spinja_buchi_is_accepting(model, state);
+    get_guard_all(model, state, labels + 1);
 }
 
 static void
@@ -198,25 +195,32 @@ SpinJaloadDynamicLib(model_t model, const char *filename)
 
     // optional, guard support (used for por)
     get_guard_count = (int(*)())
-        RT_optdlsym( filename, dlHandle, "get_guard_count" );
+        RT_optdlsym( filename, dlHandle, "spinja_get_guard_count" );
     get_guard_matrix = (const int*(*)(int))
-        RT_optdlsym( filename, dlHandle, "get_guard_matrix" );
+        RT_optdlsym( filename, dlHandle, "spinja_get_guard_matrix" );
     get_guards = (const int*(*)(int))
-        RT_optdlsym( filename, dlHandle, "get_guards" );
+        RT_optdlsym( filename, dlHandle, "spinja_get_guards" );
     get_all_guards = (const int**(*)())
-        RT_optdlsym( filename, dlHandle, "get_all_guards" );
+        RT_optdlsym( filename, dlHandle, "spinja_get_all_guards" );
     get_guard = (int(*)(void*,int,int*))
-        RT_optdlsym( filename, dlHandle, "get_guard" );
+        RT_optdlsym( filename, dlHandle, "spinja_get_guard" );
     get_guard_all = (void(*)(void*,int*,int*))
-        RT_optdlsym( filename, dlHandle, "get_guard_all" );
+        RT_optdlsym( filename, dlHandle, "spinja_get_guard_all" );
     get_guard_may_be_coenabled_matrix = (const int*(*)(int))
-        RT_optdlsym( filename, dlHandle, "get_guard_may_be_coenabled_matrix" );
+        RT_optdlsym( filename, dlHandle, "spinja_get_guard_may_be_coenabled_matrix" );
     get_guard_nes_matrix = (const int*(*)(int))
-        RT_optdlsym( filename, dlHandle, "get_guard_nes_matrix" );
+        RT_optdlsym( filename, dlHandle, "spinja_get_guard_nes_matrix" );
     get_guard_nds_matrix = (const int*(*)(int))
-        RT_optdlsym( filename, dlHandle, "get_guard_nds_matrix" );
+        RT_optdlsym( filename, dlHandle, "spinja_get_guard_nds_matrix" );
 
     (void)model;
+}
+
+int
+cmpEnd(char *str, char *m)
+{
+    if (strlen(str) < strlen(m)) return 0;
+    return strcmp(&str[strlen(str) - strlen(m)], m);
 }
 
 void
@@ -227,6 +231,9 @@ SpinJaloadGreyboxModel(model_t model, const char *filename)
     matrix_t *dm_read_info = RTmalloc(sizeof(matrix_t));
     matrix_t *dm_write_info = RTmalloc(sizeof(matrix_t));
     matrix_t *sl_info = RTmalloc (sizeof *sl_info);
+    matrix_t *gce_info = RTmalloc(sizeof(matrix_t));  // guard may be co-enabled information
+    matrix_t *gnes_info = RTmalloc(sizeof(matrix_t)); // guard necessary enabling set information
+    matrix_t *gnds_info = RTmalloc(sizeof(matrix_t)); // guard necessary disabling set informaiton
 
     //assume sequential use:
     if (NULL == dlHandle) {
@@ -237,7 +244,7 @@ SpinJaloadGreyboxModel(model_t model, const char *filename)
     GBsetContext(model,ctx);
 
     // get ltstypes
-    int state_length = spinja_get_state_size(); /* FIXME: _state_var_count() */
+    int state_length = spinja_get_state_size();
     ltstype=lts_type_create();
 
     // adding types
@@ -298,6 +305,11 @@ SpinJaloadGreyboxModel(model_t model, const char *filename)
          lts_type_set_edge_label_typeno(ltstype, 0, assert_type);
     }
 
+    // get initial state
+    int state[state_length];
+    spinja_get_initial_state(state);
+    GBsetInitialState(model,state);
+
     // check for guards
     int model_has_guards = 0;
     if (get_guard_count
@@ -319,18 +331,17 @@ SpinJaloadGreyboxModel(model_t model, const char *filename)
     }
     
     // check for property
-    int model_has_property = 0;
+    int model_is_buchi = 0;
     int property_index = 0;
-    if ( spinja_buchi_is_accepting ) {
-        for(int i=state_length; i--;) {
-            if(!strcmp("never._pc",lts_type_get_state_name(ltstype,i))) {
-                model_has_property = 1;
-                property_index = i;
-            }
+    for(int i = state_length; i--;) {
+        char *name = lts_type_get_state_name(ltstype, i);
+        if(!strcmp("never._pc", name)) {
+            model_is_buchi = 1;
+            property_index = i;
         }
     }
 
-    int ngroups = spinja_get_transition_groups(); /* FIXME: _count */
+    int ngroups = spinja_get_transition_groups();
     dm_create(dm_info, ngroups, state_length);
     dm_create(dm_read_info, ngroups, state_length);
     dm_create(dm_write_info, ngroups, state_length);
@@ -355,33 +366,90 @@ SpinJaloadGreyboxModel(model_t model, const char *filename)
 	// init state labels
 	int sl_size = 0
 	            + (model_has_guards   ? get_guard_count() : 0)
-	            + (model_has_property ? 1                 : 0)
+	            + 1 // property is either accepting state or valid end state
 	            ;
 	lts_type_set_state_label_count (ltstype, sl_size);
 
 	int sl_current = 0;
-	if(model_has_property) {
-		lts_type_set_state_label_name   (ltstype, sl_current, "buchi_accept_spinja");
-		lts_type_set_state_label_typeno (ltstype, sl_current, bool_type);
-		GBsetAcceptingStateLabelIndex(model,sl_current);
-		++sl_current;
-	}
+    lts_type_set_state_label_name   (ltstype, sl_current, "buchi_accept_spinja");
+    lts_type_set_state_label_typeno (ltstype, sl_current, bool_type);
+    GBsetAcceptingStateLabelIndex(model, sl_current);
+    ++sl_current;
+
+    dm_create(sl_info, sl_size, state_length);
+
+    if (model_is_buchi) {
+        dm_set(sl_info, GBgetAcceptingStateLabelIndex(model), property_index);
+    } else {
+        // overload accepting state semantics with valid end states semantics!
+        for (int i = state_length; i--;) {
+            char *name = lts_type_get_state_name(ltstype, i);
+            if((!cmpEnd(name, "._pc")) || (!cmpEnd(name, "._nr_pr"))) {
+                dm_set(sl_info, GBgetAcceptingStateLabelIndex(model), i);
+            }
+        }
+    }
+
 	if (model_has_guards) {
 		char buf[256];
+		int nguards = get_guard_count();
 		int guards_max = sl_current + get_guard_count();
 		for(;sl_current < guards_max; ++sl_current) {
 			snprintf(buf, 256, "guard_%d", sl_current);
 			lts_type_set_state_label_name (ltstype, sl_current, buf);
 			lts_type_set_state_label_typeno (ltstype, sl_current, bool_type);
 		}
-	}
-	
-	assert(sl_current==sl_size);
 
-	dm_create(sl_info, sl_size, state_length);
-	
-	if (model_has_property)
-	    dm_set(sl_info, GBgetAcceptingStateLabelIndex(model), property_index);
+	    // set the guards per transition group
+	    GBsetGuardsInfo(model, (guard_t**) get_all_guards());
+
+	    // initialize state label matrix
+	    // assumption, guards come first or second (0--nguards-1 | 1--nguards)
+	    for(int i = 0; i < nguards; i++) {
+	        int* guards = (int*)get_guard_matrix(i);
+	        for(int j=0; j<state_length; j++) {
+	            if (guards[j]) dm_set(sl_info, i + 1, j);
+	        }
+	    }
+
+	    // set guard may be co-enabled relation
+	    if (get_guard_may_be_coenabled_matrix) {
+	        dm_create(gce_info, nguards, nguards);
+	        for(int i=0; i < nguards; i++) {
+	            int* guardce = (int*)get_guard_may_be_coenabled_matrix(i);
+	            for(int j=0; j<nguards; j++) {
+	                if (guardce[j]) dm_set(gce_info, i, j);
+	            }
+	        }
+	        GBsetGuardCoEnabledInfo(model, gce_info);
+	    }
+
+	    // set guard necessary enabling set info
+	    if (get_guard_nes_matrix) {
+	        dm_create(gnes_info, nguards, ngroups);
+	        for(int i=0; i < nguards; i++) {
+	            int* guardnes = (int*)get_guard_nes_matrix(i);
+	            for(int j=0; j<ngroups; j++) {
+	                if (guardnes[j]) dm_set(gnes_info, i, j);
+	            }
+	        }
+	        GBsetGuardNESInfo(model, gnes_info);
+	    }
+
+	    // set guard necessary disabling set info
+	    if (get_guard_nds_matrix) {
+	        dm_create(gnds_info, nguards, ngroups);
+	        for(int i=0; i < nguards; i++) {
+	            int* guardnds = (int*)get_guard_nds_matrix(i);
+	            for(int j=0; j<ngroups; j++) {
+	                if (guardnds[j]) dm_set(gnds_info, i, j);
+	            }
+	        }
+	        GBsetGuardNDSInfo(model, gnds_info);
+	    }
+	}
+    assert (0 == GBgetAcceptingStateLabelIndex(model));
+	assert(sl_current==sl_size);
 
 	GBsetStateLabelInfo(model, sl_info);
 
@@ -390,38 +458,26 @@ SpinJaloadGreyboxModel(model_t model, const char *filename)
     // set the group implementation
     sl_group_t* sl_group_all = RTmallocZero(sizeof(sl_group_t) + sl_size * sizeof(int));
     sl_group_all->count = sl_size;
+    for(int i=0; i < sl_group_all->count; i++) sl_group_all->sl_idx[i] = i;
+    GBsetStateLabelGroupInfo(model, GB_SL_ALL, sl_group_all);
     if (model_has_guards) {
-        for(int i=0; i < sl_group_all->count; i++) sl_group_all->sl_idx[i] = i;
         sl_group_t* sl_group_guards = RTmallocZero(sizeof(sl_group_t) + get_guard_count() * sizeof(int));
         sl_group_guards->count = get_guard_count();
-        for(int i=0; i < sl_group_guards->count; i++) sl_group_guards->sl_idx[i] = i;
+        for(int i=0; i < sl_group_guards->count; i++) sl_group_guards->sl_idx[i] = i + 1;
         GBsetStateLabelGroupInfo(model, GB_SL_GUARDS, sl_group_guards);
     }
-    GBsetStateLabelGroupInfo(model, GB_SL_ALL, sl_group_all);
     GBsetStateLabelsGroup(model, sl_group);
-
-
-    // get initial state
-    int state[state_length];
-    spinja_get_initial_state(state);
-    GBsetInitialState(model,state);
 
     // get next state
     GBsetNextStateAll  (model, spinja_get_successor_all);
     GBsetNextStateLong (model, spinja_get_successor);
 
     // get state labels
-	if(model_has_property) {
-	    if (model_has_guards) {
-            GBsetStateLabelLong(model, sl_long_p);
-            GBsetStateLabelsAll(model, sl_all_p);
-	    } else {
-            GBsetStateLabelLong(model, sl_long_p_g);
-            GBsetStateLabelsAll(model, sl_all_p_g);
-	    }
-	} else if (model_has_guards) {
-        // pass request directly to dynamic lib
-	    GBsetStateLabelLong(model, (get_label_method_t) get_guard);
-	    GBsetStateLabelsAll(model, (get_label_all_method_t) get_guard_all);
+    if (model_has_guards) {
+        GBsetStateLabelLong(model, sl_long_p_g);
+        GBsetStateLabelsAll(model, sl_all_p_g);
+    } else {
+        GBsetStateLabelLong(model, sl_long_p);
+        GBsetStateLabelsAll(model, sl_all_p);
     }
 }

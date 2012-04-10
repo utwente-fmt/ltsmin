@@ -8,6 +8,7 @@
 #include <pthread.h>
 #include <sched.h>
 #include <signal.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -2003,6 +2004,16 @@ reach_handle_wrap (void *arg, transition_info_t *ti, state_data_t data)
     reach_handle (arg, &successor, ti, seen);
 }
 
+int
+valid_end_state(wctx_t *ctx, raw_data_t state)
+{
+#if defined(SPINJA)
+    return GBbuchiIsAccepting(ctx->model, state);
+#endif
+    return false;
+    (void) ctx; (void) state;
+}
+
 static inline int
 explore_state (wctx_t *ctx, raw_data_t state, int next_index)
 {
@@ -2017,7 +2028,8 @@ explore_state (wctx_t *ctx, raw_data_t state, int next_index)
         for (i = next_index; i<K && count<MAX_SUCC; i++)
             count += GBgetTransitionsLong (ctx->model, i, ctx->state.data,
                                            reach_handle_wrap, ctx);
-    if (0 == count && 0 == next_index && !lb_is_stopped(lb)) {
+    if (0 == count && 0 == next_index && !lb_is_stopped(lb) &&
+            !valid_end_state(ctx, ctx->state.data)) {
         ctx->counters.deadlocks++;
         if (dlk_detect) {
             Warning (info,"Deadlock found in state at depth %zu!", ctx->counters.level_cur);
