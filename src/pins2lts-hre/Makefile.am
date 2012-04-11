@@ -16,7 +16,7 @@ if HAVE_LIBMCRL2
 bin_PROGRAMS += lps2lts-hre
 endif
 
-if HAVE_LIBMCRL2
+if HAVE_LIBPBES
 bin_PROGRAMS += pbes2lts-hre
 endif
 

@@ -21,7 +21,20 @@ case "$with_mcrl2" in
    *) acx_mcrl2=yes;;
 esac
 
+[acx_pbes=no]
+export acx_pbes
+
 if test x"$acx_mcrl2" = xyes; then
+    if test ! -x "$with_mcrl2/bin/mcrl22lps"; then
+        AC_MSG_FAILURE([can not find mcrl22lps.])
+    fi
+    mcrl2_svn_version="`mcrl22lps --version 2>&1|grep -m1 -o \" [[0-9\.]]* \"|sed \"s/.*\.\([[0-9]]*\) .*/\1/g\"`"
+    AX_COMPARE_VERSION([eval($mcrl2_svn_version)],[ge],[10409],
+        [acx_pbes=yes]
+        [PBES="`mcrl22lps --version 2>&1|head -n1`"]
+        export PBES,
+        AC_MSG_WARN([mcrl2 library not suited for PBES tools (< svn10409).])
+    )
     AC_LANG_PUSH([C++])
     AC_CHECK_SIZEOF([void *])
     case "$ac_cv_sizeof_void_p" in
@@ -97,7 +110,7 @@ if test x"$acx_mcrl2" = xyes; then
        AX_CXX_CHECK_LIB([mcrl2_pbes], [main],
          [MCRL2_PINS_LIBS="-lmcrl2_pbes $MCRL2_PINS_LIBS"
           LIBS="-lmcrl2_pbes $LIBS"],
-         [acx_mcrl2_libs=no])
+         [acx_pbes=no])
       ])
     AC_LANG_POP([C++])
 
