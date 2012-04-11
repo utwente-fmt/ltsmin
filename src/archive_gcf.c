@@ -75,7 +75,7 @@ static void gcf_stream_write(stream_t s,void* buf,size_t count){
 		char*tmp=s->arch->buffer;
 		s->arch->buffer=s->arch->other;
 		s->arch->other=tmp;
-		bzero(s->arch->buffer,s->arch->cluster_size);
+		memset(s->arch->buffer,0,s->arch->cluster_size);
 		s->arch->next_cluster+=s->arch->worker_count;
 		s->arch->meta_block=((s->arch->next_cluster))%(s->arch->block_count);
 		s->arch->meta=(uint32_t*)((s->arch->buffer)+((s->arch->meta_offset)+(s->arch->meta_block)*(s->arch->block_size)));
@@ -191,7 +191,7 @@ archive_t arch_gcf_create(raf_t raf,size_t block_size,size_t cluster_size,int wo
 	arch->buffer=RTmalloc(cluster_size);
 	arch->pending=0;
 	arch->other=RTmalloc(cluster_size);
-	bzero(arch->buffer,cluster_size);
+	memset(arch->buffer,0,cluster_size);
 	arch->meta_block=worker%(arch->block_count);
 	arch->meta_offset=1024;
 	arch->meta=(uint32_t*)((arch->buffer)+((arch->meta_offset)+(arch->meta_block)*(arch->block_size)));
