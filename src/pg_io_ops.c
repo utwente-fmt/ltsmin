@@ -71,6 +71,7 @@ static void pg_write_end(lts_output_t output,lts_enum_cb_t writer){
     }
     fclose(ctx->outputfile);
 	free(ctx);
+	(void) output;
 }
 
 static void pg_write_close(lts_output_t output){

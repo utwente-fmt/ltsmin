@@ -6,19 +6,19 @@
 
 #include <hre/user.h>
 #include <lts-lib/rationals.h>
-#include <lts-lib/lts.h>
+#include <lts-lib/lts-pg-io.h>
 
-//FIXME
-void lts_write_pg(const char*name,lts_t lts){
+
+void lts_write_pg (const char*name, lts_t lts) {
     Print(infoShort,"writing %s",name);
     FILE* f=fopen(name,"w");
     if (f == NULL) {
         AbortCall("Could not open %s for writing",name);
     }
     lts_set_type(lts,LTS_BLOCK);
-    int N=lts_type_get_state_length(lts->ltstype);
+    //int N=lts_type_get_state_length(lts->ltstype);
     int L=lts_type_get_state_label_count(lts->ltstype);
-    int K=lts_type_get_edge_label_count(lts->ltstype);
+    //int K=lts_type_get_edge_label_count(lts->ltstype);
     if (L != 2){
         Abort("Number of state labels is %d, needs to be 2 for parity games.",L);
     }

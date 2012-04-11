@@ -13,6 +13,7 @@
 #include <lts-io/provider.h>
 #include <lts-lib/dir-info.h>
 #include <lts-lib/lts.h>
+#include <lts-lib/lts-pg-io.h>
 #include <stringindex.h>
 #include <string-map.h>
 
