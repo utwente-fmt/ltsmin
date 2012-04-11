@@ -1,3 +1,16 @@
+DATA - Release NEXT of the LTSmin toolset
+
+ * New frontend for PBESs. The systems are translated into parity
+   games which can be exhausively explored using the analysis
+   algorithms.
+    o pbes-reach for symbolic state space generation
+    o pbes2lts-grey/gsea for enumerative state space generation
+    o pbes2lts-mpi/hre for distributed state space generation
+    o spgsolver a symbolic parity game solver
+    o PGSolver file output format ('{ast}.pg')
+ * Updated SpinJa frontend that accomodates support for valid end 
+   state filtering, guards and assertion violation detection.
+
 February 22, 2012 - Release 1.8 of the LTSmin toolset
 
  * Implementation of Evangelista et al.'s parallel nested depth-first
