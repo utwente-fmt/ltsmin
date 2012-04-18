@@ -218,6 +218,10 @@ AX_CXX_CHECK_LIB([DDD],[GDDD::size() const],
    ])
 AC_LANG_POP([C++])
 
+AC_SUBST([SYLVAN_LIBS],['-lsylvan -lm'])
+AC_SUBST([SYLVAN_CPPFLAGS],['-I${top_srcdir}/sylvan/src'])
+AC_SUBST([SYLVAN_LDFLAGS],['-L${top_builddir}/sylvan'])
+
 AC_CHECK_LIB([rt], [aio_error])
 ACX_CADP_BCG_WRITE([have_bcg=yes],
   [have_bcg=no
@@ -380,7 +384,7 @@ AC_CONFIG_FILES([
 
 AC_CONFIG_LINKS([src/lempar.c:lemon/lempar.c])
 
-AC_CONFIG_SUBDIRS([nips-vm buddy ltl2ba])
+AC_CONFIG_SUBDIRS([nips-vm buddy ltl2ba sylvan])
 
 AC_OUTPUT
 
