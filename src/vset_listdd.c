@@ -813,8 +813,7 @@ rel_create_mdd(vdom_t dom, int k, int *proj)
         rel->proj[i] = proj[i];
         rel->p_id    = mdd_create_node(proj[i], rel->p_id, 0);
         // The p_id of a relation is shifted in hash keys; check this is ok
-        if ((rel->p_id >> 16) > 0) Abort("projection identifier too large");
-        //FIXME: what does the previous line do?!? GK
+        if ((rel->p_id >> 16) > 0) Abort("rel_create_mdd: projection identifier too large");
     }
     return rel;
 }
@@ -845,10 +844,10 @@ rel_load_proj(FILE* f, vdom_t dom)
     int proj[p_len];
     for(int i=0; i<p_len; i++){
         res &= fscanf(f,((i < p_len-1)?"%d ":"%d"), &(proj[i]));
-        Warning(info, "rel_load_mdd: proj[%d]=%d", i, proj[i]);
+        //Warning(info, "rel_load_mdd: proj[%d]=%d", i, proj[i]);
     }
     res &= fscanf(f,"\n");
-    Warning(info, "rel_load_proj: p_len=%d", p_len);
+    //Warning(info, "rel_load_proj: p_len=%d", p_len);
     vrel_t result = rel_create_mdd(dom, p_len, proj);
     return result;
 }
@@ -951,13 +950,41 @@ set_copy_match_mdd(vset_t dst, vset_t src, int p_len, int *proj, int *match)
     uint32_t singleton = mdd_put(0, (uint32_t*)match, p_len, NULL);
     mdd_push(singleton);
 
-    uint32_t p_id = mdd_put(0, (uint32_t*)proj, p_len, NULL);
+    uint32_t p_id = mdd_put(0, (uint32_t*)proj, p_len, NULL); // FIXME: enable to pass a projection to this function!
+    //Warning(info, "set_copy_match_mdd: p_id=%d", p_id);
     // The p_id of is shifted in hash keys; check this is ok
-    if ((p_id >> 16) > 0) Abort("projection identifier too large");
+    if ((p_id >> 16) > 0) Abort("set_copy_match_mdd: projection identifier too large");
     mdd_push(p_id);
 
     dst->mdd = mdd_copy_match(p_id, src->mdd, singleton, 0, proj, p_len);
     mdd_pop(); mdd_pop();
+}
+
+static void
+set_copy_match_proj_mdd(vset_t dst, vset_t src, int p_len, int *proj, int p_id, int *match)
+{
+    assert(src->p_len == -1 && dst->p_len == -1 && p_len >= 0);
+    uint32_t singleton = mdd_put(0, (uint32_t*)match, p_len, NULL);
+    mdd_push(singleton);
+
+    //Warning(info, "set_copy_match_proj_mdd: p_id=%d", p_id);
+    // The p_id of is shifted in hash keys; check this is ok
+    if ((p_id >> 16) > 0) Abort("set_copy_match_proj_mdd: projection identifier too large");
+    mdd_push(p_id);
+
+    dst->mdd = mdd_copy_match(p_id, src->mdd, singleton, 0, proj, p_len);
+    mdd_pop(); mdd_pop();
+}
+
+static int
+proj_create_mdd(int p_len, int *proj)
+{
+    assert(p_len >= 0);
+    uint32_t p_id = mdd_put(0, (uint32_t*)proj, p_len, NULL); // FIXME: enable to pass a projection to this function!
+    //Warning(info, "proj_create_mdd: p_id=%d", p_id);
+    // The p_id of is shifted in hash keys; check this is ok
+    if ((p_id >> 16) > 0) Abort("set_copy_match_mdd: projection identifier too large");
+    return p_id;
 }
 
 static void
@@ -970,7 +997,7 @@ set_enum_match_mdd(vset_t set, int p_len, int *proj, int *match,
 
     uint32_t p_id = mdd_put(0, (uint32_t*)proj, p_len, NULL);
     // The p_id of is shifted in hash keys; check this is ok
-    if ((p_id >> 16) > 0) Abort("projection identifier too large");
+    if ((p_id >> 16) > 0) Abort("set_enum_match_mdd: projection identifier too large");
     mdd_push(p_id);
 
     uint32_t tmp = mdd_copy_match(p_id, set->mdd, singleton, 0, proj, p_len);
@@ -1538,6 +1565,8 @@ vdom_t vdom_create_list_native(int n){
     dom->shared.set_example=set_example_mdd;
     dom->shared.set_enum_match=set_enum_match_mdd;
     dom->shared.set_copy_match=set_copy_match_mdd;
+    dom->shared.set_copy_match_proj=set_copy_match_proj_mdd;
+    dom->shared.proj_create=proj_create_mdd;
     dom->shared.set_intersect=set_intersect_mdd;
     // default implementation for dom->shared.set_zip
     dom->shared.reorder=set_reorder_mdd;

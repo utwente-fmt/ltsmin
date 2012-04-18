@@ -53,7 +53,7 @@ public:
     }
 
     ~explorer()
-    {}
+    { }
 
     int put_chunk(int type_no, std::string value)
     {
@@ -166,6 +166,7 @@ public:
         if (label==0)
         {
             int priority = this->get_info()->get_variable_priorities().at(varname);
+            //std::clog << "var: " << varname << ", priority: " << priority << std::endl;
             return priority;
         }
         else if (label==1)
@@ -290,9 +291,10 @@ int PBESgetTransitionsAll(model_t model, int*src, TransitionCB cb,
  */
 int PBESgetStateLabelLong(model_t model, int label, int *s)
 {
-    //Warning(info, "PBESgetStateLabelLong: label = %d", label);
     gb_context_t ctx = (gb_context_t)GBgetContext(model);
-    return ctx->pbes_explorer->state_label(label, s);
+    int result = ctx->pbes_explorer->state_label(label, s);
+    //Warning(info, "PBESgetStateLabelLong: label = %d, result = %d.", label, result);
+    return result;
 }
 
 /**
