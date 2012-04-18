@@ -272,6 +272,22 @@ void vset_copy_match(vset_t dst,vset_t src,int p_len,int* proj,int*match){
 	dst->dom->shared.set_copy_match(dst,src,p_len,proj,match);
 }
 
+void vset_copy_match_proj(vset_t dst,vset_t src,int p_len,int* proj,int p_id,int*match){
+    if (dst->dom->shared.set_copy_match_proj==NULL){
+        Abort("Copy match with projection object as parameter is not supported by the current BDD implementation.")
+    } else {
+        dst->dom->shared.set_copy_match_proj(dst,src,p_len,proj,p_id,match);
+    }
+}
+
+int vproj_create(vdom_t dom, int p_len, int* proj){
+    if (dom->shared.proj_create==NULL){
+        Abort("Copy match with projection object as parameter is not supported by the current BDD implementation.")
+    } else {
+        dom->shared.proj_create(p_len, proj);
+    }
+}
+
 void vset_example(vset_t set,int *e){
 	set->dom->shared.set_example(set,e);
 }
