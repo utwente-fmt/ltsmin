@@ -1,4 +1,4 @@
-DATA - Release NEXT of the LTSmin toolset
+DATE - Release NEXT of the LTSmin toolset
 
  * New frontend for PBESs. The systems are translated into parity
    games which can be exhausively explored using the analysis
@@ -10,6 +10,11 @@ DATA - Release NEXT of the LTSmin toolset
     o PGSolver file output format ('{ast}.pg')
  * Updated SpinJa frontend that accomodates support for valid end 
    state filtering, guards and assertion violation detection.
+ * New parallel BBD package: Sylvan
+    o See <thesis Tom van Dijk> for description
+    o BDD operations are parallelized using the WOOL framework
+      (included)
+    o Use: *-reach --vset=sylvan
 
 February 22, 2012 - Release 1.8 of the LTSmin toolset
 
