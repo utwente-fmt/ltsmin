@@ -161,29 +161,29 @@ parity_game* spg_load(FILE* f, vset_implementation_t impl)
     int val;
     for(int i=0; i<num_groups; i++) {
         res &= fscanf(f,"rel proj e[%d]\n", &val);
-        Warning(info, "Reading e[%d] proj.", i);
+        //Warning(info, "Reading e[%d] proj.", i);
         result->e[i] = vrel_load_proj(f, domain);
     }
     for(int i=0; i<num_groups; i++) {
         res &= fscanf(f,"rel e[%d]\n", &val);
-        Warning(info, "Reading e[%d].", i);
+        //Warning(info, "Reading e[%d].", i);
         vrel_load(f, result->e[i]);
     }
     res &= fscanf(f,"set v\n");
-    Warning(info, "Reading v.");
+    //Warning(info, "Reading v.");
     vset_t v = vset_load(f, domain);
     vset_copy(result->v, v);
     vset_destroy(v);
     for(int i=0; i<2; i++) {
         res &= fscanf(f,"set v_player[%d]\n", &val);
-        Warning(info, "Reading v_player[%d].", i);
+        //Warning(info, "Reading v_player[%d].", i);
         v = vset_load(f, domain);
         vset_copy(result->v_player[i], v);
         vset_destroy(v);
     }
     for(int i=min_priority; i<=max_priority; i++) {
         res &= fscanf(f,"set v_priority[%d]\n", &val);
-        Warning(info, "Reading v_priority[%d].", i);
+        //Warning(info, "Reading v_priority[%d].", i);
         v = vset_load(f, domain);
         vset_copy(result->v_priority[i], v);
         vset_destroy(v);

@@ -1738,13 +1738,14 @@ mu_compute (ltsmin_expr_t mu_expr, vset_t visited)
  * \brief Computes the subset of v that belongs to player <tt>player</tt>.
  * \param vars the indices of variables of player <tt>player</tt>.
  */
-void add_variable_subset(vset_t dst, vset_t src, const parity_game* g, int var_pos, int var_index)
+void add_variable_subset(vset_t dst, vset_t src, const parity_game* g, int p_id, int var_pos, int var_index)
 {
+    //Warning(info, "add_variable_subset: var_index=%d", var_index);
     int p_len = 1;
     int proj[1] = {var_pos}; // position 0 encodes the variable
     int match[1] = {var_index}; // the variable
     vset_t u = vset_create(g->domain, -1, NULL);
-    vset_copy_match(u, src, p_len, proj, match);
+    vset_copy_match_proj(u, src, p_len, proj, p_id, match);
     vset_union(dst, u);
     vset_destroy(u);
 }
@@ -1753,7 +1754,7 @@ void add_variable_subset(vset_t dst, vset_t src, const parity_game* g, int var_p
 /**
  * \brief Creates a symbolic parity game
  */
-parity_game* compute_symbolic_parity_game(vset_t visited, int* src)
+parity_game* compute_symbolic_parity_game(vset_t visited, int* src, int p_id)
 {
     lts_type_t type = GBgetLTStype(model);
     int var_type_no = 0;
@@ -1772,7 +1773,7 @@ parity_game* compute_symbolic_parity_game(vset_t visited, int* src)
             //printf("Variable: %d [%d].\n", var_pos, var_type_no);
         }
     }
-    int num_vars = GBchunkCount(model, 0); // number of propositional variables
+    int num_vars = GBchunkCount(model, var_type_no); // number of propositional variables
     int priority[num_vars]; // priorities of variables
     int min_priority = INT_MAX;
     int max_priority = INT_MIN;
@@ -1788,7 +1789,7 @@ parity_game* compute_symbolic_parity_game(vset_t visited, int* src)
             s[i] = c.data[i];
         }
         s[c.len] = 0;
-        Warning(info, "Variable %d: %s", i, s);
+        //Warning(info, "Variable %d: %s", i, s);
         lts_type_t type = GBgetLTStype(model);
         int state_length = lts_type_get_state_length(type);
         // create dummy state with variable i:
@@ -1808,10 +1809,10 @@ parity_game* compute_symbolic_parity_game(vset_t visited, int* src)
         {
             max_priority = label;
         }
-        Warning(info, "  label %d (priority): %d", 0, label);
+        //Warning(info, "  label %d (priority): %d", 0, label);
         label = GBgetStateLabelLong(model, 1, state); // player
         player[i] = label;
-        Warning(info, "  label %d (player): %d", 1, label);
+        //Warning(info, "  label %d (player): %d", 1, label);
     }
     parity_game* g = spg_create(domain, N, nGrps, min_priority, max_priority);
     for(int i=0; i < N; i++)
@@ -1822,10 +1823,10 @@ parity_game* compute_symbolic_parity_game(vset_t visited, int* src)
     for(int i = 0; i < num_vars; i++)
     {
         // players
-        Warning(info, "Adding nodes for var %d (player %d).", i, player[i]);
-        add_variable_subset(g->v_player[player[i]], g->v, g, var_pos, i);
+        //Warning(info, "Adding nodes for var %d (player %d).", i, player[i]);
+        add_variable_subset(g->v_player[player[i]], g->v, g, p_id, var_pos, i);
         // priorities
-        add_variable_subset(g->v_priority[priority[i]], g->v, g, var_pos, i);
+        add_variable_subset(g->v_priority[priority[i]], g->v, g, p_id, var_pos, i);
     }
     for(int p = 0; p < 2; p++)
     {
@@ -1937,6 +1938,26 @@ main (int argc, char *argv[])
     vset_add(visited, src);
     Warning(info, "got initial state");
 
+#if defined(PBES)
+    lts_type_t type = GBgetLTStype(model);
+    int var_pos = 0;
+    for(int i=0; i<N; i++)
+    {
+        //printf("%d: %s (%d [%s])\n", i, lts_type_get_state_name(type, i), lts_type_get_state_typeno(type, i), lts_type_get_state_type(type, i));
+        char* str1 = "string";
+        size_t strlen1 = strlen(str1);
+        char* str2 = lts_type_get_state_type(type, i);
+        size_t strlen2 = strlen(str2);
+        if (strlen1==strlen2 && strncmp(str1, str2, strlen1)==0)
+        {
+            var_pos = i;
+        }
+    }
+    int p_len = 1;
+    int proj[1] = {var_pos}; // position 0 encodes the variable
+    int p_id = vproj_create(domain, p_len, proj);
+#endif
+
     mytimer_t timer = SCCcreateTimer();
 
     SCCstartTimer(timer);
@@ -1970,7 +1991,7 @@ main (int argc, char *argv[])
         do_output(files[1], visited);
 
 #if defined(PBES)
-    parity_game * g = compute_symbolic_parity_game(visited, src);
+    parity_game * g = compute_symbolic_parity_game(visited, src, p_id);
     if (pg_output) {
         Warning(info,"Writing symbolic parity game to %s",pg_output);
         FILE *f = fopen(pg_output, "w");

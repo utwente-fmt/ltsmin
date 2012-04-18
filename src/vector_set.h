@@ -125,6 +125,16 @@ extern void vset_enum_match(vset_t set,int p_len,int* proj,int*match,vset_elemen
 extern void vset_copy_match(vset_t dst, vset_t src, int p_len,int* proj,int*match);
 
 /**
+\brief Copy the elements of a set that match the given projection.
+*/
+extern void vset_copy_match_proj(vset_t dst, vset_t src, int p_len, int* proj, int p_id, int*match);
+
+/**
+\brief Create a projection.
+*/
+extern int vproj_create(vdom_t dom, int p_len, int* proj);
+
+/**
 \brief Produce a member of a non-empty set.
 */
 extern void vset_example(vset_t set,int *e);
