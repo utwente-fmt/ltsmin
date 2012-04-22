@@ -1763,6 +1763,7 @@ mcndfs_blue (wctx_t *ctx, size_t work)
             state_info_deserialize (&ctx->state, state_data, ctx->store);
             if ( all_red && bitvector_is_set(&ctx->all_red, ctx->counters.level_cur) ) {
                 /* all successors are red */
+                wait_seed (ctx, ctx->state.ref);
                 set_all_red (ctx, &ctx->state);
             } else if ( GBbuchiIsAccepting(ctx->model, ctx->state.data) ) {
                 /* call red DFS for accepting states */
