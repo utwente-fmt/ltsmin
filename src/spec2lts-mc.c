@@ -63,10 +63,10 @@ typedef enum {
     Strat_DFS    = 2,
     Strat_NDFS   = 4,
     Strat_NNDFS  = 8,
-    Strat_MCNDFS = 16,
+    Strat_LNDFS = 16,
     Strat_ENDFS  = 32,
     Strat_CNDFS  = 64,
-    Strat_LTLG   = Strat_MCNDFS | Strat_ENDFS | Strat_CNDFS,
+    Strat_LTLG   = Strat_LNDFS | Strat_ENDFS | Strat_CNDFS,
     Strat_LTL    = Strat_NDFS | Strat_NNDFS | Strat_LTLG,
     Strat_Reach  = Strat_BFS | Strat_DFS
 } strategy_t;
@@ -176,7 +176,7 @@ static si_map_entry strategies[] = {
     {"dfs",     Strat_DFS},
     {"ndfs",    Strat_NDFS},
     {"nndfs",   Strat_NNDFS},
-    {"mcndfs",  Strat_MCNDFS},
+    {"lndfs",   Strat_LNDFS},
     {"endfs",   Strat_ENDFS},
     {"cndfs",   Strat_CNDFS},
     {NULL, 0}
@@ -605,7 +605,7 @@ static int num_global_bits (strategy_t s) {
     assert (GDANGEROUS.g == 2);
     return (Strat_ENDFS  & s ? 3 :
            (Strat_CNDFS  & s ? 2 :
-           (Strat_MCNDFS & s ? 1 : 0)));
+           (Strat_LNDFS & s ? 1 : 0)));
 }
 
 wctx_t *
@@ -630,7 +630,7 @@ wctx_create (size_t id, int depth, wctx_t *shared)
         size_t local_bits = 2;
         bitvector_create_large (&ctx->color_map, local_bits<<dbs_size);
         bitvector_clear (&ctx->color_map);
-        if ((Strat_NNDFS | Strat_MCNDFS | Strat_CNDFS | Strat_ENDFS) & strategy[depth]) {
+        if ((Strat_NNDFS | Strat_LNDFS | Strat_CNDFS | Strat_ENDFS) & strategy[depth]) {
             bitvector_create_large (&ctx->all_red, MAX_STACK);
         }
     } else if (UseGreyBox == call_mode && Strat_DFS == strategy[depth]) {
@@ -656,7 +656,7 @@ wctx_free (wctx_t *ctx, int depth)
     dfs_stack_destroy (ctx->out_stack);
     if (strategy[depth] & Strat_LTL) {  
         bitvector_free (&ctx->color_map);
-        if ((Strat_NNDFS | Strat_MCNDFS | Strat_CNDFS | Strat_ENDFS) & strategy[depth]) {
+        if ((Strat_NNDFS | Strat_LNDFS | Strat_CNDFS | Strat_ENDFS) & strategy[depth]) {
             bitvector_free (&ctx->all_red);
         }
     }
@@ -781,7 +781,7 @@ init_globals (int argc, char *argv[])
     int i = 0;
     while (Strat_None != strategy[i] && i < MAX_STRATEGIES)
         global_bits += num_global_bits(strategy[i++]);
-    count_bits = (Strat_MCNDFS == strategy[i-1] ? count_bits : 0);
+    count_bits = (Strat_LNDFS == strategy[i-1] ? count_bits : 0);
     i = 0;
     while (Strat_None != strategy[i] && i < MAX_STRATEGIES)
         local_bits += (Strat_LTL & strategy[i++] ? 2 : 0);
@@ -832,7 +832,7 @@ init_globals (int argc, char *argv[])
     case Strat_CNDFS:
     case Strat_ENDFS:
         lb = lb_create_max (W, (algo_f)endfs_blue, NULL,G, lb_method, H); break;
-    case Strat_MCNDFS:
+    case Strat_LNDFS:
         lb = lb_create_max (W, (algo_f)mcndfs_blue,NULL,G, lb_method, H); break;
     case Strat_NNDFS:
         lb = lb_create_max (W, (algo_f)nndfs_blue, NULL,G, lb_method, H); break;
@@ -914,7 +914,7 @@ print_totals (counter_t *ar_reach, counter_t *ar_red, int d, size_t db_elts)
     Warning (info, "red states: %zu (%.2f%%), bogus: %zu  (%.2f%%), transitions: %zu, waits: %zu (%.2f sec)",
              red->explored, ((double)red->explored/db_elts)*100, red->bogus_red,
              ((double)red->bogus_red/db_elts), red->trans, red->waits, red->time);
-    if  ( all_red && (strategy[d] & (Strat_MCNDFS | Strat_NNDFS | Strat_CNDFS  | Strat_ENDFS)) )
+    if  ( all_red && (strategy[d] & (Strat_LNDFS | Strat_NNDFS | Strat_CNDFS  | Strat_ENDFS)) )
         Warning (info, "all-red states: %zu (%.2f%%), bogus %zu (%.2f%%)",
              reach->allred, ((double)reach->allred/db_elts)*100,
              red->allred, ((double)red->allred/db_elts)*100);
@@ -1553,7 +1553,7 @@ nndfs_red_handle (void *arg, state_info_t *successor, transition_info_t *ti,
     if ( nn_color_eq(color, NNCYAN) ) {
         /* Found cycle back to the stack */
         ndfs_report_cycle(ctx, successor);
-    } else if ( nn_color_eq(color, NNBLUE) && (ctx->strategy != Strat_MCNDFS ||
+    } else if ( nn_color_eq(color, NNBLUE) && (ctx->strategy != Strat_LNDFS ||
             !global_has_color(ctx->state.ref, GRED, ctx->rec_bits)) ) {
         raw_data_t stack_loc = dfs_stack_push (ctx->stack, NULL);
         state_info_serialize (successor, stack_loc);
@@ -1573,8 +1573,8 @@ nndfs_blue_handle (void *arg, state_info_t *successor, transition_info_t *ti,
              GBbuchiIsAccepting(ctx->model, get(dbs, successor->ref, ctx->store2))) ) {
         /* Found cycle in blue search */
         ndfs_report_cycle(ctx, successor);
-    } else if ((ctx->strategy == Strat_MCNDFS && !global_has_color(ctx->state.ref, GRED, ctx->rec_bits)) ||
-               (ctx->strategy != Strat_MCNDFS && !nn_color_eq(color, NNPINK))) {
+    } else if ((ctx->strategy == Strat_LNDFS && !global_has_color(ctx->state.ref, GRED, ctx->rec_bits)) ||
+               (ctx->strategy != Strat_LNDFS && !nn_color_eq(color, NNPINK))) {
         raw_data_t stack_loc = dfs_stack_push (ctx->stack, NULL);
         state_info_serialize (successor, stack_loc);
         ctx->load++;
@@ -1892,7 +1892,7 @@ rec_ndfs_call (wctx_t *ctx, ref_t state)
     switch (ctx->rec_ctx->strategy) {
     case Strat_ENDFS:
        endfs_blue (ctx->rec_ctx, 0); break;
-    case Strat_MCNDFS:
+    case Strat_LNDFS:
        mcndfs_blue (ctx->rec_ctx, 0); break;
     case Strat_NNDFS:
        nndfs_blue (ctx->rec_ctx, 0); break;
