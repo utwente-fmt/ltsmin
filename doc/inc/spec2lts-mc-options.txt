@@ -33,15 +33,11 @@ ndfs;;
 nndfs;;
   multi-core swarmed New Nested Depth-First Search (Schwoon, Esparza).
 
-mcnndfs;;
-  Multi-Core Nested Depth-First Search (Laarman, Langerak, van de Pol, Weber, Wijs).
-
-mcndfs;;
-  Idem. No difference with MCNNDFS.
+ldfs;;
   Multi-Core Nested Depth-First Search (Laarman, Langerak, van de Pol, Weber, Wijs).
 
 endfs;;
-  Multi-Core Nested Depth-First Search by Evangelista er al. The algorithm has
+  Multi-Core Nested Depth-First Search by Evangelista et al. The algorithm has
   been adapted with the cyan color encoding and early cycle detection, as
   described in "Variations on Multi-Core Nested Depth-First Search"
   (Laarman, van de Pol).
@@ -51,6 +47,11 @@ endfs;;
   paper (with load balancing).
   Finally, we also allow multiple levels of ENDFS to be combined:
   "endfs,endfs,nndfs". 
+
+cndfs;;
+  New CNDFS algorithm.
+  Multi-Core Nested Depth-First Search (Evangelista, Laarman, Petrucci, van de Pol).
+
 
 *--nar*::
         No All Red. Turn off all-red optimization in NNDFS/MCNDFS.
