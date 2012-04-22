@@ -1957,17 +1957,19 @@ handle_nonseed_accepting (wctx_t *ctx)
         ctx->red.waits++;
         ctx->counters.rec += accs;
     }
-    SCCstartTimer (ctx->red.timer);
-    while ( nonred && !lb_is_stopped(lb) ) {
-        nonred = 0;
-        for (size_t i = 0; i < accs; i++) {
-            state_data = dfs_stack_peek (ctx->out_stack, i); 
-            state_info_deserialize_cheap (&ctx->state, state_data);
-            if (!global_has_color(ctx->state.ref, GRED, ctx->rec_bits))
-                nonred++;
+    if (nonred) {
+        SCCstartTimer (ctx->red.timer);
+        while ( nonred && !lb_is_stopped(lb) ) {
+            nonred = 0;
+            for (size_t i = 0; i < accs; i++) {
+                state_data = dfs_stack_peek (ctx->out_stack, i);
+                state_info_deserialize_cheap (&ctx->state, state_data);
+                if (!global_has_color(ctx->state.ref, GRED, ctx->rec_bits))
+                    nonred++;
+            }
         }
+        SCCstopTimer (ctx->red.timer);
     }
-    SCCstopTimer (ctx->red.timer);
     for (size_t i = 0; i < accs; i++)
         dfs_stack_pop (ctx->out_stack);
     while ( dfs_stack_size(ctx->in_stack) ) {
