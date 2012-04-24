@@ -67,7 +67,10 @@ if test x"$acx_mcrl2" = xyes; then
     AC_LANG_PUSH([C++])
     AX_LET([LIBS], ["$MCRL2_PINS_LIBS $LIBS"],
            [LDFLAGS], ["$MCRL2_PINS_LDFLAGS $LDFLAGS"],
-      [AX_CXX_CHECK_LIB([mcrl2_syntax], [main],
+      [AX_CXX_CHECK_LIB([dparser], [main],
+         [MCRL2_PINS_LIBS="-ldparser $MCRL2_PINS_LIBS"
+          LIBS="-ldparser $LIBS"])
+       AX_CXX_CHECK_LIB([mcrl2_syntax], [main],
          [MCRL2_PINS_LIBS="-lmcrl2_syntax $MCRL2_PINS_LIBS"
           LIBS="-lmcrl2_syntax $LIBS"])
        AX_CXX_CHECK_LIB([mcrl2_utilities], [main],
@@ -94,6 +97,9 @@ if test x"$acx_mcrl2" = xyes; then
          [MCRL2_PINS_LIBS="-lmcrl2_lps $MCRL2_PINS_LIBS"
           LIBS="-lmcrl2_lps $LIBS"],
          [acx_mcrl2_libs=no])
+       AX_CXX_CHECK_LIB([mcrl2_bes], [main],
+         [MCRL2_PINS_LIBS="-lmcrl2_bes $MCRL2_PINS_LIBS"
+          LIBS="-lmcrl2_bes $LIBS"])
        AX_CXX_CHECK_LIB([mcrl2_pbes], [main],
          [MCRL2_PINS_LIBS="-lmcrl2_pbes $MCRL2_PINS_LIBS"
           LIBS="-lmcrl2_pbes $LIBS"],
