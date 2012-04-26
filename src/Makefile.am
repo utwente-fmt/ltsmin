@@ -20,9 +20,7 @@ noinst_LTLIBRARIES += libltsmin.la
 noinst_LTLIBRARIES += libltsmin-hre-util.la
 noinst_LTLIBRARIES += libltsmin-hre.la
 
-if HAVE_LIBPBES
 noinst_LTLIBRARIES += libspg.la
-endif
 
 pkglib_LTLIBRARIES =
 
@@ -48,9 +46,7 @@ SUBDIRS += sigmin-mpi
 endif
 SUBDIRS += ce
 SUBDIRS += torx
-if HAVE_LIBPBES
 SUBDIRS += spg
-endif
 
 EXTRA_DIST  = ltsmin-lexer.c ltsmin-lexer.h
 
@@ -74,7 +70,7 @@ bin_PROGRAMS += lps-reach
 noinst_LTLIBRARIES += libmcrl2-pins.la
 endif
 
-if HAVE_LIBPBES
+if HAVE_LIBMCRL2
 bin_PROGRAMS += pbes2lts-grey 
 bin_PROGRAMS += pbes2lts-gsea
 bin_PROGRAMS += pbes-reach
@@ -128,7 +124,7 @@ endif
 if HAVE_LIBMCRL2
 bin_PROGRAMS += lps2lts-mpi
 endif
-if HAVE_LIBPBES
+if HAVE_LIBMCRL2
 bin_PROGRAMS += pbes2lts-mpi
 endif
 if HAVE_DVEC

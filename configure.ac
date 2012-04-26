@@ -339,7 +339,6 @@ AM_CONDITIONAL([HAVE_LIBTOMMATH],
   [test x"$with_bignum" != xno && test x"$have_libtommath" = xyes])
 AM_CONDITIONAL([HAVE_LIBMCRL], [test x"$acx_mcrl" = xyes])
 AM_CONDITIONAL([HAVE_LIBMCRL2], [test x"$acx_mcrl2" = xyes])
-AM_CONDITIONAL([HAVE_LIBPBES], [test x"$acx_pbes" = xyes])
 AM_CONDITIONAL([HAVE_LIBSTEP_INFO], [test x"$have_libstep_info" = xyes])
 AM_CONDITIONAL([HAVE_LIBDDD], [test x"$acx_libddd" = xyes])
 AM_CONDITIONAL([HAVE_ASCIIDOC], [test x"$ASCIIDOC" != x])
@@ -398,7 +397,6 @@ Configuration:
     MCRL     = ${with_mcrl:-NOT FOUND, building without muCRL support}
     MCRL2    = ${with_mcrl2:-NOT FOUND, building without mCRL2 support}
     CADP     = ${CADP:-NOT FOUND, building without CADP support}
-    PBES     = ${PBES:-NOT FOUND, building without PBES support}
     DiVinE-cluster
              = ${with_divine:-NOT FOUND, building without DiVinE support}
 
