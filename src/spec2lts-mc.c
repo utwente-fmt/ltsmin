@@ -2024,7 +2024,7 @@ static void
 handle_dangerous (wctx_t *ctx)
 {
     while ( dfs_stack_size(ctx->in_stack) ) {
-        state_data = dfs_stack_pop (ctx->in_stack);
+        raw_data_t state_data = dfs_stack_pop (ctx->in_stack);
         state_info_deserialize_cheap (&ctx->state, state_data);
         if ( !global_has_color(ctx->state.ref, GDANGEROUS, ctx->rec_bits) &&
               ctx->state.ref != ctx->seed )
@@ -2054,7 +2054,7 @@ handle_nonseed_accepting (wctx_t *ctx)
         while ( nonred && !lb_is_stopped(lb) ) {
             nonred = 0;
             for (size_t i = 0; i < accs; i++) {
-                state_data = dfs_stack_peek (ctx->out_stack, i);
+                raw_data_t state_data = dfs_stack_peek (ctx->out_stack, i);
                 state_info_deserialize_cheap (&ctx->state, state_data);
                 if (!global_has_color(ctx->state.ref, GRED, ctx->rec_bits))
                     nonred++;
@@ -2065,7 +2065,7 @@ handle_nonseed_accepting (wctx_t *ctx)
     for (size_t i = 0; i < accs; i++)
         dfs_stack_pop (ctx->out_stack);
     while ( dfs_stack_size(ctx->in_stack) ) {
-        state_data = dfs_stack_pop (ctx->in_stack);
+        raw_data_t state_data = dfs_stack_pop (ctx->in_stack);
         state_info_deserialize_cheap (&ctx->state, state_data);
         if (global_try_color(ctx->state.ref, GRED, ctx->rec_bits))
             ctx->red.explored++;

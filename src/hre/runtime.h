@@ -13,7 +13,7 @@
 
 extern void *RTdlsym (const char *libname, void *handle, const char *symbol);
 
-extern void *RTopt_dlsym (void *handle, const char *symbol);
+extern void *RTtrydlsym (void *handle, const char *symbol);
 
 typedef struct {
 	char* key;

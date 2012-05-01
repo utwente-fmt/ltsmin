@@ -27,7 +27,7 @@ RTdlsym (const char *libname, void *handle, const char *symbol)
 }
 
 void *
-RTopt_dlsym(void *handle, const char *symbol)
+RTtrydlsym(void *handle, const char *symbol)
 {
     return dlsym (handle, symbol);
 }
