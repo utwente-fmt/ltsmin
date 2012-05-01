@@ -315,7 +315,7 @@ static struct poptOption options[] = {
     {"update", 'u', POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &UPDATE,
       0,"cover update strategy: 0 = simple, 1 = update waiting, 2 = update passed (may break traces).", NULL},
     {"grey", 0, POPT_ARG_VAL, &call_mode, UseGreyBox, "make use of GetTransitionsLong calls", NULL},
-    {"backoff", 'b', POPT_ARG_VAL, &BACKOFF, 0, "Backoff algorithm for TA exploration", NULL},
+    {"backoff", 'b', POPT_ARG_VAL, &BACKOFF, 1, "Backoff algorithm for TA exploration", NULL},
     {"ref", 0, POPT_ARG_VAL, &refs, 1, "store references on the stack/queue instead of full states", NULL},
     {"max", 0, POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &max, 0, "maximum search depth", "<int>"},
     {"deadlock", 'd', POPT_ARG_VAL, &dlk_detect, 1, "detect deadlocks", NULL },
@@ -556,6 +556,9 @@ add_results (counter_t *res, counter_t *cnt)
     res->errors += cnt->errors;
     res->exit += cnt->exit;
     res->time += SCCrealTime (cnt->timer);
+    res->updates += cnt->updates;
+    res->deletes += cnt->deletes;
+    res->delayed += cnt->delayed;
 }
 
 static void
@@ -2302,6 +2305,9 @@ split_bfs (void *arg_src, void *arg_tgt, size_t handoff)
         in_size = dfs_stack_size (source->out_stack);
         source_stack = source->out_stack;
     }
+    if (BACKOFF && (Strat_TA & strategy[0]) && in_size < handoff)
+        while (0 != dfs_stack_frame_size (source->backoff))
+            dfs_stack_push (source_stack, dfs_stack_pop(source->backoff));
     handoff = min (in_size >> 1 , handoff);
     for (size_t i = 0; i < handoff; i++) {
         state_data_t        one = dfs_stack_peek (source_stack, i);
@@ -2319,6 +2325,9 @@ split_dfs (void *arg_src, void *arg_tgt, size_t handoff)
     wctx_t             *source = arg_src;
     wctx_t             *target = arg_tgt;
     size_t              in_size = dfs_stack_size (source->stack);
+    if (BACKOFF && (Strat_TA & strategy[0]) && in_size < handoff)
+        while (0 != dfs_stack_frame_size (source->backoff))
+            dfs_stack_push (source->stack, dfs_stack_pop(source->backoff));
     handoff = min (in_size >> 1, handoff);
     for (size_t i = 0; i < handoff; i++) {
         state_data_t        one = dfs_stack_top (source->stack);
@@ -2363,6 +2372,24 @@ typedef enum ta_update_e {
 
 static const lmap_loc_t TA_NONE = UINT64_MAX;
 
+static void
+ta_unlock (ref_t ref)
+{
+    global_unset_color (ref, GRED, 0);
+}
+
+static void
+ta_lock (ref_t ref)
+{
+    while (!global_try_color(ref, GRED, 0)) {}
+}
+
+static int
+ta_try_lock (ref_t ref)
+{
+    return !global_try_color(ref, GRED, 0);
+}
+
 lmap_cb_t
 ta_covered (void *arg, lmap_store_t *stored, lmap_loc_t loc)
 {
@@ -2389,12 +2416,12 @@ ta_handle (void *arg, state_info_t *successor, transition_info_t *ti, int seen)
     ctx->last = TA_NONE;
     ctx->successor = successor;
     lmap_loc_t last = lmap_iterate (lmap, successor->ref, ta_covered, ctx);
-    while (!global_try_color(ctx->state.ref, GRED, 0)) {} //lock
+    ta_lock (ctx->state.ref);
     if (!ctx->done) {
         last = (TA_NONE == ctx->last ? last : ctx->last);
         successor->loc = lmap_insert_from (lmap, successor->ref,
                                         successor->lattice, TA_WAITING, &last);
-        global_unset_color (ctx->state.ref, GRED, 0); //unlock
+        ta_unlock (ctx->state.ref);
         raw_data_t stack_loc = dfs_stack_push (ctx->stack, NULL);
         state_info_serialize (successor, stack_loc);
         if (trc_output)
@@ -2403,7 +2430,7 @@ ta_handle (void *arg, state_info_t *successor, transition_info_t *ti, int seen)
         ctx->load++;
         ctx->counters.visited++;
     } else {
-        global_unset_color (ctx->state.ref, GRED, 0); //unlock
+       ta_unlock (ctx->state.ref);
     }
     ctx->counters.trans++;
     (void) ti; (void) seen;
@@ -2413,12 +2440,16 @@ static inline int
 is_waiting (wctx_t *ctx, raw_data_t state_data)
 {
     state_info_deserialize (&ctx->state, state_data, ctx->store);
-    if (BACKOFF && !global_try_color(ctx->state.ref, GRED, 0)) {
-        dfs_stack_push (ctx->backoff, state_data);
-        ctx->load++;
-        return 0;
+    if (BACKOFF) {
+        if (ta_try_lock(ctx->state.ref)) {
+            dfs_stack_push (ctx->backoff, state_data);
+            ctx->load++;
+            ctx->counters.delayed++;
+            return 0;
+        }
+    } else {
+        ta_lock (ctx->state.ref);
     }
-    while (!global_try_color(ctx->state.ref, GRED, 0)) {} //lock
     int ret_val = 0;
     if (TA_UPDATE_NONE == UPDATE ||
         TA_WAITING == (ta_set_e_t)lmap_get(lmap, ctx->state.loc)->status) {
@@ -2427,7 +2458,7 @@ is_waiting (wctx_t *ctx, raw_data_t state_data)
     } else {
         ret_val = 0;
     }
-    global_unset_color (ctx->state.ref, GRED, 0); //unlock
+    ta_unlock (ctx->state.ref);
     return ret_val;
 }
 
@@ -2436,8 +2467,13 @@ ta_explore_state (wctx_t *ctx)
 {
     int                 count = 0;
     count = permute_trans (ctx->permute, &ctx->state, ta_handle, ctx);
-    if ( dlk_detect && (0 == count) )
-        handle_deadlock (ctx);
+    if (0 == count) {
+        ctx->counters.deadlocks++;
+        if (dlk_detect && !lb_is_stopped(lb)) {
+            Warning (info,"Deadlock found in state at depth %zu!", ctx->counters.level_cur);
+            handle_error_trace (ctx);
+        }
+    }
     maybe_report (&ctx->counters, "", &threshold);
     ctx->counters.explored++;
 }
@@ -2462,10 +2498,8 @@ ta_dfs (wctx_t *ctx, size_t work)
                 if (0 == dfs_stack_frame_size (ctx->backoff)) {
                     return;
                 } else {
-                    while (0 != dfs_stack_frame_size (ctx->backoff)) {
+                    while (0 != dfs_stack_frame_size (ctx->backoff))
                         dfs_stack_push (ctx->stack, dfs_stack_pop(ctx->backoff));
-                        ctx->counters.delayed++;
-                    }
                     continue;
                 }
             }
@@ -2493,10 +2527,8 @@ ta_bfs (wctx_t *ctx, size_t work)
                 if (0 == dfs_stack_frame_size (ctx->backoff)) {
                     return;
                 } else {
-                    while (0 != dfs_stack_frame_size (ctx->backoff)) {
+                    while (0 != dfs_stack_frame_size (ctx->backoff))
                         dfs_stack_push (ctx->in_stack, dfs_stack_pop(ctx->backoff));
-                        ctx->counters.delayed++;
-                    }
                     continue;
                 }
             }
