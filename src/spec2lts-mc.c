@@ -29,6 +29,7 @@
 #include <runtime.h>
 #include <scctimer.h>
 #include <spec-greybox.h>
+#include <statistics.h>
 #include <stream.h>
 #include <stringindex.h>
 #include <trace.h>
@@ -832,9 +833,9 @@ init_globals (int argc, char *argv[])
         local_bits += (Strat_LTL & strategy[i++] ? 2 : 0);
     Warning (info, "Global bits: %d, count bits: %d, local bits: %d.",
              global_bits, count_bits, local_bits);
-
     lmap_size = dbs_size + LATTICE_RATIO;
-    lmap = lmap_create (63, 64, lmap_size);
+    if (Strat_TA & strategy[0])
+        lmap = lmap_create (63, 64, lmap_size);
     switch (db_type) {
     case UseDBSLL:
         if (ZOBRIST) {
@@ -1003,23 +1004,28 @@ print_statistics (counter_t *ar_reach, counter_t *ar_red, mytimer_t timer,
         Warning (info, "");
         Warning (info, "Total memory used for local state coloring: %.1fMB", mem3);
     } else {
-        ssize_t              dev, state_dev = 0, trans_dev = 0;
-        ssize_t              state_mean = reach->explored/W;
-        ssize_t              trans_mean = reach->trans/W;
+        statistics_t state_stats; statistics_init (&state_stats);
+        statistics_t trans_stats; statistics_init (&trans_stats);
         for (size_t i = 0; i< W; i++) {
-            dev = ((ssize_t)contexts[i]->counters.explored) - state_mean;
-            state_dev += dev * dev;
-            dev = (contexts[i]->counters.trans - (reach->trans/W));
-            trans_dev += dev * dev;
+            statistics_record (&state_stats, contexts[i]->counters.explored);
+            statistics_record (&trans_stats, contexts[i]->counters.trans);
         }
         if (W > 1)
             Warning (info, "mean standard work distribution: %.1f%% (states) %.1f%% (transitions)",
-                     (100 * sqrt((double)state_dev / W) / state_mean),
-                     (100 * sqrt((double)trans_dev / W) / trans_mean));
+                     (100 * statistics_stdev(&state_stats) / statistics_mean(&state_stats)),
+                     (100 * statistics_stdev(&trans_stats) / statistics_mean(&trans_stats)));
         Warning (info, "");
         print_state_space_total ("State space has ", reach);
         SCCreportTimer (timer, "Total exploration time");
+        double time = SCCrealTime (timer);
+        Warning(info, "States per second: %.0f, Transitions per second: %.0f",
+                ar_reach->explored/time, ar_reach->trans/time);
         Warning(info, "");
+        if (Strat_TA & strategy[0]) {
+            mem3 = ((double)(ar_reach->explored*sizeof(lmap_store_t))) / (1<<20);
+            double lmap = ((double)(sizeof(lmap_store_t) * (1UL << lmap_size))) / (1<<20);
+            Warning (info, "Total memory used for symbolic storage: %.1fMB (~%.1fMB paged-in)", mem3, lmap);
+        }
     }
 
     Warning (info, "Queue width: %zuB, total height: %zu, memory: %.2fMB",

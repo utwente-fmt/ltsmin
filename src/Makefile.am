@@ -617,6 +617,7 @@ libutil_la_SOURCES += raf_object.h
 libutil_la_SOURCES += runtime.c runtime.h
 libutil_la_SOURCES += scctimer.c scctimer.h
 libutil_la_SOURCES += spec-greybox.h
+libutil_la_SOURCES += statistics.c statistics.h
 libutil_la_SOURCES += stream.c stream.h
 libutil_la_SOURCES += stream_buffer.c
 libutil_la_SOURCES += stream_diff32.c
