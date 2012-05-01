@@ -159,7 +159,11 @@ static dbs_dec_sat_bits_f   dec_sat_bits;
 static dbs_get_sat_bits_f   get_sat_bits;
 static char            *state_repr = "tree";
 static db_type_t        db_type = UseTreeDBSLL;
+#ifdef OPAAL
+static char            *arg_strategy = "ta_bfs";
+#else
 static char            *arg_strategy = "bfs";
+#endif
 static strategy_t       strategy[MAX_STRATEGIES] = {Strat_BFS, Strat_None, Strat_None, Strat_None, Strat_None};
 static char            *arg_lb = "combined";
 static lb_method_t      lb_method = LB_Combined;
@@ -185,6 +189,7 @@ static int              local_bits = 0;
 static int              count_mask;
 
 static si_map_entry strategies[] = {
+#ifndef OPAAL
     {"bfs",     Strat_BFS},
     {"dfs",     Strat_DFS},
     {"ndfs",    Strat_NDFS},
@@ -192,8 +197,10 @@ static si_map_entry strategies[] = {
     {"lndfs",   Strat_LNDFS},
     {"endfs",   Strat_ENDFS},
     {"cndfs",   Strat_CNDFS},
+#else
     {"ta_dfs",   Strat_TA_DFS},
     {"ta_bfs",   Strat_TA_BFS},
+#endif
     {NULL, 0}
 };
 
@@ -296,31 +303,38 @@ static struct poptOption options[] = {
      0, "select the data structure for storing states", "<tree|table>"},
     {"size", 's', POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &dbs_size, 0,
      "size of the state store (log2(size))", NULL},
+#ifdef OPAAL
+    {"lattice-ratio", 'l', POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &LATTICE_RATIO,
+      0,"log2 ratio between symbolic states and explicit states", NULL},
+    {"update", 'u', POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &UPDATE,
+      0,"cover update strategy: 0 = simple, 1 = update waiting, 2 = update passed (may break traces).", NULL},
+    {"backoff", 'b', POPT_ARG_VAL, &BACKOFF, 1, "Back-off algorithm for TA exploration", NULL},
+    {"strategy", 0, POPT_ARG_STRING | POPT_ARGFLAG_SHOW_DEFAULT,
+     &arg_strategy, 0, "select the search strategy", "<ta_bfs|ta_dfs>"},
+#else
     {"strategy", 0, POPT_ARG_STRING | POPT_ARGFLAG_SHOW_DEFAULT,
      &arg_strategy, 0, "select the search strategy", "<bfs|dfs|ndfs|nndfs|mcndfs|endfs|endfs,mcndfs|endfs,endfs,nndfs>"},
+     {"no-red-perm", 0, POPT_ARG_VAL, &no_red_perm, 1, "turn off transition permutation for the red search", NULL},
+     {"nar", 1, POPT_ARG_VAL, &all_red, 0, "turn off red coloring in the blue search (NNDFS/MCNDFS)", NULL},
+     {"grey", 0, POPT_ARG_VAL, &call_mode, UseGreyBox, "make use of GetTransitionsLong calls", NULL},
+     {"max", 0, POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &max, 0, "maximum search depth", "<int>"},
+#endif
     {"lb", 0, POPT_ARG_STRING | POPT_ARGFLAG_SHOW_DEFAULT,
      &arg_lb, 0, "select the load balancing method", "<srp|static|combined|none>"},
     {"perm", 'p', POPT_ARG_STRING | POPT_ARGFLAG_SHOW_DEFAULT,
      &arg_perm, 0, "select the transition permutation method",
      "<dynamic|random|rr|sort|sr|shift|shiftall|otf|none>"},
-    {"no-red-perm", 0, POPT_ARG_VAL, &no_red_perm, 1, "turn off transition permutation for the red search", NULL},
-    {"nar", 1, POPT_ARG_VAL, &all_red, 0, "turn off red coloring in the blue search (NNDFS/MCNDFS)", NULL},
     {"gran", 'g', POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &G,
      0, "subproblem granularity ( T( work(P,g) )=min( T(P), g ) )", NULL},
     {"handoff", 'h', POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &H,
      0, "maximum balancing handoff (handoff=min(max, stack_size/2))", NULL},
     {"zobrist", 'z', POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &ZOBRIST,
      0,"log2 size of zobrist random table (6 or 8 is good enough; 0 is no zobrist)", NULL},
-    {"lattice-ratio", 'l', POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &LATTICE_RATIO,
-      0,"log2 ratio between symbolic states and explicit states", NULL},
-    {"update", 'u', POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &UPDATE,
-      0,"cover update strategy: 0 = simple, 1 = update waiting, 2 = update passed (may break traces).", NULL},
-    {"grey", 0, POPT_ARG_VAL, &call_mode, UseGreyBox, "make use of GetTransitionsLong calls", NULL},
-    {"backoff", 'b', POPT_ARG_VAL, &BACKOFF, 1, "Backoff algorithm for TA exploration", NULL},
     {"ref", 0, POPT_ARG_VAL, &refs, 1, "store references on the stack/queue instead of full states", NULL},
-    {"max", 0, POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &max, 0, "maximum search depth", "<int>"},
     {"deadlock", 'd', POPT_ARG_VAL, &dlk_detect, 1, "detect deadlocks", NULL },
+#ifdef SPINJA
     {"assert", 'a', POPT_ARG_VAL, &assert_detect, 1, "detect assertion errors (SpinJa)", NULL },
+#endif
     {"trace", 0, POPT_ARG_STRING, &trc_output, 0, "file to write trace to", "<lts output>" },
     SPEC_POPT_OPTIONS,
     {NULL, 0, POPT_ARG_INCLUDE_TABLE, greybox_options, 0, "Greybox options", NULL},
