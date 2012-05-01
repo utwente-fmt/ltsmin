@@ -478,6 +478,7 @@ typedef struct counter_s {
     size_t              deletes;        // lattice deletes
     size_t              updates;        // lattice updates
     size_t              delayed;        // lattice backoff delays
+    statistics_t        lattice_ratio;  // On-the-fly calc of stdev/mean of #lat
 } counter_t;
 
 typedef struct thread_ctx_s wctx_t;
@@ -696,6 +697,7 @@ wctx_create (size_t id, int depth, wctx_t *shared)
     ctx->rec_ctx = NULL;
     ctx->red.timer = SCCcreateTimer ();
     ctx->counters.timer = SCCcreateTimer ();
+    statistics_init (&ctx->counters.lattice_ratio);
     ctx->red.time = 0;
     if (Strat_None != strategy[depth+1])
         ctx->rec_ctx = wctx_create (id, depth+1, ctx);
@@ -1036,6 +1038,14 @@ print_statistics (counter_t *ar_reach, counter_t *ar_red, mytimer_t timer,
                 ar_reach->explored/time, ar_reach->trans/time);
         Warning(info, "");
         if (Strat_TA & strategy[0]) {
+            if (RTverbosity > 2) { // quite costly: flops
+                statistics_t stats; statistics_init (&stats);
+                for (size_t i = 0; i< W; i++) {
+                    statistics_t *s = &contexts[i]->counters.lattice_ratio;
+                    statistics_union (&stats, &stats, s);
+                }
+                Warning (info, "Stdev: %.2f", statistics_stdev(&stats));
+            }
             mem3 = ((double)(ar_reach->explored*sizeof(lmap_store_t))) / (1<<20);
             double lmap = ((double)(sizeof(lmap_store_t) * (1UL << lmap_size))) / (1<<20);
             Warning (info, "Total memory used for symbolic storage: %.1fMB (~%.1fMB paged-in)", mem3, lmap);
@@ -2415,16 +2425,18 @@ ta_covered (void *arg, lmap_store_t *stored, lmap_loc_t loc)
 {
     wctx_t         *ctx = (wctx_t*) arg;
     int *succ_l = (int*)&ctx->successor->lattice;
-    if ( GBisCoveredByShort(ctx->model, succ_l, (int*)&stored->lattice) ) {
+    int *stored_l = (int*)&stored->lattice;
+    if(GBisCoveredByShort(ctx->model, succ_l, stored_l) ) {
         ctx->done = 1;
         return LMAP_CB_STOP; //A l' : (E (s,l)eL : l>=l')=>(A (s,l)eL : l>=l')
     } else if ( TA_UPDATE_NONE != UPDATE &&
             (TA_UPDATE_PASSED == UPDATE || TA_WAITING == (ta_set_e_t)stored->status) &&
-            GBisCoveredByShort(ctx->model, (int*)&stored->lattice, succ_l)) {
+            GBisCoveredByShort(ctx->model, stored_l, succ_l)) {
         lmap_delete (lmap, loc);
         ctx->last = (TA_NONE == ctx->last ? loc : ctx->last);
         ctx->counters.deletes++;
     }
+    ctx->work++;
     return LMAP_CB_NEXT;
 }
 
@@ -2433,15 +2445,21 @@ ta_handle (void *arg, state_info_t *successor, transition_info_t *ti, int seen)
 {
     wctx_t         *ctx = (wctx_t*) arg;
     ctx->done = 0;
+    ctx->work = 0;
     ctx->last = TA_NONE;
     ctx->successor = successor;
     lmap_loc_t last = lmap_iterate (lmap, successor->ref, ta_covered, ctx);
-    ta_lock (ctx->state.ref);
+    ta_lock (ctx->state.ref); //TODO: back-off
     if (!ctx->done) {
         last = (TA_NONE == ctx->last ? last : ctx->last);
         successor->loc = lmap_insert_from (lmap, successor->ref,
                                         successor->lattice, TA_WAITING, &last);
         ta_unlock (ctx->state.ref);
+        if (RTverbosity > 2) { // quite costly: flops
+            if (ctx->work > 0)
+                statistics_unrecord (&ctx->counters.lattice_ratio, ctx->work);
+            statistics_record (&ctx->counters.lattice_ratio, ctx->work+1);
+        }
         raw_data_t stack_loc = dfs_stack_push (ctx->stack, NULL);
         state_info_serialize (successor, stack_loc);
         if (trc_output)

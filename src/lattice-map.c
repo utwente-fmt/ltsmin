@@ -132,7 +132,7 @@ lmap_loc_t
 lmap_insert_from (const lmap_t *map, ref_t k, lattice_t l,
                   lmap_status_t status, lmap_loc_t *start)
 {
-    lmap_loc_int_t          loc = get_location(map, start, k);
+    lmap_loc_int_t          loc = get_location (map, start, k);
     while (1) {
         size_t              block = ((uint64_t)loc.ref) & BLOCK_MASK;
         for (; loc.loop < BLOCK_SIZE; loc.loop++) {
