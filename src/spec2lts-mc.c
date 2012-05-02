@@ -1394,6 +1394,7 @@ state_info_size ()
 /**
  * Next-state function output --> algorithm
  */
+static const lmap_loc_t NULL_LOC = -1;
 int
 state_info_initialize (state_info_t *state, state_data_t data,
                        transition_info_t *ti, state_info_t *src, wctx_t *ctx)
@@ -1401,7 +1402,7 @@ state_info_initialize (state_info_t *state, state_data_t data,
     state->data = data;
     if (Strat_TA & strategy[0]) {
         state->lattice = *(lattice_t*)(data + D);
-        state->loc = -1;
+        state->loc = NULL_LOC;
     }
     return find_or_put (state, ti, src, ctx->store2);
 }
@@ -2420,6 +2421,22 @@ ta_try_lock (ref_t ref)
     return !global_try_color(ref, GRED, 0);
 }
 
+static inline int
+backoff_or_lock (wctx_t *ctx, state_info_t *state) {
+    if (BACKOFF) {
+        if (ta_try_lock(state->ref)) {
+            raw_data_t stack_loc = dfs_stack_push (ctx->backoff, NULL);
+            state_info_serialize (state, stack_loc);
+            ctx->load++;
+            ctx->counters.delayed++;
+            return 1;
+        }
+    } else {
+        ta_lock (state->ref);
+    }
+    return 0;
+}
+
 lmap_cb_t
 ta_covered (void *arg, lmap_store_t *stored, lmap_loc_t loc)
 {
@@ -2448,13 +2465,14 @@ ta_handle (void *arg, state_info_t *successor, transition_info_t *ti, int seen)
     ctx->work = 0;
     ctx->last = TA_NONE;
     ctx->successor = successor;
+    if (backoff_or_lock(ctx, successor))
+        return;
     lmap_loc_t last = lmap_iterate (lmap, successor->ref, ta_covered, ctx);
-    ta_lock (ctx->state.ref); //TODO: back-off
     if (!ctx->done) {
         last = (TA_NONE == ctx->last ? last : ctx->last);
         successor->loc = lmap_insert_from (lmap, successor->ref,
                                         successor->lattice, TA_WAITING, &last);
-        ta_unlock (ctx->state.ref);
+        ta_unlock (successor->ref);
         if (RTverbosity > 2) { // quite costly: flops
             if (ctx->work > 0)
                 statistics_unrecord (&ctx->counters.lattice_ratio, ctx->work);
@@ -2463,12 +2481,12 @@ ta_handle (void *arg, state_info_t *successor, transition_info_t *ti, int seen)
         raw_data_t stack_loc = dfs_stack_push (ctx->stack, NULL);
         state_info_serialize (successor, stack_loc);
         if (trc_output)
-            parent_ref[successor->ref] = ctx->state.ref;
+            parent_ref[successor->ref] = ctx->state.ref; // TODO: for backoffs!
         ctx->counters.updates += TA_NONE != ctx->last;
         ctx->load++;
         ctx->counters.visited++;
     } else {
-       ta_unlock (ctx->state.ref);
+       ta_unlock (successor->ref);
     }
     ctx->counters.trans++;
     (void) ti; (void) seen;
@@ -2478,16 +2496,12 @@ static inline int
 is_waiting (wctx_t *ctx, raw_data_t state_data)
 {
     state_info_deserialize (&ctx->state, state_data, ctx->store);
-    if (BACKOFF) {
-        if (ta_try_lock(ctx->state.ref)) {
-            dfs_stack_push (ctx->backoff, state_data);
-            ctx->load++;
-            ctx->counters.delayed++;
-            return 0;
-        }
-    } else {
-        ta_lock (ctx->state.ref);
+    if (NULL_LOC == ctx->state.loc) {
+        ta_handle(ctx, &ctx->state, NULL, 0);
+        return 0; // pretend the state is already in the waiting set
     }
+    if (backoff_or_lock(ctx, &ctx->state))
+        return 0; // pretend the state is already in the waiting set
     int ret_val = 0;
     if (TA_UPDATE_NONE == UPDATE ||
         TA_WAITING == (ta_set_e_t)lmap_get(lmap, ctx->state.loc)->status) {
