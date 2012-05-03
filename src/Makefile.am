@@ -649,6 +649,7 @@ libutil_la_SOURCES += gzstream.c
 libutil_la_SOURCES += is-balloc.c is-balloc.h
 libutil_la_SOURCES += lattice-map.c lattice-map.h
 libutil_la_SOURCES += lb.c lb.h
+libutil_la_SOURCES += lb2.c lb2.h
 libutil_la_SOURCES += lts-type.c lts-type.h
 libutil_la_SOURCES += lts_count.c lts_count.h
 libutil_la_SOURCES += lts_enum.c lts_enum.h

@@ -25,6 +25,7 @@
 #include <fast_hash.h>
 #include <is-balloc.h>
 #include <lattice-map.h>
+#include <lb2.h>
 #include <lb.h>
 #include <runtime.h>
 #include <scctimer.h>
@@ -72,7 +73,10 @@ typedef enum {
     Strat_CNDFS  = 64,
     Strat_TA_DFS = 128,
     Strat_TA_BFS = 256,
-    Strat_TA     = Strat_TA_DFS | Strat_TA_BFS,
+    Strat_TA_BFS_Strict = 512,
+    Strat_2Stacks= Strat_TA_BFS | Strat_BFS | Strat_TA_BFS_Strict | Strat_CNDFS
+                    | Strat_ENDFS,
+    Strat_TA     = Strat_TA_DFS | Strat_TA_BFS | Strat_TA_BFS_Strict,
     Strat_LTLG   = Strat_LNDFS | Strat_ENDFS | Strat_CNDFS,
     Strat_LTL    = Strat_NDFS | Strat_NNDFS | Strat_LTLG,
     Strat_Reach  = Strat_BFS | Strat_DFS | Strat_TA
@@ -146,7 +150,8 @@ static int              all_red = 1;
 static box_t            call_mode = UseBlackBox;
 static size_t           max = SIZE_MAX;
 static size_t           W = 2;
-static lb_t            *lb;
+static lb_t            *lb = NULL;
+static lb2_t           *lb2 = NULL;
 static void            *dbs;
 static lmap_t          *lmap;
 static dbs_stats_f      statistics;
@@ -160,7 +165,7 @@ static dbs_get_sat_bits_f   get_sat_bits;
 static char            *state_repr = "tree";
 static db_type_t        db_type = UseTreeDBSLL;
 #ifdef OPAAL
-static char            *arg_strategy = "ta_bfs";
+static char            *arg_strategy = "ta_bfs_strict";
 #else
 static char            *arg_strategy = "bfs";
 #endif
@@ -200,6 +205,7 @@ static si_map_entry strategies[] = {
 #else
     {"ta_dfs",   Strat_TA_DFS},
     {"ta_bfs",   Strat_TA_BFS},
+    {"ta_bfs_strict", Strat_TA_BFS_Strict},
 #endif
     {NULL, 0}
 };
@@ -540,6 +546,7 @@ extern void         dfs (wctx_t *ctx, size_t work);
 extern void         bfs (wctx_t *ctx, size_t work);
 extern void         ta_dfs (wctx_t *ctx, size_t work);
 extern void         ta_bfs (wctx_t *ctx, size_t work);
+extern size_t       split_bfs_strict (void *arg_src, void *arg_tgt, size_t handoff);
 extern size_t       split_bfs (void *arg_src, void *arg_tgt, size_t handoff);
 extern size_t       split_dfs (void *arg_src, void *arg_tgt, size_t handoff);
 
@@ -674,7 +681,7 @@ wctx_create (size_t id, int depth, wctx_t *shared)
     ctx->store2 = RTalignZero (CACHE_LINE_SIZE, SLOT_SIZE * N * 2);
     ctx->stack = dfs_stack_create (state_info_int_size());
     ctx->out_stack = ctx->in_stack = ctx->stack;
-    if (strategy[depth] & (Strat_BFS | Strat_ENDFS | Strat_CNDFS | Strat_TA_BFS))
+    if (strategy[depth] & (Strat_2Stacks))
         ctx->in_stack = dfs_stack_create (state_info_int_size());
     if (strategy[depth] & (Strat_CNDFS)) //third stack for accepting states
         ctx->out_stack = dfs_stack_create (state_info_int_size());
@@ -724,7 +731,7 @@ wctx_free (wctx_t *ctx, int depth)
     //    dfs_stack_destroy (ctx->in_stack);
     if (strategy[depth] & (Strat_CNDFS))
         dfs_stack_destroy (ctx->stack); 
-    if (strategy[depth] ==  (Strat_BFS | Strat_ENDFS | Strat_TA_BFS))
+    if (strategy[depth] ==  (Strat_2Stacks))
         dfs_stack_destroy (ctx->in_stack);
     if (NULL != ctx->permute)
         permute_free (ctx->permute);
@@ -896,6 +903,8 @@ init_globals (int argc, char *argv[])
 
     /* Load balancer assigned last, see exit_ltsmin */
     switch (strategy[0]) {
+    case Strat_TA_BFS_Strict:
+        lb2 = lb2_create (W, split_bfs_strict, G, LB2_Static);
     case Strat_TA_BFS:
         lb = lb_create_max (W, (algo_f)ta_bfs,split_bfs,G, lb_method, H); break;
     case Strat_TA_DFS:
@@ -2336,9 +2345,11 @@ split_bfs (void *arg_src, void *arg_tgt, size_t handoff)
         in_size = dfs_stack_size (source->out_stack);
         source_stack = source->out_stack;
     }
-    if (BACKOFF && (Strat_TA & strategy[0]) && in_size < handoff)
-        while (0 != dfs_stack_frame_size (source->backoff))
-            dfs_stack_push (source_stack, dfs_stack_pop(source->backoff));
+    if (BACKOFF && (Strat_TA & strategy[0]) && in_size < handoff) {
+        in_size = dfs_stack_frame_size (source->backoff);
+        for (size_t i = 0; i < in_size; i++)
+            dfs_stack_push (source->in_stack, dfs_stack_pop(source->backoff));
+    }
     handoff = min (in_size >> 1 , handoff);
     for (size_t i = 0; i < handoff; i++) {
         state_data_t        one = dfs_stack_peek (source_stack, i);
@@ -2351,14 +2362,38 @@ split_bfs (void *arg_src, void *arg_tgt, size_t handoff)
 }
 
 size_t
+split_bfs_strict (void *arg_src, void *arg_tgt, size_t handoff)
+{
+    wctx_t             *source = arg_src;
+    wctx_t             *target = arg_tgt;
+    size_t              in_size = dfs_stack_size (source->in_stack);
+    if (BACKOFF && (Strat_TA & strategy[0]) && in_size < handoff) {
+        in_size = dfs_stack_frame_size (source->backoff);
+        for (size_t i = 0; i < in_size; i++)
+            dfs_stack_push (source->in_stack, dfs_stack_pop(source->backoff));
+    }
+    handoff = min (in_size >> 1 , handoff);
+    for (size_t i = 0; i < handoff; i++) {
+        state_data_t        one = dfs_stack_peek (source->in_stack, i);
+        dfs_stack_push (target->in_stack, one);
+    }
+    dfs_stack_discard (source->in_stack, handoff);
+    source->counters.splits++;
+    source->counters.transfer += handoff;
+    return handoff;
+}
+
+size_t
 split_dfs (void *arg_src, void *arg_tgt, size_t handoff)
 {
     wctx_t             *source = arg_src;
     wctx_t             *target = arg_tgt;
     size_t              in_size = dfs_stack_size (source->stack);
-    if (BACKOFF && (Strat_TA & strategy[0]) && in_size < handoff)
-        while (0 != dfs_stack_frame_size (source->backoff))
-            dfs_stack_push (source->stack, dfs_stack_pop(source->backoff));
+    if (BACKOFF && (Strat_TA & strategy[0]) && in_size < handoff) {
+        in_size = dfs_stack_frame_size (source->backoff);
+        for (size_t i = 0; i < in_size; i++)
+            dfs_stack_push (source->in_stack, dfs_stack_pop(source->backoff));
+    }
     handoff = min (in_size >> 1, handoff);
     for (size_t i = 0; i < handoff; i++) {
         state_data_t        one = dfs_stack_top (source->stack);
@@ -2593,6 +2628,32 @@ ta_bfs (wctx_t *ctx, size_t work)
 }
 
 void
+ta_bfs_strict (wctx_t *ctx)
+{
+    size_t out_size;
+    do {
+        while (lb2_balance(lb2, ctx->id, dfs_stack_frame_size(ctx->in_stack))) {
+            raw_data_t          state_data = dfs_stack_pop (ctx->in_stack);
+            if (NULL != state_data) {
+                ctx->load--;
+                if (is_waiting(ctx, state_data)) {
+                    ta_explore_state (ctx);
+                }
+            } else {
+                while (0 != dfs_stack_frame_size (ctx->backoff)) {
+                    dfs_stack_push (ctx->in_stack, dfs_stack_pop(ctx->backoff));
+                }
+            }
+        }
+        out_size = lb2_reduce (dfs_stack_frame_size(ctx->out_stack), W);
+        dfs_stack_t     old = ctx->out_stack;
+        ctx->stack = ctx->out_stack = ctx->in_stack;
+        ctx->in_stack = old;
+        increase_level (ctx, &ctx->counters);
+    } while (out_size > 0 && !lb2_is_stopped(lb2));
+}
+
+void
 wctx_init (wctx_t *ctx)
 {
     permute_set_model (ctx->permute, ctx->model);
@@ -2631,9 +2692,16 @@ explore (void *args)
     ctx->counters.trans = 0; //reset trans count
 
     /* The load balancer starts the right algorithm, see init_globals */
-    lb_local_init (lb, ctx->id, ctx, &ctx->load);
-    SCCstartTimer (timer);
-    lb_balance ( lb, ctx->id );
+    if (NULL != lb) {
+        lb_local_init (lb, ctx->id, ctx, &ctx->load);
+        SCCstartTimer (timer);
+        lb_balance ( lb, ctx->id );
+    } else {
+        lb2_local_init(lb2, ctx->id, ctx);
+        SCCstartTimer (timer);
+        assert (Strat_TA_BFS_Strict & strategy[0]);
+        ta_bfs_strict(ctx);
+    }
     SCCstopTimer (timer);
     ctx->counters.runtime = SCCrealTime (timer);
     SCCdeleteTimer (timer);
