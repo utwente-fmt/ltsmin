@@ -332,6 +332,13 @@ if test x"$acx_atomics" != "xyes"; then
   AC_MSG_WARN([no acceptable atomic operations found.])
 fi
 
+
+AC_CHECK_LIB([tbbmalloc_proxy], [malloc],
+    [have_tbbmalloc="TBB malloc library was found"]
+    [have_opaal="yes"],
+    AC_MSG_WARN([TBB malloc library not found.]))
+
+AM_CONDITIONAL([HAVE_OPAAL], [test x"$have_opaal" = "xyes"])
 AM_CONDITIONAL([HAVE_MPI], [test x"$have_mpi" != "x"])
 AM_CONDITIONAL([HAVE_LIBGMP], 
   [test x"$with_bignum" != xno && test x"$have_libgmp" = xyes])
@@ -399,6 +406,7 @@ Configuration:
     CADP     = ${CADP:-NOT FOUND, building without CADP support}
     DiVinE-cluster
              = ${with_divine:-NOT FOUND, building without DiVinE support}
+    OPAAL    = ${have_opaal:-TBB malloc NOT FOUND, building without opaal support}
 
     ASCIIDOC = ${ASCIIDOC:-NOT FOUND, not building documentation}
     XMLTO    = ${XMLTO:-NOT FOUND, not building manpages}

@@ -3,6 +3,7 @@ bin_PROGRAMS += etf-convert
 bin_PROGRAMS += ltsmin-tracepp
 bin_PROGRAMS += gcf-0.1
 
+MALLOC_LIBS="-ltbbmalloc_proxy"
 
 check_PROGRAMS  = test-bitset
 check_PROGRAMS += test-is-balloc
@@ -118,9 +119,9 @@ endif
 if HAVE_DVEC2
 bin_PROGRAMS += dve22lts-mc
 endif
-#if HAVE_OPAAL
+if HAVE_OPAAL
 bin_PROGRAMS += opaal2lts-mc
-#endif
+endif
 endif
 
 if HAVE_MPI
@@ -168,9 +169,9 @@ endif
 if HAVE_DVEC2
 pkglib_LTLIBRARIES += libdve2-open.la
 endif
-#if HAVE_OPAAL
+if HAVE_OPAAL
 pkglib_LTLIBRARIES += libopaal-open.la
-#endif
+endif
 # pins_open
 CADPCC = $(CADP)/src/com/cadp_cc
 CADPINCLUDES = -I$(CADP)/incl
@@ -264,7 +265,7 @@ dve22lts_grey_LDFLAGS  = $(DIVINE2_LDFLAGS) $(AM_LDFLAGS)
 
 # opaal2lts-grey
 #opaal2lts_grey_SOURCES  = spec2lts-grey.c opaal-greybox.c opaal-greybox.h
-#opaal2lts_grey_LDADD    = $(VSET_LIBS) libltsmin.la $(DVEC2_LIBS)
+#opaal2lts_grey_LDADD    = $(VSET_LIBS) libltsmin.la $(DVEC2_LIBS) $(MALLOC_LIBS)
 #opaal2lts_grey_CPPFLAGS = -DOPAAL $(DIVINE2_CPPFLAGS) $(AM_CPPFLAGS)
 #opaal2lts_grey_LDFLAGS  = $(DIVINE2_LDFLAGS) $(AM_LDFLAGS)
 
@@ -320,7 +321,7 @@ dve22lts_gsea_LDFLAGS  = $(DIVINE2_LDFLAGS) $(AM_LDFLAGS)
 
 # opaal2lts-gsea
 #opaal2lts_gsea_SOURCES  = spec2lts-gsea.c opaal-greybox.c opaal-greybox.h
-#opaal2lts_gsea_LDADD    = $(VSET_LIBS) libltsmin.la $(DVEC2_LIBS)
+#opaal2lts_gsea_LDADD    = $(VSET_LIBS) libltsmin.la $(DVEC2_LIBS) $(MALLOC_LIBS)
 #opaal2lts_gsea_CPPFLAGS = -DOPAAL $(DIVINE2_CPPFLAGS) $(AM_CPPFLAGS)
 #opaal2lts_gsea_LDFLAGS  = $(DIVINE2_LDFLAGS) $(AM_LDFLAGS)
 
@@ -376,7 +377,7 @@ dve2_reach_LDFLAGS  = $(DIVINE2_LDFLAGS) $(AM_LDFLAGS)
 
 # opaal-reach
 #opaal_reach_SOURCES  = spec-reach.c opaal-greybox.c opaal-greybox.h
-#opaal_reach_LDADD    = $(VSET_LIBS) libltsmin.la $(DVEC2_LIBS)
+#opaal_reach_LDADD    = $(VSET_LIBS) libltsmin.la $(DVEC2_LIBS) $(MALLOC_LIBS)
 #opaal_reach_CPPFLAGS = -DOPAAL $(DIVINE2_CPPFLAGS) $(AM_CPPFLAGS)
 #opaal_reach_LDFLAGS  = $(DIVINE2_LDFLAGS) $(AM_LDFLAGS)
 
@@ -431,7 +432,7 @@ dve22lts_mpi_LDFLAGS  = $(DIVINE2_LDFLAGS) $(AM_LDFLAGS)
 
 # opaal2lts-mpi
 #opaal2lts_mpi_SOURCES  = spec2lts-mpi.c opaal-greybox.c opaal-greybox.h
-#opaal2lts_mpi_LDADD    = libltsmin-mpi.la $(DVEC2_LIBS)
+#opaal2lts_mpi_LDADD    = libltsmin-mpi.la $(DVEC2_LIBS) $(MALLOC_LIBS)
 #opaal2lts_mpi_CPPFLAGS = -DOPAAL $(DIVINE2_CPPFLAGS) $(AM_CPPFLAGS)
 #opaal2lts_mpi_LDFLAGS  = $(DIVINE2_LDFLAGS) $(AM_LDFLAGS)
 
@@ -482,7 +483,7 @@ dve22lts_mc_LDFLAGS  = $(DIVINE2_LDFLAGS) $(AM_LDFLAGS)
 
 # opaal2lts-mc
 opaal2lts_mc_SOURCES  = spec2lts-mc.c opaal-greybox.c opaal-greybox.h
-opaal2lts_mc_LDADD    = libltsmin.la $(DVEC2_LIBS)
+opaal2lts_mc_LDADD    = libltsmin.la $(DVEC2_LIBS) $(MALLOC_LIBS)
 opaal2lts_mc_CPPFLAGS = -DOPAAL $(DIVINE2_CPPFLAGS) $(AM_CPPFLAGS)
 opaal2lts_mc_LDFLAGS  = $(DIVINE2_LDFLAGS) $(AM_LDFLAGS)
 
