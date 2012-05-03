@@ -16,9 +16,20 @@ static char* lump=UNDEFINED_METHOD;
 static int segments=1;
 static int silent=0;
 static int mkdet=0;
+static int cycle=0;
 
 static void no_op(lts_t lts){
     (void)lts;
+}
+
+static void lts_cycle_elim(lts_t lts){
+    if (lts->label!=NULL && lts->properties==NULL){
+        lts_silent_cycle_elim(lts,tau_step,NULL,NULL);
+    } else if (lts->label==NULL && lts->properties!=NULL) {
+        lts_silent_cycle_elim(lts,stutter_step,NULL,NULL);
+    } else {
+        Abort("cycle elimination requires either state labels or edge labels");
+    }
 }
 
 static void silent_compression(lts_t lts){
@@ -41,6 +52,7 @@ static  struct poptOption options[] = {
     { "copy" , 'c' , POPT_ARG_VAL , &copy , 1 , "perform a load/store copy"  , NULL },
     { "lump" , 'l' , POPT_ARG_VAL , &lump , 0 , "minimize module lumping of CTMC" , NULL },
     { "silent" , 0 , POPT_ARG_VAL , &silent , 1 , "silent step bisimulation" , NULL },
+    { "cycle" , 0 , POPT_ARG_VAL , &cycle , 1 , "cycle elimination" , NULL },
     { "determinize" , 0 , POPT_ARG_VAL , &mkdet , 1 , "compute deterministic variant" , NULL },
     { "segments" , 0 , POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT , &segments , 0 ,
       "set the number of segment for the output file" , "<N>" },
@@ -82,6 +94,10 @@ int main(int argc, char *argv[]){
     if (mkdet){
         if (reduce!=NULL) Abort("reduction specifed twice");
         reduce=lts_mkdet;
+    }
+    if (cycle){
+        if (reduce!=NULL) Abort("reduction specifed twice");
+        reduce=lts_cycle_elim;
     }
     if (reduce==NULL){
         Abort("please specify reduction");
