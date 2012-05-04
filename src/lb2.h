@@ -46,6 +46,8 @@ extern int lb2_stop (lb2_t *lb);
 
 extern int lb2_is_stopped (lb2_t *lb);
 
+extern void lb2_reinit (lb2_t *lb, size_t id);
+
 extern size_t lb2_reduce (size_t val, size_t W);
 
 #endif /* LB2_H_ */

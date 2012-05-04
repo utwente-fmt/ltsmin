@@ -293,7 +293,7 @@ state_db_popt (poptContext con, enum poptCallbackReason reason,
 static void
 exit_ltsmin(int sig)
 {
-    if ( !lb_stop(lb) ) {
+    if ( !(NULL != lb ? lb_stop(lb): lb2_stop(lb2)) ) {
         Warning(info, "UNGRACEFUL EXIT");
         exit(EXIT_FAILURE);
     } else {
@@ -904,7 +904,7 @@ init_globals (int argc, char *argv[])
     /* Load balancer assigned last, see exit_ltsmin */
     switch (strategy[0]) {
     case Strat_TA_BFS_Strict:
-        lb2 = lb2_create (W, split_bfs_strict, G, LB2_Static);
+        lb2 = lb2_create (W, split_bfs_strict, G, LB2_Static); break;
     case Strat_TA_BFS:
         lb = lb_create_max (W, (algo_f)ta_bfs,split_bfs,G, lb_method, H); break;
     case Strat_TA_DFS:
@@ -942,7 +942,10 @@ deinit_globals ()
     else //TreeDBSLL
         TreeDBSLLfree (dbs);
     RTfree (initial_data);
-    lb_destroy (lb);
+    if (NULL != lb)
+        lb_destroy (lb);
+    else
+        lb2_destroy(lb2);
     for (size_t i = 0; i < W; i++)
         wctx_free (contexts[i], 0);
     RTfree (contexts);
@@ -1103,7 +1106,7 @@ print_thread_statistics (wctx_t *ctx)
         snprintf (name, sizeof name, format, ctx->id, " R", ctx->counters.runtime);
         print_state_space_total (name, &ctx->red);
     }
-    if (ctx->load && !lb_is_stopped(lb)) {
+    if (ctx->load && !( NULL != lb ? lb_is_stopped(lb) : lb2_is_stopped(lb2))) {
         Warning (info, "Wrong load counter %zu", ctx->load);
     }
 }
@@ -1526,7 +1529,7 @@ static void
 ndfs_report_cycle (wctx_t *ctx, state_info_t *cycle_closing_state)
 {
     /* Stop other workers, exit if some other worker was first here */
-    if ( !lb_stop(lb) )
+    if ( !(NULL != lb ? lb_stop(lb): lb2_stop(lb2)) )
         return;
     size_t              level = dfs_stack_nframes (ctx->stack) + 1;
     Warning (info, "Accepting cycle FOUND at depth %zu!", level);
@@ -1547,7 +1550,7 @@ static void
 handle_error_trace (wctx_t *ctx)
 {
     /* Stop other workers, exit if some other worker was first here */
-    if ( !lb_stop(lb) )
+    if ( !(NULL != lb ? lb_stop(lb): lb2_stop(lb2)) )
         return;
     size_t              level = ctx->counters.level_cur;
     if (trc_output) {
@@ -2556,7 +2559,7 @@ ta_explore_state (wctx_t *ctx)
     count = permute_trans (ctx->permute, &ctx->state, ta_handle, ctx);
     if (0 == count) {
         ctx->counters.deadlocks++;
-        if (dlk_detect && !lb_is_stopped(lb)) {
+        if (dlk_detect && !!( NULL != lb ? lb_is_stopped(lb) : lb2_is_stopped(lb2))) {
             Warning (info,"Deadlock found in state at depth %zu!", ctx->counters.level_cur);
             handle_error_trace (ctx);
         }
@@ -2635,7 +2638,6 @@ ta_bfs_strict (wctx_t *ctx)
         while (lb2_balance(lb2, ctx->id, dfs_stack_frame_size(ctx->in_stack))) {
             raw_data_t          state_data = dfs_stack_pop (ctx->in_stack);
             if (NULL != state_data) {
-                ctx->load--;
                 if (is_waiting(ctx, state_data)) {
                     ta_explore_state (ctx);
                 }
@@ -2646,10 +2648,13 @@ ta_bfs_strict (wctx_t *ctx)
             }
         }
         out_size = lb2_reduce (dfs_stack_frame_size(ctx->out_stack), W);
+        lb2_reinit (lb2, ctx->id);
+        increase_level (ctx, &ctx->counters);
+        if (0 == ctx->id && RTverbosity >= 2)
+            Warning(info, "BFS level %zu has %zu states", ctx->counters.level_cur, out_size);
         dfs_stack_t     old = ctx->out_stack;
         ctx->stack = ctx->out_stack = ctx->in_stack;
         ctx->in_stack = old;
-        increase_level (ctx, &ctx->counters);
     } while (out_size > 0 && !lb2_is_stopped(lb2));
 }
 

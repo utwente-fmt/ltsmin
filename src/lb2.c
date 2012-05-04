@@ -31,7 +31,7 @@ struct lb2_s {
          char               pad[(2<<CACHE_LINE) - sizeof(int) - 2*sizeof(size_t)];
      } __attribute__ ((packed)) *local;
      int                all_done;
-     int                one_done;
+     int                stopped;
      int                initialized;
 };
 
@@ -43,16 +43,9 @@ static inline int  is_initialized (lb2_t *lb) {
 static inline void set_initialized (lb2_t *lb) {
     atomic_write (&lb->initialized, 1);
 }
-
-/*
-static inline int  one_done (lb2_t *lb) {
-    return atomic_read (&lb->one_done);
+static inline int  stopped (lb2_t *lb) {
+    return atomic_read (&lb->stopped);
 }
-static inline void set_one_done (lb2_t *lb) {
-    atomic_write (&lb->one_done, 1);
-}
-*/
-
 static inline int  all_done (lb2_t *lb) {
     return atomic_read (&lb->all_done);
 }
@@ -73,13 +66,21 @@ static inline void set_idle (lb2_t *lb, int id, int a) {
 int
 lb2_stop (lb2_t *lb)
 {
+    atomic_write (&lb->stopped, 1);
     return try_all_done (lb);
 }
 
 int
 lb2_is_stopped (lb2_t *lb)
 {
-    return all_done (lb);
+    return stopped (lb);
+}
+
+void
+lb2_reinit (lb2_t *lb, size_t id)
+{
+    lb->local[id].requests = 0;
+    atomic_write (&lb->all_done, 0);
 }
 
 static void
@@ -297,8 +298,8 @@ lb2_create_max (size_t threads, lb2_split_problem_f split,
     lb->threads = threads;
     lb->method = method;
     lb->all_done = 0;
-    lb->one_done = 0;
     lb->initialized = 0;
+    lb->stopped = 0;
     lb->split = split;
     lb->max_handoff = max;
     assert (gran < 32);
