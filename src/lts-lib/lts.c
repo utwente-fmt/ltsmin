@@ -327,79 +327,124 @@ void lts_silent_cycle_elim(lts_t lts,silent_predicate silent,void*silent_ctx,bit
         Warning(error,"illegally wiping out state vectors");
         lts->state_db=NULL;
     }
-    struct cycle_elim_context context;
-    context.silent=silent;
-    context.silent_ctx=silent_ctx;
     int has_props=lts->properties!=NULL;
     int has_labels=lts->label!=NULL;
-    uint32_t *temp_props;
 
-    if(has_props){
-        temp_props=(uint32_t*)RTmalloc(sizeof(uint32_t)*lts->states);
-    }
+    uint32_t *queue=(uint32_t*)RTmalloc(sizeof(uint32_t)*lts->states);
+    uint32_t *stack=(uint32_t*)RTmalloc(sizeof(uint32_t)*lts->states);
+    uint32_t *next=(uint32_t*)RTmalloc(sizeof(uint32_t)*lts->states);
+    bitset_t todo=bitset_create(64,64);
+    uint32_t *map=(uint32_t*)RTmalloc(sizeof(uint32_t)*lts->states);
 
-    uint32_t i,time,tmp,component,count,s,l,d,max;
-    uint32_t *map;
-
-    Debug("mark with exit times");
+    uint32_t stack_ptr;
+    uint32_t queue_ptr;
+    
+    Debug("queue on exit time");
     lts_set_type(lts,LTS_BLOCK);
-    map=(uint32_t*)RTmalloc(sizeof(uint32_t)*lts->states);
-    for(i=0;i<lts->states;i++) {
-        map[i]=0;
-    }
-    time=1;
-    max=0;
-    for(i=0;i<lts->states;i++){
-        uint32_t pass1_dfs_count=0;
-        pass1_dfs(lts,&context,map,&time,i,&pass1_dfs_count);
-        if (pass1_dfs_count>max) max=pass1_dfs_count;
-    }
-    Print(infoLong,"worst tau component has size %d",max);
-    /* renumber: highest exit time means lowest number */
-    /* at the same time reverse direction of edges */
-    lts_set_type(lts,LTS_LIST);
-    for(i=0;i<lts->root_count;i++){
-        lts->root_list[i]=time-map[lts->root_list[i]];
-    }
-    for(i=0;i<lts->transitions;i++){
-        tmp=lts->src[i];
-        lts->src[i]=time-map[lts->dest[i]];
-        lts->dest[i]=time-map[tmp];
-    }
-    if(has_props){
-        for(i=0;i<lts->states;i++){
-            temp_props[time-map[i]]=lts->properties[i];
+    stack_ptr=0;
+    queue_ptr=0;
+    bitset_clear_all(todo);
+    bitset_set_range(todo,0,lts->states-1);
+    stack[stack_ptr]=0;
+    while(bitset_next_set(todo,&stack[stack_ptr])){
+        Debug("enter state %u",stack[stack_ptr]);
+        bitset_clear(todo,stack[stack_ptr]);
+        next[stack_ptr]=lts->begin[stack[stack_ptr]];
+        for(;;){
+            if (next[stack_ptr]<lts->begin[stack[stack_ptr]+1]){
+                uint32_t dest=lts->dest[next[stack_ptr]];
+                Debug("edge %u: %u -> %u",next[stack_ptr],stack[stack_ptr],dest);
+                if (silent(silent_ctx,lts,stack[stack_ptr],next[stack_ptr],dest)){
+                    next[stack_ptr]++;
+                    if (bitset_test(todo,dest)){
+                        bitset_clear(todo,dest);
+                        stack_ptr++;
+                        stack[stack_ptr]=dest;
+                        next[stack_ptr]=lts->begin[stack[stack_ptr]];
+                        Debug("enter state %u",stack[stack_ptr]);
+                    }
+                } else {
+                    next[stack_ptr]++;
+                }
+            } else {
+                Debug("leave state %u",stack[stack_ptr]);
+                queue[queue_ptr]=stack[stack_ptr];
+                queue_ptr++;
+                if (stack_ptr>0){
+                    // back track;
+                    stack_ptr--;
+                } else {
+                    // DFS run complete;
+                    break;
+                }
+            }
         }
-        uint32_t tmp=lts->properties;
-        lts->properties=temp_props;
-        temp_props=tmp;
     }
     Debug("mark components");
-    lts_set_type(lts,LTS_BLOCK);
-    for(i=0;i<lts->states;i++){
-        map[i]=0;
-    }
-    component=0;
-    for(i=0;i<lts->states;i++){
-        if(map[i]==0){
-            component++;
-            pass2_dfs(lts,&context,map,component,i);
+    lts_set_type(lts,LTS_BLOCK_INV);
+    stack_ptr=0;
+    bitset_clear_all(todo);
+    bitset_set_range(todo,0,lts->states-1);
+    uint32_t component=0;
+    while(queue_ptr>0){
+        queue_ptr--;
+        if (!bitset_test(todo,queue[queue_ptr])){
+            continue;
         }
+        stack[stack_ptr]=queue[queue_ptr];
+        Debug("enter state %u (%u)",stack[stack_ptr],component);
+        bitset_clear(todo,stack[stack_ptr]);
+        map[stack[stack_ptr]]=component;
+        next[stack_ptr]=lts->begin[stack[stack_ptr]];
+        for(;;){
+            if (next[stack_ptr]<lts->begin[stack[stack_ptr]+1]){
+                uint32_t src=lts->src[next[stack_ptr]];
+                Debug("edge %u: %u <- %u",next[stack_ptr],src,stack[stack_ptr]);
+                if (silent(silent_ctx,lts,src,next[stack_ptr],stack[stack_ptr])){
+                    Debug("silent");
+                    next[stack_ptr]++;
+                    if (bitset_test(todo,src)){
+                        bitset_clear(todo,src);
+                        stack_ptr++;
+                        stack[stack_ptr]=src;
+                        next[stack_ptr]=lts->begin[stack[stack_ptr]];
+                        Debug("enter state %u (%u)",stack[stack_ptr],component);
+                        map[stack[stack_ptr]]=component;
+                    }
+                } else {
+                    next[stack_ptr]++;
+                }
+            } else {
+                Debug("leave state %u",stack[stack_ptr]);
+                if (stack_ptr>0){
+                    // back track;
+                    stack_ptr--;
+                } else {
+                    // DFS run complete;
+                    break;
+                }
+            }
+        }
+        component++;
     }
-    Debug("divide out equivalence classes reverse direction of edges again");
+    Debug("showing map");
+    for(uint32_t i=0;i<lts->states;i++){
+        Debug("map[%4u]=%4u",i,map[i]);
+    }
+    Debug("divide out equivalence classes");
     lts_set_type(lts,LTS_LIST);
     Debug("initial states");
-    for(i=0;i<lts->root_count;i++){
-        lts->root_list[i]=map[lts->root_list[i]]-1;
+    for(uint32_t i=0;i<lts->root_count;i++){
+        lts->root_list[i]=map[lts->root_list[i]];
     }
-    count=0;
+    uint32_t count=0;
     Debug("transitions");
-    for(i=0;i<lts->transitions;i++){
-        d=map[lts->src[i]]-1;
-        s=map[lts->dest[i]]-1;
+    for(uint32_t i=0;i<lts->transitions;i++){
+        uint32_t s=map[lts->src[i]];
+        uint32_t d=map[lts->dest[i]];
+        uint32_t l;
         if (has_labels) l=lts->label[i];
         if (silent(silent_ctx,lts,lts->src[i],i,lts->dest[i])&&(s==d)) {
-            if (s>d) Abort("silent step from high to low");
             continue;
         }
         lts->src[count]=s;
@@ -408,16 +453,22 @@ void lts_silent_cycle_elim(lts_t lts,silent_predicate silent,void*silent_ctx,bit
         count++;
     }
     if(has_props){
+        uint32_t *temp_props=queue;
         Debug("dividing properties");
-        for(i=0;i<lts->states;i++){
-            temp_props[map[i]-1]=lts->properties[i];
+        for(uint32_t i=0;i<lts->states;i++){
+            Debug("copy prop[%u]=%u",map[i],lts->properties[i]);
+            temp_props[map[i]]=lts->properties[i];
         }
-        uint32_t tmp=lts->properties;
-        lts->properties=temp_props;
-        temp_props=tmp;
+        for(uint32_t i=0;i<component;i++){
+            lts->properties[i]=temp_props[i];
+            Debug("prop[%u]=%u",i,lts->properties[i]);
+        }
     }
     lts_set_size(lts,lts->root_count,component,count);
     free(map);
+    free(queue);
+    free(stack);
+    free(next);
     Debug("uniq");
     lts_uniq(lts);
     Debug("cycle elim done");
