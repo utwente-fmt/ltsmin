@@ -903,7 +903,7 @@ init_globals (int argc, char *argv[])
 
     /* Load balancer assigned last, see exit_ltsmin */
     switch (strategy[0]) {
-    case Strat_TA_BFS_Strict:
+    case Strat_TA_BFS_Strict: G = log10(G) / log10(2); G = G>1 ? G : 1;
         lb2 = lb2_create (W, split_bfs_strict, G, LB2_Static); break;
     case Strat_TA_BFS:
         lb = lb_create_max (W, (algo_f)ta_bfs,split_bfs,G, lb_method, H); break;
@@ -1097,6 +1097,7 @@ print_thread_statistics (wctx_t *ctx)
 {
     char                name[128];
     char               *format = "[%zu%s] saw in %.3f sec ";
+    if (W < 4) {
     if (Strat_Reach & strategy[0]) {
         snprintf (name, sizeof name, format, ctx->id, "", ctx->counters.runtime);
         print_state_space_total (name, &ctx->counters);
@@ -1105,8 +1106,8 @@ print_thread_statistics (wctx_t *ctx)
         print_state_space_total (name, &ctx->counters);
         snprintf (name, sizeof name, format, ctx->id, " R", ctx->counters.runtime);
         print_state_space_total (name, &ctx->red);
-    }
-    if (ctx->load && !( NULL != lb ? lb_is_stopped(lb) : lb2_is_stopped(lb2))) {
+    }}
+    if (lb != NULL && ctx->load && !lb_is_stopped(lb)) {
         Warning (info, "Wrong load counter %zu", ctx->load);
     }
 }

@@ -26,23 +26,17 @@ struct lb2_s {
      size_t             max_handoff;
      struct lb2_status_s {
          int                idle;
+         uint32_t           seed;
          size_t             requests;
          size_t             received;
-         char               pad[(2<<CACHE_LINE) - sizeof(int) - 2*sizeof(size_t)];
+         char               pad[(2<<CACHE_LINE) - 2*sizeof(int) - 2*sizeof(size_t)];
      } __attribute__ ((packed)) *local;
      int                all_done;
      int                stopped;
-     int                initialized;
 };
 
 typedef struct lb2_status_s lb2_status_t;
 
-static inline int  is_initialized (lb2_t *lb) {
-    return atomic_read (&lb->initialized);
-}
-static inline void set_initialized (lb2_t *lb) {
-    atomic_write (&lb->initialized, 1);
-}
 static inline int  stopped (lb2_t *lb) {
     return atomic_read (&lb->stopped);
 }
@@ -79,17 +73,11 @@ lb2_is_stopped (lb2_t *lb)
 void
 lb2_reinit (lb2_t *lb, size_t id)
 {
-    lb->local[id].requests = 0;
+    atomic_write (&lb->local[id].requests, 0);
     atomic_write (&lb->all_done, 0);
-}
-
-static void
-wait_all (lb2_t *lb)
-{
-    for (size_t oid = 0; oid< lb->threads; oid++) {
-        while ( 0 == get_idle(lb, oid) ) {}
-        set_idle (lb, oid, 0);
-    }
+    if (0 == id)
+        set_idle (lb, id, 0);
+    lb2_barrier (lb->threads);
 }
 
 void
@@ -97,72 +85,15 @@ lb2_local_init (lb2_t *lb, int id, void *arg)
 {
     // record thread local data
     atomic_write (&(lb->args[id]), arg);
-    
-    // signal entry in lb2_local_init
-    set_idle (lb, id, 1);
-    if (id != 0) { // wait
-        while ( !is_initialized(lb) ) {}
-        return;
-    }
-
-    /*
-    if ( lb->method == LB2_Static || lb->method == LB2_Combined ) {
-        // do initial exploration and divide results
-            lb->algorithm (arg, lb->granularity);
-
-        // wait for other's to call lb2_local_init and divide initial problem
-        wait_all (lb);
-        size_t              initial = get_load (lb, id);
-        size_t              handoff = initial / lb->threads;
-        size_t              leftover = initial;
-        size_t              real_handoff;
-        for (int oid = 0; oid < (int)lb->threads; oid++) {
-            if ( oid == id )
-                continue;
-            real_handoff = lb->split ( lb->args[id], lb->args[oid], handoff );
-            leftover -= real_handoff;
-            set_load (lb, oid, get_load(lb, oid) + real_handoff);
-        }
-        set_load (lb, id, leftover);
-    } else {
-        // wait for other's to call lb2_local_init
-        wait_all (lb);
-    }
-    */
-
-    wait_all (lb);
-    
-    // release all
-    set_initialized (lb);
+    lb2_reinit (lb, id);
 }
-
-/*
-static inline int
-request_highest_load (lb2_t *lb, size_t id)
-{
-    lb2_status_t        *victim = NULL;
-    size_t              max = 0;
-    for (size_t oid = 0; oid < lb->threads; oid++) {
-        size_t              load = get_load (lb, oid);
-        if (load > max && oid != id) {
-            victim = lb->local + oid;
-            max = load;
-        }
-    }
-    if (victim == NULL)
-        return 0;
-    fetch_or (&victim->requests, 1L << id);
-    return 1;
-}
-*/
 
 static inline int
 request_random (lb2_t *lb, size_t id)
 {
      size_t res = 0;
      do {
-         res = random ();
-         res = res % lb->threads;
+         res = rand_r (&lb->local[id].seed) % lb->threads;
      } while (res == id);
      fetch_or (&lb->local[res].requests, 1L << id);
      Debug ("Requested %lld", res);
@@ -239,70 +170,28 @@ lb2_balance (lb2_t *lb, int id, size_t my_load)
     return my_load;
 }
 
-/*
-static void
-lb2_balance_static (lb2_t *lb, int id)
-{
-    while ( 0 != get_load(lb, id) && !all_done(lb) )
-        lb->algorithm ( lb->args[id], lb->granularity );
-}
-
-static void
-lb2_balance_none (lb2_t *lb, int id)
-{
-    lb->algorithm ( lb->args[id], SIZE_MAX );
-}
-
-static void
-lb2_balance_combined (lb2_t *lb, int id)
-{
-    while ( 0 != get_load(lb, id) && !one_done(lb) && !all_done(lb) )
-        lb->algorithm ( lb->args[id], lb->granularity );
-    set_one_done (lb);
-    lb2_balance_SRP ( lb, id );
-}
-
-void
-lb2_balance (lb2_t *lb, int id)
-{
-    if ( !is_initialized(lb) )
-        Fatal (1, error, "Load balancer is not initialized.")
-    switch ( lb->method ) {
-    case LB2_None:
-        lb2_balance_none ( lb, id ); break;
-    case LB2_Static:
-        lb2_balance_static ( lb, id ); break;
-    case LB2_Combined:
-        lb2_balance_combined ( lb, id ); break;
-    case LB2_SRP:
-        lb2_balance_SRP ( lb, id ); break;
-    }
-}
-*/
-
 lb2_t                *
 lb2_create (size_t threads, lb2_split_problem_f split,
            size_t gran, lb2_method_t m)
 {
-    return lb2_create_max (threads, split, gran, m, MAX_HANDOFF_DEFAULT);
+    return lb2_create_max (threads, split, gran, m, LB2_MAX_HANDOFF_DEFAULT);
 }
 
 lb2_t                *
 lb2_create_max (size_t threads, lb2_split_problem_f split,
                size_t gran, lb2_method_t method, size_t max)
 {
-    assert (threads <= sizeof (uint64_t) * 8);
+    assert (threads <= LB2_MAX_THREADS);
     lb2_t               *lb = RTalign(CACHE_LINE_SIZE, sizeof(lb2_t));
     void *args = RTalign (CACHE_LINE_SIZE, sizeof(void *[threads]));
     void *local = RTalign (CACHE_LINE_SIZE, sizeof(lb2_status_t[threads]));
     lb->threads = threads;
     lb->method = method;
     lb->all_done = 0;
-    lb->initialized = 0;
     lb->stopped = 0;
     lb->split = split;
     lb->max_handoff = max;
-    assert (gran < 32);
+    assert (gran < 32 && gran > 0 && "wrong granularity");
     lb->granularity = 1UL << gran;
     lb->mask = lb->granularity - 1;
     lb->args = args;
@@ -322,7 +211,25 @@ lb2_destroy (lb2_t *lb)
     RTfree (lb);
 }
 
-#define MAX_THREADS 64
+static size_t       __attribute__ ((aligned(1UL<<CACHE_LINE))) barrier_count = 0;
+static size_t       __attribute__ ((aligned(1UL<<CACHE_LINE))) barrier_wait = 0;
+
+lb2_barrier_result_t
+lb2_barrier (size_t W)
+{
+    //assert ((W <= LB2_MAX_THREADS));
+    size_t          flip = atomic_read (&barrier_wait);
+    size_t          count = add_fetch (&barrier_count, 1);
+    if (W == count) {
+        atomic_write (&barrier_count, 0);
+        atomic_write (&barrier_wait, 1 - flip); // flip wait
+        return LB2_BARRIER_MASTER;
+    } else {
+        while (flip == atomic_read(&barrier_wait)) {}
+        return LB2_BARRIER_SLAVE;
+    }
+}
+
 static size_t       __attribute__ ((aligned(1UL<<CACHE_LINE))) reduce_count = 0;
 static size_t       __attribute__ ((aligned(1UL<<CACHE_LINE))) reduce_result = 0;
 static size_t       __attribute__ ((aligned(1UL<<CACHE_LINE))) reduce_wait = 0;
@@ -330,7 +237,7 @@ static size_t       __attribute__ ((aligned(1UL<<CACHE_LINE))) reduce_wait = 0;
 size_t
 lb2_reduce (size_t val, size_t W)
 {
-    //assert ((W <= MAX_THREADS) && (val < (1UL<<58)) && (sizeof(size_t) == 8));
+    //assert ((W <= LB2_MAX_THREADS) && (val < (1UL<<58)) && (sizeof(size_t) == 8));
     size_t          flip = atomic_read (&reduce_wait);
     size_t          count = add_fetch (&reduce_count, val + (1UL << 58));
     if (count >> 58 == W) {
