@@ -2489,6 +2489,7 @@ ta_covered (void *arg, lmap_store_t *stored, lmap_loc_t loc)
             (TA_UPDATE_PASSED == UPDATE || TA_WAITING == (ta_set_e_t)stored->status) &&
             GBisCoveredByShort(ctx->model, stored_l, succ_l)) {
         lmap_delete (lmap, loc);
+        //Warning(info, "Delete: %zu", stored->ref);
         ctx->last = (TA_NONE == ctx->last ? loc : ctx->last);
         ctx->counters.deletes++;
     }
@@ -2517,8 +2518,14 @@ ta_handle (void *arg, state_info_t *successor, transition_info_t *ti, int seen)
                 statistics_unrecord (&ctx->counters.lattice_ratio, ctx->work);
             statistics_record (&ctx->counters.lattice_ratio, ctx->work+1);
         }
-        raw_data_t stack_loc = dfs_stack_push (ctx->stack, NULL);
-        state_info_serialize (successor, stack_loc);
+        //if (TA_UPDATE_WAITING == UPDATE && TA_NONE != ctx->last && ctx->last == successor->loc) {
+            // in waiting list update there is no need to store the successor
+            // in our work set if we _updated_ a waiting state, since this
+            // location is already in the work set of a worker.
+        //} else {
+            raw_data_t stack_loc = dfs_stack_push (ctx->stack, NULL);
+            state_info_serialize (successor, stack_loc);
+        //}
         if (trc_output)
             parent_ref[successor->ref] = ctx->state.ref; // TODO: for backoffs!
         ctx->counters.updates += TA_NONE != ctx->last;
@@ -2539,17 +2546,24 @@ is_waiting (wctx_t *ctx, raw_data_t state_data)
         ta_handle(ctx, &ctx->state, NULL, 0);
         return 0; // pretend the state is already in the waiting set
     }
+    if (TA_UPDATE_NONE == UPDATE)
+        return 1; // we don't need to update the global waiting info
     if (backoff_or_lock(ctx, &ctx->state))
         return 0; // pretend the state is already in the waiting set
     int ret_val = 0;
-    if (TA_UPDATE_NONE == UPDATE ||
-        TA_WAITING == (ta_set_e_t)lmap_get(lmap, ctx->state.loc)->status) {
+    lmap_store_t *loc = lmap_get(lmap, ctx->state.loc);
+    //if (loc->ref != ctx->state.ref) Abort("Error in lattice map found %zu, referenced from %zu!", loc->ref, ctx->state.ref);
+    if(ctx->state.ref == loc->ref && ctx->state.lattice == loc->lattice &&
+            TA_WAITING == (ta_set_e_t)loc->status) {
         lmap_set (lmap, ctx->state.loc, TA_PASSED);
         ret_val = 1;
     } else {
         ret_val = 0;
     }
     ta_unlock (ctx->state.ref);
+    //ctx->state.lattice = loc->lattice;
+    //if (!refs && UseDBSLL == db_type)
+    //    ((lattice_t*)ctx->state.data+D)[0] = loc->lattice;
     return ret_val;
 }
 
