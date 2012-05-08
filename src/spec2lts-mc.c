@@ -24,7 +24,7 @@
 #include <dm/bitvector.h>
 #include <fast_hash.h>
 #include <is-balloc.h>
-#include <lattice-map.h>
+#include <lmap.h>
 #include <lb2.h>
 #include <lb.h>
 #include <runtime.h>
@@ -57,7 +57,7 @@ typedef struct state_info_s {
     ref_t               ref;
     uint32_t            hash32;
     lattice_t           lattice;
-    lmap_loc_t          loc;
+    lm_loc_t            loc;
 } state_info_t;
 
 typedef enum { UseGreyBox, UseBlackBox } box_t;
@@ -99,6 +99,12 @@ typedef enum {
     Perm_Dynamic,   /* generate a dynamic permutation based on color feedback */
     Perm_Unknown    /* not set yet */
 } permutation_perm_t;
+
+typedef enum ta_update_e {
+    TA_UPDATE_NONE = 0,
+    TA_UPDATE_WAITING = 1,
+    TA_UPDATE_PASSED = 2,
+} ta_update_e_t;
 
 typedef struct permute_todo_s {
     state_info_t        si;
@@ -143,7 +149,6 @@ static char            *program;
 static cct_map_t       *tables = NULL;
 static char            *files[2];
 static int              dbs_size = 0;
-static int              lmap_size = 0;
 static int              refs = 0;
 static int              no_red_perm = 0;
 static int              all_red = 1;
@@ -152,8 +157,8 @@ static size_t           max = SIZE_MAX;
 static size_t           W = 2;
 static lb_t            *lb = NULL;
 static lb2_t           *lb2 = NULL;
-static void            *dbs;
-static lmap_t          *lmap;
+static void            *dbs = NULL;
+static lm_t            *lmap = NULL;
 static dbs_stats_f      statistics;
 static dbs_get_f        get;
 static dbs_get_sat_f    get_sat_bit;
@@ -182,9 +187,10 @@ static int              assert_index = -1;
 static size_t           G = 100;
 static size_t           H = MAX_HANDOFF_DEFAULT;
 static int              ZOBRIST = 0;
-static int              LATTICE_RATIO = 0;
-static int              UPDATE = 1;
+static int              LATTICE_BLOCK_SIZE = (1UL<<CACHE_LINE) / sizeof(lattice_t);
+static int              UPDATE = TA_UPDATE_WAITING;
 static int              BACKOFF = 0;
+static int              STDEV = 0;
 static ref_t           *parent_ref = NULL;
 static state_data_t     initial_data;
 static state_info_t     initial_state;
@@ -310,20 +316,24 @@ static struct poptOption options[] = {
     {"size", 's', POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &dbs_size, 0,
      "size of the state store (log2(size))", NULL},
 #ifdef OPAAL
-    {"lattice-ratio", 'l', POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &LATTICE_RATIO,
-      0,"log2 ratio between symbolic states and explicit states", NULL},
+    {"lattice-blocks", 'l', POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &LATTICE_BLOCK_SIZE,
+      0,"Size of blocks preallocated for lattices (> 1). "
+         "Small blocks save memory when most states few lattices (< 4). "
+         "Larger blocks save memory in case a few states have many lattices. "
+         "For the best performance set this to: cache line size (usually 64) divided by lattice size of 8 byte.", NULL},
     {"update", 'u', POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &UPDATE,
-      0,"cover update strategy: 0 = simple, 1 = update waiting, 2 = update passed (may break traces).", NULL},
+      0,"cover update strategy: 0 = simple, 1 = update waiting, 2 = update passed (may break traces)", NULL},
     {"backoff", 'b', POPT_ARG_VAL, &BACKOFF, 1, "Back-off algorithm for TA exploration", NULL},
+    {"stdev", 0, POPT_ARG_VAL, &STDEV, 1, "Calculate the standard deviation of lattice ratio", NULL},
     {"strategy", 0, POPT_ARG_STRING | POPT_ARGFLAG_SHOW_DEFAULT,
      &arg_strategy, 0, "select the search strategy", "<ta_bfs|ta_dfs>"},
 #else
     {"strategy", 0, POPT_ARG_STRING | POPT_ARGFLAG_SHOW_DEFAULT,
      &arg_strategy, 0, "select the search strategy", "<bfs|dfs|ndfs|nndfs|mcndfs|endfs|endfs,mcndfs|endfs,endfs,nndfs>"},
-     {"no-red-perm", 0, POPT_ARG_VAL, &no_red_perm, 1, "turn off transition permutation for the red search", NULL},
-     {"nar", 1, POPT_ARG_VAL, &all_red, 0, "turn off red coloring in the blue search (NNDFS/MCNDFS)", NULL},
-     {"grey", 0, POPT_ARG_VAL, &call_mode, UseGreyBox, "make use of GetTransitionsLong calls", NULL},
-     {"max", 0, POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &max, 0, "maximum search depth", "<int>"},
+    {"no-red-perm", 0, POPT_ARG_VAL, &no_red_perm, 1, "turn off transition permutation for the red search", NULL},
+    {"nar", 1, POPT_ARG_VAL, &all_red, 0, "turn off red coloring in the blue search (NNDFS/MCNDFS)", NULL},
+    {"grey", 0, POPT_ARG_VAL, &call_mode, UseGreyBox, "make use of GetTransitionsLong calls", NULL},
+    {"max", 0, POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &max, 0, "maximum search depth", "<int>"},
 #endif
     {"lb", 0, POPT_ARG_STRING | POPT_ARGFLAG_SHOW_DEFAULT,
      &arg_lb, 0, "select the load balancing method", "<srp|static|combined|none>"},
@@ -431,12 +441,6 @@ global_has_color (ref_t ref, global_color_t color, int rec_bits)
     return get_sat_bit (dbs, ref, rec_bits+count_bits+color.g);
 }
 
-static void
-global_unset_color (ref_t ref, global_color_t color, int rec_bits)
-{
-    unset_sat_bit (dbs, ref, rec_bits+count_bits+color.g);
-}
-
 static int //RED and BLUE are independent
 global_try_color (ref_t ref, global_color_t color, int rec_bits)
 {
@@ -483,6 +487,7 @@ typedef struct counter_s {
     double              time;
     size_t              deletes;        // lattice deletes
     size_t              updates;        // lattice updates
+    size_t              inserts;        // lattice inserts
     size_t              delayed;        // lattice backoff delays
     statistics_t        lattice_ratio;  // On-the-fly calc of stdev/mean of #lat
 } counter_t;
@@ -514,7 +519,7 @@ struct thread_ctx_s {
     int                 rec_bits;       // bit depth of recursive ndfs
     ref_t               work;           // ENDFS work for loadbalancer
     int                 done;           // ENDFS done for loadbalancer
-    lmap_loc_t          last;           // TA last tombstone location
+    lm_loc_t            last;           // TA last tombstone location
     dfs_stack_t         backoff;        // Backoff stack (for TA)
 };
 
@@ -580,6 +585,7 @@ add_results (counter_t *res, counter_t *cnt)
     res->exit += cnt->exit;
     res->time += SCCrealTime (cnt->timer);
     res->updates += cnt->updates;
+    res->inserts += cnt->inserts;
     res->deletes += cnt->deletes;
     res->delayed += cnt->delayed;
 }
@@ -833,7 +839,7 @@ init_globals (int argc, char *argv[])
 
     if (0 == dbs_size) {
         size_t el_size = (db_type == UseTreeDBSLL ? 3 : D) * SLOT_SIZE;
-        size_t map_el_size = (Strat_TA & strategy[0] ? sizeof(lmap_store_t)*4 : 0);
+        size_t map_el_size = (Strat_TA & strategy[0] ? sizeof(lattice_t) : 0);
         size_t db_el_size = (RTmemSize() / 3) / (el_size + map_el_size);
         dbs_size = (int) (log(db_el_size) / log(2));
         dbs_size = dbs_size > DB_SIZE_MAX ? DB_SIZE_MAX : dbs_size;
@@ -856,9 +862,8 @@ init_globals (int argc, char *argv[])
         local_bits += (Strat_LTL & strategy[i++] ? 2 : 0);
     Warning (info, "Global bits: %d, count bits: %d, local bits: %d.",
              global_bits, count_bits, local_bits);
-    lmap_size = dbs_size + LATTICE_RATIO;
     if (Strat_TA & strategy[0])
-        lmap = lmap_create (63, 64, lmap_size);
+        lmap = lm_create (W, 1UL<<dbs_size, LATTICE_BLOCK_SIZE);
     switch (db_type) {
     case UseDBSLL:
         if (ZOBRIST) {
@@ -942,6 +947,8 @@ deinit_globals ()
     else //TreeDBSLL
         TreeDBSLLfree (dbs);
     RTfree (initial_data);
+    if (NULL != lmap)
+        lm_free (lmap);
     if (NULL != lb)
         lb_destroy (lb);
     else
@@ -1018,10 +1025,11 @@ print_statistics (counter_t *ar_reach, counter_t *ar_red, mytimer_t timer,
     size_t              db_elts = stats->elts;
     size_t              db_nodes = stats->nodes;
     db_nodes = db_nodes == 0 ? db_elts : db_nodes;
-    size_t              el_size = db_type == UseTreeDBSLL ? 3 : D;
+    size_t              el_size = db_type == UseTreeDBSLL ? 3 : D+1;
     size_t              s = state_info_size();
     mem1 = ((double)(s * (reach->load_max+red->load_max))) / (1 << 20);
 
+    size_t lattices = reach->inserts - reach->updates;
     if (Strat_LTL & strategy[0]) {
         SCCreportTimer (timer, "Total exploration time");
         Warning (info, "");
@@ -1050,17 +1058,18 @@ print_statistics (counter_t *ar_reach, counter_t *ar_red, mytimer_t timer,
                 ar_reach->explored/time, ar_reach->trans/time);
         Warning(info, "");
         if (Strat_TA & strategy[0]) {
-            if (RTverbosity > 2) { // quite costly: flops
+            if (STDEV) { // quite costly: flops
                 statistics_t stats; statistics_init (&stats);
                 for (size_t i = 0; i< W; i++) {
                     statistics_t *s = &contexts[i]->counters.lattice_ratio;
                     statistics_union (&stats, &stats, s);
                 }
-                Warning (info, "Stdev: %.2f", statistics_stdev(&stats));
+                Warning (info, "Lattice ratio: %.2f standard deviation: %.3f", ((double)lattices/db_elts), statistics_stdev(&stats));
             }
-            mem3 = ((double)(ar_reach->explored*sizeof(lmap_store_t))) / (1<<20);
-            double lmap = ((double)(sizeof(lmap_store_t) * (1UL << lmap_size))) / (1<<20);
-            Warning (info, "Total memory used for symbolic storage: %.1fMB (~%.1fMB paged-in)", mem3, lmap);
+            mem3 = ((double)(sizeof(lattice_t[lm_allocated(lmap) + db_elts]))) / (1<<20);
+            double lm = ((double)(sizeof(lattice_t[lm_allocated(lmap) + (1UL<<dbs_size)]))) / (1<<20);
+            double redundancy = (((double)(db_elts + lm_allocated(lmap))) / lattices) * 100;
+            Warning (info, "Lattice map: %.1fMB (~%.1fMB paged-in) overhead: %.2f%%", mem3, lm, redundancy);
         }
     }
 
@@ -1068,7 +1077,7 @@ print_statistics (counter_t *ar_reach, counter_t *ar_red, mytimer_t timer,
              s, reach->load_max, mem1);
     mem2 = ((double)(1UL << (dbs_size)) / (1<<20)) * SLOT_SIZE * el_size;
     mem4 = ((double)(db_nodes * SLOT_SIZE * el_size)) / (1<<20);
-    compr = (double)(db_nodes * el_size) / (D * db_elts) * 100;
+    compr = (double)(db_nodes * el_size) / ((D+1) * db_elts) * 100;
     ratio = (double)((db_nodes * 100) / (1UL << dbs_size));
     name = db_type == UseTreeDBSLL ? "Tree" : "Table";
     Warning (info, "DB: %s, memory: %.1fMB, compr. ratio: %.1f%%, "
@@ -1082,13 +1091,14 @@ print_statistics (counter_t *ar_reach, counter_t *ar_red, mytimer_t timer,
                  "Database:\nElements: %zu\nNodes: %zu\nMisses: %zu\nEq. tests: %zu\nRehashes: %zu\n\n"
                  "Memory:\nQueue: %.1f MB\nDB: %.1f MB\nDB alloc.: %.1f MB\nColors: %.1f MB\n\n"
                  "Load balancer:\nSplits: %zu\nLoad transfer: %zu\n\n"
-                 "Lattice MAP:\nRatio: %.2f\nUpdates: %zu\nDeletes: %zu\nDelayed: %zu",
+                 "Lattice MAP:\nRatio: %.2f\nInserts: %zu\nUpdates: %zu\nDeletes: %zu\nDelayed: %zu",
                  tot, reach->runtime, reach->explored, reach->trans, reach->deadlocks,
                         reach->errors, red->waits, reach->rec,
                  db_elts, db_nodes, stats->misses, stats->tests, stats->rehashes,
                  mem1, mem4, mem2, mem3,
                  reach->splits, reach->transfer,
-                 ((double)reach->explored/db_elts), reach->updates, reach->deletes, reach->delayed);
+                 ((double)lattices/db_elts), reach->inserts, reach->updates,
+                         reach->deletes, reach->delayed);
     }
 }
 
@@ -1400,14 +1410,13 @@ state_info_size ()
     if (ZOBRIST)
         state_info_size += sizeof (uint32_t);
     if (Strat_TA & strategy[0])
-        state_info_size += sizeof (lattice_t) + sizeof (lmap_loc_t);
+        state_info_size += sizeof (lattice_t) + sizeof (lm_loc_t);
     return state_info_size;
 }
 
 /**
  * Next-state function output --> algorithm
  */
-static const lmap_loc_t NULL_LOC = -1;
 int
 state_info_initialize (state_info_t *state, state_data_t data,
                        transition_info_t *ti, state_info_t *src, wctx_t *ctx)
@@ -1415,7 +1424,7 @@ state_info_initialize (state_info_t *state, state_data_t data,
     state->data = data;
     if (Strat_TA & strategy[0]) {
         state->lattice = *(lattice_t*)(data + D);
-        state->loc = NULL_LOC;
+        state->loc = LM_NULL_LOC;
     }
     return find_or_put (state, ti, src, ctx->store2);
 }
@@ -1445,7 +1454,7 @@ state_info_serialize (state_info_t *state, raw_data_t data)
     if (Strat_TA & strategy[0]) {
         ((lattice_t*)data)[0] = state->lattice;
         data += 2;
-        ((lmap_loc_t*)data)[0] = state->loc;
+        ((lm_loc_t*)data)[0] = state->loc;
     }
 }
 
@@ -1483,7 +1492,7 @@ state_info_deserialize (state_info_t *state, raw_data_t data, state_data_t store
     if (Strat_TA & strategy[0]) {
         state->lattice = ((lattice_t*)data)[0];
         data += 2;
-        state->loc = ((lmap_loc_t*)data)[0];
+        state->loc = ((lm_loc_t*)data)[0];
     }
 }
 
@@ -1500,7 +1509,7 @@ state_info_deserialize_cheap (state_info_t *state, raw_data_t data)
     if (Strat_TA & strategy[0]) {
         state->lattice = ((lattice_t*)data)[0];
         data += 2;
-        state->loc = ((lmap_loc_t*)data)[0];
+        state->loc = ((lm_loc_t*)data)[0];
     }
 }
 
@@ -2430,40 +2439,14 @@ split_dfs (void *arg_src, void *arg_tgt, size_t handoff)
  */
 
 typedef enum ta_set_e {
-    TA_WAITING = LMAP_STATUS_OCCUPIED1,
-    TA_PASSED  = LMAP_STATUS_OCCUPIED2,
+    TA_WAITING = 0,
+    TA_PASSED  = 1,
 } ta_set_e_t;
-
-typedef enum ta_update_e {
-    TA_UPDATE_NONE = 0,
-    TA_UPDATE_WAITING = 1,
-    TA_UPDATE_PASSED = 2,
-} ta_update_e_t;
-
-static const lmap_loc_t TA_NONE = UINT64_MAX;
-
-static void
-ta_unlock (ref_t ref)
-{
-    global_unset_color (ref, GRED, 0);
-}
-
-static void
-ta_lock (ref_t ref)
-{
-    while (!global_try_color(ref, GRED, 0)) {}
-}
-
-static int
-ta_try_lock (ref_t ref)
-{
-    return !global_try_color(ref, GRED, 0);
-}
 
 static inline int
 backoff_or_lock (wctx_t *ctx, state_info_t *state) {
     if (BACKOFF) {
-        if (ta_try_lock(state->ref)) {
+        if (!lm_try_lock(lmap, state->ref)) {
             raw_data_t stack_loc = dfs_stack_push (ctx->backoff, NULL);
             state_info_serialize (state, stack_loc);
             ctx->load++;
@@ -2471,30 +2454,28 @@ backoff_or_lock (wctx_t *ctx, state_info_t *state) {
             return 1;
         }
     } else {
-        ta_lock (state->ref);
+        lm_lock (lmap, state->ref);
     }
     return 0;
 }
 
-lmap_cb_t
-ta_covered (void *arg, lmap_store_t *stored, lmap_loc_t loc)
+lm_cb_t
+ta_covered (void *arg, lattice_t l, lm_status_t status, lm_loc_t loc)
 {
     wctx_t         *ctx = (wctx_t*) arg;
     int *succ_l = (int*)&ctx->successor->lattice;
-    int *stored_l = (int*)&stored->lattice;
-    if(GBisCoveredByShort(ctx->model, succ_l, stored_l) ) {
+    if (GBisCoveredByShort(ctx->model, succ_l, (int*)&l) ) {
         ctx->done = 1;
-        return LMAP_CB_STOP; //A l' : (E (s,l)eL : l>=l')=>(A (s,l)eL : l>=l')
-    } else if ( TA_UPDATE_NONE != UPDATE &&
-            (TA_UPDATE_PASSED == UPDATE || TA_WAITING == (ta_set_e_t)stored->status) &&
-            GBisCoveredByShort(ctx->model, stored_l, succ_l)) {
-        lmap_delete (lmap, loc);
-        //Warning(info, "Delete: %zu", stored->ref);
-        ctx->last = (TA_NONE == ctx->last ? loc : ctx->last);
+        return LM_CB_STOP; //A l' : (E (s,l)eL : l>=l')=>(A (s,l)eL : l>=l')
+    } else if (TA_UPDATE_NONE != UPDATE &&
+            (TA_UPDATE_PASSED == UPDATE || TA_WAITING == (ta_set_e_t)status) &&
+            GBisCoveredByShort(ctx->model, (int*)&l, succ_l)) {
+        lm_delete (lmap, loc);
+        ctx->last = (LM_NULL_LOC == ctx->last ? loc : ctx->last);
         ctx->counters.deletes++;
     }
     ctx->work++;
-    return LMAP_CB_NEXT;
+    return LM_CB_NEXT;
 }
 
 static void
@@ -2503,36 +2484,31 @@ ta_handle (void *arg, state_info_t *successor, transition_info_t *ti, int seen)
     wctx_t         *ctx = (wctx_t*) arg;
     ctx->done = 0;
     ctx->work = 0;
-    ctx->last = TA_NONE;
+    ctx->last = LM_NULL_LOC;
     ctx->successor = successor;
     if (backoff_or_lock(ctx, successor))
         return;
-    lmap_loc_t last = lmap_iterate (lmap, successor->ref, ta_covered, ctx);
+    lm_loc_t last = lm_iterate (lmap, successor->ref, ta_covered, ctx);
     if (!ctx->done) {
-        last = (TA_NONE == ctx->last ? last : ctx->last);
-        successor->loc = lmap_insert_from (lmap, successor->ref,
+        last = (LM_NULL_LOC == ctx->last ? last : ctx->last);
+        ctx->counters.inserts++;
+        successor->loc = lm_insert_from (lmap, successor->ref,
                                         successor->lattice, TA_WAITING, &last);
-        ta_unlock (successor->ref);
-        if (RTverbosity > 2) { // quite costly: flops
+        lm_unlock (lmap, successor->ref);
+        if (STDEV) { // quite costly: flops
             if (ctx->work > 0)
                 statistics_unrecord (&ctx->counters.lattice_ratio, ctx->work);
             statistics_record (&ctx->counters.lattice_ratio, ctx->work+1);
         }
-        //if (TA_UPDATE_WAITING == UPDATE && TA_NONE != ctx->last && ctx->last == successor->loc) {
-            // in waiting list update there is no need to store the successor
-            // in our work set if we _updated_ a waiting state, since this
-            // location is already in the work set of a worker.
-        //} else {
-            raw_data_t stack_loc = dfs_stack_push (ctx->stack, NULL);
-            state_info_serialize (successor, stack_loc);
-        //}
+        raw_data_t stack_loc = dfs_stack_push (ctx->stack, NULL);
+        state_info_serialize (successor, stack_loc);
         if (trc_output)
             parent_ref[successor->ref] = ctx->state.ref; // TODO: for backoffs!
-        ctx->counters.updates += TA_NONE != ctx->last;
+        ctx->counters.updates += LM_NULL_LOC != ctx->last;
         ctx->load++;
         ctx->counters.visited++;
     } else {
-       ta_unlock (successor->ref);
+       lm_unlock (lmap, successor->ref);
     }
     ctx->counters.trans++;
     (void) ti; (void) seen;
@@ -2542,7 +2518,7 @@ static inline int
 is_waiting (wctx_t *ctx, raw_data_t state_data)
 {
     state_info_deserialize (&ctx->state, state_data, ctx->store);
-    if (NULL_LOC == ctx->state.loc) {
+    if (LM_NULL_LOC == ctx->state.loc) {
         ta_handle(ctx, &ctx->state, NULL, 0);
         return 0; // pretend the state is already in the waiting set
     }
@@ -2551,19 +2527,15 @@ is_waiting (wctx_t *ctx, raw_data_t state_data)
     if (backoff_or_lock(ctx, &ctx->state))
         return 0; // pretend the state is already in the waiting set
     int ret_val = 0;
-    lmap_store_t *loc = lmap_get(lmap, ctx->state.loc);
-    //if (loc->ref != ctx->state.ref) Abort("Error in lattice map found %zu, referenced from %zu!", loc->ref, ctx->state.ref);
-    if(ctx->state.ref == loc->ref && ctx->state.lattice == loc->lattice &&
-            TA_WAITING == (ta_set_e_t)loc->status) {
-        lmap_set (lmap, ctx->state.loc, TA_PASSED);
+    lattice_t lattice = lm_get (lmap, ctx->state.loc);
+    if (ctx->state.lattice == lattice && // maybe changed or LATTICE_NULL!
+            TA_WAITING == (ta_set_e_t)lm_get_status (lmap, ctx->state.loc)) {
+        lm_set_status (lmap, ctx->state.loc, TA_PASSED);
         ret_val = 1;
     } else {
         ret_val = 0;
     }
-    ta_unlock (ctx->state.ref);
-    //ctx->state.lattice = loc->lattice;
-    //if (!refs && UseDBSLL == db_type)
-    //    ((lattice_t*)ctx->state.data+D)[0] = loc->lattice;
+    lm_unlock (lmap, ctx->state.ref);
     return ret_val;
 }
 
