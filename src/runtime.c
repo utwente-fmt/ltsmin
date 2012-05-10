@@ -5,6 +5,7 @@
 #include <errno.h>
 #include <libgen.h>
 #include <stdarg.h>
+#include <sys/mman.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
@@ -117,7 +118,7 @@ void* RTrealloc(void *rt_ptr, size_t size){
 #define MAX_ALIGN_MEMSET (1024*1024)
 #define MAX_ALIGN_ZEROS (1024)
 static size_t next_calloc = 0;
-static void *calloc_table[MAX_ALIGN_ZEROS][2];
+static void *calloc_table[MAX_ALIGN_ZEROS][3];
 
 void* RTalignZero(size_t align, size_t size) {
     if (0 == align) Abort("Zero alignment in RTalignZero");
@@ -131,16 +132,17 @@ void* RTalignZero(size_t align, size_t size) {
     // for large sizes use calloc and do manual alignment
     if ((size / align)*align != size) // make size multiple of align
         size = ((size + align) / align)*align;
-    void *p = calloc((size / align + 1), align);
+//    void *p = calloc((size / align + 1), align);
+    void *p = mmap(NULL,size,PROT_READ|PROT_WRITE,MAP_SHARED|MAP_ANON,-1,0);
     size_t pp = (size_t)p;
-    if ((pp / align) * align != pp) { // manual alignment only if needed
-        void *old = p;
+    void *old = p;
+    if ((pp / align) * align != pp) // manual alignment only if needed
         p = (void*)((pp / align + 1) * align);
-        // store self-aligned allocs in calloc_table
-        size_t next = __sync_fetch_and_add (&next_calloc, 1);
-        calloc_table[next][0] = p;
-        calloc_table[next][1] = old;
-    }
+    // store self-aligned allocs in calloc_table
+    size_t next = __sync_fetch_and_add (&next_calloc, 1);
+    calloc_table[next][0] = p;
+    calloc_table[next][1] = old;
+    calloc_table[next][2] = (void*)size;
     return p;
 }
 
@@ -155,7 +157,7 @@ char* RTstrdup(const char *str){
 void RTfree(void *rt_ptr){
 	for (size_t i = 0; i < next_calloc; i++) {
 	    if (rt_ptr == calloc_table[i][0]) {
-	        free (calloc_table[i][1]);
+	        munmap (calloc_table[i][1], (size_t)calloc_table[i][2]);
 	        return;
 	    }
 	}
