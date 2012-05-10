@@ -49,7 +49,9 @@ static inline void set_all_done (lb2_t *lb) {
 static inline int  try_all_done (lb2_t *lb) {
     return cas (&lb->all_done, 0, 1);
 }
-
+static inline int  try_stop (lb2_t *lb) {
+    return cas (&lb->stopped, 0, 1);
+}
 static inline int  get_idle (lb2_t *lb, int id) {
     return atomic_read(&lb->local[id].idle);
 }
@@ -60,8 +62,8 @@ static inline void set_idle (lb2_t *lb, int id, int a) {
 int
 lb2_stop (lb2_t *lb)
 {
-    atomic_write (&lb->stopped, 1);
-    return try_all_done (lb);
+    set_all_done (lb);
+    return try_stop (lb);
 }
 
 int

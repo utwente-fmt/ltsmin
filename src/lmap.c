@@ -13,7 +13,7 @@
 #include <runtime.h>
 #include <lmap.h>
 
-static const size_t     LM_FACTOR = 3;
+static const size_t     LM_FACTOR = 32;
 #define                 LM_MAX_THREADS (sizeof (uint64_t) * 8)
 
 /**
@@ -324,9 +324,13 @@ lm_create (size_t workers, size_t size, size_t block_size)
     map->workers = workers;
     map->size = size;
     map->block_size = block_size;
-    map->wSize = map->size * map->block_size * LM_FACTOR;
-    map->table = RTalignZero (CACHE_LINE_SIZE,
-                 sizeof(lm_store_t[map->size + map->wSize * workers]));
+    size_t allocator_mem = map->size * LM_FACTOR;
+    size_t nblocks_per_worker = allocator_mem / (map->block_size * map->workers);
+    map->wSize = nblocks_per_worker * map->block_size;
+    allocator_mem = nblocks_per_worker * map->block_size * map->workers;
+    size_t table_size = sizeof (lm_store_t[map->size + allocator_mem]);
+    map->table = RTalignZero (CACHE_LINE_SIZE, table_size);
+    if (NULL == map->table) Abort("Allocation failed for lmap table of %zuGB", table_size>>30);
     pthread_key_create (&map->local_key, NULL);
     return map;
 }
@@ -345,6 +349,7 @@ lm_allocated (lm_t *map)
 {
     size_t total = 0;
     for (size_t i = 0; i < map->workers; i++)
-        total += map->locals[i]->next_store - map->locals[i]->begin_store;
+        if (NULL != map->locals[i])
+            total += map->locals[i]->next_store - map->locals[i]->begin_store;
     return total;
 }

@@ -1068,7 +1068,7 @@ print_statistics (counter_t *ar_reach, counter_t *ar_red, mytimer_t timer,
             }
             mem3 = ((double)(sizeof(lattice_t[lm_allocated(lmap) + db_elts]))) / (1<<20);
             double lm = ((double)(sizeof(lattice_t[lm_allocated(lmap) + (1UL<<dbs_size)]))) / (1<<20);
-            double redundancy = (((double)(db_elts + lm_allocated(lmap))) / lattices) * 100;
+            double redundancy = (((double)(db_elts + lm_allocated(lmap))) / lattices - 1) * 100;
             Warning (info, "Lattice map: %.1fMB (~%.1fMB paged-in) overhead: %.2f%%", mem3, lm, redundancy);
         }
     }
@@ -2617,12 +2617,19 @@ ta_bfs (wctx_t *ctx, size_t work)
     }
 }
 
+static inline size_t
+ta_load (wctx_t *ctx)
+{
+    return dfs_stack_frame_size(ctx->in_stack) +
+        (BACKOFF ? dfs_stack_frame_size(ctx->backoff) : 0);
+}
+
 void
 ta_bfs_strict (wctx_t *ctx)
 {
     size_t out_size;
     do {
-        while (lb2_balance(lb2, ctx->id, dfs_stack_frame_size(ctx->in_stack))) {
+        while (lb2_balance(lb2, ctx->id, ta_load(ctx))) {
             raw_data_t          state_data = dfs_stack_pop (ctx->in_stack);
             if (NULL != state_data) {
                 if (is_waiting(ctx, state_data)) {
