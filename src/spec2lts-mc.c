@@ -2361,7 +2361,7 @@ split_bfs (void *arg_src, void *arg_tgt, size_t handoff)
     if (BACKOFF && (Strat_TA & strategy[0]) && in_size < handoff) {
         in_size = dfs_stack_frame_size (source->backoff);
         for (size_t i = 0; i < in_size; i++)
-            dfs_stack_push (source->in_stack, dfs_stack_pop(source->backoff));
+            dfs_stack_push (source_stack, dfs_stack_pop(source->backoff));
     }
     handoff = min (in_size >> 1 , handoff);
     for (size_t i = 0; i < handoff; i++) {
@@ -2519,8 +2519,8 @@ is_waiting (wctx_t *ctx, raw_data_t state_data)
 {
     state_info_deserialize (&ctx->state, state_data, ctx->store);
     if (LM_NULL_LOC == ctx->state.loc) {
-        ta_handle(ctx, &ctx->state, NULL, 0);
-        return 0; // pretend the state is already in the waiting set
+        ta_handle (ctx, &ctx->state, NULL, 0);
+        return !ctx->done;
     }
     if (TA_UPDATE_NONE == UPDATE)
         return 1; // we don't need to update the global waiting info
