@@ -133,7 +133,10 @@ void* RTalignZero(size_t align, size_t size) {
     if ((size / align)*align != size) // make size multiple of align
         size = ((size + align) / align)*align;
 //    void *p = calloc((size / align + 1), align);
-    void *p = mmap(NULL,size,PROT_READ|PROT_WRITE,MAP_SHARED|MAP_ANON,-1,0);
+    void *p = mmap (NULL,size,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANON,-1,0);
+    // MAP_PRIVATE && WRITE, because we still want the attached NUMA policy to be followed
+    if (p == MAP_FAILED)
+        Abort ("mmap failed for size %zu MB", size>>20);
     size_t pp = (size_t)p;
     void *old = p;
     if ((pp / align) * align != pp) // manual alignment only if needed
