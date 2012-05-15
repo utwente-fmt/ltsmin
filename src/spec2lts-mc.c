@@ -1066,10 +1066,11 @@ print_statistics (counter_t *ar_reach, counter_t *ar_red, mytimer_t timer,
                 }
                 Warning (info, "Lattice ratio: %.2f standard deviation: %.3f", ((double)lattices/db_elts), statistics_stdev(&stats));
             }
-            mem3 = ((double)(sizeof(lattice_t[lm_allocated(lmap) + db_elts]))) / (1<<20);
-            double lm = ((double)(sizeof(lattice_t[lm_allocated(lmap) + (1UL<<dbs_size)]))) / (1<<20);
-            double redundancy = (((double)(db_elts + lm_allocated(lmap))) / lattices - 1) * 100;
-            Warning (info, "Lattice map: %.1fMB (~%.1fMB paged-in) overhead: %.2f%%", mem3, lm, redundancy);
+            size_t alloc = lm_allocated (lmap);
+            mem3 = ((double)(sizeof(lattice_t[alloc + db_elts]))) / (1<<20);
+            double lm = ((double)(sizeof(lattice_t[alloc + (1UL<<dbs_size)]))) / (1<<20);
+            double redundancy = (((double)(db_elts + alloc)) / lattices - 1) * 100;
+            Warning (info, "Lattice map: %.1fMB (~%.1fMB paged-in) overhead: %.2f%%, allocated: %zu", mem3, lm, redundancy, alloc);
         }
     }
 
