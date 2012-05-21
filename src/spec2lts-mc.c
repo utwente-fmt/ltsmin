@@ -929,7 +929,7 @@ maybe_report (counter_t *cnt, char *msg, size_t *threshold)
 static inline void
 ndfs_maybe_report (char *prefix, counter_t *cnt)
 {
-    maybe_report (cnt, prefix, &cnt->threshold);
+    maybe_report (cnt, prefix, &threshold);
 }
 
 static void
