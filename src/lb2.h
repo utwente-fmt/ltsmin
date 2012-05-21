@@ -28,10 +28,8 @@ static const size_t LB2_MAX_HANDOFF_DEFAULT = 100;
 typedef size_t      (*lb2_split_problem_f) (void *source, void *target,
                                             size_t handoff);
 
-extern lb2_t *lb2_create (size_t threads, lb2_split_problem_f split,
-                          size_t gran, lb2_method_t m);
-extern lb2_t *lb2_create_max (size_t threads, lb2_split_problem_f split,
-                              size_t gran, lb2_method_t method, size_t max);
+extern lb2_t *lb2_create (size_t threads, size_t gran);
+extern lb2_t *lb2_create_max (size_t threads, size_t gran, size_t max);
 
 /**
  \brief Records thread local data and performs initial exploration for static
@@ -41,7 +39,8 @@ extern void lb2_local_init (lb2_t *lb, int id, void *arg);
 
 extern void lb2_destroy (lb2_t *lb);
 
-extern size_t lb2_balance (lb2_t *lb, int my_id, size_t my_load);
+extern size_t lb2_balance (lb2_t *lb, int my_id, size_t my_load,
+                           lb2_split_problem_f split);
 
 extern int lb2_stop (lb2_t *lb);
 
@@ -57,5 +56,7 @@ typedef enum { LB2_BARRIER_MASTER, LB2_BARRIER_SLAVE } lb2_barrier_result_t;
 extern lb2_barrier_result_t lb2_barrier (size_t W);
 
 extern size_t lb2_reduce (size_t val, size_t W);
+
+extern size_t lb2_max_load (lb2_t *lb);
 
 #endif /* LB2_H_ */

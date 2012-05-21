@@ -17,9 +17,7 @@
 #include <atomics.h>
 
 struct lb2_s {
-     lb2_method_t       method;
      size_t             threads;
-     lb2_split_problem_f split;
      void             **args;
      size_t             granularity;
      size_t             mask;
@@ -31,11 +29,16 @@ struct lb2_s {
          size_t             received;
          char               pad[(2<<CACHE_LINE) - 2*sizeof(int) - 2*sizeof(size_t)];
      } __attribute__ ((packed)) *local;
+     struct lb2_counters_s {
+         size_t             max_load;
+         char               pad[(2<<CACHE_LINE) - sizeof(size_t)];
+     } __attribute__ ((packed)) *counters;
      int                all_done;
      int                stopped;
 };
 
 typedef struct lb2_status_s lb2_status_t;
+typedef struct lb2_counters_s lb2_counters_t;
 
 static inline int  stopped (lb2_t *lb) {
     return atomic_read (&lb->stopped);
@@ -45,9 +48,6 @@ static inline int  all_done (lb2_t *lb) {
 }
 static inline void set_all_done (lb2_t *lb) {
     atomic_write (&lb->all_done, 1);
-}
-static inline int  try_all_done (lb2_t *lb) {
-    return cas (&lb->all_done, 0, 1);
 }
 static inline int  try_stop (lb2_t *lb) {
     return cas (&lb->stopped, 0, 1);
@@ -103,7 +103,8 @@ request_random (lb2_t *lb, size_t id)
 }
 
 static inline void
-handoff (lb2_t *lb, int id, size_t requests, size_t *my_load)
+handoff (lb2_t *lb, int id, size_t requests, size_t *my_load,
+         lb2_split_problem_f split)
 {
     int                 todo[ lb->threads ];
 
@@ -121,7 +122,7 @@ handoff (lb2_t *lb, int id, size_t requests, size_t *my_load)
             assert (get_idle (lb, oid));
             size_t handoff = *my_load >> 1;
             handoff = handoff < lb->max_handoff ? handoff : lb->max_handoff;
-            size_t load = lb->split (lb->args[id], lb->args[oid], handoff );
+            size_t load = split (lb->args[id], lb->args[oid], handoff);
             *my_load -= load;
             atomic_write (&lb->local[oid].received, load);
         }
@@ -130,15 +131,16 @@ handoff (lb2_t *lb, int id, size_t requests, size_t *my_load)
 }
 
 size_t
-lb2_balance (lb2_t *lb, int id, size_t my_load)
+lb2_balance (lb2_t *lb, int id, size_t my_load, lb2_split_problem_f split)
 {
     lb2_status_t        *status = &lb->local[id];
-
+    lb2_counters_t      *counters = &lb->counters[id];
     if (lb2_is_stopped(lb))
         return 0;
     if (my_load > 0 && (my_load & lb->mask) != lb->mask )
         return my_load;
-
+    if (my_load > counters->max_load)
+        counters->max_load = my_load;
     do {
         if ( all_done(lb) ) {
             set_idle (lb, id, 1);
@@ -160,7 +162,7 @@ lb2_balance (lb2_t *lb, int id, size_t my_load)
         }
         size_t          requests = fetch_and (&status->requests, 0);
         if ( requests )
-            handoff (lb, id, requests, &my_load);
+            handoff (lb, id, requests, &my_load, split);
         if ( wait_reply ) {
             Debug ("Waiting for an answer");
             while ( get_idle(lb, id) && !all_done(lb) ) {}
@@ -173,25 +175,22 @@ lb2_balance (lb2_t *lb, int id, size_t my_load)
 }
 
 lb2_t                *
-lb2_create (size_t threads, lb2_split_problem_f split,
-           size_t gran, lb2_method_t m)
+lb2_create (size_t threads, size_t gran)
 {
-    return lb2_create_max (threads, split, gran, m, LB2_MAX_HANDOFF_DEFAULT);
+    return lb2_create_max (threads, gran, LB2_MAX_HANDOFF_DEFAULT);
 }
 
 lb2_t                *
-lb2_create_max (size_t threads, lb2_split_problem_f split,
-               size_t gran, lb2_method_t method, size_t max)
+lb2_create_max (size_t threads, size_t gran, size_t max)
 {
     assert (threads <= LB2_MAX_THREADS);
     lb2_t               *lb = RTalign(CACHE_LINE_SIZE, sizeof(lb2_t));
     void *args = RTalign (CACHE_LINE_SIZE, sizeof(void *[threads]));
     void *local = RTalign (CACHE_LINE_SIZE, sizeof(lb2_status_t[threads]));
+    lb->counters = RTalignZero (CACHE_LINE_SIZE, sizeof(lb2_counters_t[threads]));
     lb->threads = threads;
-    lb->method = method;
     lb->all_done = 0;
     lb->stopped = 0;
-    lb->split = split;
     lb->max_handoff = max;
     assert (gran < 32 && gran > 0 && "wrong granularity");
     lb->granularity = 1UL << gran;
@@ -210,6 +209,7 @@ lb2_destroy (lb2_t *lb)
 {
     RTfree (lb->args);
     RTfree (lb->local);
+    RTfree (lb->counters);
     RTfree (lb);
 }
 
@@ -250,4 +250,14 @@ lb2_reduce (size_t val, size_t W)
         while (flip == atomic_read(&reduce_wait)) {}
     }
     return atomic_read (&reduce_result);
+}
+
+size_t
+lb2_max_load (lb2_t *lb)
+{
+    size_t              total = 0;
+    for (size_t i = 0; i < lb->threads; i++) {
+        total += lb->counters[i].max_load;
+    }
+    return total;
 }
