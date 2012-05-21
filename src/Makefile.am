@@ -95,6 +95,12 @@ bin_PROGRAMS += dve22lts-gsea
 bin_PROGRAMS += dve2-reach
 endif
 
+#if HAVE_OPAAL
+bin_PROGRAMS += opaal2lts-grey
+bin_PROGRAMS += opaal2lts-gsea
+bin_PROGRAMS += opaal-reach
+#endif
+
 #if HAVE_SPINJA
 bin_PROGRAMS += spinja2lts-grey
 bin_PROGRAMS += spinja2lts-gsea
@@ -112,6 +118,9 @@ endif
 if HAVE_DVEC2
 bin_PROGRAMS += dve22lts-mc
 endif
+#if HAVE_OPAAL
+bin_PROGRAMS += opaal2lts-mc
+#endif
 endif
 
 if HAVE_MPI
@@ -133,6 +142,9 @@ endif
 if HAVE_DVEC2
 bin_PROGRAMS += dve22lts-mpi
 endif
+#if HAVE_OPAAL
+bin_PROGRAMS += opaal2lts-mpi
+#endif
 bin_PROGRAMS += ltsmin-mpi
 check_PROGRAMS += mpi-event-test
 check_PROGRAMS += test-hre-mpi
@@ -156,6 +168,9 @@ endif
 if HAVE_DVEC2
 pkglib_LTLIBRARIES += libdve2-open.la
 endif
+#if HAVE_OPAAL
+pkglib_LTLIBRARIES += libopaal-open.la
+#endif
 # pins_open
 CADPCC = $(CADP)/src/com/cadp_cc
 CADPINCLUDES = -I$(CADP)/incl
@@ -247,6 +262,12 @@ dve22lts_grey_LDADD    = $(VSET_LIBS) libltsmin.la $(DVEC2_LIBS)
 dve22lts_grey_CPPFLAGS = -DDIVINE2 $(DIVINE2_CPPFLAGS) $(AM_CPPFLAGS)
 dve22lts_grey_LDFLAGS  = $(DIVINE2_LDFLAGS) $(AM_LDFLAGS)
 
+# opaal2lts-grey
+opaal2lts_grey_SOURCES  = spec2lts-grey.c opaal-greybox.c opaal-greybox.h
+opaal2lts_grey_LDADD    = $(VSET_LIBS) libltsmin.la $(DVEC2_LIBS)
+opaal2lts_grey_CPPFLAGS = -DOPAAL $(DIVINE2_CPPFLAGS) $(AM_CPPFLAGS)
+opaal2lts_grey_LDFLAGS  = $(DIVINE2_LDFLAGS) $(AM_LDFLAGS)
+
 # spinja2lts-grey
 spinja2lts_grey_SOURCES  = spec2lts-grey.c spinja-greybox.c spinja-greybox.h
 spinja2lts_grey_LDADD    = $(VSET_LIBS) libltsmin.la $(SPINJA_LIBS)
@@ -296,6 +317,12 @@ dve22lts_gsea_SOURCES  = spec2lts-gsea.c dve2-greybox.c dve2-greybox.h
 dve22lts_gsea_LDADD    = $(VSET_LIBS) libltsmin.la $(DVEC2_LIBS)
 dve22lts_gsea_CPPFLAGS = -DDIVINE2 $(DIVINE2_CPPFLAGS) $(AM_CPPFLAGS)
 dve22lts_gsea_LDFLAGS  = $(DIVINE2_LDFLAGS) $(AM_LDFLAGS)
+
+# opaal2lts-gsea
+opaal2lts_gsea_SOURCES  = spec2lts-gsea.c opaal-greybox.c opaal-greybox.h
+opaal2lts_gsea_LDADD    = $(VSET_LIBS) libltsmin.la $(DVEC2_LIBS)
+opaal2lts_gsea_CPPFLAGS = -DOPAAL $(DIVINE2_CPPFLAGS) $(AM_CPPFLAGS)
+opaal2lts_gsea_LDFLAGS  = $(DIVINE2_LDFLAGS) $(AM_LDFLAGS)
 
 # spinja2lts-gsea
 spinja2lts_gsea_SOURCES  = spec2lts-gsea.c spinja-greybox.c spinja-greybox.h
@@ -347,12 +374,17 @@ dve2_reach_LDADD    = $(VSET_LIBS) libltsmin.la $(DVEC2_LIBS)
 dve2_reach_CPPFLAGS = -DDIVINE2 $(DIVINE2_CPPFLAGS) $(AM_CPPFLAGS)
 dve2_reach_LDFLAGS  = $(DIVINE2_LDFLAGS) $(AM_LDFLAGS)
 
+# opaal-reach
+opaal_reach_SOURCES  = spec-reach.c opaal-greybox.c opaal-greybox.h
+opaal_reach_LDADD    = $(VSET_LIBS) libltsmin.la $(DVEC2_LIBS)
+opaal_reach_CPPFLAGS = -DOPAAL $(DIVINE2_CPPFLAGS) $(AM_CPPFLAGS)
+opaal_reach_LDFLAGS  = $(DIVINE2_LDFLAGS) $(AM_LDFLAGS)
+
 # spinja-reach
 spinja_reach_SOURCES  = spec-reach.c spinja-greybox.c spinja-greybox.h
 spinja_reach_LDADD    = $(VSET_LIBS) libltsmin.la $(SPINJA_LIBS)
 spinja_reach_CPPFLAGS = -DSPINJA $(SPINJA_CPPFLAGS) $(AM_CPPFLAGS)
 spinja_reach_LDFLAGS  = $(SPINJA_LDFLAGS) $(AM_LDFLAGS)
-
 
 # etf2lts-mpi
 etf2lts_mpi_SOURCES  = spec2lts-mpi.c etf-greybox.c etf-greybox.h
@@ -396,6 +428,12 @@ dve22lts_mpi_SOURCES  = spec2lts-mpi.c dve2-greybox.c dve2-greybox.h
 dve22lts_mpi_LDADD    = libltsmin-mpi.la $(DVEC2_LIBS)
 dve22lts_mpi_CPPFLAGS = -DDIVINE2 $(DIVINE2_CPPFLAGS) $(AM_CPPFLAGS)
 dve22lts_mpi_LDFLAGS  = $(DIVINE2_LDFLAGS) $(AM_LDFLAGS)
+
+# opaal2lts-mpi
+opaal2lts_mpi_SOURCES  = spec2lts-mpi.c opaal-greybox.c opaal-greybox.h
+opaal2lts_mpi_LDADD    = libltsmin-mpi.la $(DVEC2_LIBS)
+opaal2lts_mpi_CPPFLAGS = -DOPAAL $(DIVINE2_CPPFLAGS) $(AM_CPPFLAGS)
+opaal2lts_mpi_LDFLAGS  = $(DIVINE2_LDFLAGS) $(AM_LDFLAGS)
 
 # spinja2lts-mpi
 spinja2lts_mpi_SOURCES  = spec2lts-mpi.c spinja-greybox.c spinja-greybox.h
@@ -442,6 +480,12 @@ dve22lts_mc_LDADD    = libltsmin.la $(DVEC2_LIBS)
 dve22lts_mc_CPPFLAGS = -DDIVINE2 $(DIVINE2_CPPFLAGS) $(AM_CPPFLAGS)
 dve22lts_mc_LDFLAGS  = $(DIVINE2_LDFLAGS) $(AM_LDFLAGS)
 
+# opaal2lts-mc
+opaal2lts_mc_SOURCES  = spec2lts-mc.c opaal-greybox.c opaal-greybox.h
+opaal2lts_mc_LDADD    = libltsmin.la $(DVEC2_LIBS)
+opaal2lts_mc_CPPFLAGS = -DOPAAL $(DIVINE2_CPPFLAGS) $(AM_CPPFLAGS)
+opaal2lts_mc_LDFLAGS  = $(DIVINE2_LDFLAGS) $(AM_LDFLAGS)
+
 # spinja2lts-mc
 spinja2lts_mc_SOURCES  = spec2lts-mc.c spinja-greybox.c spinja-greybox.h
 spinja2lts_mc_LDADD    = libltsmin.la $(SPINJA_LIBS)
@@ -480,6 +524,11 @@ libdve_open_la_LIBADD = libltsmin.la
 libdve2_open_la_SOURCES = spec_open.c dve2-greybox.c dve2-greybox.h
 libdve2_open_la_CPPFLAGS = -DDIVINE2 $(DIVINE2_CPPFLAGS) $(CADP_CPPFLAGS) $(AM_CPPFLAGS)
 libdve2_open_la_LIBADD = libltsmin.la
+
+# libopaal-open.la
+libopaal_open_la_SOURCES = spec_open.c opaal-greybox.c opaal-greybox.h
+libopaal_open_la_CPPFLAGS = -DDIVINE2 $(DIVINE2_CPPFLAGS) $(CADP_CPPFLAGS) $(AM_CPPFLAGS)
+libopaal_open_la_LIBADD = libltsmin.la
 
 # libspinja-open.la
 libspinja_open_la_SOURCES = spec_open.c spinja-greybox.c spinja-greybox.h

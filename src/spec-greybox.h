@@ -25,6 +25,9 @@
 #if defined(SPINJA)
 #include <spinja-greybox.h>
 #endif
+#if defined(OPAAL)
+#include <opaal-greybox.h>
+#endif
 
 #if defined(MCRL)
 #define SPEC_POPT_OPTIONS { NULL, 0, POPT_ARG_INCLUDE_TABLE, mcrl_options, 0, "mCRL options", NULL }
@@ -56,6 +59,10 @@
 #endif
 #if defined(SPINJA)
 #define SPEC_POPT_OPTIONS { NULL, 0, POPT_ARG_INCLUDE_TABLE, spinja_options, 0, "SPINJA options", NULL }
+#define SPEC_MT_SAFE 1
+#endif
+#if defined(OPAAL)
+#define SPEC_POPT_OPTIONS { NULL, 0, POPT_ARG_INCLUDE_TABLE, opaal_options, 0, "Opaal options", NULL }
 #define SPEC_MT_SAFE 1
 #endif
 
