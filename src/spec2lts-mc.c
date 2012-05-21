@@ -2142,10 +2142,10 @@ split_bfs (void *arg_src, void *arg_tgt, size_t handoff)
     }
     handoff = min (in_size >> 1 , handoff);
     for (size_t i = 0; i < handoff; i++) {
-        state_data_t        one = dfs_stack_peek (source_stack, i);
+        state_data_t        one = dfs_stack_pop (source_stack);
+        assert (NULL != one);
         dfs_stack_push (target->stack, one);
     }
-    dfs_stack_discard (source_stack, handoff);
     source->counters.splits++;
     source->counters.transfer += handoff;
     return handoff;
@@ -2164,10 +2164,10 @@ split_sbfs (void *arg_src, void *arg_tgt, size_t handoff)
     }
     handoff = min (in_size >> 1 , handoff);
     for (size_t i = 0; i < handoff; i++) {
-        state_data_t        one = dfs_stack_peek (source->in_stack, i);
+        state_data_t        one = dfs_stack_pop (source->in_stack);
+        assert (NULL != one);
         dfs_stack_push (target->in_stack, one);
     }
-    dfs_stack_discard (source->in_stack, handoff);
     source->counters.splits++;
     source->counters.transfer += handoff;
     return handoff;
