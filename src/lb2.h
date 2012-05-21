@@ -22,6 +22,11 @@ typedef enum { LB2_Static,   //Statically partition results of an initial run
                LB2_None      //Non-interfering with the search algorithm
 } lb2_method_t;
 
+typedef struct lb2_inlined_s {
+    size_t             mask;
+    int                stopped;
+} lb2_inlined_t;
+
 static const size_t LB2_MAX_THREADS = (sizeof (uint64_t) * 8);
 static const size_t LB2_MAX_HANDOFF_DEFAULT = 100;
 
@@ -39,8 +44,30 @@ extern void lb2_local_init (lb2_t *lb, int id, void *arg);
 
 extern void lb2_destroy (lb2_t *lb);
 
-extern size_t lb2_balance (lb2_t *lb, int my_id, size_t my_load,
-                           lb2_split_problem_f split);
+extern size_t lb2_internal (lb2_t *lb, int my_id, size_t my_load,
+                            lb2_split_problem_f split);
+
+#ifndef atomic_read
+#define atomic_read(v)      (*(volatile typeof(*v) *)(v))
+#endif
+
+static inline int
+lb2_is_stopped (lb2_t *lb)
+{
+    lb2_inlined_t *inlined = (lb2_inlined_t *)lb;
+    return atomic_read (&inlined->stopped);
+}
+
+static inline size_t
+lb2_balance (lb2_t *lb, int id, size_t my_load, lb2_split_problem_f split)
+{
+    if (lb2_is_stopped(lb))
+        return 0;
+    lb2_inlined_t *inlined = (lb2_inlined_t *)lb;
+    if (my_load > 0 && (my_load & inlined->mask) != inlined->mask )
+        return my_load;
+    return lb2_internal (lb, id, my_load, split);
+}
 
 extern int lb2_stop (lb2_t *lb);
 

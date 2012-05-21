@@ -12,37 +12,34 @@
 #include <assert.h>
 #include <stdlib.h>
 
+#include <atomics.h>
 #include <runtime.h>
 #include <lb2.h>
-#include <atomics.h>
 
 struct lb2_s {
-     size_t             threads;
-     void             **args;
-     size_t             granularity;
-     size_t             mask;
-     size_t             max_handoff;
-     struct lb2_status_s {
-         int                idle;
-         uint32_t           seed;
-         size_t             requests;
-         size_t             received;
-         char               pad[(2<<CACHE_LINE) - 2*sizeof(int) - 2*sizeof(size_t)];
-     } __attribute__ ((packed)) *local;
-     struct lb2_counters_s {
-         size_t             max_load;
-         char               pad[(2<<CACHE_LINE) - sizeof(size_t)];
-     } __attribute__ ((packed)) *counters;
-     int                all_done;
-     int                stopped;
+    size_t             mask;
+    int                stopped;
+    size_t             threads;
+    void             **args;
+    size_t             granularity;
+    size_t             max_handoff;
+    struct lb2_status_s {
+        int                idle;
+        uint32_t           seed;
+        size_t             requests;
+        size_t             received;
+        char               pad[(2<<CACHE_LINE) - 2*sizeof(int) - 2*sizeof(size_t)];
+    } __attribute__ ((packed)) *local;
+    struct lb2_counters_s {
+        size_t             max_load;
+        char               pad[(2<<CACHE_LINE) - sizeof(size_t)];
+    } __attribute__ ((packed)) *counters;
+    int                all_done;
 };
 
 typedef struct lb2_status_s lb2_status_t;
 typedef struct lb2_counters_s lb2_counters_t;
 
-static inline int  stopped (lb2_t *lb) {
-    return atomic_read (&lb->stopped);
-}
 static inline int  all_done (lb2_t *lb) {
     return atomic_read (&lb->all_done);
 }
@@ -64,12 +61,6 @@ lb2_stop (lb2_t *lb)
 {
     set_all_done (lb);
     return try_stop (lb);
-}
-
-int
-lb2_is_stopped (lb2_t *lb)
-{
-    return stopped (lb);
 }
 
 void
@@ -131,14 +122,10 @@ handoff (lb2_t *lb, int id, size_t requests, size_t *my_load,
 }
 
 size_t
-lb2_balance (lb2_t *lb, int id, size_t my_load, lb2_split_problem_f split)
+lb2_internal (lb2_t *lb, int id, size_t my_load, lb2_split_problem_f split)
 {
     lb2_status_t        *status = &lb->local[id];
     lb2_counters_t      *counters = &lb->counters[id];
-    if (lb2_is_stopped(lb))
-        return 0;
-    if (my_load > 0 && (my_load & lb->mask) != lb->mask )
-        return my_load;
     if (my_load > counters->max_load)
         counters->max_load = my_load;
     do {
