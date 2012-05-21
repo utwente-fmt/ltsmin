@@ -116,24 +116,6 @@ tree;;
         This is also used for the internal node table of the tree.
 
 
-*--lb*='TYPE'::
-        Select load-balancing strategy.  'TYPE' can be one of the
-        following options:
-
-srp;;
-  synchronous random polling.
-
-static;;
-  initial BFS run, with static hand-off to all threads.
-
-combined;;
-  Starts with static balancing and moves to SRP when needed (default).
-
-none;;
-  turn load balancer off. Default for swarmed algorithms, for which threads 
-  in principle explore the state space independently (see --strategy).
-
-
 *--handoff*='NUMBER'::
         Maximum number of states to hand off to a thread requesting load
         (default: NUMBER=100). The operation may be expensive, depending
