@@ -26,17 +26,6 @@ typedef struct bitvector {
 extern int          bitvector_create (bitvector_t *, size_t);
 
 /**
- * bitvector_create_large
- *  Create a large bitvector WITHOUT initializing it!
- *   1) unused bitvector_t struct
- *   2) number of bits in the vector
- *   
- * Data is SSE aligned by malloc
- * note: use bitvector_clear to set bits to 0
- */
-extern void         bitvector_create_large (bitvector_t *bv, size_t n_bits);
-
-/**
  * bitvector_clear
  *  Set all bits in the bitvector to 0
  *   1) the bitvector to clear

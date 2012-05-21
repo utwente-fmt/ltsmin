@@ -33,18 +33,6 @@ bitvector_create (bitvector_t *bv, size_t n_bits)
 }
 
 void
-bitvector_create_large (bitvector_t *bv, size_t n_bits)
-{
-    bv->n_words = utrunc (n_bits, WORD_BITS);
-    bv->data = malloc (sizeof (size_t[bv->n_words]));
-    if (bv->data==NULL) {
-        printf("out of memory trying to allocate large bitvector\n");
-        exit(0);
-    }
-    bv->n_bits = n_bits;
-}
-
-void
 bitvector_clear (bitvector_t *bv)
 {
     memset (bv->data, 0, sizeof (size_t[bv->n_words]));

@@ -674,10 +674,11 @@ wctx_create (size_t id, int depth, wctx_t *shared)
     //allocate two bits for NDFS colorings
     if (strategy[depth] & Strat_LTL) {
         size_t local_bits = 2;
-        bitvector_create_large (&ctx->color_map, local_bits<<dbs_size);
-        bitvector_clear (&ctx->color_map);
+        int res = bitvector_create (&ctx->color_map, local_bits<<dbs_size);
+        if (-1 == res) Abort ("Failure to allocate color bitvector.");
         if ((Strat_NNDFS | Strat_LNDFS | Strat_CNDFS | Strat_ENDFS) & strategy[depth]) {
-            bitvector_create_large (&ctx->all_red, MAX_STACK);
+            res = bitvector_create (&ctx->all_red, MAX_STACK);
+            if (-1 == res) Abort ("Failure to allocate all-red bitvector.");
         }
     } else if (UseGreyBox == call_mode && Strat_DFS == strategy[depth]) {
         ctx->group_stack = isba_create (1);
