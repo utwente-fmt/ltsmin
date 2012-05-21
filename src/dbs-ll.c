@@ -8,15 +8,15 @@
 #include <time.h>
 #include <signal.h>
 
-#include <runtime.h>
+#include <atomics.h>
 #include <dbs-ll.h>
+#include <runtime.h>
 
 
 static const int        TABLE_SIZE = 24;
 static const uint32_t   EMPTY = 0;
-static uint32_t   WRITE_BIT = 1;
-static uint32_t   WRITE_BIT_R = ~((uint32_t)1);
-static const uint32_t   BITS_PER_INT = sizeof (int) * 8;
+static uint32_t         WRITE_BIT = 1;
+static uint32_t         WRITE_BIT_R = ~((uint32_t)1);
 static const size_t     CL_MASK = -(1UL << CACHE_LINE);
 
 struct dbs_ll_s {
@@ -53,14 +53,14 @@ get_local (dbs_ll_t dbs)
 uint32_t
 DBSLLget_sat_bits (const dbs_ll_t dbs, const dbs_ref_t ref)
 {
-    return atomic32_read (dbs->table+ref) & dbs->sat_mask;
+    return atomic_read (dbs->table+ref) & dbs->sat_mask;
 }
 
 int
 DBSLLget_sat_bit (const dbs_ll_t dbs, const dbs_ref_t ref, int index)
 {
     uint32_t        bit = 1U << index;
-    uint32_t        hash_and_sat = atomic32_read (dbs->table+ref);
+    uint32_t        hash_and_sat = atomic_read (dbs->table+ref);
     uint32_t        val = hash_and_sat & bit;
     return val >> index;
 }
@@ -69,9 +69,9 @@ void
 DBSLLunset_sat_bit (const dbs_ll_t dbs, const dbs_ref_t ref, int index)
 {
     uint32_t        bit = 1U << index;
-    uint32_t        hash_and_sat = atomic32_read (dbs->table+ref);
+    uint32_t        hash_and_sat = atomic_read (dbs->table+ref);
     uint32_t        val = hash_and_sat & ~bit;
-    atomic32_write (dbs->table+ref, val);
+    atomic_write (dbs->table+ref, val);
 }
 
 int
@@ -79,7 +79,7 @@ DBSLLtry_set_sat_bit (const dbs_ll_t dbs, const dbs_ref_t ref, int index)
 {
     uint32_t        bit = 1U << index;
     do {
-        uint32_t        hash_and_sat = atomic32_read (dbs->table+ref);
+        uint32_t        hash_and_sat = atomic_read (dbs->table+ref);
         uint32_t        val = hash_and_sat & bit;
         if (val)
             return 0; // bit was already set
@@ -93,7 +93,7 @@ DBSLLtry_unset_sat_bit (const dbs_ll_t dbs, const dbs_ref_t ref, int index)
 {
     uint32_t        bit = (1U << index);
     do {
-        uint32_t        hash_and_sat = atomic32_read (dbs->table+ref);
+        uint32_t        hash_and_sat = atomic_read (dbs->table+ref);
         uint32_t        val = hash_and_sat & bit;
         if (!val)
             return 0; // bit was already set
@@ -107,7 +107,7 @@ DBSLLinc_sat_bits (const dbs_ll_t dbs, const dbs_ref_t ref)
 {
     uint32_t        val, newval;
     do {
-        val = atomic32_read (dbs->table+ref);
+        val = atomic_read (dbs->table+ref);
         assert ((val & dbs->sat_mask) != dbs->sat_mask);
         newval = val + 1;
     } while ( ! cas (dbs->table+ref, val, newval) );
@@ -119,7 +119,7 @@ DBSLLdec_sat_bits (const dbs_ll_t dbs, const dbs_ref_t ref)
 {
     uint32_t        val, newval;
     do {
-        val = atomic32_read (dbs->table+ref);
+        val = atomic_read (dbs->table+ref);
         assert ((val & dbs->sat_mask) != 0);
         newval = val - 1;
     } while ( ! cas (dbs->table+ref, val, newval) );
@@ -130,7 +130,7 @@ void
 DBSLLset_sat_bits (const dbs_ll_t dbs, const dbs_ref_t ref, uint16_t value)
 {
     uint32_t        hash = dbs->table[ref] & ~dbs->sat_mask;
-    atomic32_write (dbs->table+ref, hash | (value & dbs->sat_mask));
+    atomic_write (dbs->table+ref, hash | (value & dbs->sat_mask));
 }
 
 uint32_t
@@ -162,14 +162,14 @@ DBSLLlookup_hash (const dbs_ll_t dbs, const int *v, dbs_ref_t *ret, uint32_t *ha
             if (EMPTY == *bucket) {
                 if (cas (bucket, EMPTY, WAIT)) {
                     memcpy (&dbs->data[ref * l], v, b);
-                    atomic32_write (bucket, DONE);
+                    atomic_write (bucket, DONE);
                     stat->elts++;
                     *ret = ref;
                     return 0;
                 }
             }
-            if (DONE == ((atomic32_read (bucket) | WRITE_BIT) & ~dbs->sat_mask)) {
-                while (WAIT == (atomic32_read (bucket) & ~dbs->sat_mask)) {}
+            if (DONE == ((atomic_read (bucket) | WRITE_BIT) & ~dbs->sat_mask)) {
+                while (WAIT == (atomic_read (bucket) & ~dbs->sat_mask)) {}
                 if (0 == memcmp (&dbs->data[ref * l], v, b)) {
                     *ret = ref;
                     return 1;

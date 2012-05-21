@@ -8,6 +8,7 @@
 #include <strings.h>
 
 #include <archive.h>
+#include <atomics.h>
 #include <bitset.h>
 #include <dbs-ll.h>
 #include <dfs-stack.h>
@@ -19,6 +20,7 @@
 #include <runtime.h>
 #include <scctimer.h>
 #include <spec-greybox.h>
+#include <stats.h>
 #include <stringindex.h>
 #include <trace.h>
 #include <treedbs.h>

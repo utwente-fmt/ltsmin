@@ -11,14 +11,13 @@
 #include <stdlib.h>
 #include <sys/stat.h>
 
-#include "runtime.h"
-#include "dbs.h"
-#include "dbs-ll.h"
-#include "treedbs-ll.h"
-#include "treedbs.h"
-#include "stream.h"
-#include "tls.h"
-#include "hre-main.h"
+#include <atomics.h>
+#include <dbs-ll.h>
+#include <hre-main.h>
+#include <runtime.h>
+#include <stats.h>
+#include <stream.h>
+#include <treedbs-ll.h>
 
 
 typedef void *DBS_T; 
@@ -43,7 +42,6 @@ typedef struct res_s {
 static char *program;
 static int SIZE = 24;
 static size_t NUM = 100*10*1024;
-static const size_t FRAMES = 100;
 static size_t ARRAY_SIZE = 10;
 static size_t SCAN_LEN = 0;
 static size_t NUM_THREADS = 7;
@@ -135,7 +133,7 @@ void *fill(void *c) {
     } else if (SHARED_DB==4) {
         readfile(id);
         fetch_add(&dones, 1);
-        while (atomic32_read(&dones) != NUM_THREADS) {}
+        while (atomic_read(&dones) != NUM_THREADS) {}
         start = 0;
         end = n[id];
         str = id;    
@@ -186,16 +184,11 @@ void set_struct(const char *name){
         Fatal(0, error, "Not a valid structure: %s", name); 
     switch(STRUCT) {
         case 1:
-            lookup_ret = (dbs_lookup_ret_f)DBSlookup_ret;
-            create = (dbs_create_f)DBScreate;
-            statistics = (dbs_stats_f)DBSstats;
-            break;
-        case 2:
             lookup_ret = (dbs_lookup_ret_f)DBSLLlookup_ret;
             create = (dbs_create_f)DBSLLcreate_sized;
             statistics = (dbs_stats_f)DBSLLstats;
             break;
-        case 3:
+        case 2:
             lookup_ret = (dbs_lookup_ret_f)TreeDBSLLlookup;
             create = (dbs_create_f)TreeDBSLLcreate_sized;
             statistics = (dbs_stats_f)TreeDBSLLstats;

@@ -8,10 +8,9 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#include <opaal-greybox.h>
-#include <tls.h>
 #include <chunk_support.h>
 #include <dm/dm.h>
+#include <opaal-greybox.h>
 #include <runtime.h>
 #include <unix.h>
 

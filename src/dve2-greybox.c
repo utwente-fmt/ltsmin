@@ -9,7 +9,6 @@
 #include <unistd.h>
 
 #include <dve2-greybox.h>
-#include <tls.h>
 #include <chunk_support.h>
 #include <dm/dm.h>
 #include <runtime.h>

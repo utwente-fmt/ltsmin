@@ -10,8 +10,6 @@
 #include "common/array.hh"
 #include "system/state.hh"
 
-#include <tls.h>
-
 using namespace divine;
 
 namespace divine {

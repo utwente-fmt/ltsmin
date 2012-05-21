@@ -6,13 +6,11 @@
 \brief Concurrent synchronous hashtable implementation for fixed size hashes
 
 Implementation uses lockless operations
-
-\todo implement resizing
 */
 
 #include <dm/dm.h>
-#include <tls.h>
 #include <fast_hash.h>
+#include <stats.h>
 
 
 /**
@@ -98,7 +96,7 @@ extern void         DBSLLfree (dbs_ll_t dbs);
 
 /**
 \brief return a copy of internal statistics
-\see tls.h
+\see stats.h
 \param dbs The dbs
 \returns a copy of the statistics, to be freed with free
 */

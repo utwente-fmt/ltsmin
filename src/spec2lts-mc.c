@@ -16,10 +16,10 @@
 #include <time.h>
 #include <math.h>
 
+#include <atomics.h>
 #include <archive.h>
 #include <cctables.h>
 #include <dbs-ll.h>
-#include <dbs.h>
 #include <dfs-stack.h>
 #include <dm/bitvector.h>
 #include <fast_hash.h>
@@ -30,13 +30,11 @@
 #include <scctimer.h>
 #include <spec-greybox.h>
 #include <statistics.h>
-#include <stream.h>
+#include <stats.h>
 #include <stringindex.h>
 #include <trace.h>
 #include <treedbs-ll.h>
-#include <treedbs.h>
 #include <unix.h>
-#include <vector_set.h>
 #include <zobrist.h>
 
 static const int    THREAD_STACK_SIZE = 400 * 4096; //pthread_attr_setstacksize
@@ -567,6 +565,16 @@ add_results (counter_t *res, counter_t *cnt)
     res->inserts += cnt->inserts;
     res->deletes += cnt->deletes;
     res->delayed += cnt->delayed;
+}
+
+void
+add_stats(stats_t *res, stats_t *stat)
+{
+    res->elts += stat->elts;
+    res->nodes += stat->nodes;
+    res->tests += stat->tests;
+    res->misses += stat->misses;
+    res->rehashes += stat->rehashes;
 }
 
 static void
@@ -1962,7 +1970,7 @@ extern void rec_ndfs_call (wctx_t *ctx, ref_t state);
 static void
 endfs_lb (wctx_t *ctx)
 {
-    atomic32_write(&ctx->done, 1);
+    atomic_write (&ctx->done, 1);
     size_t workers[W];
     int idle_count = W-1;
     for (size_t i = 0; i<((size_t)W); i++)
@@ -1971,7 +1979,7 @@ endfs_lb (wctx_t *ctx)
     for (size_t i=0; i<W; i++) {
         if (0==workers[i])
             continue;
-        if (1 == atomic32_read(&(contexts[i]->done))) {
+        if (1 == atomic_read(&(contexts[i]->done))) {
             workers[i] = 0;
             idle_count--;
             continue;

@@ -2,7 +2,7 @@
 #ifndef TREEDBS_LL_H
 #define TREEDBS_LL_H
 
-#include "tls.h"
+#include "stats.h"
 #include "dm/dm.h"
 
 /**
@@ -80,7 +80,7 @@ extern void         TreeDBSLLcache (treedbs_ll_t dbs, size_t size);
 
 /**
 \brief return internal statistics
-\see tls.h
+\see stats.h
 \param dbs The dbs
 */
 extern stats_t     *TreeDBSLLstats (treedbs_ll_t dbs);
