@@ -1,0 +1,27 @@
+//                           -*- mode: doc; outline-regexp: "==\(=*\) ." -*-
+opaal2lts-mc(1)
+==============
+:Author:  Alfons Laarman, Mads Chr. Olesen and Andreas Dalsgaard
+:Email:   <a.w.laarman@ewi.utwente.nl>, mcro@cs.aau.dk and andrease@cs.aau.dk
+:Date:    2012-05-23
+
+== NAME
+
+opaal2lts-mc - Concurrent state space generator for UPPAAL timed automata
+[uppaal] models via the successor generator opaal [opaal].
+
+== SYNOPSIS
+
+*opaal2lts-mc* [OPTION]... 'input'[_.so|_.xml]
+
+== DESCRIPTION
+
+opaal2lts-mc generates a labelled transition system from a
+specification provided in 'input.xml' or 'intput.so' (precompiled).
+It does this concurrently for any given number of threads.
+
+== OPTIONS
+
+include::inc/spec2lts-mc-ta-options.txt[]
+
+include::inc/spec2lts-mc.txt[]

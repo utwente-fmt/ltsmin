@@ -80,6 +80,8 @@ MANPAGES += dve22lts-mc.1
 MANPAGES += dve22lts-mpi.1
 MANPAGES += dve22torx.1
 
+MANPAGES += opaal2lts-mc.1
+
 MANPAGES += pbes-reach.1
 MANPAGES += pbes2lts-gsea.1
 MANPAGES += pbes2lts-hre.1
@@ -115,6 +117,7 @@ extra_ASCIIDOC += inc/spec2lts-gsea-options.txt
 extra_ASCIIDOC += inc/spec2lts-gsea.txt
 extra_ASCIIDOC += inc/spec2lts-hre-options.txt
 extra_ASCIIDOC += inc/spec2lts-mc-options.txt
+extra_ASCIIDOC += inc/spec2lts-mc-ta-options.txt
 extra_ASCIIDOC += inc/spec2lts-mc.txt
 extra_ASCIIDOC += inc/spec2lts-mpi-options.txt
 extra_ASCIIDOC += inc/spec2lts-mpi.txt

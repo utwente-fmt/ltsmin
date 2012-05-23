@@ -4,60 +4,21 @@
 
 
 *--strategy*='TYPE'::
-        Select an exploration strategy. Two kinds of algorithms
-        are available: LTL model checking and reachability.
-        The multi-core LTL algorithms (Nested DFS) are implemented
-        in a swarmed fashion, however with a shared state storage.
-        On top of that, MCNDFS and ENDFS offer work sharing between threads
-        and can deliver speedups for some models.  
-        Note that the LTL algorithms require buchi automata as input.
-        Such a model can be provided directly by the language frontend,
-        i.e., DiVinE property models are supported, or by the LTL
-        layer (see --ltl).
-        Note finally that strict reachability exploration orders
-        are not guaranteed by all multi-core search strategies.
+        Select an exploration strategy.
         'TYPE' can be one of the following options:
 
-bfs;;
-  explore state space in breadth-first order (default).
-
 sbfs;;
-  explore state space in strict breadth-first order (default).
+  explore state space in strict breadth-first order (default). Gives best result
+  in the timed automata setting.
+  
+bfs;;
+  explore state space in breadth-first order.
 
 dfs;;
   explore state space in relaxed depth-first order. Relaxed meaning that
   the inclusion check on the set of visited states is executed immediately
   after generating a state. This saves stack space and improves performance
   of the parallel reachability analysis.
-
-ndfs;;
-  multi-core swarmed Nested Depth-First Search (Courcoubetis et al.).
-
-nndfs;;
-  multi-core swarmed New Nested Depth-First Search (Schwoon, Esparza).
-
-ldfs;;
-  Multi-Core Nested Depth-First Search (Laarman, Langerak, van de Pol, Weber, Wijs).
-
-endfs;;
-  Multi-Core Nested Depth-First Search by Evangelista et al. The algorithm has
-  been adapted with the cyan color encoding and early cycle detection, as
-  described in "Variations on Multi-Core Nested Depth-First Search"
-  (Laarman, van de Pol).
-  Note that ENDFS requires a repair procedure, NNDFS is chosen by default.
-  Alternatives can be chosen by  providing a list of strategies, for example: 
-  "endfs,mcndfs", yields the NMC-NDFS algorithm as described in the Variations
-  paper (with load balancing).
-  Finally, we also allow multiple levels of ENDFS to be combined:
-  "endfs,endfs,nndfs". 
-
-cndfs;;
-  New CNDFS algorithm.
-  Multi-Core Nested Depth-First Search (Evangelista, Laarman, Petrucci, van de Pol).
-
-
-*--nar*::
-        No All Red. Turn off all-red optimization in NNDFS/MCNDFS.
 
 *--perm*='TYPE'::
         Select the transition permutation, which is used to guide
@@ -97,10 +58,6 @@ otf;;
 
 none;;
     use the same exploration order for all workers. Default for reachability.
-
-
-*--no-red-perm*::
-    Turns the permutation layer of for the nested DFSs of the swarmed algorithms.
 
 
 *--state*='TYPE'::
@@ -148,10 +105,6 @@ tree;;
         good distributions (equal or better than Jenkin's hash).
         Improvements are only noticable for fast state generators, like
         DiVinE 2.2 (manpage:dve22lts-mc[1]).
-
-
-*--max*='NUMBER'::
-        Maximum search depth.
 
 
 include::reachability-options.txt[]

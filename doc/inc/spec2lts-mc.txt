@@ -19,3 +19,5 @@ manpage:etf[5],
 http://fmt.cs.utwente.nl/{tilde}michaelw/nips/[NIPS],
 http://divine.fi.muni.cz/[DiVinE-cluster],
 http://divine.fi.muni.cz/[DiVinE-2.2],
+https://code.launchpad.net/~opaal-developers/opaal/opaal-ltsmin-succgen[opaal],
+http://www.uppaal.org[uppaal]
