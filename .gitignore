@@ -18,10 +18,4 @@ Makefile
 Makefile.in
 ltsmin-*.tar.gz
 libtool
-src/opaal2lts-mc
-src/pbes2lts-gsea
-src/pins2lts-hre/pbes2lts-hre
-src/spg/spgsolver
-/src/pbes2lts-grey
-/src/pbes-reach
-src/gcf
+
