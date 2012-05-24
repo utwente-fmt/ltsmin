@@ -1,11 +1,15 @@
 ltsmin - minimization and instantiation of labelled transition systems 
 
 * Introduction
-LTSmin is a toolset for manipulating labelled transition
-systems. LTSmin already connects a sizeable number of existing
-(verification) tools: muCRL, mcrl2, DiVinE, SPIN,
-CADP. Moreover, it allows to reuse existing tools with new state space
-generation techniques.
+LTSmin started out as a generic toolset for manipulating labelled
+transition systems. Meanwhile the toolset was extended to a
+a full (LTL) model checker, while maintaining its language-independent
+characteristics.
+
+To obtain its input, LTSmin connects a sizeable number of existing
+(verification) tools: muCRL, mcrl2, DiVinE, SPIN (SpinJa), UPPAAL (opaal)
+and CADP. Moreover, it allows to reuse existing tools with new state space
+generation techniques by exporting LTSs into various formats.
 
 Implementing support for a new language module is in the
 order of 200--600 lines of C "glue" code, and automatically yields
@@ -26,15 +30,17 @@ checking algorithms.
 
 On the other hand, the implementation of a verification algorithm
 based on the PINS matrix automatically has access to muCRL, mcrl2,
-DVE, PROMELA and ETF language modules.
+DVE, PROMELA, UPPAAL xml and ETF language modules.
 
 Finally, all tools benefit from PINS2PINS optimizations, like local
 transition caching (which speeds up slow state space generators),
 matrix regrouping (which can drastically reduce run-time and memory
-consumption of symbolic algorithms).
+consumption of symbolic algorithms), partial order reduction and
+linear temporal logic.
 
 * Supported Systems
  - GNU/Linux (tested on Ubuntu, Debian, OpenSuSE 11.2)
+ - MacOS X, version 10.6 "Lion"
  - MacOS X, version 10.6 "Snow Leopard"
  - MacOS X, version 10.5 "Leopard"
 
@@ -159,6 +165,13 @@ hence you can also build mCRL2 without:
 See the CADP website <http://www.inrialpes.fr/vasy/cadp/> on how to
 obtain a license and download the CADP toolkit.
 
+*** TBB malloc
+
+For multi-core reachability on timed automata with the opaal frontend, install 
+TBB malloc. Scalability can be limited without a concurrent allocator, hence 
+the opaal2lts-mc frontend is not compiled in absence of TBB malloc. 
+See http://threadingbuildingblocks.org/file.php?fid=77
+
 *** DiVinE 2
 Download the latest released version of DiVinE from
 <http://divine.fi.muni.cz/>.  We tested with the version 2.4.  Apply
@@ -175,7 +188,7 @@ Build with:
 
     cd divine2
     mkdir _build && cd _build
-    cmake .. -DGUI=OFF -DRX_PATH= -DCMAKE_INSTALL_PREFIX=...
+    cmake .. -DGUI=OFF -DRX_PATH= -DCMAKE_INSTALL_PREFIX=... -DMURPHI=OFF
     make
     make install
 
