@@ -3,8 +3,6 @@ bin_PROGRAMS += etf-convert
 bin_PROGRAMS += ltsmin-tracepp
 bin_PROGRAMS += gcf-0.1
 
-MALLOC_LIBS="-ltbbmalloc_proxy"
-
 check_PROGRAMS  = test-bitset
 check_PROGRAMS += test-is-balloc
 check_PROGRAMS += test-dfs-stack

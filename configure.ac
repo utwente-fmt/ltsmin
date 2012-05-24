@@ -332,6 +332,7 @@ fi
 
 AC_CHECK_LIB([tbbmalloc_proxy], [malloc],
     [have_tbbmalloc="TBB malloc library was found"]
+    AC_SUBST([MALLOC_LIBS], ["-ltbbmalloc_proxy"])
     [have_opaal="yes"],
     AC_MSG_WARN([TBB malloc library not found.]))
 
