@@ -40,11 +40,6 @@ muCRL(+lpo+)::
 The muCRL language. See the
 http://www.cwi.nl/~mcrl/[muCRL website].
 
-NIPS-VM(+nips+)::
-
-The NIPS Virtual Machine. See the
-http://fmt.cs.utwente.nl/~michaelw/nips/[NIPS-VM website].
-
 PROMELA(+spinja+)::
 
 The PROMELA language. See the
@@ -61,7 +56,7 @@ Symbolic reachability tools that use decision diagrams for manipulating sets
 of states. The optional output produced by these tools is an ETF model.
 +
 See manpage:dve-reach[1], manpage:dve2-reach[1], manpage:etf-reach[1],
-manpage:lps-reach[1], manpage:lpo-reach[1], manpage:nips-reach[1],
+manpage:lps-reach[1], manpage:lpo-reach[1],
 and manpage:spinja-reach[1].
 
 <prefix>2lts-grey::
@@ -71,7 +66,7 @@ both decision diagrams and (tree-compressed) hash tables to represent sets of
 states. The optional output produced by these tools is an explicit LTS.
 +
 See manpage:dve2lts-grey[1], manpage:dve22lts-grey[1], manpage:etf2lts-grey[1],
-manpage:lps2lts-grey[1], manpage:lpo2lts-grey[1], manpage:nips2lts-grey[1],
+manpage:lps2lts-grey[1], manpage:lpo2lts-grey[1],
 and manpage:spinja2lts-grey[1].
 
 <prefix>2lts-gsea::
@@ -84,7 +79,7 @@ http://dx.doi.org/10.1007/s10009-008-0093-y[General State Exploring
 Algorithm (GSEA)].
 +
 See manpage:dve2lts-gsea[1], manpage:dve22lts-gsea[1], manpage:etf2lts-gsea[1],
-manpage:lps2lts-gsea[1], manpage:lpo2lts-gsea[1], manpage:nips2lts-gsea[1],
+manpage:lps2lts-gsea[1], manpage:lpo2lts-gsea[1],
 and manpage:spinja2lts-gsea[1].
 
 <prefix>2lts-mc::
@@ -93,7 +88,7 @@ Concurrent (multi-core) state space generators that enumerate states and
 can use (tree-compressed) hash tables to represent sets of states.
 +
 See manpage:dve2lts-mc[1], manpage:dve22lts-mc[1], manpage:etf2lts-mc[1],
-manpage:nips2lts-mc[1], and manpage:spinja2lts-mc[1].
+and manpage:spinja2lts-mc[1].
 
 <prefix>2lts-mpi::
 
@@ -103,7 +98,7 @@ The optional output produced by these tools is an explicit LTS.
 These tools do not work without MPI.
 +
 See manpage:dve2lts-mpi[1], manpage:dve22lts-mpi[1], manpage:etf2lts-mpi[1],
-manpage:lps2lts-mpi[1], manpage:lpo2lts-mpi[1], manpage:nips2lts-mpi[1],
+manpage:lps2lts-mpi[1], manpage:lpo2lts-mpi[1],
 and manpage:spinja2lts-mpi[1].
 
 <prefix>2lts-hre::
@@ -120,8 +115,7 @@ For example:
 --
 +
 See manpage:dve2lts-hre[1], manpage:dve22lts-hre[1], manpage:etf2lts-hre[1],
-manpage:lps2lts-hre[1], manpage:lpo2lts-hre[1], manpage:nips2lts-hre[1],
-and manpage:spinja2lts-hre[1]
+manpage:lps2lts-hre[1], manpage:lpo2lts-hre[1], and manpage:spinja2lts-hre[1]
 
 == State Space Reduction Tools
 
@@ -163,7 +157,7 @@ The LTSmin toolset provides TorX RPC interfaces.
 TorX RPC interface.
 +
 See manpage:dve2torx[1], manpage:dve22torx[1], manpage:etf2torx[1],
-manpage:lps2torx[1], manpage:lpo2torx[1], manpage:nips2torx[1],
+manpage:lps2torx[1], manpage:lpo2torx[1],
 and manpage:spinja2torx[1].
 
 == Trace Pretty Printing

@@ -37,8 +37,6 @@
 #include <unix.h>
 #include <zobrist.h>
 
-static const int    THREAD_STACK_SIZE = 400 * 4096; //pthread_attr_setstacksize
-
 static inline size_t min (size_t a, size_t b) {
     return a < b ? a : b;
 }
@@ -772,11 +770,6 @@ find_or_put_tree (state_info_t *state, transition_info_t *ti,
 void
 init_globals (int argc, char *argv[])
 {
-#ifdef NIPS // Stack usage of NIPS is higher than ptheads default max
-    attr = RTmalloc (sizeof (pthread_attr_t));
-    pthread_attr_init (attr);
-    pthread_attr_setstacksize (attr, THREAD_STACK_SIZE);
-#endif
     // parse command line parameters
     RTinitPopt (&argc, &argv, options, 1, 1, files, NULL, "<model>",
                 "Perform a parallel reachability analysis of <model>\n\nOptions");

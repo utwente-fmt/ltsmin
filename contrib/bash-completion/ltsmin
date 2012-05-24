@@ -216,16 +216,6 @@ _spec2lts-grey()
     return 1
 }
 
-_nips2lts-grey ()
-{
-    _ltsmin_set_reply ""
-    _spec2lts-grey && return 0
-    _ltsmin_set_reply_file_ext "b"
-    _ltsmin_has_input_file "b" && return 0
-    _ltsmin_set_reply_file_ext "dir|dz|gcf"
-    return 1
-}
-
 _etf2lts-grey ()
 {
     _ltsmin_set_reply ""
@@ -275,16 +265,6 @@ _spec-reach()
     return 1
 }
 
-_nips-reach ()
-{
-    _ltsmin_set_reply ""
-    _spec-reach && return 0
-    _ltsmin_set_reply_file_ext "b"
-    _ltsmin_has_input_file "b" && return 0
-    _ltsmin_set_reply_file_ext "dir|dz|gcf"
-    return 1
-}
-
 _etf-reach ()
 {
     _ltsmin_set_reply ""
@@ -312,11 +292,9 @@ shopt -s extglob
 
 complete -F _ltsmin-tracepp ltsmin-tracepp
 
-complete -F _nips2lts-grey nips2lts-grey
 complete -F _etf2lts-grey etf2lts-grey
 complete -F _lpo2lts-grey lpo2lts-grey
 
-complete -F _nips-reach nips-reach
 complete -F _etf2-reach etf-reach
 complete -F _lpo-reach lpo-reach
 

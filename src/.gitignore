@@ -24,9 +24,6 @@ lps-reach
 lps2lts-grey
 lps2lts-mpi
 mpi-event-test
-nips-reach
-nips2lts-grey
-nips2lts-mpi
 dve-reach
 dve2lts-grey
 dve2lts-mpi
@@ -35,7 +32,6 @@ dve2-reach
 dve22lts-grey
 dve22lts-mpi
 dve22lts-mc
-nips2lts-mc
 etf2lts-mc
 spinja2lts-grey
 spinja2lts-mc
@@ -65,7 +61,6 @@ etf2lts-gsea
 lpo2lts-gsea
 lps2lts-gsea
 spinja2lts-gsea
-nips2lts-gsea
 gcf-tool/gcf
 hre-test/test-hre
 hre-test/test-mpi-hre
@@ -78,6 +73,5 @@ pins2lts-hre/etf2lts-hre
 pins2lts-hre/lpo2lts-hre
 pins2lts-hre/lps2lts-hre
 pins2lts-hre/spinja2lts-hre
-pins2lts-hre/nips2lts-hre
 sigmin-one/sigmin-one
 sigmin-mpi/sigmin-mpi

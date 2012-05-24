@@ -49,10 +49,8 @@ include::inc/file-formats.txt[]
 manpage:ltsmin[7], 
 manpage:lpo2lts-grey[1],
 manpage:lps2lts-grey[1],
-manpage:nips2lts-grey[1],
 manpage:lpo2lts-mpi[1],
 manpage:lps2lts-mpi[1],
-manpage:nips2lts-mpi[1],
 manpage:ltsmin-convert[1],
 http://www.inrialpes.fr/vasy/cadp/[CADP],
 http://www.inrialpes.fr/vasy/cadp/man/bcg.html[BCG]

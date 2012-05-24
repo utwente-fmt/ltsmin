@@ -63,19 +63,6 @@ lps2torx_CPPFLAGS = -DMCRL2 $(TORX_CPPFLAGS) $(AM_CPPFLAGS)
 nodist_EXTRA_lps2torx_SOURCES = ../automake-force-linker.cxx
 
 
-# nips2torx
-# if HAVE_LIBNIPS
-bin_PROGRAMS += nips2torx
-# endif
-nips2torx_SOURCES  = spec2torx.c
-nips2torx_SOURCES += ../nips-greybox.c
-nips2torx_SOURCES += ../nips-greybox.h
-
-nips2torx_LDADD    = ../libltsmin.la $(NIPS_LIBS)
-nips2torx_CPPFLAGS = -DNIPS $(TORX_CPPFLAGS) $(NIPS_CPPFLAGS) $(AM_CPPFLAGS)
-nips2torx_LDFLAGS  = $(NIPS_LDFLAGS) $(AM_LDFLAGS)
-
-
 # spinja2torx
 # if HAVE_SPINJA
 bin_PROGRAMS += spinja2torx

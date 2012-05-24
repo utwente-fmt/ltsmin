@@ -56,14 +56,6 @@ MANPAGES += lps2lts-hre.1
 MANPAGES += lps2lts-mpi.1
 MANPAGES += lps2torx.1
 
-MANPAGES += nips-reach.1
-MANPAGES += nips2lts-grey.1
-MANPAGES += nips2lts-gsea.1
-MANPAGES += nips2lts-hre.1
-MANPAGES += nips2lts-mc.1
-MANPAGES += nips2lts-mpi.1
-MANPAGES += nips2torx.1
-
 MANPAGES += spinja-reach.1
 MANPAGES += spinja2lts-grey.1
 MANPAGES += spinja2lts-gsea.1

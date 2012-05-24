@@ -78,12 +78,6 @@ bin_PROGRAMS += pbes-reach
 noinst_LTLIBRARIES += libpbes-pins.la
 endif
 
-# if HAVE_LIBNIPS
-bin_PROGRAMS += nips2lts-grey
-bin_PROGRAMS += nips2lts-gsea
-bin_PROGRAMS += nips-reach
-#endif
-
 if HAVE_DVEC
 bin_PROGRAMS += dve2lts-grey
 bin_PROGRAMS += dve2lts-gsea
@@ -111,7 +105,6 @@ bin_PROGRAMS += spinja-reach
 
 if HAVE_ATOMICS
 bin_PROGRAMS += etf2lts-mc
-bin_PROGRAMS += nips2lts-mc
 bin_PROGRAMS += spinja2lts-mc
 if HAVE_DVEC
 bin_PROGRAMS += dve2lts-mc
@@ -126,7 +119,6 @@ endif
 
 if HAVE_MPI
 bin_PROGRAMS += etf2lts-mpi
-bin_PROGRAMS += nips2lts-mpi
 bin_PROGRAMS += spinja2lts-mpi
 if HAVE_LIBSTEP_INFO
 bin_PROGRAMS += lpo2lts-mpi
@@ -155,7 +147,6 @@ endif
 
 if HAVE_CADP
 pkglib_LTLIBRARIES += libetf-open.la
-pkglib_LTLIBRARIES += libnips-open.la
 pkglib_LTLIBRARIES += libspinja-open.la
 if HAVE_LIBSTEP_INFO
 pkglib_LTLIBRARIES += liblpo-open.la
@@ -245,12 +236,6 @@ pbes2lts_grey_LDADD    = libvset.la libpbes-pins.la libltsmin.la
 pbes2lts_grey_CPPFLAGS = -DPBES $(AM_CPPFLAGS)
 nodist_EXTRA_pbes2lts_grey_SOURCES = automake-force-linker.cxx
 
-# nips2lts-grey
-nips2lts_grey_SOURCES  = spec2lts-grey.c nips-greybox.c nips-greybox.h
-nips2lts_grey_LDADD    = $(VSET_LIBS) libltsmin.la $(NIPS_LIBS)
-nips2lts_grey_CPPFLAGS = -DNIPS $(NIPS_CPPFLAGS) $(AM_CPPFLAGS)
-nips2lts_grey_LDFLAGS  = $(NIPS_LDFLAGS) $(AM_LDFLAGS)
-
 # dve2lts-grey
 dve2lts_grey_SOURCES  = spec2lts-grey.c dve-greybox.cpp dve-greybox.h
 dve2lts_grey_LDADD    = $(VSET_LIBS) libltsmin.la $(DVEC_LIBS)
@@ -300,12 +285,6 @@ pbes2lts_gsea_SOURCES  = spec2lts-gsea.c
 pbes2lts_gsea_LDADD    = libvset.la libpbes-pins.la libltsmin.la
 pbes2lts_gsea_CPPFLAGS = -DPBES $(AM_CPPFLAGS)
 nodist_EXTRA_pbes2lts_gsea_SOURCES = automake-force-linker.cxx
-
-# nips2lts-gsea
-nips2lts_gsea_SOURCES  = spec2lts-gsea.c nips-greybox.c nips-greybox.h
-nips2lts_gsea_LDADD    = $(VSET_LIBS) libltsmin.la $(NIPS_LIBS)
-nips2lts_gsea_CPPFLAGS = -DNIPS $(NIPS_CPPFLAGS) $(AM_CPPFLAGS)
-nips2lts_gsea_LDFLAGS  = $(NIPS_LDFLAGS) $(AM_LDFLAGS)
 
 # dve2lts-gsea
 dve2lts_gsea_SOURCES  = spec2lts-gsea.c dve-greybox.cpp dve-greybox.h
@@ -357,12 +336,6 @@ pbes_reach_LDADD    = libvset.la libpbes-pins.la libltsmin.la libspg.la
 pbes_reach_CPPFLAGS = -DPBES $(AM_CPPFLAGS)
 nodist_EXTRA_pbes_reach_SOURCES = automake-force-linker.cxx
 
-# nips-reach
-nips_reach_SOURCES  = spec-reach.c nips-greybox.c nips-greybox.h
-nips_reach_LDADD    = $(VSET_LIBS) libltsmin.la $(NIPS_LIBS)
-nips_reach_CPPFLAGS = -DNIPS $(NIPS_CPPFLAGS) $(AM_CPPFLAGS)
-nips_reach_LDFLAGS  = $(NIPS_LDFLAGS) $(AM_LDFLAGS)
-
 # dve-reach
 dve_reach_SOURCES  = spec-reach.c dve-greybox.cpp dve-greybox.h
 dve_reach_LDADD    = $(VSET_LIBS) libltsmin.la $(DVEC_LIBS)
@@ -412,12 +385,6 @@ pbes2lts_mpi_LDADD    = libpbes-pins.la libltsmin-mpi.la
 pbes2lts_mpi_CPPFLAGS = -DPBES $(AM_CPPFLAGS)
 nodist_EXTRA_pbes2lts_mpi_SOURCES = automake-force-linker.cxx
 
-# nips2lts-mpi
-nips2lts_mpi_SOURCES  = spec2lts-mpi.c nips-greybox.c nips-greybox.h
-nips2lts_mpi_LDADD    = libltsmin-mpi.la $(NIPS_LIBS)
-nips2lts_mpi_CPPFLAGS = -DNIPS $(NIPS_CPPFLAGS) $(AM_CPPFLAGS)
-nips2lts_mpi_LDFLAGS  = $(NIPS_LDFLAGS) $(AM_LDFLAGS)
-
 # dve2lts-mpi
 dve2lts_mpi_SOURCES  = spec2lts-mpi.c dve-greybox.cpp dve-greybox.h
 dve2lts_mpi_LDADD    = libltsmin-mpi.la $(DVEC_LIBS)
@@ -463,12 +430,6 @@ etf2lts_mc_CPPFLAGS = -DETF $(AM_CPPFLAGS)
 #lps2lts_mc_LDFLAGS  = $(MCRL2_LDFLAGS) $(AM_LDFLAGS)
 #nodist_EXTRA_lps2lts_mc_SOURCES = automake-force-linker.cxx
 
-# nips2lts-mc
-nips2lts_mc_SOURCES  = spec2lts-mc.c nips-greybox.c nips-greybox.h
-nips2lts_mc_LDADD    = libltsmin.la $(NIPS_LIBS)
-nips2lts_mc_CPPFLAGS = -DNIPS $(NIPS_CPPFLAGS) $(AM_CPPFLAGS)
-nips2lts_mc_LDFLAGS  = $(NIPS_LDFLAGS) $(AM_LDFLAGS)
-
 # dve2lts-mc
 dve2lts_mc_SOURCES  = spec2lts-mc.c dve-greybox.cpp dve-greybox.h
 dve2lts_mc_LDADD    = libltsmin.la $(DVEC_LIBS)
@@ -510,11 +471,6 @@ liblps_open_la_SOURCES = spec_open.c
 liblps_open_la_CPPFLAGS = -DMCRL2 $(CADP_CPPFLAGS) $(AM_CPPFLAGS)
 liblps_open_la_LIBADD = libmcrl2-pins.la libltsmin.la
 nodist_EXTRA_liblps_open_la_SOURCES = automake-force-linker.cxx
-
-# libnips-open.la
-libnips_open_la_SOURCES = spec_open.c nips-greybox.c nips-greybox.h
-libnips_open_la_CPPFLAGS = -DNIPS $(NIPS_CPPFLAGS) $(CADP_CPPFLAGS) $(AM_CPPFLAGS)
-libnips_open_la_LIBADD = ${top_builddir}/nips-vm/libnips_vm.la libltsmin.la
 
 # libdve-open.la
 libdve_open_la_SOURCES = spec_open.c dve-greybox.cpp dve-greybox.h

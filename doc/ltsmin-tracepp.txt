@@ -42,6 +42,6 @@ include::inc/ltsmin-tracepp-options.txt[]
 
 == SEE ALSO
 
-manpage:lpo2lts-grey[1], manpage:nips2lts-grey[1], manpage:etf2lts-grey[1],
-manpage:lps2lts-grey[1], manpage:lpo-reach[1], manpage:nips-reach[1],
+manpage:lpo2lts-grey[1], manpage:etf2lts-grey[1],
+manpage:lps2lts-grey[1], manpage:lpo-reach[1],
 manpage:etf-reach[1], manpage:lps-reach[1]

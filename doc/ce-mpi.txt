@@ -50,5 +50,4 @@ manpage:ltsmin[7],
 manpage:ltsmin-mpi[1],
 manpage:lpo2lts-mpi[1],
 manpage:lps2lts-mpi[1],
-manpage:nips2lts-mpi[1],
 manpage:ltsmin-convert[1]

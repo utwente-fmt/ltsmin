@@ -82,10 +82,6 @@ case "$FILE" in
     echo "input is mCRL2"
     LTSMIN_MOD_LDFLAGS="@MCRL2_LDFLAGS@ @MCRL2_PINS_LDFLAGS@ -llps-open @MCRL2_LIBS@ @MCRL2_PINS_LIBS@ -lstdc++"
     ;;
- *.b)
-    echo "input is NIPS byte-code"
-    LTSMIN_MOD_LDFLAGS="@NIPS_LDFLAGS@ -lnips-open"
-    ;;
  *.etf)
     echo "input is ETF"
     LTSMIN_MOD_LDFLAGS="-letf-open"

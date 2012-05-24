@@ -185,9 +185,6 @@ fi
 ACX_DVEC_LIBS([:],
   [have_divine=no
    AC_MSG_WARN([DiVinE libraries not found.])])
-AC_SUBST([NIPS_LIBS],['${top_builddir}/nips-vm/libnips_vm.la'])
-AC_SUBST([NIPS_CPPFLAGS],['-I${top_srcdir}'])
-AC_SUBST([NIPS_LDFLAGS])
 
 AC_SUBST([BUDDY_LIBS],['${top_builddir}/buddy/src/libbdd.la -lm'])
 AC_SUBST([BUDDY_CPPFLAGS],['-I${top_srcdir}/buddy/src'])
@@ -390,7 +387,7 @@ AC_CONFIG_FILES([
 
 AC_CONFIG_LINKS([src/lempar.c:lemon/lempar.c])
 
-AC_CONFIG_SUBDIRS([nips-vm buddy ltl2ba sylvan])
+AC_CONFIG_SUBDIRS([buddy ltl2ba sylvan])
 
 AC_OUTPUT
 

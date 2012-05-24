@@ -3,7 +3,7 @@ ltsmin - minimization and instantiation of labelled transition systems
 * Introduction
 LTSmin is a toolset for manipulating labelled transition
 systems. LTSmin already connects a sizeable number of existing
-(verification) tools: muCRL, mcrl2, DiVinE, SPIN, NIPS,
+(verification) tools: muCRL, mcrl2, DiVinE, SPIN,
 CADP. Moreover, it allows to reuse existing tools with new state space
 generation techniques.
 
