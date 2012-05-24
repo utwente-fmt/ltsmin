@@ -6,7 +6,8 @@
 #include <hre/table.h>
 #include <stringindex.h>
 
-#define MAX_CHUNK_SIZE 16384
+#define CHUNK_BUFFER_SIZE 65536
+#define MAX_CHUNK_SIZE (CHUNK_BUFFER_SIZE - 4)
 
 struct value_table_s {
     string_index_t index;
@@ -38,7 +39,7 @@ static void request_action(void* context,hre_msg_t msg){
         char *data=SIgetC(vt->index,task,&len);
         //Print(infoShort,"reply [%s] to %d",data,msg->source);
         if (data==NULL) Abort("index %d unknown",task);
-        if (len>MAX_CHUNK_SIZE-4) Abort("chunk length %d exceeds maximum ().",len,MAX_CHUNK_SIZE-4);
+        if (len>MAX_CHUNK_SIZE) Abort("chunk length %d exceeds maximum (%d).",len,MAX_CHUNK_SIZE);
         if (vt->msg_pending) HREyieldWhile(vt->ctx,&vt->msg_pending);
         vt->msg->target=msg->source;
         int32_t tmp=-1;
@@ -89,6 +90,7 @@ static value_index_t put_chunk(value_table_t vt,chunk item){
         //Warning(info,"preparing message");
         vt->task=-1;
         int32_t tmp=-1;
+        if (item.len>MAX_CHUNK_SIZE) Abort("chunk length %d exceeds maximum (%d).",item.len,MAX_CHUNK_SIZE);
         memcpy(vt->msg->buffer,&tmp,4);
         memcpy(vt->msg->buffer+4,item.data,item.len);
         vt->msg->tail=item.len+4;
@@ -140,9 +142,9 @@ value_table_t HREcreateTable(hre_context_t ctx,const char* name){
     vt->index=SIcreate();
     vt->ctx=ctx;
     vt->msg_pending=0;
-    uint32_t request_tag=HREactionCreate(ctx,1,MAX_CHUNK_SIZE,request_action,vt);
-    uint32_t answer_tag=HREactionCreate(ctx,0,MAX_CHUNK_SIZE,answer_action,vt);
-    vt->msg=HREnewMessage(ctx,MAX_CHUNK_SIZE);
+    uint32_t request_tag=HREactionCreate(ctx,1,CHUNK_BUFFER_SIZE,request_action,vt);
+    uint32_t answer_tag=HREactionCreate(ctx,0,CHUNK_BUFFER_SIZE,answer_action,vt);
+    vt->msg=HREnewMessage(ctx,CHUNK_BUFFER_SIZE);
     if (HREme(ctx)==0){
         vt->msg->tag=answer_tag;
         vt->msg->comm=0;
