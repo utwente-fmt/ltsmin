@@ -50,7 +50,7 @@ und.
 */
 extern dbs_ref_t    DBSLLlookup (const dbs_ll_t dbs, const int *vector);
 
-extern uint32_t     DBSLLget_sat_bits (const dbs_ll_t dbs, const dbs_ref_t ref);
+extern uint16_t     DBSLLget_sat_bits (const dbs_ll_t dbs, const dbs_ref_t ref);
 
 extern void         DBSLLset_sat_bits (const dbs_ll_t dbs, const dbs_ref_t ref,
                                        uint16_t value);
@@ -68,9 +68,9 @@ extern void         DBSLLunset_sat_bit (const dbs_ll_t dbs, const dbs_ref_t ref,
                                         int index);
 
 
-extern uint32_t     DBSLLinc_sat_bits (const dbs_ll_t dbs, const dbs_ref_t ref);
+extern uint16_t     DBSLLinc_sat_bits (const dbs_ll_t dbs, const dbs_ref_t ref);
 
-extern uint32_t     DBSLLdec_sat_bits (const dbs_ll_t dbs, const dbs_ref_t ref);
+extern uint16_t     DBSLLdec_sat_bits (const dbs_ll_t dbs, const dbs_ref_t ref);
 
 /**
 \brief Find a vector with respect to a database and insert it if it cannot be fo
@@ -87,7 +87,7 @@ extern int          DBSLLlookup_hash (const dbs_ll_t dbs, const int *v,
 
 extern int         *DBSLLget (const dbs_ll_t dbs, const dbs_ref_t ref, int *dst);
 
-extern uint32_t     DBSLLmemoized_hash (const dbs_ll_t dbs, const dbs_ref_t ref);
+extern uint16_t     DBSLLmemoized_hash (const dbs_ll_t dbs, const dbs_ref_t ref);
 
 /**
 \brief Free the memory used by a dbs.
