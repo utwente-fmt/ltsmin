@@ -1,8 +1,8 @@
 //                           -*- mode: doc; outline-regexp: "==\(=*\) ." -*-
 opaal2lts-mc(1)
 ==============
-:Author:  Alfons Laarman, Mads Chr. Olesen and Andreas Dalsgaard
-:Email:   <a.w.laarman@ewi.utwente.nl>, mcro@cs.aau.dk and andrease@cs.aau.dk
+:Author:  Alfons Laarman
+:Email:   <a.w.laarman@ewi.utwente.nl>
 :Date:    2012-05-23
 
 == NAME

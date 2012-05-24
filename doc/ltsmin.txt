@@ -1,8 +1,8 @@
 //                           -*- mode: doc; outline-regexp: "==\(=*\) ." -*-
 ltsmin(7)
 =========
-:Author:  Stefan Blom, Michael Weber, Alfons Laarman
-:Email:   <sccblom@cs.utwente.nl>, <mw@foldr.org>, <a.w.laarman@cs.utwente.nl> 
+:Author:  Stefan Blom
+:Email:   <sccblom@cs.utwente.nl>
 :Date:    2012-23-05
 
 
