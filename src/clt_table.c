@@ -23,7 +23,6 @@ static const struct timespec BO = {0, 2500};
 #define RIGHT 3
 
 #define R_BITS 28
-#define B_SPACE 1024
 
 typedef struct __attribute__ ((__packed__)) clt_bucket {
     uint32_t            rest        : R_BITS;
@@ -39,6 +38,7 @@ struct clt_dbs_s {
     size_t              size;
     size_t              mask;
     size_t              log_size;
+    size_t              b_space;
 };
 
 /**
@@ -59,9 +59,8 @@ clt_find_left_from (const clt_dbs_t* dbs, size_t pos)
 {
 	do {
 		pos--;
-		assert (pos < dbs->size+B_SPACE);
-	}
-	while (dbs->table[pos].occupied);
+		assert (pos > 0);
+	} while (dbs->table[pos].occupied);
 	return pos;
 }
 
@@ -70,7 +69,7 @@ clt_find_right_from (const clt_dbs_t* dbs, size_t pos)
 {
 	do {
 		pos++;
-		assert (pos < dbs->size+B_SPACE+B_SPACE);
+		assert (pos < dbs->size+dbs->b_space+dbs->b_space);
 	} while (dbs->table[pos].occupied);
 	return pos;
 }
@@ -142,10 +141,10 @@ int
 clt_find_or_put (const clt_dbs_t* dbs, uint64_t k)
 {
     assert (k < (1UL << dbs->keysize));
-   	size_t              idx = MurmurHash64 (&k, 8, 0) + B_SPACE; // add breathing space
+   	uint64_t            hash = MurmurHash64 (&k, 8, 0);
     clt_bucket_t        check, oldval, newval;
     uint32_t            r = CLT_REMAINDER (k);
-   	idx &= dbs->mask;
+   	uint64_t            idx = (hash & dbs->mask) + dbs->b_space; // add breathing space
 	check = read_table (dbs, idx);
 	if (!check.occupied) {
 	    newval.rest = r;
@@ -181,7 +180,7 @@ clt_find_or_put (const clt_dbs_t* dbs, uint64_t k)
     uint32_t num_in_group = 0;
     size_t q;
 
-    // determine which emty location is closer -> less swapping 
+    // determine which empty location is closer -> less swapping
     int dir = (idx-t_left)-(t_right-idx);
     if (dir > 0) {
         while (j < t_right) {
@@ -193,14 +192,13 @@ clt_find_or_put (const clt_dbs_t* dbs, uint64_t k)
             int c2 = count;
             --j;
             while (c2 < 1 && dbs->table[j].occupied) {
-                assert (j < dbs->size+B_SPACE+B_SPACE);
+                assert (j < dbs->size+dbs->b_space+dbs->b_space);
                 c2 += dbs->table[j].change;
                 if (c2 == 0) {
                     if (dbs->table[j].rest < r) break;
                     if (dbs->table[j].rest == r) {
                         clt_unlock (dbs, t_left);
                         clt_unlock (dbs, t_right);
-                        mfence;
                         return 1; // FOUND
                     }
                 }
@@ -210,7 +208,7 @@ clt_find_or_put (const clt_dbs_t* dbs, uint64_t k)
 
         q = t_right;
         while (1) {
-            assert (q <  dbs->size+B_SPACE+B_SPACE);
+            assert (q <  dbs->size+dbs->b_space+dbs->b_space);
             count += dbs->table[q-1].change;
 
             if ( (dbs->table[idx].virgin && count == 0 && dbs->table[q-1].rest < r) ||  //bij de juiste groep zoeken naar de correcte positie in de groep
@@ -225,7 +223,7 @@ clt_find_or_put (const clt_dbs_t* dbs, uint64_t k)
             dbs->table[q].change     = dbs->table[q-1].change;
             dbs->table[q].occupied   = 1;
             --q;
-            assert (q < dbs->size+B_SPACE+B_SPACE);
+            assert (q < dbs->size+dbs->b_space+dbs->b_space);
         }
 
         dbs->table[q].rest      = r;
@@ -250,13 +248,12 @@ clt_find_or_put (const clt_dbs_t* dbs, uint64_t k)
             int c2 = count;
             ++j;
             while (c2 < 0 && dbs->table[j].occupied) {
-                assert (j < dbs->size+B_SPACE+B_SPACE);
+                assert (j < dbs->size+dbs->b_space+dbs->b_space);
                 if (c2 == -1) {
                     if (dbs->table[j].rest > r) break;
                     if (dbs->table[j].rest == r) {
                         clt_unlock (dbs, t_left);
                         clt_unlock (dbs, t_right);
-                        mfence;
                         return 1; // FOUND
                     }
                 }
@@ -281,7 +278,7 @@ clt_find_or_put (const clt_dbs_t* dbs, uint64_t k)
                 dbs->table[q].change = 0;
 
             ++q;
-            assert (q < dbs->size+B_SPACE+B_SPACE);
+            assert (q < dbs->size+dbs->b_space+dbs->b_space);
         }
 
         dbs->table[q].rest         = r;
@@ -306,17 +303,19 @@ clt_dbs_t *
 clt_create (uint32_t ksize, uint32_t log_size)
 {
     assert(sizeof(clt_bucket_t) == sizeof(uint32_t));
-    assert(log_size <= 40);
-    assert(ksize > 0 && ksize <= log_size + R_BITS);
+    assert(log_size <= 40 && "Cleary table to large");
+    assert(log_size > 7 && "Cleary table to small to add breathing space");
+    assert(ksize > 0 && ksize <= log_size + R_BITS && "Wrong cleary table dimensions");
 
     clt_dbs_t              *dbs = RTmalloc(sizeof(clt_dbs_t));
     dbs->size = 1UL << log_size;
     dbs->mask = dbs->size - 1;
     dbs->log_size = log_size;
     dbs->keysize = ksize;
-    dbs->table = RTmallocZero((dbs->size + 2*B_SPACE) * sizeof(clt_bucket_t));
+    dbs->b_space = dbs->size >> 5; // < 5 %
+    dbs->table = RTmallocZero((dbs->size + 2*dbs->b_space) * sizeof(clt_bucket_t));
     if (dbs->table == NULL)
-        Fatal(1, error, "Something went wrong allocating the table array... aborting.\n");
+        Abort ("Something went wrong allocating the table array... aborting.\n");
     return dbs;
 }
 
