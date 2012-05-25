@@ -56,7 +56,14 @@ typedef struct state_info_s {
 } state_info_t;
 
 typedef enum { UseGreyBox, UseBlackBox } box_t;
-typedef enum { UseDBSLL, UseTreeDBSLL } db_type_t;
+
+typedef enum {
+    HashTable   = 1,
+    TreeTable   = 2,
+    ClearyTree  = 4,
+    Tree        = TreeTable | ClearyTree
+} db_type_t;
+
 typedef enum {
     Strat_None   = 0,
     Strat_SBFS   = 1,
@@ -150,7 +157,6 @@ static int              all_red = 1;
 static box_t            call_mode = UseBlackBox;
 static size_t           max = SIZE_MAX;
 static size_t           ratio = 2;
-static int              slim = 0;
 static size_t           W = 2;
 static lb2_t           *lb2 = NULL;
 static void            *dbs = NULL;
@@ -164,7 +170,7 @@ static dbs_inc_sat_bits_f   inc_sat_bits;
 static dbs_dec_sat_bits_f   dec_sat_bits;
 static dbs_get_sat_bits_f   get_sat_bits;
 static char            *state_repr = "tree";
-static db_type_t        db_type = UseTreeDBSLL;
+static db_type_t        db_type = TreeTable;
 #ifdef OPAAL
 static char            *arg_strategy = "sbfs";
 #else
@@ -193,6 +199,7 @@ static int              count_bits = 0;
 static int              global_bits = 0;
 static int              local_bits = 0;
 static int              count_mask;
+static size_t           max_level_size = 0;
 
 
 static si_map_entry strategies[] = {
@@ -224,8 +231,9 @@ static si_map_entry permutations[] = {
 };
 
 static si_map_entry db_types[] = {
-    {"table",   UseDBSLL},
-    {"tree",    UseTreeDBSLL},
+    {"table",   HashTable},
+    {"tree",    TreeTable},
+    {"cleary-tree", ClearyTree},
     {NULL, 0}
 };
 
@@ -305,7 +313,7 @@ static struct poptOption options[] = {
      (void *)state_db_popt, 0, NULL, NULL},
     {"threads", 0, POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &W, 0, "number of threads", "<int>"},
     {"state", 0, POPT_ARG_STRING | POPT_ARGFLAG_SHOW_DEFAULT, &state_repr,
-     0, "select the data structure for storing states", "<tree|table>"},
+     0, "select the data structure for storing states. Beware for Cleary tree: size <= 28 + 2 * ratio.", "<tree|table|cleary-tree>"},
     {"size", 's', POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &dbs_size, 0,
      "log2 size of the state store", NULL},
 #ifdef OPAAL
@@ -322,7 +330,7 @@ static struct poptOption options[] = {
      &arg_strategy, 0, "select the search strategy", "<sbfs|bfs|dfs>"},
 #else
     {"strategy", 0, POPT_ARG_STRING | POPT_ARGFLAG_SHOW_DEFAULT,
-     &arg_strategy, 0, "select the search strategy", "<bfs|dfs|ndfs|nndfs|mcndfs|endfs|endfs,mcndfs|endfs,endfs,nndfs>"},
+     &arg_strategy, 0, "select the search strategy", "<bfs|sbfs|dfs|cndfs|lndfs|endfs|endfs,lndfs|endfs,endfs,nndfs|ndfs|nndfs>"},
     {"no-red-perm", 0, POPT_ARG_VAL, &no_red_perm, 1, "turn off transition permutation for the red search", NULL},
     {"nar", 1, POPT_ARG_VAL, &all_red, 0, "turn off red coloring in the blue search (NNDFS/MCNDFS)", NULL},
     {"grey", 0, POPT_ARG_VAL, &call_mode, UseGreyBox, "make use of GetTransitionsLong calls", NULL},
@@ -341,7 +349,6 @@ static struct poptOption options[] = {
      0,"log2 size of zobrist random table (6 or 8 is good enough; 0 is no zobrist)", NULL},
     {"ref", 0, POPT_ARG_VAL, &refs, 1, "store references on the stack/queue instead of full states", NULL},
     {"ratio", 0, POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &ratio, 0, "log2 tree root to leaf ratio", "<int>"},
-    {"slim", 0, POPT_ARG_VAL, &slim, 1, "slim tree, beware: size <= 28 + 2 * ratio", NULL},
     {"deadlock", 'd', POPT_ARG_VAL, &dlk_detect, 1, "detect deadlocks", NULL },
 #ifdef SPINJA
     {"assert", 'a', POPT_ARG_VAL, &assert_detect, 1, "detect assertion errors (SpinJa)", NULL },
@@ -825,13 +832,13 @@ init_globals (int argc, char *argv[])
     }
 
     if (0 == dbs_size) {
-        size_t el_size = (db_type == UseTreeDBSLL ? 3 : D) * SLOT_SIZE;
+        size_t el_size = (db_type != HashTable ? 3 : D) * SLOT_SIZE; // over estimation for cleary
         size_t map_el_size = (Strat_TA & strategy[0] ? sizeof(lattice_t) : 0);
         size_t db_el_size = (RTmemSize() / 3) / (el_size + map_el_size);
         dbs_size = (int) (log(db_el_size) / log(2));
         dbs_size = dbs_size > DB_SIZE_MAX ? DB_SIZE_MAX : dbs_size;
     }
-    Warning (info, "Using a %s with 2^%d elements", db_type==UseDBSLL?"hash table":"tree", dbs_size);
+    Warning (info, "Using a %s with 2^%d elements", key_search(db_types,db_type), dbs_size);
     MAX_SUCC = ( Strat_DFS == strategy[0] ? 1 : SIZE_MAX );  /* for --grey: */
     if (trc_output && !(strategy[0] & Strat_LTL))
         parent_ref = RTmalloc (sizeof(ref_t[1UL<<dbs_size]));
@@ -847,8 +854,9 @@ init_globals (int argc, char *argv[])
              global_bits, count_bits, local_bits);
     if (Strat_TA & strategy[0])
         lmap = lm_create (W, 1UL<<dbs_size, LATTICE_BLOCK_SIZE);
+    int cleary = 0;
     switch (db_type) {
-    case UseDBSLL:
+    case HashTable:
         if (ZOBRIST) {
             zobrist = zobrist_create (D, ZOBRIST, m);
             find_or_put = find_or_put_zobrist;
@@ -866,13 +874,15 @@ init_globals (int argc, char *argv[])
         dec_sat_bits = (dbs_dec_sat_bits_f) DBSLLdec_sat_bits;
         get_sat_bits = (dbs_get_sat_bits_f) DBSLLget_sat_bits;
         break;
-    case UseTreeDBSLL:
+    case ClearyTree:
+        cleary = 1;
+    case TreeTable:
         if (ZOBRIST)
             Fatal (1, error, "Zobrist and treedbs is not implemented");
         statistics = (dbs_stats_f) TreeDBSLLstats;
         get = (dbs_get_f) TreeDBSLLget;
         find_or_put = find_or_put_tree;
-        dbs = TreeDBSLLcreate_dm (D, dbs_size, ratio,  m, global_bits + count_bits, slim);
+        dbs = TreeDBSLLcreate_dm (D, dbs_size, ratio,  m, global_bits + count_bits, cleary);
         unset_sat_bit = (dbs_unset_sat_f) TreeDBSLLunset_sat_bit;
         get_sat_bit = (dbs_get_sat_f) TreeDBSLLget_sat_bit;
         try_set_sat_bit = (dbs_try_set_sat_f) TreeDBSLLtry_set_sat_bit;
@@ -880,6 +890,7 @@ init_globals (int argc, char *argv[])
         dec_sat_bits = (dbs_dec_sat_bits_f) TreeDBSLLdec_sat_bits;
         get_sat_bits = (dbs_get_sat_bits_f) TreeDBSLLget_sat_bits;
         break;
+    case Tree: default: Abort("Unknown state storage type: %d.", db_type);
     }
     contexts = RTmalloc (sizeof (wctx_t *[W]));
     for (size_t i = 0; i < W; i++)
@@ -898,7 +909,7 @@ init_globals (int argc, char *argv[])
 void
 deinit_globals ()
 {
-    if (db_type == UseDBSLL)
+    if (HashTable & db_type)
         DBSLLfree (dbs);
     else //TreeDBSLL
         TreeDBSLLfree (dbs);
@@ -972,20 +983,18 @@ print_statistics (counter_t *ar_reach, counter_t *ar_red, mytimer_t timer,
 {
     counter_t          *reach = ar_reach;
     counter_t          *red = ar_red;
-    char               *name;
     double              mem1, mem2, mem3=0, mem4, compr, fill, leafs;
     float               tot = SCCrealTime (timer);
     size_t              db_elts = stats->elts;
     size_t              db_nodes = stats->nodes;
     db_nodes = db_nodes == 0 ? db_elts : db_nodes;
-//    size_t              el_size = db_type == UseTreeDBSLL ? 3 : D+1;
-    double              el_size = db_type == UseTreeDBSLL ?
-                (slim ? 1 + (2.0 / (1UL<<ratio)) : 2 + (2.0 / (1UL<<ratio))) : D+1;
+    double              el_size =
+       db_type & Tree ? (db_type==ClearyTree?1:2) + (2.0 / (1UL<<ratio)) : D+1;
     size_t              s = state_info_size();
     size_t              max_load = Strat_NDFS & strategy[0] ?
-                            reach->level_max+red->level_max : lb2_max_load(lb2);
+                                   reach->level_max+red->level_max :
+            (Strat_SBFS & strategy[0] ? max_level_size : lb2_max_load(lb2));
     mem1 = ((double)(s * max_load)) / (1 << 20);
-
     size_t lattices = reach->inserts - reach->updates;
     if (Strat_LTL & strategy[0]) {
         SCCreportTimer (timer, "Total exploration time");
@@ -1035,15 +1044,14 @@ print_statistics (counter_t *ar_reach, counter_t *ar_red, mytimer_t timer,
              s, max_load, mem1);
     mem2 = ((double)(1UL << (dbs_size)) / (1<<20)) * SLOT_SIZE * el_size;
     mem4 = ((double)(db_nodes * SLOT_SIZE * el_size)) / (1<<20);
-    compr = (double)(db_nodes * el_size) / ((D+1) * db_elts) * 100;
     fill = (double)((db_elts * 100) / (1UL << dbs_size));
-    if (db_type == UseTreeDBSLL) {
+    if (db_type & Tree) {
+        compr = (double)(db_nodes * el_size) / ((D+1) * db_elts) * 100;
         leafs = (double)(((db_nodes - db_elts) * 100) / (1UL << (dbs_size-ratio)));
-        Warning (info, "DB: Tree, memory: %.1fMB, compr. ratio: %.1f%%, "
-                 "fill ratio: %.1f%%/%.1f%% (roots/leafs)", name, mem4, compr, fill, leafs);
+        Warning (info, "Tree memory: %.1fMB, compr.: %.1f%%, fill (roots/leafs): "
+                "%.1f%%/%.1f%%", mem4, compr, fill, leafs);
     } else {
-        Warning (info, "DB: Table, memory: %.1fMB, compr. ratio: %.1f%%, "
-                         "fill ratio: %.1f%%", mem4, compr, fill);
+        Warning (info, "Table memory: %.1fMB, fill ratio: %.1f%%", mem4, fill);
     }
     Warning (info, "Est. total memory use: %.1fMB (~%.1fMB paged-in)",
              mem1 + mem4 + mem3, mem1 + mem2 + mem3);
@@ -1291,7 +1299,7 @@ permute_trans (permute_t *perm, state_info_t *state, perm_cb_f cb, void *ctx)
     perm->nstored = perm->start_group_index = 0;
     int v[N];
     int count;
-    if ((Strat_TA & strategy[0]) && (refs || UseTreeDBSLL==db_type)) {
+    if ((Strat_TA & strategy[0]) && (refs || (Tree & db_type))) {
         memcpy (v, state->data, D<<2);
         ((lattice_t*)(v + D))[0] = state->lattice;
         count = GBgetTransitionsAll (perm->model, v, permute_one, perm);
@@ -1374,9 +1382,9 @@ size_t
 state_info_size ()
 {
     size_t              ref_size = sizeof (ref_t);
-    size_t              data_size = SLOT_SIZE * (UseDBSLL==db_type ? D : 2*D);
+    size_t              data_size = SLOT_SIZE * (HashTable & db_type ? D : 2*D);
     size_t              state_info_size = refs ? ref_size : data_size;
-    if (!refs && UseDBSLL==db_type)
+    if (!refs && (HashTable & db_type))
         state_info_size += ref_size;
     if (ZOBRIST)
         state_info_size += sizeof (uint32_t);
@@ -1413,12 +1421,12 @@ state_info_serialize (state_info_t *state, raw_data_t data)
     if (refs) {
         ((ref_t*)data)[0] = state->ref;
         data += 2;
-    } else if ( UseDBSLL==db_type ) {
+    } else if (HashTable & db_type) {
         ((ref_t*)data)[0] = state->ref;
         data += 2;
         memcpy (data, state->data, (SLOT_SIZE * D));
         data += D;
-    } else { // UseTreeDBSLL
+    } else { // Tree
         memcpy (data, state->tree, (2 * SLOT_SIZE * D));
         data += D<<1;
     }
@@ -1443,17 +1451,17 @@ state_info_deserialize (state_info_t *state, raw_data_t data, state_data_t store
         state->ref  = ((ref_t*)data)[0];
         data += 2;
         state->data = get (dbs, state->ref, store);
-        if (UseTreeDBSLL == db_type) {
+        if (Tree & db_type) {
             state->tree = state->data;
             state->data = TreeDBSLLdata (dbs, state->data);
         }
     } else {
-        if (UseDBSLL == db_type) {
+        if (HashTable & db_type) {
             state->ref  = ((ref_t*)data)[0];
             data += 2;
             state->data = data;
             data += D;
-        } else { // UseTreeDBSLL == db_type
+        } else { // Tree
             state->tree = data;
             state->data = TreeDBSLLdata (dbs, data);
             state->ref  = TreeDBSLLindex (data);
@@ -1489,7 +1497,7 @@ get_state (ref_t ref, void *arg)
 {
     wctx_t             *ctx = (wctx_t *) arg;
     raw_data_t          state = get (dbs, ref, ctx->store2);
-    return UseTreeDBSLL==db_type ? TreeDBSLLdata(dbs, state) : state;
+    return Tree & db_type ? TreeDBSLLdata(dbs, state) : state;
 }
 
 static void
@@ -2389,6 +2397,7 @@ sbfs (wctx_t *ctx)
             }
         }
         out_size = lb2_reduce (dfs_stack_frame_size(ctx->out_stack), W);
+        if (0 == ctx->id && out_size > max_level_size) max_level_size = out_size;
         lb2_reinit (lb2, ctx->id);
         increase_level (&ctx->counters);
         if (0 == ctx->id && RTverbosity >= 2)
@@ -2610,6 +2619,7 @@ ta_bfs_strict (wctx_t *ctx)
             }
         }
         out_size = lb2_reduce (dfs_stack_frame_size(ctx->out_stack), W);
+        if (0 == ctx->id && out_size > max_level_size) max_level_size = out_size;
         lb2_reinit (lb2, ctx->id);
         increase_level (&ctx->counters);
         if (0 == ctx->id && RTverbosity >= 2)
