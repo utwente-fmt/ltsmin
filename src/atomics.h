@@ -24,13 +24,15 @@ static const size_t CACHE_LINE_INT = (1 << CACHE_LINE) / sizeof (int);
 static const size_t CACHE_LINE_INT_MASK =
     -((1 << CACHE_LINE) / sizeof (int));
 
-#define cas(a, b, c) __sync_bool_compare_and_swap(a,b,c)
-#define cas_ret(a, b, c) __sync_val_compare_and_swap(a,b,c)
-#define fetch_or(a, b) __sync_fetch_and_or(a,b)
-#define fetch_and(a, b) __sync_fetch_and_and(a,b)
-#define fetch_add(a, b) __sync_fetch_and_add(a,b)
-#define add_fetch(a, b) __sync_add_and_fetch(a,b)
-#define fetch_sub(a, b) __sync_fetch_and_sub(a,b)
-#define sub_fetch(a, b) __sync_sub_and_fetch(a,b)
-
+#define cas(a, b, c)        __sync_bool_compare_and_swap(a,b,c)
+#define cas_ret(a, b, c)    __sync_val_compare_and_swap(a,b,c)
+#define fetch_or(a, b)      __sync_fetch_and_or(a,b)
+#define fetch_and(a, b)     __sync_fetch_and_and(a,b)
+#define fetch_add(a, b)     __sync_fetch_and_add(a,b)
+#define add_fetch(a, b)     __sync_add_and_fetch(a,b)
+#define fetch_sub(a, b)     __sync_fetch_and_sub(a,b)
+#define sub_fetch(a, b)     __sync_sub_and_fetch(a,b)
+#define sfence              asm volatile( "sfence" )
+#define mfence              asm volatile( "mfence" ) // __sync_synchronize
+#define prefetch(a)         __builtin_prefetch(a)
 #endif

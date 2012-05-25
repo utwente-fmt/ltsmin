@@ -149,6 +149,8 @@ static int              no_red_perm = 0;
 static int              all_red = 1;
 static box_t            call_mode = UseBlackBox;
 static size_t           max = SIZE_MAX;
+static size_t           ratio = 2;
+static int              slim = 0;
 static size_t           W = 2;
 static lb2_t           *lb2 = NULL;
 static void            *dbs = NULL;
@@ -305,7 +307,7 @@ static struct poptOption options[] = {
     {"state", 0, POPT_ARG_STRING | POPT_ARGFLAG_SHOW_DEFAULT, &state_repr,
      0, "select the data structure for storing states", "<tree|table>"},
     {"size", 's', POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &dbs_size, 0,
-     "size of the state store (log2(size))", NULL},
+     "log2 size of the state store", NULL},
 #ifdef OPAAL
     {"lattice-blocks", 'l', POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &LATTICE_BLOCK_SIZE,
       0,"Size of blocks preallocated for lattices (> 1). "
@@ -338,6 +340,8 @@ static struct poptOption options[] = {
     {"zobrist", 'z', POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &ZOBRIST,
      0,"log2 size of zobrist random table (6 or 8 is good enough; 0 is no zobrist)", NULL},
     {"ref", 0, POPT_ARG_VAL, &refs, 1, "store references on the stack/queue instead of full states", NULL},
+    {"ratio", 0, POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &ratio, 0, "log2 tree root to leaf ratio", "<int>"},
+    {"slim", 0, POPT_ARG_VAL, &slim, 1, "slim tree, beware: size <= 28 + 2 * ratio", NULL},
     {"deadlock", 'd', POPT_ARG_VAL, &dlk_detect, 1, "detect deadlocks", NULL },
 #ifdef SPINJA
     {"assert", 'a', POPT_ARG_VAL, &assert_detect, 1, "detect assertion errors (SpinJa)", NULL },
@@ -868,7 +872,7 @@ init_globals (int argc, char *argv[])
         statistics = (dbs_stats_f) TreeDBSLLstats;
         get = (dbs_get_f) TreeDBSLLget;
         find_or_put = find_or_put_tree;
-        dbs = TreeDBSLLcreate_dm (D, dbs_size, m, global_bits + count_bits);
+        dbs = TreeDBSLLcreate_dm (D, dbs_size, ratio,  m, global_bits + count_bits, slim);
         unset_sat_bit = (dbs_unset_sat_f) TreeDBSLLunset_sat_bit;
         get_sat_bit = (dbs_get_sat_f) TreeDBSLLget_sat_bit;
         try_set_sat_bit = (dbs_try_set_sat_f) TreeDBSLLtry_set_sat_bit;
@@ -969,12 +973,14 @@ print_statistics (counter_t *ar_reach, counter_t *ar_red, mytimer_t timer,
     counter_t          *reach = ar_reach;
     counter_t          *red = ar_red;
     char               *name;
-    double              mem1, mem2, mem3=0, mem4, compr, ratio;
+    double              mem1, mem2, mem3=0, mem4, compr, fill, leafs;
     float               tot = SCCrealTime (timer);
     size_t              db_elts = stats->elts;
     size_t              db_nodes = stats->nodes;
     db_nodes = db_nodes == 0 ? db_elts : db_nodes;
-    size_t              el_size = db_type == UseTreeDBSLL ? 3 : D+1;
+//    size_t              el_size = db_type == UseTreeDBSLL ? 3 : D+1;
+    double              el_size = db_type == UseTreeDBSLL ?
+                (slim ? 1 + (2.0 / (1UL<<ratio)) : 2 + (2.0 / (1UL<<ratio))) : D+1;
     size_t              s = state_info_size();
     size_t              max_load = Strat_NDFS & strategy[0] ?
                             reach->level_max+red->level_max : lb2_max_load(lb2);
@@ -1030,10 +1036,15 @@ print_statistics (counter_t *ar_reach, counter_t *ar_red, mytimer_t timer,
     mem2 = ((double)(1UL << (dbs_size)) / (1<<20)) * SLOT_SIZE * el_size;
     mem4 = ((double)(db_nodes * SLOT_SIZE * el_size)) / (1<<20);
     compr = (double)(db_nodes * el_size) / ((D+1) * db_elts) * 100;
-    ratio = (double)((db_nodes * 100) / (1UL << dbs_size));
-    name = db_type == UseTreeDBSLL ? "Tree" : "Table";
-    Warning (info, "DB: %s, memory: %.1fMB, compr. ratio: %.1f%%, "
-             "fill ratio: %.1f%%", name, mem4, compr, ratio);
+    fill = (double)((db_elts * 100) / (1UL << dbs_size));
+    if (db_type == UseTreeDBSLL) {
+        leafs = (double)(((db_nodes - db_elts) * 100) / (1UL << (dbs_size-ratio)));
+        Warning (info, "DB: Tree, memory: %.1fMB, compr. ratio: %.1f%%, "
+                 "fill ratio: %.1f%%/%.1f%% (roots/leafs)", name, mem4, compr, fill, leafs);
+    } else {
+        Warning (info, "DB: Table, memory: %.1fMB, compr. ratio: %.1f%%, "
+                         "fill ratio: %.1f%%", mem4, compr, fill);
+    }
     Warning (info, "Est. total memory use: %.1fMB (~%.1fMB paged-in)",
              mem1 + mem4 + mem3, mem1 + mem2 + mem3);
     if (RTverbosity >= 2) {        // internal counters
@@ -1152,10 +1163,19 @@ perm_todo (permute_t *perm, state_data_t dst, transition_info_t *ti)
     perm->nstored++;
 }
 
+
+static char *
+full_msg(int ret)
+{
+    return (DB_FULL == ret ? "hash table" : (DB_ROOTS_FULL == ret ? "tree roots table" : "tree leafs table"));
+}
+
 static inline void
 perm_do (permute_t *perm, int i)
 {
     permute_todo_t *todo = perm->todos + i;
+    if (todo->seen < 0)
+        if (lb2_stop(lb2)) Warning (info, "Error: %s full! Change -s/--ratio.", full_msg(todo->seen));
     perm->real_cb (perm->ctx, &todo->si, &todo->ti, todo->seen);
 }
 
@@ -1242,6 +1262,8 @@ permute_one (void *arg, transition_info_t *ti, state_data_t dst)
         }
     case Perm_None:
         seen = state_info_initialize (&successor, dst, ti, perm->state, perm->ctx);
+        if (seen < 0)
+            if (lb2_stop(lb2)) Warning (info, "Error: %s full! Change -s/--ratio.", full_msg(seen));
         perm->real_cb (perm->ctx, &successor, ti, seen);
         break;
     case Perm_Shift_All:
@@ -1536,7 +1558,7 @@ ndfs_handle_red (void *arg, state_info_t *successor, transition_info_t *ti, int 
         raw_data_t stack_loc = dfs_stack_push (ctx->stack, NULL);
         state_info_serialize (successor, stack_loc);
     }
-    (void) seen; (void) ti;
+    (void) ti; (void) seen;
 }
 
 static void
@@ -1547,7 +1569,7 @@ ndfs_handle_blue (void *arg, state_info_t *successor, transition_info_t *ti, int
         raw_data_t stack_loc = dfs_stack_push (ctx->stack, NULL);
         state_info_serialize (successor, stack_loc);
     }
-    (void) seen; (void) ti;
+    (void) ti; (void) seen;
 }
 
 static inline void
@@ -1648,7 +1670,7 @@ nndfs_red_handle (void *arg, state_info_t *successor, transition_info_t *ti,
         raw_data_t stack_loc = dfs_stack_push (ctx->stack, NULL);
         state_info_serialize (successor, stack_loc);
     }
-    (void) seen; (void) ti;
+    (void) ti; (void) seen;
 }
 
 static void
@@ -1667,7 +1689,7 @@ nndfs_blue_handle (void *arg, state_info_t *successor, transition_info_t *ti,
         raw_data_t stack_loc = dfs_stack_push (ctx->stack, NULL);
         state_info_serialize (successor, stack_loc);
     }
-    (void) seen; (void) ti;
+    (void) ti; (void) seen;
 }
 
 static inline void
@@ -1881,7 +1903,7 @@ endfs_handle_red (void *arg, state_info_t *successor, transition_info_t *ti, int
         raw_data_t stack_loc = dfs_stack_push (ctx->stack, NULL);
         state_info_serialize (successor, stack_loc);
     }
-    (void) seen; (void) ti;
+    (void) ti; (void) seen;
 }
 
 static void
@@ -1899,7 +1921,7 @@ endfs_handle_blue (void *arg, state_info_t *successor, transition_info_t *ti, in
         raw_data_t stack_loc = dfs_stack_push (ctx->stack, NULL);
         state_info_serialize (successor, stack_loc);
     }
-    (void) seen; (void) ti;
+    (void) ti; (void) seen;
 }
 
 static inline void
@@ -2247,6 +2269,8 @@ reach_handle_wrap (void *arg, transition_info_t *ti, state_data_t data)
     state_info_t        successor;
     int                 seen;
     seen = state_info_initialize (&successor, data, ti, &ctx->state, ctx);
+    if (seen < 0)
+        if (lb2_stop(lb2)) Warning (info, "Error: %s full! Change -s or --ratio.", full_msg(seen));
     reach_handle (arg, &successor, ti, seen);
 }
 

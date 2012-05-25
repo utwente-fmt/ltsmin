@@ -583,6 +583,7 @@ libutil_la_SOURCES += bitset.c bitset.h
 libutil_la_SOURCES += cctables.c cctables.h
 libutil_la_SOURCES += chunk_support.c chunk_support.h
 libutil_la_SOURCES += chunk_table_factory.c
+libutil_la_SOURCES += clt_table.c clt_table.h
 libutil_la_SOURCES += config.h
 libutil_la_SOURCES += dbs-ll.c dbs-ll.h
 libutil_la_SOURCES += dfs-stack.c dfs-stack.h

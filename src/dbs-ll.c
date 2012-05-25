@@ -16,7 +16,7 @@
 static const int        TABLE_SIZE = 24;
 static const uint16_t   EMPTY = 0;
 static uint16_t         WRITE_BIT = 1;
-static uint16_t         WRITE_BIT_R = ~((uint32_t)1);
+static uint16_t         WRITE_BIT_R = ~((uint16_t)1);
 static const size_t     CL_MASK = -(1UL << CACHE_LINE);
 
 struct dbs_ll_s {
@@ -180,15 +180,11 @@ DBSLLlookup_hash (const dbs_ll_t dbs, const int *v, dbs_ref_t *ret, uint32_t *ha
             ref += 1;
             ref = ref == line_end ? line_end - CACHE_LINE_SIZE : ref;
         }
-        hash_rehash += prime << CACHE_LINE;
+        hash_rehash += prime << CACHE_LINE; seed++;
         stat->rehashes++;
     }
-    if ( cas (&dbs->full, 0, 1) ) {
-        kill(0, SIGINT);
-        Warning(info, "ERROR: Hash table full (size: %zu el)", dbs->size);
-    }
     *ret = 0; //incorrect, but does not matter anymore
-    return 1;
+    return DB_FULL;
 }
 
 int *

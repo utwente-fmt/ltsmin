@@ -10,7 +10,9 @@
 \brief Implementation of tree compression using lockless hashtables.
 */
 
-static const int    DB_SIZE_MAX = 32;
+#define             DB_SIZE_MAX 40
+#define             DB_ROOTS_FULL -2
+#define             DB_LEAFS_FULL -3
 
 /**
 Abstract type tree database.
@@ -28,11 +30,11 @@ Create a new tree database.
 - sized
 - incremental using the dependency matrix
 */
-extern treedbs_ll_t TreeDBSLLcreate (int len, int satellite_bits);
-extern treedbs_ll_t TreeDBSLLcreate_sized (int len, int size,
-                                           int satellite_bits);
-extern treedbs_ll_t TreeDBSLLcreate_dm (int len, int size, matrix_t *m,
-                                        int satellite_bits);
+extern treedbs_ll_t TreeDBSLLcreate (int len, int ratio, int satellite_bits, int slim);
+extern treedbs_ll_t TreeDBSLLcreate_sized (int len, int size, int ratio,
+                                           int satellite_bits, int slim);
+extern treedbs_ll_t TreeDBSLLcreate_dm (int len, int size, int ratio,
+                                        matrix_t *m, int satellite_bits, int slim);
 
 extern int          TreeDBSLLtry_set_sat_bit (const treedbs_ll_t dbs,
                                               const tree_ref_t ref, int index);
@@ -68,7 +70,7 @@ extern int          TreeDBSLLlookup_dm (const treedbs_ll_t dbs, const int *v,
 extern tree_t       TreeDBSLLget (const treedbs_ll_t dbs, const tree_ref_t ref, 
                                   int *dst);
 
-extern uint32_t     TreeDBSLLindex (tree_t data);
+extern tree_ref_t   TreeDBSLLindex (tree_t data);
 extern int         *TreeDBSLLdata (const treedbs_ll_t dbs, tree_t data);
 
 /**

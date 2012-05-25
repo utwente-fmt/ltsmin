@@ -12,6 +12,7 @@ Implementation uses lockless operations
 #include <fast_hash.h>
 #include <stats.h>
 
+#define             DB_FULL -1
 
 /**
 \typedef Lockless hastable database.
