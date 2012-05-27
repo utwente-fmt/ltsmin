@@ -774,7 +774,7 @@ find_or_put_tree (state_info_t *state, transition_info_t *ti,
     int                 ret;
     ret = TreeDBSLLlookup_dm (dbs, state->data, pred->tree, store, ti->group);
     state->tree = store;
-    state->ref = TreeDBSLLindex (dbs, state->tree);
+    state->ref = TreeDBSLLindex (state->tree);
     return ret;
 }
 
@@ -1464,7 +1464,7 @@ state_info_deserialize (state_info_t *state, raw_data_t data, state_data_t store
         } else { // Tree
             state->tree = data;
             state->data = TreeDBSLLdata (dbs, data);
-            state->ref  = TreeDBSLLindex (dbs, data);
+            state->ref  = TreeDBSLLindex (data);
             data += D<<1;
         }
     }

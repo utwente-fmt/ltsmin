@@ -81,9 +81,9 @@ TreeDBSLLdata (const treedbs_ll_t dbs, tree_t data) {
 }
 
 static inline tree_ref_t
-TreeDBSLLindex (const treedbs_ll_t dbs, tree_t data) {
+TreeDBSLLindex (tree_t data) {
     int64_t            *d64 = (int64_t *)data;
-    return d64[((treedbs_ll_inlined_t *)dbs)->slim];
+    return d64[1];
 }
 
 /**

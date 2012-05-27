@@ -236,6 +236,7 @@ TreeDBSLLlookup (const treedbs_ll_t dbs, const int *vector)
             loc->node_count[0] += 1 - seen;
         } else {
             seen = lookup (&dbs->root, i64(next, 1), 0, (uint64_t*)next, loc);
+            ((uint64_t*)next)[0] = -1;
         }
     }
     return seen;
@@ -268,6 +269,7 @@ TreeDBSLLlookup_incr (const treedbs_ll_t dbs, const int *v, tree_t prev,
             loc->node_count[0] += 1 - seen;
         } else {
             seen = lookup (&dbs->root, i64(next, 1), 0, (uint64_t*)next, loc);
+            ((uint64_t*)next)[0] = -1;
         }
     }
     return seen;
@@ -298,6 +300,7 @@ TreeDBSLLlookup_dm (const treedbs_ll_t dbs, const int *v, tree_t prev,
             ((uint64_t*)next)[0] = -1;
         } else {
             seen = lookup (&dbs->root, i64(next, 1), 0, (uint64_t*)next, loc);
+            ((uint64_t*)next)[0] = -1;
         }
     }
     return seen;
@@ -308,13 +311,13 @@ TreeDBSLLget (const treedbs_ll_t dbs, const tree_ref_t ref, int *d)
 {
     uint32_t           *dst     = (uint32_t*)d;
     int64_t            *dst64   = (int64_t *)dst;
-    if (dbs->slim) {
+    //if (dbs->slim) { // skip the root leaf for cleary and for normal tree!
         dst64[0] = -1;
         dst64[1] = ref;
-    } else {
-        dst64[0] = ref;
-        dst64[1] = dbs->root.table[ref] - 1;
-    }
+    //} else {
+    //    dst64[0] = ref;
+    //    dst64[1] = dbs->root.table[ref] - 1;
+    //}
     for (int i = 2; i < dbs->nNodes; i++)
         dst64[i] = dbs->data.table[dst[i]] - 1; // see lookup() --> avoid EMPTY
     return (tree_t)dst;
