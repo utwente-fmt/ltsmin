@@ -58,7 +58,7 @@ clt_find_left_from (const clt_dbs_t* dbs, size_t pos)
 {
 	do {
 		pos--;
-		assert (pos > 0);
+		assert (pos >= 0);
 	} while (dbs->table[pos].occupied);
 	return pos;
 }
@@ -128,7 +128,7 @@ clt_try_lock (const clt_dbs_t* dbs, size_t pos)
 }
 
 static inline void
-clt_unlock (const clt_dbs_t* dbs, uint32_t pos)
+clt_unlock (const clt_dbs_t* dbs, size_t pos)
 {
     clt_bucket_t b = read_table (dbs, pos);
     b.locked = 0;
