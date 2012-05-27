@@ -57,8 +57,8 @@ static inline size_t
 clt_find_left_from (const clt_dbs_t* dbs, size_t pos)
 {
 	do {
+        assert (pos > 0);
 		pos--;
-		assert (pos >= 0);
 	} while (dbs->table[pos].occupied);
 	return pos;
 }
