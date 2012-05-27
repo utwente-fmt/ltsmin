@@ -11,6 +11,10 @@ extern uint64_t MurmurHash64 (const void * key, int len, unsigned int seed);
 
 extern uint32_t oat_hash(const void *data, int len, uint32_t seed);
 
+extern uint32_t mix32 (uint32_t a);
+
+extern uint64_t mix64 (uint64_t a);
+
 extern int mix (int a, int b, int c);
 
 static inline uint64_t

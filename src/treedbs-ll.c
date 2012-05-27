@@ -160,7 +160,7 @@ lookup (node_table_t *table,
 {
     stats_t            *stat = &loc->stat;
     uint64_t            mem, hash, a;
-    mem = hash = MurmurHash64 (&data, sizeof(uint64_t), 0);
+    mem = hash = mix64 (data);//MurmurHash64 (&data, sizeof(uint64_t), 0);
     assert (data != EMPTY_1 && "Value out of table range.");
     data += 1; // avoid EMPTY
     for (size_t probes = 0; probes < table->thres; probes++) {

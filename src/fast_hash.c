@@ -96,6 +96,31 @@ mix (int a, int b, int c)
     return c;
 }
 
+uint64_t mix64 (uint64_t key)
+{
+  key = (~key) + (key << 21); // key = (key << 21) - key - 1;
+  key = key ^ (((int64_t)key) >> 24);
+  key = (key + (key << 3)) + (key << 8); // key * 265
+  key = key ^ (((int64_t)key) >> 14);
+  key = (key + (key << 2)) + (key << 4); // key * 21
+  key = key ^ (((int64_t)key) >> 28);
+  key = key + (key << 31);
+  return key;
+}
+
+uint32_t Mix (uint32_t state)
+{
+    state += (state << 12);
+    state ^= (state >> 22);
+    state += (state << 4);
+    state ^= (state >> 9);
+    state += (state << 10);
+    state ^= (state >> 2);
+    state += (state << 7);
+    state ^= (state >> 12);
+    return state;
+}
+
 //-----------------------------------------------------------------------------
 // MurmurHash2, 64-bit versions, by Austin Appleby
 
