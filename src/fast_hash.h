@@ -13,6 +13,23 @@ extern uint32_t oat_hash(const void *data, int len, uint32_t seed);
 
 extern int mix (int a, int b, int c);
 
+static inline uint64_t
+nbit_mix (uint64_t key, int bit_size) // assert bit_size <= 64
+{
+    char *k = (char *)&key;
+    int bytes = bit_size >> 3; // div 8
+    for (int i = 1; i < bytes; i++)
+        k[i] ^= k[i - 1];
+    int bits = bit_size - (bytes << 3);
+    if (bits && bytes) {
+        k[bytes] ^= k[bytes - 1] & ((1 << bits) - 1);
+        k[bytes - 1] -= k[bytes];
+    }
+    for (int i = bytes - 1; i > 0; i--)
+        k[i - 1] -= k[i];
+    return key;
+}
+
 static const int PRIME_MASK = 1023;
 static const int primes[1024] = {
      1, 2, 3, 5, 7, 11, 13, 17, 19,

@@ -26,11 +26,15 @@
 
 #include <stdint.h>
 
-#define R_BITS 28
 
 typedef struct clt_dbs_s clt_dbs_t;
 
-
+/**
+ * Like find-or-put function from paper.
+ * Assumes keys are randomized. This can be useful in case the client knows
+ * certain properties of the key space that can be exploited for efficient
+ * randomization.
+ */
 extern int          clt_find_or_put (const clt_dbs_t* dbs, uint64_t k);
 
 extern clt_dbs_t   *clt_create (uint32_t ksize, uint32_t log_size);

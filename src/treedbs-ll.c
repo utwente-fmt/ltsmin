@@ -197,13 +197,19 @@ cmp_i64(int *v1, int *v2, size_t ref) {
     return ((int64_t *)v1)[ref] == ((int64_t *)v2)[ref];
 }
 
+static inline uint64_t
+concat_n_mix (const treedbs_ll_t dbs, uint64_t a, uint64_t b)
+{
+    // append the two number while doing some coarse-grained mixing
+    uint64_t key = (b + a) & dbs->data.mask;
+    key |= (b ^ key) << dbs->data.log_size;
+    return nbit_mix (key, dbs->data.log_size << 1);
+}
+
 static inline
 int clt_lookup (const treedbs_ll_t dbs, int *next)
 {
-    uint64_t key = next[2];
-    uint64_t left = next[3];
-    left <<= dbs->data.log_size;
-    key |= left;
+     uint64_t key = concat_n_mix (dbs, next[2], next[3]);
     int seen = clt_find_or_put (dbs->clt, key);
     ((uint64_t*)next)[0] = ((uint64_t*)next)[1];
     return seen;
