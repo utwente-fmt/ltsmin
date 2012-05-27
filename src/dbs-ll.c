@@ -148,11 +148,13 @@ DBSLLlookup_hash (const dbs_ll_t dbs, const int *v, dbs_ref_t *ret, uint32_t *ha
     size_t              l = dbs->length;
     size_t              b = dbs->bytes;
     uint32_t            hash_rehash = hash ? *hash : dbs->hash32 ((char *)v, b, 0);
-    uint16_t            hash_memo = (hash_rehash >> 16) & ~dbs->sat_mask;
-    //avoid collision of memoized hash with reserved values EMPTY and WRITE_BIT
+    uint16_t            hash_memo = ((hash_rehash >> 16) ^ hash_rehash);
+    uint16_t            lost = hash_memo & (WRITE_BIT | dbs->sat_mask);
+    hash_memo = (hash_memo + (lost << (dbs->sat_bits+1))) & ~dbs->sat_mask;
     uint32_t            prime = primes[hash_rehash & PRIME_MASK];
+    //avoid collision of memoized hash with reserved values EMPTY and WRITE_BIT
     while (EMPTY == hash_memo || WRITE_BIT == hash_memo)
-        hash_memo = (hash_memo + (prime << dbs->sat_bits)) & ~dbs->sat_mask;
+        hash_memo = (hash_memo + (prime << lost)) & ~dbs->sat_mask;
     uint16_t            WAIT = hash_memo & WRITE_BIT_R;
     uint16_t            DONE = hash_memo | WRITE_BIT;
     while (seed < dbs->threshold && !atomic_read(&dbs->full)) {
@@ -223,7 +225,7 @@ DBSLLcreate_sized (int length, int size, hash32_f hash32, int satellite_bits)
     dbs->full = 0;
     assert(satellite_bits < 32);
     dbs->sat_bits = satellite_bits;
-    dbs->sat_mask = (1UL<<satellite_bits) - 1;
+    dbs->sat_mask = satellite_bits ? (1UL<<satellite_bits) - 1 : 0;
     WRITE_BIT <<= satellite_bits;
     WRITE_BIT_R <<= satellite_bits;
     dbs->bytes = length * sizeof (int);
