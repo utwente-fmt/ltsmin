@@ -989,7 +989,7 @@ print_statistics (counter_t *ar_reach, counter_t *ar_red, mytimer_t timer,
     size_t              db_nodes = stats->nodes;
     db_nodes = db_nodes == 0 ? db_elts : db_nodes;
     double              el_size =
-       db_type & Tree ? (db_type==ClearyTree?1:2) + (2.0 / (1UL<<ratio)) : D+1;
+       db_type & Tree ? (db_type==ClearyTree?1:2) + (2.0 / (1UL<<ratio)) : D+.5;
     size_t              s = state_info_size();
     size_t              max_load = Strat_NDFS & strategy[0] ?
                                    reach->level_max+red->level_max :
@@ -1024,7 +1024,7 @@ print_statistics (counter_t *ar_reach, counter_t *ar_red, mytimer_t timer,
                 ar_reach->explored/time, ar_reach->trans/time);
         Warning(info, "");
         if (Strat_TA & strategy[0]) {
-            if (STDEV) { // quite costly: flops
+            if (STDEV) {
                 statistics_t stats; statistics_init (&stats);
                 for (size_t i = 0; i< W; i++) {
                     statistics_t *s = &contexts[i]->counters.lattice_ratio;

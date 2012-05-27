@@ -202,10 +202,10 @@ cmp_i64(int *v1, int *v2, size_t ref) {
 static inline uint64_t
 concat_n_mix (const treedbs_ll_t dbs, uint64_t a, uint64_t b)
 {
-    // append the two number while doing some coarse-grained mixing
+    // append the two numbers while doing some coarse-grained mixing
     uint64_t key = (b + a) & dbs->data.mask;
     key |= (b ^ key) << dbs->data.log_size;
-    return nbit_mix (key, dbs->data.log_size << 1);
+    return nbit_mix (key, dbs->data.log_size << 1); // fine-grained mixing
 }
 
 static inline
@@ -383,9 +383,6 @@ project_matrix_to_tree (treedbs_ll_t dbs, matrix_t *m)
     }
 }
 
-/**
- * Memorized hash bucket bits org.: <mem_hash> <lock_bit> <node_idx> <sat_bits>
- */
 treedbs_ll_t
 TreeDBSLLcreate_dm (int nNodes, int size, int ratio, matrix_t * m, int satellite_bits, int slim)
 {
