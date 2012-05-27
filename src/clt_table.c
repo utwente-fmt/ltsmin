@@ -44,7 +44,7 @@ struct clt_dbs_s {
  * return > 0 if table[pos].key >  k
  * return   0 if table[pos].key == k
  * return < 0 if table[pos].key <  k
-static inline int
+static inline size_t
 clt_compare (const clt_dbs_t* dbs, size_t pos, uint32_t r)
 {
 	if (dbs->table[pos].rest > r) return 1;
@@ -53,7 +53,7 @@ clt_compare (const clt_dbs_t* dbs, size_t pos, uint32_t r)
 }
  */
 
-static inline int
+static inline size_t
 clt_find_left_from (const clt_dbs_t* dbs, size_t pos)
 {
 	do {
@@ -63,7 +63,7 @@ clt_find_left_from (const clt_dbs_t* dbs, size_t pos)
 	return pos;
 }
 
-static inline int
+static inline size_t
 clt_find_right_from (const clt_dbs_t* dbs, size_t pos)
 {
 	do {
@@ -71,18 +71,6 @@ clt_find_right_from (const clt_dbs_t* dbs, size_t pos)
 		assert (pos < dbs->size+dbs->b_space+dbs->b_space);
 	} while (dbs->table[pos].occupied);
 	return pos;
-}
-
-static inline clt_bucket_t
-read_table (const clt_dbs_t* dbs, size_t pos)
-{
-    return *(clt_bucket_t *)&atomic_read (&dbs->table[pos]);
-}
-
-static inline void
-write_table (const clt_dbs_t* dbs, size_t pos, clt_bucket_t val)
-{
-    atomic_write (&dbs->table[pos], val);
 }
 
 static inline uint32_t
@@ -97,6 +85,18 @@ b (uint32_t val)
 {
     void *p = &val;
     return *(clt_bucket_t *)p;
+}
+
+static inline clt_bucket_t
+read_table (const clt_dbs_t* dbs, size_t pos)
+{
+    return atomic_read (&dbs->table[pos]);
+}
+
+static inline void
+write_table (const clt_dbs_t* dbs, size_t pos, clt_bucket_t val)
+{
+    atomic_write (&dbs->table[pos], val);
 }
 
 static inline bool
