@@ -13,7 +13,8 @@
 
 
 static const int        TABLE_SIZE = 26;
-static const uint64_t   EMPTY = -1UL;
+static const uint64_t   EMPTY = 0UL;
+static const uint64_t   EMPTY_1 = -1UL;
 static const size_t     CACHE_LINE_64 = (1 << CACHE_LINE) / sizeof (uint64_t);
 static const size_t     CL_MASK = -((1 << CACHE_LINE) / sizeof (uint64_t));
 
@@ -155,11 +156,13 @@ prime_rehash (uint64_t h, uint64_t v)
 
 static inline int
 lookup (node_table_t *table,
-        const uint64_t data, int index, uint64_t *res, loc_t *loc)
+        uint64_t data, int index, uint64_t *res, loc_t *loc)
 {
     stats_t            *stat = &loc->stat;
     uint64_t            mem, hash, a;
     mem = hash = MurmurHash64 (&data, sizeof(uint64_t), 0);
+    assert (data != EMPTY_1 && "Value out of table range.");
+    if (EMPTY == data) data = EMPTY_1;
     for (size_t probes = 0; probes < table->thres; probes++) {
         size_t              ref = hash & table->mask;
         size_t              line_end = (ref & CL_MASK) + CACHE_LINE_64;
@@ -181,7 +184,6 @@ lookup (node_table_t *table,
         a = hash;
         hash = prime_rehash (hash, mem);
         assert ((hash & CL_MASK) != (a & CL_MASK));
-//      Warning (info, "h=%zu m=%zu p=%zu", hash, mem, primes[mem & ((1<<9)-1)]);
         stat->rehashes++;
     }
     return table->error_num;
@@ -400,7 +402,7 @@ TreeDBSLLcreate_dm (int nNodes, int size, int ratio, matrix_t * m, int satellite
     dbs->root.log_size = size;
     dbs->root.thres = dbs->root.size / 64;
     dbs->root.mask = dbs->root.size - 1;
-    dbs->data.error_num = DB_ROOTS_FULL;
+    dbs->root.error_num = DB_ROOTS_FULL;
 
     dbs->data.log_size = size - dbs->ratio;
     dbs->data.size = dbs->root.size >> dbs->ratio;
@@ -412,17 +414,11 @@ TreeDBSLLcreate_dm (int nNodes, int size, int ratio, matrix_t * m, int satellite
     if (dbs->slim) {
         dbs->clt = clt_create (dbs->data.log_size*2, dbs->root.log_size);
     } else {
-        dbs->root.table = RTalign (CACHE_LINE_SIZE, sizeof (uint64_t) * dbs->root.size);
+        dbs->root.table = RTalignZero (CACHE_LINE_SIZE, sizeof (uint64_t) * dbs->root.size);
     }
-
-    dbs->data.table = RTalign (CACHE_LINE_SIZE, sizeof (uint64_t) * dbs->root.size);
+    dbs->data.table = RTalignZero (CACHE_LINE_SIZE, sizeof (uint64_t) * dbs->root.size);
     if (!dbs->data.table || (!dbs->root.table && !dbs->clt))
         Fatal (1, error, "Too large hash table allocated: %zu", dbs->root.size);
-    if (!dbs->slim)
-    for (size_t i = 0; i < dbs->root.size; i++)
-        dbs->root.table[i] = EMPTY;
-    for (size_t i = 0; i < dbs->data.size; i++)
-        dbs->data.table[i] = EMPTY;
     dbs->todo = NULL;
     if(m != NULL)
         project_matrix_to_tree(dbs, m);
