@@ -29,6 +29,7 @@ typedef struct node_table_s {
 
 struct treedbs_ll_s {
     int                 nNodes; // see treedbs_ll_inlined_t
+    int                 slim;   // see treedbs_ll_inlined_t
     uint32_t            sat_bits;
     uint32_t            sat_mask;
     pthread_key_t       local_key;
@@ -38,7 +39,6 @@ struct treedbs_ll_s {
     int               **todo;
     int                 k;
     size_t              ratio;
-    int                 slim;
 };
 
 typedef struct loc_s {
@@ -162,7 +162,7 @@ lookup (node_table_t *table,
     uint64_t            mem, hash, a;
     mem = hash = MurmurHash64 (&data, sizeof(uint64_t), 0);
     assert (data != EMPTY_1 && "Value out of table range.");
-    if (EMPTY == data) data = EMPTY_1;
+    data += 1; // avoid EMPTY
     for (size_t probes = 0; probes < table->thres; probes++) {
         size_t              ref = hash & table->mask;
         size_t              line_end = (ref & CL_MASK) + CACHE_LINE_64;
@@ -223,9 +223,9 @@ TreeDBSLLlookup (const treedbs_ll_t dbs, const int *vector)
     loc_t              *loc = get_local (dbs);
     size_t              n = dbs->nNodes;
     int                 seen = 0;
+    uint64_t            res = 0;
     int                *next = loc->storage;
     memcpy (next + n, vector, sizeof (int[n]));
-    uint64_t res = 0;
     for (size_t i = n - 1; seen >= 0 && i > 1; i--) {
         seen = lookup (&dbs->data, i64(next, i), i-1, &res, loc);
         next[i] = res;
@@ -247,16 +247,15 @@ TreeDBSLLlookup_incr (const treedbs_ll_t dbs, const int *v, tree_t prev,
 {
     loc_t              *loc = get_local (dbs);
     size_t              n = dbs->nNodes;
-    if ( NULL == prev ) { //first call
-        int seen = TreeDBSLLlookup (dbs, v);
-        memcpy (next, loc->storage, sizeof(int[n<<1]));
-        return seen;
-    }
+    uint64_t            res = 0;
     int                 seen = 1;
+    if ( NULL == prev ) { //first call
+        int result = TreeDBSLLlookup (dbs, v);
+        memcpy (next, loc->storage, sizeof(int[n<<1]));
+        return result;
+    }
     memcpy (next, prev, sizeof (int[n]));
     memcpy (next + n, v, sizeof (int[n]));
-
-    uint64_t res = 0;
     for (size_t i = n - 1; seen >= 0 && i > 1; i--) {
         if ( !cmp_i64(prev, next, i) ) {
             seen = lookup (&dbs->data, i64(next, i), i-1, &res, loc);
@@ -282,11 +281,10 @@ TreeDBSLLlookup_dm (const treedbs_ll_t dbs, const int *v, tree_t prev,
         return TreeDBSLLlookup_incr (dbs, v, prev, next);
     loc_t              *loc = get_local (dbs);
     int                 seen = 1;
+    int                 i;
+    uint64_t            res = 0;
     memcpy (next, prev, sizeof (int[dbs->nNodes]));
     memcpy (next + dbs->nNodes, v, sizeof (int[dbs->nNodes]));
-    int                 i;
-
-    uint64_t res = 0;
     for (size_t j = 0; seen >= 0 && (i = dbs->todo[group][j]) != -1; j++) {
         if ( i != 1 && !cmp_i64(prev, next, i) ) {
             seen = lookup (&dbs->data, i64(next, i), i-1, &res, loc);
@@ -297,6 +295,7 @@ TreeDBSLLlookup_dm (const treedbs_ll_t dbs, const int *v, tree_t prev,
         if (dbs->slim) {
             seen = clt_lookup (dbs, next);
             loc->node_count[0] += 1 - seen;
+            ((uint64_t*)next)[0] = -1;
         } else {
             seen = lookup (&dbs->root, i64(next, 1), 0, (uint64_t*)next, loc);
         }
@@ -307,12 +306,17 @@ TreeDBSLLlookup_dm (const treedbs_ll_t dbs, const int *v, tree_t prev,
 tree_t
 TreeDBSLLget (const treedbs_ll_t dbs, const tree_ref_t ref, int *d)
 {
-    uint32_t           *dst = (uint32_t*)d;
-    int64_t            *dst64 = (int64_t *)dst;
-    dst64[0] = ref;
-    dst64[1] = ref;
+    uint32_t           *dst     = (uint32_t*)d;
+    int64_t            *dst64   = (int64_t *)dst;
+    if (dbs->slim) {
+        dst64[0] = -1;
+        dst64[1] = ref;
+    } else {
+        dst64[0] = ref;
+        dst64[1] = dbs->root.table[ref] - 1;
+    }
     for (int i = 2; i < dbs->nNodes; i++)
-        dst64[i] = dbs->data.table[dst[i]];
+        dst64[i] = dbs->data.table[dst[i]] - 1; // see lookup() --> avoid EMPTY
     return (tree_t)dst;
 }
 
@@ -376,7 +380,9 @@ project_matrix_to_tree (treedbs_ll_t dbs, matrix_t *m)
 treedbs_ll_t
 TreeDBSLLcreate_dm (int nNodes, int size, int ratio, matrix_t * m, int satellite_bits, int slim)
 {
-    assert (size <= DB_SIZE_MAX);
+    assert (size <= DB_SIZE_MAX && "Tree too large");
+    assert (nNodes >= 2 && "Tree too small");
+    assert ((slim == 0 || slim == 1) && "Wrong value for slim");
     treedbs_ll_t        dbs = RTalign (CACHE_LINE_SIZE, sizeof(struct treedbs_ll_s));
     assert (satellite_bits < 4);
     dbs->sat_bits = satellite_bits;
@@ -385,7 +391,7 @@ TreeDBSLLcreate_dm (int nNodes, int size, int ratio, matrix_t * m, int satellite
     dbs->ratio = ratio;
     dbs->slim = slim;
 
-    dbs->root.size = 1L << size;
+    dbs->root.size = 1UL << size;
     dbs->root.log_size = size;
     dbs->root.thres = dbs->root.size / 64;
     dbs->root.mask = dbs->root.size - 1;

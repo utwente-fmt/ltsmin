@@ -72,6 +72,7 @@ extern tree_t       TreeDBSLLget (const treedbs_ll_t dbs, const tree_ref_t ref,
 
 typedef struct treedbs_ll_inlined_s {
     int             nNodes;
+    int             slim;
 } treedbs_ll_inlined_t;
 
 static inline tree_t
@@ -80,9 +81,9 @@ TreeDBSLLdata (const treedbs_ll_t dbs, tree_t data) {
 }
 
 static inline tree_ref_t
-TreeDBSLLindex (tree_t data) {
+TreeDBSLLindex (const treedbs_ll_t dbs, tree_t data) {
     int64_t            *d64 = (int64_t *)data;
-    return d64[0];
+    return d64[((treedbs_ll_inlined_t *)dbs)->slim];
 }
 
 /**
