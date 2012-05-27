@@ -28,7 +28,7 @@ typedef struct node_table_s {
 } node_table_t;
 
 struct treedbs_ll_s {
-    int                 nNodes;
+    int                 nNodes; // see treedbs_ll_inlined_t
     uint32_t            sat_bits;
     uint32_t            sat_mask;
     pthread_key_t       local_key;
@@ -314,16 +314,6 @@ TreeDBSLLget (const treedbs_ll_t dbs, const tree_ref_t ref, int *d)
     for (int i = 2; i < dbs->nNodes; i++)
         dst64[i] = dbs->data.table[dst[i]];
     return (tree_t)dst;
-}
-
-int *
-TreeDBSLLdata (const treedbs_ll_t dbs, tree_t data) {
-    return data + dbs->nNodes;
-}
-
-tree_ref_t
-TreeDBSLLindex (tree_t data) {
-    return data[0];
 }
 
 void

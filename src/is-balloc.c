@@ -38,14 +38,14 @@ NOTE: shrinkage of blocks pointer array is not implemented
 
  */
 
-static const size_t BLOCK_ELT_POW = 14;
-static const size_t BLOCK_ELT_SIZE = 1<<14; //blocksize in el_size
+static const size_t BLOCK_ELT_POW = 24;
+static const size_t BLOCK_ELT_SIZE = 1<<24; //blocksize in el_size
 
 static void
 add_block(isb_allocator_t buf)
 {
     Debug("adding block %zu", buf->num_block-1);
-    int size = ((buf->el_size+1)*sizeof(int))<<BLOCK_ELT_POW; //allocates an extra overflow element
+    size_t size = ((buf->el_size+1)*sizeof(int))<<BLOCK_ELT_POW; //allocates an extra overflow element
     int *block = RTmalloc(size);
     buf->blocks[buf->num_block] = block;
     buf->num_block++;

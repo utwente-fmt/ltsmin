@@ -70,8 +70,20 @@ extern int          TreeDBSLLlookup_dm (const treedbs_ll_t dbs, const int *v,
 extern tree_t       TreeDBSLLget (const treedbs_ll_t dbs, const tree_ref_t ref, 
                                   int *dst);
 
-extern tree_ref_t   TreeDBSLLindex (tree_t data);
-extern int         *TreeDBSLLdata (const treedbs_ll_t dbs, tree_t data);
+typedef struct treedbs_ll_inlined_s {
+    int             nNodes;
+} treedbs_ll_inlined_t;
+
+static inline tree_t
+TreeDBSLLdata (const treedbs_ll_t dbs, tree_t data) {
+    return data + ((treedbs_ll_inlined_t *)dbs)->nNodes;
+}
+
+static inline tree_ref_t
+TreeDBSLLindex (tree_t data) {
+    int64_t            *d64 = (int64_t *)data;
+    return d64[0];
+}
 
 /**
 \brief Free the memory used by a tree dbs.
