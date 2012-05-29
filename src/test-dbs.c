@@ -5,6 +5,7 @@
  *      Author: laarman
  */
 
+#include <assert.h>
 #include <sys/times.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -214,7 +215,7 @@ DBS_T do_readfile(int *count) {
     return dbs;
 }
 
-int main(const int argc, const char **args) {
+int main2(const int argc, const char **args) {
     HREinitBare((int*)&argc, (char***)&args);
     program = get_label();
 	DBS_T dbs;
@@ -290,3 +291,82 @@ int main(const int argc, const char **args) {
     Warning(info, "time:{{{%.2f}}}, elts:{{{%d}}}, misses:{{{%d}}}, tests:{{{%d}}}, rehashes:{{{%d}}}, %d", tot_norm, count, misses, tests, rehashes, elements);
     return 0;
 }
+
+int
+main (int c, char **v)
+{
+    treedbs_ll_t dbs = TreeDBSLLcreate_sized (4, 10, 2, 5, 0);
+    int s[4] = {1,2,3,4};
+    int t[8];
+    tree_t next = (tree_t)t;
+    TreeDBSLLlookup_incr (dbs, (int*)s, NULL, next);
+    tree_ref_t ref = TreeDBSLLindex (dbs, next);
+    uint32_t val = 0;
+    printf("%zu ", val); val = TreeDBSLLinc_sat_bits (dbs, ref);
+    printf("%zu ", val); val = TreeDBSLLinc_sat_bits (dbs, ref);
+    printf("%zu ", val); val = TreeDBSLLinc_sat_bits (dbs, ref);
+    printf("%zu ", val); val = TreeDBSLLinc_sat_bits (dbs, ref);
+    printf("%zu ", val); val = TreeDBSLLinc_sat_bits (dbs, ref);
+    printf("%zu ", val); val = TreeDBSLLinc_sat_bits (dbs, ref);
+    printf("%zu ", val); val = TreeDBSLLinc_sat_bits (dbs, ref);
+    printf("%zu ", val); val = TreeDBSLLinc_sat_bits (dbs, ref);
+    printf("%zu ", val); val = TreeDBSLLinc_sat_bits (dbs, ref);
+    printf("%zu ", val); val = TreeDBSLLinc_sat_bits (dbs, ref);
+    printf("%zu ", val); val = TreeDBSLLinc_sat_bits (dbs, ref);
+    printf("%zu ", val); val = TreeDBSLLinc_sat_bits (dbs, ref);
+    printf("%zu ", val); val = TreeDBSLLinc_sat_bits (dbs, ref);
+    printf("%zu ", val); val = TreeDBSLLinc_sat_bits (dbs, ref);
+    printf("%zu ", val); val = TreeDBSLLinc_sat_bits (dbs, ref);
+    printf("%zu ", val); val = TreeDBSLLinc_sat_bits (dbs, ref);
+    printf("%zu ", val); val = TreeDBSLLinc_sat_bits (dbs, ref);
+    printf("%zu ", val); val = TreeDBSLLinc_sat_bits (dbs, ref);
+    printf("%zu ", val); val = TreeDBSLLinc_sat_bits (dbs, ref);
+    printf("%zu ", val); val = TreeDBSLLinc_sat_bits (dbs, ref);
+    printf("%zu ", val); val = TreeDBSLLinc_sat_bits (dbs, ref);
+    printf("%zu ", val); val = TreeDBSLLinc_sat_bits (dbs, ref);
+    printf("%zu ", val); val = TreeDBSLLinc_sat_bits (dbs, ref);
+    printf("%zu ", val); val = TreeDBSLLinc_sat_bits (dbs, ref);
+    printf("%zu ", val); val = TreeDBSLLinc_sat_bits (dbs, ref);
+    printf("%zu ", val); val = TreeDBSLLinc_sat_bits (dbs, ref);
+    printf("%zu ", val); val = TreeDBSLLinc_sat_bits (dbs, ref);
+    printf("%zu ", val); val = TreeDBSLLinc_sat_bits (dbs, ref);
+    printf("%zu ", val); val = TreeDBSLLinc_sat_bits (dbs, ref);
+    printf("%zu ", val); val = TreeDBSLLinc_sat_bits (dbs, ref);
+    printf("%zu ", val); val = TreeDBSLLinc_sat_bits (dbs, ref);
+    assert ( val == 31 );
+    printf("%zu ", val); val = TreeDBSLLdec_sat_bits (dbs, ref);
+    printf("%zu ", val); val = TreeDBSLLdec_sat_bits (dbs, ref);
+    printf("%zu ", val); val = TreeDBSLLdec_sat_bits (dbs, ref);
+    printf("%zu ", val); val = TreeDBSLLdec_sat_bits (dbs, ref);
+    printf("%zu ", val); val = TreeDBSLLdec_sat_bits (dbs, ref);
+    printf("%zu ", val); val = TreeDBSLLdec_sat_bits (dbs, ref);
+    printf("%zu ", val); val = TreeDBSLLdec_sat_bits (dbs, ref);
+    printf("%zu ", val); val = TreeDBSLLdec_sat_bits (dbs, ref);
+    printf("%zu ", val); val = TreeDBSLLdec_sat_bits (dbs, ref);
+    printf("%zu ", val); val = TreeDBSLLdec_sat_bits (dbs, ref);
+    printf("%zu ", val); val = TreeDBSLLdec_sat_bits (dbs, ref);
+    printf("%zu ", val); val = TreeDBSLLdec_sat_bits (dbs, ref);
+    printf("%zu ", val); val = TreeDBSLLdec_sat_bits (dbs, ref);
+    printf("%zu ", val); val = TreeDBSLLdec_sat_bits (dbs, ref);
+    printf("%zu ", val); val = TreeDBSLLdec_sat_bits (dbs, ref);
+    printf("%zu ", val); val = TreeDBSLLdec_sat_bits (dbs, ref);
+    printf("%zu ", val); val = TreeDBSLLdec_sat_bits (dbs, ref);
+    printf("%zu ", val); val = TreeDBSLLdec_sat_bits (dbs, ref);
+    printf("%zu ", val); val = TreeDBSLLdec_sat_bits (dbs, ref);
+    printf("%zu ", val); val = TreeDBSLLdec_sat_bits (dbs, ref);
+    printf("%zu ", val); val = TreeDBSLLdec_sat_bits (dbs, ref);
+    printf("%zu ", val); val = TreeDBSLLdec_sat_bits (dbs, ref);
+    printf("%zu ", val); val = TreeDBSLLdec_sat_bits (dbs, ref);
+    printf("%zu ", val); val = TreeDBSLLdec_sat_bits (dbs, ref);
+    printf("%zu ", val); val = TreeDBSLLdec_sat_bits (dbs, ref);
+    printf("%zu ", val); val = TreeDBSLLdec_sat_bits (dbs, ref);
+    printf("%zu ", val); val = TreeDBSLLdec_sat_bits (dbs, ref);
+    printf("%zu ", val); val = TreeDBSLLdec_sat_bits (dbs, ref);
+    printf("%zu ", val); val = TreeDBSLLdec_sat_bits (dbs, ref);
+    printf("%zu ", val); val = TreeDBSLLdec_sat_bits (dbs, ref);
+    printf("%zu ", val); val = TreeDBSLLdec_sat_bits (dbs, ref);
+    assert ( val == 0 );
+    printf("%zu ", val); val = TreeDBSLLdec_sat_bits (dbs, ref);
+    //TreeDBSLLinc_sat_bits (dbs, ref);
+}
+

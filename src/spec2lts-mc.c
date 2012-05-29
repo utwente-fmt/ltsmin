@@ -256,20 +256,20 @@ state_db_popt (poptContext con, enum poptCallbackReason reason,
     case POPT_CALLBACK_REASON_POST:
         res = linear_search (db_types, state_repr);
         if (res < 0)
-            Fatal (1, error, "unknown vector storage mode type %s", state_repr);
+            Abort ("unknown vector storage mode type %s", state_repr);
         db_type = res;
         int i = 0, begin = 0, end = 0;
         char *strat = strdup (arg_strategy);
         char last;
         do {
             if (i > 0 && Strat_ENDFS != strategy[i-1])
-                Fatal (1, error, "Only ENDFS supports recursive repair procedures.");
+                Abort ("Only ENDFS supports recursive repair procedures.");
             while (',' != arg_strategy[end] && '\0' != arg_strategy[end]) ++end;
             last = strat[end];
             strat[end] = '\0';
             res = linear_search (strategies, &strat[begin]);
             if (res < 0)
-                Fatal (1, error, "unknown search strategy %s", &strat[begin]);
+                Abort ("unknown search strategy %s", &strat[begin]);
             strategy[i++] = res;
             end += 1;
             begin = end;
@@ -277,23 +277,23 @@ state_db_popt (poptContext con, enum poptCallbackReason reason,
         free (strat);
         if (Strat_ENDFS == strategy[i-1]) {
             if (MAX_STRATEGIES == i)
-                Fatal (1, error, "Open-ended recursion in ENDFS repair strategies.");
+                Abort ("Open-ended recursion in ENDFS repair strategies.");
             Warning (info, "Defaulting to NNDFS as ENDFS repair procedure.");
             strategy[i] = Strat_NNDFS;
         }
         //res = linear_search (lb_methods, arg_lb);
         //if (res < 0)
-        //    Fatal (1, error, "unknown load balance method %s", arg_lb);
+        //    Abort ("unknown load balance method %s", arg_lb);
         //lb_method = res;
         res = linear_search (permutations, arg_perm);
         if (res < 0)
-            Fatal (1, error, "unknown permutation method %s", arg_perm);
+            Abort ("unknown permutation method %s", arg_perm);
         permutation = res;
         return;
     case POPT_CALLBACK_REASON_OPTION:
         break;
     }
-    Fatal (1, error, "unexpected call to state_db_popt");
+    Abort ("unexpected call to state_db_popt");
     (void)con; (void)opt; (void)arg; (void)data;
 }
 
@@ -774,7 +774,7 @@ find_or_put_tree (state_info_t *state, transition_info_t *ti,
     int                 ret;
     ret = TreeDBSLLlookup_dm (dbs, state->data, pred->tree, store, ti->group);
     state->tree = store;
-    state->ref = TreeDBSLLindex (state->tree);
+    state->ref = TreeDBSLLindex (dbs, state->tree);
     return ret;
 }
 
@@ -792,7 +792,7 @@ init_globals (int argc, char *argv[])
         permutation = strategy[0] & Strat_Reach ? Perm_None : Perm_Dynamic;
     if (Perm_None != permutation) {
          if (call_mode == UseGreyBox)
-            Fatal (1, error, "Greybox not supported with state permutation.");
+            Abort ("Greybox not supported with state permutation.");
         refs = 1; //The permuter works with references only!
     }
     if (strategy[0] & Strat_LTL) {
@@ -846,7 +846,7 @@ init_globals (int argc, char *argv[])
     count_mask = (1<<count_bits) - 1;
     int i = 0;
     while (Strat_None != strategy[i] && i < MAX_STRATEGIES) {
-        global_bits += num_global_bits(strategy[i++]);
+        global_bits += num_global_bits(strategy[i]);
         local_bits += (Strat_LTL & strategy[i++] ? 2 : 0);
     }
     count_bits = (Strat_LNDFS == strategy[i-1] ? count_bits : 0);
@@ -876,9 +876,11 @@ init_globals (int argc, char *argv[])
         break;
     case ClearyTree:
         cleary = 1;
+        if (trc_output) Abort ("Cleary tree not supported in combination with error trails.");
+        if (Strat_LTLG & strategy[0]) Abort ("Cleary tree not supported in combination with MCNDFS algorithms.");
     case TreeTable:
         if (ZOBRIST)
-            Fatal (1, error, "Zobrist and treedbs is not implemented");
+            Abort ("Zobrist and treedbs is not implemented");
         statistics = (dbs_stats_f) TreeDBSLLstats;
         get = (dbs_get_f) TreeDBSLLget;
         find_or_put = find_or_put_tree;
@@ -890,7 +892,7 @@ init_globals (int argc, char *argv[])
         dec_sat_bits = (dbs_dec_sat_bits_f) TreeDBSLLdec_sat_bits;
         get_sat_bits = (dbs_get_sat_bits_f) TreeDBSLLget_sat_bits;
         break;
-    case Tree: default: Abort("Unknown state storage type: %d.", db_type);
+    case Tree: default: Abort ("Unknown state storage type: %d.", db_type);
     }
     contexts = RTmalloc (sizeof (wctx_t *[W]));
     for (size_t i = 0; i < W; i++)
@@ -1286,7 +1288,7 @@ permute_one (void *arg, transition_info_t *ti, state_data_t dst)
         perm_todo (perm, dst, ti);
         break;
     default:
-        Fatal(1, error, "Unknown permutation!");
+        Abort ("Unknown permutation!");
     }
 }
 
@@ -1345,7 +1347,7 @@ permute_trans (permute_t *perm, state_info_t *state, perm_cb_f cb, void *ctx)
     case Perm_None:
         break;
     default:
-        Fatal(1, error, "Unknown permutation!");
+        Abort ("Unknown permutation!");
     }
     return count;
 }
@@ -1464,7 +1466,7 @@ state_info_deserialize (state_info_t *state, raw_data_t data, state_data_t store
         } else { // Tree
             state->tree = data;
             state->data = TreeDBSLLdata (dbs, data);
-            state->ref  = TreeDBSLLindex (data);
+            state->ref  = TreeDBSLLindex (dbs, data);
             data += D<<1;
         }
     }
@@ -2149,7 +2151,7 @@ rec_ndfs_call (wctx_t *ctx, ref_t state)
     case Strat_NDFS:
        ndfs_blue (ctx->rec_ctx); break;
     default:
-       Fatal (1, error, "Invalid recursive strategy.");
+       Abort ("Invalid recursive strategy.");
     }
 }
 
