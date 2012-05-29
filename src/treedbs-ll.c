@@ -33,8 +33,9 @@ typedef struct node_table_s {
 } node_table_t;
 
 struct treedbs_ll_s {
-    int                 nNodes; // see treedbs_ll_inlined_t
+    size_t              nNodes; // see treedbs_ll_inlined_t
     int                 slim;   // see treedbs_ll_inlined_t
+    int                 indexing;// see treedbs_ll_inlined_t
     clt_dbs_t          *clt;
     node_table_t        root;
     node_table_t        data;
@@ -339,14 +340,14 @@ TreeDBSLLget (const treedbs_ll_t dbs, const tree_ref_t ref, int *d)
 {
     uint32_t           *dst     = (uint32_t*)d;
     int64_t            *dst64   = (int64_t *)dst;
-    if (dbs->slim) { // skip the root leaf for cleary and for normal tree!
+    if (!dbs->indexing) { // skip the root leaf for cleary and for normal tree!
         dst64[0] = -1;
         dst64[1] = ref;
     } else {
         dst64[0] = ref;
         dst64[1] = (dbs->root.table[ref] - 1) & dbs->root.sat_nmask;
     }
-    for (int i = 2; i < dbs->nNodes; i++)
+    for (size_t i = 2; i < dbs->nNodes; i++)
         dst64[i] = (dbs->data.table[dst[i]] - 1) & dbs->data.sat_nmask; // for "- 1", see lookup() --> avoid EMPTY
     return (tree_t)dst;
 }
@@ -361,15 +362,15 @@ LOCALfree (void *arg)
 }
 
 treedbs_ll_t
-TreeDBSLLcreate (int nNodes, int ratio, int satellite_bits, int slim)
+TreeDBSLLcreate (int nNodes, int ratio, int satellite_bits, int slim, int indexing)
 {
-    return TreeDBSLLcreate_dm (nNodes, TABLE_SIZE, ratio, NULL, satellite_bits, slim);
+    return TreeDBSLLcreate_dm (nNodes, TABLE_SIZE, ratio, NULL, satellite_bits, slim, indexing);
 }
 
 treedbs_ll_t
-TreeDBSLLcreate_sized (int nNodes, int size, int ratio, int satellite_bits, int slim)
+TreeDBSLLcreate_sized (int nNodes, int size, int ratio, int satellite_bits, int slim, int indexing)
 {
-    return TreeDBSLLcreate_dm (nNodes, size, ratio, NULL, satellite_bits, slim);
+    return TreeDBSLLcreate_dm (nNodes, size, ratio, NULL, satellite_bits, slim, indexing);
 }
 
 /**
@@ -387,7 +388,7 @@ TreeDBSLLcreate_sized (int nNodes, int size, int ratio, int satellite_bits, int 
 void
 project_matrix_to_tree (treedbs_ll_t dbs, matrix_t *m)
 {
-    int                 nNodes = dbs->nNodes;
+    size_t              nNodes = dbs->nNodes;
     int                 tmp[nNodes * 2];
     dbs->k = dm_nrows(m);
     dbs->todo = RTalign(CACHE_LINE_SIZE, dbs->k * sizeof (dbs->todo[0]));
@@ -432,7 +433,8 @@ create_nodes (node_table_t *nodes, size_t log_size, size_t sat_bits, int alloc,
 }
 
 treedbs_ll_t
-TreeDBSLLcreate_dm (int nNodes, int size, int ratio, matrix_t * m, int satellite_bits, int slim)
+TreeDBSLLcreate_dm (int nNodes, int size, int ratio, matrix_t * m,
+                    int satellite_bits, int slim, int indexing)
 {
     assert (size <= DB_SIZE_MAX && "Tree too large");
     assert (nNodes >= 2 && "Tree vectors too small");
@@ -442,6 +444,7 @@ TreeDBSLLcreate_dm (int nNodes, int size, int ratio, matrix_t * m, int satellite
     dbs->nNodes = nNodes;
     dbs->ratio = ratio;
     dbs->slim = slim;
+    dbs->indexing = indexing || !slim || satellite_bits;
     dbs->todo = NULL;
     create_nodes (&dbs->root, size, satellite_bits, !dbs->slim, DB_ROOTS_FULL);
     create_nodes (&dbs->data, size - dbs->ratio, 0, 1, DB_LEAFS_FULL);

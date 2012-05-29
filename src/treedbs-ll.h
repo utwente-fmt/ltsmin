@@ -69,18 +69,27 @@ typedef size_t tree_ref_t;
 
 typedef int *tree_t;
 
-/**
-Create a new tree database.
-
-- Autosized
-- sized
-- incremental using the dependency matrix
-*/
-extern treedbs_ll_t TreeDBSLLcreate (int len, int ratio, int satellite_bits, int slim);
+extern treedbs_ll_t TreeDBSLLcreate (int len, int ratio, int satellite_bits,
+                                     int slim, int indexing);
 extern treedbs_ll_t TreeDBSLLcreate_sized (int len, int size, int ratio,
-                                           int satellite_bits, int slim);
+                                           int satellite_bits, int slim,
+                                           int indexing);
+
+/**
+\brief Create a tree DB
+\param len the vector length
+\param size the log2 size of the tree table
+\param ratio the log2 ratio of roots/leafs
+\param m the dependency matrix
+\param satellite_bits the number of satellite bits  (>0 implies indexing)
+\param slim use cleary table for roots (implies !indexing)
+\param indexing ensure dense references (0 <= ref < 2^size) via TreeDBSLLindex
+       (!indexing is faster)
+\return the created tree DB
+*/
 extern treedbs_ll_t TreeDBSLLcreate_dm (int len, int size, int ratio,
-                                        matrix_t *m, int satellite_bits, int slim);
+                                        matrix_t *m, int satellite_bits,
+                                        int slim, int indexing);
 
 extern int          TreeDBSLLtry_set_sat_bit (const treedbs_ll_t dbs,
                                               const tree_ref_t ref, int index);
@@ -94,20 +103,20 @@ extern uint32_t     TreeDBSLLget_sat_bits (const treedbs_ll_t dbs, const tree_re
 extern uint32_t     TreeDBSLLinc_sat_bits (const treedbs_ll_t dbs, const tree_ref_t ref);
 extern uint32_t     TreeDBSLLdec_sat_bits (const treedbs_ll_t dbs, const tree_ref_t ref);
 
+extern int          TreeDBSLLlookup (const treedbs_ll_t dbs, const int *v);
+extern int          TreeDBSLLlookup_incr (const treedbs_ll_t dbs, const int *v,
+                                          tree_t prev, tree_t next);
+
 /**
-\brief Find a vector with respect to a database and insert it if it cannot be fo
-und.
+\brief Find a vector with respect to a database and insert it if it cannot be
+found.
 \param dbs The dbs
 \param vector The int vector
-\retval ret The index that the vector was found or inserted at
-\param g the group to do incremntal lookup for (-1 unknown)
-\retval arg the input of the previous vector and the output of the new 
-            internal tree data
+\param prev the input of the previous tree data
+\retval next the output of the next tree data
+\param group the group to do incremental lookup for (-1 unknown)
 \return 1 if the vector was present, 0 if it was added
 */
-extern int          TreeDBSLLlookup (const treedbs_ll_t dbs, const int *v);
-extern int          TreeDBSLLlookup_incr (const treedbs_ll_t dbs, const int *v, 
-                                          tree_t prev, tree_t next);
 extern int          TreeDBSLLlookup_dm (const treedbs_ll_t dbs, const int *v, 
                                         tree_t prev, tree_t next, int group);
 
@@ -115,8 +124,9 @@ extern tree_t       TreeDBSLLget (const treedbs_ll_t dbs, const tree_ref_t ref,
                                   int *dst);
 
 typedef struct treedbs_ll_inlined_s {
-    int             nNodes;
+    size_t          nNodes;
     int             slim;
+    int             indexing;
 } treedbs_ll_inlined_t;
 
 static inline tree_t
@@ -128,7 +138,7 @@ static inline tree_ref_t
 TreeDBSLLindex (const treedbs_ll_t dbs, tree_t data) {
     int64_t            *d64 = (int64_t *)data;
     treedbs_ll_inlined_t *d = (treedbs_ll_inlined_t *)dbs;
-    return d64[d->slim];
+    return d64[!d->indexing];
 }
 
 /**

@@ -295,7 +295,7 @@ int main2(const int argc, const char **args) {
 int
 main (int c, char **v)
 {
-    treedbs_ll_t dbs = TreeDBSLLcreate_sized (4, 10, 2, 5, 0);
+    treedbs_ll_t dbs = TreeDBSLLcreate_sized (4, 10, 2, 5, 0, 1);
     int s[4] = {1,2,3,4};
     int t[8];
     tree_t next = (tree_t)t;

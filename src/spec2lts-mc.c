@@ -838,7 +838,6 @@ init_globals (int argc, char *argv[])
         dbs_size = (int) (log(db_el_size) / log(2));
         dbs_size = dbs_size > DB_SIZE_MAX ? DB_SIZE_MAX : dbs_size;
     }
-    Warning (info, "Using a %s with 2^%d elements", key_search(db_types,db_type), dbs_size);
     MAX_SUCC = ( Strat_DFS == strategy[0] ? 1 : SIZE_MAX );  /* for --grey: */
     if (trc_output && !(strategy[0] & Strat_LTL))
         parent_ref = RTmalloc (sizeof(ref_t[1UL<<dbs_size]));
@@ -850,11 +849,10 @@ init_globals (int argc, char *argv[])
         local_bits += (Strat_LTL & strategy[i++] ? 2 : 0);
     }
     count_bits = (Strat_LNDFS == strategy[i-1] ? count_bits : 0);
-    Warning (info, "Global bits: %d, count bits: %d, local bits: %d.",
-             global_bits, count_bits, local_bits);
     if (Strat_TA & strategy[0])
         lmap = lm_create (W, 1UL<<dbs_size, LATTICE_BLOCK_SIZE);
-    int cleary = 0;
+    int                 cleary = 0;
+    int                 indexing = NULL != trc_output || ((Strat_TA | Strat_LTLG) & strategy[0]);
     switch (db_type) {
     case HashTable:
         if (ZOBRIST) {
@@ -873,27 +871,30 @@ init_globals (int argc, char *argv[])
         inc_sat_bits = (dbs_inc_sat_bits_f) DBSLLinc_sat_bits;
         dec_sat_bits = (dbs_dec_sat_bits_f) DBSLLdec_sat_bits;
         get_sat_bits = (dbs_get_sat_bits_f) DBSLLget_sat_bits;
+        Warning (info, "Using a hash table with 2^%d elements", dbs_size);
         break;
     case ClearyTree:
         cleary = 1;
-        if (trc_output) Abort ("Cleary tree not supported in combination with error trails.");
-        if (Strat_LTLG & strategy[0]) Abort ("Cleary tree not supported in combination with MCNDFS algorithms.");
+        if (indexing) Abort ("Cleary tree not supported in combination with error trails or the MCNDFS algorithms.");
     case TreeTable:
         if (ZOBRIST)
             Abort ("Zobrist and treedbs is not implemented");
         statistics = (dbs_stats_f) TreeDBSLLstats;
         get = (dbs_get_f) TreeDBSLLget;
         find_or_put = find_or_put_tree;
-        dbs = TreeDBSLLcreate_dm (D, dbs_size, ratio,  m, global_bits + count_bits, cleary);
+        dbs = TreeDBSLLcreate_dm (D, dbs_size, ratio,  m, global_bits + count_bits, cleary, indexing);
         unset_sat_bit = (dbs_unset_sat_f) TreeDBSLLunset_sat_bit;
         get_sat_bit = (dbs_get_sat_f) TreeDBSLLget_sat_bit;
         try_set_sat_bit = (dbs_try_set_sat_f) TreeDBSLLtry_set_sat_bit;
         inc_sat_bits = (dbs_inc_sat_bits_f) TreeDBSLLinc_sat_bits;
         dec_sat_bits = (dbs_dec_sat_bits_f) TreeDBSLLdec_sat_bits;
         get_sat_bits = (dbs_get_sat_bits_f) TreeDBSLLget_sat_bits;
+        Warning (info, "Using a%s tree table with 2^%d elements", indexing ? "" : " non-indexing", dbs_size);
         break;
     case Tree: default: Abort ("Unknown state storage type: %d.", db_type);
     }
+    Warning (info, "Global bits: %d, count bits: %d, local bits: %d.",
+             global_bits, count_bits, local_bits);
     contexts = RTmalloc (sizeof (wctx_t *[W]));
     for (size_t i = 0; i < W; i++)
         contexts[i] = wctx_create (i, 0, NULL);
