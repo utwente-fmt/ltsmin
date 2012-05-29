@@ -1,9 +1,8 @@
 #include "config.h"
-#include <stdlib.h>
-#include <stdio.h>
-#include <stdint.h>
-#include <signal.h>
 #include <assert.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 #include <atomics.h>
 #include <clt_table.h>
@@ -138,7 +137,7 @@ cas_sat_bits (const treedbs_ll_t dbs, const tree_ref_t ref,
               uint64_t read, uint64_t value)
 {
     value = s2b (dbs, value) | (read & dbs->root.sat_nmask);
-    return cas(dbs->root.table+ref, read, value);
+    return cas (dbs->root.table+ref, read, value);
 }
 
 int
@@ -392,16 +391,16 @@ project_matrix_to_tree (treedbs_ll_t dbs, matrix_t *m)
     int                 tmp[nNodes * 2];
     dbs->k = dm_nrows(m);
     dbs->todo = RTalign(CACHE_LINE_SIZE, dbs->k * sizeof (dbs->todo[0]));
-    for(int row = 0;row < dbs->k;++row){
+    for (int row = 0;row < dbs->k;++row) {
         dbs->todo[row] = RTalign(CACHE_LINE_SIZE, sizeof (int[nNodes]));
-        for(int i = 0; i < nNodes; i++)
+        for (size_t i = 0; i < nNodes; i++)
             tmp[i + nNodes] = dm_is_set(m, row, i);
         int j = 0;
-        for(int i = nNodes - 1; i > 0; i--) {
+        for (int i = nNodes - 1; i > 0; i--) {
             int l = (i << 1);
             int r = l + 1;
             tmp[i] = tmp[l] || tmp[r];
-            if(tmp[i]){
+            if (tmp[i]) {
                 dbs->todo[row][j++] = i;
             }
         }
@@ -427,8 +426,9 @@ create_nodes (node_table_t *nodes, size_t log_size, size_t sat_bits, int alloc,
     nodes->sat_nmask = ~nodes->sat_mask;
     if (alloc) {
         nodes->table = RTalignZero (CACHE_LINE_SIZE, sizeof (uint64_t) * nodes->size);
-        if (!nodes->table)
+        if (!nodes->table) {
             Abort ("Too large hash table allocated: %.1f GB", (sizeof (uint64_t) * nodes->size/1024/1024/1024));
+        }
     }
 }
 
@@ -450,7 +450,7 @@ TreeDBSLLcreate_dm (int nNodes, int size, int ratio, matrix_t * m,
     create_nodes (&dbs->data, size - dbs->ratio, 0, 1, DB_LEAFS_FULL);
     if (dbs->slim)
         dbs->clt = clt_create (dbs->data.log_size*2, dbs->root.log_size);
-    pthread_key_create(&dbs->local_key, LOCALfree);
+    pthread_key_create (&dbs->local_key, LOCALfree);
     if (m != NULL)
         project_matrix_to_tree(dbs, m);
     return dbs;
@@ -479,7 +479,7 @@ TreeDBSLLstats (treedbs_ll_t dbs)
 
     stats_t            *res = RTmalloc (sizeof (*res));
     loc_t              *loc = get_local (dbs);
-    for(int i = 0; i < dbs->nNodes; i++)
+    for (size_t i = 0; i < dbs->nNodes; i++)
         loc->stat.nodes += loc->node_count[i];
     loc->stat.elts = loc->node_count[0];
     memcpy (res, &loc->stat, sizeof (*res));
