@@ -426,7 +426,6 @@ void lts_silent_cycle_elim(lts_t lts,silent_predicate silent,void*silent_ctx,bit
 void lts_merge(lts_t lts1,lts_t lts2){
     Print(info,"** warning ** omitting signature check");
     if (lts1->state_db) Abort("lts_merge cannot deal with state vectors");
-    if (lts1->properties) Abort("lts_merge cannot deal with state labels");
     if (lts1->edge_idx) Abort("lts_merge cannot deal with multiple edge labels");
     uint32_t init_count=lts1->root_count;
     uint32_t state_count=lts1->states;
@@ -445,14 +444,59 @@ void lts_merge(lts_t lts1,lts_t lts2){
     if (lts1->label) {
         int T1=lts_type_get_edge_label_typeno(lts1->ltstype,0);
         int T2=lts_type_get_edge_label_typeno(lts2->ltstype,0);
-        int N=VTgetCount(lts2->values[T2]);
-        int map[N];
-        for(int i=0;i<N;i++){
-            chunk c=VTgetChunk(lts2->values[T2],i);
-            map[i]=VTputChunk(lts1->values[T1],c);
+        if (lts2->values[T2]!=NULL){
+            int N=VTgetCount(lts2->values[T2]);
+            int map[N];
+            for(int i=0;i<N;i++){
+                chunk c=VTgetChunk(lts2->values[T2],i);
+                map[i]=VTputChunk(lts1->values[T1],c);
+            }
+            for(uint32_t i=0;i<lts2->transitions;i++){
+                lts1->label[trans_count+i]=map[lts2->label[i]];
+            }
+        } else {
+            for(uint32_t i=0;i<lts2->transitions;i++){
+                lts1->label[trans_count+i]=lts2->label[i];
+            }
         }
-        for(uint32_t i=0;i<lts2->transitions;i++){
-            lts1->label[trans_count+i]=map[lts2->label[i]];
+    }
+    if (lts1->properties) {
+        if (lts1->prop_idx==NULL){
+            Print(info,"copying one property");
+            int T1=lts_type_get_state_label_typeno(lts1->ltstype,0);
+            int T2=lts_type_get_state_label_typeno(lts2->ltstype,0);
+            if (lts2->values[T2]!=NULL){
+                Print(info,"copying chunks");
+                int N=VTgetCount(lts2->values[T2]);
+                int map[N];
+                for(int i=0;i<N;i++){
+                    chunk c=VTgetChunk(lts2->values[T2],i);
+                    map[i]=VTputChunk(lts1->values[T1],c);
+                }
+                Print(info,"copying labels");
+                for(uint32_t i=0;i<lts2->states;i++){
+                    lts1->properties[state_count+i]=map[lts2->properties[i]];
+                }
+            } else {
+                for(uint32_t i=0;i<lts2->states;i++){
+                    lts1->properties[state_count+i]=lts2->properties[i];
+                }
+            }
+        } else {
+            int K=lts_type_get_state_label_count(lts1->ltstype);
+            int vec[K];
+            for(uint32_t i=0;i<lts2->states;i++){
+                TreeUnfold(lts2->prop_idx,lts2->properties[i],vec);
+                for(int j=0;j<K;j++){
+                    int T1=lts_type_get_state_label_typeno(lts1->ltstype,j);
+                    int T2=lts_type_get_state_label_typeno(lts2->ltstype,j);
+                    if (lts2->values[T2]!=NULL){
+                        chunk c=VTgetChunk(lts2->values[T2],vec[j]);
+                        vec[j]=VTputChunk(lts1->values[T1],c);
+                    }
+                }
+                lts1->properties[state_count+i]=TreeFold(lts1->prop_idx,vec);
+            }
         }
     }
     lts_free(lts2);
