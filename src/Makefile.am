@@ -580,6 +580,7 @@ libutil_la_SOURCES += archive_io_ops.c
 libutil_la_SOURCES += pg_io_ops.c
 libutil_la_SOURCES += balloc.c balloc.h
 libutil_la_SOURCES += bitset.c bitset.h
+libutil_la_SOURCES += bitvector-ll.c bitvector-ll.h
 libutil_la_SOURCES += cctables.c cctables.h
 libutil_la_SOURCES += chunk_support.c chunk_support.h
 libutil_la_SOURCES += chunk_table_factory.c
