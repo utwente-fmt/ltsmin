@@ -25,11 +25,11 @@ struct dbs_ll_s {
     size_t              bytes;
     size_t              size;
     size_t              threshold;
-    uint32_t            mask;
+    uint64_t            mask;
     int                *data;
     mem_hash_t         *table;
     mem_hash_t          sat_mask;
-    hash32_f            hash32;
+    hash64_f            hash64;
     int                 full;
     pthread_key_t       local_key;
 };
@@ -140,14 +140,14 @@ DBSLLmemoized_hash (const dbs_ll_t dbs, const dbs_ref_t ref)
 }
 
 int
-DBSLLlookup_hash (const dbs_ll_t dbs, const int *v, dbs_ref_t *ret, uint32_t *hash)
+DBSLLlookup_hash (const dbs_ll_t dbs, const int *v, dbs_ref_t *ret, hash64_t *hash)
 {
     local_t            *loc = get_local (dbs);
     stats_t            *stat = &loc->stat;
     size_t              seed = 0;
     size_t              l = dbs->length;
     size_t              b = dbs->bytes;
-    uint32_t            hash_rehash = hash ? *hash : dbs->hash32 ((char *)v, b, 0);
+    hash64_t            hash_rehash = hash ? *hash : dbs->hash64 ((char *)v, b, 0);
     mem_hash_t          hash_memo = hash_rehash >> 32;
     if (2 == sizeof(mem_hash_t))
         hash_memo = ((hash_rehash >> 48) ^ hash_memo);
@@ -188,6 +188,7 @@ DBSLLlookup_hash (const dbs_ll_t dbs, const int *v, dbs_ref_t *ret, uint32_t *ha
         stat->rehashes++;
     }
     *ret = 0; //incorrect, but does not matter anymore
+    atomic_write (&dbs->full, 1);
     return DB_FULL;
 }
 
@@ -215,15 +216,15 @@ DBSLLlookup (const dbs_ll_t dbs, const int *vector)
 dbs_ll_t
 DBSLLcreate (int length)
 {
-    return DBSLLcreate_sized (length, TABLE_SIZE, (hash32_f)SuperFastHash, 0);
+    return DBSLLcreate_sized (length, TABLE_SIZE, (hash64_f)MurmurHash64, 0);
 }
 
 dbs_ll_t
-DBSLLcreate_sized (int length, int size, hash32_f hash32, int satellite_bits)
+DBSLLcreate_sized (int length, int size, hash64_f hash64, int satellite_bits)
 {
     dbs_ll_t            dbs = RTalign (CACHE_LINE_SIZE, sizeof (struct dbs_ll_s));
     dbs->length = length;
-    dbs->hash32 = hash32;
+    dbs->hash64 = hash64;
     dbs->full = 0;
     assert(satellite_bits < 32);
     dbs->sat_bits = satellite_bits;
@@ -233,9 +234,9 @@ DBSLLcreate_sized (int length, int size, hash32_f hash32, int satellite_bits)
     dbs->bytes = length * sizeof (int);
     dbs->size = 1UL << size;
     dbs->threshold = dbs->size / 100;
-    dbs->mask = dbs->size - 1;
+    dbs->mask = ((uint64_t)dbs->size) - 1;
     dbs->table = RTalignZero (CACHE_LINE_SIZE, sizeof (mem_hash_t[dbs->size]));
-    dbs->data = RTalign (CACHE_LINE_SIZE, sizeof (int[dbs->size * length]));
+    dbs->data = RTalign (CACHE_LINE_SIZE, dbs->size * dbs->bytes);
     pthread_key_create (&dbs->local_key, RTfree);
     return dbs;
 }

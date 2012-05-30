@@ -50,7 +50,7 @@ typedef struct state_info_s {
     state_data_t        data;
     tree_t              tree;
     ref_t               ref;
-    uint32_t            hash32;
+    hash64_t            hash64;
     lattice_t           lattice;
     lm_loc_t            loc;
 } state_info_t;
@@ -742,8 +742,8 @@ wctx_free (wctx_t *ctx, int depth)
     RTfree (ctx);
 }
 
-static uint32_t
-z_rehash (const void *v, int b, uint32_t seed)
+static hash64_t
+z_rehash (const void *v, int b, hash64_t seed)
 {
     return zobrist_rehash (zobrist, seed);
     (void)b; (void)v;
@@ -753,9 +753,9 @@ static int
 find_or_put_zobrist (state_info_t *state, transition_info_t *ti,
                      state_info_t *pred, state_data_t store)
 {
-    state->hash32 = zobrist_hash_dm (zobrist, state->data, pred->data,
-                                     pred->hash32, ti->group);
-    return DBSLLlookup_hash (dbs, state->data, &state->ref, &state->hash32);
+    state->hash64 = zobrist_hash_dm (zobrist, state->data, pred->data,
+                                     pred->hash64, ti->group);
+    return DBSLLlookup_hash (dbs, state->data, &state->ref, &state->hash64);
     (void) store;
 }
 
@@ -858,10 +858,10 @@ init_globals (int argc, char *argv[])
         if (ZOBRIST) {
             zobrist = zobrist_create (D, ZOBRIST, m);
             find_or_put = find_or_put_zobrist;
-            dbs = DBSLLcreate_sized (D, dbs_size, (hash32_f)z_rehash, global_bits + count_bits);
+            dbs = DBSLLcreate_sized (D, dbs_size, (hash64_f)z_rehash, global_bits + count_bits);
         } else {
             find_or_put = find_or_put_dbs;
-            dbs = DBSLLcreate_sized (D, dbs_size, (hash32_f)SuperFastHash, global_bits + count_bits);
+            dbs = DBSLLcreate_sized (D, dbs_size, (hash64_f)MurmurHash64, global_bits + count_bits);
         }
         statistics = (dbs_stats_f) DBSLLstats;
         get = (dbs_get_f) DBSLLget;
@@ -1390,7 +1390,7 @@ state_info_size ()
     if (!refs && (HashTable & db_type))
         state_info_size += ref_size;
     if (ZOBRIST)
-        state_info_size += sizeof (uint32_t);
+        state_info_size += sizeof (hash64_t);
     if (Strat_TA & strategy[0])
         state_info_size += sizeof (lattice_t) + sizeof (lm_loc_t);
     return state_info_size;
@@ -1417,9 +1417,10 @@ state_info_initialize (state_info_t *state, state_data_t data,
 void
 state_info_serialize (state_info_t *state, raw_data_t data)
 {
+    assert (state->ref != (1 | (1ULL<<32)));
     if (ZOBRIST) {
-        ((uint32_t*)data)[0] = state->hash32;
-        data++;
+        ((uint64_t*)data)[0] = state->hash64;
+        data += 2;
     }
     if (refs) {
         ((ref_t*)data)[0] = state->ref;
@@ -1447,8 +1448,8 @@ void
 state_info_deserialize (state_info_t *state, raw_data_t data, state_data_t store)
 {
     if (ZOBRIST) {
-        state->hash32 = ((uint32_t*)data)[0];
-        data++;
+        state->hash64 = ((hash64_t*)data)[0];
+        data += 2;
     }
     if (refs) {
         state->ref  = ((ref_t*)data)[0];
@@ -1483,8 +1484,8 @@ state_info_deserialize_cheap (state_info_t *state, raw_data_t data)
 {
     assert (refs);
     if (ZOBRIST) {
-        state->hash32 = ((uint32_t*)data)[0];
-        data++;
+        state->hash64 = ((hash64_t*)data)[0];
+        data += 2;
     }
     state->ref  = ((ref_t*)data)[0];
     data += 2;

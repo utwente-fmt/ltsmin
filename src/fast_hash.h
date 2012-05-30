@@ -3,7 +3,11 @@
 
 #include <stdint.h>
 
-typedef uint32_t (*hash32_f)(const char *key, int len, uint32_t seed);
+typedef uint32_t hash32_t;
+typedef uint64_t hash64_t;
+
+typedef hash32_t (*hash32_f)(const char *key, int len, uint32_t seed);
+typedef hash64_t (*hash64_f)(const char *key, int len, unsigned int seed);
 
 extern uint32_t SuperFastHash (const void *data, int len, uint32_t hash);
 

@@ -3,9 +3,22 @@
 
 /**
 \file dbs-ll.h
-\brief Concurrent synchronous hashtable implementation for fixed size hashes
+\brief Lockless non-resizing hash table implementation for fixed-length keys
 
-Implementation uses lockless operations
+@inproceedings{Laarman:2010:BMR:1998496.1998541,
+  author = {Laarman, Alfons and van de Pol, Jaco and Weber, Michael},
+  title = {Boosting multi-core reachability performance with shared hash tables},
+  booktitle = {Proceedings of the 2010 Conference on Formal Methods in Computer-Aided Design},
+  series = {FMCAD '10},
+  year = {2010},
+  location = {Lugano, Switzerland},
+  pages = {247--256},
+  numpages = {10},
+  url = {http://dl.acm.org/citation.cfm?id=1998496.1998541},
+  acmid = {1998541},
+  publisher = {FMCAD Inc},
+  address = {Austin, TX},
+}
 */
 
 #include <dm/dm.h>
@@ -27,7 +40,7 @@ typedef int       *(*dbs_get_f) (const void *dbs, dbs_ref_t ref, int *dst);
 typedef int        (*dbs_try_set_sat_f) (const void *dbs, const dbs_ref_t ref,
                                          int index);
 typedef int        (*dbs_get_sat_f) (const void *dbs, const dbs_ref_t ref,
-                                      int index);
+                                     int index);
 typedef void       (*dbs_unset_sat_f) (const void *dbs, const dbs_ref_t ref,
                                        int index);
 typedef uint32_t   (*dbs_inc_sat_bits_f) (const void *dbs, const dbs_ref_t ref);
@@ -41,7 +54,7 @@ typedef uint32_t   (*dbs_get_sat_bits_f) (const void *dbs, const dbs_ref_t ref);
 \return the hashtable
 */
 extern dbs_ll_t     DBSLLcreate (int len);
-extern dbs_ll_t     DBSLLcreate_sized (int len, int size, hash32_f hash32, int bits);
+extern dbs_ll_t     DBSLLcreate_sized (int len, int size, hash64_f hash64, int bits);
 
 /**
 \brief Find a vector with respect to a database and insert it if it cannot be fo
@@ -85,7 +98,7 @@ und.
 extern int          DBSLLlookup_ret (const dbs_ll_t dbs, const int *v,
                                      dbs_ref_t *ret);
 extern int          DBSLLlookup_hash (const dbs_ll_t dbs, const int *v,
-                                      dbs_ref_t *ret, uint32_t * hh);
+                                      dbs_ref_t *ret, hash64_t *hh);
 
 extern int         *DBSLLget (const dbs_ll_t dbs, const dbs_ref_t ref, int *dst);
 
