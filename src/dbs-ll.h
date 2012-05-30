@@ -19,6 +19,7 @@ Implementation uses lockless operations
 */
 typedef struct dbs_ll_s *dbs_ll_t;
 
+typedef uint16_t mem_hash_t;
 typedef size_t dbs_ref_t;
 
 typedef stats_t   *(*dbs_stats_f) (const void *dbs);
@@ -51,10 +52,10 @@ und.
 */
 extern dbs_ref_t    DBSLLlookup (const dbs_ll_t dbs, const int *vector);
 
-extern uint16_t     DBSLLget_sat_bits (const dbs_ll_t dbs, const dbs_ref_t ref);
+extern mem_hash_t   DBSLLget_sat_bits (const dbs_ll_t dbs, const dbs_ref_t ref);
 
 extern void         DBSLLset_sat_bits (const dbs_ll_t dbs, const dbs_ref_t ref,
-                                       uint16_t value);
+                                       mem_hash_t value);
 
 extern int          DBSLLtry_set_sat_bit (const dbs_ll_t dbs, const dbs_ref_t ref,
                                           int index);
@@ -69,9 +70,9 @@ extern void         DBSLLunset_sat_bit (const dbs_ll_t dbs, const dbs_ref_t ref,
                                         int index);
 
 
-extern uint16_t     DBSLLinc_sat_bits (const dbs_ll_t dbs, const dbs_ref_t ref);
+extern mem_hash_t   DBSLLinc_sat_bits (const dbs_ll_t dbs, const dbs_ref_t ref);
 
-extern uint16_t     DBSLLdec_sat_bits (const dbs_ll_t dbs, const dbs_ref_t ref);
+extern mem_hash_t   DBSLLdec_sat_bits (const dbs_ll_t dbs, const dbs_ref_t ref);
 
 /**
 \brief Find a vector with respect to a database and insert it if it cannot be fo
@@ -88,7 +89,7 @@ extern int          DBSLLlookup_hash (const dbs_ll_t dbs, const int *v,
 
 extern int         *DBSLLget (const dbs_ll_t dbs, const dbs_ref_t ref, int *dst);
 
-extern uint16_t     DBSLLmemoized_hash (const dbs_ll_t dbs, const dbs_ref_t ref);
+extern mem_hash_t   DBSLLmemoized_hash (const dbs_ll_t dbs, const dbs_ref_t ref);
 
 /**
 \brief Free the memory used by a dbs.
