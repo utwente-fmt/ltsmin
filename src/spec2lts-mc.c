@@ -298,11 +298,10 @@ state_db_popt (poptContext con, enum poptCallbackReason reason,
 }
 
 static void
-exit_ltsmin(int sig)
+exit_ltsmin (int sig)
 {
-    if ( !(lb2_stop(lb2)) ) {
-        Warning(info, "UNGRACEFUL EXIT");
-        exit(EXIT_FAILURE);
+    if ( !lb2_stop(lb2) ) {
+        Abort ("UNGRACEFUL EXIT");
     } else {
         Warning(info, "PREMATURE EXIT (caught signal: %d)", sig);
     }
@@ -437,13 +436,13 @@ enum { RED=0, GREEN=1, DANGEROUS=2 };
 #define GGREEN     GCOLOR(GREEN)    // bit 1
 #define GDANGEROUS GCOLOR(DANGEROUS)// bit 2
 
-static int
+static inline int
 global_has_color (ref_t ref, global_color_t color, int rec_bits)
 {
     return get_sat_bit (dbs, ref, rec_bits+count_bits+color.g);
 }
 
-static int //RED and BLUE are independent
+static inline int //RED and BLUE are independent
 global_try_color (ref_t ref, global_color_t color, int rec_bits)
 {
     return try_set_sat_bit (dbs, ref, rec_bits+count_bits+color.g);
@@ -497,7 +496,6 @@ typedef struct thread_ctx_s wctx_t;
 
 struct thread_ctx_s {
     strategy_t          strategy;
-    pthread_t           me;             // currently executing thread
     size_t              id;             // thread id (0..NUM_THREADS)
     stream_t            out;            // raw file output stream
     model_t             model;          // Greybox model
@@ -548,8 +546,8 @@ static size_t       N; // size of entire state
 static size_t       K; // number of groups
 static size_t       MAX_SUCC; // max succ. count to expand at once
 static size_t       threshold;
-static pthread_attr_t  *attr = NULL;
 static wctx_t     **contexts;
+static pthread_t   *threads;
 static zobrist_t    zobrist = NULL;
 
 static void
@@ -639,6 +637,8 @@ set_red (wctx_t *ctx, state_info_t *state)
     }
 }
 
+static model_t      model = NULL;
+
 static              model_t
 get_model (int first)
 {
@@ -676,7 +676,7 @@ wctx_create (size_t id, int depth, wctx_t *shared)
     wctx_t             *ctx = RTalignZero (CACHE_LINE_SIZE, sizeof (wctx_t));
     ctx->id = id;
     ctx->strategy = strategy[depth];
-    ctx->model = NULL;
+    ctx->model = 0 == id ? model : get_model (0);
     state_info_create_empty (&ctx->state);
     ctx->store = RTalignZero (CACHE_LINE_SIZE, SLOT_SIZE * N * 2);
     ctx->store2 = RTalignZero (CACHE_LINE_SIZE, SLOT_SIZE * N * 2);
@@ -701,15 +701,17 @@ wctx_create (size_t id, int depth, wctx_t *shared)
         ctx->group_stack = isba_create (1);
     }
     ctx->counters.threshold = ctx->red.threshold = threshold;
-    ctx->permute = permute_create (permutation, NULL, W, K, id);
+    ctx->permute = permute_create (permutation, ctx->model, W, K, id);
     ctx->rec_bits = (depth ? shared->rec_bits + num_global_bits(strategy[depth-1]) : 0) ;
     ctx->rec_ctx = NULL;
     ctx->red.timer = SCCcreateTimer ();
     ctx->counters.timer = SCCcreateTimer ();
     statistics_init (&ctx->counters.lattice_ratio);
     ctx->red.time = 0;
-    if (Strat_None != strategy[depth+1])
+    if (Strat_None != strategy[depth+1]) {
         ctx->rec_ctx = wctx_create (id, depth+1, ctx);
+        ctx->rec_ctx->model = shared->model;
+    }
     return ctx;
 }
 
@@ -787,7 +789,7 @@ init_globals (int argc, char *argv[])
 #ifdef OPAAL
     strategy[0] |= Strat_TA;
 #endif
-    model_t             model = get_model (1);
+    model = get_model (1);
     if (Perm_Unknown == permutation) //default permutation depends on strategy
         permutation = strategy[0] & Strat_Reach ? Perm_None : Perm_Dynamic;
     if (Perm_None != permutation) {
@@ -817,7 +819,7 @@ init_globals (int argc, char *argv[])
     D = (strategy[0] & Strat_TA ? N - 2 : N);
     K = dm_nrows (m);
     Warning (info, "State length is %d, there are %d groups", N, K);
-
+    assert (GRED.g == 0);
     if (assert_detect) {
         for (int i = 0; i < edge_labels; i++) {
             char *name = lts_type_get_edge_label_name(ltstype, i);
@@ -896,9 +898,7 @@ init_globals (int argc, char *argv[])
     Warning (info, "Global bits: %d, count bits: %d, local bits: %d.",
              global_bits, count_bits, local_bits);
     contexts = RTmalloc (sizeof (wctx_t *[W]));
-    for (size_t i = 0; i < W; i++)
-        contexts[i] = wctx_create (i, 0, NULL);
-    contexts[0]->model = model;
+    threads = RTmalloc (sizeof (pthread_t[W]));
     initial_data = RTmalloc (SLOT_SIZE * N);
     GBgetInitialState (model, initial_data);
     lb2 = lb2_create_max (W, G, H);
@@ -2634,34 +2634,17 @@ ta_bfs_strict (wctx_t *ctx)
     } while (out_size > 0 && !lb2_is_stopped(lb2));
 }
 
-void
-wctx_init (wctx_t *ctx)
-{
-    permute_set_model (ctx->permute, ctx->model);
-    if (ctx->rec_ctx) {
-        ctx->rec_ctx->model = ctx->model;
-        wctx_init (ctx->rec_ctx);
-    }
-}
-
 /* explore is started for each thread (worker) */
-static pthread_mutex_t mutex;
 static void *
 explore (void *args)
 {
-    assert (GRED.g == 0);
-    wctx_t             *ctx = (wctx_t *) args;
+    size_t              id = (size_t) args;
     mytimer_t           timer = SCCcreateTimer ();
     char                lbl[20];
-    snprintf (lbl, sizeof (char[20]), W>1?"%s[%zu]":"%s", program, ctx->id);
+    snprintf (lbl, sizeof (char[20]), W>1?"%s[%zu]":"%s", program, id);
     set_label (lbl);    // register print label and load model
-
-    if (NULL == ctx->model) {
-        pthread_mutex_lock (&mutex);
-        ctx->model = get_model (0);
-        pthread_mutex_unlock (&mutex);
-    }
-    wctx_init (ctx);
+    wctx_t             *ctx = wctx_create (id, 0, NULL);
+    contexts[id] = ctx;
     transition_info_t   ti = GB_NO_TRANSITION;
     state_info_initialize (&initial_state, initial_data, &ti, &ctx->state, ctx);
     if ( Strat_TA & strategy[0] )
@@ -2671,8 +2654,7 @@ explore (void *args)
     else if (0 == ctx->id) // only w1 receives load, as it is propagated later
         reach_handle (ctx, &initial_state, &ti, 0);
     ctx->counters.trans = 0; //reset trans count
-
-    lb2_local_init (lb2, ctx->id, ctx);
+    lb2_local_init (lb2, ctx->id, ctx); // barrier
     SCCstartTimer (timer);
     switch (strategy[0]) {
     case Strat_TA_SBFS: ta_bfs_strict (ctx); break;
@@ -2700,7 +2682,6 @@ main (int argc, char *argv[])
 {
     /* Init structures */
     init_globals (argc, argv);
-    pthread_mutex_init (&mutex, NULL);
 
     /* Start workers */
     mytimer_t           timer = SCCcreateTimer ();
@@ -2708,10 +2689,10 @@ main (int argc, char *argv[])
     memset (&stats, 0 , sizeof(stats_t));
     SCCstartTimer (timer);
     for (size_t i = 0; i < W; i++)
-        pthread_create (&contexts[i]->me, attr, explore, contexts[i]);
+        pthread_create (&threads[i], NULL, explore, (void *)i);
     for (size_t i = 0; i < W; i++) {
         stats_t            *stats_i;
-        pthread_join (contexts[i]->me, (void **)&stats_i);
+        pthread_join (threads[i], (void **)&stats_i);
         add_stats (&stats, stats_i);
     }
     SCCstopTimer (timer);
