@@ -45,7 +45,7 @@ static void
 add_block(isb_allocator_t buf)
 {
     Debug("adding block %zu", buf->num_block-1);
-    size_t size = ((buf->el_size+1)*sizeof(int))<<BLOCK_ELT_POW; //allocates an extra overflow element
+    size_t size = ((buf->el_size)*sizeof(int))<<BLOCK_ELT_POW;
     int *block = RTmalloc(size);
     buf->blocks[buf->num_block] = block;
     buf->num_block++;
