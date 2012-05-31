@@ -1,20 +1,33 @@
-DATE - Release NEXT of the LTSmin toolset
+<DATE> - Release <VERSION.NEXT> of the LTSmin toolset
 
  * New frontend for PBESs. The systems are translated into parity
-   games which can be exhausively explored using the analysis
+   games which can be exhaustively explored using the analysis
    algorithms.
     o pbes-reach for symbolic state space generation
     o pbes2lts-grey/gsea for enumerative state space generation
     o pbes2lts-mpi/hre for distributed state space generation
     o spgsolver a symbolic parity game solver
     o PGSolver file output format ('{ast}.pg')
- * Updated SpinJa frontend that accomodates support for valid end 
-   state filtering, guards and assertion violation detection.
+ * Updated SpinJa frontend that accommodates support for valid end-state
+   filtering, guards and assertion violation detection.
  * New parallel BBD package: Sylvan
     o See <thesis Tom van Dijk> for description
     o BDD operations are parallelized using the WOOL framework
       (included)
     o Use: *-reach --vset=sylvan
+ * Optimized multi-core data structures and algorithms
+    o Reduced tree memory usage by 50% by splitting table for roots and leafs.
+      Set the relative ratio using: --ratio=n (n=2 by default)
+    o Created a new tree that uses a parallel Cleary table to store roots
+      halving memory usage in the best case (--state=cleary-tree)
+    o Reduced memoized hash sizes to 16 bit.
+    o Introduced a non-indexing tree that skips the root node for lookups
+      (used automatically if indices are not required by MCNDFs algorithms or
+      by tracing facility)
+    o Reduced initialization times by using calloc instead of malloc+memset
+    o Thread-local initialization and allocation for better NUMA performance
+    o Introduced 64 bit hashing, prime rehashing and Murmur hash function.
+    o New load balancer with simplified interface.
 
 February 22, 2012 - Release 1.8 of the LTSmin toolset
 
