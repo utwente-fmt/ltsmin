@@ -410,13 +410,13 @@ project_matrix_to_tree (treedbs_ll_t dbs, matrix_t *m)
 
 static void
 create_nodes (node_table_t *nodes, size_t log_size, size_t sat_bits, int alloc,
-              int error)
+              int error_num)
 {
     nodes->size = 1ULL << log_size;
     nodes->log_size = log_size;
     nodes->thres = nodes->size / 64;
     nodes->mask = nodes->size - 1;
-    nodes->error_num = error;
+    nodes->error_num = error_num;
     nodes->sat_bits = sat_bits;
     nodes->sat_mask = 0;
     nodes->sat_right = 32 - (sat_bits + 1) / 2;
