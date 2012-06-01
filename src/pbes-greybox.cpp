@@ -37,107 +37,132 @@ class explorer : public mcrl2::pbes_system::explorer {
 private:
     model_t model_;
     std::vector<std::map<int,int> > local2global_maps;
-    std::vector<std::map<int,int> > global2local_maps;
-
+    std::vector<std::vector<int> > global2local_maps;
+    int* global_group_var_ids;
+    static const int IDX_NOT_FOUND = -1;
 public:
     explorer(model_t& model, const std::string& filename, const std::string& rewrite_strategy, bool reset = false) :
         mcrl2::pbes_system::explorer(filename, rewrite_strategy, reset),
-        model_(model)
+        model_(model),
+        global_group_var_ids(0)
     {
+        local2global_maps.resize(get_info()->get_lts_type().get_number_of_state_types());
         for (int i = 0; i <= get_info()->get_lts_type().get_number_of_state_types(); i++) {
             std::map<int,int> local2global_map;
             local2global_maps.push_back(local2global_map);
-            std::map<int,int> global2local_map;
+            std::vector<int> global2local_map;
             global2local_maps.push_back(global2local_map);
         }
     }
 
     ~explorer()
-    { }
-
-    int put_chunk(int type_no, std::string value)
     {
-        char* s = new char[value.length() + 1];
-        value.copy(s, std::string::npos);
-        s[value.length()] = 0;
-        int index = GBchunkPut(model_, type_no, chunk_str(s));
-        delete[] s;
+        if (global_group_var_ids != 0)
+        {
+            RTfree(global_group_var_ids);
+        }
+    }
+
+    void init_group_id_cache()
+    {
+        if (global_group_var_ids != 0)
+        {
+            RTfree(global_group_var_ids);
+        }
+        global_group_var_ids = (int*)RTmalloc((this->get_info()->get_transition_variable_names().size())*sizeof(int));
+        int type_no = lts_type_get_state_typeno(GBgetLTStype(model_), 0);
+        int group = 0;
+        for(std::vector<std::string>::const_iterator var_name_it = this->get_info()->get_transition_variable_names().begin();
+                var_name_it != this->get_info()->get_transition_variable_names().end(); ++var_name_it)
+        {
+            int group_var_id = this->put_chunk(type_no, *var_name_it);
+            global_group_var_ids[group] = group_var_id;
+            group++;
+        }
+    }
+
+    inline int put_chunk(int type_no, std::string value)
+    {
+        int index = GBchunkPut(model_, type_no, chunk_str(const_cast<char*>(value.c_str())));
         return index;
     }
 
     void local_to_global(int* const& local, int* global)
     {
-        //gb_context_t ctx = (gb_context_t)GBgetContext(model);
         int state_length = lts_type_get_state_length(GBgetLTStype(model_));
-        int type_no;
-        std::map<int,int> local2global_map;
         for(int i=0; i<state_length; i++)
         {
-            type_no = lts_type_get_state_typeno(GBgetLTStype(model_), i);
-            //std::clog << "[" << getpid() << "] local2Global i = " << i << " type_no = " << type_no << " local[i] = " << local[i] << std::endl;
-            local2global_map = local2global_maps.at(type_no);
-            std::map<int,int>::const_iterator it = local2global_map.find(local[i]);
-            if(it == local2global_map.end())
+            int type_no = lts_type_get_state_typeno(GBgetLTStype(model_), i);
+            std::map<int,int>::iterator it = local2global_maps[type_no].find(local[i]);
+            if(it != local2global_maps[type_no].end())
+            {
+                global[i] = it->second;
+            }
+            else
             {
                 std::string s = this->get_value(type_no, local[i]);
                 global[i] = this->put_chunk(type_no, s);
-                local2global_map.insert(std::make_pair(local[i],global[i]));
-                global2local_maps.at(type_no).insert(std::make_pair(global[i],local[i]));
-            }
-            else {
-                global[i] = it->second;
+                local2global_maps[type_no][local[i]] = global[i];
+                global2local_maps[type_no].resize(global[i]+1, IDX_NOT_FOUND);
+                global2local_maps[type_no][global[i]] = local[i];
             }
         }
     }
 
-    std::string get_chunk(int type_no, int index)
+    inline std::string get_chunk(int type_no, int index)
     {
         chunk c = GBchunkGet(model_, type_no, index);
         if (c.len == 0) {
             Fatal(1, error, "lookup of %d failed", index);
         }
-        char s[c.len + 1];
-        for (unsigned int i = 0; i < c.len; i++) {
-            s[i] = c.data[i];
+        return std::string(reinterpret_cast<char*>(c.data), c.len);
+    }
+
+    inline int find_local_index(int type_no, int global)
+    {
+        if (global < static_cast<ssize_t>(global2local_maps[type_no].size()) && global2local_maps[type_no][global] != IDX_NOT_FOUND)
+        {
+            return global2local_maps[type_no][global];
         }
-        s[c.len] = 0;
-        std::string value = std::string(s);
-        return value;
+        else
+        {
+            int local = this->get_index(type_no, this->get_chunk(type_no, global));
+            global2local_maps[type_no].resize(global+1, IDX_NOT_FOUND);
+            global2local_maps[type_no][global] = local;
+            local2global_maps[type_no][local] = global;
+            return local;
+        }
     }
 
     void global_to_local(int* const& global, int* local)
     {
-        //gb_context_t ctx = (gb_context_t)GBgetContext(model);
-        //ltsmin::explorer* pbes_explorer = ctx->pbes_explorer;
         int state_length = lts_type_get_state_length(GBgetLTStype(model_));
-        int type_no;
-        std::map<int,int> global2local_map;
         for(int i=0; i<state_length; i++)
         {
-            type_no = lts_type_get_state_typeno(GBgetLTStype(model_), i);
-            //std::clog << "globalToLocal i = " << i << " type_no = " << type_no << " global[i] = " << global[i] << std::endl;
-            global2local_map = global2local_maps.at(type_no);
-            std::map<int,int>::const_iterator it = global2local_map.find(global[i]);
-            if(it == global2local_map.end())
-            {
-                std::string s = this->get_chunk(type_no, global[i]);
-                local[i] = this->get_index(type_no, s);
-                global2local_map.insert(std::make_pair(global[i],local[i]));
-                local2global_maps.at(type_no).insert(std::make_pair(local[i],global[i]));
-            }
-            else {
-                local[i] = it->second;
-            }
+            int type_no = lts_type_get_state_typeno(GBgetLTStype(model_), i);
+            local[i] = find_local_index(type_no, global[i]);
         }
+    }
+
+    inline bool check_group(int* const& src, std::size_t group)
+    {
+        if (global_group_var_ids == 0)
+        {
+            Fatal(1,error,"call to check_group before init_group_id_cache.");
+        }
+        return global_group_var_ids[group] == src[0];
     }
 
     template <typename callback>
     void next_state_long(int* const& src, std::size_t group, callback& f)
     {
-        int state_length = lts_type_get_state_length(GBgetLTStype(model_));
-        int local_src[state_length];
-        this->global_to_local(src, local_src);
-        mcrl2::pbes_system::explorer::next_state_long(local_src, group, f);
+        if (this->check_group(src, group))
+        {
+            int state_length = lts_type_get_state_length(GBgetLTStype(model_));
+            int local_src[state_length];
+            this->global_to_local(src, local_src);
+            mcrl2::pbes_system::explorer::next_state_long(local_src, group, f);
+        }
     }
 
     template <typename callback>
@@ -166,7 +191,6 @@ public:
         if (label==0)
         {
             int priority = this->get_info()->get_variable_priorities().at(varname);
-            //std::clog << "var: " << varname << ", priority: " << priority << std::endl;
             return priority;
         }
         else if (label==1)
@@ -345,6 +369,7 @@ void PBESloadGreyboxModel(model_t model, const char*name)
     lts_info* info = pbes_explorer->get_info();
     lts_type_t ltstype = PBESgetLTSType(info->get_lts_type());
     GBsetLTStype(model, ltstype);
+    ctx->pbes_explorer->init_group_id_cache();
     int state_length = lts_type_get_state_length(ltstype);
 
 
