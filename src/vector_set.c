@@ -59,7 +59,9 @@ static si_map_entry vset_table[]={
 #ifdef HAVE_DDD_H
 	{"ddd",VSET_DDD},
 #endif
+#ifdef HAVE_SYLVAN
     {"sylvan",VSET_Sylvan},
+#endif // HAVE_SYLVAN
 	{NULL,0}
 };
 
@@ -76,7 +78,9 @@ struct poptOption vset_options[]={
     { NULL,0 , POPT_ARG_INCLUDE_TABLE , atermdd_options , 0 , "ATermDD options" , NULL},
 #endif
     { NULL,0 , POPT_ARG_INCLUDE_TABLE , buddy_options , 0 , "BuDDy options" , NULL},
+#ifdef HAVE_SYLVAN
 	{ NULL,0 , POPT_ARG_INCLUDE_TABLE , sylvan_options , 0 , "Sylvan options" , NULL},
+#endif // HAVE_SYLVAN
     POPT_TABLEEND
 };
 
@@ -97,9 +101,10 @@ vdom_create_domain(int n, vset_implementation_t impl)
 #ifdef HAVE_DDD_H
     case VSET_DDD: return vdom_create_ddd(n);
 #endif
+#ifdef HAVE_SYLVAN
     case VSET_Sylvan: return vdom_create_sylvan(n);
-        default:
-            return NULL;
+#endif // HAVE_SYLVAN
+    default: return NULL;
     }
 }
 

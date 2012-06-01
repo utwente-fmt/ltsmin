@@ -215,10 +215,6 @@ AX_CXX_CHECK_LIB([DDD],[GDDD::size() const],
    ])
 AC_LANG_POP([C++])
 
-AC_SUBST([SYLVAN_LIBS],['-lsylvan -lm'])
-AC_SUBST([SYLVAN_CPPFLAGS],['-I${top_srcdir}/sylvan/src'])
-AC_SUBST([SYLVAN_LDFLAGS],['-L${top_builddir}/sylvan'])
-
 AC_CHECK_LIB([rt], [aio_error])
 ACX_CADP_BCG_WRITE([have_bcg=yes],
   [have_bcg=no
@@ -336,6 +332,24 @@ AC_CHECK_LIB([tbbmalloc_proxy], [malloc],
     [have_opaal="yes"],
     AC_MSG_WARN([TBB malloc library not found.]))
 
+AC_ARG_WITH([sylvan],[AS_HELP_STRING([--with-sylvan],[Compile sylvan])],
+            [],[with_sylvan=no])
+
+case $host in
+  x86_64-*linux*)
+    [with_sylvan="yes"];;
+esac
+
+if test "x$with_sylvan" == xyes; then
+    AC_CONFIG_SUBDIRS([sylvan])
+    [have_sylvan="yes"]
+fi
+
+AC_SUBST([SYLVAN_LIBS],['${top_srcdir}/sylvan/libsylvan.la'])
+AC_SUBST([SYLVAN_CPPFLAGS],['-I${top_srcdir}/sylvan/src'])
+AC_SUBST([SYLVAN_LDFLAGS])
+
+AM_CONDITIONAL([HAVE_SYLVAN], [test x"$have_sylvan" = "xyes"])
 AM_CONDITIONAL([HAVE_OPAAL], [test x"$have_opaal" = "xyes"])
 AM_CONDITIONAL([HAVE_MPI], [test x"$have_mpi" != "x"])
 AM_CONDITIONAL([HAVE_LIBGMP], 
@@ -388,7 +402,7 @@ AC_CONFIG_FILES([
 
 AC_CONFIG_LINKS([src/lempar.c:lemon/lempar.c])
 
-AC_CONFIG_SUBDIRS([buddy ltl2ba sylvan])
+AC_CONFIG_SUBDIRS([buddy ltl2ba])
 
 AC_OUTPUT
 
@@ -405,6 +419,7 @@ Configuration:
     DiVinE-cluster
              = ${with_divine:-NOT FOUND, building without DiVinE support}
     OPAAL    = ${have_opaal:-TBB malloc NOT FOUND, building without opaal support}
+    SYLVAN   = ${have_sylvan:-NO. Only on Linux x86_64 (override with --with-sylvan)}
 
     ASCIIDOC = ${ASCIIDOC:-NOT FOUND, not building documentation}
     XMLTO    = ${XMLTO:-NOT FOUND, not building manpages}
