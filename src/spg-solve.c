@@ -5,6 +5,9 @@
  *      Author: kant
  */
 #include <limits.h>
+#if HAVE_PROFILER
+#include <gperftools/profiler.h>
+#endif
 
 #include <spg-solve.h>
 #include <runtime.h>
@@ -249,9 +252,15 @@ bool spg_solve(const parity_game* g, spgsolver_options* options)
     } else {
         opts = options;
     }
+#if HAVE_PROFILER
+    ProfilerStart("spgsolver.perf");
+#endif
     SCCstartTimer(opts->spg_solve_timer);
     recursive_result result = spg_solve_recursive(g, opts);
     SCCstopTimer(opts->spg_solve_timer);
+#if HAVE_PROFILER
+    ProfilerStop();
+#endif
     return vset_member(result.win[0], g->src);
 }
 
@@ -267,19 +276,19 @@ recursive_result spg_solve_recursive(const parity_game* g,  const spgsolver_opti
     Warning(info, "");
     Warning(info, "solve_recursive: game has %d nodes", n_count);
     //report_game(g);
-    vdom_t domain = g->domain;
+    //vdom_t domain = g->domain;
     recursive_result result;
     if (vset_is_empty(g->v)) {
         Warning(info, "solve_recursive: game is empty.");
-        result.win[0] = vset_create(domain, -1, NULL);
-        result.win[1] = vset_create(domain, -1, NULL);
+        result.win[0] = vset_create(g->domain, -1, NULL);
+        result.win[1] = vset_create(g->domain, -1, NULL);
         return result;
     }
 
     // compute U <- {v \in V | p(v) = m}
     Warning(info, "  min = %d, max = %d", g->min_priority, g->max_priority);
     int m = g->min_priority;
-    vset_t u = vset_create(domain, -1, NULL);
+    vset_t u = vset_create(g->domain, -1, NULL);
     vset_copy(u, g->v_priority[m]);
     vset_count(u, &n_count, &elem_count);
     while(vset_is_empty(u)) {
@@ -311,11 +320,11 @@ recursive_result spg_solve_recursive(const parity_game* g,  const spgsolver_opti
         vset_destroy(x.win[player]);
         vset_destroy(x.win[1-player]);
         result.win[player] = u;
-        result.win[1-player] = vset_create(domain, -1, NULL);
+        result.win[1-player] = vset_create(g->domain, -1, NULL);
     } else {
         vset_destroy(u);
         vset_destroy(x.win[player]);
-        vset_t b = vset_create(domain, -1, NULL);
+        vset_t b = vset_create(g->domain, -1, NULL);
         vset_copy(b, x.win[1-player]);
         vset_destroy(x.win[1-player]);
         options->chaining ? spg_attractor_chaining(1-player, g, b, options) : spg_attractor(1-player, g, b, options);
@@ -371,14 +380,13 @@ void spg_game_restrict(parity_game *g, vset_t a, const spgsolver_options* option
  */
 void spg_attractor(int player, const parity_game* g, vset_t u, const spgsolver_options* options)
 {
-    (void)options;
-    vdom_t domain = g->domain;
-    vset_t v_level = vset_create(domain, -1, NULL);
+    //vdom_t domain = g->domain;
+    vset_t v_level = vset_create(g->domain, -1, NULL);
     vset_copy(v_level, u);
-
     int l = 0;
     // Compute fixpoint
     while (!vset_is_empty(v_level)) {
+        /*
         long   u_count;
         bn_int_t u_elem_count;
         vset_count(u, &u_count, &u_elem_count);
@@ -389,10 +397,11 @@ void spg_attractor(int player, const parity_game* g, vset_t u, const spgsolver_o
         Warning(info, "attr_%d^%d [%5.3f]: u has %ld nodes, v_level has %ld nodes.",
                 SCCrealTime(options->spg_solve_timer), player, l, u_count, level_count);
         SCCstartTimer(options->spg_solve_timer);
+        */
 
         // prev_attr = V \intersect prev(attr^k)
-        vset_t prev_attr = vset_create(domain, -1, NULL);
-        vset_t tmp = vset_create(domain, -1, NULL);
+        vset_t prev_attr = vset_create(g->domain, -1, NULL);
+        vset_t tmp = vset_create(g->domain, -1, NULL);
         for(int group=0; group<g->num_groups; group++) {
             vset_clear(tmp);
             vset_prev(tmp, v_level, g->e[group]);
@@ -406,7 +415,7 @@ void spg_attractor(int player, const parity_game* g, vset_t u, const spgsolver_o
         vset_intersect(v_level, g->v_player[player]);
 
         // B = next(V \intersect prev_attr)
-        vset_t b = vset_create(domain, -1, NULL);
+        vset_t b = vset_create(g->domain, -1, NULL);
         for(int group=0; group<g->num_groups; group++) {
             vset_clear(tmp);
             vset_next(tmp, prev_attr, g->e[group]);
@@ -418,7 +427,7 @@ void spg_attractor(int player, const parity_game* g, vset_t u, const spgsolver_o
         vset_minus(b, u);
 
         // prev_b = V \intersect prev(B)
-        vset_t prev_b = vset_create(domain, -1, NULL);
+        vset_t prev_b = vset_create(g->domain, -1, NULL);
         for(int group=0; group<g->num_groups; group++) {
             vset_clear(tmp);
             vset_prev(tmp, b, g->e[group]);
@@ -429,7 +438,7 @@ void spg_attractor(int player, const parity_game* g, vset_t u, const spgsolver_o
         vset_destroy(b);
 
         // Compute V_other_player \intersects (prev_attr - prev_b)
-        vset_t attr_other_player = vset_create(domain, -1, NULL);
+        vset_t attr_other_player = vset_create(g->domain, -1, NULL);
         vset_copy(attr_other_player, prev_attr);
         vset_destroy(prev_attr);
         vset_minus(attr_other_player, prev_b);
@@ -445,6 +454,7 @@ void spg_attractor(int player, const parity_game* g, vset_t u, const spgsolver_o
     }
     Warning(info, "attr_%d: %d levels.", player, l);
     vset_destroy(v_level);
+    (void)options;
 }
 
 
@@ -454,15 +464,16 @@ void spg_attractor(int player, const parity_game* g, vset_t u, const spgsolver_o
  */
 void spg_attractor_chaining(int player, const parity_game* g, vset_t u, const spgsolver_options* options)
 {
-    vdom_t domain = g->domain;
-    vset_t v_level = vset_create(domain, -1, NULL);
-    vset_t v_previous_level = vset_create(domain, -1, NULL);
-    vset_t v_group = vset_create(domain, -1, NULL);
+    //vdom_t domain = g->domain;
+    vset_t v_level = vset_create(g->domain, -1, NULL);
+    vset_t v_previous_level = vset_create(g->domain, -1, NULL);
+    vset_t v_group = vset_create(g->domain, -1, NULL);
     vset_copy(v_level, u);
     int l = 0;
     long peak_group_count = 0;
     // Compute fixpoint
     while (!vset_is_empty(v_level)) {
+        /*
         long   u_count;
         bn_int_t u_elem_count;
         vset_count(u, &u_count, &u_elem_count);
@@ -474,6 +485,7 @@ void spg_attractor_chaining(int player, const parity_game* g, vset_t u, const sp
                 SCCrealTime(options->spg_solve_timer), player, l, u_count, v_level_count, peak_group_count);
         SCCstartTimer(options->spg_solve_timer);
         peak_group_count = 0;
+        */
 
         vset_copy(v_previous_level, v_level);
         vset_clear(v_level);
@@ -481,6 +493,7 @@ void spg_attractor_chaining(int player, const parity_game* g, vset_t u, const sp
             vset_copy(v_group, v_previous_level);
             int k = 0;
             while ((options->saturation || k < 1) && !vset_is_empty(v_group)) {
+                /*
                 vset_count(u, &u_count, &u_elem_count);
                 vset_count(v_level, &v_level_count, &v_level_elem_count);
                 long   v_group_count;
@@ -490,9 +503,10 @@ void spg_attractor_chaining(int player, const parity_game* g, vset_t u, const sp
                 if (v_group_count > peak_group_count) {
                     peak_group_count = v_group_count;
                 }
+                */
 
                 // prev_attr = V \intersect prev(attr^k)
-                vset_t prev_attr = vset_create(domain, -1, NULL);
+                vset_t prev_attr = vset_create(g->domain, -1, NULL);
                 vset_prev(prev_attr, v_group, g->e[group]);
                 vset_copy(v_group, prev_attr);
                 vset_intersect(v_group, g->v_player[player]);
@@ -500,8 +514,8 @@ void spg_attractor_chaining(int player, const parity_game* g, vset_t u, const sp
                 vset_t prev_attr_other_player = prev_attr;
                 vset_intersect(prev_attr_other_player, g->v_player[1-player]);
                 // B = next(V \intersect prev_attr)
-                vset_t b = vset_create(domain, -1, NULL);
-                vset_t tmp = vset_create(domain, -1, NULL);
+                vset_t b = vset_create(g->domain, -1, NULL);
+                vset_t tmp = vset_create(g->domain, -1, NULL);
                 for(int group=0; group<g->num_groups; group++) {
                     vset_clear(tmp);
                     vset_next(tmp, prev_attr_other_player, g->e[group]);
@@ -513,7 +527,7 @@ void spg_attractor_chaining(int player, const parity_game* g, vset_t u, const sp
                 vset_minus(b, u);
 
                 // prev_b = V \intersect prev(B)
-                vset_t prev_b = vset_create(domain, -1, NULL);
+                vset_t prev_b = vset_create(g->domain, -1, NULL);
                 for(int group=0; group<g->num_groups; group++) {
                     vset_clear(tmp);
                     vset_prev(tmp, b, g->e[group]);

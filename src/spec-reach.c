@@ -39,7 +39,20 @@ static int   save_sat_levels = 0;
 
 #if defined(PBES)
 static int   pgsolve_flag = 0;
+static int   pgreduce_flag = 0;
 static char* pg_output = NULL;
+static int var_pos = 0;
+static int var_type_no = 0;
+static int variable_projection = 0;
+static size_t true_index = 0;
+static size_t false_index = 1;
+static size_t num_vars = 0;
+static int* player = 0; // players of variables
+static int* priority = 0; // priorities of variables
+static int min_priority = INT_MAX;
+static int max_priority = INT_MIN;
+static vset_t true_states;
+static vset_t false_states;
 #endif
 
 static enum { BFS_P , BFS , CHAIN_P, CHAIN } strategy = BFS_P;
@@ -136,9 +149,10 @@ static  struct poptOption options[] = {
     { "mu" , 0 , POPT_ARG_STRING , &mu_formula , 0 , "file with a mu formula" , "<mu-file>.mu" },
     { "ctl*" , 0 , POPT_ARG_STRING , &ctl_formula , 0 , "file with a ctl* formula" , "<ctl*-file>.ctl" },
 #if defined(PBES)
-    { "pgsolve" , 0 , POPT_ARG_NONE , &pgsolve_flag, 0, "Solve the generated parity game (only for symbolic tool).","" },
+    { "pg-solve" , 0 , POPT_ARG_NONE , &pgsolve_flag, 0, "Solve the generated parity game (only for symbolic tool).","" },
     { NULL, 0 , POPT_ARG_INCLUDE_TABLE, spg_solve_options , 0, "Symbolic parity game solver options", NULL},
-    { "write-pg" , 0 , POPT_ARG_STRING , &pg_output, 0, "file to write symbolic parity game to","<pg-file>.spg" },
+    { "pg-reduce" , 0 , POPT_ARG_NONE , &pgreduce_flag, 0, "Reduce the generated parity game on-the-fly (only for symbolic tool).","" },
+    { "pg-write" , 0 , POPT_ARG_STRING , &pg_output, 0, "file to write symbolic parity game to","<pg-file>.spg" },
 #endif
     SPEC_POPT_OPTIONS,
     { NULL, 0 , POPT_ARG_INCLUDE_TABLE, greybox_options , 0 , "Greybox options",NULL},
@@ -663,6 +677,168 @@ final_stat_reporting(vset_t visited, mytimer_t timer)
                    "%ld nodes )\n", max_trans_count, max_grp_count);
 }
 
+#if defined(PBES)
+/**
+ * \brief Computes the subset of v that belongs to player <tt>player</tt>.
+ * \param vars the indices of variables of player <tt>player</tt>.
+ */
+static inline void add_variable_subset(vset_t dst, vset_t src, vdom_t domain, int var_index)
+{
+    //Warning(info, "add_variable_subset: var_index=%d", var_index);
+    int p_len = 1;
+    int proj[1] = {var_pos}; // position 0 encodes the variable
+    int match[1] = {var_index}; // the variable
+    vset_t u = vset_create(domain, -1, NULL);
+    vset_copy_match_proj(u, src, p_len, proj, variable_projection, match);
+
+/*
+    chunk c = GBchunkGet(model, var_type_no, var_index);
+    if (c.len == 0) {
+        Fatal(1, error, "lookup of %d failed", var_index);
+    }
+    char s[c.len + 1];
+    for (unsigned int i = 0; i < c.len; i++) {
+        s[i] = c.data[i];
+    }
+    s[c.len] = 0;
+    Warning(info, "add_variable_subset: Variable %d: %s", var_index, s);
+    long   n_count;
+    char   elem_str[1024];
+    double e_count;
+    get_vset_size(u, &n_count, &e_count, elem_str, sizeof(elem_str));
+    Warning(info, "add_variable_subset:   %s (~%1.2e) states", elem_str, e_count);
+*/
+    vset_union(dst, u);
+    vset_destroy(u);
+}
+#endif
+
+#if defined(PBES)
+static inline void reduce_parity_game(vset_t next_level, vset_t visited, vset_t true_states, vset_t false_states)
+{
+    int p_len = 1;
+    int proj[1] = {var_pos}; // position 0 encodes the variable
+    int true_match[1] = {true_index}; // the variable
+    int false_match[1] = {false_index}; // the variable
+    long   n_count;
+    char   elem_str[1024];
+    double e_count;
+    vset_t tmp = vset_create(domain, -1, NULL);
+
+    vset_t next_level_prev = vset_create(domain, -1, NULL);
+    for (int i = 0; i < nGrps; i++) {
+        vset_prev(tmp, next_level, group_next[i]);
+        vset_union(next_level_prev, tmp);
+        vset_clear(tmp);
+    }
+    vset_intersect(next_level_prev, visited);
+
+    vset_copy_match_proj(true_states, next_level, p_len, proj, variable_projection, true_match);
+    get_vset_size(true_states, &n_count, &e_count, elem_str, sizeof(elem_str));
+    //Warning(info, "reduce_parity_game: %s (~%1.2e) TRUE states", elem_str, e_count);
+    vset_t true_prev = vset_create(domain, -1, NULL);
+    for (int i = 0; i < nGrps; i++) {
+        vset_prev(tmp, true_states, group_next[i]);
+        vset_union(true_prev, tmp);
+        vset_clear(tmp);
+    }
+    vset_intersect(true_prev, next_level_prev);
+    get_vset_size(true_prev, &n_count, &e_count, elem_str, sizeof(elem_str));
+    //Warning(info, "reduce_parity_game: %s (~%1.2e) TRUE prev states", elem_str, e_count);
+
+    vset_copy_match_proj(false_states, next_level, p_len, proj, variable_projection, false_match);
+    get_vset_size(false_states, &n_count, &e_count, elem_str, sizeof(elem_str));
+    //Warning(info, "reduce_parity_game: %s (~%1.2e) FALSE states", elem_str, e_count);
+    vset_t false_prev = vset_create(domain, -1, NULL);
+    for (int i = 0; i < nGrps; i++) {
+        vset_prev(tmp, false_states, group_next[i]);
+        vset_union(false_prev, tmp);
+        vset_clear(tmp);
+    }
+    vset_intersect(false_prev, next_level_prev);
+    get_vset_size(false_prev, &n_count, &e_count, elem_str, sizeof(elem_str));
+    //Warning(info, "reduce_parity_game: %s (~%1.2e) FALSE prev states", elem_str, e_count);
+
+    // compute which states in visited are AND/OR states
+    // computes AND states with FALSE successor, OR states with TRUE successor.
+    vset_t v_player[2];
+    for(int p=0; p<2; p++) {
+        v_player[p] = vset_create(domain, -1, NULL);
+    }
+    for(size_t i = 0; i < num_vars; i++)
+    {
+        if (i != false_index && i != true_index)
+        {
+            //Warning(info, "Adding nodes for var %d (player %d).", i, player[i]);
+            add_variable_subset(v_player[player[i]], (player[i] == 1) ? false_prev : true_prev, domain, i); // AND is player 1, OR is player 0
+        }
+    }
+
+    // compute successors of true_prev are in next_level that are not 'true' states.
+    //       These can be discarded.
+    // P == v_player[0] \setunion v_player[1]
+    // R == visited
+    // now compute next(P) - next(R-P) - {true, false}
+
+    vset_t P_next = vset_create(domain, -1, NULL);
+    for(int p=0; p<2; p++) {
+        get_vset_size(v_player[p], &n_count, &e_count, elem_str, sizeof(elem_str));
+        //Warning(info, "reduce_parity_game: %s (~%1.2e) %s states with a successor %s.", elem_str, e_count, (p==1)?"AND":"OR", (p==1)?"FALSE":"TRUE");
+        for (int i = 0; i < nGrps; i++) {
+            vset_next(tmp, v_player[p], group_next[i]);
+            vset_union(P_next, tmp);
+            vset_clear(tmp);
+        }
+    }
+    vset_intersect(P_next, next_level);
+
+    if (!vset_is_empty(P_next))
+    {
+        vset_t R_minus_P = vset_create(domain, -1, NULL);
+        vset_copy(R_minus_P, visited);
+        for(int p=0; p<2; p++) {
+            vset_minus(R_minus_P, v_player[p]);
+        }
+
+        vset_t R_minus_P_next = vset_create(domain, -1, NULL);
+        for (int i = 0; i < nGrps; i++) {
+            vset_next(tmp, R_minus_P, group_next[i]);
+            vset_union(R_minus_P_next, tmp);
+            vset_clear(tmp);
+        }
+
+        get_vset_size(P_next, &n_count, &e_count, elem_str, sizeof(elem_str));
+        Warning(info, "reduce_parity_game: %s (~%1.2e) P_next states.", elem_str, e_count);
+        get_vset_size(R_minus_P_next, &n_count, &e_count, elem_str, sizeof(elem_str));
+        Warning(info, "reduce_parity_game: %s (~%1.2e) R_minus_P_next states.", elem_str, e_count);
+        vset_minus(P_next, R_minus_P_next);
+        get_vset_size(P_next, &n_count, &e_count, elem_str, sizeof(elem_str));
+        Warning(info, "reduce_parity_game: %s (~%1.2e) [P_next - R_minus_P_next]", elem_str, e_count);
+        vset_minus(P_next, true_states);
+        vset_minus(P_next, false_states);
+        get_vset_size(P_next, &n_count, &e_count, elem_str, sizeof(elem_str));
+        Warning(info, "reduce_parity_game: RESULT: %s (~%1.2e) states that can be skipped.", elem_str, e_count);
+
+        vset_minus(next_level, P_next);
+
+        vset_destroy(R_minus_P);
+        vset_destroy(R_minus_P_next);
+    }
+
+    vset_destroy(P_next);
+    for(int p=0; p<2; p++) {
+        vset_destroy(v_player[p]);
+    }
+    vset_destroy(true_prev);
+    vset_destroy(false_prev);
+    vset_destroy(next_level_prev);
+    vset_destroy(tmp);
+
+    vset_clear(true_states);
+    vset_clear(false_states);
+}
+#endif
+
 static void
 reach_bfs_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
                    long *eg_count, long *next_count)
@@ -705,6 +881,11 @@ reach_bfs_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
         }
         diagnostic("\rlocal next complete       \n");
         if (dlk_detect) deadlock_check(deadlocks, reach_groups);
+
+#if defined(PBES)
+        if (pgreduce_flag) reduce_parity_game(next_level, visited, true_states, false_states);
+#endif
+
         vset_union(visited, next_level);
         vset_copy(current_level, next_level);
         vset_clear(next_level);
@@ -808,6 +989,11 @@ reach_chain_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
         diagnostic("\rround %d complete       \n", level);
         // no deadlocks in old new_states
         if (dlk_detect) deadlock_check(deadlocks, reach_groups);
+
+#if defined(PBES)
+        if (pgreduce_flag) reduce_parity_game(new_states, visited, true_states, false_states);
+#endif
+
         vset_zip(visited, new_states);
         vset_reorder(domain);
     }
@@ -1733,54 +1919,15 @@ mu_compute (ltsmin_expr_t mu_expr, vset_t visited)
     return result;
 }
 
-
-/**
- * \brief Computes the subset of v that belongs to player <tt>player</tt>.
- * \param vars the indices of variables of player <tt>player</tt>.
- */
-void add_variable_subset(vset_t dst, vset_t src, const parity_game* g, int p_id, int var_pos, int var_index)
-{
-    //Warning(info, "add_variable_subset: var_index=%d", var_index);
-    int p_len = 1;
-    int proj[1] = {var_pos}; // position 0 encodes the variable
-    int match[1] = {var_index}; // the variable
-    vset_t u = vset_create(g->domain, -1, NULL);
-    vset_copy_match_proj(u, src, p_len, proj, p_id, match);
-    vset_union(dst, u);
-    vset_destroy(u);
-}
-
 #if defined(PBES)
-/**
- * \brief Creates a symbolic parity game
- */
-parity_game* compute_symbolic_parity_game(vset_t visited, int* src, int p_id)
+void init_pbes()
 {
-    lts_type_t type = GBgetLTStype(model);
-    int var_type_no = 0;
-    int var_pos = 0;
-    for(int i=0; i<N; i++)
+    num_vars = GBchunkCount(model, var_type_no); // number of propositional variables
+    priority = RTmalloc(num_vars * sizeof(int)); // priority of variables
+    player = RTmalloc(num_vars * sizeof(int)); // player of variables
+    for(size_t i=0; i<num_vars; i++)
     {
-        //printf("%d: %s (%d [%s])\n", i, lts_type_get_state_name(type, i), lts_type_get_state_typeno(type, i), lts_type_get_state_type(type, i));
-        char* str1 = "string";
-        size_t strlen1 = strlen(str1);
-        char* str2 = lts_type_get_state_type(type, i);
-        size_t strlen2 = strlen(str2);
-        if (strlen1==strlen2 && strncmp(str1, str2, strlen1)==0)
-        {
-            var_pos = i;
-            var_type_no = lts_type_get_state_typeno(type, i);
-            //printf("Variable: %d [%d].\n", var_pos, var_type_no);
-        }
-    }
-    int num_vars = GBchunkCount(model, var_type_no); // number of propositional variables
-    int priority[num_vars]; // priorities of variables
-    int min_priority = INT_MAX;
-    int max_priority = INT_MIN;
-    int player[num_vars]; // players of variables
-    for(int i=0; i<num_vars; i++)
-    {
-        chunk c = GBchunkGet(model, var_type_no, i);
+        /*chunk c = GBchunkGet(model, var_type_no, i);
         if (c.len == 0) {
             Fatal(1, error, "lookup of %d failed", i);
         }
@@ -1788,7 +1935,7 @@ parity_game* compute_symbolic_parity_game(vset_t visited, int* src, int p_id)
         for (unsigned int i = 0; i < c.len; i++) {
             s[i] = c.data[i];
         }
-        s[c.len] = 0;
+        s[c.len] = 0;*/
         //Warning(info, "Variable %d: %s", i, s);
         lts_type_t type = GBgetLTStype(model);
         int state_length = lts_type_get_state_length(type);
@@ -1814,19 +1961,29 @@ parity_game* compute_symbolic_parity_game(vset_t visited, int* src, int p_id)
         player[i] = label;
         //Warning(info, "  label %d (player): %d", 1, label);
     }
+}
+#endif
+
+#if defined(PBES)
+/**
+ * \brief Creates a symbolic parity game
+ */
+parity_game* compute_symbolic_parity_game(vset_t visited, int* src)
+{
+    // num_vars and player have been pre-computed by init_pbes.
     parity_game* g = spg_create(domain, N, nGrps, min_priority, max_priority);
     for(int i=0; i < N; i++)
     {
         g->src[i] = src[i];
     }
     vset_copy(g->v, visited);
-    for(int i = 0; i < num_vars; i++)
+    for(size_t i = 0; i < num_vars; i++)
     {
         // players
         //Warning(info, "Adding nodes for var %d (player %d).", i, player[i]);
-        add_variable_subset(g->v_player[player[i]], g->v, g, p_id, var_pos, i);
+        add_variable_subset(g->v_player[player[i]], g->v, g->domain, i);
         // priorities
-        add_variable_subset(g->v_priority[priority[i]], g->v, g, p_id, var_pos, i);
+        add_variable_subset(g->v_priority[priority[i]], g->v, g->domain, i);
     }
     for(int p = 0; p < 2; p++)
     {
@@ -1940,7 +2097,8 @@ main (int argc, char *argv[])
 
 #if defined(PBES)
     lts_type_t type = GBgetLTStype(model);
-    int var_pos = 0;
+    var_pos = 0;
+    var_type_no = 0;
     for(int i=0; i<N; i++)
     {
         //printf("%d: %s (%d [%s])\n", i, lts_type_get_state_name(type, i), lts_type_get_state_typeno(type, i), lts_type_get_state_type(type, i));
@@ -1951,11 +2109,20 @@ main (int argc, char *argv[])
         if (strlen1==strlen2 && strncmp(str1, str2, strlen1)==0)
         {
             var_pos = i;
+            var_type_no = lts_type_get_state_typeno(type, i);
+            true_index = GBchunkPut(model, var_type_no, chunk_str("true"));
+            false_index = GBchunkPut(model, var_type_no, chunk_str("false"));
         }
     }
     int p_len = 1;
     int proj[1] = {var_pos}; // position 0 encodes the variable
-    int p_id = vproj_create(domain, p_len, proj);
+    variable_projection = vproj_create(domain, p_len, proj);
+#endif
+
+#if defined(PBES)
+    init_pbes();
+    true_states = vset_create(domain, -1, NULL);
+    false_states = vset_create(domain, -1, NULL);
 #endif
 
     mytimer_t timer = SCCcreateTimer();
@@ -1991,27 +2158,43 @@ main (int argc, char *argv[])
         do_output(files[1], visited);
 
 #if defined(PBES)
-    parity_game * g = compute_symbolic_parity_game(visited, src, p_id);
-    if (pg_output) {
-        Warning(info,"Writing symbolic parity game to %s",pg_output);
-        FILE *f = fopen(pg_output, "w");
-        spg_save(f, g);
-        fclose(f);
+    vset_destroy(true_states);
+    vset_destroy(false_states);
+
+    if (pg_output || pgsolve_flag) {
+        ProfilerStart("compute-spg.perf");
+        SCCresetTimer(timer);
+        SCCstartTimer(timer);
+        parity_game * g = compute_symbolic_parity_game(visited, src);
+        SCCstopTimer(timer);
+        ProfilerStop();
+        SCCreportTimer(timer, "computing symbolic parity game took");
+        if (pg_output) {
+            Warning(info,"Writing symbolic parity game to %s",pg_output);
+            FILE *f = fopen(pg_output, "w");
+            spg_save(f, g);
+            fclose(f);
+        }
+        if (pgsolve_flag)
+        {
+            spgsolver_options* spg_options = spg_get_solver_options();
+            mytimer_t pgsolve_timer = SCCcreateTimer();
+            SCCstartTimer(pgsolve_timer);
+            bool result = spg_solve(g, spg_options);
+            Warning(info, "");
+            Warning(info, "The result is: %s", result ? "true":"false");
+            SCCstopTimer(pgsolve_timer);
+            Warning(info, "");
+            SCCreportTimer(timer, "generation took");
+            SCCreportTimer(pgsolve_timer, "solving took");
+        }
+        spg_destroy(g);
     }
-    if (pgsolve_flag)
+    if (player != 0)
     {
-        spgsolver_options* spg_options = spg_get_solver_options();
-        mytimer_t pgsolve_timer = SCCcreateTimer();
-        SCCstartTimer(pgsolve_timer);
-        bool result = spg_solve(g, spg_options);
-        Warning(info, "");
-        Warning(info, "The result is: %s", result ? "true":"false");
-        SCCstopTimer(pgsolve_timer);
-        Warning(info, "");
-        SCCreportTimer(timer, "generation took");
-        SCCreportTimer(pgsolve_timer, "solving took");
+        RTfree(player);
+        RTfree(priority);
     }
-    spg_destroy(g);
 #endif
 
     exit (EXIT_SUCCESS);
