@@ -69,7 +69,7 @@ bin_PROGRAMS += lps-reach
 noinst_LTLIBRARIES += libmcrl2-pins.la
 endif
 
-if HAVE_LIBMCRL2
+if HAVE_LIBPBES
 bin_PROGRAMS += pbes2lts-grey 
 bin_PROGRAMS += pbes2lts-gsea
 bin_PROGRAMS += pbes-reach
@@ -124,7 +124,7 @@ endif
 if HAVE_LIBMCRL2
 bin_PROGRAMS += lps2lts-mpi
 endif
-if HAVE_LIBMCRL2
+if HAVE_LIBPBES
 bin_PROGRAMS += pbes2lts-mpi
 endif
 if HAVE_DVEC
@@ -173,10 +173,12 @@ libmcrl2_pins_la_CPPFLAGS = -DMCRL2 -DNDEBUG $(MCRL2_PINS_CPPFLAGS) $(AM_CPPFLAG
 libmcrl2_pins_la_LDFLAGS  = $(MCRL2_PINS_LDFLAGS) $(MCRL2_LDFLAGS) $(AM_LDFLAGS)
 libmcrl2_pins_la_LIBADD   = $(MCRL2_PINS_LIBS)
 
+if HAVE_LIBPBES
 libpbes_pins_la_SOURCES  = pbes-greybox.cpp pbes-greybox.h
 libpbes_pins_la_CPPFLAGS = -DPBES -DNDEBUG $(MCRL2_PINS_CPPFLAGS) $(AM_CPPFLAGS)
 libpbes_pins_la_LDFLAGS  = $(MCRL2_PINS_LDFLAGS) $(MCRL2_LDFLAGS) $(AM_LDFLAGS)
 libpbes_pins_la_LIBADD   = $(MCRL2_PINS_LIBS)
+endif
 
 # etf-convert
 etf_convert_SOURCES = etf-convert.c
@@ -720,8 +722,10 @@ libltsmin_hre_la_LIBADD  += $(top_builddir)/ltl2ba/libltl2ba.la
 
 libspg_la_SOURCES  = spg-solve.c spg-solve.h
 libspg_la_CPPFLAGS = -DNDEBUG $(AM_CPPFLAGS)
-libspg_la_LDFLAGS  = $(AM_LDFLAGS)
+libspg_la_LDFLAGS  = $(AM_LDFLAGS) $(PROFILER_LDFLAGS)
 libspg_la_LIBADD   = libvset.la libltsmin.la bignum/libbignum.la
+if HAVE_PROFILER
+endif 
 
 CLEANFILES =
 DISTCLEANFILES =

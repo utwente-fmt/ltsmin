@@ -253,6 +253,15 @@ AC_CHECK_LIB([zip],[zip_open],
    AC_MSG_WARN([no acceptable zip library found; building without.])
   ])
 
+# Checks for gperftools profiler
+AC_CHECK_LIB([profiler],[ProfilerStart],
+  [AC_SUBST([PROFILER_LDFLAGS],[-lprofiler])
+   acx_profiler=yes
+  ],
+  [acx_profiler=no
+   AC_MSG_WARN([no acceptable profiler library found; building without.])
+  ])
+
 # Checks for header files.
 AC_HEADER_DIRENT
 AC_HEADER_STDC
@@ -359,6 +368,7 @@ AM_CONDITIONAL([HAVE_LIBTOMMATH],
   [test x"$with_bignum" != xno && test x"$have_libtommath" = xyes])
 AM_CONDITIONAL([HAVE_LIBMCRL], [test x"$acx_mcrl" = xyes])
 AM_CONDITIONAL([HAVE_LIBMCRL2], [test x"$acx_mcrl2" = xyes])
+AM_CONDITIONAL([HAVE_LIBPBES], [test x"$acx_pbes" = xyes])
 AM_CONDITIONAL([HAVE_LIBSTEP_INFO], [test x"$have_libstep_info" = xyes])
 AM_CONDITIONAL([HAVE_LIBDDD], [test x"$acx_libddd" = xyes])
 AM_CONDITIONAL([HAVE_ASCIIDOC], [test x"$ASCIIDOC" != x])
@@ -370,6 +380,7 @@ AM_CONDITIONAL([HAVE_DVEC2], [true])    dnl can be built unconditionally
 AM_CONDITIONAL([HAVE_ATOMICS], [test x"$acx_atomics" = xyes])
 AM_CONDITIONAL([HAVE_VERSION_CONTROL], [test -d "${srcdir}/.git"])
 AM_CONDITIONAL([HAVE_LIBZIP], [test x"$acx_libzip" = xyes])
+AM_CONDITIONAL([HAVE_PROFILER], [test x"$acx_profiler" = xyes])
 
 AC_CONFIG_COMMANDS_POST(
   [ac_configure_args="$ac_configure_args --enable-keep-terminated-procs dnl
