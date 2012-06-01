@@ -1169,6 +1169,8 @@ perm_todo (permute_t *perm, state_data_t dst, transition_info_t *ti)
     permute_todo_t *next = perm->todos + perm->nstored;
     perm->tosort[perm->nstored] = perm->nstored;
     next->seen = state_info_initialize (&next->si, dst, ti, perm->state, perm->ctx);
+    next->si.data = (raw_data_t) -2; // we won't copy these around, since they
+    next->si.tree = (raw_data_t) -2; // are is stored in the DB and we have a reference
     next->ti.group = ti->group;
     next->ti.labels = ti->labels;
     perm->nstored++;
@@ -1691,6 +1693,11 @@ nndfs_blue_handle (void *arg, state_info_t *successor, transition_info_t *ti,
 {
     wctx_t             *ctx = (wctx_t *) arg;
     nndfs_color_t color = nn_get_color (&ctx->color_map, successor->ref);
+    /**
+     * The following lines bear little resemblance to the algorithms in the
+     * respective papers (NNDFS / LNDFS), but we must store all non-red states
+     * on the stack here, in order to calculate all-red correctly later.
+     */
     if ( nn_color_eq(color, NNCYAN) &&
             (GBbuchiIsAccepting(ctx->model, ctx->state.data) ||
              GBbuchiIsAccepting(ctx->model, get(dbs, successor->ref, ctx->store2))) ) {
@@ -1806,12 +1813,29 @@ nndfs_blue (wctx_t *ctx)
 }
 
 /*
- * MC-NDFS by Laarman/Langerak/vdPol/Weber/Wijs
+ * LNDFS by Laarman/Langerak/vdPol/Weber/Wijs (originally MCNDFS)
+ *
+ *  @incollection {springerlink:10.1007/978-3-642-24372-1_23,
+       author = {Laarman, Alfons and Langerak, Rom and van de Pol, Jaco and Weber, Michael and Wijs, Anton},
+       affiliation = {Formal Methods and Tools, University of Twente, The Netherlands},
+       title = {{Multi-core Nested Depth-First Search}}},
+       booktitle = {Automated Technology for Verification and Analysis},
+       series = {Lecture Notes in Computer Science},
+       editor = {Bultan, Tevfik and Hsiung, Pao-Ann},
+       publisher = {Springer Berlin / Heidelberg},
+       isbn = {978-3-642-24371-4},
+       keyword = {Computer Science},
+       pages = {321-335},
+       volume = {6996},
+       url = {http://dx.doi.org/10.1007/978-3-642-24372-1_23},
+       note = {10.1007/978-3-642-24372-1_23},
+       year = {2011}
+    }
  */
 
-/* MC-NDFS dfs_red */
+/* LNDFS dfs_red */
 static void
-mcndfs_red (wctx_t *ctx, ref_t seed)
+lndfs_red (wctx_t *ctx, ref_t seed)
 {
     inc_wip (seed);
     while ( !lb2_is_stopped(lb2) ) {
@@ -1849,9 +1873,9 @@ mcndfs_red (wctx_t *ctx, ref_t seed)
     dec_wip (seed);
 }
 
-/* MCNDFS dfs_blue */
+/* LNDFS dfs_blue */
 void
-mcndfs_blue (wctx_t *ctx)
+lndfs_blue (wctx_t *ctx)
 {
     while ( !lb2_is_stopped(lb2) ) {
         raw_data_t          state_data = dfs_stack_top (ctx->stack);
@@ -1881,7 +1905,7 @@ mcndfs_blue (wctx_t *ctx)
                 set_all_red (ctx, &ctx->state);
             } else if ( GBbuchiIsAccepting(ctx->model, ctx->state.data) ) {
                 /* call red DFS for accepting states */
-                mcndfs_red (ctx, ctx->state.ref);
+                lndfs_red (ctx, ctx->state.ref);
             } else if (ctx->counters.level_cur > 0 &&
                        !global_has_color(ctx->state.ref, GRED, ctx->rec_bits)) {
                 /* unset the all-red flag (only for non-initial nodes) */
@@ -1893,9 +1917,107 @@ mcndfs_blue (wctx_t *ctx)
     }
 }
 
-/*
- * Evangelista's MC-NDFS
+extern void rec_ndfs_call (wctx_t *ctx, ref_t state);
+
+/**
+ * o Parallel NDFS algorithm by Evangelista/Pettruci/Youcef (ENDFS)
+ * o Improved (Combination) NDFS algorithm (CNDFS).
+     <Submitted to ATVA 2012>
+ * o Combination of ENDFS and LNDFS (NMCNDFS)
+     @inproceedings{pdmc11,
+       month = {July},
+       official_url = {http://dx.doi.org/10.4204/EPTCS.72.2},
+       issn = {2075-2180},
+       author = {A. W. {Laarman} and J. C. {van de Pol}},
+       series = {Electronic Proceedings in Theoretical Computer Science},
+       editor = {J. {Barnat} and K. {Heljanko}},
+       title = {{Variations on Multi-Core Nested Depth-First Search}},
+       address = {USA},
+       publisher = {EPTCS},
+       id_number = {10.4204/EPTCS.72.2},
+       howpublished = {http://eprints.eemcs.utwente.nl/20618/},
+       volume = {72},
+       location = {Snowbird, Utah},
+       booktitle = {Proceedings of the 10th International Workshop on Parallel and Distributed Methods in verifiCation, PDMC 2011, Snowbird, Utah},
+       year = {2011},
+       pages = {13--28}
+      }
  */
+static void
+endfs_lb (wctx_t *ctx)
+{
+    atomic_write (&ctx->done, 1);
+    size_t workers[W];
+    int idle_count = W-1;
+    for (size_t i = 0; i<((size_t)W); i++)
+        workers[i] = (i==ctx->id ? 0 : 1);
+    while (0 != idle_count)
+    for (size_t i=0; i<W; i++) {
+        if (0==workers[i])
+            continue;
+        if (1 == atomic_read(&(contexts[i]->done))) {
+            workers[i] = 0;
+            idle_count--;
+            continue;
+        }
+        ref_t work = atomic_read (&contexts[i]->work);
+        if (SIZE_MAX == work)
+            continue;
+        rec_ndfs_call (ctx, work);
+    }
+}
+
+static void
+endfs_handle_dangerous (wctx_t *ctx)
+{
+    while ( dfs_stack_size(ctx->in_stack) ) {
+        raw_data_t state_data = dfs_stack_pop (ctx->in_stack);
+        state_info_deserialize_cheap (&ctx->state, state_data);
+        if ( !global_has_color(ctx->state.ref, GDANGEROUS, ctx->rec_bits) &&
+              ctx->state.ref != ctx->seed )
+            if (global_try_color(ctx->state.ref, GRED, ctx->rec_bits))
+                ctx->red.explored++;
+    }
+    if (global_try_color(ctx->seed, GRED, ctx->rec_bits)) {
+        ctx->red.explored++;
+        ctx->red.visited++;
+    }
+    if ( global_has_color(ctx->seed, GDANGEROUS, ctx->rec_bits) ) {
+        rec_ndfs_call (ctx, ctx->seed);
+    }
+}
+
+static void
+cndfs_handle_nonseed_accepting (wctx_t *ctx)
+{
+    size_t nonred, accs;
+    nonred = accs = dfs_stack_size(ctx->out_stack);
+    if (nonred) {
+        ctx->red.waits++;
+        ctx->counters.rec += accs;
+    }
+    if (nonred) {
+        SCCstartTimer (ctx->red.timer);
+        while ( nonred && !lb2_is_stopped(lb2) ) {
+            nonred = 0;
+            for (size_t i = 0; i < accs; i++) {
+                raw_data_t state_data = dfs_stack_peek (ctx->out_stack, i);
+                state_info_deserialize_cheap (&ctx->state, state_data);
+                if (!global_has_color(ctx->state.ref, GRED, ctx->rec_bits))
+                    nonred++;
+            }
+        }
+        SCCstopTimer (ctx->red.timer);
+    }
+    for (size_t i = 0; i < accs; i++)
+        dfs_stack_pop (ctx->out_stack);
+    while ( dfs_stack_size(ctx->in_stack) ) {
+        raw_data_t state_data = dfs_stack_pop (ctx->in_stack);
+        state_info_deserialize_cheap (&ctx->state, state_data);
+        if (global_try_color(ctx->state.ref, GRED, ctx->rec_bits))
+            ctx->red.explored++;
+    }
+}
 
 static void
 endfs_handle_red (void *arg, state_info_t *successor, transition_info_t *ti, int seen)
@@ -1906,8 +2028,8 @@ endfs_handle_red (void *arg, state_info_t *successor, transition_info_t *ti, int
     if ( nn_color_eq(color, NNCYAN) )
         ndfs_report_cycle (ctx, successor);
     /* Mark states dangerous if necessary */
-    if ( Strat_CNDFS != strategy[0] && 
-         GBbuchiIsAccepting(ctx->model, successor->data) &&
+    if ( Strat_ENDFS == ctx->strategy &&
+         GBbuchiIsAccepting(ctx->model, get(dbs, successor->ref, ctx->store2)) &&
          !global_has_color(successor->ref, GRED, ctx->rec_bits) )
         global_try_color(successor->ref, GDANGEROUS, ctx->rec_bits);
     if ( !nn_color_eq(color, NNPINK) &&
@@ -1923,6 +2045,12 @@ endfs_handle_blue (void *arg, state_info_t *successor, transition_info_t *ti, in
 {
     wctx_t             *ctx = (wctx_t *) arg;
     nndfs_color_t color = nn_get_color (&ctx->color_map, successor->ref);
+    /**
+     * The following lines bear little resemblance to the algorithms in the
+     * respective papers (Evangelista et al./ Laarman et al.), but we must
+     * store all non-red states on the stack in order to calculate
+     * all-red correctly later. Red states are also stored as optimization.
+     */
     if ( nn_color_eq(color, NNCYAN) &&
          (GBbuchiIsAccepting(ctx->model, ctx->state.data) ||
          GBbuchiIsAccepting(ctx->model, get(dbs, successor->ref, ctx->store2))) ) {
@@ -1983,7 +2111,6 @@ endfs_red (wctx_t *ctx, ref_t seed)
         } else { //backtrack
             dfs_stack_leave (ctx->stack);
             ctx->red.level_cur--;
-
             /* exit search if backtrack hits seed, leave stack the way it was */
             if (seed_level == dfs_stack_nframes(ctx->stack))
                 break;
@@ -1992,85 +2119,7 @@ endfs_red (wctx_t *ctx, ref_t seed)
     }
 }
 
-extern void rec_ndfs_call (wctx_t *ctx, ref_t state);
-
-static void
-endfs_lb (wctx_t *ctx)
-{
-    atomic_write (&ctx->done, 1);
-    size_t workers[W];
-    int idle_count = W-1;
-    for (size_t i = 0; i<((size_t)W); i++)
-        workers[i] = (i==ctx->id ? 0 : 1);
-    while (0 != idle_count)
-    for (size_t i=0; i<W; i++) {
-        if (0==workers[i])
-            continue;
-        if (1 == atomic_read(&(contexts[i]->done))) {
-            workers[i] = 0;
-            idle_count--;
-            continue;
-        }
-        ref_t work = atomic_read (&contexts[i]->work);
-        if (SIZE_MAX == work)
-            continue;
-        rec_ndfs_call (ctx, work);
-    }
-}
-
-static void
-handle_dangerous (wctx_t *ctx)
-{
-    while ( dfs_stack_size(ctx->in_stack) ) {
-        raw_data_t state_data = dfs_stack_pop (ctx->in_stack);
-        state_info_deserialize_cheap (&ctx->state, state_data);
-        if ( !global_has_color(ctx->state.ref, GDANGEROUS, ctx->rec_bits) &&
-              ctx->state.ref != ctx->seed )
-            if (global_try_color(ctx->state.ref, GRED, ctx->rec_bits))
-                ctx->red.explored++;
-    }
-    if (global_try_color(ctx->seed, GRED, ctx->rec_bits)) {
-        ctx->red.explored++;
-        ctx->red.visited++;
-    }
-    if ( global_has_color(ctx->seed, GDANGEROUS, ctx->rec_bits) ) {
-        rec_ndfs_call (ctx, ctx->seed);
-    }
-}
-
-static void
-handle_nonseed_accepting (wctx_t *ctx)
-{
-    size_t nonred, accs;
-    nonred = accs = dfs_stack_size(ctx->out_stack);
-    if (nonred) {
-        ctx->red.waits++;
-        ctx->counters.rec += accs;
-    }
-    if (nonred) {
-        SCCstartTimer (ctx->red.timer);
-        while ( nonred && !lb2_is_stopped(lb2) ) {
-            nonred = 0;
-            for (size_t i = 0; i < accs; i++) {
-                raw_data_t state_data = dfs_stack_peek (ctx->out_stack, i);
-                state_info_deserialize_cheap (&ctx->state, state_data);
-                if (!global_has_color(ctx->state.ref, GRED, ctx->rec_bits))
-                    nonred++;
-            }
-        }
-        SCCstopTimer (ctx->red.timer);
-    }
-    for (size_t i = 0; i < accs; i++)
-        dfs_stack_pop (ctx->out_stack);
-    while ( dfs_stack_size(ctx->in_stack) ) {
-        raw_data_t state_data = dfs_stack_pop (ctx->in_stack);
-        state_info_deserialize_cheap (&ctx->state, state_data);
-        if (global_try_color(ctx->state.ref, GRED, ctx->rec_bits))
-            ctx->red.explored++;
-    }
-}
-
-void
+void // just for checking correctness of all-red implementation. Unused.
 check (void *arg, state_info_t *successor, transition_info_t *ti, int seen)
 {
     wctx_t *ctx=arg;
@@ -2112,18 +2161,16 @@ endfs_blue (wctx_t *ctx)
             nn_set_color (&ctx->color_map, ctx->state.ref, NNBLUE);
             if ( all_red && bitvector_is_set(&ctx->all_red, ctx->counters.level_cur) ) {
                 /* all successors are red */
-
                 //permute_trans (ctx->permute, &ctx->state, check, ctx); 
-
                 set_all_red (ctx, &ctx->state);
             } else if ( GBbuchiIsAccepting(ctx->model, ctx->state.data) ) {
                 ref_t           seed = ctx->state.ref;
                 ctx->seed = ctx->work = seed;
                 endfs_red (ctx, seed);
-                if (Strat_ENDFS == strategy[0])
-                    handle_dangerous (ctx);
+                if (Strat_ENDFS == ctx->strategy)
+                    endfs_handle_dangerous (ctx);
                 else
-                    handle_nonseed_accepting (ctx);
+                    cndfs_handle_nonseed_accepting (ctx);
                 ctx->work = SIZE_MAX;
             } else if (all_red && ctx->counters.level_cur > 0 &&
                        !global_has_color(ctx->state.ref, GRED, ctx->rec_bits)) { 
@@ -2133,9 +2180,10 @@ endfs_blue (wctx_t *ctx)
             dfs_stack_pop (ctx->stack);
         }
     }
-    if ( Strat_ENDFS == strategy[0] && 
-         ctx == contexts[ctx->id] && (Strat_LTLG & ctx->rec_ctx->strategy) )
-        endfs_lb (ctx);
+    if ( Strat_ENDFS == ctx->strategy &&            // if ENDFS,
+         ctx == contexts[ctx->id] &&                // if top-level ENDFS, and
+         (Strat_LTLG & ctx->rec_ctx->strategy) )    // if rec strategy uses global bits (global pruning)
+        endfs_lb (ctx);                             // then do simple load balancing
 }
 
 void
@@ -2147,7 +2195,7 @@ rec_ndfs_call (wctx_t *ctx, ref_t state)
     case Strat_ENDFS:
        endfs_blue (ctx->rec_ctx); break;
     case Strat_LNDFS:
-       mcndfs_blue (ctx->rec_ctx); break;
+       lndfs_blue (ctx->rec_ctx); break;
     case Strat_NNDFS:
        nndfs_blue (ctx->rec_ctx); break;
     case Strat_NDFS:
@@ -2159,6 +2207,22 @@ rec_ndfs_call (wctx_t *ctx, ref_t state)
 
 /*
  * Reachability algorithms
+ *  @incollection {springerlink:10.1007/978-3-642-20398-5_40,
+     author = {Laarman, Alfons and van de Pol, Jaco and Weber, Michael},
+     affiliation = {Formal Methods and Tools, University of Twente, The Netherlands},
+     title = {{Multi-Core LTSmin: Marrying Modularity and Scalability}},
+     booktitle = {NASA Formal Methods},
+     series = {Lecture Notes in Computer Science},
+     editor = {Bobaru, Mihaela and Havelund, Klaus and Holzmann, Gerard and Joshi, Rajeev},
+     publisher = {Springer Berlin / Heidelberg},
+     isbn = {978-3-642-20397-8},
+     keyword = {Computer Science},
+     pages = {506-511},
+     volume = {6617},
+     url = {http://dx.doi.org/10.1007/978-3-642-20398-5_40},
+     note = {10.1007/978-3-642-20398-5_40},
+     year = {2011}
+   }
  */
 size_t
 split_bfs (void *arg_src, void *arg_tgt, size_t handoff)
@@ -2413,10 +2477,8 @@ sbfs (wctx_t *ctx)
 }
 
 /**
- * Reachability for timed automata.
- * Dalsgaard, Hansen, Jorgensen, Larsen, Olensen, Olsen and Srba
- * States consist out of an explicit part and a symbolic part, (a pointer to)
- * a DBM.
+ * Multi-core reachability algorithm for timed automata.
+ * <Submitted to FORMATS 2012>
  */
 
 typedef enum ta_set_e {
@@ -2666,7 +2728,7 @@ explore (void *args)
         if (UseGreyBox == call_mode) dfs_grey (ctx); else dfs (ctx); break;
     case Strat_NDFS:    ndfs_blue (ctx); break;
     case Strat_NNDFS:   nndfs_blue (ctx); break;
-    case Strat_LNDFS:   mcndfs_blue (ctx); break;
+    case Strat_LNDFS:   lndfs_blue (ctx); break;
     case Strat_CNDFS:
     case Strat_ENDFS:   endfs_blue (ctx); break;
     default: Abort ("Unknown or front-end incompatible strategy (%d).", strategy[0]);
