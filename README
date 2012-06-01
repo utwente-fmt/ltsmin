@@ -161,6 +161,8 @@ hence you can also build mCRL2 without:
 
   cmake . -DMCRL2_ENABLE_GUI_TOOLS=OFF -DCMAKE_INSTALL_PREFIX=...
 
+Note: to enable the PBES tools use the latest svn version of mCRL2.
+
 *** CADP
 See the CADP website <http://www.inrialpes.fr/vasy/cadp/> on how to
 obtain a license and download the CADP toolkit.
@@ -173,7 +175,7 @@ the opaal2lts-mc frontend is not compiled in absence of TBB malloc.
 See http://threadingbuildingblocks.org/file.php?fid=77
 
 *** DiVinE 2
-Download the latest released version of DiVinE from
+Download version 2.4 of DiVinE from
 <http://divine.fi.muni.cz/>.  We tested with the version 2.4.  Apply
 the patch from <contrib/divine-2.4.patch> to the DiVinE source tree:
 
