@@ -10,6 +10,14 @@
     o PGSolver file output format ('{ast}.pg')
  * Updated SpinJa frontend that accommodates support for valid end-state
    filtering, guards for POR, assertion violation detection and never claims.
+ * New frontend for UPPAAL xml timed automate models via opaal. This adds
+   support for semi-symbolic states to the PINS interface and requires the backend
+   algorithms to be extended with subsumption checks on the symbolic state part.
+    o opaal2lts-mc for multi-core reachability on timed automata
+    o supports all features of the multi-core tool except LTL and POR
+    o Added strict BFS algorithm in multi-core backend to reduce state count
+      (--strategy=sbfs)
+    o Currently, only supported by the multi-core reachability algorithms
  * New parallel BBD package: Sylvan
     o See <thesis Tom van Dijk> for description
     o BDD operations are parallelized using the WOOL framework
@@ -27,8 +35,10 @@
       by tracing facility)
     o Reduced initialization times by using calloc instead of malloc+memset
     o Thread-local initialization and allocation for better NUMA performance
-    o Introduced 64 bit hashing, prime rehashing and Murmur hash function.
-    o New load balancer with simplified interface.
+    o Introduced 64 bit hashing, prime rehashing and Murmur hash function
+    o New load balancer with simplified interface
+    o Added a strict BFS algorithm (--strategy=sbfs). See also news about the
+      opaal frontend
 
 February 22, 2012 - Release 1.8 of the LTSmin toolset
 
