@@ -39,7 +39,8 @@ if test x"$acx_mcrl2" = xyes; then
 see README on how to install mCRL2 properly.])]
          )])
     AX_LET([CPPFLAGS], ["$MCRL2_PINS_CPPFLAGS $CPPFLAGS"],
-      [AC_CHECK_HEADER([mcrl2/pbes/detail/pbes_greybox_interface.h],,
+      [AC_CHECK_HEADER([mcrl2/pbes/pbes_explorer.h],
+         [acx_pbes=yes],
          [AC_MSG_WARN([cannot find headers for the PBES greybox,
 installing without PBES support.])]
          )])
