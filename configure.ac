@@ -345,7 +345,7 @@ if test "x$with_sylvan" == xyes; then
     [have_sylvan="yes"]
 fi
 
-AC_SUBST([SYLVAN_LIBS],['${top_srcdir}/sylvan/libsylvan.la'])
+AC_SUBST([SYLVAN_LIBS],['${top_builddir}/sylvan/libsylvan.la'])
 AC_SUBST([SYLVAN_CPPFLAGS],['-I${top_srcdir}/sylvan/src'])
 AC_SUBST([SYLVAN_LDFLAGS])
 
