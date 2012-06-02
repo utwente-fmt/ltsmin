@@ -191,6 +191,7 @@ public:
         if (label==0)
         {
             int priority = this->get_info()->get_variable_priorities().at(varname);
+            //std::clog << "var: " << varname << ", priority: " << priority << std::endl;
             return priority;
         }
         else if (label==1)
