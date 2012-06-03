@@ -350,6 +350,7 @@ AC_SUBST([SYLVAN_CPPFLAGS],['-I${top_srcdir}/sylvan/src'])
 AC_SUBST([SYLVAN_LDFLAGS])
 
 AM_CONDITIONAL([HAVE_SYLVAN], [test x"$have_sylvan" = "xyes"])
+AS_IF([test x"$have_sylvan" = "xyes"], [AC_DEFINE([HAVE_SYLVAN], [1], [Define if using sylvan.])])
 AM_CONDITIONAL([HAVE_OPAAL], [test x"$have_opaal" = "xyes"])
 AM_CONDITIONAL([HAVE_MPI], [test x"$have_mpi" != "x"])
 AM_CONDITIONAL([HAVE_LIBGMP], 
