@@ -6,6 +6,10 @@ Language
 * All C/C++ source files must include config.h before any other included file:
   #include <config.h>
 
+* All other included headers should come in alphabetical order after config.h
+  to enable easy lookup and avoid duplicates. This also applies to file 
+  listings in, for example, Makefile.am.
+
 * Keep #include directives ordered like this:
     system headers
     external dependencies
