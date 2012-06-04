@@ -163,6 +163,9 @@ AS_CASE(["$with_bignum"],
               [AS_IF([test x"$with_bignum" = xtommath],
                      [AC_MSG_WARN([cannot use libtommath as bignum library.])])])])],
   [AC_MSG_WARN([unknown bignum library request (--with-bignum=$with_bignum) ignored.])])
+AS_CASE(["$with_bignum"],
+  [no|tommath],[have_libspg=yes],
+  [yes|gmp],[have_libspg=no; AC_MSG_WARN([not installing pbes-reach and spgsolver, because of a bug in libgmp. Use --with-bignum=no to enable spgsolver.])])
 
 if test "x$acx_mcrl" = xyes; then
   ACX_MCRL_LIBS(
@@ -369,6 +372,7 @@ AM_CONDITIONAL([HAVE_LIBTOMMATH],
 AM_CONDITIONAL([HAVE_LIBMCRL], [test x"$acx_mcrl" = xyes])
 AM_CONDITIONAL([HAVE_LIBMCRL2], [test x"$acx_mcrl2" = xyes])
 AM_CONDITIONAL([HAVE_LIBPBES], [test x"$acx_pbes" = xyes])
+AM_CONDITIONAL([HAVE_LIBSPG], [test x"$have_libspg" = xyes])
 AM_CONDITIONAL([HAVE_LIBSTEP_INFO], [test x"$have_libstep_info" = xyes])
 AM_CONDITIONAL([HAVE_LIBDDD], [test x"$acx_libddd" = xyes])
 AM_CONDITIONAL([HAVE_ASCIIDOC], [test x"$ASCIIDOC" != x])
@@ -428,6 +432,7 @@ Configuration:
     MCRL     = ${with_mcrl:-NOT FOUND, building without muCRL support}
     MCRL2    = ${with_mcrl2:-NOT FOUND, building without mCRL2 support}
     PBES     = ${acx_pbes:-NOT FOUND, building without PBES support}
+    SPG      = ${have_libspg:-NO, not building pbes-reach and spgsolver (enable with --without-bignum)}
     CADP     = ${CADP:-NOT FOUND, building without CADP support}
     DiVinE-cluster
              = ${with_divine:-NOT FOUND, building without DiVinE support}

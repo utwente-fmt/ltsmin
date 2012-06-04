@@ -19,7 +19,9 @@ noinst_LTLIBRARIES += libltsmin.la
 noinst_LTLIBRARIES += libltsmin-hre-util.la
 noinst_LTLIBRARIES += libltsmin-hre.la
 
+if HAVE_LIBSPG
 noinst_LTLIBRARIES += libspg.la
+endif
 
 pkglib_LTLIBRARIES =
 
@@ -72,7 +74,9 @@ endif
 if HAVE_LIBPBES
 bin_PROGRAMS += pbes2lts-grey 
 bin_PROGRAMS += pbes2lts-gsea
+if HAVE_LIBSPG
 bin_PROGRAMS += pbes-reach
+endif
 noinst_LTLIBRARIES += libpbes-pins.la
 endif
 

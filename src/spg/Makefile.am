@@ -1,6 +1,8 @@
 AM_CPPFLAGS = -I${top_srcdir}/src
 
+if HAVE_LIBSPG
 bin_PROGRAMS = spgsolver
+endif
 
 # spgsolver
 spgsolver_SOURCES  = spgsolver.c
