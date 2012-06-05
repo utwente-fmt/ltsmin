@@ -72,10 +72,17 @@ public:
         global_group_var_ids = (int*)RTmalloc((this->get_info()->get_transition_variable_names().size())*sizeof(int));
         int type_no = lts_type_get_state_typeno(GBgetLTStype(model_), 0);
         int group = 0;
+#ifdef PBES_EXPLORER_VERSION
         for(std::vector<std::string>::const_iterator var_name_it = this->get_info()->get_transition_variable_names().begin();
                 var_name_it != this->get_info()->get_transition_variable_names().end(); ++var_name_it)
         {
             int group_var_id = this->put_chunk(type_no, *var_name_it);
+#else
+        for(std::map<int,std::string>::const_iterator var_name_it = this->get_info()->get_transition_variable_names().begin();
+                var_name_it != this->get_info()->get_transition_variable_names().end(); ++var_name_it)
+        {
+            int group_var_id = this->put_chunk(type_no, var_name_it->second);
+#endif
             global_group_var_ids[group] = group_var_id;
             group++;
         }
