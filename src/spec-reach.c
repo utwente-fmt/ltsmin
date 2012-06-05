@@ -2162,12 +2162,10 @@ main (int argc, char *argv[])
     vset_destroy(false_states);
 
     if (pg_output || pgsolve_flag) {
-        ProfilerStart("compute-spg.perf");
         SCCresetTimer(timer);
         SCCstartTimer(timer);
         parity_game * g = compute_symbolic_parity_game(visited, src);
         SCCstopTimer(timer);
-        ProfilerStop();
         SCCreportTimer(timer, "computing symbolic parity game took");
         if (pg_output) {
             Warning(info,"Writing symbolic parity game to %s",pg_output);
