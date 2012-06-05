@@ -157,6 +157,8 @@ void vdom_init_shared(vdom_t dom,int n){
 	dom->shared.set_enum=NULL;
 	dom->shared.set_enum_match=NULL;
 	dom->shared.set_copy_match=NULL;
+	dom->shared.set_copy_match_proj=NULL;
+	dom->shared.proj_create=NULL;
 	dom->shared.set_count=NULL;
 	dom->shared.set_union=NULL;
 	dom->shared.set_intersect=NULL;
@@ -274,7 +276,7 @@ void vset_copy_match(vset_t dst,vset_t src,int p_len,int* proj,int*match){
 
 void vset_copy_match_proj(vset_t dst,vset_t src,int p_len,int* proj,int p_id,int*match){
     if (dst->dom->shared.set_copy_match_proj==NULL){
-        Abort("Copy match with projection object as parameter is not supported by the current BDD implementation.")
+        dst->dom->shared.set_copy_match(dst,src,p_len,proj,match);
     } else {
         dst->dom->shared.set_copy_match_proj(dst,src,p_len,proj,p_id,match);
     }
@@ -282,9 +284,9 @@ void vset_copy_match_proj(vset_t dst,vset_t src,int p_len,int* proj,int p_id,int
 
 int vproj_create(vdom_t dom, int p_len, int* proj){
     if (dom->shared.proj_create==NULL){
-        Abort("Copy match with projection object as parameter is not supported by the current BDD implementation.")
+        return -1;
     } else {
-        dom->shared.proj_create(p_len, proj);
+        return dom->shared.proj_create(p_len, proj);
     }
 }
 
