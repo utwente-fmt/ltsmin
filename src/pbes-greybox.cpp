@@ -41,8 +41,12 @@ private:
     int* global_group_var_ids;
     static const int IDX_NOT_FOUND = -1;
 public:
-    explorer(model_t& model, const std::string& filename, const std::string& rewrite_strategy, bool reset = false) :
+    explorer(model_t& model, const std::string& filename, const std::string& rewrite_strategy, bool reset = false, bool always_split = false) :
+#ifdef PBES_EXPLORER_VERSION
+        mcrl2::pbes_system::explorer(filename, rewrite_strategy, reset, always_split),
+#else
         mcrl2::pbes_system::explorer(filename, rewrite_strategy, reset),
+#endif
         model_(model),
         global_group_var_ids(0)
     {
@@ -53,6 +57,7 @@ public:
             std::vector<int> global2local_map;
             global2local_maps.push_back(global2local_map);
         }
+        (void)always_split;
     }
 
     ~explorer()
@@ -246,6 +251,7 @@ extern "C" {
 
 static int debug_flag = 0;
 static int reset_flag = 0;
+static int always_split_flag = 0;
 
 static void pbes_popt(poptContext con, enum poptCallbackReason reason,
                       const struct poptOption * opt, const char * arg,
@@ -266,6 +272,9 @@ static void pbes_popt(poptContext con, enum poptCallbackReason reason,
             if (reset_flag) {
                 Warning(info,"Reset flag is set.");
             }
+            if (always_split_flag) {
+                Warning(info,"Always split flag is set.");
+            }
             if (debug_flag) {
                 Warning(info,"Debug flag is set.");
                 log::mcrl2_logger::set_reporting_level(log::debug1);
@@ -283,6 +292,7 @@ static void pbes_popt(poptContext con, enum poptCallbackReason reason,
 struct poptOption pbes_options[] = {
      { NULL, 0, POPT_ARG_CALLBACK | POPT_CBFLAG_POST | POPT_CBFLAG_SKIPOPTION, (void*)pbes_popt, 0, NULL, NULL },
      { "reset" , 0 , POPT_ARG_NONE , &reset_flag, 0, "Indicate that unset parameters should be reset.","" },
+     { "always-split" , 0 , POPT_ARG_NONE , &always_split_flag, 0, "Always use conjuncts and disjuncts as transition groups.","" },
      { "debug" , 0 , POPT_ARG_NONE , &debug_flag, 0, "Enable debug output.","" },
      POPT_TABLEEND };
 
@@ -372,7 +382,8 @@ void PBESloadGreyboxModel(model_t model, const char*name)
     log::mcrl2_logger::set_reporting_level(log_level);
 
     bool reset = (reset_flag==1);
-    ltsmin::explorer* pbes_explorer = new ltsmin::explorer(model, std::string(name), mcrl2_rewriter_strategy, reset);
+    bool always_split = (always_split_flag==1);
+    ltsmin::explorer* pbes_explorer = new ltsmin::explorer(model, std::string(name), mcrl2_rewriter_strategy, reset, always_split);
     ctx->pbes_explorer = pbes_explorer;
     lts_info* info = pbes_explorer->get_info();
     lts_type_t ltstype = PBESgetLTSType(info->get_lts_type());
