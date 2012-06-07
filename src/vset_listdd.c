@@ -115,6 +115,9 @@ static inline uint32_t hash(uint32_t a,uint32_t b,uint32_t c){
 static vset_t protected_sets=NULL;
 static vrel_t protected_rels=NULL;
 
+static uint32_t* mdd_load_node_ids=NULL;
+static uint32_t mdd_load_node_count=0;
+
 static uint32_t mdd_used;
 
 /** fibonacci number of the size of the stack. */
@@ -220,6 +223,9 @@ static void mdd_collect(uint32_t a,uint32_t b){
     }
     for(uint32_t i=0;i<mdd_top;i++){
         mdd_mark(mdd_stack[i]);
+    }
+    for(uint32_t i=0;i<mdd_load_node_count;i++){
+        mdd_mark(mdd_load_node_ids[i]);
     }
     /* The following code marks results of projection and
        next, to allow them to remain in the cache. On the
@@ -420,6 +426,7 @@ static uint32_t mdd_create_node(uint32_t val,uint32_t down,uint32_t right){
     uint32_t slot_hash=hash(val,down,right);
     uint32_t slot=slot_hash%uniq_size;
     uint32_t res=unique_table[slot];
+    //Warning(debug, "mdd_create_node: slot_hash=%u, slot=%u, res=%u", slot_hash, slot, res);
     while(res){
         if (node_table[res].val==val
             && node_table[res].down==down
@@ -728,24 +735,34 @@ mdd_load(FILE* f)
     int res = fscanf(f,"n=%u\n", &n_count);
     (void)res;
     //Warning(info,"mdd_load: %u", n_count);
-    uint32_t node_ids[n_count];
-    node_ids[0] = 0;
-    node_ids[1] = 1;
-    uint32_t count = 2;
+    if (n_count < 2)
+        n_count = 2;
+    if (mdd_load_node_ids != NULL)
+        Abort("Error, mdd_load_node_ids already in use!");
+    mdd_load_node_ids = RTmalloc(n_count*sizeof(uint32_t));
+    mdd_load_node_ids[0] = 0;
+    mdd_load_node_ids[1] = 1;
+    mdd_load_node_count = 2;
     uint32_t mdd = 0;
     uint32_t id;
     uint32_t val;
     uint32_t down;
     uint32_t right;
-    while (count < n_count && fscanf(f,"%u %u %u %u\n", &id, &val, &down, &right) != EOF) {
-        //printf("TEST: %u %u %u %u\n", id, val, down, right);
-        assert(down==0 || node_ids[down]!=0);
-        assert(right==0 || node_ids[right]!=0);
-        mdd = mdd_create_node(val, node_ids[down], node_ids[right]);
-        //printf("TEST: mdd=%u\n", mdd);
-        node_ids[id] = mdd;
-        count++;
+    while (mdd_load_node_count < n_count && fscanf(f,"%u %u %u %u\n", &id, &val, &down, &right) != EOF) {
+        if (mdd_load_node_count != id)
+            Abort("Nodes have to be numbered consecutively from 2 till n-1.");
+        //Warning(debug, "id=%u, val=%u, down=%u [%u], right=%u [%u]",
+        //        id, val, down, mdd_load_node_ids[down], right, mdd_load_node_ids[right]);
+        assert(down==0 || mdd_load_node_ids[down]!=0);
+        assert(right==0 || mdd_load_node_ids[right]!=0);
+        mdd = mdd_create_node(val, mdd_load_node_ids[down], mdd_load_node_ids[right]);
+        //Warning(debug, "id=%u [%u]", id, mdd);
+        mdd_load_node_ids[id] = mdd;
+        mdd_load_node_count++;
     }
+    RTfree(mdd_load_node_ids);
+    mdd_load_node_ids = NULL;
+    mdd_load_node_count = 0;
     return mdd;
 }
 
