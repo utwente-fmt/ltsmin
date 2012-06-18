@@ -23,37 +23,82 @@ void lts_write_pg (const char*name, lts_t lts) {
         Abort("Number of state labels is %d, needs to be 2 for parity games.",L);
     }
     Warning(info,"Number of states: %d", lts->states);
+    Warning(info,"First pass...");
     // compute max priority
+    // determine if there are nodes without successors
     int max_priority = 0;
     int labels[L];
+    bool first_edge = true;
+    bool write_true = false;
+    bool write_false = false;
     for(uint32_t src_idx=0; src_idx<lts->states; src_idx++){
         TreeUnfold(lts->prop_idx, lts->properties[src_idx], labels);
         int priority = labels[0];
         if (priority > max_priority) {
             max_priority = priority;
         }
+        int player = labels[1];
+        if (lts->begin[src_idx] >= lts->begin[src_idx+1]){
+            // no edges
+            if (player==1) {
+                write_true = true;
+            } else if (player==0) {
+                write_false = true;
+            }
+            //Warning(info, "State %d has no successors.",src_idx);
+        }
     }
+    Warning(info,"Second pass...");
     bool min_game = false;
+    int max_id = lts->states;
+    int offset = 0;
+    int true_idx = 0;
+    int false_idx = 0;
+    if (write_true) {
+        true_idx = max_id;
+        max_id++;
+    }
+    if (write_false) {
+        false_idx = max_id;
+        max_id++;
+    }
     // write header.
-    fprintf(f,"parity %d;\n",lts->states+1);
+    fprintf(f,"parity %d;\n",max_id-1);
     // write states and edges
-    bool first_edge = true;
     for(uint32_t src_idx=0; src_idx<lts->states; src_idx++){
         if (src_idx > 0){
             fprintf(f,";\n");
         }
         TreeUnfold(lts->prop_idx, lts->properties[src_idx], labels);
         int priority = min_game ? labels[0] : max_priority-labels[0];
-        fprintf(f, "%d %d %d ", src_idx, priority /* priority */, labels[1] /* player */);
+        int player = labels[1];
+        fprintf(f, "%d %d %d ", src_idx+offset, priority /* priority */, player /* player */);
         first_edge = true;
         for(uint32_t edge_idx=lts->begin[src_idx]; edge_idx<lts->begin[src_idx+1]; edge_idx++){
             if (!first_edge){
                 fprintf(f, ",");
             }
-            fprintf(f,"%d",lts->dest[edge_idx]);
+            fprintf(f,"%d",lts->dest[edge_idx]+offset);
             first_edge = false;
+        }
+        if (first_edge)
+        {
+            //Warning(info,"State %d has no successors.",src_idx);
+            // add transition to true/false node
+            fprintf(f,"%d",((player==1) ? true_idx : false_idx));
         }
     }
     fprintf(f,";\n");
+    // write true and false
+    if (write_true)
+    {
+        fprintf(f, "%d %d %d ", true_idx, min_game ? 0 : max_priority /* priority */, 1 /* player */);
+        fprintf(f,"%d;\n",true_idx);
+    }
+    if (write_false)
+    {
+        fprintf(f, "%d %d %d ", false_idx, min_game ? 1 : max_priority-1 /* priority */, 0 /* player */);
+        fprintf(f,"%d;\n",false_idx);
+    }
     fclose(f);
 }
