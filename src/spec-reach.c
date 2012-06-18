@@ -44,6 +44,7 @@ static char* pg_output = NULL;
 static int var_pos = 0;
 static int var_type_no = 0;
 static int variable_projection = 0;
+static vrel_t pg_autocomplete_transitions[2];
 static size_t true_index = 0;
 static size_t false_index = 1;
 static size_t num_vars = 0;
@@ -678,6 +679,8 @@ final_stat_reporting(vset_t visited, mytimer_t timer)
 }
 
 #if defined(PBES)
+static bool debug_output_enabled = false;
+
 /**
  * \brief Computes the subset of v that belongs to player <tt>player</tt>.
  * \param vars the indices of variables of player <tt>player</tt>.
@@ -691,23 +694,24 @@ static inline void add_variable_subset(vset_t dst, vset_t src, vdom_t domain, in
     vset_t u = vset_create(domain, -1, NULL);
     vset_copy_match_proj(u, src, p_len, proj, variable_projection, match);
 
-/*
-    chunk c = GBchunkGet(model, var_type_no, var_index);
-    if (c.len == 0) {
-        Fatal(1, error, "lookup of %d failed", var_index);
+    if (debug_output_enabled)
+    {
+        chunk c = GBchunkGet(model, var_type_no, var_index);
+        if (c.len == 0) {
+            Fatal(1, error, "lookup of %d failed", var_index);
+        }
+        char s[c.len + 1];
+        for (unsigned int i = 0; i < c.len; i++) {
+            s[i] = c.data[i];
+        }
+        s[c.len] = 0;
+        long   n_count;
+        char   elem_str[1024];
+        double e_count;
+        get_vset_size(u, &n_count, &e_count, elem_str, sizeof(elem_str));
+        if (e_count > 0) Warning(debug, "add_variable_subset: %s:  %s (~%1.2e) states", s, elem_str, e_count);
     }
-    char s[c.len + 1];
-    for (unsigned int i = 0; i < c.len; i++) {
-        s[i] = c.data[i];
-    }
-    s[c.len] = 0;
-    Warning(info, "add_variable_subset: Variable %d: %s", var_index, s);
-    long   n_count;
-    char   elem_str[1024];
-    double e_count;
-    get_vset_size(u, &n_count, &e_count, elem_str, sizeof(elem_str));
-    Warning(info, "add_variable_subset:   %s (~%1.2e) states", elem_str, e_count);
-*/
+
     vset_union(dst, u);
     vset_destroy(u);
 }
@@ -1927,7 +1931,8 @@ void init_pbes()
     player = RTmalloc(num_vars * sizeof(int)); // player of variables
     for(size_t i=0; i<num_vars; i++)
     {
-        /*chunk c = GBchunkGet(model, var_type_no, i);
+        /*
+        chunk c = GBchunkGet(model, var_type_no, i);
         if (c.len == 0) {
             Fatal(1, error, "lookup of %d failed", i);
         }
@@ -1935,8 +1940,9 @@ void init_pbes()
         for (unsigned int i = 0; i < c.len; i++) {
             s[i] = c.data[i];
         }
-        s[c.len] = 0;*/
-        //Warning(info, "Variable %d: %s", i, s);
+        s[c.len] = 0;
+        Warning(info, "Variable %d: %s", i, s);
+        */
         lts_type_t type = GBgetLTStype(model);
         int state_length = lts_type_get_state_length(type);
         // create dummy state with variable i:
@@ -1965,13 +1971,27 @@ void init_pbes()
 #endif
 
 #if defined(PBES)
+struct pg_autocomplete_info {
+    int   *dst;
+    vrel_t rel;
+};
+
+static void
+pg_autocomplete_cb(void *context, int *src)
+{
+    struct pg_autocomplete_info *ctx = (struct pg_autocomplete_info*)context;
+    vrel_add(ctx->rel, src, ctx->dst);
+}
+
 /**
  * \brief Creates a symbolic parity game
  */
 parity_game* compute_symbolic_parity_game(vset_t visited, int* src)
 {
+    debug_output_enabled = true;
+
     // num_vars and player have been pre-computed by init_pbes.
-    parity_game* g = spg_create(domain, N, nGrps, min_priority, max_priority);
+    parity_game* g = spg_create(domain, N, nGrps+2, min_priority, max_priority);
     for(int i=0; i < N; i++)
     {
         g->src[i] = src[i];
@@ -2005,13 +2025,54 @@ parity_game* compute_symbolic_parity_game(vset_t visited, int* src)
         bn_int2string(s, size, &elem_count);
         Warning(info, "priority %d: %d nodes, %s elements.", p, n_count, s);
     }
-    for(int i = 0; i < g->num_groups; i++)
+
+    // Autocompleting the parity game (adding transitions to true or false
+    // for nodes without successors).
+    Warning(info, "Autocompleting parity game.");
+    for(int p = 0; p < 2; p++)
+    {
+        g->e[nGrps+p] = pg_autocomplete_transitions[p];
+
+        long   n_count;
+        bn_int_t elem_count;
+        vset_t s = vset_create(g->domain, -1, NULL);
+        vset_copy(s, g->v_player[1-p]);
+        vset_t t = vset_create(g->domain, -1, NULL);
+        for(int group=0; group<nGrps; group++) {
+            vset_clear(t);
+            vset_prev(t, visited, group_next[group]);
+            vset_minus(s, t);
+        }
+        vset_destroy(t);
+        vset_count(s, &n_count, &elem_count);
+        //Warning(info, "player[%d] - prev(V) = %d", 1-p, n_count);
+
+        // create dummy state with variable i:
+        int* state = RTmalloc(N*sizeof(int));
+        for(int j=0; j < N; j++)
+        {
+            state[j] = 0;
+        }
+        state[var_pos] = (p==0) ? false_index : true_index;
+        vset_add(g->v, state);
+        vset_add(g->v_player[p], state);
+        vset_add(g->v_priority[(p==0)? 1 : 0], state);
+
+        struct pg_autocomplete_info context;
+        context.dst = state;
+        context.rel = g->e[nGrps+p];
+        vset_enum(s, pg_autocomplete_cb, &context);
+    }
+
+    for(int i = 0; i < nGrps; i++)
     {
         g->e[i] = group_next[i];
     }
     return g;
 }
 #endif
+
+
 
 int
 main (int argc, char *argv[])
@@ -2117,6 +2178,15 @@ main (int argc, char *argv[])
     int p_len = 1;
     int proj[1] = {var_pos}; // position 0 encodes the variable
     variable_projection = vproj_create(domain, p_len, proj);
+    int unit_proj[N];
+    for(int i=0; i<N; i++)
+    {
+        unit_proj[i] = i;
+    }
+    for(int p=0; p<2; p++)
+    {
+        pg_autocomplete_transitions[p] = vrel_create(domain, N, unit_proj);
+    }
 #endif
 
 #if defined(PBES)
