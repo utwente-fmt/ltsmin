@@ -277,7 +277,6 @@ static void pbes_popt(poptContext con, enum poptCallbackReason reason,
             }
             if (debug_flag) {
                 Warning(info,"Debug flag is set.");
-                log::mcrl2_logger::set_reporting_level(log::debug1);
             }
             GBregisterLoader("pbes", PBESloadGreyboxModel);
             Warning(info,"PBES language module initialized");
@@ -378,7 +377,7 @@ void PBESloadGreyboxModel(model_t model, const char*name)
     gb_context_t ctx = (gb_context_t)RTmalloc(sizeof(struct grey_box_context));
     GBsetContext(model, ctx);
 
-    log::log_level_t log_level = debug_flag ? log::debug1 : log::quiet;
+    log::log_level_t log_level = debug_flag ? log::verbose : log::error;
     log::mcrl2_logger::set_reporting_level(log_level);
 
     bool reset = (reset_flag==1);
