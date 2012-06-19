@@ -2046,6 +2046,7 @@ parity_game* compute_symbolic_parity_game(vset_t visited, int* src)
         vset_destroy(t);
         vset_count(s, &n_count, &elem_count);
         //Warning(info, "player[%d] - prev(V) = %d", 1-p, n_count);
+        Warning(info, "Adding %d transitions to '%s'.", n_count, ((p==0)?"or":"and"));
 
         // create dummy state with variable i:
         int* state = RTmalloc(N*sizeof(int));
