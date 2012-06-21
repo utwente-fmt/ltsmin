@@ -185,8 +185,8 @@ static char*            trc_output = NULL;
 static int              dlk_detect = 0;
 static int              assert_detect = 0;
 static int              assert_index = -1;
-static size_t           G = 4;
-static size_t           H = 100;
+static size_t           G = 1;
+static size_t           H = 1000;
 static int              ZOBRIST = 0;
 static int              LATTICE_BLOCK_SIZE = (1UL<<CACHE_LINE) / sizeof(lattice_t);
 static int              UPDATE = TA_UPDATE_WAITING;
@@ -2455,6 +2455,7 @@ bfs (wctx_t *ctx)
 void
 sbfs (wctx_t *ctx)
 {
+    size_t              total = 0;
     size_t              out_size;
     do {
         while (lb2_balance(lb2, ctx->id, dfs_stack_frame_size(ctx->in_stack), split_sbfs)) {
@@ -2468,8 +2469,10 @@ sbfs (wctx_t *ctx)
         if (0 == ctx->id && out_size > max_level_size) max_level_size = out_size;
         lb2_reinit (lb2, ctx->id);
         increase_level (&ctx->counters);
-        if (0 == ctx->id && RTverbosity >= 2)
-            Warning(info, "BFS level %zu has %zu states", ctx->counters.level_cur, out_size);
+        if (0 == ctx->id && RTverbosity >= 2) {
+            total += out_size;
+            Warning(info, "BFS level %zu has %zu states %zu total", ctx->counters.level_cur, out_size, total);
+        }
         dfs_stack_t     old = ctx->out_stack;
         ctx->stack = ctx->out_stack = ctx->in_stack;
         ctx->in_stack = old;
