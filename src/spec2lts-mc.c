@@ -151,7 +151,7 @@ static char            *program;
 static cct_map_t       *tables = NULL;
 static char            *files[2];
 static int              dbs_size = 0;
-static int              refs = 0;
+static int              refs = 1;
 static int              no_red_perm = 0;
 static int              all_red = 1;
 static box_t            call_mode = UseBlackBox;
@@ -346,7 +346,7 @@ static struct poptOption options[] = {
      0, "maximum balancing handoff (handoff=min(max, stack_size/2))", NULL},
     {"zobrist", 'z', POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &ZOBRIST,
      0,"log2 size of zobrist random table (6 or 8 is good enough; 0 is no zobrist)", NULL},
-    {"ref", 0, POPT_ARG_VAL, &refs, 1, "store references on the stack/queue instead of full states", NULL},
+    {"noref", 0, POPT_ARG_INTL_DOMAIN, &refs, 0, "store full states on the stack/queue instead of references (faster)", NULL},
     {"ratio", 0, POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &ratio, 0, "log2 tree root to leaf ratio", "<int>"},
     {"deadlock", 'd', POPT_ARG_VAL, &dlk_detect, 1, "detect deadlocks", NULL },
 #ifdef SPINJA
