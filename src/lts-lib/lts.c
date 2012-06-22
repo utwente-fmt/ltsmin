@@ -408,6 +408,8 @@ void lts_merge(lts_t lts1,lts_t lts2){
     lts_free(lts2);
 }
 
+static const size_t BUFLEN = 65536;
+
 lts_t lts_encode_edge(lts_t lts){
     lts_t res=lts_create();
     lts_set_type(res,LTS_LIST);
@@ -439,15 +441,15 @@ lts_t lts_encode_edge(lts_t lts){
         }
         int vector[V];
         for(uint32_t i=0;i<lts->states;i++){
-            char label[65536];
+            char label[BUFLEN];
             char *current=label;
-            current+=sprintf(current,"state");
+            current+=snprintf(current,BUFLEN,"state");
             TreeUnfold(lts->state_db,i,vector);
             for(int j=0;j<V;j++){
                 switch(format[j]){
                 case LTStypeDirect:
                 case LTStypeRange:
-                    current+=sprintf(current,"|%d",vector[j]);
+                    current+=snprintf(current,BUFLEN,"|%d",vector[j]);
                     break;
                 case LTStypeChunk:
                 case LTStypeEnum:
@@ -455,7 +457,7 @@ lts_t lts_encode_edge(lts_t lts){
                     chunk label_c=VTgetChunk(lts->values[typeno[j]],vector[j]);
                     char label_s[label_c.len*2+6];
                     chunk2string(label_c,sizeof label_s,label_s);
-                    current+=sprintf(current,"|%s",label_s);
+                    current+=snprintf(current,BUFLEN,"|%s",label_s);
                     }
                 }
             }
@@ -475,9 +477,9 @@ lts_t lts_encode_edge(lts_t lts){
         int vector[N];
         for(uint32_t i=0;i<lts->states;i++){
 
-            char label[65536];
+            char label[BUFLEN];
             char *current=label;
-            current+=sprintf(current,"prop");
+            current+=snprintf(current,BUFLEN,"prop");
             if (N==1) vector[0]=lts->properties[i];
             if (N>1) {
                 TreeUnfold(lts->prop_idx,lts->properties[i],vector);
@@ -486,7 +488,7 @@ lts_t lts_encode_edge(lts_t lts){
                 switch(format[j]){
                 case LTStypeDirect:
                 case LTStypeRange:
-                    current+=sprintf(current,"|%d",vector[j]);
+                    current+=snprintf(current,BUFLEN,"|%d",vector[j]);
                     break;
                 case LTStypeChunk:
                 case LTStypeEnum:
@@ -494,7 +496,7 @@ lts_t lts_encode_edge(lts_t lts){
                     chunk label_c=VTgetChunk(lts->values[typeno[j]],vector[j]);
                     char label_s[label_c.len*2+6];
                     chunk2string(label_c,sizeof label_s,label_s);
-                    current+=sprintf(current,"|%s",label_s);
+                    current+=snprintf(current,BUFLEN,"|%s",label_s);
                     }
                 }
             }
@@ -514,10 +516,10 @@ lts_t lts_encode_edge(lts_t lts){
         }
         int vector[K];
         for(uint32_t i=0;i<lts->transitions;i++){
-            char label[65536];
+            char label[BUFLEN];
             char *current=label;
-            current+=sprintf(current,"edge");
             if (K==1) vector[0]=lts->label[i];
+            current+=snprintf(current,BUFLEN,"edge");
             if (K>1) {
                 TreeUnfold(lts->edge_idx,lts->label[i],vector);
             }
@@ -525,7 +527,7 @@ lts_t lts_encode_edge(lts_t lts){
                 switch(format[j]){
                 case LTStypeDirect:
                 case LTStypeRange:
-                    current+=sprintf(current,"|%d",vector[j]);
+                    current+=snprintf(current,BUFLEN,"|%d",vector[j]);
                     break;
                 case LTStypeChunk:
                 case LTStypeEnum:
@@ -533,7 +535,7 @@ lts_t lts_encode_edge(lts_t lts){
                     chunk label_c=VTgetChunk(lts->values[typeno[j]],vector[j]);
                     char label_s[label_c.len*2+6];
                     chunk2string(label_c,sizeof label_s,label_s);
-                    current+=sprintf(current,"|%s",label_s);
+                    current+=snprintf(current,BUFLEN,"|%s",label_s);
                     }
                 }
             }
