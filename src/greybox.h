@@ -353,6 +353,16 @@ extern void GBsetGuardNDSInfo(model_t model, matrix_t *info);
 extern matrix_t *GBgetGuardNDSInfo(model_t model);
 
 /**
+\brief Set the POR visibility info.
+*/
+extern void GBsetPorVisibility(model_t model, bitvector_t *bv);
+
+/**
+\brief Get the POR visibility info, i.e. which group touches an LTL variable.
+*/
+extern bitvector_t *GBgetPorVisibility(model_t model);
+
+/**
 \brief Set the initial state.
 
 The initial state is needed if a short vector next state method

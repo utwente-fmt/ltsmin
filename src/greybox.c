@@ -1,10 +1,10 @@
 #include <config.h>
 #include <stdlib.h>
 
-#include "greybox.h"
-#include "runtime.h"
-#include "treedbs.h"
-#include "dm/dm.h"
+#include <dm/dm.h>
+#include <greybox.h>
+#include <runtime.h>
+#include <treedbs.h>
 
 struct grey_box_model {
 	model_t parent;
@@ -18,7 +18,8 @@ struct grey_box_model {
     matrix_t *gce_info; // guard co-enabled info
     matrix_t *gnes_info; // guard necessary enabling set
     matrix_t *gnds_info; // guard necessary disabling set
-        int sl_idx_buchi_accept;
+    int sl_idx_buchi_accept;
+    bitvector_t *por_visibility;
 	int *s0;
 	void*context;
 	next_method_grey_t next_short;
@@ -199,7 +200,7 @@ wrapped_state_labels_default_all(model_t model, int *state, int *labels)
 
 model_t GBcreateBase(){
 	model_t model=(model_t)RTmalloc(sizeof(struct grey_box_model));
-        model->parent=NULL;
+    model->parent=NULL;
 	model->ltstype=NULL;
 	model->dm_info=NULL;
 	model->dm_read_info=NULL;
@@ -208,10 +209,11 @@ model_t GBcreateBase(){
     for(int i=0; i < GB_SL_GROUP_COUNT; i++)
         model->sl_groups[i]=NULL;
     model->guards=NULL;
+    model->por_visibility=NULL;
     model->gce_info=NULL;
     model->gnes_info=NULL;
     model->gnds_info=NULL;
-        model->sl_idx_buchi_accept = -1;
+    model->sl_idx_buchi_accept = -1;
 	model->s0=NULL;
 	model->context=0;
 	model->next_short=default_short;
@@ -281,6 +283,9 @@ void GBinitModelDefaults (model_t *p_model, model_t default_src)
 
     if (model->gce_info == NULL)
         GBsetGuardCoEnabledInfo(model, GBgetGuardCoEnabledInfo (default_src));
+
+    if (model->por_visibility == NULL)
+        GBsetPorVisibility (model, GBgetPorVisibility(default_src));
 
     if (model->gnes_info == NULL)
         GBsetGuardNESInfo(model, GBgetGuardNESInfo (default_src));
@@ -530,6 +535,15 @@ guard_t* GBgetGuard(model_t model, int group) {
 void GBsetGuardCoEnabledInfo(model_t model, matrix_t *info) {
     if (model->gce_info != NULL) Fatal(1, error, "guard may be co-enabled info already set");
     model->gce_info = info;
+}
+
+void GBsetPorVisibility(model_t model, bitvector_t *bv) {
+    if (model->por_visibility != NULL) Fatal(1, error, "POR visibility already set");
+    model->por_visibility = bv;
+}
+
+bitvector_t *GBgetPorVisibility(model_t model) {
+    return model->por_visibility;
 }
 
 matrix_t *GBgetGuardCoEnabledInfo(model_t model) {

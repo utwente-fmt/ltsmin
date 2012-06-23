@@ -1,6 +1,7 @@
 #include <config.h>
-#include <stdlib.h>
+
 #include <limits.h>
+#include <stdlib.h>
 
 #include <dm/dm.h>
 #include <greybox.h>
@@ -22,7 +23,7 @@ por_long (model_t self, int group, int *src, TransitionCB cb,
     (void)src;
     (void)cb;
     (void)user_context;
-    Abort ("Using Partial Order Reduction in combination with --grey or --reach? Long call failed.");
+    Abort ("Using Partial Order Reduction in combination with --grey or -reach? Long call failed.");
 }
 
 static int
@@ -34,7 +35,7 @@ por_short (model_t self, int group, int *src, TransitionCB cb,
     (void)src;
     (void)cb;
     (void)user_context;
-    Abort ("Using Partial Order Reduction in combination with --reach or --cached? Short call failed.");
+    Abort ("Using Partial Order Reduction in combination with -reach or --cached? Short call failed.");
 }
 
 
@@ -146,9 +147,6 @@ typedef struct por_context {
     // location in search array (extra indirection for quick switching between contexts)
     int             *search_order;
     search_context  *search;                    // context for each search
-
-    // LTL specific
-    int*             group_visibility;
 } por_context;
 
 /**
@@ -568,8 +566,8 @@ bs_emit_dlk(model_t model, por_context* pctx, int* src, TransitionCB cb, void* c
         int res = 0;
         for(int i=0; i < n; i++) {
             // enabled && selected
-            if (!pctx->group_status[i]&GS_DISABLED &&
-                 pctx->search[pctx->search_order[0]].emit_status[i]&ES_SELECTED) {
+            if (!(pctx->group_status[i]&GS_DISABLED) &&
+                 (pctx->search[pctx->search_order[0]].emit_status[i]&ES_SELECTED)) {
                 res+=GBgetTransitionsLong(pctx->parent,i,src,cb,ctx);
             }
         }
@@ -624,7 +622,7 @@ bs_emit_ltl(model_t model, por_context* pctx, int* src, TransitionCB cb, void* c
         pctx->emitted = 0;
         for(int i=0; i < n && ltlctx.por_proviso_false_cnt == 0; i++) {
             // enabled && selected
-            if ( !pctx->group_status[i]&GS_DISABLED &&
+            if ( !(pctx->group_status[i]&GS_DISABLED) &&
                  (pctx->search[pctx->search_order[0]].emit_status[i]&ES_SELECTED) ) {
                 pctx->search[pctx->search_order[0]].emit_status[i]|=ES_EMITTED;
                 res+=GBgetTransitionsLong(pctx->parent,i,src,ltl_hook_cb,&ltlctx);
@@ -636,7 +634,7 @@ bs_emit_ltl(model_t model, por_context* pctx, int* src, TransitionCB cb, void* c
             // reemmit, emit all unemmitted
             for(int i=0; i < n; i++) {
                 // enabled && selected
-                if ( !pctx->group_status[i]&GS_DISABLED &&
+                if ( !(pctx->group_status[i]&GS_DISABLED) &&
                     !(pctx->search[pctx->search_order[0]].emit_status[i]&ES_EMITTED) ) {
                     // these should also be marked as emmitted, for consistency
                     // except that this data is not used anymore
@@ -685,25 +683,11 @@ por_beam_search_ltl_all (model_t self, int *src, TransitionCB cb, void *user_con
     (void)src;
 }
 
-
-/**
- * Mark the visibility
- * NOTE: this is a hack that tightly couples the LTL and POR wrappers toghether.
- * A proper solution should be made using the PINS interface
- * Assumptions: this function is only called by the LTL layer if there is a POR layer present
- */
-void
-por_visibility(model_t model, int group, int visibility)
-{
-    por_context *ctx = (por_context *)GBgetContext (model);
-    ctx->group_visibility[group] = visibility;
-}
-
 /**
  * Setup the partial order reduction layer
  */
 model_t
-GBaddPOR (model_t model, int por_check_ltl )
+GBaddPOR (model_t model, int por_check_ltl)
 {
     Warning(info,"Initializing partial order reduction layer..");
 
@@ -866,8 +850,6 @@ GBaddPOR (model_t model, int por_check_ltl )
 
     // what proviso do we need? none (deadlock) or ltl?
     if (por_check_ltl) {
-        // reserve memory for group visibility, will be provided/set by ltl layer
-        ctx->group_visibility = RTmallocZero( groups * sizeof(int) );
         // setup ltl search
         GBsetNextStateAll   (pormodel, por_beam_search_ltl_all);
     } else {

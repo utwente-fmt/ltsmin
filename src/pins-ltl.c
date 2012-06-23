@@ -31,7 +31,6 @@ typedef struct ltl_context {
     int             sl_idx_accept;
     int             len;
     const ltsmin_buchi_t *ba;
-    int            *visibility;
 } ltl_context_t;
 
 static ltl_context_t *ctx;
@@ -256,7 +255,7 @@ ltl_textbook_long (model_t self, int group, int *src, TransitionCB cb,
            void *user_context)
 {
     (void)self; (void)group; (void)src; (void)cb; (void)user_context;
-    Abort("Using LTL layer --grey? --reach? ? Still on todo list ;)");
+    Abort("Using LTL layer --grey? -reach? ? Still on todo list ;)");
 }
 
 static int
@@ -280,6 +279,33 @@ ltl_textbook_all (model_t self, int *src, TransitionCB cb,
         return new_ctx.ntbtrans;
     } else {
         return GBgetTransitionsAll(ctx->parent, src, ltl_textbook_cb, &new_ctx);
+    }
+}
+
+void print_ltsmin_buchi(const ltsmin_buchi_t *ba)
+{
+    Warning(info, "buchi has %d states", ba->state_count);
+    for(int i=0; i < ba->state_count; i++) {
+        Warning(info, " state %d: %s", i, ba->states[i]->accept ? "accepting" : "non-accepting");
+        for(int j=0; j < ba->states[i]->transition_count; j++) {
+            char buf[4096];
+            memset(buf, 0, sizeof(buf));
+            char* at = buf;
+            *at = '\0';
+            for(int k=0; k < ba->predicate_count; k++) {
+                if (ba->states[i]->transitions[j].pos[k/32] & (1<<(k%32))) {
+                    if (at != buf) { sprintf(at, " & "); at += strlen(at); }
+                    at = ltsmin_expr_print_ltl(ba->predicates[k], at);
+                }
+                if (ba->states[i]->transitions[j].neg[k/32] & (1<<(k%32))) {
+                    if (at != buf) { sprintf(at, " & "); at += strlen(at); }
+                    *at++ = '!';
+                    at = ltsmin_expr_print_ltl(ba->predicates[k], at);
+                }
+            }
+            if (at == buf) sprintf(at, "true");
+            Warning(info, "  -> %d, | %s", ba->states[i]->transitions[j].to_state, buf);
+        }
     }
 }
 
@@ -307,31 +333,9 @@ GBaddLTL (model_t model, const char *ltl_file, pins_ltl_type_t type, model_t por
     ltsmin_expr_t notltl = LTSminExpr(UNARY_OP, LTL_NOT, 0, ltl, NULL);
     ltsmin_ltl2ba(notltl);
     const ltsmin_buchi_t* ba = ltsmin_buchi();
-
-    Warning(info, "buchi has %d states", ba->state_count);
-    for(int i=0; i < ba->state_count; i++) {
-        Warning(info, " state %d: %s", i, ba->states[i]->accept ? "accepting" : "non-accepting");
-        for(int j=0; j < ba->states[i]->transition_count; j++) {
-            char buf[4096];
-            memset(buf, 0, sizeof(buf));
-            char* at = buf;
-            *at = '\0';
-            for(int k=0; k < ba->predicate_count; k++) {
-                if (ba->states[i]->transitions[j].pos[k/32] & (1<<(k%32))) {
-                    if (at != buf) { sprintf(at, " & "); at += strlen(at); }
-                    at = ltsmin_expr_print_ltl(ba->predicates[k], at);
-                }
-                if (ba->states[i]->transitions[j].neg[k/32] & (1<<(k%32))) {
-                    if (at != buf) { sprintf(at, " & "); at += strlen(at); }
-                    *at++ = '!';
-                    at = ltsmin_expr_print_ltl(ba->predicates[k], at);
-                }
-            }
-            if (at == buf) sprintf(at, "true");
-            Warning(info, "  -> %d, | %s", ba->states[i]->transitions[j].to_state, buf);
-        }
-    }
-
+    if (NULL == ba)
+        Abort ("Empty buchi automaton.");
+    print_ltsmin_buchi(ba);
     if (ba->predicate_count > 30)
         Abort("more than 30 predicates in buchi automaton are currently not supported");
 
@@ -457,25 +461,18 @@ GBaddLTL (model_t model, const char *ltl_file, pins_ltl_type_t type, model_t por
 
     lts_type_validate(ltstype_new);
 
-    // mark visible groups
-    ctx->visibility = RTmallocZero( groups * sizeof(int) );
-    for(int k=0; k < ba->predicate_count; k++) {
-        mark_visible(ba->predicates[k], p_new_dm_w, ctx->visibility);
+    // mark visible groups in POR layer
+    if (por_model) {
+        int *visibility = RTmallocZero( groups * sizeof(int) );
+        for(int k=0; k < ba->predicate_count; k++)
+            mark_visible(ba->predicates[k], p_new_dm_w, visibility);
+        bitvector_t *bv = RTmalloc (sizeof *bv);
+        bitvector_create(bv, groups);
+        for(int i=0; i < groups; i++)
+            if (visibility[i]) bitvector_set_atomic(bv, i);
+        GBsetPorVisibility (por_model, bv);
+        RTfree(visibility);
     }
-
-    // communicate visible groups to the partial order reduction layer
-    // note: this tightly couples the LTL and POR layer, which
-    //       isn't the correct way to handle this situation.
-    //       currently however this is the only use case in which this
-    //       problem occurs and it might be solved later
-    //       The proper way to do this would be to set up communication
-    //       infrastructure throughout the PINS interface which is
-    //       is a lot of work for a single use case.
-    //       Using a shared datastructure is not possible because
-    //       initialization is not possible (createBase, requires #groups beforehand)
-    //       Therefore: the following (hack) is used
-    if (por_model)
-        for(int i=0; i < groups; i++) por_visibility(por_model, i, ctx->visibility[i]);
 
     if (type == PINS_LTL_SPIN) {
         GBsetNextStateLong  (ltlmodel, ltl_spin_long);
@@ -492,7 +489,7 @@ GBaddLTL (model_t model, const char *ltl_file, pins_ltl_type_t type, model_t por
     int             s0[ctx->len];
     GBgetInitialState (model, s0);
     // set buchi initial state
-    s0[ctx->ltl_idx] = (type == PINS_LTL_SPIN? 0 : -1);
+    s0[ctx->ltl_idx] = (type == PINS_LTL_SPIN ? 0 : -1);
 
     GBsetInitialState (ltlmodel, s0);
 
