@@ -7,16 +7,13 @@
 #undef Debug
 #include <dm/dm.h>
 #include <greybox.h>
-#include <runtime.h>
-#include <unix.h>
 #include <ltsmin-syntax.h>
 #include <ltsmin-tl.h>
 #include <ltsmin-buchi.h>
+#include <ltl2ba-lex.h>
+#include <runtime.h>
+#include <unix.h>
 
-// TODO fix include file
-extern void ltsmin_ltl2ba(ltsmin_expr_t);
-extern ltsmin_buchi_t *ltsmin_buchi();
-// TODO
 
 typedef struct cb_context {
     TransitionCB cb;

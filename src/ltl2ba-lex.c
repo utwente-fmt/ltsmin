@@ -35,6 +35,7 @@
 
 #include <ltl2ba.h>
 #undef Debug
+#include <ltl2ba-lex.h>
 #include <ltsmin-syntax.h>
 #include <ltsmin-tl.h>
 #include <ltsmin-buchi.h>

@@ -658,7 +658,7 @@ libutil_la_LDFLAGS  += $(CADP_LDFLAGS)
 libutil_la_LIBADD   += $(CADP_LIBS)
 endif
 
-libutil_la_SOURCES += ltl2ba-lex.c
+libutil_la_SOURCES += ltl2ba-lex.c ltl2ba-lex.h
 libutil_la_SOURCES += ltsmin-buchi.h
 libutil_la_CPPFLAGS += -DNXT -I${top_srcdir}/ltl2ba
 libutil_la_LIBADD += $(top_builddir)/ltl2ba/libltl2ba.la
