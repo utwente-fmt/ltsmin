@@ -690,8 +690,9 @@ static const char *ltl_semantics = "spin";
 static pins_ltl_type_t ltl_type = PINS_LTL_SPIN;
 
 static si_map_entry db_ltl_semantics[]={
-    {"spin",     PINS_LTL_SPIN},
-    {"textbook", PINS_LTL_TEXTBOOK},
+    {"spin",    PINS_LTL_SPIN},
+    {"textbook",PINS_LTL_TEXTBOOK},
+    {"ltsmin",  PINS_LTL_LTSMIN},
     {NULL, 0}
 };
 
@@ -819,7 +820,7 @@ struct poptOption ltl_options[] = {
     {"ltl", 0, POPT_ARG_STRING, &ltl_file, 0, "file with LTL formula",
      "<ltl-file>.ltl"},
     {"ltl-semantics", 0, POPT_ARG_STRING | POPT_ARGFLAG_SHOW_DEFAULT, &ltl_semantics, 0,
-     "LTL semantics", "<spin|textbook>"},
+     "LTL semantics", "<spin|textbook|ltsmin>"},
     POPT_TABLEEND
 };
 

@@ -275,7 +275,8 @@ ltsmin_buchi()
         res->predicates[i] = ltsmin_expr_lookup(NULL, sym_table[i]);
     }
     res->state_count = state_count;
-
+    res->trans_count = 0;
+    int index = 0;
     state_count = 0;
     for(s = bstates->prv; s != bstates; s = s->prv) {
         ltsmin_buchi_state_t * bs = NULL;
@@ -293,10 +294,12 @@ ltsmin_buchi()
             bs->transitions[transition_count].pos = t->pos;
             bs->transitions[transition_count].neg = t->neg;
             bs->transitions[transition_count].to_state = map_id[t->to->id+1];
+            bs->transitions[transition_count].index = index++;
             transition_count++;
         }
 
         res->states[state_count++] = bs;
     }
+    res->trans_count += index;
     return res;
 }

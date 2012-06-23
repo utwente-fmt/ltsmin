@@ -537,9 +537,14 @@ extern model_t GBaddCache(model_t model);
 PINS_LTL_TEXTBOOK adds an initial state to the model and labels
 the incoming edges with the properties of in the buchi automaton
 PINS_LTL_SPIN labels the outgoing edges with the properties of
-the buchi automaton
+the buchi automaton. Additionally, the SPIN semantics accounts
+for deadlocks in the LTS by letting the buchi continues upon deadlock.
+PINS_LTL_LTSMIN Like SPIN semantics, but without the deadlock provision.
+This allows LTSmin to maintain an efficient dependency matrix as
+deadlock detection is non-local (it depends on the conjunction of all
+guards from all transition groups).
 */
-typedef enum {PINS_LTL_TEXTBOOK, PINS_LTL_SPIN} pins_ltl_type_t;
+typedef enum {PINS_LTL_TEXTBOOK, PINS_LTL_SPIN, PINS_LTL_LTSMIN} pins_ltl_type_t;
 
 /**
 \brief Add LTL layer on top all other pins layers
