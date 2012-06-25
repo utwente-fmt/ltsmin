@@ -285,6 +285,32 @@ recursive_result spg_solve_recursive(const parity_game* g,  const spgsolver_opti
         return result;
     }
 
+    bool have_deadlock_states[2];
+    vset_t deadlock_states[2];
+    for(int p=0; p<2; p++)
+    {
+        have_deadlock_states[p] = false;
+        deadlock_states[p] = vset_create(g->domain, -1, NULL);
+        vset_copy(deadlock_states[p], g->v_player[p]);
+        vset_t t = vset_create(g->domain, -1, NULL);
+        for(int group=0; group<g->num_groups; group++) {
+            vset_clear(t);
+            vset_prev(t, g->v, g->e[group]);
+            vset_minus(deadlock_states[p], t);
+        }
+        vset_destroy(t);
+        if (!vset_is_empty(deadlock_states[p]))
+        {
+            vset_count(deadlock_states[p], &n_count, &elem_count);
+            size_t size = 20;
+            char s[size];
+            bn_int2string(s, size, &elem_count);
+            //Warning(info, "player[%d] - prev(V) = %d", 1-p, n_count);
+            Warning(info, "%s deadlock states (%d nodes) with result '%s' (p=%d).", s, n_count, ((p==0)?"false":"true"), p);
+            have_deadlock_states[p] = true;
+        }
+    }
+
     // compute U <- {v \in V | p(v) = m}
     Warning(info, "  min = %d, max = %d", g->min_priority, g->max_priority);
     int m = g->min_priority;
@@ -300,9 +326,34 @@ recursive_result spg_solve_recursive(const parity_game* g,  const spgsolver_opti
         vset_copy(u, g->v_priority[m]);
         vset_count(u, &n_count, &elem_count);
     }
-    Warning(info, "m = %d, u has %d nodes.", m, n_count);
+    if (m > 0 && have_deadlock_states[1]) // deadlock states of player 1 (and) result in true: nu X0 = X0
+    {
+        m = 0;
+    }
+    else if (m > 1 && have_deadlock_states[0]) // deadlock states of player 0 (or) result in false: mu X1 = X1
+    {
+        m = 1;
+    }
 
     int player = m % 2;
+
+    // Add deadlock states
+    if (m < 2)
+    {
+        Warning(info, "Adding deadlock states (m=%d).", m);
+        if (m >= g->min_priority)
+        {
+            vset_copy(u, g->v_priority[m]);
+        }
+        vset_union(u, deadlock_states[1-player]);
+        vset_count(u, &n_count, &elem_count);
+    }
+    for(int p=0; p<2; p++)
+    {
+        vset_destroy(deadlock_states[p]);
+    }
+
+    Warning(info, "m = %d, u has %d nodes.", m, n_count);
 
     // U = attr_player(G, U)
     options->chaining ? spg_attractor_chaining(player, g, u, options) : spg_attractor(player, g, u, options);
