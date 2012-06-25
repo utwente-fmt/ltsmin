@@ -159,8 +159,8 @@ ltsmin_expr_t ctl_parse_file(lts_type_t ltstype,const char *file){
     LTSminPrefixOperator(env, CTL_FUTURE,       "<>", 3);
     LTSminPrefixOperator(env, CTL_NEXT,         "X",  3);
 
-    LTSminBinaryOperator(env, CTL_AND,          "&",  4);
-    LTSminBinaryOperator(env, CTL_OR,           "|",  5);
+    LTSminBinaryOperator(env, CTL_AND,          "&&",  4);
+    LTSminBinaryOperator(env, CTL_OR,           "||",  5);
 
     LTSminBinaryOperator(env, CTL_EQUIV,        "<->",6);
     LTSminBinaryOperator(env, CTL_IMPLY,        "->", 7);

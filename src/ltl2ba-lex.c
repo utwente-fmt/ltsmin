@@ -113,10 +113,10 @@ tl_lex(void)
             sprintf(yytext, "false");
             Token(FALSE);
         case LTL_AND:
-            sprintf(yytext, "&");
+            sprintf(yytext, "&&");
             Token(AND);
         case LTL_OR:
-            sprintf(yytext, "|");
+            sprintf(yytext, "||");
             Token(OR);
         case LTL_NOT:
             sprintf(yytext, "!");
@@ -275,7 +275,6 @@ ltsmin_buchi()
         res->predicates[i] = ltsmin_expr_lookup(NULL, sym_table[i]);
     }
     res->state_count = state_count;
-    res->trans_count = 0;
     int index = 0;
     state_count = 0;
     for(s = bstates->prv; s != bstates; s = s->prv) {
@@ -300,6 +299,6 @@ ltsmin_buchi()
 
         res->states[state_count++] = bs;
     }
-    res->trans_count += index;
+    res->trans_count = index;
     return res;
 }
