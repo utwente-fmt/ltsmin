@@ -154,7 +154,12 @@ void HREinit(int *argc,char **argv[]){
 
 void HREabort(int code){
     auto_abort=0;
-    HREctxAbort(HREglobal(),code);
+    hre_context_t global=HREglobal();
+    if (global) {
+        HREctxAbort(global,code);
+    } else {
+        exit(code);
+    }
 }
 
 void HREexit(int code){
