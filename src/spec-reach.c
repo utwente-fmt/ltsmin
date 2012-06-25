@@ -2028,7 +2028,8 @@ parity_game* compute_symbolic_parity_game(vset_t visited, int* src)
 
     // Autocompleting the parity game (adding transitions to true or false
     // for nodes without successors).
-    Warning(info, "Autocompleting parity game.");
+    //Warning(info, "Autocompleting parity game.");
+    Warning(info, "Computing deadlock states.");
     for(int p = 0; p < 2; p++)
     {
         g->e[nGrps+p] = pg_autocomplete_transitions[p];
@@ -2036,7 +2037,7 @@ parity_game* compute_symbolic_parity_game(vset_t visited, int* src)
         long   n_count;
         bn_int_t elem_count;
         vset_t s = vset_create(g->domain, -1, NULL);
-        vset_copy(s, g->v_player[1-p]);
+        vset_copy(s, g->v_player[p]);
         vset_t t = vset_create(g->domain, -1, NULL);
         for(int group=0; group<nGrps; group++) {
             vset_clear(t);
@@ -2044,25 +2045,36 @@ parity_game* compute_symbolic_parity_game(vset_t visited, int* src)
             vset_minus(s, t);
         }
         vset_destroy(t);
-        vset_count(s, &n_count, &elem_count);
-        //Warning(info, "player[%d] - prev(V) = %d", 1-p, n_count);
-        Warning(info, "Adding %d transitions to '%s'.", n_count, ((p==0)?"or":"and"));
 
-        // create dummy state with variable i:
-        int* state = RTmalloc(N*sizeof(int));
-        for(int j=0; j < N; j++)
+        if (!vset_is_empty(s))
         {
-            state[j] = 0;
-        }
-        state[var_pos] = (p==0) ? false_index : true_index;
-        vset_add(g->v, state);
-        vset_add(g->v_player[p], state);
-        vset_add(g->v_priority[(p==0)? 1 : 0], state);
+            size_t size = 20;
+            char str[size];
+            vset_count(s, &n_count, &elem_count);
+            bn_int2string(str, size, &elem_count);
+            //Warning(info, "player[%d] - prev(V) = %d", 1-p, n_count);
+            Warning(info, "There are %s deadlock states with result '%s'.", str, ((p==0)?"false":"true"));
 
-        struct pg_autocomplete_info context;
-        context.dst = state;
-        context.rel = g->e[nGrps+p];
-        vset_enum(s, pg_autocomplete_cb, &context);
+            // create dummy state with variable i:
+/*
+            int* state = RTmalloc(N*sizeof(int));
+            for(int j=0; j < N; j++)
+            {
+                state[j] = 0;
+            }
+            state[var_pos] = (p==0) ? false_index : true_index;
+            vset_add(g->v, state);
+            vset_add(g->v_player[p], state);
+            vset_add(g->v_priority[(p==0)? 1 : 0], state);
+            vrel_add(g->e[nGrps+p], state, state);
+
+            struct pg_autocomplete_info context;
+            context.dst = state;
+            context.rel = g->e[nGrps+p];
+            vset_enum(s, pg_autocomplete_cb, &context);
+            */
+        }
+        vset_destroy(s);
     }
 
     for(int i = 0; i < nGrps; i++)
