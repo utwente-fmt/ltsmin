@@ -51,8 +51,15 @@
  */
 ltsmin_expr_t ltl_parse_file(lts_type_t ltstype,const char *file){
     FILE *in=fopen( file, "r" );
-    if (!in) Fatal(1, error, "unable to open file: %s", file);
     ltsmin_parse_env_t env=LTSminParseEnvCreate();
+    stream_t stream = NULL;
+    size_t used;
+    if (in) {
+        stream = stream_input(in);
+    } else {
+        //Fatal(1, error, "unable to open file: %s", file);
+        stream = stream_read_mem((void*)file,strlen(file),&used);
+    }
     int N;
     N=lts_type_get_state_length(ltstype);
     for(int i=0;i<N;i++){
@@ -91,7 +98,7 @@ ltsmin_expr_t ltl_parse_file(lts_type_t ltstype,const char *file){
     //LTSminBinaryOperator(env, LTL_WEAK_UNTIL,   "W",  8); // not supported by ltl2ba
     LTSminBinaryOperator(env, LTL_RELEASE,      "R",  8);
 
-    ltsmin_parse_stream(TOKEN_EXPR,env,stream_input(in));
+    ltsmin_parse_stream(TOKEN_EXPR,env,stream);
     ltsmin_expr_t expr=env->expr;
     env->expr=NULL;
     LTSminParseEnvDestroy(env);
