@@ -51,7 +51,9 @@ eval_predicate(ltsmin_expr_t e, transition_info_t* ti, int* state)
         case LTL_EQ:
             return (eval_predicate(e->arg1, ti, state) == eval_predicate(e->arg2, ti, state));
         case LTL_VAR:
-            Abort("unbound variable in LTL expression");
+            if (-1 == e->num)
+                Abort("unbound variable in LTL expression");
+            return e->num;
         default: {
             char buf[1024];
             ltsmin_expr_print_ltl(e, buf);
@@ -342,8 +344,7 @@ ltl_textbook_short (model_t self, int group, int *src, TransitionCB cb,
 
 
 static int
-ltl_textbook_all (model_t self, int *src, TransitionCB cb,
-         void *user_context)
+ltl_textbook_all (model_t self, int *src, TransitionCB cb, void *user_context)
 {
     ltl_context_t *ctx = GBgetContext(self);
     cb_context new_ctx = {cb, user_context, src, 0, ctx};
@@ -365,17 +366,17 @@ print_ltsmin_buchi(const ltsmin_buchi_t *ba)
     for(int i=0; i < ba->state_count; i++) {
         Warning(info, " state %d: %s", i, ba->states[i]->accept ? "accepting" : "non-accepting");
         for(int j=0; j < ba->states[i]->transition_count; j++) {
-            char buf[4096];
+            char buf[4096*32];
             memset(buf, 0, sizeof(buf));
             char* at = buf;
             *at = '\0';
             for(int k=0; k < ba->predicate_count; k++) {
                 if (ba->states[i]->transitions[j].pos[k/32] & (1<<(k%32))) {
-                    if (at != buf) { sprintf(at, " & "); at += strlen(at); }
+                    if (at != buf) { sprintf(at, " && "); at += strlen(at); }
                     at = ltsmin_expr_print_ltl(ba->predicates[k], at);
                 }
                 if (ba->states[i]->transitions[j].neg[k/32] & (1<<(k%32))) {
-                    if (at != buf) { sprintf(at, " & "); at += strlen(at); }
+                    if (at != buf) { sprintf(at, " && "); at += strlen(at); }
                     *at++ = '!';
                     at = ltsmin_expr_print_ltl(ba->predicates[k], at);
                 }
@@ -387,8 +388,9 @@ print_ltsmin_buchi(const ltsmin_buchi_t *ba)
 }
 
 static ltsmin_buchi_t  *shared_ba = NULL;
-static int              grab_ba = 0; // TODO: hack around non-thread-safe ltl2ba
+static int              grab_ba = 0;
 
+/* TODO: hack around non-thread-safe ltl2ba */
 ltsmin_buchi_t *
 init_ltsmin_buchi(model_t model, const char *ltl_file)
 {
@@ -400,7 +402,7 @@ init_ltsmin_buchi(model_t model, const char *ltl_file)
             Abort ("LTL layer initialization failed, model already has a ``%s'' property",
                   lts_type_get_state_label_name (ltstype,idx));
         }
-        ltsmin_expr_t ltl = ltl_parse_file(ltstype, ltl_file);
+        ltsmin_expr_t ltl = ltl_parse_file(model, ltl_file);
         ltsmin_expr_t notltl = LTSminExpr(UNARY_OP, LTL_NOT, 0, ltl, NULL);
         ltsmin_ltl2ba(notltl);
         ltsmin_buchi_t* ba = ltsmin_buchi();
@@ -611,7 +613,7 @@ GBaddLTL (model_t model, const char *ltl_file, pins_ltl_type_t type, model_t por
     int             s0[ctx->len];
     GBgetInitialState (model, s0);
     // set buchi initial state
-    s0[ctx->ltl_idx] = (type == PINS_LTL_TEXTBOOK ? -1 : 0); /* XXX textbook/spin not reversed? */
+    s0[ctx->ltl_idx] = (type == PINS_LTL_TEXTBOOK ? -1 : 0);
 
     GBsetInitialState (ltlmodel, s0);
 

@@ -3,9 +3,10 @@
 
 /* Definitions for temporal logics */
 
-#include <ltsmin-syntax.h>
+#include <greybox.h>
 #include <lts-type.h>
 #include <ltsmin-grammar.h>
+#include <ltsmin-syntax.h>
 
 /* linear temporal logic */
 typedef enum {
@@ -33,7 +34,7 @@ typedef enum {
     LTL_STRONG_RELEASE
 } LTL;
 
-extern ltsmin_expr_t ltl_parse_file(lts_type_t ltstype,const char *file);
+extern ltsmin_expr_t ltl_parse_file(model_t model,const char *file);
 
 /* Computation Tree logic */
 
@@ -101,6 +102,7 @@ extern ltsmin_expr_t ctl_star_to_mu(ltsmin_expr_t);
 extern char* ltsmin_expr_print_ltl(ltsmin_expr_t, char*);
 extern char* ltsmin_expr_print_ctl(ltsmin_expr_t, char*);
 extern char* ltsmin_expr_print_mu(ltsmin_expr_t, char*);
+extern int ltsmin_ltl_typevalues(ltsmin_expr_t ltl,ltsmin_parse_env_t env,model_t model);
 
 /* ctl* to mu conversion
  *

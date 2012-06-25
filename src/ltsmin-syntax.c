@@ -1,12 +1,15 @@
 #include <config.h>
+
+#include <assert.h>
 #include <stdio.h>
-#include <runtime.h>
-#include <ltsmin-syntax.h>
-#include <ltsmin-grammar.h>
-#include <ltsmin-parse-env.h>
-#include <ltsmin-lexer.h>
+
 #include <chunk_support.h>
 #include <ctype.h>
+#include <ltsmin-grammar.h>
+#include <ltsmin-lexer.h>
+#include <ltsmin-parse-env.h>
+#include <ltsmin-syntax.h>
+#include <runtime.h>
 
 void ltsmin_parse_stream(int select,ltsmin_parse_env_t env,stream_t stream){
     yyscan_t scanner;
@@ -312,10 +315,12 @@ void LTSminPrintExpr(log_t log,ltsmin_parse_env_t env,ltsmin_expr_t expr){
 }
 
 
-ltsmin_expr_t LTSminExpr(ltsmin_expr_case node_type, int token, int idx, ltsmin_expr_t arg1, ltsmin_expr_t arg2)
+ltsmin_expr_t LTSminExpr(ltsmin_expr_case node_type, int token, int idx,
+                         ltsmin_expr_t arg1, ltsmin_expr_t arg2)
 {
     uint32_t hash[5];
     ltsmin_expr_t E = RT_NEW(struct ltsmin_expr_s);
+    E->num = -1;
     hash[0] = E->node_type = node_type;
     hash[1] = E->token = token;
     hash[2] = E->idx = idx;

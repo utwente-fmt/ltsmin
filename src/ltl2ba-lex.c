@@ -133,9 +133,11 @@ tl_lex(void)
         case LTL_RELEASE:
             sprintf(yytext, "V");
             Token(V_OPER);
+#ifdef NXT
         case LTL_NEXT:
             sprintf(yytext, "X");
             Token(NEXT);
+#endif
         case LTL_EQUIV:
             sprintf(yytext, "<->");
             Token(EQUIV);

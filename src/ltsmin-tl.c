@@ -1,10 +1,15 @@
 #include <config.h>
+
+#include <assert.h>
+
+#include <chunk_support.h>
+#include <dynamic-array.h>
+#include <greybox.h>
+#include <ltsmin-grammar.h>
+#include <ltsmin-lexer.h>
+#include <ltsmin-parse-env.h>
 #include <ltsmin-tl.h>
 #include <runtime.h>
-#include <dynamic-array.h>
-#include <ltsmin-grammar.h>
-#include <ltsmin-parse-env.h>
-#include <ltsmin-lexer.h>
 
 /******************************************************************
  * Note: some of these functions leak memory of type ltsmin_expr_t
@@ -49,7 +54,8 @@
  *     binary priority 8          : U,R
  * LOW
  */
-ltsmin_expr_t ltl_parse_file(lts_type_t ltstype,const char *file){
+ltsmin_expr_t ltl_parse_file(model_t model,const char *file){
+    lts_type_t ltstype = GBgetLTStype(model);
     FILE *in=fopen( file, "r" );
     ltsmin_parse_env_t env=LTSminParseEnvCreate();
     stream_t stream = NULL;
@@ -57,7 +63,6 @@ ltsmin_expr_t ltl_parse_file(lts_type_t ltstype,const char *file){
     if (in) {
         stream = stream_input(in);
     } else {
-        //Fatal(1, error, "unable to open file: %s", file);
         stream = stream_read_mem((void*)file,strlen(file),&used);
     }
     int N;
@@ -100,6 +105,9 @@ ltsmin_expr_t ltl_parse_file(lts_type_t ltstype,const char *file){
 
     ltsmin_parse_stream(TOKEN_EXPR,env,stream);
     ltsmin_expr_t expr=env->expr;
+    ltsmin_ltl_typevalues(expr,env,model);
+
+    // destroy
     env->expr=NULL;
     LTSminParseEnvDestroy(env);
     return expr;
@@ -452,7 +460,7 @@ void* tableaux_table_lookup(tableaux_table_t *t, uint32_t hash, void* data)
 }
 
 /* for debuggin only */
-char* ltsmin_expr_print_ltl(ltsmin_expr_t ltl, char* buf)
+char* ltsmin_expr_print_ltl(ltsmin_expr_t ltl,char* buf)
 {
     // no equation
     if (!ltl) return buf;
@@ -469,7 +477,12 @@ char* ltsmin_expr_print_ltl(ltsmin_expr_t ltl, char* buf)
         case LTL_SVAR: sprintf(buf, "@S%d", ltl->idx); break;
         case LTL_EVAR: sprintf(buf, "@E%d", ltl->idx); break;
         case LTL_NUM: sprintf(buf, "%d", ltl->idx); break;
-        case LTL_VAR: sprintf(buf, "@V%d", ltl->idx); break;
+        case LTL_VAR:
+            if (-1 == ltl->num)
+                sprintf(buf, "@V%d", ltl->idx);
+            else
+                sprintf(buf, "@C%d", ltl->num);;
+            break;
         case LTL_EQ: sprintf(buf, " == "); break;
         case LTL_TRUE: sprintf(buf, "true"); break;
         case LTL_OR: sprintf(buf, " or "); break;
@@ -498,6 +511,67 @@ char* ltsmin_expr_print_ltl(ltsmin_expr_t ltl, char* buf)
         default:;
     }
     return buf;
+}
+
+static int
+lookup_type_value (ltsmin_expr_t e, int type,ltsmin_parse_env_t env,model_t m)
+{
+    chunk c;
+    c.data = SIgetC(env->idents,e->idx,(int*)&c.len);
+    assert(NULL != c.data);
+    int count = GBchunkCount(m,type);
+    e->num = GBchunkPut(m,type,(const chunk)c);
+    if (count != GBchunkCount(m,type)) // value was added
+        Abort ("Value for identifier '%s' cannot be found in table for type %s.",
+               c.data, lts_type_get_state_type(GBgetLTStype(m),type));
+    e->lts_type = type;
+}
+
+/* looks up the type values in expressions, e.g.: "init.a == Off" (Off = 2) */
+/* avoid rebuilding the whole tree, by storing extra info for the chunks */
+int ltsmin_ltl_typevalues(ltsmin_expr_t ltl,ltsmin_parse_env_t env,model_t model)
+{ //return type(SVAR) idx or -1
+    if (!ltl) return -1;
+    int left, right;
+    switch(ltl->node_type) {
+        case BINARY_OP:
+            left = ltsmin_ltl_typevalues(ltl->arg1, env, model);
+            right = ltsmin_ltl_typevalues(ltl->arg2, env, model);
+            switch(ltl->token) {
+            case LTL_AND:
+            case LTL_OR:
+            case LTL_EQ:
+            case LTL_IMPLY:
+            case LTL_EQUIV:
+                if (left >= 0) { // type(SVAR)
+                    if (VAR == ltl->arg2->node_type)
+                        lookup_type_value(ltl->arg2, left, env, model);
+                } else if (right >= 0) {
+                    if (VAR == ltl->arg1->node_type)
+                        lookup_type_value(ltl->arg1, right, env, model);
+                }
+            default:
+                return -1;
+            }
+        case UNARY_OP:
+            switch(ltl->token) {
+            case LTL_NOT:   return ltsmin_ltl_typevalues(ltl->arg1, env, model);
+            default:        ltsmin_ltl_typevalues(ltl->arg1, env, model);
+                            return -1;
+            }
+        default:
+            switch(ltl->token) {
+            case LTL_SVAR:
+                return lts_type_get_state_typeno(GBgetLTStype(model),ltl->idx);
+            case LTL_EVAR:
+            case LTL_NUM:
+            case LTL_VAR:
+            case LTL_TRUE:
+            case LTL_FALSE:
+                return -1;
+            default: Fatal(1, error, "unknown LTL token");
+            }
+    }
 }
 
 /* print ctl/ctl* expression in a buffer

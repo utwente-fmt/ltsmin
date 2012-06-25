@@ -1,10 +1,10 @@
 #ifndef LTSMIN_SYNTAX_H
 #define LTSMIN_SYNTAX_H
 
-#include <runtime.h>
-#include <stringindex.h>
-#include <stream.h>
 #include <fast_hash.h>
+#include <runtime.h>
+#include <stream.h>
+#include <stringindex.h>
 
 /**
 \brief Operator types.
@@ -82,6 +82,8 @@ struct ltsmin_expr_s {
     ltsmin_expr_case node_type;
     int idx;
     int token;
+    int num; // index in model chunk table
+    int lts_type; // lts type
     ltsmin_expr_t arg1;
     ltsmin_expr_t arg2;
     uint32_t hash;
