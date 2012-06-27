@@ -346,7 +346,7 @@ static struct poptOption options[] = {
      0, "maximum balancing handoff (handoff=min(max, stack_size/2))", NULL},
     {"zobrist", 'z', POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &ZOBRIST,
      0,"log2 size of zobrist random table (6 or 8 is good enough; 0 is no zobrist)", NULL},
-    {"noref", 0, POPT_ARG_INTL_DOMAIN, &refs, 0, "store full states on the stack/queue instead of references (faster)", NULL},
+    {"noref", 0, POPT_ARG_VAL, &refs, 0, "store full states on the stack/queue instead of references (faster)", NULL},
     {"ratio", 0, POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &ratio, 0, "log2 tree root to leaf ratio", "<int>"},
     {"deadlock", 'd', POPT_ARG_VAL, &dlk_detect, 1, "detect deadlocks", NULL },
 #ifdef SPINJA
@@ -676,7 +676,10 @@ wctx_create (size_t id, int depth, wctx_t *shared)
     wctx_t             *ctx = RTalignZero (CACHE_LINE_SIZE, sizeof (wctx_t));
     ctx->id = id;
     ctx->strategy = strategy[depth];
-    ctx->model = 0 == id ? model : get_model (0);
+    if (NULL == shared)
+        ctx->model = 0 == id ? model : get_model (0);
+    else
+        ctx->model = shared->model;
     state_info_create_empty (&ctx->state);
     ctx->store = RTalignZero (CACHE_LINE_SIZE, SLOT_SIZE * N * 2);
     ctx->store2 = RTalignZero (CACHE_LINE_SIZE, SLOT_SIZE * N * 2);
@@ -708,10 +711,8 @@ wctx_create (size_t id, int depth, wctx_t *shared)
     ctx->counters.timer = SCCcreateTimer ();
     statistics_init (&ctx->counters.lattice_ratio);
     ctx->red.time = 0;
-    if (Strat_None != strategy[depth+1]) {
+    if (Strat_None != strategy[depth+1])
         ctx->rec_ctx = wctx_create (id, depth+1, ctx);
-        ctx->rec_ctx->model = shared->model;
-    }
     return ctx;
 }
 
