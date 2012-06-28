@@ -6,8 +6,8 @@
 #include <dynamic-array.h>
 #include <greybox.h>
 #include <ltsmin-grammar.h>
+#include <ltsmin-parse-env.h> // required for ltsmin-lexer.h!
 #include <ltsmin-lexer.h>
-#include <ltsmin-parse-env.h>
 #include <ltsmin-tl.h>
 #include <runtime.h>
 

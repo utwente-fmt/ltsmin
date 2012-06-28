@@ -6,8 +6,8 @@
 #include <chunk_support.h>
 #include <ctype.h>
 #include <ltsmin-grammar.h>
+#include <ltsmin-parse-env.h> // required for ltsmin-lexer.h!
 #include <ltsmin-lexer.h>
-#include <ltsmin-parse-env.h>
 #include <ltsmin-syntax.h>
 #include <runtime.h>
 
@@ -311,6 +311,7 @@ void LTSminPrintExpr(log_t log,ltsmin_parse_env_t env,ltsmin_expr_t expr){
             LTSminPrintExpr(log,env,expr->arg1);
             log_printf(log,")");
             break;
+        default: Abort("Unknown expression node");
     }
 }
 
