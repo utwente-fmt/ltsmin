@@ -26,6 +26,7 @@
 #include <is-balloc.h>
 #include <lmap.h>
 #include <lb2.h>
+#include <ltsmin-tl.h>
 #include <runtime.h>
 #include <scctimer.h>
 #include <spec-greybox.h>
@@ -183,8 +184,12 @@ static permutation_perm_t permutation = Perm_Unknown;
 static permutation_perm_t permutation_red = Perm_Unknown;
 static char*            trc_output = NULL;
 static int              dlk_detect = 0;
+static char            *act_detect = NULL;
+static char            *inv_detect = NULL;
 static int              assert_detect = 0;
-static int              assert_index = -1;
+static int              act_index = -1;
+static int              act_type = -1;
+static ltsmin_expr_t    inv_expr = NULL;
 static size_t           G = 1;
 static size_t           H = 1000;
 static int              ZOBRIST = 0;
@@ -237,14 +242,6 @@ static si_map_entry db_types[] = {
     {NULL, 0}
 };
 
-/*static si_map_entry lb_methods[] = {
-    {"srp",     LB_SRP},
-    {"static",  LB_Static},
-    {"combined",LB_Combined},
-    {"none",    LB_None},
-    {NULL, 0}
-};*/
-
 static void
 state_db_popt (poptContext con, enum poptCallbackReason reason,
                const struct poptOption *opt, const char *arg, void *data)
@@ -281,10 +278,6 @@ state_db_popt (poptContext con, enum poptCallbackReason reason,
             Warning (info, "Defaulting to NNDFS as ENDFS repair procedure.");
             strategy[i] = Strat_NNDFS;
         }
-        //res = linear_search (lb_methods, arg_lb);
-        //if (res < 0)
-        //    Abort ("unknown load balance method %s", arg_lb);
-        //lb_method = res;
         res = linear_search (permutations, arg_perm);
         if (res < 0)
             Abort ("unknown permutation method %s", arg_perm);
@@ -335,8 +328,6 @@ static struct poptOption options[] = {
     {"grey", 0, POPT_ARG_VAL, &call_mode, UseGreyBox, "make use of GetTransitionsLong calls", NULL},
     {"max", 0, POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &max, 0, "maximum search depth", "<int>"},
 #endif
-//  {"lb", 0, POPT_ARG_STRING | POPT_ARGFLAG_SHOW_DEFAULT,
-//   &arg_lb, 0, "select the load balancing method", "<srp|static|combined|none>"},
     {"perm", 'p', POPT_ARG_STRING | POPT_ARGFLAG_SHOW_DEFAULT,
      &arg_perm, 0, "select the transition permutation method",
      "<dynamic|random|rr|sort|sr|shift|shiftall|otf|none>"},
@@ -349,8 +340,10 @@ static struct poptOption options[] = {
     {"noref", 0, POPT_ARG_VAL, &refs, 0, "store full states on the stack/queue instead of references (faster)", NULL},
     {"ratio", 0, POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &ratio, 0, "log2 tree root to leaf ratio", "<int>"},
     {"deadlock", 'd', POPT_ARG_VAL, &dlk_detect, 1, "detect deadlocks", NULL },
+    {"action", 'a', POPT_ARG_STRING, &act_detect, 1, "detect error action", NULL },
+    {"invariant", 'i', POPT_ARG_STRING, &inv_detect, 1, "detect deadlocks", NULL },
 #ifdef SPINJA
-    {"assert", 'a', POPT_ARG_VAL, &assert_detect, 1, "detect assertion errors (SpinJa)", NULL },
+    {"assert", 0, POPT_ARG_VAL, &assert_detect, 1, "detect assertion errors (SpinJa). Same as --action=assert", NULL },
 #endif
     {"trace", 0, POPT_ARG_STRING, &trc_output, 0, "file to write trace to", "<lts output>" },
     SPEC_POPT_OPTIONS,
@@ -481,6 +474,7 @@ typedef struct counter_s {
     size_t              splits;         // Splits by LB
     size_t              transfer;       // load transfered by LB
     size_t              deadlocks;      // deadlock count
+    size_t              violations;     // invariant violation count
     size_t              errors;         // assertion error count
     size_t              exit;           // recursive ndfss
     mytimer_t           timer;
@@ -565,6 +559,7 @@ add_results (counter_t *res, counter_t *cnt)
     res->splits += cnt->splits;
     res->transfer += cnt->transfer;
     res->deadlocks += cnt->deadlocks;
+    res->violations += cnt->violations;
     res->errors += cnt->errors;
     res->exit += cnt->exit;
     res->time += SCCrealTime (cnt->timer);
@@ -676,7 +671,10 @@ wctx_create (size_t id, int depth, wctx_t *shared)
     wctx_t             *ctx = RTalignZero (CACHE_LINE_SIZE, sizeof (wctx_t));
     ctx->id = id;
     ctx->strategy = strategy[depth];
-    ctx->model = 0 == id ? model : get_model (0);
+    if (NULL == shared)
+        ctx->model = 0 == id ? model : get_model (0);
+    else
+        ctx->model = shared->model;
     state_info_create_empty (&ctx->state);
     ctx->store = RTalignZero (CACHE_LINE_SIZE, SLOT_SIZE * N * 2);
     ctx->store2 = RTalignZero (CACHE_LINE_SIZE, SLOT_SIZE * N * 2);
@@ -708,10 +706,8 @@ wctx_create (size_t id, int depth, wctx_t *shared)
     ctx->counters.timer = SCCcreateTimer ();
     statistics_init (&ctx->counters.lattice_ratio);
     ctx->red.time = 0;
-    if (Strat_None != strategy[depth+1]) {
+    if (Strat_None != strategy[depth+1])
         ctx->rec_ctx = wctx_create (id, depth+1, ctx);
-        ctx->rec_ctx->model = shared->model;
-    }
     return ctx;
 }
 
@@ -800,12 +796,13 @@ init_globals (int argc, char *argv[])
     if (strategy[0] & Strat_LTL) {
         if (call_mode == UseGreyBox)
             Warning(info, "Greybox not supported with strategy NDFS, ignored.");
-        //lb_method = LB_None;
         threshold = 100000;
         permutation_red = no_red_perm ? Perm_None : permutation;
     } else {
         threshold = 100000 / W;
     }
+    if (!(Strat_Reach & strategy[0]) && (assert_detect || dlk_detect || act_detect || inv_detect))
+        Abort ("Verification of safety properties works only with reachability algorithms.");
     Warning (info, "Using %d cores (lb: SRP)", W/*, key_search(lb_methods, lb_method)*/);
     Warning (info, "loading model from %s", files[0]);
     program = get_label ();
@@ -820,19 +817,23 @@ init_globals (int argc, char *argv[])
     K = dm_nrows (m);
     Warning (info, "State length is %d, there are %d groups", N, K);
     assert (GRED.g == 0);
-    if (assert_detect) {
+    if (assert_detect)
+        act_detect = "assert";
+    if (act_detect) {
         for (int i = 0; i < edge_labels; i++) {
             char *name = lts_type_get_edge_label_name(ltstype, i);
-            if (0 == strcmp(name, "assert")) {
-                assert_index = lts_type_get_edge_label_typeno(ltstype, i);
+            if (0 == strcmp(name, act_detect)) {
+                act_index = i;
+                act_type = lts_type_get_edge_label_typeno(ltstype, i);
             }
         }
-        if (-1 == assert_index) {
-            Warning (info, "Cannot find assertion errors, no such edge label is defined!");
+        if (-1 == act_index) {
+            Warning (info, "Cannot find action '%s', no such edge label is defined!", act_detect);
             assert_detect = 0;
         }
     }
-
+    if (inv_detect)
+        inv_expr = pred_parse_file (model, inv_detect);
     if (0 == dbs_size) {
         size_t el_size = (db_type != HashTable ? 3 : D) * SLOT_SIZE; // over estimation for cleary
         size_t map_el_size = (Strat_TA & strategy[0] ? sizeof(lattice_t) : 0);
@@ -1061,13 +1062,14 @@ print_statistics (counter_t *ar_reach, counter_t *ar_red, mytimer_t timer,
     if (RTverbosity >= 2) {        // internal counters
         Warning (info, "Internal statistics:\n\n"
         		 "Algorithm:\nWork time: %.2f sec\nUser time: %.2f sec\nExplored: %zu\n"
-        		 	 "Transitions: %zu\nDeadlocks: %zu\nAssertion errors: %zu\nWaits: %zu\nRec. calls: %zu\n\n"
+        		 	 "Transitions: %zu\nDeadlocks: %zu\nInvariant violations: %zu\n"
+        		 	 "Error actions: %zu\nWaits: %zu\nRec. calls: %zu\n\n"
                  "Database:\nElements: %zu\nNodes: %zu\nMisses: %zu\nEq. tests: %zu\nRehashes: %zu\n\n"
                  "Memory:\nQueue: %.1f MB\nDB: %.1f MB\nDB alloc.: %.1f MB\nColors: %.1f MB\n\n"
                  "Load balancer:\nSplits: %zu\nLoad transfer: %zu\n\n"
                  "Lattice MAP:\nRatio: %.2f\nInserts: %zu\nUpdates: %zu\nDeletes: %zu\nDelayed: %zu",
                  tot, reach->runtime, reach->explored, reach->trans, reach->deadlocks,
-                        reach->errors, red->waits, reach->rec,
+                        reach->violations, reach->errors, red->waits, reach->rec,
                  db_elts, db_nodes, stats->misses, stats->tests, stats->rehashes,
                  mem1, mem4, mem2, mem3,
                  reach->splits, reach->transfer,
@@ -1544,9 +1546,6 @@ ndfs_report_cycle (wctx_t *ctx, state_info_t *cycle_closing_state)
 static void
 handle_error_trace (wctx_t *ctx)
 {
-    /* Stop other workers, exit if some other worker was first here */
-    if ( !lb2_stop(lb2) )
-        return;
     size_t              level = ctx->counters.level_cur;
     if (trc_output) {
         ref_t               start_ref = initial_state.ref;
@@ -2314,6 +2313,53 @@ bfs_load (wctx_t *ctx)
     return dfs_stack_frame_size(ctx->in_stack) + dfs_stack_frame_size(ctx->out_stack);
 }
 
+static inline int
+valid_end_state(wctx_t *ctx, raw_data_t state)
+{
+#if defined(SPINJA)
+    return GBbuchiIsAccepting(ctx->model, state);
+#endif
+    return false;
+    (void) ctx; (void) state;
+}
+
+static inline void
+deadlock_detect (wctx_t *ctx, int count)
+{
+    if (count > 0 || valid_end_state(ctx, ctx->state.data)) return;
+    ctx->counters.deadlocks++; // counting is costless
+    if (dlk_detect && trc_output && lb2_stop(lb2)) {
+        Warning (info,"Deadlock found in state at depth %zu!", ctx->counters.level_cur);
+        handle_error_trace (ctx);
+    }
+}
+
+static inline void
+invariant_detect (wctx_t *ctx, raw_data_t state)
+{
+    if ( !inv_expr || eval_predicate(inv_expr, NULL, state) ) return;
+    ctx->counters.violations++;
+    if (trc_output && lb2_stop(lb2)) {
+        Warning (info,"Invariant violation (%s) found at depth %zu!", inv_detect, ctx->counters.level_cur);
+        handle_error_trace (ctx);
+    }
+}
+
+static inline void
+action_detect (wctx_t *ctx, transition_info_t *ti, ref_t last)
+{
+    if (-1 == act_index || NULL == ti->labels || 0 == ti->labels[act_index]) return;
+    ctx->counters.errors++;
+    if (trc_output && lb2_stop(lb2)) {
+        ctx->state.ref = last; // TODO: include the action in the trace
+        chunk c = GBchunkGet (ctx->model, act_type, ti->labels[act_index]);
+        char value[4096];
+        chunk2string(c, 4096, value);
+        Warning (info, "Error action %s with value %s found at depth %zu!", act_detect, value, ctx->counters.level_cur);
+        handle_error_trace (ctx);
+    }
+}
+
 static void
 reach_handle (void *arg, state_info_t *successor, transition_info_t *ti,
               int seen)
@@ -2326,14 +2372,7 @@ reach_handle (void *arg, state_info_t *successor, transition_info_t *ti,
             parent_ref[successor->ref] = ctx->state.ref;
         ctx->counters.visited++;
     }
-    if (NULL != ti->labels && 0 != ti->labels[0] && !lb2_is_stopped(lb2)) {
-        ctx->counters.errors++;
-        if (assert_detect) {
-            chunk c = GBchunkGet (ctx->model, assert_index, ti->labels[0]);
-            Warning (info, "Assertion error (%s) found at depth %zu!", c.data, ctx->counters.level_cur);
-            handle_error_trace (ctx);
-        }
-    }
+    action_detect (ctx, ti, successor->ref);
     ctx->counters.trans++;
     (void) ti;
 }
@@ -2350,38 +2389,24 @@ reach_handle_wrap (void *arg, transition_info_t *ti, state_data_t data)
     reach_handle (arg, &successor, ti, seen);
 }
 
-int
-valid_end_state(wctx_t *ctx, raw_data_t state)
-{
-#if defined(SPINJA)
-    return GBbuchiIsAccepting(ctx->model, state);
-#endif
-    return false;
-    (void) ctx; (void) state;
-}
-
 static inline size_t
 explore_state (wctx_t *ctx, raw_data_t state, int next_index)
 {
-    if (0 == next_index && ctx->counters.level_cur >= max)
-        return K;
     size_t              count = 0;
     size_t              i = K;
     state_info_deserialize (&ctx->state, state, ctx->store);
+    if (0 == next_index) { // first (grey) call with this state
+        invariant_detect (ctx, ctx->state.data);
+        if (ctx->counters.level_cur >= max) return K;
+    }
     if ( UseBlackBox == call_mode )
         count = permute_trans (ctx->permute, &ctx->state, reach_handle, ctx);
     else // UseGreyBox
         for (i = next_index; i<K && count<MAX_SUCC; i++)
             count += GBgetTransitionsLong (ctx->model, i, ctx->state.data,
                                            reach_handle_wrap, ctx);
-    if (0 == count && 0 == next_index && !lb2_is_stopped(lb2) &&
-            !valid_end_state(ctx, ctx->state.data)) {
-        ctx->counters.deadlocks++;
-        if (dlk_detect) {
-            Warning (info,"Deadlock found in state at depth %zu!", ctx->counters.level_cur);
-            handle_error_trace (ctx);
-        }
-    }
+    if (0 == next_index) // last (grey) call with this state
+        deadlock_detect (ctx, count);
     maybe_report (&ctx->counters, "", &threshold);
     return i;
 }
@@ -2554,6 +2579,7 @@ ta_handle (void *arg, state_info_t *successor, transition_info_t *ti, int seen)
     } else {
        lm_unlock (lmap, successor->ref);
     }
+    action_detect (ctx, ti, successor->ref);
     ctx->counters.trans++;
     (void) ti; (void) seen;
 }
@@ -2587,14 +2613,9 @@ static inline void
 ta_explore_state (wctx_t *ctx)
 {
     int                 count = 0;
+    invariant_detect (ctx, ctx->state.data);
     count = permute_trans (ctx->permute, &ctx->state, ta_handle, ctx);
-    if (0 == count) {
-        ctx->counters.deadlocks++;
-        if (dlk_detect && !lb2_is_stopped(lb2)) {
-            Warning (info,"Deadlock found in state at depth %zu!", ctx->counters.level_cur);
-            handle_error_trace (ctx);
-        }
-    }
+    deadlock_detect (ctx, count);
     maybe_report (&ctx->counters, "", &threshold);
     ctx->counters.explored++;
 }
