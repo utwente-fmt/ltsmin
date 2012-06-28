@@ -1,12 +1,31 @@
 #ifndef LTSMIN_TL_H
 #define LTSMIN_TL_H
 
-/* Definitions for temporal logics */
+/* Definitions for a simple predicate language & temporal logics */
 
 #include <greybox.h>
 #include <lts-type.h>
 #include <ltsmin-grammar.h>
 #include <ltsmin-syntax.h>
+
+/* Predicate language */
+typedef enum {
+    PRED_SVAR  = SVAR,
+    PRED_EVAR  = EVAR,
+    PRED_NUM   = INT,
+    PRED_CHUNK = CHUNK,
+    PRED_VAR   = VAR,
+    PRED_EQ    = S_EQ,
+    PRED_TRUE  = S_TRUE,
+    PRED_FALSE = S_FALSE,
+    PRED_NOT   = S_NOT,
+    PRED_OR    = S_OR,
+    PRED_AND   = S_AND,
+    PRED_EQUIV = S_EQUIV,
+    PRED_IMPLY = S_IMPLY
+} Pred;
+
+extern ltsmin_expr_t pred_parse_file(model_t model,const char *file);
 
 /* linear temporal logic */
 typedef enum {
@@ -15,23 +34,22 @@ typedef enum {
     LTL_NUM   = INT,
     LTL_CHUNK = CHUNK,
     LTL_VAR   = VAR,
-    LTL_EQ    = TOKEN_USER,
-    LTL_TRUE,
-    LTL_OR,
-    LTL_NOT,
-    LTL_NEXT,
-    LTL_UNTIL,
+    LTL_TRUE  = PRED_TRUE,
+    LTL_FALSE = PRED_FALSE,
+    LTL_NOT   = PRED_NOT,
+    LTL_EQ    = PRED_EQ,
+    LTL_OR    = PRED_OR,
+    LTL_AND   = PRED_AND,
+    LTL_EQUIV = PRED_EQUIV,
+    LTL_IMPLY = PRED_IMPLY,
 
-    /* sugar */
-    LTL_FALSE,
-    LTL_AND,
-    LTL_EQUIV,
-    LTL_IMPLY,
-    LTL_FUTURE,
+    LTL_FUTURE= TOKEN_USER,
     LTL_GLOBALLY,
     LTL_RELEASE,
     LTL_WEAK_UNTIL,
-    LTL_STRONG_RELEASE
+    LTL_STRONG_RELEASE,
+    LTL_NEXT,
+    LTL_UNTIL
 } LTL;
 
 extern ltsmin_expr_t ltl_parse_file(model_t model,const char *file);
@@ -44,24 +62,24 @@ typedef enum {
     CTL_NUM   = INT,
     CTL_CHUNK = CHUNK,
     CTL_VAR   = VAR,
-    CTL_EQ    = TOKEN_USER,
-    CTL_TRUE,
-    CTL_OR,
-    CTL_NOT,
-    CTL_NEXT,
-    CTL_UNTIL,
+    CTL_TRUE  = PRED_TRUE,
+    CTL_FALSE = PRED_FALSE,
+    CTL_NOT   = PRED_NOT,
+    CTL_EQ    = PRED_EQ,
+    CTL_OR    = PRED_OR,
+    CTL_AND   = PRED_AND,
+    CTL_EQUIV = PRED_EQUIV,
+    CTL_IMPLY = PRED_IMPLY,
 
-    CTL_FALSE,
-    CTL_AND,
-    CTL_EQUIV,
-    CTL_IMPLY,
+    CTL_NEXT  = TOKEN_USER,
+    CTL_UNTIL,
     CTL_FUTURE,
     CTL_GLOBALLY,
     CTL_EXIST,
     CTL_ALL
 } CTL;
 
-extern ltsmin_expr_t ctl_parse_file(lts_type_t ltstype,const char *file);
+extern ltsmin_expr_t ctl_parse_file(model_t model,const char *file);
 
 
 /* mu-alculus */
@@ -71,6 +89,13 @@ typedef enum {
     MU_NUM                  = INT,
     MU_CHUNK                = CHUNK,
     MU_VAR                  = VAR,
+    MU_AND                  = PRED_AND,
+    MU_OR                   = PRED_OR,
+    MU_EQ                   = PRED_EQ,
+    MU_TRUE                 = PRED_TRUE,
+    MU_FALSE                = PRED_FALSE,
+    MU_NOT                  = PRED_NOT,
+
     MU_EDGE_EXIST           = EDGE_EXIST,
     MU_EDGE_ALL             = EDGE_ALL,
     MU_EDGE_EXIST_LEFT      = TOKEN_EDGE_EXIST_LEFT,
@@ -79,18 +104,12 @@ typedef enum {
     MU_EDGE_ALL_RIGHT       = TOKEN_EDGE_ALL_RIGHT,
     MU_MU                   = TOKEN_MU_SYM,
     MU_NU                   = TOKEN_NU_SYM,
-    MU_AND                  = TOKEN_USER,
-    MU_OR,
-    MU_EQ,
-    MU_TRUE,
-    MU_FALSE,
-    MU_NOT,
-    MU_NEXT,
+    MU_NEXT                 = TOKEN_USER,
     MU_EXIST,
     MU_ALL
 } MU;
 
-extern ltsmin_expr_t mu_parse_file(lts_type_t ltstype,const char *file);
+extern ltsmin_expr_t mu_parse_file(model_t model,const char *file);
 
 /* Conversion */
 extern ltsmin_expr_t ltl_to_ctl_star(ltsmin_expr_t);
@@ -102,7 +121,38 @@ extern ltsmin_expr_t ctl_star_to_mu(ltsmin_expr_t);
 extern char* ltsmin_expr_print_ltl(ltsmin_expr_t, char*);
 extern char* ltsmin_expr_print_ctl(ltsmin_expr_t, char*);
 extern char* ltsmin_expr_print_mu(ltsmin_expr_t, char*);
-extern int ltsmin_ltl_typevalues(ltsmin_expr_t ltl,ltsmin_parse_env_t env,model_t model);
+extern int ltsmin_expr_lookup_values(ltsmin_expr_t ltl,ltsmin_parse_env_t env,model_t model);
+
+/* semantics */
+extern void mark_predicate(ltsmin_expr_t e, matrix_t *m); /* mark touched variables */
+extern void mark_visible(ltsmin_expr_t e, matrix_t *m, int* group_visibility);  /* mark touched groups */
+static inline int /* evaluate predicate on state */
+eval_predicate(ltsmin_expr_t e, transition_info_t* ti, int* state)
+{
+    switch (e->token) {
+        case PRED_TRUE:
+            return 1;
+        case PRED_FALSE:
+            return 0;
+        case PRED_NUM:
+            return e->idx;
+        case PRED_SVAR:
+            return state[e->idx];
+        case PRED_EQ:
+            return (eval_predicate(e->arg1, ti, state) == eval_predicate(e->arg2, ti, state));
+        case PRED_VAR:
+            if (-1 == e->num)
+                Abort("unbound variable in predicate expression");
+            return e->num;
+        default: {
+            char buf[1024];
+            ltsmin_expr_print_ltl(e, buf);
+            Fatal(1, error, "unhandled predicate expression: %s", buf);
+        }
+    }
+    return 0;
+    (void)ti;
+}
 
 /* ctl* to mu conversion
  *

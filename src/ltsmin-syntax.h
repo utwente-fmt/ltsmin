@@ -64,6 +64,16 @@ typedef enum {
     CHUNK,
     VAR,
 
+    /* predicate language constructs, to avoid enum collisions */
+    S_EQ,
+    S_TRUE,
+    S_FALSE,
+    S_NOT,
+    S_OR,
+    S_AND,
+    S_EQUIV,
+    S_IMPLY,
+
     /* special symbols */
     MU_FIX,
     NU_FIX,

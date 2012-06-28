@@ -11,6 +11,58 @@
 #include <ltsmin-tl.h>
 #include <runtime.h>
 
+
+ltsmin_expr_t pred_parse_file(model_t model,const char *file){
+    lts_type_t ltstype = GBgetLTStype(model);
+    FILE *in=fopen( file, "r" );
+    ltsmin_parse_env_t env=LTSminParseEnvCreate();
+    stream_t stream = NULL;
+    size_t used;
+    if (in) {
+        stream = stream_input(in);
+    } else {
+        stream = stream_read_mem((void*)file,strlen(file),&used);
+    }
+    int N;
+    N=lts_type_get_state_length(ltstype);
+    for(int i=0;i<N;i++){
+        char*name=lts_type_get_state_name(ltstype,i);
+        if (name) LTSminStateVarIndex(env,name);
+    }
+    N=lts_type_get_state_label_count(ltstype);
+    for(int i=0;i<N;i++){
+        char*name=lts_type_get_state_label_name(ltstype,i);
+        // consider state label an state variable
+        if (name) LTSminStateVarIndex(env,name);
+    }
+    N=lts_type_get_edge_label_count(ltstype);
+    for(int i=0;i<N;i++){
+        char*name=lts_type_get_edge_label_name(ltstype,i);
+        if (name) LTSminEdgeVarIndex(env,name);
+    }
+
+    LTSminConstant      (env, PRED_FALSE,        "false");
+    LTSminConstant      (env, PRED_TRUE,         "true");
+
+    LTSminBinaryOperator(env, PRED_EQ,           "==", 1);
+    LTSminPrefixOperator(env, PRED_NOT,          "!",  2);
+
+    LTSminBinaryOperator(env, PRED_AND,          "&&",  4);
+    LTSminBinaryOperator(env, PRED_OR,           "||",  5);
+
+    LTSminBinaryOperator(env, PRED_EQUIV,        "<->",6);
+    LTSminBinaryOperator(env, PRED_IMPLY,        "->", 7);
+
+    ltsmin_parse_stream(TOKEN_EXPR,env,stream);
+    ltsmin_expr_t expr=env->expr;
+    ltsmin_expr_lookup_values(expr,env,model);
+
+    // destroy
+    env->expr=NULL;
+    LTSminParseEnvDestroy(env);
+    return expr;
+}
+
 /******************************************************************
  * Note: some of these functions leak memory of type ltsmin_expr_t
  *****************************************************************/
@@ -83,8 +135,8 @@ ltsmin_expr_t ltl_parse_file(model_t model,const char *file){
         if (name) LTSminEdgeVarIndex(env,name);
     }
 
-    LTSminConstant      (env, CTL_FALSE,        "false");
-    LTSminConstant      (env, CTL_TRUE,         "true");
+    LTSminConstant      (env, LTL_FALSE,        "false");
+    LTSminConstant      (env, LTL_TRUE,         "true");
 
     LTSminBinaryOperator(env, LTL_EQ,           "==", 1);
     LTSminPrefixOperator(env, LTL_NOT,          "!",  2);
@@ -105,7 +157,7 @@ ltsmin_expr_t ltl_parse_file(model_t model,const char *file){
 
     ltsmin_parse_stream(TOKEN_EXPR,env,stream);
     ltsmin_expr_t expr=env->expr;
-    ltsmin_ltl_typevalues(expr,env,model);
+    ltsmin_expr_lookup_values(expr,env,model);
 
     // destroy
     env->expr=NULL;
@@ -133,9 +185,16 @@ ltsmin_expr_t ltl_parse_file(model_t model,const char *file){
  *     U (?AU, EU?)
  *  LOW
  */
-ltsmin_expr_t ctl_parse_file(lts_type_t ltstype,const char *file){
+ltsmin_expr_t ctl_parse_file(model_t model,const char *file){
+    lts_type_t ltstype = GBgetLTStype(model);
     FILE *in=fopen( file, "r" );
-    if (!in) Fatal(1, error, "unable to open file: %s", file);
+    stream_t stream = NULL;
+    size_t used;
+    if (in) {
+        stream = stream_input(in);
+    } else {
+        stream = stream_read_mem((void*)file,strlen(file),&used);
+    }
     ltsmin_parse_env_t env=LTSminParseEnvCreate();
     int N;
     N=lts_type_get_state_length(ltstype);
@@ -175,8 +234,10 @@ ltsmin_expr_t ctl_parse_file(lts_type_t ltstype,const char *file){
 
     LTSminBinaryOperator(env, CTL_UNTIL,        "U",  8);
 
-    ltsmin_parse_stream(TOKEN_EXPR,env,stream_input(in));
+    ltsmin_parse_stream(TOKEN_EXPR,env,stream);
     ltsmin_expr_t expr=env->expr;
+    ltsmin_expr_lookup_values(expr,env,model);
+
     env->expr=NULL;
     LTSminParseEnvDestroy(env);
     return expr;
@@ -192,9 +253,16 @@ ltsmin_expr_t ctl_parse_file(lts_type_t ltstype,const char *file){
  * note: when checking priorities, use ltsmin-grammer.lemon
  * for priorities, notice that prefix 1 has a higher priority than bin 1
  */
-ltsmin_expr_t mu_parse_file(lts_type_t ltstype,const char *file){
+ltsmin_expr_t mu_parse_file(model_t model,const char *file){
+    lts_type_t ltstype = GBgetLTStype(model);
     FILE *in=fopen( file, "r" );
-    if (!in) Fatal(1, error, "unable to open file: %s", file);
+    stream_t stream = NULL;
+    size_t used;
+    if (in) {
+        stream = stream_input(in);
+    } else {
+        stream = stream_read_mem((void*)file,strlen(file),&used);
+    }
     ltsmin_parse_env_t env=LTSminParseEnvCreate();
     int N;
     N=lts_type_get_state_length(ltstype);
@@ -235,8 +303,10 @@ ltsmin_expr_t mu_parse_file(lts_type_t ltstype,const char *file){
     LTSminPrefixOperator(env, MU_EXIST, "E",4);
     LTSminPrefixOperator(env, MU_ALL, "A",4);
 
-    ltsmin_parse_stream(TOKEN_EXPR,env,stream_input(in));
+    ltsmin_parse_stream(TOKEN_EXPR,env,stream);
     ltsmin_expr_t expr=env->expr;
+    ltsmin_expr_lookup_values(expr,env,model);
+
     env->expr=NULL;
     LTSminParseEnvDestroy(env);
     return expr;
@@ -513,7 +583,7 @@ char* ltsmin_expr_print_ltl(ltsmin_expr_t ltl,char* buf)
     return buf;
 }
 
-static int
+static void
 lookup_type_value (ltsmin_expr_t e, int type,ltsmin_parse_env_t env,model_t m)
 {
     chunk c;
@@ -529,48 +599,114 @@ lookup_type_value (ltsmin_expr_t e, int type,ltsmin_parse_env_t env,model_t m)
 
 /* looks up the type values in expressions, e.g.: "init.a == Off" (Off = 2) */
 /* avoid rebuilding the whole tree, by storing extra info for the chunks */
-int ltsmin_ltl_typevalues(ltsmin_expr_t ltl,ltsmin_parse_env_t env,model_t model)
+int ltsmin_expr_lookup_values(ltsmin_expr_t ltl,ltsmin_parse_env_t env,model_t model)
 { //return type(SVAR) idx or -1
     if (!ltl) return -1;
     int left, right;
     switch(ltl->node_type) {
-        case BINARY_OP:
-            left = ltsmin_ltl_typevalues(ltl->arg1, env, model);
-            right = ltsmin_ltl_typevalues(ltl->arg2, env, model);
-            switch(ltl->token) {
-            case LTL_AND:
-            case LTL_OR:
-            case LTL_EQ:
-            case LTL_IMPLY:
-            case LTL_EQUIV:
-                if (left >= 0) { // type(SVAR)
-                    if (VAR == ltl->arg2->node_type)
-                        lookup_type_value(ltl->arg2, left, env, model);
-                } else if (right >= 0) {
-                    if (VAR == ltl->arg1->node_type)
-                        lookup_type_value(ltl->arg1, right, env, model);
-                }
-            default:
-                return -1;
-            }
-        case UNARY_OP:
-            switch(ltl->token) {
-            case LTL_NOT:   return ltsmin_ltl_typevalues(ltl->arg1, env, model);
-            default:        ltsmin_ltl_typevalues(ltl->arg1, env, model);
-                            return -1;
+    case BINARY_OP:
+        left = ltsmin_expr_lookup_values(ltl->arg1, env, model);
+        right = ltsmin_expr_lookup_values(ltl->arg2, env, model);
+        switch(ltl->token) {
+        case PRED_AND:
+        case PRED_OR:
+        case PRED_EQ:
+        case PRED_IMPLY:
+        case PRED_EQUIV:
+            if (left >= 0) { // type(SVAR)
+                if (VAR == ltl->arg2->node_type)
+                    lookup_type_value(ltl->arg2, left, env, model);
+            } else if (right >= 0) {
+                if (VAR == ltl->arg1->node_type)
+                    lookup_type_value(ltl->arg1, right, env, model);
             }
         default:
-            switch(ltl->token) {
-            case LTL_SVAR:
-                return lts_type_get_state_typeno(GBgetLTStype(model),ltl->idx);
-            case LTL_EVAR:
-            case LTL_NUM:
-            case LTL_VAR:
-            case LTL_TRUE:
-            case LTL_FALSE:
-                return -1;
-            default: Fatal(1, error, "unknown LTL token");
+            return -1;
+        }
+    case UNARY_OP:
+        switch(ltl->token) {
+        case PRED_NOT:   return ltsmin_expr_lookup_values(ltl->arg1, env, model);
+        default:        ltsmin_expr_lookup_values(ltl->arg1, env, model);
+                        return -1;
+        }
+    default:
+        switch(ltl->token) {
+        case SVAR:
+            return lts_type_get_state_typeno(GBgetLTStype(model),ltl->idx);
+        default:
+            return -1;
+        }
+    }
+}
+
+void
+mark_predicate(ltsmin_expr_t e, matrix_t *m)
+{
+    if (!e) return;
+    switch(e->node_type) {
+    case BINARY_OP:
+        mark_predicate(e->arg1,m);
+        mark_predicate(e->arg2,m);
+        break;
+    case UNARY_OP:
+        mark_predicate(e->arg1,m);
+        break;
+    default:
+        switch(e->token) {
+        case PRED_TRUE:
+        case PRED_FALSE:
+        case PRED_NUM:
+        case PRED_VAR:
+            break;
+        case PRED_EQ:
+            mark_predicate(e->arg1, m);
+            mark_predicate(e->arg2, m);
+            break;
+        case PRED_SVAR: {
+            for(int i=0; i < dm_nrows(m); i++)
+                dm_set(m, i, e->idx);
+            } break;
+        default:
+            Fatal(1, error, "unhandled predicate expression in mark_predicate");
+        }
+        break;
+    }
+}
+
+void
+mark_visible(ltsmin_expr_t e, matrix_t *m, int* group_visibility)
+{
+    if (!e) return;
+    switch(e->node_type) {
+    case BINARY_OP:
+        mark_visible(e->arg1,m,group_visibility);
+        mark_visible(e->arg2,m,group_visibility);
+        break;
+    case UNARY_OP:
+        mark_visible(e->arg1,m,group_visibility);
+        break;
+    default:
+        switch(e->token) {
+        case PRED_TRUE:
+        case PRED_FALSE:
+        case PRED_NUM:
+        case PRED_VAR:
+            break;
+        case PRED_EQ:
+            mark_visible(e->arg1, m, group_visibility);
+            mark_visible(e->arg2, m, group_visibility);
+            break;
+        case PRED_SVAR: {
+            for(int i=0; i < dm_nrows(m); i++) {
+                if (dm_is_set(m, i, e->idx)) {
+                    group_visibility[i] = 1;
+                }
             }
+            } break;
+        default:
+            Fatal(1, error, "unhandled predicate expression in mark_visible");
+        }
+        break;
     }
 }
 

@@ -2077,14 +2077,14 @@ main (int argc, char *argv[])
 
     // temporal logics
     if (mu_formula) {
-        mu_expr = mu_parse_file(ltstype, mu_formula);
+        mu_expr = mu_parse_file(model, mu_formula);
 #if 0
         char buf[1024];
         ltsmin_expr_print_mu(mu_expr, buf);
         printf("computing: %s\n",buf);
 #endif
     } else if (ctl_formula) {
-        ltsmin_expr_t ctl = ctl_parse_file(ltstype, ctl_formula);
+        ltsmin_expr_t ctl = ctl_parse_file(model, ctl_formula);
         mu_expr = ctl_star_to_mu(ctl);
         mu_formula = ctl_formula;
     }
