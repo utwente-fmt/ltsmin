@@ -13,7 +13,7 @@
 #include <hre/user.h>
 #include <lmap.h>
 
-static const size_t     LM_FACTOR = 32;
+static const size_t     LM_FACTOR = 32; // size of the map as a ratio to the locations
 #define                 LM_MAX_THREADS (sizeof (uint64_t) * 8)
 
 /**
@@ -162,6 +162,21 @@ lm_set_int (lm_t *map, lm_loc_t location, lm_internal_t internal)
     atomic_write ((uint64_t *)location, stoi(&store));
 }
 
+/**
+ * Begin thread-local !sequential! code
+ */
+static void
+deallocate_last_block (lm_t *map)
+{
+    local_t *local = get_local (map);
+    local->next_store -= map->block_size;
+    lm_loc_t loc = (lm_loc_t)&local->table[local->next_store];
+    for (size_t i = 0; i< map->block_size; i++) {
+        lm_set_int (map, loc, LM_STATUS_EMPTY);
+        loc = lm_inc_loc(loc);
+    }
+}
+
 static lm_loc_t
 allocate_block (lm_t *map)
 {
@@ -176,6 +191,9 @@ allocate_block (lm_t *map)
     lm_set_int (map, end_loc, LM_STATUS_END);
     return (lm_loc_t)&local->table[next];
 }
+/**
+ * End thread-local !sequential! code
+ */
 
 lm_loc_t
 lm_iterate_from (lm_t *map, ref_t k, lm_loc_t *start,
@@ -206,8 +224,71 @@ lm_iterate_from (lm_t *map, ref_t k, lm_loc_t *start,
             cb (ctx, store.lattice, store.status, loc);
             return loc;
         default:
-            Abort("Unknown status in lattice map iterate.");
+            Abort ("Unknown status in lattice map iterate.");
         }
+    }
+}
+
+static inline int
+lm_cas_all (lm_loc_t location, lm_store_t old, lattice_t l,
+            lm_status_t status, lm_internal_t internal)
+{
+    lm_store_t store_new = old;
+    store_new.lattice = l;
+    store_new.status = status;
+    store_new.internal = internal;
+    return cas ((uint64_t *)location, stoi(&old), stoi(&store_new));
+}
+
+lm_loc_t
+lm_insert_from_cas (lm_t *map, ref_t k, lattice_t l,
+                lm_status_t status, lm_loc_t *start)
+{
+    assert (l < 1UL << LATTICE_BITS && "Lattice pointer does not fit in store!");
+    assert (k < map->size && "Lattice map size does not match |ref_t|.");
+    lm_loc_t loc = NULL == start ?  (lm_loc_t)&map->table[k] : *start;
+    lm_store_t store = lm_get_store (map, loc);
+    lm_store_t *s_loc = (lm_store_t *)loc;
+    if (map->table < s_loc && s_loc < map->table_end && LM_STATUS_EMPTY == store.internal) {
+        lm_store_t store_new = store;
+        store_new.internal = LM_STATUS_END;
+        if (!cas ((uint64_t*)loc, stoi(&store), stoi(&store_new))) {
+            return lm_insert_from_cas (map, k, l, status, start);
+        }
+    }
+    lm_loc_t next;
+    while (true) {
+        switch (store.internal) {
+        case LM_STATUS_TOMBSTONE:
+        case LM_STATUS_EMPTY:           // insert
+            if (lm_cas_all(loc, store, l, status, LM_STATUS_LATTICE))
+                return loc;
+            break; // do reread
+        case LM_STATUS_TOMBSTONE_END:
+        case LM_STATUS_END:             // insert
+            if (lm_cas_all(loc, store, l, status, LM_STATUS_LATTICE_END))
+                return loc;
+            break; // do reread
+        case LM_STATUS_REF:             // follow
+            loc = follow (map, loc); // never changes!
+            break;
+        case LM_STATUS_LATTICE:         // next
+            loc = lm_inc_loc (loc);
+            break;
+        case LM_STATUS_LATTICE_END:     // next block, move store and set ref
+            next = allocate_block (map);
+            lm_set_all (map, next, store.lattice, store.status, LM_STATUS_LATTICE);
+            if (!lm_cas_all(loc, store, (lattice_t)next, 0, LM_STATUS_REF)) {
+                deallocate_last_block (map);
+                break; // do reread
+            }
+            loc = next;
+            break;
+            // this is the only place where we allow the replacement of an element.
+        default:
+            Abort ("Unknown status in lattice map insert.");
+        }
+        store = lm_get_store (map, loc); //reread
     }
 }
 
@@ -248,9 +329,30 @@ lm_insert_from (lm_t *map, ref_t k, lattice_t l,
             return lm_insert_from (map, k, l, status, &next);
             // this is the only place where we allow the replacement of an element.
         default:
-            Abort("Unknown status in lattice map insert.");
+            Abort ("Unknown status in lattice map insert.");
         }
         store = lm_get_store (map, loc);
+    }
+}
+
+int
+lm_cas (lm_t *map, lm_loc_t location, lm_status_t old, lm_status_t status)
+{
+    location = follow (map,location);
+    lm_store_t store = lm_get_store (map, location);
+    switch (store.internal) {
+    case LM_STATUS_LATTICE:
+    case LM_STATUS_LATTICE_END:
+        if (store.status != old)
+            return false;
+        lm_store_t store_new = store;
+        store_new.status = status;
+        return cas ((uint64_t*)location, stoi(&store), stoi(&store_new));
+    case LM_STATUS_TOMBSTONE:
+    case LM_STATUS_TOMBSTONE_END:
+        return false;
+    default:
+        Abort ("Lattice map get on empty store!.");
     }
 }
 
@@ -267,7 +369,7 @@ lm_get (lm_t *map, lm_loc_t location)
     case LM_STATUS_TOMBSTONE_END:
         return NULL_LATTICE;
     default:
-        Abort("Lattice map get on empty store!.");
+        Abort ("Lattice map get on empty store!.");
     }
 }
 
@@ -281,7 +383,7 @@ lm_get_status (lm_t *map, lm_loc_t location)
     case LM_STATUS_LATTICE_END:
         return store.status;
     default:
-        Abort("Lattice map get_status on empty store!.");
+        Abort ("Lattice map get_status on empty store!.");
     }
 }
 
@@ -299,6 +401,28 @@ lm_set_status (lm_t *map, lm_loc_t location, lm_status_t status)
         break;
     default:
         Abort("Lattice map set status on empty store!.");
+    }
+}
+
+void
+lm_cas_delete (lm_t *map, lm_loc_t location, lattice_t l, lm_status_t status)
+{
+    location = follow (map,location);
+    lm_store_t store = lm_get_store(map,location);
+    if (store.lattice != l || store.status != status)
+        return;
+    lm_store_t store_new = store;
+    switch (store.internal) {
+    case LM_STATUS_LATTICE:
+        store_new.internal = LM_STATUS_TOMBSTONE;
+        cas ((uint64_t*)location, stoi(&store), stoi(&store_new));
+        return;
+    case LM_STATUS_LATTICE_END:
+        store_new.internal = LM_STATUS_TOMBSTONE_END;
+        cas ((uint64_t*)location, stoi(&store), stoi(&store_new));
+        return;
+    default:
+        return;
     }
 }
 

@@ -190,6 +190,7 @@ static int              ZOBRIST = 0;
 static int              LATTICE_BLOCK_SIZE = (1UL<<CACHE_LINE) / sizeof(lattice_t);
 static int              UPDATE = TA_UPDATE_WAITING;
 static int              BACKOFF = 0;
+static int              NONBLOCKING = 0;
 static int              STDEV = 0;
 static ref_t           *parent_ref = NULL;
 static state_data_t     initial_data;
@@ -310,6 +311,7 @@ static struct poptOption options[] = {
     {"update", 'u', POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &UPDATE,
       0,"cover update strategy: 0 = simple, 1 = update waiting, 2 = update passed (may break traces)", NULL},
     {"backoff", 'b', POPT_ARG_VAL, &BACKOFF, 1, "Back-off algorithm for TA exploration", NULL},
+    {"non-blocking", 'n', POPT_ARG_VAL, &NONBLOCKING, 1, "Non-blocking TA reachability", NULL},
     {"stdev", 0, POPT_ARG_VAL, &STDEV, 1, "Calculate the standard deviation of lattice ratio", NULL},
     {"strategy", 0, POPT_ARG_STRING | POPT_ARGFLAG_SHOW_DEFAULT,
      &arg_strategy, 0, "select the search strategy", "<sbfs|bfs|dfs>"},
@@ -2515,6 +2517,7 @@ backoff_or_lock (wctx_t *ctx, state_info_t *state) {
     return 0;
 }
 
+
 lm_cb_t
 ta_covered (void *arg, lattice_t l, lm_status_t status, lm_loc_t loc)
 {
@@ -2526,7 +2529,10 @@ ta_covered (void *arg, lattice_t l, lm_status_t status, lm_loc_t loc)
     } else if (TA_UPDATE_NONE != UPDATE &&
             (TA_UPDATE_PASSED == UPDATE || TA_WAITING == (ta_set_e_t)status) &&
             GBisCoveredByShort(ctx->model, (int*)&l, succ_l)) {
-        lm_delete (lmap, loc);
+        if (NONBLOCKING)
+            lm_cas_delete (lmap, loc, l, status);
+        else
+            lm_delete (lmap, loc);
         ctx->last = (LM_NULL_LOC == ctx->last ? loc : ctx->last);
         ctx->counters.deletes++;
     }
@@ -2542,15 +2548,21 @@ ta_handle (void *arg, state_info_t *successor, transition_info_t *ti, int seen)
     ctx->work = 0;
     ctx->last = LM_NULL_LOC;
     ctx->successor = successor;
+    if (!NONBLOCKING)
     if (backoff_or_lock(ctx, successor))
         return;
     lm_loc_t last = lm_iterate (lmap, successor->ref, ta_covered, ctx);
     if (!ctx->done) {
         last = (LM_NULL_LOC == ctx->last ? last : ctx->last);
         ctx->counters.inserts++;
-        successor->loc = lm_insert_from (lmap, successor->ref,
+        if (NONBLOCKING) {
+            successor->loc = lm_insert_from_cas (lmap, successor->ref,
                                         successor->lattice, TA_WAITING, &last);
-        lm_unlock (lmap, successor->ref);
+        } else {
+            successor->loc = lm_insert_from (lmap, successor->ref,
+                                        successor->lattice, TA_WAITING, &last);
+            lm_unlock (lmap, successor->ref);
+        }
         if (STDEV) { // quite costly: flops
             if (ctx->work > 0)
                 statistics_unrecord (&ctx->counters.lattice_ratio, ctx->work);
@@ -2562,8 +2574,8 @@ ta_handle (void *arg, state_info_t *successor, transition_info_t *ti, int seen)
             parent_ref[successor->ref] = ctx->state.ref; // TODO: for backoffs!
         ctx->counters.updates += LM_NULL_LOC != ctx->last;
         ctx->counters.visited++;
-    } else {
-       lm_unlock (lmap, successor->ref);
+    } else if (!NONBLOCKING) {
+        lm_unlock (lmap, successor->ref);
     }
     action_detect (ctx, ti, successor->ref);
     ctx->counters.trans++;
@@ -2574,6 +2586,8 @@ static inline int
 is_waiting (wctx_t *ctx, raw_data_t state_data)
 {
     state_info_deserialize (&ctx->state, state_data, ctx->store);
+    if (NONBLOCKING) // lockless grab
+        return lm_cas (lmap, ctx->state.loc, TA_WAITING, TA_PASSED);
     if (LM_NULL_LOC == ctx->state.loc) {
         ta_handle (ctx, &ctx->state, NULL, 0);
         return !ctx->done;

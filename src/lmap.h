@@ -78,11 +78,16 @@ extern lm_loc_t     lm_iterate_from (lm_t *map, ref_t k,
                                      lm_loc_t *start, lm_iterate_f cb,
                                      void *ctx);
 
-extern lm_loc_t     lm_insert_from (lm_t *map, ref_t k,
-                                    lattice_t l, lm_status_t status,
-                                    lm_loc_t *start);
+extern lm_loc_t     lm_insert_from_cas (lm_t *map, ref_t k, lattice_t l,
+                                        lm_status_t status, lm_loc_t *start);
+
+extern lm_loc_t     lm_insert_from (lm_t *map, ref_t k, lattice_t l,
+                                    lm_status_t status, lm_loc_t *start);
 
 extern lattice_t    lm_get (lm_t *map, lm_loc_t loc);
+
+extern int          lm_cas (lm_t *map, lm_loc_t loc, lm_status_t old,
+                            lm_status_t status);
 
 extern lm_status_t  lm_get_status (lm_t *map, lm_loc_t loc);
 
@@ -90,6 +95,18 @@ extern void         lm_set_status (lm_t *map, lm_loc_t loc,
                                    lm_status_t status);
 
 extern void         lm_delete (lm_t *map, lm_loc_t loc);
+
+/**
+\brief
+A compare-and-swap based delete operation, which does not avoid the ABA problem.
+In other words, the clients have to guarantee that the deleted lattice is not
+reinserted for the explicit state which loc is associated to.
+\param map The map
+\param loc the location of a lattice store
+\param l the expected lattice stored there
+*/
+extern void         lm_cas_delete (lm_t *map, lm_loc_t loc, lattice_t l,
+                                   lm_status_t status);
 
 extern lm_loc_t     lm_insert (lm_t *map, ref_t k, lattice_t l,
                                lm_status_t status);
