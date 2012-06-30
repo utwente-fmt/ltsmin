@@ -1,11 +1,12 @@
-
 #include <config.h>
-#include "runtime.h"
-#include "etf-util.h"
-#include "etf-greybox.h"
-#include <tables.h>
-#include "dm/dm.h"
+
+#include <dm/dm.h>
+#include <etf-util.h>
+#include <etf-greybox.h>
+#include <hre/user.h>
 #include <stringindex.h>
+#include <tables.h>
+
 
 static void etf_popt(poptContext con,
  		enum poptCallbackReason reason,
@@ -22,7 +23,7 @@ static void etf_popt(poptContext con,
 	case POPT_CALLBACK_REASON_OPTION:
 		break;
 	}
-	Fatal(1,error,"unexpected call to etf_popt");
+	Abort("unexpected call to etf_popt");
 }
 struct poptOption etf_options[]= {
 	{ NULL, 0 , POPT_ARG_CALLBACK|POPT_CBFLAG_POST|POPT_CBFLAG_SKIPOPTION , etf_popt , 0 , NULL , NULL },
@@ -150,7 +151,7 @@ ETFloadGreyboxModel(model_t model, const char *name)
         int proj[state_length];
         ETFrelIterate(trans);
         if (!ETFrelNext(trans,src,dst,lbl)){
-            Fatal(1,error,"unexpected empty transition section");
+            Abort("unexpected empty transition section");
         }
         int len=0;
         for(int j=0;j<state_length;j++){
@@ -186,13 +187,13 @@ ETFloadGreyboxModel(model_t model, const char *name)
             }
             for(int k=0;k<state_length;k++) {
                 if(used[k]?(src[k]==0):(src[k]!=0)){
-                    Fatal(1,error,"inconsistent section in src vector");
+                    Abort("inconsistent section in src vector");
                 }
             }
             for(int k=0;k<len;k++) src_short[k]=src[proj[k]]-1;
             for(int k=0;k<state_length;k++) {
                 if(used[k]?(dst[k]==0):(dst[k]!=0)){
-                    Fatal(1,error,"inconsistent section in dst vector");
+                    Abort("inconsistent section in dst vector");
                 }
             }
             for(int k=0;k<len;k++) dst_short[k]=dst[proj[k]]-1;
@@ -233,7 +234,7 @@ ETFloadGreyboxModel(model_t model, const char *name)
         int value;
         ETFmapIterate(map);
         if (!ETFmapNext(map,state,&value)){
-            Fatal(1,error,"Unexpected empty map");
+            Abort("Unexpected empty map");
         }
         int len=0;
         for(int j=0;j<state_length;j++){
@@ -252,7 +253,7 @@ ETFloadGreyboxModel(model_t model, const char *name)
         do {
             for(int k=0;k<state_length;k++) {
                 if(used[k]?(state[k]==0):(state[k]!=0)){
-                    Fatal(1,error,"inconsistent map section");
+                    Abort("inconsistent map section");
                 }
             }
             for(int k=0;k<len;k++) key[k]=state[proj[k]]-1;
@@ -271,7 +272,7 @@ ETFloadGreyboxModel(model_t model, const char *name)
         int count=etf_get_value_count(etf,i);
         for(int j=0;j<count;j++){
             if (j!=GBchunkPut(model,i,etf_get_value(etf,i,j))){
-                Fatal(1,error,"etf-greybox does not support remapping of values");
+                Abort("etf-greybox does not support remapping of values");
             }
         }
     }

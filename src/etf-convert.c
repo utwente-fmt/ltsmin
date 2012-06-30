@@ -1,12 +1,13 @@
 // -*- tab-width:4 ; indent-tabs-mode:nil -*-
 #include <config.h>
+
+#include <ctype.h>
+#include <popt.h>
 #include <stdio.h>
 #include <string.h>
-#include <ctype.h>
-#include <runtime.h>
-#include <hre-main.h>
+
 #include <etf-util.h>
-#include <popt.h>
+#include <hre/user.h>
 #include <ltsmin-syntax.h>
 
 static int pv_count;
@@ -185,7 +186,7 @@ char * get_state_name(int idx) {
 	char tmp[20];
 	for (int i=n_state_names;i<n_state_names+10;i++) {
 	    snprintf(tmp,20,"s%d",i);
-	    state_names[i]=RTstrdup(tmp);
+	    state_names[i]=HREstrdup(tmp);
 	}
 	n_state_names += 10;
     }
@@ -585,13 +586,13 @@ void etf_write(const char*name,etf_model_t model){
 
 int main(int argc,char *argv[]){
 	char* files[2];
-	RTinitPopt(&argc,&argv,options,2,2,files,NULL,"<input> <output>",
-	"Convert ETF models.\n\n"
-	"This tool knows about the following formats:\n"
-	"etf Enumerated Table Format (read)\n"
-	"dve DiVinE input language (write)\n"
-	"dep DEPendencies of the model (write)\n");
-
+    HREinitBegin(argv[0]);
+    HREaddOptions(options,"Convert ETF models.\n\n"
+                          "This tool knows about the following formats:\n"
+                          "etf Enumerated Table Format (read)\n"
+                          "dve DiVinE input language (write)\n"
+                          "dep DEPendencies of the model (write)\n");
+    HREinitStart(&argc,&argv,2,2,files,"<input> <output>");
 	etf_model_t (*read_model)(const char *name)=NULL;
 	void (*write_model)(const char *name,etf_model_t model)=NULL;
 	int len;

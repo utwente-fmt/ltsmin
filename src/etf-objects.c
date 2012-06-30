@@ -1,8 +1,9 @@
 #include <config.h>
-#include <runtime.h>
-#include <etf-objects.h>
-#include <treedbs.h>
+
 #include <dynamic-array.h>
+#include <etf-objects.h>
+#include <hre/user.h>
+#include <treedbs.h>
 
 struct etf_rel_s {
 	treedbs_t rel_db;

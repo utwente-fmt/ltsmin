@@ -14,6 +14,8 @@
 #include <hre/runtime.h>
 #include <hre/user.h>
 
+int RTverbosity=1;
+
 void *
 RTdlsym (const char *libname, void *handle, const char *symbol)
 {
@@ -38,6 +40,14 @@ int linear_search(si_map_entry map[],const char*key){
         map++;
     }
     return -1;
+}
+
+char *key_search(si_map_entry map[],const int val){
+    while(map[0].key){
+        if(map[0].val == val) return map[0].key;
+        map++;
+    }
+    return "not found";
 }
 
 #if defined(__APPLE__)

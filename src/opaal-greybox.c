@@ -11,7 +11,7 @@
 #include <chunk_support.h>
 #include <dm/dm.h>
 #include <opaal-greybox.h>
-#include <runtime.h>
+#include <hre/user.h>
 #include <unix.h>
 
 // opaal ltsmin interface functions
@@ -68,7 +68,7 @@ opaal_popt(poptContext con,
     case POPT_CALLBACK_REASON_OPTION:
         break;
     }
-    Fatal(1,error,"unexpected call to opaal_popt");
+    Abort("unexpected call to opaal_popt");
 }
 
 struct poptOption opaal_options[]= {
@@ -156,7 +156,7 @@ opaalExit()
 }
 
 #define SYSFAIL(cond,...)                                               \
-    do { if (cond) FatalCall(__VA_ARGS__) Fatal(__VA_ARGS__); } while (0)
+    do { if (cond) Abort(__VA_ARGS__); } while (0)
 void
 opaalCompileGreyboxModel(model_t model, const char *filename)
 {
@@ -165,22 +165,22 @@ opaalCompileGreyboxModel(model_t model, const char *filename)
 
     // check file exists
     if ((ret = stat (filename, &st)) != 0)
-        FatalCall (1, error, "%s", filename);
+        Abort("File not found: %s", filename);
 
     // compile opaal model
     char command[4096];
     char *verbose = (RTverbosity >= 2 ? "-v" : "");
     if (snprintf(command, sizeof command, "opaal_ltsmin --only-compile %s '%s'", verbose, filename) >= (ssize_t)sizeof command)
-        Fatal (1, error, "Cannot compile `%s', paths too long", filename);
+        Abort("Cannot compile `%s', paths too long", filename);
 
     if ((ret = system(command)) != 0)
-        SYSFAIL(ret < 0, 1, error, "Command failed with exit code %d: %s", ret, command);
+        SYSFAIL(ret < 0, "Command failed with exit code %d: %s", ret, command);
 
     // check existence of so file
     char *opaal_so_fname = "/tmp/gensuccgen.so";
 
     if ((ret = stat (opaal_so_fname, &st)) != 0)
-        SYSFAIL(ret < 0, 1, error, "File not found: %s", opaal_so_fname);
+        SYSFAIL(ret < 0, "File not found: %s", opaal_so_fname);
 
     opaalLoadDynamicLib(model, opaal_so_fname);
 }
@@ -197,11 +197,11 @@ opaalLoadDynamicLib(model_t model, const char *filename)
         dlHandle = dlopen(abs_filename, RTLD_LAZY);
         if (dlHandle == NULL)
         {
-            Fatal (1, error, "%s, Library \"%s\" is not reachable", dlerror(), filename);
+            Abort("%s, Library \"%s\" is not reachable", dlerror(), filename);
             return;
         }
     } else {
-        Fatal (1, error, "%s, Library \"%s\" is not found", dlerror(), filename);
+        Abort("%s, Library \"%s\" is not found", dlerror(), filename);
     }
     atexit (opaalExit);                   // cleanup
 
@@ -304,7 +304,7 @@ opaalLoadGreyboxModel(model_t model, const char *filename)
     for(int i=0; i < ntypes; i++) {
         const char* type_name = get_state_variable_type_name(i);
         if (lts_type_add_type(ltstype,type_name,NULL) != i) {
-            Fatal(1,error,"wrong type number");
+            Abort("wrong type number");
         }
     }
     int bool_is_new, bool_type = lts_type_add_type (ltstype, "bool", &bool_is_new);

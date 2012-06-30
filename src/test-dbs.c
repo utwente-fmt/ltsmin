@@ -15,9 +15,9 @@
 #include <atomics.h>
 #include <dbs-ll.h>
 #include <hre-main.h>
-#include <runtime.h>
+#include <hre/user.h>
 #include <stats.h>
-#include <stream.h>
+#include <hre-io/user.h>
 #include <treedbs-ll.h>
 
 
@@ -182,7 +182,7 @@ void set_struct(const char *name){
     STRUCT = strcmp(name, "tree") ? (strcmp(name, "dbsll") ? 
                  (strcmp(name, "dbs") ? 0: 1) : 2) : 3;
     if (!STRUCT)
-        Fatal(0, error, "Not a valid structure: %s", name); 
+        Abort("Not a valid structure: %s", name);
     switch(STRUCT) {
         case 1:
             lookup_ret = (dbs_lookup_ret_f)DBSLLlookup_ret;

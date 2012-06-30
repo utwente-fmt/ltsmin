@@ -1,17 +1,16 @@
 #include <config.h>
+
+#include <assert.h>
+#include <ctype.h>
+#include <limits.h>
 #include <stdint.h>
 #include <string.h>
 #include <stdlib.h>
 #include <strings.h>
-#include <ctype.h>
-#include <assert.h>
 
-#include <stdint.h>
-#include <stringindex.h>
-#include <limits.h>
-
+#include <hre/user.h>
 #include <spec-greybox.h>
-#include <runtime.h>
+#include <stringindex.h>
 #include <treedbs.h>
 
 
@@ -126,9 +125,11 @@ int
 main (int argc, char *argv[])
 {
     char               *files[1];
-    RTinitPopt (&argc, &argv, options, 1, 1, files, NULL, "<model>",
-                "Run the TorX remote procedure call protocol on <model>.\n\n"
-                "Options");
+    HREinitBegin(argv[0]);
+    HREaddOptions(options,"Run the TorX remote procedure call protocol on <model>.\n\nOtions");
+    //lts_lib_setup(); // TODO
+    HREinitStart(&argc,&argv,1,1,files,"<model>");
+
     Warning (info, "loading model from %s", files[0]);
     model_t             model = GBcreateBase ();
     GBsetChunkMethods (model, new_string_index, NULL,

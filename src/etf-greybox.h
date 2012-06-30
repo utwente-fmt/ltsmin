@@ -6,7 +6,8 @@
 */
 
 #include <popt.h>
-#include "greybox.h"
+
+#include <greybox.h>
 
 extern struct poptOption etf_options[];
 

@@ -2,8 +2,7 @@
 #include <assert.h>
 #include <ctype.h>
 #include <limits.h>
-#include <lts_enum.h>
-#include <lts_io.h>
+#include <math.h>
 #include <popt.h>
 #include <pthread.h>
 #include <sched.h>
@@ -14,10 +13,8 @@
 #include <string.h>
 #include <sys/types.h>
 #include <time.h>
-#include <math.h>
 
 #include <atomics.h>
-#include <archive.h>
 #include <cctables.h>
 #include <dbs-ll.h>
 #include <dfs-stack.h>
@@ -27,12 +24,10 @@
 #include <lmap.h>
 #include <lb2.h>
 #include <ltsmin-tl.h>
-#include <runtime.h>
-#include <scctimer.h>
+#include <hre/user.h>
 #include <spec-greybox.h>
 #include <statistics.h>
 #include <stats.h>
-#include <stringindex.h>
 #include <trace.h>
 #include <treedbs-ll.h>
 #include <unix.h>
@@ -158,7 +153,7 @@ static int              all_red = 1;
 static box_t            call_mode = UseBlackBox;
 static size_t           max = SIZE_MAX;
 static size_t           ratio = 2;
-static size_t           W = 2;
+static size_t           W = -1;
 static lb2_t           *lb2 = NULL;
 static void            *dbs = NULL;
 static lm_t            *lmap = NULL;
@@ -348,7 +343,6 @@ static struct poptOption options[] = {
     {"trace", 0, POPT_ARG_STRING, &trc_output, 0, "file to write trace to", "<lts output>" },
     SPEC_POPT_OPTIONS,
     {NULL, 0, POPT_ARG_INCLUDE_TABLE, greybox_options, 0, "Greybox options", NULL},
-    {NULL, 0, POPT_ARG_INCLUDE_TABLE, lts_io_options, 0, NULL, NULL},
     POPT_TABLEEND
 };
 
@@ -477,7 +471,7 @@ typedef struct counter_s {
     size_t              violations;     // invariant violation count
     size_t              errors;         // assertion error count
     size_t              exit;           // recursive ndfss
-    mytimer_t           timer;
+    rt_timer_t           timer;
     double              time;
     size_t              deletes;        // lattice deletes
     size_t              updates;        // lattice updates
@@ -562,7 +556,7 @@ add_results (counter_t *res, counter_t *cnt)
     res->violations += cnt->violations;
     res->errors += cnt->errors;
     res->exit += cnt->exit;
-    res->time += SCCrealTime (cnt->timer);
+    res->time += RTrealTime (cnt->timer);
     res->updates += cnt->updates;
     res->inserts += cnt->inserts;
     res->deletes += cnt->deletes;
@@ -702,8 +696,8 @@ wctx_create (size_t id, int depth, wctx_t *shared)
     ctx->permute = permute_create (permutation, ctx->model, W, K, id);
     ctx->rec_bits = (depth ? shared->rec_bits + num_global_bits(strategy[depth-1]) : 0) ;
     ctx->rec_ctx = NULL;
-    ctx->red.timer = SCCcreateTimer ();
-    ctx->counters.timer = SCCcreateTimer ();
+    ctx->red.timer = RTcreateTimer ();
+    ctx->counters.timer = RTcreateTimer ();
     statistics_init (&ctx->counters.lattice_ratio);
     ctx->red.time = 0;
     if (Strat_None != strategy[depth+1])
@@ -779,12 +773,16 @@ find_or_put_tree (state_info_t *state, transition_info_t *ti,
 void
 init_globals (int argc, char *argv[])
 {
-    // parse command line parameters
-    RTinitPopt (&argc, &argv, options, 1, 1, files, NULL, "<model>",
-                "Perform a parallel reachability analysis of <model>\n\nOptions");
+    HREinitBegin(argv[0]); // the organizer thread is called after the binary
+    HREaddOptions(options,"Perform a parallel reachability analysis of <model>\n\nOptions");
+    //lts_lib_setup(); // TODO
+    HREinitStart(&argc,&argv,1,2,files,"<model>");
+    program = get_label ();
 #ifdef OPAAL
     strategy[0] |= Strat_TA;
 #endif
+    if (W == -1)
+        W = RTnumCPUs();
     model = get_model (1);
     if (Perm_Unknown == permutation) //default permutation depends on strategy
         permutation = strategy[0] & Strat_Reach ? Perm_None : Perm_Dynamic;
@@ -805,7 +803,6 @@ init_globals (int argc, char *argv[])
         Abort ("Verification of safety properties works only with reachability algorithms.");
     Warning (info, "Using %d cores (lb: SRP)", W/*, key_search(lb_methods, lb_method)*/);
     Warning (info, "loading model from %s", files[0]);
-    program = get_label ();
     lts_type_t          ltstype = GBgetLTStype (model);
     int                 state_labels = lts_type_get_state_label_count (ltstype);
     int                 edge_labels = lts_type_get_edge_label_count (ltstype);
@@ -982,13 +979,13 @@ print_totals (counter_t *ar_reach, counter_t *ar_red, int d, size_t db_elts)
 }
 
 static void
-print_statistics (counter_t *ar_reach, counter_t *ar_red, mytimer_t timer,
+print_statistics (counter_t *ar_reach, counter_t *ar_red, rt_timer_t timer,
                   stats_t *stats)
 {
     counter_t          *reach = ar_reach;
     counter_t          *red = ar_red;
     double              mem1, mem2, mem3=0, mem4, compr, fill, leafs;
-    float               tot = SCCrealTime (timer);
+    float               tot = RTrealTime (timer);
     size_t              db_elts = stats->elts;
     size_t              db_nodes = stats->nodes;
     db_nodes = db_nodes == 0 ? db_elts : db_nodes;
@@ -1001,7 +998,7 @@ print_statistics (counter_t *ar_reach, counter_t *ar_red, mytimer_t timer,
     mem1 = ((double)(s * max_load)) / (1 << 20);
     size_t lattices = reach->inserts - reach->updates;
     if (Strat_LTL & strategy[0]) {
-        SCCreportTimer (timer, "Total exploration time");
+        RTprintTimer (info, timer, "Total exploration time");
         Warning (info, "");
         Warning (info, "State space has %zu states, %zu are accepting", db_elts,
                  red->visited);
@@ -1022,8 +1019,8 @@ print_statistics (counter_t *ar_reach, counter_t *ar_red, mytimer_t timer,
                      (100 * statistics_stdev(&trans_stats) / statistics_mean(&trans_stats)));
         Warning (info, "");
         print_state_space_total ("State space has ", reach);
-        SCCreportTimer (timer, "Total exploration time");
-        double time = SCCrealTime (timer);
+        RTprintTimer (info, timer, "Total exploration time");
+        double time = RTrealTime (timer);
         Warning(info, "States per second: %.0f, Transitions per second: %.0f",
                 ar_reach->explored/time, ar_reach->trans/time);
         Warning(info, "");
@@ -1996,7 +1993,7 @@ cndfs_handle_nonseed_accepting (wctx_t *ctx)
         ctx->counters.rec += accs;
     }
     if (nonred) {
-        SCCstartTimer (ctx->red.timer);
+        RTstartTimer (ctx->red.timer);
         while ( nonred && !lb2_is_stopped(lb2) ) {
             nonred = 0;
             for (size_t i = 0; i < accs; i++) {
@@ -2006,7 +2003,7 @@ cndfs_handle_nonseed_accepting (wctx_t *ctx)
                     nonred++;
             }
         }
-        SCCstopTimer (ctx->red.timer);
+        RTstopTimer (ctx->red.timer);
     }
     for (size_t i = 0; i < accs; i++)
         dfs_stack_pop (ctx->out_stack);
@@ -2725,10 +2722,10 @@ static void *
 explore (void *args)
 {
     size_t              id = (size_t) args;
-    mytimer_t           timer = SCCcreateTimer ();
-    char                lbl[20];
-    snprintf (lbl, sizeof (char[20]), W>1?"%s[%zu]":"%s", program, id);
-    set_label (lbl);    // register print label and load model
+    rt_timer_t          timer = RTcreateTimer ();
+    char                prog_name[256];
+    snprintf (prog_name, 256, "%s[%zu]", program, id);
+    HREinitBegin(prog_name); // worker threads are called <binary>[<id>]
     wctx_t             *ctx = wctx_create (id, 0, NULL);
     contexts[id] = ctx;
     transition_info_t   ti = GB_NO_TRANSITION;
@@ -2741,7 +2738,7 @@ explore (void *args)
         reach_handle (ctx, &initial_state, &ti, 0);
     ctx->counters.trans = 0; //reset trans count
     lb2_local_init (lb2, ctx->id, ctx); // barrier
-    SCCstartTimer (timer);
+    RTstartTimer (timer);
     switch (strategy[0]) {
     case Strat_TA_SBFS: ta_bfs_strict (ctx); break;
     case Strat_TA_BFS:  ta_bfs (ctx); break;
@@ -2757,9 +2754,9 @@ explore (void *args)
     case Strat_ENDFS:   endfs_blue (ctx); break;
     default: Abort ("Unknown or front-end incompatible strategy (%d).", strategy[0]);
     }
-    SCCstopTimer (timer);
-    ctx->counters.runtime = SCCrealTime (timer);
-    SCCdeleteTimer (timer);
+    RTstopTimer (timer);
+    ctx->counters.runtime = RTrealTime (timer);
+    RTdeleteTimer (timer);
     return statistics (dbs);
 }
 
@@ -2770,18 +2767,18 @@ main (int argc, char *argv[])
     init_globals (argc, argv);
 
     /* Start workers */
-    mytimer_t           timer = SCCcreateTimer ();
+    rt_timer_t           timer = RTcreateTimer ();
     stats_t             stats;
     memset (&stats, 0 , sizeof(stats_t));
-    SCCstartTimer (timer);
+    RTstartTimer (timer);
     for (size_t i = 0; i < W; i++)
         pthread_create (&threads[i], NULL, explore, (void *)i);
-    for (size_t i = 0; i < W; i++) {
+    for (size_t i = 0; i < W; i++) { // the organizer thread waits
         stats_t            *stats_i;
         pthread_join (threads[i], (void **)&stats_i);
         add_stats (&stats, stats_i);
     }
-    SCCstopTimer (timer);
+    RTstopTimer (timer);
 
     /* Gather results */
     counter_t         reach[MAX_STRATEGIES]; memset (reach, 0, sizeof(reach));
@@ -2793,7 +2790,7 @@ main (int argc, char *argv[])
     }
     if (RTverbosity >= 1)
         print_statistics (reach, red, timer, &stats);
-    SCCdeleteTimer (timer);
+    RTdeleteTimer (timer);
     deinit_globals ();
     exit (EXIT_SUCCESS);
 }

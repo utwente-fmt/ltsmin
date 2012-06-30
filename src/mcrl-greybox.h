@@ -2,7 +2,8 @@
 #define MCRL_GREYBOX_H
 
 #include <popt.h>
-#include "greybox.h"
+
+#include <greybox.h>
 
 /**
 \brief Options of the mCRL language module.

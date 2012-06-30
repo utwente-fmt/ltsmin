@@ -1,5 +1,6 @@
 #include "config.h"
 #include <assert.h>
+#include <pthread.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -7,7 +8,7 @@
 #include <atomics.h>
 #include <clt_table.h>
 #include <fast_hash.h>
-#include <runtime.h>
+#include <hre/user.h>
 #include <treedbs-ll.h>
 
 

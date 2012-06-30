@@ -5,17 +5,16 @@
  *      Author: laarman
  */
 
-#include "config.h"
-#include <trace.h>
-#include <runtime.h>
-#include <lts_enum.h>
-#include <lts_io.h>
+#include <config.h>
+
+
 #include <dir_ops.h>
-#include <treedbs.h>
+#include <hre/user.h>
+#include <lts-io/user.h>
 #include <stringindex.h>
-#include <scctimer.h>
-#include <fifo.h>
-#include <struct_io.h>
+#include <trace.h>
+#include <treedbs.h>
+//#include <struct_io.h>
 
 struct trc_s {
     int                 len;
@@ -29,7 +28,7 @@ struct trc_s {
     int                *trace_idx_map; // maps n-th step of the trace to state_db idx
 };
 
-static lts_enum_cb_t    trace_handle=NULL;
+static lts_file_t       trace_handle=NULL;
 
 typedef struct write_trace_step_s {
     int                 src_no;
@@ -130,7 +129,7 @@ write_trace_state(trc_env_t *env, int src_no, int *state)
     Warning (debug,"dumping state %d", src_no);
     int                 labels[env->state_labels];
     if (env->state_labels) GBgetStateLabelsAll(env->model, state, labels);
-    enum_state (trace_handle, 0, state, labels);
+    lts_write_state (trace_handle, 0, state, labels);
 }
 
 
@@ -142,7 +141,7 @@ write_trace_next (void *arg, transition_info_t *ti, int *dst)
     for (int i = 0; i < ctx->N; i++)
         if (ctx->dst[i] != dst[i]) return;
     ctx->found = 1;
-    enum_seg_seg (trace_handle, 0, ctx->src_no, 0, ctx->dst_no, ti->labels);
+    lts_write_edge (trace_handle, 0, &ctx->src_no, 0, &ctx->dst_no, ti->labels);
 }
 
 static void
@@ -156,7 +155,7 @@ write_trace_step (trc_env_t *env, int src_no, int *src, int dst_no, int *dst)
     ctx.found = 0;
     ctx.N = env->N;
     GBgetTransitionsAll (env->model, src, write_trace_next, &ctx);
-    if (ctx.found==0) Fatal (1, error, "no matching transition found");
+    if (ctx.found==0) Abort("no matching transition found");
 }
 
 static void
@@ -189,14 +188,14 @@ find_trace_to (trc_env_t *env, int dst_idx, int level, ref_t *parent_ofs)
     size_t              max_length = level * 10;
     ref_t              *trace = RTmalloc(sizeof(ref_t) * max_length);
     if (trace == NULL)
-        Fatal(1, error, "unable to allocate memory for trace");
+        Abort("unable to allocate memory for trace");
     int                 i = max_length - 1;
     ref_t               curr_idx = dst_idx;
     trace[i] = curr_idx;
     while(curr_idx != env->start_idx) {
         i--;
         if (i < 0)
-            Fatal (1, error, "Trace length 10x longer than initially found trace. Giving up.");
+            Abort("Trace length 10x longer than initially found trace. Giving up.");
         curr_idx = parent_ofs[curr_idx];
         trace[i] = curr_idx;
     }
@@ -210,95 +209,73 @@ void
 trc_find_and_write (trc_env_t *env, char *trc_output, ref_t dst_idx, 
                       int level, ref_t *parent_ofs)
 {
-    lts_output_t trace_output=lts_output_open(trc_output,
-                                              env->model,1,0,1,"vsi",NULL);
-    {
-       int *init_state = env->get_state(env->start_idx, env->get_state_arg);
-       lts_output_set_root_vec(trace_output,(uint32_t*)init_state);
-       lts_output_set_root_idx(trace_output,0,0);
-    }
-    trace_handle = lts_output_begin (trace_output, 0, 1, 0);
-    mytimer_t timer = SCCcreateTimer ();
-    SCCstartTimer (timer);
+    lts_type_t ltstype = GBgetLTStype(env->model);
+    trace_handle=lts_file_create(trc_output,ltstype,1,NULL);
+    int *init_state = env->get_state(env->start_idx, env->get_state_arg);
+    lts_write_init(trace_handle,0,init_state);
+    rt_timer_t timer = RTcreateTimer ();
+    RTstartTimer (timer);
     find_trace_to (env, dst_idx, level, parent_ofs);
-    SCCstopTimer (timer);
-    SCCreportTimer (timer, "constructing the trace took");
-    lts_output_end (trace_output, trace_handle);
-    lts_output_close (&trace_output);
+    RTstopTimer (timer);
+    RTprintTimer (info, timer, "constructing the trace took");
+    lts_file_close (trace_handle);
 }
 
 void
 trc_write_trace (trc_env_t *env, char *trc_output, ref_t *trace, int level)
 {
-    lts_output_t trace_output=lts_output_open (trc_output,
-                                               env->model,1,0,1,"vsi",NULL);
-    {
-       int *init_state = env->get_state (env->start_idx, env->get_state_arg);
-       lts_output_set_root_vec (trace_output, (uint32_t*)init_state);
-       lts_output_set_root_idx (trace_output, 0, 0);
-    }
-    trace_handle=lts_output_begin (trace_output, 0, 1, 0);
-    mytimer_t timer = SCCcreateTimer ();
-    SCCstartTimer (timer);
+    lts_type_t ltstype = GBgetLTStype(env->model);
+    trace_handle=lts_file_create(trc_output,ltstype,1,NULL);
+    int *init_state = env->get_state(env->start_idx, env->get_state_arg);
+    lts_write_init(trace_handle,0,init_state);
+    rt_timer_t timer = RTcreateTimer ();
+    RTstartTimer (timer);
     write_trace (env, level, trace);
-    SCCstopTimer (timer);
-    SCCreportTimer (timer, "constructing the trace took");
-    lts_output_end (trace_output, trace_handle);
-    lts_output_close (&trace_output);
+    RTstopTimer (timer);
+    RTprintTimer (info, timer, "constructing the trace took");
+    lts_file_close (trace_handle);
 }
 
 trc_t trc_read (const char *name){
     trc_t trace=RT_NEW(struct trc_s);
     archive_t arch;
-    char *decode;
-    if (is_a_dir(name)){
-        Warning(info,"open dir %s",name);
-        arch=arch_dir_open((char*)name,IO_BLOCKSIZE);
-        decode=NULL;
-    } else {
-        Warning(info,"open gcf %s",name);
-        arch=arch_gcf_read(raf_unistd((char*)name));
-        decode="auto";
-    }
-    stream_t ds=arch_read(arch,"info",decode);
+    stream_t ds=arch_read(arch,"info");
     char description[1024];
     DSreadS(ds,description,1024);
     if(strncmp(description,"vsi",3)){
-        Fatal(1,error,"input has to be vsi");
+        Abort("input has to be vsi");
     }
     int N;
-    fifo_t fifo=FIFOcreate(4096);
+    stream_t fs=FIFOcreate(4096);
     if (strcmp(description+4,"1.0")){ // check version
-        Fatal(1,error,"unknown version %s",description+4);
+        Abort("unknown version %s",description+4);
     }
     char *comment=DSreadSA(ds);
     Warning(info,"comment is %s",comment);
     N=DSreadU32(ds);
-    if (N!=1) Fatal(1,error,"more than one segment");
+    if (N!=1) Abort("more than one segment");
     N=DSreadVL(ds);
     {
-        stream_t fs=FIFOstream(fifo);
         char data[N];
         DSread(ds,data,N);
         DSwrite(fs,data,N);
-        if(DSreadU32(fs)) Fatal(1,error,"root seg not 0");
-        if(DSreadU32(fs)) Fatal(1,error,"root ofs not 0");
+        if(DSreadU32(fs)) Abort("root seg not 0");
+        if(DSreadU32(fs)) Abort("root ofs not 0");
         N=DSreadU32(fs);
         if (N) {
             for(int i=0;i<N;i++){
                 DSreadU32(fs);
             }
         }
-        if (FIFOsize(fifo)) Fatal(1,error,"Too much data in initial state (%d bytes)",FIFOsize(fifo));
+        if (FIFOsize(fs)) Abort("Too much data in initial state (%d bytes)",FIFOsize(fs));
     }
     N=DSreadVL(ds);
     {
-        stream_t fs=FIFOstream(fifo);
         char data[N];
         DSread(ds,data,N);
         DSwrite(fs,data,N);
         trace->ltstype=lts_type_deserialize(fs);
-        if (FIFOsize(fifo)) Fatal(1,error,"Too much data in lts type (%d bytes)",FIFOsize(fifo));
+        if (FIFOsize(fs)) Abort("Too much data in lts type (%d bytes)",FIFOsize(fs));
     }
     Warning(info,"got the ltstype, skipping the rest");
     DSclose(&ds);
@@ -309,7 +286,7 @@ trc_t trc_read (const char *name){
         Warning(info,"loading type %s",lts_type_get_type(trace->ltstype,i));
         char stream_name[1024];
         sprintf(stream_name,"CT-%d",i);
-        ds=arch_read(arch,stream_name,decode);
+        ds=arch_read(arch,stream_name);
         trace->values[i]=SIcreate();
         int L;
         for(L=0;;L++){
@@ -327,7 +304,7 @@ trc_t trc_read (const char *name){
     trace->state_db=TreeDBScreate(N);
     int trc_size = 1<<7;
     trace->trace_idx_map=RTmalloc(trc_size * sizeof(int));
-    struct_stream_t vec=arch_read_vec_U32(arch,"SV-0-%d",N,decode);
+    struct_stream_t vec=arch_read_vec_U32(arch,"SV-0-%d",N);
     while(!DSstructEmpty(vec)){
         uint32_t state[N];
         DSreadStruct(vec,state);
@@ -349,7 +326,7 @@ trc_t trc_read (const char *name){
         Warning(info,"reading defined state labels");
         trace->map_db=TreeDBScreate(N);
         trace->state_lbl=RTmallocZero(sl_count*sizeof(int));
-        struct_stream_t map=arch_read_vec_U32(arch, "SL-0-%d",N,decode);
+        struct_stream_t map=arch_read_vec_U32(arch, "SL-0-%d",N);
         for(uint32_t j=0;j<sl_count;++j) {
             int map_vec[N];
             DSreadStruct(map, map_vec);
@@ -370,10 +347,10 @@ trc_t trc_read (const char *name){
         int lbl_vec[N];
         trace->edge_db=TreeDBScreate(N);
         trace->edge_lbl=RTmallocZero(edge_count*sizeof(int));
-        struct_stream_t lbl=arch_read_vec_U32(arch,"EL-0-%d",N,decode);
+        struct_stream_t lbl=arch_read_vec_U32(arch,"EL-0-%d",N);
         for (uint32_t j=0;j<edge_count;j++){
             if (DSstructEmpty(lbl)) {
-                Fatal(1,error,"not enough edge labels found");
+                Abort("not enough edge labels found");
             }
             DSreadStruct(lbl,lbl_vec);
             trace->edge_lbl[j] = TreeFold(trace->edge_db, lbl_vec);
@@ -393,20 +370,20 @@ trc_t trc_read (const char *name){
         char* segofs[2]={"seg","ofs"};
         int src_vec[2];
         int dst_ofs[1];
-        struct_stream_t src=arch_read_vec_U32_named(arch,"ES-0-%s",2,segofs,decode);
-        struct_stream_t dst=arch_read_vec_U32_named(arch,"ED-0-%s",1,ofs,decode);
+        struct_stream_t src=arch_read_vec_U32_named(arch,"ES-0-%s",2,segofs);
+        struct_stream_t dst=arch_read_vec_U32_named(arch,"ED-0-%s",1,ofs);
         for (uint32_t j=0;j<edge_count;j++){
             if (DSstructEmpty(src) || DSstructEmpty(dst)) {
-                Fatal(1,error,"not enough tranitions found");
+                Abort("not enough tranitions found");
             }
             DSreadStruct(src,src_vec);
             DSreadStruct(dst,dst_ofs);
             // check src/dst
             if (src_vec[0] != 0){
-                Fatal(1,error,"transition source segment != 0");
+                Abort("transition source segment != 0");
             }
             if (src_vec[1] != dst_ofs[0] - 1 && src_vec[1] != (int)j) {
-                Fatal(1,error,"transition src/dst is not straight sequence");
+                Abort("transition src/dst is not straight sequence");
             }
         }
         if (!(DSstructEmpty(src) || DSstructEmpty(dst))) {

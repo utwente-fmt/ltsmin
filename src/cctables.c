@@ -1,10 +1,12 @@
 #include <config.h>
-#include <stdint.h>
-#include <pthread.h>
 
-#include "runtime.h"
-#include "cctables.h"
-#include "stringindex.h"
+#include <pthread.h>
+#include <stdint.h>
+
+#include <cctables.h>
+#include <hre/user.h>
+#include <stringindex.h>
+
 
 static const size_t MAX_TABLES = 500;
 
@@ -50,7 +52,7 @@ cct_new_map(void* context)
     cct_map_t *map = cont->tables;
     pthread_rwlock_rdlock(&map->lock);
     if (cont->map_index >= MAX_TABLES)
-        Fatal(1, error, "Chunktable limit reached: %d.", MAX_TABLES);
+        Abort("Chunktable limit reached: %d.", MAX_TABLES);
     table_t *t = &map->table[cont->map_index++];
     pthread_rwlock_unlock(&map->lock);
     if (!t->string_index) {

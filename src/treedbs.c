@@ -1,9 +1,11 @@
 #include <config.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include "runtime.h"
-#include "fast_hash.h"
+
 #include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+#include "fast_hash.h"
+#include "hre/user.h"
 #include "treedbs.h"
 
 #define BLOCKSIZE 256
@@ -43,7 +45,7 @@ static void resize_hash(treedbs_t dbs,int node){
 	dbs->db_hash_size[node]*=2;
 	dbs->db_mask[node]=(dbs->db_mask[node]<<1)|1;
 	if (!(dbs->db_hash[node]=realloc(dbs->db_hash[node],dbs->db_hash_size[node]*sizeof(int))))
-		 Fatal(0,error,"realloc hash failed");
+		 Abort("realloc hash failed");
 	for (i=0;i<dbs->db_hash_size[node];i++) dbs->db_hash[node][i]=-1;
 	for (i=0;i<dbs->db_next[node];i++) {
 		hash=hashvalue(dbs->db_left[node][i],dbs->db_right[node][i])&dbs->db_mask[node];
@@ -59,7 +61,7 @@ static void resize_data(treedbs_t dbs,int node){
 	if (!(dbs->db_left[node]=realloc(dbs->db_left[node],dbs->db_size[node]*sizeof(int)))
 	|| !(dbs->db_right[node]=realloc(dbs->db_right[node],dbs->db_size[node]*sizeof(int)))
 	|| !(dbs->db_bucket[node]=realloc(dbs->db_bucket[node],dbs->db_size[node]*sizeof(int)))
-	) Fatal(0,error,"realloc data failed");
+	) Abort("realloc data failed");
 
 	//ATwarning("resize of %d to %d succesful",node,db_size[node]);
 }

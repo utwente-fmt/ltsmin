@@ -2,8 +2,8 @@
 #define LTSMIN_SYNTAX_H
 
 #include <fast_hash.h>
-#include <runtime.h>
-#include <stream.h>
+#include <hre/user.h>
+#include <hre-io/stream.h>
 #include <stringindex.h>
 
 /**

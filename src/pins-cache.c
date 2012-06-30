@@ -1,11 +1,12 @@
 #include <config.h>
-#include <stdlib.h>
-#include <assert.h>
 
-#include "greybox.h"
-#include "runtime.h"
-#include "dynamic-array.h"
-#include "stringindex.h"
+#include <assert.h>
+#include <stdlib.h>
+
+#include <dynamic-array.h>
+#include <greybox.h>
+#include <hre/user.h>
+#include <stringindex.h>
 
 static const int EL_OFFSET = 1;
 

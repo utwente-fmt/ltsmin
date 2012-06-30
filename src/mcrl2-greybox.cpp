@@ -17,9 +17,9 @@ extern "C" {
 #include <assert.h>
 #include <popt.h>
 
-#include <mcrl2-greybox.h>
 #include <dm/dm.h>
-#include <runtime.h>
+#include <hre/user.h>
+#include <mcrl2-greybox.h>
 }
 
 #ifdef MCRL2_JITTYC_AVAILABLE

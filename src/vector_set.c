@@ -1,8 +1,8 @@
 #include <config.h>
 #include <stdlib.h>
 
+#include <hre/user.h>
 #include <vdom_object.h>
-#include <runtime.h>
 
 #ifdef HAVE_ATERM2_H
 extern struct poptOption atermdd_options[];
@@ -33,18 +33,18 @@ static void vset_popt(poptContext con,
 	switch(reason){
 	case POPT_CALLBACK_REASON_PRE:
 	case POPT_CALLBACK_REASON_POST:
-		Fatal(1,error,"unexpected call to vset_popt");
+		Abort("unexpected call to vset_popt");
 	case POPT_CALLBACK_REASON_OPTION:
 		if (!strcmp(opt->longName,"vset")){
 			int res=linear_search((si_map_entry*)data,arg);
 			if (res<0) {
 				Warning(error,"unknown vector set implementation %s",arg);
-				RTexitUsage(EXIT_FAILURE);
+				HREexitUsage(EXIT_FAILURE);
 			}
 			vset_default_domain=res;
 			return;
 		}
-		Fatal(1,error,"unexpected call to vset_popt");
+		Abort("unexpected call to vset_popt");
 	}
 }
 

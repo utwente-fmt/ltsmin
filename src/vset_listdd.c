@@ -1,10 +1,11 @@
 #include <config.h>
-#include <stdlib.h>
-#include <assert.h>
 
-#include <vdom_object.h>
-#include <runtime.h>
+#include <assert.h>
 #include <stdint.h>
+#include <stdlib.h>
+
+#include <hre/user.h>
+#include <vdom_object.h>
 
 static uint32_t mdd_nodes;
 static uint32_t uniq_size;

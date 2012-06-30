@@ -61,8 +61,8 @@ GShom setVarVal (int vr, int vl) {
 }
 
 extern "C" {
+#include <hre/user.h>
 #include <vdom_object.h>
-#include <runtime.h>
 
 struct vector_domain {
     struct vector_domain_shared shared;

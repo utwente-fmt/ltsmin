@@ -1,10 +1,12 @@
 // -*- tab-width:4 ; indent-tabs-mode:nil -*-
 #include <config.h>
-#include <tables.h>
-#include <runtime.h>
+
 #include <string.h>
 #include <stdlib.h>
+
 #include <dynamic-array.h>
+#include <hre/user.h>
+#include <tables.h>
 
 struct value_table_s {
     char *type_name;

@@ -10,7 +10,7 @@
 #include <stdbool.h>
 
 #include <vector_set.h>
-#include <scctimer.h>
+#include <hre/runtime.h>
 
 typedef struct
 {
@@ -37,7 +37,7 @@ typedef struct
 {
     bool chaining;
     bool saturation;
-    mytimer_t spg_solve_timer;
+    rt_timer_t spg_solve_timer;
 } spgsolver_options;
 
 

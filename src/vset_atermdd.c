@@ -2,9 +2,9 @@
 #include <stdlib.h>
 #include <assert.h>
 
-#include <vdom_object.h>
-#include <runtime.h>
 #include <aterm2.h>
+#include <hre/user.h>
+#include <vdom_object.h>
 
 static void WarningHandler(const char *format, va_list args) {
 	FILE* f=log_get_stream(info);
@@ -22,7 +22,7 @@ static void ErrorHandler(const char *format, va_list args) {
 		ATvfprintf(f, format, args);
 		fprintf(f,"\n");
 	}
-	Fatal(1,error,"ATerror");
+	Abort("ATerror");
 	exit(EXIT_FAILURE);
 }
 
@@ -36,7 +36,7 @@ static void atermdd_popt(poptContext con,
 		break;
 	case POPT_CALLBACK_REASON_POST: {
 		char*argv[]={"xxx",NULL};
-		ATinit(1, argv, (ATerm*) RTstackBottom());
+		ATinit(1, argv, (ATerm*) HREstackBottom());
 		ATsetWarningHandler(WarningHandler);
 		ATsetErrorHandler(ErrorHandler);
 		return;
@@ -44,7 +44,7 @@ static void atermdd_popt(poptContext con,
 	case POPT_CALLBACK_REASON_OPTION:
 		break;
 	}
-	Fatal(1,error,"unexpected call to atermdd_popt");
+	Abort("unexpected call to atermdd_popt");
 }
 
 struct poptOption atermdd_options[]= {

@@ -82,7 +82,7 @@ dve_popt(poptContext con,
     case POPT_CALLBACK_REASON_OPTION:
         break;
     }
-    Fatal(1,error,"unexpected call to dve_popt");
+    Abort("unexpected call to dve_popt");
 }
 
 struct poptOption dve_options[] = {
@@ -179,7 +179,7 @@ DVEcompileGreyboxModel(model_t model, const char *filename)
         FatalCall (1, error, "Cannot determine absolute path of %s", filename);
     const char *basename = strrchr (abs_filename, '/');
     if (basename == NULL)
-        Fatal (1, error, "Could not extract basename of file: %s", abs_filename);
+        Abort("Could not extract basename of file: %s", abs_filename);
     ++basename;                         // skip '/'
 
     // get temporary directory
@@ -193,7 +193,7 @@ DVEcompileGreyboxModel(model_t model, const char *filename)
 
     int len = snprintf (templatename, sizeof templatename, "%s/ltsmin-XXXXXX", tmpdir);
     if (len >= (ssize_t)sizeof templatename)
-        Fatal (1, error, "Path too long: %s", tmpdir);
+        Abort("Path too long: %s", tmpdir);
 
     atexit (DVEexit);                   // cleanup
     if ((tmpdir = mkdtemp(templatename)) == NULL)
@@ -203,14 +203,14 @@ DVEcompileGreyboxModel(model_t model, const char *filename)
     char command[PATH_MAX];
     // XXX shell escape filename
     if (snprintf (command, sizeof command, "cp '%s' '%s'", abs_filename, tmpdir) >= (ssize_t)sizeof command)
-        Fatal (1, error, "Paths to long: cannot copy `%s' to `%s'", abs_filename, tmpdir);
+        Abort("Paths to long: cannot copy `%s' to `%s'", abs_filename, tmpdir);
 
     if ((ret = system (command)) != 0)
         SYSFAIL(ret < 0, 1, error, "Command failed with exit code %d: %s", ret, command);
 
     // compile dve model
     if (snprintf(command, sizeof command, "divine.precompile '%s/%s'", tmpdir, basename) >= (ssize_t)sizeof command)
-        Fatal (1, error, "Cannot copy `%s' to `%s', paths too long", abs_filename, tmpdir);
+        Abort("Cannot copy `%s' to `%s', paths too long", abs_filename, tmpdir);
 
     if ((ret = system(command)) != 0)
         SYSFAIL(ret < 0, 1, error, "Command failed with exit code %d: %s", ret, command);
@@ -218,7 +218,7 @@ DVEcompileGreyboxModel(model_t model, const char *filename)
     // check existence of dveC file
     char dveC[PATH_MAX];
     if (snprintf (dveC, sizeof dveC, "%s/%sC", tmpdir, basename) >= (ssize_t)sizeof dveC)
-        Fatal (1, error, "Path too long: %s", tmpdir);
+        Abort("Path too long: %s", tmpdir);
 
     if ((ret = stat (dveC, &st)) != 0)
         SYSFAIL(ret < 0, 1, error, "File not found: %s", dveC);
@@ -238,11 +238,11 @@ DVEloadDynamicLib (model_t model, const char *filename)
         dlHandle = dlopen(abs_filename, RTLD_LAZY);
         if (dlHandle == NULL)
         {
-            Fatal (1, error, "%s, Library \"%s\" is not reachable", dlerror(), filename);
+            Abort("%s, Library \"%s\" is not reachable", dlerror(), filename);
             return;
         }
     } else {
-        Fatal (1, error, "%s, Library \"%s\" is not found", dlerror(), filename);
+        Abort("%s, Library \"%s\" is not found", dlerror(), filename);
     }
 
     // get functions
@@ -260,7 +260,7 @@ DVEloadDynamicLib (model_t model, const char *filename)
     if (lib_get_succ == NULL || lib_is_accepting == NULL ||
         lib_is_in_accepting_component == NULL || lib_get_initial_state == NULL ||
         lib_print_state == NULL) {
-        Fatal (1, error, "Library \"%s\" doesn't export the required functions", filename);
+        Abort("Library \"%s\" doesn't export the required functions", filename);
     }
 
     // added interface functions
@@ -295,7 +295,7 @@ DVEloadDynamicLib (model_t model, const char *filename)
 
     // check system_with_property
     if (lib_system_with_property()) {
-        Fatal(1,error,"DVE models with properties are currently not supported!");
+        Abort("DVE models with properties are currently not supported!");
     }
 }
 
@@ -331,7 +331,7 @@ DVEloadGreyboxModel (model_t model, const char *filename)
     for(int i=0; i < ntypes; i++) {
         const char* type_name = lib_get_state_variable_type_name(i);
         if (lts_type_add_type(ltstype,type_name,NULL) != i) {
-            Fatal(1,error,"wrong type number");
+            Abort("wrong type number");
         }
     }
 

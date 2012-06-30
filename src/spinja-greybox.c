@@ -7,10 +7,10 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#include <spinja-greybox.h>
 #include <dm/dm.h>
 #include <chunk_support.h>
-#include <runtime.h>
+#include <hre/runtime.h>
+#include <spinja-greybox.h>
 #include <unix.h>
 
 #define GUARD_CHECK_MISSING(g) { \
@@ -68,7 +68,7 @@ spinja_popt (poptContext con,
 	case POPT_CALLBACK_REASON_OPTION:
 		break;
 	}
-	Fatal(1,error,"unexpected call to spinja_popt");
+	Abort("unexpected call to spinja_popt");
 }
 
 struct poptOption spinja_options[]= {
@@ -83,14 +83,14 @@ typedef struct grey_box_context {
 static void* dlHandle = NULL;
 
 #define SYSFAIL(cond,...)                                               \
-    do { if (cond) FatalCall(__VA_ARGS__) Fatal(__VA_ARGS__); } while (0)
+    do { if (cond) Abort(__VA_ARGS__); } while (0)
 void
 SpinJacompileGreyboxModel(model_t model, const char *filename)
 {
     (void)model;
     (void)filename;
     /* FIXME */
-    FatalCall(1, error, "Unimplemented: automatic compilation of promela code, please do this manually");
+    Abort("Unimplemented: automatic compilation of promela code, please do this manually");
 }
 #undef SYSFAIL
 
@@ -147,11 +147,11 @@ SpinJaloadDynamicLib(model_t model, const char *filename)
     if (ret_filename != NULL) {
         dlHandle = dlopen (abs_filename, RTLD_LAZY);
         if (dlHandle == NULL) {
-            Fatal (1, error, "%s, Library \"%s\" is not reachable", dlerror(), filename);
+            Abort("%s, Library \"%s\" is not reachable", dlerror(), filename);
             return;
         }
     } else {
-        Fatal (1, error, "%s, Library \"%s\" is not found", dlerror(), filename);
+        Abort("%s, Library \"%s\" is not found", dlerror(), filename);
     }
 
     // load dynamic library functionality
@@ -252,10 +252,10 @@ SpinJaloadGreyboxModel(model_t model, const char *filename)
     for (int i=0; i < ntypes; i++) {
         const char* type_name = spinja_get_type_name(i);
         if(!type_name) {
-            Fatal(1,error,"invalid type name");
+            Abort("invalid type name");
         }
         if (lts_type_add_type(ltstype,type_name,NULL) != i) {
-            Fatal(1,error,"wrong type number");
+            Abort("wrong type number");
         }
     }
 

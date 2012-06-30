@@ -112,6 +112,13 @@ extern void HREabort(int code) __attribute__ ((noreturn));
 extern void HREexit(int code) __attribute__ ((noreturn));
 
 /**
+\brief Print usage info and perform a graceful shutdown (collaborative).
+*/
+extern void HREexitUsage(int code);
+
+extern int RTverbosity; //TODO
+
+/**
 Set the label of this thread.
 */
 extern void set_label(const char* fmt,...);
@@ -242,6 +249,10 @@ extern hre_region_t HREcreateRegion(void* area,hre_malloc_t malloc,hre_realloc_t
 extern void* RTmalloc(size_t size);
 
 extern void* RTmallocZero(size_t size);
+
+extern void* RTalign(size_t align, size_t size);
+
+extern void* RTalignZero(size_t align, size_t size);
 
 extern void* RTrealloc(void *rt_ptr, size_t size);
 

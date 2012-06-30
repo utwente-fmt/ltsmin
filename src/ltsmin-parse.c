@@ -2,7 +2,7 @@
 
 #include <ltl2ba.h>
 #undef Debug
-#include <runtime.h>
+#include <hre/user.h>
 #include <ltsmin-syntax.h>
 #include <ltsmin-grammar.h>
 #include <lts-type.h>
@@ -24,8 +24,10 @@ void ltsmin_ltl2ba(ltsmin_expr_t);
 
 int main(int argc, char *argv[]){
     char* file_name;
-    RTinitPopt(&argc,&argv,options,1,1,&file_name,NULL,"<input>",
-                "test the LTSmin expression parser\n\nOptions");
+    HREinitBegin(argv[0]);
+    HREaddOptions(options,"test the LTSmin expression parser\n\nOptions");
+    HREinitStart(&argc,&argv,1,2,&file_name,"<input>");
+
     lts_type_t ltstype=lts_type_create();
     lts_type_set_state_length(ltstype,1);
     lts_type_set_state_name(ltstype,0,"x");

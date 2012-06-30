@@ -13,7 +13,7 @@
 #include <stdlib.h>
 
 #include <atomics.h>
-#include <runtime.h>
+#include <hre/user.h>
 #include <lb2.h>
 
 struct lb2_s {

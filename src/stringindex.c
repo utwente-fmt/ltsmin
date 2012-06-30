@@ -1,13 +1,13 @@
 // -*- tab-width:4 ; indent-tabs-mode:nil -*-
 #include <config.h>
-#include <string.h>
 #include <assert.h>
+#include <string.h>
 #include <stdlib.h>
 
 #include <dynamic-array.h>
-#include <stringindex.h>
-#include <runtime.h>
+#include <hre/user.h>
 #include <fast_hash.h>
+#include <stringindex.h>
 
 #define DEBUG(...) {}
 //define DEBUG Debug

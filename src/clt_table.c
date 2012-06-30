@@ -10,7 +10,7 @@
 #include <atomics.h>
 #include <clt_table.h>
 #include <fast_hash.h>
-#include <runtime.h>
+#include <hre/user.h>
 
 static const struct timespec BO = {0, 2500};
 

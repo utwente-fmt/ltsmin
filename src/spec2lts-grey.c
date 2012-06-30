@@ -6,7 +6,7 @@
 #include <string.h>
 #include <strings.h>
 
-#include <archive.h>
+#include <hre-io/archive.h>
 #include <bitset.h>
 #include <dbs-ll.h>
 #include <dfs-stack.h>
@@ -14,8 +14,8 @@
 #include <is-balloc.h>
 #include <limits.h>
 #include <lts_enum.h>
-#include <lts_io.h>
-#include <runtime.h>
+#include <lts-io/user.h>
+#include <hre/user.h>
 #include <scctimer.h>
 #include <spec-greybox.h>
 #include <stringindex.h>
@@ -28,7 +28,7 @@ static lts_enum_cb_t output_handle=NULL;
 static char* trc_output=NULL;
 static int dlk_detect=0;
 static lts_enum_cb_t trace_handle=NULL;
-static lts_output_t trace_output=NULL;
+static lts_file_t trace_output=NULL;
 
 static array_manager_t state_man=NULL;
 static uint32_t *parent_ofs=NULL;
@@ -76,14 +76,14 @@ state_db_popt (poptContext con, enum poptCallbackReason reason,
             int db = linear_search (db_types, arg_state_db);
             if (db < 0) {
                 Warning (error, "unknown vector storage mode type %s", arg_state_db);
-                RTexitUsage (EXIT_FAILURE);
+                HREexitUsage (EXIT_FAILURE);
             }
             state_db = db;
 
             int s = linear_search (strategies, arg_strategy);
             if (s < 0) {
                 Warning (error, "unknown search mode %s", arg_strategy);
-                RTexitUsage (EXIT_FAILURE);
+                HREexitUsage (EXIT_FAILURE);
             }
             strategy = s;
         }
@@ -112,7 +112,6 @@ static  struct poptOption options[] = {
         SPEC_POPT_OPTIONS,
 	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, greybox_options , 0 , "Greybox options", NULL },
 	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, vset_options , 0 , "Vector set options", NULL },
-	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, lts_io_options , 0 , NULL , NULL },
 	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, development_options , 0 , "Development options" , NULL },
 	POPT_TABLEEND
 };
@@ -401,6 +400,7 @@ static void
 bfs_explore_state_index (void *context, int idx, int *src, int level)
 {
     model_t             model = (model_t)context;
+    lts_type_t          ltstype = GBgetLTStype(model);
     maybe_write_state (model, &idx, src);
     int count = 0;
     switch (call_mode) {
@@ -416,7 +416,7 @@ bfs_explore_state_index (void *context, int idx, int *src, int level)
     if (count == 0 && dlk_detect) {
         Warning(info,"deadlock found in state %d", idx);
         if (trc_output) {
-            trace_output=lts_output_open(trc_output,model,1,0,1,"vsi",NULL);
+            trace_output=lts_file_create(trc_output,ltstype,1,NULL); //vsi
             {
                 int init_state[N];
                 get_state(0, init_state);
@@ -467,6 +467,7 @@ static void
 dfs_explore_state_vector2 (model_t model, const int *src, int *o_next_group)
 {
 	int                 count = 0;
+    lts_type_t          ltstype = GBgetLTStype(model);
     if (*o_next_group == 0)
         maybe_write_state (model, NULL, src);
     int                 i = *o_next_group;
@@ -485,12 +486,11 @@ dfs_explore_state_vector2 (model_t model, const int *src, int *o_next_group)
     if (count == 0 && *o_next_group == 0 && dlk_detect) {
         Warning(info,"deadlock found!");
         if (trc_output) {
-            trace_output=lts_output_open(trc_output,model,1,0,1,"vsi",NULL);
+            trace_output=lts_file_create(trc_output,ltstype,1,NULL); //vsi
             {
                 int init_state[N];
                 GBgetInitialState(model, init_state);
-                lts_output_set_root_vec(trace_output,(uint32_t*)init_state);
-                lts_output_set_root_idx(trace_output,0,0);
+                lts_write_init(trace_output,0,(uint32_t*)init_state);
             }
             trace_handle=lts_output_begin(trace_output,0,0,0);
             find_dfs_stack_trace_vset(model, stack);
@@ -1327,9 +1327,10 @@ init_write_lts (lts_output_t *p_output,
 int main(int argc, char *argv[]){
 	char           *files[2];
         lts_output_t    output = NULL;
-	RTinitPopt(&argc,&argv,options,1,2,files,NULL,"<model> [<lts>]",
+	HREinitPopt(&argc,&argv,options,1,2,files,NULL,"<model> [<lts>]",
 		"Perform an enumerative reachability analysis of <model>\n\n"
 		"Options");
+	lts_lib_setup();
 	if (files[1]) {
 		Warning(info,"Writing output to %s",files[1]);
 		write_lts=1;

@@ -1,18 +1,17 @@
 #include <config.h>
-#include <stdlib.h>
-#include <limits.h>
+
 #include <assert.h>
+#include <limits.h>
+#include <stdlib.h>
 
 #include <ltl2ba.h>
 #undef Debug
 #include <atomics.h>
 #include <dm/dm.h>
 #include <greybox.h>
-#include <ltsmin-syntax.h>
+#include <hre/user.h>
 #include <ltsmin-tl.h>
-#include <ltsmin-buchi.h>
 #include <ltl2ba-lex.h>
-#include <runtime.h>
 #include <unix.h>
 
 

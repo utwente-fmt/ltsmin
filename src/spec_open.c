@@ -11,11 +11,10 @@
 #include <caesar_standard.h>
 #include <caesar_graph.h>
 
-#include <archive.h>
 #include <fast_hash.h>
-#include <lts_enum.h>
-#include <lts_io.h>
-#include <runtime.h>
+#include <hre/user.h>
+#include <hre-io/user.h>
+#include <lts-io/user.h>
 #include <spec-greybox.h>
 #include <stringindex.h>
 #include <treedbs.h>
@@ -520,7 +519,7 @@ void CAESAR_INIT_GRAPH(void) {
 
 	int res=poptParseArgvString(cmdline,&argc,(void*)(&argv));
 	if (res){
-		Fatal(1,error,"could not parse %s: %s",opencaesar_args,poptStrerror(res));
+		Abort("could not parse %s: %s",opencaesar_args,poptStrerror(res));
 	}
 
  	char *files[2];

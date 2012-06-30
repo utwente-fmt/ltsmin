@@ -1,23 +1,22 @@
 #include <config.h>
-#include <popt.h>
-#include <archive.h>
-#include <stdio.h>
-#include <runtime.h>
-#include "treedbs.h"
-
-#include <lts_enum.h>
-#include <lts_io.h>
-#include <greybox.h>
-#include <stringindex.h>
-
+#include <assert.h>
 #include <inttypes.h>
+#include <popt.h>
+#include <stdio.h>
+
+#include <greybox.h>
+#include <hre/user.h>
+#include <hre-io/archive.h>
+#include <lts_enum.h>
+#include <lts-io/user.h>
+#include <stringindex.h>
+#include <treedbs.h>
 
 static int segments=0;
 static model_t model=NULL;
 
 static  struct poptOption options[] = {
 	{ "segments" , 0 , POPT_ARG_INT , &segments , 0 , "set the number of segments in the output. (default: same as input)" , "<count>" },
-	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, lts_io_options , 0 , NULL ,NULL},
 	POPT_TABLEEND
 };
 
@@ -60,7 +59,7 @@ static void dbs_fold(void*context,int *vec,int *seg,int *ofs){
 	*ofs=TreeFold(ctx->dbs,vec);
 }
 
-static void convert_vector_input(lts_input_t input,char *output_name){
+static void convert_vector_input(lts_file_t input,char *output_name){
 	if (segments!=1) Fatal(1,error,"cannot write more than one segment");
 	lts_type_t ltstype=GBgetLTStype(model);
 	int N=lts_type_get_state_length(ltstype);
@@ -68,14 +67,13 @@ static void convert_vector_input(lts_input_t input,char *output_name){
 	treedbs_t dbs=TreeDBScreate(N);
 	// we should convert the GB not and not hack the ltstype.
 	lts_type_set_state_label_count(ltstype,0);
-	lts_output_t output=lts_output_open(output_name,model,segments,0,1,"-ii",NULL);
+	lts_file_t output=lts_file_open(output_name,model,segments,0,1,"-ii",NULL);
 	lts_output_set_root_idx(output,0,0);
 	lts_enum_cb_t ecb=lts_output_begin(output,segments,segments,segments);
-	N=lts_input_segments(input);
+	N=lts_file_get_segments(input);
 	uint32_t begin[N];
-	lts_count_t *count=lts_input_count(input);
 	begin[0]=0;
-	for(int i=1;i<N;i++) begin[i]=begin[i-1]+count->state[i-1];
+	for(int i=1;i<N;i++) begin[i]=begin[i-1]+lts_get_state_count(input,i);
 	struct dbs_ctx ctx;
 	ctx.dbs=dbs;
 	ctx.begin=begin;
@@ -86,14 +84,17 @@ static void convert_vector_input(lts_input_t input,char *output_name){
 	lts_input_enum_all(input,LTS_ENUM_EDGES,ecb_wrapped);
 	lts_output_end(output,ecb);
 	lts_output_close(&output);
-	uint32_t* root=lts_input_root(input);
-	uint32_t root_no=TreeFold(dbs,(int*)root);
+	assert (1 == lts_get_init_count(input)); // TODO
+	uint32_t root;
+	int root_seg;
+	lts_read_init(input, &root_seg, &root);
+	uint32_t root_no=TreeFold(dbs,(int*)&root);
 	if (root_no!=0){
 		Fatal(1,error,"root is %u rather than 0",root_no);
 	}
 }
 
-static void convert_input(lts_input_t input,char *output_name){
+static void convert_input(lts_file_t input,char *output_name){
 	int N=lts_input_segments(input);
 	uint64_t offset[N+1];
 	lts_count_t *count=lts_input_count(input);
@@ -130,7 +131,10 @@ static void copy_input(lts_input_t input,char *output_name){
 
 int main(int argc, char *argv[]){
 	char* files[2];
-	RTinitPopt(&argc,&argv,options,2,2,files,NULL,"<input> <output>","Stream based file format conversion\n\nOptions");
+    HREinitBegin(argv[0]);
+    HREaddOptions(options,"Stream based file format conversion\n\nOptions");
+    lts_lib_setup();
+    HREinitStart(&argc,&argv,1,2,files,"<input> <output>");
 	model=GBcreateBase();
 	GBsetChunkMethods(model,new_string_index,NULL,
 		(int2chunk_t)SIgetC,(chunk2int_t)SIputC,(get_count_t)SIgetCount);

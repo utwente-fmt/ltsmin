@@ -3,9 +3,10 @@
 #include <aterm2.h>
 
 #include <at-map.h>
-#include <greybox.h>
-#include <runtime.h>
 #include <chunk_support.h>
+#include <greybox.h>
+#include <hre/user.h>
+
 
 struct at_map_s {
     model_t         model;
@@ -81,7 +82,7 @@ ATfindTerm (at_map_t map, int idx)
     // Warning(info,"missing index %d",idx);
     chunk           c = GBchunkGet (map->model, map->type_no, idx);
     if (c.len == 0) {
-        Fatal (1, error, "lookup of %d failed", idx);
+        Abort("lookup of %d failed", idx);
     }
     char            s[c.len + 1];
     for (size_t i = 0; i < c.len; i++)

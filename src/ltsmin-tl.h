@@ -147,7 +147,7 @@ eval_predicate(ltsmin_expr_t e, transition_info_t* ti, int* state)
         default: {
             char buf[1024];
             ltsmin_expr_print_ltl(e, buf);
-            Fatal(1, error, "unhandled predicate expression: %s", buf);
+            Abort("unhandled predicate expression: %s", buf);
         }
     }
     return 0;

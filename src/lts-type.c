@@ -3,8 +3,7 @@
 #include <assert.h>
 #include <string.h>
 
-#include <hre-main.h>
-#include <runtime.h>
+#include <hre/user.h>
 #include <lts-type.h>
 #include <stringindex.h>
 #include <dynamic-array.h>

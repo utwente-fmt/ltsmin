@@ -1,8 +1,10 @@
 #include <config.h>
-#include <runtime.h>
-#include <string-map.h>
-#include <string.h>
+
 #include <fnmatch.h>
+#include <string.h>
+
+#include <hre/user.h>
+#include <string-map.h>
 
 struct string_string_map {
 	char **pattern;
@@ -28,7 +30,7 @@ string_map_t SSMcreateSWP(const char* swp_spec){
 		pattern=tmp+1;
 		tmp=strrchr(pol->pattern[i],':');
 		if (!tmp){
-			Fatal(1,error,"bad map entry %s",pattern);
+			Abort("bad map entry %s",pattern);
 		}
 		tmp[0]=0;
 		pol->value[i]=tmp+1;

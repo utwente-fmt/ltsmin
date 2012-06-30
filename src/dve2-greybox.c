@@ -8,10 +8,10 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#include <dve2-greybox.h>
 #include <chunk_support.h>
 #include <dm/dm.h>
-#include <runtime.h>
+#include <dve2-greybox.h>
+#include <hre/user.h>
 #include <unix.h>
 
 // dve2 ltsmin interface functions
@@ -72,7 +72,7 @@ dve_popt(poptContext con,
     case POPT_CALLBACK_REASON_OPTION:
         break;
     }
-    Fatal(1,error,"unexpected call to dve_popt");
+    Abort("unexpected call to dve_popt");
 }
 
 struct poptOption dve2_options[]= {
@@ -160,7 +160,7 @@ DVEexit()
 }
 
 #define SYSFAIL(cond,...)                                               \
-    do { if (cond) FatalCall(__VA_ARGS__) Fatal(__VA_ARGS__); } while (0)
+    do { if (cond) Abort(__VA_ARGS__); } while (0)
 void
 DVE2compileGreyboxModel(model_t model, const char *filename)
 {
@@ -169,15 +169,15 @@ DVE2compileGreyboxModel(model_t model, const char *filename)
 
     // check file exists
     if ((ret = stat (filename, &st)) != 0)
-        FatalCall (1, error, "%s", filename);
+        Abort ("File does not exist: %s", filename);
 
     char abs_filename[PATH_MAX];
     char *ret_filename = realpath (filename, abs_filename);
     if (ret_filename == NULL)
-        FatalCall (1, error, "Cannot determine absolute path of %s", filename);
+        Abort("Cannot determine absolute path of %s", filename);
     const char *basename = strrchr (abs_filename, '/');
     if (basename == NULL)
-        Fatal (1, error, "Could not extract basename of file: %s", abs_filename);
+        Abort("Could not extract basename of file: %s", abs_filename);
     ++basename;                         // skip '/'
 
     // get temporary directory
@@ -186,14 +186,14 @@ DVE2compileGreyboxModel(model_t model, const char *filename)
         tmpdir = "/tmp";
 
     if ((ret = stat (tmpdir, &st)) != 0)
-        FatalCall(1, error, "Cannot access `%s' for temporary compilation",
+        Abort("Cannot access `%s' for temporary compilation",
                   tmpdir);
     // XXX if ( cas(&initialized, 0, 1) ) {
     if (snprintf (templatename, sizeof templatename, "%s/ltsmin-XXXXXX", tmpdir) >= (ssize_t)sizeof templatename)
-        Fatal (1, error, "Path too long: %s", tmpdir);
+        Abort("Path too long: %s", tmpdir);
 
     if ((tmpdir = mkdtemp(templatename)) == NULL)
-        FatalCall(1, error, "Cannot create temporary directory for compilation: %s", tmpdir);
+        Abort("Cannot create temporary directory for compilation: %s", tmpdir);
 
     // change to temp dir
     char cwd[PATH_MAX];
@@ -201,28 +201,28 @@ DVE2compileGreyboxModel(model_t model, const char *filename)
         cwd[0] = 0;
     int cwdfd = open (".", O_RDONLY);
     if (cwdfd < 0)
-        FatalCall(1, error, "Cannot open current directory");
+        Abort("Cannot open current directory");
     if ((ret = chdir (tmpdir)) != 0)
-        FatalCall(1, error, "Cannot change directory: %s", tmpdir);
+        Abort("Cannot change directory: %s", tmpdir);
     
     // compile dve model
     char command[4096];
     if (snprintf(command, sizeof command, "divine compile --ltsmin '%s'", abs_filename) >= (ssize_t)sizeof command)
-        Fatal (1, error, "Cannot compile `%s', paths too long", abs_filename);
+        Abort("Cannot compile `%s', paths too long", abs_filename);
 
     if ((ret = system(command)) != 0)
-        SYSFAIL(ret < 0, 1, error, "Command failed with exit code %d: %s", ret, command);
+        SYSFAIL(ret < 0, "Command failed with exit code %d: %s", ret, command);
 
     if (fchdir (cwdfd) != 0 && (cwd[0] == 0 || chdir(cwd) != 0))
-        FatalCall(1, error, "Cannot change directory back to current: %s", cwd);
+        Abort("Cannot change directory back to current: %s", cwd);
     
     // check existence of dve2C file
     char dve_so_fname[PATH_MAX];
     if (snprintf (dve_so_fname, sizeof dve_so_fname, "%s/%s2C", tmpdir, basename) >= (ssize_t)sizeof dve_so_fname)
-        Fatal (1, error, "Path too long: %s", tmpdir);
+        Abort("Path too long: %s", tmpdir);
 
     if ((ret = stat (dve_so_fname, &st)) != 0)
-        SYSFAIL(ret < 0, 1, error, "File not found: %s", dve_so_fname);
+        Abort("File not found: %s", dve_so_fname);
 
     DVE2loadDynamicLib(model, dve_so_fname);
 }
@@ -239,11 +239,11 @@ DVE2loadDynamicLib(model_t model, const char *filename)
         dlHandle = dlopen(abs_filename, RTLD_LAZY);
         if (dlHandle == NULL)
         {
-            Fatal (1, error, "%s, Library \"%s\" is not reachable", dlerror(), filename);
+            Abort("%s, Library \"%s\" is not reachable", dlerror(), filename);
             return;
         }
     } else {
-        Fatal (1, error, "%s, Library \"%s\" is not found", dlerror(), filename);
+        Abort("%s, Library \"%s\" is not found", dlerror(), filename);
     }
     atexit (DVEexit);                   // cleanup
 
@@ -346,7 +346,7 @@ DVE2loadGreyboxModel(model_t model, const char *filename)
     for(int i=0; i < ntypes; i++) {
         const char* type_name = get_state_variable_type_name(i);
         if (lts_type_add_type(ltstype,type_name,NULL) != i) {
-            Fatal(1,error,"wrong type number");
+            Abort("wrong type number");
         }
     }
     int bool_is_new, bool_type = lts_type_add_type (ltstype, "bool", &bool_is_new);

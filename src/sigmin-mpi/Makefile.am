@@ -12,5 +12,5 @@ sigmin_mpi_SOURCES += sig-array.c sig-array.h
 sigmin_mpi_LDFLAGS  = $(AM_LDFLAGS)
 sigmin_mpi_LDADD    = ../lts-io/liblts-io.la
 sigmin_mpi_LDADD   += ../hre-mpi/libhre.la
-sigmin_mpi_LDADD   += ../libltsmin-hre.la
+sigmin_mpi_LDADD   += ../libltsmin.la
 sigmin_mpi_CPPFLAGS = -I ${top_srcdir}/src $(AM_CPPFLAGS)

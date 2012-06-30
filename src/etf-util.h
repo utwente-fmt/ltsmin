@@ -6,10 +6,10 @@
 \brief Enumerated Table Format Utilities.
 */
 
-#include "lts-type.h"
-#include "treedbs.h"
-#include "chunk_support.h"
+#include <chunk_support.h>
 #include <etf-objects.h>
+#include <lts-type.h>
+#include <treedbs.h>
 
 /**
 Opaque type for ETF models.

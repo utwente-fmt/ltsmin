@@ -6,6 +6,7 @@
  */
 
 #include "config.h"
+
 #include <assert.h>
 #include <math.h>
 #include <stdint.h>
@@ -14,7 +15,7 @@
 
 #include <atomics.h>
 #include <bitvector-ll.h>
-#include <runtime.h>
+#include <hre/user.h>
 
 struct bitvector_ll_s {
     size_t              sat_bits;

@@ -2,8 +2,8 @@
 #ifndef LTS_TYPE_H
 #define LTS_TYPE_H
 
-#include <stream.h>
-#include <runtime.h>
+#include <hre-io/user.h>
+#include <hre/user.h>
 
 /**
 \file lts-type.h

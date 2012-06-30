@@ -6,9 +6,11 @@
  */
 
 #include <config.h>
+
+#include <stdio.h>
 #include <stdlib.h>
-#include <stdio.h> 
-#include "is-balloc.h"
+
+#include <is-balloc.h>
 
 static const size_t NUM = 10*1024*1024;
 static const int N = 5;

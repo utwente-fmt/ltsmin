@@ -5,7 +5,7 @@
 
 #include <dm/dm.h>
 #include <greybox.h>
-#include <runtime.h>
+#include <hre/user.h>
 
 
 /**

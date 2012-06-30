@@ -2,6 +2,7 @@
 #define VECTOR_SET_H
 
 #include <popt.h>
+
 #include <bignum/bignum.h>
 
 /**

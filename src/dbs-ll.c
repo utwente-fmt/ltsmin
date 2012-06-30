@@ -10,7 +10,7 @@
 
 #include <atomics.h>
 #include <dbs-ll.h>
-#include <runtime.h>
+#include <hre/user.h>
 
 
 static const int        TABLE_SIZE = 24;
