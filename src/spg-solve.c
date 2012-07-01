@@ -437,7 +437,7 @@ void spg_attractor(int player, const parity_game* g, vset_t u, const spgsolver_o
     int l = 0;
     // Compute fixpoint
     while (!vset_is_empty(v_level)) {
-        /*
+
         long   u_count;
         bn_int_t u_elem_count;
         vset_count(u, &u_count, &u_elem_count);
@@ -445,10 +445,9 @@ void spg_attractor(int player, const parity_game* g, vset_t u, const spgsolver_o
         bn_int_t level_elem_count;
         vset_count(v_level, &level_count, &level_elem_count);
         SCCstopTimer(options->spg_solve_timer);
-        Warning(info, "attr_%d^%d [%5.3f]: u has %ld nodes, v_level has %ld nodes.",
+        Warning(debug, "attr_%d^%d [%5.3f]: u has %ld nodes, v_level has %ld nodes.",
                 SCCrealTime(options->spg_solve_timer), player, l, u_count, level_count);
         SCCstartTimer(options->spg_solve_timer);
-        */
 
         // prev_attr = V \intersect prev(attr^k)
         vset_t prev_attr = vset_create(g->domain, -1, NULL);
@@ -465,7 +464,7 @@ void spg_attractor(int player, const parity_game* g, vset_t u, const spgsolver_o
         vset_copy(v_level, prev_attr);
         vset_intersect(v_level, g->v_player[player]);
 
-        // B = next(V \intersect prev_attr)
+        // B = V \intersect next(prev_attr)
         vset_t b = vset_create(g->domain, -1, NULL);
         for(int group=0; group<g->num_groups; group++) {
             vset_clear(tmp);
@@ -498,9 +497,10 @@ void spg_attractor(int player, const parity_game* g, vset_t u, const spgsolver_o
         vset_union(v_level, attr_other_player);
         vset_destroy(attr_other_player);
 
-        // copy result
-        vset_minus(v_level, u);
-        vset_union(u, v_level);
+        // copy result:
+        // U := U \union v_level
+        // v_level := v_level - U
+        vset_zip(u, v_level);
         l++;
     }
     Warning(info, "attr_%d: %d levels.", player, l);
@@ -524,7 +524,7 @@ void spg_attractor_chaining(int player, const parity_game* g, vset_t u, const sp
     long peak_group_count = 0;
     // Compute fixpoint
     while (!vset_is_empty(v_level)) {
-        /*
+
         long   u_count;
         bn_int_t u_elem_count;
         vset_count(u, &u_count, &u_elem_count);
@@ -532,11 +532,10 @@ void spg_attractor_chaining(int player, const parity_game* g, vset_t u, const sp
         bn_int_t v_level_elem_count;
         vset_count(v_level, &v_level_count, &v_level_elem_count);
         SCCstopTimer(options->spg_solve_timer);
-        Warning(info, "attr_%d^%d [%5.3f]: u has %ld nodes, v_level has %ld nodes, v_group has %ld nodes max.",
+        Warning(debug, "attr_%d^%d [%5.3f]: u has %ld nodes, v_level has %ld nodes, v_group has %ld nodes max.",
                 SCCrealTime(options->spg_solve_timer), player, l, u_count, v_level_count, peak_group_count);
         SCCstartTimer(options->spg_solve_timer);
         peak_group_count = 0;
-        */
 
         vset_copy(v_previous_level, v_level);
         vset_clear(v_level);
@@ -544,17 +543,16 @@ void spg_attractor_chaining(int player, const parity_game* g, vset_t u, const sp
             vset_copy(v_group, v_previous_level);
             int k = 0;
             while ((options->saturation || k < 1) && !vset_is_empty(v_group)) {
-                /*
+
                 vset_count(u, &u_count, &u_elem_count);
                 vset_count(v_level, &v_level_count, &v_level_elem_count);
                 long   v_group_count;
                 bn_int_t v_group_elem_count;
                 vset_count(v_group, &v_group_count, &v_group_elem_count);
-                //Warning(info, "  %d: u has %ld nodes, v_level has %ld nodes, v_group has %ld nodes.", k, u_count, v_level_count, v_group_count);
+                Warning(debug, "  %d: u has %ld nodes, v_level has %ld nodes, v_group has %ld nodes.", k, u_count, v_level_count, v_group_count);
                 if (v_group_count > peak_group_count) {
                     peak_group_count = v_group_count;
                 }
-                */
 
                 // prev_attr = V \intersect prev(attr^k)
                 vset_t prev_attr = vset_create(g->domain, -1, NULL);

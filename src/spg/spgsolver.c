@@ -28,6 +28,8 @@ main (int argc, char *argv[])
 
     vset_implementation_t vset_impl = VSET_ListDD;
     FILE *f = fopen(files[0], "r");
+    if (f == NULL)
+        FatalCall (1, error, "Unable to open file ``%s''", files[0]);
     parity_game* g = spg_load(f, vset_impl);
     fclose(f);
     spgsolver_options* spg_options = spg_get_solver_options();
