@@ -108,6 +108,10 @@ reinserted for the explicit state which loc is associated to.
 extern void         lm_cas_delete (lm_t *map, lm_loc_t loc, lattice_t l,
                                    lm_status_t status);
 
+extern int lm_cas_update (lm_t *map, lm_loc_t location,
+                          lattice_t l_old, lm_status_t status_old,
+                          lattice_t l, lm_status_t status);
+
 extern lm_loc_t     lm_insert (lm_t *map, ref_t k, lattice_t l,
                                lm_status_t status);
 

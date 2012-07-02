@@ -404,6 +404,27 @@ lm_set_status (lm_t *map, lm_loc_t location, lm_status_t status)
     }
 }
 
+int
+lm_cas_update (lm_t *map, lm_loc_t location,
+               lattice_t l_old, lm_status_t status_old,
+               lattice_t l, lm_status_t status)
+{
+    location = follow (map,location);
+    lm_store_t store = lm_get_store(map,location);
+    if (store.lattice != l_old || store.status != status_old)
+        return false;
+    lm_store_t store_new = store;
+    store_new.lattice = l;
+    store_new.status = status;
+    switch (store.internal) {
+    case LM_STATUS_LATTICE:
+    case LM_STATUS_LATTICE_END:
+        return cas ((uint64_t*)location, stoi(&store), stoi(&store_new));
+    default:
+        return false;
+    }
+}
+
 void
 lm_cas_delete (lm_t *map, lm_loc_t location, lattice_t l, lm_status_t status)
 {

@@ -2529,10 +2529,15 @@ ta_covered (void *arg, lattice_t l, lm_status_t status, lm_loc_t loc)
     } else if (TA_UPDATE_NONE != UPDATE &&
             (TA_UPDATE_PASSED == UPDATE || TA_WAITING == (ta_set_e_t)status) &&
             GBisCoveredByShort(ctx->model, (int*)&l, succ_l)) {
-        if (NONBLOCKING)
-            lm_cas_delete (lmap, loc, l, status);
-        else
+        if (NONBLOCKING) {
+            if (!lm_cas_update (lmap, loc, l, status, ctx->successor->lattice, (lm_status_t)TA_PASSED)) {
+                lattice_t n = lm_get(lmap, loc);
+                lm_status_t s = lm_get_status(lmap, loc);
+                return ta_covered(arg, n, s, loc);
+            }
+        } else {
             lm_delete (lmap, loc);
+        }
         ctx->last = (LM_NULL_LOC == ctx->last ? loc : ctx->last);
         ctx->counters.deletes++;
     }
