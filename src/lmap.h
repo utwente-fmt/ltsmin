@@ -86,9 +86,6 @@ extern lm_loc_t     lm_insert_from (lm_t *map, ref_t k, lattice_t l,
 
 extern lattice_t    lm_get (lm_t *map, lm_loc_t loc);
 
-extern int          lm_cas (lm_t *map, lm_loc_t loc, lm_status_t old,
-                            lm_status_t status);
-
 extern lm_status_t  lm_get_status (lm_t *map, lm_loc_t loc);
 
 extern void         lm_set_status (lm_t *map, lm_loc_t loc,

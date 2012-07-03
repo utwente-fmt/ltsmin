@@ -335,27 +335,6 @@ lm_insert_from (lm_t *map, ref_t k, lattice_t l,
     }
 }
 
-int
-lm_cas (lm_t *map, lm_loc_t location, lm_status_t old, lm_status_t status)
-{
-    location = follow (map,location);
-    lm_store_t store = lm_get_store (map, location);
-    switch (store.internal) {
-    case LM_STATUS_LATTICE:
-    case LM_STATUS_LATTICE_END:
-        if (store.status != old)
-            return false;
-        lm_store_t store_new = store;
-        store_new.status = status;
-        return cas ((uint64_t*)location, stoi(&store), stoi(&store_new));
-    case LM_STATUS_TOMBSTONE:
-    case LM_STATUS_TOMBSTONE_END:
-        return false;
-    default:
-        Abort ("Lattice map get on empty store!.");
-    }
-}
-
 lattice_t
 lm_get (lm_t *map, lm_loc_t location)
 {

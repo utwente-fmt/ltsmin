@@ -507,6 +507,7 @@ struct thread_ctx_s {
     ref_t               work;           // ENDFS work for loadbalancer
     int                 done;           // ENDFS done for loadbalancer
     int                 subsumes;       //
+    lm_loc_t            added_at;          //
     lm_loc_t            last;           // TA last tombstone location
     dfs_stack_t         backoff;        // Backoff stack (for TA)
     rt_timer_t          timer;
@@ -2518,27 +2519,48 @@ backoff_or_lock (wctx_t *ctx, state_info_t *state) {
     return 0;
 }
 
-
 lm_cb_t
 ta_covered (void *arg, lattice_t l, lm_status_t status, lm_loc_t loc)
 {
     wctx_t         *ctx = (wctx_t*) arg;
-    int *succ_l = (int*)&ctx->successor->lattice;
+    lattice_t lattice = ctx->successor->lattice;
+    int *succ_l = (int*)&lattice;
     if (!ctx->subsumes && GBisCoveredByShort(ctx->model, succ_l, (int*)&l) ) {
         ctx->done = 1;
         return LM_CB_STOP; //A l' : (E (s,l)eL : l>=l')=>(A (s,l)eL : l>=l')
     } else if (TA_UPDATE_NONE != UPDATE &&
             (TA_UPDATE_PASSED == UPDATE || TA_WAITING == (ta_set_e_t)status) &&
             GBisCoveredByShort(ctx->model, (int*)&l, succ_l)) {
-        if (NONBLOCKING) {
-            if (!lm_cas_update (lmap, loc, l, status, ctx->successor->lattice, (lm_status_t)TA_PASSED)) {
+        ctx->subsumes = 1;
+        lm_delete (lmap, loc);
+        ctx->last = (LM_NULL_LOC == ctx->last ? loc : ctx->last);
+        ctx->counters.deletes++;
+    }
+    ctx->work++;
+    return LM_CB_NEXT;
+}
+
+lm_cb_t
+ta_covered_nb (void *arg, lattice_t l, lm_status_t status, lm_loc_t loc)
+{
+    wctx_t         *ctx = (wctx_t*) arg;
+    lattice_t lattice = ctx->successor->lattice;
+    int *succ_l = (int*)&lattice;
+    if (GBisCoveredByShort(ctx->model, succ_l, (int*)&l) ) {
+        ctx->done = 1;
+        return LM_CB_STOP; //A l' : (E (s,l)eL : l>=l')=>(A (s,l)eL : l>=l')
+    } else if (TA_UPDATE_NONE != UPDATE &&
+            (TA_UPDATE_PASSED == UPDATE || TA_WAITING == (ta_set_e_t)status) &&
+            GBisCoveredByShort(ctx->model, (int*)&l, succ_l)) {
+        if (LM_NULL_LOC == ctx->added_at) { // replace first waiting, will be added to waiting set
+            ctx->added_at = loc;
+            if (!lm_cas_update (lmap, loc, l, status, lattice, (lm_status_t)TA_WAITING)) {
                 lattice_t n = lm_get(lmap, loc);
                 lm_status_t s = lm_get_status(lmap, loc);
-                return ta_covered(arg, n, s, loc);
+                return ta_covered (arg, n, s, loc); // retry
             }
-        } else {
-            ctx->subsumes = 1;
-            lm_delete (lmap, loc);
+        } else {                            // delete second etc
+            lm_cas_delete (lmap, loc, l, status);
         }
         ctx->last = (LM_NULL_LOC == ctx->last ? loc : ctx->last);
         ctx->counters.deletes++;
@@ -2554,24 +2576,18 @@ ta_handle (void *arg, state_info_t *successor, transition_info_t *ti, int seen)
     ctx->done = 0;
     ctx->subsumes = 0;
     ctx->work = 0;
+    ctx->added_at = LM_NULL_LOC;
     ctx->last = LM_NULL_LOC;
     ctx->successor = successor;
-    if (!NONBLOCKING)
     if (backoff_or_lock(ctx, successor))
         return;
     lm_loc_t last = lm_iterate (lmap, successor->ref, ta_covered, ctx);
     if (!ctx->done) {
         last = (LM_NULL_LOC == ctx->last ? last : ctx->last);
-        ctx->counters.inserts++;
-        if (NONBLOCKING) {
-            successor->loc = lm_insert_from_cas (lmap, successor->ref,
-                                        successor->lattice, TA_WAITING, &last);
-        } else {
-            successor->loc = lm_insert_from (lmap, successor->ref,
-                                        successor->lattice, TA_WAITING, &last);
-            lm_unlock (lmap, successor->ref);
-        }
-        if (STDEV) { // quite costly: flops
+        successor->loc = lm_insert_from (lmap, successor->ref,
+                                    successor->lattice, TA_WAITING, &last);
+        lm_unlock (lmap, successor->ref);
+        if (0) { // quite costly: flops
             if (ctx->work > 0)
                 statistics_unrecord (&ctx->counters.lattice_ratio, ctx->work);
             statistics_record (&ctx->counters.lattice_ratio, ctx->work+1);
@@ -2582,10 +2598,42 @@ ta_handle (void *arg, state_info_t *successor, transition_info_t *ti, int seen)
             parent_ref[successor->ref] = ctx->state.ref; // TODO: for backoffs!
         ctx->counters.updates += LM_NULL_LOC != ctx->last;
         ctx->counters.visited++;
-    } else if (!NONBLOCKING) {
+    } else {
         lm_unlock (lmap, successor->ref);
     }
     action_detect (ctx, ti, successor->ref);
+    ctx->counters.trans++;
+    (void) ti; (void) seen;
+}
+
+static void
+ta_handle_nb (void *arg, state_info_t *successor, transition_info_t *ti, int seen)
+{
+    wctx_t         *ctx = (wctx_t*) arg;
+    ctx->done = 0;
+    ctx->subsumes = 0;
+    ctx->work = 0;
+    ctx->added_at = LM_NULL_LOC;
+    ctx->last = LM_NULL_LOC;
+    ctx->successor = successor;
+    lm_loc_t last = lm_iterate (lmap, successor->ref, ta_covered_nb, ctx);
+    if (!ctx->done) {
+        last = (LM_NULL_LOC == ctx->last ? last : ctx->last);
+        if (LM_NULL_LOC == ctx->added_at) {
+            successor->loc = lm_insert_from_cas (lmap, successor->ref,
+                                    successor->lattice, TA_WAITING, &last);
+            ctx->counters.inserts++;
+        } else {
+            successor->loc = ctx->added_at;
+        }
+        raw_data_t stack_loc = dfs_stack_push (ctx->stack, NULL);
+        state_info_serialize (successor, stack_loc);
+        if (trc_output)
+            parent_ref[successor->ref] = ctx->state.ref; // TODO: for backoffs!
+        ctx->counters.updates += LM_NULL_LOC != ctx->last;
+        ctx->load++;
+        ctx->counters.visited++;
+    }
     ctx->counters.trans++;
     (void) ti; (void) seen;
 }
@@ -2594,16 +2642,17 @@ static inline int
 is_waiting (wctx_t *ctx, raw_data_t state_data)
 {
     state_info_deserialize (&ctx->state, state_data, ctx->store);
-    if (NONBLOCKING) // lockless grab
-        return lm_cas (lmap, ctx->state.loc, TA_WAITING, TA_PASSED);
-    if (LM_NULL_LOC == ctx->state.loc) {
+    if (LM_NULL_LOC == ctx->state.loc) { // state was backed off before
         ta_handle (ctx, &ctx->state, NULL, 0);
         return !ctx->done;
     }
+    if (NONBLOCKING) // lockless grab
+        return lm_cas_update (lmap, ctx->state.loc, ctx->state.lattice, TA_WAITING,
+                                                    ctx->state.lattice, TA_PASSED);
     if (TA_UPDATE_NONE == UPDATE)
         return 1; // we don't need to update the global waiting info
     if (backoff_or_lock(ctx, &ctx->state))
-        return 0; // pretend the state is already in the waiting set
+        return 0; // for now pretend the state is already in the waiting set
     int ret_val = 0;
     lattice_t lattice = lm_get (lmap, ctx->state.loc);
     if (ctx->state.lattice == lattice && // maybe changed or LATTICE_NULL!
@@ -2622,7 +2671,8 @@ ta_explore_state (wctx_t *ctx)
 {
     int                 count = 0;
     invariant_detect (ctx, ctx->state.data);
-    count = permute_trans (ctx->permute, &ctx->state, ta_handle, ctx);
+    count = permute_trans (ctx->permute, &ctx->state,
+                           NONBLOCKING ? ta_handle_nb : ta_handle, ctx);
     deadlock_detect (ctx, count);
     maybe_report (&ctx->counters, "", &threshold);
     ctx->counters.explored++;
