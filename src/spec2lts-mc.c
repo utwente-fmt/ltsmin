@@ -189,7 +189,6 @@ static size_t           H = 1000;
 static int              ZOBRIST = 0;
 static int              LATTICE_BLOCK_SIZE = (1UL<<CACHE_LINE) / sizeof(lattice_t);
 static int              UPDATE = TA_UPDATE_WAITING;
-static int              BACKOFF = 0;
 static int              NONBLOCKING = 0;
 static int              STDEV = 0;
 static ref_t           *parent_ref = NULL;
@@ -310,7 +309,6 @@ static struct poptOption options[] = {
          "For the best performance set this to: cache line size (usually 64) divided by lattice size of 8 byte.", NULL},
     {"update", 'u', POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &UPDATE,
       0,"cover update strategy: 0 = simple, 1 = update waiting, 2 = update passed (may break traces)", NULL},
-    {"backoff", 'b', POPT_ARG_VAL, &BACKOFF, 1, "Back-off algorithm for TA exploration", NULL},
     {"non-blocking", 'n', POPT_ARG_VAL, &NONBLOCKING, 1, "Non-blocking TA reachability", NULL},
     {"stdev", 0, POPT_ARG_VAL, &STDEV, 1, "Calculate the standard deviation of lattice ratio", NULL},
     {"strategy", 0, POPT_ARG_STRING | POPT_ARGFLAG_SHOW_DEFAULT,
@@ -477,7 +475,6 @@ typedef struct counter_s {
     size_t              deletes;        // lattice deletes
     size_t              updates;        // lattice updates
     size_t              inserts;        // lattice inserts
-    size_t              delayed;        // lattice backoff delays
     statistics_t        lattice_ratio;  // On-the-fly calc of stdev/mean of #lat
 } counter_t;
 
@@ -507,9 +504,8 @@ struct thread_ctx_s {
     ref_t               work;           // ENDFS work for loadbalancer
     int                 done;           // ENDFS done for loadbalancer
     int                 subsumes;       //
-    lm_loc_t            added_at;          //
+    lm_loc_t            added_at;       //
     lm_loc_t            last;           // TA last tombstone location
-    dfs_stack_t         backoff;        // Backoff stack (for TA)
     rt_timer_t          timer;
     stats_t            *stats;
 };
@@ -564,7 +560,6 @@ add_results (counter_t *res, counter_t *cnt)
     res->updates += cnt->updates;
     res->inserts += cnt->inserts;
     res->deletes += cnt->deletes;
-    res->delayed += cnt->delayed;
 }
 
 void
@@ -681,8 +676,6 @@ wctx_create (size_t id, int depth, wctx_t *shared)
         ctx->in_stack = dfs_stack_create (state_info_int_size());
     if (strategy[depth] & (Strat_CNDFS)) //third stack for accepting states
         ctx->out_stack = dfs_stack_create (state_info_int_size());
-    if (strategy[depth] & (Strat_TA))
-        ctx->backoff = dfs_stack_create (state_info_int_size());
     //allocate two bits for NDFS colorings
     if (strategy[depth] & Strat_LTL) {
         size_t local_bits = 2;
@@ -720,8 +713,6 @@ wctx_free (wctx_t *ctx, int depth)
             bitvector_free (&ctx->all_red);
         }
     }
-    if (strategy[depth] & (Strat_TA))
-        dfs_stack_destroy (ctx->backoff);
     if (NULL != ctx->group_stack)
         isba_destroy (ctx->group_stack);
     //if (strategy[depth] & (Strat_BFS | Strat_ENDFS | Strat_CNDFS))
@@ -1052,14 +1043,14 @@ print_statistics (counter_t *ar_reach, counter_t *ar_red, rt_timer_t timer,
              "Database:\nElements: %zu\nNodes: %zu\nMisses: %zu\nEq. tests: %zu\nRehashes: %zu\n\n"
              "Memory:\nQueue: %.1f MB\nDB: %.1f MB\nDB alloc.: %.1f MB\nColors: %.1f MB\n\n"
              "Load balancer:\nSplits: %zu\nLoad transfer: %zu\n\n"
-             "Lattice MAP:\nRatio: %.2f\nInserts: %zu\nUpdates: %zu\nDeletes: %zu\nDelayed: %zu",
+             "Lattice MAP:\nRatio: %.2f\nInserts: %zu\nUpdates: %zu\nDeletes: %zu",
              tot, reach->runtime, reach->explored, reach->trans, reach->deadlocks,
                     reach->violations, reach->errors, red->waits, reach->rec,
              db_elts, db_nodes, stats->misses, stats->tests, stats->rehashes,
              mem1, mem4, mem2, mem3,
              reach->splits, reach->transfer,
              ((double)lattices/db_elts), reach->inserts, reach->updates,
-                     reach->deletes, reach->delayed);
+                     reach->deletes);
 }
 
 static void
@@ -2218,11 +2209,6 @@ split_bfs (void *arg_src, void *arg_tgt, size_t handoff)
         in_size = dfs_stack_size (source->out_stack);
         source_stack = source->out_stack;
     }
-    if (BACKOFF && (Strat_TA & strategy[0]) && in_size < handoff) {
-        in_size = dfs_stack_frame_size (source->backoff);
-        for (size_t i = 0; i < in_size; i++)
-            dfs_stack_push (source_stack, dfs_stack_pop(source->backoff));
-    }
     handoff = min (in_size >> 1 , handoff);
     for (size_t i = 0; i < handoff; i++) {
         state_data_t        one = dfs_stack_pop (source_stack);
@@ -2240,11 +2226,6 @@ split_sbfs (void *arg_src, void *arg_tgt, size_t handoff)
     wctx_t             *source = arg_src;
     wctx_t             *target = arg_tgt;
     size_t              in_size = dfs_stack_size (source->in_stack);
-    if (BACKOFF && (Strat_TA & strategy[0]) && in_size < handoff) {
-        in_size = dfs_stack_frame_size (source->backoff);
-        for (size_t i = 0; i < in_size; i++)
-            dfs_stack_push (source->in_stack, dfs_stack_pop(source->backoff));
-    }
     handoff = min (in_size >> 1 , handoff);
     for (size_t i = 0; i < handoff; i++) {
         state_data_t        one = dfs_stack_pop (source->in_stack);
@@ -2262,11 +2243,6 @@ split_dfs (void *arg_src, void *arg_tgt, size_t handoff)
     wctx_t             *source = arg_src;
     wctx_t             *target = arg_tgt;
     size_t              in_size = dfs_stack_size (source->stack);
-    if (BACKOFF && (Strat_TA & strategy[0]) && in_size < handoff) {
-        in_size = dfs_stack_frame_size (source->backoff);
-        for (size_t i = 0; i < in_size; i++)
-            dfs_stack_push (source->in_stack, dfs_stack_pop(source->backoff));
-    }
     handoff = min (in_size >> 1, handoff);
     for (size_t i = 0; i < handoff; i++) {
         state_data_t        one = dfs_stack_top (source->stack);
@@ -2504,21 +2480,6 @@ typedef enum ta_set_e {
     TA_PASSED  = 1,
 } ta_set_e_t;
 
-static inline int
-backoff_or_lock (wctx_t *ctx, state_info_t *state) {
-    if (BACKOFF) {
-        if (!lm_try_lock(lmap, state->ref)) {
-            raw_data_t stack_loc = dfs_stack_push (ctx->backoff, NULL);
-            state_info_serialize (state, stack_loc);
-            ctx->counters.delayed++;
-            return 1;
-        }
-    } else {
-        lm_lock (lmap, state->ref);
-    }
-    return 0;
-}
-
 lm_cb_t
 ta_covered (void *arg, lattice_t l, lm_status_t status, lm_loc_t loc)
 {
@@ -2553,11 +2514,12 @@ ta_covered_nb (void *arg, lattice_t l, lm_status_t status, lm_loc_t loc)
             (TA_UPDATE_PASSED == UPDATE || TA_WAITING == (ta_set_e_t)status) &&
             GBisCoveredByShort(ctx->model, (int*)&l, succ_l)) {
         if (LM_NULL_LOC == ctx->added_at) { // replace first waiting, will be added to waiting set
-            ctx->added_at = loc;
             if (!lm_cas_update (lmap, loc, l, status, lattice, (lm_status_t)TA_WAITING)) {
                 lattice_t n = lm_get(lmap, loc);
                 lm_status_t s = lm_get_status(lmap, loc);
                 return ta_covered (arg, n, s, loc); // retry
+            } else {
+                ctx->added_at = loc;
             }
         } else {                            // delete second etc
             lm_cas_delete (lmap, loc, l, status);
@@ -2579,14 +2541,14 @@ ta_handle (void *arg, state_info_t *successor, transition_info_t *ti, int seen)
     ctx->added_at = LM_NULL_LOC;
     ctx->last = LM_NULL_LOC;
     ctx->successor = successor;
-    if (backoff_or_lock(ctx, successor))
-        return;
+    lm_lock (lmap, successor->ref);
     lm_loc_t last = lm_iterate (lmap, successor->ref, ta_covered, ctx);
     if (!ctx->done) {
         last = (LM_NULL_LOC == ctx->last ? last : ctx->last);
         successor->loc = lm_insert_from (lmap, successor->ref,
                                     successor->lattice, TA_WAITING, &last);
         lm_unlock (lmap, successor->ref);
+        ctx->counters.inserts++;
         if (0) { // quite costly: flops
             if (ctx->work > 0)
                 statistics_unrecord (&ctx->counters.lattice_ratio, ctx->work);
@@ -2595,7 +2557,7 @@ ta_handle (void *arg, state_info_t *successor, transition_info_t *ti, int seen)
         raw_data_t stack_loc = dfs_stack_push (ctx->stack, NULL);
         state_info_serialize (successor, stack_loc);
         if (trc_output)
-            parent_ref[successor->ref] = ctx->state.ref; // TODO: for backoffs!
+            parent_ref[successor->ref] = ctx->state.ref;
         ctx->counters.updates += LM_NULL_LOC != ctx->last;
         ctx->counters.visited++;
     } else {
@@ -2618,8 +2580,8 @@ ta_handle_nb (void *arg, state_info_t *successor, transition_info_t *ti, int see
     ctx->successor = successor;
     lm_loc_t last = lm_iterate (lmap, successor->ref, ta_covered_nb, ctx);
     if (!ctx->done) {
-        last = (LM_NULL_LOC == ctx->last ? last : ctx->last);
         if (LM_NULL_LOC == ctx->added_at) {
+            last = (LM_NULL_LOC == ctx->last ? last : ctx->last);
             successor->loc = lm_insert_from_cas (lmap, successor->ref,
                                     successor->lattice, TA_WAITING, &last);
             ctx->counters.inserts++;
@@ -2629,41 +2591,12 @@ ta_handle_nb (void *arg, state_info_t *successor, transition_info_t *ti, int see
         raw_data_t stack_loc = dfs_stack_push (ctx->stack, NULL);
         state_info_serialize (successor, stack_loc);
         if (trc_output)
-            parent_ref[successor->ref] = ctx->state.ref; // TODO: for backoffs!
+            parent_ref[successor->ref] = ctx->state.ref;
         ctx->counters.updates += LM_NULL_LOC != ctx->last;
-        ctx->load++;
         ctx->counters.visited++;
     }
     ctx->counters.trans++;
     (void) ti; (void) seen;
-}
-
-static inline int
-is_waiting (wctx_t *ctx, raw_data_t state_data)
-{
-    state_info_deserialize (&ctx->state, state_data, ctx->store);
-    if (LM_NULL_LOC == ctx->state.loc) { // state was backed off before
-        ta_handle (ctx, &ctx->state, NULL, 0);
-        return !ctx->done;
-    }
-    if (NONBLOCKING) // lockless grab
-        return lm_cas_update (lmap, ctx->state.loc, ctx->state.lattice, TA_WAITING,
-                                                    ctx->state.lattice, TA_PASSED);
-    if (TA_UPDATE_NONE == UPDATE)
-        return 1; // we don't need to update the global waiting info
-    if (backoff_or_lock(ctx, &ctx->state))
-        return 0; // for now pretend the state is already in the waiting set
-    int ret_val = 0;
-    lattice_t lattice = lm_get (lmap, ctx->state.loc);
-    if (ctx->state.lattice == lattice && // maybe changed or LATTICE_NULL!
-            TA_WAITING == (ta_set_e_t)lm_get_status (lmap, ctx->state.loc)) {
-        lm_set_status (lmap, ctx->state.loc, TA_PASSED);
-        ret_val = 1;
-    } else {
-        ret_val = 0;
-    }
-    lm_unlock (lmap, ctx->state.ref);
-    return ret_val;
 }
 
 static inline void
@@ -2678,27 +2611,38 @@ ta_explore_state (wctx_t *ctx)
     ctx->counters.explored++;
 }
 
-static inline size_t
-ta_load (wctx_t *ctx, dfs_stack_t stack)
+static inline int
+grab_waiting (wctx_t *ctx, raw_data_t state_data)
 {
-    return dfs_stack_frame_size(stack) +
-        (BACKOFF ? dfs_stack_frame_size(ctx->backoff) : 0);
+    state_info_deserialize (&ctx->state, state_data, ctx->store);
+    if ((TA_UPDATE_NONE == UPDATE) && !NONBLOCKING)
+        return 1; // we don't need to update the global waiting info
+    return lm_cas_update(lmap, ctx->state.loc, ctx->state.lattice, TA_WAITING,
+                                               ctx->state.lattice, TA_PASSED);
+    // unlocked! May cause newly created passed state to be deleted by a,
+    // waiting set update. However, this behavior is valid since it can be
+    // simulated by swapping these two operations in the schedule.
 }
 
 static inline size_t
 ta_bfs_load (wctx_t *ctx)
 {
-    return dfs_stack_frame_size(ctx->in_stack) + dfs_stack_frame_size(ctx->out_stack) +
-        (BACKOFF ? dfs_stack_frame_size(ctx->backoff) : 0);
+    return dfs_stack_frame_size(ctx->in_stack) + dfs_stack_frame_size(ctx->out_stack);
+}
+
+static inline size_t
+ta_load (wctx_t *ctx)
+{
+    return dfs_stack_frame_size(ctx->in_stack);
 }
 
 void
 ta_dfs (wctx_t *ctx)
 {
-    while (lb2_balance(lb2, ctx->id, ta_load(ctx, ctx->stack), split_dfs)) {
+    while (lb2_balance(lb2, ctx->id, dfs_stack_size(ctx->stack), split_dfs)) {
         raw_data_t          state_data = dfs_stack_top (ctx->stack);
         if (NULL != state_data) {
-            if (is_waiting(ctx, state_data)) {
+            if (grab_waiting(ctx, state_data)) {
                 dfs_stack_enter (ctx->stack);
                 increase_level (&ctx->counters);
                 ta_explore_state (ctx);
@@ -2706,15 +2650,8 @@ ta_dfs (wctx_t *ctx)
                 dfs_stack_pop (ctx->stack);
             }
         } else {
-            if (0 == dfs_stack_size (ctx->stack)) {
-                if (0 == dfs_stack_frame_size (ctx->backoff)) {
-                    return;
-                } else {
-                    while (0 != dfs_stack_frame_size (ctx->backoff))
-                        dfs_stack_push (ctx->stack, dfs_stack_pop(ctx->backoff));
-                    continue;
-                }
-            }
+            if (0 == dfs_stack_size (ctx->stack))
+                return;
             dfs_stack_leave (ctx->stack);
             ctx->counters.level_cur--;
             dfs_stack_pop (ctx->stack);
@@ -2728,19 +2665,12 @@ ta_bfs (wctx_t *ctx)
     while (lb2_balance(lb2, ctx->id, ta_bfs_load(ctx), split_bfs)) {
         raw_data_t          state_data = dfs_stack_pop (ctx->in_stack);
         if (NULL != state_data) {
-            if (is_waiting(ctx, state_data)) {
+            if (grab_waiting(ctx, state_data)) {
                 ta_explore_state (ctx);
             }
         } else {
-            if (0 == dfs_stack_frame_size (ctx->out_stack)) {
-                if (0 == dfs_stack_frame_size (ctx->backoff)) {
-                    return;
-                } else {
-                    while (0 != dfs_stack_frame_size (ctx->backoff))
-                        dfs_stack_push (ctx->in_stack, dfs_stack_pop(ctx->backoff));
-                    continue;
-                }
-            }
+            if (0 == dfs_stack_frame_size (ctx->out_stack))
+                return;
             dfs_stack_t     old = ctx->out_stack;
             ctx->stack = ctx->out_stack = ctx->in_stack;
             ctx->in_stack = old;
@@ -2754,15 +2684,11 @@ ta_bfs_strict (wctx_t *ctx)
 {
     size_t out_size;
     do {
-        while (lb2_balance(lb2, ctx->id, ta_load(ctx, ctx->in_stack), split_sbfs)) {
+        while (lb2_balance(lb2, ctx->id, ta_load(ctx), split_sbfs)) {
             raw_data_t          state_data = dfs_stack_pop (ctx->in_stack);
             if (NULL != state_data) {
-                if (is_waiting(ctx, state_data)) {
+                if (grab_waiting(ctx, state_data)) {
                     ta_explore_state (ctx);
-                }
-            } else {
-                while (0 != dfs_stack_frame_size (ctx->backoff)) {
-                    dfs_stack_push (ctx->in_stack, dfs_stack_pop(ctx->backoff));
                 }
             }
         }
