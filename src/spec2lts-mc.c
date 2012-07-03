@@ -506,6 +506,7 @@ struct thread_ctx_s {
     int                 rec_bits;       // bit depth of recursive ndfs
     ref_t               work;           // ENDFS work for loadbalancer
     int                 done;           // ENDFS done for loadbalancer
+    int                 subsumes;       //
     lm_loc_t            last;           // TA last tombstone location
     dfs_stack_t         backoff;        // Backoff stack (for TA)
     rt_timer_t          timer;
@@ -2523,7 +2524,7 @@ ta_covered (void *arg, lattice_t l, lm_status_t status, lm_loc_t loc)
 {
     wctx_t         *ctx = (wctx_t*) arg;
     int *succ_l = (int*)&ctx->successor->lattice;
-    if (GBisCoveredByShort(ctx->model, succ_l, (int*)&l) ) {
+    if (!ctx->subsumes && GBisCoveredByShort(ctx->model, succ_l, (int*)&l) ) {
         ctx->done = 1;
         return LM_CB_STOP; //A l' : (E (s,l)eL : l>=l')=>(A (s,l)eL : l>=l')
     } else if (TA_UPDATE_NONE != UPDATE &&
@@ -2536,6 +2537,7 @@ ta_covered (void *arg, lattice_t l, lm_status_t status, lm_loc_t loc)
                 return ta_covered(arg, n, s, loc);
             }
         } else {
+            ctx->subsumes = 1;
             lm_delete (lmap, loc);
         }
         ctx->last = (LM_NULL_LOC == ctx->last ? loc : ctx->last);
@@ -2550,6 +2552,7 @@ ta_handle (void *arg, state_info_t *successor, transition_info_t *ti, int seen)
 {
     wctx_t         *ctx = (wctx_t*) arg;
     ctx->done = 0;
+    ctx->subsumes = 0;
     ctx->work = 0;
     ctx->last = LM_NULL_LOC;
     ctx->successor = successor;
