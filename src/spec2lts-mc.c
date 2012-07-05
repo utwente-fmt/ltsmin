@@ -901,10 +901,6 @@ init_globals (int argc, char *argv[])
     GBgetInitialState (model, initial_data);
     lb2 = lb2_create_max (W, G, H);
     (void) signal (SIGINT, exit_ltsmin);
-    if (RTverbosity >= 3) {
-        fprintf (stderr, "Dependency Matrix:\n");
-        GBprintDependencyMatrixCombined (stderr, model);
-    }
 }
 
 void
@@ -933,7 +929,7 @@ print_state_space_total (char *name, counter_t *cnt)
 static inline void
 maybe_report (counter_t *cnt, char *msg, size_t *threshold)
 {
-    if (RTverbosity < 1 || cnt->explored < *threshold)
+    if (!log_active(info) || cnt->explored < *threshold)
         return;
     if (!cas (threshold, *threshold, *threshold << 1))
         return;
@@ -1056,23 +1052,21 @@ print_statistics (counter_t *ar_reach, counter_t *ar_red, rt_timer_t timer,
     }
     Warning (info, "Est. total memory use: %.1fMB (~%.1fMB paged-in)",
              mem1 + mem4 + mem3, mem1 + mem2 + mem3);
-    if (RTverbosity >= 2) {        // internal counters
-        Warning (info, "Internal statistics:\n\n"
-        		 "Algorithm:\nWork time: %.2f sec\nUser time: %.2f sec\nExplored: %zu\n"
-        		 	 "Transitions: %zu\nDeadlocks: %zu\nInvariant violations: %zu\n"
-        		 	 "Error actions: %zu\nWaits: %zu\nRec. calls: %zu\n\n"
-                 "Database:\nElements: %zu\nNodes: %zu\nMisses: %zu\nEq. tests: %zu\nRehashes: %zu\n\n"
-                 "Memory:\nQueue: %.1f MB\nDB: %.1f MB\nDB alloc.: %.1f MB\nColors: %.1f MB\n\n"
-                 "Load balancer:\nSplits: %zu\nLoad transfer: %zu\n\n"
-                 "Lattice MAP:\nRatio: %.2f\nInserts: %zu\nUpdates: %zu\nDeletes: %zu\nDelayed: %zu",
-                 tot, reach->runtime, reach->explored, reach->trans, reach->deadlocks,
-                        reach->violations, reach->errors, red->waits, reach->rec,
-                 db_elts, db_nodes, stats->misses, stats->tests, stats->rehashes,
-                 mem1, mem4, mem2, mem3,
-                 reach->splits, reach->transfer,
-                 ((double)lattices/db_elts), reach->inserts, reach->updates,
-                         reach->deletes, reach->delayed);
-    }
+    Warning (infoLong, "Internal statistics:\n\n"
+             "Algorithm:\nWork time: %.2f sec\nUser time: %.2f sec\nExplored: %zu\n"
+                 "Transitions: %zu\nDeadlocks: %zu\nInvariant violations: %zu\n"
+                 "Error actions: %zu\nWaits: %zu\nRec. calls: %zu\n\n"
+             "Database:\nElements: %zu\nNodes: %zu\nMisses: %zu\nEq. tests: %zu\nRehashes: %zu\n\n"
+             "Memory:\nQueue: %.1f MB\nDB: %.1f MB\nDB alloc.: %.1f MB\nColors: %.1f MB\n\n"
+             "Load balancer:\nSplits: %zu\nLoad transfer: %zu\n\n"
+             "Lattice MAP:\nRatio: %.2f\nInserts: %zu\nUpdates: %zu\nDeletes: %zu\nDelayed: %zu",
+             tot, reach->runtime, reach->explored, reach->trans, reach->deadlocks,
+                    reach->violations, reach->errors, red->waits, reach->rec,
+             db_elts, db_nodes, stats->misses, stats->tests, stats->rehashes,
+             mem1, mem4, mem2, mem3,
+             reach->splits, reach->transfer,
+             ((double)lattices/db_elts), reach->inserts, reach->updates,
+                     reach->deletes, reach->delayed);
 }
 
 static void
@@ -2491,9 +2485,9 @@ sbfs (wctx_t *ctx)
         if (0 == ctx->id && out_size > max_level_size) max_level_size = out_size;
         lb2_reinit (lb2, ctx->id);
         increase_level (&ctx->counters);
-        if (0 == ctx->id && RTverbosity >= 2) {
+        if (0 == ctx->id) {
             total += out_size;
-            Warning(info, "BFS level %zu has %zu states %zu total", ctx->counters.level_cur, out_size, total);
+            Warning(infoLong, "BFS level %zu has %zu states %zu total", ctx->counters.level_cur, out_size, total);
         }
         dfs_stack_t     old = ctx->out_stack;
         ctx->stack = ctx->out_stack = ctx->in_stack;
@@ -2709,7 +2703,7 @@ ta_bfs_strict (wctx_t *ctx)
         if (0 == ctx->id && out_size > max_level_size) max_level_size = out_size;
         lb2_reinit (lb2, ctx->id);
         increase_level (&ctx->counters);
-        if (0 == ctx->id && RTverbosity >= 2)
+        if (0 == ctx->id && log_active(infoLong))
             Warning(info, "BFS level %zu has %zu states", ctx->counters.level_cur, out_size);
         dfs_stack_t     old = ctx->out_stack;
         ctx->stack = ctx->out_stack = ctx->in_stack;
@@ -2788,7 +2782,7 @@ main (int argc, char *argv[])
         ctx_add_counters (ctx, reach, red);
         print_thread_statistics (ctx);
     }
-    if (RTverbosity >= 1)
+    if (log_active(info))
         print_statistics (reach, red, timer, &stats);
     RTdeleteTimer (timer);
     deinit_globals ();

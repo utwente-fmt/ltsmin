@@ -16,7 +16,7 @@ static const char *fdd_reorder_opt="none";
 static int fdd_order_strat=BDD_REORDER_NONE;
 
 static void vset_fdd_gbchandler(int pre, bddGbcStat *s) {
-  if (!pre && RTverbosity>=2) {
+  if (!pre && log_active(infoLong)) {
     Warning(info,"Garbage collection #%d: %d nodes / %d free / %.1fs / %.1fs total",
 	    s->num, s->nodes, s->freenodes,
 	    (float)s->time/(float)(CLOCKS_PER_SEC),

@@ -19,7 +19,7 @@
 
 
 #define diagnostic(...) {\
-    if (RTverbosity >= 2)\
+    if (log_active(infoLong))\
         fprintf(stderr, __VA_ARGS__);\
 }
 
@@ -501,8 +501,8 @@ explore_cb(void *context, int *src)
     GBgetTransitionsShort(model, ctx->group, src, group_add, context);
     (*ctx->explored)++;
 
-    if ((*ctx->explored) % 1000 == 0 && RTverbosity >= 2) {
-        Warning(info, "explored %d short vectors for group %d",
+    if ((*ctx->explored) % 1000 == 0) {
+        Warning(infoLong, "explored %d short vectors for group %d",
                     *ctx->explored, ctx->group);
     }
 }
@@ -619,7 +619,7 @@ stats_and_progress_report(vset_t current, vset_t visited, int level)
     if (n_count > max_vis_count)
         max_vis_count = n_count;
 
-    if (RTverbosity >= 2) {
+    if (log_active(infoLong)) {
         fprintf(stderr, "transition caches ( grp nds elts ): ");
 
         for (int i = 0; i < nGrps; i++) {
@@ -1696,7 +1696,7 @@ init_model(char *file)
 
     GBloadFile(model, file, &model);
 
-    if (RTverbosity >= 2) {
+    if (log_active(infoLong)) {
         fprintf(stderr, "Dependency Matrix:\n");
         GBprintDependencyMatrixCombined(stderr, model);
     }

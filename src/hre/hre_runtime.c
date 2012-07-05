@@ -14,8 +14,6 @@
 #include <hre/runtime.h>
 #include <hre/user.h>
 
-int RTverbosity=1;
-
 void *
 RTdlsym (const char *libname, void *handle, const char *symbol)
 {

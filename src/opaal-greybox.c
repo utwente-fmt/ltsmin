@@ -169,8 +169,7 @@ opaalCompileGreyboxModel(model_t model, const char *filename)
 
     // compile opaal model
     char command[4096];
-    char *verbose = (RTverbosity >= 2 ? "-v" : "");
-    if (snprintf(command, sizeof command, "opaal_ltsmin --only-compile %s '%s'", verbose, filename) >= (ssize_t)sizeof command)
+    if (snprintf(command, sizeof command, "opaal_ltsmin --only-compile '%s'", filename) >= (ssize_t)sizeof command)
         Abort("Cannot compile `%s', paths too long", filename);
 
     if ((ret = system(command)) != 0)

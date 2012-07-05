@@ -116,8 +116,6 @@ extern void HREexit(int code) __attribute__ ((noreturn));
 */
 extern void HREexitUsage(int code);
 
-extern int RTverbosity; //TODO
-
 /**
 Set the label of this thread.
 */
