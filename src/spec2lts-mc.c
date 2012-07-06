@@ -143,8 +143,6 @@ extern void             permute_free (permute_t *perm);
 extern int              permute_trans (permute_t *perm, state_info_t *state,
                                        perm_cb_f cb, void *ctx);
 
-static char            *program;
-static cct_map_t       *tables = NULL;
 static char            *files[2];
 static int              dbs_size = 0;
 static int              refs = 1;
@@ -298,7 +296,7 @@ exit_ltsmin (int sig)
 static struct poptOption options[] = {
     {NULL, 0, POPT_ARG_CALLBACK | POPT_CBFLAG_POST | POPT_CBFLAG_SKIPOPTION,
      (void *)state_db_popt, 0, NULL, NULL},
-    {"threads", 0, POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &W, 0, "number of threads", "<int>"},
+//    {"threads", 0, POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &W, 0, "number of threads", "<int>"},
     {"state", 0, POPT_ARG_STRING | POPT_ARGFLAG_SHOW_DEFAULT, &state_repr,
      0, "select the data structure for storing states. Beware for Cleary tree: size <= 28 + 2 * ratio.", "<tree|table|cleary-tree>"},
     {"size", 's', POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &dbs_size, 0,
@@ -471,7 +469,7 @@ typedef struct counter_s {
     size_t              violations;     // invariant violation count
     size_t              errors;         // assertion error count
     size_t              exit;           // recursive ndfss
-    rt_timer_t           timer;
+    rt_timer_t          timer;
     double              time;
     size_t              deletes;        // lattice deletes
     size_t              updates;        // lattice updates
@@ -507,6 +505,8 @@ struct thread_ctx_s {
     int                 done;           // ENDFS done for loadbalancer
     lm_loc_t            last;           // TA last tombstone location
     dfs_stack_t         backoff;        // Backoff stack (for TA)
+    rt_timer_t          timer;
+    stats_t            *stats;
 };
 
 /* predecessor --(transition_info)--> successor */
@@ -535,7 +535,6 @@ static size_t       K; // number of groups
 static size_t       MAX_SUCC; // max succ. count to expand at once
 static size_t       threshold;
 static wctx_t     **contexts;
-static pthread_t   *threads;
 static zobrist_t    zobrist = NULL;
 
 static void
@@ -574,13 +573,14 @@ add_stats(stats_t *res, stats_t *stat)
 }
 
 static void
-ctx_add_counters (wctx_t *ctx, counter_t *cnt, counter_t *red)
+ctx_add_counters (wctx_t *ctx, counter_t *cnt, counter_t *red, stats_t *stats)
 {
+    if (NULL != ctx->rec_ctx)                   // recursion
+        ctx_add_counters (ctx->rec_ctx, cnt+1, red+1, NULL);
+    if (ctx == contexts[ctx->id])               // top level
+        add_stats (stats, ctx->stats);
     add_results(cnt, &ctx->counters);
     add_results(red, &ctx->red);
-    if (NULL != ctx->rec_ctx) {
-        ctx_add_counters (ctx->rec_ctx, cnt+1, red+1);
-    }
 }
 
 static inline void
@@ -632,12 +632,10 @@ static              model_t
 get_model (int first)
 {
     int                 start_index = 0;
-    if (tables == NULL)
-        tables = cct_create_map ();
-    cct_cont_t         *map = cct_create_cont (tables, start_index);
+    cct_cont_t         *map = cct_create_cont (start_index);
     model_t             model = GBcreateBase ();
-    GBsetChunkMethods (model, cct_new_map, map, cct_map_get, cct_map_put,
-                       cct_map_count);
+    GBsetChunkMethods (model, (newmap_t)cct_create_vt, map,
+                       HREgreyboxI2C, HREgreyboxC2I, HREgreyboxCount);
     if (first)
         GBloadFileShared (model, files[0]);
     GBloadFile (model, files[0], &model);
@@ -771,18 +769,12 @@ find_or_put_tree (state_info_t *state, transition_info_t *ti,
 }
 
 void
-init_globals (int argc, char *argv[])
+init_globals ()
 {
-    HREinitBegin(argv[0]); // the organizer thread is called after the binary
-    HREaddOptions(options,"Perform a parallel reachability analysis of <model>\n\nOptions");
-    //lts_lib_setup(); // TODO
-    HREinitStart(&argc,&argv,1,2,files,"<model>");
-    program = get_label ();
 #ifdef OPAAL
     strategy[0] |= Strat_TA;
 #endif
-    if (W == -1)
-        W = RTnumCPUs();
+    W = HREpeers(HREglobal());
     model = get_model (1);
     if (Perm_Unknown == permutation) //default permutation depends on strategy
         permutation = strategy[0] & Strat_Reach ? Perm_None : Perm_Dynamic;
@@ -896,7 +888,6 @@ init_globals (int argc, char *argv[])
     Warning (info, "Global bits: %d, count bits: %d, local bits: %d.",
              global_bits, count_bits, local_bits);
     contexts = RTmalloc (sizeof (wctx_t *[W]));
-    threads = RTmalloc (sizeof (pthread_t[W]));
     initial_data = RTmalloc (SLOT_SIZE * N);
     GBgetInitialState (model, initial_data);
     lb2 = lb2_create_max (W, G, H);
@@ -2712,27 +2703,25 @@ ta_bfs_strict (wctx_t *ctx)
 }
 
 /* explore is started for each thread (worker) */
-static void *
-explore (void *args)
+static void
+explore (size_t id)
 {
-    size_t              id = (size_t) args;
-    rt_timer_t          timer = RTcreateTimer ();
-    char                prog_name[256];
-    snprintf (prog_name, 256, "%s[%zu]", program, id);
-    HREinitBegin(prog_name); // worker threads are called <binary>[<id>]
-    wctx_t             *ctx = wctx_create (id, 0, NULL);
-    contexts[id] = ctx;
-    transition_info_t   ti = GB_NO_TRANSITION;
-    state_info_initialize (&initial_state, initial_data, &ti, &ctx->state, ctx);
-    if ( Strat_TA & strategy[0] )
-        ta_handle (ctx, &initial_state, &ti, 0);
-    else if ( Strat_LTL & strategy[0] )
-        ndfs_handle_blue (ctx, &initial_state, &ti, 0);
-    else if (0 == ctx->id) // only w1 receives load, as it is propagated later
-        reach_handle (ctx, &initial_state, &ti, 0);
-    ctx->counters.trans = 0; //reset trans count
-    lb2_local_init (lb2, ctx->id, ctx); // barrier
-    RTstartTimer (timer);
+    wctx_t             *ctx = wctx_create (id, 0, NULL);// after global init
+    ctx->timer = RTcreateTimer ();
+    contexts[id] = ctx;                                 // before alg. start
+    if (0 == id) {
+        transition_info_t   ti = GB_NO_TRANSITION;      // before alg. start:
+        state_info_initialize (&initial_state, initial_data, &ti, &ctx->state, ctx);
+        if ( Strat_TA & strategy[0] )
+            ta_handle (ctx, &initial_state, &ti, 0);
+        else if ( Strat_LTL & strategy[0] )
+            ndfs_handle_blue (ctx, &initial_state, &ti, 0);
+        else if (0 == ctx->id) // only w1 receives load, as it is propagated later
+            reach_handle (ctx, &initial_state, &ti, 0);
+        ctx->counters.trans = 0; //reset trans count
+    }
+    lb2_local_init (lb2, ctx->id, ctx);                 // BARRIER
+    RTstartTimer (ctx->timer);
     switch (strategy[0]) {
     case Strat_TA_SBFS: ta_bfs_strict (ctx); break;
     case Strat_TA_BFS:  ta_bfs (ctx); break;
@@ -2748,43 +2737,40 @@ explore (void *args)
     case Strat_ENDFS:   endfs_blue (ctx); break;
     default: Abort ("Unknown or front-end incompatible strategy (%d).", strategy[0]);
     }
-    RTstopTimer (timer);
-    ctx->counters.runtime = RTrealTime (timer);
-    RTdeleteTimer (timer);
-    return statistics (dbs);
+    RTstopTimer (ctx->timer);
+    ctx->counters.runtime = RTrealTime (ctx->timer);
+    print_thread_statistics (ctx);
+    ctx->stats = statistics (dbs);
 }
 
 int
 main (int argc, char *argv[])
 {
     /* Init structures */
-    init_globals (argc, argv);
+    HREinitBegin(argv[0]);
+    HREaddOptions(options,"Perform a parallel reachability analysis of <model>\n\nOptions");
+    //lts_lib_setup(); // TODO
+    HREenableThreads(1);
+    HREinitStart(&argc,&argv,1,1,files,"<model>");      // spawns threads!
 
-    /* Start workers */
-    rt_timer_t           timer = RTcreateTimer ();
-    stats_t             stats;
-    memset (&stats, 0 , sizeof(stats_t));
-    RTstartTimer (timer);
+    size_t              id = HREme (HREglobal());
+
+    if (0 == id) init_globals ();                       // global init
+
+    lb2_barrier (HREpeers(HREglobal()));                // BARRIER
+
+    explore (id);
+
+    lb2_barrier (HREpeers(HREglobal()));                // BARRIER
+
+    if (0 != id) return EXIT_SUCCESS;                   // local exit
+
+    counter_t          *reach = RTmallocZero (sizeof(counter_t[MAX_STRATEGIES]));
+    counter_t          *red = RTmallocZero (sizeof(counter_t[MAX_STRATEGIES]));
+    stats_t            *stats = RTmallocZero (sizeof (stats_t));
     for (size_t i = 0; i < W; i++)
-        pthread_create (&threads[i], NULL, explore, (void *)i);
-    for (size_t i = 0; i < W; i++) { // the organizer thread waits
-        stats_t            *stats_i;
-        pthread_join (threads[i], (void **)&stats_i);
-        add_stats (&stats, stats_i);
-    }
-    RTstopTimer (timer);
-
-    /* Gather results */
-    counter_t         reach[MAX_STRATEGIES]; memset (reach, 0, sizeof(reach));
-    counter_t         red[MAX_STRATEGIES]; memset (red, 0, sizeof(red));
-    for (size_t i = 0; i < W; i++) {
-        wctx_t             *ctx = contexts[i];
-        ctx_add_counters (ctx, reach, red);
-        print_thread_statistics (ctx);
-    }
+        ctx_add_counters (contexts[i], reach, red, stats);
     if (log_active(info))
-        print_statistics (reach, red, timer, &stats);
-    RTdeleteTimer (timer);
+        print_statistics (reach, red, contexts[0]->timer, stats);
     deinit_globals ();
-    exit (EXIT_SUCCESS);
-}
+}                                                       // global exit
