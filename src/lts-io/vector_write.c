@@ -194,7 +194,7 @@ static void write_chunk_tables(lts_file_t file){
         value_table_t values=lts_file_get_table(file,i);
         switch(lts_type_get_format(ltstype,i)){
         case LTStypeDirect:
-            if (values) {
+            if (values && VTgetCount(values)!=0) {
                 Print(error,"direct type %s has table",type_name);
             }
             break;

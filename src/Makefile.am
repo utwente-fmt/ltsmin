@@ -49,25 +49,25 @@ BUILT_SOURCES  = ltsmin-grammar.c ltsmin-grammar.h
 BUILT_SOURCES += ltsmin-lexer.c ltsmin-lexer.h
 
 #bin_PROGRAMS += etf2lts-grey
-#bin_PROGRAMS += etf2lts-gsea
+bin_PROGRAMS += etf2lts-gsea
 bin_PROGRAMS += etf-reach
 
 if HAVE_LIBSTEP_INFO
 #bin_PROGRAMS += lpo2lts-grey
-#bin_PROGRAMS += lpo2lts-gsea
+bin_PROGRAMS += lpo2lts-gsea
 bin_PROGRAMS += lpo-reach
 endif
 
 if HAVE_LIBMCRL2
 #bin_PROGRAMS += lps2lts-grey
-#bin_PROGRAMS += lps2lts-gsea
+bin_PROGRAMS += lps2lts-gsea
 bin_PROGRAMS += lps-reach
 noinst_LTLIBRARIES += libmcrl2-pins.la
 endif
 
 if HAVE_LIBPBES
 #bin_PROGRAMS += pbes2lts-grey 
-#bin_PROGRAMS += pbes2lts-gsea
+bin_PROGRAMS += pbes2lts-gsea
 if HAVE_LIBSPG
 bin_PROGRAMS += pbes-reach
 endif
@@ -76,13 +76,13 @@ endif
 
 if HAVE_DVEC
 #bin_PROGRAMS += dve2lts-grey
-#bin_PROGRAMS += dve2lts-gsea
+bin_PROGRAMS += dve2lts-gsea
 bin_PROGRAMS += dve-reach
 endif
 
 if HAVE_DVEC2
 #bin_PROGRAMS += dve22lts-grey
-#bin_PROGRAMS += dve22lts-gsea
+bin_PROGRAMS += dve22lts-gsea
 bin_PROGRAMS += dve2-reach
 endif
 
@@ -94,7 +94,7 @@ endif
 
 #if HAVE_SPINJA
 #bin_PROGRAMS += spinja2lts-grey
-#bin_PROGRAMS += spinja2lts-gsea
+bin_PROGRAMS += spinja2lts-gsea
 bin_PROGRAMS += spinja-reach
 #endif
 
@@ -215,54 +215,54 @@ ltsmin_parse_LDADD = libltsmin.la
 ##spinja2lts_grey_LDFLAGS  = $(SPINJA_LDFLAGS) $(AM_LDFLAGS)
 
 
-### etf2lts-gsea
-##etf2lts_gsea_SOURCES  = spec2lts-gsea.c etf-greybox.c etf-greybox.h
-##etf2lts_gsea_LDADD    = $(VSET_LIBS) libltsmin.la
-##etf2lts_gsea_CPPFLAGS = -DETF $(AM_CPPFLAGS)
+# etf2lts-gsea
+etf2lts_gsea_SOURCES  = spec2lts-gsea.c etf-greybox.c etf-greybox.h
+etf2lts_gsea_LDADD    = $(VSET_LIBS) libltsmin.la libmc.la
+etf2lts_gsea_CPPFLAGS = -DETF $(AM_CPPFLAGS)
 
-### lpo2lts-gsea
-##lpo2lts_gsea_SOURCES  = spec2lts-gsea.c mcrl-greybox.c mcrl-greybox.h
-##lpo2lts_gsea_SOURCES += at-map.c at-map.h
-##lpo2lts_gsea_LDADD    = $(VSET_LIBS) libltsmin.la $(MCRL_LIBS)
-##lpo2lts_gsea_CPPFLAGS = -DMCRL $(MCRL_CPPFLAGS) $(AM_CPPFLAGS)
-##lpo2lts_gsea_LDFLAGS  = $(MCRL_LDFLAGS) $(AM_LDFLAGS)
+# lpo2lts-gsea
+lpo2lts_gsea_SOURCES  = spec2lts-gsea.c mcrl-greybox.c mcrl-greybox.h
+lpo2lts_gsea_SOURCES += at-map.c at-map.h
+lpo2lts_gsea_LDADD    = $(VSET_LIBS) libltsmin.la libmc.la $(MCRL_LIBS)
+lpo2lts_gsea_CPPFLAGS = -DMCRL $(MCRL_CPPFLAGS) $(AM_CPPFLAGS)
+lpo2lts_gsea_LDFLAGS  = $(MCRL_LDFLAGS) $(AM_LDFLAGS)
 
-### lps2lts-gsea
-##lps2lts_gsea_SOURCES  = spec2lts-gsea.c
-##lps2lts_gsea_LDADD    = $(VSET_LIBS) libmcrl2-pins.la libltsmin.la
-##lps2lts_gsea_CPPFLAGS = -DMCRL2 $(AM_CPPFLAGS)
-##lps2lts_gsea_LDFLAGS  = $(MCRL2_LDFLAGS) $(AM_LDFLAGS)
-##nodist_EXTRA_lps2lts_gsea_SOURCES = automake-force-linker.cxx
+# lps2lts-gsea
+lps2lts_gsea_SOURCES  = spec2lts-gsea.c
+lps2lts_gsea_LDADD    = $(VSET_LIBS) libmcrl2-pins.la libltsmin.la libmc.la
+lps2lts_gsea_CPPFLAGS = -DMCRL2 $(AM_CPPFLAGS)
+lps2lts_gsea_LDFLAGS  = $(MCRL2_LDFLAGS) $(AM_LDFLAGS)
+nodist_EXTRA_lps2lts_gsea_SOURCES = automake-force-linker.cxx
 
-### pbes2lts-gsea
-##pbes2lts_gsea_SOURCES  = spec2lts-gsea.c
-##pbes2lts_gsea_LDADD    = libvset.la libpbes-pins.la libltsmin.la
-##pbes2lts_gsea_CPPFLAGS = -DPBES $(AM_CPPFLAGS)
-##nodist_EXTRA_pbes2lts_gsea_SOURCES = automake-force-linker.cxx
+# pbes2lts-gsea
+pbes2lts_gsea_SOURCES  = spec2lts-gsea.c
+pbes2lts_gsea_LDADD    = libvset.la libpbes-pins.la libltsmin.la libmc.la
+pbes2lts_gsea_CPPFLAGS = -DPBES $(AM_CPPFLAGS)
+nodist_EXTRA_pbes2lts_gsea_SOURCES = automake-force-linker.cxx
 
-### dve2lts-gsea
-##dve2lts_gsea_SOURCES  = spec2lts-gsea.c dve-greybox.cpp dve-greybox.h
-##dve2lts_gsea_LDADD    = $(VSET_LIBS) libltsmin.la $(DVEC_LIBS)
-##dve2lts_gsea_CPPFLAGS = -DDIVINE $(DIVINE_CPPFLAGS) $(AM_CPPFLAGS)
-##dve2lts_gsea_LDFLAGS  = $(DIVINE_LDFLAGS) $(AM_LDFLAGS)
+# dve2lts-gsea
+dve2lts_gsea_SOURCES  = spec2lts-gsea.c dve-greybox.cpp dve-greybox.h
+dve2lts_gsea_LDADD    = $(VSET_LIBS) libltsmin.la libmc.la $(DVEC_LIBS)
+dve2lts_gsea_CPPFLAGS = -DDIVINE $(DIVINE_CPPFLAGS) $(AM_CPPFLAGS)
+dve2lts_gsea_LDFLAGS  = $(DIVINE_LDFLAGS) $(AM_LDFLAGS)
 
-### dve22lts-gsea
-##dve22lts_gsea_SOURCES  = spec2lts-gsea.c dve2-greybox.c dve2-greybox.h
-##dve22lts_gsea_LDADD    = $(VSET_LIBS) libltsmin.la $(DVEC2_LIBS)
-##dve22lts_gsea_CPPFLAGS = -DDIVINE2 $(DIVINE2_CPPFLAGS) $(AM_CPPFLAGS)
-##dve22lts_gsea_LDFLAGS  = $(DIVINE2_LDFLAGS) $(AM_LDFLAGS)
+# dve22lts-gsea
+dve22lts_gsea_SOURCES  = spec2lts-gsea.c dve2-greybox.c dve2-greybox.h
+dve22lts_gsea_LDADD    = $(VSET_LIBS) libltsmin.la libmc.la $(DVEC2_LIBS)
+dve22lts_gsea_CPPFLAGS = -DDIVINE2 $(DIVINE2_CPPFLAGS) $(AM_CPPFLAGS)
+dve22lts_gsea_LDFLAGS  = $(DIVINE2_LDFLAGS) $(AM_LDFLAGS)
 
 # opaal2lts-gsea
 #opaal2lts_gsea_SOURCES  = spec2lts-gsea.c opaal-greybox.c opaal-greybox.h
-#opaal2lts_gsea_LDADD    = $(VSET_LIBS) libltsmin.la $(DVEC2_LIBS) $(MALLOC_LIBS)
+#opaal2lts_gsea_LDADD    = $(VSET_LIBS) libltsmin.la libmc.la $(DVEC2_LIBS) $(MALLOC_LIBS)
 #opaal2lts_gsea_CPPFLAGS = -DOPAAL $(DIVINE2_CPPFLAGS) $(AM_CPPFLAGS)
 #opaal2lts_gsea_LDFLAGS  = $(DIVINE2_LDFLAGS) $(AM_LDFLAGS)
 
-### spinja2lts-gsea
-##spinja2lts_gsea_SOURCES  = spec2lts-gsea.c spinja-greybox.c spinja-greybox.h
-##spinja2lts_gsea_LDADD    = $(VSET_LIBS) libltsmin.la $(SPINJA_LIBS)
-##spinja2lts_gsea_CPPFLAGS = -DSPINJA $(SPINJA_CPPFLAGS) $(AM_CPPFLAGS)
-##spinja2lts_gsea_LDFLAGS  = $(SPINJA_LDFLAGS) $(AM_LDFLAGS)
+# spinja2lts-gsea
+spinja2lts_gsea_SOURCES  = spec2lts-gsea.c spinja-greybox.c spinja-greybox.h
+spinja2lts_gsea_LDADD    = $(VSET_LIBS) libltsmin.la libmc.la $(SPINJA_LIBS)
+spinja2lts_gsea_CPPFLAGS = -DSPINJA $(SPINJA_CPPFLAGS) $(AM_CPPFLAGS)
+spinja2lts_gsea_LDFLAGS  = $(SPINJA_LDFLAGS) $(AM_LDFLAGS)
 
 
 # etf-reach

@@ -7,7 +7,6 @@
 #include <string.h>
 #include <strings.h>
 
-#include <archive.h>
 #include <atomics.h>
 #include <bitset.h>
 #include <dbs-ll.h>
@@ -15,13 +14,12 @@
 #include <trace.h>
 #include <dynamic-array.h>
 #include <is-balloc.h>
-#include <lts_enum.h>
-#include <lts_io.h>
-#include <runtime.h>
-#include <scctimer.h>
+#include <lts-io/user.h>
+#include <hre/user.h>
 #include <spec-greybox.h>
 #include <stats.h>
 #include <stringindex.h>
+#include <tables.h>
 #include <trace.h>
 #include <treedbs.h>
 #include <vector_set.h>
@@ -57,8 +55,7 @@ static struct {
 
     model_t model;
     const char* trc_output;
-    lts_enum_cb_t trace_handle;
-    lts_output_t trace_output;
+    lts_file_t trace_output;
     int dlk_detect;
 
     const char *ltl_semantics;
@@ -89,7 +86,6 @@ static struct {
 } opt = {
     .model         = NULL,
     .trc_output    = NULL,
-    .trace_handle  = NULL,
     .trace_output  = NULL,
     .dlk_detect    = 0,
     .ltl_semantics = "spin",
@@ -140,21 +136,21 @@ state_db_popt (poptContext con, enum poptCallbackReason reason,
             int db = linear_search (db_types, opt.arg_state_db);
             if (db < 0) {
                 Warning (error, "unknown vector storage mode type %s", opt.arg_state_db);
-                RTexitUsage (EXIT_FAILURE);
+                HREexitUsage (EXIT_FAILURE);
             }
             opt.state_db = db;
 
             int s = linear_search (strategies, opt.arg_strategy);
             if (s < 0) {
                 Warning (error, "unknown search mode %s", opt.arg_strategy);
-                RTexitUsage (EXIT_FAILURE);
+                HREexitUsage (EXIT_FAILURE);
             }
             opt.strategy = s;
 
             int p = linear_search (provisos, opt.arg_proviso);
             if (p < 0) {
                 Warning(error, "unknown proviso %s", opt.arg_proviso);
-                RTexitUsage (EXIT_FAILURE);
+                HREexitUsage (EXIT_FAILURE);
             }
             opt.proviso = p;
         }
@@ -186,7 +182,6 @@ static struct poptOption options[] = {
     SPEC_POPT_OPTIONS,
     { NULL, 0 , POPT_ARG_INCLUDE_TABLE, greybox_options , 0 , "Greybox options", NULL },
     { NULL, 0 , POPT_ARG_INCLUDE_TABLE, vset_options , 0 , "Vector set options", NULL },
-    { NULL, 0 , POPT_ARG_INCLUDE_TABLE, lts_io_options , 0 , NULL , NULL },
     { NULL, 0 , POPT_ARG_INCLUDE_TABLE, development_options , 0 , "Development options" , NULL },
     POPT_TABLEEND
 };
@@ -213,8 +208,7 @@ static struct {
 static void *
 new_string_index (void *context)
 {
-    (void)context;
-    return SIcreate ();
+    return chunk_table_create (context, "GSEA table");
 }
 
 typedef struct gsea_state {
@@ -446,10 +440,10 @@ gsea_init_dot(const char *filename)
  */
 static void
 write_trace_state(model_t model, int src_no, int *state){
-    Warning(debug,"dumping state %d",src_no);
+    Debug("dumping state %d",src_no);
     int labels[global.state_labels];
     if (global.state_labels) GBgetStateLabelsAll(model,state,labels);
-    enum_state(opt.trace_handle,0,state,labels);
+    lts_write_state(opt.trace_output,0,state,labels);
 }
 
 struct write_trace_step_s {
@@ -468,7 +462,7 @@ write_trace_next (void *arg, transition_info_t *ti, int *dst)
         if (ctx->dst_state[i]!=dst[i]) return;
     }
     ctx->found=1;
-    enum_seg_seg(opt.trace_handle,0,ctx->depth-1,0,ctx->depth,ti->labels);
+    lts_write_edge(opt.trace_output,0,ctx->src_state,0,dst,ti->labels);
 }
 
 static void
@@ -515,7 +509,7 @@ static void
 bfs_tree_closed_insert(gsea_state_t *state, void *arg) {
     // count depth
     if (gc.store.tree.level_bound == global.explored) {
-        if (RTverbosity > 1) Warning(info, "level %zu, has %zu states, explored %zu states %zu transitions", global.max_depth, global.visited - global.explored, global.explored, global.ntransitions);
+        if (log_active(infoLong)) Warning(info, "level %zu, has %zu states, explored %zu states %zu transitions", global.max_depth, global.visited - global.explored, global.explored, global.ntransitions);
 
         global.depth=++global.max_depth;
         gc.store.tree.level_bound = global.visited;
@@ -560,7 +554,7 @@ bfs_vset_foreach_open(foreach_open_cb open_cb, void *arg)
     while(!vset_is_empty(gc.store.vset.next_set)) {
         vset_copy(gc.store.vset.current_set, gc.store.vset.next_set);
         vset_clear(gc.store.vset.next_set);
-        if (RTverbosity > 1) Warning(info, "level %zu, has %zu states, explored %zu states %zu transitions", global.max_depth, global.visited - global.explored, global.explored, global.ntransitions);
+        if (log_active(infoLong)) Warning(info, "level %zu, has %zu states, explored %zu states %zu transitions", global.max_depth, global.visited - global.explored, global.explored, global.ntransitions);
         global.depth++;
         vset_enum(gc.store.vset.current_set, (void(*)(void*,int*)) bfs_vset_foreach_open_enum_cb, &args);
         global.max_depth++;
@@ -637,20 +631,19 @@ dfs_goal_trace(gsea_state_t *state, void *arg)
     ctx.found = 0;
 
     // init trace output
-    opt.trace_output=lts_output_open((char*)opt.trc_output,opt.model,1,0,1,"vsi",NULL);
-    {
-        int init_state[global.N];
-        GBgetInitialState(opt.model, init_state);
-        lts_output_set_root_vec(opt.trace_output,(uint32_t*)init_state);
-        lts_output_set_root_idx(opt.trace_output,0,0);
-    }
-    opt.trace_handle=lts_output_begin(opt.trace_output,0,1,0);
+    lts_type_t ltstype = GBgetLTStype(opt.model);
+    opt.trace_output=lts_file_create(opt.trc_output,ltstype,1,lts_index_template());
+    int T=lts_type_get_type_count(ltstype);
+    for(int i=0;i<T;i++)
+        lts_file_set_table(opt.trace_output,i,GBgetChunkMap(opt.model,i));
+    int init_state[global.N];
+    GBgetInitialState(opt.model, init_state);
+    lts_write_init(opt.trace_output, 0, init_state);
 
     // init context, pass context to stackwalker
     dfs_stack_walk_down(gc.queue.filo.stack, dfs_goal_trace_cb, &ctx);
 
-    lts_output_end(opt.trace_output,opt.trace_handle);
-    lts_output_close(&opt.trace_output);
+    lts_file_close(opt.trace_output);
 
     (void)state;
     (void)arg;
@@ -713,7 +706,7 @@ dfs_state_next_all(gsea_state_t *state, void *arg)
     // update max depth
     if (global.depth > global.max_depth) {
         global.max_depth++;
-        if (RTverbosity > 1) Warning(info, "new level %zu, explored %zu states, %zu transitions", global.max_depth, global.explored, global.ntransitions);
+        if (log_active(infoLong)) Warning(info, "new level %zu, explored %zu states, %zu transitions", global.max_depth, global.explored, global.ntransitions);
     }
     // wrap with enter stack frame
     dfs_stack_enter(gc.queue.filo.stack);
@@ -756,7 +749,7 @@ dfs_state_next_grey(gsea_state_t *state, void *arg)
     // update max depth
     if (global.depth > global.max_depth) {
         global.max_depth++;
-        if (RTverbosity > 1) Warning(info, "new level %zu, explored %zu states, %zu transitions", global.max_depth, global.explored, global.ntransitions);
+        if (log_active(infoLong)) Warning(info, "new level %zu, explored %zu states, %zu transitions", global.max_depth, global.explored, global.ntransitions);
     }
     // wrap with enter stack frame
     dfs_stack_enter(gc.queue.filo.stack);
@@ -1608,7 +1601,7 @@ gsea_process(void *arg, transition_info_t *ti, int *dst)
 
 static void
 gsea_progress(void *arg) {
-    if (RTverbosity < 1 || global.explored < opt.threshold)
+    if (!log_active(info) || global.explored < opt.threshold)
         return;
     if (!cas (&opt.threshold, opt.threshold, opt.threshold << 1))
         return;
@@ -1630,21 +1623,21 @@ int
 main (int argc, char *argv[])
 {
     const char *files[1];
-    RTinitPopt(&argc,&argv,options,1,1,(char **)files,NULL,"<model>",
-        "Perform an enumerative reachability analysis of <model>\n\n"
-        "Options");
+    HREinitBegin(argv[0]); // the organizer thread is called after the binary
+    HREaddOptions(options,"Perform a parallel reachability analysis of <model>\n\nOptions");
+    lts_lib_setup();
+    HREinitStart(&argc,&argv,1,1,(char**)files,"<model>");
 
     Warning(info,"loading model from %s",files[0]);
     opt.model=GBcreateBase();
     GBsetChunkMethods(opt.model,new_string_index,NULL,
-        (int2chunk_t)SIgetC,(chunk2int_t)SIputC,(get_count_t)SIgetCount);
+        (int2chunk_t)HREgreyboxI2C,(chunk2int_t)HREgreyboxC2I,(get_count_t)HREgreyboxCount);
 
     GBloadFile(opt.model,files[0],&opt.model);
 
     lts_type_t ltstype=GBgetLTStype(opt.model);
-    if (RTverbosity >=2) {
+    if (log_active(infoLong))
         lts_type_print(info,ltstype);
-    }
     global.N=lts_type_get_state_length(ltstype);
     global.K=dm_nrows(GBgetDMInfo(opt.model));
     Warning(info,"length is %d, there are %d groups",global.N,global.K);
