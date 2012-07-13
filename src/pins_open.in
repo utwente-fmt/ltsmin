@@ -147,10 +147,10 @@ shift
 
 case "$NAME" in
 	*.c )	
-		if test -f $NAME
+		if test -f "$NAME"
 		then
 			USER="$NAME"
-		elif test -f $SRC/$NAME
+		elif test -f "$SRC/$NAME"
 		then
 			USER="$SRC/$NAME"
 		else
@@ -160,10 +160,10 @@ case "$NAME" in
 		;;
 
 	*.o | *.a )
-		if test -f $NAME
+		if test -f "$NAME"
 		then
 			USER="$NAME"
-		elif test -f $BIN/$NAME
+		elif test -f "$BIN/$NAME"
 		then
 			USER="$BIN/$NAME"
 		else
@@ -173,22 +173,22 @@ case "$NAME" in
 		;;
 
 	* )
-		if test -f $NAME.c
+		if test -f "$NAME.c"
 		then
 			USER="$NAME.c"
-		elif test -f $SRC/$NAME.c
+		elif test -f "$SRC/$NAME.c"
 		then
 			USER="$SRC/$NAME.c"
-		elif test -f $NAME.a
+		elif test -f "$NAME.a"
 		then
 			USER="$NAME.a"
-		elif test -f $BIN/$NAME.a
+		elif test -f "$BIN/$NAME.a"
 		then
 			USER="$BIN/$NAME.a"
-		elif test -f $NAME.o
+		elif test -f "$NAME.o"
 		then
 			USER="$NAME.o"
-		elif test -f $BIN/$NAME.o
+		elif test -f "$BIN/$NAME.o"
 		then
 			USER="$BIN/$NAME.o"
 		else
@@ -206,17 +206,17 @@ fi
 
 case "$USER" in
 	*.c )
-		CPPFLAGS_AUX=`grep '@(#)CPPFLAGS' $USER | sed -e 's/.*".*=\(.*\)".*/\1/' | sed -e 's/\\\"/"/g'`
-		CFLAGS_AUX=`grep '@(#)CFLAGS' $USER | sed -e 's/.*".*=\(.*\)".*/\1/' | sed -e 's/\\\"/"/g'`
-		LDFLAGS_AUX=`grep '@(#)LDFLAGS' $USER | sed -e 's/.*".*=\(.*\)".*/\1/' | sed -e 's/\\\"/"/g'`
-		LD_LIBRARY_PATH_AUX=`grep '@(#)LD_LIBRARY_PATH' $USER | sed -e 's/.*".*=\(.*\)".*/\1/' | sed -e 's/\\\"/"/g'`
+		CPPFLAGS_AUX=`grep '@(#)CPPFLAGS' "$USER" | sed -e 's/.*".*=\(.*\)".*/\1/' | sed -e 's/\\\"/"/g'`
+		CFLAGS_AUX=`grep '@(#)CFLAGS' "$USER" | sed -e 's/.*".*=\(.*\)".*/\1/' | sed -e 's/\\\"/"/g'`
+		LDFLAGS_AUX=`grep '@(#)LDFLAGS' "$USER" | sed -e 's/.*".*=\(.*\)".*/\1/' | sed -e 's/\\\"/"/g'`
+		LD_LIBRARY_PATH_AUX=`grep '@(#)LD_LIBRARY_PATH' "$USER" | sed -e 's/.*".*=\(.*\)".*/\1/' | sed -e 's/\\\"/"/g'`
 		;;
 	*.o | *.a )
 		LC_CTYPE="C" ; export LC_CTYPE
-		CPPFLAGS_AUX=`strings $USER 2> /dev/null | grep '@(#)CPPFLAGS' | sed -e 's/.*=//'`
-		CFLAGS_AUX=`strings $USER 2> /dev/null | grep '@(#)CFLAGS' | sed -e 's/.*=//'`
-		LDFLAGS_AUX=`strings $USER 2> /dev/null | grep '@(#)LDFLAGS' | sed -e 's/.*=//'`
-		LD_LIBRARY_PATH_AUX=`strings $USER 2> /dev/null | grep '@(#)LD_LIBRARY_PATH' | sed -e 's/.*=//'`
+		CPPFLAGS_AUX=`strings "$USER" 2> /dev/null | grep '@(#)CPPFLAGS' | sed -e 's/.*=//'`
+		CFLAGS_AUX=`strings "$USER" 2> /dev/null | grep '@(#)CFLAGS' | sed -e 's/.*=//'`
+		LDFLAGS_AUX=`strings "$USER" 2> /dev/null | grep '@(#)LDFLAGS' | sed -e 's/.*=//'`
+		LD_LIBRARY_PATH_AUX=`strings "$USER" 2> /dev/null | grep '@(#)LD_LIBRARY_PATH' | sed -e 's/.*=//'`
 		;;
 esac
 
@@ -249,18 +249,18 @@ fi
 
 case "$USER" in
 	*.c )
-		PROG=`basename $USER .c`
-		$CC $CPPFLAGS $CFLAGS -c $USER -o $PROG.o
-		$LD $CFLAGS $PROG.o $LDFLAGS -o $PROG
-		rm -f $PROG.o
+		PROG=`basename "$USER" .c`
+		$CC $CPPFLAGS $CFLAGS -c "$USER" -o "$PROG.o"
+		$LD $CFLAGS "$PROG.o" $LDFLAGS -o "$PROG"
+		rm -f "$PROG.o"
 		;;
 	*.o )
-		PROG=`basename $USER .o`
-		$LD $CFLAGS $USER $LDFLAGS -o $PROG
+		PROG=`basename "$USER" .o`
+		$LD $CFLAGS "$USER" $LDFLAGS -o "$PROG"
 		;;
 	*.a )
-		PROG=`basename $USER .a`
-		$LD $CFLAGS $USER $LDFLAGS -o $PROG
+		PROG=`basename "$USER" .a`
+		$LD $CFLAGS "$USER" $LDFLAGS -o "$PROG"
 		;;
 esac
 
@@ -286,6 +286,6 @@ then
 else
 	echo "$COMMAND: running \`\`$PROG $@'' for \`\`$FILE''"
 fi
-./$PROG "$@"
+./"$PROG" "$@"
 
 exit 0
