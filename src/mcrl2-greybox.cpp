@@ -330,6 +330,8 @@ MCRL2initGreybox (int argc,const char *argv[],void* stack_bottom)
 {
     Warning(debug,"ATerm init");
     MCRL2_ATERMPP_INIT_(argc, const_cast<char**>(argv), stack_bottom);
+    (void)argc;
+    (void)argv;
     (void)stack_bottom;
 }
 
