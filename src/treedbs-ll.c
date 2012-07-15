@@ -121,6 +121,9 @@ void
 TreeDBSLLunset_sat_bit (const treedbs_ll_t dbs, const tree_ref_t ref, int index)
 {
     uint64_t            bit = bit_pos (dbs->root.sat_bits, index);
+    uint64_t            hash_and_sat = atomic_read (dbs->root.table+ref);
+    if (0 == (hash_and_sat & bit))
+        return;
     fetch_and (dbs->root.table+ref, ~bit);
 }
 
@@ -128,8 +131,22 @@ int
 TreeDBSLLtry_set_sat_bit (const treedbs_ll_t dbs, const tree_ref_t ref, int index)
 {
     uint64_t            bit = bit_pos (dbs->root.sat_bits, index);
+    uint64_t            hash_and_sat = atomic_read (dbs->root.table+ref);
+    if (0 != (hash_and_sat & bit))
+        return 0;
     uint64_t            prev = fetch_or (dbs->root.table+ref, bit);
     return (prev & bit) == 0;
+}
+
+int
+TreeDBSLLtry_unset_sat_bit (const treedbs_ll_t dbs, const tree_ref_t ref, int index)
+{
+    uint64_t            bit = bit_pos (dbs->root.sat_bits, index);
+    uint64_t            hash_and_sat = atomic_read (dbs->root.table+ref);
+    if (0 == (hash_and_sat & bit))
+        return 0;
+    uint64_t            prev = fetch_and (dbs->root.table+ref, ~bit);
+    return (prev & bit) != 0;
 }
 
 static inline int
@@ -138,14 +155,6 @@ cas_sat_bits (const treedbs_ll_t dbs, const tree_ref_t ref,
 {
     value = s2b (dbs, value) | (read & dbs->root.sat_nmask);
     return cas (dbs->root.table+ref, read, value);
-}
-
-int
-TreeDBSLLtry_unset_sat_bit (const treedbs_ll_t dbs, const tree_ref_t ref, int index)
-{
-    uint64_t            bit = bit_pos (dbs->root.sat_bits, index);
-    uint64_t            prev = fetch_and (dbs->root.table+ref, ~bit);
-    return (prev & bit) != 0;
 }
 
 uint32_t
