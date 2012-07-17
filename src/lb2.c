@@ -179,7 +179,7 @@ lb2_create_max (size_t threads, size_t gran, size_t max)
     lb->all_done = 0;
     lb->stopped = 0;
     lb->max_handoff = max;
-    assert (gran < 32 && gran >= 0 && "wrong granularity");
+    assert (gran < 32 && "wrong granularity");
     lb->granularity = 1UL << gran;
     lb->mask = lb->granularity - 1;
     lb->args = args;
