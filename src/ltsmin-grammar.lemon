@@ -302,7 +302,7 @@ step_list(L) ::= step_list(P) VALUE(S) . { L=ETFlistAppend(P,INLINE_VALUE,S); }
 This section contains the grammar for mu-calculus expressions.
 It should be split into a section for mu-calculus and a library
 of state expressions, edge expression, data expressions, etc.
-that can be reused for other languages (e.g. CTL, LTL)
+that can be reused for other languages (e.g. CTL, CTL* and LTL)
 */
 
 %type expr { ltsmin_expr_t }

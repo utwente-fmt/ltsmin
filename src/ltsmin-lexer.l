@@ -6,9 +6,9 @@
 %{
 #include <ltsmin-parse-env.h>
 #include <ltsmin-grammar.h>
+#include <chunk_support.h>
 #include <runtime.h>
 #include <stream.h>
-#include <chunk_support.h>
 
 void * yyalloc (size_t bytes, void * yyscanner){
     (void)yyscanner;
