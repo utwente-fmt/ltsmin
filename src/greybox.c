@@ -19,7 +19,7 @@ struct grey_box_model {
     matrix_t *gnes_info; // guard necessary enabling set
     matrix_t *gnds_info; // guard necessary disabling set
     int sl_idx_buchi_accept;
-    bitvector_t *por_visibility;
+    int *por_visibility;
 	int *s0;
 	void*context;
 	next_method_grey_t next_short;
@@ -537,12 +537,17 @@ void GBsetGuardCoEnabledInfo(model_t model, matrix_t *info) {
     model->gce_info = info;
 }
 
-void GBsetPorVisibility(model_t model, bitvector_t *bv) {
-    if (model->por_visibility != NULL) Abort("POR visibility already set");
-    model->por_visibility = bv;
+void GBsetPorVisibility(model_t model, int*visibility) {
+    if (model->por_visibility != NULL) {
+        //Warning(info, "POR visibility already set");
+        RTfree(model->por_visibility);
+        model->por_visibility = visibility;
+    } else {
+        model->por_visibility = visibility;
+    }
 }
 
-bitvector_t *GBgetPorVisibility(model_t model) {
+int *GBgetPorVisibility(model_t model) {
     return model->por_visibility;
 }
 

@@ -147,6 +147,8 @@ typedef struct por_context {
     // location in search array (extra indirection for quick switching between contexts)
     int             *search_order;
     search_context  *search;                    // context for each search
+
+    int             *group_visibility;          // LTL specific
 } por_context;
 
 /**
@@ -282,6 +284,11 @@ static int bs_setup(model_t model, por_context* pctx, int* src)
     // fill guard status, request all guard values,
     GBgetStateLabelsGroup(model, GB_SL_GUARDS, src, pctx->guard_status);
 
+    // check group visibility set
+    if (pctx->group_visibility == NULL) {
+        pctx->group_visibility = GBgetPorVisibility(model);
+    }
+
     // fill group status
     for(int i=0; i<n; i++) {
         guard_t* gt = GBgetGuard(model, i);
@@ -299,7 +306,7 @@ static int bs_setup(model_t model, por_context* pctx, int* src)
             pctx->group_score[i] = 1;
         } else {
             // note: n*n won't work when n is very large (overflow)
-            pctx->group_score[i] = pctx->group_status[i] & GS_VISIBLE ? n : n*n;
+            pctx->group_score[i] = (pctx->group_visibility[i]) ? n*n : n;
         }
     }
     // fill nes score
@@ -324,7 +331,7 @@ static int bs_setup(model_t model, por_context* pctx, int* src)
     // select an enabled transition group
     int beam_idx = 0;
     for(int z=0; z<n; z++) {
-        if (!pctx->group_status[z]&GS_DISABLED) {
+        if (!(pctx->group_status[z]&GS_DISABLED)) {
             // increase emit limit
             pctx->emit_limit++;
             // add to beam search
@@ -474,7 +481,7 @@ bs_analyze(model_t model, por_context* pctx, int* src)
             if (s[idx].score == pctx->emit_score-1) select_group (model, pctx, current_group); /* init search context here? */
 
             // update the search score
-            s[idx].score += 1 + ( pctx->group_status[current_group] & GS_VISIBLE ? n : 0);
+            s[idx].score += 1 + ( pctx->group_visibility[current_group] ? n : 0);
 
             // quit the search when emit_limit is reached
             // this block is just to skip useless work, everything is emitted anyway
@@ -566,7 +573,7 @@ bs_emit_dlk(model_t model, por_context* pctx, int* src, TransitionCB cb, void* c
         int res = 0;
         for(int i=0; i < n; i++) {
             // enabled && selected
-            if (!(pctx->group_status[i]&GS_DISABLED) &&
+            if ((!(pctx->group_status[i]&GS_DISABLED)) &&
                  (pctx->search[pctx->search_order[0]].emit_status[i]&ES_SELECTED)) {
                 res+=GBgetTransitionsLong(pctx->parent,i,src,cb,ctx);
             }
@@ -622,7 +629,7 @@ bs_emit_ltl(model_t model, por_context* pctx, int* src, TransitionCB cb, void* c
         pctx->emitted = 0;
         for(int i=0; i < n && ltlctx.por_proviso_false_cnt == 0; i++) {
             // enabled && selected
-            if ( !(pctx->group_status[i]&GS_DISABLED) &&
+            if ( (!(pctx->group_status[i]&GS_DISABLED)) &&
                  (pctx->search[pctx->search_order[0]].emit_status[i]&ES_SELECTED) ) {
                 pctx->search[pctx->search_order[0]].emit_status[i]|=ES_EMITTED;
                 res+=GBgetTransitionsLong(pctx->parent,i,src,ltl_hook_cb,&ltlctx);
@@ -634,8 +641,8 @@ bs_emit_ltl(model_t model, por_context* pctx, int* src, TransitionCB cb, void* c
             // reemmit, emit all unemmitted
             for(int i=0; i < n; i++) {
                 // enabled && selected
-                if ( !(pctx->group_status[i]&GS_DISABLED) &&
-                    !(pctx->search[pctx->search_order[0]].emit_status[i]&ES_EMITTED) ) {
+                if ( (!(pctx->group_status[i]&GS_DISABLED)) &&
+                    (!(pctx->search[pctx->search_order[0]].emit_status[i]&ES_EMITTED)) ) {
                     // these should also be marked as emmitted, for consistency
                     // except that this data is not used anymore
                     // pctx->search[pctx->search_order[0]].emit_status[i]|=ES_EMITTED;
@@ -832,7 +839,7 @@ GBaddPOR (model_t model, int por_check_ltl)
     ctx->guard_tg              = dm_cols_to_idx_table(&gg_matrix);
     ctx->guard_nce             = dm_rows_to_idx_table(&gnce_matrix);
     ctx->guard_nes             = dm_rows_to_idx_table(&gnes_matrix);
-    ctx->guard_nds = dm_rows_to_idx_table(&gnds_matrix);
+    ctx->guard_nds             = dm_rows_to_idx_table(&gnds_matrix);
 
 
     // free temporary matrices
@@ -847,6 +854,10 @@ GBaddPOR (model_t model, int por_check_ltl)
 
     GBsetNextStateLong  (pormodel, por_long);
     GBsetNextStateShort (pormodel, por_short);
+
+    // reserve memory for group visibility, will be provided/set by ltl layer again
+    ctx->group_visibility = RTmallocZero( groups * sizeof(int) );
+    GBsetPorVisibility  (pormodel, ctx->group_visibility);
 
     // what proviso do we need? none (deadlock) or ltl?
     if (por_check_ltl) {
@@ -868,3 +879,4 @@ GBaddPOR (model_t model, int por_check_ltl)
 
     return pormodel;
 }
+

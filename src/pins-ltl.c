@@ -503,12 +503,7 @@ GBaddLTL (model_t model, const char *ltl_file, pins_ltl_type_t type, model_t por
         int *visibility = RTmallocZero( sizeof(int[new_ngroups]) );
         for(int k=0; k < ba->predicate_count; k++)
             mark_visible(ba->predicates[k], p_new_dm_w, visibility);
-        bitvector_t *bv = RTmalloc (sizeof *bv);
-        bitvector_create(bv, new_ngroups);
-        for(int i=0; i < new_ngroups; i++)
-            if (visibility[i]) bitvector_set_atomic(bv, i);
-        GBsetPorVisibility (por_model, bv);
-        RTfree(visibility);
+        GBsetPorVisibility (por_model, visibility);
     }
 
     switch (type) {
