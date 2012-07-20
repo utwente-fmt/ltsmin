@@ -1524,6 +1524,84 @@ set_least_fixpoint_mdd(vset_t dst, vset_t src, vrel_t rels[], int rel_count)
 }
 
 
+static void mdd_mark_for_dot(uint32_t mdd){
+  // only heads of mdd-nodes are marked
+  // note that head of one mdd-node might be in the middle of another one!
+  // this means that "sharing within mdd-nodes" is not represented in dot.
+    if (mdd<=1) return;
+    if (node_table[mdd].val&0x80000000) return;
+    node_table[mdd].val = node_table[mdd].val | 0x80000000;
+    uint32_t x = mdd;
+    while (x) {
+      mdd_mark_for_dot(node_table[x].down);
+      x=node_table[x].right;
+    }
+}
+
+static char trueprinted;
+
+static void mdd_clear_and_print(FILE* fp,uint32_t mdd){
+  if (mdd==0) {fprintf(fp," n0 [shape=record,label=\"<f0> False\"]\n");}
+  else if (mdd==1) {
+    if (!trueprinted) {
+      fprintf(fp," n1 [shape=record,label=\"<f0> True\"]\n");
+      trueprinted=1;
+    }
+  }
+  else if (node_table[mdd].val & 0x80000000) {
+    node_table[mdd].val=node_table[mdd].val & 0x7fffffff;
+
+    // print the mdd-node with values
+    uint32_t x=mdd;
+    int i=0;
+    fprintf(fp," n%u [shape=record,label=\"",mdd);
+    while (x) {
+      if (i>0) fprintf(fp,"|");
+      fprintf(fp,"<f%d> %u",i,node_table[x].val & 0x7fffffff);
+      x=node_table[x].right;
+      i++;
+    }
+    fprintf(fp,"\"];\n");
+
+    // print the edges from this node
+    x=mdd;
+    i=0;
+    while (x) {
+      fprintf(fp,"   n%u:f%d -> n%u:f0;\n",mdd,i,node_table[x].down);
+      x=node_table[x].right;
+      i++;
+    }
+
+    // recursively print the sub-mdds
+    x=mdd;
+    while (x) {
+      mdd_clear_and_print(fp,node_table[x].down);
+      x=node_table[x].right;
+    }
+  }
+}
+
+
+void set_dot_mdd(FILE* fp, vset_t src) {
+  uint32_t mdd = src->mdd;
+  fprintf(fp,"digraph setbdd {\nnode [shape=record];\n");
+  mdd_mark_for_dot(mdd);
+  trueprinted=0;
+  mdd_clear_and_print(fp,mdd);
+  fprintf(fp,"}\n");
+}
+
+
+void rel_dot_mdd(FILE* fp, vrel_t src) {
+  uint32_t mdd = src->mdd;
+  fprintf(fp,"digraph relbdd {\nnode [shape=record];\n");
+  mdd_mark_for_dot(mdd); // this changes mdd_used; does it matter?
+  trueprinted=0;
+  mdd_clear_and_print(fp,mdd);
+  fprintf(fp,"}\n");
+}
+
+
 vdom_t vdom_create_list_native(int n){
     Warning(info,"Creating a native ListDD domain.");
     vdom_t dom=(vdom_t)RTmalloc(sizeof(struct vector_domain));
@@ -1590,6 +1668,8 @@ vdom_t vdom_create_list_native(int n){
     dom->shared.reorder=set_reorder_mdd;
     dom->shared.set_destroy=set_destroy_mdd;
     dom->shared.set_least_fixpoint=set_least_fixpoint_mdd;
+    dom->shared.set_dot=set_dot_mdd;
+    dom->shared.rel_dot=rel_dot_mdd;
     return dom;
 }
 

@@ -44,6 +44,8 @@ struct vector_domain_shared {
 	void (*reorder)();
 	void (*set_destroy)(vset_t set);
 	void (*set_least_fixpoint)(vset_t dst,vset_t src,vrel_t rels[],int rel_count);
+	void (*set_dot)(FILE* fp, vset_t src);
+	void (*rel_dot)(FILE* fp, vrel_t src);
 };
 
 /** Initialise the shared part of the domain. */
