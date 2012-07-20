@@ -2726,7 +2726,7 @@ explore (size_t id)
     case Strat_TA_SBFS: ta_bfs_strict (ctx); break;
     case Strat_TA_BFS:  ta_bfs (ctx); break;
     case Strat_TA_DFS:  ta_dfs (ctx); break;
-    case Strat_SBFS:    sbfs (ctx);
+    case Strat_SBFS:    sbfs (ctx); break;
     case Strat_BFS:     bfs (ctx); break;
     case Strat_DFS:
         if (UseGreyBox == call_mode) dfs_grey (ctx); else dfs (ctx); break;
