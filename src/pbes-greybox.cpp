@@ -269,7 +269,7 @@ static void pbes_popt(poptContext con, enum poptCallbackReason reason,
         {
             Warning(debug,"pbes init");
             Warning (debug,"ATerm init");
-            MCRL2_ATERMPP_INIT_(0,0,RTstackBottom());
+            MCRL2_ATERMPP_INIT_(0,0,HREstackBottom());
             if (reset_flag) {
                 Warning(info,"Reset flag is set.");
             }

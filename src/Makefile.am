@@ -38,7 +38,7 @@ SUBDIRS += sigmin-one
 if HAVE_MPI
 SUBDIRS += sigmin-mpi
 endif
-SUBDIRS += ce
+#SUBDIRS += ce
 SUBDIRS += torx
 SUBDIRS += spg
 
@@ -471,6 +471,7 @@ libmc_la_SOURCES += trace.c trace.h
 libmc_la_SOURCES += treedbs-ll.c treedbs-ll.h
 libmc_la_SOURCES += zobrist.c zobrist.h
 
+libmc_la_LIBADD   = libltsmin.la
 
 # ltsmin-hre settings
 libltsmin_la_SOURCES  = balloc.c balloc.h

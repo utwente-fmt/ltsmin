@@ -2250,7 +2250,7 @@ main (int argc, char *argv[])
         RTstartTimer(timer);
         parity_game * g = compute_symbolic_parity_game(visited, src);
         RTstopTimer(timer);
-        RTreportTimer(timer, "computing symbolic parity game took");
+        RTprintTimer(info, timer, "computing symbolic parity game took");
         if (pg_output) {
             Warning(info,"Writing symbolic parity game to %s",pg_output);
             FILE *f = fopen(pg_output, "w");
@@ -2267,7 +2267,7 @@ main (int argc, char *argv[])
             Warning(info, "The result is: %s", result ? "true":"false");
             RTstopTimer(pgsolve_timer);
             Warning(info, "");
-            RTprintTimer(info timer, "generation took");
+            RTprintTimer(info, timer, "generation took");
             RTprintTimer(info, pgsolve_timer, "solving took");
         }
         spg_destroy(g);
