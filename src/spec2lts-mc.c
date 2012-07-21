@@ -2749,7 +2749,6 @@ main (int argc, char *argv[])
     /* Init structures */
     HREinitBegin(argv[0]);
     HREaddOptions(options,"Perform a parallel reachability analysis of <model>\n\nOptions");
-    //lts_lib_setup(); // TODO
     HREenableThreads(1);
     HREinitStart(&argc,&argv,1,1,files,"<model>");      // spawns threads!
 
