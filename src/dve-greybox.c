@@ -10,7 +10,7 @@
 
 #include <chunk_support.h>
 #include <dm/dm.h>
-#include <dve2-greybox.h>
+#include <dve-greybox.h>
 #include <hre/user.h>
 #include <unix.h>
 
@@ -75,7 +75,7 @@ dve_popt(poptContext con,
     Abort("unexpected call to dve_popt");
 }
 
-struct poptOption dve2_options[]= {
+struct poptOption dve_options[]= {
 	{ NULL, 0 , POPT_ARG_CALLBACK|POPT_CBFLAG_POST|POPT_CBFLAG_SKIPOPTION , (void*)&dve_popt, 0 , NULL , NULL },
 	POPT_TABLEEND
 };

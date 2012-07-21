@@ -10,7 +10,7 @@
 #include <dm/dm.h>
 #include <chunk_support.h>
 #include <hre/runtime.h>
-#include <spinja-greybox.h>
+#include <prom-greybox.h>
 #include <unix.h>
 
 #define GUARD_CHECK_MISSING(g) { \

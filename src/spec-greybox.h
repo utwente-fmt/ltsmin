@@ -16,11 +16,8 @@
 #if defined(DIVINE)
 #include <dve-greybox.h>
 #endif
-#if defined(DIVINE2)
-#include <dve2-greybox.h>
-#endif
 #if defined(SPINJA)
-#include <spinja-greybox.h>
+#include <prom-greybox.h>
 #endif
 #if defined(OPAAL)
 #include <opaal-greybox.h>
@@ -44,10 +41,6 @@
 #endif
 #if defined(DIVINE)
 #define SPEC_POPT_OPTIONS { NULL, 0, POPT_ARG_INCLUDE_TABLE, dve_options, 0, "DiVinE options", NULL }
-#define SPEC_MT_SAFE 1
-#endif
-#if defined(DIVINE2)
-#define SPEC_POPT_OPTIONS { NULL, 0, POPT_ARG_INCLUDE_TABLE, dve2_options, 0, "DiVinE 2 options", NULL }
 #define SPEC_MT_SAFE 1
 #endif
 #if defined(SPINJA)
