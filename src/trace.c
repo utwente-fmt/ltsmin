@@ -173,6 +173,7 @@ trc_write_trace (trc_env_t *env, char *trc_output, ref_t *trace, int level)
     write_trace (env, level, trace);
     RTstopTimer (timer);
     RTprintTimer (info, timer, "constructing the trace took");
-    /* Undo trick to fake single thread to rhe LTS lib */
     lts_file_close (env->trace_handle);
+    /* Undo trick to fake single thread to rhe LTS lib */
+    HREglobalSet(c);
 }
