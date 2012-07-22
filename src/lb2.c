@@ -16,26 +16,30 @@
 #include <hre/user.h>
 #include <lb2.h>
 
+
 struct lb2_s {
-    size_t             mask;
-    int                stopped;
+    size_t             mask;    //inlined: see lb2.h
+    int                stopped; //inlined: see lb2.h
     size_t             threads;
     void             **args;
     size_t             granularity;
     size_t             max_handoff;
+    char               pad[(2<<CACHE_LINE)];
     struct lb2_status_s {
-        int                idle;
-        uint32_t           seed;
-        size_t             requests;
-        size_t             received;
-        char               pad[(2<<CACHE_LINE) - 2*sizeof(int) - 2*sizeof(size_t)];
+        int                 idle;
+        uint32_t            seed;
+        char                pad1[(2<<CACHE_LINE) - 2*sizeof(int)];
+        size_t              requests;
+        size_t              received;
+        char                pad2[(2<<CACHE_LINE) - 2*sizeof(size_t)];
     } __attribute__ ((packed)) *local;
     struct lb2_counters_s {
-        size_t             max_load;
-        char               pad[(2<<CACHE_LINE) - sizeof(size_t)];
+        size_t              max_load;
+        char                pad[(2<<CACHE_LINE) - sizeof(size_t)];
     } __attribute__ ((packed)) *counters;
     int                all_done;
 };
+
 
 typedef struct lb2_status_s lb2_status_t;
 typedef struct lb2_counters_s lb2_counters_t;
@@ -84,13 +88,13 @@ lb2_local_init (lb2_t *lb, int id, void *arg)
 static inline int
 request_random (lb2_t *lb, size_t id)
 {
-     size_t res = 0;
-     do {
-         res = rand_r (&lb->local[id].seed) % lb->threads;
-     } while (res == id);
-     fetch_or (&lb->local[res].requests, 1L << id);
-     Debug ("Requested %lld", res);
-     return 1;
+    size_t res = 0;
+    do {
+        res = rand_r (&lb->local[id].seed) % lb->threads;
+    } while (res == id);
+    fetch_or (&lb->local[res].requests, 1L << id);
+    Debug ("Requested %lld", res);
+    return 1;
 }
 
 static inline void
@@ -187,6 +191,7 @@ lb2_create_max (size_t threads, size_t gran, size_t max)
     for (size_t i = 0; i < threads; i++) {
         lb->local[i].idle = 0;
         lb->local[i].requests = 0;
+        lb->local[i].seed = (i + 1) * 32732678642;
     }
     return lb;
 }
