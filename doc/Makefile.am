@@ -30,6 +30,7 @@ MANPAGES += etf.5
 MANPAGES += gcf.1
 MANPAGES += ce-mpi.1
 MANPAGES += pins_open.1
+MANPAGES += spinjal.1
 
 MANPAGES += dve-reach.1
 MANPAGES += dve2lts-gsea.1

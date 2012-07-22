@@ -29,6 +29,7 @@ prom2lts-mc
 prom-reach
 stamp-h1
 git_version.h
+spinjal
 subst_pins_open.mk
 regroup
 test

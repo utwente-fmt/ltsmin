@@ -99,6 +99,8 @@ bin_PROGRAMS += opaal2lts-mc
 endif
 endif
 
+bin_SCRIPTS =
+
 if HAVE_CADP
 pkglib_LTLIBRARIES += libetf-open.la
 if HAVE_SPINJA
@@ -119,9 +121,10 @@ endif
 # pins_open
 CADPCC = $(CADP)/src/com/cadp_cc
 CADPINCLUDES = -I$(CADP)/incl
-bin_SCRIPTS = pins_open
+bin_SCRIPTS += pins_open
 endif
 
+bin_SCRIPTS += spinjal
 
 libmcrl2_pins_la_SOURCES  = mcrl2-greybox.cpp mcrl2-greybox.h
 libmcrl2_pins_la_CPPFLAGS = -DMCRL2 -DNDEBUG $(MCRL2_PINS_CPPFLAGS) $(AM_CPPFLAGS)
@@ -450,6 +453,14 @@ pins_open: pins_open.in Makefile subst_pins_open.mk
 subst_pins_open.mk: pins_open.in Makefile config.munge.pl
 	perl $(srcdir)/config.munge.pl subst_pins_open < $< > $@
 
+
+CLEANFILES += spinjal
+
+EXTRA_DIST += spinjal.in
+
+spinjal: spinjal.in Makefile subst_pins_open.mk
+	$(subst_pins_open) < $< > $@
+	chmod +x $@
 
 CLEANFILES += ltsmin-grammar.c ltsmin-grammar.h
 CLEANFILES += ltsmin-grammar.out

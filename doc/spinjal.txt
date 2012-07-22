@@ -1,0 +1,40 @@
+//                           -*- mode: doc; outline-regexp: "==\(=*\) ." -*-
+spinjal(1)
+============
+:Author:  Alfons Laarman
+:Email:   <a.w.laarman@cs.utwente.nl>
+:Date:    2012-07-22
+
+== NAME
+
+spinjal - compile promela models to .spinja PINS libraries for use with
+prom frontends.
+
+== SYNOPSIS
+
+*{manname}* [-o3] model.promela
+
+*{manname}* [-o3] model.prm
+
+*{manname}* [-o3] model
+
+*{manname}* [-o3] model.prom
+
+*{manname}* [-o3] model.pml
+
+== DESCRIPTION
+
+{manname} executes the SpinJa compiler, that is part of the LTSmin distribution,
+on the given Promela model. The result is an .spinja object file that implements
+the PINS interface and can be used by the +prom+ frontends.
+
+
+== OPTIONS
+*-v*::
+        Increase verbosity.
+
+== SEE ALSO
+
+manpage:prom2lts-mc[7],
+http://eprints.eemcs.utwente.nl/22042/[Extending LTSmin with Promela through SpinJa].
+
