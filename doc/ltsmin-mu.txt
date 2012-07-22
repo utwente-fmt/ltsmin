@@ -22,8 +22,8 @@ LTSmin syntax for Mu Calculus formulas
 |0        | false      | constant false
 |1        | ==         | test operator ('state variable name'=='number')
 |2        | !          | Logical negation
-|3        | &,/\       | Logical and
-|4        | \|,\/      | Logical or
+|3        | &&,/\      | Logical and
+|4        | \|\|,\/    | Logical or
 |5        | X          | neXt operator
 |5        | E          | Exist a successor
 |5        | A          | All successors

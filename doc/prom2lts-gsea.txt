@@ -1,25 +1,25 @@
 //                           -*- mode: doc; outline-regexp: "==\(=*\) ." -*-
-dve22lts-gsea(1)
-================
+prom2lts-gsea(1)
+==================
 :Author:  Elwin Pater
 :Email:   <e.pater@student.utwente.nl>
-:Date:    2011-01-21
+:Date:    2011-06-24
 
 == NAME
 
-dve22lts-gsea - Sequential state space generator for DiVinE DVE models.
+prom2lts-gsea - Sequential state space generator for SpinJa models.
 
 == SYNOPSIS
 
-*{manname}* [OPTION]... 'input'[_.dve_|_.dve2C_]
+*{manname}* [OPTION]... 'input.prom'
 
 == DESCRIPTION
 
 {manname} generates a labelled transition system from a specification
-provided in 'input.dve' or 'input.dve2C' by enumerative reachability
+provided in 'input.prom' by enumerative reachability
 analysis using a general state expanding algorithm.
 
-include::inc/dve2.txt[]
+include::inc/prom.txt[]
 
 == OPTIONS
 

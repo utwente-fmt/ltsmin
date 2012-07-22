@@ -12,19 +12,19 @@ state space generators
 
 == SYNOPSIS
 
-*pins_open* 'model'._type_ ['cc_options'] 'app'[_.a_|_.c_|_.o_] ['app_options']
+*{manname}* 'model'._type_ ['cc_options'] 'app'[_.a_|_.c_|_.o_] ['app_options']
 
-*pins_open* [OPTION]...
+*{manname}* [OPTION]...
 
 == DESCRIPTION
 
-pins_open provides the OPEN/CAESAR interface for state space
+{manname} provides the OPEN/CAESAR interface for state space
 generators which themselves provide a LTSmin PINS interface.
 Supporting PINS libraries which correspond to the _type_ of 'model'
 are linked to an OPEN/CAESAR application 'app'[_.a_|_.c_|_.o_].  The
 resulting executable 'app' is then executed.
 
-pins_open follows the OPEN/CAESAR command line conventions.
+{manname} follows the OPEN/CAESAR command line conventions.
 
 == OPTIONS
 *--version*::
@@ -40,12 +40,12 @@ http://www.inrialpes.fr/vasy/cadp/[CADP]) with the manpage:mcrl[1]
 specification 'brp.tbf':
 
 ----
-pins_open brp.tbf declarator
+{manname} brp.tbf declarator
 ----
 
 Output:
 ----
-pins_open: running ``declarator'' for ``brp.tbf''
+{manname}: running ``declarator'' for ``brp.tbf''
 
 *** checking compatibility of ``./declarator''
 

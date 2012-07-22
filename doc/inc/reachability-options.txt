@@ -1,6 +1,22 @@
 *-d*, *--deadlock*::
-      Find state with no outgoing transitions.  Returns with exit code
-      1 if deadlock is found, otherwise 0.
+      Find state with no outgoing transitions.
+
+
+*-i*, *--invariant*='PREDFILE|PREDEXPRESSION'::
+      Find state where the invariant is violated. The file 'PREDFILE'
+      contains an expression in a simple predicate language (see
+      manpage:ltsmin-pred[5]). Its contents can also be entered directly as
+      a 'PREDEXPRESSION'.
+
+
+*-a*, *--action*='STRING'::
+      Find state with an outgoing transtition of type 'STRING'.
+
+
+*--assert*
+    detect assertion errors. Same as --action=assert. Only for Promela (prom)
+    frontends.
+
 
 *--trace*='FILE'_.gcf_::
       When finding a deadlock state or a transition labelled with a certain

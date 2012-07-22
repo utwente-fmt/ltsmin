@@ -155,10 +155,9 @@ cleary-tree;;
         counter.
 
 
-*--ref*::
-        Save space by storing references to table/tree on the stack/queue.
-        Normally full states are stored. The swarmed algorithms always use
-        references.
+*--noref*::
+        Store full state vectors on queue/stack. This is usually a bit faster,
+        but requires more memory. Incompatible with the swarmed algorithms.
 
 
 *--zobrist*='NUMBER'::

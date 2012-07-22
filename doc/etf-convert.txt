@@ -1,6 +1,6 @@
 //                           -*- mode: doc; outline-regexp: "==\(=*\) ." -*-
-gcf(1)
-======
+etf-convert(1)
+==============
 :Author:  Stefan Blom
 :Email:   <sccblom@cs.utwente.nl>
 :Date:    2008-12-03
@@ -12,7 +12,7 @@ etf-convert - Translate ETF to DVE.
 
 == SYNOPSIS
 
-etf-convert [OPTIONS] <input> <output>
+{manname} [OPTIONS] <input> <output>
 
 == DESCRIPTION
 

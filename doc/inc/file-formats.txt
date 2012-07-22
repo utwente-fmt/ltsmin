@@ -26,7 +26,7 @@ as can be seen in the following table:
 |=======================================
 
 
-The directory format uses multiple files to store a LTS.
+The directory format uses multiple files to store an LTS.
 The various extension explain how these files are stored in the underlying file system.
 The '{ast}.dir' format uses multiple files in a directory without compression.
 If the LTS has one edge label, no state labels and does not store state vectors then

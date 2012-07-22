@@ -1,5 +1,5 @@
 //                           -*- mode: doc; outline-regexp: "==\(=*\) ." -*-
-spinja2torx(1)
+prom2torx(1)
 ==============
 :Author:  Michael Weber
 :Email:   <michaelw@cs.utwente.nl>
@@ -7,20 +7,20 @@ spinja2torx(1)
 
 == NAME
 
-spinja2torx - TorX RPC interface for SPINJA models.
+prom2torx - TorX RPC interface for SPINJA models.
 
 == SYNOPSIS
 
-*{manname}* [OPTION]... 'input.spinja'
+*{manname}* [OPTION]... 'input.prom'
 
 == DESCRIPTION
 
 {manname} provides access to a labelled transition system from a
-specification provided in 'input.spinja' via the TorX-Explorer textual
+specification provided in 'input.prom' via the TorX-Explorer textual
 interface on _stdin_ and _stdout_.  Specifications are compiled with
 SpinJa from PROMELA input models.
 
-include::inc/spinja.txt[]
+include::inc/prom.txt[]
 
 == OPTIONS
 

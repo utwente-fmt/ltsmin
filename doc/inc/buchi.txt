@@ -8,9 +8,9 @@ For generating accepting state label information, the following
 options are supported:
 
 . The input specification is already combined with a Buchi automaton,
-  and states are appropriately marked with accepting labels.  (This
-  requires the frontend to know about accepting state labels
-  information.)
+  and states are appropriately marked with accepting labels.  Currently two
+  frontends support this functionality: SpinJa (see documentation on +prom+
+  tools), and DiVinE (see documentation on +dve+ tools).
 
 . LTSmin tools can build the cross product of input specification and
   Buchi automaton (through a PINS layer) themselves, and will annotate
@@ -18,3 +18,8 @@ options are supported:
 
 NOTE: these options cannot be combined; only one can be active at a
 time.
+
+NOTE: As of LTSmin release 1.9, our default LTL semantics mimics those of
+SPIN/DiVinE. Before that, LTSmin implemented textbook semantics. See
+the documentation on the enumerative tools for more information. 
+

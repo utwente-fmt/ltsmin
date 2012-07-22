@@ -32,6 +32,8 @@ If no output file is given, txt output will be written to stdout.
 
 include::inc/general-options.txt[]
 
+include::inc/file-formats.txt[]
+
 include::inc/ltsmin-tracepp-options.txt[]
 
 == EXIT STATUS

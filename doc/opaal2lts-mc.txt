@@ -12,11 +12,11 @@ opaal2lts-mc - Concurrent state space generator for UPPAAL timed automata
 
 == SYNOPSIS
 
-*opaal2lts-mc* [OPTION]... 'input'[_.so|_.xml]
+*{manname}* [OPTION]... 'input'[_.so|_.xml]
 
 == DESCRIPTION
 
-opaal2lts-mc generates a labelled transition system from a
+{manname} generates a labelled transition system from a
 specification provided in 'input.xml' or 'intput.so' (precompiled).
 It does this concurrently for any given number of threads.
 

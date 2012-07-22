@@ -1,19 +1,19 @@
 //                           -*- mode: doc; outline-regexp: "==\(=*\) ." -*-
-ltsmin-ctl(5)
+ltsmin-pred(5)
 =============
-:Author:  Elwin Pater
-:Email:   <e.pater@student.utwente.nl>
-:Date:    2011-02-10
+:Author:  Alfons Laarman
+:Email:   <a.w.laarman@ewi.utwente.nl>
+:Date:    2012-07-22
 
 == NAME
-ltsmin-ctl - Computation Tree Logic
+ltsmin-pred - Simple Predicate Language
 
 == SYNOPSIS
-LTSmin syntax for Computation Tree Logic formulas
+LTSmin syntax for Simple Predicate Language formulae
 
 == DESCRIPTION
 
-.CTL operators and priority
+.Language's operators and priority
 [options="header"]
 
 |===================================================================
@@ -22,27 +22,25 @@ LTSmin syntax for Computation Tree Logic formulas
 |0        | false    | constant false
 |1        | ==       | test operator ('state variable name'=='number')
 |2        | !        | Logical negation
-|3        | E        | Exist a successor
-|3        | A        | All successors
-|3        | []       | Globally (Always) operator
-|3        | <>       | Finally (Eventually) operator
-|3        | X        | neXt operator
 |4        | &&       | Logical and
 |5        | \|\|     | Logical or
 |6        | $$<->$$  | Logical equivalence
 |7        | $$->$$   | Logical implication
-|8        | U        | Until operator
 |===================================================================
 
-CAUTION: Using the letters E,A,X or U as state label name might
-confuse the parser.
 
 == EXAMPLE
 
 ----
-A ( [] ( (phil_0 == 1) -> <> phil_0 == 2) )
+init_0.x == 4 && (user_1.a[3] -> register_2.y)   
 ----
+
+This predicate example  could be used in the prom frontends, to search for
+states where either x is not equal to 4 in (instance 0) the init proctype, or
+the element three of array a in (instance 1 of) proctype user is non-zero,
+while y in (instance 2 of) proctype register is zero.
 
 == SEE ALSO
 manpage:ltsmin[7],
-manpage:etf-reach[1]
+manpage:etf2lts-gsea[1],
+manpage:etf2lts-grey[1]

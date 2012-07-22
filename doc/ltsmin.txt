@@ -20,7 +20,7 @@ The LTSmin toolset was designed to support multiple languages. All tools for
 a specific language start with a prefix that indicates the language. Below,
 we list the languages and the prefixes that are supported in this release:
 
-DVE(+dve+,+dve2+)::
+DVE(+dve+)::
 
 The DVE language.  See the
 http://divine.fi.muni.cz/[DiVinE website].
@@ -40,13 +40,13 @@ muCRL(+lpo+)::
 The muCRL language. See the
 http://www.cwi.nl/~mcrl/[muCRL website].
 
-PROMELA(+spinja+)::
+Promela(+prom+)::
 
-The PROMELA language is supported via the included version of spinja,
-which generates C code implementing the PINS interface. See the
+The Promela language is supported via the included version of SpinJa,
+which generates C code implementing the PINS interface. See
 http://spinroot.com/[Spin website]
-and the
-http://code.google.com/p/spinja/[SpinJa website].
+and 
+http://eprints.eemcs.utwente.nl/22042/[Extending LTSmin with Promela through SpinJa].
 
 UPPAAL(+opaal+)
 The UPPAAL xml language for timed automata is supported via the opaal
@@ -68,9 +68,9 @@ The LTSmin toolset has six tools for reachability analysis:
 Symbolic reachability tools that use decision diagrams for manipulating sets
 of states. The optional output produced by these tools is an ETF model.
 +
-See manpage:dve-reach[1], manpage:dve2-reach[1], manpage:etf-reach[1],
+See manpage:dve-reach[1], manpage:etf-reach[1],
 manpage:lps-reach[1], manpage:lpo-reach[1],
-and manpage:spinja-reach[1].
+and manpage:prom-reach[1].
 
 <prefix>2lts-grey::
 
@@ -78,9 +78,9 @@ Sequential state space generators that enumerate states and can use
 both decision diagrams and (tree-compressed) hash tables to represent sets of
 states. The optional output produced by these tools is an explicit LTS.
 +
-See manpage:dve2lts-grey[1], manpage:dve22lts-grey[1], manpage:etf2lts-grey[1],
+See manpage:dve2lts-grey[1], manpage:etf2lts-grey[1],
 manpage:lps2lts-grey[1], manpage:lpo2lts-grey[1],
-and manpage:spinja2lts-grey[1].
+and manpage:prom2lts-grey[1].
 
 <prefix>2lts-gsea::
 
@@ -91,21 +91,21 @@ These tools are based on an extended version of the
 http://dx.doi.org/10.1007/s10009-008-0093-y[General State Exploring
 Algorithm (GSEA)].
 +
-See manpage:dve2lts-gsea[1], manpage:dve22lts-gsea[1], manpage:etf2lts-gsea[1],
+See manpage:dve2lts-gsea[1], manpage:etf2lts-gsea[1],
 manpage:lps2lts-gsea[1], manpage:lpo2lts-gsea[1],
-and manpage:spinja2lts-gsea[1].
+and manpage:prom2lts-gsea[1].
 
 <prefix>2lts-mc::
 
 Concurrent (multi-core) state space generators and model checkers.
 Enumeration uses lockless (tree-compressed) hash tables to represent sets of
 states. Model checking of LTL is supported by a set of multi-core NDFS
-algorithms. To input LTL-formulae, onecan use the PINS2PINS wrapper (--ltl)
+algorithms. To input LTL-formulae, one can use the PINS2PINS wrapper (--ltl)
 or an LTL cross-product computed by the frontend (DiVinE 2 property models or
 PROMELA models via SpinJa with never claim). 
 +
-See manpage:dve2lts-mc[1], manpage:dve22lts-mc[1], manpage:etf2lts-mc[1],
-manpage:opaal2lts-mc[1] and manpage:spinja2lts-mc[1].
+See manpage:dve2lts-mc[1], manpage:etf2lts-mc[1],
+manpage:opaal2lts-mc[1] and manpage:prom2lts-mc[1].
 
 <prefix>2lts-mpi::
 
@@ -114,9 +114,9 @@ distributed hash tables for storing sets of states.
 The optional output produced by these tools is an explicit LTS.
 These tools do not work without MPI.
 +
-See manpage:dve2lts-mpi[1], manpage:dve22lts-mpi[1], manpage:etf2lts-mpi[1],
+See manpage:dve2lts-mpi[1], manpage:etf2lts-mpi[1],
 manpage:lps2lts-mpi[1], manpage:lpo2lts-mpi[1],
-and manpage:spinja2lts-mpi[1].
+and manpage:prom2lts-mpi[1].
 
 <prefix>2lts-hre::
 
@@ -131,8 +131,8 @@ For example:
 * Neither mCRL nor mCRL2 supports multi threading.
 --
 +
-See manpage:dve2lts-hre[1], manpage:dve22lts-hre[1], manpage:etf2lts-hre[1],
-manpage:lps2lts-hre[1], manpage:lpo2lts-hre[1], and manpage:spinja2lts-hre[1]
+See manpage:dve2lts-hre[1], manpage:etf2lts-hre[1],
+manpage:lps2lts-hre[1], manpage:lpo2lts-hre[1], and manpage:prom2lts-hre[1]
 
 == State Space Reduction Tools
 
@@ -175,7 +175,7 @@ TorX RPC interface.
 +
 See manpage:dve2torx[1], manpage:dve22torx[1], manpage:etf2torx[1],
 manpage:lps2torx[1], manpage:lpo2torx[1],
-and manpage:spinja2torx[1].
+and manpage:prom2torx[1].
 
 == Trace Pretty Printing
 
