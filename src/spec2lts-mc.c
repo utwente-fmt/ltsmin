@@ -2708,19 +2708,21 @@ explore (size_t id)
 {
     wctx_t             *ctx = wctx_create (id, 0, NULL);// after global init
     ctx->timer = RTcreateTimer ();
-    contexts[id] = ctx;                                 // before alg. start
-    if (0 == id) {
-        transition_info_t   ti = GB_NO_TRANSITION;      // before alg. start:
+    contexts[id] = ctx;
+    transition_info_t   ti = GB_NO_TRANSITION;
+    if (0 == ctx->id)                                   // before alg. start:
         state_info_initialize (&initial_state, initial_data, &ti, &ctx->state, ctx);
+    lb2_local_init (lb2, ctx->id, ctx);                 // BARRIER
+
+    if ( Strat_LTL & strategy[0] )
+        ndfs_handle_blue (ctx, &initial_state, &ti, 0);
+    else if (0 == ctx->id) { // only w1 receives load, as it is propagated later
         if ( Strat_TA & strategy[0] )
             ta_handle (ctx, &initial_state, &ti, 0);
-        else if ( Strat_LTL & strategy[0] )
-            ndfs_handle_blue (ctx, &initial_state, &ti, 0);
-        else if (0 == ctx->id) // only w1 receives load, as it is propagated later
+        else
             reach_handle (ctx, &initial_state, &ti, 0);
-        ctx->counters.trans = 0; //reset trans count
     }
-    lb2_local_init (lb2, ctx->id, ctx);                 // BARRIER
+    ctx->counters.trans = 0; //reset trans count
     RTstartTimer (ctx->timer);
     switch (strategy[0]) {
     case Strat_TA_SBFS: ta_bfs_strict (ctx); break;
