@@ -88,15 +88,15 @@ case "$FILE" in
     ;;
  *.dve)
     echo "input is DVE2"
-    LTSMIN_MOD_LDFLAGS="@DIVINE2_LDFLAGS@ -ldve2-open @DVEC2_LIBS@"
+    LTSMIN_MOD_LDFLAGS="@DIVINE2_LDFLAGS@ -ldve-open @DVEC2_LIBS@"
     ;;
  *.dve2C)
     echo "input is DVE2 (compiled)"
-    LTSMIN_MOD_LDFLAGS="@DIVINE2_LDFLAGS@ -ldve2-open @DVEC2_LIBS@"
+    LTSMIN_MOD_LDFLAGS="@DIVINE2_LDFLAGS@ -ldve-open @DVEC2_LIBS@"
     ;;
  *.spinja)
-    echo "input is SpinJa (compiled)"
-    LTSMIN_MOD_LDFLAGS="@SPINJA_LDFLAGS@ -lspinja-open @SPINJA_LIBS@"
+    echo "input is Promela (compiled)"
+    LTSMIN_MOD_LDFLAGS="@SPINJA_LDFLAGS@ -lprom-open @SPINJA_LIBS@"
     ;;
  *)
     echo "Did not recognize type of $FILE"
