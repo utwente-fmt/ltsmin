@@ -146,3 +146,9 @@ stream_t stream_rle32(stream_t s){
     ds->procs.close=rle_close;
     return ds;
 }
+
+stream_t stream_unrle32(stream_t s){
+    Abort("Sorry, unrle32 is not implemented yet.");
+}
+
+

@@ -60,9 +60,26 @@ extern stream_t stream_gunzip(stream_t expanded,int level,int bufsize);
 
 extern stream_t stream_diff32(stream_t s);
 
+extern stream_t stream_undiff32(stream_t s);
+
 extern stream_t stream_rle32(stream_t s);
 
+extern stream_t stream_unrle32(stream_t s);
+
+/**
+\brief Encode the stream with the given code.
+
+That is, writing the stream involves encoding and reading involves decoding.
+ */
 extern stream_t stream_add_code(stream_t s,char* code);
+
+
+/**
+\brief Decode the stream with the given code.
+
+That is, writing the stream involves deconding and reading involves encoding.
+ */
+extern stream_t stream_add_decode(stream_t s,char* code);
 
 /**
 \brief Create a stream that reads from the given file descriptor.

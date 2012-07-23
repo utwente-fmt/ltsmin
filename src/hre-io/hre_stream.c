@@ -357,13 +357,32 @@ stream_t stream_add_code(stream_t s,char* code){
     if(!strncmp(code,"gzip",4)){
         int level=Z_DEFAULT_COMPRESSION;
         sscanf(code+4,"%d",&level);
-        return stream_gzip(s,Z_DEFAULT_COMPRESSION,8192);
-    }
-    if(!strncmp(code,"gunzip",6)){
-        int level=Z_DEFAULT_COMPRESSION;
-        sscanf(code+6,"%d",&level);
-        return stream_gunzip(s,Z_DEFAULT_COMPRESSION,8192);
+        Print(info,"gzip level %d",level);
+        return stream_gzip(s,level,8192);
     }
     Abort("unknown code prefix %s",code);
     return NULL;
 }
+
+stream_t stream_add_decode(stream_t s,char* code){
+    if (code==NULL || strlen(code)==0) return s;
+    char*tail=strchr(code,'|');
+    if(tail){
+        s=stream_add_code(s,tail+1);
+    }
+    if(!strncmp(code,"diff32",6)){
+        return stream_undiff32(s);
+    }
+    if(!strncmp(code,"rle32",5)){
+        return stream_unrle32(s);
+    }
+    if(!strncmp(code,"gzip",4)){
+        int level=Z_DEFAULT_COMPRESSION;
+        sscanf(code+4,"%d",&level);
+        Print(info,"gunzip level %d",level);
+        return stream_gunzip(s,level,8192);
+    }
+    Abort("unknown code prefix %s",code);
+    return NULL;
+}
+

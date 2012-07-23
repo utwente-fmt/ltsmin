@@ -6,6 +6,7 @@
 #include <hre-io/user.h>
 
 struct archive_obj {
+    int(*contains)(archive_t arch,char*name);
     stream_t(*read)(archive_t arch,char*name);
     stream_t(*read_raw)(archive_t arch,char*name,char**code);
     stream_t(*write)(archive_t arch,char*name,char *code);
@@ -19,6 +20,7 @@ struct archive_obj {
 
 #define ARCH_TRANSPARENT_COMPRESSION 1
 
+extern int arch_illegal_contains(archive_t arch,char*name);
 extern stream_t arch_illegal_read(archive_t arch,char*name);
 extern stream_t arch_illegal_read_raw(archive_t arch,char*name,char**code);
 extern stream_t arch_illegal_write(archive_t arch,char*name,char*code);
