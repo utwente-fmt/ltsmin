@@ -1,3 +1,8 @@
+*-n*::
+      Do not exit when an error is found. Just count errors. Error counts are
+      printed with +-v+.
+
+
 *-d*, *--deadlock*::
       Find state with no outgoing transitions.
 
@@ -10,7 +15,7 @@
 
 
 *-a*, *--action*='STRING'::
-      Find state with an outgoing transtition of type 'STRING'.
+      Find state with an outgoing transition of type 'STRING'.
 
 
 *--assert*

@@ -40,6 +40,9 @@ states where either x is not equal to 4 in (instance 0) the init proctype, or
 the element three of array a in (instance 1 of) proctype user is non-zero,
 while y in (instance 2 of) proctype register is zero.
 
+For variable naming consult the +--labels+ option in the PINS tools.
+
+
 == SEE ALSO
 manpage:ltsmin[7],
 manpage:etf2lts-gsea[1],

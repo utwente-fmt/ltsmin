@@ -43,6 +43,9 @@ confuse the parser.
 A ( [] ( (phil_0 == 1) -> <> phil_0 == 2) )
 ----
 
+For variable naming consult the +--labels+ option in the PINS tools.
+
+
 == SEE ALSO
 manpage:ltsmin[7],
 manpage:etf-reach[1]

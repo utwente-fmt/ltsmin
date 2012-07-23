@@ -14,7 +14,8 @@ options are supported:
 
 . LTSmin tools can build the cross product of input specification and
   Buchi automaton (through a PINS layer) themselves, and will annotate
-  cross-product states appropriately when they are accepting.
+  cross-product states appropriately when they are accepting. See also
+  +--labels+ option in the PINS tools.
 
 NOTE: these options cannot be combined; only one can be active at a
 time.

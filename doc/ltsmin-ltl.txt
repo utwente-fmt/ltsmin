@@ -42,6 +42,9 @@ confuse the parser.
 ! ([] ( (phil_0 == 1) -> <> phil_0 == 2) )
 ----
 
+For variable naming consult the +--labels+ option in the PINS tools.
+
+
 == SEE ALSO
 manpage:ltsmin[7],
 manpage:etf2lts-gsea[1],

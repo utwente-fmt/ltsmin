@@ -1,5 +1,11 @@
 === PINS Options
 
+*--labels*::
+        Print state variable, type and value names, and state and action labels.
+        Then exit.
+        Useful for writing predicate (+--invariant+), LTL (+--ltl+),
+        CTL/CTL* (+--ctl+), and mu-calculus (+--mu+) expressions.
+
 *--matrix*::
         Print the dependency matrix and exit.
 
