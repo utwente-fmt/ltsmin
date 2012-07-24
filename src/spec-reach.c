@@ -2182,6 +2182,10 @@ main (int argc, char *argv[])
     vset_add(visited, src);
     Warning(info, "got initial state");
 
+    if (mu_expr) { // run a small test to check correctness of mu formula
+        vset_t x = mu_compute(mu_expr, visited);
+        vset_destroy(x);
+    }
 #if defined(PBES)
     lts_type_t type = GBgetLTStype(model);
     var_pos = 0;
