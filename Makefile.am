@@ -1,6 +1,11 @@
 ACLOCAL_AMFLAGS = -I m4
 
-SUBDIRS = @subdirs@ lemon src doc
+SUBDIRS = @subdirs@ lemon src
+if HAVE_ASCIIDOC
+if HAVE_XMLTO
+SUBDIRS += doc
+endif
+endif
 EXTRA_DIST  = ltsminreconf
 EXTRA_DIST += Doxyfile
 EXTRA_DIST += contrib/bash-completion/ltsmin

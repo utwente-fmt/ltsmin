@@ -1,6 +1,6 @@
 #include <config.h>
 
-#include <runtime.h>
+#include <hre/user.h>
 #include <vector_set.h>
 
 static void
@@ -11,12 +11,12 @@ test_vset_popt(poptContext con, enum poptCallbackReason reason,
 
     switch (reason) {
     case POPT_CALLBACK_REASON_PRE:
-        Fatal(1, error, "unexpected call to test_vset_popt");
+        Abort("unexpected call to test_vset_popt");
     case POPT_CALLBACK_REASON_POST: {
         return;
     }
     case POPT_CALLBACK_REASON_OPTION:
-        Fatal(1, error, "unexpected call to test_vset_popt");
+        Abort("unexpected call to test_vset_popt");
     }
 }
 

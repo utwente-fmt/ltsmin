@@ -1,14 +1,13 @@
 #include <config.h>
-#include <stdlib.h>
-#include <math.h>
+
 #include <assert.h>
-
-#include <runtime.h>
-#include <vdom_object.h>
-
+#include <math.h>
 #include <stdarg.h>
+#include <stdlib.h>
 
+#include <hre/user.h>
 #include <sylvan.h>
+#include <vdom_object.h>
 
 //#define GC_AFTER_EACH_OP 1
 
@@ -251,7 +250,7 @@ static inline void check_state(const int *e, int N)
         if (e[i] != 0) {
             register int X = 32 - __builtin_clz(e[i]);
             if (X > optimal_bits_per_state) optimal_bits_per_state = X;
-            if (X > fddbits) Fatal(0, error, "%d bits are not enough for the state vector (try %d)!", fddbits, X);
+            if (X > fddbits) Abort("%d bits are not enough for the state vector (try %d)!", fddbits, X);
         }
     }
 }

@@ -1,0 +1,29 @@
+//                           -*- mode: doc; outline-regexp: "==\(=*\) ." -*-
+prom2lts-mc(1)
+================
+:Author:  Alfons Laarman
+:Email:   <a.w.laarman@ewi.utwente.nl>
+:Date:    2011-06-13
+
+== NAME
+
+prom2lts-mc - Concurrent state space generator for SpinJa models.
+
+== SYNOPSIS
+
+*{manname}* [OPTION]... 'input.prom'
+
+== DESCRIPTION
+
+{manname} generates a labelled transition system from a compiled
+specification provided in 'input.prom'.  It does this concurrently
+for any given number of threads.
+LTS output is not supported by this tool, use the distributed tools instead.
+
+include::inc/prom.txt[]
+
+== OPTIONS
+
+include::inc/spec2lts-mc-options.txt[]
+
+include::inc/spec2lts-mc.txt[]

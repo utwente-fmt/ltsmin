@@ -13,29 +13,16 @@ etf2torx_CPPFLAGS = -DETF $(TORX_CPPFLAGS) $(AM_CPPFLAGS)
 
 
 # dve2torx
-if HAVE_DVEC
+if HAVE_DVE
 bin_PROGRAMS += dve2torx
 endif
 dve2torx_SOURCES  = spec2torx.c
-dve2torx_SOURCES += ../dve-greybox.cpp
+dve2torx_SOURCES += ../dve-greybox.c
 dve2torx_SOURCES += ../dve-greybox.h
 
 dve2torx_LDADD    = ../libltsmin.la $(DVEC_LIBS)
 dve2torx_CPPFLAGS = -DDIVINE $(TORX_CPPFLAGS) $(DIVINE_CPPFLAGS) $(AM_CPPFLAGS)
 dve2torx_LDFLAGS  = $(DIVINE_LDFLAGS) $(AM_LDFLAGS)
-
-
-# dve22torx
-if HAVE_DVEC2
-bin_PROGRAMS += dve22torx
-endif
-dve22torx_SOURCES  = spec2torx.c
-dve22torx_SOURCES += ../dve2-greybox.c
-dve22torx_SOURCES += ../dve2-greybox.h
-
-dve22torx_LDADD    = ../libltsmin.la $(DVEC2_LIBS)
-dve22torx_CPPFLAGS = -DDIVINE2 $(TORX_CPPFLAGS) $(DIVINE2_CPPFLAGS) $(AM_CPPFLAGS)
-dve22torx_LDFLAGS  = $(DIVINE2_LDFLAGS) $(AM_LDFLAGS)
 
 
 # lpo2torx
@@ -63,17 +50,17 @@ lps2torx_CPPFLAGS = -DMCRL2 $(TORX_CPPFLAGS) $(AM_CPPFLAGS)
 nodist_EXTRA_lps2torx_SOURCES = ../automake-force-linker.cxx
 
 
-# spinja2torx
-# if HAVE_SPINJA
-bin_PROGRAMS += spinja2torx
-# endif
-spinja2torx_SOURCES  = spec2torx.c
-spinja2torx_SOURCES += ../spinja-greybox.c
-spinja2torx_SOURCES += ../spinja-greybox.h
+# prom2torx
+if HAVE_SPINJA
+bin_PROGRAMS += prom2torx
+endif
+prom2torx_SOURCES  = spec2torx.c
+prom2torx_SOURCES += ../prom-greybox.c
+prom2torx_SOURCES += ../prom-greybox.h
 
-spinja2torx_LDADD    = ../libltsmin.la $(SPINJA_LIBS)
-spinja2torx_CPPFLAGS = -DSPINJA $(SPINJA_CPPFLAGS) $(TORX_CPPFLAGS) $(AM_CPPFLAGS)
-spinja2torx_LDFLAGS  = $(SPINJA_LDFLAGS) $(AM_LDFLAGS)
+prom2torx_LDADD    = ../libltsmin.la $(SPINJA_LIBS)
+prom2torx_CPPFLAGS = -DSPINJA $(SPINJA_CPPFLAGS) $(TORX_CPPFLAGS) $(AM_CPPFLAGS)
+prom2torx_LDFLAGS  = $(SPINJA_LDFLAGS) $(AM_LDFLAGS)
 
 
 # make

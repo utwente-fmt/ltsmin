@@ -1,0 +1,52 @@
+== SpinJa
+
+Use SpinJa (distributed as submodule LTSmin) to compile PROMELA model
+'leader.pm' to 'leader.pm.spinja':
+
+----
+java -cp <prefix>/share/ltsmin/spinja.jar spinja.Compile -o3 -l leader.pm
+gcc -g -O2 -fPIC -shared leader.spinja.c -o leader.spinja
+----
+
+Note that option +-l+ is currently mandatory.
+Alternatively, one can use the included script:
+
+----
+spinjal -o3 leader.pm
+----
+
+The optional flag +-o3+ turns off control flow optimizations.
+
+On the resulting compiled SpinJa module, all SpinJa-related LTSmin
+tools can be used:
+
+----
+prom-reach -rgs --order=chain leader.pm.spinja leader.etf
+prom2lts-mc --assert -prr --threads=16 leader.pm.spinja
+prom2lts-gsea --por -d --trace=t.gcf leader.pm.spinja
+----
+
+These three examples perform: full symbolic reachability with chaining order
+(+--order+) and reordering (+-rgs+) storing the
+state space in ETF format, doing a randomized (+-prr+) parallel (+--threads+)
+search for assertion violations (+--assert+) in the model, and searching for
+deadlocks (+-d+) storing the first counter example in 't.gcf' (+--trace+).
+
+If a never claim is present in the model, a Buchi automaton is created.
+LTSmin can directly perform LTL model checking on such models:
+
+----
+prom2lts-mc --strategy=cndfs --threads=16 leader-never.pm.spinja
+prom2lts-gsea --por --proviso=color --strategy=scc leader-never.pm.spinja 
+----
+
+These two examples perform LTL model checking using: multi-core NDFS (cndfs),
+and a sequential SCC-based algorithm with partial order reduction (+--por+ and
++--proviso+, where different provisos are available).
+Again one can provide additional options to store traces, etc.
+
+See the man pages of the respective tools for further options.
+
+NOTE: This version of SpinJa is incompatible with the original SpinJa,
+meaning that it does not make sense to use any other options when starting
+ <prefix>/share/ltsmin/spinja.jar manually.

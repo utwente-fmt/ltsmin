@@ -8,13 +8,16 @@
  */
 
 #include <config.h>
+
+#include <assert.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <limits.h>
-#include <assert.h>
-#include "runtime.h"
-#include "dfs-stack.h"
+
+#include <hre/user.h>
+#include <dfs-stack.h>
+
 
 struct dfs_stack {
     isb_allocator_t states;
@@ -85,7 +88,7 @@ dfs_stack_destroy (dfs_stack_t stack)
 void
 dfs_stack_enter (dfs_stack_t stack)
 {
-    if (stack->frame_size == stack->frame_bottom) Fatal(1, error, "Enter on empty frame %d == %d ", stack->frame_size, stack->frame_bottom);
+    if (stack->frame_size == stack->frame_bottom) Abort("Enter on empty frame %d == %d ", stack->frame_size, stack->frame_bottom);
     int t[2] = {stack->frame_size, stack->frame_bottom};
     isba_push_int(stack->frames, t);
     stack->frame_size = 0;
@@ -96,7 +99,7 @@ dfs_stack_enter (dfs_stack_t stack)
 void
 dfs_stack_leave (dfs_stack_t stack)
 {
-    if (stack->nframes == 0) Fatal(1, error, "Leave on empty stack");
+    if (stack->nframes == 0) Abort("Leave on empty stack");
     isba_discard_int(stack->states, stack->frame_size);
     int         *top = isba_top_int(stack->frames);
     stack->frame_size = top[0];
@@ -137,7 +140,7 @@ int *
 dfs_stack_peek_top (dfs_stack_t stack, size_t frame_offset)
 {
     if (!frame_offset && stack->frame_size == stack->frame_bottom)
-        Fatal(1, error, "Peek top on empty frame");
+        Abort("Peek top on empty frame");
     size_t offset = frame_offset ? stack->frame_size : 0;
     size_t x;
     for (x = 1; x < frame_offset; x++) {
@@ -178,7 +181,7 @@ int *
 dfs_stack_pop_bottom (dfs_stack_t stack)
 {
     if (stack->frame_size == stack->frame_bottom)
-        Fatal(1, error, "pop bottom empty frame");
+        Abort("pop bottom empty frame");
     stack->frame_bottom++;
     return isba_peek_int(stack->states, stack->frame_size - stack->frame_bottom);
 }

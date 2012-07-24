@@ -1,9 +1,11 @@
 #include <config.h>
+
 #include <stdio.h>
 #include <stdlib.h>
 
 #include <balloc.h>
-#include <runtime.h>
+#include <hre/user.h>
+
 
 struct block;
 struct block {

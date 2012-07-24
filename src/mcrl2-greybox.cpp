@@ -17,9 +17,9 @@ extern "C" {
 #include <assert.h>
 #include <popt.h>
 
-#include <mcrl2-greybox.h>
 #include <dm/dm.h>
-#include <runtime.h>
+#include <hre/user.h>
+#include <mcrl2-greybox.h>
 }
 
 #ifdef MCRL2_JITTYC_AVAILABLE
@@ -275,9 +275,9 @@ mcrl2_popt (poptContext con, enum poptCallbackReason reason,
         Warning(debug,"mcrl2 init");
         int argc;
         const char **argv;
-        RTparseOptions (mcrl2_args,&argc,&argv);
-        argv[0] = "--mcrl2";
-        MCRL2initGreybox (argc, argv, RTstackBottom());
+        RTparseOptions (mcrl2_args,&argc,(char***)&argv);
+        argv[0] = (char*)"--mcrl2";
+        MCRL2initGreybox (argc, argv, HREstackBottom());
         const char *opt_rewriter = mcrl2_rewriter_strategy.c_str();
         int opt_verbosity = 0;
         struct poptOption options[] = {

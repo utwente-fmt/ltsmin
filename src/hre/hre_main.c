@@ -30,14 +30,14 @@ static void ctx_destroy(void *arg){
     if (ctx) HREfree(hre_heap,ctx);
 }
 
-static struct thread_context* create_context(){
+static struct thread_context* create_context(char *app){
     struct thread_context*ctx=RT_NEW(struct thread_context);
     pthread_setspecific(hre_key,ctx);
     if (gettimeofday(&ctx->init_tv,NULL)){
         AbortCall("gettimeofday");
     }
     ctx->main=0;
-    set_label("%s",application);
+    set_label("%s",app);
     return ctx;
 }
 
@@ -48,7 +48,7 @@ void HREinitBegin(const char*app_name){
         app_path=strdup(app_name);
         application=basename(app_path);
         pthread_key_create(&hre_key, ctx_destroy);
-        ctx=create_context();
+        ctx=create_context(application);
         ctx->main=1;
         HREinitPopt();
         runtime_man=create_manager(16);
@@ -56,7 +56,7 @@ void HREinitBegin(const char*app_name){
     } else {
         // worker thread or second call.
         ctx=pthread_getspecific(hre_key);
-        if (!ctx) ctx=create_context();
+        if (!ctx) ctx=create_context((char*)app_name);
     }
     HREinitFeedback(); // CHECK ME: for every thread or just for the main thread?
 }
@@ -81,13 +81,13 @@ hre_context_t HREglobal(){
 
 void HREglobalSet(hre_context_t context){
     struct thread_context *ctx=pthread_getspecific(hre_key);
-    if (!ctx) ctx=create_context();
+    if (!ctx) ctx=create_context(application);
     ctx->global=context;
 }
 
 void HREmainSet(hre_context_t context){
     struct thread_context *ctx=pthread_getspecific(hre_key);
-    if (!ctx) ctx=create_context();
+    if (!ctx) ctx=create_context(application);
     ctx->main_ctx=context;
     ctx->main=1;
 }
@@ -99,7 +99,7 @@ hre_context_t HREmainGet(){
 
 void HREprocessSet(hre_context_t context){
     struct thread_context *ctx=pthread_getspecific(hre_key);
-    if (!ctx) ctx=create_context();
+    if (!ctx) ctx=create_context(application);
     ctx->process_ctx=context;
 }
 
@@ -182,6 +182,11 @@ void HREexit(int code){
     } else {
         exit(code);
     }
+}
+
+void HREexitUsage(int code){
+    HREprintUsage();
+    HREexit(code);
 }
 
 void HREregisterRuntime(hre_runtime_t runtime){

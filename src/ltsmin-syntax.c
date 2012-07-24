@@ -5,11 +5,11 @@
 
 #include <chunk_support.h>
 #include <ctype.h>
+#include <hre/user.h>
 #include <ltsmin-grammar.h>
 #include <ltsmin-parse-env.h> // required for ltsmin-lexer.h!
 #include <ltsmin-lexer.h>
 #include <ltsmin-syntax.h>
-#include <runtime.h>
 
 void ltsmin_parse_stream(int select,ltsmin_parse_env_t env,stream_t stream){
     yyscan_t scanner;
@@ -98,7 +98,7 @@ int LTSminConstant(ltsmin_parse_env_t env, int token, const char* name){
         SIlookup(env->unary_ops,name)!=SI_INDEX_FAILED ||
         SIlookup(env->constant_ops,name)!=SI_INDEX_FAILED)
     {
-        Fatal(1,error,"operator %s already exists",name);
+        Abort("operator %s already exists",name);
     }
     int res=SIput(env->constant_ops,name);
     ensure_access(env->constant_man,res);
@@ -122,7 +122,7 @@ int LTSminPrefixOperator(ltsmin_parse_env_t env, int token, const char* name,int
         SIlookup(env->unary_ops,name)!=SI_INDEX_FAILED ||
         SIlookup(env->constant_ops,name)!=SI_INDEX_FAILED)
     {
-        Fatal(1,error,"operator %s already exists",name);
+        Abort("operator %s already exists",name);
     }
     int res=SIput(env->unary_ops,name);
     ensure_access(env->unary_man,res);
@@ -136,7 +136,7 @@ int LTSminPrefixOperator(ltsmin_parse_env_t env, int token, const char* name,int
         case 7: env->unary_info[res].pattern=TOKEN_PREFIX7; break;
         case 8: env->unary_info[res].pattern=TOKEN_PREFIX8; break;
         case 9: env->unary_info[res].pattern=TOKEN_PREFIX9; break;
-        default: Fatal(1,error,"priority %d is not supported",prio);
+        default: Abort("priority %d is not supported",prio);
     }
     env->unary_info[res].prio=prio;
     env->unary_info[res].token=token;
@@ -148,7 +148,7 @@ int LTSminPostfixOperator(ltsmin_parse_env_t env, int token, const char* name,in
         SIlookup(env->unary_ops,name)!=SI_INDEX_FAILED ||
         SIlookup(env->constant_ops,name)!=SI_INDEX_FAILED)
     {
-        Fatal(1,error,"operator %s already exists",name);
+        Abort("operator %s already exists",name);
     }
     int res=SIput(env->unary_ops,name);
     ensure_access(env->unary_man,res);
@@ -162,7 +162,7 @@ int LTSminPostfixOperator(ltsmin_parse_env_t env, int token, const char* name,in
         case 7: env->unary_info[res].pattern=TOKEN_POSTFIX7; break;
         case 8: env->unary_info[res].pattern=TOKEN_POSTFIX8; break;
         case 9: env->unary_info[res].pattern=TOKEN_POSTFIX9; break;
-        default: Fatal(1,error,"priority %d is not supported",prio);
+        default: Abort("priority %d is not supported",prio);
     }
     env->unary_info[res].prio=prio;
     env->unary_info[res].token=token;
@@ -197,7 +197,7 @@ int LTSminBinaryOperator(ltsmin_parse_env_t env, int token, const char* name,int
         SIlookup(env->unary_ops,name)!=SI_INDEX_FAILED ||
         SIlookup(env->constant_ops,name)!=SI_INDEX_FAILED)
     {
-        Fatal(1,error,"operator %s already exists",name);
+        Abort("operator %s already exists",name);
     }
     int res=SIput(env->binary_ops,name);
     ensure_access(env->binary_man,res);
@@ -210,7 +210,7 @@ int LTSminBinaryOperator(ltsmin_parse_env_t env, int token, const char* name,int
         case 6: env->binary_info[res].pattern=TOKEN_BIN6; break;
         case 7: env->binary_info[res].pattern=TOKEN_BIN7; break;
         case 8: env->binary_info[res].pattern=TOKEN_BIN8; break;
-        default: Fatal(1,error,"priority %d is not supported",prio);
+        default: Abort("priority %d is not supported",prio);
     }
     env->binary_info[res].prio=prio;
     env->binary_info[res].token=token;

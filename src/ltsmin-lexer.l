@@ -6,9 +6,9 @@
 %{
 #include <ltsmin-parse-env.h>
 #include <ltsmin-grammar.h>
+#include <hre/user.h>
+#include <hre-io/user.h>
 #include <chunk_support.h>
-#include <runtime.h>
-#include <stream.h>
 
 void * yyalloc (size_t bytes, void * yyscanner){
     (void)yyscanner;
@@ -31,7 +31,7 @@ void   yyfree (void * ptr, void * yyscanner){
 #define YY_INPUT(buf,result,max_size) \
     { result = stream_read_max(yyextra->input, buf , max_size ) ; }
 
-#define YY_FATAL_ERROR(msg) Fatal(1,error,"LTSmin lexer: %s",msg);
+#define YY_FATAL_ERROR(msg) Abort("LTSmin lexer: %s",msg);
 
 %}
 
@@ -161,7 +161,7 @@ endofline   (\n|\r|\n\r|\r\n)
         }
     }
     if (!matched)
-        Fatal(1,error,"Unknown operator %s at line %d, pos %d",yytext,yyextra->lineno+1,yyextra->linepos+1);
+        Abort("Unknown operator %s at line %d, pos %d",yytext,yyextra->lineno+1,yyextra->linepos+1);
 }
 
 . {

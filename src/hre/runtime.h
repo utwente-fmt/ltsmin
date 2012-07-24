@@ -25,6 +25,10 @@ typedef struct {
  */
 extern int linear_search(si_map_entry map[],const char*key);
 
+/**
+\brief Find the key name for a given option, or "not found" if it does not exist.
+ */
+extern char *key_search(si_map_entry map[],const int val);
 
 /** \defgroup rt_timer Simple time measuring functions.*/
 /*@{*/

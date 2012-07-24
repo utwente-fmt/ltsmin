@@ -5,11 +5,11 @@
 #include <chunk_support.h>
 #include <dynamic-array.h>
 #include <greybox.h>
+#include <hre/user.h>
 #include <ltsmin-grammar.h>
 #include <ltsmin-parse-env.h> // required for ltsmin-lexer.h!
 #include <ltsmin-lexer.h>
 #include <ltsmin-tl.h>
-#include <runtime.h>
 
 
 ltsmin_expr_t pred_parse_file(model_t model,const char *file){
@@ -340,7 +340,7 @@ ltsmin_expr_t ltl_to_ctl_star_1(ltsmin_expr_t in)
         //case LTL_WEAK_UNTIL // convert..
         default:
             // unhandled?
-            Fatal(1,error,"unhandled case in ltl_to_ctl_star");
+            Abort("unhandled case in ltl_to_ctl_star");
     }
     // handle sub-expressions
     switch (in->node_type) {
@@ -478,7 +478,7 @@ void tableaux_table_grow(tableaux_table_t *t)
         t->size = new_t.size;
         return;
     }
-    Fatal(1,error, "tl tableaux realloc failed");
+    Abort("tl tableaux realloc failed");
 }
 
 /* add an element to the simple hash table
@@ -566,7 +566,7 @@ char* ltsmin_expr_print_ltl(ltsmin_expr_t ltl,char* buf)
         case LTL_FUTURE: sprintf(buf, "F "); break;
         case LTL_GLOBALLY: sprintf(buf, "G "); break;
         default:
-            Fatal(1, error, "unknown LTL token");
+            Abort("unknown LTL token");
     }
     buf += strlen(buf);
     // right eq
@@ -667,7 +667,7 @@ mark_predicate(ltsmin_expr_t e, matrix_t *m)
                 dm_set(m, i, e->idx);
             } break;
         default:
-            Fatal(1, error, "unhandled predicate expression in mark_predicate");
+            Abort("unhandled predicate expression in mark_predicate");
         }
         break;
     }
@@ -704,7 +704,7 @@ mark_visible(ltsmin_expr_t e, matrix_t *m, int* group_visibility)
             }
             } break;
         default:
-            Fatal(1, error, "unhandled predicate expression in mark_visible");
+            Abort("unhandled predicate expression in mark_visible");
         }
         break;
     }
@@ -746,7 +746,7 @@ char* ltsmin_expr_print_ctl(ltsmin_expr_t ctl, char* buf)
         case CTL_EXIST: sprintf(buf, "E "); break;
         case CTL_ALL: sprintf(buf, "A "); break;
         default:
-            Fatal(1, error, "unknown CTL token");
+            Abort("unknown CTL token");
     }
     buf += strlen(buf);
     // right eq
@@ -814,7 +814,7 @@ tableaux_node_t* tableaux_node_add_expr(tableaux_node_quantifier_t q, tableaux_n
         res->expr_list->generating_expr[1] = NULL;
         return res;
     } else {
-        if (res->quantifier != q) Fatal(1, error, "Tableaux node quantifiers don't match")
+        if (res->quantifier != q) Abort("Tableaux node quantifiers don't match")
     }
     // add to tableaux list
     // note: list is sorted in increasing order of the hash values of the expressions
@@ -835,7 +835,7 @@ tableaux_node_t* tableaux_node_add_expr(tableaux_node_quantifier_t q, tableaux_n
                 if ((*l)->generating_expr[0] == NULL) {
                     (*l)->generating_expr[0] = generating_e;
                 } else {
-                    if ((*l)->generating_expr[1] != NULL) Fatal(1, error, "invalid assumption: generating_expr[<2]");
+                    if ((*l)->generating_expr[1] != NULL) Abort("invalid assumption: generating_expr[<2]");
                     (*l)->generating_expr[1] = generating_e;
                 }
             }
@@ -968,7 +968,7 @@ ltsmin_expr_t tableaux_expr_unary_tail(tableaux_t *t, ltsmin_expr_t e)
     // return tail of a unary expression UNARY_OP phi thus phi
     // the function also looks up the expression in the expression
     // table, such that no duplicates can exist
-    if (e->node_type != UNARY_OP) Fatal(1, error, "tableaux_expr_unary_tail on non-unary operator");
+    if (e->node_type != UNARY_OP) Abort("tableaux_expr_unary_tail on non-unary operator");
     return tableaux_expr(t, e->arg1);
 }
 
@@ -1176,7 +1176,7 @@ void tableaux_apply_rule(tableaux_t *t, syntax_tree_t *s)
                                 } break;
                             default:
                                 // what about ! A (..) and ! E( ..) -> should possibly use tableaux_not?
-                                Fatal(1, error, "unhandled in conversion not expr");
+                                Abort("unhandled in conversion not expr");
                         }
 
                         } break;
@@ -1249,7 +1249,7 @@ void tableaux_apply_rule(tableaux_t *t, syntax_tree_t *s)
 
                         break;
                     default:
-                        Fatal(1, error, "unhandled case in tableaux apply_rule");
+                        Abort("unhandled case in tableaux apply_rule");
                 }
                 return;
             }
@@ -1328,7 +1328,7 @@ void tableaux_print_compressed(syntax_tree_t *s, int level, int* pstart, int* ps
 
     //Warning(info, "after node start %d stop %d", start, stop);
     if (stop - start < node_len) {
-        //Fatal(1, error, "failed node_len assumption");
+        //Abort("failed node_len assumption");
         // hmmz, the right child should be aligned to right instead..
         stop = start + node_len;
     }
@@ -1415,7 +1415,7 @@ void tableaux_build_syntax_tree(tableaux_t *t, syntax_tree_t* s)
         // this should destroy the syntax_tree node, and set the TABLEAUX_IDENTITY flag if the parent
         // this can probably only happen if MU_TRUE and MU_FALSE are converted to NULL nodes for the
         // tableaux. For simplicity, just let them in the formula, and simplify afterwards.
-        Fatal(1, error, "TABLAUX_IDENTITY empty on both sides!");
+        Abort("TABLAUX_IDENTITY empty on both sides!");
     } else {
         tableaux_apply_rule(t, s);
         if (s->branch[ST_LEFT])  tableaux_build_syntax_tree(t, s->branch[ST_LEFT]);
@@ -1439,7 +1439,7 @@ int ctl_star_dual(int token) {
         // case CTL_UNTIL: return CTL_RELEASE;
         // case CTL_WEAK_UNTIL: return CTL_STRONG_RELEASE;
     }
-    Fatal(1, error, "invalid dual");
+    Abort("invalid dual");
     return token;
 }
 
@@ -1584,7 +1584,7 @@ char* ltsmin_expr_print_mu(ltsmin_expr_t mu, char* buf)
         case MU_EDGE_ALL:
             sprintf(buf, "[%s] ", "?"); break; // TODO
         default:
-            Fatal(1, error, "unknown MU token");
+            Abort("unknown MU token");
     }
     buf += strlen(buf);
     // right eq
@@ -1625,7 +1625,7 @@ ltsmin_expr_t ctl_star_to_mu_1(ltsmin_expr_t in)
         case CTL_EXIST:     res->token = MU_EXIST;     break;
         default:
             // unhandled?
-            Fatal(1,error,"unhandled case in ctl_star_to_mu_1");
+            Abort("unhandled case in ctl_star_to_mu_1");
     }
     // handle sub-expressions
     switch (in->node_type) {
@@ -1767,12 +1767,12 @@ ltsmin_expr_t tableaux_translate_syntax_tree(tableaux_t* t, syntax_tree_t *s)
                 case TABLEAUX_TERMINAL:
                     // error:
                     // it isn't a terminal node if is_companion is set here
-                    Fatal(1, error, "encountered terminal with is_companion set");
+                    Abort("encountered terminal with is_companion set");
                     break;
                 case TABLEAUX_PRETERMINAL:
                     // error:
                     // it isn't a terminal node if is_companion is set here
-                    Fatal(1, error, "encountered preterminal with is_companion set");
+                    Abort("encountered preterminal with is_companion set");
                     break;
                 case TABLEAUX_IDENTITY:
                     el_expr = mu_left;

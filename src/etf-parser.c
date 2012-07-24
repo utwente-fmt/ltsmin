@@ -1,12 +1,15 @@
 #include <config.h>
-#include "etf-internal.h"
+
+#include <stdio.h>
+
+#include <etf-internal.h>
 #include <etf-util.h>
+#include <hre/user.h>
 #include <ltsmin-syntax.h>
 #include <ltsmin-grammar.h>
 #include <ltsmin-parse-env.h>
 #include <ltsmin-lexer.h>
-#include <stdio.h>
-#include <runtime.h>
+
 
 /*
 static etf_parse_env_t ETFparseEnvCreate(){
@@ -31,7 +34,7 @@ static etf_parse_env_t ETFparseEnvCreate(){
 etf_model_t etf_parse_file(const char *file){
     FILE *in=fopen( file, "r" );
     if (in == NULL)
-        FatalCall (1, error, "Unable to open file ``%s''", file);
+        AbortCall ("Unable to open file ``%s''", file);
     ltsmin_parse_env_t env=LTSminParseEnvCreate();
     LTSminKeyword(env,TOKEN_BEGIN,"begin");
     LTSminKeyword(env,TOKEN_END,"end");

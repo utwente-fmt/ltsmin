@@ -1,6 +1,6 @@
 //                           -*- mode: doc; outline-regexp: "==\(=*\) ." -*-
-gcf(1)
-======
+etf-convert(1)
+==============
 :Author:  Stefan Blom
 :Email:   <sccblom@cs.utwente.nl>
 :Date:    2008-12-03
@@ -12,12 +12,13 @@ etf-convert - Translate ETF to DVE.
 
 == SYNOPSIS
 
-etf-convert [OPTIONS] <input> <output>
+{manname} [OPTIONS] <input> <output>
 
 == DESCRIPTION
 
-This tool translates ETF to DVE. Note that the translation
-is a very simple one, that produces relatively inefficient DVE code.
+This tool translates manpage:etf[5] to http://divine.fi.muni.cz/[DVE].
+Note that the translation is a very simple one, that produces relatively
+inefficient DVE code.
 
 == OPTIONS
 

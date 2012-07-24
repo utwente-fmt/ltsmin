@@ -1,9 +1,9 @@
 //                           -*- mode: doc; outline-regexp: "==\(=*\) ." -*-
 dve2lts-gsea(1)
-===============
-:Author:  Michael Weber
-:Email:   <michaelw@cs.utwente.nl>
-:Date:    2011-02-05
+================
+:Author:  Elwin Pater
+:Email:   <e.pater@student.utwente.nl>
+:Date:    2011-01-21
 
 == NAME
 
@@ -11,16 +11,22 @@ dve2lts-gsea - Sequential state space generator for DIVINE models.
 
 == SYNOPSIS
 
-*{manname}* [OPTION]... 'input'[_.dve_|_.dveC_]
+*{manname}* [OPTION]... 'input'[_.dve_|_.dve2C_] <['output.fmt']>
 
 == DESCRIPTION
 
 {manname} generates a labelled transition system from a specification
-provided in 'input.dve/input.dveC' by enumerative reachability
-analysis using a general state expanding algorithm.
+provided in 'input.dve' or 'input.dve2C' by enumerative reachability
+analysis using a general state expanding algorithm.  'output.fmt'
+specifies the name of the output archive.  The desired format is
+deduced from the filename extension. Available formats are described
+below.
+
+include::inc/dve.txt[]
 
 == OPTIONS
 
 include::inc/spec2lts-gsea-options.txt[]
 
 include::inc/spec2lts-gsea.txt[]
+

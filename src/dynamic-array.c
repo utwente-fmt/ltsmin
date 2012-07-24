@@ -4,7 +4,7 @@
 #include <strings.h>
 
 #include <dynamic-array.h>
-#include <runtime.h>
+#include <hre/user.h>
 
 #define MBLOCK 16
 

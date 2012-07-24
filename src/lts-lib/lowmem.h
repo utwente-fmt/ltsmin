@@ -11,5 +11,7 @@ extern void lowmem_branching_reduce(lts_t lts);
 
 extern void lowmem_lumping_reduce(lts_t lts);
 
+extern void lts_quotient(lts_t lts,uint32_t *map);
+
 #endif
 

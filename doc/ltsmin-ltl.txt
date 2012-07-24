@@ -25,8 +25,8 @@ LTSmin syntax for Linear Temporal Logic formulas
 |3        | []       | Globally (Always) operator
 |3        | <>       | Finally (Eventually) operator
 |3        | X        | neXt operator
-|4        | &        | Logical and
-|5        | \|       | Logical or
+|4        | &&       | Logical and
+|5        | \|\|     | Logical or
 |6        | $$<->$$  | Logical equivalence
 |7        | $$->$$   | Logical implication
 |8        | U        | Until operator
@@ -41,6 +41,9 @@ confuse the parser.
 ----
 ! ([] ( (phil_0 == 1) -> <> phil_0 == 2) )
 ----
+
+For variable naming consult the +--labels+ option in the PINS tools.
+
 
 == SEE ALSO
 manpage:ltsmin[7],

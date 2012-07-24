@@ -9,7 +9,8 @@ etf(5)
 etf - enumerated table format
 
 == SYNOPSIS
-A text based intermediate format for PINS models.
+A text based intermediate format for PINS models for efficient storage
+of symbolically represented state spaces.
 
 == DESCRIPTION
 

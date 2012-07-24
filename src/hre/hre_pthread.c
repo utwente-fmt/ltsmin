@@ -15,7 +15,7 @@
 
 #include <hre/provider.h>
 
-static size_t SHARED_SIZE=134217728;
+static size_t SHARED_SIZE=34359738368;
 static size_t SHARED_ALIGN=64;
 #define QUEUE_SIZE 64
 

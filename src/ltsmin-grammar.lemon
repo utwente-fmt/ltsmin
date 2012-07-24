@@ -1,11 +1,12 @@
 %include {
 #include <assert.h>
 #include <stdlib.h>
-#include <etf-util.h>
-#include "etf-internal.h"
-#include <runtime.h>
-#include <ltsmin-parse-env.h>
+
 #include <chunk_support.h>
+#include <etf-util.h>
+#include <etf-internal.h>
+#include <hre/user.h>
+#include <ltsmin-parse-env.h>
 }
 
 /* Section common parser configuration.
@@ -24,7 +25,7 @@ This section is shared by the parsers for all LTSmin languages.
 %extra_argument { ltsmin_parse_env_t env }
 %stack_overflow {
     (void)yypMinor;
-    Fatal(1,error,"stack overflow");
+    Abort("stack overflow");
 }
 
 /* Section ETF grammar
@@ -63,7 +64,7 @@ etf_spec ::= error . {
 state_section ::= BEGIN STATE decl_list(L) END STATE. {
     int N=ETFlistLength(L);
     if (N==0) {
-        Fatal(1,error,"state vector length must be at least 1");
+        Abort("state vector length must be at least 1");
     }
     Warning(info,"The state length is %d",N);
     lts_type_set_state_length(env->etf->ltstype,N);
@@ -106,10 +107,10 @@ init_section ::= BEGIN INIT valref_list(L) END INIT.
 {
     int N=ETFlistLength(L);
     if (N!=lts_type_get_state_length(env->etf->ltstype)){
-        Fatal(1,error,"incorrect length of initial state: %d instead of %d.",
+        Abort("incorrect length of initial state: %d instead of %d.",
             N,lts_type_get_state_length(env->etf->ltstype));
     }
-    if (env->etf->initial_state) Fatal(1,error,"more than one init section");
+    if (env->etf->initial_state) Abort("more than one init section");
     env->etf->initial_state=(int*)RTmalloc(N*sizeof(int));
     etf_list_t list=L;
     for(int i=N-1;i>=0;i--){
@@ -124,7 +125,7 @@ init_section ::= BEGIN INIT valref_list(L) END INIT.
                 break;
             }
             default:
-                Fatal(1,error,"unknown discriminator %d",list->fst);
+                Abort("unknown discriminator %d",list->fst);
         }
 	list=list->prev;
     }
@@ -157,7 +158,7 @@ sort_list(IDX) ::= IDENT(ID) . {
     int typeno=ETFgetType(env->etf,name);
     IDX=env->etf->type_values[typeno];
     if (SIgetCount(IDX)!=0) {
-        Fatal(1,error,"sort %s not empty",name);
+        Abort("sort %s not empty",name);
     }
 }
 sort_list(IDX) ::= sort_list(IDX1) VALUE(S) . {
@@ -166,7 +167,7 @@ sort_list(IDX) ::= sort_list(IDX1) VALUE(S) . {
     c.data=SIgetC(env->values,S,(int*)&c.len);
     int idx=SIgetCount(IDX);
     if (idx!=SIputC(IDX,c.data,c.len)) {
-	Fatal(1,error,"non-sequential index");
+	Abort("non-sequential index");
     }
 }
 
@@ -215,7 +216,7 @@ map_list(M) ::= map_list(M1) END_OF_LINE . { M=M1; } // skip empty lines.
 map_list(M) ::= map_list(M1) map_entry(L) value(V) END_OF_LINE . {
     int N=ETFlistLength(L);
     if(N!=lts_type_get_state_length(env->etf->ltstype)) {
-        Fatal(1,error,"bad state length in map entry");
+        Abort("bad state length in map entry");
     }
     int state[N];
     etf_list_t list=L;
@@ -255,7 +256,7 @@ trans_list(R) ::= trans_list(R1) step_list(L)  END_OF_LINE  . {
         int N=lts_type_get_state_length(env->etf->ltstype);
         int K=lts_type_get_edge_label_count(env->etf->ltstype);
         if(len!=N+K){
-            Fatal(1,error,"bad length in trans entry: %d",len);
+            Abort("bad length in trans entry: %d",len);
         }
         int src[N];
         int dst[N];
@@ -274,7 +275,7 @@ trans_list(R) ::= trans_list(R1) step_list(L)  END_OF_LINE  . {
                     break;
                 }
                 default:
-                    Fatal(1,error,"unknown discriminator %d",list->fst);
+                    Abort("unknown discriminator %d",list->fst);
             }
             list=list->prev;
         }
@@ -308,7 +309,7 @@ that can be reused for other languages (e.g. CTL, CTL* and LTL)
 %type expr { ltsmin_expr_t }
 %destructor expr {
     (void)env;(void)$$;
-    Fatal(1,error,"Expressions are not supposed to be destroyed.");
+    Abort("Expressions are not supposed to be destroyed.");
 }
 
 input ::= EXPR expr(E) . {

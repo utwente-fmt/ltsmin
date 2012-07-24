@@ -68,7 +68,29 @@ table;;
   use a lockless hash table.
 
 tree;;
-  use a lockless tree-compressed hash table (default).
+  use a lockless tree-compressed table. In many cases the tree
+  can compress states to two integers regardless of their length. To efficiently
+  accommodate more than 4*10^9 states, the table is split in a root and a leaf
+  table whose respective size can be adjusted using the --ratio option
+  (default). 
+
+cleary-tree;;
+  use a lockless tree-compressed hash table with a parallel Cleary table to
+  store roots. The compressed size of a state can approach one integer 
+  with this approach. The leafs table is stored as a standard tree table (two
+  integers per subtree), which typically can be much smaller (up to the
+  square root of the root table size). To control the respective size of the
+  leaf table use the --ratio option.
+
+
+*--ratio*='NUMBER'::
+        Log_2 ratio between root and leaf table in tree compression. The ratio
+        can theoretically be as low as the square root of the root table size
+        (see --size). This will however only work if the state vectors are
+        perfectly combinatorial wrt their variable values. In most cases
+        the leaf table will grow larger, but find found that a factor four
+        (--ratio=2) works well for over 75% of the BEEM models.
+        (default: NUMBER=2). 
 
 
 *--size*='NUMBER'::
@@ -90,10 +112,9 @@ tree;;
         counter.
 
 
-*--ref*::
-        Save space by storing references to table/tree on the stack/queue.
-        Normally full states are stored. The swarmed algorithms always use
-        references.
+*--noref*::
+        Store full state vectors on queue/stack. This is usually a bit faster,
+        but requires more memory. Incompatible with the swarmed algorithms.
 
 
 *--zobrist*='NUMBER'::

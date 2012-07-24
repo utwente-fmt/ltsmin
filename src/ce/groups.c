@@ -4,10 +4,9 @@
 #include "groups.h"
 #include <assert.h>
 #include "bufs.h"
-#include "scctimer.h"
 #include "sortcount.h"
 #include <stdio.h>
-#include <runtime.h>
+#include <hre/runtime.h>
 
 //#include "Dtaudlts.h"
 
@@ -150,19 +149,19 @@ int dlts_elim_tauscc_groups(dlts_t lts){
  taudlts_t t, tviz;
  int *oscc, *wscc;
  int Mtot,i;
- mytimer_t tau_timer;
+ rt_timer_t tau_timer;
 
  MPI_Comm_size(lts->comm, &nodes);
  MPI_Comm_rank(lts->comm, &me);
  
- tau_timer=SCCcreateTimer();SCCstartTimer(tau_timer);
+ tau_timer=RTcreateTimer();RTstartTimer(tau_timer);
 
  t = taudlts_create(lts->comm);
  taudlts_extract_from_dlts(t, lts);
  tviz = taudlts_create(t->comm);
  tviz->M=0; tviz->N = t->N;
 
- SCCstopTimer(tau_timer);
+ RTstopTimer(tau_timer);
 
  oscc=(int*)calloc(t->N,sizeof(int));	
  wscc=(int*)calloc(t->N,sizeof(int));
@@ -192,7 +191,7 @@ int dlts_elim_tauscc_groups(dlts_t lts){
 	
 	taudlts_scc_stabilize(t, wscc, oscc);
 
-	SCCstartTimer(tau_timer);
+	RTstartTimer(tau_timer);
 
 	taudlts_aux2normal(tviz);
 	taudlts_cleanup(tviz, wscc, oscc);
@@ -203,13 +202,13 @@ int dlts_elim_tauscc_groups(dlts_t lts){
 	if (wscc!=NULL) {free(wscc); wscc=NULL;}
 	// if (oscc!=NULL) {free(oscc); oscc=NULL;}
 
-	SCCstopTimer(tau_timer); SCCreportTimer(tau_timer, "taugraph I/O: ");
+	RTstopTimer(tau_timer); RTprintTimer(info, tau_timer, "taugraph I/O: ");
 	return 1;
  }
  // else, give up
  else{
 	taudlts_free(t); taudlts_free(tviz);
-	free(wscc); free(oscc); SCCreportTimer(tau_timer, "taugraph I/O: ");
+	free(wscc); free(oscc); RTprintTimer(info, tau_timer, "taugraph I/O: ");
 	return 0;
  }
 }

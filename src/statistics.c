@@ -1,7 +1,7 @@
 
 #include <math.h>
-#include <runtime.h>
 
+#include <hre/user.h>
 #include <statistics.h>
 
 void

@@ -117,11 +117,11 @@ ACX_MCRL2([:],
   [AC_MSG_WARN([no acceptable mCRL2 installation found.])])
 AC_CHECK_PROGS(ASCIIDOC, [asciidoc])
 if test x"$ASCIIDOC" = x && test -d "${srcdir}/.git"; then
-  AC_MSG_FAILURE([Asciidoc is needed unless building from a release tarball.])
+  AC_MSG_WARN([Asciidoc is needed for building documentation.])
 fi
 AC_CHECK_PROGS(XMLTO, [xmlto])
 if test x"$XMLTO" = x && test -d "${srcdir}/.git"; then
-  AC_MSG_FAILURE([xmlto is needed unless building from a release tarball.])
+  AC_MSG_WARN([xmlto is needed for building man pages.])
 fi
 DX_DOXYGEN_FEATURE(ON)
 DX_HTML_FEATURE(ON)
@@ -185,9 +185,6 @@ if test "x$acx_mcrl2" = xyes; then
     [acx_mcrl2=no
      AC_MSG_WARN([mcrl2 library not found.])])
 fi
-ACX_DVEC_LIBS([:],
-  [have_divine=no
-   AC_MSG_WARN([DiVinE libraries not found.])])
 
 AC_SUBST([BUDDY_LIBS],['${top_builddir}/buddy/src/libbdd.la -lm'])
 AC_SUBST([BUDDY_CPPFLAGS],['-I${top_srcdir}/buddy/src'])
@@ -379,8 +376,8 @@ AM_CONDITIONAL([HAVE_ASCIIDOC], [test x"$ASCIIDOC" != x])
 AM_CONDITIONAL([HAVE_XMLTO], [test x"$XMLTO" != x])
 AM_CONDITIONAL([HAVE_LIBBCG], [test x"$have_bcg" = xyes])
 AM_CONDITIONAL([HAVE_CADP], [test x"$acx_cadp" = xyes])
-AM_CONDITIONAL([HAVE_DVEC], [test x"$acx_dvec_libs" = xyes])
-AM_CONDITIONAL([HAVE_DVEC2], [true])    dnl can be built unconditionally
+AM_CONDITIONAL([HAVE_DVE], [true])    dnl can be built unconditionally
+AM_CONDITIONAL([HAVE_SPINJA], [true])    dnl can be built unconditionally
 AM_CONDITIONAL([HAVE_ATOMICS], [test x"$acx_atomics" = xyes])
 AM_CONDITIONAL([HAVE_VERSION_CONTROL], [test -d "${srcdir}/.git"])
 AM_CONDITIONAL([HAVE_LIBZIP], [test x"$acx_libzip" = xyes])
@@ -434,8 +431,6 @@ Configuration:
     PBES     = ${acx_pbes:-NOT FOUND, building without PBES support}
     SPG      = ${have_libspg:-NO, not building pbes-reach and spgsolver (enable with --without-bignum)}
     CADP     = ${CADP:-NOT FOUND, building without CADP support}
-    DiVinE-cluster
-             = ${with_divine:-NOT FOUND, building without DiVinE support}
     OPAAL    = ${have_opaal:-TBB malloc NOT FOUND, building without opaal support}
     SYLVAN   = ${have_sylvan:-NO. Only on Linux x86_64 (override with --with-sylvan)}
 

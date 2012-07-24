@@ -2,10 +2,9 @@
 #include "paint.h"
 #include <assert.h>
 #include "bufs.h"
-#include "scctimer.h"
 #include "sortcount.h"
 #include <stdio.h>
-#include <runtime.h>
+#include <hre/runtime.h>
 
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 #pragma GCC diagnostic ignored "-Wunused-variable"
@@ -719,9 +718,9 @@ void dlts_elim_tauscc_colours(dlts_t lts){
  int i;
  int *oscc, *wscc;
  int* weight = NULL;
- mytimer_t bugtimer;
+ rt_timer_t bugtimer;
 
- bugtimer=SCCcreateTimer();SCCstartTimer(bugtimer);
+ bugtimer=RTcreateTimer();RTstartTimer(bugtimer);
 
  t = taudlts_create(lts->comm);
  taudlts_extract_from_dlts(t, lts);
@@ -740,7 +739,7 @@ void dlts_elim_tauscc_colours(dlts_t lts){
 	wscc[i] = me;
  }
 #ifdef DEBUG
- SCCreportTimer(bugtimer, "taugraph IN: ");
+ RTreportTimer(bugtimer, "taugraph IN: ");
 #endif
  
  extreme_colours(t, tviz, wscc, oscc);
@@ -755,7 +754,7 @@ void dlts_elim_tauscc_colours(dlts_t lts){
  print_status(t);
 
 #ifdef DEBUG
- SCCreportTimer(bugtimer, "E2 finished: ");
+ RTreportTimer(bugtimer, "E2 finished: ");
 #endif
  
  // insert t and tviz in taudlts (???? is inserting t needed ???) 
@@ -768,7 +767,7 @@ void dlts_elim_tauscc_colours(dlts_t lts){
  dlts_shuffle(lts, wscc, oscc); 
 #ifdef DEBUG
  Warning(info,"shuffled");
- SCCreportTimer(bugtimer, "shuffled: ");
+ RTreportTimer(bugtimer, "shuffled: ");
 #endif
 
 #ifdef VERBOSE
@@ -779,7 +778,7 @@ void dlts_elim_tauscc_colours(dlts_t lts){
 
 #ifdef DEBUG
  Warning(info,"shrinked");
- SCCreportTimer(bugtimer, "shrinked: ");
+ RTreportTimer(bugtimer, "shrinked: ");
 #endif
  if (weight!=NULL) {free(weight); weight=NULL;}
  if (wscc!=NULL) {free(wscc); wscc=NULL;}

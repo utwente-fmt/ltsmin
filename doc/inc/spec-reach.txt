@@ -21,7 +21,7 @@ manpage:ltsmin-tracepp[1],
 http://dx.doi.org/10.1007/978-3-540-85762-4_6[ICTAC 2008, LNCS 5160],
 http://www.cwi.nl/{tilde}mcrl/[muCRL],
 http://www.mcrl2.org/[mCRL2],
-http://divine.fi.muni.cz/[DiVinE-cluster],
 http://divine.fi.muni.cz/[DiVinE 2.2],
 http://www.mpi-forum.org/[MPI Forum],
-http://buddy.sourceforge.net/[BuDDy]
+http://buddy.sourceforge.net/[BuDDy], and
+http://eprints.eemcs.utwente.nl/22042/[prom].

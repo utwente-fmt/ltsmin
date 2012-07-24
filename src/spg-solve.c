@@ -10,7 +10,7 @@
 #endif
 
 #include <spg-solve.h>
-#include <runtime.h>
+#include <hre/user.h>
 
 static int chaining_attractor_flag = 0;
 static int saturating_attractor_flag = 0;
@@ -33,7 +33,7 @@ get_vset_size(vset_t set, long *node_count,
     len = bn_int2string(elem_str, str_len, &elem_count);
 
     if (len >= str_len)
-        Fatal(1, error, "Error converting number to string");
+        Abort("Error converting number to string");
 
     bn_clear(&elem_count);
 }
@@ -226,7 +226,7 @@ spgsolver_options* spg_get_solver_options()
     spgsolver_options* options = (spgsolver_options*)RTmalloc(sizeof(spgsolver_options));
     options->chaining = (chaining_attractor_flag > 0);
     options->saturation = (saturating_attractor_flag > 0);
-    options->spg_solve_timer = SCCcreateTimer();
+    options->spg_solve_timer = RTcreateTimer();
     return options;
 }
 
@@ -236,7 +236,7 @@ spgsolver_options* spg_get_solver_options()
  */
 void spg_destroy_solver_options(spgsolver_options* options)
 {
-    SCCdeleteTimer(options->spg_solve_timer);
+    RTdeleteTimer(options->spg_solve_timer);
     RTfree(options);
 }
 
@@ -255,9 +255,9 @@ bool spg_solve(const parity_game* g, spgsolver_options* options)
 #if HAVE_PROFILER
     ProfilerStart("spgsolver.perf");
 #endif
-    SCCstartTimer(opts->spg_solve_timer);
+    RTstartTimer(opts->spg_solve_timer);
     recursive_result result = spg_solve_recursive(g, opts);
-    SCCstopTimer(opts->spg_solve_timer);
+    RTstopTimer(opts->spg_solve_timer);
 #if HAVE_PROFILER
     ProfilerStop();
 #endif
@@ -320,7 +320,7 @@ recursive_result spg_solve_recursive(const parity_game* g,  const spgsolver_opti
     while(vset_is_empty(u)) {
         m++;
         if (m > g->max_priority) {
-            Fatal(a, error, "no min priority found!");
+            Abort("no min priority found!");
         }
         vset_clear(u);
         vset_copy(u, g->v_priority[m]);
@@ -444,10 +444,10 @@ void spg_attractor(int player, const parity_game* g, vset_t u, const spgsolver_o
         long   level_count;
         bn_int_t level_elem_count;
         vset_count(v_level, &level_count, &level_elem_count);
-        SCCstopTimer(options->spg_solve_timer);
+        RTstopTimer(options->spg_solve_timer);
         Warning(debug, "attr_%d^%d [%5.3f]: u has %ld nodes, v_level has %ld nodes.",
-                SCCrealTime(options->spg_solve_timer), player, l, u_count, level_count);
-        SCCstartTimer(options->spg_solve_timer);
+                RTrealTime(options->spg_solve_timer), player, l, u_count, level_count);
+        RTstartTimer(options->spg_solve_timer);
 
         // prev_attr = V \intersect prev(attr^k)
         vset_t prev_attr = vset_create(g->domain, -1, NULL);
@@ -531,10 +531,10 @@ void spg_attractor_chaining(int player, const parity_game* g, vset_t u, const sp
         long   v_level_count;
         bn_int_t v_level_elem_count;
         vset_count(v_level, &v_level_count, &v_level_elem_count);
-        SCCstopTimer(options->spg_solve_timer);
+        RTstopTimer(options->spg_solve_timer);
         Warning(debug, "attr_%d^%d [%5.3f]: u has %ld nodes, v_level has %ld nodes, v_group has %ld nodes max.",
-                SCCrealTime(options->spg_solve_timer), player, l, u_count, v_level_count, peak_group_count);
-        SCCstartTimer(options->spg_solve_timer);
+                RTrealTime(options->spg_solve_timer), player, l, u_count, v_level_count, peak_group_count);
+        RTstartTimer(options->spg_solve_timer);
         peak_group_count = 0;
 
         vset_copy(v_previous_level, v_level);

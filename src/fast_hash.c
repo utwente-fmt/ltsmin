@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
+
 #include <fast_hash.h>
 
 #undef get16bits

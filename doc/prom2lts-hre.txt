@@ -1,0 +1,30 @@
+//                           -*- mode: doc; outline-regexp: "==\(=*\) ." -*-
+prom2lts-hre(1)
+=================
+:Author:  Jeroen Ketema
+:Email:   <jketema@ewi.utwente.nl>
+:Date:    2012-02-20
+
+== NAME
+
+prom2lts-hre - Distributed state space generator for SPINJA models.
+
+== SYNOPSIS
+
+*{manname}* [OPTIONS]... 'input.prom' ['output.fmt']
+
+== DESCRIPTION
+
+{manname} generates a labelled transition system from a specification
+provided in 'input.prom'.  Specifications are compiled with SpinJa
+from PROMELA input models.  'output.fmt' specifies the name of the
+output archive.  The desired format is deduced from the filename
+extension. Available formats are described below.
+
+include::inc/prom.txt[]
+
+== OPTIONS
+
+include::inc/spec2lts-hre-options.txt[]
+
+include::inc/spec2lts-hre.txt[]

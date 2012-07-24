@@ -138,6 +138,8 @@ eval_predicate(ltsmin_expr_t e, transition_info_t* ti, int* state)
             return e->idx;
         case PRED_SVAR:
             return state[e->idx];
+        case PRED_NOT:
+            return !eval_predicate(e->arg1, ti, state);
         case PRED_EQ:
             return (eval_predicate(e->arg1, ti, state) == eval_predicate(e->arg2, ti, state));
         case PRED_VAR:
@@ -147,11 +149,10 @@ eval_predicate(ltsmin_expr_t e, transition_info_t* ti, int* state)
         default: {
             char buf[1024];
             ltsmin_expr_print_ltl(e, buf);
-            Fatal(1, error, "unhandled predicate expression: %s", buf);
+            Abort("unhandled predicate expression: %s", buf);
         }
     }
     return 0;
-    (void)ti;
 }
 
 /* ctl* to mu conversion

@@ -1,11 +1,12 @@
-#include "config.h"
+#include <config.h>
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
 #include <time.h>
 
-#include <runtime.h>
+#include <hre/user.h>
 #include <zobrist.h>
 
 static const hash64_t   INITIAL_HASH = 0;

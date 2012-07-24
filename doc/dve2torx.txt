@@ -3,7 +3,7 @@ dve2torx(1)
 ============
 :Author:  Michael Weber
 :Email:   <michaelw@cs.utwente.nl>
-:Date:    2009-10-31
+:Date:    2011-06-13
 
 == NAME
 
@@ -11,13 +11,15 @@ dve2torx - TorX RPC interface for DVE models.
 
 == SYNOPSIS
 
-*{manname}* [OPTION]... 'input'[_.dve_|_.dveC_]
+*{manname}* [OPTION]... 'input'<_.dve_|_.dve2C_>
 
 == DESCRIPTION
 
 {manname} provides access to a labelled transition system from a
 specification provided in 'input'[_.dve_|_.dveC_] via the
 TorX-Explorer textual interface on _stdin_ and _stdout_.
+
+include::inc/dve.txt[]
 
 == OPTIONS
 

@@ -11,23 +11,20 @@ etf2lts-hre - Distributed state space generator for ETF models.
 
 == SYNOPSIS
 
-*etf2lts-hre* [OPTIONS]... 'input.etf' ['output.fmt']
+*{manname}* [OPTIONS]... 'input.etf' ['output.fmt']
 
 == DESCRIPTION
 
-etf2lts-hre generates a labelled transition system from a
+{manname} generates a labelled transition system from a
 specification provided in 'input.etf'.  Specifications are in
-manpage:etf[5] format.  'output.fmt' specifies the name of the output
-archive.  The desired format is deduced from the filename extension.
+manpage:etf[5] format.  'output.fmt'
+specifies the name of the output archive.  The desired format is
+deduced from the filename extension. Available formats are described
+below.
+
 
 == OPTIONS
 
 include::inc/spec2lts-hre-options.txt[]
 
-include::inc/pins-options.txt[]
-
-include::inc/lts-io-options.txt[]
-
-include::inc/hre-startup.txt[]
-
-include::inc/hre-options.txt[]
+include::inc/spec2lts-hre.txt[]

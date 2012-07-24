@@ -1,4 +1,5 @@
 #include <config.h>
+#include <limits.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -7,21 +8,18 @@
 #include <dm/dm.h>
 #include <dynamic-array.h>
 #include <greybox.h>
-#include <lts_enum.h>
-#include <lts_io.h>
-#include <ltsmin-grammar.h>
+#include <hre/user.h>
+#include <lts-io/user.h>
 #include <ltsmin-syntax.h>
 #include <ltsmin-tl.h>
-#include <runtime.h>
-#include <scctimer.h>
 #include <spec-greybox.h>
 #include <stringindex.h>
 #include <vector_set.h>
 #include <spg-solve.h>
-#include <limits.h>
+
 
 #define diagnostic(...) {\
-    if (RTverbosity >= 2)\
+    if (log_active(infoLong))\
         fprintf(stderr, __VA_ARGS__);\
 }
 
@@ -32,6 +30,9 @@ static char* mu_formula  = NULL;
 static char* trc_output = NULL;
 static int   dlk_detect = 0;
 static char* act_detect = NULL;
+static char* inv_detect = NULL;
+static int   assert_detect = 0;
+static int   no_exit = 0;
 static int   act_detect_table;
 static int   act_detect_index;
 static int   sat_granularity = 10;
@@ -59,7 +60,7 @@ static vset_t false_states;
 static enum { BFS_P , BFS , CHAIN_P, CHAIN } strategy = BFS_P;
 
 static char* order = "bfs-prev";
-static const si_map_entry ORDER[] = {
+static si_map_entry ORDER[] = {
     {"bfs-prev", BFS_P},
     {"bfs", BFS},
     {"chain-prev", CHAIN_P},
@@ -70,7 +71,7 @@ static const si_map_entry ORDER[] = {
 static enum { NO_SAT, SAT_LIKE, SAT_LOOP, SAT_FIX, SAT } sat_strategy = NO_SAT;
 
 static char* saturation = "none";
-static const si_map_entry SATURATION[] = {
+static si_map_entry SATURATION[] = {
     {"none", NO_SAT},
     {"sat-like", SAT_LIKE},
     {"sat-loop", SAT_LOOP},
@@ -82,7 +83,7 @@ static const si_map_entry SATURATION[] = {
 static enum { UNGUIDED, DIRECTED } guide_strategy = UNGUIDED;
 
 static char *guidance = "unguided";
-static const si_map_entry GUIDED[] = {
+static si_map_entry GUIDED[] = {
     {"unguided", UNGUIDED},
     {"directed", DIRECTED},
     {NULL, 0}
@@ -96,14 +97,14 @@ reach_popt(poptContext con, enum poptCallbackReason reason,
 
     switch (reason) {
     case POPT_CALLBACK_REASON_PRE:
-        Fatal(1, error, "unexpected call to reach_popt");
+        Abort("unexpected call to reach_popt");
     case POPT_CALLBACK_REASON_POST: {
         int res;
 
         res = linear_search(ORDER, order);
         if (res < 0) {
             Warning(error, "unknown exploration order %s", order);
-            RTexitUsage(EXIT_FAILURE);
+            HREexitUsage(EXIT_FAILURE);
         } else {
             Warning(info, "Exploration order is %s", order);
         }
@@ -112,7 +113,7 @@ reach_popt(poptContext con, enum poptCallbackReason reason,
         res = linear_search(SATURATION, saturation);
         if (res < 0) {
             Warning(error, "unknown saturation strategy %s", saturation);
-            RTexitUsage(EXIT_FAILURE);
+            HREexitUsage(EXIT_FAILURE);
         } else {
             Warning(info, "Saturation strategy is %s", saturation);
         }
@@ -121,7 +122,7 @@ reach_popt(poptContext con, enum poptCallbackReason reason,
         res = linear_search(GUIDED, guidance);
         if (res < 0) {
             Warning(error, "unknown guided search strategy %s", guidance);
-            RTexitUsage(EXIT_FAILURE);
+            HREexitUsage(EXIT_FAILURE);
         } else {
             Warning(info, "Guided search strategy is %s", guidance);
         }
@@ -133,7 +134,7 @@ reach_popt(poptContext con, enum poptCallbackReason reason,
         return;
     }
     case POPT_CALLBACK_REASON_OPTION:
-        Fatal(1, error, "unexpected call to reach_popt");
+        Abort("unexpected call to reach_popt");
     }
 }
 
@@ -143,9 +144,14 @@ static  struct poptOption options[] = {
     { "saturation" , 0, POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &saturation , 0 , "select the saturation strategy" , "<none|sat-like|sat-loop|sat-fix|sat>" },
     { "sat-granularity" , 0 , POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &sat_granularity , 0 , "set saturation granularity","<number>" },
     { "save-sat-levels", 0, POPT_ARG_VAL, &save_sat_levels, 1, "save previous states seen at saturation levels", NULL },
-    {"guidance", 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &guidance, 0 , "select the guided search strategy" , "<unguided|directed>" },
+    { "guidance", 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &guidance, 0 , "select the guided search strategy" , "<unguided|directed>" },
     { "deadlock" , 'd' , POPT_ARG_VAL , &dlk_detect , 1 , "detect deadlocks" , NULL },
     { "action" , 0 , POPT_ARG_STRING , &act_detect , 0 , "detect action" , "<action>" },
+    { "invariant", 'i', POPT_ARG_STRING, &inv_detect, 1, "detect deadlocks", NULL },
+#ifdef SPINJA
+    { "assert", 0, POPT_ARG_VAL, &assert_detect, 1, "detect assertion errors (SpinJa). Same as --action=assert", NULL },
+#endif
+    { "no-exit", 'n', POPT_ARG_VAL, &no_exit, 1, "no exit on error, just count (for error counters use -v)", NULL },
     { "trace" , 0 , POPT_ARG_STRING , &trc_output , 0 , "file to write trace to" , "<lts-file>.gcf" },
     { "mu" , 0 , POPT_ARG_STRING , &mu_formula , 0 , "file with a mu formula" , "<mu-file>.mu" },
     { "ctl" , 0 , POPT_ARG_STRING , &ctl_formula , 0 , "file with a ctl* formula" , "<ctl-file>.ctl" },
@@ -158,7 +164,6 @@ static  struct poptOption options[] = {
     SPEC_POPT_OPTIONS,
     { NULL, 0 , POPT_ARG_INCLUDE_TABLE, greybox_options , 0 , "Greybox options",NULL},
     { NULL, 0 , POPT_ARG_INCLUDE_TABLE, vset_options , 0 , "Vector set options",NULL},
-    { NULL, 0 , POPT_ARG_INCLUDE_TABLE, lts_io_options , 0 , NULL , NULL },
     POPT_TABLEEND
 };
 
@@ -226,7 +231,7 @@ save_level(vset_t visited)
 }
 
 static void
-write_trace_state(lts_enum_cb_t trace_handle, int src_no, int *state)
+write_trace_state(lts_file_t trace_handle, int src_no, int *state)
 {
   int labels[sLbls];
 
@@ -235,11 +240,11 @@ write_trace_state(lts_enum_cb_t trace_handle, int src_no, int *state)
   if (sLbls != 0)
       GBgetStateLabelsAll(model, state, labels);
 
-  enum_state(trace_handle, 0, state, labels);
+  lts_write_state(trace_handle, 0, state, labels);
 }
 
 struct write_trace_step_s {
-    lts_enum_cb_t trace_handle;
+    lts_file_t    trace_handle;
     int           src_no;
     int           dst_no;
     int          *dst;
@@ -260,12 +265,12 @@ write_trace_next(void *arg, transition_info_t *ti, int *dst)
     }
 
     ctx->found = 1;
-    enum_seg_seg(ctx->trace_handle, 0, ctx->src_no, 0, ctx->dst_no, ti->labels);
+    lts_write_edge(ctx->trace_handle, 0, &ctx->src_no, 0, dst, ti->labels);
 }
 
 static void
-write_trace_step(lts_enum_cb_t trace_handle, int src_no, int *src,
-                     int dst_no, int *dst)
+write_trace_step(lts_file_t trace_handle, int src_no, int *src,
+                 int dst_no, int *dst)
 {
     struct write_trace_step_s ctx;
 
@@ -279,11 +284,11 @@ write_trace_step(lts_enum_cb_t trace_handle, int src_no, int *src,
     GBgetTransitionsAll(model, src, write_trace_next, &ctx);
 
     if (!ctx.found)
-        Fatal(1, error, "no matching transition found");
+        Abort("no matching transition found");
 }
 
 static void
-write_trace(lts_enum_cb_t trace_handle, int **states, int total_states)
+write_trace(lts_file_t trace_handle, int **states, int total_states)
 {
     // output starting from initial state, which is in states[total_states-1]
 
@@ -292,7 +297,7 @@ write_trace(lts_enum_cb_t trace_handle, int **states, int total_states)
 
         write_trace_state(trace_handle, current_step, states[i]);
         write_trace_step(trace_handle, current_step, states[i],
-                             current_step + 1, states[i - 1]);
+                         current_step + 1, states[i - 1]);
     }
 
     write_trace_state(trace_handle, total_states - 1, states[0]);
@@ -300,7 +305,7 @@ write_trace(lts_enum_cb_t trace_handle, int **states, int total_states)
 
 static void
 find_trace_to(int trace_end[][N], int end_count, int level, vset_t *levels,
-                  lts_enum_cb_t trace_handle)
+              lts_file_t trace_handle)
 {
     int    prev_level   = level - 2;
     vset_t src_set      = vset_create(domain, -1, NULL);
@@ -405,27 +410,29 @@ static void
 find_trace(int trace_end[][N], int end_count, int level, vset_t *levels)
 {
     // Find initial state and open output file
-    int           init_state[N];
-    lts_output_t  trace_output;
-    lts_enum_cb_t trace_handle;
+    int             init_state[N];
+    lts_file_t      trace_output;
+    lts_type_t      ltstype = GBgetLTStype(model);
 
     GBgetInitialState(model, init_state);
-    trace_output = lts_output_open(trc_output, model, 1, 0, 1, "vsi", NULL);
-    lts_output_set_root_vec(trace_output, (uint32_t*)init_state);
-    lts_output_set_root_idx(trace_output, 0, 0);
-    trace_handle = lts_output_begin(trace_output, 0, 0, 0);
+
+    trace_output = lts_file_create(trc_output, ltstype, 1, lts_vset_template());
+    lts_write_init(trace_output, 0, (uint32_t*)init_state);
+    int T=lts_type_get_type_count(ltstype);
+    for(int i=0;i<T;i++){
+        lts_file_set_table(trace_output,i,GBgetChunkMap(model,i));
+    }
 
     // Generate trace
-    mytimer_t  timer = SCCcreateTimer();
+    rt_timer_t  timer = RTcreateTimer();
 
-    SCCstartTimer(timer);
-    find_trace_to(trace_end, end_count, level, levels, trace_handle);
-    SCCstopTimer(timer);
-    SCCreportTimer(timer, "constructing trace took");
+    RTstartTimer(timer);
+    find_trace_to(trace_end, end_count, level, levels, trace_output);
+    RTstopTimer(timer);
+    RTprintTimer(info, timer, "constructing trace took");
 
     // Close output file
-    lts_output_end(trace_output, trace_handle);
-    lts_output_close(&trace_output);
+    lts_file_close(trace_output);
 }
 
 struct find_action_info {
@@ -502,8 +509,8 @@ explore_cb(void *context, int *src)
     GBgetTransitionsShort(model, ctx->group, src, group_add, context);
     (*ctx->explored)++;
 
-    if ((*ctx->explored) % 1000 == 0 && RTverbosity >= 2) {
-        Warning(info, "explored %d short vectors for group %d",
+    if ((*ctx->explored) % 1000 == 0) {
+        Warning(infoLong, "explored %d short vectors for group %d",
                     *ctx->explored, ctx->group);
     }
 }
@@ -572,7 +579,7 @@ get_vset_size(vset_t set, long *node_count, double *elem_approximation,
     len = bn_int2string(elem_str, str_len, &elem_count);
 
     if (len >= str_len)
-        Fatal(1, error, "Error converting number to string");
+        Abort("Error converting number to string");
 
     *elem_approximation = bn_int2double(&elem_count);
 
@@ -590,7 +597,7 @@ get_vrel_size(vrel_t rel, long *node_count, double *elem_approximation,
     len = bn_int2string(elem_str, str_len, &elem_count);
 
     if (len >= str_len)
-        Fatal(1, error, "Error converting number to string");
+        Abort("Error converting number to string");
 
     *elem_approximation = bn_int2double(&elem_count);
 
@@ -620,7 +627,7 @@ stats_and_progress_report(vset_t current, vset_t visited, int level)
     if (n_count > max_vis_count)
         max_vis_count = n_count;
 
-    if (RTverbosity >= 2) {
+    if (log_active(infoLong)) {
         fprintf(stderr, "transition caches ( grp nds elts ): ");
 
         for (int i = 0; i < nGrps; i++) {
@@ -648,13 +655,13 @@ stats_and_progress_report(vset_t current, vset_t visited, int level)
 }
 
 static void
-final_stat_reporting(vset_t visited, mytimer_t timer)
+final_stat_reporting(vset_t visited, rt_timer_t timer)
 {
     long   n_count;
     char   elem_str[1024];
     double e_count;
 
-    SCCreportTimer(timer, "reachability took");
+    RTprintTimer(info,timer, "reachability took");
 
     if (dlk_detect)
         Warning(info, "No deadlocks found");
@@ -1533,14 +1540,14 @@ static void
 do_output(char *etf_output, vset_t visited)
 {
     FILE      *tbl_file;
-    mytimer_t  timer    = SCCcreateTimer();
+    rt_timer_t  timer    = RTcreateTimer();
 
-    SCCstartTimer(timer);
+    RTstartTimer(timer);
     Warning(info, "writing output");
     tbl_file = fopen(etf_output, "w");
 
     if (tbl_file == NULL)
-        FatalCall(1, error,"could not open %s", etf_output);
+        AbortCall("could not open %s", etf_output);
 
     output_init(tbl_file);
     output_trans(tbl_file);
@@ -1548,8 +1555,8 @@ do_output(char *etf_output, vset_t visited)
     output_types(tbl_file);
 
     fclose(tbl_file);
-    SCCstopTimer(timer);
-    SCCreportTimer(timer, "writing output took");
+    RTstopTimer(timer);
+    RTprintTimer(info, timer, "writing output took");
 }
 
 static void
@@ -1697,7 +1704,7 @@ init_model(char *file)
 
     GBloadFile(model, file, &model);
 
-    if (RTverbosity >= 2) {
+    if (log_active(infoLong)) {
         fprintf(stderr, "Dependency Matrix:\n");
         GBprintDependencyMatrixCombined(stderr, model);
     }
@@ -1744,6 +1751,8 @@ init_action()
     if (eLbls != 1)
         Abort("action detection assumes precisely one edge label");
 
+    if (assert_detect)
+        act_detect = "assert";
     chunk c = chunk_str(act_detect);
     //table number of first edge label.
     act_detect_table=lts_type_get_edge_label_typeno(ltstype, 0);
@@ -1784,9 +1793,9 @@ mu_compute (ltsmin_expr_t mu_expr, vset_t visited)
     case MU_EQ: { // svar == int
         /* Currently MU_EQ works only in the context of an SVAR/INTEGER pair */
         if (!mu_expr->arg1->token == MU_SVAR)
-            Fatal(1,error, "Expecting == with state variable on the left side!\n");
+            Abort("Expecting == with state variable on the left side!\n");
         if (!mu_expr->arg1->token == MU_NUM)
-            Fatal(1,error, "Expecting == with int on the right side!\n");
+            Abort("Expecting == with int on the right side!\n");
         result = get_svar_eq_int_set(mu_expr->arg1->idx, mu_expr->arg2->idx, visited);
     } break;
     case MU_OR: { // OR
@@ -1809,7 +1818,7 @@ mu_compute (ltsmin_expr_t mu_expr, vset_t visited)
         vset_destroy(mc);
     } break;
     case MU_NEXT: // X
-        Fatal(1,error, "unhandled MU_NEXT");
+        Abort("unhandled MU_NEXT");
         break;
     case MU_EXIST: { // E
         if (mu_expr->arg1->token == MU_NEXT) {
@@ -1830,17 +1839,17 @@ mu_compute (ltsmin_expr_t mu_expr, vset_t visited)
             // in order to prevent this, intersect with visited
             vset_intersect(result, visited);
         } else {
-            Fatal(1,error, "invalid operator following MU_EXIST, expecting MU_NEXT");
+            Abort("invalid operator following MU_EXIST, expecting MU_NEXT");
         }
     } break;
     case MU_NUM:
-        Fatal(1,error, "unhandled MU_NUM");
+        Abort("unhandled MU_NUM");
         break;
     case MU_SVAR:
-        Fatal(1,error, "unhandled MU_SVAR");
+        Abort("unhandled MU_SVAR");
         break;
     case MU_EVAR:
-        Fatal(1, error, "unhandled MU_EVAR");
+        Abort("unhandled MU_EVAR");
         break;
     case MU_VAR:
         ensure_access(mu_var_man, mu_expr->idx);
@@ -1879,7 +1888,7 @@ mu_compute (ltsmin_expr_t mu_expr, vset_t visited)
             vset_destroy(prev);
             vset_destroy(notphi);
         } else {
-            Fatal(1,error, "invalid operator following MU_ALL, expecting MU_NEXT");
+            Abort("invalid operator following MU_ALL, expecting MU_NEXT");
         }
         break;
     case MU_MU:
@@ -1918,7 +1927,7 @@ mu_compute (ltsmin_expr_t mu_expr, vset_t visited)
         }
         break;
     default:
-        Fatal(1,error, "encountered unhandled mu operator");
+        Abort("encountered unhandled mu operator");
     }
     return result;
 }
@@ -1934,7 +1943,7 @@ void init_pbes()
         /*
         chunk c = GBchunkGet(model, var_type_no, i);
         if (c.len == 0) {
-            Fatal(1, error, "lookup of %d failed", i);
+            Abort("lookup of %d failed", i);
         }
         char s[c.len + 1];
         for (unsigned int i = 0; i < c.len; i++) {
@@ -2091,17 +2100,21 @@ int
 main (int argc, char *argv[])
 {
     char *files[2];
-    RTinitPopt(&argc, &argv, options, 1, 2, files, NULL, "<model> [<etf>]",
-                   "Perform a symbolic reachability analysis of <model>\n"
-                       "The optional output of this analysis is an ETF "
-                           "representation of the input\n\nOptions");
+    HREinitBegin(argv[0]);
+    HREaddOptions(options,"Perform a symbolic reachability analysis of <model>\n"
+                  "The optional output of this analysis is an ETF "
+                      "representation of the input\n\nOptions");
+    lts_lib_setup();
+    HREinitStart(&argc,&argv,1,2,files,"<model> [<etf>]");
 
     vset_implementation_t vset_impl = VSET_IMPL_AUTOSELECT;
     vset_t visited;
 
     init_model(files[0]);
     init_domain(vset_impl, &visited);
-    if (act_detect != NULL) init_action();
+    if (assert_detect || act_detect != NULL) init_action();
+    if (inv_detect) Abort("Invariant violation detection is not implemented.");
+    if (no_exit) Abort("Error counting (--no-exit) is not implemented.");
 
     sat_proc_t sat_proc = NULL;
     reach_proc_t reach_proc = NULL;
@@ -2169,6 +2182,10 @@ main (int argc, char *argv[])
     vset_add(visited, src);
     Warning(info, "got initial state");
 
+    if (mu_expr) { // run a small test to check correctness of mu formula
+        vset_t x = mu_compute(mu_expr, visited);
+        vset_destroy(x);
+    }
 #if defined(PBES)
     lts_type_t type = GBgetLTStype(model);
     var_pos = 0;
@@ -2208,11 +2225,11 @@ main (int argc, char *argv[])
     false_states = vset_create(domain, -1, NULL);
 #endif
 
-    mytimer_t timer = SCCcreateTimer();
+    rt_timer_t timer = RTcreateTimer();
 
-    SCCstartTimer(timer);
+    RTstartTimer(timer);
     guided_proc(sat_proc, reach_proc, visited, files[1]);
-    SCCstopTimer(timer);
+    RTstopTimer(timer);
 
     if (mu_expr) {
         // setup var manager
@@ -2245,11 +2262,11 @@ main (int argc, char *argv[])
     vset_destroy(false_states);
 
     if (pg_output || pgsolve_flag) {
-        SCCresetTimer(timer);
-        SCCstartTimer(timer);
+        RTresetTimer(timer);
+        RTstartTimer(timer);
         parity_game * g = compute_symbolic_parity_game(visited, src);
-        SCCstopTimer(timer);
-        SCCreportTimer(timer, "computing symbolic parity game took");
+        RTstopTimer(timer);
+        RTprintTimer(info, timer, "computing symbolic parity game took");
         if (pg_output) {
             Warning(info,"Writing symbolic parity game to %s",pg_output);
             FILE *f = fopen(pg_output, "w");
@@ -2259,15 +2276,15 @@ main (int argc, char *argv[])
         if (pgsolve_flag)
         {
             spgsolver_options* spg_options = spg_get_solver_options();
-            mytimer_t pgsolve_timer = SCCcreateTimer();
-            SCCstartTimer(pgsolve_timer);
+            rt_timer_t pgsolve_timer = RTcreateTimer();
+            RTstartTimer(pgsolve_timer);
             bool result = spg_solve(g, spg_options);
             Warning(info, "");
             Warning(info, "The result is: %s", result ? "true":"false");
-            SCCstopTimer(pgsolve_timer);
+            RTstopTimer(pgsolve_timer);
             Warning(info, "");
-            SCCreportTimer(timer, "generation took");
-            SCCreportTimer(pgsolve_timer, "solving took");
+            RTprintTimer(info, timer, "generation took");
+            RTprintTimer(info, pgsolve_timer, "solving took");
         }
         spg_destroy(g);
     }

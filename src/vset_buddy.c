@@ -5,10 +5,7 @@
 #include <time.h>
 
 #include <fdd.h>
-#include <assert.h>
-#include <time.h>
-
-#include <runtime.h>
+#include <hre/user.h>
 #include <vdom_object.h>
 
 static int fdd_bits=16;
@@ -19,7 +16,7 @@ static const char *fdd_reorder_opt="none";
 static int fdd_order_strat=BDD_REORDER_NONE;
 
 static void vset_fdd_gbchandler(int pre, bddGbcStat *s) {
-  if (!pre && RTverbosity>=2) {
+  if (!pre && log_active(infoLong)) {
     Warning(info,"Garbage collection #%d: %d nodes / %d free / %.1fs / %.1fs total",
 	    s->num, s->nodes, s->freenodes,
 	    (float)s->time/(float)(CLOCKS_PER_SEC),
@@ -47,7 +44,7 @@ static void buddy_popt(poptContext con,
 			const char * arg, void * data) {
   (void)con;(void)opt;(void)arg;(void)data;
   if (reason != POPT_CALLBACK_REASON_POST) 
-    Fatal(1,error,"unexpected call to buddy_popt");
+    Abort("unexpected call to buddy_popt");
   
   if (!strcmp(fdd_reorder_opt,"none"))
     fdd_order_strat=BDD_REORDER_NONE;
@@ -66,7 +63,7 @@ static void buddy_popt(poptContext con,
   else if (!strcmp(fdd_reorder_opt,"random"))
     fdd_order_strat=BDD_REORDER_RANDOM;
   else
-    Fatal(1,error,"BuDDy reordering strategy not recognized: %s",fdd_reorder_opt);
+    Abort("BuDDy reordering strategy not recognized: %s",fdd_reorder_opt);
 
   return;
 }
@@ -204,13 +201,13 @@ static vrel_t rel_create_fdd(vdom_t dom,int k,int* proj){
     rel->pairs=bdd_newpair();
     int res=fdd_setpairs(rel->pairs,vars2,vars,k);
     if (res<0){
-        Fatal(1,error,"BuDDy error: %s",bdd_errstring(res));
+        Abort("BuDDy error: %s",bdd_errstring(res));
     }
     // for prev function
     rel->inv_pairs=bdd_newpair();
     res=fdd_setpairs(rel->inv_pairs,vars,vars2,k);
     if (res<0){
-        Fatal(1,error,"BuDDy error: %s",bdd_errstring(res));
+        Abort("BuDDy error: %s",bdd_errstring(res));
     }
     if (k==dom->shared.size) {
         rel->p_set = dom->varset;
@@ -515,7 +512,7 @@ vdom_t vdom_create_fdd(int n){
 	for(int i=0;i<n;i++){
 		res=fdd_extdomain(domain,2);
 		if (res<0){
-			Fatal(1,error,"BuDDy error: %s",bdd_errstring(res));
+			Abort("BuDDy error: %s",bdd_errstring(res));
 		}
 		dom->vars[i]=res;
 		dom->vars2[i]=res+1;
@@ -524,7 +521,7 @@ vdom_t vdom_create_fdd(int n){
 	}
 	dom->varset=bdd_addref(fdd_makeset(dom->vars,n));
 	if (dom->varset==bddfalse) {
-		Fatal(1,error,"fdd_makeset failed");
+		Abort("fdd_makeset failed");
 	}
 	dom->shared.set_create=set_create_fdd;
 	dom->shared.set_add=set_add_fdd;

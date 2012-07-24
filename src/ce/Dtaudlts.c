@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include <sys/types.h>
 #include <mpi.h>
-#include <runtime.h>
+#include <hre/runtime.h>
 #include <assert.h>
 #include "Dtaudlts.h"
 #include "bufs.h"

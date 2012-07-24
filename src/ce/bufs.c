@@ -1,8 +1,9 @@
-#include <runtime.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <mpi.h>
 #include "bufs.h"
+
+#include <hre/runtime.h>
 
 //#define DEBUG
 
@@ -75,7 +76,7 @@ void rcvBuf(intbuf_t* bufs, int* w, MPI_Comm comm, int* tag, int* size){
 
   MPI_Status status; 
   if ((MPI_Probe(MPI_ANY_SOURCE, MPI_ANY_TAG, comm, &status)) != MPI_SUCCESS)
-    Fatal(1,error,"ERROR IN PROBE"); 
+    Abort("ERROR IN PROBE");
   MPI_Get_count(&status, MPI_INT, size);
   *w = status.MPI_SOURCE;
   *tag = status.MPI_TAG;
@@ -183,10 +184,10 @@ void Receive(int* w, MPI_Comm comm, int tag, int* msg){
 intbuf_t newBuffer(int initialsize){
   intbuf_t buf;
   if ((buf = (intbuf_t)calloc(1,sizeof(struct intbuf))) == NULL)
-      Fatal(1,error,"Could not allocate IntBuffer");
+      Abort("Could not allocate IntBuffer");
   buf->size = initialsize;
   if ((buf->b = (int*)calloc(buf->size, sizeof(int))) == NULL)
-    Fatal(1,error,"Could not allocate IntBuffer");
+      Abort("Could not allocate IntBuffer");
   buf->index = 0;
   return buf;
 }
@@ -201,10 +202,10 @@ void freeBuffer(intbuf_t buf){
 
 void resetBuffer(intbuf_t buf){
   if (buf==NULL)
-    Fatal(1,error,"IntBuffer not initialized");
+    Abort("IntBuffer not initialized");
   buf->size = BUFSIZE;
   if ((buf->b = (int*)realloc(buf->b, buf->size*sizeof(int))) == NULL)
-    Fatal(1,error,"Could not re-allocate IntBuffer");
+    Abort("Could not re-allocate IntBuffer");
   buf->index = 0;  
 }
 
@@ -223,7 +224,7 @@ void add(intbuf_t buf, int* x, int n){
   while (buf->index  + n >= buf->size){
     buf->size += BUFSIZE;
     if(( buf->b = (int*)realloc(buf->b , (buf->size)*sizeof(int))) == NULL)
-      Fatal(1,error,"Could not reallocate a Buffer");
+      Abort("Could not reallocate a Buffer");
   };
   for(i = 0; i < n; i++)
     buf->b[buf->index++] = x[i];
@@ -233,7 +234,7 @@ void add1(intbuf_t buf, int x){
   if (buf->index  + 1 >= buf->size){
     buf->size += BUFSIZE;
     if(( buf->b = (int*)realloc(buf->b , (buf->size)*sizeof(int))) == NULL)
-      Fatal(1,error,"Could not reallocate a Buffer");
+      Abort("Could not reallocate a Buffer");
   };
   buf->b[buf->index++] = x;
 }
@@ -243,7 +244,7 @@ void add4(intbuf_t buf, int x, int y, int z, int t){
   while (buf->index  + 4 >= buf->size){
     buf->size += BUFSIZE;
     if(( buf->b = (int*)realloc(buf->b , (buf->size)*sizeof(int))) == NULL)
-      Fatal(1,error,"Could not reallocate a Buffer");
+      Abort("Could not reallocate a Buffer");
   };
   buf->b[buf->index++] = x;  
   buf->b[buf->index++] = y;  

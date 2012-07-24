@@ -1,6 +1,7 @@
 #include <config.h>
-#include <tables.h>
+
 #include <stringindex.h>
+#include <tables.h>
 
 static void destroy(value_table_t vt){
     SIdestroy((string_index_t*)vt);

@@ -2,13 +2,14 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "mcrl-greybox.h"
-#include "runtime.h"
-#include "rw.h"
-#include "mcrl.h"
-#include "step.h"
-#include "at-map.h"
-#include "dm/dm.h"
+#include <at-map.h>
+#include <dm/dm.h>
+#include <hre/user.h>
+#include <mcrl.h>
+#include <mcrl-greybox.h>
+#include <rw.h>
+#include <step.h>
+
 
 static char *mcrl_args="-alt rw";
 
@@ -28,7 +29,7 @@ static void ErrorHandler(const char *format, va_list args) {
 		ATvfprintf(f, format, args);
 		fprintf(f,"\n");
 	}
-	Fatal(1,error,"ATerror");
+	Abort("ATerror");
 	exit(EXIT_FAILURE);
 }
 
@@ -57,7 +58,7 @@ static void MCRLinitGreybox(int argc,const char *argv[],void* stack_bottom){
 		for(int i=1;i<argc;i++){
 			Warning(error,"unparsed mCRL option %s",argv[i]);
 		}
-		Fatal(1,error,"Exiting");
+		Abort("Exiting");
 	}
 }
 
@@ -73,10 +74,10 @@ static void mcrl_popt(poptContext con,
 		int argc;
 		const char **argv;
 		if (strstr(mcrl_args,"-confluent")||strstr(mcrl_args,"-conf-table")||strstr(mcrl_args,"-conf-compute")){
-			Fatal(1,error,"This tool does not support tau confluence reduction.");
+			Abort("This tool does not support tau confluence reduction.");
 		}
-		RTparseOptions(mcrl_args,&argc,&argv);
-		MCRLinitGreybox(argc,argv,RTstackBottom());
+		RTparseOptions(mcrl_args,&argc,(char***)&argv);
+		MCRLinitGreybox(argc,argv,HREstackBottom());
 		free(argv);    // Allocated as one block by RTparseOptions
 		GBregisterLoader("tbf",MCRLloadGreyboxModel);
 		Warning(debug,"mCRL language module initialized");
@@ -85,7 +86,7 @@ static void mcrl_popt(poptContext con,
 	case POPT_CALLBACK_REASON_OPTION:
 		break;
 	}
-	Fatal(1,error,"unexpected call to mcrl_popt");
+	Abort("unexpected call to mcrl_popt");
 }
 struct poptOption mcrl_options[]= {
 	{ NULL, 0 , POPT_ARG_CALLBACK|POPT_CBFLAG_POST|POPT_CBFLAG_SKIPOPTION , mcrl_popt , 0 , NULL , NULL },
@@ -157,7 +158,7 @@ static void MCRLgetStateLabelsAll(model_t model,int*state,int*labels){
 		at_src[i]=ATfindTerm(termmap,state[i]);
 	}
 	int res=STstepSmd(at_src,s_smd_map,dm_nrows(&sl_info));
-	if (res<0) Fatal(1,error,"error in STstepSmd")
+	if (res<0) Abort("error in STstepSmd")
 }
 
 static int MCRLgetTransitionsLong(model_t model,int group,int*src,TransitionCB cb,void*context){
@@ -171,7 +172,7 @@ static int MCRLgetTransitionsLong(model_t model,int group,int*src,TransitionCB c
 		at_src[i]=ATfindTerm(termmap,src[i]);
 	}
 	int res=STstepSmd(at_src,e_smd_map+group,1);
-	if (res<0) Fatal(1,error,"error in STstepSmd")
+	if (res<0) Abort("error in STstepSmd")
 	return res;
 }
 
@@ -186,22 +187,22 @@ static int MCRLgetTransitionsAll(model_t model,int*src,TransitionCB cb,void*cont
 		at_src[i]=ATfindTerm(termmap,src[i]);
 	}
 	int res=STstepSmd(at_src,e_smd_map,dm_nrows(&dm_info));
-	if (res<0) Fatal(1,error,"error in STstepSmd")
+	if (res<0) Abort("error in STstepSmd")
 	return res;
 }
 
 void MCRLloadGreyboxModel(model_t m,const char*model){
 	if(instances) {
-		Fatal(1,error,"mCRL is limited to one instance, due to global variables.");
+		Abort("mCRL is limited to one instance, due to global variables.");
 	}
 	instances++;
 	char*x=strdup(model);
 	if(!MCRLinitNamedFile(x)) {
-		FatalCall(1,error,"failed to open %s",model);
+		Abort("failed to open %s",model);
 	}
 	free(x);
 	if (!RWinitialize(MCRLgetAdt())) {
-		Fatal(1,error,"could not initialize rewriter for %s",model);
+		Abort("could not initialize rewriter for %s",model);
 	}
 	lts_type_t ltstype=lts_type_create();
 	state_length=MCRLgetNumberOfPars();

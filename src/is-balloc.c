@@ -1,12 +1,15 @@
 // -*- tab-width:4 ; indent-tabs-mode:nil -*-
 
 #include <config.h>
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
 #include <unix.h>
-#include <runtime.h>
+
+#include <hre/user.h>
 #include <is-balloc.h>
+
 
 #define INIT_MAX_BLOCKS (1024*64)
 
@@ -121,7 +124,7 @@ int *
 isba_pop_int(isb_allocator_t buf)
 {
     if (buf->cur_index == 0) {
-        if (buf->num_block == 1) Fatal(1, error, "Pop on empty buffer");
+        if (buf->num_block == 1) Abort("Pop on empty buffer");
         remove_block(buf);
         buf->cur_index = BLOCK_ELT_SIZE;
     }
@@ -142,7 +145,7 @@ isba_to_string(isb_allocator_t buf)
                           buf->el_size, buf->num_block, BLOCK_ELT_SIZE,
                           buf->cur_index, ar[0]);
     if (status == -1)
-        Fatal(1, error, "Could not allocate string.");
+        Abort("Could not allocate string.");
 
     return res;
 }
@@ -158,7 +161,7 @@ isba_discard_int(isb_allocator_t buf, size_t amount)
    if (buf->cur_index < amount) {
         size_t blocks = amount>>BLOCK_ELT_POW;
         if (buf->num_block == 1 || buf->num_block <= blocks)
-            Fatal(1, error, "Discard %zu on buffer of size %zu elements", amount, isba_size_int(buf));
+            Abort("Discard %zu on buffer of size %zu elements", amount, isba_size_int(buf));
         size_t x;
         for (x = 0; x <= blocks; x++) remove_block(buf);
         buf->cur_index = BLOCK_ELT_SIZE-(amount&(BLOCK_ELT_SIZE-1))+buf->cur_index;
@@ -180,7 +183,7 @@ int *
 isba_top_int(isb_allocator_t buf)
 {
     if (buf->cur_index == 0) {
-        if (buf->num_block == 1) Fatal(1, error, "Top on empty buffer");
+        if (buf->num_block == 1) Abort("Top on empty buffer");
         return &buf->blocks[buf->num_block-2][(BLOCK_ELT_SIZE-1)*buf->el_size];
     } else {
         return &buf->blocks[buf->num_block-1][(buf->cur_index-1)*buf->el_size];
@@ -193,7 +196,7 @@ isba_peek_int(isb_allocator_t buf, size_t offset_top)
     size_t size = isba_size_int(buf);
     if (offset_top >= size)
         return NULL;
-        //Fatal(1, error, "peeks offset %zu is too large for a buffer with size %zu", offset_top, size);
+        //Abort("peeks offset %zu is too large for a buffer with size %zu", offset_top, size);
     size_t newsize = size - (offset_top+1);
     size_t block = newsize>>BLOCK_ELT_POW;
     size_t rest = newsize&(BLOCK_ELT_SIZE-1);

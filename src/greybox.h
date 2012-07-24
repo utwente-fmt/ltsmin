@@ -3,9 +3,11 @@
 
 #include <popt.h>
 #include <stdio.h>
-#include "chunk_support.h"
-#include "lts-type.h"
-#include "dm/dm.h"
+
+#include <chunk_support.h>
+#include <dm/dm.h>
+#include <lts-type.h>
+
 
 /**
  @file greybox.h
@@ -355,12 +357,12 @@ extern matrix_t *GBgetGuardNDSInfo(model_t model);
 /**
 \brief Set the POR visibility info.
 */
-extern void GBsetPorVisibility(model_t model, bitvector_t *bv);
+extern void GBsetPorVisibility(model_t model, int*bv);
 
 /**
 \brief Get the POR visibility info, i.e. which group touches an LTL variable.
 */
-extern bitvector_t *GBgetPorVisibility(model_t model);
+extern int *GBgetPorVisibility(model_t model);
 
 /**
 \brief Set the initial state.
@@ -555,14 +557,6 @@ extern model_t GBaddLTL(model_t model, const char *ltl_file, pins_ltl_type_t typ
 \brief Add POR layer before LTL layer
 */
 extern model_t GBaddPOR(model_t model, const int has_ltl);
-
-/**
-\brief connection from ltl to por layer
-
-Note: this is a hack because the layers are closely coupled
-      a better solution must be provided sometime in the future
-*/
-extern void por_visibility(model_t model, int group, int visibility);
 
 //@{
 

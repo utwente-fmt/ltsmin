@@ -14,8 +14,9 @@
 extern "C" {
 
 #include <popt.h>
-#include "pbes-greybox.h"
-#include <runtime.h>
+
+#include <hre/user.h>
+#include <pbes-greybox.h>
 
 } // end of extern "C"
 
@@ -125,7 +126,7 @@ public:
     {
         chunk c = GBchunkGet(model_, type_no, index);
         if (c.len == 0) {
-            Fatal(1, error, "lookup of %d failed", index);
+            Abort("lookup of %d failed", index);
         }
         return std::string(reinterpret_cast<char*>(c.data), c.len);
     }
@@ -160,7 +161,7 @@ public:
     {
         if (global_group_var_ids == 0)
         {
-            Fatal(1,error,"call to check_group before init_group_id_cache.");
+            Abort("call to check_group before init_group_id_cache.");
         }
         return global_group_var_ids[group] == src[0];
     }
@@ -268,7 +269,7 @@ static void pbes_popt(poptContext con, enum poptCallbackReason reason,
         {
             Warning(debug,"pbes init");
             Warning (debug,"ATerm init");
-            MCRL2_ATERMPP_INIT_(0,0,RTstackBottom());
+            MCRL2_ATERMPP_INIT_(0,0,HREstackBottom());
             if (reset_flag) {
                 Warning(info,"Reset flag is set.");
             }
@@ -285,7 +286,7 @@ static void pbes_popt(poptContext con, enum poptCallbackReason reason,
     case POPT_CALLBACK_REASON_OPTION:
         break;
     }
-    Fatal(1,error,"unexpected call to pbes_popt");
+    Abort("unexpected call to pbes_popt");
 }
 
 struct poptOption pbes_options[] = {

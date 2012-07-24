@@ -3,7 +3,7 @@
 
 #include <dm/dm.h>
 #include <greybox.h>
-#include <runtime.h>
+#include <hre/user.h>
 #include <treedbs.h>
 
 struct grey_box_model {
@@ -19,7 +19,7 @@ struct grey_box_model {
     matrix_t *gnes_info; // guard necessary enabling set
     matrix_t *gnds_info; // guard necessary disabling set
     int sl_idx_buchi_accept;
-    bitvector_t *por_visibility;
+    int *por_visibility;
 	int *s0;
 	void*context;
 	next_method_grey_t next_short;
@@ -351,7 +351,7 @@ void GBsetContext(model_t model,void* context){
 }
 
 void GBsetLTStype(model_t model,lts_type_t info){
-	if (model->ltstype != NULL)  Fatal(1,error,"ltstype already set");
+	if (model->ltstype != NULL)  Abort("ltstype already set");
     lts_type_validate(info);
 	model->ltstype=info;
     if (model->map==NULL){
@@ -368,7 +368,7 @@ lts_type_t GBgetLTStype(model_t model){
 }
 
 void GBsetDMInfo(model_t model, matrix_t *dm_info) {
-	if (model->dm_info != NULL) Fatal(1, error, "dependency matrix already set");
+	if (model->dm_info != NULL) Abort("dependency matrix already set");
 	model->dm_info=dm_info;
 }
 
@@ -377,7 +377,7 @@ matrix_t *GBgetDMInfo(model_t model) {
 }
 
 void GBsetDMInfoRead(model_t model, matrix_t *dm_info) {
-	if (model->dm_read_info != NULL) Fatal(1, error, "dependency matrix already set");
+	if (model->dm_read_info != NULL) Abort("dependency matrix already set");
 	model->dm_read_info=dm_info;
 }
 
@@ -390,7 +390,7 @@ matrix_t *GBgetDMInfoRead(model_t model) {
 }
 
 void GBsetDMInfoWrite(model_t model, matrix_t *dm_info) {
-	if (model->dm_write_info != NULL) Fatal(1, error, "dependency matrix already set");
+	if (model->dm_write_info != NULL) Abort("dependency matrix already set");
 	model->dm_write_info=dm_info;
 }
 
@@ -403,7 +403,7 @@ matrix_t *GBgetDMInfoWrite(model_t model) {
 }
 
 void GBsetStateLabelInfo(model_t model, matrix_t *info){
-	if (model->sl_info != NULL)  Fatal(1,error,"state info already set");
+	if (model->sl_info != NULL)  Abort("state info already set");
 	model->sl_info=info;
 }
 
@@ -413,7 +413,7 @@ matrix_t *GBgetStateLabelInfo(model_t model){
 
 void GBsetInitialState(model_t model,int *state){
 	if (model->ltstype==NULL)
-            Fatal(1,error,"must set ltstype before setting initial state");
+            Abort("must set ltstype before setting initial state");
 	RTfree (model->s0);
 	int len=lts_type_get_state_length(model->ltstype);
 	model->s0=(int*)RTmalloc(len * sizeof(int));
@@ -455,13 +455,13 @@ void GBsetIsCoveredByShort(model_t model,covered_by_grey_t covered_by_short){
 
 int GBisCoveredByShort(model_t model,int*a,int*b) {
     if (NULL == model->covered_by_short)
-        Fatal (1,error,"No symbolic comparison function (isCoveredByShort) present for loaded model.");
+        Abort("No symbolic comparison function (isCoveredByShort) present for loaded model.");
     return model->covered_by_short(a,b);
 }
 
 int GBisCoveredBy(model_t model,int*a,int*b) {
     if (NULL == model->covered_by)
-        Fatal (1,error,"No symbolic comparison function (isCoveredBy) present for loaded model.");
+        Abort("No symbolic comparison function (isCoveredBy) present for loaded model.");
     return model->covered_by(a,b);
 }
 
@@ -533,16 +533,21 @@ guard_t* GBgetGuard(model_t model, int group) {
 }
 
 void GBsetGuardCoEnabledInfo(model_t model, matrix_t *info) {
-    if (model->gce_info != NULL) Fatal(1, error, "guard may be co-enabled info already set");
+    if (model->gce_info != NULL) Abort("guard may be co-enabled info already set");
     model->gce_info = info;
 }
 
-void GBsetPorVisibility(model_t model, bitvector_t *bv) {
-    if (model->por_visibility != NULL) Fatal(1, error, "POR visibility already set");
-    model->por_visibility = bv;
+void GBsetPorVisibility(model_t model, int*visibility) {
+    if (model->por_visibility != NULL) {
+        //Warning(info, "POR visibility already set");
+        RTfree(model->por_visibility);
+        model->por_visibility = visibility;
+    } else {
+        model->por_visibility = visibility;
+    }
 }
 
-bitvector_t *GBgetPorVisibility(model_t model) {
+int *GBgetPorVisibility(model_t model) {
     return model->por_visibility;
 }
 
@@ -551,7 +556,7 @@ matrix_t *GBgetGuardCoEnabledInfo(model_t model) {
 }
 
 void GBsetGuardNESInfo(model_t model, matrix_t *info) {
-    if (model->gnes_info != NULL) Fatal(1, error, "guard NES info already set");
+    if (model->gnes_info != NULL) Abort("guard NES info already set");
     model->gnes_info = info;
 }
 
@@ -560,7 +565,7 @@ matrix_t *GBgetGuardNESInfo(model_t model) {
 }
 
 void GBsetGuardNDSInfo(model_t model, matrix_t *info) {
-    if (model->gnds_info != NULL) Fatal(1, error, "guard NDS info already set");
+    if (model->gnds_info != NULL) Abort("guard NDS info already set");
     model->gnds_info = info;
 }
 
@@ -681,6 +686,7 @@ static char* model_type_pre[MAX_TYPES];
 static pins_loader_t model_preloader[MAX_TYPES];
 static int registered_pre=0;
 static int matrix=0;
+static int labels=0;
 static int cache=0;
 static int por=0;
 static const char *regroup_options = NULL;
@@ -709,7 +715,8 @@ ltl_popt (poptContext con, enum poptCallbackReason reason,
             int l = linear_search (db_ltl_semantics, ltl_semantics);
             if (l < 0) {
                 Warning (error, "unknown ltl semantic %s", ltl_semantics);
-                RTexitUsage (EXIT_FAILURE);
+                HREprintUsage();
+                HREexit(EXIT_FAILURE);
             }
             ltl_type = l;
         }
@@ -717,9 +724,26 @@ ltl_popt (poptContext con, enum poptCallbackReason reason,
     case POPT_CALLBACK_REASON_OPTION:
         break;
     }
-    Fatal (1, error, "unexpected call to ltl_popt");
+    Abort("unexpected call to ltl_popt");
 }
 
+void chunk_table_print(log_t log, model_t model) {
+    lts_type_t t = GBgetLTStype(model);
+    log_printf(log,"The registered types values are:\n");
+    int N=lts_type_get_type_count(t);
+    int idx = 0;
+    for(int i=0;i<N;i++){
+        int V = GBchunkCount(model, i);
+        for(int j=0;j<V;j++){
+            char *type = lts_type_get_type(t, i);
+            chunk c = GBchunkGet(model, i, j);
+            char name[c.len*2+6];
+            chunk2string(c, sizeof name, name);
+            log_printf(log,"%4d: %s (%s)\n",idx, name, type);
+            idx++;
+        }
+    }
+}
 
 void
 GBloadFile (model_t model, const char *filename, model_t *wrapped)
@@ -745,14 +769,19 @@ GBloadFile (model_t model, const char *filename, model_t *wrapped)
                 if (matrix) {
                     GBprintDependencyMatrixCombined(stdout, model);
                     exit (EXIT_SUCCESS);
-                } else
+                } else if (labels) {
+                    lts_type_print(info, GBgetLTStype(model));
+                    chunk_table_print(info, model);
+                    exit (EXIT_SUCCESS);
+                } else {
                     return;
+                }
             }
         }
-        Fatal (1, error, "No factory method has been registered for %s models",
+        Abort("No factory method has been registered for %s models",
                extension);
     } else {
-        Fatal (1, error, "filename %s doesn't have an extension",
+        Abort("filename %s doesn't have an extension",
                filename);
     }
 }
@@ -770,7 +799,7 @@ GBloadFileShared (model_t model, const char *filename)
             }
         }
     } else {
-        Fatal (1, error, "filename %s doesn't have an extension", filename);
+        Abort("filename %s doesn't have an extension", filename);
     }
 }
 
@@ -780,7 +809,7 @@ void GBregisterLoader(const char*extension,pins_loader_t loader){
 		model_loader[registered]=loader;
 		registered++;
 	} else {
-		Fatal(1,error,"model type registry overflow");
+		Abort("model type registry overflow");
 	}
 }
 
@@ -790,7 +819,7 @@ void GBregisterPreLoader(const char*extension,pins_loader_t loader){
         model_preloader[registered_pre]=loader;
         registered_pre++;
     } else {
-        Fatal(1,error,"model type registry overflow");
+        Abort("model type registry overflow");
     }
 }
 
@@ -817,14 +846,15 @@ GBbuchiIsAccepting (model_t model, int *state)
 
 struct poptOption ltl_options[] = {
     {NULL, 0, POPT_ARG_CALLBACK | POPT_CBFLAG_POST | POPT_CBFLAG_SKIPOPTION, (void *)ltl_popt, 0, NULL, NULL},
-    {"ltl", 0, POPT_ARG_STRING, &ltl_file, 0, "file with LTL formula",
-     "<ltl-file>.ltl"},
+    {"ltl", 0, POPT_ARG_STRING, &ltl_file, 0, "LTL formula or file with LTL formula",
+     "<ltl-file>.ltl|<ltl formula>"},
     {"ltl-semantics", 0, POPT_ARG_STRING | POPT_ARGFLAG_SHOW_DEFAULT, &ltl_semantics, 0,
      "LTL semantics", "<spin|textbook|ltsmin>"},
     POPT_TABLEEND
 };
 
 struct poptOption greybox_options[]={
+    { "labels", 0, POPT_ARG_VAL, &labels, 1, "print state variable and type names, and state and action labels", NULL },
 	{ "matrix" , 'm' , POPT_ARG_VAL , &matrix , 1 , "print the dependency matrix for the model and exit" , NULL},
 	{ "por" , 'p' , POPT_ARG_VAL , &por , 1 , "enable partial order reduction" , NULL },
 	{ "cache" , 'c' , POPT_ARG_VAL , &cache , 1 , "enable caching of grey box calls" , NULL },

@@ -1,0 +1,27 @@
+== DIVINE
+
+Compile a DVE input model with divine:
+
+----
+divine compile -l input.dve
+----
+
+The command results in a compiled model 'input.dve2C'.
+
+If an LTL property is present in the model, a buchi automaton is created.
+LTSmin can directly perform LTL model checking on such models:
+
+----
+dve2lts-mc --strategy=cndfs --threads=16 anderson.6.prop4.dve2C
+dve2lts-gsea --por --proviso=color --strategy=scc anderson.6.prop4.dve 
+----
+
+These two examples perform LTL model checking using: multi-core NDFS (cndfs),
+and a sequential SCC-based algorithm with partial order reduction (+--por+ and
++--proviso+, where different provisos are available).
+Again one can provide additional options to store traces, etc.
+
+Note that this requires a modified version of the DiVinE toolset,
+which adds an LTSmin compilation backend (option +-l+).  For
+availability, refer to the
+http://fmt.cs.utwente.nl/tools/ltsmin/[LTSmin website].

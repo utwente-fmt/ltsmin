@@ -38,7 +38,7 @@
 
 #include <config.h>
 #include "set.h"
-#include "runtime.h"
+#include "hre/runtime.h"
 #include <stdlib.h>
 
 #define EMPTY_LIST -1

@@ -20,34 +20,31 @@ if HAVE_LIBPBES
 bin_PROGRAMS += pbes2lts-hre
 endif
 
-if HAVE_DVEC
+if HAVE_DVE
 bin_PROGRAMS += dve2lts-hre
 endif
 
-if HAVE_DVEC2
-bin_PROGRAMS += dve22lts-hre
-endif
 
-bin_PROGRAMS += spinja2lts-hre
+bin_PROGRAMS += prom2lts-hre
 
 # etf2lts-hre
 etf2lts_hre_SOURCES   = spec2lts-hre.c
 etf2lts_hre_SOURCES  += ../etf-greybox.c ../etf-greybox.h
-etf2lts_hre_LDADD     = ../lts-io/liblts-io.la $(HRE_LIB) ../libltsmin-hre.la
+etf2lts_hre_LDADD     = ../lts-io/liblts-io.la $(HRE_LIB) ../libltsmin.la
 etf2lts_hre_CPPFLAGS  = -DETF $(DIST_CPPFLAGS)
 
 # lpo2lts-hre
 lpo2lts_hre_SOURCES   = spec2lts-hre.c
 lpo2lts_hre_SOURCES  += ../mcrl-greybox.c ../mcrl-greybox.h
 lpo2lts_hre_SOURCES  += ../at-map.c ../at-map.h
-lpo2lts_hre_LDADD     = ../lts-io/liblts-io.la $(HRE_LIB) ../libltsmin-hre.la
+lpo2lts_hre_LDADD     = ../lts-io/liblts-io.la $(HRE_LIB) ../libltsmin.la
 lpo2lts_hre_LDADD    += $(MCRL_LIBS)
 lpo2lts_hre_CPPFLAGS  = -DMCRL $(MCRL_CPPFLAGS) $(DIST_CPPFLAGS)
 lpo2lts_hre_LDFLAGS   = $(MCRL_LDFLAGS) $(AM_LDFLAGS)
 
 # lps2lts-hre
 lps2lts_hre_SOURCES   = spec2lts-hre.c
-lps2lts_hre_LDADD     = ../lts-io/liblts-io.la $(HRE_LIB) ../libltsmin-hre.la
+lps2lts_hre_LDADD     = ../lts-io/liblts-io.la $(HRE_LIB) ../libltsmin.la
 lps2lts_hre_LDADD    +=  ../libmcrl2-pins.la
 lps2lts_hre_CPPFLAGS  = -DMCRL2 $(DIST_CPPFLAGS)
 lps2lts_hre_LDFLAGS   = $(MCRL2_LDFLAGS) $(AM_LDFLAGS)
@@ -55,7 +52,7 @@ nodist_EXTRA_lps2lts_hre_SOURCES = ../automake-force-linker.cxx
 
 # pbes2lts-hre
 pbes2lts_hre_SOURCES   = spec2lts-hre.c
-pbes2lts_hre_LDADD     = ../lts-io/liblts-io.la $(HRE_LIB) ../libltsmin-hre.la
+pbes2lts_hre_LDADD     = ../lts-io/liblts-io.la $(HRE_LIB) ../libltsmin.la
 pbes2lts_hre_LDADD    +=  ../libpbes-pins.la
 pbes2lts_hre_CPPFLAGS  = -DPBES $(DIST_CPPFLAGS)
 pbes2lts_hre_LDFLAGS   = $(MCRL2_LDFLAGS) $(AM_LDFLAGS)
@@ -63,24 +60,16 @@ nodist_EXTRA_pbes2lts_hre_SOURCES = ../automake-force-linker.cxx
 
 # dve2lts-hre
 dve2lts_hre_SOURCES   = spec2lts-hre.c
-dve2lts_hre_SOURCES  += ../dve-greybox.cpp ../dve-greybox.h
-dve2lts_hre_LDADD     = ../lts-io/liblts-io.la $(HRE_LIB) ../libltsmin-hre.la
+dve2lts_hre_SOURCES  += ../dve-greybox.c ../dve-greybox.h
+dve2lts_hre_LDADD     = ../lts-io/liblts-io.la $(HRE_LIB) ../libltsmin.la
 dve2lts_hre_LDADD    += $(DVEC_LIBS)
 dve2lts_hre_CPPFLAGS  = -DDIVINE $(DIVINE_CPPFLAGS) $(DIST_CPPFLAGS)
 dve2lts_hre_LDFLAGS   = $(DIVINE_LDFLAGS) $(AM_LDFLAGS)
 
-# dve22lts-hre
-dve22lts_hre_SOURCES  = spec2lts-hre.c
-dve22lts_hre_SOURCES += ../dve2-greybox.c ../dve2-greybox.h
-dve22lts_hre_LDADD    = ../lts-io/liblts-io.la $(HRE_LIB) ../libltsmin-hre.la
-dve22lts_hre_LDADD   += $(DVEC2_LIBS)
-dve22lts_hre_CPPFLAGS = -DDIVINE2 $(DIVINE2_CPPFLAGS) $(DIST_CPPFLAGS)
-dve22lts_hre_LDFLAGS  = $(DIVINE2_LDFLAGS) $(AM_LDFLAGS)
-
-# spinja2lts-hre
-spinja2lts_hre_SOURCES  = spec2lts-hre.c
-spinja2lts_hre_SOURCES += ../spinja-greybox.c ../spinja-greybox.h
-spinja2lts_hre_LDADD    = ../lts-io/liblts-io.la $(HRE_LIB) ../libltsmin-hre.la
-spinja2lts_hre_LDADD   += $(SPINJA_LIBS)
-spinja2lts_hre_CPPFLAGS = -DSPINJA $(SPINJA_CPPFLAGS) $(DIST_CPPFLAGS)
-spinja2lts_hre_LDFLAGS  = $(SPINJA_LDFLAGS) $(AM_LDFLAGS)
+# prom2lts-hre
+prom2lts_hre_SOURCES  = spec2lts-hre.c
+prom2lts_hre_SOURCES += ../prom-greybox.c ../prom-greybox.h
+prom2lts_hre_LDADD    = ../lts-io/liblts-io.la $(HRE_LIB) ../libltsmin.la
+prom2lts_hre_LDADD   += $(SPINJA_LIBS)
+prom2lts_hre_CPPFLAGS = -DSPINJA $(SPINJA_CPPFLAGS) $(DIST_CPPFLAGS)
+prom2lts_hre_LDFLAGS  = $(SPINJA_LDFLAGS) $(AM_LDFLAGS)

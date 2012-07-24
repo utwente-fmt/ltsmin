@@ -1,11 +1,13 @@
 #include <config.h>
-#include "bitset.h"
-#include <unistd.h>
+
 #include <sys/types.h>
-#include <stdlib.h>
-#include "balloc.h"
 #include <stdint.h>
-#include <runtime.h>
+#include <stdlib.h>
+#include <unistd.h>
+
+#include <balloc.h>
+#include <bitset.h>
+#include <hre/user.h>
 
 /**
 A leaf bitset is an array of words, one word contains 64 bits.

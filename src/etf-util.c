@@ -5,11 +5,12 @@
 
 #define ETF_BUF 4096
 
-#include "runtime.h"
-#include "etf-util.h"
-#include "dynamic-array.h"
-#include "stringindex.h"
+
+#include <dynamic-array.h>
 #include <etf-internal.h>
+#include <etf-util.h>
+#include <hre/user.h>
+#include <stringindex.h>
 
 
 etf_model_t ETFmodelCreate(){
@@ -63,7 +64,7 @@ lts_type_t etf_type(etf_model_t model){
 void etf_get_initial(etf_model_t model,int* state){
 	int N=lts_type_get_state_length(model->ltstype);
 	if (!model->initial_state){
-		Fatal(1,error,"model has no initial state");
+		Abort("model has no initial state");
 	}
 	for(int i=0;i<N;i++) state[i]=model->initial_state[i];
 }
@@ -106,11 +107,11 @@ static int incr_ofs(int N,int *ofs,int*used,int max){
 	return carry;
 }
 void etf_ode_add(etf_model_t model){
-	if (model->trans_count) Fatal(1,error,"model already has transitions");
+	if (model->trans_count) Abort("model already has transitions");
 	int state_length=lts_type_get_state_length(model->ltstype);
 	ensure_access(model->trans_manager,state_length);
 	if (state_length != model->map_count){
-		Fatal(1,error,"inconsistent map count");
+		Abort("inconsistent map count");
 	}
 	int vcount[state_length];
 	for(int i=0;i<state_length;i++){
@@ -119,7 +120,7 @@ void etf_ode_add(etf_model_t model){
 	}
 	int is_new;
 	int signtype=lts_type_add_type(model->ltstype,"sign",&is_new);
-	if(is_new) Fatal(1,error,"model does not define sign type");
+	if(is_new) Abort("model does not define sign type");
 	Warning(debug,"sign type has %d values",SIgetCount(model->type_values[signtype]));
 	for(int i=0;i<SIgetCount(model->type_values[signtype]);i++){
 		Warning(debug,"sign[%d]=%s",i,SIget(model->type_values[signtype],i));
@@ -139,12 +140,12 @@ void etf_ode_add(etf_model_t model){
 		int value;
 		ETFmapIterate(map);
 		if (!ETFmapNext(map,used,&value)){
-			Fatal(1,error,"Unexpected empty map");
+			Abort("Unexpected empty map");
 		}
 		while(ETFmapNext(map,state,&value)){
 			for(int k=0;k<state_length;k++) {
 				if(used[k]?(state[k]==0):(state[k]!=0)){
-					Fatal(1,error,"inconsistent map section");
+					Abort("inconsistent map section");
 				}
 			}
 		}
@@ -160,7 +161,7 @@ void etf_ode_add(etf_model_t model){
 		int varidx=0;
 		while(strcmp(lts_type_get_state_name(model->ltstype,varidx),var)&&varidx<state_length) varidx++;
 		if(varidx>=state_length){
-			Fatal(1,error,"variable %s is not a state variable",var);
+			Abort("variable %s is not a state variable",var);
 		} else {
 			Warning(debug,"variable %s has index %d",var,varidx);
 		}
@@ -188,7 +189,7 @@ void etf_ode_add(etf_model_t model){
 				int last=used[varidx]?src[varidx]:(vcount[varidx]-1);
 				if (value==zero) continue;
 				if (value!=neg && value!=pos) {
-					Fatal(1,error,"unexpected sign: %d",value);
+					Abort("unexpected sign: %d",value);
 				}
 				char label[1024];
 				sprintf(label,"%s%s",var,(value==neg)?"-":"+");

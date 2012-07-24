@@ -2,6 +2,7 @@
 #define VECTOR_SET_H
 
 #include <popt.h>
+
 #include <bignum/bignum.h>
 
 /**
@@ -262,6 +263,10 @@ not over sub-domains. A relation in rels is expanded on-the-fly in case
 an expand callback is set.
 */
 void vset_least_fixpoint(vset_t dst, vset_t src, vrel_t rels[], int rel_count);
+
+void vset_dot(FILE* fp, vset_t src);
+
+void vrel_dot(FILE* fp, vrel_t src);
 
 //@}
 

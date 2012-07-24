@@ -11,14 +11,17 @@ etf2lts-gsea - Sequential state space generator for ETF models.
 
 == SYNOPSIS
 
-*{manname}* [OPTION]... 'input'_.etf_
+*{manname}* [OPTION]... 'input'_.etf_ ['output.fmt']
 
 == DESCRIPTION
 
 {manname} generates a labelled transition system from a specification
 provided in 'input.etf' by enumerative reachability analysis using a
 general state expanding algorithm.  Specifications are in
-manpage:etf[5] format.
+manpage:etf[5] format.  'output.fmt'
+specifies the name of the output archive.  The desired format is
+deduced from the filename extension. Available formats are described
+below.
 
 == OPTIONS
 

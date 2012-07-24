@@ -1,0 +1,29 @@
+//                           -*- mode: doc; outline-regexp: "==\(=*\) ." -*-
+prom-reach(1)
+===============
+:Author:  Michael Weber
+:Email:   <michaelw@cs.utwente.nl>
+:Date:    2011-06-13
+
+== NAME
+
+prom-reach - Symbolic reachability analysis for SpinJa models.
+
+== SYNOPSIS
+
+*{manname}* [OPTION]... 'input.prom' ['output.etf']
+
+== DESCRIPTION
+
+{manname} performs a reachability analysis on a specification provided
+in 'input.prom'.  Specifications are compiled with SpinJa from
+PROMELA input models.  'output.etf' specifies the name of the output
+archive, written in manpage:etf[5] format.
+
+include::inc/prom.txt[]
+
+== OPTIONS
+
+include::inc/spec-reach-options.txt[]
+
+include::inc/spec-reach.txt[]

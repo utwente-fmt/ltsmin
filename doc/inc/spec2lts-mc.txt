@@ -1,8 +1,8 @@
 include::pins-options.txt[]
 
-include::devel-options.txt[]
-
 include::general-options.txt[]
+
+include::buchi.txt[]
 
 == EXIT STATUS
 *0*::
@@ -16,7 +16,7 @@ include::support.txt[]
 manpage:ltsmin[7],
 manpage:ltsmin-tracepp[1],
 manpage:etf[5],
-http://divine.fi.muni.cz/[DiVinE-cluster],
 http://divine.fi.muni.cz/[DiVinE-2.2],
 https://code.launchpad.net/~opaal-developers/opaal/opaal-ltsmin-succgen[opaal],
-http://www.uppaal.org[uppaal]
+http://www.uppaal.org[uppaal], and
+http://eprints.eemcs.utwente.nl/22042/[prom].

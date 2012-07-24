@@ -8,16 +8,21 @@ ASCIIDOC_FLAGS += -a no-inline-literal
 ASCIIDOC_FLAGS += -a ltsmin-asciidoc-no-roff
 ASCIIDOC_FLAGS += -a version=$(VERSION)
 
-MANPAGES  = ltsmin.7
+MANPAGES =
+MANPAGES += etf.5
+MANPAGES += etf-convert.1
+MANPAGES += gcf.1
+MANPAGES += ltsmin.7
 MANPAGES += ltsmin-ctl.5
 MANPAGES += ltsmin-ltl.5
+MANPAGES += ltsmin-pred.5
 MANPAGES += ltsmin-mpi.1
 MANPAGES += ltsmin-mu.5
 MANPAGES += ltsmin-tracepp.1
 MANPAGES += ltsmin-convert.1
-MANPAGES += lts-tracepp.1
 MANPAGES += ltscmp-one.1
 MANPAGES += ltstrans.1
+MANPAGES += pins_open.1
 MANPAGES += sigmin-mpi.1
 MANPAGES += sigmin-one.1
 MANPAGES += etf-convert.1
@@ -25,59 +30,41 @@ MANPAGES += etf.5
 MANPAGES += gcf.1
 MANPAGES += ce-mpi.1
 MANPAGES += pins_open.1
+MANPAGES += spinjal.1
 
 MANPAGES += dve-reach.1
-MANPAGES += dve2lts-grey.1
 MANPAGES += dve2lts-gsea.1
 MANPAGES += dve2lts-hre.1
 MANPAGES += dve2lts-mc.1
-MANPAGES += dve2lts-mpi.1
 MANPAGES += dve2torx.1
 
 MANPAGES += etf-reach.1
-MANPAGES += etf2lts-grey.1
 MANPAGES += etf2lts-gsea.1
 MANPAGES += etf2lts-hre.1
 MANPAGES += etf2lts-mc.1
-MANPAGES += etf2lts-mpi.1
 MANPAGES += etf2torx.1
 
 MANPAGES += lpo-reach.1
-MANPAGES += lpo2lts-grey.1
 MANPAGES += lpo2lts-gsea.1
 MANPAGES += lpo2lts-hre.1
-MANPAGES += lpo2lts-mpi.1
 MANPAGES += lpo2torx.1
 
 MANPAGES += lps-reach.1
-MANPAGES += lps2lts-grey.1
 MANPAGES += lps2lts-gsea.1
 MANPAGES += lps2lts-hre.1
-MANPAGES += lps2lts-mpi.1
 MANPAGES += lps2torx.1
 
-MANPAGES += spinja-reach.1
-MANPAGES += spinja2lts-grey.1
-MANPAGES += spinja2lts-gsea.1
-MANPAGES += spinja2lts-hre.1
-MANPAGES += spinja2lts-mc.1
-MANPAGES += spinja2lts-mpi.1
-MANPAGES += spinja2torx.1
-
-MANPAGES += dve2-reach.1
-MANPAGES += dve22lts-grey.1
-MANPAGES += dve22lts-gsea.1
-MANPAGES += dve22lts-hre.1
-MANPAGES += dve22lts-mc.1
-MANPAGES += dve22lts-mpi.1
-MANPAGES += dve22torx.1
+MANPAGES += prom-reach.1
+MANPAGES += prom2lts-gsea.1
+MANPAGES += prom2lts-hre.1
+MANPAGES += prom2lts-mc.1
+MANPAGES += prom2torx.1
 
 MANPAGES += opaal2lts-mc.1
 
 MANPAGES += pbes-reach.1
 MANPAGES += pbes2lts-gsea.1
 MANPAGES += pbes2lts-hre.1
-MANPAGES += pbes2lts-mpi.1
 
 MANPAGES += spgsolver.1
 
@@ -87,7 +74,7 @@ extra_ASCIIDOC  = inc/buchi.txt
 extra_ASCIIDOC += inc/buddy-options.txt
 extra_ASCIIDOC += inc/compression.txt
 extra_ASCIIDOC += inc/devel-options.txt
-extra_ASCIIDOC += inc/dve2.txt
+extra_ASCIIDOC += inc/dve.txt
 extra_ASCIIDOC += inc/file-formats.txt
 extra_ASCIIDOC += inc/general-options.txt
 extra_ASCIIDOC += inc/hre-options.txt
@@ -100,21 +87,18 @@ extra_ASCIIDOC += inc/mcrl-options.txt
 extra_ASCIIDOC += inc/mcrl2-options.txt
 extra_ASCIIDOC += inc/mpi-blurb.txt
 extra_ASCIIDOC += inc/pins-options.txt
+extra_ASCIIDOC += inc/prom.txt
 extra_ASCIIDOC += inc/reachability-options.txt
 extra_ASCIIDOC += inc/spec-reach-options.txt
 extra_ASCIIDOC += inc/spec-reach.txt
-extra_ASCIIDOC += inc/spec2lts-grey-options.txt
-extra_ASCIIDOC += inc/spec2lts-grey.txt
 extra_ASCIIDOC += inc/spec2lts-gsea-options.txt
 extra_ASCIIDOC += inc/spec2lts-gsea.txt
 extra_ASCIIDOC += inc/spec2lts-hre-options.txt
+extra_ASCIIDOC += inc/spec2lts-hre.txt
 extra_ASCIIDOC += inc/spec2lts-mc-options.txt
 extra_ASCIIDOC += inc/spec2lts-mc-ta-options.txt
 extra_ASCIIDOC += inc/spec2lts-mc.txt
-extra_ASCIIDOC += inc/spec2lts-mpi-options.txt
-extra_ASCIIDOC += inc/spec2lts-mpi.txt
 extra_ASCIIDOC += inc/spec2torx.txt
-extra_ASCIIDOC += inc/spinja.txt
 extra_ASCIIDOC += inc/state-storage-options.txt
 extra_ASCIIDOC += inc/support.txt
 extra_ASCIIDOC += inc/vset-options.txt

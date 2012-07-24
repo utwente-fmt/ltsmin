@@ -39,7 +39,7 @@
 #include <ltsmin-syntax.h>
 #include <ltsmin-tl.h>
 #include <ltsmin-buchi.h>
-#include <runtime.h>
+#include <hre/user.h>
 
 
 typedef struct ltsmin_expr_list_t {

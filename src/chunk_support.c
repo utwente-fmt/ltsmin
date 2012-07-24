@@ -1,10 +1,12 @@
 #include <config.h>
+
 #include <assert.h>
 #include <ctype.h>
-#include <chunk_support.h>
-#include <runtime.h>
 
-#define VALID_IDX(i,c) if (i>=c.len) Fatal(1,error,"chunk overflow")
+#include <chunk_support.h>
+#include <hre/user.h>
+
+#define VALID_IDX(i,c) if (i>=c.len) Abort("chunk overflow")
 
 static const char HEX[16]="0123456789ABCDEF";
 
@@ -41,7 +43,7 @@ static int hex_decode(char c){
 	case '0'...'9': return (c-'0');
 	case 'a'...'f': return (10+c-'a');
 	case 'A'...'F': return (10+c-'A');
-	default: Fatal(1,error,"%c is not a hex digit",c); return 0;
+	default: Abort("%c is not a hex digit",c); return 0;
 	}
 }
 
@@ -124,7 +126,7 @@ void string2chunk(char*src,chunk *dst){
 	if (src[0]=='#' && src[len-1]=='#') {
 		Warning(debug,"hex");
 		len=len/2 - 1;
-		if (dst->len<len) Fatal(1,error,"chunk overflow");
+		if (dst->len<len) Abort("chunk overflow");
 		dst->len=len;
 		for(uint32_t i=0;i<len;i++){
 			dst->data[i]=(hex_decode(src[2*i+1])<<4)+hex_decode(src[2*i+2]);
@@ -132,18 +134,18 @@ void string2chunk(char*src,chunk *dst){
 	} else if (src[0]=='"' && src[len-1]=='"') {
 		Warning(debug,"quoted");
 		len=len-2;
-		if (dst->len<len) Fatal(1,error,"chunk overflow");
+		if (dst->len<len) Abort("chunk overflow");
 		dst->len=0;
 #define PUT_CHAR(c) { dst->data[dst->len]=c; dst->len++ ; }
 		for(uint32_t i=0;i<len;i++) {
-			if (!isprint(src[i+1])) Fatal(1,error,"non-printable character in source");
-			if (src[i+1]=='"') Fatal(1,error,"unquoted \" in string");
+			if (!isprint(src[i+1])) Abort("non-printable character in source");
+			if (src[i+1]=='"') Abort("unquoted \" in string");
 			if (src[i+1]=='\\') {
-				if (i+1==len) Fatal(1,error,"bad escape sequence");
+				if (i+1==len) Abort("bad escape sequence");
 				switch(src[i+2]){
 				case '\\': PUT_CHAR('\\'); i++; continue;
 				case '"': PUT_CHAR('"'); i++; continue;
-				default: Fatal(1,error,"unknown escape sequence");
+				default: Abort("unknown escape sequence");
 				}
 			}
 			PUT_CHAR(src[i+1]);
@@ -151,11 +153,11 @@ void string2chunk(char*src,chunk *dst){
 #undef PUT_CHAR
 	} else {
 		Warning(debug,"verbatim");
-		if (dst->len<len) Fatal(1,error,"chunk overflow");
+		if (dst->len<len) Abort("chunk overflow");
 		dst->len=len;
 		for(uint32_t i=0;i<len;i++) {
-			if (!isprint(src[i])) Fatal(1,error,"non-printable character in source");
-			if (isspace(src[i])) Fatal(1,error,"white space in source");
+			if (!isprint(src[i])) Abort("non-printable character in source");
+			if (isspace(src[i])) Abort("white space in source");
 			dst->data[i]=src[i];
 		}
 	}

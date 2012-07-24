@@ -1,0 +1,49 @@
+//                           -*- mode: doc; outline-regexp: "==\(=*\) ." -*-
+ltsmin-pred(5)
+=============
+:Author:  Alfons Laarman
+:Email:   <a.w.laarman@ewi.utwente.nl>
+:Date:    2012-07-22
+
+== NAME
+ltsmin-pred - Simple Predicate Language
+
+== SYNOPSIS
+LTSmin syntax for Simple Predicate Language formulae
+
+== DESCRIPTION
+
+.Language's operators and priority
+[options="header"]
+
+|===================================================================
+|Priority | Operator | Meaning
+|0        | true     | constant true
+|0        | false    | constant false
+|1        | ==       | test operator ('state variable name'=='number')
+|2        | !        | Logical negation
+|4        | &&       | Logical and
+|5        | \|\|     | Logical or
+|6        | $$<->$$  | Logical equivalence
+|7        | $$->$$   | Logical implication
+|===================================================================
+
+
+== EXAMPLE
+
+----
+init_0.x == 4 && (user_1.a[3] -> register_2.y)   
+----
+
+This predicate example  could be used in the prom frontends, to search for
+states where either x is not equal to 4 in (instance 0) the init proctype, or
+the element three of array a in (instance 1 of) proctype user is non-zero,
+while y in (instance 2 of) proctype register is zero.
+
+For variable naming consult the +--labels+ option in the PINS tools.
+
+
+== SEE ALSO
+manpage:ltsmin[7],
+manpage:etf2lts-gsea[1],
+manpage:etf2lts-grey[1]

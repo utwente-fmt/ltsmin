@@ -40,6 +40,14 @@ int linear_search(si_map_entry map[],const char*key){
     return -1;
 }
 
+char *key_search(si_map_entry map[],const int val){
+    while(map[0].key){
+        if(map[0].val == val) return map[0].key;
+        map++;
+    }
+    return "not found";
+}
+
 #if defined(__APPLE__)
 
 size_t RTmemSize(){

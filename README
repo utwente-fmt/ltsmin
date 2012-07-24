@@ -1,4 +1,4 @@
-ltsmin - minimization and instantiation of labelled transition systems 
+LTSmin - minimization and instantiation of labelled transition systems
 
 * Introduction
 LTSmin started out as a generic toolset for manipulating labelled
@@ -39,8 +39,9 @@ consumption of symbolic algorithms), partial order reduction and
 linear temporal logic.
 
 * Supported Systems
+ - Cygwin/Windows (tested on Windows 7 with Cygwin 1.7)
  - GNU/Linux (tested on Ubuntu, Debian, OpenSuSE 11.2)
- - MacOS X, version 10.6 "Lion"
+ - MacOS X, version 10.7 "Lion"
  - MacOS X, version 10.6 "Snow Leopard"
  - MacOS X, version 10.5 "Leopard"
 
