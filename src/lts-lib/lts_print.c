@@ -7,7 +7,7 @@
 void lts_print(log_t log,lts_t lts){
     int has_labels=lts->label!=NULL;
     int has_props=lts->properties!=NULL;
-    for(int i=0;i<lts->root_count;i++){
+    for(uint32_t i=0;i<lts->root_count;i++){
         Print(log,"init: %u",lts->root_list[i]);
     }
     switch(lts->type){

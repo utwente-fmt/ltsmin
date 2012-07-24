@@ -172,7 +172,7 @@ void lowmem_strong_reduce(lts_t lts){
         }
     }
     free(map);
-    lts_quotient(lts,newmap);
+    lts_quotient(lts,(uint32_t*)newmap);
     free(newmap);
 }
 

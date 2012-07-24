@@ -20,11 +20,11 @@
 Recursively insert a transition in signatures.
  */
 static void dfs_insert(lts_t silent,int *newmap,int label,int dest,int state){
-	int set,j;
+	int set;
 	set=SetInsert(newmap[state],label,dest);
 	if (set != newmap[state]) {
 		newmap[state]=set;
-		for(j=silent->begin[state];j<silent->begin[state+1];j++){
+		for(uint32_t j=silent->begin[state];j<silent->begin[state+1];j++){
 			dfs_insert(silent,newmap,label,dest,silent->src[j]);
 		}
 	}
@@ -100,7 +100,7 @@ void lts_silent_compress(lts_t lts,silent_predicate is_silent,void*silent_contex
 	    }
 	    Debug("propagation fase");
 	    for(uint32_t i=0;i<lts->transitions;i++){
-	        dfs_insert(silent,newmap,has_labels?lts->label[i]:0,map[lts->dest[i]],lts->src[i]);
+	        dfs_insert(silent,(int*)newmap,has_labels?lts->label[i]:0,map[lts->dest[i]],lts->src[i]);
 	    }
 	    Debug("counting number of blocks");
 	    uint32_t old_count=map_count;
@@ -127,7 +127,7 @@ void lts_silent_compress(lts_t lts,silent_predicate is_silent,void*silent_contex
 	uint32_t r_count=0;
 	uint32_t t_count=0;
 	for(uint32_t i=0;i<lts->root_count;i++){
-	    uint32_t root=SIputC(id_index,&(map[lts->root_list[i]]),4);
+	    uint32_t root=SIputC(id_index,(const char*)&(map[lts->root_list[i]]),4);
 	    if(root==r_count){
 	        repr[root]=lts->root_list[i];
 	        r_count++;
@@ -138,7 +138,7 @@ void lts_silent_compress(lts_t lts,silent_predicate is_silent,void*silent_contex
 	Debug("processing reachable states");
 	uint32_t s_count=r_count;
 	for(uint32_t i=0;i<lts->transitions;i++){
-	    uint32_t state=SIputC(id_index,&(map[lts->dest[i]]),4);
+	    uint32_t state=SIputC(id_index,(const char*)&(map[lts->dest[i]]),4);
 	    if(state==s_count){
 	        repr[state]=lts->dest[i];
 	        s_count++;
@@ -146,7 +146,7 @@ void lts_silent_compress(lts_t lts,silent_predicate is_silent,void*silent_contex
         }
 	}
 	Debug("reduced LTS has %u initial states, %u states and %u transitions",r_count,s_count,t_count);
-	uint32_t *temp_props;
+	uint32_t *temp_props=NULL;
 	if(has_props){
 	    temp_props=(uint32_t*)RTmalloc(4*s_count);
 	    for(uint32_t i=0;i<s_count;i++){
@@ -168,7 +168,7 @@ void lts_silent_compress(lts_t lts,silent_predicate is_silent,void*silent_contex
 			if (lbl==-1) continue;
 			lts->src[t_count]=i;
 			if (has_labels) lts->label[t_count]=lbl;
-			lts->dest[t_count]=SIlookupC(id_index,&dst,4);
+			lts->dest[t_count]=SIlookupC(id_index,(const char*)&dst,4);
 			t_count++;
 		}
 	}

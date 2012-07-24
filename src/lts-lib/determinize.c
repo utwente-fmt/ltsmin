@@ -21,12 +21,12 @@
 static int fully_expored;
 static bitset_t master;
 
-static int mkdet_next_lab(lts_t orig,int l,int S){
-	int T,s,i;
+static int mkdet_next_lab(lts_t orig,uint32_t l,int S){
+	int T,s;
 	if (S==EMPTY_SET) return EMPTY_SET;
 	T=mkdet_next_lab(orig,l,SetGetParent(S));
 	s=SetGetDest(S);
-	for(i=orig->begin[s];i<orig->begin[s+1];i++){
+	for(uint32_t i=orig->begin[s];i<orig->begin[s+1];i++){
 		if(orig->label[i]==l){
 			T=SetInsert(T,0,orig->dest[i]);
 		}
@@ -70,12 +70,12 @@ static void mkdet_dfs_lab(lts_t orig,int S,lts_t lts,int*scount,int*tcount,int*t
 	}
 }
 
-static int mkdet_next_prop(lts_t orig,int p,int S){
-	int T,s,i;
+static int mkdet_next_prop(lts_t orig,uint32_t p,int S){
+	int T,s;
 	if (S==EMPTY_SET) return EMPTY_SET;
 	T=mkdet_next_prop(orig,p,SetGetParent(S));
 	s=SetGetDest(S);
-	for(i=orig->begin[s];i<orig->begin[s+1];i++){
+	for(uint32_t i=orig->begin[s];i<orig->begin[s+1];i++){
 		if(orig->properties[orig->dest[i]]==p){
 			T=SetInsert(T,0,orig->dest[i]);
 		}
@@ -128,7 +128,8 @@ void lts_mkdet(lts_t lts){
     master=bitset_create(256,256);
     int has_labels=lts->label!=NULL;
     int has_props=lts->properties!=NULL;
-	int i,j,tcount,smax,tmax,scount;
+    uint32_t i;
+	int tcount,smax,tmax,scount;
 	lts_t orig;
 
     Debug("copying LTS");

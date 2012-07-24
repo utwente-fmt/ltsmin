@@ -30,7 +30,7 @@ static void build_block(uint32_t states,uint32_t transitions,u_int32_t *begin,u_
     int has_label=(label!=NULL);
     uint32_t i;
     uint32_t loc1,loc2;
-    u_int32_t tmp_label1,tmp_label2;
+    u_int32_t tmp_label1=0,tmp_label2=0;
     u_int32_t tmp_other1,tmp_other2;
 
     for(i=0;i<states;i++) begin[i]=0;
@@ -286,10 +286,12 @@ void lts_sort_dest(lts_t lts){
 }
 
 int tau_step(void*context,lts_t lts,uint32_t src,uint32_t edge,uint32_t dest){
+    (void)context; (void)src; (void)dest;
     return lts->label[edge]==(uint32_t)(lts->tau);
 }
 
 int stutter_step(void*context,lts_t lts,uint32_t src,uint32_t edge,uint32_t dest){
+    (void)context; (void)edge;
     return lts->properties[src]==lts->properties[dest];
 }
 
@@ -297,29 +299,6 @@ struct cycle_elim_context {
     silent_predicate silent;
     void* silent_ctx;
 };
-
-static void pass1_dfs(lts_t lts,struct cycle_elim_context *ctx,uint32_t *e_time,uint32_t *time,uint32_t state,uint32_t *count){
-    if (e_time[state]>0) return;
-    (*count)++;
-    e_time[state]=1;
-    for(uint32_t i=lts->begin[state];i<lts->begin[state+1];i++){
-        if (ctx->silent(ctx->silent_ctx,lts,state,i,lts->dest[i])){
-            pass1_dfs(lts,ctx,e_time,time,lts->dest[i],count);
-        }
-    }
-    (*time)++;
-    e_time[state]=(*time);
-}
-
-static void pass2_dfs(lts_t lts,struct cycle_elim_context *ctx,uint32_t *map,uint32_t component,uint32_t state){
-    if(map[state]>0) return;
-    map[state]=component;
-    for(uint32_t i=lts->begin[state];i<lts->begin[state+1];i++){
-        if (ctx->silent(ctx->silent_ctx,lts,state,i,lts->dest[i])){
-            pass2_dfs(lts,ctx,map,component,lts->dest[i]);
-        }
-    }
-}
 
 void lts_silent_cycle_elim(lts_t lts,silent_predicate silent,void*silent_ctx,bitset_t diverging){
     if (diverging!=NULL) Abort("cannot do diverence yet");
@@ -439,10 +418,10 @@ void lts_silent_cycle_elim(lts_t lts,silent_predicate silent,void*silent_ctx,bit
     }
     uint32_t count=0;
     Debug("transitions");
+    uint32_t s,d,l=0;
     for(uint32_t i=0;i<lts->transitions;i++){
-        uint32_t s=map[lts->src[i]];
-        uint32_t d=map[lts->dest[i]];
-        uint32_t l;
+        s=map[lts->src[i]];
+        d=map[lts->dest[i]];
         if (has_labels) l=lts->label[i];
         if (silent(silent_ctx,lts,lts->src[i],i,lts->dest[i])&&(s==d)) {
             continue;
