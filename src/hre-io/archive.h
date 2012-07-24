@@ -56,15 +56,15 @@ extern arch_enum_t arch_enum(archive_t archive,char *regex);
 
 /// Info item for a stream in an archive.
 typedef struct archive_item_s {
-    char *name;
-    char *code;
+    const char *name;
+    const char *code;
     off_t length;
     off_t compressed;
 } *archive_item_t;
 
 /// Callbacks for enumerating an archive.
 struct arch_enum_callbacks {
-	int(*new_item)(void*arg,int no,char*name);
+	int(*new_item)(void*arg,int no,const char*name);
 	int(*end_item)(void*arg,int no);
 	int(*data)(void*arg,int no,void*data,size_t len);
 	int(*stat)(void*arg,int no,archive_item_t item);

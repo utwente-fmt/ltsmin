@@ -14,10 +14,12 @@
 #ifndef HAVE_ZIP_H
 
 archive_t arch_zip_read(const char* name,int buf){
+    (void)name; (void)buf;
     Abort("This build does not include ZIP support.");
 }
 
 void arch_zip_create(const char* name,int buf_size,string_map_t policy,archive_t contents){
+    (void)name; (void)buf; (void)buf_size; (void)policy; (void)contents;
     Abort("This build does not include ZIP support.");
 }
 
@@ -72,7 +74,7 @@ static stream_t hre_zip_read(archive_t archive,char *name){
     int id=SIlookup(archive->stream_index,name);
     if (id==SI_INDEX_FAILED) Abort("stream %s not found",name);
     stream_t s=zip_read_stream(archive,id);
-    char*tmp=zip_get_file_comment(archive->archive,id,NULL,0);
+    const char*tmp=zip_get_file_comment(archive->archive,id,NULL,0);
     if (tmp!=NULL){
         s=stream_add_code(s,tmp);
     }
@@ -84,7 +86,7 @@ static stream_t hre_zip_read_raw(archive_t archive,char *name,char**code){
     if (id==SI_INDEX_FAILED) Abort("stream %s not found",name);
     stream_t s=zip_read_stream(archive,id);
     if (code) {
-        char*tmp=zip_get_file_comment(archive->archive,id,NULL,0);
+        const char*tmp=zip_get_file_comment(archive->archive,id,NULL,0);
         if (tmp!=NULL){
             *code=strdup(tmp);
         } else {
@@ -210,7 +212,7 @@ typedef struct copy_zip_context {
     string_map_t policy;
 } *copy_zip_context_t;
 
-static copy_zip_context_t copy_zip_setup(struct zip *dst,archive_t src,char*name){
+static copy_zip_context_t copy_zip_setup(struct zip *dst,archive_t src,const char*name){
     copy_zip_context_t ctx=RT_NEW(struct copy_zip_context);
     ctx->src=src;
     ctx->dst=dst;
@@ -283,7 +285,7 @@ copy_zip_function(void *state, void *data, size_t len, enum zip_source_cmd cmd)
     }
 }
 
-static int copy_zip_item(void*arg,int id,char*name){
+static int copy_zip_item(void*arg,int id,const char*name){
     (void)id;
     copy_zip_context_t ctx=(copy_zip_context_t)arg;
     Print(infoLong,"queueing %s",name);
@@ -302,6 +304,7 @@ static int copy_zip_item(void*arg,int id,char*name){
 
 
 void arch_zip_create(const char* target,int buf_size,string_map_t policy,archive_t arch_in){
+    (void)buf_size;
     // clean old zip if any.
     if (unlink(target)&&errno!=ENOENT){
         AbortCall("could not remove existing %s",target);

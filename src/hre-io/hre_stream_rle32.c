@@ -148,6 +148,7 @@ stream_t stream_rle32(stream_t s){
 }
 
 stream_t stream_unrle32(stream_t s){
+    (void)s;
     Abort("Sorry, unrle32 is not implemented yet.");
 }
 

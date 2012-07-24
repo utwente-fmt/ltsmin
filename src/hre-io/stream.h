@@ -71,7 +71,7 @@ extern stream_t stream_unrle32(stream_t s);
 
 That is, writing the stream involves encoding and reading involves decoding.
  */
-extern stream_t stream_add_code(stream_t s,char* code);
+extern stream_t stream_add_code(stream_t s,const char* code);
 
 
 /**
@@ -79,7 +79,7 @@ extern stream_t stream_add_code(stream_t s,char* code);
 
 That is, writing the stream involves deconding and reading involves encoding.
  */
-extern stream_t stream_add_decode(stream_t s,char* code);
+extern stream_t stream_add_decode(stream_t s,const char* code);
 
 /**
 \brief Create a stream that reads from the given file descriptor.
