@@ -20,14 +20,14 @@ typedef struct copy_context {
     int bs;
 } *copy_context_t;
 
-static int copy_item(void*arg,int id,char*name){
+static int copy_item(void*arg,int id,const char*name){
     (void)id;
     copy_context_t ctx=(copy_context_t)arg;
     Print(info,"copying %s",name);
     char*compression=SSMcall(ctx->encode,name);
     Print(debug,"compression method is %s",compression);
-    stream_t is=arch_read(ctx->src,name);
-    stream_t os=arch_write_apply(ctx->dst,name,compression);
+    stream_t is=arch_read(ctx->src,(char*)name);
+    stream_t os=arch_write_apply(ctx->dst,(char*)name,compression);
     char buf[ctx->bs];
     for(;;){
         int len=stream_read_max(is,buf,ctx->bs);
@@ -351,32 +351,24 @@ static void gcf_list(){
     arch_close(&gcf);
 }
 
-
 static void zip_copy_gcf(){
-    char *gcf_name=HREnextArg();
-    if (gcf_name==NULL) {
-        Abort("missing <gcf archive> argument");
+    char* source=HREnextArg();
+    if (source==NULL) {
+        Abort("missing <source> argument");
+    }
+    char* target=HREnextArg();
+    if (target==NULL) {
+        Abort("missing <target> argument");
     }
     if (HREnextArg()){
         Abort("too many arguments");
     }
-    Printf(infoShort,"Archive %s contains:\n",gcf_name);
-    archive_t gcf=arch_zip_read(gcf_name,65536);
-    struct arch_enum_callbacks cb={.stat=list_item};
-    struct list_count totals={0,0,0};
-    Printf(infoShort," stream size   compressed stream name (compression)\n",gcf_name);
-    arch_enum_t e=arch_enum(gcf,NULL);
-    if (arch_enumerate(e,&cb,&totals)){
-        Abort("unexpected non-zero return");
-    }
-    Printf(infoShort,"totals:\n");
-    Printf(infoShort,"%12lld %12lld files: %d (%3.2f%%)\n",
-        totals.total_orig,totals.total_compressed,totals.files,
-        100.0*((float)(totals.total_orig-totals.total_compressed))/((float)totals.total_orig));
-    arch_enum_free(&e);
-    arch_close(&gcf);
+    archive_t arch_in=arch_zip_read(source,65536);
+    archive_t arch_out=arch_gcf_create(raf_unistd(target),blocksize,blocksize*blockcount,0,1);
+    archive_copy(arch_in,arch_out,compression_policy,blocksize,NULL);
+    arch_close(&arch_in);
+    arch_close(&arch_out);
 }
-
 
 /**************************************************************************/
 /* main                                                                   */
