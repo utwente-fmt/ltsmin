@@ -154,7 +154,11 @@ static arch_enum_t zip_enum(archive_t archive,char *regex){
     e->procs.free=zip_enum_free;
     e->archive=archive;
     e->next=0;
+#ifdef LIBZIP_VERSION
     e->count=zip_get_num_entries(archive->archive,0);
+#else
+    e->count=zip_get_num_files(archive->archive);
+#endif
     return e;
 }
 
@@ -174,7 +178,11 @@ archive_t arch_zip_read(const char* name,int buf){
         Abort("cannot open zip archive `%s': %s\n",name , errstr);
     }
     arch->stream_index=SIcreate();
+#ifdef LIBZIP_VERSION
     int count=zip_get_num_entries(arch->archive,0);
+#else
+    int count=zip_get_num_files(arch->archive);
+#endif
     for(int i=0;i<count;i++){
         struct zip_stat sb;
         int res=zip_stat_index(arch->archive,i,0,&sb);
