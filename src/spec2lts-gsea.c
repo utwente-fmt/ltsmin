@@ -1314,6 +1314,66 @@ gsea_goal_trace_default(gsea_state_t *state, void *arg)
     (void)state; (void)arg;
 }
 
+void init_output (const char *output, lts_file_t template)
+{
+    lts_type_t ltstype=GBgetLTStype(opt.model);
+    Warning(info,"Writing output to %s",output);
+    if (opt.write_state) {
+        opt.lts_file = lts_file_create (output, ltstype, 1, template);
+    } else {
+        opt.lts_file = lts_file_create_nostate (output, ltstype, 1, template);
+    }
+    for (size_t i = 0; i < global.T; i++) {
+        lts_file_set_table (opt.lts_file, i, GBgetChunkMap (opt.model, i));
+    }
+}
+
+void finish_output (void *arg)
+{
+    lts_file_close(opt.lts_file);
+    gsea_finished(arg);
+}
+
+static void *
+gsea_init_vec(gsea_state_t *state)
+{
+    lts_write_init (opt.lts_file, 0, state->state);
+    return gsea_init_default(state);
+}
+
+static void *
+gsea_init_idx(gsea_state_t *state)
+{
+    uint32_t tmp[1] = { 0 };
+    lts_write_init (opt.lts_file, 0, tmp);
+    return gsea_init_default(state);
+}
+
+static void
+gsea_lts_write_state(gsea_state_t *state, void *arg)
+{
+    int labels[global.state_labels];
+    if (global.state_labels)
+        GBgetStateLabelsAll(opt.model, state->state, labels);
+    lts_write_state(opt.lts_file, 0, state->state, labels);
+    (void) arg;
+}
+
+static void
+gsea_lts_write_edge_idx(gsea_state_t* src, transition_info_t *ti, gsea_state_t *dst)
+{
+    assert ((size_t)src->tree.tree_idx == global.explored - 1);
+    lts_write_edge(opt.lts_file, 0, &src->tree.tree_idx, 0, &dst->tree.tree_idx, ti->labels);
+}
+
+static void
+gsea_lts_write_edge_vec(gsea_state_t* src, transition_info_t *ti, gsea_state_t *dst)
+{
+    int src_idx = global.explored - 1;
+    lts_write_edge(opt.lts_file, 0, &src_idx, 0, dst->state, ti->labels);
+    (void) src;
+}
+
 static void
 gsea_setup_default()
 {
@@ -1438,12 +1498,38 @@ gsea_setup_default()
 }
 
 static void
-gsea_setup()
+gsea_setup(const char *output)
 {
+    // setup error detection facilities
+    lts_type_t ltstype=GBgetLTStype(opt.model);
+    if (opt.assert_detect)
+        opt.act_detect = "assert";
+    if (opt.act_detect) {
+        for (int i = 0; i < lts_type_get_edge_label_count(ltstype); i++) {
+            char *name = lts_type_get_edge_label_name(ltstype, i);
+            if (0 == strcmp(name, opt.act_detect)) {
+                opt.act_index = i;
+                opt.act_type = lts_type_get_edge_label_typeno(ltstype, i);
+            }
+        }
+        if (-1 == opt.act_index) Warning (info, "Cannot find action '%s', no such edge label is defined!", opt.act_detect);
+    }
+    if (opt.inv_detect)
+        opt.inv_expr = pred_parse_file (opt.model, opt.inv_detect);
+
+    // setup search algorithms and datastructures
     switch(opt.strategy) {
     case Strat_BFS:
         switch (opt.state_db) {
         case DB_TreeDBS:
+            if (output) {
+                init_output (output, lts_index_template());
+                gc.init = gsea_init_idx;
+                if (opt.write_state || global.state_labels)
+                    gc.pre_state_next = gsea_lts_write_state; // not chained
+                gc.state_process = gsea_lts_write_edge_idx; // not chained
+                gc.report_finished = finish_output;
+            }
             // setup standard bfs/tree configuration
             gc.open_insert_condition = bfs_tree_open_insert_condition;
             gc.open_insert = bfs_tree_open_insert;
@@ -1456,6 +1542,16 @@ gsea_setup()
             gc.context = RTmalloc(sizeof(int) * global.N);
             break;
         case DB_Vset:
+            if (output) {
+                if (opt.write_state == 0) Warning(info, "Turning on --write-state");
+                opt.write_state = 1;
+                init_output (output, lts_vset_template());
+                gc.init = gsea_init_vec;
+                if (opt.write_state || global.state_labels)
+                    gc.pre_state_next = gsea_lts_write_state; // not chained
+                gc.state_process = gsea_lts_write_edge_vec; // not chained
+                gc.report_finished = finish_output;
+            }
             // setup standard bfs/vset configuration
             gc.foreach_open = bfs_vset_foreach_open;
             gc.open_insert_condition = bfs_vset_open_insert_condition;
@@ -1482,6 +1578,7 @@ gsea_setup()
         if (opt.assert_detect || opt.dlk_detect || opt.act_detect || opt.inv_detect)
             Abort ("Verification of safety properties works only with reachability algorithms.");
     case Strat_DFS:
+        if (output) Abort("Use BFS to write the state space to an lts file.");
         switch (opt.state_db) {
         case DB_TreeDBS:
             // setup dfs/tree configuration
@@ -1688,11 +1785,11 @@ gsea_finished(void *arg) {
 int
 main (int argc, char *argv[])
 {
-    const char *files[1];
+    const char *files[2];
     HREinitBegin(argv[0]); // the organizer thread is called after the binary
     HREaddOptions(options,"Perform a parallel reachability analysis of <model>\n\nOptions");
     lts_lib_setup();
-    HREinitStart(&argc,&argv,1,1,(char**)files,"<model>");
+    HREinitStart(&argc,&argv,1,2,(char**)files,"<model> [<lts>]");
 
     Warning(info,"loading model from %s",files[0]);
     opt.model=GBcreateBase();
@@ -1704,6 +1801,7 @@ main (int argc, char *argv[])
     lts_type_t ltstype=GBgetLTStype(opt.model);
     global.N=lts_type_get_state_length(ltstype);
     global.K=dm_nrows(GBgetDMInfo(opt.model));
+    global.T=lts_type_get_type_count(ltstype);
     Warning(info,"length is %d, there are %d groups",global.N,global.K);
     global.state_labels=lts_type_get_state_label_count(ltstype);
     global.edge_labels=lts_type_get_edge_label_count(ltstype);
@@ -1713,7 +1811,7 @@ main (int argc, char *argv[])
     GBgetInitialState(opt.model,src);
     Warning(info,"got initial state");
 
-    gsea_setup();
+    gsea_setup(files[1]);
     gsea_setup_default();
     gsea_search(src);
 
