@@ -367,8 +367,9 @@ empty_projection_rel_test()
 int
 main(int argc, char *argv[])
 {
-    RTinitPopt(&argc, &argv, options, 0, 0, NULL, NULL, NULL,
-               "Vector set test\n\nOptions");
+    HREinitBegin(argv[0]); // the organizer thread is called after the binary
+    HREaddOptions(options,"Vector set test\n\nOptions");
+    HREinitStart(&argc,&argv,0,0,NULL,NULL);
 
     vset_implementation_t vset_impl = VSET_IMPL_AUTOSELECT;
 

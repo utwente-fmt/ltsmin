@@ -523,7 +523,10 @@ void CAESAR_INIT_GRAPH(void) {
 	}
 
  	char *files[2];
-	RTinitPopt(&argc,&argv,options,1,1,files,NULL,"<model>","Options");
+    HREinitBegin(argv[0]);
+    HREaddOptions(options,"Options");
+    HREinitStart(&argc,&argv,1,1,(char**)files,"<model>");
+
 	Warning(info,"loading model from %s",files[0]);
 	model=GBcreateBase();
 	GBsetChunkMethods(model,new_string_index,NULL,
