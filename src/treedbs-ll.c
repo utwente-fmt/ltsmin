@@ -60,7 +60,7 @@ get_local (treedbs_ll_t dbs)
         memset (loc, 0, sizeof (loc_t));
         loc->storage = RTalign (CACHE_LINE_SIZE, sizeof (int[dbs->nNodes * 2]));
         loc->node_count = RTalignZero (CACHE_LINE_SIZE, sizeof (size_t[dbs->nNodes]));
-        memset (loc->storage, -1, sizeof (loc->storage));
+        memset (loc->storage, -1, sizeof (int[dbs->nNodes * 2]));
         pthread_setspecific (dbs->local_key, loc);
     }
     return loc;

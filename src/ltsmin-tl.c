@@ -1839,7 +1839,7 @@ ltsmin_expr_t tableaux_translate_syntax_tree(tableaux_t* t, syntax_tree_t *s)
                         Warning(info, " mu-path exist from %s to %s? %s", buf, buf, path_var_idx ? "yes" : "no");
                     }
 
-                    res = LTSminExpr(MU_VAR, MU_VAR, s->companion->path_var[path_var_idx], mu_left, mu_right);
+                    res = LTSminExpr((ltsmin_expr_case)MU_VAR, MU_VAR, s->companion->path_var[path_var_idx], mu_left, mu_right);
                 }
                 break;
             case TABLEAUX_IDENTITY:

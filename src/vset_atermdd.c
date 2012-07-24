@@ -549,7 +549,7 @@ set_enum_2(ATerm set, ATerm *a, int len,
 static void
 set_enum_list(vset_t set, vset_element_cb cb, void* context)
 {
-    union enum_context ctx = {enum_cb : {cb, context}};
+    union enum_context ctx = {.enum_cb = {cb, context}};
     int N = (set->p_len < 0)?set->dom->shared.size:set->p_len;
     ATerm vec[N];
 
@@ -559,7 +559,7 @@ set_enum_list(vset_t set, vset_element_cb cb, void* context)
 static void
 set_example_list(vset_t set, int *e)
 {
-    union enum_context ctx = {enum_elem : e};
+    union enum_context ctx = {.enum_elem = e};
     int N = (set->p_len < 0)?set->dom->shared.size:set->p_len;
     ATerm vec[N];
 
@@ -612,7 +612,7 @@ int set_enum_t2(ATerm set, int *a, int len,
 static void
 set_enum_tree(vset_t set, vset_element_cb cb, void* context)
 {
-    union enum_context ctx = {enum_cb : {cb, context}};
+    union enum_context ctx = {.enum_cb = {cb, context}};
     int N = (set->p_len < 0)?set->dom->shared.size:set->p_len;
     int vec[N];
 
@@ -622,7 +622,7 @@ set_enum_tree(vset_t set, vset_element_cb cb, void* context)
 static void
 set_example_tree(vset_t set, int *e)
 {
-    union enum_context ctx = {enum_elem : e};
+    union enum_context ctx = {.enum_elem = e};
     int N = (set->p_len < 0)?set->dom->shared.size:set->p_len;
     int vec[N];
 
@@ -1543,7 +1543,7 @@ set_enum_match_tree(vset_t set, int p_len, int *proj, int *match,
         ATtableReset(global_ct);
     }
 
-    union enum_context ctx = {enum_cb : {cb, context}};
+    union enum_context ctx = {.enum_cb = {cb, context}};
     int vec[N];
 
     set_enum_t2(match_set, vec, N, vset_enum_wrap_tree, 0, 1, 0, &ctx);
