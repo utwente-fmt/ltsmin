@@ -1,0 +1,13 @@
+=== Symbolic Parity Game Solver Options
+
+*--chaining-attractor*::
+        Use attractor with chaining.
+        
+*--saturating-attractor*::
+        Use attractor with saturating.
+        
+*--pg-swap*::
+        Swap parity games to disk during parity game solving.
+        
+*--pg-write-dot*::
+        Write dot files to disk during parity game solving for debugging.

@@ -22,6 +22,11 @@ of the output archive, written in manpage:etf[5] format.
 
 == OPTIONS
 
+
+include::inc/spg-options.txt[]
+
+include::inc/spg-solve-options.txt[]
+
 include::inc/pins2lts-sym-options.txt[]
 
 include::inc/mcrl2-options.txt[]

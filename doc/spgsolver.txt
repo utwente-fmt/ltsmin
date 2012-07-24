@@ -11,11 +11,15 @@ spgsolver - symbolic parity game solver.
 
 == SYNOPSIS
 
-spgsolver [OPTIONS] <input>
+spgsolver [OPTIONS] <game>
 
 == OPTIONS
 
-include::inc/listdd-options.txt[]
+include::inc/spg-solve-options.txt[]
+
+include::inc/vset-options.txt[]
+
+include::inc/general-options.txt[]
 
 == EXIT STATUS
 0::

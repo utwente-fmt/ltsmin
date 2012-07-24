@@ -1,0 +1,10 @@
+=== Symbolic Parity Game Options
+
+*--pg-solve*::
+        Solve the generated parity game.
+
+*--pg-reduce*::
+        Reduce the generated parity game on-the-fly.
+        
+*--pg-write='file'*::
+        Writes a symbolic parity game to 'file'.        

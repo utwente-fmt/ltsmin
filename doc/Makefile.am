@@ -103,6 +103,8 @@ extra_ASCIIDOC += inc/hre-options.txt
 extra_ASCIIDOC += inc/hre-startup.txt
 extra_ASCIIDOC += inc/lts-io-options.txt
 extra_ASCIIDOC += inc/pbes-options.txt
+extra_ASCIIDOC += inc/spg-options.txt
+extra_ASCIIDOC += inc/spg-solve-options.txt
 
 EXTRA_DIST  = asciidoc.conf
 EXTRA_DIST += manpage-base.xsl

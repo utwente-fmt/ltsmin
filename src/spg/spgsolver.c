@@ -24,7 +24,7 @@ main (int argc, char *argv[])
     char *files[1];
     HREinitBegin(argv[0]);
     HREaddOptions(options,"Symbolic parity game solver. Solves <game>.\n");
-    HREinitStart(&argc,&argv,1,1,files,"<model> [<etf>]");
+    HREinitStart(&argc,&argv,1,1,files,"<game>");
 
     vset_implementation_t vset_impl = VSET_ListDD;
     FILE *f = fopen(files[0], "r");
