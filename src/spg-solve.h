@@ -28,6 +28,7 @@ typedef struct
     int min_priority;
     int max_priority;
     vset_t *v_priority;
+    char** v_priority_swapfile;
     int num_groups;
     vrel_t *e;
 } parity_game;
@@ -35,6 +36,8 @@ typedef struct
 
 typedef struct
 {
+    bool swap;
+    bool dot;
     bool chaining;
     bool saturation;
     rt_timer_t spg_solve_timer;
@@ -88,7 +91,7 @@ void spg_destroy_solver_options(spgsolver_options* options);
 /**
  * \brief
  */
-bool spg_solve(const parity_game* g, spgsolver_options* options);
+bool spg_solve(parity_game* g, spgsolver_options* options);
 
 
 /**
@@ -97,7 +100,7 @@ bool spg_solve(const parity_game* g, spgsolver_options* options);
  * \param v
  * \return true iff ...
  */
-recursive_result spg_solve_recursive(const parity_game* g, const spgsolver_options* options);
+recursive_result spg_solve_recursive(parity_game* g, const spgsolver_options* options);
 
 
 /**

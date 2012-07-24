@@ -2286,7 +2286,10 @@ main (int argc, char *argv[])
             RTprintTimer(info, timer, "generation took");
             RTprintTimer(info, pgsolve_timer, "solving took");
         }
-        spg_destroy(g);
+        else
+        {
+            spg_destroy(g);
+        }
     }
     if (player != 0)
     {
