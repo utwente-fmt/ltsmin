@@ -1,0 +1,75 @@
+#!/bin/bash
+
+logTO(){
+  LOG_FILE=$1
+  echo date > $LOG_FILE
+}
+
+goodCMD(){
+  echo "running $*" >> $LOG_FILE
+  if ! "$@" >> $LOG_FILE 2>&1
+  then fail "unexpected failure" ; fi
+}
+
+badCMD(){
+  echo "running $*" >> $LOG_FILE
+  if "$@" >> $LOG_FILE 2>&1
+  then fail "unexpected success" ; fi
+}
+
+mustSay(){
+  if ! test -f $LOG_FILE ; then return ; fi
+  egrep -q "$1" $LOG_FILE || fail "log file $LOG_FILE does not contain [$1]"
+}
+
+compareFiles(){
+  dir1=$1
+  dir2=$2
+  shift
+  shift
+  for f in $* ; do
+    if ! cmp -s $dir1/$f $dir2/$f
+    then fail "Files $dir1/$f and $dir2/$f are different" ; fi
+  done
+}
+
+# define the tests
+
+testCreate(){
+  logTO test_create.log
+  goodCMD gcf --create test.gcf test-gcf shunit*
+  goodCMD gcf -f -q -x --output=test.dir test.gcf
+  badCMD  gcf -q -x --output=test.dir test.gcf
+  compareFiles . test.dir test-gcf shunit2.*
+  /bin/rm -rf test.dir
+  goodCMD gcf --to-zip test.gcf test.zip
+  goodCMD unzip -d test.dir test.zip
+  compareFiles . test.dir test-gcf shunit2.*
+  /bin/rm -rf test.gcf test.dir
+  goodCMD gcf --from-zip test.zip test.gcf
+  goodCMD gcf -f -q -x --output=test.dir test.gcf
+  compareFiles . test.dir test-gcf shunit2.*
+  /bin/rm -rf test.gcf test.dir test.zip
+}
+
+#oneTimeTearDown(){
+#    /bin/rm -f test.err
+#}
+
+# run them for specified output format
+case $1 in
+ txt)
+    shift
+    echo "outputting result as text"
+    . shunit2.txt
+ ;;
+ xml)
+    shift
+    SHUNIT_OUTPUTDIR=.
+    . shunit2.xml
+ ;;
+ *)
+    echo "unknown output format, usage: $0 txt|xml"
+ ;;
+esac
+
