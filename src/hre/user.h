@@ -11,6 +11,10 @@
 #define RUNTIME_H
 #endif
 
+#ifndef POPT_ARG_LONGLONG
+#define POPT_ARG_LONGLONG POPT_ARG_LONG
+#endif
+
 /**
 Opaque type memory region.
 */
