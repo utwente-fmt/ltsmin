@@ -18,6 +18,7 @@ prom2lts-mc - Concurrent state space generator for SpinJa models.
 {manname} generates a labelled transition system from a compiled
 specification provided in 'input.prom'.  It does this concurrently
 for any given number of threads.
+LTS output is not supported by this tool, use the distributed tools instead.
 
 include::inc/prom.txt[]
 

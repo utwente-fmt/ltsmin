@@ -11,13 +11,16 @@ prom2lts-gsea - Sequential state space generator for SpinJa models.
 
 == SYNOPSIS
 
-*{manname}* [OPTION]... 'input.prom'
+*{manname}* [OPTION]... 'input.prom' ['output.fmt']
 
 == DESCRIPTION
 
 {manname} generates a labelled transition system from a specification
 provided in 'input.prom' by enumerative reachability
 analysis using a general state expanding algorithm.
+'output.fmt' specifies the name of
+the output archive.  The desired format is deduced from the filename
+extension. Available formats are described below.
 
 include::inc/prom.txt[]
 

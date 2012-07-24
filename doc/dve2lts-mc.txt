@@ -11,13 +11,15 @@ dve2lts-mc - Concurrent state space generator for DiVinE 2 models.
 
 == SYNOPSIS
 
-*{manname}* [OPTION]... 'input'[_.dve_|_.dve2C_]
+*{manname}* [OPTION]... 'input'<_.dve_|_.dve2C_>
 
 == DESCRIPTION
 
 {manname} generates a labelled transition system from a compiled
 specification provided in 'input.dve' or 'input.dve2C' (precompiled).
 It does this concurrently for any given number of threads.
+LTS output is not supported by this tool, use the distributed tools instead.
+
 
 include::inc/dve.txt[]
 

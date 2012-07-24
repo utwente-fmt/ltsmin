@@ -12,13 +12,22 @@ opaal2lts-mc - Concurrent state space generator for UPPAAL timed automata
 
 == SYNOPSIS
 
-*{manname}* [OPTION]... 'input'[_.so|_.xml]
+*{manname}* [OPTION]... 'input'<_.so|_.xml>
 
 == DESCRIPTION
 
 {manname} generates a labelled transition system from a
 specification provided in 'input.xml' or 'intput.so' (precompiled).
 It does this concurrently for any given number of threads.
+This tool does not support LTS output.
+
+https://code.launchpad.net/~opaal-developers/opaal/
+opaal-ltsmin-succgen[opaal] is an open source implementation of the
+UPPAAL model checker. It was extended to generate successor generators for
+the LTSmin PINS interface. Therefore the PINS interface was extended to
+support the semi-symbolic states in timed automata.
+For more details on the multi-core timed-automata implementation, refer
+to http://eprints.eemcs.utwente.nl/21972/[Multi-Core Reachability for Timed Automata]
 
 == OPTIONS
 

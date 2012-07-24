@@ -11,7 +11,7 @@ dve2torx - TorX RPC interface for DVE models.
 
 == SYNOPSIS
 
-*{manname}* [OPTION]... 'input'[_.dve_|_.dve2C_]
+*{manname}* [OPTION]... 'input'<_.dve_|_.dve2C_>
 
 == DESCRIPTION
 

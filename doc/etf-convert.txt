@@ -16,8 +16,9 @@ etf-convert - Translate ETF to DVE.
 
 == DESCRIPTION
 
-This tool translates ETF to DVE. Note that the translation
-is a very simple one, that produces relatively inefficient DVE code.
+This tool translates manpage:etf[5] to http://divine.fi.muni.cz/[DVE].
+Note that the translation is a very simple one, that produces relatively
+inefficient DVE code.
 
 == OPTIONS
 

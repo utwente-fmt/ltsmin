@@ -16,8 +16,9 @@ etf2lts-mc - Concurrent state space generator for ETF models.
 == DESCRIPTION
 
 {manname} generates a labelled transition system from a compiled
-specification provided in 'input.etf'. It does this concurrently
-for any given number of threads.
+specification provided in 'input.etf' (see manpage:etf[5]).
+It does this concurrently for any given number of threads.
+LTS output is not supported by this tool, use the distributed tools instead.
 
 == OPTIONS
 

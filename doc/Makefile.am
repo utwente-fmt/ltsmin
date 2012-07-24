@@ -94,6 +94,7 @@ extra_ASCIIDOC += inc/spec-reach.txt
 extra_ASCIIDOC += inc/spec2lts-gsea-options.txt
 extra_ASCIIDOC += inc/spec2lts-gsea.txt
 extra_ASCIIDOC += inc/spec2lts-hre-options.txt
+extra_ASCIIDOC += inc/spec2lts-hre.txt
 extra_ASCIIDOC += inc/spec2lts-mc-options.txt
 extra_ASCIIDOC += inc/spec2lts-mc-ta-options.txt
 extra_ASCIIDOC += inc/spec2lts-mc.txt
