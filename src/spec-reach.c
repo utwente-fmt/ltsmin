@@ -30,6 +30,9 @@ static char* mu_formula  = NULL;
 static char* trc_output = NULL;
 static int   dlk_detect = 0;
 static char* act_detect = NULL;
+static char* inv_detect = NULL;
+static int   assert_detect = 0;
+static int   no_exit = 0;
 static int   act_detect_table;
 static int   act_detect_index;
 static int   sat_granularity = 10;
@@ -141,9 +144,14 @@ static  struct poptOption options[] = {
     { "saturation" , 0, POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &saturation , 0 , "select the saturation strategy" , "<none|sat-like|sat-loop|sat-fix|sat>" },
     { "sat-granularity" , 0 , POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &sat_granularity , 0 , "set saturation granularity","<number>" },
     { "save-sat-levels", 0, POPT_ARG_VAL, &save_sat_levels, 1, "save previous states seen at saturation levels", NULL },
-    {"guidance", 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &guidance, 0 , "select the guided search strategy" , "<unguided|directed>" },
+    { "guidance", 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &guidance, 0 , "select the guided search strategy" , "<unguided|directed>" },
     { "deadlock" , 'd' , POPT_ARG_VAL , &dlk_detect , 1 , "detect deadlocks" , NULL },
     { "action" , 0 , POPT_ARG_STRING , &act_detect , 0 , "detect action" , "<action>" },
+    { "invariant", 'i', POPT_ARG_STRING, &inv_detect, 1, "detect deadlocks", NULL },
+#ifdef SPINJA
+    { "assert", 0, POPT_ARG_VAL, &assert_detect, 1, "detect assertion errors (SpinJa). Same as --action=assert", NULL },
+#endif
+    { "no-exit", 'n', POPT_ARG_VAL, &no_exit, 1, "no exit on error, just count (for error counters use -v)", NULL },
     { "trace" , 0 , POPT_ARG_STRING , &trc_output , 0 , "file to write trace to" , "<lts-file>.gcf" },
     { "mu" , 0 , POPT_ARG_STRING , &mu_formula , 0 , "file with a mu formula" , "<mu-file>.mu" },
     { "ctl" , 0 , POPT_ARG_STRING , &ctl_formula , 0 , "file with a ctl* formula" , "<ctl-file>.ctl" },
@@ -1743,6 +1751,8 @@ init_action()
     if (eLbls != 1)
         Abort("action detection assumes precisely one edge label");
 
+    if (assert_detect)
+        act_detect = "assert";
     chunk c = chunk_str(act_detect);
     //table number of first edge label.
     act_detect_table=lts_type_get_edge_label_typeno(ltstype, 0);
@@ -2102,7 +2112,9 @@ main (int argc, char *argv[])
 
     init_model(files[0]);
     init_domain(vset_impl, &visited);
-    if (act_detect != NULL) init_action();
+    if (assert_detect || act_detect != NULL) init_action();
+    if (inv_detect) Abort("Invariant violation detection is not implemented.");
+    if (no_exit) Abort("Error counting (--no-exit) is not implemented.");
 
     sat_proc_t sat_proc = NULL;
     reach_proc_t reach_proc = NULL;

@@ -132,12 +132,6 @@ lts_type_t lts_type_permute(lts_type_t t0,int *pi){
 }
 
 void lts_type_print(log_t log, lts_type_t t){
-    log_printf(log,"The state vector is:\n");
- 	for(int i=0;i<t->state_length;i++){
- 	    log_printf(log,"%4d: %s:%s\n",i,
-                   t->state_name[i],
-                   SIget(t->type_db,t->state_type[i]));
-	}
 	log_printf(log,"The state labels are:\n");
 	for(int i=0;i<t->state_label_count;i++){
 	    log_printf(log,"%4d: %s:%s\n",i,
@@ -155,6 +149,12 @@ void lts_type_print(log_t log, lts_type_t t){
 	for(int i=0;i<N;i++){
 	    log_printf(log,"%4d: %s (%s)\n",i,SIget(t->type_db,i),data_format_string(t,i));
 	}
+    log_printf(log,"The state vector is:\n");
+    for(int i=0;i<t->state_length;i++){
+        log_printf(log,"%4d: %s:%s\n",i,
+                   t->state_name[i],
+                   SIget(t->type_db,t->state_type[i]));
+    }
 }
 
 void lts_type_destroy(lts_type_t *t){

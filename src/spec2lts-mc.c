@@ -180,6 +180,7 @@ static int              dlk_detect = 0;
 static char            *act_detect = NULL;
 static char            *inv_detect = NULL;
 static int              assert_detect = 0;
+static int              no_exit = 0;
 static int              act_index = -1;
 static int              act_type = -1;
 static ltsmin_expr_t    inv_expr = NULL;
@@ -296,14 +297,13 @@ exit_ltsmin (int sig)
 static struct poptOption options[] = {
     {NULL, 0, POPT_ARG_CALLBACK | POPT_CBFLAG_POST | POPT_CBFLAG_SKIPOPTION,
      (void *)state_db_popt, 0, NULL, NULL},
-//    {"threads", 0, POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &W, 0, "number of threads", "<int>"},
-    {"state", 0, POPT_ARG_STRING | POPT_ARGFLAG_SHOW_DEFAULT, &state_repr,
-     0, "select the data structure for storing states. Beware for Cleary tree: size <= 28 + 2 * ratio.", "<tree|table|cleary-tree>"},
+    {"state", 0, POPT_ARG_STRING | POPT_ARGFLAG_SHOW_DEFAULT, &state_repr, 0,
+      "select the data structure for storing states. Beware for Cleary tree: size <= 28 + 2 * ratio.", "<tree|table|cleary-tree>"},
     {"size", 's', POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &dbs_size, 0,
      "log2 size of the state store", NULL},
 #ifdef OPAAL
-    {"lattice-blocks", 'l', POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &LATTICE_BLOCK_SIZE,
-      0,"Size of blocks preallocated for lattices (> 1). "
+    {"lattice-blocks", 'l', POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &LATTICE_BLOCK_SIZE, 0,
+      "Size of blocks preallocated for lattices (> 1). "
          "Small blocks save memory when most states few lattices (< 4). "
          "Larger blocks save memory in case a few states have many lattices. "
          "For the best performance set this to: cache line size (usually 64) divided by lattice size of 8 byte.", NULL},
@@ -319,25 +319,26 @@ static struct poptOption options[] = {
     {"no-red-perm", 0, POPT_ARG_VAL, &no_red_perm, 1, "turn off transition permutation for the red search", NULL},
     {"nar", 1, POPT_ARG_VAL, &all_red, 0, "turn off red coloring in the blue search (NNDFS/MCNDFS)", NULL},
     {"grey", 0, POPT_ARG_VAL, &call_mode, UseGreyBox, "make use of GetTransitionsLong calls", NULL},
-    {"max", 0, POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &max, 0, "maximum search depth", "<int>"},
+    {"max", 0, POPT_ARG_LONGLONG | POPT_ARGFLAG_SHOW_DEFAULT, &max, 0, "maximum search depth", "<int>"},
 #endif
     {"perm", 'p', POPT_ARG_STRING | POPT_ARGFLAG_SHOW_DEFAULT,
      &arg_perm, 0, "select the transition permutation method",
      "<dynamic|random|rr|sort|sr|shift|shiftall|otf|none>"},
-    {"gran", 'g', POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &G,
-     0, "subproblem granularity ( T( work(P,g) )=min( T(P), g ) )", NULL},
-    {"handoff", 'h', POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &H,
-     0, "maximum balancing handoff (handoff=min(max, stack_size/2))", NULL},
-    {"zobrist", 'z', POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &ZOBRIST,
-     0,"log2 size of zobrist random table (6 or 8 is good enough; 0 is no zobrist)", NULL},
+    {"gran", 'g', POPT_ARG_LONGLONG | POPT_ARGFLAG_SHOW_DEFAULT, &G, 0,
+     "subproblem granularity ( T( work(P,g) )=min( T(P), g ) )", NULL},
+    {"handoff", 0, POPT_ARG_LONGLONG | POPT_ARGFLAG_SHOW_DEFAULT, &H, 0,
+     "maximum balancing handoff (handoff=min(max, stack_size/2))", NULL},
+    {"zobrist", 'z', POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &ZOBRIST, 0,
+     "log2 size of zobrist random table (6 or 8 is good enough; 0 is no zobrist)", NULL},
     {"noref", 0, POPT_ARG_VAL, &refs, 0, "store full states on the stack/queue instead of references (faster)", NULL},
-    {"ratio", 0, POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &ratio, 0, "log2 tree root to leaf ratio", "<int>"},
+    {"ratio", 0, POPT_ARG_LONGLONG | POPT_ARGFLAG_SHOW_DEFAULT, &ratio, 0, "log2 tree root to leaf ratio", "<int>"},
     {"deadlock", 'd', POPT_ARG_VAL, &dlk_detect, 1, "detect deadlocks", NULL },
-    {"action", 'a', POPT_ARG_STRING, &act_detect, 1, "detect error action", NULL },
-    {"invariant", 'i', POPT_ARG_STRING, &inv_detect, 1, "detect deadlocks", NULL },
+    {"action", 'a', POPT_ARG_STRING, &act_detect, 0, "detect error action", NULL },
+    {"invariant", 'i', POPT_ARG_STRING, &inv_detect, 0, "detect invariant violations", NULL },
 #ifdef SPINJA
     {"assert", 0, POPT_ARG_VAL, &assert_detect, 1, "detect assertion errors (SpinJa). Same as --action=assert", NULL },
 #endif
+    {"no-exit", 'n', POPT_ARG_VAL, &no_exit, 1, "no exit on error, just count (for error counters use -v)", NULL },
     {"trace", 0, POPT_ARG_STRING, &trc_output, 0, "file to write trace to", "<lts output>" },
     SPEC_POPT_OPTIONS,
     {NULL, 0, POPT_ARG_INCLUDE_TABLE, greybox_options, 0, "Greybox options", NULL},
@@ -816,10 +817,7 @@ init_globals ()
                 act_type = lts_type_get_edge_label_typeno(ltstype, i);
             }
         }
-        if (-1 == act_index) {
-            Warning (info, "Cannot find action '%s', no such edge label is defined!", act_detect);
-            assert_detect = 0;
-        }
+        if (-1 == act_index) Warning (info, "Cannot find action '%s', no such edge label is defined!", act_detect);
     }
     if (inv_detect)
         inv_expr = pred_parse_file (model, inv_detect);
@@ -2310,9 +2308,11 @@ deadlock_detect (wctx_t *ctx, int count)
 {
     if (count > 0 || valid_end_state(ctx, ctx->state.data)) return;
     ctx->counters.deadlocks++; // counting is costless
-    if (dlk_detect && trc_output && lb2_stop(lb2)) {
-        Warning (info,"Deadlock found in state at depth %zu!", ctx->counters.level_cur);
-        handle_error_trace (ctx);
+    if (dlk_detect && (!no_exit || trc_output) && lb2_stop(lb2)) {
+        Warning (info, "");
+        Warning (info, "Deadlock found in state at depth %zu!", ctx->counters.level_cur);
+        Warning (info, "");
+        if (trc_output) handle_error_trace (ctx);
     }
 }
 
@@ -2321,9 +2321,11 @@ invariant_detect (wctx_t *ctx, raw_data_t state)
 {
     if ( !inv_expr || eval_predicate(inv_expr, NULL, state) ) return;
     ctx->counters.violations++;
-    if (trc_output && lb2_stop(lb2)) {
-        Warning (info,"Invariant violation (%s) found at depth %zu!", inv_detect, ctx->counters.level_cur);
-        handle_error_trace (ctx);
+    if ((!no_exit || trc_output) && lb2_stop(lb2)) {
+        Warning (info, "");
+        Warning (info, "Invariant violation (%s) found at depth %zu!", inv_detect, ctx->counters.level_cur);
+        Warning (info, "");
+        if (trc_output) handle_error_trace (ctx);
     }
 }
 
@@ -2332,13 +2334,15 @@ action_detect (wctx_t *ctx, transition_info_t *ti, ref_t last)
 {
     if (-1 == act_index || NULL == ti->labels || 0 == ti->labels[act_index]) return;
     ctx->counters.errors++;
-    if (trc_output && lb2_stop(lb2)) {
+    if ((!no_exit || trc_output) && lb2_stop(lb2)) {
         ctx->state.ref = last; // TODO: include the action in the trace
         chunk c = GBchunkGet (ctx->model, act_type, ti->labels[act_index]);
         char value[4096];
         chunk2string(c, 4096, value);
+        Warning (info, "");
         Warning (info, "Error action %s with value %s found at depth %zu!", act_detect, value, ctx->counters.level_cur);
-        handle_error_trace (ctx);
+        Warning (info, "");
+        if (trc_output) handle_error_trace (ctx);
     }
 }
 

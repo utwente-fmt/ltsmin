@@ -686,6 +686,7 @@ static char* model_type_pre[MAX_TYPES];
 static pins_loader_t model_preloader[MAX_TYPES];
 static int registered_pre=0;
 static int matrix=0;
+static int labels=0;
 static int cache=0;
 static int por=0;
 static const char *regroup_options = NULL;
@@ -726,6 +727,23 @@ ltl_popt (poptContext con, enum poptCallbackReason reason,
     Abort("unexpected call to ltl_popt");
 }
 
+void chunk_table_print(log_t log, model_t model) {
+    lts_type_t t = GBgetLTStype(model);
+    log_printf(log,"The registered types values are:\n");
+    int N=lts_type_get_type_count(t);
+    int idx = 0;
+    for(int i=0;i<N;i++){
+        int V = GBchunkCount(model, i);
+        for(int j=0;j<V;j++){
+            char *type = lts_type_get_type(t, i);
+            chunk c = GBchunkGet(model, i, j);
+            char name[c.len*2+6];
+            chunk2string(c, sizeof name, name);
+            log_printf(log,"%4d: %s (%s)\n",idx, name, type);
+            idx++;
+        }
+    }
+}
 
 void
 GBloadFile (model_t model, const char *filename, model_t *wrapped)
@@ -751,8 +769,13 @@ GBloadFile (model_t model, const char *filename, model_t *wrapped)
                 if (matrix) {
                     GBprintDependencyMatrixCombined(stdout, model);
                     exit (EXIT_SUCCESS);
-                } else
+                } else if (labels) {
+                    lts_type_print(info, GBgetLTStype(model));
+                    chunk_table_print(info, model);
+                    exit (EXIT_SUCCESS);
+                } else {
                     return;
+                }
             }
         }
         Abort("No factory method has been registered for %s models",
@@ -823,14 +846,15 @@ GBbuchiIsAccepting (model_t model, int *state)
 
 struct poptOption ltl_options[] = {
     {NULL, 0, POPT_ARG_CALLBACK | POPT_CBFLAG_POST | POPT_CBFLAG_SKIPOPTION, (void *)ltl_popt, 0, NULL, NULL},
-    {"ltl", 0, POPT_ARG_STRING, &ltl_file, 0, "file with LTL formula",
-     "<ltl-file>.ltl"},
+    {"ltl", 0, POPT_ARG_STRING, &ltl_file, 0, "LTL formula or file with LTL formula",
+     "<ltl-file>.ltl|<ltl formula>"},
     {"ltl-semantics", 0, POPT_ARG_STRING | POPT_ARGFLAG_SHOW_DEFAULT, &ltl_semantics, 0,
      "LTL semantics", "<spin|textbook|ltsmin>"},
     POPT_TABLEEND
 };
 
 struct poptOption greybox_options[]={
+    { "labels", 0, POPT_ARG_VAL, &labels, 1, "print state variable and type names, and state and action labels", NULL },
 	{ "matrix" , 'm' , POPT_ARG_VAL , &matrix , 1 , "print the dependency matrix for the model and exit" , NULL},
 	{ "por" , 'p' , POPT_ARG_VAL , &por , 1 , "enable partial order reduction" , NULL },
 	{ "cache" , 'c' , POPT_ARG_VAL , &cache , 1 , "enable caching of grey box calls" , NULL },

@@ -15,11 +15,13 @@
 #include <hre/user.h>
 #endif
 #include <lts-io/user.h>
+#include <ltsmin-tl.h>
 #include <spec-greybox.h>
 #include <stringindex.h>
 #include <treedbs.h>
 
 struct dist_thread_context {
+    model_t model;
     lts_file_t output;
     treedbs_t dbs;
     int mpi_me;
@@ -27,30 +29,92 @@ struct dist_thread_context {
     array_manager_t state_man;
     uint32_t *parent_ofs;
     uint16_t *parent_seg;
-    long long int explored,visited,transitions;
+    size_t explored,visited,transitions,level,deadlocks,errors,violations;
 };
 
-static int dst_ofs=2;
-static int lbl_ofs;
-static int trans_len;
-static int write_lts=0;
-static int nice_value=0;
-static int find_dlk=0;
-static int write_state=0;
-static int size;
-static int state_labels;
-static int edge_labels;
-static int mpi_nodes;
+static int              dst_ofs=2;
+static int              lbl_ofs;
+static int              trans_len;
+static int              write_lts=0;
+static int              nice_value=0;
+static int              dlk_detect=0;
+static char            *act_detect = NULL;
+static char            *inv_detect = NULL;
+static int              assert_detect = 0;
+static int              no_exit = 0;
+static int              act_index = -1;
+static int              act_type = -1;
+static ltsmin_expr_t    inv_expr = NULL;
+static int              write_state=0;
+static int              size;
+static int              state_labels;
+static int              edge_labels;
+static int              mpi_nodes;
 
 static  struct poptOption options[] = {
-    { "nice" , 0 , POPT_ARG_INT , &nice_value , 0 , "set the nice level of all workers"
-      " (useful when running on other peoples workstations)" , NULL},
-    { "write-state" , 0 , POPT_ARG_VAL , &write_state, 1 , "write the full state vector" , NULL },
-    { "deadlock" , 'd' , POPT_ARG_VAL , &find_dlk , 1 , "detect deadlocks" , NULL },
+    { "nice", 0, POPT_ARG_INT, &nice_value, 0, "set the nice level of all workers"
+      " (useful when running on other peoples workstations)", NULL},
+    { "write-state", 0, POPT_ARG_VAL, &write_state, 1, "write the full state vector", NULL },
+    { "deadlock", 'd', POPT_ARG_VAL, &dlk_detect, 1, "detect deadlocks", NULL },
+    { "action", 'a', POPT_ARG_STRING, &act_detect, 0, "detect error action", NULL },
+    { "invariant", 'i', POPT_ARG_STRING, &inv_detect, 0, "detect invariant violations", NULL },
+#ifdef SPINJA
+    { "assert", 0, POPT_ARG_VAL, &assert_detect, 1, "detect assertion errors (SpinJa). Same as --action=assert", NULL },
+#endif
+    { "no-exit", 'n', POPT_ARG_VAL, &no_exit, 1, "no exit on error, just count (for error counters use -v)", NULL },
     SPEC_POPT_OPTIONS,
-    { NULL, 0 , POPT_ARG_INCLUDE_TABLE, greybox_options , 0 , "Greybox options", NULL },
+    { NULL, 0, POPT_ARG_INCLUDE_TABLE, greybox_options, 0, "Greybox options", NULL },
     POPT_TABLEEND
 };
+
+static inline int
+valid_end_state(struct dist_thread_context *ctx, int *state)
+{
+#if defined(SPINJA)
+    return GBbuchiIsAccepting(ctx->model, state);
+#endif
+    return 0;
+    (void) ctx; (void) state;
+}
+
+static inline void
+deadlock_detect (struct dist_thread_context *ctx, int *state, int count)
+{
+    if (count==0 && dlk_detect && !valid_end_state(ctx, state)){
+        ctx->deadlocks++;
+        if (no_exit) return;
+        Warning (info, "");
+        Warning (info, "deadlock found at depth %zu", ctx->level);
+        HREexit(0);
+    }
+}
+
+static inline void
+invariant_detect (struct dist_thread_context *ctx, int *state)
+{
+    if ( !inv_expr || eval_predicate(inv_expr, NULL, state) ) return;
+    ctx->violations++;
+    if (no_exit) return;
+
+    Warning (info, "");
+    Warning (info, "Invariant violation (%s) found at depth %zu!", inv_detect, ctx->level);
+    HREexit(0);
+}
+
+static inline void
+action_detect (struct dist_thread_context *ctx, transition_info_t *ti)
+{
+    if (-1 == act_index || NULL == ti->labels || 0 == ti->labels[act_index]) return;
+    ctx->errors++;
+    if (no_exit) return;
+
+    chunk c = GBchunkGet (ctx->model, act_type, ti->labels[act_index]);
+    char value[4096];
+    chunk2string(c, 4096, value);
+    Warning (info, "");
+    Warning (info, "Error action %s with value %s found at depth %zu!", act_detect, value, ctx->level);
+    HREexit(0);
+}
 
 static uint32_t chk_base=0;
 
@@ -69,29 +133,32 @@ struct src_info {
     int seg;
     int ofs;
     hre_task_t new_trans;
+    struct dist_thread_context *ctx;
 };
 
 static void callback(void*context,transition_info_t*info,int*dst){
+    struct src_info *ctx  = (struct src_info*)context;
+    action_detect (ctx->ctx, info);
     int who=owner(dst);
     uint32_t trans[trans_len];
-    trans[0]=((struct src_info*)context)->ofs;
+    trans[0]=ctx->ofs;
     for(int i=0;i<size;i++){
         trans[dst_ofs+i]=dst[i];
     }
     for(int i=0;i<edge_labels;i++){
         trans[lbl_ofs+i]=info->labels[i];
     }
-    TaskSubmitFixed(((struct src_info*)context)->new_trans,who,trans);
+    TaskSubmitFixed(ctx->new_trans,who,trans);
 }
 
 static void new_transition(void*context,int src_seg,int len,void*arg){
     struct dist_thread_context* ctx=(struct dist_thread_context*)context;
     (void)len;
     uint32_t *trans=(uint32_t*)arg;
-    int temp=TreeFold(ctx->dbs,(int32_t*)(trans+dst_ofs));
+    size_t temp=TreeFold(ctx->dbs,(int32_t*)(trans+dst_ofs));
     if (temp>=ctx->visited) {
         ctx->visited=temp+1;
-        if(find_dlk){
+        if(dlk_detect){
             ensure_access(ctx->state_man,temp);
             ctx->parent_seg[temp]=src_seg;
             ctx->parent_ofs[temp]=trans[0];
@@ -104,11 +171,7 @@ static void new_transition(void*context,int src_seg,int len,void*arg){
     ctx->transitions++;
 }
 
-static pthread_mutex_t shared_mutex = PTHREAD_MUTEX_INITIALIZER;
-static int shared_todo=1;
-
 int main(int argc, char*argv[]){
-    long long int global_visited,global_explored,global_transitions;
     char *files[2];
     HREinitBegin(argv[0]);
     HREaddOptions(options,"Perform a distributed enumerative reachability analysis of <model>\n\nOptions");
@@ -129,14 +192,12 @@ int main(int argc, char*argv[]){
     memset(ctx.tcount,0,mpi_nodes*sizeof(int));
 
     model_t model=GBcreateBase();
+    ctx.model = model;
     GBsetChunkMethods(model,HREgreyboxNewmap,HREglobal(),HREgreyboxI2C,HREgreyboxC2I,HREgreyboxCount);
 
-    pthread_mutex_lock(&shared_mutex);
-    if (shared_todo){
+    if (ctx.mpi_me == 0)
         GBloadFileShared(model,files[0]);
-        shared_todo=0;
-    }
-    pthread_mutex_unlock(&shared_mutex);
+    HREbarrier(HREglobal());
     GBloadFile(model,files[0],&model);
 
     HREbarrier(HREglobal());
@@ -151,13 +212,27 @@ int main(int argc, char*argv[]){
         if (rv==-1) Warning(info,"failed to set nice");
     }
     /***************************************************/
-    if (find_dlk) {
+    if (dlk_detect) {
         ctx.state_man=create_manager(65536);
         ctx.parent_ofs=NULL;
         ADD_ARRAY(ctx.state_man,ctx.parent_ofs,uint32_t);
         ctx.parent_seg=NULL;
         ADD_ARRAY(ctx.state_man,ctx.parent_seg,uint16_t);
     }
+    if (assert_detect)
+        act_detect = "assert";
+    if (act_detect) {
+        for (int i = 0; i < edge_labels; i++) {
+            char *name = lts_type_get_edge_label_name(ltstype, i);
+            if (0 == strcmp(name, act_detect)) {
+                act_index = i;
+                act_type = lts_type_get_edge_label_typeno(ltstype, i);
+            }
+        }
+        if (-1 == act_index) Warning (info, "Cannot find action '%s', no such edge label is defined!", act_detect);
+    }
+    if (inv_detect)
+        inv_expr = pred_parse_file (model, inv_detect);
     HREbarrier(HREglobal());
     /***************************************************/
     size=lts_type_get_state_length(ltstype);
@@ -175,8 +250,14 @@ int main(int argc, char*argv[]){
     Warning(info,"initial state computed at %d",ctx.mpi_me);
     adjust_owner(src);
     Warning(info,"initial state translated at %d",ctx.mpi_me);
+    size_t global_visited,global_explored,global_transitions;
+    size_t global_deadlocks,global_errors,global_violations;
     ctx.explored=0;
     ctx.transitions=0;
+    ctx.level=0;
+    ctx.deadlocks=0;
+    ctx.errors=0;
+    ctx.violations=0;
     global_visited=1;
     global_explored=0;
     global_transitions=0;
@@ -218,30 +299,31 @@ int main(int argc, char*argv[]){
     trans_len=lbl_ofs+edge_labels;
     struct src_info src_ctx;
     src_ctx.new_trans=TaskCreate(task_queue,1,65536,new_transition,&ctx,trans_len*4);
+    src_ctx.ctx = &ctx;
+    rt_timer_t timer = RTcreateTimer();
     /***************************************************/
-    int level=0;
+
+    RTstartTimer(timer);
+    size_t threshold = 100000;
     for(;;){
-        long long int limit=ctx.visited;
-        int lvl_scount=0;
-        int lvl_tcount=0;
+        size_t limit=ctx.visited;
+        size_t lvl_scount=0;
+        size_t lvl_tcount=0;
         HREbarrier(HREglobal());
         if (ctx.mpi_me==0) {
-            Warning(info,"level %d has %lld states, explored %lld states %lld transitions",
-                level,global_visited-global_explored,global_explored,global_transitions);
+            Warning(info,"level %d has %zu states, explored %zu states %zu transitions",
+                ctx.level,global_visited-global_explored,global_explored,global_transitions);
         }
-        level++;
+        ctx.level++;
         while(ctx.explored<limit){
             TreeUnfold(ctx.dbs,ctx.explored,src);
             src_ctx.seg=ctx.mpi_me;
             src_ctx.ofs=ctx.explored;
             ctx.explored++;
+            invariant_detect (&ctx, src);
             int count=GBgetTransitionsAll(model,src,callback,&src_ctx);
-            if (count<0) Fatal(1,error,"error in GBgetTransitionsAll");
-            if (count==0 && find_dlk){
-                Warning(info,"deadlock found: %d.%d",src_ctx.seg,src_ctx.ofs);
-                //deadlock_found(ctx.seg,ctx.ofs);
-                Fatal(1,error,"trace printing unimplemented");
-            }
+            if (count<0) Abort("error in GBgetTransitionsAll");
+            deadlock_detect (&ctx, src, count);
             if (state_labels){
                 GBgetStateLabelsAll(model,src,labels);
             }
@@ -251,34 +333,41 @@ int main(int argc, char*argv[]){
 
             lvl_scount++;
             lvl_tcount+=count;
-            if ((lvl_scount%1000)==0) {
-                Warning(infoLong,"generated %d transitions from %d states",
-                    lvl_tcount,lvl_scount);
+            if (ctx.mpi_me == 0 && lvl_scount >= threshold) {
+                Warning(info,"generated ~%d transitions from ~%d states",
+                    lvl_tcount * mpi_nodes,lvl_scount * mpi_nodes);
+                threshold <<= 1;
             }
             if ((lvl_scount%4)==0) HREyield(HREglobal());
         }
-        Warning(infoLong,"explored %d states and %d transitions",lvl_scount,lvl_tcount);
+        //Warning(infoLong,"saw %d states and %d transitions",lvl_scount,lvl_tcount);
         TQwait(task_queue);
-        Warning(infoLong,"level terminated");
         HREreduce(HREglobal(),1,&ctx.visited,&global_visited,UInt64,Sum);
         HREreduce(HREglobal(),1,&ctx.explored,&global_explored,UInt64,Sum);
         HREreduce(HREglobal(),1,&ctx.transitions,&global_transitions,UInt64,Sum);
         if (global_visited==global_explored) break;
     }
+    RTstopTimer(timer);
+    Warning(infoLong,"My share is %lld states and %lld transitions",ctx.explored,ctx.transitions);
+
+    HREreduce(HREglobal(),1,&ctx.deadlocks,&global_deadlocks,UInt64,Sum);
+    HREreduce(HREglobal(),1,&ctx.errors,&global_errors,UInt64,Sum);
+    HREreduce(HREglobal(),1,&ctx.violations,&global_violations,UInt64,Sum);
+
     if (ctx.mpi_me==0) {
         Warning(info,"state space has %d levels %lld states %lld transitions",
-            level,global_explored,global_transitions);
+            ctx.level,global_explored,global_transitions);
+        RTprintTimer (info, timer, "Exploration time");
+
+        Warning (infoLong, "\n\nDeadlocks: %zu\nInvariant violations: %zu\n"
+                 "Error actions: %zu", global_deadlocks,global_violations,
+                 global_errors);
     }
-    HREbarrier(HREglobal());;
     /* State space was succesfully generated. */
-    Warning(infoLong,"My share is %lld states and %lld transitions",ctx.explored,ctx.transitions);
     HREbarrier(HREglobal());;
-    if(write_lts){
+    if (write_lts) {
         lts_file_close(ctx.output);
     }
-    //char dir[16];
-    //sprintf(dir,"gmon-%d",mpi_me);
-    //chdir(dir);
     HREbarrier(HREglobal());
     HREexit(0);
 }
