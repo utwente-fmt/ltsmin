@@ -353,6 +353,21 @@ void lts_type_validate(lts_type_t t){
             Abort("type %d used for edge label %d, but undefined",t->edge_label_type[i],i);
         }
     }
+    int N=SIgetCount(t->type_db);
+    for(int i=0;i<N;i++){
+        switch(t->type_format[i]){
+        case LTStypeDirect: continue;
+        case LTStypeRange: {
+            if (t->type_min[i]>t->type_max[i]){
+                Abort("illegal range [%d,%d]",t->type_min[i],t->type_max[i]);
+            }
+            continue;
+        }
+        case LTStypeChunk: continue;
+        case LTStypeEnum: continue;
+        }
+        Abort("illegal format value: %d",t->type_format[i]);        
+    }
 }
 
 void lts_type_serialize(lts_type_t t,stream_t ds){

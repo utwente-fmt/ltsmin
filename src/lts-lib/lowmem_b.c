@@ -171,6 +171,16 @@ void lowmem_branching_reduce(lts_t lts){
     long long int hash_lookups;
     uint32_t tau;
 
+    if (lts->label==NULL) {
+        Abort("Cannot apply branching bisimulation to an LTS without edge labels.");
+    }
+    if (lts->edge_idx!=NULL){
+        Abort("Cannot apply branching bisimulation to an LTS with more than one edge label.");
+    }
+    if (lts->properties!=NULL || lts->state_db!=NULL){
+        Abort("Cannot apply branching bisimulation to an LTS with state labels.");
+    }
+
     tau=(uint32_t)lts->tau;
     if (lts->tau<0) {
         Print(infoShort,"No silent steps. Using strong bisimulation algorithm");

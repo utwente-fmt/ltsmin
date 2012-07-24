@@ -150,6 +150,11 @@ static arch_enum_t gcf_enum(archive_t archive,char *regex){
     return e;
 }
 
+static int gcf_contains(archive_t archive,char *name){
+    int id=SIlookup(archive->stream_index,name);
+    return (id!=SI_INDEX_FAILED);
+}
+
 static stream_t gcf_read(archive_t archive,char *name){
     int id=SIlookup(archive->stream_index,name);
     if (id==SI_INDEX_FAILED) Abort("stream %s not found",name);
@@ -335,6 +340,7 @@ archive_t arch_gcf_read(raf_t raf){
         //Debug("closed meta stream %u",i);
     }
     Debug("meta data loaded");
+    arch->procs.contains=gcf_contains;
     arch->procs.close=gcf_close_read;
     arch->procs.read=gcf_read;
     arch->procs.read_raw=gcf_read_raw;

@@ -14,6 +14,9 @@
 /// Test if archive is readable.
 extern int arch_readable(archive_t archive);
 
+/// Test if the archive contains the stream.
+extern int arch_contains(archive_t archive,char *name);
+
 /**
 \brief Read a stream in the archive, without decompressing it.
 
@@ -94,6 +97,19 @@ extern archive_t arch_gcf_create(raf_t raf,size_t block_size,size_t cluster_size
 
 /// Read an existing GCF archive.
 extern archive_t arch_gcf_read(raf_t raf);
+
+/**
+\brief Read an existing ZIP archive.
+ */
+extern archive_t arch_zip_read(const char* name,int buf_size);
+
+/**
+\brief Create a new zip archive from an existing archive.
+
+Note that it will never be possible to have a writable ZIP archive,
+because ZIP archives cannot deal with multiple streams at once.
+ */
+extern void arch_zip_create(const char* name,int buf_size,string_map_t policy,archive_t contents);
 
 /// Get the name of the archive.
 extern const char* arch_name(archive_t archive);

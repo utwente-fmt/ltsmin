@@ -100,10 +100,11 @@ static void fsm_pull(lts_file_t dst,lts_file_t src){
         fprintf(dst->f,"\n");
     }
     fprintf(dst->f,"---\n");
-    Debug("writing state vector and/or labels.");
     if (N1+N2>0){
+        Debug("writing state vector and/or labels.");
         int src_seg;
-        uint32_t src_state[N1];
+        // Without vector, a number could be read. TODO: decide if that is allowed.
+        uint32_t src_state[N1==0?1:N1];
         uint32_t state_labels[N2];
         while(lts_read_state(src,&src_seg,src_state,state_labels)){
             for(int i=0;i< N1;i++){
@@ -117,6 +118,7 @@ static void fsm_pull(lts_file_t dst,lts_file_t src){
     }
     fprintf(dst->f,"---\n");
     {
+        Debug("writing transitions.");
         int src_seg;
         uint32_t src_idx;
         int dst_seg;

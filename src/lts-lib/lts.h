@@ -8,6 +8,7 @@
 #include <lts-io/user.h>
 #include <lts-type.h>
 #include <treedbs.h>
+#include <bitset.h>
 
 /**
 \file lts-lib/lts.h
@@ -128,13 +129,38 @@ extern void lts_bfs_reorder(lts_t lts);
 extern void lts_randomize(lts_t lts);
 
 /**
- Eliminate tau cycles from the given LTS.
- This function should be adapted to eliminate
- arbitrary silent cycles and be abel to return
- a bitset that indicates the components with cycles
- to be able to keep diverence information.
+\brief Predicate type for determining silent steps.
  */
-extern void lts_tau_cycle_elim(lts_t lts);
+typedef int(*silent_predicate)(void*context,lts_t lts,uint32_t src,uint32_t edge,uint32_t dest);
+
+/**
+\brief Eliminate silent cycles from the given LTS.
+ */
+extern void lts_silent_cycle_elim(lts_t lts,silent_predicate silent,void*context,bitset_t diverging);
+
+/**
+\brief Tau edge predicate.
+*/
+extern int tau_step(void*context,lts_t lts,uint32_t src,uint32_t edge,uint32_t dest);
+
+#define lts_tau_cycle_elim(lts) lts_silent_cycle_elim(lts,tau_step,NULL,NULL)
+
+/**
+\brief Stuttering step predicate.
+ */
+extern int stutter_step(void*context,lts_t lts,uint32_t src,uint32_t edge,uint32_t dest);
+
+/**
+\brief Compress silent steps in LTS.
+
+This is tau*a equialence for an edge label LTS.
+ */
+extern void lts_silent_compress(lts_t lts,silent_predicate silent,void*silent_context);
+
+/**
+\brief Determinize the given LTS.
+*/
+extern void lts_mkdet(lts_t lts);
 
 /**
  Open the given file and write the results to the given lts.

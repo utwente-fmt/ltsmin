@@ -46,6 +46,25 @@
 
 #define sethashcode(set,label,dest) (36425657*set+77673689*label+2341271*dest)
 
+/*
+static unsigned int sethashcode(int set,int label,int dest){
+    unsigned register int a,b,c;
+    a=set;
+    b=label;
+    c=dest;
+  a -= b; a -= c; a ^= (c>>13);
+  b -= c; b -= a; b ^= (a<<8); 
+  c -= a; c -= b; c ^= (b>>13);
+  a -= b; a -= c; a ^= (c>>12);
+  b -= c; b -= a; b ^= (a<<16);
+  c -= a; c -= b; c ^= (b>>5); 
+  a -= b; a -= c; a ^= (c>>3);  
+  b -= c; b -= a; b ^= (a<<10); 
+  c -= a; c -= b; c ^= (b>>15); 
+    return c;
+}
+*/
+
 #define seteq(l1,d1,l2,d2) ((l1==l2)&&(d1==d2))
 #define setleq(l1,d1,l2,d2) ((l1 < l2) || ((l1==l2)&&(d1<=d2)))
 #define setless(l1,d1,l2,d2) ((l1 < l2) || ((l1==l2)&&(d1<d2)))
@@ -54,11 +73,11 @@
 /** dynamic node array **/
 
 struct setnode {
-    int label;
-    int dest;
-    int parent;
-    int tag;
-};
+    int    label;
+    int    dest;
+    int    parent;
+    int    tag;
+} ;
 
 static struct setnode *setnodes=NULL;
 static int setnodesize=0;
@@ -80,12 +99,12 @@ static void setchecknode(){
 /** dynamic hash table **/
 
 struct setbucket {
-    int set;
-    int label;
-    int dest;
-    int bigset;
-    int next;
-};
+    int    set;
+    int    label;
+    int    dest;
+    int    bigset;
+    int    next;
+} ;
 
 static struct setbucket *setbuckets=NULL;
 static int setbucketsize=0;
@@ -319,3 +338,6 @@ unsigned int SetGetHash(int set){
     }
     return hash;
 }
+
+
+

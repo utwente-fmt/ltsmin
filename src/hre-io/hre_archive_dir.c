@@ -89,6 +89,13 @@ static arch_enum_t dir_enum(archive_t archive,char *regex){
     return e;
 }
 
+static int dir_contains(archive_t archive,char *name){
+    char fname[LTSMIN_PATHNAME_MAX*2+2];
+    sprintf(fname,"%s/%s",archive->dir,name);
+    return is_a_file(fname);
+}
+
+
 archive_t arch_dir_create(char*dirname,int buf,int del){
     archive_t arch=(archive_t)HREmalloc(NULL,sizeof(struct archive_s));
     arch_init(arch);
@@ -97,6 +104,7 @@ archive_t arch_dir_create(char*dirname,int buf,int del){
     }
     strncpy(arch->dir,dirname,LTSMIN_PATHNAME_MAX-1);
     arch->dir[LTSMIN_PATHNAME_MAX-1]=0;
+    arch->procs.contains=dir_contains;
     arch->procs.read=dir_read;
     arch->procs.read_raw=dir_read_raw;
     arch->procs.write=dir_write;
@@ -115,6 +123,7 @@ archive_t arch_dir_open(char*dirname,int buf){
     }
     strncpy(arch->dir,dirname,LTSMIN_PATHNAME_MAX-1);
     arch->dir[LTSMIN_PATHNAME_MAX-1]=0;
+    arch->procs.contains=dir_contains;
     arch->procs.read=dir_read;
     arch->procs.read_raw=dir_read_raw;
     arch->procs.write=dir_write;

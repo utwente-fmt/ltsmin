@@ -187,6 +187,7 @@ static int read_state(lts_file_t file,int *seg,void* state,void*labels){
         if (file->lts->state_db) {
             TreeUnfold(file->lts->state_db,file->state_count,state);
         } else {
+            // TODO: decide if reading state number is allowed/required.
             *((uint32_t*)state)=file->state_count;
         }
         file->state_count++;

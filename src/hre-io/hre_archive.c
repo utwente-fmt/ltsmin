@@ -24,6 +24,9 @@ int arch_readable(archive_t archive){
     return (archive->procs.read!=arch_illegal_read);
 }
 
+int arch_contains(archive_t archive,char *name){
+    return archive->procs.contains(archive,name);
+}
 
 stream_t arch_read_raw(archive_t archive,char *name,char**code){
     if (archive->procs.flags&ARCH_TRANSPARENT_COMPRESSION){
@@ -101,6 +104,11 @@ void arch_enum_free(arch_enum_t* enumerator){
     (*enumerator)->procs.free(enumerator);
 }
 
+int arch_illegal_contains(archive_t arch,char*name){
+    (void)arch;(void)name;
+    Abort("illegal contains test on archive");
+}
+
 stream_t arch_illegal_read(archive_t arch,char*name){
     (void)arch;(void)name;
     Abort("illegal read on archive");
@@ -126,6 +134,7 @@ void arch_illegal_close(archive_t *arch){
     Abort("illegal close on archive");
 }
 void arch_init(archive_t arch){
+    arch->procs.contains=arch_illegal_contains;
     arch->procs.read=arch_illegal_read;
     arch->procs.read_raw=arch_illegal_read_raw;
     arch->procs.write=arch_illegal_write;

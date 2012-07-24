@@ -107,6 +107,12 @@ static uint32_t merge_sort_uniq_tmp(
 }
 
 void lts_uniq(lts_t lts){
+    Debug("removing duplicate transitions");
+    int has_labels=lts->label!=NULL && lts->transitions>0;
+    if (!has_labels) {
+        Debug("creating dummy labels");
+        lts->label=(uint32_t*)RTmallocZero(4*lts->transitions);
+    }
     uint32_t i,j,count,found;
     array_manager_t tmpman=create_manager(32768);
     uint32_t *tmplbl=NULL;
@@ -150,4 +156,10 @@ void lts_uniq(lts_t lts){
         count++;
     }
     lts_set_size(lts,count,lts->states,lts->begin[lts->states]);
+    if (!has_labels) {
+        Debug("removing dummy labels");
+        RTfree(lts->label);
+        lts->label=NULL;
+    }
 }
+

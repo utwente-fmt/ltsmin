@@ -19,6 +19,7 @@
 #include <spec-greybox.h>
 #include <stringindex.h>
 #include <treedbs.h>
+#include <string-map.h>
 
 struct dist_thread_context {
     model_t model;
@@ -32,8 +33,6 @@ struct dist_thread_context {
     size_t explored,visited,transitions,level,deadlocks,errors,violations;
 };
 
-static int              dst_ofs=2;
-static int              lbl_ofs;
 static int              trans_len;
 static int              write_lts=0;
 static int              nice_value=0;
@@ -50,8 +49,15 @@ static int              size;
 static int              state_labels;
 static int              edge_labels;
 static int              mpi_nodes;
+static int              dst_ofs=2;
+static int              lbl_ofs;
+static char*            label_filter=NULL;
+
 
 static  struct poptOption options[] = {
+    { "filter" , 0 , POPT_ARG_STRING , &label_filter , 0 ,
+      "Select the labels to be written to file from the state vector elements, "
+      "state labels and edge labels." , "<patternlist>" },
     { "nice", 0, POPT_ARG_INT, &nice_value, 0, "set the nice level of all workers"
       " (useful when running on other peoples workstations)", NULL},
     { "write-state", 0, POPT_ARG_VAL, &write_state, 1, "write the full state vector", NULL },
@@ -274,9 +280,17 @@ int main(int argc, char*argv[]){
         Warning(info,"Writing output to %s",files[1]);
         write_lts=1;
         if (write_state) {
+            // write-state means write everything.
             ctx.output=lts_file_create(files[1],ltstype,mpi_nodes,lts_index_template());
+        } else if (label_filter!=NULL) {
+            string_set_t label_set=SSMcreateSWPset(label_filter);
+            Print(info,"label filter is \"%s\"",label_filter);
+            ctx.output=lts_file_create_filter(files[1],ltstype,label_set,mpi_nodes,lts_index_template());
+            write_state=1;
         } else {
+            // default is all state labels and all edge labels
             ctx.output=lts_file_create_nostate(files[1],ltstype,mpi_nodes,lts_index_template());
+            if (state_labels>0) write_state=1;
         }
         int T=lts_type_get_type_count(ltstype);
         for(int i=0;i<T;i++){
@@ -327,7 +341,7 @@ int main(int argc, char*argv[]){
             if (state_labels){
                 GBgetStateLabelsAll(model,src,labels);
             }
-            if(write_lts && (write_state || state_labels)){
+            if(write_lts && write_state){
                 lts_write_state(ctx.output,ctx.mpi_me,src,labels);
             }
 
