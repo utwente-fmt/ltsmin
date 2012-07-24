@@ -357,7 +357,7 @@ stream_t stream_add_code(stream_t s,char* code){
     if(!strncmp(code,"gzip",4)){
         int level=Z_DEFAULT_COMPRESSION;
         sscanf(code+4,"%d",&level);
-        Print(info,"gzip level %d",level);
+        Debug(info,"gzip level %d",level);
         return stream_gzip(s,level,8192);
     }
     Abort("unknown code prefix %s",code);
@@ -379,7 +379,7 @@ stream_t stream_add_decode(stream_t s,char* code){
     if(!strncmp(code,"gzip",4)){
         int level=Z_DEFAULT_COMPRESSION;
         sscanf(code+4,"%d",&level);
-        Print(info,"gunzip level %d",level);
+        Debug(info,"gunzip level %d",level);
         return stream_gunzip(s,level,8192);
     }
     Abort("unknown code prefix %s",code);
