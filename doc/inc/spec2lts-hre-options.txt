@@ -5,6 +5,14 @@
 *--write-state*::
         Write the full state vector.
 
+*--filter*='<patternlist>'::
+        Select the labels to be written to file from the
+        state vector elements, state labels and edge labels.
+        The argument is a list of shell file patterns.
+        E.g. "x*" selects all state parameters and state labels
+        starting with "x".
+
 *-d, --deadlock*::
         Find state with no outgoing transitions. Returns with exit code 1
         if deadlock is found, otherwise 0.
+

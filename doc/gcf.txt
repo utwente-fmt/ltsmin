@@ -19,11 +19,13 @@ gcf --list <gcf>
 
 gcf --copy <gcf_source> <gcf_target>
 
-gcf --zip <gcf_source> <zip_target>
-
 gcf --compress (<file>|<dir>)*
 
 gcf --decompress (<file>|<dir>)*
+
+gcf --to-zip <gcf_source> <zip_target>
+
+gcf --from-zip <zip_source> <gcf_target>
 
 == DESCRIPTION
 This tool can build a GCF archive from a given list of files and files within
@@ -63,8 +65,11 @@ into the GCF archive ++name.gcf++.
 *-d*, *--decompress*::
 Reverse operation of *--compress*.
 
-*--zip*::
-Copy the contents of the GCF to a ZIP archive.
+*--to-zip*::
+Copy the contents of the GCF archive to a ZIP archive.
+
+*--from-zip*::
+Copy the contents of the ZIP archive to a GCF archive.
 
 == OPTIONS
 
@@ -85,6 +90,10 @@ to every file. On specifying compression policies, see below.
 *-o*, *--output*='STRING'::
 Specify the directory into which the *--extract* should write the extracted
 files.
+
+*--zip-code*='<policy>'::
+Set the compression policy used for ZIP archives. The default is no encoding.
+On specifying compression policies, see below.
 
 include::inc/general-options.txt[]
 

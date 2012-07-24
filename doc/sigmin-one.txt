@@ -37,6 +37,9 @@ Minimize modulo CTMC lumping.
 Minimize modulo silent step bisimulation.
 This bisimulation is a generalization of tau * a bisimulation to arbitrary LTSs.
 
+*--cycle*::
+Minimize the lts modulo strongly connected components of silent steps.
+
 *--determinize*::
 Compute a deterministic version of the given LTS.
 
