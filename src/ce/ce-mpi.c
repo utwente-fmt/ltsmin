@@ -2,13 +2,13 @@
 #include <string.h>
 #include <stdlib.h>
 
-#include <mpi-runtime.h>
 #include <mpi.h>
 #include "Dtaudlts.h"
 #include "paint.h"
-#include "scctimer.h"
 #include "groups.h"
 
+#include <hre/runtime.h>
+#include <hre-mpi/user.h>
 
 // some variables requested by bufs.h
 int                 flag;
@@ -52,29 +52,26 @@ int
 main (int argc, char **argv)
 {
     dlts_t              lts;
-    mytimer_t           timer;
+    rt_timer_t          timer;
     int                 oldN, oldM, tauN, tauM, N, M, i, j;
 
     char               *files[2];
-#ifdef OMPI_MPI_H
-    char               *mpirun =
-        "mpirun --mca btl <transport>,self [MPI OPTIONS] -np <workers>";
-#else
-    char               *mpirun = "mpirun [MPI OPTIONS] -np <workers>";
-#endif
-    RTinitPoptMPI (&argc, &argv, options, 1, 2, files, mpirun,
-                   "<input> [<output>]",
-                   "Perform a distributed cycle elimination on the input.\n\nOptions");
+    HREinitBegin(argv[0]);
+    HREaddOptions(options,"Perform a distributed cycle elimination on the input.\n\nOptions");
+    //lts_lib_setup();
+    HREselectMPI();
+    HREinitStart(&argc,&argv,1,2,files,"<input> [<output>]");
+
 
     MPI_Comm_size (MPI_COMM_WORLD, &nodes);
     MPI_Comm_rank (MPI_COMM_WORLD, &me);
 
-    timer = SCCcreateTimer ();
+    timer = RTcreateTimer ();
 
     if (me == 0)
         Warning (info, "(tau)SCC elimination");
     if (me == 0)
-        SCCstartTimer (timer);
+        RTstartTimer (timer);
     MPI_Barrier (MPI_COMM_WORLD);
     lts = dlts_create (MPI_COMM_WORLD);
     dlts_read (lts, files[0], 0);
@@ -89,10 +86,10 @@ main (int argc, char **argv)
         oldN = i;
         oldM = j;
         Warning (info, "%d states and %d transitions", oldN, oldM);
-        SCCstopTimer (timer);
-        SCCreportTimer (timer, "***** reading the LTS took");
-        SCCresetTimer (timer);
-        SCCstartTimer (timer);
+        RTstopTimer (timer);
+        RTprintTimer (info, timer, "***** reading the LTS took");
+        RTresetTimer (timer);
+        RTstartTimer (timer);
     }
     MPI_Barrier (MPI_COMM_WORLD);
     switch (action) {
@@ -102,21 +99,21 @@ main (int argc, char **argv)
     case SCC_GROUP:
         if (!dlts_elim_tauscc_groups (lts)) {
             if (me == 0)
-                Fatal (1, error, "cannot get it small enough!");
+                Abort("cannot get it small enough!");
         }
         MPI_Barrier (MPI_COMM_WORLD);
         break;
     default:
         if (me == 0)
-            Fatal (1, error, "bad action %d", action);
+            Abort("bad action %d", action);
         MPI_Barrier (MPI_COMM_WORLD);
     }
     MPI_Barrier (lts->comm);
     if (me == 0) {
-        SCCstopTimer (timer);
-        SCCreportTimer (timer, "***** SCC reduction took");
-        SCCresetTimer (timer);
-        SCCstartTimer (timer);
+        RTstopTimer (timer);
+        RTprintTimer (info, timer, "***** SCC reduction took");
+        RTresetTimer (timer);
+        RTstartTimer (timer);
     }
     // statistics...
     N = lts->state_count[me];
@@ -157,7 +154,5 @@ main (int argc, char **argv)
         dlts_writedir (lts, files[1], 0);
     }
     // if (lts != NULL) dlts_free(lts);
-    RTfiniMPI ();
-    MPI_Finalize ();
-    return 0;
+    HREexit(0);
 }

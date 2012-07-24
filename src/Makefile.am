@@ -38,7 +38,7 @@ SUBDIRS += sigmin-one
 if HAVE_MPI
 SUBDIRS += sigmin-mpi
 endif
-#SUBDIRS += ce
+SUBDIRS += ce
 SUBDIRS += torx
 SUBDIRS += spg
 
