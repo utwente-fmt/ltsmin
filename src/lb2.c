@@ -17,29 +17,29 @@
 #include <lb2.h>
 
 typedef struct lb2_status_s {
-    int                 idle;
-    uint32_t            seed;
+    int                 idle;           // poll local + write global
+    uint32_t            seed;           // read+write local
     char                pad1[(2<<CACHE_LINE) - 2*sizeof(int)];
-    size_t              requests;
-    size_t              received;
+    size_t              requests;       // read local + write global
+    size_t              received;       // read local + write global
     char                pad2[(2<<CACHE_LINE) - 2*sizeof(size_t)];
-    size_t              max_load;
+    size_t              max_load;       // read local
     char                pad[(2<<CACHE_LINE) - sizeof(size_t)];
-    void               *arg;
+    void               *arg;            // read local + read global
 } lb2_status_t;
 
 /**
- * The base struct is read only, except for occational (one-time) writes to
+ * The base struct is read only, except for occasional (one-time) writes to
  * stopped/all_done.
  */
 struct lb2_s {
     size_t             mask;    //inlined: see lb2.h
     int                stopped; //inlined: see lb2.h
+    int                all_done;
     size_t             threads;
     size_t             granularity;
     size_t             max_handoff;
     lb2_status_t     **local;
-    int                all_done;
 };
 
 
@@ -139,9 +139,11 @@ lb2_internal (lb2_t *lb, int id, size_t my_load, lb2_split_problem_f split)
             set_idle (lb, id, 1);
             return 0;
         }
-        set_idle (lb, id, 0 == my_load);
+        int idle = (0 == my_load);
+        if (idle != get_idle(lb, id))
+            set_idle (lb, id, idle); // update only if necessary (others are watching)
         int             wait_reply = 0;
-        if ( get_idle(lb, id) ) {
+        if ( idle ) {
             size_t          all_idle = 1;
             for (size_t oid = 0; oid < lb->threads && all_idle; oid++)
                 all_idle &= get_idle (lb, oid);
