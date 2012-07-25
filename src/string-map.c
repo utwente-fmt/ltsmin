@@ -64,7 +64,7 @@ char* SSMcall(string_map_t map,const char*input){
 }
 
 string_set_t SSMcreateSWPset(const char* swp_spec){
-	string_set_t pol=RT_NEW(struct string_string_map);
+	string_set_t pol=RT_NEW(struct string_set);
 	int N=2;
 	char*pattern=strdup(swp_spec);
 	char*tmp=pattern;
