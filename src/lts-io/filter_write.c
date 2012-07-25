@@ -88,7 +88,7 @@ static lts_file_t lts_file_create_filtered(const char* name,lts_type_t ltstype,s
     Debug("filter state parameters");
     if (allow_vector) for(int i=0;i<NV;i++){
         char* name=lts_type_get_state_name(ltstype,i);
-        if(!SSMmember(filter,name)){
+        if(SSMmember(filter,name)){
             Print(infoShort,"keeping %s",name);
             file->state_proj[file->state_count]=(i<<1)+1;
             file->state_count++;
@@ -105,7 +105,7 @@ static lts_file_t lts_file_create_filtered(const char* name,lts_type_t ltstype,s
     Debug("filter state labels");
     for(int i=0;i<NS;i++){
         char* name=lts_type_get_state_label_name(ltstype,i);
-        if(!SSMmember(filter,name)){
+        if(SSMmember(filter,name)){
             Print(infoShort,"keeping %s",name);
             file->state_proj[file->state_count]=(i<<1);
             file->state_count++;
@@ -137,7 +137,7 @@ static lts_file_t lts_file_create_filtered(const char* name,lts_type_t ltstype,s
     Debug("filter edge labels");
     for(int i=0;i<NE;i++){
         char* name=lts_type_get_edge_label_name(ltstype,i);
-        if(!SSMmember(filter,name)){
+        if(SSMmember(filter,name)){
             Print(infoShort,"keeping %s",name);
             file->edge_proj[file->edge_count]=i;
             file->edge_count++;
