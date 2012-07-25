@@ -9,6 +9,7 @@
 
 #include <hre/runtime.h>
 #include <hre-mpi/user.h>
+#include <lts-lib/lts.h>
 
 // some variables requested by bufs.h
 int                 flag;
@@ -58,7 +59,7 @@ main (int argc, char **argv)
     char               *files[2];
     HREinitBegin(argv[0]);
     HREaddOptions(options,"Perform a distributed cycle elimination on the input.\n\nOptions");
-    //lts_lib_setup();
+    lts_lib_setup();
     HREselectMPI();
     HREinitStart(&argc,&argv,1,2,files,"<input> [<output>]");
 
@@ -73,8 +74,7 @@ main (int argc, char **argv)
     if (me == 0)
         RTstartTimer (timer);
     MPI_Barrier (MPI_COMM_WORLD);
-    lts = dlts_create (MPI_COMM_WORLD);
-    dlts_read (lts, files[0], 0);
+    lts = dlts_read(MPI_COMM_WORLD,files[0]);
     oldN = lts->state_count[me];
     oldM = 0;
     for (i = 0; i < lts->segment_count; i++)
@@ -151,7 +151,7 @@ main (int argc, char **argv)
     if (files[1]) {
         if (me == 0)
             Warning (info, "NOW WRITING");
-        dlts_writedir (lts, files[1], 0);
+        dlts_writedir (lts, files[1]);
     }
     // if (lts != NULL) dlts_free(lts);
     HREexit(0);

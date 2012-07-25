@@ -29,10 +29,12 @@ typedef struct dlts {
  int ***dest;
 } *dlts_t;
 
-dlts_t dlts_create(MPI_Comm communicator);
+dlts_t dlts_read(MPI_Comm communicator, char* filename);
+
 void dlts_free(dlts_t lts);
-int dlts_read(dlts_t lts, char* filename, int type);
-int dlts_writedir(dlts_t lts, char* filename, int writemode);
+
+void dlts_writedir(dlts_t lts, char* filename);
+
 // both write functions
 // expect the following fields of the lts structure to be filled (with correct data):
 //   comm

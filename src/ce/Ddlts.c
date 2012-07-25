@@ -1,13 +1,14 @@
+// -*- tab-width:4 ; indent-tabs-mode:nil -*-
+#include <config.h>
 
-#include <hre/runtime.h>
+#include <hre/user.h>
+#include <hre-io/user.h>
+#include <lts-io/internal.h>
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include "dir_ops.h"
-#include "seglts.h"
-#include "data_io.h"
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -22,15 +23,142 @@
 dlts_t dlts_create(MPI_Comm communicator)
 
  ****************************************************/
+ 
+dlts_t dlts_read(MPI_Comm communicator,char*filename){
+    int me, nodes;
+    int i,j;
+    dlts_t lts;
+    
+    hre_context_t ctx=HREglobal();
+    HREbarrier(ctx);
+    nodes=HREpeers(ctx);
+    me=HREme(ctx);
+    
+    lts=(dlts_t)malloc(sizeof(struct dlts));
+    if (!lts) Fatal(1,error,"out of memory in dlts_create");
+    lts->dirname=filename;
+    lts->segment_count=nodes;
+    lts->comm=communicator;
+    lts->tau=-1;
+    
+    lts_file_t file=lts_file_open(filename);
+    value_table_t vt=HREcreateTable(ctx,"action");
+    lts_file_set_table(file,0,vt);
+    lts->label_count=VTgetCount(vt);
+    Print(info,"there are %d labels",lts->label_count);
+    lts->label_string=(char**)malloc(lts->label_count*sizeof(char*));
+    for(i=0;i<lts->label_count;i++){
+        chunk c=VTgetChunk(vt,i);
+        lts->label_string[i]=strndup(c.data,c.len);
+        if ( (c.len==3 && strcmp(c.data,"tau")==0)
+          || (c.len==1 && strcmp(c.data,"i")==0)
+           )
+        {
+            Print(infoShort,"invisible label is %s",c.data);
+            if (lts->tau>=0) Abort("two silent labels");
+            lts->tau=i;
+        }
+        if (me==0) Print(info,"label %d is \"%s\"",i,lts->label_string[i]);
+    }
+    
+    if (me==0) {
+        lts_read_init(file,&(lts->root_seg),&(lts->root_ofs));
+    } else {
+        lts->root_seg=0;
+        lts->root_ofs=0;
+    }
+    HREreduce(ctx,1,&(lts->root_seg),&(lts->root_seg),UInt32,Max);
+    HREreduce(ctx,1,&(lts->root_ofs),&(lts->root_ofs),UInt32,Max);
+    Print(info,"root is %d/%d",lts->root_seg,lts->root_ofs);
 
-dlts_t dlts_create(MPI_Comm communicator){
-	dlts_t lts;
-	lts=(dlts_t)malloc(sizeof(struct dlts));
-	if (!lts) Fatal(1,error,"out of memory in dlts_create");
-	lts->dirname=NULL;
-	lts->segment_count=0;
-  lts->comm=communicator;
-	return lts;
+    lts->state_count=(int*)malloc(lts->segment_count*sizeof(int));
+    for(i=0;i<lts->segment_count;i++){
+        lts->state_count[i]=lts_get_state_count(file,i);
+        Print(info,"count[%d]=%d",i,lts->state_count[i]);
+    }
+    lts->transition_count=(int**)malloc(lts->segment_count*sizeof(int*));
+    lts->src=(int***)malloc(lts->segment_count*sizeof(int**));
+    lts->label=(int***)malloc(lts->segment_count*sizeof(int**));
+    lts->dest=(int***)malloc(lts->segment_count*sizeof(int**));
+    for(i=0;i<lts->segment_count;i++){
+        lts->transition_count[i]=(int*)malloc(lts->segment_count*sizeof(int));
+        lts->src[i]=(int**)malloc(lts->segment_count*sizeof(int*));
+        lts->label[i]=(int**)malloc(lts->segment_count*sizeof(int*));
+        lts->dest[i]=(int**)malloc(lts->segment_count*sizeof(int*));
+        for(j=0;j<lts->segment_count;j++){
+            lts->transition_count[i][j]=0;
+            lts->src[i][j]=NULL;
+            lts->label[i][j]=NULL;
+            lts->dest[i][j]=NULL;
+        }
+    }
+    
+    switch(lts_file_get_edge_owner(file)){
+    case SourceOwned:
+        Abort("Source owned edges unsupported in dlts_read");
+        break;
+    case DestOwned:{
+        int N=lts_get_edge_count(file,me);
+        Print(info,"loading %d edges",N);
+        for(i=0;i<lts->segment_count;i++){
+            lts->src[i][me]=(int*)malloc(N*sizeof(int));
+            lts->label[i][me]=(int*)malloc(N*sizeof(int));
+            lts->dest[i][me]=(int*)malloc(N*sizeof(int));
+        }
+        int src_seg,src_ofs,dst_seg,dst_ofs,lbl;
+        dst_seg=me;
+        while(lts_read_edge(file,&src_seg,&src_ofs,&dst_seg,&dst_ofs,&lbl)){
+            lts->src[src_seg][me][lts->transition_count[src_seg][me]]=src_ofs;
+            lts->label[src_seg][me][lts->transition_count[src_seg][me]]=lbl;
+            lts->dest[src_seg][me][lts->transition_count[src_seg][me]]=dst_ofs;
+            lts->transition_count[src_seg][me]++;
+        }
+        Print(info,"done");
+        for(i=0;i<lts->segment_count;i++){
+            lts->src[i][me]=(int*)realloc(lts->src[i][me],lts->transition_count[i][me]*sizeof(int));
+            lts->label[i][me]=(int*)realloc(lts->label[i][me],lts->transition_count[i][me]*sizeof(int));
+            lts->dest[i][me]=(int*)realloc(lts->dest[i][me],lts->transition_count[i][me]*sizeof(int));
+        }
+        for(i=0;i<lts->segment_count;i++){
+            HREreduce(ctx,lts->segment_count,lts->transition_count[i],lts->transition_count[i],UInt32,Max);
+        }
+        for(i=0;i<lts->segment_count;i++){
+            if(i==me) continue;
+            lts->src[me][i]=(int*)realloc(lts->src[me][i],lts->transition_count[me][i]*sizeof(int));
+            lts->label[me][i]=(int*)realloc(lts->label[me][i],lts->transition_count[me][i]*sizeof(int));
+            lts->dest[me][i]=(int*)realloc(lts->dest[me][i],lts->transition_count[me][i]*sizeof(int));
+        }
+        for(int r=1;r<lts->segment_count;r++){
+            i=(me+r)%nodes;
+            j=(me+nodes-r)%nodes;
+            Print(info,"transitions from %d and to %d",i,j);
+            MPI_Sendrecv(
+                lts->src[i][me], lts->transition_count[i][me] , MPI_INT, i , 1,
+                lts->src[me][j], lts->transition_count[me][j] , MPI_INT, j , 1,
+                communicator,NULL
+            );
+            MPI_Sendrecv(
+                lts->label[i][me], lts->transition_count[i][me] , MPI_INT, i , 2,
+                lts->label[me][j], lts->transition_count[me][j] , MPI_INT, j , 2,
+                communicator,NULL
+            );
+            MPI_Sendrecv(
+                lts->dest[i][me], lts->transition_count[i][me] , MPI_INT, i , 3,
+                lts->dest[me][j], lts->transition_count[me][j] , MPI_INT, j , 3,
+                communicator,NULL
+            );
+        }
+        MPI_Barrier(communicator);
+        break;
+    }
+    default:
+        Abort("missing case in dlts_read");
+    }
+
+    if (me==0) Print(info,"LTS loaded");
+    //HREbarrier(ctx);
+    //HREexit(0);
+    return lts;
 }
 
 
@@ -41,310 +169,59 @@ void dlts_free(dlts_t lts)
  ****************************************************/
 
 void dlts_free(dlts_t lts){
-	int i,j;
-	for(i=0;i<lts->segment_count;i++){
-		free(lts->transition_count[i]);
-		free(lts->label_string[i]);
-		for(j=0;j<lts->segment_count;j++){
-			if (lts->src[i][j]) free(lts->src[i][j]);
-			if (lts->label[i][j]) free(lts->label[i][j]);
-			if (lts->dest[i][j]) free(lts->dest[i][j]);
-		}
-		free(lts->src[i]);
-		free(lts->label[i]);
-		free(lts->dest[i]);
-	}
-	free(lts->transition_count);
-	free(lts->label_string);
-	free(lts->src);
-	free(lts->label);
-	free(lts->dest);
-  free(lts->comm);
-	free(lts);
-}
-
-
-/****************************************************
-
- ****************************************************/
-
-void dlts_getinfo(dlts_t lts){
-	FILE* info;
-	char name[1024],buf[BUFFER_SIZE];
-	int i,j,version,len,dummy;
-
-	sprintf(name,"%s/info",lts->dirname);
-	info=fopen(name,"r");
-	setvbuf(info,buf,_IOFBF,BUFFER_SIZE);
-	fread32(info,&version);
-	if (version!=31) Fatal(1,error,"wrong file version: %d",version);
-	fread16(info,&len);
-	lts->info=(char*)malloc(len+1);
-	freadN(info,lts->info,len);
-	lts->info[len]=0;
-	fread32(info,&(lts->segment_count));
-	fread32(info,&(lts->root_seg));
-	fread32(info,&(lts->root_ofs));
-	fread32(info,&(lts->label_count));
-	fread32(info,&(lts->tau));
-	fread32(info,&dummy);
-	lts->state_count=(int*)malloc(lts->segment_count*sizeof(int));
-	for(i=0;i<lts->segment_count;i++){
-		fread32(info,(lts->state_count)+i);
-	}
-	lts->transition_count=(int**)malloc(lts->segment_count*sizeof(int*));
-	for(i=0;i<lts->segment_count;i++){
-		lts->transition_count[i]=(int*)malloc(lts->segment_count*sizeof(int));
-		for(j=0;j<lts->segment_count;j++){
-			fread32(info,&(lts->transition_count[i][j]));
-		}
-	}
-	lts->src=(int***)malloc(lts->segment_count*sizeof(int**));
-	lts->label=(int***)malloc(lts->segment_count*sizeof(int**));
-	lts->dest=(int***)malloc(lts->segment_count*sizeof(int**));
-	for(i=0;i<lts->segment_count;i++){
-		lts->src[i]=(int**)malloc(lts->segment_count*sizeof(int*));
-		lts->label[i]=(int**)malloc(lts->segment_count*sizeof(int*));
-		lts->dest[i]=(int**)malloc(lts->segment_count*sizeof(int*));
-		for(j=0;j<lts->segment_count;j++){
-			lts->src[i][j]=NULL;
-			lts->label[i][j]=NULL;
-			lts->dest[i][j]=NULL;
-		}
-	}
-}
-
-
-
-/****************************************************
-
- ****************************************************/
-
-void dlts_getTermDB(dlts_t lts){
-	char name[1024];
-	int fd;
-	struct stat info;
-	char *ptr;
-	int i;
-	char *termdata;
-
-	sprintf(name,"%s/TermDB",lts->dirname);
-	fd=open(name,O_RDONLY);
-	fstat(fd,&info);
-	lts->label_string=(char**)malloc(lts->label_count*sizeof(char*));
-	termdata=(char*)malloc(info.st_size);
-	read(fd,termdata,info.st_size);
-	ptr=termdata;
-	for(i=0;i<lts->label_count;i++){
-		lts->label_string[i]=ptr;
-		while(*ptr!='\n') ptr++;
-		*ptr=0;
-		lts->label_string[i]=strdup(lts->label_string[i]);
-		ptr++;
-	}
-	close(fd);
-	free(termdata);
+    int i,j;
+    for(i=0;i<lts->segment_count;i++){
+        free(lts->transition_count[i]);
+        free(lts->label_string[i]);
+        for(j=0;j<lts->segment_count;j++){
+            if (lts->src[i][j]) free(lts->src[i][j]);
+            if (lts->label[i][j]) free(lts->label[i][j]);
+            if (lts->dest[i][j]) free(lts->dest[i][j]);
+        }
+        free(lts->src[i]);
+        free(lts->label[i]);
+        free(lts->dest[i]);
+    }
+    free(lts->transition_count);
+    free(lts->label_string);
+    free(lts->src);
+    free(lts->label);
+    free(lts->dest);
+    free(lts->comm);
+    free(lts);
 }
 
 /****************************************************
 
  ****************************************************/
 
-void dlts_load_src(dlts_t lts,int from,int to){
-	int i;
-	char name[1024],buf[BUFFER_SIZE];
-	FILE* file;
-	int *data;
+void dlts_writedir(dlts_t lts, char* name){
 
-	sprintf(name,"%s/src-%d-%d",lts->dirname,from,to);
-	if ((file = fopen(name,"r")) == NULL)
-	 Fatal(1,error,"error opening file %s ",name);
-
-	setvbuf(file,buf,_IOFBF,BUFFER_SIZE);
-	data=(int*)malloc((lts->transition_count[from][to])*sizeof(int));
-	for(i=0;i<lts->transition_count[from][to];i++){
-		fread32(file,data+i);
-	}
-	lts->src[from][to]=data;
-	fclose(file);
-}
-
-
-void dlts_load_label(dlts_t lts,int from,int to){
-	int i;
-	char name[1024],buf[BUFFER_SIZE];
-	FILE* file;
-	int *data;
-	sprintf(name,"%s/label-%d-%d",lts->dirname,from,to);
-	file=fopen(name,"r");
-	setvbuf(file,buf,_IOFBF,BUFFER_SIZE);
-	data=(int*)malloc(lts->transition_count[from][to]*sizeof(int));
-	for(i=0;i<lts->transition_count[from][to];i++){
-		fread32(file,data+i);
-	}
-	lts->label[from][to]=data;
-	fclose(file);
-}
-
-void dlts_load_dest(dlts_t lts,int from,int to){
-	int i;
-	char name[1024],buf[BUFFER_SIZE];
-	FILE* file;
-	int *data;
-	sprintf(name,"%s/dest-%d-%d",lts->dirname,from,to);
-	file=fopen(name,"r");
-	setvbuf(file,buf,_IOFBF,BUFFER_SIZE);
-	data=(int*)malloc(lts->transition_count[from][to]*sizeof(int));
-	for(i=0;i<lts->transition_count[from][to];i++){
-		fread32(file,data+i);
-	}
-	lts->dest[from][to]=data;
-	fclose(file);
-}
-
-
-/****************************************************
-
- ****************************************************/
-
-void dlts_free_dest(dlts_t lts,int from,int to){
-	free(lts->dest[from][to]);
-	lts->dest[from][to]=NULL;
-}
-void dlts_free_src(dlts_t lts,int from,int to){
-	free(lts->src[from][to]);
-	lts->src[from][to]=NULL;
-}
-void dlts_free_label(dlts_t lts,int from,int to){
-	free(lts->label[from][to]);
-	lts->label[from][to]=NULL;
-}
-
-
-
-
-
-/****************************************************
-
- ****************************************************/
-
-int dlts_read(dlts_t lts, char* filename, int type){
-(void)type;
- int me, nodes, i;
-
- MPI_Barrier(lts->comm);
- MPI_Comm_size(lts->comm, &nodes);
- MPI_Comm_rank(lts->comm, &me);
- // Warning(info,"%d starts reading", me); fflush(stdout);
- if (me==0) Warning(info,"start reading");
- lts->dirname=filename;
- dlts_getinfo(lts);
- dlts_getTermDB(lts);
-
- if (nodes != lts->segment_count){
-	if (me==0){ 
-	 Warning(info,"segment count: %d does not equal worker count: %d", 
-					 lts->segment_count, nodes);
-	 fflush(stdout);
-	}
-	MPI_Barrier(lts->comm);
-	MPI_Finalize();
-	exit(1);
- }
-
- for(i=0;i<lts->segment_count;i++){
-	dlts_load_src(lts,me,i);
-	dlts_load_label(lts,me,i);
-	dlts_load_dest(lts,me,i);
-	dlts_load_src(lts,i,me);
-	dlts_load_label(lts,i,me);
-	dlts_load_dest(lts,i,me);
- }
-
- // Warning(info,"%d finished reading", me); fflush(stdout);
- MPI_Barrier(lts->comm); 
- if (me==0) Warning(info,"finished reading");
- return 0;
-}
-
-/****************************************************
-
- ****************************************************/
-
-int dlts_writedir(dlts_t lts, char* name, int writemode){
-(void)writemode;
- /*
-code more or less copy-pasted from lts.c (lts_write_dir) 
-	*/
  int me, nodes;
- seginfo_t info;
- char filename[1024];
  int i,j;
- int* tmp;
- FILE *output;
- FILE *src_out;
- FILE *lbl_out;
- FILE *dst_out;
  
- MPI_Barrier(lts->comm);
- MPI_Comm_size(lts->comm, &nodes);
- MPI_Comm_rank(lts->comm, &me);
- // Warning(info,"%d starts writing", me); 
-
- SLTSCreateInfo(&info,lts->segment_count);
- if (me==0){
-	info->label_tau=lts->tau;
-	info->label_count=lts->label_count;
-	info->initial_seg=lts->root_seg; 
-	info->initial_ofs=lts->root_ofs;
-	create_empty_dir(name,DELETE_ALL);
-	snprintf(filename, sizeof filename, "%s/TermDB",name);
-	output=fopen(filename,"w");
-	for(i=0;i<lts->label_count;i++){
-	 fprintf(output,"%s\n",lts->label_string[i]);
-	}
-	fclose(output);
+ hre_context_t ctx=HREglobal();
+ HREbarrier(ctx);
+ nodes=HREpeers(ctx);
+ me=HREme(ctx);
+ lts_type_t ltstype=single_action_type();
+ lts_file_t template=lts_index_template();
+ lts_file_set_edge_owner(template,SourceOwned);
+ lts_file_t file=lts_file_create(name,ltstype,nodes,template);
+ value_table_t vt=HREcreateTable(ctx,"action");
+ lts_file_set_table(file,0,vt);
+ if (me==0) {
+    lts_write_init(file,lts->root_seg,&lts->root_ofs);
+    for(i=0;i<lts->label_count;i++){
+        VTputChunk(vt,chunk_str(lts->label_string[i]));
+    }
  }
-
- MPI_Barrier(lts->comm);
-
  for(j=0;j<lts->segment_count;j++) {
-	//	Warning(info,"Writing transitions %d->%d   ",me,j);
-	sprintf(filename,"%s/src-%d-%d",name,me,j);
-	if((src_out=fopen(filename,"w"))==NULL)
-	 Fatal(1,error,"error creating file %s  ",filename);
-	sprintf(filename,"%s/label-%d-%d",name,me,j);
-	lbl_out=fopen(filename,"w");
-	sprintf(filename,"%s/dest-%d-%d",name,me,j);
-	dst_out=fopen(filename,"w");
-	
-	for(i=0;i<lts->transition_count[me][j];i++){
-	 fwrite32(src_out,lts->src[me][j][i]);
-	 fwrite32(lbl_out,lts->label[me][j][i]);
-	 fwrite32(dst_out,lts->dest[me][j][i]);
-	}
-	fclose(src_out);
-	fclose(lbl_out);
-	fclose(dst_out);
-	MPI_Barrier(lts->comm);
+    for(i=0;i<lts->transition_count[me][j];i++){
+        lts_write_edge(file,me,&lts->src[me][j][i],j,&lts->dest[me][j][i],&lts->label[me][j][i]);
+    }
  }
-
- i = lts->state_count[me];
- MPI_Gather(&i, 1, MPI_INT, info->state_count, 1, MPI_INT, 0, lts->comm);
- tmp = (int*)calloc(nodes, sizeof(int));
- for(j=0; j<nodes; j++){
-	i = lts->transition_count[me][j];
-	MPI_Gather(&i, 1, MPI_INT, tmp, 1, MPI_INT, 0, lts->comm);
-	if (me==0)
-	 for(i=0;i<nodes;i++)
-		info->transition_count[i][j] = tmp[i];
- }
- 
- if (me==0)
-	SLTSWriteInfo(info,name);
-
- // Warning(info,"%d finished writing", me); 
- MPI_Barrier(lts->comm);
- return 0;
+ HREbarrier(ctx);
+ lts_file_close(file);
 }
 

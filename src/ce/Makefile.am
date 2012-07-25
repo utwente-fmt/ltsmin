@@ -10,12 +10,10 @@ endif
 ce_mpi_SOURCES = \
     ce-mpi.c \
     bufs.c bufs.h \
-    data_io.c data_io.h \
     Ddlts.c Ddlts.h \
     Dtaudlts.c Dtaudlts.h \
     groups.c groups.h \
     paint.c paint.h	\
-    seglts.c seglts.h \
     sortcount.c sortcount.h
 
 ce_mpi_LDADD = ../hre-mpi/libhre.la ../libltsmin.la
