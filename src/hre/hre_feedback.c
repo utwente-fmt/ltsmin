@@ -155,7 +155,7 @@ struct poptOption hre_feedback_options[]={
 
 
 FILE* log_get_stream(log_t log){
-    if (log && log->flags & LOG_PRINT) {
+    if (log && (log->flags & LOG_PRINT)) {
         if (log->f) return log->f; else return stderr;
     } else {
         return NULL;
@@ -167,7 +167,7 @@ int log_active(log_t log){
 }
 
 void log_printf(log_t log,const char *fmt,...){
-    if (log && log->flags & LOG_PRINT){
+    if (log && (log->flags & LOG_PRINT)){
         va_list args;
         va_start(args,fmt);
         vfprintf(log->f?log->f:stderr,fmt,args);

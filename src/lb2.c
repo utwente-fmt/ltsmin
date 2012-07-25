@@ -16,33 +16,32 @@
 #include <hre/user.h>
 #include <lb2.h>
 
+typedef struct lb2_status_s {
+    int                 idle;           // poll local + write global
+    uint32_t            seed;           // read+write local
+    char                pad1[(2<<CACHE_LINE) - 2*sizeof(int)];
+    size_t              requests;       // read local + write global
+    size_t              received;       // read local + write global
+    char                pad2[(2<<CACHE_LINE) - 2*sizeof(size_t)];
+    size_t              max_load;       // read local
+    char                pad[(2<<CACHE_LINE) - sizeof(size_t)];
+    void               *arg;            // read local + read global
+} lb2_status_t;
 
+/**
+ * The base struct is read only, except for occasional (one-time) writes to
+ * stopped/all_done.
+ */
 struct lb2_s {
     size_t             mask;    //inlined: see lb2.h
     int                stopped; //inlined: see lb2.h
+    int                all_done;
     size_t             threads;
-    void             **args;
     size_t             granularity;
     size_t             max_handoff;
-    char               pad[(2<<CACHE_LINE)];
-    struct lb2_status_s {
-        int                 idle;
-        uint32_t            seed;
-        char                pad1[(2<<CACHE_LINE) - 2*sizeof(int)];
-        size_t              requests;
-        size_t              received;
-        char                pad2[(2<<CACHE_LINE) - 2*sizeof(size_t)];
-    } __attribute__ ((packed)) *local;
-    struct lb2_counters_s {
-        size_t              max_load;
-        char                pad[(2<<CACHE_LINE) - sizeof(size_t)];
-    } __attribute__ ((packed)) *counters;
-    int                all_done;
+    lb2_status_t     **local;
 };
 
-
-typedef struct lb2_status_s lb2_status_t;
-typedef struct lb2_counters_s lb2_counters_t;
 
 static inline int  all_done (lb2_t *lb) {
     return atomic_read (&lb->all_done);
@@ -54,10 +53,10 @@ static inline int  try_stop (lb2_t *lb) {
     return cas (&lb->stopped, 0, 1);
 }
 static inline int  get_idle (lb2_t *lb, int id) {
-    return atomic_read(&lb->local[id].idle);
+    return atomic_read(&lb->local[id]->idle);
 }
 static inline void set_idle (lb2_t *lb, int id, int a) {
-    atomic_write (&lb->local[id].idle, a);
+    atomic_write (&lb->local[id]->idle, a);
 }
 
 int
@@ -70,7 +69,7 @@ lb2_stop (lb2_t *lb)
 void
 lb2_reinit (lb2_t *lb, size_t id)
 {
-    atomic_write (&lb->local[id].requests, 0);
+    atomic_write (&lb->local[id]->requests, 0);
     atomic_write (&lb->all_done, 0);
     if (0 == id)
         set_idle (lb, id, 0);
@@ -80,8 +79,12 @@ lb2_reinit (lb2_t *lb, size_t id)
 void
 lb2_local_init (lb2_t *lb, int id, void *arg)
 {
+    lb->local[id] = RTalign(CACHE_LINE_SIZE, sizeof(lb2_status_t));
+    lb->local[id]->idle = 0;
+    lb->local[id]->requests = 0;
+    lb->local[id]->seed = (id + 1) * 32732678642;
     // record thread local data
-    atomic_write (&(lb->args[id]), arg);
+    atomic_write (&(lb->local[id]->arg), arg);
     lb2_reinit (lb, id);
 }
 
@@ -90,9 +93,9 @@ request_random (lb2_t *lb, size_t id)
 {
     size_t res = 0;
     do {
-        res = rand_r (&lb->local[id].seed) % lb->threads;
+        res = rand_r (&lb->local[id]->seed) % lb->threads;
     } while (res == id);
-    fetch_or (&lb->local[res].requests, 1L << id);
+    fetch_or (&lb->local[res]->requests, 1L << id);
     Debug ("Requested %lld", res);
     return 1;
 }
@@ -117,9 +120,9 @@ handoff (lb2_t *lb, int id, size_t requests, size_t *my_load,
             assert (get_idle (lb, oid));
             size_t handoff = *my_load >> 1;
             handoff = handoff < lb->max_handoff ? handoff : lb->max_handoff;
-            size_t load = split (lb->args[id], lb->args[oid], handoff);
+            size_t load = split (lb->local[id]->arg, lb->local[oid]->arg, handoff);
             *my_load -= load;
-            atomic_write (&lb->local[oid].received, load);
+            atomic_write (&lb->local[oid]->received, load);
         }
         set_idle (lb, oid, 0);
     }
@@ -128,18 +131,19 @@ handoff (lb2_t *lb, int id, size_t requests, size_t *my_load,
 size_t
 lb2_internal (lb2_t *lb, int id, size_t my_load, lb2_split_problem_f split)
 {
-    lb2_status_t        *status = &lb->local[id];
-    lb2_counters_t      *counters = &lb->counters[id];
-    if (my_load > counters->max_load)
-        counters->max_load = my_load;
+    lb2_status_t        *status = lb->local[id];
+    if (my_load > status->max_load)
+        status->max_load = my_load;
     do {
         if ( all_done(lb) ) {
             set_idle (lb, id, 1);
             return 0;
         }
-        set_idle (lb, id, 0 == my_load);
+        int idle = (0 == my_load);
+        if (idle != get_idle(lb, id))
+            set_idle (lb, id, idle); // update only if necessary (others are watching)
         int             wait_reply = 0;
-        if ( get_idle(lb, id) ) {
+        if ( idle ) {
             size_t          all_idle = 1;
             for (size_t oid = 0; oid < lb->threads && all_idle; oid++)
                 all_idle &= get_idle (lb, oid);
@@ -157,8 +161,8 @@ lb2_internal (lb2_t *lb, int id, size_t my_load, lb2_split_problem_f split)
         if ( wait_reply ) {
             Debug ("Waiting for an answer");
             while ( get_idle(lb, id) && !all_done(lb) ) {}
-            my_load += atomic_read (&lb->local[id].received);
-            atomic_write (&lb->local[id].received, 0);
+            my_load += atomic_read (&lb->local[id]->received);
+            atomic_write (&lb->local[id]->received, 0);
             Debug ("Received load: %zu", my_load);
         }
     } while (my_load == 0);
@@ -176,9 +180,9 @@ lb2_create_max (size_t threads, size_t gran, size_t max)
 {
     assert (threads <= LB2_MAX_THREADS);
     lb2_t               *lb = RTalign(CACHE_LINE_SIZE, sizeof(lb2_t));
-    void *args = RTalign (CACHE_LINE_SIZE, sizeof(void *[threads]));
-    void *local = RTalign (CACHE_LINE_SIZE, sizeof(lb2_status_t[threads]));
-    lb->counters = RTalignZero (CACHE_LINE_SIZE, sizeof(lb2_counters_t[threads]));
+    lb->local = RTalign(CACHE_LINE_SIZE, sizeof(lb2_status_t[LB2_MAX_THREADS]));
+    for (size_t i = 0; i < threads; i++)
+        lb->local[i] = NULL;
     lb->threads = threads;
     lb->all_done = 0;
     lb->stopped = 0;
@@ -186,22 +190,15 @@ lb2_create_max (size_t threads, size_t gran, size_t max)
     assert (gran < 32 && "wrong granularity");
     lb->granularity = 1UL << gran;
     lb->mask = lb->granularity - 1;
-    lb->args = args;
-    lb->local = local;
-    for (size_t i = 0; i < threads; i++) {
-        lb->local[i].idle = 0;
-        lb->local[i].requests = 0;
-        lb->local[i].seed = (i + 1) * 32732678642;
-    }
     return lb;
 }
 
 void
 lb2_destroy (lb2_t *lb)
 {
-    RTfree (lb->args);
+    for (size_t i = 0; i < lb->threads; i++)
+        if (lb->local[i]) RTfree(lb->local[i]);
     RTfree (lb->local);
-    RTfree (lb->counters);
     RTfree (lb);
 }
 
@@ -249,7 +246,7 @@ lb2_max_load (lb2_t *lb)
 {
     size_t              total = 0;
     for (size_t i = 0; i < lb->threads; i++) {
-        total += lb->counters[i].max_load;
+        total += lb->local[i]->max_load;
     }
     return total;
 }
