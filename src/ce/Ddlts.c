@@ -35,7 +35,7 @@ dlts_t dlts_read(MPI_Comm communicator,char*filename){
     me=HREme(ctx);
     
     lts=(dlts_t)malloc(sizeof(struct dlts));
-    if (!lts) Fatal(1,error,"out of memory in dlts_create");
+    if (!lts) Abort("out of memory in dlts_create");
     lts->dirname=filename;
     lts->segment_count=nodes;
     lts->comm=communicator;
@@ -45,7 +45,7 @@ dlts_t dlts_read(MPI_Comm communicator,char*filename){
     value_table_t vt=HREcreateTable(ctx,"action");
     lts_file_set_table(file,0,vt);
     lts->label_count=VTgetCount(vt);
-    Print(info,"there are %d labels",lts->label_count);
+    Debug("there are %d labels",lts->label_count);
     lts->label_string=(char**)malloc(lts->label_count*sizeof(char*));
     for(i=0;i<lts->label_count;i++){
         chunk c=VTgetChunk(vt,i);
@@ -54,11 +54,11 @@ dlts_t dlts_read(MPI_Comm communicator,char*filename){
           || (c.len==1 && strcmp(c.data,"i")==0)
            )
         {
-            Print(infoShort,"invisible label is %s",c.data);
+            if (me==0) Print(infoShort,"invisible label is %s",c.data);
             if (lts->tau>=0) Abort("two silent labels");
             lts->tau=i;
         }
-        if (me==0) Print(info,"label %d is \"%s\"",i,lts->label_string[i]);
+        if (me==0) Debug("label %d is \"%s\"",i,lts->label_string[i]);
     }
     
     if (me==0) {
@@ -69,12 +69,12 @@ dlts_t dlts_read(MPI_Comm communicator,char*filename){
     }
     HREreduce(ctx,1,&(lts->root_seg),&(lts->root_seg),UInt32,Max);
     HREreduce(ctx,1,&(lts->root_ofs),&(lts->root_ofs),UInt32,Max);
-    Print(info,"root is %d/%d",lts->root_seg,lts->root_ofs);
+    Debug("root is %d/%d",lts->root_seg,lts->root_ofs);
 
     lts->state_count=(int*)malloc(lts->segment_count*sizeof(int));
     for(i=0;i<lts->segment_count;i++){
         lts->state_count[i]=lts_get_state_count(file,i);
-        Print(info,"count[%d]=%d",i,lts->state_count[i]);
+        Debug("count[%d]=%d",i,lts->state_count[i]);
     }
     lts->transition_count=(int**)malloc(lts->segment_count*sizeof(int*));
     lts->src=(int***)malloc(lts->segment_count*sizeof(int**));
@@ -92,14 +92,37 @@ dlts_t dlts_read(MPI_Comm communicator,char*filename){
             lts->dest[i][j]=NULL;
         }
     }
-    
     switch(lts_file_get_edge_owner(file)){
     case SourceOwned:
-        Abort("Source owned edges unsupported in dlts_read");
+        Debug("source owned edges");
         break;
+    case DestOwned:
+        Debug("target owned edges");
+        break;
+    default:
+        Abort("unknown edge ownership");
+    }
+    int N=lts_get_edge_count(file,me);
+
+    Debug("loading %d edges",N);
+    switch(lts_file_get_edge_owner(file)){
+    case SourceOwned:{
+        for(i=0;i<lts->segment_count;i++){
+            lts->src[me][i]=(int*)malloc(N*sizeof(int));
+            lts->label[me][i]=(int*)malloc(N*sizeof(int));
+            lts->dest[me][i]=(int*)malloc(N*sizeof(int));
+        }
+        int src_seg,src_ofs,dst_seg,dst_ofs,lbl;
+        src_seg=me;
+        while(lts_read_edge(file,&src_seg,&src_ofs,&dst_seg,&dst_ofs,&lbl)){
+            lts->src[me][dst_seg][lts->transition_count[me][dst_seg]]=src_ofs;
+            lts->label[me][dst_seg][lts->transition_count[me][dst_seg]]=lbl;
+            lts->dest[me][dst_seg][lts->transition_count[me][dst_seg]]=dst_ofs;
+            lts->transition_count[me][dst_seg]++;
+        }
+        break;
+    }
     case DestOwned:{
-        int N=lts_get_edge_count(file,me);
-        Print(info,"loading %d edges",N);
         for(i=0;i<lts->segment_count;i++){
             lts->src[i][me]=(int*)malloc(N*sizeof(int));
             lts->label[i][me]=(int*)malloc(N*sizeof(int));
@@ -113,25 +136,53 @@ dlts_t dlts_read(MPI_Comm communicator,char*filename){
             lts->dest[src_seg][me][lts->transition_count[src_seg][me]]=dst_ofs;
             lts->transition_count[src_seg][me]++;
         }
-        Print(info,"done");
-        for(i=0;i<lts->segment_count;i++){
-            lts->src[i][me]=(int*)realloc(lts->src[i][me],lts->transition_count[i][me]*sizeof(int));
-            lts->label[i][me]=(int*)realloc(lts->label[i][me],lts->transition_count[i][me]*sizeof(int));
-            lts->dest[i][me]=(int*)realloc(lts->dest[i][me],lts->transition_count[i][me]*sizeof(int));
-        }
-        for(i=0;i<lts->segment_count;i++){
-            HREreduce(ctx,lts->segment_count,lts->transition_count[i],lts->transition_count[i],UInt32,Max);
-        }
-        for(i=0;i<lts->segment_count;i++){
-            if(i==me) continue;
-            lts->src[me][i]=(int*)realloc(lts->src[me][i],lts->transition_count[me][i]*sizeof(int));
-            lts->label[me][i]=(int*)realloc(lts->label[me][i],lts->transition_count[me][i]*sizeof(int));
-            lts->dest[me][i]=(int*)realloc(lts->dest[me][i],lts->transition_count[me][i]*sizeof(int));
-        }
+        break;
+    }}
+    Debug("distributing edge counts");
+    for(i=0;i<lts->segment_count;i++){
+        HREreduce(ctx,lts->segment_count,lts->transition_count[i],lts->transition_count[i],UInt32,Max);
+    }
+    Debug("adjusting allocated memory");
+    for(i=0;i<lts->segment_count;i++){
+        lts->src[i][me]=(int*)realloc(lts->src[i][me],lts->transition_count[i][me]*sizeof(int));
+        lts->label[i][me]=(int*)realloc(lts->label[i][me],lts->transition_count[i][me]*sizeof(int));
+        lts->dest[i][me]=(int*)realloc(lts->dest[i][me],lts->transition_count[i][me]*sizeof(int));
+        if (i==me) continue;
+        lts->src[me][i]=(int*)realloc(lts->src[me][i],lts->transition_count[me][i]*sizeof(int));
+        lts->label[me][i]=(int*)realloc(lts->label[me][i],lts->transition_count[me][i]*sizeof(int));
+        lts->dest[me][i]=(int*)realloc(lts->dest[me][i],lts->transition_count[me][i]*sizeof(int));            
+    }
+    Debug("copying edge data");
+    MPI_Barrier(communicator);
+    switch(lts_file_get_edge_owner(file)){
+    case SourceOwned:
         for(int r=1;r<lts->segment_count;r++){
             i=(me+r)%nodes;
             j=(me+nodes-r)%nodes;
-            Print(info,"transitions from %d and to %d",i,j);
+            Debug("transitions from %d and to %d",i,j);
+            MPI_Sendrecv(
+                lts->src[me][j], lts->transition_count[me][j] , MPI_INT, j , 1,
+                lts->src[i][me], lts->transition_count[i][me] , MPI_INT, i , 1,
+                communicator,NULL
+            );
+            MPI_Sendrecv(
+                lts->label[me][j], lts->transition_count[me][j] , MPI_INT, j , 2,
+                lts->label[i][me], lts->transition_count[i][me] , MPI_INT, i , 2,
+                communicator,NULL
+            );
+            MPI_Sendrecv(
+                lts->dest[me][j], lts->transition_count[me][j] , MPI_INT, j , 3,
+                lts->dest[i][me], lts->transition_count[i][me] , MPI_INT, i , 3,
+                communicator,NULL
+            );
+            MPI_Barrier(communicator);
+        }
+        break;
+    case DestOwned:
+        for(int r=1;r<lts->segment_count;r++){
+            i=(me+r)%nodes;
+            j=(me+nodes-r)%nodes;
+            Debug("transitions from %d and to %d",i,j);
             MPI_Sendrecv(
                 lts->src[i][me], lts->transition_count[i][me] , MPI_INT, i , 1,
                 lts->src[me][j], lts->transition_count[me][j] , MPI_INT, j , 1,
@@ -147,17 +198,10 @@ dlts_t dlts_read(MPI_Comm communicator,char*filename){
                 lts->dest[me][j], lts->transition_count[me][j] , MPI_INT, j , 3,
                 communicator,NULL
             );
+            MPI_Barrier(communicator);
         }
-        MPI_Barrier(communicator);
         break;
     }
-    default:
-        Abort("missing case in dlts_read");
-    }
-
-    if (me==0) Print(info,"LTS loaded");
-    //HREbarrier(ctx);
-    //HREexit(0);
     return lts;
 }
 
