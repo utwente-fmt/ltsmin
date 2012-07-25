@@ -19,7 +19,7 @@ archive_t arch_zip_read(const char* name,int buf){
 }
 
 void arch_zip_create(const char* name,int buf_size,string_map_t policy,archive_t contents){
-    (void)name; (void)buf; (void)buf_size; (void)policy; (void)contents;
+    (void)name; (void)buf_size; (void)policy; (void)contents;
     Abort("This build does not include ZIP support.");
 }
 
