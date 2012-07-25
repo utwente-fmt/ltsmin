@@ -1,0 +1,533 @@
+% This is a description of a modular hef system, including
+% the axis functionality. It contains a problem with a
+% relais opening too late. Therefore, it is possible to
+% nondeterministically go to a deadlocking state, instead
+% of a state corresponding to correct behaviour, after pressing
+% the first setref button.
+
+% This description of the hef has four legs. 
+
+% Correctness requirements are:
+% 
+% 1) if there is a message mes2, all systems are in the same
+%    control state, except if they have reached a HSTP
+%    (SToP due to hardware problems) state.
+% 2) It is impossible to reach the STP state.
+% 3) Pressing a button, say up, will eventually bring the
+%    system in a the UP state, except if it ends in the HSTP
+%    state. Similar properties hold for all other commands.
+
+% This systemdescription does not include the HLT state, 
+% which can be reached if the system detects a too large
+% difference in the heights of lifts.
+% Als the height of a lift is not described.
+
+sort Bool 
+func T,F:->Bool
+map  if:Bool#Bool#Bool->Bool
+     not:Bool->Bool
+     and:Bool#Bool->Bool
+     or:Bool#Bool->Bool
+
+var b,b':Bool
+rew if(T,b,b')=b
+    if(F,b,b')=b'
+    not(T)=F
+    not(F)=T
+    not(not(b))=b
+    and(T,b)=b
+    and(F,b)=F
+    and(b,T)=b
+    and(b,F)=F
+    or(T,b)=T
+    or(F,b)=b
+    or(b,T)=T
+    or(b,F)=b
+
+    
+sort Height
+func dummy:->Height
+map  eq:Height#Height->Bool     
+rew  eq(dummy,dummy)=T
+
+sort State
+func SBY:->State
+     STP:->State
+     HSTP:->State
+     AXS:->State
+     AUP:->State
+     SUB:->State
+     SRF:->State
+     SDN:->State
+      UP:->State
+     DWN:->State
+     UPUL:->State
+     DNUL:->State
+
+map  eq:State#State->Bool
+
+rew eq(SBY,SBY)=T
+    eq(STP,SBY)=F
+    eq(HSTP,SBY)=F
+    eq(AXS,SBY)=F
+    eq(AUP,SBY)=F
+    eq(SUB,SBY)=F
+    eq(SRF,SBY)=F
+    eq(SDN,SBY)=F
+    eq( UP,SBY)=F
+    eq(DWN,SBY)=F
+    eq(UPUL,SBY)=F
+    eq(DNUL,SBY)=F
+    eq(SBY,STP)=F
+    eq(STP,STP)=T
+    eq(HSTP,STP)=F
+    eq(AXS,STP)=F
+    eq(AUP,STP)=F
+    eq(SUB,STP)=F
+    eq(SRF,STP)=F
+    eq(SDN,STP)=F
+    eq( UP,STP)=F
+    eq(DWN,STP)=F
+    eq(SBY,HSTP)=F
+    eq(STP,HSTP)=F
+    eq(HSTP,HSTP)=T
+    eq(AXS,HSTP)=F
+    eq(AUP,HSTP)=F
+    eq(SUB,HSTP)=F
+    eq(SRF,HSTP)=F
+    eq(SDN,HSTP)=F
+    eq( UP,HSTP)=F
+    eq(DWN,HSTP)=F
+    eq(UPUL,HSTP)=F
+    eq(DNUL,HSTP)=F
+    eq(SBY,AXS)=F
+    eq(STP,AXS)=F
+    eq(HSTP,AXS)=F
+    eq(AXS,AXS)=T
+    eq(AUP,AXS)=F
+    eq(SUB,AXS)=F
+    eq(SRF,AXS)=F
+    eq(SDN,AXS)=F
+    eq( UP,AXS)=F
+    eq(DWN,AXS)=F
+    eq(UPUL,AXS)=F
+    eq(DNUL,AXS)=F
+    eq(SBY,AUP)=F
+    eq(STP,AUP)=F
+    eq(HSTP,AUP)=F
+    eq(AXS,AUP)=F
+    eq(AUP,AUP)=T
+    eq(SUB,AUP)=F
+    eq(SRF,AUP)=F
+    eq(SDN,AUP)=F
+    eq( UP,AUP)=F
+    eq(DWN,AUP)=F
+    eq(UPUL,AUP)=F
+    eq(DNUL,AUP)=F
+    eq(SBY,SUB)=F
+    eq(STP,SUB)=F
+    eq(HSTP,SUB)=F
+    eq(AXS,SUB)=F
+    eq(AUP,SUB)=F
+    eq(SUB,SUB)=T
+    eq(SRF,SUB)=F
+    eq(SDN,SUB)=F
+    eq( UP,SUB)=F
+    eq(DWN,SUB)=F
+    eq(UPUL,SUB)=F
+    eq(DNUL,SUB)=F
+    eq(SBY,SRF)=F
+    eq(STP,SRF)=F
+    eq(HSTP,SRF)=F
+    eq(AXS,SRF)=F
+    eq(AUP,SRF)=F
+    eq(SUB,SRF)=F
+    eq(SRF,SRF)=T
+    eq(SDN,SRF)=F
+    eq( UP,SRF)=F
+    eq(DWN,SRF)=F
+    eq(UPUL,SRF)=F
+    eq(DNUL,SRF)=F
+    eq(SBY,SDN)=F
+    eq(STP,SDN)=F
+    eq(HSTP,SDN)=F
+    eq(AXS,SDN)=F
+    eq(AUP,SDN)=F
+    eq(SUB,SDN)=F
+    eq(SRF,SDN)=F
+    eq(SDN,SDN)=T
+    eq( UP,SDN)=F
+    eq(DWN,SDN)=F
+    eq(UPUL,SDN)=F
+    eq(DNUL,SDN)=F
+    eq(SBY,UP)=F
+    eq(STP,UP)=F
+    eq(HSTP,UP)=F
+    eq(AXS,UP)=F
+    eq(AUP,UP)=F
+    eq(SUB,UP)=F
+    eq(SRF,UP)=F
+    eq(SDN,UP)=F
+    eq( UP,UP)=T
+    eq(DWN,UP)=F
+    eq(UPUL,UP)=F
+    eq(DNUL,UP)=F
+    eq(SBY,DWN)=F
+    eq(STP,DWN)=F
+    eq(HSTP,DWN)=F
+    eq(AXS,DWN)=F
+    eq(AUP,DWN)=F
+    eq(SUB,DWN)=F
+    eq(SRF,DWN)=F
+    eq(SDN,DWN)=F
+    eq( UP,DWN)=F
+    eq(DWN,DWN)=T
+    eq(UPUL,DWN)=F
+    eq(DNUL,DWN)=F
+    eq(SBY,UPUL)=F
+    eq(STP,UPUL)=F
+    eq(HSTP,UPUL)=F
+    eq(AXS,UPUL)=F
+    eq(AUP,UPUL)=F
+    eq(SUB,UPUL)=F
+    eq(SRF,UPUL)=F
+    eq(SDN,UPUL)=F
+    eq( UP,UPUL)=F
+    eq(DWN,UPUL)=F
+    eq(UPUL,UPUL)=T
+    eq(DNUL,UPUL)=F
+    eq(SBY,DNUL)=F
+    eq(STP,DNUL)=F
+    eq(HSTP,DNUL)=F
+    eq(AXS,DNUL)=F
+    eq(AUP,DNUL)=F
+    eq(SUB,DNUL)=F
+    eq(SRF,DNUL)=F
+    eq(SDN,DNUL)=F
+    eq( UP,DNUL)=F
+    eq(DWN,DNUL)=F
+    eq(UPUL,DNUL)=F
+    eq(DNUL,DNUL)=T
+
+sort Address 
+func 1,2,3,4:->Address
+map  eq:Address#Address->Bool
+sort Alist
+func ema:->Alist
+     set:Address#Alist->Alist
+map  reset:Address#Alist->Alist
+     test:Address#Alist->Bool
+     empty:Alist->Bool
+     if:Bool#Alist#Alist->Alist
+     Addresses:Alist#Address->Alist
+     Addresses-up:Alist#Address#Address->Alist
+     Addresses-up-aux:Bool#Bool#Alist#Address#Address->Alist
+     Addresses-down:Alist#Address#Address->Alist
+     Addresses-down-aux:Bool#Bool#Alist#Address#Address->Alist
+     conc:Alist#Alist->Alist
+     S:Address->Address
+     P:Address->Address
+     max:->Address
+
+var a,a':Address
+    A,A':Alist
+    b   :Bool
+rew reset(a,ema)=ema
+    reset(a,set(a',A))=if(eq(a,a'),reset(a,A),set(a',reset(a,A)))
+    test(a,ema)=F
+    test(a,set(a',A))=if(eq(a,a'),T,test(a,A))
+    empty(ema)=T
+    empty(set(a,A))=F
+    if(T,A,A')=A
+    if(F,A,A')=A'
+
+% Addresses calculates all the nodes connected to the central node,
+% that are reachable via closed relais. There is no delivery to the
+% sending process.
+
+Addresses(A,a)=conc(Addresses-up(A,a,a),Addresses-down(A,a,a))
+    Addresses-up(A,a,a')=
+% if(test(a,A),set(S(a),if(eq(S(a),a'),ema,Addresses-up(A,S(a),a'))),ema)
+         Addresses-up-aux(test(a,A),eq(S(a),a'),A,a,a')
+    Addresses-up-aux(T,T,A,a,a')=set(S(a),ema)
+    Addresses-up-aux(T,F,A,a,a')=set(S(a),Addresses-up(A,S(a),a'))
+    Addresses-up-aux(F,b,A,a,a')=ema
+
+    Addresses-down(A,a,a')=
+% if(eq(P(a),a'),ema,if(test(a,A),set(a,Addresses-down(A,P(a),a')),ema))
+         Addresses-down-aux(eq(P(a),a'),test(P(a),A),A,a,a')
+    Addresses-down-aux(T,b,A,a,a')=ema
+    Addresses-down-aux(F,T,A,a,a')=set(P(a),Addresses-down(A,P(a),a'))
+    Addresses-down-aux(F,F,A,a,a')=ema
+
+    conc(ema,A)=A
+    conc(set(a,A),A')=set(a,conc(A,A'))
+    S(1)=2 S(2)=3 S(3)=4 S(4)=1
+    P(2)=1 P(3)=2 P(4)=3 P(1)=4
+    max=4
+    eq(1,1)=T
+    eq(1,2)=F
+    eq(1,3)=F
+    eq(1,4)=F
+    eq(2,1)=F
+    eq(2,2)=T
+    eq(2,3)=F
+    eq(2,4)=F
+    eq(3,1)=F
+    eq(3,2)=F
+    eq(3,3)=T
+    eq(3,4)=F
+    eq(4,1)=F
+    eq(4,2)=F
+    eq(4,3)=F
+    eq(4,4)=T
+    
+
+sort Mes 
+func mes0: Address#Height#State->Mes   % set new height
+     mes1: Address->Mes   % setref message
+     mes2: Address->Mes   % synchronization message
+%    mes3: Address->Mes   % for later extensions     
+
+map  eq:Mes#Mes->Bool
+     mes0:Mes->Bool
+     mes1:Mes->Bool
+     mes2:Mes->Bool
+     mes3:Mes->Bool
+     getaddress:Mes->Address
+     getheight:Mes->Height
+     getstate:Mes->State
+
+var  a,a':Address h,h':Height s,s':State
+rew  mes0(mes0(a,h,s))=T
+     mes0(mes1(a))=F
+     mes0(mes2(a))=F
+     mes1(mes0(a,h,s))=F
+     mes1(mes1(a))=T
+     mes1(mes2(a))=F
+     mes2(mes0(a,h,s))=F
+     mes2(mes1(a))=F
+     mes2(mes2(a))=T
+     eq(mes0(a,h,s),mes0(a',h',s'))=and(eq(a,a'),and(eq(h,h'),eq(s,s')))
+     eq(mes0(a,h,s),mes1(a'))=F
+     eq(mes0(a,h,s),mes2(a'))=F
+     eq(mes1(a),mes0(a',h',s'))=F
+     eq(mes1(a),mes1(a'))=eq(a,a')
+     eq(mes1(a),mes2(a'))=F
+     eq(mes2(a),mes0(a',h',s'))=F
+     eq(mes2(a),mes1(a'))=F
+     eq(mes2(a),mes2(a'))=eq(a,a')
+     getaddress(mes0(a,h,s))=a
+     getaddress(mes1(a))=a
+     getaddress(mes2(a))=a
+     getheight(mes0(a,h,s))=h
+     getstate(mes0(a,h,s))=s
+
+% Below the Bus is described. It reads data and delivers it to 
+% all parties connected via closed relays, except to the sender 
+% itself.
+
+act r1,s2:Mes#Address
+    r_open-relais,r_close-relais:Address
+    protocol_error:Address
+
+proc Bus(R:Alist)=
+       sum(m:Mes,sum(a:Address,r1(m,a).
+          (Bus(R)<| empty(Addresses(R,a))|> Deliver(m,R,Addresses(R,a)))))+
+       sum(a:Address,r_open-relais(a).Bus(reset(a,R)))+
+       sum(a:Address,r_close-relais(a).Bus(set(a,R)))
+    
+     Deliver(m:Mes,R:Alist,A:Alist)=
+       sum(a:Address,s2(m,a).
+            (Bus(R)<| empty(reset(a,A)) |> Deliver(m,R,reset(a,A)))
+                    <| test(a,A) |> delta)+
+       sum(a:Address,r_open-relais(a).Deliver(m,reset(a,R),A))+
+       sum(a:Address,r_close-relais(a).Deliver(m,set(a,R),A))
+
+% Below we describe the behaviour of each lift control.
+
+act s1,r2:Mes#Address
+    s_open-relais,s_close-relais:Address
+    setref,setrefup,setrefdown,
+    up,down,none,unlockup,unlockdown,
+    axis,axisup,axisdown:Address
+
+% Hef0 is the initial state. n is the address
+% of the physical connection to the databus.
+
+% act HEF0:Address
+proc Hef0(n:Address)=
+%      HEF0(n).Hef0(n)+
+       setref(n).
+         s_close-relais(n).
+         s1(mes1(1),n).
+         s_open-relais(n).
+         sum(mes:Mes,
+         r2(mes,n).
+           ( s1(mes0(S(1),dummy,SBY),n).
+             Hef3(n,1,getaddress(mes),dummy,SBY,getaddress(mes),T,T)
+            <| mes1(mes) |>
+             protocol_error(n).Hef2(n,1,1,dummy,STP,F)
+           ))
+       +
+       sum(mes:Mes,
+         r2(mes,n).
+         ( s_close-relais(n).
+           s1(mes1(S(getaddress(mes))),n).
+           Hef1(n,S(getaddress(mes)),S(getaddress(mes)))
+          <| mes1(mes) |>
+           protocol_error(n).Hef2(n,1,1,dummy,STP,F)
+         ))
+
+% Hef1 catches all mes1 messages, until
+% a mes0 arrives. The last number in a
+% mes1 message is the number of systems (nos)
+
+% act HEF1:Address#Address#Address
+proc Hef1(n:Address, m:Address, nos:Address)=
+%       HEF1(n,m,nos).Hef1(n,m,nos)+
+       sum(mes:Mes,
+         r2(mes,n).
+         ( Hef1(n,m,getaddress(mes))
+          <| mes1(mes) |>
+           ( ( s1(mes0(S(m),getheight(mes),getstate(mes)),n).
+                      Hef3(n,m,nos,getheight(mes),getstate(mes),P(nos),F,T)
+              <| eq(getaddress(mes),m) |>
+               Hef3(n,m,nos,getheight(mes),getstate(mes),P(nos),F,T)
+             )
+            <| mes0(mes) |>
+             protocol_error(n).Hef2(n,m,1,dummy,STP,F)
+           )
+         ))
+    
+% This is normal operation.
+% The STATUS action is added to monitor this process
+
+act stable
+% act HEF2:Address#Address#Address#State#Bool
+proc Hef2(n:Address,m:Address,nos:Address,h:Height,s:State,controlling:Bool)=
+      Hef3(n,m,nos,h,s,nos,F,F)+
+%       HEF2(n,m,nos,s,controlling).Hef2(n,m,nos,h,s,controlling) +
+       ( up(n).s1(mes0(S(m),dummy,UP),n).
+              Hef3(n,m,nos,dummy,UP,nos,T,T) +
+         down(n).s1(mes0(S(m),dummy,DWN),n).
+              Hef3(n,m,nos,dummy,DWN,nos,T,T) +
+         setref(n).s1(mes0(S(m),dummy,SRF),n).
+              Hef3(n,m,nos,dummy,SRF,nos,T,T)) <| eq(s,SBY) |> delta +
+       unlockup(n).s1(mes0(S(m),dummy,UPUL),n).
+              Hef3(n,m,nos,dummy,UPUL,nos,T,T) 
+                    <| and(eq(s,UP),controlling) |> delta+
+       unlockdown(n).s1(mes0(S(m),dummy,DNUL),n).
+              Hef3(n,m,nos,dummy,DNUL,nos,T,T) 
+                    <| and(eq(s,DWN),controlling) |> delta+
+       none(n).s1(mes0(S(m),dummy,SBY),n).
+              Hef3(n,m,nos,dummy,SBY,nos,T,T) <| controlling |> delta+
+       setrefup(n).stable.Hefsetrefup(n,m,nos,h)
+                    <| and(eq(s,SRF),controlling) |> delta+
+       setrefdown(n).stable.Hefsetrefdown(n,m,nos,h)
+                    <| and(eq(s,SRF),controlling) |> delta
+
+% This is the mode when the system at position n, and with 
+% number m is counting messages of type mes1, with state s
+% to find out whether all stations are synchronized.
+% It counts count-1 message0's and then waits for a message2
+% if it is not controlling, or it sends the message2 if it
+% is controlling. After this it returns to 
+% Hef2.
+
+% act HEF3:Address#Address#Address#State#Address#Bool#Bool
+proc Hef3(n:Address,m:Address,nos:Address,h:Height,s:State,
+            count:Address,controlling:Bool,state_determined:Bool)=
+%       HEF3(n,m,nos,s,count,controlling,state_determined).
+%          Hef3(n,m,nos,h,s,count,controlling,state_determined)+
+
+       (( s1(mes2(m),n).stable.Hef2(n,m,nos,h,s,T)
+        <| controlling |>
+         ( sum(mes:Mes,r2(mes,n). 
+             ( Hef2(n,m,nos,h,s,F)
+             <| mes2(mes) |>
+             protocol_error(n).Hef2(n,m,nos,h,STP,F)
+         )))  )
+       <| eq(count,1) |>
+        ( sum(mes:Mes,r2(mes,n).
+           ((s1(mes0(S(m),h,getstate(mes)),n).
+                   Hef3(n,m,nos,h,getstate(mes),P(count),controlling,T)
+            <| and(eq(getaddress(mes),m),not(and(eq(count,2),controlling))) |>
+             Hef3(n,m,nos,h,getstate(mes),P(count),controlling,T)
+            )
+           <| and(mes0(mes),or(eq(getstate(mes),s),not(state_determined))) |>
+             protocol_error(n).Hef2(n,m,nos,h,STP,F)
+           ))
+       ))
+
+
+proc Hefsetrefup(n:Address,m:Address,nos:Address,h:Height)=
+      up(n).stable.Hefsetrefup(n,m,nos,h)+
+      setref(n).stable.Hef2(n,m,nos,h,SRF,T)
+
+proc Hefsetrefdown(n:Address,m:Address,nos:Address,h:Height)=
+      down(n).stable.Hefsetrefdown(n,m,nos,h)+
+      setref(n).stable.Hef2(n,m,nos,h,SRF,T)
+
+act up_s,down_s,setref_s,none_s,
+    unlockup_s,unlockdown_s,setrefup_s,
+    setrefdown_s:Address
+    stable_s
+
+proc one_button_at_a_time_monitor=
+     sum(n:Address,up_s(n).stable_s.
+          one_button_at_a_time_monitor)+
+     sum(n:Address,down_s(n).stable_s.
+          one_button_at_a_time_monitor)+
+     sum(n:Address,setref_s(n).stable_s.
+          one_button_at_a_time_monitor)+
+     sum(n:Address,setrefup_s(n).stable_s.
+          one_button_at_a_time_monitor)+
+     sum(n:Address,setrefdown_s(n).stable_s.
+          one_button_at_a_time_monitor)+
+     sum(n:Address,none_s(n).stable_s.
+         one_button_at_a_time_monitor)+
+     sum(n:Address,unlockup_s(n).stable_s.
+          one_button_at_a_time_monitor)+
+     sum(n:Address,unlockdown_s(n).stable_s.
+          one_button_at_a_time_monitor)
+     
+
+act c1,c2:Mes#Address
+    c_open-relais,c_close-relais:Address
+act up_c,down_c,setref_c,none_c,
+    unlockup_c,unlockdown_c,setrefup_c,
+    setrefdown_c:Address
+    stable_c
+comm r1 | s1 = c1
+     r2 | s2 = c2
+     s_open-relais | r_open-relais = c_open-relais
+     s_close-relais | r_close-relais = c_close-relais
+     up | up_s = up_c
+     down | down_s = down_c
+     setref | setref_s = setref_c
+     unlockup | unlockup_s = unlockup_c
+     unlockdown | unlockdown_s = unlockdown_c
+     none | none_s = none_c
+     setrefup | setrefup_s = setrefup_c
+     setrefdown | setrefdown_s = setrefdown_c
+     stable | stable_s = stable_c
+
+init  hide({c1,c2,c_open-relais,c_close-relais,stable_c},
+      encap({r1,r2,s1,s2,
+            s_open-relais,r_open-relais,
+            s_close-relais, r_close-relais,
+            up, up_s,
+            down, down_s,
+            setref, setref_s,
+            unlockup, unlockup_s,
+            unlockdown, unlockdown_s,
+            none, none_s,
+            setrefup, setrefup_s,
+            setrefdown, setrefdown_s,
+            stable, stable_s },
+         Bus(ema)||Hef0(1)||Hef0(2)|| Hef0(3)||Hef0(4)
+               || one_button_at_a_time_monitor
+         ))
+
+% init Bus(ema)

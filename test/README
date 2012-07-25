@@ -1,0 +1,12 @@
+To execute the tests in this directory:
+
+ 1. make sure that the LTSmin installation in mentioned in PATH.
+ 2. execute the test for xml output
+     ./test-mcrl xml
+    or text output
+     ./test-mcrl txt
+
+
+
+
+  
