@@ -15,7 +15,6 @@
 
 #include <hre/provider.h>
 
-static size_t SHARED_SIZE=34359738368;
 static size_t SHARED_ALIGN=64;
 #define QUEUE_SIZE 64
 
@@ -181,8 +180,9 @@ static void * pthread_shm_get(hre_context_t context,size_t size){
 static const char* pthread_class="Posix threads";
 
 void HREpthreadRun(int threads){
-    pthread_attr_t attr[threads];
     pthread_t thr[threads];
+    /* Caused huge performance regression in MC tool. Probably due to
+    pthread_attr_t attr[threads]; // note, one should be enough for all threads
     for(int i=0;i<threads;i++){
         if (pthread_attr_init(attr+i)){
             AbortCall("pthread_attr_init %d",i);
@@ -192,8 +192,10 @@ void HREpthreadRun(int threads){
             AbortCall("pthread_attr_setstacksize[%d] to %lld",i,stack_size);
         }
     }
-    struct shared_area* shared=(struct shared_area*)HREmalloc(hre_heap,SHARED_SIZE);
-    shared->size=SHARED_SIZE;
+    */
+    size_t size = RTmemSize();
+    struct shared_area* shared=(struct shared_area*)HREmalloc(hre_heap,size);
+    shared->size=size;
     shared->align=SHARED_ALIGN;
     shared->next=sizeof(struct shared_area);
     int remainder=sizeof(struct shared_area)%SHARED_ALIGN;
@@ -231,7 +233,7 @@ void HREpthreadRun(int threads){
     }
     for(int i=0;i<threads;i++){
         Debug("starting thread %d",i);
-        if (pthread_create(thr+i,attr+i,thread_main,thr_ctx[i])) {
+        if (pthread_create(thr+i,NULL,thread_main,thr_ctx[i])) {
             Abort("couldn't create thread %d",i);
         }
     }
@@ -241,14 +243,14 @@ void HREpthreadRun(int threads){
             Abort("couldn't join with thread %d",i);
         }
         Debug("joined with thread %d",i);
-        pthread_attr_destroy(attr+i);
+        //pthread_attr_destroy(attr+i);
     }
     HREexit(EXIT_SUCCESS);
 }
 
 static void hre_process_exit(hre_context_t ctx,int code) __attribute__ ((noreturn));
 static void hre_process_exit(hre_context_t ctx,int code){
-    (void)ctx;(void)code;
+    (void)ctx;
     exit(code);
 }
 
@@ -359,16 +361,17 @@ static void fork_start(int* argc,char **argv[],int run_threads){
     if(fd==-1){
         AbortCall("shm_open");
     }
-    if(ftruncate(fd, SHARED_SIZE)==-1){
+    size_t size = RTmemSize() * 2;
+    if(ftruncate(fd, size)==-1){
         shm_unlink(shm_name);
         AbortCall("ftruncate");
     }
-    struct shared_area* shared=(struct shared_area*)mmap(NULL,SHARED_SIZE,PROT_READ|PROT_WRITE,MAP_SHARED,fd,0);
+    struct shared_area* shared=(struct shared_area*)mmap(NULL,size,PROT_READ|PROT_WRITE,MAP_SHARED,fd,0);
     if(shared==MAP_FAILED){
         shm_unlink(shm_name);
         AbortCall("mmap");
     }
-    shared->size=SHARED_SIZE;
+    shared->size=size;
     shared->align=SHARED_ALIGN;
     shared->next=sizeof(struct shared_area);
     int remainder=sizeof(struct shared_area)%SHARED_ALIGN;

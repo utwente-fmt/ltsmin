@@ -276,7 +276,7 @@ void HREmsgReady(hre_msg_t msg){
     }
 }
 
-hre_region_t HTEmsgRegion(hre_context_t context){
+hre_region_t HREmsgRegion(hre_context_t context){
     return USR2SYS(context)->msg_region;
 }
 
