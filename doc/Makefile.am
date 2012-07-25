@@ -9,6 +9,7 @@ ASCIIDOC_FLAGS += -a ltsmin-asciidoc-no-roff
 ASCIIDOC_FLAGS += -a version=$(VERSION)
 
 MANPAGES =
+MANPAGES += ce-mpi.1
 MANPAGES += etf.5
 MANPAGES += etf-convert.1
 MANPAGES += gcf.1
@@ -25,11 +26,6 @@ MANPAGES += ltstrans.1
 MANPAGES += pins_open.1
 MANPAGES += sigmin-mpi.1
 MANPAGES += sigmin-one.1
-MANPAGES += etf-convert.1
-MANPAGES += etf.5
-MANPAGES += gcf.1
-MANPAGES += ce-mpi.1
-MANPAGES += pins_open.1
 MANPAGES += spinjal.1
 
 MANPAGES += dve-reach.1
