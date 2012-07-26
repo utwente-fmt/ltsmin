@@ -2530,7 +2530,7 @@ ta_covered_nb (void *arg, lattice_t l, lm_status_t status, lm_loc_t loc)
             if (!lm_cas_update (lmap, loc, l, status, lattice, (lm_status_t)TA_WAITING)) {
                 lattice_t n = lm_get(lmap, loc);
                 lm_status_t s = lm_get_status(lmap, loc);
-                return ta_covered (arg, n, s, loc); // retry
+                return ta_covered_nb (arg, n, s, loc); // retry
             } else {
                 ctx->added_at = loc;
             }
@@ -2578,7 +2578,7 @@ ta_handle (void *arg, state_info_t *successor, transition_info_t *ti, int seen)
     }
     action_detect (ctx, ti, successor->ref);
     ctx->counters.trans++;
-    (void) ti; (void) seen;
+    (void) seen;
 }
 
 static void
