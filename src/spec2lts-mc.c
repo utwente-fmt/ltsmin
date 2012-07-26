@@ -1801,7 +1801,7 @@ nndfs_blue (wctx_t *ctx)
        keyword = {Computer Science},
        pages = {321-335},
        volume = {6996},
-       url = {http://dx.doi.org/10.1007/978-3-642-24372-1_23},
+       url = {http://eprints.eemcs.utwente.nl/20337/},
        note = {10.1007/978-3-642-24372-1_23},
        year = {2011}
     }
@@ -1909,7 +1909,7 @@ extern void rec_ndfs_call (wctx_t *ctx, ref_t state);
        address = {USA},
        publisher = {EPTCS},
        id_number = {10.4204/EPTCS.72.2},
-       howpublished = {http://eprints.eemcs.utwente.nl/20618/},
+       url = {http://eprints.eemcs.utwente.nl/20618/},
        volume = {72},
        location = {Snowbird, Utah},
        booktitle = {Proceedings of the 10th International Workshop on Parallel and Distributed Methods in verifiCation, PDMC 2011, Snowbird, Utah},
@@ -2193,7 +2193,7 @@ rec_ndfs_call (wctx_t *ctx, ref_t state)
      keyword = {Computer Science},
      pages = {506-511},
      volume = {6617},
-     url = {http://dx.doi.org/10.1007/978-3-642-20398-5_40},
+     url = {http://eprints.eemcs.utwente.nl/20004/},
      note = {10.1007/978-3-642-20398-5_40},
      year = {2011}
    }
@@ -2472,7 +2472,20 @@ sbfs (wctx_t *ctx)
 
 /**
  * Multi-core reachability algorithm for timed automata.
- * <Submitted to FORMATS 2012>
+ * @inproceedings{eemcs21972,
+             month = {September},
+            author = {A. E. {Dalsgaard} and A. W. {Laarman} and K. G. {Larsen} and M. C. {Olesen} and J. C. {van de Pol}},
+         num_pages = {16},
+            series = {Lecture Notes in Computer Science},
+            editor = {M. {Jurdzinski} and D. {Nickovic}},
+           address = {London},
+         publisher = {Springer Verlag},
+          location = {London, UK},
+              note = {http://eprints.eemcs.utwente.nl/21972/},
+         booktitle = {10th International Conference on Formal Modeling and Analysis of Timed Systems, FORMATS 2012, London, UK},
+             title = {{Multi-Core Reachability for Timed Automata}},
+              year = {2012}
+   }
  */
 
 typedef enum ta_set_e {
