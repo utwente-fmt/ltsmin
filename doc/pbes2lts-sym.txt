@@ -1,13 +1,13 @@
 //                           -*- mode: doc; outline-regexp: "==\(=*\) ." -*-
-pbes-reach(1)
-=============
+pbes2lts-sym(1)
+================
 :Author:  Gijs Kant
 :Email:   <kant@cs.utwente.nl>
 :Date:    2010-11-23
 
 == NAME
 
-pbes-reach - Symbolic reachability analysis for PBES models.
+pbes2lts-sym - Symbolic reachability analysis for PBES models.
 
 == SYNOPSIS
 
@@ -22,11 +22,11 @@ of the output archive, written in manpage:etf[5] format.
 
 == OPTIONS
 
-include::inc/spec-reach-options.txt[]
+include::inc/pins2lts-sym-options.txt[]
 
 include::inc/mcrl2-options.txt[]
 
 include::inc/pbes-options.txt[]
 
-include::inc/spec-reach.txt[]
+include::inc/pins2lts-sym.txt[]
 

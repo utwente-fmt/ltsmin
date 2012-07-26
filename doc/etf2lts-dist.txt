@@ -1,13 +1,13 @@
 //                           -*- mode: doc; outline-regexp: "==\(=*\) ." -*-
-etf2lts-hre(1)
-==============
+etf2lts-dist(1)
+===============
 :Author:  Jeroen Ketema
 :Email:   <jketema@ewi.utwente.nl>
 :Date:    2012-02-20
 
 == NAME
 
-etf2lts-hre - Distributed state space generator for ETF models.
+etf2lts-dist - Distributed state space generator for ETF models.
 
 == SYNOPSIS
 
@@ -25,6 +25,6 @@ below.
 
 == OPTIONS
 
-include::inc/spec2lts-hre-options.txt[]
+include::inc/pins2lts-dist-options.txt[]
 
-include::inc/spec2lts-hre.txt[]
+include::inc/pins2lts-dist.txt[]

@@ -64,25 +64,15 @@ manpage:spgsolver[1].
 
 The LTSmin toolset has six tools for reachability analysis:
 
-<prefix>-reach::
+<prefix>2lts-sym::
 Symbolic reachability tools that use decision diagrams for manipulating sets
 of states. The optional output produced by these tools is an ETF model.
 +
-See manpage:dve-reach[1], manpage:etf-reach[1],
-manpage:lps-reach[1], manpage:lpo-reach[1],
-and manpage:prom-reach[1].
+See manpage:dve2lts-sym[1], manpage:etf2lts-sym[1],
+manpage:lps2lts-sym[1], manpage:lpo2lts-sym[1],
+and manpage:prom2lts-sym[1].
 
-<prefix>2lts-grey::
-
-Sequential state space generators that enumerate states and can use
-both decision diagrams and (tree-compressed) hash tables to represent sets of
-states. The optional output produced by these tools is an explicit LTS.
-+
-See manpage:dve2lts-grey[1], manpage:etf2lts-grey[1],
-manpage:lps2lts-grey[1], manpage:lpo2lts-grey[1],
-and manpage:prom2lts-grey[1].
-
-<prefix>2lts-gsea::
+<prefix>2lts-seq::
 
 Sequential state space generators that enumerate states and can use
 both decision diagrams and (tree-compressed) hash tables to represent sets of
@@ -91,9 +81,9 @@ These tools are based on an extended version of the
 http://dx.doi.org/10.1007/s10009-008-0093-y[General State Exploring
 Algorithm (GSEA)].
 +
-See manpage:dve2lts-gsea[1], manpage:etf2lts-gsea[1],
-manpage:lps2lts-gsea[1], manpage:lpo2lts-gsea[1],
-and manpage:prom2lts-gsea[1].
+See manpage:dve2lts-seq[1], manpage:etf2lts-seq[1],
+manpage:lps2lts-seq[1], manpage:lpo2lts-seq[1],
+and manpage:prom2lts-seq[1].
 
 <prefix>2lts-mc::
 
@@ -106,33 +96,23 @@ PROMELA models via SpinJa with never claim).
 +
 See manpage:dve2lts-mc[1], manpage:etf2lts-mc[1],
 manpage:opaal2lts-mc[1] and manpage:prom2lts-mc[1].
-
-<prefix>2lts-mpi::
-
-Distributed state space generators that enumerate states and use
-distributed hash tables for storing sets of states.
-The optional output produced by these tools is an explicit LTS.
-These tools do not work without MPI.
-+
-See manpage:dve2lts-mpi[1], manpage:etf2lts-mpi[1],
-manpage:lps2lts-mpi[1], manpage:lpo2lts-mpi[1],
-and manpage:prom2lts-mpi[1].
-
-<prefix>2lts-hre::
-
-Distributed state space generators that enumerate states and use
-distributed hash tables for storing sets of states.
-The optional output produced by these tools is an explicit LTS.
-These tools work with MPI, multiple threads or multiple process whenever possible and available.
-For example:
 +
 --
 * MacOS X does not support the multiple process architecture at this time.
 * Neither mCRL nor mCRL2 supports multi threading.
 --
 +
-See manpage:dve2lts-hre[1], manpage:etf2lts-hre[1],
-manpage:lps2lts-hre[1], manpage:lpo2lts-hre[1], and manpage:prom2lts-hre[1]
+<prefix>2lts-dist::
+
+Distributed state space generators that enumerate states and use
+distributed hash tables for storing sets of states.
+The optional output produced by these tools is an explicit LTS.
+These tools work with MPI, multiple threads or multiple process whenever possible and available.
+For example:
+
+See manpage:dve2lts-dist[1], manpage:etf2lts-dist[1],
+manpage:lps2lts-dist[1], manpage:lpo2lts-dist[1],
+and manpage:prom2lts-dist[1]
 
 == State Space Reduction Tools
 
@@ -212,11 +192,11 @@ This produces a file named 'brp.tbf'. This is the input for the state
 space generator. Just to see how many states and transitions are produced,
 we can run the command
 ----
-lpo2lts-grey brp.tbf
+lpo2lts-seq brp.tbf
 ----
 Assuming that the model is small and CADP is installed, we can simply generate a BCG file
 ----
-lpo2lts-grey brp.tbf brp.bcg
+lpo2lts-seq brp.tbf brp.bcg
 ----
 and then use CADP.
 
@@ -247,7 +227,7 @@ The LTSmin tool set also has a symbolic reachability tool.
 If we want to know the number of states, we can give the command:
 
 ----
-lpo-reach brp.tbf
+lpo2lts-sym brp.tbf
 ----
 
 This command will compute the necessary part of the transition relation and the
@@ -255,7 +235,7 @@ set of reachable states. If we want to record the necessary part of the transiti
 then we can do so in the form of an ETF file:
 
 ----
-lpo-reach brp.tbf brp.etf
+lpo2lts-sym brp.tbf brp.etf
 ----
 
 This etf file can be translated to DVE for model checking:

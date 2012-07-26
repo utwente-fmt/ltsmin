@@ -23,7 +23,7 @@ tools can be used:
 ----
 prom-reach -rgs --order=chain leader.pm.spinja leader.etf
 prom2lts-mc --assert -prr --threads=16 leader.pm.spinja
-prom2lts-gsea --por -d --trace=t.gcf leader.pm.spinja
+prom2lts-seq --por -d --trace=t.gcf leader.pm.spinja
 ----
 
 These three examples perform: full symbolic reachability with chaining order
@@ -37,7 +37,7 @@ LTSmin can directly perform LTL model checking on such models:
 
 ----
 prom2lts-mc --strategy=cndfs --threads=16 leader-never.pm.spinja
-prom2lts-gsea --por --proviso=color --strategy=scc leader-never.pm.spinja 
+prom2lts-seq --por --proviso=color --strategy=scc leader-never.pm.spinja 
 ----
 
 These two examples perform LTL model checking using: multi-core NDFS (cndfs),

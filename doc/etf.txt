@@ -120,7 +120,8 @@ end sort
 
 == SEE ALSO
 manpage:ltsmin[7],
-manpage:etf2lts-mpi[1],
-manpage:etf2lts-grey[1],
-manpage:etf-reach[1],
+manpage:etf2lts-dist[1],
+manpage:etf2lts-seq[1],
+manpage:etf2lts-mc[1],
+manpage:etf2lts-sym[1],
 manpage:etf-convert[1]

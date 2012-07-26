@@ -1,13 +1,13 @@
 //                           -*- mode: doc; outline-regexp: "==\(=*\) ." -*-
-dve-reach(1)
-==========
+dve2lts-sym(1)
+==============
 :Author:  Elwin Pater
 :Email:   <e.pater@student.utwente.nl>
 :Date:    2009-10-26
 
 == NAME
 
-dve-reach - Symbolic reachability analysis for DiVinE DVE models.
+dve2lts-sym - Symbolic reachability analysis for DiVinE DVE models.
 
 == SYNOPSIS
 
@@ -24,6 +24,6 @@ include::inc/dve.txt[]
 
 == OPTIONS
 
-include::inc/spec-reach-options.txt[]
+include::inc/pins2lts-sym-options.txt[]
 
-include::inc/spec-reach.txt[]
+include::inc/pins2lts-sym.txt[]

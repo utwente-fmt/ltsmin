@@ -22,4 +22,4 @@ manpage:etf[5] format.
 
 == OPTIONS
 
-include::inc/spec2torx.txt[]
+include::inc/pins2torx.txt[]

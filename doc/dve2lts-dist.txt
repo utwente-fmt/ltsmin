@@ -1,5 +1,5 @@
 //                           -*- mode: doc; outline-regexp: "==\(=*\) ." -*-
-dve2lts-hre(1)
+dve2lts-dist(1)
 ===============
 :Author:  Jeroen Ketema
 :Email:   <jketema@ewi.utwente.nl>
@@ -7,7 +7,7 @@ dve2lts-hre(1)
 
 == NAME
 
-dve2lts-hre - Distributed state space generator for DIVINE models.
+dve2lts-dist - Distributed state space generator for DIVINE models.
 
 == SYNOPSIS
 
@@ -26,6 +26,6 @@ include::inc/dve.txt[]
 
 == OPTIONS
 
-include::inc/spec2lts-hre-options.txt[]
+include::inc/pins2lts-dist-options.txt[]
 
-include::inc/spec2lts-hre.txt[]
+include::inc/pins2lts-dist.txt[]

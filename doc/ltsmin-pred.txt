@@ -45,5 +45,5 @@ For variable naming consult the +--labels+ option in the PINS tools.
 
 == SEE ALSO
 manpage:ltsmin[7],
-manpage:etf2lts-gsea[1],
-manpage:etf2lts-grey[1]
+manpage:etf2lts-seq[1],
+manpage:etf2lts-mc[1]

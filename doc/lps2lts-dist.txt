@@ -1,13 +1,13 @@
 //                           -*- mode: doc; outline-regexp: "==\(=*\) ." -*-
-lps2lts-hre(1)
-============
+lps2lts-dist(1)
+================
 :Author:  Jeroen Ketema
 :Email:   <jketema@ewi.utwente.nl>
 :Date:    2012-02-20
 
 == NAME
 
-lps2lts-hre - Distributed state space generator for mCRL2 models.
+lps2lts-dist - Distributed state space generator for mCRL2 models.
 
 == SYNOPSIS
 
@@ -23,8 +23,8 @@ extension.  Available file formats are described blow.
 
 == OPTIONS
 
-include::inc/spec2lts-hre-options.txt[]
+include::inc/pins2lts-dist-options.txt[]
 
 include::inc/mcrl2-options.txt[]
 
-include::inc/spec2lts-hre.txt[]
+include::inc/pins2lts-dist.txt[]

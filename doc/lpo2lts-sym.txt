@@ -1,13 +1,13 @@
 //                           -*- mode: doc; outline-regexp: "==\(=*\) ." -*-
-lpo-reach(1)
-============
+lpo2lts-sym(1)
+===============
 :Author:  Stefan Blom
 :Email:   <sccblom@cs.utwente.nl>
 :Date:    2009-03-16
 
 == NAME
 
-lpo-reach - Symbolic reachability analysis for muCRL models.
+lpo2lts-sym - Symbolic reachability analysis for muCRL models.
 
 == SYNOPSIS
 
@@ -23,8 +23,8 @@ format.
 
 == OPTIONS
 
-include::inc/spec-reach-options.txt[]
+include::inc/pins2lts-sym-options.txt[]
 
 include::inc/mcrl-options.txt[]
 
-include::inc/spec-reach.txt[]
+include::inc/pins2lts-sym.txt[]

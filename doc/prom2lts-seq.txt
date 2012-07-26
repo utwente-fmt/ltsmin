@@ -1,13 +1,13 @@
 //                           -*- mode: doc; outline-regexp: "==\(=*\) ." -*-
-prom2lts-gsea(1)
-==================
+prom2lts-seq(1)
+================
 :Author:  Elwin Pater
 :Email:   <e.pater@student.utwente.nl>
 :Date:    2011-06-24
 
 == NAME
 
-prom2lts-gsea - Sequential state space generator for SpinJa models.
+prom2lts-seq - Sequential state space generator for SpinJa models.
 
 == SYNOPSIS
 
@@ -26,7 +26,7 @@ include::inc/prom.txt[]
 
 == OPTIONS
 
-include::inc/spec2lts-gsea-options.txt[]
+include::inc/pins2lts-seq-options.txt[]
 
-include::inc/spec2lts-gsea.txt[]
+include::inc/pins2lts-seq.txt[]
 

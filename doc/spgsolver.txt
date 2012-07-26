@@ -25,4 +25,4 @@ include::inc/listdd-options.txt[]
 
 == SEE ALSO
 
-manpage:pbes-reach[1]
+manpage:pbes2lts-sym[1]

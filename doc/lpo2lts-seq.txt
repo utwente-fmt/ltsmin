@@ -1,5 +1,5 @@
 //                           -*- mode: doc; outline-regexp: "==\(=*\) ." -*-
-lpo2lts-gsea(1)
+lpo2lts-seq(1)
 ===============
 :Author:  Michael Weber
 :Email:   <michaelw@cs.utwente.nl>
@@ -7,7 +7,7 @@ lpo2lts-gsea(1)
 
 == NAME
 
-lpo2lts-gsea - Sequential state space generator for mCRL models.
+lpo2lts-seq - Sequential state space generator for mCRL models.
 
 == SYNOPSIS
 
@@ -25,8 +25,8 @@ extension.  Available file formats are described blow.
 
 == OPTIONS
 
-include::inc/spec2lts-gsea-options.txt[]
+include::inc/pins2lts-seq-options.txt[]
 
 include::inc/mcrl-options.txt[]
 
-include::inc/spec2lts-gsea.txt[]
+include::inc/pins2lts-seq.txt[]

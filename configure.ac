@@ -3,7 +3,7 @@ AC_INIT([ltsmin],[1.8],[ltsmin-support@cs.utwente.nl])
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_AUX_DIR([autotools])
 AM_INIT_AUTOMAKE([foreign])
-AC_CONFIG_SRCDIR([src/spec-reach.c])
+AC_CONFIG_SRCDIR([src/greybox.c])
 AC_CONFIG_HEADERS([src/config.h])
 
 AC_SUBST([pkglibdir], "\${libdir}/${PACKAGE_NAME}-${PACKAGE_VERSION}")
@@ -401,7 +401,10 @@ AC_CONFIG_FILES([
        src/ltscmp-one/Makefile
        src/ltstrans/Makefile
        src/gcf-tool/Makefile
-       src/pins2lts-hre/Makefile
+       src/pins2lts-dist/Makefile
+       src/pins2lts-mc/Makefile
+       src/pins2lts-seq/Makefile
+       src/pins2lts-sym/Makefile
        src/sigmin-one/Makefile
        src/sigmin-mpi/Makefile
        src/spg/Makefile

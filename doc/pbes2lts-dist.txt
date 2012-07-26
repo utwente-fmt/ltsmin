@@ -1,13 +1,13 @@
 //                           -*- mode: doc; outline-regexp: "==\(=*\) ." -*-
-pbes2lts-hre(1)
-===============
+pbes2lts-dist(1)
+=================
 :Author:  Gijs Kant
 :Email:   <kant@cs.utwente.nl>
 :Date:    2012-02-21
 
 == NAME
 
-pbes2lts-hre - Distributed parity game generator.
+pbes2lts-dist - Distributed parity game generator.
 
 == SYNOPSIS
 
@@ -23,10 +23,10 @@ extension. Available formats are described below.
 
 == OPTIONS
 
-include::inc/spec2lts-hre-options.txt[]
+include::inc/pins2lts-dist-options.txt[]
 
 include::inc/mcrl2-options.txt[]
 
 include::inc/pbes-options.txt[]
 
-include::inc/spec2lts-hre.txt[]
+include::inc/pins2lts-dist.txt[]

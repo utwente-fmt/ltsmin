@@ -1,5 +1,5 @@
 //                           -*- mode: doc; outline-regexp: "==\(=*\) ." -*-
-pbes2lts-gsea(1)
+pbes2lts-seq(1)
 ===============
 :Author:  Gijs Kant
 :Email:   <kant@cs.utwente.nl>
@@ -7,7 +7,7 @@ pbes2lts-gsea(1)
 
 == NAME
 
-pbes2lts-gsea - Sequential parity game generator.
+pbes2lts-seq - Sequential parity game generator.
 
 == SYNOPSIS
 
@@ -25,10 +25,10 @@ extension. Available formats are described below.
 
 == OPTIONS
 
-include::inc/spec2lts-gsea-options.txt[]
+include::inc/pins2lts-seq-options.txt[]
 
 include::inc/mcrl2-options.txt[]
 
 include::inc/pbes-options.txt[]
 
-include::inc/spec2lts-gsea.txt[]
+include::inc/pins2lts-seq.txt[]

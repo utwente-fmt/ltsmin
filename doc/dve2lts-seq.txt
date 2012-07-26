@@ -1,5 +1,5 @@
 //                           -*- mode: doc; outline-regexp: "==\(=*\) ." -*-
-dve2lts-gsea(1)
+dve2lts-seq(1)
 ================
 :Author:  Elwin Pater
 :Email:   <e.pater@student.utwente.nl>
@@ -7,7 +7,7 @@ dve2lts-gsea(1)
 
 == NAME
 
-dve2lts-gsea - Sequential state space generator for DIVINE models.
+dve2lts-seq - Sequential state space generator for DIVINE models.
 
 == SYNOPSIS
 
@@ -26,7 +26,7 @@ include::inc/dve.txt[]
 
 == OPTIONS
 
-include::inc/spec2lts-gsea-options.txt[]
+include::inc/pins2lts-seq-options.txt[]
 
-include::inc/spec2lts-gsea.txt[]
+include::inc/pins2lts-seq.txt[]
 

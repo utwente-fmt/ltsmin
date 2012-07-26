@@ -1,13 +1,13 @@
 //                           -*- mode: doc; outline-regexp: "==\(=*\) ." -*-
-lps-reach(1)
-==========
+lps2lts-sym(1)
+=============== 
 :Author:  Stefan Blom
 :Email:   <sccblom@cs.utwente.nl>
 :Date:    2009-03-16
 
 == NAME
 
-lps-reach - Symbolic reachability analysis for mCRL2 models.
+lps2lts-sym - Symbolic reachability analysis for mCRL2 models.
 
 == SYNOPSIS
 
@@ -22,9 +22,9 @@ of the output archive, written in manpage:etf[5] format.
 
 == OPTIONS
 
-include::inc/spec-reach-options.txt[]
+include::inc/pins2lts-sym-options.txt[]
 
 include::inc/mcrl2-options.txt[]
 
-include::inc/spec-reach.txt[]
+include::inc/pins2lts-sym.txt[]
 

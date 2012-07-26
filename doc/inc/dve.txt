@@ -13,7 +13,7 @@ LTSmin can directly perform LTL model checking on such models:
 
 ----
 dve2lts-mc --strategy=cndfs --threads=16 anderson.6.prop4.dve2C
-dve2lts-gsea --por --proviso=color --strategy=scc anderson.6.prop4.dve 
+dve2lts-seq --por --proviso=color --strategy=scc anderson.6.prop4.dve 
 ----
 
 These two examples perform LTL model checking using: multi-core NDFS (cndfs),

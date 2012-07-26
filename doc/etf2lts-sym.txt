@@ -1,17 +1,17 @@
 //                           -*- mode: doc; outline-regexp: "==\(=*\) ." -*-
-etf-reach(1)
-==========
+etf2lts-sym(1)
+===============
 :Author:  Stefan Blom
 :Email:   <sccblom@cs.utwente.nl>
 :Date:    2009-03-16
 
 == NAME
 
-etf-reach - Symbolic reachability analysis for ETF models.
+etf2lts-sym - Symbolic reachability analysis for ETF models.
 
 == SYNOPSIS
 
-*etf-reach* [OPTION]... 'input.etf' ['output.etf']
+*etf2lts-sym* [OPTION]... 'input.etf' ['output.etf']
 
 == DESCRIPTION
 
@@ -22,6 +22,6 @@ manpage:etf[5] format.
 
 == OPTIONS
 
-include::inc/spec-reach-options.txt[]
+include::inc/pins2lts-sym-options.txt[]
 
-include::inc/spec-reach.txt[]
+include::inc/pins2lts-sym.txt[]

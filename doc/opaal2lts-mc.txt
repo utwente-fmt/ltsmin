@@ -1,6 +1,6 @@
 //                           -*- mode: doc; outline-regexp: "==\(=*\) ." -*-
 opaal2lts-mc(1)
-==============
+===============
 :Author:  Alfons Laarman
 :Email:   <a.w.laarman@ewi.utwente.nl>
 :Date:    2012-05-23
@@ -31,6 +31,6 @@ to http://eprints.eemcs.utwente.nl/21972/[Multi-Core Reachability for Timed Auto
 
 == OPTIONS
 
-include::inc/spec2lts-mc-ta-options.txt[]
+include::inc/pins2lts-mc-ta-options.txt[]
 
-include::inc/spec2lts-mc.txt[]
+include::inc/pins2lts-mc.txt[]

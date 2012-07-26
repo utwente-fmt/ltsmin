@@ -1,5 +1,5 @@
 //                           -*- mode: doc; outline-regexp: "==\(=*\) ." -*-
-prom2lts-hre(1)
+prom2lts-dist(1)
 =================
 :Author:  Jeroen Ketema
 :Email:   <jketema@ewi.utwente.nl>
@@ -7,7 +7,7 @@ prom2lts-hre(1)
 
 == NAME
 
-prom2lts-hre - Distributed state space generator for SPINJA models.
+prom2lts-dist - Distributed state space generator for SPINJA models.
 
 == SYNOPSIS
 
@@ -25,6 +25,6 @@ include::inc/prom.txt[]
 
 == OPTIONS
 
-include::inc/spec2lts-hre-options.txt[]
+include::inc/pins2lts-dist-options.txt[]
 
-include::inc/spec2lts-hre.txt[]
+include::inc/pins2lts-dist.txt[]

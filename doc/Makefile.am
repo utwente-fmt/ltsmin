@@ -28,39 +28,39 @@ MANPAGES += sigmin-mpi.1
 MANPAGES += sigmin-one.1
 MANPAGES += spinjal.1
 
-MANPAGES += dve-reach.1
-MANPAGES += dve2lts-gsea.1
-MANPAGES += dve2lts-hre.1
+MANPAGES += dve2lts-sym.1
+MANPAGES += dve2lts-seq.1
+MANPAGES += dve2lts-dist.1
 MANPAGES += dve2lts-mc.1
 MANPAGES += dve2torx.1
 
-MANPAGES += etf-reach.1
-MANPAGES += etf2lts-gsea.1
-MANPAGES += etf2lts-hre.1
+MANPAGES += etf2lts-sym.1
+MANPAGES += etf2lts-seq.1
+MANPAGES += etf2lts-dist.1
 MANPAGES += etf2lts-mc.1
 MANPAGES += etf2torx.1
 
-MANPAGES += lpo-reach.1
-MANPAGES += lpo2lts-gsea.1
-MANPAGES += lpo2lts-hre.1
+MANPAGES += lpo2lts-sym.1
+MANPAGES += lpo2lts-seq.1
+MANPAGES += lpo2lts-dist.1
 MANPAGES += lpo2torx.1
 
-MANPAGES += lps-reach.1
-MANPAGES += lps2lts-gsea.1
-MANPAGES += lps2lts-hre.1
+MANPAGES += lps2lts-sym.1
+MANPAGES += lps2lts-seq.1
+MANPAGES += lps2lts-dist.1
 MANPAGES += lps2torx.1
 
-MANPAGES += prom-reach.1
-MANPAGES += prom2lts-gsea.1
-MANPAGES += prom2lts-hre.1
+MANPAGES += prom2lts-sym.1
+MANPAGES += prom2lts-seq.1
+MANPAGES += prom2lts-dist.1
 MANPAGES += prom2lts-mc.1
 MANPAGES += prom2torx.1
 
 MANPAGES += opaal2lts-mc.1
 
-MANPAGES += pbes-reach.1
-MANPAGES += pbes2lts-gsea.1
-MANPAGES += pbes2lts-hre.1
+MANPAGES += pbes2lts-sym.1
+MANPAGES += pbes2lts-seq.1
+MANPAGES += pbes2lts-dist.1
 
 MANPAGES += spgsolver.1
 
@@ -85,16 +85,16 @@ extra_ASCIIDOC += inc/mpi-blurb.txt
 extra_ASCIIDOC += inc/pins-options.txt
 extra_ASCIIDOC += inc/prom.txt
 extra_ASCIIDOC += inc/reachability-options.txt
-extra_ASCIIDOC += inc/spec-reach-options.txt
-extra_ASCIIDOC += inc/spec-reach.txt
-extra_ASCIIDOC += inc/spec2lts-gsea-options.txt
-extra_ASCIIDOC += inc/spec2lts-gsea.txt
-extra_ASCIIDOC += inc/spec2lts-hre-options.txt
-extra_ASCIIDOC += inc/spec2lts-hre.txt
-extra_ASCIIDOC += inc/spec2lts-mc-options.txt
-extra_ASCIIDOC += inc/spec2lts-mc-ta-options.txt
-extra_ASCIIDOC += inc/spec2lts-mc.txt
-extra_ASCIIDOC += inc/spec2torx.txt
+extra_ASCIIDOC += inc/pins2lts-sym-options.txt
+extra_ASCIIDOC += inc/pins2lts-sym.txt
+extra_ASCIIDOC += inc/pins2lts-seq-options.txt
+extra_ASCIIDOC += inc/pins2lts-seq.txt
+extra_ASCIIDOC += inc/pins2lts-dist-options.txt
+extra_ASCIIDOC += inc/pins2lts-dist.txt
+extra_ASCIIDOC += inc/pins2lts-mc-options.txt
+extra_ASCIIDOC += inc/pins2lts-mc-ta-options.txt
+extra_ASCIIDOC += inc/pins2lts-mc.txt
+extra_ASCIIDOC += inc/pins2torx.txt
 extra_ASCIIDOC += inc/state-storage-options.txt
 extra_ASCIIDOC += inc/support.txt
 extra_ASCIIDOC += inc/vset-options.txt

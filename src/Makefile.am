@@ -33,7 +33,12 @@ SUBDIRS += gcf-tool
 SUBDIRS += lts-tracepp
 SUBDIRS += ltscmp-one
 SUBDIRS += ltstrans
-SUBDIRS += pins2lts-hre
+SUBDIRS += pins2lts-dist
+SUBDIRS += pins2lts-sym
+SUBDIRS += pins2lts-seq
+if HAVE_ATOMICS
+SUBDIRS += pins2lts-mc
+endif
 SUBDIRS += sigmin-one
 if HAVE_MPI
 SUBDIRS += sigmin-mpi
@@ -48,54 +53,14 @@ EXTRA_DIST  = ltsmin-lexer.c ltsmin-lexer.h
 BUILT_SOURCES  = ltsmin-grammar.c ltsmin-grammar.h
 BUILT_SOURCES += ltsmin-lexer.c ltsmin-lexer.h
 
-bin_PROGRAMS += etf2lts-gsea
-bin_PROGRAMS += etf-reach
-
-if HAVE_LIBSTEP_INFO
-bin_PROGRAMS += lpo2lts-gsea
-bin_PROGRAMS += lpo-reach
-endif
 
 if HAVE_LIBMCRL2
-bin_PROGRAMS += lps2lts-gsea
-bin_PROGRAMS += lps-reach
 noinst_LTLIBRARIES += libmcrl2-pins.la
 endif
 
 if HAVE_LIBPBES
-bin_PROGRAMS += pbes2lts-gsea
 if HAVE_LIBSPG
-bin_PROGRAMS += pbes-reach
-endif
 noinst_LTLIBRARIES += libpbes-pins.la
-endif
-
-if HAVE_DVE
-bin_PROGRAMS += dve2lts-gsea
-bin_PROGRAMS += dve-reach
-endif
-
-if HAVE_OPAAL
-#bin_PROGRAMS += opaal2lts-gsea
-#bin_PROGRAMS += opaal-reach
-endif
-
-if HAVE_SPINJA
-bin_PROGRAMS += prom2lts-gsea
-bin_PROGRAMS += prom-reach
-endif
-
-
-if HAVE_ATOMICS
-bin_PROGRAMS += etf2lts-mc
-if HAVE_SPINJA
-bin_PROGRAMS += prom2lts-mc
-endif
-if HAVE_DVE
-bin_PROGRAMS += dve2lts-mc
-endif
-if HAVE_OPAAL
-bin_PROGRAMS += opaal2lts-mc
 endif
 endif
 
@@ -151,134 +116,6 @@ ltsmin_parse_SOURCES = ltsmin-parse.c
 ltsmin_parse_CPPFLAGS = -DNXT -I${top_srcdir}/ltl2ba
 ltsmin_parse_LDADD = libltsmin.la
 
-
-# etf2lts-gsea
-etf2lts_gsea_SOURCES  = spec2lts-gsea.c etf-greybox.c etf-greybox.h
-etf2lts_gsea_LDADD    = $(VSET_LIBS) libltsmin.la libmc.la
-etf2lts_gsea_CPPFLAGS = -DETF $(AM_CPPFLAGS)
-
-# lpo2lts-gsea
-lpo2lts_gsea_SOURCES  = spec2lts-gsea.c mcrl-greybox.c mcrl-greybox.h
-lpo2lts_gsea_SOURCES += at-map.c at-map.h
-lpo2lts_gsea_LDADD    = $(VSET_LIBS) libltsmin.la libmc.la $(MCRL_LIBS)
-lpo2lts_gsea_CPPFLAGS = -DMCRL $(MCRL_CPPFLAGS) $(AM_CPPFLAGS)
-lpo2lts_gsea_LDFLAGS  = $(MCRL_LDFLAGS) $(AM_LDFLAGS)
-
-# lps2lts-gsea
-lps2lts_gsea_SOURCES  = spec2lts-gsea.c
-lps2lts_gsea_LDADD    = $(VSET_LIBS) libmcrl2-pins.la libltsmin.la libmc.la
-lps2lts_gsea_CPPFLAGS = -DMCRL2 $(AM_CPPFLAGS)
-lps2lts_gsea_LDFLAGS  = $(MCRL2_LDFLAGS) $(AM_LDFLAGS)
-nodist_EXTRA_lps2lts_gsea_SOURCES = automake-force-linker.cxx
-
-# pbes2lts-gsea
-pbes2lts_gsea_SOURCES  = spec2lts-gsea.c
-pbes2lts_gsea_LDADD    = libvset.la libpbes-pins.la libltsmin.la libmc.la
-pbes2lts_gsea_CPPFLAGS = -DPBES $(AM_CPPFLAGS)
-nodist_EXTRA_pbes2lts_gsea_SOURCES = automake-force-linker.cxx
-
-# dve2lts-gsea
-dve2lts_gsea_SOURCES  = spec2lts-gsea.c dve-greybox.c dve-greybox.h
-dve2lts_gsea_LDADD    = $(VSET_LIBS) libltsmin.la libmc.la $(DVEC_LIBS)
-dve2lts_gsea_CPPFLAGS = -DDIVINE $(DIVINE_CPPFLAGS) $(AM_CPPFLAGS)
-dve2lts_gsea_LDFLAGS  = $(DIVINE_LDFLAGS) $(AM_LDFLAGS)
-
-# opaal2lts-gsea
-#opaal2lts_gsea_SOURCES  = spec2lts-gsea.c opaal-greybox.c opaal-greybox.h
-#opaal2lts_gsea_LDADD    = $(VSET_LIBS) libltsmin.la libmc.la $(DVEC2_LIBS) $(MALLOC_LIBS)
-#opaal2lts_gsea_CPPFLAGS = -DOPAAL $(OPAAL_CPPFLAGS) $(AM_CPPFLAGS)
-#opaal2lts_gsea_LDFLAGS  = $(OPAAL_LDFLAGS) $(AM_LDFLAGS)
-
-# prom2lts-gsea
-prom2lts_gsea_SOURCES  = spec2lts-gsea.c prom-greybox.c prom-greybox.h
-prom2lts_gsea_LDADD    = $(VSET_LIBS) libltsmin.la libmc.la $(SPINJA_LIBS)
-prom2lts_gsea_CPPFLAGS = -DSPINJA $(SPINJA_CPPFLAGS) $(AM_CPPFLAGS)
-prom2lts_gsea_LDFLAGS  = $(SPINJA_LDFLAGS) $(AM_LDFLAGS)
-
-
-# etf-reach
-etf_reach_SOURCES  = spec-reach.c etf-greybox.c etf-greybox.h
-etf_reach_LDADD    = $(VSET_LIBS) libltsmin.la
-etf_reach_CPPFLAGS = -DETF $(AM_CPPFLAGS)
-
-# lpo-reach
-lpo_reach_SOURCES  = spec-reach.c mcrl-greybox.c mcrl-greybox.h
-lpo_reach_SOURCES += at-map.c at-map.h
-lpo_reach_LDADD    = $(VSET_LIBS) libltsmin.la $(MCRL_LIBS)
-lpo_reach_CPPFLAGS = -DMCRL $(MCRL_CPPFLAGS) $(AM_CPPFLAGS)
-lpo_reach_LDFLAGS  = $(MCRL_LDFLAGS) $(AM_LDFLAGS)
-
-# lps-reach
-lps_reach_SOURCES  = spec-reach.c
-lps_reach_LDADD    = $(VSET_LIBS) libmcrl2-pins.la libltsmin.la
-lps_reach_CPPFLAGS = -DMCRL2 $(AM_CPPFLAGS)
-lps_reach_LDFLAGS  = $(MCRL2_LDFLAGS) $(AM_LDFLAGS)
-nodist_EXTRA_lps_reach_SOURCES = automake-force-linker.cxx
-
-# pbes-reach
-pbes_reach_SOURCES  = spec-reach.c
-pbes_reach_LDADD    = libvset.la libpbes-pins.la libltsmin.la libspg.la
-pbes_reach_CPPFLAGS = -DPBES $(AM_CPPFLAGS)
-nodist_EXTRA_pbes_reach_SOURCES = automake-force-linker.cxx
-
-# dve-reach
-dve_reach_SOURCES  = spec-reach.c dve-greybox.c dve-greybox.h
-dve_reach_LDADD    = $(VSET_LIBS) libltsmin.la $(DVEC_LIBS)
-dve_reach_CPPFLAGS = -DDIVINE $(DIVINE_CPPFLAGS) $(AM_CPPFLAGS)
-dve_reach_LDFLAGS  = $(DIVINE_LDFLAGS) $(AM_LDFLAGS)
-
-# opaal-reach
-#opaal_reach_SOURCES  = spec-reach.c opaal-greybox.c opaal-greybox.h
-#opaal_reach_LDADD    = $(VSET_LIBS) libltsmin.la $(DVEC2_LIBS) $(MALLOC_LIBS)
-#opaal_reach_CPPFLAGS = -DOPAAL $(OPAAL_CPPFLAGS) $(AM_CPPFLAGS)
-#opaal_reach_LDFLAGS  = $(OPAAL_LDFLAGS) $(AM_LDFLAGS)
-
-# prom-reach
-prom_reach_SOURCES  = spec-reach.c prom-greybox.c prom-greybox.h
-prom_reach_LDADD    = $(VSET_LIBS) libltsmin.la $(SPINJA_LIBS)
-prom_reach_CPPFLAGS = -DSPINJA $(SPINJA_CPPFLAGS) $(AM_CPPFLAGS)
-prom_reach_LDFLAGS  = $(SPINJA_LDFLAGS) $(AM_LDFLAGS)
-
-
-# etf2lts-mc
-etf2lts_mc_SOURCES  = spec2lts-mc.c etf-greybox.c etf-greybox.h
-etf2lts_mc_LDADD    = libltsmin.la libmc.la
-etf2lts_mc_CPPFLAGS = -DETF $(AM_CPPFLAGS)
-
-## mCRL and mCRL2 (ATerms) are not thread-safe
-## lpo2lts-mc
-#lpo2lts_mc_SOURCES  = spec2lts-mc.c mcrl-greybox.c mcrl-greybox.h
-#lpo2lts_mc_SOURCES += at-map.c at-map.h
-#lpo2lts_mc_LDADD    = libltsmin.la $(MCRL_LIBS)
-#lpo2lts_mc_CPPFLAGS = -DMCRL $(MCRL_CPPFLAGS) $(AM_CPPFLAGS)
-#lpo2lts_mc_LDFLAGS  = $(MCRL_LDFLAGS) $(AM_LDFLAGS)
-
-## lps2lts-mc
-#lps2lts_mc_SOURCES  = spec2lts-mc.c
-#lps2lts_mc_LDADD    = libmcrl2-pins.la libltsmin.la
-#lps2lts_mc_CPPFLAGS = -DMCRL2 $(AM_CPPFLAGS)
-#lps2lts_mc_LDFLAGS  = $(MCRL2_LDFLAGS) $(AM_LDFLAGS)
-#nodist_EXTRA_lps2lts_mc_SOURCES = automake-force-linker.cxx
-
-# dve2lts-mc
-dve2lts_mc_SOURCES  = spec2lts-mc.c dve-greybox.c dve-greybox.h
-dve2lts_mc_LDADD    = libltsmin.la libmc.la $(DVEC_LIBS)
-dve2lts_mc_CPPFLAGS = -DDIVINE $(DIVINE_CPPFLAGS) $(AM_CPPFLAGS)
-dve2lts_mc_LDFLAGS  = $(DIVINE_LDFLAGS) $(AM_LDFLAGS)
-
-# opaal2lts-mc
-opaal2lts_mc_SOURCES  = spec2lts-mc.c opaal-greybox.c opaal-greybox.h
-opaal2lts_mc_LDADD    = libltsmin.la libmc.la $(DVEC2_LIBS) $(MALLOC_LIBS)
-opaal2lts_mc_CPPFLAGS = -DOPAAL $(OPAAL_CPPFLAGS) $(AM_CPPFLAGS)
-opaal2lts_mc_LDFLAGS  = $(OPAAL_LDFLAGS) $(AM_LDFLAGS)
-
-# prom2lts-mc
-prom2lts_mc_SOURCES  = spec2lts-mc.c prom-greybox.c prom-greybox.h
-prom2lts_mc_LDADD    = libltsmin.la libmc.la $(SPINJA_LIBS)
-prom2lts_mc_CPPFLAGS = -DSPINJA $(SPINJA_CPPFLAGS) $(AM_CPPFLAGS)
-prom2lts_mc_LDFLAGS  = $(SPINJA_LDFLAGS) $(AM_LDFLAGS)
-
-
 # libetf-open.la
 libetf_open_la_SOURCES = spec_open.c etf-greybox.c etf-greybox.h
 libetf_open_la_CPPFLAGS = -DETF $(CADP_CPPFLAGS) $(AM_CPPFLAGS)
@@ -330,8 +167,6 @@ test_vset_LDADD   = $(VSET_LIBS) libltsmin.la
 
 
 # libraries
-VSET_LIBS = libvset.la
-
 libvset_la_SOURCES   = vector_set.c vector_set.h vdom_object.h
 libvset_la_SOURCES  += vset_listdd.c
 libvset_la_SOURCES  += vset_buddy.c
@@ -365,7 +200,7 @@ libvset_la_CPPFLAGS += $(AM_CPPFLAGS)
 libvset_la_LDFLAGS  += $(AM_LDFLAGS)
 
 
-libmc_la_SOURCES = bitvector-ll.c bitvector-ll.h
+libmc_la_SOURCES =  bitvector-ll.c bitvector-ll.h
 libmc_la_SOURCES += cctables.c cctables.h
 libmc_la_SOURCES += clt_table.c clt_table.h
 libmc_la_SOURCES += dbs-ll.c dbs-ll.h
@@ -430,8 +265,6 @@ libspg_la_SOURCES  = spg-solve.c spg-solve.h
 libspg_la_CPPFLAGS = -DNDEBUG $(AM_CPPFLAGS)
 libspg_la_LDFLAGS  = $(AM_LDFLAGS) $(PROFILER_LDFLAGS)
 libspg_la_LIBADD   = libvset.la libltsmin.la bignum/libbignum.la
-if HAVE_PROFILER
-endif 
 
 CLEANFILES =
 DISTCLEANFILES =

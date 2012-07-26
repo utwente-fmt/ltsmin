@@ -1,5 +1,5 @@
 //                           -*- mode: doc; outline-regexp: "==\(=*\) ." -*-
-etf2lts-gsea(1)
+etf2lts-seq(1)
 ===============
 :Author:  Michael Weber
 :Email:   <michaelw@cs.utwente.nl>
@@ -7,7 +7,7 @@ etf2lts-gsea(1)
 
 == NAME
 
-etf2lts-gsea - Sequential state space generator for ETF models.
+etf2lts-seq - Sequential state space generator for ETF models.
 
 == SYNOPSIS
 
@@ -25,6 +25,6 @@ below.
 
 == OPTIONS
 
-include::inc/spec2lts-gsea-options.txt[]
+include::inc/pins2lts-seq-options.txt[]
 
-include::inc/spec2lts-gsea.txt[]
+include::inc/pins2lts-seq.txt[]

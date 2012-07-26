@@ -22,6 +22,6 @@ LTS output is not supported by this tool, use the distributed tools instead.
 
 == OPTIONS
 
-include::inc/spec2lts-mc-options.txt[]
+include::inc/pins2lts-mc-options.txt[]
 
-include::inc/spec2lts-mc.txt[]
+include::inc/pins2lts-mc.txt[]

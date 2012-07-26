@@ -1,5 +1,5 @@
 //                           -*- mode: doc; outline-regexp: "==\(=*\) ." -*-
-prom-reach(1)
+prom2lts-sym(1)
 ===============
 :Author:  Michael Weber
 :Email:   <michaelw@cs.utwente.nl>
@@ -7,7 +7,7 @@ prom-reach(1)
 
 == NAME
 
-prom-reach - Symbolic reachability analysis for SpinJa models.
+prom2lts-sym - Symbolic reachability analysis for SpinJa models.
 
 == SYNOPSIS
 
@@ -24,6 +24,6 @@ include::inc/prom.txt[]
 
 == OPTIONS
 
-include::inc/spec-reach-options.txt[]
+include::inc/pins2lts-sym-options.txt[]
 
-include::inc/spec-reach.txt[]
+include::inc/pins2lts-sym.txt[]

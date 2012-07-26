@@ -25,4 +25,4 @@ manpage:mcrl22mcrl[1].
 
 include::inc/mcrl-options.txt[]
 
-include::inc/spec2torx.txt[]
+include::inc/pins2torx.txt[]

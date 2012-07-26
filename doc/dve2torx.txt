@@ -23,4 +23,4 @@ include::inc/dve.txt[]
 
 == OPTIONS
 
-include::inc/spec2torx.txt[]
+include::inc/pins2torx.txt[]

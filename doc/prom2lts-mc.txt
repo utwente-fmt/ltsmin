@@ -24,6 +24,6 @@ include::inc/prom.txt[]
 
 == OPTIONS
 
-include::inc/spec2lts-mc-options.txt[]
+include::inc/pins2lts-mc-options.txt[]
 
-include::inc/spec2lts-mc.txt[]
+include::inc/pins2lts-mc.txt[]
