@@ -626,7 +626,8 @@ set_red (wctx_t *ctx, state_info_t *state)
     }
 }
 
-static model_t      model = NULL;
+static model_t          model = NULL;
+static pthread_mutex_t  mutex;
 
 static              model_t
 get_model (int first)
@@ -638,7 +639,9 @@ get_model (int first)
                        HREgreyboxI2C, HREgreyboxC2I, HREgreyboxCount);
     if (first)
         GBloadFileShared (model, files[0]);
+    pthread_mutex_lock (&mutex);
     GBloadFile (model, files[0], &model);
+    pthread_mutex_unlock (&mutex);
     return model;
 }
 
@@ -770,6 +773,7 @@ init_globals ()
 #ifdef OPAAL
     strategy[0] |= Strat_TA;
 #endif
+    pthread_mutex_init (&mutex, NULL);
     W = HREpeers(HREglobal());
     model = get_model (1);
     if (Perm_Unknown == permutation) //default permutation depends on strategy
@@ -2632,7 +2636,7 @@ grab_waiting (wctx_t *ctx, raw_data_t state_data)
         return 1; // we don't need to update the global waiting info
     return lm_cas_update(lmap, ctx->state.loc, ctx->state.lattice, TA_WAITING,
                                                ctx->state.lattice, TA_PASSED);
-    // unlocked! May cause newly created passed state to be deleted by a,
+    // lockless! May cause newly created passed state to be deleted by a,
     // waiting set update. However, this behavior is valid since it can be
     // simulated by swapping these two operations in the schedule.
 }
