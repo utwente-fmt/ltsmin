@@ -53,29 +53,30 @@ get_vset_size(vset_t set, long *node_count,
 
 static inline void report_game(const parity_game* g)
 {
-#ifdef LTSMIN_DEBUG
-    long   total_count;
-    long   n_count;
-    char   elem_str[1024];
-    Warning(debug, "");
-    get_vset_size(g->v, &n_count, elem_str, sizeof(elem_str));
-    total_count = n_count;
-    Warning(debug, "parity_game: g->v has %s elements (%ld nodes)", elem_str, n_count);
-    //Warning(info, "parity_game: min_priority = %d, max_priority = %d", g->min_priority, g->max_priority);
-    for(int i=g->min_priority; i<= g->max_priority; i++)
+    if (log_active(infoLong))
     {
-        get_vset_size(g->v_priority[i], &n_count, elem_str, sizeof(elem_str));
-        total_count += n_count;
-        Warning(debug, "parity_game: g->v_priority[%d] has %s elements (%ld nodes)", i, elem_str, n_count);
+        long   total_count;
+        long   n_count;
+        char   elem_str[1024];
+        Warning(infoLong, "");
+        get_vset_size(g->v, &n_count, elem_str, sizeof(elem_str));
+        total_count = n_count;
+        Print(infoLong, "parity_game: g->v has %s elements (%ld nodes)", elem_str, n_count);
+        //Print(infoLong, "parity_game: min_priority = %d, max_priority = %d", g->min_priority, g->max_priority);
+        for(int i=g->min_priority; i<= g->max_priority; i++)
+        {
+            get_vset_size(g->v_priority[i], &n_count, elem_str, sizeof(elem_str));
+            total_count += n_count;
+            Print(infoLong, "parity_game: g->v_priority[%d] has %s elements (%ld nodes)", i, elem_str, n_count);
+        }
+        for(int i=0; i < 2; i++)
+        {
+            get_vset_size(g->v_player[i], &n_count, elem_str, sizeof(elem_str));
+            total_count += n_count;
+            Print(infoLong, "parity_game: g->v_player[%d] has %s elements (%ld nodes)", i, elem_str, n_count);
+        }
+        Print(infoLong, "parity_game: %ld nodes total", total_count);
     }
-    for(int i=0; i < 2; i++)
-    {
-        get_vset_size(g->v_player[i], &n_count, elem_str, sizeof(elem_str));
-        total_count += n_count;
-        Warning(debug, "parity_game: g->v_player[%d] has %s elements (%ld nodes)", i, elem_str, n_count);
-    }
-    Warning(debug, "parity_game: %ld nodes total", total_count);
-#endif
 }
 
 
@@ -172,7 +173,7 @@ parity_game* spg_load(FILE* f, vset_implementation_t impl)
     res &= fscanf(f,"num_groups=%d\n", &num_groups);
     res &= fscanf(f,"min_priority=%d\n", &min_priority);
     res &= fscanf(f,"max_priority=%d\n", &max_priority);
-    Warning(info, "Loading symbolic parity game. "
+    Print(infoShort, "Loading symbolic parity game. "
             "state_length=%d, num_groups=%d, min_priority=%d, max_priority=%d",
             state_length, num_groups, min_priority, max_priority);
     vdom_t domain = vdom_create_domain(state_length, impl);
@@ -185,34 +186,34 @@ parity_game* spg_load(FILE* f, vset_implementation_t impl)
     int val;
     for(int i=0; i<num_groups; i++) {
         res &= fscanf(f,"rel proj e[%d]\n", &val);
-        //Warning(info, "Reading e[%d] proj.", i);
+        //Print(infoLong, "Reading e[%d] proj.", i);
         result->e[i] = vrel_load_proj(f, domain);
     }
     for(int i=0; i<num_groups; i++) {
         res &= fscanf(f,"rel e[%d]\n", &val);
-        //Warning(info, "Reading e[%d].", i);
+        //Print(infoLong, "Reading e[%d].", i);
         vrel_load(f, result->e[i]);
     }
     res &= fscanf(f,"set v\n");
-    //Warning(info, "Reading v.");
+    //Print(infoLong, "Reading v.");
     vset_t v = vset_load(f, domain);
     vset_copy(result->v, v);
     vset_destroy(v);
     for(int i=0; i<2; i++) {
         res &= fscanf(f,"set v_player[%d]\n", &val);
-        //Warning(info, "Reading v_player[%d].", i);
+        //Print(infoLong, "Reading v_player[%d].", i);
         v = vset_load(f, domain);
         vset_copy(result->v_player[i], v);
         vset_destroy(v);
     }
     for(int i=min_priority; i<=max_priority; i++) {
         res &= fscanf(f,"set v_priority[%d]\n", &val);
-        //Warning(info, "Reading v_priority[%d].", i);
+        //Print(infoLong, "Reading v_priority[%d].", i);
         v = vset_load(f, domain);
         vset_copy(result->v_priority[i], v);
         vset_destroy(v);
     }
-    Warning(info, "Done loading symbolic parity game.");
+    Print(infoShort, "Done loading symbolic parity game.");
     return result;
 }
 
@@ -279,7 +280,7 @@ void spg_swap_game(parity_game* g, char* swapfilename)
     FILE* swapfile = fopen(swapfilename, "w");
     if (swapfile == NULL)
         AbortCall ("Unable to open file ``%s'' for writing", swapfilename);
-    Warning(debug, "Writing game to temporary file %s.", swapfilename);
+    Print(infoLong, "Writing game to temporary file %s.", swapfilename);
     spg_save(swapfile, g);
     fclose(swapfile);
 }
@@ -297,7 +298,7 @@ parity_game* spg_unswap_game(char* swapfilename)
 
 void spg_partial_swap_game(parity_game* g)
 {
-    Warning(debug, "Partially swapping game.");
+    Print(infoLong, "Partially swapping game.");
     for(int i=g->min_priority; i <= g->max_priority; i++)
     {
         g->v_priority_swapfile[i] = spg_swapfilename();
@@ -312,7 +313,7 @@ void spg_partial_swap_game(parity_game* g)
 
 void spg_restore_swapped_game(parity_game* g)
 {
-    Warning(debug, "Restoring partially swapped game.");
+    Print(infoLong, "Restoring partially swapped game.");
     for(int i=g->min_priority; i <= g->max_priority; i++)
     {
         FILE* swapfile = fopen(g->v_priority_swapfile[i], "r");
@@ -355,17 +356,19 @@ bool spg_solve(parity_game* g, spgsolver_options* options)
 
 /**
  * \brief Recursively computes the winning sets for both players.
+ * As a side-effect destroys the game g.
  */
 recursive_result spg_solve_recursive(parity_game* g,  const spgsolver_options* options)
 {
-#ifdef LTSMIN_DEBUG
     long   n_count;
     bn_int_t elem_count;
-    vset_count(g->v, &n_count, &elem_count);
-    Warning(debug, "");
-    Warning(debug, "solve_recursive: game has %d nodes", n_count);
-    report_game(g);
-#endif
+    if (log_active(infoLong))
+    {
+        vset_count(g->v, &n_count, &elem_count);
+        Print(infoLong, "");
+        Print(infoLong, "solve_recursive: game has %d nodes", n_count);
+        report_game(g);
+    }
 
 #ifdef LTSMIN_DEBUG
     char dotfilename[255];
@@ -381,7 +384,7 @@ recursive_result spg_solve_recursive(parity_game* g,  const spgsolver_options* o
 
     recursive_result result;
     if (vset_is_empty(g->v)) {
-        Warning(debug, "solve_recursive: game is empty.");
+        Print(infoLong, "solve_recursive: game is empty.");
         result.win[0] = vset_create(g->domain, -1, NULL);
         result.win[1] = vset_create(g->domain, -1, NULL);
         return result;
@@ -403,26 +406,25 @@ recursive_result spg_solve_recursive(parity_game* g,  const spgsolver_options* o
         vset_destroy(t);
         if (!vset_is_empty(deadlock_states[p]))
         {
-#ifdef LTSMIN_DEBUG
-            vset_count(deadlock_states[p], &n_count, &elem_count);
-            size_t size = 20;
-            char s[size];
-            bn_int2string(s, size, &elem_count);
-            //Warning(info, "player[%d] - prev(V) = %d", 1-p, n_count);
-            Warning(debug, "%s deadlock states (%d nodes) with result '%s' (p=%d).", s, n_count, ((p==0)?"false":"true"), p);
-#endif
+            if(log_active(infoLong))
+            {
+                vset_count(deadlock_states[p], &n_count, &elem_count);
+                size_t size = 20;
+                char s[size];
+                bn_int2string(s, size, &elem_count);
+                //Print(infoLong, "player[%d] - prev(V) = %d", 1-p, n_count);
+                Print(infoLong, "%s deadlock states (%d nodes) with result '%s' (p=%d).", s, n_count, ((p==0)?"false":"true"), p);
+            }
             have_deadlock_states[p] = true;
         }
     }
 
     // compute U <- {v \in V | p(v) = m}
-    Warning(debug, "  min = %d, max = %d", g->min_priority, g->max_priority);
+    Print(infoLong, "  min = %d, max = %d", g->min_priority, g->max_priority);
     int m = g->min_priority;
     vset_t u = vset_create(g->domain, -1, NULL);
     vset_copy(u, g->v_priority[m]);
-#ifdef LTSMIN_DEBUG
-    vset_count(u, &n_count, &elem_count);
-#endif
+    if (log_active(infoLong)) vset_count(u, &n_count, &elem_count);
     while(vset_is_empty(u)) {
         m++;
         if (m > g->max_priority) {
@@ -430,9 +432,7 @@ recursive_result spg_solve_recursive(parity_game* g,  const spgsolver_options* o
         }
         vset_clear(u);
         vset_copy(u, g->v_priority[m]);
-#ifdef LTSMIN_DEBUG
-        vset_count(u, &n_count, &elem_count);
-#endif
+        if (log_active(infoLong)) vset_count(u, &n_count, &elem_count);
     }
     if (m > 0 && have_deadlock_states[1]) // deadlock states of player 1 (and) result in true: nu X0 = X0
     {
@@ -448,37 +448,35 @@ recursive_result spg_solve_recursive(parity_game* g,  const spgsolver_options* o
     // Add deadlock states
     if (m < 2)
     {
-        Warning(debug, "Adding deadlock states (m=%d).", m);
+        Print(infoLong, "Adding deadlock states (m=%d).", m);
         if (m >= g->min_priority)
         {
             vset_copy(u, g->v_priority[m]);
         }
         vset_union(u, deadlock_states[1-player]);
-#ifdef LTSMIN_DEBUG
-        vset_count(u, &n_count, &elem_count);
-#endif
+        if (log_active(infoLong)) vset_count(u, &n_count, &elem_count);
     }
     for(int p=0; p<2; p++)
     {
         vset_destroy(deadlock_states[p]);
     }
 
-    Warning(debug, "m = %d, u has %d nodes.", m, n_count);
+    Print(infoLong, "m = %d, u has %d nodes.", m, n_count);
 
-    // IDEA: partial hibernate/swap here? Save priorities
+    // partial hibernate/swap parity game here: Save priorities to disk.
     if (options->swap) spg_partial_swap_game(g);
 
     // U = attr_player(G, U)
     options->chaining ? spg_attractor_chaining(player, g, u, options) : spg_attractor(player, g, u, options);
 
-    // IDEA: restore the game here...
+    // restore the partially swapped game.
     if (options->swap) spg_restore_swapped_game(g);
 
     vset_t empty = vset_create(g->domain, -1, NULL);
 
     parity_game* g_minus_u = spg_copy(g);
 
-    // IDEA: save and destroy g here
+    // save and destroy g
     char* g_filename;
     if (options->swap)
     {
@@ -503,7 +501,7 @@ recursive_result spg_solve_recursive(parity_game* g,  const spgsolver_options* o
         vset_destroy(u);
         vset_destroy(x.win[player]);
 
-        // IDEA: load g here
+        // load g
         if (options->swap)
             g = spg_unswap_game(g_filename);
 
@@ -516,7 +514,7 @@ recursive_result spg_solve_recursive(parity_game* g,  const spgsolver_options* o
 
         parity_game* g_minus_b = spg_copy(g);
 
-        spg_destroy(g); // NEW
+        spg_destroy(g);
 
         spg_game_restrict(g_minus_b, b, options);
         recursive_result y = spg_solve_recursive(g_minus_b, options);
@@ -528,12 +526,13 @@ recursive_result spg_solve_recursive(parity_game* g,  const spgsolver_options* o
     }
     if (options->swap) free(g_filename);
 
-#ifdef LTSMIN_DEBUG
-    vset_count(result.win[0], &n_count, &elem_count);
-    Warning(debug, "result.win[0]: %ld nodes.", n_count);
-    vset_count(result.win[1], &n_count, &elem_count);
-    Warning(debug, "result.win[1]: %ld nodes.", n_count);
-#endif
+    if (log_active(infoLong))
+    {
+        vset_count(result.win[0], &n_count, &elem_count);
+        Print(infoLong, "result.win[0]: %ld nodes.", n_count);
+        vset_count(result.win[1], &n_count, &elem_count);
+        Print(infoLong, "result.win[1]: %ld nodes.", n_count);
+    }
 
 #ifdef LTSMIN_DEBUG
     if (options->dot)
@@ -600,18 +599,19 @@ void spg_attractor(int player, const parity_game* g, vset_t u, const spgsolver_o
     int l = 0;
     // Compute fixpoint
     while (!vset_is_empty(v_level)) {
-#ifdef LTSMIN_DEBUG
-        long   u_count;
-        bn_int_t u_elem_count;
-        vset_count(u, &u_count, &u_elem_count);
-        long   level_count;
-        bn_int_t level_elem_count;
-        vset_count(v_level, &level_count, &level_elem_count);
-        RTstopTimer(options->spg_solve_timer);
-        Warning(debug, "attr_%d^%d [%5.3f]: u has %ld nodes, v_level has %ld nodes.",
-                RTrealTime(options->spg_solve_timer), player, l, u_count, level_count);
-        RTstartTimer(options->spg_solve_timer);
-#endif
+        if (log_active(infoLong))
+        {
+            long   u_count;
+            bn_int_t u_elem_count;
+            vset_count(u, &u_count, &u_elem_count);
+            long   level_count;
+            bn_int_t level_elem_count;
+            vset_count(v_level, &level_count, &level_elem_count);
+            RTstopTimer(options->spg_solve_timer);
+            Print(infoLong, "attr_%d^%d [%5.3f]: u has %ld nodes, v_level has %ld nodes.",
+                    RTrealTime(options->spg_solve_timer), player, l, u_count, level_count);
+            RTstartTimer(options->spg_solve_timer);
+        }
 
         // prev_attr = V \intersect prev(attr^k)
         vset_t prev_attr = vset_create(g->domain, -1, NULL);
@@ -678,7 +678,7 @@ void spg_attractor(int player, const parity_game* g, vset_t u, const spgsolver_o
 
         l++;
     }
-    Warning(debug, "attr_%d: %d levels.", player, l);
+    Print(infoLong, "attr_%d: %d levels.", player, l);
     vset_destroy(v_level);
     (void)options;
 }
@@ -696,24 +696,25 @@ void spg_attractor_chaining(int player, const parity_game* g, vset_t u, const sp
     vset_t v_group = vset_create(g->domain, -1, NULL);
     vset_copy(v_level, u);
     int l = 0;
-#ifdef LTSMIN_DEBUG
+
     long peak_group_count = 0;
-#endif
+    long   u_count;
+    bn_int_t u_elem_count;
+    long   v_level_count;
+    bn_int_t v_level_elem_count;
+
     // Compute fixpoint
     while (!vset_is_empty(v_level)) {
-#ifdef LTSMIN_DEBUG
-        long   u_count;
-        bn_int_t u_elem_count;
-        vset_count(u, &u_count, &u_elem_count);
-        long   v_level_count;
-        bn_int_t v_level_elem_count;
-        vset_count(v_level, &v_level_count, &v_level_elem_count);
-        RTstopTimer(options->spg_solve_timer);
-        Warning(debug, "attr_%d^%d [%5.3f]: u has %ld nodes, v_level has %ld nodes, v_group has %ld nodes max.",
-                RTrealTime(options->spg_solve_timer), player, l, u_count, v_level_count, peak_group_count);
-        RTstartTimer(options->spg_solve_timer);
-        peak_group_count = 0;
-#endif
+        if (log_active(infoLong))
+        {
+            vset_count(u, &u_count, &u_elem_count);
+            vset_count(v_level, &v_level_count, &v_level_elem_count);
+            RTstopTimer(options->spg_solve_timer);
+            Print(infoLong, "attr_%d^%d [%5.3f]: u has %ld nodes, v_level has %ld nodes, v_group has %ld nodes max.",
+                    RTrealTime(options->spg_solve_timer), player, l, u_count, v_level_count, peak_group_count);
+            RTstartTimer(options->spg_solve_timer);
+            peak_group_count = 0;
+        }
 
         vset_copy(v_previous_level, v_level);
         vset_clear(v_level);
@@ -721,17 +722,18 @@ void spg_attractor_chaining(int player, const parity_game* g, vset_t u, const sp
             vset_copy(v_group, v_previous_level);
             int k = 0;
             while ((options->saturation || k < 1) && !vset_is_empty(v_group)) {
-#ifdef LTSMIN_DEBUG
-                vset_count(u, &u_count, &u_elem_count);
-                vset_count(v_level, &v_level_count, &v_level_elem_count);
-                long   v_group_count;
-                bn_int_t v_group_elem_count;
-                vset_count(v_group, &v_group_count, &v_group_elem_count);
-                Warning(debug, "  %d: u has %ld nodes, v_level has %ld nodes, v_group has %ld nodes.", k, u_count, v_level_count, v_group_count);
-                if (v_group_count > peak_group_count) {
-                    peak_group_count = v_group_count;
+                if (log_active(infoLong))
+                {
+                    vset_count(u, &u_count, &u_elem_count);
+                    vset_count(v_level, &v_level_count, &v_level_elem_count);
+                    long   v_group_count;
+                    bn_int_t v_group_elem_count;
+                    vset_count(v_group, &v_group_count, &v_group_elem_count);
+                    Print(infoLong, "  %d: u has %ld nodes, v_level has %ld nodes, v_group has %ld nodes.", k, u_count, v_level_count, v_group_count);
+                    if (v_group_count > peak_group_count) {
+                        peak_group_count = v_group_count;
+                    }
                 }
-#endif
 
                 // prev_attr = V \intersect prev(attr^k)
                 vset_t prev_attr = vset_create(g->domain, -1, NULL);
@@ -778,11 +780,11 @@ void spg_attractor_chaining(int player, const parity_game* g, vset_t u, const sp
                 vset_union(u, v_group);
                 k++;
             }
-            Warning(debug, "  group  %d: %d iterations.", group, k);
+            Print(infoLong, "  group  %d: %d iterations.", group, k);
         }
         l++;
     }
-    Warning(debug, "attr_%d: %d levels.", player, l);
+    Print(infoLong, "attr_%d: %d levels.", player, l);
     vset_destroy(v_group);
     vset_destroy(v_level);
     vset_destroy(v_previous_level);

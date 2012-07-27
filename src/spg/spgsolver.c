@@ -36,11 +36,11 @@ main (int argc, char *argv[])
     rt_timer_t spgsolve_timer = RTcreateTimer();
     RTstartTimer(spgsolve_timer);
     bool result = spg_solve(g, spg_options);
-    Warning(info, "");
-    Warning(info, "The result is: %s", result ? "true":"false");
+    Print(infoShort, "");
+    Print(infoShort, "The result is: %s", result ? "true":"false");
     RTstopTimer(spgsolve_timer);
-    Warning(info, "");
-    RTprintTimer(info, spgsolve_timer, "solving took");
+    Print(infoShort, "");
+    RTprintTimer(infoShort, spgsolve_timer, "solving took");
 
     HREexit(EXIT_SUCCESS);
 }
