@@ -57,6 +57,9 @@ nodist_EXTRA_lps2lts_sym_SOURCES = ../automake-force-linker.cxx
 pbes2lts_sym_SOURCES   = pins2lts-sym.c
 pbes2lts_sym_LDADD     = ../lts-io/liblts-io.la $(HRE_LIB) ../libltsmin.la
 pbes2lts_sym_LDADD    += $(VSET_LIBS)  ../libpbes-pins.la
+if HAVE_LIBSPG
+pbes2lts_sym_LDADD    += ../libspg.la
+endif
 pbes2lts_sym_CPPFLAGS  = -DPBES $(DIST_CPPFLAGS)
 pbes2lts_sym_LDFLAGS   = $(MCRL2_LDFLAGS) $(AM_LDFLAGS)
 nodist_EXTRA_pbes2lts_sym_SOURCES = ../automake-force-linker.cxx

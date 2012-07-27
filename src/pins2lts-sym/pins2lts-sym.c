@@ -45,7 +45,6 @@ static char* pg_output = NULL;
 static int var_pos = 0;
 static int var_type_no = 0;
 static int variable_projection = 0;
-static vrel_t pg_autocomplete_transitions[2];
 static size_t true_index = 0;
 static size_t false_index = 1;
 static size_t num_vars = 0;
@@ -701,7 +700,7 @@ static inline void add_variable_subset(vset_t dst, vset_t src, vdom_t domain, in
     vset_t u = vset_create(domain, -1, NULL);
     vset_copy_match_proj(u, src, p_len, proj, variable_projection, match);
 
-    if (debug_output_enabled)
+    if (debug_output_enabled && log_active(infoLong))
     {
         chunk c = GBchunkGet(model, var_type_no, var_index);
         if (c.len == 0) {
@@ -716,7 +715,7 @@ static inline void add_variable_subset(vset_t dst, vset_t src, vdom_t domain, in
         char   elem_str[1024];
         double e_count;
         get_vset_size(u, &n_count, &e_count, elem_str, sizeof(elem_str));
-        if (e_count > 0) Warning(debug, "add_variable_subset: %s:  %s (~%1.2e) states", s, elem_str, e_count);
+        if (e_count > 0) Print(infoLong, "add_variable_subset: %s:  %s (~%1.2e) states", s, elem_str, e_count);
     }
 
     vset_union(dst, u);
@@ -745,8 +744,11 @@ static inline void reduce_parity_game(vset_t next_level, vset_t visited, vset_t 
     vset_intersect(next_level_prev, visited);
 
     vset_copy_match_proj(true_states, next_level, p_len, proj, variable_projection, true_match);
-    get_vset_size(true_states, &n_count, &e_count, elem_str, sizeof(elem_str));
-    //Warning(info, "reduce_parity_game: %s (~%1.2e) TRUE states", elem_str, e_count);
+    if (log_active(infoLong))
+    {
+        //get_vset_size(true_states, &n_count, &e_count, elem_str, sizeof(elem_str));
+        //Print(infoLong, "reduce_parity_game: %s (~%1.2e) TRUE states", elem_str, e_count);
+    }
     vset_t true_prev = vset_create(domain, -1, NULL);
     for (int i = 0; i < nGrps; i++) {
         vset_prev(tmp, true_states, group_next[i]);
@@ -754,12 +756,18 @@ static inline void reduce_parity_game(vset_t next_level, vset_t visited, vset_t 
         vset_clear(tmp);
     }
     vset_intersect(true_prev, next_level_prev);
-    get_vset_size(true_prev, &n_count, &e_count, elem_str, sizeof(elem_str));
-    //Warning(info, "reduce_parity_game: %s (~%1.2e) TRUE prev states", elem_str, e_count);
+    if (log_active(infoLong))
+    {
+        //get_vset_size(true_prev, &n_count, &e_count, elem_str, sizeof(elem_str));
+        //Print(infoLong, "reduce_parity_game: %s (~%1.2e) TRUE prev states", elem_str, e_count);
+    }
 
     vset_copy_match_proj(false_states, next_level, p_len, proj, variable_projection, false_match);
-    get_vset_size(false_states, &n_count, &e_count, elem_str, sizeof(elem_str));
-    //Warning(info, "reduce_parity_game: %s (~%1.2e) FALSE states", elem_str, e_count);
+    if (log_active(infoLong))
+    {
+        //get_vset_size(false_states, &n_count, &e_count, elem_str, sizeof(elem_str));
+        //Print(infoLong, "reduce_parity_game: %s (~%1.2e) FALSE states", elem_str, e_count);
+    }
     vset_t false_prev = vset_create(domain, -1, NULL);
     for (int i = 0; i < nGrps; i++) {
         vset_prev(tmp, false_states, group_next[i]);
@@ -767,8 +775,11 @@ static inline void reduce_parity_game(vset_t next_level, vset_t visited, vset_t 
         vset_clear(tmp);
     }
     vset_intersect(false_prev, next_level_prev);
-    get_vset_size(false_prev, &n_count, &e_count, elem_str, sizeof(elem_str));
-    //Warning(info, "reduce_parity_game: %s (~%1.2e) FALSE prev states", elem_str, e_count);
+    if (log_active(infoLong))
+    {
+        //get_vset_size(false_prev, &n_count, &e_count, elem_str, sizeof(elem_str));
+        //Print(infoLong, "reduce_parity_game: %s (~%1.2e) FALSE prev states", elem_str, e_count);
+    }
 
     // compute which states in visited are AND/OR states
     // computes AND states with FALSE successor, OR states with TRUE successor.
@@ -780,7 +791,7 @@ static inline void reduce_parity_game(vset_t next_level, vset_t visited, vset_t 
     {
         if (i != false_index && i != true_index)
         {
-            //Warning(info, "Adding nodes for var %d (player %d).", i, player[i]);
+            //Print(infoLong, "Adding nodes for var %d (player %d).", i, player[i]);
             add_variable_subset(v_player[player[i]], (player[i] == 1) ? false_prev : true_prev, domain, i); // AND is player 1, OR is player 0
         }
     }
@@ -794,7 +805,7 @@ static inline void reduce_parity_game(vset_t next_level, vset_t visited, vset_t 
     vset_t P_next = vset_create(domain, -1, NULL);
     for(int p=0; p<2; p++) {
         get_vset_size(v_player[p], &n_count, &e_count, elem_str, sizeof(elem_str));
-        //Warning(info, "reduce_parity_game: %s (~%1.2e) %s states with a successor %s.", elem_str, e_count, (p==1)?"AND":"OR", (p==1)?"FALSE":"TRUE");
+        //Print(infoLong, "reduce_parity_game: %s (~%1.2e) %s states with a successor %s.", elem_str, e_count, (p==1)?"AND":"OR", (p==1)?"FALSE":"TRUE");
         for (int i = 0; i < nGrps; i++) {
             vset_next(tmp, v_player[p], group_next[i]);
             vset_union(P_next, tmp);
@@ -818,17 +829,26 @@ static inline void reduce_parity_game(vset_t next_level, vset_t visited, vset_t 
             vset_clear(tmp);
         }
 
-        get_vset_size(P_next, &n_count, &e_count, elem_str, sizeof(elem_str));
-        Warning(info, "reduce_parity_game: %s (~%1.2e) P_next states.", elem_str, e_count);
-        get_vset_size(R_minus_P_next, &n_count, &e_count, elem_str, sizeof(elem_str));
-        Warning(info, "reduce_parity_game: %s (~%1.2e) R_minus_P_next states.", elem_str, e_count);
+        if (log_active(infoLong))
+        {
+            get_vset_size(P_next, &n_count, &e_count, elem_str, sizeof(elem_str));
+            Print(infoLong, "reduce_parity_game: %s (~%1.2e) P_next states.", elem_str, e_count);
+            get_vset_size(R_minus_P_next, &n_count, &e_count, elem_str, sizeof(elem_str));
+            Print(infoLong, "reduce_parity_game: %s (~%1.2e) R_minus_P_next states.", elem_str, e_count);
+        }
         vset_minus(P_next, R_minus_P_next);
-        get_vset_size(P_next, &n_count, &e_count, elem_str, sizeof(elem_str));
-        Warning(info, "reduce_parity_game: %s (~%1.2e) [P_next - R_minus_P_next]", elem_str, e_count);
+        if (log_active(infoLong))
+        {
+            get_vset_size(P_next, &n_count, &e_count, elem_str, sizeof(elem_str));
+            Print(infoLong, "reduce_parity_game: %s (~%1.2e) [P_next - R_minus_P_next]", elem_str, e_count);
+        }
         vset_minus(P_next, true_states);
         vset_minus(P_next, false_states);
-        get_vset_size(P_next, &n_count, &e_count, elem_str, sizeof(elem_str));
-        Warning(info, "reduce_parity_game: RESULT: %s (~%1.2e) states that can be skipped.", elem_str, e_count);
+        if (log_active(infoShort))
+        {
+            get_vset_size(P_next, &n_count, &e_count, elem_str, sizeof(elem_str));
+            Print(infoShort, "reduce_parity_game: %s (~%1.2e) states can be skipped.", elem_str, e_count);
+        }
 
         vset_minus(next_level, P_next);
 
@@ -1941,16 +1961,19 @@ void init_pbes()
     for(size_t i=0; i<num_vars; i++)
     {
         /*
-        chunk c = GBchunkGet(model, var_type_no, i);
-        if (c.len == 0) {
-            Abort("lookup of %d failed", i);
+        if (log_active(infoLong))
+        {
+            chunk c = GBchunkGet(model, var_type_no, i);
+            if (c.len == 0) {
+                Abort("lookup of %d failed", i);
+            }
+            char s[c.len + 1];
+            for (unsigned int i = 0; i < c.len; i++) {
+                s[i] = c.data[i];
+            }
+            s[c.len] = 0;
+            Print(infoLong, "Variable %d: %s", i, s);
         }
-        char s[c.len + 1];
-        for (unsigned int i = 0; i < c.len; i++) {
-            s[i] = c.data[i];
-        }
-        s[c.len] = 0;
-        Warning(info, "Variable %d: %s", i, s);
         */
         lts_type_t type = GBgetLTStype(model);
         int state_length = lts_type_get_state_length(type);
@@ -1971,27 +1994,15 @@ void init_pbes()
         {
             max_priority = label;
         }
-        //Warning(info, "  label %d (priority): %d", 0, label);
+        //Print(infoLong, "  label %d (priority): %d", 0, label);
         label = GBgetStateLabelLong(model, 1, state); // player
         player[i] = label;
-        //Warning(info, "  label %d (player): %d", 1, label);
+        //Print(infoLong, "  label %d (player): %d", 1, label);
     }
 }
 #endif
 
 #if defined(PBES)
-struct pg_autocomplete_info {
-    int   *dst;
-    vrel_t rel;
-};
-
-static void
-pg_autocomplete_cb(void *context, int *src)
-{
-    struct pg_autocomplete_info *ctx = (struct pg_autocomplete_info*)context;
-    vrel_add(ctx->rel, src, ctx->dst);
-}
-
 /**
  * \brief Creates a symbolic parity game
  */
@@ -2000,7 +2011,7 @@ parity_game* compute_symbolic_parity_game(vset_t visited, int* src)
     debug_output_enabled = true;
 
     // num_vars and player have been pre-computed by init_pbes.
-    parity_game* g = spg_create(domain, N, nGrps+2, min_priority, max_priority);
+    parity_game* g = spg_create(domain, N, nGrps, min_priority, max_priority);
     for(int i=0; i < N; i++)
     {
         g->src[i] = src[i];
@@ -2009,83 +2020,34 @@ parity_game* compute_symbolic_parity_game(vset_t visited, int* src)
     for(size_t i = 0; i < num_vars; i++)
     {
         // players
-        //Warning(info, "Adding nodes for var %d (player %d).", i, player[i]);
+        //Print(infoLong, "Adding nodes for var %d (player %d).", i, player[i]);
         add_variable_subset(g->v_player[player[i]], g->v, g->domain, i);
         // priorities
         add_variable_subset(g->v_priority[priority[i]], g->v, g->domain, i);
     }
-    for(int p = 0; p < 2; p++)
+    if (log_active(infoShort))
     {
-        long   n_count;
-        bn_int_t elem_count;
-        size_t size = 20;
-        char s[size];
-        vset_count(g->v_player[p], &n_count, &elem_count);
-        bn_int2string(s, size, &elem_count);
-        Warning(info, "player %d: %d nodes, %s elements.", p, n_count, s);
-    }
-    for(int p = min_priority; p <= max_priority; p++)
-    {
-        long   n_count;
-        bn_int_t elem_count;
-        size_t size = 20;
-        char s[size];
-        vset_count(g->v_priority[p], &n_count, &elem_count);
-        bn_int2string(s, size, &elem_count);
-        Warning(info, "priority %d: %d nodes, %s elements.", p, n_count, s);
-    }
-
-    // Autocompleting the parity game (adding transitions to true or false
-    // for nodes without successors).
-    //Warning(info, "Autocompleting parity game.");
-    Warning(info, "Computing deadlock states.");
-    for(int p = 0; p < 2; p++)
-    {
-        g->e[nGrps+p] = pg_autocomplete_transitions[p];
-
-        long   n_count;
-        bn_int_t elem_count;
-        vset_t s = vset_create(g->domain, -1, NULL);
-        vset_copy(s, g->v_player[p]);
-        vset_t t = vset_create(g->domain, -1, NULL);
-        for(int group=0; group<nGrps; group++) {
-            vset_clear(t);
-            vset_prev(t, visited, group_next[group]);
-            vset_minus(s, t);
-        }
-        vset_destroy(t);
-
-        if (!vset_is_empty(s))
+        for(int p = 0; p < 2; p++)
         {
+            long   n_count;
+            bn_int_t elem_count;
             size_t size = 20;
-            char str[size];
-            vset_count(s, &n_count, &elem_count);
-            bn_int2string(str, size, &elem_count);
-            //Warning(info, "player[%d] - prev(V) = %d", 1-p, n_count);
-            Warning(info, "There are %s deadlock states with result '%s'.", str, ((p==0)?"false":"true"));
-
-            // create dummy state with variable i:
-/*
-            int* state = RTmalloc(N*sizeof(int));
-            for(int j=0; j < N; j++)
-            {
-                state[j] = 0;
-            }
-            state[var_pos] = (p==0) ? false_index : true_index;
-            vset_add(g->v, state);
-            vset_add(g->v_player[p], state);
-            vset_add(g->v_priority[(p==0)? 1 : 0], state);
-            vrel_add(g->e[nGrps+p], state, state);
-
-            struct pg_autocomplete_info context;
-            context.dst = state;
-            context.rel = g->e[nGrps+p];
-            vset_enum(s, pg_autocomplete_cb, &context);
-            */
+            char s[size];
+            vset_count(g->v_player[p], &n_count, &elem_count);
+            bn_int2string(s, size, &elem_count);
+            Print(infoShort, "player %d: %d nodes, %s elements.", p, n_count, s);
         }
-        vset_destroy(s);
+        for(int p = min_priority; p <= max_priority; p++)
+        {
+            long   n_count;
+            bn_int_t elem_count;
+            size_t size = 20;
+            char s[size];
+            vset_count(g->v_priority[p], &n_count, &elem_count);
+            bn_int2string(s, size, &elem_count);
+            Print(infoShort, "priority %d: %d nodes, %s elements.", p, n_count, s);
+        }
     }
-
     for(int i = 0; i < nGrps; i++)
     {
         g->e[i] = group_next[i];
@@ -2192,7 +2154,7 @@ main (int argc, char *argv[])
     var_type_no = 0;
     for(int i=0; i<N; i++)
     {
-        //printf("%d: %s (%d [%s])\n", i, lts_type_get_state_name(type, i), lts_type_get_state_typeno(type, i), lts_type_get_state_type(type, i));
+        //Printf(infoLong, "%d: %s (%d [%s])\n", i, lts_type_get_state_name(type, i), lts_type_get_state_typeno(type, i), lts_type_get_state_type(type, i));
         char* str1 = "string";
         size_t strlen1 = strlen(str1);
         char* str2 = lts_type_get_state_type(type, i);
@@ -2208,15 +2170,6 @@ main (int argc, char *argv[])
     int p_len = 1;
     int proj[1] = {var_pos}; // position 0 encodes the variable
     variable_projection = vproj_create(domain, p_len, proj);
-    int unit_proj[N];
-    for(int i=0; i<N; i++)
-    {
-        unit_proj[i] = i;
-    }
-    for(int p=0; p<2; p++)
-    {
-        pg_autocomplete_transitions[p] = vrel_create(domain, N, unit_proj);
-    }
 #endif
 
 #if defined(PBES)
