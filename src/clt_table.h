@@ -6,21 +6,21 @@
  * Parallel Cleary table implementation after Laarman/van der Vegt:
  *
  * @incollection {springerlink:10.1007/978-3-642-25929-6_18,
- *     author = {van der Vegt, Steven and Laarman, Alfons},
- *     affiliation = {Formal Methods and Tools, University of Twente, The Netherlands},
- *     title = {A Parallel Compact Hash Table},
- *     booktitle = {Mathematical and Engineering Methods in Computer Science},
- *     series = {Lecture Notes in Computer Science},
- *     editor = {Kotasek, Zdenek and Bouda, Jan and Cerna, Ivana and Sekanina, Lukas and Vojnar, Tomas and Antos, David},
- *     publisher = {Springer Berlin / Heidelberg},
- *     isbn = {978-3-642-25928-9},
- *     keyword = {Computer Science},
- *     pages = {191-204},
- *     volume = {7119},
- *     url = {http://dx.doi.org/10.1007/978-3-642-25929-6_18},
- *     note = {10.1007/978-3-642-25929-6_18},
- *     year = {2012}
- *  }
+       author = {van der Vegt, Steven and Laarman, Alfons},
+       affiliation = {Formal Methods and Tools, University of Twente, The Netherlands},
+       title = {{A Parallel Compact Hash Table}},
+       booktitle = {Mathematical and Engineering Methods in Computer Science},
+       series = {Lecture Notes in Computer Science},
+       editor = {Kotasek, Zdenek and Bouda, Jan and Cerna, Ivana and Sekanina, Lukas and Vojnar, Tomas and Antos, David},
+       publisher = {Springer Berlin / Heidelberg},
+       isbn = {978-3-642-25928-9},
+       keyword = {Computer Science},
+       pages = {191-204},
+       volume = {7119},
+       url = {http://eprints.eemcs.utwente.nl/20648/},
+       note = {10.1007/978-3-642-25929-6_18},
+       year = {2012}
+    }
  *
  */
 

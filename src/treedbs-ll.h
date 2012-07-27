@@ -24,21 +24,21 @@
  *
  * For details refer to:
  * @incollection {springerlink:10.1007/978-3-642-22306-8_4,
- *   author = {Laarman, Alfons and van de Pol, Jaco and Weber, Michael},
- *   affiliation = {Formal Methods and Tools, University of Twente, The Netherlands},
- *   title = {Parallel Recursive State Compression for Free},
- *   booktitle = {Model Checking Software},
- *   series = {Lecture Notes in Computer Science},
- *   editor = {Groce, Alex and Musuvathi, Madanlal},
- *   publisher = {Springer Berlin / Heidelberg},
- *   isbn = {978-3-642-22305-1},
- *   keyword = {Computer Science},
- *   pages = {38-56},
- *   volume = {6823},
- *   url = {http://dx.doi.org/10.1007/978-3-642-22306-8_4},
- *   note = {10.1007/978-3-642-22306-8_4},
- *   year = {2011}
- * }
+     author = {Laarman, Alfons and van de Pol, Jaco and Weber, Michael},
+     affiliation = {Formal Methods and Tools, University of Twente, The Netherlands},
+     title = {{Parallel Recursive State Compression for Free}},
+     booktitle = {Model Checking Software},
+     series = {Lecture Notes in Computer Science},
+     editor = {Groce, Alex and Musuvathi, Madanlal},
+     publisher = {Springer Berlin / Heidelberg},
+     isbn = {978-3-642-22305-1},
+     keyword = {Computer Science},
+     pages = {38-56},
+     volume = {6823},
+     url = {http://eprints.eemcs.utwente.nl/20146/},
+     note = {10.1007/978-3-642-22306-8_4},
+     year = {2011}
+   }
  *
  * In this implementation, the storage of tree root nodes is separated from
  * the internal nodes. Internal nodes are stored in the data table which
