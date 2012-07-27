@@ -59,9 +59,7 @@ noinst_LTLIBRARIES += libmcrl2-pins.la
 endif
 
 if HAVE_LIBPBES
-if HAVE_LIBSPG
 noinst_LTLIBRARIES += libpbes-pins.la
-endif
 endif
 
 bin_SCRIPTS =
