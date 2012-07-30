@@ -120,7 +120,7 @@ static void write_close(lts_file_t file){
     lts_set_size(file->lts,file->init_count,file->state_count,file->edge_count);
     file->lts->tau=-1;
     if (lts_type_get_edge_label_count(file->lts->ltstype)==1 &&
-        strcmp(lts_type_get_edge_label_name(file->lts->ltstype,0),"action")==0)
+        strncmp(lts_type_get_edge_label_name(file->lts->ltstype,0),"action",6)==0)
     {
         Print(infoShort,"action labeled, detecting silent step");
         int tableno=lts_type_get_edge_label_typeno(file->lts->ltstype,0);
