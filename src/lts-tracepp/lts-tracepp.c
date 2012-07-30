@@ -484,7 +484,8 @@ main(int argc,char*argv[]){
     HREaddOptions(options,"Pretty print trace files\n\n"
                 "Supported output file extensions are:\n"
                 "  txt: Textual output\n"
-                "  csv: Comma separated values\n\n"
+                "  csv: Comma separated values\n"
+                "  aut: AUT file format\n\n"
                 "Options");
     lts_lib_setup();
     HREinitStart(&argc,&argv,1,2,files,"<input> [<output>]");
