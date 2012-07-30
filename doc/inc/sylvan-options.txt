@@ -1,0 +1,25 @@
+=== Sylvan Options
+
+*--sylvan-threads*='NUMBER'::
+        Set number of workers. Defaults to 1.
+
+*--sylvan-dqsize
+        Sets the size of the (static) task queue for work stealing in Wool
+        to N.  Defaults to 100000.
+
+*--sylvan-tablesize*='NUMBER'::
+        Sets the size of the BDD table to 1<<N nodes. Defaults to 23.
+        Maximum of 29.
+
+*--sylvan-cachesize*='NUMBER'::
+        Set the size of the memoization table to 1<<N entries. 
+        Defaults to 23.
+
+*--sylvan-bits*='BITS'::
+        Sets the number of bits for each integer in the state vector.  
+        Defaults to 16.
+
+*--sylvan-granularity*='NUMBER'::
+        Controls memoization table usage.  Only use the memoization 
+        table every 1/N BDD levels.  Defaults to 1, i.e., always use the table.
+ 

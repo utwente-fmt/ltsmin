@@ -1,15 +1,18 @@
 === Vector Set Options
 
 *--vset*='TYPE'::
-        Select type of vector set: 'ldd', 'list', 'tree', 'fdd', or 'ddd'.
+        Select type of vector set: 'ldd', 'list', 'tree', 'fdd', 'ddd', or 'sylvan'.
         With 'ldd', the ListDD list encoding is used (non-ATerm based).
         With 'list', ATermDD with list encoding is used.
         With 'tree', ATermDD with tree encoding is used.
         With 'fdd', BuDDy FDDs are used.
         With 'ddd', libDDD SDDs are used.
+        With 'sylvan', the parallel BDD package Sylvan is used.
         Defaults to first available type in the list.
 
 include::listdd-options.txt[]
 
 include::buddy-options.txt[]
+
+include::sylvan-options.txt[]
 

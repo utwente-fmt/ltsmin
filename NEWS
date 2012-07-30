@@ -19,11 +19,17 @@
       (--strategy=sbfs)
     o Currently, only supported by the multi-core reachability algorithms
  * New parallel BBD package: Sylvan
-    o See <thesis Tom van Dijk> for description
-    o BDD operations are parallelized using the WOOL framework
-      (included)
-    o Use: *-reach --vset=sylvan
-    o Supported platforms: Linux 64bit
+    o See http://essay.utwente.nl/61650/ for a description
+    o BDD operations are parallelized using the Wool framework (included)
+    o Use: *2lts-sym --vset=sylvan
+    o Supported platforms: Linux 64 bit and Mac OSX
+    o Parameters: 
+      --sylvan-threads     <N> Number of workers
+      --sylvan-dqsize      <N> Size of the static task queue of Wool
+      --sylvan-tablesize   <N> Size of the BDD table (1<<N nodes)
+      --sylvan-cachesize   <N> Size of the memoization table (1<<N entries)
+      --sylvan-bits        <N> Number of bits per integer in the state vector
+      --sylvan-granularity <N> Only use the memoization table every 1/N BDD levels
  * Optimized multi-core data structures and algorithms
     o Reduced tree memory usage by 50% by splitting table for roots and leafs.
       Set the relative ratio using: --ratio=n (n=2 by default)

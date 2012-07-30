@@ -9,14 +9,6 @@
 #include <sylvan.h>
 #include <vdom_object.h>
 
-//#define GC_AFTER_EACH_OP 1
-
-#if GC_AFTER_EACH_OP
-#define OPTIONAL_GC_AFTER_EACH_OP sylvan_gc();
-#else
-#define OPTIONAL_GC_AFTER_EACH_OP ;
-#endif
-
 static int fddbits = 16;
 static int threads = 1;
 static int datasize = 23;
@@ -42,12 +34,12 @@ static void ltsmin_sylvan_init()
 }
 
 struct poptOption sylvan_options[]= {
-  { "sylvan-threads",0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &threads , 0 , "set number of threads in Sylvan","<threads>"},
-  { "sylvan-dqsize",0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &dqsize , 0 , "set length of task dq in Wool","<dqsize>"},
-  { "sylvan-bits",0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &fddbits, 0, "set number of bits per state","<bits>"},
-  { "sylvan-tablesize",0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &datasize , 0 , "set size of BDD table as a power of 2","<datasize>"},
-  { "sylvan-cachesize",0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &cachesize , 0 , "set siz of operations cache as a power of 2","<cachesize>"},
-  { "sylvan-granularity",0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &granularity , 0 , "granularity","<granularity>"},
+  { "sylvan-threads",0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &threads , 0 , "set number of threads for parallelization","<threads>"},
+  { "sylvan-dqsize",0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &dqsize , 0 , "set length of task queue","<dqsize>"},
+  { "sylvan-bits",0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &fddbits, 0, "set number of bits per integer in the state vector","<bits>"},
+  { "sylvan-tablesize",0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &datasize , 0 , "set size of BDD table to 1<<datasize","<datasize>"},
+  { "sylvan-cachesize",0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &cachesize , 0 , "set size of memoization cache to 1<<cachesize","<cachesize>"},
+  { "sylvan-granularity",0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &granularity , 0 , "only use memoization cache for every 1/granularity BDD levels","<granularity>"},
   POPT_TABLEEND
 };
 
@@ -80,6 +72,7 @@ struct vector_relation {
     int variables_size; 
 };
 
+// The following function is for debugging purposes
 static void TRACE_IN(char *f, ...) 
 {   
     return;
@@ -252,7 +245,6 @@ static vrel_t rel_create(vdom_t dom, int k, int* proj)
         }
     }
     
-    OPTIONAL_GC_AFTER_EACH_OP    
     return rel;
 }
 
@@ -269,15 +261,13 @@ static void rel_destroy(vrel_t rel)
     sylvan_deref(rel->variables_set);
     free(rel->variables_arr);
     free(rel);
-
-    OPTIONAL_GC_AFTER_EACH_OP
 }
-
-
 
 
 static int optimal_bits_per_state = 0;
 
+/* Helper function to detect problems with the number of bits per stats 
+   TODO: handle negative numbers?? */
 static inline void check_state(const int *e, int N) 
 {
     for (int i=0; i<N; i++) {
@@ -289,6 +279,8 @@ static inline void check_state(const int *e, int N)
     }
 }
 
+/* Call this function to retrieve the automatically 
+   determined optimal number of bits per state */
 void sylvan_print_optimal_bits_per_state() {
     if (optimal_bits_per_state != fddbits) 
         Warning(info, "Optimal --sylvan-bits value is %d", optimal_bits_per_state);
@@ -336,7 +328,6 @@ static inline BDD state_to_bdd(vset_t set, const int* e)
         UNREF
     }
 
-    OPTIONAL_GC_AFTER_EACH_OP
     return bdd;
 }
 
@@ -351,7 +342,6 @@ static void set_add(vset_t set, const int* e)
     BDD prev = REF(set->bdd);
     set->bdd = sylvan_or(prev, bdd);
     UNREFALL
-    OPTIONAL_GC_AFTER_EACH_OP
 }
 
 /**
@@ -364,8 +354,6 @@ static int set_member(vset_t set, const int* e)
     BDD ebdd = REF(state_to_bdd(set, e));
     int res = REF(sylvan_and(set->bdd, ebdd)) != sylvan_false ? 1 : 0;
     UNREFALL
-
-    OPTIONAL_GC_AFTER_EACH_OP
     return res;
 }
 
@@ -396,7 +384,6 @@ static void set_clear(vset_t set)
     TRACE_IN("set_clear", 1, set);
     sylvan_deref(set->bdd);
     set->bdd = sylvan_false;
-    OPTIONAL_GC_AFTER_EACH_OP
 }
 
 /**
@@ -408,7 +395,6 @@ static void set_copy(vset_t dst, vset_t src)
     TRACE_IN("set_copy", 2, dst, src);
     sylvan_deref(dst->bdd);
     dst->bdd = sylvan_ref(src->bdd);
-    OPTIONAL_GC_AFTER_EACH_OP
 }
 
 /**
@@ -545,8 +531,6 @@ static void set_enum_match(vset_t set, int p_len, int* proj, int* match, vset_el
     memset(vec, 0, sizeof(int)*set->variables_size/fddbits);
     set_enum_do(match_bdd, set->variables_size, set->variables_arr, vec, 0, cb, context);
     sylvan_deref(match_bdd);
-
-    OPTIONAL_GC_AFTER_EACH_OP
 }
 
 static void set_copy_match(vset_t dst, vset_t src, int p_len, int* proj, int*match)
@@ -575,49 +559,18 @@ static void set_copy_match(vset_t dst, vset_t src, int p_len, int* proj, int*mat
     sylvan_deref(dst->bdd);
     dst->bdd = sylvan_and(match_bdd, src->bdd);
     sylvan_deref(match_bdd);
-
-    OPTIONAL_GC_AFTER_EACH_OP
 }
-
-/*
-static inline BDDVAR compute_range_low(BDD bdd) {
-    if (bdd == sylvan_true || bdd == sylvan_false) return 0; // actually incorrect
-    return sylvan_var(bdd);
-}
-
-static BDDVAR compute_range_high(BDD bdd) {
-    REFSTACK(4)
-    if (bdd == sylvan_true || bdd == sylvan_false) return 0; // actually incorrect
-    BDDVAR it = sylvan_var(bdd);
-    BDDVAR one = compute_range_high(REF(sylvan_low(bdd)));
-    BDDVAR two = compute_range_high(REF(sylvan_high(bdd)));
-    UNREFALL
-    if (it < one) it = one;
-    if (it < two) it = two;
-    return it;
-}
-*/
 
 static void set_count(vset_t set, long *nodes, bn_int_t *elements) 
 {
-    TRACE_IN("set_count", 0);
-    
-    //fprintf(stderr, "Entered set_count\n");
-    //fprintf(stderr, "BDD Range of %d is from %d to %d.\n", set->bdd, compute_range_low(set->bdd), compute_range_high(set->bdd));
-    //fprintf(stderr, "SET Range is from %d to %d.\n", compute_range_low(set->variables_set), compute_range_high(set->variables_set));
-
     *nodes = sylvan_nodecount(set->bdd);
-
     double count = (double)sylvan_satcount(set->bdd, set->variables_set);
     bn_double2int(count, elements);
 }
 
 static void rel_count(vrel_t rel, long *nodes, bn_int_t *elements)
 {
-    TRACE_IN("rel_count", 0);
-  
     *nodes = sylvan_nodecount(rel->bdd);
-
     double count = (double)sylvan_satcount(rel->bdd, rel->variables_set);
     bn_double2int(count, elements);
 }
@@ -631,7 +584,6 @@ static void set_union(vset_t dst, vset_t src)
     BDD t;
     dst->bdd = sylvan_or(t=dst->bdd, src->bdd);
     sylvan_deref(t);
-    OPTIONAL_GC_AFTER_EACH_OP
 }
 
 /**
@@ -643,7 +595,6 @@ static void set_intersect(vset_t dst, vset_t src)
     BDD t;
     dst->bdd = sylvan_and(t=dst->bdd, src->bdd);
     sylvan_deref(t);
-    OPTIONAL_GC_AFTER_EACH_OP
 }
 
 /**
@@ -655,7 +606,6 @@ static void set_minus(vset_t dst, vset_t src)
     BDD t;
     dst->bdd = sylvan_diff(t=dst->bdd, src->bdd);
     sylvan_deref(t);
-    OPTIONAL_GC_AFTER_EACH_OP
 }
 
 /**
@@ -664,13 +614,6 @@ static void set_minus(vset_t dst, vset_t src)
 static void set_next(vset_t dst, vset_t src, vrel_t rel) {
     // calculate relational product and quantify
     TRACE_IN("set_next", 2, dst, src);
-    /*
-    fprintf(stderr, "Calculating NEXT, where rel is %d - %d (%d - %d), src is %d - %d, dst is %d - %d\n",
-        compute_range_low(rel->bdd), compute_range_high(rel->bdd), 
-        compute_range_low(rel->variables_set), compute_range_high(rel->variables_set),
-        compute_range_low(src->bdd), compute_range_high(src->bdd),
-        compute_range_low(dst->variables_set), compute_range_high(dst->variables_set));
-    */    
     if (dst->projection != src->projection) {
         fprintf(stderr, "in set_next, dst projection != src projection!\n");
     }
@@ -678,11 +621,9 @@ static void set_next(vset_t dst, vset_t src, vrel_t rel) {
     sylvan_deref(dst->bdd);
     dst->bdd = sylvan_relprods(src->bdd, rel->bdd, rel->variables_set);
 
+    // To use RelProd instead of RelProdS, uncomment the following lines and comment the preceding line
     // BDD temp = sylvan_relprod(src->bdd, rel->bdd, rel->variables_nonprime_set);
     // dst->bdd = sylvan_substitute(temp, rel->variables_prime_set);
-
-    //fprintf(stderr, "Calculated set_next(%d, %d) = %d\n", src->bdd, rel->bdd, dst->bdd);
-    OPTIONAL_GC_AFTER_EACH_OP
 } 
 
 /**
@@ -692,7 +633,6 @@ static void set_prev(vset_t dst, vset_t src, vrel_t rel) {
     TRACE_IN("set_prev", 2, dst, src);
     sylvan_deref(dst->bdd);
     dst->bdd = sylvan_relprods_reversed(src->bdd, rel->bdd, rel->variables_set);
-    OPTIONAL_GC_AFTER_EACH_OP
 }
 
  /**
@@ -707,7 +647,6 @@ static void set_project(vset_t dst,vset_t src){
     else {
         dst->bdd = sylvan_ref(src->bdd);
     }
-    OPTIONAL_GC_AFTER_EACH_OP
 }
 
 /**
@@ -724,10 +663,6 @@ static void set_zip(vset_t dst, vset_t src)
     src->bdd = sylvan_diff(tmp2,tmp1);
     sylvan_deref(tmp1);
     sylvan_deref(tmp2);
-    OPTIONAL_GC_AFTER_EACH_OP
-    int c = 0;
-    if (tmp1 != sylvan_false) c++;
-    if (tmp2 != sylvan_false) c++;
 }
 
 /**
@@ -776,7 +711,6 @@ static void rel_add(vrel_t rel, const int *src, const int *dst)
     rel->bdd = sylvan_or(REF(rel->bdd), bdd);
     UNREF
     sylvan_deref(bdd);
-    OPTIONAL_GC_AFTER_EACH_OP
 }
 
 /**
