@@ -152,7 +152,7 @@ AC_ARG_WITH([bignum],
 AS_CASE(["$with_bignum"],
   [no],[],
   [yes|gmp|tommath],
-    [AS_IF([test x"$with_bignum" = xyes || test x"$with_bignum" = xgmp],
+    [AS_IF([test x"$with_bignum" = xgmp],
            [AC_CHECK_LIB([gmp], [__gmpz_init], 
               [with_bignum=gmp; have_libgmp=yes],
               [AS_IF([test x"$with_bignum" = xgmp],
@@ -164,8 +164,8 @@ AS_CASE(["$with_bignum"],
                      [AC_MSG_WARN([cannot use libtommath as bignum library.])])])])],
   [AC_MSG_WARN([unknown bignum library request (--with-bignum=$with_bignum) ignored.])])
 AS_CASE(["$with_bignum"],
-  [no|tommath],[have_libspg=yes],
-  [yes|gmp],[have_libspg=no; AC_MSG_WARN([not installing pbes-reach and spgsolver, because of a bug in libgmp. Use --with-bignum=no to enable spgsolver.])])
+  [yes|no|tommath],[have_libspg=yes],
+  [gmp],[have_libspg=no; AC_MSG_WARN([not installing pbes-reach and spgsolver, because of a bug in libgmp. Use --with-bignum=no to enable spgsolver.])])
 
 if test "x$acx_mcrl" = xyes; then
   ACX_MCRL_LIBS(
