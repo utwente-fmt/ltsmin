@@ -179,7 +179,6 @@ static char*            trc_output = NULL;
 static int              dlk_detect = 0;
 static char            *act_detect = NULL;
 static char            *inv_detect = NULL;
-static int              assert_detect = 0;
 static int              no_exit = 0;
 static int              act_index = -1;
 static int              act_type = -1;
@@ -335,9 +334,6 @@ static struct poptOption options[] = {
     {"deadlock", 'd', POPT_ARG_VAL, &dlk_detect, 1, "detect deadlocks", NULL },
     {"action", 'a', POPT_ARG_STRING, &act_detect, 0, "detect error action", NULL },
     {"invariant", 'i', POPT_ARG_STRING, &inv_detect, 0, "detect invariant violations", NULL },
-#ifdef SPINJA
-    {"assert", 0, POPT_ARG_VAL, &assert_detect, 1, "detect assertion errors (SpinJa). Same as --action=assert", NULL },
-#endif
     {"no-exit", 'n', POPT_ARG_VAL, &no_exit, 1, "no exit on error, just count (for error counters use -v)", NULL },
     {"trace", 0, POPT_ARG_STRING, &trc_output, 0, "file to write trace to", "<lts output>" },
     SPEC_POPT_OPTIONS,
@@ -791,7 +787,7 @@ init_globals ()
     } else {
         threshold = 100000 / W;
     }
-    if (!(Strat_Reach & strategy[0]) && (assert_detect || dlk_detect || act_detect || inv_detect))
+    if (!(Strat_Reach & strategy[0]) && (dlk_detect || act_detect || inv_detect))
         Abort ("Verification of safety properties works only with reachability algorithms.");
     Warning (info, "Using %d cores (lb: SRP)", W/*, key_search(lb_methods, lb_method)*/);
     Warning (info, "loading model from %s", files[0]);
@@ -806,17 +802,15 @@ init_globals ()
     K = dm_nrows (m);
     Warning (info, "State length is %d, there are %d groups", N, K);
     assert (GRED.g == 0);
-    if (assert_detect)
-        act_detect = "assert";
     if (act_detect) {
-        for (int i = 0; i < edge_labels; i++) {
-            char *name = lts_type_get_edge_label_name(ltstype, i);
-            if (0 == strcmp(name, act_detect)) {
-                act_index = i;
-                act_type = lts_type_get_edge_label_typeno(ltstype, i);
-            }
-        }
-        if (-1 == act_index) Warning (info, "Cannot find action '%s', no such edge label is defined!", act_detect);
+        chunk c = chunk_str(act_detect);
+        //table number of first edge label.
+        char *type = lts_type_get_edge_label_name(ltstype, 0);
+        assert (strncmp(type, "action", 6) != 0 && "No edge label 'action...'");
+        int typeno = lts_type_get_edge_label_typeno(ltstype, 0);
+        act_index = GBchunkPut(model, typeno, c);
+        act_type = 0;
+        Warning(info, "Detecting action \"%s\"", act_detect);
     }
     if (inv_detect)
         inv_expr = pred_parse_file (model, inv_detect);
@@ -2316,15 +2310,15 @@ invariant_detect (wctx_t *ctx, raw_data_t state)
 static inline void
 action_detect (wctx_t *ctx, transition_info_t *ti, ref_t last)
 {
-    if (-1 == act_index || NULL == ti->labels || 0 == ti->labels[act_index]) return;
+    if (-1 == act_index || NULL == ti->labels || ti->labels[act_type] != act_index) return;
     ctx->counters.errors++;
     if ((!no_exit || trc_output) && lb2_stop(lb2)) {
-        ctx->state.ref = last; // TODO: include the action in the trace
-        chunk c = GBchunkGet (ctx->model, act_type, ti->labels[act_index]);
+        ctx->state.ref = last; // include the action in the trace
+        chunk c = GBchunkGet (ctx->model, act_type, act_index);
         char value[4096];
         chunk2string(c, 4096, value);
         Warning (info, "");
-        Warning (info, "Error action %s with value %s found at depth %zu!", act_detect, value, ctx->counters.level_cur);
+        Warning (info, "Error action '%s' found at depth %zu!", act_detect, ctx->counters.level_cur);
         Warning (info, "");
         if (trc_output) handle_error_trace (ctx);
     }

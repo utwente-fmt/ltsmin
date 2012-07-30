@@ -57,7 +57,6 @@ static struct {
     int              dlk_detect;
     char            *act_detect;
     char            *inv_detect;
-    int              assert_detect;
     int              no_exit;
     int              act_index;
     int              act_type;
@@ -89,7 +88,6 @@ static struct {
     .dlk_detect     = 0,
     .act_detect     = NULL,
     .inv_detect     = NULL,
-    .assert_detect  = 0,
     .no_exit        = 0,
     .act_index      = -1,
     .act_type       = -1,
@@ -174,9 +172,6 @@ static struct poptOption options[] = {
     { "deadlock" , 'd' , POPT_ARG_VAL , &opt.dlk_detect , 1 , "detect deadlocks" , NULL },
     { "action", 'a', POPT_ARG_STRING, &opt.act_detect, 0, "detect error action", NULL },
     { "invariant", 'i', POPT_ARG_STRING, &opt.inv_detect, 0, "detect invariant violations", NULL },
-#ifdef SPINJA
-    { "assert", 0, POPT_ARG_VAL, &opt.assert_detect, 1, "detect assertion errors (SpinJa). Same as --action=assert", NULL },
-#endif
     { "no-exit", 'n', POPT_ARG_VAL, &opt.no_exit, 1, "no exit on error, just count (for error counters use -v)", NULL },
     { "dot" , 0 , POPT_ARG_STRING|POPT_ARGFLAG_DOC_HIDDEN, &opt.dot_output , 0 , "file to dot graph to" , "<dot output>" },
     { "trace" , 0 , POPT_ARG_STRING , &opt.trc_output , 0 , "file to write trace to" , "<lts output>" },
@@ -1291,7 +1286,7 @@ gsea_invariant_check(gsea_state_t *state, void *arg)
 static void
 gsea_action_check(gsea_state_t *src, transition_info_t *ti, gsea_state_t *dst)
 {
-    if (NULL != ti->labels && 0 != ti->labels[opt.act_index]) {
+    if (NULL == ti->labels || ti->labels[opt.act_type] != opt.act_index) {
         global.errors++;
         do_trace(dst, NULL, "Error action", opt.act_detect);
     }
@@ -1502,17 +1497,15 @@ gsea_setup(const char *output)
 {
     // setup error detection facilities
     lts_type_t ltstype=GBgetLTStype(opt.model);
-    if (opt.assert_detect)
-        opt.act_detect = "assert";
     if (opt.act_detect) {
-        for (int i = 0; i < lts_type_get_edge_label_count(ltstype); i++) {
-            char *name = lts_type_get_edge_label_name(ltstype, i);
-            if (0 == strcmp(name, opt.act_detect)) {
-                opt.act_index = i;
-                opt.act_type = lts_type_get_edge_label_typeno(ltstype, i);
-            }
-        }
-        if (-1 == opt.act_index) Warning (info, "Cannot find action '%s', no such edge label is defined!", opt.act_detect);
+        chunk c = chunk_str(opt.act_detect);
+        //table number of first edge label.
+        char *type = lts_type_get_edge_label_name(ltstype, 0);
+        assert (strncmp(type, "action", 6) != 0 && "No edge label 'action...'");
+        int typeno = lts_type_get_edge_label_typeno(ltstype, 0);
+        opt.act_index = GBchunkPut(opt.model, typeno, c);
+        opt.act_type = 0;
+        Warning(info, "Detecting action \"%s\"", opt.act_detect);
     }
     if (opt.inv_detect)
         opt.inv_expr = pred_parse_file (opt.model, opt.inv_detect);
@@ -1575,7 +1568,7 @@ gsea_setup(const char *output)
         break;
 
     case Strat_SCC:
-        if (opt.assert_detect || opt.dlk_detect || opt.act_detect || opt.inv_detect)
+        if (opt.dlk_detect || opt.act_detect || opt.inv_detect)
             Abort ("Verification of safety properties works only with reachability algorithms.");
     case Strat_DFS:
         if (output) Abort("Use BFS to write the state space to an lts file.");

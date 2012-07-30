@@ -1,6 +1,7 @@
 // -*- tab-width:4 ; indent-tabs-mode:nil -*-
 #include <config.h>
 
+#include <assert.h>
 #include <pthread.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -39,7 +40,6 @@ static int              nice_value=0;
 static int              dlk_detect=0;
 static char            *act_detect = NULL;
 static char            *inv_detect = NULL;
-static int              assert_detect = 0;
 static int              no_exit = 0;
 static int              act_index = -1;
 static int              act_type = -1;
@@ -64,9 +64,6 @@ static  struct poptOption options[] = {
     { "deadlock", 'd', POPT_ARG_VAL, &dlk_detect, 1, "detect deadlocks", NULL },
     { "action", 'a', POPT_ARG_STRING, &act_detect, 0, "detect error action", NULL },
     { "invariant", 'i', POPT_ARG_STRING, &inv_detect, 0, "detect invariant violations", NULL },
-#ifdef SPINJA
-    { "assert", 0, POPT_ARG_VAL, &assert_detect, 1, "detect assertion errors (SpinJa). Same as --action=assert", NULL },
-#endif
     { "no-exit", 'n', POPT_ARG_VAL, &no_exit, 1, "no exit on error, just count (for error counters use -v)", NULL },
     SPEC_POPT_OPTIONS,
     { NULL, 0, POPT_ARG_INCLUDE_TABLE, greybox_options, 0, "Greybox options", NULL },
@@ -110,15 +107,11 @@ invariant_detect (struct dist_thread_context *ctx, int *state)
 static inline void
 action_detect (struct dist_thread_context *ctx, transition_info_t *ti)
 {
-    if (-1 == act_index || NULL == ti->labels || 0 == ti->labels[act_index]) return;
+    if (-1 == act_index || NULL == ti->labels || ti->labels[act_type] != act_index) return;
     ctx->errors++;
     if (no_exit) return;
-
-    chunk c = GBchunkGet (ctx->model, act_type, ti->labels[act_index]);
-    char value[4096];
-    chunk2string(c, 4096, value);
     Warning (info, "");
-    Warning (info, "Error action %s with value %s found at depth %zu!", act_detect, value, ctx->level);
+    Warning (info, "Error action '%s' found at depth %zu!", act_detect, ctx->level);
     HREexit(0);
 }
 
@@ -225,17 +218,15 @@ int main(int argc, char*argv[]){
         ctx.parent_seg=NULL;
         ADD_ARRAY(ctx.state_man,ctx.parent_seg,uint16_t);
     }
-    if (assert_detect)
-        act_detect = "assert";
     if (act_detect) {
-        for (int i = 0; i < edge_labels; i++) {
-            char *name = lts_type_get_edge_label_name(ltstype, i);
-            if (0 == strcmp(name, act_detect)) {
-                act_index = i;
-                act_type = lts_type_get_edge_label_typeno(ltstype, i);
-            }
-        }
-        if (-1 == act_index) Warning (info, "Cannot find action '%s', no such edge label is defined!", act_detect);
+        chunk c = chunk_str(act_detect);
+        //table number of first edge label.
+        char *type = lts_type_get_edge_label_name(ltstype, 0);
+        assert (strncmp(type, "action", 6) != 0 && "No edge label 'action...'");
+        int typeno = lts_type_get_edge_label_typeno(ltstype, 0);
+        act_index = GBchunkPut(model, typeno, c);
+        act_type = 0;
+        Warning(info, "Detecting action \"%s\"", act_detect);
     }
     if (inv_detect)
         inv_expr = pred_parse_file (model, inv_detect);
