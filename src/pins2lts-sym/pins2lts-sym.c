@@ -204,13 +204,6 @@ typedef void (*sat_proc_t)(reach_proc_t reach_proc, vset_t visited,
 typedef void (*guided_proc_t)(sat_proc_t sat_proc, reach_proc_t reach_proc,
                               vset_t visited, char *etf_output);
 
-static void *
-new_string_index (void *context)
-{
-    (void)context;
-    return SIcreate ();
-}
-
 static inline void
 grow_levels(int new_levels)
 {
@@ -1721,8 +1714,7 @@ init_model(char *file)
 {
     Warning(info, "opening %s", file);
     model = GBcreateBase();
-    GBsetChunkMethods(model, new_string_index, NULL, (int2chunk_t)SIgetC,
-                          (chunk2int_t)SIputC, (get_count_t)SIgetCount);
+    GBsetChunkMethods(model,HREgreyboxNewmap,HREglobal(),HREgreyboxI2C,HREgreyboxC2I,HREgreyboxCount);
 
     GBloadFile(model, file, &model);
 
