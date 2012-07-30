@@ -9,6 +9,8 @@
  *      Author: laarman
  */
 
+#include <config.h>
+
 #include <assert.h>
 #include <stdlib.h>
 
@@ -19,12 +21,12 @@
 typedef struct lb2_status_s {
     int                 idle;           // poll local + write global
     uint32_t            seed;           // read+write local
-    char                pad1[(2<<CACHE_LINE) - 2*sizeof(int)];
+    char                pad0[CACHE_LINE_SIZE - 2*sizeof(int)];
     size_t              requests;       // read local + write global
     size_t              received;       // read local + write global
-    char                pad2[(2<<CACHE_LINE) - 2*sizeof(size_t)];
+    char                pad1[CACHE_LINE_SIZE - 2*sizeof(size_t)];
     size_t              max_load;       // read local
-    char                pad[(2<<CACHE_LINE) - sizeof(size_t)];
+    char                pad2[CACHE_LINE_SIZE - sizeof(size_t)];
     void               *arg;            // read local + read global
 } lb2_status_t;
 
@@ -202,8 +204,8 @@ lb2_destroy (lb2_t *lb)
     RTfree (lb);
 }
 
-static size_t       __attribute__ ((aligned(1UL<<CACHE_LINE))) barrier_count = 0;
-static size_t       __attribute__ ((aligned(1UL<<CACHE_LINE))) barrier_wait = 0;
+static size_t       __attribute__ ((aligned(CACHE_LINE_SIZE))) barrier_count = 0;
+static size_t       __attribute__ ((aligned(CACHE_LINE_SIZE))) barrier_wait = 0;
 
 lb2_barrier_result_t
 lb2_barrier (size_t W)
@@ -221,9 +223,9 @@ lb2_barrier (size_t W)
     }
 }
 
-static size_t       __attribute__ ((aligned(1UL<<CACHE_LINE))) reduce_count = 0;
-static size_t       __attribute__ ((aligned(1UL<<CACHE_LINE))) reduce_result = 0;
-static size_t       __attribute__ ((aligned(1UL<<CACHE_LINE))) reduce_wait = 0;
+static size_t       __attribute__ ((aligned(CACHE_LINE_SIZE))) reduce_count = 0;
+static size_t       __attribute__ ((aligned(CACHE_LINE_SIZE))) reduce_result = 0;
+static size_t       __attribute__ ((aligned(CACHE_LINE_SIZE))) reduce_wait = 0;
 
 size_t
 lb2_reduce (size_t val, size_t W)

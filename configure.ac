@@ -215,6 +215,8 @@ AX_CXX_CHECK_LIB([DDD],[GDDD::size() const],
    ])
 AC_LANG_POP([C++])
 
+ACX_CLINE_DEF([], [])
+
 AC_CHECK_LIB([rt], [aio_error])
 ACX_CADP_BCG_WRITE([have_bcg=yes],
   [have_bcg=no
