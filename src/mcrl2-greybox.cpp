@@ -29,7 +29,7 @@ static std::string mcrl2_rewriter_strategy = "jitty";
 #endif
 static char const* mcrl2_args = "";
 static int         finite_types = 0;
-static int         readable_edge_labels = 0;
+static int         readable_edge_labels = 1;
 
 namespace ltsmin {
 
@@ -321,7 +321,7 @@ struct poptOption mcrl2_options[] = {
     { NULL, 0, POPT_ARG_CALLBACK|POPT_CBFLAG_POST|POPT_CBFLAG_SKIPOPTION, (void*)mcrl2_popt, 0 , NULL , NULL},
     { "mcrl2", 0, POPT_ARG_STRING, &mcrl2_args, 0, "pass options to the mCRL2 library", "<mCRL2 options>" },
     { "mcrl2-finite-types", 0, POPT_ARG_VAL, &finite_types, 1, "use mCRL2 finite type information", NULL },
-    { "mcrl2-readable-edge-labels", 0, POPT_ARG_VAL, &readable_edge_labels, 1, "use human readable edge labels", NULL },
+    { "mcrl2-internal-edge-labels", 0, POPT_ARG_VAL, &readable_edge_labels, 0, "use mcrl2-internal edge label encoding", NULL },
     POPT_TABLEEND
 };
 
