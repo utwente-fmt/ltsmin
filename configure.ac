@@ -354,6 +354,10 @@ if test "x$with_sylvan" == xyes; then
     [have_sylvan="yes"]
 fi
 
+if test "x$have_libspg" == xyes; then
+    AC_DEFINE([HAVE_LIBSPG], [], [Defined if the SPG lib has been compiled.])
+fi
+
 AC_SUBST([SYLVAN_LIBS],['${top_builddir}/sylvan/libsylvan.la'])
 AC_SUBST([SYLVAN_CPPFLAGS],['-I${top_srcdir}/sylvan/src'])
 AC_SUBST([SYLVAN_LDFLAGS])

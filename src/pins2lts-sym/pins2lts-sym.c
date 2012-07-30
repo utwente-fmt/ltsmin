@@ -155,10 +155,12 @@ static  struct poptOption options[] = {
     { "mu" , 0 , POPT_ARG_STRING , &mu_formula , 0 , "file with a mu formula" , "<mu-file>.mu" },
     { "ctl" , 0 , POPT_ARG_STRING , &ctl_formula , 0 , "file with a ctl* formula" , "<ctl-file>.ctl" },
 #if defined(PBES)
+#ifdef HAVE_LIBSPG
     { "pg-solve" , 0 , POPT_ARG_NONE , &pgsolve_flag, 0, "Solve the generated parity game (only for symbolic tool).","" },
     { NULL, 0 , POPT_ARG_INCLUDE_TABLE, spg_solve_options , 0, "Symbolic parity game solver options", NULL},
     { "pg-reduce" , 0 , POPT_ARG_NONE , &pgreduce_flag, 0, "Reduce the generated parity game on-the-fly (only for symbolic tool).","" },
     { "pg-write" , 0 , POPT_ARG_STRING , &pg_output, 0, "file to write symbolic parity game to","<pg-file>.spg" },
+#endif
 #endif
     SPEC_POPT_OPTIONS,
     { NULL, 0 , POPT_ARG_INCLUDE_TABLE, greybox_options , 0 , "Greybox options",NULL},
@@ -2003,6 +2005,7 @@ void init_pbes()
 #endif
 
 #if defined(PBES)
+#if defined(HAVE_LIBSPG)
 /**
  * \brief Creates a symbolic parity game
  */
@@ -2054,6 +2057,7 @@ parity_game* compute_symbolic_parity_game(vset_t visited, int* src)
     }
     return g;
 }
+#endif
 #endif
 
 
@@ -2214,6 +2218,7 @@ main (int argc, char *argv[])
     vset_destroy(true_states);
     vset_destroy(false_states);
 
+#ifdef HAVE_LIBSPG
     if (pg_output || pgsolve_flag) {
         RTresetTimer(timer);
         RTstartTimer(timer);
@@ -2244,6 +2249,7 @@ main (int argc, char *argv[])
             spg_destroy(g);
         }
     }
+#endif
     if (player != 0)
     {
         RTfree(player);
