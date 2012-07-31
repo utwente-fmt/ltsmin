@@ -137,10 +137,7 @@ static void write_close(lts_file_t file){
                 file->lts->tau=i;
             }
         }
-        if (file->lts->tau>=0) {
-            chunk c=VTgetChunk(vt,file->lts->tau);
-            Print(infoShort,"invisible label is %s",c.data);
-        } else {
+        if (file->lts->tau<0) {
             Print(infoShort,"no silent label");
         }
     }
