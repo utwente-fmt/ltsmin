@@ -49,9 +49,11 @@ dlts_t dlts_read(MPI_Comm communicator,char*filename){
     lts->label_string=(char**)malloc(lts->label_count*sizeof(char*));
     for(i=0;i<lts->label_count;i++){
         chunk c=VTgetChunk(vt,i);
-        lts->label_string[i]=strndup(c.data,c.len);
-        if ( (c.len==3 && strcmp(c.data,"tau")==0)
-          || (c.len==1 && strcmp(c.data,"i")==0)
+        lts->label_string[i]=RTmalloc(c.len + 1);
+        strncpy(lts->label_string[i], c.data,c.len);
+        lts->label_string[i][c.len] = '\0';
+        if ( (c.len==3 && strncmp(c.data,"tau",3)==0)
+          || (c.len==1 && strncmp(c.data,"i",1)==0)
            )
         {
             if (me==0) Print(infoShort,"invisible label is %s",c.data);
