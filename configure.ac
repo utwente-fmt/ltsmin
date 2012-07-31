@@ -344,12 +344,7 @@ AC_CHECK_LIB([tbbmalloc_proxy], [malloc],
     AC_MSG_WARN([TBB malloc library not found.]))
 
 AC_ARG_WITH([sylvan],[AS_HELP_STRING([--with-sylvan],[Compile sylvan])],
-            [],[with_sylvan=no])
-
-case $host in
-  x86_64-*linux*)
-    [with_sylvan="yes"];;
-esac
+            [],[with_sylvan=yes])
 
 if test "x$with_sylvan" == xyes; then
     AC_CONFIG_SUBDIRS([sylvan])

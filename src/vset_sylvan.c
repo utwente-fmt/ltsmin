@@ -158,7 +158,6 @@ static vset_t set_create(vdom_t dom, int k, int* proj)
         }
     }
 
-    OPTIONAL_GC_AFTER_EACH_OP
     return set;
 }
 
@@ -173,8 +172,6 @@ static void set_destroy(vset_t set)
     sylvan_deref(set->variables_set);
     free(set->variables_arr);
     free(set);
-
-    OPTIONAL_GC_AFTER_EACH_OP
 }
 
 /**
