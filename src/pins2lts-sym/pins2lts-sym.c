@@ -20,11 +20,6 @@
 #include <spg-solve.h>
 
 
-#define diagnostic(...) {\
-    if (log_active(infoLong))\
-        fprintf(stderr, __VA_ARGS__);\
-}
-
 static ltsmin_expr_t mu_expr = NULL;
 static char* ctl_formula = NULL;
 static char* mu_formula  = NULL;
@@ -476,7 +471,6 @@ group_add(void *context, transition_info_t *ti, int *dst)
     vrel_add(ctx->rel, ctx->src, dst);
 
     if (act_detect != NULL && ti->labels[0] == act_detect_index) {
-        diagnostic("\n");
         Warning(info, "found action: %s", act_detect);
 
         if (trc_output == NULL)
@@ -501,7 +495,7 @@ explore_cb(void *context, int *src)
     GBgetTransitionsShort(model, ctx->group, src, group_add, context);
     (*ctx->explored)++;
 
-    if ((*ctx->explored) % 1000 == 0) {
+    if ((*ctx->explored) % 10000 == 0) {
         Warning(infoLong, "explored %d short vectors for group %d",
                     *ctx->explored, ctx->group);
     }
@@ -602,47 +596,46 @@ stats_and_progress_report(vset_t current, vset_t visited, int level)
     long   n_count;
     char   elem_str[1024];
     double e_count;
-
-    if (current != NULL) {
-        get_vset_size(current, &n_count, &e_count, elem_str, sizeof(elem_str));
-        Warning(info, "level %d has %s (~%1.2e) states ( %ld nodes )",
-                    level, elem_str, e_count, n_count);
-
-        if (n_count > max_lev_count)
-            max_lev_count = n_count;
-    }
-
-    get_vset_size(visited, &n_count, &e_count, elem_str, sizeof(elem_str));
-    Warning(info, "visited %d has %s (~%1.2e) states ( %ld nodes )",
-                level, elem_str, e_count, n_count);
-
-    if (n_count > max_vis_count)
-        max_vis_count = n_count;
-
+    
+    if (sat_strategy == NO_SAT || log_active(infoLong)) Print(infoShort, "level %d is finished",level);
     if (log_active(infoLong)) {
-        fprintf(stderr, "transition caches ( grp nds elts ): ");
-
+      if (current != NULL) {
+        get_vset_size(current, &n_count, &e_count, elem_str, sizeof(elem_str));
+        Print(infoLong, "level %d has %s (~%1.2e) states ( %ld nodes )",
+	      level, elem_str, e_count, n_count);
+        if (n_count > max_lev_count)
+	  max_lev_count = n_count;
+      }
+      get_vset_size(visited, &n_count, &e_count, elem_str, sizeof(elem_str));
+      Print(infoLong, "visited %d has %s (~%1.2e) states ( %ld nodes )",
+	    level, elem_str, e_count, n_count);
+      
+      if (n_count > max_vis_count)
+        max_vis_count = n_count;
+      
+      if (log_active(debug)) {
+        Debug("transition caches ( grp nds elts ):");
+	
         for (int i = 0; i < nGrps; i++) {
-            get_vrel_size(group_next[i], &n_count, &e_count, elem_str,
-                              sizeof(elem_str));
-            fprintf(stderr, "( %d %ld %s ) ", i, n_count, elem_str);
-
-            if (n_count > max_trans_count)
-                max_trans_count = n_count;
+	  get_vrel_size(group_next[i], &n_count, &e_count, elem_str,
+			sizeof(elem_str));
+	  Debug("( %d %ld %s ) ", i, n_count, elem_str);
+	  
+	  if (n_count > max_trans_count)
+	    max_trans_count = n_count;
         }
-
-        fprintf(stderr,"\ngroup explored    ( grp nds elts ): ");
-
+	
+        Debug("\ngroup explored    ( grp nds elts ): ");
+	
         for (int i = 0; i < nGrps; i++) {
-            get_vset_size(group_explored[i], &n_count, &e_count, elem_str,
-                              sizeof(elem_str));
-            fprintf(stderr, "( %d %ld %s ) ", i, n_count, elem_str);
-
-            if (n_count > max_grp_count)
-                max_grp_count = n_count;
+	  get_vset_size(group_explored[i], &n_count, &e_count, elem_str,
+			sizeof(elem_str));
+	  Debug("( %d %ld %s ) ", i, n_count, elem_str);
+	  
+	  if (n_count > max_grp_count)
+	    max_grp_count = n_count;
         }
-
-        fprintf(stderr, "\n");
+      }
     }
 }
 
@@ -662,19 +655,23 @@ final_stat_reporting(vset_t visited, rt_timer_t timer)
         Warning(info, "Action \"%s\" not found", act_detect);
 
     get_vset_size(visited, &n_count, &e_count, elem_str, sizeof(elem_str));
-    Warning(info, "state space has %s (~%1.2e) states", elem_str, e_count);
+    Print(infoShort, "state space has %s (~%1.2e) states, %ld BDD nodes", elem_str, e_count,n_count);
 
-    if (max_lev_count == 0) {
-        Warning(info, "( %ld final BDD nodes; %ld peak nodes )",
-                    n_count, max_vis_count);
-    } else {
-        Warning(info, "( %ld final BDD nodes; %ld peak nodes; "
-                          "%ld peak nodes per level )",
-                    n_count, max_vis_count, max_lev_count);
+    if (log_active(infoLong)) {
+      if (max_lev_count == 0) {
+        Print(infoLong, "( %ld final BDD nodes; %ld peak nodes )",
+	      n_count, max_vis_count);
+      } else {
+        Print(infoLong, "( %ld final BDD nodes; %ld peak nodes; "
+	      "%ld peak nodes per level )",
+	      n_count, max_vis_count, max_lev_count);
+      }
+      
+      if (log_active(debug)) {
+	Debug("( peak transition cache: %ld nodes; peak group explored: "
+	      "%ld nodes )\n", max_trans_count, max_grp_count);
+      }
     }
-
-    diagnostic("( peak transition cache: %ld nodes; peak group explored: "
-                   "%ld nodes )\n", max_trans_count, max_grp_count);
 }
 
 #if defined(PBES)
@@ -883,15 +880,12 @@ reach_bfs_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
         level++;
         for (int i = 0; i < nGrps; i++){
             if (!bitvector_is_set(reach_groups, i)) continue;
-            diagnostic("\rexploring group %4d/%d", i, nGrps);
             expand_group_next(i, current_level);
             (*eg_count)++;
         }
-        diagnostic("\rexploration complete             \n");
         if (dlk_detect) vset_copy(deadlocks, current_level);
         for (int i = 0; i < nGrps; i++) {
             if (!bitvector_is_set(reach_groups,i)) continue;
-            diagnostic("\rlocal next %4d/%d", i, nGrps);
             (*next_count)++;
             vset_next(temp, current_level, group_next[i]);
             if (dlk_detect) {
@@ -903,7 +897,6 @@ reach_bfs_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
             vset_union(next_level, temp);
             vset_clear(temp);
         }
-        diagnostic("\rlocal next complete       \n");
         if (dlk_detect) deadlock_check(deadlocks, reach_groups);
 
 #if defined(PBES)
@@ -944,15 +937,12 @@ reach_bfs(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
         level++;
         for (int i = 0; i < nGrps; i++) {
             if (!bitvector_is_set(reach_groups,i)) continue;
-            diagnostic("\rexploring group %4d/%d", i, nGrps);
             expand_group_next(i, visited);
             (*eg_count)++;
         }
-        diagnostic("\rexploration complete             \n");
         if (dlk_detect) vset_copy(deadlocks, visited);
         for (int i = 0; i < nGrps; i++) {
             if (!bitvector_is_set(reach_groups,i)) continue;
-            diagnostic("\rlocal next %4d/%d", i, nGrps);
             (*next_count)++;
             vset_next(temp, old_vis, group_next[i]);
             if (dlk_detect) {
@@ -962,7 +952,6 @@ reach_bfs(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
             }
             vset_union(visited, temp);
         }
-        diagnostic("\rlocal next complete       \n");
         if (dlk_detect) deadlock_check(deadlocks, reach_groups);
         vset_clear(temp);
         vset_reorder(domain);
@@ -996,7 +985,6 @@ reach_chain_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
         if (dlk_detect) vset_copy(deadlocks, new_states);
         for (int i = 0; i < nGrps; i++) {
             if (!bitvector_is_set(reach_groups, i)) continue;
-            diagnostic("\rgroup %4d/%d", i, nGrps);
             expand_group_next(i, new_states);
             (*eg_count)++;
             (*next_count)++;
@@ -1010,7 +998,6 @@ reach_chain_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
             vset_union(new_states, temp);
             vset_clear(temp);
         }
-        diagnostic("\rround %d complete       \n", level);
         // no deadlocks in old new_states
         if (dlk_detect) deadlock_check(deadlocks, reach_groups);
 
@@ -1050,7 +1037,6 @@ reach_chain(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
         if (dlk_detect) vset_copy(deadlocks, visited);
         for (int i = 0; i < nGrps; i++) {
             if (!bitvector_is_set(reach_groups, i)) continue;
-            diagnostic("\rgroup %4d/%d", i, nGrps);
             expand_group_next(i, visited);
             (*eg_count)++;
             (*next_count)++;
@@ -1062,7 +1048,6 @@ reach_chain(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
                 vset_clear(dlk_temp);
             }
         }
-        diagnostic("\rround %d complete       \n", level);
         // no deadlocks in old_vis
         if (dlk_detect) deadlock_check(deadlocks, reach_groups);
         vset_reorder(domain);
@@ -1104,15 +1089,12 @@ reach_sat_fix(reach_proc_t reach_proc, vset_t visited,
         level++;
         for(int i = 0; i < nGrps; i++){
             if (!bitvector_is_set(reach_groups, i)) continue;
-            diagnostic("\rexploring group %4d/%d", i, nGrps);
             expand_group_next(i, visited);
             (*eg_count)++;
         }
-        diagnostic("\rexploration complete             \n");
         if (dlk_detect) vset_copy(deadlocks, visited);
         vset_least_fixpoint(visited, visited, group_next, nGrps);
         (*next_count)++;
-        diagnostic("\rround %d complete       \n", level);
         if (dlk_detect) {
             for (int i = 0; i < nGrps; i++) {
                 vset_prev(dlk_temp, visited, group_next[i]);
@@ -1166,12 +1148,6 @@ initialize_levels(bitvector_t *groups, int *empty_groups, int *back,
         empty_groups[k] = bitvector_is_empty(&groups[k]);
     }
 
-    // Level diagnostic
-    diagnostic("level:");
-    for (int i = 0; i < nGrps; i++)
-        diagnostic(" %d", level[i]);
-    diagnostic("\n");
-
     if (back == NULL)
         return;
 
@@ -1213,11 +1189,6 @@ initialize_levels(bitvector_t *groups, int *empty_groups, int *back,
     for (int k = 0; k < max_sat_levels; k++)
         bitvector_free(&level_matrix[k]);
 
-    // Back diagnostic
-    diagnostic("back:");
-    for (int k = 0; k < max_sat_levels; k++)
-        diagnostic(" %d", back[k]);
-    diagnostic("\n");
 }
 
 static void
@@ -1653,10 +1624,6 @@ establish_group_order(int *group_order, int *initial_count)
         bitvector_set(&found_groups, new_group);
     }
 
-    diagnostic("Group exploration order:");
-    for (int i=0;i<group_total;i++)
-        diagnostic(" %d", group_order[i]);
-    diagnostic("\n");
     return group_total;
 }
 
