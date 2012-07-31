@@ -23,8 +23,8 @@ static void write_init(lts_file_t file,int seg,void* state){
         state_no=*((uint32_t*)state) * file->segments + seg;
         break;
     case SegVector:
-        Abort("SegVector unsupported");
     case Vector:
+        if (seg != 0) Abort("(Seg)Vector format with multiple segments unsupported");
         state_no=TreeFold(file->lts->state_db,state);
         break;
     default:
