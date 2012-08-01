@@ -29,8 +29,8 @@ static int   dlk_detect = 0;
 static char* act_detect = NULL;
 static char* inv_detect = NULL;
 static int   no_exit = 0;
-static int   act_detect_table;
-static int   act_detect_index;
+static int   act_index;
+static int   act_label;
 static int   sat_granularity = 10;
 static int   save_sat_levels = 0;
 
@@ -470,7 +470,7 @@ group_add(void *context, transition_info_t *ti, int *dst)
 
     vrel_add(ctx->rel, ctx->src, dst);
 
-    if (act_detect != NULL && ti->labels[0] == act_detect_index) {
+    if (act_detect != NULL && ti->labels[act_label] == act_index) {
         Warning(info, "found action: %s", act_detect);
 
         if (trc_output == NULL)
@@ -1606,7 +1606,7 @@ establish_group_order(int *group_order, int *initial_count)
     bitvector_create(&found_groups, nGrps);
 
     for (int i = 0; i < nGrps; i++){
-        if (GBtransitionInGroup(model, &act_detect_index, i)) {
+        if (GBtransitionInGroup(model, &act_index, i)) {
             Warning(info, "Found \"%s\" potentially in group %d", act_detect,i);
             group_order[group_total] = i;
             group_total++;
@@ -1727,15 +1727,15 @@ init_domain(vset_implementation_t impl, vset_t *visited)
 static void
 init_action()
 {
-    if (eLbls != 1)
-        Abort("action detection assumes precisely one edge label");
-
+    // table number of first edge label
+    act_label = 0;
+    if (lts_type_get_edge_label_count(ltstype) == 0 ||
+            strncmp(lts_type_get_edge_label_name(ltstype, act_label),
+                    "action", 6) != 0)
+        Abort("No edge label 'action...' for action detection");
+    int typeno = lts_type_get_edge_label_typeno(ltstype, act_label);
     chunk c = chunk_str(act_detect);
-    //table number of first edge label.
-    act_detect_table=lts_type_get_edge_label_typeno(ltstype, 0);
-    char *type = lts_type_get_edge_label_name(ltstype, 0);
-    assert (strncmp(type, "action", 6) != 0 && "No edge label 'action...'");
-    act_detect_index=GBchunkPut(model,act_detect_table, c);
+    act_index = GBchunkPut(model, typeno, c);
     Warning(info, "Detecting action \"%s\"", act_detect);
 }
 
