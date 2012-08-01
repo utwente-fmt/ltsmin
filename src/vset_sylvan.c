@@ -125,16 +125,16 @@ static vset_t set_create(vdom_t dom, int k, int* proj)
                 j--;
                 for (n=fddbits-1;n>=0;n--) {
                     set->variables_arr[m--] = (i*fddbits+n) * 2;
-                    REF(set->variables_set);
-                    REF(sylvan_ithvar((i*fddbits+n) * 2));
+                    (void)REF(set->variables_set);
+                    (void)REF(sylvan_ithvar((i*fddbits+n) * 2));
                     set->variables_set = sylvan_or(READREF(2), READREF(1));
                     UNREFALL
                 }
             } else {
                 // to be quantified
                 for (n=fddbits-1;n>=0;n--) { // note starting with last
-                    REF(set->projection);
-                    REF(sylvan_ithvar((i*fddbits+n) * 2));
+                    (void)REF(set->projection);
+                    (void)REF(sylvan_ithvar((i*fddbits+n) * 2));
                     set->projection = sylvan_or(READREF(2), READREF(1));
                     UNREFALL
                 }
@@ -150,8 +150,8 @@ static vset_t set_create(vdom_t dom, int k, int* proj)
         for (int i=dom->shared.size-1;i>=0;i--) {
             for (int j=fddbits-1;j>=0;j--) {
                 set->variables_arr[(i*fddbits+j)] = (i*fddbits+j) * 2;
-                REF(set->variables_set);
-                REF(sylvan_ithvar((i*fddbits+j)*2));
+                (void)REF(set->variables_set);
+                (void)REF(sylvan_ithvar((i*fddbits+j)*2));
                 set->variables_set = sylvan_or(READREF(2), READREF(1));
                 UNREFALL
             }
@@ -213,14 +213,14 @@ static vrel_t rel_create(vdom_t dom, int k, int* proj)
 
                 BDD bdd_x_prime, bdd_x;
 
-                REF(rel->variables_set);
-                REF(rel->variables_prime_set);
-                REF(rel->variables_nonprime_set);
-                REF(bdd_x_prime=sylvan_ithvar(x_prime));
-                REF(bdd_x=sylvan_ithvar(x));
+                (void)REF(rel->variables_set);
+                (void)REF(rel->variables_prime_set);
+                (void)REF(rel->variables_nonprime_set);
+                (void)REF(bdd_x_prime=sylvan_ithvar(x_prime));
+                (void)REF(bdd_x=sylvan_ithvar(x));
 
                 rel->variables_set = sylvan_or(rel->variables_set, bdd_x_prime);
-                REF(rel->variables_set);
+                (void)REF(rel->variables_set);
                 rel->variables_set = sylvan_or(rel->variables_set, bdd_x);
 
                 rel->variables_prime_set = sylvan_or(rel->variables_prime_set, bdd_x_prime);
@@ -231,11 +231,11 @@ static vrel_t rel_create(vdom_t dom, int k, int* proj)
             for (n=fddbits-1; n>=0; n--) {
                 BDDVAR x = (i*fddbits+n) * 2;
                 BDDVAR x_prime = (i*fddbits+n) * 2 + 1;
-                REF(rel->projection);
-                REF(sylvan_ithvar(x_prime));
+                (void)REF(rel->projection);
+                (void)REF(sylvan_ithvar(x_prime));
                 rel->projection = sylvan_or(READREF(2), READREF(1));
-                REF(rel->projection);
-                REF(sylvan_ithvar(x));
+                (void)REF(rel->projection);
+                (void)REF(sylvan_ithvar(x));
                 rel->projection = sylvan_or(READREF(2), READREF(1));
                 UNREFALL
             }
@@ -311,7 +311,7 @@ static inline BDD state_to_bdd(vset_t set, const int* e)
 // TODO: fix this. if in variables_arr then do else not...
             BDD val = REF(sylvan_ithvar(x * 2));
             
-            REF(bdd);
+            (void)REF(bdd);
             if (b & 1) bdd = sylvan_and(val, bdd);
             else bdd = sylvan_and(REF(sylvan_not(val)), bdd);
             
@@ -512,7 +512,7 @@ static void set_enum_match(vset_t set, int p_len, int* proj, int* match, vset_el
         uint32_t b = match[i];
         for (int p=fddbits-1;p>=0;p--) {
             BDD p_bdd = REF(sylvan_ithvar(j*fddbits*2+p*2));
-            REF(match_bdd);
+            (void)REF(match_bdd);
             if (b & 1) match_bdd = sylvan_and(p_bdd, match_bdd);
             else match_bdd = sylvan_and(REF(sylvan_not(p_bdd)), match_bdd);
             UNREFALL
@@ -544,7 +544,7 @@ static void set_copy_match(vset_t dst, vset_t src, int p_len, int* proj, int*mat
         uint32_t b = match[i];
         for (int p=fddbits-1; p>=0; p--) {
             BDD p_bdd = REF(sylvan_ithvar(j*fddbits*2+p*2));
-            REF(match_bdd);
+            (void)REF(match_bdd);
             if (b & 1) match_bdd = sylvan_and(p_bdd, match_bdd);
             else match_bdd = sylvan_and(REF(sylvan_not(p_bdd)), match_bdd);
             UNREFALL
