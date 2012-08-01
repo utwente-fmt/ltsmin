@@ -16,7 +16,23 @@
 #include <hre/provider.h>
 #include <hre/internal.h>
 
+static hre_region_t region = NULL;
+
+hre_region_t
+RTgetMallocRegion()
+{
+    return region;
+}
+
+void
+RTsetMallocRegion(hre_region_t r)
+{
+    region = r;
+}
+
 void* RTmalloc(size_t size){
+    if (region)
+        return HREmalloc(region, size);
     if(size==0) return NULL;
     void *tmp=malloc(size);
     if (tmp==NULL) Abort("out of memory trying to get %d",size);
@@ -24,13 +40,17 @@ void* RTmalloc(size_t size){
 }
 
 void* RTmallocZero(size_t size){
-    void *p=RTmalloc(size);
-    memset(p, 0, size);
-    return p;
+    if (region)
+        return HREmallocZero(region, size);
+    if(size==0) return NULL;
+    void *tmp=calloc((size + CACHE_LINE_SIZE - 1) >> CACHE_LINE, CACHE_LINE_SIZE);
+    if (tmp==NULL) Abort("out of memory trying to get %d",size);
+    return tmp;
 }
 
-void* RTalign(size_t align, size_t size)
-{
+void* RTalign(size_t align, size_t size) {
+    if (region)
+        return HREalign(region, align, size);
     void *ret;
     errno = posix_memalign(&ret, align, size);
     if (errno) {
@@ -54,6 +74,8 @@ static size_t next_calloc = 0;
 static void *calloc_table[MAX_ALIGN_ZEROS][3];
 
 void* RTalignZero(size_t align, size_t size) {
+    if (region)
+        return HREalign(region, align, size);
     if (0 == align) Abort("Zero alignment in RTalignZero");
     if (0 == size) return NULL;
     if (size < MAX_ALIGN_MEMSET) {
@@ -83,6 +105,8 @@ void* RTalignZero(size_t align, size_t size) {
 }
 
 void* RTrealloc(void *rt_ptr, size_t size){
+    if (region)
+        return HRErealloc(region, rt_ptr, size);
     if (size==0) { // macosx realloc(??.0) does not return NULL!
         free(rt_ptr);
         return NULL;
@@ -93,6 +117,8 @@ void* RTrealloc(void *rt_ptr, size_t size){
 }
 
 void RTfree(void *rt_ptr){
+    if (region)
+        return HREfree(region, rt_ptr);
     for (size_t i = 0; i < next_calloc; i++) {
         if (rt_ptr == calloc_table[i][0]) {
             munmap (calloc_table[i][1], (size_t)calloc_table[i][2]);
@@ -107,6 +133,7 @@ void RTfree(void *rt_ptr){
 struct hre_region_s {
     void*area;
     hre_malloc_t malloc;
+    hre_align_t align;
     hre_realloc_t realloc;
     hre_free_t free;
 };
@@ -121,12 +148,29 @@ void* HREmalloc(hre_region_t region,size_t size){
     }
 }
 
+void* HREalign(hre_region_t region,size_t align,size_t size){
+    if(region==NULL) {
+        return RTalign(align,size);
+    } else {
+        return region->align(region->area,align,size);
+    }
+}
+
+void* HREalignZero(hre_region_t region,size_t align,size_t size){
+    if(region==NULL) {
+        return RTalignZero(align,size);
+    } else {
+        return region->align(region->area,align,size);
+        // Assumes region is zero'd
+    }
+}
+
 void* HREmallocZero(hre_region_t region,size_t size){
     if(region==NULL) {
         return RTmallocZero(size);
     } else {
         void*res=region->malloc(region->area,size);
-        if (size) memset(res, 0, size);
+        //if (size) memset(res, 0, size); //region was allocated using MAP_ANON
         return res;
     }
 }
@@ -147,10 +191,11 @@ void HREfree(hre_region_t region,void* mem){
     }
 }
 
-hre_region_t HREcreateRegion(void* area,hre_malloc_t malloc,hre_realloc_t realloc,hre_free_t free){
+hre_region_t HREcreateRegion(void* area,hre_malloc_t malloc,hre_align_t align,hre_realloc_t realloc,hre_free_t free){
     hre_region_t res=HRE_NEW(hre_heap,struct hre_region_s);
     res->area=area;
     res->malloc=malloc;
+    res->align=align;
     res->realloc=realloc;
     res->free=free;
     return res;

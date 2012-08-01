@@ -5,8 +5,12 @@
 #include <fcntl.h>
 #include <pthread.h>
 #include <signal.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
+#ifdef __APPLE__
+#define _DARWIN_C_SOURCE
+#endif
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -15,7 +19,7 @@
 
 #include <hre/provider.h>
 
-static size_t SHARED_ALIGN=64;
+static size_t SHARED_ALIGN=CACHE_LINE_SIZE;
 #define QUEUE_SIZE 64
 
 struct shared_area {
@@ -52,22 +56,40 @@ static void* area_malloc(void* ptr,size_t size){
     struct shared_area* area=(struct shared_area*)ptr;
     pthread_mutex_lock(&area->mutex);
     if (area->next+size > area->size) Abort("area memory exhausted");
-    size_t tmp=area->next;
-    void*res=((void*)area)+area->next;
-    int remainder=size%area->align;
-    size=size-remainder;
-    area->next=area->next+size+(remainder?area->align:0);
-    Debug("allocated %d from %d to %d next %d",size,tmp,tmp+size,area->next);
+    size_t tmp = area->next;
+    size_t old_size = size;
+    void *res = ((void *)area) + area->next;
+    // modify size to a multiple of ALIGN, so that next will be aligned again:
+    size_t remainder = size % area->align;
+    if (remainder)
+        size = size + area->align - remainder;
+    area->next = area->next + size;
+    //Debug("allocated %zu from %zu to %zu next %zu",old_size,tmp,tmp+size,area->next);
     pthread_mutex_unlock(&area->mutex);
     return res;
 }
 
-static void* area_realloc(void* area,void *rt_ptr, size_t size){
-    if (rt_ptr && size) {
-        Abort("cannot reallocate inside area");
+static void* area_align(void* ptr,size_t align,size_t size){
+    struct shared_area* area=(struct shared_area*)ptr;
+    void*res=((void*)area)+area->next;
+    size_t pp = (size_t)res;
+    if ((pp / align) * align != pp) {
+        // manual alignment only if needed
+        res=area_malloc (ptr, size + align);
+        size_t pp = (size_t)res;
+        res = (void*) ((pp / align + 1) * align);
+    } else {
+        res=area_malloc (ptr, size);
     }
-    if (rt_ptr==NULL ) return area_malloc(area,size);
-    return NULL;
+    return res;
+}
+
+static void* area_realloc(void* area,void *rt_ptr, size_t size){
+    void *res = area_malloc(area, size);
+    if (rt_ptr)
+        memmove(res, rt_ptr, size); // over estimation
+    Debug("Reallocating %zu from %p to %p", size, rt_ptr, res);
+    return res;
 }
 
 static void area_free(void*area,void *rt_ptr){
@@ -165,12 +187,26 @@ void hre_thread_exit(hre_context_t ctx,int code){
     pthread_exit(NULL);
 }
 
+static void *
+alloc_region(size_t size, bool public)
+{
+    void *res;
+    if (public) {
+        res = mmap(NULL,size,PROT_READ|PROT_WRITE,MAP_SHARED|MAP_ANON,-1,0);
+        if (res == MAP_FAILED) res = NULL;
+    } else {
+        res = calloc((size + CACHE_LINE_SIZE - 1) >> CACHE_LINE, CACHE_LINE_SIZE);
+    }
+    return res;
+}
+
 static void * pthread_shm_get(hre_context_t context,size_t size){
     assert(sizeof(union shm_pointer) == sizeof(uint64_t));
     union shm_pointer shm;
     shm.val=0;
     if (HREme(context)==0){
-        shm.ptr=malloc(size);
+        shm.ptr = alloc_region(size, false);
+        if (shm.ptr == NULL) AbortCall("calloc");
     }
     HREreduce(context,1,&shm,&shm,UInt64,Max);
     Debug("pthread shared area is %p",shm.ptr);
@@ -179,40 +215,67 @@ static void * pthread_shm_get(hre_context_t context,size_t size){
 
 static const char* pthread_class="Posix threads";
 
-void HREpthreadRun(int threads){
-    pthread_t thr[threads];
-    /* Caused huge performance regression in MC tool. Probably due to
-    pthread_attr_t attr[threads]; // note, one should be enough for all threads
-    for(int i=0;i<threads;i++){
-        if (pthread_attr_init(attr+i)){
-            AbortCall("pthread_attr_init %d",i);
-        }
-        size_t stack_size=32 * 1024 * 1024;
-        if (pthread_attr_setstacksize(attr+i,stack_size)){
-            AbortCall("pthread_attr_setstacksize[%d] to %lld",i,stack_size);
-        }
+static struct shared_area *
+create_shared_region(bool public)
+{
+    size_t size, real;
+    size = real = RTmemSize() * 16;
+    struct shared_area *shared = alloc_region(size, public);
+    while (shared == NULL) {
+        size/=2;
+        assert (size >> CACHE_LINE);
+        shared = alloc_region(size, public);
     }
-    */
-    size_t size = RTmemSize();
-    struct shared_area* shared=(struct shared_area*)HREmalloc(hre_heap,size);
+    if (size != real) {
+        Warning (info, "=============================================================================");
+        Warning (info, "Runtime environment could only preallocate %zu GB while requesting %zu GB.", size >> 30, real >> 30);
+        Warning (info, "        Configure your system limits to exploit all memory.");
+        Warning (info, "=============================================================================");
+    }
+    // region needs to be allocated with calloc, we assume it is zero'd
     shared->size=size;
     shared->align=SHARED_ALIGN;
     shared->next=sizeof(struct shared_area);
-    int remainder=sizeof(struct shared_area)%SHARED_ALIGN;
+    size_t res = ((size_t)shared) + shared->next;
+    size_t remainder = res % SHARED_ALIGN;
     if (remainder) {
-        shared->next=shared->next+SHARED_ALIGN-remainder;
+        shared->next = shared->next + SHARED_ALIGN - remainder;
     }
-    hre_region_t region=HREcreateRegion(shared,area_malloc,area_realloc,area_free);
-
+    int flag = public ? PTHREAD_PROCESS_SHARED : PTHREAD_PROCESS_PRIVATE;
     pthread_mutexattr_init(&shared->mutexattr);
-    if (pthread_mutexattr_setpshared(&shared->mutexattr,PTHREAD_PROCESS_PRIVATE)){
+    if (pthread_mutexattr_setpshared(&shared->mutexattr, flag)){
         AbortCall("pthread_mutexattr_setpshared");
     }
     pthread_mutex_init(&shared->mutex,&shared->mutexattr);
     pthread_condattr_init(&shared->condattr);
-    if (pthread_condattr_setpshared(&shared->condattr,PTHREAD_PROCESS_PRIVATE)){
+    if (pthread_condattr_setpshared(&shared->condattr, flag)){
         AbortCall("pthread_condattr_setpshared");
     }
+    return shared;
+}
+
+pthread_attr_t
+set_thread_stack_size()
+{
+    pthread_attr_t attr;
+    if (pthread_attr_init(&attr)){
+        AbortCall("pthread_attr_init");
+    }
+    size_t stack_size=32 * 1024 * 1024;
+    if (pthread_attr_setstacksize(&attr, stack_size)){
+        AbortCall("pthread_attr_setstacksize to %lld",stack_size);
+    }
+    return attr;
+}
+
+void HREpthreadRun(int threads){
+    pthread_t thr[threads];
+    /* Caused huge performance regression in MC tool */
+    //pthread_attr_t attr;
+    //attr = set_thread_stack_size();
+    struct shared_area *shared = create_shared_region(false);
+    hre_region_t region=HREcreateRegion(shared,area_malloc,area_align,area_realloc,area_free);
+
     struct message_queue *queues=HREmallocZero(region,threads*sizeof(struct message_queue));
     hre_context_t thr_ctx[threads];
     for(int i=0;i<threads;i++){
@@ -265,7 +328,7 @@ void* hre_posix_shm_get(hre_context_t context,size_t size){
     void* shm=NULL;
     if (HREme(context)==0){
         strcpy((char*)template,"HREprocessXXXXXX");
-        char* shm_name=mktemp((char*)template);;
+        char* shm_name=mktemp((char*)template);
         Debug("name is %s",shm_name);
         int fd=shm_open(shm_name,O_CREAT|O_RDWR,FILE_MODE);
         if(fd==-1){
@@ -355,40 +418,11 @@ static void fork_start(int* argc,char **argv[],int run_threads){
     int kill_sent=0;
     pid_t pid[procs];
     for(int i=0;i<procs;i++) pid[i]=0;
-    char shm_template[24]="HREprocessXXXXXX";
-    char* shm_name=mktemp(shm_template);
-    int fd=shm_open(shm_name,O_CREAT|O_RDWR,FILE_MODE);
-    if(fd==-1){
-        AbortCall("shm_open");
-    }
-    size_t size = RTmemSize() * 2;
-    if(ftruncate(fd, size)==-1){
-        shm_unlink(shm_name);
-        AbortCall("ftruncate");
-    }
-    struct shared_area* shared=(struct shared_area*)mmap(NULL,size,PROT_READ|PROT_WRITE,MAP_SHARED,fd,0);
-    if(shared==MAP_FAILED){
-        shm_unlink(shm_name);
-        AbortCall("mmap");
-    }
-    shared->size=size;
-    shared->align=SHARED_ALIGN;
-    shared->next=sizeof(struct shared_area);
-    int remainder=sizeof(struct shared_area)%SHARED_ALIGN;
-    if (remainder) {
-        shared->next=shared->next+SHARED_ALIGN-remainder;
-    }
-    hre_region_t region=HREcreateRegion(shared,area_malloc,area_realloc,area_free);
 
-    pthread_mutexattr_init(&shared->mutexattr);
-    if (pthread_mutexattr_setpshared(&shared->mutexattr,PTHREAD_PROCESS_SHARED)){
-        AbortCall("pthread_mutexattr_setpshared");
-    }
-    pthread_mutex_init(&shared->mutex,&shared->mutexattr);
-    pthread_condattr_init(&shared->condattr);
-    if (pthread_condattr_setpshared(&shared->condattr,PTHREAD_PROCESS_SHARED)){
-        AbortCall("pthread_condattr_setpshared");
-    }
+    // this area is mmapped before the fork, so no shm_open is required
+    struct shared_area* shared = create_shared_region(true);
+    hre_region_t region=HREcreateRegion(shared,area_malloc,area_align,area_realloc,area_free);
+
     struct message_queue *queues=HREmallocZero(region,procs*sizeof(struct message_queue));
     for(int i=0;i<procs;i++){
         pthread_mutex_init(&queues[i].lock,&shared->mutexattr);
@@ -460,7 +494,6 @@ static void fork_start(int* argc,char **argv[],int run_threads){
         }
     }
     Debug("last child terminated");
-    shm_unlink(shm_name);
     if (success) {
         HREexit(EXIT_SUCCESS);
     } else {

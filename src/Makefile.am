@@ -201,6 +201,7 @@ libvset_la_LDFLAGS  += $(AM_LDFLAGS)
 libmc_la_SOURCES =  bitvector-ll.c bitvector-ll.h
 libmc_la_SOURCES += cctables.c cctables.h
 libmc_la_SOURCES += clt_table.c clt_table.h
+libmc_la_SOURCES += color.c color.h
 libmc_la_SOURCES += dbs-ll.c dbs-ll.h
 libmc_la_SOURCES += dfs-stack.c dfs-stack.h
 libmc_la_SOURCES += hre-tools.h

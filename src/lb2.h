@@ -80,9 +80,9 @@ extern void lb2_reinit (lb2_t *lb, size_t id);
 
 typedef enum { LB2_BARRIER_MASTER, LB2_BARRIER_SLAVE } lb2_barrier_result_t;
 
-extern lb2_barrier_result_t lb2_barrier (size_t W);
+extern lb2_barrier_result_t lb2_barrier (lb2_t *lb);
 
-extern size_t lb2_reduce (size_t val, size_t W);
+extern size_t lb2_reduce (lb2_t *lb, size_t val);
 
 extern size_t lb2_max_load (lb2_t *lb);
 

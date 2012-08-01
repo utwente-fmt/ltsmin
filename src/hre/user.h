@@ -3,6 +3,9 @@
 #define HRE_USER_H
 
 #include <popt.h>
+#include <stdint.h>
+#include <stdio.h>
+
 #include <hre-io/types.h>
 
 #ifdef RUNTIME_H
@@ -104,6 +107,22 @@ This function start all processes and all threads, specified
 on the command line.
 */
 extern void HREinit(int *argc,char **argv[]);
+
+/**
+\brief Assertion check.
+*/
+#define HREassert(check,...)    if (!check) {\
+                                    Print(error,__VA_ARGS__);\
+                                    HREabort(-1);\
+                                }
+/**
+\brief Assertion check only for debugging.
+*/
+#ifdef LTSMIN_DEBUG
+#define HRE_ASSERT              HREassert
+#else
+#define HRE_ASSERT(check,...)
+#endif
 
 /**
 \brief Emergency shutdown (async).
@@ -219,6 +238,16 @@ Allocate memory in a region.
 extern void* HREmalloc(hre_region_t region,size_t size);
 
 /**
+Allocate memory in a region aligned.
+*/
+extern void* HREalign(hre_region_t region,size_t align, size_t size);
+
+/**
+Allocate memory in a region aligned.
+*/
+extern void* HREalignZero(hre_region_t region,size_t align, size_t size);
+
+/**
 Allocate and fill with zeros.
 */
 extern void* HREmallocZero(hre_region_t region,size_t size);
@@ -239,14 +268,21 @@ Reallocate memory.
 extern void* HRErealloc(hre_region_t region,void* mem,size_t size);
 
 typedef void*(*hre_malloc_t)(void* area,size_t size);
+typedef void*(*hre_align_t)(void* area,size_t align, size_t size);
 typedef void*(*hre_realloc_t)(void* area,void*mem,size_t size);
 typedef void(*hre_free_t)(void* area,void*mem);
 
 /**
-Create a new allocater given malloc, realloc and free methods.
+Create a new allocater given malloc, align, realloc and free methods.
 */
 
-extern hre_region_t HREcreateRegion(void* area,hre_malloc_t malloc,hre_realloc_t realloc,hre_free_t free);
+extern hre_region_t HREcreateRegion(void* area,hre_malloc_t malloc,hre_align_t align,hre_realloc_t realloc,hre_free_t free);
+
+extern hre_region_t RTgetMallocRegion();
+
+extern void RTsetMallocRegion(hre_region_t r);
+
+extern hre_region_t HREdefaultRegion(hre_context_t context);
 
 extern void* RTmalloc(size_t size);
 
@@ -263,6 +299,15 @@ extern void RTfree(void *rt_ptr);
 #define RT_NEW(obj) HRE_NEW(NULL,obj)
 #define Warning Print
 #define Fatal(code,chan,...) Abort(__VA_ARGS__)
+
+/**
+ * Macros for switching runtime allocation to HRE global region and back (LOCAL).
+ */
+#define RT_ALLOC_GLOBAL \
+    HREassert ((HREdefaultRegion(HREglobal()) != NULL), "RT_ALLOC_GLOBAL: no global region available");\
+    HREassert ((RTgetMallocRegion() == NULL), "RT_ALLOC_GLOBAL: global region already active!");\
+    RTsetMallocRegion (HREdefaultRegion(HREglobal()));
+#define RT_ALLOC_LOCAL RTsetMallocRegion (NULL);
 
 /*}@*/
 

@@ -4,6 +4,8 @@
 #include <greybox.h>
 
 typedef size_t              ref_t;
+static const ref_t          DUMMY_IDX = SIZE_MAX;
+
 typedef void *(*trc_get_state_f)(ref_t state_no, void *arg);
 typedef struct trc_env_s    trc_env_t;
 

@@ -27,7 +27,7 @@ struct isb_allocator {
  Lazy block allocation:
  Block allocation is done before operation execution, thus the amount
  of blocks allocated is not invariant wrt the number of elements on the stack.
- Making this buffers block configuration indeteministic.
+ Making this buffers block configuration nondeteministic.
  The operation is still correct since 0%BLOCK_SIZE==BLOCK_SIZE%BLOCK_SIZE,
  preserving the invariants:
  - the top-block always contains cur_index amount of elements.
@@ -41,8 +41,8 @@ NOTE: shrinkage of blocks pointer array is not implemented
 
  */
 
-static const size_t BLOCK_ELT_POW = 24;
-static const size_t BLOCK_ELT_SIZE = 1<<24; //blocksize in el_size
+static const size_t BLOCK_ELT_POW = 20;
+static const size_t BLOCK_ELT_SIZE = 1<<20; //blocksize in el_size
 
 static void
 add_block(isb_allocator_t buf)

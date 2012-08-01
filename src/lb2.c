@@ -21,13 +21,10 @@
 typedef struct lb2_status_s {
     int                 idle;           // poll local + write global
     uint32_t            seed;           // read+write local
-    char                pad0[CACHE_LINE_SIZE - 2*sizeof(int)];
-    size_t              requests;       // read local + write global
-    size_t              received;       // read local + write global
-    char                pad1[CACHE_LINE_SIZE - 2*sizeof(size_t)];
-    size_t              max_load;       // read local
-    char                pad2[CACHE_LINE_SIZE - sizeof(size_t)];
-    void               *arg;            // read local + read global
+    size_t  __attribute__ ((aligned(CACHE_LINE_SIZE))) requests; // read local + write global
+    size_t  __attribute__ ((aligned(CACHE_LINE_SIZE))) received; // read local + write global
+    size_t  __attribute__ ((aligned(CACHE_LINE_SIZE))) max_load; // read local
+    void    __attribute__ ((aligned(CACHE_LINE_SIZE)))*arg;      // read local + read global
 } lb2_status_t;
 
 /**
@@ -42,6 +39,11 @@ struct lb2_s {
     size_t             granularity;
     size_t             max_handoff;
     lb2_status_t     **local;
+    size_t  __attribute__ ((aligned(CACHE_LINE_SIZE))) barrier_count;
+    size_t  __attribute__ ((aligned(CACHE_LINE_SIZE))) barrier_wait;
+    size_t  __attribute__ ((aligned(CACHE_LINE_SIZE))) reduce_count;
+    size_t  __attribute__ ((aligned(CACHE_LINE_SIZE))) reduce_result;
+    size_t  __attribute__ ((aligned(CACHE_LINE_SIZE))) reduce_wait;
 };
 
 
@@ -75,18 +77,21 @@ lb2_reinit (lb2_t *lb, size_t id)
     atomic_write (&lb->all_done, 0);
     if (0 == id)
         set_idle (lb, id, 0);
-    lb2_barrier (lb->threads);
+    //lb2_barrier (lb->threads);
+    HREbarrier(HREglobal());
 }
 
 void
 lb2_local_init (lb2_t *lb, int id, void *arg)
 {
-    lb->local[id] = RTalign(CACHE_LINE_SIZE, sizeof(lb2_status_t));
-    lb->local[id]->idle = 0;
-    lb->local[id]->requests = 0;
-    lb->local[id]->seed = (id + 1) * 32732678642;
+    lb2_status_t        *loc = RTalign(CACHE_LINE_SIZE, sizeof(lb2_status_t));
+    assert ((size_t)&loc->received - (size_t)&loc->requests == CACHE_LINE_SIZE);
+    loc->idle = 0;
+    loc->requests = 0;
+    loc->seed = (id + 1) * 32732678642;
     // record thread local data
-    atomic_write (&(lb->local[id]->arg), arg);
+    atomic_write (&(loc->arg), arg);
+    lb->local[id] = loc;
     lb2_reinit (lb, id);
 }
 
@@ -183,6 +188,7 @@ lb2_create_max (size_t threads, size_t gran, size_t max)
     assert (threads <= LB2_MAX_THREADS);
     lb2_t               *lb = RTalign(CACHE_LINE_SIZE, sizeof(lb2_t));
     lb->local = RTalign(CACHE_LINE_SIZE, sizeof(lb2_status_t[LB2_MAX_THREADS]));
+    assert ((size_t)&lb->barrier_wait - (size_t)&lb->barrier_count == CACHE_LINE_SIZE);
     for (size_t i = 0; i < threads; i++)
         lb->local[i] = NULL;
     lb->threads = threads;
@@ -204,43 +210,38 @@ lb2_destroy (lb2_t *lb)
     RTfree (lb);
 }
 
-static size_t       __attribute__ ((aligned(CACHE_LINE_SIZE))) barrier_count = 0;
-static size_t       __attribute__ ((aligned(CACHE_LINE_SIZE))) barrier_wait = 0;
-
 lb2_barrier_result_t
-lb2_barrier (size_t W)
+lb2_barrier (lb2_t *lb)
 {
+    size_t W = lb->threads;
     //assert ((W <= LB2_MAX_THREADS));
-    size_t          flip = atomic_read (&barrier_wait);
-    size_t          count = add_fetch (&barrier_count, 1);
+    size_t          flip = atomic_read (&lb->barrier_wait);
+    size_t          count = add_fetch (&lb->barrier_count, 1);
     if (W == count) {
-        atomic_write (&barrier_count, 0);
-        atomic_write (&barrier_wait, 1 - flip); // flip wait
+        atomic_write (&lb->barrier_count, 0);
+        atomic_write (&lb->barrier_wait, 1 - flip); // flip wait
         return LB2_BARRIER_MASTER;
     } else {
-        while (flip == atomic_read(&barrier_wait)) {}
+        while (flip == atomic_read(&lb->barrier_wait)) {}
         return LB2_BARRIER_SLAVE;
     }
 }
 
-static size_t       __attribute__ ((aligned(CACHE_LINE_SIZE))) reduce_count = 0;
-static size_t       __attribute__ ((aligned(CACHE_LINE_SIZE))) reduce_result = 0;
-static size_t       __attribute__ ((aligned(CACHE_LINE_SIZE))) reduce_wait = 0;
-
 size_t
-lb2_reduce (size_t val, size_t W)
+lb2_reduce (lb2_t *lb, size_t val)
 {
+    size_t W = lb->threads;
     //assert ((W <= LB2_MAX_THREADS) && (val < (1UL<<58)) && (sizeof(size_t) == 8));
-    size_t          flip = atomic_read (&reduce_wait);
-    size_t          count = add_fetch (&reduce_count, val + (1UL << 58));
+    size_t          flip = atomic_read (&lb->reduce_wait);
+    size_t          count = add_fetch (&lb->reduce_count, val + (1UL << 58));
     if (count >> 58 == W) {
-        atomic_write (&reduce_count, 0);
-        atomic_write (&reduce_result, count - (W << 58));
-        atomic_write (&reduce_wait, 1 - flip); // flip wait
+        atomic_write (&lb->reduce_count, 0);
+        atomic_write (&lb->reduce_result, count - (W << 58));
+        atomic_write (&lb->reduce_wait, 1 - flip); // flip wait
     } else {
-        while (flip == atomic_read(&reduce_wait)) {}
+        while (flip == atomic_read(&lb->reduce_wait)) {}
     }
-    return atomic_read (&reduce_result);
+    return atomic_read (&lb->reduce_result);
 }
 
 size_t
