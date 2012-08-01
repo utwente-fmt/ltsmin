@@ -245,22 +245,6 @@ static vrel_t rel_create(vdom_t dom, int k, int* proj)
     return rel;
 }
 
-/**
- * Destroy a rel.
- * The rel must be created first with rel_create
- */
-static void rel_destroy(vrel_t rel) 
-{
-    sylvan_deref(rel->bdd);
-    sylvan_deref(rel->projection);
-    sylvan_deref(rel->variables_prime_set);
-    sylvan_deref(rel->variables_nonprime_set);
-    sylvan_deref(rel->variables_set);
-    free(rel->variables_arr);
-    free(rel);
-}
-
-
 static int optimal_bits_per_state = 0;
 
 /* Helper function to detect problems with the number of bits per stats 
@@ -300,9 +284,6 @@ static inline BDD state_to_bdd(vset_t set, const int* e)
     TRACE_IN("state_to_bdd", 1, set);
 
     // Construct BDD from state (go from last variable to first variable)
-
-    int m = set->variables_size-1;
-
     for(int i=N-1;i>=0;i--) { // start with last byte (N-1)
         uint32_t b = e[i];
         
