@@ -148,4 +148,7 @@ extern log_t hre_debug;
     HREabort(0);\
 }
 
+#define Warning Print
+#define Fatal(code,chan,...) Abort(__VA_ARGS__)
+
 #endif

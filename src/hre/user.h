@@ -261,8 +261,6 @@ extern void* RTrealloc(void *rt_ptr, size_t size);
 extern void RTfree(void *rt_ptr);
 
 #define RT_NEW(obj) HRE_NEW(NULL,obj)
-#define Warning Print
-#define Fatal(code,chan,...) Abort(__VA_ARGS__)
 
 /*}@*/
 
