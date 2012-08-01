@@ -8,9 +8,12 @@
 *--filter*='<patternlist>'::
         Select the labels to be written to file from the
         state vector elements, state labels and edge labels.
-        The argument is a list of shell file patterns.
-        E.g. "x*" selects all state parameters and state labels
-        starting with "x".
+        The argument is a semicolon separated list of shell
+        file patterns. Each pattern may be prefixed with "!" to
+        exclude a set of labels. If none of the patterns matches the default
+        is to exclude the label. Hence, all labels starting with
+        an "x" are specified as "x*". The complement all labels,
+        except those starting with an "x" are specified as "!x*;*".
 
 *-d, --deadlock*::
         Find state with no outgoing transitions. Returns with exit code 1

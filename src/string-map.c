@@ -90,8 +90,18 @@ int SSMmember(string_set_t map,const char*input){
 		int i;
 		for(i=0;map->pattern[i];i++){
 		    if (map->pattern[i]==NULL) return 0;
-			if (!fnmatch(map->pattern[i],input,0)) {
-				return 1;
+		    if (map->pattern[i][0]=='!'){
+		        switch(fnmatch(map->pattern[i]+1,input,0)){
+		            case 0: return 0;
+		            case FNM_NOMATCH: continue;
+		            default: Abort("error in fnmatch");
+				}    
+		    } else {
+		        switch(fnmatch(map->pattern[i],input,0)){
+		            case 0: return 1;
+		            case FNM_NOMATCH: continue;
+		            default: Abort("error in fnmatch");
+				}    
 			}			
 		}
 	} else {
