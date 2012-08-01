@@ -59,7 +59,7 @@ static struct {
     char            *inv_detect;
     int              no_exit;
     int              act_index;
-    int              act_type;
+    int              act_label;
     ltsmin_expr_t    inv_expr;
 
     size_t           threshold;
@@ -90,7 +90,7 @@ static struct {
     .inv_detect     = NULL,
     .no_exit        = 0,
     .act_index      = -1,
-    .act_type       = -1,
+    .act_label       = -1,
     .inv_expr       = NULL,
     .threshold      = 100000,
     .max            = SIZE_MAX,
@@ -1286,7 +1286,7 @@ gsea_invariant_check(gsea_state_t *state, void *arg)
 static void
 gsea_action_check(gsea_state_t *src, transition_info_t *ti, gsea_state_t *dst)
 {
-    if (NULL == ti->labels || ti->labels[opt.act_type] != opt.act_index) {
+    if (NULL == ti->labels || ti->labels[opt.act_label] != opt.act_index) {
         global.errors++;
         do_trace(dst, NULL, "Error action", opt.act_detect);
     }
@@ -1498,13 +1498,15 @@ gsea_setup(const char *output)
     // setup error detection facilities
     lts_type_t ltstype=GBgetLTStype(opt.model);
     if (opt.act_detect) {
+        // table number of first edge label
+        opt.act_label = 0;
+        if (lts_type_get_edge_label_count(ltstype) == 0 ||
+                strncmp(lts_type_get_edge_label_name(ltstype, opt.act_label),
+                        "action", 6) != 0)
+            Abort("No edge label 'action...' for action detection");
+        int typeno = lts_type_get_edge_label_typeno(ltstype, opt.act_label);
         chunk c = chunk_str(opt.act_detect);
-        //table number of first edge label.
-        char *type = lts_type_get_edge_label_name(ltstype, 0);
-        assert (strncmp(type, "action", 6) != 0 && "No edge label 'action...'");
-        int typeno = lts_type_get_edge_label_typeno(ltstype, 0);
         opt.act_index = GBchunkPut(opt.model, typeno, c);
-        opt.act_type = 0;
         Warning(info, "Detecting action \"%s\"", opt.act_detect);
     }
     if (opt.inv_detect)
