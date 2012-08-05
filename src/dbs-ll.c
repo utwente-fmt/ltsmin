@@ -6,7 +6,6 @@
 #include <assert.h>
 #include <string.h>
 #include <time.h>
-#include <signal.h>
 
 #include <atomics.h>
 #include <dbs-ll.h>

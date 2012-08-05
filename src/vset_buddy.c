@@ -168,9 +168,9 @@ static void set_destroy_fdd(vset_t set) {
     // free projection complement variables
     set->p_len = 0;
     if (set->proj != set->dom->proj)
-        free(set->proj);
+        RTfree(set->proj);
     // free set
-    free(set);
+    RTfree(set);
     return;
 }
 

@@ -200,7 +200,7 @@ void MCRLloadGreyboxModel(model_t m,const char*model){
 	if(!MCRLinitNamedFile(x)) {
 		Abort("failed to open %s",model);
 	}
-	free(x);
+	free(x); // strdup
 	if (!RWinitialize(MCRLgetAdt())) {
 		Abort("could not initialize rewriter for %s",model);
 	}
@@ -219,7 +219,7 @@ void MCRLloadGreyboxModel(model_t m,const char*model){
 	termmap=ATmapCreate(m,lts_type_add_type(ltstype,"leaf",NULL),NULL,print_term,parse_term);
 	actionmap=ATmapCreate(m,lts_type_add_type(ltstype,"action",NULL),NULL,remove_quotes,NULL);
 
-	dst=(ATerm*)malloc(state_length*sizeof(ATerm));
+	dst=(ATerm*)RTmalloc(state_length*sizeof(ATerm));
 	for(int i=0;i<state_length;i++) {
 		dst[i]=NULL;
 	}

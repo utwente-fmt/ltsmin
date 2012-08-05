@@ -292,7 +292,7 @@ void* HREshmGet(hre_context_t context,size_t size){
     if (USR2SYS(context)->shm_get) {
         return USR2SYS(context)->shm_get(context,size);
     } else if (HREpeers(context)==1) {
-        return malloc(size);
+        return RTmalloc(size);
     } else {
         return NULL;
     }

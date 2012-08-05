@@ -375,7 +375,7 @@ void LTSminExprDestroy(ltsmin_expr_t expr)
 {
     if (expr->arg1) LTSminExprDestroy(expr->arg1);
     if (expr->arg2) LTSminExprDestroy(expr->arg2);
-    free(expr);
+    RTfree(expr);
 }
 
 static char*keyword[]={"begin","end","state","edge","init","trans","sort","map",NULL};

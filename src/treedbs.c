@@ -44,7 +44,7 @@ static void resize_hash(treedbs_t dbs,int node){
 
 	dbs->db_hash_size[node]*=2;
 	dbs->db_mask[node]=(dbs->db_mask[node]<<1)|1;
-	if (!(dbs->db_hash[node]=realloc(dbs->db_hash[node],dbs->db_hash_size[node]*sizeof(int))))
+	if (!(dbs->db_hash[node]=RTrealloc(dbs->db_hash[node],dbs->db_hash_size[node]*sizeof(int))))
 		 Abort("realloc hash failed");
 	for (i=0;i<dbs->db_hash_size[node];i++) dbs->db_hash[node][i]=-1;
 	for (i=0;i<dbs->db_next[node];i++) {
@@ -58,9 +58,9 @@ static void resize_hash(treedbs_t dbs,int node){
 static void resize_data(treedbs_t dbs,int node){
 	int blk_count=dbs->db_size[node]/BLOCKSIZE;
 	dbs->db_size[node]+=BLOCKSIZE*((blk_count/2)+1);
-	if (!(dbs->db_left[node]=realloc(dbs->db_left[node],dbs->db_size[node]*sizeof(int)))
-	|| !(dbs->db_right[node]=realloc(dbs->db_right[node],dbs->db_size[node]*sizeof(int)))
-	|| !(dbs->db_bucket[node]=realloc(dbs->db_bucket[node],dbs->db_size[node]*sizeof(int)))
+	if (!(dbs->db_left[node]=RTrealloc(dbs->db_left[node],dbs->db_size[node]*sizeof(int)))
+	|| !(dbs->db_right[node]=RTrealloc(dbs->db_right[node],dbs->db_size[node]*sizeof(int)))
+	|| !(dbs->db_bucket[node]=RTrealloc(dbs->db_bucket[node],dbs->db_size[node]*sizeof(int)))
 	) Abort("realloc data failed");
 
 	//ATwarning("resize of %d to %d succesful",node,db_size[node]);
@@ -131,8 +131,8 @@ TreeFold_ret(treedbs_t dbs,int *vector, int *idx)
                 dbs->range+=BLOCKSIZE*((blk_count/2)+1);
             }
             //Warning(info,"resize from %d to %d",old,dbs->range);
-            dbs->map=realloc(dbs->map,dbs->range*sizeof(int));
-            dbs->rev=realloc(dbs->rev,dbs->range*sizeof(int));
+            dbs->map=RTrealloc(dbs->map,dbs->range*sizeof(int));
+            dbs->rev=RTrealloc(dbs->rev,dbs->range*sizeof(int));
             while(old<dbs->range){
                 dbs->map[old]=-1;
                 dbs->rev[old]=-1;

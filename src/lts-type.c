@@ -159,7 +159,7 @@ void lts_type_print(log_t log, lts_type_t t){
 
 void lts_type_destroy(lts_type_t *t){
 	Warning(info,"Need to define ownership and implement destroy of LTS type.");
-	free(*t);
+	RTfree(*t);
 	*t=NULL;
 }
 
@@ -424,7 +424,7 @@ lts_type_t lts_type_deserialize(stream_t ds){
 	for(uint32_t i=0;i<N;i++){
 		char*x=DSreadSA(ds);
 		if (strlen(x)) lts_type_set_state_name(t,i,x);
-		free(x);
+		RTfree(x);
 		lts_type_set_state_typeno(t,i,DSreadU32(ds));
 	}
 	N=DSreadU32(ds);
@@ -433,7 +433,7 @@ lts_type_t lts_type_deserialize(stream_t ds){
 	for(uint32_t i=0;i<N;i++){
 		char*x=DSreadSA(ds);
 		if (strlen(x)) lts_type_set_state_label_name(t,i,x);
-		free(x);
+		RTfree(x);
 		lts_type_set_state_label_typeno(t,i,DSreadU32(ds));
 	}
 	N=DSreadU32(ds);
@@ -442,7 +442,7 @@ lts_type_t lts_type_deserialize(stream_t ds){
 	for(uint32_t i=0;i<N;i++){
 		char*x=DSreadSA(ds);
 		if (strlen(x)) lts_type_set_edge_label_name(t,i,x);
-		free(x);
+		RTfree(x);
 		lts_type_set_edge_label_typeno(t,i,DSreadU32(ds));
 	}
 	N=DSreadU32(ds);
@@ -450,7 +450,7 @@ lts_type_t lts_type_deserialize(stream_t ds){
 	for(uint32_t i=0;i<N;i++){
 		char*x=DSreadSA(ds);
 		SIputAt(t->type_db,x,i);
-		free(x);
+		RTfree(x);
 		if (has_format_info) {
 			x=DSreadSA(ds);
 			if (strcmp(x,"direct")==0){
@@ -472,7 +472,7 @@ lts_type_t lts_type_deserialize(stream_t ds){
 			    }
 				Abort("unsupported data format %s",x);
 			}
-			free(x);
+			RTfree(x);
 		} else {
 		    t->type_format[i]=LTStypeChunk;
 		}

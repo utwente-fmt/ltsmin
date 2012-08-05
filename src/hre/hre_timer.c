@@ -16,7 +16,7 @@ struct timer {
 
 rt_timer_t RTcreateTimer(){
     rt_timer_t timer;
-    timer=(rt_timer_t)malloc(sizeof(struct timer));
+    timer=(rt_timer_t)RTmalloc(sizeof(struct timer));
     if (timer){
         timer->real_time=0;
         timer->times.tms_utime=0;

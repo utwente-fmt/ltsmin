@@ -68,7 +68,7 @@ value_table_t VTcreateBase(char*type_name,size_t user_size){
 void VTdestroy(value_table_t vt){
     value_table_t object=USR2SYS(vt);
     if (object->destroy) object->destroy(vt);
-    free(object->type_name);
+    free(object->type_name); //strdup
     RTfree(object);
 }
 
@@ -145,7 +145,7 @@ matrix_table_t MTcreate(int width){
 
 void MTdestroy(matrix_table_t mt){
     for(int i=0;i<mt->width;i++){
-        free(mt->column[i]);
+        RTfree(mt->column[i]);
     }
     RTfree(mt->column);
     // TODO destroy_manager(mt->man);

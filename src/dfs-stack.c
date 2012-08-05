@@ -82,7 +82,7 @@ dfs_stack_destroy (dfs_stack_t stack)
 {
     isba_destroy(stack->states);
     isba_destroy(stack->frames);
-    free(stack);
+    RTfree(stack);
 }
 
 void

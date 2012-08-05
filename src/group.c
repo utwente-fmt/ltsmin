@@ -256,7 +256,7 @@ apply_regroup_spec (matrix_t *m, const char *spec_)
                        tok);
             }
         }
-        free(spec_full);
+        RTfree(spec_full);
     }
 }
 

@@ -321,6 +321,6 @@ clt_create (uint32_t ksize, uint32_t log_size)
 
 void clt_free(clt_dbs_t* dbs)
 {
-    free(dbs->table);
-    free(dbs);
+    RTfree(dbs->table);
+    RTfree(dbs);
 }

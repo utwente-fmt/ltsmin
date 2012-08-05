@@ -473,7 +473,7 @@ void tableaux_table_grow(tableaux_table_t *t)
                 tableaux_table_add(&new_t, t->table[el].hash, t->table[el].data);
         }
         // swap internal tables
-        free(t->table);
+        RTfree(t->table);
         t->table = new_t.table;
         t->size = new_t.size;
         return;
@@ -829,7 +829,7 @@ tableaux_node_t* tableaux_node_add_expr(tableaux_node_quantifier_t q, tableaux_n
         if ( (*l)->expr->hash < e->hash) break;
         // assume unique expressions are added
         if ( (*l)->expr == e) {
-            free(ne);
+            RTfree(ne);
             // add generating expression
             if ((*l)->generating_expr[0] != generating_e && (*l)->generating_expr[1] != generating_e) {
                 if ((*l)->generating_expr[0] == NULL) {
@@ -978,7 +978,7 @@ ltsmin_expr_t tableaux_expr_unary_cons(tableaux_t *t, CTL op, ltsmin_expr_t e)
     // convert node to positive normal form
     ltsmin_expr_t ee = LTSminExpr(UNARY_OP, op, 0, e, NULL);
     ltsmin_expr_t res = tableaux_expr(t, ee);
-    free(ee);
+    RTfree(ee);
     return res;
 }
 
@@ -1244,8 +1244,8 @@ void tableaux_apply_rule(tableaux_t *t, syntax_tree_t *s)
                         n_left = tableaux_node_add_expr(s->node->quantifier, n_left, tableaux_expr(t,e), el);
                         tableaux_extend_syntax_tree(t, s, ST_LEFT, TABLEAUX_IDENTITY, n_left);
                         // free created expression
-                        free(e->arg1);
-                        free(e);
+                        RTfree(e->arg1);
+                        RTfree(e);
 
                         break;
                     default:

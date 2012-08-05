@@ -116,7 +116,7 @@ static void len_resize(void*arg,void*old_array,int old_size,void*new_array,int n
 		N=si->mask+1;
 		DEBUG("resizing table from %d to %d",N,N+N);
 		si->mask=(si->mask<<1)+1;
-		si->table=(int*)realloc(si->table,(si->mask+1)*sizeof(int));
+		si->table=(int*)RTrealloc(si->table,(si->mask+1)*sizeof(int));
 		for(i=0;i<N;i++){
 			current=si->table[i];
 			si->table[i]=END_OF_LIST;
@@ -163,13 +163,13 @@ void SIdestroy(string_index_t *si){
     int size=array_size((*si)->man);
 
 	for(i=0;i<size;i++){
-		if (USED(*si,i)) free((*si)->data[i]);
+		if (USED(*si,i)) RTfree((*si)->data[i]);
 	}
-	free((*si)->len);
-	free((*si)->data);
-	free((*si)->next);
-	free((*si)->table);
-	free(*si);
+	RTfree((*si)->len);
+	RTfree((*si)->data);
+	RTfree((*si)->next);
+	RTfree((*si)->table);
+	RTfree(*si);
 	*si=NULL;
 }
 
@@ -275,7 +275,7 @@ void SIreset(string_index_t si){
 	int i,N;
 	N=array_size(si->man);
 	for(i=0;i<N;i++) {
-		if (USED(si,i)) free(si->data[i]);
+		if (USED(si,i)) RTfree(si->data[i]);
 	}
 	si->count=0;
 	si->free_list=END_OF_LIST;
@@ -296,7 +296,7 @@ void SIdeleteC(string_index_t si,const char*str,int len){
 	while(idx!=END_OF_LIST){
 		if (0==strcmp(str,si->data[idx])) {
 			deleted=idx;
-			free(si->data[idx]);
+			RTfree(si->data[idx]);
 			si->count--;
 			idx=si->next[idx];
 			while(idx!=END_OF_LIST){

@@ -12,11 +12,11 @@
 
 void * yyalloc (size_t bytes, void * yyscanner){
     (void)yyscanner;
-    return malloc(bytes);
+    return RTmalloc(bytes);
 }
 void * yyrealloc (void * ptr, size_t bytes, void * yyscanner){
     (void)yyscanner;
-    return realloc(ptr,bytes);
+    return RTrealloc(ptr,bytes);
 }
 
 void   yyfree (void * ptr, void * yyscanner){

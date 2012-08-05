@@ -141,7 +141,7 @@ etf_map_t ETFmapCreate(int length){
 void ETFmapDestroy(etf_map_t *map_p){
 	etf_map_t map=*map_p;
 	map_p=NULL;
-	free(map->data);
+	RTfree(map->data);
 	RTfree(map);
 }
 

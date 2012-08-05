@@ -170,7 +170,7 @@ CAESAR_TYPE_STRING CAESAR_STRING_LABEL(CAESAR_TYPE_LABEL l) {
 	n = 5;
 	if (b-p < n) { 
 		u = p-s;
-		s = realloc(s, u+n);/* TODO: check s!=0 */
+		s = RTrealloc(s, u+n);/* TODO: check s!=0 */
 		p = s+u;
 		b = s + u+n;
 	}
@@ -178,7 +178,7 @@ CAESAR_TYPE_STRING CAESAR_STRING_LABEL(CAESAR_TYPE_LABEL l) {
         n = 6;
         if (b-p < n) { 
             u = p-s;
-            s = realloc(s, u+n); /* TODO: check s!=0 */
+            s = RTrealloc(s, u+n); /* TODO: check s!=0 */
             p = s+u;
             b = s + u+n;
         }
@@ -199,7 +199,7 @@ CAESAR_TYPE_STRING CAESAR_STRING_LABEL(CAESAR_TYPE_LABEL l) {
             n = strlen(name)+ 1 + clen+1+1+1; /* for name , '=' , c, ';',  '>', '\0' */
             if (b-p < n) { 
                 u = p-s;
-                s = realloc(s, u+n); /* TODO: check s!=0 */
+                s = RTrealloc(s, u+n); /* TODO: check s!=0 */
                 p = s+u;
                 b = s + u+n;
             }
@@ -250,7 +250,7 @@ CAESAR_TYPE_STRING CAESAR_STRING_LABEL(CAESAR_TYPE_LABEL l) {
             n=strlen(name)+c.len*2+7;
             if (b-p < n) { 
                 u = p-s;
-                s = realloc(s, u+n); /* TODO: check s!=0 */
+                s = RTrealloc(s, u+n); /* TODO: check s!=0 */
                 p = s+u;
                 b = s + u+n;
             }
@@ -279,7 +279,7 @@ CAESAR_TYPE_STRING CAESAR_INFORMATION_LABEL(CAESAR_TYPE_LABEL l) {
 	n = 5;
 	if (b-p < n) {
 		u = p-s;
-		s = realloc(s, u+n);/* TODO: check s!=0 */
+		s = RTrealloc(s, u+n);/* TODO: check s!=0 */
 		p = s+u;
 		b = s + u+n;
 	}
@@ -291,7 +291,7 @@ CAESAR_TYPE_STRING CAESAR_INFORMATION_LABEL(CAESAR_TYPE_LABEL l) {
 		n = 15; /* size to print integer + ';',  '>', '\0' */
 		if (b-p < n) { 
 			u = p-s;
-			s = realloc(s, u+n); /* TODO: check s!=0 */
+			s = RTrealloc(s, u+n); /* TODO: check s!=0 */
 			p = s+u;
 			b = s + u+n;
 		}
