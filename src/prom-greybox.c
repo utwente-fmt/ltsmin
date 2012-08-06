@@ -273,7 +273,7 @@ SpinJaloadGreyboxModel(model_t model, const char *filename)
 
     int assert_type = 0;
     if (NULL != spinja_get_edge_count)
-         assert_type = lts_type_add_type(ltstype, "assert", NULL);
+         assert_type = lts_type_add_type(ltstype, "action", NULL);
     GBsetLTStype(model, ltstype);
 
     if (bool_is_new) {
@@ -294,15 +294,16 @@ SpinJaloadGreyboxModel(model_t model, const char *filename)
     }
 
     if (NULL != spinja_get_edge_count) {
-         for (int i = 0; i < spinja_get_edge_count(); i++) {
-             const char* edge_value = spinja_get_edge_name(i);
+         if (spinja_get_edge_count() > 0) {
+             // All actions are assert statements. We do not export there values.
+             const char* edge_value = "assert";
              int num = GBchunkPut(model, assert_type, chunk_str((char*)edge_value));
-             assert (i == num);
+             assert (0 == num);
+             lts_type_set_edge_label_count(ltstype, 1);
+             lts_type_set_edge_label_name(ltstype, 0, "action");
+             lts_type_set_edge_label_type(ltstype, 0, "action");
+             lts_type_set_edge_label_typeno(ltstype, 0, assert_type);
          }
-         lts_type_set_edge_label_count(ltstype, 1);
-         lts_type_set_edge_label_name(ltstype, 0, "assert");
-         lts_type_set_edge_label_type(ltstype, 0, "assert");
-         lts_type_set_edge_label_typeno(ltstype, 0, assert_type);
     }
 
     // get initial state
