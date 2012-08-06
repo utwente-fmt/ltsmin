@@ -14,9 +14,8 @@
 #define RUNTIME_H
 #endif
 
-#ifndef POPT_ARG_LONGLONG
-#define POPT_ARG_LONGLONG POPT_ARG_LONG
-#endif
+#define EXPECT_FALSE(e) __builtin_expect(e, 0)
+#define EXPECT_TRUE(e) __builtin_expect(e, 1)
 
 /**
 Opaque type memory region.
@@ -109,12 +108,23 @@ on the command line.
 extern void HREinit(int *argc,char **argv[]);
 
 /**
-\brief Assertion check.
+\brief Assertion check, with or without print arguments
 */
-#define HREassert(check,...)    if (!check) {\
-                                    Print(error,__VA_ARGS__);\
-                                    HREabort(-1);\
-                                }
+#ifdef DNDEBUG
+#define HREassert(check,...)    ((void)0)
+#else
+#define HREassert(e,...) \
+    if (EXPECT_FALSE(!(e))) {\
+        char buf[4096];\
+        if (#__VA_ARGS__[0])\
+            snprintf(buf, 4096, ": " __VA_ARGS__);\
+        else\
+            buf[0] = '\0';\
+        Print(assertion, "assertion \"%s\" failed%s", #e, buf);\
+        exit(-1);\
+    }
+#endif
+
 /**
 \brief Assertion check only for debugging.
 */

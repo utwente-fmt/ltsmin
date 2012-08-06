@@ -6,10 +6,20 @@
 #include <popt.h>
 #include <stdlib.h>
 
+
+#ifndef POPT_ARG_LONGLONG
+#define POPT_ARG_LONGLONG POPT_ARG_LONG
+#endif
+
 /**
 \brief Opaque type log stream or channel.
 */
 typedef struct runtime_log *log_t;
+
+/**
+\brief Log stream for assertion failures.
+*/
+extern log_t assertion;
 
 /**
 \brief Log stream for error messages.
@@ -77,7 +87,7 @@ This channel is a macro. If LTSMIN_DEBUG is defined then
 debugging info can be printed by using the --debug option.
 Otherwise the debug statements are removed at compile time.
 */
-#ifdef LTSMIN_DEBUG
+#if defined(LTSMIN_DEBUG) && !defined(NDEBUG)
 #define debug hre_debug
 #else
 #define debug NULL
