@@ -1,5 +1,5 @@
 #include <config.h>
-#include <assert.h>
+
 #include <dlfcn.h>
 #include <limits.h>
 #include <stdlib.h>
@@ -279,8 +279,8 @@ SpinJaloadGreyboxModel(model_t model, const char *filename)
     if (bool_is_new) {
         int idx_false = GBchunkPut(model, bool_type, chunk_str("false"));
         int idx_true  = GBchunkPut(model, bool_type, chunk_str("true"));
-        assert (idx_false == 0);
-        assert (idx_true == 1);
+        HREassert (idx_false == 0, "idx_false != 0 but %d", idx_false);
+        HREassert (idx_true == 1, "idx_true != 1 but %d", idx_true);
         (void)idx_false; (void)idx_true;
     }
 
@@ -297,7 +297,7 @@ SpinJaloadGreyboxModel(model_t model, const char *filename)
          for (int i = 0; i < spinja_get_edge_count(); i++) {
              const char* edge_value = spinja_get_edge_name(i);
              int num = GBchunkPut(model, assert_type, chunk_str((char*)edge_value));
-             assert (i == num);
+             HREassert (i == num, "typenum error");
          }
          lts_type_set_edge_label_count(ltstype, 1);
          lts_type_set_edge_label_name(ltstype, 0, "assert");
@@ -347,13 +347,13 @@ SpinJaloadGreyboxModel(model_t model, const char *filename)
     dm_create(dm_write_info, ngroups, state_length);
     for (int i=0; i < dm_nrows(dm_info); i++) {
         int* proj = (int*)spinja_get_transition_read_dependencies(i);
-        assert (proj != NULL);
+        HREassert (proj != NULL, "No SpinJa read dependencies");
         for(int j=0; j<state_length; j++) {
             if (proj[j]) dm_set(dm_info, i, j);
             if (proj[j]) dm_set(dm_read_info, i, j);
         }
         proj = (int*)spinja_get_transition_write_dependencies(i);
-        assert (proj != NULL);
+        HREassert (proj != NULL, "No SpinJa write dependencies");
         for(int j=0; j<state_length; j++) {
             if (proj[j]) dm_set(dm_info, i, j);
             if (proj[j]) dm_set(dm_write_info, i, j);
@@ -448,8 +448,8 @@ SpinJaloadGreyboxModel(model_t model, const char *filename)
 	        GBsetGuardNDSInfo(model, gnds_info);
 	    }
 	}
-    assert (0 == GBgetAcceptingStateLabelIndex(model));
-	assert(sl_current==sl_size);
+    HREassert (0 == GBgetAcceptingStateLabelIndex(model), "Wrong accepting state label index");
+	HREassert (sl_current==sl_size, "State labels wrongly initialized");
 
 	GBsetStateLabelInfo(model, sl_info);
 

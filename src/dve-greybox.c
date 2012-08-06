@@ -1,5 +1,5 @@
 #include <config.h>
-#include <assert.h>
+
 #include <dlfcn.h>
 #include <fcntl.h>
 #include <limits.h>
@@ -103,7 +103,7 @@ sl_long_p (model_t model, int label, int *state)
 static void
 sl_all_p (model_t model, int *state, int *labels)
 {
-    assert (labels != NULL);
+    HREassert (labels != NULL, "no labels");
     labels[GBgetAcceptingStateLabelIndex(model)] = buchi_is_accepting(model, state);
 }
 
@@ -325,7 +325,7 @@ DVE2loadGreyboxModel(model_t model, const char *filename)
     //assume sequential use:
     if (NULL == dlHandle) {
         char *extension = strrchr (filename, '.');
-        assert (extension != NULL);
+        HREassert (extension != NULL, "No filename extension %s", filename);
         ++extension;
         if (0==strcmp (extension, "dve2C") || 0==strcmp (extension, "so")) {
             DVE2loadDynamicLib(model, filename);
@@ -400,8 +400,8 @@ DVE2loadGreyboxModel(model_t model, const char *filename)
     if (bool_is_new) {
         int idx_false = GBchunkPut(model, bool_type, chunk_str("false"));
         int idx_true  = GBchunkPut(model, bool_type, chunk_str("true"));
-        assert (idx_false == 0);
-        assert (idx_true == 1);
+        HREassert (idx_false == 0, "idx_false != 0 but %d", idx_false);
+        HREassert (idx_true == 1, "idx_true != 1 but %d", idx_true);
         (void)idx_false; (void)idx_true;
     }
 

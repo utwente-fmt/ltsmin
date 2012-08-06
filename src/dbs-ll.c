@@ -1,9 +1,9 @@
 #include <config.h>
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <pthread.h>
-#include <assert.h>
 #include <string.h>
 #include <time.h>
 
@@ -107,7 +107,7 @@ DBSLLinc_sat_bits (const dbs_ll_t dbs, const dbs_ref_t ref)
     mem_hash_t      val, newval;
     do {
         val = atomic_read (dbs->table+ref);
-        assert ((val & dbs->sat_mask) != dbs->sat_mask);
+        HREassert ((val & dbs->sat_mask) != dbs->sat_mask, "Too many incs");
         newval = val + 1;
     } while ( ! cas (dbs->table+ref, val, newval) );
     return newval;
@@ -119,7 +119,7 @@ DBSLLdec_sat_bits (const dbs_ll_t dbs, const dbs_ref_t ref)
     mem_hash_t      val, newval;
     do {
         val = atomic_read (dbs->table+ref);
-        assert ((val & dbs->sat_mask) != 0);
+        HREassert ((val & dbs->sat_mask) != 0, "Too many decs");
         newval = val - 1;
     } while ( ! cas (dbs->table+ref, val, newval) );
     return newval;
@@ -225,7 +225,7 @@ DBSLLcreate_sized (int length, int size, hash64_f hash64, int satellite_bits)
     dbs->length = length;
     dbs->hash64 = hash64;
     dbs->full = 0;
-    assert(satellite_bits < 32);
+    HREassert (satellite_bits < 8, "To many satellite bits for good DBS performance");
     dbs->sat_bits = satellite_bits;
     dbs->sat_mask = satellite_bits ? (1UL<<satellite_bits) - 1 : 0;
     WRITE_BIT <<= satellite_bits;

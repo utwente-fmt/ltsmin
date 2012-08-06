@@ -1,6 +1,5 @@
 #include <config.h>
 
-#include <assert.h>
 #include <ctype.h>
 
 #include <chunk_support.h>
@@ -73,7 +72,7 @@ void
 chunk2string (chunk src, size_t dst_size, char *dst) {
     Warning (debug, "encoding chunk of length %d", src.len);
 
-    assert (dst_size >= sizeof "##...");
+    HREassert (dst_size >= sizeof "##...", "Chunk too small (sizeof '##...')");
 
     size_t k = 0;
     for (size_t i = 0; i < src.len; ++i) {

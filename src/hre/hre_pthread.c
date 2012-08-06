@@ -1,7 +1,6 @@
 // -*- tab-width:4 ; indent-tabs-mode:nil -*-
 #include <config.h>
 
-#include <assert.h>
 #include <fcntl.h>
 #include <pthread.h>
 #include <signal.h>
@@ -201,7 +200,7 @@ alloc_region(size_t size, bool public)
 }
 
 static void * pthread_shm_get(hre_context_t context,size_t size){
-    assert(sizeof(union shm_pointer) == sizeof(uint64_t));
+    HREassert(sizeof(union shm_pointer) == sizeof(uint64_t), "Not a 64 bit pointer");
     union shm_pointer shm;
     shm.val=0;
     if (HREme(context)==0){
@@ -223,7 +222,7 @@ create_shared_region(bool public)
     struct shared_area *shared = alloc_region(size, public);
     while (shared == NULL) {
         size/=2;
-        assert (size >> CACHE_LINE);
+        HREassert (size >> CACHE_LINE, "Could not allocate any space for defailt memory region");
         shared = alloc_region(size, public);
     }
     if (size != real) {
@@ -322,7 +321,7 @@ static const char* process_class="HRE multi-process";
 #define FILE_MODE (S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)
 
 void* hre_posix_shm_get(hre_context_t context,size_t size){
-    assert(sizeof(union shm_pointer) == sizeof(uint64_t));
+    HREassert(sizeof(union shm_pointer) == sizeof(uint64_t), "Not a 64 bit pointer");
     Debug("Creating posix SHM");
     union shm_pointer template[4]={{.val=0},{.val=0},{.val=0},{.val=0}};
     void* shm=NULL;

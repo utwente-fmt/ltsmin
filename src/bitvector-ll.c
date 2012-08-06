@@ -7,7 +7,6 @@
 
 #include "config.h"
 
-#include <assert.h>
 #include <math.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -19,6 +18,7 @@
 
 struct bitvector_ll_s {
     size_t              sat_bits;
+    size_t              sat_mask;
     size_t              log_bits;
     uint16_t           *bits;
 };
@@ -79,8 +79,8 @@ BVLLinc_sat_bits (const bitvector_ll_t *dbs, const bv_ref_t ref)
     size_t rest = (ref << dbs->log_bits) & 15;
     do {
         bits = atomic_read (dbs->bits + pos);
-        //new_val = (bits >> rest) & (dbs->sat_bits - 1);
-        //assert (new_val < (1UL << dbs->root.sat_bits) && "Too many sat bit incs");
+        HRE_ASSERT (((bits >> rest) & dbs->sat_mask) < dbs->sat_bits - 1,
+                    "Too many sat bit incs");
         new_val = bits + (1 << rest);
     } while ( !cas(dbs->bits+pos, bits, new_val) );
     return  (new_val >> rest) & (dbs->sat_bits - 1);
@@ -94,11 +94,11 @@ BVLLdec_sat_bits (const bitvector_ll_t *dbs, const bv_ref_t ref)
     size_t rest = (ref << dbs->log_bits) & 15;
     do {
         bits = atomic_read (dbs->bits + pos);
-        //new_val = (bits >> rest) & (dbs->sat_bits - 1);
-        //assert (new_val > 0 && "Too many sat bit decs");
+        HRE_ASSERT (((bits >> rest) & dbs->sat_mask) > 0,
+                    "Too many sat bit decs");
         new_val = bits - (1 << rest);
     } while ( !cas(dbs->bits+pos, bits, new_val) );
-    return (new_val >> rest) & (dbs->sat_bits - 1);
+    return (new_val >> rest) & dbs->sat_mask;
 }
 
 bitvector_ll_t *
@@ -107,7 +107,8 @@ BVLLcreate (size_t bits, size_t size)
     bitvector_ll_t     *dbs = RTalign (CACHE_LINE_SIZE, sizeof(bitvector_ll_t));
     dbs->log_bits = ceil (log(bits) / log(2));
     dbs->sat_bits = 1UL << dbs->log_bits;
-    assert (dbs->sat_bits < 16 && "too many sat bits for tree DB");
+    dbs->sat_mask = dbs->sat_bits - 1;
+    HREassert (dbs->sat_bits < 16, "too many sat bits for bitvector-ll");
     dbs->bits = RTalignZero (CACHE_LINE_SIZE, dbs->sat_bits << (size - 3));
     return dbs;
 }

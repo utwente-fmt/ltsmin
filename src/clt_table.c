@@ -1,5 +1,5 @@
 #include <config.h>
-#include <assert.h>
+
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdint.h>
@@ -57,7 +57,7 @@ static inline size_t
 clt_find_left_from (const clt_dbs_t* dbs, size_t pos)
 {
 	do {
-        assert (pos > 0);
+        HREassert (pos > 0, "Cleary table overflow"); //TODO: return negative error (see dbs-ll.c)
 		pos--;
 	} while (dbs->table[pos].occupied);
 	return pos;
@@ -68,7 +68,7 @@ clt_find_right_from (const clt_dbs_t* dbs, size_t pos)
 {
 	do {
 		pos++;
-		assert (pos < dbs->size+dbs->b_space+dbs->b_space);
+		HREassert (pos < dbs->size + dbs->b_space + dbs->b_space, "Cleary table overflow");
 	} while (dbs->table[pos].occupied);
 	return pos;
 }
@@ -138,7 +138,7 @@ clt_unlock (const clt_dbs_t* dbs, size_t pos)
 int
 clt_find_or_put (const clt_dbs_t* dbs, uint64_t k)
 {
-    assert (k < (1UL << dbs->keysize));
+    HREassert (k < (1UL << dbs->keysize), "Cleary table: invalid key");
     clt_bucket_t        check, oldval, newval;
     uint32_t            rem = CLT_REM (k);
     uint64_t            idx = CLT_HASH (dbs,k) + dbs->b_space; // add breathing space
@@ -189,7 +189,7 @@ clt_find_or_put (const clt_dbs_t* dbs, uint64_t k)
             int c2 = count;
             --j;
             while (c2 < 1 && dbs->table[j].occupied) {
-                assert (j < dbs->size+dbs->b_space+dbs->b_space);
+                HREassert (j < dbs->size + dbs->b_space + dbs->b_space, "Cleary table overflow");
                 c2 += dbs->table[j].change;
                 if (c2 == 0) {
                     if (dbs->table[j].rest < rem) break;
@@ -206,7 +206,7 @@ clt_find_or_put (const clt_dbs_t* dbs, uint64_t k)
         // swap
         q = t_right;
         while (1) {
-            assert (q <  dbs->size+dbs->b_space+dbs->b_space);
+            HREassert (q <  dbs->size + dbs->b_space + dbs->b_space, "Cleary table overflow");
             count += dbs->table[q-1].change;
 
             if ( (dbs->table[idx].virgin && count == 0 && dbs->table[q-1].rest < rem) ||  //bij de juiste groep zoeken naar de correcte positie in de groep
@@ -221,7 +221,7 @@ clt_find_or_put (const clt_dbs_t* dbs, uint64_t k)
             dbs->table[q].change     = dbs->table[q-1].change;
             dbs->table[q].occupied   = 1;
             --q;
-            assert (q < dbs->size+dbs->b_space+dbs->b_space);
+            HREassert (q < dbs->size + dbs->b_space + dbs->b_space, "Cleary table overflow");
         }
 
         dbs->table[q].rest      = rem;
@@ -246,7 +246,7 @@ clt_find_or_put (const clt_dbs_t* dbs, uint64_t k)
             int c2 = count;
             ++j;
             while (c2 < 0 && dbs->table[j].occupied) {
-                assert (j < dbs->size+dbs->b_space+dbs->b_space);
+                HREassert (j < dbs->size + dbs->b_space + dbs->b_space, "Cleary table overflow");
                 if (c2 == -1) {
                     if (dbs->table[j].rest > rem) break;
                     if (dbs->table[j].rest == rem) {
@@ -276,7 +276,7 @@ clt_find_or_put (const clt_dbs_t* dbs, uint64_t k)
                 dbs->table[q].change = 0;
 
             ++q;
-            assert (q < dbs->size+dbs->b_space+dbs->b_space);
+            HREassert (q < dbs->size + dbs->b_space + dbs->b_space, "Cleary table overflow");
         }
 
         dbs->table[q].rest         = rem;
@@ -300,11 +300,15 @@ clt_find_or_put (const clt_dbs_t* dbs, uint64_t k)
 clt_dbs_t *
 clt_create (uint32_t ksize, uint32_t log_size)
 {
-    assert (sizeof(clt_bucket_t) == sizeof(uint32_t));
-    assert (log_size <= 40 && "Cleary table to large");
-    assert (log_size > 7 && "Cleary table to small to add breathing space");
-    assert (ksize > 0 && ksize <= log_size + R_BITS && "Wrong cleary table dimensions");
-    assert (ksize > log_size && "Cleary keysize to small for good distribution");
+    HREassert (sizeof(clt_bucket_t) == sizeof(uint32_t), "Wrong bucket size");
+    HREassert (log_size <= 40, "Cleary table to large: 2^%zu", log_size);
+    HREassert (log_size > 7, "Cleary table to small to add breathing space: 2^%zu", log_size);
+    HREassert (ksize > 0 && ksize <= log_size + R_BITS,
+               "Wrong Cleary table dimensions "
+               "(logsize:2^%zu, keysize: %zu)", log_size, ksize);
+    HREassert (ksize > log_size,
+               "Cleary keysize to small for good distribution "
+               "(logsize:2^%zu, keysize: %zu)", log_size, ksize);
     clt_dbs_t              *dbs = RTmalloc (sizeof(clt_dbs_t));
     dbs->size = 1UL << log_size;
     dbs->mask = dbs->size - 1;
@@ -313,7 +317,7 @@ clt_create (uint32_t ksize, uint32_t log_size)
     dbs->diff = dbs->keysize - dbs->log_size;
     dbs->b_space = dbs->size >> 5; // < 5 %
     dbs->table = RTmallocZero ((dbs->size + 2*dbs->b_space) * sizeof(clt_bucket_t));
-    assert ( !(((size_t)dbs->table) & 3) && "Wrong alignment");
+    HREassert ( !(((size_t)dbs->table) & 3), "Wrong alignment");
     if (dbs->table == NULL)
         Abort ("Something went wrong allocating the table array... aborting.\n");
     return dbs;

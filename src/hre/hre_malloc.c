@@ -1,7 +1,7 @@
 // -*- tab-width:4 ; indent-tabs-mode:nil -*-
 #include <config.h>
 #undef _XOPEN_SOURCE
-#include <assert.h>
+
 #include <dlfcn.h>
 #include <errno.h>
 #include <libgen.h>
@@ -64,7 +64,7 @@ void* RTalign(size_t align, size_t size) {
             Fatal(0,error,"unknown error allocating %zu bytes aligned at %d",
                   size, align);
     }}
-    assert(NULL != ret);
+    HREassert (NULL != ret, "Alloc failed");
     return ret;
 }
 

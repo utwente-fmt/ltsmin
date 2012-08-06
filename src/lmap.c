@@ -1,6 +1,5 @@
 #include <config.h>
 
-#include <assert.h>
 #include <pthread.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -189,10 +188,10 @@ allocate_block (lm_t *map)
     lm_loc_t next = local->next_store;
     local->next_store += map->block_size;
     size_t end = local->next_store - 1;
-    assert (end < map->wSize && "Lattice map allocator overflow, enlarge LM_FACTOR.");
+    HREassert (end < map->wSize, "Lattice map allocator overflow, enlarge LM_FACTOR.");
     lm_loc_t end_loc = (lm_loc_t)&local->table[end];
     lm_store_t block_end = lm_get_store (end_loc);
-    assert (block_end.internal == LM_STATUS_EMPTY);
+    HREassert (block_end.internal == LM_STATUS_EMPTY, "Block not initialized to LM_STATUS_EMPTY");
     lm_set_int (end_loc, LM_STATUS_END);
     return (lm_loc_t)&local->table[next];
 }
@@ -249,8 +248,8 @@ lm_loc_t
 lm_insert_from_cas (lm_t *map, ref_t k, lattice_t l,
                 lm_status_t status, lm_loc_t *start)
 {
-    assert (l < 1UL << LATTICE_BITS && "Lattice pointer does not fit in store!");
-    assert (k < map->size && "Lattice map size does not match |ref_t|.");
+    HREassert (l < 1UL << LATTICE_BITS, "Lattice pointer does not fit in store!");
+    HREassert (k < map->size, "Lattice map size does not match |ref_t|.");
     lm_loc_t loc = NULL == start ?  (lm_loc_t)&map->table[k] : *start;
     lm_store_t store = lm_get_store (loc);
     lm_store_t *s_loc = (lm_store_t *)loc;
@@ -297,8 +296,8 @@ lm_loc_t
 lm_insert_from (lm_t *map, ref_t k, lattice_t l,
                 lm_status_t status, lm_loc_t *start)
 {
-    assert (l < 1UL << LATTICE_BITS && "Lattice pointer does not fit in store!");
-    assert (k < map->size && "Lattice map size does not match |ref_t|.");
+    HREassert (l < 1UL << LATTICE_BITS, "Lattice pointer does not fit in store!");
+    HREassert (k < map->size, "Lattice map size does not match |ref_t|.");
     lm_loc_t loc = NULL == start ?  (lm_loc_t)&map->table[k] : *start;
     lm_store_t store = lm_get_store (loc);
     lm_store_t *s_loc = (lm_store_t *)loc;
@@ -371,7 +370,7 @@ void
 lm_set_status (lm_t *map, lm_loc_t location, lm_status_t status)
 {
     location = follow (location);
-    assert (status < (1UL << 3) && "Only 3 status bits are reserved.");
+    HREassert (status < (1UL << 3), "Only 3 status bits are reserved.");
     lm_store_t store = lm_get_store (location);
     switch (store.internal) {
     case LM_STATUS_LATTICE:
@@ -461,7 +460,7 @@ lm_iterate (lm_t *map, ref_t k, lm_iterate_f cb, void *ctx)
 lm_t *
 lm_create (size_t workers, size_t size, size_t block_size)
 {
-    assert (block_size >= 2 && block_size < size * LM_FACTOR && "Wrong block size");
+    HREassert (block_size >= 2 && block_size < size * LM_FACTOR, "Wrong block size");
     lm_t           *map = RTalignZero (CACHE_LINE_SIZE, sizeof (struct lm_s));
     map->workers = workers;
     map->size = size;

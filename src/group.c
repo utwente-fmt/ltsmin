@@ -1,6 +1,5 @@
 #include <config.h>
 
-#include <assert.h>
 #include <stdio.h>
 #include <string.h>
 #include <strings.h>
@@ -194,8 +193,6 @@ max_col_first (matrix_t *m, int cola, int colb)
     return 0;
 }
 
-void GBcopyLTStype(model_t model,lts_type_t info);
-
 static void
 apply_regroup_spec (matrix_t *m, const char *spec_)
 {
@@ -203,7 +200,7 @@ apply_regroup_spec (matrix_t *m, const char *spec_)
     if (spec_ != NULL) {
         char               *spec = strdup (spec_);
         char               *spec_full = spec;
-        assert (spec != NULL);
+        HREassert (spec != NULL, "No spec");
 
         char               *tok;
         while ((tok = strsep (&spec, ",")) != NULL) {
@@ -387,7 +384,7 @@ GBregroup (model_t model, const char *regroup_spec)
     matrix_t           *s = RTmalloc (sizeof (matrix_t));
 
     dm_copy (GBgetStateLabelInfo (model), s);
-    assert (dm_ncols(m) == dm_ncols(s));
+    HREassert (dm_ncols(m) == dm_ncols(s), "Error in DM copy");
 
     // probably better to write some functions to do this,
     // i.e. dm_get_column_permutation

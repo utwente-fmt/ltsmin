@@ -1,6 +1,6 @@
 // -*- tab-width:4 ; indent-tabs-mode:nil -*-
 #include <config.h>
-#include <assert.h>
+
 #include <string.h>
 #include <stdlib.h>
 
@@ -126,7 +126,7 @@ static void len_resize(void*arg,void*old_array,int old_size,void*new_array,int n
 				len=si->len[current];
 				hash=SuperFastHash(si->data[current],len,0);
 				bucket=hash&si->mask;
-				assert(bucket==i||bucket==N+i);
+				HREassert(bucket==i||bucket==N+i,"error");
 				si->next[current]=si->table[bucket];
 				si->table[bucket]=current;
 				DEBUG("moving %s from %d to %d",si->data[current],i,bucket);

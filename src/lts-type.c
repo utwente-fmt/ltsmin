@@ -1,12 +1,12 @@
 // -*- tab-width:4 ; indent-tabs-mode:nil -*-
 #include <config.h>
-#include <assert.h>
+
 #include <string.h>
 
+#include <dynamic-array.h>
 #include <hre/user.h>
 #include <lts-type.h>
 #include <stringindex.h>
-#include <dynamic-array.h>
 
 struct lts_type_s {
 int state_length;
@@ -25,17 +25,17 @@ int *type_max;
 };
 
 int lts_type_get_max(lts_type_t  t,int typeno){
-    assert(t->type_format[typeno]==LTStypeRange);
+    HREassert(t->type_format[typeno]==LTStypeRange, "Wrong type");
     return t->type_max[typeno];
 }
 
 int lts_type_get_min(lts_type_t  t,int typeno){
-    assert(t->type_format[typeno]==LTStypeRange);
+    HREassert(t->type_format[typeno]==LTStypeRange, "Wrong type");
     return t->type_min[typeno];
 }
 
 void lts_type_set_range(lts_type_t  t,int typeno,int min,int max){
-    assert(t->type_format[typeno]==LTStypeRange);
+    HREassert(t->type_format[typeno]==LTStypeRange, "Wrong type");
     t->type_min[typeno]=min;
     t->type_max[typeno]=max;
 }

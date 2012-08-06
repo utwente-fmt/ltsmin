@@ -1,5 +1,5 @@
 #include "config.h"
-#include <assert.h>
+
 #include <pthread.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -165,7 +165,7 @@ TreeDBSLLinc_sat_bits (const treedbs_ll_t dbs, const tree_ref_t ref)
     do {
         bits = atomic_read (dbs->root.table+ref);
         new_val = b2s (dbs, bits);
-        assert (new_val < (1UL << dbs->root.sat_bits) && "Too many sat bit incs");
+        HREassert (new_val < (1UL << dbs->root.sat_bits), "Too many sat bit incs");
         new_val += 1;
     } while ( !cas_sat_bits(dbs, ref, bits, new_val) );
     return new_val;
@@ -178,7 +178,7 @@ TreeDBSLLdec_sat_bits (const treedbs_ll_t dbs, const tree_ref_t ref)
     do {
         bits = atomic_read (dbs->root.table+ref);
         new_val = b2s (dbs, bits);
-        assert (new_val > 0 && "Too many sat bit decs");
+        HREassert (new_val > 0, "Too many sat bit decs");
         new_val -= 1;
     } while ( !cas_sat_bits(dbs, ref, bits, new_val) );
     return new_val;
@@ -199,7 +199,7 @@ lookup (node_table_t *nodes,
     stats_t            *stat = &loc->stat;
     uint64_t            mem, hash, a;
     mem = hash = mix64 (data);
-    assert (data != EMPTY_1 && "Value out of table range.");
+    HREassert (data != EMPTY_1, "Value out of table range.");
     data += 1; // avoid EMPTY
     for (size_t probes = 0; probes < nodes->thres; probes++) {
         size_t              ref = hash & nodes->mask;
@@ -221,7 +221,7 @@ lookup (node_table_t *nodes,
         }
         a = hash;
         hash = prime_rehash (hash, mem);
-        assert ((hash & CL_MASK) != (a & CL_MASK));
+        HREassert ((hash & CL_MASK) != (a & CL_MASK), "loop in hashing function");
         stat->rehashes++;
     }
     return nodes->error_num;
@@ -446,10 +446,12 @@ treedbs_ll_t
 TreeDBSLLcreate_dm (int nNodes, int size, int ratio, matrix_t * m,
                     int satellite_bits, int slim, int indexing)
 {
-    assert (size <= DB_SIZE_MAX && "Tree too large");
-    assert (nNodes >= 2 && "Tree vectors too small");
-    assert ((slim == 0 || slim == 1) && "Wrong value for slim");
-    assert (satellite_bits + 2 * (size-ratio) <= 64 && "Tree table size and satellite bits too large or ratio loo low.");
+    HREassert (size <= DB_SIZE_MAX, "Tree too large: %d", size);
+    HREassert (nNodes >= 2, "Tree vectors too small: %d", nNodes);
+    HREassert ((slim == 0 || slim == 1), "Wrong value for slim: %d", slim);
+    HREassert (satellite_bits + 2 * (size-ratio) <= 64,
+               "Tree table size and satellite bits (%d) too large or ratio too "
+               "low (%d).", satellite_bits, ratio);
     treedbs_ll_t        dbs = RTalign (CACHE_LINE_SIZE, sizeof(struct treedbs_ll_s));
     dbs->nNodes = nNodes;
     dbs->ratio = ratio;

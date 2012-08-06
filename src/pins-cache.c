@@ -1,6 +1,5 @@
 #include <config.h>
 
-#include <assert.h>
 #include <stdlib.h>
 
 #include <dynamic-array.h>
@@ -112,7 +111,7 @@ cached_transition_in_group (model_t self, int* labels, int group)
 model_t
 GBaddCache (model_t model)
 {
-    assert (model != NULL);
+    HREassert (model != NULL, "No model");
     matrix_t           *p_dm = GBgetDMInfo (model);
     matrix_t           *p_dm_read = GBgetDMInfoRead (model);
     matrix_t           *p_dm_write = GBgetDMInfoWrite (model);

@@ -1,7 +1,5 @@
 #include <config.h>
 
-#include <assert.h>
-
 #include <chunk_support.h>
 #include <dynamic-array.h>
 #include <greybox.h>
@@ -489,7 +487,7 @@ void tableaux_table_grow(tableaux_table_t *t)
  */
 void tableaux_table_add(tableaux_table_t *t, uint32_t hash, void* data)
 {
-    //assert(hash != NULL);
+    //HREassert(hash != NULL, "no hash");
     uint32_t key = hash & (t->size-1);
     while(1) {
         // empty bucket?
@@ -588,7 +586,7 @@ lookup_type_value (ltsmin_expr_t e, int type,ltsmin_parse_env_t env,model_t m)
 {
     chunk c;
     c.data = SIgetC(env->idents,e->idx,(int*)&c.len);
-    assert(NULL != c.data);
+    HREassert (NULL != c.data, "Empty chunk");
     int count = GBchunkCount(m,type);
     e->num = GBchunkPut(m,type,(const chunk)c);
     if (count != GBchunkCount(m,type)) // value was added

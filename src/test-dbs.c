@@ -5,7 +5,6 @@
  *      Author: laarman
  */
 
-#include <assert.h>
 #include <sys/times.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -14,7 +13,6 @@
 
 #include <atomics.h>
 #include <dbs-ll.h>
-#include <hre-main.h>
 #include <hre/user.h>
 #include <stats.h>
 #include <hre-io/user.h>
@@ -333,7 +331,7 @@ main (int c, char **v)
     printf("%zu ", val); val = TreeDBSLLinc_sat_bits (dbs, ref);
     printf("%zu ", val); val = TreeDBSLLinc_sat_bits (dbs, ref);
     printf("%zu ", val); val = TreeDBSLLinc_sat_bits (dbs, ref);
-    assert ( val == 31 );
+    HREassert ( val == 31, "Error in test");
     printf("%zu ", val); val = TreeDBSLLdec_sat_bits (dbs, ref);
     printf("%zu ", val); val = TreeDBSLLdec_sat_bits (dbs, ref);
     printf("%zu ", val); val = TreeDBSLLdec_sat_bits (dbs, ref);
@@ -365,7 +363,7 @@ main (int c, char **v)
     printf("%zu ", val); val = TreeDBSLLdec_sat_bits (dbs, ref);
     printf("%zu ", val); val = TreeDBSLLdec_sat_bits (dbs, ref);
     printf("%zu ", val); val = TreeDBSLLdec_sat_bits (dbs, ref);
-    assert ( val == 0 );
+    HREassert ( val == 0, "no empty");
     printf("%zu ", val); val = TreeDBSLLdec_sat_bits (dbs, ref);
     //TreeDBSLLinc_sat_bits (dbs, ref);
 }

@@ -11,7 +11,6 @@
 
 #include <config.h>
 
-#include <assert.h>
 #include <stdlib.h>
 
 #include <atomics.h>
@@ -85,7 +84,8 @@ void
 lb2_local_init (lb2_t *lb, int id, void *arg)
 {
     lb2_status_t        *loc = RTalign(CACHE_LINE_SIZE, sizeof(lb2_status_t));
-    assert ((size_t)&loc->received - (size_t)&loc->requests == CACHE_LINE_SIZE);
+    size_t alloc_distance = (size_t)&loc->received - (size_t)&loc->requests;
+    HREassert (alloc_distance == CACHE_LINE_SIZE, "Wrong alignment in allocation");
     loc->idle = 0;
     loc->requests = 0;
     loc->seed = (id + 1) * 32732678642;
@@ -124,7 +124,7 @@ handoff (lb2_t *lb, int id, size_t requests, size_t *my_load,
     for (size_t idx = 0; idx < j; idx++) {
         int oid = todo[idx];
         if (j - idx <= (lb->threads >> 1)) {
-            assert (get_idle (lb, oid));
+            HREassert (get_idle (lb, oid), "Thread reactiveated before handoff complete");
             size_t handoff = *my_load >> 1;
             handoff = handoff < lb->max_handoff ? handoff : lb->max_handoff;
             size_t load = split (lb->local[id]->arg, lb->local[oid]->arg, handoff);
@@ -157,7 +157,7 @@ lb2_internal (lb2_t *lb, int id, size_t my_load, lb2_split_problem_f split)
             Debug ("LBing with load: %zu, all_done: %zu", my_load, all_idle);
             if ( all_idle ) {
                 set_all_done (lb);
-                assert (my_load == 0);
+                HREassert (my_load == 0, "Premature termination detection");
                 break; // load == 0
             }
             wait_reply = request_random (lb, id); // lb->threads > 1
@@ -185,17 +185,18 @@ lb2_create (size_t threads, size_t gran)
 lb2_t                *
 lb2_create_max (size_t threads, size_t gran, size_t max)
 {
-    assert (threads <= LB2_MAX_THREADS);
+    HREassert (threads <= LB2_MAX_THREADS, "Only %d threads allowed", LB2_MAX_THREADS);
     lb2_t               *lb = RTalign(CACHE_LINE_SIZE, sizeof(lb2_t));
     lb->local = RTalign(CACHE_LINE_SIZE, sizeof(lb2_status_t[LB2_MAX_THREADS]));
-    assert ((size_t)&lb->barrier_wait - (size_t)&lb->barrier_count == CACHE_LINE_SIZE);
+    size_t alloc_distance = (size_t)&lb->barrier_wait - (size_t)&lb->barrier_count;
+    HREassert (alloc_distance == CACHE_LINE_SIZE, "Wrong alignment in allocation");
     for (size_t i = 0; i < threads; i++)
         lb->local[i] = NULL;
     lb->threads = threads;
     lb->all_done = 0;
     lb->stopped = 0;
     lb->max_handoff = max;
-    assert (gran < 32 && "wrong granularity");
+    HREassert (gran < 32, "wrong granularity");
     lb->granularity = 1UL << gran;
     lb->mask = lb->granularity - 1;
     return lb;
@@ -214,7 +215,6 @@ lb2_barrier_result_t
 lb2_barrier (lb2_t *lb)
 {
     size_t W = lb->threads;
-    //assert ((W <= LB2_MAX_THREADS));
     size_t          flip = atomic_read (&lb->barrier_wait);
     size_t          count = add_fetch (&lb->barrier_count, 1);
     if (W == count) {
@@ -231,7 +231,7 @@ size_t
 lb2_reduce (lb2_t *lb, size_t val)
 {
     size_t W = lb->threads;
-    //assert ((W <= LB2_MAX_THREADS) && (val < (1UL<<58)) && (sizeof(size_t) == 8));
+    HRE_ASSERT ((val < (1UL<<58)) && (sizeof(size_t) == 8), "Overflow in reduce");
     size_t          flip = atomic_read (&lb->reduce_wait);
     size_t          count = add_fetch (&lb->reduce_count, val + (1UL << 58));
     if (count >> 58 == W) {

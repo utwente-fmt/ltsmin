@@ -56,18 +56,14 @@ static void fix_array(struct array ref,int old_size,int new_size){
 	void*tmp;
 	void*old=*ref.ar;
 	tmp=RTrealloc(*ref.ar,new_size*ref.e_size);
-	if (tmp) {
-		DEBUG("%x -> %x",*ref.ar,tmp);
-		*ref.ar=tmp;
-		if (ref.callback) {
-			ref.callback(ref.cbarg,old,old_size,tmp,new_size);
-		} else if (new_size>old_size) {
-			memset(tmp+(old_size*ref.e_size), 0, (new_size-old_size)*ref.e_size);
-		}
-	} else {
-		// size is never 0, so tmp==NULL is an error.
-		Abort("realloc from %d to %d * %d failed",old_size,new_size,ref.e_size);
-	}
+	HREassert (tmp, "realloc from %d to %d * %d failed",old_size,new_size,ref.e_size);
+    DEBUG("%x -> %x",*ref.ar,tmp);
+    *ref.ar=tmp;
+    if (ref.callback) {
+        ref.callback(ref.cbarg,old,old_size,tmp,new_size);
+    } else if (new_size>old_size) {
+        memset(tmp+(old_size*ref.e_size), 0, (new_size-old_size)*ref.e_size);
+    }
 }
 
 void add_array(array_manager_t man,void**ar,int e_size,array_resize_cb callback,void*cbarg){

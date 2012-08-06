@@ -1,7 +1,5 @@
 #include <config.h>
 
-#include <config.h>
-
 #include <color.h>
 
 static size_t               count_mask;

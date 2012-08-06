@@ -14,7 +14,6 @@
 #include <mcrl2/lps/ltsmin.h>
 
 extern "C" {
-#include <assert.h>
 #include <popt.h>
 
 #include <dm/dm.h>

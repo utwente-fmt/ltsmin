@@ -2,7 +2,6 @@
 
 #include <config.h>
 
-#include <assert.h>
 #include <stdint.h>
 
 #include <dynamic-array.h>
@@ -257,7 +256,7 @@ void TaskSubmitFixed(hre_task_t task,int owner,void* arg){
 }
 
 void TaskSubmitFlex(hre_task_t task,int owner,int len,void* arg){
-    assert(len>=0);
+    HREassert(len>=0, "len < 0 (%d)", len);
     int me=HREme(task->queue->ctx);
     if (me==owner) {
         task->call(task->arg,me,len,arg);

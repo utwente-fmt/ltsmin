@@ -1,7 +1,6 @@
 // -*- tab-width:4 ; indent-tabs-mode:nil -*-
 #include <config.h>
 
-#include <assert.h>
 #include <fcntl.h>
 #include <limits.h>
 #include <mpi.h>
@@ -60,8 +59,8 @@ static void mpi_send(hre_context_t context,hre_msg_t msg){
 
 static void mpi_thread_send(hre_context_t context,hre_msg_t msg){
     Debug("posting send %d -> %d on comm %d tag %d (%p)",msg->source,msg->target,msg->comm,msg->tag,msg);
-    assert(msg->source==(unsigned int)HREme(context));
-    assert(msg->target!=(unsigned int)HREme(context));
+    HREassert(msg->source==(unsigned int)HREme(context), "Caller should be sender");
+    HREassert(msg->target!=(unsigned int)HREme(context), "Caller cannot be receiver and sender");
     int host=context->shared->addr[msg->target].host;
     int tag=msg->tag*context->shared->max_threads*context->shared->max_threads;
     tag=tag+context->shared->addr[msg->source].thread*context->shared->max_threads;
@@ -92,8 +91,8 @@ void mpi_thread_recv_ready(void* context,MPI_Status *status){
 
 static void mpi_thread_recv(hre_context_t context,hre_msg_t msg){
     Debug("posting %d -> %d recv on comm %d tag %d (%p)",msg->source,msg->target,msg->comm,msg->tag,msg);
-    assert(msg->target==(unsigned int)HREme(context));
-    assert(msg->source!=(unsigned int)HREme(context));
+    HREassert(msg->source==(unsigned int)HREme(context), "Caller should be receiver");
+    HREassert(msg->target!=(unsigned int)HREme(context), "Caller cannot be receiver and sender");
     int source=context->shared->addr[msg->source].host;
     int tag=msg->tag*context->shared->max_threads*context->shared->max_threads;
     tag=tag+context->shared->addr[msg->source].thread*context->shared->max_threads;
@@ -324,7 +323,7 @@ static hre_context_t HREctxMPIshared(MPI_Comm parent,hre_context_t local){
             }
         }
     }
-    assert(sizeof(union mpi_pointer) == sizeof(uint64_t));
+    HREassert(sizeof(union mpi_pointer) == sizeof(uint64_t), "Expected 64 bit pointer");
     union mpi_pointer temp[4]={{.val=0},{.val=0},{.val=0},{.val=0}};
     if (local_me==0){
         temp[0].val=global_peers;

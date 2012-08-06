@@ -1,6 +1,5 @@
 #include <config.h>
 
-#include <assert.h>
 #include <limits.h>
 #include <stdlib.h>
 
@@ -368,7 +367,7 @@ GBaddLTL (model_t model, const char *ltl_file, pins_ltl_type_t type, model_t por
     int type_count = lts_type_get_type_count(ltstype_new);
     int ltl_type = lts_type_add_type(ltstype_new, "buchi", NULL);
     // sanity check, type ltl is new (added last)
-    assert (ltl_type == type_count);
+    HREassert (ltl_type == type_count, "LTL type error");
     int bool_is_new;
     int bool_type = lts_type_add_type (ltstype_new, "bool", &bool_is_new);
 
@@ -406,8 +405,8 @@ GBaddLTL (model_t model, const char *ltl_file, pins_ltl_type_t type, model_t por
     if (bool_is_new) {
         int         idx_false = GBchunkPut(ltlmodel, bool_type, chunk_str("false"));
         int         idx_true  = GBchunkPut(ltlmodel, bool_type, chunk_str("true"));
-        assert (idx_false == 0);
-        assert (idx_true == 1);
+        HREassert (idx_false == 0, "idx_false != 0 but %d", idx_false);
+        HREassert (idx_true == 1, "idx_true != 1 but %d", idx_true);
         (void)idx_false; (void)idx_true;
     }
 
