@@ -181,6 +181,7 @@ static char            *act_detect = NULL;
 static char            *inv_detect = NULL;
 static int              no_exit = 0;
 static int              act_index = -1;
+static int              act_type = -1;
 static int              act_label = -1;
 static ltsmin_expr_t    inv_expr = NULL;
 static size_t           G = 1;
@@ -809,9 +810,9 @@ init_globals ()
                 strncmp(lts_type_get_edge_label_name(ltstype, act_label),
                         "action", 6) != 0)
             Abort("No edge label 'action...' for action detection");
-        int typeno = lts_type_get_edge_label_typeno(ltstype, act_label);
+        act_type = lts_type_get_edge_label_typeno(ltstype, act_label);
         chunk c = chunk_str(act_detect);
-        act_index = GBchunkPut(model, typeno, c);
+        act_index = GBchunkPut(model, act_type, c);
         Warning(info, "Detecting action \"%s\"", act_detect);
     }
     if (inv_detect)
@@ -2316,7 +2317,7 @@ action_detect (wctx_t *ctx, transition_info_t *ti, ref_t last)
     ctx->counters.errors++;
     if ((!no_exit || trc_output) && lb2_stop(lb2)) {
         ctx->state.ref = last; // include the action in the trace
-        chunk c = GBchunkGet (ctx->model, act_label, act_index);
+        chunk c = GBchunkGet (ctx->model, act_type, act_index);
         char value[4096];
         chunk2string(c, 4096, value);
         Warning (info, "");
