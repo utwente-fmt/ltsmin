@@ -3,6 +3,7 @@
 #define HRE_USER_H
 
 #include <popt.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 
@@ -312,18 +313,15 @@ extern void* RTrealloc(void *rt_ptr, size_t size);
 
 extern void RTfree(void *rt_ptr);
 
+/**
+\brief Switch (HREsetRegion) to the global allocator provided by the region
+        HREdefaultRegion (shared = true). And back (shared = false).
+ */
+extern void RTswitchAlloc(bool shared);
+
 #define RT_NEW(obj) HRE_NEW(NULL,obj)
 #define Warning Print
 #define Fatal(code,chan,...) Abort(__VA_ARGS__)
-
-/**
- * Macros for switching runtime allocation to HRE global region and back (LOCAL).
- */
-#define RT_ALLOC_GLOBAL \
-    HREassert ((HREdefaultRegion(HREglobal()) != NULL), "RT_ALLOC_GLOBAL: no global region available");\
-    HREassert ((RTgetMallocRegion() == NULL), "RT_ALLOC_GLOBAL: global region already active!");\
-    RTsetMallocRegion (HREdefaultRegion(HREglobal()));
-#define RT_ALLOC_LOCAL RTsetMallocRegion (NULL);
 
 /*}@*/
 

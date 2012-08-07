@@ -38,9 +38,10 @@ static inline size_t min (size_t a, size_t b) {
     return a < b ? a : b;
 }
 
+#define                     MAX_STRATEGIES 5
+
 /********************************** TYPEDEFS **********************************/
 
-#define                     MAX_STRATEGIES 5
 typedef int                *state_data_t;
 static const state_data_t   state_data_dummy;
 static const size_t         SLOT_SIZE = sizeof(*state_data_dummy);
@@ -572,7 +573,7 @@ wctx_t *
 wctx_create (model_t model, int depth, wctx_t *shared)
 {
     HREassert (NULL == 0, "NULL != 0");
-    MC_ALLOC_GLOBAL
+    RTswitchAlloc (!SPEC_MT_SAFE);
     wctx_t             *ctx = RTalignZero (CACHE_LINE_SIZE, sizeof (wctx_t));
     ctx->id = HREme (HREglobal());
     ctx->strategy = strategy[depth];
@@ -586,7 +587,7 @@ wctx_create (model_t model, int depth, wctx_t *shared)
     if (UseGreyBox == call_mode && Strat_DFS == strategy[depth]) {
         ctx->group_stack = isba_create (1);
     }
-    MC_ALLOC_LOCAL
+    RTswitchAlloc (false);
 
     //allocate two bits for NDFS colorings
     if (strategy[depth] & Strat_LTL) {
@@ -628,7 +629,7 @@ wctx_free_rec (wctx_t *ctx, int depth)
     if (NULL != ctx->permute)
         permute_free (ctx->permute);
 
-    MC_ALLOC_GLOBAL
+    RTswitchAlloc (!SPEC_MT_SAFE);
     if (NULL != ctx->group_stack)
         isba_destroy (ctx->group_stack);
     //if (strategy[depth] & (Strat_BFS | Strat_ENDFS | Strat_CNDFS))
@@ -640,7 +641,7 @@ wctx_free_rec (wctx_t *ctx, int depth)
     if ( NULL != ctx->rec_ctx )
         wctx_free_rec (ctx->rec_ctx, depth+1);
     RTfree (ctx);
-    MC_ALLOC_LOCAL
+    RTswitchAlloc (false);
 }
 
 void
@@ -658,7 +659,7 @@ postlocal_global_init (wctx_t *ctx)
 {
     int id = HREme (HREglobal());
     if (id == 0) {
-        MC_ALLOC_GLOBAL
+        RTswitchAlloc (!SPEC_MT_SAFE);
         global = RTmallocZero (sizeof(global_t));
         matrix_t           *m = GBgetDMInfo (ctx->model);
         size_t              bits = global_bits + count_bits;
@@ -681,21 +682,18 @@ postlocal_global_init (wctx_t *ctx)
         } else {
             global->threshold = 100000 / W;
         }
-        RTsetMallocRegion(NULL);
-        MC_ALLOC_LOCAL
+        RTswitchAlloc (false);
         (void) signal (SIGINT, exit_ltsmin);
     }
     HREreduce (HREglobal(), 1, &global, &global, UInt64, Max);
-
-    MC_ALLOC_GLOBAL
-    lb2_local_init (global->lb2, ctx->id, ctx);
-    MC_ALLOC_LOCAL
 
     color_set_dbs(global->dbs);
 
     global->contexts[id] = ctx; // publish local context
 
-    HREbarrier(HREglobal());
+    RTswitchAlloc (!SPEC_MT_SAFE);
+    lb2_local_init (global->lb2, ctx->id, ctx); // Barrier
+    RTswitchAlloc (false);
 }
 
 /**
@@ -706,11 +704,12 @@ void
 prelocal_global_init ()
 {
     if (HREme(HREglobal()) == 0) {
-        tables = cct_create_map (); // HRE-aware
-        GBloadFileShared (NULL, files[0]); // NOTE: no model argument
         pthread_mutexattr_t attr;
-        pthread_mutexattr_setpshared(&attr, MC_MUTEX_SHARED_ATTR);
+        tables = cct_create_map (!SPEC_MT_SAFE);
+        int type = SPEC_MT_SAFE ? PTHREAD_PROCESS_PRIVATE : PTHREAD_PROCESS_SHARED;
+        pthread_mutexattr_setpshared(&attr, type);
         pthread_mutex_init (&mutex, &attr);
+        GBloadFileShared (NULL, files[0]); // NOTE: no model argument
     }
     HREreduce (HREglobal(), 1, &tables, &tables, UInt64, Max);
 }
@@ -819,7 +818,7 @@ local_init ()
 static void
 deinit_globals ()
 {
-    MC_ALLOC_GLOBAL
+    RTswitchAlloc (!SPEC_MT_SAFE);
     if (HashTable & db_type)
         DBSLLfree (global->dbs);
     else //TreeDBSLL
@@ -830,7 +829,7 @@ deinit_globals ()
     if (global->zobrist != NULL)
         zobrist_free(global->zobrist);
     RTfree (global->contexts);
-    MC_ALLOC_LOCAL
+    RTswitchAlloc (false);
 }
 
 static void
@@ -989,9 +988,9 @@ print_statistics (counter_t *ar_reach, counter_t *ar_red, rt_timer_t timer,
 void
 reduce_and_print_result (wctx_t *ctx)
 {
-    MC_ALLOC_GLOBAL
+    RTswitchAlloc (!SPEC_MT_SAFE);
     ctx->stats = statistics (global->dbs);
-    MC_ALLOC_LOCAL
+    RTswitchAlloc (false);
 
     HREbarrier (HREglobal());
     if (0 == ctx->id) {
@@ -1013,7 +1012,9 @@ print_setup ()
 {
     if ((strategy[0] & Strat_LTL) && call_mode == UseGreyBox)
         Warning(info, "Greybox not supported with strategy NDFS, ignored.");
-    Warning (info, "Using %d cores (lb: SRP)", W/*, key_search(lb_methods, lb_method)*/);
+    Warning (info, "Using %d %s (lb: SRP, strategy: %s)", W,
+             W == 1 ? "core (sequential)" : (SPEC_MT_SAFE ? "threads" : "processes"),
+             key_search(strategies, strategy[0]));
     Warning (info, "loading model from %s", files[0]);
     Warning (info, "There are %d state labels and %d edge labels", SL, EL);
     Warning (info, "State length is %d, there are %d groups", N, K);
@@ -2740,11 +2741,12 @@ main (int argc, char *argv[])
     /* Init structures */
     HREinitBegin (argv[0]);
     HREaddOptions (options,"Perform a parallel reachability analysis of <model>\n\nOptions");
-#if SPEC_MT_SAFE == 0
-    HREenableAll (); // enable multi process for mCRL/mCrl2 and PBES
-    HREenableThreads (0);
-#else
+#if SPEC_MT_SAFE == 1
     HREenableThreads (1);
+    Warning (info, "Enabling multi-thread runtime.");
+#else
+    HREenableFork (1); // enable multi-process env for mCRL/mCrl2 and PBES
+    Warning (info, "Enabling multi-process runtime.");
 #endif
     HREinitStart (&argc,&argv,1,1,files,"<model>");      // spawns threads!
 

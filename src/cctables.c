@@ -1,5 +1,6 @@
 #include <config.h>
 
+#include <pthread.h>
 #include <stdint.h>
 
 #include <cctables.h>
@@ -7,6 +8,34 @@
 #include <hre/user.h>
 #include <stringindex.h>
 
+/**
+ * Class diagram:
+ *
+ * (singleton)
+ *    /---\ 1     *  /-----\
+ *    |Map|----------|Table|
+ *    \---/          \-----/
+ *      |1
+ *      |
+ *      |
+ * /---------\ 1  1 /------\
+ * |Container|------|Worker|
+ * \---------/      \------/
+ *
+ * A worker (PThread or process) has a local container which maintains allocated
+ * tables. Tables are allocated in fixed order because all workers execute the
+ * same deterministic code.
+ * Before a table is allocated, the container checks the global Map structure
+ * whether or not it the table with this index was already allocated (remember
+ * the fixed order). If not allocates it, adds it to the map and the container.
+ * Otherwise, it reads the existing table from the Map and adds it to the
+ * local container.
+ *
+ * A function pointer in allocator switches the allocator to a inter-process
+ * allocator when tables are create or when values are added to the tables.
+ * An rw mutex takes care of mutual exclusion (it is initialized as
+ * inter-process mutex depending on the value of shared).
+ */
 
 static const size_t MAX_TABLES = 500;
 
@@ -20,35 +49,39 @@ typedef struct table_s table_t;
 
 struct cct_map_s {
     pthread_rwlock_t        map_lock;
+    bool                    shared;   // shared or private allocation
     table_t                *table;
 };
 
 struct table_s {
     pthread_rwlock_t        table_lock;
     void                   *string_index;
+    cct_map_t              *map;
 };
 
 struct cct_cont_s {
     size_t                  map_index;
-    cct_map_t              *tables;
+    cct_map_t              *map;
 };
 
 
 cct_map_t *
-cct_create_map()
+cct_create_map(bool shared)
 {
-    MC_ALLOC_GLOBAL
+    RTswitchAlloc(shared);
     cct_map_t *map = RTmallocZero(sizeof(cct_map_t));
+    map->shared = shared;
     map->table = RTmallocZero(sizeof(table_t[MAX_TABLES]));
     for ( size_t i = 0; i < MAX_TABLES; i++ )
         map->table[i].string_index = NULL;
     pthread_rwlockattr_t    lock_attr;
     pthread_rwlockattr_init(&lock_attr);
-    if (pthread_rwlockattr_setpshared(&lock_attr, MC_MUTEX_SHARED_ATTR)){
+    int type = map->shared ? PTHREAD_PROCESS_SHARED : PTHREAD_PROCESS_PRIVATE;
+    if (pthread_rwlockattr_setpshared(&lock_attr, type)){
         AbortCall("pthread_rwlockattr_setpshared");
     }
     pthread_rwlock_init(&map->map_lock, &lock_attr);
-    MC_ALLOC_LOCAL
+    RTswitchAlloc(false);
     return map;
 }
 
@@ -57,7 +90,7 @@ cct_create_cont(cct_map_t *tables)
 { 
     cct_cont_t *container = RTmalloc(sizeof(cct_cont_t));
     container->map_index = 0;
-    container->tables = tables;
+    container->map = tables;
     return container;
 }
 
@@ -96,27 +129,29 @@ void *
 cct_new_map(void* context) 
 {
     cct_cont_t *cont = context;
-    cct_map_t *map = cont->tables;
+    cct_map_t *map = cont->map;
     pthread_rwlock_rdlock(&map->map_lock);
     if (cont->map_index >= MAX_TABLES)
-        Abort("Chunktable limit reached: %d.", MAX_TABLES);
-    table_t *t = &map->table[cont->map_index++];
+        Abort("Chunk table limit reached: %d.", MAX_TABLES);
+    table_t *table = &map->table[cont->map_index++];
     pthread_rwlock_unlock(&map->map_lock);
-    if (!t->string_index) {
+    if (!table->string_index) {
         pthread_rwlock_wrlock(&map->map_lock);
-        if (!t->string_index) {
-            MC_ALLOC_GLOBAL
+        if (!table->string_index) {
+            RTswitchAlloc(map->shared);
             pthread_rwlockattr_t attr; pthread_rwlockattr_init(&attr);
-            if (pthread_rwlockattr_setpshared(&attr, MC_MUTEX_SHARED_ATTR)){
+            int type = map->shared ? PTHREAD_PROCESS_SHARED : PTHREAD_PROCESS_PRIVATE;
+            if (pthread_rwlockattr_setpshared(&attr, type)){
                 AbortCall("pthread_rwlockattr_setpshared");
             }
-            pthread_rwlock_init(&t->table_lock, &attr);
-            t->string_index = SIcreate();
-            MC_ALLOC_LOCAL
+            pthread_rwlock_init(&table->table_lock, &attr);
+            table->string_index = SIcreate();
+            table->map = map;
+            RTswitchAlloc(false);
         }
         pthread_rwlock_unlock(&map->map_lock);
     }
-    return t;
+    return table;
 }
 
 inline void *
@@ -138,9 +173,9 @@ cct_map_put(void*ctx,void *chunk,int len)
     pthread_rwlock_unlock(&table->table_lock);
     if (idx==SI_INDEX_FAILED) {
         pthread_rwlock_wrlock(&table->table_lock);
-        MC_ALLOC_GLOBAL
+        RTswitchAlloc(table->map->shared);
         idx = SIputC(table->string_index,chunk,len);
-        MC_ALLOC_LOCAL
+        RTswitchAlloc(false);
         pthread_rwlock_unlock(&table->table_lock);
     }
     return idx;

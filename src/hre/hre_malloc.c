@@ -139,6 +139,19 @@ void RTfree(void *rt_ptr){
     }
 }
 
+void
+RTswitchAlloc (bool shared)
+{
+    if (shared) {
+        HREassert (RTgetMallocRegion() == NULL);
+        //HREassert (HREdefaultRegion(HREglobal()) != NULL);
+        RTsetMallocRegion (HREdefaultRegion(HREglobal()));
+    } else {
+        //HREassert (RTgetMallocRegion() != NULL);
+        RTsetMallocRegion (NULL);
+    }
+}
+
 struct hre_region_s {
     void*area;
     hre_malloc_t malloc;
