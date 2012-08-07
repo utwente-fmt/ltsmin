@@ -185,7 +185,7 @@ lb2_create (size_t threads, size_t gran)
 lb2_t                *
 lb2_create_max (size_t threads, size_t gran, size_t max)
 {
-    HREassert (threads <= LB2_MAX_THREADS, "Only %d threads allowed", LB2_MAX_THREADS);
+    HREassert (threads <= LB2_MAX_THREADS, "Only %zu threads allowed", LB2_MAX_THREADS);
     lb2_t               *lb = RTalign(CACHE_LINE_SIZE, sizeof(lb2_t));
     lb->local = RTalign(CACHE_LINE_SIZE, sizeof(lb2_status_t[LB2_MAX_THREADS]));
     size_t alloc_distance = (size_t)&lb->barrier_wait - (size_t)&lb->barrier_count;

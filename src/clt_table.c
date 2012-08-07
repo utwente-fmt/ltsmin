@@ -301,14 +301,12 @@ clt_dbs_t *
 clt_create (uint32_t ksize, uint32_t log_size)
 {
     HREassert (sizeof(clt_bucket_t) == sizeof(uint32_t), "Wrong bucket size");
-    HREassert (log_size <= 40, "Cleary table to large: 2^%zu", log_size);
-    HREassert (log_size > 7, "Cleary table to small to add breathing space: 2^%zu", log_size);
-    HREassert (ksize > 0 && ksize <= log_size + R_BITS,
-               "Wrong Cleary table dimensions "
-               "(logsize:2^%zu, keysize: %zu)", log_size, ksize);
-    HREassert (ksize > log_size,
-               "Cleary keysize to small for good distribution "
-               "(logsize:2^%zu, keysize: %zu)", log_size, ksize);
+    HREassert (log_size <= 40, "Cleary table to large: 2^%u", log_size);
+    HREassert (log_size > 7, "Cleary table to small to add breathing space: 2^%u", log_size);
+    HREassert (ksize > 0 && ksize <= log_size + R_BITS, "Wrong Cleary table dimensions "
+               "(logsize:2^%u, keysize: %u)", log_size, ksize);
+    HREassert (ksize > log_size, "Cleary keysize to small for good distribution "
+               "(logsize:2^%u, keysize: %u)", log_size, ksize);
     clt_dbs_t              *dbs = RTmalloc (sizeof(clt_dbs_t));
     dbs->size = 1UL << log_size;
     dbs->mask = dbs->size - 1;
