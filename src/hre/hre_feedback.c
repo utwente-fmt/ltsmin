@@ -201,7 +201,7 @@ void log_message(log_t log,const char*file,int line,int errnum,const char *fmt,.
     struct thread_context *ctx=pthread_getspecific(hre_key);
     // If needed put the time in the string when.
     char when[128];
-    if (HREwhen){
+    if (HREwhen && ctx){
         struct timeval tv;
         if (gettimeofday(&tv,NULL)){
             HREwhen=0;
@@ -263,7 +263,8 @@ void log_message(log_t log,const char*file,int line,int errnum,const char *fmt,.
         errmsg[0]=0;
         err_msg=errmsg;
     }
+    char *label = ctx ? ctx->label : "HRE";
     // print the entire line in one statement to minimize interleaving in output.
-    fprintf(f,"%s%s%s%s: %s%s\n",ctx->label,when,where,tag,main_msg,err_msg);
+    fprintf(f,"%s%s%s%s: %s%s\n",label,when,where,tag,main_msg,err_msg);
 }
 
