@@ -18,7 +18,13 @@
 
 #include <hre/provider.h>
 
-static size_t SHARED_ALIGN=CACHE_LINE_SIZE;
+/**
+ * For pthreads we only use a small shared region for the queues.
+ * For forks all shared objects are allocated on the region, so we try to claim
+ * as much memory as possible.
+ */
+static size_t PTHREAD_SHARED_SIZE = 8388608;
+static size_t SHARED_ALIGN = sizeof(size_t);
 #define QUEUE_SIZE 64
 
 struct shared_area {
@@ -63,7 +69,7 @@ static void* area_malloc(void* ptr,size_t size){
     if (remainder)
         size = size + area->align - remainder;
     area->next = area->next + size;
-    //Debug("allocated %zu from %zu to %zu next %zu",old_size,tmp,tmp+size,area->next);
+    Debug("allocated %zu from %zu to %zu next %zu",old_size,tmp,tmp+size,area->next);
     pthread_mutex_unlock(&area->mutex);
     return res;
 }
@@ -215,10 +221,9 @@ static void * pthread_shm_get(hre_context_t context,size_t size){
 static const char* pthread_class="Posix threads";
 
 static struct shared_area *
-create_shared_region(bool public)
+create_shared_region(size_t size, bool public)
 {
-    size_t size, real;
-    size = real = RTmemSize() * 16;
+    size_t real = size;
     struct shared_area *shared = alloc_region(size, public);
     while (shared == NULL) {
         size/=2;
@@ -272,7 +277,7 @@ void HREpthreadRun(int threads){
     /* Caused huge performance regression in MC tool */
     //pthread_attr_t attr;
     //attr = set_thread_stack_size();
-    struct shared_area *shared = create_shared_region(false);
+    struct shared_area *shared = create_shared_region(PTHREAD_SHARED_SIZE,false);
     hre_region_t region=HREcreateRegion(shared,area_malloc,area_align,area_realloc,area_free);
 
     struct message_queue *queues=HREmallocZero(region,threads*sizeof(struct message_queue));
@@ -419,7 +424,7 @@ static void fork_start(int* argc,char **argv[],int run_threads){
     for(int i=0;i<procs;i++) pid[i]=0;
 
     // this area is mmapped before the fork, so no shm_open is required
-    struct shared_area* shared = create_shared_region(true);
+    struct shared_area* shared = create_shared_region(RTmemSize()*4, true);
     hre_region_t region=HREcreateRegion(shared,area_malloc,area_align,area_realloc,area_free);
 
     struct message_queue *queues=HREmallocZero(region,procs*sizeof(struct message_queue));
@@ -502,6 +507,7 @@ static void fork_start(int* argc,char **argv[],int run_threads){
 }
 
 void HREenableFork(int procs){
+    Debug("Enabling process runtime environment.");
     pthread_condattr_t attr;
     pthread_condattr_init(&attr);
     int res=pthread_condattr_setpshared(&attr,PTHREAD_PROCESS_SHARED);
