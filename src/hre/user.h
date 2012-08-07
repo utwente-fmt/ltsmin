@@ -111,8 +111,13 @@ extern void HREinit(int *argc,char **argv[]);
 \brief Assertion check, with or without print arguments
 */
 #ifdef DNDEBUG
-#define HREassert(check,...)    ((void)0)
+#define HREassert(check,...)    ((void)0);
 #else
+#ifdef LTSMIN_DEBUG
+#define PRINT_STACK HREprintStack();
+#else
+#define PRINT_STACK ((void)0);
+#endif
 #define HREassert(e,...) \
     if (EXPECT_FALSE(!(e))) {\
         char buf[4096];\
@@ -121,6 +126,7 @@ extern void HREinit(int *argc,char **argv[]);
         else\
             buf[0] = '\0';\
         Print(assertion, "assertion \"%s\" failed%s", #e, buf);\
+        PRINT_STACK\
         exit(-1);\
     }
 #endif
@@ -131,7 +137,7 @@ extern void HREinit(int *argc,char **argv[]);
 #ifdef LTSMIN_DEBUG
 #define HRE_ASSERT              HREassert
 #else
-#define HRE_ASSERT(check,...)
+#define HRE_ASSERT(check,...)   ((void)0);
 #endif
 
 /**

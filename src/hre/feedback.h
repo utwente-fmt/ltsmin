@@ -125,7 +125,11 @@ extern log_t hre_debug;
 /**
 \brief Macro that prints a one-line debug message.
 */
+#ifdef LTSMIN_DEBUG
 #define Debug(...) HREmessage(debug,__VA_ARGS__)
+#else
+#define Debug(...) ((void)0);
+#endif
 
 /**
 \brief Macro that prints a one-line message to a channel.
@@ -157,5 +161,7 @@ extern log_t hre_debug;
     log_message(error,__FILE__,__LINE__,errno,__VA_ARGS__);\
     HREabort(0);\
 }
+
+extern void HREprintStack ();
 
 #endif

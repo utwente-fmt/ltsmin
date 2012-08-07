@@ -28,6 +28,7 @@ void
 RTsetMallocRegion(hre_region_t r)
 {
     region = r;
+    Debug ("Switched allocator to %p", r);
 }
 
 void* RTmalloc(size_t size){
@@ -36,6 +37,7 @@ void* RTmalloc(size_t size){
     if(size==0) return NULL;
     void *tmp=malloc(size);
     if (tmp==NULL) Abort("out of memory trying to get %d",size);
+    Debug("allocated %zu from system", size);
     return tmp;
 }
 
@@ -45,6 +47,7 @@ void* RTmallocZero(size_t size){
     if(size==0) return NULL;
     void *tmp=calloc((size + CACHE_LINE_SIZE - 1) >> CACHE_LINE, CACHE_LINE_SIZE);
     if (tmp==NULL) Abort("out of memory trying to get %d",size);
+    Debug("allocated %zu in anonymous pages from system", size);
     return tmp;
 }
 
@@ -65,6 +68,7 @@ void* RTalign(size_t align, size_t size) {
                   size, align);
     }}
     HREassert (NULL != ret, "Alloc failed");
+    Debug("allocated %zu aligned at %zu from system", size, align);
     return ret;
 }
 
@@ -82,6 +86,7 @@ void* RTalignZero(size_t align, size_t size) {
         // for small sizes do memset
         void *mem = RTalign(align, size);
         memset (mem, 0 , size);
+        Debug("allocated %zu in anonymous pages aligned at %zu from system", size, align);
         return mem;
     }
     // for large sizes use calloc and do manual alignment
@@ -101,6 +106,7 @@ void* RTalignZero(size_t align, size_t size) {
     calloc_table[next][0] = p;
     calloc_table[next][1] = old;
     calloc_table[next][2] = (void*)size;
+    Debug("allocated %zu in (LARGE) anonymous pages aligned at %zu from system", size, align);
     return p;
 }
 
@@ -113,6 +119,7 @@ void* RTrealloc(void *rt_ptr, size_t size){
     }
     void *tmp=realloc(rt_ptr,size);
     if (tmp==NULL) Abort("out of memory trying to resize to %d",size);
+    Debug("reallocated %p to size from system", rt_ptr, size);
     return tmp;
 }
 
@@ -122,11 +129,13 @@ void RTfree(void *rt_ptr){
     for (size_t i = 0; i < next_calloc; i++) {
         if (rt_ptr == calloc_table[i][0]) {
             munmap (calloc_table[i][1], (size_t)calloc_table[i][2]);
+            Debug("freed %p (LARGE) from system", rt_ptr);
             return;
         }
     }
     if (rt_ptr != NULL) {
         free (rt_ptr);
+        Debug("freed %p from system", rt_ptr);
     }
 }
 

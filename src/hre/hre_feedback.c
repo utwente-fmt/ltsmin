@@ -56,7 +56,24 @@ static const char when_long[]="when";
 #define quiet_short 'q'
 
 static struct sigaction segv_sa;
-static void segv_handle(int signum){
+
+void
+HREprintStack ()
+{
+#if defined(HAVE_BACKTRACE) && defined(HAVE_BACKTRACE_SYMBOLS)
+    void* stacktrace[64];
+    int size = backtrace (stacktrace, 64);
+    char** stackinfo = backtrace_symbols (stacktrace, size);
+    for (int i = 0; i < size; i++) {
+        fprintf (stderr, " %2d: %s\n", i, stackinfo[i]);
+    }
+#else
+    fprintf (stderr, "not available.\n");
+#endif
+}
+
+static void segv_handle (int signum)
+{
     (void)signum;
     fprintf(stderr,
             "*** segmentation fault ***\n\n"
@@ -66,16 +83,7 @@ static void segv_handle(int signum){
             "In addition, include the following information:\n"
             "Package: " PACKAGE_STRING "\n"
             "Stack trace:\n");
-#if defined(HAVE_BACKTRACE) && defined(HAVE_BACKTRACE_SYMBOLS)
-    void*stacktrace[64];
-    int size=backtrace(stacktrace,64);
-    char **stackinfo=backtrace_symbols(stacktrace,size);
-    for(int i=0;i<size;i++){
-        fprintf(stderr," %2d: %s\n",i,stackinfo[i]);
-    }
-#else
-    fprintf (stderr, "not available.\n");
-#endif
+    HREprintStack ();
     _exit (EXIT_FAILURE);
 }
 static void segv_setup(){
