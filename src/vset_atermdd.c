@@ -147,7 +147,7 @@ static vset_t set_create_both(vdom_t dom,int k,int* proj){
 static void set_destroy_both(vset_t set) {
     ATunprotect(&set->set);
     set->p_len = 0;
-    free(set);
+    RTfree(set);
 }
 
 static vrel_t rel_create_both(vdom_t dom,int k,int* proj){
@@ -196,7 +196,7 @@ static long count_set_t2(ATerm set){
     if (idx>=elem_size){
       long elem_size_old=elem_size;
       elem_size=elem_size+(elem_size>>1);
-      elem_count=realloc(elem_count,elem_size*sizeof(bn_int_t));
+      elem_count=RTrealloc(elem_count,elem_size*sizeof(bn_int_t));
       //ATwarning("resize %d %d %x",idx,elem_size,elem_count);
       for(int i=elem_size_old;i<elem_size;i++) bn_init(&elem_count[i]);
     }
@@ -219,7 +219,7 @@ set_count_t(ATerm set, long *nodes, bn_int_t *elements)
 
   count_is=ATindexedSetCreate(HASH_INIT,HASH_LOAD);
   elem_size=HASH_INIT;
-  elem_count=malloc(elem_size*sizeof(bn_int_t));
+  elem_count=RTmalloc(elem_size*sizeof(bn_int_t));
   for(int i=0;i<elem_size;i++) bn_init(&elem_count[i]);
   node_count=2; // atom and emptyset
   idx=ATindexedSetPut(count_is,Empty,NULL);
@@ -232,7 +232,7 @@ set_count_t(ATerm set, long *nodes, bn_int_t *elements)
   bn_init_copy(elements,&elem_count[idx]);
   ATindexedSetDestroy(count_is);
   for(int i=0;i<elem_size;i++) bn_clear(&elem_count[i]);
-  free(elem_count);
+  RTfree(elem_count);
 
   if (set == Atom || set == Empty)
       node_count = 1;
@@ -258,7 +258,7 @@ static long count_set_2(ATerm set){
     if (idx>=elem_size){
       long elem_size_old=elem_size;
       elem_size=elem_size+(elem_size>>1);
-      elem_count=realloc(elem_count,elem_size*sizeof(bn_int_t));
+      elem_count=RTrealloc(elem_count,elem_size*sizeof(bn_int_t));
       //ATwarning("resize %d %d %x",idx,elem_size,elem_count);
       for(int i=elem_size_old;i<elem_size;i++) bn_init(&elem_count[i]);
     }
@@ -278,7 +278,7 @@ count_set(ATerm set, long *nodes, bn_int_t *elements)
 
   count_is=ATindexedSetCreate(HASH_INIT,HASH_LOAD);
   elem_size=HASH_INIT;
-  elem_count=malloc(elem_size*sizeof(bn_int_t));
+  elem_count=RTmalloc(elem_size*sizeof(bn_int_t));
   for(int i=0;i<elem_size;i++) bn_init(&elem_count[i]);
   node_count=2; // atom and emptyset
   idx=ATindexedSetPut(count_is,(ATerm)emptyset,NULL);
@@ -291,7 +291,7 @@ count_set(ATerm set, long *nodes, bn_int_t *elements)
   bn_init_copy(elements,&elem_count[idx]);
   ATindexedSetDestroy(count_is);
   for(int i=0;i<elem_size;i++) bn_clear(&elem_count[i]);
-  free(elem_count);
+  RTfree(elem_count);
 
   if (set == atom || set == emptyset)
       node_count = 1;

@@ -3,10 +3,11 @@
 #include <ltl2ba.h>
 #undef Debug
 #include <hre/user.h>
-#include <ltsmin-syntax.h>
-#include <ltsmin-grammar.h>
-#include <lts-type.h>
-#include <ltsmin-tl.h>
+#include <ltsmin-lib/ltsmin-syntax.h>
+#include <ltsmin-lib/ltsmin-grammar.h>
+#include <ltsmin-lib/lts-type.h>
+#include <ltsmin-lib/ltsmin-tl.h>
+#include <pins-lib/pins.h>
 
 typedef enum {PARSE_LTL, PARSE_CTL, PARSE_CTL_S, PARSE_MU} parse_mode_t;
 static parse_mode_t parse_mode=PARSE_MU;
@@ -38,12 +39,14 @@ int main(int argc, char *argv[]){
     lts_type_set_edge_label_count(ltstype,1);
     lts_type_set_edge_label_name(ltstype,0,"action");
     lts_type_set_edge_label_type(ltstype,0,"action");
+    model_t model = GBcreateBase();
+    GBsetLTStype(ltstype);
     switch(parse_mode) {
         case PARSE_MU: {
-            mu_parse_file(ltstype, file_name);
+            parse_file(file_name, mu_parse_file, model);
             } break;
         case PARSE_LTL: {
-            ltsmin_expr_t ltl = ltl_parse_file(ltstype, file_name);
+            ltsmin_expr_t ltl = parse_file(file_name, ltl_parse_file, model);
             ltsmin_expr_t notltl = LTSminExpr(UNARY_OP, LTL_NOT, 0, ltl, NULL);
             ltsmin_ltl2ba(notltl);
             /*
@@ -55,11 +58,11 @@ int main(int argc, char *argv[]){
             */
             } break;
         case PARSE_CTL: {
-            ltsmin_expr_t ctl = ctl_parse_file(ltstype, file_name);
+            ltsmin_expr_t ctl = parse_file(file_name, ctl_parse_file, model);
             (void)ctl;
             } break;
         case PARSE_CTL_S: {
-            ltsmin_expr_t ctl = ctl_parse_file(ltstype, file_name);
+            ltsmin_expr_t ctl = parse_file(file_name, ctl_parse_file, model);
             ltsmin_expr_t mu = ctl_star_to_mu(ctl);
             (void)mu;
             } break;

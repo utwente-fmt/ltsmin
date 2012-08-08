@@ -6,9 +6,9 @@
 #include <sys/types.h>
 
 #include <lts-io/user.h>
-#include <lts-type.h>
-#include <treedbs.h>
-#include <bitset.h>
+#include <ltsmin-lib/lts-type.h>
+#include <util-lib/bitset.h>
+#include <util-lib/treedbs.h>
 
 /**
 \file lts-lib/lts.h

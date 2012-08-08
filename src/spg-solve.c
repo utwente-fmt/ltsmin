@@ -324,7 +324,7 @@ void spg_restore_swapped_game(parity_game* g)
             AbortCall ("Unable to open file ``%s''", g->v_priority_swapfile[i]);
         g->v_priority[i] = vset_load(swapfile, g->domain);
         fclose(swapfile);
-        free(g->v_priority_swapfile[i]);
+        free(g->v_priority_swapfile[i]); // tempnam()
     }
 }
 
@@ -563,7 +563,7 @@ recursive_result spg_solve_recursive(parity_game* g,  const spgsolver_options* o
     }
     if (options->swap)
     {
-        free(g_filename);
+        free(g_filename); // tempnam()
     }
 
     if (log_active(infoLong))

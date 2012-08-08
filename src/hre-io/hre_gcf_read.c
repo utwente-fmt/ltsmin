@@ -7,14 +7,14 @@
 #include <string.h>
 #include <strings.h>
 
-#include <balloc.h>
-#include <dynamic-array.h>
 #include <hre/unix.h>
 #include <hre-io/arch_object.h>
 #include <hre-io/gcf_common.h>
 #include <hre-io/stream_object.h>
 #include <hre-io/user.h>
-#include <stringindex.h>
+#include <util-lib/balloc.h>
+#include <util-lib/dynamic-array.h>
+#include <util-lib/stringindex.h>
 
 typedef struct part_list_s *part_list_t;
 struct part_list_s {

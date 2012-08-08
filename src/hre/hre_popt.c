@@ -6,11 +6,11 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#include <dynamic-array.h>
 #include <git_version.h>
 #include <hre/internal.h>
 #include <hre/unix.h>
 #include <hre/user.h>
+#include <util-lib/dynamic-array.h>
 
 enum {
     PRINT_VERSION = 1,

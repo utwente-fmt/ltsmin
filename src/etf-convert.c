@@ -6,9 +6,9 @@
 #include <stdio.h>
 #include <string.h>
 
-#include <etf-util.h>
 #include <hre/user.h>
-#include <ltsmin-syntax.h>
+#include <ltsmin-lib/etf-util.h>
+#include <ltsmin-lib/ltsmin-syntax.h>
 
 static int pv_count;
 static char* pvars=NULL;

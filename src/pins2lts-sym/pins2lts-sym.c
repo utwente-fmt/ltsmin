@@ -8,16 +8,17 @@
 #include <strings.h>
 
 #include <dm/dm.h>
-#include <dynamic-array.h>
-#include <greybox.h>
 #include <hre/user.h>
 #include <lts-io/user.h>
-#include <ltsmin-syntax.h>
-#include <ltsmin-tl.h>
-#include <spec-greybox.h>
-#include <stringindex.h>
-#include <vector_set.h>
+#include <pins-lib/pins.h>
+#include <pins-lib/pins-impl.h>
+#include <pins-lib/property-semantics.h>
+#include <ltsmin-lib/ltsmin-syntax.h>
+#include <ltsmin-lib/ltsmin-tl.h>
 #include <spg-solve.h>
+#include <vector_set.h>
+#include <util-lib/dynamic-array.h>
+#include <util-lib/stringindex.h>
 
 
 static ltsmin_expr_t mu_expr = NULL;
@@ -2089,14 +2090,14 @@ main (int argc, char *argv[])
 
     // temporal logics
     if (mu_formula) {
-        mu_expr = mu_parse_file(model, mu_formula);
+        mu_expr = parse_file(mu_formula, mu_parse_file, model);
 #if 0
         char buf[1024];
         ltsmin_expr_print_mu(mu_expr, buf);
         printf("computing: %s\n",buf);
 #endif
     } else if (ctl_formula) {
-        ltsmin_expr_t ctl = ctl_parse_file(model, ctl_formula);
+        ltsmin_expr_t ctl = parse_file(ctl_formula, ctl_parse_file, model);
         mu_expr = ctl_star_to_mu(ctl);
         mu_formula = ctl_formula;
     }

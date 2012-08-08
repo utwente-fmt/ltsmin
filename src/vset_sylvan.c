@@ -170,8 +170,8 @@ static void set_destroy(vset_t set)
     sylvan_deref(set->bdd);
     sylvan_deref(set->projection);
     sylvan_deref(set->variables_set);
-    free(set->variables_arr);
-    free(set);
+    RTfree(set->variables_arr);
+    RTfree(set);
 }
 
 /**

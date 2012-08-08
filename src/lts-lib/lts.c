@@ -9,7 +9,7 @@
 #include <hre/user.h>
 #include <lts-io/provider.h>
 #include <lts-lib/lts.h>
-#include <tables.h>
+#include <util-lib/tables.h>
 
 lts_t lts_create(){
     lts_t lts=(lts_t)RTmallocZero(sizeof(struct lts));

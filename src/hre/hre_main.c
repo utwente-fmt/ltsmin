@@ -199,6 +199,7 @@ void HREregisterRuntime(hre_runtime_t runtime){
 }
 
 void HREenableThreads(int threads){
+    Debug("Enabling posix threads runtime environment.");
     if (HREmainThread()){
         thread_count=threads;
     }

@@ -3,7 +3,7 @@ AC_INIT([ltsmin],[1.8],[ltsmin-support@cs.utwente.nl])
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_AUX_DIR([autotools])
 AM_INIT_AUTOMAKE([foreign])
-AC_CONFIG_SRCDIR([src/greybox.c])
+AC_CONFIG_SRCDIR([src/pins-lib/pins.c])
 AC_CONFIG_HEADERS([src/config.h])
 
 AC_SUBST([pkglibdir], "\${libdir}/${PACKAGE_NAME}-${PACKAGE_VERSION}")
@@ -398,16 +398,20 @@ AC_CONFIG_FILES([
        src/hre-test/Makefile
        src/lts-io/Makefile
        src/lts-lib/Makefile
-       src/lts-tracepp/Makefile
-       src/ltscmp-one/Makefile
-       src/ltstrans/Makefile
+       src/mc-lib/Makefile
+       src/util-lib/Makefile
+       src/ltsmin-lib/Makefile
+       src/pins-lib/Makefile
+       src/ltsmin-printtrace/Makefile
+       src/ltsmin-compare/Makefile
+       src/ltsmin-convert/Makefile
        src/gcf-tool/Makefile
        src/pins2lts-dist/Makefile
        src/pins2lts-mc/Makefile
        src/pins2lts-seq/Makefile
        src/pins2lts-sym/Makefile
-       src/sigmin-one/Makefile
-       src/sigmin-mpi/Makefile
+       src/ltsmin-reduce/Makefile
+       src/ltsmin-reduce-dist/Makefile
        src/spg/Makefile
        src/dm/Makefile
        src/bignum/Makefile
@@ -417,7 +421,7 @@ AC_CONFIG_FILES([
        lemon/Makefile
 ])
 
-AC_CONFIG_LINKS([src/lempar.c:lemon/lempar.c])
+AC_CONFIG_LINKS([src/ltsmin-lib/lempar.c:lemon/lempar.c])
 
 AC_CONFIG_SUBDIRS([buddy ltl2ba])
 
