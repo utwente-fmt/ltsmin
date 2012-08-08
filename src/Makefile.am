@@ -30,18 +30,18 @@ SUBDIRS += lts-io
 SUBDIRS += lts-lib
 SUBDIRS += .
 SUBDIRS += gcf-tool
-SUBDIRS += lts-tracepp
-SUBDIRS += ltscmp-one
-SUBDIRS += ltstrans
+SUBDIRS += ltsmin-printtrace
+SUBDIRS += ltsmin-compare
+SUBDIRS += ltsmin-convert
 SUBDIRS += pins2lts-dist
 SUBDIRS += pins2lts-sym
 SUBDIRS += pins2lts-seq
 if HAVE_ATOMICS
 SUBDIRS += pins2lts-mc
 endif
-SUBDIRS += sigmin-one
+SUBDIRS += ltsmin-reduce
 if HAVE_MPI
-SUBDIRS += sigmin-mpi
+SUBDIRS += ltsmin-reduce-dist
 endif
 SUBDIRS += ce
 SUBDIRS += torx

@@ -1,0 +1,8 @@
+bin_PROGRAMS = ltsmin-compare
+
+# ltsmin-compare
+ltsmin_compare_SOURCES   = ltsmin-compare.c
+ltsmin_compare_LDADD     =  ../lts-lib/liblts-lib.la ../lts-io/liblts-io.la
+ltsmin_compare_LDADD    += ../hre/libhre.la ../libltsmin.la
+ltsmin_compare_CPPFLAGS  = -I ${top_srcdir}/src $(AM_CPPFLAGS)
+ltsmin_compare_LDFLAGS   = $(AM_LDFLAGS)

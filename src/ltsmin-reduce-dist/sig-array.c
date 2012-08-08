@@ -2,7 +2,7 @@
 #include <config.h>
 
 #include <hre/user.h>
-#include <sig-array.h>
+#include <ltsmin-reduce-dist/sig-array.h>
 
 struct sig_array_s {
     seg_lts_t lts;

@@ -398,16 +398,16 @@ AC_CONFIG_FILES([
        src/hre-test/Makefile
        src/lts-io/Makefile
        src/lts-lib/Makefile
-       src/lts-tracepp/Makefile
-       src/ltscmp-one/Makefile
-       src/ltstrans/Makefile
+       src/ltsmin-printtrace/Makefile
+       src/ltsmin-compare/Makefile
+       src/ltsmin-convert/Makefile
        src/gcf-tool/Makefile
        src/pins2lts-dist/Makefile
        src/pins2lts-mc/Makefile
        src/pins2lts-seq/Makefile
        src/pins2lts-sym/Makefile
-       src/sigmin-one/Makefile
-       src/sigmin-mpi/Makefile
+       src/ltsmin-reduce/Makefile
+       src/ltsmin-reduce-dist/Makefile
        src/spg/Makefile
        src/dm/Makefile
        src/bignum/Makefile

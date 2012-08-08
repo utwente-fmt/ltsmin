@@ -5,8 +5,8 @@
 #include <popt.h>
 
 #include <hre-mpi/user.h>
-#include <sigmin-mpi/seg-lts.h>
-#include <sigmin-mpi/sigmin-types.h>
+#include <ltsmin-reduce-dist/seg-lts.h>
+#include <ltsmin-reduce-dist/sigmin-types.h>
 
 extern struct poptOption sigmin_set_options[];
 

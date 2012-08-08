@@ -5,8 +5,8 @@
 #include <hre/runtime.h>
 #include <hre-mpi/user.h>
 #include <lts-lib/set.h>
-#include <sigmin-mpi/sigmin-types.h>
-#include <sigmin-mpi/sigmin-set.h>
+#include <ltsmin-reduce-dist/sigmin-types.h>
+#include <ltsmin-reduce-dist/sigmin-set.h>
 
 static int mpi_nodes=0;
 static int mpi_me=0;

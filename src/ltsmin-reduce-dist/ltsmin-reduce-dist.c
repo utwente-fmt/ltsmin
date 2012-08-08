@@ -8,10 +8,10 @@
 #include <fast_hash.h>
 #include <hre/runtime.h>
 #include <hre-mpi/user.h>
-#include <sigmin-mpi/seg-lts.h>
-#include <sigmin-mpi/sigmin-array.h>
-#include <sigmin-mpi/sigmin-set.h>
-#include <sigmin-mpi/sig-array.h>
+#include <ltsmin-reduce-dist/seg-lts.h>
+#include <ltsmin-reduce-dist/sigmin-array.h>
+#include <ltsmin-reduce-dist/sigmin-set.h>
+#include <ltsmin-reduce-dist/sig-array.h>
 #include <stringindex.h>
 
 #define STRONG_REDUCTION_SET 1

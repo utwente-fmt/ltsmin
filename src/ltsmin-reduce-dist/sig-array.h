@@ -7,8 +7,8 @@
 #ifndef SIG_ARRAY_H
 #define SIG_ARRAY_H
 
-#include <sigmin-mpi/seg-lts.h>
-#include <sigmin-mpi/sigmin-types.h>
+#include <ltsmin-reduce-dist/seg-lts.h>
+#include <ltsmin-reduce-dist/sigmin-types.h>
 
 /// Opaque type for a signature array.
 typedef struct sig_array_s* sig_array_t;

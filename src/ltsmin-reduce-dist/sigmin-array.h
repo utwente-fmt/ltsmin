@@ -3,8 +3,8 @@
 #ifndef SIGMIN_ARRAY_H
 #define SIGMIN_ARRAY_H
 
-#include <sigmin-mpi/seg-lts.h>
-#include <sigmin-mpi/sig-array.h>
+#include <ltsmin-reduce-dist/seg-lts.h>
+#include <ltsmin-reduce-dist/sig-array.h>
 
 /**
 \brief Compute a sig array equivalence relation.

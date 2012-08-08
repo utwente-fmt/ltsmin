@@ -7,7 +7,7 @@
 #include <dynamic-array.h>
 #include <lts-io/provider.h>
 #include <hre/user.h>
-#include <sigmin-mpi/seg-lts.h>
+#include <ltsmin-reduce-dist/seg-lts.h>
 
 struct seg_lts_s {
     lts_type_t sig;

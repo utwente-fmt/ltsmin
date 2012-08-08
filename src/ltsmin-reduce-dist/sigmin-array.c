@@ -6,8 +6,8 @@
 
 #include <fast_hash.h>
 #include <hre-mpi/user.h>
-#include <sigmin-mpi/seg-lts.h>
-#include <sigmin-mpi/sig-array.h>
+#include <ltsmin-reduce-dist/seg-lts.h>
+#include <ltsmin-reduce-dist/sig-array.h>
 #include <stringindex.h>
 
 static int mpi_nodes;
