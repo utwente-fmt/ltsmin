@@ -12,8 +12,6 @@ cct interface more explicit.
 
 #include <stdbool.h>
 
-#include <tables.h>
-
 
 /**
 \typedef a thread-local container for the chunk table map

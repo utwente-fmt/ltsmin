@@ -7,7 +7,7 @@
 
 #include <hre/dir_ops.h>
 #include <hre-io/user.h>
-#include <string-map.h>
+#include <util-lib/string-map.h>
 
 /**************************************************************************/
 /* auxiliary functions                                                    */

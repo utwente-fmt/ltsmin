@@ -4,7 +4,7 @@
 
 #include <stdint.h>
 
-#include <chunk_support.h>
+#include <util-lib/chunk_support.h>
 
 /**
 \file sigmin-sig.h

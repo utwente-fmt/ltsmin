@@ -4,7 +4,7 @@
 #include <hre/user.h>
 #include <lts-io/user.h>
 #include <lts-lib/lts.h>
-#include <treedbs.h>
+#include <util-lib/treedbs.h>
 
 typedef enum {Undefined,LTScopy,LTSrdwr,LTSindex} task_t;
 

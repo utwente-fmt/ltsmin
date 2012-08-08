@@ -1,12 +1,12 @@
 // -*- tab-width:4 ; indent-tabs-mode:nil -*-
 #include <config.h>
 
-#include <bitset.h>
 #include <hre/runtime.h>
 #include <hre-mpi/user.h>
 #include <lts-lib/set.h>
 #include <ltsmin-reduce-dist/sigmin-types.h>
 #include <ltsmin-reduce-dist/sigmin-set.h>
+#include <util-lib/bitset.h>
 
 static int mpi_nodes=0;
 static int mpi_me=0;

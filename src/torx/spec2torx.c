@@ -9,9 +9,10 @@
 #include <strings.h>
 
 #include <hre/user.h>
-#include <spec-greybox.h>
-#include <stringindex.h>
-#include <treedbs.h>
+#include <pins-lib/pins.h>
+#include <pins-lib/pins-impl.h>
+#include <util-lib/stringindex.h>
+#include <util-lib/treedbs.h>
 
 
 static struct poptOption options[] = {

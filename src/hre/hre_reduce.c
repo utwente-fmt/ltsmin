@@ -4,9 +4,9 @@
 
 #include <stdlib.h>
 
-#include <dynamic-array.h>
 #include <hre/internal.h>
 #include <hre/provider.h>
+#include <util-lib/dynamic-array.h>
 
 #define REDUCE_SIZE 16384
 

@@ -2,9 +2,10 @@
 
 #include <config.h>
 #include <stdlib.h>
+
 #include <hre/provider.h>
 #include <hre/internal.h>
-#include <dynamic-array.h>
+#include <util-lib/dynamic-array.h>
 
 /* Type definitions */
 

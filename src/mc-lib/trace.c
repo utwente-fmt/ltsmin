@@ -7,13 +7,12 @@
 
 #include <config.h>
 
-#include <dir_ops.h>
 #include <hre/user.h>
 #include <lts-io/user.h>
-#include <lts-type.h>
+#include <ltsmin-lib/lts-type.h>
 #include <mc-lib/trace.h>
-#include <stringindex.h>
-#include <treedbs.h>
+#include <util-lib/stringindex.h>
+#include <util-lib/treedbs.h>
 
 
 typedef struct write_trace_step_s {

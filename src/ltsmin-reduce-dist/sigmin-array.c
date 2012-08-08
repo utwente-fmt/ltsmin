@@ -4,11 +4,11 @@
 #include <mpi.h>
 #include <stddef.h>
 
-#include <fast_hash.h>
 #include <hre-mpi/user.h>
 #include <ltsmin-reduce-dist/seg-lts.h>
 #include <ltsmin-reduce-dist/sig-array.h>
-#include <stringindex.h>
+#include <util-lib/fast_hash.h>
+#include <util-lib/stringindex.h>
 
 static int mpi_nodes;
 static int mpi_me;

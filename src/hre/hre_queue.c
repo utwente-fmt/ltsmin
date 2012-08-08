@@ -4,8 +4,8 @@
 
 #include <stdint.h>
 
-#include <dynamic-array.h>
 #include <hre/user.h>
+#include <util-lib/dynamic-array.h>
 
 enum state {Terminated=0,Idle=1,Dirty=2,Active=3};
 

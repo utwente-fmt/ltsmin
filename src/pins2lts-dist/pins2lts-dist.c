@@ -8,19 +8,21 @@
 #include <string.h>
 #include <unistd.h>
 
-#include <dynamic-array.h>
-#include <fast_hash.h>
 #ifdef USEMPI
 #include <hre-mpi/user.h>
 #else
 #include <hre/user.h>
 #endif
 #include <lts-io/user.h>
-#include <ltsmin-tl.h>
-#include <spec-greybox.h>
-#include <stringindex.h>
-#include <treedbs.h>
-#include <string-map.h>
+#include <ltsmin-lib/ltsmin-tl.h>
+#include <pins-lib/pins.h>
+#include <pins-lib/pins-impl.h>
+#include <pins-lib/property-semantics.h>
+#include <util-lib/dynamic-array.h>
+#include <util-lib/fast_hash.h>
+#include <util-lib/stringindex.h>
+#include <util-lib/treedbs.h>
+#include <util-lib/string-map.h>
 
 struct dist_thread_context {
     model_t model;
@@ -229,7 +231,7 @@ int main(int argc, char*argv[]){
         Warning(info, "Detecting action \"%s\"", act_detect);
     }
     if (inv_detect)
-        inv_expr = pred_parse_file (model, inv_detect);
+        inv_expr = parse_file (inv_detect, pred_parse_file, model);
     HREbarrier(HREglobal());
     /***************************************************/
     size=lts_type_get_state_length(ltstype);

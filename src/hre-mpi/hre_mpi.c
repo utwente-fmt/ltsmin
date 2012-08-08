@@ -11,9 +11,9 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#include <dynamic-array.h>
 #include <hre-mpi/user.h>
 #include <hre/provider.h>
+#include <util-lib/dynamic-array.h>
 
 typedef struct mpi_shared_s {
     pthread_mutex_t mutex;

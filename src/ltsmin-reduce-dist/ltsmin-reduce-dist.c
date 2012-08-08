@@ -5,14 +5,14 @@
 #include <popt.h>
 #include <stddef.h>
 
-#include <fast_hash.h>
 #include <hre/runtime.h>
 #include <hre-mpi/user.h>
 #include <ltsmin-reduce-dist/seg-lts.h>
 #include <ltsmin-reduce-dist/sigmin-array.h>
 #include <ltsmin-reduce-dist/sigmin-set.h>
 #include <ltsmin-reduce-dist/sig-array.h>
-#include <stringindex.h>
+#include <util-lib/fast_hash.h>
+#include <util-lib/stringindex.h>
 
 #define STRONG_REDUCTION_SET 1
 #define BRANCHING_REDUCTION_SET 2

@@ -1,7 +1,7 @@
 #ifndef TRACE_H
 #define TRACE_H
 
-#include <greybox.h>
+#include <pins-lib/pins.h>
 
 typedef size_t              ref_t;
 static const ref_t          DUMMY_IDX = SIZE_MAX;

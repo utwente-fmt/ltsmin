@@ -5,11 +5,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include <fast_hash.h>
 #include <hre/user.h>
 #include <mc-lib/atomics.h>
 #include <mc-lib/clt_table.h>
-#include <treedbs-ll.h>
+#include <mc-lib/treedbs-ll.h>
+#include <util-lib/fast_hash.h>
 
 
 static const int        TABLE_SIZE = 26;

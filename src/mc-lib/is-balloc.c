@@ -5,11 +5,10 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
-#include <unix.h>
 
 #include <hre/user.h>
 #include <mc-lib/is-balloc.h>
-
+#include <util-lib/unix.h>
 
 #define INIT_MAX_BLOCKS (1024*64)
 

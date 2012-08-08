@@ -33,8 +33,8 @@
 
 #include <stdint.h>
 
-#include <fast_hash.h>
 #include <dm/dm.h>
+#include <util-lib/fast_hash.h>
 
 typedef struct zobrist_s *zobrist_t;
 

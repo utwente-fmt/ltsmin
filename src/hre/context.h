@@ -9,9 +9,9 @@ A context is the rough equivalent of the MPI communicator.
 #ifndef HRE_CONTEXT_H
 #define HRE_CONTEXT_H
 
-#include <dynamic-array.h>
 #include <hre/provider.h>
-#include <tables.h>
+#include <util-lib/dynamic-array.h>
+#include <util-lib/tables.h>
 
 /**
 \brief Get the global context.

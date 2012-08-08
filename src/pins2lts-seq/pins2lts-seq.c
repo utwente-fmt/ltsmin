@@ -1,4 +1,5 @@
 #include <config.h>
+
 #include <assert.h>
 #include <ctype.h>
 #include <limits.h>
@@ -7,19 +8,22 @@
 #include <string.h>
 #include <strings.h>
 
-#include <bitset.h>
-#include <dynamic-array.h>
+
 #include <hre/user.h>
 #include <lts-io/user.h>
-#include <ltsmin-tl.h>
+#include <ltsmin-lib/ltsmin-tl.h>
+#include <pins-lib/pins.h>
+#include <pins-lib/pins-impl.h>
+#include <pins-lib/property-semantics.h>
 #include <mc-lib/dbs-ll.h>
 #include <mc-lib/dfs-stack.h>
 #include <mc-lib/is-balloc.h>
 #include <mc-lib/trace.h>
-#include <spec-greybox.h>
-#include <stringindex.h>
-#include <tables.h>
-#include <treedbs.h>
+#include <util-lib/bitset.h>
+#include <util-lib/dynamic-array.h>
+#include <util-lib/stringindex.h>
+#include <util-lib/tables.h>
+#include <util-lib/treedbs.h>
 #include <vector_set.h>
 
 /*
@@ -1506,7 +1510,7 @@ gsea_setup(const char *output)
         Warning(info, "Detecting action \"%s\"", opt.act_detect);
     }
     if (opt.inv_detect)
-        opt.inv_expr = pred_parse_file (opt.model, opt.inv_detect);
+        opt.inv_expr = parse_file (opt.inv_detect, pred_parse_file, opt.model);
 
     // setup search algorithms and datastructures
     switch(opt.strategy) {

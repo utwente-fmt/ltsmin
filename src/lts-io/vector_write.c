@@ -3,11 +3,11 @@
 
 #include <assert.h>
 
-#include <chunk_support.h>
 #include <hre/dir_ops.h>
 #include <hre-io/user.h>
 #include <lts-io/internal.h>
-#include <tables.h>
+#include <util-lib/chunk_support.h>
+#include <util-lib/tables.h>
 
 /* Should this be an option? */
 static char* compression_policy="*ofs:diff32|gzip;SV*:rle32|gzip;?L*:rle32|gzip;info:;gzip";

@@ -9,7 +9,7 @@
 #define ARCHIVE_H
 
 #include <hre-io/user.h>
-#include <string-map.h>
+#include <util-lib/string-map.h>
 
 /// Test if archive is readable.
 extern int arch_readable(archive_t archive);

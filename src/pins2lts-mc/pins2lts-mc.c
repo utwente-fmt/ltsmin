@@ -15,9 +15,8 @@
 #include <time.h>
 
 #include <dm/bitvector.h>
-#include <fast_hash.h>
 #include <hre/user.h>
-#include <ltsmin-tl.h>
+#include <ltsmin-lib/ltsmin-tl.h>
 #include <mc-lib/atomics.h>
 #include <mc-lib/color.h>
 #include <mc-lib/cctables.h>
@@ -31,8 +30,11 @@
 #include <mc-lib/trace.h>
 #include <mc-lib/treedbs-ll.h>
 #include <mc-lib/zobrist.h>
-#include <spec-greybox.h>
-#include <unix.h>
+#include <pins-lib/pins.h>
+#include <pins-lib/pins-impl.h>
+#include <pins-lib/property-semantics.h>
+#include <util-lib/fast_hash.h>
+#include <util-lib/unix.h>
 
 static inline size_t min (size_t a, size_t b) {
     return a < b ? a : b;
@@ -762,7 +764,7 @@ local_init ()
         act_type = 0;
     }
     if (inv_detect)
-        inv_expr = pred_parse_file (model, inv_detect);
+        inv_expr = parse_file (inv_detect, pred_parse_file, model);
     if (0 == dbs_size) {
         size_t el_size = (db_type != HashTable ? 3 : D) * SLOT_SIZE; // over estimation for cleary
         size_t map_el_size = (Strat_TA & strategy[0] ? sizeof(lattice_t) : 0);

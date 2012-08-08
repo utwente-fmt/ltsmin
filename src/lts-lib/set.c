@@ -37,9 +37,11 @@
  */
 
 #include <config.h>
-#include "set.h"
-#include "hre/runtime.h"
+
 #include <stdlib.h>
+
+#include <hre/runtime.h>
+#include <lts-lib/set.h>
 
 #define EMPTY_LIST -1
 

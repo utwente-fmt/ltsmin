@@ -3,10 +3,10 @@
 #include <pthread.h>
 #include <stdint.h>
 
-#include <chunk_support.h>
 #include <hre/user.h>
 #include <mc-lib/cctables.h>
-#include <stringindex.h>
+#include <util-lib/chunk_support.h>
+#include <util-lib/stringindex.h>
 
 /**
  * Class diagram:

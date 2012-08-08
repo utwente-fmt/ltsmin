@@ -4,8 +4,8 @@
 
 #include <hre/user.h>
 #include <lts-io/user.h>
-#include <lts-type.h>
-#include <tables.h>
+#include <ltsmin-lib/lts-type.h>
+#include <util-lib/tables.h>
 
 /**
 \brief Abstract data type for parallel manipulation of segmented LTSs.
