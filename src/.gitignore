@@ -32,9 +32,9 @@ test-cache
 gcf-tool/gcf
 hre-test/test-hre
 hre-test/test-mpi-hre
-ltscmp-one/ltscmp-one
-ltstrans/ltstrans
-lts-tracepp/lts-tracepp
-sigmin-one/sigmin-one
-sigmin-mpi/sigmin-mpi
+ltsmin-compare
+ltsmin-convert
+ltsmin-printtrace
+ltsmin-reduce
+ltsmin-reduce-dist
 spg/spgsolver
