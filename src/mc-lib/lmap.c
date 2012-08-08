@@ -8,9 +8,9 @@
 #include <string.h>
 #include <time.h>
 
-#include <atomics.h>
 #include <hre/user.h>
-#include <lmap.h>
+#include <mc-lib/atomics.h>
+#include <mc-lib/lmap.h>
 
 static const size_t     LM_FACTOR = 32; // size of the map as a ratio to the locations
 #define                 LM_MAX_THREADS (sizeof (uint64_t) * 8)

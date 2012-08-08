@@ -12,9 +12,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include <atomics.h>
-#include <bitvector-ll.h>
 #include <hre/user.h>
+#include <mc-lib/atomics.h>
+#include <mc-lib/bitvector-ll.h>
 
 struct bitvector_ll_s {
     size_t              sat_bits;

@@ -8,7 +8,7 @@
 #include <unix.h>
 
 #include <hre/user.h>
-#include <is-balloc.h>
+#include <mc-lib/is-balloc.h>
 
 
 #define INIT_MAX_BLOCKS (1024*64)

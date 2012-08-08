@@ -7,7 +7,7 @@
 #include <time.h>
 
 #include <hre/user.h>
-#include <zobrist.h>
+#include <mc-lib/zobrist.h>
 
 static const hash64_t   INITIAL_HASH = 0;
 

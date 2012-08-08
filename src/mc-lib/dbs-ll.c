@@ -7,9 +7,9 @@
 #include <string.h>
 #include <time.h>
 
-#include <atomics.h>
-#include <dbs-ll.h>
 #include <hre/user.h>
+#include <mc-lib/atomics.h>
+#include <mc-lib/dbs-ll.h>
 
 
 static const int        TABLE_SIZE = 24;

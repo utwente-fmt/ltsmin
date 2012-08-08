@@ -5,10 +5,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include <atomics.h>
-#include <clt_table.h>
 #include <fast_hash.h>
 #include <hre/user.h>
+#include <mc-lib/atomics.h>
+#include <mc-lib/clt_table.h>
 #include <treedbs-ll.h>
 
 

@@ -2,8 +2,8 @@
 #ifndef TREEDBS_LL_H
 #define TREEDBS_LL_H
 
-#include "stats.h"
-#include "dm/dm.h"
+#include <dm/dm.h>
+#include <mc-lib/stats.h>
 
 /**
  * \file treedbs-ll.h

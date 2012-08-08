@@ -398,6 +398,7 @@ AC_CONFIG_FILES([
        src/hre-test/Makefile
        src/lts-io/Makefile
        src/lts-lib/Makefile
+       src/mc-lib/Makefile
        src/ltsmin-printtrace/Makefile
        src/ltsmin-compare/Makefile
        src/ltsmin-convert/Makefile

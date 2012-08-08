@@ -10,9 +10,9 @@
 #include <dir_ops.h>
 #include <hre/user.h>
 #include <lts-io/user.h>
-#include <stringindex.h>
-#include <trace.h>
 #include <lts-type.h>
+#include <mc-lib/trace.h>
+#include <stringindex.h>
 #include <treedbs.h>
 
 

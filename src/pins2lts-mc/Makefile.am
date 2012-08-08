@@ -1,6 +1,6 @@
 HRE_LIB = ../hre/libhre.la
 DIST_CPPFLAGS = -I ${top_srcdir}/src $(AM_CPPFLAGS)
-MC_LIBS = ../libmc.la
+MC_LIBS = ../mc-lib/libmc.la
 
 bin_PROGRAMS = etf2lts-mc
 

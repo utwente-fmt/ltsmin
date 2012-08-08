@@ -16,7 +16,6 @@ noinst_LTLIBRARIES += libspg.la
 endif
 
 noinst_LTLIBRARIES += libltsmin.la
-noinst_LTLIBRARIES += libmc.la
 
 SUBDIRS  = dm
 SUBDIRS += bignum
@@ -33,12 +32,13 @@ SUBDIRS += gcf-tool
 SUBDIRS += ltsmin-printtrace
 SUBDIRS += ltsmin-compare
 SUBDIRS += ltsmin-convert
+if HAVE_ATOMICS
+SUBDIRS += mc-lib
+SUBDIRS += pins2lts-mc
+SUBDIRS += pins2lts-seq
+endif
 SUBDIRS += pins2lts-dist
 SUBDIRS += pins2lts-sym
-SUBDIRS += pins2lts-seq
-if HAVE_ATOMICS
-SUBDIRS += pins2lts-mc
-endif
 SUBDIRS += ltsmin-reduce
 if HAVE_MPI
 SUBDIRS += ltsmin-reduce-dist
@@ -197,23 +197,6 @@ endif
 libvset_la_CPPFLAGS += $(AM_CPPFLAGS)
 libvset_la_LDFLAGS  += $(AM_LDFLAGS)
 
-
-libmc_la_SOURCES =  bitvector-ll.c bitvector-ll.h
-libmc_la_SOURCES += cctables.c cctables.h
-libmc_la_SOURCES += clt_table.c clt_table.h
-libmc_la_SOURCES += color.c color.h
-libmc_la_SOURCES += dbs-ll.c dbs-ll.h
-libmc_la_SOURCES += dfs-stack.c dfs-stack.h
-libmc_la_SOURCES += hre-tools.h
-libmc_la_SOURCES += is-balloc.c is-balloc.h
-libmc_la_SOURCES += lb2.c lb2.h
-libmc_la_SOURCES += lmap.c lmap.h
-libmc_la_SOURCES += statistics.c statistics.h
-libmc_la_SOURCES += trace.c trace.h
-libmc_la_SOURCES += treedbs-ll.c treedbs-ll.h
-libmc_la_SOURCES += zobrist.c zobrist.h
-
-libmc_la_LIBADD   = libltsmin.la
 
 # ltsmin-hre settings
 libltsmin_la_SOURCES  = balloc.c balloc.h

@@ -15,7 +15,7 @@
 #include <unistd.h>
 
 #include <hre/user.h>
-#include <dfs-stack.h>
+#include <mc-lib/dfs-stack.h>
 
 
 struct dfs_stack {

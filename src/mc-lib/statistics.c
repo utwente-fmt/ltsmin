@@ -2,7 +2,7 @@
 #include <math.h>
 
 #include <hre/user.h>
-#include <statistics.h>
+#include <mc-lib/statistics.h>
 
 void
 statistics_record (statistics_t *stats, double x) {

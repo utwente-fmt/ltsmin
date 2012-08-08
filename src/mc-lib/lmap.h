@@ -14,7 +14,7 @@
 */
 
 #include <dm/dm.h>
-#include <trace.h>
+#include <mc-lib/trace.h>
 
 /**
 \typedef

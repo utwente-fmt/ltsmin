@@ -13,31 +13,31 @@
 
 #include <stdlib.h>
 
-#include <atomics.h>
 #include <hre/user.h>
-#include <lb2.h>
+#include <mc-lib/atomics.h>
+#include <mc-lib/lb.h>
 
-typedef struct lb2_status_s {
+typedef struct lb_status_s {
     int                 idle;           // poll local + write global
     uint32_t            seed;           // read+write local
     size_t  __attribute__ ((aligned(CACHE_LINE_SIZE))) requests; // read local + write global
     size_t  __attribute__ ((aligned(CACHE_LINE_SIZE))) received; // read local + write global
     size_t  __attribute__ ((aligned(CACHE_LINE_SIZE))) max_load; // read local
     void    __attribute__ ((aligned(CACHE_LINE_SIZE)))*arg;      // read local + read global
-} lb2_status_t;
+} lb_status_t;
 
 /**
  * The base struct is read only, except for occasional (one-time) writes to
  * stopped/all_done.
  */
-struct lb2_s {
-    size_t             mask;    //inlined: see lb2.h
-    int                stopped; //inlined: see lb2.h
+struct lb_s {
+    size_t             mask;    //inlined: see lb.h
+    int                stopped; //inlined: see lb.h
     int                all_done;
     size_t             threads;
     size_t             granularity;
     size_t             max_handoff;
-    lb2_status_t     **local;
+    lb_status_t     **local;
     size_t  __attribute__ ((aligned(CACHE_LINE_SIZE))) barrier_count;
     size_t  __attribute__ ((aligned(CACHE_LINE_SIZE))) barrier_wait;
     size_t  __attribute__ ((aligned(CACHE_LINE_SIZE))) reduce_count;
@@ -46,44 +46,44 @@ struct lb2_s {
 };
 
 
-static inline int  all_done (lb2_t *lb) {
+static inline int  all_done (lb_t *lb) {
     return atomic_read (&lb->all_done);
 }
-static inline void set_all_done (lb2_t *lb) {
+static inline void set_all_done (lb_t *lb) {
     atomic_write (&lb->all_done, 1);
 }
-static inline int  try_stop (lb2_t *lb) {
+static inline int  try_stop (lb_t *lb) {
     return cas (&lb->stopped, 0, 1);
 }
-static inline int  get_idle (lb2_t *lb, int id) {
+static inline int  get_idle (lb_t *lb, int id) {
     return atomic_read(&lb->local[id]->idle);
 }
-static inline void set_idle (lb2_t *lb, int id, int a) {
+static inline void set_idle (lb_t *lb, int id, int a) {
     atomic_write (&lb->local[id]->idle, a);
 }
 
 int
-lb2_stop (lb2_t *lb)
+lb_stop (lb_t *lb)
 {
     set_all_done (lb);
     return try_stop (lb);
 }
 
 void
-lb2_reinit (lb2_t *lb, size_t id)
+lb_reinit (lb_t *lb, size_t id)
 {
     atomic_write (&lb->local[id]->requests, 0);
     atomic_write (&lb->all_done, 0);
     if (0 == id)
         set_idle (lb, id, 0);
-    //lb2_barrier (lb->threads);
+    //lb_barrier (lb->threads);
     HREbarrier(HREglobal());
 }
 
 void
-lb2_local_init (lb2_t *lb, int id, void *arg)
+lb_local_init (lb_t *lb, int id, void *arg)
 {
-    lb2_status_t        *loc = RTalign(CACHE_LINE_SIZE, sizeof(lb2_status_t));
+    lb_status_t        *loc = RTalign(CACHE_LINE_SIZE, sizeof(lb_status_t));
     size_t alloc_distance = (size_t)&loc->received - (size_t)&loc->requests;
     HREassert (alloc_distance == CACHE_LINE_SIZE, "Wrong alignment in allocation");
     loc->idle = 0;
@@ -92,11 +92,11 @@ lb2_local_init (lb2_t *lb, int id, void *arg)
     // record thread local data
     atomic_write (&(loc->arg), arg);
     lb->local[id] = loc;
-    lb2_reinit (lb, id);
+    lb_reinit (lb, id);
 }
 
 static inline int
-request_random (lb2_t *lb, size_t id)
+request_random (lb_t *lb, size_t id)
 {
     size_t res = 0;
     do {
@@ -108,8 +108,8 @@ request_random (lb2_t *lb, size_t id)
 }
 
 static inline void
-handoff (lb2_t *lb, int id, size_t requests, size_t *my_load,
-         lb2_split_problem_f split)
+handoff (lb_t *lb, int id, size_t requests, size_t *my_load,
+         lb_split_problem_f split)
 {
     int                 todo[ lb->threads ];
 
@@ -136,9 +136,9 @@ handoff (lb2_t *lb, int id, size_t requests, size_t *my_load,
 }
 
 size_t
-lb2_internal (lb2_t *lb, int id, size_t my_load, lb2_split_problem_f split)
+lb_internal (lb_t *lb, int id, size_t my_load, lb_split_problem_f split)
 {
-    lb2_status_t        *status = lb->local[id];
+    lb_status_t        *status = lb->local[id];
     if (my_load > status->max_load)
         status->max_load = my_load;
     do {
@@ -176,18 +176,18 @@ lb2_internal (lb2_t *lb, int id, size_t my_load, lb2_split_problem_f split)
     return my_load;
 }
 
-lb2_t                *
-lb2_create (size_t threads, size_t gran)
+lb_t                *
+lb_create (size_t threads, size_t gran)
 {
-    return lb2_create_max (threads, gran, LB2_MAX_HANDOFF_DEFAULT);
+    return lb_create_max (threads, gran, lb_MAX_HANDOFF_DEFAULT);
 }
 
-lb2_t                *
-lb2_create_max (size_t threads, size_t gran, size_t max)
+lb_t                *
+lb_create_max (size_t threads, size_t gran, size_t max)
 {
-    HREassert (threads <= LB2_MAX_THREADS, "Only %zu threads allowed", LB2_MAX_THREADS);
-    lb2_t               *lb = RTalign(CACHE_LINE_SIZE, sizeof(lb2_t));
-    lb->local = RTalign(CACHE_LINE_SIZE, sizeof(lb2_status_t[LB2_MAX_THREADS]));
+    HREassert (threads <= lb_MAX_THREADS, "Only %zu threads allowed", lb_MAX_THREADS);
+    lb_t               *lb = RTalign(CACHE_LINE_SIZE, sizeof(lb_t));
+    lb->local = RTalign(CACHE_LINE_SIZE, sizeof(lb_status_t[lb_MAX_THREADS]));
     size_t alloc_distance = (size_t)&lb->barrier_wait - (size_t)&lb->barrier_count;
     HREassert (alloc_distance == CACHE_LINE_SIZE, "Wrong alignment in allocation");
     for (size_t i = 0; i < threads; i++)
@@ -203,7 +203,7 @@ lb2_create_max (size_t threads, size_t gran, size_t max)
 }
 
 void
-lb2_destroy (lb2_t *lb)
+lb_destroy (lb_t *lb)
 {
     for (size_t i = 0; i < lb->threads; i++)
         if (lb->local[i]) RTfree(lb->local[i]);
@@ -211,8 +211,8 @@ lb2_destroy (lb2_t *lb)
     RTfree (lb);
 }
 
-lb2_barrier_result_t
-lb2_barrier (lb2_t *lb)
+lb_barrier_result_t
+lb_barrier (lb_t *lb)
 {
     size_t W = lb->threads;
     size_t          flip = atomic_read (&lb->barrier_wait);
@@ -220,15 +220,15 @@ lb2_barrier (lb2_t *lb)
     if (W == count) {
         atomic_write (&lb->barrier_count, 0);
         atomic_write (&lb->barrier_wait, 1 - flip); // flip wait
-        return LB2_BARRIER_MASTER;
+        return lb_BARRIER_MASTER;
     } else {
         while (flip == atomic_read(&lb->barrier_wait)) {}
-        return LB2_BARRIER_SLAVE;
+        return lb_BARRIER_SLAVE;
     }
 }
 
 size_t
-lb2_reduce (lb2_t *lb, size_t val)
+lb_reduce (lb_t *lb, size_t val)
 {
     size_t W = lb->threads;
     HRE_ASSERT ((val < (1UL<<58)) && (sizeof(size_t) == 8), "Overflow in reduce");
@@ -245,7 +245,7 @@ lb2_reduce (lb2_t *lb, size_t val)
 }
 
 size_t
-lb2_max_load (lb2_t *lb)
+lb_max_load (lb_t *lb)
 {
     size_t              total = 0;
     for (size_t i = 0; i < lb->threads; i++) {

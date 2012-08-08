@@ -1,6 +1,6 @@
 #include <config.h>
 
-#include <color.h>
+#include <mc-lib/color.h>
 
 static size_t               count_mask;
 static size_t               count_bits;

@@ -21,9 +21,9 @@
 }
 */
 
-#include <dm/dm.h>
 #include <fast_hash.h>
-#include <stats.h>
+#include <dm/dm.h>
+#include <mc-lib/stats.h>
 
 #define             DB_FULL -1
 

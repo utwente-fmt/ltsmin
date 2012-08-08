@@ -1,8 +1,8 @@
 #ifndef COLOR_H
 #define COLOR_H
 
-#include <dbs-ll.h>
-#include <trace.h>
+#include <mc-lib/dbs-ll.h>
+#include <mc-lib/trace.h>
 
 /**
  * Different implementations of NDFS state colorings.

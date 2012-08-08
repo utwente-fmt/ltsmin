@@ -14,7 +14,7 @@
  */
 
 
-#include "is-balloc.h"
+#include <mc-lib/is-balloc.h>
 
 typedef struct dfs_stack *dfs_stack_t;
 

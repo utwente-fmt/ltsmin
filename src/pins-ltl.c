@@ -5,10 +5,11 @@
 
 #include <ltl2ba.h>
 #undef Debug
-#include <atomics.h>
+
 #include <dm/dm.h>
 #include <greybox.h>
 #include <hre/user.h>
+#include <mc-lib/atomics.h>
 #include <ltsmin-tl.h>
 #include <ltl2ba-lex.h>
 #include <unix.h>

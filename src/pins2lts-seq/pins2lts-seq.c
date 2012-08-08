@@ -7,20 +7,18 @@
 #include <string.h>
 #include <strings.h>
 
-#include <atomics.h>
 #include <bitset.h>
-#include <dbs-ll.h>
-#include <dfs-stack.h>
 #include <dynamic-array.h>
 #include <hre/user.h>
-#include <is-balloc.h>
 #include <lts-io/user.h>
 #include <ltsmin-tl.h>
+#include <mc-lib/dbs-ll.h>
+#include <mc-lib/dfs-stack.h>
+#include <mc-lib/is-balloc.h>
+#include <mc-lib/trace.h>
 #include <spec-greybox.h>
-#include <stats.h>
 #include <stringindex.h>
 #include <tables.h>
-#include <trace.h>
 #include <treedbs.h>
 #include <vector_set.h>
 
@@ -1757,8 +1755,7 @@ static void
 gsea_progress(void *arg) {
     if (!log_active(info) || global.explored < opt.threshold)
         return;
-    if (!cas (&opt.threshold, opt.threshold, opt.threshold << 1))
-        return;
+    opt.threshold <<= 1;
     Warning (info, "explored %zu levels ~%zu states ~%zu transitions",
              global.max_depth, global.explored, global.ntransitions);
     (void)arg;
