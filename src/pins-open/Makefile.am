@@ -1,0 +1,59 @@
+
+DM_LIB = ../dm/libdm.la
+HRE_LIB = ../hre/libhre.la
+UTIL_LIB = ../util-lib/libutil.la $(HRE_LIB)
+MC_LIB = ../mc-lib/libmc.la $(UTIL_LIB)
+LTSMIN_LIB = ../ltsmin-lib/libltsmin.la $(UTIL_LIB)
+PINS_LIB = ../pins-lib/libpins.la $(LTSMIN_LIB)
+VSET_LIB = ../vset-lib/libvset.la
+
+pkglib_LTLIBRARIES  = libetf-open.la
+if HAVE_SPINJA
+pkglib_LTLIBRARIES += libprom-open.la
+endif
+if HAVE_LIBSTEP_INFO
+pkglib_LTLIBRARIES += liblpo-open.la
+endif
+if HAVE_LIBMCRL2
+pkglib_LTLIBRARIES += liblps-open.la
+endif
+if HAVE_DVE
+pkglib_LTLIBRARIES += libdve-open.la
+endif
+if HAVE_OPAAL
+pkglib_LTLIBRARIES += libopaal-open.la
+endif
+
+# libetf-open.la
+libetf_open_la_SOURCES   = spec_open.c pins-lib/etf-pins.c pins-lib/etf-pins.h
+libetf_open_la_CPPFLAGS  = -DETF $(CADP_CPPFLAGS) $(AM_CPPFLAGS)
+libetf_open_la_LIBADD    = $(PINS_LIB)
+
+# liblpo-open.la
+liblpo_open_la_SOURCES   = spec_open.c
+liblpo_open_la_CPPFLAGS  = -DMCRL $(MCRL_CPPFLAGS) $(CADP_CPPFLAGS) $(AM_CPPFLAGS)
+liblpo_open_la_CPPFLAGS += ../pins-lib/libmcrl-pins.la
+liblpo_open_la_LIBADD    = $(PINS_LIB)
+nodist_EXTRA_liblpo_open_la_SOURCES = automake-force-linker.cxx
+
+# liblps-open.la
+liblps_open_la_SOURCES   = spec_open.c
+liblps_open_la_CPPFLAGS  = -DMCRL2 $(CADP_CPPFLAGS) $(AM_CPPFLAGS)
+liblps_open_la_LIBADD    = ../pins-lib/libmcrl2-pins.la $(PINS_LIB)
+nodist_EXTRA_liblps_open_la_SOURCES = automake-force-linker.cxx
+
+# libdve-open.la
+libdve_open_la_SOURCES   = spec_open.c pins-lib/dve-pins.c pins-lib/dve-pins.h
+libdve_open_la_CPPFLAGS  = -DDIVINE $(DIVINE_CPPFLAGS) $(CADP_CPPFLAGS) $(AM_CPPFLAGS)
+libdve_open_la_LIBADD    = $(PINS_LIB)
+
+# libopaal-open.la
+libopaal_open_la_SOURCES = spec_open.c pins-lib/opaal-pins.c pins-lib/opaal-pins.h
+libopaal_open_la_CPPFLAGS= -DOPAAL $(OPAAL_CPPFLAGS) $(CADP_CPPFLAGS) $(AM_CPPFLAGS)
+libopaal_open_la_LIBADD  = $(PINS_LIB)
+
+# libprom-open.la
+libprom_open_la_SOURCES  = spec_open.c pins-lib/prom-pins.c pins-lib/prom-pins.h
+libprom_open_la_CPPFLAGS = -DSPINJA $(SPINJA_CPPFLAGS) $(CADP_CPPFLAGS) $(AM_CPPFLAGS)
+libprom_open_la_LIBADD   = $(PINS_LIB)
+

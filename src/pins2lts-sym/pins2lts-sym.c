@@ -15,7 +15,7 @@
 #include <pins-lib/property-semantics.h>
 #include <ltsmin-lib/ltsmin-syntax.h>
 #include <ltsmin-lib/ltsmin-tl.h>
-#include <spg-solve.h>
+#include <spg-lib/spg-solve.h>
 #include <vset-lib/vector_set.h>
 #include <util-lib/dynamic-array.h>
 #include <util-lib/stringindex.h>

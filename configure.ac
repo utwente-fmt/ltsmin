@@ -403,7 +403,9 @@ AC_CONFIG_FILES([
        src/pins-lib/Makefile
        src/util-lib/Makefile
        src/vset-lib/Makefile
+       src/spg-lib/Makefile
        src/gcf-tool/Makefile
+       src/etf-convert/Makefile
        src/ltsmin-printtrace/Makefile
        src/ltsmin-compare/Makefile
        src/ltsmin-convert/Makefile
@@ -413,11 +415,14 @@ AC_CONFIG_FILES([
        src/pins2lts-mc/Makefile
        src/pins2lts-seq/Makefile
        src/pins2lts-sym/Makefile
+       src/pins-open/Makefile
        src/spg/Makefile
        src/dm/Makefile
        src/bignum/Makefile
        src/ce/Makefile
        src/torx/Makefile
+       src/scripts/Makefile
+       src/tests/Makefile
        doc/Makefile
        lemon/Makefile
 ])

@@ -9,8 +9,8 @@
 #include <gperftools/profiler.h>
 #endif
 
-#include <spg-solve.h>
 #include <hre/user.h>
+#include <spg-lib/spg-solve.h>
 
 static vset_implementation_t vset_impl = VSET_ListDD;
 

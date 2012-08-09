@@ -9,7 +9,7 @@
 #include <limits.h>
 
 #include <hre/user.h>
-#include <spg-solve.h>
+#include <spg-lib/spg-solve.h>
 #include <vset-lib/vector_set.h>
 
 static  struct poptOption options[] = {

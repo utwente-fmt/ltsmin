@@ -54,7 +54,7 @@ pbes2lts_sym_SOURCES   = pins2lts-sym.c
 pbes2lts_sym_LDADD     = $(HRE_LIB) $(PINS_LIBS)
 pbes2lts_sym_LDADD    += $(VSET_LIBS) ../pins-lib/libpbes-pins.la
 if HAVE_LIBSPG
-pbes2lts_sym_LDADD    += ../libspg.la
+pbes2lts_sym_LDADD    += ../spg-lib/libspg.la
 endif
 pbes2lts_sym_CPPFLAGS  = -DPBES $(SYM_CPPFLAGS)
 pbes2lts_sym_LDFLAGS   = $(MCRL2_LDFLAGS) $(AM_LDFLAGS)
