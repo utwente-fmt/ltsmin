@@ -8,13 +8,8 @@
 .deps/
 config.h
 etf-convert/etf-convert
-stamp-h1
+gcf-tool/gcf
 git_version.h
-spinjal
-subst_pins_open.mk
-regroup
-test
-pins_open
 ltsmin-parse
 ltsmin-grammar.c
 ltsmin-grammar.h
@@ -22,6 +17,7 @@ ltsmin-grammar.out
 ltsmin-lexer.c
 ltsmin-lexer.h
 lempar.c
+pins-open
 test-bitset
 test-dbs
 test-dfs-stack
@@ -31,7 +27,6 @@ test-hre
 test-hre-mpi
 test-regroup
 test-vset
-gcf-tool/gcf
 hre-test/test-hre
 hre-test/test-mpi-hre
 ltsmin-compare
@@ -40,3 +35,6 @@ ltsmin-printtrace
 ltsmin-reduce
 ltsmin-reduce-dist
 spg/spgsolver
+spinjal
+stamp-h1
+subst_pins_open.mk
