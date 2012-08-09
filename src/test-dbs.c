@@ -5,18 +5,19 @@
  *      Author: laarman
  */
 
+#include <pthread.h>
+#include <stdlib.h>
+#include <sys/stat.h>
 #include <sys/times.h>
 #include <sys/types.h>
 #include <unistd.h>
-#include <stdlib.h>
-#include <sys/stat.h>
 
-#include <atomics.h>
-#include <dbs-ll.h>
 #include <hre/user.h>
-#include <stats.h>
 #include <hre-io/user.h>
-#include <treedbs-ll.h>
+#include <mc-lib/atomics.h>
+#include <mc-lib/dbs-ll.h>
+#include <mc-lib/stats.h>
+#include <mc-lib/treedbs-ll.h>
 
 
 typedef void *DBS_T; 
@@ -214,7 +215,8 @@ DBS_T do_readfile(int *count) {
 }
 
 int main2(const int argc, const char **args) {
-    HREinitBare((int*)&argc, (char***)&args);
+    HREinitBegin (args[0]);
+    HREinitStart (&argc,&args,0,0,NULL,NULL);
     program = get_label();
 	DBS_T dbs;
     int elements = 0;

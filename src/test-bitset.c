@@ -1,8 +1,9 @@
 #include <config.h>
-#include "bitset.h"
+
 #include <unistd.h>
 #include <sys/types.h>
 
+#include <util-lib/bitset.h>
 
 static void setclear(){
 	int i;

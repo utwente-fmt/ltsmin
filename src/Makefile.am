@@ -81,9 +81,12 @@ endif
 
 bin_SCRIPTS += spinjal
 
-UTIL_LIB = util-lib/libutil.la
+DM_LIB = dm/libdm.la
+HRE_LIB = hre/libhre.la
+UTIL_LIB = util-lib/libutil.la $(HRE_LIB)
+MC_LIB = mc-lib/libmc.la $(UTIL_LIB)
 LTSMIN_LIB = ltsmin-lib/libltsmin.la $(UTIL_LIB)
-PINS_LIB = pins-lib/libpins.la $(UTIL_LIB)
+PINS_LIB = pins-lib/libpins.la $(LTSMIN_LIB)
 VSET_LIB = vset-lib/libvset.la
 
 # etf-convert
@@ -97,7 +100,7 @@ test_bitset_LDADD   = $(LTSMIN_LIB)
 # ltsmin-parse
 ltsmin_parse_SOURCES     = ltsmin-parse.c
 ltsmin_parse_CPPFLAGS    = -DNXT -I${top_srcdir}/ltl2ba
-ltsmin_parse_LDADD       = $(LTSMIN_LIB)
+ltsmin_parse_LDADD       = $(PINS_LIB)
 
 # libetf-open.la
 libetf_open_la_SOURCES   = spec_open.c pins-lib/etf-pins.c pins-lib/etf-pins.h
@@ -134,24 +137,24 @@ libprom_open_la_LIBADD   = $(PINS_LIB)
 
 # test-is-balloc
 test_is_balloc_SOURCES = test-is-balloc.c
-test_is_balloc_LDADD   = $(UTIL_LIB)
+test_is_balloc_LDADD   = $(MC_LIB)
 
 # test-dfs-stack
 test_dfs_stack_SOURCES = test-dfs-stack.c
-test_dfs_stack_LDADD   = $(UTIL_LIB)
+test_dfs_stack_LDADD   = $(MC_LIB)
 
 # test-dbs
 test_dbs_SOURCES = test-dbs.c
-test_dbs_LDADD   = $(MC_LIB)
+test_dbs_LDADD   = $(MC_LIB) $(DM_LIB)
 
 # test-vset
 test_vset_SOURCES = test-vset.c
-test_vset_LDADD   = $(VSET_LIB) util-lib/libutil.la
+test_vset_LDADD   = $(VSET_LIB) $(UTIL_LIB)
 
 libspg_la_SOURCES  = spg-solve.c spg-solve.h
 libspg_la_CPPFLAGS = -DNDEBUG $(AM_CPPFLAGS)
 libspg_la_LDFLAGS  = $(AM_LDFLAGS) $(PROFILER_LDFLAGS)
-libspg_la_LIBADD   = $(VSET_LIB) $(UTIL_LIB) bignum/libbignum.la
+libspg_la_LIBADD   = $(VSET_LIB) $(UTIL_LIB)
 
 EXTRA_DIST =
 CLEANFILES =

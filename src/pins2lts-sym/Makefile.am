@@ -1,7 +1,7 @@
 HRE_LIB = ../hre/libhre.la
 SYM_CPPFLAGS = -I ${top_srcdir}/src $(AM_CPPFLAGS)
 PINS_LIBS = ../util-lib/libutil.la ../ltsmin-lib/libltsmin.la ../pins-lib/libpins.la
-VSET_LIBS = ../libvset.la
+VSET_LIBS = ../vset-lib/libvset.la
 
 bin_PROGRAMS = etf2lts-sym
 

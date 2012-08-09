@@ -28,7 +28,7 @@ test-dfs-stack
 test-hre
 test-hre-mpi
 test-dbs
-test-cache
+test-vset
 gcf-tool/gcf
 hre-test/test-hre
 hre-test/test-mpi-hre

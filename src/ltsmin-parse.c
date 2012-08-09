@@ -7,6 +7,7 @@
 #include <ltsmin-lib/ltsmin-grammar.h>
 #include <ltsmin-lib/lts-type.h>
 #include <ltsmin-lib/ltsmin-tl.h>
+#include <pins-lib/property-semantics.h>
 #include <pins-lib/pins.h>
 
 typedef enum {PARSE_LTL, PARSE_CTL, PARSE_CTL_S, PARSE_MU} parse_mode_t;
@@ -40,7 +41,7 @@ int main(int argc, char *argv[]){
     lts_type_set_edge_label_name(ltstype,0,"action");
     lts_type_set_edge_label_type(ltstype,0,"action");
     model_t model = GBcreateBase();
-    GBsetLTStype(ltstype);
+    GBsetLTStype(model, ltstype);
     switch(parse_mode) {
         case PARSE_MU: {
             parse_file(file_name, mu_parse_file, model);

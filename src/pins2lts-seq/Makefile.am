@@ -1,6 +1,6 @@
 HRE_LIB = ../hre/libhre.la
 SEQ_CPPFLAGS = -I ${top_srcdir}/src $(AM_CPPFLAGS)
-VSET_LIBS = ../libvset.la
+VSET_LIBS = ../vset-lib/libvset.la
 PINS_LIBS = ../pins-lib/libpins.la ../ltsmin-lib/libltsmin.la ../util-lib/libutil.la
 MC_LIBS = ../mc-lib/libmc.la
 
