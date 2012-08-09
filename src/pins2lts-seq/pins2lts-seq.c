@@ -476,7 +476,8 @@ write_trace_next (void *arg, transition_info_t *ti, int *dst)
         if (ctx->dst_state[i]!=dst[i]) return;
     }
     ctx->found=1;
-    lts_write_edge(opt.trace_output,0,ctx->src_state,0,dst,ti->labels);
+    int src_idx = ctx->depth - 1;
+    lts_write_edge(opt.trace_output,0,&src_idx,0,dst,ti->labels);
 }
 
 static void
@@ -622,10 +623,8 @@ dfs_goal_trace_cb(int* stack_element, void *ctx)
     memcpy(trace_ctx->dst_state, state.state, global.N * sizeof(int));
 
     write_trace_state(opt.model, trace_ctx->depth, trace_ctx->dst_state);
-    // write transition, except on initial state
-    int src_idx = trace_ctx->depth - 1;
     if (trace_ctx->depth != 0)
-        write_trace_step(opt.model, &src_idx, trace_ctx->dst_state, trace_ctx->depth);
+        write_trace_step(opt.model, trace_ctx->src_state, trace_ctx->dst_state, trace_ctx->depth);
     trace_ctx->depth++;
     return 1;
 }
