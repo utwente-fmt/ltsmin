@@ -1,6 +1,7 @@
 
 noinst_LTLIBRARIES = libmc.la
 
+# libmc
 libmc_la_SOURCES =  
 libmc_la_SOURCES += atomics.h
 libmc_la_SOURCES += bitvector-ll.c bitvector-ll.h
@@ -17,5 +18,4 @@ libmc_la_SOURCES += stats.h
 libmc_la_SOURCES += trace.c trace.h
 libmc_la_SOURCES += treedbs-ll.c treedbs-ll.h
 libmc_la_SOURCES += zobrist.c zobrist.h
-
-libmc_la_CFLAGS  = -I ${top_srcdir}/src
+libmc_la_CPPFLAGS = $(AM_CPPFLAGS)

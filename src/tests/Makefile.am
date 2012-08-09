@@ -17,37 +17,41 @@ check_PROGRAMS += test-regroup
 check_PROGRAMS += test-vset
 
 # test-bitset
-test_bitset_SOURCES = test-bitset.c
-test_bitset_LDADD   = $(LTSMIN_LIB)
+test_bitset_SOURCES 		= test-bitset.c
+test_bitset_LDADD  		 	= $(LTSMIN_LIB) $(AM_LDFLAGS)
 
 # test-ltsmin-parse
-test_ltsmin_parse_SOURCES     = test-ltsmin-parse.c
-test_ltsmin_parse_CPPFLAGS    = -DNXT -I${top_srcdir}/ltl2ba
-test_ltsmin_parse_LDADD       = $(PINS_LIB)
+test_ltsmin_parse_SOURCES 	= test-ltsmin-parse.c
+test_ltsmin_parse_LDADD    	= $(PINS_LIB) $(AM_LDFLAGS)
+test_ltsmin_parse_CPPFLAGS 	= -DNXT $(AM_CPPFLAGS)
 
 # test-is-balloc
-test_is_balloc_SOURCES = test-is-balloc.c
-test_is_balloc_LDADD   = $(MC_LIB)
+test_is_balloc_SOURCES 		= test-is-balloc.c
+test_is_balloc_LDADD   		= $(MC_LIB) $(AM_LDFLAGS)
+test_is_balloc_CPPFLAGS 	= $(AM_CPPFLAGS)
 
 # test-dfs-stack
-test_dfs_stack_SOURCES = test-dfs-stack.c
-test_dfs_stack_LDADD   = $(MC_LIB)
+test_dfs_stack_SOURCES 		= test-dfs-stack.c
+test_dfs_stack_LDADD   		= $(MC_LIB) $(AM_LDFLAGS)
+test_dfs_stack_CPPFLAGS 	= $(AM_CPPFLAGS)
 
 # test-dbs
-test_dbs_SOURCES = test-dbs.c
-test_dbs_LDADD   = $(MC_LIB) $(DM_LIB)
+test_dbs_SOURCES 			= test-dbs.c
+test_dbs_LDADD   			= $(MC_LIB) $(DM_LIB) $(AM_LDFLAGS)
+test_dbs_CPPFLAGS 			= $(AM_CPPFLAGS)
 
 # test-vset
-test_vset_SOURCES = test-vset.c
-test_vset_LDADD   = $(VSET_LIB) $(UTIL_LIB)
+test_vset_SOURCES 			= test-vset.c
+test_vset_LDADD   			= $(VSET_LIB) $(UTIL_LIB) $(AM_LDFLAGS)
+test_vset_CPPFLAGS 			= $(AM_CPPFLAGS)
 
 # test-regroup
-test_regroup_SOURCES = test-regroup.c
-test_regroup_LDADD = ../dm/libdm.la
-test_regroup_CFLAGS = -I ${top_srcdir}/src
+test_regroup_SOURCES 		= test-regroup.c
+test_regroup_LDADD 			= ../dm/libdm.la $(AM_LDFLAGS)
+test_regroup_CPPFLAGS 		= $(AM_CPPFLAGS)
 
 # test-dm
-test_dm_SOURCES = test-dm.c
-test_dm_LDADD = ../dm/libdm_debug.la
-test_dm_CFLAGS = -I ${top_srcdir}/src -DDMDEBUG
+test_dm_SOURCES 			= test-dm.c
+test_dm_LDADD 				= ../dm/libdm_debug.la $(AM_LDFLAGS)
+test_dm_CPPFLAGS 			= -DDMDEBUG $(AM_CPPFLAGS)
 

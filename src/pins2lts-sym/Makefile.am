@@ -1,5 +1,5 @@
 HRE_LIB = ../hre/libhre.la
-SYM_CPPFLAGS = -I ${top_srcdir}/src $(AM_CPPFLAGS)
+SYM_CPPFLAGS = $(AM_CPPFLAGS)
 PINS_LIBS = ../pins-lib/libpins.la ../ltsmin-lib/libltsmin.la ../util-lib/libutil.la
 VSET_LIBS = ../vset-lib/libvset.la
 

@@ -1,8 +1,31 @@
 
-pkglib_LTLIBRARIES =
-noinst_LTLIBRARIES =
+# LIB DEPENDENCIES (transitive depends on relations)
+#
+# vset-lib  ---->  bignum-lib
+#    |
+#    |
+#    v
+#   HRE   <------>   HRE-IO
+#    ^
+#    |
+#    v
+# util-lib
+#    ^
+#    |
+#    |
+# ltsmin-lib  <--->  lts-io  <----  lts-lib 
+#    ^   ^
+#    |    \
+#    |     \
+#    |      \
+#    |      mc-lib
+#    |            \
+#    |             v
+# pins-lib  ---->  dm-lib
+#    
+#
 
-#independent libs
+
 # dependency matrix lib
 SUBDIRS  = dm
 # bignum lib
@@ -15,30 +38,31 @@ if HAVE_MPI
 SUBDIRS += hre-mpi
 endif
 SUBDIRS += hre-test
-SUBDIRS += lts-io
-SUBDIRS += lts-lib
 
 # util lib with basic data structures
 SUBDIRS += util-lib
-#dependents:
+
 SUBDIRS += gcf-tool
 
 # LTSmin lib with LTS data types and parsers for property languages
 SUBDIRS += ltsmin-lib
-#dependents:
+
 SUBDIRS += etf-convert
+
+SUBDIRS += lts-io
+SUBDIRS += lts-lib
 SUBDIRS += ltsmin-printtrace
 SUBDIRS += ltsmin-compare
 SUBDIRS += ltsmin-convert
 SUBDIRS += ltsmin-reduce
 if HAVE_MPI
 SUBDIRS += ltsmin-reduce-dist
-endif
 SUBDIRS += ce
+endif
 
 # PINS lib, defining the partitioned next-state interface
 SUBDIRS += pins-lib
-#dependents:
+
 if HAVE_CADP
 SUBDIRS += pins-open
 endif
@@ -47,19 +71,19 @@ SUBDIRS += torx
 
 # vset (BDD/MDD) lib
 SUBDIRS += vset-lib
-#dependents:
 
-# symbolic parity game lib 
 if HAVE_LIBSPG
+# symbolic parity game lib
 SUBDIRS += spg-lib
-#dependents:
+
 SUBDIRS += spg
 endif
 SUBDIRS += pins2lts-sym
 
-# multi-core lib, lockless data structures and a load balancer
 if HAVE_ATOMICS
+# multi-core lib, lockless data structures and a load balancer
 SUBDIRS += mc-lib
+
 SUBDIRS += pins2lts-mc
 SUBDIRS += pins2lts-seq
 endif

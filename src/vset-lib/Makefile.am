@@ -1,7 +1,7 @@
 
 noinst_LTLIBRARIES  = libvset.la
 
-# libraries
+# libvset
 libvset_la_SOURCES   = vector_set.c vector_set.h vdom_object.h
 libvset_la_SOURCES  += vset_listdd.c
 libvset_la_SOURCES  += vset_buddy.c
@@ -31,6 +31,6 @@ libvset_la_LDFLAGS  += $(DDD_LDFLAGS)
 libvset_la_LIBADD   += $(DDD_LIBS)
 endif
 
-libvset_la_CPPFLAGS += $(AM_CPPFLAGS) -I ${top_srcdir}/src
-libvset_la_LDFLAGS  += $(AM_LDFLAGS)
 libvset_la_LIBADD   += ../bignum/libbignum.la
+libvset_la_LDFLAGS  += $(AM_LDFLAGS)
+libvset_la_CPPFLAGS += $(AM_CPPFLAGS)

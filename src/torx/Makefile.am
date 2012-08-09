@@ -1,4 +1,3 @@
-AM_CPPFLAGS = -I${top_srcdir}/src
 
 PINS_LIBS = ../pins-lib/libpins.la ../ltsmin-lib/libltsmin.la ../util-lib/libutil.la
 
@@ -9,8 +8,8 @@ bin_PROGRAMS += etf2torx
 etf2torx_SOURCES  = spec2torx.c
 etf2torx_SOURCES += ../pins-lib/etf-pins.c ../pins-lib/etf-pins.h
 etf2torx_LDADD    = $(PINS_LIBS)
+etf2torx_LDFLAGS  = $(AM_LDFLAGS)
 etf2torx_CPPFLAGS = -DETF $(TORX_CPPFLAGS) $(AM_CPPFLAGS)
-
 
 # dve2torx
 if HAVE_DVE
@@ -19,9 +18,8 @@ endif
 dve2torx_SOURCES  = spec2torx.c
 dve2torx_SOURCES += ../pins-lib/dve-pins.c ../pins-lib/dve-pins.h
 dve2torx_LDADD    = $(PINS_LIBS) $(DVE_LIBS)
-dve2torx_CPPFLAGS = -DDIVINE $(TORX_CPPFLAGS) $(DIVINE_CPPFLAGS) $(AM_CPPFLAGS)
 dve2torx_LDFLAGS  = $(DIVINE_LDFLAGS) $(AM_LDFLAGS)
-
+dve2torx_CPPFLAGS = -DDIVINE $(TORX_CPPFLAGS) $(DIVINE_CPPFLAGS) $(AM_CPPFLAGS)
 
 # lpo2torx
 if HAVE_LIBSTEP_INFO
@@ -29,9 +27,8 @@ bin_PROGRAMS +=  lpo2torx
 endif
 lpo2torx_SOURCES  = spec2torx.c
 lpo2torx_LDADD    = ../pins-lib/libmcrl-pins.la $(PINS_LIBS) $(MCRL_LIBS)
-lpo2torx_CPPFLAGS = -DMCRL $(TORX_CPPFLAGS) $(AM_CPPFLAGS) $(MCRL_CPPFLAGS)
 lpo2torx_LDFLAGS  = $(MCRL_LDFLAGS) $(AM_LDFLAGS)
-
+lpo2torx_CPPFLAGS = -DMCRL $(TORX_CPPFLAGS) $(AM_CPPFLAGS) $(MCRL_CPPFLAGS)
 
 # lps2torx
 if HAVE_LIBMCRL2
@@ -39,9 +36,9 @@ bin_PROGRAMS += lps2torx
 endif
 lps2torx_SOURCES  = spec2torx.c
 lps2torx_LDADD    = ../pins-lib/libmcrl2-pins.la $(PINS_LIBS)
+lps2torx_LDFLAGS  = $(AM_LDFLAGS)
 lps2torx_CPPFLAGS = -DMCRL2 $(TORX_CPPFLAGS) $(AM_CPPFLAGS)
 nodist_EXTRA_lps2torx_SOURCES = ../automake-force-linker.cxx
-
 
 # prom2torx
 if HAVE_SPINJA
@@ -50,9 +47,5 @@ endif
 prom2torx_SOURCES  = spec2torx.c
 prom2torx_SOURCES += ../pins-lib/prom-pins.c ../pins-lib/prom-pins.h
 prom2torx_LDADD    = $(PINS_LIBS) $(SPINJA_LIBS)
-prom2torx_CPPFLAGS = -DSPINJA $(SPINJA_CPPFLAGS) $(TORX_CPPFLAGS) $(AM_CPPFLAGS)
 prom2torx_LDFLAGS  = $(SPINJA_LDFLAGS) $(AM_LDFLAGS)
-
-
-# make
-.DELETE_ON_ERROR:
+prom2torx_CPPFLAGS = -DSPINJA $(SPINJA_CPPFLAGS) $(TORX_CPPFLAGS) $(AM_CPPFLAGS)

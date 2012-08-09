@@ -1,5 +1,5 @@
 HRE_LIB = ../hre/libhre.la
-DIST_CPPFLAGS = -I ${top_srcdir}/src $(AM_CPPFLAGS)
+DIST_CPPFLAGS = $(AM_CPPFLAGS)
 MC_LIBS = ../mc-lib/libmc.la ../pins-lib/libpins.la ../ltsmin-lib/libltsmin.la \
 		  ../util-lib/libutil.la
 

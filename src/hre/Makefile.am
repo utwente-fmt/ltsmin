@@ -1,5 +1,6 @@
 noinst_LTLIBRARIES = libhre.la
 
+# libhre
 libhre_la_SOURCES  = user.h internal.h provider.h
 libhre_la_SOURCES += hre_context.c context.h
 libhre_la_SOURCES += hre_dir_ops.c dir_ops.h
@@ -18,10 +19,11 @@ libhre_la_SOURCES += hre_unix.c unix.h
 libhre_la_SOURCES += hre_utils.c
 libhre_la_SOURCES += qsortex.c
 
-libhre_la_CPPFLAGS = -I ${top_srcdir}/src $(AM_CPPFLAGS)
+libhre_la_CPPFLAGS = $(AM_CPPFLAGS)
 
 libhre_la_LIBADD   = ../hre-io/libhre-io.la
 
+# git_version.h
 EXTRA_DIST = git_version.h
 DISTCLEANFILES = git_version.h.tmp
 MAINTAINERCLEANFILES = git_version.h

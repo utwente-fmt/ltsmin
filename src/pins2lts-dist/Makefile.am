@@ -1,11 +1,11 @@
 if HAVE_MPI
 HRE_LIB = ../hre-mpi/libhre.la
-DIST_CPPFLAGS = -DUSEMPI -I ${top_srcdir}/src $(AM_CPPFLAGS)
+DIST_CPPFLAGS = -DUSEMPI $(AM_CPPFLAGS)
 else
 HRE_LIB = ../hre/libhre.la
-DIST_CPPFLAGS = -I ${top_srcdir}/src $(AM_CPPFLAGS)
+DIST_CPPFLAGS = $(AM_CPPFLAGS)
 endif
-PINS_LIBS =  ../pins-lib/libpins.la  ../util-lib/libutil.la ../ltsmin-lib/libltsmin.la
+PINS_LIBS = ../pins-lib/libpins.la ../util-lib/libutil.la ../ltsmin-lib/libltsmin.la
 
 bin_PROGRAMS = etf2lts-dist
 

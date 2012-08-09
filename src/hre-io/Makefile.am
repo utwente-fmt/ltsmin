@@ -1,5 +1,6 @@
 noinst_LTLIBRARIES = libhre-io.la
 
+# libhre-io
 libhre_io_la_SOURCES  = user.h types.h
 libhre_io_la_SOURCES += hre_archive.c archive.h arch_object.h
 libhre_io_la_SOURCES += hre_archive_dir.c
@@ -19,7 +20,7 @@ libhre_io_la_SOURCES += hre_stream_rle32.c
 libhre_io_la_SOURCES += hre_struct_io.c struct_io.h
 libhre_io_la_SOURCES += hre_zip_io.c
 
-libhre_io_la_CPPFLAGS = -I ${top_srcdir}/src $(LIBZIP_CPPFLAGS) $(AM_CPPFLAGS)
+libhre_io_la_CPPFLAGS = $(LIBZIP_CPPFLAGS) $(AM_CPPFLAGS)
 
 libhre_io_la_LDFLAGS  = $(LIBZIP_LDFLAGS) $(AM_LDFLAGS)
 libhre_io_la_LIBADD   = $(LIBZIP_LIBS)
