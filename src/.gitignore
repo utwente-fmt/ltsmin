@@ -7,7 +7,7 @@
 .depend.bak
 .deps/
 config.h
-etf-convert
+etf-convert/etf-convert
 stamp-h1
 git_version.h
 spinjal
