@@ -7,6 +7,7 @@
 
 #include <hre/runtime.h>
 #include <hre-mpi/user.h>
+#include <ltsmin-lib/ltsmin-standard.h>
 #include <ltsmin-reduce-dist/seg-lts.h>
 #include <ltsmin-reduce-dist/sigmin-array.h>
 #include <ltsmin-reduce-dist/sigmin-set.h>
@@ -177,7 +178,7 @@ int main(int argc, char*argv[]){
         }
     }
     if (mpi_me==0) RTdeleteTimer(timer);
-    HREexit(0);
+    HREexit(LTSMIN_EXIT_SUCCESS);
 }
 
 

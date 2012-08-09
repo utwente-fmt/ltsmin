@@ -17,6 +17,7 @@
 #include <dm/bitvector.h>
 #include <hre/unix.h>
 #include <hre/user.h>
+#include <ltsmin-lib/ltsmin-standard.h>
 #include <ltsmin-lib/ltsmin-tl.h>
 #include <mc-lib/atomics.h>
 #include <mc-lib/color.h>
@@ -974,18 +975,22 @@ print_statistics (counter_t *ar_reach, counter_t *ar_red, rt_timer_t timer,
     }
     Warning (info, "Est. total memory use: %.1fMB (~%.1fMB paged-in)",
              mem1 + mem4 + mem3, mem1 + mem2 + mem3);
+
+    if (no_exit)
+        Warning (info, "\n\nDeadlocks: %zu\nInvariant violations: %zu\n"
+                 "Error actions: %zu", reach->deadlocks, reach->violations,
+                 reach->errors);
+
     Warning (infoLong, "Internal statistics:\n\n"
              "Algorithm:\nWork time: %.2f sec\nUser time: %.2f sec\nExplored: %zu\n"
-                 "Transitions: %zu\nDeadlocks: %zu\nInvariant violations: %zu\n"
-                 "Error actions: %zu\nWaits: %zu\nRec. calls: %zu\n\n"
+                 "Transitions: %zu\nWaits: %zu\nRec. calls: %zu\n\n"
              "Database:\nElements: %zu\nNodes: %zu\nMisses: %zu\nEq. tests: %zu\nRehashes: %zu\n\n"
              "Memory:\nQueue: %.1f MB\nDB: %.1f MB\nDB alloc.: %.1f MB\nColors: %.1f MB\n\n"
              "Load balancer:\nSplits: %zu\nLoad transfer: %zu\n\n"
              "Lattice MAP:\nRatio: %.2f\nInserts: %zu\nUpdates: %zu\nDeletes: %zu",
-             tot, reach->runtime, reach->explored, reach->trans, reach->deadlocks,
-                    reach->violations, reach->errors, red->waits, reach->rec,
-             db_elts, db_nodes, stats->misses, stats->tests, stats->rehashes,
-             mem1, mem4, mem2, mem3,
+             tot, reach->runtime, reach->explored, reach->trans, red->waits,
+             reach->rec, db_elts, db_nodes, stats->misses, stats->tests,
+             stats->rehashes, mem1, mem4, mem2, mem3,
              reach->splits, reach->transfer,
              ((double)lattices/db_elts), reach->inserts, reach->updates,
                      reach->deletes);
@@ -1497,6 +1502,7 @@ ndfs_report_cycle (wctx_t *ctx, state_info_t *cycle_closing_state)
         RTfree (trace);
     }
     Warning (info,"Exiting now!");
+    HREabort (LTSMIN_EXIT_COUNTER_EXAMPLE);
 }
 
 static void
@@ -1509,6 +1515,7 @@ handle_error_trace (wctx_t *ctx)
         trc_find_and_write (trace_env, trc_output, ctx->state.ref, level, global->parent_ref);
     }
     Warning (info, "Exiting now!");
+    HREabort (LTSMIN_EXIT_COUNTER_EXAMPLE);
 }
 
 /*
@@ -2273,7 +2280,7 @@ deadlock_detect (wctx_t *ctx, int count)
         Warning (info, "");
         Warning (info, "Deadlock found in state at depth %zu!", ctx->counters.level_cur);
         Warning (info, "");
-        if (trc_output) handle_error_trace (ctx);
+        handle_error_trace (ctx);
     }
 }
 
@@ -2286,7 +2293,7 @@ invariant_detect (wctx_t *ctx, raw_data_t state)
         Warning (info, "");
         Warning (info, "Invariant violation (%s) found at depth %zu!", inv_detect, ctx->counters.level_cur);
         Warning (info, "");
-        if (trc_output) handle_error_trace (ctx);
+        handle_error_trace (ctx);
     }
 }
 
@@ -2300,7 +2307,7 @@ action_detect (wctx_t *ctx, transition_info_t *ti, ref_t last)
         Warning (info, "");
         Warning (info, "Error action '%s' found at depth %zu!", act_detect, ctx->counters.level_cur);
         Warning (info, "");
-        if (trc_output) handle_error_trace (ctx);
+        handle_error_trace (ctx);
     }
 }
 
@@ -2767,5 +2774,5 @@ main (int argc, char *argv[])
 
     deinit_all (ctx);
 
-    HREexit (EXIT_SUCCESS);
+    HREexit (LTSMIN_EXIT_SUCCESS);
 }

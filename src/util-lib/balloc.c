@@ -92,7 +92,7 @@ void BAfree(allocater_t a,void* e){
 	for(p=a->free_list;p!=NULL;p=*((void**)p)){
 		if (e==p) {
 			fprintf(stderr,"BAfree: freeing element already on the free list\n");
-			exit(1);
+			exit(HRE_EXIT_FAILURE);
 		}
 	}
 	for(blk=a->block_list;blk!=NULL;blk=blk->next){
@@ -110,6 +110,6 @@ void BAfree(allocater_t a,void* e){
 		}
 	}
 	//fprintf(stderr,"BAfree(%d): attempt to free an unowned block\n",a->element_size);
-	exit(1);
+	exit(HRE_EXIT_FAILURE);
 #endif
 }

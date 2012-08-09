@@ -153,7 +153,7 @@ static void hre_popt(poptContext con,
                 return;
             }
             Abort("unimplemented option: %s",opt->longName);
-            exit(EXIT_FAILURE);
+            exit(HRE_EXIT_FAILURE);
     }
 }
 
@@ -281,7 +281,7 @@ void HREinitStart(int *argc,char **argv[],int min_args,int max_args,char*args[],
         }
         // Exit gracefully if there is an error.
         if (HREcheckAny(main_ctx,res)){
-            HREexit(EXIT_FAILURE);
+            HREexit(HRE_EXIT_FAILURE);
         }
         // Parse at other workers.
         if (HREme(main_ctx)!=0){

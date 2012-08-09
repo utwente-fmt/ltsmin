@@ -156,7 +156,7 @@ static void hre_popt(poptContext con,
                 return;
             }
             Abort("unimplemented option: %s",opt->longName);
-            exit(EXIT_FAILURE);
+            exit(HRE_EXIT_FAILURE);
     }
 }
 
@@ -189,7 +189,7 @@ void HREselectMPI(){
 static void mpi_abort(hre_context_t ctx,int code) __attribute__ ((noreturn));
 static void mpi_abort(hre_context_t ctx,int code){
     MPI_Abort(ctx->comm,code);
-    exit(EXIT_FAILURE);
+    exit(HRE_EXIT_FAILURE);
 }
 
 static void mpi_exit(hre_context_t ctx,int code) __attribute__ ((noreturn));
@@ -197,9 +197,9 @@ static void mpi_exit(hre_context_t ctx,int code){
     (void)ctx;
     MPI_Finalize();
     if (code) {
-        exit(EXIT_FAILURE);
+        exit(HRE_EXIT_FAILURE);
     } else {
-        exit(EXIT_SUCCESS);
+        exit(HRE_EXIT_SUCCESS);
     }
 }
 

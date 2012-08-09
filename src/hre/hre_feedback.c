@@ -84,7 +84,7 @@ static void segv_handle (int signum)
             "Package: " PACKAGE_STRING "\n"
             "Stack trace:\n");
     HREprintStack ();
-    _exit (EXIT_FAILURE);
+    _exit (HRE_EXIT_FAILURE);
 }
 static void segv_setup(){
     memset(&segv_sa, 0, sizeof(segv_sa));

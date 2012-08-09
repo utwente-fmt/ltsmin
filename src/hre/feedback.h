@@ -11,6 +11,9 @@
 #define POPT_ARG_LONGLONG POPT_ARG_LONG
 #endif
 
+#define HRE_EXIT_FAILURE    255
+#define HRE_EXIT_SUCCESS    0
+
 /**
 \brief Opaque type log stream or channel.
 */
@@ -151,7 +154,7 @@ extern log_t hre_debug;
 */
 #define Abort(...) {\
     log_message(error,__FILE__,__LINE__,0,__VA_ARGS__);\
-    HREabort(0);\
+    HREabort(HRE_EXIT_FAILURE);\
 }
 
 /**
@@ -159,7 +162,7 @@ extern log_t hre_debug;
 */
 #define AbortCall(...) {\
     log_message(error,__FILE__,__LINE__,errno,__VA_ARGS__);\
-    HREabort(0);\
+    HREabort(HRE_EXIT_FAILURE);\
 }
 
 #define Warning Print

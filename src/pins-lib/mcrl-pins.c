@@ -8,6 +8,7 @@
 
 #include <dm/dm.h>
 #include <hre/user.h>
+#include <ltsmin-lib/ltsmin-standard.h>
 #include <pins-lib/at-map.h>
 #include <pins-lib/mcrl-pins.h>
 
@@ -30,7 +31,7 @@ static void ErrorHandler(const char *format, va_list args) {
 		fprintf(f,"\n");
 	}
 	Abort("ATerror");
-	exit(EXIT_FAILURE);
+	exit(LTSMIN_EXIT_FAILURE);
 }
 
 

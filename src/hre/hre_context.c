@@ -53,17 +53,17 @@ hre_context_t HREctxCreate(int me,int peers,const char* class_name,size_t user_s
 
 static void process_abort(hre_context_t ctx,int code) __attribute__ ((noreturn));
 static void process_abort(hre_context_t ctx,int code){
-    (void)ctx;(void)code;
-    exit(EXIT_FAILURE);
+    (void)ctx;
+    exit(code);
 }
 
 static void process_exit(hre_context_t ctx,int code) __attribute__ ((noreturn));
 static void process_exit(hre_context_t ctx,int code){
     (void)ctx;
     if (code) {
-        exit(EXIT_FAILURE);
+        exit(HRE_EXIT_FAILURE);
     } else {
-        exit(EXIT_SUCCESS);
+        exit(HRE_EXIT_SUCCESS);
     }
 }
 

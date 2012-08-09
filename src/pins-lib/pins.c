@@ -3,6 +3,7 @@
 
 #include <dm/dm.h>
 #include <hre/user.h>
+#include <ltsmin-lib/ltsmin-standard.h>
 #include <pins-lib/pins.h>
 #include <util-lib/treedbs.h>
 
@@ -716,7 +717,7 @@ ltl_popt (poptContext con, enum poptCallbackReason reason,
             if (l < 0) {
                 Warning (error, "unknown ltl semantic %s", ltl_semantics);
                 HREprintUsage();
-                HREexit(EXIT_FAILURE);
+                HREexit(LTSMIN_EXIT_FAILURE);
             }
             ltl_type = l;
         }
@@ -768,11 +769,11 @@ GBloadFile (model_t model, const char *filename, model_t *wrapped)
 
                 if (matrix) {
                     GBprintDependencyMatrixCombined(stdout, model);
-                    exit (EXIT_SUCCESS);
+                    exit (LTSMIN_EXIT_SUCCESS);
                 } else if (labels) {
                     lts_type_print(info, GBgetLTStype(model));
                     chunk_table_print(info, model);
-                    exit (EXIT_SUCCESS);
+                    exit (LTSMIN_EXIT_SUCCESS);
                 } else {
                     return;
                 }

@@ -313,7 +313,7 @@ void HREpthreadRun(int threads){
         Debug("joined with thread %d",i);
         //pthread_attr_destroy(attr+i);
     }
-    HREexit(EXIT_SUCCESS);
+    HREexit(HRE_EXIT_SUCCESS);
 }
 
 static void hre_process_exit(hre_context_t ctx,int code) __attribute__ ((noreturn));
@@ -409,7 +409,7 @@ static void fork_popt(poptContext con,
                 return;
             }
             Abort("unimplemented option: %s",opt->longName);
-            exit(EXIT_FAILURE);
+            exit(HRE_EXIT_FAILURE);
     }
 }
 
@@ -420,6 +420,7 @@ static void fork_start(int* argc,char **argv[],int run_threads){
     int procs=fork_count;
     int children=0;
     int success=1;
+    int code;
     int kill_sent=0;
     pid_t pid[procs];
     for(int i=0;i<procs;i++) pid[i]=0;
@@ -493,6 +494,7 @@ static void fork_start(int* argc,char **argv[],int run_threads){
                 pid[i]=0;
                 children--;
                 if (WEXITSTATUS(status) || WIFSIGNALED(status)) {
+                    if (success) code = WEXITSTATUS(status);
                     success=0;
                 }
             }
@@ -500,9 +502,9 @@ static void fork_start(int* argc,char **argv[],int run_threads){
     }
     Debug("last child terminated");
     if (success) {
-        HREexit(EXIT_SUCCESS);
+        HREexit(HRE_EXIT_SUCCESS);
     } else {
-        HREexit(EXIT_FAILURE);
+        HREexit(code);
     }
     (void)argc;(void)argv;
 }

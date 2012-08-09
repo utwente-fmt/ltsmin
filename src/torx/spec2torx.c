@@ -9,6 +9,7 @@
 #include <strings.h>
 
 #include <hre/user.h>
+#include <ltsmin-lib/ltsmin-standard.h>
 #include <pins-lib/pins.h>
 #include <pins-lib/pins-impl.h>
 #include <util-lib/stringindex.h>
@@ -158,5 +159,5 @@ main (int argc, char *argv[])
     torx_ctx_t          ctx = { model, ltstype };
     torx_ui (&ctx);
 
-    exit (EXIT_SUCCESS);
+    HREexit (LTSMIN_EXIT_SUCCESS);
 }

@@ -11,6 +11,7 @@
 
 #include <hre/user.h>
 #include <lts-io/user.h>
+#include <ltsmin-lib/ltsmin-standard.h>
 #include <ltsmin-lib/ltsmin-tl.h>
 #include <pins-lib/pins.h>
 #include <pins-lib/pins-impl.h>
@@ -138,21 +139,21 @@ state_db_popt (poptContext con, enum poptCallbackReason reason,
             int db = linear_search (db_types, opt.arg_state_db);
             if (db < 0) {
                 Warning (error, "unknown vector storage mode type %s", opt.arg_state_db);
-                HREexitUsage (EXIT_FAILURE);
+                HREexitUsage (LTSMIN_EXIT_FAILURE);
             }
             opt.state_db = db;
 
             int s = linear_search (strategies, opt.arg_strategy);
             if (s < 0) {
                 Warning (error, "unknown search mode %s", opt.arg_strategy);
-                HREexitUsage (EXIT_FAILURE);
+                HREexitUsage (LTSMIN_EXIT_FAILURE);
             }
             opt.strategy = s;
 
             int p = linear_search (provisos, opt.arg_proviso);
             if (p < 0) {
                 Warning(error, "unknown proviso %s", opt.arg_proviso);
-                HREexitUsage (EXIT_FAILURE);
+                HREexitUsage (LTSMIN_EXIT_FAILURE);
             }
             opt.proviso = p;
         }
@@ -451,11 +452,12 @@ gsea_init_dot(const char *filename)
  * Trace
  */
 static void
-write_trace_state(model_t model, int src_no, int *state){
-    Debug("dumping state %d",src_no);
+write_trace_state(model_t model, int state_idx, int *state){
+    Debug("dumping state %d",state_idx);
     int labels[global.state_labels];
     if (global.state_labels) GBgetStateLabelsAll(model,state,labels);
     lts_write_state(opt.trace_output,0,state,labels);
+    (void) state_idx;
 }
 
 struct write_trace_step_s {
@@ -609,9 +611,6 @@ dfs_goal_trace_cb(int* stack_element, void *ctx)
     struct write_trace_step_s* trace_ctx = (struct write_trace_step_s*)ctx;
     // printf("state %p, %d\n", stack_element, *stack_element);
     gsea_state_t state;
-    // todo: this needs some assign functon instead of peek?
-    // assign(state, arg, *queue); -> do what's needed to assign
-    // replaces peek
     state.tree.tree_idx = *stack_element;
     state.state=stack_element;
     gc.queue.filo.stack_to_state(&state, NULL);
@@ -622,11 +621,11 @@ dfs_goal_trace_cb(int* stack_element, void *ctx)
     memcpy(trace_ctx->src_state, trace_ctx->dst_state, global.N * sizeof(int));
     memcpy(trace_ctx->dst_state, state.state, global.N * sizeof(int));
 
-    // write transition, except on initial state
-    if (trace_ctx->depth != 0)
-        write_trace_step(opt.model, trace_ctx->src_state, trace_ctx->dst_state, trace_ctx->depth);
-
     write_trace_state(opt.model, trace_ctx->depth, trace_ctx->dst_state);
+    // write transition, except on initial state
+    int src_idx = trace_ctx->depth - 1;
+    if (trace_ctx->depth != 0)
+        write_trace_step(opt.model, &src_idx, trace_ctx->dst_state, trace_ctx->depth);
     trace_ctx->depth++;
     return 1;
 }
@@ -644,7 +643,7 @@ dfs_goal_trace(gsea_state_t *state, void *arg)
 
     // init trace output
     lts_type_t ltstype = GBgetLTStype(opt.model);
-    opt.trace_output=lts_file_create(opt.trc_output,ltstype,1,lts_index_template());
+    opt.trace_output=lts_file_create(opt.trc_output,ltstype,1,lts_vset_template());
     int T=lts_type_get_type_count(ltstype);
     for(int i=0;i<T;i++)
         lts_file_set_table(opt.trace_output,i,GBgetChunkMap(opt.model,i));
@@ -1189,7 +1188,7 @@ scc_state_matched(gsea_state_t *state, void *arg)
                     gc.goal_trace(state, arg);
                 }
                 Warning(info, "exiting now");
-                HREexit(0);
+                HREexit(LTSMIN_EXIT_COUNTER_EXAMPLE);
             }
         } while (gc.store.scc.dfsnum[r>>1] > gc.store.scc.dfsnum[state->tree.tree_idx]);
         dfs_stack_push(gc.store.scc.roots, &r);
@@ -1261,7 +1260,7 @@ do_trace(gsea_state_t *state, void *arg, char *type, char *name)
     Warning (info, "");
     if (opt.trc_output && gc.goal_trace) gc.goal_trace(state, arg);
     Warning(info, "exiting now");
-    HREexit(0);
+    HREabort(LTSMIN_EXIT_COUNTER_EXAMPLE);
 }
 
 static void
@@ -1307,7 +1306,7 @@ gsea_goal_trace_default(gsea_state_t *state, void *arg)
 {
     if (opt.trc_output) Abort ("goal state reached, but tracing not implemented for current search strategy.");
     Warning (info, "goal state reached.");
-    HREexit(0);
+    HREabort(LTSMIN_EXIT_COUNTER_EXAMPLE);
     (void)state; (void)arg;
 }
 
@@ -1772,7 +1771,8 @@ gsea_finished(void *arg) {
     Warning (info, "state space %zu levels, %zu states %zu transitions",
              global.max_depth, global.explored, global.ntransitions);
 
-    Warning (infoLong, "\nDeadlocks: %zu\nInvariant violations: %zu\n"
+    if (opt.no_exit)
+        Warning (info, "\n\nDeadlocks: %zu\nInvariant violations: %zu\n"
              "Error actions: %zu", global.deadlocks,global.violations,
              global.errors);
     (void)arg;
@@ -1811,5 +1811,5 @@ main (int argc, char *argv[])
     gsea_setup_default();
     gsea_search(src);
 
-    exit(EXIT_SUCCESS);
+    HREexit(LTSMIN_EXIT_SUCCESS);
 }
