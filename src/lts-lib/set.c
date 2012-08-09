@@ -36,10 +36,12 @@
  *
  */
 
-#include <config.h>
-#include "set.h"
-#include "hre/runtime.h"
+#include <hre/config.h>
+
 #include <stdlib.h>
+
+#include <hre/runtime.h>
+#include <lts-lib/set.h>
 
 #define EMPTY_LIST -1
 

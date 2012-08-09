@@ -1,12 +1,12 @@
 // -*- tab-width:4 ; indent-tabs-mode:nil -*-
-#include <config.h>
+#include <hre/config.h>
 
 #include <stdlib.h>
 
 #include <hre/user.h>
 #include <lts-lib/rationals.h>
 #include <lts-lib/lts.h>
-#include <stringindex.h>
+#include <util-lib/stringindex.h>
 
 static char* tra_get_lab(const char *name){
     char *lab_name=strdup(name);

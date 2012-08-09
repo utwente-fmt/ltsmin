@@ -1,5 +1,7 @@
 AM_CPPFLAGS = -I${top_srcdir}/src
 
+LTSMIN_LIBS = ../util-lib/libutil.la ../ltsmin-lib/libltsmin.la
+
 bin_PROGRAMS =
 
 if HAVE_MPI
@@ -16,5 +18,5 @@ ce_mpi_SOURCES = \
     paint.c paint.h	\
     sortcount.c sortcount.h
 
-ce_mpi_LDADD = ../hre-mpi/libhre.la ../libltsmin.la
+ce_mpi_LDADD = ../hre-mpi/libhre.la $(LTSMIN_LIBS)
 

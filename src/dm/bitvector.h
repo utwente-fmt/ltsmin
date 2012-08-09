@@ -3,8 +3,8 @@
 
 #include <stdlib.h>
 #include <stdio.h>
-#include <string.h>
 #include <stdint.h>
+#include <string.h>
 
 typedef struct bitvector {
     size_t              n_bits;

@@ -1,11 +1,11 @@
-#include <config.h>
+#include <hre/config.h>
 
 #include <limits.h>
 #include <math.h>
 #include <stdlib.h>
 #include <time.h>
 
-#include "dm.h"
+#include <dm/dm.h>
 
 #ifdef DMDEBUG
 #define DMDBG(x) x

@@ -1,5 +1,5 @@
 // -*- tab-width:4 ; indent-tabs-mode:nil -*-
-#include <config.h>
+#include <hre/config.h>
 
 #include <stdlib.h>
 #include <string.h>
@@ -9,7 +9,7 @@
 #include <hre/user.h>
 #include <lts-io/provider.h>
 #include <lts-lib/lts.h>
-#include <tables.h>
+#include <util-lib/tables.h>
 
 lts_t lts_create(){
     lts_t lts=(lts_t)RTmallocZero(sizeof(struct lts));

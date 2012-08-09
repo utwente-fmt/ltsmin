@@ -1,18 +1,19 @@
 // -*- tab-width:4 ; indent-tabs-mode:nil -*-
 
-#include <config.h>
+#include <hre/config.h>
+
+#include <unistd.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/types.h>
+
 #include <hre/user.h>
 #include <lts-io/provider.h>
-#include <unistd.h>
-#include <string.h>
-#include <stdlib.h>
-#include <sys/types.h>
-#include <stdlib.h>
-#include <tables.h>
 #include <lts-lib/lts.h>
 #include <lts-lib/set.h>
-#include <bitset.h>
-#include <stringindex.h>
+#include <util-lib/bitset.h>
+#include <util-lib/stringindex.h>
+#include <util-lib/tables.h>
 
 #define UNDEF ((uint32_t)-1)
 #define MKDET_BLOCK_SIZE 4096

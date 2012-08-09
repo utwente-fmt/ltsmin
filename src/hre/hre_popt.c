@@ -1,16 +1,16 @@
 // -*- tab-width:4 ; indent-tabs-mode:nil -*-
-#include <config.h>
+#include <hre/config.h>
 
 #include <errno.h>
 #include <stdarg.h>
 #include <stdlib.h>
 #include <stdio.h>
 
-#include <dynamic-array.h>
-#include <git_version.h>
+#include <hre/git_version.h>
 #include <hre/internal.h>
 #include <hre/unix.h>
 #include <hre/user.h>
+#include <util-lib/dynamic-array.h>
 
 enum {
     PRINT_VERSION = 1,

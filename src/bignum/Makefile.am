@@ -13,3 +13,4 @@ else
 libbignum_la_SOURCES += bignum-ll.c
 endif
 endif
+libbignum_la_CFLAGS = -I ${top_srcdir}/src 

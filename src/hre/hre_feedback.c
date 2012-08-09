@@ -1,5 +1,5 @@
 // -*- tab-width:4 ; indent-tabs-mode:nil -*-
-#include <config.h>
+#include <hre/config.h>
 
 #include <ctype.h>
 #ifdef HAVE_EXECINFO_H
@@ -18,7 +18,7 @@
 #include <hre/internal.h>
 #include <hre/provider.h>
 #include <hre/unix.h>
-#include <stringindex.h>
+#include <util-lib/stringindex.h>
 
 #define LOG_IGNORE 0x00
 #define LOG_PRINT 0x01
@@ -37,6 +37,8 @@ struct runtime_log stats_log={NULL,NULL,LOG_IGNORE,NULL};
 log_t stats=&stats_log;
 struct runtime_log error_log={NULL,"** error **",LOG_PRINT,NULL};
 log_t error=&error_log;
+struct runtime_log assert_log={NULL,NULL,LOG_PRINT|LOG_WHERE,NULL};
+log_t assertion=&assert_log;
 struct runtime_log info_log={NULL,NULL,LOG_PRINT,NULL};
 log_t info=&info_log;
 struct runtime_log infoShort_log={NULL,NULL,LOG_PRINT,NULL};
@@ -54,7 +56,24 @@ static const char when_long[]="when";
 #define quiet_short 'q'
 
 static struct sigaction segv_sa;
-static void segv_handle(int signum){
+
+void
+HREprintStack ()
+{
+#if defined(HAVE_BACKTRACE) && defined(HAVE_BACKTRACE_SYMBOLS)
+    void* stacktrace[64];
+    int size = backtrace (stacktrace, 64);
+    char** stackinfo = backtrace_symbols (stacktrace, size);
+    for (int i = 0; i < size; i++) {
+        fprintf (stderr, " %2d: %s\n", i, stackinfo[i]);
+    }
+#else
+    fprintf (stderr, "not available.\n");
+#endif
+}
+
+static void segv_handle (int signum)
+{
     (void)signum;
     fprintf(stderr,
             "*** segmentation fault ***\n\n"
@@ -64,16 +83,7 @@ static void segv_handle(int signum){
             "In addition, include the following information:\n"
             "Package: " PACKAGE_STRING "\n"
             "Stack trace:\n");
-#if defined(HAVE_BACKTRACE) && defined(HAVE_BACKTRACE_SYMBOLS)
-    void*stacktrace[64];
-    int size=backtrace(stacktrace,64);
-    char **stackinfo=backtrace_symbols(stacktrace,size);
-    for(int i=0;i<size;i++){
-        fprintf(stderr," %2d: %s\n",i,stackinfo[i]);
-    }
-#else
-    fprintf (stderr, "not available.\n");
-#endif
+    HREprintStack ();
     _exit (EXIT_FAILURE);
 }
 static void segv_setup(){
@@ -191,7 +201,7 @@ void log_message(log_t log,const char*file,int line,int errnum,const char *fmt,.
     struct thread_context *ctx=pthread_getspecific(hre_key);
     // If needed put the time in the string when.
     char when[128];
-    if (HREwhen){
+    if (HREwhen && ctx){
         struct timeval tv;
         if (gettimeofday(&tv,NULL)){
             HREwhen=0;
@@ -253,7 +263,8 @@ void log_message(log_t log,const char*file,int line,int errnum,const char *fmt,.
         errmsg[0]=0;
         err_msg=errmsg;
     }
+    char *label = ctx ? ctx->label : "HRE";
     // print the entire line in one statement to minimize interleaving in output.
-    fprintf(f,"%s%s%s%s: %s%s\n",ctx->label,when,where,tag,main_msg,err_msg);
+    fprintf(f,"%s%s%s%s: %s%s\n",label,when,where,tag,main_msg,err_msg);
 }
 

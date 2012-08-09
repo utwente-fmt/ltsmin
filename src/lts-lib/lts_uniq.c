@@ -1,11 +1,11 @@
 // -*- tab-width:4 ; indent-tabs-mode:nil -*-
-#include <config.h>
+#include <hre/config.h>
 
 #include <assert.h>
 
-#include <dynamic-array.h>
 #include <hre/user.h>
 #include <lts-lib/lts.h>
+#include <util-lib/dynamic-array.h>
 
 static uint32_t merge_uniq(
     uint32_t *dst1,uint32_t *dst2,

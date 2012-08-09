@@ -1,10 +1,11 @@
 // -*- tab-width:4 ; indent-tabs-mode:nil -*-
-#include <config.h>
+#include <hre/config.h>
 
-#include <fast_hash.h>
+
 #include <lts-lib/lts.h>
 #include <lts-lib/lowmem.h>
-#include <rationals.h>
+#include <lts-lib/rationals.h>
+#include <util-lib/fast_hash.h>
 
 static int rehash(int h){
     return SuperFastHash(&h,4,h);

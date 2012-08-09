@@ -510,6 +510,7 @@ INPUT                  = $(SRCDIR)/src  \
                          $(SRCDIR)/src/bignum  \
                          $(SRCDIR)/src/ce  \
                          $(SRCDIR)/src/dm  \
+                         $(SRCDIR)/src/etf-convert  \
                          $(SRCDIR)/src/gcf-tool  \
                          $(SRCDIR)/src/hre  \
                          $(SRCDIR)/src/hre-io  \
@@ -517,13 +518,26 @@ INPUT                  = $(SRCDIR)/src  \
                          $(SRCDIR)/src/hre-test  \
                          $(SRCDIR)/src/lts-io  \
                          $(SRCDIR)/src/lts-lib  \
-                         $(SRCDIR)/src/lts-tracepp  \
-                         $(SRCDIR)/src/ltscmp-one  \
-                         $(SRCDIR)/src/ltstrans  \
-                         $(SRCDIR)/src/pins2lts-hre  \
-                         $(SRCDIR)/src/sigmin-mpi  \
-                         $(SRCDIR)/src/sigmin-one  \
-                         $(SRCDIR)/src/torx
+                         $(SRCDIR)/src/ltsmin-compare  \
+                         $(SRCDIR)/src/ltsmin-convert  \
+                         $(SRCDIR)/src/ltsmin-lib  \
+                         $(SRCDIR)/src/ltsmin-printtrace  \
+                         $(SRCDIR)/src/ltsmin-reduce  \
+                         $(SRCDIR)/src/ltsmin-reduce-dist  \
+                         $(SRCDIR)/src/mc-lib  \
+                         $(SRCDIR)/src/pins2lts-dist  \
+                         $(SRCDIR)/src/pins2lts-mc  \
+                         $(SRCDIR)/src/pins2lts-seq  \
+                         $(SRCDIR)/src/pins2lts-sym  \
+                         $(SRCDIR)/src/pins-lib  \
+                         $(SRCDIR)/src/pins-open  \
+                         $(SRCDIR)/src/scripts  \
+                         $(SRCDIR)/src/spg  \
+                         $(SRCDIR)/src/spg-lib  \
+                         $(SRCDIR)/src/tests  \
+                         $(SRCDIR)/src/torx  \
+                         $(SRCDIR)/src/util-lib  \
+                         $(SRCDIR)/src/vset-lib
 
 # This tag can be used to specify the character encoding of the source files
 # that doxygen parses. Internally doxygen uses the UTF-8 encoding, which is

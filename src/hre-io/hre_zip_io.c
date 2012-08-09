@@ -1,5 +1,5 @@
 // -*- tab-width:4 ; indent-tabs-mode:nil -*-
-#include <config.h>
+#include <hre/config.h>
 
 #ifdef HAVE_ZIP_H
 #include <zip.h>
@@ -9,7 +9,7 @@
 #include <hre-io/arch_object.h>
 #include <hre-io/stream_object.h>
 #include <hre-io/user.h>
-#include <stringindex.h>
+#include <util-lib/stringindex.h>
 
 #ifndef HAVE_ZIP_H
 

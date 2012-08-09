@@ -3,6 +3,10 @@
 #define HRE_USER_H
 
 #include <popt.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <stdio.h>
+
 #include <hre-io/types.h>
 
 #ifdef RUNTIME_H
@@ -11,9 +15,8 @@
 #define RUNTIME_H
 #endif
 
-#ifndef POPT_ARG_LONGLONG
-#define POPT_ARG_LONGLONG POPT_ARG_LONG
-#endif
+#define EXPECT_FALSE(e) __builtin_expect(e, 0)
+#define EXPECT_TRUE(e) __builtin_expect(e, 1)
 
 /**
 Opaque type memory region.
@@ -104,6 +107,39 @@ This function start all processes and all threads, specified
 on the command line.
 */
 extern void HREinit(int *argc,char **argv[]);
+
+/**
+\brief Assertion check, with or without print arguments
+*/
+#ifdef DNDEBUG
+#define HREassert(check,...)    ((void)0);
+#else
+#ifdef LTSMIN_DEBUG
+#define PRINT_STACK HREprintStack();
+#else
+#define PRINT_STACK ((void)0);
+#endif
+#define HREassert(e,...) \
+    if (EXPECT_FALSE(!(e))) {\
+        char buf[4096];\
+        if (#__VA_ARGS__[0])\
+            snprintf(buf, 4096, ": " __VA_ARGS__);\
+        else\
+            buf[0] = '\0';\
+        Print(assertion, "assertion \"%s\" failed%s", #e, buf);\
+        PRINT_STACK\
+        exit(-1);\
+    }
+#endif
+
+/**
+\brief Assertion check only for debugging.
+*/
+#ifdef LTSMIN_DEBUG
+#define HRE_ASSERT              HREassert
+#else
+#define HRE_ASSERT(check,...)   ((void)0);
+#endif
 
 /**
 \brief Emergency shutdown (async).
@@ -219,6 +255,16 @@ Allocate memory in a region.
 extern void* HREmalloc(hre_region_t region,size_t size);
 
 /**
+Allocate memory in a region aligned.
+*/
+extern void* HREalign(hre_region_t region,size_t align, size_t size);
+
+/**
+Allocate memory in a region aligned.
+*/
+extern void* HREalignZero(hre_region_t region,size_t align, size_t size);
+
+/**
 Allocate and fill with zeros.
 */
 extern void* HREmallocZero(hre_region_t region,size_t size);
@@ -239,14 +285,21 @@ Reallocate memory.
 extern void* HRErealloc(hre_region_t region,void* mem,size_t size);
 
 typedef void*(*hre_malloc_t)(void* area,size_t size);
+typedef void*(*hre_align_t)(void* area,size_t align, size_t size);
 typedef void*(*hre_realloc_t)(void* area,void*mem,size_t size);
 typedef void(*hre_free_t)(void* area,void*mem);
 
 /**
-Create a new allocater given malloc, realloc and free methods.
+Create a new allocater given malloc, align, realloc and free methods.
 */
 
-extern hre_region_t HREcreateRegion(void* area,hre_malloc_t malloc,hre_realloc_t realloc,hre_free_t free);
+extern hre_region_t HREcreateRegion(void* area,hre_malloc_t malloc,hre_align_t align,hre_realloc_t realloc,hre_free_t free);
+
+extern hre_region_t RTgetMallocRegion();
+
+extern void RTsetMallocRegion(hre_region_t r);
+
+extern hre_region_t HREdefaultRegion(hre_context_t context);
 
 extern void* RTmalloc(size_t size);
 
@@ -259,6 +312,12 @@ extern void* RTalignZero(size_t align, size_t size);
 extern void* RTrealloc(void *rt_ptr, size_t size);
 
 extern void RTfree(void *rt_ptr);
+
+/**
+\brief Switch (HREsetRegion) to the global allocator provided by the region
+        HREdefaultRegion (shared = true). And back (shared = false).
+ */
+extern void RTswitchAlloc(bool shared);
 
 #define RT_NEW(obj) HRE_NEW(NULL,obj)
 

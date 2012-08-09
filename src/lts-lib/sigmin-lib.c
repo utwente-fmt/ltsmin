@@ -1,5 +1,5 @@
 // -*- tab-width:4 ; indent-tabs-mode:nil -*-
-#include <config.h>
+#include <hre/config.h>
 
 #include <assert.h>
 #include <ctype.h>
@@ -14,8 +14,8 @@
 #include <lts-lib/dir-info.h>
 #include <lts-lib/lts.h>
 #include <lts-lib/lts-pg-io.h>
-#include <stringindex.h>
-#include <string-map.h>
+#include <util-lib/stringindex.h>
+#include <util-lib/string-map.h>
 
 /* DIR format writing */
 

@@ -1,10 +1,10 @@
 // -*- tab-width:4 ; indent-tabs-mode:nil -*-
-#include <config.h>
+#include <hre/config.h>
 #include <string.h>
 
 #include <hre/user.h>
 #include <hre/table.h>
-#include <stringindex.h>
+#include <util-lib/stringindex.h>
 
 #define CHUNK_BUFFER_SIZE 65536
 #define MAX_CHUNK_SIZE (CHUNK_BUFFER_SIZE - 4)

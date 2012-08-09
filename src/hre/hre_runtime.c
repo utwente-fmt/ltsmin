@@ -4,7 +4,7 @@
 #include <sys/types.h>
 #endif
 
-#include <config.h>
+#include <hre/config.h>
 
 #include <dlfcn.h>
 #include <stdlib.h>

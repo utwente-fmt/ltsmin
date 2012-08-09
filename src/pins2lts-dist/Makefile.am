@@ -5,6 +5,7 @@ else
 HRE_LIB = ../hre/libhre.la
 DIST_CPPFLAGS = -I ${top_srcdir}/src $(AM_CPPFLAGS)
 endif
+PINS_LIBS =  ../pins-lib/libpins.la  ../util-lib/libutil.la ../ltsmin-lib/libltsmin.la
 
 bin_PROGRAMS = etf2lts-dist
 
@@ -30,47 +31,47 @@ endif
 
 # etf2lts-dist
 etf2lts_dist_SOURCES   = pins2lts-dist.c
-etf2lts_dist_SOURCES  += ../etf-greybox.c ../etf-greybox.h
-etf2lts_dist_LDADD     = ../lts-io/liblts-io.la $(HRE_LIB) ../libltsmin.la
+etf2lts_dist_SOURCES  += ../pins-lib/etf-pins.c ../pins-lib/etf-pins.h
+etf2lts_dist_LDADD     = $(HRE_LIB) $(PINS_LIBS)
 etf2lts_dist_CPPFLAGS  = -DETF $(DIST_CPPFLAGS)
 
 # lpo2lts-dist
 lpo2lts_dist_SOURCES   = pins2lts-dist.c
-lpo2lts_dist_SOURCES  += ../mcrl-greybox.c ../mcrl-greybox.h
-lpo2lts_dist_SOURCES  += ../at-map.c ../at-map.h
-lpo2lts_dist_LDADD     = ../lts-io/liblts-io.la $(HRE_LIB) ../libltsmin.la
+lpo2lts_dist_LDADD     = $(HRE_LIB) $(PINS_LIBS)
+lpo2lts_dist_LDADD    += ../pins-lib/libmcrl-pins.la
 lpo2lts_dist_LDADD    += $(MCRL_LIBS)
 lpo2lts_dist_CPPFLAGS  = -DMCRL $(MCRL_CPPFLAGS) $(DIST_CPPFLAGS)
 lpo2lts_dist_LDFLAGS   = $(MCRL_LDFLAGS) $(AM_LDFLAGS)
+nodist_EXTRA_lpo2lts_dist_SOURCES = ../automake-force-linker.cxx
 
 # lps2lts-dist
 lps2lts_dist_SOURCES   = pins2lts-dist.c
-lps2lts_dist_LDADD     = ../lts-io/liblts-io.la $(HRE_LIB) ../libltsmin.la
-lps2lts_dist_LDADD    +=  ../libmcrl2-pins.la
+lps2lts_dist_LDADD     = $(HRE_LIB) $(PINS_LIBS)
+lps2lts_dist_LDADD    += ../pins-lib/libmcrl2-pins.la
 lps2lts_dist_CPPFLAGS  = -DMCRL2 $(DIST_CPPFLAGS)
 lps2lts_dist_LDFLAGS   = $(MCRL2_LDFLAGS) $(AM_LDFLAGS)
 nodist_EXTRA_lps2lts_dist_SOURCES = ../automake-force-linker.cxx
 
 # pbes2lts-dist
 pbes2lts_dist_SOURCES   = pins2lts-dist.c
-pbes2lts_dist_LDADD     = ../lts-io/liblts-io.la $(HRE_LIB) ../libltsmin.la
-pbes2lts_dist_LDADD    +=  ../libpbes-pins.la
+pbes2lts_dist_LDADD     = $(HRE_LIB) $(PINS_LIBS)
+pbes2lts_dist_LDADD    += ../pins-lib/libpbes-pins.la
 pbes2lts_dist_CPPFLAGS  = -DPBES $(DIST_CPPFLAGS)
 pbes2lts_dist_LDFLAGS   = $(MCRL2_LDFLAGS) $(AM_LDFLAGS)
 nodist_EXTRA_pbes2lts_dist_SOURCES = ../automake-force-linker.cxx
 
 # dve2lts-dist
 dve2lts_dist_SOURCES   = pins2lts-dist.c
-dve2lts_dist_SOURCES  += ../dve-greybox.c ../dve-greybox.h
-dve2lts_dist_LDADD     = ../lts-io/liblts-io.la $(HRE_LIB) ../libltsmin.la
+dve2lts_dist_SOURCES  += ../pins-lib/dve-pins.c ../pins-lib/dve-pins.h
+dve2lts_dist_LDADD     = $(HRE_LIB) $(PINS_LIBS)
 dve2lts_dist_LDADD    += $(DVEC_LIBS)
 dve2lts_dist_CPPFLAGS  = -DDIVINE $(DIVINE_CPPFLAGS) $(DIST_CPPFLAGS)
 dve2lts_dist_LDFLAGS   = $(DIVINE_LDFLAGS) $(AM_LDFLAGS)
 
 # prom2lts-dist
 prom2lts_dist_SOURCES  = pins2lts-dist.c
-prom2lts_dist_SOURCES += ../prom-greybox.c ../prom-greybox.h
-prom2lts_dist_LDADD    = ../lts-io/liblts-io.la $(HRE_LIB) ../libltsmin.la
+prom2lts_dist_SOURCES += ../pins-lib/prom-pins.c ../pins-lib/prom-pins.h
+prom2lts_dist_LDADD    = $(HRE_LIB) $(PINS_LIBS)
 prom2lts_dist_LDADD   += $(SPINJA_LIBS)
 prom2lts_dist_CPPFLAGS = -DSPINJA $(SPINJA_CPPFLAGS) $(DIST_CPPFLAGS)
 prom2lts_dist_LDFLAGS  = $(SPINJA_LDFLAGS) $(AM_LDFLAGS)

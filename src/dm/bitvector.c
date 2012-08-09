@@ -1,6 +1,8 @@
-#include <config.h>
-#include "bitvector.h"
+#include <hre/config.h>
+
 #include <limits.h>
+
+#include <dm/bitvector.h>
 
 static inline       size_t
 utrunc (size_t x, size_t m)

@@ -1,4 +1,5 @@
-#include <config.h>
+#include <hre/config.h>
+
 #include <assert.h>
 #include <ctype.h>
 #include <limits.h>
@@ -7,22 +8,23 @@
 #include <string.h>
 #include <strings.h>
 
-#include <atomics.h>
-#include <bitset.h>
-#include <dbs-ll.h>
-#include <dfs-stack.h>
-#include <dynamic-array.h>
+
 #include <hre/user.h>
-#include <is-balloc.h>
 #include <lts-io/user.h>
-#include <ltsmin-tl.h>
-#include <spec-greybox.h>
-#include <stats.h>
-#include <stringindex.h>
-#include <tables.h>
-#include <trace.h>
-#include <treedbs.h>
-#include <vector_set.h>
+#include <ltsmin-lib/ltsmin-tl.h>
+#include <pins-lib/pins.h>
+#include <pins-lib/pins-impl.h>
+#include <pins-lib/property-semantics.h>
+#include <mc-lib/dbs-ll.h>
+#include <mc-lib/dfs-stack.h>
+#include <mc-lib/is-balloc.h>
+#include <mc-lib/trace.h>
+#include <util-lib/bitset.h>
+#include <util-lib/dynamic-array.h>
+#include <util-lib/stringindex.h>
+#include <util-lib/tables.h>
+#include <util-lib/treedbs.h>
+#include <vset-lib/vector_set.h>
 
 /*
  * Exploration algorithms based on an extended version of the
@@ -1510,7 +1512,7 @@ gsea_setup(const char *output)
         Warning(info, "Detecting action \"%s\"", opt.act_detect);
     }
     if (opt.inv_detect)
-        opt.inv_expr = pred_parse_file (opt.model, opt.inv_detect);
+        opt.inv_expr = parse_file (opt.inv_detect, pred_parse_file, opt.model);
 
     // setup search algorithms and datastructures
     switch(opt.strategy) {
@@ -1759,8 +1761,7 @@ static void
 gsea_progress(void *arg) {
     if (!log_active(info) || global.explored < opt.threshold)
         return;
-    if (!cas (&opt.threshold, opt.threshold, opt.threshold << 1))
-        return;
+    opt.threshold <<= 1;
     Warning (info, "explored %zu levels ~%zu states ~%zu transitions",
              global.max_depth, global.explored, global.ntransitions);
     (void)arg;

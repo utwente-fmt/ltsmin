@@ -1,11 +1,11 @@
 AM_CPPFLAGS = -I${top_srcdir}/src
 
-if HAVE_LIBSPG
+LTSMIN_LIBS = ../util-lib/libutil.la ../ltsmin-lib/libltsmin.la
+
 bin_PROGRAMS = spgsolver
-endif
 
 # spgsolver
 spgsolver_SOURCES  = spgsolver.c
-spgsolver_CPPFLAGS = $(AM_CPPFLAGS)
+spgsolver_CPPFLAGS = $(AM_CPPFLAGS) -I ${top_srcdir}/src
 spgsolver_LDFLAGS  = $(AM_LDFLAGS)
-spgsolver_LDADD    = ../libspg.la ../libvset.la ../libltsmin.la ../bignum/libbignum.la
+spgsolver_LDADD    = ../spg-lib/libspg.la ../vset-lib/libvset.la $(LTSMIN_LIBS)

@@ -4,9 +4,9 @@
 #define LTS_USER_H
 
 #include <hre-io/user.h>
-#include <lts-type.h>
-#include <tables.h>
-#include <string-map.h>
+#include <ltsmin-lib/lts-type.h>
+#include <util-lib/tables.h>
+#include <util-lib/string-map.h>
 
 /**
 \file lts-io/user.h

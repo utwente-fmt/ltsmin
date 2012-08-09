@@ -7,7 +7,7 @@ Provides replicated value tables.
 */
 
 #include <hre/user.h>
-#include <tables.h>
+#include <util-lib/tables.h>
 
 #ifndef HRE_TABLE_H
 #define HRE_TABLE_H

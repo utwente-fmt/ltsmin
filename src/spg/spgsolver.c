@@ -4,13 +4,13 @@
  *  Created on: 20 Feb 2012
  *      Author: kant
  */
-#include <config.h>
+#include <hre/config.h>
 
 #include <limits.h>
 
-#include <../hre/user.h>
-#include <../vector_set.h>
-#include <../spg-solve.h>
+#include <hre/user.h>
+#include <spg-lib/spg-solve.h>
+#include <vset-lib/vector_set.h>
 
 static  struct poptOption options[] = {
     { NULL, 0 , POPT_ARG_INCLUDE_TABLE, spg_solve_options , 0, "Symbolic parity game solver options", NULL},

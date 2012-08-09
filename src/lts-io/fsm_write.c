@@ -1,14 +1,14 @@
 // -*- tab-width:4 ; indent-tabs-mode:nil -*-
-#include <config.h>
+#include <hre/config.h>
 
 #include <assert.h>
 #include <ctype.h>
 #include <stdio.h>
 
-#include <chunk_support.h>
 #include <hre/user.h>
 #include <lts-io/internal.h>
-#include <tables.h>
+#include <util-lib/chunk_support.h>
+#include <util-lib/tables.h>
 
 struct lts_file_s{
     FILE* f;

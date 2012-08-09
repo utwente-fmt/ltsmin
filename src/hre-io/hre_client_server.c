@@ -1,4 +1,4 @@
-#include <config.h>
+#include <hre/config.h>
 
 #include <netdb.h>
 #include <netinet/in.h>

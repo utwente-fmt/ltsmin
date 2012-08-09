@@ -1,9 +1,9 @@
 // -*- tab-width:4 ; indent-tabs-mode:nil -*-
-#include <config.h>
+#include <hre/config.h>
 
-#include <dynamic-array.h>
 #include <hre/user.h>
 #include <hre-mpi/user.h>
+#include <util-lib/dynamic-array.h>
 
 struct event_queue_s{
     array_manager_t man;

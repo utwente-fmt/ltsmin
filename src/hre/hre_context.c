@@ -1,10 +1,11 @@
 // -*- tab-width:4 ; indent-tabs-mode:nil -*-
 
-#include <config.h>
+#include <hre/config.h>
 #include <stdlib.h>
+
 #include <hre/provider.h>
 #include <hre/internal.h>
-#include <dynamic-array.h>
+#include <util-lib/dynamic-array.h>
 
 /* Type definitions */
 
@@ -276,7 +277,7 @@ void HREmsgReady(hre_msg_t msg){
     }
 }
 
-hre_region_t HREmsgRegion(hre_context_t context){
+hre_region_t HREdefaultRegion(hre_context_t context){
     return USR2SYS(context)->msg_region;
 }
 
@@ -292,7 +293,7 @@ void* HREshmGet(hre_context_t context,size_t size){
     if (USR2SYS(context)->shm_get) {
         return USR2SYS(context)->shm_get(context,size);
     } else if (HREpeers(context)==1) {
-        return malloc(size);
+        return RTmalloc(size);
     } else {
         return NULL;
     }

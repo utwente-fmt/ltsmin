@@ -1,5 +1,5 @@
 // -*- tab-width:4 ; indent-tabs-mode:nil -*-
-#include <config.h>
+#include <hre/config.h>
 
 #include <libgen.h>
 #include <pthread.h>
@@ -199,6 +199,7 @@ void HREregisterRuntime(hre_runtime_t runtime){
 }
 
 void HREenableThreads(int threads){
+    Debug("Enabling posix threads runtime environment.");
     if (HREmainThread()){
         thread_count=threads;
     }

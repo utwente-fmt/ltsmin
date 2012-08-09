@@ -1,5 +1,5 @@
 // -*- tab-width:4 ; indent-tabs-mode:nil -*-
-#include <config.h>
+#include <hre/config.h>
 
 #include <fnmatch.h>
 #include <stdio.h>
@@ -7,7 +7,7 @@
 
 #include <hre/dir_ops.h>
 #include <hre-io/user.h>
-#include <string-map.h>
+#include <util-lib/string-map.h>
 
 /**************************************************************************/
 /* auxiliary functions                                                    */
