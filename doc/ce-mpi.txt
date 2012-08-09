@@ -38,7 +38,7 @@ include::inc/general-options.txt[]
 == EXIT STATUS
 0::
         Successful termination.
-1::
+255::
         Some error occurred.
 
 include::inc/support.txt[]

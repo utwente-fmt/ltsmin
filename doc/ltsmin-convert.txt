@@ -42,7 +42,7 @@ include::inc/file-formats.txt[]
 
 *0*::
         Successful termination.
-*>0*::
+*255*::
         Some error occurred.
 
 == SEE ALSO

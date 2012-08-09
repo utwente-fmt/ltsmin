@@ -1,4 +1,4 @@
-=== Tracepp Options
+=== Print trace Options
 
 *-s*, *--csv-separator*::
         Define a custom the separator used in csv output

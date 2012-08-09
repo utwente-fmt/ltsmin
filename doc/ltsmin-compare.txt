@@ -1,17 +1,17 @@
 //                           -*- mode: doc; outline-regexp: "==\(=*\) ." -*-
-ltscmp-one(1)
-=============
+ltsmin-compare(1)
+=================
 :Author:  Stefan Blom
 :Email:   <sccblom@ewi.utwente.nl>
 :Date:    2011-06-02
 
 == NAME
 
-ltscmp-one - comparison of labelled transition systems modulo bisimulation
+ltsmin-compare - comparison of labelled transition systems modulo bisimulation
 
 == SYNOPSIS
 
-ltscmp-one [OPTIONS] <input 1> <input 2>
+ltsmin-compare [OPTIONS] <input 1> <input 2>
 
 == OPTIONS
 
@@ -43,11 +43,13 @@ include::inc/hre-options.txt[]
 == EXIT STATUS
 0::
         Successful termination: LTSs are equivalent.
->0::
-        Some error occurred or LTSs are not equivalent.
+1::
+        LTSs are not equivalent.
+255::
+        Some error occurred.
 
 == SEE ALSO
 
-manpage:sigmin-mpi[1], manpage:sigmin-one[1]
+manpage:ltsmin-reduce-dist[1], manpage:ltsmin-reduce[1]
 
 

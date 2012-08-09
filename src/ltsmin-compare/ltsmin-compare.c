@@ -109,6 +109,6 @@ int main(int argc, char *argv[]){
         HREexit(LTSMIN_EXIT_SUCCESS);
     } else {
         Print(infoShort,"LTSs are distinguishable");
-        HREexit(LTSMIN_EXIT_FAILURE);
+        HREexit(LTSMIN_EXIT_COUNTER_EXAMPLE);
     }
 }

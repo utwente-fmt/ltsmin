@@ -6,8 +6,8 @@
 *-q*::
         Be quiet; do not print anything to the terminal.
 
-*--debug*::
-        Enable debugging output.
+*--debug=<file.c>*::
+        Enable debugging output for file.c (option allowed multiple times).
 
 *--version*::
         Print version string of this tool.

@@ -11,7 +11,9 @@ include::file-formats.txt[]
 == EXIT STATUS
 *0*::
         Successful termination.
-*>0*::
+*1*::
+        Counter example found.
+*255*::
         Some error occurred.
 
 include::support.txt[]
@@ -19,7 +21,7 @@ include::support.txt[]
 == SEE ALSO
 manpage:ltsmin[7],
 manpage:ltsmin-convert[1],
-manpage:ltsmin-tracepp[1],
+manpage:ltsmin-printtrace[1],
 manpage:ltsmin-ltl[5],
 manpage:etf[5],
 http://www.cwi.nl/{tilde}mcrl/[muCRL],

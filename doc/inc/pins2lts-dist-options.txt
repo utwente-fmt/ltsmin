@@ -15,7 +15,4 @@
         an "x" are specified as "x*". The complement all labels,
         except those starting with an "x" are specified as "!x*;*".
 
-*-d, --deadlock*::
-        Find state with no outgoing transitions. Returns with exit code 1
-        if deadlock is found, otherwise 0.
-
+include::reachability-options.txt[]
