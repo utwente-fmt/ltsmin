@@ -70,6 +70,7 @@ static void process_exit(hre_context_t ctx,int code){
 void hre_ready_decr(hre_msg_t self,void* ready_ctx){
     (*((int*)ready_ctx))--;
     Debug("decrease on %d -> %d : %d",self->source,self->target,*((int*)ready_ctx));
+    (void) self;
 }
 
 

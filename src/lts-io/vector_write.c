@@ -414,6 +414,7 @@ static lts_file_t archive_create(archive_t archive,const char* name,
     for(int i=0;i<lts_file_owned_count(file);i++){
         int seg=lts_file_owned(file,i);
         Debug("owned segment %d is %d",i,seg);
+        (void) seg;
     }
     write_begin(file);
     return file;

@@ -70,6 +70,7 @@ static void* area_malloc(void* ptr,size_t size){
         size = size + area->align - remainder;
     area->next = area->next + size;
     Debug("allocated %zu from %zu to %zu next %zu",old_size,tmp,tmp+size,area->next);
+    (void) old_size; (void) tmp;
     pthread_mutex_unlock(&area->mutex);
     return res;
 }
