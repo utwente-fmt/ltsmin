@@ -37,7 +37,7 @@ libetf_open_la_LIBADD    = $(PINS_LIB)
 # liblpo-open.la
 liblpo_open_la_SOURCES   = pins-open.c
 liblpo_open_la_CPPFLAGS  = -DMCRL $(MCRL_CPPFLAGS) $(CADP_CPPFLAGS)
-liblpo_open_la_CPPFLAGS += ../pins-lib/libmcrl-pins.la $(TOP_CFLAGS)
+liblpo_open_la_CPPFLAGS += ../pins-lib/libmcrl-pins.la $(AM_CPPFLAGS)
 liblpo_open_la_LIBADD    = $(PINS_LIB)
 nodist_EXTRA_liblpo_open_la_SOURCES = automake-force-linker.cxx
 
