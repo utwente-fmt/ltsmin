@@ -42,6 +42,7 @@ lpo2lts_dist_LDADD    += ../pins-lib/libmcrl-pins.la
 lpo2lts_dist_LDADD    += $(MCRL_LIBS)
 lpo2lts_dist_CPPFLAGS  = -DMCRL $(MCRL_CPPFLAGS) $(DIST_CPPFLAGS)
 lpo2lts_dist_LDFLAGS   = $(MCRL_LDFLAGS) $(AM_LDFLAGS)
+nodist_EXTRA_lpo2lts_dist_SOURCES = ../automake-force-linker.cxx
 
 # lps2lts-dist
 lps2lts_dist_SOURCES   = pins2lts-dist.c

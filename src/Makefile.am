@@ -86,48 +86,48 @@ LTSMIN_LIB = ltsmin-lib/libltsmin.la util-lib/libutil.la
 
 # etf-convert
 etf_convert_SOURCES = etf-convert.c
-etf_convert_LDADD = $(LTSMIN_LIB)
+etf_convert_LDADD   = $(LTSMIN_LIB)
 
 # test-bitset
 test_bitset_SOURCES = test-bitset.c
-test_bitset_LDADD = $(LTSMIN_LIB)
+test_bitset_LDADD   = $(LTSMIN_LIB)
 
 # ltsmin-parse
-ltsmin_parse_SOURCES = ltsmin-parse.c
-ltsmin_parse_CPPFLAGS = -DNXT -I${top_srcdir}/ltl2ba
-ltsmin_parse_LDADD = $(LTSMIN_LIB)
+ltsmin_parse_SOURCES     = ltsmin-parse.c
+ltsmin_parse_CPPFLAGS    = -DNXT -I${top_srcdir}/ltl2ba
+ltsmin_parse_LDADD       = $(LTSMIN_LIB)
 
 # libetf-open.la
-libetf_open_la_SOURCES = spec_open.c pins-lib/etf-pins.c pins-lib/etf-pins.h
-libetf_open_la_CPPFLAGS = -DETF $(CADP_CPPFLAGS) $(AM_CPPFLAGS)
-libetf_open_la_LIBADD = $(PINS_LIB)
+libetf_open_la_SOURCES   = spec_open.c pins-lib/etf-pins.c pins-lib/etf-pins.h
+libetf_open_la_CPPFLAGS  = -DETF $(CADP_CPPFLAGS) $(AM_CPPFLAGS)
+libetf_open_la_LIBADD    = $(PINS_LIB)
 
 # liblpo-open.la
-liblpo_open_la_SOURCES  = spec_open.c pins-lib/mcrl-pins.c pins-lib/mcrl-pins.h
-liblpo_open_la_SOURCES += pins-lib/at-map.c pins-lib/at-map.h
-liblpo_open_la_CPPFLAGS = -DMCRL $(MCRL_CPPFLAGS) $(CADP_CPPFLAGS) $(AM_CPPFLAGS)
-liblpo_open_la_LIBADD = $(PINS_LIB)
+liblpo_open_la_SOURCES   = spec_open.c
+liblpo_open_la_CPPFLAGS  = -DMCRL $(MCRL_CPPFLAGS) $(CADP_CPPFLAGS) $(AM_CPPFLAGS)
+liblpo_open_la_CPPFLAGS += pins-lib/libmcrl-pins.la
+liblpo_open_la_LIBADD    = $(PINS_LIB)
 
 # liblps-open.la
-liblps_open_la_SOURCES = spec_open.c
-liblps_open_la_CPPFLAGS = -DMCRL2 $(CADP_CPPFLAGS) $(AM_CPPFLAGS)
-liblps_open_la_LIBADD = libmcrl2-pins.la $(PINS_LIB)
+liblps_open_la_SOURCES   = spec_open.c
+liblps_open_la_CPPFLAGS  = -DMCRL2 $(CADP_CPPFLAGS) $(AM_CPPFLAGS)
+liblps_open_la_LIBADD    = pins-lib/libmcrl2-pins.la $(PINS_LIB)
 nodist_EXTRA_liblps_open_la_SOURCES = automake-force-linker.cxx
 
 # libdve-open.la
-libdve_open_la_SOURCES = spec_open.c pins-lib/dve-pins.c pins-lib/dve-pins.h
-libdve_open_la_CPPFLAGS = -DDIVINE $(DIVINE_CPPFLAGS) $(CADP_CPPFLAGS) $(AM_CPPFLAGS)
-libdve_open_la_LIBADD = $(PINS_LIB)
+libdve_open_la_SOURCES   = spec_open.c pins-lib/dve-pins.c pins-lib/dve-pins.h
+libdve_open_la_CPPFLAGS  = -DDIVINE $(DIVINE_CPPFLAGS) $(CADP_CPPFLAGS) $(AM_CPPFLAGS)
+libdve_open_la_LIBADD    = $(PINS_LIB)
 
 # libopaal-open.la
 libopaal_open_la_SOURCES = spec_open.c pins-lib/opaal-pins.c pins-lib/opaal-pins.h
-libopaal_open_la_CPPFLAGS = -DOPAAL $(OPAAL_CPPFLAGS) $(CADP_CPPFLAGS) $(AM_CPPFLAGS)
-libopaal_open_la_LIBADD = $(PINS_LIB)
+libopaal_open_la_CPPFLAGS= -DOPAAL $(OPAAL_CPPFLAGS) $(CADP_CPPFLAGS) $(AM_CPPFLAGS)
+libopaal_open_la_LIBADD  = $(PINS_LIB)
 
 # libprom-open.la
-libprom_open_la_SOURCES = spec_open.c pins-lib/prom-pins.c pins-lib/prom-pins.h
+libprom_open_la_SOURCES  = spec_open.c pins-lib/prom-pins.c pins-lib/prom-pins.h
 libprom_open_la_CPPFLAGS = -DSPINJA $(SPINJA_CPPFLAGS) $(CADP_CPPFLAGS) $(AM_CPPFLAGS)
-libprom_open_la_LIBADD = $(PINS_LIB)
+libprom_open_la_LIBADD   = $(PINS_LIB)
 
 
 # test-is-balloc
@@ -154,6 +154,7 @@ libvset_la_SOURCES  += vset_buddy.c
 libvset_la_CPPFLAGS  = $(BUDDY_CPPFLAGS)
 libvset_la_LDFLAGS   = $(BUDDY_LDFLAGS)
 libvset_la_LIBADD    = $(BUDDY_LIBS)
+libvset_la_LIBADD   += bignum/libbignum.la
 
 if HAVE_SYLVAN
 libvset_la_SOURCES  += vset_sylvan.c
@@ -165,7 +166,7 @@ endif
 if HAVE_LIBMCRL
 libvset_la_SOURCES  += vset_atermdd.c
 libvset_la_CPPFLAGS += $(MCRL_CPPFLAGS)
-libvset_la_LDFLAGS  += $(MCRL_LDFLAGS)
+libvset_la_LDFLAGS  += $(MCRL_LDFLAGS) bignum/libbignum.la
 libvset_la_LIBADD   += -lATerm
 endif
 

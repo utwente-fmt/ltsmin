@@ -1,11 +1,6 @@
-if HAVE_MPI
 HRE_LIB = ../hre/libhre.la
-DIST_CPPFLAGS = -DUSEMPI -I ${top_srcdir}/src $(AM_CPPFLAGS)
-else
-HRE_LIB = ../hre/libhre.la
-DIST_CPPFLAGS = -I ${top_srcdir}/src $(AM_CPPFLAGS)
-endif
-PINS_LIBS = ../pins-lib/libpins.la ../util-lib/libutil.la ../ltsmin-lib/libltsmin.la
+SYM_CPPFLAGS = -I ${top_srcdir}/src $(AM_CPPFLAGS)
+PINS_LIBS = ../util-lib/libutil.la ../ltsmin-lib/libltsmin.la ../pins-lib/libpins.la
 VSET_LIBS = ../libvset.la
 
 bin_PROGRAMS = etf2lts-sym
@@ -33,22 +28,24 @@ endif
 # etf2lts-sym
 etf2lts_sym_SOURCES   = pins2lts-sym.c
 etf2lts_sym_SOURCES  += ../pins-lib/etf-pins.c ../pins-lib/etf-pins.h
-etf2lts_sym_LDADD     = $(VSET_LIBS) $(HRE_LIB) $(PINS_LIBS)
-etf2lts_sym_CPPFLAGS  = -DETF $(DIST_CPPFLAGS)
+etf2lts_sym_LDADD     = $(HRE_LIB) $(PINS_LIBS) $(VSET_LIBS)
+etf2lts_sym_CPPFLAGS  = -DETF $(SYM_CPPFLAGS)
 
 # lpo2lts-sym
 lpo2lts_sym_SOURCES   = pins2lts-sym.c
 lpo2lts_sym_LDADD     = $(HRE_LIB) $(PINS_LIBS)
 lpo2lts_sym_LDADD    += ../pins-lib/libmcrl-pins.la
 lpo2lts_sym_LDADD    += $(VSET_LIBS) $(MCRL_LIBS)
-lpo2lts_sym_CPPFLAGS  = -DMCRL $(MCRL_CPPFLAGS) $(DIST_CPPFLAGS)
+lpo2lts_sym_CPPFLAGS  = -DMCRL $(MCRL_CPPFLAGS) $(SYM_CPPFLAGS)
 lpo2lts_sym_LDFLAGS   = $(MCRL_LDFLAGS) $(AM_LDFLAGS)
+nodist_EXTRA_lpo2lts_sym_SOURCES = ../automake-force-linker.cxx
 
 # lps2lts-sym
 lps2lts_sym_SOURCES   = pins2lts-sym.c
 lps2lts_sym_LDADD     = $(HRE_LIB) $(PINS_LIBS)
-lps2lts_sym_LDADD    += $(VSET_LIBS) ../pins-lib/libmcrl2-pins.la
-lps2lts_sym_CPPFLAGS  = -DMCRL2 $(DIST_CPPFLAGS)
+lps2lts_sym_LDADD    += ../pins-lib/libmcrl2-pins.la
+lps2lts_sym_LDADD    += $(VSET_LIBS) $(MCRL2_LIBS)
+lps2lts_sym_CPPFLAGS  = -DMCRL2 $(SYM_CPPFLAGS)
 lps2lts_sym_LDFLAGS   = $(MCRL2_LDFLAGS) $(AM_LDFLAGS)
 nodist_EXTRA_lps2lts_sym_SOURCES = ../automake-force-linker.cxx
 
@@ -59,7 +56,7 @@ pbes2lts_sym_LDADD    += $(VSET_LIBS) ../pins-lib/libpbes-pins.la
 if HAVE_LIBSPG
 pbes2lts_sym_LDADD    += ../libspg.la
 endif
-pbes2lts_sym_CPPFLAGS  = -DPBES $(DIST_CPPFLAGS)
+pbes2lts_sym_CPPFLAGS  = -DPBES $(SYM_CPPFLAGS)
 pbes2lts_sym_LDFLAGS   = $(MCRL2_LDFLAGS) $(AM_LDFLAGS)
 nodist_EXTRA_pbes2lts_sym_SOURCES = ../automake-force-linker.cxx
 
@@ -67,8 +64,8 @@ nodist_EXTRA_pbes2lts_sym_SOURCES = ../automake-force-linker.cxx
 dve2lts_sym_SOURCES   = pins2lts-sym.c
 dve2lts_sym_SOURCES  += ../pins-lib/dve-pins.c ../pins-lib/dve-pins.h
 dve2lts_sym_LDADD     = $(HRE_LIB) $(PINS_LIBS)
-dve2lts_sym_LDADD    += $(VSET_LIBS) $(DVEC_LIBS)
-dve2lts_sym_CPPFLAGS  = -DDIVINE $(DIVINE_CPPFLAGS) $(DIST_CPPFLAGS)
+dve2lts_sym_LDADD    += $(VSET_LIBS) $(DVE_LIBS)
+dve2lts_sym_CPPFLAGS  = -DDIVINE $(DIVINE_CPPFLAGS) $(SYM_CPPFLAGS)
 dve2lts_sym_LDFLAGS   = $(DIVINE_LDFLAGS) $(AM_LDFLAGS)
 
 # prom2lts-sym
@@ -76,5 +73,5 @@ prom2lts_sym_SOURCES  = pins2lts-sym.c
 prom2lts_sym_SOURCES += ../pins-lib/prom-pins.c ../pins-lib/prom-pins.h
 prom2lts_sym_LDADD    = $(HRE_LIB) $(PINS_LIBS)
 prom2lts_sym_LDADD   += $(VSET_LIBS) $(SPINJA_LIBS)
-prom2lts_sym_CPPFLAGS = -DSPINJA $(SPINJA_CPPFLAGS) $(DIST_CPPFLAGS)
+prom2lts_sym_CPPFLAGS = -DSPINJA $(SPINJA_CPPFLAGS) $(SYM_CPPFLAGS)
 prom2lts_sym_LDFLAGS  = $(SPINJA_LDFLAGS) $(AM_LDFLAGS)

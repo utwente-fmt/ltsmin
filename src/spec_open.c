@@ -11,13 +11,13 @@
 #include <caesar_standard.h>
 #include <caesar_graph.h>
 
-#include <fast_hash.h>
 #include <hre/user.h>
 #include <hre-io/user.h>
 #include <lts-io/user.h>
-#include <spec-greybox.h>
-#include <stringindex.h>
-#include <treedbs.h>
+#include <pins-lib/pins-impl.h>
+#include <util-lib/fast_hash.h>
+#include <util-lib/stringindex.h>
+#include <util-lib/treedbs.h>
 
 static model_t model;
 static lts_type_t ltstype;
