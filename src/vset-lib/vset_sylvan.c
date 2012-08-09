@@ -5,9 +5,10 @@
 #include <stdarg.h>
 #include <stdlib.h>
 
-#include <hre/user.h>
 #include <sylvan.h>
-#include <vdom_object.h>
+
+#include <hre/user.h>
+#include <vset-lib/vdom_object.h>
 
 static int fddbits = 16;
 static int threads = 1;

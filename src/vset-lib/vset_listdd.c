@@ -5,7 +5,7 @@
 #include <stdlib.h>
 
 #include <hre/user.h>
-#include <vdom_object.h>
+#include <vset-lib/vdom_object.h>
 
 static uint32_t mdd_nodes;
 static uint32_t uniq_size;

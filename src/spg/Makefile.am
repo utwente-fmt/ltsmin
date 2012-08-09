@@ -10,4 +10,4 @@ endif
 spgsolver_SOURCES  = spgsolver.c
 spgsolver_CPPFLAGS = $(AM_CPPFLAGS)
 spgsolver_LDFLAGS  = $(AM_LDFLAGS)
-spgsolver_LDADD    = ../libspg.la ../libvset.la $(LTSMIN_LIBS) ../bignum/libbignum.la
+spgsolver_LDADD    = ../libspg.la ../vset-lib/libvset.la $(LTSMIN_LIBS)

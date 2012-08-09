@@ -1,6 +1,7 @@
 
 
 pkglib_LTLIBRARIES =
+noinst_LTLIBRARIES =
 
 check_PROGRAMS  = test-bitset
 check_PROGRAMS += test-is-balloc
@@ -8,8 +9,6 @@ check_PROGRAMS += test-dfs-stack
 check_PROGRAMS += ltsmin-parse
 check_PROGRAMS += test-dbs
 check_PROGRAMS += test-vset
-
-noinst_LTLIBRARIES  = libvset.la
 
 if HAVE_LIBSPG
 noinst_LTLIBRARIES += libspg.la
@@ -27,6 +26,7 @@ SUBDIRS += hre-test
 SUBDIRS += lts-io
 SUBDIRS += lts-lib
 
+SUBDIRS += vset-lib
 SUBDIRS += util-lib
 SUBDIRS += ltsmin-lib
 
@@ -81,8 +81,10 @@ endif
 
 bin_SCRIPTS += spinjal
 
-PINS_LIB = pins-lib/libpins.la
-LTSMIN_LIB = ltsmin-lib/libltsmin.la util-lib/libutil.la
+UTIL_LIB = util-lib/libutil.la
+LTSMIN_LIB = ltsmin-lib/libltsmin.la $(UTIL_LIB)
+PINS_LIB = pins-lib/libpins.la $(UTIL_LIB)
+VSET_LIB = vset-lib/libvset.la
 
 # etf-convert
 etf_convert_SOURCES = etf-convert.c
@@ -144,47 +146,12 @@ test_dbs_LDADD   = $(MC_LIB)
 
 # test-vset
 test_vset_SOURCES = test-vset.c
-test_vset_LDADD   = $(VSET_LIBS) util-lib/libutil.la
-
-
-# libraries
-libvset_la_SOURCES   = vector_set.c vector_set.h vdom_object.h
-libvset_la_SOURCES  += vset_listdd.c
-libvset_la_SOURCES  += vset_buddy.c
-libvset_la_CPPFLAGS  = $(BUDDY_CPPFLAGS)
-libvset_la_LDFLAGS   = $(BUDDY_LDFLAGS)
-libvset_la_LIBADD    = $(BUDDY_LIBS)
-libvset_la_LIBADD   += bignum/libbignum.la
-
-if HAVE_SYLVAN
-libvset_la_SOURCES  += vset_sylvan.c
-libvset_la_CPPFLAGS += $(SYLVAN_CPPFLAGS) 
-libvset_la_LDFLAGS  += $(SYLVAN_LDFLAGS) 
-libvset_la_LIBADD   += $(SYLVAN_LIBS)
-endif
-
-if HAVE_LIBMCRL
-libvset_la_SOURCES  += vset_atermdd.c
-libvset_la_CPPFLAGS += $(MCRL_CPPFLAGS)
-libvset_la_LDFLAGS  += $(MCRL_LDFLAGS) bignum/libbignum.la
-libvset_la_LIBADD   += -lATerm
-endif
-
-if HAVE_LIBDDD
-CCLD = $(CXXLD)
-libvset_la_SOURCES  += vset_ddd.cpp
-libvset_la_CPPFLAGS += $(DDD_CPPFLAGS)
-libvset_la_LDFLAGS  += $(DDD_LDFLAGS)
-libvset_la_LIBADD   += $(DDD_LIBS)
-endif
-
-libvset_la_CPPFLAGS += $(AM_CPPFLAGS)
-libvset_la_LDFLAGS  += $(AM_LDFLAGS)
+test_vset_LDADD   = $(VSET_LIB) util-lib/libutil.la
 
 libspg_la_SOURCES  = spg-solve.c spg-solve.h
 libspg_la_CPPFLAGS = -DNDEBUG $(AM_CPPFLAGS)
 libspg_la_LDFLAGS  = $(AM_LDFLAGS) $(PROFILER_LDFLAGS)
-libspg_la_LIBADD   = libvset.la $(UTIL_LIB) bignum/libbignum.la
+libspg_la_LIBADD   = $(VSET_LIB) $(UTIL_LIB) bignum/libbignum.la
 
 EXTRA_DIST =
 CLEANFILES =

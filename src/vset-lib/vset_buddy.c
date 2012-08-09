@@ -6,7 +6,7 @@
 
 #include <fdd.h>
 #include <hre/user.h>
-#include <vdom_object.h>
+#include <vset-lib/vdom_object.h>
 
 static int fdd_bits=16;
 static int cacheratio=64;

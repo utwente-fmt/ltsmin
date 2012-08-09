@@ -9,8 +9,8 @@
 
 #include <stdbool.h>
 
-#include <vector_set.h>
 #include <hre/runtime.h>
+#include <vset-lib/vector_set.h>
 
 typedef struct
 {

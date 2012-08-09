@@ -4,7 +4,7 @@
 
 #include <aterm2.h>
 #include <hre/user.h>
-#include <vdom_object.h>
+#include <vset-lib/vdom_object.h>
 
 static void WarningHandler(const char *format, va_list args) {
 	FILE* f=log_get_stream(info);

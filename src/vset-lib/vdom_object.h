@@ -2,7 +2,7 @@
 #define VDOM_OBJECT_H
 
 
-#include <vector_set.h>
+#include <vset-lib/vector_set.h>
 
 /** \file vdom_object.h
 Object structure and helper functions for vector sets.

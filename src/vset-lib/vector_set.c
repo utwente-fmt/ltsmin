@@ -2,7 +2,7 @@
 #include <stdlib.h>
 
 #include <hre/user.h>
-#include <vdom_object.h>
+#include <vset-lib/vdom_object.h>
 
 #ifdef HAVE_ATERM2_H
 extern struct poptOption atermdd_options[];

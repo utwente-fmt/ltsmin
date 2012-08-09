@@ -1,7 +1,7 @@
 #include <config.h>
 
 #include <hre/user.h>
-#include <vector_set.h>
+#include <vset-lib/vector_set.h>
 
 static void
 test_vset_popt(poptContext con, enum poptCallbackReason reason,

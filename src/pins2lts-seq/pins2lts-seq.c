@@ -24,7 +24,7 @@
 #include <util-lib/stringindex.h>
 #include <util-lib/tables.h>
 #include <util-lib/treedbs.h>
-#include <vector_set.h>
+#include <vset-lib/vector_set.h>
 
 /*
  * Exploration algorithms based on an extended version of the
