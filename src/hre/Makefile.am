@@ -16,6 +16,7 @@ libhre_la_SOURCES += hre_runtime.c runtime.h
 libhre_la_SOURCES += hre_timer.c
 libhre_la_SOURCES += hre_unix.c unix.h
 libhre_la_SOURCES += hre_utils.c
+libhre_la_SOURCES += qsortex.c
 
 libhre_la_CPPFLAGS = -I ${top_srcdir}/src $(AM_CPPFLAGS)
 

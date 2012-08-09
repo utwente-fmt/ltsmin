@@ -9,10 +9,10 @@
 #include <unistd.h>
 
 #include <dm/dm.h>
+#include <hre/unix.h>
 #include <hre/user.h>
 #include <pins-lib/dve-pins.h>
 #include <util-lib/chunk_support.h>
-#include <util-lib/unix.h>
 
 // dve2 ltsmin interface functions
 void        (*get_initial_state)(char *to);

@@ -23,11 +23,13 @@ ltsmin-lexer.c
 ltsmin-lexer.h
 lempar.c
 test-bitset
-test-is-balloc
+test-dbs
 test-dfs-stack
+test-dm
+test-is-balloc
 test-hre
 test-hre-mpi
-test-dbs
+test-regroup
 test-vset
 gcf-tool/gcf
 hre-test/test-hre

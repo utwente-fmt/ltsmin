@@ -15,6 +15,7 @@
 #include <time.h>
 
 #include <dm/bitvector.h>
+#include <hre/unix.h>
 #include <hre/user.h>
 #include <ltsmin-lib/ltsmin-tl.h>
 #include <mc-lib/atomics.h>
@@ -34,7 +35,7 @@
 #include <pins-lib/pins-impl.h>
 #include <pins-lib/property-semantics.h>
 #include <util-lib/fast_hash.h>
-#include <util-lib/unix.h>
+
 
 static inline size_t min (size_t a, size_t b) {
     return a < b ? a : b;

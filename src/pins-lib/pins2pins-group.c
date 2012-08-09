@@ -5,11 +5,11 @@
 #include <strings.h>
 
 #include <dm/dm.h>
+#include <hre/unix.h>
 #include <hre/user.h>
 #include <pins-lib/pins.h>
 #include <ltsmin-lib/lts-type.h>
 #include <util-lib/dynamic-array.h>
-#include <util-lib/unix.h>
 
 typedef struct group_context {
     int                 len;

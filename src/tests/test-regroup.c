@@ -1,6 +1,8 @@
 #include <hre/config.h>
+
 #include <stdio.h>
-#include "dm.h"
+
+#include <dm/dm.h>
 
 
 int

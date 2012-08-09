@@ -8,13 +8,13 @@
 #undef Debug
 
 #include <dm/dm.h>
+#include <hre/unix.h>
 #include <hre/user.h>
 #include <ltsmin-lib/ltsmin-tl.h>
 #include <ltsmin-lib/ltl2ba-lex.h>
 #include <mc-lib/atomics.h>
 #include <pins-lib/pins.h>
 #include <pins-lib/property-semantics.h>
-#include <util-lib/unix.h>
 
 
 typedef struct ltl_context {

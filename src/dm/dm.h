@@ -1,11 +1,11 @@
 #ifndef DM_H
 #define DM_H
 
-#include "bitvector.h"
-
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+
+#include <dm/bitvector.h>
 
 #ifdef __cplusplus
 extern "C" {

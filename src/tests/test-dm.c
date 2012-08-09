@@ -1,7 +1,10 @@
 #include <hre/config.h>
+
 #include <stdio.h>
-#include "bitvector.h"
-#include "dm.h"
+
+#include <dm/bitvector.h>
+#include <dm/dm.h>
+
 
 void
 print_matrix (matrix_t *m)

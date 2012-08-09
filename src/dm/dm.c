@@ -5,7 +5,7 @@
 #include <stdlib.h>
 #include <time.h>
 
-#include "dm.h"
+#include <dm/dm.h>
 
 #ifdef DMDEBUG
 #define DMDBG(x) x

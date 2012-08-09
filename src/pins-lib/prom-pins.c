@@ -9,9 +9,9 @@
 
 #include <dm/dm.h>
 #include <hre/runtime.h>
+#include <hre/unix.h>
 #include <pins-lib/prom-pins.h>
 #include <util-lib/chunk_support.h>
-#include <util-lib/unix.h>
 
 #define GUARD_CHECK_MISSING(g) { \
 	if(g) { Warning(info,"missing guard function: get_guard_count"); }
