@@ -1,4 +1,4 @@
-#include <config.h>
+#include <hre/config.h>
 
 #include <hre/user.h>
 #include <ltsmin-lib/etf-objects.h>

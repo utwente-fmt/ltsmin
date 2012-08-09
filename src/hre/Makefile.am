@@ -20,3 +20,20 @@ libhre_la_SOURCES += hre_utils.c
 libhre_la_CPPFLAGS = -I ${top_srcdir}/src $(AM_CPPFLAGS)
 
 libhre_la_LIBADD   = ../hre-io/libhre-io.la
+
+EXTRA_DIST = git_version.h
+DISTCLEANFILES = git_version.h.tmp
+MAINTAINERCLEANFILES = git_version.h
+
+BUILT_SOURCES = git_version.h
+
+if HAVE_VERSION_CONTROL
+GIT_DESCRIBE := $(shell cd $(top_srcdir) && git describe --tags --abbrev=6 --dirty 2>/dev/null)
+
+git_version.h: git_version.h.tmp
+	@if cmp $< $@ 2>/dev/null; then $(RM) $<; else mv $< $@; fi
+
+git_version.h.tmp:
+	@echo "#define GIT_VERSION \"$(GIT_DESCRIBE)\"" > $@
+.PHONY: git_version.h.tmp
+endif

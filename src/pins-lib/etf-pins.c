@@ -1,4 +1,4 @@
-#include <config.h>
+#include <hre/config.h>
 
 #include <dm/dm.h>
 #include <hre/user.h>

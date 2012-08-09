@@ -31,6 +31,6 @@ libvset_la_LDFLAGS  += $(DDD_LDFLAGS)
 libvset_la_LIBADD   += $(DDD_LIBS)
 endif
 
-libvset_la_CPPFLAGS += $(AM_CPPFLAGS)
+libvset_la_CPPFLAGS += $(AM_CPPFLAGS) -I ${top_srcdir}/src
 libvset_la_LDFLAGS  += $(AM_LDFLAGS)
 libvset_la_LIBADD   += ../bignum/libbignum.la

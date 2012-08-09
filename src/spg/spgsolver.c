@@ -4,7 +4,7 @@
  *  Created on: 20 Feb 2012
  *      Author: kant
  */
-#include <config.h>
+#include <hre/config.h>
 
 #include <limits.h>
 

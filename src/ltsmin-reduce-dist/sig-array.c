@@ -1,5 +1,5 @@
 // -*- tab-width:4 ; indent-tabs-mode:nil -*-
-#include <config.h>
+#include <hre/config.h>
 
 #include <hre/user.h>
 #include <ltsmin-reduce-dist/sig-array.h>

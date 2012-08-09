@@ -1,4 +1,4 @@
-#include <config.h>
+#include <hre/config.h>
 #include <stdio.h>
 #include "bitvector.h"
 #include "dm.h"

@@ -1,4 +1,4 @@
-#include <config.h>
+#include <hre/config.h>
 
 #include <util-lib/stringindex.h>
 #include <util-lib/tables.h>

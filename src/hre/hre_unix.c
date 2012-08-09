@@ -1,4 +1,4 @@
-#include <config.h>
+#include <hre/config.h>
 #include <string.h>
 
 #include <hre/unix.h>

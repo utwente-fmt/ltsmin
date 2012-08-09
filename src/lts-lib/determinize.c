@@ -1,6 +1,6 @@
 // -*- tab-width:4 ; indent-tabs-mode:nil -*-
 
-#include <config.h>
+#include <hre/config.h>
 
 #include <unistd.h>
 #include <stdlib.h>

@@ -1,4 +1,4 @@
-#include <config.h>
+#include <hre/config.h>
 
 #include <hre/user.h>
 #include <vset-lib/vector_set.h>

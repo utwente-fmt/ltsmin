@@ -1,4 +1,4 @@
-#include <config.h>
+#include <hre/config.h>
 
 #include <limits.h>
 #include <stdlib.h>

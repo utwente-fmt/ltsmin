@@ -43,18 +43,21 @@ if HAVE_CADP
 SUBDIRS += pins-open
 endif
 SUBDIRS += pins2lts-dist
-SUBDIRS += pins2lts-sym
 SUBDIRS += torx
 
 # vset (BDD/MDD) lib
 SUBDIRS += vset-lib
 #dependents:
+
 # symbolic parity game lib 
 if HAVE_LIBSPG
 SUBDIRS += spg-lib
 #dependents:
 SUBDIRS += spg
 endif
+SUBDIRS += pins2lts-sym
+
+# multi-core lib, lockless data structures and a load balancer
 if HAVE_ATOMICS
 SUBDIRS += mc-lib
 SUBDIRS += pins2lts-mc
@@ -63,23 +66,6 @@ endif
 
 SUBDIRS += scripts
 SUBDIRS += tests
-
-EXTRA_DIST = git_version.h
-DISTCLEANFILES = git_version.h.tmp
-MAINTAINERCLEANFILES = git_version.h
-
-BUILT_SOURCES = git_version.h
-
-if HAVE_VERSION_CONTROL
-GIT_DESCRIBE := $(shell cd $(top_srcdir) && git describe --tags --abbrev=6 --dirty 2>/dev/null)
-
-git_version.h: git_version.h.tmp
-	@if cmp $< $@ 2>/dev/null; then $(RM) $<; else mv $< $@; fi
-
-git_version.h.tmp:
-	@echo "#define GIT_VERSION \"$(GIT_DESCRIBE)\"" > $@
-.PHONY: git_version.h.tmp
-endif
 
 # make
 .DELETE_ON_ERROR:

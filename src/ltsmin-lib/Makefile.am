@@ -23,9 +23,8 @@ libltsmin_la_LIBADD  += ../dm/libdm.la
 libltsmin_la_LIBADD  += ../bignum/libbignum.la
 libltsmin_la_LIBADD  += $(top_builddir)/ltl2ba/libltl2ba.la
 
-libltsmin_la_CPPFLAGS  = -DNXT
+libltsmin_la_CPPFLAGS  = -DNXT -I ${top_srcdir}/src
 libltsmin_la_CPPFLAGS += -I${top_srcdir}/ltl2ba $(AM_CPPFLAGS)
-
 
 EXTRA_DIST  = ltsmin-lexer.c ltsmin-lexer.h
 

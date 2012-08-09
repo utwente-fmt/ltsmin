@@ -1,4 +1,4 @@
-#include <config.h>
+#include <hre/config.h>
 #include "bitvector.h"
 #include <limits.h>
 

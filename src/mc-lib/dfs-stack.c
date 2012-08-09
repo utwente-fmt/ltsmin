@@ -7,7 +7,7 @@
  \brief a framestack build with two stacks
  */
 
-#include <config.h>
+#include <hre/config.h>
 
 #include <limits.h>
 #include <stdio.h>

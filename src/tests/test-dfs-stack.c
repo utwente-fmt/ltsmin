@@ -5,7 +5,7 @@
  *      Author: laarman
  */
 
-#include <config.h>
+#include <hre/config.h>
 
 #include <stdlib.h>
 

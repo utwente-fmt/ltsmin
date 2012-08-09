@@ -18,5 +18,4 @@ libmc_la_SOURCES += trace.c trace.h
 libmc_la_SOURCES += treedbs-ll.c treedbs-ll.h
 libmc_la_SOURCES += zobrist.c zobrist.h
 
-libmc_la_LIBADD   = $(LTSMIN_LIB)
-
+libmc_la_CFLAGS  = -I ${top_srcdir}/src

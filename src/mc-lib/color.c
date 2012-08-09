@@ -1,4 +1,4 @@
-#include <config.h>
+#include <hre/config.h>
 
 #include <mc-lib/color.h>
 

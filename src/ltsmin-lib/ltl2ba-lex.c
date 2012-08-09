@@ -29,7 +29,7 @@
 /*                                                                        */
 /* Some of the code in this file was taken from the Spin software         */
 /* Written by Gerard J. Holzmann, Bell Laboratories, U.S.A.               */
-#include <config.h>
+#include <hre/config.h>
 #include <stdlib.h>
 #include <ctype.h>
 

@@ -1,4 +1,4 @@
-#include <config.h>
+#include <hre/config.h>
 #include <assert.h>
 
 // gmp doesn't deal well with extern "C"

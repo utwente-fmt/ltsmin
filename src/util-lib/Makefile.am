@@ -15,3 +15,5 @@ libutil_la_SOURCES += unix.h
 
 libutil_la_LIBADD   = ../hre/libhre.la
 libutil_la_LIBADD  += ../hre-io/libhre-io.la
+
+libutil_la_CFLAGS   = -I ${top_srcdir}/src 

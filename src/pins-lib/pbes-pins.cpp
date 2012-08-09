@@ -2,7 +2,7 @@
  \file pbes-greybox.cpp
  */
 
-#include <config.h>
+#include <hre/config.h>
 
 #include <mcrl2/atermpp/aterm_init.h>
 #include <mcrl2/pbes/pbes.h>
