@@ -12,6 +12,7 @@ cct interface more explicit.
 
 #include <stdbool.h>
 
+#include <util-lib/tables.h>
 
 /**
 \typedef a thread-local container for the chunk table map
@@ -31,14 +32,6 @@ extern cct_map_t       *cct_create_map(bool shared);
 extern cct_cont_t      *cct_create_cont(cct_map_t *tables);
 
 extern value_table_t    cct_create_vt(cct_cont_t *map);
-
-extern void            *cct_new_map(void* context);
-
-extern void            *cct_map_get(void*ctx,int idx,int*len);
-
-extern int              cct_map_put(void*ctx,void *chunk,int len);
-
-extern int              cct_map_count(void* ctx);
 
 #endif
 

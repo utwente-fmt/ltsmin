@@ -524,3 +524,11 @@ void HREenableFork(int procs){
     fork_count=procs;
     HREregisterRuntime(&fork_runtime);
 }
+
+size_t
+HREgetRegionSize(hre_region_t region)
+{
+    struct shared_area *area = HREgetArea(region);
+    return area->size;
+}
+

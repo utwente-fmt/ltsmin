@@ -214,6 +214,10 @@ void HREfree(hre_region_t region,void* mem){
     }
 }
 
+void *HREgetArea(hre_region_t region) {
+    return region->area;
+}
+
 hre_region_t HREcreateRegion(void* area,hre_malloc_t malloc,hre_align_t align,hre_realloc_t realloc,hre_free_t free){
     hre_region_t res=HRE_NEW(hre_heap,struct hre_region_s);
     res->area=area;

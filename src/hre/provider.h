@@ -31,6 +31,8 @@ extern int HREmainThread();
 /// Set the main thread context.
 extern void HREmainSet(hre_context_t context);
 
+extern void *HREgetArea(hre_region_t region);
+
 /**
 \brief Get the main thread context.
 
