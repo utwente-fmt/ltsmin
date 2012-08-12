@@ -710,7 +710,8 @@ prelocal_global_init ()
 {
     if (HREme(HREglobal()) == 0) {
         pthread_mutexattr_t attr;
-        tables = cct_create_map (!SPEC_MT_SAFE);
+        //                       multi-process && multiple processes
+        tables = cct_create_map (!SPEC_MT_SAFE && HREdefaultRegion(HREglobal()) != NULL);
         int type = SPEC_MT_SAFE ? PTHREAD_PROCESS_PRIVATE : PTHREAD_PROCESS_SHARED;
         pthread_mutexattr_setpshared(&attr, type);
         pthread_mutex_init (&mutex, &attr);

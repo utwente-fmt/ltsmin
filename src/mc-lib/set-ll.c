@@ -32,9 +32,14 @@ struct set_ll_allocator_s {
 set_ll_allocator_t *
 set_ll_init_allocator (bool shared)
 {
-    hre_region_t        region = HREdefaultRegion(HREglobal());
-    size_t              region_size = HREgetRegionSize(region);
     size_t              workers = HREpeers(HREglobal());
+    size_t              region_size = 0;
+    if (shared) {
+        hre_region_t        region = HREdefaultRegion(HREglobal());
+        region_size = HREgetRegionSize(region);
+    } else {
+        region_size = RTmemSize();
+    }
     size_t              size = region_size / SLABS_RATIO / workers;
 
     RTswitchAlloc (shared); // global allocation of allocator?
@@ -46,7 +51,7 @@ set_ll_init_allocator (bool shared)
         set_ll_slab_t      *slab = alloc->slabs[i];
         HREassert (slab != NULL, "Slab allocation failed.");
         slab->mem = RTmalloc (size);
-        HREassert (slab->mem != NULL, "Slab memory allocation failed.");
+        HREassert (slab->mem != NULL, "Slab memory allocation failed. Increase your user limits");
         slab->next = 0;
         slab->size = size;
         slab->cur_len = SIZE_MAX;
