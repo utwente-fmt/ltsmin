@@ -20,9 +20,9 @@ endif
 if HAVE_DVE
 pkglib_LTLIBRARIES += libdve-open.la
 endif
-if HAVE_OPAAL
-pkglib_LTLIBRARIES += libopaal-open.la
-endif
+##if HAVE_OPAAL
+##pkglib_LTLIBRARIES += libopaal-open.la
+##endif
 if HAVE_LIBPBES
 pkglib_LTLIBRARIES += libpbes-open.la
 endif

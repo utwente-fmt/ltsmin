@@ -268,7 +268,8 @@ static int hti_copy_entry (hti_t *ht1, volatile entry_t *ht1_ent,
     HREassert(ht2);
     HREassert(ht1_ent >= ht1->table && ht1_ent < ht1->table + (1ULL << ht1->scale));
 #ifndef NBD32
-    HREassert(key_hash == 0 || ht1->ht->key_type->hash == NULL || (key_hash >> 16) == (ht1_ent->key >> 48));
+    HREassert(key_hash == 0 || ht1->ht->key_type->hash == NULL ||
+              (key_hash >> 16) == (ht1_ent->key >> 48));
 #endif
 
     map_val_t ht1_ent_val = ht1_ent->val;
@@ -303,7 +304,7 @@ static int hti_copy_entry (hti_t *ht1, volatile entry_t *ht1_ent,
     map_key_t ht1_ent_key = ht1_ent->key;
     map_key_t key = (ht1->ht->key_type == NULL) ? (map_key_t)ht1_ent_key : (map_key_t)GET_PTR(ht1_ent_key);
 
-    // We use 0 to indicate that <key_hash> is uninitiallized. Occasionally the key's hash will really be 0 and we
+    // We use 0 to indicate that <key_hash> is uninitialized. Occasionally the key's hash will really be 0 and we
     // waste time recomputing it every time. It is rare enough that it won't hurt performance.
     if (key_hash == 0) {
         key_hash = hash32(ht1->ht, key, ctx);
@@ -327,7 +328,7 @@ static int hti_copy_entry (hti_t *ht1, volatile entry_t *ht1_ent,
         if (old_ht2_ent_key != DOES_NOT_EXIST) {
             TRACE("h0", "hti_copy_entry: lost race to CAS key %p into new entry; found %p",
                     ht1_ent_key, old_ht2_ent_key);
-            return hti_copy_entry(ht1, ht1_ent, key_hash, ht2,ctx); // recursive tail-call
+            return hti_copy_entry(ht1, ht1_ent, key_hash, ht2, ctx); // recursive tail-call
         }
         add_fetch(&ht2->key_count, 1);
     }
@@ -408,7 +409,8 @@ static map_val_t hti_cas (hti_t *hti, map_key_t key, uint32_t key_hash,
                           ? (map_key_t)key
                           : (map_key_t)hti->ht->key_type->clone((void *)key, ctx);
 #ifndef NBD32
-        if (EXPECT_FALSE(hti->ht->key_type->hash != NULL)) {
+        if ((hti->ht->key_type->hash != NULL)) { //EXPECT_FALSE
+            HREassert (GET_PTR(new_key) == new_key);
             // Combine <new_key> pointer with bits from its hash
             new_key = ((uint64_t)(key_hash >> 16) << 48) | new_key;
         }

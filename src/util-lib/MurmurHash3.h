@@ -17,25 +17,8 @@ extern void MurmurHash3_x64_128 ( const void * key, int len, uint32_t seed, void
 
 //-----------------------------------------------------------------------------
 
-static inline uint64_t
-MurmurHash64 (const void * key, int len, unsigned int seed)
-{
-    uint64_t hash[2];
-#ifdef __x86_64__
-    MurmurHash3_x64_128 (key, len, seed, hash);
-#else
-    MurmurHash3_x86_128 (key, len, seed, hash);
-#endif
-    hash[0] ^= hash[1];
-    return hash[0];
-}
+extern uint64_t MurmurHash64 (const void * key, int len, unsigned int seed);
 
-static inline uint32_t
-MurmurHash32 (const void * key, int len, unsigned int seed)
-{
-    uint32_t hash;
-    MurmurHash3_x86_32 (key, len, seed, &hash);
-    return hash;
-}
+extern uint32_t MurmurHash32 (const void * key, int len, unsigned int seed);
 
 #endif // _MURMURHASH3_H_

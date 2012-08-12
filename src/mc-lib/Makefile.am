@@ -21,3 +21,4 @@ libmc_la_SOURCES += trace.c trace.h
 libmc_la_SOURCES += treedbs-ll.c treedbs-ll.h
 libmc_la_SOURCES += zobrist.c zobrist.h
 libmc_la_CPPFLAGS = $(AM_CPPFLAGS)
+libmc_la_LIBADD   = ../util-lib/libutil.la
