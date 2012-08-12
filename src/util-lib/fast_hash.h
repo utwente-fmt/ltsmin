@@ -13,27 +13,6 @@ typedef hash64_t (*hash64_f)(const char *key, int len, unsigned int seed);
 
 extern uint32_t SuperFastHash (const void *data, int len, uint32_t hash);
 
-static inline uint64_t
-MurmurHash64 (const void * key, int len, unsigned int seed)
-{
-    uint64_t hash[2];
-#ifdef __x86_64__
-    MurmurHash3_x64_128 (key, len, seed, hash);
-#else
-    MurmurHash3_x86_128 (key, len, seed, hash);
-#endif
-    hash[0] ^= hash[1];
-    return hash[0];
-}
-
-static inline uint32_t
-MurmurHash32 (const void * key, int len, unsigned int seed)
-{
-    uint32_t hash;
-    MurmurHash3_x86_32 (key, len, seed, &hash);
-    return hash;
-}
-
 extern uint32_t oat_hash(const void *data, int len, uint32_t seed);
 
 extern uint32_t mix32 (uint32_t a);
