@@ -21,6 +21,7 @@ typedef struct set_ll_slab_s {
     size_t              next;
     size_t              size;
     size_t              cur_len;
+    char               *cur_key;
 } set_ll_slab_t;
 
 struct set_ll_allocator_s {
@@ -56,10 +57,30 @@ set_ll_init_allocator (bool shared)
     return alloc;
 }
 
+/**
+ * We might receive stings from the hash table that are not the one currently
+ * being inserted, for example during a resize. This function remedies that.
+ */
+static size_t
+get_length (char *str, set_ll_slab_t *slab)
+{
+    size_t              len = 0;
+    if (str == slab->cur_key) {
+        len = slab->cur_len;
+        HREassert (len == strlen(str), "Incorrect length passed for '%s', %zu instead of %zu. Rest: '%s'.",
+                   str, len, strlen(str), &str[len]);
+    } else {
+        len = strlen(str);
+    }
+    return len;
+}
+
 static uint32_t
 strhash (const char *str, set_ll_slab_t *slab)
 {
-    size_t              len = slab->cur_len;
+    size_t              len = get_length (str, slab);
+    HRE_ASSERT (len == strlen(str), "Incorrect length passed for '%s', %zu instead of %zu. Rest: '%s'",
+                str, len, strlen(str), &str[len+1]);
     uint64_t h = MurmurHash64(str, len, 0);
     return (h & 0xFFFFFFFF) ^ (h >> 32);
 }
@@ -69,12 +90,12 @@ strclone (char *str, set_ll_slab_t *slab)
 {
     char               *mem = (char *)slab->mem;
     char               *ptr = mem + slab->next;
-    size_t              size = slab->cur_len + 1; // '\0'
+    size_t              len = get_length (str, slab) + 1; // '\0'
     HREassert (slab->cur_len != SIZE_MAX, "Failed to pass length via static.");
-    slab->next += size;
+    slab->next += len;
     HREassert (slab->next < slab->size, "Local slab of %zu from worker "
                "%d exceeded: %zu", slab->size, HREme(HREglobal()), slab->next);
-    memmove (ptr, str, size);
+    memmove (ptr, str, len);
     return (void *) ptr;
 }
 
@@ -146,12 +167,16 @@ set_ll_get (set_ll_t *set, int idx, int *len)
     *len = str->len;
     Debug ("Index(%d)\t--(%zu,%zu)--> (%s,%d) %p", idx, worker, index, str->ptr,
                                                    str->len, str->ptr);
+    HRE_ASSERT (str->len == strlen(str->ptr), "Incorrect length passed for '%s', %zu instead of %zu. Rest: '%s'",
+                str->ptr, str->len, strlen(str->ptr), &str->ptr[str->len+1]);
     return str->ptr;
 }
 
 int
 set_ll_put (set_ll_t *set, char *str, int len)
 {
+    HRE_ASSERT (len == strlen(str), "Incorrect length passed for '%s', %zu instead of %zu. Rest: '%s'",
+                str, len, strlen(str), &str[len+1]);
     hre_context_t       global = HREglobal ();
     size_t              worker = HREme (global);
     size_t              workers = HREpeers (global);
@@ -166,6 +191,7 @@ set_ll_put (set_ll_t *set, char *str, int len)
     map_key_t           key = (map_key_t)str;
     set_ll_slab_t      *slab = set->alloc->slabs[worker];
 
+    slab->cur_key = str;
     slab->cur_len = len; // avoid having to recompute the length
     RTswitchAlloc (set->alloc->shared); // in case the table resizes
     //insert idx+1 to avoid collision with DOES_NOT_EXIST:
@@ -208,6 +234,7 @@ set_ll_install (set_ll_t *set, char *name, int idx)
     set_ll_slab_t      *slab = set->alloc->slabs[worker];
     size_t              len = strlen(name);
 
+    slab->cur_len = name;
     slab->cur_len = len; // avoid having to recompute the length
     RTswitchAlloc (set->alloc->shared);
     old = ht_cas_empty (set->ht, key, idx + 1, &clone, slab);
