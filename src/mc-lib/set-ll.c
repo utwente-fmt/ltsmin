@@ -14,6 +14,7 @@
 
 
 #define MAX_WORKERS 64
+#define SLABS_RATIO  4
 
 typedef struct set_ll_slab_s {
     void               *mem;
@@ -23,59 +24,56 @@ typedef struct set_ll_slab_s {
 } set_ll_slab_t;
 
 struct set_ll_allocator_s {
-    set_ll_slab_t      **slabs;
+    set_ll_slab_t     **slabs;
+    bool                shared;
 };
 
 set_ll_allocator_t *
-set_ll_init_allocator ()
+set_ll_init_allocator (bool shared)
 {
     hre_region_t        region = HREdefaultRegion(HREglobal());
     size_t              region_size = HREgetRegionSize(region);
     size_t              workers = HREpeers(HREglobal());
-    size_t              size = region_size / 4 / workers;
-    set_ll_allocator_t *alloc = HREmalloc(region, sizeof(set_ll_allocator_t *));
+    size_t              size = region_size / SLABS_RATIO / workers;
+
+    RTswitchAlloc (shared); // global allocation of allocator?
+    set_ll_allocator_t *alloc = RTmalloc (sizeof(set_ll_allocator_t));
     Debug ("Allocating a slab of %zuMB for %zu workers", size >> 20, workers);
-    alloc->slabs = HREmalloc(region, sizeof(void *[workers]));
+    alloc->slabs = RTmalloc (sizeof(void *[workers]));
     for (size_t i = 0; i < workers; i++) {
-        alloc->slabs[i] = HREalign (region, CACHE_LINE_SIZE, sizeof(set_ll_slab_t));
+        alloc->slabs[i] = RTalign (CACHE_LINE_SIZE, sizeof(set_ll_slab_t));
         set_ll_slab_t      *slab = alloc->slabs[i];
         HREassert (slab != NULL, "Slab allocation failed.");
-        slab->mem = HREmalloc (region, size);
+        slab->mem = RTmalloc (size);
         HREassert (slab->mem != NULL, "Slab memory allocation failed.");
         slab->next = 0;
         slab->size = size;
         slab->cur_len = SIZE_MAX;
     }
+    RTswitchAlloc (false);
+
+    alloc->shared = shared;
     return alloc;
 }
 
-static set_ll_allocator_t *static_allocator = NULL; //TODO extend datatype with reentrend functions
-
 static uint32_t
-strhash (const char *str)
+strhash (const char *str, set_ll_slab_t *slab)
 {
-
-    size_t              id = HREme(HREglobal());
-    HREassert (static_allocator != NULL, "Failed to pass length via static.");
-    set_ll_slab_t      *slab = static_allocator->slabs[id];
     size_t              len = slab->cur_len;
     uint64_t h = MurmurHash64(str, len, 0);
     return (h & 0xFFFFFFFF) ^ (h >> 32);
 }
 
 static char *
-strclone (char *str)
+strclone (char *str, set_ll_slab_t *slab)
 {
-    size_t              id = HREme(HREglobal());
-    HREassert (static_allocator != NULL, "Failed to pass length via static.");
-    set_ll_slab_t      *slab = static_allocator->slabs[id];
     char               *mem = (char *)slab->mem;
     char               *ptr = mem + slab->next;
     size_t              size = slab->cur_len + 1; // '\0'
     HREassert (slab->cur_len != SIZE_MAX, "Failed to pass length via static.");
     slab->next += size;
     HREassert (slab->next < slab->size, "Local slab of %zu from worker "
-               "%zu exceeded: %zu", slab->size, id, slab->next);
+               "%d exceeded: %zu", slab->size, HREme(HREglobal()), slab->next);
     memmove (ptr, str, size);
     return (void *) ptr;
 }
@@ -131,9 +129,8 @@ typedef struct str_s {
  * table, but not yet in its local balloc. Immediately after such a situation
  * the worker insert such a key in balloc. The second conjunct then holds.
  */
-
 char    *
-set_ll_get  (set_ll_t *set, int idx, int *len)
+set_ll_get (set_ll_t *set, int idx, int *len)
 {
     size_t              read;
     size_t              workers = HREpeers(HREglobal());
@@ -147,15 +144,17 @@ set_ll_get  (set_ll_t *set, int idx, int *len)
     str_t              *str = (str_t *)isba_index (balloc, index);
     HREassert (res != NULL, "Value %d (%zu/%zu) not in lockless string set", idx, index, worker);
     *len = str->len;
-    Debug ("Indx(%d)\t--(%zu,%zu)--> (%s,%d) %p", idx, worker, index, str->ptr, str->len, str->ptr);
+    Debug ("Index(%d)\t--(%zu,%zu)--> (%s,%d) %p", idx, worker, index, str->ptr,
+                                                   str->len, str->ptr);
     return str->ptr;
 }
 
 int
 set_ll_put (set_ll_t *set, char *str, int len)
 {
-    size_t              worker = HREme (HREglobal());
-    size_t              workers = HREpeers(HREglobal());
+    hre_context_t       global = HREglobal ();
+    size_t              worker = HREme (global);
+    size_t              workers = HREpeers (global);
     isb_allocator_t     balloc = set->local[worker].balloc;
     size_t              index = set->local[worker].count;
     map_key_t           idx = index * workers + worker; // global index
@@ -166,71 +165,96 @@ set_ll_put (set_ll_t *set, char *str, int len)
     map_val_t           old;
     map_key_t           key = (map_key_t)str;
     set_ll_slab_t      *slab = set->alloc->slabs[worker];
-    static_allocator = set->alloc;
-    slab->cur_len = len; // avoid having to recompute the length;
-    RTswitchAlloc (true); // in case the table resizes
+
+    slab->cur_len = len; // avoid having to recompute the length
+    RTswitchAlloc (set->alloc->shared); // in case the table resizes
     //insert idx+1 to avoid collision with DOES_NOT_EXIST:
-    old = ht_cas_empty (set->ht, key, idx + 1, &clone);
+    old = ht_cas_empty (set->ht, key, idx + 1, &clone, slab);
     RTswitchAlloc (false);
     slab->cur_len = SIZE_MAX;
-    static_allocator = NULL;
 
     if (old == DOES_NOT_EXIST) {
         // install value in balloc (late)
         str_t               string = {.ptr = (char *)clone, .len = len};
-        RTswitchAlloc (true); // in case balloc allocates a block
-        void *p = isba_push_int (balloc, (int*)&string);
+        RTswitchAlloc (set->alloc->shared); // in case balloc allocates a block
+        isba_push_int (balloc, (int*)&string);
         RTswitchAlloc (false);
         atomic_write (&set->local[worker].count, index + 1); // signal done
-        Debug ("Wrot(%zu)\t<--(%zu,%zu)-- (%s,%d) %p", idx, worker, index, str, len, clone);
+        Debug ("Write(%zu)\t<--(%zu,%zu)-- (%s,%d) %p", idx, worker, index, str,
+                                                        len, clone);
     } else {
         idx = old - 1;
-        worker = idx % workers;
-        index = idx / workers;
-        Debug ("WrRd(%zu)\t<--(%zu,%zu)-- (%s,%d) %p", idx, worker, index, str, len, clone);
+        Debug ("Find (%zu)\t<--(%zu,%zu)-- (%s,%d) %p", idx, idx % workers,
+                                               idx / workers, str, len, clone);
     }
     return (int)idx;
 }
 
 int
-set_ll_count(set_ll_t *set)
+set_ll_count (set_ll_t *set)
 {
-    HREassert(false, "set_ll_count not implemented");
+    HREassert (false, "set_ll_count not implemented");
     (void) set;
 }
 
+void
+set_ll_install (set_ll_t *set, char *name, int idx)
+{
+    size_t              workers = HREpeers (HREglobal());
+    map_key_t           clone, old, key = (map_key_t)name;
+    size_t              worker = idx % workers;
+    isb_allocator_t     balloc = set->local[worker].balloc;
+    size_t              index = idx / workers;
+    set_ll_slab_t      *slab = set->alloc->slabs[worker];
+    size_t              len = strlen(name);
+
+    slab->cur_len = len; // avoid having to recompute the length
+    RTswitchAlloc (set->alloc->shared);
+    old = ht_cas_empty (set->ht, key, idx + 1, &clone, slab);
+    RTswitchAlloc (false);
+    slab->cur_len = SIZE_MAX;
+
+    if (old - 1 == idx)
+        return;
+    HREassert (old == DOES_NOT_EXIST);
+    str_t               string = {.ptr = (char *)clone, .len = len};
+
+    RTswitchAlloc (set->alloc->shared);
+    isba_push_int (balloc, (int*)&string);
+    RTswitchAlloc (false);
+    atomic_write (&set->local[worker].count, index + 1); // signal done
+
+    Debug ("Bind (%zu)\t<--(%zu,%zu)-> (%s,%d) %p", idx, worker, index, name,
+                                                    len, clone);
+}
+
 set_ll_t*
-set_ll_create(set_ll_allocator_t *alloc)
+set_ll_create (set_ll_allocator_t *alloc)
 {
     HREassert (sizeof(str_t) == 12);
-    set_ll_t *set = HREmalloc (HREdefaultRegion(HREglobal()), sizeof(set_ll_t));
-    set->alloc = alloc;
 
-    RTswitchAlloc(true); // global allocation of table
+    RTswitchAlloc (alloc->shared); // global allocation of table, ballocs and set
+    set_ll_t           *set = RTmalloc (sizeof(set_ll_t));
     set->ht = ht_alloc (&DATATYPE_HRE_STR, INIT_HT_SCALE);
-    RTswitchAlloc(false);
-
-    RTswitchAlloc(true); // global allocation of ballocs
     for (int i = 0; i < HREpeers(HREglobal()); i++) {
         // a pointer to the string and its length (int) will be put on a balloc:
         set->local[i].balloc = isba_create(sizeof(char *) / sizeof(int) + 1);
         set->local[i].count = 0;
     }
-    RTswitchAlloc(false);
+    RTswitchAlloc (false);
+
+    set->alloc = alloc;
+
     return set;
 }
 
 void
-set_ll_destroy(set_ll_t *set)
+set_ll_destroy (set_ll_t *set)
 {
-    RTswitchAlloc(true); // global deallocation of table
+    RTswitchAlloc (set->alloc->shared); // global deallocation of table, ballocs and set
     ht_free (set->ht);
-    RTswitchAlloc(false);
-
-    RTswitchAlloc(true); // global deallocation of ballocs
     for (int i = 0; i < HREpeers(HREglobal()); i++)
         isba_destroy (set->local[i].balloc);
-    RTswitchAlloc(false);
-
     HREfree (HREdefaultRegion(HREglobal()), set);
+    RTswitchAlloc (false);
 }

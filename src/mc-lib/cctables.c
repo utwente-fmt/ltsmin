@@ -67,20 +67,22 @@ struct cct_cont_s {
 cct_map_t *
 cct_create_map(bool shared)
 {
-    hre_region_t            region = HREdefaultRegion (HREglobal());
-    cct_map_t              *map = HREmalloc (region, sizeof(cct_map_t));
+    RTswitchAlloc (shared); // global shared-memory allocation?
+    cct_map_t              *map = RTmalloc(sizeof(cct_map_t));
     map->shared = shared;
-    map->table = HREmalloc (region, sizeof(table_t[MAX_TABLES]));
+    map->table = RTmalloc(sizeof(table_t[MAX_TABLES]));
+    RTswitchAlloc (false);
+
     for (size_t i = 0; i < MAX_TABLES; i++)
         map->table[i].string_set = NULL;
     pthread_rwlockattr_t    lock_attr;
     pthread_rwlockattr_init(&lock_attr);
     int type = map->shared ? PTHREAD_PROCESS_SHARED : PTHREAD_PROCESS_PRIVATE;
-    if (pthread_rwlockattr_setpshared(&lock_attr, type)){
+    if (pthread_rwlockattr_setpshared(&lock_attr, type))
         AbortCall("pthread_rwlockattr_setpshared");
-    }
     pthread_rwlock_init(&map->map_lock, &lock_attr);
-    map->set_allocator = set_ll_init_allocator();
+
+    map->set_allocator = set_ll_init_allocator(shared);
     return map;
 }
 
@@ -97,17 +99,15 @@ cct_create_cont(cct_map_t *tables)
 static value_index_t
 put_chunk(value_table_t vt,chunk item)
 {
-    void               *t=*((void **)vt);
-    table_t            *table = t;
+    table_t            *table = *((table_t **)vt);
     return set_ll_put(table->string_set, item.data, item.len);
 }
 
 static chunk
 get_chunk(value_table_t vt,value_index_t idx)
 {
-    void               *t=*((void **)vt);
+    table_t            *table = *((table_t **)vt);
     int                 len;
-    table_t            *table = t;
     const char         *data = set_ll_get(table->string_set, (int)idx, &len);
     return chunk_ld(len, (char *)data);
 }
@@ -115,8 +115,7 @@ get_chunk(value_table_t vt,value_index_t idx)
 static int
 get_count(value_table_t vt)
 {
-    void               *t=*((void **)vt);
-    table_t            *table = t;
+    table_t            *table = *((table_t **)vt);
     return set_ll_count(table->string_set);
 }
 
@@ -134,6 +133,11 @@ new_map(void* context)
         pthread_rwlock_wrlock(&map->map_lock);
         if (!table->string_set) {
             table->string_set = set_ll_create(map->set_allocator);
+
+            // insert true and false to enforce their numbering (required by some PINS implementations)
+            set_ll_install (table->string_set, "false", 0);
+            set_ll_install (table->string_set, "true" , 1);
+
             table->map = map;
         }
         pthread_rwlock_unlock(&map->map_lock);

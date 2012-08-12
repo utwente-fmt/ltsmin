@@ -23,13 +23,18 @@ typedef struct set_ll_allocator_s set_ll_allocator_t;
 /**
  \brief Initializes internal allocator. Call once. Uses HRE.
  */
-extern set_ll_allocator_t *set_ll_init_allocator ();
+extern set_ll_allocator_t *set_ll_init_allocator (bool shared);
 
 extern char        *set_ll_get      (set_ll_t *set, int idx, int *len);
 
 extern int          set_ll_put      (set_ll_t *set, char *str, int len);
 
 extern int          set_ll_count    (set_ll_t *set);
+
+/**
+\Brief binds a key to a specific value. NOT THREAD-SAFE!
+ */
+void                set_ll_install (set_ll_t *set, char *name, int idx);
 
 extern set_ll_t    *set_ll_create   ();
 
