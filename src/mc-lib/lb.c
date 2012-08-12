@@ -74,8 +74,7 @@ lb_reinit (lb_t *lb, size_t id)
 {
     atomic_write (&lb->local[id]->requests, 0);
     atomic_write (&lb->all_done, 0);
-    if (0 == id)
-        set_idle (lb, id, 0);
+    set_idle (lb, id, 0);
     //lb_barrier (lb->threads);
     HREbarrier(HREglobal());
 }

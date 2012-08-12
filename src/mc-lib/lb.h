@@ -14,6 +14,9 @@
 #ifndef LB_H_
 #define LB_H_
 
+#include <stdint.h>
+
+
 typedef struct lb_s lb_t;
 
 typedef enum { lb_Static,   //Statically partition results of an initial run
