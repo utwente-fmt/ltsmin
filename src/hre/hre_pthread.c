@@ -69,7 +69,7 @@ static void* area_malloc(void* ptr,size_t size){
     if (remainder)
         size = size + area->align - remainder;
     area->next = area->next + size;
-    Debug("allocated %zu from %zu to %zu next %zu",old_size,tmp,tmp+size,area->next);
+    Debug("allocated %zu from %zu to %zu",old_size,tmp,tmp+size);
     (void) old_size; (void) tmp;
     pthread_mutex_unlock(&area->mutex);
     return res;
@@ -87,6 +87,7 @@ static void* area_align(void* ptr,size_t align,size_t size){
     } else {
         res=area_malloc (ptr, size);
     }
+    Debug("allocated %zu from %zu to %zu at alignment %zu",size,res,res+size,align);
     return res;
 }
 
@@ -101,6 +102,7 @@ static void* area_realloc(void* area,void *rt_ptr, size_t size){
 static void area_free(void*area,void *rt_ptr){
     (void)area;
     (void)rt_ptr;
+    Debug("Freeing %p", rt_ptr);
 }
 
 static void queue_put(hre_context_t context,hre_msg_t msg,int queue){
