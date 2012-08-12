@@ -498,7 +498,7 @@ recursive_result spg_solve_recursive(parity_game* g,  const spgsolver_options* o
 
     recursive_result x;
     vset_t empty = vset_create(g->domain, -1, NULL);
-    char* g_filename;
+    char* g_filename = NULL;
     {
         parity_game* g_minus_u = spg_copy(g);
 

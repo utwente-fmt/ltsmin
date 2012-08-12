@@ -12,7 +12,7 @@ static const char HEX[16]="0123456789ABCDEF";
 void chunk_encode_copy(chunk dst,chunk src,char esc){
 	chunk_len k=0;
 	for(chunk_len i=0;i<src.len;i++){
-		if (isprint(src.data[i])) {
+		if (isprint((unsigned char)src.data[i])) {
 			if (src.data[i]==esc){
 				VALID_IDX(k+1,dst);
 				dst.data[k]=esc;
@@ -76,7 +76,7 @@ chunk2string (chunk src, size_t dst_size, char *dst) {
 
     size_t k = 0;
     for (size_t i = 0; i < src.len; ++i) {
-        if (!isprint (src.data[i]))
+        if (!isprint((unsigned char)src.data[i]))
             goto hex;
     }
 
@@ -137,7 +137,8 @@ void string2chunk(char*src,chunk *dst){
 		dst->len=0;
 #define PUT_CHAR(c) { dst->data[dst->len]=c; dst->len++ ; }
 		for(uint32_t i=0;i<len;i++) {
-			if (!isprint(src[i+1])) Abort("non-printable character in source");
+			if (!isprint((unsigned char)src[i+1]))
+			    Abort("non-printable character in source");
 			if (src[i+1]=='"') Abort("unquoted \" in string");
 			if (src[i+1]=='\\') {
 				if (i+1==len) Abort("bad escape sequence");
@@ -155,8 +156,10 @@ void string2chunk(char*src,chunk *dst){
 		if (dst->len<len) Abort("chunk overflow");
 		dst->len=len;
 		for(uint32_t i=0;i<len;i++) {
-			if (!isprint(src[i])) Abort("non-printable character in source");
-			if (isspace(src[i])) Abort("white space in source");
+			if (!isprint((unsigned char)src[i]))
+			    Abort("non-printable character in source");
+			if (isspace((unsigned char)src[i]))
+			    Abort("white space in source");
 			dst->data[i]=src[i];
 		}
 	}

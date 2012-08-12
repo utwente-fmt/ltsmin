@@ -38,7 +38,7 @@ static int samesig(lts_t lts,int*map,int s1,int s2){
 
 static int hashcode(lts_t lts,int *map,int i){
     int hc;
-    long j;
+    size_t j;
     hc=map[i];
     for(j=lts->begin[i];j<lts->begin[i+1];j++){
         if(j>lts->begin[i] &&

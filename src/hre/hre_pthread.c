@@ -189,10 +189,11 @@ static void* thread_main(void*arg){
     return NULL;
 }
 
-void hre_thread_exit(hre_context_t ctx,int code){
+void hre_thread_exit(hre_context_t ctx, int code){
     (void)ctx;(void)code;
     Debug("thread exit");
     pthread_exit(NULL);
+    exit(code); // avoid warning in cygwin
 }
 
 static void *
@@ -422,7 +423,7 @@ static void fork_start(int* argc,char **argv[],int run_threads){
     int procs=fork_count;
     int children=0;
     int success=1;
-    int code;
+    int code = 0;
     int kill_sent=0;
     pid_t pid[procs];
     for(int i=0;i<procs;i++) pid[i]=0;

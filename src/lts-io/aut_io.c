@@ -123,20 +123,20 @@ static int aut_read_edge(lts_file_t file,int *src_seg,void* src_state,
     }
     int from_idx,from_end,label_idx,to_idx,i;
 // find destination state and end of label
-    for(i=strlen(buffer);!isdigit(buffer[i]);i--);
+    for(i=strlen(buffer);!isdigit((unsigned char)buffer[i]);i--);
     buffer[i+1]=0;
-    for(;isdigit(buffer[i]);i--);
+    for(;isdigit((unsigned char)buffer[i]);i--);
     to_idx=i+1;
     for(;buffer[i]!=',';i--);
-    for(i--;isblank(buffer[i]);i--);
+    for(i--;isblank((unsigned char)buffer[i]);i--);
     buffer[i+1]=0;
 // find source state and begin of label
-    for(i=0;!isdigit(buffer[i]);i++);
+    for(i=0;!isdigit((unsigned char)buffer[i]);i++);
     from_idx=i;
-    for(;isdigit(buffer[i]);i++);
+    for(;isdigit((unsigned char)buffer[i]);i++);
     from_end=i;
     for(;buffer[i]!=',';i++);
-    for(i++;isblank(buffer[i]);i++);
+    for(i++;isblank((unsigned char)buffer[i]);i++);
     buffer[from_end]='\00';
     label_idx=i;
     int lbl_len=strlen(buffer+label_idx);
