@@ -128,7 +128,7 @@ extern void HREinit(int *argc,char **argv[]);
             buf[0] = '\0';\
         Print(assertion, "assertion \"%s\" failed%s", #e, buf);\
         PRINT_STACK\
-        HREexit(HRE_EXIT_FAILURE);\
+        HREabort(HRE_EXIT_FAILURE);\
     }
 #endif
 
