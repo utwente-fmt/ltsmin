@@ -596,7 +596,7 @@ static void hti_defer_free (hti_t *hti) {
             }
         }
     }
-    //nbd_free((void *)hti->table); //TODO
+    //nbd_free((void *)hti->table); //TODO: reclaim memory
 
     //nbd_free(hti);
 }

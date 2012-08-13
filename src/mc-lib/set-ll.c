@@ -131,7 +131,7 @@ static const datatype_t DATATYPE_HRE_STR = {
 
 typedef struct local_s {
     isb_allocator_t     balloc;
-    size_t              count;
+    size_t              count;  // TODO: lazy updates with positive feedback
     char                pad[CACHE_LINE_SIZE - sizeof(size_t) - sizeof(isb_allocator_t)];
 } local_t;
 
