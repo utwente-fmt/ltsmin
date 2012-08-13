@@ -5,6 +5,7 @@
 #include <lts-io/user.h>
 #include <lts-lib/lts.h>
 #include <lts-lib/lowmem.h>
+#include <ltsmin-lib/ltsmin-standard.h>
 
 #define UNDEFINED_METHOD ((char*)1)
 
@@ -117,5 +118,5 @@ int main(int argc, char *argv[]){
     } else {
         Debug("no output");
     }
-    HREexit(EXIT_SUCCESS);
+    HREexit(LTSMIN_EXIT_SUCCESS);
 }

@@ -122,21 +122,21 @@ ltsmin-mpi::
 Distributed minimization modulo strong and branching bisimulation.
 See manpage:ltsmin-mpi[1].
 
-sigmin-mpi::
+ltsmin-reduce-dist::
 Distributed minimization modulo strong and branching bisimulation.
 This tool has an implementation of the new inductive signature algorithms
 that work on tau-cycle free LTSs.
-See manpage:sigmin-mpi[1].
+See manpage:ltsmin-reduce-dist[1].
 
-sigmin-one::
+ltsmin-reduce::
 Sequential minimization modulo strong and branching bisimulation, as well as
 modulo lumping of CTMCs.
-See manpage:sigmin-one[1].
+See manpage:ltsmin-reduce[1].
 
-ltscmp-one::
+ltsmin-compare::
 Compare two transitions systems, using the same equivalences as supported by
-sigmine-one.
-See manpage:ltscmp-one[1].
+ltsmin-reduce.
+See manpage:ltsmin-compare[1].
 
 == Tau Cycle Elimination Tool
 
@@ -159,13 +159,10 @@ and manpage:prom2torx[1].
 
 == Trace Pretty Printing
 
-ltsmin-tracepp::
-Pretty print traces. See manpage:ltsmin-tracepp[1].
+ltsmin-printtrace::
+Pretty print traces. See manpage:ltsmin-printtrace[1].
 
 == Conversion Tools
-
-ltstrans::
-Convert LTS file formats. See manpage:ltstrans[1].
 
 etf-convert::
 Translate ETF to DVE. See manpage:etf-convert[1].

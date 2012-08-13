@@ -13,6 +13,7 @@
 #include <pins-lib/pins.h>
 #include <pins-lib/pins-impl.h>
 #include <pins-lib/property-semantics.h>
+#include <ltsmin-lib/ltsmin-standard.h>
 #include <ltsmin-lib/ltsmin-syntax.h>
 #include <ltsmin-lib/ltsmin-tl.h>
 #include <spg-lib/spg-solve.h>
@@ -100,7 +101,7 @@ reach_popt(poptContext con, enum poptCallbackReason reason,
         res = linear_search(ORDER, order);
         if (res < 0) {
             Warning(error, "unknown exploration order %s", order);
-            HREexitUsage(EXIT_FAILURE);
+            HREexitUsage(LTSMIN_EXIT_FAILURE);
         } else {
             Warning(info, "Exploration order is %s", order);
         }
@@ -109,7 +110,7 @@ reach_popt(poptContext con, enum poptCallbackReason reason,
         res = linear_search(SATURATION, saturation);
         if (res < 0) {
             Warning(error, "unknown saturation strategy %s", saturation);
-            HREexitUsage(EXIT_FAILURE);
+            HREexitUsage(LTSMIN_EXIT_FAILURE);
         } else {
             Warning(info, "Saturation strategy is %s", saturation);
         }
@@ -118,7 +119,7 @@ reach_popt(poptContext con, enum poptCallbackReason reason,
         res = linear_search(GUIDED, guidance);
         if (res < 0) {
             Warning(error, "unknown guided search strategy %s", guidance);
-            HREexitUsage(EXIT_FAILURE);
+            HREexitUsage(LTSMIN_EXIT_FAILURE);
         } else {
             Warning(info, "Guided search strategy is %s", guidance);
         }
@@ -453,7 +454,8 @@ find_action_cb(void* context, int* src)
         find_trace(trace_end, 2, global_level + 1, levels);
     }
 
-    Fatal(1, info, "exiting now");
+    Warning(info, "exiting now");
+    HREabort(LTSMIN_EXIT_COUNTER_EXAMPLE);
 }
 
 struct group_add_info {
@@ -474,8 +476,10 @@ group_add(void *context, transition_info_t *ti, int *dst)
     if (act_detect != NULL && ti->labels[act_label] == act_index) {
         Warning(info, "found action: %s", act_detect);
 
-        if (trc_output == NULL)
-            Fatal(1, info, "exiting now");
+        if (trc_output == NULL){
+            Warning(info, "exiting now");
+            HREabort(LTSMIN_EXIT_COUNTER_EXAMPLE);
+        }
 
         struct find_action_info action_ctx;
         int group = ctx->group;
@@ -552,7 +556,8 @@ deadlock_check(vset_t deadlocks, bitvector_t *reach_groups)
         find_trace(dlk_state, 1, global_level, levels);
     }
 
-    Fatal(1,info,"exiting now");
+    Warning(info, "exiting now");
+    HREabort(LTSMIN_EXIT_COUNTER_EXAMPLE);
 }
 
 static inline void
@@ -695,7 +700,7 @@ static inline void add_variable_subset(vset_t dst, vset_t src, vdom_t domain, in
     {
         chunk c = GBchunkGet(model, var_type_no, var_index);
         if (c.len == 0) {
-            Fatal(1, error, "lookup of %d failed", var_index);
+            Abort("lookup of %d failed", var_index);
         }
         char s[c.len + 1];
         for (unsigned int i = 0; i < c.len; i++) {
@@ -2217,5 +2222,5 @@ main (int argc, char *argv[])
     }
 #endif
 
-    exit (EXIT_SUCCESS);
+    HREexit (LTSMIN_EXIT_SUCCESS);
 }

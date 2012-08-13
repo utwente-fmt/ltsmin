@@ -7,7 +7,9 @@ include::general-options.txt[]
 == EXIT STATUS
 *0*::
         Successful termination.
-*>0*::
+*1*::
+        Counter example found.
+*255*::
         Some error occurred.
 
 include::support.txt[]
@@ -17,7 +19,7 @@ manpage:ltsmin[7],
 manpage:etf[5],
 manpage:ltsmin-mpi[1],
 manpage:ltsmin-convert[1],
-manpage:ltsmin-tracepp[1],
+manpage:ltsmin-printtrace[1],
 http://dx.doi.org/10.1007/978-3-540-85762-4_6[ICTAC 2008, LNCS 5160],
 http://www.cwi.nl/{tilde}mcrl/[muCRL],
 http://www.mcrl2.org/[mCRL2],

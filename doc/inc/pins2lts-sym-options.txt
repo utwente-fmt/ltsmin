@@ -37,10 +37,6 @@ to saturate levels.
         effect for any of the saturation strategies in combination with either
         'bfs-prev' or 'chain-prev'.
 
-*--action*='ACTION'::
-        Find a transition labeled with 'ACTION'. Returns with exit code 1
-        if such a transition is found, otherwise 0.
-
 *--guidance*='STRATEGY'::
         Select a search strategy for searching for actions: 'unguided',
         'directed'. The 'unguided' strategy considers all transition

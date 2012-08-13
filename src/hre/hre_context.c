@@ -53,23 +53,24 @@ hre_context_t HREctxCreate(int me,int peers,const char* class_name,size_t user_s
 
 static void process_abort(hre_context_t ctx,int code) __attribute__ ((noreturn));
 static void process_abort(hre_context_t ctx,int code){
-    (void)ctx;(void)code;
-    exit(EXIT_FAILURE);
+    (void)ctx;
+    exit(code);
 }
 
 static void process_exit(hre_context_t ctx,int code) __attribute__ ((noreturn));
 static void process_exit(hre_context_t ctx,int code){
     (void)ctx;
     if (code) {
-        exit(EXIT_FAILURE);
+        exit(HRE_EXIT_FAILURE);
     } else {
-        exit(EXIT_SUCCESS);
+        exit(HRE_EXIT_SUCCESS);
     }
 }
 
 void hre_ready_decr(hre_msg_t self,void* ready_ctx){
     (*((int*)ready_ctx))--;
     Debug("decrease on %d -> %d : %d",self->source,self->target,*((int*)ready_ctx));
+    (void) self;
 }
 
 

@@ -9,6 +9,7 @@
 #include <strings.h>
 
 #include <hre/user.h>
+#include <ltsmin-lib/ltsmin-standard.h>
 #include <pins-lib/pins.h>
 #include <pins-lib/pins-impl.h>
 #include <util-lib/stringindex.h>
@@ -67,7 +68,7 @@ torx_transition (void *arg, transition_info_t *ti, int *dst)
 static int
 torx_handle_request (torx_ctx_t *ctx, char *req)
 {
-    while (isspace (*req)) ++req;
+    while (isspace ((unsigned char)*req)) ++req;
     switch (req[0]) {
     case 'r':                           /* reset */
         fprintf (stdout, "R 0\t1\n");   /* initial state has index 0 */
@@ -76,7 +77,7 @@ torx_handle_request (torx_ctx_t *ctx, char *req)
     case 'e': {                         /* explore */
         int n, res;
         req++;
-        while (isspace (*req)) ++req;
+        while (isspace ((unsigned char)*req)) ++req;
         if ((res = sscanf (req, "%u", &n)) != 1) {
             int                 l = strlen (req);
             if (req[l - 1] == '\n')
@@ -158,5 +159,5 @@ main (int argc, char *argv[])
     torx_ctx_t          ctx = { model, ltstype };
     torx_ui (&ctx);
 
-    exit (EXIT_SUCCESS);
+    HREexit (LTSMIN_EXIT_SUCCESS);
 }

@@ -8,6 +8,7 @@
 #include <hre/runtime.h>
 #include <lts-io/user.h>
 #include <lts-lib/lts.h>
+#include <ltsmin-lib/ltsmin-standard.h>
 #include <util-lib/chunk_support.h>
 
 #define  BUFLEN 4096
@@ -45,7 +46,7 @@ output_popt (poptContext con, enum poptCallbackReason reason,
             if (ov < 0) {
                 Warning (error, "unknown output value %s", arg_value);
                 HREprintUsage();
-                HREabort(EXIT_FAILURE);
+                HREabort(LTSMIN_EXIT_FAILURE);
             }
             output_value = ov;
         }
@@ -537,5 +538,5 @@ main(int argc,char*argv[]){
 
     // close output file
     if (files[1]) fclose(output_file);
-    HREexit(EXIT_SUCCESS);
+    HREexit(LTSMIN_EXIT_SUCCESS);
 }

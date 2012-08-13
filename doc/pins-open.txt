@@ -1,5 +1,5 @@
 //                           -*- mode: doc; outline-regexp: "==\(=*\) ." -*-
-pins_open(1)
+pins-open(1)
 ============
 :Author:  Michael Weber
 :Email:   <michaelw@cs.utwente.nl>
@@ -7,7 +7,7 @@ pins_open(1)
 
 == NAME
 
-pins_open - execute OPEN/CAESAR application programs on PINS-based
+pins-open - execute OPEN/CAESAR application programs on PINS-based
 state space generators
 
 == SYNOPSIS

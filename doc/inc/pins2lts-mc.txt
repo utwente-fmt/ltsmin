@@ -7,14 +7,16 @@ include::buchi.txt[]
 == EXIT STATUS
 *0*::
         Successful termination.
-*>0*::
+*1*::
+        Counter example found.
+*255*::
         Some error occurred.
 
 include::support.txt[]
 
 == SEE ALSO
 manpage:ltsmin[7],
-manpage:ltsmin-tracepp[1],
+manpage:ltsmin-printtrace[1],
 manpage:etf[5],
 http://divine.fi.muni.cz/[DiVinE-2.2],
 https://code.launchpad.net/~opaal-developers/opaal/opaal-ltsmin-succgen[opaal],

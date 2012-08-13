@@ -2123,7 +2123,7 @@ void update_destinations(taudlts_t t, int* wscc, int* oscc, char* workers){
  // transform t->begin representation into osrc..
  if ((osrc=(int*)calloc(t->M, sizeof(int))) == NULL){
 	Warning(info,"%3d: out of memory in update_destinations",me);
-	exit(1);
+	exit(HRE_EXIT_FAILURE);
  }
 	//	Fatal(1,error,"%3d: out of memory in update_destinations",me);
  // Warning(info,"%d blllllllllllllaa ",me);

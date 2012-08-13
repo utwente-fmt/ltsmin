@@ -4,6 +4,7 @@
 #include <hre/user.h>
 #include <lts-io/user.h>
 #include <lts-lib/lts.h>
+#include <ltsmin-lib/ltsmin-standard.h>
 #include <util-lib/treedbs.h>
 
 typedef enum {Undefined,LTScopy,LTSrdwr,LTSindex} task_t;
@@ -165,5 +166,5 @@ int main(int argc, char *argv[]){
         }
     }
     Print(infoShort,"done");
-    HREexit(0);
+    HREexit(LTSMIN_EXIT_SUCCESS);
 }

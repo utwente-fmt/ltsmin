@@ -1,17 +1,17 @@
 //                           -*- mode: doc; outline-regexp: "==\(=*\) ." -*-
-sigmin-mpi(1)
-=============
+ltsmin-reduce-dist(1)
+=====================
 :Author:  Stefan Blom
 :Email:   <sccblom@ewi.utwente.nl>
 :Date:    2011-06-02
 
 == NAME
 
-sigmin-mpi - distributed reduction of labelled transition systems modulo strong or branching bisimulation
+ltsmin-reduce-dist - distributed reduction of labelled transition systems modulo strong or branching bisimulation
 
 == SYNOPSIS
 
-mpirun [MPI OPTIONS] sigmin-mpi [OPTIONS] <input> [<output>]
+mpirun [MPI OPTIONS] ltsmin-reduce-dist [OPTIONS] <input> [<output>]
 
 == OPTIONS
 
@@ -24,5 +24,5 @@ include::inc/hre-options.txt[]
 
 == SEE ALSO
 
-manpage:ltscmp-one[1], manpage:sigmin-one[1]
+manpage:ltsmin-compare[1], manpage:ltsmin-reduce[1]
 

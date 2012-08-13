@@ -24,7 +24,7 @@ include::inc/general-options.txt[]
 == EXIT STATUS
 0::
         Successful termination.
->0::
+255::
         Some error occurred.
 
 == SEE ALSO

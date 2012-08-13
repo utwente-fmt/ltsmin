@@ -154,5 +154,5 @@ main (int argc, char **argv)
         dlts_writedir (lts, files[1]);
     }
     // if (lts != NULL) dlts_free(lts);
-    HREexit(0);
+    HREexit(HRE_EXIT_SUCCESS);
 }

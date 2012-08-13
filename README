@@ -210,20 +210,41 @@ This produces a file ``model.dve2C'', which can also be passed to
 LTSmin tools.  (This step is done automatically by the LTSmin tools
 when passing in a ``.dve'' model, doing it manually is rarely needed.)
 
-*** DiVinE(-cluster)
-Download the latest CVS version of DiVinE-cluster; instructions can be
-found at <http://divine.fi.muni.cz/trac/wiki/DevelopmentIntroduction>.
-We tested with the version from 2009-12-01.
+*** SpinJa / Promela
 
-Alternatively, download divine-cluster 0.8.3 from
-<http://divine.fi.muni.cz/page.php?page=download> and apply the patch
-from <contrib/divine-cluster-0.8.3-ltsmin.patch> to the divine-cluster
-source tree:
+Use SpinJa (distributed as submodule LTSmin) to compile PROMELA model
+'leader.pm' to 'leader.pm.spinja':
 
-  cd divine-0.8.3
-  patch -p1 < /path/to/ltsmin/contrib/divine-cluster-0.8.3-ltsmin.patch
+----
+java -cp <prefix>/share/ltsmin/spinja.jar spinja.Compile -o3 -l leader.pm
+gcc -g -O2 -fPIC -shared leader.spinja.c -o leader.spinja
+----
 
-Then, build and install divine-cluster according to their documentation.
+Note that option +-l+ is currently mandatory.
+Alternatively, one can use the included script:
+
+----
+spinjal -o3 leader.pm
+----
+
+The optional flag +-o3+ turns off control flow optimizations.
+
+The resulting compiled SpinJa module can be loaded by  all SpinJa-related LTSmin
+tools (prom*).
+
+*** opaal / UPPAAL XML
+
+Download opaal from <https://code.launchpad.net/~opaal-developers/opaal/
+opaal-ltsmin-succgen>. Follow the included installation instructions.
+
+
+UPPAAL xml models can be compiled to PINS binaries (.xml.so) using the included
+opaal_ltsmin script.
+
+The multcore LTSmin tool can explore the model (opaal2lts-mc). Provide the
+TBB allocator location at load run time for good performance:
+LD_PRELOAD=/usr/lib/libjemalloc.so.1 opaal2lts-mc <model.xml.so>
+
 
 *** libDDD
 Download libDDD (>= 1.7) from <http://move.lip6.fr/software/DDD/>.

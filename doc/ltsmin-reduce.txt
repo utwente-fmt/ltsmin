@@ -1,17 +1,17 @@
 //                           -*- mode: doc; outline-regexp: "==\(=*\) ." -*-
-sigmin-one(1)
-=============
+ltsmin-reduce(1)
+================
 :Author:  Stefan Blom
 :Email:   <sccblom@ewi.utwente.nl>
 :Date:    2011-06-02
 
 == NAME
 
-sigmin-one - sequential reduction of labelled transition systems modulo bisimulation
+ltsmin-reduce - sequential reduction of labelled transition systems modulo bisimulation
 
 == SYNOPSIS
 
-sigmin-one [OPTIONS] <input> [<output>]
+ltsmin-reduce [OPTIONS] <input> [<output>]
 
 == OPTIONS
 
@@ -52,4 +52,4 @@ include::inc/hre-options.txt[]
 
 == SEE ALSO
 
-manpage:ltscmp-one[1], manpage:sigmin-mpi[1]
+manpage:ltsmin-compare[1], manpage:ltsmin-reduce-dist[1]

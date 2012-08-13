@@ -9,6 +9,7 @@
 #include <limits.h>
 
 #include <hre/user.h>
+#include <ltsmin-lib/ltsmin-standard.h>
 #include <spg-lib/spg-solve.h>
 #include <vset-lib/vector_set.h>
 
@@ -42,5 +43,5 @@ main (int argc, char *argv[])
     Print(infoShort, "");
     RTprintTimer(infoShort, spgsolve_timer, "solving took");
 
-    HREexit(EXIT_SUCCESS);
+    HREexit(LTSMIN_EXIT_SUCCESS);
 }

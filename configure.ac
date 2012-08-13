@@ -344,7 +344,11 @@ AC_CHECK_LIB([tbbmalloc_proxy], [malloc],
     AC_MSG_WARN([TBB malloc library not found.]))
 
 AC_ARG_WITH([sylvan],[AS_HELP_STRING([--with-sylvan],[Compile sylvan])],
-            [],[with_sylvan=yes])
+            [],[AC_RUN_IFELSE([AC_LANG_PROGRAM([], [dnl
+return sizeof(void*) == 8 ? 0 : 1;
+                              ])],
+                              [with_sylvan=yes],
+                              [with_sylvan=no])])
 
 if test "x$with_sylvan" == xyes; then
     AC_CONFIG_SUBDIRS([sylvan])
@@ -354,6 +358,8 @@ fi
 if test "x$have_libspg" == xyes; then
     AC_DEFINE([HAVE_LIBSPG], [], [Defined if the SPG lib has been compiled.])
 fi
+
+AC_SUBST(AM_CPPFLAGS,['-I${top_srcdir}/src -I${top_builddir}/src'])
 
 AC_SUBST([SYLVAN_LIBS],['${top_builddir}/sylvan/libsylvan.la'])
 AC_SUBST([SYLVAN_CPPFLAGS],['-I${top_srcdir}/sylvan/src'])
@@ -446,7 +452,7 @@ Configuration:
     SPG      = ${have_libspg:-NO, not building pbes-reach and spgsolver (enable with --without-bignum)}
     CADP     = ${CADP:-NOT FOUND, building without CADP support}
     OPAAL    = ${have_opaal:-TBB malloc NOT FOUND, building without opaal support}
-    SYLVAN   = ${have_sylvan:-NO. Only on Linux x86_64 (override with --with-sylvan)}
+    SYLVAN   = ${have_sylvan:-NO. Only on 64-bit systems (override with --with-sylvan)}
 
     ASCIIDOC = ${ASCIIDOC:-NOT FOUND, not building documentation}
     XMLTO    = ${XMLTO:-NOT FOUND, not building manpages}

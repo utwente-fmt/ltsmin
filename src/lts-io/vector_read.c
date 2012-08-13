@@ -178,9 +178,8 @@ static value_table_t set_table(lts_file_t file,int type_no,value_table_t table){
     case LTStypeEnum:
         break;
     }
-    char*type_name=lts_type_get_type(ltstype,type_no);
     stream_t ds;
-    Debug("reading values of type %s",type_name);
+    Debug("reading values of type %s",lts_type_get_type(ltstype,type_no));
     char stream_name[1024];
     sprintf(stream_name,"CT-%d",type_no);
     ds=arch_read(file->archive,stream_name);

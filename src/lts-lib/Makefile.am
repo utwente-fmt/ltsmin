@@ -1,5 +1,6 @@
 noinst_LTLIBRARIES = liblts-lib.la
 
+# liblts
 liblts_lib_la_SOURCES  = bfs_reorder.c
 liblts_lib_la_SOURCES += determinize.c
 liblts_lib_la_SOURCES += dir-info.c dir-info.h
@@ -18,5 +19,5 @@ liblts_lib_la_SOURCES += sigmin-lib.c
 liblts_lib_la_SOURCES += set.c set.h
 liblts_lib_la_SOURCES += silent_compress.c
 
-liblts_lib_la_CPPFLAGS = -I ${top_srcdir}/src $(AM_CPPFLAGS)
+liblts_lib_la_CPPFLAGS = $(AM_CPPFLAGS)
 

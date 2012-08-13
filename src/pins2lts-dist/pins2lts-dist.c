@@ -15,6 +15,7 @@
 #endif
 #include <lts-io/user.h>
 #include <ltsmin-lib/ltsmin-tl.h>
+#include <ltsmin-lib/ltsmin-standard.h>
 #include <pins-lib/pins.h>
 #include <pins-lib/pins-impl.h>
 #include <pins-lib/property-semantics.h>
@@ -90,7 +91,7 @@ deadlock_detect (struct dist_thread_context *ctx, int *state, int count)
         if (no_exit) return;
         Warning (info, "");
         Warning (info, "deadlock found at depth %zu", ctx->level);
-        HREexit(0);
+        HREabort(LTSMIN_EXIT_COUNTER_EXAMPLE);
     }
 }
 
@@ -103,7 +104,7 @@ invariant_detect (struct dist_thread_context *ctx, int *state)
 
     Warning (info, "");
     Warning (info, "Invariant violation (%s) found at depth %zu!", inv_detect, ctx->level);
-    HREexit(0);
+    HREabort(LTSMIN_EXIT_COUNTER_EXAMPLE);
 }
 
 static inline void
@@ -114,7 +115,7 @@ action_detect (struct dist_thread_context *ctx, transition_info_t *ti)
     if (no_exit) return;
     Warning (info, "");
     Warning (info, "Error action '%s' found at depth %zu!", act_detect, ctx->level);
-    HREexit(0);
+    HREabort(LTSMIN_EXIT_COUNTER_EXAMPLE);
 }
 
 static uint32_t chk_base=0;
@@ -368,9 +369,10 @@ int main(int argc, char*argv[]){
             ctx.level,global_explored,global_transitions);
         RTprintTimer (info, timer, "Exploration time");
 
-        Warning (infoLong, "\n\nDeadlocks: %zu\nInvariant violations: %zu\n"
-                 "Error actions: %zu", global_deadlocks,global_violations,
-                 global_errors);
+        if (no_exit)
+            Warning (info, "\n\nDeadlocks: %zu\nInvariant violations: %zu\n"
+                     "Error actions: %zu", global_deadlocks,global_violations,
+                     global_errors);
     }
     /* State space was succesfully generated. */
     HREbarrier(HREglobal());;
@@ -378,5 +380,5 @@ int main(int argc, char*argv[]){
         lts_file_close(ctx.output);
     }
     HREbarrier(HREglobal());
-    HREexit(0);
+    HREexit(LTSMIN_EXIT_SUCCESS);
 }

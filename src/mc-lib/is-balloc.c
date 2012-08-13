@@ -201,3 +201,14 @@ isba_peek_int(isb_allocator_t buf, size_t offset_top)
     size_t rest = newsize&(BLOCK_ELT_SIZE-1);
     return &buf->blocks[block][rest * buf->el_size];
 }
+
+int *
+isba_index(isb_allocator_t buf, size_t index)
+{
+    size_t size = isba_size_int(buf);
+    if (index >= size)
+        return NULL;
+    size_t block = index >> BLOCK_ELT_POW;
+    size_t rest = index & (BLOCK_ELT_SIZE-1);
+    return &buf->blocks[block][rest * buf->el_size];
+}

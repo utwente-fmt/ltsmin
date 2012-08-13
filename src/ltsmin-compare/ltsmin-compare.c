@@ -5,6 +5,7 @@
 #include <lts-io/user.h>
 #include <lts-lib/lts.h>
 #include <lts-lib/lowmem.h>
+#include <ltsmin-lib/ltsmin-standard.h>
 
 #define UNDEFINED_METHOD ((char*)1)
 
@@ -105,9 +106,9 @@ int main(int argc, char *argv[]){
     reduce(lts1);
     if (lts1->root_count==1) {
         Print(infoShort,"LTSs are equivalent");
-        HREexit(EXIT_SUCCESS);
+        HREexit(LTSMIN_EXIT_SUCCESS);
     } else {
         Print(infoShort,"LTSs are distinguishable");
-        HREexit(EXIT_FAILURE);
+        HREexit(LTSMIN_EXIT_COUNTER_EXAMPLE);
     }
 }

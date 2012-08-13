@@ -31,8 +31,6 @@ void   yyfree (void * ptr, void * yyscanner){
 #define YY_INPUT(buf,result,max_size) \
     { result = stream_read_max(yyextra->input, buf , max_size ) ; }
 
-#define YY_FATAL_ERROR(msg) Abort("LTSmin lexer: %s",msg);
-
 %}
 
 white_space [ \t]+

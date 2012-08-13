@@ -1,6 +1,6 @@
 //                           -*- mode: doc; outline-regexp: "==\(=*\) ." -*-
-ltsmin-tracepp(1)
-=================
+ltsmin-printtrace(1)
+====================
 :Author:  Elwin Pater
 :Email:   <e.pater@student.utwente.nl>
 :Date:    2009-09-10
@@ -8,11 +8,11 @@ ltsmin-tracepp(1)
 
 == NAME
 
-ltsmin-tracepp - Trace pretty printer
+ltsmin-printtrace - Trace pretty printer
 
 == SYNOPSIS
 
-ltsmin-tracepp [OPTIONS] <input> [<output>]
+ltsmin-printtrace [OPTIONS] <input> [<output>]
 
 == DESCRIPTION
 
@@ -34,12 +34,12 @@ include::inc/general-options.txt[]
 
 include::inc/file-formats.txt[]
 
-include::inc/ltsmin-tracepp-options.txt[]
+include::inc/ltsmin-printtrace-options.txt[]
 
 == EXIT STATUS
 0::
         Successful termination.
->0::
+255::
         Some error occurred.
 
 == SEE ALSO

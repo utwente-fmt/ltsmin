@@ -69,7 +69,8 @@ static void* area_malloc(void* ptr,size_t size){
     if (remainder)
         size = size + area->align - remainder;
     area->next = area->next + size;
-    Debug("allocated %zu from %zu to %zu next %zu",old_size,tmp,tmp+size,area->next);
+    Debug("allocated %zu from %zu to %zu",old_size,tmp,tmp+size);
+    (void) old_size; (void) tmp;
     pthread_mutex_unlock(&area->mutex);
     return res;
 }
@@ -86,6 +87,7 @@ static void* area_align(void* ptr,size_t align,size_t size){
     } else {
         res=area_malloc (ptr, size);
     }
+    Debug("allocated %zu from %zu to %zu at alignment %zu",size,res,res+size,align);
     return res;
 }
 
@@ -100,6 +102,7 @@ static void* area_realloc(void* area,void *rt_ptr, size_t size){
 static void area_free(void*area,void *rt_ptr){
     (void)area;
     (void)rt_ptr;
+    Debug("Freeing %p", rt_ptr);
 }
 
 static void queue_put(hre_context_t context,hre_msg_t msg,int queue){
@@ -186,10 +189,11 @@ static void* thread_main(void*arg){
     return NULL;
 }
 
-void hre_thread_exit(hre_context_t ctx,int code){
+void hre_thread_exit(hre_context_t ctx, int code){
     (void)ctx;(void)code;
     Debug("thread exit");
     pthread_exit(NULL);
+    exit(code); // avoid warning in cygwin
 }
 
 static void *
@@ -312,7 +316,7 @@ void HREpthreadRun(int threads){
         Debug("joined with thread %d",i);
         //pthread_attr_destroy(attr+i);
     }
-    HREexit(EXIT_SUCCESS);
+    HREexit(HRE_EXIT_SUCCESS);
 }
 
 static void hre_process_exit(hre_context_t ctx,int code) __attribute__ ((noreturn));
@@ -408,7 +412,7 @@ static void fork_popt(poptContext con,
                 return;
             }
             Abort("unimplemented option: %s",opt->longName);
-            exit(EXIT_FAILURE);
+            exit(HRE_EXIT_FAILURE);
     }
 }
 
@@ -419,6 +423,7 @@ static void fork_start(int* argc,char **argv[],int run_threads){
     int procs=fork_count;
     int children=0;
     int success=1;
+    int code = 0;
     int kill_sent=0;
     pid_t pid[procs];
     for(int i=0;i<procs;i++) pid[i]=0;
@@ -492,6 +497,7 @@ static void fork_start(int* argc,char **argv[],int run_threads){
                 pid[i]=0;
                 children--;
                 if (WEXITSTATUS(status) || WIFSIGNALED(status)) {
+                    if (success) code = WEXITSTATUS(status);
                     success=0;
                 }
             }
@@ -499,9 +505,9 @@ static void fork_start(int* argc,char **argv[],int run_threads){
     }
     Debug("last child terminated");
     if (success) {
-        HREexit(EXIT_SUCCESS);
+        HREexit(HRE_EXIT_SUCCESS);
     } else {
-        HREexit(EXIT_FAILURE);
+        HREexit(code);
     }
     (void)argc;(void)argv;
 }
@@ -521,3 +527,11 @@ void HREenableFork(int procs){
     fork_count=procs;
     HREregisterRuntime(&fork_runtime);
 }
+
+size_t
+HREgetRegionSize(hre_region_t region)
+{
+    struct shared_area *area = HREgetArea(region);
+    return area->size;
+}
+

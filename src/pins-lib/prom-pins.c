@@ -296,9 +296,6 @@ SpinJaloadGreyboxModel(model_t model, const char *filename)
     if (NULL != spinja_get_edge_count) {
          if (spinja_get_edge_count() > 0) {
              // All actions are assert statements. We do not export there values.
-             const char* edge_value = "assert";
-             int num = GBchunkPut(model, assert_type, chunk_str((char*)edge_value));
-             HREassert (0 == num, "typenum error");
              lts_type_set_edge_label_count(ltstype, 1);
              lts_type_set_edge_label_name(ltstype, 0, "action");
              lts_type_set_edge_label_type(ltstype, 0, "action");

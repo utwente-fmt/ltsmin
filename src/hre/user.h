@@ -128,7 +128,7 @@ extern void HREinit(int *argc,char **argv[]);
             buf[0] = '\0';\
         Print(assertion, "assertion \"%s\" failed%s", #e, buf);\
         PRINT_STACK\
-        exit(-1);\
+        HREabort(HRE_EXIT_FAILURE);\
     }
 #endif
 
@@ -300,6 +300,8 @@ extern hre_region_t RTgetMallocRegion();
 extern void RTsetMallocRegion(hre_region_t r);
 
 extern hre_region_t HREdefaultRegion(hre_context_t context);
+
+extern size_t HREgetRegionSize(hre_region_t region);
 
 extern void* RTmalloc(size_t size);
 

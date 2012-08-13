@@ -35,6 +35,8 @@ extern int *isba_top_int(isb_allocator_t isb_alloc);
 
 extern int *isba_peek_int(isb_allocator_t isb_alloc, size_t offset_top);
 
+extern int *isba_index(isb_allocator_t isb_alloc, size_t offset_top);
+
 extern size_t isba_size_int(isb_allocator_t isb_alloc);
 
 #endif
