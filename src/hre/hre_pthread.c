@@ -416,6 +416,12 @@ static void fork_popt(poptContext con,
     }
 }
 
+static void
+handle_signal (int sig)
+{
+    // nada
+}
+
 static void fork_start(int* argc,char **argv[],int run_threads){
     if (run_threads){
         Abort("multi-process and threads are incompatible");
@@ -465,6 +471,7 @@ static void fork_start(int* argc,char **argv[],int run_threads){
         }
         children++;
     }
+    signal (SIGINT, handle_signal); // avoid exit on ctrl + c
     while(children>0){
         // If a failure occurred then we need to shut down all children.
         if (!success && !kill_sent) {
@@ -478,6 +485,7 @@ static void fork_start(int* argc,char **argv[],int run_threads){
         }
         int status;
         pid_t res=wait(&status);
+        Debug("process %d received %d,%d (exit: %d, signal: %d)", res, WEXITSTATUS(status), status, WIFEXITED(status), WIFSIGNALED(status));
         if (res==-1 ) {
             PrintCall(error,"wait");
             success=0;

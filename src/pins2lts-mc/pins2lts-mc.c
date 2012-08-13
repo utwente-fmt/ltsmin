@@ -558,10 +558,12 @@ find_or_put_tree (state_info_t *state, transition_info_t *ti,
 static void
 exit_ltsmin (int sig)
 {
+    if (HREme(HREglobal()) != 0)
+        return;
     if ( !lb_stop(global->lb) ) {
         Abort ("UNGRACEFUL EXIT");
     } else {
-        Warning(info, "PREMATURE EXIT (caught signal: %d)", sig);
+        Warning (info, "PREMATURE EXIT (caught signal: %d)", sig);
     }
 }
 
@@ -688,8 +690,8 @@ postlocal_global_init (wctx_t *ctx)
             global->threshold = 100000 / W;
         }
         RTswitchAlloc (false);
-        (void) signal (SIGINT, exit_ltsmin);
     }
+    (void) signal (SIGINT, exit_ltsmin);
     HREreduce (HREglobal(), 1, &global, &global, UInt64, Max);
 
     color_set_dbs(global->dbs);
