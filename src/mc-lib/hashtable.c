@@ -111,6 +111,7 @@ nbd_malloc (size_t n) {
     TRACE("m1", "nbd_malloc: request size %llu", n, 0);
     void *x = RTalignZero (CACHE_LINE_SIZE, n);
     TRACE("m1", "nbd_malloc: returning %p", x, 0);
+    HREassert(x, "Allocation failed!");
     return x;
 }
 
@@ -410,7 +411,7 @@ static map_val_t hti_cas (hti_t *hti, map_key_t key, uint32_t key_hash,
                           : (map_key_t)hti->ht->key_type->clone((void *)key, ctx);
 #ifndef NBD32
         if ((hti->ht->key_type->hash != NULL)) { //EXPECT_FALSE
-            HREassert (GET_PTR(new_key) == new_key);
+            HREassert (GET_PTR(new_key) == (void *)new_key);
             // Combine <new_key> pointer with bits from its hash
             new_key = ((uint64_t)(key_hash >> 16) << 48) | new_key;
         }
@@ -594,9 +595,9 @@ static void hti_defer_free (hti_t *hti) {
             }
         }
     }
-    nbd_free((void *)hti->table);
+    //nbd_free((void *)hti->table);
 
-    nbd_free(hti);
+    //nbd_free(hti);
 }
 
 static void hti_release (hti_t *hti) {

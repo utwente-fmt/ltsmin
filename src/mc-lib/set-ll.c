@@ -81,7 +81,7 @@ get_length (char *str, set_ll_slab_t *slab)
 }
 
 static uint32_t
-strhash (const char *str, set_ll_slab_t *slab)
+strhash (char *str, set_ll_slab_t *slab)
 {
     size_t              len = get_length (str, slab);
     HRE_ASSERT (len == strlen(str), "Incorrect length passed for '%s', %zu instead of %zu. Rest: '%s'",
@@ -172,7 +172,7 @@ set_ll_get (set_ll_t *set, int idx, int *len)
     *len = str->len;
     Debug ("Index(%d)\t--(%zu,%zu)--> (%s,%d) %p", idx, worker, index, str->ptr,
                                                    str->len, str->ptr);
-    HRE_ASSERT (str->len == strlen(str->ptr), "Incorrect length passed for '%s', %zu instead of %zu. Rest: '%s'",
+    HRE_ASSERT (str->len == strlen(str->ptr), "Incorrect length passed for '%s', %d instead of %zu. Rest: '%s'",
                 str->ptr, str->len, strlen(str->ptr), &str->ptr[str->len+1]);
     return str->ptr;
 }
@@ -180,7 +180,7 @@ set_ll_get (set_ll_t *set, int idx, int *len)
 int
 set_ll_put (set_ll_t *set, char *str, int len)
 {
-    HRE_ASSERT (len == strlen(str), "Incorrect length passed for '%s', %zu instead of %zu. Rest: '%s'",
+    HRE_ASSERT (len == strlen(str), "Incorrect length passed for '%s', %d instead of %zu. Rest: '%s'",
                 str, len, strlen(str), &str[len+1]);
     hre_context_t       global = HREglobal ();
     size_t              worker = HREme (global);
@@ -239,7 +239,7 @@ set_ll_install (set_ll_t *set, char *name, int idx)
     set_ll_slab_t      *slab = set->alloc->slabs[worker];
     size_t              len = strlen(name);
 
-    slab->cur_len = name;
+    slab->cur_key = name;
     slab->cur_len = len; // avoid having to recompute the length
     RTswitchAlloc (set->alloc->shared);
     old = ht_cas_empty (set->ht, key, idx + 1, &clone, slab);
@@ -260,7 +260,7 @@ set_ll_install (set_ll_t *set, char *name, int idx)
                                                     len, clone);
 }
 
-set_ll_t*
+set_ll_t *
 set_ll_create (set_ll_allocator_t *alloc)
 {
     HREassert (sizeof(str_t) == 12);
