@@ -14,7 +14,7 @@
 
 
 #define MAX_WORKERS 64
-#define SLABS_RATIO  4
+#define SLABS_RATIO 16
 
 typedef struct set_ll_slab_s {
     void               *mem;
@@ -51,7 +51,7 @@ set_ll_init_allocator (bool shared)
         set_ll_slab_t      *slab = alloc->slabs[i];
         HREassert (slab != NULL, "Slab allocation failed.");
         slab->mem = RTmalloc (size);
-        HREassert (slab->mem != NULL, "Slab memory allocation failed. Increase your user limits");
+        HREassert (slab->mem != NULL, "Slab memory allocation failed. Increase your user limits or SLABS_RATIO");
         slab->next = 0;
         slab->size = size;
         slab->cur_len = SIZE_MAX;
