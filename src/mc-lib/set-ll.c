@@ -172,7 +172,7 @@ set_ll_get (set_ll_t *set, int idx, int *len)
     *len = str->len;
     Debug ("Index(%d)\t--(%zu,%zu)--> (%s,%d) %p", idx, worker, index, str->ptr,
                                                    str->len, str->ptr);
-    HRE_ASSERT (str->len == strlen(str->ptr), "Incorrect length passed for '%s', %d instead of %zu. Rest: '%s'",
+    HRE_ASSERT (str->len == (int)strlen(str->ptr), "Incorrect length passed for '%s', %d instead of %zu. Rest: '%s'",
                 str->ptr, str->len, strlen(str->ptr), &str->ptr[str->len+1]);
     return str->ptr;
 }
@@ -180,7 +180,7 @@ set_ll_get (set_ll_t *set, int idx, int *len)
 int
 set_ll_put (set_ll_t *set, char *str, int len)
 {
-    HRE_ASSERT (len == strlen(str), "Incorrect length passed for '%s', %d instead of %zu. Rest: '%s'",
+    HRE_ASSERT (len == (int)strlen(str), "Incorrect length passed for '%s', %d instead of %zu. Rest: '%s'",
                 str, len, strlen(str), &str[len+1]);
     hre_context_t       global = HREglobal ();
     size_t              worker = HREme (global);
@@ -246,7 +246,7 @@ set_ll_install (set_ll_t *set, char *name, int idx)
     RTswitchAlloc (false);
     slab->cur_len = SIZE_MAX;
 
-    if (old - 1 == idx)
+    if (old - 1 == (size_t)idx)
         return;
     HREassert (old == DOES_NOT_EXIST);
     str_t               string = {.ptr = (char *)clone, .len = len};
@@ -278,6 +278,34 @@ set_ll_create (set_ll_allocator_t *alloc)
     set->alloc = alloc;
 
     return set;
+}
+
+size_t
+set_ll_print_stats (log_t log, set_ll_t *set, char *name)
+{
+    size_t              workers = HREpeers(HREglobal());
+    size_t              references = 0; // balloc references
+    size_t              alloc = ht_size (set->ht); // table allocation size in byte
+    for (size_t i = 0; i < workers; i++)
+        references += set->local[i].count;
+    size_t              table = references * sizeof(map_key_t) * 2;
+    Warning (log, "String table '%s': %zuMB pointers and %zuMB "
+            "tables (%.2f%% overhead)", name,
+            (references * sizeof(str_t)) >> 20, table >> 20,
+             (double)alloc / table * 100);
+    return alloc + references * sizeof(str_t);
+}
+
+
+size_t
+set_ll_print_alloc_stats(log_t log, set_ll_allocator_t *alloc)
+{
+    size_t              workers = HREpeers(HREglobal());
+    size_t              strings = 0; // string storage in byte
+    for (size_t i = 0; i < workers; i++)
+        strings += alloc->slabs[i]->next;
+    Warning (log, "Stored %zuMB of string chucks", strings >> 20);
+    return strings;
 }
 
 void

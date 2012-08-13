@@ -910,7 +910,7 @@ print_totals (counter_t *ar_reach, counter_t *ar_red, int d, size_t db_elts)
 
 static void
 print_statistics (counter_t *ar_reach, counter_t *ar_red, rt_timer_t timer,
-                  stats_t *stats)
+                  stats_t *stats, lts_type_t ltstype)
 {
     counter_t          *reach = ar_reach;
     counter_t          *red = ar_red;
@@ -976,8 +976,10 @@ print_statistics (counter_t *ar_reach, counter_t *ar_red, rt_timer_t timer,
     } else {
         Warning (info, "Table memory: %.1fMB, fill ratio: %.1f%%", mem4, fill);
     }
+    double chunks = cct_print_stats (info, infoLong, ltstype, tables) / (1<<20);
     Warning (info, "Est. total memory use: %.1fMB (~%.1fMB paged-in)",
-             mem1 + mem4 + mem3, mem1 + mem2 + mem3);
+             mem1 + mem4 + mem3 + chunks, mem1 + mem2 + mem3 + chunks);
+
 
     if (no_exit)
         Warning (info, "\n\nDeadlocks: %zu\nInvariant violations: %zu\n"
@@ -1015,7 +1017,8 @@ reduce_and_print_result (wctx_t *ctx)
         for (size_t i = 0; i < W; i++)
             ctx_add_counters (global->contexts[i], reach, red, stats);
         if (log_active(info)) {
-            print_statistics (reach, red, global->contexts[0]->timer, stats);
+            print_statistics (reach, red, global->contexts[0]->timer, stats,
+                              GBgetLTStype(ctx->model));
         }
         RTfree (reach); RTfree (red); RTfree (stats);
     }

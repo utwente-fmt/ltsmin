@@ -51,6 +51,7 @@ void          ht_free       (hashtable_t *ht);
 ht_iter_t *   ht_iter_begin (hashtable_t *ht, map_key_t key);
 map_val_t     ht_iter_next  (ht_iter_t *iter, map_key_t *key_ptr);
 void          ht_iter_free  (ht_iter_t *iter);
+size_t        ht_size       (hashtable_t *ht);
 
 static inline map_val_t
 ht_cas_empty (hashtable_t *ht, map_key_t key, map_val_t val, map_key_t *clone,
