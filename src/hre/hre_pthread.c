@@ -420,6 +420,7 @@ static void
 handle_signal (int sig)
 {
     // nada
+    (void) sig;
 }
 
 static void fork_start(int* argc,char **argv[],int run_threads){
@@ -543,3 +544,35 @@ HREgetRegionSize(hre_region_t region)
     return area->size;
 }
 
+typedef struct hre_local_s {
+    void               *ptr;
+    char               *pad[CACHE_LINE_SIZE - sizeof(void *)];
+} hre_local_t;
+
+void
+HREcreateLocal(hre_key_t *key, void (*destructor)(void *))
+{
+    hre_local_t       **local = (hre_local_t **)key;
+    size_t              workers = HREpeers (HREglobal());
+    hre_region_t        region = HREdefaultRegion (HREglobal());
+    *local = HREalign (region, CACHE_LINE_SIZE, sizeof(hre_local_t[workers]));
+    for (size_t i = 0; i < workers; i++)
+        (*local)[i].ptr = NULL;
+    (void) destructor; // TODO: deallocation
+}
+
+void
+HREsetLocal(hre_key_t key, void *package)
+{
+    size_t              id = HREme (HREglobal());
+    hre_local_t        *local = (hre_local_t *)key;
+    local[id].ptr = package;
+}
+
+void *
+HREgetLocal(hre_key_t key)
+{
+    size_t              id = HREme (HREglobal());
+    hre_local_t        *local = (hre_local_t *)key;
+    return local[id].ptr;
+}

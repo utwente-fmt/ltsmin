@@ -303,6 +303,14 @@ extern hre_region_t HREdefaultRegion(hre_context_t context);
 
 extern size_t HREgetRegionSize(hre_region_t region);
 
+typedef size_t hre_key_t;
+
+extern void  HREcreateLocal(hre_key_t *key, void (*destructor)(void *));
+
+extern void  HREsetLocal(hre_key_t key, void *package);
+
+extern void* HREgetLocal(hre_key_t key);
+
 extern void* RTmalloc(size_t size);
 
 extern void* RTmallocZero(size_t size);

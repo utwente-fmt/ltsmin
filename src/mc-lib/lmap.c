@@ -1,6 +1,5 @@
 #include <hre/config.h>
 
-#include <pthread.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -52,7 +51,7 @@ struct lm_s {
     lm_store_t         *table;
     lm_store_t         *table_end;
     size_t              block_size;
-    pthread_key_t       local_key;
+    hre_key_t           local_key;
     local_t            *locals[LM_MAX_THREADS];
 };
 
@@ -61,7 +60,7 @@ static size_t           next_index = 0;
 static inline local_t *
 get_local (lm_t *map)
 {
-    local_t            *loc = pthread_getspecific (map->local_key);
+    local_t            *loc = HREgetLocal (map->local_key);
     if (NULL == loc) {
         loc = RTalignZero (CACHE_LINE_SIZE, sizeof (local_t));
         loc->id = fetch_add (&next_index, 1);
@@ -69,7 +68,7 @@ get_local (lm_t *map)
         // force allocation on local node
         size_t table_size = sizeof (lm_store_t[map->wSize]);
         loc->table = RTalignZero (CACHE_LINE_SIZE, table_size);
-        pthread_setspecific (map->local_key, loc);
+        HREsetLocal (map->local_key, loc);
         map->locals[loc->id] = loc;
     }
     return loc;
@@ -473,7 +472,7 @@ lm_create (size_t workers, size_t size, size_t block_size)
     map->table = RTalignZero (CACHE_LINE_SIZE, table_size);
     map->table_end = map->table + map->size;
     if (NULL == map->table) Abort("Allocation failed for lmap table of %zuGB", table_size>>30);
-    pthread_key_create (&map->local_key, NULL);
+    HREcreateLocal (&map->local_key, NULL);
     return map;
 }
 
