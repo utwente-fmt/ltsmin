@@ -1770,7 +1770,7 @@ gsea_finished(void *arg) {
     Warning (info, "state space %zu levels, %zu states %zu transitions",
              global.max_depth, global.explored, global.ntransitions);
 
-    if (opt.no_exit)
+    if (opt.no_exit || log_active(infoLong))
         Warning (info, "\n\nDeadlocks: %zu\nInvariant violations: %zu\n"
              "Error actions: %zu", global.deadlocks,global.violations,
              global.errors);

@@ -981,7 +981,7 @@ print_statistics (counter_t *ar_reach, counter_t *ar_red, rt_timer_t timer,
              mem1 + mem4 + mem3 + chunks, mem1 + mem2 + mem3 + chunks);
 
 
-    if (no_exit)
+    if (no_exit || log_active(infoLong))
         Warning (info, "\n\nDeadlocks: %zu\nInvariant violations: %zu\n"
                  "Error actions: %zu", reach->deadlocks, reach->violations,
                  reach->errors);

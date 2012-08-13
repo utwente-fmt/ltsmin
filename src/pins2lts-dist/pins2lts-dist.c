@@ -369,7 +369,7 @@ int main(int argc, char*argv[]){
             ctx.level,global_explored,global_transitions);
         RTprintTimer (info, timer, "Exploration time");
 
-        if (no_exit)
+        if (no_exit || log_active(infoLong))
             Warning (info, "\n\nDeadlocks: %zu\nInvariant violations: %zu\n"
                      "Error actions: %zu", global_deadlocks,global_violations,
                      global_errors);
