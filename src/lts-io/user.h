@@ -135,6 +135,11 @@ int lts_file_owned_count(lts_file_t lts);
 int lts_file_owned(lts_file_t lts,int nth);
 
 /**
+\brief Set the HRE context of the file.
+*/
+void lts_file_set_context(lts_file_t lts, hre_context_t ctx);
+
+/**
 \brief Get the HRE context of the file.
 */
 hre_context_t lts_file_context(lts_file_t lts);

@@ -254,6 +254,7 @@ set_ll_count (set_ll_t *set)
     size_t              references = 0;
     for (size_t i = 0; i < workers; i++)
         references += set->local[i].count;
+    Debug ("Count %p: %zu", set ,references);
     return references;
 }
 
@@ -261,12 +262,13 @@ void
 set_ll_install (set_ll_t *set, char *name, int idx)
 {
     size_t              workers = HREpeers (HREglobal());
-    map_key_t           clone, old, key = (map_key_t)name;
     size_t              worker = idx % workers;
+    HREassert (idx >= set->local[worker].count);
     isb_allocator_t     balloc = set->local[worker].balloc;
     size_t              index = idx / workers;
     set_ll_slab_t      *slab = set->alloc->slabs[worker];
     size_t              len = strlen(name);
+    map_key_t           clone, old, key = (map_key_t)name;
 
     slab->cur_key = name;
     slab->cur_len = len; // avoid having to recompute the length
@@ -295,18 +297,23 @@ set_ll_finalize (set_ll_t *set, char *bogus)
     size_t              workers = HREpeers (HREglobal());
     size_t              max_local = set_ll_max (set);
     set_ll_slab_t      *slab = set->alloc->slabs[0];
-
-    slab->cur_key = NULL;
-    slab->cur_len = strlen(bogus);
-    str_t               str = { .ptr = strclone (bogus, slab),
-                                .len = strlen(bogus) };
-    slab->cur_len = SIZE_MAX;
+    HREassert (strlen(bogus) < LTSMIN_PATHNAME_MAX - strlen("4294967296"));
+    char                unique[LTSMIN_PATHNAME_MAX];
+    size_t              count;
 
     size_t              added = 0;
     for (size_t i = 0; i < workers; i++) {
         isb_allocator_t     balloc = set->local[i].balloc;
         RTswitchAlloc (set->alloc->shared);
         while (set->local[i].count < max_local) {
+            snprintf (unique, LTSMIN_PATHNAME_MAX, "%s (unique %zu)", bogus, count++);
+            slab->cur_key = NULL;
+            slab->cur_len = strlen(unique);
+            str_t               str = { .ptr = strclone (unique, slab),
+                                        .len = strlen(unique) };
+            slab->cur_len = SIZE_MAX;
+
+
             isba_push_int (balloc, (int*)&str);
             set->local[i].count++;
         }

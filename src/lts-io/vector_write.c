@@ -422,7 +422,7 @@ static lts_file_t archive_create(archive_t archive,const char* name,
 
 
 lts_file_t gcf_file_create(const char* name,lts_type_t ltstype,int segments,lts_file_t settings){
-    hre_context_t global=HREglobal();
+    hre_context_t global = settings ? lts_file_context(settings) : HREglobal();
     int me=HREme(global);
     int peers=HREpeers(global);
     if (segments%peers) {
@@ -436,7 +436,7 @@ lts_file_t gcf_file_create(const char* name,lts_type_t ltstype,int segments,lts_
 }
 
 lts_file_t gcd_file_create(const char* name,lts_type_t ltstype,int segments,lts_file_t settings){
-    hre_context_t global=HREglobal();
+    hre_context_t global = settings ? lts_file_context(settings) : HREglobal();
     int me=HREme(global);
     int peers=HREpeers(global);
     if (segments%peers) {
@@ -447,9 +447,9 @@ lts_file_t gcd_file_create(const char* name,lts_type_t ltstype,int segments,lts_
         if(create_empty_dir((char*)name,DELETE_ALL)){
             Abort("could not create or clear directory %s",name);
         }
-        HREbarrier(HREglobal());
+        HREbarrier(global);
     } else {
-        HREbarrier(HREglobal());
+        HREbarrier(global);
         for(int i=0;;i++){
             if (i==1000) Abort("timeout during creation of %s",name);
             if (is_a_dir((char*)name)) break;
@@ -462,7 +462,7 @@ lts_file_t gcd_file_create(const char* name,lts_type_t ltstype,int segments,lts_
 }
 
 lts_file_t dir_file_create(const char* name,lts_type_t ltstype,int segments,lts_file_t settings){
-    hre_context_t global=HREglobal();
+    hre_context_t global = settings ? lts_file_context(settings) : HREglobal();
     int me=HREme(global);
     int peers=HREpeers(global);
     if (segments%peers) {
@@ -473,9 +473,9 @@ lts_file_t dir_file_create(const char* name,lts_type_t ltstype,int segments,lts_
         if(create_empty_dir((char*)name,DELETE_ALL)){
             Abort("could not create or clear directory %s",name);
         }
-        HREbarrier(HREglobal());
+        HREbarrier(global);
     } else {
-        HREbarrier(HREglobal());
+        HREbarrier(global);
         for(int i=0;;i++){
             if (i==1000) Abort("timeout during creation of %s",name);
             if (is_a_dir((char*)name)) break;

@@ -133,12 +133,11 @@ trc_find_and_write (trc_env_t *env, char *trc_output, ref_t dst_idx,
                       int level, ref_t *parent_ofs)
 {
     lts_type_t ltstype = GBgetLTStype(env->model);
-    /* Trick to fake single thread to rhe LTS lib */
-    hre_context_t c = HREglobal();
     hre_context_t n = HREctxCreate(0, 1, "blah", 0);
-    HREglobalSet(n);
-    /*  LITS lib write code: */
-    env->trace_handle=lts_file_create(trc_output,ltstype,1,NULL);
+    lts_file_t template = lts_index_template();
+    lts_file_set_context(template, n);
+    env->trace_handle=lts_file_create(trc_output,ltstype,1,template);
+    lts_file_set_context(env->trace_handle, n);
     for(int i=0;i<lts_type_get_type_count(ltstype);i++)
         lts_file_set_table(env->trace_handle,i,GBgetChunkMap(env->model,i));
     int *init_state = env->get_state(env->start_idx, env->get_state_arg);
@@ -149,20 +148,16 @@ trc_find_and_write (trc_env_t *env, char *trc_output, ref_t dst_idx,
     RTstopTimer (timer);
     RTprintTimer (info, timer, "constructing the trace took");
     lts_file_close (env->trace_handle);
-    /* Undo trick to fake single thread to rhe LTS lib */
-    HREglobalSet(c);
 }
 
 void
 trc_write_trace (trc_env_t *env, char *trc_output, ref_t *trace, int level)
 {
     lts_type_t ltstype = GBgetLTStype(env->model);
-    /* Trick to fake single thread to rhe LTS lib */
-    hre_context_t c = HREglobal();
     hre_context_t n = HREctxCreate(0, 1, "blah", 0);
-    HREglobalSet(n);
-    /*  LITS lib write code: */
-    env->trace_handle=lts_file_create(trc_output,ltstype,1,NULL);
+    lts_file_t template = lts_index_template();
+    lts_file_set_context(template, n);
+    env->trace_handle=lts_file_create(trc_output,ltstype,1,template);
     for(int i=0;i<lts_type_get_type_count(ltstype);i++)
         lts_file_set_table(env->trace_handle,i,GBgetChunkMap(env->model,i));
     int *init_state = env->get_state(env->start_idx, env->get_state_arg);
@@ -173,6 +168,4 @@ trc_write_trace (trc_env_t *env, char *trc_output, ref_t *trace, int level)
     RTstopTimer (timer);
     RTprintTimer (info, timer, "constructing the trace took");
     lts_file_close (env->trace_handle);
-    /* Undo trick to fake single thread to rhe LTS lib */
-    HREglobalSet(c);
 }
