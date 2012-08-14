@@ -37,6 +37,7 @@ struct dist_thread_context {
     size_t explored,visited,transitions,level,deadlocks,errors,violations;
 };
 
+static const size_t         THRESHOLD = 100000 / 100 * SPEC_REL_PERF;
 static int              trans_len;
 static int              write_lts=0;
 static int              nice_value=0;
@@ -314,7 +315,7 @@ int main(int argc, char*argv[]){
     /***************************************************/
 
     RTstartTimer(timer);
-    size_t threshold = 100000;
+    size_t threshold = THRESHOLD;
     for(;;){
         size_t limit=ctx.visited;
         size_t lvl_scount=0;

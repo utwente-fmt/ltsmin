@@ -46,6 +46,7 @@ static inline size_t min (size_t a, size_t b) {
 
 /********************************** TYPEDEFS **********************************/
 
+static const size_t         THRESHOLD = 100000 / 100 * SPEC_REL_PERF;
 typedef int                *state_data_t;
 static const state_data_t   state_data_dummy;
 static const size_t         SLOT_SIZE = sizeof(*state_data_dummy);
@@ -685,9 +686,9 @@ postlocal_global_init (wctx_t *ctx)
         global->lb = lb_create_max (W, G, H);
         global->contexts = RTmalloc (sizeof (wctx_t*[W]));
         if (strategy[0] & Strat_LTL) {
-            global->threshold = 100000;
+            global->threshold = THRESHOLD;
         } else {
-            global->threshold = 100000 / W;
+            global->threshold = THRESHOLD / W;
         }
         RTswitchAlloc (false);
     }
