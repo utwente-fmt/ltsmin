@@ -16,10 +16,8 @@ opaal2lts-mc - Concurrent state space generator for UPPAAL timed automata
 
 == DESCRIPTION
 
-{manname} generates a labelled transition system from a
-specification provided in 'input.xml' or 'intput.so' (precompiled).
-It does this concurrently for any given number of threads.
-This tool does not support LTS output.
+{manname} performs multi-core reachability on the labelled transition system
+from a compiled specification provided in 'input.xml' or 'intput.so' (precompiled).
 
 https://code.launchpad.net/~opaal-developers/opaal/
 opaal-ltsmin-succgen[opaal] is an open source implementation of the

@@ -98,8 +98,8 @@ See manpage:dve2lts-mc[1], manpage:etf2lts-mc[1],
 manpage:opaal2lts-mc[1] and manpage:prom2lts-mc[1].
 +
 --
-* MacOS X does not support the multiple process architecture at this time.
-* Neither mCRL nor mCRL2 supports multi threading.
+* MacOS X does only supports the multiple process architecture from version
+* 10.7 (Lion).
 --
 +
 <prefix>2lts-dist::

@@ -41,11 +41,13 @@ MANPAGES += etf2torx.1
 MANPAGES += lpo2lts-sym.1
 MANPAGES += lpo2lts-seq.1
 MANPAGES += lpo2lts-dist.1
+MANPAGES += lpo2lts-mc.1
 MANPAGES += lpo2torx.1
 
 MANPAGES += lps2lts-sym.1
 MANPAGES += lps2lts-seq.1
 MANPAGES += lps2lts-dist.1
+MANPAGES += lps2lts-mc.1
 MANPAGES += lps2torx.1
 
 MANPAGES += prom2lts-sym.1
@@ -59,6 +61,7 @@ MANPAGES += opaal2lts-mc.1
 MANPAGES += pbes2lts-sym.1
 MANPAGES += pbes2lts-seq.1
 MANPAGES += pbes2lts-dist.1
+MANPAGES += pbes2lts-mc.1
 
 MANPAGES += spgsolver.1
 
