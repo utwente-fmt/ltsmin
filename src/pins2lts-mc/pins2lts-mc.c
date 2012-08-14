@@ -1502,6 +1502,8 @@ ndfs_report_cycle (wctx_t *ctx, state_info_t *cycle_closing_state)
         /* Write last state to stack to close cycle */
         trace[level-1] = cycle_closing_state->ref;
         find_dfs_stack_trace (ctx, ctx->stack, trace, level);
+        double uw = cct_finalize (tables, "BOGUS, you should not see this string.");
+        Warning (infoLong, "Parallel chunk tables under-water mark: %.2f", uw);
         trc_env_t          *trace_env = trc_create (ctx->model, get_state,
                                                     trace[0], ctx);
         trc_write_trace (trace_env, trc_output, trace, level);
@@ -1518,6 +1520,8 @@ handle_error_trace (wctx_t *ctx)
     if (trc_output) {
         ref_t               start_ref = ctx->initial.ref;
         trc_env_t  *trace_env = trc_create (ctx->model, get_state, start_ref, ctx);
+        double uw = cct_finalize (tables, "BOGUS, you should not see this string.");
+        Warning (infoLong, "Parallel chunk tables under-water mark: %.2f", uw);
         trc_find_and_write (trace_env, trc_output, ctx->state.ref, level, global->parent_ref);
     }
     Warning (info, "Exiting now!");

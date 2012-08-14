@@ -9,6 +9,7 @@
 #include <mc-lib/hashtable.h>
 #include <mc-lib/is-balloc.h>
 #include <mc-lib/set-ll.h>
+#include <mc-lib/statistics.h>
 #include <mc-lib/stats.h>
 #include <util-lib/fast_hash.h>
 
@@ -19,6 +20,7 @@
 typedef struct set_ll_slab_s {
     void               *mem;
     size_t              next;
+    size_t              total;
     size_t              size;
     size_t              cur_len;
     char               *cur_key;
@@ -53,6 +55,7 @@ set_ll_init_allocator (bool shared)
         slab->mem = RTmalloc (size);
         HREassert (slab->mem != NULL, "Slab memory allocation failed. Increase your user limits or SLABS_RATIO");
         slab->next = 0;
+        slab->total = 0;
         slab->size = size;
         slab->cur_len = SIZE_MAX;
     }
@@ -98,6 +101,7 @@ strclone (char *str, set_ll_slab_t *slab)
     size_t              len = get_length (str, slab) + 1; // '\0'
     HREassert (slab->cur_len != SIZE_MAX, "Failed to pass length via static.");
     slab->next += len;
+    slab->total++;
     HREassert (slab->next < slab->size, "Local slab of %zu from worker "
                "%d exceeded: %zu", slab->size, HREme(HREglobal()), slab->next);
     memmove (ptr, str, len);
@@ -221,11 +225,36 @@ set_ll_put (set_ll_t *set, char *str, int len)
     return (int)idx;
 }
 
+static int
+set_ll_max (set_ll_t *set)
+{
+    size_t              workers = HREpeers (HREglobal());
+    size_t              references = 0;
+    for (size_t i = 0; i < workers; i++)
+        if (references < set->local[i].count) references = set->local[i].count;
+    return references;
+}
+
+static double
+set_ll_stdev (set_ll_t *set)
+{
+    size_t              workers = HREpeers (HREglobal());
+    statistics_t stats;
+    statistics_init(&stats);
+    for (size_t i = 0; i < workers; i++)
+        statistics_record(&stats, set->local[i].count);
+    return statistics_stdev(&stats);
+}
+
+
 int
 set_ll_count (set_ll_t *set)
 {
-    HREassert (false, "set_ll_count not implemented");
-    (void) set;
+    size_t              workers = HREpeers (HREglobal());
+    size_t              references = 0;
+    for (size_t i = 0; i < workers; i++)
+        references += set->local[i].count;
+    return references;
 }
 
 void
@@ -260,6 +289,63 @@ set_ll_install (set_ll_t *set, char *name, int idx)
                                                     len, clone);
 }
 
+double
+set_ll_finalize (set_ll_t *set, char *bogus)
+{
+    size_t              workers = HREpeers (HREglobal());
+    size_t              max_local = set_ll_max (set);
+    set_ll_slab_t      *slab = set->alloc->slabs[0];
+
+    slab->cur_key = NULL;
+    slab->cur_len = strlen(bogus);
+    str_t               str = { .ptr = strclone (bogus, slab),
+                                .len = strlen(bogus) };
+    slab->cur_len = SIZE_MAX;
+
+    size_t              added = 0;
+    for (size_t i = 0; i < workers; i++) {
+        isb_allocator_t     balloc = set->local[i].balloc;
+        RTswitchAlloc (set->alloc->shared);
+        while (set->local[i].count < max_local) {
+            isba_push_int (balloc, (int*)&str);
+            set->local[i].count++;
+        }
+        RTswitchAlloc (false);
+    }
+    double              underwater = workers * max_local;
+    underwater /= underwater - added;
+    return underwater;
+}
+
+size_t
+set_ll_print_stats (log_t log, set_ll_t *set, char *name)
+{
+    size_t              references = set_ll_count (set); // balloc references
+    double              stdev = set_ll_stdev (set);
+    size_t              alloc = ht_size (set->ht); // table allocation size in byte
+    size_t              table = references * sizeof(map_key_t) * 2;
+    Warning (log, "String table '%s': %zuMB pointers, %zuMB "
+             "tables (%.2f%% overhead), %zu strings (distr.: %.2f)", name,
+             (references * sizeof(str_t)) >> 20, table >> 20,
+             (double)alloc / table * 100, references, stdev);
+    return alloc + references * sizeof(str_t);
+}
+
+
+size_t
+set_ll_print_alloc_stats(log_t log, set_ll_allocator_t *alloc)
+{
+    size_t              workers = HREpeers(HREglobal());
+    size_t              strings = 0; // string storage in byte
+    size_t              count = 0; // number of strings
+    for (size_t i = 0; i < workers; i++) {
+        strings += alloc->slabs[i]->next;
+        count += alloc->slabs[i]->total;
+    }
+    Warning (log, "Stored %zu string chucks using %zuMB", count, strings >> 20);
+    return strings;
+}
+
 set_ll_t *
 set_ll_create (set_ll_allocator_t *alloc)
 {
@@ -278,34 +364,6 @@ set_ll_create (set_ll_allocator_t *alloc)
     set->alloc = alloc;
 
     return set;
-}
-
-size_t
-set_ll_print_stats (log_t log, set_ll_t *set, char *name)
-{
-    size_t              workers = HREpeers(HREglobal());
-    size_t              references = 0; // balloc references
-    size_t              alloc = ht_size (set->ht); // table allocation size in byte
-    for (size_t i = 0; i < workers; i++)
-        references += set->local[i].count;
-    size_t              table = references * sizeof(map_key_t) * 2;
-    Warning (log, "String table '%s': %zuMB pointers and %zuMB "
-            "tables (%.2f%% overhead)", name,
-            (references * sizeof(str_t)) >> 20, table >> 20,
-             (double)alloc / table * 100);
-    return alloc + references * sizeof(str_t);
-}
-
-
-size_t
-set_ll_print_alloc_stats(log_t log, set_ll_allocator_t *alloc)
-{
-    size_t              workers = HREpeers(HREglobal());
-    size_t              strings = 0; // string storage in byte
-    for (size_t i = 0; i < workers; i++)
-        strings += alloc->slabs[i]->next;
-    Warning (log, "Stored %zuMB of string chucks", strings >> 20);
-    return strings;
 }
 
 void

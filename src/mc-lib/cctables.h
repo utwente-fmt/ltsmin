@@ -33,6 +33,8 @@ extern cct_map_t       *cct_create_map(bool shared);
 extern size_t           cct_print_stats(log_t log, log_t details,
                                         lts_type_t type, cct_map_t *);
 
+extern double           cct_finalize(cct_map_t *map, char *bogus);
+
 extern cct_cont_t      *cct_create_cont(cct_map_t *tables);
 
 extern value_table_t    cct_create_vt(cct_cont_t *map);

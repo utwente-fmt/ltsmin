@@ -79,6 +79,18 @@ cct_print_stats(log_t log, log_t details, lts_type_t ltstype, cct_map_t *map)
     return total;
 }
 
+double
+cct_finalize(cct_map_t *map, char *bogus)
+{
+    size_t                  i = 0;
+    double                  underwater = 0;
+    while (map->table[i].string_set != NULL) {
+        underwater += set_ll_finalize (map->table[i].string_set, bogus);
+        i++;
+    }
+    return underwater / i;
+}
+
 cct_map_t *
 cct_create_map(bool shared)
 {
