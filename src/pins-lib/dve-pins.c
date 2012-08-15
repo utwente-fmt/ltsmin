@@ -343,9 +343,16 @@ DVE2loadGreyboxModel(model_t model, const char *filename)
 
     // adding types
     int ntypes = get_state_variable_type_count();
-    for(int i=0; i < ntypes; i++) {
+    for(int i = 0; i < ntypes; i++) {
         const char* type_name = get_state_variable_type_name(i);
-        if (lts_type_add_type(ltstype,type_name,NULL) != i) {
+        HREassert (type_name != NULL, "invalid type name");
+        int type_value_count = get_state_variable_type_value_count(i);
+        if (0 == type_value_count) {
+            lts_type_set_format (ltstype, i, LTStypeDirect);
+        } else {
+             lts_type_set_format (ltstype, i, LTStypeEnum);
+        }
+        if (lts_type_add_type(ltstype, type_name, NULL) != i) {
             Abort("wrong type number");
         }
     }
@@ -389,8 +396,6 @@ DVE2loadGreyboxModel(model_t model, const char *filename)
     // setting values for types
     for(int i=0; i < ntypes; i++) {
         int type_value_count = get_state_variable_type_value_count(i);
-        if (0 == type_value_count)
-            lts_type_set_format (ltstype, i, LTStypeDirect);
         for(int j=0; j < type_value_count; ++j) {
             const char* type_value = get_state_variable_type_value(i, j);
             GBchunkPut(model, i, chunk_str((char*)type_value));

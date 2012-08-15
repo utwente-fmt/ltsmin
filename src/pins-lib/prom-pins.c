@@ -249,12 +249,16 @@ SpinJaloadGreyboxModel(model_t model, const char *filename)
 
     // adding types
     int ntypes = spinja_get_type_count();
-    for (int i=0; i < ntypes; i++) {
+    for (int i = 0; i < ntypes; i++) {
         const char* type_name = spinja_get_type_name(i);
-        if(!type_name) {
-            Abort("invalid type name");
+        HREassert (type_name != NULL, "invalid type name");
+        int type_value_count = spinja_get_type_value_count(i);
+        if (0 == type_value_count) {
+            lts_type_set_format (ltstype, i, LTStypeDirect);
+        } else {
+             lts_type_set_format (ltstype, i, LTStypeEnum);
         }
-        if (lts_type_add_type(ltstype,type_name,NULL) != i) {
+        if (lts_type_add_type(ltstype, type_name, NULL) != i) {
             Abort("wrong type number");
         }
     }
@@ -272,7 +276,7 @@ SpinJaloadGreyboxModel(model_t model, const char *filename)
     }
 
     int assert_type = 0;
-    if (NULL != spinja_get_edge_count)
+    if (spinja_get_edge_count() > 0)
          assert_type = lts_type_add_type(ltstype, "action", NULL);
     GBsetLTStype(model, ltstype);
 
@@ -293,15 +297,13 @@ SpinJaloadGreyboxModel(model_t model, const char *filename)
         }
     }
 
-    if (NULL != spinja_get_edge_count) {
-         if (spinja_get_edge_count() > 0) {
-             // All actions are assert statements. We do not export there values.
-             lts_type_set_edge_label_count(ltstype, 1);
-             lts_type_set_edge_label_name(ltstype, 0, "action");
-             lts_type_set_edge_label_type(ltstype, 0, "action");
-             lts_type_set_edge_label_typeno(ltstype, 0, assert_type);
-         }
-    }
+     if (spinja_get_edge_count() > 0) {
+         // All actions are assert statements. We do not export there values.
+         lts_type_set_edge_label_count(ltstype, 1);
+         lts_type_set_edge_label_name(ltstype, 0, "action");
+         lts_type_set_edge_label_type(ltstype, 0, "action");
+         lts_type_set_edge_label_typeno(ltstype, 0, assert_type);
+     }
 
     // get initial state
     int state[state_length];
