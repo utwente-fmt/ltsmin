@@ -45,7 +45,7 @@
  */
 
 typedef enum { UseGreyBox , UseBlackBox } box_mode_t;
-static const size_t         THRESHOLD = 100000 / 100 * SPEC_REL_PERF;
+#define THRESHOLD (100000 / 100 * SPEC_REL_PERF)
 
 typedef struct grey_stack
 {
