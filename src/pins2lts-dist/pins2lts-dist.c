@@ -21,7 +21,7 @@
 #include <pins-lib/property-semantics.h>
 #include <util-lib/dynamic-array.h>
 #include <util-lib/fast_hash.h>
-#include <util-lib/stringindex.h>
+#include <hre/stringindex.h>
 #include <util-lib/treedbs.h>
 #include <util-lib/string-map.h>
 

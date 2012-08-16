@@ -1,5 +1,7 @@
 
-PINS_LIBS = ../pins-lib/libpins.la ../ltsmin-lib/libltsmin.la ../util-lib/libutil.la
+PINS_LIBS  = ../pins-lib/libpins.la ../util-lib/libutil.la ../hre/libhre.la
+PINS_LIBS += ../ltsmin-lib/libltsmin.la ../dm/libdm.la ../lts-io/liblts-io.la
+PINS_LIBS +=  ../hre-io/libhre-io.la
 
 bin_PROGRAMS =
 

@@ -7,8 +7,6 @@
 #include <stdint.h>
 #include <stdio.h>
 
-#include <hre-io/types.h>
-
 #ifdef RUNTIME_H
 #error "runtime defined: inconsistent include sequence!"
 #else

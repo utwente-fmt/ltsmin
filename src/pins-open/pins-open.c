@@ -16,7 +16,7 @@
 #include <lts-io/user.h>
 #include <pins-lib/pins-impl.h>
 #include <util-lib/fast_hash.h>
-#include <util-lib/stringindex.h>
+#include <hre/stringindex.h>
 #include <util-lib/treedbs.h>
 
 static model_t model;

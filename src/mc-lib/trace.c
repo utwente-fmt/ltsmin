@@ -11,7 +11,7 @@
 #include <lts-io/user.h>
 #include <ltsmin-lib/lts-type.h>
 #include <mc-lib/trace.h>
-#include <util-lib/stringindex.h>
+#include <hre/stringindex.h>
 #include <util-lib/treedbs.h>
 
 

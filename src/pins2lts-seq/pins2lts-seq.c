@@ -22,7 +22,7 @@
 #include <mc-lib/trace.h>
 #include <util-lib/bitset.h>
 #include <util-lib/dynamic-array.h>
-#include <util-lib/stringindex.h>
+#include <hre/stringindex.h>
 #include <util-lib/tables.h>
 #include <util-lib/treedbs.h>
 #include <vset-lib/vector_set.h>

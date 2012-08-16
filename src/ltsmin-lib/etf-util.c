@@ -9,7 +9,7 @@
 #include <ltsmin-lib/etf-internal.h>
 #include <ltsmin-lib/etf-util.h>
 #include <util-lib/dynamic-array.h>
-#include <util-lib/stringindex.h>
+#include <hre/stringindex.h>
 
 
 etf_model_t ETFmodelCreate(){

@@ -1,6 +1,8 @@
 HRE_LIB = ../hre/libhre.la
 SYM_CPPFLAGS = $(AM_CPPFLAGS)
-PINS_LIBS = ../pins-lib/libpins.la ../ltsmin-lib/libltsmin.la ../util-lib/libutil.la
+PINS_LIBS  = ../pins-lib/libpins.la ../util-lib/libutil.la ../hre/libhre.la
+PINS_LIBS += ../ltsmin-lib/libltsmin.la ../dm/libdm.la ../lts-io/liblts-io.la
+PINS_LIBS +=  ../hre-io/libhre-io.la
 VSET_LIBS = ../vset-lib/libvset.la
 
 bin_PROGRAMS = etf2lts-sym

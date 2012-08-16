@@ -5,7 +5,14 @@ else
 HRE_LIB = ../hre/libhre.la
 DIST_CPPFLAGS = $(AM_CPPFLAGS)
 endif
-PINS_LIBS = ../pins-lib/libpins.la ../util-lib/libutil.la ../ltsmin-lib/libltsmin.la
+PINS_LIBS  =
+PINS_LIBS += ../lts-io/liblts-io.la
+PINS_LIBS += ../hre-io/libhre-io.la
+PINS_LIBS += ../hre/libhre.la
+PINS_LIBS += ../pins-lib/libpins.la
+PINS_LIBS += ../ltsmin-lib/libltsmin.la
+PINS_LIBS += ../util-lib/libutil.la
+PINS_LIBS += ../dm/libdm.la
 
 bin_PROGRAMS = etf2lts-dist
 

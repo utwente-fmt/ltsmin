@@ -3,7 +3,6 @@ noinst_LTLIBRARIES  = libltsmin.la
 # libltsmin
 libltsmin_la_SOURCES  =
 libltsmin_la_SOURCES += ltsmin-grammar.lemon
-libltsmin_la_SOURCES += ltsmin-lexer.l
 libltsmin_la_SOURCES += etf-internal.h
 libltsmin_la_SOURCES += etf-objects.c etf-objects.h
 libltsmin_la_SOURCES += etf-parser.c
@@ -17,11 +16,7 @@ libltsmin_la_SOURCES += ltsmin-tl.c ltsmin-tl.h
 libltsmin_la_SOURCES += ltsmin-grammar.c ltsmin-grammar.h
 libltsmin_la_SOURCES += ltsmin-lexer.c ltsmin-lexer.h
 
-libltsmin_la_LIBADD   = $(UTIL_LIB)
-libltsmin_la_LIBADD  += ../hre-io/libhre-io.la 
-libltsmin_la_LIBADD  += ../dm/libdm.la
-libltsmin_la_LIBADD  += ../bignum/libbignum.la
-libltsmin_la_LIBADD  += $(top_builddir)/ltl2ba/libltl2ba.la
+libltsmin_la_LIBADD   = $(top_builddir)/ltl2ba/libltl2ba.la
 libltsmin_la_CPPFLAGS = -DNXT
 libltsmin_la_CPPFLAGS+= -I${top_srcdir}/ltl2ba $(AM_CPPFLAGS)
 

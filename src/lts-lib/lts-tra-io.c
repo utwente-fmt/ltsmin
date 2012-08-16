@@ -6,7 +6,7 @@
 #include <hre/user.h>
 #include <lts-lib/rationals.h>
 #include <lts-lib/lts.h>
-#include <util-lib/stringindex.h>
+#include <hre/stringindex.h>
 
 static char* tra_get_lab(const char *name){
     char *lab_name=strdup(name);

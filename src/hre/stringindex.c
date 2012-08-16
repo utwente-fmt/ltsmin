@@ -7,7 +7,7 @@
 #include <hre/user.h>
 #include <util-lib/dynamic-array.h>
 #include <util-lib/fast_hash.h>
-#include <util-lib/stringindex.h>
+#include <hre/stringindex.h>
 
 #define DEBUG(...) {}
 //define DEBUG Debug

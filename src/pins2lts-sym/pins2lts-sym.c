@@ -19,7 +19,7 @@
 #include <spg-lib/spg-solve.h>
 #include <vset-lib/vector_set.h>
 #include <util-lib/dynamic-array.h>
-#include <util-lib/stringindex.h>
+#include <hre/stringindex.h>
 
 
 static ltsmin_expr_t mu_expr = NULL;

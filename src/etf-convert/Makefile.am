@@ -1,5 +1,5 @@
 
-HRE_LIB = ../hre/libhre.la
+HRE_LIB = ../hre/libhre.la ../hre-io/libhre-io.la
 UTIL_LIB = ../util-lib/libutil.la $(HRE_LIB)
 LTSMIN_LIB = ../ltsmin-lib/libltsmin.la $(UTIL_LIB)
 

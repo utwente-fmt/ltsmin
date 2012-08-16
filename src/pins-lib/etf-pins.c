@@ -4,7 +4,7 @@
 #include <hre/user.h>
 #include <ltsmin-lib/etf-util.h>
 #include <pins-lib/etf-pins.h>
-#include <util-lib/stringindex.h>
+#include <hre/stringindex.h>
 #include <util-lib/tables.h>
 
 
