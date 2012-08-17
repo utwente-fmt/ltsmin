@@ -27,7 +27,7 @@ main (int argc, char *argv[])
     HREaddOptions(options,"Symbolic parity game solver. Solves <game>.\n");
     HREinitStart(&argc,&argv,1,1,files,"<game>");
 
-    vset_implementation_t vset_impl = VSET_ListDD;
+    vset_implementation_t vset_impl = VSET_IMPL_AUTOSELECT;
     FILE *f = fopen(files[0], "r");
     if (f == NULL)
         AbortCall ("Unable to open file ``%s''", files[0]);
