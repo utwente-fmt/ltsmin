@@ -1,5 +1,5 @@
 #include <hre/config.h>
-#include <assert.h>
+
 #include <ctype.h>
 #include <limits.h>
 #include <math.h>
@@ -569,9 +569,9 @@ exit_ltsmin (int sig)
 }
 
 static int num_global_bits (strategy_t s) {
-    assert (GRED.g == 0);
-    assert (GGREEN.g == 1);
-    assert (GDANGEROUS.g == 2);
+    HREassert (GRED.g == 0);
+    HREassert (GGREEN.g == 1);
+    HREassert (GDANGEROUS.g == 2);
     return (Strat_ENDFS  & s ? 3 :
            (Strat_CNDFS  & s ? 2 :
            ((Strat_LNDFS | Strat_TA) & s ? 1 : 0)));
@@ -760,7 +760,7 @@ local_init ()
         permutation_red = no_red_perm ? Perm_None : permutation;
     if (!(Strat_Reach & strategy[0]) && (dlk_detect || act_detect || inv_detect))
         Abort ("Verification of safety properties works only with reachability algorithms.");
-    assert (GRED.g == 0);
+    HREassert (GRED.g == 0);
     if (act_detect) {
         // table number of first edge label
         act_label = 0;
@@ -1136,7 +1136,7 @@ dyn_cmp (const void *a, const void *b, void *arg)
 static inline void
 perm_todo (permute_t *perm, state_data_t dst, transition_info_t *ti)
 {
-    assert (perm->nstored < perm->trans+TODO_MAX);
+    HREassert (perm->nstored < perm->trans+TODO_MAX);
     permute_todo_t *next = perm->todos + perm->nstored;
     perm->tosort[perm->nstored] = perm->nstored;
     next->seen = state_info_initialize (&next->si, dst, ti, perm->state, perm->ctx);
@@ -1389,7 +1389,6 @@ state_info_initialize (state_info_t *state, state_data_t data,
 void
 state_info_serialize (state_info_t *state, raw_data_t data)
 {
-    assert (state->ref != (1 | (1ULL<<32)));
     if (ZOBRIST) {
         ((uint64_t*)data)[0] = state->hash64;
         data += 2;
@@ -1454,7 +1453,7 @@ state_info_deserialize (state_info_t *state, raw_data_t data, state_data_t store
 void
 state_info_deserialize_cheap (state_info_t *state, raw_data_t data)
 {
-    assert (refs);
+    HREassert (refs);
     if (ZOBRIST) {
         state->hash64 = ((hash64_t*)data)[0];
         data += 2;
@@ -1481,7 +1480,7 @@ find_dfs_stack_trace (wctx_t *ctx, dfs_stack_t stack, ref_t *trace, size_t level
 {
     // gather trace
     state_info_t        state;
-    assert (level - 1 == dfs_stack_nframes (ctx->stack));
+    HREassert (level - 1 == dfs_stack_nframes (ctx->stack));
     for (int i = dfs_stack_nframes (ctx->stack)-1; i >= 0; i--) {
         dfs_stack_leave (stack);
         raw_data_t          data = dfs_stack_pop (stack);
@@ -2096,7 +2095,7 @@ void // just for checking correctness of all-red implementation. Unused.
 check (void *arg, state_info_t *successor, transition_info_t *ti, int seen)
 {
     wctx_t *ctx=arg;
-    assert (global_has_color(successor->ref, GRED, ctx->rec_bits) );
+    HREassert (global_has_color(successor->ref, GRED, ctx->rec_bits) );
     (void) ti; (void) seen;
 }
 
@@ -2211,7 +2210,7 @@ split_bfs (void *arg_src, void *arg_tgt, size_t handoff)
     handoff = min (in_size >> 1 , handoff);
     for (size_t i = 0; i < handoff; i++) {
         state_data_t        one = dfs_stack_pop (source_stack);
-        assert (NULL != one);
+        HREassert (NULL != one);
         dfs_stack_push (target->stack, one);
     }
     source->counters.splits++;
@@ -2228,7 +2227,7 @@ split_sbfs (void *arg_src, void *arg_tgt, size_t handoff)
     handoff = min (in_size >> 1 , handoff);
     for (size_t i = 0; i < handoff; i++) {
         state_data_t        one = dfs_stack_pop (source->in_stack);
-        assert (NULL != one);
+        HREassert (NULL != one);
         dfs_stack_push (target->in_stack, one);
     }
     source->counters.splits++;

@@ -112,6 +112,7 @@ static void
 strfree (char *str)
 {
     Debug ("Deallocating %p.", str);
+    (void) str;
 }
 
 static const size_t INIT_HT_SCALE = 8;
@@ -191,8 +192,9 @@ set_ll_put (set_ll_t *set, char *str, int len)
     size_t              workers = HREpeers (global);
     isb_allocator_t     balloc = set->local[worker].balloc;
     size_t              index = set->local[worker].count;
-    map_key_t           idx = index * workers + worker; // global index
-    HREassert (idx < (1ULL<<32), "Exceeded int value range for chunk %s, the %zu'st insert for worker %zu", str, index, worker);
+    uint64_t            value = (uint64_t)index * workers + worker;
+    HREassert (value < (1ULL<<32), "Exceeded int value range for chunk %s, the %zu'st insert for worker %zu", str, index, worker);
+    map_key_t           idx = value; // global index
 
     // insert key in table
     map_key_t           clone;
@@ -263,7 +265,7 @@ set_ll_install (set_ll_t *set, char *name, int idx)
 {
     size_t              workers = HREpeers (HREglobal());
     size_t              worker = idx % workers;
-    HREassert (idx >= set->local[worker].count);
+    HREassert ((size_t)idx >= set->local[worker].count);
     isb_allocator_t     balloc = set->local[worker].balloc;
     size_t              index = idx / workers;
     set_ll_slab_t      *slab = set->alloc->slabs[worker];
@@ -299,7 +301,7 @@ set_ll_finalize (set_ll_t *set, char *bogus)
     set_ll_slab_t      *slab = set->alloc->slabs[0];
     HREassert (strlen(bogus) < LTSMIN_PATHNAME_MAX - strlen("4294967296"));
     char                unique[LTSMIN_PATHNAME_MAX];
-    size_t              count;
+    size_t              count = 0;
 
     size_t              added = 0;
     for (size_t i = 0; i < workers; i++) {
