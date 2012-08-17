@@ -1,9 +1,14 @@
 HRE_LIB = ../hre/libhre.la
 SEQ_CPPFLAGS = $(AM_CPPFLAGS)
+PINS_LIBS  =
+PINS_LIBS += ../lts-io/liblts-io.la
+PINS_LIBS += ../hre-io/libhre-io.la
+PINS_LIBS += $(HRE_LIB)
+PINS_LIBS += ../pins-lib/libpins.la
+PINS_LIBS += ../ltsmin-lib/libltsmin.la
+PINS_LIBS += ../util-lib/libutil.la
+PINS_LIBS += ../dm/libdm.la
 VSET_LIBS = ../vset-lib/libvset.la
-PINS_LIBS  = ../pins-lib/libpins.la ../util-lib/libutil.la ../hre/libhre.la
-PINS_LIBS += ../ltsmin-lib/libltsmin.la ../dm/libdm.la ../lts-io/liblts-io.la
-PINS_LIBS +=  ../hre-io/libhre-io.la
 MC_LIBS = ../mc-lib/libmc.la
 
 bin_PROGRAMS = etf2lts-seq
