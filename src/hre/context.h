@@ -74,7 +74,11 @@ extern void HREsetExit(hre_context_t ctx,hre_exit_m method);
 /// Exit from the running application.
 extern void HREctxExit(hre_context_t ctx,int code) __attribute__ ((noreturn));
 
-typedef enum {UInt32, UInt64} unit_t;
+typedef enum {
+    UInt32,
+    UInt64,
+    Pointer = sizeof(char *) == 4 ? UInt32 : UInt64
+} unit_t;
 
 typedef enum {Sum,Max} operand_t;
 
