@@ -693,13 +693,13 @@ void ht_free (hashtable_t *ht) {
 }
 
 void ht_print (hashtable_t *ht, int verbose) {
-    printf("probe:%-2d density:%.1f%% count:%-8lld ", ht->probe, ht->density, (uint64_t)ht_count(ht));
+    printf("probe:%-2d density:%.1f%% count:%-8zu ", ht->probe, ht->density, ht_count(ht));
     hti_t *hti = ht->hti;
     while (hti) {
         if (verbose) {
             for (size_t i = 0; i < (1ULL << hti->scale); ++i) {
                 volatile entry_t *ent = hti->table + i;
-                printf("[0x%zu] 0x%llx:0x%llx\n", i, (uint64_t)ent->key, (uint64_t)ent->val);
+                printf("[0x%zu] 0x%zu:0x%zu\n", i, (size_t)ent->key, (size_t)ent->val);
                 if (i > 30) {
                     printf("...\n");
                     break;
