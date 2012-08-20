@@ -1,6 +1,5 @@
 #include <hre/config.h>
 
-#include <pthread.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -13,7 +12,7 @@
 #include <mc-lib/lmap.h>
 
 static const size_t     LM_FACTOR = 32; // size of the map as a ratio to the locations
-#define                 LM_MAX_THREADS (sizeof (uint64_t) * 8)
+#define                 LM_MAX_THREADS (sizeof (size_t) * 8)
 
 /**
  * A store can be: empty, reference, lattice or tombstone (deleted, but probe seq. continues)
@@ -29,10 +28,14 @@ typedef enum lm_internal_e {
     LM_STATUS_TOMBSTONE_END = 6  //
 } lm_internal_t;
 
+#ifdef __x86_64__
 #define LATTICE_BITS 57
+#else
+#define LATTICE_BITS 25
+#endif
 
 typedef struct lm_store_s {
-    uint64_t            lock    : 1;
+    lattice_t           lock    : 1;
     lm_internal_t       internal: 3;
     lm_status_t         status  : 3;
     lattice_t           lattice : LATTICE_BITS;
@@ -52,7 +55,7 @@ struct lm_s {
     lm_store_t         *table;
     lm_store_t         *table_end;
     size_t              block_size;
-    pthread_key_t       local_key;
+    hre_key_t           local_key;
     local_t            *locals[LM_MAX_THREADS];
 };
 
@@ -61,7 +64,7 @@ static size_t           next_index = 0;
 static inline local_t *
 get_local (lm_t *map)
 {
-    local_t            *loc = pthread_getspecific (map->local_key);
+    local_t            *loc = HREgetLocal (map->local_key);
     if (NULL == loc) {
         loc = RTalignZero (CACHE_LINE_SIZE, sizeof (local_t));
         loc->id = fetch_add (&next_index, 1);
@@ -69,7 +72,7 @@ get_local (lm_t *map)
         // force allocation on local node
         size_t table_size = sizeof (lm_store_t[map->wSize]);
         loc->table = RTalignZero (CACHE_LINE_SIZE, table_size);
-        pthread_setspecific (map->local_key, loc);
+        HREsetLocal (map->local_key, loc);
         map->locals[loc->id] = loc;
     }
     return loc;
@@ -87,10 +90,10 @@ lm_inc_loc (lm_loc_t location)
     return location + sizeof(lm_store_t);
 }
 
-static inline uint64_t
+static inline size_t
 stoi (void *p)
 {
-    return *(uint64_t*)p;
+    return *(size_t*)p;
 }
 
 void
@@ -99,7 +102,7 @@ lm_unlock (lm_t *map, ref_t ref)
     lm_loc_t loc = (lm_loc_t)&map->table[ref];
     lm_store_t store = lm_get_store (loc);
     store.lock = 0;
-    atomic_write ((uint64_t*)loc, stoi(&store));
+    atomic_write ((size_t*)loc, stoi(&store));
 }
 
 void
@@ -110,10 +113,10 @@ lm_lock (lm_t *map, ref_t ref)
     lm_store_t store;
     do {
         store = lm_get_store (loc);
-        uint64_t old = stoi(&store);
+        size_t old = stoi(&store);
         if (1 == store.lock) continue;
         store.lock = 1;
-        result = cas ((uint64_t*)loc, old, stoi(&store));
+        result = cas ((size_t*)loc, old, stoi(&store));
     } while (!result);
 }
 
@@ -148,7 +151,7 @@ lm_set_all (lm_loc_t location, lm_store_t store, lattice_t l,
     store.lattice = l;
     store.status = status;
     store.internal = internal;
-    atomic_write ((uint64_t *)location, stoi(&store));
+    atomic_write ((size_t *)location, stoi(&store));
 }
 
 static inline void
@@ -156,14 +159,14 @@ lm_set_int (lm_loc_t location, lm_internal_t internal)
 {
     lm_store_t store = lm_get_store (location);
     store.internal = internal;
-    atomic_write ((uint64_t *)location, stoi(&store));
+    atomic_write ((size_t *)location, stoi(&store));
 }
 
 static inline void
 lm_set_int2 (lm_loc_t location, lm_store_t store, lm_internal_t internal)
 {
     store.internal = internal;
-    atomic_write ((uint64_t *)location, stoi(&store));
+    atomic_write ((size_t *)location, stoi(&store));
 }
 
 /**
@@ -241,7 +244,7 @@ lm_cas_all (lm_loc_t location, lm_store_t old, lattice_t l,
     store_new.lattice = l;
     store_new.status = status;
     store_new.internal = internal;
-    return cas ((uint64_t *)location, stoi(&old), stoi(&store_new));
+    return cas ((size_t *)location, stoi(&old), stoi(&store_new));
 }
 
 lm_loc_t
@@ -376,7 +379,7 @@ lm_set_status (lm_t *map, lm_loc_t location, lm_status_t status)
     case LM_STATUS_LATTICE:
     case LM_STATUS_LATTICE_END:
         store.status = status;
-        atomic_write ((uint64_t*)location, stoi(&store));
+        atomic_write ((size_t*)location, stoi(&store));
         break;
     default:
         Abort("Lattice map set status on empty store!.");
@@ -399,7 +402,7 @@ lm_cas_update (lm_t *map, lm_loc_t location,
     switch (store.internal) {
     case LM_STATUS_LATTICE:
     case LM_STATUS_LATTICE_END:
-        return cas ((uint64_t*)location, stoi(&store), stoi(&store_new));
+        return cas ((size_t*)location, stoi(&store), stoi(&store_new));
     default:
         return false;
     }
@@ -417,11 +420,11 @@ lm_cas_delete (lm_t *map, lm_loc_t location, lattice_t l, lm_status_t status)
     switch (store.internal) {
     case LM_STATUS_LATTICE:
         store_new.internal = LM_STATUS_TOMBSTONE;
-        cas ((uint64_t*)location, stoi(&store), stoi(&store_new));
+        cas ((size_t*)location, stoi(&store), stoi(&store_new));
         return;
     case LM_STATUS_LATTICE_END:
         store_new.internal = LM_STATUS_TOMBSTONE_END;
-        cas ((uint64_t*)location, stoi(&store), stoi(&store_new));
+        cas ((size_t*)location, stoi(&store), stoi(&store_new));
         return;
     default:
         return;
@@ -473,7 +476,7 @@ lm_create (size_t workers, size_t size, size_t block_size)
     map->table = RTalignZero (CACHE_LINE_SIZE, table_size);
     map->table_end = map->table + map->size;
     if (NULL == map->table) Abort("Allocation failed for lmap table of %zuGB", table_size>>30);
-    pthread_key_create (&map->local_key, NULL);
+    HREcreateLocal (&map->local_key, NULL);
     return map;
 }
 

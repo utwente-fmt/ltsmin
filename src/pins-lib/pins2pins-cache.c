@@ -5,7 +5,7 @@
 #include <hre/user.h>
 #include <pins-lib/pins.h>
 #include <util-lib/dynamic-array.h>
-#include <util-lib/stringindex.h>
+#include <hre/stringindex.h>
 
 static const int EL_OFFSET = 1;
 

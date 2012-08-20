@@ -14,7 +14,7 @@
 #include <hre-io/user.h>
 #include <util-lib/balloc.h>
 #include <util-lib/dynamic-array.h>
-#include <util-lib/stringindex.h>
+#include <hre/stringindex.h>
 
 typedef struct part_list_s *part_list_t;
 struct part_list_s {

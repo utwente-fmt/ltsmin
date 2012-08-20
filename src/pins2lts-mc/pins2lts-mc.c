@@ -1,5 +1,5 @@
 #include <hre/config.h>
-#include <assert.h>
+
 #include <ctype.h>
 #include <limits.h>
 #include <math.h>
@@ -46,6 +46,7 @@ static inline size_t min (size_t a, size_t b) {
 
 /********************************** TYPEDEFS **********************************/
 
+static const size_t         THRESHOLD = 100000 / 100 * SPEC_REL_PERF;
 typedef int                *state_data_t;
 static const state_data_t   state_data_dummy;
 static const size_t         SLOT_SIZE = sizeof(*state_data_dummy);
@@ -558,17 +559,19 @@ find_or_put_tree (state_info_t *state, transition_info_t *ti,
 static void
 exit_ltsmin (int sig)
 {
+    if (HREme(HREglobal()) != 0)
+        return;
     if ( !lb_stop(global->lb) ) {
         Abort ("UNGRACEFUL EXIT");
     } else {
-        Warning(info, "PREMATURE EXIT (caught signal: %d)", sig);
+        Warning (info, "PREMATURE EXIT (caught signal: %d)", sig);
     }
 }
 
 static int num_global_bits (strategy_t s) {
-    assert (GRED.g == 0);
-    assert (GGREEN.g == 1);
-    assert (GDANGEROUS.g == 2);
+    HREassert (GRED.g == 0);
+    HREassert (GGREEN.g == 1);
+    HREassert (GDANGEROUS.g == 2);
     return (Strat_ENDFS  & s ? 3 :
            (Strat_CNDFS  & s ? 2 :
            ((Strat_LNDFS | Strat_TA) & s ? 1 : 0)));
@@ -683,13 +686,13 @@ postlocal_global_init (wctx_t *ctx)
         global->lb = lb_create_max (W, G, H);
         global->contexts = RTmalloc (sizeof (wctx_t*[W]));
         if (strategy[0] & Strat_LTL) {
-            global->threshold = 100000;
+            global->threshold = THRESHOLD;
         } else {
-            global->threshold = 100000 / W;
+            global->threshold = THRESHOLD / W;
         }
         RTswitchAlloc (false);
-        (void) signal (SIGINT, exit_ltsmin);
     }
+    (void) signal (SIGINT, exit_ltsmin);
     HREreduce (HREglobal(), 1, &global, &global, UInt64, Max);
 
     color_set_dbs(global->dbs);
@@ -757,7 +760,7 @@ local_init ()
         permutation_red = no_red_perm ? Perm_None : permutation;
     if (!(Strat_Reach & strategy[0]) && (dlk_detect || act_detect || inv_detect))
         Abort ("Verification of safety properties works only with reachability algorithms.");
-    assert (GRED.g == 0);
+    HREassert (GRED.g == 0);
     if (act_detect) {
         // table number of first edge label
         act_label = 0;
@@ -908,7 +911,7 @@ print_totals (counter_t *ar_reach, counter_t *ar_red, int d, size_t db_elts)
 
 static void
 print_statistics (counter_t *ar_reach, counter_t *ar_red, rt_timer_t timer,
-                  stats_t *stats)
+                  stats_t *stats, lts_type_t ltstype)
 {
     counter_t          *reach = ar_reach;
     counter_t          *red = ar_red;
@@ -974,10 +977,12 @@ print_statistics (counter_t *ar_reach, counter_t *ar_red, rt_timer_t timer,
     } else {
         Warning (info, "Table memory: %.1fMB, fill ratio: %.1f%%", mem4, fill);
     }
+    double chunks = cct_print_stats (info, infoLong, ltstype, tables) / (1<<20);
     Warning (info, "Est. total memory use: %.1fMB (~%.1fMB paged-in)",
-             mem1 + mem4 + mem3, mem1 + mem2 + mem3);
+             mem1 + mem4 + mem3 + chunks, mem1 + mem2 + mem3 + chunks);
 
-    if (no_exit)
+
+    if (no_exit || log_active(infoLong))
         Warning (info, "\n\nDeadlocks: %zu\nInvariant violations: %zu\n"
                  "Error actions: %zu", reach->deadlocks, reach->violations,
                  reach->errors);
@@ -1013,7 +1018,8 @@ reduce_and_print_result (wctx_t *ctx)
         for (size_t i = 0; i < W; i++)
             ctx_add_counters (global->contexts[i], reach, red, stats);
         if (log_active(info)) {
-            print_statistics (reach, red, global->contexts[0]->timer, stats);
+            print_statistics (reach, red, global->contexts[0]->timer, stats,
+                              GBgetLTStype(ctx->model));
         }
         RTfree (reach); RTfree (red); RTfree (stats);
     }
@@ -1130,7 +1136,7 @@ dyn_cmp (const void *a, const void *b, void *arg)
 static inline void
 perm_todo (permute_t *perm, state_data_t dst, transition_info_t *ti)
 {
-    assert (perm->nstored < perm->trans+TODO_MAX);
+    HREassert (perm->nstored < perm->trans+TODO_MAX);
     permute_todo_t *next = perm->todos + perm->nstored;
     perm->tosort[perm->nstored] = perm->nstored;
     next->seen = state_info_initialize (&next->si, dst, ti, perm->state, perm->ctx);
@@ -1383,7 +1389,6 @@ state_info_initialize (state_info_t *state, state_data_t data,
 void
 state_info_serialize (state_info_t *state, raw_data_t data)
 {
-    assert (state->ref != (1 | (1ULL<<32)));
     if (ZOBRIST) {
         ((uint64_t*)data)[0] = state->hash64;
         data += 2;
@@ -1448,7 +1453,7 @@ state_info_deserialize (state_info_t *state, raw_data_t data, state_data_t store
 void
 state_info_deserialize_cheap (state_info_t *state, raw_data_t data)
 {
-    assert (refs);
+    HREassert (refs);
     if (ZOBRIST) {
         state->hash64 = ((hash64_t*)data)[0];
         data += 2;
@@ -1475,7 +1480,7 @@ find_dfs_stack_trace (wctx_t *ctx, dfs_stack_t stack, ref_t *trace, size_t level
 {
     // gather trace
     state_info_t        state;
-    assert (level - 1 == dfs_stack_nframes (ctx->stack));
+    HREassert (level - 1 == dfs_stack_nframes (ctx->stack));
     for (int i = dfs_stack_nframes (ctx->stack)-1; i >= 0; i--) {
         dfs_stack_leave (stack);
         raw_data_t          data = dfs_stack_pop (stack);
@@ -1497,6 +1502,8 @@ ndfs_report_cycle (wctx_t *ctx, state_info_t *cycle_closing_state)
         /* Write last state to stack to close cycle */
         trace[level-1] = cycle_closing_state->ref;
         find_dfs_stack_trace (ctx, ctx->stack, trace, level);
+        double uw = cct_finalize (tables, "BOGUS, you should not see this string.");
+        Warning (infoLong, "Parallel chunk tables under-water mark: %.2f", uw);
         trc_env_t          *trace_env = trc_create (ctx->model, get_state,
                                                     trace[0], ctx);
         trc_write_trace (trace_env, trc_output, trace, level);
@@ -1513,6 +1520,8 @@ handle_error_trace (wctx_t *ctx)
     if (trc_output) {
         ref_t               start_ref = ctx->initial.ref;
         trc_env_t  *trace_env = trc_create (ctx->model, get_state, start_ref, ctx);
+        double uw = cct_finalize (tables, "BOGUS, you should not see this string.");
+        Warning (infoLong, "Parallel chunk tables under-water mark: %.2f", uw);
         trc_find_and_write (trace_env, trc_output, ctx->state.ref, level, global->parent_ref);
     }
     Warning (info, "Exiting now!");
@@ -2086,7 +2095,7 @@ void // just for checking correctness of all-red implementation. Unused.
 check (void *arg, state_info_t *successor, transition_info_t *ti, int seen)
 {
     wctx_t *ctx=arg;
-    assert (global_has_color(successor->ref, GRED, ctx->rec_bits) );
+    HREassert (global_has_color(successor->ref, GRED, ctx->rec_bits) );
     (void) ti; (void) seen;
 }
 
@@ -2201,7 +2210,7 @@ split_bfs (void *arg_src, void *arg_tgt, size_t handoff)
     handoff = min (in_size >> 1 , handoff);
     for (size_t i = 0; i < handoff; i++) {
         state_data_t        one = dfs_stack_pop (source_stack);
-        assert (NULL != one);
+        HREassert (NULL != one);
         dfs_stack_push (target->stack, one);
     }
     source->counters.splits++;
@@ -2218,7 +2227,7 @@ split_sbfs (void *arg_src, void *arg_tgt, size_t handoff)
     handoff = min (in_size >> 1 , handoff);
     for (size_t i = 0; i < handoff; i++) {
         state_data_t        one = dfs_stack_pop (source->in_stack);
-        assert (NULL != one);
+        HREassert (NULL != one);
         dfs_stack_push (target->in_stack, one);
     }
     source->counters.splits++;

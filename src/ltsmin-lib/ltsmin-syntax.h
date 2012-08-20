@@ -4,7 +4,7 @@
 #include <hre/user.h>
 #include <hre-io/stream.h>
 #include <util-lib/fast_hash.h>
-#include <util-lib/stringindex.h>
+#include <hre/stringindex.h>
 
 /**
 \brief Operator types.

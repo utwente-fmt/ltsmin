@@ -25,6 +25,8 @@ typedef struct set_ll_allocator_s set_ll_allocator_t;
  */
 extern set_ll_allocator_t *set_ll_init_allocator (bool shared);
 
+extern size_t              set_ll_print_alloc_stats(log_t log, set_ll_allocator_t *);
+
 extern char        *set_ll_get      (set_ll_t *set, int idx, int *len);
 
 extern int          set_ll_put      (set_ll_t *set, char *str, int len);
@@ -37,6 +39,14 @@ extern int          set_ll_count    (set_ll_t *set);
 void                set_ll_install (set_ll_t *set, char *name, int idx);
 
 extern set_ll_t    *set_ll_create   ();
+
+/**
+\brief Fill-in all indices in the set with bogus values to create a continuous
+        range as required by LTS io library.
+ */
+extern double       set_ll_finalize (set_ll_t *set, char *bogus);
+
+extern size_t       set_ll_print_stats(log_t log, set_ll_t *set, char *name);
 
 extern void         set_ll_destroy  (set_ll_t *set);
 

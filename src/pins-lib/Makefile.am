@@ -45,11 +45,5 @@ libpins_la_SOURCES += pins2pins-por.c
 libpins_la_SOURCES += property-semantics.c property-semantics.h
 
 libpins_la_LIBADD   =
-libpins_la_LIBADD  += $(LTSMIN_LIB)
-libpins_la_LIBADD  += ../hre/libhre.la
-libpins_la_LIBADD  += ../hre-io/libhre-io.la 
-libpins_la_LIBADD  += ../lts-io/liblts-io.la
-libpins_la_LIBADD  += ../dm/libdm.la
-libpins_la_LIBADD  += $(top_builddir)/ltl2ba/libltl2ba.la
 
 libpins_la_CPPFLAGS = -DNXT $(AM_CPPFLAGS) -I${top_srcdir}/ltl2ba

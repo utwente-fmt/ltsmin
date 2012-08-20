@@ -9,16 +9,18 @@
 #include <mc-lib/hashtable.h>
 #include <mc-lib/is-balloc.h>
 #include <mc-lib/set-ll.h>
+#include <mc-lib/statistics.h>
 #include <mc-lib/stats.h>
 #include <util-lib/fast_hash.h>
 
 
 #define MAX_WORKERS 64
-#define SLABS_RATIO  4
+#define SLABS_RATIO 16
 
 typedef struct set_ll_slab_s {
     void               *mem;
     size_t              next;
+    size_t              total;
     size_t              size;
     size_t              cur_len;
     char               *cur_key;
@@ -51,8 +53,9 @@ set_ll_init_allocator (bool shared)
         set_ll_slab_t      *slab = alloc->slabs[i];
         HREassert (slab != NULL, "Slab allocation failed.");
         slab->mem = RTmalloc (size);
-        HREassert (slab->mem != NULL, "Slab memory allocation failed. Increase your user limits");
+        HREassert (slab->mem != NULL, "Slab memory allocation failed. Increase your user limits or SLABS_RATIO");
         slab->next = 0;
+        slab->total = 0;
         slab->size = size;
         slab->cur_len = SIZE_MAX;
     }
@@ -98,6 +101,7 @@ strclone (char *str, set_ll_slab_t *slab)
     size_t              len = get_length (str, slab) + 1; // '\0'
     HREassert (slab->cur_len != SIZE_MAX, "Failed to pass length via static.");
     slab->next += len;
+    slab->total++;
     HREassert (slab->next < slab->size, "Local slab of %zu from worker "
                "%d exceeded: %zu", slab->size, HREme(HREglobal()), slab->next);
     memmove (ptr, str, len);
@@ -108,6 +112,7 @@ static void
 strfree (char *str)
 {
     Debug ("Deallocating %p.", str);
+    (void) str;
 }
 
 static const size_t INIT_HT_SCALE = 8;
@@ -131,7 +136,7 @@ static const datatype_t DATATYPE_HRE_STR = {
 
 typedef struct local_s {
     isb_allocator_t     balloc;
-    size_t              count;
+    size_t              count;  // TODO: lazy updates with positive feedback
     char                pad[CACHE_LINE_SIZE - sizeof(size_t) - sizeof(isb_allocator_t)];
 } local_t;
 
@@ -172,7 +177,7 @@ set_ll_get (set_ll_t *set, int idx, int *len)
     *len = str->len;
     Debug ("Index(%d)\t--(%zu,%zu)--> (%s,%d) %p", idx, worker, index, str->ptr,
                                                    str->len, str->ptr);
-    HRE_ASSERT (str->len == strlen(str->ptr), "Incorrect length passed for '%s', %d instead of %zu. Rest: '%s'",
+    HRE_ASSERT (str->len == (int)strlen(str->ptr), "Incorrect length passed for '%s', %d instead of %zu. Rest: '%s'",
                 str->ptr, str->len, strlen(str->ptr), &str->ptr[str->len+1]);
     return str->ptr;
 }
@@ -180,15 +185,16 @@ set_ll_get (set_ll_t *set, int idx, int *len)
 int
 set_ll_put (set_ll_t *set, char *str, int len)
 {
-    HRE_ASSERT (len == strlen(str), "Incorrect length passed for '%s', %d instead of %zu. Rest: '%s'",
+    HRE_ASSERT (len == (int)strlen(str), "Incorrect length passed for '%s', %d instead of %zu. Rest: '%s'",
                 str, len, strlen(str), &str[len+1]);
     hre_context_t       global = HREglobal ();
     size_t              worker = HREme (global);
     size_t              workers = HREpeers (global);
     isb_allocator_t     balloc = set->local[worker].balloc;
     size_t              index = set->local[worker].count;
-    map_key_t           idx = index * workers + worker; // global index
-    HREassert (idx < (1ULL<<32), "Exceeded int value range for chunk %s, the %zu'st insert for worker %zu", str, index, worker);
+    uint64_t            value = (uint64_t)index * workers + worker;
+    HREassert (value < (1ULL<<32), "Exceeded int value range for chunk %s, the %zu'st insert for worker %zu", str, index, worker);
+    map_key_t           idx = value; // global index
 
     // insert key in table
     map_key_t           clone;
@@ -221,23 +227,50 @@ set_ll_put (set_ll_t *set, char *str, int len)
     return (int)idx;
 }
 
+static int
+set_ll_max (set_ll_t *set)
+{
+    size_t              workers = HREpeers (HREglobal());
+    size_t              references = 0;
+    for (size_t i = 0; i < workers; i++)
+        if (references < set->local[i].count) references = set->local[i].count;
+    return references;
+}
+
+static double
+set_ll_stdev (set_ll_t *set)
+{
+    size_t              workers = HREpeers (HREglobal());
+    statistics_t stats;
+    statistics_init(&stats);
+    for (size_t i = 0; i < workers; i++)
+        statistics_record(&stats, set->local[i].count);
+    return statistics_stdev(&stats);
+}
+
+
 int
 set_ll_count (set_ll_t *set)
 {
-    HREassert (false, "set_ll_count not implemented");
-    (void) set;
+    size_t              workers = HREpeers (HREglobal());
+    size_t              references = 0;
+    for (size_t i = 0; i < workers; i++)
+        references += set->local[i].count;
+    Debug ("Count %p: %zu", set ,references);
+    return references;
 }
 
 void
 set_ll_install (set_ll_t *set, char *name, int idx)
 {
     size_t              workers = HREpeers (HREglobal());
-    map_key_t           clone, old, key = (map_key_t)name;
     size_t              worker = idx % workers;
+    HREassert ((size_t)idx >= set->local[worker].count);
     isb_allocator_t     balloc = set->local[worker].balloc;
     size_t              index = idx / workers;
     set_ll_slab_t      *slab = set->alloc->slabs[worker];
     size_t              len = strlen(name);
+    map_key_t           clone, old, key = (map_key_t)name;
 
     slab->cur_key = name;
     slab->cur_len = len; // avoid having to recompute the length
@@ -246,7 +279,7 @@ set_ll_install (set_ll_t *set, char *name, int idx)
     RTswitchAlloc (false);
     slab->cur_len = SIZE_MAX;
 
-    if (old - 1 == idx)
+    if (old - 1 == (size_t)idx)
         return;
     HREassert (old == DOES_NOT_EXIST);
     str_t               string = {.ptr = (char *)clone, .len = len};
@@ -258,6 +291,68 @@ set_ll_install (set_ll_t *set, char *name, int idx)
 
     Debug ("Bind (%zu)\t<--(%zu,%zu)-> (%s,%d) %p", idx, worker, index, name,
                                                     len, clone);
+}
+
+double
+set_ll_finalize (set_ll_t *set, char *bogus)
+{
+    size_t              workers = HREpeers (HREglobal());
+    size_t              max_local = set_ll_max (set);
+    set_ll_slab_t      *slab = set->alloc->slabs[0];
+    HREassert (strlen(bogus) < LTSMIN_PATHNAME_MAX - strlen("4294967296"));
+    char                unique[LTSMIN_PATHNAME_MAX];
+    size_t              count = 0;
+
+    size_t              added = 0;
+    for (size_t i = 0; i < workers; i++) {
+        isb_allocator_t     balloc = set->local[i].balloc;
+        RTswitchAlloc (set->alloc->shared);
+        while (set->local[i].count < max_local) {
+            snprintf (unique, LTSMIN_PATHNAME_MAX, "%s (unique %zu)", bogus, count++);
+            slab->cur_key = NULL;
+            slab->cur_len = strlen(unique);
+            str_t               str = { .ptr = strclone (unique, slab),
+                                        .len = strlen(unique) };
+            slab->cur_len = SIZE_MAX;
+
+
+            isba_push_int (balloc, (int*)&str);
+            set->local[i].count++;
+        }
+        RTswitchAlloc (false);
+    }
+    double              underwater = workers * max_local;
+    underwater /= underwater - added;
+    return underwater;
+}
+
+size_t
+set_ll_print_stats (log_t log, set_ll_t *set, char *name)
+{
+    size_t              references = set_ll_count (set); // balloc references
+    double              stdev = set_ll_stdev (set);
+    size_t              alloc = ht_size (set->ht); // table allocation size in byte
+    size_t              table = references * sizeof(map_key_t) * 2;
+    Warning (log, "String table '%s': %zuMB pointers, %zuMB "
+             "tables (%.2f%% overhead), %zu strings (distr.: %.2f)", name,
+             (references * sizeof(str_t)) >> 20, table >> 20,
+             (double)alloc / table * 100, references, stdev);
+    return alloc + references * sizeof(str_t);
+}
+
+
+size_t
+set_ll_print_alloc_stats(log_t log, set_ll_allocator_t *alloc)
+{
+    size_t              workers = HREpeers(HREglobal());
+    size_t              strings = 0; // string storage in byte
+    size_t              count = 0; // number of strings
+    for (size_t i = 0; i < workers; i++) {
+        strings += alloc->slabs[i]->next;
+        count += alloc->slabs[i]->total;
+    }
+    Warning (log, "Stored %zu string chucks using %zuMB", count, strings >> 20);
+    return strings;
 }
 
 set_ll_t *

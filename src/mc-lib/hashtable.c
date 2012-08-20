@@ -82,6 +82,7 @@ struct ht_iter {
 
 struct ht {
     hti_t *hti;
+    hti_t *first;
     const datatype_t *key_type;
     uint32_t hti_copies;
     double density;
@@ -595,7 +596,7 @@ static void hti_defer_free (hti_t *hti) {
             }
         }
     }
-    //nbd_free((void *)hti->table);
+    //nbd_free((void *)hti->table); //TODO: reclaim memory
 
     //nbd_free(hti);
 }
@@ -673,7 +674,7 @@ size_t ht_count (hashtable_t *ht) {
 hashtable_t *ht_alloc (const datatype_t *key_type, size_t size) {
     hashtable_t *ht = nbd_malloc(sizeof(hashtable_t));
     ht->key_type = key_type;
-    ht->hti = (hti_t *)hti_alloc(ht, size);
+    ht->hti = ht->first = (hti_t *)hti_alloc(ht, size);
     ht->hti_copies = 0;
     ht->density = 0.0;
     return ht;
@@ -692,13 +693,13 @@ void ht_free (hashtable_t *ht) {
 }
 
 void ht_print (hashtable_t *ht, int verbose) {
-    printf("probe:%-2d density:%.1f%% count:%-8lld ", ht->probe, ht->density, (uint64_t)ht_count(ht));
+    printf("probe:%-2d density:%.1f%% count:%-8zu ", ht->probe, ht->density, ht_count(ht));
     hti_t *hti = ht->hti;
     while (hti) {
         if (verbose) {
             for (size_t i = 0; i < (1ULL << hti->scale); ++i) {
                 volatile entry_t *ent = hti->table + i;
-                printf("[0x%zu] 0x%llx:0x%llx\n", i, (uint64_t)ent->key, (uint64_t)ent->val);
+                printf("[0x%zu] 0x%zu:0x%zu\n", i, (size_t)ent->key, (size_t)ent->val);
                 if (i > 30) {
                     printf("...\n");
                     break;
@@ -735,6 +736,16 @@ ht_iter_t *ht_iter_begin (hashtable_t *ht, map_key_t key) {
 
     return iter;
     (void) key;
+}
+
+size_t ht_size (hashtable_t *ht) {
+    hti_t *hti = ht->first;
+    size_t sizes = 0; // sizes of all tables in byte
+    while (hti != NULL) {
+        sizes += 1ULL << hti->scale;
+        hti = hti->next;
+    }
+    return sizes * sizeof(map_key_t) * 2;
 }
 
 map_val_t ht_iter_next (ht_iter_t *iter, map_key_t *key_ptr) {

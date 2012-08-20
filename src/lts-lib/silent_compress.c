@@ -13,7 +13,7 @@
 #include <lts-io/provider.h>
 #include <lts-lib/set.h>
 #include <util-lib/bitset.h>
-#include <util-lib/stringindex.h>
+#include <hre/stringindex.h>
 #include <util-lib/tables.h>
 
 #define UNDEF ((uint32_t)-1)

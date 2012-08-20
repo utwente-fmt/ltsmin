@@ -1,6 +1,6 @@
 #include <hre/config.h>
 
-#include <util-lib/stringindex.h>
+#include <hre/stringindex.h>
 #include <util-lib/tables.h>
 
 static void destroy(value_table_t vt){

@@ -229,13 +229,18 @@ lb_barrier (lb_t *lb)
 size_t
 lb_reduce (lb_t *lb, size_t val)
 {
+#ifdef __x86_64__
+#define SHIFT 58
+#else
+#define SHIFT 26
+#endif
     size_t W = lb->threads;
-    HRE_ASSERT ((val < (1UL<<58)) && (sizeof(size_t) == 8), "Overflow in reduce");
+    HRE_ASSERT ((val < (1ULL<<SHIFT)), "Overflow in reduce");
     size_t          flip = atomic_read (&lb->reduce_wait);
-    size_t          count = add_fetch (&lb->reduce_count, val + (1UL << 58));
-    if (count >> 58 == W) {
+    size_t          count = add_fetch (&lb->reduce_count, val + (1ULL << SHIFT));
+    if (count >> SHIFT == W) {
         atomic_write (&lb->reduce_count, 0);
-        atomic_write (&lb->reduce_result, count - (W << 58));
+        atomic_write (&lb->reduce_result, count - (W << SHIFT));
         atomic_write (&lb->reduce_wait, 1 - flip); // flip wait
     } else {
         while (flip == atomic_read(&lb->reduce_wait)) {}

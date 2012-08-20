@@ -3,7 +3,6 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
-#include <pthread.h>
 #include <string.h>
 #include <time.h>
 
@@ -30,7 +29,7 @@ struct dbs_ll_s {
     mem_hash_t          sat_mask;
     hash64_f            hash64;
     int                 full;
-    pthread_key_t       local_key;
+    hre_key_t           local_key;
 };
 
 typedef struct local_s {
@@ -40,11 +39,11 @@ typedef struct local_s {
 local_t *
 get_local (dbs_ll_t dbs)
 {
-    local_t            *loc = pthread_getspecific (dbs->local_key);
+    local_t            *loc = HREgetLocal (dbs->local_key);
     if (loc == NULL) {
         loc = RTalign (CACHE_LINE_SIZE, sizeof (local_t));
         memset (loc, 0, sizeof (local_t));
-        pthread_setspecific (dbs->local_key, loc);
+        HREsetLocal (dbs->local_key, loc);
     }
     return loc;
 }
@@ -236,7 +235,7 @@ DBSLLcreate_sized (int length, int size, hash64_f hash64, int satellite_bits)
     dbs->mask = ((uint64_t)dbs->size) - 1;
     dbs->table = RTalignZero (CACHE_LINE_SIZE, sizeof (mem_hash_t[dbs->size]));
     dbs->data = RTalign (CACHE_LINE_SIZE, dbs->size * dbs->bytes);
-    pthread_key_create (&dbs->local_key, RTfree);
+    HREcreateLocal (&dbs->local_key, RTfree);
     return dbs;
 }
 

@@ -8,7 +8,7 @@
 #include <ltsmin-reduce-dist/seg-lts.h>
 #include <ltsmin-reduce-dist/sig-array.h>
 #include <util-lib/fast_hash.h>
-#include <util-lib/stringindex.h>
+#include <hre/stringindex.h>
 
 static int mpi_nodes;
 static int mpi_me;

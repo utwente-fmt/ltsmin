@@ -13,7 +13,7 @@
 #include <ltsmin-reduce-dist/sigmin-set.h>
 #include <ltsmin-reduce-dist/sig-array.h>
 #include <util-lib/fast_hash.h>
-#include <util-lib/stringindex.h>
+#include <hre/stringindex.h>
 
 #define STRONG_REDUCTION_SET 1
 #define BRANCHING_REDUCTION_SET 2

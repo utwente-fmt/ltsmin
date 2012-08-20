@@ -15,6 +15,8 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <sys/time.h>
+
 
 #include <hre/provider.h>
 
@@ -47,15 +49,10 @@ struct message_queue {
     struct msg_queue_s* comm;
 };
 
-struct shm_template {
-    char shm_template[24];
-    void *shm;
-};
-
-union shm_pointer {
-    uint64_t val;
-    void* ptr;
-};
+typedef struct shm_s {
+    size_t id;
+    void *ptr;
+} shm_t;
 
 static void* area_malloc(void* ptr,size_t size){
     struct shared_area* area=(struct shared_area*)ptr;
@@ -210,14 +207,13 @@ alloc_region(size_t size, bool public)
 }
 
 static void * pthread_shm_get(hre_context_t context,size_t size){
-    HREassert(sizeof(union shm_pointer) == sizeof(uint64_t), "Not a 64 bit pointer");
-    union shm_pointer shm;
-    shm.val=0;
+    shm_t shm;
+    shm.id = 0;
     if (HREme(context)==0){
         shm.ptr = alloc_region(size, false);
         if (shm.ptr == NULL) AbortCall("calloc");
     }
-    HREreduce(context,1,&shm,&shm,UInt64,Max);
+    HREreduce(context,2,&shm,&shm,Pointer,Max);
     Debug("pthread shared area is %p",shm.ptr);
     return shm.ptr;
 }
@@ -325,53 +321,60 @@ static void hre_process_exit(hre_context_t ctx,int code){
     exit(code);
 }
 
-static const char* process_class="HRE multi-process";
+static const char      *process_class="HRE multi-process";
 
 #define FILE_MODE (S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)
 
+static size_t           name_counter = 0;
+
 void* hre_posix_shm_get(hre_context_t context,size_t size){
-    HREassert(sizeof(union shm_pointer) == sizeof(uint64_t), "Not a 64 bit pointer");
     Debug("Creating posix SHM");
-    union shm_pointer template[4]={{.val=0},{.val=0},{.val=0},{.val=0}};
-    void* shm=NULL;
+    char                shm_name[LTSMIN_PATHNAME_MAX];
+    shm_t               shm = { .ptr = 0, .id = 0 };
     if (HREme(context)==0){
-        strcpy((char*)template,"HREprocessXXXXXX");
-        char* shm_name=mktemp((char*)template);
+        if (name_counter == 0) {
+            struct timeval time;
+            gettimeofday(&time, NULL);
+            name_counter = time.tv_sec * time.tv_usec;
+        } else {
+            name_counter++;
+        }
+        shm.id = name_counter;
+        snprintf(shm_name, LTSMIN_PATHNAME_MAX, "HREprocess%zu", name_counter);
         Debug("name is %s",shm_name);
         int fd=shm_open(shm_name,O_CREAT|O_RDWR,FILE_MODE);
-        if(fd==-1){
+        if (fd == -1) {
             AbortCall("shm_open");
         }
-        if(ftruncate(fd, size)==-1){
+        if (ftruncate(fd, size)==-1) {
             shm_unlink(shm_name);
             AbortCall("ftruncate");
         }
-        shm=mmap(NULL,size,PROT_READ|PROT_WRITE,MAP_SHARED,fd,0);
-        if(shm==MAP_FAILED){
+        shm.ptr = mmap(NULL,size,PROT_READ|PROT_WRITE,MAP_SHARED,fd,0);
+        if (shm.ptr == MAP_FAILED) {
             shm_unlink(shm_name);
             AbortCall("mmap");
         }
         Debug("open shared memory %s at %p",shm_name,shm);
-        template[3].ptr=shm;
     }
-    HREreduce(context,4,template,template,UInt64,Max);
-    if (HREme(context)!=0){
-        shm=template[3].ptr;
-        Debug("trying shared memory %s at %p",(char*)template,shm);
-        int fd=shm_open((char*)template,O_RDWR,FILE_MODE);
-        if(fd==-1){
+    HREreduce(context,2,&shm,&shm,Pointer,Max);
+    if (HREme(context)!=0) {
+        snprintf(shm_name, LTSMIN_PATHNAME_MAX, "HREprocess%zu", shm.id);
+        Debug("trying shared memory %s at %p", shm_name, shm.ptr);
+        int fd=shm_open(shm_name,O_RDWR,FILE_MODE);
+        if (fd == -1) {
             AbortCall("shm_open");
         }
-        void*tmp=mmap(shm,size,PROT_READ|PROT_WRITE,MAP_SHARED|MAP_FIXED,fd,0);
-        if(tmp==MAP_FAILED){
-            shm_unlink((char*)template);
+        void *tmp=mmap(shm.ptr,size,PROT_READ|PROT_WRITE,MAP_SHARED|MAP_FIXED,fd,0);
+        if (tmp == MAP_FAILED) {
+            shm_unlink(shm_name);
             AbortCall("mmap");
         }
-        if (tmp!=shm) Abort("OS did not respect MAP_FIXED");
+        HREassert(tmp == shm.ptr, "OS did not respect MAP_FIXED");
     }
     HREbarrier(context);
-    shm_unlink((char*)template);
-    return shm;
+    shm_unlink(shm_name);
+    return shm.ptr;
 }
 
 
@@ -414,6 +417,13 @@ static void fork_popt(poptContext con,
             Abort("unimplemented option: %s",opt->longName);
             exit(HRE_EXIT_FAILURE);
     }
+}
+
+static void
+handle_signal (int sig)
+{
+    // nada
+    (void) sig;
 }
 
 static void fork_start(int* argc,char **argv[],int run_threads){
@@ -465,6 +475,7 @@ static void fork_start(int* argc,char **argv[],int run_threads){
         }
         children++;
     }
+    signal (SIGINT, handle_signal); // avoid exit on ctrl + c
     while(children>0){
         // If a failure occurred then we need to shut down all children.
         if (!success && !kill_sent) {
@@ -478,6 +489,7 @@ static void fork_start(int* argc,char **argv[],int run_threads){
         }
         int status;
         pid_t res=wait(&status);
+        Debug("process %d received %d,%d (exit: %d, signal: %d)", res, WEXITSTATUS(status), status, WIFEXITED(status), WIFSIGNALED(status));
         if (res==-1 ) {
             PrintCall(error,"wait");
             success=0;
@@ -535,3 +547,35 @@ HREgetRegionSize(hre_region_t region)
     return area->size;
 }
 
+typedef struct hre_local_s {
+    void               *ptr;
+    char               *pad[CACHE_LINE_SIZE - sizeof(void *)];
+} hre_local_t;
+
+void
+HREcreateLocal(hre_key_t *key, void (*destructor)(void *))
+{
+    hre_local_t       **local = (hre_local_t **)key;
+    size_t              workers = HREpeers (HREglobal());
+    hre_region_t        region = HREdefaultRegion (HREglobal());
+    *local = HREalign (region, CACHE_LINE_SIZE, sizeof(hre_local_t[workers]));
+    for (size_t i = 0; i < workers; i++)
+        (*local)[i].ptr = NULL;
+    (void) destructor; // TODO: deallocation
+}
+
+void
+HREsetLocal(hre_key_t key, void *package)
+{
+    size_t              id = HREme (HREglobal());
+    hre_local_t        *local = (hre_local_t *)key;
+    local[id].ptr = package;
+}
+
+void *
+HREgetLocal(hre_key_t key)
+{
+    size_t              id = HREme (HREglobal());
+    hre_local_t        *local = (hre_local_t *)key;
+    return local[id].ptr;
+}

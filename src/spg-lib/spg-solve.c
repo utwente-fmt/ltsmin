@@ -99,7 +99,7 @@ parity_game* spg_create(const vdom_t domain, int state_length, int num_groups, i
     result->min_priority = min_priority;
     result->max_priority = max_priority;
     result->v_priority = (vset_t*)RTmalloc((max_priority+1) * sizeof(vset_t));
-    result->v_priority_swapfile = (char**)RTmalloc((max_priority+1) * sizeof(char*));
+    result->v_priority_swapfile = RTmalloc((max_priority+1) * sizeof(tmp_file_t *));
     for(int i=min_priority; i<=max_priority; i++) {
         result->v_priority[i] = vset_create(domain, -1, NULL);
     }
@@ -270,30 +270,33 @@ void spg_destroy_solver_options(spgsolver_options* options)
     RTfree(options);
 }
 
-
-char* spg_swapfilename()
+tmp_file_t *
+spg_swapfilename()
 {
-    char* swapfilename = tempnam(NULL, "spg_");
-    return swapfilename;
+    tmp_file_t         *tmp = RTmalloc(sizeof(tmp_file_t));
+    strcpy(tmp->buffer, "spg_XXXXXX");
+    if ((tmp->fd = mkstemp(tmp->buffer)) == -1)
+        AbortCall ("Unable to open file ``%s'' for writing", tmp->buffer);
+    return tmp;
 }
 
 // hibernate
-void spg_swap_game(parity_game* g, char* swapfilename)
+void spg_swap_game(parity_game* g, tmp_file_t *swap)
 {
-    FILE* swapfile = fopen(swapfilename, "w");
+    FILE* swapfile = fdopen(swap->fd, "w");
     if (swapfile == NULL)
-        AbortCall ("Unable to open file ``%s'' for writing", swapfilename);
-    Print(infoLong, "Writing game to temporary file %s.", swapfilename);
+        AbortCall ("Unable to open file for writing ``%s''", swap->buffer);
+    Print(infoLong, "Writing game to temporary file %s.", swap->buffer);
     spg_save(swapfile, g);
     fclose(swapfile);
 }
 
 // resume
-parity_game* spg_unswap_game(char* swapfilename)
+parity_game* spg_unswap_game(tmp_file_t *swap)
 {
-    FILE* swapfile = fopen(swapfilename, "r");
+    FILE* swapfile = fdopen(swap->fd, "r");
     if (swapfile == NULL)
-        AbortCall ("Unable to open file ``%s''", swapfilename);
+        AbortCall ("Unable to open file ``%s''", swap->buffer);
     parity_game* g = spg_load(swapfile, vset_impl);
     fclose(swapfile);
     return g;
@@ -305,9 +308,9 @@ void spg_partial_swap_game(parity_game* g)
     for(int i=g->min_priority; i <= g->max_priority; i++)
     {
         g->v_priority_swapfile[i] = spg_swapfilename();
-        FILE* swapfile = fopen(g->v_priority_swapfile[i], "w");
+        FILE* swapfile = fdopen(g->v_priority_swapfile[i]->fd, "w");
         if (swapfile == NULL)
-            AbortCall ("Unable to open file ``%s'' for writing", g->v_priority_swapfile[i]);
+            AbortCall ("Unable to open file ``%s'' for writing", g->v_priority_swapfile[i]->buffer);
         vset_save(swapfile, g->v_priority[i]);
         fclose(swapfile);
         vset_destroy(g->v_priority[i]);
@@ -319,9 +322,9 @@ void spg_restore_swapped_game(parity_game* g)
     Print(infoLong, "Restoring partially swapped game.");
     for(int i=g->min_priority; i <= g->max_priority; i++)
     {
-        FILE* swapfile = fopen(g->v_priority_swapfile[i], "r");
+        FILE* swapfile = fdopen(g->v_priority_swapfile[i]->fd, "r");
         if (swapfile == NULL)
-            AbortCall ("Unable to open file ``%s''", g->v_priority_swapfile[i]);
+            AbortCall ("Unable to open file ``%s''", g->v_priority_swapfile[i]->buffer);
         g->v_priority[i] = vset_load(swapfile, g->domain);
         fclose(swapfile);
         free(g->v_priority_swapfile[i]); // tempnam()
@@ -498,7 +501,7 @@ recursive_result spg_solve_recursive(parity_game* g,  const spgsolver_options* o
 
     recursive_result x;
     vset_t empty = vset_create(g->domain, -1, NULL);
-    char* g_filename = NULL;
+    tmp_file_t *g_filename = NULL;
     {
         parity_game* g_minus_u = spg_copy(g);
 

@@ -22,7 +22,7 @@
 #include <mc-lib/trace.h>
 #include <util-lib/bitset.h>
 #include <util-lib/dynamic-array.h>
-#include <util-lib/stringindex.h>
+#include <hre/stringindex.h>
 #include <util-lib/tables.h>
 #include <util-lib/treedbs.h>
 #include <vset-lib/vector_set.h>
@@ -45,6 +45,7 @@
  */
 
 typedef enum { UseGreyBox , UseBlackBox } box_mode_t;
+#define THRESHOLD (100000 / 100 * SPEC_REL_PERF)
 
 typedef struct grey_stack
 {
@@ -95,7 +96,7 @@ static struct {
     .act_index      = -1,
     .act_label       = -1,
     .inv_expr       = NULL,
-    .threshold      = 100000,
+    .threshold      = THRESHOLD,
     .max            = SIZE_MAX,
     .call_mode      = UseBlackBox,
     .arg_strategy   = "bfs",
@@ -1770,7 +1771,7 @@ gsea_finished(void *arg) {
     Warning (info, "state space %zu levels, %zu states %zu transitions",
              global.max_depth, global.explored, global.ntransitions);
 
-    if (opt.no_exit)
+    if (opt.no_exit || log_active(infoLong))
         Warning (info, "\n\nDeadlocks: %zu\nInvariant violations: %zu\n"
              "Error actions: %zu", global.deadlocks,global.violations,
              global.errors);

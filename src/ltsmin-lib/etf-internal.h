@@ -3,7 +3,7 @@
 
 #include <ltsmin-lib/etf-util.h>
 #include <util-lib/dynamic-array.h>
-#include <util-lib/stringindex.h>
+#include <hre/stringindex.h>
 
 
 struct etf_parse_env_s{

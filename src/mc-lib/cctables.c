@@ -64,6 +64,33 @@ struct cct_cont_s {
     cct_map_t              *map;
 };
 
+size_t
+cct_print_stats(log_t log, log_t details, lts_type_t ltstype, cct_map_t *map)
+{
+    size_t                  i = 0;
+    size_t                  total = 0;
+    total += set_ll_print_alloc_stats(log, map->set_allocator);
+    while (map->table[i].string_set != NULL) {
+        char                   *name = lts_type_get_type(ltstype, i);
+        total += set_ll_print_stats(details, map->table[i].string_set, name);
+        i++;
+    }
+    Warning (log, "Total memory used for chunk indexing: %zuMB", total >> 20);
+    return total;
+}
+
+double
+cct_finalize(cct_map_t *map, char *bogus)
+{
+    size_t                  i = 0;
+    double                  underwater = 0;
+    while (map->table[i].string_set != NULL) {
+        underwater += set_ll_finalize (map->table[i].string_set, bogus);
+        i++;
+    }
+    return underwater / i;
+}
+
 cct_map_t *
 cct_create_map(bool shared)
 {

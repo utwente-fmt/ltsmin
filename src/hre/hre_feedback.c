@@ -18,7 +18,7 @@
 #include <hre/internal.h>
 #include <hre/provider.h>
 #include <hre/unix.h>
-#include <util-lib/stringindex.h>
+#include <hre/stringindex.h>
 
 #define LOG_IGNORE 0x00
 #define LOG_PRINT 0x01

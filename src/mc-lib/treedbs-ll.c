@@ -1,6 +1,5 @@
-#include "config.h"
+#include <hre/config.h>
 
-#include <pthread.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -41,7 +40,7 @@ struct treedbs_ll_s {
     node_table_t        data;
     int               **todo;
     int                 k;
-    pthread_key_t       local_key;
+    hre_key_t           local_key;
     size_t              ratio;
 };
 
@@ -54,14 +53,14 @@ typedef struct loc_s {
 static inline loc_t *
 get_local (treedbs_ll_t dbs)
 {
-    loc_t              *loc = pthread_getspecific (dbs->local_key);
+    loc_t              *loc = HREgetLocal (dbs->local_key);
     if (loc == NULL) {
         loc = RTalign (CACHE_LINE_SIZE, sizeof (loc_t));
         memset (loc, 0, sizeof (loc_t));
         loc->storage = RTalign (CACHE_LINE_SIZE, sizeof (int[dbs->nNodes * 2]));
         loc->node_count = RTalignZero (CACHE_LINE_SIZE, sizeof (size_t[dbs->nNodes]));
         memset (loc->storage, -1, sizeof (int[dbs->nNodes * 2]));
-        pthread_setspecific (dbs->local_key, loc);
+        HREsetLocal (dbs->local_key, loc);
     }
     return loc;
 }
@@ -462,7 +461,7 @@ TreeDBSLLcreate_dm (int nNodes, int size, int ratio, matrix_t * m,
     create_nodes (&dbs->data, size - dbs->ratio, 0, 1, DB_LEAFS_FULL);
     if (dbs->slim)
         dbs->clt = clt_create (dbs->data.log_size*2, dbs->root.log_size);
-    pthread_key_create (&dbs->local_key, LOCALfree);
+    HREcreateLocal (&dbs->local_key, LOCALfree);
     if (m != NULL)
         project_matrix_to_tree(dbs, m);
     return dbs;

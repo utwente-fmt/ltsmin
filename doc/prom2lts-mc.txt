@@ -15,9 +15,9 @@ prom2lts-mc - Concurrent state space generator for SpinJa models.
 
 == DESCRIPTION
 
-{manname} generates a labelled transition system from a compiled
-specification provided in 'input.prom'.  It does this concurrently
-for any given number of threads.
+{manname} performs multi-core reachability and LTL model checking on the
+labelled transition system from a compiled specification provided in
+'input.prom' or 'input.prom.pinja'.
 LTS output is not supported by this tool, use the distributed tools instead.
 
 include::inc/prom.txt[]

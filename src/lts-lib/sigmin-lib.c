@@ -14,7 +14,7 @@
 #include <lts-lib/dir-info.h>
 #include <lts-lib/lts.h>
 #include <lts-lib/lts-pg-io.h>
-#include <util-lib/stringindex.h>
+#include <hre/stringindex.h>
 #include <util-lib/string-map.h>
 
 /* DIR format writing */

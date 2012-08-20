@@ -9,7 +9,7 @@
 #include <hre-io/arch_object.h>
 #include <hre-io/stream_object.h>
 #include <hre-io/user.h>
-#include <util-lib/stringindex.h>
+#include <hre/stringindex.h>
 
 #ifndef HAVE_ZIP_H
 

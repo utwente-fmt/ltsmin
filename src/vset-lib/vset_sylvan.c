@@ -1,6 +1,7 @@
 #include <hre/config.h>
 
 #include <assert.h>
+#include <inttypes.h>
 #include <math.h>
 #include <stdarg.h>
 #include <stdlib.h>
@@ -87,7 +88,7 @@ static void TRACE_IN(char *f, ...)
         if (i>0) ptr+=sprintf(ptr, ", ");
         vset_t set = va_arg(args, vset_t);
         uint32_t bdd = (uint32_t)(set->bdd);
-        ptr+=sprintf(ptr, "%llx=", (uint64_t)set);
+        ptr+=sprintf(ptr, "%"PRIu64"=", (uint64_t)set);
         ptr+=sprintf(ptr, "%s%u", bdd&0x8000000?"~":"", bdd&0x7ffffff);
     }
     ptr+=sprintf(ptr, ");");

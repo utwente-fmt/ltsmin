@@ -6,7 +6,7 @@
 #include <hre/user.h>
 #include <ltsmin-lib/lts-type.h>
 #include <util-lib/dynamic-array.h>
-#include <util-lib/stringindex.h>
+#include <hre/stringindex.h>
 
 struct lts_type_s {
 int state_length;

@@ -4,7 +4,7 @@
 
 #include <hre/user.h>
 #include <hre/table.h>
-#include <util-lib/stringindex.h>
+#include <hre/stringindex.h>
 
 #define CHUNK_BUFFER_SIZE 65536
 #define MAX_CHUNK_SIZE (CHUNK_BUFFER_SIZE - 4)
