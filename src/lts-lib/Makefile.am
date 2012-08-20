@@ -4,6 +4,7 @@ noinst_LTLIBRARIES = liblts-lib.la
 liblts_lib_la_SOURCES  = bfs_reorder.c
 liblts_lib_la_SOURCES += determinize.c
 liblts_lib_la_SOURCES += dir-info.c dir-info.h
+liblts_lib_la_SOURCES += find-states.c
 liblts_lib_la_SOURCES += lts.c lts.h
 liblts_lib_la_SOURCES += lts-io.c
 liblts_lib_la_SOURCES += lts_print.c
