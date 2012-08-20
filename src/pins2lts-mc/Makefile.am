@@ -48,21 +48,21 @@ lpo2lts_mc_LDADD     = $(HRE_LIB) ../pins-lib/libmcrl-pins.la
 lpo2lts_mc_LDADD    += $(MC_LIBS) $(MCRL_LIBS)
 lpo2lts_mc_CPPFLAGS  = -DMCRL $(MCRL_CPPFLAGS) $(DIST_CPPFLAGS)
 lpo2lts_mc_LDFLAGS   = $(MCRL_LDFLAGS) $(AM_LDFLAGS)
-nodist_EXTRA_lpo2lts_mc_SOURCES = ../automake-force-linker.cxx
+nodist_EXTRA_lpo2lts_mc_SOURCES = automake-force-linker.cxx
 
 ## lps2lts-mc
 lps2lts_mc_SOURCES   = pins2lts-mc.c
 lps2lts_mc_LDADD     = $(MC_LIBS)  ../pins-lib/libmcrl2-pins.la
 lps2lts_mc_CPPFLAGS  = -DMCRL2 $(DIST_CPPFLAGS)
 lps2lts_mc_LDFLAGS   = $(MCRL2_LDFLAGS) $(AM_LDFLAGS)
-nodist_EXTRA_lps2lts_mc_SOURCES = ../automake-force-linker.cxx
+nodist_EXTRA_lps2lts_mc_SOURCES = automake-force-linker.cxx
 
 ## pbes2lts-mc
 pbes2lts_mc_SOURCES   = pins2lts-mc.c
 pbes2lts_mc_LDADD     = $(MC_LIBS) ../pins-lib/libpbes-pins.la
 pbes2lts_mc_CPPFLAGS  = -DPBES $(DIST_CPPFLAGS)
 pbes2lts_mc_LDFLAGS   = $(MCRL2_LDFLAGS) $(AM_LDFLAGS)
-nodist_EXTRA_pbes2lts_mc_SOURCES = ../automake-force-linker.cxx
+nodist_EXTRA_pbes2lts_mc_SOURCES = automake-force-linker.cxx
 
 # dve2lts-mc
 dve2lts_mc_SOURCES   = pins2lts-mc.c

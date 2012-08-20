@@ -190,30 +190,8 @@ AC_SUBST([BUDDY_LIBS],['${top_builddir}/buddy/src/libbdd.la -lm'])
 AC_SUBST([BUDDY_CPPFLAGS],['-I${top_srcdir}/buddy/src'])
 AC_SUBST([BUDDY_LDFLAGS])
 
-AC_LANG_PUSH([C++])
-AX_CXX_CHECK_LIB([DDD],[GDDD::size() const],
- [AC_SUBST([DDD_LIBS],[-lDDD])
-  AX_LET([CPPFLAGS],["$CPPFLAGS"],
-   [dnl libddd should be used via #include <ddd/DDD.h>, but this does not work
-    dnl currently because internal libddd header files expect the "ddd" directory
-    dnl in the include path.  Hence, some hoops to autodetect where libddd is
-    dnl installed.  Note that this is still not foolproof, if e.g., headers are
-    dnl in some default location like /usr/local (user has to add path explicitly)
-    AC_CHECK_HEADER([ddd/DDD.h],
-      [for f in $CPPFLAGS; do
-         case "$f" in
-           -I*) if test -f "${f#-I}/ddd/DDD.h"; then
-                  AC_SUBST([DDD_CPPFLAGS],[$f/ddd])
-                  CPPFLAGS="$DDD_CPPFLAGS $CPPFLAGS"
-                  break
-                fi
-                ;;
-         esac
-       done])
-     AC_CHECK_HEADERS([DDD.h],, [AC_MSG_FAILURE([DDD.h not found.])])])
-     acx_libddd=yes
-   ])
-AC_LANG_POP([C++])
+ACX_DDD([:],
+  [AC_MSG_WARN([No libDDD installation found.])])
 
 ACX_CLINE_DEF([], [])
 
@@ -451,6 +429,7 @@ Configuration:
     PBES     = ${acx_pbes:-NOT FOUND, building without PBES support}
     SPG      = ${have_libspg:-NO, not building pbes-reach and spgsolver (enable with --without-bignum)}
     CADP     = ${CADP:-NOT FOUND, building without CADP support}
+    LIBDDD   = ${LIBDDD:-NOT FOUND, building without DDD support}
     OPAAL    = ${have_opaal:-TBB malloc NOT FOUND, building without opaal support}
     SYLVAN   = ${have_sylvan:-NO. Only on 64-bit systems (override with --with-sylvan)}
 
