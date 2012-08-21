@@ -15,17 +15,15 @@ ltsmin-reduce [OPTIONS] <input> [<output>]
 
 == OPTIONS
 
-*-s*::
+*-s*, *--strong*::
 Minimize modulo strong bisimulation using the default implementation.
 
-*--strong[='variant']*::
-Minimize modulo strong bisimulation using the given 'variant' or the default implementation.
-
-*-b*::
+*-b*, *--branching*::
 Minimize modulo branching bisimulation using the default implementation.
 
-*--branching[='variant']*::
-Minimize modulo branching bisimulation using the given 'variant' or the default implementation.
+*--divergence*::
+When used in combination with branching bisimulation, the result is
+divergence preserving branching bisimulation.
 
 *-c*, *--copy*::
 Perform a load/store copy.

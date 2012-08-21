@@ -286,8 +286,12 @@ void lts_sort_dest(lts_t lts){
 }
 
 int tau_step(void*context,lts_t lts,uint32_t src,uint32_t edge,uint32_t dest){
-    (void)context; (void)src; (void)dest;
-    return lts->label[edge]==(uint32_t)(lts->tau);
+    (void)src; (void)dest;
+    if (lts->label[edge]!=(uint32_t)(lts->tau)) return 0;
+    bitset_t diverging=(bitset_t)context;
+    if (diverging==NULL) return 1;
+    if (bitset_set(diverging,dest)) return 1;
+    return !bitset_set(diverging,src);
 }
 
 int stutter_step(void*context,lts_t lts,uint32_t src,uint32_t edge,uint32_t dest){
@@ -301,7 +305,6 @@ struct cycle_elim_context {
 };
 
 void lts_silent_cycle_elim(lts_t lts,silent_predicate silent,void*silent_ctx,bitset_t diverging){
-    if (diverging!=NULL) Abort("cannot do diverence yet");
     if (lts->state_db!=NULL){
         Warning(error,"illegally wiping out state vectors");
         lts->state_db=NULL;
@@ -424,7 +427,9 @@ void lts_silent_cycle_elim(lts_t lts,silent_predicate silent,void*silent_ctx,bit
         d=map[lts->dest[i]];
         if (has_labels) l=lts->label[i];
         if (silent(silent_ctx,lts,lts->src[i],i,lts->dest[i])&&(s==d)) {
-            continue;
+            if (diverging==NULL || !bitset_test(diverging,lts->src[i])) {
+                continue;
+            }
         }
         lts->src[count]=s;
         if (has_labels) lts->label[count]=l;
