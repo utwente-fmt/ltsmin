@@ -247,7 +247,7 @@ AC_ARG_WITH([profiler],
   [with_profiler=yes], [with_profiler=no])
 AS_IF([test x"$with_profiler" = xyes],
   [AC_CHECK_LIB([profiler],[ProfilerStart],
-      [AC_SUBST([PROFILER_LDFLAGS],[-lprofiler])
+      [AC_SUBST([PROFILER_LDFLAGS],['-lprofiler -ltcmalloc'])
        AC_SUBST([PROFILER_CPPFLAGS],[-DHAVE_PROFILER])
        acx_profiler=yes
       ],
