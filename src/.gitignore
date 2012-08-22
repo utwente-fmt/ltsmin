@@ -29,11 +29,11 @@ test-regroup
 test-vset
 hre-test/test-hre
 hre-test/test-mpi-hre
-ltsmin-compare
-ltsmin-convert
-ltsmin-printtrace
-ltsmin-reduce
-ltsmin-reduce-dist
+ltsmin-compare/ltsmin-compare
+ltsmin-convert/ltsmin-convert
+ltsmin-printtrace/ltsmin-printtrace
+ltsmin-reduce/ltsmin-reduce
+ltsmin-reduce-dist/ltsmin-reduce-dist
 spg/spgsolver
 spinjal
 stamp-h1

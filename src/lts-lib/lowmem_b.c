@@ -195,7 +195,7 @@ void lowmem_branching_reduce(lts_t lts,bitset_t diverging){
     if (diverging!=NULL){
         for(i=0;i<(int)lts->states;i++){
             for(j=lts->begin[i];j<(int)lts->begin[i+1];j++){
-                if (i==lts->dest[j] && lts->label[j]==tau) {
+                if (i==(int)lts->dest[j] && lts->label[j]==tau) {
                     lts->label[j]=DIV;
                 }
             }

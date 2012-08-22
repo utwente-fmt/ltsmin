@@ -10,7 +10,6 @@
 typedef enum {Undefined=0,Strong,Branching,Trace,Lumping} task_t;
 
 static task_t task=Undefined;
-static int segments=1;
 static int divergence_sensitive=0;
 static int stuttering=0;
 
