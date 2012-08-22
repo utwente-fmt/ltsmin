@@ -162,7 +162,9 @@ static int rehash(int h){
     return h*12531829 + 87419861;
 }
 
-void lowmem_branching_reduce(lts_t lts){
+#define DIV 0x7fffffff
+
+void lowmem_branching_reduce(lts_t lts,bitset_t diverging){
     int *oldmap,*newmap,*tmpmap;
     int *hash,mask,hc;
     int i,j,k,tmp;
@@ -170,7 +172,7 @@ void lowmem_branching_reduce(lts_t lts){
     long long int chain_length;
     long long int hash_lookups;
     uint32_t tau;
-
+    
     if (lts->label==NULL) {
         Abort("Cannot apply branching bisimulation to an LTS without edge labels.");
     }
@@ -187,17 +189,18 @@ void lowmem_branching_reduce(lts_t lts){
         lowmem_strong_reduce(lts);
         return;
     }
-    lts_tau_cycle_elim(lts);
+    lts_silent_cycle_elim(lts,tau_step,diverging,diverging);
     Print(infoShort,"size after tau cycle elimination is %d states and %d transitions",lts->states,lts->transitions);
-
-/*
-    if (tau_indir_elim) {
-        lts_tau_indir_elim(lts);
-        Warning(1,"size after trivial tau elimination is %d states and %d transitions",lts->states,lts->transitions);
-    }
-*/
-
     lts_set_type(lts,LTS_BLOCK);
+    if (diverging!=NULL){
+        for(i=0;i<(int)lts->states;i++){
+            for(j=lts->begin[i];j<(int)lts->begin[i+1];j++){
+                if (i==lts->dest[j] && lts->label[j]==tau) {
+                    lts->label[j]=DIV;
+                }
+            }
+        }
+    }
     oldmap=(int*)RTmalloc(lts->states*sizeof(int));
     newmap=(int*)RTmalloc(lts->states*sizeof(int));
     for(i=0;i<(int)lts->states;i++){
@@ -337,7 +340,7 @@ void lowmem_branching_reduce(lts_t lts){
         uint32_t d=newmap[lts->dest[i]];
         if ((l==tau)&&(s==d)) continue;
         lts->src[count]=s;
-        lts->label[count]=l;
+        lts->label[count]=(l==DIV)?tau:l;
         lts->dest[count]=d;
         count++;
     }

@@ -158,6 +158,17 @@ This is tau*a equialence for an edge label LTS.
 extern void lts_silent_compress(lts_t lts,silent_predicate silent,void*silent_context);
 
 /**
+ Find the set of divergent states.
+ */
+extern void lts_find_divergent(lts_t lts,silent_predicate silent,void*silent_context,bitset_t divergent);
+
+/**
+ Compute the set of deadlocks of the LTS.
+ */
+extern void lts_find_deadlocks(lts_t lts,bitset_t deadlocks);
+
+
+/**
 \brief Determinize the given LTS.
 */
 extern void lts_mkdet(lts_t lts);
