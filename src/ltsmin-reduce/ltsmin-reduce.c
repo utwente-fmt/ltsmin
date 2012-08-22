@@ -7,8 +7,6 @@
 #include <lts-lib/lowmem.h>
 #include <ltsmin-lib/ltsmin-standard.h>
 
-#define UNDEFINED_METHOD ((char*)1)
-
 typedef enum {Undefined=0,Strong,Branching,Cycle,Determinize,Copy,Silent,Lumping} task_t;
 
 static task_t task=Undefined;
@@ -38,7 +36,7 @@ static void silent_compression(lts_t lts){
 static  struct poptOption options[] = {
     { "strong" , 's' , POPT_ARG_VAL , &task , Strong , "minimize module strong bisimulation" , NULL },
     { "branching" , 'b' , POPT_ARG_VAL , &task, Branching , "minimize module branching bisimulation" , NULL },
-    { "divergence" , 0 , POPT_ARG_VAL , &divergence_sensitive , 1 , "make branching bisimulation divergence sensitive" },
+    { "divergence" , 0 , POPT_ARG_VAL , &divergence_sensitive , 1 , "make branching bisimulation divergence sensitive" , NULL },
     { "copy" , 'c' , POPT_ARG_VAL , &task , Copy , "perform a load/store copy"  , NULL },
     { "lump" , 'l' , POPT_ARG_VAL , &task, Lumping , "minimize module lumping of CTMC" , NULL },
     { "silent" , 0 , POPT_ARG_VAL , &task, Silent  , "silent step bisimulation" , NULL },

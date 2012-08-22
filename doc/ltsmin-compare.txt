@@ -15,26 +15,23 @@ ltsmin-compare [OPTIONS] <input 1> <input 2>
 
 == OPTIONS
 
-*-s*::
+*-s*, *--strong*::
 Compare modulo strong bisimulation using the default implementation.
 
-*--strong[='variant']*::
-Compare modulo strong bisimulation using the given 'variant' or the default implementation.
-
-*-b*::
+*-b*, *--branching*::
 Compare modulo branching bisimulation using the default implementation.
-
-*--branching[='variant']*::
-Compare modulo branching bisimulation using the given 'variant' or the default implementation.
 
 *-l*, *--lump*::
 Compare modulo CTMC lumping.
 
-*--trace[='stutter']*::
+*-t*, *--trace*::
 Compare the two LTSs modulo (optionally stuttering) trace equivalence. This happens in multiple steps.
 First, the LTSs are compared modulo strong bisimulation (or silent step bisimulation
 if the stutter option is given). If the resulting LTSs are not equal, the LTSs are made deterministic and
 compared modulo strong bisimulation.
+
+*--stutter*::
+Compare module stuttering during trace equivalence comparison.
 
 include::inc/lts-io-options.txt[]
 
