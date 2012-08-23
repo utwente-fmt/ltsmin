@@ -24,8 +24,8 @@ libvset_la_LIBADD   += -lATerm
 endif
 
 if HAVE_LIBDDD
-CCLD = $(CXXLD)
 libvset_la_SOURCES  += vset_ddd.cpp
+nodist_EXTRA_libvset_la_SOURCES = automake-force-linker.cxx
 libvset_la_CPPFLAGS += $(DDD_CPPFLAGS)
 libvset_la_LDFLAGS  += $(DDD_LDFLAGS)
 libvset_la_LIBADD   += $(DDD_LIBS)

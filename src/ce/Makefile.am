@@ -1,5 +1,9 @@
-LTSMIN_LIBS  = ../util-lib/libutil.la ../ltsmin-lib/libltsmin.la
-LTSMIN_LIBS += ../hre-mpi/libhre.la ../hre-io/libhre-io.la
+LTSMIN_LIBS  =
+LTSMIN_LIBS += ../lts-io/liblts-io.la
+LTSMIN_LIBS += ../hre-io/libhre-io.la
+LTSMIN_LIBS += ../hre-mpi/libhre.la
+LTSMIN_LIBS += ../ltsmin-lib/libltsmin.la
+LTSMIN_LIBS += ../util-lib/libutil.la
 
 bin_PROGRAMS 	= ce-mpi
 

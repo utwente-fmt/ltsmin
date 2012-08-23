@@ -211,7 +211,9 @@ DVE2compileGreyboxModel(model_t model, const char *filename)
         Abort("Cannot compile `%s', paths too long", abs_filename);
 
     if ((ret = system(command)) != 0)
-        SYSFAIL(ret < 0, "Command failed with exit code %d: %s", ret, command);
+        SYSFAIL(ret < 0, "Command failed with exit code %d: %s\n"
+                "Please install the patched DiVinE 2.4 version from the LTSmin website:\n"
+                "http://fmt.cs.utwente.nl/tools/ltsmin/#divine", ret, command);
 
     if (fchdir (cwdfd) != 0 && (cwd[0] == 0 || chdir(cwd) != 0))
         Abort("Cannot change directory back to current: %s", cwd);
