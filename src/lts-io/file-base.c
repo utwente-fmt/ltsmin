@@ -78,7 +78,7 @@ lts_file_t lts_file_bare(const char* name,lts_type_t ltstype,int segments,lts_fi
     lts->max_src_p1=(uint32_t*)HREmallocZero(hre_heap,segments*sizeof(uint32_t));
     lts->max_dst_p1=(uint32_t*)HREmallocZero(hre_heap,segments*sizeof(uint32_t));
     lts->expected_values=(uint32_t*)HREmallocZero(hre_heap,segments*sizeof(uint32_t));
-    lts->ctx=settings ? lts_file_context(settings) : HREglobal();
+    lts->ctx=lts_file_context(settings) ? lts_file_context(settings) : HREglobal();
     lts->name=strdup(name);
     lts->user_size=user_size;
     lts->ltstype=ltstype;
@@ -423,6 +423,7 @@ void lts_file_set_context(lts_file_t lts, hre_context_t ctx){
 }
 
 hre_context_t lts_file_context(lts_file_t lts){
+    if (lts == NULL) return NULL;
     return SYSTEM(lts)->ctx;
 }
 
