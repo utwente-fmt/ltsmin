@@ -12,6 +12,11 @@ static value_index_t put_chunk(value_table_t vt,chunk item){
     return (value_index_t)SIputC(si,item.data,item.len);
 }
 
+static void put_at_chunk(value_table_t vt,chunk item, value_index_t pos){
+    string_index_t si=*((string_index_t*)vt);
+    SIputCAt(si,item.data,item.len,pos);
+}
+
 static chunk get_chunk(value_table_t vt,value_index_t idx){
     string_index_t si=*((string_index_t*)vt);
     int len;
@@ -30,6 +35,7 @@ value_table_t chunk_table_create(void* context,char*type_name){
     *((string_index_t*)vt)=SIcreate();
     VTdestroySet(vt,destroy);
     VTputChunkSet(vt,put_chunk);
+    VTputAtChunkSet(vt,put_at_chunk);
     VTgetChunkSet(vt,get_chunk);
     VTgetCountSet(vt,get_count);
     return vt;

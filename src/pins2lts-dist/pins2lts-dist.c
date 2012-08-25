@@ -196,7 +196,11 @@ int main(int argc, char*argv[]){
 
     model_t model=GBcreateBase();
     ctx.model = model;
-    GBsetChunkMethods(model,HREgreyboxNewmap,HREglobal(),HREgreyboxI2C,HREgreyboxC2I,HREgreyboxCount);
+    GBsetChunkMethods(model,HREgreyboxNewmap,HREglobal(),
+                      HREgreyboxI2C,
+                      HREgreyboxC2I,
+                      HREgreyboxCAtI,
+                      HREgreyboxCount);
 
     if (ctx.mpi_me == 0)
         GBloadFileShared(model,files[0]);

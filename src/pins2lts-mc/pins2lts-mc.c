@@ -36,11 +36,9 @@
 #include <pins-lib/pins-impl.h>
 #include <pins-lib/property-semantics.h>
 #include <util-lib/fast_hash.h>
+#include <util-lib/fast_hash.h>
+#include <util-lib/util.h>
 
-
-static inline size_t min (size_t a, size_t b) {
-    return a < b ? a : b;
-}
 
 #define                     MAX_STRATEGIES 5
 
@@ -733,7 +731,10 @@ local_init ()
 
     cct_cont_t         *map = cct_create_cont (tables);
     GBsetChunkMethods (model, (newmap_t)cct_create_vt, map,
-                       HREgreyboxI2C, HREgreyboxC2I, HREgreyboxCount);
+                       HREgreyboxI2C,
+                       HREgreyboxC2I,
+                       HREgreyboxCAtI,
+                       HREgreyboxCount);
     pthread_mutex_lock (&mutex);
     GBloadFile (model, files[0], &model);
     pthread_mutex_unlock (&mutex);
@@ -771,7 +772,6 @@ local_init ()
         act_type = lts_type_get_edge_label_typeno(ltstype, act_label);
         chunk c = chunk_str(act_detect);
         act_index = GBchunkPut(model, act_type, c);
-        Warning(info, "Detecting action \"%s\"", act_detect);
     }
     if (inv_detect)
         inv_expr = parse_file (inv_detect, pred_parse_file, model);

@@ -12,6 +12,7 @@
 #include <mc-lib/statistics.h>
 #include <mc-lib/stats.h>
 #include <util-lib/fast_hash.h>
+#include <util-lib/util.h>
 
 
 #define MAX_WORKERS 64
@@ -171,9 +172,8 @@ set_ll_get (set_ll_t *set, int idx, int *len)
     while ((read = atomic_read(&set->local[worker].count)) == index) {} // poll
     HREassert (index < read, "Invariant violated %zu !< %zu (idx=%d)", index, read, idx);
     // TODO: memory fence?
-    int *res = isba_index (balloc, index);
     str_t              *str = (str_t *)isba_index (balloc, index);
-    HREassert (res != NULL, "Value %d (%zu/%zu) not in lockless string set", idx, index, worker);
+    HREassert (str != NULL, "Value %d (%zu/%zu) not in lockless string set", idx, index, worker);
     *len = str->len;
     Debug ("Index(%d)\t--(%zu,%zu)--> (%s,%d) %p", idx, worker, index, str->ptr,
                                                    str->len, str->ptr);
@@ -261,15 +261,21 @@ set_ll_count (set_ll_t *set)
 }
 
 void
-set_ll_install (set_ll_t *set, char *name, int idx)
+set_ll_install (set_ll_t *set, char *name, int len, int idx)
 {
     size_t              workers = HREpeers (HREglobal());
     size_t              worker = idx % workers;
-    HREassert ((size_t)idx >= set->local[worker].count);
-    isb_allocator_t     balloc = set->local[worker].balloc;
     size_t              index = idx / workers;
+    isb_allocator_t     balloc = set->local[worker].balloc;
+    if ((size_t)idx < set->local[worker].count) {
+        str_t              *str = (str_t *)isba_index (balloc, index);
+        HREassert (str, "Corruption in set.");
+        HREassert (strncmp(str->ptr, name, min(str->len,len)) == 0,
+                   "String '%s' already inserted at %d, while trying to insert "
+                   "'%s' there", str->ptr, idx, name);
+        return;
+    }
     set_ll_slab_t      *slab = set->alloc->slabs[worker];
-    size_t              len = strlen(name);
     map_key_t           clone, old, key = (map_key_t)name;
 
     slab->cur_key = name;

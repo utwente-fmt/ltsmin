@@ -1287,7 +1287,7 @@ gsea_invariant_check(gsea_state_t *state, void *arg)
 static void
 gsea_action_check(gsea_state_t *src, transition_info_t *ti, gsea_state_t *dst)
 {
-    if (NULL == ti->labels || ti->labels[opt.act_label] != opt.act_index) {
+    if (NULL != ti->labels && ti->labels[opt.act_label] == opt.act_index) {
         global.errors++;
         do_trace(dst, NULL, "Error action", opt.act_detect);
     }
@@ -1790,7 +1790,10 @@ main (int argc, char *argv[])
     Warning(info,"loading model from %s",files[0]);
     opt.model=GBcreateBase();
     GBsetChunkMethods(opt.model,new_string_index,NULL,
-        (int2chunk_t)HREgreyboxI2C,(chunk2int_t)HREgreyboxC2I,(get_count_t)HREgreyboxCount);
+                      (int2chunk_t)HREgreyboxI2C,
+                      (chunk2int_t)HREgreyboxC2I,
+                      (chunkatint_t)HREgreyboxCAtI,
+                      (get_count_t)HREgreyboxCount);
 
     GBloadFile(opt.model,files[0],&opt.model);
 

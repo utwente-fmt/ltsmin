@@ -82,6 +82,10 @@ extern value_index_t VTputChunk(value_table_t vt,chunk item);
 typedef value_index_t(*put_chunk_t)(value_table_t vt,chunk item);
 extern void VTputChunkSet(value_table_t vt,put_chunk_t method);
 
+extern void VTputAtChunk(value_table_t vt,chunk item,value_index_t pos);
+typedef void(*put_at_chunk_t)(value_table_t vt,chunk item,value_index_t pos);
+extern void VTputAtChunkSet(value_table_t vt,put_at_chunk_t method);
+
 extern chunk VTgetChunk(value_table_t vt,value_index_t idx);
 typedef chunk(*get_chunk_t)(value_table_t vt,value_index_t idx);
 extern void VTgetChunkSet(value_table_t vt,get_chunk_t method);
