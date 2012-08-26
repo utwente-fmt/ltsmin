@@ -347,10 +347,10 @@ DVE2loadGreyboxModel(model_t model, const char *filename)
     int ntypes = get_state_variable_type_count();
     for(int i = 0; i < ntypes; i++) {
         const char* type_name = get_state_variable_type_name(i);
+        HREassert (type_name != NULL, "invalid type name");
         if (lts_type_add_type(ltstype, type_name, NULL) != i) {
             Abort("wrong type number");
         }
-        HREassert (type_name != NULL, "invalid type name");
         int type_value_count = get_state_variable_type_value_count(i);
         if (0 == type_value_count) {
             lts_type_set_format (ltstype, i, LTStypeDirect);

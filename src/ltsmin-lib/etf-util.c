@@ -120,6 +120,8 @@ void etf_ode_add(etf_model_t model){
 	int is_new;
 	int signtype=lts_type_add_type(model->ltstype,"sign",&is_new);
 	if(is_new) Abort("model does not define sign type");
+	data_format_t format = lts_type_get_format(model->ltstype, signtype);
+	HREassert (format == LTStypeEnum || format == LTStypeChunk);
 	Warning(debug,"sign type has %d values",SIgetCount(model->type_values[signtype]));
 	for(int i=0;i<SIgetCount(model->type_values[signtype]);i++){
 		Warning(debug,"sign[%d]=%s",i,SIget(model->type_values[signtype],i));
