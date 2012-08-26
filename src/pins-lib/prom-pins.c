@@ -251,15 +251,16 @@ SpinJaloadGreyboxModel(model_t model, const char *filename)
     int ntypes = spinja_get_type_count();
     for (int i = 0; i < ntypes; i++) {
         const char* type_name = spinja_get_type_name(i);
+        if (lts_type_add_type(ltstype, type_name, NULL) != i) {
+            Abort("wrong type number");
+        }
         HREassert (type_name != NULL, "invalid type name");
         int type_value_count = spinja_get_type_value_count(i);
+        Debug("Promela type %s (%d) has %d values.", type_name, i, type_value_count);
         if (0 == type_value_count) {
             lts_type_set_format (ltstype, i, LTStypeDirect);
         } else {
              lts_type_set_format (ltstype, i, LTStypeEnum);
-        }
-        if (lts_type_add_type(ltstype, type_name, NULL) != i) {
-            Abort("wrong type number");
         }
     }
 

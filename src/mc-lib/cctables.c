@@ -134,7 +134,9 @@ static void
 put_at_chunk(value_table_t vt,chunk item,value_index_t pos)
 {
     table_t            *table = *((table_t **)vt);
+    pthread_rwlock_wrlock(&table->map->map_lock);
     set_ll_install(table->string_set, item.data, item.len, pos);
+    pthread_rwlock_unlock(&table->map->map_lock);
 }
 
 static chunk
