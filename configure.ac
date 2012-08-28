@@ -379,7 +379,6 @@ AC_CONFIG_FILES([
        src/hre-io/Makefile
        src/hre/Makefile
        src/hre-mpi/Makefile
-       src/hre-test/Makefile
        src/lts-io/Makefile
        src/lts-lib/Makefile
        src/ltsmin-lib/Makefile

@@ -37,7 +37,6 @@ SUBDIRS += hre
 if HAVE_MPI
 SUBDIRS += hre-mpi
 endif
-SUBDIRS += hre-test
 
 # util lib with basic data structures
 SUBDIRS += util-lib
