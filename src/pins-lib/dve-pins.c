@@ -400,7 +400,7 @@ DVE2loadGreyboxModel(model_t model, const char *filename)
         int type_value_count = get_state_variable_type_value_count(i);
         for(int j=0; j < type_value_count; ++j) {
             const char* type_value = get_state_variable_type_value(i, j);
-            GBchunkPutAt(model, i, chunk_str((char*)type_value), i);
+            GBchunkPutAt(model, i, chunk_str((char*)type_value), j);
         }
     }
 

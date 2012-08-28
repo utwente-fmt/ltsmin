@@ -291,7 +291,7 @@ SpinJaloadGreyboxModel(model_t model, const char *filename)
         int type_value_count = spinja_get_type_value_count(i);
         for(int j=0; j < type_value_count; ++j) {
             const char* type_value = spinja_get_type_value_name(i, j);
-            GBchunkPut(model, i, chunk_str((char*)type_value));
+            GBchunkPutAt(model, i, chunk_str((char*)type_value), j);
         }
     }
 
