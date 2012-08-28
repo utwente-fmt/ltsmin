@@ -1,0 +1,5 @@
+puts "DEBUG: lib/default.exp is being loaded"
+
+proc test_include {param} {
+    puts "test: $param"
+}
