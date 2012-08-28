@@ -1,0 +1,76 @@
+# include the general include file which contains the functions
+source lib/include.tcl
+
+puts "\n---------------------------"
+puts   "TESTING: Language Frontends"
+puts   "---------------------------\n"
+
+
+#cd into the test dir such that output files are placed here.
+cd $subdir
+
+# Language Tools
+# --------------
+#set ltools(spinjal) "fgs.promela"
+#set ltools(mcrl) "-tbf -regular -nocluster hef_wrong.mcrl"
+#set ltools(mvrl22lps) "-n -D ieee_11073.mcrl2 > ieee_11073.lps"
+
+# Language Frontends
+set frontends [dict create]
+dict set frontends etf model "gear.1.etf"
+dict set frontends etf exp_output "2689 states 3567 transitions"
+
+dict set frontends dve model "gear.1.dve" 
+dict set frontends dve exp_output "2689 states 3567 transitions"
+
+dict set frontends prom model "fgs.promela.spinja"
+dict set frontends prom exp_output ""
+
+dict set frontends lpo model  "hef_wrong.tbf"
+dict set frontends lpo exp_output "15557 states 27300 transitions"
+
+dict set frontends lps model "ieee-11073.lps"
+dict set frontends lps exp_output "1760 states 6583 transitions"
+
+dict set frontends opaal model "fischer5.xml"
+dict set frontends opaal exp_output ""
+
+dict set frontends pbes model "brp-nodeadlock.pbes"
+dict set frontends pbes exp_output "10548 states 12168 transitions"
+
+set backends "mc,dist,sym,seq"
+set filter "*2lts-{$backends}"
+set be_filter "{mc}"
+set EXAMPLES_PATH "../../examples"
+
+
+
+proc find_bins_by_filter { filter } {
+    set frontends [list]
+    set lts_backends [glob -directory "../../src" -type d pins2lts* ]
+    foreach dir $lts_backends {
+        set lts_bins [glob -nocomplain -directory $dir -type f $filter]
+        foreach path $lts_bins {
+            lappend frontends $path
+        }
+    }
+
+    return $frontends
+}
+
+set lang_fe [ find_lang_frontends $filter]
+
+foreach path $lang_fe {
+    set testcounter 1
+    set tokens [split $path "/"]
+    set command [lindex $tokens end]
+    set frontend [lindex [split $command "2"] 0]
+    if { [dict exists $frontends $frontend model] } {
+        set model [dict get $frontends $frontend model]
+        runmytest "test$testcounter" "$path $EXAMPLES_PATH/$model" [dict get $frontends $frontend exp_output]
+    } else {
+        puts "No test defined for $command"
+    }
+}
+
+cd ".."
