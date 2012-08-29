@@ -23,6 +23,7 @@ libhre_la_SOURCES += qsortex.c
 libhre_la_CPPFLAGS = $(AM_CPPFLAGS)
 
 ##libhre_la_LIBADD   = ../hre-io/libhre-io.la
+libhre_la_LIBADD   = ../util-lib/libutil.la
 
 # git_version.h
 EXTRA_DIST = git_version.h

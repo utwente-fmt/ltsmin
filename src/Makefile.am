@@ -33,13 +33,13 @@ SUBDIRS += bignum
 
 # hybrid runtime environment lib
 SUBDIRS += hre-io
+SUBDIRS += util-lib
 SUBDIRS += hre
 if HAVE_MPI
 SUBDIRS += hre-mpi
 endif
 
 # util lib with basic data structures
-SUBDIRS += util-lib
 
 SUBDIRS += gcf-tool
 
