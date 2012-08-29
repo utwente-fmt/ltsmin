@@ -83,7 +83,7 @@ zobrist_create (size_t length, size_t z_length, matrix_t * m)
     if (m == NULL)
         return z;
     z->ones = RTmalloc (z->rows * sizeof (z->ones[0]));
-    for (int row = 0; row < z->rows; ++row) {
+    for (size_t row = 0; row < z->rows; ++row) {
         z->ones[row] = RTmalloc ((1 + 
                        dm_ones_in_row (m, row)) * sizeof (z->ones[0][0]));
         dm_row_iterator_t   ri;
@@ -104,7 +104,7 @@ zobrist_free (zobrist_t z)
         RTfree (z->keys[j]);
     RTfree (z->keys);
     if (z->ones) {
-        for (int row = 0; row < z->rows; ++row)
+        for (size_t row = 0; row < z->rows; ++row)
             RTfree (z->ones[row]);
         RTfree (z->ones);
     }
