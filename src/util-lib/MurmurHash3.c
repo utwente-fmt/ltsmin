@@ -69,29 +69,9 @@ static FORCE_INLINE uint64_t fmix64 ( uint64_t k )
 
 //-----------------------------------------------------------------------------
 
-uint64_t
-MurmurHash64 (const void * key, int len, unsigned int seed)
-{
-    uint64_t hash[2];
-#ifdef __x86_64__
-    MurmurHash3_x64_128 (key, len, seed, hash);
-#else
-    MurmurHash3_x86_128 (key, len, seed, hash);
-#endif
-    hash[0] ^= hash[1];
-    return hash[0];
-}
 
-uint32_t
-MurmurHash32 (const void * key, int len, unsigned int seed)
-{
-    uint32_t hash;
-    MurmurHash3_x86_32 (key, len, seed, &hash);
-    return hash;
-}
-
-void MurmurHash3_x86_32 ( const void * key, int len,
-                          uint32_t seed, void * out )
+static inline void MurmurHash3_x86_32_i ( const void * key, int len,
+                                          uint32_t seed, void * out )
 {
   const uint8_t * data = (const uint8_t*)key;
   const int nblocks = len / 4;
@@ -143,6 +123,19 @@ void MurmurHash3_x86_32 ( const void * key, int len,
 
   *(uint32_t*)out = h1;
 } 
+
+void MurmurHash3_x86_32 ( const void * key, int len, uint32_t seed, void * out )
+{
+    return MurmurHash3_x86_32_i (key, len, seed, out);
+}
+
+uint32_t
+MurmurHash32 (const void * key, int len, unsigned int seed)
+{
+    uint32_t hash;
+    MurmurHash3_x86_32_i (key, len, seed, &hash);
+    return hash;
+}
 
 //-----------------------------------------------------------------------------
 
