@@ -277,7 +277,7 @@ void HREpthreadRun(int threads){
     /* Caused huge performance regression in MC tool */
     //pthread_attr_t attr;
     //attr = set_thread_stack_size();
-    struct shared_area *shared = create_shared_region(PTHREAD_SHARED_SIZE,false);
+    struct shared_area *shared = create_shared_region(PTHREAD_SHARED_SIZE*threads,false);
     hre_region_t region=HREcreateRegion(shared,area_malloc,area_align,area_realloc,area_free);
 
     struct message_queue *queues=HREmallocZero(region,threads*sizeof(struct message_queue));
