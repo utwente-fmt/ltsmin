@@ -39,8 +39,6 @@ if HAVE_MPI
 SUBDIRS += hre-mpi
 endif
 
-# util lib with basic data structures
-
 SUBDIRS += gcf-tool
 
 # LTSmin lib with LTS data types and parsers for property languages
