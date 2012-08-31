@@ -1,0 +1,11 @@
+never {    /* ![] (zune_at_S -> <> zune_at_E) */
+T0_init:
+	if
+	:: (! ((zune_at_E)) && (zune_at_S)) -> goto accept_S4
+	:: (1) -> goto T0_init
+	fi;
+accept_S4:
+	if
+	:: (! ((zune_at_E))) -> goto accept_S4
+	fi;
+}

@@ -1,16 +1,16 @@
 # include the general include file which contains the functions
 source lib/include.tcl
 
-puts "\n----------------------------------------------"
-puts   "TESTING: Algorithmic backends for ETF language"
-puts   "----------------------------------------------\n"
-
+# use the local uncluding file containing several procedures
+source lib/backends.tcl
 
 #cd into the test dir such that output files are placed here.
 cd $subdir
 
-# use the local uncluding file containing several procedures
-source inc_backends.tcl
+puts "\n----------------------------------------------"
+puts   "TESTING: Algorithmic backends for ETF language"
+puts   "----------------------------------------------\n"
+
 
 # the number of threads to use in multithreaded backends
 set num_threads 5
@@ -26,11 +26,13 @@ dict set langs etf options mc "--threads=$num_threads"
 # the expected result for a pass
 dict set langs etf exp_output ""
 
+# Wich backends are we performing the ETF languate tests on?
 set filter "{mc}"
-set EXAMPLES_PATH "../../examples"
 
 # find the available backends
 set alg_be [ find_alg_backends $filter ]
 
 # run the test for the ETF-frontend
 run_test_for_alg_backends $alg_be $langs $backends
+
+cd ".."

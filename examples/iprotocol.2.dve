@@ -1,0 +1,134 @@
+
+// 2 parameters:
+
+
+
+channel Get, Put, SAck, SNak, SData, RAck, RNak, RData, RCorrData, Timeout;
+//byte got_message=0;
+
+process Timer {
+state tick;
+init tick;
+trans
+    tick -> tick { sync Timeout!; };
+}
+
+process Producer{
+byte message=0;
+state wait,produce;
+init wait;
+trans
+  wait    -> produce {},
+  produce -> wait {sync Get!message;
+                      effect message = (message+1)%4;};
+}
+
+process Consumer{
+byte message=0;
+state wait, consume;
+init wait;
+trans
+  wait    -> consume {sync Put?message;},
+  consume -> wait {};
+}
+
+
+
+process Medium {
+byte value;
+state wait, data, ack, nak, dataOk, ackOk, nakOk;
+init wait;
+trans
+    wait  -> data  { sync SData?value; },
+    data  -> dataOk{ sync RData!value; },
+    data  -> wait  { sync RCorrData!value; },
+    data  -> wait  {},
+    wait  -> ack   { sync RAck?value; },
+    ack   -> ackOk { sync SAck!value; },
+    ack   -> wait  {},
+    wait  -> nak   { sync RNak?value; }, 
+    nak   -> nakOk { sync SNak!value; },
+    nak   -> wait  {},
+    dataOk-> wait  {},
+    ackOk -> wait  {},
+    nakOk -> wait  {};
+ }
+ 
+process Sender{
+byte sendseq=1, rack=0, value;
+state wait, data, ack, nak, timeout;
+init wait;
+trans
+    wait    -> ack     {sync SAck?value; },
+    wait    -> nak     {sync SNak?value; },
+    wait    -> timeout {sync Timeout?;},
+    wait    -> data    {guard (rack + 2)%4 >sendseq;
+                        sync Get?value;},
+    ack     -> wait    {guard (rack<sendseq && rack < value && value < sendseq) ||
+                              (rack>sendseq && sendseq < value && value < rack);
+                        effect rack = value;},
+    ack     -> wait    {guard (rack>=sendseq || rack >= value || value >= sendseq) &&
+                              (rack<=sendseq || sendseq >= value || value >= rack);},
+    nak     -> wait    {guard (rack<sendseq && rack < value && value < sendseq) ||
+                              (rack>sendseq && sendseq < value && value < rack);
+                        sync SData!value;},
+    nak     -> wait    {guard (rack>=sendseq || rack >= value || value >= sendseq) &&
+                              (rack<=sendseq || sendseq >= value || value >= rack);},
+    timeout -> wait    {guard (rack+1)%4 != sendseq;
+                        sync SData!(rack+1)%4;},
+    timeout -> wait    {guard (rack+1)%4 == sendseq;},
+    data    -> wait    {sync SData!sendseq;
+                        effect sendseq = (sendseq+1)%4;};
+}
+
+process Receiver{
+byte i, value, sent=0, recseq=0, lack=0, recbuf[4], nakd[4];
+state wait, data, put_data, send_naks, corr_data, on_timeout,timeout_ack;
+init wait;
+trans 
+    wait      -> data        {sync RData?value; },
+    wait      -> corr_data   {sync RCorrData?value; },
+    wait      -> on_timeout  {sync Timeout?; 
+                              effect i=0;},
+    data      -> send_naks   {guard value != (recseq+1)%4;
+                              effect recbuf[value]=1, i=(recseq+1)%4;},
+    data      -> put_data    {guard value == (recseq+1)%4;
+                              sync Put!value;
+                              effect recseq=(recseq+1)%4, sent=(sent+1)%4;},
+    send_naks -> send_naks   {guard i != value && nakd[i]==1;
+                              effect i = (i+1)%4;},
+    send_naks -> send_naks   {guard i != value && nakd[i]==0;
+                              sync RNak!i;
+                              effect nakd[i]=1,i = (i+1)%4;},
+    send_naks -> wait        {guard i==value;},
+    put_data  -> put_data    {guard sent== 2/2;
+                              sync RAck!recseq;
+                              effect lack=recseq, sent=0;},
+    put_data  -> put_data    {guard sent != 2/2 && recbuf[(recseq+1)%4]==1;
+                              sync Put!(recseq+1)%4;
+                              effect recseq = (recseq+1)%4, recbuf[recseq]=0;},
+    put_data  -> wait        {guard sent != 2/2 && recbuf[(recseq+1)%4]==0;},
+    corr_data -> wait        {guard nakd[value]==0;
+                              sync RNak!value;},
+    corr_data -> wait        {guard nakd[value]==1;},
+    on_timeout-> on_timeout  {guard i<4;        
+                              effect nakd[i]=0, i=i+1;},
+    on_timeout-> timeout_ack {guard i==4;
+                              sync RNak!(recseq+1)%4;
+                              effect nakd[(recseq+1)%4]=1;},
+    timeout_ack->wait        {sync RAck!lack;};
+
+}
+
+system async;
+
+
+
+
+
+
+
+
+
+
+
