@@ -5,12 +5,13 @@
 set timeout 120
 
 # The directory containing all the models used for testing.
-set EXAMPLES_PATH "../../examples"
+set EXAMPLES_PATH "$base_dir/../examples"
 
 # filter: filter a specific (list of) backend(s): {mc,sym,seq}
 proc find_alg_backends { filter } {
+    global base_dir
     set backends [list]
-    set lts_backends [glob -directory "../../src" -type d pins2lts-$filter ]
+    set lts_backends [glob -directory "$base_dir/../src" -type d pins2lts-$filter ]
     foreach dir $lts_backends {
         set lts_bins [glob -nocomplain -directory $dir -type f *2lts-$filter ]
         foreach path $lts_bins {
@@ -22,8 +23,9 @@ proc find_alg_backends { filter } {
 }
 
 proc find_lang_frontends { filter } {
+    global base_dir
     set frontends [list]
-    set lts_backends [glob -directory "../../src" -type d pins2lts* ]
+    set lts_backends [glob -directory "$base_dir/../src" -type d pins2lts* ]
     foreach dir $lts_backends {
         set lts_bins [glob -nocomplain -directory $dir -type f $filter]
         foreach path $lts_bins {
@@ -118,4 +120,13 @@ proc runmytest { test_name command_line exp_output} {
     }
 }
 
+# create a list with for every bin the path
+set binpaths(ltsmin-compare) "$base_dir/../src/ltsmin-compare/ltsmin-compare"
+set binpaths(ltsmin-convert) "$base_dir/../src/ltsmin-convert/ltsmin-convert"
+set binpaths(ltsmin-printtrace) "$base_dir/../src/ltsmin-printtrace/ltsmin-printtrace"
 
+set bins [find_alg_backends "{seq,mc,dist,sym}"]
+foreach path $bins {
+    set bin [lindex [split $path "/"] end]
+    set binpaths($bin) $path
+}

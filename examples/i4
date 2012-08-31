@@ -1,0 +1,199 @@
+/*
+  Revised 2ff PROMELA Validation Model
+  Taylor's I-Protocol, as implemented in the GNU UUCP package
+ 
+  - restructed sender and receiver 
+  - removed source and sink processes (sndr_u and recv_u)
+  - removed hck and dck from packet, replaced with nondeteministic choice
+  - replaced dropping packet by media with ignoring packet by sender/receiver
+*/
+
+#define FULL	1
+#define FIXED	1
+#define WIN     4	/* range sequence numbers   */
+
+#define true	1	/* for 2.9.7, not needed in 3.3.0 */
+#define false	0
+
+#define HWIN    (WIN/2) /* window size: WIN/2       */
+#define QWIN    (WIN/4) /* half window size: WIN/4  */
+#define diff(x,y)	((x+WIN-y)%WIN)
+#define inc(x)		x=(x+1)%WIN
+ 
+chan s2m   = [0] of { mtype, byte, byte };	/* type, seq nr, ack (piggyback) */
+chan m2s   = [0] of { mtype, byte, byte };	/* type, seq nr, ack (piggyback) */
+chan r2m   = [0] of { mtype, byte, byte };	/* type, seq nr, ack (piggyback) */
+chan m2r   = [0] of { mtype, byte, byte };	/* type, seq nr, ack (piggyback) */
+ 
+mtype = { ack, nak, data };
+
+active proctype medium1()
+{	byte pty;  /* packet type */
+	byte seq;  /* sequence number field */
+	byte ak;   /* acknowledgement field */
+
+	do
+	:: s2m?pty(seq, ak) ->
+		m2r!pty(seq, ak)  /* good transmission */
+	od
+}
+
+active proctype medium2()
+{	byte pty;  /* packet type */
+	byte seq;  /* sequence number field */
+	byte ak;   /* acknowledgement field */
+
+	do
+	:: r2m?pty(seq, ak) ->
+		m2s!pty(seq, ak)  /* good transmission */
+	od
+}
+
+active proctype sender()
+{	byte sendseq=1;	/* next sequence number to use when sending */
+	byte rack;	/* last sequence number acked by remote     */
+	byte pty;	/* packet type */
+	byte seq;	/* packet sequence number */
+	byte ak;	/* ack field in packet */
+
+#define openwindow (diff(sendseq, rack) <= HWIN && sendseq != rack)
+
+      do
+      :: openwindow ->	/* opening in remote window */
+		s2m!data(sendseq, 0);	/* send data packet */
+		inc(sendseq)		/* update sendseq */
+
+      :: m2s?pty(seq, ak) ->	/* drop packet from remote */
+progress_sdrop:	skip
+
+      :: m2s?pty(seq, ak) ->	/* error free packet from remote */
+		assert(pty == ack || pty == nak);
+		if
+		:: (!((ak==sendseq)
+			|| diff(ak, rack)>HWIN
+			|| diff(sendseq, ak)>HWIN)) ->
+				rack = ak
+		:: else
+		fi;
+		if
+		:: pty==nak ->
+			if
+			:: (!((seq==sendseq)
+				|| diff(seq, rack)>HWIN
+				|| diff(sendseq, seq)>HWIN)) ->
+					s2m!data(seq, 0)
+			:: else
+			fi
+		:: else
+		fi
+
+      :: s2m!nak(1, 0);		/* timeout */
+		if
+		:: openwindow ->
+progress_t1:		skip
+		:: else
+		fi;
+		if
+		:: (sendseq!=(rack+1)%WIN) ->
+			s2m!data((rack+1)%WIN,0)
+		:: else
+		fi
+      od
+}
+
+/* receiver's sennak routine */
+#define r_sendnak(x)  atomic{ r2m!nak(x,recseq); lack = recseq; nakd[x] = true }
+
+active proctype recver()
+{	byte recseq;		/* last sequence number returned */
+	byte lack;		/* last seqnumber acked to remote        */
+	bool recbuf[WIN];	/* array of out-of-order data packets rcvd from remote*/
+	bool nakd[WIN];	/* record of naks sent recently */
+	byte pty;		/* packet type */
+	byte seq;		/* packet seq no */
+	byte ak;		/* piggyback ack */
+	byte tmp;		/* local scratch variable */
+
+	do
+	:: m2r?pty(seq, ak);
+progress_rdrop:	skip
+
+	:: m2r?pty(seq, ak);
+		if
+		:: pty == nak
+#if FIXED
+			->
+			r2m!ack(recseq, recseq);
+			lack=recseq
+#endif
+		:: pty == data -> 
+			if
+			:: ((diff(seq, lack) > HWIN) || (seq==lack))
+				/* not in window */
+			:: else ->
+				if
+#if FULL
+				:: true ->	/* bad data xsum */
+progress_r1:				if
+/*					:: (!((seq==recseq) && (!recbuf[seq]&&!nakd[seq]))) -> */
+					:: ((seq!=recseq)&& !recbuf[seq]&& (diff(seq, recseq)<= WIN/2)) ->
+						r_sendnak(seq)
+					:: else
+					fi
+#endif
+				:: 		/* good data */
+					nakd[seq] = false;
+					if
+					:: (seq != (recseq+1)%WIN) ->
+						if
+						:: (seq != recseq && !recbuf[seq]) ->
+							recbuf[seq] = true;
+							tmp = (recseq+1)%WIN;
+							do
+							:: (tmp != seq) ->
+								if
+								:: (!(nakd[tmp] || recbuf[tmp])) ->
+									r_sendnak(tmp)
+								:: else
+								fi;
+								inc(tmp)
+							:: (tmp == seq) -> break
+							od
+						:: else
+						fi;
+					:: else ->
+progress_r2:					recseq = seq; /* deliver to user */
+						tmp=(seq+1)%WIN;
+						do
+						:: recbuf[tmp] ->
+							recseq = tmp; /* deliver to user */
+							recbuf[tmp]=false;
+							inc(tmp)
+						:: else -> break
+						od;
+						if
+						:: (!(diff(seq, lack)<QWIN)) ->
+							r2m!ack(seq, seq);
+							lack=recseq
+						:: else
+						fi
+					fi
+				fi
+			fi
+		fi
+ 
+	:: r2m!nak((recseq+1)%WIN, recseq);	/* timeout */
+progress_t2:	d_step {
+			seq = 0;
+			do
+			:: (seq<WIN) -> nakd[seq]=false; seq++
+			:: (seq==WIN) -> break
+			od;
+			lack = recseq;
+			nakd[(recseq+1)%WIN] = true
+		}
+      od
+}
+
+
+
