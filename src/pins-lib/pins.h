@@ -460,6 +460,9 @@ typedef void*(*newmap_t)(void*newmap_context);
 /** Translate the given chunk to an integer with repect to the given map.
  */
 typedef int (*chunk2int_t)(void*map,void*chunk,int len);
+/** Put the given chunk at a location in the map.
+ */
+typedef void (*chunkatint_t)(void*map,void*chunk,int len,int pos);
 /** Translate the given integer to a chunk with repect to the given map.
  */
 typedef void* (*int2chunk_t)(void*map,int idx,int*len);
@@ -468,8 +471,13 @@ typedef int (*get_count_t)(void* object);
 
 /** Set the map factory method and the lookup methods for chunk maps.
  */
-extern void GBsetChunkMethods(model_t model,newmap_t newmap,void*newmap_context,
-	int2chunk_t int2chunk,chunk2int_t chunk2int,get_count_t get_count);
+extern void GBsetChunkMethods(model_t model,
+                              newmap_t newmap,
+                              void *newmap_context,
+                              int2chunk_t int2chunk,
+                              chunk2int_t chunk2int,
+                              chunkatint_t chunkat,
+                              get_count_t get_count);
 
 /**
 \brief Copy map factory methods, lookup methods AND chunk maps.
@@ -497,6 +505,14 @@ Moreover, the result can only be guaranteed to be correct if there are no Put-ca
 in progress anywhere in the system during the time this call is made.
 */
 extern int GBchunkCount(model_t model,int type_no);
+
+/**
+\brief Put a chunk into a table at a specific index.
+
+WARNING: only to be used at initialization time! Otherwise this operation will
+fail with an error.
+*/
+extern void GBchunkPutAt(model_t model,int type_no,const chunk c,int index);
 
 /**
 \brief Put a chunk into a table.

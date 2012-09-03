@@ -20,6 +20,8 @@ extern value_table_t HREcreateTable(hre_context_t ctx,const char* name);
  */
 extern void* HREgreyboxNewmap(void*newmap_context);
 
+extern void HREgreyboxCAtI(void*map,void*data,int len,int pos);
+
 extern int HREgreyboxC2I(void*map,void*data,int len);
 
 extern void* HREgreyboxI2C(void*map,int idx,int*len);

@@ -1,6 +1,9 @@
 
 noinst_LTLIBRARIES  = libvset.la
 
+# Warning overwriting user variable! (Avoid DDD warnings)
+CXXFLAGS = @CXXFLAGS@ -Wno-unused-parameter -Wno-overloaded-virtual
+
 # libvset
 libvset_la_SOURCES   = vector_set.c vector_set.h vdom_object.h
 libvset_la_SOURCES  += vset_listdd.c

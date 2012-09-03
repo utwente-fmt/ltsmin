@@ -24,7 +24,8 @@ test-dfs-stack
 test-dm
 test-is-balloc
 test-hre
-test-hre-mpi
+test-mpi-hre
+test-ltsmin-parse
 test-regroup
 test-vset
 hre-test/test-hre

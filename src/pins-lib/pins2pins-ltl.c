@@ -406,11 +406,8 @@ GBaddLTL (model_t model, const char *ltl_file, pins_ltl_type_t type, model_t por
     GBgrowChunkMaps(ltlmodel, type_count);
 
     if (bool_is_new) {
-        int         idx_false = GBchunkPut(ltlmodel, bool_type, chunk_str("false"));
-        int         idx_true  = GBchunkPut(ltlmodel, bool_type, chunk_str("true"));
-        HREassert (idx_false == 0, "idx_false != 0 but %d", idx_false);
-        HREassert (idx_true == 1, "idx_true != 1 but %d", idx_true);
-        (void)idx_false; (void)idx_true;
+        GBchunkPutAt(ltlmodel, bool_type, chunk_str("false"), 0);
+        GBchunkPutAt(ltlmodel, bool_type, chunk_str("true"), 1);
     }
 
     matrix_t       *p_new_dm = (matrix_t*) RTmalloc(sizeof(matrix_t));

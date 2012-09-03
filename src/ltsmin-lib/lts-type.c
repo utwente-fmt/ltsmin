@@ -322,7 +322,18 @@ int lts_type_put_type(lts_type_t  t,const char *name,data_format_t format,int* i
 }
 
 int lts_type_add_type(lts_type_t  t,const char *name,int *is_new){
-    return lts_type_put_type(t,name,LTStypeChunk,is_new);
+    int type_no;
+    if (is_new) {
+        type_no=SIlookup(t->type_db,name);
+        if (type_no!=SI_INDEX_FAILED) {
+            *is_new=0;
+            return type_no;
+        }
+        *is_new=1;
+    }
+    type_no=SIput(t->type_db,name);
+    t->type_format[type_no] = LTStypeChunk;
+    return type_no;
 }
 
 char* lts_type_get_type(lts_type_t  t,int typeno){

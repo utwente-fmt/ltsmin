@@ -348,14 +348,14 @@ DVE2loadGreyboxModel(model_t model, const char *filename)
     for(int i = 0; i < ntypes; i++) {
         const char* type_name = get_state_variable_type_name(i);
         HREassert (type_name != NULL, "invalid type name");
+        if (lts_type_add_type(ltstype, type_name, NULL) != i) {
+            Abort("wrong type number");
+        }
         int type_value_count = get_state_variable_type_value_count(i);
         if (0 == type_value_count) {
             lts_type_set_format (ltstype, i, LTStypeDirect);
         } else {
              lts_type_set_format (ltstype, i, LTStypeEnum);
-        }
-        if (lts_type_add_type(ltstype, type_name, NULL) != i) {
-            Abort("wrong type number");
         }
     }
     int bool_is_new, bool_type = lts_type_add_type (ltstype, "bool", &bool_is_new);
@@ -400,16 +400,13 @@ DVE2loadGreyboxModel(model_t model, const char *filename)
         int type_value_count = get_state_variable_type_value_count(i);
         for(int j=0; j < type_value_count; ++j) {
             const char* type_value = get_state_variable_type_value(i, j);
-            GBchunkPut(model, i, chunk_str((char*)type_value));
+            GBchunkPutAt(model, i, chunk_str((char*)type_value), j);
         }
     }
 
     if (bool_is_new) {
-        int idx_false = GBchunkPut(model, bool_type, chunk_str("false"));
-        int idx_true  = GBchunkPut(model, bool_type, chunk_str("true"));
-        HREassert (idx_false == 0, "idx_false != 0 but %d", idx_false);
-        HREassert (idx_true == 1, "idx_true != 1 but %d", idx_true);
-        (void)idx_false; (void)idx_true;
+        GBchunkPutAt(model, bool_type, chunk_str("false"), 0);
+        GBchunkPutAt(model, bool_type, chunk_str("true"), 1);
     }
 
     lts_type_validate(ltstype);

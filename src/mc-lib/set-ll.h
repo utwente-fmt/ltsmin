@@ -36,9 +36,9 @@ extern int          set_ll_count    (set_ll_t *set);
 /**
 \Brief binds a key to a specific value. NOT THREAD-SAFE!
  */
-void                set_ll_install (set_ll_t *set, char *name, int idx);
+void                set_ll_install  (set_ll_t *set, char *name, int len, int idx);
 
-extern set_ll_t    *set_ll_create   ();
+extern set_ll_t    *set_ll_create   (set_ll_allocator_t *alloc);
 
 /**
 \brief Fill-in all indices in the set with bogus values to create a continuous

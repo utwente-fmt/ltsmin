@@ -13,6 +13,8 @@ typedef hash64_t (*hash64_f)(const char *key, int len, unsigned int seed);
 
 extern uint32_t SuperFastHash (const void *data, int len, uint32_t hash);
 
+extern uint64_t MurmurHash64 (const void * key, int len, unsigned int seed);
+
 extern uint32_t oat_hash(const void *data, int len, uint32_t seed);
 
 extern uint32_t mix32 (uint32_t a);

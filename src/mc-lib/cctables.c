@@ -130,6 +130,15 @@ put_chunk(value_table_t vt,chunk item)
     return set_ll_put(table->string_set, item.data, item.len);
 }
 
+static void
+put_at_chunk(value_table_t vt,chunk item,value_index_t pos)
+{
+    table_t            *table = *((table_t **)vt);
+    pthread_rwlock_wrlock(&table->map->map_lock);
+    set_ll_install(table->string_set, item.data, item.len, pos);
+    pthread_rwlock_unlock(&table->map->map_lock);
+}
+
 static chunk
 get_chunk(value_table_t vt,value_index_t idx)
 {
@@ -160,11 +169,6 @@ new_map(void* context)
         pthread_rwlock_wrlock(&map->map_lock);
         if (!table->string_set) {
             table->string_set = set_ll_create(map->set_allocator);
-
-            // insert true and false to enforce their numbering (required by some PINS implementations)
-            set_ll_install (table->string_set, "false", 0);
-            set_ll_install (table->string_set, "true" , 1);
-
             table->map = map;
         }
         pthread_rwlock_unlock(&map->map_lock);
@@ -179,6 +183,7 @@ cct_create_vt(cct_cont_t *ctx)
     value_table_t vt = VTcreateBase("CCT map", sizeof(table_t *));
     VTdestroySet(vt,NULL);
     VTputChunkSet(vt,put_chunk);
+    VTputAtChunkSet(vt,put_at_chunk);
     VTgetChunkSet(vt,get_chunk);
     VTgetCountSet(vt,get_count);
     *((void **)vt) = new_map(map);

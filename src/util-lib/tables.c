@@ -15,6 +15,7 @@ struct value_table_s {
     put_native_t put_native;
     get_native_t get_native;
     put_chunk_t put_chunk;
+    put_at_chunk_t put_at_chunk;
     get_chunk_t get_chunk;
     vt_get_count_t get_count;
 };
@@ -38,6 +39,11 @@ static value_index_t missing_put_chunk(value_table_t vt,chunk item){
     (void)vt;(void)item;
     Abort("method put_chunk has not been set");
     return (value_index_t)0;
+}
+
+static void missing_put_at_chunk(value_table_t vt,chunk item,value_index_t pos){
+    (void)vt;(void)item;(void)pos;
+    Abort("method put_chunk has not been set");
 }
 
 static chunk missing_get_chunk(value_table_t vt,value_index_t idx){
@@ -95,6 +101,16 @@ value_index_t VTputChunk(value_table_t vt,chunk item){
 void VTputChunkSet(value_table_t vt,put_chunk_t method){
     value_table_t object=USR2SYS(vt);
     object->put_chunk=method?method:missing_put_chunk;
+}
+
+void VTputAtChunk(value_table_t vt,chunk item,value_index_t pos){
+    value_table_t object=USR2SYS(vt);
+    object->put_at_chunk(vt,item,pos);
+}
+
+void VTputAtChunkSet(value_table_t vt,put_at_chunk_t method){
+    value_table_t object=USR2SYS(vt);
+    object->put_at_chunk=method?method:missing_put_at_chunk;
 }
 
 chunk VTgetChunk(value_table_t vt,value_index_t idx){

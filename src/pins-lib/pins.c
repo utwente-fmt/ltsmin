@@ -37,6 +37,7 @@ struct grey_box_model {
 	newmap_t newmap;
 	int2chunk_t int2chunk;
 	chunk2int_t chunk2int;
+    chunkatint_t chunkatint;
 	get_count_t get_count;
 	void** map;
 };
@@ -584,11 +585,13 @@ int GBtransitionInGroup(model_t model,int* labels,int group){
 }
 
 void GBsetChunkMethods(model_t model,newmap_t newmap,void*newmap_context,
-	int2chunk_t int2chunk,chunk2int_t chunk2int,get_count_t get_count){
+	int2chunk_t int2chunk,chunk2int_t chunk2int,chunkatint_t chunkatint,
+	get_count_t get_count){
 	model->newmap_context=newmap_context;
 	model->newmap=newmap;
 	model->int2chunk=int2chunk;
 	model->chunk2int=chunk2int;
+	model->chunkatint=chunkatint;
 	model->get_count=get_count;
 }
 
@@ -623,6 +626,10 @@ void GBgrowChunkMaps(model_t model, int old_n)
         }
     }
     RTfree (old_map);
+}
+
+void GBchunkPutAt(model_t model,int type_no,const chunk c,int pos){
+    model->chunkatint(model->map[type_no],c.data,c.len,pos);
 }
 
 int GBchunkPut(model_t model,int type_no,const chunk c){

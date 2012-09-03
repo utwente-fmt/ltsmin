@@ -135,7 +135,9 @@ main (int argc, char *argv[])
     Warning (info, "loading model from %s", files[0]);
     model_t             model = GBcreateBase ();
     GBsetChunkMethods (model, new_string_index, NULL,
-                       (int2chunk_t)SIgetC, (chunk2int_t)SIputC,
+                       (int2chunk_t)SIgetC,
+                       (chunk2int_t)SIputC,
+                       (chunkatint_t)SIputCAt,
                        (get_count_t)SIgetCount);
 
     GBloadFile (model, files[0], &model);

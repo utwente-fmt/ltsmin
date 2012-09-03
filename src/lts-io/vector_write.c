@@ -422,7 +422,7 @@ static lts_file_t archive_create(archive_t archive,const char* name,
 
 
 lts_file_t gcf_file_create(const char* name,lts_type_t ltstype,int segments,lts_file_t settings){
-    hre_context_t global = settings ? lts_file_context(settings) : HREglobal();
+    hre_context_t global = lts_file_context(settings) ? lts_file_context(settings) : HREglobal();
     int me=HREme(global);
     int peers=HREpeers(global);
     if (segments%peers) {
@@ -436,7 +436,7 @@ lts_file_t gcf_file_create(const char* name,lts_type_t ltstype,int segments,lts_
 }
 
 lts_file_t gcd_file_create(const char* name,lts_type_t ltstype,int segments,lts_file_t settings){
-    hre_context_t global = settings ? lts_file_context(settings) : HREglobal();
+    hre_context_t global = lts_file_context(settings) ? lts_file_context(settings) : HREglobal();
     int me=HREme(global);
     int peers=HREpeers(global);
     if (segments%peers) {
@@ -462,7 +462,7 @@ lts_file_t gcd_file_create(const char* name,lts_type_t ltstype,int segments,lts_
 }
 
 lts_file_t dir_file_create(const char* name,lts_type_t ltstype,int segments,lts_file_t settings){
-    hre_context_t global = settings ? lts_file_context(settings) : HREglobal();
+    hre_context_t global = lts_file_context(settings) ? lts_file_context(settings) : HREglobal();
     int me=HREme(global);
     int peers=HREpeers(global);
     if (segments%peers) {

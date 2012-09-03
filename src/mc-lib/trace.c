@@ -130,7 +130,7 @@ find_trace_to (trc_env_t *env, int dst_idx, int level, ref_t *parent_ofs)
 
 void
 trc_find_and_write (trc_env_t *env, char *trc_output, ref_t dst_idx, 
-                      int level, ref_t *parent_ofs)
+                    int level, ref_t *parent_ofs)
 {
     lts_type_t ltstype = GBgetLTStype(env->model);
     hre_context_t n = HREctxCreate(0, 1, "blah", 0);

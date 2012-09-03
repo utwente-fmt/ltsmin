@@ -252,14 +252,15 @@ SpinJaloadGreyboxModel(model_t model, const char *filename)
     for (int i = 0; i < ntypes; i++) {
         const char* type_name = spinja_get_type_name(i);
         HREassert (type_name != NULL, "invalid type name");
+        if (lts_type_add_type(ltstype, type_name, NULL) != i) {
+            Abort("wrong type number");
+        }
         int type_value_count = spinja_get_type_value_count(i);
+        Debug("Promela type %s (%d) has %d values.", type_name, i, type_value_count);
         if (0 == type_value_count) {
             lts_type_set_format (ltstype, i, LTStypeDirect);
         } else {
              lts_type_set_format (ltstype, i, LTStypeEnum);
-        }
-        if (lts_type_add_type(ltstype, type_name, NULL) != i) {
-            Abort("wrong type number");
         }
     }
 
@@ -275,17 +276,14 @@ SpinJaloadGreyboxModel(model_t model, const char *filename)
         lts_type_set_state_typeno(ltstype,i,type);
     }
 
-    int assert_type = 0;
+    int action_type = 0;
     if (spinja_get_edge_count() > 0)
-         assert_type = lts_type_add_type(ltstype, "action", NULL);
+         action_type = lts_type_add_type(ltstype, "action", NULL);
     GBsetLTStype(model, ltstype);
 
     if (bool_is_new) {
-        int idx_false = GBchunkPut(model, bool_type, chunk_str("false"));
-        int idx_true  = GBchunkPut(model, bool_type, chunk_str("true"));
-        HREassert (idx_false == 0, "idx_false != 0 but %d", idx_false);
-        HREassert (idx_true == 1, "idx_true != 1 but %d", idx_true);
-        (void)idx_false; (void)idx_true;
+        GBchunkPutAt(model, bool_type, chunk_str("false"), 0);
+        GBchunkPutAt(model, bool_type, chunk_str("true"), 1);
     }
 
     // setting values for types
@@ -293,16 +291,20 @@ SpinJaloadGreyboxModel(model_t model, const char *filename)
         int type_value_count = spinja_get_type_value_count(i);
         for(int j=0; j < type_value_count; ++j) {
             const char* type_value = spinja_get_type_value_name(i, j);
-            GBchunkPut(model, i, chunk_str((char*)type_value));
+            GBchunkPutAt(model, i, chunk_str((char*)type_value), j);
         }
     }
 
      if (spinja_get_edge_count() > 0) {
-         // All actions are assert statements. We do not export there values.
+         // All actions are assert statements. We do not export their values.
          lts_type_set_edge_label_count(ltstype, 1);
          lts_type_set_edge_label_name(ltstype, 0, "action");
          lts_type_set_edge_label_type(ltstype, 0, "action");
-         lts_type_set_edge_label_typeno(ltstype, 0, assert_type);
+         lts_type_set_edge_label_typeno(ltstype, 0, action_type);
+         for (int i = 0; i < spinja_get_edge_count(); i++) {
+            chunk c = chunk_str((char *)spinja_get_edge_name(i));
+            GBchunkPutAt(model, action_type, c, i);
+         }
      }
 
     // get initial state

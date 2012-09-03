@@ -20,6 +20,7 @@ struct zobrist_s {
     int               **ones;
     hash64_t            start;
     size_t              hits;
+    size_t              rows;
 };
 
 hash64_t
@@ -70,6 +71,7 @@ zobrist_create (size_t length, size_t z_length, matrix_t * m)
     z->mask = z->key_length - 1;
     z->length = length;
     z->keys = RTmalloc (sizeof (hash64_t *[length]));
+    z->rows = dm_nrows (m);
     srandom (time(NULL));
     for (size_t j = 0; j < length; j++) {
         z->keys[j] = RTmalloc (sizeof (hash64_t[z->key_length]));
@@ -80,8 +82,8 @@ zobrist_create (size_t length, size_t z_length, matrix_t * m)
     z->ones = NULL;
     if (m == NULL)
         return z;
-    z->ones = RTmalloc (dm_nrows (m) * sizeof (z->ones[0]));
-    for (int row = 0; row < dm_nrows (m); ++row) {
+    z->ones = RTmalloc (z->rows * sizeof (z->ones[0]));
+    for (size_t row = 0; row < z->rows; ++row) {
         z->ones[row] = RTmalloc ((1 + 
                        dm_ones_in_row (m, row)) * sizeof (z->ones[0][0]));
         dm_row_iterator_t   ri;
@@ -98,8 +100,13 @@ zobrist_create (size_t length, size_t z_length, matrix_t * m)
 void
 zobrist_free (zobrist_t z)
 {
+    for (size_t j = 0; j < z->length; j++)
+        RTfree (z->keys[j]);
     RTfree (z->keys);
-    if (z->keys)
-        RTfree (z->keys);
+    if (z->ones) {
+        for (size_t row = 0; row < z->rows; ++row)
+            RTfree (z->ones[row]);
+        RTfree (z->ones);
+    }
     RTfree (z);
 }

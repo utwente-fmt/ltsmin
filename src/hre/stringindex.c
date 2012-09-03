@@ -216,11 +216,8 @@ static void PutEntry(string_index_t si,const char*str,int s_len,int index){
 	int bucket;
 
     ensure_access(si->man,index);
-	if (si->next[index]>=0) {
-		//fprintf(stderr,"Cannot put %s at %d: position occupied by %s\n",str,index,si->data[index]);
-		Abort("Cannot put %s at %d: position occupied by %s",str,index,si->data[index]);
-		return;
-	}
+	HREassert (si->next[index] < 0, "Cannot put %s at %d: position occupied by %s",
+	                                str,index,si->data[index]);
 	cut_from_free_list(si,index);
 	si->len[index]=s_len;
 	si->data[index]=RTmalloc(s_len+1);
@@ -260,10 +257,7 @@ void SIputCAt(string_index_t si,const char*str,int len,int pos){
 
 	idx=SIlookupC(si,str,len);
 	if (idx==pos) return;
-	if (idx!=SI_INDEX_FAILED){
-		Abort("Cannot put %s at %d: already at %d",str,pos,idx);
-		return;
-	}
+	HREassert (idx==SI_INDEX_FAILED, "Cannot put %s at %d: already at %d",str,pos,idx);
 	PutEntry(si,str,len,pos);
 }
 
