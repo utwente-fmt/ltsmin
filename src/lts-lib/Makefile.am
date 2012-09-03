@@ -6,6 +6,7 @@ liblts_lib_la_SOURCES += determinize.c
 liblts_lib_la_SOURCES += dir-info.c dir-info.h
 liblts_lib_la_SOURCES += find-states.c
 liblts_lib_la_SOURCES += lts.c lts.h
+liblts_lib_la_SOURCES += lts_access.c
 liblts_lib_la_SOURCES += lts-imca-io.c
 liblts_lib_la_SOURCES += lts-io.c
 liblts_lib_la_SOURCES += lts_print.c

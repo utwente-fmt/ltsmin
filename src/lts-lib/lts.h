@@ -227,4 +227,13 @@ This allows reading an LTS using the LTS-IO API.
 */
 lts_file_t lts_reader(lts_t lts,int segments,lts_file_t settings);
 
+
+/**
+\brief Get the value of a state label.
+*/
+extern uint32_t lts_state_get_label(lts_t lts,uint32_t state_no,uint32_t label_no);
+
+
+
+
 #endif

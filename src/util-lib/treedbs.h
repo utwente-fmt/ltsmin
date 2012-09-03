@@ -26,6 +26,11 @@ extern int TreeDBSlookup(treedbs_t dbs,int *vector);
 extern int TreeDBSlookup_ret(treedbs_t dbs,int *vector, int *idx);
 
 /**
+Get a single element of a vector.
+*/
+extern int TreeDBSGet(treedbs_t dbs,int index,int pos);
+
+/**
 Unfold an element to a tree,
 */
 extern void TreeUnfold(treedbs_t dbs,int index,int*vector);

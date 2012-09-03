@@ -24,6 +24,7 @@ check_PROGRAMS += test-ltsmin-parse
 check_PROGRAMS += test-mucalc-parser
 check_PROGRAMS += test-regroup
 check_PROGRAMS += test-simplemap
+check_PROGRAMS += test-treedbs
 check_PROGRAMS += test-vset
 
 # test-bitset
@@ -85,6 +86,11 @@ test_regroup_CPPFLAGS 		= $(AM_CPPFLAGS)
 test_simplemap_SOURCES        = test-simplemap.c
 test_simplemap_LDADD          = $(HRE_LIB) ../util-lib/libutil.la $(AM_LDFLAGS)
 test_simplemap_CPPFLAGS       = $(AM_CPPFLAGS)
+
+# test-treedbs
+test_treedbs_SOURCES 		= test-treedbs.c
+test_treedbs_LDADD		 	= ../hre/libhre.la ../hre-io/libhre-io.la ../util-lib/libutil.la
+test_treedbs_CPPFLAGS 	    = $(AM_CPPFLAGS)
 
 # test-vset
 test_vset_SOURCES 			= test-vset.c

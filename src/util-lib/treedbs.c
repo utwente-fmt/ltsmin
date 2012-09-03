@@ -1,3 +1,4 @@
+// -*- tab-width:4 ; indent-tabs-mode:nil -*-
 #include <hre/config.h>
 
 #include <stdint.h>
@@ -32,6 +33,13 @@ struct treedbs_s {
 	int *db_next;
 	int *db_tree_left;
 	int *db_tree_right;
+	
+	/** Contains the path to a leaf for every leaf index. Every step is:
+	    0 : right here.
+	    <0 : go left using -node.
+	    >0 : go right using node.
+     */
+	int **db_tree_path;
 
 	int **db_hash;
 	int *db_mask;
@@ -164,6 +172,25 @@ TreeFold_ret(treedbs_t dbs,int *vector, int *idx)
     }
 }
 
+int TreeDBSGet(treedbs_t dbs,int index,int pos){
+	int nPars=dbs->nPars;
+ 	if (nPars==1) {
+		return dbs->rev[index];
+	} else {
+	    Debug("getting pos %d from state %d",pos,index);
+	    int tmp=index;
+	    for(int i=0;dbs->db_tree_path[pos][i]!=0;i++){
+	        Debug("path value %d is %d",i,dbs->db_tree_path[pos][i]);
+	        if (dbs->db_tree_path[pos][i]<0){
+	            tmp=dbs->db_left[-dbs->db_tree_path[pos][i]][tmp];
+	        } else {
+	            tmp=dbs->db_right[dbs->db_tree_path[pos][i]][tmp];
+	        }
+	    }
+	    return tmp;
+	}
+}
+
 void TreeUnfold(treedbs_t dbs,int index,int*vector){
 	int nPars=dbs->nPars;
 	if (nPars==1) {
@@ -192,6 +219,18 @@ static int mktree(treedbs_t dbs,int next_node,int begin,int end){
 	int middle_end=begin+((end-begin)/2);
 	int middle_begin=middle_end+1;
 	int this_node=next_node;
+	for (int i=begin;i<=middle_end;i++){
+	    int j=0;
+	    while(dbs->db_tree_path[i-dbs->nPars][j]!=0) j++;
+	    dbs->db_tree_path[i-dbs->nPars][j]=-this_node;
+	    dbs->db_tree_path[i-dbs->nPars][j+1]=0;
+	}
+	for (int i=middle_begin;i<=end;i++){
+	    int j=0;
+	    while(dbs->db_tree_path[i-dbs->nPars][j]!=0) j++;
+	    dbs->db_tree_path[i-dbs->nPars][j]=this_node;
+	    dbs->db_tree_path[i-dbs->nPars][j+1]=0;
+	}
 	next_node++;
 	if (begin==middle_end) {
 		dbs->db_tree_left[this_node]=begin;
@@ -210,6 +249,15 @@ static int mktree(treedbs_t dbs,int next_node,int begin,int end){
 
 static void maketree(treedbs_t dbs){
 	mktree(dbs,1,dbs->nPars,dbs->nPars+dbs->nPars-1);
+	/*
+	for(int i=0;i<dbs->nPars;i++){
+	    printf("path to %4d:",i);
+	    for(int j=0;dbs->db_tree_path[i][j]!=0;j++){
+	        printf(" %4d",dbs->db_tree_path[i][j]);
+	    }
+	    printf("\n");
+	}
+	*/
 }
 
 treedbs_t TreeDBScreate(int nPars){
@@ -234,12 +282,18 @@ treedbs_t TreeDBScreate(int nPars){
 		dbs->db_mask=(int*)RTmalloc(nPars*sizeof(int));
 		dbs->db_tree_left=(int*)RTmalloc(nPars*sizeof(int));
 		dbs->db_tree_right=(int*)RTmalloc(nPars*sizeof(int));
+		dbs->db_tree_path=(int**)RTmalloc(nPars*sizeof(int*));
+		
 		dbs->db_hash_size=(int*)RTmalloc(nPars*sizeof(int));
 		for(int i=1;i<dbs->nPars;i++){
 			dbs->db_left[i]=(int*)RTmalloc(BLOCKSIZE*sizeof(int));
 			dbs->db_right[i]=(int*)RTmalloc(BLOCKSIZE*sizeof(int));
 			dbs->db_bucket[i]=(int*)RTmalloc(BLOCKSIZE*sizeof(int));
 			dbs->db_hash[i]=(int*)RTmalloc(INIT_HASH_SIZE*sizeof(int));
+		}
+		for(int i=0;i<dbs->nPars;i++){
+		    dbs->db_tree_path[i]=(int*)RTmalloc(nPars*sizeof(int));
+		    dbs->db_tree_path[i][0]=0;
 		}
 		maketree(dbs);
 		for(int i=1;i<nPars;i++){
