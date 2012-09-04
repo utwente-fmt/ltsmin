@@ -43,17 +43,20 @@ to saturate levels.
         groups. The 'directed' strategy focuses the search on the transition
         groups in which the action occurs. Defaults to 'unguided'.
 
-*--mu*='MUFILE'::
+*--mu*='MUFILE|MUFORMULA'::
     After computing all reachable states, evaluate the mu-formula in 'MUFILE'
 +
 'MUFILE' is a file containing a Mu Calculus formula (see
-manpage:ltsmin-mu[5]). This formula is a propositional formula with
-least and greatest fixpoint operator. It will be evaluated after generation
-of the complete state space.
+manpage:ltsmin-mu[5]). Alternatively, the formula can be provide directly as
+MUFORMULA. This formula is a propositional formula with least and greatest
+fixpoint operator. It will be evaluated after generation of the complete state
+space.
 
-*--ctl**='CTLFILE'::
-    Convert a ctl* formula given in 'CTLFILE' (see manpage:ltsmin-ctl[5]) to
-    a mu-formula (see manpage:ltsmin-mu[5]), and evaluate the mu-formula after
-    computing all reachable states.
+*--ctl-star*='CTLFILE|CTLFORMULA'::
+    'CTLFILE' is a file containing an Linear Temporal Logic Star (CTL*) formula
+    (see manpage:ltsmin-ltl[5]).  Which content can also be provided directly as
+    'CTLFORMULA'.
+    The formula is translated to a mu-formula (see manpage:ltsmin-mu[5]),
+    which is evaluated after computing all reachable states.
 
 include::reachability-options.txt[]

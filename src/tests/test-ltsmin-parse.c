@@ -16,7 +16,7 @@ static parse_mode_t parse_mode=PARSE_MU;
 static  struct poptOption options[] = {
     {"ltl", 0, POPT_ARG_VAL, &parse_mode, PARSE_LTL, "parse and verify an ltl formula", NULL },
     {"ctl", 0, POPT_ARG_VAL, &parse_mode, PARSE_CTL, "parse and verify a ctl formula", NULL },
-    {"ctl*", 0, POPT_ARG_VAL, &parse_mode, PARSE_CTL_S, "parse and verify a ctl* formula", NULL },
+    {"ctl-star", 0, POPT_ARG_VAL, &parse_mode, PARSE_CTL_S, "parse and verify a ctl* formula", NULL },
     {"mu", 0, POPT_ARG_VAL, &parse_mode, PARSE_MU, "parse and verify mu calculus", NULL },
     POPT_TABLEEND
 };

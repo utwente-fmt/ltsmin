@@ -13,6 +13,7 @@
 #else
 #include <hre/user.h>
 #endif
+#include <hre/stringindex.h>
 #include <lts-io/user.h>
 #include <ltsmin-lib/ltsmin-tl.h>
 #include <ltsmin-lib/ltsmin-standard.h>
@@ -21,7 +22,6 @@
 #include <pins-lib/property-semantics.h>
 #include <util-lib/dynamic-array.h>
 #include <util-lib/fast_hash.h>
-#include <hre/stringindex.h>
 #include <util-lib/treedbs.h>
 #include <util-lib/string-map.h>
 
