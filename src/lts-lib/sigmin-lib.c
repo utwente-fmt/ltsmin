@@ -280,3 +280,26 @@ void lts_write(char *name,lts_t lts,int segments){
         }
     }
 }
+
+lts_t lts_copy(lts_t orig){
+    lts_t copy=lts_create();
+    lts_set_sig(copy,orig->ltstype);
+    lts_file_t src=lts_reader(orig,1,NULL);
+    lts_file_t dst=lts_writer(copy,1,src);
+    int T=lts_type_get_type_count(orig->ltstype);
+    for(int i=0;i<T;i++){
+        if (orig->values[i]) {
+            int N=VTgetCount(orig->values[i]);
+            for(int j=0;j<N;j++){
+                chunk c=VTgetChunk(orig->values[i],j);
+                VTputAtChunk(copy->values[i],c,j);
+            }
+        }
+    }
+    lts_file_copy(src,dst);
+    lts_file_close(src);
+    lts_file_close(dst);
+    return copy;
+}
+
+

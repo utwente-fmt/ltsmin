@@ -234,6 +234,10 @@ lts_file_t lts_reader(lts_t lts,int segments,lts_file_t settings);
 extern uint32_t lts_state_get_label(lts_t lts,uint32_t state_no,uint32_t label_no);
 
 
-
+/**
+\brief Create a copy of a LTS.
+*/
+extern lts_t lts_copy(lts_t orig);
 
 #endif
+
