@@ -77,7 +77,8 @@ extern void HREctxExit(hre_context_t ctx,int code) __attribute__ ((noreturn));
 typedef enum {
     UInt32,
     UInt64,
-    Pointer = sizeof(char *) == 4 ? UInt32 : UInt64
+    Pointer,
+    SizeT
 } unit_t;
 
 typedef enum {Sum,Max} operand_t;

@@ -142,7 +142,7 @@ ETFloadGreyboxModel(model_t model, const char *name)
     ctx->trans_key_idx=(string_index_t*)RTmalloc(dm_nrows(p_dm_info)*sizeof(string_index_t));
     ctx->trans_table=(matrix_table_t*)RTmalloc(dm_nrows(p_dm_info)*sizeof(matrix_table_t));
     for(int i=0; i < dm_nrows(p_dm_info); i++) {
-        Warning(info,"parsing table %d",i);
+        Warning(infoLong,"parsing table %d",i);
         etf_rel_t trans=etf_trans_section(etf,i);
         int used[state_length];
         int src[state_length];
@@ -165,7 +165,7 @@ ETFloadGreyboxModel(model_t model, const char *name)
                 used[j]=0;
             }
         }
-        Warning(info,"length is %d",len);
+        Warning(infoLong,"length is %d",len);
         ctx->trans_key_idx[i]=SIcreate();
         ctx->trans_table[i]=MTcreate(3);
         int src_short[len];
@@ -212,7 +212,7 @@ ETFloadGreyboxModel(model_t model, const char *name)
             row[1]=(int32_t)SIputC(ctx->trans_key_idx[i],(char*)dst_short,len<<2);
             MTaddRow(ctx->trans_table[i],row);
         } while(ETFrelNext(trans,src,dst,lbl));
-        Warning(info,"table %d has %d states and %d transitions",
+        Warning(infoLong,"table %d has %d states and %d transitions",
                 i,SIgetCount(ctx->trans_key_idx[i]),ETFrelCount(trans));
         ETFrelDestroy(&trans);
         MTclusterBuild(ctx->trans_table[i],0,SIgetCount(ctx->trans_key_idx[i]));
@@ -227,7 +227,7 @@ ETFloadGreyboxModel(model_t model, const char *name)
     ctx->label_key_idx=(string_index_t*)RTmalloc(dm_nrows(p_sl_info)*sizeof(string_index_t));
     ctx->label_data=(int**)RTmalloc(dm_nrows(p_sl_info)*sizeof(int*));
     for(int i=0;i<dm_nrows(p_sl_info);i++){
-        Warning(info,"parsing map %d",i);
+        Warning(infoLong,"parsing map %d",i);
         etf_map_t map=etf_get_map(etf,i);
         int used[state_length];
         int state[state_length];
@@ -268,12 +268,10 @@ ETFloadGreyboxModel(model_t model, const char *name)
 
     int type_count=lts_type_get_type_count(ltstype);
     for(int i=0;i<type_count;i++){
-        Warning(info,"Setting values for type %d (%s)",i,lts_type_get_type(ltstype,i));
+        Warning(infoLong,"Setting values for type %d (%s)",i,lts_type_get_type(ltstype,i));
         int count=etf_get_value_count(etf,i);
         for(int j=0;j<count;j++){
-            if (j!=GBchunkPut(model,i,etf_get_value(etf,i,j))){
-                Abort("etf-greybox does not support remapping of values");
-            }
+            GBchunkPutAt(model,i,etf_get_value(etf,i,j),j);
         }
     }
 
