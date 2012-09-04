@@ -264,6 +264,27 @@ static int              LATTICE_BLOCK_SIZE = (1UL<<CACHE_LINE) / sizeof(lattice_
 static int              UPDATE = TA_UPDATE_WAITING;
 static int              NONBLOCKING = 0;
 
+void
+print_setup ()
+{
+    if ((strategy[0] & Strat_LTL) && call_mode == UseGreyBox)
+        Warning(info, "Greybox not supported with strategy NDFS, ignored.");
+    Warning (info, "Using %d %s (lb: SRP, strategy: %s)", W,
+             W == 1 ? "core (sequential)" : (SPEC_MT_SAFE ? "threads" : "processes"),
+             key_search(strategies, strategy[0]));
+    Warning (info, "loading model from %s", files[0]);
+    Warning (info, "There are %d state labels and %d edge labels", SL, EL);
+    Warning (info, "State length is %d, there are %d groups", N, K);
+    if (act_detect)
+        Warning(info, "Detecting action \"%s\"", act_detect);
+    if (db_type == HashTable) {
+        Warning (info, "Using a hash table with 2^%d elements", dbs_size)
+    } else
+        Warning (info, "Using a%s tree table with 2^%d elements", indexing ? "" : " non-indexing", dbs_size);
+    Warning (info, "Global bits: %d, count bits: %d, local bits: %d.",
+             global_bits, count_bits, local_bits);
+}
+
 static void
 state_db_popt (poptContext con, enum poptCallbackReason reason,
                const struct poptOption *opt, const char *arg, void *data)
@@ -367,11 +388,11 @@ typedef struct global_s {
     size_t              threshold;
     wctx_t            **contexts;
     zobrist_t           zobrist;
+    cct_map_t          *tables;
+    pthread_mutex_t     mutex;
 } global_t;
 
 static global_t           *global;
-static cct_map_t          *tables = NULL;
-static pthread_mutex_t     mutex;
 
 typedef struct counter_s {
     double              runtime;        // measured exploration time
@@ -657,6 +678,27 @@ wctx_free (wctx_t *ctx)
 }
 
 /**
+ * Performs those allocations that are absolutely necessary for local initiation
+ * It initializes a mutex and a table of chunk tables.
+ */
+void
+prelocal_global_init ()
+{
+    if (HREme(HREglobal()) == 0) {
+        RTswitchAlloc (!SPEC_MT_SAFE);
+        global = RTmallocZero (sizeof(global_t));
+        RTswitchAlloc (false);
+        //                               multi-process && multiple processes
+        global->tables = cct_create_map (!SPEC_MT_SAFE && HREdefaultRegion(HREglobal()) != NULL);
+#if SPEC_MT_SAFE == 1
+        pthread_mutex_init (&global->mutex, NULL);
+#endif
+        GBloadFileShared (NULL, files[0]); // NOTE: no model argument
+    }
+    HREreduce (HREglobal(), 1, &global, &global, Pointer, Max);
+}
+
+/**
  * Performs those global allocations that can be delayed.
  * No barrier needed before calling this function.
  */
@@ -665,10 +707,9 @@ postlocal_global_init (wctx_t *ctx)
 {
     int id = HREme (HREglobal());
     if (id == 0) {
-        RTswitchAlloc (!SPEC_MT_SAFE);
-        global = RTmallocZero (sizeof(global_t));
         matrix_t           *m = GBgetDMInfo (ctx->model);
         size_t              bits = global_bits + count_bits;
+        RTswitchAlloc (!SPEC_MT_SAFE);
         if (db_type == HashTable) {
             if (ZOBRIST)
                 global->zobrist = zobrist_create (D, ZOBRIST, m);
@@ -683,62 +724,23 @@ postlocal_global_init (wctx_t *ctx)
             global->lmap = lm_create (W, 1UL<<dbs_size, LATTICE_BLOCK_SIZE);
         global->lb = lb_create_max (W, G, H);
         global->contexts = RTmalloc (sizeof (wctx_t*[W]));
-        if (strategy[0] & Strat_LTL) {
-            global->threshold = THRESHOLD;
-        } else {
-            global->threshold = THRESHOLD / W;
-        }
+        global->threshold = strategy[0] & Strat_LTL ? THRESHOLD : THRESHOLD / W;
         RTswitchAlloc (false);
     }
-    (void) signal (SIGINT, exit_ltsmin);
-    HREreduce (HREglobal(), 1, &global, &global, UInt64, Max);
-
-    color_set_dbs(global->dbs);
+    HREbarrier (HREglobal());
 
     global->contexts[id] = ctx; // publish local context
+    color_set_dbs (global->dbs);
+    (void) signal (SIGINT, exit_ltsmin);
 
     RTswitchAlloc (!SPEC_MT_SAFE);
     lb_local_init (global->lb, ctx->id, ctx); // Barrier
     RTswitchAlloc (false);
 }
 
-/**
- * Performs those allocations that are absolutely necessary for local initiation
- * It initializes a mutex and a table of chunk tables.
- */
 void
-prelocal_global_init ()
+statics_init (model_t model)
 {
-    if (HREme(HREglobal()) == 0) {
-        pthread_mutexattr_t attr;
-        //                       multi-process && multiple processes
-        tables = cct_create_map (!SPEC_MT_SAFE && HREdefaultRegion(HREglobal()) != NULL);
-        int type = SPEC_MT_SAFE ? PTHREAD_PROCESS_PRIVATE : PTHREAD_PROCESS_SHARED;
-        pthread_mutexattr_setpshared(&attr, type);
-        pthread_mutex_init (&mutex, &attr);
-        GBloadFileShared (NULL, files[0]); // NOTE: no model argument
-    }
-    HREreduce (HREglobal(), 1, &tables, &tables, UInt64, Max);
-}
-
-/**
- * Initialize locals: model and settings
- */
-wctx_t *
-local_init ()
-{
-    model_t             model = GBcreateBase ();
-
-    cct_cont_t         *map = cct_create_cont (tables);
-    GBsetChunkMethods (model, (newmap_t)cct_create_vt, map,
-                       HREgreyboxI2C,
-                       HREgreyboxC2I,
-                       HREgreyboxCAtI,
-                       HREgreyboxCount);
-    pthread_mutex_lock (&mutex);
-    GBloadFile (model, files[0], &model);
-    pthread_mutex_unlock (&mutex);
-
 #ifdef OPAAL
     strategy[0] |= Strat_TA;
 #endif
@@ -823,7 +825,42 @@ local_init ()
         break;
     case Tree: default: Abort ("Unknown state storage type: %d.", db_type);
     }
+}
 
+
+/**
+ * Initialize locals: model and settings
+ */
+wctx_t *
+local_init ()
+{
+    model_t             model = GBcreateBase ();
+
+    cct_cont_t         *map = cct_create_cont (global->tables);
+    GBsetChunkMethods (model, (newmap_t)cct_create_vt, map,
+                       HREgreyboxI2C,
+                       HREgreyboxC2I,
+                       HREgreyboxCAtI,
+                       HREgreyboxCount);
+
+#if SPEC_MT_SAFE == 1
+    // some frontends (opaal) do not have a thread-safe initial state function
+    pthread_mutex_lock (&global->mutex);
+    GBloadFile (model, files[0], &model);
+    pthread_mutex_unlock (&global->mutex);
+
+    if (HREme(HREglobal()) == 0)
+        statics_init (model);
+    HREbarrier(HREglobal());
+#else
+    GBloadFile (model, files[0], &model);
+
+    // in the multi-process environment, we initialize statics locally:
+    statics_init (model);
+#endif
+
+    if (HREme(HREglobal()) == 0)
+        print_setup ();
     return wctx_create (model, 0, NULL);
 }
 
@@ -978,7 +1015,7 @@ print_statistics (counter_t *ar_reach, counter_t *ar_red, rt_timer_t timer,
     } else {
         Warning (info, "Table memory: %.1fMB, fill ratio: %.1f%%", mem4, fill);
     }
-    double chunks = cct_print_stats (info, infoLong, ltstype, tables) / (1<<20);
+    double chunks = cct_print_stats (info, infoLong, ltstype, global->tables) / (1<<20);
     Warning (info, "Est. total memory use: %.1fMB (~%.1fMB paged-in)",
              mem1 + mem4 + mem3 + chunks, mem1 + mem2 + mem3 + chunks);
 
@@ -1003,7 +1040,6 @@ print_statistics (counter_t *ar_reach, counter_t *ar_red, rt_timer_t timer,
                      reach->deletes);
 }
 
-
 void
 reduce_and_print_result (wctx_t *ctx)
 {
@@ -1025,27 +1061,6 @@ reduce_and_print_result (wctx_t *ctx)
         RTfree (reach); RTfree (red); RTfree (stats);
     }
     HREbarrier (HREglobal());
-}
-
-void
-print_setup ()
-{
-    if ((strategy[0] & Strat_LTL) && call_mode == UseGreyBox)
-        Warning(info, "Greybox not supported with strategy NDFS, ignored.");
-    Warning (info, "Using %d %s (lb: SRP, strategy: %s)", W,
-             W == 1 ? "core (sequential)" : (SPEC_MT_SAFE ? "threads" : "processes"),
-             key_search(strategies, strategy[0]));
-    Warning (info, "loading model from %s", files[0]);
-    Warning (info, "There are %d state labels and %d edge labels", SL, EL);
-    Warning (info, "State length is %d, there are %d groups", N, K);
-    if (act_detect)
-        Warning(info, "Detecting action \"%s\"", act_detect);
-    if (db_type == HashTable) {
-        Warning (info, "Using a hash table with 2^%d elements", dbs_size)
-    } else
-        Warning (info, "Using a%s tree table with 2^%d elements", indexing ? "" : " non-indexing", dbs_size);
-    Warning (info, "Global bits: %d, count bits: %d, local bits: %d.",
-             global_bits, count_bits, local_bits);
 }
 
 static void
@@ -1503,7 +1518,7 @@ ndfs_report_cycle (wctx_t *ctx, state_info_t *cycle_closing_state)
         /* Write last state to stack to close cycle */
         trace[level-1] = cycle_closing_state->ref;
         find_dfs_stack_trace (ctx, ctx->stack, trace, level);
-        double uw = cct_finalize (tables, "BOGUS, you should not see this string.");
+        double uw = cct_finalize (global->tables, "BOGUS, you should not see this string.");
         Warning (infoLong, "Parallel chunk tables under-water mark: %.2f", uw);
         trc_env_t          *trace_env = trc_create (ctx->model, get_state,
                                                     trace[0], ctx);
@@ -1521,7 +1536,7 @@ handle_error_trace (wctx_t *ctx)
     if (trc_output) {
         ref_t               start_ref = ctx->initial.ref;
         trc_env_t  *trace_env = trc_create (ctx->model, get_state, start_ref, ctx);
-        double uw = cct_finalize (tables, "BOGUS, you should not see this string.");
+        double uw = cct_finalize (global->tables, "BOGUS, you should not see this string.");
         Warning (infoLong, "Parallel chunk tables under-water mark: %.2f", uw);
         trc_find_and_write (trace_env, trc_output, ctx->state.ref, level, global->parent_ref);
     }
@@ -2454,7 +2469,7 @@ sbfs (wctx_t *ctx)
             }
         }
         size = dfs_stack_frame_size (ctx->out_stack);
-        HREreduce (HREglobal(), 1, &size, &out_size, UInt64, Sum);
+        HREreduce (HREglobal(), 1, &size, &out_size, SizeT, Sum);
         lb_reinit (global->lb, ctx->id);
         increase_level (&ctx->counters);
         if (0 == ctx->id) {
@@ -2704,7 +2719,7 @@ ta_bfs_strict (wctx_t *ctx)
             }
         }
         size = dfs_stack_frame_size(ctx->out_stack);
-        HREreduce(HREglobal(), 1, &size, &out_size, UInt64, Sum);
+        HREreduce(HREglobal(), 1, &size, &out_size, SizeT, Sum);
         lb_reinit (global->lb, ctx->id);
         increase_level (&ctx->counters);
         if (0 == ctx->id && log_active(infoLong)) {
@@ -2735,6 +2750,8 @@ explore (wctx_t *ctx)
     }
     ctx->counters.trans = 0; //reset trans count
     ctx->timer = RTcreateTimer ();
+
+    HREbarrier (HREglobal());
     RTstartTimer (ctx->timer);
     switch (strategy[0]) {
     case Strat_TA_SBFS: ta_bfs_strict (ctx); break;
@@ -2765,10 +2782,8 @@ main (int argc, char *argv[])
     HREaddOptions (options,"Perform a parallel reachability analysis of <model>\n\nOptions");
 #if SPEC_MT_SAFE == 1
     HREenableThreads (1);
-    Warning (info, "Enabling multi-thread runtime.");
 #else
     HREenableFork (1); // enable multi-process env for mCRL/mCrl2 and PBES
-    Warning (info, "Enabling multi-process runtime.");
 #endif
     HREinitStart (&argc,&argv,1,1,files,"<model>");      // spawns threads!
 
@@ -2776,8 +2791,6 @@ main (int argc, char *argv[])
     prelocal_global_init ();
     ctx = local_init ();
     postlocal_global_init (ctx);
-
-    if (ctx->id == 0) print_setup ();
 
     explore (ctx);
 

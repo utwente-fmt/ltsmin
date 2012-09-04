@@ -19,6 +19,11 @@ static void reduce_action(void* context,hre_msg_t msg){
     uint32_t*tmp=(uint32_t*)msg->buffer;
     unit_t type=tmp[0];
     operand_t op=tmp[1];
+    if (type == Pointer) {
+        type = sizeof(char *) == 4 ? UInt32 : UInt64;
+    } else if(type == SizeT) {
+        type = sizeof(size_t) == 4 ? UInt32 : UInt64;
+    }
     if (ctx->reduce_count[turn]==ctx->peers) {
         ctx->reduce_op[turn]=op;
         ctx->reduce_type[turn]=type;
@@ -27,7 +32,7 @@ static void reduce_action(void* context,hre_msg_t msg){
         if (ctx->reduce_type[turn]!=type) Abort("inconsistent type");
     }
     ctx->reduce_count[turn]--;
-    switch(type){
+   switch(type){
     case UInt32:
     {
         int len=msg->tail/4-2;
@@ -46,9 +51,9 @@ static void reduce_action(void* context,hre_msg_t msg){
     }
     case UInt64:
     {
-        int len=msg->tail/8-1;
-        uint64_t *out=(uint64_t *)ctx->reduce_out[turn];
-        uint64_t *in=(uint64_t *)&msg->buffer[8];
+        int len=msg->tail/4-2;
+        uint32_t *out=(uint32_t *)ctx->reduce_out[turn];
+        uint32_t *in=(uint32_t *)&msg->buffer[8];
         switch(op){
         case Sum:
             for(int i=0;i<len;i++) out[i]+=in[i];
@@ -93,6 +98,12 @@ void HREreduce(hre_context_t ctx,int len,void*in,void*out,unit_t type,operand_t 
         break;
     case UInt64:
         size=8*len;
+        break;
+    case Pointer:
+        size=sizeof(void*)*len;
+        break;
+    case SizeT:
+        size=sizeof(size_t)*len;
         break;
     default:
         Abort("missing case");
