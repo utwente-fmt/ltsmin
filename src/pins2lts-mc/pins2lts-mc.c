@@ -930,8 +930,10 @@ print_totals (counter_t *ar_reach, counter_t *ar_red, int d, size_t db_elts)
         red->visited /= W;
         red->explored /= W;
     }
-    Warning (info, "%s_%d (%s/%s) stats:", key_search(strategies, strategy[d]), d+1,
-             key_search(permutations, permutation), key_search(permutations, permutation_red));
+    Warning (info, "%s_%d (%s/%s) stats:",
+             key_search(strategies, strategy[d] & ~Strat_TA), d+1,
+             key_search(permutations, permutation),
+             key_search(permutations, permutation_red));
     Warning (info, "blue states: %zu (%.2f%%), transitions: %zu (per worker)",
              reach->explored, ((double)reach->explored/db_elts)*100, reach->trans);
     Warning (info, "red states: %zu (%.2f%%), bogus: %zu  (%.2f%%), transitions: %zu, waits: %zu (%.2f sec)",
