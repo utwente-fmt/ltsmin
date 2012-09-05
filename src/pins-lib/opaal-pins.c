@@ -11,6 +11,7 @@
 #include <dm/dm.h>
 #include <hre/unix.h>
 #include <hre/user.h>
+#include <mc-lib/hashtable.h>
 #include <pins-lib/opaal-pins.h>
 #include <util-lib/chunk_support.h>
 
@@ -41,6 +42,12 @@ const char* (*get_state_variable_type_value)(int type, int value);
 int         (*get_transition_count)();
 const int*  (*get_transition_read_dependencies)(int t);
 const int*  (*get_transition_write_dependencies)(int t);
+
+void*       (*lattice_clone) (const void *lattice);
+int         (*lattice_cmp) (const void *l1, const void *l2);
+uint32_t    (*lattice_hash) (const void *lattice);
+void        (*lattice_delete) (const void *lattice);
+
 covered_by_grey_t   covered_by;
 covered_by_grey_t   covered_by_short;
 
@@ -133,6 +140,92 @@ sl_group (model_t model, sl_group_enum_t group, int *state, int *labels)
         default:
             return;
     }
+}
+
+static int
+lattice_cmp_wrapper (const void *l1, const void *l2)
+{
+    return lattice_cmp (l1, l2);
+}
+
+static uint32_t
+lattice_hash_wrapper (const void *lattice, void *ctx)
+{
+    return lattice_hash (lattice);
+    (void)ctx;
+}
+
+static void *
+lattice_clone_wrapper (const void *lattice, void *ctx)
+{
+    return lattice_clone (lattice);
+    (void)ctx;
+}
+
+static void
+lattice_free_wrapper (const void *lattice)
+{
+    lattice_delete (lattice);
+}
+
+static const datatype_t DATATYPE_FED = {
+    (cmp_fun_t)lattice_cmp_wrapper,
+    (hash_fun_t)lattice_hash_wrapper,
+    (clone_fun_t)lattice_clone_wrapper,
+    (free_fun_t)lattice_free_wrapper
+};
+static const size_t INIT_SCALE = 20;
+static hashtable_t *table = NULL;
+
+__attribute__((constructor)) void
+initialize_table ()
+{
+    table = ht_alloc (&DATATYPE_FED, INIT_SCALE);
+}
+
+typedef struct context_wrapper_s {
+    TransitionCB    user_cb;
+    void           *user_context;
+    size_t          lattice_idx;
+} context_wrapper_t;
+
+void
+cb_wrapper(void *context, transition_info_t *transition_info, int *dst)
+{
+    context_wrapper_t *ctx = (context_wrapper_t *) context;
+    void **lattice = (void **) &dst[ctx->lattice_idx];
+    //void *clone;
+    size_t old_lattice = (size_t)*lattice;
+    ht_cas_empty (table,
+                  (map_key_t)*lattice, // key
+                  (map_val_t)0x77777777,
+                  (map_key_t*)lattice, // will be overwritten
+                  NULL);
+    //*lattice = clone;
+    Debug ("Lattice of next state: %zu --> %zu", old_lattice, (size_t)*lattice);
+    ctx->user_cb (ctx->user_context, transition_info, dst);
+}
+
+int
+get_all_wrapper (model_t self, int* src, TransitionCB cb, void *user_context)
+{
+    context_wrapper_t ctx;
+    lts_type_t ltstype = GBgetLTStype (self);
+    ctx.lattice_idx = lts_type_get_state_length(ltstype) - 2;
+    ctx.user_cb = cb;
+    ctx.user_context = user_context;
+    return get_successors (self, src, cb_wrapper, &ctx);
+}
+
+int
+get_next_wrapper (model_t self, int t, int *src, TransitionCB cb, void *user_context)
+{
+    context_wrapper_t ctx;
+    lts_type_t ltstype = GBgetLTStype (self);
+    ctx.lattice_idx = lts_type_get_state_length(ltstype) - 2;
+    ctx.user_cb = cb;
+    ctx.user_context = user_context;
+    return get_successor (self, t, src, cb_wrapper, &ctx);
 }
 
 void
@@ -253,6 +346,15 @@ opaalLoadDynamicLib(model_t model, const char *filename)
     RTdlsym( filename, dlHandle, "get_guard_nes_matrix" );
     get_guard_nds_matrix = (const int*(*)(int))
     RTdlsym( filename, dlHandle, "get_guard_nds_matrix" );
+
+    lattice_clone = (void *(*)(const void *))
+    RTdlsym( filename, dlHandle, "lattice_clone" );
+    lattice_cmp = (int (*)(const void *, const void *))
+    RTdlsym( filename, dlHandle, "lattice_cmp" );
+    lattice_hash = (uint32_t (*)(const void *))
+    RTdlsym( filename, dlHandle, "lattice_hash" );
+    lattice_delete = (void (*)(const void *))
+    RTdlsym( filename, dlHandle, "lattice_delete" );
 
     // optionally load the covered_by method for partly symbolic states
     covered_by = (covered_by_grey_t)
@@ -476,10 +578,18 @@ opaalLoadGreyboxModel(model_t model, const char *filename)
     // get initial state
     int state[state_length];
     get_initial_state((char*)state);
+    void **lattice = (void **) &state[state_length - 2];
+    //void *clone;
+    ht_cas_empty (table,
+                  (map_key_t)*lattice, // key
+                  (map_val_t)0x77777777,
+                  (map_key_t*)lattice, // will be overwritten
+                  NULL);
+    Debug ("Lattice of initial state: %zu", (size_t)*lattice);
     GBsetInitialState(model,state);
 
-    GBsetNextStateAll  (model, (next_method_black_t) get_successors);
-    GBsetNextStateLong (model, (next_method_grey_t)  get_successor);
+    GBsetNextStateAll  (model, get_all_wrapper);
+    GBsetNextStateLong (model, get_next_wrapper);
     GBsetIsCoveredBy (model, covered_by);
     GBsetIsCoveredByShort (model, covered_by_short);
 }
