@@ -129,8 +129,7 @@ extern log_t hre_debug;
 \brief Macro that prints a one-line debug message.
 */
 #ifdef LTSMIN_DEBUG
-#define Debug(...) HREmessage(debug,__VA_ARGS__); \
-                   if (log_active(infoLong)) HREprintStack();
+#define Debug(...) HREmessage(debug,__VA_ARGS__)
 #else
 #define Debug(...) ((void)0);
 #endif
