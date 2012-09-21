@@ -16,7 +16,7 @@
 
 // dve2 ltsmin interface functions
 void        (*get_initial_state)(char *to);
-int         (*have_property)(); // bool not defined, todo
+int         (*have_property)();
 int         (*buchi_is_accepting)(void* m, int* in);
 int         (*get_successor)( void* m, int t, int *in, TransitionCB, void *arg );
 int         (*get_successors)( void* m, int *in, TransitionCB, void *arg );

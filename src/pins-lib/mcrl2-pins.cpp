@@ -15,6 +15,7 @@
 
 extern "C" {
 #include <popt.h>
+#include <sys/stat.h>
 
 #include <dm/dm.h>
 #include <hre/user.h>
@@ -375,6 +376,11 @@ void
 MCRL2loadGreyboxModel (model_t m, const char *model_name)
 {
     Warning(info, "mCRL2 rewriter: %s", mcrl2_rewriter_strategy.c_str());
+    // check file exists
+    struct stat st;
+    if (stat(model_name, &st) != 0)
+        Abort ("File does not exist: %s", model_name);
+
     pins = new ltsmin::pins(m, std::string(model_name), mcrl2_rewriter_strategy);
     GBsetContext(m,pins);
 
