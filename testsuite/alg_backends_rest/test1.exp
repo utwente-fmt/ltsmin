@@ -1,0 +1,52 @@
+# include the general include file which contains the functions
+source lib/include.tcl
+# use the nclude file containing several procedures
+source lib/backends.tcl
+
+#cd into the test dir such that output files are placed here.
+cd $subdir
+
+puts "\n-----------------------------"
+puts   "TESTING: Algorithmic backends"
+puts   "-----------------------------\n"
+
+# the number of threads to use in multithreaded backends
+set num_threads 5
+
+# Language frontends:
+# -------------------
+
+# dve:
+dict set langs dve model "gear.1.dve"
+dict set langs dve options mc "--threads=$num_threads"
+dict set langs dve exp_output "2689 states 3567 transitions"
+
+# prom:
+dict set langs prom model "fgs.promela.spinja"
+# list with commands to be executed before the language tests. This can be used to generate models.
+dict set langs prom precommands {"spinjal ../../examples/fgs.promela" "mv fgs.promela.spinja ../../examples"}
+dict set langs prom options mc "--threads=$num_threads"
+dict set langs prom exp_output ""
+
+# lps:
+#dict set langs lps model "ieee-11073.lps"
+dict set langs lps options mc "--procs=$num_threads"
+dict set langs lps exp_output "1760 states 6583 transitions"
+
+# opaal:
+#dict set langs opaal model ""
+#dict set langs opaal options mc "--procs=$num_threads"
+
+# pbes:
+dict set langs pbes model "brp-nodeadlock.pbes"
+dict set langs pbes options mc "--procs=$num_threads"
+dict set langs pbes exp_output "10548 states 12168 transitions"
+
+set filter "{mc}"
+
+set alg_be [ find_alg_backends $filter ]
+
+run_test_for_alg_backends $alg_be $langs $backends
+
+
+cd ".."

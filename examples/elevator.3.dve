@@ -1,0 +1,195 @@
+
+
+
+
+
+
+channel call_0, get_in_0, get_out_0;channel call_1, get_in_1, get_out_1;channel call_2, get_in_2, get_out_2;
+byte floor_queue_0[3];
+byte floor_queue_0_act = 0;
+
+byte floor_queue_1[3];
+byte floor_queue_1_act = 0;
+
+byte floor_queue_2[3];
+byte floor_queue_2_act = 0;
+
+byte floor_queue_3[3];
+byte floor_queue_3_act = 0;
+
+byte floor_queue_4[3];
+byte floor_queue_4_act = 0;
+
+byte floor_queue_5[3];
+byte floor_queue_5_act = 0;
+
+
+
+byte current = 0;
+
+
+
+process Person_0 {
+byte at_floor = 0; 
+state out, waiting, in_elevator;
+init out;
+trans
+
+ waiting -> in_elevator { guard 0 != at_floor; sync get_in_0!0; },
+ waiting -> in_elevator { guard 1 != at_floor; sync get_in_0!1; },
+ waiting -> in_elevator { guard 2 != at_floor; sync get_in_0!2; },
+ waiting -> in_elevator { guard 3 != at_floor; sync get_in_0!3; },
+ waiting -> in_elevator { guard 4 != at_floor; sync get_in_0!4; },
+ waiting -> in_elevator { guard 5 != at_floor; sync get_in_0!5; },
+
+
+ in_elevator -> out {sync get_out_0?at_floor; },
+
+ out -> waiting { sync call_0!at_floor; };
+}
+
+process Person_1 {
+byte at_floor = 0; 
+state out, waiting, in_elevator;
+init out;
+trans
+
+ waiting -> in_elevator { guard 0 != at_floor; sync get_in_1!0; },
+ waiting -> in_elevator { guard 1 != at_floor; sync get_in_1!1; },
+ waiting -> in_elevator { guard 2 != at_floor; sync get_in_1!2; },
+ waiting -> in_elevator { guard 3 != at_floor; sync get_in_1!3; },
+ waiting -> in_elevator { guard 4 != at_floor; sync get_in_1!4; },
+ waiting -> in_elevator { guard 5 != at_floor; sync get_in_1!5; },
+
+
+ in_elevator -> out {sync get_out_1?at_floor; },
+
+ out -> waiting { sync call_1!at_floor; };
+}
+
+process Person_2 {
+byte at_floor = 0; 
+state out, waiting, in_elevator;
+init out;
+trans
+
+ waiting -> in_elevator { guard 0 != at_floor; sync get_in_2!0; },
+ waiting -> in_elevator { guard 1 != at_floor; sync get_in_2!1; },
+ waiting -> in_elevator { guard 2 != at_floor; sync get_in_2!2; },
+ waiting -> in_elevator { guard 3 != at_floor; sync get_in_2!3; },
+ waiting -> in_elevator { guard 4 != at_floor; sync get_in_2!4; },
+ waiting -> in_elevator { guard 5 != at_floor; sync get_in_2!5; },
+
+
+ in_elevator -> out {sync get_out_2?at_floor; },
+
+ out -> waiting { sync call_2!at_floor; };
+}
+
+
+
+process Servis {
+byte floor, caller;
+state q, r;
+init q;
+trans
+ q -> r { sync call_0?floor; effect caller = 0; },
+ q -> r { sync call_1?floor; effect caller = 1; },
+ q -> r { sync call_2?floor; effect caller = 2; },
+
+ r -> q { guard 0 == floor; effect floor_queue_0[floor_queue_0_act] = caller, floor_queue_0_act = floor_queue_0_act +1; } ,
+ r -> q { guard 1 == floor; effect floor_queue_1[floor_queue_1_act] = caller, floor_queue_1_act = floor_queue_1_act +1; } ,
+ r -> q { guard 2 == floor; effect floor_queue_2[floor_queue_2_act] = caller, floor_queue_2_act = floor_queue_2_act +1; } ,
+ r -> q { guard 3 == floor; effect floor_queue_3[floor_queue_3_act] = caller, floor_queue_3_act = floor_queue_3_act +1; } ,
+ r -> q { guard 4 == floor; effect floor_queue_4[floor_queue_4_act] = caller, floor_queue_4_act = floor_queue_4_act +1; } ,
+ r -> q { guard 5 == floor; effect floor_queue_5[floor_queue_5_act] = caller, floor_queue_5_act = floor_queue_5_act +1; } ;
+}
+
+
+
+process Elevator {
+byte going_to, serving=0, who;
+state choose_next, move_next, q, transporting;
+init choose_next;
+trans
+ choose_next -> choose_next {
+	guard 0 == serving && floor_queue_0_act == 0 && (not(floor_queue_0_act == 0)  or not(floor_queue_1_act == 0)  or not(floor_queue_2_act == 0)  or not(floor_queue_3_act == 0)  or not(floor_queue_4_act == 0)  or not(floor_queue_5_act == 0) );
+	effect serving = (serving +1) % 6; },
+ choose_next -> choose_next {
+	guard 1 == serving && floor_queue_1_act == 0 && (not(floor_queue_0_act == 0)  or not(floor_queue_1_act == 0)  or not(floor_queue_2_act == 0)  or not(floor_queue_3_act == 0)  or not(floor_queue_4_act == 0)  or not(floor_queue_5_act == 0) );
+	effect serving = (serving +1) % 6; },
+ choose_next -> choose_next {
+	guard 2 == serving && floor_queue_2_act == 0 && (not(floor_queue_0_act == 0)  or not(floor_queue_1_act == 0)  or not(floor_queue_2_act == 0)  or not(floor_queue_3_act == 0)  or not(floor_queue_4_act == 0)  or not(floor_queue_5_act == 0) );
+	effect serving = (serving +1) % 6; },
+ choose_next -> choose_next {
+	guard 3 == serving && floor_queue_3_act == 0 && (not(floor_queue_0_act == 0)  or not(floor_queue_1_act == 0)  or not(floor_queue_2_act == 0)  or not(floor_queue_3_act == 0)  or not(floor_queue_4_act == 0)  or not(floor_queue_5_act == 0) );
+	effect serving = (serving +1) % 6; },
+ choose_next -> choose_next {
+	guard 4 == serving && floor_queue_4_act == 0 && (not(floor_queue_0_act == 0)  or not(floor_queue_1_act == 0)  or not(floor_queue_2_act == 0)  or not(floor_queue_3_act == 0)  or not(floor_queue_4_act == 0)  or not(floor_queue_5_act == 0) );
+	effect serving = (serving +1) % 6; },
+ choose_next -> choose_next {
+	guard 5 == serving && floor_queue_5_act == 0 && (not(floor_queue_0_act == 0)  or not(floor_queue_1_act == 0)  or not(floor_queue_2_act == 0)  or not(floor_queue_3_act == 0)  or not(floor_queue_4_act == 0)  or not(floor_queue_5_act == 0) );
+	effect serving = (serving +1) % 6; },
+
+ choose_next -> move_next { guard 0 == serving && (not (floor_queue_0_act == 0)); },
+ choose_next -> move_next { guard 1 == serving && (not (floor_queue_1_act == 0)); },
+ choose_next -> move_next { guard 2 == serving && (not (floor_queue_2_act == 0)); },
+ choose_next -> move_next { guard 3 == serving && (not (floor_queue_3_act == 0)); },
+ choose_next -> move_next { guard 4 == serving && (not (floor_queue_4_act == 0)); },
+ choose_next -> move_next { guard 5 == serving && (not (floor_queue_5_act == 0)); },
+
+
+move_next -> move_next { guard serving < current; effect current = current - 1; },
+ move_next -> move_next { guard serving > current; effect current = current + 1; },
+ move_next -> q {
+	guard serving == current && 0 == current;
+	effect who = floor_queue_0[0], floor_queue_0[0] = floor_queue_0[1], floor_queue_0[1] = floor_queue_0[2],  floor_queue_0[2] = 0, floor_queue_0_act = floor_queue_0_act -1;},
+ move_next -> q {
+	guard serving == current && 1 == current;
+	effect who = floor_queue_1[0], floor_queue_1[0] = floor_queue_1[1], floor_queue_1[1] = floor_queue_1[2],  floor_queue_1[2] = 0, floor_queue_1_act = floor_queue_1_act -1;},
+ move_next -> q {
+	guard serving == current && 2 == current;
+	effect who = floor_queue_2[0], floor_queue_2[0] = floor_queue_2[1], floor_queue_2[1] = floor_queue_2[2],  floor_queue_2[2] = 0, floor_queue_2_act = floor_queue_2_act -1;},
+ move_next -> q {
+	guard serving == current && 3 == current;
+	effect who = floor_queue_3[0], floor_queue_3[0] = floor_queue_3[1], floor_queue_3[1] = floor_queue_3[2],  floor_queue_3[2] = 0, floor_queue_3_act = floor_queue_3_act -1;},
+ move_next -> q {
+	guard serving == current && 4 == current;
+	effect who = floor_queue_4[0], floor_queue_4[0] = floor_queue_4[1], floor_queue_4[1] = floor_queue_4[2],  floor_queue_4[2] = 0, floor_queue_4_act = floor_queue_4_act -1;},
+ move_next -> q {
+	guard serving == current && 5 == current;
+	effect who = floor_queue_5[0], floor_queue_5[0] = floor_queue_5[1], floor_queue_5[1] = floor_queue_5[2],  floor_queue_5[2] = 0, floor_queue_5_act = floor_queue_5_act -1;},
+
+ q -> transporting {
+	guard 0 == who; 
+	sync get_in_0?going_to;},
+ q -> transporting {
+	guard 1 == who; 
+	sync get_in_1?going_to;},
+ q -> transporting {
+	guard 2 == who; 
+	sync get_in_2?going_to;},
+
+
+ transporting -> choose_next {
+	guard 0 == who &&  going_to == current;
+	sync get_out_0!current;
+	effect going_to = 0, who = 0
+	, serving = current ; },
+ transporting -> choose_next {
+	guard 1 == who &&  going_to == current;
+	sync get_out_1!current;
+	effect going_to = 0, who = 0
+	, serving = current ; },
+ transporting -> choose_next {
+	guard 2 == who &&  going_to == current;
+	sync get_out_2!current;
+	effect going_to = 0, who = 0
+	, serving = current ; },
+
+ transporting -> transporting { guard going_to < current; effect current = current - 1; },
+ transporting -> transporting { guard going_to > current; effect current = current + 1; }; 
+}
+
+
+system async;

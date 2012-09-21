@@ -1,0 +1,5 @@
+*.o
+*.cpp
+*.log
+*.bin
+*.sum

@@ -1,0 +1,40 @@
+
+byte Slot[2] = {1, 0 ,0  };
+byte next=0;
+
+process P_0 {
+byte my_place;
+state NCS, p1, p2, p3, CS;
+init NCS;
+trans
+ NCS -> p1 { effect my_place = next, next = next+1; },
+ p1 -> p2 { guard my_place == 2-1; effect next = next-2; },
+ p1 -> p2 { guard my_place != 2-1; effect my_place = my_place%2; },
+ p2 -> p3 { guard Slot[my_place] == 1;  },
+ p3 -> CS { effect Slot[(my_place+2-1)%2]=0; },
+ CS -> NCS { effect Slot[(my_place+1)%2]=1;};
+}
+process P_1 {
+byte my_place;
+state NCS, p1, p2, p3, CS;
+init NCS;
+trans
+ NCS -> p1 { effect my_place = next, next = next+1; },
+ p1 -> p2 { guard my_place == 2-1; effect next = next-2; },
+ p1 -> p2 { guard my_place != 2-1; effect my_place = my_place%2; },
+ p2 -> p3 { guard Slot[my_place] == 1;  },
+ p3 -> CS { effect Slot[(my_place+2-1)%2]=0; },
+ CS -> NCS { effect Slot[(my_place+1)%2]=1;};
+}
+
+process LTL_property {
+state q1, q2;
+init q1;
+accept q2;
+trans
+q1 -> q1 {},
+q1 -> q2 { guard not ( P_0.CS + P_1.CS == 1); },
+q2 -> q2 { guard not ( P_0.CS + P_1.CS == 1); };
+}
+
+system async property LTL_property;

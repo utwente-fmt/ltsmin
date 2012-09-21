@@ -34,6 +34,13 @@ AC_DEFINE([_FILE_OFFSET_BITS], 64)
 AC_DEFINE([LTSMIN_PATHNAME_MAX], 1024, [Define maximal length of pathnames])
 AC_DEFINE([DEFFILEMODE], 0666, [Define default file mode])
 
+#DejaGNU
+if test x"$DEJAGNU" = x
+then
+  DEJAGNU="\$(top_srcdir)/testsuite/global-conf.exp"
+fi
+AC_SUBST(DEJAGNU)
+  
 
 # Checks for programs.
 AC_SUBST(AM_CXXFLAGS,["-Wno-inline -ftemplate-depth-128 -finline-functions"])
@@ -408,6 +415,7 @@ AC_CONFIG_FILES([
        src/tests/Makefile
        doc/Makefile
        lemon/Makefile
+       testsuite/Makefile
 ])
 
 AC_CONFIG_LINKS([src/ltsmin-lib/lempar.c:lemon/lempar.c])
