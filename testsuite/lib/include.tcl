@@ -2,7 +2,7 @@
 # File for putting general test procedures
 
 # Models should be able to complete whithin the timeout value.
-set timeout 120
+set timeout 20
 
 # The directory containing all the models used for testing.
 set EXAMPLES_PATH "$base_dir/../examples"
@@ -43,7 +43,7 @@ proc runmytest { test_name command_line exp_output} {
     set unfindable_string "adhadkhaslkdLKHLKHads^*&^876"
 
     if { [string length $exp_output] == 0 } {
-        set exp_output unfindable_string
+        set exp_output $unfindable_string
     }
 
     eval spawn $command_line
@@ -95,7 +95,7 @@ proc runmytest { test_name command_line exp_output} {
         eof {
             # only fail if an exp_output is set, otherwise let the exit code decide
             if { $exp_output != $unfindable_string } {
-                fail "Program ended without outputting values which are known to be correct"
+                fail "Program ended without outputting: $exp_output"
             }        
         }
 

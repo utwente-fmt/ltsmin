@@ -26,7 +26,7 @@ dict set langs etf options mc "--threads=$num_threads"
 # the expected result for a pass
 dict set langs etf exp_output ""
 
-# Wich backends are we performing the ETF languate tests on?
+# Wich backends are we performing the ETF language tests on?
 set filter "{mc}"
 
 # find the available backends

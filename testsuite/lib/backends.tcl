@@ -87,7 +87,7 @@ proc run_test_for_alg_backends { alg_be langs backends} {
                 note "No test defined for backend: $command $be"
             }
         } else {
-            note "No model defined for language frontend $lang_fe"
+            #note "No model defined for language frontend $lang_fe"
         }
     }
 }

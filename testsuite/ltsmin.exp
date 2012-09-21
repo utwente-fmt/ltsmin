@@ -30,3 +30,4 @@ proc ltsmin_option_proc {args} {
 
 proc ltsmin_option_help {args} {
     puts "DEBUG: ltsmin_option_help (command line option help) executed with arguments ${args}"
+}
