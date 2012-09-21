@@ -77,7 +77,7 @@ void ltl_ltsmin_cb (void*context,transition_info_t*ti,int*dst) {
     // copy dst, append ltl never claim in lockstep
     int dst_buchi[ctx->len];
     int dst_pred[1] = {0}; // assume < 32 predicates..
-    memcpy(dst_buchi, dst, (ctx->len - 1) * sizeof(int) );
+    memcpy(dst_buchi + 1, dst, (ctx->len - 1) * sizeof(int) );
     // evaluate predicates
     for(int i=0; i < ctx->ba->predicate_count; i++) {
         if (eval_predicate(ctx->ba->predicates[i], ti, infoctx->src)) /* ltsmin: src instead of dst */
@@ -114,8 +114,8 @@ ltl_ltsmin_long (model_t self, int group, int *src, TransitionCB cb,
            void *user_context)
 {
     ltl_context_t *ctx = GBgetContext(self);
-    cb_context new_ctx = {cb, user_context, src, 0, ctx};
-    return GBgetTransitionsLong(ctx->parent, group, src, ltl_ltsmin_cb, &new_ctx);
+    cb_context new_ctx = {cb, user_context, src+1, 0, ctx};
+    return GBgetTransitionsLong(ctx->parent, group, src+1, ltl_ltsmin_cb, &new_ctx);
 }
 
 static int
@@ -132,8 +132,8 @@ ltl_ltsmin_all (model_t self, int *src, TransitionCB cb,
          void *user_context)
 {
     ltl_context_t *ctx = GBgetContext(self);
-    cb_context new_ctx = {cb, user_context, src, 0, ctx};
-    return GBgetTransitionsAll(ctx->parent, src, ltl_ltsmin_cb, &new_ctx);
+    cb_context new_ctx = {cb, user_context, src+1, 0, ctx};
+    return GBgetTransitionsAll(ctx->parent, src+1, ltl_ltsmin_cb, &new_ctx);
 }
 
 /*
@@ -145,14 +145,14 @@ void ltl_spin_cb (void*context,transition_info_t*ti,int*dst) {
     // copy dst, append ltl never claim in lockstep
     int dst_buchi[ctx->len];
     int dst_pred[1] = {0}; // assume < 32 predicates..
-    memcpy(dst_buchi, dst, (ctx->len - 1) * sizeof(int) );
+    memcpy(dst_buchi + 1, dst, (ctx->len - 1) * sizeof(int) );
     // evaluate predicates
     for(int i=0; i < ctx->ba->predicate_count; i++) {
         if (eval_predicate(ctx->ba->predicates[i], ti, infoctx->src)) /* spin: src instead of dst */
             dst_pred[0] |= (1 << i);
     }
 
-    int i = infoctx->src[ctx->ltl_idx];
+    int i = infoctx->src[ctx->ltl_idx-1];
     for(int j=0; j < ctx->ba->states[i]->transition_count; j++) {
         // check predicates
         if ((dst_pred[0] & ctx->ba->states[i]->transitions[j].pos[0]) == ctx->ba->states[i]->transitions[j].pos[0] &&
@@ -188,14 +188,14 @@ ltl_spin_short (model_t self, int group, int *src, TransitionCB cb,
 
 static int
 ltl_spin_all (model_t self, int *src, TransitionCB cb,
-         void *user_context)
+              void *user_context)
 {
     ltl_context_t *ctx = GBgetContext(self);
-    cb_context new_ctx = {cb, user_context, src, 0, ctx};
-    int trans = GBgetTransitionsAll(ctx->parent, src, ltl_spin_cb, &new_ctx);
+    cb_context new_ctx = {cb, user_context, src+1, 0, ctx};
+    int trans = GBgetTransitionsAll(ctx->parent, src+1, ltl_spin_cb, &new_ctx);
     if (0 == trans) { // deadlock, let buchi continue unchecked
         int dst_buchi[ctx->len];
-        memcpy(dst_buchi, src, (ctx->len - 1) * sizeof(int) );
+        memcpy(dst_buchi + 1, src, (ctx->len - 1) * sizeof(int) );
         int i = src[ctx->ltl_idx];
         HREassert (i < ctx->ba->state_count );
         int labels[ctx->edge_labels];
@@ -220,7 +220,7 @@ void ltl_textbook_cb (void*context,transition_info_t*ti,int*dst) {
     // copy dst, append ltl never claim in lockstep
     int dst_buchi[ctx->len];
     int dst_pred[1] = {0}; // assume < 32 predicates..
-    memcpy(dst_buchi, dst, ctx->len * sizeof(int) );
+    memcpy(dst_buchi + 1, dst, (ctx->len - 1) * sizeof(int) );
     // evaluate predicates
     for(int i=0; i < ctx->ba->predicate_count; i++) {
         if (eval_predicate(ctx->ba->predicates[i], ti, dst)) /* textbook: dst instead of src */
@@ -273,7 +273,7 @@ static int
 ltl_textbook_all (model_t self, int *src, TransitionCB cb, void *user_context)
 {
     ltl_context_t *ctx = GBgetContext(self);
-    cb_context new_ctx = {cb, user_context, src, 0, ctx};
+    cb_context new_ctx = {cb, user_context, src+1, 0, ctx};
     if (src[ctx->ltl_idx] == -1) {
         int labels[ctx->edge_labels];
         memset (labels, 0, sizeof(int) * ctx->edge_labels);
@@ -281,7 +281,7 @@ ltl_textbook_all (model_t self, int *src, TransitionCB cb, void *user_context)
         ltl_textbook_cb(&new_ctx, &ti, src);
         return new_ctx.ntbtrans;
     } else {
-        return GBgetTransitionsAll(ctx->parent, src, ltl_textbook_cb, &new_ctx);
+        return GBgetTransitionsAll(ctx->parent, src+1, ltl_textbook_cb, &new_ctx);
     }
 }
 
@@ -318,7 +318,7 @@ print_ltsmin_buchi(const ltsmin_buchi_t *ba, ltsmin_parse_env_t env)
 static ltsmin_buchi_t  *shared_ba = NULL;
 static int              grab_ba = 0;
 
-/* TODO: hack around non-thread-safe ltl2ba */
+/* NOTE: this is hack around non-thread-safe ltl2ba */
 ltsmin_buchi_t *
 init_ltsmin_buchi(model_t model, const char *ltl_file)
 {
@@ -367,8 +367,8 @@ GBaddLTL (model_t model, const char *ltl_file, pins_ltl_type_t type, model_t por
     lts_type_t ltstype = GBgetLTStype(model);
     int ltl_idx = lts_type_get_state_length(ltstype);
     // set in context for later use in function
-    ctx->ltl_idx = ltl_idx;
-    ctx->len = ltl_idx + 1;
+    ctx->ltl_idx = 0;
+    ctx->len = lts_type_get_state_length(ltstype) + 1;
     lts_type_t ltstype_new = lts_type_clone(ltstype);
     // set new length
     lts_type_set_state_length(ltstype_new, ctx->len);
@@ -387,6 +387,14 @@ GBaddLTL (model_t model, const char *ltl_file, pins_ltl_type_t type, model_t por
     int             sl_len = dm_ncols (p_sl);
     ctx->sl_idx_accept = sl_count;
     GBsetAcceptingStateLabelIndex (ltlmodel, ctx->sl_idx_accept);
+
+    // move old state names
+    for(int i=ctx->len-1; i > 0;i--){
+        //ltstype_new->state_name[i]= ltstype_new->state_name[i-1];
+        lts_type_set_state_name(ltstype_new, i, lts_type_get_state_name(ltstype_new, i-1));
+        //ltstype_new->state_type[i]= ltstype_new->state_type[i-1];
+        lts_type_set_state_type(ltstype_new, i, lts_type_get_state_type(ltstype_new, i-1));
+    }
 
     // add name
     lts_type_set_state_name(ltstype_new, ltl_idx, "ltl");
@@ -438,16 +446,16 @@ GBaddLTL (model_t model, const char *ltl_file, pins_ltl_type_t type, model_t por
         // copy old matrix rows
         for(int j=0; j < len; j++) {
             if (dm_is_set(p_dm, i, j))
-                dm_set(p_new_dm, i, j);
+                dm_set(p_new_dm, i, j+1);
             if (dm_is_set(p_dm_r, i, j))
-                dm_set(p_new_dm_r, i, j);
+                dm_set(p_new_dm_r, i, j+1);
             if (dm_is_set(p_dm_w, i, j))
-                dm_set(p_new_dm_w, i, j);
+                dm_set(p_new_dm_w, i, j+1);
         }
         // add buchi as dependent
-        dm_set(p_new_dm, i, len);
-        dm_set(p_new_dm_r, i, len);
-        dm_set(p_new_dm_w, i, len);
+        dm_set(p_new_dm, i, ltl_idx);
+        dm_set(p_new_dm_r, i, ltl_idx);
+        dm_set(p_new_dm_w, i, ltl_idx);
     }
 
     // fill groups added by SPIN LTL deadlock behavior with guards dependencies
@@ -457,13 +465,13 @@ GBaddLTL (model_t model, const char *ltl_file, pins_ltl_type_t type, model_t por
     if (NULL == guards) { // use DM read matrix as over-estimation for guard deps
         for(int i=0; i < groups; i++) {
             for (int j=0; j < len; j++) {
-                deps[j] |= dm_is_set(p_dm_r, i, j);
+                deps[j+1] |= dm_is_set(p_dm_r, i, j);
             }
         }
     } else { // use exact guards dependency information
         for(int i=0; i < guards->count; i++) {
             for (int j=0; j < len; j++) {
-                deps[j] |= dm_is_set(p_sl, guards->sl_idx[i], j);
+                deps[j+1] |= dm_is_set(p_sl, guards->sl_idx[i], j);
             }
         }
     }
@@ -491,7 +499,7 @@ GBaddLTL (model_t model, const char *ltl_file, pins_ltl_type_t type, model_t por
     for (int i=0; i < sl_count; ++i) {
         for (int j=0; j < sl_len; ++j) {
             if (dm_is_set(p_sl, i, j))
-                dm_set(p_new_sl, i, j);
+                dm_set(p_new_sl, i, j+1);
         }
     }
     dm_set(p_new_sl, ctx->sl_idx_accept, ctx->ltl_idx);
@@ -535,7 +543,7 @@ GBaddLTL (model_t model, const char *ltl_file, pins_ltl_type_t type, model_t por
     GBinitModelDefaults (&ltlmodel, model);
 
     int             s0[ctx->len];
-    GBgetInitialState (model, s0);
+    GBgetInitialState (model, s0+1);
     // set buchi initial state
     s0[ctx->ltl_idx] = (type == PINS_LTL_TEXTBOOK ? -1 : 0);
 

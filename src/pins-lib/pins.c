@@ -343,6 +343,10 @@ void GBinitModelDefaults (model_t *p_model, model_t default_src)
         GBsetStateLabelsGroup (model, wrapped_state_labels_default_group);
         GBsetStateLabelsAll (model, wrapped_state_labels_default_all);
     }
+    if (model->covered_by == NULL)
+        GBsetIsCoveredBy(model, default_src->covered_by);
+    if (model->covered_by_short == NULL)
+        GBsetIsCoveredByShort(model, default_src->covered_by_short);
 }
 
 void* GBgetContext(model_t model){
@@ -457,13 +461,13 @@ void GBsetIsCoveredByShort(model_t model,covered_by_grey_t covered_by_short){
 
 int GBisCoveredByShort(model_t model,int*a,int*b) {
     if (NULL == model->covered_by_short)
-        Abort("No symbolic comparison function (isCoveredByShort) present for loaded model.");
+        Abort("No symbolic comparison function (covered_by_short) present for loaded model.");
     return model->covered_by_short(a,b);
 }
 
 int GBisCoveredBy(model_t model,int*a,int*b) {
     if (NULL == model->covered_by)
-        Abort("No symbolic comparison function (isCoveredBy) present for loaded model.");
+        Abort("No symbolic comparison function (covered_by) present for loaded model.");
     return model->covered_by(a,b);
 }
 
