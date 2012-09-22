@@ -14,6 +14,8 @@ puts   "----------------------------------------------\n"
 # the number of threads to use in multithreaded backends
 set num_threads 5
 
+set langs [dict create]
+
 # lpo defines
 dict set langs lpo model "hef_wrong.tbf"
 dict set langs lpo options mc "--procs=$num_threads"

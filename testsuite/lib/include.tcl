@@ -46,7 +46,7 @@ proc runmytest { test_name command_line exp_output} {
         set exp_output $unfindable_string
     }
 
-    eval spawn $command_line
+    set PID [ eval spawn $command_line ]
 
     expect {
 
@@ -79,17 +79,23 @@ proc runmytest { test_name command_line exp_output} {
             fail "$test_name: error: $expect_out(buffer)"
         }
 
-         "error" {
-             fail "An error message was encountered in the application output.";
-         }
+        "error" {
+            fail "An error message was encountered in the application output.";
+        }
 
         timeout {
             fail "Program takes to long to execute"
+            exec kill -9 $PID
             return
         }
 
         $exp_output {
             pass "Expected output $exp_output found"
+        }
+	    
+        full_buffer {
+            puts "\n full buffer hit"
+            exit -1
         }
         
         eof {
@@ -101,7 +107,7 @@ proc runmytest { test_name command_line exp_output} {
 
     }
     # get the exit code
-    set result [wait]
+    catch wait result
 
     # check for non-zero exit codes
     set exit_code [lindex $result 3]
