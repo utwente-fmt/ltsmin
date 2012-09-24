@@ -2823,7 +2823,7 @@ ta_cndfs_handle_blue (void *arg, state_info_t *successor, transition_info_t *ti,
     if ( ecd && cyan && (GBbuchiIsAccepting(ctx->model, ctx->state.data) ||
          GBbuchiIsAccepting(ctx->model, succ_data)) ) {
         /* Found cycle in blue search */
-        Warning(info, "State[0]: %d Succ[0]: %d Succ: %zu", ctx->state.data[0],
+        Warning(debug, "State[0]: %d Succ[0]: %d Succ: %zu", ctx->state.data[0],
                 succ_data[0], successor->ref);
         ndfs_report_cycle (ctx, successor);
     }
@@ -2870,7 +2870,7 @@ ta_cndfs_red (wctx_t *ctx, ref_t seed)
                  !ta_cndfs_subsumed_red(ctx, NULL) ) {
                 SIputC(ctx->pink, state.data, sizeof(struct val_s));
                 dfs_stack_push (ctx->in_stack, state_data);
-                Warning(info, "Explore(Red, %zu, %zu)", state.val.ref, state.val.lattice);
+                Warning(debug, "Explore(Red, %zu, %zu)", state.val.ref, state.val.lattice);
                 if ( ctx->state.ref != seed &&
                      GBbuchiIsAccepting(ctx->model, ctx->state.data) )
                     dfs_stack_push (ctx->out_stack, state_data);
@@ -2906,10 +2906,10 @@ ta_cndfs_blue (wctx_t *ctx)
                 if (all_red)
                     bitvector_set (&ctx->all_red, ctx->counters.level_cur);
                 SIputC(ctx->cyan, state.data, sizeof(struct val_s));
-                Warning(info, "Explore(Blue, %zu, %zu)", state.val.ref, state.val.lattice);
+                Warning(debug, "Explore(Blue, %zu, %zu)", state.val.ref, state.val.lattice);
                 ta_cndfs_explore_state_blue (ctx, &ctx->counters);
             } else {
-                Warning(info, "Drop(Blue, %zu, %zu)", state.val.ref, state.val.lattice);
+                Warning(debug, "Drop(Blue, %zu, %zu)", state.val.ref, state.val.lattice);
                 if ( all_red && ctx->counters.level_cur != 0 &&
                      !ta_cndfs_subsumed_red(ctx, NULL) )
                     bitvector_unset (&ctx->all_red, ctx->counters.level_cur - 1);
@@ -2924,7 +2924,7 @@ ta_cndfs_blue (wctx_t *ctx)
             state_data = dfs_stack_top (ctx->stack);
             state_info_deserialize (&ctx->state, state_data, ctx->store);
             new_state (&state, &ctx->state);
-            Warning(info, "Backtrack(Blue, %zu, %zu)", state.val.ref, state.val.lattice);
+            Warning(debug, "Backtrack(Blue, %zu, %zu)", state.val.ref, state.val.lattice);
             /* Mark state BLUE on backtrack */
             ta_cndfs_mark_blue (ctx);
             SIdelete(ctx->cyan, state.data);
@@ -2934,7 +2934,7 @@ ta_cndfs_blue (wctx_t *ctx)
                 ta_cndfs_mark_red (ctx); // TODO: allred count
             } else if ( GBbuchiIsAccepting(ctx->model, ctx->state.data) ) {
                 ref_t           seed = ctx->state.ref;
-                Warning(info, "Acc");
+                Warning(debug, "Acc");
                 ta_cndfs_red (ctx, seed);
                 ta_cndfs_handle_nonseed_accepting (ctx);
             } else if (all_red && ctx->counters.level_cur > 0 &&
