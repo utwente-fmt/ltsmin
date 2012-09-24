@@ -72,17 +72,16 @@ typedef enum {
     Strat_BFS    = 2,
     Strat_DFS    = 4,
     Strat_NDFS   = 8,
-    Strat_NNDFS  = 16,
-    Strat_LNDFS  = 32,
-    Strat_ENDFS  = 64,
-    Strat_CNDFS  = 128,
-    Strat_TA     = 256,
+    Strat_LNDFS  = 16,
+    Strat_ENDFS  = 32,
+    Strat_CNDFS  = 64,
+    Strat_TA     = 128,
     Strat_TA_SBFS= Strat_SBFS | Strat_TA,
     Strat_TA_BFS = Strat_BFS | Strat_TA,
     Strat_TA_DFS = Strat_DFS | Strat_TA,
     Strat_2Stacks= Strat_BFS | Strat_SBFS | Strat_CNDFS | Strat_ENDFS,
     Strat_LTLG   = Strat_LNDFS | Strat_ENDFS | Strat_CNDFS,
-    Strat_LTL    = Strat_NDFS | Strat_NNDFS | Strat_LTLG,
+    Strat_LTL    = Strat_NDFS | Strat_LTLG,
     Strat_Reach  = Strat_BFS | Strat_SBFS | Strat_DFS
 } strategy_t;
 
@@ -210,7 +209,6 @@ static si_map_entry strategies[] = {
     {"sbfs",    Strat_SBFS},
 #ifndef OPAAL
     {"ndfs",    Strat_NDFS},
-    {"nndfs",   Strat_NNDFS},
     {"lndfs",   Strat_LNDFS},
     {"endfs",   Strat_ENDFS},
     {"cndfs",   Strat_CNDFS},
@@ -317,8 +315,8 @@ state_db_popt (poptContext con, enum poptCallbackReason reason,
         if (Strat_ENDFS == strategy[i-1]) {
             if (MAX_STRATEGIES == i)
                 Abort ("Open-ended recursion in ENDFS repair strategies.");
-            Warning (info, "Defaulting to NNDFS as ENDFS repair procedure.");
-            strategy[i] = Strat_NNDFS;
+            Warning (info, "Defaulting to NDFS as ENDFS repair procedure.");
+            strategy[i] = Strat_NDFS;
         }
         res = linear_search (permutations, arg_perm);
         if (res < 0)
@@ -352,7 +350,7 @@ static struct poptOption options[] = {
      &arg_strategy, 0, "select the search strategy", "<sbfs|bfs|dfs>"},
 #else
     {"strategy", 0, POPT_ARG_STRING | POPT_ARGFLAG_SHOW_DEFAULT,
-     &arg_strategy, 0, "select the search strategy", "<bfs|sbfs|dfs|cndfs|lndfs|endfs|endfs,lndfs|endfs,endfs,nndfs|ndfs|nndfs>"},
+     &arg_strategy, 0, "select the search strategy", "<bfs|sbfs|dfs|cndfs|lndfs|endfs|endfs,lndfs|endfs,endfs,ndfs|ndfs>"},
     {"no-red-perm", 0, POPT_ARG_VAL, &no_red_perm, 1, "turn off transition permutation for the red search", NULL},
     {"nar", 1, POPT_ARG_VAL, &all_red, 0, "turn off red coloring in the blue search (NNDFS/MCNDFS)", NULL},
     {"grey", 0, POPT_ARG_VAL, &call_mode, UseGreyBox, "make use of GetTransitionsLong calls", NULL},
@@ -620,7 +618,7 @@ wctx_create (model_t model, int depth, wctx_t *shared)
         size_t local_bits = 2;
         int res = bitvector_create (&ctx->color_map, local_bits<<dbs_size);
         if (-1 == res) Abort ("Failure to allocate color bitvector.");
-        if ((Strat_NNDFS | Strat_LNDFS | Strat_CNDFS | Strat_ENDFS) & strategy[depth]) {
+        if ((Strat_NDFS | Strat_LNDFS | Strat_CNDFS | Strat_ENDFS) & strategy[depth]) {
             res = bitvector_create (&ctx->all_red, MAX_STACK);
             if (-1 == res) Abort ("Failure to allocate all-red bitvector.");
         }
@@ -648,7 +646,7 @@ wctx_free_rec (wctx_t *ctx, int depth)
     RTfree (ctx->store2);
     if (strategy[depth] & Strat_LTL) {  
         bitvector_free (&ctx->color_map);
-        if ((Strat_NNDFS | Strat_LNDFS | Strat_CNDFS | Strat_ENDFS) & strategy[depth]) {
+        if ((Strat_NDFS | Strat_LNDFS | Strat_CNDFS | Strat_ENDFS) & strategy[depth]) {
             bitvector_free (&ctx->all_red);
         }
     }
@@ -938,7 +936,7 @@ print_totals (counter_t *ar_reach, counter_t *ar_red, int d, size_t db_elts)
     Warning (info, "red states: %zu (%.2f%%), bogus: %zu  (%.2f%%), transitions: %zu, waits: %zu (%.2f sec)",
              red->explored, ((double)red->explored/db_elts)*100, red->bogus_red,
              ((double)red->bogus_red/db_elts), red->trans, red->waits, red->time);
-    if  ( all_red && (strategy[d] & (Strat_LNDFS | Strat_NNDFS | Strat_CNDFS  | Strat_ENDFS)) )
+    if  ( all_red && (strategy[d] & (Strat_LNDFS | Strat_NDFS | Strat_CNDFS  | Strat_ENDFS)) )
         Warning (info, "all-red states: %zu (%.2f%%), bogus %zu (%.2f%%)",
              reach->allred, ((double)reach->allred/db_elts)*100,
              red->allred, ((double)red->allred/db_elts)*100);
@@ -1545,122 +1543,12 @@ handle_error_trace (wctx_t *ctx)
     HREabort (LTSMIN_EXIT_COUNTER_EXAMPLE);
 }
 
-/*
- * NDFS algorithm by Courcoubetis et al.
- */
-
-/* ndfs_handle and ndfs_explore_state can be used by blue and red search */
-static void
-ndfs_handle_red (void *arg, state_info_t *successor, transition_info_t *ti, int seen)
-{
-    wctx_t             *ctx = (wctx_t *) arg;
-    if ( successor->ref == ctx->seed )
-        /* Found cycle back to the seed */
-        ndfs_report_cycle (ctx, successor);
-    if ( !ndfs_has_color(&ctx->color_map, successor->ref, NRED) ) {
-        raw_data_t stack_loc = dfs_stack_push (ctx->stack, NULL);
-        state_info_serialize (successor, stack_loc);
-    }
-    (void) ti; (void) seen;
-}
-
-static void
-ndfs_handle_blue (void *arg, state_info_t *successor, transition_info_t *ti, int seen)
-{
-    wctx_t             *ctx = (wctx_t *) arg;
-    if ( !ndfs_has_color(&ctx->color_map, successor->ref, NBLUE) ) {
-        raw_data_t stack_loc = dfs_stack_push (ctx->stack, NULL);
-        state_info_serialize (successor, stack_loc);
-    }
-    (void) ti; (void) seen;
-}
-
-static inline void
-ndfs_explore_state_red (wctx_t *ctx)
-{
-    counter_t *cnt = &ctx->red;
-    dfs_stack_enter (ctx->stack);
-    increase_level (cnt);
-    ctx->permute->permutation = permutation_red;
-    cnt->trans += permute_trans (ctx->permute, &ctx->state, ndfs_handle_red, ctx);
-    cnt->explored++;
-    ndfs_maybe_report ("[R] ", cnt);
-}
-
-static inline void
-ndfs_explore_state_blue (wctx_t *ctx)
-{
-    counter_t *cnt = &ctx->counters;
-    dfs_stack_enter (ctx->stack);
-    increase_level (cnt);
-    ctx->permute->permutation = permutation;
-    cnt->trans += permute_trans (ctx->permute, &ctx->state, ndfs_handle_blue, ctx);
-    cnt->explored++;
-    ndfs_maybe_report ("[B] ", cnt);
-}
-
-/* NDFS dfs_red */
-static void
-ndfs_red (wctx_t *ctx, ref_t seed)
-{
-    ctx->seed = seed;
-    ctx->red.visited++; //count accepting states
-    while ( !lb_is_stopped(global->lb) ) {
-        raw_data_t          state_data = dfs_stack_top (ctx->stack);
-        if (NULL != state_data) {
-            state_info_deserialize (&ctx->state, state_data, ctx->store);
-            if ( ndfs_try_color(&ctx->color_map, ctx->state.ref, NRED) ) {
-                if (seed == ctx->state.ref)
-                    break;
-                dfs_stack_pop (ctx->stack);
-            } else
-                ndfs_explore_state_red (ctx);
-        } else { //backtrack
-            dfs_stack_leave (ctx->stack);
-            ctx->red.level_cur--;
-            state_data = dfs_stack_top (ctx->stack);
-            state_info_deserialize_cheap (&ctx->state, state_data);
-            /* exit search if backtrack hits seed, leave stack the way it was */
-            if (seed == ctx->state.ref)
-                break;
-            dfs_stack_pop (ctx->stack);
-        }
-    }
-}
-
-/* NDFS dfs_blue */
-void
-ndfs_blue (wctx_t *ctx)
-{
-    while ( !lb_is_stopped(global->lb) ) {
-        raw_data_t          state_data = dfs_stack_top (ctx->stack);
-        if (NULL != state_data) {
-            state_info_deserialize (&ctx->state, state_data, ctx->store);
-            if ( ndfs_try_color(&ctx->color_map, ctx->state.ref, NBLUE) ) {
-                dfs_stack_pop (ctx->stack);
-            } else
-                ndfs_explore_state_blue (ctx);
-        } else { //backtrack
-            if (0 == dfs_stack_nframes (ctx->stack))
-                return;
-            dfs_stack_leave (ctx->stack);
-            ctx->counters.level_cur--;
-            /* call red DFS for accepting states */
-            state_data = dfs_stack_top (ctx->stack);
-            state_info_deserialize (&ctx->state, state_data, ctx->store);
-            if ( GBbuchiIsAccepting(ctx->model, ctx->state.data) )
-                ndfs_red (ctx, ctx->state.ref);
-            dfs_stack_pop (ctx->stack);
-        }
-    }
-}
-
-/*
+/* Courcoubetis et al. NDFS, with extensions:
  * New NDFS algorithm by Schwoon/Esparza/Gaiser
  */
 
 static void
-nndfs_red_handle (void *arg, state_info_t *successor, transition_info_t *ti,
+ndfs_red_handle (void *arg, state_info_t *successor, transition_info_t *ti,
                   int seen)
 {
     wctx_t             *ctx = (wctx_t *) arg;
@@ -1677,8 +1565,8 @@ nndfs_red_handle (void *arg, state_info_t *successor, transition_info_t *ti,
 }
 
 static void
-nndfs_blue_handle (void *arg, state_info_t *successor, transition_info_t *ti,
-                   int seen)
+ndfs_blue_handle (void *arg, state_info_t *successor, transition_info_t *ti,
+                  int seen)
 {
     wctx_t             *ctx = (wctx_t *) arg;
     nndfs_color_t color = nn_get_color (&ctx->color_map, successor->ref);
@@ -1701,34 +1589,34 @@ nndfs_blue_handle (void *arg, state_info_t *successor, transition_info_t *ti,
 }
 
 static inline void
-nndfs_explore_state_red (wctx_t *ctx)
+ndfs_explore_state_red (wctx_t *ctx)
 {
     counter_t *cnt = &ctx->red;
     dfs_stack_enter (ctx->stack);
     increase_level (cnt);
     ctx->permute->permutation = permutation_red;
-    cnt->trans += permute_trans (ctx->permute, &ctx->state, nndfs_red_handle, ctx);
+    cnt->trans += permute_trans (ctx->permute, &ctx->state, ndfs_red_handle, ctx);
     ndfs_maybe_report ("[R] ", cnt);
 }
 
 static inline void
-nndfs_explore_state_blue (wctx_t *ctx)
+ndfs_explore_state_blue (wctx_t *ctx)
 {
     counter_t *cnt = &ctx->counters;
     dfs_stack_enter (ctx->stack);
     increase_level (cnt);
     ctx->permute->permutation = permutation;
-    cnt->trans += permute_trans (ctx->permute, &ctx->state, nndfs_blue_handle, ctx);
+    cnt->trans += permute_trans (ctx->permute, &ctx->state, ndfs_blue_handle, ctx);
     cnt->explored++;
     ndfs_maybe_report ("[B] ", cnt);
 }
 
 /* NNDFS dfs_red */
 static void
-nndfs_red (wctx_t *ctx, ref_t seed)
+ndfs_red (wctx_t *ctx, ref_t seed)
 {
     ctx->red.visited++; //count accepting states
-    nndfs_explore_state_red (ctx);
+    ndfs_explore_state_red (ctx);
     while ( !lb_is_stopped(global->lb) ) {
         raw_data_t          state_data = dfs_stack_top (ctx->stack);
         if (NULL != state_data) {
@@ -1736,7 +1624,7 @@ nndfs_red (wctx_t *ctx, ref_t seed)
             nndfs_color_t color = nn_get_color (&ctx->color_map, ctx->state.ref);
             if ( nn_color_eq(color, NNBLUE) ) {
                 nn_set_color (&ctx->color_map, ctx->state.ref, NNPINK);
-                nndfs_explore_state_red (ctx);
+                ndfs_explore_state_red (ctx);
                 ctx->red.explored++;
             } else {
                 if (seed == ctx->state.ref)
@@ -1756,9 +1644,9 @@ nndfs_red (wctx_t *ctx, ref_t seed)
     }
 }
 
-/* NNDFS dfs_blue */
+/* NDFS dfs_blue */
 void
-nndfs_blue (wctx_t *ctx)
+ndfs_blue (wctx_t *ctx)
 {
     while ( !lb_is_stopped(global->lb) ) {
         raw_data_t          state_data = dfs_stack_top (ctx->stack);
@@ -1768,7 +1656,7 @@ nndfs_blue (wctx_t *ctx)
             if ( nn_color_eq(color, NNWHITE) ) {
                 bitvector_set ( &ctx->all_red, ctx->counters.level_cur );
                 nn_set_color (&ctx->color_map, ctx->state.ref, NNCYAN);
-                nndfs_explore_state_blue (ctx);
+                ndfs_explore_state_blue (ctx);
             } else {
                 if ( ctx->counters.level_cur != 0 && !nn_color_eq(color, NNPINK) )
                     bitvector_unset ( &ctx->all_red, ctx->counters.level_cur - 1);
@@ -1789,7 +1677,7 @@ nndfs_blue (wctx_t *ctx)
                     ctx->red.visited++;
             } else if ( GBbuchiIsAccepting(ctx->model, ctx->state.data) ) {
                 /* call red DFS for accepting states */
-                nndfs_red (ctx, ctx->state.ref);
+                ndfs_red (ctx, ctx->state.ref);
                 nn_set_color (&ctx->color_map, ctx->state.ref, NNPINK);
             } else {
                 if (ctx->counters.level_cur > 0)
@@ -1835,7 +1723,7 @@ lndfs_red (wctx_t *ctx, ref_t seed)
             if ( !nn_color_eq(color, NNPINK) &&
                  !global_has_color(ctx->state.ref, GRED, ctx->rec_bits) ) {
                 nn_set_color (&ctx->color_map, ctx->state.ref, NNPINK);
-                nndfs_explore_state_red (ctx);
+                ndfs_explore_state_red (ctx);
             } else {
                 if (seed == ctx->state.ref)
                     break;
@@ -1875,7 +1763,7 @@ lndfs_blue (wctx_t *ctx)
                  !global_has_color(ctx->state.ref, GRED, ctx->rec_bits) ) {
                 bitvector_set (&ctx->all_red, ctx->counters.level_cur);
                 nn_set_color (&ctx->color_map, ctx->state.ref, NNCYAN);
-                nndfs_explore_state_blue (ctx);
+                ndfs_explore_state_blue (ctx);
             } else {
                 if ( ctx->counters.level_cur != 0 && !global_has_color(ctx->state.ref, GRED, ctx->rec_bits) )
                     bitvector_unset (&ctx->all_red, ctx->counters.level_cur - 1);
@@ -2185,8 +2073,6 @@ rec_ndfs_call (wctx_t *ctx, ref_t state)
        endfs_blue (ctx->rec_ctx); break;
     case Strat_LNDFS:
        lndfs_blue (ctx->rec_ctx); break;
-    case Strat_NNDFS:
-       nndfs_blue (ctx->rec_ctx); break;
     case Strat_NDFS:
        ndfs_blue (ctx->rec_ctx); break;
     default:
@@ -2742,7 +2628,7 @@ explore (wctx_t *ctx)
     GBgetInitialState (ctx->model, initial);
     state_info_initialize (&ctx->initial, initial, &ti, &ctx->state, ctx);
     if ( Strat_LTL & strategy[0] )
-        ndfs_handle_blue (ctx, &ctx->initial, &ti, 0);
+        ndfs_blue_handle (ctx, &ctx->initial, &ti, 0);
     else if (0 == ctx->id) { // only w1 receives load, as it is propagated later
         if ( Strat_TA & strategy[0] )
             ta_handle (ctx, &ctx->initial, &ti, 0);
@@ -2763,7 +2649,6 @@ explore (wctx_t *ctx)
     case Strat_DFS:
         if (UseGreyBox == call_mode) dfs_grey (ctx); else dfs (ctx); break;
     case Strat_NDFS:    ndfs_blue (ctx); break;
-    case Strat_NNDFS:   nndfs_blue (ctx); break;
     case Strat_LNDFS:   lndfs_blue (ctx); break;
     case Strat_CNDFS:
     case Strat_ENDFS:   endfs_blue (ctx); break;
