@@ -204,6 +204,7 @@ cb_wrapper(void *context, transition_info_t *transition_info, int *dst)
     //*lattice = clone;
     Debug ("Lattice of next state: %zu --> %zu", old_lattice, (size_t)*lattice);
     ctx->user_cb (ctx->user_context, transition_info, dst);
+    (void) old_lattice;
 }
 
 int
@@ -407,6 +408,7 @@ opaalLoadGreyboxModel(model_t model, const char *filename)
         if (lts_type_add_type(ltstype,type_name,NULL) != i) {
             Abort("wrong type number");
         }
+        lts_type_set_format (ltstype, i, LTStypeDirect);
     }
     int bool_is_new, bool_type = lts_type_add_type (ltstype, "bool", &bool_is_new);
 

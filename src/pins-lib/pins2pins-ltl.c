@@ -80,7 +80,7 @@ void ltl_ltsmin_cb (void*context,transition_info_t*ti,int*dst) {
     memcpy(dst_buchi + 1, dst, (ctx->len - 1) * sizeof(int) );
     // evaluate predicates
     for(int i=0; i < ctx->ba->predicate_count; i++) {
-        if (eval_predicate(ctx->ba->predicates[i], ti, infoctx->src)) /* ltsmin: src instead of dst */
+        if (eval_predicate(ctx->ba->predicates[i], ti, infoctx->src + 1)) /* ltsmin: src instead of dst */
             dst_pred[0] |= (1 << i);
     }
 
@@ -132,7 +132,7 @@ ltl_ltsmin_all (model_t self, int *src, TransitionCB cb,
          void *user_context)
 {
     ltl_context_t *ctx = GBgetContext(self);
-    cb_context new_ctx = {cb, user_context, src+1, 0, ctx};
+    cb_context new_ctx = {cb, user_context, src, 0, ctx};
     return GBgetTransitionsAll(ctx->parent, src+1, ltl_ltsmin_cb, &new_ctx);
 }
 
@@ -148,11 +148,11 @@ void ltl_spin_cb (void*context,transition_info_t*ti,int*dst) {
     memcpy(dst_buchi + 1, dst, (ctx->len - 1) * sizeof(int) );
     // evaluate predicates
     for(int i=0; i < ctx->ba->predicate_count; i++) {
-        if (eval_predicate(ctx->ba->predicates[i], ti, infoctx->src)) /* spin: src instead of dst */
+        if (eval_predicate(ctx->ba->predicates[i], ti, infoctx->src + 1)) /* spin: src instead of dst */
             dst_pred[0] |= (1 << i);
     }
 
-    int i = infoctx->src[ctx->ltl_idx-1];
+    int i = infoctx->src[ctx->ltl_idx];
     for(int j=0; j < ctx->ba->states[i]->transition_count; j++) {
         // check predicates
         if ((dst_pred[0] & ctx->ba->states[i]->transitions[j].pos[0]) == ctx->ba->states[i]->transitions[j].pos[0] &&
@@ -191,7 +191,7 @@ ltl_spin_all (model_t self, int *src, TransitionCB cb,
               void *user_context)
 {
     ltl_context_t *ctx = GBgetContext(self);
-    cb_context new_ctx = {cb, user_context, src+1, 0, ctx};
+    cb_context new_ctx = {cb, user_context, src, 0, ctx};
     int trans = GBgetTransitionsAll(ctx->parent, src+1, ltl_spin_cb, &new_ctx);
     if (0 == trans) { // deadlock, let buchi continue unchecked
         int dst_buchi[ctx->len];
@@ -273,12 +273,12 @@ static int
 ltl_textbook_all (model_t self, int *src, TransitionCB cb, void *user_context)
 {
     ltl_context_t *ctx = GBgetContext(self);
-    cb_context new_ctx = {cb, user_context, src+1, 0, ctx};
+    cb_context new_ctx = {cb, user_context, src, 0, ctx};
     if (src[ctx->ltl_idx] == -1) {
         int labels[ctx->edge_labels];
         memset (labels, 0, sizeof(int) * ctx->edge_labels);
         transition_info_t ti = GB_TI(labels, -1);
-        ltl_textbook_cb(&new_ctx, &ti, src);
+        ltl_textbook_cb(&new_ctx, &ti, src + 1);
         return new_ctx.ntbtrans;
     } else {
         return GBgetTransitionsAll(ctx->parent, src+1, ltl_textbook_cb, &new_ctx);
@@ -365,7 +365,6 @@ GBaddLTL (model_t model, const char *ltl_file, pins_ltl_type_t type, model_t por
 
     // copy and extend ltstype
     lts_type_t ltstype = GBgetLTStype(model);
-    int ltl_idx = lts_type_get_state_length(ltstype);
     // set in context for later use in function
     ctx->ltl_idx = 0;
     ctx->len = lts_type_get_state_length(ltstype) + 1;
@@ -397,8 +396,8 @@ GBaddLTL (model_t model, const char *ltl_file, pins_ltl_type_t type, model_t por
     }
 
     // add name
-    lts_type_set_state_name(ltstype_new, ltl_idx, "ltl");
-    lts_type_set_state_typeno(ltstype_new, ltl_idx, ltl_type);
+    lts_type_set_state_name(ltstype_new, ctx->ltl_idx, "ltl");
+    lts_type_set_state_typeno(ltstype_new, ctx->ltl_idx, ltl_type);
 
     // copy state labels
     lts_type_set_state_label_count (ltstype_new, sl_count+1);
@@ -453,9 +452,9 @@ GBaddLTL (model_t model, const char *ltl_file, pins_ltl_type_t type, model_t por
                 dm_set(p_new_dm_w, i, j+1);
         }
         // add buchi as dependent
-        dm_set(p_new_dm, i, ltl_idx);
-        dm_set(p_new_dm_r, i, ltl_idx);
-        dm_set(p_new_dm_w, i, ltl_idx);
+        dm_set(p_new_dm, i, ctx->ltl_idx);
+        dm_set(p_new_dm_r, i, ctx->ltl_idx);
+        dm_set(p_new_dm_w, i, ctx->ltl_idx);
     }
 
     // fill groups added by SPIN LTL deadlock behavior with guards dependencies
