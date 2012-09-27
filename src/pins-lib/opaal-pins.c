@@ -408,7 +408,12 @@ opaalLoadGreyboxModel(model_t model, const char *filename)
         if (lts_type_add_type(ltstype,type_name,NULL) != i) {
             Abort("wrong type number");
         }
-        lts_type_set_format (ltstype, i, LTStypeDirect);
+        int type_value_count = get_state_variable_type_value_count(i);
+        if (0 == type_value_count) {
+            lts_type_set_format (ltstype, i, LTStypeDirect);
+        } else {
+             lts_type_set_format (ltstype, i, LTStypeEnum);
+        }
     }
     int bool_is_new, bool_type = lts_type_add_type (ltstype, "bool", &bool_is_new);
 
