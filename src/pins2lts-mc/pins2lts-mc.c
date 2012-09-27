@@ -446,6 +446,7 @@ struct thread_ctx_s {
     lm_loc_t            last;           // TA last tombstone location
     rt_timer_t          timer;
     stats_t            *stats;
+    string_index_t      cyan;
 };
 
 static void
@@ -570,6 +571,21 @@ find_or_put_tree (state_info_t *state, transition_info_t *ti,
     state->tree = store;
     state->ref = TreeDBSLLindex (global->dbs, state->tree);
     return ret;
+}
+
+typedef union ta_cndfs_state_u {
+    struct val_s {
+        ref_t           ref;
+        lattice_t       lattice;
+    } val;
+    char                data[16];
+} ta_cndfs_state_t;
+
+static inline void
+new_state (ta_cndfs_state_t *out, state_info_t *si)
+{
+    out->val.ref = si->ref;
+    out->val.lattice = si->lattice;
 }
 
 static void
@@ -1486,22 +1502,44 @@ static void *
 get_state (ref_t ref, void *arg)
 {
     wctx_t             *ctx = (wctx_t *) arg;
-    raw_data_t          state = get (global->dbs, ref, ctx->store2);
+    state_data_t        state = get (global->dbs, ref, ctx->store2);
     return Tree & db_type ? TreeDBSLLdata(global->dbs, state) : state;
 }
 
-static void
-find_dfs_stack_trace (wctx_t *ctx, dfs_stack_t stack, ref_t *trace, size_t level)
+static void *
+get_stack_state (ref_t ref, void *arg)
 {
-    // gather trace
-    state_info_t        state;
-    HREassert (level - 1 == dfs_stack_nframes (ctx->stack));
-    for (int i = dfs_stack_nframes (ctx->stack)-1; i >= 0; i--) {
-        dfs_stack_leave (stack);
-        raw_data_t          data = dfs_stack_pop (stack);
-        state_info_deserialize (&state, data, ctx->store);
-        trace[i] = state.ref;
+    wctx_t             *ctx = (wctx_t *) arg;
+    ta_cndfs_state_t   *state = (ta_cndfs_state_t *)SIget(ctx->cyan, ref);
+    state_data_t        data  = get_state (state->val.ref, ctx);
+    Debug ("Trace %d (%zu,%zu)", ref, state->val.ref, state->val.lattice);
+    if (strategy[0] & Strat_TA) {
+        memcpy (ctx->store, data, D<<2);
+        ((lattice_t*)(ctx->store + D))[0] = state->val.lattice;
+        data = ctx->store;
     }
+    return data;
+}
+
+static void
+find_and_write_dfs_stack_trace (wctx_t *ctx, int level)
+{
+    ref_t          *trace = RTmalloc (sizeof(ref_t) * level);
+    if (ctx->cyan) SIdestroy(&ctx->cyan);
+    ctx->cyan = SIcreate();
+    for (int i = level - 1; i >= 0; i--) {
+        state_data_t data = dfs_stack_peek_top (ctx->stack, i);
+        state_info_deserialize_cheap (&ctx->state, data);
+        ta_cndfs_state_t state;
+        new_state(&state, &ctx->state);
+        if (!(strategy[0] & Strat_TA)) state.val.lattice = 0;
+        int val = SIputC (ctx->cyan, state.data, sizeof(struct val_s));
+        trace[level - i - 1] = (ref_t) val;
+    }
+    trc_env_t          *trace_env = trc_create (ctx->model, get_stack_state,
+                                                trace[0], ctx);
+    trc_write_trace (trace_env, trc_output, trace, level);
+    RTfree (trace);
 }
 
 static void
@@ -1513,16 +1551,12 @@ ndfs_report_cycle (wctx_t *ctx, state_info_t *cycle_closing_state)
     size_t              level = dfs_stack_nframes (ctx->stack) + 1;
     Warning (info, "Accepting cycle FOUND at depth %zu!", level);
     if (trc_output) {
-        ref_t              *trace = RTmalloc(sizeof(ref_t) * level);
-        /* Write last state to stack to close cycle */
-        trace[level-1] = cycle_closing_state->ref;
-        find_dfs_stack_trace (ctx, ctx->stack, trace, level);
         double uw = cct_finalize (global->tables, "BOGUS, you should not see this string.");
         Warning (infoLong, "Parallel chunk tables under-water mark: %.2f", uw);
-        trc_env_t          *trace_env = trc_create (ctx->model, get_state,
-                                                    trace[0], ctx);
-        trc_write_trace (trace_env, trc_output, trace, level);
-        RTfree (trace);
+        /* Write last state to stack to close cycle */
+        state_data_t data = dfs_stack_push (ctx->stack, NULL);
+        state_info_serialize (cycle_closing_state, data);
+        find_and_write_dfs_stack_trace (ctx, level);
     }
     Warning (info,"Exiting now!");
     HREabort (LTSMIN_EXIT_COUNTER_EXAMPLE);
@@ -1533,11 +1567,18 @@ handle_error_trace (wctx_t *ctx)
 {
     size_t              level = ctx->counters.level_cur;
     if (trc_output) {
-        ref_t               start_ref = ctx->initial.ref;
-        trc_env_t  *trace_env = trc_create (ctx->model, get_state, start_ref, ctx);
         double uw = cct_finalize (global->tables, "BOGUS, you should not see this string.");
         Warning (infoLong, "Parallel chunk tables under-water mark: %.2f", uw);
-        trc_find_and_write (trace_env, trc_output, ctx->state.ref, level, global->parent_ref);
+        if (strategy[0] & Strat_TA) {
+            if (W != 1 || strategy[0] != Strat_TA_DFS)
+                Abort("Opaal error traces only supported with a single thread and DFS order");
+            dfs_stack_leave (ctx->stack);
+            level = dfs_stack_nframes (ctx->stack) + 1;
+            find_and_write_dfs_stack_trace (ctx, level);
+        } else {
+            trc_env_t  *trace_env = trc_create (ctx->model, get_state, ctx->initial.ref, ctx);
+            trc_find_and_write (trace_env, trc_output, ctx->state.ref, level, global->parent_ref);
+        }
     }
     Warning (info, "Exiting now!");
     HREabort (LTSMIN_EXIT_COUNTER_EXAMPLE);
@@ -2211,12 +2252,15 @@ invariant_detect (wctx_t *ctx, raw_data_t state)
 }
 
 static inline void
-action_detect (wctx_t *ctx, transition_info_t *ti, ref_t last)
+action_detect (wctx_t *ctx, transition_info_t *ti, state_info_t *successor)
 {
     if (-1 == act_index || NULL == ti->labels || ti->labels[act_label] != act_index) return;
     ctx->counters.errors++;
     if ((!no_exit || trc_output) && lb_stop(global->lb)) {
-        ctx->state.ref = last; // include the action in the trace
+        state_data_t data = dfs_stack_push (ctx->stack, NULL);
+        state_info_serialize (successor, data);
+        dfs_stack_enter (ctx->stack);
+        state_info_deserialize_cheap (&ctx->state, data); // used as last state
         Warning (info, "");
         Warning (info, "Error action '%s' found at depth %zu!", act_detect, ctx->counters.level_cur);
         Warning (info, "");
@@ -2229,6 +2273,7 @@ reach_handle (void *arg, state_info_t *successor, transition_info_t *ti,
               int seen)
 {
     wctx_t             *ctx = (wctx_t *) arg;
+    action_detect (ctx, ti, successor);
     if (!seen) {
         raw_data_t stack_loc = dfs_stack_push (ctx->stack, NULL);
         state_info_serialize (successor, stack_loc);
@@ -2236,7 +2281,6 @@ reach_handle (void *arg, state_info_t *successor, transition_info_t *ti,
             global->parent_ref[successor->ref] = ctx->state.ref;
         ctx->counters.visited++;
     }
-    action_detect (ctx, ti, successor->ref);
     ctx->counters.trans++;
     (void) ti;
 }
@@ -2476,7 +2520,7 @@ ta_handle (void *arg, state_info_t *successor, transition_info_t *ti, int seen)
     } else {
         lm_unlock (global->lmap, successor->ref);
     }
-    action_detect (ctx, ti, successor->ref);
+    action_detect (ctx, ti, successor);
     ctx->counters.trans++;
     (void) seen;
 }
