@@ -7,11 +7,11 @@
 
 #include <hre/config.h>
 
+#include <hre/stringindex.h>
 #include <hre/user.h>
 #include <lts-io/user.h>
 #include <ltsmin-lib/lts-type.h>
 #include <mc-lib/trace.h>
-#include <hre/stringindex.h>
 #include <util-lib/treedbs.h>
 
 
@@ -29,12 +29,11 @@ struct trc_env_s {
     trc_get_state_f     get_state;
     void               *get_state_arg;
     int                 state_labels;
-    ref_t               start_idx;
     lts_file_t          trace_handle;
 };
 
 trc_env_t *
-trc_create (model_t model, trc_get_state_f get, ref_t start_idx, void *arg)
+trc_create (model_t model, trc_get_state_f get, void *arg)
 {
     trc_env_t          *trace = RTmalloc(sizeof(trc_env_t));
     lts_type_t          ltstype = GBgetLTStype (model);
@@ -43,14 +42,12 @@ trc_create (model_t model, trc_get_state_f get, ref_t start_idx, void *arg)
     trace->get_state = get;
     trace->get_state_arg = arg;
     trace->model = model;
-    trace->start_idx = start_idx;
     return trace;
 }
 
 static void 
-write_trace_state(trc_env_t *env, int src_no, int *state)
+write_trace_state(trc_env_t *env, int *state)
 {
-    Warning (debug,"dumping state %d", src_no);
     int                 labels[env->state_labels];
     if (env->state_labels) GBgetStateLabelsAll(env->model, state, labels);
     lts_write_state (env->trace_handle, 0, state, labels);
@@ -61,50 +58,56 @@ write_trace_next (void *arg, transition_info_t *ti, int *dst)
 {
     write_trace_step_t *ctx = (write_trace_step_t*)arg;
     if (ctx->found) return;
-    for (int i = 0; i < ctx->env->N; i++)
-        if (ctx->dst[i] != dst[i]) return;
+    if (0 != memcmp(ctx->dst, dst, sizeof(int[ctx->env->N]))) return;
     ctx->found = 1;
     lts_write_edge (ctx->env->trace_handle, 0, &ctx->src_no, 0, &ctx->dst_no, ti->labels);
 }
 
 static void
-write_trace_step (trc_env_t *env, int src_no, int *src, int dst_no, int *dst)
+write_trace_step (write_trace_step_t *ctx, int *src)
 {
-    Warning (debug,"finding edge for state %d", src_no);
-    struct write_trace_step_s ctx;
-    ctx.src_no = src_no;
-    ctx.dst_no = dst_no;
-    ctx.dst = dst;
-    ctx.found = 0;
-    ctx.env = env;
-    GBgetTransitionsAll (env->model, src, write_trace_next, &ctx);
-    if (ctx.found==0) Abort("no matching transition found");
+    Warning (debug,"finding edge for state %d", ctx->src_no);
+    ctx->found = 0;
+    GBgetTransitionsAll (ctx->env->model, src, write_trace_next, ctx);
+    if (ctx->found==0) Abort("no matching transition found for %u", ctx->dst_no);
 }
 
 static void
 write_trace (trc_env_t *env, size_t trace_size, ref_t *trace)
 {
-    // write initial state
-    size_t              i = 0;
-    int                 step = 0;
+    string_index_t      si = SIcreate();
+    size_t              i = 1;
+    int                 last;
     int                 src[env->N];
-    int                *dst = env->get_state (env->start_idx, env->get_state_arg);
-    write_trace_state (env, env->start_idx, dst);
-    i++;
+    write_trace_step_t  ctx;
+    ctx.env = env;
+    ctx.dst = env->get_state (trace[0], env->get_state_arg);
+    ctx.dst_no = SIputC (si, (const char *)&trace[0], sizeof(ref_t));
+     // write initial state
+    write_trace_state (env, ctx.dst);
+
     while (i < trace_size) {
-        for (int j=0; j < env->N; ++j)
-            src[j] = dst[j];
-        dst = env->get_state (trace[i], env->get_state_arg);
-        write_trace_step (env, step, src, step + 1, dst);  // write step
-        write_trace_state (env, trace[i], dst);            // write dst_idx
+        memcpy(src, ctx.dst, sizeof(int[env->N]));
+        ctx.src_no = ctx.dst_no;
+        ctx.dst = env->get_state (trace[i], env->get_state_arg);
+        ctx.dst_no = last = SIlookupC(si, (const char *)&trace[i], sizeof(ref_t));
+        if (ctx.dst_no == SI_INDEX_FAILED) {
+            ctx.dst_no = SIputC (si, (const char *)&trace[i], sizeof(ref_t));
+        }
+        write_trace_step (&ctx, src);                           // write step
+        if (last == SI_INDEX_FAILED)
+            write_trace_state (env, ctx.dst);                   // write dst
         i++;
-        step++;
     }
+    SIdestroy (&si);
 }
 
-static void
-find_trace_to (trc_env_t *env, int dst_idx, int level, ref_t *parent_ofs)
+void
+trc_find_and_write (trc_env_t *env, char *trc_output, ref_t dst_idx,
+                    int level, ref_t *parent_ofs, ref_t start_idx)
 {
+    rt_timer_t timer = RTcreateTimer ();
+    RTstartTimer (timer);
     /* Other workers may have influenced the trace, writing to parent_ofs.
      * we artificially limit the length of the trace to 10 times that of the
      * found one */
@@ -115,7 +118,7 @@ find_trace_to (trc_env_t *env, int dst_idx, int level, ref_t *parent_ofs)
     int                 i = max_length - 1;
     ref_t               curr_idx = dst_idx;
     trace[i] = curr_idx;
-    while(curr_idx != env->start_idx) {
+    while(curr_idx != start_idx) {
         i--;
         if (i < 0)
             Abort("Trace length 10x longer than initially found trace. Giving up.");
@@ -123,31 +126,11 @@ find_trace_to (trc_env_t *env, int dst_idx, int level, ref_t *parent_ofs)
         trace[i] = curr_idx;
     }
     Warning (info, "reconstructed trace length: %zu", max_length - i);
-    // write trace
-    write_trace (env, max_length - i, &trace[i]);
-    RTfree (trace);
-}
 
-void
-trc_find_and_write (trc_env_t *env, char *trc_output, ref_t dst_idx, 
-                    int level, ref_t *parent_ofs)
-{
-    lts_type_t ltstype = GBgetLTStype(env->model);
-    hre_context_t n = HREctxCreate(0, 1, "blah", 0);
-    lts_file_t template = lts_index_template();
-    lts_file_set_context(template, n);
-    env->trace_handle=lts_file_create(trc_output,ltstype,1,template);
-    lts_file_set_context(env->trace_handle, n);
-    for(int i=0;i<lts_type_get_type_count(ltstype);i++)
-        lts_file_set_table(env->trace_handle,i,GBgetChunkMap(env->model,i));
-    int *init_state = env->get_state(env->start_idx, env->get_state_arg);
-    lts_write_init(env->trace_handle,0,init_state);
-    rt_timer_t timer = RTcreateTimer ();
-    RTstartTimer (timer);
-    find_trace_to (env, dst_idx, level, parent_ofs);
     RTstopTimer (timer);
     RTprintTimer (info, timer, "constructing the trace took");
-    lts_file_close (env->trace_handle);
+    trc_write_trace (env, trc_output, &trace[i], max_length - i);
+    RTfree (trace);
 }
 
 void
@@ -160,12 +143,8 @@ trc_write_trace (trc_env_t *env, char *trc_output, ref_t *trace, int level)
     env->trace_handle=lts_file_create(trc_output,ltstype,1,template);
     for(int i=0;i<lts_type_get_type_count(ltstype);i++)
         lts_file_set_table(env->trace_handle,i,GBgetChunkMap(env->model,i));
-    int *init_state = env->get_state(env->start_idx, env->get_state_arg);
-    lts_write_init(env->trace_handle,0,init_state);
-    rt_timer_t timer = RTcreateTimer ();
-    RTstartTimer (timer);
+    uint32_t tmp[1]={trace[0]};
+    lts_write_init(env->trace_handle,0,tmp);
     write_trace (env, level, trace);
-    RTstopTimer (timer);
-    RTprintTimer (info, timer, "constructing the trace took");
     lts_file_close (env->trace_handle);
 }

@@ -1536,8 +1536,8 @@ find_and_write_dfs_stack_trace (wctx_t *ctx, int level)
         int val = SIputC (ctx->cyan, state.data, sizeof(struct val_s));
         trace[level - i - 1] = (ref_t) val;
     }
-    trc_env_t          *trace_env = trc_create (ctx->model, get_stack_state,
-                                                trace[0], ctx);
+    trc_env_t          *trace_env = trc_create (ctx->model, get_stack_state, ctx);
+    Warning (info, "Writing trace to %s", trc_output);
     trc_write_trace (trace_env, trc_output, trace, level);
     RTfree (trace);
 }
@@ -1576,8 +1576,10 @@ handle_error_trace (wctx_t *ctx)
             level = dfs_stack_nframes (ctx->stack) + 1;
             find_and_write_dfs_stack_trace (ctx, level);
         } else {
-            trc_env_t  *trace_env = trc_create (ctx->model, get_state, ctx->initial.ref, ctx);
-            trc_find_and_write (trace_env, trc_output, ctx->state.ref, level, global->parent_ref);
+            trc_env_t  *trace_env = trc_create (ctx->model, get_state, ctx);
+            Warning (info, "Writing trace to %s", trc_output);
+            trc_find_and_write (trace_env, trc_output, ctx->state.ref, level,
+                                global->parent_ref, ctx->initial.ref);
         }
     }
     Warning (info, "Exiting now!");
