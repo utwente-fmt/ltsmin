@@ -186,9 +186,7 @@ DVE2compileGreyboxModel(model_t model, const char *filename)
         tmpdir = "/tmp";
 
     if ((ret = stat (tmpdir, &st)) != 0)
-        Abort("Cannot access `%s' for temporary compilation",
-                  tmpdir);
-    // XXX if ( cas(&initialized, 0, 1) ) {
+        Abort("Cannot access `%s' for temporary compilation", tmpdir);
     if (snprintf (templatename, sizeof templatename, "%s/ltsmin-XXXXXX", tmpdir) >= (ssize_t)sizeof templatename)
         Abort("Path too long: %s", tmpdir);
 
