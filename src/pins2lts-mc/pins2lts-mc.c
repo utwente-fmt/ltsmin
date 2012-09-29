@@ -1009,10 +1009,10 @@ print_statistics (counter_t *ar_reach, counter_t *ar_red, rt_timer_t timer,
                      (100 * statistics_stdev(&state_stats) / statistics_mean(&state_stats)),
                      (100 * statistics_stdev(&trans_stats) / statistics_mean(&trans_stats)));
         Warning (info, "");
+        reach->level_max /= W;
         print_state_space_total ("State space has ", reach);
         RTprintTimer (info, timer, "Total exploration time");
         double time = RTrealTime (timer);
-        reach->level_max /= W;
         Warning(info, "States per second: %.0f, Transitions per second: %.0f",
                 ar_reach->explored/time, ar_reach->trans/time);
         Warning(info, "");
