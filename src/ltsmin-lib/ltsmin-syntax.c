@@ -225,95 +225,114 @@ int LTSminBinaryToken(ltsmin_parse_env_t env, int idx)
     return env->binary_info[idx].token;
 }
 
-void LTSminPrintExpr(log_t log,ltsmin_parse_env_t env,ltsmin_expr_t expr){
+size_t
+LTSminSPrintExpr(char *buf, ltsmin_expr_t expr, ltsmin_parse_env_t env)
+{
+    char *begin = buf;
     switch(expr->node_type){
         case VAR:
-            log_printf(log,"%s",SIget(env->idents,expr->idx));
+            buf += sprintf(buf, "%s",SIget(env->idents,expr->idx));
             break;
         case SVAR:
-            log_printf(log,"%s",LTSminStateVarName(env, expr->idx));
+            buf += sprintf(buf, "%s",LTSminStateVarName(env, expr->idx));
             break;
         case EVAR:
-            log_printf(log,"%s",LTSminEdgeVarName(env, expr->idx));
+            buf += sprintf(buf, "%s",LTSminEdgeVarName(env, expr->idx));
             break;
         case INT:
-            log_printf(log,"%d",expr->idx);
+            buf += sprintf(buf, "%d",expr->idx);
             break;
         case CHUNK: {
             chunk c;
             c.data=SIgetC(env->values,expr->idx,(int*)&c.len);
             char print[c.len*2+6];
             chunk2string(c,sizeof print,print);
-            log_printf(info,"%s",print);
+            buf += sprintf(buf,"%s",print);
             break;
         }
         case CONSTANT: {
-            log_printf(log," %s ",LTSminConstantName(env, expr->idx));
+            buf += sprintf(buf, " %s ",LTSminConstantName(env, expr->idx));
             break;
         }
         case BINARY_OP: {
-            log_printf(log,"(");
-            LTSminPrintExpr(log,env,expr->arg1);
-            log_printf(log," %s ",LTSminBinaryName(env, expr->idx));
-            LTSminPrintExpr(log,env,expr->arg2);
-            log_printf(log,")");
+            buf += sprintf(buf, "(");
+            buf += LTSminSPrintExpr(buf, expr->arg1, env);
+            buf += sprintf(buf, " %s ",LTSminBinaryName(env, expr->idx));
+            buf += LTSminSPrintExpr(buf, expr->arg2, env);
+            buf += sprintf(buf, ")");
             break;
         }
         case UNARY_OP:
             if (LTSminUnaryIsPrefix(env, expr->idx)) {
-                log_printf(log,"(%s ", LTSminUnaryName(env, expr->idx));
-                LTSminPrintExpr(log,env,expr->arg1);
-                log_printf(log,")");
+                buf += sprintf(buf, "(%s ", LTSminUnaryName(env, expr->idx));
+                buf += LTSminSPrintExpr(buf, expr->arg1, env);
+                buf += sprintf(buf, ")");
             } else {
-                log_printf(log,"(");
-                LTSminPrintExpr(log,env,expr->arg1);
-                log_printf(log,"%s )", LTSminUnaryName(env, expr->idx));
+                buf += sprintf(buf, "(");
+                buf += LTSminSPrintExpr(buf, expr->arg1, env);
+                buf += sprintf(buf, "%s )", LTSminUnaryName(env, expr->idx));
             }
             break;
         case MU_FIX:
-            log_printf(log,"(%s %s.",SIget(env->keywords,TOKEN_MU_SYM), SIget(env->idents,expr->idx));
-            LTSminPrintExpr(log,env,expr->arg1);
-            log_printf(log,")");
+            buf += sprintf(buf, "(%s %s.",SIget(env->keywords,TOKEN_MU_SYM), SIget(env->idents,expr->idx));
+            buf += LTSminSPrintExpr(buf, expr->arg1, env);
+            buf += sprintf(buf, ")");
             break;
         case NU_FIX:
-            log_printf(log,"(%s %s.",SIget(env->keywords,TOKEN_NU_SYM), SIget(env->idents,expr->idx));
-            LTSminPrintExpr(log,env,expr->arg1);
-            log_printf(log,")");
+            buf += sprintf(buf, "(%s %s.",SIget(env->keywords,TOKEN_NU_SYM), SIget(env->idents,expr->idx));
+            buf += LTSminSPrintExpr(buf, expr->arg1, env);
+            buf += sprintf(buf, ")");
             break;
         case EXISTS_STEP:
-            log_printf(log,"(%s ", SIget(env->keywords,TOKEN_EXISTS_SYM));
-            LTSminPrintExpr(log,env,expr->arg1);
-            log_printf(log,".");
-            LTSminPrintExpr(log,env,expr->arg2);
-            log_printf(log,")");
+            buf += sprintf(buf, "(%s ", SIget(env->keywords,TOKEN_EXISTS_SYM));
+            buf += LTSminSPrintExpr(buf, expr->arg1, env);
+            buf += sprintf(buf, ".");
+            buf += LTSminSPrintExpr(buf, expr->arg2, env);
+            buf += sprintf(buf, ")");
             break;
         case FORALL_STEP:
-            log_printf(log,"(%s ", SIget(env->keywords,TOKEN_ALL_SYM));
-            LTSminPrintExpr(log,env,expr->arg1);
-            log_printf(log,".");
-            LTSminPrintExpr(log,env,expr->arg2);
-            log_printf(log,")");
+            buf += sprintf(buf, "(%s ", SIget(env->keywords,TOKEN_ALL_SYM));
+            buf += LTSminSPrintExpr(buf, expr->arg1, env);
+            buf += sprintf(buf, ".");
+            buf += LTSminSPrintExpr(buf, expr->arg2, env);
+            buf += sprintf(buf, ")");
             break;
         case EDGE_EXIST:
-            log_printf(log,"(%s%s%s",
+            buf += sprintf(buf, "(%s%s%s",
                 SIget(env->keywords,TOKEN_EDGE_EXIST_LEFT),
                 SIget(env->edge_vars,expr->idx),
                 SIget(env->keywords,TOKEN_EDGE_EXIST_RIGHT));
-            LTSminPrintExpr(log,env,expr->arg1);
-            log_printf(log,")");
+            buf += LTSminSPrintExpr(buf, expr->arg1, env);
+            buf += sprintf(buf, ")");
             break;
         case EDGE_ALL:
-            log_printf(log,"(%s%s%s",
+            buf += sprintf(buf, "(%s%s%s",
                 SIget(env->keywords,TOKEN_EDGE_ALL_LEFT),
                 SIget(env->edge_vars,expr->idx),
                 SIget(env->keywords,TOKEN_EDGE_ALL_RIGHT));
-            LTSminPrintExpr(log,env,expr->arg1);
-            log_printf(log,")");
+            buf += LTSminSPrintExpr(buf, expr->arg1, env);
+            buf += sprintf(buf, ")");
             break;
         default: Abort("Unknown expression node");
     }
+    return buf - begin;
 }
 
+char *
+LTSminPrintExpr(ltsmin_expr_t expr, ltsmin_parse_env_t env)
+{
+    size_t len = LTSminSPrintExpr(env->buffer, expr, env);
+    HREassert (len < ENV_BUFFER_SIZE, "Buffer overflow in print expression");
+    return env->buffer;
+}
+
+void
+LTSminLogExpr(log_t log,char*msg,ltsmin_expr_t expr,ltsmin_parse_env_t env)
+{
+    size_t len = LTSminSPrintExpr(env->buffer, expr, env);
+    HREassert (len < ENV_BUFFER_SIZE, "Buffer overflow in print expression");
+    Warning(log, "%s%s", msg, env->buffer);
+}
 
 ltsmin_expr_t LTSminExpr(ltsmin_expr_case node_type, int token, int idx,
                          ltsmin_expr_t arg1, ltsmin_expr_t arg2)

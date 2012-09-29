@@ -16,6 +16,8 @@ struct op_info{
     int prio;
 };
 
+static const size_t ENV_BUFFER_SIZE = 4096;
+
 struct ltsmin_parse_env_s{
     stream_t input;
     void* parser;
@@ -36,10 +38,11 @@ struct ltsmin_parse_env_s{
     int lineno;    //line number, maintained by lexer.
     int linebased; /* if 0 then end of line is ignored as white space. 
                       Otherwise an EOL token is generated. */
-    int linepos;
-    etf_model_t etf;
-    string_index_t etf_current_idx;
-    ltsmin_expr_t expr;
+    int                 linepos;
+    etf_model_t         etf;
+    string_index_t      etf_current_idx;
+    ltsmin_expr_t       expr;
+    char                buffer[ENV_BUFFER_SIZE];
 };
 
 

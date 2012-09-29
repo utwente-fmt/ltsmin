@@ -56,6 +56,7 @@ extern void *ParseAlloc(void *(*mallocProc)(size_t));
 extern void ParseFree(void *p,void (*freeProc)(void*));
 
 typedef struct ltsmin_expr_s *ltsmin_expr_t;
+
 typedef enum {
     /* common symbols */
     SVAR,
@@ -89,16 +90,19 @@ typedef enum {
 } ltsmin_expr_case;
 
 struct ltsmin_expr_s {
-    ltsmin_expr_case node_type;
-    int idx;
-    int token;
-    int num; // index in model chunk table
-    int lts_type; // lts type
-    ltsmin_expr_t arg1;
-    ltsmin_expr_t arg2;
-    uint32_t hash;
+    ltsmin_expr_case    node_type;
+    int                 idx;
+    int                 token;
+    int                 num; // index in model chunk table
+    int                 lts_type; // lts type
+    ltsmin_expr_t       arg1;
+    ltsmin_expr_t       arg2;
+    uint32_t            hash;
 };
-extern void LTSminPrintExpr(log_t log,ltsmin_parse_env_t env,ltsmin_expr_t expr);
+
+extern void   LTSminLogExpr(log_t log,char*msg,ltsmin_expr_t expr,ltsmin_parse_env_t env);
+extern size_t LTSminSPrintExpr(char *buf,ltsmin_expr_t expr,ltsmin_parse_env_t env);
+extern char  *LTSminPrintExpr(ltsmin_expr_t expr,ltsmin_parse_env_t env);
 
 ltsmin_expr_t LTSminExpr(ltsmin_expr_case node_type, int token, int idx, ltsmin_expr_t arg1, ltsmin_expr_t arg2);
 int           LTSminExprEq(ltsmin_expr_t expr1, ltsmin_expr_t expr2);

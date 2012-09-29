@@ -314,9 +314,7 @@ that can be reused for other languages (e.g. CTL, CTL* and LTL)
 
 input ::= EXPR expr(E) . {
     (void)E;
-    log_printf(info,"Expression is: ");
-    LTSminPrintExpr(info,env,E);
-    log_printf(info,"\n");
+    LTSminLogExpr(info,"Expression is: ",E,env);
     env->expr=E;
 }
 

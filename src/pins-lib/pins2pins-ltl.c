@@ -28,11 +28,11 @@ typedef struct ltl_context {
 } ltl_context_t;
 
 typedef struct cb_context {
-    TransitionCB cb;
-    void* user_context;
-    int*  src;
-    int   ntbtrans;               /* number of textbook transitions */
-    ltl_context_t *ctx;
+    TransitionCB    cb;
+    void           *user_context;
+    int            *src;
+    int             ntbtrans; /* number of textbook transitions */
+    ltl_context_t  *ctx;
 } cb_context;
 
 static int
@@ -320,16 +320,16 @@ init_ltsmin_buchi(model_t model, const char *ltl_file)
 {
     lts_type_t ltstype = GBgetLTStype(model);
     if (NULL == shared_ba && cas(&grab_ba, 0, 1)) {
-        Warning(info,"Initializing LTL layer.., formula file %s", ltl_file);
+        Warning(info,"Initializing LTL layer.., formula: %s", ltl_file);
         int idx = GBgetAcceptingStateLabelIndex (model);
         if (idx != -1) {
             Abort ("LTL layer initialization failed, model already has a ``%s'' property",
-                  lts_type_get_state_label_name (ltstype,idx));
+                   lts_type_get_state_label_name(ltstype,idx));
         }
         ltsmin_expr_t ltl = parse_file (ltl_file, ltl_parse_file, model);
         ltsmin_expr_t notltl = LTSminExpr(UNARY_OP, LTL_NOT, 0, ltl, NULL);
         ltsmin_ltl2ba(notltl);
-        ltsmin_buchi_t* ba = ltsmin_buchi();
+        ltsmin_buchi_t *ba = ltsmin_buchi();
         if (NULL == ba)
             Abort ("Empty buchi automaton.");
         if (ba->predicate_count > 30)
