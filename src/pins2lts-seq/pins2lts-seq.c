@@ -1104,6 +1104,7 @@ write_trace_next (void *arg, transition_info_t *ti, int *dst)
     if (!ctx->found && num <= ctx->num_root && num >= ctx->num_current) {
         gc.queue.filo.push(&next, NULL);
     }
+    (void) ti;
 }
 
 static void

@@ -494,6 +494,14 @@ ctx_add_counters (wctx_t *ctx, counter_t *cnt, counter_t *red, stats_t *stats)
     add_results(red, &ctx->red);
 }
 
+static void *
+get_state (ref_t ref, void *arg)
+{
+    wctx_t             *ctx = (wctx_t *) arg;
+    state_data_t        state = get (global->dbs, ref, ctx->store2);
+    return Tree & db_type ? TreeDBSLLdata(global->dbs, state) : state;
+}
+
 static inline void
 wait_seed (wctx_t *ctx, ref_t seed)
 {
@@ -530,7 +538,7 @@ set_red (wctx_t *ctx, state_info_t *state)
 {
     if (global_try_color(state->ref, GRED, ctx->rec_bits)) {
         ctx->red.explored++;
-        if ( GBbuchiIsAccepting(ctx->model, get(global->dbs, state->ref, ctx->store2)) )
+        if ( GBbuchiIsAccepting(ctx->model, get_state(state->ref, ctx)) )
             ctx->red.visited++; /* count accepting states */
     } else {
         ctx->red.bogus_red++;
@@ -1499,14 +1507,6 @@ state_info_deserialize_cheap (state_info_t *state, raw_data_t data)
 }
 
 static void *
-get_state (ref_t ref, void *arg)
-{
-    wctx_t             *ctx = (wctx_t *) arg;
-    state_data_t        state = get (global->dbs, ref, ctx->store2);
-    return Tree & db_type ? TreeDBSLLdata(global->dbs, state) : state;
-}
-
-static void *
 get_stack_state (ref_t ref, void *arg)
 {
     wctx_t             *ctx = (wctx_t *) arg;
@@ -1620,7 +1620,7 @@ ndfs_blue_handle (void *arg, state_info_t *successor, transition_info_t *ti,
      */
     if ( nn_color_eq(color, NNCYAN) &&
             (GBbuchiIsAccepting(ctx->model, ctx->state.data) ||
-             GBbuchiIsAccepting(ctx->model, get(global->dbs, successor->ref, ctx->store2))) ) {
+             GBbuchiIsAccepting(ctx->model, get_state(successor->ref, ctx))) ) {
         /* Found cycle in blue search */
         ndfs_report_cycle(ctx, successor);
     } else if ((ctx->strategy == Strat_LNDFS && !global_has_color(ctx->state.ref, GRED, ctx->rec_bits)) ||
@@ -1949,7 +1949,7 @@ endfs_handle_red (void *arg, state_info_t *successor, transition_info_t *ti, int
         ndfs_report_cycle (ctx, successor);
     /* Mark states dangerous if necessary */
     if ( Strat_ENDFS == ctx->strategy &&
-         GBbuchiIsAccepting(ctx->model, get(global->dbs, successor->ref, ctx->store2)) &&
+         GBbuchiIsAccepting(ctx->model, get_state(successor->ref, ctx)) &&
          !global_has_color(successor->ref, GRED, ctx->rec_bits) )
         global_try_color(successor->ref, GDANGEROUS, ctx->rec_bits);
     if ( !nn_color_eq(color, NNPINK) &&
@@ -1973,7 +1973,7 @@ endfs_handle_blue (void *arg, state_info_t *successor, transition_info_t *ti, in
      */
     if ( nn_color_eq(color, NNCYAN) &&
          (GBbuchiIsAccepting(ctx->model, ctx->state.data) ||
-         GBbuchiIsAccepting(ctx->model, get(global->dbs, successor->ref, ctx->store2))) ) {
+         GBbuchiIsAccepting(ctx->model, get_state(successor->ref, ctx))) ) {
         /* Found cycle in blue search */
         ndfs_report_cycle(ctx, successor);
     } else if ( all_red || (!nn_color_eq(color, NNCYAN) && !nn_color_eq(color, NNBLUE) &&

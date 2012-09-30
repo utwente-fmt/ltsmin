@@ -372,6 +372,8 @@ GBaddLTL (model_t model, const char *ltl_file, pins_ltl_type_t type, model_t por
     // add type
     int type_count = lts_type_get_type_count(ltstype_new);
     int ltl_type = lts_type_add_type(ltstype_new, "buchi", NULL);
+    lts_type_set_format (ltstype_new, ltl_type, LTStypeDirect);
+
     // sanity check, type ltl is new (added last)
     HREassert (ltl_type == type_count, "LTL type error");
     int bool_is_new;
