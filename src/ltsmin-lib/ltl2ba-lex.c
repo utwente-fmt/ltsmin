@@ -209,6 +209,7 @@ void
 ltsmin_ltl2ba(ltsmin_expr_t e)
 {
     ltl2ba_init();
+    tl_verbose = log_active (infoLong);
     tl_yylex = tl_lex;
     set_uform("");
     const int le_size = 64;
