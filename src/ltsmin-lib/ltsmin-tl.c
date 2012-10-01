@@ -552,7 +552,7 @@ void* tableaux_table_lookup(tableaux_table_t *t, uint32_t hash, void* data)
 char *ltsmin_expr_print_ltl(ltsmin_expr_t ltl,char* buf)
 {
     // no equation
-    if (!ltl) return buf;
+    HREassert (ltl, "Empty LTL expression");
 
     // left eq
     switch(ltl->node_type) {
@@ -600,6 +600,7 @@ char *ltsmin_expr_print_ltl(ltsmin_expr_t ltl,char* buf)
             break;
         default:;
     }
+    *buf='\0';
     return buf;
 }
 
@@ -660,6 +661,7 @@ char* ltsmin_expr_print_ctl(ltsmin_expr_t ctl, char* buf)
             break;
         default:;
     }
+    *buf='\0';
     return buf;
 }
 
@@ -1504,6 +1506,7 @@ char* ltsmin_expr_print_mu(ltsmin_expr_t mu, char* buf)
             break;
         default:;
     }
+    *buf='\0';
     return buf;
 }
 

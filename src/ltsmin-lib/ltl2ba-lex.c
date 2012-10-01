@@ -65,7 +65,8 @@ static int	tl_lex(void);
 extern YYSTYPE  tl_yylval;
 char	yytext[2048];
 
-#define Token(y)        tl_yylval = tl_nn(y,ZN,ZN); append_uform(yytext); return y
+#define Token(y)        tl_yylval = tl_nn(y,ZN,ZN); append_uform(yytext); \
+    Debug ("LTL Lexer: passing token '%s' to LTL2BA", yytext); return y
 
 #define LTL_LPAR ((void*)0x01)
 #define LTL_RPAR ((void*)0x02)
@@ -94,6 +95,7 @@ ltsmin_expr_lookup(ltsmin_expr_t e, char* text)
     *pp_le_list = (ltsmin_expr_list_t*) tl_emalloc(sizeof(ltsmin_expr_list_t));
     (*pp_le_list)->text = strdup(text);
     (*pp_le_list)->expr = e;
+    Debug ("LTL Symbol table: record expression %p as '%s'", e, text);
     (*pp_le_list)->next = NULL;
     return e;
 }
@@ -155,6 +157,7 @@ tl_lex(void)
             tl_yylval->sym = tl_lookup(yytext);
             append_uform(yytext);
             }
+            Debug ("LTL Lexer: passing token '%s' to LTL2BA", yytext);
             return PREDICATE;
         default:
             Abort("unhandled LTL_TOKEN: %d\n", e->token);
@@ -172,6 +175,7 @@ add_lin_expr(ltsmin_expr_t e)
         le->size *= 2;
         le = RTrealloc(le, sizeof(ltsmin_lin_expr_t) + le->size * sizeof(ltsmin_expr_t));
     }
+    Debug ("LTL Linearizer: added expression %p at %d", e, le->count);
     le->lin_expr[le->count++] = e;
 }
 
@@ -276,7 +280,10 @@ ltsmin_buchi()
     res->predicate_count = n_symbols;
     res->predicates = RTmalloc(n_symbols * sizeof(ltsmin_expr_t));
     for (int i=0; i < n_symbols; i++) {
-        res->predicates[i] = ltsmin_expr_lookup(NULL, sym_table[i]);
+        ltsmin_expr_t e = ltsmin_expr_lookup (NULL, sym_table[i]);
+        Debug("LTL symbol table: lookup up predicate '%s': %p", sym_table[i], e);
+        HREassert (e != NULL, "Lookup failed for expression: %s", sym_table[i]);
+        res->predicates[i] = e;
     }
     res->state_count = state_count;
     int index = 0;
