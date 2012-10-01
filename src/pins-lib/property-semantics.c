@@ -7,7 +7,6 @@
 
 #include <stdbool.h>
 
-#include <ltsmin-lib/ltsmin-parse-env.h>
 #include <pins-lib/property-semantics.h>
 
 /**
@@ -96,13 +95,21 @@ ltsmin_expr_lookup_values(ltsmin_expr_t ltl,ltsmin_parse_env_t env,model_t model
  * Chunk values are looked up in PINS.
  */
 ltsmin_expr_t
-parse_file(const char *file, parse_f parser, model_t model)
+parse_file_env(const char *file, parse_f parser, model_t model,
+               ltsmin_parse_env_t env)
 {
     lts_type_t ltstype = GBgetLTStype(model);
-    ltsmin_parse_env_t env = LTSminParseEnvCreate();
     ltsmin_expr_t expr = parser(file, env, ltstype);
     ltsmin_expr_lookup_values(expr, env, model);
     env->expr = NULL;
+    return expr;
+}
+
+ltsmin_expr_t
+parse_file(const char *file, parse_f parser, model_t model)
+{
+    ltsmin_parse_env_t env = LTSminParseEnvCreate();
+    ltsmin_expr_t expr = parse_file_env(file, parser, model, env);
     LTSminParseEnvDestroy(env);
     return expr;
 }

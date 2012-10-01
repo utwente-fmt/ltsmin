@@ -7,8 +7,12 @@
 
 #include <ltsmin-lib/ltsmin-tl.h>
 #include <pins-lib/pins.h>
+#include <ltsmin-lib/ltsmin-parse-env.h>
 
 extern ltsmin_expr_t parse_file(const char *file, parse_f parser, model_t model);
+
+extern ltsmin_expr_t parse_file_env(const char *file, parse_f parser,
+                                    model_t model, ltsmin_parse_env_t env);
 
 extern void mark_predicate(ltsmin_expr_t e, matrix_t *m); /* mark touched variables */
 

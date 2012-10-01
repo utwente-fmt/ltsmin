@@ -287,7 +287,7 @@ ltl_textbook_all (model_t self, int *src, TransitionCB cb, void *user_context)
 }
 
 void
-print_ltsmin_buchi(const ltsmin_buchi_t *ba)
+print_ltsmin_buchi(const ltsmin_buchi_t *ba, ltsmin_parse_env_t env)
 {
     Warning(info, "buchi has %d states", ba->state_count);
     for(int i=0; i < ba->state_count; i++) {
@@ -299,13 +299,15 @@ print_ltsmin_buchi(const ltsmin_buchi_t *ba)
             *at = '\0';
             for(int k=0; k < ba->predicate_count; k++) {
                 if (ba->states[i]->transitions[j].pos[k/32] & (1<<(k%32))) {
-                    if (at != buf) { sprintf(at, " && "); at += strlen(at); }
-                    at = ltsmin_expr_print_ltl(ba->predicates[k], at);
+                    if (at != buf)
+                        at += sprintf(at, " && ");
+                    at += LTSminSPrintExpr(at, ba->predicates[k], env);
                 }
                 if (ba->states[i]->transitions[j].neg[k/32] & (1<<(k%32))) {
-                    if (at != buf) { sprintf(at, " && "); at += strlen(at); }
+                    if (at != buf)
+                        at += sprintf(at, " && ");
                     *at++ = '!';
-                    at = ltsmin_expr_print_ltl(ba->predicates[k], at);
+                    at += LTSminSPrintExpr(at, ba->predicates[k], env);
                 }
             }
             if (at == buf) sprintf(at, "true");
@@ -329,7 +331,8 @@ init_ltsmin_buchi(model_t model, const char *ltl_file)
             Abort ("LTL layer initialization failed, model already has a ``%s'' property",
                    lts_type_get_state_label_name(ltstype,idx));
         }
-        ltsmin_expr_t ltl = parse_file (ltl_file, ltl_parse_file, model);
+        ltsmin_parse_env_t env = LTSminParseEnvCreate();
+        ltsmin_expr_t ltl = parse_file_env (ltl_file, ltl_parse_file, model, env);
         ltsmin_expr_t notltl = LTSminExpr(UNARY_OP, LTL_NOT, 0, ltl, NULL);
         ltsmin_ltl2ba(notltl);
         ltsmin_buchi_t *ba = ltsmin_buchi();
@@ -338,7 +341,8 @@ init_ltsmin_buchi(model_t model, const char *ltl_file)
         if (ba->predicate_count > 30)
             Abort("more than 30 predicates in buchi automaton are currently not supported");
         atomic_write (&shared_ba, ba);
-        print_ltsmin_buchi(ba);
+        print_ltsmin_buchi(ba, env);
+        LTSminParseEnvDestroy (env);
     } else {
         while (NULL == atomic_read(&shared_ba)) {}
     }
