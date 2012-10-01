@@ -16,7 +16,7 @@ struct op_info{
     int prio;
 };
 
-static const size_t ENV_BUFFER_SIZE = 4096;
+#define ENV_BUFFER_SIZE 4096
 
 struct ltsmin_parse_env_s{
     stream_t input;
