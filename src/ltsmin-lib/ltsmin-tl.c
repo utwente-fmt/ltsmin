@@ -86,6 +86,41 @@ pred_parse_file(const char *file, ltsmin_parse_env_t env, lts_type_t ltstype)
  *  LOW
  */
 
+/* Convert weak untils to until or generally */
+static ltsmin_expr_t
+ltl_tree_walker(ltsmin_expr_t in)
+{
+    ltsmin_expr_t arg1, arg2, u, g;
+    // handle sub-expressions
+    switch (in->node_type) {
+        case UNARY_OP:
+            arg1 = ltl_tree_walker(in->arg1);
+            in->arg1 = arg1;
+            LTSminExprRehash(in);
+            break;
+        case BINARY_OP:
+            arg1 = ltl_tree_walker(in->arg1);
+            arg2 = ltl_tree_walker(in->arg2);
+            switch (in->token) {
+                case LTL_WEAK_UNTIL:
+                    u = LTSminExpr(BINARY_OP, LTL_UNTIL, 0, arg1, arg2);
+                    g = LTSminExpr(UNARY_OP, LTL_GLOBALLY, 0, arg1, NULL);
+                    RTfree (in);
+                    in = LTSminExpr(BINARY_OP, LTL_OR, 0, u, g);
+                    break;
+                default:
+                    in->arg1 = arg1;
+                    in->arg2 = arg2;
+                    LTSminExprRehash(in);
+                    break;
+            }
+            break;
+        default:
+            break;
+    }
+    return in;
+}
+
 /* Parser Priorities:
  * HIGH
  *     binary priority 1          : ==, !=, etc
@@ -144,11 +179,12 @@ ltl_parse_file(const char *file, ltsmin_parse_env_t env, lts_type_t ltstype)
     LTSminBinaryOperator(env, LTL_IMPLY,        "->", 7);
 
     LTSminBinaryOperator(env, LTL_UNTIL,        "U",  8);
-    //LTSminBinaryOperator(env, LTL_WEAK_UNTIL,   "W",  8); // not supported by ltl2ba
+    LTSminBinaryOperator(env, LTL_WEAK_UNTIL,   "W",  8); // translated to U \/ []
     LTSminBinaryOperator(env, LTL_RELEASE,      "R",  8);
 
     ltsmin_parse_stream(TOKEN_EXPR,env,stream);
-    ltsmin_expr_t expr=env->expr;
+    env->expr = ltl_tree_walker (env->expr);
+    ltsmin_expr_t expr = env->expr;
 
     return expr;
 }
