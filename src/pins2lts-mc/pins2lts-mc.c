@@ -251,6 +251,7 @@ static int              refs = 1;
 static int              ZOBRIST = 0;
 static int              no_red_perm = 0;
 static int              all_red = 1;
+static int              owcty_reset = 0;
 static int              ecd = 1;
 static box_t            call_mode = UseBlackBox;
 static size_t           max_level = SIZE_MAX;
@@ -323,12 +324,9 @@ state_db_popt (poptContext con, enum poptCallbackReason reason,
         } while ('\0' != last && i < MAX_STRATEGIES);
         free (strat); // strdup
         if (Strat_OWCTY == strategy[0]) {
-            if (Strat_None == strategy[1]) {
+            if (ecd && Strat_None == strategy[1]) {
                 Warning (info, "Defaulting to MAP as OWCTY early cycle detection procedure.");
                 strategy[1] = Strat_MAP;
-            }
-            if (~(Strat_MAP | Strat_ECD) & strategy[1]) {
-                Fatal (1, error, "Not a valid OWCRT early cycle detection procedure: %s.", key_search(strategies, strategy[1]));
             }
         }
         if (Strat_ENDFS == strategy[i-1]) {
@@ -376,6 +374,7 @@ static struct poptOption options[] = {
 #endif
     {"nar", 1, POPT_ARG_VAL, &all_red, 0, "turn off red coloring in the blue search (NNDFS/MCNDFS)", NULL},
     {"no-ecd", 1, POPT_ARG_VAL, &ecd, 0, "turn off early cycle detection (NNDFS/MCNDFS)", NULL},
+    {"owcty-reset", 0, POPT_ARG_VAL, &owcty_reset, 1, "turn on reset in OWCTY algorithm", NULL},
     {"perm", 'p', POPT_ARG_STRING | POPT_ARGFLAG_SHOW_DEFAULT,
      &arg_perm, 0, "select the transition permutation method",
      "<dynamic|random|rr|sort|sr|shift|shiftall|otf|none>"},
@@ -397,6 +396,12 @@ static struct poptOption options[] = {
     POPT_TABLEEND
 };
 
+typedef struct owcty_ext_s {
+    uint32_t                count : 30;
+    uint32_t                bit : 1;
+    uint32_t                acc : 1;
+} __attribute ((packed)) owcty_ext_t;
+
 typedef struct global_s {
     lb_t               *lb;
     void               *dbs;
@@ -407,6 +412,7 @@ typedef struct global_s {
     zobrist_t           zobrist;
     cct_map_t          *tables;
     pthread_mutex_t     mutex;
+    owcty_ext_t         *state_ext;
 } global_t;
 
 static global_t           *global;
@@ -777,9 +783,12 @@ postlocal_global_init (wctx_t *ctx)
             global->dbs = TreeDBSLLcreate_dm (D, dbs_size, ratio, m, bits,
                                              db_type == ClearyTree, indexing);
         }
-        if ((strategy[0] & Strat_OWCTY) ||
-            (trc_output && !(strategy[0] & Strat_LTL)))
+        if (!ecd && strategy[1] != Strat_None)
+            Abort ("Conflicting options --no-ecd and %s.", key_search(strategies, strategy[1]));
+        if (strategy[1] != Strat_MAP || (trc_output && !(strategy[0] & (Strat_LTL | Strat_TA))))
             global->parent_ref = RTmalloc (sizeof(ref_t[1UL<<dbs_size]));
+        if (strategy[0] & Strat_OWCTY)
+            global->state_ext = RTalignZero (CACHE_LINE_SIZE, sizeof(owcty_ext_t[1UL << dbs_size]));
         if (Strat_TA & strategy[0])
             global->lmap = lm_create (W, 1UL<<dbs_size, LATTICE_BLOCK_SIZE);
         global->lb = lb_create_max (W, G, H);
@@ -2462,6 +2471,65 @@ sbfs (wctx_t *ctx)
  * OWCTY-MAP Barnat et al.
  */
 
+#define                     state_ext32 ((uint32_t *)global->state_ext)
+
+static inline owcty_ext_t
+read_extention (ref_t ref)
+{
+    return *(owcty_ext_t *)&atomic_read (&global->state_ext[ref]);
+}
+
+static inline void
+write_extention (ref_t ref, owcty_ext_t val)
+{
+    atomic_write ((uint32_t *)&global->state_ext[ref], *(uint32_t *)&val);
+}
+
+static inline int
+cas_extention (ref_t ref, owcty_ext_t now, owcty_ext_t val)
+{
+    return cas ((uint32_t *)&global->state_ext[ref], *(uint32_t *)&now, *(uint32_t *)&val);
+}
+
+static inline uint32_t
+inc_extention (ref_t ref, uint32_t val)
+{
+    uint32_t x = add_fetch (&state_ext32[ref], val);
+    owcty_ext_t y = *(owcty_ext_t *)&x;
+    return y.count;
+}
+
+static inline uint32_t
+get_count (ref_t ref)
+{
+    return read_extention (ref).count;
+}
+
+static inline void
+reset_extention (ref_t ref, int bit, int acc)
+{
+    owcty_ext_t             reset;
+    reset.acc = acc;
+    reset.bit = bit;
+    reset.count = 0;
+    write_extention (ref, reset);
+}
+
+static inline int
+try_reset_extention (ref_t ref, uint32_t reset_val, int bit, bool check_zero)
+{
+    owcty_ext_t             reset, ext;
+    do {
+        ext = read_extention (ref);
+        if (ext.bit == bit || (check_zero && ext.count == 0))
+            return 0;
+        reset.acc = ext.acc;
+        reset.bit = bit;
+        reset.count = reset_val;
+    } while (!cas_extention(ref, ext, reset));
+    return 1;
+}
+
 static inline void
 owcty_map (wctx_t *ctx, state_info_t *successor)
 {
@@ -2593,72 +2661,12 @@ owcty_initialize (wctx_t *ctx)
     return size[0];
 }
 
-typedef struct owcty_ext_s {
-    uint32_t                count : 30;
-    uint32_t                bit : 1;
-    uint32_t                acc : 1;
-} __attribute ((packed)) owcty_ext_t;
-
-static owcty_ext_t         *state_ext = NULL;
-#define                     state_ext32 ((uint32_t *)state_ext)
-
-static inline owcty_ext_t
-read_extention (ref_t ref)
-{
-    return *(owcty_ext_t *)&atomic_read (&state_ext[ref]);
-}
-
-static inline void
-write_extention (ref_t ref, owcty_ext_t val)
-{
-    atomic_write ((uint32_t *)&state_ext[ref], *(uint32_t *)&val);
-}
-
-static inline int
-cas_extention (ref_t ref, owcty_ext_t now, owcty_ext_t val)
-{
-    return cas ((uint32_t *)&state_ext[ref], *(uint32_t *)&now, *(uint32_t *)&val);
-}
-
-static inline int
-try_reset_extention (ref_t ref, int bit)
-{
-    owcty_ext_t             reset, ext;
-    do {
-        ext = read_extention (ref);
-        if (ext.bit == bit)
-            return 0;
-        reset.acc = ext.acc;
-        reset.bit = bit;
-        reset.count = 1;
-    } while (!cas_extention(ref, ext, reset));
-    return 1;
-}
-
-static inline uint32_t
-inc_extention (ref_t ref, uint32_t val)
-{
-    uint32_t x = add_fetch (&state_ext32[ref], val);
-    owcty_ext_t y = *(owcty_ext_t *)&x;
-    return y.count;
-}
-
-static inline uint32_t
-get_count (ref_t ref)
-{
-    return read_extention (ref).count;
-}
-
-static inline void
-reset_extention (ref_t ref, int bit, int acc)
-{
-    owcty_ext_t             reset;
-    reset.acc = acc;
-    reset.bit = bit;
-    reset.count = 0;
-    write_extention (ref, reset);
-}
-
+/**
+ * A reset can be skipped, because the in_stack is also checked during the
+ * owcty_reachability call. However, this inlined reset costs more cas operations,
+ * while an explicit reset costs an additional synchronization and is not
+ * load balanced.
+ */
 size_t
 owcty_reachability_pre (wctx_t *ctx, size_t iteration)
 {
@@ -2694,7 +2702,7 @@ owcty_reachability_handle (void *arg, state_info_t *successor, transition_info_t
                            int seen)
 {
     wctx_t             *ctx = (wctx_t *) arg;
-    if (try_reset_extention(successor->ref, ctx->flip)) {
+    if (try_reset_extention (successor->ref, 1, ctx->flip, false)) {
         raw_data_t stack_loc = dfs_stack_push (ctx->stack, NULL);
         state_info_serialize (successor, stack_loc);
         ctx->counters.visited++;
@@ -2707,12 +2715,19 @@ owcty_reachability_handle (void *arg, state_info_t *successor, transition_info_t
     (void) ti; (void) seen;
 }
 
+/**
+ * bit == flip (visited by other workers reachability)
+ *    ignore
+ * bit != flip
+ *    count > 0:    reset(0) & explore
+ *    count == 0:   ignore (eliminated)
+ */
 size_t
-owcty_reachability (wctx_t *ctx)
+owcty_reachability (wctx_t *ctx, size_t iteration)
 {
     if (0 == ctx->id) { RTresetTimer(ctx->timer2); RTstartTimer (ctx->timer2); }
     size_t visited = 0;
-    while (lb_balance(global->lb, ctx->id, dfs_stack_size(ctx->stack), owcty_split)) {
+    while (lb_balance(global->lb, ctx->id, dfs_stack_size (ctx->stack) + dfs_stack_size (ctx->in_stack), owcty_split)) {
         raw_data_t          state_data = dfs_stack_top (ctx->stack);
         if (NULL != state_data) {
             state_info_deserialize (&ctx->state, state_data, ctx->store);
@@ -2724,8 +2739,16 @@ owcty_reachability (wctx_t *ctx)
             maybe_report (&ctx->counters, "", &global->threshold);
             visited++;
         } else {
-            if (0 == dfs_stack_nframes (ctx->stack))
+            if (0 == dfs_stack_nframes (ctx->stack)) {
+                while ((state_data = dfs_stack_pop (ctx->in_stack))) {
+                    state_info_deserialize_cheap (&ctx->state, state_data);
+                    if (try_reset_extention(ctx->state.ref, 0, ctx->flip, iteration > 0)) { // grab & reset
+                        dfs_stack_push (ctx->stack, state_data);
+                        break;
+                    }
+                }
                 continue;
+            }
             dfs_stack_leave (ctx->stack);
             ctx->counters.level_cur--;
             dfs_stack_pop (ctx->stack);
@@ -2818,20 +2841,6 @@ owcty_elimination (wctx_t *ctx)
 }
 
 void
-count_reset (wctx_t* ctx)
-{
-    rt_timer_t              timer = RTcreateTimer ();
-    if (0 == ctx->id) { RTresetTimer (timer); RTstartTimer (timer); }
-    //    if (strategy[1] == Strat_MAP && 0 == ctx->id)
-    //        memset (global->parent_ref, 0, sizeof (ref_t[1UL<<dbs_size]));
-    if (0 == ctx->id)
-        state_ext = RTalignZero (CACHE_LINE_SIZE, sizeof(owcty_ext_t[1UL << dbs_size]));
-    HREbarrier(HREglobal());
-
-    if (0 == ctx->id) { RTstopTimer (timer); Warning (info, "Memset: %.2f sec", RTrealTime(timer)) }
-}
-
-void
 owcty (wctx_t *ctx)
 {
     owcty_ext_t             reset;
@@ -2846,31 +2855,31 @@ owcty (wctx_t *ctx)
     size_t              new_size, old_size = SIZE_MAX, iteration = 0;
 
     new_size = owcty_initialize (ctx);
-    count_reset (ctx);
 
-    while (old_size != new_size && !lb_is_stopped(global->lb)) {
+    while (new_size && old_size != new_size && !lb_is_stopped(global->lb)) {
 
         ctx->flip = 1 - ctx->flip;
         old_size = new_size;
 
-        owcty_reachability_pre (ctx, iteration++);
+        if (owcty_reset)
+            owcty_reachability_pre (ctx, iteration);
 
         lb_reinit (global->lb, ctx->id); // barrier
 
-        new_size = owcty_reachability (ctx);
+        new_size = owcty_reachability (ctx, iteration++);
 
-        owcty_elimination_pre (ctx);
+        owcty_elimination_pre (ctx); // TODO: avoid by "grabbing states"
 
         lb_reinit (global->lb, ctx->id); // barrier
 
         new_size -= owcty_elimination (ctx);
     }
 
-    if (0 == ctx->id && old_size == new_size) {
-        if (old_size > 0) {
-            Warning (info, "Accepting cycle FOUND after %zu iterations!", iteration);
+    if (0 == ctx->id && (new_size == 0 || old_size == new_size)) {
+        if (new_size > 0) {
+            Warning (info, "Accepting cycle FOUND after %zu iteration(s)!", iteration);
         } else {
-            Warning (info, "NO Accepting cycle found after %zu iterations!", iteration);
+            Warning (info, "NO Accepting cycle found after %zu iteration(s)!", iteration);
         }
     }
 }
@@ -2975,8 +2984,6 @@ ta_handle (void *arg, state_info_t *successor, transition_info_t *ti, int seen)
         }
         raw_data_t stack_loc = dfs_stack_push (ctx->stack, NULL);
         state_info_serialize (successor, stack_loc);
-        if (trc_output)
-            global->parent_ref[successor->ref] = ctx->state.ref;
         ctx->counters.updates += LM_NULL_LOC != ctx->last;
         ctx->counters.visited++;
     } else {
@@ -3009,8 +3016,6 @@ ta_handle_nb (void *arg, state_info_t *successor, transition_info_t *ti, int see
         }
         raw_data_t stack_loc = dfs_stack_push (ctx->stack, NULL);
         state_info_serialize (successor, stack_loc);
-        if (trc_output)
-            global->parent_ref[successor->ref] = ctx->state.ref;
         ctx->counters.updates += LM_NULL_LOC != ctx->last;
         ctx->counters.visited++;
     }
