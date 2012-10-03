@@ -368,14 +368,11 @@ set_ll_print_alloc_stats(log_t log, set_ll_allocator_t *alloc)
 set_ll_t *
 set_ll_create (set_ll_allocator_t *alloc)
 {
-    HREassert (sizeof(str_t) == 12);
-
     RTswitchAlloc (alloc->shared); // global allocation of table, ballocs and set
     set_ll_t           *set = RTmalloc (sizeof(set_ll_t));
     set->ht = ht_alloc (&DATATYPE_HRE_STR, INIT_HT_SCALE);
     for (int i = 0; i < HREpeers(HREglobal()); i++) {
-        // a pointer to the string and its length (int) will be put on a balloc:
-        set->local[i].balloc = isba_create(sizeof(char *) / sizeof(int) + 1);
+        set->local[i].balloc = isba_create(sizeof(str_t) / sizeof(int));
         set->local[i].count = 0;
         set->local[i].offset = 0;
     }
