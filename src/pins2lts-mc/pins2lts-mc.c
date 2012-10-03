@@ -56,6 +56,8 @@ typedef struct state_info_s {
     hash64_t            hash64;
     lattice_t           lattice;
     lm_loc_t            loc;
+    int                 pred;
+    int                 accepting;
 } state_info_t;
 
 typedef enum { UseGreyBox, UseBlackBox } box_t;
@@ -785,7 +787,7 @@ postlocal_global_init (wctx_t *ctx)
         }
         if (!ecd && strategy[1] != Strat_None)
             Abort ("Conflicting options --no-ecd and %s.", key_search(strategies, strategy[1]));
-        if (strategy[1] != Strat_MAP || (trc_output && !(strategy[0] & (Strat_LTL | Strat_TA))))
+        if (strategy[1] == Strat_MAP || (trc_output && !(strategy[0] & (Strat_LTL | Strat_TA))))
             global->parent_ref = RTmalloc (sizeof(ref_t[1UL<<dbs_size]));
         if (strategy[0] & Strat_OWCTY)
             global->state_ext = RTalignZero (CACHE_LINE_SIZE, sizeof(owcty_ext_t[1UL << dbs_size]));
@@ -1453,6 +1455,8 @@ state_info_size ()
         state_info_size += ref_size;
     if (ZOBRIST)
         state_info_size += sizeof (hash64_t);
+    if (Strat_OWCTY & strategy[0])
+        state_info_size++;
     if (Strat_TA & strategy[0])
         state_info_size += sizeof (lattice_t) + sizeof (lm_loc_t);
     return state_info_size;
@@ -1495,6 +1499,10 @@ state_info_serialize (state_info_t *state, raw_data_t data)
         memcpy (data, state->tree, (2 * SLOT_SIZE * D));
         data += D<<1;
     }
+    if (Strat_OWCTY & strategy[0]) {
+        data[0] = state->pred;
+        data++;
+    }
     if (Strat_TA & strategy[0]) {
         ((lattice_t*)data)[0] = state->lattice;
         data += 2;
@@ -1533,6 +1541,10 @@ state_info_deserialize (state_info_t *state, raw_data_t data, state_data_t store
             data += D<<1;
         }
     }
+    if (Strat_OWCTY & strategy[0]) {
+        state->pred = data[0];
+        data++;
+    }
     if (Strat_TA & strategy[0]) {
         state->lattice = ((lattice_t*)data)[0];
         data += 2;
@@ -1550,6 +1562,10 @@ state_info_deserialize_cheap (state_info_t *state, raw_data_t data)
     }
     state->ref  = ((ref_t*)data)[0];
     data += 2;
+    if (Strat_OWCTY & strategy[0]) {
+        state->pred = data[0];
+        data++;
+    }
     if (Strat_TA & strategy[0]) {
         state->lattice = ((lattice_t*)data)[0];
         data += 2;
@@ -2702,17 +2718,22 @@ owcty_reachability_handle (void *arg, state_info_t *successor, transition_info_t
                            int seen)
 {
     wctx_t             *ctx = (wctx_t *) arg;
-    if (try_reset_extention (successor->ref, 1, ctx->flip, false)) {
+    successor->pred = ctx->state.pred | ctx->state.accepting;
+    if (try_reset_extention(successor->ref, successor->pred, ctx->flip, false)) {
         raw_data_t stack_loc = dfs_stack_push (ctx->stack, NULL);
         state_info_serialize (successor, stack_loc);
-        ctx->counters.visited++;
     } else {
-        uint32_t num = inc_extention (successor->ref, 1);
+        uint32_t num = inc_extention (successor->ref, successor->pred);
         HREassert (num < (1UL<<30)-1, "Overflow in accepting predecessor counter");
     }
-    //HREassert (read_extention(successor->ref).bit == ctx->flip);
     ctx->counters.trans++;
     (void) ti; (void) seen;
+}
+
+static inline size_t
+owcty_load (wctx_t *ctx)
+{
+    return dfs_stack_size (ctx->stack) + dfs_stack_size (ctx->in_stack);
 }
 
 /**
@@ -2725,25 +2746,29 @@ owcty_reachability_handle (void *arg, state_info_t *successor, transition_info_t
 size_t
 owcty_reachability (wctx_t *ctx, size_t iteration)
 {
+    ctx->counters.visited = 0; // number of states reachable from accepting states
+//    size_t before = ctx->counters.explored;
     if (0 == ctx->id) { RTresetTimer(ctx->timer2); RTstartTimer (ctx->timer2); }
-    size_t visited = 0;
-    while (lb_balance(global->lb, ctx->id, dfs_stack_size (ctx->stack) + dfs_stack_size (ctx->in_stack), owcty_split)) {
+    while (lb_balance(global->lb, ctx->id, owcty_load(ctx), owcty_split)) {
         raw_data_t          state_data = dfs_stack_top (ctx->stack);
         if (NULL != state_data) {
             state_info_deserialize (&ctx->state, state_data, ctx->store);
             dfs_stack_enter (ctx->stack);
             increase_level (&ctx->counters);
-            if ( GBbuchiIsAccepting(ctx->model, ctx->state.data) )
+            ctx->state.accepting = GBbuchiIsAccepting(ctx->model, ctx->state.data);
+            if ( ctx->state.accepting )
                 dfs_stack_push (ctx->out_stack, state_data);
+            ctx->counters.visited += ctx->state.accepting | ctx->state.pred;
             permute_trans (ctx->permute, &ctx->state, owcty_reachability_handle, ctx);
             maybe_report (&ctx->counters, "", &global->threshold);
-            visited++;
+            ctx->counters.explored++;
         } else {
             if (0 == dfs_stack_nframes (ctx->stack)) {
                 while ((state_data = dfs_stack_pop (ctx->in_stack))) {
                     state_info_deserialize_cheap (&ctx->state, state_data);
                     if (try_reset_extention(ctx->state.ref, 0, ctx->flip, iteration > 0)) { // grab & reset
-                        dfs_stack_push (ctx->stack, state_data);
+                        state_data = dfs_stack_push (ctx->stack, NULL);
+                        state_info_serialize (&ctx->state, state_data);
                         break;
                     }
                 }
@@ -2754,8 +2779,7 @@ owcty_reachability (wctx_t *ctx, size_t iteration)
             dfs_stack_pop (ctx->stack);
         }
     }
-    ctx->counters.explored += visited;
-    size_t size[2] = { visited, dfs_stack_size(ctx->out_stack) };
+    size_t size[2] = { ctx->counters.visited, dfs_stack_size(ctx->out_stack) };
     HREreduce (HREglobal(), 2, &size, &size, SizeT, Sum);
     if (0 == ctx->id) {
         RTstopTimer (ctx->timer2);
@@ -2767,16 +2791,15 @@ owcty_reachability (wctx_t *ctx, size_t iteration)
 size_t
 owcty_elimination_pre (wctx_t *ctx)
 {
-
     if (0 == ctx->id) { RTresetTimer(ctx->timer2); RTstartTimer (ctx->timer2); }
 
     state_data_t            data;
     while ((data = dfs_stack_pop (ctx->out_stack)) && !lb_is_stopped(global->lb)) {
         state_info_deserialize_cheap (&ctx->state, data);
         if (0 == get_count(ctx->state.ref) ) {
-            dfs_stack_push (ctx->stack, data);
+            dfs_stack_push (ctx->stack, data); // to eliminate
         } else {
-            dfs_stack_push (ctx->in_stack, data);
+            dfs_stack_push (ctx->in_stack, data); // to reachability (maybe eliminated)
         }
     }
 
@@ -2805,10 +2828,13 @@ owcty_elimination_handle (void *arg, state_info_t *successor, transition_info_t 
     (void) ti; (void) seen;
 }
 
+/**
+ * returns explored - initial
+ */
 size_t
 owcty_elimination (wctx_t *ctx)
 {
-    size_t size = 0;
+    size_t before = ctx->counters.explored + dfs_stack_size(ctx->stack);
 
     if (0 == ctx->id) { RTresetTimer(ctx->timer2); RTstartTimer (ctx->timer2); }
 
@@ -2821,7 +2847,7 @@ owcty_elimination (wctx_t *ctx)
             state_info_deserialize (&ctx->state, state_data, ctx->store);
             permute_trans (ctx->permute, &ctx->state, owcty_elimination_handle, ctx);
             maybe_report (&ctx->counters, "", &global->threshold);
-            size++;
+            ctx->counters.explored++;
         } else {
             if (0 == dfs_stack_nframes (ctx->stack))
                 continue;
@@ -2831,7 +2857,7 @@ owcty_elimination (wctx_t *ctx)
         }
     }
 
-    ctx->counters.explored += size;
+    size_t size = ctx->counters.explored - before;
     HREreduce (HREglobal(), 1, &size, &size, SizeT, Sum);
     if (0 == ctx->id) {
         RTstopTimer (ctx->timer2);
@@ -2848,18 +2874,20 @@ owcty (wctx_t *ctx)
     reset.acc = 0;
     reset.count = 1;
     ctx->flip = 0;
-    HREassert (1 == *(uint32_t*)&reset);
+    HREassert (1 == *(uint32_t *)&reset);
     fetch_add ((uint32_t *)&reset, -1);
     HREassert (0 == reset.count);
     ctx->timer2 = RTcreateTimer();
-    size_t              new_size, old_size = SIZE_MAX, iteration = 0;
+    size_t              new_size = SIZE_MAX, old_size = 0, iteration = 0;
 
-    new_size = owcty_initialize (ctx);
+    //new_size = owcty_initialize (ctx);
 
     while (new_size && old_size != new_size && !lb_is_stopped(global->lb)) {
 
         ctx->flip = 1 - ctx->flip;
         old_size = new_size;
+
+        if (0 == ctx->id) Warning (info, "OWCTY iteration %zu", iteration);
 
         if (owcty_reset)
             owcty_reachability_pre (ctx, iteration);
@@ -2868,7 +2896,8 @@ owcty (wctx_t *ctx)
 
         new_size = owcty_reachability (ctx, iteration++);
 
-        owcty_elimination_pre (ctx); // TODO: avoid by "grabbing states"
+        new_size -= owcty_elimination_pre (ctx); // TODO: avoid by "grabbing states"
+        if (new_size == 0 || new_size == old_size) break; // early exit
 
         lb_reinit (global->lb, ctx->id); // barrier
 
@@ -2882,6 +2911,7 @@ owcty (wctx_t *ctx)
             Warning (info, "NO Accepting cycle found after %zu iteration(s)!", iteration);
         }
     }
+    HREbarrier(HREglobal());
 }
 
 /**
@@ -3402,7 +3432,10 @@ explore (wctx_t *ctx)
     state_data_t            initial = RTmalloc (sizeof(int[N]));
     GBgetInitialState (ctx->model, initial);
     state_info_initialize (&ctx->initial, initial, &ti, &ctx->state, ctx);
-    if ( Strat_LTL & strategy[0] ) {
+    if ( Strat_OWCTY & strategy[0] ) { ctx->state.pred = ctx->state.accepting=0;
+        ctx->flip = 1;
+        if (0 == ctx->id) owcty_reachability_handle (ctx, &ctx->initial, &ti, 0);
+    } else if ( Strat_LTL & strategy[0] ) {
         if ( Strat_TA & strategy[0] )
             ta_cndfs_handle_blue (ctx, &ctx->initial, &ti, 0);
         else
