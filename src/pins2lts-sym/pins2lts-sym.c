@@ -2180,6 +2180,20 @@ main (int argc, char *argv[])
 
     final_stat_reporting(visited, timer);
 
+    if (log_active(infoLong)) {
+        long   n_count;
+        char   elem_str[1024];
+        double e_count;
+
+        long total_count = 0;
+        for(int i=0; i<nGrps; i++) {
+            get_vrel_size(group_next[i], &n_count, &e_count, elem_str, sizeof(elem_str));
+            Print(infoLong, "group_next[%d]: %ld nodes", i, n_count);
+            total_count += n_count;
+        }
+        Print(infoLong, "group_next: %ld nodes total", total_count);
+    }
+
     if (files[1] != NULL)
         do_output(files[1], visited);
 

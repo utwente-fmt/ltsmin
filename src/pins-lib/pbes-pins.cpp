@@ -379,7 +379,7 @@ void PBESloadGreyboxModel(model_t model, const char*name)
     gb_context_t ctx = (gb_context_t)RTmalloc(sizeof(struct grey_box_context));
     GBsetContext(model, ctx);
 
-    log::log_level_t log_level = debug_flag ? log::verbose : log::error;
+    log::log_level_t log_level = log_active(infoLong) ? log::verbose : log::error;
     log::mcrl2_logger::set_reporting_level(log_level);
 
     bool reset = (reset_flag==1);
