@@ -252,6 +252,8 @@ static int              dbs_size = 0;
 static int              refs = 1;
 static int              ZOBRIST = 0;
 static int              no_red_perm = 0;
+static int              blue_subsumption = 0;
+static int              red_subsumption = 0;
 static int              all_red = 1;
 static int              owcty_reset = 0;
 static int              ecd = 1;
@@ -367,6 +369,8 @@ static struct poptOption options[] = {
     {"non-blocking", 'n', POPT_ARG_VAL, &NONBLOCKING, 1, "Non-blocking TA reachability", NULL},
     {"strategy", 0, POPT_ARG_STRING | POPT_ARGFLAG_SHOW_DEFAULT,
      &arg_strategy, 0, "select the search strategy", "<sbfs|bfs|dfs|cndfs>"},
+    {"bs", 0, POPT_ARG_VAL, &blue_subsumption, 1, "turn on subsumption in the blue search", NULL},
+    {"rs", 0, POPT_ARG_VAL, &red_subsumption, 1, "turn on subsumption in the red search", NULL},
 #else
     {"strategy", 0, POPT_ARG_STRING | POPT_ARGFLAG_SHOW_DEFAULT,
      &arg_strategy, 0, "select the search strategy", "<bfs|sbfs|dfs|cndfs|lndfs|endfs|endfs,lndfs|endfs,endfs,ndfs|ndfs>"},
@@ -3119,8 +3123,9 @@ ta_cndfs_covered_red (void *arg, lattice_t l, lm_status_t status, lm_loc_t loc)
 {
     wctx_t *ctx = (wctx_t *) arg;
     int *sigma = (int*)&ctx->state.lattice;
-    if ( status == LM_RED && // Red or Blue
-         GBisCoveredByShort(ctx->model, sigma, (int*)&l) ) {
+    if ( status == LM_RED && (
+        (blue_subsumption && GBisCoveredByShort(ctx->model, sigma, (int*)&l)) ||
+        (!blue_subsumption && ctx->state.lattice == l) ) ) {
         ctx->done = 1;
         return LM_CB_STOP;
     }
@@ -3143,8 +3148,9 @@ ta_cndfs_covered (void *arg, lattice_t l, lm_status_t status, lm_loc_t loc)
 {
     wctx_t *ctx = (wctx_t *) arg;
     int *sigma = (int*)&ctx->state.lattice;
-    if ( status != LM_WHITE && // Red or Blue
-         GBisCoveredByShort(ctx->model, sigma, (int*)&l) ) {
+    if ( status != LM_WHITE && ( // Red or Blue
+         (red_subsumption && GBisCoveredByShort(ctx->model, sigma, (int*)&l)) ||
+         (!red_subsumption && ctx->state.lattice == l) ) ) {
         ctx->done = 1;
         return LM_CB_STOP;
     }
