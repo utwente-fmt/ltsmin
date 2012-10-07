@@ -261,17 +261,12 @@ ltsmin_buchi()
     if(bstates->nxt->nxt == bstates && bstates->nxt->id == 0) { /* true */
         return NULL;
     }
-    // count states
-    int state_count = 0, max_id = 0;
+
+    // mapping map_id[final * 32 + s_id + 1] -> state id
+    int map_id[32*32];
+    int state_count = 0;
     for(s = bstates->prv; s != bstates; s = s->prv) {
-        max_id = max_id < (s->id + 1) ? s->id + 1 : max_id;
-        state_count++;
-    }
-    // mapping map_id[s_id + 1] -> state id
-    int map_id[max_id];
-    state_count = 0;
-    for(s = bstates->prv; s != bstates; s = s->prv) {
-        map_id[s->id + 1] = state_count++;
+        map_id[s->final * 32 + s->id + 1] = state_count++;
     }
 
     // allocate buchi struct
@@ -303,7 +298,7 @@ ltsmin_buchi()
         for(t = s->trans->nxt; t != s->trans; t = t->nxt) {
             bs->transitions[transition_count].pos = t->pos;
             bs->transitions[transition_count].neg = t->neg;
-            bs->transitions[transition_count].to_state = map_id[t->to->id+1];
+            bs->transitions[transition_count].to_state = map_id[t->to->final*32+t->to->id+1];
             bs->transitions[transition_count].index = index++;
             transition_count++;
         }
