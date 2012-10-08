@@ -20,8 +20,8 @@ lookup_type_value (ltsmin_expr_t e, int type, const chunk c,
     int count = GBchunkCount(m,type);
     e->num = GBchunkPut(m,type,c);
     if (strict && count != GBchunkCount(m,type)) // value was added
-        Abort ("Value for identifier '%s' cannot be found in table for type '%s'.",
-               c.data, lts_type_get_type(GBgetLTStype(m),type));
+        Warning (info, "Value for identifier '%s' cannot be found in table for enum type '%s'.",
+                 c.data, lts_type_get_type(GBgetLTStype(m),type));
     e->lts_type = type;
 }
 
