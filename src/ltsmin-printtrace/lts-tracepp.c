@@ -134,13 +134,8 @@ output_text(lts_t trace, FILE* output_file) {
 
         uint32_t i = (x != trace->transitions ? x : trace->dest[x-1]);
         fprintf(output_file, "state %d/%d\n",i,trace->transitions);
-        if (i == 0) {
-            // ouput initial state
-            fprintf(output_file, "Initial state\n");
-            for(int j=0; j<N; ++j) prev_state[j] = -1;
-            for(int j=0; j<sLbls; ++j) prev_state_lbls[j] = -1;
-        } else {
-            // last state
+        if (i != 0) {
+            // previous state
             for(int j=0; j<N; ++j) prev_state[j] = state[j];
             for(int j=0; j<sLbls; ++j) prev_state_lbls[j] = state_lbls[j];
         }
@@ -152,7 +147,7 @@ output_text(lts_t trace, FILE* output_file) {
 
         // output state
         for(int j=0; j<N; ++j) {
-            if (arg_all || state[j] != prev_state[j]) {
+            if (arg_all || i == 0 || state[j] != prev_state[j]) {
                 char *name = lts_type_get_state_name(trace->ltstype, j);
                 char *type = lts_type_get_state_type(trace->ltstype, j);
                 snprintf(tmp, BUFLEN, "%s:%s[%d]", name == NULL ? "_" : name, type == NULL ? "_" : type, j);
@@ -172,7 +167,7 @@ output_text(lts_t trace, FILE* output_file) {
                 state_lbls[0]=trace->properties[i];
             }
             for(int j=0; j<sLbls; ++j) {
-                if (arg_all || state_lbls[j] != prev_state_lbls[j]) {
+                if (arg_all || i == 0 || state_lbls[j] != prev_state_lbls[j]) {
                     char *name = lts_type_get_state_label_name(trace->ltstype, j);
                     char *type = lts_type_get_state_label_type(trace->ltstype, j);
                     snprintf(tmp, BUFLEN, "%s:%s[%d]", name == NULL ? "_" : name, type == NULL ? "_" : type, j);
@@ -319,11 +314,11 @@ output_text_table(lts_t trace, FILE* output_file) {
         int edge_lbls[eLbls];
 
         uint32_t i = (x != trace->transitions ? x : trace->dest[x-1]);
-        for(int j=0; j<N; ++j) prev_state[j] = (i == 0 ? -1 : state[j]);
+        for(int j=0; j<N; ++j) prev_state[j] = state[j];
         if (N) TreeUnfold(trace->state_db, i, state);
         fprintf(output_file, "%.3d: [",i);
         for(int j=0; j<N; ++j) {
-            if (arg_all || state[j] != prev_state[j]) {
+            if (arg_all || i == 0 || state[j] != prev_state[j]) {
                 int typeno = lts_type_get_state_typeno(trace->ltstype, j);
                 trace_get_type_str(trace, typeno, state[j], BUFLEN, tmp);
             } else {
@@ -344,7 +339,7 @@ output_text_table(lts_t trace, FILE* output_file) {
                 state_lbls[0]=trace->properties[i];
             }
             for(int j=0; j<sLbls; ++j) {
-                if (arg_all || state_lbls[j] != prev_state_lbls[j]) {
+                if (arg_all || i == 0 || state_lbls[j] != prev_state_lbls[j]) {
                     int typeno = lts_type_get_state_label_typeno(trace->ltstype, j);
                     trace_get_type_str(trace, typeno, state_lbls[j], BUFLEN, tmp);
                 } else {
@@ -363,7 +358,7 @@ output_text_table(lts_t trace, FILE* output_file) {
                 for(int j=0; j<eLbls; ++j) prev_edge_lbls[j] = (i == 0 ? -1 : edge_lbls[j]);
                 trc_get_edge_label(trace, i, edge_lbls);
                 for(int j=0; j<eLbls; ++j) {
-                    if (arg_all || edge_lbls[j] != prev_edge_lbls[j]) {
+                    if (arg_all || i == 0 || edge_lbls[j] != prev_edge_lbls[j]) {
                         int typeno = lts_type_get_edge_label_typeno(trace->ltstype, j);
                         trace_get_type_str(trace, typeno, edge_lbls[j], BUFLEN, tmp);
                     } else {
