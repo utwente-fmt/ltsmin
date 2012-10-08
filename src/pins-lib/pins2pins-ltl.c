@@ -53,7 +53,7 @@ ltl_sl_long(model_t model, int label, int *state)
     ltl_context_t *ctx = GBgetContext(model);
     if (label == ctx->sl_idx_accept) {
         HREassert (state[ctx->ltl_idx] < ctx->ba->state_count);
-        return state[ctx->ltl_idx] == -1 || ctx->ba->states[state[ctx->ltl_idx]]->accept;
+        return ctx->ba->states[state[ctx->ltl_idx]]->accept;
     } else {
         return GBgetStateLabelLong(GBgetParent(model), label, state);
     }
@@ -65,8 +65,7 @@ ltl_sl_all(model_t model, int *state, int *labels)
     ltl_context_t *ctx = GBgetContext(model);
     GBgetStateLabelsAll(GBgetParent(model), state, labels);
     HREassert (state[ctx->ltl_idx] < ctx->ba->state_count);
-    labels[ctx->sl_idx_accept] =
-        state[ctx->ltl_idx] == -1 || ctx->ba->states[state[ctx->ltl_idx]]->accept;
+    labels[ctx->sl_idx_accept] = ctx->ba->states[state[ctx->ltl_idx]]->accept;
 }
 
 /*
