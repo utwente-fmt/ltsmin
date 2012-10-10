@@ -359,7 +359,6 @@ void spg_restore_swapped_game(parity_game* g)
  */
 bool spg_solve(parity_game* g, spgsolver_options* options)
 {
-    simplemap_test();
     spgsolver_options* opts;
     if (options==NULL || options==0) {
         opts = spg_get_solver_options();

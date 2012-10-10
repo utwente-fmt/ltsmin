@@ -22,6 +22,7 @@ endif
 check_PROGRAMS += test-is-balloc
 check_PROGRAMS += test-ltsmin-parse
 check_PROGRAMS += test-regroup
+check_PROGRAMS += test-simplemap
 check_PROGRAMS += test-vset
 
 # test-bitset
@@ -73,6 +74,11 @@ test_ltsmin_parse_LDADD    += $(top_builddir)/ltl2ba/libltl2ba.la
 test_regroup_SOURCES 		= test-regroup.c
 test_regroup_LDADD 			= ../dm/libdm.la $(AM_LDFLAGS)
 test_regroup_CPPFLAGS 		= $(AM_CPPFLAGS)
+
+# test-simplemap
+test_simplemap_SOURCES        = test-simplemap.c
+test_simplemap_LDADD          = $(HRE_LIB) ../util-lib/libutil.la $(AM_LDFLAGS)
+test_simplemap_CPPFLAGS       = $(AM_CPPFLAGS)
 
 # test-vset
 test_vset_SOURCES 			= test-vset.c
