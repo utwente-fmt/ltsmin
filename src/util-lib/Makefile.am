@@ -7,6 +7,7 @@ libutil_la_SOURCES += chunk_support.c chunk_support.h
 libutil_la_SOURCES += chunk_table_factory.c
 libutil_la_SOURCES += dynamic-array.c dynamic-array.h
 libutil_la_SOURCES += fast_hash.c fast_hash.h
+libutil_la_SOURCES += fast_set.c fast_set.h
 libutil_la_SOURCES += MurmurHash3.c MurmurHash3.h
 libutil_la_SOURCES += string-map.c string-map.h
 libutil_la_SOURCES += tables.c tables.h

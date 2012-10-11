@@ -37,6 +37,7 @@
 #include <pins-lib/pins-impl.h>
 #include <pins-lib/property-semantics.h>
 #include <util-lib/fast_hash.h>
+#include <util-lib/fast_set.h>
 #include <util-lib/util.h>
 
 
@@ -53,8 +54,8 @@ typedef struct state_info_s {
     state_data_t        data;
     tree_t              tree;
     ref_t               ref;
-    hash64_t            hash64;
     lattice_t           lattice;
+    hash64_t            hash64;
     lm_loc_t            loc;
     int                 pred;
     int                 accepting;
@@ -379,7 +380,9 @@ static struct poptOption options[] = {
     {"max", 0, POPT_ARG_LONGLONG | POPT_ARGFLAG_SHOW_DEFAULT, &max_level, 0, "maximum search depth", "<int>"},
 #endif
     {"nar", 1, POPT_ARG_VAL, &all_red, 0, "turn off red coloring in the blue search (NNDFS/MCNDFS)", NULL},
+#ifdef LTSMIN_DEBUG // incorrect for NDFS algorithms since cyan is removed from seed:
     {"no-ecd", 1, POPT_ARG_VAL, &ecd, 0, "turn off early cycle detection (NNDFS/MCNDFS)", NULL},
+#endif
     {"owcty-reset", 0, POPT_ARG_VAL, &owcty_reset, 1, "turn on reset in OWCTY algorithm", NULL},
     {"perm", 'p', POPT_ARG_STRING | POPT_ARGFLAG_SHOW_DEFAULT,
      &arg_perm, 0, "select the transition permutation method",
@@ -479,8 +482,9 @@ struct thread_ctx_s {
     rt_timer_t          timer;
     rt_timer_t          timer2;
     stats_t            *stats;
-    string_index_t      cyan;
-    string_index_t      pink;
+    fset_t             *cyan;
+    fset_t             *pink;
+    string_index_t      si;
     uint32_t           *depth;
     int                 flip;           // OWCTY invert state space bit
     ssize_t             iteration;
@@ -690,8 +694,8 @@ wctx_create (model_t model, int depth, wctx_t *shared)
         int res = bitvector_create (&ctx->color_map, local_bits<<dbs_size);
         if (-1 == res) Abort ("Failure to allocate color bitvector.");
         if (strategy[0] & Strat_TA) {
-            ctx->cyan = SIcreate();
-            ctx->pink = SIcreate();
+            ctx->cyan = fset_create (16, 10, 24);
+            ctx->pink = fset_create (16, 4, 24);
         }
         if ((Strat_NDFS | Strat_LNDFS | Strat_CNDFS | Strat_ENDFS) & strategy[depth]) {
             res = bitvector_create (&ctx->all_red, MAX_STACK);
@@ -905,7 +909,6 @@ statics_init (model_t model)
     }
 }
 
-
 /**
  * Initialize locals: model and settings
  */
@@ -1072,15 +1075,14 @@ print_statistics (counter_t *ar_reach, counter_t *ar_red, rt_timer_t timer,
         double time = RTrealTime (timer);
         Warning(info, "States per second: %.0f, Transitions per second: %.0f",
                 ar_reach->explored/time, ar_reach->trans/time);
-
         Warning(info, " ");
-        if (Strat_TA & strategy[0]) {
-            size_t alloc = lm_allocated (global->lmap);
-            mem3 = ((double)(sizeof(lattice_t[alloc + db_elts]))) / (1<<20);
-            double lm = ((double)(sizeof(lattice_t[alloc + (1UL<<dbs_size)]))) / (1<<20);
-            double redundancy = (((double)(db_elts + alloc)) / lattices - 1) * 100;
-            Warning (info, "Lattice map: %.1fMB (~%.1fMB paged-in) overhead: %.2f%%, allocated: %zu", mem3, lm, redundancy, alloc);
-        }
+    }
+    if (Strat_TA & strategy[0]) {
+        size_t alloc = lm_allocated (global->lmap);
+        mem3 = ((double)(sizeof(lattice_t[alloc + db_elts]))) / (1<<20);
+        double lm = ((double)(sizeof(lattice_t[alloc + (1UL<<dbs_size)]))) / (1<<20);
+        double redundancy = (((double)(db_elts + alloc)) / lattices - 1) * 100;
+        Warning (info, "Lattice map: %.1fMB (~%.1fMB paged-in) overhead: %.2f%%, allocated: %zu", mem3, lm, redundancy, alloc);
     }
 
     Warning (info, "Queue width: %zuB, total height: %zu, memory: %.2fMB",
@@ -1582,7 +1584,7 @@ static void *
 get_stack_state (ref_t ref, void *arg)
 {
     wctx_t             *ctx = (wctx_t *) arg;
-    ta_cndfs_state_t   *state = (ta_cndfs_state_t *)SIget(ctx->cyan, ref);
+    ta_cndfs_state_t   *state = (ta_cndfs_state_t *) SIget(ctx->si, ref);
     state_data_t        data  = get_state (state->val.ref, ctx);
     Debug ("Trace %d (%zu,%zu)", ref, state->val.ref, state->val.lattice);
     if (strategy[0] & Strat_TA) {
@@ -1597,20 +1599,20 @@ static void
 find_and_write_dfs_stack_trace (wctx_t *ctx, int level)
 {
     ref_t          *trace = RTmalloc (sizeof(ref_t) * level);
-    if (ctx->cyan) SIdestroy(&ctx->cyan);
-    ctx->cyan = SIcreate();
+    ctx->si = SIcreate();
     for (int i = level - 1; i >= 0; i--) {
         state_data_t data = dfs_stack_peek_top (ctx->stack, i);
         state_info_deserialize_cheap (&ctx->state, data);
         ta_cndfs_state_t state;
         new_state(&state, &ctx->state);
         if (!(strategy[0] & Strat_TA)) state.val.lattice = 0;
-        int val = SIputC (ctx->cyan, state.data, sizeof(struct val_s));
+        int val = SIputC (ctx->si, state.data, sizeof(struct val_s));
         trace[level - i - 1] = (ref_t) val;
     }
     trc_env_t          *trace_env = trc_create (ctx->model, get_stack_state, ctx);
     Warning (info, "Writing trace to %s", trc_output);
     trc_write_trace (trace_env, trc_output, trace, level);
+    SIdestroy (&ctx->si);
     RTfree (trace);
 }
 
@@ -2948,7 +2950,7 @@ ta_handle (void *arg, state_info_t *successor, transition_info_t *ti, int seen)
 {
     wctx_t         *ctx = (wctx_t*) arg;
     ctx->done = 0;
-    ctx->subsumes = 0;
+    ctx->subsumes = 0; // if a successor subsumes one in the set, it cannot be subsumed itself (see invariant paper)
     ctx->work = 0;
     ctx->added_at = LM_NULL_LOC;
     ctx->last = LM_NULL_LOC;
@@ -3128,7 +3130,7 @@ ta_cndfs_covered_red (void *arg, lattice_t l, lm_status_t status, lm_loc_t loc)
         (!blue_subsumption && ctx->state.lattice == l) ) ) {
         ctx->done = 1;
         return LM_CB_STOP;
-    }
+    } // TODO: delete
     return LM_CB_NEXT;
     (void) loc;
 }
@@ -3141,7 +3143,6 @@ ta_cndfs_subsumed_red (wctx_t *ctx, lm_loc_t *last)
     if (last) *last = last2;
     return ctx->done;
 }
-
 
 lm_cb_t
 ta_cndfs_covered (void *arg, lattice_t l, lm_status_t status, lm_loc_t loc)
@@ -3173,7 +3174,7 @@ ta_cndfs_mark_blue (wctx_t *ctx)
     lm_lock (global->lmap, ctx->state.ref);
     lm_loc_t last;
     if (!ta_cndfs_subsumed_blue_or_red(ctx, &last)) {
-        ctx->counters.explored++;
+        ctx->counters.inserts++;
         lm_insert_from (global->lmap, ctx->state.ref, ctx->state.lattice, LM_BLUE, &last);
     }
     lm_unlock (global->lmap, ctx->state.ref);
@@ -3185,23 +3186,37 @@ ta_cndfs_mark_red (wctx_t *ctx)
     lm_lock (global->lmap, ctx->state.ref);
     lm_loc_t last;
     if (!ta_cndfs_subsumed_red(ctx, &last)) {
-        ctx->red.explored++;
+        ctx->red.inserts++;
         lm_insert_from (global->lmap, ctx->state.ref, ctx->state.lattice, LM_RED, &last);
     }
     lm_unlock (global->lmap, ctx->state.ref);
 }
 
 static inline int
-has_state (string_index_t si, ta_cndfs_state_t *state)
+ta_has_state (fset_t *table, state_info_t *s, bool add_if_absent)
 {
-    return SI_INDEX_FAILED != SIlookupC(si, state->data, sizeof(struct val_s));
+    struct val_s        state;
+    state.ref = s->ref;
+    state.lattice = s->lattice;
+    hash32_t hash = (s->ref | (s->lattice >> 3));
+    return fset_find (table, &hash, &state, add_if_absent);
+}
+
+static inline void
+ta_remove_state (fset_t *table, state_info_t *s)
+{
+    struct val_s        state;
+    state.ref = s->ref;
+    state.lattice = s->lattice;
+    hash32_t hash = (s->ref | (s->lattice >> 3));
+    int success = fset_delete (table, &hash, &state);
+    HREassert (success, "Could not remove key from set");
 }
 
 static void
 ta_cndfs_handle_nonseed_accepting (wctx_t *ctx)
 {
-    size_t nonred, accs;
-    ta_cndfs_state_t    state;
+    size_t              nonred, accs;
     nonred = accs = dfs_stack_size (ctx->out_stack);
     if (nonred) {
         ctx->red.waits++;
@@ -3220,25 +3235,27 @@ ta_cndfs_handle_nonseed_accepting (wctx_t *ctx)
     }
     for (size_t i = 0; i < accs; i++)
         dfs_stack_pop (ctx->out_stack);
+    size_t pre = dfs_stack_size(ctx->in_stack);
     while ( dfs_stack_size(ctx->in_stack) ) {
         raw_data_t state_data = dfs_stack_pop (ctx->in_stack);
         state_info_deserialize_cheap (&ctx->state, state_data);
         ta_cndfs_mark_red (ctx);
-        new_state (&state, &ctx->state);
-        SIdelete(ctx->pink, state.data);
+        //remove_state (ctx->pink, &ctx->state);
     }
+    if (pre)
+        fset_clear (ctx->pink);
+    HREassert (fset_count(ctx->pink) == 0, "Pink set not empty: %zu", fset_count(ctx->pink));
 }
 
 static void
 ta_cndfs_handle_red (void *arg, state_info_t *successor, transition_info_t *ti, int seen)
 {
     wctx_t             *ctx = (wctx_t *) arg;
-    ta_cndfs_state_t    state;
-    new_state (&state, successor);
     /* Find cycle back to the seed */
-    if ( has_state(ctx->cyan, &state) )
+    if ( ta_has_state(ctx->cyan, successor, false) )
         ndfs_report_cycle (ctx, successor);
-    if ( !has_state(ctx->pink, &state) && !ta_cndfs_subsumed_red(ctx, NULL) ) {
+    if ( !ta_has_state(ctx->pink, successor, false) &&
+         !ta_cndfs_subsumed_red(ctx, NULL) ) {
         raw_data_t stack_loc = dfs_stack_push (ctx->stack, NULL);
         state_info_serialize (successor, stack_loc);
     }
@@ -3249,15 +3266,11 @@ static void
 ta_cndfs_handle_blue (void *arg, state_info_t *successor, transition_info_t *ti, int seen)
 {
     wctx_t             *ctx = (wctx_t *) arg;
-    ta_cndfs_state_t    state;
-    new_state (&state, successor);
-    int cyan = has_state(ctx->cyan, &state);
-    state_data_t succ_data = get_state(successor->ref, ctx);
+    int cyan = ta_has_state (ctx->cyan, successor, false);
+    state_data_t succ_data = get_state (successor->ref, ctx);
     if ( ecd && cyan && (GBbuchiIsAccepting(ctx->model, ctx->state.data) ||
          GBbuchiIsAccepting(ctx->model, succ_data)) ) {
         /* Found cycle in blue search */
-        Warning(debug, "State[0]: %d Succ[0]: %d Succ: %zu", ctx->state.data[0],
-                succ_data[0], successor->ref);
         ndfs_report_cycle (ctx, successor);
     }
     if ( all_red || !cyan ) {
@@ -3274,6 +3287,7 @@ ta_cndfs_explore_state_red (wctx_t *ctx, counter_t *cnt)
     increase_level (cnt);
     ctx->permute->permutation = permutation_red;
     cnt->trans += permute_trans (ctx->permute, &ctx->state, ta_cndfs_handle_red, ctx);
+    cnt->explored++;
     ndfs_maybe_report ("[R] ", cnt);
 }
 
@@ -3290,21 +3304,18 @@ ta_cndfs_explore_state_blue (wctx_t *ctx, counter_t *cnt)
 
 /* ENDFS dfs_red */
 static void
-ta_cndfs_red (wctx_t *ctx, ref_t seed)
+ta_cndfs_red (wctx_t *ctx, ref_t seed, lattice_t l_seed)
 {
-    ta_cndfs_state_t    state;
     size_t              seed_level = dfs_stack_nframes (ctx->stack);
     while ( !lb_is_stopped(global->lb) ) {
         raw_data_t          state_data = dfs_stack_top (ctx->stack);
         if (NULL != state_data) {
             state_info_deserialize (&ctx->state, state_data, ctx->store);
-            new_state (&state, &ctx->state);
-            if ( !has_state(ctx->pink, &state) &&
-                 !ta_cndfs_subsumed_red(ctx, NULL) ) {
-                SIputC(ctx->pink, state.data, sizeof(struct val_s));
+            if ( !ta_cndfs_subsumed_red(ctx, NULL) &&
+                 !ta_has_state(ctx->pink, &ctx->state, true) ) {
+                Debug ("(%zu,%zu", ctx->state.ref, ctx->state.lattice);
                 dfs_stack_push (ctx->in_stack, state_data);
-                Warning(debug, "Explore(Red, %zu, %zu)", state.val.ref, state.val.lattice);
-                if ( ctx->state.ref != seed &&
+                if ( ctx->state.ref != seed && ctx->state.lattice != l_seed &&
                      GBbuchiIsAccepting(ctx->model, ctx->state.data) )
                     dfs_stack_push (ctx->out_stack, state_data);
                 ta_cndfs_explore_state_red (ctx, &ctx->red);
@@ -3313,9 +3324,13 @@ ta_cndfs_red (wctx_t *ctx, ref_t seed)
                     break;
                 dfs_stack_pop (ctx->stack);
             }
-        } else { //backtrack
+        } else { // backtrack
             dfs_stack_leave (ctx->stack);
             ctx->red.level_cur--;
+
+            state_data = dfs_stack_top (ctx->stack);
+            state_info_deserialize_cheap (&ctx->state, state_data);
+            Debug (")%zu,%zu", ctx->state.ref, ctx->state.lattice);
             /* exit search if backtrack hits seed, leave stack the way it was */
             if (seed_level == dfs_stack_nframes(ctx->stack))
                 break;
@@ -3328,47 +3343,42 @@ ta_cndfs_red (wctx_t *ctx, ref_t seed)
 void
 ta_cndfs_blue (wctx_t *ctx)
 {
-    ta_cndfs_state_t state;
     while ( !lb_is_stopped(global->lb) ) {
         raw_data_t          state_data = dfs_stack_top (ctx->stack);
         if (NULL != state_data) {
             state_info_deserialize (&ctx->state, state_data, ctx->store);
-            new_state (&state, &ctx->state);
-            if ( !has_state(ctx->cyan, &state) &&
-                 !ta_cndfs_subsumed_blue_or_red(ctx, NULL) ) {
+            if ( !ta_cndfs_subsumed_blue_or_red(ctx, NULL) &&
+                 !ta_has_state(ctx->cyan, &ctx->state, true) ) {
+                Debug ("<%zu,%zu", ctx->state.ref, ctx->state.lattice);
                 if (all_red)
                     bitvector_set (&ctx->all_red, ctx->counters.level_cur);
-                SIputC(ctx->cyan, state.data, sizeof(struct val_s));
-                Warning(debug, "Explore(Blue, %zu, %zu)", state.val.ref, state.val.lattice);
                 ta_cndfs_explore_state_blue (ctx, &ctx->counters);
             } else {
-                Warning(debug, "Drop(Blue, %zu, %zu)", state.val.ref, state.val.lattice);
                 if ( all_red && ctx->counters.level_cur != 0 &&
                      !ta_cndfs_subsumed_red(ctx, NULL) )
                     bitvector_unset (&ctx->all_red, ctx->counters.level_cur - 1);
                 dfs_stack_pop (ctx->stack);
             }
-        } else { //backtrack
-            if (0 == dfs_stack_nframes(ctx->stack))
+        } else { // backtrack
+            if (0 == dfs_stack_nframes(ctx->stack)) {
+                HREassert (fset_count(ctx->cyan) == 0, "Cyan set not empty: %zu", fset_count(ctx->cyan));
                 break;
+            }
             dfs_stack_leave (ctx->stack);
             ctx->counters.level_cur--;
             /* call red DFS for accepting states */
             state_data = dfs_stack_top (ctx->stack);
             state_info_deserialize (&ctx->state, state_data, ctx->store);
-            new_state (&state, &ctx->state);
-            Warning(debug, "Backtrack(Blue, %zu, %zu)", state.val.ref, state.val.lattice);
+            Debug (">%zu,%zu", ctx->state.ref, ctx->state.lattice);
+            ta_remove_state (ctx->cyan, &ctx->state);
             /* Mark state BLUE on backtrack */
             ta_cndfs_mark_blue (ctx);
-            SIdelete(ctx->cyan, state.data);
             if ( all_red && bitvector_is_set(&ctx->all_red, ctx->counters.level_cur) ) {
                 /* all successors are red */
                 //permute_trans (ctx->permute, &ctx->state, check, ctx);
                 ta_cndfs_mark_red (ctx); // TODO: allred count
             } else if ( GBbuchiIsAccepting(ctx->model, ctx->state.data) ) {
-                ref_t           seed = ctx->state.ref;
-                Warning(debug, "Acc");
-                ta_cndfs_red (ctx, seed);
+                ta_cndfs_red (ctx, ctx->state.ref, ctx->state.lattice);
                 ta_cndfs_handle_nonseed_accepting (ctx);
             } else if (all_red && ctx->counters.level_cur > 0 &&
                        !ta_cndfs_subsumed_red(ctx, NULL) ) {
