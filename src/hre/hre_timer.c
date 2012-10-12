@@ -79,9 +79,7 @@ void RTstopTimer(rt_timer_t timer){
 
 void RTprintTimer(log_t log,rt_timer_t timer,char *msg){
     clock_t tick=sysconf(_SC_CLK_TCK);
-    float tm_real=((float)(timer->real_time))/((float)tick);
-    float tm_user=((float)(timer->times.tms_utime))/((float)tick);
-    float tm_sys=((float)(timer->times.tms_stime))/((float)tick);
+    float tm_real, tm_user, tm_sys;
     if (timer->running) {
         struct tms tmp;
         clock_t real_time;
