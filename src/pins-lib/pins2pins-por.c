@@ -714,8 +714,7 @@ GBaddPOR (model_t model, int por_check_ltl)
     Warning(info, "Initializing dependency lookup table.");
 
     matrix_t           *p_dm = GBgetDMInfo (model);
-    matrix_t           *p_dm_w = p_dm;
-    p_dm_w = GBgetDMInfoWrite (model);
+    matrix_t           *p_dm_w = GBgetDMInfoWrite (model);
 
     int groups = dm_nrows( p_dm );
     int len = dm_ncols( p_dm );
