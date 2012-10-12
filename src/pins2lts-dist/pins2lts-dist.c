@@ -326,7 +326,7 @@ int main(int argc, char*argv[]){
         size_t lvl_tcount=0;
         HREbarrier(HREglobal());
         if (ctx.mpi_me==0) {
-            Warning(info,"level %d has %zu states, explored %zu states %zu transitions",
+            Warning(info,"level %zu has %zu states, explored %zu states %zu transitions",
                 ctx.level,global_visited-global_explored,global_explored,global_transitions);
         }
         ctx.level++;
@@ -349,7 +349,7 @@ int main(int argc, char*argv[]){
             lvl_scount++;
             lvl_tcount+=count;
             if (ctx.mpi_me == 0 && lvl_scount >= threshold) {
-                Warning(info,"generated ~%d transitions from ~%d states",
+                Warning(info,"generated ~%zu transitions from ~%zu states",
                     lvl_tcount * mpi_nodes,lvl_scount * mpi_nodes);
                 threshold <<= 1;
             }
@@ -363,14 +363,14 @@ int main(int argc, char*argv[]){
         if (global_visited==global_explored) break;
     }
     RTstopTimer(timer);
-    Warning(infoLong,"My share is %lld states and %lld transitions",ctx.explored,ctx.transitions);
+    Warning(infoLong,"My share is %zu states and %zu transitions",ctx.explored,ctx.transitions);
 
     HREreduce(HREglobal(),1,&ctx.deadlocks,&global_deadlocks,UInt64,Sum);
     HREreduce(HREglobal(),1,&ctx.errors,&global_errors,UInt64,Sum);
     HREreduce(HREglobal(),1,&ctx.violations,&global_violations,UInt64,Sum);
 
     if (ctx.mpi_me==0) {
-        Warning(info,"state space has %d levels %lld states %lld transitions",
+        Warning(info,"state space has %zu levels %zu states %zu transitions",
             ctx.level,global_explored,global_transitions);
         RTprintTimer (info, timer, "Exploration time");
 

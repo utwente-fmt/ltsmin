@@ -84,7 +84,7 @@ static void* area_align(void* ptr,size_t align,size_t size){
     } else {
         res=area_malloc (ptr, size);
     }
-    Debug("allocated %zu from %zu to %zu at alignment %zu",size,res,res+size,align);
+    Debug("allocated %zu from %p to %p at alignment %zu",size,res,res+size,align);
     return res;
 }
 
@@ -267,7 +267,7 @@ set_thread_stack_size()
     }
     size_t stack_size=32 * 1024 * 1024;
     if (pthread_attr_setstacksize(&attr, stack_size)){
-        AbortCall("pthread_attr_setstacksize to %lld",stack_size);
+        AbortCall("pthread_attr_setstacksize to %zu",stack_size);
     }
     return attr;
 }
@@ -355,7 +355,7 @@ void* hre_posix_shm_get(hre_context_t context,size_t size){
             shm_unlink(shm_name);
             AbortCall("mmap");
         }
-        Debug("open shared memory %s at %p",shm_name,shm);
+        Debug("open shared memory %s at %p",shm_name,shm.ptr);
     }
     HREreduce(context,2,&shm,&shm,Pointer,Max);
     if (HREme(context)!=0) {

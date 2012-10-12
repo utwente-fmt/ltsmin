@@ -41,7 +41,7 @@ static void RAFread(raf_t raf,void*buf,size_t len,off_t ofs){
         AbortCall("could not read %s",raf->shared.name);
     }
     if (res!=(ssize_t)len) {
-        AbortCall("short read %u/%u from %s at %llu",res,len,raf->shared.name,ofs);
+        AbortCall("short read %zd/%zu from %s at %llu",res,len,raf->shared.name,ofs);
     }
 }
 

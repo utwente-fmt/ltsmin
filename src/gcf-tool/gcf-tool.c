@@ -334,7 +334,7 @@ static void gcf_list(){
     struct arch_enum_callbacks cb={.stat=list_item};
     struct list_count totals={0,0,0};
     Printf(infoShort,"Archive %s contains:\n",gcf_name);
-    Printf(infoShort," stream size   compressed stream name (compression)\n",gcf_name);
+    Printf(infoShort," stream size   compressed stream name (compression)\n");
     arch_enum_t e=arch_enum(gcf,NULL);
     if (arch_enumerate(e,&cb,&totals)){
         Abort("unexpected non-zero return");
