@@ -775,85 +775,6 @@ mdd_load_bin(FILE* f)
     return mdd;
 }
 
-//static void mdd_clear_and_write(FILE* f, uint32_t mdd, uint32_t* n_count, uint32_t* node_ids){
-static void mdd_clear_and_write(FILE* f, uint32_t mdd, uint32_t* n_count, map_t node_map){
-    if (mdd<=1) return;
-    if (node_table[mdd].val&0x80000000) {
-        node_table[mdd].val=node_table[mdd].val&0x7fffffff;
-        mdd_clear_and_write(f,node_table[mdd].down, n_count, node_map);
-        mdd_clear_and_write(f,node_table[mdd].right, n_count, node_map);
-        //node_ids[mdd] = (uint32_t)*n_count;
-        simplemap_put(node_map, mdd, (uint32_t)*n_count);
-        fprintf(f, "%u %u %u %u\n",
-            (uint32_t)*n_count,
-            node_table[mdd].val,
-            //node_ids[node_table[mdd].down],
-            //node_ids[node_table[mdd].right]
-            simplemap_get(node_map, node_table[mdd].down),
-            simplemap_get(node_map, node_table[mdd].right)
-        );
-        (*n_count)++;
-    }
-}
-
-static void
-mdd_save(FILE* f, uint32_t mdd)
-{
-    uint32_t n_count = mdd_node_count(mdd);
-    Print(infoLong,"mdd_save: %u / %u (%.0f\%)", n_count, mdd_nodes, 100*(((float)n_count)/(float)mdd_nodes));
-    fprintf(f,"n=%u\n", n_count);
-    mdd_mark(mdd);
-    //uint32_t* node_ids = RTmalloc(mdd_nodes*sizeof(uint32_t));
-    map_t node_map = simplemap_create(n_count * 1.1 + 2);
-    //node_ids[0] = 0;
-    //node_ids[1] = 1;
-    simplemap_put(node_map, 0, 0);
-    simplemap_put(node_map, 1, 1);
-    uint32_t count = 2;
-    //mdd_clear_and_write(f, mdd, &count, node_ids);
-    mdd_clear_and_write(f, mdd, &count, node_map);
-    //RTfree(node_ids);
-    simplemap_destroy(node_map);
-}
-
-static uint32_t
-mdd_load(FILE* f)
-{
-    uint32_t n_count;
-    int res = fscanf(f,"n=%u\n", &n_count);
-    (void)res;
-    //Warning(info,"mdd_load: %u", n_count);
-    if (n_count < 2)
-        n_count = 2;
-    if (mdd_load_node_ids != NULL)
-        Abort("Error, mdd_load_node_ids already in use!");
-    mdd_load_node_ids = RTmalloc(n_count*sizeof(uint32_t));
-    mdd_load_node_ids[0] = 0;
-    mdd_load_node_ids[1] = 1;
-    mdd_load_node_count = 2;
-    uint32_t mdd = 0;
-    uint32_t id;
-    uint32_t val;
-    uint32_t down;
-    uint32_t right;
-    while (mdd_load_node_count < n_count && fscanf(f,"%u %u %u %u\n", &id, &val, &down, &right) != EOF) {
-        if (mdd_load_node_count != id)
-            Abort("Nodes have to be numbered consecutively from 2 till n-1.");
-        //Warning(debug, "id=%u, val=%u, down=%u [%u], right=%u [%u]",
-        //        id, val, down, mdd_load_node_ids[down], right, mdd_load_node_ids[right]);
-        assert(down==0 || mdd_load_node_ids[down]!=0);
-        assert(right==0 || mdd_load_node_ids[right]!=0);
-        mdd = mdd_create_node(val, mdd_load_node_ids[down], mdd_load_node_ids[right]);
-        //Warning(debug, "id=%u [%u]", id, mdd);
-        mdd_load_node_ids[id] = mdd;
-        mdd_load_node_count++;
-    }
-    RTfree(mdd_load_node_ids);
-    mdd_load_node_ids = NULL;
-    mdd_load_node_count = 0;
-    return mdd;
-}
-
 static vset_t
 set_create_mdd(vdom_t dom, int k, int *proj)
 {
@@ -936,17 +857,6 @@ rel_save_proj_bin(FILE* f, vrel_t rel)
 }
 
 static void
-rel_save_proj(FILE* f, vrel_t rel)
-{
-    fprintf(f,"len=%d\n", rel->p_len);
-    fprintf(f,"proj=");
-    for(int i=0; i<rel->p_len; i++){
-        fprintf(f,((i < rel->p_len-1)?"%d ":"%d"), rel->proj[i]);
-    }
-    fprintf(f,"\n");
-}
-
-static void
 rel_save_mdd(FILE* f, vrel_t rel)
 {
     mdd_save_bin(f, rel->mdd);
@@ -962,23 +872,6 @@ rel_load_proj_bin(FILE* f, vdom_t dom)
         proj[i] = DSreadS32(s);
     }
     free(s);
-    vrel_t result = rel_create_mdd(dom, p_len, proj);
-    return result;
-}
-
-static vrel_t
-rel_load_proj(FILE* f, vdom_t dom)
-{
-    int p_len;
-    int res = fscanf(f,"len=%d\n", &p_len);
-    res &= fscanf(f,"proj=");
-    int proj[p_len];
-    for(int i=0; i<p_len; i++){
-        res &= fscanf(f,((i < p_len-1)?"%d ":"%d"), &(proj[i]));
-        //Warning(info, "rel_load_mdd: proj[%d]=%d", i, proj[i]);
-    }
-    res &= fscanf(f,"\n");
-    //Warning(info, "rel_load_proj: p_len=%d", p_len);
     vrel_t result = rel_create_mdd(dom, p_len, proj);
     return result;
 }

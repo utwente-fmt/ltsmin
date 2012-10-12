@@ -707,85 +707,6 @@ mdd64_load_bin(FILE* f)
     return mdd;
 }
 
-//TODO: Use DSwrite* here
-static void mdd64_clear_and_write(FILE* f, uint64_t mdd, uint64_t* n_count, map64_t node_map){
-    if (mdd<=1) return;
-    if (node_table[mdd].val&0x80000000) {
-        node_table[mdd].val=node_table[mdd].val&0x7fffffff;
-        mdd64_clear_and_write(f,node_table[mdd].down, n_count, node_map);
-        mdd64_clear_and_write(f,node_table[mdd].right, n_count, node_map);
-        //node_ids[mdd] = (uint32_t)*n_count;
-        simplemap64_put(node_map, mdd, (uint64_t)*n_count);
-        fprintf(f, "%" PRIu64 " %u %" PRIu64 " %" PRIu64 "\n",
-            (uint64_t)*n_count,
-            node_table[mdd].val,
-            //node_ids[node_table[mdd].down],
-            //node_ids[node_table[mdd].right]
-            simplemap64_get(node_map, node_table[mdd].down),
-            simplemap64_get(node_map, node_table[mdd].right)
-        );
-        (*n_count)++;
-    }
-}
-
-static void
-mdd64_save(FILE* f, uint64_t mdd)
-{
-    uint64_t n_count = mdd64_node_count(mdd);
-    Print(infoLong,"mdd_save: %" PRIu64 " / %" PRIu64 " (%.0f\%)", n_count, mdd_nodes, 100*(((float)n_count)/(float)mdd_nodes));
-    fprintf(f,"n=%" PRIu64 "\n", n_count);
-    mdd64_mark(mdd);
-    //uint32_t* node_ids = RTmalloc(mdd_nodes*sizeof(uint32_t));
-    map64_t node_map = simplemap64_create(n_count * 1.1 + 2);
-    //node_ids[0] = 0;
-    //node_ids[1] = 1;
-    simplemap64_put(node_map, 0, 0);
-    simplemap64_put(node_map, 1, 1);
-    uint64_t count = 2;
-    //mdd64_clear_and_write(f, mdd, &count, node_ids);
-    mdd64_clear_and_write(f, mdd, &count, node_map);
-    //RTfree(node_ids);
-    simplemap64_destroy(node_map);
-}
-
-static uint64_t
-mdd64_load(FILE* f)
-{
-    uint64_t n_count;
-    int res = fscanf(f,"n=%" PRIu64 "\n", &n_count);
-    (void)res;
-    //Warning(info,"mdd_load: %llu", n_count);
-    if (n_count < 2)
-        n_count = 2;
-    if (mdd_load_node_ids != NULL)
-        Abort("Error, mdd_load_node_ids already in use!");
-    mdd_load_node_ids = RTmalloc(n_count*sizeof(uint64_t));
-    mdd_load_node_ids[0] = 0;
-    mdd_load_node_ids[1] = 1;
-    mdd_load_node_count = 2;
-    uint64_t mdd = 0;
-    uint64_t id;
-    uint32_t val;
-    uint64_t down;
-    uint64_t right;
-    while (mdd_load_node_count < n_count && fscanf(f,"%" PRIu64 " %u %" PRIu64 " %" PRIu64 "\n", &id, &val, &down, &right) != EOF) {
-        if (mdd_load_node_count != id)
-            Abort("Nodes have to be numbered consecutively from 2 till n-1.");
-        //Warning(debug, "id=%llu, val=%u, down=%llu [%llu], right=%llu [%llu]",
-        //        id, val, down, mdd_load_node_ids[down], right, mdd_load_node_ids[right]);
-        assert(down==0 || mdd_load_node_ids[down]!=0);
-        assert(right==0 || mdd_load_node_ids[right]!=0);
-        mdd = mdd64_create_node(val, mdd_load_node_ids[down], mdd_load_node_ids[right]);
-        //Warning(debug, "id=%llu [%llu]", id, mdd);
-        mdd_load_node_ids[id] = mdd;
-        mdd_load_node_count++;
-    }
-    RTfree(mdd_load_node_ids);
-    mdd_load_node_ids = NULL;
-    mdd_load_node_count = 0;
-    return mdd;
-}
-
 static vset_t
 set_create_mdd64(vdom_t dom, int k, int *proj)
 {
@@ -868,17 +789,6 @@ rel_save_proj64_bin(FILE* f, vrel_t rel)
 }
 
 static void
-rel_save_proj64(FILE* f, vrel_t rel)
-{
-    fprintf(f,"len=%d\n", rel->p_len);
-    fprintf(f,"proj=");
-    for(int i=0; i<rel->p_len; i++){
-        fprintf(f,((i < rel->p_len-1)?"%d ":"%d"), rel->proj[i]);
-    }
-    fprintf(f,"\n");
-}
-
-static void
 rel_save_mdd64(FILE* f, vrel_t rel)
 {
     mdd64_save_bin(f, rel->mdd);
@@ -894,23 +804,6 @@ rel_load_proj64_bin(FILE* f, vdom_t dom)
         proj[i] = DSreadS32(s);
     }
     free(s);
-    vrel_t result = rel_create_mdd64(dom, p_len, proj);
-    return result;
-}
-
-static vrel_t
-rel_load_proj64(FILE* f, vdom_t dom)
-{
-    int p_len;
-    int res = fscanf(f,"len=%d\n", &p_len);
-    res &= fscanf(f,"proj=");
-    int proj[p_len];
-    for(int i=0; i<p_len; i++){
-        res &= fscanf(f,((i < p_len-1)?"%d ":"%d"), &(proj[i]));
-        //Warning(info, "rel_load_mdd: proj[%d]=%d", i, proj[i]);
-    }
-    res &= fscanf(f,"\n");
-    //Warning(info, "rel_load_proj: p_len=%d", p_len);
     vrel_t result = rel_create_mdd64(dom, p_len, proj);
     return result;
 }

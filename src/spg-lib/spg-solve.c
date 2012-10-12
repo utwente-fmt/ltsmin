@@ -668,8 +668,8 @@ void spg_attractor(int player, const parity_game* g, vset_t u, const spgsolver_o
     }
 #endif
 
-    char* swapfilename_u;
-    char* swapfilename_v_level;
+    //char* swapfilename_u;
+    //char* swapfilename_v_level;
     if (options->swap)
     {
         //swapfilename_u = spg_swapfilename();
