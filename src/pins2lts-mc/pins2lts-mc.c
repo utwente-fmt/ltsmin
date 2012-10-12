@@ -1102,7 +1102,6 @@ print_statistics (counter_t *ar_reach, counter_t *ar_red, rt_timer_t timer,
     Warning (info, "Est. total memory use: %.1fMB (~%.1fMB paged-in)",
              mem1 + mem4 + mem3 + chunks, mem1 + mem2 + mem3 + chunks);
 
-
     if (no_exit || log_active(infoLong))
         Warning (info, "\n\nDeadlocks: %zu\nInvariant violations: %zu\n"
                  "Error actions: %zu", reach->deadlocks, reach->violations,
@@ -1151,7 +1150,7 @@ print_thread_statistics (wctx_t *ctx)
 {
     char                name[128];
     char               *format = "[%zu%s] saw in %.3f sec ";
-    if (W < 4) {
+    if (W < 4 || log_active(infoLong)) {
     if ((Strat_Reach | Strat_OWCTY) & strategy[0]) {
         snprintf (name, sizeof name, format, ctx->id, "", ctx->counters.runtime);
         print_state_space_total (name, &ctx->counters);
@@ -1160,6 +1159,11 @@ print_thread_statistics (wctx_t *ctx)
         print_state_space_total (name, &ctx->counters);
         snprintf (name, sizeof name, format, ctx->id, " R", ctx->counters.runtime);
         print_state_space_total (name, &ctx->red);
+
+        if (Strat_TA & strategy[0]) {
+            fset_print_statistics(ctx->cyan, "Cyan set");
+            fset_print_statistics(ctx->pink, "Pink set");
+        }
     }}
 }
 
@@ -2505,21 +2509,24 @@ read_extention (ref_t ref)
 static inline void
 write_extention (ref_t ref, owcty_ext_t val)
 {
-    atomic_write ((uint32_t *)&global->state_ext[ref], *(uint32_t *)&val);
+    uint32_t           *v = (uint32_t *)&val;
+    atomic_write (((uint32_t *)global->state_ext) + ref, *v);
 }
 
 static inline int
 cas_extention (ref_t ref, owcty_ext_t now, owcty_ext_t val)
 {
-    return cas ((uint32_t *)&global->state_ext[ref], *(uint32_t *)&now, *(uint32_t *)&val);
+    uint32_t           *n = (uint32_t *)&now;
+    uint32_t           *v = (uint32_t *)&val;
+    return cas (((uint32_t *)global->state_ext) + ref, *n, *v);
 }
 
 static inline uint32_t
 inc_extention (ref_t ref, uint32_t val)
 {
-    uint32_t x = add_fetch (&state_ext32[ref], val);
-    owcty_ext_t y = *(owcty_ext_t *)&x;
-    return y.count;
+    uint32_t            x = add_fetch (&state_ext32[ref], val);
+    owcty_ext_t        *y = (owcty_ext_t *)&x;
+    return y->count;
 }
 
 static inline uint32_t
@@ -2808,12 +2815,13 @@ owcty_elimination (wctx_t *ctx)
     RTstopTimer (ctx->timer2);
     return size[0] - size[1];
 }
+
 static inline void
-owcty_report (wctx_t *ctx, char *operation, size_t candidates)
+owcty_progress_report (wctx_t *ctx, char *operation, size_t candidates)
 {
-    if (0 == ctx->id)
-        Warning (info, "candidate set %s(%d):\t%zu (%.2f sec)", operation,
-                 ctx->iteration / 2 + 1, candidates, RTrealTime(ctx->timer2));
+    if (0 != ctx->id) return;
+    Warning (info, "candidate set %s(%d):\t%zu (%.2f sec)", operation,
+             ctx->iteration / 2 + 1, candidates, RTrealTime(ctx->timer2));
 }
 
 void
@@ -2823,18 +2831,14 @@ owcty (wctx_t *ctx)
             GBbuchiIsAccepting(ctx->model, ctx->initial.data))
         atomic_write (global->parent_ref+ctx->initial.ref, ctx->initial.ref + 1);
 
-    owcty_ext_t             reset;
-    reset.bit = 0;
-    reset.acc = 0;
-    reset.count = 1;
+    owcty_ext_t             reset = { .bit = 0, .acc = 0, .count = 1 };
+    uint32_t               *r32 = (uint32_t *) &reset;
+    HREassert (1 == *r32); fetch_add (r32, -1); HREassert (0 == reset.count);
+    ctx->timer2 = RTcreateTimer();
+
     ctx->flip = 0;
     ctx->iteration = -1;
-    HREassert (1 == *(uint32_t *)&reset);
-    fetch_add ((uint32_t *)&reset, -1);
-    HREassert (0 == reset.count);
-    ctx->timer2 = RTcreateTimer();
     size_t              new_size = SIZE_MAX, old_size = 0;
-
     while (new_size && old_size != new_size && !lb_is_stopped(global->lb)) {
 
         ctx->flip = 1 - ctx->flip;
@@ -2846,28 +2850,28 @@ owcty (wctx_t *ctx)
         ctx->iteration++;
         lb_reinit (global->lb, ctx->id); // barrier
         new_size = owcty_reachability (ctx);
-        owcty_report (ctx, "reachability", new_size);
+        owcty_progress_report (ctx, "reachability", new_size);
 
         new_size -= owcty_elimination_pre (ctx); // TODO: avoid by "grabbing states"
-        owcty_report (ctx, "pre_elimination", new_size);
+        owcty_progress_report (ctx, "pre_elimination", new_size);
         if (new_size == 0 || new_size == old_size) break; // early exit
 
         ctx->iteration++;
         lb_reinit (global->lb, ctx->id); // barrier
         new_size -= owcty_elimination (ctx);
-        owcty_report (ctx, "elimination", new_size);
+        owcty_progress_report (ctx, "elimination", new_size);
     }
 
     if (0 == ctx->id && (new_size == 0 || old_size == new_size)) {
-        if (new_size > 0) {
+        if (new_size > 0) { // print result:
             Warning (info, "Accepting cycle FOUND after %zu iteration(s)!",
                      ctx->iteration / 2 + 1);
         } else {
             Warning (info, "NO Accepting cycle found after %zu iteration(s)!",
                      ctx->iteration / 2 + 1);
         }
+        HREbarrier(HREglobal()); // print result before (local) statistics
     }
-    HREbarrier(HREglobal());
 }
 
 /**
@@ -3198,8 +3202,8 @@ ta_has_state (fset_t *table, state_info_t *s, bool add_if_absent)
     struct val_s        state;
     state.ref = s->ref;
     state.lattice = s->lattice;
-    hash32_t hash = (s->ref | (s->lattice >> 3));
-    return fset_find (table, &hash, &state, add_if_absent);
+    //hash32_t hash = (s->ref | (s->lattice >> 3));
+    return fset_find (table, NULL, &state, add_if_absent);
 }
 
 static inline void
@@ -3208,8 +3212,8 @@ ta_remove_state (fset_t *table, state_info_t *s)
     struct val_s        state;
     state.ref = s->ref;
     state.lattice = s->lattice;
-    hash32_t hash = (s->ref | (s->lattice >> 3));
-    int success = fset_delete (table, &hash, &state);
+    //hash32_t hash = (s->ref | (s->lattice >> 3));
+    int success = fset_delete (table, NULL, &state);
     HREassert (success, "Could not remove key from set");
 }
 
@@ -3222,13 +3226,14 @@ ta_cndfs_handle_nonseed_accepting (wctx_t *ctx)
         ctx->red.waits++;
         ctx->counters.rec += accs;
         RTstartTimer (ctx->red.timer);
-        while ( nonred ) {
+        while ( nonred && !lb_is_stopped(global->lb) ) {
             nonred = 0;
             for (size_t i = 0; i < accs; i++) {
                 raw_data_t state_data = dfs_stack_peek (ctx->out_stack, i);
                 state_info_deserialize_cheap (&ctx->state, state_data);
-                if (!ta_cndfs_subsumed_red(ctx, NULL))
+                if (!ta_cndfs_subsumed_red(ctx, NULL)) {
                     nonred++;
+                }
             }
         }
         RTstopTimer (ctx->red.timer);
@@ -3365,6 +3370,7 @@ ta_cndfs_blue (wctx_t *ctx)
                 break;
             }
             dfs_stack_leave (ctx->stack);
+            HREassert (ctx->counters.level_cur != 0);
             ctx->counters.level_cur--;
             /* call red DFS for accepting states */
             state_data = dfs_stack_top (ctx->stack);

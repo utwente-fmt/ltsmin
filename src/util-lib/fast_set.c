@@ -26,6 +26,8 @@ struct fset_s {
     void               *todo_data;
     size_t              load;
     size_t              tombs;
+    size_t              lookups;
+    size_t              probes;
     size_t              resizes;
     size_t              max_grow;
     size_t              max_load;
@@ -143,12 +145,14 @@ fset_find_loc (fset_t *dbs, mem_hash_t mem, void *data, size_t *ref,
     if (tomb) *tomb = NONE;
     mem_hash_t          h = mem;
     size_t              rh = 0;
+    dbs->lookups++;
     Debug ("Locating key %zu,%zu with hash %u", ((size_t*)data)[0], ((size_t*)data)[1], mem);
     while (true) {
         *ref = h & dbs->mask;
         size_t              line_begin = *ref & CACHE_LINE_MEM_MASK;
         size_t              line_end = line_begin + CACHE_LINE_MEM_SIZE;
         for (size_t i = 0; i < CACHE_LINE_MEM_SIZE; i++) {
+            dbs->probes++;
             if (NULL != tomb && TOMB == *memoized(dbs,*ref))
                 *tomb = *ref; // first found tombstone
             if (EMPTY == *memoized(dbs,*ref))
@@ -208,7 +212,7 @@ fset_find (fset_t *dbs, mem_hash_t *mem, void *data, bool insert_absert)
     *memoized(dbs, ref) = h | FULL;
     dbs->load++;
     dbs->max_load = max (dbs->max_load, dbs->load);
-    if ((dbs->load + dbs->tombs << 2) > dbs->size3) {
+    if (((dbs->load + dbs->tombs) << 2) > dbs->size3) {
         if (!resize(dbs, GROW)) { // > 75% full ==> grow
             return FSET_FULL;
         }
@@ -263,6 +267,8 @@ fset_create (size_t data_length, size_t init_size, size_t max_size)
     dbs->max_grow = dbs->init_size;
     dbs->max_load = 0;
     dbs->max_todos = 0;
+    dbs->lookups = 0;
+    dbs->probes = 0;
     dbs->timer = RTcreateTimer ();
     //fset_clear (dbs); // mallocZero
     return dbs;
@@ -271,13 +277,10 @@ fset_create (size_t data_length, size_t init_size, size_t max_size)
 void
 fset_print_statistics (fset_t *dbs, char *s)
 {
-    Warning (info, "%s max load = %zu kb, max_size = %zu kb, "
-            "scratch pad = %zu kb, resizes = %zu (%.2f sec).",
-             s,
-             sizeof(mem_hash_t[dbs->max_load]) >> 10,
-             sizeof(mem_hash_t[dbs->max_grow]) >> 10,
-             sizeof(mem_hash_t[dbs->max_todos]) >> 10,
-             dbs->resizes, RTrealTime(dbs->timer));
+    Warning (info, "%s max load = %zu, max_size = %zu, scratch pad = %zu, "
+             "resizes = %zu, probes/lookup = %.2f", s,
+             dbs->max_load, dbs->max_grow, dbs->max_todos, dbs->resizes,
+             (float)dbs->probes / dbs->lookups, RTrealTime(dbs->timer));
 }
 
 size_t
