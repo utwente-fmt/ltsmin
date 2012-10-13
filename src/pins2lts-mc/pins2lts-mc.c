@@ -3339,10 +3339,13 @@ static void
 ta_cndfs_handle_blue (void *arg, state_info_t *successor, transition_info_t *ti, int seen)
 {
     wctx_t             *ctx = (wctx_t *) arg;
-    int cyan = ta_has_state (ctx->cyan, successor, false);
     state_data_t succ_data = get_state (successor->ref, ctx);
+    int acc = GBbuchiIsAccepting(ctx->model, succ_data);
+    if (!seen && acc)
+        ctx->red.visited++;
+    int cyan = ta_has_state (ctx->cyan, successor, false);
     if ( ecd && cyan && (GBbuchiIsAccepting(ctx->model, ctx->state.data) ||
-         GBbuchiIsAccepting(ctx->model, succ_data)) ) {
+         acc) ) {
         /* Found cycle in blue search */
         ndfs_report_cycle (ctx, successor);
     }

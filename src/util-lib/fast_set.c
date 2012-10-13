@@ -69,7 +69,7 @@ resize (fset_t *dbs, fset_resize_t mode)
 {
     void               *data;
     bool                res;
-    HREassert (!dbs->resizing);
+    if (dbs->resizing) return true;
     dbs->resizing = 1;
     RTstartTimer (dbs->timer);
 
