@@ -694,8 +694,8 @@ wctx_create (model_t model, int depth, wctx_t *shared)
         int res = bitvector_create (&ctx->color_map, local_bits<<dbs_size);
         if (-1 == res) Abort ("Failure to allocate color bitvector.");
         if (strategy[0] & Strat_TA) {
-            ctx->cyan = fset_create (16, 10, 24);
-            ctx->pink = fset_create (16, 4, 24);
+            ctx->cyan = fset_create (16, 10, 28);
+            ctx->pink = fset_create (16, 4, 28);
         }
         if ((Strat_NDFS | Strat_LNDFS | Strat_CNDFS | Strat_ENDFS) & strategy[depth]) {
             res = bitvector_create (&ctx->all_red, MAX_STACK);
@@ -3271,7 +3271,9 @@ ta_has_state (fset_t *table, state_info_t *s, bool add_if_absent)
     state.ref = s->ref;
     state.lattice = s->lattice;
     //hash32_t hash = (s->ref | (s->lattice >> 3));
-    return fset_find (table, NULL, &state, add_if_absent);
+    int res = fset_find (table, NULL, &state, add_if_absent);
+    HREassert (res != FSET_FULL, "Cyan table full");
+    return res;
 }
 
 static inline void
@@ -3317,7 +3319,9 @@ ta_cndfs_handle_nonseed_accepting (wctx_t *ctx)
     }
     if (pre)
         fset_clear (ctx->pink);
-    HREassert (fset_count(ctx->pink) == 0, "Pink set not empty: %zu", fset_count(ctx->pink));
+    //HREassert (fset_count(ctx->pink) == 0, "Pink set not empty: %zu", fset_count(ctx->pink));
+    if (fset_count(ctx->pink) != 0)
+        Warning (info, "Pink set not empty: %zu", fset_count(ctx->pink));
 }
 
 static void
@@ -3389,7 +3393,6 @@ ta_cndfs_red (wctx_t *ctx, ref_t seed, lattice_t l_seed)
             state_info_deserialize (&ctx->state, state_data, ctx->store);
             if ( !ta_cndfs_subsumed_red(ctx, NULL) &&
                  !ta_has_state(ctx->pink, &ctx->state, true) ) {
-                Debug ("(%zu,%zu", ctx->state.ref, ctx->state.lattice);
                 dfs_stack_push (ctx->in_stack, state_data);
                 if ( ctx->state.ref != seed && ctx->state.lattice != l_seed &&
                      GBbuchiIsAccepting(ctx->model, ctx->state.data) )
@@ -3405,9 +3408,6 @@ ta_cndfs_red (wctx_t *ctx, ref_t seed, lattice_t l_seed)
             HREassert (ctx->red.level_cur != 0);
             ctx->red.level_cur--;
 
-            state_data = dfs_stack_top (ctx->stack);
-            state_info_deserialize_cheap (&ctx->state, state_data);
-            Debug (")%zu,%zu", ctx->state.ref, ctx->state.lattice);
             /* exit search if backtrack hits seed, leave stack the way it was */
             if (seed_level == dfs_stack_nframes(ctx->stack))
                 break;
@@ -3426,7 +3426,6 @@ ta_cndfs_blue (wctx_t *ctx)
             state_info_deserialize (&ctx->state, state_data, ctx->store);
             if ( !ta_cndfs_subsumed_blue_or_red(ctx, NULL) &&
                  !ta_has_state(ctx->cyan, &ctx->state, true) ) {
-                Debug ("<%zu,%zu", ctx->state.ref, ctx->state.lattice);
                 if (all_red)
                     bitvector_set (&ctx->all_red, ctx->counters.level_cur);
                 ta_cndfs_explore_state_blue (ctx, &ctx->counters);
@@ -3438,16 +3437,17 @@ ta_cndfs_blue (wctx_t *ctx)
             }
         } else { // backtrack
             if (0 == dfs_stack_nframes(ctx->stack)) {
-                HREassert (fset_count(ctx->cyan) == 0, "Cyan set not empty: %zu", fset_count(ctx->cyan));
+                //HREassert (fset_count(ctx->cyan) == 0, "Cyan set not empty: %zu", fset_count(ctx->cyan));
+                if (fset_count(ctx->cyan) != 0)
+                    Warning (info, "Cyan set not empty: %zu", fset_count(ctx->cyan));
                 break;
             }
             dfs_stack_leave (ctx->stack);
-            HREassert (ctx->counters.level_cur != 0);
+            HREassert (ctx->counters.level_cur != 0 && ctx->counters.level_cur < 1ULL << 48); // overflow
             ctx->counters.level_cur--;
             /* call red DFS for accepting states */
             state_data = dfs_stack_top (ctx->stack);
             state_info_deserialize (&ctx->state, state_data, ctx->store);
-            Debug (">%zu,%zu", ctx->state.ref, ctx->state.lattice);
             ta_remove_state (ctx->cyan, &ctx->state);
             /* Mark state BLUE on backtrack */
             ta_cndfs_mark_blue (ctx);

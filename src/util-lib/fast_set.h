@@ -19,7 +19,7 @@ extern size_t   fset_count (fset_t *dbs);
 extern int      fset_find (fset_t *dbs, hash32_t *h, void *data,
                            bool insert_absent);
 
-extern int      fset_delete (fset_t *dbs, hash32_t *mem, void *data);
+extern bool     fset_delete (fset_t *dbs, hash32_t *mem, void *data);
 
 extern void     fset_clear (fset_t *dbs);
 

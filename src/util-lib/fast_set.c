@@ -58,49 +58,57 @@ state (const fset_t *dbs, void *data, size_t ref)
     return ((char*)data) + (ref * dbs->data_length);
 }
 
+static const char *fset_resize_names[3] = { "Grow", "Shrink", "Rehash" };
+
 typedef enum fset_resize_e {
     GROW,
     SHRINK,
     REHASH
 } fset_resize_t;
 
-int
+static int
 resize (fset_t *dbs, fset_resize_t mode)
 {
     void               *data;
     bool                res;
     if (dbs->resizing) return true;
     dbs->resizing = 1;
-    RTstartTimer (dbs->timer);
 
-    size_t              b = dbs->data_length;
     size_t              old_size = dbs->size;
     switch (mode) {
     case GROW:
-        if (dbs->size == dbs->size_max)
+        if (dbs->size == dbs->size_max) {
+            dbs->resizing = 0;
             return false;
+        }
         memset (dbs->hash + dbs->size, 0, sizeof (mem_hash_t[dbs->size]));
         dbs->size <<= 1;
         dbs->size3 <<= 1;
         break;
     case SHRINK:
+        if (dbs->size == dbs->init_size) {
+            dbs->resizing = 0;
+            return true;
+        }
         dbs->size >>= 1;
         dbs->size3 >>= 1;
         break;
     case REHASH: break;
     }
     dbs->mask = dbs->size - 1;
+    Debug ("%s %zu to %zu", fset_resize_names[mode], old_size, dbs->size);
 
+    //RTstartTimer (dbs->timer);
     size_t              tombs = 0;
     size_t              todos = 0;
     for (size_t i = 0; i < old_size; i++) {
         mem_hash_t          h = *memoized(dbs,i);
         if (TOMB == h) {
             tombs++;
-        } else if (h != EMPTY){// && (h & dbs->mask) != i) {
+        } else if (h != EMPTY) {// && (h & dbs->mask) != i) {
             dbs->todo[todos] = *memoized(dbs,i);
             void               *data = state(dbs, dbs->todo_data, todos);
-            memcpy (data, state(dbs, dbs->data, i), b);
+            memcpy (data, state(dbs, dbs->data, i), dbs->data_length);
             todos++;
         }
         *memoized(dbs, i) = EMPTY;
@@ -120,9 +128,10 @@ resize (fset_t *dbs, fset_resize_t mode)
         //HREassert (fset_find (dbs, &h, data, true));
     }
 
-    RTstopTimer (dbs->timer);
-    Debug ("Resize/rehash %zu to %zu took %zu/%zu todos and cleaned %zu/%zu tombstones in %.2f sec",
-           old_size, dbs->size, todos, dbs->load, tombs, dbs->load + tombs, RTrealTime(dbs->timer));
+    //RTstopTimer (dbs->timer);
+    Debug ("%s %zu to %zu took %zu/%zu todos and cleaned %zu/%zu tombstones in %.2f sec",
+           fset_resize_names[mode], old_size, dbs->size, todos, dbs->load, tombs,
+           dbs->load + tombs, RTrealTime(dbs->timer));
     dbs->max_todos = max (todos, dbs->max_todos);
     dbs->max_grow = max (dbs->max_grow, dbs->size);
     dbs->resizes++;
@@ -146,7 +155,7 @@ fset_find_loc (fset_t *dbs, mem_hash_t mem, void *data, size_t *ref,
     mem_hash_t          h = mem;
     size_t              rh = 0;
     dbs->lookups++;
-    Debug ("Locating key %zu,%zu with hash %u", ((size_t*)data)[0], ((size_t*)data)[1], mem);
+    //Debug ("Locating key %zu,%zu with hash %u", ((size_t*)data)[0], ((size_t*)data)[1], mem);
     while (true) {
         *ref = h & dbs->mask;
         size_t              line_begin = *ref & CACHE_LINE_MEM_MASK;
@@ -163,11 +172,13 @@ fset_find_loc (fset_t *dbs, mem_hash_t mem, void *data, size_t *ref,
             *ref = (*ref+1 == line_end ? line_begin : *ref+1);
         }
         h = rehash (h, mem);
-        if (rh++ > 1000) Abort ("Hash table full of tombstones (size = %zu, load = %zu, tombs = %zu).", dbs->size, dbs->load, dbs->tombs);
+        if (rh++ > 1000) {
+            return FSET_FULL;
+        }
     }
 }
 
-int
+bool
 fset_delete (fset_t *dbs, mem_hash_t *mem, void *data)
 {
     size_t              ref;
@@ -179,14 +190,12 @@ fset_delete (fset_t *dbs, mem_hash_t *mem, void *data)
     *memoized(dbs,ref) = TOMB; // TODO: avoid TOMB when next in line is EMPTY
     dbs->tombs++;
     dbs->load--;
-    if (dbs->load < dbs->size>>2 && dbs->size != dbs->init_size) {
-        if (!resize(dbs, SHRINK)) { // <25% keys ==> shrink
-            return FSET_FULL;
-        }
-    } else if (dbs->tombs > dbs->size>>2) {
-        if (!resize(dbs, REHASH)) { // >25% tombs ==> rehash
-            return FSET_FULL;
-        }
+    if (dbs->load < dbs->size >> 3 && dbs->size != dbs->init_size) {
+        bool res = resize (dbs, SHRINK);                // <12.5% keys ==> shrink
+        HREassert (res, "Cannot shrink table?");
+    } else if (dbs->tombs << 2 > dbs->size3) {
+        bool res = resize (dbs, REHASH);                // >75% tombs ==> rehash
+        HREassert (res, "Cannot rehash table?");
     }
     return true;
 }
@@ -213,8 +222,9 @@ fset_find (fset_t *dbs, mem_hash_t *mem, void *data, bool insert_absert)
     dbs->load++;
     dbs->max_load = max (dbs->max_load, dbs->load);
     if (((dbs->load + dbs->tombs) << 2) > dbs->size3) {
-        if (!resize(dbs, GROW)) { // > 75% full ==> grow
-            return FSET_FULL;
+        if (!resize(dbs, GROW)) {                       // > 75% full ==> grow
+            Debug ("Hash table almost full (size = %zu, load = %zu, tombs = %zu)",
+                   dbs->size, dbs->load, dbs->tombs);
         }
     }
     return false;
