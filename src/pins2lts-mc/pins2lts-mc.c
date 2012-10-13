@@ -3130,11 +3130,11 @@ ta_cndfs_covered_red (void *arg, lattice_t l, lm_status_t status, lm_loc_t loc)
     wctx_t *ctx = (wctx_t *) arg;
     int *sigma = (int*)&ctx->state.lattice;
     if ( status == LM_RED && (
-        (blue_subsumption && GBisCoveredByShort(ctx->model, sigma, (int*)&l)) ||
-        (!blue_subsumption && ctx->state.lattice == l) ) ) {
+        (red_subsumption && GBisCoveredByShort(ctx->model, sigma, (int*)&l)) ||
+        (!red_subsumption && ctx->state.lattice == l) ) ) {
         ctx->done = 1;
         return LM_CB_STOP;
-    } // TODO: delete
+    }
     return LM_CB_NEXT;
     (void) loc;
 }
@@ -3142,20 +3142,26 @@ ta_cndfs_covered_red (void *arg, lattice_t l, lm_status_t status, lm_loc_t loc)
 int
 ta_cndfs_subsumed_red (wctx_t *ctx, lm_loc_t *last)
 {
+    if (blue_subsumption || red_subsumption)
+        lm_lock (global->lmap, ctx->state.ref);
+
     ctx->done = 0;
     lm_loc_t last2 = lm_iterate (global->lmap, ctx->state.ref, ta_cndfs_covered_red, ctx);
     if (last) *last = last2;
+
+    if (blue_subsumption || red_subsumption)
+        lm_unlock (global->lmap, ctx->state.ref);
     return ctx->done;
 }
 
 lm_cb_t
-ta_cndfs_covered (void *arg, lattice_t l, lm_status_t status, lm_loc_t loc)
+ta_cndfs_covered_blue_or_red (void *arg, lattice_t l, lm_status_t status, lm_loc_t loc)
 {
     wctx_t *ctx = (wctx_t *) arg;
     int *sigma = (int*)&ctx->state.lattice;
     if ( status != LM_WHITE && ( // Red or Blue
-         (red_subsumption && GBisCoveredByShort(ctx->model, sigma, (int*)&l)) ||
-         (!red_subsumption && ctx->state.lattice == l) ) ) {
+         (blue_subsumption && GBisCoveredByShort(ctx->model, sigma, (int*)&l)) ||
+         (!blue_subsumption && ctx->state.lattice == l) ) ) {
         ctx->done = 1;
         return LM_CB_STOP;
     }
@@ -3166,33 +3172,95 @@ ta_cndfs_covered (void *arg, lattice_t l, lm_status_t status, lm_loc_t loc)
 int
 ta_cndfs_subsumed_blue_or_red (wctx_t *ctx, lm_loc_t *last)
 {
+    // without subsumption we only might miss an update in worst case (which corresponds to a reordering of a sequential run)
+    if (blue_subsumption || red_subsumption)
+        lm_lock (global->lmap, ctx->state.ref);
+
     ctx->done = 0;
-    lm_loc_t last2 = lm_iterate (global->lmap, ctx->state.ref, ta_cndfs_covered, ctx);
+    lm_loc_t last2 = lm_iterate (global->lmap, ctx->state.ref, ta_cndfs_covered_blue_or_red, ctx);
     if (last) *last = last2;
+
+    if (blue_subsumption || red_subsumption)
+        lm_unlock (global->lmap, ctx->state.ref);
     return ctx->done;
 }
 
-void
+lm_cb_t
+ta_cndfs_spray_blue (void *arg, lattice_t l, lm_status_t status, lm_loc_t loc)
+{
+    wctx_t             *ctx = (wctx_t *) arg;
+    int                *sigma = (int*)&ctx->state.lattice;
+    if (blue_subsumption) { // no premature stop (mark blue states red)
+        if (GBisCoveredByShort(ctx->model, (int*)&l, sigma) ) {
+            lm_delete (global->lmap, loc);
+            ctx->last = (LM_NULL_LOC == ctx->last ? loc : ctx->last);
+            ctx->red.deletes++;
+        }
+    } else {
+        if ( ctx->state.lattice == l ) {
+            HREassert (status == LM_BLUE || status == LM_RED); // nothing to be done
+            ctx->done = 1;
+            return LM_CB_STOP;
+        }
+    }
+    return LM_CB_NEXT;
+}
+
+static inline void
 ta_cndfs_mark_blue (wctx_t *ctx)
 {
     lm_lock (global->lmap, ctx->state.ref);
-    lm_loc_t last;
-    if (!ta_cndfs_subsumed_blue_or_red(ctx, &last)) {
-        ctx->counters.inserts++;
+    lm_loc_t            last;
+
+    ctx->done = 0;
+    ctx->last = LM_NULL_LOC;
+    last = lm_iterate (global->lmap, ctx->state.ref, ta_cndfs_spray_blue, ctx);
+    if (!ctx->done) {
+        last = (LM_NULL_LOC == ctx->last ? last : ctx->last);
         lm_insert_from (global->lmap, ctx->state.ref, ctx->state.lattice, LM_BLUE, &last);
+        ctx->red.inserts++;
     }
+
     lm_unlock (global->lmap, ctx->state.ref);
 }
 
-void
+lm_cb_t
+ta_cndfs_spray_red (void *arg, lattice_t l, lm_status_t status, lm_loc_t loc)
+{
+    wctx_t             *ctx = (wctx_t *) arg;
+    int                *sigma = (int*)&ctx->state.lattice;
+    if (red_subsumption) { // no premature stop (mark blue states red)
+        if (GBisCoveredByShort(ctx->model, (int*)&l, sigma) ) {
+            lm_delete (global->lmap, loc);
+            ctx->last = (LM_NULL_LOC == ctx->last ? loc : ctx->last);
+            ctx->red.deletes++;
+        }
+    } else {
+        if ( ctx->state.lattice == l ) {
+            if (status != LM_RED)
+                lm_set_status (global->lmap, loc, LM_RED);
+            ctx->done = 1;
+            return LM_CB_STOP;
+        }
+    }
+    return LM_CB_NEXT;
+}
+
+static inline void
 ta_cndfs_mark_red (wctx_t *ctx)
 {
     lm_lock (global->lmap, ctx->state.ref);
-    lm_loc_t last;
-    if (!ta_cndfs_subsumed_red(ctx, &last)) {
-        ctx->red.inserts++;
+    lm_loc_t            last;
+
+    ctx->done = 0;
+    ctx->last = LM_NULL_LOC;
+    last = lm_iterate (global->lmap, ctx->state.ref, ta_cndfs_spray_red, ctx);
+    if (!ctx->done) {
+        last = (LM_NULL_LOC == ctx->last ? last : ctx->last);
         lm_insert_from (global->lmap, ctx->state.ref, ctx->state.lattice, LM_RED, &last);
+        ctx->red.inserts++;
     }
+
     lm_unlock (global->lmap, ctx->state.ref);
 }
 
@@ -3226,7 +3294,7 @@ ta_cndfs_handle_nonseed_accepting (wctx_t *ctx)
         ctx->red.waits++;
         ctx->counters.rec += accs;
         RTstartTimer (ctx->red.timer);
-        while ( nonred && !lb_is_stopped(global->lb) ) {
+        while ( nonred && !lb_is_stopped(global->lb) ) { // TODO: mark done states
             nonred = 0;
             for (size_t i = 0; i < accs; i++) {
                 raw_data_t state_data = dfs_stack_peek (ctx->out_stack, i);
@@ -3331,6 +3399,7 @@ ta_cndfs_red (wctx_t *ctx, ref_t seed, lattice_t l_seed)
             }
         } else { // backtrack
             dfs_stack_leave (ctx->stack);
+            HREassert (ctx->red.level_cur != 0);
             ctx->red.level_cur--;
 
             state_data = dfs_stack_top (ctx->stack);
