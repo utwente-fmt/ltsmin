@@ -3126,10 +3126,10 @@ ta_cndfs_covered (void *arg, lattice_t l, lm_status_t status, lm_loc_t loc)
     lm_status_t         color = (lm_status_t)ctx->subsumes;
     int subsumption = (blue_subsumption && color == LM_BLUE) ||
                       (red_subsumption && color == LM_RED);
-    int *sigma = (int*)&ctx->state.lattice;
+    int *sigma = (int*)&ctx->successor->lattice;
     if ( status == color && (
          (subsumption && GBisCoveredByShort(ctx->model, sigma, (int*)&l)) ||
-         (!subsumption && ctx->state.lattice == l) ) ) {
+         (!subsumption && ctx->successor->lattice == l) ) ) {
         ctx->done = 1;
         return LM_CB_STOP;
     }
@@ -3138,19 +3138,19 @@ ta_cndfs_covered (void *arg, lattice_t l, lm_status_t status, lm_loc_t loc)
 }
 
 int
-ta_cndfs_subsumed (wctx_t *ctx, lm_loc_t *last, lm_status_t color)
+ta_cndfs_subsumed (wctx_t *ctx, state_info_t *state, lm_status_t color)
 {
     // without subsumption we only might miss an update in worst case (which corresponds to a reordering of a sequential run)
-    //if (blue_subsumption || red_subsumption)
-        lm_lock (global->lmap, ctx->state.ref);
+    if (blue_subsumption || red_subsumption)
+        lm_lock (global->lmap, state->ref);
 
     ctx->subsumes = color;
     ctx->done = 0;
-    lm_loc_t last2 = lm_iterate (global->lmap, ctx->state.ref, ta_cndfs_covered, ctx);
-    if (last) *last = last2;
+    ctx->successor = state;
+    lm_iterate (global->lmap, state->ref, ta_cndfs_covered, ctx);
 
-    //if (blue_subsumption || red_subsumption)
-        lm_unlock (global->lmap, ctx->state.ref);
+    if (blue_subsumption || red_subsumption)
+        lm_unlock (global->lmap, state->ref);
     return ctx->done;
 }
 
@@ -3159,7 +3159,7 @@ ta_cndfs_spray (void *arg, lattice_t l, lm_status_t status, lm_loc_t loc)
 {
     wctx_t             *ctx = (wctx_t *) arg;
     lm_status_t         color = (lm_status_t)ctx->subsumes;
-    int                *sigma = (int*)&ctx->state.lattice;
+    int                *sigma = (int*)&ctx->successor->lattice;
     int subsumption = (blue_subsumption && color == LM_BLUE) ||
                       (red_subsumption && color == LM_RED);
     if (subsumption) { // no premature stop (mark blue states red)
@@ -3170,7 +3170,7 @@ ta_cndfs_spray (void *arg, lattice_t l, lm_status_t status, lm_loc_t loc)
             ctx->red.deletes++;
         }
     } else {
-        if ( ctx->state.lattice == l ) {
+        if ( ctx->successor->lattice == l ) {
             if (status != color)
                 lm_set_status (global->lmap, loc, color);
             ctx->done = 1;
@@ -3181,22 +3181,23 @@ ta_cndfs_spray (void *arg, lattice_t l, lm_status_t status, lm_loc_t loc)
 }
 
 static inline void
-ta_cndfs_mark (wctx_t *ctx, lm_status_t color)
+ta_cndfs_mark (wctx_t *ctx, state_info_t *state, lm_status_t color)
 {
-    lm_lock (global->lmap, ctx->state.ref);
+    lm_lock (global->lmap, state->ref);
     lm_loc_t            last;
 
+    ctx->successor = state;
     ctx->subsumes = color;
     ctx->done = 0;
     ctx->last = LM_NULL_LOC;
-    last = lm_iterate (global->lmap, ctx->state.ref, ta_cndfs_spray, ctx);
+    last = lm_iterate (global->lmap, state->ref, ta_cndfs_spray, ctx);
     if (!ctx->done) {
         last = (LM_NULL_LOC == ctx->last ? last : ctx->last);
-        lm_insert_from (global->lmap, ctx->state.ref, ctx->state.lattice, color, &last);
-        ctx->red.inserts++;
+        lm_insert_from (global->lmap, state->ref, state->lattice, color, &last);
+        ctx->counters.inserts++;
     }
 
-    lm_unlock (global->lmap, ctx->state.ref);
+    lm_unlock (global->lmap, state->ref);
 }
 
 static inline int
@@ -3236,7 +3237,7 @@ ta_cndfs_handle_nonseed_accepting (wctx_t *ctx)
             for (size_t i = 0; i < accs; i++) {
                 raw_data_t state_data = dfs_stack_peek (ctx->out_stack, i);
                 state_info_deserialize_cheap (&ctx->state, state_data);
-                if (!ta_cndfs_subsumed(ctx, NULL, LM_RED)) {
+                if (!ta_cndfs_subsumed(ctx, &ctx->state, LM_RED)) {
                     nonred++;
                 }
             }
@@ -3249,7 +3250,7 @@ ta_cndfs_handle_nonseed_accepting (wctx_t *ctx)
     while ( dfs_stack_size(ctx->in_stack) ) {
         raw_data_t state_data = dfs_stack_pop (ctx->in_stack);
         state_info_deserialize_cheap (&ctx->state, state_data);
-        ta_cndfs_mark (ctx, LM_RED);
+        ta_cndfs_mark (ctx, &ctx->state, LM_RED);
         //remove_state (ctx->pink, &ctx->state);
     }
     if (pre)
@@ -3266,8 +3267,8 @@ ta_cndfs_handle_red (void *arg, state_info_t *successor, transition_info_t *ti, 
     /* Find cycle back to the seed */
     if ( ta_cndfs_has_state(ctx->cyan, successor, false) )
         ndfs_report_cycle (ctx, successor);
-    if ( !ta_cndfs_has_state(ctx->pink, successor, false) &&
-         !ta_cndfs_subsumed(ctx, NULL, LM_RED) ) {
+    if ( !ta_cndfs_has_state(ctx->pink, successor, false) //&&
+         /*!ta_cndfs_subsumed(ctx, successor, LM_RED)*/ ) {
         raw_data_t stack_loc = dfs_stack_push (ctx->stack, NULL);
         state_info_serialize (successor, stack_loc);
     }
@@ -3326,7 +3327,7 @@ ta_cndfs_red (wctx_t *ctx, ref_t seed, lattice_t l_seed)
         raw_data_t          state_data = dfs_stack_top (ctx->stack);
         if (NULL != state_data) {
             state_info_deserialize (&ctx->state, state_data, ctx->store);
-            if ( !ta_cndfs_subsumed(ctx, NULL, LM_RED) &&
+            if ( !ta_cndfs_subsumed(ctx, &ctx->state, LM_RED) &&
                  !ta_cndfs_has_state(ctx->pink, &ctx->state, true) ) {
                 dfs_stack_push (ctx->in_stack, state_data);
                 if ( ctx->state.ref != seed && ctx->state.lattice != l_seed &&
@@ -3359,14 +3360,14 @@ ta_cndfs_blue (wctx_t *ctx)
         raw_data_t          state_data = dfs_stack_top (ctx->stack);
         if (NULL != state_data) {
             state_info_deserialize (&ctx->state, state_data, ctx->store);
-            if ( !ta_cndfs_subsumed(ctx, NULL, LM_BLUE) &&
+            if ( !ta_cndfs_subsumed(ctx, &ctx->state, LM_BLUE) &&
                  !ta_cndfs_has_state(ctx->cyan, &ctx->state, true) ) {
                 if (all_red)
                     bitvector_set (&ctx->all_red, ctx->counters.level_cur);
                 ta_cndfs_explore_state_blue (ctx, &ctx->counters);
             } else {
                 if ( all_red && ctx->counters.level_cur != 0 &&
-                     !ta_cndfs_subsumed(ctx, NULL, LM_RED) )
+                     !ta_cndfs_subsumed(ctx, &ctx->state, LM_RED) )
                     bitvector_unset (&ctx->all_red, ctx->counters.level_cur - 1);
                 dfs_stack_pop (ctx->stack);
             }
@@ -3385,16 +3386,16 @@ ta_cndfs_blue (wctx_t *ctx)
             state_info_deserialize (&ctx->state, state_data, ctx->store);
             ta_cndfs_remove_state (ctx->cyan, &ctx->state);
             /* Mark state BLUE on backtrack */
-            ta_cndfs_mark (ctx, LM_BLUE);
+            ta_cndfs_mark (ctx, &ctx->state, LM_BLUE);
             if ( all_red && bitvector_is_set(&ctx->all_red, ctx->counters.level_cur) ) {
                 /* all successors are red */
                 //permute_trans (ctx->permute, &ctx->state, check, ctx);
-                ta_cndfs_mark (ctx, LM_RED); // TODO: allred count
+                ta_cndfs_mark (ctx, &ctx->state, LM_RED); // TODO: allred count
             } else if ( GBbuchiIsAccepting(ctx->model, ctx->state.data) ) {
                 ta_cndfs_red (ctx, ctx->state.ref, ctx->state.lattice);
                 ta_cndfs_handle_nonseed_accepting (ctx);
             } else if (all_red && ctx->counters.level_cur > 0 &&
-                       !ta_cndfs_subsumed(ctx, NULL, LM_RED) ) {
+                       !ta_cndfs_subsumed(ctx, &ctx->state, LM_RED) ) {
                 /* unset the all-red flag (only for non-initial nodes) */
                 bitvector_unset (&ctx->all_red, ctx->counters.level_cur - 1);
             }
