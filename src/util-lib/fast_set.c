@@ -281,6 +281,7 @@ fset_create (size_t data_length, size_t init_size, size_t max_size)
     dbs->probes = 0;
     dbs->timer = RTcreateTimer ();
     //fset_clear (dbs); // mallocZero
+    max_size = (size_t)fset_resize_names[0]; // avoid warning unused
     return dbs;
 }
 

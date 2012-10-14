@@ -804,7 +804,7 @@ postlocal_global_init (wctx_t *ctx)
             global->lmap = lm_create (W, 1UL<<dbs_size, LATTICE_BLOCK_SIZE);
         global->lb = lb_create_max (W, G, H);
         global->contexts = RTmalloc (sizeof (wctx_t*[W]));
-        global->threshold = strategy[0] & Strat_LTL ? THRESHOLD : THRESHOLD / W;
+        global->threshold = strategy[0] & Strat_NDFS ? THRESHOLD : THRESHOLD / W;
         RTswitchAlloc (false);
     }
     HREbarrier (HREglobal());
@@ -980,23 +980,17 @@ print_state_space_total (char *name, counter_t *cnt)
 }
 
 static inline void
-maybe_report (counter_t *cnt, char *msg, size_t *threshold)
+maybe_report (counter_t *cnt, char *msg)
 {
-    if (!log_active(info) || cnt->explored < *threshold)
+    if (!log_active(info) || cnt->explored < global->threshold)
         return;
-    if (!cas (threshold, *threshold, *threshold << 1))
+    if (!cas (&global->threshold, global->threshold, global->threshold << 1))
         return;
     if (W == 1 || (strategy[0] & Strat_LTL))
         print_state_space_total (msg, cnt);
     else
         Warning (info, "%s%zu levels ~%zu states ~%zu transitions", msg,
                  cnt->level_max, W * cnt->explored,  W * cnt->trans);
-}
-
-static inline void
-ndfs_maybe_report (char *prefix, counter_t *cnt)
-{
-    maybe_report (cnt, prefix, &global->threshold);
 }
 
 static void
@@ -1717,7 +1711,7 @@ ndfs_explore_state_red (wctx_t *ctx)
     increase_level (cnt);
     ctx->permute->permutation = permutation_red;
     cnt->trans += permute_trans (ctx->permute, &ctx->state, ndfs_red_handle, ctx);
-    ndfs_maybe_report ("[R] ", cnt);
+    maybe_report (cnt, "[R] ");
 }
 
 static inline void
@@ -1729,7 +1723,7 @@ ndfs_explore_state_blue (wctx_t *ctx)
     ctx->permute->permutation = permutation;
     cnt->trans += permute_trans (ctx->permute, &ctx->state, ndfs_blue_handle, ctx);
     cnt->explored++;
-    ndfs_maybe_report ("[B] ", cnt);
+    maybe_report (cnt, "[B] ");
 }
 
 /* NNDFS dfs_red */
@@ -2069,7 +2063,7 @@ endfs_explore_state_red (wctx_t *ctx, counter_t *cnt)
     increase_level (cnt);
     ctx->permute->permutation = permutation_red;
     cnt->trans += permute_trans (ctx->permute, &ctx->state, endfs_handle_red, ctx);
-    ndfs_maybe_report ("[R] ", cnt);
+    maybe_report (cnt, "[R] ");
 }
 
 static inline void
@@ -2080,7 +2074,7 @@ endfs_explore_state_blue (wctx_t *ctx, counter_t *cnt)
     ctx->permute->permutation = permutation;
     cnt->trans += permute_trans (ctx->permute, &ctx->state, endfs_handle_blue, ctx);
     cnt->explored++;
-    ndfs_maybe_report ("[B] ", cnt);
+    maybe_report (cnt, "[B] ");
 }
 
 /* ENDFS dfs_red */
@@ -2396,7 +2390,7 @@ explore_state (wctx_t *ctx, raw_data_t state, int next_index)
     }
     if (0 == next_index) // last (grey) call with this state
         deadlock_detect (ctx, count);
-    maybe_report (&ctx->counters, "", &global->threshold);
+    maybe_report (&ctx->counters, "");
     return i;
 }
 
@@ -2711,7 +2705,7 @@ owcty_reachability (wctx_t *ctx)
                 dfs_stack_push (ctx->out_stack, state_data);
             ctx->counters.visited += ctx->state.accepting | ctx->state.pred;
             permute_trans (ctx->permute, &ctx->state, owcty_reachability_handle, ctx);
-            maybe_report (&ctx->counters, "", &global->threshold);
+            maybe_report (&ctx->counters, "");
             ctx->counters.explored++;
         } else {
             if (0 == dfs_stack_nframes (ctx->stack)) {
@@ -2799,7 +2793,7 @@ owcty_elimination (wctx_t *ctx)
             increase_level (&ctx->counters);
             state_info_deserialize (&ctx->state, state_data, ctx->store);
             permute_trans (ctx->permute, &ctx->state, owcty_elimination_handle, ctx);
-            maybe_report (&ctx->counters, "", &global->threshold);
+            maybe_report (&ctx->counters, "");
             ctx->counters.explored++;
         } else {
             if (0 == dfs_stack_nframes (ctx->stack))
@@ -3021,7 +3015,7 @@ ta_explore_state (wctx_t *ctx)
     count = permute_trans (ctx->permute, &ctx->state,
                            NONBLOCKING ? ta_handle_nb : ta_handle, ctx);
     deadlock_detect (ctx, count);
-    maybe_report (&ctx->counters, "", &global->threshold);
+    maybe_report (&ctx->counters, "");
     ctx->counters.explored++;
 }
 
@@ -3368,7 +3362,7 @@ ta_cndfs_explore_state_red (wctx_t *ctx, counter_t *cnt)
     ctx->permute->permutation = permutation_red;
     cnt->trans += permute_trans (ctx->permute, &ctx->state, ta_cndfs_handle_red, ctx);
     cnt->explored++;
-    ndfs_maybe_report ("[R] ", cnt);
+    maybe_report (cnt, "[R] ");
 }
 
 static inline void
@@ -3379,7 +3373,7 @@ ta_cndfs_explore_state_blue (wctx_t *ctx, counter_t *cnt)
     ctx->permute->permutation = permutation;
     cnt->trans += permute_trans (ctx->permute, &ctx->state, ta_cndfs_handle_blue, ctx);
     cnt->explored++;
-    ndfs_maybe_report ("[B] ", cnt);
+    maybe_report (cnt, "[B] ");
 }
 
 /* ENDFS dfs_red */
