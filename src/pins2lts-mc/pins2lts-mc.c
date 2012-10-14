@@ -836,7 +836,7 @@ statics_init (model_t model)
     W = HREpeers(HREglobal());
     if (Perm_Unknown == permutation) //default permutation depends on strategy
         permutation = strategy[0] & Strat_Reach ? Perm_None :
-                      (strategy[0] & Strat_TA ? Perm_Random : Perm_Dynamic);
+                      (strategy[0] & Strat_TA ? Perm_RR : Perm_Dynamic);
     if (Perm_None != permutation) {
          if (call_mode == UseGreyBox)
             Abort ("Greybox not supported with state permutation.");
@@ -1322,7 +1322,8 @@ permute_free (permute_t *perm)
             RTfree (perm->rand[i]);
         RTfree (perm->rand);
     }
-    if (((Perm_SR | Perm_RR) & perm->permutation) || Perm_Dynamic == perm->permutation) {
+    if ( Perm_RR == perm->permutation || Perm_SR == perm->permutation ||
+         Perm_Dynamic == perm->permutation ) {
         RTfree (perm->rand[0]);
         RTfree (perm->rand);
     }
