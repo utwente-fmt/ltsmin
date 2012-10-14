@@ -163,10 +163,10 @@ lm_set_int (lm_loc_t location, lm_internal_t internal)
 }
 
 static inline void
-lm_set_int2 (lm_loc_t location, lm_store_t store, lm_internal_t internal)
+lm_set_int2 (lm_loc_t location, lm_store_t *store, lm_internal_t internal)
 {
-    store.internal = internal;
-    atomic_write ((size_t *)location, stoi(&store));
+    store->internal = internal;
+    atomic_write ((size_t *)location, stoi(store));
 }
 
 /**
@@ -249,7 +249,7 @@ lm_cas_all (lm_loc_t location, lm_store_t old, lattice_t l,
 
 lm_loc_t
 lm_insert_from_cas (lm_t *map, ref_t k, lattice_t l,
-                lm_status_t status, lm_loc_t *start)
+                    lm_status_t status, lm_loc_t *start)
 {
     HREassert (l < 1UL << LATTICE_BITS, "Lattice pointer does not fit in store!");
     HREassert (k < map->size, "Lattice map size does not match |ref_t|.");
@@ -257,7 +257,7 @@ lm_insert_from_cas (lm_t *map, ref_t k, lattice_t l,
     lm_store_t store = lm_get_store (loc);
     lm_store_t *s_loc = (lm_store_t *)loc;
     if (map->table <= s_loc && s_loc < map->table_end && LM_STATUS_EMPTY == store.internal)
-        lm_set_int2 (loc, store, LM_STATUS_END); //this table part is a map!
+        lm_set_int2 (loc, &store, LM_STATUS_END); //this table part is a map!
         // can be done with write, since all workers will do this first on this location
     lm_loc_t next;
     while (true) {
@@ -305,7 +305,7 @@ lm_insert_from (lm_t *map, ref_t k, lattice_t l,
     lm_store_t store = lm_get_store (loc);
     lm_store_t *s_loc = (lm_store_t *)loc;
     if (map->table <= s_loc && s_loc < map->table_end && LM_STATUS_EMPTY == store.internal)
-        lm_set_int2 (loc, store, LM_STATUS_END); //this table part is a map!
+        lm_set_int2 (loc, &store, LM_STATUS_END); //this table part is a map!
     lm_loc_t next;
     while (true) {
         switch (store.internal) {
@@ -413,7 +413,7 @@ void
 lm_cas_delete (lm_t *map, lm_loc_t location, lattice_t l, lm_status_t status)
 {
     location = follow (location);
-    lm_store_t store = lm_get_store(location);
+    lm_store_t store = lm_get_store (location);
     if (store.lattice != l || store.status != status)
         return;
     lm_store_t store_new = store;
@@ -436,12 +436,14 @@ void
 lm_delete (lm_t *map, lm_loc_t location)
 {
     location = follow (location);
-    lm_store_t store = lm_get_store(location);
+    lm_store_t store = lm_get_store (location);
     switch (store.internal) {
     case LM_STATUS_LATTICE:
-        lm_set_int2 (location, store, LM_STATUS_TOMBSTONE); break;
+        lm_set_int2 (location, &store, LM_STATUS_TOMBSTONE);
+        break;
     case LM_STATUS_LATTICE_END:
-        lm_set_int2 (location, store, LM_STATUS_TOMBSTONE_END); break;
+        lm_set_int2 (location, &store, LM_STATUS_TOMBSTONE_END);
+        break;
     default:
         Abort ("Deleting non-lattice from lattice map.");
     }
