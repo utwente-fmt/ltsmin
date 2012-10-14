@@ -3127,7 +3127,7 @@ ta_cndfs_covered (void *arg, lattice_t l, lm_status_t status, lm_loc_t loc)
     int subsumption = (blue_subsumption && color == LM_BLUE) ||
                       (red_subsumption && color == LM_RED);
     int *sigma = (int*)&ctx->successor->lattice;
-    if ( status == color && (
+    if ( (status & color) && (
          (subsumption && GBisCoveredByShort(ctx->model, sigma, (int*)&l)) ||
          (!subsumption && ctx->successor->lattice == l) ) ) {
         ctx->done = 1;
@@ -3171,8 +3171,8 @@ ta_cndfs_spray (void *arg, lattice_t l, lm_status_t status, lm_loc_t loc)
         }
     } else {
         if ( ctx->successor->lattice == l ) {
-            if (status != color)
-                lm_set_status (global->lmap, loc, color);
+            if ((status & color) == 0)
+                lm_set_status (global->lmap, loc, status | color);
             ctx->done = 1;
             return LM_CB_STOP;
         }
