@@ -5,6 +5,7 @@
  *      Author: kant
  */
 #include <assert.h>
+#include <inttypes.h>
 
 #include <util-lib/simplemap.h>
 #include <util-lib/fast_hash.h>
@@ -115,7 +116,7 @@ uint32_t simplemap_get(map_t map, uint32_t key)
 */
 map64_t simplemap64_create(uint64_t size)
 {
-    Print(infoLong, "Creating map of size %d.", size);
+    Print(infoLong, "Creating map of size %"PRIu64, size);
     map64_t map;
     map.values = RTmalloc(size*sizeof(entry64_t));
     for(size_t i = 0; i < size; i++)
@@ -162,7 +163,7 @@ bool simplemap64_put(map64_t map, uint64_t key, uint64_t value)
         }
         if (loc==l)
         {
-            Print(infoLong, "simplemap_put: loc=%d, c=%d.", loc, c);
+            Print(infoLong, "simplemap_put: loc=%"PRIu64", c=%"PRIu64".", loc, c);
             Abort("Map is full.");
         }
         c++;

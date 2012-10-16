@@ -238,7 +238,7 @@ static lts_file_t vector_open_old(stream_t ds,char* description,archive_t archiv
                 DSreadU32(fifo);
             }
         }
-        if (FIFOsize(fifo)) Abort("Too much data in initial state (%d bytes)",FIFOsize(fifo));
+        if (FIFOsize(fifo)) Abort("Too much data in initial state (%zu bytes)",FIFOsize(fifo));
     }
     N=DSreadVL(ds);
     lts_type_t ltstype;
@@ -247,7 +247,7 @@ static lts_file_t vector_open_old(stream_t ds,char* description,archive_t archiv
         DSread(ds,data,N);
         DSwrite(fifo,data,N);
         ltstype=lts_type_deserialize(fifo);
-        if (FIFOsize(fifo)) Abort("Too much data in lts type (%d bytes)",FIFOsize(fifo));
+        if (FIFOsize(fifo)) Abort("Too much data in lts type (%zu bytes)",FIFOsize(fifo));
         if (description[0]=='-') lts_type_set_state_length(ltstype,0);
     }
     lts_file_t file=lts_file_bare(arch_name(archive),ltstype,segment_count,NULL,sizeof(struct lts_file_s));
@@ -270,7 +270,7 @@ static lts_file_t vector_open_old(stream_t ds,char* description,archive_t archiv
             Debug("segment %d has %u edges",i,tmp);
             lts_set_edge_count(file,i,tmp);
         }
-        if (FIFOsize(fifo)) Abort("Too much data in state and transition counts (%d bytes)",FIFOsize(fifo));
+        if (FIFOsize(fifo)) Abort("Too much data in state and transition counts (%zu bytes)",FIFOsize(fifo));
     }
     Debug("getting compression tree");
     N=DSreadVL(ds);
@@ -370,7 +370,7 @@ lts_file_t vector_open(archive_t archive){
         Debug("deserialize type pre");
         ltstype=lts_type_deserialize(fifo);
         Debug("deserialize type post");
-        if (FIFOsize(fifo)) Abort("Too much data in lts type (%d bytes)",FIFOsize(fifo));
+        if (FIFOsize(fifo)) Abort("Too much data in lts type (%zu bytes)",FIFOsize(fifo));
     }
     lts_file_t file;
     Debug("getting state format info");
@@ -429,7 +429,7 @@ lts_file_t vector_open(archive_t archive){
             Abort("illegal dest mode %s",tmp);
         }
         RTfree(tmp);
-        if (FIFOsize(fifo)) Abort("Too much data in lts layout description (%d bytes)",FIFOsize(fifo));
+        if (FIFOsize(fifo)) Abort("Too much data in lts layout description (%zu bytes)",FIFOsize(fifo));
     }
     Debug("getting counts");
     N=DSreadVL(ds);
@@ -460,7 +460,7 @@ lts_file_t vector_open(archive_t archive){
             uint32_t tmp=DSreadU32(fifo);
             lts_set_expected_value_count(file,i,tmp);
         }
-        if (FIFOsize(fifo)) Abort("Too much data in state and transition counts (%d bytes)",FIFOsize(fifo));
+        if (FIFOsize(fifo)) Abort("Too much data in state and transition counts (%zu bytes)",FIFOsize(fifo));
     }
     Debug("getting compression tree");
     N=DSreadVL(ds);

@@ -2006,7 +2006,7 @@ parity_game* compute_symbolic_parity_game(vset_t visited, int* src)
             vset_count(g->v_player[p], &n_count, &elem_count);
             bn_int2string(s, size, &elem_count);
             bn_clear(&elem_count);
-            Print(infoShort, "player %d: %d nodes, %s elements.", p, n_count, s);
+            Print(infoShort, "player %d: %ld nodes, %s elements.", p, n_count, s);
         }
         for(int p = min_priority; p <= max_priority; p++)
         {
@@ -2017,7 +2017,7 @@ parity_game* compute_symbolic_parity_game(vset_t visited, int* src)
             vset_count(g->v_priority[p], &n_count, &elem_count);
             bn_int2string(s, size, &elem_count);
             bn_clear(&elem_count);
-            Print(infoShort, "priority %d: %d nodes, %s elements.", p, n_count, s);
+            Print(infoShort, "priority %d: %ld nodes, %s elements.", p, n_count, s);
         }
     }
     for(int i = 0; i < nGrps; i++)

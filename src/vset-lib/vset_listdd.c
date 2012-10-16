@@ -1,6 +1,7 @@
 #include <hre/config.h>
 
 #include <assert.h>
+#include <inttypes.h>
 #include <stdint.h>
 #include <stdlib.h>
 
@@ -718,7 +719,7 @@ mdd_save_bin(FILE* f, uint32_t mdd)
 {
     stream_t s = stream_output(f);
     uint64_t n_count = (uint64_t)mdd_node_count(mdd);
-    Print(infoLong,"mdd_save: %u / %u (%.0f\%)", n_count, mdd_nodes, 100*(((float)n_count)/(float)mdd_nodes));
+    Print(infoLong,"mdd_save: %"PRIu64" / %u (%.0f%%)", n_count, mdd_nodes, 100*(((float)n_count)/(float)mdd_nodes));
     DSwriteU64(s, n_count);
     mdd_mark(mdd);
     map_t node_map = simplemap_create(n_count * 1.1 + 2);

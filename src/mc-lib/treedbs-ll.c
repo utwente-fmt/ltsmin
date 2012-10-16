@@ -436,7 +436,7 @@ create_nodes (node_table_t *nodes, size_t log_size, size_t sat_bits, int alloc,
     if (alloc) {
         nodes->table = RTalignZero (CACHE_LINE_SIZE, sizeof (uint64_t) * nodes->size);
         if (!nodes->table) {
-            Abort ("Too large hash table allocated: %.1f GB", (sizeof (uint64_t) * nodes->size/1024/1024/1024));
+            Abort ("Too large hash table allocated: %.1f GB", ((float)sizeof (uint64_t) * nodes->size/1024/1024/1024));
         }
     }
 }

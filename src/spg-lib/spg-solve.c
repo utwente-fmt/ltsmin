@@ -398,7 +398,7 @@ recursive_result spg_solve_recursive(parity_game* g,  const spgsolver_options* o
         vset_count(g->v, &n_count, &elem_count);
         bn_clear(&elem_count);
         Print(infoLong, "");
-        Print(infoLong, "solve_recursive: game has %d nodes", n_count);
+        Print(infoLong, "solve_recursive: game has %ld nodes", n_count);
         report_game(g);
     }
 
@@ -453,7 +453,7 @@ recursive_result spg_solve_recursive(parity_game* g,  const spgsolver_options* o
                     bn_int2string(s, size, &elem_count);
                     bn_clear(&elem_count);
                     //Print(infoLong, "player[%d] - prev(V) = %d", 1-p, n_count);
-                    Print(infoLong, "%s deadlock states (%d nodes) with result '%s' (p=%d).", s, n_count, ((p==0)?"false":"true"), p);
+                    Print(infoLong, "%s deadlock states (%ld nodes) with result '%s' (p=%d).", s, n_count, ((p==0)?"false":"true"), p);
                 }
                 have_deadlock_states[p] = true;
             }
@@ -512,7 +512,7 @@ recursive_result spg_solve_recursive(parity_game* g,  const spgsolver_options* o
             vset_destroy(deadlock_states[p]);
         }
 
-        Print(infoLong, "m = %d, u has %d nodes.", m, n_count);
+        Print(infoLong, "m = %d, u has %ld nodes.", m, n_count);
     }
 
     // partial hibernate/swap parity game here: Save priorities to disk.

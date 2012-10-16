@@ -1274,7 +1274,7 @@ void tableaux_print(tableaux_t *t)
     int stop = start;
     tableaux_print_compressed(&t->root, 0, &start, &stop);
     for(int i=0; i <= max_level; i++) {
-        Warning(info, tableaux_lines[i]);
+        Warning(info, "%s", tableaux_lines[i]);
     }
     destroy_manager(line_man);
 }

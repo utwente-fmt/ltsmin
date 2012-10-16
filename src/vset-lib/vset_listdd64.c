@@ -1,8 +1,7 @@
 #include <config.h>
 
-#define __STDC_FORMAT_MACROS
-#include <inttypes.h>
 #include <assert.h>
+#include <inttypes.h>
 #include <stdint.h>
 #include <stdlib.h>
 
@@ -129,7 +128,7 @@ mdd64_create_stack()
 {
     stack_size = fib(stack_fib);
     mdd_stack = RTmalloc(sizeof(uint64_t[stack_size]));
-    Warning(info, "initial stack size %u", stack_size);
+    Warning(info, "initial stack size %"PRIu64, stack_size);
 }
 
 static void
@@ -143,7 +142,7 @@ mdd64_push(uint64_t mdd)
 
         mdd_stack = RTrealloc(mdd_stack, sizeof(uint64_t[stack_size_new]));
         stack_size = stack_size_new;
-        Warning(debug, "new stack size %u", stack_size);
+        Warning(debug, "new stack size %"PRIu64"", stack_size);
     }
     mdd_stack[mdd_top]=mdd;
     mdd_top++;
@@ -224,7 +223,7 @@ static void mdd64_collect(uint64_t a,uint64_t b){
     for(uint64_t i=0;i<mdd_load_node_count;i++){
         mdd64_mark(mdd_load_node_ids[i]);
     }
-    Warning(debug, "ListDD garbage collection: %u of %u nodes used",
+    Warning(debug, "ListDD garbage collection: %"PRIu64" of %"PRIu64" nodes used",
             mdd_used, mdd_nodes);
     int resize=0;
     // The two assignments below are not needed, but silence compiler warnings
@@ -245,7 +244,7 @@ static void mdd64_collect(uint64_t a,uint64_t b){
             Warning(debug, "op cache reached maximum size");
             new_cache_size = UINT64_MAX;
         }
-        Warning(debug, "new op cache has %u entries", new_cache_size);
+        Warning(debug, "new op cache has %"PRIu64" entries", new_cache_size);
     }
     for(uint64_t i=0;i<cache_size;i++){
         uint64_t slot,arg1,arg2,res; uint32_t op;
@@ -316,7 +315,7 @@ static void mdd64_collect(uint64_t a,uint64_t b){
             unique_table[i]=mdd64_sweep_bucket(unique_table[i]);
         }
     } else {
-        Warning(debug,"copied %u op cache nodes",copy_count);
+        Warning(debug,"copied %"PRIu64" op cache nodes",copy_count);
         RTfree(op_cache);
         op_cache=new_cache;
         cache_size=new_cache_size;
@@ -356,7 +355,7 @@ static void mdd64_collect(uint64_t a,uint64_t b){
                 free_node=i;
             }
         }
-        Warning(debug,"node/unique tables have %u/%u entries",mdd_nodes,uniq_size);
+        Warning(debug,"node/unique tables have %"PRIu64"/%"PRIu64" entries",mdd_nodes,uniq_size);
     }
 }
 
@@ -652,7 +651,7 @@ mdd64_save_bin(FILE* f, uint64_t mdd)
 {
     stream_t s = stream_output(f);
     uint64_t n_count = mdd64_node_count(mdd);
-    Print(infoLong,"mdd_save: %" PRIu64 " / %" PRIu64 " (%.0f\%)", n_count, mdd_nodes, 100*(((float)n_count)/(float)mdd_nodes));
+    Print(infoLong,"mdd_save: %" PRIu64 " / %" PRIu64 " (%.0f%%)", n_count, mdd_nodes, 100*(((float)n_count)/(float)mdd_nodes));
     DSwriteU64(s, n_count);
     mdd64_mark(mdd);
     map64_t node_map = simplemap64_create(n_count * 1.1 + 2);
@@ -1546,11 +1545,11 @@ vdom_t vdom_create_list64_native(int n){
     vdom_init_shared(dom,n);
     if (unique_table==NULL) {
         mdd_nodes=(nodes_fib <= FIB_MAX)?fib(nodes_fib):UINT64_MAX;
-        Warning(info,"initial node table has %u entries",mdd_nodes);
+        Warning(info,"initial node table has %"PRIu64" entries",mdd_nodes);
         uniq_size=(nodes_fib + 1 <= FIB_MAX)?fib(nodes_fib+1):UINT64_MAX;
-        Warning(info,"initial uniq table has %u entries",uniq_size);
+        Warning(info,"initial uniq table has %"PRIu64" entries",uniq_size);
         cache_size=(nodes_fib+cache_fib <= FIB_MAX)?fib(nodes_fib+cache_fib):UINT64_MAX;
-        Warning(info,"initial op cache has %u entries",cache_size);
+        Warning(info,"initial op cache has %"PRIu64" entries",cache_size);
 
         unique_table=RTmalloc(uniq_size*sizeof(uint64_t));
         node_table=RTmalloc(mdd_nodes*sizeof(struct mdd_node));

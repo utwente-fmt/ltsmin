@@ -1775,10 +1775,10 @@ main (int argc, char *argv[])
     global.N=lts_type_get_state_length(ltstype);
     global.K=dm_nrows(GBgetDMInfo(opt.model));
     global.T=lts_type_get_type_count(ltstype);
-    Warning(info,"length is %d, there are %d groups",global.N,global.K);
+    Warning(info,"length is %zu, there are %zu groups",global.N,global.K);
     global.state_labels=lts_type_get_state_label_count(ltstype);
     global.edge_labels=lts_type_get_edge_label_count(ltstype);
-    Warning(info,"There are %d state labels and %d edge labels",global.state_labels,global.edge_labels);
+    Warning(info,"There are %zu state labels and %zu edge labels",global.state_labels,global.edge_labels);
 
     int src[global.N];
     GBgetInitialState(opt.model,src);

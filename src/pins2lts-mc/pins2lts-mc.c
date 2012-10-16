@@ -266,12 +266,12 @@ print_setup ()
 {
     if ((strategy[0] & Strat_LTL) && call_mode == UseGreyBox)
         Warning(info, "Greybox not supported with strategy NDFS, ignored.");
-    Warning (info, "Using %d %s (lb: SRP, strategy: %s)", W,
+    Warning (info, "Using %zu %s (lb: SRP, strategy: %s)", W,
              W == 1 ? "core (sequential)" : (SPEC_MT_SAFE ? "threads" : "processes"),
              key_search(strategies, strategy[0]));
     Warning (info, "loading model from %s", files[0]);
-    Warning (info, "There are %d state labels and %d edge labels", SL, EL);
-    Warning (info, "State length is %d, there are %d groups", N, K);
+    Warning (info, "There are %zu state labels and %zu edge labels", SL, EL);
+    Warning (info, "State length is %zu, there are %zu groups", N, K);
     if (act_detect)
         Warning(info, "Detecting action \"%s\"", act_detect);
     if (db_type == HashTable) {

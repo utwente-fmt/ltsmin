@@ -162,7 +162,7 @@ new_map(void* context)
     cct_map_t *map = cont->map;
     pthread_rwlock_rdlock(&map->map_lock);
     if (cont->map_index >= MAX_TABLES)
-        Abort("Chunk table limit reached: %d.", MAX_TABLES);
+        Abort("Chunk table limit reached: %zu.", MAX_TABLES);
     table_t *table = &map->table[cont->map_index++];
     pthread_rwlock_unlock(&map->map_lock);
     if (!table->string_set) {
