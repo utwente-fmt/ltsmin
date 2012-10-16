@@ -107,6 +107,8 @@ extra_ASCIIDOC += inc/pbes-options.txt
 extra_ASCIIDOC += inc/spg-options.txt
 extra_ASCIIDOC += inc/spg-solve-options.txt
 
+extra_ASCIIDOC += inc/sylvan-options.txt
+
 EXTRA_DIST  = asciidoc.conf
 EXTRA_DIST += manpage-base.xsl
 EXTRA_DIST += manpage-normal.xsl
