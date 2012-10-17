@@ -2658,8 +2658,8 @@ owcty_map (wctx_t *ctx, state_info_t *successor)
     ref_t               map_pred = atomic_read (global->parent_ref+ctx->state.ref);
     if ( GBbuchiIsAccepting(ctx->model, get_state(successor->ref, ctx)) ) {
         if (successor->ref == ctx->state.ref || map_pred == successor->ref) {
-            //ndfs_report_cycle (ctx, successor);
-            Warning (info, "Cycle found");
+            ndfs_report_cycle (ctx, successor);
+            //Warning (info, "Cycle found");
         }
         size_t              num = successor->ref + 1;
         map_pred = max (num, map_pred);
@@ -2672,8 +2672,8 @@ owcty_ecd (wctx_t *ctx, state_info_t *successor)
 {
     uint32_t acc_level = ecd_get_state (ctx->cyan, successor);
     if (acc_level < ctx->red.level_cur) {
-        //ndfs_report_cycle (ctx, successor);
-        Warning (info, "Cycle found");
+        ndfs_report_cycle (ctx, successor);
+        //Warning (info, "Cycle found");
     }
 }
 
