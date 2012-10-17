@@ -690,16 +690,15 @@ wctx_create (model_t model, int depth, wctx_t *shared)
 
     //allocate two bits for NDFS colorings
     if (strategy[depth] & Strat_LTL) {
-        size_t local_bits = 2;
-        int res = bitvector_create (&ctx->color_map, local_bits<<dbs_size);
-        if (-1 == res) Abort ("Failure to allocate color bitvector.");
         if (strategy[0] & Strat_TA) {
-            ctx->cyan = fset_create (16, 10, 28);
-            ctx->pink = fset_create (16, 4, 28);
+            ctx->cyan = fset_create (16, 0, 10, 28);
+            ctx->pink = fset_create (16, 0, FSET_MIN_SIZE, 28);
         }
-        if ((Strat_NDFS | Strat_LNDFS | Strat_CNDFS | Strat_ENDFS) & strategy[depth]) {
-            res = bitvector_create (&ctx->all_red, MAX_STACK);
-            if (-1 == res) Abort ("Failure to allocate all-red bitvector.");
+        if (~Strat_OWCTY & strategy[depth]) {
+            size_t local_bits = 2;
+            int res = bitvector_create (&ctx->color_map, local_bits<<dbs_size);
+            res &= bitvector_create (&ctx->all_red, MAX_STACK);
+            if (-1 == res) Abort ("Failure to allocate a bitvector.");
         }
     }
 
@@ -724,9 +723,13 @@ wctx_free_rec (wctx_t *ctx, int depth)
     RTfree (ctx->store);
     RTfree (ctx->store2);
     if (strategy[depth] & Strat_LTL) {  
-        bitvector_free (&ctx->color_map);
-        if ((Strat_NDFS | Strat_LNDFS | Strat_CNDFS | Strat_ENDFS) & strategy[depth]) {
+        if (strategy[0] & Strat_TA) {
+            fset_free (ctx->cyan);
+            fset_free (ctx->pink);
+        }
+        if (~Strat_OWCTY & strategy[depth]) {
             bitvector_free (&ctx->all_red);
+            bitvector_free (&ctx->color_map);
         }
     }
     if (NULL != ctx->permute)
@@ -1217,18 +1220,16 @@ dyn_cmp (const void *a, const void *b, void *arg)
     int                *rand = *perm->rand;
     const permute_todo_t     *A = &perm->todos[*((int*)a)];
     const permute_todo_t     *B = &perm->todos[*((int*)b)];
-  
-    if (!(Strat_LTL & strategy[0]) || A->seen != B->seen) {
-        return B->seen - A->seen;
-    } else {
-        int Awhite = nn_color_eq(nn_get_color(&ctx->color_map, A->si.ref), NNWHITE);
-        int Bwhite = nn_color_eq(nn_get_color(&ctx->color_map, B->si.ref), NNWHITE);
-        int Aval = ((A->seen) << 1) | Awhite;
-        int Bval = ((B->seen) << 1) | Bwhite;
-        if (Aval == Bval)
-            return rand[A->ti.group] - rand[B->ti.group];
-        return Bval - Aval;
+
+    int Aval = A->seen;
+    int Bval = B->seen;
+    if ((Strat_LTL & ctx->strategy) && A->seen == B->seen) {
+        Aval = nn_color_eq(nn_get_color(&ctx->color_map, A->si.ref), NNWHITE);
+        Bval = nn_color_eq(nn_get_color(&ctx->color_map, B->si.ref), NNWHITE);
     }
+    if (Aval == Bval) // if dynamically no difference, then randomize:
+        return rand[A->ti.group] - rand[B->ti.group];
+    return Bval - Aval;
 }
 
 static inline void
@@ -2816,7 +2817,7 @@ static inline void
 owcty_progress_report (wctx_t *ctx, char *operation, size_t candidates)
 {
     if (0 != ctx->id) return;
-    Warning (info, "candidate set %s(%d):\t%zu (%.2f sec)", operation,
+    Warning (info, "candidate set %s(%zd):\t%zu (%.2f sec)", operation,
              ctx->iteration / 2 + 1, candidates, RTrealTime(ctx->timer2));
 }
 
@@ -3207,8 +3208,7 @@ ta_cndfs_has_state (fset_t *table, state_info_t *s, bool add_if_absent)
     struct val_s        state;
     state.ref = s->ref;
     state.lattice = s->lattice;
-    //hash32_t hash = (s->ref | (s->lattice >> 3));
-    int res = fset_find (table, NULL, &state, add_if_absent);
+    int res = fset_find (table, NULL, &state, NULL, add_if_absent);
     HREassert (res != FSET_FULL, "Cyan table full");
     return res;
 }
@@ -3219,7 +3219,6 @@ ta_cndfs_remove_state (fset_t *table, state_info_t *s)
     struct val_s        state;
     state.ref = s->ref;
     state.lattice = s->lattice;
-    //hash32_t hash = (s->ref | (s->lattice >> 3));
     int success = fset_delete (table, NULL, &state);
     HREassert (success, "Could not remove key from set");
 }

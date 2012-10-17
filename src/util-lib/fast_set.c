@@ -13,7 +13,9 @@
 typedef hash32_t mem_hash_t;
 
 struct fset_s {
+    size_t              key_length;
     size_t              data_length;
+    size_t              total_length;
     size_t              size;
     size_t              size3;
     size_t              init_size;
@@ -40,7 +42,6 @@ static const size_t CACHE_LINE_MEM_SIZE = CACHE_LINE_SIZE / sizeof (mem_hash_t);
 static const size_t CACHE_LINE_MEM_MASK = -(CACHE_LINE_SIZE / sizeof (mem_hash_t));
 
 #define EMPTY 0UL
-static const size_t CACHE_MEM = CACHE_LINE - 2; //log(sizeof (mem_hash_t)
 static const mem_hash_t FULL  = ((mem_hash_t)-1) ^ (((mem_hash_t)-1)>>1);// 1000
 static const mem_hash_t NFULL = ((mem_hash_t)-1) >> 1;                   // 0111
 static const mem_hash_t TOMB  = 1UL;                                     // 0001
@@ -55,7 +56,7 @@ memoized (const fset_t *dbs, size_t ref)
 static inline void *
 state (const fset_t *dbs, void *data, size_t ref)
 {
-    return ((char*)data) + (ref * dbs->data_length);
+    return ((char*)data) + (ref * dbs->total_length);
 }
 
 static const char *fset_resize_names[3] = { "Grow", "Shrink", "Rehash" };
@@ -69,7 +70,7 @@ typedef enum fset_resize_e {
 static int
 resize (fset_t *dbs, fset_resize_t mode)
 {
-    void               *data;
+    void               *key, *data;
     bool                res;
     if (dbs->resizing) return true;
     dbs->resizing = 1;
@@ -108,7 +109,7 @@ resize (fset_t *dbs, fset_resize_t mode)
         } else if (h != EMPTY) {// && (h & dbs->mask) != i) {
             dbs->todo[todos] = *memoized(dbs,i);
             void               *data = state(dbs, dbs->todo_data, todos);
-            memcpy (data, state(dbs, dbs->data, i), dbs->data_length);
+            memcpy (data, state(dbs, dbs->data, i), dbs->total_length);
             todos++;
         }
         *memoized(dbs, i) = EMPTY;
@@ -121,8 +122,9 @@ resize (fset_t *dbs, fset_resize_t mode)
 
     for (size_t i = 0; i < todos; i++) {
         mem_hash_t          h = dbs->todo[i] & NFULL;
-        data = state(dbs, dbs->todo_data, i);
-        res = fset_find (dbs, &h, data, true); // load++
+        key = state(dbs, dbs->todo_data, i);
+        data = key + dbs->key_length;
+        res = fset_find (dbs, &h, key, &data, true); // load++
         HREassert (!res);
         //HREassert (fset_find (dbs, &h, data, false));
         //HREassert (fset_find (dbs, &h, data, true));
@@ -142,14 +144,14 @@ resize (fset_t *dbs, fset_resize_t mode)
 static inline mem_hash_t
 rehash (mem_hash_t h, mem_hash_t v)
 {
-    return h + (primes[v & ((1<<9)-1)] << CACHE_MEM);
+    return h + (primes[v & ((1<<9)-1)] << FSET_MIN_SIZE);
 }
 
 static bool
 fset_find_loc (fset_t *dbs, mem_hash_t mem, void *data, size_t *ref,
                size_t *tomb)
 {
-    size_t              b = dbs->data_length;
+    size_t              b = dbs->key_length;
     mem |= FULL;
     if (tomb) *tomb = NONE;
     mem_hash_t          h = mem;
@@ -179,12 +181,12 @@ fset_find_loc (fset_t *dbs, mem_hash_t mem, void *data, size_t *ref,
 }
 
 bool
-fset_delete (fset_t *dbs, mem_hash_t *mem, void *data)
+fset_delete (fset_t *dbs, mem_hash_t *mem, void *key)
 {
     size_t              ref;
-    size_t              b = dbs->data_length;
-    mem_hash_t          h = (mem == NULL ? MurmurHash64(data, b, 0) : *mem);
-    bool found = fset_find_loc (dbs, h, data, &ref, NULL);
+    size_t              b = dbs->key_length;
+    mem_hash_t          h = (mem == NULL ? MurmurHash64(key, b, 0) : *mem);
+    bool found = fset_find_loc (dbs, h, key, &ref, NULL);
     if (!found)
         return false;
     *memoized(dbs,ref) = TOMB; // TODO: avoid TOMB when next in line is EMPTY
@@ -201,23 +203,33 @@ fset_delete (fset_t *dbs, mem_hash_t *mem, void *data)
 }
 
 int
-fset_find (fset_t *dbs, mem_hash_t *mem, void *data, bool insert_absert)
+fset_find (fset_t *dbs, mem_hash_t *mem, void *key, void **data,
+           bool insert_absert)
 {
     size_t              ref;
     size_t              tomb;
-    size_t              b = dbs->data_length;
-    mem_hash_t          h = (mem == NULL ? MurmurHash64(data, b, 0) : *mem);
-    bool found = fset_find_loc (dbs, h, data, &ref, &tomb);
+    size_t              k = dbs->key_length;
+    size_t              d = dbs->data_length;
+    mem_hash_t          h = (mem == NULL ? MurmurHash64(key, k, 0) : *mem);
+    bool found = fset_find_loc (dbs, h, key, &ref, &tomb);
+    void *data_res = state(dbs, dbs->data, ref) + k;
     if (!insert_absert || found) {
+        *data = data_res;
         return found;
     }
 
+    // insert:
+    HREassert (dbs->data_length == 0 || data);
     if (tomb != NONE) {
         ref = tomb;
         dbs->tombs--;
     }
-    if (dbs->data_length)
-        memcpy (state(dbs, dbs->data, ref), data, b);
+    if (dbs->key_length)
+        memcpy (state(dbs, dbs->data, ref), key, k);
+    if (dbs->data_length) {
+        memcpy (data_res, *data, d);
+        *data = data_res;
+    }
     *memoized(dbs, ref) = h | FULL;
     dbs->load++;
     dbs->max_load = max (dbs->max_load, dbs->load);
@@ -248,22 +260,25 @@ fset_clear (fset_t *dbs)
 }
 
 fset_t *
-fset_create (size_t data_length, size_t init_size, size_t max_size)
+fset_create (size_t key_length, size_t data_length, size_t init_size,
+             size_t max_size)
 {
     HREassert (true == 1);
     HREassert (false == 0);
     HREassert (sizeof(mem_hash_t) == 4);// CACHE_MEM
     HREassert (max_size < 32);          // FULL bit
     HREassert (init_size <= max_size);  // precondition
-    HREassert (init_size >= CACHE_MEM); // walk the line code
+    HREassert (init_size >= FSET_MIN_SIZE); // walk the line code
     fset_t           *dbs = RTalign (CACHE_LINE_SIZE, sizeof(fset_t));
+    dbs->key_length = key_length;
     dbs->data_length = data_length;
+    dbs->total_length = data_length + key_length;
     dbs->size_max = 1UL << max_size;
-    if (data_length)
-        dbs->data = RTalign (CACHE_LINE_SIZE, data_length * dbs->size_max);
+    if (dbs->total_length) {
+        dbs->data = RTalign (CACHE_LINE_SIZE, dbs->total_length * dbs->size_max);
+        dbs->todo_data = RTalign (CACHE_LINE_SIZE, dbs->total_length * dbs->size_max);
+    }
     dbs->hash = RTalignZero (CACHE_LINE_SIZE, sizeof(mem_hash_t) * dbs->size_max);
-    if (data_length)
-        dbs->todo_data = RTalign (CACHE_LINE_SIZE, data_length * dbs->size_max);
     dbs->todo = RTalign (CACHE_LINE_SIZE, 2 * sizeof(mem_hash_t) * dbs->size_max);
     dbs->init_size = 1UL<<init_size;
     dbs->init_size3 = dbs->init_size * 3;
@@ -291,7 +306,7 @@ fset_print_statistics (fset_t *dbs, char *s)
     Warning (info, "%s max load = %zu, max_size = %zu, scratch pad = %zu, "
              "resizes = %zu, probes/lookup = %.2f", s,
              dbs->max_load, dbs->max_grow, dbs->max_todos, dbs->resizes,
-             (float)dbs->probes / dbs->lookups, RTrealTime(dbs->timer));
+             (float)dbs->probes / dbs->lookups/*, RTrealTime(dbs->timer)*/);
 }
 
 size_t
@@ -304,7 +319,7 @@ fset_mem (fset_t *dbs)
 void
 fset_free (fset_t *dbs)
 {
-    free (dbs->data);
-    free (dbs->hash);
-    free (dbs);
+    RTfree (dbs->data);
+    RTfree (dbs->hash);
+    RTfree (dbs);
 }

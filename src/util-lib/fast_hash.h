@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 
+#include <mc-lib/trace.h>
 #include <util-lib/MurmurHash3.h>
 
 typedef uint32_t hash32_t;
@@ -22,6 +23,12 @@ extern uint32_t mix32 (uint32_t a);
 extern uint64_t mix64 (uint64_t a);
 
 extern int mix (int a, int b, int c);
+
+static inline hash64_t
+ref_hash (ref_t ref)
+{
+    return ref ^ (ref << 8); // extrapolate least significant bits
+}
 
 static inline uint64_t
 nbit_mix (uint64_t key, int bit_size) // assert bit_size <= 64
