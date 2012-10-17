@@ -259,7 +259,7 @@ static lts_file_t vector_open_old(stream_t ds,char* description,archive_t archiv
         DSread(ds,data,N);
         DSwrite(fifo,data,N);
         N=segment_count;
-        Debug("fifo now %d bytes for %d segments",FIFOsize(fifo),N);
+        Debug("fifo now %zu bytes for %d segments",FIFOsize(fifo),N);
         for(int i=0;i<N;i++){
             uint32_t tmp=DSreadU32(fifo);
             Debug("segment %d has %u states",i,tmp);
@@ -439,7 +439,7 @@ lts_file_t vector_open(archive_t archive){
         DSread(ds,data,N);
         DSwrite(fifo,data,N);
         N=segment_count;
-        Debug("fifo now %d bytes for %d segments",FIFOsize(fifo),N);
+        Debug("fifo now %zu bytes for %d segments",FIFOsize(fifo),N);
         {
             uint32_t tmp=DSreadU32(fifo);
             Debug("LTS has %u initial states",tmp);

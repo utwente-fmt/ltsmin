@@ -90,7 +90,7 @@ deadlock_detect (struct dist_thread_context *ctx, int *state, int count)
     if (count==0 && dlk_detect && !valid_end_state(ctx, state)){
         ctx->deadlocks++;
         if (no_exit) return;
-        Warning (info, "");
+        Warning (info, " ");
         Warning (info, "deadlock found at depth %zu", ctx->level);
         HREabort(LTSMIN_EXIT_COUNTER_EXAMPLE);
     }
@@ -103,7 +103,7 @@ invariant_detect (struct dist_thread_context *ctx, int *state)
     ctx->violations++;
     if (no_exit) return;
 
-    Warning (info, "");
+    Warning (info, " ");
     Warning (info, "Invariant violation (%s) found at depth %zu!", inv_detect, ctx->level);
     HREabort(LTSMIN_EXIT_COUNTER_EXAMPLE);
 }
@@ -114,7 +114,7 @@ action_detect (struct dist_thread_context *ctx, transition_info_t *ti)
     if (-1 == act_index || NULL == ti->labels || ti->labels[act_label] != act_index) return;
     ctx->errors++;
     if (no_exit) return;
-    Warning (info, "");
+    Warning (info, " ");
     Warning (info, "Error action '%s' found at depth %zu!", act_detect, ctx->level);
     HREabort(LTSMIN_EXIT_COUNTER_EXAMPLE);
 }

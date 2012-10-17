@@ -50,7 +50,7 @@ bool simplemap_put(map_t map, uint32_t key, uint32_t value)
     //Print(infoLong, "simplemap_put: key=%d, value=%d, loc=%d.", key, value, loc);
     uint32_t l = loc;
     uint32_t c = 0;
-    while (map.values[loc].value&0x80000000 && map.values[loc].key != key)
+    while ((map.values[loc].value & 0x80000000) && map.values[loc].key != key)
     {
         if (loc < map.size - 1)
         {
@@ -87,7 +87,7 @@ uint32_t simplemap_get(map_t map, uint32_t key)
 {
     uint32_t loc = hash(key) % map.size;
     uint32_t l = loc;
-    while (map.values[loc].value & 0x80000000 && map.values[loc].key != key)
+    while ((map.values[loc].value & 0x80000000) && map.values[loc].key != key)
     {
         if (loc < map.size - 1)
         {
@@ -151,7 +151,7 @@ bool simplemap64_put(map64_t map, uint64_t key, uint64_t value)
     //Print(infoLong, "simplemap_put: key=%d, value=%d, loc=%d.", key, value, loc);
     uint64_t l = loc;
     uint64_t c = 0;
-    while (map.values[loc].value&0x80000000 && map.values[loc].key != key)
+    while ((map.values[loc].value & 0x80000000) && map.values[loc].key != key)
     {
         if (loc < map.size - 1)
         {
@@ -188,7 +188,7 @@ uint64_t simplemap64_get(map64_t map, uint64_t key)
 {
     uint64_t loc = hash64(key) % map.size;
     uint64_t l = loc;
-    while (map.values[loc].value & 0x80000000 && map.values[loc].key != key)
+    while ((map.values[loc].value & 0x80000000) && map.values[loc].key != key)
     {
         if (loc < map.size - 1)
         {

@@ -990,12 +990,12 @@ print_statistics (counter_t *ar_reach, counter_t *ar_red, rt_timer_t timer,
     size_t lattices = reach->inserts - reach->updates;
     if (Strat_LTL & strategy[0]) {
         RTprintTimer (info, timer, "Total exploration time");
-        Warning (info, "");
+        Warning (info, " ");
         Warning (info, "State space has %zu states, %zu are accepting", db_elts,
                  red->visited);
         print_totals (ar_reach, ar_red, 0, db_elts);
         mem3 = ((double)(((((size_t)local_bits)<<dbs_size))/8*W)) / (1UL<<20);
-        Warning (info, "");
+        Warning (info, " ");
         Warning (info, "Total memory used for local state coloring: %.1fMB", mem3);
     } else {
         statistics_t state_stats; statistics_init (&state_stats);
@@ -1008,14 +1008,15 @@ print_statistics (counter_t *ar_reach, counter_t *ar_red, rt_timer_t timer,
             Warning (info, "mean standard work distribution: %.1f%% (states) %.1f%% (transitions)",
                      (100 * statistics_stdev(&state_stats) / statistics_mean(&state_stats)),
                      (100 * statistics_stdev(&trans_stats) / statistics_mean(&trans_stats)));
-        Warning (info, "");
+        Warning (info, " ");
         reach->level_max /= W;
         print_state_space_total ("State space has ", reach);
         RTprintTimer (info, timer, "Total exploration time");
         double time = RTrealTime (timer);
         Warning(info, "States per second: %.0f, Transitions per second: %.0f",
                 ar_reach->explored/time, ar_reach->trans/time);
-        Warning(info, "");
+
+        Warning(info, " ");
         if (Strat_TA & strategy[0]) {
             size_t alloc = lm_allocated (global->lmap);
             mem3 = ((double)(sizeof(lattice_t[alloc + db_elts]))) / (1<<20);
@@ -2233,9 +2234,9 @@ deadlock_detect (wctx_t *ctx, int count)
     if (count > 0 || valid_end_state(ctx, ctx->state.data)) return;
     ctx->counters.deadlocks++; // counting is costless
     if (dlk_detect && (!no_exit || trc_output) && lb_stop(global->lb)) {
-        Warning (info, "");
+        Warning (info, " ");
         Warning (info, "Deadlock found in state at depth %zu!", ctx->counters.level_cur);
-        Warning (info, "");
+        Warning (info, " ");
         handle_error_trace (ctx);
     }
 }
@@ -2246,9 +2247,9 @@ invariant_detect (wctx_t *ctx, raw_data_t state)
     if ( !inv_expr || eval_predicate(inv_expr, NULL, state) ) return;
     ctx->counters.violations++;
     if ((!no_exit || trc_output) && lb_stop(global->lb)) {
-        Warning (info, "");
+        Warning (info, " ");
         Warning (info, "Invariant violation (%s) found at depth %zu!", inv_detect, ctx->counters.level_cur);
-        Warning (info, "");
+        Warning (info, " ");
         handle_error_trace (ctx);
     }
 }
@@ -2263,9 +2264,9 @@ action_detect (wctx_t *ctx, transition_info_t *ti, state_info_t *successor)
         state_info_serialize (successor, data);
         dfs_stack_enter (ctx->stack);
         state_info_deserialize_cheap (&ctx->state, data); // used as last state
-        Warning (info, "");
+        Warning (info, " ");
         Warning (info, "Error action '%s' found at depth %zu!", act_detect, ctx->counters.level_cur);
-        Warning (info, "");
+        Warning (info, " ");
         handle_error_trace (ctx);
     }
 }

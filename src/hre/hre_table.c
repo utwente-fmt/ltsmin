@@ -92,7 +92,7 @@ static void put_at_chunk(value_table_t vt,chunk item,value_index_t index){
     if (HREme(vt->ctx)!=0) {
         Debug("validating at owner chunk %s at %u",item.data, index);
         if (vt->msg_pending) {
-            Debug("waiting for msg (%x/%d) %s",vt->msg_pending,vt->msg_pending,&vt->msg_pending);
+            Debug("waiting for msg (%x/%d) %s",vt->msg_pending,vt->msg_pending,vt->msg->buffer+4);
             HREyieldWhile(vt->ctx,&vt->msg_pending);
         }
         Debug("preparing message");
@@ -114,7 +114,7 @@ static value_index_t put_chunk(value_table_t vt,chunk item){
     if (res==SI_INDEX_FAILED) {
         Debug("looking up chunk %s",item.data);
         if (vt->msg_pending) {
-            Debug("waiting for msg (%x/%d) %s",vt->msg_pending,vt->msg_pending,&vt->msg_pending);
+            Debug("waiting for msg (%x/%d) %s",vt->msg_pending,vt->msg_pending,vt->msg->buffer+4);
             HREyieldWhile(vt->ctx,&vt->msg_pending);
         }
         Debug("preparing message");

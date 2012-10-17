@@ -1229,9 +1229,9 @@ do_trace(gsea_state_t *state, void *arg, char *type, char *name)
     if (opt.no_exit && !opt.trc_output) return;
     opt.threshold = global.visited-1;
     gc.report_progress(arg);
-    Warning (info, "");
+    Warning (info, " ");
     Warning (info, "%s (%s) found at depth %zu!", type, name, global.depth);
-    Warning (info, "");
+    Warning (info, " ");
     if (opt.trc_output && gc.goal_trace) gc.goal_trace(state, arg);
     Warning(info, "exiting now");
     HREabort(LTSMIN_EXIT_COUNTER_EXAMPLE);

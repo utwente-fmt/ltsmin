@@ -2220,10 +2220,10 @@ main (int argc, char *argv[])
             rt_timer_t pgsolve_timer = RTcreateTimer();
             RTstartTimer(pgsolve_timer);
             bool result = spg_solve(g, spg_options);
-            Warning(info, "");
+            Warning(info, " ");
             Warning(info, "The result is: %s", result ? "true":"false");
             RTstopTimer(pgsolve_timer);
-            Warning(info, "");
+            Warning(info, " ");
             RTprintTimer(info, timer, "generation took");
             RTprintTimer(info, pgsolve_timer, "solving took");
         }

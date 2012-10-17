@@ -61,7 +61,7 @@ static void report_game(const parity_game* g)
         long   total_count;
         long   n_count;
         char   elem_str[1024];
-        Warning(infoLong, "");
+        Warning(infoLong, " ");
         get_vset_size(g->v, &n_count, elem_str, sizeof(elem_str));
         total_count = n_count;
         Print(infoLong, "parity_game: g->v has %s elements (%ld nodes)", elem_str, n_count);
@@ -397,7 +397,7 @@ recursive_result spg_solve_recursive(parity_game* g,  const spgsolver_options* o
         bn_int_t elem_count;
         vset_count(g->v, &n_count, &elem_count);
         bn_clear(&elem_count);
-        Print(infoLong, "");
+        Print(infoLong, " ");
         Print(infoLong, "solve_recursive: game has %ld nodes", n_count);
         report_game(g);
     }

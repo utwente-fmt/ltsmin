@@ -204,7 +204,7 @@ static volatile entry_t *hti_lookup (hti_t *hti, map_key_t key, uint32_t key_has
 
 // Allocate and initialize a hti_t with 2^<scale> entries.
 static hti_t *hti_alloc (hashtable_t *parent, size_t scale) {
-    Debug ("initializing to %zu elements", 1ULL << scale);
+    Debug ("initializing to %llu elements", 1ULL << scale);
     hti_t *hti = (hti_t *)nbd_malloc(sizeof(hti_t));
     //memset(hti, 0, sizeof(hti_t)); // ensured by HREalignZero
     hti->scale = scale;
