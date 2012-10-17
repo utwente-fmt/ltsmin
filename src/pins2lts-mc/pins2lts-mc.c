@@ -476,16 +476,15 @@ struct thread_ctx_s {
     int                 rec_bits;       // bit depth of recursive ndfs
     ref_t               work;           // ENDFS work for loadbalancer
     int                 done;           // ENDFS done for loadbalancer
-    int                 subsumes;       //
-    lm_loc_t            added_at;       //
+    int                 subsumes;       // TA successor subsumes a state in LMAP
+    lm_loc_t            added_at;       // TA successor is added at location
     lm_loc_t            last;           // TA last tombstone location
-    rt_timer_t          timer;
-    rt_timer_t          timer2;
+    rt_timer_t          timer;          // Local exploration time timer
+    rt_timer_t          timer2;         // OWCTY extra timer
     stats_t            *stats;
-    fset_t             *cyan;
-    fset_t             *pink;
-    string_index_t      si;
-    uint32_t           *depth;
+    fset_t             *cyan;           // Cyan states for ta_cndfs or OWCTY_ECD
+    fset_t             *pink;           // Pink states for ta_cndfs
+    string_index_t      si;             // Trace index
     int                 flip;           // OWCTY invert state space bit
     ssize_t             iteration;
 };
@@ -671,12 +670,6 @@ wctx_create (model_t model, int depth, wctx_t *shared)
     ctx->id = HREme (HREglobal());
     ctx->strategy = strategy[depth];
     ctx->model = model;
-    if (strategy[1] & Strat_ECD) {
-        ctx->depth = RTmallocZero (sizeof(uint32_t[1UL<<dbs_size]));
-        for (size_t i = 0; i < 1UL<<dbs_size; i++) {
-            ctx->depth[i] = UINT32_MAX;
-        }
-    }
     ctx->stack = dfs_stack_create (state_info_int_size());
     ctx->out_stack = ctx->in_stack = ctx->stack;
     if (strategy[depth] & (Strat_2Stacks | Strat_OWCTY))
@@ -691,14 +684,16 @@ wctx_create (model_t model, int depth, wctx_t *shared)
     //allocate two bits for NDFS colorings
     if (strategy[depth] & Strat_LTL) {
         if (strategy[0] & Strat_TA) {
-            ctx->cyan = fset_create (16, 0, 10, 28);
-            ctx->pink = fset_create (16, 0, FSET_MIN_SIZE, 28);
+            ctx->cyan = fset_create (sizeof(ta_cndfs_state_t), 0, 10, 28);
+            ctx->pink = fset_create (sizeof(ta_cndfs_state_t), 0, FSET_MIN_SIZE, 28);
         }
         if (~Strat_OWCTY & strategy[depth]) {
             size_t local_bits = 2;
             int res = bitvector_create (&ctx->color_map, local_bits<<dbs_size);
             res &= bitvector_create (&ctx->all_red, MAX_STACK);
             if (-1 == res) Abort ("Failure to allocate a bitvector.");
+        } else if (ecd && (strategy[1] & Strat_ECD)) {
+            ctx->cyan = fset_create (sizeof(ref_t), sizeof(uint32_t), 10, 28);
         }
     }
 
@@ -730,6 +725,8 @@ wctx_free_rec (wctx_t *ctx, int depth)
         if (~Strat_OWCTY & strategy[depth]) {
             bitvector_free (&ctx->all_red);
             bitvector_free (&ctx->color_map);
+        } else if (ecd && (strategy[1] & Strat_ECD)) {
+            fset_free (ctx->cyan);
         }
     }
     if (NULL != ctx->permute)
@@ -1223,7 +1220,7 @@ dyn_cmp (const void *a, const void *b, void *arg)
 
     int Aval = A->seen;
     int Bval = B->seen;
-    if ((Strat_LTL & ctx->strategy) && A->seen == B->seen) {
+    if ((Strat_LTL & ~Strat_OWCTY & ctx->strategy) && A->seen == B->seen) {
         Aval = nn_color_eq(nn_get_color(&ctx->color_map, A->si.ref), NNWHITE);
         Bval = nn_color_eq(nn_get_color(&ctx->color_map, B->si.ref), NNWHITE);
     }
@@ -1587,7 +1584,7 @@ get_stack_state (ref_t ref, void *arg)
     wctx_t             *ctx = (wctx_t *) arg;
     ta_cndfs_state_t   *state = (ta_cndfs_state_t *) SIget(ctx->si, ref);
     state_data_t        data  = get_state (state->val.ref, ctx);
-    Debug ("Trace %d (%zu,%zu)", ref, state->val.ref, state->val.lattice);
+    Debug ("Trace %zu (%zu,%zu)", ref, state->val.ref, state->val.lattice);
     if (strategy[0] & Strat_TA) {
         memcpy (ctx->store, data, D<<2);
         ((lattice_t*)(ctx->store + D))[0] = state->val.lattice;
@@ -2557,30 +2554,60 @@ try_reset_extention (ref_t ref, uint32_t reset_val, int bit, bool check_zero)
     return 1;
 }
 
+static inline uint32_t
+ecd_get_state (fset_t *table, state_info_t *s)
+{
+    hash32_t            hash = ref_hash (s->ref);
+    uint32_t           *p;
+    int res = fset_find (table, &hash, &s->ref, (void **)&p, false);
+    HREassert (res != FSET_FULL, "Cyan table full");
+    return res ? *p : UINT32_MAX;
+}
+
+static inline void
+ecd_add_state (fset_t *table, state_info_t *s, size_t level)
+{
+    //Warning (info, "Adding %zu", s->ref);
+    HREassert (level < UINT32_MAX, "Stack length overflow for ECD");
+    uint32_t            num = level;
+    uint32_t           *num2 = &num;
+    hash32_t            hash = ref_hash (s->ref);
+    int res = fset_find (table, &hash, &s->ref, (void **)&num2, true);
+    HREassert (res != FSET_FULL && !res, "Cyan table full");
+}
+
+static inline void
+ecd_remove_state (fset_t *table, state_info_t *s)
+{
+    //Warning (info, "Removing %zu", s->ref);
+    hash32_t            hash = ref_hash (s->ref);
+    int success = fset_delete (table, &hash, &s->ref);
+    HREassert (success, "Could not remove key from set");
+}
+
 size_t
 owcty_split (void *arg_src, void *arg_tgt, size_t handoff)
 {
     wctx_t             *source = arg_src;
     wctx_t             *target = arg_tgt;
-    target->red.level_cur = 1;
+    HREassert (target->red.level_cur == 0, "Target accepting level counter is off");
     size_t              in_size = dfs_stack_size (source->stack);
     handoff = min (in_size >> 1, handoff);
     for (size_t i = 0; i < handoff; i++) {
         state_data_t        one = dfs_stack_top (source->stack);
-        if (!one) {
+        if (!one) { // drop the state as it alreasy explored!!!
             dfs_stack_leave (source->stack);
             source->counters.level_cur--;
             one = dfs_stack_pop (source->stack);
             if ((source->iteration & 1) == 0 && // only in the reachability phase
                     Strat_ECD == strategy[1]) {
                 state_info_deserialize (&source->state, one, source->store);
-                if (source->red.level_cur>0 && GBbuchiIsAccepting(source->model, source->state.data))
+                if (GBbuchiIsAccepting(source->model, source->state.data)) {
+                    HREassert (source->red.level_cur != 0, "Source accepting level counter is off");
                     source->red.level_cur--;
-                source->depth[source->state.ref] = UINT32_MAX;
+                }
+                ecd_remove_state (source->cyan, &source->state);
             }
-            dfs_stack_push (target->stack, one);
-            dfs_stack_enter (target->stack);
-            target->counters.level_cur++;
         } else {
             dfs_stack_push (target->stack, one);
             dfs_stack_pop (source->stack);
@@ -2643,7 +2670,7 @@ owcty_map (wctx_t *ctx, state_info_t *successor)
 static inline void
 owcty_ecd (wctx_t *ctx, state_info_t *successor)
 {
-    uint32_t acc_level = ctx->depth[successor->ref];
+    uint32_t acc_level = ecd_get_state (ctx->cyan, successor);
     if (acc_level < ctx->red.level_cur) {
         //ndfs_report_cycle (ctx, successor);
         Warning (info, "Cycle found");
@@ -2698,11 +2725,8 @@ owcty_reachability (wctx_t *ctx)
             increase_level (&ctx->counters);
             ctx->state.accepting = GBbuchiIsAccepting(ctx->model, ctx->state.data);
             if (strategy[1] == Strat_ECD) {
-                ctx->depth[ctx->state.ref] = ctx->red.level_cur;
-                if ( ctx->state.accepting ) {
-                    HREassert (ctx->red.level_cur < UINT32_MAX);
-                    ctx->red.level_cur++;
-                }
+                ecd_add_state (ctx->cyan, &ctx->state, ctx->red.level_cur);
+                ctx->red.level_cur += ctx->state.accepting;
             }
             if ( ctx->state.accepting )
                 dfs_stack_push (ctx->out_stack, state_data);
@@ -2728,14 +2752,18 @@ owcty_reachability (wctx_t *ctx)
             if (strategy[1] == Strat_ECD) {
                 state_data = dfs_stack_top (ctx->stack);
                 state_info_deserialize (&ctx->state, state_data, ctx->store);
-                if (ctx->red.level_cur>0 && GBbuchiIsAccepting(ctx->model, ctx->state.data))
+                if (GBbuchiIsAccepting(ctx->model, ctx->state.data)) {
+                    HREassert (ctx->red.level_cur != 0, "Accepting level counter is off");
                     ctx->red.level_cur--;
-                ctx->depth[ctx->state.ref] = UINT32_MAX;
+                }
+                ecd_remove_state (ctx->cyan, &ctx->state);
             }
             dfs_stack_pop (ctx->stack);
         }
     }
 
+    if (strategy[1] == Strat_ECD && !lb_is_stopped(global->lb))
+        HREassert (fset_count(ctx->cyan) == 0 && ctx->red.level_cur == 0, "Cyan stack not empty");
     size_t size[2] = { ctx->counters.visited, dfs_stack_size(ctx->out_stack) };
     HREreduce (HREglobal(), 2, &size, &size, SizeT, Sum);
     RTstopTimer (ctx->timer2);
@@ -2867,8 +2895,8 @@ owcty (wctx_t *ctx)
             Warning (info, "NO Accepting cycle found after %zu iteration(s)!",
                      ctx->iteration / 2 + 1);
         }
-        HREbarrier(HREglobal()); // print result before (local) statistics
     }
+    HREbarrier(HREglobal()); // print result before (local) statistics
 }
 
 /**
