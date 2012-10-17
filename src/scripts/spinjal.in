@@ -36,7 +36,7 @@ if [ -f "$output_file" ]; then
     rm -f "$output_file";
 fi
 
-java -Xms120m -Xmx2048m -cp $CP spinja.Compile -l ${1+"$@"}
+java -Xss8M -Xms120m -Xmx2048m -cp $CP spinja.Compile -l ${1+"$@"}
 ERROR=$?
 if [ $ERROR -ne 0 ]; then
     echo "Compilation of $promela_file failed"
