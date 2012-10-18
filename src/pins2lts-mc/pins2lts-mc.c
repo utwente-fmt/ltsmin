@@ -2541,19 +2541,19 @@ reset_extention (ref_t ref, int bit, int acc)
     write_extention (ref, reset);
 }
 
-static inline int
+static inline bool
 try_reset_extention (ref_t ref, uint32_t reset_val, int bit, bool check_zero)
 {
     owcty_ext_t             reset, ext;
     do {
         ext = read_extention (ref);
         if (ext.bit == bit || (check_zero && ext.count == 0))
-            return 0;
+            return false;
         reset.acc = ext.acc;
         reset.bit = bit;
         reset.count = reset_val;
     } while (!cas_extention(ref, ext, reset));
-    return 1;
+    return true;
 }
 
 static inline uint32_t
@@ -2562,7 +2562,7 @@ ecd_get_state (fset_t *table, state_info_t *s)
     hash32_t            hash = ref_hash (s->ref);
     uint32_t           *p;
     int res = fset_find (table, &hash, &s->ref, (void **)&p, false);
-    HREassert (res != FSET_FULL, "Cyan table full");
+    HREassert (res != FSET_FULL, "ECD table full");
     return res ? *p : UINT32_MAX;
 }
 
@@ -2575,7 +2575,7 @@ ecd_add_state (fset_t *table, state_info_t *s, size_t level)
     uint32_t           *num2 = &num;
     hash32_t            hash = ref_hash (s->ref);
     int res = fset_find (table, &hash, &s->ref, (void **)&num2, true);
-    HREassert (res != FSET_FULL && !res, "Cyan table full");
+    HREassert (res != FSET_FULL && !res, "ECD table full");
 }
 
 static inline void
@@ -2685,11 +2685,12 @@ owcty_reachability_handle (void *arg, state_info_t *successor, transition_info_t
 {
     wctx_t             *ctx = (wctx_t *) arg;
     successor->pred = ctx->state.pred | ctx->state.accepting;
+    HREassert (successor->pred == 0 || successor->pred == 1);
     if (try_reset_extention(successor->ref, successor->pred, ctx->flip, false)) {
         raw_data_t stack_loc = dfs_stack_push (ctx->stack, NULL);
         state_info_serialize (successor, stack_loc);
-    } else {
-        uint32_t num = inc_extention (successor->ref, successor->pred);
+    } else if (successor->pred) {
+        uint32_t num = inc_extention (successor->ref, 1);
         HREassert (num < (1UL<<30)-1, "Overflow in accepting predecessor counter");
     }
     if (strategy[1] == Strat_MAP)
@@ -2765,7 +2766,7 @@ owcty_reachability (wctx_t *ctx)
     }
 
     if (strategy[1] == Strat_ECD && !lb_is_stopped(global->lb))
-        HREassert (fset_count(ctx->cyan) == 0 && ctx->red.level_cur == 0, "Cyan stack not empty");
+        HREassert (fset_count(ctx->cyan) == 0 && ctx->red.level_cur == 0, "ECD stack not empty, size: %zu, depth: %zu", fset_count(ctx->cyan), ctx->red.level_cur);
     size_t size[2] = { ctx->counters.visited, dfs_stack_size(ctx->out_stack) };
     HREreduce (HREglobal(), 2, &size, &size, SizeT, Sum);
     RTstopTimer (ctx->timer2);
