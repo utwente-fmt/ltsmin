@@ -380,9 +380,7 @@ static struct poptOption options[] = {
     {"max", 0, POPT_ARG_LONGLONG | POPT_ARGFLAG_SHOW_DEFAULT, &max_level, 0, "maximum search depth", "<int>"},
 #endif
     {"nar", 1, POPT_ARG_VAL, &all_red, 0, "turn off red coloring in the blue search (NNDFS/MCNDFS)", NULL},
-#ifdef LTSMIN_DEBUG // incorrect for NDFS algorithms since cyan is removed from seed:
     {"no-ecd", 1, POPT_ARG_VAL, &ecd, 0, "turn off early cycle detection (NNDFS/MCNDFS)", NULL},
-#endif
     {"owcty-reset", 0, POPT_ARG_VAL, &owcty_reset, 1, "turn on reset in OWCTY algorithm", NULL},
     {"perm", 'p', POPT_ARG_STRING | POPT_ARGFLAG_SHOW_DEFAULT,
      &arg_perm, 0, "select the transition permutation method",
@@ -987,7 +985,7 @@ maybe_report (counter_t *cnt, char *msg)
         return;
     if (!cas (&global->threshold, global->threshold, global->threshold << 1))
         return;
-    if (W == 1 || (strategy[0] & Strat_LTL))
+    if (W == 1 || (strategy[0] & Strat_NDFS))
         print_state_space_total (msg, cnt);
     else
         Warning (info, "%s%zu levels ~%zu states ~%zu transitions", msg,
@@ -1783,21 +1781,22 @@ ndfs_blue (wctx_t *ctx)
             dfs_stack_leave (ctx->stack);
             ctx->counters.level_cur--;
             state_data = dfs_stack_top (ctx->stack);
-            state_info_deserialize (&ctx->state, state_data, ctx->store);
+            state_info_t            seed;
+            state_info_deserialize (&seed, state_data, ctx->store);
             if ( all_red && bitvector_is_set(&ctx->all_red, ctx->counters.level_cur) ) {
                 /* exit if backtrack hits seed, leave stack the way it was */
-                nn_set_color (&ctx->color_map, ctx->state.ref, NNPINK);
+                nn_set_color (&ctx->color_map, seed.ref, NNPINK);
                 ctx->counters.allred++;
-                if ( GBbuchiIsAccepting(ctx->model, ctx->state.data) )
+                if ( GBbuchiIsAccepting(ctx->model, seed.data) )
                     ctx->red.visited++;
-            } else if ( GBbuchiIsAccepting(ctx->model, ctx->state.data) ) {
+            } else if ( GBbuchiIsAccepting(ctx->model, seed.data) ) {
                 /* call red DFS for accepting states */
-                ndfs_red (ctx, ctx->state.ref);
-                nn_set_color (&ctx->color_map, ctx->state.ref, NNPINK);
+                ndfs_red (ctx, seed.ref);
+                nn_set_color (&ctx->color_map, seed.ref, NNPINK);
             } else {
                 if (ctx->counters.level_cur > 0)
                     bitvector_unset (&ctx->all_red, ctx->counters.level_cur - 1);
-                nn_set_color (&ctx->color_map, ctx->state.ref, NNBLUE);
+                nn_set_color (&ctx->color_map, seed.ref, NNBLUE);
             }
             dfs_stack_pop (ctx->stack);
         }
@@ -1890,20 +1889,21 @@ lndfs_blue (wctx_t *ctx)
             dfs_stack_leave (ctx->stack);
             ctx->counters.level_cur--;
             state_data = dfs_stack_top (ctx->stack);
-            state_info_deserialize (&ctx->state, state_data, ctx->store);
+            state_info_t            seed;
+            state_info_deserialize (&seed, state_data, ctx->store);
             if ( all_red && bitvector_is_set(&ctx->all_red, ctx->counters.level_cur) ) {
                 /* all successors are red */
-                wait_seed (ctx, ctx->state.ref);
-                set_all_red (ctx, &ctx->state);
-            } else if ( GBbuchiIsAccepting(ctx->model, ctx->state.data) ) {
+                wait_seed (ctx, seed.ref);
+                set_all_red (ctx, &seed);
+            } else if ( GBbuchiIsAccepting(ctx->model, seed.data) ) {
                 /* call red DFS for accepting states */
-                lndfs_red (ctx, ctx->state.ref);
+                lndfs_red (ctx, seed.ref);
             } else if (ctx->counters.level_cur > 0 &&
-                       !global_has_color(ctx->state.ref, GRED, ctx->rec_bits)) {
+                       !global_has_color(seed.ref, GRED, ctx->rec_bits)) {
                 /* unset the all-red flag (only for non-initial nodes) */
                 bitvector_unset (&ctx->all_red, ctx->counters.level_cur - 1);
             }
-            nn_set_color (&ctx->color_map, ctx->state.ref, NNBLUE);
+            nn_set_color (&ctx->color_map, seed.ref, NNBLUE);
             dfs_stack_pop (ctx->stack);
         }
     }
@@ -2123,6 +2123,7 @@ check (void *arg, state_info_t *successor, transition_info_t *ti, int seen)
 void
 endfs_blue (wctx_t *ctx)
 {
+    HREassert (ecd, "CNDFS's correctness depends crucially on ECD");
     ctx->done = 0;
     while ( !lb_is_stopped(global->lb) ) {
         raw_data_t          state_data = dfs_stack_top (ctx->stack);
@@ -2156,9 +2157,8 @@ endfs_blue (wctx_t *ctx)
                 //permute_trans (ctx->permute, &ctx->state, check, ctx); 
                 set_all_red (ctx, &ctx->state);
             } else if ( GBbuchiIsAccepting(ctx->model, ctx->state.data) ) {
-                ref_t           seed = ctx->state.ref;
-                ctx->seed = ctx->work = seed;
-                endfs_red (ctx, seed);
+                ctx->seed = ctx->work = ctx->state.ref;
+                endfs_red (ctx, ctx->seed);
                 if (Strat_ENDFS == ctx->strategy)
                     endfs_handle_dangerous (ctx);
                 else
@@ -2172,10 +2172,10 @@ endfs_blue (wctx_t *ctx)
             dfs_stack_pop (ctx->stack);
         }
     }
-    if ( Strat_ENDFS == ctx->strategy &&            // if ENDFS,
-         ctx == global->contexts[ctx->id] &&         // if top-level ENDFS, and
-         (Strat_LTLG & ctx->rec_ctx->strategy) )    // if rec strategy uses global bits (global pruning)
-        endfs_lb (ctx);                             // then do simple load balancing
+    if ( Strat_ENDFS == ctx->strategy &&         // if ENDFS,
+         ctx == global->contexts[ctx->id] &&     // if top-level ENDFS, and
+         (Strat_LTLG & ctx->rec_ctx->strategy) ) // if rec strategy uses global bits (global pruning)
+        endfs_lb (ctx);                          // then do simple load balancing
 }
 
 void
