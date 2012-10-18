@@ -419,7 +419,8 @@ typedef struct global_s {
     zobrist_t           zobrist;
     cct_map_t          *tables;
     pthread_mutex_t     mutex;
-    owcty_ext_t         *state_ext;
+    owcty_ext_t        *state_ext;
+    int                 exit_status;
 } global_t;
 
 static global_t           *global;
@@ -761,6 +762,7 @@ prelocal_global_init ()
     if (HREme(HREglobal()) == 0) {
         RTswitchAlloc (!SPEC_MT_SAFE);
         global = RTmallocZero (sizeof(global_t));
+        global->exit_status = LTSMIN_EXIT_SUCCESS;
         RTswitchAlloc (false);
         //                               multi-process && multiple processes
         global->tables = cct_create_map (!SPEC_MT_SAFE && HREdefaultRegion(HREglobal()) != NULL);
@@ -1619,7 +1621,9 @@ ndfs_report_cycle (wctx_t *ctx, state_info_t *cycle_closing_state)
     if ( !lb_stop(global->lb) )
         return;
     size_t              level = dfs_stack_nframes (ctx->stack) + 1;
+    Warning (info, " ");
     Warning (info, "Accepting cycle FOUND at depth %zu!", level);
+    Warning (info, " ");
     if (trc_output) {
         double uw = cct_finalize (global->tables, "BOGUS, you should not see this string.");
         Warning (infoLong, "Parallel chunk tables under-water mark: %.2f", uw);
@@ -1628,8 +1632,7 @@ ndfs_report_cycle (wctx_t *ctx, state_info_t *cycle_closing_state)
         state_info_serialize (cycle_closing_state, data);
         find_and_write_dfs_stack_trace (ctx, level);
     }
-    Warning (info,"Exiting now!");
-    HREabort (LTSMIN_EXIT_COUNTER_EXAMPLE);
+    global->exit_status = LTSMIN_EXIT_COUNTER_EXAMPLE;
 }
 
 static void
@@ -1652,8 +1655,7 @@ handle_error_trace (wctx_t *ctx)
                                 global->parent_ref, ctx->initial.ref);
         }
     }
-    Warning (info, "Exiting now!");
-    HREabort (LTSMIN_EXIT_COUNTER_EXAMPLE);
+    global->exit_status = LTSMIN_EXIT_COUNTER_EXAMPLE;
 }
 
 /* Courcoubetis et al. NDFS, with extensions:
@@ -2595,7 +2597,7 @@ owcty_split (void *arg_src, void *arg_tgt, size_t handoff)
     handoff = min (in_size >> 1, handoff);
     for (size_t i = 0; i < handoff; i++) {
         state_data_t        one = dfs_stack_top (source->stack);
-        if (!one) { // drop the state as it alreasy explored!!!
+        if (!one) { // drop the state as it already explored!!!
             dfs_stack_leave (source->stack);
             source->counters.level_cur--;
             one = dfs_stack_pop (source->stack);
@@ -3477,7 +3479,10 @@ explore (wctx_t *ctx)
     }
     RTstopTimer (ctx->timer);
     ctx->counters.runtime = RTrealTime (ctx->timer);
-    print_thread_statistics (ctx);
+    for (size_t i = 0; i < W && !lb_is_stopped(global->lb); i++) {
+        if (i == ctx->id) print_thread_statistics (ctx);
+        HREbarrier (HREglobal());
+    }
     RTfree (initial);
 }
 
@@ -3505,5 +3510,5 @@ main (int argc, char *argv[])
 
     deinit_all (ctx);
 
-    HREexit (LTSMIN_EXIT_SUCCESS);
+    HREabort (global->exit_status);
 }

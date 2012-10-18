@@ -65,8 +65,11 @@ static inline void set_idle (lb_t *lb, int id, int a) {
 int
 lb_stop (lb_t *lb)
 {
-    set_all_done (lb);
-    return try_stop (lb);
+    if (try_stop(lb)) {     // first set is_stopped!
+        set_all_done (lb);  // second set all_done
+        return true; // winner
+    }
+    return false;
 }
 
 void
