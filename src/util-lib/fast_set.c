@@ -102,17 +102,29 @@ resize (fset_t *dbs, fset_resize_t mode)
     //RTstartTimer (dbs->timer);
     size_t              tombs = 0;
     size_t              todos = 0;
-    for (size_t i = 0; i < old_size; i++) {
-        mem_hash_t          h = *memoized(dbs,i);
-        if (TOMB == h) {
-            tombs++;
-        } else if (h != EMPTY) {// && (h & dbs->mask) != i) {
-            dbs->todo[todos] = *memoized(dbs,i);
-            void               *data = state(dbs, dbs->todo_data, todos);
-            memcpy (data, state(dbs, dbs->data, i), dbs->total_length);
-            todos++;
+    if (dbs->total_length) {
+        for (size_t i = 0; i < old_size; i++) {
+            mem_hash_t          h = *memoized(dbs,i);
+            if (TOMB == h) {
+                tombs++;
+            } else if (h != EMPTY) {// && (h & dbs->mask) != i) {
+                dbs->todo[todos] = *memoized(dbs,i);
+                void               *data = state(dbs, dbs->todo_data, todos);
+                memcpy (data, state(dbs, dbs->data, i), dbs->total_length);
+                todos++;
+            }
+            *memoized(dbs, i) = EMPTY;
         }
-        *memoized(dbs, i) = EMPTY;
+    } else {
+        for (size_t i = 0; i < old_size; i++) {
+            mem_hash_t          h = *memoized(dbs,i);
+            if (TOMB == h) {
+                tombs++;
+            } else if (h != EMPTY) {// && (h & dbs->mask) != i) {
+                dbs->todo[todos++] = *memoized(dbs,i);
+            }
+            *memoized(dbs, i) = EMPTY;
+        }
     }
     dbs->tombs -= tombs;
     dbs->load  -= todos;
@@ -214,7 +226,8 @@ fset_find (fset_t *dbs, mem_hash_t *mem, void *key, void **data,
     bool found = fset_find_loc (dbs, h, key, &ref, &tomb);
     void *data_res = state(dbs, dbs->data, ref) + k;
     if (!insert_absert || found) {
-        *data = data_res;
+        if (dbs->data_length)
+            *data = data_res;
         return found;
     }
 
