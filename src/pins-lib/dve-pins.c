@@ -318,9 +318,6 @@ DVE2loadGreyboxModel(model_t model, const char *filename)
     matrix_t *dm_read_info = RTmalloc(sizeof(matrix_t));
     matrix_t *dm_write_info = RTmalloc(sizeof(matrix_t));
     matrix_t *sl_info = RTmalloc(sizeof(matrix_t));
-    matrix_t *gce_info = RTmalloc(sizeof(matrix_t));  // guard may be co-enabled information
-    matrix_t *gnes_info = RTmalloc(sizeof(matrix_t)); // guard necessary enabling set information
-    matrix_t *gnds_info = RTmalloc(sizeof(matrix_t)); // guard necessary disabling set informaiton
 
     //assume sequential use:
     if (NULL == dlHandle) {
@@ -474,6 +471,7 @@ DVE2loadGreyboxModel(model_t model, const char *filename)
 
     // set guard may be co-enabled relation
     if (get_guard_may_be_coenabled_matrix) {
+        matrix_t *gce_info = RTmalloc(sizeof(matrix_t));
         dm_create(gce_info, nguards, nguards);
         for(int i=0; i < nguards; i++) {
             int* guardce = (int*)get_guard_may_be_coenabled_matrix(i);
@@ -486,6 +484,7 @@ DVE2loadGreyboxModel(model_t model, const char *filename)
 
     // set guard necessary enabling set info
     if (get_guard_nes_matrix) {
+        matrix_t *gnes_info = RTmalloc(sizeof(matrix_t));
         dm_create(gnes_info, nguards, ngroups);
         for(int i=0; i < nguards; i++) {
             int* guardnes = (int*)get_guard_nes_matrix(i);
@@ -498,6 +497,7 @@ DVE2loadGreyboxModel(model_t model, const char *filename)
 
     // set guard necessary disabling set info
     if (get_guard_nds_matrix) {
+        matrix_t *gnds_info = RTmalloc(sizeof(matrix_t));
         dm_create(gnds_info, nguards, ngroups);
         for(int i=0; i < nguards; i++) {
             int* guardnds = (int*)get_guard_nds_matrix(i);
