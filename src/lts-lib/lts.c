@@ -638,7 +638,7 @@ lts_t lts_encode_edge(lts_t lts){
 
     {
         int typeno[K];
-        data_format_t format[N];
+        data_format_t format[K];
         for(int i=0;i<K;i++){
             typeno[i]=lts_type_get_edge_label_typeno(lts->ltstype,i);
             format[i]=lts_type_get_format(lts->ltstype,typeno[i]);
