@@ -92,23 +92,6 @@ static char templatename[PATH_MAX];
    Buchi state */
 
 static int
-sl_long_p (model_t model, int label, int *state)
-{
-    if (label == GBgetAcceptingStateLabelIndex(model)) {
-        return buchi_is_accepting(model, state);
-    } else {
-        Abort("unexpected state label requested: %d", label);
-    }
-}
-
-static void
-sl_all_p (model_t model, int *state, int *labels)
-{
-    HREassert (labels != NULL, "no labels");
-    labels[GBgetAcceptingStateLabelIndex(model)] = buchi_is_accepting(model, state);
-}
-
-static int
 sl_long_p_g (model_t model, int label, int *state)
 {
     if (label == GBgetAcceptingStateLabelIndex(model)) {
@@ -437,8 +420,6 @@ DVE2loadGreyboxModel(model_t model, const char *filename)
                 dm_set(sl_info, GBgetAcceptingStateLabelIndex(model), i);
             }
         }
-        sl_long = sl_long_p;
-        sl_all = sl_all_p;
     }
 
     // if the model has guards, add guards as state labels

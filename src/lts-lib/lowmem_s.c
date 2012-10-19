@@ -123,7 +123,6 @@ void lowmem_strong_reduce(lts_t lts){
         // insert states into hash table
         count=0;
         for(i=0;i<lts->states;i++){
-            k=0;
             hash_lookups++;
             for(hc=hashcode(lts,map,i);;hc=rehash(hc)){
                 chain_length++;

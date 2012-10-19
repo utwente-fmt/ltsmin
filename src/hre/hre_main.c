@@ -56,7 +56,7 @@ void HREinitBegin(const char*app_name){
     } else {
         // worker thread or second call.
         ctx=pthread_getspecific(hre_key);
-        if (!ctx) ctx=create_context((char*)app_name);
+        if (!ctx) create_context((char*)app_name);
     }
     HREinitFeedback(); // CHECK ME: for every thread or just for the main thread?
 }
