@@ -186,7 +186,7 @@ void log_printf(log_t log,const char *fmt,...){
 }
 
 void log_message(log_t log,const char*file,int line,int errnum,const char *fmt,...){
-    if (log && (log->flags & LOG_PRINT)==0) return;
+    if (log == NULL || (log->flags & LOG_PRINT)==0) return;
     if (log->index){
         const char *tmp=file;
         for(;;){
