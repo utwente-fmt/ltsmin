@@ -1,5 +1,6 @@
 #include <hre/config.h>
 
+#include <inttypes.h>
 #include <stdbool.h>
 #include <string.h>
 
@@ -177,8 +178,8 @@ set_ll_get (set_ll_t *set, int idx, int *len)
     str_t              *str = (str_t *)isba_index (balloc, index - offset);
     HREassert (str != NULL, "Value %d (%zu/%zu) not in lockless string set", idx, index, worker);
     *len = str->len;
-    Debug ("Index(%d)\t--(%zu,%zu)--> (%s,%d) %p", idx, worker, index, str->ptr,
-                                                   str->len, str->ptr);
+    Debug ("Index(%d)\t--(%zu,%zu)--> (%s,%d) %p",
+           idx, worker, index, str->ptr, str->len, str->ptr);
     HRE_ASSERT (str->len == (int)strlen(str->ptr), "Incorrect length passed for '%s', %d instead of %zu. Rest: '%s'",
                 str->ptr, str->len, strlen(str->ptr), &str->ptr[str->len+1]);
     return str->ptr;
@@ -219,12 +220,12 @@ set_ll_put (set_ll_t *set, char *str, int len)
         isba_push_int (balloc, (int*)&string);
         RTswitchAlloc (false);
         atomic_write (&set->local[worker].count, index + 1); // signal done
-        Debug ("Write(%zu)\t<--(%zu,%zu)-- (%s,%d) %p", idx, worker, index, str,
-                                                        len, clone);
+        Debug ("Write(%zu)\t<--(%zu,%zu)-- (%s,%d) %p",
+               (size_t)idx, worker, index, str, len, (void*)clone);
     } else {
         idx = old - 1;
-        Debug ("Find (%zu)\t<--(%zu,%zu)-- (%s,%d) %p", idx, idx % workers,
-                                               idx / workers, str, len, clone);
+        Debug ("Find (%zu)\t<--(%zu,%zu)-- (%s,%d) %p", (size_t)idx,
+               (size_t)idx % workers, (size_t)idx / workers, str, len, (void *)clone);
     }
     return (int)idx;
 }
@@ -299,8 +300,8 @@ set_ll_install (set_ll_t *set, char *name, int len, int idx)
     set->local[worker].offset += index - set->local[worker].count;
     atomic_write (&set->local[worker].count, index + 1); // signal done
 
-    Debug ("Bind (%zu)\t<--(%zu,%zu)-> (%s,%d) %p", idx, worker, index, name,
-                                                    len, clone);
+    Debug ("Bind (%d)\t<--(%zu,%zu)-> (%s,%d) %llu", idx, worker, index, name,
+                                                     len, clone);
 }
 
 double
@@ -368,14 +369,11 @@ set_ll_print_alloc_stats(log_t log, set_ll_allocator_t *alloc)
 set_ll_t *
 set_ll_create (set_ll_allocator_t *alloc)
 {
-    HREassert (sizeof(str_t) == 12);
-
     RTswitchAlloc (alloc->shared); // global allocation of table, ballocs and set
     set_ll_t           *set = RTmalloc (sizeof(set_ll_t));
     set->ht = ht_alloc (&DATATYPE_HRE_STR, INIT_HT_SCALE);
     for (int i = 0; i < HREpeers(HREglobal()); i++) {
-        // a pointer to the string and its length (int) will be put on a balloc:
-        set->local[i].balloc = isba_create(sizeof(char *) / sizeof(int) + 1);
+        set->local[i].balloc = isba_create(sizeof(str_t) / sizeof(int));
         set->local[i].count = 0;
         set->local[i].offset = 0;
     }

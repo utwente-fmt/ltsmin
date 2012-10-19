@@ -1,11 +1,14 @@
 #include <hre/config.h>
 
 #include <assert.h>
+#include <inttypes.h>
 #include <stdint.h>
 #include <stdlib.h>
 
 #include <hre/user.h>
 #include <vset-lib/vdom_object.h>
+#include <hre-io/user.h>
+#include <util-lib/simplemap.h>
 
 static uint32_t mdd_nodes;
 static uint32_t uniq_size;
@@ -696,48 +699,49 @@ static uint32_t mdd_take(uint32_t mdd,int len,uint32_t count){
 }
 */
 
-//TODO: Use DSwrite* here
-static void mdd_clear_and_write(FILE* f, uint32_t mdd, uint32_t* n_count, uint32_t* node_ids){
+static void mdd_clear_and_write_bin(stream_t s, uint32_t mdd, uint32_t* n_count, map_t node_map){
     if (mdd<=1) return;
     if (node_table[mdd].val&0x80000000) {
         node_table[mdd].val=node_table[mdd].val&0x7fffffff;
-        mdd_clear_and_write(f,node_table[mdd].down, n_count, node_ids);
-        mdd_clear_and_write(f,node_table[mdd].right, n_count, node_ids);
-        node_ids[mdd] = (uint32_t)*n_count;
-        fprintf(f, "%u %u %u %u\n",
-            (uint32_t)*n_count,
-            node_table[mdd].val,
-            node_ids[node_table[mdd].down],
-            node_ids[node_table[mdd].right]
-        );
+        mdd_clear_and_write_bin(s,node_table[mdd].down, n_count, node_map);
+        mdd_clear_and_write_bin(s,node_table[mdd].right, n_count, node_map);
+        simplemap_put(node_map, mdd, (uint32_t)*n_count);
+        DSwriteU64(s, (uint64_t)*n_count);
+        DSwriteU32(s, node_table[mdd].val);
+        DSwriteU64(s, (uint64_t)simplemap_get(node_map, node_table[mdd].down));
+        DSwriteU64(s, (uint64_t)simplemap_get(node_map, node_table[mdd].right));
         (*n_count)++;
     }
 }
 
 static void
-mdd_save(FILE* f, uint32_t mdd)
+mdd_save_bin(FILE* f, uint32_t mdd)
 {
-    uint32_t n_count = mdd_node_count(mdd);
-    //Warning(info,"mdd_save: %u", n_count);
-    fprintf(f,"n=%u\n", n_count);
+    stream_t s = stream_output(f);
+    uint64_t n_count = (uint64_t)mdd_node_count(mdd);
+    Print(infoLong,"mdd_save: %"PRIu64" / %u (%.0f%%)", n_count, mdd_nodes, 100*(((float)n_count)/(float)mdd_nodes));
+    DSwriteU64(s, n_count);
     mdd_mark(mdd);
-    uint32_t* node_ids = RTmalloc(mdd_nodes*sizeof(uint32_t));
-    node_ids[0] = 0;
-    node_ids[1] = 1;
+    map_t node_map = simplemap_create(n_count * 1.1 + 2);
+    simplemap_put(node_map, 0, 0);
+    simplemap_put(node_map, 1, 1);
     uint32_t count = 2;
-    mdd_clear_and_write(f, mdd, &count, node_ids);
-    RTfree(node_ids);
+    mdd_clear_and_write_bin(s, mdd, &count, node_map);
+    simplemap_destroy(node_map);
+    stream_flush(s);
+    free(s);
 }
 
 static uint32_t
-mdd_load(FILE* f)
+mdd_load_bin(FILE* f)
 {
-    uint32_t n_count;
-    int res = fscanf(f,"n=%u\n", &n_count);
-    (void)res;
-    //Warning(info,"mdd_load: %u", n_count);
+    stream_t s = stream_input(f);
+    uint64_t n_count;
+    n_count = DSreadU64(s);
     if (n_count < 2)
         n_count = 2;
+    if (n_count > UINT32_MAX)
+        Abort("Number of nodes is too large for 32-bit encoding.");
     if (mdd_load_node_ids != NULL)
         Abort("Error, mdd_load_node_ids already in use!");
     mdd_load_node_ids = RTmalloc(n_count*sizeof(uint32_t));
@@ -749,19 +753,24 @@ mdd_load(FILE* f)
     uint32_t val;
     uint32_t down;
     uint32_t right;
-    while (mdd_load_node_count < n_count && fscanf(f,"%u %u %u %u\n", &id, &val, &down, &right) != EOF) {
+    while (mdd_load_node_count < n_count && !stream_empty(s)) {
+        id = (uint32_t)DSreadU64(s);
+        val = DSreadU32(s);
+        down = (uint32_t)DSreadU64(s);
+        right = (uint32_t)DSreadU64(s);
         if (mdd_load_node_count != id)
             Abort("Nodes have to be numbered consecutively from 2 till n-1.");
-        //Warning(debug, "id=%u, val=%u, down=%u [%u], right=%u [%u]",
+        //Warning(debug, "id=%llu, val=%u, down=%llu [%llu], right=%llu [%llu]",
         //        id, val, down, mdd_load_node_ids[down], right, mdd_load_node_ids[right]);
         assert(down==0 || mdd_load_node_ids[down]!=0);
         assert(right==0 || mdd_load_node_ids[right]!=0);
         mdd = mdd_create_node(val, mdd_load_node_ids[down], mdd_load_node_ids[right]);
-        //Warning(debug, "id=%u [%u]", id, mdd);
+        //Warning(debug, "id=%llu [%llu]", id, mdd);
         mdd_load_node_ids[id] = mdd;
         mdd_load_node_count++;
     }
     RTfree(mdd_load_node_ids);
+    free(s);
     mdd_load_node_ids = NULL;
     mdd_load_node_count = 0;
     return mdd;
@@ -791,14 +800,14 @@ set_create_mdd(vdom_t dom, int k, int *proj)
 static void
 set_save_mdd(FILE* f, vset_t set)
 {
-    mdd_save(f, set->mdd);
+    mdd_save_bin(f, set->mdd);
 }
 
 static vset_t
 set_load_mdd(FILE* f, vdom_t dom)
 {
     vset_t result = set_create_mdd(dom, -1, NULL);
-    result->mdd = mdd_load(f);
+    result->mdd = mdd_load_bin(f);
     return result;
 }
 
@@ -837,35 +846,33 @@ rel_create_mdd(vdom_t dom, int k, int *proj)
 }
 
 static void
-rel_save_proj(FILE* f, vrel_t rel)
+rel_save_proj_bin(FILE* f, vrel_t rel)
 {
-    fprintf(f,"len=%d\n", rel->p_len);
-    fprintf(f,"proj=");
+    stream_t s = stream_output(f);
+    DSwriteS32(s, rel->p_len);
     for(int i=0; i<rel->p_len; i++){
-        fprintf(f,((i < rel->p_len-1)?"%d ":"%d"), rel->proj[i]);
+        DSwriteS32(s, rel->proj[i]);
     }
-    fprintf(f,"\n");
+    stream_flush(s);
+    free(s);
 }
 
 static void
 rel_save_mdd(FILE* f, vrel_t rel)
 {
-    mdd_save(f, rel->mdd);
+    mdd_save_bin(f, rel->mdd);
 }
 
 static vrel_t
-rel_load_proj(FILE* f, vdom_t dom)
+rel_load_proj_bin(FILE* f, vdom_t dom)
 {
-    int p_len;
-    int res = fscanf(f,"len=%d\n", &p_len);
-    res &= fscanf(f,"proj=");
+    stream_t s = stream_input(f);
+    int p_len = DSreadS32(s);
     int proj[p_len];
     for(int i=0; i<p_len; i++){
-        res &= fscanf(f,((i < p_len-1)?"%d ":"%d"), &(proj[i]));
-        //Warning(info, "rel_load_mdd: proj[%d]=%d", i, proj[i]);
+        proj[i] = DSreadS32(s);
     }
-    res &= fscanf(f,"\n");
-    //Warning(info, "rel_load_proj: p_len=%d", p_len);
+    free(s);
     vrel_t result = rel_create_mdd(dom, p_len, proj);
     return result;
 }
@@ -873,7 +880,7 @@ rel_load_proj(FILE* f, vdom_t dom)
 static void
 rel_load_mdd(FILE* f, vrel_t rel)
 {
-    rel->mdd = mdd_load(f);
+    rel->mdd = mdd_load_bin(f);
 }
 
 static void
@@ -1649,9 +1656,9 @@ vdom_t vdom_create_list_native(int n){
     dom->shared.set_union=set_union_mdd;
     dom->shared.set_minus=set_minus_mdd;
     dom->shared.rel_create=rel_create_mdd;
-    dom->shared.rel_save_proj=rel_save_proj;
+    dom->shared.rel_save_proj=rel_save_proj_bin;
     dom->shared.rel_save=rel_save_mdd;
-    dom->shared.rel_load_proj=rel_load_proj;
+    dom->shared.rel_load_proj=rel_load_proj_bin;
     dom->shared.rel_load=rel_load_mdd;
     dom->shared.rel_add=rel_add_mdd;
     dom->shared.rel_count=rel_count_mdd;

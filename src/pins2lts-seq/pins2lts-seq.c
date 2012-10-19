@@ -9,6 +9,7 @@
 #include <strings.h>
 
 
+#include <hre/stringindex.h>
 #include <hre/user.h>
 #include <lts-io/user.h>
 #include <ltsmin-lib/ltsmin-standard.h>
@@ -22,7 +23,6 @@
 #include <mc-lib/trace.h>
 #include <util-lib/bitset.h>
 #include <util-lib/dynamic-array.h>
-#include <hre/stringindex.h>
 #include <util-lib/tables.h>
 #include <util-lib/treedbs.h>
 #include <vset-lib/vector_set.h>
@@ -57,7 +57,6 @@ typedef struct grey_stack
 static struct {
     model_t          model;
     const char      *trc_output;
-    lts_file_t       trace_output;
     int              dlk_detect;
     char            *act_detect;
     char            *inv_detect;
@@ -88,7 +87,6 @@ static struct {
     .write_state    = 0,
     .model          = NULL,
     .trc_output     = NULL,
-    .trace_output   = NULL,
     .dlk_detect     = 0,
     .act_detect     = NULL,
     .inv_detect     = NULL,
@@ -99,8 +97,8 @@ static struct {
     .threshold      = THRESHOLD,
     .max            = SIZE_MAX,
     .call_mode      = UseBlackBox,
-    .arg_strategy   = "bfs",
-    .strategy       = Strat_BFS,
+    .arg_strategy   = "dfs",
+    .strategy       = Strat_DFS,
     .arg_state_db   = "tree",
     .state_db       = DB_TreeDBS,
     .arg_proviso    = "closedset",
@@ -391,19 +389,6 @@ typedef struct gsea_context {
 
 static gsea_context_t gc;
 
-
-#ifdef DEBUG
-static void
-print_state(gsea_state_t *state)
-{
-    for(size_t i=0; i < global.N; i++) {
-        printf("%d ", state->state[i]);
-    }
-    printf("\n");
-}
-#endif
-
-
 /*
  * Graphviz Output
  */
@@ -446,54 +431,6 @@ gsea_init_dot(const char *filename)
         gc.report_finished = gsea_report_finished_dot;
     }
 }
-
-
-
-/*
- * Trace
- */
-static void
-write_trace_state(model_t model, int state_idx, int *state){
-    Debug("dumping state %d",state_idx);
-    int labels[global.state_labels];
-    if (global.state_labels) GBgetStateLabelsAll(model,state,labels);
-    lts_write_state(opt.trace_output,0,state,labels);
-    (void) state_idx;
-}
-
-struct write_trace_step_s {
-    int* src_state;
-    int* dst_state;
-    int found;
-    int depth;
-};
-
-static void
-write_trace_next (void *arg, transition_info_t *ti, int *dst)
-{
-    struct write_trace_step_s*ctx=(struct write_trace_step_s*)arg;
-    if(ctx->found) return;
-    for(size_t i=0;i<global.N;i++) {
-        if (ctx->dst_state[i]!=dst[i]) return;
-    }
-    ctx->found=1;
-    int src_idx = ctx->depth - 1;
-    lts_write_edge(opt.trace_output,0,&src_idx,0,dst,ti->labels);
-}
-
-static void
-write_trace_step (model_t model, int *src, int *dst, int depth)
-{
-    //Warning(debug,"finding edge for state %d",src_no);
-    struct write_trace_step_s ctx;
-    ctx.src_state=src;
-    ctx.dst_state=dst;
-    ctx.found=0;
-    ctx.depth=depth;
-    GBgetTransitionsAll(model,src,write_trace_next,&ctx);
-    if (ctx.found==0) Abort ("no matching transition found");
-}
-
 
 /* GSEA run configurations */
 
@@ -606,56 +543,31 @@ bfs_vset_open_insert_condition(gsea_state_t *state, void *arg)
  * DFS (GSEA run configurations)
  */
 
-/* dfs framework configuration */
-static int
-dfs_goal_trace_cb(int* stack_element, void *ctx)
+static void *
+get_stack_state (ref_t ref, void *arg)
 {
-    struct write_trace_step_s* trace_ctx = (struct write_trace_step_s*)ctx;
-    // printf("state %p, %d\n", stack_element, *stack_element);
     gsea_state_t state;
-    state.tree.tree_idx = *stack_element;
-    state.state=stack_element;
+    state.tree.tree_idx = ref;
     gc.queue.filo.stack_to_state(&state, NULL);
-    // this is the state..
-    // print_state(&state);
-
-    // last state
-    memcpy(trace_ctx->src_state, trace_ctx->dst_state, global.N * sizeof(int));
-    memcpy(trace_ctx->dst_state, state.state, global.N * sizeof(int));
-
-    write_trace_state(opt.model, trace_ctx->depth, trace_ctx->dst_state);
-    if (trace_ctx->depth != 0)
-        write_trace_step(opt.model, trace_ctx->src_state, trace_ctx->dst_state, trace_ctx->depth);
-    trace_ctx->depth++;
-    return 1;
+    return state.state;
+    (void) arg;
 }
 
 static void
-dfs_goal_trace(gsea_state_t *state, void *arg)
+dfs_goal_trace (gsea_state_t *state, void *arg)
 {
-    int src[global.N];
-    int dst[global.N];
-    struct write_trace_step_s ctx;
-    ctx.src_state = src;
-    ctx.dst_state = dst;
-    ctx.depth = 0;
-    ctx.found = 0;
-
-    // init trace output
-    lts_type_t ltstype = GBgetLTStype(opt.model);
-    opt.trace_output=lts_file_create(opt.trc_output,ltstype,1,lts_vset_template());
-    int T=lts_type_get_type_count(ltstype);
-    for(int i=0;i<T;i++)
-        lts_file_set_table(opt.trace_output,i,GBgetChunkMap(opt.model,i));
-    int init_state[global.N];
-    GBgetInitialState(opt.model, init_state);
-    lts_write_init(opt.trace_output, 0, init_state);
-
-    // init context, pass context to stackwalker
-    dfs_stack_walk_down(gc.queue.filo.stack, dfs_goal_trace_cb, &ctx);
-
-    lts_file_close(opt.trace_output);
-
+    if (state)
+        dfs_stack_push (gc.queue.filo.stack, &(state->tree.tree_idx));
+    else
+        dfs_stack_leave (gc.queue.filo.stack); // drop irrelevant successors
+    size_t          level = dfs_stack_nframes (gc.queue.filo.stack) + 1;
+    ref_t          *trace = RTmalloc (sizeof(ref_t) * level);
+    for (int i = level - 1; i >= 0; i--)
+        trace[level - i - 1] = *dfs_stack_peek_top (gc.queue.filo.stack, i);
+    trc_env_t          *trace_env = trc_create (opt.model, get_stack_state, NULL);
+    Warning (info, "Writing trace to %s", opt.trc_output);
+    trc_write_trace (trace_env, (char *)opt.trc_output, trace, level);
+    RTfree (trace);
     (void)state;
     (void)arg;
 }
@@ -1171,27 +1083,89 @@ scc_state_backtrack(gsea_state_t *state, void *arg)
     return 1;
 }
 
+typedef struct write_trace_step_s {
+    int                 idx_root;
+    int                 idx_current;
+    int                 num_root;
+    int                 num_current;
+    int                 found;
+} write_trace_step_t;
+
+static void
+write_trace_next (void *arg, transition_info_t *ti, int *dst)
+{
+    write_trace_step_t *ctx = (write_trace_step_t*)arg;
+    gsea_state_t next;
+    next.state = dst;
+    dfs_tree_state_to_stack (&next, NULL);
+    int num = gc.store.scc.dfsnum[next.tree.tree_idx];
+    if (next.tree.tree_idx == ctx->idx_root)
+        ctx->found = 1;
+    if (!ctx->found && num <= ctx->num_root && num >= ctx->num_current) {
+        gc.queue.filo.push(&next, NULL);
+    }
+    (void) ti;
+}
+
+static void
+scc_current_reconstruct (gsea_state_t *from, gsea_state_t *end)
+{
+    write_trace_step_t  ctx;
+    gsea_state_t        state;
+    ctx.idx_current = from->tree.tree_idx;
+    ctx.idx_root = end->tree.tree_idx;
+    ctx.num_root = gc.store.scc.dfsnum[end->tree.tree_idx];
+    ctx.num_current = gc.store.scc.dfsnum[from->tree.tree_idx];
+    gc.queue.filo.push(from, NULL);
+    Warning (info, "Reconstructing cycle in SCC: %d <= depth <= %d with root %d", ctx.num_root, ctx.num_current, ctx.idx_root);
+    ctx.found = 0;
+    size_t len = dfs_stack_nframes (gc.queue.filo.stack);
+    while (ctx.found) {
+        state.state = dfs_stack_top (gc.queue.filo.stack);
+        if (state.state != NULL) {
+            state.tree.tree_idx = *state.state;
+            dfs_tree_stack_to_state (&state, NULL);
+            dfs_stack_enter (gc.queue.filo.stack);
+            ctx.found = 0;
+            GBgetTransitionsAll (opt.model, state.state, write_trace_next, &ctx);
+        } else {
+            dfs_stack_leave (gc.queue.filo.stack);
+            state.tree.tree_idx = *dfs_stack_pop (gc.queue.filo.stack);
+            if (ctx.idx_current == state.tree.tree_idx) {
+                Abort ("Failed to reconstruct cycle in SCC at %d <= depth <= %d", ctx.num_root, ctx.num_current);
+            }
+        }
+    }
+    len = dfs_stack_nframes (gc.queue.filo.stack) - len;
+    Warning (info, "Cycle reconstruction succeeded, %zu steps added", len);
+    dfs_stack_enter (gc.queue.filo.stack);
+}
+
 static void
 scc_state_matched(gsea_state_t *state, void *arg)
 {
     if (bitset_test(gc.store.scc.current, state->tree.tree_idx)) {
         int b = 0, r;
         do {
-            r = *dfs_stack_pop(gc.store.scc.roots);
+            r = *dfs_stack_pop (gc.store.scc.roots);
             b |= (r&1);
             if (b) {
                 opt.threshold = global.visited-1;
-                gc.report_progress(arg);
-                Warning(info, "accepting cycle found!");
+                gc.report_progress (arg);
+                Warning (info, "accepting cycle found!");
                 if (opt.trc_output && gc.goal_trace) {
-                    gc.queue.filo.push(state, arg);
-                    gc.goal_trace(state, arg);
+                    while (gc.store.scc.dfsnum[r>>1] > gc.store.scc.dfsnum[state->tree.tree_idx])
+                        r = *dfs_stack_pop (gc.store.scc.roots);
+                    gsea_state_t closing;
+                    closing.tree.tree_idx = r>>1;
+                    scc_current_reconstruct (state, &closing);
+                    gc.goal_trace (NULL, arg);
                 }
-                Warning(info, "exiting now");
-                HREexit(LTSMIN_EXIT_COUNTER_EXAMPLE);
+                Warning (info, "exiting now");
+                HREexit (LTSMIN_EXIT_COUNTER_EXAMPLE);
             }
         } while (gc.store.scc.dfsnum[r>>1] > gc.store.scc.dfsnum[state->tree.tree_idx]);
-        dfs_stack_push(gc.store.scc.roots, &r);
+        dfs_stack_push (gc.store.scc.roots, &r);
     }
     if (gc.scc_state_matched) return gc.scc_state_matched(state, arg);
 }
@@ -1255,9 +1229,9 @@ do_trace(gsea_state_t *state, void *arg, char *type, char *name)
     if (opt.no_exit && !opt.trc_output) return;
     opt.threshold = global.visited-1;
     gc.report_progress(arg);
-    Warning (info, "");
+    Warning (info, " ");
     Warning (info, "%s (%s) found at depth %zu!", type, name, global.depth);
-    Warning (info, "");
+    Warning (info, " ");
     if (opt.trc_output && gc.goal_trace) gc.goal_trace(state, arg);
     Warning(info, "exiting now");
     HREabort(LTSMIN_EXIT_COUNTER_EXAMPLE);
@@ -1272,7 +1246,7 @@ gsea_dlk_wrapper(gsea_state_t *state, void *arg)
     if (state->count != 0 || valid_end_state(state->state)) return; // no deadlock
 
     global.deadlocks++;
-    do_trace(state, arg, "deadlock", "");
+    do_trace(NULL, arg, "deadlock", ""); // state still on stack
 }
 
 static void
@@ -1281,7 +1255,7 @@ gsea_invariant_check(gsea_state_t *state, void *arg)
     if ( eval_predicate(opt.inv_expr, NULL, state->state) ) return; // invariant holds
 
     global.violations++;
-    do_trace(state, arg, "Invariant violation", opt.inv_detect);
+    do_trace(NULL, arg, "Invariant violation", opt.inv_detect); // state still on stack
 }
 
 static void
@@ -1801,10 +1775,10 @@ main (int argc, char *argv[])
     global.N=lts_type_get_state_length(ltstype);
     global.K=dm_nrows(GBgetDMInfo(opt.model));
     global.T=lts_type_get_type_count(ltstype);
-    Warning(info,"length is %d, there are %d groups",global.N,global.K);
+    Warning(info,"length is %zu, there are %zu groups",global.N,global.K);
     global.state_labels=lts_type_get_state_label_count(ltstype);
     global.edge_labels=lts_type_get_edge_label_count(ltstype);
-    Warning(info,"There are %d state labels and %d edge labels",global.state_labels,global.edge_labels);
+    Warning(info,"There are %zu state labels and %zu edge labels",global.state_labels,global.edge_labels);
 
     int src[global.N];
     GBgetInitialState(opt.model,src);

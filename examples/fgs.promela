@@ -1,0 +1,581 @@
+/*************************************************************/
+/*                                                           */
+/* specification of the flight guidance system in SPIN 3.2.4 */
+/*                                                           */
+/* authors: Gerald Luettgen & Victor Carreno                 */
+/* date:    05/09/99                                         */
+/*                                                           */
+/*************************************************************/
+
+/** values of modes **********************************************************/
+
+#define cleared            0
+#define active             1
+#define track              2
+#define armed_initial      3
+#define armed_long_enough  4
+#define off                5
+#define cues               6
+#define no_cues            7
+
+/** events and signals *******************************************************/
+
+mtype = { /* environment events */
+          hdg_switch_hit,              nav_switch_hit,
+          nav_armed_long_enough_event, nav_track_cond_met_event,
+          ga_switch_hit,               vs_pitch_wheel_changed,
+          vs_switch_hit,               fd_switch_hit,
+          overspeed_start,             overspeed_stop,
+          ap_engaged_event,            ap_disengaged_event,
+          sync_switch_pressed,         sync_switch_released,
+
+          /* simple guidance, arming guidance and flight director events */
+          clear,                       activate, 
+          deactivate,                  switch,
+          turn_on,                     turn_off, 
+          force_cues,                  armed_long_enough_event,
+          track_cond_met_event,
+
+          /* signals */
+          activated,                   deactivated,
+          turned_on,                   turned_off,
+          null
+        }
+
+typedef ag_state { byte mode           = cleared;
+                   bool track_cond_met = false
+                 };
+
+/** variables controled by the environment ***********************************/
+
+bool overspeed      = false;
+bool ap_engaged     = false;
+
+/** mode and signal variables & variable for env. event **********************/
+
+bit  pitch = cleared;      bit  old_pitch = cleared;
+bit  vs    = cleared;      bit  old_vs    = cleared;
+bit  vga   = cleared;      bit  old_vga   = cleared;
+bit  roll  = cleared;      bit  old_roll  = cleared;
+bit  hdg   = cleared;      bit  old_hdg   = cleared;
+bit  lga   = cleared;      bit  old_lga   = cleared;
+byte fd    = off;          byte old_fd    = off;
+
+ag_state nav; 
+ag_state old_nav;
+
+mtype pitch_signal = null;      mtype vs_signal   = null;
+mtype vga_signal   = null;      mtype roll_signal = null;
+mtype hdg_signal   = null;      mtype lga_signal  = null;
+mtype nav_signal   = null;      mtype fd_signal   = null;
+
+mtype env_ev = null;
+
+/** useful abbreviations *****************************************************/
+
+#define lateral_mode_requested ((env_ev==hdg_switch_hit) || (env_ev==nav_switch_hit) || (env_ev==ga_switch_hit))
+
+#define vertical_mode_requested ((env_ev==vs_switch_hit) || (env_ev==ga_switch_hit))
+
+inline flight_director_event(env_ev) { (env_ev==ap_engaged_event) || 
+                                       (env_ev==fd_switch_hit)    ||
+                                       (env_ev==overspeed_start)  ||
+                                        lateral_mode_requested    ||
+                                       vertical_mode_requested
+                                     }
+
+/** auxiliary "functions" ****************************************************/
+
+inline hdg_event(env_ev)   { env_ev==hdg_switch_hit }
+
+inline nav_event(env_ev)   { (env_ev==nav_switch_hit)              || 
+                             (env_ev==nav_armed_long_enough_event) ||
+                             (env_ev==nav_track_cond_met_event) 
+                           }
+
+inline lga_event(env_ev)   { (env_ev==ga_switch_hit)       || 
+                             (env_ev==ap_engaged_event)    ||
+                             (env_ev==sync_switch_pressed)
+                           }
+
+inline pitch_event(env_ev) { env_ev==vs_pitch_wheel_changed }
+
+inline vs_event(env_ev)    { env_ev==vs_switch_hit }
+
+inline vga_event(env_ev)   { (env_ev==ga_switch_hit)       ||
+                             (env_ev==ap_engaged_event)    ||
+                             (env_ev==sync_switch_pressed)
+                           }
+
+/** abstract data type module simple guidance ********************************/
+
+inline simple_guidance(mode, event, signal)
+{
+  if
+  :: mode==cleared ->
+       if
+       :: event==activate   -> mode=active;  signal=activated  
+       :: event==deactivate ->               signal=null
+       :: event==switch     -> mode=active;  signal=activated 
+       :: event==clear      ->               signal=null
+       fi
+  :: mode==active  ->
+       if
+       :: event==activate   ->               signal=null
+       :: event==deactivate -> mode=cleared; signal=null       
+       :: event==switch     -> mode=cleared; signal=deactivated
+       :: event==clear      -> mode=cleared; signal=deactivated
+       fi
+  fi
+}
+
+/** abstract data object module arming guidance ******************************/
+
+inline arming_guidance(event, signal)
+{
+  if
+  :: nav.mode==cleared ->
+       if
+       :: event==activate                -> nav.mode          =armed_initial;
+                                            signal            =activated
+       :: event==deactivate              -> signal            =null
+       :: event==switch                  -> nav.mode          =armed_initial;
+                                            signal            =activated
+       :: event==clear                   -> signal            =null
+       :: event==armed_long_enough_event -> signal            =null
+       :: event==track_cond_met_event    -> nav.track_cond_met=true;
+                                            signal            =null
+       fi
+  :: else         ->
+       if
+       :: event==activate                -> signal  =null
+       :: event==deactivate              -> nav.mode=cleared;
+                                            signal  =null
+       :: event==switch                  -> nav.mode=cleared;
+                                            signal  =deactivated
+       :: event==clear                   -> nav.mode=cleared;
+                                            signal  =deactivated
+       :: event==armed_long_enough_event ->
+            if 
+            :: (nav.mode==armed_initial) && 
+               nav.track_cond_met        -> nav.mode=track;
+                                            signal  =null
+            :: (nav.mode==armed_initial) && 
+               !nav.track_cond_met       -> nav.mode=armed_long_enough;
+                                            signal  =null
+            :: else                      -> signal  =null
+            fi
+       :: event==track_cond_met_event    ->
+            if
+            :: nav.mode==armed_long_enough -> nav.mode          =track;
+                                              nav.track_cond_met=true;
+                                              signal            =null
+            :: else                        -> nav.track_cond_met=true;
+                                              signal            =null
+            fi
+       fi
+  fi
+}
+
+/** function module lateral guidance *****************************************/
+
+inline lateral_guidance(env_ev)
+{
+  if
+  :: hdg_event(env_ev) ->
+       simple_guidance(hdg, switch, hdg_signal);
+       if
+       :: hdg_signal==activated   ->
+            simple_guidance(roll, deactivate, roll_signal);
+            simple_guidance(lga,  deactivate, lga_signal );
+            arming_guidance(      deactivate, nav_signal )
+       :: hdg_signal==deactivated ->
+            simple_guidance(roll, activate,   roll_signal)
+       :: else                    -> 
+            skip
+       fi
+  :: nav_event(env_ev) ->
+       if
+       :: env_ev==nav_switch_hit              -> 
+            arming_guidance(switch,                  nav_signal)
+       :: env_ev==nav_track_cond_met_event    -> 
+            arming_guidance(track_cond_met_event,    nav_signal)
+       :: env_ev==nav_armed_long_enough_event ->
+            arming_guidance(armed_long_enough_event, nav_signal)
+       fi;
+       if
+       :: nav_signal==activated   ->
+            simple_guidance(roll, deactivate, roll_signal);
+            simple_guidance(hdg,  deactivate, hdg_signal );
+            simple_guidance(lga,  deactivate, lga_signal )
+       :: nav_signal==deactivated ->
+            simple_guidance(roll, activate,   roll_signal)
+       :: else                    -> 
+            skip
+       fi
+  :: lga_event(env_ev) ->
+       if
+       :: env_ev==ga_switch_hit -> 
+            simple_guidance(lga, activate, lga_signal)
+       :: else                  -> 
+            simple_guidance(lga, clear,    lga_signal)
+       fi;
+       if
+       :: lga_signal==activated   ->
+             simple_guidance(roll, deactivate, roll_signal);
+             simple_guidance(hdg,  deactivate, hdg_signal );
+             arming_guidance(      deactivate, nav_signal )
+       :: lga_signal==deactivated ->
+            simple_guidance(roll,  activate,   roll_signal)
+       :: else                    -> 
+            skip
+       fi
+  :: else              -> 
+       skip
+  fi
+}
+
+/** function module vertical guidance ****************************************/
+
+inline vertical_guidance(env_ev)
+{
+  if
+  :: pitch_event(env_ev) ->
+       simple_guidance(pitch, activate, pitch_signal);
+       if
+       :: pitch_signal==activated ->
+            simple_guidance(vs,  deactivate, vs_signal );
+            simple_guidance(vga, deactivate, vga_signal)
+       :: else                    -> 
+            skip
+       fi
+  :: vs_event(env_ev)    ->
+       simple_guidance(vs, switch, vs_signal);
+       if
+       :: vs_signal==activated   ->
+            simple_guidance(pitch, deactivate, pitch_signal);
+            simple_guidance(vga,   deactivate, vga_signal  )
+       :: vs_signal==deactivated ->
+            simple_guidance(pitch, activate,   pitch_signal)
+       :: else                   -> 
+            skip
+       fi
+  :: vga_event(env_ev)   ->
+       if
+       :: env_ev==ga_switch_hit -> simple_guidance(vga, switch,vga_signal)
+       :: else                  -> simple_guidance(vga, clear, vga_signal)
+       fi;
+       if
+       :: vga_signal==activated   ->
+            simple_guidance(pitch, deactivate, pitch_signal);
+            simple_guidance(vs,    deactivate, vs_signal   )
+       :: vga_signal==deactivated ->
+            simple_guidance(pitch, activate,   pitch_signal)
+       :: else                    -> 
+            skip
+       fi
+  :: else                -> 
+       skip
+  fi
+}
+
+/** abstract data object module flight director ******************************/
+
+inline flight_director(event, signal)
+{
+  if
+  :: fd==off     ->
+       if
+       :: event==force_cues -> fd=cues; signal=turned_on;
+       :: event==turn_on    -> fd=cues; signal=turned_on
+       :: event==switch     -> fd=cues; signal=turned_on
+       :: event==turn_off   ->          signal=null
+       fi
+  :: fd==cues    ->
+       if
+       :: event==force_cues -> signal=null
+       :: event==turn_on    -> signal=null
+       :: event==switch     ->
+            if
+            :: overspeed || ap_engaged -> fd=no_cues; signal=null
+            :: else                    -> fd=off;     signal=turned_off
+            fi 
+       :: event==turn_off   ->
+            if
+            :: overspeed || ap_engaged -> fd=no_cues; signal=null
+            :: else                    -> fd=off;     signal=turned_off
+            fi
+       fi
+  :: else        ->
+       if
+       :: event==force_cues -> fd=cues; signal=null 
+       :: event==turn_on    -> fd=cues; signal=null
+       :: event==switch     ->
+            if
+            :: overspeed || ap_engaged -> fd=cues; signal=null
+            :: else                    -> fd=off;  signal=turned_off
+            fi
+       :: event==turn_off   ->
+            if
+            :: overspeed || ap_engaged ->          signal=null
+            :: else                    -> fd=off;  signal=turned_off
+            fi
+       fi
+  fi
+}
+
+/** mandatory and mode confusion properties as assertions ********************/
+
+#define nav_active ((nav.mode==armed_initial) || (nav.mode==armed_long_enough) || (nav.mode==track))
+
+#define crew_input ((env_ev==ap_engaged_event) || (env_ev==sync_switch_pressed) || (env_ev==sync_switch_released) || (env_ev==fd_switch_hit) || lateral_mode_requested || vertical_mode_requested || (env_ev==vs_pitch_wheel_changed))
+
+#define ignored_crew_input (((env_ev==ap_engaged_event) && !((old_lga==active)||(old_vga==active))) || ((env_ev==sync_switch_pressed) && !((old_lga==active)||(old_vga==active))) || (env_ev==sync_switch_released) || ((env_ev==vs_pitch_wheel_changed) && (old_fd==off)) || ((env_ev==vs_pitch_wheel_changed) && (old_pitch==active)))
+
+#define indirect_mode_change (((env_ev==overspeed_start) && !(old_fd==cues)) || ((env_ev==nav_armed_long_enough_event) && (old_nav.mode==armed_initial)) || ((env_ev==nav_track_cond_met_event) && (old_nav.mode==armed_long_enough)))
+
+#define mode_change ((fd != old_fd) || (pitch != old_pitch) || (vs != old_vs) || (vga != old_vga) || (roll != old_roll) || (hdg != old_hdg) || (lga != old_lga) || (nav.mode != old_nav.mode))
+
+inline mandatory_and_mode_confusion_properties(env_ev)
+{
+  /** the flight director is on if the autopilot is engaged **/
+  assert(!ap_engaged || !(fd==off));
+
+  /** at least one lateral mode is active iff the flight director is on **/
+  assert(
+    ((fd==off) || (roll==active || hdg==active || lga==active || nav_active)
+    ) &&
+    (!(roll==active || hdg==active || lga==active || nav_active) ||
+     !(fd==off)
+    )
+  );
+
+  /** there is never more than one lateral mode active **/
+  assert(
+    (!(lga ==active) || (roll==cleared && hdg==cleared && nav.mode==cleared)
+    ) &&
+    (!(roll==active) ||  (lga==cleared && hdg==cleared && nav.mode==cleared)
+    ) &&
+    (!(hdg ==active) || (roll==cleared && lga==cleared && nav.mode==cleared)
+    ) &&
+    (!(nav_active)   || (roll==cleared && hdg==cleared && lga     ==cleared)
+    )
+  );
+
+  /** at least one vertical mode is active iff the flight director is on **/
+  assert(
+    ((fd==off) || (vga==active || vs==active || pitch==active)
+    ) &&
+    (!(vga==active || vs==active || pitch==active) || !(fd==off)
+    )
+  );
+
+  /** at most one vertical mode is active **/
+  assert(
+    (!(vga  ==active) || (pitch==cleared &&  vs==cleared)) &&
+    (!(vs   ==active) || (pitch==cleared && vga==cleared)) &&
+    (!(pitch==active) || (  vga==cleared &&  vs==cleared))
+  );
+ 
+  /** if the flight director is off, all modes must be cleared **/
+
+  assert(!(fd==off) || (pitch   ==cleared &&   vs==cleared && 
+                          vga   ==cleared && roll==cleared && 
+                          hdg   ==cleared &&  lga==cleared &&
+                        nav.mode==cleared
+                       )
+        );
+
+  /** the default modes are active if the flight director is on and **/
+  /** all other modes are cleared                                   **/
+
+  assert(!(!(fd==off) &&  vs==cleared && vga==cleared && 
+                         hdg==cleared && lga==cleared && nav.mode==cleared
+           ) ||
+         (pitch==active && roll==active)
+        );
+
+  /** mandatory properties **/
+  if
+  :: env_ev==hdg_switch_hit ->
+     /** check for response to pressing HDG button **/
+     assert(!(old_hdg==cleared) || ( hdg==active ));
+     assert(!(old_hdg==active ) || (roll==active ));
+     assert(!(old_hdg==active ) || ( hdg==cleared))
+
+  :: env_ev==nav_switch_hit ->
+     /** check for response to pressing NAV button **/
+     assert(!(old_nav.mode==cleared) || ((nav.mode==armed_initial)     || 
+                                         (nav.mode==armed_long_enough) ||
+                                         (nav.mode==track)
+                                        )
+           );
+     assert(!((old_nav.mode==armed_initial)     ||
+              (old_nav.mode==armed_long_enough) || 
+              (old_nav.mode==track)
+             ) || (roll==active)
+           );
+     assert(!((old_nav.mode==armed_initial)     || 
+              (old_nav.mode==armed_long_enough) || 
+              (old_nav.mode==track)
+             ) || (nav.mode==cleared) 
+           )
+
+  :: env_ev==vs_switch_hit ->
+     /** check for response to pressing VS button **/
+     assert(!(old_vs==cleared) || (vs==active));
+     assert(!(old_vs==active ) || (pitch==active));
+     assert(!(old_vs==active ) || (vs==cleared))
+
+  :: env_ev==fd_switch_hit ->
+     /** check for response to pressing the FD button **/
+     assert(!(old_fd==off) || (fd==cues)); 
+     assert((!(!(old_fd==off) && !(ap_engaged || overspeed))) || (fd==off)); 
+     assert(!((old_fd==cues) && (ap_engaged || overspeed)) || (fd==no_cues));
+     assert(!((old_fd==no_cues) && (ap_engaged || overspeed)) || (fd==cues));
+
+  :: else -> 
+       skip
+
+  fi;
+
+  /** search for ignored crew inputs        **/
+  /** assert(!(crew_input) || mode_change); **/
+  /** property violated                     **/
+
+  /** no unknown ignored crew inputs **/
+  assert(!(crew_input && !(ignored_crew_input)) || mode_change);
+
+  /** search for indirect mode changes            **/
+  /** assert(!(!(crew_input)) || !(mode_change)); **/
+  /** property violated                           **/
+
+  /** no unknown indirect mode changes **/
+  assert(!(!(crew_input) && !(indirect_mode_change)) || !(mode_change));
+
+  /** save the current mode values **/
+  old_pitch = pitch;  old_vs    = vs;  old_vga   = vga;  old_roll  = roll;
+  old_hdg   = hdg;    old_lga   = lga; old_fd    = fd;
+
+  old_nav.mode = nav.mode;  old_nav.track_cond_met = nav.track_cond_met
+}
+
+/*****************************************************************************/
+
+inline clear_all_modes()
+{
+  pitch=cleared;   vs=cleared;       vga=cleared;  roll=cleared; 
+    hdg=cleared;  lga=cleared;  nav.mode=cleared
+}
+
+/*****************************************************************************/
+
+inline select_default_mode()
+{
+  pitch=active;  roll=active
+}
+
+
+/*****************************************************************************/
+
+inline process_external_event(env_ev)
+{
+  if
+  :: env_ev==ap_engaged_event    -> ap_engaged=true
+  :: env_ev==ap_disengaged_event -> ap_engaged=false
+  :: env_ev==overspeed_start     -> overspeed =true
+  :: env_ev==overspeed_stop      -> overspeed =false
+  :: else                        -> skip
+  fi
+}
+
+/*****************************************************************************/
+
+inline process_fd_event(env_ev)
+{
+  if
+  :: flight_director_event(env_ev) ->
+       if
+       :: env_ev==fd_switch_hit    -> flight_director(switch, fd_signal)
+       :: env_ev==overspeed_start  -> flight_director(force_cues, fd_signal)
+       :: else                     -> flight_director(turn_on, fd_signal)
+       fi;
+       if
+       :: fd_signal==turned_off    -> clear_all_modes()
+       :: fd_signal==turned_on     -> select_default_mode()
+       :: else                     -> skip
+       fi       
+  :: else                          -> 
+       skip
+  fi
+}
+
+/*****************************************************************************/
+
+inline process_flight_mode_event(env_ev)
+{
+  if
+  :: !(fd==off) -> lateral_guidance(env_ev);  vertical_guidance(env_ev)
+  :: else       -> skip
+  fi
+}
+
+/*****************************************************************************/
+
+inline clear_signals()
+{
+  pitch_signal = null;  vs_signal    = null;
+  vga_signal   = null;  roll_signal  = null;
+  hdg_signal   = null;  lga_signal   = null;
+  nav_signal   = null;  fd_signal    = null
+}
+
+/** main module performing modeling one synchronous step of the system *******/
+
+inline fgs(env_ev)
+{
+  process_external_event(env_ev);
+  process_fd_event(env_ev);
+  process_flight_mode_event(env_ev);
+  clear_signals();                         /** signals are no longer needed **/
+  mandatory_and_mode_confusion_properties(env_ev)
+}
+
+/** init process, including model of the environment *************************/
+
+init
+{ 
+  end_main: do            /* loop body encodes 1 synchronous step     */
+            :: atomic{ if /* nondeterministically choose env. event   */
+                       :: env_ev=hdg_switch_hit
+                       :: env_ev=nav_switch_hit
+                       :: env_ev=nav_armed_long_enough_event
+                       :: env_ev=nav_track_cond_met_event
+                       :: env_ev=ga_switch_hit
+                       :: env_ev=vs_pitch_wheel_changed
+                       :: env_ev=vs_switch_hit
+                       :: env_ev=fd_switch_hit
+                       :: env_ev=overspeed_start
+                       :: env_ev=overspeed_stop
+                       :: env_ev=ap_engaged_event
+                       :: env_ev=ap_disengaged_event
+                       :: env_ev=sync_switch_pressed
+                       :: env_ev=sync_switch_released
+                       fi;
+                       fgs(env_ev); /* perform synchronous step       */
+                       env_ev=null  /* env. event is no longer needed */
+                     }
+            od
+}
+
+/*****************************************************************************/
+/*
+/* end of fgs.spin
+/*
+/*****************************************************************************/
+
+
+
+
+
+

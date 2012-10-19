@@ -307,15 +307,15 @@ static int list_item(void*arg,int no,archive_item_t item){
     ((struct list_count*)arg)->total_compressed+=item->compressed;
     if (item->code==NULL || strlen(item->code)==0) {
         if (item->compressed<item->length && item->compressed>0) {
-            Printf(infoShort,"%12lld %12lld %s\n",item->length,item->compressed,item->name);
+            Printf(infoShort,"%12zd %12zd %s\n",(ssize_t)item->length,(ssize_t)item->compressed,item->name);
         } else {
-            Printf(infoShort,"%12lld %12s %s\n",item->length,"",item->name);
+            Printf(infoShort,"%12zd %12s %s\n",(ssize_t)item->length,"",item->name);
         }
     } else {
         if (item->compressed==item->length || item->compressed==0) {
-            Printf(infoShort,"%12lld %12s %s (%s)\n",item->length,"",item->name,item->code);
+            Printf(infoShort,"%12zd %12s %s (%s)\n",(ssize_t)item->length,"",item->name,item->code);
         } else {
-            Printf(infoShort,"%12lld %12lld %s (%s)\n",item->length,item->compressed,item->name,item->code);
+            Printf(infoShort,"%12zd %12zd %s (%s)\n",(ssize_t)item->length,(ssize_t)item->compressed,item->name,item->code);
         }
     }
     return 0;
@@ -334,18 +334,18 @@ static void gcf_list(){
     struct arch_enum_callbacks cb={.stat=list_item};
     struct list_count totals={0,0,0};
     Printf(infoShort,"Archive %s contains:\n",gcf_name);
-    Printf(infoShort," stream size   compressed stream name (compression)\n",gcf_name);
+    Printf(infoShort," stream size   compressed stream name (compression)\n");
     arch_enum_t e=arch_enum(gcf,NULL);
     if (arch_enumerate(e,&cb,&totals)){
         Abort("unexpected non-zero return");
     }
     Printf(infoShort,"totals:\n");
-    Printf(infoShort,"%12lld %12lld files: %d (%3.2f%%)\n",
-        totals.total_orig,totals.total_compressed,totals.files,
+    Printf(infoShort,"%12zd %12zd files: %d (%3.2f%%)\n",
+           (ssize_t)totals.total_orig,(ssize_t)totals.total_compressed,totals.files,
         100.0*((float)(totals.total_orig-totals.total_compressed))/((float)totals.total_orig));
     arch_enum_free(&e);
     uint64_t gcf_size=raf_size(raf);
-    Printf(infoShort,"gcf file size%12llu (%3.2f%% overhead, %3.2f%% compression)\n",gcf_size,
+    Printf(infoShort,"gcf file size%12zu (%3.2f%% overhead, %3.2f%% compression)\n",(size_t)gcf_size,
         100.0*((float)(gcf_size-totals.total_compressed))/((float)totals.total_compressed),
         100.0*(((float)totals.total_orig)-((float)gcf_size))/((float)totals.total_orig));
     arch_close(&gcf);

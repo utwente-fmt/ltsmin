@@ -7,10 +7,13 @@ CXXFLAGS = @CXXFLAGS@ -Wno-unused-parameter -Wno-overloaded-virtual
 # libvset
 libvset_la_SOURCES   = vector_set.c vector_set.h vdom_object.h
 libvset_la_SOURCES  += vset_listdd.c
+libvset_la_SOURCES  += vset_listdd64.c
 libvset_la_SOURCES  += vset_buddy.c
 libvset_la_CPPFLAGS  = $(BUDDY_CPPFLAGS)
 libvset_la_LDFLAGS   = $(BUDDY_LDFLAGS)
 libvset_la_LIBADD    = $(BUDDY_LIBS)
+libvset_la_LIBADD   += ../util-lib/libutil.la
+libvset_la_LIBADD   += ../hre-io/libhre-io.la
 
 if HAVE_SYLVAN
 libvset_la_SOURCES  += vset_sylvan.c

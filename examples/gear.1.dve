@@ -1,0 +1,154 @@
+
+ // maximal gear
+
+
+
+
+// timers
+byte tGB = 255, tC = 255, tE = 255, tGC = 255;
+
+channel OpenClutch, CloseClutch, ClutchIsOpen, ClutchIsClosed;
+channel ReqSet, ReqNeu, GearSet, GearNeu;
+channel ReqSpeed, ReqTorque, ReqZeroTorque, TorqueZero, SpeedSet;
+channel ReqNewGear, NewGear;
+
+int toGear=0;
+int currentGear = 0;
+
+process Clutch {
+state closed, opening, open, closing, error_open, error_close;
+init closed;
+trans
+ closed -> opening { sync OpenClutch?;  effect tC = 3; },
+ opening -> open { guard tC <= 1; sync ClutchIsOpen!; effect tC = 255; },
+ opening -> error_open { guard tC == 0; effect tC = 255; },
+ open -> closing { sync CloseClutch?; effect tC = 3; },
+ closing -> closed { guard tC <= 1; sync ClutchIsClosed!; effect tC = 255; },
+ closing -> error_close { guard tC == 0; effect tC = 255; }; 
+}
+
+process GearBox {
+state neutral, closing, idle, opening, error_idle, error_neu;
+init neutral;
+trans
+ neutral -> closing { sync ReqSet?; effect tGB = 6; },
+ closing -> error_idle { guard tGB == 0; effect tGB = 255; },
+ closing -> idle { guard tGB <= 4; sync GearSet!; effect tGB = 255; },
+ idle -> opening { sync ReqNeu?; effect tGB = 4; },
+ opening -> error_neu { guard tGB == 0; effect tGB = 255; },
+ opening -> neutral { guard tGB <=2; sync GearNeu!; effect tGB = 255; };
+}
+
+process Engine {
+state torque, dec_torque, clutch_close, clutch_open, initial, speed, error_speed,
+find_speed, zero;
+init initial;
+trans
+ initial -> find_speed {sync ReqSpeed?; effect tE = 4; },
+
+ find_speed -> clutch_open { guard tE == 0; },
+ find_speed -> speed { guard tE <= 3; sync SpeedSet!; effect tE = 10; },
+
+ clutch_open -> initial { guard toGear==0; },
+ clutch_open -> clutch_close { guard toGear!=0; effect tE = 18; },
+
+ speed -> error_speed { guard tE == 0; effect tE = 255; },
+ speed -> torque { guard tE >0; sync ReqTorque?; effect tE = 255; },
+
+ clutch_close -> error_speed { guard tE == 0; effect tE = 255; },
+ clutch_close -> torque { guard tE < 17; sync ReqTorque?; effect tE = 255; },
+
+ torque -> dec_torque { sync ReqZeroTorque?; effect tE = 8; },
+
+ dec_torque -> clutch_open { guard tE == 0; },
+ dec_torque -> zero { guard tE <= 5; sync TorqueZero!; effect tE = 255; },
+
+ zero -> initial { guard toGear == 0; },
+ zero -> find_speed { guard toGear != 0; sync ReqSpeed?; effect tE = 4; };
+}
+
+process Interface {
+state gear, go_up, go_down;
+init gear;
+trans
+ gear -> go_up { guard currentGear < 5; sync ReqNewGear!1; },
+ go_up -> gear { sync NewGear?; effect currentGear = currentGear + 1; },
+ gear -> go_down { guard currentGear >-1; sync ReqNewGear!-1; },
+ go_down -> gear { sync NewGear?; effect currentGear = currentGear - 1; };
+}
+
+process GearControl {
+int dir;
+state gear, initiate, check_torque, req_neu_gear, check_gear_neu,
+copen_error, clutch_open2, gneu_error, check_gear_neu2, req_sync_speed,
+check_clutch, req_set_gear2, check_sync_speed, req_set_gear, clutch_open,
+check_gear_set1, gset_error, check_gear_set2, req_torque, check_clutch_closed, clutch_close,
+gear_changed, check_clutch_closed2, check_clutch2, cclose_error;
+init gear;
+
+trans
+ gear -> initiate { sync ReqNewGear?dir; effect toGear = toGear + dir;},
+
+ initiate -> check_torque { guard currentGear != 0; sync ReqZeroTorque!; effect tGC = 5; },
+ initiate -> req_sync_speed { guard currentGear == 0; },
+
+ req_sync_speed -> gear_changed { guard toGear == 0; },
+ req_sync_speed -> check_sync_speed { guard toGear!=0; sync ReqSpeed!; effect tGC = 3; },
+
+ check_sync_speed -> req_set_gear { guard tGC >0; sync SpeedSet?; },
+ check_sync_speed -> check_clutch { guard tGC ==0; sync OpenClutch!; effect tGC = 4; },
+
+ req_set_gear -> check_gear_set1 { sync ReqSet!; effect tGC = 7; },
+
+ check_gear_set1 -> req_torque { sync GearSet?; effect tGC = 0; },
+ check_gear_set1 -> gset_error { guard tGC ==0; effect tGC = 255; },
+
+ req_torque -> gear_changed { sync ReqTorque!; },
+ gear_changed -> gear { sync NewGear!; effect tGC=255; },
+
+ check_torque -> req_neu_gear { guard tGC >0; sync TorqueZero?; },
+ check_torque -> check_clutch2 { guard tGC == 0; sync OpenClutch!; effect tGC = 4; },
+
+ req_neu_gear -> check_gear_neu { sync ReqNeu!; effect tGC = 5; },
+
+ check_gear_neu -> req_sync_speed { sync GearNeu?; },
+ check_gear_neu -> gneu_error { guard tGC == 0; effect tGC = 255; }, 
+
+ check_clutch2 -> copen_error { guard tGC == 0; effect tGC = 255; },
+ check_clutch2 -> clutch_open2 { sync ClutchIsOpen?; effect tGC = 0;},
+
+ clutch_open2 -> check_gear_neu2 { sync ReqNeu!; effect tGC = 5; },
+
+ check_gear_neu2 -> gneu_error { guard tGC == 0; effect tGC = 255; },
+ check_gear_neu2 -> req_set_gear2 { sync GearNeu?; effect tGC = 0; },
+
+ req_set_gear2 -> check_gear_set2 { guard toGear != 0; sync ReqSet!; effect tGC = 7; },
+ req_set_gear2 -> check_clutch_closed2 { guard toGear==0; sync CloseClutch!; effect tGC = 4;},
+
+ check_clutch -> copen_error { guard tGC ==0; },
+ check_clutch -> clutch_open { sync ClutchIsOpen?; effect tGC = 0; },
+
+ clutch_open -> check_gear_set2 { sync ReqSet!; effect tGC = 7; },
+
+ check_gear_set2 -> gset_error { guard tGC == 0; effect tGC = 255; },
+ check_gear_set2 -> clutch_close { sync GearSet?; effect tGC = 0; },
+
+ clutch_close -> check_clutch_closed {sync CloseClutch!; effect tGC = 4; },
+
+ check_clutch_closed -> req_torque { sync ClutchIsClosed?; effect tGC = 0; },
+ check_clutch_closed -> cclose_error { guard tGC == 0; effect tGC = 255;},
+ 
+ check_clutch_closed2 -> cclose_error { guard tGC == 0; effect tGC = 255; },
+ check_clutch_closed2 -> gear_changed { sync ClutchIsClosed?; effect tGC = 0;};
+
+}
+
+process Timer {
+state q;
+init q;
+trans
+ q -> q { guard tGB != 0 && tC != 0 && tE !=0 && tGC !=0;
+	  effect tGB = (tGB-1) | ((tGB==255)*255), tC = (tC-1) | ((tC==255)*255), tE = (tE-1) | ((tE==255)*255), tGC = (tGC-1) | ((tGC==255)*255);} ;
+}
+
+system async;

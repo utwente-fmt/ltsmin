@@ -28,11 +28,11 @@ typedef struct ltl_context {
 } ltl_context_t;
 
 typedef struct cb_context {
-    TransitionCB cb;
-    void* user_context;
-    int*  src;
-    int   ntbtrans;               /* number of textbook transitions */
-    ltl_context_t *ctx;
+    TransitionCB    cb;
+    void           *user_context;
+    int            *src;
+    int             ntbtrans; /* number of textbook transitions */
+    ltl_context_t  *ctx;
 } cb_context;
 
 static int
@@ -52,7 +52,8 @@ ltl_sl_long(model_t model, int label, int *state)
 {
     ltl_context_t *ctx = GBgetContext(model);
     if (label == ctx->sl_idx_accept) {
-        return state[ctx->ltl_idx] == -1 || ctx->ba->states[state[ctx->ltl_idx]]->accept;
+        HREassert (state[ctx->ltl_idx] < ctx->ba->state_count);
+        return ctx->ba->states[state[ctx->ltl_idx]]->accept;
     } else {
         return GBgetStateLabelLong(GBgetParent(model), label, state);
     }
@@ -63,8 +64,8 @@ ltl_sl_all(model_t model, int *state, int *labels)
 {
     ltl_context_t *ctx = GBgetContext(model);
     GBgetStateLabelsAll(GBgetParent(model), state, labels);
-    labels[ctx->sl_idx_accept] =
-        state[ctx->ltl_idx] == -1 || ctx->ba->states[state[ctx->ltl_idx]]->accept;
+    HREassert (state[ctx->ltl_idx] < ctx->ba->state_count);
+    labels[ctx->sl_idx_accept] = ctx->ba->states[state[ctx->ltl_idx]]->accept;
 }
 
 /*
@@ -76,7 +77,7 @@ void ltl_ltsmin_cb (void*context,transition_info_t*ti,int*dst) {
     // copy dst, append ltl never claim in lockstep
     int dst_buchi[ctx->len];
     int dst_pred[1] = {0}; // assume < 32 predicates..
-    memcpy(dst_buchi, dst, ctx->len * sizeof(int) );
+    memcpy(dst_buchi, dst, (ctx->len - 1) * sizeof(int) );
     // evaluate predicates
     for(int i=0; i < ctx->ba->predicate_count; i++) {
         if (eval_predicate(ctx->ba->predicates[i], ti, infoctx->src)) /* ltsmin: src instead of dst */
@@ -84,7 +85,7 @@ void ltl_ltsmin_cb (void*context,transition_info_t*ti,int*dst) {
     }
 
     int i = infoctx->src[ctx->ltl_idx];
-
+    HREassert (i < ctx->ba->state_count);
     for(int j=0; j < ctx->ba->states[i]->transition_count; j++) {
         // check predicates
         if ((dst_pred[0] & ctx->ba->states[i]->transitions[j].pos[0]) == ctx->ba->states[i]->transitions[j].pos[0] &&
@@ -144,7 +145,7 @@ void ltl_spin_cb (void*context,transition_info_t*ti,int*dst) {
     // copy dst, append ltl never claim in lockstep
     int dst_buchi[ctx->len];
     int dst_pred[1] = {0}; // assume < 32 predicates..
-    memcpy(dst_buchi, dst, ctx->len * sizeof(int) );
+    memcpy(dst_buchi, dst, (ctx->len - 1) * sizeof(int) );
     // evaluate predicates
     for(int i=0; i < ctx->ba->predicate_count; i++) {
         if (eval_predicate(ctx->ba->predicates[i], ti, infoctx->src)) /* spin: src instead of dst */
@@ -194,8 +195,9 @@ ltl_spin_all (model_t self, int *src, TransitionCB cb,
     int trans = GBgetTransitionsAll(ctx->parent, src, ltl_spin_cb, &new_ctx);
     if (0 == trans) { // deadlock, let buchi continue unchecked
         int dst_buchi[ctx->len];
-        memcpy(dst_buchi, src, ctx->len * sizeof(int) );
+        memcpy(dst_buchi, src, (ctx->len - 1) * sizeof(int) );
         int i = src[ctx->ltl_idx];
+        HREassert (i < ctx->ba->state_count );
         int labels[ctx->edge_labels];
         memset (labels, 0, sizeof(int) * ctx->edge_labels);
         for(int j=0; j < ctx->ba->states[i]->transition_count; j++) {
@@ -227,7 +229,7 @@ void ltl_textbook_cb (void*context,transition_info_t*ti,int*dst) {
 
     int i = infoctx->src[ctx->ltl_idx];
     if (i == -1) { i=0; } /* textbook: extra initial state */
-
+    HREassert (i < ctx->ba->state_count );
     for(int j=0; j < ctx->ba->states[i]->transition_count; j++) {
         // check predicates
         if ((dst_pred[0] & ctx->ba->states[i]->transitions[j].pos[0]) == ctx->ba->states[i]->transitions[j].pos[0] &&
@@ -284,7 +286,7 @@ ltl_textbook_all (model_t self, int *src, TransitionCB cb, void *user_context)
 }
 
 void
-print_ltsmin_buchi(const ltsmin_buchi_t *ba)
+print_ltsmin_buchi(const ltsmin_buchi_t *ba, ltsmin_parse_env_t env)
 {
     Warning(info, "buchi has %d states", ba->state_count);
     for(int i=0; i < ba->state_count; i++) {
@@ -296,13 +298,15 @@ print_ltsmin_buchi(const ltsmin_buchi_t *ba)
             *at = '\0';
             for(int k=0; k < ba->predicate_count; k++) {
                 if (ba->states[i]->transitions[j].pos[k/32] & (1<<(k%32))) {
-                    if (at != buf) { sprintf(at, " && "); at += strlen(at); }
-                    at = ltsmin_expr_print_ltl(ba->predicates[k], at);
+                    if (at != buf)
+                        at += sprintf(at, " && ");
+                    at += LTSminSPrintExpr(at, ba->predicates[k], env);
                 }
                 if (ba->states[i]->transitions[j].neg[k/32] & (1<<(k%32))) {
-                    if (at != buf) { sprintf(at, " && "); at += strlen(at); }
+                    if (at != buf)
+                        at += sprintf(at, " && ");
                     *at++ = '!';
-                    at = ltsmin_expr_print_ltl(ba->predicates[k], at);
+                    at += LTSminSPrintExpr(at, ba->predicates[k], env);
                 }
             }
             if (at == buf) sprintf(at, "true");
@@ -320,22 +324,24 @@ init_ltsmin_buchi(model_t model, const char *ltl_file)
 {
     lts_type_t ltstype = GBgetLTStype(model);
     if (NULL == shared_ba && cas(&grab_ba, 0, 1)) {
-        Warning(info,"Initializing LTL layer.., formula file %s", ltl_file);
+        Warning(info,"Initializing LTL layer.., formula: %s", ltl_file);
         int idx = GBgetAcceptingStateLabelIndex (model);
         if (idx != -1) {
             Abort ("LTL layer initialization failed, model already has a ``%s'' property",
-                  lts_type_get_state_label_name (ltstype,idx));
+                   lts_type_get_state_label_name(ltstype,idx));
         }
-        ltsmin_expr_t ltl = parse_file (ltl_file, ltl_parse_file, model);
+        ltsmin_parse_env_t env = LTSminParseEnvCreate();
+        ltsmin_expr_t ltl = parse_file_env (ltl_file, ltl_parse_file, model, env);
         ltsmin_expr_t notltl = LTSminExpr(UNARY_OP, LTL_NOT, 0, ltl, NULL);
         ltsmin_ltl2ba(notltl);
-        ltsmin_buchi_t* ba = ltsmin_buchi();
+        ltsmin_buchi_t *ba = ltsmin_buchi();
         if (NULL == ba)
             Abort ("Empty buchi automaton.");
         if (ba->predicate_count > 30)
             Abort("more than 30 predicates in buchi automaton are currently not supported");
         atomic_write (&shared_ba, ba);
-        print_ltsmin_buchi(ba);
+        print_ltsmin_buchi(ba, env);
+        LTSminParseEnvDestroy (env);
     } else {
         while (NULL == atomic_read(&shared_ba)) {}
     }
@@ -369,6 +375,8 @@ GBaddLTL (model_t model, const char *ltl_file, pins_ltl_type_t type, model_t por
     // add type
     int type_count = lts_type_get_type_count(ltstype_new);
     int ltl_type = lts_type_add_type(ltstype_new, "buchi", NULL);
+    lts_type_set_format (ltstype_new, ltl_type, LTStypeDirect);
+
     // sanity check, type ltl is new (added last)
     HREassert (ltl_type == type_count, "LTL type error");
     int bool_is_new;

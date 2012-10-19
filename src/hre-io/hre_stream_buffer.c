@@ -56,7 +56,7 @@ static size_t buf_read_max(stream_t stream,void*buf,size_t count){
 
 static void buf_read(stream_t stream,void*buf,size_t count){
     size_t res=buf_read_max(stream,buf,count);
-    if (res<count) Abort("short read %d instead of %d",res,count);
+    if (res<count) Abort("short read %zu instead of %zu",res,count);
 }
 
 static int buf_empty(stream_t stream){

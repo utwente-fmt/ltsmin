@@ -92,7 +92,7 @@ static void TRACE_IN(char *f, ...)
         ptr+=sprintf(ptr, "%s%u", bdd&0x8000000?"~":"", bdd&0x7ffffff);
     }
     ptr+=sprintf(ptr, ");");
-    Warning(info, buf);
+    Warning(info, "%s", buf);
     va_end(args);
 }
 

@@ -102,7 +102,7 @@ request_random (lb_t *lb, size_t id)
         res = rand_r (&lb->local[id]->seed) % lb->threads;
     } while (res == id);
     fetch_or (&lb->local[res]->requests, 1L << id);
-    Debug ("Requested %lld", res);
+    Debug ("Requested %zu", res);
     return 1;
 }
 

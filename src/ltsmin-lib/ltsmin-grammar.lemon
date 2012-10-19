@@ -21,7 +21,7 @@ This section is shared by the parsers for all LTSmin languages.
     HREmessage(error,"syntax error near line %d, pos %d",env->lineno+1,env->linepos+1);
 }
 %parse_failure { HREabort(0); }
-%parse_accept { Warning(info,"success!"); }
+%parse_accept { Warning(infoLong,"success!"); }
 %extra_argument { ltsmin_parse_env_t env }
 %stack_overflow {
     (void)yypMinor;
@@ -34,7 +34,7 @@ This section contains the grammar definition of ETF.
 */
 
 input ::= ETF etf_spec . {
-    Warning(info,"parsing finished");
+    Warning(infoLong,"parsing finished");
     etf_model_t model=env->etf;
     lts_type_set_state_label_count(model->ltstype,model->map_count);
     for(int i=0;i<model->map_count;i++){
@@ -66,7 +66,7 @@ state_section ::= BEGIN STATE decl_list(L) END STATE. {
     if (N==0) {
         Abort("state vector length must be at least 1");
     }
-    Warning(info,"The state length is %d",N);
+    Warning(infoLong,"The state length is %d",N);
     lts_type_set_state_length(env->etf->ltstype,N);
     etf_list_t list=L;
     for(int i=N-1;i>=0;i--){
@@ -82,13 +82,13 @@ state_section ::= BEGIN STATE decl_list(L) END STATE. {
         list=list->prev;
     }
     ETFlistFree(L);
-    Warning(info,"done");
+    Warning(infoLong,"done");
 }
 
 edge_section ::= BEGIN EDGE decl_list(L) END EDGE.
 {
     int N=ETFlistLength(L);
-    Warning(info,"There are %d edge labels",N);
+    Warning(infoLong,"There are %d edge labels",N);
     lts_type_set_edge_label_count(env->etf->ltstype,N);
     etf_list_t list=L;
     for(int i=N-1;i>=0;i--){
@@ -100,7 +100,7 @@ edge_section ::= BEGIN EDGE decl_list(L) END EDGE.
         list=list->prev;
     }
     ETFlistFree(L);
-    Warning(info,"done");
+    Warning(infoLong,"done");
 }
 
 init_section ::= BEGIN INIT valref_list(L) END INIT.
@@ -130,7 +130,7 @@ init_section ::= BEGIN INIT valref_list(L) END INIT.
 	list=list->prev;
     }
     ETFlistFree(L);
-    Warning(info,"initial state found");
+    Warning(infoLong,"initial state found");
 }
 
 %type valref_list { etf_list_t }
@@ -149,12 +149,12 @@ decl_list(L) ::= decl_list(P) IDENT(N) COLON IDENT(T) . { L=ETFlistAppend(P,N,T)
 %type sort_list { string_index_t }
 
 sort_section ::= BEGIN SORT sort_list(IDX) END SORT. {
-    Warning(info,"read %d values",SIgetCount(IDX));
+    Warning(infoLong,"read %d values",SIgetCount(IDX));
 }
 
 sort_list(IDX) ::= IDENT(ID) . {
     char *name=SIget(env->idents,ID);
-    Warning(info,"reading values for sort %s",name);
+    Warning(infoLong,"reading values for sort %s",name);
     int typeno=ETFgetType(env->etf,name);
     IDX=env->etf->type_values[typeno];
     if (SIgetCount(IDX)!=0) {
@@ -179,7 +179,7 @@ trans_section ::= BEGIN TRANS trans_list(R) end TRANS. {
         env->etf->trans[env->etf->trans_count]=R;
         env->etf->trans_count++;
     } else {
-        Warning(info,"skipping empty trans section");
+        Warning(infoLong,"skipping empty trans section");
     }
 }
 
@@ -192,7 +192,7 @@ map_section ::= BEGIN MAP map_list(M) end MAP. {
     char*name=env->etf->map_names[env->etf->map_count];
     char*sort=env->etf->map_types[env->etf->map_count];
     //int typeno=ETFgetType(env->etf,sort);
-    Warning(info,"added map %d (%s:%s) with %d entries",
+    Warning(infoLong,"added map %d (%s:%s) with %d entries",
             env->etf->map_count,name,sort,ETFmapCount(M));
     env->etf->map_count++;
     env->etf_current_idx=NULL;
@@ -314,9 +314,7 @@ that can be reused for other languages (e.g. CTL, CTL* and LTL)
 
 input ::= EXPR expr(E) . {
     (void)E;
-    log_printf(info,"Expression is: ");
-    LTSminPrintExpr(info,env,E);
-    log_printf(info,"\n");
+    LTSminLogExpr(info,"Expression is: ",E,env);
     env->expr=E;
 }
 

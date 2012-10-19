@@ -256,7 +256,7 @@ static void write_header(lts_file_t file){
     DSwriteS(ds,comment);
 // the LTS type
     lts_type_serialize(ltstype,fs);
-    Debug("ltstype is %d bytes",FIFOsize(fs));
+    Debug("ltstype is %zu bytes",FIFOsize(fs));
     DSwriteVL(ds,FIFOsize(fs));
     for(;;){
         char data[1024];
@@ -286,7 +286,7 @@ static void write_header(lts_file_t file){
     write_state_mode(fs,lts_file_source_mode(file));
     // dest mode
     write_state_mode(fs,lts_file_dest_mode(file));
-    Debug("state format info is %d bytes",FIFOsize(fs));
+    Debug("state format info is %zu bytes",FIFOsize(fs));
     DSwriteVL(ds,FIFOsize(fs));
     for(;;){
         char data[1024];

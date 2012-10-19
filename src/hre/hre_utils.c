@@ -9,7 +9,7 @@
 char* HREstrdup(const char *str){
     if (str == NULL) return NULL;
     char *tmp = strdup (str);
-    if (tmp == NULL) Abort("out of memory trying to get %d", strlen (str)+1);
+    if (tmp == NULL) Abort("out of memory trying to get %zu", strlen (str)+1);
     return tmp;
 }
 

@@ -392,7 +392,7 @@ void lts_type_serialize(lts_type_t t,stream_t ds){
 		DSwriteU32(ds,lts_type_get_state_typeno(t,i));
 	}
 	N=lts_type_get_state_label_count(t);
-	Warning(info,"%d state labels",N);
+	Warning(debug,"%d state labels",N);
 	DSwriteU32(ds,N);
 	for(uint32_t i=0;i<N;i++){
 		char*x=lts_type_get_state_label_name(t,i);
@@ -400,7 +400,7 @@ void lts_type_serialize(lts_type_t t,stream_t ds){
 		DSwriteU32(ds,lts_type_get_state_label_typeno(t,i));
 	}
 	N=lts_type_get_edge_label_count(t);
-	Warning(info,"%d edge labels",N);
+	Warning(debug,"%d edge labels",N);
 	DSwriteU32(ds,N);
 	for(uint32_t i=0;i<N;i++){
 		char*x=lts_type_get_edge_label_name(t,i);
@@ -409,7 +409,7 @@ void lts_type_serialize(lts_type_t t,stream_t ds){
 		Warning(debug,"edge label %d is %s : %s",i,x,lts_type_get_edge_label_type(t,i));
 	}
 	N=lts_type_get_type_count(t);
-	Warning(info,"%d types",N);
+	Warning(debug,"%d types",N);
 	DSwriteU32(ds,N);
 	for(uint32_t i=0;i<N;i++){
 		DSwriteS(ds,lts_type_get_type(t,i));
@@ -430,7 +430,7 @@ lts_type_t lts_type_deserialize(stream_t ds){
 		Abort("cannot deserialize %s",version);
 	}
 	uint32_t N=DSreadU32(ds);
-	Warning(info,"state length is %d",N);
+	Warning(debug,"state length is %d",N);
 	lts_type_set_state_length(t,N);
 	for(uint32_t i=0;i<N;i++){
 		char*x=DSreadSA(ds);
@@ -439,7 +439,7 @@ lts_type_t lts_type_deserialize(stream_t ds){
 		lts_type_set_state_typeno(t,i,DSreadU32(ds));
 	}
 	N=DSreadU32(ds);
-	Warning(info,"%d state labels",N);
+	Warning(debug,"%d state labels",N);
 	lts_type_set_state_label_count(t,N);
 	for(uint32_t i=0;i<N;i++){
 		char*x=DSreadSA(ds);
@@ -448,7 +448,7 @@ lts_type_t lts_type_deserialize(stream_t ds){
 		lts_type_set_state_label_typeno(t,i,DSreadU32(ds));
 	}
 	N=DSreadU32(ds);
-	Warning(info,"%d edge labels",N);
+	Warning(debug,"%d edge labels",N);
 	lts_type_set_edge_label_count(t,N);
 	for(uint32_t i=0;i<N;i++){
 		char*x=DSreadSA(ds);
@@ -457,7 +457,7 @@ lts_type_t lts_type_deserialize(stream_t ds){
 		lts_type_set_edge_label_typeno(t,i,DSreadU32(ds));
 	}
 	N=DSreadU32(ds);
-	Warning(info,"%d types",N);
+	Warning(debug,"%d types",N);
 	for(uint32_t i=0;i<N;i++){
 		char*x=DSreadSA(ds);
 		SIputAt(t->type_db,x,i);

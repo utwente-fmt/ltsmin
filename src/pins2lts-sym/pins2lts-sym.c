@@ -148,7 +148,7 @@ static  struct poptOption options[] = {
     { "no-exit", 'n', POPT_ARG_VAL, &no_exit, 1, "no exit on error, just count (for error counters use -v)", NULL },
     { "trace" , 0 , POPT_ARG_STRING , &trc_output , 0 , "file to write trace to" , "<lts-file>.gcf" },
     { "mu" , 0 , POPT_ARG_STRING , &mu_formula , 0 , "file with a mu formula" , "<mu-file>.mu" },
-    { "ctl" , 0 , POPT_ARG_STRING , &ctl_formula , 0 , "file with a ctl* formula" , "<ctl-file>.ctl" },
+    { "ctl-star" , 0 , POPT_ARG_STRING , &ctl_formula , 0 , "file with a ctl* formula" , "<ctl-file>.ctl" },
 #if defined(PBES)
 #ifdef HAVE_LIBSPG
     { "pg-solve" , 0 , POPT_ARG_NONE , &pgsolve_flag, 0, "Solve the generated parity game (only for symbolic tool).","" },
@@ -2006,7 +2006,7 @@ parity_game* compute_symbolic_parity_game(vset_t visited, int* src)
             vset_count(g->v_player[p], &n_count, &elem_count);
             bn_int2string(s, size, &elem_count);
             bn_clear(&elem_count);
-            Print(infoShort, "player %d: %d nodes, %s elements.", p, n_count, s);
+            Print(infoShort, "player %d: %ld nodes, %s elements.", p, n_count, s);
         }
         for(int p = min_priority; p <= max_priority; p++)
         {
@@ -2017,7 +2017,7 @@ parity_game* compute_symbolic_parity_game(vset_t visited, int* src)
             vset_count(g->v_priority[p], &n_count, &elem_count);
             bn_int2string(s, size, &elem_count);
             bn_clear(&elem_count);
-            Print(infoShort, "priority %d: %d nodes, %s elements.", p, n_count, s);
+            Print(infoShort, "priority %d: %ld nodes, %s elements.", p, n_count, s);
         }
     }
     for(int i = 0; i < nGrps; i++)
@@ -2180,6 +2180,20 @@ main (int argc, char *argv[])
 
     final_stat_reporting(visited, timer);
 
+    if (log_active(infoLong)) {
+        long   n_count;
+        char   elem_str[1024];
+        double e_count;
+
+        long total_count = 0;
+        for(int i=0; i<nGrps; i++) {
+            get_vrel_size(group_next[i], &n_count, &e_count, elem_str, sizeof(elem_str));
+            Print(infoLong, "group_next[%d]: %ld nodes", i, n_count);
+            total_count += n_count;
+        }
+        Print(infoLong, "group_next: %ld nodes total", total_count);
+    }
+
     if (files[1] != NULL)
         do_output(files[1], visited);
 
@@ -2206,10 +2220,10 @@ main (int argc, char *argv[])
             rt_timer_t pgsolve_timer = RTcreateTimer();
             RTstartTimer(pgsolve_timer);
             bool result = spg_solve(g, spg_options);
-            Warning(info, "");
+            Warning(info, " ");
             Warning(info, "The result is: %s", result ? "true":"false");
             RTstopTimer(pgsolve_timer);
-            Warning(info, "");
+            Warning(info, " ");
             RTprintTimer(info, timer, "generation took");
             RTprintTimer(info, pgsolve_timer, "solving took");
         }

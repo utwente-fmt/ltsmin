@@ -261,7 +261,7 @@ archive_t arch_gcf_read(raf_t raf){
         for(uint32_t i=0;i<cluster_count;i++){
             if (i) {
                 used=0;
-                Debug("reading alloc from offset %x",i*arch->cluster_size);
+                Debug("reading alloc from offset %zu",i*arch->cluster_size);
                 raf_read(raf,buf,4096,i*arch->cluster_size);
             }
             uint32_t id,offset,length;

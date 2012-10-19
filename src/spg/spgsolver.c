@@ -27,7 +27,7 @@ main (int argc, char *argv[])
     HREaddOptions(options,"Symbolic parity game solver. Solves <game>.\n");
     HREinitStart(&argc,&argv,1,1,files,"<game>");
 
-    vset_implementation_t vset_impl = VSET_ListDD;
+    vset_implementation_t vset_impl = VSET_IMPL_AUTOSELECT;
     FILE *f = fopen(files[0], "r");
     if (f == NULL)
         AbortCall ("Unable to open file ``%s''", files[0]);
@@ -37,10 +37,10 @@ main (int argc, char *argv[])
     rt_timer_t spgsolve_timer = RTcreateTimer();
     RTstartTimer(spgsolve_timer);
     bool result = spg_solve(g, spg_options);
-    Print(infoShort, "");
+    Print(infoShort, " ");
     Print(infoShort, "The result is: %s", result ? "true":"false");
     RTstopTimer(spgsolve_timer);
-    Print(infoShort, "");
+    Print(infoShort, " ");
     RTprintTimer(infoShort, spgsolve_timer, "solving took");
 
     HREexit(LTSMIN_EXIT_SUCCESS);

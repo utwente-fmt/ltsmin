@@ -14,6 +14,7 @@
 extern "C" {
 
 #include <popt.h>
+#include <sys/stat.h>
 
 #include <hre/user.h>
 #include <pins-lib/pbes-pins.h>
@@ -369,22 +370,31 @@ lts_type_t PBESgetLTSType(const lts_type& t)
     return type;
 }
 
+ltsmin::explorer* pbes_explorer;
+
 void
 PBESexit ()
-{}
+{
+    delete pbes_explorer;
+}
 
 void PBESloadGreyboxModel(model_t model, const char*name)
 {
+    // check file exists
+    struct stat st;
+    if (stat(name, &st) != 0)
+        Abort ("File does not exist: %s", name);
+
     //std::clog << "PBESloadGreyboxModel(model, " << name << "):" << std::endl;
     gb_context_t ctx = (gb_context_t)RTmalloc(sizeof(struct grey_box_context));
     GBsetContext(model, ctx);
 
-    log::log_level_t log_level = debug_flag ? log::verbose : log::error;
+    log::log_level_t log_level = log_active(infoLong) ? log::verbose : log::error;
     log::mcrl2_logger::set_reporting_level(log_level);
 
     bool reset = (reset_flag==1);
     bool always_split = (always_split_flag==1);
-    ltsmin::explorer* pbes_explorer = new ltsmin::explorer(model, std::string(name), mcrl2_rewriter_strategy, reset, always_split);
+    pbes_explorer = new ltsmin::explorer(model, std::string(name), mcrl2_rewriter_strategy, reset, always_split);
     ctx->pbes_explorer = pbes_explorer;
     lts_info* info = pbes_explorer->get_info();
     lts_type_t ltstype = PBESgetLTSType(info->get_lts_type());

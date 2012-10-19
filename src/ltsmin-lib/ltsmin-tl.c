@@ -86,6 +86,41 @@ pred_parse_file(const char *file, ltsmin_parse_env_t env, lts_type_t ltstype)
  *  LOW
  */
 
+/* Convert weak untils to until or generally */
+static ltsmin_expr_t
+ltl_tree_walker(ltsmin_expr_t in)
+{
+    ltsmin_expr_t arg1, arg2, u, g;
+    // handle sub-expressions
+    switch (in->node_type) {
+        case UNARY_OP:
+            arg1 = ltl_tree_walker(in->arg1);
+            in->arg1 = arg1;
+            LTSminExprRehash(in);
+            break;
+        case BINARY_OP:
+            arg1 = ltl_tree_walker(in->arg1);
+            arg2 = ltl_tree_walker(in->arg2);
+            switch (in->token) {
+                case LTL_WEAK_UNTIL:
+                    u = LTSminExpr(BINARY_OP, LTL_UNTIL, 0, arg1, arg2);
+                    g = LTSminExpr(UNARY_OP, LTL_GLOBALLY, 0, arg1, NULL);
+                    RTfree (in);
+                    in = LTSminExpr(BINARY_OP, LTL_OR, 0, u, g);
+                    break;
+                default:
+                    in->arg1 = arg1;
+                    in->arg2 = arg2;
+                    LTSminExprRehash(in);
+                    break;
+            }
+            break;
+        default:
+            break;
+    }
+    return in;
+}
+
 /* Parser Priorities:
  * HIGH
  *     binary priority 1          : ==, !=, etc
@@ -144,11 +179,12 @@ ltl_parse_file(const char *file, ltsmin_parse_env_t env, lts_type_t ltstype)
     LTSminBinaryOperator(env, LTL_IMPLY,        "->", 7);
 
     LTSminBinaryOperator(env, LTL_UNTIL,        "U",  8);
-    //LTSminBinaryOperator(env, LTL_WEAK_UNTIL,   "W",  8); // not supported by ltl2ba
+    LTSminBinaryOperator(env, LTL_WEAK_UNTIL,   "W",  8); // translated to U \/ []
     LTSminBinaryOperator(env, LTL_RELEASE,      "R",  8);
 
     ltsmin_parse_stream(TOKEN_EXPR,env,stream);
-    ltsmin_expr_t expr=env->expr;
+    env->expr = ltl_tree_walker (env->expr);
+    ltsmin_expr_t expr = env->expr;
 
     return expr;
 }
@@ -513,10 +549,10 @@ void* tableaux_table_lookup(tableaux_table_t *t, uint32_t hash, void* data)
 }
 
 /* for debuggin only */
-char* ltsmin_expr_print_ltl(ltsmin_expr_t ltl,char* buf)
+char *ltsmin_expr_print_ltl(ltsmin_expr_t ltl,char* buf)
 {
     // no equation
-    if (!ltl) return buf;
+    HREassert (ltl, "Empty LTL expression");
 
     // left eq
     switch(ltl->node_type) {
@@ -534,8 +570,9 @@ char* ltsmin_expr_print_ltl(ltsmin_expr_t ltl,char* buf)
             if (-1 == ltl->num)
                 sprintf(buf, "@V%d", ltl->idx);
             else
-                sprintf(buf, "@C%d", ltl->num);;
+                sprintf(buf, "@C%d", ltl->num);
             break;
+        case LTL_CHUNK: sprintf(buf, "@H%d", ltl->idx); break;
         case LTL_EQ: sprintf(buf, " == "); break;
         case LTL_TRUE: sprintf(buf, "true"); break;
         case LTL_OR: sprintf(buf, " or "); break;
@@ -563,6 +600,7 @@ char* ltsmin_expr_print_ltl(ltsmin_expr_t ltl,char* buf)
             break;
         default:;
     }
+    *buf='\0';
     return buf;
 }
 
@@ -586,7 +624,13 @@ char* ltsmin_expr_print_ctl(ltsmin_expr_t ctl, char* buf)
         case CTL_SVAR: sprintf(buf, "@S%d", ctl->idx); break;
         case CTL_EVAR: sprintf(buf, "@E%d", ctl->idx); break;
         case CTL_NUM: sprintf(buf, "%d", ctl->idx); break;
-        case CTL_VAR: sprintf(buf, "@V%d", ctl->idx); break;
+        case CTL_VAR:
+            if (-1 == ctl->num)
+                sprintf(buf, "@V%d", ctl->idx);
+            else
+                sprintf(buf, "@C%d", ctl->num);
+            break;
+        case CTL_CHUNK: sprintf(buf, "@H%d", ctl->idx); break;
         case CTL_EQ: sprintf(buf, " == "); break;
         case CTL_TRUE: sprintf(buf, "true"); break;
         case CTL_OR: sprintf(buf, " or "); break;
@@ -617,6 +661,7 @@ char* ltsmin_expr_print_ctl(ltsmin_expr_t ctl, char* buf)
             break;
         default:;
     }
+    *buf='\0';
     return buf;
 }
 
@@ -1229,7 +1274,7 @@ void tableaux_print(tableaux_t *t)
     int stop = start;
     tableaux_print_compressed(&t->root, 0, &start, &stop);
     for(int i=0; i <= max_level; i++) {
-        Warning(info, tableaux_lines[i]);
+        Warning(info, "%s", tableaux_lines[i]);
     }
     destroy_manager(line_man);
 }
@@ -1411,7 +1456,13 @@ char* ltsmin_expr_print_mu(ltsmin_expr_t mu, char* buf)
         case MU_SVAR: sprintf(buf, "@S%d", mu->idx); break;
         case MU_EVAR: sprintf(buf, "@E%d", mu->idx); break;
         case MU_NUM: sprintf(buf, "%d", mu->idx); break;
-        case MU_VAR: sprintf(buf, "@V%d", mu->idx); break;
+        case MU_VAR:
+            if (-1 == mu->num)
+                sprintf(buf, "@V%d", mu->idx);
+            else
+                sprintf(buf, "@C%d", mu->num);
+            break;
+        case MU_CHUNK: sprintf(buf, "@H%d", mu->idx); break;
         case MU_EQ: sprintf(buf, " == "); break;
         case MU_TRUE: sprintf(buf, "true"); break;
         case MU_OR: sprintf(buf, " \\/ "); break;
@@ -1455,6 +1506,7 @@ char* ltsmin_expr_print_mu(ltsmin_expr_t mu, char* buf)
             break;
         default:;
     }
+    *buf='\0';
     return buf;
 }
 

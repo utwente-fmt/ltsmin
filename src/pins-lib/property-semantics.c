@@ -5,21 +5,56 @@
  *      Author: laarman
  */
 
-#include <ltsmin-lib/ltsmin-parse-env.h>
+#include <stdbool.h>
+
 #include <pins-lib/property-semantics.h>
 
+/**
+ * Enums need their values to be present in the tables, hence the strict lookup.
+ */
 static void
-lookup_type_value (ltsmin_expr_t e, int type,ltsmin_parse_env_t env,model_t m)
+lookup_type_value (ltsmin_expr_t e, int type, const chunk c,
+                   model_t m, bool strict)
 {
-    chunk c;
-    c.data = SIgetC(env->idents,e->idx,(int*)&c.len);
     HREassert (NULL != c.data, "Empty chunk");
     int count = GBchunkCount(m,type);
-    e->num = GBchunkPut(m,type,(const chunk)c);
-    if (count != GBchunkCount(m,type)) // value was added
-        Abort ("Value for identifier '%s' cannot be found in table for type %s.",
-               c.data, lts_type_get_state_type(GBgetLTStype(m),type));
+    e->num = GBchunkPut(m,type,c);
+    if (strict && count != GBchunkCount(m,type)) // value was added
+        Warning (info, "Value for identifier '%s' cannot be found in table for enum type '%s'.",
+                 c.data, lts_type_get_type(GBgetLTStype(m),type));
     e->lts_type = type;
+}
+
+static void
+ltsmin_expr_lookup_value(ltsmin_expr_t top, ltsmin_expr_t e, int typeno,
+                         ltsmin_parse_env_t env, model_t model)
+{
+    switch(e->node_type) {
+    case VAR:
+    case CHUNK:
+    case INT:
+        break;
+    default:
+        return;
+    }
+    chunk c;
+    data_format_t format = lts_type_get_format(GBgetLTStype(model), typeno);
+    switch (format) {
+    case LTStypeDirect:
+    case LTStypeRange:
+        if (INT != e->node_type)
+            Abort ("Expected an integer value for comparison: %s", LTSminPrintExpr(top, env));
+        break;
+    case LTStypeEnum:
+    case LTStypeChunk:
+        c.data = env->buffer;
+        c.len = LTSminSPrintExpr(c.data, e, env);
+        HREassert (c.len < ENV_BUFFER_SIZE, "Buffer overflow in print expression");
+        lookup_type_value (e, typeno, c, model, format==LTStypeEnum);
+        Debug ("Bound '%s' to %d in table for type '%s'", c.data,
+               e->num, lts_type_get_state_type(GBgetLTStype(model),typeno));
+        break;
+    }
 }
 
 /* looks up the type values in expressions, e.g.: "init.a == Off" (Off = 2) */
@@ -34,27 +69,17 @@ ltsmin_expr_lookup_values(ltsmin_expr_t ltl,ltsmin_parse_env_t env,model_t model
         left = ltsmin_expr_lookup_values(ltl->arg1, env, model);
         right = ltsmin_expr_lookup_values(ltl->arg2, env, model);
         switch(ltl->token) {
-        case PRED_AND:
-        case PRED_OR:
         case PRED_EQ:
-        case PRED_IMPLY:
-        case PRED_EQUIV:
             if (left >= 0) { // type(SVAR)
-                if (VAR == ltl->arg2->node_type)
-                    lookup_type_value(ltl->arg2, left, env, model);
-            } else if (right >= 0) {
-                if (VAR == ltl->arg1->node_type)
-                    lookup_type_value(ltl->arg1, right, env, model);
+                ltsmin_expr_lookup_value (ltl, ltl->arg2, left, env, model);
+            } else if (right >= 0) { // type(SVAR)
+                ltsmin_expr_lookup_value (ltl, ltl->arg1, right, env, model);
             }
-        default:
-            return -1;
         }
+        return -1;
     case UNARY_OP:
-        switch(ltl->token) {
-        case PRED_NOT:   return ltsmin_expr_lookup_values(ltl->arg1, env, model);
-        default:        ltsmin_expr_lookup_values(ltl->arg1, env, model);
-                        return -1;
-        }
+        ltsmin_expr_lookup_values(ltl->arg1, env, model);
+        return -1;
     default:
         switch(ltl->token) {
         case SVAR:
@@ -65,14 +90,26 @@ ltsmin_expr_lookup_values(ltsmin_expr_t ltl,ltsmin_parse_env_t env,model_t model
     }
 }
 
+/**
+ * Parses file using parser
+ * Chunk values are looked up in PINS.
+ */
 ltsmin_expr_t
-parse_file(const char *file, parse_f parser, model_t model)
+parse_file_env(const char *file, parse_f parser, model_t model,
+               ltsmin_parse_env_t env)
 {
     lts_type_t ltstype = GBgetLTStype(model);
-    ltsmin_parse_env_t env = LTSminParseEnvCreate();
     ltsmin_expr_t expr = parser(file, env, ltstype);
     ltsmin_expr_lookup_values(expr, env, model);
     env->expr = NULL;
+    return expr;
+}
+
+ltsmin_expr_t
+parse_file(const char *file, parse_f parser, model_t model)
+{
+    ltsmin_parse_env_t env = LTSminParseEnvCreate();
+    ltsmin_expr_t expr = parse_file_env(file, parser, model, env);
     LTSminParseEnvDestroy(env);
     return expr;
 }
@@ -95,6 +132,7 @@ mark_predicate(ltsmin_expr_t e, matrix_t *m)
         case PRED_FALSE:
         case PRED_NUM:
         case PRED_VAR:
+        case PRED_CHUNK:
             break;
         case PRED_EQ:
             mark_predicate(e->arg1, m);
@@ -129,6 +167,7 @@ mark_visible(ltsmin_expr_t e, matrix_t *m, int* group_visibility)
         case PRED_FALSE:
         case PRED_NUM:
         case PRED_VAR:
+        case PRED_CHUNK:
             break;
         case PRED_EQ:
             mark_visible(e->arg1, m, group_visibility);

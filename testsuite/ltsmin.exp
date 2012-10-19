@@ -1,0 +1,33 @@
+puts "DEBUG: lib/ltsmin.exp is being loaded"
+
+proc ltsmin_version {args} {
+    puts "DEBUG: ltsmin_version executed with arguments ${args}"
+}
+
+proc ltsmin_load {args} {
+    puts "DEBUG: ltsmin_load executed with arguments ${args}"
+}
+
+proc ltsmin_finish {args} {
+    puts "DEBUG: ltsmin_finish executed with arguments ${args}"
+}
+
+proc ltsmin_exit {args} {
+    puts "DEBUG: ltsmin_exit executed with arguments ${args}"
+}
+
+proc ltsmin_start {args} {
+    puts "DEBUG: ltsmin_start executed with arguments ${args}"
+}
+
+proc ltsmin_init {args} {
+    puts "DEBUG: ltsmin_init executed with arguments ${args}"
+}
+
+proc ltsmin_option_proc {args} {
+    puts "DEBUG: ltsmin_option_proc (command line option processing) executed with arguments ${args}"
+}
+
+proc ltsmin_option_help {args} {
+    puts "DEBUG: ltsmin_option_help (command line option help) executed with arguments ${args}"
+}

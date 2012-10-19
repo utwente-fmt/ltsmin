@@ -37,7 +37,7 @@ void* RTmalloc(size_t size){
         return HREmalloc(region, size);
     if(size==0) return NULL;
     void *tmp=malloc(size);
-    if (tmp==NULL) Abort("out of memory trying to get %d",size);
+    if (tmp==NULL) Abort("out of memory trying to get %zu",size);
     Debug("allocated %zu from system", size);
     return tmp;
 }
@@ -47,7 +47,7 @@ void* RTmallocZero(size_t size){
         return HREmallocZero(region, size);
     if(size==0) return NULL;
     void *tmp=calloc((size + CACHE_LINE_SIZE - 1) >> CACHE_LINE, CACHE_LINE_SIZE);
-    if (tmp==NULL) Abort("out of memory trying to get %d",size);
+    if (tmp==NULL) Abort("out of memory trying to get %zu",size);
     Debug("allocated %zu in anonymous pages from system", size);
     return tmp;
 }
@@ -60,12 +60,12 @@ void* RTalign(size_t align, size_t size) {
     if (errno) {
     switch (errno) {
         case ENOMEM:
-            Fatal(0,error,"out of memory on allocating %zu bytes aligned at %d",
+            Fatal(0,error,"out of memory on allocating %zu bytes aligned at %zu",
                   size, align);
         case EINVAL:
-            Fatal(0,error,"invalid alignment %d", align);
+            Fatal(0,error,"invalid alignment %zu", align);
         default:
-            Fatal(0,error,"unknown error allocating %zu bytes aligned at %d",
+            Fatal(0,error,"unknown error allocating %zu bytes aligned at %zu",
                   size, align);
     }}
     HREassert (NULL != ret, "Alloc failed");
@@ -118,9 +118,9 @@ void* RTrealloc(void *rt_ptr, size_t size){
         free(rt_ptr);
         return NULL;
     }
+    Debug("reallocating %p to size %zu from system", rt_ptr, size);
     void *tmp=realloc(rt_ptr,size);
-    if (tmp==NULL) Abort("out of memory trying to resize to %d",size);
-    Debug("reallocated %p to size from system", rt_ptr, size);
+    if (tmp==NULL) Abort("out of memory trying to resize to %zu",size);
     return tmp;
 }
 
@@ -129,14 +129,14 @@ void RTfree(void *rt_ptr){
         return HREfree(region, rt_ptr);
     for (size_t i = 0; i < next_calloc; i++) {
         if (rt_ptr == calloc_table[i][0]) {
+            Debug("freeing %p (LARGE) from system", rt_ptr);
             munmap (calloc_table[i][1], (size_t)calloc_table[i][2]);
-            Debug("freed %p (LARGE) from system", rt_ptr);
             return;
         }
     }
     if (rt_ptr != NULL) {
+        Debug("freeing %p from system", rt_ptr);
         free (rt_ptr);
-        Debug("freed %p from system", rt_ptr);
     }
 }
 

@@ -11,4 +11,6 @@ libutil_la_SOURCES += MurmurHash3.c MurmurHash3.h
 libutil_la_SOURCES += string-map.c string-map.h
 libutil_la_SOURCES += tables.c tables.h
 libutil_la_SOURCES += treedbs.c treedbs.h
+libutil_la_SOURCES += simplemap.c simplemap.h
+libutil_la_SOURCES += util.h
 libutil_la_CPPFLAGS = $(AM_CPPFLAGS) 

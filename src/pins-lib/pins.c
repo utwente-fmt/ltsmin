@@ -605,6 +605,7 @@ void GBcopyChunkMaps(model_t dst, model_t src)
     dst->newmap = src->newmap;
     dst->int2chunk = src->int2chunk;
     dst->chunk2int = src->chunk2int;
+    dst->chunkatint = src->chunkatint;
     dst->get_count = src->get_count;
 
     int N    = lts_type_get_type_count(GBgetLTStype(src));

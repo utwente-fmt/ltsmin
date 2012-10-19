@@ -67,7 +67,7 @@ dm_create_permutation_group (permutation_group_t *o, int size, int *data)
     o->data_size = size;
     o->fixed_size = data != NULL;
     if (!o->fixed_size) {
-        o->data = malloc (sizeof (permutation_group_t) * size);
+        o->data = malloc (sizeof (int) * size);
     } else {
         o->data = data;
     }
@@ -96,7 +96,7 @@ dm_add_to_permutation_group (permutation_group_t *o, int idx)
 
         // realloc
         int                 new_size = o->size + 20;
-        int                *new_data = realloc (o->data, new_size);
+        int                *new_data = realloc (o->data, sizeof(int)*new_size);
         if (new_data != NULL) {
             o->data_size = new_size;
             o->data = new_data;

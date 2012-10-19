@@ -157,7 +157,9 @@ extern void HREexitUsage(int code);
 /**
 Set the label of this thread.
 */
-extern void set_label(const char* fmt,...);
+extern void set_label(const char* fmt,...)
+                      __attribute__ ((format (printf, 1, 2)));
+
 /**
 Get the label of this thread.
 */

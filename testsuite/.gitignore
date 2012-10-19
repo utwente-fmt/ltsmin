@@ -1,0 +1,6 @@
+*.o
+*.cpp
+*.log
+*.bin
+*.sum
+site.exp

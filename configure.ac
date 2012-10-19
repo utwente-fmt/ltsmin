@@ -34,6 +34,13 @@ AC_DEFINE([_FILE_OFFSET_BITS], 64)
 AC_DEFINE([LTSMIN_PATHNAME_MAX], 1024, [Define maximal length of pathnames])
 AC_DEFINE([DEFFILEMODE], 0666, [Define default file mode])
 
+#DejaGNU
+if test x"$DEJAGNU" = x
+then
+  DEJAGNU="\$(top_srcdir)/testsuite/global-conf.exp"
+fi
+AC_SUBST(DEJAGNU)
+  
 
 # Checks for programs.
 AC_SUBST(AM_CXXFLAGS,["-Wno-inline -ftemplate-depth-128 -finline-functions"])
@@ -234,13 +241,20 @@ AC_CHECK_LIB([zip],[zip_open],
   ])
 
 # Checks for gperftools profiler
-AC_CHECK_LIB([profiler],[ProfilerStart],
-  [AC_SUBST([PROFILER_LDFLAGS],[-lprofiler])
-   acx_profiler=yes
-  ],
-  [acx_profiler=no
-   AC_MSG_WARN([no acceptable profiler library found; building without.])
-  ])
+AC_ARG_WITH([profiler],
+  [AS_HELP_STRING([--with-profiler], 
+    [enable support for gperftools in spgsolver @<:@default=no@:>@])],
+  [with_profiler=yes], [with_profiler=no])
+AS_IF([test x"$with_profiler" = xyes],
+  [AC_CHECK_LIB([profiler],[ProfilerStart],
+      [AC_SUBST([PROFILER_LDFLAGS],['-lprofiler -ltcmalloc'])
+       AC_SUBST([PROFILER_CPPFLAGS],[-DHAVE_PROFILER])
+       acx_profiler=yes
+      ],
+      [acx_profiler=no
+       AC_MSG_WARN([no acceptable profiler library found; building without.])
+      ])
+   ])
 
 # Checks for header files.
 AC_HEADER_DIRENT
@@ -408,6 +422,7 @@ AC_CONFIG_FILES([
        src/tests/Makefile
        doc/Makefile
        lemon/Makefile
+       testsuite/Makefile
 ])
 
 AC_CONFIG_LINKS([src/ltsmin-lib/lempar.c:lemon/lempar.c])

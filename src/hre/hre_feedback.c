@@ -266,5 +266,8 @@ void log_message(log_t log,const char*file,int line,int errnum,const char *fmt,.
     char *label = ctx ? ctx->label : "HRE";
     // print the entire line in one statement to minimize interleaving in output.
     fprintf(f,"%s%s%s%s: %s%s\n",label,when,where,tag,main_msg,err_msg);
+    if (log == debug && log_active(infoLong)) {
+        HREprintStack();
+    }
 }
 

@@ -16,7 +16,7 @@
 static int arg_all=0;
 static int arg_table=0;
 static char *arg_value="name";
-static enum { FF_TXT, FF_CSV, FF_AUT } file_format = FF_TXT;
+static enum { FF_TXT, FF_CSV } file_format = FF_TXT;
 static char *arg_sep=",";
 static enum { IDX, NAME } output_value = NAME;
 
@@ -29,7 +29,6 @@ static si_map_entry output_values[] = {
 static si_map_entry file_formats[] = {
     {"txt",     FF_TXT},
     {"csv",     FF_CSV},
-    {"aut",     FF_AUT},
     {NULL, 0}
 };
 
@@ -126,21 +125,17 @@ output_text(lts_t trace, FILE* output_file) {
     }
 
     // output trace
-    for(uint32_t i=0; i<=trace->transitions; ++i) {
+    for(uint32_t x=0; x<=trace->transitions; ++x) {
         int prev_state[N];
         int state[N];
         int prev_state_lbls[sLbls];
         int state_lbls[sLbls];
         int edge_lbls[eLbls];
 
+        uint32_t i = (x != trace->transitions ? x : trace->dest[x-1]);
         fprintf(output_file, "state %d/%d\n",i,trace->transitions);
-        if (i == 0) {
-            // ouput initial state
-            fprintf(output_file, "Initial state\n");
-            for(int j=0; j<N; ++j) prev_state[j] = -1;
-            for(int j=0; j<sLbls; ++j) prev_state_lbls[j] = -1;
-        } else {
-            // last state
+        if (i != 0) {
+            // previous state
             for(int j=0; j<N; ++j) prev_state[j] = state[j];
             for(int j=0; j<sLbls; ++j) prev_state_lbls[j] = state_lbls[j];
         }
@@ -152,7 +147,7 @@ output_text(lts_t trace, FILE* output_file) {
 
         // output state
         for(int j=0; j<N; ++j) {
-            if (arg_all || state[j] != prev_state[j]) {
+            if (arg_all || i == 0 || state[j] != prev_state[j]) {
                 char *name = lts_type_get_state_name(trace->ltstype, j);
                 char *type = lts_type_get_state_type(trace->ltstype, j);
                 snprintf(tmp, BUFLEN, "%s:%s[%d]", name == NULL ? "_" : name, type == NULL ? "_" : type, j);
@@ -172,7 +167,7 @@ output_text(lts_t trace, FILE* output_file) {
                 state_lbls[0]=trace->properties[i];
             }
             for(int j=0; j<sLbls; ++j) {
-                if (arg_all || state_lbls[j] != prev_state_lbls[j]) {
+                if (arg_all || i == 0 || state_lbls[j] != prev_state_lbls[j]) {
                     char *name = lts_type_get_state_label_name(trace->ltstype, j);
                     char *type = lts_type_get_state_label_type(trace->ltstype, j);
                     snprintf(tmp, BUFLEN, "%s:%s[%d]", name == NULL ? "_" : name, type == NULL ? "_" : type, j);
@@ -310,18 +305,20 @@ output_text_table(lts_t trace, FILE* output_file) {
 
 
     // print the state / state labels / edge labels
-    for(uint32_t i=0; i<trace->states; ++i) {
+    for(uint32_t x=0; x<=trace->transitions; ++x) {
         int prev_state[N];
         int state[N];
         int prev_state_lbls[sLbls];
         int state_lbls[sLbls];
         int prev_edge_lbls[eLbls];
         int edge_lbls[eLbls];
-        for(int j=0; j<N; ++j) prev_state[j] = (i == 0 ? -1 : state[j]);
+
+        uint32_t i = (x != trace->transitions ? x : trace->dest[x-1]);
+        for(int j=0; j<N; ++j) prev_state[j] = state[j];
         if (N) TreeUnfold(trace->state_db, i, state);
         fprintf(output_file, "%.3d: [",i);
         for(int j=0; j<N; ++j) {
-            if (arg_all || state[j] != prev_state[j]) {
+            if (arg_all || i == 0 || state[j] != prev_state[j]) {
                 int typeno = lts_type_get_state_typeno(trace->ltstype, j);
                 trace_get_type_str(trace, typeno, state[j], BUFLEN, tmp);
             } else {
@@ -342,7 +339,7 @@ output_text_table(lts_t trace, FILE* output_file) {
                 state_lbls[0]=trace->properties[i];
             }
             for(int j=0; j<sLbls; ++j) {
-                if (arg_all || state_lbls[j] != prev_state_lbls[j]) {
+                if (arg_all || i == 0 || state_lbls[j] != prev_state_lbls[j]) {
                     int typeno = lts_type_get_state_label_typeno(trace->ltstype, j);
                     trace_get_type_str(trace, typeno, state_lbls[j], BUFLEN, tmp);
                 } else {
@@ -361,7 +358,7 @@ output_text_table(lts_t trace, FILE* output_file) {
                 for(int j=0; j<eLbls; ++j) prev_edge_lbls[j] = (i == 0 ? -1 : edge_lbls[j]);
                 trc_get_edge_label(trace, i, edge_lbls);
                 for(int j=0; j<eLbls; ++j) {
-                    if (arg_all || edge_lbls[j] != prev_edge_lbls[j]) {
+                    if (arg_all || i == 0 || edge_lbls[j] != prev_edge_lbls[j]) {
                         int typeno = lts_type_get_edge_label_typeno(trace->ltstype, j);
                         trace_get_type_str(trace, typeno, edge_lbls[j], BUFLEN, tmp);
                     } else {
@@ -406,9 +403,11 @@ output_csv(lts_t trace, FILE* output_file) {
     fprintf(output_file, "\n");
 
     // print the state / state labels / edge labels
-    for(uint32_t i=0; i<trace->states; ++i) {
+    for(uint32_t x=0; x<=trace->transitions; ++x) {
         int state[N];
         char tmp[BUFLEN];
+
+        uint32_t i = (x != trace->transitions ? x : trace->dest[x-1]);
         if (N) TreeUnfold(trace->state_db, i, state);
         for(int j=0; j<N; ++j) {
             int typeno = lts_type_get_state_typeno(trace->ltstype, j);
@@ -449,36 +448,6 @@ output_csv(lts_t trace, FILE* output_file) {
     }
 }
 
-void
-output_aut(lts_t trace, FILE* output_file) {
-    int eLbls = lts_type_get_edge_label_count(trace->ltstype);
-    int edge_lbls[eLbls];
-
-    // print header
-    int len = trace->states;
-    fprintf(output_file, "des (%d, %d, %d)\n", 0, len - 1, len);
-
-    // print edges
-    char tmp[BUFLEN];
-    for(int i=0; i < len - 1; ++i) {
-        // initialize tmp
-        tmp[0] = '\0';
-
-        // get edge label
-        if (trace->label != NULL) {
-            trc_get_edge_label(trace, i, edge_lbls);
-            for(int j=0; j<eLbls; ++j) {
-                int typeno = lts_type_get_edge_label_typeno(trace->ltstype, j);
-                trace_get_type_str(trace, typeno, edge_lbls[j], BUFLEN, tmp);
-                fprintf(output_file, "%s%s", j==0 ? "": " ", tmp);
-            }
-        } else {
-            snprintf(tmp, sizeof tmp, "?");
-        }
-        fprintf(output_file, "(%d, \"%s\", %d)\n", i, tmp, i + 1);
-    }
-}
-
 int
 main(int argc,char*argv[]){
     char *files[2];
@@ -486,8 +455,7 @@ main(int argc,char*argv[]){
     HREaddOptions(options,"Pretty print trace files\n\n"
                 "Supported output file extensions are:\n"
                 "  txt: Textual output\n"
-                "  csv: Comma separated values\n"
-                "  aut: AUT file format\n\n"
+                "  csv: Comma separated values\n\n"
                 "Options");
     lts_lib_setup();
     HREinitStart(&argc,&argv,1,2,files,"<input> [<output>]");
@@ -516,6 +484,8 @@ main(int argc,char*argv[]){
 
     lts_t trace=lts_create();
     lts_read(files[0],trace);
+    //lts_bfs_reorder(trace); //cannot reorder an LTS with state vectors
+    lts_set_type(trace, LTS_BLOCK);
     Warning(info,"length of trace is %d",trace->transitions);
 
     switch (file_format) {
@@ -528,9 +498,6 @@ main(int argc,char*argv[]){
             break;
         case FF_CSV:
             output_csv(trace, output_file);
-            break;
-        case FF_AUT:
-            output_aut(trace, output_file);
             break;
         default:
             Fatal(1,error,"File format no(t) yet/longer supported!");

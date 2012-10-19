@@ -37,6 +37,7 @@ const char* (*spinja_get_type_value_name)(int type, int value);
 int         (*spinja_get_type_value_count)(int type);
 const char* (*spinja_get_edge_name)(int type);
 int         (*spinja_get_edge_count)();
+const char* (*spinja_get_group_name)(int type);
 
 int         (*spinja_buchi_is_accepting)(void* model, int* state);
 
@@ -192,6 +193,8 @@ SpinJaloadDynamicLib(model_t model, const char *filename)
         RT_optdlsym( filename, dlHandle, "spinja_get_edge_name" );
     spinja_get_edge_count = (int(*)())
         RT_optdlsym( filename, dlHandle, "spinja_get_edge_count" );
+    spinja_get_group_name = (const char*(*)(int))
+        RT_optdlsym( filename, dlHandle, "spinja_get_group_name" );
 
     // optional, guard support (used for por)
     get_guard_count = (int(*)())
@@ -277,8 +280,11 @@ SpinJaloadGreyboxModel(model_t model, const char *filename)
     }
 
     int action_type = 0;
-    if (spinja_get_edge_count() > 0)
+    int statement_type = 0;
+    if (spinja_get_edge_count() > 0) {
          action_type = lts_type_add_type(ltstype, "action", NULL);
+         statement_type = lts_type_add_type(ltstype, "statement", NULL);
+    }
     GBsetLTStype(model, ltstype);
 
     if (bool_is_new) {
@@ -295,17 +301,26 @@ SpinJaloadGreyboxModel(model_t model, const char *filename)
         }
     }
 
-     if (spinja_get_edge_count() > 0) {
-         // All actions are assert statements. We do not export their values.
-         lts_type_set_edge_label_count(ltstype, 1);
-         lts_type_set_edge_label_name(ltstype, 0, "action");
-         lts_type_set_edge_label_type(ltstype, 0, "action");
-         lts_type_set_edge_label_typeno(ltstype, 0, action_type);
-         for (int i = 0; i < spinja_get_edge_count(); i++) {
-            chunk c = chunk_str((char *)spinja_get_edge_name(i));
-            GBchunkPutAt(model, action_type, c, i);
-         }
-     }
+    if (spinja_get_edge_count() > 0) {
+        lts_type_set_edge_label_count(ltstype, 2);
+
+        // All actions are assert statements. We do not export their values.
+        lts_type_set_edge_label_name(ltstype, 0, "action");
+        lts_type_set_edge_label_type(ltstype, 0, "action");
+        lts_type_set_edge_label_typeno(ltstype, 0, action_type);
+        for (int i = 0; i < spinja_get_edge_count(); i++) {
+           chunk c = chunk_str((char *)spinja_get_edge_name(i));
+           GBchunkPutAt(model, action_type, c, i);
+        }
+
+        lts_type_set_edge_label_name(ltstype, 1, "statement");
+        lts_type_set_edge_label_type(ltstype, 1, "statement");
+        lts_type_set_edge_label_typeno(ltstype, 1, statement_type);
+        for (int i = 0; i < spinja_get_transition_groups(); i++) {
+            chunk c = chunk_str((char *)spinja_get_group_name(i));
+            GBchunkPutAt(model, statement_type, c, i);
+        }
+    }
 
     // get initial state
     int state[state_length];

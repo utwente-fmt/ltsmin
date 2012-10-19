@@ -65,7 +65,8 @@ static int	tl_lex(void);
 extern YYSTYPE  tl_yylval;
 char	yytext[2048];
 
-#define Token(y)        tl_yylval = tl_nn(y,ZN,ZN); append_uform(yytext); return y
+#define Token(y)        tl_yylval = tl_nn(y,ZN,ZN); append_uform(yytext); \
+    Debug ("LTL Lexer: passing token '%s' to LTL2BA", yytext); return y
 
 #define LTL_LPAR ((void*)0x01)
 #define LTL_RPAR ((void*)0x02)
@@ -94,6 +95,7 @@ ltsmin_expr_lookup(ltsmin_expr_t e, char* text)
     *pp_le_list = (ltsmin_expr_list_t*) tl_emalloc(sizeof(ltsmin_expr_list_t));
     (*pp_le_list)->text = strdup(text);
     (*pp_le_list)->expr = e;
+    Debug ("LTL Symbol table: record expression %p as '%s'", e, text);
     (*pp_le_list)->next = NULL;
     return e;
 }
@@ -155,6 +157,7 @@ tl_lex(void)
             tl_yylval->sym = tl_lookup(yytext);
             append_uform(yytext);
             }
+            Debug ("LTL Lexer: passing token '%s' to LTL2BA", yytext);
             return PREDICATE;
         default:
             Abort("unhandled LTL_TOKEN: %d\n", e->token);
@@ -172,6 +175,7 @@ add_lin_expr(ltsmin_expr_t e)
         le->size *= 2;
         le = RTrealloc(le, sizeof(ltsmin_lin_expr_t) + le->size * sizeof(ltsmin_expr_t));
     }
+    Debug ("LTL Linearizer: added expression %p at %d", e, le->count);
     le->lin_expr[le->count++] = e;
 }
 
@@ -209,6 +213,7 @@ void
 ltsmin_ltl2ba(ltsmin_expr_t e)
 {
     ltl2ba_init();
+    tl_verbose = log_active (infoLong);
     tl_yylex = tl_lex;
     set_uform("");
     const int le_size = 64;
@@ -256,17 +261,12 @@ ltsmin_buchi()
     if(bstates->nxt->nxt == bstates && bstates->nxt->id == 0) { /* true */
         return NULL;
     }
-    // count states
-    int state_count = 0, max_id = 0;
+
+    // mapping map_id[final * 32 + s_id + 1] -> state id
+    int map_id[32*32];
+    int state_count = 0;
     for(s = bstates->prv; s != bstates; s = s->prv) {
-        max_id = max_id < (s->id + 1) ? s->id + 1 : max_id;
-        state_count++;
-    }
-    // mapping map_id[s_id + 1] -> state id
-    int map_id[max_id];
-    state_count = 0;
-    for(s = bstates->prv; s != bstates; s = s->prv) {
-        map_id[s->id + 1] = state_count++;
+        map_id[s->final * 32 + s->id + 1] = state_count++;
     }
 
     // allocate buchi struct
@@ -275,7 +275,10 @@ ltsmin_buchi()
     res->predicate_count = n_symbols;
     res->predicates = RTmalloc(n_symbols * sizeof(ltsmin_expr_t));
     for (int i=0; i < n_symbols; i++) {
-        res->predicates[i] = ltsmin_expr_lookup(NULL, sym_table[i]);
+        ltsmin_expr_t e = ltsmin_expr_lookup (NULL, sym_table[i]);
+        Debug("LTL symbol table: lookup up predicate '%s': %p", sym_table[i], e);
+        HREassert (e != NULL, "Lookup failed for expression: %s", sym_table[i]);
+        res->predicates[i] = e;
     }
     res->state_count = state_count;
     int index = 0;
@@ -295,7 +298,7 @@ ltsmin_buchi()
         for(t = s->trans->nxt; t != s->trans; t = t->nxt) {
             bs->transitions[transition_count].pos = t->pos;
             bs->transitions[transition_count].neg = t->neg;
-            bs->transitions[transition_count].to_state = map_id[t->to->id+1];
+            bs->transitions[transition_count].to_state = map_id[t->to->final*32+t->to->id+1];
             bs->transitions[transition_count].index = index++;
             transition_count++;
         }

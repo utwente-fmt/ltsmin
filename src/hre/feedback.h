@@ -70,13 +70,16 @@ extern FILE* log_get_stream(log_t log);
 \brief Utility function for printing single line messages with headers.
 \deprecated Please use the Print macro instead.
 */
-extern void log_message(log_t log,const char*file,int line,int errnum,const char *fmt,...);
+extern void log_message(log_t log,const char*file,int line,int errnum,
+                        const char *fmt,...)
+                        __attribute__ ((format (printf, 5, 6)));
 
 /**
 \brief Output directly to a log stream.
 \deprecated Please use the Printf macro instead.
 */
-extern void log_printf(log_t log,const char *fmt,...);
+extern void log_printf(log_t log,const char *fmt,...)
+                       __attribute__ ((format (printf, 2, 3)));
 
 /**
 \brief Test if the given log is active.

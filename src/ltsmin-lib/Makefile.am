@@ -7,7 +7,7 @@ libltsmin_la_SOURCES += etf-internal.h
 libltsmin_la_SOURCES += etf-objects.c etf-objects.h
 libltsmin_la_SOURCES += etf-parser.c
 libltsmin_la_SOURCES += etf-util.c etf-util.h
-libltsmin_la_SOURCES += ltl2ba-lex.c
+libltsmin_la_SOURCES += ltl2ba-lex.c ltl2ba-lex.h
 libltsmin_la_SOURCES += lts-type.c lts-type.h
 libltsmin_la_SOURCES += ltsmin-buchi.h
 libltsmin_la_SOURCES += ltsmin-parse-env.h
@@ -15,6 +15,8 @@ libltsmin_la_SOURCES += ltsmin-syntax.c ltsmin-syntax.h
 libltsmin_la_SOURCES += ltsmin-tl.c ltsmin-tl.h
 libltsmin_la_SOURCES += ltsmin-grammar.c ltsmin-grammar.h
 libltsmin_la_SOURCES += ltsmin-lexer.c ltsmin-lexer.h
+libltsmin_la_SOURCES += ltsmin-lexer.l
+libltsmin_la_SOURCES += ltsmin-standard.h
 
 libltsmin_la_LIBADD   = $(top_builddir)/ltl2ba/libltl2ba.la
 libltsmin_la_CPPFLAGS = -DNXT

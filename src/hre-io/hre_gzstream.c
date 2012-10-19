@@ -100,7 +100,7 @@ static size_t gzip_read_max(stream_t stream,void*buf,size_t count){
 
 static void gzip_read(stream_t stream,void*buf,size_t count){
     size_t res=gzip_read_max(stream,buf,count);
-    if (res<count) Abort("short read %d instead of %d",res,count);
+    if (res<count) Abort("short read %zu instead of %zu",res,count);
 }
 
 static void gzip_write(stream_t stream,void*buf,size_t count){
