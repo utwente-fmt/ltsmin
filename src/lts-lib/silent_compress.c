@@ -76,7 +76,7 @@ void lts_silent_compress(lts_t lts,silent_predicate is_silent,void*silent_contex
 	Debug("Create initial partition");
 	lts_set_type(lts,LTS_LIST);
 	lts_set_type(silent,LTS_BLOCK_INV);
-	uint32_t *map=(uint32_t*)RTmalloc(sizeof(int)*lts->states);
+	uint32_t *map=(uint32_t*)RTmalloc(sizeof(uint32_t)*lts->states);
 	if(has_props){
 	    // TODO: make initial partition an argument.
 	    for(uint32_t i=0;i<lts->states;i++){
@@ -89,7 +89,7 @@ void lts_silent_compress(lts_t lts,silent_predicate is_silent,void*silent_contex
 	}
 	
 	Debug("perform partition refinement");
-	uint32_t *newmap=(uint32_t*)RTmalloc(sizeof(int)*lts->states);
+	uint32_t *newmap=(uint32_t*)RTmalloc(sizeof(uint32_t)*lts->states);
 	uint32_t map_count=1;
 	int iter=0;
 	bitset_t valid=bitset_create(256,256);
@@ -150,7 +150,7 @@ void lts_silent_compress(lts_t lts,silent_predicate is_silent,void*silent_contex
 	Debug("reduced LTS has %u initial states, %u states and %u transitions",r_count,s_count,t_count);
 	uint32_t *temp_props=NULL;
 	if(has_props){
-	    temp_props=(uint32_t*)RTmalloc(sizeof(int)*s_count);
+	    temp_props=(uint32_t*)RTmalloc(sizeof(uint32_t)*s_count);
 	    for(uint32_t i=0;i<s_count;i++){
 	        temp_props[i]=lts->properties[repr[i]];
 	    }

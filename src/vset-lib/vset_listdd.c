@@ -379,7 +379,7 @@ static void mdd_collect(uint32_t a,uint32_t b){
                 Warning(debug, "unique table reached maximum size");
                 uniq_size = UINT32_MAX;
             }
-            unique_table = RTrealloc(unique_table, uniq_size*sizeof(int));
+            unique_table = RTrealloc(unique_table, uniq_size*sizeof(uint32_t));
         } else if (mdd_nodes < old_size) {
             Warning(debug, "node table reached maximum size");
             mdd_nodes = UINT32_MAX;
@@ -1621,7 +1621,7 @@ vdom_t vdom_create_list_native(int n){
         cache_size=(nodes_fib+cache_fib <= FIB_MAX)?fib(nodes_fib+cache_fib):UINT32_MAX;
         Warning(info,"initial op cache has %u entries",cache_size);
 
-        unique_table=RTmalloc(uniq_size*sizeof(int));
+        unique_table=RTmalloc(uniq_size*sizeof(uint32_t));
         node_table=RTmalloc(mdd_nodes*sizeof(struct mdd_node));
         op_cache=RTmalloc(cache_size*sizeof(struct op_rec));
 
