@@ -41,7 +41,6 @@ void lts_bfs_reorder(lts_t lts) {
     if (i<lts->states) {
         Abort("only %d out of %d states reachable",i,lts->states);
     }
-    RTfree(repr);
     Debug("created map");
     lts_set_type(lts,LTS_LIST);
     Debug("transformed into list representation");
@@ -60,8 +59,9 @@ void lts_bfs_reorder(lts_t lts) {
         }
         RTfree(props);
     } else {
-        RTfree(map);
+        RTfree(repr);
     }
+    RTfree(map);
     Debug("applied map");
     lts_set_type(lts,orig_type);
     Debug("original format restored");
