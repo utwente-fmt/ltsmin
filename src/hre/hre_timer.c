@@ -58,6 +58,11 @@ void RTstartTimer(rt_timer_t timer){
     }
 }
 
+void RTrestartTimer(rt_timer_t timer){
+    RTresetTimer (timer);
+    RTstartTimer (timer);
+}
+
 void RTstopTimer(rt_timer_t timer){
     if (timer->running) {
         struct tms tmp;

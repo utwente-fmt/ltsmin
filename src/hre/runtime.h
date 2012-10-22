@@ -48,6 +48,9 @@ extern void RTresetTimer(rt_timer_t timer);
 /// Start the stop-watch running.
 extern void RTstartTimer(rt_timer_t timer);
 
+/// Reset and Start the stop-watch running.
+extern void RTrestartTimer(rt_timer_t timer);
+
 /// Stop the stopwatch running.
 extern void RTstopTimer(rt_timer_t timer);
 

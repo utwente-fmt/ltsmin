@@ -41,11 +41,11 @@ struct fset_s {
 static const size_t CACHE_LINE_MEM_SIZE = CACHE_LINE_SIZE / sizeof (mem_hash_t);
 static const size_t CACHE_LINE_MEM_MASK = -(CACHE_LINE_SIZE / sizeof (mem_hash_t));
 
-#define EMPTY 0UL
-static const mem_hash_t FULL  = ((mem_hash_t)-1) ^ (((mem_hash_t)-1)>>1);// 1000
-static const mem_hash_t NFULL = ((mem_hash_t)-1) >> 1;                   // 0111
-static const mem_hash_t TOMB  = 1UL;                                     // 0001
-static const size_t NONE      = -1UL;
+static const mem_hash_t EMPTY= (mem_hash_t)0;
+static const mem_hash_t FULL = ((mem_hash_t)-1) ^ (((mem_hash_t)-1)>>1);// 1000
+static const mem_hash_t MASK = ((mem_hash_t)-1) >> 1;                   // 0111
+static const mem_hash_t TOMB = 1UL;                                     // 0001
+static const mem_hash_t NONE = (mem_hash_t)-1;
 
 static inline mem_hash_t *
 memoized (const fset_t *dbs, size_t ref)
@@ -133,7 +133,7 @@ resize (fset_t *dbs, fset_resize_t mode)
     HREassert (dbs->load < 1ULL << 32); // overflow
 
     for (size_t i = 0; i < todos; i++) {
-        mem_hash_t          h = dbs->todo[i] & NFULL;
+        mem_hash_t          h = dbs->todo[i] & MASK;
         key = state(dbs, dbs->todo_data, i);
         data = key + dbs->key_length;
         res = fset_find (dbs, &h, key, &data, true); // load++
@@ -161,7 +161,7 @@ rehash (mem_hash_t h, mem_hash_t v)
 
 static bool
 fset_find_loc (fset_t *dbs, mem_hash_t mem, void *data, size_t *ref,
-               size_t *tomb)
+               mem_hash_t *tomb)
 {
     size_t              b = dbs->key_length;
     mem |= FULL;
@@ -219,7 +219,7 @@ fset_find (fset_t *dbs, mem_hash_t *mem, void *key, void **data,
            bool insert_absert)
 {
     size_t              ref;
-    size_t              tomb;
+    mem_hash_t          tomb;
     size_t              k = dbs->key_length;
     size_t              d = dbs->data_length;
     mem_hash_t          h = (mem == NULL ? MurmurHash64(key, k, 0) : *mem);
