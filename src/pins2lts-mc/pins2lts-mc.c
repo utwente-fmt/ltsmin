@@ -255,6 +255,7 @@ static int              blue_subsumption = 0;
 static int              red_subsumption = 0;
 static int              all_red = 1;
 static int              owcty_do_reset = 0;
+static int              owcty_ecd_all = 0;
 static int              ecd = 1;
 static box_t            call_mode = UseBlackBox;
 static size_t           max_level = SIZE_MAX;
@@ -377,9 +378,10 @@ static struct poptOption options[] = {
     {"grey", 0, POPT_ARG_VAL, &call_mode, UseGreyBox, "make use of GetTransitionsLong calls", NULL},
     {"max", 0, POPT_ARG_LONGLONG | POPT_ARGFLAG_SHOW_DEFAULT, &max_level, 0, "maximum search depth", "<int>"},
     {"owcty-reset", 0, POPT_ARG_VAL, &owcty_do_reset, 1, "turn on reset in OWCTY algorithm", NULL},
+    {"all-ecd", 0, POPT_ARG_VAL, &owcty_ecd_all, 1, "turn on ECD during all iterations (normally only during initialization)", NULL},
 #endif
-    {"nar", 1, POPT_ARG_VAL, &all_red, 0, "turn off red coloring in the blue search (NNDFS/MCNDFS)", NULL},
-    {"no-ecd", 1, POPT_ARG_VAL, &ecd, 0, "turn off early cycle detection (NNDFS/MCNDFS)", NULL},
+    {"nar", 0, POPT_ARG_VAL, &all_red, 0, "turn off red coloring in the blue search (NNDFS/MCNDFS)", NULL},
+    {"no-ecd", 0, POPT_ARG_VAL, &ecd, 0, "turn off early cycle detection (NNDFS/MCNDFS)", NULL},
     {"perm", 'p', POPT_ARG_STRING | POPT_ARGFLAG_SHOW_DEFAULT,
      &arg_perm, 0, "select the transition permutation method",
      "<dynamic|random|rr|sort|sr|shift|shiftall|otf|none>"},
@@ -2522,26 +2524,26 @@ owcty_pre_count (ref_t ref)
 static inline void
 owcty_pre_reset (ref_t ref, int bit, int acc)
 {
-    owcty_pre_t             reset;
-    reset.acc = acc;
-    HREassert(reset.bit != bit);
-    reset.bit = bit;
-    reset.count = 0;
-    owcty_pre_write (ref, reset);
+    owcty_pre_t             pre;
+    pre.acc = acc;
+    HREassert(pre.bit != bit);
+    pre.bit = bit;
+    pre.count = 0;
+    owcty_pre_write (ref, pre);
 }
 
 static bool
 owcty_pre_try_reset (ref_t ref, uint32_t reset_val, int bit, bool check_zero)
 {
-    owcty_pre_t             reset, ext;
+    owcty_pre_t             pre, orig;
     do {
-        ext = owcty_pre_read (ref);
-        if (ext.bit == bit || (check_zero && ext.count == 0))
+        orig = owcty_pre_read (ref);
+        if (orig.bit == bit || (check_zero && orig.count == 0))
             return false;
-        reset.acc = ext.acc;
-        reset.bit = bit;
-        reset.count = reset_val;
-    } while (!owcty_pre_cas(ref, ext, reset));
+        pre.acc = orig.acc;
+        pre.bit = bit;
+        pre.count = reset_val;
+    } while (!owcty_pre_cas(ref, orig, pre));
     return true;
 }
 
@@ -2590,7 +2592,6 @@ owcty_reset (wctx_t *ctx)
     if (ctx->iteration == 0) {
         while ((data = dfs_stack_pop (ctx->in_stack)) && !lb_is_stopped(global->lb)) {
             state_info_deserialize_cheap (&ctx->state, data);
-            Warning (info, "%zu", ctx->state.ref);
             owcty_pre_reset (ctx->state.ref, ctx->flip, 1);
             dfs_stack_push (ctx->stack, data);
         }
@@ -2604,8 +2605,6 @@ owcty_reset (wctx_t *ctx)
         }
     }
 
-    if (strategy[1] == Strat_ECD && !lb_is_stopped(global->lb))
-        HREassert (fset_count(ctx->cyan) == 0 && ctx->red.level_cur == 0, "ECD stack not empty, size: %zu, depth: %zu", fset_count(ctx->cyan), ctx->red.level_cur);
     size_t size = dfs_stack_size (ctx->stack);
     HREreduce (HREglobal(), 1, &size, &size, SizeT, Sum);
     return size;
@@ -2865,8 +2864,10 @@ owcty_do (wctx_t *ctx, size_t *size, size_t (*phase)(wctx_t *ctx), char *name,
     if (reinit_explore) {
         ctx->iteration++;
         lb_reinit (global->lb, ctx->id); // barrier
-        permute_free (ctx->permute); // reinitialize random exploration order:
-        ctx->permute = permute_create (permutation, ctx->model, W, K, ctx->id);
+        if (owcty_ecd_all) {
+            permute_free (ctx->permute); // reinitialize random exploration order:
+            ctx->permute = permute_create (permutation, ctx->model, W, K, ctx->id);
+        }
     }
     if (0 == ctx->id) RTrestartTimer (ctx->timer2);
     size_t new_size = phase(ctx);
@@ -2889,6 +2890,7 @@ owcty (wctx_t *ctx)
     ctx->iteration = ctx->flip = 0;
     owcty_do (ctx, &size, owcty_reachability,       "initialization", false);
     swap (ctx->in_stack, ctx->out_stack);
+    if (!owcty_ecd_all) strategy[1] = Strat_None;
 
     while (size && old_size != size && !lb_is_stopped(global->lb)) {
         ctx->flip = 1 - ctx->flip;
@@ -2900,10 +2902,9 @@ owcty (wctx_t *ctx)
         owcty_do (ctx, &size, owcty_elimination,    "elimination",    true);
     }
 
-    if (0 == ctx->id && (size == 0 || old_size == size)) {
+    if (0 == ctx->id && !lb_is_stopped(global->lb) && (size == 0 || old_size == size))
         Warning (info, "Accepting cycle %s after %zu iteration(s)!",
                  (size > 0 ? "FOUND" : "NOT found"), (ctx->iteration + 1) / 2);
-    }
     HREbarrier(HREglobal()); // print result before (local) statistics
 }
 
