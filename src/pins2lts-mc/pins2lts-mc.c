@@ -251,8 +251,6 @@ static int              dbs_size = 0;
 static int              refs = 1;
 static int              ZOBRIST = 0;
 static int              no_red_perm = 0;
-static int              blue_subsumption = 0;
-static int              red_subsumption = 0;
 static int              all_red = 1;
 static int              owcty_do_reset = 0;
 static int              owcty_ecd_all = 0;
@@ -369,8 +367,6 @@ static struct poptOption options[] = {
     {"non-blocking", 'n', POPT_ARG_VAL, &NONBLOCKING, 1, "Non-blocking TA reachability", NULL},
     {"strategy", 0, POPT_ARG_STRING | POPT_ARGFLAG_SHOW_DEFAULT,
      &arg_strategy, 0, "select the search strategy", "<sbfs|bfs|dfs|cndfs>"},
-    {"bs", 0, POPT_ARG_VAL, &blue_subsumption, 1, "turn on subsumption in the blue search", NULL},
-    {"rs", 0, POPT_ARG_VAL, &red_subsumption, 1, "turn on subsumption in the red search", NULL},
 #else
     {"strategy", 0, POPT_ARG_STRING | POPT_ARGFLAG_SHOW_DEFAULT,
      &arg_strategy, 0, "select the search strategy", "<bfs|sbfs|dfs|cndfs|lndfs|endfs|endfs,lndfs|endfs,endfs,ndfs|ndfs>"},
@@ -2526,7 +2522,6 @@ owcty_pre_reset (ref_t ref, int bit, int acc)
 {
     owcty_pre_t             pre;
     pre.acc = acc;
-    HREassert(pre.bit != bit);
     pre.bit = bit;
     pre.count = 0;
     owcty_pre_write (ref, pre);
@@ -3163,12 +3158,7 @@ ta_cndfs_covered (void *arg, lattice_t l, lm_status_t status, lm_loc_t loc)
 {
     wctx_t             *ctx = (wctx_t *) arg;
     lm_status_t         color = (lm_status_t)ctx->subsumes;
-    int subsumption = (blue_subsumption && color == LM_BLUE) ||
-                      (red_subsumption && color == LM_RED);
-    int *sigma = (int*)&ctx->successor->lattice;
-    if ( (status & color) && (
-         (subsumption && GBisCoveredByShort(ctx->model, sigma, (int*)&l)) ||
-         (!subsumption && ctx->successor->lattice == l) ) ) {
+    if ( (status & color) && (ctx->successor->lattice == l) ) {
         ctx->done = 1;
         return LM_CB_STOP;
     }
@@ -3179,17 +3169,10 @@ ta_cndfs_covered (void *arg, lattice_t l, lm_status_t status, lm_loc_t loc)
 int
 ta_cndfs_subsumed (wctx_t *ctx, state_info_t *state, lm_status_t color)
 {
-    // without subsumption we only might miss an update in worst case (which corresponds to a reordering of a sequential run)
-    if (blue_subsumption || red_subsumption)
-        lm_lock (global->lmap, state->ref);
-
     ctx->subsumes = color;
     ctx->done = 0;
     ctx->successor = state;
     lm_iterate (global->lmap, state->ref, ta_cndfs_covered, ctx);
-
-    if (blue_subsumption || red_subsumption)
-        lm_unlock (global->lmap, state->ref);
     return ctx->done;
 }
 
@@ -3199,22 +3182,11 @@ ta_cndfs_spray (void *arg, lattice_t l, lm_status_t status, lm_loc_t loc)
     wctx_t             *ctx = (wctx_t *) arg;
     lm_status_t         color = (lm_status_t)ctx->subsumes;
     int                *sigma = (int*)&ctx->successor->lattice;
-    int subsumption = (blue_subsumption && color == LM_BLUE) ||
-                      (red_subsumption && color == LM_RED);
-    if (subsumption) { // no premature stop (mark blue states red)
-        if (  status == color &&
-              GBisCoveredByShort(ctx->model, (int*)&l, sigma) ) {
-            lm_delete (global->lmap, loc);
-            ctx->last = (LM_NULL_LOC == ctx->last ? loc : ctx->last);
-            ctx->red.deletes++;
-        }
-    } else {
-        if ( ctx->successor->lattice == l ) {
-            if ((status & color) == 0)
-                lm_set_status (global->lmap, loc, status | color);
-            ctx->done = 1;
-            return LM_CB_STOP;
-        }
+    if ( ctx->successor->lattice == l ) {
+        if ((status & color) == 0)
+            lm_set_status (global->lmap, loc, status | color);
+        ctx->done = 1;
+        return LM_CB_STOP;
     }
     return LM_CB_NEXT;
 }
@@ -3318,7 +3290,7 @@ ta_cndfs_handle_blue (void *arg, state_info_t *successor, transition_info_t *ti,
     wctx_t             *ctx = (wctx_t *) arg;
     state_data_t succ_data = get_state (successor->ref, ctx);
     int acc = GBbuchiIsAccepting(ctx->model, succ_data);
-    ctx->red.visited += !seen & acc;
+    ctx->red.visited += ~seen & acc;
     int cyan = ta_cndfs_has_state (ctx->cyan, successor, false);
     if ( ecd && cyan && (GBbuchiIsAccepting(ctx->model, ctx->state.data) || acc) ) {
         /* Found cycle in blue search */
