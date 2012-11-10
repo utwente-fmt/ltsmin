@@ -41,13 +41,11 @@ dict set frontends pbes exp_output "10548 states 12168 transitions"
 set backends "mc,dist,sym,seq"
 set filter "*2lts-{$backends}"
 set be_filter "{mc}"
-set EXAMPLES_PATH "../../examples"
-
 
 
 proc find_bins_by_filter { filter } {
     set frontends [list]
-    set lts_backends [glob -directory "../../src" -type d pins2lts* ]
+    set lts_backends [glob -directory "$base_dir/../src" -type d pins2lts* ]
     foreach dir $lts_backends {
         set lts_bins [glob -nocomplain -directory $dir -type f $filter]
         foreach path $lts_bins {

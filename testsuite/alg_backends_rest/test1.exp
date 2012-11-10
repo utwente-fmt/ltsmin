@@ -26,7 +26,7 @@ dict set langs dve exp_output "2689 states 3567 transitions"
 # prom:
 dict set langs prom model "fgs.promela.spinja"
 # list with commands to be executed before the language tests. This can be used to generate models.
-dict set langs prom precommands {"spinjal ../../examples/fgs.promela" "mv fgs.promela.spinja ../../examples"}
+dict set langs prom precommands {"spinjal $EXAMPLES_PATH/fgs.promela" "mv fgs.promela.spinja $EXAMPLES_PATH/examples"}
 dict set langs prom options mc "--threads=$num_threads"
 dict set langs prom exp_output ""
 
