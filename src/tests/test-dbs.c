@@ -66,7 +66,7 @@ void readfile(const size_t i) {
     stream_close(&s[i]);
     NUM+=n[i];
     char *fname = rindex(filename, '/');
-    Warning(info, "Read %s into memory (%d x %d)", fname==NULL? filename : fname+1, ARRAY_SIZE, n[i]);
+    Warning(info, "Read %s into memory (%zu x %zu)", fname==NULL? filename : fname+1, ARRAY_SIZE, n[i]);
     return;
 }
 
@@ -143,7 +143,7 @@ void *fill(void *c) {
         str = 0;
     }
     n[id]=end-start; 
-	Warning(info, "Filling [%d] dbs with %zu - %zu = %zu vectors", id, end, start, end-start) ;
+	Warning(info, "Filling [%zu] dbs with %zu - %zu = %zu vectors", id, end, start, end-start) ;
 	res_t res = RTmalloc(sizeof( *res));
     res->count = 0;
     int idx;
@@ -171,7 +171,7 @@ void *fill(void *c) {
 	float real=(times(&tmp2)-real_time1)/tick;
 	float sys=(tmp2.tms_stime-tmp1.tms_stime)/tick;
 	float usr=(tmp2.tms_utime-tmp1.tms_utime)/tick;
-	Warning(info, "filling [%d]: DONE real=%5.3f, sys=%5.3f, user=%5.3f", id, real,sys,usr);
+	Warning(info, "filling [%zu]: DONE real=%5.3f, sys=%5.3f, user=%5.3f", id, real,sys,usr);
     res->time = real;
     res->stats = statistics(dbs);
     return res;
@@ -256,7 +256,7 @@ int main2(const int argc, const char **args) {
     } else {
         dbs = SHARED_DB ? create(ARRAY_SIZE, SIZE) : NULL;
     }
-    Warning(info, "THREADS: %d, SIZE: %d", NUM_THREADS, ARRAY_SIZE);
+    Warning(info, "THREADS: %zu, SIZE: %zu", NUM_THREADS, ARRAY_SIZE);
 
 	thread_id_key = RTmalloc(sizeof *thread_id_key);
     pthread_key_create(thread_id_key, NULL);

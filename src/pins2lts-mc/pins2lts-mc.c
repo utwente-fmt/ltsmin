@@ -3181,7 +3181,6 @@ ta_cndfs_spray (void *arg, lattice_t l, lm_status_t status, lm_loc_t loc)
 {
     wctx_t             *ctx = (wctx_t *) arg;
     lm_status_t         color = (lm_status_t)ctx->subsumes;
-    int                *sigma = (int*)&ctx->successor->lattice;
     if ( ctx->successor->lattice == l ) {
         if ((status & color) == 0)
             lm_set_status (global->lmap, loc, status | color);

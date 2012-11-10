@@ -33,4 +33,5 @@ void simplemap_test()
 int main(int argc, char *argv[]){
     simplemap_test();
     return 0;
+    (void) argc; (void) argv;
 }
