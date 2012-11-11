@@ -2628,7 +2628,7 @@ owcty_ecd (wctx_t *ctx, state_info_t *successor)
     }
 }
 
-size_t
+static size_t
 owcty_split (void *arg_src, void *arg_tgt, size_t handoff)
 {
     wctx_t             *source = arg_src;
@@ -2676,7 +2676,10 @@ owcty_initialize_handle (void *arg, state_info_t *successor, transition_info_t *
     if (!seen) {
         raw_data_t stack_loc = dfs_stack_push (ctx->stack, NULL);
         state_info_serialize (successor, stack_loc);
-    }
+    } else if (strategy[1] == Strat_ECD)
+        owcty_ecd (ctx, successor);
+    if (strategy[1] == Strat_MAP)
+        owcty_map (ctx, successor);
     ctx->counters.trans++;
     (void) ti;
 }
@@ -2714,7 +2717,7 @@ owcty_load (wctx_t *ctx)
  *    count > 0:    reset(0) & explore
  *    count == 0:   ignore (eliminated)
  */
-size_t
+static size_t
 owcty_reachability (wctx_t *ctx)
 {
     ctx->counters.visited = 0; // number of states reachable from accepting states
@@ -2776,7 +2779,7 @@ owcty_reachability (wctx_t *ctx)
  * phase, but it may be the case that the entire candidate set is already set
  * to zero, in that case we avoid exploration
  */
-size_t
+static size_t
 owcty_elimination_pre (wctx_t *ctx)
 {
     state_data_t            data;
@@ -2842,16 +2845,7 @@ owcty_elimination (wctx_t *ctx)
     return size[0] - size[1];
 }
 
-static inline void
-owcty_progress_report (wctx_t *ctx, char *operation, size_t candidates)
-{
-    if (0 != ctx->id || lb_is_stopped(global->lb)) return;
-    RTstopTimer (ctx->timer2);
-    Warning (info, "candidates after %s(%zd):\t%12zu (%4.2f sec)", operation,
-             (ctx->iteration + 1) / 2, candidates, RTrealTime(ctx->timer2));
-}
-
-static inline void
+static void
 owcty_do (wctx_t *ctx, size_t *size, size_t (*phase)(wctx_t *ctx), char *name,
           bool reinit_explore)
 {
@@ -2867,10 +2861,13 @@ owcty_do (wctx_t *ctx, size_t *size, size_t (*phase)(wctx_t *ctx), char *name,
     if (0 == ctx->id) RTrestartTimer (ctx->timer2);
     size_t new_size = phase(ctx);
     *size = phase == owcty_elimination || phase == owcty_elimination_pre ? *size - new_size : new_size;
-    owcty_progress_report (ctx, name, *size);
+    if (0 != ctx->id || lb_is_stopped(global->lb)) return;
+    RTstopTimer (ctx->timer2);
+    Warning (info, "candidates after %s(%zd):\t%12zu (%4.2f sec)", name,
+             (ctx->iteration + 1) / 2, *size, RTrealTime(ctx->timer2));
 }
 
-void
+static void
 owcty (wctx_t *ctx)
 {
     if (strategy[1] == Strat_MAP && 0 == ctx->id && GBbuchiIsAccepting(ctx->model, ctx->initial.data))
@@ -2887,7 +2884,7 @@ owcty (wctx_t *ctx)
     swap (ctx->in_stack, ctx->out_stack);
     if (!owcty_ecd_all) strategy[1] = Strat_None;
 
-    while (size && old_size != size && !lb_is_stopped(global->lb)) {
+    while (size != 0 && old_size != size && !lb_is_stopped(global->lb)) {
         ctx->flip = 1 - ctx->flip;
         owcty_do (ctx, &size, owcty_reset,          "reset\t",        false);
         owcty_do (ctx, &size, owcty_reachability,   "reachability",   true);
