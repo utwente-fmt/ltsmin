@@ -2534,7 +2534,7 @@ dfs_fifo_handle (void *arg, state_info_t *successor, transition_info_t *ti,
 {
     wctx_t             *ctx = (wctx_t *) arg;
     if (GBbuchiIsAccepting(ctx->model, get_state(successor->ref, ctx))) {
-        if (!seen) {
+        if (!seen || (all_red && !global_has_color(successor->ref, GRED, 0))) {
             raw_data_t stack_loc = dfs_stack_push (ctx->out_stack, NULL);
             state_info_serialize (successor, stack_loc);
         }
@@ -2617,6 +2617,8 @@ dfs_fifo (wctx_t *ctx)
             if (NULL != state_data) {
                 dfs_stack_push (ctx->stack, state_data);
                 state_info_deserialize_cheap (&ctx->state, state_data);
+                if (all_red && global_has_color(ctx->state.ref, GRED, 0))
+                    continue;
                 dfs_fifo_dfs (ctx, ctx->state.ref);
                 ctx->red.visited++;
             }
