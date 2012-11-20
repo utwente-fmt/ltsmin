@@ -2547,6 +2547,27 @@ dfs_fifo_handle (void *arg, state_info_t *successor, transition_info_t *ti,
     (void) ti;
 }
 
+size_t
+split_dfs_fifo (void *arg_src, void *arg_tgt, size_t handoff)
+{
+    wctx_t             *source = arg_src;
+    wctx_t             *target = arg_tgt;
+    size_t              in_size = dfs_stack_size (source->in_stack);
+    if (in_size == 1) {
+        dfs_stack_push (target->in_stack, dfs_stack_top(source->in_stack));
+        return 1;
+    }
+    handoff = min (in_size >> 1 , handoff);
+    for (size_t i = 0; i < handoff; i++) {
+        state_data_t        one = dfs_stack_pop (source->in_stack);
+        HREassert (NULL != one);
+        dfs_stack_push (target->in_stack, one);
+    }
+    source->counters.splits++;
+    source->counters.transfer += handoff;
+    return handoff;
+}
+
 void
 dfs_fifo_dfs (wctx_t *ctx, ref_t seed)
 {
@@ -2579,10 +2600,10 @@ dfs_fifo_dfs (wctx_t *ctx, ref_t seed)
             global_try_color (ctx->state.ref, GRED, 0);
         }
         // load balance the FIFO queue (this is a synchronizing affair)
-        lb_balance (global->lb, ctx->id, dfs_stack_frame_size(ctx->in_stack) + 1, split_sbfs);
+        lb_balance (global->lb, ctx->id, dfs_stack_frame_size(ctx->in_stack) + 2, split_dfs_fifo);
     }
     HREassert (lb_is_stopped(global->lb) || fset_count(ctx->cyan) == 0,
-               "DFS stack not empty, size: %zu %zu", fset_count(ctx->cyan));
+               "DFS stack not empty, size: %zu", fset_count(ctx->cyan));
 }
 
 void
@@ -2591,7 +2612,7 @@ dfs_fifo (wctx_t *ctx)
     size_t              total = 0;
     size_t              out_size, size;
     do {
-        while (lb_balance (global->lb, ctx->id, dfs_stack_frame_size(ctx->in_stack), split_sbfs)) {
+        while (lb_balance (global->lb, ctx->id, dfs_stack_frame_size(ctx->in_stack), split_dfs_fifo)) {
             raw_data_t          state_data = dfs_stack_pop (ctx->in_stack);
             if (NULL != state_data) {
                 dfs_stack_push (ctx->stack, state_data);
@@ -3538,11 +3559,11 @@ explore (wctx_t *ctx)
     GBgetInitialState (ctx->model, initial);
     state_info_initialize (&ctx->initial, initial, &ti, &ctx->state, ctx);
     if ( Strat_DFSFIFO & strategy[0] ) {
-        if (0 == ctx->id) {
+        // if (0 == ctx->id) {
             raw_data_t stack_loc = dfs_stack_push (ctx->in_stack, NULL);
             state_info_serialize (&ctx->initial, stack_loc);
-        }
-        ctx->seed = GBbuchiIsAccepting(ctx->model, initial) ? -1 : ctx->initial.ref;
+        // }
+        ctx->seed = GBbuchiIsAccepting(ctx->model, initial) ? (ref_t)-1 : ctx->initial.ref;
     } else if ( Strat_OWCTY & strategy[0] ) {
         if (0 == ctx->id) owcty_initialize_handle (ctx, &ctx->initial, &ti, 0);
     } else if ( ~Strat_DFSFIFO & Strat_LTL & strategy[0] ) {
