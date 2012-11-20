@@ -1082,12 +1082,11 @@ print_statistics (counter_t *ar_reach, counter_t *ar_red, rt_timer_t timer,
     double              el_size =
        db_type & Tree ? (db_type==ClearyTree?1:2) + (2.0 / (1UL<<ratio)) : D+.5;
     size_t              s = state_info_size();
-    size_t              max_load = Strat_NDFS & strategy[0] ?
-                                   reach->level_max+red->level_max :
-            (Strat_SBFS & strategy[0] ? max_level_size : lb_max_load(global->lb));
-    mem1 = ((double)(s * max_load)) / (1 << 20);
-    size_t lattices = reach->inserts - reach->updates;
+    size_t              max_load;
+    size_t              lattices = reach->inserts - reach->updates;
     if (Strat_LTL & strategy[0]) {
+        max_load = reach->level_max+red->level_max;
+        max_load += (Strat_DFSFIFO & strategy[0] ? max_level_size : 0);
         RTprintTimer (info, timer, "Total exploration time");
         Warning (info, " ");
         Warning (info, "State space has %zu states, %zu are accepting", db_elts,
@@ -1097,6 +1096,7 @@ print_statistics (counter_t *ar_reach, counter_t *ar_red, rt_timer_t timer,
         Warning (info, " ");
         Warning (info, "Total memory used for local state coloring: %.1fMB", mem3);
     } else {
+        max_load = (Strat_SBFS & strategy[0] ? max_level_size : lb_max_load(global->lb));
         statistics_t state_stats; statistics_init (&state_stats);
         statistics_t trans_stats; statistics_init (&trans_stats);
         for (size_t i = 0; i< W; i++) {
@@ -1124,6 +1124,7 @@ print_statistics (counter_t *ar_reach, counter_t *ar_red, rt_timer_t timer,
         Warning (info, "Lattice map: %.1fMB (~%.1fMB paged-in) overhead: %.2f%%, allocated: %zu", mem3, lm, redundancy, alloc);
     }
 
+    mem1 = ((double)(s * max_load)) / (1 << 20);
     Warning (info, "Queue width: %zuB, total height: %zu, memory: %.2fMB",
              s, max_load, mem1);
     mem2 = ((double)(1UL << (dbs_size)) / (1<<20)) * SLOT_SIZE * el_size;
@@ -2537,6 +2538,7 @@ dfs_fifo_handle (void *arg, state_info_t *successor, transition_info_t *ti,
         if (!seen || (all_red && !global_has_color(successor->ref, GRED, 0))) {
             raw_data_t stack_loc = dfs_stack_push (ctx->out_stack, NULL);
             state_info_serialize (successor, stack_loc);
+            ctx->red.visited += !seen;
         }
     } else {
         raw_data_t stack_loc = dfs_stack_push (ctx->stack, NULL);
@@ -2557,7 +2559,7 @@ split_dfs_fifo (void *arg_src, void *arg_tgt, size_t handoff)
         dfs_stack_push (target->in_stack, dfs_stack_top(source->in_stack));
         return 1;
     }
-    handoff = min (in_size >> 1 , handoff);
+    handoff = min (in_size >> 1, handoff);
     for (size_t i = 0; i < handoff; i++) {
         state_data_t        one = dfs_stack_pop (source->in_stack);
         HREassert (NULL != one);
@@ -2600,7 +2602,7 @@ dfs_fifo_dfs (wctx_t *ctx, ref_t seed)
             global_try_color (ctx->state.ref, GRED, 0);
         }
         // load balance the FIFO queue (this is a synchronizing affair)
-        lb_balance (global->lb, ctx->id, dfs_stack_frame_size(ctx->in_stack) + 2, split_dfs_fifo);
+        lb_balance (global->lb, ctx->id, dfs_stack_frame_size(ctx->in_stack), split_dfs_fifo);
     }
     HREassert (lb_is_stopped(global->lb) || fset_count(ctx->cyan) == 0,
                "DFS stack not empty, size: %zu", fset_count(ctx->cyan));
@@ -2613,14 +2615,14 @@ dfs_fifo (wctx_t *ctx)
     size_t              out_size, size;
     do {
         while (lb_balance (global->lb, ctx->id, dfs_stack_frame_size(ctx->in_stack), split_dfs_fifo)) {
-            raw_data_t          state_data = dfs_stack_pop (ctx->in_stack);
+            raw_data_t          state_data = dfs_stack_top (ctx->in_stack);
             if (NULL != state_data) {
                 dfs_stack_push (ctx->stack, state_data);
                 state_info_deserialize_cheap (&ctx->state, state_data);
                 if (all_red && global_has_color(ctx->state.ref, GRED, 0))
                     continue;
                 dfs_fifo_dfs (ctx, ctx->state.ref);
-                ctx->red.visited++;
+                dfs_stack_pop (ctx->in_stack);
             }
         }
         size = dfs_stack_frame_size (ctx->out_stack);
@@ -3561,11 +3563,11 @@ explore (wctx_t *ctx)
     GBgetInitialState (ctx->model, initial);
     state_info_initialize (&ctx->initial, initial, &ti, &ctx->state, ctx);
     if ( Strat_DFSFIFO & strategy[0] ) {
-        // if (0 == ctx->id) {
-            raw_data_t stack_loc = dfs_stack_push (ctx->in_stack, NULL);
-            state_info_serialize (&ctx->initial, stack_loc);
-        // }
-        ctx->seed = GBbuchiIsAccepting(ctx->model, initial) ? (ref_t)-1 : ctx->initial.ref;
+        raw_data_t stack_loc = dfs_stack_push (ctx->in_stack, NULL);
+        state_info_serialize (&ctx->initial, stack_loc);
+        int acc = GBbuchiIsAccepting (ctx->model, initial);
+        ctx->seed = acc ? (ref_t)-1 : ctx->initial.ref;
+        ctx->red.visited += acc;
     } else if ( Strat_OWCTY & strategy[0] ) {
         if (0 == ctx->id) owcty_initialize_handle (ctx, &ctx->initial, &ti, 0);
     } else if ( ~Strat_DFSFIFO & Strat_LTL & strategy[0] ) {
