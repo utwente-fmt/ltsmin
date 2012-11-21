@@ -20,7 +20,13 @@ string_map_t SSMcreateSWP(const char* swp_spec){
 	int N=1;
 	char*pattern=strdup(swp_spec);
 	char*tmp=pattern;
-	while((tmp=strchr(tmp,';'))){
+	int separator;
+	if (strchr(tmp,',')!=NULL){
+	    separator=',';
+	} else {
+	    separator=';';
+	}
+	while((tmp=strchr(tmp,separator))){
 		tmp++;
 		N++;
 	}
@@ -29,7 +35,7 @@ string_map_t SSMcreateSWP(const char* swp_spec){
 	pol->value=RTmalloc(N*sizeof(char*));
 	for(int i=0;i<N-1;i++){
 		pol->pattern[i]=pattern;
-		tmp=strchr(pattern,';');
+		tmp=strchr(pattern,separator);
 		tmp[0]=0;
 		pattern=tmp+1;
 		tmp=strrchr(pol->pattern[i],':');
@@ -68,7 +74,13 @@ string_set_t SSMcreateSWPset(const char* swp_spec){
 	int N=2;
 	char*pattern=strdup(swp_spec);
 	char*tmp=pattern;
-	while((tmp=strchr(tmp,';'))){
+	int separator;
+	if (strchr(tmp,',')!=NULL){
+	    separator=',';
+	} else {
+	    separator=';';
+	}
+	while((tmp=strchr(tmp,separator))){
 		tmp++;
 		N++;
 	}
@@ -76,7 +88,7 @@ string_set_t SSMcreateSWPset(const char* swp_spec){
 	pol->pattern=RTmalloc(N*sizeof(char*));
 	for(int i=0;i<N-2;i++){
 		pol->pattern[i]=pattern;
-		tmp=strchr(pattern,';');
+		tmp=strchr(pattern,separator);
 		tmp[0]=0;
 		pattern=tmp+1;
 	}
