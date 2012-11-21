@@ -247,6 +247,7 @@ static si_map_entry db_types[] = {
 };
 
 static char            *files[2];
+static char            *table_size = "20%";
 static int              dbs_size = 0;
 static int              refs = 1;
 static int              ZOBRIST = 0;
@@ -354,8 +355,8 @@ static struct poptOption options[] = {
      (void *)state_db_popt, 0, NULL, NULL},
     {"state", 0, POPT_ARG_STRING | POPT_ARGFLAG_SHOW_DEFAULT, &state_repr, 0,
       "select the data structure for storing states. Beware for Cleary tree: size <= 28 + 2 * ratio.", "<tree|table|cleary-tree>"},
-    {"size", 's', POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &dbs_size, 0,
-     "log2 size of the state store", NULL},
+    {"size", 's', POPT_ARG_STRING | POPT_ARGFLAG_SHOW_DEFAULT, &table_size, 0,
+     "log2 size of the state store or maximum % of memory to use", NULL},
 #ifdef OPAAL
     {"lattice-blocks", 'l', POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &LATTICE_BLOCK_SIZE, 0,
       "Size of blocks preallocated for lattices (> 1). "
@@ -858,11 +859,14 @@ statics_init (model_t model)
     }
     if (inv_detect)
         inv_expr = parse_file (inv_detect, pred_parse_file, model);
-    if (0 == dbs_size) {
+    char *end;
+    dbs_size = strtol (table_size, &end, 10);
+    if (dbs_size == 0) Abort ("Not a valid table size: -s %s", table_size);
+    if (*end == '%') {
         size_t el_size = (db_type != HashTable ? 3 : D) * SLOT_SIZE; // over estimation for cleary
         size_t map_el_size = (Strat_TA & strategy[0] ? sizeof(lattice_t) : 0);
-        size_t db_el_size = (RTmemSize() / 3) / (el_size + map_el_size);
-        dbs_size = (int) (log(db_el_size) / log(2));
+        size_t db_el_size = (RTmemSize() / 100 * dbs_size) / (el_size + map_el_size);
+        dbs_size = (int) log2(db_el_size);
         dbs_size = dbs_size > DB_SIZE_MAX ? DB_SIZE_MAX : dbs_size;
     }
     MAX_SUCC = ( Strat_DFS == strategy[0] ? 1 : SIZE_MAX );  /* for --grey: */
@@ -871,7 +875,7 @@ statics_init (model_t model)
         global_bits += num_global_bits (strategy[i]);
         local_bits += (Strat_LTL & strategy[i++] ? 2 : 0);
     }
-    count_bits = (Strat_LNDFS == strategy[i-1] ? ceil(log(W+1)/log(2)) : 0);
+    count_bits = (Strat_LNDFS == strategy[i-1] ? ceil(log2(W+1)) : 0);
     indexing = NULL != trc_output || ((Strat_TA | Strat_LTLG) & strategy[0]);
     switch (db_type) {
     case HashTable:
