@@ -9,8 +9,9 @@
 #include <util-lib/chunk_support.h>
 
 /**
- @file greybox.h
- @brief The grey box interface to models.
+ @file pins.h
+ @brief The Partitioned Next-State Interface (PINS) to models.
+        Formerly: greybox interface (GB).
 
 This version assumes a few things:
 - Every states in the model have the same length.
