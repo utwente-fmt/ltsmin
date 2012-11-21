@@ -182,7 +182,7 @@ static dbs_get_f        get;
 static dbs_stats_f      statistics;
 static hash64_f         hasher;
 static db_type_t        db_type = TreeTable;
-static strategy_t       strategy[MAX_STRATEGIES] = {Strat_BFS, Strat_None, Strat_None, Strat_None, Strat_None};
+static strategy_t       strategy[MAX_STRATEGIES] = {Strat_None, Strat_None, Strat_None, Strat_None, Strat_None};
 static permutation_perm_t permutation = Perm_Unknown;
 static permutation_perm_t permutation_red = Perm_Unknown;
 static char*            trc_output = NULL;
@@ -822,6 +822,8 @@ statics_init (model_t model)
         Abort ("Wrong strategy for timed verification: %s", key_search(strategies, strategy[0]));
     strategy[0] |= Strat_TA;
 #endif
+    if (strategy[0] == Strat_None)
+        strategy[0] = (GBgetAcceptingStateLabelIndex(model) < 0 ? Strat_BFS : Strat_CNDFS);
     lts_type_t          ltstype = GBgetLTStype (model);
     matrix_t           *m = GBgetDMInfo (model);
     SL = lts_type_get_state_label_count (ltstype);
