@@ -55,11 +55,11 @@ torx_transition (void *arg, transition_info_t *ti, int *dst)
         c = GBchunkGet (ctx->model,
                         lts_type_get_edge_label_typeno (ctx->ltstype, 0),
                         ti->labels[0]);
-        if (c.len != 3 || strncmp (c.data, "tau", c.len) != 0)
+        if (c.len != strlen(LTSMIN_EDGE_VALUE_TAU) || strncmp (c.data, LTSMIN_EDGE_VALUE_TAU, c.len) != 0)
             vis = 1;
     } else {
-        c.len  = 3;
-        c.data = "tau";
+        c.len  = strlen(LTSMIN_EDGE_VALUE_TAU);
+        c.data = (char *) LTSMIN_EDGE_VALUE_TAU;
     }    
     
     /* tab-separated fields: edge vis sat lbl pred vars state */

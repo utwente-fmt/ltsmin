@@ -14,6 +14,7 @@
 #include <fcntl.h>
 
 #include "Ddlts.h"
+#include <ltsmin-lib/ltsmin-standard.h>
 
 #define BUFFER_SIZE (1024 * 1024)
 
@@ -42,7 +43,7 @@ dlts_t dlts_read(MPI_Comm communicator,char*filename){
     lts->tau=-1;
     
     lts_file_t file=lts_file_open(filename);
-    value_table_t vt=HREcreateTable(ctx,"action");
+    value_table_t vt=HREcreateTable(ctx,LTSMIN_EDGE_TYPE_ACTION_PREFIX);
     lts_file_set_table(file,0,vt);
     lts->label_count=VTgetCount(vt);
     Debug("there are %d labels",lts->label_count);
@@ -52,7 +53,7 @@ dlts_t dlts_read(MPI_Comm communicator,char*filename){
         lts->label_string[i]=RTmalloc(c.len + 1);
         strncpy(lts->label_string[i], c.data,c.len);
         lts->label_string[i][c.len] = '\0';
-        if ( (c.len==3 && strncmp(c.data,"tau",3)==0)
+        if ( (c.len==3 && strncmp(c.data,LTSMIN_EDGE_VALUE_TAU,3)==0)
           || (c.len==1 && strncmp(c.data,"i",1)==0)
            )
         {
@@ -254,7 +255,7 @@ void dlts_writedir(dlts_t lts, char* name){
  lts_file_t template=lts_index_template();
  lts_file_set_edge_owner(template,SourceOwned);
  lts_file_t file=lts_file_create(name,ltstype,nodes,template);
- value_table_t vt=HREcreateTable(ctx,"action");
+ value_table_t vt=HREcreateTable(ctx,LTSMIN_EDGE_TYPE_ACTION_PREFIX);
  lts_file_set_table(file,0,vt);
  if (me==0) {
     lts_write_init(file,lts->root_seg,&lts->root_ofs);

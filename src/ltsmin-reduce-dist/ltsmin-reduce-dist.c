@@ -108,7 +108,7 @@ int main(int argc, char*argv[]){
             int count=VTgetCount(vt);
             for(int i=0;i<count;i++){
                 chunk c=VTgetChunk(vt,i);
-                if (c.len==3 && !strncmp(c.data,"tau",3)){
+                if (c.len==3 && !strncmp(c.data,LTSMIN_EDGE_VALUE_TAU,3)){
                     if (tau>=0) Fatal(1,error,"more than one silent action");
                     tau=i;
                 }

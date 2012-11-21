@@ -11,12 +11,13 @@
 #include <caesar_standard.h>
 #include <caesar_graph.h>
 
+#include <hre/stringindex.h>
 #include <hre/user.h>
 #include <hre-io/user.h>
 #include <lts-io/user.h>
+#include <ltsmin-lib/ltsmin-standard.h>
 #include <pins-lib/pins-impl.h>
 #include <util-lib/fast_hash.h>
-#include <hre/stringindex.h>
 #include <util-lib/treedbs.h>
 
 static model_t model;
@@ -192,7 +193,7 @@ CAESAR_TYPE_STRING CAESAR_STRING_LABEL(CAESAR_TYPE_LABEL l) {
         for(i=0; i < edge_labels; i++) {
             char *name=lts_type_get_edge_label_name(ltstype,i);
             c=GBchunkGet(model,lts_type_get_edge_label_typeno(ltstype,i),l->label[i]);
-            if (c.len==3 && strncmp(c.data, "tau", c.len)==0)
+            if (c.len==3 && strncmp(c.data, LTSMIN_EDGE_VALUE_TAU, c.len)==0)
                 clen=strlen(tau);
             else
                 clen=c.len*2+6;
@@ -211,7 +212,7 @@ CAESAR_TYPE_STRING CAESAR_STRING_LABEL(CAESAR_TYPE_LABEL l) {
                 sprintf(p, "%s=",name);
                 p += strlen(p);
             }
-            if (c.len==3 && strncmp(c.data, "tau", c.len)==0)
+            if (c.len==3 && strncmp(c.data, LTSMIN_EDGE_VALUE_TAU, c.len)==0)
                 sprintf(p, "%s", tau);
             else
                 chunk2string(c,b-p,p);
@@ -440,7 +441,7 @@ CAESAR_TYPE_BOOLEAN CAESAR_VISIBLE_LABEL(CAESAR_TYPE_LABEL x) {
 	CAESAR_TYPE_BOOLEAN vis = CAESAR_TRUE;
 	if (edge_labels==1) {
 		chunk c=GBchunkGet(model,lts_type_get_edge_label_typeno(ltstype,0),x->label[0]);
-		if (c.len==3 && strncmp(c.data, "tau", c.len)==0)
+		if (c.len==3 && strncmp(c.data, LTSMIN_EDGE_VALUE_TAU, c.len)==0)
 			vis =CAESAR_FALSE;
 	}
 	return vis;

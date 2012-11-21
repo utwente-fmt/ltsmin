@@ -38,8 +38,8 @@ int main(int argc, char *argv[]){
     lts_type_set_state_label_name(ltstype,0,"p");
     lts_type_set_state_label_type(ltstype,0,"boolean");
     lts_type_set_edge_label_count(ltstype,1);
-    lts_type_set_edge_label_name(ltstype,0,"action");
-    lts_type_set_edge_label_type(ltstype,0,"action");
+    lts_type_set_edge_label_name(ltstype,0,LTSMIN_EDGE_TYPE_ACTION_PREFIX);
+    lts_type_set_edge_label_type(ltstype,0,LTSMIN_EDGE_TYPE_ACTION_PREFIX);
     model_t model = GBcreateBase();
     GBsetLTStype(model, ltstype);
     switch(parse_mode) {

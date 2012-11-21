@@ -3,6 +3,7 @@
 
 #include <hre/user.h>
 #include <lts-io/internal.h>
+#include <ltsmin-lib/ltsmin-standard.h>
 
 typedef enum {AUT_FMT, BCG_FMT, DIR_FMT, GCD_FMT, GCF_FMT, FSM_FMT } lts_format_t;
 
@@ -66,10 +67,10 @@ void lts_file_copy(lts_file_t src,lts_file_t dst){
 lts_type_t single_action_type(){
     lts_type_t ltstype=lts_type_create();
     lts_type_set_state_length(ltstype,0);
-    lts_type_add_type(ltstype,"action",NULL);
+    lts_type_add_type(ltstype,LTSMIN_EDGE_TYPE_ACTION_PREFIX,NULL);
     lts_type_set_edge_label_count(ltstype,1);
-    lts_type_set_edge_label_name(ltstype,0,"action");
-    lts_type_set_edge_label_type(ltstype,0,"action");
+    lts_type_set_edge_label_name(ltstype,0,LTSMIN_EDGE_TYPE_ACTION_PREFIX);
+    lts_type_set_edge_label_type(ltstype,0,LTSMIN_EDGE_TYPE_ACTION_PREFIX);
     lts_type_set_state_label_count(ltstype,0);
     return ltstype;
 }

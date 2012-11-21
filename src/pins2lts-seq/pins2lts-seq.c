@@ -1477,8 +1477,8 @@ gsea_setup(const char *output)
         opt.act_label = 0;
         if (lts_type_get_edge_label_count(ltstype) == 0 ||
                 strncmp(lts_type_get_edge_label_name(ltstype, opt.act_label),
-                        "action", 6) != 0)
-            Abort("No edge label 'action...' for action detection");
+                        LTSMIN_EDGE_TYPE_ACTION_PREFIX, strlen(LTSMIN_EDGE_TYPE_ACTION_PREFIX)) != 0)
+               Abort("No edge label '%s...' for action detection", LTSMIN_EDGE_TYPE_ACTION_PREFIX);
         int typeno = lts_type_get_edge_label_typeno(ltstype, opt.act_label);
         chunk c = chunk_str(opt.act_detect);
         opt.act_index = GBchunkPut(opt.model, typeno, c);

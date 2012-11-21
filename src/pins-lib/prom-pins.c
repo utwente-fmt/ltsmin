@@ -10,6 +10,7 @@
 #include <dm/dm.h>
 #include <hre/runtime.h>
 #include <hre/unix.h>
+#include <ltsmin-lib/ltsmin-standard.h>
 #include <pins-lib/prom-pins.h>
 #include <util-lib/chunk_support.h>
 
@@ -279,8 +280,8 @@ SpinJaloadGreyboxModel(model_t model, const char *filename)
     int action_type = 0;
     int statement_type = 0;
     if (spinja_get_edge_count() > 0) {
-         action_type = lts_type_add_type(ltstype, "action", NULL);
-         statement_type = lts_type_add_type(ltstype, "statement", NULL);
+         action_type = lts_type_add_type(ltstype, LTSMIN_EDGE_TYPE_ACTION_PREFIX, NULL);
+         statement_type = lts_type_add_type(ltstype, LTSMIN_EDGE_TYPE_STATEMENT, NULL);
     }
     GBsetLTStype(model, ltstype);
 
@@ -302,16 +303,16 @@ SpinJaloadGreyboxModel(model_t model, const char *filename)
         lts_type_set_edge_label_count(ltstype, 2);
 
         // All actions are assert statements. We do not export their values.
-        lts_type_set_edge_label_name(ltstype, 0, "action");
-        lts_type_set_edge_label_type(ltstype, 0, "action");
+        lts_type_set_edge_label_name(ltstype, 0, LTSMIN_EDGE_TYPE_ACTION_PREFIX);
+        lts_type_set_edge_label_type(ltstype, 0, LTSMIN_EDGE_TYPE_ACTION_PREFIX);
         lts_type_set_edge_label_typeno(ltstype, 0, action_type);
         for (int i = 0; i < spinja_get_edge_count(); i++) {
            chunk c = chunk_str((char *)spinja_get_edge_name(i));
            GBchunkPutAt(model, action_type, c, i);
         }
 
-        lts_type_set_edge_label_name(ltstype, 1, "statement");
-        lts_type_set_edge_label_type(ltstype, 1, "statement");
+        lts_type_set_edge_label_name(ltstype, 1, LTSMIN_EDGE_TYPE_STATEMENT);
+        lts_type_set_edge_label_type(ltstype, 1, LTSMIN_EDGE_TYPE_STATEMENT);
         lts_type_set_edge_label_typeno(ltstype, 1, statement_type);
         for (int i = 0; i < spinja_get_transition_groups(); i++) {
             chunk c = chunk_str((char *)spinja_get_group_name(i));
@@ -409,7 +410,7 @@ SpinJaloadGreyboxModel(model_t model, const char *filename)
 		int nguards = get_guard_count();
 		int guards_max = sl_current + get_guard_count();
 		for(;sl_current < guards_max; ++sl_current) {
-			snprintf(buf, 256, "guard_%d", sl_current);
+			snprintf(buf, 256, "%s_%d", LTSMIN_LABEL_TYPE_GUARD_PREFIX, sl_current);
 			lts_type_set_state_label_name (ltstype, sl_current, buf);
 			lts_type_set_state_label_typeno (ltstype, sl_current, bool_type);
 		}

@@ -11,6 +11,7 @@
 #include <dm/dm.h>
 #include <hre/unix.h>
 #include <hre/user.h>
+#include <ltsmin-lib/ltsmin-standard.h>
 #include <pins-lib/dve-pins.h>
 #include <util-lib/chunk_support.h>
 
@@ -297,12 +298,6 @@ DVE2loadDynamicLib(model_t model, const char *filename)
     get_guard_nds_matrix = (const int*(*)(int))
     RTdlsym( filename, dlHandle, "get_guard_nds_matrix" );
 
-    // optionally load the covered_by method for partly symbolic states
-    covered_by = (covered_by_grey_t)
-        RTtrydlsym(dlHandle, "covered_by");
-    covered_by_short = (covered_by_grey_t)
-        RTtrydlsym(dlHandle, "covered_by_short");
-
     // check system_with_property
     if (have_property()) {
         buchi_is_accepting = (int(*)(void*,int*))
@@ -377,7 +372,7 @@ DVE2loadGreyboxModel(model_t model, const char *filename)
     lts_type_set_state_label_count (ltstype, sl_size);
     char buf[256];
     for(int i=0; i < nguards; i++) {
-        snprintf(buf, 256, "guard_%d", i);
+        snprintf(buf, 256, "%s_%d", LTSMIN_LABEL_TYPE_GUARD_PREFIX, i);
         lts_type_set_state_label_name (ltstype, i, buf);
         lts_type_set_state_label_typeno (ltstype, i, bool_type);
     }

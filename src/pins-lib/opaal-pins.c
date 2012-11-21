@@ -11,6 +11,7 @@
 #include <dm/dm.h>
 #include <hre/unix.h>
 #include <hre/user.h>
+#include <ltsmin-lib/ltsmin-standard.h>
 #include <mc-lib/hashtable.h>
 #include <pins-lib/opaal-pins.h>
 #include <util-lib/chunk_support.h>
@@ -439,7 +440,7 @@ opaalLoadGreyboxModel(model_t model, const char *filename)
     lts_type_set_state_label_count (ltstype, sl_size);
     char buf[256];
     for(int i=0; i < nguards; i++) {
-        snprintf(buf, 256, "guard_%d", i);
+        snprintf(buf, 256, "%s_%d", LTSMIN_LABEL_TYPE_GUARD_PREFIX, i);
         lts_type_set_state_label_name (ltstype, i, buf);
         lts_type_set_state_label_typeno (ltstype, i, bool_type);
     }

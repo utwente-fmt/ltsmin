@@ -218,7 +218,7 @@ void MCRLloadGreyboxModel(model_t m,const char*model){
         lts_type_set_state_type(ltstype,i,"leaf");
     }
 	termmap=ATmapCreate(m,lts_type_add_type(ltstype,"leaf",NULL),NULL,print_term,parse_term);
-	actionmap=ATmapCreate(m,lts_type_add_type(ltstype,"action",NULL),NULL,remove_quotes,NULL);
+	actionmap=ATmapCreate(m,lts_type_add_type(ltstype,LTSMIN_EDGE_TYPE_ACTION_PREFIX,NULL),NULL,remove_quotes,NULL);
 
 	dst=(ATerm*)RTmalloc(state_length*sizeof(ATerm));
 	for(int i=0;i<state_length;i++) {
@@ -231,8 +231,8 @@ void MCRLloadGreyboxModel(model_t m,const char*model){
 	int nSmds=STgetSummandCount();
 
 	lts_type_set_edge_label_count(ltstype,1);
-	lts_type_set_edge_label_name(ltstype,0,"action");
-	lts_type_set_edge_label_type(ltstype,0,"action");
+	lts_type_set_edge_label_name(ltstype,0,LTSMIN_EDGE_TYPE_ACTION_PREFIX);
+	lts_type_set_edge_label_type(ltstype,0,LTSMIN_EDGE_TYPE_ACTION_PREFIX);
 
 	dm_create(&dm_info, nSmds, state_length);
 	e_smd_map=(int*)RTmalloc( nSmds *sizeof(int));

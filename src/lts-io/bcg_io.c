@@ -3,6 +3,7 @@
 
 #include <hre/user.h>
 #include <lts-io/internal.h>
+#include <ltsmin-lib/ltsmin-standard.h>
 
 #ifndef HAVE_BCG_USER_H
 
@@ -44,7 +45,7 @@ static void bcg_file_push(lts_file_t src,lts_file_t dst){
     for(unsigned int i=0;i<label_count;i++){
         char *lbl=BCG_OT_LABEL_STRING (src->graph,i);
         if (!BCG_OT_LABEL_VISIBLE (src->graph,i)){
-            lbl="tau";
+            lbl=LTSMIN_EDGE_VALUE_TAU;
         }
         int lbl_len=strlen(lbl);
         if ((lbl[0]=='#' && lbl[lbl_len-1]=='#')||
@@ -145,7 +146,7 @@ static void bcg_write_edge(lts_file_t file,int src_seg,void* src_state,
         chunk2string(label_c,sizeof label_s,label_s);
     }
     char *bcg_label;
-    if (strcmp(label_s,"tau") && strcmp(label_s,"\"tau\"")){
+    if (strcmp(label_s,LTSMIN_EDGE_VALUE_TAU) && strcmp(label_s,"\"" LTSMIN_EDGE_VALUE_TAU "\"")){
         bcg_label=label_s;
     } else {
         bcg_label="i";

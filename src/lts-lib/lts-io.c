@@ -3,6 +3,7 @@
 
 #include <lts-io/internal.h>
 #include <lts-lib/lts.h>
+#include <ltsmin-lib/ltsmin-standard.h>
 
 struct lts_file_s {
     lts_t lts;
@@ -120,7 +121,7 @@ static void write_close(lts_file_t file){
     lts_set_size(file->lts,file->init_count,file->state_count,file->edge_count);
     file->lts->tau=-1;
     if (lts_type_get_edge_label_count(file->lts->ltstype)==1 &&
-        strncmp(lts_type_get_edge_label_name(file->lts->ltstype,0),"action",6)==0)
+        strncmp(lts_type_get_edge_label_name(file->lts->ltstype,0),LTSMIN_EDGE_TYPE_ACTION_PREFIX,6)==0)
     {
         Print(infoShort,"action labeled, detecting silent step");
         int tableno=lts_type_get_edge_label_typeno(file->lts->ltstype,0);
@@ -128,7 +129,7 @@ static void write_close(lts_file_t file){
         int N=VTgetCount(vt);
         for(int i=0;i<N;i++){
             chunk c=VTgetChunk(vt,i);
-            if ( (c.len==3 && strcmp(c.data,"tau")==0)
+            if ( (c.len==strlen(LTSMIN_EDGE_VALUE_TAU) && strcmp(c.data,LTSMIN_EDGE_VALUE_TAU)==0)
               || (c.len==1 && strcmp(c.data,"i")==0)
                )
             {

@@ -5,11 +5,12 @@
 
 #define ETF_BUF 4096
 
+#include <hre/stringindex.h>
 #include <hre/user.h>
 #include <ltsmin-lib/etf-internal.h>
 #include <ltsmin-lib/etf-util.h>
+#include <ltsmin-lib/ltsmin-standard.h>
 #include <util-lib/dynamic-array.h>
-#include <hre/stringindex.h>
 
 
 etf_model_t ETFmodelCreate(){
@@ -130,9 +131,9 @@ void etf_ode_add(etf_model_t model){
 	int zero=SIlookupC(model->type_values[signtype],"0",1);
 	int pos=SIlookupC(model->type_values[signtype],"+",1);
 	Warning(debug,"signs (-,0,+) are %d %d %d",neg,zero,pos);
-	int actiontype=ETFgetType(model,"action");
+	int actiontype=ETFgetType(model,LTSMIN_EDGE_TYPE_ACTION_PREFIX);
 	lts_type_set_edge_label_count(model->ltstype,1);
-	lts_type_set_edge_label_type(model->ltstype,0,"action");
+	lts_type_set_edge_label_type(model->ltstype,0,LTSMIN_EDGE_TYPE_ACTION_PREFIX);
 	for(int i=0;i<state_length;i++){
 		Warning(debug,"parsing map %d",i);
 		etf_map_t map=model->map[i];
