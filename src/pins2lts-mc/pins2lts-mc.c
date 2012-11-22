@@ -2399,11 +2399,11 @@ dfs_grey (wctx_t *ctx)
     while (lb_balance(global->lb, ctx->id, dfs_stack_size(ctx->stack), split_dfs)) {
         raw_data_t          state_data = dfs_stack_top (ctx->stack);
         if (NULL == state_data) {
-            if (0 == dfs_stack_nframes (ctx->stack))
-                return;
-            dfs_stack_leave (ctx->stack);
-            ctx->counters.level_cur--;
-            next_index = isba_pop_int (ctx->group_stack)[0];
+            if (0 != dfs_stack_nframes (ctx->stack)) {
+                dfs_stack_leave (ctx->stack);
+                ctx->counters.level_cur--;
+                next_index = isba_pop_int (ctx->group_stack)[0];
+            }
             continue;
         }
         if (next_index == K) {
@@ -2431,7 +2431,7 @@ dfs (wctx_t *ctx)
             ctx->counters.explored++;
         } else {
             if (0 == dfs_stack_nframes (ctx->stack))
-                return;
+                continue;
             dfs_stack_leave (ctx->stack);
             ctx->counters.level_cur--;
             dfs_stack_pop (ctx->stack);
@@ -2449,7 +2449,7 @@ bfs (wctx_t *ctx)
             ctx->counters.explored++;
         } else {
             if (0 == dfs_stack_frame_size (ctx->out_stack))
-                return;
+                continue;
             dfs_stack_t     old = ctx->out_stack;
             ctx->stack = ctx->out_stack = ctx->in_stack;
             ctx->in_stack = old;
@@ -3118,7 +3118,7 @@ ta_dfs (wctx_t *ctx)
             }
         } else {
             if (0 == dfs_stack_size (ctx->stack))
-                return;
+                continue;
             dfs_stack_leave (ctx->stack);
             ctx->counters.level_cur--;
             dfs_stack_pop (ctx->stack);
@@ -3137,7 +3137,7 @@ ta_bfs (wctx_t *ctx)
             }
         } else {
             if (0 == dfs_stack_frame_size (ctx->out_stack))
-                return;
+                continue;
             dfs_stack_t     old = ctx->out_stack;
             ctx->stack = ctx->out_stack = ctx->in_stack;
             ctx->in_stack = old;
