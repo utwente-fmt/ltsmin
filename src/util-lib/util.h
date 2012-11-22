@@ -23,7 +23,7 @@
 })
 
 
-static char *
+char *
 gnu_basename (char *path)
 {
     char *base = strrchr(path, '/');

@@ -41,7 +41,9 @@ ltl_sl_short(model_t model, int label, int *state)
     ltl_context_t *ctx = GBgetContext(model);
     if (label == ctx->sl_idx_accept) {
         // state[0] must be the buchi automaton, because it's the only dependency
-        return state[0] == -1 || ctx->ba->states[state[0]]->accept;
+        int val = state[0] == -1 ? 0 : state[0];
+        HREassert (val < ctx->ba->state_count);
+        return ctx->ba->states[val]->accept;
     } else {
         return GBgetStateLabelShort(GBgetParent(model), label, state);
     }
@@ -52,8 +54,9 @@ ltl_sl_long(model_t model, int label, int *state)
 {
     ltl_context_t *ctx = GBgetContext(model);
     if (label == ctx->sl_idx_accept) {
-        HREassert (state[ctx->ltl_idx] < ctx->ba->state_count);
-        return ctx->ba->states[state[ctx->ltl_idx]]->accept;
+        int val = state[ctx->ltl_idx] == -1 ? 0 : state[ctx->ltl_idx];
+        HREassert (val < ctx->ba->state_count);
+        return ctx->ba->states[val]->accept;
     } else {
         return GBgetStateLabelLong(GBgetParent(model), label, state);
     }
@@ -64,8 +67,9 @@ ltl_sl_all(model_t model, int *state, int *labels)
 {
     ltl_context_t *ctx = GBgetContext(model);
     GBgetStateLabelsAll(GBgetParent(model), state, labels);
-    HREassert (state[ctx->ltl_idx] < ctx->ba->state_count);
-    labels[ctx->sl_idx_accept] = ctx->ba->states[state[ctx->ltl_idx]]->accept;
+    int val = state[ctx->ltl_idx] == -1 ? 0 : state[ctx->ltl_idx];
+    HREassert (val < ctx->ba->state_count);
+    labels[ctx->sl_idx_accept] = ctx->ba->states[val]->accept;
 }
 
 /*
@@ -153,6 +157,7 @@ void ltl_spin_cb (void*context,transition_info_t*ti,int*dst) {
     }
 
     int i = infoctx->src[ctx->ltl_idx];
+    HREassert (i < ctx->ba->state_count);
     for(int j=0; j < ctx->ba->states[i]->transition_count; j++) {
         // check predicates
         if ((dst_pred[0] & ctx->ba->states[i]->transitions[j].pos[0]) == ctx->ba->states[i]->transitions[j].pos[0] &&
@@ -327,7 +332,7 @@ init_ltsmin_buchi(model_t model, const char *ltl_file)
         Warning(info,"Initializing LTL layer.., formula: %s", ltl_file);
         int idx = GBgetAcceptingStateLabelIndex (model);
         if (idx != -1) {
-            Abort ("LTL layer initialization failed, model already has a ``%s'' property",
+            Warning (info, "LTL layer initialization: model already has a ``%s'' property",
                    lts_type_get_state_label_name(ltstype,idx));
         }
         ltsmin_parse_env_t env = LTSminParseEnvCreate();
