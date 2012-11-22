@@ -49,7 +49,7 @@
 #define SPEC_REL_PERF 100
 #endif
 #if defined(SPINJA)
-#define SPEC_POPT_OPTIONS { NULL, 0, POPT_ARG_INCLUDE_TABLE, spinja_options, 0, "SPINJA options", NULL }
+#define SPEC_POPT_OPTIONS { NULL, 0, POPT_ARG_INCLUDE_TABLE, prom_options, 0, "Promela options", NULL }
 #define SPEC_MT_SAFE 1
 #define SPEC_REL_PERF 100
 #endif

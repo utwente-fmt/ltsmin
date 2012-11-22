@@ -1,6 +1,9 @@
 #ifndef UTIL_SMALL_H
 #define UTIL_SMALL_H
 
+#include <stdlib.h>
+
+
 #define max(a,b) ({ \
     typeof(a) _a = (a); \
     typeof(b) _b = (b); \
@@ -18,6 +21,14 @@
     a = b; \
     b = tmp; \
 })
+
+
+static char *
+gnu_basename (char *path)
+{
+    char *base = strrchr(path, '/');
+    return base ? base+1 : path;
+}
 
 #endif // UTIL_SMALL_H
 

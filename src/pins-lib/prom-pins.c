@@ -13,6 +13,7 @@
 #include <ltsmin-lib/ltsmin-standard.h>
 #include <pins-lib/prom-pins.h>
 #include <util-lib/chunk_support.h>
+#include <util-lib/util.h>
 
 #define GUARD_CHECK_MISSING(g) { \
 	if(g) { Warning(info,"missing guard function: get_guard_count"); }
@@ -26,34 +27,34 @@ void        (*spinja_get_initial_state)(int *to);
 next_method_grey_t spinja_get_successor;
 next_method_black_t spinja_get_successor_all;
 
-int         (*spinja_get_state_size)();
-int         (*spinja_get_transition_groups)();
-const int*  (*spinja_get_transition_read_dependencies)(int t);
-const int*  (*spinja_get_transition_write_dependencies)(int t);
-const char* (*spinja_get_state_variable_name)(int var);
-int         (*spinja_get_state_variable_type)(int var);
-const char* (*spinja_get_type_name)(int type);
-int         (*spinja_get_type_count)();
-const char* (*spinja_get_type_value_name)(int type, int value);
-int         (*spinja_get_type_value_count)(int type);
-const char* (*spinja_get_edge_name)(int type);
-int         (*spinja_get_edge_count)();
-const char* (*spinja_get_group_name)(int type);
+int         (*prom_get_state_size)();
+int         (*prom_get_transition_groups)();
+const int*  (*prom_get_transition_read_dependencies)(int t);
+const int*  (*prom_get_transition_write_dependencies)(int t);
+const char* (*prom_get_state_variable_name)(int var);
+int         (*prom_get_state_variable_type)(int var);
+const char* (*prom_get_type_name)(int type);
+int         (*prom_get_type_count)();
+const char* (*prom_get_type_value_name)(int type, int value);
+int         (*prom_get_type_value_count)(int type);
+const char* (*prom_get_edge_name)(int type);
+int         (*prom_get_edge_count)();
+const char* (*prom_get_group_name)(int type);
 
-int         (*spinja_buchi_is_accepting)(void* model, int* state);
+int         (*prom_buchi_is_accepting)(void* model, int* state);
 
-int         (*get_guard_count)();
-const int*  (*get_guard_matrix)(int g);
-const int*  (*get_guards)(int t);
-const int** (*get_all_guards)();
-int         (*get_guard)(void*, int g, int *src);
-void        (*get_guard_all)(void*, int *src, int* guards);
-const int*  (*get_guard_may_be_coenabled_matrix)(int g);
-const int*  (*get_guard_nes_matrix)(int g);
-const int*  (*get_guard_nds_matrix)(int g);
+int         (*prom_get_guard_count)();
+const int*  (*prom_get_guard_matrix)(int g);
+const int*  (*prom_get_guards)(int t);
+const int** (*prom_get_all_guards)();
+int         (*prom_get_guard)(void*, int g, int *src);
+void        (*prom_get_guard_all)(void*, int *src, int* guards);
+const int*  (*prom_get_guard_may_be_coenabled_matrix)(int g);
+const int*  (*prom_get_guard_nes_matrix)(int g);
+const int*  (*prom_get_guard_nds_matrix)(int g);
 
 static void
-spinja_popt (poptContext con,
+prom_popt (poptContext con,
              enum poptCallbackReason reason,
              const struct poptOption *opt,
              const char *arg, void *data)
@@ -63,8 +64,18 @@ spinja_popt (poptContext con,
 	case POPT_CALLBACK_REASON_PRE:
 		break;
 	case POPT_CALLBACK_REASON_POST:
-		GBregisterPreLoader("spinja", SpinJaloadDynamicLib);
-		GBregisterLoader("spinja", SpinJaloadGreyboxModel);
+        GBregisterPreLoader("pr", PromCompileGreyboxModel);
+        GBregisterPreLoader("promela", PromCompileGreyboxModel);
+        GBregisterPreLoader("prom", PromCompileGreyboxModel);
+        GBregisterPreLoader("prm", PromCompileGreyboxModel);
+        GBregisterPreLoader("pml", PromCompileGreyboxModel);
+		GBregisterPreLoader("spinja", PromLoadDynamicLib);
+        GBregisterLoader("pr", PromLoadGreyboxModel);
+        GBregisterLoader("promela", PromLoadGreyboxModel);
+        GBregisterLoader("prom", PromLoadGreyboxModel);
+        GBregisterLoader("pml", PromLoadGreyboxModel);
+        GBregisterLoader("prm", PromLoadGreyboxModel);
+        GBregisterLoader("spinja", PromLoadGreyboxModel);
 		Warning(info,"Precompiled spinja module initialized");
 		return;
 	case POPT_CALLBACK_REASON_OPTION:
@@ -73,8 +84,8 @@ spinja_popt (poptContext con,
 	Abort("unexpected call to spinja_popt");
 }
 
-struct poptOption spinja_options[]= {
-	{ NULL, 0 , POPT_ARG_CALLBACK|POPT_CBFLAG_POST|POPT_CBFLAG_SKIPOPTION , (void*)&spinja_popt, 0 , NULL , NULL },
+struct poptOption prom_options[]= {
+	{ NULL, 0 , POPT_ARG_CALLBACK|POPT_CBFLAG_POST|POPT_CBFLAG_SKIPOPTION , (void*)&prom_popt, 0 , NULL , NULL },
 	POPT_TABLEEND
 };
 
@@ -84,45 +95,33 @@ typedef struct grey_box_context {
 
 static void* dlHandle = NULL;
 
-#define SYSFAIL(cond,...)                                               \
-    do { if (cond) Abort(__VA_ARGS__); } while (0)
-void
-SpinJacompileGreyboxModel(model_t model, const char *filename)
-{
-    (void)model;
-    (void)filename;
-    /* FIXME */
-    Abort("Unimplemented: automatic compilation of promela code, please do this manually");
-}
-#undef SYSFAIL
-
 static int sl_long_p (model_t model, int label, int *state) {
 	if (label == GBgetAcceptingStateLabelIndex(model)) {
-		return spinja_buchi_is_accepting(model, state);
+		return prom_buchi_is_accepting(model, state);
 	} else {
 		Abort("unexpected state label requested: %d", label);
 	}
 }
 
 static void sl_all_p (model_t model, int *state, int *labels) {
-	labels[0] = spinja_buchi_is_accepting(model, state);
+	labels[0] = prom_buchi_is_accepting(model, state);
 }
 
 static int
 sl_long_p_g (model_t model, int label, int *state)
 {
     if (label == 0) {
-        return spinja_buchi_is_accepting(model, state);
+        return prom_buchi_is_accepting(model, state);
     } else {
-        return get_guard(model, label - 1, state);
+        return prom_get_guard(model, label - 1, state);
     }
 }
 
 static void
 sl_all_p_g (model_t model, int *state, int *labels)
 {
-    labels[0] = spinja_buchi_is_accepting(model, state);
-    get_guard_all(model, state, labels + 1);
+    labels[0] = prom_buchi_is_accepting(model, state);
+    prom_get_guard_all(model, state, labels + 1);
 }
 
 static void
@@ -133,7 +132,7 @@ sl_group (model_t model, sl_group_enum_t group, int *state, int *labels)
             GBgetStateLabelsAll(model, state, labels);
             return;
         case GB_SL_GUARDS:
-            get_guard_all(model, state, labels);
+            prom_get_guard_all(model, state, labels);
             return;
         default:
             return;
@@ -141,7 +140,39 @@ sl_group (model_t model, sl_group_enum_t group, int *state, int *labels)
 }
 
 void
-SpinJaloadDynamicLib(model_t model, const char *filename)
+PromCompileGreyboxModel(model_t model, const char *filename)
+{
+    struct stat st;
+    int ret;
+
+    // check file exists
+    if ((ret = stat (filename, &st)) != 0)
+        Abort("File not found: %s", filename);
+
+    // compile opaal model
+    char command[4096];
+    if (snprintf(command, sizeof command, "spinjal '%s'", filename) >= (ssize_t)sizeof command)
+        Abort("Cannot compile `%s', paths too long", filename);
+
+    if ((ret = system(command)) != 0)
+        HREassert(ret >= 0, "Command failed with exit code %d: %s", ret, command);
+
+    char *basename = gnu_basename ((char *)filename);
+    // check existence of bin file
+    char *bin_fname = RTmalloc(strlen(basename) + strlen(".spinja") + 1);
+    strncpy(bin_fname, basename, strlen(basename));
+    char *ext = bin_fname + strlen(basename);
+    strncpy(ext, ".spinja", strlen(".spinja"));
+
+    if ((ret = stat (bin_fname, &st)) != 0)
+        HREassert(ret >= 0, "File not found: %s", bin_fname);
+
+    PromLoadDynamicLib(model, bin_fname);
+    RTfree (bin_fname);
+}
+
+void
+PromLoadDynamicLib(model_t model, const char *filename)
 {
     // Open spinja file
     char abs_filename[PATH_MAX];
@@ -164,57 +195,57 @@ SpinJaloadDynamicLib(model_t model, const char *filename)
     spinja_get_successor_all = (next_method_black_t)
         RTdlsym( filename, dlHandle, "spinja_get_successor_all" );
 
-    spinja_get_state_size = (int(*)())
+    prom_get_state_size = (int(*)())
         RTdlsym( filename, dlHandle, "spinja_get_state_size" );
 
-    spinja_get_transition_groups = (int(*)())
+    prom_get_transition_groups = (int(*)())
         RTdlsym( filename, dlHandle, "spinja_get_transition_groups" );
 
-    spinja_get_transition_read_dependencies = (const int*(*)(int))
+    prom_get_transition_read_dependencies = (const int*(*)(int))
         RTdlsym( filename, dlHandle, "spinja_get_transition_read_dependencies" );
-    spinja_get_transition_write_dependencies = (const int*(*)(int))
+    prom_get_transition_write_dependencies = (const int*(*)(int))
         RTdlsym( filename, dlHandle, "spinja_get_transition_write_dependencies" );
 
-    spinja_get_state_variable_name = (const char*(*)(int))
+    prom_get_state_variable_name = (const char*(*)(int))
         RTdlsym( filename, dlHandle, "spinja_get_state_variable_name" );
-    spinja_get_state_variable_type = (int (*)(int))
+    prom_get_state_variable_type = (int (*)(int))
         RTdlsym( filename, dlHandle, "spinja_get_state_variable_type" );
-    spinja_get_type_name = (const char*(*)(int))
+    prom_get_type_name = (const char*(*)(int))
         RTdlsym( filename, dlHandle, "spinja_get_type_name" );
-    spinja_get_type_count = (int(*)())
+    prom_get_type_count = (int(*)())
         RTdlsym( filename, dlHandle, "spinja_get_type_count" );
-    spinja_get_type_value_name = (const char*(*)(int,int))
+    prom_get_type_value_name = (const char*(*)(int,int))
         RTdlsym( filename, dlHandle, "spinja_get_type_value_name" );
-    spinja_get_type_value_count = (int(*)(int))
+    prom_get_type_value_count = (int(*)(int))
         RTdlsym( filename, dlHandle, "spinja_get_type_value_count" );
-    spinja_buchi_is_accepting = (int(*)(void*arg,int*state))
+    prom_buchi_is_accepting = (int(*)(void*arg,int*state))
         RT_optdlsym( filename, dlHandle, "spinja_buchi_is_accepting" );
 
-    spinja_get_edge_name = (const char*(*)(int))
+    prom_get_edge_name = (const char*(*)(int))
         RT_optdlsym( filename, dlHandle, "spinja_get_edge_name" );
-    spinja_get_edge_count = (int(*)())
+    prom_get_edge_count = (int(*)())
         RT_optdlsym( filename, dlHandle, "spinja_get_edge_count" );
-    spinja_get_group_name = (const char*(*)(int))
+    prom_get_group_name = (const char*(*)(int))
         RT_optdlsym( filename, dlHandle, "spinja_get_group_name" );
 
     // optional, guard support (used for por)
-    get_guard_count = (int(*)())
+    prom_get_guard_count = (int(*)())
         RT_optdlsym( filename, dlHandle, "spinja_get_guard_count" );
-    get_guard_matrix = (const int*(*)(int))
+    prom_get_guard_matrix = (const int*(*)(int))
         RT_optdlsym( filename, dlHandle, "spinja_get_guard_matrix" );
-    get_guards = (const int*(*)(int))
+    prom_get_guards = (const int*(*)(int))
         RT_optdlsym( filename, dlHandle, "spinja_get_guards" );
-    get_all_guards = (const int**(*)())
+    prom_get_all_guards = (const int**(*)())
         RT_optdlsym( filename, dlHandle, "spinja_get_all_guards" );
-    get_guard = (int(*)(void*,int,int*))
+    prom_get_guard = (int(*)(void*,int,int*))
         RT_optdlsym( filename, dlHandle, "spinja_get_guard" );
-    get_guard_all = (void(*)(void*,int*,int*))
+    prom_get_guard_all = (void(*)(void*,int*,int*))
         RT_optdlsym( filename, dlHandle, "spinja_get_guard_all" );
-    get_guard_may_be_coenabled_matrix = (const int*(*)(int))
+    prom_get_guard_may_be_coenabled_matrix = (const int*(*)(int))
         RT_optdlsym( filename, dlHandle, "spinja_get_guard_may_be_coenabled_matrix" );
-    get_guard_nes_matrix = (const int*(*)(int))
+    prom_get_guard_nes_matrix = (const int*(*)(int))
         RT_optdlsym( filename, dlHandle, "spinja_get_guard_nes_matrix" );
-    get_guard_nds_matrix = (const int*(*)(int))
+    prom_get_guard_nds_matrix = (const int*(*)(int))
         RT_optdlsym( filename, dlHandle, "spinja_get_guard_nds_matrix" );
 
     (void)model;
@@ -228,7 +259,7 @@ cmpEnd(char *str, char *m)
 }
 
 void
-SpinJaloadGreyboxModel(model_t model, const char *filename)
+PromLoadGreyboxModel(model_t model, const char *filename)
 {
     lts_type_t ltstype;
     matrix_t *dm_info = RTmalloc (sizeof *dm_info);
@@ -238,25 +269,31 @@ SpinJaloadGreyboxModel(model_t model, const char *filename)
 
     //assume sequential use:
     if (NULL == dlHandle) {
-        SpinJaloadDynamicLib (model, filename);
+        char *extension = strrchr (filename, '.');
+        HREassert (extension != NULL, "No filename extension in %s", filename);
+        if (0==strcmp (extension, ".spinja")) {
+            PromLoadDynamicLib (model, filename);
+        } else {
+            PromCompileGreyboxModel(model, filename);
+        }
     }
 
     gb_context_t ctx=(gb_context_t)RTmalloc(sizeof(struct grey_box_context));
     GBsetContext(model,ctx);
 
     // get ltstypes
-    int state_length = spinja_get_state_size();
+    int state_length = prom_get_state_size();
     ltstype=lts_type_create();
 
     // adding types
-    int ntypes = spinja_get_type_count();
+    int ntypes = prom_get_type_count();
     for (int i = 0; i < ntypes; i++) {
-        const char* type_name = spinja_get_type_name(i);
+        const char* type_name = prom_get_type_name(i);
         HREassert (type_name != NULL, "invalid type name");
         if (lts_type_add_type(ltstype, type_name, NULL) != i) {
             Abort("wrong type number");
         }
-        int type_value_count = spinja_get_type_value_count(i);
+        int type_value_count = prom_get_type_value_count(i);
         Debug("Promela type %s (%d) has %d values.", type_name, i, type_value_count);
         if (0 == type_value_count) {
             lts_type_set_format (ltstype, i, LTStypeDirect);
@@ -271,15 +308,15 @@ SpinJaloadGreyboxModel(model_t model, const char *filename)
 
     // set state name & type
     for (int i=0; i < state_length; ++i) {
-        const char* name = spinja_get_state_variable_name(i);
-        const int   type = spinja_get_state_variable_type(i);
+        const char* name = prom_get_state_variable_name(i);
+        const int   type = prom_get_state_variable_type(i);
         lts_type_set_state_name(ltstype,i,name);
         lts_type_set_state_typeno(ltstype,i,type);
     }
 
     int action_type = 0;
     int statement_type = 0;
-    if (spinja_get_edge_count() > 0) {
+    if (prom_get_edge_count() > 0) {
          action_type = lts_type_add_type(ltstype, LTSMIN_EDGE_TYPE_ACTION_PREFIX, NULL);
          statement_type = lts_type_add_type(ltstype, LTSMIN_EDGE_TYPE_STATEMENT, NULL);
     }
@@ -292,30 +329,30 @@ SpinJaloadGreyboxModel(model_t model, const char *filename)
 
     // setting values for types
     for(int i=0; i < ntypes; i++) {
-        int type_value_count = spinja_get_type_value_count(i);
+        int type_value_count = prom_get_type_value_count(i);
         for(int j=0; j < type_value_count; ++j) {
-            const char* type_value = spinja_get_type_value_name(i, j);
+            const char* type_value = prom_get_type_value_name(i, j);
             GBchunkPutAt(model, i, chunk_str((char*)type_value), j);
         }
     }
 
-    if (spinja_get_edge_count() > 0) {
+    if (prom_get_edge_count() > 0) {
         lts_type_set_edge_label_count(ltstype, 2);
 
         // All actions are assert statements. We do not export their values.
         lts_type_set_edge_label_name(ltstype, 0, LTSMIN_EDGE_TYPE_ACTION_PREFIX);
         lts_type_set_edge_label_type(ltstype, 0, LTSMIN_EDGE_TYPE_ACTION_PREFIX);
         lts_type_set_edge_label_typeno(ltstype, 0, action_type);
-        for (int i = 0; i < spinja_get_edge_count(); i++) {
-           chunk c = chunk_str((char *)spinja_get_edge_name(i));
+        for (int i = 0; i < prom_get_edge_count(); i++) {
+           chunk c = chunk_str((char *)prom_get_edge_name(i));
            GBchunkPutAt(model, action_type, c, i);
         }
 
         lts_type_set_edge_label_name(ltstype, 1, LTSMIN_EDGE_TYPE_STATEMENT);
         lts_type_set_edge_label_type(ltstype, 1, LTSMIN_EDGE_TYPE_STATEMENT);
         lts_type_set_edge_label_typeno(ltstype, 1, statement_type);
-        for (int i = 0; i < spinja_get_transition_groups(); i++) {
-            chunk c = chunk_str((char *)spinja_get_group_name(i));
+        for (int i = 0; i < prom_get_transition_groups(); i++) {
+            chunk c = chunk_str((char *)prom_get_group_name(i));
             GBchunkPutAt(model, statement_type, c, i);
         }
     }
@@ -327,18 +364,18 @@ SpinJaloadGreyboxModel(model_t model, const char *filename)
 
     // check for guards
     int model_has_guards = 0;
-    if (get_guard_count
-     || get_guard_matrix
-     || get_guards
-     || get_all_guards
-     || get_guard
-     || get_guard_all ) {
-        if (!get_guard_count
-         || !get_guard_matrix
-         || !get_guards
-         || !get_all_guards
-         || !get_guard
-         || !get_guard_all) {
+    if (prom_get_guard_count
+     || prom_get_guard_matrix
+     || prom_get_guards
+     || prom_get_all_guards
+     || prom_get_guard
+     || prom_get_guard_all ) {
+        if (!prom_get_guard_count
+         || !prom_get_guard_matrix
+         || !prom_get_guards
+         || !prom_get_all_guards
+         || !prom_get_guard
+         || !prom_get_guard_all) {
             Warning(info,"SpinJa guard functionality only partially available in model, ignoring guards");
         } else {
             model_has_guards = 1;
@@ -356,18 +393,18 @@ SpinJaloadGreyboxModel(model_t model, const char *filename)
         }
     }
 
-    int ngroups = spinja_get_transition_groups();
+    int ngroups = prom_get_transition_groups();
     dm_create(dm_info, ngroups, state_length);
     dm_create(dm_read_info, ngroups, state_length);
     dm_create(dm_write_info, ngroups, state_length);
     for (int i=0; i < dm_nrows(dm_info); i++) {
-        int* proj = (int*)spinja_get_transition_read_dependencies(i);
+        int* proj = (int*)prom_get_transition_read_dependencies(i);
         HREassert (proj != NULL, "No SpinJa read dependencies");
         for(int j=0; j<state_length; j++) {
             if (proj[j]) dm_set(dm_info, i, j);
             if (proj[j]) dm_set(dm_read_info, i, j);
         }
-        proj = (int*)spinja_get_transition_write_dependencies(i);
+        proj = (int*)prom_get_transition_write_dependencies(i);
         HREassert (proj != NULL, "No SpinJa write dependencies");
         for(int j=0; j<state_length; j++) {
             if (proj[j]) dm_set(dm_info, i, j);
@@ -380,7 +417,7 @@ SpinJaloadGreyboxModel(model_t model, const char *filename)
 
 	// init state labels
 	int sl_size = 0
-	            + (model_has_guards   ? get_guard_count() : 0)
+	            + (model_has_guards   ? prom_get_guard_count() : 0)
 	            + 1 // property is either accepting state or valid end state
 	            ;
 	lts_type_set_state_label_count (ltstype, sl_size);
@@ -407,8 +444,8 @@ SpinJaloadGreyboxModel(model_t model, const char *filename)
 
 	if (model_has_guards) {
 		char buf[256];
-		int nguards = get_guard_count();
-		int guards_max = sl_current + get_guard_count();
+		int nguards = prom_get_guard_count();
+		int guards_max = sl_current + prom_get_guard_count();
 		for(;sl_current < guards_max; ++sl_current) {
 			snprintf(buf, 256, "%s_%d", LTSMIN_LABEL_TYPE_GUARD_PREFIX, sl_current);
 			lts_type_set_state_label_name (ltstype, sl_current, buf);
@@ -416,23 +453,23 @@ SpinJaloadGreyboxModel(model_t model, const char *filename)
 		}
 
 	    // set the guards per transition group
-	    GBsetGuardsInfo(model, (guard_t**) get_all_guards());
+	    GBsetGuardsInfo(model, (guard_t**) prom_get_all_guards());
 
 	    // initialize state label matrix
 	    // assumption, guards come first or second (0--nguards-1 | 1--nguards)
 	    for(int i = 0; i < nguards; i++) {
-	        int* guards = (int*)get_guard_matrix(i);
+	        int* guards = (int*)prom_get_guard_matrix(i);
 	        for(int j=0; j<state_length; j++) {
 	            if (guards[j]) dm_set(sl_info, i + 1, j);
 	        }
 	    }
 
 	    // set guard may be co-enabled relation
-	    if (get_guard_may_be_coenabled_matrix) {
+	    if (prom_get_guard_may_be_coenabled_matrix) {
             matrix_t *gce_info = RTmalloc(sizeof(matrix_t));
 	        dm_create(gce_info, nguards, nguards);
 	        for(int i=0; i < nguards; i++) {
-	            int* guardce = (int*)get_guard_may_be_coenabled_matrix(i);
+	            int* guardce = (int*)prom_get_guard_may_be_coenabled_matrix(i);
 	            for(int j=0; j<nguards; j++) {
 	                if (guardce[j]) dm_set(gce_info, i, j);
 	            }
@@ -441,11 +478,11 @@ SpinJaloadGreyboxModel(model_t model, const char *filename)
 	    }
 
 	    // set guard necessary enabling set info
-	    if (get_guard_nes_matrix) {
+	    if (prom_get_guard_nes_matrix) {
             matrix_t *gnes_info = RTmalloc(sizeof(matrix_t));
 	        dm_create(gnes_info, nguards, ngroups);
 	        for(int i=0; i < nguards; i++) {
-	            int* guardnes = (int*)get_guard_nes_matrix(i);
+	            int* guardnes = (int*)prom_get_guard_nes_matrix(i);
 	            for(int j=0; j<ngroups; j++) {
 	                if (guardnes[j]) dm_set(gnes_info, i, j);
 	            }
@@ -454,11 +491,11 @@ SpinJaloadGreyboxModel(model_t model, const char *filename)
 	    }
 
 	    // set guard necessary disabling set info
-	    if (get_guard_nds_matrix) {
+	    if (prom_get_guard_nds_matrix) {
             matrix_t *gnds_info = RTmalloc(sizeof(matrix_t));
 	        dm_create(gnds_info, nguards, ngroups);
 	        for(int i=0; i < nguards; i++) {
-	            int* guardnds = (int*)get_guard_nds_matrix(i);
+	            int* guardnds = (int*)prom_get_guard_nds_matrix(i);
 	            for(int j=0; j<ngroups; j++) {
 	                if (guardnds[j]) dm_set(gnds_info, i, j);
 	            }
@@ -479,8 +516,8 @@ SpinJaloadGreyboxModel(model_t model, const char *filename)
     for(int i=0; i < sl_group_all->count; i++) sl_group_all->sl_idx[i] = i;
     GBsetStateLabelGroupInfo(model, GB_SL_ALL, sl_group_all);
     if (model_has_guards) {
-        sl_group_t* sl_group_guards = RTmallocZero(sizeof(sl_group_t) + get_guard_count() * sizeof(int));
-        sl_group_guards->count = get_guard_count();
+        sl_group_t* sl_group_guards = RTmallocZero(sizeof(sl_group_t) + prom_get_guard_count() * sizeof(int));
+        sl_group_guards->count = prom_get_guard_count();
         for(int i=0; i < sl_group_guards->count; i++) sl_group_guards->sl_idx[i] = i + 1;
         GBsetStateLabelGroupInfo(model, GB_SL_GUARDS, sl_group_guards);
     }

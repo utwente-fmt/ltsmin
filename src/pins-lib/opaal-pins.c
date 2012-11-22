@@ -15,6 +15,7 @@
 #include <mc-lib/hashtable.h>
 #include <pins-lib/opaal-pins.h>
 #include <util-lib/chunk_support.h>
+#include <util-lib/util.h>
 
 // opaal ltsmin interface functions
 void        (*get_initial_state)(char *to);
@@ -250,8 +251,6 @@ opaalExit()
     }
 }
 
-#define SYSFAIL(cond,...)                                               \
-    do { if (cond) Abort(__VA_ARGS__); } while (0)
 void
 opaalCompileGreyboxModel(model_t model, const char *filename)
 {
@@ -268,17 +267,21 @@ opaalCompileGreyboxModel(model_t model, const char *filename)
         Abort("Cannot compile `%s', paths too long", filename);
 
     if ((ret = system(command)) != 0)
-        SYSFAIL(ret < 0, "Command failed with exit code %d: %s", ret, command);
+        HREassert(ret >= 0, "Command failed with exit code %d: %s", ret, command);
 
+    char *basename = gnu_basename ((char *)filename);
     // check existence of so file
-    char *opaal_so_fname = "/tmp/gensuccgen.so";
+    char *opaal_so_fname = strdup(basename);
+    char *ext = strrchr(opaal_so_fname, '.');
+    HREassert (strcmp(ext, ".xml") == 0, "Opaal input is not XML");
+    strcpy(ext, ".so");
 
     if ((ret = stat (opaal_so_fname, &st)) != 0)
-        SYSFAIL(ret < 0, "File not found: %s", opaal_so_fname);
+        HREassert(ret >= 0, "File not found: %s", opaal_so_fname);
 
     opaalLoadDynamicLib(model, opaal_so_fname);
+    free (opaal_so_fname);
 }
-#undef SYSFAIL
 
 void
 opaalLoadDynamicLib(model_t model, const char *filename)

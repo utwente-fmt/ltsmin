@@ -26,13 +26,13 @@
 #include <popt.h>
 #include <pins-lib/pins.h>
 
-extern struct poptOption spinja_options[];
+extern struct poptOption prom_options[];
 
 /**
 Load a spinja model.
 */
-extern void SpinJaloadDynamicLib(model_t model, const char *name);
-extern void SpinJaloadGreyboxModel(model_t model,const char*name);
-extern void SpinJacompileGreyboxModel(model_t model,const char*name);
+extern void PromLoadDynamicLib(model_t model, const char *name);
+extern void PromLoadGreyboxModel(model_t model,const char*name);
+extern void PromCompileGreyboxModel(model_t model,const char*name);
 
 #endif
