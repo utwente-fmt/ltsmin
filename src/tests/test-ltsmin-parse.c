@@ -6,6 +6,7 @@
 #include <ltsmin-lib/ltsmin-syntax.h>
 #include <ltsmin-lib/ltsmin-grammar.h>
 #include <ltsmin-lib/lts-type.h>
+#include <ltsmin-lib/ltsmin-standard.h>
 #include <ltsmin-lib/ltsmin-tl.h>
 #include <pins-lib/property-semantics.h>
 #include <pins-lib/pins.h>

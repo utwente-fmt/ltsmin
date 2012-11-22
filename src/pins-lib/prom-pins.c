@@ -15,9 +15,6 @@
 #include <util-lib/chunk_support.h>
 #include <util-lib/util.h>
 
-#define GUARD_CHECK_MISSING(g) { \
-	if(g) { Warning(info,"missing guard function: get_guard_count"); }
-
 // Remove when LTSmin has RT_optdlsym() again
 #define RT_optdlsym(f,h,s) dlsym(h,s)
 

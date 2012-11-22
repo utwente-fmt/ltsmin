@@ -1,7 +1,5 @@
-#ifndef UTIL_SMALL_H
-#define UTIL_SMALL_H
-
-#include <stdlib.h>
+#ifndef UTIL_LTSMIN_H
+#define UTIL_LTSMIN_H
 
 
 #define max(a,b) ({ \
@@ -22,13 +20,7 @@
     b = tmp; \
 })
 
+extern char *gnu_basename (char *path);
 
-char *
-gnu_basename (char *path)
-{
-    char *base = strrchr(path, '/');
-    return base ? base+1 : path;
-}
-
-#endif // UTIL_SMALL_H
+#endif // UTIL_LTSMIN_H
 
