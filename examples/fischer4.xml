@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?><!DOCTYPE nta PUBLIC '-//Uppaal Team//DTD Flat System 1.1//EN' 'http://www.it.uu.se/research/group/darts/uppaal/flat-1_1.dtd'><nta><declaration>// Fischer's mutual exclusion protocol.
+
+const int N = 4;
+
+typedef int[1,N] id_t;
+int id;
+int k;</declaration><template><name x="16" y="-8">P</name><parameter>id_t pid</parameter><declaration>clock x;
+</declaration><location id="id0" x="216" y="176"><name x="216" y="192">wait</name></location><location id="id1" x="216" y="48"><name x="216" y="16">req</name><label kind="invariant" x="240" y="32">x&lt;=2</label></location><location id="id2" x="64" y="48"><name x="54" y="18">A</name></location><location id="id3" x="64" y="176"><name x="56" y="192">cs</name></location><init ref="id2"/><transition><source ref="id2"/><target ref="id1"/><label kind="guard" x="88" y="24">id== 0</label><label kind="assignment" x="160" y="24">x = 0</label></transition><transition><source ref="id1"/><target ref="id0"/><label kind="guard" x="144" y="72">x&lt;=2</label><label kind="assignment" x="144" y="104">x = 0,
+id = pid</label><nail x="216" y="96"/></transition><transition><source ref="id0"/><target ref="id1"/><label kind="guard" x="264" y="120">id== 0</label><label kind="assignment" x="264" y="88">x = 0</label><nail x="251" y="146"/><nail x="251" y="82"/></transition><transition><source ref="id0"/><target ref="id3"/><label kind="guard" x="96" y="184">x&gt;2 &amp;&amp; id==pid</label><label kind="assignment" x="96" y="200">k++</label></transition><transition><source ref="id3"/><target ref="id2"/><label kind="assignment" x="8" y="80">id = 0,
+k--</label></transition></template><system>system P;</system></nta>

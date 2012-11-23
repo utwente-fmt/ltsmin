@@ -1,5 +1,14 @@
 *.o
+*.so
+*.spinja
+*.gcf
+*.aut
+*.bcg
+*.fsm
+*.dir
+*.etf
 *.cpp
+*.c
 *.log
 *.bin
 *.sum

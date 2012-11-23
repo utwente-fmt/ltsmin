@@ -3,7 +3,7 @@
 #define MORE_STATES
 
 #ifndef N
-#define N	4
+#define N	3
 #endif
 
 byte turn[N], flag[N];

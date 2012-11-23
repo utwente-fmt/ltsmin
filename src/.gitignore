@@ -27,6 +27,7 @@ test-hre
 test-mpi-hre
 test-ltsmin-parse
 test-regroup
+test-simplemap
 test-vset
 hre-test/test-hre
 hre-test/test-mpi-hre

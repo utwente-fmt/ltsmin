@@ -24,7 +24,7 @@ dict set langs etf model "gear.1.etf"
 # for each language frontend optional parameters per backend
 dict set langs etf options mc "--threads=$num_threads"
 # the expected result for a pass
-dict set langs etf exp_output ""
+dict set langs etf exp_output "2689 states 3567 transitions"
 
 # Wich backends are we performing the ETF language tests on?
 set filter "{mc}"

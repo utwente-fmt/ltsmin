@@ -14,29 +14,43 @@ cd $subdir
 #set ltools(spinjal) "fgs.promela"
 #set ltools(mcrl) "-tbf -regular -nocluster hef_wrong.mcrl"
 #set ltools(mvrl22lps) "-n -D ieee_11073.mcrl2 > ieee_11073.lps"
+set prom_model "fgs.promela"
+set precommands {"$binpaths(spinjal) $EXAMPLES_PATH/$prom_model"
+                 "mv $prom_model.spinja $EXAMPLES_PATH/"}
+foreach command $precommands {
+    puts [subst "Executing precommand: '$command'"]
+    eval exec $command
+}
 
 # Language Frontends
 set frontends [dict create]
 dict set frontends etf model "gear.1.etf"
-dict set frontends etf exp_output "2689 states 3567 transitions"
+dict set frontends etf exp_output " 2689 "
+#" states 3567 transitions"
 
 dict set frontends dve model "gear.1.dve" 
-dict set frontends dve exp_output "2689 states 3567 transitions"
+dict set frontends dve exp_output " 2689 "
+#" states 3567 transitions"
 
-dict set frontends prom model "fgs.promela.spinja"
-dict set frontends prom exp_output ""
+dict set frontends prom model [subst "$prom_model.spinja"]
+# list with commands to be executed before the language tests. This can be used to generate models.
+dict set frontends prom exp_output " 242 "
+#" states 3388 transitions"
 
 dict set frontends lpo model  "hef_wrong.tbf"
-dict set frontends lpo exp_output "15557 states 27300 transitions"
+dict set frontends lpo exp_output " 15557 "
+#"  states 27300 transitions"
 
 dict set frontends lps model "ieee-11073.lps"
-dict set frontends lps exp_output "1760 states 6583 transitions"
+dict set frontends lps exp_output " 1760 "
+#"  states 6583 transitions"
 
-dict set frontends opaal model "fischer5.xml"
-dict set frontends opaal exp_output ""
+dict set frontends opaal model "fischer4.xml"
+dict set frontends opaal exp_output " 268 "
 
 dict set frontends pbes model "brp-nodeadlock.pbes"
-dict set frontends pbes exp_output "10548 states 12168 transitions"
+dict set frontends pbes exp_output " 10548 "
+#"  states 12168 transitions"
 
 set backends "mc,dist,sym,seq"
 set filter "*2lts-{$backends}"
