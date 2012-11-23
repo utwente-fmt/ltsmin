@@ -1162,7 +1162,7 @@ scc_state_matched(gsea_state_t *state, void *arg)
                     gc.goal_trace (NULL, arg);
                 }
                 Warning (info, "exiting now");
-                HREexit (LTSMIN_EXIT_COUNTER_EXAMPLE);
+                HREabort (LTSMIN_EXIT_COUNTER_EXAMPLE);
             }
         } while (gc.store.scc.dfsnum[r>>1] > gc.store.scc.dfsnum[state->tree.tree_idx]);
         dfs_stack_push (gc.store.scc.roots, &r);
