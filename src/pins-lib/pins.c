@@ -43,6 +43,7 @@ struct grey_box_model {
     chunkatint_t chunkatint;
 	get_count_t get_count;
 	void** map;
+	int mucalc_node_count;
 };
 
 struct nested_cb {
@@ -238,6 +239,7 @@ model_t GBcreateBase(){
 	model->chunk2int=NULL;
 	model->map=NULL;
 	model->get_count=NULL;
+	model->mucalc_node_count=0;
 	return model;
 }
 
@@ -795,6 +797,25 @@ ltl_popt (poptContext con, enum poptCallbackReason reason,
     Abort("unexpected call to ltl_popt");
 }
 
+static char *mucalc_file = NULL;
+
+int GBhaveMucalc() {
+    return (mucalc_file) ? 1 : 0;
+}
+
+void GBsetMucalcNodeCount(model_t model, int nodecount)
+{
+    Print(infoLong, "GBsetMucalcNodeCount: %d", nodecount);
+    model->mucalc_node_count = nodecount;
+}
+
+int GBgetMucalcNodeCount(model_t model)
+{
+    Print(infoLong, "GBgetMucalcNodeCount: %d", model->mucalc_node_count);
+    return model->mucalc_node_count;
+}
+
+
 void chunk_table_print(log_t log, model_t model) {
     lts_type_t t = GBgetLTStype(model);
     log_printf(log,"The registered types values are:\n");
@@ -829,6 +850,13 @@ GBloadFile (model_t model, const char *filename, model_t *wrapped)
                         model = GBaddLTL (model, ltl_file, ltl_type);
                     if (regroup_options != NULL)
                         model = GBregroup (model, regroup_options);
+                    if (mucalc_file) {
+                        if (ltl_file)
+                            Abort("The -mucalc option and -ltl options can not be combined.");
+                        if (por)
+                            Abort("The -mucalc option and -por options can not be combined.");
+                        model = GBaddMucalc (model, mucalc_file);
+                    }
                     if (cache)
                         model = GBaddCache (model);
                     *wrapped = model;
@@ -974,6 +1002,8 @@ struct poptOption greybox_options[]={
 	{ "regroup" , 'r' , POPT_ARG_STRING, &regroup_options , 0 ,
           "enable regrouping; available transformations T: "
           "gs, ga, gsa, gc, gr, cs, cn, cw, ca, csa, rs, rn, ru", "<(T,)+>" },
+    {"mucalc", 0, POPT_ARG_STRING, &mucalc_file, 0, "modal mu-calculus formula or file with modal mu-calculus formula",
+          "<mucalc-file>.mcf|<mucalc formula>"},
 	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, ltl_options , 0 , "LTL options", NULL },
 	POPT_TABLEEND	
 };

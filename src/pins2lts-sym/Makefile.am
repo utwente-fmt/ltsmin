@@ -8,6 +8,10 @@ PINS_LIBS += ../pins-lib/libpins.la
 PINS_LIBS += ../ltsmin-lib/libltsmin.la
 PINS_LIBS += ../util-lib/libutil.la
 PINS_LIBS += ../dm/libdm.la
+if HAVE_LIBSPG
+PINS_LIBS += ../spg-lib/libspg.la
+endif
+
 VSET_LIBS = ../vset-lib/libvset.la
 
 bin_PROGRAMS = etf2lts-sym
@@ -61,9 +65,6 @@ nodist_EXTRA_lps2lts_sym_SOURCES = automake-force-linker.cxx # req. by mcrl2
 pbes2lts_sym_SOURCES   = pins2lts-sym.c
 pbes2lts_sym_LDADD     = $(PINS_LIBS)
 pbes2lts_sym_LDADD    += $(VSET_LIBS) ../pins-lib/libpbes-pins.la
-if HAVE_LIBSPG
-pbes2lts_sym_LDADD    += ../spg-lib/libspg.la
-endif
 pbes2lts_sym_CPPFLAGS  = -DPBES $(SYM_CPPFLAGS)
 pbes2lts_sym_LDFLAGS   = $(MCRL2_LDFLAGS) $(AM_LDFLAGS)
 nodist_EXTRA_pbes2lts_sym_SOURCES = automake-force-linker.cxx # req. by pbes

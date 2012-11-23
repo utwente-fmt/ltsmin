@@ -1,0 +1,74 @@
+%include {
+#include <assert.h>
+#include <stdlib.h>
+
+#include <hre/user.h>
+#include <ltsmin-lib/mucalc-parse-env.h>
+#include <ltsmin-lib/mucalc-syntax.h>
+#include <ltsmin-lib/mucalc-grammar.h>
+}
+
+/* 
+  Section common parser configuration.
+*/
+
+%name MucalcParse
+%token_prefix TOKEN_
+%token_type { int }
+%syntax_error {
+    (void)yymajor;(void)yyminor;
+    HREmessage(error,"syntax error near line %d, pos %d",env->lineno+1,env->linepos+1);
+    env->error = true;
+}
+%parse_failure { HREabort(0); }
+%parse_accept {  }
+%extra_argument { mucalc_parse_env_t env }
+%stack_overflow {
+    (void)yypMinor;
+    Abort("stack overflow");
+}
+
+/* Mu-Calculus */
+
+input ::= EXPR expr(E) . { env->formula_tree = E; }
+
+%nonassoc MU NU EQUALS.
+%left AND OR.
+%right LMUST LMAY RMUST RMAY.
+%left NOT.
+%right LBRACKET RBRACKET.
+
+%type expr { mucalc_expr_t }
+%destructor expr {
+    (void)env;(void)$$;
+    Abort("Expressions are not supposed to be destroyed.");
+}
+expr(E) ::= LPAR expr(E1) RPAR.             { E = E1; }
+expr(E) ::= TRUE.                           { E = env->true_expr; }
+expr(E) ::= FALSE.                          { E = env->false_expr; }
+expr(E) ::= proposition(P).                 { E = mucalc_expr_create(env, MUCALC_PROPOSITION, P, NULL, NULL); }
+expr(E) ::= NOT expr(E1).                   { E = mucalc_expr_create(env, MUCALC_NOT, 0, E1, NULL); }
+expr(E) ::= expr(E1) AND expr(E2).          { E = mucalc_expr_create(env, MUCALC_AND, 0, E1, E2); }
+expr(E) ::= expr(E1) OR expr(E2).           { E = mucalc_expr_create(env, MUCALC_OR, 0, E1, E2); }
+expr(E) ::= MU variable(V) DOT expr(E1).    { env->variable_count++;
+                                              E = mucalc_expr_create(env, MUCALC_MU, V, E1, NULL); }
+expr(E) ::= NU variable(V) DOT expr(E1).    { env->variable_count++;
+                                              E = mucalc_expr_create(env, MUCALC_NU, V, E1, NULL); }
+expr(E) ::= variable(V).                    { E = mucalc_expr_create(env, MUCALC_VAR, V, NULL, NULL); }
+expr(E) ::= LMUST action_expr(A) RMUST expr(E1).    { E = mucalc_expr_create(env, MUCALC_MUST, A, E1, NULL); }
+expr(E) ::= LMAY action_expr(A) RMAY expr(E1).      { E = mucalc_expr_create(env, MUCALC_MAY, A, E1, NULL); }
+
+%type action_expr { int }
+action_expr(A) ::= .                        { A = mucalc_add_action_expression(env, -1, false); }
+action_expr(A) ::= STRING(S).               { A = mucalc_add_action_expression(env, S, false); }
+action_expr(A) ::= NOT STRING(S).           { A = mucalc_add_action_expression(env, S, true); }
+
+%type proposition { int } 
+proposition(P) ::= LBRACKET ID(I) EQUALS value(V) RBRACKET.  { P = mucalc_add_proposition(env, I, V); }
+
+%type value { int }
+value(V) ::= STRING(S).                     { printf("STRING\n"); V = mucalc_add_value(env, MUCALC_VALUE_STRING, S); }
+value(V) ::= NUMBER(N).                     { printf("NUMBER: %d\n", N); V = mucalc_add_value(env, MUCALC_VALUE_NUMBER, N); }
+
+%type variable { int }
+variable(V) ::= ID(I).                     { V = I; }

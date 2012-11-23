@@ -632,6 +632,12 @@ extern model_t GBaddLTL(model_t model, const char *ltl_file, pins_ltl_type_t typ
 */
 extern model_t GBaddPOR(model_t model, const int has_ltl);
 
+/**
+\brief Add mu-calculus layer
+*/
+extern model_t GBaddMucalc (model_t model, const char *mucalc_file);
+
+
 //@{
 
 /**
@@ -639,6 +645,22 @@ extern model_t GBaddPOR(model_t model, const int has_ltl);
 */
 extern model_t GBregroup(model_t model, const char *group_spec);
 
+/**
+ * \brief Returns 1 if the mucalc wrapper is active; 0 otherwise.
+ */
+int GBhaveMucalc();
+
+/**
+ * \brief Sets the number of subformulae of the mu-calculus property that is being checked.
+ * Needed for the parity game solver.
+ */
+void GBsetMucalcNodeCount(model_t model, int nodecount);
+
+/**
+ * \brief Gets the number of subformulae of the mu-calculus property that is being checked.
+ * Needed for the parity game solver.
+ */
+int GBgetMucalcNodeCount(model_t model);
 
 //@}
 

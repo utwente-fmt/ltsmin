@@ -21,6 +21,7 @@ check_PROGRAMS += test-mpi-hre
 endif
 check_PROGRAMS += test-is-balloc
 check_PROGRAMS += test-ltsmin-parse
+check_PROGRAMS += test-mucalc-parser
 check_PROGRAMS += test-regroup
 check_PROGRAMS += test-simplemap
 check_PROGRAMS += test-vset
@@ -69,6 +70,11 @@ test_ltsmin_parse_SOURCES 	= test-ltsmin-parse.c
 test_ltsmin_parse_CPPFLAGS  = -DNXT -I${top_srcdir}/ltl2ba $(AM_CPPFLAGS)
 test_ltsmin_parse_LDADD		= $(PINS_LIBS) $(DM_LIB) $(AM_LDFLAGS)
 test_ltsmin_parse_LDADD    += $(top_builddir)/ltl2ba/libltl2ba.la
+
+# test-mucalc-parser
+test_mucalc_parser_SOURCES   = test-mucalc-parser.c
+test_mucalc_parser_CPPFLAGS  = $(AM_CPPFLAGS)
+test_mucalc_parser_LDADD     = $(HRE_LIB) ../hre-io/libhre-io.la ../ltsmin-lib/libmucalc.la $(AM_LDFLAGS)
 
 # test-regroup
 test_regroup_SOURCES 		= test-regroup.c

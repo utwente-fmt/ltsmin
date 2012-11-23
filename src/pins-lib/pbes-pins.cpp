@@ -19,6 +19,7 @@ extern "C" {
 #include <hre/user.h>
 #include <pins-lib/pbes-pins.h>
 #include <pins-lib/pins.h>
+#include <pins-lib/pg-types.h>
 
 } // end of extern "C"
 
@@ -203,16 +204,16 @@ public:
         int local_s[state_length];
         this->global_to_local(s, local_s);
         std::string varname = this->get_string_value(local_s[0]);
-        if (label==0)
+        if (label==PG_PRIORITY)
         {
             int priority = this->get_info()->get_variable_priorities().at(varname);
             //std::clog << "var: " << varname << ", priority: " << priority << std::endl;
             return priority;
         }
-        else if (label==1)
+        else if (label==PG_PLAYER)
         {
             lts_info::operation_type type = this->get_info()->get_variable_types().at(varname);
-            return type==parity_game_generator::PGAME_AND ? 1 : 0;
+            return type==parity_game_generator::PGAME_AND ? PG_AND : PG_OR;
         }
         return 0;
     }

@@ -10,6 +10,7 @@
 #include <dm/dm.h>
 #include <hre/user.h>
 #include <lts-io/user.h>
+#include <pins-lib/pg-types.h>
 #include <pins-lib/pins.h>
 #include <pins-lib/pins-impl.h>
 #include <pins-lib/property-semantics.h>
@@ -36,9 +37,10 @@ static int   act_label;
 static int   sat_granularity = 10;
 static int   save_sat_levels = 0;
 
-#if defined(PBES)
 static int   pgsolve_flag = 0;
+#if defined(PBES)
 static int   pgreduce_flag = 0;
+#endif
 static char* pg_output = NULL;
 static int var_pos = 0;
 static int var_type_no = 0;
@@ -52,7 +54,6 @@ static int min_priority = INT_MAX;
 static int max_priority = INT_MIN;
 static vset_t true_states;
 static vset_t false_states;
-#endif
 
 static enum { BFS_P , BFS , CHAIN_P, CHAIN } strategy = BFS_P;
 
@@ -149,13 +150,13 @@ static  struct poptOption options[] = {
     { "trace" , 0 , POPT_ARG_STRING , &trc_output , 0 , "file to write trace to" , "<lts-file>.gcf" },
     { "mu" , 0 , POPT_ARG_STRING , &mu_formula , 0 , "file with a mu formula" , "<mu-file>.mu" },
     { "ctl-star" , 0 , POPT_ARG_STRING , &ctl_formula , 0 , "file with a ctl* formula" , "<ctl-file>.ctl" },
-#if defined(PBES)
 #ifdef HAVE_LIBSPG
     { "pg-solve" , 0 , POPT_ARG_NONE , &pgsolve_flag, 0, "Solve the generated parity game (only for symbolic tool).","" },
     { NULL, 0 , POPT_ARG_INCLUDE_TABLE, spg_solve_options , 0, "Symbolic parity game solver options", NULL},
+#if defined(PBES)
     { "pg-reduce" , 0 , POPT_ARG_NONE , &pgreduce_flag, 0, "Reduce the generated parity game on-the-fly (only for symbolic tool).","" },
-    { "pg-write" , 0 , POPT_ARG_STRING , &pg_output, 0, "file to write symbolic parity game to","<pg-file>.spg" },
 #endif
+    { "pg-write" , 0 , POPT_ARG_STRING , &pg_output, 0, "file to write symbolic parity game to","<pg-file>.spg" },
 #endif
     SPEC_POPT_OPTIONS,
     { NULL, 0 , POPT_ARG_INCLUDE_TABLE, greybox_options , 0 , "Greybox options",NULL},
@@ -697,7 +698,6 @@ final_stat_reporting(vset_t visited, rt_timer_t timer)
     }
 }
 
-#if defined(PBES)
 static bool debug_output_enabled = false;
 
 /**
@@ -715,6 +715,7 @@ static inline void add_variable_subset(vset_t dst, vset_t src, vdom_t domain, in
 
     if (debug_output_enabled && log_active(infoLong))
     {
+        /*
         chunk c = GBchunkGet(model, var_type_no, var_index);
         if (c.len == 0) {
             Abort("lookup of %d failed", var_index);
@@ -724,17 +725,17 @@ static inline void add_variable_subset(vset_t dst, vset_t src, vdom_t domain, in
             s[i] = c.data[i];
         }
         s[c.len] = 0;
+        */
         long   n_count;
         char   elem_str[1024];
         double e_count;
         get_vset_size(u, &n_count, &e_count, elem_str, sizeof(elem_str));
-        if (e_count > 0) Print(infoLong, "add_variable_subset: %s:  %s (~%1.2e) states", s, elem_str, e_count);
+        if (e_count > 0) Print(infoLong, "add_variable_subset: %d:  %s (~%1.2e) states", var_index, elem_str, e_count);
     }
 
     vset_union(dst, u);
     vset_destroy(u);
 }
-#endif
 
 #if defined(PBES)
 static inline void reduce_parity_game(vset_t next_level, vset_t visited, vset_t true_states, vset_t false_states)
@@ -1936,29 +1937,51 @@ mu_compute (ltsmin_expr_t mu_expr, vset_t visited)
     return result;
 }
 
-#if defined(PBES)
-void init_pbes()
+/**
+ * \brief Initialises the data structures for generating symbolic parity games.
+ */
+void init_spg(model_t model)
 {
+    lts_type_t type = GBgetLTStype(model);
+    var_pos = 0;
+    var_type_no = 0;
+    for(int i=0; i<N; i++)
+    {
+        //Printf(infoLong, "%d: %s (%d [%s])\n", i, lts_type_get_state_name(type, i), lts_type_get_state_typeno(type, i), lts_type_get_state_type(type, i));
+#ifdef PBES
+        char* str1 = "string"; // for the PBES language module
+#else
+        char* str1 = "mu"; // for the mu-calculus PINS layer
+#endif
+        size_t strlen1 = strlen(str1);
+        char* str2 = lts_type_get_state_type(type, i);
+        size_t strlen2 = strlen(str2);
+        if (strlen1==strlen2 && strncmp(str1, str2, strlen1)==0)
+        {
+            var_pos = i;
+            var_type_no = lts_type_get_state_typeno(type, i);
+            if (GBhaveMucalc()) {
+                true_index = 0; // enforced by mucalc parser (mucalc-grammar.lemon / mucalc-syntax.c)
+                false_index = 1;
+            } else { // required for the PBES language module.
+                true_index = GBchunkPut(model, var_type_no, chunk_str("true"));
+                false_index = GBchunkPut(model, var_type_no, chunk_str("false"));
+            }
+        }
+    }
+    int p_len = 1;
+    int proj[1] = {var_pos}; // position 0 encodes the variable
+    variable_projection = vproj_create(domain, p_len, proj);
+
     num_vars = GBchunkCount(model, var_type_no); // number of propositional variables
+    if (GBhaveMucalc()) {
+        num_vars = GBgetMucalcNodeCount(model); // number of mu-calculus subformulae
+    }
+    Print(infoLong, "init_spg: var_type_no=%d, num_vars=%d", var_type_no, num_vars);
     priority = RTmalloc(num_vars * sizeof(int)); // priority of variables
     player = RTmalloc(num_vars * sizeof(int)); // player of variables
     for(size_t i=0; i<num_vars; i++)
     {
-        /*
-        if (log_active(infoLong))
-        {
-            chunk c = GBchunkGet(model, var_type_no, i);
-            if (c.len == 0) {
-                Abort("lookup of %d failed", i);
-            }
-            char s[c.len + 1];
-            for (unsigned int i = 0; i < c.len; i++) {
-                s[i] = c.data[i];
-            }
-            s[c.len] = 0;
-            Print(infoLong, "Variable %d: %s", i, s);
-        }
-        */
         lts_type_t type = GBgetLTStype(model);
         int state_length = lts_type_get_state_length(type);
         // create dummy state with variable i:
@@ -1968,31 +1991,30 @@ void init_pbes()
             state[j] = 0;
         }
         state[var_pos] = i;
-        int label = GBgetStateLabelLong(model, 0, state); // priority
+        int label = GBgetStateLabelLong(model, PG_PRIORITY, state); // priority
         priority[i] = label;
-        if (label < min_priority)
-        {
+        if (label < min_priority) {
             min_priority = label;
         }
-        if (label > max_priority)
-        {
+        if (label > max_priority) {
             max_priority = label;
         }
         //Print(infoLong, "  label %d (priority): %d", 0, label);
-        label = GBgetStateLabelLong(model, 1, state); // player
+        label = GBgetStateLabelLong(model, PG_PLAYER, state); // player
         player[i] = label;
         //Print(infoLong, "  label %d (player): %d", 1, label);
     }
+    true_states = vset_create(domain, -1, NULL);
+    false_states = vset_create(domain, -1, NULL);
 }
-#endif
 
-#if defined(PBES)
 #if defined(HAVE_LIBSPG)
 /**
- * \brief Creates a symbolic parity game
+ * \brief Creates a symbolic parity game from the generated LTS.
  */
 parity_game* compute_symbolic_parity_game(vset_t visited, int* src)
 {
+    Print(infoLong, "Computing symbolic parity game.");
     debug_output_enabled = true;
 
     // num_vars and player have been pre-computed by init_pbes.
@@ -2005,7 +2027,7 @@ parity_game* compute_symbolic_parity_game(vset_t visited, int* src)
     for(size_t i = 0; i < num_vars; i++)
     {
         // players
-        //Print(infoLong, "Adding nodes for var %d (player %d).", i, player[i]);
+        Print(infoLong, "Adding nodes for var %d (player %d).", i, player[i]);
         add_variable_subset(g->v_player[player[i]], g->v, g->domain, i);
         // priorities
         add_variable_subset(g->v_priority[priority[i]], g->v, g->domain, i);
@@ -2042,9 +2064,6 @@ parity_game* compute_symbolic_parity_game(vset_t visited, int* src)
     return g;
 }
 #endif
-#endif
-
-
 
 int
 main (int argc, char *argv[])
@@ -2133,38 +2152,25 @@ main (int argc, char *argv[])
     Warning(info, "got initial state");
 
     if (mu_expr) { // run a small test to check correctness of mu formula
+        // and cause a segfault, because mu_var_man is not initialised yet...
+        // setup var manager
+        mu_var_man = create_manager(65535);
+        ADD_ARRAY(mu_var_man, mu_var, vset_t);
+
         vset_t x = mu_compute(mu_expr, visited);
         vset_destroy(x);
     }
-#if defined(PBES)
-    lts_type_t type = GBgetLTStype(model);
-    var_pos = 0;
-    var_type_no = 0;
-    for(int i=0; i<N; i++)
-    {
-        //Printf(infoLong, "%d: %s (%d [%s])\n", i, lts_type_get_state_name(type, i), lts_type_get_state_typeno(type, i), lts_type_get_state_type(type, i));
-        char* str1 = "string";
-        size_t strlen1 = strlen(str1);
-        char* str2 = lts_type_get_state_type(type, i);
-        size_t strlen2 = strlen(str2);
-        if (strlen1==strlen2 && strncmp(str1, str2, strlen1)==0)
-        {
-            var_pos = i;
-            var_type_no = lts_type_get_state_typeno(type, i);
-            true_index = GBchunkPut(model, var_type_no, chunk_str("true"));
-            false_index = GBchunkPut(model, var_type_no, chunk_str("false"));
-        }
+    bool spg = false;
+#ifdef PBES
+    spg = true;
+#endif
+    if (GBhaveMucalc()) { // mu-calculus pins2pins layer
+        Warning(info,"Generating a Symbolic Parity Game (SPG).");
+        spg = true;
     }
-    int p_len = 1;
-    int proj[1] = {var_pos}; // position 0 encodes the variable
-    variable_projection = vproj_create(domain, p_len, proj);
-#endif
-
-#if defined(PBES)
-    init_pbes();
-    true_states = vset_create(domain, -1, NULL);
-    false_states = vset_create(domain, -1, NULL);
-#endif
+    if (spg) {
+        init_spg(model);
+    }
 
     rt_timer_t timer = RTcreateTimer();
 
@@ -2173,10 +2179,7 @@ main (int argc, char *argv[])
     RTstopTimer(timer);
 
     if (mu_expr) {
-        // setup var manager
-        mu_var_man = create_manager(65535);
-        ADD_ARRAY(mu_var_man, mu_var, vset_t);
-
+        Print(infoLong, "Starting mu-calculus model checking.");
         vset_t x = mu_compute(mu_expr, visited);
 
         if (x) {
@@ -2212,48 +2215,43 @@ main (int argc, char *argv[])
     if (files[1] != NULL)
         do_output(files[1], visited);
 
-#if defined(PBES)
-    vset_destroy(true_states);
-    vset_destroy(false_states);
-
+    if (spg) { // converting the LTS to a symbolic parity game, save and solve.
+        vset_destroy(true_states);
+        vset_destroy(false_states);
 #ifdef HAVE_LIBSPG
-    if (pg_output || pgsolve_flag) {
-        RTresetTimer(timer);
-        RTstartTimer(timer);
-        parity_game * g = compute_symbolic_parity_game(visited, src);
-        RTstopTimer(timer);
-        RTprintTimer(info, timer, "computing symbolic parity game took");
-        if (pg_output) {
-            Warning(info,"Writing symbolic parity game to %s",pg_output);
-            FILE *f = fopen(pg_output, "w");
-            spg_save(f, g);
-            fclose(f);
+        if (pg_output || pgsolve_flag) {
+            RTresetTimer(timer);
+            RTstartTimer(timer);
+            parity_game * g = compute_symbolic_parity_game(visited, src);
+            RTstopTimer(timer);
+            RTprintTimer(info, timer, "computing symbolic parity game took");
+            if (pg_output) {
+                Print(info,"Writing symbolic parity game to %s",pg_output);
+                FILE *f = fopen(pg_output, "w");
+                spg_save(f, g);
+                fclose(f);
+            }
+            if (pgsolve_flag) {
+                spgsolver_options* spg_options = spg_get_solver_options();
+                rt_timer_t pgsolve_timer = RTcreateTimer();
+                RTstartTimer(pgsolve_timer);
+                bool result = spg_solve(g, spg_options);
+                Print(info, " ");
+                Print(info, "The result is: %s", result ? "true":"false");
+                RTstopTimer(pgsolve_timer);
+                Print(info, " ");
+                RTprintTimer(info, timer, "generation took");
+                RTprintTimer(info, pgsolve_timer, "solving took");
+            } else {
+                spg_destroy(g);
+            }
         }
-        if (pgsolve_flag)
-        {
-            spgsolver_options* spg_options = spg_get_solver_options();
-            rt_timer_t pgsolve_timer = RTcreateTimer();
-            RTstartTimer(pgsolve_timer);
-            bool result = spg_solve(g, spg_options);
-            Warning(info, " ");
-            Warning(info, "The result is: %s", result ? "true":"false");
-            RTstopTimer(pgsolve_timer);
-            Warning(info, " ");
-            RTprintTimer(info, timer, "generation took");
-            RTprintTimer(info, pgsolve_timer, "solving took");
-        }
-        else
-        {
-            spg_destroy(g);
+#endif
+        if (player != 0) {
+            RTfree(player);
+            RTfree(priority);
         }
     }
-#endif
-    if (player != 0)
-    {
-        RTfree(player);
-        RTfree(priority);
-    }
-#endif
 
     HREexit (LTSMIN_EXIT_SUCCESS);
 }

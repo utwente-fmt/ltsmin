@@ -7,6 +7,7 @@
 #include <hre/user.h>
 #include <lts-lib/rationals.h>
 #include <lts-lib/lts-pg-io.h>
+#include <pins-lib/pg-types.h>
 
 
 void lts_write_pg (const char*name, lts_t lts) {
@@ -33,20 +34,26 @@ void lts_write_pg (const char*name, lts_t lts) {
     bool write_false = false;
     for(uint32_t src_idx=0; src_idx<lts->states; src_idx++){
         TreeUnfold(lts->prop_idx, lts->properties[src_idx], labels);
-        int priority = labels[0];
+        int priority = labels[PG_PRIORITY];
         if (priority > max_priority) {
             max_priority = priority;
         }
-        int player = labels[1];
+        int player = labels[PG_PLAYER];
         if (lts->begin[src_idx] >= lts->begin[src_idx+1]){
             // no edges
-            if (player==1) {
+            if (player==PG_AND) {
                 write_true = true;
-            } else if (player==0) {
+            } else if (player==PG_OR) {
                 write_false = true;
             }
             //Warning(info, "State %d has no successors.",src_idx);
         }
+    }
+    if (max_priority%2!=0)
+    {
+        // when converting from min to max-priority game,
+        // the maximum priority should be even.
+        max_priority++;
     }
     Warning(info,"Second pass...");
     bool min_game = false;
@@ -70,7 +77,7 @@ void lts_write_pg (const char*name, lts_t lts) {
             fprintf(f,";\n");
         }
         TreeUnfold(lts->prop_idx, lts->properties[src_idx], labels);
-        int priority = min_game ? labels[0] : max_priority-labels[0];
+        int priority = min_game ? labels[PG_PRIORITY] : max_priority-labels[PG_PRIORITY];
         int player = labels[1];
         fprintf(f, "%d %d %d ", src_idx+offset, priority /* priority */, player /* player */);
         first_edge = true;
@@ -85,19 +92,19 @@ void lts_write_pg (const char*name, lts_t lts) {
         {
             //Warning(info,"State %d has no successors.",src_idx);
             // add transition to true/false node
-            fprintf(f,"%d",((player==1) ? true_idx : false_idx));
+            fprintf(f,"%d",((player==PG_AND) ? true_idx : false_idx));
         }
     }
     fprintf(f,";\n");
     // write true and false
     if (write_true)
     {
-        fprintf(f, "%d %d %d ", true_idx, min_game ? 0 : max_priority /* priority */, 1 /* player */);
+        fprintf(f, "%d %d %d ", true_idx, min_game ? 0 : max_priority /* priority */, PG_AND /* player */);
         fprintf(f,"%d;\n",true_idx);
     }
     if (write_false)
     {
-        fprintf(f, "%d %d %d ", false_idx, min_game ? 1 : max_priority-1 /* priority */, 0 /* player */);
+        fprintf(f, "%d %d %d ", false_idx, min_game ? 1 : max_priority-1 /* priority */, PG_OR /* player */);
         fprintf(f,"%d;\n",false_idx);
     }
     fclose(f);

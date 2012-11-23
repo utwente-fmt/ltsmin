@@ -1,4 +1,5 @@
 noinst_LTLIBRARIES  = libltsmin.la
+noinst_LTLIBRARIES += libmucalc.la
 
 # libltsmin
 libltsmin_la_SOURCES  =
@@ -22,16 +23,30 @@ libltsmin_la_LIBADD   = $(top_builddir)/ltl2ba/libltl2ba.la
 libltsmin_la_CPPFLAGS = -DNXT
 libltsmin_la_CPPFLAGS+= -I${top_srcdir}/ltl2ba $(AM_CPPFLAGS)
 
+# mu-calculus parser
+libmucalc_la_SOURCES  =
+libmucalc_la_SOURCES += mucalc-parse-env.h
+libmucalc_la_SOURCES += mucalc-syntax.c mucalc-syntax.h
+libmucalc_la_SOURCES += mucalc-lexer.c mucalc-lexer.h
+libmucalc_la_SOURCES += mucalc-grammar.c mucalc-grammar.h
+
 # lemon parser
 EXTRA_DIST  = ltsmin-lexer.c ltsmin-lexer.h
+EXTRA_DIST += mucalc-lexer.c mucalc-lexer.h
 
 BUILT_SOURCES  = ltsmin-grammar.c ltsmin-grammar.h
 BUILT_SOURCES += ltsmin-lexer.c ltsmin-lexer.h
+BUILT_SOURCES += mucalc-grammar.c mucalc-grammar.h
+BUILT_SOURCES += mucalc-lexer.c mucalc-lexer.h
 
 CLEANFILES =
 CLEANFILES += ltsmin-grammar.c ltsmin-grammar.h
 CLEANFILES += ltsmin-lexer.c ltsmin-lexer.h
 CLEANFILES += ltsmin-grammar.out
+CLEANFILES += mucalc-grammar.c mucalc-grammar.h
+CLEANFILES += mucalc-lexer.c mucalc-lexer.h
+CLEANFILES += mucalc-grammar.out
+
 MAINTAINERCLEANFILES =
 MAINTAINERCLEANFILES += ltsmin-tokens.c ltsmin-tokens.h
 LEMON_FLAGS = -s
