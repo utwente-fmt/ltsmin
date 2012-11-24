@@ -2530,7 +2530,7 @@ dfs_fifo_handle (void *arg, state_info_t *successor, transition_info_t *ti,
                  int seen)
 {
     wctx_t             *ctx = (wctx_t *) arg;
-    if (GBbuchiIsAccepting(ctx->model, get_state(successor->ref, ctx))) {
+    if (GBbuchiIsProgress(ctx->model, get_state(successor->ref, ctx))) {
         if (!seen || (all_red && !global_has_color(successor->ref, GRED, 0))) {
             raw_data_t stack_loc = dfs_stack_push (ctx->out_stack, NULL);
             state_info_serialize (successor, stack_loc);
@@ -2607,6 +2607,7 @@ dfs_fifo_dfs (wctx_t *ctx, ref_t seed)
 void
 dfs_fifo (wctx_t *ctx)
 {
+    HREassert (GBgetProgressStateLabelIndex(ctx->model) >= 0, "No progress labels defined for DFS_FIFO");
     size_t              total = 0;
     size_t              out_size, size;
     do {
