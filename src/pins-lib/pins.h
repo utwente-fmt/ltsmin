@@ -232,7 +232,37 @@ extern int GBsetAcceptingStateLabelIndex(model_t model, int index);
 
 extern int GBbuchiIsAccepting(model_t model, int* src);
 /**<
-\brief Return accepting/not-accepting for a given state
+\brief Return accepting/not-accepting for a given state, false if undefined
+*/
+
+extern int GBgetProgressStateLabelIndex(model_t model);
+/**<
+\brief Get index of progress state label
+*/
+
+extern int GBsetProgressStateLabelIndex(model_t model, int index);
+/**<
+\brief Set index of progress state label
+*/
+
+extern int GBbuchiIsProgress(model_t model, int* src);
+/**<
+\brief Return progress/non-progress for a given state, false if undefined
+*/
+
+extern int GBgetValidEndStateLabelIndex(model_t model);
+/**<
+\brief Get index of valid end state label
+*/
+
+extern int GBsetValidEndStateLabelIndex(model_t model, int index);
+/**<
+\brief Set index of valid end state label
+*/
+
+extern int GBbuchiIsValidEnd(model_t model, int* src);
+/**<
+\brief Return valid end/invalid end for a given state, false if undefined
 */
 
 extern int GBtransitionInGroup(model_t model, int* labels, int group);

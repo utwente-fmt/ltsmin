@@ -328,7 +328,7 @@ DVE2loadGreyboxModel(model_t model, const char *filename)
              lts_type_set_format (ltstype, i, LTStypeEnum);
         }
     }
-    int bool_is_new, bool_type = lts_type_add_type (ltstype, "bool", &bool_is_new);
+    int bool_is_new, bool_type = lts_type_add_type (ltstype, LTSMIN_TYPE_BOOL, &bool_is_new);
 
     lts_type_set_state_length(ltstype, state_length);
 
@@ -375,8 +375,8 @@ DVE2loadGreyboxModel(model_t model, const char *filename)
     }
 
     if (bool_is_new) {
-        GBchunkPutAt(model, bool_type, chunk_str("false"), 0);
-        GBchunkPutAt(model, bool_type, chunk_str("true"), 1);
+        GBchunkPutAt(model, bool_type, chunk_str(LTSMIN_VALUE_BOOL_FALSE), 0);
+        GBchunkPutAt(model, bool_type, chunk_str(LTSMIN_VALUE_BOOL_TRUE), 1);
     }
 
     lts_type_validate(ltstype);

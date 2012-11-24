@@ -13,6 +13,7 @@
 
 #include <hre/user.h>
 
+
 /**
  * Exit codes
  */
@@ -20,6 +21,22 @@
 #define LTSMIN_EXIT_COUNTER_EXAMPLE     1
 #define LTSMIN_EXIT_SUCCESS             HRE_EXIT_SUCCESS
 #define LTSMIN_EXIT_FAILURE             HRE_EXIT_FAILURE
+
+
+/**
+ * Types
+ */
+
+#define LTSMIN_TYPE_BOOL                "bool"
+
+
+/**
+ * Values
+ */
+
+#define LTSMIN_VALUE_BOOL_FALSE         "false" // GBchunkPutAt(.., 0)
+#define LTSMIN_VALUE_BOOL_TRUE          "true"  // GBchunkPutAt(.., 1)
+
 
 /**
  * Edges
@@ -33,6 +50,7 @@
 
 /* statements (promela code line numbers in SpinS) */
 #define LTSMIN_EDGE_TYPE_STATEMENT      "statement"
+
 
 /**
  * States labels

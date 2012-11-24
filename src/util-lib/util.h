@@ -1,6 +1,7 @@
 #ifndef UTIL_LTSMIN_H
 #define UTIL_LTSMIN_H
 
+#include <stdbool.h>
 
 #define max(a,b) ({ \
     typeof(a) _a = (a); \
@@ -21,6 +22,8 @@
 })
 
 extern char *gnu_basename (char *path);
+
+extern bool has_prefix (const char *name, const char *prefix);
 
 #endif // UTIL_LTSMIN_H
 

@@ -74,20 +74,10 @@ static  struct poptOption options[] = {
     POPT_TABLEEND
 };
 
-static inline int
-valid_end_state(struct dist_thread_context *ctx, int *state)
-{
-#if defined(SPINJA)
-    return GBbuchiIsAccepting(ctx->model, state);
-#endif
-    return 0;
-    (void) ctx; (void) state;
-}
-
 static inline void
 deadlock_detect (struct dist_thread_context *ctx, int *state, int count)
 {
-    if (count==0 && dlk_detect && !valid_end_state(ctx, state)){
+    if (count==0 && dlk_detect && !GBbuchiIsValidEnd(ctx->model, state)){
         ctx->deadlocks++;
         if (no_exit) return;
         Warning (info, " ");

@@ -2287,20 +2287,10 @@ bfs_load (wctx_t *ctx)
     return dfs_stack_frame_size(ctx->in_stack) + dfs_stack_frame_size(ctx->out_stack);
 }
 
-static inline int
-valid_end_state(wctx_t *ctx, raw_data_t state)
-{
-#if defined(SPINJA)
-    return GBbuchiIsAccepting(ctx->model, state);
-#endif
-    return false;
-    (void) ctx; (void) state;
-}
-
 static inline void
 deadlock_detect (wctx_t *ctx, int count)
 {
-    if (count > 0 || valid_end_state(ctx, ctx->state.data)) return;
+    if (count > 0 || GBbuchiIsValidEnd(ctx->model, ctx->state.data)) return;
     ctx->counters.deadlocks++; // counting is costless
     if (dlk_detect && (!no_exit || trc_output) && lb_stop(global->lb)) {
         Warning (info, " ");

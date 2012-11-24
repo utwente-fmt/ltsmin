@@ -1213,16 +1213,6 @@ gsea_state_next_grey_default(gsea_state_t *state, void *arg)
     (void)arg;
 }
 
-static inline int
-valid_end_state(int *state)
-{
-#if defined(SPINJA)
-    return GBbuchiIsAccepting(opt.model, state);
-#endif
-    return 0;
-    (void) state;
-}
-
 static inline void
 do_trace(gsea_state_t *state, void *arg, char *type, char *name)
 {
@@ -1243,7 +1233,7 @@ gsea_dlk_wrapper(gsea_state_t *state, void *arg)
     // chain deadlock test after original code
     if (gc.dlk_placeholder) gc.dlk_placeholder(state, arg);
 
-    if (state->count != 0 || valid_end_state(state->state)) return; // no deadlock
+    if (state->count != 0 || GBbuchiIsValidEnd(opt.model, state->state)) return; // no deadlock
 
     global.deadlocks++;
     do_trace(NULL, arg, "deadlock", ""); // state still on stack

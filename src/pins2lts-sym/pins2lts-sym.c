@@ -523,6 +523,16 @@ expand_group_next(int group, vset_t set)
 }
 
 static void
+valid_end_cb(void *context, int *src)
+{
+    int *state = (int *) context;
+    if (!state[N] && !GBbuchiIsValidEnd(model, src)) {
+        memcpy (state, src, sizeof(int[N]));
+        state[N] = 1;
+    }
+}
+
+static void
 deadlock_check(vset_t deadlocks, bitvector_t *reach_groups)
 {
     if (vset_is_empty(deadlocks))
@@ -547,12 +557,19 @@ deadlock_check(vset_t deadlocks, bitvector_t *reach_groups)
     if (vset_is_empty(deadlocks))
         return;
 
+    int dlk_state[1][N + 1];
+    if (GBgetValidEndStateLabelIndex(model) >= 0) {
+        dlk_state[0][N] = 0; // Did not find an invalid end state yet
+        vset_enum (deadlocks, valid_end_cb, dlk_state[0]);
+        if (dlk_state[0][N])
+            return;
+    } else {
+        vset_example(deadlocks, dlk_state[0]);
+    }
+
     Warning(info, "deadlock found");
 
     if (trc_output) {
-        int dlk_state[1][N];
-
-        vset_example(deadlocks, dlk_state[0]);
         find_trace(dlk_state, 1, global_level, levels);
     }
 
