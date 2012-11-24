@@ -80,14 +80,15 @@ typedef enum {
     Strat_OWCTY  = 128,
     Strat_MAP    = 256,
     Strat_ECD    = 512,
-    Strat_TA     = 1024,
+    Strat_DFSFIFO= 1024, // Not exactly LTL, but uses accepting states (for now) and random order
+    Strat_TA     = 2048,
     Strat_TA_SBFS= Strat_SBFS | Strat_TA,
     Strat_TA_BFS = Strat_BFS | Strat_TA,
     Strat_TA_DFS = Strat_DFS | Strat_TA,
     Strat_TA_CNDFS= Strat_CNDFS | Strat_TA,
-    Strat_2Stacks= Strat_BFS | Strat_SBFS | Strat_CNDFS | Strat_ENDFS,
+    Strat_2Stacks= Strat_BFS | Strat_SBFS | Strat_CNDFS | Strat_ENDFS | Strat_DFSFIFO,
     Strat_LTLG   = Strat_LNDFS | Strat_ENDFS | Strat_CNDFS,
-    Strat_LTL    = Strat_NDFS | Strat_LTLG | Strat_OWCTY,
+    Strat_LTL    = Strat_NDFS | Strat_LTLG | Strat_OWCTY | Strat_DFSFIFO,
     Strat_Reach  = Strat_BFS | Strat_SBFS | Strat_DFS
 } strategy_t;
 
@@ -221,6 +222,7 @@ static si_map_entry strategies[] = {
     {"owcty",   Strat_OWCTY},
     {"map",     Strat_MAP},
     {"ecd",     Strat_ECD},
+    {"dfsfifo", Strat_DFSFIFO},
 #endif
     {NULL, 0}
 };
@@ -519,6 +521,45 @@ add_stats(stats_t *res, stats_t *stat)
     res->rehashes += stat->rehashes;
 }
 
+static inline bool
+ecd_has_state (fset_t *table, state_info_t *s)
+{
+    hash32_t            hash = ref_hash (s->ref);
+    return fset_find (table, &hash, &s->ref, NULL, false);
+}
+
+static inline uint32_t
+ecd_get_state (fset_t *table, state_info_t *s)
+{
+    hash32_t            hash = ref_hash (s->ref);
+    uint32_t           *p;
+    int res = fset_find (table, &hash, &s->ref, (void **)&p, false);
+    HREassert (res != FSET_FULL, "ECD table full");
+    return res ? *p : UINT32_MAX;
+}
+
+static inline void
+ecd_add_state (fset_t *table, state_info_t *s, size_t level)
+{
+    //Warning (info, "Adding %zu", s->ref);
+    HREassert (level < UINT32_MAX, "Stack length overflow for ECD");
+    uint32_t            num = level;
+    uint32_t           *num2 = &num;
+    hash32_t            hash = ref_hash (s->ref);
+    int res = fset_find (table, &hash, &s->ref, (void **)&num2, true);
+    HREassert (res != FSET_FULL, "ECD table full");
+    HREassert (!res, "Element %zu already in ECD table", s->ref);
+}
+
+static inline void
+ecd_remove_state (fset_t *table, state_info_t *s)
+{
+    //Warning (info, "Removing %zu", s->ref);
+    hash32_t            hash = ref_hash (s->ref);
+    int success = fset_delete (table, &hash, &s->ref);
+    HREassert (success, "Could not remove key from set");
+}
+
 static void
 ctx_add_counters (wctx_t *ctx, counter_t *cnt, counter_t *red, stats_t *stats)
 {
@@ -654,7 +695,7 @@ static int num_global_bits (strategy_t s) {
     HREassert (GDANGEROUS.g == 2);
     return (Strat_ENDFS  & s ? 3 :
            (Strat_CNDFS  & s ? 2 :
-           ((Strat_LNDFS | Strat_OWCTY | Strat_TA) & s ? 1 : 0)));
+           ((Strat_LNDFS | Strat_OWCTY | Strat_DFSFIFO | Strat_TA) & s ? 1 : 0)));
 }
 
 wctx_t *
@@ -670,7 +711,7 @@ wctx_create (model_t model, int depth, wctx_t *shared)
     ctx->out_stack = ctx->in_stack = ctx->stack;
     if (strategy[depth] & (Strat_2Stacks | Strat_OWCTY))
         ctx->in_stack = dfs_stack_create (state_info_int_size());
-    if (strategy[depth] & (Strat_CNDFS | Strat_OWCTY)) //third stack for accepting states
+    if (strategy[depth] & (Strat_CNDFS | Strat_OWCTY | Strat_DFSFIFO)) //third stack for accepting states
         ctx->out_stack = dfs_stack_create (state_info_int_size());
     if (UseGreyBox == call_mode && Strat_DFS == strategy[depth]) {
         ctx->group_stack = isba_create (1);
@@ -690,6 +731,9 @@ wctx_create (model_t model, int depth, wctx_t *shared)
             if (-1 == res) Abort ("Failure to allocate a bitvector.");
         } else if (ecd && (strategy[1] & Strat_ECD)) {
             ctx->cyan = fset_create (sizeof(ref_t), sizeof(uint32_t), 10, 28);
+        }
+        if (strategy[0] & Strat_DFSFIFO) {
+            ctx->cyan = fset_create (sizeof(ref_t), 0, 10, 28);
         }
     }
 
@@ -733,7 +777,7 @@ wctx_free_rec (wctx_t *ctx, int depth)
         isba_destroy (ctx->group_stack);
     //if (strategy[depth] & (Strat_BFS | Strat_ENDFS | Strat_CNDFS))
     //    dfs_stack_destroy (ctx->in_stack);
-    if (strategy[depth] & (Strat_CNDFS))
+    if (strategy[depth] & (Strat_CNDFS | Strat_OWCTY | Strat_DFSFIFO))
         dfs_stack_destroy (ctx->stack); 
     if (strategy[depth] ==  (Strat_2Stacks))
         dfs_stack_destroy (ctx->in_stack);
@@ -873,7 +917,7 @@ statics_init (model_t model)
     int i = 0;
     while (Strat_None != strategy[i] && i < MAX_STRATEGIES) {
         global_bits += num_global_bits (strategy[i]);
-        local_bits += (Strat_LTL & strategy[i++] ? 2 : 0);
+        local_bits += (~Strat_DFSFIFO & Strat_LTL & strategy[i++] ? 2 : 0);
     }
     count_bits = (Strat_LNDFS == strategy[i-1] ? ceil(log2(W+1)) : 0);
     indexing = NULL != trc_output || ((Strat_TA | Strat_LTLG) & strategy[0]);
@@ -1044,12 +1088,11 @@ print_statistics (counter_t *ar_reach, counter_t *ar_red, rt_timer_t timer,
     double              el_size =
        db_type & Tree ? (db_type==ClearyTree?1:2) + (2.0 / (1UL<<ratio)) : D+.5;
     size_t              s = state_info_size();
-    size_t              max_load = Strat_NDFS & strategy[0] ?
-                                   reach->level_max+red->level_max :
-            (Strat_SBFS & strategy[0] ? max_level_size : lb_max_load(global->lb));
-    mem1 = ((double)(s * max_load)) / (1 << 20);
-    size_t lattices = reach->inserts - reach->updates;
+    size_t              max_load;
+    size_t              lattices = reach->inserts - reach->updates;
     if (Strat_LTL & strategy[0]) {
+        max_load = reach->level_max+red->level_max;
+        max_load += (Strat_DFSFIFO & strategy[0] ? max_level_size : 0);
         RTprintTimer (info, timer, "Total exploration time");
         Warning (info, " ");
         Warning (info, "State space has %zu states, %zu are accepting", db_elts,
@@ -1059,6 +1102,7 @@ print_statistics (counter_t *ar_reach, counter_t *ar_red, rt_timer_t timer,
         Warning (info, " ");
         Warning (info, "Total memory used for local state coloring: %.1fMB", mem3);
     } else {
+        max_load = (Strat_SBFS & strategy[0] ? max_level_size : lb_max_load(global->lb));
         statistics_t state_stats; statistics_init (&state_stats);
         statistics_t trans_stats; statistics_init (&trans_stats);
         for (size_t i = 0; i< W; i++) {
@@ -1086,6 +1130,7 @@ print_statistics (counter_t *ar_reach, counter_t *ar_red, rt_timer_t timer,
         Warning (info, "Lattice map: %.1fMB (~%.1fMB paged-in) overhead: %.2f%%, allocated: %zu", mem3, lm, redundancy, alloc);
     }
 
+    mem1 = ((double)(s * max_load)) / (1 << 20);
     Warning (info, "Queue width: %zuB, total height: %zu, memory: %.2fMB",
              s, max_load, mem1);
     mem2 = ((double)(1UL << (dbs_size)) / (1<<20)) * SLOT_SIZE * el_size;
@@ -2477,6 +2522,119 @@ sbfs (wctx_t *ctx)
 }
 
 /**
+ * DFS-FIFO for non-progress detection
+ */
+
+static void
+dfs_fifo_handle (void *arg, state_info_t *successor, transition_info_t *ti,
+                 int seen)
+{
+    wctx_t             *ctx = (wctx_t *) arg;
+    if (GBbuchiIsAccepting(ctx->model, get_state(successor->ref, ctx))) {
+        if (!seen || (all_red && !global_has_color(successor->ref, GRED, 0))) {
+            raw_data_t stack_loc = dfs_stack_push (ctx->out_stack, NULL);
+            state_info_serialize (successor, stack_loc);
+            ctx->red.visited += !seen;
+        }
+    } else {
+        raw_data_t stack_loc = dfs_stack_push (ctx->stack, NULL);
+        state_info_serialize (successor, stack_loc);
+        ctx->counters.visited++;
+    }
+    ctx->counters.trans++;
+    (void) ti;
+}
+
+size_t
+split_dfs_fifo (void *arg_src, void *arg_tgt, size_t handoff)
+{
+    wctx_t             *source = arg_src;
+    wctx_t             *target = arg_tgt;
+    size_t              in_size = dfs_stack_size (source->in_stack);
+    if (in_size == 1) {
+        dfs_stack_push (target->in_stack, dfs_stack_top(source->in_stack));
+        return 1;
+    }
+    handoff = min (in_size >> 1, handoff);
+    for (size_t i = 0; i < handoff; i++) {
+        state_data_t        one = dfs_stack_pop (source->in_stack);
+        HREassert (NULL != one);
+        dfs_stack_push (target->in_stack, one);
+    }
+    source->counters.splits++;
+    source->counters.transfer += handoff;
+    return handoff;
+}
+
+void
+dfs_fifo_dfs (wctx_t *ctx, ref_t seed)
+{
+    while (!lb_is_stopped(global->lb)) {
+        raw_data_t          state_data = dfs_stack_top (ctx->stack);
+        if (NULL != state_data) {
+            state_info_deserialize (&ctx->state, state_data, ctx->store);
+            if (ecd_has_state(ctx->cyan, &ctx->state)) {
+                ndfs_report_cycle (ctx, &ctx->state);
+            } else if (!global_has_color(ctx->state.ref, GRED, 0)) {
+                if (ctx->state.ref != seed && ctx->state.ref != ctx->seed)
+                    ecd_add_state (ctx->cyan, &ctx->state, 0);
+                dfs_stack_enter (ctx->stack);
+                increase_level (&ctx->counters);
+                permute_trans (ctx->permute, &ctx->state, dfs_fifo_handle, ctx);
+                maybe_report (&ctx->counters, "");
+                ctx->counters.explored++;
+            } else {
+                dfs_stack_pop (ctx->stack);
+            }
+        } else {
+            if (dfs_stack_nframes(ctx->stack) == 0)
+                break;
+            dfs_stack_leave (ctx->stack);
+            state_data = dfs_stack_pop (ctx->stack);
+            state_info_deserialize_cheap (&ctx->state, state_data);
+            ctx->counters.level_cur--;
+            if (ctx->state.ref != seed && ctx->state.ref != ctx->seed)
+                ecd_remove_state (ctx->cyan, &ctx->state);
+            global_try_color (ctx->state.ref, GRED, 0);
+        }
+        // load balance the FIFO queue (this is a synchronizing affair)
+        lb_balance (global->lb, ctx->id, dfs_stack_frame_size(ctx->in_stack), split_dfs_fifo);
+    }
+    HREassert (lb_is_stopped(global->lb) || fset_count(ctx->cyan) == 0,
+               "DFS stack not empty, size: %zu", fset_count(ctx->cyan));
+}
+
+void
+dfs_fifo (wctx_t *ctx)
+{
+    size_t              total = 0;
+    size_t              out_size, size;
+    do {
+        while (lb_balance (global->lb, ctx->id, dfs_stack_frame_size(ctx->in_stack), split_dfs_fifo)) {
+            raw_data_t          state_data = dfs_stack_top (ctx->in_stack);
+            if (NULL != state_data) {
+                dfs_stack_push (ctx->stack, state_data);
+                state_info_deserialize_cheap (&ctx->state, state_data);
+                if (all_red && global_has_color(ctx->state.ref, GRED, 0))
+                    continue;
+                dfs_fifo_dfs (ctx, ctx->state.ref);
+                dfs_stack_pop (ctx->in_stack);
+            }
+        }
+        size = dfs_stack_frame_size (ctx->out_stack);
+        HREreduce (HREglobal(), 1, &size, &out_size, SizeT, Sum);
+        lb_reinit (global->lb, ctx->id);
+        increase_level (&ctx->red);
+        if (ctx->id == 0) {
+            if (out_size > max_level_size) max_level_size = out_size;
+            total += out_size;
+            Warning(infoLong, "DFS-FIFO level %zu has %zu states %zu total", ctx->red.level_cur, out_size, total);
+        }
+        swap (ctx->out_stack, ctx->in_stack);
+    } while (out_size > 0 && !lb_is_stopped(global->lb));
+}
+
+/**
  * OWCTY-MAP Barnat et al.
  *
  * Input-output diagram of OWCTY procedures:
@@ -2557,38 +2715,6 @@ owcty_pre_try_reset (ref_t ref, uint32_t reset_val, int bit, bool check_zero)
         pre.count = reset_val;
     } while (!owcty_pre_cas(ref, orig, pre));
     return true;
-}
-
-static inline uint32_t
-ecd_get_state (fset_t *table, state_info_t *s)
-{
-    hash32_t            hash = ref_hash (s->ref);
-    uint32_t           *p;
-    int res = fset_find (table, &hash, &s->ref, (void **)&p, false);
-    HREassert (res != FSET_FULL, "ECD table full");
-    return res ? *p : UINT32_MAX;
-}
-
-static inline void
-ecd_add_state (fset_t *table, state_info_t *s, size_t level)
-{
-    //Warning (info, "Adding %zu", s->ref);
-    HREassert (level < UINT32_MAX, "Stack length overflow for ECD");
-    uint32_t            num = level;
-    uint32_t           *num2 = &num;
-    hash32_t            hash = ref_hash (s->ref);
-    int res = fset_find (table, &hash, &s->ref, (void **)&num2, true);
-    HREassert (res != FSET_FULL, "ECD table full");
-    HREassert (!res, "Element %zu already in ECD table", s->ref);
-}
-
-static inline void
-ecd_remove_state (fset_t *table, state_info_t *s)
-{
-    //Warning (info, "Removing %zu", s->ref);
-    hash32_t            hash = ref_hash (s->ref);
-    int success = fset_delete (table, &hash, &s->ref);
-    HREassert (success, "Could not remove key from set");
 }
 
 /**
@@ -3432,9 +3558,15 @@ explore (wctx_t *ctx)
     state_data_t            initial = RTmalloc (sizeof(int[N]));
     GBgetInitialState (ctx->model, initial);
     state_info_initialize (&ctx->initial, initial, &ti, &ctx->state, ctx);
-    if ( Strat_OWCTY & strategy[0] ) {
+    if ( Strat_DFSFIFO & strategy[0] ) {
+        raw_data_t stack_loc = dfs_stack_push (ctx->in_stack, NULL);
+        state_info_serialize (&ctx->initial, stack_loc);
+        int acc = GBbuchiIsAccepting (ctx->model, initial);
+        ctx->seed = acc ? (ref_t)-1 : ctx->initial.ref;
+        ctx->red.visited += acc;
+    } else if ( Strat_OWCTY & strategy[0] ) {
         if (0 == ctx->id) owcty_initialize_handle (ctx, &ctx->initial, &ti, 0);
-    } else if ( Strat_LTL & strategy[0] ) {
+    } else if ( ~Strat_DFSFIFO & Strat_LTL & strategy[0] ) {
         if ( Strat_TA & strategy[0] )
             ta_cndfs_handle_blue (ctx, &ctx->initial, &ti, 0);
         else
@@ -3464,6 +3596,7 @@ explore (wctx_t *ctx)
     case Strat_CNDFS:
     case Strat_ENDFS:   endfs_blue (ctx); break;
     case Strat_OWCTY:   owcty (ctx); break;
+    case Strat_DFSFIFO: dfs_fifo (ctx); break;
     default: Abort ("Strategy is unknown or incompatible with the current front-end (%d).", strategy[0]);
     }
     RTstopTimer (ctx->timer);
