@@ -283,7 +283,7 @@ PromLoadGreyboxModel(model_t model, const char *filename)
     }
 
     // edge label types
-    int action_type, statement_type;
+    int action_type = -1, statement_type;
     if (prom_get_edge_count && prom_get_edge_count() > 0) {
         lts_type_set_edge_label_count (ltstype, 2);
         action_type = lts_type_add_type(ltstype, LTSMIN_EDGE_TYPE_ACTION_PREFIX, NULL);
@@ -327,6 +327,7 @@ PromLoadGreyboxModel(model_t model, const char *filename)
 
     // add edge labels
     if (prom_get_edge_count && prom_get_edge_count() > 0) {
+        HREassert (action_type != -1);
         // All actions are assert statements. We do not export their values.
         for (int i = 0; i < prom_get_edge_count(); i++) {
            chunk c = chunk_str((char *)prom_get_edge_name(i));
@@ -370,11 +371,17 @@ PromLoadGreyboxModel(model_t model, const char *filename)
     GBsetStateLabelLong(model, (get_label_method_t)prom_get_label);
     GBsetStateLabelsAll(model, (get_label_all_method_t)prom_get_labels_all);
 
-    // check for property: (label order: guard,..,guard,accept,end,progress,etc)
+    // check for properties (label order: guard,..,guard,accept,end,progress,etc)
     for(int i = nguards; i < sl_size; i++) {
         const char *name = prom_get_label_name (i);
         if(strcmp("accept_buchi", name) == 0) {
-            GBsetAcceptingStateLabelIndex (model, nguards);
+            GBsetAcceptingStateLabelIndex (model, i);
+        }
+        if(strcmp("progress", name) == 0) {
+            GBsetProgressStateLabelIndex (model, i);
+        }
+        if(strcmp("end_valid", name) == 0) {
+            GBsetValidEndStateLabelIndex (model, i);
         }
     }
 
