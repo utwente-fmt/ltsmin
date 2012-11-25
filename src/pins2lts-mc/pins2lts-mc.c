@@ -2616,9 +2616,8 @@ dfs_fifo (wctx_t *ctx)
             if (NULL != state_data) {
                 dfs_stack_push (ctx->stack, state_data);
                 state_info_deserialize_cheap (&ctx->state, state_data);
-                if (all_red && global_has_color(ctx->state.ref, GRED, 0))
-                    continue;
-                dfs_fifo_dfs (ctx, ctx->state.ref);
+                if (all_red || !global_has_color(ctx->state.ref, GRED, 0))
+                    dfs_fifo_dfs (ctx, ctx->state.ref);
                 dfs_stack_pop (ctx->in_stack);
             }
         }

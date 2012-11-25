@@ -299,13 +299,13 @@ void GBinitModelDefaults (model_t *p_model, model_t default_src)
     if (model->gnds_info == NULL)
         GBsetGuardNDSInfo(model, GBgetGuardNDSInfo (default_src));
 
-    if (GBgetAcceptingStateLabelIndex (default_src) < 0)
+    if (GBgetAcceptingStateLabelIndex (default_src) >= 0)
         GBsetAcceptingStateLabelIndex(model, GBgetAcceptingStateLabelIndex (default_src));
 
-    if (GBgetProgressStateLabelIndex (default_src) < 0)
+    if (GBgetProgressStateLabelIndex (default_src) >= 0)
         GBsetProgressStateLabelIndex(model, GBgetProgressStateLabelIndex (default_src));
 
-    if (GBgetValidEndStateLabelIndex (default_src) < 0)
+    if (GBgetValidEndStateLabelIndex (default_src) >= 0)
         GBsetValidEndStateLabelIndex(model, GBgetValidEndStateLabelIndex (default_src));
 
     if (model->s0 == NULL) {
