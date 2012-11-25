@@ -8,8 +8,8 @@
 #include <util-lib/chunk_support.h>
 #include <util-lib/dynamic-array.h>
 
-ltsmin_expr_t
-pred_parse_file(const char *file, ltsmin_parse_env_t env, lts_type_t ltstype)
+static stream_t
+read_formula (const char *file)
 {
     FILE *in=fopen( file, "r" );
     stream_t stream = NULL;
@@ -19,23 +19,44 @@ pred_parse_file(const char *file, ltsmin_parse_env_t env, lts_type_t ltstype)
     } else {
         stream = stream_read_mem((void*)file,strlen(file),&used);
     }
-    int N;
-    N=lts_type_get_state_length(ltstype);
-    for(int i=0;i<N;i++){
+    return stream;
+}
+
+static void
+fill_env (ltsmin_parse_env_t env, lts_type_t ltstype)
+{
+    int N = lts_type_get_state_length(ltstype);
+    for (int i = 0; i < N; i++) {
         char*name=lts_type_get_state_name(ltstype,i);
-        if (name) LTSminStateVarIndex(env,name);
+        HREassert (name);
+        int idx = LTSminStateVarIndex(env,name);
+        HREassert (i == idx);
     }
-    N=lts_type_get_state_label_count(ltstype);
-    for(int i=0;i<N;i++){
+
+    int L = lts_type_get_state_label_count(ltstype);
+    for (int i = 0; i < L; i++) {
         char*name=lts_type_get_state_label_name(ltstype,i);
-        // consider state label an state variable
-        if (name) LTSminStateVarIndex(env,name);
+        HREassert (name);
+        // consider state label an state variable with idx >= N
+        int idx = LTSminStateVarIndex(env,name);
+        HREassert (idx == N + i);
     }
-    N=lts_type_get_edge_label_count(ltstype);
-    for(int i=0;i<N;i++){
+
+    int E=lts_type_get_edge_label_count(ltstype);
+    for (int i = 0; i < E; i++) {
         char*name=lts_type_get_edge_label_name(ltstype,i);
-        if (name) LTSminEdgeVarIndex(env,name);
+        HREassert (name);
+        int idx = LTSminEdgeVarIndex(env,name);
+        HREassert (i == idx);
     }
+}
+
+ltsmin_expr_t
+pred_parse_file(const char *file, ltsmin_parse_env_t env, lts_type_t ltstype)
+{
+    stream_t stream = read_formula (file);
+
+    fill_env (env, ltstype);
 
     LTSminConstant      (env, PRED_FALSE,        "false");
     LTSminConstant      (env, PRED_TRUE,         "true");
@@ -136,31 +157,9 @@ ltl_tree_walker(ltsmin_expr_t in)
 ltsmin_expr_t
 ltl_parse_file(const char *file, ltsmin_parse_env_t env, lts_type_t ltstype)
 {
-    FILE *in=fopen( file, "r" );
-    stream_t stream = NULL;
-    size_t used;
-    if (in) {
-        stream = stream_input(in);
-    } else {
-        stream = stream_read_mem((void*)file,strlen(file),&used);
-    }
-    int N;
-    N=lts_type_get_state_length(ltstype);
-    for(int i=0;i<N;i++){
-        char*name=lts_type_get_state_name(ltstype,i);
-        if (name) LTSminStateVarIndex(env,name);
-    }
-    N=lts_type_get_state_label_count(ltstype);
-    for(int i=0;i<N;i++){
-        char*name=lts_type_get_state_label_name(ltstype,i);
-        // consider state label an state variable
-        if (name) LTSminStateVarIndex(env,name);
-    }
-    N=lts_type_get_edge_label_count(ltstype);
-    for(int i=0;i<N;i++){
-        char*name=lts_type_get_edge_label_name(ltstype,i);
-        if (name) LTSminEdgeVarIndex(env,name);
-    }
+    stream_t stream = read_formula (file);
+
+    fill_env (env, ltstype);
 
     LTSminConstant      (env, LTL_FALSE,        "false");
     LTSminConstant      (env, LTL_TRUE,         "true");
@@ -212,30 +211,9 @@ ltl_parse_file(const char *file, ltsmin_parse_env_t env, lts_type_t ltstype)
 ltsmin_expr_t
 ctl_parse_file(const char *file, ltsmin_parse_env_t env, lts_type_t ltstype)
 {
-    FILE *in=fopen( file, "r" );
-    stream_t stream = NULL;
-    size_t used;
-    if (in) {
-        stream = stream_input(in);
-    } else {
-        stream = stream_read_mem((void*)file,strlen(file),&used);
-    }
-    int N;
-    N=lts_type_get_state_length(ltstype);
-    for(int i=0;i<N;i++){
-        char*name=lts_type_get_state_name(ltstype,i);
-        if(name) LTSminStateVarIndex(env,name);
-    }
-    N=lts_type_get_state_label_count(ltstype);
-    for(int i=0;i<N;i++){
-        char*name=lts_type_get_state_label_name(ltstype,i);
-        LTSminStateVarIndex(env,name);
-    }
-    N=lts_type_get_edge_label_count(ltstype);
-    for(int i=0;i<N;i++){
-        char*name=lts_type_get_edge_label_name(ltstype,i);
-        LTSminEdgeVarIndex(env,name);
-    }
+    stream_t stream = read_formula (file);
+
+    fill_env (env, ltstype);
 
     LTSminConstant      (env, CTL_FALSE,        "false");
     LTSminConstant      (env, CTL_TRUE,         "true");
@@ -277,31 +255,9 @@ ctl_parse_file(const char *file, ltsmin_parse_env_t env, lts_type_t ltstype)
 ltsmin_expr_t
 mu_parse_file(const char *file, ltsmin_parse_env_t env, lts_type_t ltstype)
 {
-    FILE *in=fopen( file, "r" );
-    stream_t stream = NULL;
-    size_t used;
-    if (in) {
-        stream = stream_input(in);
-    } else {
-        stream = stream_read_mem((void*)file,strlen(file),&used);
-    }
-    int N;
-    N=lts_type_get_state_length(ltstype);
-    for(int i=0;i<N;i++){
-        char*name=lts_type_get_state_name(ltstype,i);
-        if (name) LTSminStateVarIndex(env,name);
-    }
-    N=lts_type_get_state_label_count(ltstype);
-    for(int i=0;i<N;i++){
-        char*name=lts_type_get_state_label_name(ltstype,i);
-        // consider state label an state variable
-        if (name) LTSminStateVarIndex(env,name);
-    }
-    N=lts_type_get_edge_label_count(ltstype);
-    for(int i=0;i<N;i++){
-        char*name=lts_type_get_edge_label_name(ltstype,i);
-        if (name) LTSminEdgeVarIndex(env,name);
-    }
+    stream_t stream = read_formula (file);
+
+    fill_env (env, ltstype);
 
     LTSminConstant      (env, MU_FALSE,        "false");
     LTSminConstant      (env, MU_TRUE,         "true");
