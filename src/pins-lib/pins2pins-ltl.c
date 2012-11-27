@@ -577,9 +577,9 @@ GBaddLTL (model_t model, const char *ltl_file, pins_ltl_type_t type, model_t por
     // mark visible groups in POR layer: all groups that write to a variable
     // that influences the buchi's predicates.
     if (por_model) {
-        int *visibility = RTmallocZero( sizeof(int[new_ngroups]) );
+        int *visibility = RTmallocZero( sizeof(int[groups]) );
         for(int k=0; k < ba->predicate_count; k++)
-            mark_visible(ba->predicates[k], p_new_dm_w, visibility);
+            mark_visible(ba->predicates[k], p_dm_w, visibility);
         GBsetPorVisibility (por_model, visibility);
     }
 
