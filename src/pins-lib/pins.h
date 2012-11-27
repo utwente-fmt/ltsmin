@@ -651,12 +651,6 @@ extern model_t GBregroup(model_t model, const char *group_spec);
 int GBhaveMucalc();
 
 /**
- * \brief Sets the number of subformulae of the mu-calculus property that is being checked.
- * Needed for the parity game solver.
- */
-void GBsetMucalcNodeCount(model_t model, int nodecount);
-
-/**
  * \brief Gets the number of subformulae of the mu-calculus property that is being checked.
  * Needed for the parity game solver.
  */

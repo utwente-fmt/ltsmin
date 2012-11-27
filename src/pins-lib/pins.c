@@ -5,6 +5,7 @@
 #include <hre/user.h>
 #include <ltsmin-lib/ltsmin-standard.h>
 #include <pins-lib/pins.h>
+#include <pins-lib/pins2pins-mucalc.h>
 #include <util-lib/treedbs.h>
 
 struct grey_box_model {
@@ -43,7 +44,6 @@ struct grey_box_model {
     chunkatint_t chunkatint;
 	get_count_t get_count;
 	void** map;
-	int mucalc_node_count;
 };
 
 struct nested_cb {
@@ -239,7 +239,6 @@ model_t GBcreateBase(){
 	model->chunk2int=NULL;
 	model->map=NULL;
 	model->get_count=NULL;
-	model->mucalc_node_count=0;
 	return model;
 }
 
@@ -803,16 +802,12 @@ int GBhaveMucalc() {
     return (mucalc_file) ? 1 : 0;
 }
 
-void GBsetMucalcNodeCount(model_t model, int nodecount)
-{
-    Print(infoLong, "GBsetMucalcNodeCount: %d", nodecount);
-    model->mucalc_node_count = nodecount;
-}
-
-int GBgetMucalcNodeCount(model_t model)
-{
-    Print(infoLong, "GBgetMucalcNodeCount: %d", model->mucalc_node_count);
-    return model->mucalc_node_count;
+int GBgetMucalcNodeCount(model_t model) {
+    // FIXME: this assumes that the mu-calc layer is the topmost layer!
+    // (will break with caching option, for instance)
+    mucalc_context_t *ctx = (mucalc_context_t*)GBgetContext(model);
+    Print(infoLong, "GBgetMucalcNodeCount: %d", ctx->groupinfo.node_count);
+    return ctx->groupinfo.node_count;
 }
 
 

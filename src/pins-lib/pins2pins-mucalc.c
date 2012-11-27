@@ -9,47 +9,12 @@
 #include <hre-io/user.h>
 #include <mc-lib/atomics.h>
 #include <pins-lib/pins.h>
+#include <pins-lib/pins2pins-mucalc.h>
 #include <ltsmin-lib/mucalc-grammar.h>
 #include <ltsmin-lib/mucalc-parse-env.h>
 #include <ltsmin-lib/mucalc-syntax.h>
 #include <ltsmin-lib/mucalc-lexer.h>
 #include <pins-lib/pg-types.h>
-
-
-typedef struct mucalc_node {
-    mucalc_expr_t       expression;
-    pg_player_enum_t    player;
-    int                 priority;
-} mucalc_node_t;
-
-
-typedef struct mucalc_group_entry {
-    mucalc_node_t       node;
-    int                 parent_group;
-} mucalc_group_entry_t;
-
-
-typedef struct mucalc_groupinfo {
-    int                     group_count;
-    mucalc_group_entry_t   *entries;
-    int                     node_count;
-    mucalc_node_t          *nodes;
-    int                     variable_count;
-    int                    *fixpoint_nodes; // mapping from variable index to node number
-    int                     initial_node;
-} mucalc_groupinfo_t;
-
-
-typedef struct mucalc_context {
-    model_t         parent;
-    int             action_label_index;
-    int             action_label_type_no;
-    mucalc_parse_env_t env;
-    int             mu_idx;
-    int             len;
-    int             groups;
-    mucalc_groupinfo_t groupinfo;
-} mucalc_context_t;
 
 
 typedef struct cb_context {
@@ -769,8 +734,6 @@ GBaddMucalc (model_t model, const char *mucalc_file)
 
     // Compute transition groups
     ctx->groupinfo = mucalc_compute_groupinfo(env, parent_groups);
-
-    GBsetMucalcNodeCount(_model, ctx->groupinfo.node_count);
 
     // Compute dependency matrix, add mucalc node
     matrix_t *_p_dm = (matrix_t*) RTmalloc(sizeof(matrix_t));
