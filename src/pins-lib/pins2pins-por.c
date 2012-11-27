@@ -696,6 +696,11 @@ por_beam_search_ltl_all (model_t self, int *src, TransitionCB cb, void *user_con
 model_t
 GBaddPOR (model_t model, int por_check_ltl)
 {
+    if (GBgetAcceptingStateLabelIndex(model) != -1) {
+        Warning (info, "POR layer: model may be a buchi automaton.");
+        Warning (info, "POR layer: use LTSmin's own LTL layer (--ltl) for correct POR.");
+    }
+
     Warning(info,"Initializing partial order reduction layer..");
 
     // check support for guards, fail without
