@@ -12,14 +12,12 @@ static stream_t
 read_formula (const char *file)
 {
     FILE *in=fopen( file, "r" );
-    stream_t stream = NULL;
-    size_t used;
+    size_t *used = RTmalloc(sizeof(size_t));
     if (in) {
-        stream = stream_input(in);
+        return stream_input(in);
     } else {
-        stream = stream_read_mem((void*)file,strlen(file),&used);
+        return stream_read_mem((void*)file, strlen(file), used);
     }
-    return stream;
 }
 
 static void
