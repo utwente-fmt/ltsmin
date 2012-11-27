@@ -2257,7 +2257,7 @@ rec_ndfs_call (wctx_t *ctx, ref_t state)
      year = {2011}
    }
  */
-size_t
+ssize_t
 split_bfs (void *arg_src, void *arg_tgt, size_t handoff)
 {
     wctx_t             *source = arg_src;
@@ -2279,7 +2279,7 @@ split_bfs (void *arg_src, void *arg_tgt, size_t handoff)
     return handoff;
 }
 
-size_t
+ssize_t
 split_sbfs (void *arg_src, void *arg_tgt, size_t handoff)
 {
     wctx_t             *source = arg_src;
@@ -2296,7 +2296,7 @@ split_sbfs (void *arg_src, void *arg_tgt, size_t handoff)
     return handoff;
 }
 
-size_t
+ssize_t
 split_dfs (void *arg_src, void *arg_tgt, size_t handoff)
 {
     wctx_t             *source = arg_src;
@@ -2545,7 +2545,7 @@ dfs_fifo_handle (void *arg, state_info_t *successor, transition_info_t *ti,
     (void) ti;
 }
 
-size_t
+ssize_t
 split_dfs_fifo (void *arg_src, void *arg_tgt, size_t handoff)
 {
     wctx_t             *source = arg_src;
@@ -2553,8 +2553,13 @@ split_dfs_fifo (void *arg_src, void *arg_tgt, size_t handoff)
     size_t              in_size = dfs_stack_size (source->in_stack);
     if (in_size == 1) {
         dfs_stack_push (target->in_stack, dfs_stack_top(source->in_stack));
-        return 1;
+        return -1;
+    } else if (in_size == 0) {
+        return 0;
     }
+    // secure current state
+    dfs_stack_push (source->stack, dfs_stack_pop(source->in_stack));
+
     handoff = min (in_size >> 1, handoff);
     for (size_t i = 0; i < handoff; i++) {
         state_data_t        one = dfs_stack_pop (source->in_stack);
@@ -2563,6 +2568,10 @@ split_dfs_fifo (void *arg_src, void *arg_tgt, size_t handoff)
     }
     source->counters.splits++;
     source->counters.transfer += handoff;
+
+    // push back current state
+    dfs_stack_push (source->in_stack, dfs_stack_pop(source->stack));
+
     return handoff;
 }
 
@@ -2771,7 +2780,7 @@ owcty_ecd (wctx_t *ctx, state_info_t *successor)
     }
 }
 
-static size_t
+static ssize_t
 owcty_split (void *arg_src, void *arg_tgt, size_t handoff)
 {
     wctx_t             *source = arg_src;

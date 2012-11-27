@@ -129,8 +129,11 @@ handoff (lb_t *lb, int id, size_t requests, size_t *my_load,
             HREassert (get_idle (lb, oid), "Thread reactiveated before handoff complete");
             size_t handoff = *my_load >> 1;
             handoff = handoff < lb->max_handoff ? handoff : lb->max_handoff;
-            size_t load = split (lb->local[id]->arg, lb->local[oid]->arg, handoff);
-            *my_load -= load;
+            ssize_t load = split (lb->local[id]->arg, lb->local[oid]->arg, handoff);
+            if (load < 0) // copied load
+                load = -load;
+            else
+                *my_load -= load;
             atomic_write (&lb->local[oid]->received, load);
         }
         set_idle (lb, oid, 0);
