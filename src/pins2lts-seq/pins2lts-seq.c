@@ -101,8 +101,8 @@ static struct {
     .strategy       = Strat_DFS,
     .arg_state_db   = "tree",
     .state_db       = DB_TreeDBS,
-    .arg_proviso    = "closedset",
-    .proviso        = LTLP_ClosedSet,
+    .arg_proviso    = "stack",
+    .proviso        = LTLP_Stack,
 };
 
 static si_map_entry strategies[] = {
