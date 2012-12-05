@@ -28,6 +28,7 @@ libmucalc_la_SOURCES  =
 libmucalc_la_SOURCES += mucalc-parse-env.h
 libmucalc_la_SOURCES += mucalc-syntax.c mucalc-syntax.h
 libmucalc_la_SOURCES += mucalc-lexer.c mucalc-lexer.h
+libmucalc_la_SOURCES += mucalc-lexer.l
 libmucalc_la_SOURCES += mucalc-grammar.c mucalc-grammar.h
 
 # lemon parser
