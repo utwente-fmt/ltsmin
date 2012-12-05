@@ -269,7 +269,7 @@ static void* bs_init_context(model_t model)
  * For each state, this function sets up the current guard values etc
  * This setup is then reused by the analysis function
  */
-static int bs_setup(model_t model, por_context* pctx, int* src)
+static void bs_setup(model_t model, por_context* pctx, int* src)
 {
     // init globals
     int n_guards = pctx->nguards;
@@ -284,11 +284,6 @@ static int bs_setup(model_t model, por_context* pctx, int* src)
     // fill guard status, request all guard values,
     GBgetStateLabelsGroup(model, GB_SL_GUARDS, src, pctx->guard_status);
 
-    // check group visibility set
-    if (pctx->group_visibility == NULL) {
-        pctx->group_visibility = GBgetPorVisibility(model);
-    }
-
     // fill group status
     for(int i=0; i<n; i++) {
         guard_t* gt = GBgetGuard(model, i);
@@ -300,6 +295,7 @@ static int bs_setup(model_t model, por_context* pctx, int* src)
             }
         }
     }
+
     // fill group score
     for(int i=0; i<n; i++) {
         if (pctx->group_status[i] & GS_DISABLED) {
@@ -349,8 +345,6 @@ static int bs_setup(model_t model, por_context* pctx, int* src)
     }
     // reset beam
     pctx->beam_used = beam_idx;
-
-    return 0;
 }
 
 /**
@@ -859,10 +853,6 @@ GBaddPOR (model_t model, int por_check_ltl)
     GBsetNextStateLong  (pormodel, por_long);
     GBsetNextStateShort (pormodel, por_short);
 
-    // reserve memory for group visibility, will be provided/set by ltl layer again
-    ctx->group_visibility = RTmallocZero( groups * sizeof(int) );
-    GBsetPorVisibility  (pormodel, ctx->group_visibility);
-
     // what proviso do we need? none (deadlock) or ltl?
     if (por_check_ltl) {
         // setup ltl search
@@ -873,6 +863,14 @@ GBaddPOR (model_t model, int por_check_ltl)
     }
 
     GBinitModelDefaults (&pormodel, model);
+
+    if (GBgetPorGroupVisibility(pormodel) == NULL) {
+        // reserve memory for group visibility, will be provided by ltl layer or tool
+        ctx->group_visibility = RTmallocZero( groups * sizeof(int) );
+        GBsetPorGroupVisibility  (pormodel, ctx->group_visibility);
+    } else {
+        ctx->group_visibility = GBgetPorGroupVisibility(pormodel);
+    }
 
     int                 s0[len];
     GBgetInitialState (model, s0);

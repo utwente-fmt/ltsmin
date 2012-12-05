@@ -61,6 +61,7 @@ void        (*prom_get_labels_all)  (void *, int *src, int* labels);
 const int*  (*prom_get_label_may_be_coenabled_matrix)(int g);
 const int*  (*prom_get_label_nes_matrix)(int g); // could be optional for POR
 const int*  (*prom_get_label_nds_matrix)(int g); // could be optional for POR
+const int*  (*prom_get_label_visiblity_matrix)(int g); //
 
 static void
 prom_popt (poptContext con,
@@ -216,6 +217,8 @@ PromLoadDynamicLib(model_t model, const char *filename)
         RTtrydlsym( dlHandle, "spinja_get_label_nes_matrix" );
     prom_get_label_nds_matrix = (const int*(*)(int))
         RTtrydlsym( dlHandle, "spinja_get_label_nds_matrix" );
+    prom_get_label_visiblity_matrix = (const int*(*)(int))
+        RTtrydlsym( dlHandle, "spinja_get_label_visiblity_matrix" );
 
     (void)model;
 }
@@ -237,6 +240,7 @@ PromLoadGreyboxModel(model_t model, const char *filename)
     matrix_t *dm_info = RTmalloc (sizeof *dm_info);
     matrix_t *dm_read_info = RTmalloc(sizeof(matrix_t));
     matrix_t *dm_write_info = RTmalloc(sizeof(matrix_t));
+    matrix_t *dm_visibility_info = RTmalloc(sizeof(matrix_t));
     matrix_t *sl_info = RTmalloc (sizeof *sl_info);
 
     // assume sequential use (preLoader may not have been called):
@@ -390,6 +394,17 @@ PromLoadGreyboxModel(model_t model, const char *filename)
     GBsetDMInfo(model, dm_info);
     GBsetDMInfoRead(model, dm_read_info);
     GBsetDMInfoWrite(model, dm_write_info);
+
+    dm_create(dm_visibility_info, sl_size, ngroups);
+    for (int i=0; i < dm_nrows(dm_visibility_info); i++) {
+        const int *visible = prom_get_label_visiblity_matrix(i);
+        for(int j=0; j<dm_ncols(dm_visibility_info); j++) {
+            if (visible[j]) {
+                dm_set(dm_visibility_info, i, j);
+            }
+        }
+    }
+    GBsetStateLabelVisibilityInfo(model, dm_visibility_info);
 
     // initialize state label dependency matrix
     dm_create(sl_info, sl_size, state_length);

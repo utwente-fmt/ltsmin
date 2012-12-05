@@ -196,19 +196,23 @@ int lts_type_get_state_length(lts_type_t  t){
 }
 
 void lts_type_set_state_name(lts_type_t  t,int idx,const char* name){
-	t->state_name[idx]=strdup(name);
+    HREassert (idx < t->state_length);
+    t->state_name[idx]=strdup(name);
 }
 
 char* lts_type_get_state_name(lts_type_t  t,int idx){
-	return t->state_name[idx];
+    HREassert (idx < t->state_length);
+    return t->state_name[idx];
 }
 
 void lts_type_set_state_type(lts_type_t  t,int idx,const char* name){
-	t->state_type[idx]=SIput(t->type_db,name);
+    HREassert (idx < t->state_length);
+    t->state_type[idx]=SIput(t->type_db,name);
 }
 
 char* lts_type_get_state_type(lts_type_t  t,int idx){
-	if(t->state_type[idx]==SI_INDEX_FAILED) {
+    HREassert (idx < t->state_length);
+    if(t->state_type[idx]==SI_INDEX_FAILED) {
 		return NULL;
 	} else {
 		return SIget(t->type_db,t->state_type[idx]);
@@ -216,10 +220,12 @@ char* lts_type_get_state_type(lts_type_t  t,int idx){
 }
 
 void lts_type_set_state_typeno(lts_type_t  t,int idx,int typeno){
+    HREassert (idx < t->state_length);
 	t->state_type[idx]=typeno;
 }
 
 int lts_type_get_state_typeno(lts_type_t  t,int idx){
+    HREassert (idx < t->state_length);
 	return t->state_type[idx];
 }
 
@@ -232,18 +238,23 @@ int lts_type_get_state_label_count(lts_type_t  t){
 	return t->state_label_count;
 }
 void lts_type_set_state_label_name(lts_type_t  t,int label,const char*name){
+    HREassert (label < t->state_label_count);
 	t->state_label_name[label]=strdup(name);
 }
 void lts_type_set_state_label_type(lts_type_t  t,int label,const char*name){
-	t->state_label_type[label]=SIput(t->type_db,name);
+    HREassert (label < t->state_label_count);
+    t->state_label_type[label]=SIput(t->type_db,name);
 }
 void lts_type_set_state_label_typeno(lts_type_t  t,int label,int typeno){
+    HREassert (label < t->state_label_count);
 	t->state_label_type[label]=typeno;
 }
 char* lts_type_get_state_label_name(lts_type_t  t,int label){
+    HREassert (label < t->state_label_count);
 	return t->state_label_name[label];
 }
 char* lts_type_get_state_label_type(lts_type_t  t,int label){
+    HREassert (label < t->state_label_count);
 	if(t->state_label_type[label]==SI_INDEX_FAILED) {
 		return NULL;
 	} else {
@@ -251,8 +262,24 @@ char* lts_type_get_state_label_type(lts_type_t  t,int label){
 	}
 }
 int lts_type_get_state_label_typeno(lts_type_t  t,int label){
+    HREassert (label < t->state_label_count);
 	return t->state_label_type[label];
 }
+int lts_type_find_state_label_prefix(lts_type_t  t, const char *prefix) {
+    for (int i = 0; i < lts_type_get_state_label_count(t); i++) {
+        char *name = lts_type_get_state_label_name(t, i);
+        if (strncmp(name, prefix, strlen(prefix)) == 0) return i;
+    }
+    return -1;
+}
+int lts_type_find_state_label(lts_type_t  t, const char *name) {
+    for (int i = 0; i < lts_type_get_state_label_count(t); i++) {
+        char *ename = lts_type_get_state_label_name(t, i);
+        if (strcmp(name, ename) == 0) return i;
+    }
+    return -1;
+}
+
 
 
 void lts_type_set_edge_label_count(lts_type_t  t,int count){
@@ -264,28 +291,47 @@ int lts_type_get_edge_label_count(lts_type_t  t){
 	return t->edge_label_count;
 }
 void lts_type_set_edge_label_name(lts_type_t  t,int label,const char*name){
+    HREassert (label < t->edge_label_count);
 	t->edge_label_name[label]=strdup(name);
 }
 void lts_type_set_edge_label_type(lts_type_t  t,int label,const char*name){
-	t->edge_label_type[label]=SIput(t->type_db,name);
+    HREassert (label < t->edge_label_count);
+    t->edge_label_type[label]=SIput(t->type_db,name);
 }
 void lts_type_set_edge_label_typeno(lts_type_t  t,int label,int typeno){
+    HREassert (label < t->edge_label_count);
 	t->edge_label_type[label]=typeno;
 }
 char* lts_type_get_edge_label_name(lts_type_t  t,int label){
-	return t->edge_label_name[label];
+    HREassert (label < t->edge_label_count);
+    return t->edge_label_name[label];
 }
 char* lts_type_get_edge_label_type(lts_type_t  t,int label){
-	if(t->edge_label_type[label]==SI_INDEX_FAILED) {
+    HREassert (label < t->edge_label_count);
+    if(t->edge_label_type[label]==SI_INDEX_FAILED) {
 		return NULL;
 	} else {
 		return SIget(t->type_db,t->edge_label_type[label]);
 	}
 }
 int lts_type_get_edge_label_typeno(lts_type_t  t,int label){
-	return t->edge_label_type[label];
+    HREassert (label < t->edge_label_count);
+    return t->edge_label_type[label];
 }
-
+int lts_type_find_edge_label_prefix(lts_type_t  t, const char *prefix) {
+    for (int i = 0; i < lts_type_get_edge_label_count(t); i++) {
+        char *name = lts_type_get_edge_label_name(t, i);
+        if (strncmp(name, prefix, strlen(prefix)) == 0) return i;
+    }
+    return -1;
+}
+int lts_type_find_edge_label(lts_type_t  t, const char *name) {
+    for (int i = 0; i < lts_type_get_edge_label_count(t); i++) {
+        char *ename = lts_type_get_edge_label_name(t, i);
+        if (strcmp(name, ename) == 0) return i;
+    }
+    return -1;
+}
 
 int lts_type_get_type_count(lts_type_t  t){
 	return SIgetCount(t->type_db);
@@ -338,6 +384,17 @@ int lts_type_add_type(lts_type_t  t,const char *name,int *is_new){
 
 char* lts_type_get_type(lts_type_t  t,int typeno){
 	return SIget(t->type_db,typeno);
+}
+
+int lts_type_find_type_prefix(lts_type_t  t, const char *prefix) {
+    for (int i = 0; i < lts_type_get_type_count(t); i++) {
+        char *name = lts_type_get_type(t, i);
+        if (strncmp(name, prefix, strlen(prefix)) == 0) return i;
+    }
+    return -1;
+}
+int lts_type_find_type(lts_type_t  t, const char *name) {
+    return SIlookup(t->type_db,name);
 }
 
 void lts_type_validate(lts_type_t t){

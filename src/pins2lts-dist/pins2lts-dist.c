@@ -90,7 +90,7 @@ deadlock_detect (struct dist_thread_context *ctx, int *state, int count)
 static inline void
 invariant_detect (struct dist_thread_context *ctx, int *state)
 {
-    if ( !inv_expr || eval_predicate(inv_expr, NULL, state) ) return;
+    if ( !inv_expr || eval_predicate(ctx->model, inv_expr, NULL, state, size) ) return;
     ctx->violations++;
     if (no_exit) return;
 

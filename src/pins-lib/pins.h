@@ -79,6 +79,11 @@ typedef struct guard {
 //@{
 
 /**
+ * \brief boolean indicating whether PINS uses POR
+ */
+extern int GB_POR;
+
+/**
 \brief Factory method for loading models.
 
 Given a model that has been initialized with data synchronization functions,
@@ -385,14 +390,37 @@ extern void GBsetGuardNDSInfo(model_t model, matrix_t *info);
 extern matrix_t *GBgetGuardNDSInfo(model_t model);
 
 /**
-\brief Set the POR visibility info.
+\brief Set the label visibility matrix to a model
 */
-extern void GBsetPorVisibility(model_t model, int*bv);
+extern void GBsetStateLabelVisibilityInfo(model_t model, matrix_t *info);
 
 /**
-\brief Get the POR visibility info, i.e. which group touches an LTL variable.
+\brief Get the label visibility matrix of a model.
+Visibility can also be over-estimated by combining StateLabelInfo and DMInfo
 */
-extern int *GBgetPorVisibility(model_t model);
+extern matrix_t *GBgetStateLabelVisibilityInfo(model_t model);
+
+/**
+\brief Adds visibility info for a state label to the PorVisibility array.
+If the info is not present, the state label matrix is used
+*/
+extern void GBaddStateLabelVisible(model_t model, int label);
+
+/**
+\brief Adds visibility info for a state variable to the PorVisibility array.
+Uses DMWriteInfo (or DMInfo).
+*/
+extern void GBaddStateVariableVisible(model_t model, int index);
+
+/**
+\brief Set the POR group visibility info.
+*/
+extern void GBsetPorGroupVisibility(model_t model, int*bv);
+
+/**
+\brief Get the POR group visibility info, i.e. which group touches an LTL variable.
+*/
+extern int *GBgetPorGroupVisibility(model_t model);
 
 /**
 \brief Set the initial state.
@@ -597,7 +625,7 @@ typedef enum {PINS_LTL_TEXTBOOK, PINS_LTL_SPIN, PINS_LTL_LTSMIN} pins_ltl_type_t
 /**
 \brief Add LTL layer on top all other pins layers
 */
-extern model_t GBaddLTL(model_t model, const char *ltl_file, pins_ltl_type_t type, model_t por_model);
+extern model_t GBaddLTL(model_t model, const char *ltl_file, pins_ltl_type_t type);
 
 /**
 \brief Add POR layer before LTL layer
