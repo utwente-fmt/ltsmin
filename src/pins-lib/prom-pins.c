@@ -15,6 +15,10 @@
 #include <util-lib/chunk_support.h>
 #include <util-lib/util.h>
 
+static const char* ACCEPTING_STATE_LABEL_NAME       = "accept_";
+static const char* NON_PROGRESS_STATE_LABEL_NAME    = "np_";
+static const char* VALID_END_STATE_LABEL_NAME       = "end_";
+
 /**
  * SpinJa - LTSmin interface functions
  */
@@ -39,24 +43,24 @@ const char* (*prom_get_type_value_name)(int type, int value);
 int         (*prom_get_type_value_count)(int type);
 
 /* PINS edge labels (could be optional) */
-const char* (*prom_get_edge_name)(int type);
 int         (*prom_get_edge_count)();
-const char* (*prom_get_group_name)(int type);
+const char* (*prom_get_edge_name)(int type);
+int         (*prom_get_edge_type)(int type);
 
 /* PINS state labels (could be optional) */
 int         (*prom_get_label_count) ();
+int         (*prom_get_guard_count) (); // a subset of the labels
 const int*  (*prom_get_label_matrix)(int g);
-int         (*prom_get_guard_count) ();
 
-/* PINS POR matrices and guard info (could be optional) */
-const int*  (*prom_get_guards)      (int t);
-const int** (*prom_get_all_guards)  ();
+/* PINS POR matrices and label info (could be optional) */
+const int*  (*prom_get_labels)      (int t);
+const int** (*prom_get_all_labels)  ();
 int         (*prom_get_label)       (void *, int g, int *src);
 const char* (*prom_get_label_name)  (int g);
-void        (*prom_get_labels_all)  (void *, int *src, int* guards);
-const int*  (*prom_get_guard_may_be_coenabled_matrix)(int g);
-const int*  (*prom_get_guard_nes_matrix)(int g); // could be optional for POR
-const int*  (*prom_get_guard_nds_matrix)(int g); // could be optional for POR
+void        (*prom_get_labels_all)  (void *, int *src, int* labels);
+const int*  (*prom_get_label_may_be_coenabled_matrix)(int g);
+const int*  (*prom_get_label_nes_matrix)(int g); // could be optional for POR
+const int*  (*prom_get_label_nds_matrix)(int g); // could be optional for POR
 
 static void
 prom_popt (poptContext con,
@@ -183,35 +187,35 @@ PromLoadDynamicLib(model_t model, const char *filename)
         RTdlsym( filename, dlHandle, "spinja_get_type_value_name" );
     prom_get_type_value_count = (int(*)(int))
         RTdlsym( filename, dlHandle, "spinja_get_type_value_count" );
-    prom_get_edge_name = (const char*(*)(int))
-        RTtrydlsym( dlHandle, "spinja_get_edge_name" );
     prom_get_edge_count = (int(*)())
-        RTtrydlsym( dlHandle, "spinja_get_edge_count" );
-    prom_get_group_name = (const char*(*)(int))
-        RTdlsym( filename, dlHandle, "spinja_get_group_name" );
-    prom_get_guard_count = (int(*)())
-        RTdlsym( filename, dlHandle, "spinja_get_guard_count" );
+        RTdlsym( filename, dlHandle, "spinja_get_edge_count" );
+    prom_get_edge_name = (const char*(*)(int))
+        RTdlsym( filename, dlHandle, "spinja_get_edge_name" );
+    prom_get_edge_type = (int(*)(int))
+        RTdlsym( filename, dlHandle, "spinja_get_edge_type" );
     prom_get_label_count = (int(*)())
         RTdlsym( filename, dlHandle, "spinja_get_label_count" );
+    prom_get_guard_count = (int(*)())
+        RTdlsym( filename, dlHandle, "spinja_get_guard_count" );
     prom_get_label_matrix = (const int*(*)(int))
         RTdlsym( filename, dlHandle, "spinja_get_label_matrix" );
-    prom_get_guards = (const int*(*)(int))
-        RTdlsym( filename, dlHandle, "spinja_get_guards" );
-    prom_get_all_guards = (const int**(*)())
-        RTdlsym( filename, dlHandle, "spinja_get_all_guards" );
+    prom_get_labels = (const int*(*)(int))
+        RTdlsym( filename, dlHandle, "spinja_get_labels" );
+    prom_get_all_labels = (const int**(*)())
+        RTdlsym( filename, dlHandle, "spinja_get_all_labels" );
     prom_get_label = (int(*)(void*,int,int*))
         RTdlsym( filename, dlHandle, "spinja_get_label" );
     prom_get_label_name = (const char*(*)(int))
         RTdlsym( filename, dlHandle, "spinja_get_label_name" );
     prom_get_labels_all = (void(*)(void*,int*,int*))
         RTdlsym( filename, dlHandle, "spinja_get_labels_all" );
-    prom_get_guard_may_be_coenabled_matrix = (const int*(*)(int))
-        RTdlsym( filename, dlHandle, "spinja_get_guard_may_be_coenabled_matrix" );
+    prom_get_label_may_be_coenabled_matrix = (const int*(*)(int))
+        RTdlsym( filename, dlHandle, "spinja_get_label_may_be_coenabled_matrix" );
     // optional POR functionality (NES/NDS):
-    prom_get_guard_nes_matrix = (const int*(*)(int))
-        RTtrydlsym( dlHandle, "spinja_get_guard_nes_matrix" );
-    prom_get_guard_nds_matrix = (const int*(*)(int))
-        RTtrydlsym( dlHandle, "spinja_get_guard_nds_matrix" );
+    prom_get_label_nes_matrix = (const int*(*)(int))
+        RTtrydlsym( dlHandle, "spinja_get_label_nes_matrix" );
+    prom_get_label_nds_matrix = (const int*(*)(int))
+        RTtrydlsym( dlHandle, "spinja_get_label_nds_matrix" );
 
     (void)model;
 }
@@ -283,21 +287,14 @@ PromLoadGreyboxModel(model_t model, const char *filename)
     }
 
     // edge label types
-    int action_type = -1, statement_type;
-    if (prom_get_edge_count && prom_get_edge_count() > 0) {
-        lts_type_set_edge_label_count (ltstype, 2);
-        action_type = lts_type_add_type(ltstype, LTSMIN_EDGE_TYPE_ACTION_PREFIX, NULL);
-        lts_type_set_edge_label_name(ltstype, 0, LTSMIN_EDGE_TYPE_ACTION_PREFIX);
-        lts_type_set_edge_label_type(ltstype, 0, LTSMIN_EDGE_TYPE_ACTION_PREFIX);
-        lts_type_set_edge_label_typeno(ltstype, 0, action_type);
-    } else {
-        lts_type_set_edge_label_count (ltstype, 1);
+    lts_type_set_edge_label_count (ltstype, prom_get_edge_count());
+    for (int i = 0; i < prom_get_edge_count(); i++) {
+        lts_type_set_edge_label_name(ltstype, i, prom_get_edge_name(i));
+        int typeno = prom_get_edge_type(i);
+        const char* type_name = prom_get_type_name(typeno);
+        lts_type_set_edge_label_type(ltstype, i, type_name);
+        lts_type_set_edge_label_typeno(ltstype, i, typeno);
     }
-    int index = lts_type_get_edge_label_count(ltstype) - 1;
-    statement_type = lts_type_add_type(ltstype, LTSMIN_EDGE_TYPE_STATEMENT, NULL);
-    lts_type_set_edge_label_name(ltstype, index, LTSMIN_EDGE_TYPE_STATEMENT);
-    lts_type_set_edge_label_type(ltstype, index, LTSMIN_EDGE_TYPE_STATEMENT);
-    lts_type_set_edge_label_typeno(ltstype, index, statement_type);
 
     GBsetLTStype(model, ltstype); // must set ltstype before setting initial state
                                   // creates tables for types!
@@ -323,20 +320,6 @@ PromLoadGreyboxModel(model_t model, const char *filename)
             const char* type_value = prom_get_type_value_name(i, j);
             GBchunkPutAt(model, i, chunk_str((char*)type_value), j);
         }
-    }
-
-    // add edge labels
-    if (prom_get_edge_count && prom_get_edge_count() > 0) {
-        HREassert (action_type != -1);
-        // All actions are assert statements. We do not export their values.
-        for (int i = 0; i < prom_get_edge_count(); i++) {
-           chunk c = chunk_str((char *)prom_get_edge_name(i));
-           GBchunkPutAt(model, action_type, c, i);
-        }
-    }
-    for (int i = 0; i < prom_get_transition_groups(); i++) {
-        chunk c = chunk_str((char *)prom_get_group_name(i));
-        GBchunkPutAt(model, statement_type, c, i);
     }
 
 	// init state labels
@@ -374,13 +357,13 @@ PromLoadGreyboxModel(model_t model, const char *filename)
     // check for properties (label order: guard,..,guard,accept,end,progress,etc)
     for(int i = nguards; i < sl_size; i++) {
         const char *name = prom_get_label_name (i);
-        if(strcmp("accept_buchi", name) == 0) {
+        if (strcmp (ACCEPTING_STATE_LABEL_NAME, name) == 0) {
             GBsetAcceptingStateLabelIndex (model, i);
         }
-        if(strcmp("progress", name) == 0) {
+        if(strcmp(NON_PROGRESS_STATE_LABEL_NAME, name) == 0) {
             GBsetProgressStateLabelIndex (model, i);
         }
-        if(strcmp("end_valid", name) == 0) {
+        if(strcmp(VALID_END_STATE_LABEL_NAME, name) == 0) {
             GBsetValidEndStateLabelIndex (model, i);
         }
     }
@@ -419,14 +402,14 @@ PromLoadGreyboxModel(model_t model, const char *filename)
     GBsetStateLabelInfo(model, sl_info);
 
     // set the guards per transition group
-    GBsetGuardsInfo(model, (guard_t**) prom_get_all_guards());
+    GBsetGuardsInfo(model, (guard_t**) prom_get_all_labels());
 
     // set guard may be co-enabled relation
-    if (prom_get_guard_may_be_coenabled_matrix) {
+    if (prom_get_label_may_be_coenabled_matrix) {
         matrix_t *gce_info = RTmalloc(sizeof(matrix_t));
         dm_create(gce_info, nguards, nguards);
         for (int i = 0; i < nguards; i++) {
-            int *guardce = (int*)prom_get_guard_may_be_coenabled_matrix(i);
+            int *guardce = (int*)prom_get_label_may_be_coenabled_matrix(i);
             for(int j = 0; j < nguards; j++) {
                 if (guardce[j]) dm_set(gce_info, i, j);
             }
@@ -435,11 +418,11 @@ PromLoadGreyboxModel(model_t model, const char *filename)
     }
 
     // set guard necessary enabling set info
-    if (prom_get_guard_nes_matrix) {
+    if (prom_get_label_nes_matrix) {
         matrix_t *gnes_info = RTmalloc(sizeof(matrix_t));
         dm_create(gnes_info, nguards, ngroups);
         for(int i = 0; i < nguards; i++) {
-            int *guardnes = (int*)prom_get_guard_nes_matrix(i);
+            int *guardnes = (int*)prom_get_label_nes_matrix(i);
             for(int j = 0; j < ngroups; j++) {
                 if (guardnes[j]) dm_set(gnes_info, i, j);
             }
@@ -448,11 +431,11 @@ PromLoadGreyboxModel(model_t model, const char *filename)
     }
 
     // set guard necessary disabling set info
-    if (prom_get_guard_nds_matrix) {
+    if (prom_get_label_nds_matrix) {
         matrix_t *gnds_info = RTmalloc(sizeof(matrix_t));
         dm_create(gnds_info, nguards, ngroups);
         for(int i = 0; i < nguards; i++) {
-            int *guardnds = (int*)prom_get_guard_nds_matrix(i);
+            int *guardnds = (int*)prom_get_label_nds_matrix(i);
             for(int j = 0; j < ngroups; j++) {
                 if (guardnds[j]) dm_set(gnds_info, i, j);
             }
