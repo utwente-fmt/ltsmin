@@ -14,7 +14,7 @@ endif
 
 VSET_LIBS = ../vset-lib/libvset.la
 
-bin_PROGRAMS = etf2lts-sym
+bin_PROGRAMS = etf2lts-sym pins2lts-sym
 
 if HAVE_LIBSTEP_INFO
 bin_PROGRAMS += lpo2lts-sym
@@ -42,6 +42,13 @@ etf2lts_sym_SOURCES  += ../pins-lib/etf-pins.c ../pins-lib/etf-pins.h
 etf2lts_sym_LDADD     = $(PINS_LIBS) $(VSET_LIBS)
 etf2lts_sym_CPPFLAGS  = -DETF $(SYM_CPPFLAGS)
 nodist_EXTRA_etf2lts_sym_SOURCES = automake-force-linker.cxx # req. by vset
+
+# pins2lts-sym
+pins2lts_sym_SOURCES   = pins2lts-sym.c
+pins2lts_sym_SOURCES  += ../pins-lib/dlopen-pins.c ../pins-lib/dlopen-pins.h
+pins2lts_sym_LDADD     = $(PINS_LIBS) $(VSET_LIBS)
+pins2lts_sym_CPPFLAGS  = -DPINS_DLL $(SYM_CPPFLAGS)
+nodist_EXTRA_pins2lts_sym_SOURCES = automake-force-linker.cxx # req. by vset
 
 # lpo2lts-sym
 lpo2lts_sym_SOURCES   = pins2lts-sym.c

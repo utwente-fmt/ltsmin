@@ -1756,7 +1756,7 @@ main (int argc, char *argv[])
 {
     const char *files[2];
     HREinitBegin(argv[0]); // the organizer thread is called after the binary
-    HREaddOptions(options,"Perform a parallel reachability analysis of <model>\n\nOptions");
+    HREaddOptions(options,"Perform a sequential reachability analysis of <model>\n\nOptions");
     lts_lib_setup();
     HREinitStart(&argc,&argv,1,2,(char**)files,"<model> [<lts>]");
 

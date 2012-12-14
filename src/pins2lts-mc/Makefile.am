@@ -10,7 +10,7 @@ PINS_LIBS += ../util-lib/libutil.la
 PINS_LIBS += ../dm/libdm.la
 MC_LIBS = ../mc-lib/libmc.la $(PINS_LIBS)
 
-bin_PROGRAMS  = etf2lts-mc
+bin_PROGRAMS  = etf2lts-mc pins2lts-mc
 
 if HAVE_LIBSTEP_INFO
 bin_PROGRAMS += lpo2lts-mc
@@ -41,6 +41,12 @@ etf2lts_mc_SOURCES   = pins2lts-mc.c
 etf2lts_mc_SOURCES  += ../pins-lib/etf-pins.c ../pins-lib/etf-pins.h
 etf2lts_mc_LDADD     = $(MC_LIBS) 
 etf2lts_mc_CPPFLAGS  = -DETF $(DIST_CPPFLAGS)
+
+# pins2lts-mc
+pins2lts_mc_SOURCES   = pins2lts-mc.c
+pins2lts_mc_SOURCES  += ../pins-lib/dlopen-pins.c ../pins-lib/dlopen-pins.h
+pins2lts_mc_LDADD     = $(MC_LIBS) 
+pins2lts_mc_CPPFLAGS  = -DPINS_DLL $(DIST_CPPFLAGS)
 
 ## lpo2lts-mc
 lpo2lts_mc_SOURCES   = pins2lts-mc.c

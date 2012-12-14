@@ -11,6 +11,15 @@
 \brief Process architecture independent RunTime utilities.
 */
 
+/**
+ * Open the given library, abort on failure.
+ */
+extern void *RTdlopen (const char *name);
+
+/**
+ * Resolve the symbol with respect to the given library.
+ * The libname argument is for error messages only.
+ */
 extern void *RTdlsym (const char *libname, void *handle, const char *symbol);
 
 extern void *RTtrydlsym (void *handle, const char *symbol);

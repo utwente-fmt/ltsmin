@@ -1,0 +1,29 @@
+//                           -*- mode: doc; outline-regexp: "==\(=*\) ." -*-
+pins2lts-mc(1)
+==============
+:Author:  Stefan Blom
+:Email:   <s.c.c.blom@ewi.utwente.nl>
+:Date:    2013-06-21
+
+== NAME
+
+pins2lts-mc - Concurrent state space generator for ETF models.
+
+== SYNOPSIS
+
+*{manname}* --loader=<plugin> [OPTION]... <input>
+
+== DESCRIPTION
+
+{manname} generates a labelled transition system from a compiled
+specification provided in 'input.etf' (see manpage:etf[5]).
+It does this concurrently for any given number of threads.
+LTS output is not supported by this tool, use the distributed tools instead.
+
+== OPTIONS
+
+include::inc/pins2lts-mc-options.txt[]
+
+include::inc/plugin-options.txt[]
+
+include::inc/pins2lts-mc.txt[]

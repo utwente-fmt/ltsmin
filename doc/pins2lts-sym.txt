@@ -1,0 +1,28 @@
+//                           -*- mode: doc; outline-regexp: "==\(=*\) ." -*-
+pins2lts-sym(1)
+===============
+:Author:  Stefan Blom
+:Email:   <s.c.c.blom@ewi.utwente.nl>
+:Date:    2013-06-21
+
+== NAME
+
+pins2lts-sym - Symbolic reachability analysis for plugin models.
+
+== SYNOPSIS
+
+*pins2lts-sym* --loader=<plugin> [OPTION]... <input> ['output.etf']
+
+== DESCRIPTION
+
+{manname} performs a reachability analysis on a specification provided
+as a plugin/input pair. 'output.etf' specifies the name of the output archive, written in
+manpage:etf[5] format.
+
+== OPTIONS
+
+include::inc/pins2lts-sym-options.txt[]
+
+include::inc/plugin-options.txt[]
+
+include::inc/pins2lts-sym.txt[]

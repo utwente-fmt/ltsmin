@@ -13,6 +13,14 @@ etf2torx_LDADD    = $(PINS_LIBS)
 etf2torx_LDFLAGS  = $(AM_LDFLAGS)
 etf2torx_CPPFLAGS = -DETF $(TORX_CPPFLAGS) $(AM_CPPFLAGS)
 
+# pins2torx
+bin_PROGRAMS += pins2torx
+pins2torx_SOURCES  = spec2torx.c
+pins2torx_SOURCES += ../pins-lib/dlopen-pins.c ../pins-lib/dlopen-pins.h
+pins2torx_LDADD    = $(PINS_LIBS)
+pins2torx_LDFLAGS  = $(AM_LDFLAGS)
+pins2torx_CPPFLAGS = -DPINS_DLL $(TORX_CPPFLAGS) $(AM_CPPFLAGS)
+
 # dve2torx
 if HAVE_DVE
 bin_PROGRAMS += dve2torx

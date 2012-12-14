@@ -11,7 +11,7 @@ PINS_LIBS += ../util-lib/libutil.la
 PINS_LIBS += ../dm/libdm.la
 VSET_LIBS = ../vset-lib/libvset.la
 
-bin_PROGRAMS = etf2lts-seq
+bin_PROGRAMS = etf2lts-seq pins2lts-seq
 
 if HAVE_LIBSTEP_INFO
 bin_PROGRAMS += lpo2lts-seq
@@ -32,6 +32,15 @@ endif
 if HAVE_SPINS
 bin_PROGRAMS += prom2lts-seq
 endif
+
+# pins2lts-seq
+pins2lts_seq_SOURCES   = pins2lts-seq.c
+pins2lts_seq_SOURCES  += ../pins-lib/dlopen-pins.c ../pins-lib/dlopen-pins.h
+pins2lts_seq_LDADD     = $(HRE_LIB) $(PINS_LIBS)
+pins2lts_seq_LDADD    += $(VSET_LIBS)
+pins2lts_seq_CPPFLAGS  = -DPINS_DLL $(SEQ_CPPFLAGS)
+nodist_EXTRA_pins2lts_seq_SOURCES = automake-force-linker.cxx # req. by vset
+
 
 # etf2lts-seq
 etf2lts_seq_SOURCES   = pins2lts-seq.c

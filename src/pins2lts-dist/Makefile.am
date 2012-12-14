@@ -14,7 +14,7 @@ PINS_LIBS += ../util-lib/libutil.la
 PINS_LIBS += ../ltsmin-lib/libltsmin.la
 PINS_LIBS += ../dm/libdm.la
 
-bin_PROGRAMS = etf2lts-dist
+bin_PROGRAMS = etf2lts-dist pins2lts-dist
 
 if HAVE_LIBSTEP_INFO
 bin_PROGRAMS += lpo2lts-dist
@@ -41,6 +41,12 @@ etf2lts_dist_SOURCES   = pins2lts-dist.c
 etf2lts_dist_SOURCES  += ../pins-lib/etf-pins.c ../pins-lib/etf-pins.h
 etf2lts_dist_LDADD     = $(PINS_LIBS)
 etf2lts_dist_CPPFLAGS  = -DETF $(DIST_CPPFLAGS)
+
+# pins2lts-dist
+pins2lts_dist_SOURCES   = pins2lts-dist.c
+pins2lts_dist_SOURCES  += ../pins-lib/dlopen-pins.c ../pins-lib/dlopen-pins.h
+pins2lts_dist_LDADD     = $(PINS_LIBS)
+pins2lts_dist_CPPFLAGS  = -DPINS_DLL $(DIST_CPPFLAGS)
 
 # lpo2lts-dist
 lpo2lts_dist_SOURCES   = pins2lts-dist.c

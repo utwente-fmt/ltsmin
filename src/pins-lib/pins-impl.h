@@ -22,6 +22,10 @@
 #if defined(OPAAL)
 #include <pins-lib/opaal-pins.h>
 #endif
+#if defined(PINS_DLL)
+#include <pins-lib/dlopen-pins.h>
+#endif
+
 
 #if defined(MCRL)
 #define SPEC_POPT_OPTIONS { NULL, 0, POPT_ARG_INCLUDE_TABLE, mcrl_options, 0, "mCRL options", NULL }
@@ -56,6 +60,11 @@
 #if defined(OPAAL)
 #define SPEC_POPT_OPTIONS { NULL, 0, POPT_ARG_INCLUDE_TABLE, opaal_options, 0, "Opaal options", NULL }
 #define SPEC_MT_SAFE 1
+#define SPEC_REL_PERF 10
+#endif
+#if defined(PINS_DLL)
+#define SPEC_POPT_OPTIONS { NULL, 0, POPT_ARG_INCLUDE_TABLE, pins_plugin_options, 0, "PINS plugin options", NULL }
+#define SPEC_MT_SAFE 0
 #define SPEC_REL_PERF 10
 #endif
 

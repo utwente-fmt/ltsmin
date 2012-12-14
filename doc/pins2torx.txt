@@ -1,0 +1,27 @@
+//                           -*- mode: doc; outline-regexp: "==\(=*\) ." -*-
+pins2torx(1)
+===========
+:Author:  Stefan Blom
+:Email:   <s.c.c.blom@ewi.utwente.nl>
+:Date:    2013-06-21
+
+== NAME
+
+pins2torx - TorX RPC interface for plugin models.
+
+== SYNOPSIS
+
+*{manname}* --loader=<plugin> [OPTION]... <input>
+
+== DESCRIPTION
+
+{manname} provides access to a labelled transition system from a
+specification provided as a plugin/input pair via the TorX-Explorer textual
+interface on _stdin_ and _stdout_.
+
+== OPTIONS
+
+include::inc/pins2torx.txt[]
+
+include::inc/plugin-options.txt[]
+

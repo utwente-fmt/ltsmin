@@ -1,0 +1,9 @@
+=== Plugin Options
+
+*--loader=<plugin>*::
+Load the given dynamic library, which must contain a language module.
++
+To get help about the options of a plugin, use
++
+*{manname}* --loader=<plugin> --help
+

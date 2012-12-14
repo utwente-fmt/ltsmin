@@ -7,12 +7,37 @@
 #include <hre/config.h>
 
 #include <dlfcn.h>
+#include <limits.h>
 #include <stdlib.h>
 #include <unistd.h>
 
 #include <hre/feedback.h>
 #include <hre/runtime.h>
 #include <hre/user.h>
+
+typedef void(*plugin_init_t)();
+
+void* RTdlopen(const char *name){
+    void *dlHandle;
+    char abs_filename[PATH_MAX];
+    char *ret_filename = realpath(name, abs_filename);
+    if (ret_filename) {
+        dlHandle = dlopen(abs_filename, RTLD_LAZY);
+        if (dlHandle == NULL)
+        {
+            Abort("%s, Library \"%s\" is not reachable", dlerror(), name);
+        }
+    } else {
+        Abort("Library \"%s\" is not found", name);
+    }
+    plugin_init_t init=RTtrydlsym(dlHandle,"hre_init");
+    if (init!=NULL){
+        init();
+    } else {
+        Warning(info,"library has no initializer");
+    }
+    return dlHandle;
+}
 
 void *
 RTdlsym (const char *libname, void *handle, const char *symbol)
