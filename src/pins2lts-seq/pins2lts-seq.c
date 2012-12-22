@@ -1233,9 +1233,10 @@ gsea_dlk_wrapper(gsea_state_t *state, void *arg)
     // chain deadlock test after original code
     if (gc.dlk_placeholder) gc.dlk_placeholder(state, arg);
 
-    if (state->count != 0 || GBbuchiIsValidEnd(opt.model, state->state)) return; // no deadlock
-
+    if (state->count != 0) return; // no deadlock
     global.deadlocks++;
+    if (GBbuchiIsValidEnd(opt.model, state->state)) return; // valid end state
+    if ( !opt.inv_expr ) global.violations++;
     do_trace(NULL, arg, "deadlock", ""); // state still on stack
 }
 
@@ -1464,11 +1465,9 @@ gsea_setup(const char *output)
     lts_type_t ltstype=GBgetLTStype(opt.model);
     if (opt.act_detect) {
         // table number of first edge label
-        opt.act_label = 0;
-        if (lts_type_get_edge_label_count(ltstype) == 0 ||
-                strncmp(lts_type_get_edge_label_name(ltstype, opt.act_label),
-                        LTSMIN_EDGE_TYPE_ACTION_PREFIX, strlen(LTSMIN_EDGE_TYPE_ACTION_PREFIX)) != 0)
-               Abort("No edge label '%s...' for action detection", LTSMIN_EDGE_TYPE_ACTION_PREFIX);
+        opt.act_label = lts_type_find_edge_label_prefix (ltstype, LTSMIN_EDGE_TYPE_ACTION_PREFIX);
+        if (opt.act_label == -1)
+            Abort("No edge label '%s...' for action detection", LTSMIN_EDGE_TYPE_ACTION_PREFIX);
         int typeno = lts_type_get_edge_label_typeno(ltstype, opt.act_label);
         chunk c = chunk_str(opt.act_detect);
         opt.act_index = GBchunkPut(opt.model, typeno, c);
@@ -1736,8 +1735,8 @@ gsea_finished(void *arg) {
              global.max_depth, global.explored, global.ntransitions);
 
     if (opt.no_exit || log_active(infoLong))
-        Warning (info, "\n\nDeadlocks: %zu\nInvariant violations: %zu\n"
-             "Error actions: %zu", global.deadlocks,global.violations,
+        HREprintf (info, "\nDeadlocks: %zu\nInvariant violations: %zu\n"
+             "Error actions: %zu\n", global.deadlocks,global.violations,
              global.errors);
     (void)arg;
 }

@@ -1149,17 +1149,17 @@ print_statistics (counter_t *ar_reach, counter_t *ar_red, rt_timer_t timer,
              mem1 + mem4 + mem3 + chunks, mem1 + mem2 + mem3 + chunks);
 
     if (no_exit || log_active(infoLong))
-        Warning (info, "\n\nDeadlocks: %zu\nInvariant violations: %zu\n"
-                 "Error actions: %zu", reach->deadlocks, reach->violations,
+        HREprintf (info, "\nDeadlocks: %zu\nInvariant/valid-end state violations: %zu\n"
+                 "Error actions: %zu\n", reach->deadlocks, reach->violations,
                  reach->errors);
 
-    Warning (infoLong, "Internal statistics:\n\n"
+    HREprintf (infoLong, "\nInternal statistics:\n\n"
              "Algorithm:\nWork time: %.2f sec\nUser time: %.2f sec\nExplored: %zu\n"
                  "Transitions: %zu\nWaits: %zu\nRec. calls: %zu\n\n"
              "Database:\nElements: %zu\nNodes: %zu\nMisses: %zu\nEq. tests: %zu\nRehashes: %zu\n\n"
              "Memory:\nQueue: %.1f MB\nDB: %.1f MB\nDB alloc.: %.1f MB\nColors: %.1f MB\n\n"
              "Load balancer:\nSplits: %zu\nLoad transfer: %zu\n\n"
-             "Lattice MAP:\nRatio: %.2f\nInserts: %zu\nUpdates: %zu\nDeletes: %zu",
+             "Lattice MAP:\nRatio: %.2f\nInserts: %zu\nUpdates: %zu\nDeletes: %zu\n",
              tot, reach->runtime, reach->explored, reach->trans, red->waits,
              reach->rec, db_elts, db_nodes, stats->misses, stats->tests,
              stats->rehashes, mem1, mem4, mem2, mem3,
@@ -2335,8 +2335,10 @@ bfs_load (wctx_t *ctx)
 static inline void
 deadlock_detect (wctx_t *ctx, int count)
 {
-    if (count > 0 || GBbuchiIsValidEnd(ctx->model, ctx->state.data)) return;
+    if (count > 0) return;
     ctx->counters.deadlocks++; // counting is costless
+    if (GBbuchiIsValidEnd(ctx->model, ctx->state.data)) return;
+    if ( !inv_expr ) ctx->counters.violations++;
     if (dlk_detect && (!no_exit || trc_output) && lb_stop(global->lb)) {
         Warning (info, " ");
         Warning (info, "Deadlock found in state at depth %zu!", ctx->counters.level_cur);

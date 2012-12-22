@@ -1755,11 +1755,9 @@ static void
 init_action()
 {
     // table number of first edge label
-    act_label = 0;
-    if (lts_type_get_edge_label_count(ltstype) == 0 ||
-            strncmp(lts_type_get_edge_label_name(ltstype, act_label),
-                    LTSMIN_EDGE_TYPE_ACTION_PREFIX, strlen(LTSMIN_EDGE_TYPE_ACTION_PREFIX)) != 0)
-           Abort("No edge label '%s...' for action detection", LTSMIN_EDGE_TYPE_ACTION_PREFIX);
+    act_label = lts_type_find_edge_label_prefix (ltstype, LTSMIN_EDGE_TYPE_ACTION_PREFIX);
+    if (act_label == -1)
+        Abort("No edge label '%s...' for action detection", LTSMIN_EDGE_TYPE_ACTION_PREFIX);
     int typeno = lts_type_get_edge_label_typeno(ltstype, act_label);
     chunk c = chunk_str(act_detect);
     act_index = GBchunkPut(model, typeno, c);
