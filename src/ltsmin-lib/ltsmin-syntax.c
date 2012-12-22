@@ -231,7 +231,10 @@ LTSminSPrintExpr(char *buf, ltsmin_expr_t expr, ltsmin_parse_env_t env)
     char *begin = buf;
     switch(expr->node_type){
         case VAR:
-            buf += sprintf(buf, "%s",SIget(env->idents,expr->idx));
+            if (expr->num == -1)
+                buf += sprintf(buf, "%s(UNBOUND)",SIget(env->idents,expr->idx));
+            else
+                buf += sprintf(buf, "%s",SIget(env->idents,expr->idx));
             break;
         case SVAR:
             buf += sprintf(buf, "%s",LTSminStateVarName(env, expr->idx));
