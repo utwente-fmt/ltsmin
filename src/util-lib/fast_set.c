@@ -218,41 +218,36 @@ int
 fset_find (fset_t *dbs, mem_hash_t *mem, void *key, void **data,
            bool insert_absert)
 {
+    HREassert (dbs->data_length == 0 || data);
+
     size_t              ref;
     mem_hash_t          tomb;
     size_t              k = dbs->key_length;
-    size_t              d = dbs->data_length;
     mem_hash_t          h = (mem == NULL ? MurmurHash64(key, k, 0) : *mem);
-    bool found = fset_find_loc (dbs, h, key, &ref, &tomb);
-    void *data_res = state(dbs, dbs->data, ref) + k;
-    if (!insert_absert || found) {
-        if (dbs->data_length)
-            *data = data_res;
-        return found;
-    }
+    bool                found = fset_find_loc (dbs, h, key, &ref, &tomb);
 
-    // insert:
-    HREassert (dbs->data_length == 0 || data);
-    if (tomb != NONE) {
-        ref = tomb;
-        dbs->tombs--;
-    }
-    if (dbs->key_length)
-        memcpy (state(dbs, dbs->data, ref), key, k);
-    if (dbs->data_length) {
-        memcpy (data_res, *data, d);
-        *data = data_res;
-    }
-    *memoized(dbs, ref) = h | FULL;
-    dbs->load++;
-    dbs->max_load = max (dbs->max_load, dbs->load);
-    if (((dbs->load + dbs->tombs) << 2) > dbs->size3) {
-        if (!resize(dbs, GROW)) {                       // > 75% full ==> grow
-            Debug ("Hash table almost full (size = %zu, load = %zu, tombs = %zu)",
-                   dbs->size, dbs->load, dbs->tombs);
+    if (data)
+        *data = state(dbs, dbs->data, ref) + k;
+
+    if (insert_absert && !found) {
+        // insert:
+        if (tomb != NONE) {
+            ref = tomb;
+            dbs->tombs--;
+        }
+        if (dbs->key_length)
+            memcpy (state(dbs, dbs->data, ref), key, k);
+        *memoized(dbs, ref) = h | FULL;
+        dbs->load++;
+        dbs->max_load = max (dbs->max_load, dbs->load);
+        if (((dbs->load + dbs->tombs) << 2) > dbs->size3) {
+            if (!resize(dbs, GROW)) {                       // > 75% full ==> grow
+                Debug ("Hash table almost full (size = %zu, load = %zu, tombs = %zu)",
+                       dbs->size, dbs->load, dbs->tombs);
+            }
         }
     }
-    return false;
+    return found;
 }
 
 size_t
