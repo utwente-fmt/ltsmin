@@ -28,7 +28,7 @@ fill_env (ltsmin_parse_env_t env, lts_type_t ltstype)
         char*name=lts_type_get_state_name(ltstype,i);
         HREassert (name);
         int idx = LTSminStateVarIndex(env,name);
-        HREassert (i == idx);
+        HREassert (i == idx, "Model has equally state variables ('%s') at index %d and %d", name, i, idx);
     }
 
     int L = lts_type_get_state_label_count(ltstype);
@@ -37,7 +37,7 @@ fill_env (ltsmin_parse_env_t env, lts_type_t ltstype)
         HREassert (name);
         // consider state label an state variable with idx >= N
         int idx = LTSminStateVarIndex(env,name);
-        HREassert (idx == N + i);
+        HREassert (N + i == idx, "Model has equally named state label ('%s') at index %d and %d", name, i - N, idx);
     }
 
     int E=lts_type_get_edge_label_count(ltstype);
