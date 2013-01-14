@@ -1630,6 +1630,7 @@ state_info_serialize (state_info_t *state, raw_data_t data)
     }
     if (Strat_TA & strategy[0]) {
         ((lattice_t*)data)[0] = state->lattice;
+        HREassert (state->lattice != 0);
         data += 2;
         ((lm_loc_t*)data)[0] = state->loc;
     }
@@ -1668,6 +1669,7 @@ state_info_deserialize (state_info_t *state, raw_data_t data, state_data_t store
     }
     if (Strat_TA & strategy[0]) {
         state->lattice = ((lattice_t*)data)[0];
+        HREassert (state->lattice != 0);
         data += 2;
         state->loc = ((lm_loc_t*)data)[0];
     }
@@ -1685,6 +1687,7 @@ state_info_deserialize_cheap (state_info_t *state, raw_data_t data)
     data += 2;
     if (Strat_TA & strategy[0]) {
         state->lattice = ((lattice_t*)data)[0];
+        HREassert (state->lattice != 0);
         data += 2;
         state->loc = ((lm_loc_t*)data)[0];
     }
@@ -3487,19 +3490,19 @@ ta_cndfs_remove_state (fset_t *table, state_info_t *s)
 /* maintain a linked list of cyan states with same concrete part on the stack */
 
 static inline void
-ta_cndfs_next (wctx_t *ctx, state_data_t stack_loc, state_info_t *s)
+ta_cndfs_next (wctx_t *ctx, raw_data_t stack_loc, state_info_t *s)
 {
     void               *data;
     hash32_t            hash = ref_hash (s->ref);
     int res = fset_find (ctx->cyan2, &hash, &s->ref, &data, true);
     HREassert (res != FSET_FULL, "Cyan2 table full");
     if (res) {
-        s->loc = (lm_loc_t)data;
+        s->loc = *(lm_loc_t*)data;
     } else {
-        s->loc = (lm_loc_t)NULL;
+        s->loc = LM_NULL_LOC;
     }
     state_info_serialize (s, stack_loc);    // write previous pointer to stack
-    *(state_data_t *)data = stack_loc;      // write current pointer to hash map
+    *(raw_data_t *)data = stack_loc;      // write current pointer to hash map
 }
 
 static inline void
@@ -3525,9 +3528,12 @@ ta_cndfs_subsumes_cyan (wctx_t *ctx, state_info_t *s)
     int res = fset_find (ctx->cyan2, &hash, &s->ref, &data, false);
     if (!res)
         return false;
-    state_data_t stack_loc = *(state_data_t *)data;
-    state_info_t state;
-    while (stack_loc) {
+    state_info_t        state;
+    raw_data_t          stack_loc;
+    state.loc = *(lm_loc_t*)data;
+    size_t              iteration = 0;
+    while (state.loc != LM_NULL_LOC) {
+        stack_loc = (raw_data_t)state.loc;
         state_info_deserialize_cheap (&state, stack_loc);
         if (state.lattice == s->lattice) {
             return true;
@@ -3536,7 +3542,7 @@ ta_cndfs_subsumes_cyan (wctx_t *ctx, state_info_t *s)
             ctx->counters.deletes++;
             return true;
         }
-        stack_loc = (state_data_t)state.loc;
+        iteration++;
     }
     return false;
 }
@@ -3550,7 +3556,7 @@ ta_cndfs_handle_nonseed_accepting (wctx_t *ctx)
         ctx->red.waits++;
         ctx->counters.rec += accs;
         RTstartTimer (ctx->red.timer);
-        while ( nonred && !lb_is_stopped(global->lb) ) { // TODO: mark done states
+        while ( nonred && !lb_is_stopped(global->lb) ) {
             nonred = 0;
             for (size_t i = 0; i < accs; i++) {
                 raw_data_t state_data = dfs_stack_peek (ctx->out_stack, i);
@@ -3582,7 +3588,7 @@ static inline bool
 ta_cndfs_is_cyan (wctx_t *ctx, state_info_t *s, raw_data_t d, bool add_if_absent)
 {
     if (UPDATE == 1) {
-        if (add_if_absent) { //BOTH stacks:
+        if (add_if_absent) { // BOTH stacks:
             bool result = ta_cndfs_subsumes_cyan (ctx, s);
             if (!result && add_if_absent)
                 ta_cndfs_next (ctx, d, &ctx->state);
@@ -3622,7 +3628,7 @@ ta_cndfs_handle_blue (void *arg, state_info_t *successor, transition_info_t *ti,
     state_data_t succ_data = get_state (successor->ref, ctx);
     int acc = GBbuchiIsAccepting(ctx->model, succ_data);
     ctx->red.visited += ~seen & acc;
-    int cyan = ta_cndfs_has_state (ctx->cyan, successor, false);
+    int cyan = ta_cndfs_is_cyan (ctx, successor, NULL, false);
     if ( ecd && cyan && (GBbuchiIsAccepting(ctx->model, ctx->state.data) || acc) ) {
         /* Found cycle in blue search */
         ndfs_report_cycle (ctx, successor);
@@ -3768,10 +3774,11 @@ explore (wctx_t *ctx)
     } else if ( Strat_OWCTY & strategy[0] ) {
         if (0 == ctx->id) owcty_initialize_handle (ctx, &ctx->initial, &ti, 0);
     } else if ( ~Strat_DFSFIFO & Strat_LTL & strategy[0] ) {
-        if ( Strat_TA & strategy[0] )
+        if ( Strat_TA & strategy[0] ) {
             ta_cndfs_handle_blue (ctx, &ctx->initial, &ti, 0);
-        else
+        } else {
             ndfs_blue_handle (ctx, &ctx->initial, &ti, 0);
+        }
     } else if (0 == ctx->id) { // only w1 receives load, as it is propagated later
         if ( Strat_TA & strategy[0] )
             ta_handle (ctx, &ctx->initial, &ti, 0);
