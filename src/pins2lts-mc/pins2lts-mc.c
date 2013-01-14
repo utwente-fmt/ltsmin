@@ -3169,7 +3169,9 @@ ta_covered (void *arg, lattice_t l, lm_status_t status, lm_loc_t loc)
     wctx_t         *ctx = (wctx_t*) arg;
     lattice_t lattice = ctx->successor->lattice;
     int *succ_l = (int*)&lattice;
-    if (!ctx->subsumes && GBisCoveredByShort(ctx->model, succ_l, (int*)&l) ) {
+    if (UPDATE == TA_UPDATE_NONE
+            ? lattice == l
+            : !ctx->subsumes && GBisCoveredByShort(ctx->model, succ_l, (int*)&l) ) {
         ctx->done = 1;
         return LM_CB_STOP; //A l' : (E (s,l)eL : l>=l')=>(A (s,l)eL : l>=l')
     } else if (TA_UPDATE_NONE != UPDATE &&
@@ -3190,7 +3192,9 @@ ta_covered_nb (void *arg, lattice_t l, lm_status_t status, lm_loc_t loc)
     wctx_t         *ctx = (wctx_t*) arg;
     lattice_t lattice = ctx->successor->lattice;
     int *succ_l = (int*)&lattice;
-    if (GBisCoveredByShort(ctx->model, succ_l, (int*)&l) ) {
+    if (UPDATE == TA_UPDATE_NONE
+            ? lattice == l
+            : GBisCoveredByShort(ctx->model, succ_l, (int*)&l) ) {
         ctx->done = 1;
         return LM_CB_STOP; //A l' : (E (s,l)eL : l>=l')=>(A (s,l)eL : l>=l')
     } else if (TA_UPDATE_NONE != UPDATE &&
