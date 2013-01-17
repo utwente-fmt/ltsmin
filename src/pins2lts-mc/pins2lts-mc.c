@@ -1229,14 +1229,14 @@ print_statistics (counter_t *ar_reach, counter_t *ar_red, rt_timer_t timer,
              "Database:\nElements: %zu\nNodes: %zu\nMisses: %zu\nEq. tests: %zu\nRehashes: %zu\n\n"
              "Memory:\nQueue: %.1f MB\nDB: %.1f MB\nDB alloc.: %.1f MB\nColors: %.1f MB\n\n"
              "Load balancer:\nSplits: %zu\nLoad transfer: %zu\n\n"
-             "Lattice MAP:\nRatio: %.2f\nInserts: %zu\n%s: %zu\n%s: %zu\n",
+             "Lattice MAP:\nRatio: %.2f\nInserts: %zu\nUpdates: %zu\nDeletes: %zu\n"
+             "Red subsumed: %zu\nCyan is subsumed: %zu\n",
              tot, reach->runtime, reach->explored, reach->trans, red->waits,
              reach->rec, db_elts, db_nodes, stats->misses, stats->tests,
              stats->rehashes, mem1, mem4, mem2, mem3,
              reach->splits, reach->transfer,
-             ((double)lattices/db_elts), reach->inserts,
-             strategy[0] & Strat_CNDFS ? "Red subsumed" : "Updates", reach->updates,
-             strategy[0] & Strat_CNDFS ? "Cyan is subsumed" : "Updates", reach->deletes);
+             ((double)lattices/db_elts), reach->inserts, reach->updates,
+             reach->deletes, red->updates, red->deletes);
 }
 
 void
@@ -3407,10 +3407,10 @@ ta_cndfs_covered (void *arg, lattice_t l, lm_status_t status, lm_loc_t loc)
         return LM_CB_STOP;
     }
     int *succ_l = (int *) &ctx->successor->lattice;
-    if (UPDATE != 0 && (status & color & LM_RED)) {
+    if (UPDATE != 0 && (color & status & LM_RED)) {
         if ( GBisCoveredByShort(ctx->model, succ_l, (int*)&l) ) {
             ctx->done = 1;
-            ctx->counters.updates++;
+            ctx->red.updates++; // count (strictly) subsumed by reds
             return LM_CB_STOP;
         }
     }
@@ -3425,7 +3425,11 @@ ta_cndfs_subsumed (wctx_t *ctx, state_info_t *state, lm_status_t color)
     ctx->subsumes = color;
     ctx->done = 0;
     ctx->successor = state;
+
+    lm_lock (global->lmap, state->ref);
     lm_iterate (global->lmap, state->ref, ta_cndfs_covered, ctx);
+    lm_unlock (global->lmap, state->ref);
+
     return ctx->done;
 }
 
@@ -3434,33 +3438,50 @@ ta_cndfs_spray (void *arg, lattice_t l, lm_status_t status, lm_loc_t loc)
 {
     wctx_t             *ctx = (wctx_t *) arg;
     lm_status_t         color = (lm_status_t)ctx->subsumes;
-    if ( ctx->successor->lattice == l ) {
-        if ((status & color) == 0)
-            lm_set_status (global->lmap, loc, status | color);
-        ctx->done = 1;
-        return LM_CB_STOP;
+
+    if (UPDATE != 0 && (color & LM_RED)) {
+        int *succ_l = (int *) &ctx->successor->lattice;
+        if ( (status & LM_RED) &&
+                    GBisCoveredByShort(ctx->model, succ_l, (int*)&l) ) {
+                ctx->done = 1;
+                //return LM_CB_STOP; // continue to remove blue states
+        } else if (status & LM_BOTH) { // remove subsumed blue and red states
+            if ( GBisCoveredByShort(ctx->model, (int*)&l, succ_l) ) {
+                lm_delete (global->lmap, loc);
+                ctx->last = (LM_NULL_LOC == ctx->last ? loc : ctx->last);
+                ctx->counters.deletes++;
+            }
+        }
+    } else {
+        if ( ctx->successor->lattice == l ) {
+            if ((status & color) == 0)
+                lm_set_status (global->lmap, loc, status | color);
+            ctx->done = 1;
+            return LM_CB_STOP;
+        }
     }
+
     return LM_CB_NEXT;
 }
 
 static inline int
 ta_cndfs_mark (wctx_t *ctx, state_info_t *state, lm_status_t color)
 {
-    lm_lock (global->lmap, state->ref);
     lm_loc_t            last;
-
     ctx->successor = state;
     ctx->subsumes = color;
     ctx->done = 0;
     ctx->last = LM_NULL_LOC;
+
+    lm_lock (global->lmap, state->ref);
     last = lm_iterate (global->lmap, state->ref, ta_cndfs_spray, ctx);
     if (!ctx->done) {
         last = (LM_NULL_LOC == ctx->last ? last : ctx->last);
         lm_insert_from (global->lmap, state->ref, state->lattice, color, &last);
         ctx->counters.inserts++;
     }
-
     lm_unlock (global->lmap, state->ref);
+
     return ctx->done;
 }
 
@@ -3539,7 +3560,7 @@ ta_cndfs_subsumes_cyan (wctx_t *ctx, state_info_t *s)
             return true;
         }
         if (GBisCoveredByShort(ctx->model, (int*)&state.lattice, (int*)&s->lattice)) {
-            ctx->counters.deletes++;
+            ctx->red.deletes++;
             return true;
         }
         iteration++;
