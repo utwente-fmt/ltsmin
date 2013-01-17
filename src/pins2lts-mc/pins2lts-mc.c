@@ -3484,7 +3484,7 @@ ta_cndfs_remove_state (fset_t *table, state_info_t *s)
     state.ref = s->ref;
     state.lattice = s->lattice;
     int success = fset_delete (table, NULL, &state);
-    HREassert (success, "Could not remove key from set");
+    HREassert (success, "Could not remove lattice state (%zu,%zu) from set", s->ref, s->lattice);
 }
 
 /* maintain a linked list of cyan states with same concrete part on the stack */
@@ -3509,7 +3509,7 @@ static inline void
 ta_cndfs_previous (wctx_t *ctx, state_info_t *s)
 {
     hash32_t            hash = ref_hash (s->ref);
-    if (s->loc == (lm_loc_t)NULL) {
+    if (s->loc == (lm_loc_t)LM_NULL_LOC) {
         int res = fset_delete (ctx->cyan2, &hash, &s->ref);
         HREassert (res, "state %zu not in Cyan2 table", s->ref);
         return;
@@ -3590,9 +3590,10 @@ ta_cndfs_is_cyan (wctx_t *ctx, state_info_t *s, raw_data_t d, bool add_if_absent
     if (UPDATE == 1) {
         if (add_if_absent) { // BOTH stacks:
             bool result = ta_cndfs_subsumes_cyan (ctx, s);
+            result = ta_cndfs_has_state(ctx->cyan, s, add_if_absent);
             if (!result && add_if_absent)
                 ta_cndfs_next (ctx, d, &ctx->state);
-            return ta_cndfs_has_state(ctx->cyan, s, add_if_absent);
+            return result;
         } else {
             return ta_cndfs_subsumes_cyan (ctx, s);
         }
