@@ -3206,7 +3206,8 @@ ta_covered_nb (void *arg, lattice_t l, lm_status_t status, lm_loc_t loc)
         if (LM_NULL_LOC == ctx->added_at) { // replace first waiting, will be added to waiting set
             if (!lm_cas_update (global->lmap, loc, l, status, lattice, (lm_status_t)TA_WAITING)) {
                 lattice_t n = lm_get (global->lmap, loc);
-                if (n == NULL_LATTICE) return false;
+                if (n == NULL_LATTICE) // deleted
+                    return LM_CB_NEXT;
                 lm_status_t s = lm_get_status (global->lmap, loc);
                 return ta_covered_nb (arg, n, s, loc); // retry
             } else {
@@ -3425,11 +3426,13 @@ ta_cndfs_subsumed (wctx_t *ctx, state_info_t *state, lm_status_t color)
     ctx->subsumes = color;
     ctx->done = 0;
     ctx->successor = state;
-
-    lm_lock (global->lmap, state->ref);
-    lm_iterate (global->lmap, state->ref, ta_cndfs_covered, ctx);
-    lm_unlock (global->lmap, state->ref);
-
+    if (NONBLOCKING) {
+        lm_iterate (global->lmap, state->ref, ta_cndfs_covered, ctx);
+    } else {
+        lm_lock (global->lmap, state->ref);
+        lm_iterate (global->lmap, state->ref, ta_cndfs_covered, ctx);
+        lm_unlock (global->lmap, state->ref);
+    }
     return ctx->done;
 }
 
@@ -3466,6 +3469,51 @@ ta_cndfs_spray (void *arg, lattice_t l, lm_status_t status, lm_loc_t loc)
     return LM_CB_NEXT;
 }
 
+lm_cb_t
+ta_cndfs_spray_nb (void *arg, lattice_t l, lm_status_t status, lm_loc_t loc)
+{
+    wctx_t             *ctx = (wctx_t *) arg;
+    lm_status_t         color = (lm_status_t)ctx->subsumes;
+
+    if (UPDATE != 0) {
+        lattice_t lattice = ctx->successor->lattice;
+        int *succ_l = (int *)&lattice;
+        if ( ((status & color) && ctx->successor->lattice == l) ||
+             ((status & LM_RED) &&
+                    GBisCoveredByShort(ctx->model, succ_l, (int*)&l)) ) {
+            ctx->done = 1;
+            if (color & LM_BLUE) // only red marking should continue to remove blue states
+                return LM_CB_STOP;
+        } else if (color & LM_RED) { // remove subsumed blue and red states
+            if ( GBisCoveredByShort(ctx->model, (int*)&l, succ_l) ) {
+                if (!ctx->done) {
+                    if (!lm_cas_update (global->lmap, loc, l, status, lattice, color)) {
+                        lattice_t n = lm_get (global->lmap, loc);
+                        if (n == NULL_LATTICE) // deleted
+                            return LM_CB_NEXT;
+                        lm_status_t s = lm_get_status (global->lmap, loc);
+                        return ta_covered_nb (arg, n, s, loc); // retry
+                    } else {
+                        ctx->done = 1;
+                    }
+                } else {                            // delete second etc
+                    lm_cas_delete (global->lmap, loc, l, status);
+                    ctx->counters.deletes++;
+                }
+            }
+        }
+    } else {
+        if ( ctx->successor->lattice == l ) {
+            if ((status & color) == 0) // ? always inserted with color ?
+                lm_set_status (global->lmap, loc, status | color);
+            ctx->done = 1;
+            return LM_CB_STOP;
+        }
+    }
+
+    return LM_CB_NEXT;
+}
+
 static inline int
 ta_cndfs_mark (wctx_t *ctx, state_info_t *state, lm_status_t color)
 {
@@ -3475,15 +3523,22 @@ ta_cndfs_mark (wctx_t *ctx, state_info_t *state, lm_status_t color)
     ctx->done = 0;
     ctx->last = LM_NULL_LOC;
 
-    lm_lock (global->lmap, state->ref);
-    last = lm_iterate (global->lmap, state->ref, ta_cndfs_spray, ctx);
-    if (!ctx->done) {
-        last = (LM_NULL_LOC == ctx->last ? last : ctx->last);
-        lm_insert_from (global->lmap, state->ref, state->lattice, color, &last);
-        ctx->counters.inserts++;
+    if (NONBLOCKING) {
+        last = lm_iterate (global->lmap, state->ref, ta_cndfs_spray_nb, ctx);
+        if (!ctx->done) {
+            lm_insert_from_cas (global->lmap, state->ref, state->lattice, color, &last);
+            ctx->counters.inserts++;
+        }
+    } else {
+        lm_lock (global->lmap, state->ref);
+        last = lm_iterate (global->lmap, state->ref, ta_cndfs_spray, ctx);
+        if (!ctx->done) {
+            last = (LM_NULL_LOC == ctx->last ? last : ctx->last);
+            lm_insert_from (global->lmap, state->ref, state->lattice, color, &last);
+            ctx->counters.inserts++;
+        }
+        lm_unlock (global->lmap, state->ref);
     }
-    lm_unlock (global->lmap, state->ref);
-
     return ctx->done;
 }
 
