@@ -3439,13 +3439,15 @@ ta_cndfs_spray (void *arg, lattice_t l, lm_status_t status, lm_loc_t loc)
     wctx_t             *ctx = (wctx_t *) arg;
     lm_status_t         color = (lm_status_t)ctx->subsumes;
 
-    if (UPDATE != 0 && (color & LM_RED)) {
+    if (UPDATE != 0) {
         int *succ_l = (int *) &ctx->successor->lattice;
-        if ( (status & LM_RED) &&
-                    GBisCoveredByShort(ctx->model, succ_l, (int*)&l) ) {
-                ctx->done = 1;
-                //return LM_CB_STOP; // continue to remove blue states
-        } else if (status & LM_BOTH) { // remove subsumed blue and red states
+        if ( ((status & color) && ctx->successor->lattice == l) ||
+             ((status & LM_RED) &&
+                    GBisCoveredByShort(ctx->model, succ_l, (int*)&l)) ) {
+            ctx->done = 1;
+            if (color & LM_BLUE) // only red marking should continue to remove blue states
+                return LM_CB_STOP;
+        } else if ((color & LM_RED)) { // remove subsumed blue and red states
             if ( GBisCoveredByShort(ctx->model, (int*)&l, succ_l) ) {
                 lm_delete (global->lmap, loc);
                 ctx->last = (LM_NULL_LOC == ctx->last ? loc : ctx->last);
