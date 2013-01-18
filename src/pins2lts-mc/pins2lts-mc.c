@@ -3488,11 +3488,11 @@ ta_cndfs_spray_nb (void *arg, lattice_t l, lm_status_t status, lm_loc_t loc)
             if ( GBisCoveredByShort(ctx->model, (int*)&l, succ_l) ) {
                 if (!ctx->done) {
                     if (!lm_cas_update (global->lmap, loc, l, status, lattice, color)) {
-                        lattice_t n = lm_get (global->lmap, loc);
-                        if (n == NULL_LATTICE) // deleted
+                        l = lm_get (global->lmap, loc);
+                        if (l == NULL_LATTICE) // deleted
                             return LM_CB_NEXT;
-                        lm_status_t s = lm_get_status (global->lmap, loc);
-                        return ta_covered_nb (arg, n, s, loc); // retry
+                        status = lm_get_status (global->lmap, loc);
+                        return ta_cndfs_spray_nb (arg, l, status, loc); // retry
                     } else {
                         ctx->done = 1;
                     }
@@ -3505,11 +3505,11 @@ ta_cndfs_spray_nb (void *arg, lattice_t l, lm_status_t status, lm_loc_t loc)
     } else {
         if ( ctx->successor->lattice == l ) {
             if (!lm_cas_update (global->lmap, loc, l, status, lattice, status|color)) {
-                lattice_t n = lm_get (global->lmap, loc);
-                if (n == NULL_LATTICE) // deleted
+                l = lm_get (global->lmap, loc);
+                if (l == NULL_LATTICE) // deleted
                     return LM_CB_NEXT;
-                lm_status_t s = lm_get_status (global->lmap, loc);
-                return ta_covered_nb (arg, n, s, loc); // retry
+                status = lm_get_status (global->lmap, loc);
+                return ta_cndfs_spray_nb (arg, l, status, loc); // retry
             } else {
                 ctx->done = 1;
                 return LM_CB_STOP;
