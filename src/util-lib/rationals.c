@@ -4,7 +4,7 @@
 #include <math.h>
 
 #include <hre/user.h>
-#include <lts-lib/rationals.h>
+#include <util-lib/rationals.h>
 
 uint32_t gcd32(uint32_t a,uint32_t b){
     uint32_t tmp;

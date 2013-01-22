@@ -4,7 +4,7 @@
 #include <stdlib.h>
 
 #include <hre/user.h>
-#include <lts-lib/rationals.h>
+#include <util-lib/rationals.h>
 #include <lts-lib/lts.h>
 #include <hre/stringindex.h>
 

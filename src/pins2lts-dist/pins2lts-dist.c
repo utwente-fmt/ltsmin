@@ -25,6 +25,7 @@
 #include <util-lib/treedbs.h>
 #include <util-lib/string-map.h>
 
+
 struct dist_thread_context {
     model_t model;
     lts_file_t output;
@@ -34,7 +35,7 @@ struct dist_thread_context {
     array_manager_t state_man;
     uint32_t *parent_ofs;
     uint16_t *parent_seg;
-    size_t explored,visited,transitions,level,deadlocks,errors,violations;
+    size_t explored,visited,transitions,targets,level,deadlocks,errors,violations;
     ltsmin_parse_env_t env;
 };
 
@@ -57,7 +58,6 @@ static int              mpi_nodes;
 static int              dst_ofs=2;
 static int              lbl_ofs;
 static char*            label_filter=NULL;
-
 
 static  struct poptOption options[] = {
     { "filter" , 0 , POPT_ARG_STRING , &label_filter , 0 ,
@@ -117,7 +117,7 @@ static inline void adjust_owner(int32_t *state){
     chk_base=SuperFastHash((char*)state,size*4,0);
 }
 
-static inline int owner(int32_t *state){
+static inline int owner(int *state){
     uint32_t hash=chk_base^SuperFastHash((char*)state,size*4,0);
     return (hash%mpi_nodes);
 }
@@ -128,13 +128,13 @@ struct src_info {
     int seg;
     int ofs;
     hre_task_t new_trans;
+    stream_t fifo;
     struct dist_thread_context *ctx;
 };
 
 static void callback(void*context,transition_info_t*info,int*dst){
     struct src_info *ctx  = (struct src_info*)context;
     action_detect (ctx->ctx, info);
-    int who=owner(dst);
     uint32_t trans[trans_len];
     trans[0]=ctx->ofs;
     for(int i=0;i<size;i++){
@@ -143,7 +143,11 @@ static void callback(void*context,transition_info_t*info,int*dst){
     for(int i=0;i<edge_labels;i++){
         trans[lbl_ofs+i]=info->labels[i];
     }
-    TaskSubmitFixed(ctx->new_trans,who,trans);
+    if (ctx->fifo==NULL){
+        TaskSubmitFixed(ctx->new_trans,owner(dst),trans);
+    } else {
+        stream_write(ctx->fifo,trans,sizeof(trans));
+    }
 }
 
 static void new_transition(void*context,int src_seg,int len,void*arg){
@@ -163,7 +167,185 @@ static void new_transition(void*context,int src_seg,int len,void*arg){
         lts_write_edge(ctx->output,src_seg,trans,ctx->mpi_me,&temp,trans+lbl_ofs);
     }
     ctx->tcount[src_seg]++;
-    ctx->transitions++;
+    ctx->targets++;
+}
+
+
+struct repr_info {
+    int first;
+    int next;
+    int last;
+    int number;
+    int low_number;
+    int low_state;
+    int back;
+};
+
+struct repr_context {
+    array_manager_t state_man;
+    array_manager_t trans_man;
+    int* trans;
+    struct repr_info *info;
+    treedbs_t dbs;
+    int trans_next;
+};
+
+static void discard_callback(void*context,transition_info_t*ti,int*dst){
+}
+
+static void repr_callback(void*context,transition_info_t*ti,int*dst){
+    struct repr_context *ctx  = (struct repr_context*)context;
+    int idx;
+    if (!TreeFold_ret(ctx->dbs,dst,&idx)){
+        //Warning(info,"new index %d",idx);
+        ensure_access(ctx->state_man,idx);
+        ctx->info[idx].first=-1;
+    } else {
+        //Warning(info,"old index %d",idx);
+    }
+    ensure_access(ctx->trans_man,ctx->trans_next);
+    ctx->trans[ctx->trans_next]=idx;
+    ctx->trans_next++;
+}
+
+static void repr_explore(struct repr_context* ctx,model_t model,matrix_t* confluent,int idx,int *state){
+    ctx->info[idx].first=ctx->trans_next;
+    ctx->info[idx].next=ctx->trans_next;
+    int trans=GBgetTransitionsMarked(model,confluent,0,state,repr_callback,ctx);
+    ctx->info[idx].last=ctx->trans_next;
+    if (trans!=(ctx->info[idx].last-ctx->info[idx].first)) Abort("confluent hyper edge detected");
+    if (trans>0){
+        Debug("marked confluent edges found (%d).",trans);
+        return;
+    }
+    if (trans==0) {
+      Debug("check silent steps for single edge, without non-confluence markers.");
+      trans=GBgetTransitionsMarked(model,confluent,1,state,repr_callback,ctx);
+      ctx->info[idx].last=ctx->trans_next;
+      if (trans!=1) {
+        Debug("not a single silent edge.");
+        ctx->info[idx].last=ctx->info[idx].first;
+        ctx->trans_next=ctx->info[idx].first;
+        return;
+      }
+      if (trans!=(ctx->info[idx].last-ctx->info[idx].first)) {
+        Debug("hyper edge does not count as confluent.");
+        ctx->info[idx].last=ctx->info[idx].first;
+        ctx->trans_next=ctx->info[idx].first;
+        return;
+      }
+      trans=GBgetTransitionsMarked(model,confluent,2,state,discard_callback,NULL);
+      if (trans!=0) {
+        Debug("any non-confluent marker makes step non-confluent.");
+        ctx->info[idx].last=ctx->info[idx].first;
+        ctx->trans_next=ctx->info[idx].first;
+        return;
+      }
+      lts_type_t ltstype=GBgetLTStype(model);
+      int N=lts_type_get_state_length(ltstype);
+      int S=lts_type_get_state_label_count(ltstype);
+      if (S>0) {
+          Debug("checking state labels");
+          int L1[S];
+          int S2[N];
+          int L2[S];
+          TreeUnfold(ctx->dbs,ctx->trans[ctx->info[idx].first],S2);
+          GBgetStateLabelsAll(model,state,L1);
+          GBgetStateLabelsAll(model,S2,L2);
+          for(int i=0;i<S;i++){
+            if (L1[i]!=L2[i]){
+              Debug("not silent due to state label %d difference",i);
+              ctx->info[idx].last=ctx->info[idx].first;
+              ctx->trans_next=ctx->info[idx].first;
+              return;
+            }
+          }
+      }
+      Debug("dynamic confluent edge.");
+    }
+}
+
+int state_less(treedbs_t dbs,int N,int idx1,int idx2){
+    int s1[N];
+    int s2[N];
+    TreeUnfold(dbs,idx1,s1);
+    TreeUnfold(dbs,idx2,s2);
+    for(int i=0;i<N;i++){
+        if (s1[i] < s2[i]) return 1;
+        if (s1[i] > s2[i]) return 0;
+    }
+    return 0;
+}
+
+static void get_repr(model_t model,matrix_t* confluent,int *state){
+    lts_type_t ltstype=GBgetLTStype(model);
+    int N=lts_type_get_state_length(ltstype);
+    struct repr_context ctx;
+
+    ctx.trans_man=create_manager(256);
+    ctx.trans=NULL;
+    ctx.trans_next=0;
+    ADD_ARRAY(ctx.trans_man,ctx.trans,int);
+    
+    ctx.state_man=create_manager(256);
+    ctx.info=NULL;
+    ADD_ARRAY(ctx.state_man,ctx.info,struct repr_info);
+    
+    ctx.dbs=TreeDBScreate(N);    
+
+    int current=TreeFold(ctx.dbs,state);
+    if (current!=0) Abort("root is not 0");
+    repr_explore(&ctx,model,confluent,0,state);
+    ctx.info[0].number=0;
+    int next_number=1;
+    int next;
+    for(;;){
+        if(ctx.info[current].first==-1){
+            TreeUnfold(ctx.dbs,current,state);
+            repr_explore(&ctx,model,confluent,current,state);
+            ctx.info[current].number=next_number;
+            ctx.info[current].low_number=next_number;
+            ctx.info[current].low_state=current;
+            next_number++;
+            if(ctx.info[current].first==ctx.info[current].last){
+                //Warning(info,"trivial TSCC found");
+                break;
+            }
+        }
+        if (ctx.info[current].next<ctx.info[current].last) {
+          next=ctx.trans[ctx.info[current].next];
+          ctx.info[current].next++;
+          if (ctx.info[next].first==-1){
+            ctx.info[next].back=current;
+            current=next;  
+          } else {
+            if (ctx.info[next].number < ctx.info[current].low_number){
+                ctx.info[current].low_number = ctx.info[next].number;
+            }
+            if (state_less(ctx.dbs,N,next,ctx.info[current].low_state)){
+                ctx.info[current].low_state = next;
+            }
+          }
+          continue;
+        }
+        if (ctx.info[current].low_number==ctx.info[current].number) {
+            //Warning(info,"non-trivial TSCC found");
+            break;
+        }
+        next=ctx.info[current].back;
+        if (ctx.info[current].low_number < ctx.info[next].low_number) {
+            ctx.info[next].low_number=ctx.info[current].low_number;
+        }
+        if (state_less(ctx.dbs,N,ctx.info[current].low_state,ctx.info[next].low_state)){
+            ctx.info[next].low_state = ctx.info[current].low_state;
+        }
+        current=next;
+    }
+
+    TreeUnfold(ctx.dbs,ctx.info[current].low_state,state);
+    destroy_manager(ctx.trans_man);
+    destroy_manager(ctx.state_man);
+    TreeDBSfree(ctx.dbs);
 }
 
 int main(int argc, char*argv[]){
@@ -202,6 +384,42 @@ int main(int argc, char*argv[]){
     HREbarrier(HREglobal());
     Warning(info,"model created");
     lts_type_t ltstype=GBgetLTStype(model);
+
+    int class_label=lts_type_find_edge_label(ltstype,LTSMIN_EDGE_TYPE_ACTION_CLASS);
+    matrix_t *inhibit_matrix=NULL;
+    matrix_t *class_matrix=NULL;
+    matrix_t *confluence_matrix=NULL;
+    {
+        int id=GBgetMatrixID(model,"inhibit");
+        if (id>=0){
+            inhibit_matrix=GBgetMatrix(model,id);
+            Warning(infoLong,"inhibit matrix is:");
+            if (log_active(infoLong)) dm_print(stderr,inhibit_matrix);
+        } else {
+            Warning(infoLong,"no inhibit matrix");
+        }
+        id = GBgetMatrixID(model,LTSMIN_EDGE_TYPE_ACTION_CLASS);
+        if (id>=0){
+            class_matrix=GBgetMatrix(model,id);
+            Warning(infoLong,"inhibit class matrix is:");
+            if (log_active(infoLong)) dm_print(stderr,class_matrix);
+        } else {
+            Warning(infoLong,"no inhibit class matrix");
+        }
+        if (class_label>=0) {
+            Warning(infoLong,"inhibit class label is %d",class_label);
+        } else {
+            Warning(infoLong,"no inhibit class label");
+        }
+        id = GBgetMatrixID(model,"confluent");
+        if (id>=0){
+            confluence_matrix=GBgetMatrix(model,id);
+            Warning(infoLong,"confluence matrix is:");
+            if (log_active(infoLong)) dm_print(stderr,confluence_matrix);
+        } else {
+            Warning(infoLong,"no confluence matrix");
+        }
+    }
 
     /* Initializing according to the options just parsed.
      */
@@ -249,12 +467,17 @@ int main(int argc, char*argv[]){
     /***************************************************/
     GBgetInitialState(model,src);
     Warning(info,"initial state computed at %d",ctx.mpi_me);
+    if (confluence_matrix!=NULL){
+      get_repr(model,confluence_matrix,src);
+      Warning(info,"representative of initial state computed at %d",ctx.mpi_me);
+    }
     adjust_owner(src);
     Warning(info,"initial state translated at %d",ctx.mpi_me);
-    size_t global_visited,global_explored,global_transitions;
+    size_t global_visited,global_explored,global_transitions,global_targets;
     size_t global_deadlocks,global_errors,global_violations;
     ctx.explored=0;
     ctx.transitions=0;
+    ctx.targets=0;
     ctx.level=0;
     ctx.deadlocks=0;
     ctx.errors=0;
@@ -262,6 +485,7 @@ int main(int argc, char*argv[]){
     global_visited=1;
     global_explored=0;
     global_transitions=0;
+    global_targets=0;
     if(ctx.mpi_me==0){
         Warning(info,"folding initial state at %d",ctx.mpi_me);
         if (TreeFold(ctx.dbs,src)) Fatal(1,error,"Initial state wasn't assigned state no 0");
@@ -274,12 +498,16 @@ int main(int argc, char*argv[]){
     if (files[1]) {
         Warning(info,"Writing output to %s",files[1]);
         write_lts=1;
+        // get default filter.
+        string_set_t label_set=GBgetDefaultFilter(model);
+        // get command line override if it exists.
+        if (label_filter!=NULL){
+            label_set=SSMcreateSWPset(label_filter);
+        }
         if (write_state) {
             // write-state means write everything.
             ctx.output=lts_file_create(files[1],ltstype,mpi_nodes,lts_index_template());
-        } else if (label_filter!=NULL) {
-            string_set_t label_set=SSMcreateSWPset(label_filter);
-            Print(info,"label filter is \"%s\"",label_filter);
+        } else if (label_set!=NULL) {
             ctx.output=lts_file_create_filter(files[1],ltstype,label_set,mpi_nodes,lts_index_template());
             write_state=1;
         } else {
@@ -309,6 +537,11 @@ int main(int argc, char*argv[]){
     struct src_info src_ctx;
     src_ctx.new_trans=TaskCreate(task_queue,1,65536,new_transition,&ctx,trans_len*4);
     src_ctx.ctx = &ctx;
+    if (confluence_matrix==NULL) {
+        src_ctx.fifo=NULL;
+    } else {
+        src_ctx.fifo=FIFOcreate(4096);
+    }
     rt_timer_t timer = RTcreateTimer();
     /***************************************************/
 
@@ -330,7 +563,39 @@ int main(int argc, char*argv[]){
             src_ctx.ofs=ctx.explored;
             ctx.explored++;
             invariant_detect (&ctx, src);
-            int count=GBgetTransitionsAll(model,src,callback,&src_ctx);
+            int count;
+            if (inhibit_matrix!=NULL){
+                    int N=dm_nrows(inhibit_matrix);
+                    int class_count[N];
+                    count=0;
+                    for(int i=0;i<N;i++){
+                        class_count[i]=0;
+                        int j=0;
+                        for(;j<i;j++){
+                            if (class_count[j]>0 && dm_is_set(inhibit_matrix,j,i)) break;
+                        }
+                        if (j<i) continue;
+                        if (class_label>=0){
+                            class_count[i]=GBgetTransitionsMatching(model,class_label,i,src,callback,&src_ctx);
+                        } else if (class_matrix!=NULL) {
+                            class_count[i]=GBgetTransitionsMarked(model,class_matrix,i,src,callback,&src_ctx);
+                        } else {
+                            Abort("inhibit set, but no known classification found.");
+                        }
+                        count+=class_count[i];
+                    }
+            } else {
+                count=GBgetTransitionsAll(model,src,callback,&src_ctx);
+            }
+            ctx.transitions+=count;
+            if(confluence_matrix!=NULL){
+              int trans[trans_len];
+              while(FIFOsize(src_ctx.fifo)>0){
+                stream_read(src_ctx.fifo,trans,sizeof(trans));
+                get_repr(model,confluence_matrix,trans+dst_ofs);
+                TaskSubmitFixed(src_ctx.new_trans,owner(trans+dst_ofs),trans);
+              }
+            }
             if (count<0) Abort("error in GBgetTransitionsAll");
             deadlock_detect (&ctx, src, count);
             if(write_lts && write_state){
@@ -353,6 +618,7 @@ int main(int argc, char*argv[]){
         HREreduce(HREglobal(),1,&ctx.visited,&global_visited,UInt64,Sum);
         HREreduce(HREglobal(),1,&ctx.explored,&global_explored,UInt64,Sum);
         HREreduce(HREglobal(),1,&ctx.transitions,&global_transitions,UInt64,Sum);
+        HREreduce(HREglobal(),1,&ctx.targets,&global_targets,UInt64,Sum);
         if (global_visited==global_explored) break;
     }
     RTstopTimer(timer);
@@ -363,8 +629,18 @@ int main(int argc, char*argv[]){
     HREreduce(HREglobal(),1,&ctx.violations,&global_violations,UInt64,Sum);
 
     if (ctx.mpi_me==0) {
-        Warning(info,"state space has %zu levels %zu states %zu transitions",
-            ctx.level,global_explored,global_transitions);
+        if (global_transitions==0 && global_targets>0) {
+            Warning(error,"language module fails to report the number of transitions");
+            Warning(error,"assuming number of transitions is number of targets");
+            global_transitions=global_targets;
+        }
+        if (global_targets > global_transitions) {
+            Warning(info,"state space has %zu levels %zu states %zu transitions %zu targets",
+                ctx.level,global_explored,global_transitions,global_targets);
+        } else {
+            Warning(info,"state space has %zu levels %zu states %zu transitions",
+                ctx.level,global_explored,global_transitions);
+        }
         RTprintTimer (info, timer, "Exploration time");
 
         if (no_exit || log_active(infoLong))

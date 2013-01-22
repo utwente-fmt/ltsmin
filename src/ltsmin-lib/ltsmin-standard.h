@@ -45,11 +45,15 @@
  * Edges
  */
 
-/* tau actions */
+/** The invisible action.
+ */
 #define LTSMIN_EDGE_VALUE_TAU           "tau"
 
-/* actions (has to be a prefix: defined as "action_label" in mcrl) */
+/** actions (has to be a prefix: defined as "action_label" in mcrl) */
 #define LTSMIN_EDGE_TYPE_ACTION_PREFIX  "action"
+
+/** actions class, for use in e.g. Mapa models. */
+#define LTSMIN_EDGE_TYPE_ACTION_CLASS  "action_class"
 
 /**
  * Statements, used for:
@@ -60,6 +64,15 @@
  **/
 #define LTSMIN_EDGE_TYPE_STATEMENT      "statement"
 
+/**
+@brief The name and type of the hyper edge group.
+
+Hyper edges are represented using an extra edge label.
+If the value of this label is 0 then the edge is not an hyper edge.
+Otherwise edges, which start is the same state and are marked with the same hyper edge group
+are part of a single hyper edge.
+*/
+#define LTSMIN_EDGE_TYPE_HYPEREDGE_GROUP "group" 
 
 /**
  * States labels

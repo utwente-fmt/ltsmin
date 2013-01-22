@@ -195,6 +195,13 @@ extern void lts_read_tra(const char*tra,lts_t lts);
  */
 extern void lts_write_tra(const char*tra,lts_t lts);
 
+
+/**
+ Write a Markov Automaton in IMCA format.
+ */
+extern void lts_write_imca(const char*imca,lts_t lts);
+
+ 
 /**
  Merge the second LTS into the first and destroy the second LTS.
  */

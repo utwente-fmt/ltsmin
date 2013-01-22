@@ -4,7 +4,7 @@
 
 #include <lts-lib/lts.h>
 #include <lts-lib/lowmem.h>
-#include <lts-lib/rationals.h>
+#include <util-lib/rationals.h>
 #include <util-lib/fast_hash.h>
 
 static int rehash(int h){

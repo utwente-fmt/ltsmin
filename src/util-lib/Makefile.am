@@ -9,6 +9,7 @@ libutil_la_SOURCES += dynamic-array.c dynamic-array.h
 libutil_la_SOURCES += fast_hash.c fast_hash.h
 libutil_la_SOURCES += fast_set.c fast_set.h
 libutil_la_SOURCES += MurmurHash3.c MurmurHash3.h
+libutil_la_SOURCES += rationals.c rationals.h
 libutil_la_SOURCES += string-map.c string-map.h
 libutil_la_SOURCES += tables.c tables.h
 libutil_la_SOURCES += treedbs.c treedbs.h

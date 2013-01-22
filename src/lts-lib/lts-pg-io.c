@@ -5,7 +5,7 @@
 #include <stdbool.h>
 
 #include <hre/user.h>
-#include <lts-lib/rationals.h>
+#include <util-lib/rationals.h>
 #include <lts-lib/lts-pg-io.h>
 #include <pins-lib/pg-types.h>
 

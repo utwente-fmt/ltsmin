@@ -3,10 +3,13 @@
 
 #include <dm/dm.h>
 #include <hre/user.h>
+#include <hre/stringindex.h>
 #include <ltsmin-lib/ltsmin-standard.h>
 #include <pins-lib/pins.h>
 #include <pins-lib/pins2pins-mucalc.h>
 #include <util-lib/treedbs.h>
+
+/** \file pins.c */
 
 struct grey_box_model {
 	model_t parent;
@@ -29,6 +32,7 @@ struct grey_box_model {
 	void*context;
 	next_method_grey_t next_short;
 	next_method_grey_t next_long;
+	next_method_matching_t next_matching;
 	next_method_black_t next_all;
 	get_label_method_t state_labels_short;
 	get_label_method_t state_labels_long;
@@ -44,7 +48,67 @@ struct grey_box_model {
     chunkatint_t chunkatint;
 	get_count_t get_count;
 	void** map;
+	string_set_t default_filter;
+	
+	/** Index of static information matrices. */
+	string_index_t static_info_index;
+	/** Array of static information matrices. */
+	struct static_info_matrix * static_info_matrices;
 };
+
+struct static_info_matrix{
+    const char* name;
+    matrix_t*matrix;
+    pins_strictness_t strictness;
+    index_class_t row_info;
+    index_class_t column_info;
+};
+
+int GBsetMatrix(
+    model_t model,
+    const char*name,
+    matrix_t *matrix,
+    pins_strictness_t strictness,
+    index_class_t row_info,
+    index_class_t column_info
+){
+    int res=SIput(model->static_info_index,name);
+    model->static_info_matrices[res].name=name;
+    model->static_info_matrices[res].matrix=matrix;
+    model->static_info_matrices[res].strictness=strictness;
+    model->static_info_matrices[res].row_info=row_info;
+    model->static_info_matrices[res].column_info=column_info;
+    return res;
+}
+
+
+int GBgetMatrixID(model_t model,char*name){
+    return SIlookup(model->static_info_index,name);
+}
+
+int GBgetMatrixCount(model_t model){
+    return SIgetCount(model->static_info_index);
+}
+
+const char* GBgetMatrixName(model_t model,int ID){
+    return model->static_info_matrices[ID].name;
+}
+
+matrix_t* GBgetMatrix(model_t model,int ID){
+    return model->static_info_matrices[ID].matrix;
+}
+
+pins_strictness_t GBgetMatrixStrictness(model_t model,int ID){
+    return model->static_info_matrices[ID].strictness;
+}
+
+index_class_t GBgetMatrixRowInfo(model_t model,int ID){
+    return model->static_info_matrices[ID].row_info;
+}
+
+index_class_t GBgetMatrixColumnInfo(model_t model,int ID){
+    return model->static_info_matrices[ID].column_info;
+}
 
 struct nested_cb {
 	model_t model;
@@ -97,6 +161,18 @@ int default_long(model_t self,int group,int*src,TransitionCB cb,void*context){
 	dm_project_vector(GBgetDMInfo(self), group, src, src_short);
 
 	return self->next_short(self,group,src_short,expand_dest,&info);
+}
+
+
+int GBgetTransitionsMarked(model_t self,matrix_t* matrix,int row,int*src,TransitionCB cb,void*context){
+    int N=dm_ncols(matrix);
+    int res=0;
+    for(int i=0;i<N;i++){
+        if (dm_is_set(matrix,row,i)){
+            res+=self->next_long(self,i,src,cb,context);
+        }
+    }
+    return res;
 }
 
 int default_all(model_t self,int*src,TransitionCB cb,void*context){
@@ -203,6 +279,44 @@ wrapped_state_labels_default_all(model_t model, int *state, int *labels)
     return GBgetStateLabelsAll(GBgetParent(model), state, labels);
 }
 
+struct filter_context {
+    void *user_ctx;
+    TransitionCB user_cb;
+    int idx;
+    int value;
+    int count;
+    int group_idx;
+    int group_val;
+};
+
+static void matching_callback(void*context,transition_info_t*ti,int*dst){
+    struct filter_context* ctx=(struct filter_context*)context;
+    if (ti->labels[ctx->idx]==ctx->value){
+        ctx->user_cb(ctx->user_ctx,ti,dst);
+        if (ctx->group_idx>=0){
+            if (ti->labels[ctx->group_idx]==0 || ti->labels[ctx->group_idx]!=ctx->group_val){
+                ctx->group_val=ti->labels[ctx->group_idx];
+                ctx->count++;
+            }
+        } else {
+            ctx->count++;
+        }
+    }
+}
+
+static int next_matching_default(model_t model,int label_idx,int value,int*src,TransitionCB cb,void*context){
+    struct filter_context ctx;
+    ctx.user_ctx=context;
+    ctx.user_cb=cb;
+    ctx.idx=label_idx;
+    ctx.group_idx=lts_type_find_edge_label(model->ltstype,LTSMIN_EDGE_TYPE_HYPEREDGE_GROUP);
+    ctx.value=value;
+    ctx.count=0;
+    ctx.group_val=0;        
+    GBgetTransitionsAll(model,src,matching_callback,&ctx);
+    return ctx.count;
+}
+
 
 model_t GBcreateBase(){
 	model_t model=(model_t)RTmalloc(sizeof(struct grey_box_model));
@@ -227,6 +341,7 @@ model_t GBcreateBase(){
 	model->context=0;
 	model->next_short=default_short;
 	model->next_long=default_long;
+	model->next_matching=next_matching_default;
 	model->next_all=default_all;
 	model->state_labels_short=state_labels_default_short;
 	model->state_labels_long=state_labels_default_long;
@@ -239,6 +354,10 @@ model_t GBcreateBase(){
 	model->chunk2int=NULL;
 	model->map=NULL;
 	model->get_count=NULL;
+	
+	model->static_info_index=SIcreate();
+	model->static_info_matrices=NULL;
+	ADD_ARRAY(SImanager(model->static_info_index),model->static_info_matrices,struct static_info_matrix);
 	return model;
 }
 
@@ -465,6 +584,14 @@ void GBsetNextStateLong(model_t model,next_method_grey_t method){
 
 int GBgetTransitionsLong(model_t model,int group,int*src,TransitionCB cb,void*context){
 	return model->next_long(model,group,src,cb,context);
+}
+
+void GBsetNextStateMatching(model_t model,next_method_matching_t method){
+	model->next_matching=method;
+}
+
+int GBgetTransitionsMatching(model_t model,int label_idx,int value,int*src,TransitionCB cb,void*context){
+    return model->next_matching(model,label_idx,value,src,cb,context);
 }
 
 void GBsetIsCoveredBy(model_t model,covered_by_grey_t covered_by){
@@ -743,6 +870,7 @@ void GBprintDependencyMatrixCombined(FILE* file, model_t model) {
     }
 }
 
+
 /**********************************************************************
  * Grey box factory functionality
  */
@@ -1008,4 +1136,13 @@ GBgetChunkMap(model_t model,int type_no)
 {
 	return model->map[type_no];
 }
+
+void GBsetDefaultFilter(model_t model,string_set_t filter){
+    model->default_filter=filter;
+}
+
+string_set_t GBgetDefaultFilter(model_t model){
+    return model->default_filter;
+}
+
 

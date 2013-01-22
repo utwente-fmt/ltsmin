@@ -205,13 +205,15 @@ static struct {
     size_t errors;
     size_t visited;
     size_t explored;
-    size_t ntransitions;
+    size_t n_transitions;
+    size_t n_targets;
 } global = {
     .visited        = 0,
     .explored       = 0,
     .depth          = 0,
     .max_depth      = 0,
-    .ntransitions   = 0,
+    .n_transitions  = 0,
+    .n_targets      = 0,
     .deadlocks      = 0,
     .violations     = 0,
     .errors         = 0,
@@ -463,7 +465,7 @@ static void
 bfs_tree_closed_insert(gsea_state_t *state, void *arg) {
     // count depth
     if (gc.store.tree.level_bound == global.explored) {
-        if (log_active(infoLong)) Warning(info, "level %zu, has %zu states, explored %zu states %zu transitions", global.max_depth, global.visited - global.explored, global.explored, global.ntransitions);
+        if (log_active(infoLong)) Warning(info, "level %zu, has %zu states, explored %zu states %zu transitions", global.max_depth, global.visited - global.explored, global.explored, global.n_transitions);
 
         global.depth=++global.max_depth;
         gc.store.tree.level_bound = global.visited;
@@ -508,7 +510,7 @@ bfs_vset_foreach_open(foreach_open_cb open_cb, void *arg)
     while(!vset_is_empty(gc.store.vset.next_set)) {
         vset_copy(gc.store.vset.current_set, gc.store.vset.next_set);
         vset_clear(gc.store.vset.next_set);
-        if (log_active(infoLong)) Warning(info, "level %zu, has %zu states, explored %zu states %zu transitions", global.max_depth, global.visited - global.explored, global.explored, global.ntransitions);
+        if (log_active(infoLong)) Warning(info, "level %zu, has %zu states, explored %zu states %zu transitions", global.max_depth, global.visited - global.explored, global.explored, global.n_transitions);
         global.depth++;
         vset_enum(gc.store.vset.current_set, (void(*)(void*,int*)) bfs_vset_foreach_open_enum_cb, &args);
         global.max_depth++;
@@ -630,12 +632,14 @@ dfs_state_next_all(gsea_state_t *state, void *arg)
     // update max depth
     if (global.depth > global.max_depth) {
         global.max_depth++;
-        if (log_active(infoLong)) Warning(info, "new level %zu, explored %zu states, %zu transitions", global.max_depth, global.explored, global.ntransitions);
+        if (log_active(infoLong)) Warning(info, "new level %zu, explored %zu states, %zu transitions", global.max_depth, global.explored, global.n_transitions);
     }
     // wrap with enter stack frame
     dfs_stack_enter(gc.queue.filo.stack);
     // original call
-    state->count = GBgetTransitionsAll (opt.model, state->state, gsea_process, state);
+    int T = GBgetTransitionsAll (opt.model, state->state, gsea_process, state);
+    state->count = T;
+    global.n_transitions += T;
     (void)arg;
 }
 
@@ -673,7 +677,7 @@ dfs_state_next_grey(gsea_state_t *state, void *arg)
     // update max depth
     if (global.depth > global.max_depth) {
         global.max_depth++;
-        if (log_active(infoLong)) Warning(info, "new level %zu, explored %zu states, %zu transitions", global.max_depth, global.explored, global.ntransitions);
+        if (log_active(infoLong)) Warning(info, "new level %zu, explored %zu states, %zu transitions", global.max_depth, global.explored, global.n_transitions);
     }
     // wrap with enter stack frame
     dfs_stack_enter(gc.queue.filo.stack);
@@ -685,7 +689,9 @@ dfs_state_next_grey(gsea_state_t *state, void *arg)
     // since the state is reexplored, it is counted more then once, so uncount again
     if (state->count != 0) global.explored--;
     for(; grey->group < (int)global.K && state->count == grey->count; grey->group++) {
-        state->count += GBgetTransitionsLong (opt.model, grey->group, state->state, gsea_process, state);
+        int T = GBgetTransitionsLong (opt.model, grey->group, state->state, gsea_process, state);
+        state->count += T;
+        global.n_transitions += T;
     }
     // sync state count
     grey->count = state->count;
@@ -1128,7 +1134,7 @@ scc_current_reconstruct (gsea_state_t *from, gsea_state_t *end)
             dfs_tree_stack_to_state (&state, NULL);
             dfs_stack_enter (gc.queue.filo.stack);
             ctx.found = 0;
-            GBgetTransitionsAll (opt.model, state.state, write_trace_next, &ctx);
+            global.n_transitions += GBgetTransitionsAll (opt.model, state.state, write_trace_next, &ctx);
         } else {
             dfs_stack_leave (gc.queue.filo.stack);
             state.tree.tree_idx = *dfs_stack_pop (gc.queue.filo.stack);
@@ -1200,7 +1206,9 @@ gsea_open_insert_condition_default(gsea_state_t *state, void *arg)
 static void
 gsea_state_next_all_default(gsea_state_t *state, void *arg)
 {
-    state->count = GBgetTransitionsAll (opt.model, state->state, gsea_process, state);
+    int T = GBgetTransitionsAll (opt.model, state->state, gsea_process, state);
+    state->count = T;
+    global.n_transitions += T;
     (void)arg;
 }
 
@@ -1209,7 +1217,9 @@ gsea_state_next_grey_default(gsea_state_t *state, void *arg)
 {
     state->count = 0;
     for (size_t i = 0; i < global.K; i++) {
-        state->count += GBgetTransitionsLong (opt.model, i, state->state, gsea_process, state);
+        int T = GBgetTransitionsLong (opt.model, i, state->state, gsea_process, state);
+        state->count += T;
+        global.n_transitions += T;
     }
     (void)arg;
 }
@@ -1724,7 +1734,7 @@ gsea_process(void *arg, transition_info_t *ti, int *dst)
         ti->por_proviso = gc.state_proviso ? gc.state_proviso(ti, &s_next) : 0;
         if (gc.state_matched) gc.state_matched(&s_next, arg);
     }
-    global.ntransitions++;
+    global.n_targets++;
     if (gc.state_process) gc.state_process((gsea_state_t*)arg, ti, &s_next);
     (void)ti;
 }
@@ -1735,15 +1745,20 @@ gsea_progress(void *arg) {
         return;
     opt.threshold <<= 1;
     Warning (info, "explored %zu levels ~%zu states ~%zu transitions",
-             global.max_depth, global.explored, global.ntransitions);
+             global.max_depth, global.explored, global.n_transitions);
     (void)arg;
 }
 
 static void
 gsea_finished(void *arg) {
-    Warning (info, "state space %zu levels, %zu states %zu transitions",
-             global.max_depth, global.explored, global.ntransitions);
-
+    if (global.n_transitions < global.n_targets){
+        Warning (info, "state space %zu levels, %zu states %zu transitions %zu targets",
+             global.max_depth, global.explored, global.n_transitions, global.n_targets);
+    } else {
+        Warning (info, "state space %zu levels, %zu states %zu transitions",
+             global.max_depth, global.explored, global.n_transitions);
+    }
+    
     if (opt.no_exit || log_active(infoLong))
         HREprintf (info, "\nDeadlocks: %zu\nInvariant violations: %zu\n"
              "Error actions: %zu\n", global.deadlocks,global.violations,

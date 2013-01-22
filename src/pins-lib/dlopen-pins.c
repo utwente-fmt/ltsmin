@@ -41,7 +41,7 @@ static void plugin_popt(poptContext con,
 	    }
 		break;
 	}
-	Abort("unexpected call to etf_popt");
+	Abort("unexpected call to dlopen plugin callback");
 }
 
 
@@ -58,6 +58,16 @@ struct poptOption pins_plugin_options[LOADER_OPTION_SIZE]= {
 void PINSpluginLoadLanguageModule(const char *name){
     void* dlHandle = RTdlopen(name);
     char* pins_name=RTdlsym(name,dlHandle,"pins_plugin_name");
+    
+    init_proc init=RTtrydlsym(dlHandle,"init");
+    if (init!=NULL){
+        Warning(info,"Initializing %s plugin",pins_name);
+        char *argv[2];
+        argv[0]=get_label();
+        argv[1]=NULL;
+        init(1,argv);
+    }
+
     loader_record_t* pins_loaders=RTdlsym(name,dlHandle,"pins_loaders");
     for(int i=0;pins_loaders[i].extension!=NULL;i++){
         Warning(info,"registering loader for %s",pins_loaders[i].extension);

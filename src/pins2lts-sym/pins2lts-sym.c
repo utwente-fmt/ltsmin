@@ -55,6 +55,12 @@ static int max_priority = INT_MIN;
 static vset_t true_states;
 static vset_t false_states;
 
+/*
+  The inhibit and class matrices are used for maximal progress.
+ */
+static matrix_t *inhibit_matrix=NULL;
+static matrix_t *class_matrix=NULL;
+
 static enum { BFS_P , BFS , CHAIN_P, CHAIN } strategy = BFS_P;
 
 static char* order = "bfs-prev";
@@ -888,12 +894,21 @@ static void
 reach_bfs_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
                    long *eg_count, long *next_count)
 {
+    int N=0;
+    if (inhibit_matrix!=NULL){
+        N=dm_nrows(inhibit_matrix);
+    }
     int level = 0;
     vset_t current_level = vset_create(domain, -1, NULL);
+    vset_t current_class = vset_create(domain, -1, NULL);
     vset_t next_level = vset_create(domain, -1, NULL);
     vset_t temp = vset_create(domain, -1, NULL);
     vset_t deadlocks = dlk_detect?vset_create(domain, -1, NULL):NULL;
-    vset_t dlk_temp = dlk_detect?vset_create(domain, -1, NULL):NULL;
+    vset_t dlk_temp = (dlk_detect||N>0)?vset_create(domain, -1, NULL):NULL;
+    vset_t enabled[N];
+    for(int i=0;i<N;i++){
+        enabled[i]=vset_create(domain, -1, NULL);
+    }
 
     vset_copy(current_level, visited);
     if (save_sat_levels) vset_minus(current_level, visited_old);
@@ -907,19 +922,49 @@ reach_bfs_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
             expand_group_next(i, current_level);
             (*eg_count)++;
         }
+        for(int i=0;i<N;i++){
+            vset_clear(enabled[i]);
+        }
         if (dlk_detect) vset_copy(deadlocks, current_level);
-        for (int i = 0; i < nGrps; i++) {
-            if (!bitvector_is_set(reach_groups,i)) continue;
-            (*next_count)++;
-            vset_next(temp, current_level, group_next[i]);
-            if (dlk_detect) {
-                vset_prev(dlk_temp, temp, group_next[i]);
-                vset_minus(deadlocks, dlk_temp);
-                vset_clear(dlk_temp);
+        if (N>0){
+            for(int c=0;c<N;c++){
+                vset_copy(current_class,current_level);
+                for(int i=0;i<c;i++){
+                    if (dm_is_set(inhibit_matrix,i,c)){
+                        vset_minus(current_class, enabled[i]);
+                    }
+                }
+                for (int i = 0; i < nGrps; i++) {
+                    if (!bitvector_is_set(reach_groups,i)) continue;
+                    if (!dm_is_set(class_matrix,c,i)) continue;
+                    (*next_count)++;
+                    vset_next(temp, current_class, group_next[i]);
+                    vset_prev(dlk_temp, temp, group_next[i]);
+                    if (dlk_detect) {
+                        vset_minus(deadlocks, dlk_temp);
+                    }
+                    vset_union(enabled[c],dlk_temp);
+                    vset_clear(dlk_temp);
+                    vset_minus(temp, visited);
+                    vset_union(next_level, temp);
+                    vset_clear(temp);
+                }
+                vset_clear(current_class);
             }
-            vset_minus(temp, visited);
-            vset_union(next_level, temp);
-            vset_clear(temp);
+        } else {
+            for (int i = 0; i < nGrps; i++) {
+                if (!bitvector_is_set(reach_groups,i)) continue;
+                (*next_count)++;
+                vset_next(temp, current_level, group_next[i]);
+                if (dlk_detect) {
+                    vset_prev(dlk_temp, temp, group_next[i]);
+                    vset_minus(deadlocks, dlk_temp);
+                    vset_clear(dlk_temp);
+                }
+                vset_minus(temp, visited);
+                vset_union(next_level, temp);
+                vset_clear(temp);
+            }
         }
         if (dlk_detect) deadlock_check(deadlocks, reach_groups);
 
@@ -1723,6 +1768,19 @@ init_model(char *file)
     nGrps = dm_nrows(GBgetDMInfo(model));
     max_sat_levels = (N / sat_granularity) + 1;
     Warning(info, "state vector length is %d; there are %d groups", N, nGrps);
+
+    int id=GBgetMatrixID(model,"inhibit");
+    if (id>=0){
+        inhibit_matrix=GBgetMatrix(model,id);
+        Warning(infoLong,"inhibit matrix is:");
+        if (log_active(infoLong)) dm_print(stderr,inhibit_matrix);
+    }
+    id = GBgetMatrixID(model,LTSMIN_EDGE_TYPE_ACTION_CLASS);
+    if (id>=0){
+        class_matrix=GBgetMatrix(model,id);
+        Warning(infoLong,"inhibit class matrix is:");
+        if (log_active(infoLong)) dm_print(stderr,class_matrix);
+    }
 }
 
 static void
@@ -2084,6 +2142,12 @@ main (int argc, char *argv[])
     if (act_detect != NULL) init_action();
     if (inv_detect) Abort("Invariant violation detection is not implemented.");
     if (no_exit) Abort("Error counting (--no-exit) is not implemented.");
+
+
+    if (inhibit_matrix!=NULL){
+        if (strategy != BFS_P) Abort("maximal progress works for bfs-prev only.");
+        if (sat_strategy != NO_SAT) Abort("maximal progress is incompatibale with saturation");
+    }
 
     sat_proc_t sat_proc = NULL;
     reach_proc_t reach_proc = NULL;
