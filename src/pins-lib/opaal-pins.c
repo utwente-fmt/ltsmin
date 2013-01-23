@@ -52,6 +52,7 @@ void        (*lattice_delete) (const void *lattice);
 
 covered_by_grey_t   covered_by;
 covered_by_grey_t   covered_by_short;
+lattice_print_grey_t lattice_print;
 
 enum {
     SL_IDX_BUCHI_ACCEPT = 0,
@@ -360,12 +361,16 @@ opaalLoadDynamicLib(model_t model, const char *filename)
     RTdlsym( filename, dlHandle, "lattice_hash" );
     lattice_delete = (void (*)(const void *))
     RTdlsym( filename, dlHandle, "lattice_delete" );
+    lattice_print = (const char* (*)(const void *))
+    RTdlsym( filename, dlHandle, "lattice_print" );
 
     // optionally load the covered_by method for partly symbolic states
     covered_by = (covered_by_grey_t)
         RTtrydlsym(dlHandle, "covered_by");
     covered_by_short = (covered_by_grey_t)
         RTtrydlsym(dlHandle, "covered_by_short");
+    lattice_print = (lattice_print_grey_t)
+        RTtrydlsym(dlHandle, "lattice_print");
 
     // check system_with_property
     if (have_property()) {
@@ -603,4 +608,5 @@ opaalLoadGreyboxModel(model_t model, const char *filename)
     GBsetNextStateLong (model, get_next_wrapper);
     GBsetIsCoveredBy (model, covered_by);
     GBsetIsCoveredByShort (model, covered_by_short);
+    GBsetLatticePrint (model, lattice_print);
 }
