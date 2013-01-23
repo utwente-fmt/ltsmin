@@ -87,6 +87,8 @@ struct poptOption opaal_options[]= {
 };
 
 typedef struct grey_box_context {
+    int lattice_type;
+    int lattice_label_idx;
     int todo;
 } *gb_context_t;
 
@@ -101,6 +103,9 @@ sl_long_p (model_t model, int label, int *state)
 {
     if (label == GBgetAcceptingStateLabelIndex(model)) {
         return buchi_is_accepting(model, state);
+    }
+    else if (label == ((gb_context_t)GBgetContext(model))->lattice_label_idx) {
+        return 42;
     } else {
         Abort("unexpected state label requested: %d", label);
     }
@@ -110,7 +115,19 @@ static void
 sl_all_p (model_t model, int *state, int *labels)
 {
     HREassert (labels != NULL, "No labels");
-    labels[GBgetAcceptingStateLabelIndex(model)] = buchi_is_accepting(model, state);
+    if (GBgetAcceptingStateLabelIndex(model) > -1) {
+        labels[GBgetAcceptingStateLabelIndex(model)] = buchi_is_accepting(model, state);
+    }
+
+    gb_context_t ctx = (gb_context_t)GBgetContext(model);
+    lts_type_t ltstype = GBgetLTStype (model);
+    int lattice_idx = lts_type_get_state_length(ltstype) - 2;
+    void **lattice = (void **) &state[lattice_idx];
+    const char* type_value = GBgetLatticePrint(model, *lattice);
+    chunk c = chunk_str((char*)type_value);
+    size_t chunk_idx = GBchunkPut(model, ctx->lattice_type, c);
+
+    labels[ctx->lattice_label_idx] = chunk_idx;
 }
 
 static int
@@ -118,6 +135,9 @@ sl_long_p_g (model_t model, int label, int *state)
 {
     if (label == GBgetAcceptingStateLabelIndex(model)) {
         return buchi_is_accepting(model, state);
+    }
+    else if (label == ((gb_context_t)GBgetContext(model))->lattice_label_idx) {
+        return 42;
     } else {
         return get_guard(model, label, state);
     }
@@ -127,7 +147,10 @@ static void
 sl_all_p_g (model_t model, int *state, int *labels)
 {
     get_guard_all(model, state, labels);
-    labels[GBgetAcceptingStateLabelIndex(model)] = buchi_is_accepting(model, state);
+    if (GBgetAcceptingStateLabelIndex(model) > -1) {
+        labels[GBgetAcceptingStateLabelIndex(model)] = buchi_is_accepting(model, state);
+    }
+    labels[((gb_context_t)GBgetContext(model))->lattice_label_idx] = 42;
 }
 
 static void
@@ -361,7 +384,7 @@ opaalLoadDynamicLib(model_t model, const char *filename)
     RTdlsym( filename, dlHandle, "lattice_hash" );
     lattice_delete = (void (*)(const void *))
     RTdlsym( filename, dlHandle, "lattice_delete" );
-    lattice_print = (const char* (*)(const void *))
+    lattice_print = (const char* (*)(const int*))
     RTdlsym( filename, dlHandle, "lattice_print" );
 
     // optionally load the covered_by method for partly symbolic states
@@ -424,6 +447,12 @@ opaalLoadGreyboxModel(model_t model, const char *filename)
              lts_type_set_format (ltstype, i, LTStypeEnum);
         }
     }
+    // lattice label type
+    int lattice_type_is_new;
+    ctx->lattice_type = lts_type_add_type(ltstype,"lattice",&lattice_type_is_new);
+    HREassert (lattice_type_is_new, "Lattice type was already present");
+    lts_type_set_format (ltstype, ctx->lattice_type, LTStypeEnum);
+
     int bool_is_new, bool_type = lts_type_add_type (ltstype, LTSMIN_TYPE_BOOL, &bool_is_new);
 
     lts_type_set_state_length(ltstype, state_length);
@@ -440,11 +469,13 @@ opaalLoadGreyboxModel(model_t model, const char *filename)
     int nguards = get_guard_count(); // TODO: should be in model has guards block..?
     int sl_size = 0 +
                   nguards +
+                  1 + // lattice label
                   (have_property() ? 1 : 0);
 
     // assumption on state labels:
     // state labels (idx): 0 - nguards-1 = guard state labels
-    // state label  (idx): nguards = property state label
+    // state label  (idx): nguards = lattice state label
+    // state label  (idx): nguards+1 = property state label
     lts_type_set_state_label_count (ltstype, sl_size);
     char buf[256];
     for(int i=0; i < nguards; i++) {
@@ -452,11 +483,15 @@ opaalLoadGreyboxModel(model_t model, const char *filename)
         lts_type_set_state_label_name (ltstype, i, buf);
         lts_type_set_state_label_typeno (ltstype, i, bool_type);
     }
+    lts_type_set_state_label_name (ltstype, nguards,
+                                   "lattice");
+    lts_type_set_state_label_typeno (ltstype, nguards, ctx->lattice_type);
+    ctx->lattice_label_idx = nguards;
     if (have_property()) {
-        lts_type_set_state_label_name (ltstype, nguards,
+        lts_type_set_state_label_name (ltstype, nguards+1,
                                        "buchi_accept_opaal");
-        lts_type_set_state_label_typeno (ltstype, nguards, bool_type);
-        GBsetAcceptingStateLabelIndex (model,nguards);
+        lts_type_set_state_label_typeno (ltstype, nguards+1, bool_type);
+        GBsetAcceptingStateLabelIndex (model,nguards+1);
     }
 
     GBsetLTStype(model, ltstype);
@@ -513,19 +548,15 @@ opaalLoadGreyboxModel(model_t model, const char *filename)
                 dm_set(sl_info, GBgetAcceptingStateLabelIndex(model), i);
             }
         }
-        sl_long = sl_long_p;
-        sl_all = sl_all_p;
     }
+    sl_long = sl_long_p;
+    sl_all = sl_all_p;
 
     // if the model has guards, add guards as state labels
     if (have_property()) {
         // filter the property
         sl_long = sl_long_p_g;
         sl_all = sl_all_p_g;
-    } else {
-        // pass request directly to dynamic lib
-        sl_long = (get_label_method_t)     get_guard;
-        sl_all =  (get_label_all_method_t) get_guard_all;
     }
 
     // set the guards per transition group

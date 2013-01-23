@@ -185,7 +185,7 @@ extern int GBisCoveredBy(model_t model,int*a,int*b);
 /**< @brief Symbolic part of state a is covered by symbolic part of state b
  */
 
-typedef const char* (*lattice_print_grey_t)(int*);
+typedef const char* (*lattice_print_grey_t)(const int*);
 /**< @brief Type of the isCoveredBy function.
 */
 
