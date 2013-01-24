@@ -105,7 +105,14 @@ sl_long_p (model_t model, int label, int *state)
         return buchi_is_accepting(model, state);
     }
     else if (label == ((gb_context_t)GBgetContext(model))->lattice_label_idx) {
-        return 42;
+        gb_context_t ctx = (gb_context_t)GBgetContext(model);
+        lts_type_t ltstype = GBgetLTStype (model);
+        int lattice_idx = lts_type_get_state_length(ltstype) - 2;
+        void **lattice = (void **) &state[lattice_idx];
+        const char* type_value = GBgetLatticePrint(model, *lattice);
+        chunk c = chunk_str((char*)type_value);
+        size_t chunk_idx = GBchunkPut(model, ctx->lattice_type, c);
+        return chunk_idx;
     } else {
         Abort("unexpected state label requested: %d", label);
     }
@@ -137,7 +144,14 @@ sl_long_p_g (model_t model, int label, int *state)
         return buchi_is_accepting(model, state);
     }
     else if (label == ((gb_context_t)GBgetContext(model))->lattice_label_idx) {
-        return 42;
+        gb_context_t ctx = (gb_context_t)GBgetContext(model);
+        lts_type_t ltstype = GBgetLTStype (model);
+        int lattice_idx = lts_type_get_state_length(ltstype) - 2;
+        void **lattice = (void **) &state[lattice_idx];
+        const char* type_value = GBgetLatticePrint(model, *lattice);
+        chunk c = chunk_str((char*)type_value);
+        size_t chunk_idx = GBchunkPut(model, ctx->lattice_type, c);
+        return chunk_idx;
     } else {
         return get_guard(model, label, state);
     }
@@ -150,7 +164,15 @@ sl_all_p_g (model_t model, int *state, int *labels)
     if (GBgetAcceptingStateLabelIndex(model) > -1) {
         labels[GBgetAcceptingStateLabelIndex(model)] = buchi_is_accepting(model, state);
     }
-    labels[((gb_context_t)GBgetContext(model))->lattice_label_idx] = 42;
+    gb_context_t ctx = (gb_context_t)GBgetContext(model);
+    lts_type_t ltstype = GBgetLTStype (model);
+    int lattice_idx = lts_type_get_state_length(ltstype) - 2;
+    void **lattice = (void **) &state[lattice_idx];
+    const char* type_value = GBgetLatticePrint(model, *lattice);
+    chunk c = chunk_str((char*)type_value);
+    size_t chunk_idx = GBchunkPut(model, ctx->lattice_type, c);
+
+    labels[ctx->lattice_label_idx] = chunk_idx;
 }
 
 static void
