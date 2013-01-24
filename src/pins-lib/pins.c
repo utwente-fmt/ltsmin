@@ -36,7 +36,6 @@ struct grey_box_model {
 	transition_in_group_t transition_in_group;
 	covered_by_grey_t covered_by;
     covered_by_grey_t covered_by_short;
-    lattice_print_grey_t lattice_print;
 	void* newmap_context;
 	newmap_t newmap;
 	int2chunk_t int2chunk;
@@ -485,16 +484,6 @@ int GBisCoveredBy(model_t model,int*a,int*b) {
     if (NULL == model->covered_by)
         Abort("No symbolic comparison function (covered_by) present for loaded model.");
     return model->covered_by(a,b);
-}
-
-void GBsetLatticePrint(model_t model, lattice_print_grey_t lattice_print){
-    model->lattice_print = lattice_print;
-}
-
-const char * GBgetLatticePrint(model_t model,int*a) {
-    if (NULL == model->lattice_print)
-        Abort("No lattice_print function present for loaded model.");
-    return model->lattice_print(a);
 }
 
 void GBsetNextStateAll(model_t model,next_method_black_t method){

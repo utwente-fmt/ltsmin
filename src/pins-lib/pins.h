@@ -185,20 +185,6 @@ extern int GBisCoveredBy(model_t model,int*a,int*b);
 /**< @brief Symbolic part of state a is covered by symbolic part of state b
  */
 
-typedef const char* (*lattice_print_grey_t)(const int*);
-/**< @brief Type of the isCoveredBy function.
-*/
-
-extern void GBsetLatticePrint(model_t model, lattice_print_grey_t lattice_print);
-/**
-\brief Set the covered_by method.
-*/
-
-extern const char* GBgetLatticePrint(model_t model,int*a);
-/**
-\brief Get the string describing this lattice val.
-*/
-
 extern matrix_t *GBgetStateLabelInfo(model_t model);
 /**<
 \brief Get the state group information of a model.

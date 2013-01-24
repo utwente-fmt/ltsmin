@@ -49,10 +49,10 @@ void*       (*lattice_clone) (const void *lattice);
 int         (*lattice_cmp) (const void *l1, const void *l2);
 uint32_t    (*lattice_hash) (const void *lattice);
 void        (*lattice_delete) (const void *lattice);
+const char* (*lattice_print) (const void *lattice);
 
 covered_by_grey_t   covered_by;
 covered_by_grey_t   covered_by_short;
-lattice_print_grey_t lattice_print;
 
 enum {
     SL_IDX_BUCHI_ACCEPT = 0,
@@ -109,7 +109,7 @@ sl_long_p (model_t model, int label, int *state)
         lts_type_t ltstype = GBgetLTStype (model);
         int lattice_idx = lts_type_get_state_length(ltstype) - 2;
         void **lattice = (void **) &state[lattice_idx];
-        const char* type_value = GBgetLatticePrint(model, *lattice);
+        const char* type_value = lattice_print(*lattice);
         chunk c = chunk_str((char*)type_value);
         size_t chunk_idx = GBchunkPut(model, ctx->lattice_type, c);
         return chunk_idx;
@@ -130,7 +130,7 @@ sl_all_p (model_t model, int *state, int *labels)
     lts_type_t ltstype = GBgetLTStype (model);
     int lattice_idx = lts_type_get_state_length(ltstype) - 2;
     void **lattice = (void **) &state[lattice_idx];
-    const char* type_value = GBgetLatticePrint(model, *lattice);
+    const char* type_value = lattice_print(*lattice);
     chunk c = chunk_str((char*)type_value);
     size_t chunk_idx = GBchunkPut(model, ctx->lattice_type, c);
 
@@ -148,7 +148,7 @@ sl_long_p_g (model_t model, int label, int *state)
         lts_type_t ltstype = GBgetLTStype (model);
         int lattice_idx = lts_type_get_state_length(ltstype) - 2;
         void **lattice = (void **) &state[lattice_idx];
-        const char* type_value = GBgetLatticePrint(model, *lattice);
+        const char* type_value = lattice_print(*lattice);
         chunk c = chunk_str((char*)type_value);
         size_t chunk_idx = GBchunkPut(model, ctx->lattice_type, c);
         return chunk_idx;
@@ -168,7 +168,7 @@ sl_all_p_g (model_t model, int *state, int *labels)
     lts_type_t ltstype = GBgetLTStype (model);
     int lattice_idx = lts_type_get_state_length(ltstype) - 2;
     void **lattice = (void **) &state[lattice_idx];
-    const char* type_value = GBgetLatticePrint(model, *lattice);
+    const char* type_value = lattice_print(*lattice);
     chunk c = chunk_str((char*)type_value);
     size_t chunk_idx = GBchunkPut(model, ctx->lattice_type, c);
 
@@ -406,7 +406,7 @@ opaalLoadDynamicLib(model_t model, const char *filename)
     RTdlsym( filename, dlHandle, "lattice_hash" );
     lattice_delete = (void (*)(const void *))
     RTdlsym( filename, dlHandle, "lattice_delete" );
-    lattice_print = (const char* (*)(const int*))
+    lattice_print = (const char* (*)(const void*))
     RTdlsym( filename, dlHandle, "lattice_print" );
 
     // optionally load the covered_by method for partly symbolic states
@@ -414,8 +414,6 @@ opaalLoadDynamicLib(model_t model, const char *filename)
         RTtrydlsym(dlHandle, "covered_by");
     covered_by_short = (covered_by_grey_t)
         RTtrydlsym(dlHandle, "covered_by_short");
-    lattice_print = (lattice_print_grey_t)
-        RTtrydlsym(dlHandle, "lattice_print");
 
     // check system_with_property
     if (have_property()) {
@@ -661,5 +659,4 @@ opaalLoadGreyboxModel(model_t model, const char *filename)
     GBsetNextStateLong (model, get_next_wrapper);
     GBsetIsCoveredBy (model, covered_by);
     GBsetIsCoveredByShort (model, covered_by_short);
-    GBsetLatticePrint (model, lattice_print);
 }
