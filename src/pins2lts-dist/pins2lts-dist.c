@@ -77,19 +77,20 @@ static  struct poptOption options[] = {
 static inline void
 deadlock_detect (struct dist_thread_context *ctx, int *state, int count)
 {
-    if (count==0 && dlk_detect && !GBbuchiIsValidEnd(ctx->model, state)){
-        ctx->deadlocks++;
-        if (no_exit) return;
-        Warning (info, " ");
-        Warning (info, "deadlock found at depth %zu", ctx->level);
-        HREabort(LTSMIN_EXIT_COUNTER_EXAMPLE);
-    }
+    if (count != 0) return;
+    ctx->deadlocks++;
+    if (GBbuchiIsValidEnd(ctx->model, state)) return;
+    if ( !inv_expr ) ctx->violations++;
+    if (no_exit || !dlk_detect) return;
+    Warning (info, " ");
+    Warning (info, "deadlock found at depth %zu", ctx->level);
+    HREabort(LTSMIN_EXIT_COUNTER_EXAMPLE);
 }
 
 static inline void
 invariant_detect (struct dist_thread_context *ctx, int *state)
 {
-    if ( !inv_expr || eval_predicate(inv_expr, NULL, state) ) return;
+    if ( !inv_expr || eval_predicate(ctx->model, inv_expr, NULL, state, size) ) return;
     ctx->violations++;
     if (no_exit) return;
 
@@ -218,11 +219,9 @@ int main(int argc, char*argv[]){
     }
     if (act_detect) {
         // table number of first edge label
-        act_label = 0;
-        if (lts_type_get_edge_label_count(ltstype) == 0 ||
-                strncmp(lts_type_get_edge_label_name(ltstype, act_label),
-                        LTSMIN_EDGE_TYPE_ACTION_PREFIX, strlen(LTSMIN_EDGE_TYPE_ACTION_PREFIX)) != 0)
-               Abort("No edge label '%s...' for action detection", LTSMIN_EDGE_TYPE_ACTION_PREFIX);
+        act_label = lts_type_find_edge_label_prefix (ltstype, LTSMIN_EDGE_TYPE_ACTION_PREFIX);
+        if (act_label == -1)
+            Abort("No edge label '%s...' for action detection", LTSMIN_EDGE_TYPE_ACTION_PREFIX);
         int typeno = lts_type_get_edge_label_typeno(ltstype, act_label);
         chunk c = chunk_str(act_detect);
         act_index = GBchunkPut(model, typeno, c);
@@ -365,8 +364,8 @@ int main(int argc, char*argv[]){
         RTprintTimer (info, timer, "Exploration time");
 
         if (no_exit || log_active(infoLong))
-            Warning (info, "\n\nDeadlocks: %zu\nInvariant violations: %zu\n"
-                     "Error actions: %zu", global_deadlocks,global_violations,
+            HREprintf (info, "\nDeadlocks: %zu\nInvariant violations: %zu\n"
+                     "Error actions: %zu\n", global_deadlocks,global_violations,
                      global_errors);
     }
     /* State space was succesfully generated. */

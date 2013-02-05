@@ -19,10 +19,11 @@ struct grey_box_model {
     matrix_t *gce_info; // guard co-enabled info
     matrix_t *gnes_info; // guard necessary enabling set
     matrix_t *gnds_info; // guard necessary disabling set
+    matrix_t *visibility_info; // label visibility info
     int sl_idx_buchi_accept;
     int sl_idx_progress;
     int sl_idx_valid_end;
-    int *por_visibility;
+    int *group_visibility;
 	int *s0;
 	void*context;
 	next_method_grey_t next_short;
@@ -213,10 +214,11 @@ model_t GBcreateBase(){
     for(int i=0; i < GB_SL_GROUP_COUNT; i++)
         model->sl_groups[i]=NULL;
     model->guards=NULL;
-    model->por_visibility=NULL;
+    model->group_visibility=NULL;
     model->gce_info=NULL;
     model->gnes_info=NULL;
     model->gnds_info=NULL;
+    model->visibility_info=NULL;
     model->sl_idx_buchi_accept = -1;
     model->sl_idx_progress = -1;
     model->sl_idx_valid_end = -1;
@@ -290,8 +292,8 @@ void GBinitModelDefaults (model_t *p_model, model_t default_src)
     if (model->gce_info == NULL)
         GBsetGuardCoEnabledInfo(model, GBgetGuardCoEnabledInfo (default_src));
 
-    if (model->por_visibility == NULL)
-        GBsetPorVisibility (model, GBgetPorVisibility(default_src));
+    if (model->group_visibility == NULL)
+        GBsetPorGroupVisibility (model, GBgetPorGroupVisibility(default_src));
 
     if (model->gnes_info == NULL)
         GBsetGuardNESInfo(model, GBgetGuardNESInfo (default_src));
@@ -299,13 +301,16 @@ void GBinitModelDefaults (model_t *p_model, model_t default_src)
     if (model->gnds_info == NULL)
         GBsetGuardNDSInfo(model, GBgetGuardNDSInfo (default_src));
 
-    if (GBgetAcceptingStateLabelIndex (default_src) < 0)
+    if (model->visibility_info == NULL)
+        GBsetStateLabelVisibilityInfo(model, GBgetStateLabelVisibilityInfo (default_src));
+
+    if (GBgetAcceptingStateLabelIndex (default_src) >= 0)
         GBsetAcceptingStateLabelIndex(model, GBgetAcceptingStateLabelIndex (default_src));
 
-    if (GBgetProgressStateLabelIndex (default_src) < 0)
+    if (GBgetProgressStateLabelIndex (default_src) >= 0)
         GBsetProgressStateLabelIndex(model, GBgetProgressStateLabelIndex (default_src));
 
-    if (GBgetValidEndStateLabelIndex (default_src) < 0)
+    if (GBgetValidEndStateLabelIndex (default_src) >= 0)
         GBsetValidEndStateLabelIndex(model, GBgetValidEndStateLabelIndex (default_src));
 
     if (model->s0 == NULL) {
@@ -549,22 +554,17 @@ guard_t* GBgetGuard(model_t model, int group) {
 }
 
 void GBsetGuardCoEnabledInfo(model_t model, matrix_t *info) {
-    if (model->gce_info != NULL) Abort("guard may be co-enabled info already set");
+    HREassert (model->gce_info == NULL, "guard may be co-enabled info already set");
     model->gce_info = info;
 }
 
-void GBsetPorVisibility(model_t model, int*visibility) {
-    if (model->por_visibility != NULL) {
-        //Warning(info, "POR visibility already set");
-        RTfree(model->por_visibility);
-        model->por_visibility = visibility;
-    } else {
-        model->por_visibility = visibility;
-    }
+void GBsetPorGroupVisibility(model_t model, int*visibility) {
+    HREassert (model->group_visibility == NULL, "POR group visibility already set");
+    model->group_visibility = visibility;
 }
 
-int *GBgetPorVisibility(model_t model) {
-    return model->por_visibility;
+int *GBgetPorGroupVisibility(model_t model) {
+    return model->group_visibility;
 }
 
 matrix_t *GBgetGuardCoEnabledInfo(model_t model) {
@@ -572,7 +572,7 @@ matrix_t *GBgetGuardCoEnabledInfo(model_t model) {
 }
 
 void GBsetGuardNESInfo(model_t model, matrix_t *info) {
-    if (model->gnes_info != NULL) Abort("guard NES info already set");
+    HREassert (model->gnes_info == NULL, "guard NES info already set");
     model->gnes_info = info;
 }
 
@@ -581,7 +581,7 @@ matrix_t *GBgetGuardNESInfo(model_t model) {
 }
 
 void GBsetGuardNDSInfo(model_t model, matrix_t *info) {
-    if (model->gnds_info != NULL) Abort("guard NDS info already set");
+    HREassert (model->gnds_info == NULL, "guard NDS info already set");
     model->gnds_info = info;
 }
 
@@ -589,6 +589,51 @@ matrix_t *GBgetGuardNDSInfo(model_t model) {
     return model->gnds_info;
 }
 
+void GBsetStateLabelVisibilityInfo(model_t model, matrix_t *info) {
+    HREassert (model->visibility_info == NULL, "State label visibility info already set");
+    model->visibility_info = info;
+}
+
+matrix_t *GBgetStateLabelVisibilityInfo(model_t model) {
+    return model->visibility_info;
+}
+
+void GBaddStateLabelVisible(model_t model, int label) {
+    int                *visible = GBgetPorGroupVisibility(model);
+    HREassert (visible != NULL, "GBaddStateLabelVisible: No (lower) PINS layer uses POR visibility.");
+    matrix_t           *wr_info = GBgetDMInfoWrite(model);
+    int                 ngroups = dm_nrows (wr_info);
+    matrix_t           *label_visibility = GBgetStateLabelVisibilityInfo(model);
+    if (label_visibility != NULL) {
+        for (int i = 0; i < ngroups; i++)
+            if (dm_is_set(label_visibility, label, i)) visible[i] = 1;
+    } else {
+        matrix_t           *sl_info = GBgetStateLabelInfo (model);
+        dm_row_iterator_t   ri;
+        dm_create_row_iterator (&ri, sl_info, label);
+        int                 j;
+        for (int i = 0; i < ngroups; i++) {
+            while ((j = dm_row_next (&ri)) != -1) {
+                if (dm_is_set(wr_info, i, j)) {
+                    visible[i] = 1;
+                    break;
+                }
+            }
+        }
+    }
+}
+
+void GBaddStateVariableVisible(model_t model, int index) {
+    int                *visible = GBgetPorGroupVisibility(model);
+    HREassert (visible != NULL, "GBaddStateVariableVisible: No (lower) PINS layer uses POR visibility.");
+    matrix_t           *wr_info = GBgetDMInfoWrite (model);
+    int                 ngroups = dm_nrows (wr_info);
+    for (int i = 0; i < ngroups; i++) {
+        if (dm_is_set(wr_info, i, index)) {
+            visible[i] = 1;
+        }
+    }
+}
 
 void GBsetTransitionInGroup(model_t model,transition_in_group_t method){
 	model->transition_in_group=method;
@@ -711,7 +756,7 @@ static int registered_pre=0;
 static int matrix=0;
 static int labels=0;
 static int cache=0;
-static int por=0;
+int GB_POR=0;
 static const char *regroup_options = NULL;
 
 static char *ltl_file = NULL;
@@ -778,10 +823,10 @@ GBloadFile (model_t model, const char *filename, model_t *wrapped)
             if (0==strcmp (model_type[i], extension)) {
                 model_loader[i] (model, filename);
                 if (wrapped) {
-                    if (por)
+                    if (GB_POR)
                         model = GBaddPOR (model, ltl_file != NULL);
                     if (ltl_file)
-                        model = GBaddLTL (model, ltl_file, ltl_type, por ? model : NULL);
+                        model = GBaddLTL (model, ltl_file, ltl_type);
                     if (regroup_options != NULL)
                         model = GBregroup (model, regroup_options);
                     if (cache)
@@ -921,7 +966,7 @@ struct poptOption ltl_options[] = {
 struct poptOption greybox_options[]={
     { "labels", 0, POPT_ARG_VAL, &labels, 1, "print state variable and type names, and state and action labels", NULL },
 	{ "matrix" , 'm' , POPT_ARG_VAL , &matrix , 1 , "print the dependency matrix for the model and exit" , NULL},
-	{ "por" , 'p' , POPT_ARG_VAL , &por , 1 , "enable partial order reduction" , NULL },
+	{ "por" , 'p' , POPT_ARG_VAL , &GB_POR , 1 , "enable partial order reduction" , NULL },
 	{ "cache" , 'c' , POPT_ARG_VAL , &cache , 1 , "enable caching of grey box calls" , NULL },
 	{ "regroup" , 'r' , POPT_ARG_STRING, &regroup_options , 0 ,
           "enable regrouping; available transformations T: "

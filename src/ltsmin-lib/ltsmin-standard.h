@@ -36,6 +36,9 @@
 
 #define LTSMIN_VALUE_BOOL_FALSE         "false" // GBchunkPutAt(.., 0)
 #define LTSMIN_VALUE_BOOL_TRUE          "true"  // GBchunkPutAt(.., 1)
+#define LTSMIN_VALUE_ACTION_PROGRESS    "progress"  // progress actions
+/* A value that contains "<progress>" is counted as a progress transition */
+#define LTSMIN_VALUE_STATEMENT_PROGRESS "<progress>"
 
 
 /**
@@ -48,7 +51,13 @@
 /* actions (has to be a prefix: defined as "action_label" in mcrl) */
 #define LTSMIN_EDGE_TYPE_ACTION_PREFIX  "action"
 
-/* statements (promela code line numbers in SpinS) */
+/**
+ * Statements, used for:
+ * - pretty printing model transitions
+ * - extracting structural features of transitions, see LTSMIN_VALUE_STATEMENT_PROGRESS
+ * The assumption is here that this type contains at least as many values as
+ * transition groups.
+ **/
 #define LTSMIN_EDGE_TYPE_STATEMENT      "statement"
 
 

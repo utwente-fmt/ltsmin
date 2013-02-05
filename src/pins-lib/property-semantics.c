@@ -82,8 +82,14 @@ ltsmin_expr_lookup_values(ltsmin_expr_t ltl,ltsmin_parse_env_t env,model_t model
         return -1;
     default:
         switch(ltl->token) {
-        case SVAR:
-            return lts_type_get_state_typeno(GBgetLTStype(model),ltl->idx);
+        case SVAR: {
+            lts_type_t ltstype = GBgetLTStype (model);
+            int N = lts_type_get_state_length (ltstype);
+            if (ltl->idx < N)
+                return lts_type_get_state_typeno (ltstype, ltl->idx);
+            else
+                return lts_type_get_state_label_typeno (ltstype, ltl->idx - N);
+        }
         default:
             return -1;
         }
@@ -115,16 +121,16 @@ parse_file(const char *file, parse_f parser, model_t model)
 }
 
 void
-mark_predicate(ltsmin_expr_t e, matrix_t *m)
+mark_predicate (model_t m, ltsmin_expr_t e, int *dep)
 {
     if (!e) return;
     switch(e->node_type) {
     case BINARY_OP:
-        mark_predicate(e->arg1,m);
-        mark_predicate(e->arg2,m);
+        mark_predicate(m,e->arg1,dep);
+        mark_predicate(m,e->arg2,dep);
         break;
     case UNARY_OP:
-        mark_predicate(e->arg1,m);
+        mark_predicate(m,e->arg1,dep);
         break;
     default:
         switch(e->token) {
@@ -135,13 +141,24 @@ mark_predicate(ltsmin_expr_t e, matrix_t *m)
         case PRED_CHUNK:
             break;
         case PRED_EQ:
-            mark_predicate(e->arg1, m);
-            mark_predicate(e->arg2, m);
+            mark_predicate(m,e->arg1, dep);
+            mark_predicate(m,e->arg2, dep);
             break;
         case PRED_SVAR: {
-            for(int i=0; i < dm_nrows(m); i++)
-                dm_set(m, i, e->idx);
-            } break;
+            lts_type_t ltstype = GBgetLTStype(m);
+            int N = lts_type_get_state_length (ltstype);
+            if (e->idx < N) { // state variable
+                dep[e->idx] = 1;
+            } else { // state label
+                HREassert (e->idx < N + lts_type_get_state_label_count(ltstype));
+                matrix_t *sl = GBgetStateLabelInfo (m);
+                HREassert (N == dm_ncols(sl));
+                for (int i = 0; i < N; i++) {
+                    if (dm_is_set(sl, e->idx - N, i)) dep[i] = 1;
+                }
+            }
+            break;
+        }
         default:
             Abort("unhandled predicate expression in mark_predicate");
         }
@@ -150,16 +167,18 @@ mark_predicate(ltsmin_expr_t e, matrix_t *m)
 }
 
 void
-mark_visible(ltsmin_expr_t e, matrix_t *m, int* group_visibility)
+mark_visible(model_t model, ltsmin_expr_t e)
 {
+    int *visibility = GBgetPorGroupVisibility (model);
+    HREassert (visibility != NULL, "POR layer present, but no visibility info found.");
     if (!e) return;
     switch(e->node_type) {
     case BINARY_OP:
-        mark_visible(e->arg1,m,group_visibility);
-        mark_visible(e->arg2,m,group_visibility);
+        mark_visible(model,e->arg1);
+        mark_visible(model,e->arg2);
         break;
     case UNARY_OP:
-        mark_visible(e->arg1,m,group_visibility);
+        mark_visible(model,e->arg1);
         break;
     default:
         switch(e->token) {
@@ -170,14 +189,18 @@ mark_visible(ltsmin_expr_t e, matrix_t *m, int* group_visibility)
         case PRED_CHUNK:
             break;
         case PRED_EQ:
-            mark_visible(e->arg1, m, group_visibility);
-            mark_visible(e->arg2, m, group_visibility);
+            mark_visible(model, e->arg1);
+            mark_visible(model, e->arg2);
             break;
         case PRED_SVAR: {
-            for(int i=0; i < dm_nrows(m); i++) {
-                if (dm_is_set(m, i, e->idx)) {
-                    group_visibility[i] = 1;
-                }
+            lts_type_t          ltstype = GBgetLTStype (model);
+            matrix_t           *write_info = GBgetDMInfoWrite (model);
+            int                 N = dm_ncols (write_info);
+            if (e->idx < N) {
+                GBaddStateVariableVisible (model, e->idx);
+            } else { // state label
+                HREassert (e->idx < N + lts_type_get_state_label_count(ltstype));
+                GBaddStateLabelVisible (model, e->idx - N);
             }
             } break;
         default:

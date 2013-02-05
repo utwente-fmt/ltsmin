@@ -100,6 +100,8 @@ extern void lts_type_set_state_label_typeno(lts_type_t  t,int label,int typeno);
 extern char* lts_type_get_state_label_name(lts_type_t  t,int label);
 extern char* lts_type_get_state_label_type(lts_type_t  t,int label);
 extern int lts_type_get_state_label_typeno(lts_type_t  t,int label);
+extern int lts_type_find_state_label_prefix(lts_type_t  t, const char *prefix);
+extern int lts_type_find_state_label(lts_type_t  t, const char *name);
 
 extern void lts_type_set_edge_label_count(lts_type_t  t,int count);
 extern int lts_type_get_edge_label_count(lts_type_t  t);
@@ -109,6 +111,8 @@ extern void lts_type_set_edge_label_typeno(lts_type_t  t,int label,int typeno);
 extern char* lts_type_get_edge_label_name(lts_type_t  t,int label);
 extern char* lts_type_get_edge_label_type(lts_type_t  t,int label);
 extern int lts_type_get_edge_label_typeno(lts_type_t  t,int label);
+extern int lts_type_find_edge_label_prefix(lts_type_t  t, const char *prefix);
+extern int lts_type_find_edge_label(lts_type_t  t, const char *name) ;
 
 /**
  * Get the number of data types used.
@@ -150,7 +154,14 @@ extern void lts_type_set_range(lts_type_t  t,int typeno,int min,int max);
 Add a type with a given representation to the LTS type.
 */
 extern int lts_type_put_type(lts_type_t  t,const char *name,data_format_t format,int* is_new);
-
+/**
+Find a type with a certain name
+*/
+extern int lts_type_find_type_prefix(lts_type_t  t, const char *prefix);
+/**
+Find a type with a name that starts with prefix
+*/
+extern int lts_type_find_type(lts_type_t  t, const char *name);
 
 extern void lts_type_serialize(lts_type_t t,stream_t s);
 extern lts_type_t lts_type_deserialize(stream_t s);

@@ -33,7 +33,8 @@ typedef struct lb_inlined_s {
 static const size_t lb_MAX_THREADS = (sizeof (uint64_t) * 8);
 static const size_t lb_MAX_HANDOFF_DEFAULT = 100;
 
-typedef size_t      (*lb_split_problem_f) (void *source, void *target,
+// return negative number when handoff is instead copied
+typedef ssize_t      (*lb_split_problem_f) (void *source, void *target,
                                             size_t handoff);
 
 extern lb_t *lb_create (size_t threads, size_t gran);
@@ -48,7 +49,7 @@ extern void lb_local_init (lb_t *lb, int id, void *arg);
 extern void lb_destroy (lb_t *lb);
 
 extern size_t lb_internal (lb_t *lb, int my_id, size_t my_load,
-                            lb_split_problem_f split);
+                           lb_split_problem_f split);
 
 #ifndef atomic_read
 #define atomic_read(v)      (*(volatile typeof(*v) *)(v))

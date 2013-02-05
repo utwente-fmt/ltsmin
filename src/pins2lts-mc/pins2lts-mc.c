@@ -80,14 +80,15 @@ typedef enum {
     Strat_OWCTY  = 128,
     Strat_MAP    = 256,
     Strat_ECD    = 512,
-    Strat_TA     = 1024,
+    Strat_DFSFIFO= 1024, // Not exactly LTL, but uses accepting states (for now) and random order
+    Strat_TA     = 2048,
     Strat_TA_SBFS= Strat_SBFS | Strat_TA,
     Strat_TA_BFS = Strat_BFS | Strat_TA,
     Strat_TA_DFS = Strat_DFS | Strat_TA,
     Strat_TA_CNDFS= Strat_CNDFS | Strat_TA,
-    Strat_2Stacks= Strat_BFS | Strat_SBFS | Strat_CNDFS | Strat_ENDFS,
+    Strat_2Stacks= Strat_BFS | Strat_SBFS | Strat_CNDFS | Strat_ENDFS | Strat_DFSFIFO,
     Strat_LTLG   = Strat_LNDFS | Strat_ENDFS | Strat_CNDFS,
-    Strat_LTL    = Strat_NDFS | Strat_LTLG | Strat_OWCTY,
+    Strat_LTL    = Strat_NDFS | Strat_LTLG | Strat_OWCTY | Strat_DFSFIFO,
     Strat_Reach  = Strat_BFS | Strat_SBFS | Strat_DFS
 } strategy_t;
 
@@ -108,6 +109,13 @@ typedef enum {
     Perm_Dynamic,   /* generate a dynamic permutation based on color feedback */
     Perm_Unknown    /* not set yet */
 } permutation_perm_t;
+
+
+typedef enum {
+    Proviso_None,
+//    LTLP_ClosedSet, //TODO
+    Proviso_Stack,
+} proviso_t;
 
 typedef enum ta_update_e {
     TA_UPDATE_NONE = 0,
@@ -185,6 +193,7 @@ static db_type_t        db_type = TreeTable;
 static strategy_t       strategy[MAX_STRATEGIES] = {Strat_None, Strat_None, Strat_None, Strat_None, Strat_None};
 static permutation_perm_t permutation = Perm_Unknown;
 static permutation_perm_t permutation_red = Perm_Unknown;
+static const char      *arg_proviso = "none";
 static char*            trc_output = NULL;
 static int              act_index = -1;
 static int              act_type = -1;
@@ -210,6 +219,7 @@ static const size_t     MAX_STACK = 100000000;  // length of allred bitset
 /********************************** OPTIONS **********************************/
 
 static si_map_entry strategies[] = {
+    {"none",    Strat_None},
     {"bfs",     Strat_BFS},
     {"dfs",     Strat_DFS},
     {"sbfs",    Strat_SBFS},
@@ -221,6 +231,7 @@ static si_map_entry strategies[] = {
     {"owcty",   Strat_OWCTY},
     {"map",     Strat_MAP},
     {"ecd",     Strat_ECD},
+    {"dfsfifo", Strat_DFSFIFO},
 #endif
     {NULL, 0}
 };
@@ -246,6 +257,12 @@ static si_map_entry db_types[] = {
     {NULL, 0}
 };
 
+static si_map_entry provisos[]={
+    {"none",        Proviso_None},
+    {"stack",       Proviso_Stack},
+    {NULL, 0}
+};
+
 static char            *files[2];
 static char            *table_size = "20%";
 static int              dbs_size = 0;
@@ -259,13 +276,10 @@ static int              ecd = 1;
 static box_t            call_mode = UseBlackBox;
 static size_t           max_level = SIZE_MAX;
 static size_t           ratio = 2;
+static proviso_t        proviso = Proviso_None;
 static char            *arg_perm = "unknown";
 static char            *state_repr = "tree";
-#ifdef OPAAL
-static char            *arg_strategy = "sbfs";
-#else
-static char            *arg_strategy = "bfs";
-#endif
+static char            *arg_strategy = "none";
 static int              dlk_detect = 0;
 static char            *act_detect = NULL;
 static char            *inv_detect = NULL;
@@ -273,28 +287,6 @@ static int              no_exit = 0;
 static int              LATTICE_BLOCK_SIZE = (1UL<<CACHE_LINE) / sizeof(lattice_t);
 static int              UPDATE = TA_UPDATE_WAITING;
 static int              NONBLOCKING = 0;
-
-void
-print_setup ()
-{
-    if ((strategy[0] & Strat_LTL) && call_mode == UseGreyBox)
-        Warning(info, "Greybox not supported with strategy NDFS, ignored.");
-    Warning (info, "Using %zu %s (lb: %s, strategy: %s)", W,
-             W == 1 ? "core (sequential)" : (SPEC_MT_SAFE ? "threads" : "processes"),
-             (strategy[0] & Strat_LTL ? "randomized backtrack coloring" : "SRP"),
-             key_search(strategies, strategy[0] & ~Strat_TA));
-    Warning (info, "loading model from %s", files[0]);
-    Warning (info, "There are %zu state labels and %zu edge labels", SL, EL);
-    Warning (info, "State length is %zu, there are %zu groups", N, K);
-    if (act_detect)
-        Warning(info, "Detecting action \"%s\"", act_detect);
-    if (db_type == HashTable) {
-        Warning (info, "Using a hash table with 2^%d elements", dbs_size)
-    } else
-        Warning (info, "Using a%s tree table with 2^%d elements", indexing ? "" : " non-indexing", dbs_size);
-    Warning (info, "Global bits: %d, count bits: %d, local bits: %d.",
-             global_bits, count_bits, local_bits);
-}
 
 static void
 state_db_popt (poptContext con, enum poptCallbackReason reason,
@@ -342,6 +334,9 @@ state_db_popt (poptContext con, enum poptCallbackReason reason,
         if (res < 0)
             Abort ("unknown permutation method %s", arg_perm);
         permutation = res;
+
+        int p = proviso = linear_search (provisos, arg_proviso);
+        if (p < 0) Abort ("unknown proviso %s", arg_proviso);
         return;
     case POPT_CALLBACK_REASON_OPTION:
         break;
@@ -376,6 +371,8 @@ static struct poptOption options[] = {
     {"max", 0, POPT_ARG_LONGLONG | POPT_ARGFLAG_SHOW_DEFAULT, &max_level, 0, "maximum search depth", "<int>"},
     {"owcty-reset", 0, POPT_ARG_VAL, &owcty_do_reset, 1, "turn on reset in OWCTY algorithm", NULL},
     {"all-ecd", 0, POPT_ARG_VAL, &owcty_ecd_all, 1, "turn on ECD during all iterations (normally only during initialization)", NULL},
+    { "proviso", 0, POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT, &arg_proviso , 0 ,
+      "select proviso for ltl/por (only single core!)", "<closedset|stack>"},
 #endif
     {"nar", 0, POPT_ARG_VAL, &all_red, 0, "turn off red coloring in the blue search (NNDFS/MCNDFS)", NULL},
     {"no-ecd", 0, POPT_ARG_VAL, &ecd, 0, "turn off early cycle detection (NNDFS/MCNDFS)", NULL},
@@ -480,9 +477,12 @@ struct thread_ctx_s {
     stats_t            *stats;          // Statistics
     fset_t             *cyan;           // Cyan states for ta_cndfs or OWCTY_ECD
     fset_t             *pink;           // Pink states for ta_cndfs
+    fset_t             *cyan2;          // Cyan states for ta_cndfs_sub
     string_index_t      si;             // Trace index
     int                 flip;           // OWCTY invert state space bit
     ssize_t             iteration;      // OWCTY: 0=init, uneven=reach, even=elim
+    int                *progress;       // progress transitions
+    size_t              progress_trans; // progress transitions
 };
 
 static void
@@ -517,6 +517,45 @@ add_stats(stats_t *res, stats_t *stat)
     res->tests += stat->tests;
     res->misses += stat->misses;
     res->rehashes += stat->rehashes;
+}
+
+static inline bool
+ecd_has_state (fset_t *table, state_info_t *s)
+{
+    hash32_t            hash = ref_hash (s->ref);
+    return fset_find (table, &hash, &s->ref, NULL, false);
+}
+
+static inline uint32_t
+ecd_get_state (fset_t *table, state_info_t *s)
+{
+    hash32_t            hash = ref_hash (s->ref);
+    uint32_t           *p;
+    int res = fset_find (table, &hash, &s->ref, (void **)&p, false);
+    HREassert (res != FSET_FULL, "ECD table full");
+    return res ? *p : UINT32_MAX;
+}
+
+static inline void
+ecd_add_state (fset_t *table, state_info_t *s, size_t level)
+{
+    //Warning (info, "Adding %zu", s->ref);
+    HREassert (level < UINT32_MAX, "Stack length overflow for ECD");
+    uint32_t           *data;
+    hash32_t            hash = ref_hash (s->ref);
+    int res = fset_find (table, &hash, &s->ref, (void**)&data, true);
+    HREassert (res != FSET_FULL, "ECD table full");
+    HREassert (!res, "Element %zu already in ECD table", s->ref);
+    if (!res) *data = level;
+}
+
+static inline void
+ecd_remove_state (fset_t *table, state_info_t *s)
+{
+    //Warning (info, "Removing %zu", s->ref);
+    hash32_t            hash = ref_hash (s->ref);
+    int success = fset_delete (table, &hash, &s->ref);
+    HREassert (success, "Could not remove key from set");
 }
 
 static void
@@ -618,8 +657,9 @@ find_or_put_tree (state_info_t *state, transition_info_t *ti,
 }
 
 //static const lm_status_t LM_WHITE = 0;
-static const lm_status_t LM_RED = 1;
+static const lm_status_t LM_RED  = 1;
 static const lm_status_t LM_BLUE = 2;
+static const lm_status_t LM_BOTH = 1 | 2;
 
 typedef union ta_cndfs_state_u {
     struct val_s {
@@ -654,7 +694,7 @@ static int num_global_bits (strategy_t s) {
     HREassert (GDANGEROUS.g == 2);
     return (Strat_ENDFS  & s ? 3 :
            (Strat_CNDFS  & s ? 2 :
-           ((Strat_LNDFS | Strat_OWCTY | Strat_TA) & s ? 1 : 0)));
+           ((Strat_LNDFS | Strat_OWCTY | Strat_DFSFIFO | Strat_TA) & s ? 1 : 0)));
 }
 
 wctx_t *
@@ -670,7 +710,7 @@ wctx_create (model_t model, int depth, wctx_t *shared)
     ctx->out_stack = ctx->in_stack = ctx->stack;
     if (strategy[depth] & (Strat_2Stacks | Strat_OWCTY))
         ctx->in_stack = dfs_stack_create (state_info_int_size());
-    if (strategy[depth] & (Strat_CNDFS | Strat_OWCTY)) //third stack for accepting states
+    if (strategy[depth] & (Strat_CNDFS | Strat_OWCTY | Strat_DFSFIFO)) //third stack for accepting states
         ctx->out_stack = dfs_stack_create (state_info_int_size());
     if (UseGreyBox == call_mode && Strat_DFS == strategy[depth]) {
         ctx->group_stack = isba_create (1);
@@ -682,6 +722,7 @@ wctx_create (model_t model, int depth, wctx_t *shared)
         if (strategy[0] & Strat_TA) {
             ctx->cyan = fset_create (sizeof(ta_cndfs_state_t), 0, 10, 28);
             ctx->pink = fset_create (sizeof(ta_cndfs_state_t), 0, FSET_MIN_SIZE, 28);
+            ctx->cyan2= fset_create (sizeof(ref_t), sizeof(void *), 10, 28);
         }
         if (~Strat_OWCTY & strategy[depth]) {
             size_t local_bits = 2;
@@ -691,8 +732,27 @@ wctx_create (model_t model, int depth, wctx_t *shared)
         } else if (ecd && (strategy[1] & Strat_ECD)) {
             ctx->cyan = fset_create (sizeof(ref_t), sizeof(uint32_t), 10, 28);
         }
+        if (strategy[0] & Strat_DFSFIFO) {
+            ctx->cyan = fset_create (sizeof(ref_t), 0, 10, 28);
+            // find progress transitions
+            lts_type_t      ltstype = GBgetLTStype (ctx->model);
+            int             statement_label = lts_type_find_edge_label (
+                                             ltstype, LTSMIN_EDGE_TYPE_STATEMENT);
+            if (statement_label != -1) {
+                int             statement_type = lts_type_get_edge_label_typeno (
+                                                         ltstype, statement_label);
+                size_t          count = GBchunkCount (ctx->model, statement_type);
+                if (count >= K) {
+                    ctx->progress = RTmallocZero (sizeof(int[K]));
+                    for (size_t i = 0; i < K; i++) {
+                        chunk c = GBchunkGet (ctx->model, statement_type, i);
+                        ctx->progress[i] = strstr(c.data, LTSMIN_VALUE_STATEMENT_PROGRESS) != NULL;
+                        ctx->progress_trans += ctx->progress[i];
+                    }
+                }
+            }
+        }
     }
-
     state_info_create_empty (&ctx->state);
     ctx->store = RTalignZero (CACHE_LINE_SIZE, SLOT_SIZE * N * 2);
     ctx->store2 = RTalignZero (CACHE_LINE_SIZE, SLOT_SIZE * N * 2);
@@ -733,7 +793,7 @@ wctx_free_rec (wctx_t *ctx, int depth)
         isba_destroy (ctx->group_stack);
     //if (strategy[depth] & (Strat_BFS | Strat_ENDFS | Strat_CNDFS))
     //    dfs_stack_destroy (ctx->in_stack);
-    if (strategy[depth] & (Strat_CNDFS))
+    if (strategy[depth] & (Strat_CNDFS | Strat_OWCTY | Strat_DFSFIFO))
         dfs_stack_destroy (ctx->stack); 
     if (strategy[depth] ==  (Strat_2Stacks))
         dfs_stack_destroy (ctx->in_stack);
@@ -818,13 +878,14 @@ postlocal_global_init (wctx_t *ctx)
 void
 statics_init (model_t model)
 {
+    if (strategy[0] == Strat_None)
+        strategy[0] = (GBgetAcceptingStateLabelIndex(model) < 0 ?
+              (strategy[0] == Strat_TA ? Strat_SBFS : Strat_BFS) : Strat_CNDFS);
 #ifdef OPAAL
     if (!(strategy[0] & (Strat_CNDFS|Strat_Reach)))
         Abort ("Wrong strategy for timed verification: %s", key_search(strategies, strategy[0]));
     strategy[0] |= Strat_TA;
 #endif
-    if (strategy[0] == Strat_None)
-        strategy[0] = (GBgetAcceptingStateLabelIndex(model) < 0 ? Strat_BFS : Strat_CNDFS);
     lts_type_t          ltstype = GBgetLTStype (model);
     matrix_t           *m = GBgetDMInfo (model);
     SL = lts_type_get_state_label_count (ltstype);
@@ -848,10 +909,8 @@ statics_init (model_t model)
     HREassert (GRED.g == 0);
     if (act_detect) {
         // table number of first edge label
-        act_label = 0;
-        if (lts_type_get_edge_label_count(ltstype) == 0 ||
-                strncmp(lts_type_get_edge_label_name(ltstype, act_label),
-                     LTSMIN_EDGE_TYPE_ACTION_PREFIX, strlen(LTSMIN_EDGE_TYPE_ACTION_PREFIX)) != 0)
+        act_label = lts_type_find_edge_label_prefix (ltstype, LTSMIN_EDGE_TYPE_ACTION_PREFIX);
+        if (act_label == -1)
             Abort("No edge label '%s...' for action detection", LTSMIN_EDGE_TYPE_ACTION_PREFIX);
         act_type = lts_type_get_edge_label_typeno(ltstype, act_label);
         chunk c = chunk_str(act_detect);
@@ -873,7 +932,7 @@ statics_init (model_t model)
     int i = 0;
     while (Strat_None != strategy[i] && i < MAX_STRATEGIES) {
         global_bits += num_global_bits (strategy[i]);
-        local_bits += (Strat_LTL & strategy[i++] ? 2 : 0);
+        local_bits += (~Strat_DFSFIFO & Strat_LTL & strategy[i++] ? 2 : 0);
     }
     count_bits = (Strat_LNDFS == strategy[i-1] ? ceil(log2(W+1)) : 0);
     indexing = NULL != trc_output || ((Strat_TA | Strat_LTLG) & strategy[0]);
@@ -909,6 +968,48 @@ statics_init (model_t model)
                      (dbs_get_sat_bits_f)TreeDBSLLget_sat_bits);
         break;
     case Tree: default: Abort ("Unknown state storage type: %d.", db_type);
+    }
+    if ((strategy[0] & Strat_DFSFIFO) && proviso != Proviso_None) Abort ("DFS_FIFO does not require a proviso.");
+    if (GB_POR && (strategy[0] & ~Strat_DFSFIFO)) {
+        if (strategy[0] & Strat_OWCTY) Abort ("OWCTY with POR not implemented.");
+        if (strategy[0] & Strat_LTL) {
+            if (W > 1) Abort ("Cannot use POR with more than one thread/process.");
+            proviso = Proviso_Stack;
+        } else if (inv_detect) {
+            Abort ("Cycle proviso for safety properties not yet implemented.");
+        }
+        permutation = permutation_red = Perm_None;
+    }
+}
+
+static void
+print_setup (wctx_t *ctx)
+{
+    if ((strategy[0] & Strat_LTL) && call_mode == UseGreyBox)
+        Warning(info, "Greybox not supported with strategy NDFS, ignored.");
+    Warning (info, "loading model from %s", files[0]);
+    Warning (info, "There are %zu state labels and %zu edge labels", SL, EL);
+    Warning (info, "State length is %zu, there are %zu groups", N, K);
+    if (act_detect)
+        Warning(info, "Detecting action \"%s\"", act_detect);
+    Warning (info, "Running %s on %zu %s", key_search(strategies, strategy[0] & ~Strat_TA),
+             W, W == 1 ? "core (sequential)" : (SPEC_MT_SAFE ? "threads" : "processes"));
+    if (db_type == HashTable) {
+        Warning (info, "Using a hash table with 2^%d elements", dbs_size);
+    } else
+        Warning (info, "Using a%s tree table with 2^%d elements", indexing ? "" : " non-indexing", dbs_size);
+    Warning (info, "Global bits: %d, count bits: %d, local bits: %d.",
+             global_bits, count_bits, local_bits);
+    if (strategy[0] & Strat_DFSFIFO)
+            Warning (info, "Found %zu progress transitions.", ctx->progress_trans);
+    Warning (info, "Successor permutation: %s", key_search(permutations, permutation));
+    if (GB_POR) {
+        int            *visibility = GBgetPorGroupVisibility (ctx->model);
+        size_t          visibles = 0;
+        for (size_t i = 0; i < K; i++)
+            visibles += visibility[i];
+        Warning (info, "Visible groups: %zu", visibles);
+        Warning (info, "POR cycle proviso: %s", key_search(provisos, proviso));
     }
 }
 
@@ -947,9 +1048,23 @@ local_init ()
     statics_init (model);
 #endif
 
+    if (GB_POR) {
+        if (strategy[0] & Strat_DFSFIFO) {
+            int progress_sl = GBgetProgressStateLabelIndex (model);
+            HREassert (progress_sl >= 0, "No progress labels defined for DFS_FIFO");
+            GBaddStateLabelVisible (model, progress_sl);
+        } else if (inv_expr) {
+            mark_visible (model, inv_expr);
+        } else if (dlk_detect) {
+            int end_label = GBgetValidEndStateLabelIndex (model);
+            if (end_label != -1) GBaddStateLabelVisible (model, end_label);
+        }
+    }
+
+    wctx_t          *ctx = wctx_create (model, 0, NULL);
     if (HREme(HREglobal()) == 0)
-        print_setup ();
-    return wctx_create (model, 0, NULL);
+        print_setup (ctx);
+    return ctx;
 }
 
 static void
@@ -972,9 +1087,8 @@ deinit_globals ()
 static void
 deinit_all (wctx_t *ctx)
 {
-    if (0 == ctx->id) {
+    if (0 == ctx->id)
         deinit_globals ();
-    }
     wctx_free (ctx);
     HREbarrier (HREglobal());
 }
@@ -1044,12 +1158,11 @@ print_statistics (counter_t *ar_reach, counter_t *ar_red, rt_timer_t timer,
     double              el_size =
        db_type & Tree ? (db_type==ClearyTree?1:2) + (2.0 / (1UL<<ratio)) : D+.5;
     size_t              s = state_info_size();
-    size_t              max_load = Strat_NDFS & strategy[0] ?
-                                   reach->level_max+red->level_max :
-            (Strat_SBFS & strategy[0] ? max_level_size : lb_max_load(global->lb));
-    mem1 = ((double)(s * max_load)) / (1 << 20);
-    size_t lattices = reach->inserts - reach->updates;
+    size_t              max_load;
+    size_t              lattices = reach->inserts - reach->updates;
     if (Strat_LTL & strategy[0]) {
+        max_load = reach->level_max+red->level_max;
+        max_load += (Strat_DFSFIFO & strategy[0] ? max_level_size : 0);
         RTprintTimer (info, timer, "Total exploration time");
         Warning (info, " ");
         Warning (info, "State space has %zu states, %zu are accepting", db_elts,
@@ -1059,6 +1172,7 @@ print_statistics (counter_t *ar_reach, counter_t *ar_red, rt_timer_t timer,
         Warning (info, " ");
         Warning (info, "Total memory used for local state coloring: %.1fMB", mem3);
     } else {
+        max_load = (Strat_SBFS & strategy[0] ? max_level_size : lb_max_load(global->lb));
         statistics_t state_stats; statistics_init (&state_stats);
         statistics_t trans_stats; statistics_init (&trans_stats);
         for (size_t i = 0; i< W; i++) {
@@ -1086,6 +1200,7 @@ print_statistics (counter_t *ar_reach, counter_t *ar_red, rt_timer_t timer,
         Warning (info, "Lattice map: %.1fMB (~%.1fMB paged-in) overhead: %.2f%%, allocated: %zu", mem3, lm, redundancy, alloc);
     }
 
+    mem1 = ((double)(s * max_load)) / (1 << 20);
     Warning (info, "Queue width: %zuB, total height: %zu, memory: %.2fMB",
              s, max_load, mem1);
     mem2 = ((double)(1UL << (dbs_size)) / (1<<20)) * SLOT_SIZE * el_size;
@@ -1104,23 +1219,24 @@ print_statistics (counter_t *ar_reach, counter_t *ar_red, rt_timer_t timer,
              mem1 + mem4 + mem3 + chunks, mem1 + mem2 + mem3 + chunks);
 
     if (no_exit || log_active(infoLong))
-        Warning (info, "\n\nDeadlocks: %zu\nInvariant violations: %zu\n"
-                 "Error actions: %zu", reach->deadlocks, reach->violations,
+        HREprintf (info, "\nDeadlocks: %zu\nInvariant/valid-end state violations: %zu\n"
+                 "Error actions: %zu\n", reach->deadlocks, reach->violations,
                  reach->errors);
 
-    Warning (infoLong, "Internal statistics:\n\n"
+    HREprintf (infoLong, "\nInternal statistics:\n\n"
              "Algorithm:\nWork time: %.2f sec\nUser time: %.2f sec\nExplored: %zu\n"
                  "Transitions: %zu\nWaits: %zu\nRec. calls: %zu\n\n"
              "Database:\nElements: %zu\nNodes: %zu\nMisses: %zu\nEq. tests: %zu\nRehashes: %zu\n\n"
              "Memory:\nQueue: %.1f MB\nDB: %.1f MB\nDB alloc.: %.1f MB\nColors: %.1f MB\n\n"
              "Load balancer:\nSplits: %zu\nLoad transfer: %zu\n\n"
-             "Lattice MAP:\nRatio: %.2f\nInserts: %zu\nUpdates: %zu\nDeletes: %zu",
+             "Lattice MAP:\nRatio: %.2f\nInserts: %zu\nUpdates: %zu\nDeletes: %zu\n"
+             "Red subsumed: %zu\nCyan is subsumed: %zu\n",
              tot, reach->runtime, reach->explored, reach->trans, red->waits,
              reach->rec, db_elts, db_nodes, stats->misses, stats->tests,
              stats->rehashes, mem1, mem4, mem2, mem3,
              reach->splits, reach->transfer,
              ((double)lattices/db_elts), reach->inserts, reach->updates,
-                     reach->deletes);
+             reach->deletes, red->updates, red->deletes);
 }
 
 void
@@ -1514,6 +1630,7 @@ state_info_serialize (state_info_t *state, raw_data_t data)
     }
     if (Strat_TA & strategy[0]) {
         ((lattice_t*)data)[0] = state->lattice;
+        HREassert (state->lattice != 0);
         data += 2;
         ((lm_loc_t*)data)[0] = state->loc;
     }
@@ -1552,6 +1669,7 @@ state_info_deserialize (state_info_t *state, raw_data_t data, state_data_t store
     }
     if (Strat_TA & strategy[0]) {
         state->lattice = ((lattice_t*)data)[0];
+        HREassert (state->lattice != 0);
         data += 2;
         state->loc = ((lm_loc_t*)data)[0];
     }
@@ -1569,6 +1687,7 @@ state_info_deserialize_cheap (state_info_t *state, raw_data_t data)
     data += 2;
     if (Strat_TA & strategy[0]) {
         state->lattice = ((lattice_t*)data)[0];
+        HREassert (state->lattice != 0);
         data += 2;
         state->loc = ((lm_loc_t*)data)[0];
     }
@@ -1664,6 +1783,10 @@ ndfs_red_handle (void *arg, state_info_t *successor, transition_info_t *ti,
 {
     wctx_t             *ctx = (wctx_t *) arg;
     nndfs_color_t color = nn_get_color(&ctx->color_map, successor->ref);
+    ti->por_proviso = 1; // only visit blue states to stay in reduced search space
+
+    if (proviso != Proviso_None && !nn_color_eq(color, NNBLUE))
+        return; // only revisit blue states to determinize POR
     if ( nn_color_eq(color, NNCYAN) ) {
         /* Found cycle back to the stack */
         ndfs_report_cycle(ctx, successor);
@@ -1681,6 +1804,9 @@ ndfs_blue_handle (void *arg, state_info_t *successor, transition_info_t *ti,
 {
     wctx_t             *ctx = (wctx_t *) arg;
     nndfs_color_t color = nn_get_color (&ctx->color_map, successor->ref);
+
+    if (proviso == Proviso_Stack)
+        ti->por_proviso = !nn_color_eq(color, NNCYAN);
     /**
      * The following lines bear little resemblance to the algorithms in the
      * respective papers (NNDFS / LNDFS), but we must store all non-red states
@@ -2015,6 +2141,10 @@ endfs_handle_red (void *arg, state_info_t *successor, transition_info_t *ti, int
     wctx_t             *ctx = (wctx_t *) arg;
     /* Find cycle back to the seed */
     nndfs_color_t color = nn_get_color (&ctx->color_map, successor->ref);
+
+    ti->por_proviso = 1; // only sequentially!
+    if (proviso != Proviso_None && !nn_color_eq(color, NNBLUE))
+         return; // only revisit blue states to determinize POR
     if ( nn_color_eq(color, NNCYAN) )
         ndfs_report_cycle (ctx, successor);
     /* Mark states dangerous if necessary */
@@ -2035,6 +2165,10 @@ endfs_handle_blue (void *arg, state_info_t *successor, transition_info_t *ti, in
 {
     wctx_t             *ctx = (wctx_t *) arg;
     nndfs_color_t color = nn_get_color (&ctx->color_map, successor->ref);
+
+    if (proviso == Proviso_Stack) // only sequentially!
+        ti->por_proviso = !nn_color_eq(color, NNCYAN);
+
     /**
      * The following lines bear little resemblance to the algorithms in the
      * respective papers (Evangelista et al./ Laarman et al.), but we must
@@ -2212,7 +2346,7 @@ rec_ndfs_call (wctx_t *ctx, ref_t state)
      year = {2011}
    }
  */
-size_t
+ssize_t
 split_bfs (void *arg_src, void *arg_tgt, size_t handoff)
 {
     wctx_t             *source = arg_src;
@@ -2234,7 +2368,7 @@ split_bfs (void *arg_src, void *arg_tgt, size_t handoff)
     return handoff;
 }
 
-size_t
+ssize_t
 split_sbfs (void *arg_src, void *arg_tgt, size_t handoff)
 {
     wctx_t             *source = arg_src;
@@ -2251,7 +2385,7 @@ split_sbfs (void *arg_src, void *arg_tgt, size_t handoff)
     return handoff;
 }
 
-size_t
+ssize_t
 split_dfs (void *arg_src, void *arg_tgt, size_t handoff)
 {
     wctx_t             *source = arg_src;
@@ -2290,8 +2424,10 @@ bfs_load (wctx_t *ctx)
 static inline void
 deadlock_detect (wctx_t *ctx, int count)
 {
-    if (count > 0 || GBbuchiIsValidEnd(ctx->model, ctx->state.data)) return;
+    if (count > 0) return;
     ctx->counters.deadlocks++; // counting is costless
+    if (GBbuchiIsValidEnd(ctx->model, ctx->state.data)) return;
+    if ( !inv_expr ) ctx->counters.violations++;
     if (dlk_detect && (!no_exit || trc_output) && lb_stop(global->lb)) {
         Warning (info, " ");
         Warning (info, "Deadlock found in state at depth %zu!", ctx->counters.level_cur);
@@ -2303,7 +2439,7 @@ deadlock_detect (wctx_t *ctx, int count)
 static inline void
 invariant_detect (wctx_t *ctx, raw_data_t state)
 {
-    if ( !inv_expr || eval_predicate(inv_expr, NULL, state) ) return;
+    if ( !inv_expr || eval_predicate(ctx->model, inv_expr, NULL, state, N) ) return;
     ctx->counters.violations++;
     if ((!no_exit || trc_output) && lb_stop(global->lb)) {
         Warning (info, " ");
@@ -2477,6 +2613,128 @@ sbfs (wctx_t *ctx)
 }
 
 /**
+ * DFS-FIFO for non-progress detection
+ */
+
+static void
+dfs_fifo_handle (void *arg, state_info_t *successor, transition_info_t *ti,
+                 int seen)
+{
+    wctx_t             *ctx = (wctx_t *) arg;
+    if (ctx->progress_trans > 0 ? ctx->progress[ti->group] :  // progress transitions
+        GBbuchiIsProgress(ctx->model, get_state(successor->ref, ctx))) { // progress states
+        if (!seen || !global_has_color(successor->ref, GRED, 0)) {
+            raw_data_t stack_loc = dfs_stack_push (ctx->out_stack, NULL);
+            state_info_serialize (successor, stack_loc);
+            ctx->red.visited += !seen;
+        }
+    } else {
+        raw_data_t stack_loc = dfs_stack_push (ctx->stack, NULL);
+        state_info_serialize (successor, stack_loc);
+        ctx->counters.visited++;
+    }
+    ctx->counters.trans++;
+    (void) ti;
+}
+
+ssize_t
+split_dfs_fifo (void *arg_src, void *arg_tgt, size_t handoff)
+{
+    wctx_t             *source = arg_src;
+    wctx_t             *target = arg_tgt;
+    size_t              in_size = dfs_stack_size (source->in_stack);
+    if (in_size == 1) {
+        dfs_stack_push (target->in_stack, dfs_stack_top(source->in_stack));
+        return -1;
+    } else if (in_size == 0) {
+        return 0;
+    }
+    // secure current state
+    dfs_stack_push (source->stack, dfs_stack_pop(source->in_stack));
+
+    handoff = min (in_size >> 1, handoff);
+    for (size_t i = 0; i < handoff; i++) {
+        state_data_t        one = dfs_stack_pop (source->in_stack);
+        HREassert (NULL != one);
+        dfs_stack_push (target->in_stack, one);
+    }
+    source->counters.splits++;
+    source->counters.transfer += handoff;
+
+    // push back current state
+    dfs_stack_push (source->in_stack, dfs_stack_pop(source->stack));
+
+    return handoff;
+}
+
+void
+dfs_fifo_dfs (wctx_t *ctx, ref_t seed)
+{
+    while (!lb_is_stopped(global->lb)) {
+        raw_data_t          state_data = dfs_stack_top (ctx->stack);
+        if (NULL != state_data) {
+            state_info_deserialize (&ctx->state, state_data, ctx->store);
+            if (ecd_has_state(ctx->cyan, &ctx->state)) {
+                ndfs_report_cycle (ctx, &ctx->state);
+            } else if (!global_has_color(ctx->state.ref, GRED, 0)) {
+                if (ctx->state.ref != seed && ctx->state.ref != ctx->seed)
+                    ecd_add_state (ctx->cyan, &ctx->state, 0);
+                dfs_stack_enter (ctx->stack);
+                increase_level (&ctx->counters);
+                permute_trans (ctx->permute, &ctx->state, dfs_fifo_handle, ctx);
+                maybe_report (&ctx->counters, "");
+                ctx->counters.explored++;
+            } else {
+                dfs_stack_pop (ctx->stack);
+            }
+        } else {
+            if (dfs_stack_nframes(ctx->stack) == 0)
+                break;
+            dfs_stack_leave (ctx->stack);
+            state_data = dfs_stack_pop (ctx->stack);
+            state_info_deserialize_cheap (&ctx->state, state_data);
+            ctx->counters.level_cur--;
+            if (ctx->state.ref != seed && ctx->state.ref != ctx->seed)
+                ecd_remove_state (ctx->cyan, &ctx->state);
+            global_try_color (ctx->state.ref, GRED, 0);
+        }
+        // load balance the FIFO queue (this is a synchronizing affair)
+        lb_balance (global->lb, ctx->id, dfs_stack_frame_size(ctx->in_stack), split_dfs_fifo);
+    }
+    HREassert (lb_is_stopped(global->lb) || fset_count(ctx->cyan) == 0,
+               "DFS stack not empty, size: %zu", fset_count(ctx->cyan));
+}
+
+void
+dfs_fifo (wctx_t *ctx)
+{
+    size_t              total = 0;
+    size_t              out_size, size;
+    do {
+        while (lb_balance (global->lb, ctx->id, dfs_stack_frame_size(ctx->in_stack), split_dfs_fifo)) {
+            raw_data_t          state_data = dfs_stack_top (ctx->in_stack);
+            if (NULL != state_data) {
+                dfs_stack_push (ctx->stack, state_data);
+                state_info_deserialize_cheap (&ctx->state, state_data);
+                if (!global_has_color(ctx->state.ref, GRED, 0))
+                    dfs_fifo_dfs (ctx, ctx->state.ref);
+                dfs_stack_pop (ctx->in_stack);
+            }
+        }
+        size = dfs_stack_frame_size (ctx->out_stack);
+        HREreduce (HREglobal(), 1, &size, &out_size, SizeT, Sum);
+        lb_reinit (global->lb, ctx->id);
+        increase_level (&ctx->red);
+        if (ctx->id == 0) {
+            if (out_size > max_level_size) max_level_size = out_size;
+            total += out_size;
+            Warning(infoLong, "DFS-FIFO level %zu has %zu states %zu total", ctx->red.level_cur, out_size, total);
+        }
+        swap (ctx->out_stack, ctx->in_stack);
+    } while (out_size > 0 && !lb_is_stopped(global->lb));
+}
+
+/**
  * OWCTY-MAP Barnat et al.
  *
  * Input-output diagram of OWCTY procedures:
@@ -2559,38 +2817,6 @@ owcty_pre_try_reset (ref_t ref, uint32_t reset_val, int bit, bool check_zero)
     return true;
 }
 
-static inline uint32_t
-ecd_get_state (fset_t *table, state_info_t *s)
-{
-    hash32_t            hash = ref_hash (s->ref);
-    uint32_t           *p;
-    int res = fset_find (table, &hash, &s->ref, (void **)&p, false);
-    HREassert (res != FSET_FULL, "ECD table full");
-    return res ? *p : UINT32_MAX;
-}
-
-static inline void
-ecd_add_state (fset_t *table, state_info_t *s, size_t level)
-{
-    //Warning (info, "Adding %zu", s->ref);
-    HREassert (level < UINT32_MAX, "Stack length overflow for ECD");
-    uint32_t            num = level;
-    uint32_t           *num2 = &num;
-    hash32_t            hash = ref_hash (s->ref);
-    int res = fset_find (table, &hash, &s->ref, (void **)&num2, true);
-    HREassert (res != FSET_FULL, "ECD table full");
-    HREassert (!res, "Element %zu already in ECD table", s->ref);
-}
-
-static inline void
-ecd_remove_state (fset_t *table, state_info_t *s)
-{
-    //Warning (info, "Removing %zu", s->ref);
-    hash32_t            hash = ref_hash (s->ref);
-    int success = fset_delete (table, &hash, &s->ref);
-    HREassert (success, "Could not remove key from set");
-}
-
 /**
  * A reset can be skipped, because the in_stack is also checked during the
  * owcty_reachability call. However, this inlined reset costs more cas operations,
@@ -2645,7 +2871,7 @@ owcty_ecd (wctx_t *ctx, state_info_t *successor)
     }
 }
 
-static size_t
+static ssize_t
 owcty_split (void *arg_src, void *arg_tgt, size_t handoff)
 {
     wctx_t             *source = arg_src;
@@ -2946,7 +3172,9 @@ ta_covered (void *arg, lattice_t l, lm_status_t status, lm_loc_t loc)
     wctx_t         *ctx = (wctx_t*) arg;
     lattice_t lattice = ctx->successor->lattice;
     int *succ_l = (int*)&lattice;
-    if (!ctx->subsumes && GBisCoveredByShort(ctx->model, succ_l, (int*)&l) ) {
+    if (UPDATE == TA_UPDATE_NONE
+            ? lattice == l
+            : !ctx->subsumes && GBisCoveredByShort(ctx->model, succ_l, (int*)&l) ) {
         ctx->done = 1;
         return LM_CB_STOP; //A l' : (E (s,l)eL : l>=l')=>(A (s,l)eL : l>=l')
     } else if (TA_UPDATE_NONE != UPDATE &&
@@ -2967,7 +3195,9 @@ ta_covered_nb (void *arg, lattice_t l, lm_status_t status, lm_loc_t loc)
     wctx_t         *ctx = (wctx_t*) arg;
     lattice_t lattice = ctx->successor->lattice;
     int *succ_l = (int*)&lattice;
-    if (GBisCoveredByShort(ctx->model, succ_l, (int*)&l) ) {
+    if (UPDATE == TA_UPDATE_NONE
+            ? lattice == l
+            : GBisCoveredByShort(ctx->model, succ_l, (int*)&l) ) {
         ctx->done = 1;
         return LM_CB_STOP; //A l' : (E (s,l)eL : l>=l')=>(A (s,l)eL : l>=l')
     } else if (TA_UPDATE_NONE != UPDATE &&
@@ -2976,7 +3206,8 @@ ta_covered_nb (void *arg, lattice_t l, lm_status_t status, lm_loc_t loc)
         if (LM_NULL_LOC == ctx->added_at) { // replace first waiting, will be added to waiting set
             if (!lm_cas_update (global->lmap, loc, l, status, lattice, (lm_status_t)TA_WAITING)) {
                 lattice_t n = lm_get (global->lmap, loc);
-                if (n == NULL_LATTICE) return false;
+                if (n == NULL_LATTICE) // deleted
+                    return LM_CB_NEXT;
                 lm_status_t s = lm_get_status (global->lmap, loc);
                 return ta_covered_nb (arg, n, s, loc); // retry
             } else {
@@ -3176,6 +3407,15 @@ ta_cndfs_covered (void *arg, lattice_t l, lm_status_t status, lm_loc_t loc)
         ctx->done = 1;
         return LM_CB_STOP;
     }
+    int *succ_l = (int *) &ctx->successor->lattice;
+    if (UPDATE != 0 && (color & status & LM_RED)) {
+        if ( GBisCoveredByShort(ctx->model, succ_l, (int*)&l) ) {
+            ctx->done = 1;
+            ctx->red.updates++; // count (strictly) subsumed by reds
+            return LM_CB_STOP;
+        }
+    }
+
     return LM_CB_NEXT;
     (void) loc;
 }
@@ -3186,7 +3426,13 @@ ta_cndfs_subsumed (wctx_t *ctx, state_info_t *state, lm_status_t color)
     ctx->subsumes = color;
     ctx->done = 0;
     ctx->successor = state;
-    lm_iterate (global->lmap, state->ref, ta_cndfs_covered, ctx);
+    if (NONBLOCKING) {
+        lm_iterate (global->lmap, state->ref, ta_cndfs_covered, ctx);
+    } else {
+        lm_lock (global->lmap, state->ref);
+        lm_iterate (global->lmap, state->ref, ta_cndfs_covered, ctx);
+        lm_unlock (global->lmap, state->ref);
+    }
     return ctx->done;
 }
 
@@ -3195,34 +3441,114 @@ ta_cndfs_spray (void *arg, lattice_t l, lm_status_t status, lm_loc_t loc)
 {
     wctx_t             *ctx = (wctx_t *) arg;
     lm_status_t         color = (lm_status_t)ctx->subsumes;
-    if ( ctx->successor->lattice == l ) {
-        if ((status & color) == 0)
-            lm_set_status (global->lmap, loc, status | color);
-        ctx->done = 1;
-        return LM_CB_STOP;
+
+    if (UPDATE != 0) {
+        int *succ_l = (int *) &ctx->successor->lattice;
+        if ( ((status & color) && ctx->successor->lattice == l) ||
+             ((status & LM_RED) &&
+                    GBisCoveredByShort(ctx->model, succ_l, (int*)&l)) ) {
+            ctx->done = 1;
+            if (color & LM_BLUE) // only red marking should continue to remove blue states
+                return LM_CB_STOP;
+        } else if ((color & LM_RED)) { // remove subsumed blue and red states
+            if ( GBisCoveredByShort(ctx->model, (int*)&l, succ_l) ) {
+                lm_delete (global->lmap, loc);
+                ctx->last = (LM_NULL_LOC == ctx->last ? loc : ctx->last);
+                ctx->counters.deletes++;
+            }
+        }
+    } else {
+        if ( ctx->successor->lattice == l ) {
+            if ((status & color) == 0)
+                lm_set_status (global->lmap, loc, status | color);
+            ctx->done = 1;
+            return LM_CB_STOP;
+        }
     }
+
     return LM_CB_NEXT;
 }
 
-static inline void
+lm_cb_t
+ta_cndfs_spray_nb (void *arg, lattice_t l, lm_status_t status, lm_loc_t loc)
+{
+    wctx_t             *ctx = (wctx_t *) arg;
+    lm_status_t         color = (lm_status_t)ctx->subsumes;
+    lattice_t           lattice = ctx->successor->lattice;
+
+    if (UPDATE != 0) {
+        int *succ_l = (int *)&lattice;
+        if ( ((status & color) && ctx->successor->lattice == l) ||
+             ((status & LM_RED) &&
+                    GBisCoveredByShort(ctx->model, succ_l, (int*)&l)) ) {
+            ctx->done = 1;
+            if (color & LM_BLUE) // only red marking should continue to remove blue states
+                return LM_CB_STOP;
+        } else if (color & LM_RED) { // remove subsumed blue and red states
+            if ( GBisCoveredByShort(ctx->model, (int*)&l, succ_l) ) {
+                if (!ctx->done) {
+                    if (!lm_cas_update (global->lmap, loc, l, status, lattice, color)) {
+                        l = lm_get (global->lmap, loc);
+                        if (l == NULL_LATTICE) // deleted
+                            return LM_CB_NEXT;
+                        status = lm_get_status (global->lmap, loc);
+                        return ta_cndfs_spray_nb (arg, l, status, loc); // retry
+                    } else {
+                        ctx->done = 1;
+                    }
+                } else {                            // delete second etc
+                    lm_cas_delete (global->lmap, loc, l, status);
+                    ctx->counters.deletes++;
+                }
+            }
+        }
+    } else {
+        if ( ctx->successor->lattice == l ) {
+            if (!lm_cas_update (global->lmap, loc, l, status, lattice, status|color)) {
+                l = lm_get (global->lmap, loc);
+                if (l == NULL_LATTICE) // deleted
+                    return LM_CB_NEXT;
+                status = lm_get_status (global->lmap, loc);
+                return ta_cndfs_spray_nb (arg, l, status, loc); // retry
+            } else {
+                ctx->done = 1;
+                return LM_CB_STOP;
+            }
+        }
+    }
+
+    return LM_CB_NEXT;
+}
+
+static inline int
 ta_cndfs_mark (wctx_t *ctx, state_info_t *state, lm_status_t color)
 {
-    lm_lock (global->lmap, state->ref);
     lm_loc_t            last;
-
     ctx->successor = state;
     ctx->subsumes = color;
     ctx->done = 0;
     ctx->last = LM_NULL_LOC;
-    last = lm_iterate (global->lmap, state->ref, ta_cndfs_spray, ctx);
-    if (!ctx->done) {
-        last = (LM_NULL_LOC == ctx->last ? last : ctx->last);
-        lm_insert_from (global->lmap, state->ref, state->lattice, color, &last);
-        ctx->counters.inserts++;
-    }
 
-    lm_unlock (global->lmap, state->ref);
+    if (NONBLOCKING) {
+        last = lm_iterate (global->lmap, state->ref, ta_cndfs_spray_nb, ctx);
+        if (!ctx->done) {
+            lm_insert_from_cas (global->lmap, state->ref, state->lattice, color, &last);
+            ctx->counters.inserts++;
+        }
+    } else {
+        lm_lock (global->lmap, state->ref);
+        last = lm_iterate (global->lmap, state->ref, ta_cndfs_spray, ctx);
+        if (!ctx->done) {
+            last = (LM_NULL_LOC == ctx->last ? last : ctx->last);
+            lm_insert_from (global->lmap, state->ref, state->lattice, color, &last);
+            ctx->counters.inserts++;
+        }
+        lm_unlock (global->lmap, state->ref);
+    }
+    return ctx->done;
 }
+
+/* maintain on-stack states */
 
 static inline int
 ta_cndfs_has_state (fset_t *table, state_info_t *s, bool add_if_absent)
@@ -3242,7 +3568,67 @@ ta_cndfs_remove_state (fset_t *table, state_info_t *s)
     state.ref = s->ref;
     state.lattice = s->lattice;
     int success = fset_delete (table, NULL, &state);
-    HREassert (success, "Could not remove key from set");
+    HREassert (success, "Could not remove lattice state (%zu,%zu) from set", s->ref, s->lattice);
+}
+
+/* maintain a linked list of cyan states with same concrete part on the stack */
+
+static inline void
+ta_cndfs_next (wctx_t *ctx, raw_data_t stack_loc, state_info_t *s)
+{
+    void               *data;
+    hash32_t            hash = ref_hash (s->ref);
+    int res = fset_find (ctx->cyan2, &hash, &s->ref, &data, true);
+    HREassert (res != FSET_FULL, "Cyan2 table full");
+    if (res) {
+        s->loc = *(lm_loc_t*)data;
+    } else {
+        s->loc = LM_NULL_LOC;
+    }
+    state_info_serialize (s, stack_loc);    // write previous pointer to stack
+    *(raw_data_t *)data = stack_loc;      // write current pointer to hash map
+}
+
+static inline void
+ta_cndfs_previous (wctx_t *ctx, state_info_t *s)
+{
+    hash32_t            hash = ref_hash (s->ref);
+    if (s->loc == (lm_loc_t)LM_NULL_LOC) {
+        int res = fset_delete (ctx->cyan2, &hash, &s->ref);
+        HREassert (res, "state %zu not in Cyan2 table", s->ref);
+        return;
+    }
+    void              *data;
+    int res = fset_find (ctx->cyan2, &hash, &s->ref, &data, false);
+    HREassert (res, "state %zu not in Cyan2 table", s->ref);
+    *(lm_loc_t *)data = s->loc;                  // write new current pointer to hash map
+}
+
+static inline bool
+ta_cndfs_subsumes_cyan (wctx_t *ctx, state_info_t *s)
+{
+    void               *data;
+    hash32_t            hash = ref_hash (s->ref);
+    int res = fset_find (ctx->cyan2, &hash, &s->ref, &data, false);
+    if (!res)
+        return false;
+    state_info_t        state;
+    raw_data_t          stack_loc;
+    state.loc = *(lm_loc_t*)data;
+    size_t              iteration = 0;
+    while (state.loc != LM_NULL_LOC) {
+        stack_loc = (raw_data_t)state.loc;
+        state_info_deserialize_cheap (&state, stack_loc);
+        if (state.lattice == s->lattice) {
+            return true;
+        }
+        if (GBisCoveredByShort(ctx->model, (int*)&state.lattice, (int*)&s->lattice)) {
+            ctx->red.deletes++;
+            return true;
+        }
+        iteration++;
+    }
+    return false;
 }
 
 static void
@@ -3254,7 +3640,7 @@ ta_cndfs_handle_nonseed_accepting (wctx_t *ctx)
         ctx->red.waits++;
         ctx->counters.rec += accs;
         RTstartTimer (ctx->red.timer);
-        while ( nonred && !lb_is_stopped(global->lb) ) { // TODO: mark done states
+        while ( nonred && !lb_is_stopped(global->lb) ) {
             nonred = 0;
             for (size_t i = 0; i < accs; i++) {
                 raw_data_t state_data = dfs_stack_peek (ctx->out_stack, i);
@@ -3282,12 +3668,35 @@ ta_cndfs_handle_nonseed_accepting (wctx_t *ctx)
         Warning (info, "Pink set not empty: %zu", fset_count(ctx->pink));
 }
 
+static inline bool
+ta_cndfs_is_cyan (wctx_t *ctx, state_info_t *s, raw_data_t d, bool add_if_absent)
+{
+    if (UPDATE == 1) {
+        if (add_if_absent) { // BOTH stacks:
+            bool result = ta_cndfs_subsumes_cyan (ctx, s);
+            result = ta_cndfs_has_state(ctx->cyan, s, add_if_absent);
+            if (!result && add_if_absent)
+                ta_cndfs_next (ctx, d, &ctx->state);
+            return result;
+        } else {
+            return ta_cndfs_subsumes_cyan (ctx, s);
+        }
+    } else if (UPDATE == 2) {
+        bool result = ta_cndfs_subsumes_cyan (ctx, s);
+        if (!result && add_if_absent)
+            ta_cndfs_next (ctx, d, &ctx->state);
+        return result;
+    } else {
+        return ta_cndfs_has_state(ctx->cyan, s, add_if_absent);
+    }
+}
+
 static void
 ta_cndfs_handle_red (void *arg, state_info_t *successor, transition_info_t *ti, int seen)
 {
     wctx_t             *ctx = (wctx_t *) arg;
     /* Find cycle back to the seed */
-    if ( ta_cndfs_has_state(ctx->cyan, successor, false) )
+    if ( ta_cndfs_is_cyan(ctx, successor, NULL, false) )
         ndfs_report_cycle (ctx, successor);
     if ( !ta_cndfs_has_state(ctx->pink, successor, false) //&&
          /*!ta_cndfs_subsumed(ctx, successor, LM_RED)*/ ) {
@@ -3304,7 +3713,7 @@ ta_cndfs_handle_blue (void *arg, state_info_t *successor, transition_info_t *ti,
     state_data_t succ_data = get_state (successor->ref, ctx);
     int acc = GBbuchiIsAccepting(ctx->model, succ_data);
     ctx->red.visited += ~seen & acc;
-    int cyan = ta_cndfs_has_state (ctx->cyan, successor, false);
+    int cyan = ta_cndfs_is_cyan (ctx, successor, NULL, false);
     if ( ecd && cyan && (GBbuchiIsAccepting(ctx->model, ctx->state.data) || acc) ) {
         /* Found cycle in blue search */
         ndfs_report_cycle (ctx, successor);
@@ -3376,12 +3785,13 @@ ta_cndfs_red (wctx_t *ctx, ref_t seed, lattice_t l_seed)
 void
 ta_cndfs_blue (wctx_t *ctx)
 {
+    lm_status_t BLUE_CHECK = (UPDATE != 0 ? LM_BOTH : LM_BLUE);
     while ( !lb_is_stopped(global->lb) ) {
         raw_data_t          state_data = dfs_stack_top (ctx->stack);
         if (NULL != state_data) {
             state_info_deserialize (&ctx->state, state_data, ctx->store);
-            if ( !ta_cndfs_subsumed(ctx, &ctx->state, LM_BLUE) &&
-                 !ta_cndfs_has_state(ctx->cyan, &ctx->state, true) ) {
+            if ( !ta_cndfs_subsumed(ctx, &ctx->state, BLUE_CHECK) &&
+                 !ta_cndfs_is_cyan(ctx, &ctx->state, state_data, true) ) {
                 if (all_red)
                     bitvector_set (&ctx->all_red, ctx->counters.level_cur);
                 ta_cndfs_explore_state_blue (ctx, &ctx->counters);
@@ -3393,7 +3803,6 @@ ta_cndfs_blue (wctx_t *ctx)
             }
         } else { // backtrack
             if (0 == dfs_stack_nframes(ctx->stack)) {
-                //HREassert (fset_count(ctx->cyan) == 0, "Cyan set not empty: %zu", fset_count(ctx->cyan));
                 if (fset_count(ctx->cyan) != 0)
                     Warning (info, "Cyan set not empty: %zu", fset_count(ctx->cyan));
                 break;
@@ -3404,13 +3813,22 @@ ta_cndfs_blue (wctx_t *ctx)
             /* call red DFS for accepting states */
             state_data = dfs_stack_top (ctx->stack);
             state_info_deserialize (&ctx->state, state_data, ctx->store);
-            ta_cndfs_remove_state (ctx->cyan, &ctx->state);
+            if (UPDATE == 1) {
+                ta_cndfs_previous (ctx, &ctx->state);
+                ta_cndfs_remove_state (ctx->cyan, &ctx->state);
+            } else if (UPDATE == 2) {
+                ta_cndfs_previous (ctx, &ctx->state);
+            } else {
+                ta_cndfs_remove_state (ctx->cyan, &ctx->state);
+            }
             /* Mark state BLUE on backtrack */
             ta_cndfs_mark (ctx, &ctx->state, LM_BLUE);
             if ( all_red && bitvector_is_set(&ctx->all_red, ctx->counters.level_cur) ) {
                 /* all successors are red */
                 //permute_trans (ctx->permute, &ctx->state, check, ctx);
-                ta_cndfs_mark (ctx, &ctx->state, LM_RED); // TODO: allred count
+                int red = ta_cndfs_mark (ctx, &ctx->state, LM_RED);
+                ctx->counters.allred += red;
+                ctx->red.allred += 1 - red;
             } else if ( GBbuchiIsAccepting(ctx->model, ctx->state.data) ) {
                 ta_cndfs_red (ctx, ctx->state.ref, ctx->state.lattice);
                 ta_cndfs_handle_nonseed_accepting (ctx);
@@ -3432,13 +3850,20 @@ explore (wctx_t *ctx)
     state_data_t            initial = RTmalloc (sizeof(int[N]));
     GBgetInitialState (ctx->model, initial);
     state_info_initialize (&ctx->initial, initial, &ti, &ctx->state, ctx);
-    if ( Strat_OWCTY & strategy[0] ) {
+    if ( Strat_DFSFIFO & strategy[0] ) {
+        raw_data_t stack_loc = dfs_stack_push (ctx->in_stack, NULL);
+        state_info_serialize (&ctx->initial, stack_loc);
+        int acc = GBbuchiIsAccepting (ctx->model, initial);
+        ctx->seed = acc ? (ref_t)-1 : ctx->initial.ref;
+        ctx->red.visited += acc;
+    } else if ( Strat_OWCTY & strategy[0] ) {
         if (0 == ctx->id) owcty_initialize_handle (ctx, &ctx->initial, &ti, 0);
-    } else if ( Strat_LTL & strategy[0] ) {
-        if ( Strat_TA & strategy[0] )
+    } else if ( ~Strat_DFSFIFO & Strat_LTL & strategy[0] ) {
+        if ( Strat_TA & strategy[0] ) {
             ta_cndfs_handle_blue (ctx, &ctx->initial, &ti, 0);
-        else
+        } else {
             ndfs_blue_handle (ctx, &ctx->initial, &ti, 0);
+        }
     } else if (0 == ctx->id) { // only w1 receives load, as it is propagated later
         if ( Strat_TA & strategy[0] )
             ta_handle (ctx, &ctx->initial, &ti, 0);
@@ -3464,6 +3889,7 @@ explore (wctx_t *ctx)
     case Strat_CNDFS:
     case Strat_ENDFS:   endfs_blue (ctx); break;
     case Strat_OWCTY:   owcty (ctx); break;
+    case Strat_DFSFIFO: dfs_fifo (ctx); break;
     default: Abort ("Strategy is unknown or incompatible with the current front-end (%d).", strategy[0]);
     }
     RTstopTimer (ctx->timer);
