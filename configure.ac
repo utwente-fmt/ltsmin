@@ -328,12 +328,12 @@ if test x"$acx_atomics" != "xyes"; then
   AC_MSG_WARN([no acceptable atomic operations found.])
 fi
 
-
-AC_CHECK_LIB([tbbmalloc_proxy], [malloc],
-    [have_tbbmalloc="TBB malloc library was found"]
-    AC_SUBST([MALLOC_LIBS], ["-ltbbmalloc_proxy"])
-    [have_opaal="yes"],
-    AC_MSG_WARN([TBB malloc library not found.]))
+have_opaal="yes"
+#AC_CHECK_LIB([tbbmalloc_proxy], [malloc],
+#    [have_tbbmalloc="TBB malloc library was found"]
+#    AC_SUBST([MALLOC_LIBS], ["-ltbbmalloc_proxy"])
+#    [have_opaal="yes"],
+#    AC_MSG_WARN([TBB malloc library not found.]))
 
 AC_ARG_WITH([sylvan],[AS_HELP_STRING([--with-sylvan],[Compile sylvan])],
             [],[AC_RUN_IFELSE([AC_LANG_PROGRAM([], [dnl
