@@ -90,6 +90,8 @@ lb_local_init (lb_t *lb, int id, void *arg)
     HREassert (alloc_distance == CACHE_LINE_SIZE, "Wrong alignment in allocation");
     loc->idle = 0;
     loc->requests = 0;
+    loc->received = 0;
+    loc->max_load = 0;
     loc->seed = (id + 1) * 32732678642;
     // record thread local data
     atomic_write (&(loc->arg), arg);
