@@ -835,12 +835,15 @@ GBloadFile (model_t model, const char *filename, model_t *wrapped)
                 }
 
                 if (matrix) {
-                    GBprintDependencyMatrixCombined(stdout, model);
-                    exit (LTSMIN_EXIT_SUCCESS);
+                    if (HREme(HREglobal()) == 0)
+                        GBprintDependencyMatrixCombined(stdout, model);
+                    HREabort (LTSMIN_EXIT_SUCCESS);
                 } else if (labels) {
-                    lts_type_print(info, GBgetLTStype(model));
-                    chunk_table_print(info, model);
-                    exit (LTSMIN_EXIT_SUCCESS);
+                    if (HREme(HREglobal()) == 0) {
+                        lts_type_print(info, GBgetLTStype(model));
+                        chunk_table_print(info, model);
+                    }
+                    HREabort (LTSMIN_EXIT_SUCCESS);
                 } else {
                     return;
                 }

@@ -30,8 +30,7 @@ static void ErrorHandler(const char *format, va_list args) {
 		ATvfprintf(f, format, args);
 		fprintf(f,"\n");
 	}
-	Abort("ATerror");
-	exit(LTSMIN_EXIT_FAILURE);
+	Abort ("ATerror");
 }
 
 

@@ -23,7 +23,6 @@ static void ErrorHandler(const char *format, va_list args) {
 		fprintf(f,"\n");
 	}
 	Abort("ATerror");
-	exit(HRE_EXIT_FAILURE);
 }
 
 static void atermdd_popt(poptContext con,
