@@ -37,6 +37,6 @@ ltsmin-printtrace/ltsmin-printtrace
 ltsmin-reduce/ltsmin-reduce
 ltsmin-reduce-dist/ltsmin-reduce-dist
 spg/spgsolver
-spinjal
+spins
 stamp-h1
 subst_pins_open.mk

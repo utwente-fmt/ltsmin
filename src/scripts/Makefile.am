@@ -1,5 +1,5 @@
 
-bin_SCRIPTS = spinjal
+bin_SCRIPTS = spins
 
 if HAVE_CADP
 CADPCC = $(CADP)/src/com/cadp_cc
@@ -12,19 +12,19 @@ pins-open: pins-open.in Makefile subst_pins_open.mk
 	$(subst_pins_open) < $< > $@
 	chmod +x $@
 
-# spinjal
-spinjal: spinjal.in Makefile subst_pins_open.mk
+# spins
+spins: spins.in Makefile subst_pins_open.mk
 	$(subst_pins_open) < $< > $@
 	chmod +x $@
 
 -include subst_pins_open.mk
 
-subst_pins_open.mk: spinjal.in Makefile config.munge.pl
+subst_pins_open.mk: spins.in Makefile config.munge.pl
 	perl $(srcdir)/config.munge.pl subst_pins_open < $< > $@
 
-CLEANFILES 		= pins_open spinjal
+CLEANFILES 		= pins_open spins
 DISTCLEANFILES  = subst_pins_open.mk
 
-EXTRA_DIST  = pins-open.in spinjal.in
+EXTRA_DIST  = pins-open.in spins.in
 EXTRA_DIST += config.munge.pl subst_pins_open.mk
 	

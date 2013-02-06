@@ -60,7 +60,7 @@ ACX_PTHREAD(
 
 AC_ARG_VAR([ANT], [ANT command (Java build tool)])
 AC_PATH_TOOL(ANT, ["${ANT:-ant}"])
-if test -f "${srcdir}/spinja/spinja.jar" || \
+if test -f "${srcdir}/spins/spins.jar" || \
   command -v "$ANT" 2>/dev/null 2>&1
 then :
 else

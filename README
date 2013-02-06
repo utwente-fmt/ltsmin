@@ -1,4 +1,4 @@
-LTSmin - minimization and instantiation of labelled transition systems
+LTSmin - model checking and minimization of labelled transition systems
 
 * Introduction
 LTSmin started out as a generic toolset for manipulating labelled
@@ -210,26 +210,26 @@ This produces a file ``model.dve2C'', which can also be passed to
 LTSmin tools.  (This step is done automatically by the LTSmin tools
 when passing in a ``.dve'' model, doing it manually is rarely needed.)
 
-*** SpinJa / Promela
+*** SpinS / Promela
 
-Use SpinJa (distributed as submodule LTSmin) to compile PROMELA model
-'leader.pm' to 'leader.pm.spinja':
+Use SpinS (distributed as submodule LTSmin) to compile PROMELA model
+'leader.pm' to 'leader.pm.spins':
 
 ----
-java -cp <prefix>/share/ltsmin/spinja.jar spinja.Compile -o3 -l leader.pm
-gcc -g -O2 -fPIC -shared leader.spinja.c -o leader.spinja
+java -cp <prefix>/share/ltsmin/spins.jar spins.Compile -o3 -l leader.pm
+gcc -g -O2 -fPIC -shared leader.spins.c -o leader.spins
 ----
 
 Note that option +-l+ is currently mandatory.
 Alternatively, one can use the included script:
 
 ----
-spinjal -o3 leader.pm
+spins -o3 leader.pm
 ----
 
 The optional flag +-o3+ turns off control flow optimizations.
 
-The resulting compiled SpinJa module can be loaded by  all SpinJa-related LTSmin
+The resulting compiled SpinS module can be loaded by  all SpinJa-related LTSmin
 tools (prom*).
 
 *** opaal / UPPAAL XML

@@ -3,7 +3,11 @@ TAGS
 \#*\#
 *~
 *.exe
-*.in
+*.log
+*.sum
+*.plist
+*.dSYM
+config.h.in
 .libs/
 .metadata/
 aclocal.m4

@@ -13,9 +13,9 @@ EXTRA_DIST += CODING-STANDARDS
 
 doc_DATA = AUTHORS COPYING README CODING-STANDARDS
 
-dist_pkgdata_DATA = spinja/spinja.jar
+dist_pkgdata_DATA = spins/spins.jar
 
-MAINTAINERCLEANFILES = spinja/spinja.jar
+MAINTAINERCLEANFILES = spins/spins.jar
 
 if DX_COND_doc
 mostlyclean-local: doxygen-clean
@@ -33,5 +33,5 @@ distcheck-hook:
 libtool: $(LIBTOOL_DEPS)
 	$(SHELL) ./config.status --recheck
 
-spinja/spinja.jar:
-	test -f $@ || (cd "${top_srcdir}/spinja/src" && $(ANT))
+spins/spins.jar:
+	test -f $@ || (cd "${top_srcdir}/spins/src" && $(ANT))

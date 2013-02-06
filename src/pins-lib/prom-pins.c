@@ -20,7 +20,7 @@ static const char* NON_PROGRESS_STATE_LABEL_NAME    = "np_";
 static const char* VALID_END_STATE_LABEL_NAME       = "end_";
 
 /**
- * SpinJa - LTSmin interface functions
+ * SpinS - LTSmin interface functions
  */
 
 /* Next-state functions */
@@ -79,20 +79,20 @@ prom_popt (poptContext con,
         GBregisterPreLoader("prom",     PromCompileGreyboxModel);
         GBregisterPreLoader("prm",      PromCompileGreyboxModel);
         GBregisterPreLoader("pml",      PromCompileGreyboxModel);
-		GBregisterPreLoader("spinja",   PromLoadDynamicLib);
+		GBregisterPreLoader("spins",   PromLoadDynamicLib);
 
         GBregisterLoader("pr",          PromLoadGreyboxModel);
         GBregisterLoader("promela",     PromLoadGreyboxModel);
         GBregisterLoader("prom",        PromLoadGreyboxModel);
         GBregisterLoader("pml",         PromLoadGreyboxModel);
         GBregisterLoader("prm",         PromLoadGreyboxModel);
-        GBregisterLoader("spinja",      PromLoadGreyboxModel);
-		Warning(info,"Precompiled spinja module initialized");
+        GBregisterLoader("spins",      PromLoadGreyboxModel);
+		Warning(info,"Precompiled spins module initialized");
 		return;
 	case POPT_CALLBACK_REASON_OPTION:
 		break;
 	}
-	Abort("unexpected call to spinja_popt");
+	Abort("unexpected call to spins_popt");
 }
 
 struct poptOption prom_options[]= {
@@ -107,7 +107,7 @@ typedef struct grey_box_context {
 static void* dlHandle = NULL;
 
 /**
- * Compile a promela model to a .spinja binary using spinjal
+ * Compile a promela model to a .spins binary using spinsl
  * calls: PromLoadDynamicLib
  */
 void
@@ -122,7 +122,7 @@ PromCompileGreyboxModel(model_t model, const char *filename)
 
     // compile opaal model
     char command[4096];
-    if (snprintf(command, sizeof command, "spinjal '%s'", filename) >= (ssize_t)sizeof command)
+    if (snprintf(command, sizeof command, "spins '%s'", filename) >= (ssize_t)sizeof command)
         Abort("Cannot compile `%s', paths too long", filename);
 
     if ((ret = system(command)) != 0)
@@ -130,10 +130,10 @@ PromCompileGreyboxModel(model_t model, const char *filename)
 
     char *basename = gnu_basename ((char *)filename);
     // check existence of bin file
-    char *bin_fname = RTmalloc(strlen(basename) + strlen(".spinja") + 1);
+    char *bin_fname = RTmallocZero(strlen(basename) + strlen(".spins") + 1);
     strncpy(bin_fname, basename, strlen(basename));
     char *ext = bin_fname + strlen(basename);
-    strncpy(ext, ".spinja", strlen(".spinja"));
+    strncpy(ext, ".spins", strlen(".spins"));
 
     if ((ret = stat (bin_fname, &st)) != 0)
         HREassert(ret >= 0, "File not found: %s", bin_fname);
@@ -143,12 +143,12 @@ PromCompileGreyboxModel(model_t model, const char *filename)
 }
 
 /**
- * Load a .spinja binary as a dynamic library
+ * Load a .spins binary as a dynamic library
  */
 void
 PromLoadDynamicLib(model_t model, const char *filename)
 {
-    // Open spinja file
+    // Open spins file
     char abs_filename[PATH_MAX];
     char *ret_filename = realpath(filename, abs_filename);
     if (ret_filename != NULL) {
@@ -163,62 +163,62 @@ PromLoadDynamicLib(model_t model, const char *filename)
 
     // load dynamic library functionality
     prom_get_initial_state = (void(*)(int*))
-        RTdlsym( filename, dlHandle, "spinja_get_initial_state" );
+        RTdlsym( filename, dlHandle, "spins_get_initial_state" );
     prom_get_successor = (next_method_grey_t)
-        RTdlsym( filename, dlHandle, "spinja_get_successor" );
+        RTdlsym( filename, dlHandle, "spins_get_successor" );
     prom_get_successor_all = (next_method_black_t)
-        RTdlsym( filename, dlHandle, "spinja_get_successor_all" );
+        RTdlsym( filename, dlHandle, "spins_get_successor_all" );
     prom_get_state_size = (int(*)())
-        RTdlsym( filename, dlHandle, "spinja_get_state_size" );
+        RTdlsym( filename, dlHandle, "spins_get_state_size" );
     prom_get_transition_groups = (int(*)())
-        RTdlsym( filename, dlHandle, "spinja_get_transition_groups" );
+        RTdlsym( filename, dlHandle, "spins_get_transition_groups" );
     prom_get_transition_read_dependencies = (const int*(*)(int))
-        RTdlsym( filename, dlHandle, "spinja_get_transition_read_dependencies" );
+        RTdlsym( filename, dlHandle, "spins_get_transition_read_dependencies" );
     prom_get_transition_write_dependencies = (const int*(*)(int))
-        RTdlsym( filename, dlHandle, "spinja_get_transition_write_dependencies" );
+        RTdlsym( filename, dlHandle, "spins_get_transition_write_dependencies" );
     prom_get_state_variable_name = (const char*(*)(int))
-        RTdlsym( filename, dlHandle, "spinja_get_state_variable_name" );
+        RTdlsym( filename, dlHandle, "spins_get_state_variable_name" );
     prom_get_state_variable_type = (int (*)(int))
-        RTdlsym( filename, dlHandle, "spinja_get_state_variable_type" );
+        RTdlsym( filename, dlHandle, "spins_get_state_variable_type" );
     prom_get_type_name = (const char*(*)(int))
-        RTdlsym( filename, dlHandle, "spinja_get_type_name" );
+        RTdlsym( filename, dlHandle, "spins_get_type_name" );
     prom_get_type_count = (int(*)())
-        RTdlsym( filename, dlHandle, "spinja_get_type_count" );
+        RTdlsym( filename, dlHandle, "spins_get_type_count" );
     prom_get_type_value_name = (const char*(*)(int,int))
-        RTdlsym( filename, dlHandle, "spinja_get_type_value_name" );
+        RTdlsym( filename, dlHandle, "spins_get_type_value_name" );
     prom_get_type_value_count = (int(*)(int))
-        RTdlsym( filename, dlHandle, "spinja_get_type_value_count" );
+        RTdlsym( filename, dlHandle, "spins_get_type_value_count" );
     prom_get_edge_count = (int(*)())
-        RTdlsym( filename, dlHandle, "spinja_get_edge_count" );
+        RTdlsym( filename, dlHandle, "spins_get_edge_count" );
     prom_get_edge_name = (const char*(*)(int))
-        RTdlsym( filename, dlHandle, "spinja_get_edge_name" );
+        RTdlsym( filename, dlHandle, "spins_get_edge_name" );
     prom_get_edge_type = (int(*)(int))
-        RTdlsym( filename, dlHandle, "spinja_get_edge_type" );
+        RTdlsym( filename, dlHandle, "spins_get_edge_type" );
     prom_get_label_count = (int(*)())
-        RTdlsym( filename, dlHandle, "spinja_get_label_count" );
+        RTdlsym( filename, dlHandle, "spins_get_label_count" );
     prom_get_guard_count = (int(*)())
-        RTdlsym( filename, dlHandle, "spinja_get_guard_count" );
+        RTdlsym( filename, dlHandle, "spins_get_guard_count" );
     prom_get_label_matrix = (const int*(*)(int))
-        RTdlsym( filename, dlHandle, "spinja_get_label_matrix" );
+        RTdlsym( filename, dlHandle, "spins_get_label_matrix" );
     prom_get_labels = (const int*(*)(int))
-        RTdlsym( filename, dlHandle, "spinja_get_labels" );
+        RTdlsym( filename, dlHandle, "spins_get_labels" );
     prom_get_all_labels = (const int**(*)())
-        RTdlsym( filename, dlHandle, "spinja_get_all_labels" );
+        RTdlsym( filename, dlHandle, "spins_get_all_labels" );
     prom_get_label = (int(*)(void*,int,int*))
-        RTdlsym( filename, dlHandle, "spinja_get_label" );
+        RTdlsym( filename, dlHandle, "spins_get_label" );
     prom_get_label_name = (const char*(*)(int))
-        RTdlsym( filename, dlHandle, "spinja_get_label_name" );
+        RTdlsym( filename, dlHandle, "spins_get_label_name" );
     prom_get_labels_all = (void(*)(void*,int*,int*))
-        RTdlsym( filename, dlHandle, "spinja_get_labels_all" );
+        RTdlsym( filename, dlHandle, "spins_get_labels_all" );
     prom_get_label_may_be_coenabled_matrix = (const int*(*)(int))
-        RTdlsym( filename, dlHandle, "spinja_get_label_may_be_coenabled_matrix" );
+        RTdlsym( filename, dlHandle, "spins_get_label_may_be_coenabled_matrix" );
     // optional POR functionality (NES/NDS):
     prom_get_label_nes_matrix = (const int*(*)(int))
-        RTtrydlsym( dlHandle, "spinja_get_label_nes_matrix" );
+        RTtrydlsym( dlHandle, "spins_get_label_nes_matrix" );
     prom_get_label_nds_matrix = (const int*(*)(int))
-        RTtrydlsym( dlHandle, "spinja_get_label_nds_matrix" );
+        RTtrydlsym( dlHandle, "spins_get_label_nds_matrix" );
     prom_get_label_visiblity_matrix = (const int*(*)(int))
-        RTtrydlsym( dlHandle, "spinja_get_label_visiblity_matrix" );
+        RTtrydlsym( dlHandle, "spins_get_label_visiblity_matrix" );
 
     (void)model;
 }
@@ -231,7 +231,7 @@ sl_group (model_t model, sl_group_enum_t group, int*src, int *label)
 }
 
 /**
- * Load .spinja information into PINS (and ltstype)
+ * Load .spins information into PINS (and ltstype)
  */
 void
 PromLoadGreyboxModel(model_t model, const char *filename)
@@ -247,7 +247,7 @@ PromLoadGreyboxModel(model_t model, const char *filename)
     if (NULL == dlHandle) {
         char *extension = strrchr (filename, '.');
         HREassert (extension != NULL, "No filename extension in %s", filename);
-        if (0==strcmp (extension, ".spinja")) {
+        if (0==strcmp (extension, ".spins")) {
             PromLoadDynamicLib (model, filename);
         } else {
             PromCompileGreyboxModel(model, filename);
@@ -379,13 +379,13 @@ PromLoadGreyboxModel(model_t model, const char *filename)
     dm_create(dm_write_info, ngroups, state_length);
     for (int i=0; i < dm_nrows(dm_info); i++) {
         int* proj = (int*)prom_get_transition_read_dependencies(i);
-        HREassert (proj != NULL, "No SpinJa read dependencies");
+        HREassert (proj != NULL, "No SpinS read dependencies");
         for(int j=0; j<state_length; j++) {
             if (proj[j]) dm_set(dm_info, i, j);
             if (proj[j]) dm_set(dm_read_info, i, j);
         }
         proj = (int*)prom_get_transition_write_dependencies(i);
-        HREassert (proj != NULL, "No SpinJa write dependencies");
+        HREassert (proj != NULL, "No SpinS write dependencies");
         for(int j=0; j<state_length; j++) {
             if (proj[j]) dm_set(dm_info, i, j);
             if (proj[j]) dm_set(dm_write_info, i, j);

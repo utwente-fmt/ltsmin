@@ -1,5 +1,5 @@
 #!/bin/bash
-# Simple bash shell script to launch SpinJa using the LTSmin backend
+# Simple bash shell script to launch SpinS using the LTSmin backend
 
 
 COMMAND="$(basename "$0")"
@@ -11,14 +11,14 @@ LTSMIN_LIB="@pkglibdir@"
 LTSMIN_SRCDIR="@top_srcdir@"
 LTSMIN_SRCDIR="`dirname $0`/$LTSMIN_SRCDIR"
 
-spinja_dir="$LTSMIN_PREFIX/share/ltsmin"
-spinja_dir2="$LTSMIN_SRCDIR/spinja/build"
+spins_dir="$LTSMIN_PREFIX/share/ltsmin"
+spins_dir2="$LTSMIN_SRCDIR/spins/build"
 
-CP="$spinja_dir/spinja.jar"
+CP="$spins_dir/spins.jar"
 if [ ! -e $CP ]; then
-    spinja_dir=$spinja_dir2
+    spins_dir=$spins_dir2
 fi
-CP="$spinja_dir/spinja.jar"
+CP="$spins_dir/spins.jar"
 promela_file=
 no_compile=0
 
@@ -31,19 +31,19 @@ for option in ${1+"$@"}; do
 done
 
 if [ -z "$promela_file" ]; then
-    echo "usage: spinja [options] promela_file" ;
+    echo "usage: spins [options] promela_file" ;
     echo "options will be passed to GCC"
     exit 1
 fi
 
 promela_name=`basename $promela_file`
-output_file="${promela_name}.spinja.c"
+output_file="${promela_name}.spins.c"
 
 if [ -f "$output_file" ]; then
     rm -f "$output_file";
 fi
 
-java -Xss8M -Xms120m -Xmx2048m -cp $CP spinja.Compile -l ${1+"$@"}
+java -Xss8M -Xms120m -Xmx2048m -cp $CP spins.Compile ${1+"$@"}
 ERROR=$?
 if [ $ERROR -ne 0 ]; then
     echo "Compilation of $promela_file failed"
@@ -55,9 +55,9 @@ if [ $no_compile == 1 ]; then
     exit 0
 fi
 
-gcc -fPIC -shared -O2 -ggdb $CFLAGS $output_file -o $promela_name.spinja
+gcc -fPIC -shared -O2 -ggdb $CFLAGS $output_file -o $promela_name.spins
 if [ ! $? -eq 0 ]; then
     echo "Compilation of $output_file failed"
 else
-    echo "Compiled C model to $promela_name.spinja"
+    echo "Compiled C model to $promela_name.spins"
 fi
