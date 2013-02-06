@@ -17,7 +17,7 @@ static uint32_t cache_size;
 /** fibonacci number of the size of the node table. */
 static uint32_t nodes_fib=30;
 /** Maximum fibonacci number before overflow. */
-static const uint32_t FIB_MAX = 47;
+static const uint32_t FIB_MAX = 46;
 /** difference between the fibonacci numbers of the sizes of the node table and the cache. */
 static int cache_fib=0;
 
@@ -166,17 +166,17 @@ mdd_pop()
 
 static void mdd_mark(uint32_t mdd){
     if (mdd<=1) return;
-    if (node_table[mdd].val&0x80000000) return;
+    if (node_table[mdd].next&0x80000000) return;
     mdd_used++;
-    node_table[mdd].val=node_table[mdd].val|0x80000000;
+    node_table[mdd].next=node_table[mdd].next|0x80000000;
     mdd_mark(node_table[mdd].down);
     mdd_mark(node_table[mdd].right);
 }
 
 static void mdd_clear_and_count(uint32_t mdd,uint32_t *count){
     if (mdd<=1) return;
-    if (node_table[mdd].val&0x80000000) {
-        node_table[mdd].val=node_table[mdd].val&0x7fffffff;
+    if (node_table[mdd].next&0x80000000) {
+        node_table[mdd].next=node_table[mdd].next&0x7fffffff;
         (*count)++;
         mdd_clear_and_count(node_table[mdd].down,count);
         mdd_clear_and_count(node_table[mdd].right,count);
@@ -197,8 +197,8 @@ mdd_node_count(uint32_t mdd)
 static uint32_t mdd_sweep_bucket(uint32_t mdd){
     if (mdd==0) return 0;
     if (mdd==1) Abort("data corruption");
-    if (node_table[mdd].val&0x80000000){
-        node_table[mdd].val=node_table[mdd].val&0x7fffffff;
+    if (node_table[mdd].next&0x80000000){
+        node_table[mdd].next=node_table[mdd].next&0x7fffffff;
         node_table[mdd].next=mdd_sweep_bucket(node_table[mdd].next);
         return mdd;
     } else {
@@ -231,47 +231,11 @@ static void mdd_collect(uint32_t a,uint32_t b){
     for(uint32_t i=0;i<mdd_load_node_count;i++){
         mdd_mark(mdd_load_node_ids[i]);
     }
-    /* The following code marks results of projection and
+    /* There used to be code marking results of projection and
        next, to allow them to remain in the cache. On the
        few tests done, there did not seem to be a speedup
        but the memory use went up considerably.
        Still it may be useful for saturation.
-    for(uint32_t i=0;i<cache_size;i++){
-        uint32_t slot,op,arg1,arg2,res;
-        op=op_cache[i].op&0xffff;
-        switch(op){
-            case OP_PROJECT:
-            {
-                arg1=op_cache[i].arg1;
-                if (!(node_table[arg1].val&0x80000000)) {
-                    op_cache[i].op=OP_UNUSED;
-                    continue;
-                }
-                res=op_cache[i].res.other.res;
-                mdd_mark(res);
-                continue;
-            }
-            case OP_SAT:
-            case OP_RELPROD:
-            case OP_UNION:
-            {
-                arg1=op_cache[i].arg1;
-                if (!(node_table[arg1].val&0x80000000)) {
-                    op_cache[i].op=OP_UNUSED;
-                    continue;
-                }
-                arg2=op_cache[i].res.other.arg2;
-                if (!(node_table[arg2].val&0x80000000)) {
-                    op_cache[i].op=OP_UNUSED;
-                    continue;
-                }
-                res=op_cache[i].res.other.res;
-                mdd_mark(res);
-                continue;
-            }
-            default: continue;
-        }
-    }
     */
     Warning(debug, "ListDD garbage collection: %u of %u nodes used",
             mdd_used, mdd_nodes);
@@ -304,7 +268,7 @@ static void mdd_collect(uint32_t a,uint32_t b){
             case OP_COUNT: {
                 arg1=op_cache[i].arg1;
                 arg2=0;
-                if (!(node_table[arg1].val&0x80000000)){
+                if (!(node_table[arg1].next&0x80000000)){
                     op_cache[i].op=OP_UNUSED;
                     continue;
                 }
@@ -314,13 +278,13 @@ static void mdd_collect(uint32_t a,uint32_t b){
             case OP_PROJECT:
             {
                 arg1=op_cache[i].arg1;
-                if (!(node_table[arg1].val&0x80000000)) {
+                if (!(node_table[arg1].next&0x80000000)) {
                     op_cache[i].op=OP_UNUSED;
                     continue;
                 }
                 arg2=op_cache[i].res.other.arg2;
                 res=op_cache[i].res.other.res;
-                if (!(node_table[res].val&0x80000000)) {
+                if (!(node_table[res].next&0x80000000)) {
                     op_cache[i].op=OP_UNUSED;
                     continue;
                 }
@@ -337,17 +301,17 @@ static void mdd_collect(uint32_t a,uint32_t b){
             case OP_RELPROD:
             {
                 arg1=op_cache[i].arg1;
-                if (!(node_table[arg1].val&0x80000000)) {
+                if (!(node_table[arg1].next&0x80000000)) {
                     op_cache[i].op=OP_UNUSED;
                     continue;
                 }
                 arg2=op_cache[i].res.other.arg2;
-                if (!(node_table[arg2].val&0x80000000)) {
+                if (!(node_table[arg2].next&0x80000000)) {
                     op_cache[i].op=OP_UNUSED;
                     continue;
                 }
                 res=op_cache[i].res.other.res;
-                if (!(node_table[res].val&0x80000000)) {
+                if (!(node_table[res].next&0x80000000)) {
                     op_cache[i].op=OP_UNUSED;
                     continue;
                 }
@@ -395,8 +359,8 @@ static void mdd_collect(uint32_t a,uint32_t b){
         }
         node_table[mdd_nodes-1].next=0;
         for(uint32_t i=2;i<old_size;i++){
-            if (node_table[i].val&0x80000000){
-                node_table[i].val=node_table[i].val&0x7fffffff;
+            if (node_table[i].next&0x80000000){
+                node_table[i].next=node_table[i].next&0x7fffffff;
                 uint32_t slot=hash(node_table[i].val,node_table[i].down,node_table[i].right)%uniq_size;
                 node_table[i].next=unique_table[slot];
                 unique_table[slot]=i;
@@ -701,8 +665,8 @@ static uint32_t mdd_take(uint32_t mdd,int len,uint32_t count){
 
 static void mdd_clear_and_write_bin(stream_t s, uint32_t mdd, uint32_t* n_count, map_t node_map){
     if (mdd<=1) return;
-    if (node_table[mdd].val&0x80000000) {
-        node_table[mdd].val=node_table[mdd].val&0x7fffffff;
+    if (node_table[mdd].next&0x80000000) {
+        node_table[mdd].next=node_table[mdd].next&0x7fffffff;
         mdd_clear_and_write_bin(s,node_table[mdd].down, n_count, node_map);
         mdd_clear_and_write_bin(s,node_table[mdd].right, n_count, node_map);
         simplemap_put(node_map, mdd, (uint32_t)*n_count);
@@ -1536,8 +1500,8 @@ static void mdd_mark_for_dot(uint32_t mdd){
   // note that head of one mdd-node might be in the middle of another one!
   // this means that "sharing within mdd-nodes" is not represented in dot.
     if (mdd<=1) return;
-    if (node_table[mdd].val&0x80000000) return;
-    node_table[mdd].val = node_table[mdd].val | 0x80000000;
+    if (node_table[mdd].next&0x80000000) return;
+    node_table[mdd].next = node_table[mdd].next | 0x80000000;
     uint32_t x = mdd;
     while (x) {
       mdd_mark_for_dot(node_table[x].down);
@@ -1555,8 +1519,8 @@ static void mdd_clear_and_print(FILE* fp,uint32_t mdd){
       trueprinted=1;
     }
   }
-  else if (node_table[mdd].val & 0x80000000) {
-    node_table[mdd].val=node_table[mdd].val & 0x7fffffff;
+  else if (node_table[mdd].next & 0x80000000) {
+    node_table[mdd].next=node_table[mdd].next & 0x7fffffff;
 
     // print the mdd-node with values
     uint32_t x=mdd;
@@ -1564,7 +1528,7 @@ static void mdd_clear_and_print(FILE* fp,uint32_t mdd){
     fprintf(fp," n%u [shape=record,label=\"",mdd);
     while (x) {
       if (i>0) fprintf(fp,"|");
-      fprintf(fp,"<f%d> %u",i,node_table[x].val & 0x7fffffff);
+      fprintf(fp,"<f%d> " PRIu32,i,node_table[x].val);
       x=node_table[x].right;
       i++;
     }
