@@ -1496,7 +1496,7 @@ static void mdd64_clear_and_print(FILE* fp,uint64_t mdd){
     fprintf(fp," n%" PRIu64 " [shape=record,label=\"",mdd);
     while (x) {
       if (i>0) fprintf(fp,"|");
-      fprintf(fp,"<f%d> " PRIu32,i,node_table[x].val);
+      fprintf(fp,"<f%d> %"PRIu32, i, node_table[x].val);
       x=node_table[x].right;
       i++;
     }

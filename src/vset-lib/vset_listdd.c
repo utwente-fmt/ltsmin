@@ -1528,7 +1528,7 @@ static void mdd_clear_and_print(FILE* fp,uint32_t mdd){
     fprintf(fp," n%u [shape=record,label=\"",mdd);
     while (x) {
       if (i>0) fprintf(fp,"|");
-      fprintf(fp,"<f%d> " PRIu32,i,node_table[x].val);
+      fprintf(fp,"<f%d> %"PRIu32, i, node_table[x].val);
       x=node_table[x].right;
       i++;
     }
