@@ -8,7 +8,7 @@ PINS_LIB = ../pins-lib/libpins.la $(LTSMIN_LIB)
 VSET_LIB = ../vset-lib/libvset.la
 
 pkglib_LTLIBRARIES  = libetf-open.la
-if HAVE_SPINJA
+if HAVE_SPINS
 pkglib_LTLIBRARIES += libprom-open.la
 endif
 if HAVE_LIBSTEP_INFO
@@ -70,7 +70,7 @@ libdve_open_la_LIBADD    = $(PINS_LIB)
 # libprom-open.la
 libprom_open_la_SOURCES  = pins-open.c ../pins-lib/prom-pins.c
 libprom_open_la_SOURCES += ../pins-lib/prom-pins.h
-libprom_open_la_CPPFLAGS = -DSPINJA $(SPINJA_CPPFLAGS) $(CADP_CPPFLAGS)
+libprom_open_la_CPPFLAGS = -DSPINS $(SPINS_CPPFLAGS) $(CADP_CPPFLAGS)
 libprom_open_la_CPPFLAGS+= $(AM_CPPFLAGS)
 libprom_open_la_LIBADD   = $(PINS_LIB)
 

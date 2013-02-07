@@ -1,5 +1,5 @@
-#ifndef SPINJA_GREYBOX_H
-#define SPINJA_GREYBOX_H
+#ifndef SPINS_GREYBOX_H
+#define SPINS_GREYBOX_H
 
 /**
  * \file prom-greybox.h
@@ -28,7 +28,7 @@
 extern struct poptOption prom_options[];
 
 /**
-Load a spinja model.
+Load a spins model.
 */
 extern void PromLoadDynamicLib(model_t model, const char *name);
 extern void PromLoadGreyboxModel(model_t model,const char*name);

@@ -32,7 +32,7 @@ if HAVE_DVE
 bin_PROGRAMS += dve2lts-dist
 endif
 
-if HAVE_SPINJA
+if HAVE_SPINS
 bin_PROGRAMS += prom2lts-dist
 endif
 
@@ -79,6 +79,6 @@ dve2lts_dist_LDFLAGS   = $(DIVINE_LDFLAGS) $(AM_LDFLAGS)
 prom2lts_dist_SOURCES  = pins2lts-dist.c
 prom2lts_dist_SOURCES += ../pins-lib/prom-pins.c ../pins-lib/prom-pins.h
 prom2lts_dist_LDADD    = $(PINS_LIBS)
-prom2lts_dist_LDADD   += $(SPINJA_LIBS)
-prom2lts_dist_CPPFLAGS = -DSPINJA $(SPINJA_CPPFLAGS) $(DIST_CPPFLAGS)
-prom2lts_dist_LDFLAGS  = $(SPINJA_LDFLAGS) $(AM_LDFLAGS)
+prom2lts_dist_LDADD   += $(SPINS_LIBS)
+prom2lts_dist_CPPFLAGS = -DSPINS $(SPINS_CPPFLAGS) $(DIST_CPPFLAGS)
+prom2lts_dist_LDFLAGS  = $(SPINS_LDFLAGS) $(AM_LDFLAGS)

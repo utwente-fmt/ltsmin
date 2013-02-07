@@ -28,7 +28,7 @@ if HAVE_DVE
 bin_PROGRAMS += dve2lts-sym
 endif
 
-if HAVE_SPINJA
+if HAVE_SPINS
 bin_PROGRAMS += prom2lts-sym
 endif
 
@@ -81,7 +81,7 @@ nodist_EXTRA_dve2lts_sym_SOURCES = automake-force-linker.cxx # req. by vset
 prom2lts_sym_SOURCES  = pins2lts-sym.c
 prom2lts_sym_SOURCES += ../pins-lib/prom-pins.c ../pins-lib/prom-pins.h
 prom2lts_sym_LDADD    = $(PINS_LIBS)
-prom2lts_sym_LDADD   += $(VSET_LIBS) $(SPINJA_LIBS)
-prom2lts_sym_CPPFLAGS = -DSPINJA $(SPINJA_CPPFLAGS) $(SYM_CPPFLAGS)
-prom2lts_sym_LDFLAGS  = $(SPINJA_LDFLAGS) $(AM_LDFLAGS)
+prom2lts_sym_LDADD   += $(VSET_LIBS) $(SPINS_LIBS)
+prom2lts_sym_CPPFLAGS = -DSPINS $(SPINS_CPPFLAGS) $(SYM_CPPFLAGS)
+prom2lts_sym_LDFLAGS  = $(SPINS_LDFLAGS) $(AM_LDFLAGS)
 nodist_EXTRA_prom2lts_sym_SOURCES = automake-force-linker.cxx # req. by vset

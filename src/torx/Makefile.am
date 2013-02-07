@@ -43,11 +43,11 @@ lps2torx_CPPFLAGS = -DMCRL2 $(TORX_CPPFLAGS) $(AM_CPPFLAGS)
 nodist_EXTRA_lps2torx_SOURCES = ../automake-force-linker.cxx
 
 # prom2torx
-if HAVE_SPINJA
+if HAVE_SPINS
 bin_PROGRAMS += prom2torx
 endif
 prom2torx_SOURCES  = spec2torx.c
 prom2torx_SOURCES += ../pins-lib/prom-pins.c ../pins-lib/prom-pins.h
-prom2torx_LDADD    = $(PINS_LIBS) $(SPINJA_LIBS)
-prom2torx_LDFLAGS  = $(SPINJA_LDFLAGS) $(AM_LDFLAGS)
-prom2torx_CPPFLAGS = -DSPINJA $(SPINJA_CPPFLAGS) $(TORX_CPPFLAGS) $(AM_CPPFLAGS)
+prom2torx_LDADD    = $(PINS_LIBS) $(SPINS_LIBS)
+prom2torx_LDFLAGS  = $(SPINS_LDFLAGS) $(AM_LDFLAGS)
+prom2torx_CPPFLAGS = -DSPINS $(SPINS_CPPFLAGS) $(TORX_CPPFLAGS) $(AM_CPPFLAGS)

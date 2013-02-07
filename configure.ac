@@ -58,14 +58,8 @@ ACX_PTHREAD(
    CC="$PTHREAD_CC"],
   [AC_MSG_FAILURE([no pthread support found.])])
 
-AC_ARG_VAR([ANT], [ANT command (Java build tool)])
-AC_PATH_TOOL(ANT, ["${ANT:-ant}"])
-if test -f "${srcdir}/spins/spins.jar" || \
-  command -v "$ANT" 2>/dev/null 2>&1
-then :
-else
-  AC_MSG_ERROR([Apache Ant (Java build tool) not found.])
-fi
+dnl Checks for programs.
+ACX_SPINS([:], [AC_MSG_WARN([SpinS will not be compiled.])])
 
 dnl Newer libtool allows this instead:
 dnl LT_PREREQ(2.2)
@@ -376,7 +370,8 @@ AM_CONDITIONAL([HAVE_XMLTO], [test x"$XMLTO" != x])
 AM_CONDITIONAL([HAVE_LIBBCG], [test x"$have_bcg" = xyes])
 AM_CONDITIONAL([HAVE_CADP], [test x"$acx_cadp" = xyes])
 AM_CONDITIONAL([HAVE_DVE], [true])    dnl can be built unconditionally
-AM_CONDITIONAL([HAVE_SPINJA], [true])    dnl can be built unconditionally
+AM_CONDITIONAL([HAVE_SPINS], [true])
+AM_CONDITIONAL([HAVE_SPINS_COMPILER], [test x"$acx_spins" = "xyes"])
 AM_CONDITIONAL([HAVE_ATOMICS], [test x"$acx_atomics" = xyes])
 AM_CONDITIONAL([HAVE_VERSION_CONTROL], [test -d "${srcdir}/.git"])
 AM_CONDITIONAL([HAVE_LIBZIP], [test x"$acx_libzip" = xyes])
@@ -434,20 +429,20 @@ AC_OUTPUT
 cat <<EOM
 Configuration:
 ======================================================================
+    ASCIIDOC = ${ASCIIDOC:-NOT FOUND, not building documentation}
+    CADP     = ${CADP:-NOT FOUND, building without CADP support}
     CC       = ${CC:-NOT FOUND}
-    MPICC    = ${MPICC:-NOT FOUND, building without MPI support}
     CXX      = ${CXX:-NOT FOUND}
-    MPICXX   = ${MPICXX:-NOT FOUND, building without MPI support}
+    LIBDDD   = ${LIBDDD:-NOT FOUND, building without DDD support}
     MCRL     = ${with_mcrl:-NOT FOUND, building without muCRL support}
     MCRL2    = ${with_mcrl2:-NOT FOUND, building without mCRL2 support}
+    MPICC    = ${MPICC:-NOT FOUND, building without MPI support}
+    MPICXX   = ${MPICXX:-NOT FOUND, building without MPI support}
+    OPAAL    = ${have_opaal:-TBB malloc NOT FOUND, building without opaal support}
     PBES     = ${acx_pbes:-NOT FOUND, building without PBES support}
     SPG      = ${have_libspg:-NO, not building pbes-reach and spgsolver (enable with --without-bignum)}
-    CADP     = ${CADP:-NOT FOUND, building without CADP support}
-    LIBDDD   = ${LIBDDD:-NOT FOUND, building without DDD support}
-    OPAAL    = ${have_opaal:-TBB malloc NOT FOUND, building without opaal support}
-    SYLVAN   = ${have_sylvan:-NO. Only on 64-bit systems (override with --with-sylvan)}
-
-    ASCIIDOC = ${ASCIIDOC:-NOT FOUND, not building documentation}
+    SPINS    = ${acx_spins:-NO, JDK or Ant not found (override with --with-spins)}
+    SYLVAN   = ${have_sylvan:-NO, only on 64-bit systems (override with --with-sylvan)}
     XMLTO    = ${XMLTO:-NOT FOUND, not building manpages}
 ======================================================================
 EOM

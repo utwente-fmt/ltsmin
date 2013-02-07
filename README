@@ -7,7 +7,7 @@ a full (LTL) model checker, while maintaining its language-independent
 characteristics.
 
 To obtain its input, LTSmin connects a sizeable number of existing
-(verification) tools: muCRL, mcrl2, DiVinE, SPIN (SpinJa), UPPAAL (opaal)
+(verification) tools: muCRL, mcrl2, DiVinE, SPIN (SpinS), UPPAAL (opaal)
 and CADP. Moreover, it allows to reuse existing tools with new state space
 generation techniques by exporting LTSs into various formats.
 
@@ -229,7 +229,7 @@ spins -o3 leader.pm
 
 The optional flag +-o3+ turns off control flow optimizations.
 
-The resulting compiled SpinS module can be loaded by  all SpinJa-related LTSmin
+The resulting compiled SpinS module can be loaded by  all SpinS-related LTSmin
 tools (prom*).
 
 *** opaal / UPPAAL XML

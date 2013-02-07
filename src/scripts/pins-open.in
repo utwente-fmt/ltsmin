@@ -50,7 +50,7 @@ do
                 exit 0
                 ;;
         --help | -h )
-                echo "$COMMAND [ltsmin_options] model[.b|.etf|.lps|.tbf|.dve|.dve2C|.spinja] [cc_options] app[.a|.c|.o] [app_options]..."
+                echo "$COMMAND [ltsmin_options] model[.b|.etf|.lps|.tbf|.dve|.dve2C|.spins] [cc_options] app[.a|.c|.o] [app_options]..."
                 echo "  where \`\`app'' is an OPEN/CAESAR application"
                 exit 0
                 ;;
@@ -94,9 +94,9 @@ case "$FILE" in
     echo "input is DVE2 (compiled)"
     LTSMIN_MOD_LDFLAGS="@DIVINE2_LDFLAGS@ -ldve-open @DVEC2_LIBS@"
     ;;
- *.spinja)
+ *.spins)
     echo "input is Promela (compiled)"
-    LTSMIN_MOD_LDFLAGS="@SPINJA_LDFLAGS@ -lprom-open @SPINJA_LIBS@"
+    LTSMIN_MOD_LDFLAGS="@SPINS_LDFLAGS@ -lprom-open @SPINS_LIBS@"
     ;;
  *)
     echo "Did not recognize type of $FILE"

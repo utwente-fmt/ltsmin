@@ -8,8 +8,8 @@
     o pbes2lts-mpi/hre for distributed state space generation
     o spgsolver a symbolic parity game solver
     o PGSolver file output format ('{ast}.pg')
- * Updated SpinJa frontend that accommodates support for valid end-state
-   filtering, guards for POR, assertion violation detection and never claims.
+ * Renamed SpinJa to SpinS. Added support for valid end-state filtering,
+   guards for POR, assertion violation detection and never claims.
  * New frontend for UPPAAL xml timed automate models via opaal. This adds
    support for semi-symbolic states to the PINS interface and requires the backend
    algorithms to be extended with subsumption checks on the symbolic state part.
