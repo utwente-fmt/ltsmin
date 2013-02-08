@@ -37,16 +37,20 @@ dict set frontends prom model [subst "$prom_model.spins"]
 dict set frontends prom exp_output " 242 "
 #" states 3388 transitions"
 
-dict set frontends lpo model  "hef_wrong.tbf"
-dict set frontends lpo exp_output " 15557 "
+#dict set frontends lpo model  "hef_wrong.tbf"
+#dict set frontends lpo exp_output " 15557 "
 #"  states 27300 transitions"
+#
+# disabled because mcrl filename parse error
 
 dict set frontends lps model "ieee-11073.lps"
 dict set frontends lps exp_output " 1760 "
 #"  states 6583 transitions"
 
-dict set frontends opaal model "fischer4.xml"
-dict set frontends opaal exp_output " 268 "
+#dict set frontends opaal model "fischer4.xml"
+#dict set frontends opaal exp_output " 268 "
+#
+# disabled because opaal is not in path
 
 dict set frontends pbes model "brp-nodeadlock.pbes"
 dict set frontends pbes exp_output " 10548 "
