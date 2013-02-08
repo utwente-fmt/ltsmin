@@ -37,7 +37,7 @@ proc test_forall_params { params_dict idx command } {
 # backends: dict with options for algorithmic backends
 proc run_test_for_alg_backends { alg_be langs backends} {
     global EXAMPLES_PATH
-    global SPINJAL
+    global SPINS
 
     foreach path $alg_be {
         set testcounter 1

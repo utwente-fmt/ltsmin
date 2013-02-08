@@ -131,7 +131,7 @@ proc runmytest { test_name command_line exp_output} {
 set binpaths(ltsmin-compare) "$base_dir/../src/ltsmin-compare/ltsmin-compare"
 set binpaths(ltsmin-convert) "$base_dir/../src/ltsmin-convert/ltsmin-convert"
 set binpaths(ltsmin-printtrace) "$base_dir/../src/ltsmin-printtrace/ltsmin-printtrace"
-set binpaths(spinjal) "$base_dir/../src/scripts/spinjal"
+set binpaths(spins) "$base_dir/../src/scripts/spins"
 
 set bins [find_alg_backends "{seq,mc,dist,sym}"]
 foreach path $bins {
@@ -143,8 +143,8 @@ proc compile_promela { prom_models } {
     global binpaths
     global EXAMPLES_PATH
     foreach prom_model $prom_models {
-        set commands {"$binpaths(spinjal) $EXAMPLES_PATH/$prom_model"
-                      "mv $prom_model.spinja $EXAMPLES_PATH/"}
+        set commands {"$binpaths(spins) $EXAMPLES_PATH/$prom_model"
+                      "mv $prom_model.spins $EXAMPLES_PATH/"}
         foreach command $commands {
             puts [subst "Executing precommand: '$command'"]
             eval exec $command

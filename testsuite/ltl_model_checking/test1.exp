@@ -26,11 +26,11 @@ dict set commands test_16_dve_seq exp "633945 states"
 # peterson
 foreach s $strategies {
     dict set commands test16_seq_$s cmd "$binpaths(prom2lts-mc) --threads=4 \
-	--strategy=$s -s20 $EXAMPLES_PATH/peterson3.pml.spinja"
+	--strategy=$s -s20 $EXAMPLES_PATH/peterson3.pml.spins"
     dict set commands test16_seq_$s exp "167277 states"
 }
 dict set commands test16_prom_seq cmd "$binpaths(prom2lts-seq) --strategy=scc \
-	$EXAMPLES_PATH/peterson3.pml.spinja"
+	$EXAMPLES_PATH/peterson3.pml.spins"
 dict set commands test16_prom_seq exp "167277 states"
 
 
@@ -49,11 +49,11 @@ dict set commands test_17_dve_seq exp "Accepting cycle FOUND"
 # zune:
 foreach s $strategies {
     dict set commands test17_prom_mc_$s cmd "$binpaths(prom2lts-mc) --threads=4 \
-	-s22 --strategy=$s $EXAMPLES_PATH/zune.pml.spinja"
+	-s22 --strategy=$s $EXAMPLES_PATH/zune.pml.spins"
     dict set commands test17_prom_mc_$s exp "Accepting cycle FOUND"
 }
 dict set commands test17_prom_seq cmd "$binpaths(prom2lts-seq) --strategy=scc \
-	$EXAMPLES_PATH/zune.pml.spinja"
+	$EXAMPLES_PATH/zune.pml.spins"
 dict set commands test17_prom_seq exp "accepting cycle found"
 
 

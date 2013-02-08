@@ -7,16 +7,16 @@ EXTRA_DIST = \
 			 lib/unix.exp \
 			 lib/default.exp
 
-CLEANFILES = *.o *.so *.spinja *.gcf *.aut *.bcg *.fsm *.etf *.cpp *.c *.log \
+CLEANFILES = *.o *.so *.spins *.gcf *.aut *.bcg *.fsm *.etf *.cpp *.c *.log \
              *.sum *.c *.bin \
-             */*.o */*.so */*.spinja */*.gcf */*.aut */*.bcg */*.fsm */*.etf \
+             */*.o */*.so */*.spins */*.gcf */*.aut */*.bcg */*.fsm */*.etf \
              */*.cpp */*.c */*.log */*.sum */*.c */*.bin
 
 clean: clean_dirs
 
 clean_dirs:
 	rm -rf */*.dir
-	rm -rf ../examples/*.spinja
+	rm -rf ../examples/*.spins
 
 export DEJAGNU
 DEJATOOL = ltsmin

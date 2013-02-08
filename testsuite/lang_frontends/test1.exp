@@ -11,12 +11,12 @@ cd $subdir
 
 # Language Tools
 # --------------
-#set ltools(spinjal) "fgs.promela"
+#set ltools(spins) "fgs.promela"
 #set ltools(mcrl) "-tbf -regular -nocluster hef_wrong.mcrl"
 #set ltools(mvrl22lps) "-n -D ieee_11073.mcrl2 > ieee_11073.lps"
 set prom_model "fgs.promela"
-set precommands {"$binpaths(spinjal) $EXAMPLES_PATH/$prom_model"
-                 "mv $prom_model.spinja $EXAMPLES_PATH/"}
+set precommands {"$binpaths(spins) $EXAMPLES_PATH/$prom_model"
+                 "mv $prom_model.spins $EXAMPLES_PATH/"}
 foreach command $precommands {
     puts [subst "Executing precommand: '$command'"]
     eval exec $command
@@ -32,7 +32,7 @@ dict set frontends dve model "gear.1.dve"
 dict set frontends dve exp_output " 2689 "
 #" states 3567 transitions"
 
-dict set frontends prom model [subst "$prom_model.spinja"]
+dict set frontends prom model [subst "$prom_model.spins"]
 # list with commands to be executed before the language tests. This can be used to generate models.
 dict set frontends prom exp_output " 242 "
 #" states 3388 transitions"
