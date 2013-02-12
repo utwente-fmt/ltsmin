@@ -156,10 +156,9 @@ resize (fset_t *dbs, fset_resize_t mode)
     }
 
     //RTstopTimer (dbs->timer);
-    size_t          load = dbs->load + tombs;
     Debug ("%s %zu to %zu took %zu/%zu todos and cleaned %zu/%zu tombstones in %.2f sec",
            fset_resize_names[mode], old_size, dbs->size, todos, dbs->load, tombs,
-           load, RTrealTime(dbs->timer));
+           dbs->load + tombs, RTrealTime(dbs->timer));
     dbs->max_todos = max (todos, dbs->max_todos);
     dbs->max_grow = max (dbs->max_grow, dbs->size);
     dbs->resizes++;
