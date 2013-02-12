@@ -1,6 +1,5 @@
 AUTOMAKE_OPTIONS = dejagnu
-RUNTESTDEFAULTFLAGS = -v -v
-
+#RUNTESTDEFAULTFLAGS = -v -v
 
 EXTRA_DIST = \
 			 ltsmin.exp \
@@ -19,4 +18,14 @@ clean_dirs:
 	rm -rf ../examples/*.spins
 
 export DEJAGNU
-DEJATOOL = ltsmin
+
+DEJATOOL = 	alg_backends_etf \
+			alg_backends_rest \
+			ltl_model_checking \
+			lts_generation \
+			safety_model_checking
+
+if HAVE_LIBSTEP_INFO
+# Test disabled due to bug in mcrl path parsing
+# DEJATOOL +=	alg_backends_lpo#
+endif

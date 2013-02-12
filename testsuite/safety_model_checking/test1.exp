@@ -2,37 +2,49 @@ source lib/include.tcl
 
 cd $subdir
 
-compile_promela {"i4" "p312.pml"}
+
+
+puts "\n----------------------------------------------"
+puts   "TESTING: LTS generation: state spaces, traces and ETFs"
+puts   "----------------------------------------------\n"
+
+
+set spins 1
+if { [ compile_promela {"i4" "p312.pml"} ] == 0 } {
+    puts "No SpinS compiler found!, Skipping Promela examples"
+    set spins 0
+}
 
 set commands [dict create]
 
 # TEST 13:
 
-dict set commands test13_seq cmd "$binpaths(prom2lts-seq) $EXAMPLES_PATH/i4.spins -d -n"
-dict set commands test13_seq exp "Deadlocks: 501"
-
-dict set commands test13_mc cmd "$binpaths(prom2lts-mc) $EXAMPLES_PATH/i4.spins -d -n"
-dict set commands test13_mc exp "Deadlocks: 501"
-
-dict set commands test13_dist cmd "$binpaths(prom2lts-dist) $EXAMPLES_PATH/i4.spins -d -n"
-dict set commands test13_dist exp "Deadlocks: 501"
-
-dict set commands test13_sym cmd "$binpaths(prom2lts-sym) $EXAMPLES_PATH/i4.spins -d"
-dict set commands test13_sym exp ""
-
-
-# TEST 14:
-
-dict set commands test14_seq cmd "$binpaths(prom2lts-seq) $EXAMPLES_PATH/p312.pml.spins --action=assert --trace=t14_seq.gcf"
-dict set commands test14_seq exp ""
-
-dict set commands test14_mc cmd "$binpaths(prom2lts-mc) $EXAMPLES_PATH/p312.pml.spins --action=assert --trace=t14_mc.gcf"
-# TODO: Unknown correct output due to a segmentation fault in the tool
-dict set commands test14_mc exp ""
-
-dict set commands test14_sym cmd "$binpaths(prom2lts-sym) $EXAMPLES_PATH/p312.pml.spins --action=assert --trace=t14_sym.gcf"
-dict set commands test14_sym exp ""
-
+if {$spins == 1} {
+    dict set commands test13_seq cmd "$binpaths(prom2lts-seq) $EXAMPLES_PATH/i4.spins -d -n"
+    dict set commands test13_seq exp "Deadlocks: 501"
+    
+    dict set commands test13_mc cmd "$binpaths(prom2lts-mc) $EXAMPLES_PATH/i4.spins -d -n"
+    dict set commands test13_mc exp "Deadlocks: 501"
+    
+    dict set commands test13_dist cmd "$binpaths(prom2lts-dist) $EXAMPLES_PATH/i4.spins -d -n"
+    dict set commands test13_dist exp "Deadlocks: 501"
+    
+    dict set commands test13_sym cmd "$binpaths(prom2lts-sym) $EXAMPLES_PATH/i4.spins -d"
+    dict set commands test13_sym exp ""
+    
+    
+    # TEST 14:
+    
+    dict set commands test14_seq cmd "$binpaths(prom2lts-seq) $EXAMPLES_PATH/p312.pml.spins --action=assert --trace=t14_seq.gcf"
+    dict set commands test14_seq exp ""
+    
+    dict set commands test14_mc cmd "$binpaths(prom2lts-mc) $EXAMPLES_PATH/p312.pml.spins --action=assert --trace=t14_mc.gcf"
+    # TODO: Unknown correct output due to a segmentation fault in the tool
+    dict set commands test14_mc exp ""
+    
+    dict set commands test14_sym cmd "$binpaths(prom2lts-sym) $EXAMPLES_PATH/p312.pml.spins --action=assert --trace=t14_sym.gcf"
+    dict set commands test14_sym exp ""
+}
 
 # TEST 15:
 

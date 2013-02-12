@@ -2,7 +2,17 @@ source lib/include.tcl
 
 cd $subdir
 
-compile_promela {"p117.pml"}
+
+puts "\n----------------------------------------------"
+puts   "TESTING: LTS generation: state spaces, traces and ETFs"
+puts   "----------------------------------------------\n"
+
+
+set spins 1
+if { [ compile_promela {"p117.pml"} ] == 0 } {
+    puts "No SpinS compiler found!, Skipping Promela examples"
+    set spins 0
+}
 
 set commands [dict create]
 
@@ -18,28 +28,24 @@ dict set commands test8_check exp "2689 states 3567 transitions"
 # TEST 9:
 
 dict set commands test9_seq cmd "$binpaths(lps2lts-seq) --strategy=bfs $EXAMPLES_PATH/ieee-11073.lps model.gcf"
-# TODO: unknown expected output since the tool crashes
 dict set commands test9_seq exp "1760 states 6583 transitions"
 
 dict set commands test9_dist cmd "$binpaths(lps2lts-dist) $EXAMPLES_PATH/ieee-11073.lps model.gcf"
-# TODO: unknown expected output since the tool crashes
 dict set commands test9_dist exp "1760 states 6583 transitions"
 
 
 # TEST 10:
 
-# TODO: Is there a need for a --thread=5 parameter?
-dict set commands test10_mc cmd "$binpaths(prom2lts-mc) $EXAMPLES_PATH/p117.pml.spins -d --trace=a.gcf"
-# TODO: Unknown correct output since this tool crashes with a segmentation fault
-dict set commands test10_mc exp ""
-
-dict set commands test10_seq cmd "$binpaths(prom2lts-seq) --strategy=dfs $EXAMPLES_PATH/p117.pml.spins -d --trace=a.gcf"
-# TODO: Unknown correct output since this tool crashes with an illegal instruction
-dict set commands test10_seq exp ""
-
-dict set commands test10_sym cmd "$binpaths(prom2lts-sym) $EXAMPLES_PATH/p117.pml.spins -d --trace=a.gcf"
-# TODO: Unknown correct output since this tool crashes with a segmentation fault
-dict set commands test10_sym exp ""
+if {$spins == 1} {
+    dict set commands test10_mc cmd "$binpaths(prom2lts-mc) $EXAMPLES_PATH/p117.pml.spins -d --thread=2 --trace=a.gcf"
+    dict set commands test10_mc exp ""
+    
+    dict set commands test10_seq cmd "$binpaths(prom2lts-seq) --strategy=dfs $EXAMPLES_PATH/p117.pml.spins -d --trace=a.gcf"
+    dict set commands test10_seq exp ""
+    
+    dict set commands test10_sym cmd "$binpaths(prom2lts-sym) $EXAMPLES_PATH/p117.pml.spins -d --trace=a.gcf"
+    dict set commands test10_sym exp ""
+}
 
 # TODO: Validate the traces of this test by using ltsmin-printtrace
 
@@ -56,11 +62,9 @@ dict set commands test11_aut cmd "$binpaths(lps2lts-seq) --strategy=bfs $EXAMPLE
 dict set commands test11_aut exp "1760 states 6583 transitions"
 
 dict set commands test11_fsm cmd "$binpaths(lps2lts-seq) --strategy=bfs $EXAMPLES_PATH/ieee-11073.lps model.fsm"
-# TODO: Unknown correct output since the tool crashes with a segmentation fault
 dict set commands test11_fsm exp "1760 states 6583 transitions"
 
 dict set commands test11_dir cmd "$binpaths(lps2lts-seq) --strategy=bfs $EXAMPLES_PATH/ieee-11073.lps model.dir"
-# TODO: Unknown correct output since the tool crashes with a segmentation fault
 dict set commands test11_dir exp "1760 states 6583 transitions"
 
 # compare the output to eachother
@@ -85,11 +89,9 @@ dict set commands test11_check5 exp "LTSs are equivalent"
 # TEST 12:
 
 dict set commands test12_gcf cmd "$binpaths(lps2lts-dist) --procs=4 $EXAMPLES_PATH/ieee-11073.lps model_dist.gcf"
-# TODO: Unknown correct output since the tool crashes with a segmentation fault
 dict set commands test12_gcf exp ""
 
 dict set commands test12_dir cmd "$binpaths(lps2lts-dist) --procs=4 $EXAMPLES_PATH/ieee-11073.lps model_dist.dir"
-# TODO: Unknown correct output since the tool crashes with a segmentation fault
 dict set commands test12_dir exp ""
 
 # NOTE: The working of the following code has never been tested since no correct output was available

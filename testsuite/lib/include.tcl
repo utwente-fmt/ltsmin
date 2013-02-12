@@ -1,7 +1,7 @@
 # include.tcl
 # File for putting general test procedures
 
-# Models should be able to complete whithin the timeout value.
+# Models should be able to complete within the timeout value.
 set timeout 30
 
 # The directory containing all the models used for testing.
@@ -128,6 +128,7 @@ proc runmytest { test_name command_line exp_output} {
 }
 
 # create a list with for every bin the path
+set binpaths(spins-jar) "$base_dir/../spins/spins.jar"
 set binpaths(ltsmin-compare) "$base_dir/../src/ltsmin-compare/ltsmin-compare"
 set binpaths(ltsmin-convert) "$base_dir/../src/ltsmin-convert/ltsmin-convert"
 set binpaths(ltsmin-printtrace) "$base_dir/../src/ltsmin-printtrace/ltsmin-printtrace"
@@ -142,6 +143,11 @@ foreach path $bins {
 proc compile_promela { prom_models } {
     global binpaths
     global EXAMPLES_PATH
+
+    if { [file exists "$binpaths(spins-jar)" ] != 1 } {
+         return false
+    }
+
     foreach prom_model $prom_models {
         set commands {"$binpaths(spins) $EXAMPLES_PATH/$prom_model"
                       "mv $prom_model.spins $EXAMPLES_PATH/"}
@@ -150,5 +156,6 @@ proc compile_promela { prom_models } {
             eval exec $command
         }
     }
+    return true
 }
 

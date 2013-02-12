@@ -26,10 +26,7 @@ set filter "{mc}"
 # find the available backends
 set alg_be [ find_alg_backends $filter ]
 
-# run the test for the ETF-frontend
-# run_test_for_alg_backends $alg_be $langs $backends
-#
-# Test disabled due to bug in mcrl path parsing
-
+# run the test for the LPO-frontend
+run_test_for_alg_backends $alg_be $langs $backends
 
 cd ".."
