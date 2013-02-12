@@ -2,7 +2,7 @@ include::pins-options.txt[]
 
 include::vset-options.txt[]
 
-include::io-options.txt[]
+include::lts-io-options.txt[]
 
 include::devel-options.txt[]
 

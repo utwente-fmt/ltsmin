@@ -7,11 +7,16 @@ ltsmin-reduce-dist(1)
 
 == NAME
 
-ltsmin-reduce-dist - distributed reduction of labelled transition systems modulo strong or branching bisimulation
+ltsmin-reduce-dist - distributed reduction of labelled transition systems
+modulo strong or branching bisimulation
 
 == SYNOPSIS
 
 mpirun [MPI OPTIONS] ltsmin-reduce-dist [OPTIONS] <input> [<output>]
+
+== DESCRIPTION
+
+include::inc/mpi-example.txt[]
 
 == OPTIONS
 

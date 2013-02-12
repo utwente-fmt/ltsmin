@@ -7,7 +7,7 @@ prom2lts-sym(1)
 
 == NAME
 
-prom2lts-sym - Symbolic reachability analysis for SpinJa models.
+prom2lts-sym - Symbolic reachability analysis for SpinS models.
 
 == SYNOPSIS
 
@@ -16,7 +16,7 @@ prom2lts-sym - Symbolic reachability analysis for SpinJa models.
 == DESCRIPTION
 
 {manname} performs a reachability analysis on a specification provided
-in 'input.prom'.  Specifications are compiled with SpinJa from
+in 'input.prom'.  Specifications are compiled with SpinS from
 PROMELA input models.  'output.etf' specifies the name of the output
 archive, written in manpage:etf[5] format.
 

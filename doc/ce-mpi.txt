@@ -9,7 +9,7 @@ ce-mpi(1)
 ce-mpi - distributed tau cycle elimination of labelled transition systems
 
 == SYNOPSIS
-mpirun _<nodespec>_ {manname} [OPTION] '<input>' '<output>'
+{manname} [OPTION] '<input>' '<output>'
 
 == DESCRIPTION
 
@@ -19,6 +19,8 @@ coloring.
 
 For both, input and output only (old-style) DIR archives are
 supported; see also manpage:ltsmin-convert[1].
+
+include::inc/mpi-example.txt[]
 
 include::inc/mpi-blurb.txt[]
 
@@ -47,7 +49,7 @@ include::inc/support.txt[]
 http://www.win.tue.nl/~sorzan/teza.pdf.gz[On Distributed Verification
 and Verified Distribution, 2004]
 manpage:ltsmin[7],
-manpage:ltsmin-mpi[1],
-manpage:lpo2lts-mpi[1],
-manpage:lps2lts-mpi[1],
+manpage:ltsmin-dist[1],
+manpage:lpo2lts-dist[1],
+manpage:lps2lts-dist[1],
 manpage:ltsmin-convert[1]

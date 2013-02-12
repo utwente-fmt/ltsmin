@@ -7,7 +7,7 @@ prom2lts-dist(1)
 
 == NAME
 
-prom2lts-dist - Distributed state space generator for SPINJA models.
+prom2lts-dist - Distributed state space generator for spins models.
 
 == SYNOPSIS
 
@@ -16,10 +16,12 @@ prom2lts-dist - Distributed state space generator for SPINJA models.
 == DESCRIPTION
 
 {manname} generates a labelled transition system from a specification
-provided in 'input.prom'.  Specifications are compiled with SpinJa
+provided in 'input.prom'.  Specifications are compiled with SpinS
 from PROMELA input models.  'output.fmt' specifies the name of the
 output archive.  The desired format is deduced from the filename
 extension. Available formats are described below.
+
+include::inc/mpi-example.txt[]
 
 include::inc/prom.txt[]
 

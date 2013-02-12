@@ -42,11 +42,11 @@ http://www.cwi.nl/~mcrl/[muCRL website].
 
 Promela(+prom+)::
 
-The Promela language is supported via the included version of SpinJa,
+The Promela language is supported via the included version of SpinS,
 which generates C code implementing the PINS interface. See
 http://spinroot.com/[Spin website]
 and 
-http://eprints.eemcs.utwente.nl/22042/[Extending LTSmin with Promela through SpinJa].
+http://eprints.eemcs.utwente.nl/22042/[SpinS: Extending LTSmin with Promela through SpinJa].
 
 UPPAAL(+opaal+)
 The UPPAAL xml language for timed automata is supported via the opaal
@@ -92,14 +92,14 @@ Enumeration uses lockless (tree-compressed) hash tables to represent sets of
 states. Model checking of LTL is supported by a set of multi-core NDFS
 algorithms. To input LTL-formulae, one can use the PINS2PINS wrapper (--ltl)
 or an LTL cross-product computed by the frontend (DiVinE 2 property models or
-PROMELA models via SpinJa with never claim). 
+PROMELA models via SpinS with never claim). 
 +
 See manpage:dve2lts-mc[1], manpage:etf2lts-mc[1],
 manpage:opaal2lts-mc[1] and manpage:prom2lts-mc[1].
 +
 --
-* MacOS X does only supports the multiple process architecture from version
-* 10.7 (Lion).
+* MacOS X only supports the multiple process architecture from version
+10.7 (Lion).
 --
 +
 <prefix>2lts-dist::
@@ -118,20 +118,16 @@ and manpage:prom2lts-dist[1]
 
 The LTSmin toolset provides distributed minimization various bisimulations.
 
-ltsmin-mpi::
-Distributed minimization modulo strong and branching bisimulation.
-See manpage:ltsmin-mpi[1].
+ltsmin-reduce::
+Sequential minimization modulo strong and branching bisimulation, as well as
+modulo lumping of CTMCs.
+See manpage:ltsmin-reduce[1].
 
 ltsmin-reduce-dist::
 Distributed minimization modulo strong and branching bisimulation.
 This tool has an implementation of the new inductive signature algorithms
 that work on tau-cycle free LTSs.
 See manpage:ltsmin-reduce-dist[1].
-
-ltsmin-reduce::
-Sequential minimization modulo strong and branching bisimulation, as well as
-modulo lumping of CTMCs.
-See manpage:ltsmin-reduce[1].
 
 ltsmin-compare::
 Compare two transitions systems, using the same equivalences as supported by
@@ -192,30 +188,40 @@ we can run the command
 lpo2lts-seq brp.tbf
 ----
 Assuming that the model is small and CADP is installed, we can simply generate a BCG file
+(this requires BFS exploration order)
 ----
-lpo2lts-seq brp.tbf brp.bcg
+lpo2lts-seq --strategy=bfs brp.tbf brp.bcg
 ----
 and then use CADP.
 
 If it turns out that the LTS was very big then we might want to use the distributed tools
 to generate and reduce the LTS:
 ----
-mpirun -np 4 -mca btl tcp,self lpo2lts-mpi brp.tbf brp.dir
-mpirun -np 4 -mca btl tcp,self ltsmin-mpi brp.dir brp-s.dir
-ltsmin-convert --segments 1 brp-s.dir brp-s.bcg
+lpo2lts-dist --workers=4 brp.tbf brp.dir
+ltsmin-reduce-dist --workers=4 brp.dir brp-s.dir
+ltsmin-convert --rdwr --segments 1 brp-s.dir brp-s.bcg
+----
+
+The tools start the command 'mpirun' silently in the background with the
+suitable options.
+Alternatively, one may wish to call 'mpirun' with additional options. This can
+be done using the '--mpi' option, e.g.:
+
+----
+mpirun -np 4 -mca btl tcp,self lpo2lts-dist --mpi brp.tbf brp.dir
 ----
 
 The dir format used to store the LTS in the example is backwards compatible with the mCRL toolset.
 We also support a newer format that adds compression:
 ----
-mpirun -np 4 -mca btl tcp,self lpo2lts-mpi brp.tbf brp.gcf
-mpirun -np 4 -mca btl tcp,self ltsmin-mpi brp.gcf brp-s.gcf
-ltsmin-convert --segments 1 brp-s.gcf brp-s.bcg
+lpo2lts-dist --workers=4 brp.tbf brp.gcf
+ltsmin-reduce-dist --workers=4 brp.gcf brp-s.gcf
+ltsmin-convert --rdwr --segments 1 brp-s.gcf brp-s.bcg
 ----
 
 When the model is suitable, state space generation can be speeded up by memoizing next state calls:
 ----
-mpirun -np 4 -mca btl tcp,self lpo2lts-mpi --cache brp.tbf brp.gcf
+lpo2lts-dist --workers=4 --cache brp.tbf brp.gcf
 ----
 
 === symbolic tools
@@ -228,7 +234,7 @@ lpo2lts-sym brp.tbf
 ----
 
 This command will compute the necessary part of the transition relation and the
-set of reachable states. If we want to record the necessary part of the transition relation
+set of reachable states. If we want to record the transition relation symbolically
 then we can do so in the form of an ETF file:
 
 ----
@@ -242,7 +248,7 @@ etf-convert brp.etf brp.dve
 
 It can also serve as the input for state space generation
 ----
-mpirun -np 4 -mca btl tcp,self etf2lts-mpi brp.etf brp-s.gcf
+etf2lts-dist --workers=4 brp.etf brp-s.gcf
 ----
 
 === parity game solvers

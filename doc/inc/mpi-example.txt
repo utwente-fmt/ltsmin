@@ -1,0 +1,9 @@
+
+Using the option '--workers=N', this tool starts the command 'mpirun' silently
+in the background with the suitable options, i.e. '-np 4'.
+Alternatively, one may wish to call 'mpirun' with additional options. This can
+be done using the '--mpi' option, e.g.:
+
+----
+mpirun -np 4 -mca btl tcp,self {manname} --mpi
+----

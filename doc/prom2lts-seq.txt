@@ -7,7 +7,7 @@ prom2lts-seq(1)
 
 == NAME
 
-prom2lts-seq - Sequential state space generator for SpinJa models.
+prom2lts-seq - Sequential state space generator for SpinS models.
 
 == SYNOPSIS
 

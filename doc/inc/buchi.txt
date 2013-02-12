@@ -9,7 +9,7 @@ options are supported:
 
 . The input specification is already combined with a Buchi automaton,
   and states are appropriately marked with accepting labels.  Currently two
-  frontends support this functionality: SpinJa (see documentation on +prom+
+  frontends support this functionality: SpinS (see documentation on +prom+
   tools), and DiVinE (see documentation on +dve+ tools).
 
 . LTSmin tools can build the cross product of input specification and

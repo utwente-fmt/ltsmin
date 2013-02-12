@@ -47,5 +47,5 @@ Again one can provide additional options to store traces, etc.
 
 See the man pages of the respective tools for further options.
 
-NOTE: This SpinS is an adaptation of the SpinJa model checker, which produces
-Java code from models.
+NOTE: SpinS is an adaptation of the SpinJa model checker, which generates C code
+implementing the PINS interface instead of Java code.

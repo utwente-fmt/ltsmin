@@ -22,6 +22,7 @@ specifies the name of the output archive.  The desired format is
 deduced from the filename extension. Available formats are described
 below.
 
+include::inc/mpi-example.txt[]
 
 == OPTIONS
 

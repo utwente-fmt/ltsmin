@@ -1,0 +1,197 @@
+sort Bool
+
+func T,F:-> Bool
+
+map  and,or: Bool # Bool -> Bool
+     not: Bool -> Bool
+     eq:Bool # Bool -> Bool
+
+var  x: Bool
+rew  and(T,x)=x
+     and(x,T)=x
+     and(x,F)=F
+     and(F,x)=F
+     or(T,x)=T
+     or(x,T)=T
+     or(x,F)=x
+     or(F,x)=x
+     not(F)=T
+     not(T)=F
+	eq(x,x)=T
+     eq(T,T)=T
+     eq(F,F)=T
+     eq(T,F)=F
+     eq(F,T)=F
+
+
+sort Nat
+
+func zero:-> Nat
+     S: Nat-> Nat
+
+map  lt: Nat # Nat -> Bool
+     eq: Nat # Nat -> Bool
+
+var  n,m: Nat
+rew  lt(zero,zero)=F
+     lt(S(n),zero)=F
+     lt(zero,S(n))=T
+     lt(S(n),S(m))=lt(n,m)
+	eq(n,n)=T
+     eq(zero,zero)=T
+     eq(zero,S(n))=F
+     eq(S(n),zero)=F
+     eq(S(n),S(m))=eq(n,m)
+
+
+sort D
+
+func d1,d2: -> D
+
+map  eq: D # D -> Bool
+var d:D
+rew  eq(d1,d1)=T
+     eq(d2,d2)=T
+     eq(d1,d2)=F
+     eq(d2,d1)=F
+	eq(d,d)=T
+
+sort datalist
+
+func in: D -> datalist
+     in: D # datalist -> datalist
+
+map  head: datalist -> D
+     tail: datalist -> datalist
+     length: datalist -> Nat
+     eq: datalist # datalist -> Bool
+
+var  d,d': D
+     l,l': datalist
+rew  head(in(d))=d
+     head(in(d,l))=d
+     tail(in(d,l))=l
+     length(in(d))=zero
+     length(in(d,l))=S(length(l))
+	eq(l,l)=T
+     eq(in(d),in(d'))=eq(d,d')
+     eq(in(d),in(d',l))=F
+     eq(in(d,l),in(d'))=F
+     eq(in(d,l),in(d',l'))=eq(l,l')
+
+
+sort acknow
+
+func ack: -> acknow
+
+map  eq: acknow # acknow -> Bool
+
+rew  eq(ack,ack) = T
+
+
+sort timeout
+
+func to: -> timeout
+
+map  eq: timeout # timeout -> Bool
+      
+rew  eq(to,to) = T
+
+
+sort signal
+
+func ok,nok,dk: -> signal
+
+map  eq: signal # signal -> Bool
+
+var  x: signal
+rew  eq(x,x)=T
+     eq(ok,nok)=F
+     eq(ok,dk)=F
+     eq(nok,ok)=F
+     eq(nok,dk)=F
+     eq(dk,ok)=F
+     eq(dk,nok)=F
+
+
+sort label
+
+func first,last: -> label
+
+map  eq: label # label -> Bool
+
+var  x: label 
+rew  eq(first,first)=T
+     eq(last,last)=T
+     eq(first,last)=F
+     eq(last,first)=F
+	eq(x,x)=T
+
+sort bit
+
+func 0,1:-> bit
+
+map  invert: bit -> bit
+     eq: bit # bit -> Bool
+
+var x:bit
+rew  invert(1)=0
+     invert(0)=1
+	eq(x,x)=T
+     eq(0,0)=T
+     eq(1,1)=T
+     eq(0,1)=F
+     eq(1,0)=F
+
+
+act  s1       : signal
+     r1       : datalist
+     s2,r2,c2 : D # bit # bit
+     s3,r3,c3 : D # bit # bit
+     s4       : D
+     s4       : D # label
+     s5,r5,c5 : acknow
+     s6,r6,c6 : acknow
+     s7,r7,c7 : timeout
+     s8,r8,c8 : timeout
+     j
+
+comm r2|s2=c2
+     r3|s3=c3
+     r5|s5=c5
+     r6|s6=c6
+     r7|s7=c7
+     r8|s8=c8
+
+
+proc X = sum(l:datalist,r1(l).Y(l,0,zero) <| eq(length(l),S(S(S(zero)))) |> delta)
+     Y(l:datalist,b:bit,n:Nat) =
+             s2(head(l),b,0).Z(l,b,n) <| lt(zero,length(l)) |>
+             s2(head(l),b,1).Z(l,b,n)
+     Z(l:datalist,b:bit,n:Nat) = 
+             (r6(ack).Y(tail(l),invert(b),zero) <| lt(zero,length(l)) |>
+              r6(ack).s1(ok).X) +
+              (r7(to).Y(l,b,S(n)) <| lt(n,S(S(S(S(zero))))) |>
+               (r7(to).s1(nok).s8(to).X <| lt(zero,length(l)) |>
+                r7(to).s1(dk).s8(to).X))
+
+     V = sum(d:D,r3(d,0,0).s4(d,first).s5(ack).W(1)) +
+         sum(d:D,sum(b:bit,r3(d,b,1).s5(ack).V)) +
+         r8(to).V
+     W(b:bit) = sum(d:D,r3(d,b,0).s4(d).s5(ack).W(invert(b))) +
+                sum(d:D,r3(d,b,1).s4(d,last).s5(ack).V) +
+                sum(d:D,r3(d,invert(b),0).s5(ack).W(b)) +
+                r8(to).V
+             
+     K = sum(d:D,sum(b:bit,sum(b':bit,r2(d,b,b').(j.s3(d,b,b')+j.s7(to)).K)))
+     L = r5(ack).(j.s6(ack)+j.s7(to)).L
+
+init hide({c2,c3,c5,c6,c7,c8,j}, 
+          encap({s2,s3,s5,s6,s7,s8,r2,r3,r5,r6,r7,r8}, V || X || K ||  L))
+
+map C2-Bool : Bool#Bool#Bool->Bool
+var b,b1,b2:Bool
+rew
+	C2-Bool(T,b1,b2)=b1
+	C2-Bool(F,b1,b2)=b2
+	C2-Bool(b,b1,b1)=b1

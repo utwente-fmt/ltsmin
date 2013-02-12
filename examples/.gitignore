@@ -1,1 +1,5 @@
-*.spinja
+*.spins*
+*.tbf
+*.so
+*.dSYM
+

@@ -1,17 +1,17 @@
 //                           -*- mode: doc; outline-regexp: "==\(=*\) ." -*-
 ltsmin-convert(1)
 =================
-:Author:  Michael Weber
-:Email:   <michaelw@foldr.org>
-:Date:    2009-03-16
+:Author:  Stefan Blom
+:Email:   <sccblom@ewi.utwente.nl>
+:Date:    2011-06-02
 
 == NAME
 
-ltsmin-convert - convert file formats for labelled transition system 
+ltsmin-convert - convert file formats for labelled transition systems.
 
 == SYNOPSIS
 
-*ltsmin-convert* [OPTION]... 'input' 'output'
+*ltsmin-convert* [OPTIONS]... 'input' 'output'
 
 == DESCRIPTION
 
@@ -21,7 +21,16 @@ matching. See the File Formats section for details.
 
 == OPTIONS
 
-*--segments*::
+*--copy*::
+Perform a streaming copy from <input> to <output>.
+
+*--rdwr*::
+Perform a load/store copy from <input> to <output>.
+
+*--index*::
+Transform the vector based <input> to indexed <output>.
+
+*--segments='N'*::
 Set the number of segments in the output file.  If the output format
 does not support segmentation (BCG) then the default is 1 and
 specifying any number other than 1 is an error.  Otherwise, the
@@ -32,9 +41,16 @@ not much more.  E.g., if the input is in BFS order and just one
 segment then then the output will still be in BFS order.  However, if
 the input has more than one segment then BFS order is lost.
 
-include::inc/io-options.txt[]
+*--encode*::
+Encode any LTS as a single edge label LTS during a load/store copy.
 
-include::inc/general-options.txt[]
+*--bfs*::
+Change the indexing of the LTS to match BFS exploration order during a load/store copy.
+Note that the current version cannot reorder the LTS if it has state vectors.
+
+include::inc/lts-io-options.txt[]
+
+include::inc/hre-options.txt[]
 
 include::inc/file-formats.txt[]
 
@@ -44,17 +60,15 @@ include::inc/file-formats.txt[]
         Successful termination.
 *255*::
         Some error occurred.
-
 == SEE ALSO
 manpage:ltsmin[7],
+manpage:ltsmin-compare[1],
+manpage:ltsmin-reduce[1],
+manpage:ltsmin-reduce-dist[1],
 manpage:lpo2lts-dist[1],
 manpage:lpo2lts-mc[1],
 manpage:lpo2lts-seq[1],
 manpage:lpo2lts-sym[1],
-manpage:lps2lts-dist[1],
-manpage:lps2lts-mc[1],
-manpage:lps2lts-seq[1],
-manpage:lps2lts-sym[1],
 http://www.inrialpes.fr/vasy/cadp/[CADP],
 http://www.inrialpes.fr/vasy/cadp/man/bcg.html[BCG]
 

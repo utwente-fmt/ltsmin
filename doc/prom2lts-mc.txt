@@ -7,7 +7,7 @@ prom2lts-mc(1)
 
 == NAME
 
-prom2lts-mc - Concurrent state space generator for SpinJa models.
+prom2lts-mc - Concurrent state space generator for SpinS models.
 
 == SYNOPSIS
 
@@ -17,7 +17,7 @@ prom2lts-mc - Concurrent state space generator for SpinJa models.
 
 {manname} performs multi-core reachability and LTL model checking on the
 labelled transition system from a compiled specification provided in
-'input.prom' or 'input.prom.pinja'.
+'input.prom' or 'input.prom.spins'.
 LTS output is not supported by this tool, use the distributed tools instead.
 
 include::inc/prom.txt[]

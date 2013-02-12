@@ -7,7 +7,7 @@ prom2torx(1)
 
 == NAME
 
-prom2torx - TorX RPC interface for SPINJA models.
+prom2torx - TorX RPC interface for SpinS models.
 
 == SYNOPSIS
 
@@ -18,7 +18,7 @@ prom2torx - TorX RPC interface for SPINJA models.
 {manname} provides access to a labelled transition system from a
 specification provided in 'input.prom' via the TorX-Explorer textual
 interface on _stdin_ and _stdout_.  Specifications are compiled with
-SpinJa from PROMELA input models.
+SpinS from PROMELA input models.
 
 include::inc/prom.txt[]
 
