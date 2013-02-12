@@ -314,11 +314,11 @@ archive_t arch_gcf_read(raf_t raf){
                 off_t len;
                 ghf_read_orig(ds,&id,&len);
                 arch->gcf_info[id].compressed=len;
-                Debug("file %u compressed to %lld bytes",id,len);
+                Debug("file %u compressed to %jd bytes",id,(intmax_t)len);
                 uint32_t tmp=len%arch->block_size;
                 if (tmp) arch->gcf_info[id].data_tail->length=tmp;
                 if (arch->gcf_info[id].code==NULL || strlen(arch->gcf_info[id].code)==0){
-                    Debug("assuming file %u contains %lld bytes",id,len);
+                    Debug("assuming file %u contains %jd bytes",id,(intmax_t)len);
                     arch->gcf_info[id].size=len;
                 }
                 continue;
@@ -328,7 +328,7 @@ archive_t arch_gcf_read(raf_t raf){
                 off_t len;
                 ghf_read_len(ds,&id,&len);
                 arch->gcf_info[id].size=len;
-                Debug("file %u contains %lld bytes",id,len);
+                Debug("file %u contains %jd bytes",id,(intmax_t)len);
                 continue;
             }
             default:

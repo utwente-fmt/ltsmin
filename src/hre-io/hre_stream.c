@@ -1,6 +1,7 @@
 // -*- tab-width:4 ; indent-tabs-mode:nil -*-
 #include <hre/config.h>
 
+#include <inttypes.h>
 #include <stdlib.h>
 #include <zlib.h>
 
@@ -97,7 +98,7 @@ void stream_illegal_close(stream_t *stream){
 }
 void stream_default_close_z(stream_t *stream,uint64_t orig_size){
     (void)orig_size;
-    Debug("ignoring orig size %llu",orig_size);
+    Debug("ignoring orig size %"PRIu64,orig_size);
     (*stream)->procs.close(stream);
 }
 void stream_init(stream_t s){

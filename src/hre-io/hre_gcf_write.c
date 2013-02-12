@@ -2,6 +2,7 @@
 #include <hre/config.h>
 
 #include <arpa/inet.h>
+#include <inttypes.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -66,7 +67,7 @@ static void gcf_stream_write(stream_t s,void* buf,size_t count){
 }
 
 static void gcf_stream_close(stream_t *s){
-    Debug("gcf_stream_close %u %llu",(*s)->id,(*s)->len);
+    Debug("gcf_stream_close %u %jd",(*s)->id,(intmax_t)(*s)->len);
     if ((*s)->id > (*s)->arch->worker_count) {
         ghf_write_len((*s)->arch->meta_stream,(*s)->id,(*s)->len);
     }
@@ -75,7 +76,7 @@ static void gcf_stream_close(stream_t *s){
 }
 
 static void gcf_stream_close_z(stream_t *s,uint64_t orig_size){
-    Debug("stream %u: compressed %llu, original %llu",(*s)->id,(*s)->len,orig_size);
+    Debug("stream %u: compressed %jd, original %"PRIu64,(*s)->id,(intmax_t)(*s)->len,orig_size);
     if ((*s)->id > (*s)->arch->worker_count) {
         ghf_write_orig((*s)->arch->meta_stream,(*s)->id,orig_size);
     }
