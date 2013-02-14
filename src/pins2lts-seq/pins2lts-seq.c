@@ -1483,10 +1483,16 @@ gsea_setup(const char *output)
         case DB_TreeDBS:
             if (output) {
                 init_output (output, lts_index_template());
-                gc.init = gsea_init_idx;
-                if (opt.write_state || global.state_labels)
+                if (opt.write_state) {
+                    gc.init = gsea_init_vec;
                     gc.pre_state_next = gsea_lts_write_state; // not chained
-                gc.state_process = gsea_lts_write_edge_idx; // not chained
+                    gc.state_process = gsea_lts_write_edge_idx; // not chained
+                } else {
+                    gc.init = gsea_init_idx;
+                    if (global.state_labels)
+                        gc.pre_state_next = gsea_lts_write_state; // not chained
+                    gc.state_process = gsea_lts_write_edge_idx; // not chained
+                }
                 gc.report_finished = finish_output;
             }
             // setup standard bfs/tree configuration
@@ -1528,7 +1534,7 @@ gsea_setup(const char *output)
         }
 
         // proviso: doens't work here
-        if (opt.proviso != LTLP_ClosedSet)
+        if (GB_POR && opt.proviso != LTLP_ClosedSet)
             Abort("proviso does not work for bfs, use --proviso=closedset");
 
         break;
@@ -1601,7 +1607,7 @@ gsea_setup(const char *output)
             gc.queue.filo.stack = dfs_stack_create(global.N);
 
             // proviso: doens't work here
-            if (opt.proviso != LTLP_ClosedSet)
+            if (GB_POR && opt.proviso != LTLP_ClosedSet)
                 Abort("proviso not implemented for dfs/vset combination");
 
             break;
@@ -1622,6 +1628,7 @@ gsea_setup(const char *output)
             gc.queue.filo.stack = dfs_stack_create(sizeof(ref_t)/sizeof(int));
 
             // proviso: dfs table specific
+            if (GB_POR)
             switch (opt.proviso) {
                 case LTLP_Stack:
                     gc.queue.filo.proviso.stack.off_stack_set = bitset_create(128,128);
