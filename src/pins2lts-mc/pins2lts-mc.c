@@ -537,16 +537,18 @@ ecd_get_state (fset_t *table, state_info_t *s)
 }
 
 static inline void
-ecd_add_state (fset_t *table, state_info_t *s, size_t level)
+ecd_add_state (fset_t *table, state_info_t *s, size_t *level)
 {
     //Warning (info, "Adding %zu", s->ref);
-    HREassert (level < UINT32_MAX, "Stack length overflow for ECD");
     uint32_t           *data;
     hash32_t            hash = ref_hash (s->ref);
     int res = fset_find (table, &hash, &s->ref, (void**)&data, true);
     HREassert (res != FSET_FULL, "ECD table full");
     HREassert (!res, "Element %zu already in ECD table", s->ref);
-    if (!res) *data = level;
+    if (level != NULL && !res) {
+        HREassert (*level < UINT32_MAX, "Stack length overflow for ECD");
+        *data = *level;
+    }
 }
 
 static inline void
@@ -2678,7 +2680,7 @@ dfs_fifo_dfs (wctx_t *ctx, ref_t seed)
                 ndfs_report_cycle (ctx, &ctx->state);
             } else if (!global_has_color(ctx->state.ref, GRED, 0)) {
                 if (ctx->state.ref != seed && ctx->state.ref != ctx->seed)
-                    ecd_add_state (ctx->cyan, &ctx->state, 0);
+                    ecd_add_state (ctx->cyan, &ctx->state, NULL);
                 dfs_stack_enter (ctx->stack);
                 increase_level (&ctx->counters);
                 permute_trans (ctx->permute, &ctx->state, dfs_fifo_handle, ctx);
@@ -2974,7 +2976,7 @@ owcty_reachability (wctx_t *ctx)
             increase_level (&ctx->counters);
             bool accepting = GBbuchiIsAccepting(ctx->model, ctx->state.data);
             if (strategy[1] == Strat_ECD) {
-                ecd_add_state (ctx->cyan, &ctx->state, ctx->red.level_cur);
+                ecd_add_state (ctx->cyan, &ctx->state, &ctx->red.level_cur);
                 ctx->red.level_cur += accepting;
             }
             if ( accepting )
