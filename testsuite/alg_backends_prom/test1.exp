@@ -7,7 +7,7 @@ source lib/backends.tcl
 cd $subdir
 
 puts "\n-----------------------------"
-puts   "TESTING: Algorithmic backend for the DVE language"
+puts   "TESTING: Algorithmic backends for Promela"
 puts   "-----------------------------\n"
 
 # the number of threads to use in multithreaded backends
@@ -18,16 +18,22 @@ set langs [dict create]
 # Language frontends:
 # -------------------
 
-# dve:
-dict set langs dve model "gear.1.dve"
-dict set langs dve options mc "--threads=$num_threads"
+set prom_model "fgs.promela"
+set spins 1
+if { [ compile_promela $prom_model ] == 0 } {
+    puts "No SpinS compiler found!, Skipping Promela examples"
+    set spins 0
+}
 
-dict set langs dve exp_output "2689 states 3567 transitions"
+# prom:
+dict set langs prom model [subst "$prom_model.spins"]
+dict set langs prom options mc "--threads=$num_threads"
+dict set langs prom exp_output "242 states 3388 transitions"
 set alg_be [ find_alg_backends "{dist,mc,seq}" ]
 run_test_for_alg_backends $alg_be $langs $backends
 
 # different output for symbolic tool:
-dict set langs dve exp_output "state space has 2689"
+dict set langs prom exp_output "state space has 242"
 set alg_be [ find_alg_backends "{sym}" ]
 run_test_for_alg_backends $alg_be $langs $backends
 

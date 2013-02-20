@@ -88,10 +88,10 @@ dict set commands test11_check5 exp "LTSs are equivalent"
 
 # TEST 12:
 
-dict set commands test12_gcf cmd "$binpaths(lps2lts-dist) --procs=4 $EXAMPLES_PATH/ieee-11073.lps model_dist.gcf"
+dict set commands test12_gcf cmd "$binpaths(lps2lts-dist) $EXAMPLES_PATH/ieee-11073.lps model_dist.gcf"
 dict set commands test12_gcf exp ""
 
-dict set commands test12_dir cmd "$binpaths(lps2lts-dist) --procs=4 $EXAMPLES_PATH/ieee-11073.lps model_dist.dir"
+dict set commands test12_dir cmd "$binpaths(lps2lts-dist) $EXAMPLES_PATH/ieee-11073.lps model_dist.dir"
 dict set commands test12_dir exp ""
 
 # NOTE: The working of the following code has never been tested since no correct output was available

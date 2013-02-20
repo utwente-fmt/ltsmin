@@ -19,20 +19,17 @@ set num_threads 5
 # -------------------
 set langs [dict create]
 # a model per language
-# This is a required field. Whitout it, the language is skipped
 dict set langs etf model "gear.1.etf" 
-# for each language frontend optional parameters per backend
 dict set langs etf options mc "--threads=$num_threads"
-# the expected result for a pass
+
 dict set langs etf exp_output "2689 states 3567 transitions"
-
-# Wich backends are we performing the ETF language tests on?
-set filter "{mc}"
-
-# find the available backends
-set alg_be [ find_alg_backends $filter ]
-
-# run the test for the ETF-frontend
+set alg_be [ find_alg_backends "{dist,mc,seq}" ]
 run_test_for_alg_backends $alg_be $langs $backends
+
+# different output for symbolic tool:
+dict set langs etf exp_output "state space has 2689"
+set alg_be [ find_alg_backends "{sym}" ]
+run_test_for_alg_backends $alg_be $langs $backends
+
 
 cd ".."

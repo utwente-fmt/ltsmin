@@ -48,6 +48,7 @@ proc runmytest { test_name command_line exp_output} {
 
     set PID [ eval spawn $command_line ]
 
+    set expected false
     match_max 1000000
     expect {
 
@@ -67,7 +68,20 @@ proc runmytest { test_name command_line exp_output} {
 
         "Zobrist and treedbs is not implemented" {
             xfail "The combination of zobrist and treedbs is not implemented";
+            catch { exp_close }
             return
+        }
+	    
+        "unimplemented combination --strategy=bfs, --state=table" {
+	    xfail "unimplemented combination --strategy=bfs, --state=table";
+	    catch { exp_close }
+	    return
+	}
+
+        "Decision diagram package does not support least fixpoint" {
+	    xfail "Decision diagram package does not support least fixpoint";
+	    catch { exp_close }
+	    return
         }
 
         # Check for any warning messages in the output first
@@ -107,11 +121,10 @@ proc runmytest { test_name command_line exp_output} {
         }
 
     }
-    # get the exit code
-    catch wait result
-
-    # check for non-zero exit codes
+    catch { exp_close }
+    set result [exp_wait]
     set exit_code [lindex $result 3]
+
     #puts "DEBUG: exit_code: $exit_code"
     switch $exit_code {
         0   {

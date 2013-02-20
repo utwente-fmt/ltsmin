@@ -7,8 +7,24 @@ set backends [dict create]
 # 1 row for every param and a list of possible values
 dict set backends mc params "--strategy=" {dfs bfs sbfs}
 dict set backends mc params "--state=" {tree table cleary-tree}
-# no options? use an empty string: ""
 dict set backends mc options {"-z6" "--noref" "-prr" "-pdynamic" ""}
+
+
+# 1 row for every param and a list of possible values
+dict set backends sym params "--order=" {bfs-prev bfs chain-prev chain}
+dict set backends sym params "--saturation=" {none sat-like sat-loop sat-fix sat}
+# internal and BuDDy
+dict set backends sym params "--vset=" {ldd fdd}
+dict set backends sym options {""}
+
+# 1 row for every param and a list of possible values
+dict set backends seq params "--strategy=" {dfs bfs}
+dict set backends seq params "--state=" {tree table vset}
+dict set backends seq options {""}
+
+# 1 row for every param and a list of possible values
+dict set backends dist params "--debug=" {bogus.c}
+dict set backends dist options {""}
 
 
 proc test_forall_params { params_dict idx command } {

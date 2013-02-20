@@ -351,9 +351,35 @@ AC_SUBST([SYLVAN_LIBS],['${top_builddir}/sylvan/libsylvan.la'])
 AC_SUBST([SYLVAN_CPPFLAGS],['-I${top_srcdir}/sylvan/src'])
 AC_SUBST([SYLVAN_LDFLAGS])
 
+AC_CHECK_PROGS(OPAAL_LTSMIN, [opaal_ltsmin])
+
+AC_TRY_RUN([
+#include <sys/types.h>
+#include <pthread.h>
+int main()
+{
+    pthread_mutex_t mutex;
+    pthread_mutexattr_t attr;
+    if (pthread_mutexattr_init(&attr))
+        exit(1);
+    if (pthread_mutexattr_setpshared(&attr, PTHREAD_PROCESS_SHARED))
+        exit(2);
+    if (pthread_mutex_init(&mutex, &attr))
+        exit(3);
+    if (pthread_mutexattr_destroy(&attr))
+        exit(4);
+    if (pthread_mutex_destroy(&mutex))
+        exit(5);
+    exit(0);
+}],
+[], [POSIX_SHARED=yes], 
+[POSIX_SHARED=no])
+
+AM_CONDITIONAL([HAVE_POSIX], [test x"$POSIX_SHARED" = "xyes"])
 AM_CONDITIONAL([HAVE_SYLVAN], [test x"$have_sylvan" = "xyes"])
 AS_IF([test x"$have_sylvan" = "xyes"], [AC_DEFINE([HAVE_SYLVAN], [1], [Define if using sylvan.])])
 AM_CONDITIONAL([HAVE_OPAAL], [test x"$have_opaal" = "xyes"])
+AM_CONDITIONAL([HAVE_OPAAL_COMPILER], [test x"$OPAAL_LTSMIN" != x])
 AM_CONDITIONAL([HAVE_MPI], [test x"$have_mpi" != "x"])
 AM_CONDITIONAL([HAVE_LIBGMP], 
   [test x"$with_bignum" != xno && test x"$have_libgmp" = xyes])

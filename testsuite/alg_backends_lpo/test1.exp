@@ -19,14 +19,15 @@ set langs [dict create]
 # lpo defines
 dict set langs lpo model "hef_wrong.tbf"
 dict set langs lpo options mc "--procs=$num_threads"
+
 dict set langs lpo exp_output "15557 states 27300 transitions"
-
-set filter "{mc}"
-
-# find the available backends
-set alg_be [ find_alg_backends $filter ]
-
-# run the test for the LPO-frontend
+set alg_be [ find_alg_backends "{dist,mc,seq}" ]
 run_test_for_alg_backends $alg_be $langs $backends
+
+# different output for symbolic tool:
+dict set langs lpo exp_output "state space has 15557"
+set alg_be [ find_alg_backends "{sym}" ]
+run_test_for_alg_backends $alg_be $langs $backends
+
 
 cd ".."

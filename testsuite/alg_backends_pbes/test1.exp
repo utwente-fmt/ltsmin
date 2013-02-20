@@ -7,7 +7,7 @@ source lib/backends.tcl
 cd $subdir
 
 puts "\n-----------------------------"
-puts   "TESTING: Algorithmic backend for the DVE language"
+puts   "TESTING: Algorithmic backends for PBES"
 puts   "-----------------------------\n"
 
 # the number of threads to use in multithreaded backends
@@ -18,16 +18,15 @@ set langs [dict create]
 # Language frontends:
 # -------------------
 
-# dve:
-dict set langs dve model "gear.1.dve"
-dict set langs dve options mc "--threads=$num_threads"
-
-dict set langs dve exp_output "2689 states 3567 transitions"
+# pbes:
+dict set langs pbes model "brp-nodeadlock.pbes"
+dict set langs pbes options mc "--procs=$num_threads"
+dict set langs pbes exp_output "10548 states 12168 transitions"
 set alg_be [ find_alg_backends "{dist,mc,seq}" ]
 run_test_for_alg_backends $alg_be $langs $backends
 
 # different output for symbolic tool:
-dict set langs dve exp_output "state space has 2689"
+dict set langs pbes exp_output "state space has 10548"
 set alg_be [ find_alg_backends "{sym}" ]
 run_test_for_alg_backends $alg_be $langs $backends
 
