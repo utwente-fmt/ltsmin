@@ -53,7 +53,7 @@ foreach s $strategies {
 }
 dict set commands test_17_dve_seq cmd "$binpaths(dve2lts-seq) --strategy=scc \
 	$EXAMPLES_PATH/iprotocol.2.prop4.dve"
-dict set commands test_17_dve_seq exp "Accepting cycle FOUND"
+dict set commands test_17_dve_seq exp "accepting cycle found"
 
 # zune:
 if {$spins == 1} {
