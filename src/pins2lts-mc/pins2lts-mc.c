@@ -2457,10 +2457,11 @@ action_detect (wctx_t *ctx, transition_info_t *ti, state_info_t *successor)
     if (-1 == act_index || NULL == ti->labels || ti->labels[act_label] != act_index) return;
     ctx->counters.errors++;
     if ((!no_exit || trc_output) && lb_stop(global->lb)) {
+        if (trc_output && successor->ref != ctx->state.ref) // race, but ok:
+            atomic_write(&global->parent_ref[successor->ref], ctx->state.ref);
         state_data_t data = dfs_stack_push (ctx->stack, NULL);
         state_info_serialize (successor, data);
         dfs_stack_enter (ctx->stack);
-        state_info_deserialize_cheap (&ctx->state, data); // used as last state
         Warning (info, " ");
         Warning (info, "Error action '%s' found at depth %zu!", act_detect, ctx->counters.level_cur);
         Warning (info, " ");
@@ -2477,8 +2478,9 @@ reach_handle (void *arg, state_info_t *successor, transition_info_t *ti,
     if (!seen) {
         raw_data_t stack_loc = dfs_stack_push (ctx->stack, NULL);
         state_info_serialize (successor, stack_loc);
-        if (trc_output)
-            global->parent_ref[successor->ref] = ctx->state.ref;
+        if (trc_output && successor->ref != ctx->state.ref &&
+                global->parent_ref[successor->ref] == 0) // race, but ok:
+            atomic_write(&global->parent_ref[successor->ref], ctx->state.ref);
         ctx->counters.visited++;
     }
     ctx->counters.trans++;
