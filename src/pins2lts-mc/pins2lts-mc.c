@@ -86,7 +86,7 @@ typedef enum {
     Strat_TA_BFS = Strat_BFS | Strat_TA,
     Strat_TA_DFS = Strat_DFS | Strat_TA,
     Strat_TA_CNDFS= Strat_CNDFS | Strat_TA,
-    Strat_2Stacks= Strat_BFS | Strat_SBFS | Strat_CNDFS | Strat_ENDFS | Strat_DFSFIFO,
+    Strat_2Stacks= Strat_BFS | Strat_SBFS | Strat_CNDFS | Strat_ENDFS | Strat_DFSFIFO | Strat_OWCTY,
     Strat_LTLG   = Strat_LNDFS | Strat_ENDFS | Strat_CNDFS,
     Strat_LTL    = Strat_NDFS | Strat_LTLG | Strat_OWCTY | Strat_DFSFIFO,
     Strat_Reach  = Strat_BFS | Strat_SBFS | Strat_DFS
@@ -708,9 +708,10 @@ wctx_create (model_t model, int depth, wctx_t *shared)
     ctx->id = HREme (HREglobal());
     ctx->strategy = strategy[depth];
     ctx->model = model;
+    ctx->work = SIZE_MAX; // essential for ENDFS load balancing
     ctx->stack = dfs_stack_create (state_info_int_size());
     ctx->out_stack = ctx->in_stack = ctx->stack;
-    if (strategy[depth] & (Strat_2Stacks | Strat_OWCTY))
+    if (strategy[depth] & Strat_2Stacks)
         ctx->in_stack = dfs_stack_create (state_info_int_size());
     if (strategy[depth] & (Strat_CNDFS | Strat_OWCTY | Strat_DFSFIFO)) //third stack for accepting states
         ctx->out_stack = dfs_stack_create (state_info_int_size());
@@ -2258,7 +2259,6 @@ void
 endfs_blue (wctx_t *ctx)
 {
     HREassert (ecd, "CNDFS's correctness depends crucially on ECD");
-    ctx->done = 0;
     while ( !lb_is_stopped(global->lb) ) {
         raw_data_t          state_data = dfs_stack_top (ctx->stack);
         if (NULL != state_data) {
