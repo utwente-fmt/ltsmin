@@ -561,7 +561,7 @@ deadlock_check(vset_t deadlocks, bitvector_t *reach_groups)
     if (GBgetValidEndStateLabelIndex(model) >= 0) {
         dlk_state[0][N] = 0; // Did not find an invalid end state yet
         vset_enum (deadlocks, valid_end_cb, dlk_state[0]);
-        if (dlk_state[0][N])
+        if (!dlk_state[0][N])
             return;
     } else {
         vset_example(deadlocks, dlk_state[0]);

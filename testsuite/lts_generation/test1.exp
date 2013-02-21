@@ -37,14 +37,14 @@ dict set commands test9_dist exp "1760 states 6583 transitions"
 # TEST 10:
 
 if {$spins == 1} {
-    dict set commands test10_mc cmd "$binpaths(prom2lts-mc) $EXAMPLES_PATH/p117.pml.spins -d --thread=2 --trace=a.gcf"
-    dict set commands test10_mc exp ""
+    dict set commands test10_mc cmd "$binpaths(prom2lts-mc) $EXAMPLES_PATH/p117.pml.spins -d --threads=2 --trace=a.gcf"
+    dict set commands test10_mc exp "Deadlock found"
     
     dict set commands test10_seq cmd "$binpaths(prom2lts-seq) --strategy=dfs $EXAMPLES_PATH/p117.pml.spins -d --trace=a.gcf"
-    dict set commands test10_seq exp ""
+    dict set commands test10_seq exp "found at depth"
     
     dict set commands test10_sym cmd "$binpaths(prom2lts-sym) $EXAMPLES_PATH/p117.pml.spins -d --trace=a.gcf"
-    dict set commands test10_sym exp ""
+    dict set commands test10_sym exp "deadlock found"
 }
 
 # TODO: Validate the traces of this test by using ltsmin-printtrace
