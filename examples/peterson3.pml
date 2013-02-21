@@ -65,7 +65,7 @@ again:
 	goto again
 }
 #if 1
-#define p	(p_cnt >= (2+4+8+16))	/* assuming N >= 4 */
+#define p	(p_cnt >= (2+4+8))	/* assuming N >= 3 */
 
 never {    /* []<> p */
 T0_init:
