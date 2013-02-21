@@ -68,12 +68,13 @@ dict set commands test11_aut cmd "$binpaths(lps2lts-seq) --strategy=bfs $EXAMPLE
 dict set commands test11_aut exp ""
 #"1760 states 6583 transitions"
 
-dict set commands test11_fsm cmd "$binpaths(lps2lts-seq) --strategy=bfs $EXAMPLES_PATH/ieee-11073.lps model.fsm"
-dict set commands test11_fsm exp ""
-#"1760 states 6583 transitions"
-
 dict set commands test11_dir cmd "$binpaths(lps2lts-seq) --strategy=bfs $EXAMPLES_PATH/ieee-11073.lps model.dir"
 dict set commands test11_dir exp ""
+#"1760 states 6583 transitions"
+
+# can only be written a posteriori
+dict set commands test11_fsm cmd "$binpaths(lps2lts-sym) $EXAMPLES_PATH/ieee-11073.lps model.fsm"
+dict set commands test11_fsm exp ""
 #"1760 states 6583 transitions"
 
 # compare the output to eachother
@@ -81,6 +82,7 @@ dict set commands test11_dir exp ""
 #TODO: selecting an appropriate comparing method, now just using "-b" because that one does not crash
 dict set commands test11_check1 cmd "$binpaths(ltsmin-compare) -b model.gcf model.bcg"
 dict set commands test11_check1 exp "LTSs are equivalent"
+#dict set commands test11_check1 exp "BCG support was not enabled at compile time"
 
 dict set commands test11_check2 cmd "$binpaths(ltsmin-compare) -b model.gcf model.aut"
 dict set commands test11_check2 exp "LTSs are equivalent"
