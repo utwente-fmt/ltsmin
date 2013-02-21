@@ -594,9 +594,10 @@ typedef struct ltl_hook_context
 
 void ltl_hook_cb (void*context,transition_info_t *ti,int*dst) {
     ltl_hook_context_t* infoctx = (ltl_hook_context_t*)context;
-    infoctx->cb(infoctx->user_context, ti, dst);
+    transition_info_t ti_new = GB_TI (ti->labels, ti->group);
+    infoctx->cb(infoctx->user_context, &ti_new, dst);
     // catch transition info status
-    if (ti->por_proviso) {
+    if (ti_new.por_proviso) {
         infoctx->por_proviso_true_cnt++;
     } else {
         infoctx->por_proviso_false_cnt++;
@@ -654,16 +655,10 @@ bs_emit_ltl(model_t model, por_context* pctx, int* src, TransitionCB cb, void* c
 static int
 por_beam_search_dlk_all (model_t self, int *src, TransitionCB cb, void *user_context)
 {
-    int res = 0;
-
     por_context* pctx = ((por_context*)GBgetContext(self));
-    do {
-        bs_setup(self, pctx, src);
-        bs_analyze(self, pctx, src);
-    } while ( (res = bs_emit_dlk(self, pctx, src, cb, user_context)) < 0 );
-
-    return res;
-    (void)src;
+    bs_setup(self, pctx, src);
+    bs_analyze(self, pctx, src);
+    return bs_emit_dlk(self, pctx, src, cb, user_context);
 }
 
 /**
@@ -672,16 +667,10 @@ por_beam_search_dlk_all (model_t self, int *src, TransitionCB cb, void *user_con
 static int
 por_beam_search_ltl_all (model_t self, int *src, TransitionCB cb, void *user_context)
 {
-    int res = 0;
-
     por_context* pctx = ((por_context*)GBgetContext(self));
-    do {
-        bs_setup(self, pctx, src);
-        bs_analyze(self, pctx, src);
-    } while ( (res = bs_emit_ltl(self, pctx, src, cb, user_context)) < 0 );
-
-    return res;
-    (void)src;
+    bs_setup(self, pctx, src);
+    bs_analyze(self, pctx, src);
+    return bs_emit_ltl(self, pctx, src, cb, user_context);
 }
 
 /**
