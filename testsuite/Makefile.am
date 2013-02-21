@@ -19,7 +19,9 @@ clean_dirs:
 
 export DEJAGNU
 
-DEJATOOL = 	alg_backends_dve \
+DEJATOOL  =
+
+DEJATOOL +=	alg_backends_dve \
 			alg_backends_etf \
 			ltl_model_checking \
 			safety_model_checking
@@ -36,6 +38,7 @@ endif
 
 if HAVE_POSIX
 # the following tools all require --procs=
+
 if HAVE_LIBMCRL2
 DEJATOOL +=	alg_backends_lps
 DEJATOOL +=	alg_backends_pbes
