@@ -232,7 +232,7 @@ LTSminSPrintExpr(char *buf, ltsmin_expr_t expr, ltsmin_parse_env_t env)
     switch(expr->node_type){
         case VAR:
             if (expr->num == -1)
-                buf += sprintf(buf, "%s(UNBOUND)",SIget(env->idents,expr->idx));
+                buf += sprintf(buf, "%s",SIget(env->idents,expr->idx));
             else
                 buf += sprintf(buf, "%s",SIget(env->idents,expr->idx));
             break;
