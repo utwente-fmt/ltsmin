@@ -1118,7 +1118,7 @@ print_state_space_total (char *name, counter_t *cnt)
 static inline void
 maybe_report (counter_t *cnt, char *msg)
 {
-    if (!log_active(info) || cnt->explored < global->threshold)
+    if (EXPECT_TRUE(!log_active(info) || cnt->explored < global->threshold))
         return;
     if (!cas (&global->threshold, global->threshold, global->threshold << 1))
         return;
@@ -2490,8 +2490,10 @@ reach_handle (void *arg, state_info_t *successor, transition_info_t *ti,
     if (!seen) {
         raw_data_t stack_loc = dfs_stack_push (ctx->stack, NULL);
         state_info_serialize (successor, stack_loc);
-        if (trc_output && successor->ref != ctx->state.ref &&
-                global->parent_ref[successor->ref] == 0) // race, but ok:
+        if (EXPECT_FALSE( trc_output &&
+                          successor->ref != ctx->state.ref &&
+                          global->parent_ref[successor->ref] == 0 &&
+                          ti != &GB_NO_TRANSITION )) // race, but ok:
             atomic_write(&global->parent_ref[successor->ref], ctx->state.ref);
         ctx->counters.visited++;
     }
@@ -2670,7 +2672,9 @@ pbfs (wctx_t *ctx)
         ctx->red.explored = 0;     // count states in next level
         ctx->flip = 1 - ctx->flip; // switch in;out stacks
         for (size_t i = 0; i < W; i++) {
-            while ((state_data = isba_pop_int(ctx->queues[(i << 1) + ctx->flip]))) {
+            size_t          current = (i << 1) + ctx->flip;
+            while ((state_data = isba_pop_int (ctx->queues[current])) &&
+                    !lb_is_stopped(global->lb)) {
                 state_info_deserialize (&ctx->state, state_data, ctx->store);
                 invariant_detect (ctx, ctx->state.data);
                 count = permute_trans (ctx->permute, &ctx->state, pbfs_handle, ctx);
@@ -2680,7 +2684,7 @@ pbfs (wctx_t *ctx)
             }
         }
         count = sbfs_level (ctx, ctx->red.explored);
-    } while (count);
+    } while (count && !lb_is_stopped(global->lb));
 }
 
 /**
@@ -3476,14 +3480,16 @@ ta_pbfs (wctx_t *ctx)
         ctx->red.explored = 0; // count states in next level
         ctx->flip = 1 - ctx->flip;
         for (size_t i = 0; i < W; i++) {
-            while ((state_data = isba_pop_int(ctx->queues[(i << 1) + ctx->flip]))) {
+            size_t          current = (i << 1) + ctx->flip;
+            while ((state_data = isba_pop_int (ctx->queues[current])) &&
+                    !lb_is_stopped (global->lb)) {
                 if (grab_waiting(ctx, state_data)) {
                     ta_explore_state (ctx);
                 }
             }
         }
         count = sbfs_level (ctx, ctx->red.explored);
-    } while (count);
+    } while (count && !lb_is_stopped(global->lb));
 }
 
 
@@ -3963,7 +3969,7 @@ explore (wctx_t *ctx)
                 ta_queue_state = pbfs_queue_state;
             ta_handle (ctx, &ctx->initial, &ti, 0);
         } else if ( Strat_PBFS & strategy[0] ) {
-            pbfs_handle (ctx, &ctx->initial, &ti, 0);
+            pbfs_queue_state (ctx, &ctx->initial);
         } else {
             reach_handle (ctx, &ctx->initial, &ti, 0);
         }
