@@ -18,6 +18,7 @@
 #include <hre/stringindex.h>
 #include <hre/unix.h>
 #include <hre/user.h>
+#include <lts-io/user.h>
 #include <ltsmin-lib/ltsmin-standard.h>
 #include <ltsmin-lib/ltsmin-tl.h>
 #include <mc-lib/atomics.h>
@@ -290,6 +291,8 @@ static int              no_exit = 0;
 static int              LATTICE_BLOCK_SIZE = (1UL<<CACHE_LINE) / sizeof(lattice_t);
 static int              UPDATE = TA_UPDATE_WAITING;
 static int              NONBLOCKING = 0;
+static int              write_state=0;
+static char*            label_filter=NULL;
 
 static void
 state_db_popt (poptContext con, enum poptCallbackReason reason,
@@ -355,6 +358,10 @@ static struct poptOption options[] = {
       "select the data structure for storing states. Beware for Cleary tree: size <= 28 + 2 * ratio.", "<tree|table|cleary-tree>"},
     {"size", 's', POPT_ARG_STRING | POPT_ARGFLAG_SHOW_DEFAULT, &table_size, 0,
      "log2 size of the state store or maximum % of memory to use", NULL},
+     { "write-state", 0, POPT_ARG_VAL, &write_state, 1, "write the full state vector", NULL },
+     { "filter" , 0 , POPT_ARG_STRING , &label_filter , 0 ,
+       "Select the labels to be written to file from the state vector elements, "
+       "state labels and edge labels." , "<patternlist>" },
 #ifdef OPAAL
     {"lattice-blocks", 'l', POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &LATTICE_BLOCK_SIZE, 0,
       "Size of blocks preallocated for lattices (> 1). "
@@ -487,6 +494,7 @@ struct thread_ctx_s {
     ssize_t             iteration;      // OWCTY: 0=init, uneven=reach, even=elim
     int                *progress;       // progress transitions
     size_t              progress_trans; // progress transitions
+    lts_file_t          lts;
 };
 
 static void
@@ -1077,6 +1085,28 @@ local_init ()
     }
 
     wctx_t          *ctx = wctx_create (model, 0, NULL);
+    if (files[1]) {
+        lts_type_t ltstype = GBgetLTStype (model);
+        Print1 (info,"Writing output to %s",files[1]);
+        if (strategy[0] & ~Strat_PBFS) {
+            Print1 (info,"Switching to PBFS algorithm for LTS write");
+            strategy[0] = Strat_PBFS;
+        }
+        lts_file_t          template = lts_vset_template ();
+        if (label_filter != NULL) {
+            string_set_t label_set = SSMcreateSWPset(label_filter);
+            Print1 (info, "label filter is \"%s\"", label_filter);
+            ctx->lts = lts_file_create_filter (files[1], ltstype, label_set, W, template);
+            write_state=1;
+        } else {
+            ctx->lts = lts_file_create (files[1], ltstype, W, template);
+            if (SL > 0) write_state = 1;
+        }
+        int T = lts_type_get_type_count (ltstype);
+        for (int i = 0; i < T; i++)
+            lts_file_set_table (ctx->lts, i, GBgetChunkMap(model,i));
+        HREbarrier (HREglobal()); // opening is sometimes a collaborative operation. (e.g. *.dir)
+    }
     if (HREme(HREglobal()) == 0)
         print_setup (ctx);
     return ctx;
@@ -1102,6 +1132,8 @@ deinit_globals ()
 static void
 deinit_all (wctx_t *ctx)
 {
+    if (ctx->lts)
+        lts_file_close (ctx->lts);
     if (0 == ctx->id)
         deinit_globals ();
     wctx_free (ctx);
@@ -2654,10 +2686,17 @@ pbfs_handle (void *arg, state_info_t *successor, transition_info_t *ti,
     action_detect (ctx, ti, successor);
     if (!seen) {
         pbfs_queue_state (ctx, successor);
-        if (trc_output && successor->ref != ctx->state.ref &&
-                global->parent_ref[successor->ref] == 0) // race, but ok:
+        if (EXPECT_FALSE( trc_output &&
+                          successor->ref != ctx->state.ref &&
+                          global->parent_ref[successor->ref] == 0) ) // race, but ok:
             atomic_write(&global->parent_ref[successor->ref], ctx->state.ref);
         ctx->counters.visited++;
+    }
+    if (EXPECT_FALSE(ctx->lts != NULL)) {
+        int             src = ctx->counters.explored;
+        int            *tgt = successor->data;
+        int             tgt_owner = ref_hash (successor->ref) % W;
+        lts_write_edge (ctx->lts, ctx->id, &src, tgt_owner, tgt, ti->labels);
     }
     ctx->counters.trans++;
     (void) ti;
@@ -2668,6 +2707,7 @@ pbfs (wctx_t *ctx)
 {
     size_t              count;
     raw_data_t          state_data;
+    int                 labels[SL];
     do {
         ctx->red.explored = 0;     // count states in next level
         ctx->flip = 1 - ctx->flip; // switch in;out stacks
@@ -2680,6 +2720,11 @@ pbfs (wctx_t *ctx)
                 count = permute_trans (ctx->permute, &ctx->state, pbfs_handle, ctx);
                 deadlock_detect (ctx, count);
                 maybe_report (&ctx->counters, "");
+                if (EXPECT_FALSE(ctx->lts && write_state)){
+                    if (SL > 0)
+                        GBgetStateLabelsAll (ctx->model, ctx->state.data, labels);
+                    lts_write_state (ctx->lts, ctx->id, ctx->state.data, labels);
+                }
                 ctx->counters.explored++;
             }
         }
@@ -3338,6 +3383,12 @@ ta_handle (void *arg, state_info_t *successor, transition_info_t *ti, int seen)
         lm_unlock (global->lmap, successor->ref);
     }
     action_detect (ctx, ti, successor);
+    if (EXPECT_FALSE(ctx->lts != NULL)) {
+        int             src = ctx->counters.explored;
+        int            *tgt = successor->data;
+        int             tgt_owner = ref_hash (successor->ref) % W;
+        lts_write_edge (ctx->lts, ctx->id, &src, tgt_owner, tgt, ti->labels);
+    }
     ctx->counters.trans++;
     (void) seen;
 }
@@ -3476,6 +3527,7 @@ ta_pbfs (wctx_t *ctx)
 {
     size_t              count;
     raw_data_t          state_data;
+    int                 labels[SL];
     do {
         ctx->red.explored = 0; // count states in next level
         ctx->flip = 1 - ctx->flip;
@@ -3485,6 +3537,11 @@ ta_pbfs (wctx_t *ctx)
                     !lb_is_stopped (global->lb)) {
                 if (grab_waiting(ctx, state_data)) {
                     ta_explore_state (ctx);
+                    if (EXPECT_FALSE(ctx->lts && write_state)){
+                        if (SL > 0)
+                            GBgetStateLabelsAll (ctx->model, ctx->state.data, labels);
+                        lts_write_state (ctx->lts, ctx->id, ctx->state.data, labels);
+                    }
                 }
             }
         }
@@ -3969,6 +4026,10 @@ explore (wctx_t *ctx)
                 ta_queue_state = pbfs_queue_state;
             ta_handle (ctx, &ctx->initial, &ti, 0);
         } else if ( Strat_PBFS & strategy[0] ) {
+            if (ctx->lts != NULL) {
+                int             src_owner = ref_hash(ctx->initial.ref) % W;
+                lts_write_init (ctx->lts, src_owner, initial);
+            }
             pbfs_queue_state (ctx, &ctx->initial);
         } else {
             reach_handle (ctx, &ctx->initial, &ti, 0);
@@ -4014,12 +4075,13 @@ main (int argc, char *argv[])
     /* Init structures */
     HREinitBegin (argv[0]);
     HREaddOptions (options,"Perform a parallel reachability analysis of <model>\n\nOptions");
+    lts_lib_setup();
 #if SPEC_MT_SAFE == 1
     HREenableThreads (1);
 #else
     HREenableFork (1); // enable multi-process env for mCRL/mCrl2 and PBES
 #endif
-    HREinitStart (&argc,&argv,1,1,files,"<model>");      // spawns threads!
+    HREinitStart (&argc,&argv,1,2,files,"<model> [lts]");      // spawns threads!
 
     wctx_t                 *ctx;
     prelocal_global_init ();

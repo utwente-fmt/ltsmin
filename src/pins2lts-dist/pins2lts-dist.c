@@ -328,10 +328,9 @@ int main(int argc, char*argv[]){
             int count=GBgetTransitionsAll(model,src,callback,&src_ctx);
             if (count<0) Abort("error in GBgetTransitionsAll");
             deadlock_detect (&ctx, src, count);
-            if (state_labels){
-                GBgetStateLabelsAll(model,src,labels);
-            }
             if(write_lts && write_state){
+                if (state_labels)
+                    GBgetStateLabelsAll(model,src,labels);
                 lts_write_state(ctx.output,ctx.mpi_me,src,labels);
             }
 
