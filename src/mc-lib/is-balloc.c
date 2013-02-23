@@ -123,7 +123,7 @@ int *
 isba_pop_int(isb_allocator_t buf)
 {
     if (buf->cur_index == 0) {
-        if (buf->num_block == 1) Abort("Pop on empty buffer");
+        if (buf->num_block == 1) return NULL;
         remove_block(buf);
         buf->cur_index = BLOCK_ELT_SIZE;
     }
