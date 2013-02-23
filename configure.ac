@@ -37,11 +37,10 @@ AC_DEFINE([DEFFILEMODE], 0666, [Define default file mode])
 #DejaGNU
 if test x"$DEJAGNU" = x
 then
-  DEJAGNU="\$(top_srcdir)/testsuite/global-conf.exp"
+  DEJAGNU="\$(top_srcdir)/testsuite/ltsmin.exp"
 fi
 AC_SUBST(DEJAGNU)
   
-
 # Checks for programs.
 AC_SUBST(AM_CXXFLAGS,["-Wno-inline -ftemplate-depth-128 -finline-functions"])
 
@@ -57,9 +56,6 @@ ACX_PTHREAD(
    CXXFLAGS="$CXXFLAGS $PTHREAD_CFLAGS"
    CC="$PTHREAD_CC"],
   [AC_MSG_FAILURE([no pthread support found.])])
-
-dnl Checks for programs.
-ACX_SPINS([:], [AC_MSG_WARN([SpinS will not be compiled.])])
 
 dnl Newer libtool allows this instead:
 dnl LT_PREREQ(2.2)
@@ -83,6 +79,34 @@ AX_CHECK_FLEX([
 
 AC_PROG_MAKE_SET
 AC_PROG_INSTALL
+
+AC_LANG_SAVE
+AC_LANG_C
+AC_RUN_IFELSE([AC_LANG_SOURCE([[
+#include <sys/types.h>
+#include <pthread.h>
+int main()
+{
+    pthread_mutex_t mutex;
+    pthread_mutexattr_t attr;
+    if (pthread_mutexattr_init(&attr))
+        exit(1);
+    if (pthread_mutexattr_setpshared(&attr, PTHREAD_PROCESS_SHARED))
+        exit(2);
+    if (pthread_mutex_init(&mutex, &attr))
+        exit(3);
+    if (pthread_mutexattr_destroy(&attr))
+        exit(4);
+    if (pthread_mutex_destroy(&mutex))
+        exit(5);
+    exit(0);
+}
+]])], [POSIX_SHARED=yes], [POSIX_SHARED=no
+    AC_MSG_WARN([No POSIX support found.])])
+AC_LANG_RESTORE
+
+dnl Checks for programs.
+ACX_SPINS([:], [AC_MSG_WARN([SpinS will not be compiled.])])
 
 ACX_MPI(
   [CC="$MPICC"
@@ -352,28 +376,6 @@ AC_SUBST([SYLVAN_CPPFLAGS],['-I${top_srcdir}/sylvan/src'])
 AC_SUBST([SYLVAN_LDFLAGS])
 
 AC_CHECK_PROGS(OPAAL_LTSMIN, [opaal_ltsmin])
-
-AC_TRY_RUN([
-#include <sys/types.h>
-#include <pthread.h>
-int main()
-{
-    pthread_mutex_t mutex;
-    pthread_mutexattr_t attr;
-    if (pthread_mutexattr_init(&attr))
-        exit(1);
-    if (pthread_mutexattr_setpshared(&attr, PTHREAD_PROCESS_SHARED))
-        exit(2);
-    if (pthread_mutex_init(&mutex, &attr))
-        exit(3);
-    if (pthread_mutexattr_destroy(&attr))
-        exit(4);
-    if (pthread_mutex_destroy(&mutex))
-        exit(5);
-    exit(0);
-}],
-[], [POSIX_SHARED=yes], 
-[POSIX_SHARED=no])
 
 AM_CONDITIONAL([HAVE_POSIX], [test x"$POSIX_SHARED" = "xyes"])
 AM_CONDITIONAL([HAVE_SYLVAN], [test x"$have_sylvan" = "xyes"])

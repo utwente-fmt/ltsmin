@@ -36,6 +36,10 @@ DEJATOOL +=	lts_generation
 endif
 endif
 
+if HAVE_OPAAL_COMPILER
+#DEJATOOL +=	alg_backends_opaal
+endif
+
 if HAVE_POSIX
 # the following tools all require --procs=
 
@@ -44,12 +48,9 @@ DEJATOOL +=	alg_backends_lps
 DEJATOOL +=	alg_backends_pbes
 endif
 
-if HAVE_OPAAL_COMPILER
-DEJATOOL +=	alg_backends_opaal
-endif
-
 if HAVE_LIBMCRL
 # Test disabled due to bug in mcrl path parsing
-DEJATOOL +=	alg_backends_lpo
+#DEJATOOL +=	alg_backends_lpo
 endif
+
 endif

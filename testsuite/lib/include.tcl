@@ -2,7 +2,7 @@
 # File for putting general test procedures
 
 # Models should be able to complete within the timeout value.
-set timeout 30
+set timeout 120
 
 # The directory containing all the models used for testing.
 set EXAMPLES_PATH "$base_dir/../examples"

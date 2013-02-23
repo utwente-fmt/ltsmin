@@ -23,7 +23,7 @@ dict set backends seq params "--state=" {tree table vset}
 dict set backends seq options {""}
 
 # 1 row for every param and a list of possible values
-dict set backends dist params "--debug=" {bogus.c}
+dict set backends dist params "" {""}
 dict set backends dist options {""}
 
 

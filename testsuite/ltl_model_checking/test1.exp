@@ -67,17 +67,16 @@ if {$spins == 1} {
     dict set commands test17_prom_seq exp "accepting cycle found"
 }
 
-
 # TEST 18:
 dict set commands test18_mc cmd "$binpaths(dve2lts-mc) --strategy=ndfs \
 	-s22 $EXAMPLES_PATH/iprotocol.2.dve \
-	--ltl=\"((\[\] <> Medium==dataOk) && (\[\]<>Medium==nakOk)) -> (\[\]<>Consumer==consume)\""
+	--ltl=$EXAMPLES_PATH/iprotocol.2.ltl"
 dict set commands test18_mc exp "Accepting cycle FOUND"
 
 # NOTE: the difference in the use of captitals in the expected output between this and previous test
 dict set commands test18_seq cmd "$binpaths(dve2lts-seq) --strategy=scc \
 	$EXAMPLES_PATH/iprotocol.2.dve \
-	--ltl=\"((\[\] <> Medium==dataOk) && (\[\]<>Medium==nakOk)) -> (\[\]<>Consumer==consume)\""
+	--ltl=$EXAMPLES_PATH/iprotocol.2.ltl"
 dict set commands test18_seq exp "accepting cycle found"
 
 
@@ -85,14 +84,13 @@ dict set commands test18_seq exp "accepting cycle found"
 
 dict set commands test19_mc cmd [subst "$binpaths(dve2lts-mc) --strategy=ndfs \
 	-s22 $EXAMPLES_PATH/elevator.3.dve \
-	--ltl=\"(\[\] (Person_0==in_elevator -> (<> Person_0==out)))\""]
+	--ltl=$EXAMPLES_PATH/elevator.3.ltl"]
 dict set commands test19_mc exp "495463 states"
 
 dict set commands test19_seq cmd "$binpaths(dve2lts-seq) --strategy=scc \
 	$EXAMPLES_PATH/elevator.3.dve \
-	--ltl=\"(\[\] (Person_0==in_elevator->(<>Person_0==out)))\""
+	--ltl=$EXAMPLES_PATH/elevator.3.ltl"
 dict set commands test19_seq exp "495463 states"
-
 
 foreach testcase [dict keys $commands] {
     set command [dict get $commands $testcase cmd]
