@@ -203,48 +203,48 @@ apply_regroup_spec (matrix_t *m, const char *spec_)
         char               *tok;
         while ((tok = strsep (&spec, ",")) != NULL) {
             if (strcasecmp (tok, "cs") == 0) {
-                Warning (info, "Regroup Column Sort");
+                Print1 (info, "Regroup Column Sort");
                 dm_sort_cols (m, &max_col_first);
             } else if (strcasecmp (tok, "cn") == 0) {
-                Warning (info, "Regroup Column Nub");
+                Print1 (info, "Regroup Column Nub");
                 dm_nub_cols (m);
             } else if (strcasecmp (tok, "csa") == 0) {
-                Warning (info, "Regroup Column swap with Simulated Annealing");
+                Print1 (info, "Regroup Column swap with Simulated Annealing");
                 dm_anneal (m);
             } else if (strcasecmp (tok, "cw") == 0) {
-                Warning (info, "Regroup Column sWaps");
+                Print1 (info, "Regroup Column sWaps");
                 dm_optimize (m);
             } else if (strcasecmp (tok, "ca") == 0) {
-                Warning (info, "Regroup Column All permutations");
+                Print1 (info, "Regroup Column All permutations");
                 dm_all_perm (m);
             } else if (strcasecmp (tok, "rs") == 0) {
-                Warning (info, "Regroup Row Sort");
+                Print1 (info, "Regroup Row Sort");
                 dm_sort_rows (m, &max_row_first);
             } else if (strcasecmp (tok, "rn") == 0) {
-                Warning (info, "Regroup Row Nub");
+                Print1 (info, "Regroup Row Nub");
                 dm_nub_rows (m);
             } else if (strcasecmp (tok, "ru") == 0) {
-                Warning (info, "Regroup Row sUbsume");
+                Print1 (info, "Regroup Row sUbsume");
                 dm_subsume_rows (m);
             } else if (strcasecmp (tok, "gsa") == 0) {
                 const char         *macro = "gc,gr,csa,rs";
-                Warning (info, "Regroup macro Simulated Annealing: %s", macro);
+                Print1 (info, "Regroup macro Simulated Annealing: %s", macro);
                 apply_regroup_spec (m, macro);
             } else if (strcasecmp (tok, "gs") == 0) {
                 const char         *macro = "gc,gr,cw,rs";
-                Warning (info, "Regroup macro Group Safely: %s", macro);
+                Print1 (info, "Regroup macro Group Safely: %s", macro);
                 apply_regroup_spec (m, macro);
             } else if (strcasecmp (tok, "ga") == 0) {
                 const char         *macro = "gc,rs,ru,cw,rs";
-                Warning (info, "Regroup macro Group Aggressively: %s", macro);
+                Print1 (info, "Regroup macro Group Aggressively: %s", macro);
                 apply_regroup_spec (m, macro);
             } else if (strcasecmp (tok, "gc") == 0) {
                 const char         *macro = "cs,cn";
-                Warning (info, "Regroup macro Cols: %s", macro);
+                Print1 (info, "Regroup macro Cols: %s", macro);
                 apply_regroup_spec (m, macro);
             } else if (strcasecmp (tok, "gr") == 0) {
                 const char         *macro = "rs,rn";
-                Warning (info, "Regroup macro Rows: %s", macro);
+                Print1 (info, "Regroup macro Rows: %s", macro);
                 apply_regroup_spec (m, macro);
             } else if (tok[0] != '\0') {
                 Fatal (1, error, "Unknown regrouping specification: '%s'",
@@ -298,7 +298,7 @@ GBregroup (model_t model, const char *regroup_spec)
 
     dm_copy (GBgetDMInfo (model), m);
 
-    Warning (info, "Regroup specification: %s", regroup_spec);
+    Print1 (info, "Regroup specification: %s", regroup_spec);
     apply_regroup_spec (m, regroup_spec);
     // post processing regroup specification
     // undo column grouping
@@ -333,7 +333,7 @@ GBregroup (model_t model, const char *regroup_spec)
     {
         int                 oldNgroups = dm_nrows (GBgetDMInfo (model));
         int                 newNgroups = dm_nrows (m);
-        Warning (info, "Regrouping: %d->%d groups", oldNgroups,
+        Print1  (info, "Regrouping: %d->%d groups", oldNgroups,
                  newNgroups);
         ctx->transbegin = RTmalloc ((1 + newNgroups) * sizeof (int));
         ctx->transmap = RTmalloc (oldNgroups * sizeof (int));

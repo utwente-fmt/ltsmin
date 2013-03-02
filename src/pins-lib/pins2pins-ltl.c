@@ -358,7 +358,7 @@ GBaddLTL (model_t model, const char *ltl_file, pins_ltl_type_t type)
     lts_type_t ltstype = GBgetLTStype(model);
     int old_idx = GBgetAcceptingStateLabelIndex (model);
     if (old_idx != -1) {
-        Warning (info, "LTL layer: model already has a ``%s'' property, overriding",
+        Print1 (info, "LTL layer: model already has a ``%s'' property, overriding",
                lts_type_get_state_label_name(ltstype, old_idx));
     }
 

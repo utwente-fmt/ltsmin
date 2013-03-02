@@ -680,15 +680,15 @@ model_t
 GBaddPOR (model_t model, int por_check_ltl)
 {
     if (GBgetAcceptingStateLabelIndex(model) != -1) {
-        Warning (info, "POR layer: model may be a buchi automaton.");
-        Warning (info, "POR layer: use LTSmin's own LTL layer (--ltl) for correct POR.");
+        Print1  (info, "POR layer: model may be a buchi automaton.");
+        Print1  (info, "POR layer: use LTSmin's own LTL layer (--ltl) for correct POR.");
     }
 
-    Warning(info,"Initializing partial order reduction layer..");
+    Print1 (info,"Initializing partial order reduction layer..");
 
     // check support for guards, fail without
     if (!GBhasGuardsInfo(model)) {
-        Warning(info, "Frontend doesn't have guards. Ignoring --por.");
+        Print1 (info, "Frontend doesn't have guards. Ignoring --por.");
         return model;
     }
 
@@ -699,7 +699,7 @@ GBaddPOR (model_t model, int por_check_ltl)
     ctx->parent = model;
 
     // initializing dependency lookup table ( (t, t') \in D relation)
-    Warning(info, "Initializing dependency lookup table.");
+    Print1 (info, "Initializing dependency lookup table.");
 
     matrix_t           *p_dm = GBgetDMInfo (model);
     matrix_t           *p_dm_w = GBgetDMInfoWrite (model);
@@ -836,7 +836,7 @@ GBaddPOR (model_t model, int por_check_ltl)
     dm_free(&gnds_matrix);
 
     // init por model
-    Warning(info, "Initializing dependency lookup table done.");
+    Print1 (info, "Initializing dependency lookup table done.");
     GBsetContext (pormodel, ctx);
 
     GBsetNextStateLong  (pormodel, por_long);
