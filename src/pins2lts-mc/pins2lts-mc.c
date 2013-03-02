@@ -707,8 +707,8 @@ static int num_global_bits (strategy_t s) {
     HREassert (GGREEN.g == 1);
     HREassert (GDANGEROUS.g == 2);
     return (Strat_ENDFS  & s ? 3 :
-           (Strat_CNDFS  & s ? 2 :
-           ((Strat_LNDFS | Strat_OWCTY | Strat_DFSFIFO | Strat_TA) & s ? 1 : 0)));
+           ((Strat_CNDFS | Strat_DFSFIFO) & s ? 2 :
+           ((Strat_LNDFS | Strat_OWCTY | Strat_TA) & s ? 1 : 0)));
 }
 
 wctx_t *
@@ -2741,19 +2741,18 @@ dfs_fifo_handle (void *arg, state_info_t *successor, transition_info_t *ti,
                  int seen)
 {
     wctx_t             *ctx = (wctx_t *) arg;
-    if (ctx->progress_trans > 0 ? ctx->progress[ti->group] :  // progress transitions
-        GBbuchiIsProgress(ctx->model, get_state(successor->ref, ctx))) { // progress states
-        if (!seen || !global_has_color(successor->ref, GRED, 0)) {
-            raw_data_t stack_loc = dfs_stack_push (ctx->out_stack, NULL);
-            state_info_serialize (successor, stack_loc);
-            ctx->red.visited += !seen;
-        }
-    } else {
+    ctx->counters.trans++;
+    if (seen) return;
+    if (ctx->progress_trans > 0 ? !ctx->progress[ti->group] :  // progress transitions
+            !GBbuchiIsProgress(ctx->model, get_state(successor->ref, ctx))) { // progress states
         raw_data_t stack_loc = dfs_stack_push (ctx->stack, NULL);
         state_info_serialize (successor, stack_loc);
         ctx->counters.visited++;
+    } else if (global_try_color(successor->ref, GGREEN, 0)) {
+        raw_data_t stack_loc = dfs_stack_push (ctx->out_stack, NULL);
+        state_info_serialize (successor, stack_loc);
+        ctx->red.visited += !seen;
     }
-    ctx->counters.trans++;
     (void) ti;
 }
 
@@ -2763,31 +2762,17 @@ split_dfs_fifo (void *arg_src, void *arg_tgt, size_t handoff)
     wctx_t             *source = arg_src;
     wctx_t             *target = arg_tgt;
     size_t              in_size = dfs_stack_size (source->in_stack);
-    if (in_size == 1) {
-        dfs_stack_push (target->in_stack, dfs_stack_top(source->in_stack));
-        return -1;
-    } else if (in_size == 0) {
-        return 0;
-    }
-    // secure current state
-    dfs_stack_push (source->stack, dfs_stack_pop(source->in_stack));
-
-    handoff = min (in_size >> 1, handoff);
+    handoff = min ((in_size >> 1) + 1, handoff);
     for (size_t i = 0; i < handoff; i++) {
         state_data_t        one = dfs_stack_pop (source->in_stack);
-        HREassert (NULL != one);
         dfs_stack_push (target->in_stack, one);
     }
     source->counters.splits++;
     source->counters.transfer += handoff;
-
-    // push back current state
-    dfs_stack_push (source->in_stack, dfs_stack_pop(source->stack));
-
     return handoff;
 }
 
-void
+static void
 dfs_fifo_dfs (wctx_t *ctx, ref_t seed)
 {
     while (!lb_is_stopped(global->lb)) {
@@ -2814,8 +2799,9 @@ dfs_fifo_dfs (wctx_t *ctx, ref_t seed)
             state_data = dfs_stack_pop (ctx->stack);
             state_info_deserialize_cheap (&ctx->state, state_data);
             ctx->counters.level_cur--;
-            if (ctx->state.ref != seed && ctx->state.ref != ctx->seed)
+            if (ctx->state.ref != seed && ctx->state.ref != ctx->seed) {
                 ecd_remove_state (ctx->cyan, &ctx->state);
+            }
             global_try_color (ctx->state.ref, GRED, 0);
         }
         // load balance the FIFO queue (this is a synchronizing affair)
@@ -2832,13 +2818,12 @@ dfs_fifo (wctx_t *ctx)
     size_t              out_size, size;
     do {
         while (lb_balance (global->lb, ctx->id, dfs_stack_frame_size(ctx->in_stack), split_dfs_fifo)) {
-            raw_data_t          state_data = dfs_stack_top (ctx->in_stack);
+            raw_data_t          state_data = dfs_stack_pop (ctx->in_stack);
             if (NULL != state_data) {
                 dfs_stack_push (ctx->stack, state_data);
                 state_info_deserialize_cheap (&ctx->state, state_data);
                 if (!global_has_color(ctx->state.ref, GRED, 0))
                     dfs_fifo_dfs (ctx, ctx->state.ref);
-                dfs_stack_pop (ctx->in_stack);
             }
         }
         size = dfs_stack_frame_size (ctx->out_stack);
