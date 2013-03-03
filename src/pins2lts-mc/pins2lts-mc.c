@@ -744,8 +744,8 @@ wctx_create (model_t model, int depth, wctx_t *shared)
     if (strategy[depth] & Strat_LTL) {
         if (strategy[0] & Strat_TA) {
             ctx->cyan = fset_create (sizeof(ta_cndfs_state_t), 0, 10, 28);
-            ctx->pink = fset_create (sizeof(ta_cndfs_state_t), 0, FSET_MIN_SIZE, 28);
-            ctx->cyan2= fset_create (sizeof(ref_t), sizeof(void *), 10, 28);
+            ctx->pink = fset_create (sizeof(ta_cndfs_state_t), 0, FSET_MIN_SIZE, 20);
+            ctx->cyan2= fset_create (sizeof(ref_t), sizeof(void *), 10, 20);
         }
         if (~Strat_OWCTY & strategy[depth]) {
             size_t local_bits = 2;
@@ -753,10 +753,10 @@ wctx_create (model_t model, int depth, wctx_t *shared)
             res &= bitvector_create (&ctx->all_red, MAX_STACK);
             if (-1 == res) Abort ("Failure to allocate a bitvector.");
         } else if (ecd && (strategy[1] & Strat_ECD)) {
-            ctx->cyan = fset_create (sizeof(ref_t), sizeof(uint32_t), 10, 28);
+            ctx->cyan = fset_create (sizeof(ref_t), sizeof(uint32_t), 10, 20);
         }
         if (strategy[0] & Strat_DFSFIFO) {
-            ctx->cyan = fset_create (sizeof(ref_t), 0, 10, 28);
+            ctx->cyan = fset_create (sizeof(ref_t), 0, 10, 20);
             // find progress transitions
             lts_type_t      ltstype = GBgetLTStype (ctx->model);
             int             statement_label = lts_type_find_edge_label (

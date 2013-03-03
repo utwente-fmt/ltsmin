@@ -219,9 +219,10 @@ bool
 fset_delete (fset_t *dbs, mem_hash_t *mem, void *key)
 {
     size_t              ref;
-    size_t              b = dbs->key_length;
+    size_t              k = dbs->key_length;
     mem_hash_t          tomb = NONE;
-    mem_hash_t          h = (mem == NULL ? MurmurHash64(key, b, 0) : *mem);
+    HREassert (k != 0 || (key == NULL && mem != NULL && *mem != FULL), "Called keyless fast set with key or wrong hash");
+    mem_hash_t          h = (mem == NULL ? MurmurHash64(key, k, 0) : *mem);
     bool found = fset_find_loc (dbs, h, key, &ref, &tomb);
     if (!found)
         return false;
@@ -246,7 +247,7 @@ fset_find (fset_t *dbs, mem_hash_t *mem, void *key, void **data,
     size_t              ref;
     mem_hash_t          tomb = NONE;
     size_t              k = dbs->key_length;
-    HREassert (k != 0 || (key == NULL && mem != NULL && (*mem&FULL) == 0), "Called keyless fast set with key or wrong hash");
+    HREassert (k != 0 || (key == NULL && mem != NULL && *mem != FULL), "Called keyless fast set with key or wrong hash");
     mem_hash_t          h = (mem == NULL ? MurmurHash64(key, k, 0) : *mem);
     bool                found = fset_find_loc (dbs, h, key, &ref, &tomb);
 
