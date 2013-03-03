@@ -919,7 +919,7 @@ statics_init (model_t model)
     W = HREpeers(HREglobal());
     if (Perm_Unknown == permutation) //default permutation depends on strategy
         permutation = strategy[0] & Strat_Reach ? Perm_None :
-                      (strategy[0] & Strat_TA ? Perm_RR : Perm_Dynamic);
+                     (strategy[0] & (Strat_TA | Strat_DFSFIFO) ? Perm_RR : Perm_Dynamic);
     if (Perm_None != permutation) {
          if (call_mode == UseGreyBox)
             Abort ("Greybox not supported with state permutation.");
@@ -2407,7 +2407,7 @@ split_bfs (void *arg_src, void *arg_tgt, size_t handoff)
     for (size_t i = 0; i < handoff; i++) {
         state_data_t        one = dfs_stack_pop (source_stack);
         HREassert (NULL != one);
-        dfs_stack_push (target->stack, one);
+        dfs_stack_push (target->in_stack, one);
     }
     source->counters.splits++;
     source->counters.transfer += handoff;
@@ -2420,7 +2420,7 @@ split_sbfs (void *arg_src, void *arg_tgt, size_t handoff)
     wctx_t             *source = arg_src;
     wctx_t             *target = arg_tgt;
     size_t              in_size = dfs_stack_size (source->in_stack);
-    handoff = min (in_size >> 1 , handoff);
+    handoff = min (in_size >> 1, handoff);
     for (size_t i = 0; i < handoff; i++) {
         state_data_t        one = dfs_stack_pop (source->in_stack);
         HREassert (NULL != one);
@@ -2459,6 +2459,12 @@ split_dfs (void *arg_src, void *arg_tgt, size_t handoff)
     source->counters.splits++;
     source->counters.transfer += handoff;
     return handoff;
+}
+
+static inline size_t
+in_load (wctx_t *ctx)
+{
+    return dfs_stack_frame_size(ctx->in_stack);
 }
 
 static inline size_t
@@ -2520,7 +2526,7 @@ reach_handle (void *arg, state_info_t *successor, transition_info_t *ti,
     wctx_t             *ctx = (wctx_t *) arg;
     action_detect (ctx, ti, successor);
     if (!seen) {
-        raw_data_t stack_loc = dfs_stack_push (ctx->stack, NULL);
+        raw_data_t stack_loc = dfs_stack_push (ctx->out_stack, NULL);
         state_info_serialize (successor, stack_loc);
         if (EXPECT_FALSE( trc_output &&
                           successor->ref != ctx->state.ref &&
@@ -2624,8 +2630,6 @@ bfs (wctx_t *ctx)
             explore_state (ctx, state_data, 0);
             ctx->counters.explored++;
         } else {
-            if (0 == dfs_stack_frame_size (ctx->out_stack))
-                continue;
             swap (ctx->out_stack, ctx->in_stack);
             ctx->stack = ctx->out_stack;
             increase_level (&ctx->counters);
@@ -2652,7 +2656,7 @@ sbfs (wctx_t *ctx)
 {
     size_t              next_level_size, local_next_size;
     do {
-        while (lb_balance (global->lb, ctx->id, dfs_stack_frame_size (ctx->in_stack), split_sbfs)) {
+        while (lb_balance (global->lb, ctx->id, in_load(ctx), split_sbfs)) {
             raw_data_t          state_data = dfs_stack_pop (ctx->in_stack);
             if (NULL != state_data) {
                 explore_state (ctx, state_data, 0);
@@ -2736,19 +2740,29 @@ pbfs (wctx_t *ctx)
  * DFS-FIFO for non-progress detection
  */
 
+#define setV GRED
+#define setF GGREEN
+
 static void
 dfs_fifo_handle (void *arg, state_info_t *successor, transition_info_t *ti,
                  int seen)
 {
     wctx_t             *ctx = (wctx_t *) arg;
     ctx->counters.trans++;
-    if (seen) return;
-    if (ctx->progress_trans > 0 ? !ctx->progress[ti->group] :  // progress transitions
-            !GBbuchiIsProgress(ctx->model, get_state(successor->ref, ctx))) { // progress states
+    bool is_progress = ctx->progress_trans > 0 ? ctx->progress[ti->group] :  // ! progress transition
+            GBbuchiIsProgress(ctx->model, get_state(successor->ref, ctx)); // ! progress state
+
+    if (!is_progress && seen && ecd_has_state(ctx->cyan, successor))
+         ndfs_report_cycle (ctx, successor);
+
+    // dfs_fifo_dfs/dfs_fifo_bfs also check this, but we want a clean stack for LB!
+    if (global_has_color(ctx->state.ref, setV, 0))
+        return;
+    if (!is_progress) {
         raw_data_t stack_loc = dfs_stack_push (ctx->stack, NULL);
         state_info_serialize (successor, stack_loc);
         ctx->counters.visited++;
-    } else if (global_try_color(successor->ref, GGREEN, 0)) {
+    } else if (global_try_color(successor->ref, setF, 0)) { // new F state
         raw_data_t stack_loc = dfs_stack_push (ctx->out_stack, NULL);
         state_info_serialize (successor, stack_loc);
         ctx->red.visited += !seen;
@@ -2756,32 +2770,16 @@ dfs_fifo_handle (void *arg, state_info_t *successor, transition_info_t *ti,
     (void) ti;
 }
 
-ssize_t
-split_dfs_fifo (void *arg_src, void *arg_tgt, size_t handoff)
-{
-    wctx_t             *source = arg_src;
-    wctx_t             *target = arg_tgt;
-    size_t              in_size = dfs_stack_size (source->in_stack);
-    handoff = min ((in_size >> 1) + 1, handoff);
-    for (size_t i = 0; i < handoff; i++) {
-        state_data_t        one = dfs_stack_pop (source->in_stack);
-        dfs_stack_push (target->in_stack, one);
-    }
-    source->counters.splits++;
-    source->counters.transfer += handoff;
-    return handoff;
-}
+typedef size_t (*lb_load_f)(wctx_t *);
 
 static void
-dfs_fifo_dfs (wctx_t *ctx, ref_t seed)
+dfs_fifo_dfs (wctx_t *ctx, ref_t seed, lb_load_f load, lb_split_problem_f split)
 {
     while (!lb_is_stopped(global->lb)) {
         raw_data_t          state_data = dfs_stack_top (ctx->stack);
         if (NULL != state_data) {
             state_info_deserialize (&ctx->state, state_data, ctx->store);
-            if (ecd_has_state(ctx->cyan, &ctx->state)) {
-                ndfs_report_cycle (ctx, &ctx->state);
-            } else if (!global_has_color(ctx->state.ref, GRED, 0)) {
+            if (!global_has_color(ctx->state.ref, setV, 0)) {
                 if (ctx->state.ref != seed && ctx->state.ref != ctx->seed)
                     ecd_add_state (ctx->cyan, &ctx->state, NULL);
                 dfs_stack_enter (ctx->stack);
@@ -2802,28 +2800,29 @@ dfs_fifo_dfs (wctx_t *ctx, ref_t seed)
             if (ctx->state.ref != seed && ctx->state.ref != ctx->seed) {
                 ecd_remove_state (ctx->cyan, &ctx->state);
             }
-            global_try_color (ctx->state.ref, GRED, 0);
+            global_try_color (ctx->state.ref, setV, 0);
         }
         // load balance the FIFO queue (this is a synchronizing affair)
-        lb_balance (global->lb, ctx->id, dfs_stack_frame_size(ctx->in_stack), split_dfs_fifo);
+        lb_balance (global->lb, ctx->id, load(ctx)+1, split); //never report 0 load!
     }
     HREassert (lb_is_stopped(global->lb) || fset_count(ctx->cyan) == 0,
                "DFS stack not empty, size: %zu", fset_count(ctx->cyan));
 }
 
-void
-dfs_fifo (wctx_t *ctx)
+static void
+dfs_fifo_sbfs (wctx_t *ctx)
 {
     size_t              total = 0;
     size_t              out_size, size;
     do {
-        while (lb_balance (global->lb, ctx->id, dfs_stack_frame_size(ctx->in_stack), split_dfs_fifo)) {
+        while (lb_balance (global->lb, ctx->id, in_load(ctx), split_sbfs)) {
             raw_data_t          state_data = dfs_stack_pop (ctx->in_stack);
             if (NULL != state_data) {
-                dfs_stack_push (ctx->stack, state_data);
                 state_info_deserialize_cheap (&ctx->state, state_data);
-                if (!global_has_color(ctx->state.ref, GRED, 0))
-                    dfs_fifo_dfs (ctx, ctx->state.ref);
+                //if (!global_has_color(ctx->state.ref, setV, 0)) { //checked in dfs_fifo_dfs
+                    dfs_stack_push (ctx->stack, state_data);
+                    dfs_fifo_dfs (ctx, ctx->state.ref, in_load, split_sbfs);
+                //}
             }
         }
         size = dfs_stack_frame_size (ctx->out_stack);
@@ -2837,6 +2836,27 @@ dfs_fifo (wctx_t *ctx)
         }
         swap (ctx->out_stack, ctx->in_stack);
     } while (out_size > 0 && !lb_is_stopped(global->lb));
+}
+
+static void
+dfs_fifo_bfs (wctx_t *ctx)
+{
+    while (lb_balance (global->lb, ctx->id, bfs_load(ctx), split_bfs)) {
+        raw_data_t          state_data = dfs_stack_pop (ctx->in_stack);
+        if (NULL != state_data) {
+            state_info_deserialize_cheap (&ctx->state, state_data);
+            //if (!global_has_color(ctx->state.ref, GRED, 0)) { //checked in dfs_fifo_dfs
+                dfs_stack_push (ctx->stack, state_data);
+                dfs_fifo_dfs (ctx, ctx->state.ref, bfs_load, split_bfs);
+            //}
+        } else {
+            size_t out_size = dfs_stack_frame_size (ctx->out_stack);
+            if (out_size > atomic_read(&max_level_size))
+                atomic_write(&max_level_size, out_size * W); // over-estimation
+            increase_level (&ctx->counters);
+            swap (ctx->out_stack, ctx->in_stack);
+        }
+    }
 }
 
 /**
@@ -3431,18 +3451,6 @@ grab_waiting (wctx_t *ctx, raw_data_t state_data)
     // simulated by swapping these two operations in the schedule.
 }
 
-static inline size_t
-ta_bfs_load (wctx_t *ctx)
-{
-    return dfs_stack_frame_size(ctx->in_stack) + dfs_stack_frame_size(ctx->out_stack);
-}
-
-static inline size_t
-ta_load (wctx_t *ctx)
-{
-    return dfs_stack_frame_size(ctx->in_stack);
-}
-
 void
 ta_dfs (wctx_t *ctx)
 {
@@ -3469,18 +3477,14 @@ ta_dfs (wctx_t *ctx)
 void
 ta_bfs (wctx_t *ctx)
 {
-    while (lb_balance(global->lb, ctx->id, ta_bfs_load(ctx), split_bfs)) {
+    while (lb_balance(global->lb, ctx->id, bfs_load(ctx), split_bfs)) {
         raw_data_t          state_data = dfs_stack_pop (ctx->in_stack);
         if (NULL != state_data) {
             if (grab_waiting(ctx, state_data)) {
                 ta_explore_state (ctx);
             }
         } else {
-            if (0 == dfs_stack_frame_size (ctx->out_stack))
-                continue;
-            dfs_stack_t     old = ctx->out_stack;
-            ctx->stack = ctx->out_stack = ctx->in_stack;
-            ctx->in_stack = old;
+            swap (ctx->in_stack, ctx->out_stack);
             increase_level (&ctx->counters);
         }
     }
@@ -3491,7 +3495,7 @@ ta_sbfs (wctx_t *ctx)
 {
     size_t              next_level_size, local_next_size;
     do {
-        while (lb_balance(global->lb, ctx->id, ta_load(ctx), split_sbfs)) {
+        while (lb_balance(global->lb, ctx->id, in_load(ctx), split_sbfs)) {
             raw_data_t          state_data = dfs_stack_pop (ctx->in_stack);
             if (NULL != state_data) {
                 if (grab_waiting(ctx, state_data)) {
@@ -4035,14 +4039,15 @@ explore (wctx_t *ctx)
     case Strat_SBFS:    sbfs (ctx); break;
     case Strat_PBFS:    pbfs (ctx); break;
     case Strat_BFS:     bfs (ctx); break;
-    case Strat_DFS:
-        if (UseGreyBox == call_mode) dfs_grey (ctx); else dfs (ctx); break;
+    case Strat_DFS:     if (UseGreyBox == call_mode) dfs_grey (ctx);
+                        else                         dfs (ctx); break;
     case Strat_NDFS:    ndfs_blue (ctx); break;
     case Strat_LNDFS:   lndfs_blue (ctx); break;
     case Strat_CNDFS:
     case Strat_ENDFS:   endfs_blue (ctx); break;
     case Strat_OWCTY:   owcty (ctx); break;
-    case Strat_DFSFIFO: dfs_fifo (ctx); break;
+    case Strat_DFSFIFO: if (all_red) dfs_fifo_bfs (ctx); // default
+                        else         dfs_fifo_sbfs (ctx); break;
     default: Abort ("Strategy is unknown or incompatible with the current front-end (%d).", strategy[0]);
     }
     RTstopTimer (ctx->timer);
