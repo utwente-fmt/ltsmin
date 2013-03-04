@@ -1,55 +1,68 @@
-<DATE> - Release <VERSION.NEXT> of the LTSmin toolset
+March 4, 2012 - Release 2.0 of the LTSmin toolset
 
- * New frontend for PBESs. The systems are translated into parity
-   games which can be exhaustively explored using the analysis
-   algorithms.
-    o pbes-reach for symbolic state space generation
-    o pbes2lts-grey/gsea for enumerative state space generation
-    o pbes2lts-mpi/hre for distributed state space generation
-    o spgsolver a symbolic parity game solver
-    o PGSolver file output format ('{ast}.pg')
- * Renamed SpinJa to SpinS. Added support for valid end-state filtering,
-   guards for POR, assertion violation detection and never claims.
- * New frontend for UPPAAL xml timed automate models via opaal. This adds
-   support for semi-symbolic states to the PINS interface and requires the backend
-   algorithms to be extended with subsumption checks on the symbolic state part.
-    o opaal2lts-mc for multi-core reachability on timed automata
-    o supports all features of the multi-core tool except LTL and POR
-    o Added strict BFS algorithm in multi-core backend to reduce state count
-      (--strategy=sbfs)
-    o Currently, only supported by the multi-core reachability algorithms
- * New parallel BBD package: Sylvan
-    o See http://essay.utwente.nl/61650/ for a description
+ * Refactored runtime and IO libraries, organized source code and renamed tools:
+    o *-reach     -> *2lts-sym  (Symbolic CTL/mu model checking, ETF output)
+    o *2lts-mc    -- *2lts-mc   (Multi-core LTL model checking, compression)
+    o *-mpi       -> *2lts-dist (Distributed LTS generation, LTS output)
+    o *-gsea/grey -> *2lts-seq  (Sequential POR, LTL, LTS output, BDD storage)
+    o lts-compare -- NEW        (Branching/String bisim. equivalence check)
+    o ltsmin-tracepp -> ltsmin-printtrace    (Trace pretty printing)
+    o ltsmin(-mpi)   -> ltsmin-reduce(-dist) (LTS minimization: LTSmin's origin)
+    o ltstrans       -> lts-convert          (LTS file format conversion)
+ * New parallel BBD package: Sylvan [1,2]
     o BDD operations are parallelized using the Wool framework (included)
-    o Use: *2lts-sym --vset=sylvan
-    o Supported platforms: Linux 64 bit and Mac OSX
-    o Parameters: 
-      --sylvan-threads     <N> Number of workers
-      --sylvan-dqsize      <N> Size of the static task queue of Wool
-      --sylvan-tablesize   <N> Size of the BDD table (1<<N nodes)
-      --sylvan-cachesize   <N> Size of the memoization table (1<<N entries)
-      --sylvan-bits        <N> Number of bits per integer in the state vector
-      --sylvan-granularity <N> Only use the memoization table every 1/N BDD levels
- * Optimized multi-core data structures and algorithms
+    o Use: *2lts-sym --vset=sylvan or *2lts-seq --state=vset --vset=sylvan
+ * New frontend for UPPAAL xml timed automata via opaal [A] (only opaal2lts-mc).
+   This adds semi-symbolic states and inclusion checks to PINS [3]:
+    o Multi-core reachability on timed automata using inclusion abstraction
+    o Supports all multi-core features, including NDFS with abstraction [4]
+    o Added a strict BFS algorithm [3] to reduce abstracted state counts
+      (--strategy=sbfs, default for opaal)
+ * New frontend for PBESs generating parity games for the symbolic solver [5]:
+    o All backends: pbes2lts-sym, pbes2lts-mc, pbes2lts-dist, and pbes2lts-seq 
+    o Adds a symbolic parity game solver: spgsolver
+    o PGSolver file output format ('{ast}.pg')
+ * Extensions to the multi-core backend (*2lts-mc):
+    o Support for muCRL/mCRL2/PBES using processes ({lpo,lps,pbes}2lts-mc)
+    o Added CNDFS algorithm [6]
+    o Added OWCTY algorithm [B] in the multi-core backends
+    o Added DFS_FIFO algorithm for parallel livelock detection using POR [7]
+    o Added strict BFS algorithms (--strategy=sbfs,pbfs, see [3,C])
+    o Elementary support for writing LTSs (using pbfs) and POR (single threaded)
+ * Renamed SpinJa to SpinS [8], and added:
+   o Valid end-state filter, assertions (--action=assert) and never claims
+   o Guards and dependencies for POR
+   o Support for Java 1.5 and VMs from different vendors (previously JDK 1.7)
+ * Optimized multi-core data structures (mc-lib):
+    o Reduced initialization times by using calloc instead of malloc+memset
     o Reduced tree memory usage by 50% by splitting table for roots and leafs.
       Set the relative ratio using: --ratio=n (n=2 by default)
-    o Created a new tree that uses a parallel Cleary table to store roots
-      halving memory usage in the best case (--state=cleary-tree)
-    o Reduced memoized hash sizes to 16 bit.
+    o Parallel Cleary tree (--state=cleary-tree) halving memory usage [9,8]
+    o Reduced memoized hash sizes to 16 bit
     o Introduced a non-indexing tree that skips the root node for lookups
-      (used automatically if indices are not required by MCNDFs algorithms or
-      by tracing facility)
-    o Reduced initialization times by using calloc instead of malloc+memset
     o Thread-local initialization and allocation for better NUMA performance
-    o Introduced 64 bit hashing, prime rehashing and Murmur hash function
     o New load balancer with simplified interface
-    o Added a strict BFS algorithm (--strategy=sbfs). See also news about the
-      opaal frontend
+ * Added test suite, called via 'make check' (requires DejaGNU)
+
+[1] Multi-Core BDD Operations for Symbolic Reachability - http://essay.utwente.nl/61650/
+[2] Multi-core and/or Symbolic Model Checking - http://eprints.eemcs.utwente.nl/22550/
+[3] Multi-Core Reachability for Timed Automata - http://eprints.eemcs.utwente.nl/21972/
+[4] Multi-Core Emptiness Checking of Timed Buchi Automata using Inclusion Abstraction -
+    http://eprints.eemcs.utwente.nl/23158
+[5] Efficient Instantiation of Parameterised Boolean Equations Systems to Parity Games -
+    http://eprints.eemcs.utwente.nl/22278/
+[6] Improved Multi-Core NDFS - http://eprints.eemcs.utwente.nl/21967/
+[7] Improved On-The-Fly Livelock Detection - http://eprints.eemcs.utwente.nl/23159
+[8] SpinS: Extending LTSmin with Promela via SpinJa - http://eprints.eemcs.utwente.nl/22042/
+[9] A Parallel Compact Hash Table - http://eprints.eemcs.utwente.nl/20648/
+[A] opaal: https://code.launchpad.net/~opaal-developers/opaal/opaal-ltsmin-succgen
+[B] Barnat et al. - A Time-Optimal On-the-Fly parallel algorithm for model checking of weak LTL properties
+[C] G. Holzmann - Parallelizing the Spin Model Checker
 
 February 22, 2012 - Release 1.8 of the LTSmin toolset
 
- * Implementation of Evangelista et al.'s parallel nested depth-first
-   search and a number of variations
+ * Implementation of Evangelista et al.'s parallel NDFS and variations, see:
+   http://eprints.eemcs.utwente.nl/20618/ (Variations on Multi-Core NDFS)
  * Native implementations of Ciardo et al.'s saturation algorithms for
    AtermDD and ListDD (<spec>-reach --saturation=sat) (Tien-Loong Siaw)
  * Dependency matrix regrouping using simulated annealing (-rgsa, -rcsa)
