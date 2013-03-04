@@ -273,6 +273,7 @@ static int              dbs_size = 0;
 static int              refs = 1;
 static int              ZOBRIST = 0;
 static int              no_red_perm = 0;
+static int              strict_dfsfifo = 0;
 static int              all_red = 1;
 static int              owcty_do_reset = 0;
 static int              owcty_ecd_all = 0;
@@ -385,6 +386,7 @@ static struct poptOption options[] = {
       "select proviso for ltl/por (only single core!)", "<closedset|stack>"},
 #endif
     {"nar", 0, POPT_ARG_VAL, &all_red, 0, "turn off red coloring in the blue search (NNDFS/MCNDFS)", NULL},
+    {"strict", 0, POPT_ARG_VAL, &strict_dfsfifo, 1, "turn onn struct BFS in DFS_FIFO", NULL},
     {"no-ecd", 0, POPT_ARG_VAL, &ecd, 0, "turn off early cycle detection (NNDFS/MCNDFS)", NULL},
     {"perm", 'p', POPT_ARG_STRING | POPT_ARGFLAG_SHOW_DEFAULT,
      &arg_perm, 0, "select the transition permutation method",
@@ -4046,8 +4048,8 @@ explore (wctx_t *ctx)
     case Strat_CNDFS:
     case Strat_ENDFS:   endfs_blue (ctx); break;
     case Strat_OWCTY:   owcty (ctx); break;
-    case Strat_DFSFIFO: if (all_red) dfs_fifo_bfs (ctx); // default
-                        else         dfs_fifo_sbfs (ctx); break;
+    case Strat_DFSFIFO: if (strict_dfsfifo) dfs_fifo_sbfs (ctx); // default
+                        else                dfs_fifo_bfs (ctx); break;
     default: Abort ("Strategy is unknown or incompatible with the current front-end (%d).", strategy[0]);
     }
     RTstopTimer (ctx->timer);
