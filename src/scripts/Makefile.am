@@ -7,7 +7,7 @@ CADPINCLUDES = -I$(CADP)/incl
 bin_SCRIPTS += pins-open
 endif
 
-# pins_open
+# pins-open
 pins-open: pins-open.in Makefile subst_pins_open.mk
 	$(subst_pins_open) < $< > $@
 	chmod +x $@
@@ -22,7 +22,7 @@ spins: spins.in Makefile subst_pins_open.mk
 subst_pins_open.mk: spins.in Makefile config.munge.pl
 	perl $(srcdir)/config.munge.pl subst_pins_open < $< > $@
 
-CLEANFILES 		= pins_open spins
+CLEANFILES 		= pins-open spins
 DISTCLEANFILES  = subst_pins_open.mk
 
 EXTRA_DIST  = pins-open.in spins.in
