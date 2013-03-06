@@ -1,17 +1,19 @@
 March 4, 2012 - Release 2.0 of the LTSmin toolset
 
  * Refactored runtime and IO libraries, organized source code and renamed tools:
-    o *-reach     -> *2lts-sym  (Symbolic CTL/mu model checking, ETF output)
-    o *2lts-mc    -- *2lts-mc   (Multi-core LTL model checking, compression)
-    o *-mpi       -> *2lts-dist (Distributed LTS generation, LTS output)
-    o *-gsea/grey -> *2lts-seq  (Sequential POR, LTL, LTS output, BDD storage)
-    o lts-compare -- NEW        (Branching/String bisim. equivalence check)
-    o ltsmin-tracepp -> ltsmin-printtrace    (Trace pretty printing)
-    o ltsmin(-mpi)   -> ltsmin-reduce(-dist) (LTS minimization: LTSmin's origin)
-    o ltstrans       -> lts-convert          (LTS file format conversion)
+    o *-reach       -> *2lts-sym  (Symbolic CTL/mu model checking, ETF output)
+    o *2lts-mc      -- *2lts-mc   (Multi-core LTL model checking, compression)
+    o *2lts-mpi     -> *2lts-dist (Distributed LTS generation, LTS output)
+    o *2lts-gsea    -> *2lts-seq  (Sequential POR, LTL, LTS output, BDD storage)
+    o *2lts-grey    -- REMOVED    (Old sequential tool)
+    o lts-compare   -- NEW        (Branching/String bisim. equivalence check)
+    o ltsmin-tracepp-> ltsmin-printtrace    (Trace pretty printing)
+    o ltsmin(-mpi)  -> ltsmin-reduce(-dist) (LTS minimization: LTSmin's origin)
+    o ltstrans      -> lts-convert          (LTS file format conversion)
  * New parallel BBD package: Sylvan [1,2]
     o BDD operations are parallelized using the Wool framework (included)
-    o Use: *2lts-sym --vset=sylvan or *2lts-seq --state=vset --vset=sylvan
+    o Use: *2lts-sym --vset=sylvan
+           *2lts-seq --state=vset --vset=sylvan
  * New frontend for UPPAAL xml timed automata via opaal [A] (only opaal2lts-mc).
    This adds semi-symbolic states and inclusion checks to PINS [3]:
     o Multi-core reachability on timed automata using inclusion abstraction
@@ -20,7 +22,7 @@ March 4, 2012 - Release 2.0 of the LTSmin toolset
       (--strategy=sbfs, default for opaal)
  * New frontend for PBESs generating parity games for the symbolic solver [5]:
     o All backends: pbes2lts-sym, pbes2lts-mc, pbes2lts-dist, and pbes2lts-seq 
-    o Adds a symbolic parity game solver: spgsolver
+    o Added a symbolic parity game solver: spgsolver
     o PGSolver file output format ('{ast}.pg')
  * Extensions to the multi-core backend (*2lts-mc):
     o Support for muCRL/mCRL2/PBES using processes ({lpo,lps,pbes}2lts-mc)
@@ -30,9 +32,9 @@ March 4, 2012 - Release 2.0 of the LTSmin toolset
     o Added strict BFS algorithms (--strategy=sbfs,pbfs, see [3,C])
     o Elementary support for writing LTSs (using pbfs) and POR (single threaded)
  * Renamed SpinJa to SpinS [8], and added:
-   o Valid end-state filter, assertions (--action=assert) and never claims
-   o Guards and dependencies for POR
-   o Support for Java 1.5 and VMs from different vendors (previously JDK 1.7)
+    o Valid end-state filter, assertions (--action=assert) and never claims
+    o Guards and dependencies for POR
+    o Support for Java 1.5 and VMs from different vendors (previously JDK 1.7)
  * Optimized multi-core data structures (mc-lib):
     o Reduced initialization times by using calloc instead of malloc+memset
     o Reduced tree memory usage by 50% by splitting table for roots and leafs.
