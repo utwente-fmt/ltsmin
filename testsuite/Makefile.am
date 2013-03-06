@@ -3,8 +3,8 @@ AUTOMAKE_OPTIONS = dejagnu
 
 EXTRA_DIST = \
 			 ltsmin.exp \
-			 lib/unix.exp \
-			 lib/default.exp
+			 lib/*.tcl \
+			 */*.exp
 
 CLEANFILES = *.o *.so *.spins *.gcf *.aut *.bcg *.fsm *.etf *.cpp *.c *.log \
              *.sum *.c *.bin \
