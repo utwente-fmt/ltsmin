@@ -300,8 +300,8 @@ set_ll_install (set_ll_t *set, char *name, int len, int idx)
     set->local[worker].offset += index - set->local[worker].count;
     atomic_write (&set->local[worker].count, index + 1); // signal done
 
-    Debug ("Bind (%d)\t<--(%zu,%zu)-> (%s,%d) %llu", idx, worker, index, name,
-                                                     len, clone);
+    Debug ("Bind (%d)\t<--(%zu,%zu)-> (%s,%d) %zu", idx, worker, index, name,
+                                                     len, (size_t) clone);
 }
 
 double
