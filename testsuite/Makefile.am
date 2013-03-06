@@ -6,16 +6,12 @@ EXTRA_DIST = \
 			 lib/*.tcl \
 			 */*.exp
 
-CLEANFILES = *.o *.so *.spins *.gcf *.aut *.bcg *.fsm *.etf *.cpp *.c *.log \
-             *.sum *.c *.bin \
-             */*.o */*.so */*.spins */*.gcf */*.aut */*.bcg */*.fsm */*.etf \
-             */*.cpp */*.c */*.log */*.sum */*.c */*.bin
+CLEANFILES = out/* *.log *.sum
 
-clean: clean_dirs
+clean-local:
+	rm -rf out
 
-clean_dirs:
-	rm -rf */*.dir
-	rm -rf ../examples/*.spins
+DISTCLEANFILES = site.exp
 
 export DEJAGNU
 

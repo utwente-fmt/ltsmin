@@ -53,7 +53,6 @@ proc test_forall_params { params_dict idx command } {
 # backends: dict with options for algorithmic backends
 proc run_test_for_alg_backends { alg_be langs backends} {
     global EXAMPLES_PATH
-    global SPINS
 
     foreach path $alg_be {
         set testcounter 1
@@ -66,6 +65,14 @@ proc run_test_for_alg_backends { alg_be langs backends} {
         if { [dict exists $langs $lang_fe model] } {
             set model [dict get $langs $lang_fe model]
 
+            if { [file exists "$model" ] } {
+            	set model "$model"
+            } elseif { [file exists "$EXAMPLES_PATH/$model" ] } {
+		 set model "$EXAMPLES_PATH/$model" 
+            } else {
+                 fail "Model not found: $model"
+		 continue
+            }
             # if exists, execute the precommand
             # i.e. can be used to generate models
             if { [dict exists $langs $lang_fe precommands] } {
@@ -95,7 +102,7 @@ proc run_test_for_alg_backends { alg_be langs backends} {
                 }
                 
                 foreach cmd $command_list {
-                    set command "$cmd $lang_option $EXAMPLES_PATH/$model"
+                    set command "$cmd $lang_option $model"
                     runmytest $testcounter $command [dict get $langs $lang_fe exp_output ]
                 }
 
@@ -103,7 +110,7 @@ proc run_test_for_alg_backends { alg_be langs backends} {
                 note "No test defined for backend: $command $be"
             }
         } else {
-            #note "No model defined for language frontend $lang_fe"
+	    #note "No model defined for language frontend $lang_fe"
         }
     }
 }

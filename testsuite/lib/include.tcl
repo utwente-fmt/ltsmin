@@ -4,8 +4,14 @@
 # Models should be able to complete within the timeout value.
 set timeout 120
 
+proc makeAbsolute {pathname} {
+    file join [pwd] $pathname
+}
+
+set LTSMIN_SRCDIR "[makeAbsolute $srcdir]/.."
+
 # The directory containing all the models used for testing.
-set EXAMPLES_PATH "$base_dir/../examples"
+set EXAMPLES_PATH "$LTSMIN_SRCDIR/examples"
 
 # filter: filter a specific (list of) backend(s): {mc,sym,seq}
 proc find_alg_backends { filter } {
@@ -141,11 +147,12 @@ proc runmytest { test_name command_line exp_output} {
 }
 
 # create a list with for every bin the path
-set binpaths(spins-jar) "$base_dir/../spins/spins.jar"
+set binpaths(spins-jar) "$LTSMIN_SRCDIR/spins/spins.jar"
 set binpaths(ltsmin-compare) "$base_dir/../src/ltsmin-compare/ltsmin-compare"
 set binpaths(ltsmin-convert) "$base_dir/../src/ltsmin-convert/ltsmin-convert"
 set binpaths(ltsmin-printtrace) "$base_dir/../src/ltsmin-printtrace/ltsmin-printtrace"
 set binpaths(spins) "$base_dir/../src/scripts/spins"
+set binpaths(out) "out"
 
 set bins [find_alg_backends "{seq,mc,dist,sym}"]
 foreach path $bins {
@@ -157,13 +164,14 @@ proc compile_promela { prom_models } {
     global binpaths
     global EXAMPLES_PATH
 
-    if { [file exists "$binpaths(spins-jar)" ] != 1 } {
-         return false
+    if { ! [file exists "$binpaths(spins-jar)" ] } {
+	 fail "Cannot find spins binary in $binpaths(spins-jar)"
+	 exit 0
     }
 
     foreach prom_model $prom_models {
-        set commands {"$binpaths(spins) $EXAMPLES_PATH/$prom_model"
-                      "mv $prom_model.spins $EXAMPLES_PATH/"}
+        set commands {"$binpaths(spins) $EXAMPLES_PATH/$prom_model"}
+# "mv $prom_model.spins $EXAMPLES_PATH/"
         foreach command $commands {
             puts [subst "Executing precommand: '$command'"]
             eval exec $command

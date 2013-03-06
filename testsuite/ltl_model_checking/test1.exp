@@ -1,18 +1,13 @@
-source lib/include.tcl
+source $srcdir/lib/include.tcl
 
-cd $subdir
-
-set commands [dict create]
+if { [file exists $binpaths(out) ] != 1 } {
+    file mkdir $binpaths(out)
+}
+cd $binpaths(out)
 
 puts "\n----------------------------------------------"
 puts   "TESTING: LTL Algorithms"
 puts   "----------------------------------------------\n"
-
-set spins 1
-if { [ compile_promela {"peterson3.pml" "zune.pml"} ] == 0 } {
-    puts "No SpinS compiler found!, Skipping Promela examples"
-    set spins 0
-}
 
 set commands [dict create]
 
@@ -31,17 +26,17 @@ dict set commands test_16_dve_seq cmd "$binpaths(dve2lts-seq) --strategy=scc \
 # This expected value is assumed to be the same as previous multicore results. This is untested!
 dict set commands test_16_dve_seq exp "633945 states"
 
+compile_promela {"peterson3.pml" "zune.pml"}
+
 # peterson
-if {$spins == 1} {
-    foreach s $strategies {
-        dict set commands test16_seq_$s cmd "$binpaths(prom2lts-mc) --threads=4 \
-    	--strategy=$s -s20 $EXAMPLES_PATH/peterson3.pml.spins"
-        dict set commands test16_seq_$s exp "167277 states"
-    }
-    dict set commands test16_prom_seq cmd "$binpaths(prom2lts-seq) --strategy=scc \
-    	$EXAMPLES_PATH/peterson3.pml.spins"
-    dict set commands test16_prom_seq exp "167277 states"
+foreach s $strategies {
+    dict set commands test16_seq_$s cmd "$binpaths(prom2lts-mc) --threads=4 \
+	--strategy=$s -s20 peterson3.pml.spins"
+    dict set commands test16_seq_$s exp "167277 states"
 }
+dict set commands test16_prom_seq cmd "$binpaths(prom2lts-seq) --strategy=scc \
+					peterson3.pml.spins"
+dict set commands test16_prom_seq exp "167277 states"
 
 # TEST 17:
 
@@ -56,16 +51,14 @@ dict set commands test_17_dve_seq cmd "$binpaths(dve2lts-seq) --strategy=scc \
 dict set commands test_17_dve_seq exp "accepting cycle found"
 
 # zune:
-if {$spins == 1} {
-    foreach s $strategies {
-        dict set commands test17_prom_mc_$s cmd "$binpaths(prom2lts-mc) --threads=4 \
-    	-s22 --strategy=$s $EXAMPLES_PATH/zune.pml.spins"
-        dict set commands test17_prom_mc_$s exp "Accepting cycle FOUND"
-    }
-    dict set commands test17_prom_seq cmd "$binpaths(prom2lts-seq) --strategy=scc \
-    	$EXAMPLES_PATH/zune.pml.spins"
-    dict set commands test17_prom_seq exp "accepting cycle found"
+foreach s $strategies {
+    dict set commands test17_prom_mc_$s cmd "$binpaths(prom2lts-mc) --threads=4 \
+	-s22 --strategy=$s zune.pml.spins"
+    dict set commands test17_prom_mc_$s exp "Accepting cycle FOUND"
 }
+dict set commands test17_prom_seq cmd "$binpaths(prom2lts-seq) --strategy=scc \
+					zune.pml.spins"
+dict set commands test17_prom_seq exp "accepting cycle found"
 
 # TEST 18:
 dict set commands test18_mc cmd "$binpaths(dve2lts-mc) --strategy=ndfs \

@@ -2,17 +2,17 @@
 # Simple bash shell script to launch SpinS using the LTSmin backend
 
 
-COMMAND="$(basename "$0")"
+COMMAND="$(readlink -f `dirname "$0"`)"
 
 # the following variables are initialised by "configure"
 LTSMIN_VERSION="@VERSION@"
 LTSMIN_PREFIX="@prefix@"
 LTSMIN_LIB="@pkglibdir@"
 LTSMIN_SRCDIR="@top_srcdir@"
-LTSMIN_SRCDIR="`dirname $0`/$LTSMIN_SRCDIR"
+LTSMIN_SRCDIR="$COMMAND/$LTSMIN_SRCDIR"
 
 spins_dir="$LTSMIN_PREFIX/share/ltsmin"
-spins_dir2="$LTSMIN_SRCDIR/spins/build"
+spins_dir2="$LTSMIN_SRCDIR/spins"
 
 CP="$spins_dir/spins.jar"
 if [ ! -e $CP ]; then

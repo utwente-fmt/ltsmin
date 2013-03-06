@@ -1,11 +1,14 @@
 # include the general include file which contains the functions
-source lib/include.tcl
+source $srcdir/lib/include.tcl
 
 # use the local uncluding file containing several procedures
-source lib/backends.tcl
+source $srcdir/lib/backends.tcl
 
 #cd into the test dir such that output files are placed here.
-cd $subdir
+if { [file exists $binpaths(out) ] != 1 } {
+    file mkdir $binpaths(out)
+}
+cd $binpaths(out)
 
 puts "\n----------------------------------------------"
 puts   "TESTING: Algorithmic backends for ETF language"
