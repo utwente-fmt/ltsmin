@@ -1,6 +1,6 @@
 ACLOCAL_AMFLAGS = -I m4
 
-SUBDIRS = @subdirs@ lemon src testsuite
+SUBDIRS = @subdirs@ lemon examples src testsuite
 if HAVE_ASCIIDOC
 if HAVE_XMLTO
 SUBDIRS += doc

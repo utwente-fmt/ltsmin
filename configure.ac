@@ -412,6 +412,7 @@ AC_CONFIG_COMMANDS_POST(
 
 AC_CONFIG_FILES([
        Makefile
+       examples/Makefile
        src/Makefile
        src/hre-io/Makefile
        src/hre/Makefile
