@@ -3955,7 +3955,6 @@ ta_cndfs_blue (wctx_t *ctx)
                 break;
             }
             dfs_stack_leave (ctx->stack);
-            HREassert (ctx->counters.level_cur != 0 && ctx->counters.level_cur < 1ULL << 48); // overflow
             ctx->counters.level_cur--;
             /* call red DFS for accepting states */
             state_data = dfs_stack_top (ctx->stack);
