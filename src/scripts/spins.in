@@ -19,6 +19,12 @@ if [ ! -e $CP ]; then
     spins_dir=$spins_dir2
 fi
 CP="$spins_dir/spins.jar"
+
+CYGPATH=`which cygpath 2> /dev/null`
+if [ ! -z "$CYGPATH" ]; then
+    CP=`cygpath -wp "$CP"`
+fi
+
 promela_file=
 no_compile=0
 
@@ -43,7 +49,7 @@ if [ -f "$output_file" ]; then
     rm -f "$output_file";
 fi
 
-java -Xss8M -Xms120m -Xmx2048m -cp $CP spins.Compile ${1+"$@"}
+java -Xss8M -Xms120m -Xmx1024m -cp $CP spins.Compile ${1+"$@"}
 ERROR=$?
 if [ $ERROR -ne 0 ]; then
     echo "Compilation of $promela_file failed"
