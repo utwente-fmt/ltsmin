@@ -4,14 +4,6 @@ Use SpinS (distributed as submodule LTSmin) to compile PROMELA model
 'leader.pm' to 'leader.pm.spins':
 
 ----
-java -cp <prefix>/share/ltsmin/spins.jar spins.Compile -o3 -l leader.pm
-gcc -g -O2 -fPIC -shared leader.spins.c -o leader.spins
-----
-
-Note that option +-l+ is currently mandatory.
-Alternatively, one can use the included script:
-
-----
 spins -o3 leader.pm
 ----
 
@@ -21,7 +13,7 @@ On the resulting compiled SpinS module, all SpinS-related LTSmin
 tools can be used:
 
 ----
-prom-reach -rgs --order=chain leader.pm.spins leader.etf
+prom2lts-sym -rgs --order=chain leader.pm.spins leader.etf
 prom2lts-mc --assert -prr --threads=16 leader.pm.spins
 prom2lts-seq --por -d --trace=t.gcf leader.pm.spins
 ----
