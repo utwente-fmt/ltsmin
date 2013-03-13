@@ -115,10 +115,7 @@ typedef struct search_context
 typedef struct por_context {
     model_t             parent;                     // parent PINS model
     int                 nguards;                    // number of guards
-    matrix_t            is_dependent;               // is dependent matrix groups to groups
-    matrix_t            guard_is_dependent;         // is dependent matrix guards to groups
     int**               is_dependent_tg_tg;         // mapping from transition group to dependent transition groups
-    int**               is_dependent_guard_tg;      // mapping from guard to dependent transition groups
     int**               guard_tg;                   // mapping from guard to transition group
     int**               guard_nce;                  // mapping from guards to transition groups that may not be co-enabled
     int**               guard_nes;                  // transition groups that form a nes for a guard (guard -> [t1, t2, t..])
@@ -706,18 +703,19 @@ GBaddPOR (model_t model, int por_check_ltl)
 
     int groups = dm_nrows( p_dm );
     int len = dm_ncols( p_dm );
-    dm_create(&ctx->is_dependent, groups, groups);
+    matrix_t            is_dependent;
+    dm_create(&is_dependent, groups, groups);
     for(int i=0; i < groups; i++) {
         for(int j=0; j < groups; j++) {
             if (i == j) {
-                dm_set(&ctx->is_dependent, i, j);
+                dm_set(&is_dependent, i, j);
             } else {
                 // is dependent?
                 for (int k=0; k < len; k++)
                 {
                     if ((dm_is_set( p_dm_w, i, k) && dm_is_set( p_dm, j, k)) ||
                         (dm_is_set( p_dm, i, k) && dm_is_set( p_dm_w, j, k)) ) {
-                        dm_set( &ctx->is_dependent, i, j );
+                        dm_set( &is_dependent, i, j );
                         break;
                     }
                 }
@@ -730,12 +728,13 @@ GBaddPOR (model_t model, int por_check_ltl)
     int guards = sl_guards->count;
     matrix_t        *p_sl = GBgetStateLabelInfo(model);
     // len is unchanged
-    dm_create(&ctx->guard_is_dependent, guards, groups);
+    matrix_t guard_is_dependent;
+    dm_create(&guard_is_dependent, guards, groups);
     for(int i=0; i < guards; i++) {
         for(int j=0; j < groups; j++) {
             for(int k=0; k < len; k++) {
                 if (dm_is_set( p_sl, sl_guards->sl_idx[i], k ) && dm_is_set( p_dm_w, j, k )) {
-                    dm_set( &ctx->guard_is_dependent, i, j );
+                    dm_set( &guard_is_dependent, i, j );
                     break;
                 }
             }
@@ -747,14 +746,13 @@ GBaddPOR (model_t model, int por_check_ltl)
     dm_create(&gg_matrix, groups, guards);
     for(int i=0; i < groups; i++) {
         guard_t* g = GBgetGuard(model, i);
-        if (g != NULL) {
-            for(int j=0; j < g->count; j++) {
-                dm_set(&gg_matrix, i, g->guard[j]);
-            }
-        } else {
-            Abort ("GUARD RETURNED NULL %d", i);
+        HREassert(g != NULL, "GUARD RETURNED NULL %d", i);
+        for(int j=0; j < g->count; j++) {
+            dm_set(&gg_matrix, i, g->guard[j]);
         }
     }
+    ctx->guard_tg               = dm_cols_to_idx_table(&gg_matrix);
+    dm_free(&gg_matrix);
 
     // extract guard not co-enabled and guard-nes information
     // from guard may-be-co-enabled with guard relation:
@@ -763,6 +761,7 @@ GBaddPOR (model_t model, int por_check_ltl)
     matrix_t *p_gce_matrix = GBgetGuardCoEnabledInfo(model);
     matrix_t gnce_matrix;
     dm_create(&gnce_matrix, guards, groups);
+    ci_list** g_tg              = (ci_list**)ctx->guard_tg;
     for(int g=0; g < guards; g++) {
         // iterate over all guards
         for (int gg=0; gg < guards; gg++) {
@@ -770,10 +769,8 @@ GBaddPOR (model_t model, int por_check_ltl)
             if (!dm_is_set(p_gce_matrix, g, gg)) {
                 // gg may not be co-enabled with g, find all
                 // transition groups in which it is used
-                for(int tg=0; tg < groups; tg++) {
-                    // if it is used, mark in gnce_matrix
-                    if (dm_is_set(&gg_matrix, tg, gg))
-                        dm_set(&gnce_matrix, g, tg);
+                for( int tg=0; tg < g_tg[gg]->count; tg++) {
+                    dm_set(&gnce_matrix, g, g_tg[gg]->data[tg]);
                 }
             }
         }
@@ -794,7 +791,7 @@ GBaddPOR (model_t model, int por_check_ltl)
             // vector the guard reads from, otherwise
             // this value can be removed
             if (dm_is_set(&gnes_matrix, i, j)) {
-                if (!dm_is_set(&ctx->guard_is_dependent, i, j))
+                if (!dm_is_set(&guard_is_dependent, i, j))
                     dm_unset(&gnes_matrix, i, j);
             }
         }
@@ -814,26 +811,24 @@ GBaddPOR (model_t model, int por_check_ltl)
             // vector the guard reads from, otherwise
             // this value can be removed
             if (dm_is_set(&gnds_matrix, i, j)) {
-                if (!dm_is_set(&ctx->guard_is_dependent, i, j))
+                if (!dm_is_set(&guard_is_dependent, i, j))
                     dm_unset(&gnds_matrix, i, j);
             }
         }
     }
 
     // set lookup tables
-    ctx->is_dependent_tg_tg    = dm_rows_to_idx_table(&ctx->is_dependent);
-    ctx->is_dependent_guard_tg = dm_rows_to_idx_table(&ctx->guard_is_dependent);
-    ctx->guard_tg              = dm_cols_to_idx_table(&gg_matrix);
+    ctx->is_dependent_tg_tg    = dm_rows_to_idx_table(&is_dependent);
     ctx->guard_nce             = dm_rows_to_idx_table(&gnce_matrix);
     ctx->guard_nes             = dm_rows_to_idx_table(&gnes_matrix);
     ctx->guard_nds             = dm_rows_to_idx_table(&gnds_matrix);
 
-
     // free temporary matrices
-    dm_free(&gg_matrix);
     dm_free(&gnce_matrix);
     dm_free(&gnes_matrix);
     dm_free(&gnds_matrix);
+    dm_free(&guard_is_dependent);
+    dm_free(&is_dependent);
 
     // init por model
     Print1 (info, "Initializing dependency lookup table done.");
