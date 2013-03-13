@@ -776,6 +776,19 @@ GBaddPOR (model_t model, int por_check_ltl)
         }
     }
 
+    for(int i=0; i < groups; i++) {
+        guard_t* guard = GBgetGuard(model, i);
+        HREassert(guard != NULL, "GUARD RETURNED NULL %d", i);
+        for (int j=0; j < guard->count; j++) {
+            int g = guard->guard[j];
+            for(int t=0; t < groups; t++) {
+                if (dm_is_set(&gnce_matrix, g, t)) {
+                    dm_unset(&is_dependent, i, t);
+                }
+            }
+        }
+    }
+
     // mark minimal necessary enabling set
     matrix_t *p_gnes_matrix = GBgetGuardNESInfo(model);
     // copy p_gnes_matrix to gnes_matrix, then optimize it
