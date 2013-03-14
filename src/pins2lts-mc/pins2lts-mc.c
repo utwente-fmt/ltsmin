@@ -25,8 +25,6 @@
 #include <mc-lib/color.h>
 #include <mc-lib/cctables.h>
 #include <mc-lib/dbs-ll.h>
-#include <mc-lib/dfs-stack.h>
-#include <mc-lib/is-balloc.h>
 #include <mc-lib/lmap.h>
 #include <mc-lib/lb.h>
 #include <mc-lib/statistics.h>
@@ -34,11 +32,13 @@
 #include <mc-lib/trace.h>
 #include <mc-lib/treedbs-ll.h>
 #include <mc-lib/zobrist.h>
+#include <util-lib/dfs-stack.h>
+#include <util-lib/fast_hash.h>
+#include <util-lib/fast_set.h>
+#include <util-lib/is-balloc.h>
 #include <pins-lib/pins.h>
 #include <pins-lib/pins-impl.h>
 #include <pins-lib/property-semantics.h>
-#include <util-lib/fast_hash.h>
-#include <util-lib/fast_set.h>
 #include <util-lib/util.h>
 
 

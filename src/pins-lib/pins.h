@@ -82,6 +82,7 @@ typedef struct guard {
  * \brief boolean indicating whether PINS uses POR
  */
 extern int GB_POR;
+extern int GB_POR_CHECK;
 
 /**
 \brief Factory method for loading models.

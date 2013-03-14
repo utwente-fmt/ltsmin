@@ -757,6 +757,7 @@ static int matrix=0;
 static int labels=0;
 static int cache=0;
 int GB_POR=0;
+int GB_POR_CHECK=0;
 static const char *regroup_options = NULL;
 
 static char *ltl_file = NULL;
@@ -817,6 +818,7 @@ void
 GBloadFile (model_t model, const char *filename, model_t *wrapped)
 {
     char               *extension = strrchr (filename, '.');
+    if (GB_POR_CHECK) GB_POR=1;
     if (extension) {
         extension++;
         for (int i = 0; i < registered; i++) {
@@ -970,6 +972,7 @@ struct poptOption greybox_options[]={
     { "labels", 0, POPT_ARG_VAL, &labels, 1, "print state variable and type names, and state and action labels", NULL },
 	{ "matrix" , 'm' , POPT_ARG_VAL , &matrix , 1 , "print the dependency matrix for the model and exit" , NULL},
 	{ "por" , 'p' , POPT_ARG_VAL , &GB_POR , 1 , "enable partial order reduction" , NULL },
+	{ "check-por" , 'p' , POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &GB_POR_CHECK , 1 , "verify partial order reduction peristent sets" , NULL },
 	{ "cache" , 'c' , POPT_ARG_VAL , &cache , 1 , "enable caching of grey box calls" , NULL },
 	{ "regroup" , 'r' , POPT_ARG_STRING, &regroup_options , 0 ,
           "enable regrouping; available transformations T: "

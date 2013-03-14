@@ -5,7 +5,11 @@
 
 #include <dm/dm.h>
 #include <hre/user.h>
+#include <ltsmin-lib/ltsmin-standard.h>
 #include <pins-lib/pins.h>
+#include <util-lib/fast_set.h>
+#include <util-lib/is-balloc.h>
+#include <util-lib/treedbs.h>
 
 
 /**
@@ -44,10 +48,8 @@ por_short (model_t self, int group, int *src, TransitionCB cb,
  * Using the NES and NDS information
  */
 typedef enum {
+    GS_ENABLED      = 0x00, // should be zero (memset)
     GS_DISABLED     = 0x01,
-    GS_VISIBLE      = 0x02,
-    GS_CLOSED       = 0x04,
-    GS_INACTIVE     = 0x08,
 } group_status_t;
 
 typedef enum {
@@ -95,15 +97,15 @@ typedef struct ci_list
  */
 typedef struct search_context
 {
-    emit_status_t *emit_status;                     // status of each transition group
-    int *work;                                      // list of size n+1, enabled transitions start at 0 upwards,
-                                                    // disabled transitions start at n downwards
-                                                    // [enabled0, enabled1, .. | free | workn-1, workn]
-    int  work_enabled;                              // number of enabled groups in work
-    int  work_disabled;                             // number of disabled groups in work
+    emit_status_t   *emit_status;    // status of each transition group
+    int             *work;           // list of size n+1, enabled transitions start at 0 upwards,
+                                     // disabled transitions start at n downwards
+                                     // [enabled0, enabled1, .. | free | workn-1, workn]
+    int             work_enabled;    // number of enabled groups in work
+    int             work_disabled;   // number of disabled groups in work
 
-    int  score;                                     // search weight
-    int *nes_score;                                 // nes score
+    int             score;           // search weight
+    int            *nes_score;       // nes score
 } search_context;
 
 
@@ -113,39 +115,42 @@ typedef struct search_context
  * of guards, necessary enabling/disabling sets (nes/nds) etc
  */
 typedef struct por_context {
-    model_t             parent;                     // parent PINS model
-    int                 nguards;                    // number of guards
-    int**               is_dependent_tg_tg;         // mapping from transition group to dependent transition groups
-    int**               guard_tg;                   // mapping from guard to transition group
-    int**               guard_nce;                  // mapping from guards to transition groups that may not be co-enabled
-    int**               guard_nes;                  // transition groups that form a nes for a guard (guard -> [t1, t2, t..])
-    int**               guard_nds;                  // transition groups that form a nds for a guard
+    model_t         parent;         // parent PINS model
+    int             nguards;        // number of guards
+    matrix_t        is_dep_and_ce;  //
+    matrix_t        gnce_tg_tg;     // mapping from group to not coenabled group
+    int**           is_dep_and_ce_tg_tg; // mapping from transition group to dependent and coenabled transition groups
+    int**           guard_tg;       // mapping from guard to transition group
+    int**           guard_nce;      // mapping from guards to transition groups that may not be co-enabled
+    int**           guard_nes;      // transition groups that form a nes for a guard (guard -> [t1, t2, t..])
+    int**           guard_nds;      // transition groups that form a nds for a guard
 
     /**
      * The global data used for the search
      * This data is setup one time for each state that is processed
      */
-    int             *guard_status;              // status of the guards in current state
-    group_status_t  *group_status;              // status of the transition groups in the current state
-    int             *group_score;               // score assigned to each group by heuristic function
-    int              beam_width;                // maximum width of the beam search
-    int              beam_used;                 // number of search contexts in use
+    int             *guard_status;  // status of the guards in current state
+    group_status_t  *group_status;  // status of the transition groups in the current state
+    int             *group_score;   // score assigned to each group by heuristic function
+    int              beam_width;    // maximum width of the beam search
+    int              beam_used;     // number of search contexts in use
 
     // global nes/nds
-    int             *nes_score;                 // Template for the nes_score (TODO: check)
-    ci_list        **ns;                        // nes/nds combined
-    ci_list        **group_in;                  // mapping group to each nes/nds in which it is used
-    ci_list        **group_has;                 // mapping group to each nes/nds for it
+    int             *nes_score;     // Template for the nes_score (TODO: check)
+    ci_list        **ns;            // nes/nds combined
+    ci_list        **group_in;      // mapping group to each nes/nds in which it is used
+    ci_list        **group_has;     // mapping group to each nes/nds for it
 
-    int              emit_limit;                // maximum number of transition groups that can be emitted
-    int              emit_score;                // directly emit when search finishes with this score
-    int              emitted;                   // number of already emitted transitions
+    int              emit_limit;    // maximum number of transition groups that can be emitted
+    int              emit_score;    // directly emit when search finishes with this score
+    int              emitted;       // number of already emitted transitions
 
     // location in search array (extra indirection for quick switching between contexts)
     int             *search_order;
-    search_context  *search;                    // context for each search
+    search_context  *search;        // context for each search
 
-    int             *group_visibility;          // LTL specific
+    int             *group_visibility; // LTL specific
+    hre_key_t        local_key;
 } por_context;
 
 /**
@@ -275,7 +280,7 @@ static void bs_setup(model_t model, por_context* pctx, int* src)
     int n = dm_nrows(GBgetDMInfo(model));
 
     // clear global tables
-    memset(pctx->group_status, 0, n * sizeof(group_status_t));
+    memset(pctx->group_status, GS_ENABLED, n * sizeof(group_status_t));
     memset(pctx->nes_score, 0, (n_guards * 2) * sizeof(int));
 
     // fill guard status, request all guard values,
@@ -413,7 +418,7 @@ bs_analyze(model_t model, por_context* pctx, int* src)
             // for a disabled transition we need to add the necessary enabling set
             // lookup which set has the lowest score on the heuristic function h(x)
             int selected_nes = -1;
-            int selected_score = INT_MAX;
+            int selected_score = INT32_MAX;
 
             // for each possible nes for the current group
             for(int k=0 ; k< pctx->group_has[current_group]->count; k++) {
@@ -484,8 +489,8 @@ bs_analyze(model_t model, por_context* pctx, int* src)
 
             // push all dependent unselected groups
             por_context *ctx = (por_context*)GBgetContext(model);
-            for (int j=0; j < *ctx->is_dependent_tg_tg[current_group]; j++) {
-                int dependent_group = ctx->is_dependent_tg_tg[current_group][j+1];
+            for (int j=0; j < *ctx->is_dep_and_ce_tg_tg[current_group]; j++) {
+                int dependent_group = ctx->is_dep_and_ce_tg_tg[current_group][j+1];
                 // already selected?
                 if (s[idx].emit_status[dependent_group] & ES_SELECTED) continue;
                 // mark as selected
@@ -573,6 +578,153 @@ bs_emit_dlk(model_t model, por_context* pctx, int* src, TransitionCB cb, void* c
     }
 }
 
+typedef struct dlk_hook_context {
+    por_context    *pctx;
+    void*           user_context;
+    int             len;
+    int             groups;
+    int            *persistent;
+    ci_list        *pers_list;
+    ci_list        *en_list;
+    int             seen;
+    int             current;
+    int             current_idx;
+    int            *src;
+    isb_allocator_t stack;
+    treedbs_t       tree;
+    fset_t         *set;
+} dlk_check_context_t;
+
+static inline dlk_check_context_t *
+get_check_ctx (por_context *ctx)
+{
+    dlk_check_context_t *loc = HREgetLocal (ctx->local_key);
+    if (loc == NULL) {
+        matrix_t* m = GBgetDMInfo(ctx->parent);
+        loc = RTalign (CACHE_LINE_SIZE, sizeof (dlk_check_context_t));
+        loc->groups = dm_nrows(m);
+        loc->len = dm_ncols(m);
+        loc->persistent = RTalignZero (CACHE_LINE_SIZE, sizeof (int[loc->groups]));
+        loc->pers_list = RTalignZero (CACHE_LINE_SIZE, sizeof (int[loc->groups+1]));
+        loc->en_list = RTalignZero (CACHE_LINE_SIZE, sizeof (int[loc->groups+1]));
+        loc->stack = isba_create (loc->len + 2);
+        //loc->tree = TreeDBScreate (loc->len);
+        loc->set = fset_create (loc->len, 0, 4, 26);
+        loc->pctx = ctx;
+        HREsetLocal (ctx->local_key, loc);
+    }
+    return loc;
+}
+
+static void
+dlk_hook_check_cb (void *context, transition_info_t *ti, int *dst)
+{
+    dlk_check_context_t *ctx = (dlk_check_context_t*)context;
+    if (ctx->persistent[ti->group]) { // a group may have multiple callbacks:
+        if (ctx->current != ti->group) { // first time we see this one
+            ctx->current = ti->group;
+            ctx->current_idx = 0;
+            ctx->seen++;
+        } else {
+            ctx->current_idx++;
+        }
+        return; // we've taken a transition from the persistent set, stop checking
+    }
+
+    int seen = fset_find (ctx->set, NULL, dst, NULL, true);
+    if (!seen) {
+        int *space = isba_push_int (ctx->stack, NULL);
+        memcpy(&space[0], dst, sizeof(int[ctx->len]));
+        space[ctx->len] = ti->group;
+        space[ctx->len+1] = ctx->current_idx;
+    }
+}
+
+// checks the tranistive closure of all transitions outside the persistent set
+// all transitions in these tranistion groups should be independent with all
+// transitions in the selected persistent set
+static inline void
+check_persistence (dlk_check_context_t *ctx) {
+    int *state;
+    while ((state = isba_pop_int(ctx->stack))) {
+        int group = state[ctx->len];
+        for (int i = 0; i < ctx->pers_list->count; i++) {
+            int p = ctx->pers_list->data[i];
+            HREassert (p != group, "i == state_group (both %d)? something must be wrong", p);
+            int dependent = dm_is_set(&ctx->pctx->is_dep_and_ce, p, group);
+            HREassert (!dependent, "Error: dependency between %d and %d", p, group);
+        }
+        ctx->seen = 0;
+        ctx->current = -1;
+        GBgetTransitionsAll(ctx->pctx->parent, state, dlk_hook_check_cb, ctx);
+        if (ctx->seen != ctx->pers_list->count) {
+            Warning (error, "Persistent set was disabled by %d (seen: %d)", group, ctx->seen);
+            for (int i = 0; i < ctx->pers_list->count; i++) {
+                printf ("%d, ", ctx->pers_list->data[i]);
+            }printf ("\n");
+            HREabort (LTSMIN_EXIT_FAILURE);
+        }
+    }
+}
+
+static inline int
+bs_emit_dlk_check (model_t model, por_context *pctx, int *src, TransitionCB cb,
+                   void *ctx)
+{
+    if (pctx->beam_used == 0) { // check real deadlock
+        int successors = GBgetTransitionsAll(pctx->parent, src, cb, ctx);
+        HREassert (successors == 0, "Deadlock state introduced by POR!");
+        return 0;
+    }
+
+    if (pctx->search[pctx->search_order[0]].score >= pctx->emit_limit) {
+        return GBgetTransitionsAll(pctx->parent, src, cb, ctx);
+    } else { // check:
+        dlk_check_context_t *dlkctx = get_check_ctx (pctx);
+        int res = 0;
+        dlkctx->pers_list->count = 0;
+        dlkctx->en_list->count = 0;
+        for (int i = 0; i < dlkctx->groups; i++) {
+            dlkctx->persistent[i] = 0;
+            if (pctx->group_status[i] & GS_DISABLED) continue;
+            // enabled:
+
+            // check MCE relation
+            for (int j = 0; j < dlkctx->en_list->count; j++) {
+                int group = dlkctx->en_list->data[j];
+                int nce = dm_is_set(&pctx->gnce_tg_tg, i, group);
+                HREassert (!nce, "Error: groups enabled, but not coenabled: %d and %d", i, group);
+            }
+            dlkctx->en_list->data[dlkctx->en_list->count++] = i;
+
+            if (pctx->search[pctx->search_order[0]].emit_status[i]&ES_SELECTED) { // selected
+                 res += GBgetTransitionsLong(pctx->parent,i,src,cb,ctx); // original callback
+                 dlkctx->persistent[i] = 1;
+                 dlkctx->pers_list->data[dlkctx->pers_list->count++] = i;
+            } else {
+                // these are the ignored transitions, push them to the stack to explore
+                GBgetTransitionsLong(pctx->parent,i,src,dlk_hook_check_cb,dlkctx);
+            }
+        }
+        // check if the groups are all independent with the groups in SELECTED..
+        if (dlkctx->pers_list->count > 0) {
+            check_persistence (dlkctx);
+            //Warning (info, "Transitive por check visited %zu states", fset_count(dlkctx->set));
+            fset_clear (dlkctx->set);
+        }
+        return res;
+    }
+    (void) model;
+}
+
+static int
+por_beam_search_dlk_all_check (model_t self, int *src, TransitionCB cb, void *user_context)
+{
+    por_context *pctx = ((por_context*)GBgetContext(self));
+    bs_setup(self, pctx, src);
+    bs_analyze(self, pctx, src);
+    return bs_emit_dlk_check (self, pctx, src, cb, user_context);
+}
 /**
  * These functions emits the persistent set with the ltl constraints
  * For ltl, extra communication with the algorithm is required.
@@ -703,19 +855,18 @@ GBaddPOR (model_t model, int por_check_ltl)
 
     int groups = dm_nrows( p_dm );
     int len = dm_ncols( p_dm );
-    matrix_t            is_dependent;
-    dm_create(&is_dependent, groups, groups);
+    dm_create(&ctx->is_dep_and_ce, groups, groups);
     for(int i=0; i < groups; i++) {
         for(int j=0; j < groups; j++) {
             if (i == j) {
-                dm_set(&is_dependent, i, j);
+                dm_set(&ctx->is_dep_and_ce, i, j);
             } else {
                 // is dependent?
                 for (int k=0; k < len; k++)
                 {
                     if ((dm_is_set( p_dm_w, i, k) && dm_is_set( p_dm, j, k)) ||
                         (dm_is_set( p_dm, i, k) && dm_is_set( p_dm_w, j, k)) ) {
-                        dm_set( &is_dependent, i, j );
+                        dm_set( &ctx->is_dep_and_ce, i, j );
                         break;
                     }
                 }
@@ -752,6 +903,7 @@ GBaddPOR (model_t model, int por_check_ltl)
         }
     }
     ctx->guard_tg               = dm_cols_to_idx_table(&gg_matrix);
+    ci_list **group_tg          = (ci_list**)dm_rows_to_idx_table(&gg_matrix);
     dm_free(&gg_matrix);
 
     // extract guard not co-enabled and guard-nes information
@@ -776,6 +928,20 @@ GBaddPOR (model_t model, int por_check_ltl)
         }
     }
 
+    dm_create (&ctx->gnce_tg_tg, groups, groups);
+    for (int i=0; i < groups; i++) {
+        for (int j=0; j < groups; j++) {
+            // iterate over all guards
+            for (int g=0; g < group_tg[i]->count; g++) {
+                if (dm_is_set(&gnce_matrix, group_tg[i]->data[g], j)) {
+                    dm_set(&ctx->gnce_tg_tg, i, j);
+                    break;
+                }
+            }
+        }
+    }
+
+    // unset not coenabled in is_dep_and_ce
     for(int i=0; i < groups; i++) {
         guard_t* guard = GBgetGuard(model, i);
         HREassert(guard != NULL, "GUARD RETURNED NULL %d", i);
@@ -783,7 +949,7 @@ GBaddPOR (model_t model, int por_check_ltl)
             int g = guard->guard[j];
             for(int t=0; t < groups; t++) {
                 if (dm_is_set(&gnce_matrix, g, t)) {
-                    dm_unset(&is_dependent, i, t);
+                    dm_unset(&ctx->is_dep_and_ce, i, t);
                 }
             }
         }
@@ -831,7 +997,7 @@ GBaddPOR (model_t model, int por_check_ltl)
     }
 
     // set lookup tables
-    ctx->is_dependent_tg_tg    = dm_rows_to_idx_table(&is_dependent);
+    ctx->is_dep_and_ce_tg_tg   = dm_rows_to_idx_table(&ctx->is_dep_and_ce);
     ctx->guard_nce             = dm_rows_to_idx_table(&gnce_matrix);
     ctx->guard_nes             = dm_rows_to_idx_table(&gnes_matrix);
     ctx->guard_nds             = dm_rows_to_idx_table(&gnds_matrix);
@@ -841,7 +1007,7 @@ GBaddPOR (model_t model, int por_check_ltl)
     dm_free(&gnes_matrix);
     dm_free(&gnds_matrix);
     dm_free(&guard_is_dependent);
-    dm_free(&is_dependent);
+
 
     // init por model
     Print1 (info, "Initializing dependency lookup table done.");
@@ -852,11 +1018,16 @@ GBaddPOR (model_t model, int por_check_ltl)
 
     // what proviso do we need? none (deadlock) or ltl?
     if (por_check_ltl) {
+        HREassert (!GB_POR_CHECK, "Use --por-check without LTL");
         // setup ltl search
         GBsetNextStateAll   (pormodel, por_beam_search_ltl_all);
     } else {
         // setup deadlock search
-        GBsetNextStateAll   (pormodel, por_beam_search_dlk_all);
+        if (GB_POR_CHECK) {
+            GBsetNextStateAll   (pormodel, por_beam_search_dlk_all_check);
+        } else {
+            GBsetNextStateAll   (pormodel, por_beam_search_dlk_all);
+        }
     }
 
     GBinitModelDefaults (&pormodel, model);
@@ -875,6 +1046,8 @@ GBaddPOR (model_t model, int por_check_ltl)
 
     // after complete initialization
     bs_init_context (pormodel);
+
+    HREcreateLocal (&ctx->local_key, NULL);
 
     return pormodel;
 }

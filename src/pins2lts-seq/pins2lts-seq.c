@@ -18,11 +18,11 @@
 #include <pins-lib/pins-impl.h>
 #include <pins-lib/property-semantics.h>
 #include <mc-lib/dbs-ll.h>
-#include <mc-lib/dfs-stack.h>
-#include <mc-lib/is-balloc.h>
 #include <mc-lib/trace.h>
 #include <util-lib/bitset.h>
 #include <util-lib/dynamic-array.h>
+#include <util-lib/dfs-stack.h>
+#include <util-lib/is-balloc.h>
 #include <util-lib/tables.h>
 #include <util-lib/treedbs.h>
 #include <vset-lib/vector_set.h>

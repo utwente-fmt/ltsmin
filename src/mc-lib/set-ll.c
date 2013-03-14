@@ -8,11 +8,11 @@
 #include <mc-lib/atomics.h>
 #include <mc-lib/cctables.h>
 #include <mc-lib/hashtable.h>
-#include <mc-lib/is-balloc.h>
 #include <mc-lib/set-ll.h>
 #include <mc-lib/statistics.h>
 #include <mc-lib/stats.h>
 #include <util-lib/fast_hash.h>
+#include <util-lib/is-balloc.h>
 #include <util-lib/util.h>
 
 
