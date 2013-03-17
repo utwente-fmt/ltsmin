@@ -8,8 +8,9 @@
 #include <ltsmin-lib/ltsmin-standard.h>
 #include <pins-lib/pins.h>
 #include <util-lib/fast_set.h>
-#include <util-lib/is-balloc.h>
+#include <util-lib/dfs-stack.h>
 #include <util-lib/treedbs.h>
+#include <util-lib/util.h>
 
 
 /**
@@ -586,11 +587,17 @@ typedef struct dlk_hook_context {
     int            *persistent;
     ci_list        *pers_list;
     ci_list        *en_list;
-    int             seen;
+    int             pgroup_count; // persistent groups encountered
+    int             np_count;     // non persistent trans count
+    int             p_count;      // pers (trans) count
     int             current;
     int             current_idx;
+    int             follow_group;
+    int             follow_group_idx;
     int            *src;
-    isb_allocator_t stack;
+    dfs_stack_t     stack;
+    dfs_stack_t     tgt_in_stack;
+    dfs_stack_t     tgt_out_stack;
     treedbs_t       tree;
     fset_t         *set;
 } dlk_check_context_t;
@@ -607,7 +614,9 @@ get_check_ctx (por_context *ctx)
         loc->persistent = RTalignZero (CACHE_LINE_SIZE, sizeof (int[loc->groups]));
         loc->pers_list = RTalignZero (CACHE_LINE_SIZE, sizeof (int[loc->groups+1]));
         loc->en_list = RTalignZero (CACHE_LINE_SIZE, sizeof (int[loc->groups+1]));
-        loc->stack = isba_create (loc->len + 2);
+        loc->stack = dfs_stack_create (loc->len + 2);
+        loc->tgt_in_stack = dfs_stack_create (loc->len + 2);
+        loc->tgt_out_stack = dfs_stack_create (loc->len + 2);
         //loc->tree = TreeDBScreate (loc->len);
         loc->set = fset_create (loc->len, 0, 4, 26);
         loc->pctx = ctx;
@@ -616,55 +625,211 @@ get_check_ctx (por_context *ctx)
     return loc;
 }
 
-static void
-dlk_hook_check_cb (void *context, transition_info_t *ti, int *dst)
+static inline void
+update_group_info (dlk_check_context_t *ctx, transition_info_t *ti)
 {
-    dlk_check_context_t *ctx = (dlk_check_context_t*)context;
-    if (ctx->persistent[ti->group]) { // a group may have multiple callbacks:
-        if (ctx->current != ti->group) { // first time we see this one
-            ctx->current = ti->group;
-            ctx->current_idx = 0;
-            ctx->seen++;
-        } else {
-            ctx->current_idx++;
-        }
-        return; // we've taken a transition from the persistent set, stop checking
-    }
-
-    int seen = fset_find (ctx->set, NULL, dst, NULL, true);
-    if (!seen) {
-        int *space = isba_push_int (ctx->stack, NULL);
-        memcpy(&space[0], dst, sizeof(int[ctx->len]));
-        space[ctx->len] = ti->group;
-        space[ctx->len+1] = ctx->current_idx;
+    if (ctx->current != ti->group) {
+        // first time we see this one
+        ctx->current = ti->group;
+        ctx->current_idx = 0;
+    } else {
+        ctx->current_idx++;
     }
 }
 
-// checks the tranistive closure of all transitions outside the persistent set
-// all transitions in these tranistion groups should be independent with all
-// transitions in the selected persistent set
-static inline void
-check_persistence (dlk_check_context_t *ctx) {
-    int *state;
-    while ((state = isba_pop_int(ctx->stack))) {
-        int group = state[ctx->len];
-        for (int i = 0; i < ctx->pers_list->count; i++) {
-            int p = ctx->pers_list->data[i];
-            HREassert (p != group, "i == state_group (both %d)? something must be wrong", p);
-            int dependent = dm_is_set(&ctx->pctx->is_dep_and_ce, p, group);
-            HREassert (!dependent, "Error: dependency between %d and %d", p, group);
+static void
+push_state (dlk_check_context_t* ctx, dfs_stack_t stack, int* dst)
+{
+    int *space = dfs_stack_push (stack, NULL );
+    memcpy (space, dst, sizeof(int[ctx->len]));
+    space[ctx->len] = ctx->current; // from update group info
+    space[ctx->len + 1] = ctx->current_idx; // from update group info
+}
+
+static void
+explore_state (dlk_check_context_t *ctx, int *state, TransitionCB cb) {
+    ctx->p_count = ctx->np_count = ctx->pgroup_count = 0;
+    ctx->current = -1;
+    GBgetTransitionsAll(ctx->pctx->parent, state, cb, ctx);
+}
+
+static void
+follow_dfs_cb (void *context, transition_info_t *ti, int *dst)
+{
+    dlk_check_context_t *ctx = (dlk_check_context_t*)context;
+    update_group_info (ctx, ti);
+
+    if (ti->group != ctx->follow_group) return;
+    if (ctx->current_idx != ctx->follow_group_idx) return;
+
+    push_state (ctx, ctx->tgt_out_stack, dst);
+    ctx->p_count++;
+}
+
+static void
+check_persistent_cb (void *context, transition_info_t *ti, int *dst)
+{
+    dlk_check_context_t *ctx = (dlk_check_context_t*)context;
+    if (ctx->persistent[ti->group] == 0) return; // non persistent (not selected)
+
+    update_group_info (ctx, ti);
+    push_state (ctx, ctx->tgt_out_stack, dst);
+    ctx->pgroup_count += ctx->current_idx == 0;
+    ctx->p_count++;
+}
+
+/**
+ * Check for whether path of np transitions from src to dst commutes with the
+ * same path from all tgt s.t. src --persistent--> tgt:
+ *
+ * src  --np--> s_1 --np--> .... --np-->  dst
+ *  |                                      |
+ * pers*                                  pers*
+ *  |                                      |
+ *  v                                      v
+ * tgt* --np--> s_1 --np--> .... --np--> tgtdst*
+ */
+static void
+check_commute (dlk_check_context_t *ctx, int *dst)
+{
+    int bottom = dfs_stack_nframes (ctx->stack);
+    HREassert (bottom > 1, "Pers == En?");
+
+    int *src = dfs_stack_peek_top (ctx->stack, bottom);
+    HREassert (src[ctx->len] == -1, "Source not on bottom of stack");
+
+    // get all persistent trans from src
+    explore_state (ctx, src, check_persistent_cb);
+    HREassert (ctx->pgroup_count == ctx->pers_list->count, "Persistent groups disappeared?");
+    int pcount = ctx->p_count;
+    HREassert (dfs_stack_size(ctx->tgt_out_stack) == pcount);
+
+    swap (ctx->tgt_in_stack, ctx->tgt_out_stack);
+
+    // Follow DFS trace by updating states inline in src_stack
+    for (int i = bottom - 1; i > 0; i--) {
+        int *path = dfs_stack_peek_top (ctx->stack, i);
+        ctx->follow_group  = path[ctx->len];
+        ctx->follow_group_idx = path[ctx->len + 1];
+
+        for (int j = pcount - 1; j >= 0; j--) {
+            int *state = dfs_stack_peek (ctx->tgt_in_stack, j);
+            explore_state (ctx, state, follow_dfs_cb);
+            if (ctx->p_count != 1) {
+                Warning (error, "NP path disabled from pers trans ? at group %d,%d (successor count: %d), pers groups:", ctx->follow_group, ctx->follow_group_idx, ctx->p_count);
+                for (int i = 0; i < ctx->pers_list->count; i++) {
+                    printf ("%d, ", ctx->pers_list->data[i]);
+                }printf ("\n");
+                HREabort (LTSMIN_EXIT_FAILURE);
+            }
         }
-        ctx->seen = 0;
-        ctx->current = -1;
-        GBgetTransitionsAll(ctx->pctx->parent, state, dlk_hook_check_cb, ctx);
-        if (ctx->seen != ctx->pers_list->count) {
-            Warning (error, "Persistent set was disabled by %d (seen: %d)", group, ctx->seen);
-            for (int i = 0; i < ctx->pers_list->count; i++) {
-                printf ("%d, ", ctx->pers_list->data[i]);
-            }printf ("\n");
-            HREabort (LTSMIN_EXIT_FAILURE);
+
+        swap (ctx->tgt_in_stack, ctx->tgt_out_stack); // tgtdst == tgt_in_stack
+        for (int j = pcount - 1; j >= 0; j--) // empty out
+            HREassert (dfs_stack_pop(ctx->tgt_out_stack));
+        HREassert (dfs_stack_size(ctx->tgt_out_stack) == 0);
+    }
+
+    explore_state (ctx, dst, check_persistent_cb);
+    HREassert (pcount == ctx->p_count, "Persistent trans disappeared (|src| = %d, |dst| = %d)", pcount, ctx->p_count);
+
+    for (int j = pcount - 1; j >= 0; j--) {
+        int *state1 = dfs_stack_pop (ctx->tgt_in_stack);
+        int *state2 = dfs_stack_pop (ctx->tgt_out_stack);
+        int diff = memcmp (state1, state2, sizeof(int[ctx->len]));
+        HREassert (diff == 0, "Does not commute!")
+    }
+}
+
+static void
+check_np_cb (void *context, transition_info_t *ti, int *dst)
+{
+    dlk_check_context_t *ctx = (dlk_check_context_t*)context;
+
+    update_group_info (ctx, ti);
+
+    if (ctx->persistent[ti->group]) {
+        ctx->pgroup_count += ctx->current_idx == 0;
+        return; // we've taken a transition from the persistent set, stop checking
+    }
+
+    ctx->np_count++;
+    int seen = fset_find (ctx->set, NULL, dst, NULL, false);
+    if (!seen) push_state (ctx, ctx->stack, dst);
+}
+
+static void
+check_result (dlk_check_context_t *ctx, int *state, int group)
+{
+    if (group != -1)
+    for (int i = 0; i < ctx->pers_list->count; i++) {
+        int p = ctx->pers_list->data[i];
+        HREassert (p != group, "i == state_group (both %d)? something must be wrong", p);
+        int dependent = dm_is_set(&ctx->pctx->is_dep_and_ce, p, group);
+        HREassert (!dependent, "Error: dependency between %d and %d", p, group);
+    }
+
+    if (ctx->pgroup_count != ctx->pers_list->count) {
+        Warning (error, "Persistent set was disabled by %d (seen: %d)", group, ctx->pgroup_count);
+        for (int i = 0; i < ctx->pers_list->count; i++) {
+            printf ("%d, ", ctx->pers_list->data[i]);
+        }printf ("\n");
+        HREabort (LTSMIN_EXIT_FAILURE);
+    }
+
+    if (ctx->np_count == 0) { // no more nonpersistent trans
+        // check commutative
+        check_commute (ctx, state);
+    }
+}
+
+static void
+do_dfs_over_np (dlk_check_context_t *ctx)
+{
+    while (true) {
+        int *state = dfs_stack_top (ctx->stack);
+        if (NULL != state) {
+            int seen = fset_find (ctx->set, NULL, state, NULL, true);
+            if (!seen) {
+                dfs_stack_enter (ctx->stack);
+                int group = state[ctx->len];
+                explore_state (ctx, state, check_np_cb);
+                check_result (ctx, state, group);
+            } else {
+                dfs_stack_pop (ctx->stack);
+            }
+        } else if (0 == dfs_stack_size (ctx->stack)) {
+            break;
+        } else {
+            dfs_stack_leave (ctx->stack);
+            dfs_stack_pop (ctx->stack);
         }
     }
+}
+
+// checks the transitive closure of all transitions outside the persistent set
+// all transitions in these transition groups should be independent with all
+// transitions in the selected persistent set
+static void
+check_persistence (dlk_check_context_t *ctx, int *src)
+{
+    if (ctx->pers_list->count == 0) return; // no pers set
+    HREassert (ctx->pctx->emit_limit != ctx->pers_list->count, "Pers == En?");
+
+    /*for (int j = 0; j < ctx->en_list->count; j++) { // enabled
+        int group = ctx->en_list->data[j];
+        if (ctx->persistent[group] == 0) { // !selected
+            ctx->current = -1;
+            GBgetTransitionsLong (ctx->pctx->parent,group,src,dlk_hook_check_cb,ctx);
+            do_dfs (ctx);
+        }
+    }*/
+    int *space = dfs_stack_push (ctx->stack, NULL);
+    memcpy (space, src, sizeof(int[ctx->len]));
+    space[ctx->len] = -1;
+    do_dfs_over_np (ctx);
+    //Warning (info, "Transitive por check visited %zu states", fset_count(dlkctx->set));
+    fset_clear (ctx->set); // clean seen states
 }
 
 static inline int
@@ -672,7 +837,7 @@ bs_emit_dlk_check (model_t model, por_context *pctx, int *src, TransitionCB cb,
                    void *ctx)
 {
     if (pctx->beam_used == 0) { // check real deadlock
-        int successors = GBgetTransitionsAll(pctx->parent, src, cb, ctx);
+        int successors = GBgetTransitionsAll (pctx->parent, src, cb, ctx);
         HREassert (successors == 0, "Deadlock state introduced by POR!");
         return 0;
     }
@@ -680,38 +845,29 @@ bs_emit_dlk_check (model_t model, por_context *pctx, int *src, TransitionCB cb,
     if (pctx->search[pctx->search_order[0]].score >= pctx->emit_limit) {
         return GBgetTransitionsAll(pctx->parent, src, cb, ctx);
     } else { // check:
-        dlk_check_context_t *dlkctx = get_check_ctx (pctx);
+        dlk_check_context_t *dctx = get_check_ctx (pctx);
         int res = 0;
-        dlkctx->pers_list->count = 0;
-        dlkctx->en_list->count = 0;
-        for (int i = 0; i < dlkctx->groups; i++) {
-            dlkctx->persistent[i] = 0;
-            if (pctx->group_status[i] & GS_DISABLED) continue;
-            // enabled:
+        dctx->pers_list->count = 0;
+        dctx->en_list->count = 0;
+        for (int i = 0; i < dctx->groups; i++) {
+            dctx->persistent[i] = 0;
+            if (pctx->group_status[i] & GS_DISABLED) continue; // disabled
 
             // check MCE relation
-            for (int j = 0; j < dlkctx->en_list->count; j++) {
-                int group = dlkctx->en_list->data[j];
+            for (int j = 0; j < dctx->en_list->count; j++) {
+                int group = dctx->en_list->data[j];
                 int nce = dm_is_set(&pctx->gnce_tg_tg, i, group);
                 HREassert (!nce, "Error: groups enabled, but not coenabled: %d and %d", i, group);
             }
-            dlkctx->en_list->data[dlkctx->en_list->count++] = i;
+            dctx->en_list->data[dctx->en_list->count++] = i;
 
             if (pctx->search[pctx->search_order[0]].emit_status[i]&ES_SELECTED) { // selected
-                 res += GBgetTransitionsLong(pctx->parent,i,src,cb,ctx); // original callback
-                 dlkctx->persistent[i] = 1;
-                 dlkctx->pers_list->data[dlkctx->pers_list->count++] = i;
-            } else {
-                // these are the ignored transitions, push them to the stack to explore
-                GBgetTransitionsLong(pctx->parent,i,src,dlk_hook_check_cb,dlkctx);
+                 res += GBgetTransitionsLong (pctx->parent,i,src,cb,ctx); // original callback
+                 dctx->persistent[i] = 1;
+                 dctx->pers_list->data[dctx->pers_list->count++] = i;
             }
         }
-        // check if the groups are all independent with the groups in SELECTED..
-        if (dlkctx->pers_list->count > 0) {
-            check_persistence (dlkctx);
-            //Warning (info, "Transitive por check visited %zu states", fset_count(dlkctx->set));
-            fset_clear (dlkctx->set);
-        }
+        check_persistence (dctx, src);
         return res;
     }
     (void) model;
