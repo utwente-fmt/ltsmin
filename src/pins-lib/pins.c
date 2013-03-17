@@ -746,6 +746,12 @@ void GBprintDependencyMatrixCombined(FILE* file, model_t model) {
  * Grey box factory functionality
  */
 
+typedef enum {
+    POR_NONE,
+    POR,
+    POR_CHECK,
+} por_t;
+
 #define MAX_TYPES 16
 static char* model_type[MAX_TYPES];
 static pins_loader_t model_loader[MAX_TYPES];
@@ -756,8 +762,7 @@ static int registered_pre=0;
 static int matrix=0;
 static int labels=0;
 static int cache=0;
-int GB_POR=0;
-int GB_POR_CHECK=0;
+int GB_POR=POR_NONE;
 static const char *regroup_options = NULL;
 
 static char *ltl_file = NULL;
@@ -818,15 +823,16 @@ void
 GBloadFile (model_t model, const char *filename, model_t *wrapped)
 {
     char               *extension = strrchr (filename, '.');
-    if (GB_POR_CHECK) GB_POR=1;
     if (extension) {
         extension++;
         for (int i = 0; i < registered; i++) {
             if (0==strcmp (model_type[i], extension)) {
                 model_loader[i] (model, filename);
                 if (wrapped) {
-                    if (GB_POR)
+                    if (GB_POR == POR)
                         model = GBaddPOR (model, ltl_file != NULL);
+                    else if (GB_POR == POR_CHECK)
+                        model = GBaddPORCheck (model, ltl_file != NULL);
                     if (ltl_file)
                         model = GBaddLTL (model, ltl_file, ltl_type);
                     if (regroup_options != NULL)
@@ -971,8 +977,8 @@ struct poptOption ltl_options[] = {
 struct poptOption greybox_options[]={
     { "labels", 0, POPT_ARG_VAL, &labels, 1, "print state variable and type names, and state and action labels", NULL },
 	{ "matrix" , 'm' , POPT_ARG_VAL , &matrix , 1 , "print the dependency matrix for the model and exit" , NULL},
-	{ "por" , 'p' , POPT_ARG_VAL , &GB_POR , 1 , "enable partial order reduction" , NULL },
-	{ "check-por" , 'p' , POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &GB_POR_CHECK , 1 , "verify partial order reduction peristent sets" , NULL },
+	{ "por" , 'p' , POPT_ARG_VAL , &GB_POR , POR , "enable partial order reduction" , NULL },
+	{ "check-por" , 'p' , POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &GB_POR , POR_CHECK , "verify partial order reduction peristent sets" , NULL },
 	{ "cache" , 'c' , POPT_ARG_VAL , &cache , 1 , "enable caching of grey box calls" , NULL },
 	{ "regroup" , 'r' , POPT_ARG_STRING, &regroup_options , 0 ,
           "enable regrouping; available transformations T: "

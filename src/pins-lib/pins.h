@@ -82,7 +82,6 @@ typedef struct guard {
  * \brief boolean indicating whether PINS uses POR
  */
 extern int GB_POR;
-extern int GB_POR_CHECK;
 
 /**
 \brief Factory method for loading models.
@@ -632,6 +631,11 @@ extern model_t GBaddLTL(model_t model, const char *ltl_file, pins_ltl_type_t typ
 \brief Add POR layer before LTL layer
 */
 extern model_t GBaddPOR(model_t model, const int has_ltl);
+
+/**
+\brief Add layer that checks vorrectness of POR reductions before LTL layer
+*/
+extern model_t GBaddPORCheck(model_t model, const int has_ltl);
 
 //@{
 
