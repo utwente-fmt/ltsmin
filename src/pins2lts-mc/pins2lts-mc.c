@@ -1087,9 +1087,6 @@ local_init ()
             GBaddStateLabelVisible (model, progress_sl);
         } else if (ctx->inv_expr) {
             mark_visible (model, ctx->inv_expr, ctx->env);
-        } else if (dlk_detect) {
-            int end_label = GBgetValidEndStateLabelIndex (model);
-            if (end_label != -1) GBaddStateLabelVisible (model, end_label);
         }
     }
 
