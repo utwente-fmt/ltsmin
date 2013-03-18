@@ -799,6 +799,11 @@ dfs_tree_stack_closed_color_proviso(gsea_state_t* state, int is_backtrack, void*
 static int
 dfs_tree_color_proviso(transition_info_t* ti, gsea_state_t* state)
 {
+    if (ti->por_proviso) { // POR layer set proviso, so state is fully expanded!
+        gc.queue.filo.proviso.color.fully_expanded = 1;
+        return 1;
+    }
+
     // assume it is oke
     int result = 1;
 
