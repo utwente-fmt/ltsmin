@@ -80,6 +80,7 @@ typedef struct search_context
  */
 typedef struct por_context {
     model_t         parent;         // parent PINS model
+    int             ltl;
     int             nguards;        // number of guards
     matrix_t        is_dep_and_ce;  //
     matrix_t        gnce_tg_tg;     // mapping from group to not coenabled group

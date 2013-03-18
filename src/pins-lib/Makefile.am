@@ -47,6 +47,7 @@ libpbes_pins_la_LIBADD    = $(MCRL2_PINS_LIBS) $(LIBS)
 # libpins
 libpins_la_SOURCES  =
 libpins_la_SOURCES += pins.c pins.h
+libpins_la_SOURCES += pins-util.c pins-util.h
 libpins_la_SOURCES += pins-impl.h
 libpins_la_SOURCES += pins2pins-cache.c
 libpins_la_SOURCES += pins2pins-group.c

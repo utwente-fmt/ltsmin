@@ -38,6 +38,7 @@
 #include <util-lib/is-balloc.h>
 #include <pins-lib/pins.h>
 #include <pins-lib/pins-impl.h>
+#include <pins-lib/pins-util.h>
 #include <pins-lib/property-semantics.h>
 #include <util-lib/util.h>
 
@@ -711,7 +712,8 @@ static int num_global_bits (strategy_t s) {
     HREassert (GDANGEROUS.g == 2);
     return (Strat_ENDFS  & s ? 3 :
            ((Strat_CNDFS | Strat_DFSFIFO) & s ? 2 :
-           ((Strat_LNDFS | Strat_OWCTY | Strat_TA) & s ? 1 : 0)));
+           ((Strat_LNDFS | Strat_OWCTY | Strat_TA) & s ? 1 :
+           ((Strat_DFS & s) && proviso == Proviso_Stack ? 1 : 0) )));
 }
 
 wctx_t *
@@ -778,6 +780,8 @@ wctx_create (model_t model, int depth, wctx_t *shared)
                 }
             }
         }
+    } else if ((strategy[0] & Strat_DFS) && Proviso_Stack) {
+        ctx->cyan = fset_create (sizeof(ref_t), 0, 10, 20);
     }
     state_info_create_empty (&ctx->state);
     ctx->store = RTalignZero (CACHE_LINE_SIZE, SLOT_SIZE * N * 2);
@@ -913,6 +917,21 @@ statics_init (model_t model)
         Abort ("Wrong strategy for timed verification: %s", key_search(strategies, strategy[0]));
     strategy[0] |= Strat_TA;
 #endif
+    W = HREpeers(HREglobal());
+    if ((strategy[0] & Strat_DFSFIFO) && proviso != Proviso_None) Abort ("DFS_FIFO does not require a proviso.");
+    if (GB_POR && (strategy[0] & ~Strat_DFSFIFO)) {
+        if (strategy[0] & Strat_OWCTY) Abort ("OWCTY with POR not implemented.");
+        if (strategy[0] & Strat_LTL) {
+            if (W > 1) Abort ("Cannot use POR with more than one thread/process.");
+            if (proviso == Proviso_None) Warning (info, "Forcing use of the stack cycle proviso.");
+            proviso = Proviso_Stack;
+        } else if (inv_detect || act_detect) {
+            if ((strategy[0] & ~Strat_DFS) || W > 1) Abort ("Cycle proviso for safety properties with this (parallel) search strategy is not yet implemented, use DFS.");
+            if (proviso == Proviso_None) Warning (info, "Forcing use of the stack cycle proviso.");
+            proviso = Proviso_Stack;
+        }
+        permutation = permutation_red = Perm_None;
+    }
     lts_type_t          ltstype = GBgetLTStype (model);
     matrix_t           *m = GBgetDMInfo (model);
     SL = lts_type_get_state_label_count (ltstype);
@@ -920,7 +939,6 @@ statics_init (model_t model)
     N = lts_type_get_state_length (ltstype);
     D = (strategy[0] & Strat_TA ? N - 2 : N);
     K = dm_nrows (m);
-    W = HREpeers(HREglobal());
     if (Perm_Unknown == permutation) //default permutation depends on strategy
         permutation = strategy[0] & Strat_Reach ? Perm_None :
                      (strategy[0] & (Strat_TA | Strat_DFSFIFO) ? Perm_RR : Perm_Dynamic);
@@ -933,7 +951,6 @@ statics_init (model_t model)
         permutation_red = no_red_perm ? Perm_None : permutation;
     if (!(Strat_Reach & strategy[0]) && (dlk_detect || act_detect || inv_detect))
         Abort ("Verification of safety properties works only with reachability algorithms.");
-    HREassert (GRED.g == 0);
     if (act_detect) {
         // table number of first edge label
         act_label = lts_type_find_edge_label_prefix (ltstype, LTSMIN_EDGE_TYPE_ACTION_PREFIX);
@@ -994,17 +1011,6 @@ statics_init (model_t model)
         break;
     case Tree: default: Abort ("Unknown state storage type: %d.", db_type);
     }
-    if ((strategy[0] & Strat_DFSFIFO) && proviso != Proviso_None) Abort ("DFS_FIFO does not require a proviso.");
-    if (GB_POR && (strategy[0] & ~Strat_DFSFIFO)) {
-        if (strategy[0] & Strat_OWCTY) Abort ("OWCTY with POR not implemented.");
-        if (strategy[0] & Strat_LTL) {
-            if (W > 1) Abort ("Cannot use POR with more than one thread/process.");
-            proviso = Proviso_Stack;
-        } else if (inv_detect) {
-            Abort ("Cycle proviso for safety properties not yet implemented.");
-        }
-        permutation = permutation_red = Perm_None;
-    }
 }
 
 static void
@@ -1012,7 +1018,6 @@ print_setup (wctx_t *ctx)
 {
     if ((strategy[0] & Strat_LTL) && call_mode == UseGreyBox)
         Warning(info, "Greybox not supported with strategy NDFS, ignored.");
-    Warning (info, "loading model from %s", files[0]);
     Warning (info, "There are %zu state labels and %zu edge labels", SL, EL);
     Warning (info, "State length is %zu, there are %zu groups", N, K);
     if (act_detect)
@@ -1033,8 +1038,8 @@ print_setup (wctx_t *ctx)
         size_t          visibles = 0;
         for (size_t i = 0; i < K; i++)
             visibles += visibility[i];
-        Warning (info, "Visible groups: %zu", visibles);
-        Warning (info, "POR cycle proviso: %s", key_search(provisos, proviso));
+        Warning (info, "Visible groups: %zu / %zu", visibles, K);
+        Warning (info, "POR cycle proviso: %s %s", key_search(provisos, proviso), strategy[0] & Strat_LTL ? "(ltl)" : "");
     }
 }
 
@@ -1053,6 +1058,7 @@ local_init ()
                        HREgreyboxCAtI,
                        HREgreyboxCount);
 
+    Print1 (info, "Loading model from %s", files[0]);
 #if SPEC_MT_SAFE == 1
     // some frontends (opaal) do not have a thread-safe initial state function
 #ifdef OPAAL
@@ -1085,8 +1091,12 @@ local_init ()
             int progress_sl = GBgetProgressStateLabelIndex (model);
             HREassert (progress_sl >= 0, "No progress labels defined for DFS_FIFO");
             GBaddStateLabelVisible (model, progress_sl);
-        } else if (ctx->inv_expr) {
+        }
+        if (ctx->inv_expr) {
             mark_visible (model, ctx->inv_expr, ctx->env);
+        }
+        if (act_detect) {
+            mark_edge_label_visible (model, act_label, act_index);
         }
     }
 
@@ -2483,7 +2493,7 @@ deadlock_detect (wctx_t *ctx, int count)
 {
     if (count > 0) return;
     ctx->counters.deadlocks++; // counting is costless
-    if (GBbuchiIsValidEnd(ctx->model, ctx->state.data)) return;
+    if (GBstateIsValidEnd(ctx->model, ctx->state.data)) return;
     if ( !ctx->inv_expr ) ctx->counters.violations++;
     if (dlk_detect && (!no_exit || trc_output) && lb_stop(global->lb)) {
         Warning (info, " ");
@@ -2531,6 +2541,7 @@ reach_handle (void *arg, state_info_t *successor, transition_info_t *ti,
 {
     wctx_t             *ctx = (wctx_t *) arg;
     action_detect (ctx, ti, successor);
+    ti->por_proviso = 1;
     if (!seen) {
         raw_data_t stack_loc = dfs_stack_push (ctx->out_stack, NULL);
         state_info_serialize (successor, stack_loc);
@@ -2540,6 +2551,8 @@ reach_handle (void *arg, state_info_t *successor, transition_info_t *ti,
                           ti != &GB_NO_TRANSITION )) // race, but ok:
             atomic_write(&global->parent_ref[successor->ref], ctx->state.ref);
         ctx->counters.visited++;
+    } else if (proviso == Proviso_Stack) {
+        ti->por_proviso = !ecd_has_state (ctx->cyan, successor);
     }
     ctx->counters.trans++;
     (void) ti;
@@ -2558,11 +2571,10 @@ reach_handle_wrap (void *arg, transition_info_t *ti, state_data_t data)
 }
 
 static inline size_t
-explore_state (wctx_t *ctx, raw_data_t state, int next_index)
+explore_state (wctx_t *ctx, int next_index)
 {
     size_t              count = 0;
     size_t              i = K;
-    state_info_deserialize (&ctx->state, state, ctx->store);
     if (0 == next_index) { // first (grey) call with this state
         invariant_detect (ctx, ctx->state.data);
         if (ctx->counters.level_cur >= max_level) return K;
@@ -2600,11 +2612,42 @@ dfs_grey (wctx_t *ctx)
         } else {
             dfs_stack_enter (ctx->stack);
             increase_level (&ctx->counters);
-            next_index = explore_state (ctx, state_data, next_index);
+            state_info_deserialize (&ctx->state, state_data, ctx->store);
+            next_index = explore_state (ctx, next_index);
             isba_push_int (ctx->group_stack, (int *)&next_index);
         }
         next_index = 0;
     }
+}
+
+void
+dfs_proviso (wctx_t *ctx)
+{
+    while (lb_balance(global->lb, ctx->id, dfs_stack_size(ctx->stack), split_dfs)) {
+        raw_data_t          state_data = dfs_stack_top (ctx->stack);
+        // strict DFS (use extra bit because the permutor already adds successors to V)
+        if (NULL != state_data) {
+            state_info_deserialize (&ctx->state, state_data, ctx->store);
+            if (global_try_color(ctx->state.ref, GRED, 0)) {
+                dfs_stack_enter (ctx->stack);
+                increase_level (&ctx->counters);
+                ecd_add_state (ctx->cyan, &ctx->state, NULL);
+                explore_state (ctx, 0);
+                ctx->counters.explored++;
+            } else {
+                dfs_stack_pop (ctx->stack);
+            }
+        } else {
+            if (0 == dfs_stack_nframes (ctx->stack))
+                continue;
+            dfs_stack_leave (ctx->stack);
+            ctx->counters.level_cur--;
+            state_data = dfs_stack_pop (ctx->stack);
+            state_info_deserialize_cheap (&ctx->state, state_data);
+            ecd_remove_state (ctx->cyan, &ctx->state);
+        }
+    }
+    HREassert (lb_is_stopped(global->lb) || fset_count(ctx->cyan) == 0);
 }
 
 void
@@ -2615,7 +2658,8 @@ dfs (wctx_t *ctx)
         if (NULL != state_data) {
             dfs_stack_enter (ctx->stack);
             increase_level (&ctx->counters);
-            explore_state (ctx, state_data, 0);
+            state_info_deserialize (&ctx->state, state_data, ctx->store);
+            explore_state (ctx, 0);
             ctx->counters.explored++;
         } else {
             if (0 == dfs_stack_nframes (ctx->stack))
@@ -2633,7 +2677,8 @@ bfs (wctx_t *ctx)
     while (lb_balance(global->lb, ctx->id, bfs_load(ctx), split_bfs)) {
         raw_data_t          state_data = dfs_stack_pop (ctx->in_stack);
         if (NULL != state_data) {
-            explore_state (ctx, state_data, 0);
+            state_info_deserialize (&ctx->state, state_data, ctx->store);
+            explore_state (ctx, 0);
             ctx->counters.explored++;
         } else {
             swap (ctx->out_stack, ctx->in_stack);
@@ -2665,7 +2710,8 @@ sbfs (wctx_t *ctx)
         while (lb_balance (global->lb, ctx->id, in_load(ctx), split_sbfs)) {
             raw_data_t          state_data = dfs_stack_pop (ctx->in_stack);
             if (NULL != state_data) {
-                explore_state (ctx, state_data, 0);
+                state_info_deserialize (&ctx->state, state_data, ctx->store);
+                explore_state (ctx, 0);
                 ctx->counters.explored++;
             }
         }
@@ -2756,7 +2802,7 @@ dfs_fifo_handle (void *arg, state_info_t *successor, transition_info_t *ti,
     wctx_t             *ctx = (wctx_t *) arg;
     ctx->counters.trans++;
     bool is_progress = ctx->progress_trans > 0 ? ctx->progress[ti->group] :  // ! progress transition
-            GBbuchiIsProgress(ctx->model, get_state(successor->ref, ctx)); // ! progress state
+            GBstateIsProgress(ctx->model, get_state(successor->ref, ctx)); // ! progress state
 
     if (!is_progress && seen && ecd_has_state(ctx->cyan, successor))
          ndfs_report_cycle (ctx, successor);
@@ -4044,8 +4090,10 @@ explore (wctx_t *ctx)
     case Strat_SBFS:    sbfs (ctx); break;
     case Strat_PBFS:    pbfs (ctx); break;
     case Strat_BFS:     bfs (ctx); break;
-    case Strat_DFS:     if (UseGreyBox == call_mode) dfs_grey (ctx);
-                        else                         dfs (ctx); break;
+    case Strat_DFS:     if (UseGreyBox == call_mode)        dfs_grey (ctx);
+                        else if (proviso == Proviso_Stack)  dfs_proviso (ctx);
+                        else                                dfs (ctx);
+                        break;
     case Strat_NDFS:    ndfs_blue (ctx); break;
     case Strat_LNDFS:   lndfs_blue (ctx); break;
     case Strat_CNDFS:

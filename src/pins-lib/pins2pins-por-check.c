@@ -214,10 +214,9 @@ check_result (dlk_check_context_t *ctx, int *state, int group)
 
     HREassert (ctx->pgroup_count == ctx->pers_list->count,
         "Persistent set (%s) was disabled by %d (seen: %d)", str_list(ctx->pers_list), group, ctx->pgroup_count);
-
     if (ctx->np_count == 0) { // no more nonpersistent trans
         // check commutative
-        check_commute (ctx, state);
+        check_commute (ctx, state); //TODO: is this sufficient? or do we need all paths of DFS search?
     }
 }
 
@@ -236,7 +235,7 @@ do_dfs_over_np (dlk_check_context_t *ctx)
             } else {
                 dfs_stack_pop (ctx->stack);
             }
-        } else if (0 == dfs_stack_size(ctx->stack)) {
+        } else if (dfs_stack_size(ctx->stack) == 0) {
             break;
         } else {
             dfs_stack_leave (ctx->stack);

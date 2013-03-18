@@ -80,7 +80,7 @@ deadlock_detect (struct dist_thread_context *ctx, int *state, int count)
 {
     if (count != 0) return;
     ctx->deadlocks++;
-    if (GBbuchiIsValidEnd(ctx->model, state)) return;
+    if (GBstateIsValidEnd(ctx->model, state)) return;
     if ( !inv_expr ) ctx->violations++;
     if (no_exit || !dlk_detect) return;
     Warning (info, " ");
@@ -144,6 +144,7 @@ static void callback(void*context,transition_info_t*info,int*dst){
         trans[lbl_ofs+i]=info->labels[i];
     }
     TaskSubmitFixed(ctx->new_trans,who,trans);
+    info->por_proviso = 1;
 }
 
 static void new_transition(void*context,int src_seg,int len,void*arg){
@@ -219,6 +220,7 @@ int main(int argc, char*argv[]){
         ADD_ARRAY(ctx.state_man,ctx.parent_seg,uint16_t);
     }
     if (act_detect) {
+        if (GB_POR) Abort ("Distributed tool implements no cycle provisos.");
         // table number of first edge label
         act_label = lts_type_find_edge_label_prefix (ltstype, LTSMIN_EDGE_TYPE_ACTION_PREFIX);
         if (act_label == -1)

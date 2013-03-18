@@ -526,7 +526,7 @@ static void
 valid_end_cb(void *context, int *src)
 {
     int *state = (int *) context;
-    if (!state[N] && !GBbuchiIsValidEnd(model, src)) {
+    if (!state[N] && !GBstateIsValidEnd(model, src)) {
         memcpy (state, src, sizeof(int[N]));
         state[N] = 1;
     }
@@ -1628,8 +1628,11 @@ establish_group_order(int *group_order, int *initial_count)
 
     bitvector_create(&found_groups, nGrps);
 
+    int labels[sLbls];
+    for (int i = 0; i < sLbls; i++)
+        labels[i] = act_label == i ? act_index : -1;
     for (int i = 0; i < nGrps; i++){
-        if (GBtransitionInGroup(model, &act_index, i)) {
+        if (GBtransitionInGroup(model, labels, i)) {
             Warning(info, "Found \"%s\" potentially in group %d", act_detect,i);
             group_order[group_total] = i;
             group_total++;

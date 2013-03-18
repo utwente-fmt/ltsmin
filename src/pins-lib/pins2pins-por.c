@@ -426,64 +426,28 @@ bs_analyze(model_t model, por_context* pctx, int* src)
     (void) src;
 }
 
-
 /**
- * This function emits the persistent set for deadlocks
- * For deadlocks, no extra communication with the algorithm is required
- * and the persistent set just needs to be emitted. The assumption
- * is that the persistent set contains at least one transition by the assumption
- * that if all guards of a transition group are true, there is a successor state.
- * If this is not the case this function must be adapted to check that there is
- * at least one successor state generated
- */
-static inline int
-bs_emit_dlk(model_t model, por_context* pctx, int* src, TransitionCB cb, void* ctx)
-{
-    // if no transition is in the beam search, there are no
-    // enabled transitions, return 0 directly
-    if (pctx->beam_used == 0) return 0;
-
-    // the score is setup such that score > emit_limit implies that
-    // all transition groups are selected or a visible transition is selected
-    // in this case, return all enabled transitions
-    if (pctx->search[pctx->search_order[0]].score >= pctx->emit_limit) {
-        return GBgetTransitionsAll(pctx->parent, src, cb, ctx);
-    // if none of the above, return the persistent set
-    } else {
-        int n = dm_nrows(GBgetDMInfo(model));
-
-        // emit
-        int res = 0;
-        for(int i=0; i < n; i++) {
-            // enabled && selected
-            if ((!(pctx->group_status[i]&GS_DISABLED)) &&
-                 (pctx->search[pctx->search_order[0]].emit_status[i]&ES_SELECTED)) {
-                res+=GBgetTransitionsLong(pctx->parent,i,src,cb,ctx);
-            }
-        }
-        return res;
-    }
-}
-
-/**
- * These functions emits the persistent set with the ltl constraints
- * For ltl, extra communication with the algorithm is required.
+ * These functions emits the persistent set with cycle proviso
+ * To ensure this proviso extra communication with the algorithm is required.
  * The algorithm annotates each transition with the por_proviso flag.
  * For ltl, all selected transition groups in the persistent set must
  * have this por_proviso flag set to true, otherwise enabled(s) will be returned.
+ * For safety, the proviso needs to hold for at least on emitted state.
+ * The client may (should) set the proviso always to true for deadlocks.
  */
 
-typedef struct ltl_hook_context
-{
+typedef struct ltl_hook_context {
     TransitionCB    cb;
     void*           user_context;
-    int por_proviso_true_cnt;
-    int por_proviso_false_cnt;
+    int             por_proviso_true_cnt;
+    int             por_proviso_false_cnt;
+    int             force_proviso_true;     // feedback to algorithm that proviso already holds
 } ltl_hook_context_t;
 
 void ltl_hook_cb (void*context,transition_info_t *ti,int*dst) {
     ltl_hook_context_t* infoctx = (ltl_hook_context_t*)context;
     transition_info_t ti_new = GB_TI (ti->labels, ti->group);
+    ti_new.por_proviso = infoctx->force_proviso_true;
     infoctx->cb(infoctx->user_context, &ti_new, dst);
     // catch transition info status
     if (ti_new.por_proviso) {
@@ -494,24 +458,25 @@ void ltl_hook_cb (void*context,transition_info_t *ti,int*dst) {
 }
 
 static inline int
-bs_emit_ltl(model_t model, por_context* pctx, int* src, TransitionCB cb, void* ctx)
+bs_emit (model_t model, por_context* pctx, int* src, TransitionCB cb, void* ctx)
 {
     // if no enabled transitions, return directly
     if (pctx->beam_used == 0) return 0;
     // if the score is larger then the number of enabled transitions, emit all
     if (pctx->emitted == 0 && pctx->search[pctx->search_order[0]].score >= pctx->emit_limit) {
         // return all enabled
-        return GBgetTransitionsAll(pctx->parent, src, cb, ctx);
+        ltl_hook_context_t ltlctx = {cb, ctx, 0, 0, 1};
+        return GBgetTransitionsAll(pctx->parent, src, ltl_hook_cb, &ltlctx);
     // otherwise: try the persistent set, but enforce that all por_proviso flags are true
     } else {
         // setup context
         int n = dm_nrows(GBgetDMInfo(model));
-        ltl_hook_context_t ltlctx = {cb, ctx, 0, 0};
+        ltl_hook_context_t ltlctx = {cb, ctx, 0, 0, 0};
 
         // emit select as long as por_proviso_false_cnt is 0
         int res = 0;
         pctx->emitted = 0;
-        for(int i=0; i < n && ltlctx.por_proviso_false_cnt == 0; i++) {
+        for(int i=0; i < n && (!pctx->ltl || ltlctx.por_proviso_false_cnt == 0); i++) {
             // enabled && selected
             if ( (!(pctx->group_status[i]&GS_DISABLED)) &&
                  (pctx->search[pctx->search_order[0]].emit_status[i]&ES_SELECTED) ) {
@@ -521,7 +486,8 @@ bs_emit_ltl(model_t model, por_context* pctx, int* src, TransitionCB cb, void* c
         }
 
         // emit all if there is a transition group with por_proviso = false
-        if (ltlctx.por_proviso_false_cnt != 0) {
+        if ( ( pctx->ltl && ltlctx.por_proviso_false_cnt != 0)  ||
+             (!pctx->ltl && ltlctx.por_proviso_true_cnt  == 0) ) {
             // reemmit, emit all unemmitted
             for(int i=0; i < n; i++) {
                 // enabled && selected
@@ -539,27 +505,15 @@ bs_emit_ltl(model_t model, por_context* pctx, int* src, TransitionCB cb, void* c
 }
 
 /**
- * Generic persistent set beam search *
- */
-static int
-por_beam_search_dlk_all (model_t self, int *src, TransitionCB cb, void *user_context)
-{
-    por_context* pctx = ((por_context*)GBgetContext(self));
-    bs_setup(self, pctx, src);
-    bs_analyze(self, pctx, src);
-    return bs_emit_dlk(self, pctx, src, cb, user_context);
-}
-
-/**
  * Same but for LTL
  */
 static int
-por_beam_search_ltl_all (model_t self, int *src, TransitionCB cb, void *user_context)
+por_beam_search_all (model_t self, int *src, TransitionCB cb, void *user_context)
 {
     por_context* pctx = ((por_context*)GBgetContext(self));
     bs_setup(self, pctx, src);
     bs_analyze(self, pctx, src);
-    return bs_emit_ltl(self, pctx, src, cb, user_context);
+    return bs_emit (self, pctx, src, cb, user_context);
 }
 
 /**
@@ -586,6 +540,7 @@ GBaddPOR (model_t model, int por_check_ltl)
 
     por_context *ctx = RTmalloc (sizeof *ctx);
     ctx->parent = model;
+    ctx->ltl = por_check_ltl;
 
     // initializing dependency lookup table ( (t, t') \in D relation)
     Print1 (info, "Initializing dependency lookup table.");
@@ -756,14 +711,7 @@ GBaddPOR (model_t model, int por_check_ltl)
     GBsetNextStateLong  (pormodel, por_long);
     GBsetNextStateShort (pormodel, por_short);
 
-    // what proviso do we need? none (deadlock) or ltl?
-    if (por_check_ltl) {
-        // setup ltl search
-        GBsetNextStateAll   (pormodel, por_beam_search_ltl_all);
-    } else {
-        // setup deadlock search
-        GBsetNextStateAll   (pormodel, por_beam_search_dlk_all);
-    }
+    GBsetNextStateAll   (pormodel, por_beam_search_all);
 
     GBinitModelDefaults (&pormodel, model);
 

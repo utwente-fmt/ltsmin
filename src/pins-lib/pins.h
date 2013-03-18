@@ -250,7 +250,7 @@ extern int GBsetProgressStateLabelIndex(model_t model, int index);
 \brief Set index of progress state label
 */
 
-extern int GBbuchiIsProgress(model_t model, int* src);
+extern int GBstateIsProgress(model_t model, int* src);
 /**<
 \brief Return progress/non-progress for a given state, false if undefined
 */
@@ -265,7 +265,7 @@ extern int GBsetValidEndStateLabelIndex(model_t model, int index);
 \brief Set index of valid end state label
 */
 
-extern int GBbuchiIsValidEnd(model_t model, int* src);
+extern int GBstateIsValidEnd(model_t model, int* src);
 /**<
 \brief Return valid end/invalid end for a given state, false if undefined
 */

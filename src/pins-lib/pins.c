@@ -938,7 +938,7 @@ GBsetProgressStateLabelIndex (model_t model, int idx)
 }
 
 int
-GBbuchiIsProgress (model_t model, int *state)
+GBstateIsProgress (model_t model, int *state)
 {
     return model->sl_idx_progress >= 0 &&
         GBgetStateLabelLong(model, model->sl_idx_progress, state);
@@ -959,7 +959,7 @@ GBsetValidEndStateLabelIndex (model_t model, int idx)
 }
 
 int
-GBbuchiIsValidEnd (model_t model, int *state)
+GBstateIsValidEnd (model_t model, int *state)
 {
     return model->sl_idx_valid_end >= 0 &&
         GBgetStateLabelLong(model, model->sl_idx_valid_end, state);
