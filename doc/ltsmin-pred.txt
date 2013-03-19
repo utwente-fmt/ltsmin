@@ -32,8 +32,11 @@ LTSmin syntax for Simple Predicate Language formulae
 == EXAMPLE
 
 ----
-init_0.x == 4 && (user_1.a[3] -> register_2.y)   
+init_0\.x == 4 && (user_1\.a\[3\] == 1 -> register_2\.y == 2)   
 ----
+
+(Note the dot ('.') and square braces ('[' and ']') need to be escaped, as
+ these symbols are used as keywords in the CTL and mu-calculus languages)
 
 This predicate example  could be used in the prom frontends, to search for
 states where either x is not equal to 4 in (instance 0) the init proctype, or

@@ -110,6 +110,11 @@ typedef enum {
     MU_ALL
 } MU;
 
+extern const char  *PRED_NAME(Pred pred);
+extern const char  *LTL_NAME(LTL ltl);
+extern const char  *CTL_NAME(CTL ctl);
+extern const char  *MU_NAME(MU mu);
+
 extern ltsmin_expr_t mu_parse_file(const char *,ltsmin_parse_env_t,lts_type_t);
 
 /* Conversion */
