@@ -110,12 +110,9 @@ static void* bs_init_context(model_t model)
     // group has relation
     // mapping [0...n_guards-1] disabled guard (nes)
     // mapping [n_guards..2*n_guards-1] enabled guard (nds)
-    // group has relation is more difficult because nds
-    // needs not co-enabled info and transition groups
 
     // get local variables pointing to mappings guard->tg, guard->nce
     ci_list** g_tg = (ci_list**)pctx->guard_tg;
-    ci_list** g_nce = (ci_list**)pctx->guard_nce;
 
     // setup group has relation
     matrix_t group_has;
@@ -126,8 +123,8 @@ static void* bs_init_context(model_t model)
             dm_set(&group_has, g_tg[i]->data[k], i);
         }
         // nds
-        for( int k=0; k < g_nce[i]->count; k++) {
-            dm_set(&group_has, g_nce[i]->data[k], i+n_guards);
+        for( int k=0; k < g_tg[i]->count; k++) {
+            dm_set(&group_has, g_tg[i]->data[k], i+n_guards);
         }
     }
     // build table group has
@@ -429,8 +426,8 @@ bs_analyze(model_t model, por_context* pctx, int* src)
 
             // push all dependent unselected groups
             por_context *ctx = (por_context*)GBgetContext(model);
-            for (int j=0; j < *ctx->is_dep_and_ce_tg_tg[current_group]; j++) {
-                int dependent_group = ctx->is_dep_and_ce_tg_tg[current_group][j+1];
+            for (int j=0; j < *ctx->not_accords_tg_tg[current_group]; j++) {
+                int dependent_group = ctx->not_accords_tg_tg[current_group][j+1];
                 // already selected?
                 if (s[idx].emit_status[dependent_group] & ES_SELECTED) continue;
                 // mark as selected
@@ -604,18 +601,18 @@ GBaddPOR (model_t model, int por_check_ltl)
 
     int groups = dm_nrows( p_dm );
     int len = dm_ncols( p_dm );
-    dm_create(&ctx->is_dep_and_ce, groups, groups);
+    dm_create(&ctx->not_accords_with, groups, groups);
     for(int i=0; i < groups; i++) {
         for(int j=0; j < groups; j++) {
             if (i == j) {
-                dm_set(&ctx->is_dep_and_ce, i, j);
+                dm_set(&ctx->not_accords_with, i, j);
             } else {
                 // is dependent?
                 for (int k=0; k < len; k++)
                 {
                     if ((dm_is_set( p_dm_w, i, k) && dm_is_set( p_dm, j, k)) ||
                         (dm_is_set( p_dm, i, k) && dm_is_set( p_dm_w, j, k)) ) {
-                        dm_set( &ctx->is_dep_and_ce, i, j );
+                        dm_set( &ctx->not_accords_with, i, j );
                         break;
                     }
                 }
@@ -655,55 +652,12 @@ GBaddPOR (model_t model, int por_check_ltl)
     ci_list **group_tg          = (ci_list**)dm_rows_to_idx_table(&gg_matrix);
     dm_free(&gg_matrix);
 
-    // extract guard not co-enabled and guard-nes information
-    // from guard may-be-co-enabled with guard relation:
-    // for a guard g, find all guards g' that may-not-be co-enabled with it
-    // then, for each g', mark all groups in gnce_matrix
-    matrix_t *p_gce_matrix = GBgetGuardCoEnabledInfo(model);
-    HREassert (dm_ncols(p_gce_matrix) == guards && dm_nrows(p_gce_matrix) == guards);
-    matrix_t gnce_matrix;
-    dm_create(&gnce_matrix, guards, groups);
-    ci_list** g_tg              = (ci_list**)ctx->guard_tg;
-    for(int g=0; g < guards; g++) {
-        // iterate over all guards
-        for (int gg=0; gg < guards; gg++) {
-            // find all guards that may not be co-enabled
-            if (!dm_is_set(p_gce_matrix, g, gg)) {
-                // gg may not be co-enabled with g, find all
-                // transition groups in which it is used
-                for( int tg=0; tg < g_tg[gg]->count; tg++) {
-                    dm_set(&gnce_matrix, g, g_tg[gg]->data[tg]);
-                }
-            }
-        }
-    }
-
-    dm_create (&ctx->gnce_tg_tg, groups, groups);
-    for (int i=0; i < groups; i++) {
-        for (int j=0; j < groups; j++) {
-            // iterate over all guards
-            for (int g=0; g < group_tg[i]->count; g++) {
-                if (dm_is_set(&gnce_matrix, group_tg[i]->data[g], j)) {
-                    dm_set(&ctx->gnce_tg_tg, i, j);
-                    break;
-                }
-            }
-        }
-    }
-
-    // unset not coenabled in is_dep_and_ce
-    for(int i=0; i < groups; i++) {
-        guard_t* guard = GBgetGuard(model, i);
-        HREassert(guard != NULL, "GUARD RETURNED NULL %d", i);
-        for (int j=0; j < guard->count; j++) {
-            int g = guard->guard[j];
-            for(int t=0; t < groups; t++) {
-                if (dm_is_set(&gnce_matrix, g, t)) {
-                    dm_unset(&ctx->is_dep_and_ce, i, t);
-                }
-            }
-        }
-    }
+    // extract accords with matrix
+    matrix_t *not_accords_with = GBgetGuardCoEnabledInfo(model);
+    HREassert (dm_nrows(not_accords_with) == groups && dm_ncols(not_accords_with) == groups);
+    //dm_copy (accords_with, &ctx->not_accords_with);
+    dm_create(&ctx->not_accords_with, groups, groups);
+    dm_copy(not_accords_with, &ctx->not_accords_with);
 
     // mark minimal necessary enabling set
     matrix_t *p_gnes_matrix = GBgetGuardNESInfo(model);
@@ -747,14 +701,12 @@ GBaddPOR (model_t model, int por_check_ltl)
     }
 
     // set lookup tables
-    ctx->is_dep_and_ce_tg_tg   = dm_rows_to_idx_table(&ctx->is_dep_and_ce);
-    ctx->guard_nce             = dm_rows_to_idx_table(&gnce_matrix);
+    ctx->not_accords_tg_tg     = dm_rows_to_idx_table(&ctx->not_accords_with);
     ctx->guard_nes             = dm_rows_to_idx_table(&ctx->gnes_matrix);
     ctx->guard_nds             = dm_rows_to_idx_table(&ctx->gnds_matrix);
     ctx->guard_dep             = (ci_list **) dm_rows_to_idx_table(&guard_is_dependent);
 
     // free temporary matrices
-    dm_free(&gnce_matrix);
     dm_free(&guard_is_dependent);
 
 

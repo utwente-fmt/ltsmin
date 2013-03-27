@@ -84,11 +84,9 @@ typedef struct por_context {
     int             nguards;        // number of guards
     matrix_t        gnes_matrix;    //
     matrix_t        gnds_matrix;    //
-    matrix_t        is_dep_and_ce;  //
-    matrix_t        gnce_tg_tg;     // mapping from group to not coenabled group
-    int**           is_dep_and_ce_tg_tg; // mapping from transition group to dependent and coenabled transition groups
+    matrix_t        not_accords_with;   //
+    int**           not_accords_tg_tg;  // mapping from transition group to groups that it accords with
     int**           guard_tg;       // mapping from guard to transition group
-    int**           guard_nce;      // mapping from guards to transition groups that may not be co-enabled
     int**           guard_nes;      // transition groups that form a nes for a guard (guard -> [t1, t2, t..])
     int**           guard_nds;      // transition groups that form a nds for a guard
     ci_list       **guard_dep;      // transition groups that depend on a guard

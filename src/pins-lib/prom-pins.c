@@ -61,7 +61,6 @@ void        (*prom_get_labels_all)  (void *, int *src, int* labels);
 const int*  (*prom_get_label_may_be_coenabled_matrix)(int g);
 const int*  (*prom_get_label_nes_matrix)(int g); // could be optional for POR
 const int*  (*prom_get_label_nds_matrix)(int g); // could be optional for POR
-const int*  (*prom_get_label_visiblity_matrix)(int g); //
 
 static void
 prom_popt (poptContext con,
@@ -217,8 +216,6 @@ PromLoadDynamicLib(model_t model, const char *filename)
         RTtrydlsym( dlHandle, "spins_get_label_nes_matrix" );
     prom_get_label_nds_matrix = (const int*(*)(int))
         RTtrydlsym( dlHandle, "spins_get_label_nds_matrix" );
-    prom_get_label_visiblity_matrix = (const int*(*)(int))
-        RTtrydlsym( dlHandle, "spins_get_label_visiblity_matrix" );
 
     (void)model;
 }
@@ -240,7 +237,6 @@ PromLoadGreyboxModel(model_t model, const char *filename)
     matrix_t *dm_info = RTmalloc (sizeof *dm_info);
     matrix_t *dm_read_info = RTmalloc(sizeof(matrix_t));
     matrix_t *dm_write_info = RTmalloc(sizeof(matrix_t));
-    matrix_t *dm_visibility_info = RTmalloc(sizeof(matrix_t));
     matrix_t *sl_info = RTmalloc (sizeof *sl_info);
 
     // assume sequential use (preLoader may not have been called):
@@ -411,17 +407,16 @@ PromLoadGreyboxModel(model_t model, const char *filename)
     GBsetGuardsInfo(model, (guard_t**) prom_get_all_labels());
 
     // set guard may be co-enabled relation
-    if (prom_get_label_may_be_coenabled_matrix) {
-        matrix_t *gce_info = RTmalloc(sizeof(matrix_t));
-        dm_create(gce_info, sl_size, sl_size);
-        for (int i = 0; i < sl_size; i++) {
-            int *guardce = (int*)prom_get_label_may_be_coenabled_matrix(i);
-            for(int j = 0; j < sl_size; j++) {
-                if (guardce[j]) dm_set(gce_info, i, j);
-            }
+    HREassert (prom_get_label_may_be_coenabled_matrix, "No coenabled matrix!");
+    matrix_t *gce_info = RTmalloc(sizeof(matrix_t));
+    dm_create(gce_info, ngroups, ngroups);
+    for (int i = 0; i < ngroups; i++) {
+        int *guardce = (int*)prom_get_label_may_be_coenabled_matrix(i);
+        for(int j = 0; j < ngroups; j++) {
+            if (guardce[j]) dm_set(gce_info, i, j);
         }
-        GBsetGuardCoEnabledInfo(model, gce_info);
     }
+    GBsetGuardCoEnabledInfo(model, gce_info);
 
     // set guard necessary enabling set info
     if (prom_get_label_nes_matrix) {
