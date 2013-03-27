@@ -136,7 +136,7 @@ dfs_stack_top (dfs_stack_t stack)
 }
 
 int *
-dfs_stack_peek_top (dfs_stack_t stack, size_t frame_offset)
+dfs_stack_peek_top2 (dfs_stack_t stack, size_t frame_offset, size_t o)
 {
     if (!frame_offset && stack->frame_size == stack->frame_bottom)
         Abort("Peek top on empty frame");
@@ -145,7 +145,13 @@ dfs_stack_peek_top (dfs_stack_t stack, size_t frame_offset)
     for (x = 1; x < frame_offset; x++) {
         offset += isba_peek_int(stack->frames, x-1)[0];
     }
-    return isba_peek_int(stack->states, offset);
+    return isba_peek_int(stack->states, offset + o);
+}
+
+int *
+dfs_stack_peek_top (dfs_stack_t stack, size_t frame_offset)
+{
+    return dfs_stack_peek_top2 (stack, frame_offset, 0);
 }
 
 int *

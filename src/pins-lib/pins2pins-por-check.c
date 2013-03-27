@@ -18,9 +18,12 @@ typedef struct dlk_hook_context {
     void*           user_context;
     int             len;
     int             groups;
-    int            *persistent;
-    ci_list        *pers_list;
+    int            *stubborn;
+    ci_list        *ss_list;
+    ci_list        *ss_en_list;
+    ci_list        *ss_count_list;
     ci_list        *en_list;
+    ci_list        *seen_list;
     int             pgroup_count; // persistent groups encountered
     int             np_count;     // non persistent trans count
     int             p_count;      // pers (trans) count
@@ -49,6 +52,30 @@ str_list (ci_list *list)
     return set;
 }
 
+static char *
+str_group (dlk_check_context_t *ctx, int group)
+{
+    model_t model = ctx->pctx->parent;
+    lts_type_t ltstype = GBgetLTStype (model);
+    int label = lts_type_find_edge_label (ltstype, LTSMIN_EDGE_TYPE_STATEMENT);
+    if (label) return "NULL";
+    int type = lts_type_get_edge_label_typeno (ltstype, label);
+    int count = GBchunkCount (model, type);
+    if (count < ctx->groups) return "NULL";
+    chunk c = GBchunkGet (model, type, group);
+    return c.data;
+}
+
+static bool
+find_list (ci_list *list, int num)
+{
+    for (int i = 0; i < list->count; i++) {
+        int entry = list->data[i];
+        if (entry == num) return true;
+    }
+    return false;
+}
+
 static inline dlk_check_context_t *
 create_check_ctx (por_context *ctx)
 {
@@ -56,9 +83,11 @@ create_check_ctx (por_context *ctx)
     dlk_check_context_t *check_ctx = RTalign (CACHE_LINE_SIZE, sizeof (dlk_check_context_t));
     check_ctx->groups = dm_nrows(m);
     check_ctx->len = dm_ncols(m);
-    check_ctx->persistent = RTalignZero (CACHE_LINE_SIZE, sizeof (int[check_ctx->groups]));
-    check_ctx->pers_list = RTalignZero (CACHE_LINE_SIZE, sizeof (int[check_ctx->groups+1]));
+    check_ctx->stubborn = RTalignZero (CACHE_LINE_SIZE, sizeof (int[check_ctx->groups]));
+    check_ctx->ss_list = RTalignZero (CACHE_LINE_SIZE, sizeof (int[check_ctx->groups+1]));
+    check_ctx->ss_en_list = RTalignZero (CACHE_LINE_SIZE, sizeof (int[check_ctx->groups+1]));
     check_ctx->en_list = RTalignZero (CACHE_LINE_SIZE, sizeof (int[check_ctx->groups+1]));
+    check_ctx->seen_list = RTalignZero (CACHE_LINE_SIZE, sizeof (int[check_ctx->groups+1]));
     check_ctx->stack = dfs_stack_create (check_ctx->len + 2);
     check_ctx->tgt_in_stack = dfs_stack_create (check_ctx->len + 2);
     check_ctx->tgt_out_stack = dfs_stack_create (check_ctx->len + 2);
@@ -81,7 +110,7 @@ update_group_info (dlk_check_context_t *ctx, transition_info_t *ti)
 }
 
 static void
-push_state (dlk_check_context_t* ctx, dfs_stack_t stack, int* dst)
+push_trans (dlk_check_context_t* ctx, dfs_stack_t stack, int* dst)
 {
     int *space = dfs_stack_push (stack, NULL );
     memcpy (space, dst, sizeof(int[ctx->len]));
@@ -93,7 +122,134 @@ static void
 explore_state (dlk_check_context_t *ctx, int *state, TransitionCB cb) {
     ctx->p_count = ctx->np_count = ctx->pgroup_count = 0;
     ctx->current = -1;
+    ctx->seen_list->count = 0;
+    ctx->src = state;
     GBgetTransitionsAll(ctx->pctx->parent, state, cb, ctx);
+}
+
+static void
+print_diff (dlk_check_context_t *ctx, int *s1, int *s2)
+{
+    model_t model = ctx->pctx->parent;
+    lts_type_t ltstype = GBgetLTStype (model);
+    for (int i = 0; i < ctx->len; i++) {
+        if (s1[i] != s2[i]) {
+            Printf (info, "%30s: %d <--> %d",
+                    lts_type_get_state_name(ltstype, i), s1[i], s2[i]);
+            Printf (info, "\n");
+        }
+    }
+}
+
+static void
+print_noncommuting_trans (dlk_check_context_t *ctx, int *src, int *dst, int *s1,
+                                                               int *tgt, int *s2)
+{
+    Printf (info, "\n");
+    Printf (info, "src  ----ns---->  dst\n");
+    Printf (info, " |                 |\n");
+    Printf (info, "stub              stub\n");
+    Printf (info, " |                 |\n");
+    Printf (info, " v                 v\n");
+    Printf (info, "tgt --ns--> s2 =?= s1\n");
+
+
+    Printf (info, "\n");
+    Printf (info, "src --> dst (group %d)\n", dst[ctx->len]);
+    print_diff (ctx, src, dst);
+
+    Printf (info, "\n");
+    Printf (info, "dst --> s1 (group %d)\n", s1[ctx->len]);
+    print_diff (ctx, dst, s1);
+
+    Printf (info, "\n");
+    Printf (info, "src --> tgt (group %d)\n", tgt[ctx->len]);
+    print_diff (ctx, src, tgt);
+
+    Printf (info, "\n");
+    Printf (info, "tgt --> s2 (group %d)\n", s2[ctx->len]);
+    print_diff (ctx, tgt, s2);
+
+    Printf (info, "\n");
+    Printf (info, "s1 =?= s2\n");
+    print_diff (ctx, s1, s2);
+}
+
+static void
+print_disabled_trans (dlk_check_context_t *ctx, int *src, int *dst, int *tgt)
+{
+    Printf (info, "\n");
+    Printf (info, "src  ----ns---->  dst\n");
+    Printf (info, " |                 |\n");
+    Printf (info, "stub              stub\n");
+    Printf (info, " |                 |\n");
+    Printf (info, " v                 v\n");
+    Printf (info, "tgt --ns--> ERR   s1\n");
+
+    Printf (info, "\n");
+    Printf (info, "src --> dst (group %d)\n", dst[ctx->len]);
+    print_diff (ctx, src, dst);
+
+    Printf (info, "\n");
+    Printf (info, "src --> tgt (group %d)\n", tgt[ctx->len]);
+    print_diff (ctx, src, tgt);
+}
+
+/**
+ * Check for whether a ns transition from src to dst commutes with the
+ * same path from all tgt s.t. src --stubborn--> tgt:
+ *
+ * src  --ns-->  dst --ns--> next
+ *  |             |
+ * stub*         stub*
+ *  |             |
+ *  v             v s1
+ * tgt* --ns--> tgtdst*
+ *           s2
+ */
+static void
+check_commute (dlk_check_context_t *ctx, int *dst)
+{
+    int group = dst[ctx->len];
+    int group_idx = dst[ctx->len + 1];
+
+    if (group == -1) return;
+
+    int scount = dfs_stack_frame_size(ctx->tgt_in_stack);
+    int nscount = dfs_stack_frame_size(ctx->tgt_out_stack);
+    if (scount != nscount)
+        Warning (error, "Stubborn trans %s disappeared after NS %d/%d (|src| = %d, |dst| = %d):\n %s <--> %s",
+                 str_list(ctx->ss_en_list), group, group_idx, scount, nscount,
+                 str_group(ctx,ctx->ss_en_list->data[0]), str_group(ctx, group));
+
+    for (int i = scount - 1; i >= 0; i--) {
+        int *s1 = dfs_stack_peek (ctx->tgt_in_stack, i);
+        int *s2 = dfs_stack_peek (ctx->tgt_out_stack, i);
+        HREassert (s2[ctx->len] == group);
+        HREassert (s2[ctx->len + 1] == group_idx);
+        int diff = memcmp (s1, s2, sizeof(int[ctx->len]));
+
+        if (diff != 0) {
+            int *src = dfs_stack_peek_top (ctx->stack, 2);
+            int *tgt = dfs_stack_peek_top2 (ctx->tgt_in_stack, 1, i);
+
+            print_noncommuting_trans (ctx, src, dst, s1, tgt, s2);
+
+            HREassert (diff == 0, "Stubborn trans %d/%d does not commute with NS trans: %d/%d "
+                       "(count: %d, idx: %d, stubborn enabled: %d)"
+                       ":\n %s <--> %s",
+                       s1[ctx->len], s1[ctx->len+1], s2[ctx->len], s1[ctx->len + 1],
+                       scount, i, ctx->ss_en_list->count,
+                       str_group(ctx, s1[ctx->len]),
+                       str_group(ctx, s2[ctx->len]));
+        }
+
+        //Debug ("Stubborn trans %d/%d commutes with %d/%d",
+        //      s1[ctx->len], s1[ctx->len+1], s2[ctx->len], s1[ctx->len + 1]);
+    }
+    for (int i = scount - 1; i >= 0; i--) {
+        dfs_stack_pop (ctx->tgt_out_stack);
+    }
 }
 
 static void
@@ -105,194 +261,146 @@ follow_dfs_cb (void *context, transition_info_t *ti, int *dst)
     if (ti->group != ctx->follow_group) return;
     if (ctx->current_idx != ctx->follow_group_idx) return;
 
-    push_state (ctx, ctx->tgt_out_stack, dst);
-    ctx->p_count++;
-}
-
-static void
-check_persistent_cb (void *context, transition_info_t *ti, int *dst)
-{
-    dlk_check_context_t *ctx = (dlk_check_context_t*)context;
-    if (ctx->persistent[ti->group] == 0) return; // non persistent (not selected)
-
-    update_group_info (ctx, ti);
-    push_state (ctx, ctx->tgt_out_stack, dst);
-    ctx->pgroup_count += ctx->current_idx == 0;
+    push_trans (ctx, ctx->tgt_out_stack, dst);
     ctx->p_count++;
 }
 
 /**
- * Check for whether path of np transitions from src to dst commutes with the
- * same path from all tgt s.t. src --persistent--> tgt:
- *
- * src  --np--> s_1 --np--> .... --np-->  dst
- *  |                                      |
- * pers*                                  pers*
- *  |                                      |
- *  v                                      v
- * tgt* --np--> s_1 --np--> .... --np--> tgtdst*
+ * Explore same transition from stubborn state and put results on out stack
  */
 static void
-check_commute (dlk_check_context_t *ctx, int *dst)
+mimic (dlk_check_context_t *ctx, int *state)
 {
-    int bottom = dfs_stack_nframes (ctx->stack);
-    HREassert (bottom > 1, "Pers == En?");
+    ctx->follow_group = state[ctx->len];
+    ctx->follow_group_idx = state[ctx->len + 1];
 
-    int *src = dfs_stack_peek_top (ctx->stack, bottom);
-    HREassert (src[ctx->len] == -1, "Source not on bottom of stack");
+    if (ctx->follow_group == -1) return;
 
-    // get all persistent trans from src
-    explore_state (ctx, src, check_persistent_cb);
-    HREassert (ctx->pgroup_count == ctx->pers_list->count, "Persistent groups disappeared?");
-    int pcount = ctx->p_count;
-    HREassert (dfs_stack_size(ctx->tgt_out_stack) == (size_t)pcount);
+    // iterate over stubborn transitions
+    for (int i = dfs_stack_frame_size(ctx->tgt_in_stack) - 1; i >= 0; i--) {
+        int *t = dfs_stack_peek (ctx->tgt_in_stack, i);
+        explore_state (ctx, t, follow_dfs_cb);
 
-    swap (ctx->tgt_in_stack, ctx->tgt_out_stack);
+        if (ctx->p_count != 1) {
+            int *src = dfs_stack_peek_top (ctx->stack, 1);
+            print_disabled_trans (ctx, src, state, t);
 
-    ci_list        *path_list = ctx->en_list; path_list->count = 0; // reused!
-    // Follow DFS trace by updating states inline in src_stack
-    for (int i = bottom - 1; i > 0; i--) {
-        int *path = dfs_stack_peek_top (ctx->stack, i);
-        ctx->follow_group  = path[ctx->len];
-        ctx->follow_group_idx = path[ctx->len + 1];
-        path_list->data[path_list->count++] = ctx->follow_group;
+            HREassert (ctx->p_count == 1, "NS trans %d/%d disabled from stubborn trans "
+                     "%d/%d (successor count: %d), pers set: %s"
+                     ":\n %s <--> %s",
+                     ctx->follow_group, ctx->follow_group_idx, t[ctx->len],
+                     t[ctx->len + 1], ctx->p_count, str_list(ctx->ss_en_list),
+                     str_group(ctx, state[ctx->len]),
+                     str_group(ctx, t[ctx->len]));
 
-        for (int j = pcount - 1; j >= 0; j--) {
-            int *state = dfs_stack_peek (ctx->tgt_in_stack, j);
-            explore_state (ctx, state, follow_dfs_cb);
-            HREassert (ctx->p_count == 1, "NP path (%s) disabled from pers trans "
-                     "%d/%d (not group!) at group %d,%d (successor count: %d), pers set: %s",
-                     str_list(path_list), j, pcount, ctx->follow_group,
-                     ctx->follow_group_idx, ctx->p_count, str_list(ctx->pers_list));
         }
-
-        swap (ctx->tgt_in_stack, ctx->tgt_out_stack); // tgtdst == tgt_in_stack
-        for (int j = pcount - 1; j >= 0; j--) // empty out
-            HREassert (dfs_stack_pop(ctx->tgt_out_stack));
-        HREassert (dfs_stack_size(ctx->tgt_out_stack) == 0);
     }
-
-    explore_state (ctx, dst, check_persistent_cb);
-    HREassert (pcount == ctx->p_count, "Persistent trans disappeared (|src| = %d, |dst| = %d)", pcount, ctx->p_count);
-
-    for (int j = pcount - 1; j >= 0; j--) {
-        int *state1 = dfs_stack_pop (ctx->tgt_in_stack);
-        int *state2 = dfs_stack_pop (ctx->tgt_out_stack);
-        int diff = memcmp (state1, state2, sizeof(int[ctx->len]));
-        HREassert (diff == 0, "Path %s not commute with persistent set: %s (trans: %d)", str_list(path_list), str_list(ctx->pers_list), pcount);
-    }
-    Debug ("Path %s commutes with persistent set: %s (trans: %d)", str_list(path_list), str_list(ctx->pers_list), pcount);
 }
 
 static void
-check_np_cb (void *context, transition_info_t *ti, int *dst)
+get_nonstubborn_cb (void *context, transition_info_t *ti, int *dst)
 {
     dlk_check_context_t *ctx = (dlk_check_context_t*)context;
 
     update_group_info (ctx, ti);
+    ctx->seen_list->data[ctx->seen_list->count++] = ti->group;
 
-    if (ctx->persistent[ti->group]) {
-        ctx->pgroup_count += ctx->current_idx == 0;
-        return; // we've taken a transition from the persistent set, stop checking
-    }
-
-    ctx->np_count++;
-    int seen = fset_find (ctx->set, NULL, dst, NULL, false);
-    if (!seen) push_state (ctx, ctx->stack, dst);
-}
-
-static void
-check_result (dlk_check_context_t *ctx, int *state, int group)
-{
-    if (group != -1)
-    for (int i = 0; i < ctx->pers_list->count; i++) {
-        int p = ctx->pers_list->data[i];
-        HREassert (p != group, "i == state_group (both %d)? something must be wrong", p);
-        int dependent = dm_is_set(&ctx->pctx->is_dep_and_ce, p, group);
-        HREassert (!dependent, "Error: dependency between %d and %d", p, group);
-    }
-
-    HREassert (ctx->pgroup_count == ctx->pers_list->count,
-        "Persistent set (%s) was disabled by %d (seen: %d)", str_list(ctx->pers_list), group, ctx->pgroup_count);
-    if (ctx->np_count == 0) { // no more nonpersistent trans
-        // check commutative
-        check_commute (ctx, state); //TODO: is this sufficient? or do we need all paths of DFS search?
+    if (ctx->stubborn[ti->group]) {
+        if (find_list(ctx->ss_en_list, ti->group)) {
+            // push (initially) enabled stubborn transitions
+            push_trans (ctx, ctx->tgt_in_stack, dst);
+        } else {
+            //Debug ("Disabled stubborn transition %d was enabled by %d (ignoring it)",
+            //       ti->group, ctx->src[ctx->len]);
+        }
+    } else {
+        push_trans (ctx, ctx->stack, dst);
     }
 }
 
 static void
-do_dfs_over_np (dlk_check_context_t *ctx)
+do_dfs_over_ns (dlk_check_context_t *ctx)
 {
+    // for symmetry with stack push an unused state on tgt_in_stack
+    dfs_stack_push (ctx->tgt_in_stack, dfs_stack_top (ctx->stack));
+
     while (true) {
         int *state = dfs_stack_top (ctx->stack);
         if (NULL != state) {
+
+            // For every explored NS transition, we check commutativity with
+            // the stubborn transitions enabled at the initial state.
+            mimic (ctx, state);         // fill tgt_out
+            dfs_stack_enter (ctx->stack);
+            dfs_stack_enter (ctx->tgt_in_stack);
+            explore_state (ctx, state, get_nonstubborn_cb);
+            check_commute (ctx, state); // empty tgt_out
+
             int seen = fset_find (ctx->set, NULL, state, NULL, true);
-            if (!seen) {
-                dfs_stack_enter (ctx->stack);
-                int group = state[ctx->len];
-                explore_state (ctx, state, check_np_cb);
-                check_result (ctx, state, group);
-            } else {
-                dfs_stack_pop (ctx->stack);
+            if (seen) {
+                dfs_stack_leave (ctx->stack); // throw away NS successors (next)
+                dfs_stack_pop (ctx->stack); // throw away state
+                dfs_stack_leave (ctx->tgt_in_stack);
             }
-        } else if (dfs_stack_size(ctx->stack) == 0) {
+        } else if (dfs_stack_nframes(ctx->stack) == 0) {
             break;
         } else {
+            dfs_stack_leave (ctx->tgt_in_stack); // removes multiple states
             dfs_stack_leave (ctx->stack);
             dfs_stack_pop (ctx->stack);
         }
     }
+
+    dfs_stack_pop (ctx->tgt_in_stack); // remove symmetry state
 }
 
 // checks the transitive closure of all transitions outside the persistent set
 // all transitions in these transition groups should be independent with all
 // transitions in the selected persistent set
 static void
-check_persistence (dlk_check_context_t *ctx, int *src)
+check_semistubborn (dlk_check_context_t *ctx, int *src)
 {
-    if (ctx->pers_list->count == 0) return; // no pers set
-    HREassert (ctx->pctx->emit_limit != ctx->pers_list->count, "Pers == En?");
+    if (ctx->ss_list->count == 0) return; // no pers set
+    HREassert (ctx->pctx->emit_limit != ctx->ss_en_list->count, "Pers == En?");
     int *space = dfs_stack_push (ctx->stack, NULL);
     memcpy (space, src, sizeof(int[ctx->len]));
     space[ctx->len] = -1;
-    do_dfs_over_np (ctx);
-    //Warning (info, "Transitive por check visited %zu states", fset_count(dlkctx->set));
+    do_dfs_over_ns (ctx);
+    Debug ("Transitive por check visited %zu states", fset_count(ctx->set));
     fset_clear (ctx->set); // clean seen states
 }
 
 static inline void
 bs_emit_dlk_check (model_t model, por_context *pctx, int *src, TransitionCB cb,
-                   void *ctx)
+                   void *org)
 {
     if (pctx->beam_used == 0) { // check real deadlock
-        int successors = GBgetTransitionsAll (pctx->parent, src, cb, ctx);
+        int successors = GBgetTransitionsAll (pctx->parent, src, cb, org);
         HREassert (successors == 0, "Deadlock state introduced by POR!");
     }
 
     if (pctx->search[pctx->search_order[0]].score >= pctx->emit_limit)
         return;
 
-    dlk_check_context_t *dctx = GBgetContext(model);
-    dctx->pers_list->count = 0;
-    dctx->en_list->count = 0;
-    for (int i = 0; i < dctx->groups; i++) {
-        dctx->persistent[i] = 0;
-        if (pctx->group_status[i] & GS_DISABLED) continue; // disabled
-
-        // check MCE relation
-        for (int j = 0; j < dctx->en_list->count; j++) {
-            int group = dctx->en_list->data[j];
-            int nce = dm_is_set(&pctx->gnce_tg_tg, i, group);
-            HREassert (!nce, "Error: groups enabled, but not coenabled: %d and %d", i, group);
-        }
-        dctx->en_list->data[dctx->en_list->count++] = i;
+    dlk_check_context_t *ctx = GBgetContext(model);
+    ctx->ss_list->count = 0;
+    ctx->en_list->count = 0;
+    ctx->ss_en_list->count = 0;
+    for (int i = 0; i < ctx->groups; i++) {
+        if (!(pctx->group_status[i] & GS_DISABLED))
+            ctx->en_list->data[ctx->en_list->count++] = i;
 
         if (pctx->search[pctx->search_order[0]].emit_status[i]&ES_SELECTED) { // selected
-             dctx->persistent[i] = 1;
-             dctx->pers_list->data[dctx->pers_list->count++] = i;
+            ctx->stubborn[i] = 1;
+            ctx->ss_list->data[ctx->ss_list->count++] = i;
+            if (!(pctx->group_status[i] & GS_DISABLED)) {
+                ctx->ss_en_list->data[ctx->ss_en_list->count++] = i;
+            }
+        } else {
+            ctx->stubborn[i] = 0;
         }
     }
-    check_persistence (dctx, src);
+    check_semistubborn (ctx, src);
 }
 
 static int
