@@ -392,7 +392,12 @@ dm_print (FILE * f, const matrix_t *m)
 {
     int                 i,
                         j;
+    fprintf(f, "      ");
+    for (j = 0; j < dm_ncols(m); j+=10)
+        fprintf(f, "0         ");
+    fprintf(f, "\n");
     for (i = 0; i < dm_nrows (m); i++) {
+        fprintf(f, "%4d: ", i);
         for (j = 0; j < dm_ncols (m); j++) {
             fprintf (f, "%c", (char)(dm_is_set (m, i, j) ? '+' : '-'));
         }

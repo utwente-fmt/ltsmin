@@ -673,15 +673,18 @@ int GBchunkCount(model_t model,int type_no){
 
 
 void GBprintDependencyMatrix(FILE* file, model_t model) {
-	dm_print(file, GBgetDMInfo(model));
+    Printf (info, "\nDependency matrix (combined read/write):\n");
+    dm_print(file, GBgetDMInfo(model));
 }
 
 void GBprintDependencyMatrixRead(FILE* file, model_t model) {
-	dm_print(file, GBgetDMInfoRead(model));
+    Printf (info, "\nRead dependencies:\n");
+    dm_print(file, GBgetDMInfoRead(model));
 }
 
 void GBprintDependencyMatrixWrite(FILE* file, model_t model) {
-	dm_print(file, GBgetDMInfoWrite(model));
+    Printf (info, "\nWrite dependencies:\n");
+    dm_print(file, GBgetDMInfoWrite(model));
 }
 
 void GBprintDependencyMatrixCombined(FILE* file, model_t model) {
@@ -689,7 +692,13 @@ void GBprintDependencyMatrixCombined(FILE* file, model_t model) {
     matrix_t *dm_r = GBgetDMInfoRead(model);
     matrix_t *dm_w = GBgetDMInfoWrite(model);
 
+    Printf (info, "\nRead/write dependencies:\n");
+    fprintf(file, "      ");
+    for (int j = 0; j < dm_ncols(dm); j+=10)
+        fprintf(file, "0         ");
+    fprintf(file, " \n");
     for (int i = 0; i < dm_nrows(dm); i++) {
+        fprintf(file, "%4d: ", i);
         for (int j = 0; j < dm_ncols(dm); j++) {
             if (dm_is_set(dm_r, i, j) && dm_is_set(dm_w, i, j)) {
                 fprintf(file, "+");
@@ -703,6 +712,17 @@ void GBprintDependencyMatrixCombined(FILE* file, model_t model) {
         }
         fprintf(file, "\n");
     }
+}
+
+void GBprintPORMatrix(FILE* file, model_t model) {
+    Printf (info, "\nMaybe coenabled matrix:\n");
+    dm_print(file, GBgetGuardCoEnabledInfo(model));
+
+    Printf (info, "\nNecessary enabling matrix:\n");
+    dm_print(file, GBgetGuardNESInfo(model));
+
+    Printf (info, "\nNecessary disabling matrix:\n");
+    dm_print(file, GBgetGuardNDSInfo(model));
 }
 
 /**********************************************************************
@@ -806,15 +826,19 @@ GBloadFile (model_t model, const char *filename, model_t *wrapped)
                 }
 
                 if (matrix) {
-                    if (HREme(HREglobal()) == 0)
+                    if (HREme(HREglobal()) == 0) {
                         GBprintDependencyMatrixCombined(stdout, model);
-                    HREabort (LTSMIN_EXIT_SUCCESS);
+                        if (log_active(infoLong)) {
+                            GBprintPORMatrix(stdout, model);
+                        }
+                        HREabort (LTSMIN_EXIT_SUCCESS);
+                    }
                 } else if (labels) {
                     if (HREme(HREglobal()) == 0) {
                         lts_type_print(info, GBgetLTStype(model));
                         chunk_table_print(info, model);
+                        HREabort (LTSMIN_EXIT_SUCCESS);
                     }
-                    HREabort (LTSMIN_EXIT_SUCCESS);
                 } else {
                     return;
                 }
