@@ -13,6 +13,22 @@
 #include <util-lib/treedbs.h>
 #include <util-lib/util.h>
 
+/**
+ * Verifies the results of the POR layer by checking the definition of the
+ * dynamic stubborn set on the generated stubborn sets (on all paths over
+ * non-stubborn transitions, the stubborn transitions remain enabled/disabled,
+ * moreover the non stubborn transitions commute with the stubborn ones).
+ *
+ * Concepts (should be self explanatory):
+ * - stubborn transition
+ * - stubborn group
+ * - non-stubborn (NS) transition
+ * - non-stubborn group
+ * - DFS over non-stubborn transitions
+ *
+ *
+ */
+
 typedef struct dlk_hook_context {
     por_context    *pctx;
     void*           user_context;
@@ -195,6 +211,27 @@ print_disabled_trans (dlk_check_context_t *ctx, int *src, int *dst, int *tgt)
     print_diff (ctx, src, tgt);
 }
 
+static void
+print_enabled_trans (dlk_check_context_t *ctx, int *src, int *dst, int *s1)
+{
+    Printf (info, "\n");
+    Printf (info, "src  ----ns---->  dst\n");
+    Printf (info, "                   |\n");
+    Printf (info, "                 stub\n");
+    Printf (info, "                   |\n");
+    Printf (info, "                   v\n");
+    Printf (info, "                  s1\n");
+
+    Printf (info, "\n");
+    Printf (info, "src --> dst (group %d)\n", dst[ctx->len]);
+    print_diff (ctx, src, dst);
+
+    Printf (info, "\n");
+    Printf (info, "dst --> s1 (group %d)\n", s1[ctx->len]);
+    print_diff (ctx, dst, s1);
+}
+
+
 /**
  * Check for whether a ns transition from src to dst commutes with the
  * same path from all tgt s.t. src --stubborn--> tgt:
@@ -237,7 +274,7 @@ check_commute (dlk_check_context_t *ctx, int *dst)
 
             HREassert (diff == 0, "Stubborn trans %d/%d does not commute with NS trans: %d/%d "
                        "(count: %d, idx: %d, stubborn enabled: %d)"
-                       ":\n %s <--> %s",
+                       ":\n\n%s\ndoes not commute with\n%s",
                        s1[ctx->len], s1[ctx->len+1], s2[ctx->len], s1[ctx->len + 1],
                        scount, i, ctx->ss_en_list->count,
                        str_group(ctx, s1[ctx->len]),
@@ -287,7 +324,7 @@ mimic (dlk_check_context_t *ctx, int *state)
 
             HREassert (ctx->p_count == 1, "NS trans %d/%d disabled from stubborn trans "
                      "%d/%d (successor count: %d), pers set: %s"
-                     ":\n %s <--> %s",
+                     ":\n\n%s\nwas disabled by:\n%s",
                      ctx->follow_group, ctx->follow_group_idx, t[ctx->len],
                      t[ctx->len + 1], ctx->p_count, str_list(ctx->ss_en_list),
                      str_group(ctx, state[ctx->len]),
@@ -310,8 +347,14 @@ get_nonstubborn_cb (void *context, transition_info_t *ti, int *dst)
             // push (initially) enabled stubborn transitions
             push_trans (ctx, ctx->tgt_in_stack, dst);
         } else {
-            //Debug ("Disabled stubborn transition %d was enabled by %d (ignoring it)",
-            //       ti->group, ctx->src[ctx->len]);
+            int *src = dfs_stack_peek_top (ctx->stack, 2);
+            print_enabled_trans (ctx, src, ctx->src, dst);
+            HREassert (false, "Disabled stubborn transition %d was enabled by %d/%d, (ss: %s)"
+                           ":\n\n%s\nwas enabled by:\n%s",
+                           ti->group, ctx->src[ctx->len], ctx->src[ctx->len+1],
+                           str_list(ctx->ss_list),
+                           str_group(ctx, ti->group),
+                           str_group(ctx, ctx->src[ctx->len]));
         }
     } else {
         push_trans (ctx, ctx->stack, dst);
