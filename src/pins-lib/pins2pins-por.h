@@ -82,20 +82,23 @@ typedef struct por_context {
     model_t         parent;         // parent PINS model
     int             ltl;
     int             nguards;        // number of guards
+    int             nlabels;        // number of labels (including guards
+    int             ngroups;        // number of groups
     matrix_t        gnes_matrix;    //
     matrix_t        gnds_matrix;    //
     matrix_t        not_accords_with;   //
-    int**           not_accords_tg_tg;  // mapping from transition group to groups that it accords with
-    int**           guard_tg;       // mapping from guard to transition group
-    int**           guard_nes;      // transition groups that form a nes for a guard (guard -> [t1, t2, t..])
-    int**           guard_nds;      // transition groups that form a nds for a guard
+    ci_list       **not_accords_tg_tg;  // mapping from transition group to groups that it accords with
+    ci_list       **guard2group;    // mapping from guard to transition group
+    ci_list       **group2guard;    // mapping from group to guards
+    ci_list       **guard_nes;      // transition groups that form a nes for a guard (guard -> [t1, t2, t..])
+    ci_list       **guard_nds;      // transition groups that form a nds for a guard
     ci_list       **guard_dep;      // transition groups that depend on a guard
 
     /**
      * The global data used for the search
      * This data is setup one time for each state that is processed
      */
-    int             *guard_status;  // status of the guards in current state
+    int             *label_status;  // status of the guards in current state
     group_status_t  *group_status;  // status of the transition groups in the current state
     int             *group_score;   // score assigned to each group by heuristic function
     int              beam_width;    // maximum width of the beam search
@@ -104,8 +107,7 @@ typedef struct por_context {
     // global nes/nds
     int             *nes_score;     // Template for the nes_score (TODO: check)
     ci_list        **ns;            // nes/nds combined
-    ci_list        **group_in;      // mapping group to each nes/nds in which it is used
-    ci_list        **group_has;     // mapping group to each nes/nds for it
+    ci_list        **group2ns;      // mapping group to each nes/nds in which it is used
 
     int              emit_limit;    // maximum number of transition groups that can be emitted
     int              emit_score;    // directly emit when search finishes with this score
@@ -115,11 +117,12 @@ typedef struct por_context {
     int             *search_order;
     search_context  *search;        // context for each search
 
-    int             *group_visibility;
-    int             *label_visibility;
-    int             *dynamic_visibility;
-    ci_list         *marked_list;
-    ci_list         *label_list;
+    int             *group_visibility; // visible groups (static)
+    int             *label_visibility; // visible labels (for dynamic visibility)
+
+    ci_list         *label_list;    // visible labels
+    ci_list         *marked_list;   // labels dynamically marked as visible
+    int             *dynamic_visibility; // idem
 } por_context;
 
 #endif // PINS2PINS_POR

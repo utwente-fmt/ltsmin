@@ -46,41 +46,49 @@ por_short (model_t self, int group, int *src, TransitionCB cb,
  * Initialize and allocate all memory that is reused all the time
  * Setup pointers to functions used in beam search
  */
-static void* bs_init_context(model_t model)
+static void *
+bs_init_context(model_t model)
 {
+    por_context* ctx = (por_context*) GBgetContext(model);
+
     // get number of transition groups
-    int n = dm_nrows(GBgetDMInfo(model));
+    ctx->ngroups = dm_nrows(GBgetDMInfo(model));
+    sl_group_t *guardLabels = GBgetStateLabelGroupInfo (model, GB_SL_GUARDS);
+    HREassert (guardLabels->sl_idx[0] == 0);
     // get the number of guards
-    int n_guards = (GBgetStateLabelGroupInfo(model, GB_SL_GUARDS))->count;
+    ctx->nguards = guardLabels->count;
+    // get the number of labels
+    ctx->nlabels = pins_get_state_label_count(model);
+
+    Debug ("Groups %d, labels %d, guards %d\n", ctx->ngroups, ctx->nlabels, ctx->nguards);
 
     // setup a fixed maximum of number of search contexts
     // since we use at most one search context per transition group, use n
-    const int BEAM_WIDTH = n;
-    por_context* context = (por_context*) GBgetContext(model);
+    const int BEAM_WIDTH = ctx->ngroups;
+
     // set number of guards used
-    context->nguards = n_guards;
     // alloc search contexts
-    context->search = RTmallocZero( BEAM_WIDTH * sizeof(search_context) );
+    ctx->search = RTmallocZero( BEAM_WIDTH * sizeof(search_context) );
     // set #emitted to zero, meaning that a new analysis should start
-    context->emitted = 0;
+    ctx->emitted = 0;
     // init group status array
-    context->group_status = RTmallocZero(n * sizeof (group_status_t) );
-    context->group_score  = RTmallocZero(n * sizeof(int) );
+    ctx->group_status = RTmallocZero(ctx->ngroups * sizeof (group_status_t) );
+    ctx->group_score  = RTmallocZero(ctx->ngroups * sizeof(int) );
     // init guard_status array
-    context->guard_status = RTmallocZero(n_guards * sizeof(int) );
+    ctx->label_status = RTmallocZero(ctx->nlabels * sizeof(int) );
 
     // init beam_width/beam_used
-    context->beam_width = BEAM_WIDTH;
-    context->beam_used = BEAM_WIDTH;
+    ctx->beam_width = BEAM_WIDTH;
+    ctx->beam_used = BEAM_WIDTH;
 
     // init search_order;
-    context->search_order = RTmallocZero(BEAM_WIDTH * sizeof(int) );
+    ctx->search_order = RTmallocZero(BEAM_WIDTH * sizeof(int) );
 
     // get por_context
     por_context* pctx = (por_context *)GBgetContext(model);
 
     // init nes score template
-    context->nes_score = RTmallocZero( (n_guards * 2) * sizeof(int) );
+    ctx->nes_score = RTmallocZero( (ctx->nguards * 2) * sizeof(int) );
 
     // get local variables pointing to nes/nds
     ci_list** nes = (ci_list**)pctx->guard_nes;
@@ -93,63 +101,40 @@ static void* bs_init_context(model_t model)
     // this way the search algorithm can skip the nes/nds that isn't needed based on
     // guard_status, using <n or >=n as conditions
     matrix_t group_in;
-    dm_create(&group_in, n_guards * 2, n); // mapping from nes/nds (2*n_guards) to transition group (n)
-    for(int i=0; i < n_guards; i++) {
+    dm_create(&group_in, ctx->nguards * 2, ctx->ngroups);
+    for(int i=0; i < ctx->nguards; i++) {
         for(int j=0; j < nes[i]->count; j++) {
             dm_set(&group_in, i, nes[i]->data[j]);
         }
         for(int j=0; j < nds[i]->count; j++) {
-            dm_set(&group_in, i+n_guards, nds[i]->data[j]);
+            dm_set(&group_in, i+ctx->nguards, nds[i]->data[j]);
         }
+        Printf (debug, "Guard %4d: NESs %4d, NDSs %4d\n", i, nes[i]->count, nds[i]->count);
     }
     // build tables ns, and group in
-    context->ns = (ci_list**) dm_rows_to_idx_table(&group_in);
-    context->group_in = (ci_list**) dm_cols_to_idx_table(&group_in);
+    ctx->ns = (ci_list**) dm_rows_to_idx_table(&group_in);
+    ctx->group2ns = (ci_list**) dm_cols_to_idx_table(&group_in);
     dm_free(&group_in);
-
-    // group has relation
-    // mapping [0...n_guards-1] disabled guard (nes)
-    // mapping [n_guards..2*n_guards-1] enabled guard (nds)
-
-    // get local variables pointing to mappings guard->tg, guard->nce
-    ci_list** g_tg = (ci_list**)pctx->guard_tg;
-
-    // setup group has relation
-    matrix_t group_has;
-    dm_create(&group_has, n, n_guards * 2);
-    for(int i=0; i < n_guards; i++) {
-        // nes
-        for( int k=0; k < g_tg[i]->count; k++) {
-            dm_set(&group_has, g_tg[i]->data[k], i);
-        }
-        // nds
-        for( int k=0; k < g_tg[i]->count; k++) {
-            dm_set(&group_has, g_tg[i]->data[k], i+n_guards);
-        }
-    }
-    // build table group has
-    context->group_has = (ci_list**) dm_rows_to_idx_table(&group_has);
-    dm_free(&group_has);
 
     // init for each search context
     for(int i=0 ; i < BEAM_WIDTH; i++) {
         // init default search order
-        context->search_order[i] = i;
+        ctx->search_order[i] = i;
         // init emit status
-        context->search[i].emit_status = RTmallocZero( n * sizeof(emit_status_t) );
+        ctx->search[i].emit_status = RTmallocZero( ctx->ngroups * sizeof(emit_status_t) );
         // init work_array
         // note, n+1 to initialize work_disabled on n
-        context->search[i].work = RTmallocZero( (n+1) * sizeof(int) );
+        ctx->search[i].work = RTmallocZero( (ctx->ngroups+1) * sizeof(int) );
         // init work_enabled/work_disabled
-        context->search[i].work_enabled = 0;
-        context->search[i].work_disabled = n;
+        ctx->search[i].work_enabled = 0;
+        ctx->search[i].work_disabled = ctx->ngroups;
         // init score
-        context->search[i].score = 0;
+        ctx->search[i].score = 0;
         // note, n+1 to initialize work_disabled on n
-        context->search[i].nes_score = RTmallocZero( (n_guards * 2) * sizeof(int) );
+        ctx->search[i].nes_score = RTmallocZero( (ctx->nguards * 2) * sizeof(int) );
     }
 
-    return (void*)context;
+    return ctx;
 }
 
 static inline void
@@ -180,7 +165,7 @@ mark_dynamic_labels (por_context* pctx)
             int group = pctx->guard_dep[label]->data[j];
             if (pctx->group_visibility[group] || pctx->dynamic_visibility[group])
                 continue;
-            if (pctx->guard_status[label]) {
+            if (pctx->label_status[label]) {
                 pctx->dynamic_visibility[group] |= dm_is_set (&pctx->gnds_matrix, label, group);
             } else {
                 pctx->dynamic_visibility[group] |= dm_is_set (&pctx->gnes_matrix, label, group);
@@ -209,26 +194,26 @@ unmark_dynamic_labels (por_context* pctx)
 static void bs_setup(model_t model, por_context* pctx, int* src)
 {
     // init globals
-    int n_guards = pctx->nguards;
+    int nguards = pctx->nguards;
 
     // get number of transition
-    int n = dm_nrows(GBgetDMInfo(model));
+    int ngroups = pctx->ngroups;
 
     // clear global tables
-    memset(pctx->group_status, GS_ENABLED, n * sizeof(group_status_t));
-    memset(pctx->nes_score, 0, (n_guards * 2) * sizeof(int));
+    memset(pctx->group_status, GS_ENABLED, ngroups * sizeof(group_status_t));
+    memset(pctx->nes_score, 0, (nguards * 2) * sizeof(int));
 
     // fill guard status, request all guard values,
-    GBgetStateLabelsAll(model, src, pctx->guard_status);
+    GBgetStateLabelsAll(model, src, pctx->label_status);
 
     mark_dynamic_labels (pctx);
 
     // fill group status
-    for(int i=0; i<n; i++) {
+    for(int i=0; i<ngroups; i++) {
         guard_t* gt = GBgetGuard(model, i);
         // mark groups as disabled
         for(int j=0; j < gt->count; j++) {
-            if (pctx->guard_status[gt->guard[j]] == 0) {
+            if (pctx->label_status[gt->guard[j]] == 0) {
                 pctx->group_status[i] |= GS_DISABLED;
                 break;
             }
@@ -236,18 +221,18 @@ static void bs_setup(model_t model, por_context* pctx, int* src)
     }
 
     // fill group score
-    for(int i=0; i<n; i++) {
+    for(int i=0; i<ngroups; i++) {
         if (pctx->group_status[i] & GS_DISABLED) {
             pctx->group_score[i] = 1;
         } else {
             // note: n*n won't work when n is very large (overflow)
-            pctx->group_score[i] = (pctx->group_visibility[i] || pctx->dynamic_visibility[i]) ? n*n : n;
+            pctx->group_score[i] = (pctx->group_visibility[i] || pctx->dynamic_visibility[i]) ? ngroups*ngroups : ngroups;
         }
     }
     // fill nes score
     // heuristic score h(x): 1 for disabled transition, n for enabled transition, n^2 for visible transition
-    for(int i=0; i < n_guards; i++) {
-        int idx = pctx->guard_status[i] ? i + n_guards : i;
+    for(int i=0; i < nguards; i++) {
+        int idx = pctx->label_status[i] ? i + nguards : i;
         pctx->nes_score[idx] = 0;
         for(int j=0; j < pctx->ns[idx]->count; j++) {
             pctx->nes_score[idx] += pctx->group_score[ pctx->ns[idx]->data[j] ];
@@ -259,31 +244,28 @@ static void bs_setup(model_t model, por_context* pctx, int* src)
         pctx->search_order[i] = i;
     }
 
-    // clear emit status
-    pctx->emit_score = 1;
-    pctx->emit_limit = 0;
-
     // select an enabled transition group
     int beam_idx = 0;
-    for(int z=0; z<n; z++) {
+    for(int z=0; z<ngroups; z++) {
         if (!(pctx->group_status[z]&GS_DISABLED)) {
-            // increase emit limit
-            pctx->emit_limit++;
             // add to beam search
             pctx->search[beam_idx].work[0] = z;
             // init work_enabled/work_disabled
             pctx->search[beam_idx].work_enabled = 1;
-            pctx->search[beam_idx].work_disabled = n;
+            pctx->search[beam_idx].work_disabled = ngroups;
             // init score
-            pctx->search[beam_idx].score = 0;
-            memset(pctx->search[beam_idx].emit_status, 0, n * sizeof(emit_status_t));
-            memcpy(pctx->search[beam_idx].nes_score, pctx->nes_score, n_guards * 2 * sizeof(int));
+            pctx->search[beam_idx].score = 0; // 0 = uninitialized
+            memset(pctx->search[beam_idx].emit_status, 0, sizeof(emit_status_t[ngroups]));
+            memcpy(pctx->search[beam_idx].nes_score, pctx->nes_score, nguards * 2 * sizeof(int));
 
             beam_idx++;
         }
     }
     // reset beam
     pctx->beam_used = beam_idx;
+    // clear emit status
+    pctx->emit_score = 1;
+    pctx->emit_limit = beam_idx; // if |persistent| = |en|, we can stop the search
 }
 
 /**
@@ -297,11 +279,11 @@ select_group (model_t model, por_context* pctx, int group)
     int so = pctx->search_order[0];
 
     // change the heuristic function according to selected group
-    for(int k=0 ; k< pctx->group_in[group]->count; k++) {
-        int nes = pctx->group_in[group]->data[k];
+    for(int k=0 ; k< pctx->group2ns[group]->count; k++) {
+        int ns = pctx->group2ns[group]->data[k];
         // note: this selects some nesses that aren't used, but take the extra work
         // instead of accessing the guards to verify the work
-        pctx->search[so].nes_score[nes] -= pctx->group_score[group];
+        pctx->search[so].nes_score[ns] -= pctx->group_score[group];
     }
     return;
     (void)model;
@@ -352,37 +334,41 @@ bs_analyze(model_t model, por_context* pctx, int* src)
             // mark as selected and ready
             s[idx].emit_status[current_group] |= ES_SELECTED | ES_READY;
 
-            // for a disabled transition we need to add the necessary enabling set
+            // for a disabled transition we need to add the necessary set
             // lookup which set has the lowest score on the heuristic function h(x)
-            int selected_nes = -1;
+            int selected_ns = -1;
             int selected_score = INT32_MAX;
 
-            // for each possible nes for the current group
-            for(int k=0 ; k< pctx->group_has[current_group]->count; k++) {
-                // get the nes
-                int nes = pctx->group_has[current_group]->data[k];
+            // for each possible ns for the current group
+            for(int k=0 ; k< pctx->group2guard[current_group]->count; k++) {
+                // get the guard
+                int guard = pctx->group2guard[current_group]->data[k];
+                int ns = pctx->label_status[guard] ? guard + n_guards : guard;
+
                 // check the score by the heuristic function h(x)
-                if (s[idx].nes_score[nes] < selected_score) {
-                    // check nes is indeed for this group
-                    if ((nes < n_guards && (pctx->guard_status[nes] == 0))  ||
-                        (nes >= n_guards && (pctx->guard_status[nes-n_guards] != 0)) ) {
-                        // make this the current best
-                        selected_nes = nes;
-                        selected_score = s[idx].nes_score[nes];
-                        // if score is 0 it can't improve, break the loop
-                        if (selected_score == 0) break;
-                    }
+                if (!pctx->label_status[guard] && // only NES
+                        s[idx].nes_score[ns] < selected_score) {
+                    // make this the current best
+                    selected_ns = ns;
+                    selected_score = s[idx].nes_score[ns];
+                    // if score is 0 it can't improve, break the loop
+                    if (selected_score == 0) break;
                 }
             }
+
+            Printf (debug, "BEAM-%d investigating group %d (disabled) --> ", idx, current_group);
             // add nes
-            if (selected_nes == -1) Abort ("selected nes -1");
+            if (selected_ns == -1) Abort ("selected nes -1");
             // add the selected nes to work
-            ci_list* cil = pctx->ns[selected_nes];
+            ci_list* cil = pctx->ns[selected_ns];
             for(int k=0; k < cil->count; k++) {
                 // find group to add
                 int group = cil->data[k];
                 // if already selected, continue
-                if (s[idx].emit_status[group] & ES_SELECTED) continue;
+                if (s[idx].emit_status[group] & ES_SELECTED) {
+                    Printf (debug, "(%d), ", group);
+                    continue;
+                }
                 // otherwise mark as selected
                 s[idx].emit_status[group] |= ES_SELECTED;
                 select_group (model, pctx, group);
@@ -392,7 +378,10 @@ bs_analyze(model_t model, por_context* pctx, int* src)
                 } else {
                     s[idx].work[s[idx].work_enabled++] = group;
                 }
+                Printf (debug, "%d, ", group);
             }
+            Printf (debug, " (ns %d (%s), score %d)\n", selected_ns % n_guards,
+                    selected_ns < n_guards ? "disabled" : "enabled", selected_score);
         }
 
         // if the current search context has enabled transitions, handle all of them
@@ -401,6 +390,7 @@ bs_analyze(model_t model, por_context* pctx, int* src)
             s[idx].work_enabled--;
             int w = s[idx].work_enabled;
             int current_group = s[idx].work[w];
+            Printf (debug, "BEAM-%d investigating group %d (enabled) --> ", idx, current_group);
 
             // select and mark as ready
             s[idx].emit_status[current_group] |= ES_SELECTED | ES_READY;
@@ -421,15 +411,18 @@ bs_analyze(model_t model, por_context* pctx, int* src)
             if (s[idx].score >= pctx->emit_limit) {
                 s[idx].work_enabled = 0;
                 s[idx].work_disabled = n;
+                Printf (debug, " (quitting |ss|=|en|)\n");
                 break;
             }
 
             // push all dependent unselected groups
-            por_context *ctx = (por_context*)GBgetContext(model);
-            for (int j=0; j < *ctx->not_accords_tg_tg[current_group]; j++) {
-                int dependent_group = ctx->not_accords_tg_tg[current_group][j+1];
+            for (int j=0; j < pctx->not_accords_tg_tg[current_group]->count; j++) {
+                int dependent_group = pctx->not_accords_tg_tg[current_group]->data[j];
                 // already selected?
-                if (s[idx].emit_status[dependent_group] & ES_SELECTED) continue;
+                if (s[idx].emit_status[dependent_group] & ES_SELECTED) {
+                    Printf (debug, "(%d), ", dependent_group);
+                    continue;
+                }
                 // mark as selected
                 s[idx].emit_status[dependent_group] |= ES_SELECTED;
                 // and select
@@ -440,7 +433,9 @@ bs_analyze(model_t model, por_context* pctx, int* src)
                 } else {
                     s[idx].work[s[idx].work_enabled++] = dependent_group;
                 }
+                Printf (debug, "%d, ", dependent_group);
             }
+            Printf (debug, "\n");
         }
         // move search context down based on score
         int score = s[idx].score;
@@ -448,8 +443,10 @@ bs_analyze(model_t model, por_context* pctx, int* src)
         // if it can't move, we found the best score
         if (pctx->beam_used > 1 && score > s[pctx->search_order[1]].score) {
             // if score is one, and we have no more work, we're ready too
-            if (score == pctx->emit_score && s[idx].work_disabled == n)
+            if (score == pctx->emit_score && s[idx].work_disabled == n) {
+                Printf (debug, "bailing out, no disabled work and |ss|=1\n");
                 break;
+            }
 
             // bubble current context down the search, continue with other context
             // this is known by the above conditions
@@ -469,7 +466,10 @@ bs_analyze(model_t model, por_context* pctx, int* src)
             idx = pctx->search_order[0];
         } else {
             // break out if not moving, and no more work can be done
-            if (s[idx].work_disabled == n) break;
+            if (s[idx].work_disabled == n) {
+                Printf (debug, "bailing out, no disabled work\n");
+                break;
+            }
         }
      }
      return 0;
@@ -601,12 +601,22 @@ GBaddPOR (model_t model, int por_check_ltl)
 
     int groups = dm_nrows( p_dm );
     int len = dm_ncols( p_dm );
+
+    // extract accords with matrix
+    matrix_t *not_accords_with = GBgetGuardCoEnabledInfo(model);
+    HREassert (dm_nrows(not_accords_with) == groups && dm_ncols(not_accords_with) == groups);
+
+    // Combine Do Not Accord with dependency information
     dm_create(&ctx->not_accords_with, groups, groups);
     for(int i=0; i < groups; i++) {
         for(int j=0; j < groups; j++) {
             if (i == j) {
                 dm_set(&ctx->not_accords_with, i, j);
             } else {
+                if (!dm_is_set(not_accords_with, i , j)) {
+                    continue; // transitions accord with each other
+                }
+
                 // is dependent?
                 for (int k=0; k < len; k++)
                 {
@@ -648,16 +658,9 @@ GBaddPOR (model_t model, int por_check_ltl)
             dm_set(&gg_matrix, i, g->guard[j]);
         }
     }
-    ctx->guard_tg               = dm_cols_to_idx_table(&gg_matrix);
-    ci_list **group_tg          = (ci_list**)dm_rows_to_idx_table(&gg_matrix);
+    ctx->guard2group            = (ci_list **) dm_cols_to_idx_table(&gg_matrix);
+    ctx->group2guard            = (ci_list **) dm_rows_to_idx_table(&gg_matrix);
     dm_free(&gg_matrix);
-
-    // extract accords with matrix
-    matrix_t *not_accords_with = GBgetGuardCoEnabledInfo(model);
-    HREassert (dm_nrows(not_accords_with) == groups && dm_ncols(not_accords_with) == groups);
-    //dm_copy (accords_with, &ctx->not_accords_with);
-    dm_create(&ctx->not_accords_with, groups, groups);
-    dm_copy(not_accords_with, &ctx->not_accords_with);
 
     // mark minimal necessary enabling set
     matrix_t *p_gnes_matrix = GBgetGuardNESInfo(model);
@@ -701,9 +704,9 @@ GBaddPOR (model_t model, int por_check_ltl)
     }
 
     // set lookup tables
-    ctx->not_accords_tg_tg     = dm_rows_to_idx_table(&ctx->not_accords_with);
-    ctx->guard_nes             = dm_rows_to_idx_table(&ctx->gnes_matrix);
-    ctx->guard_nds             = dm_rows_to_idx_table(&ctx->gnds_matrix);
+    ctx->not_accords_tg_tg     = (ci_list **) dm_rows_to_idx_table(&ctx->not_accords_with);
+    ctx->guard_nes             = (ci_list **) dm_rows_to_idx_table(&ctx->gnes_matrix);
+    ctx->guard_nds             = (ci_list **) dm_rows_to_idx_table(&ctx->gnds_matrix);
     ctx->guard_dep             = (ci_list **) dm_rows_to_idx_table(&guard_is_dependent);
 
     // free temporary matrices
