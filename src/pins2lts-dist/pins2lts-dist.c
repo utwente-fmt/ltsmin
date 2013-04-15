@@ -220,7 +220,7 @@ int main(int argc, char*argv[]){
         ADD_ARRAY(ctx.state_man,ctx.parent_seg,uint16_t);
     }
     if (act_detect) {
-        if (GB_POR) Abort ("Distributed tool implements no cycle provisos.");
+        if (PINS_POR) Abort ("Distributed tool implements no cycle provisos.");
         // table number of first edge label
         act_label = lts_type_find_edge_label_prefix (ltstype, LTSMIN_EDGE_TYPE_ACTION_PREFIX);
         if (act_label == -1)
@@ -231,7 +231,7 @@ int main(int argc, char*argv[]){
         Warning(info, "Detecting action \"%s\"", act_detect);
     }
     if (inv_detect) {
-        if (GB_POR) Abort ("Distributed tool implements no cycle provisos.");
+        if (PINS_POR) Abort ("Distributed tool implements no cycle provisos.");
         ltsmin_parse_env_t env = LTSminParseEnvCreate();
         inv_expr = parse_file_env (inv_detect, pred_parse_file, model, env);
         ctx.env = env;

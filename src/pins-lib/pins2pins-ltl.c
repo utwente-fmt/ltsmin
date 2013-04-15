@@ -18,6 +18,52 @@
 #include <pins-lib/property-semantics.h>
 
 
+static char *ltl_file = NULL;
+static const char *ltl_semantics_name = "none";
+
+static si_map_entry db_ltl_semantics[]={
+    {"none",    PINS_LTL_NONE},
+    {"spin",    PINS_LTL_SPIN},
+    {"textbook",PINS_LTL_TEXTBOOK},
+    {"ltsmin",  PINS_LTL_LTSMIN},
+    {NULL, 0}
+};
+
+static void
+ltl_popt (poptContext con, enum poptCallbackReason reason,
+          const struct poptOption *opt, const char *arg, void *data)
+{
+    (void)con; (void)opt; (void)arg; (void)data;
+    switch (reason) {
+    case POPT_CALLBACK_REASON_PRE:
+        break;
+    case POPT_CALLBACK_REASON_POST:
+        {
+            int l = linear_search (db_ltl_semantics, ltl_semantics_name);
+            if (l < 0) {
+                Warning (error, "unknown ltl semantic %s", ltl_semantics_name);
+                HREprintUsage();
+                HREexit(LTSMIN_EXIT_FAILURE);
+            }
+            PINS_LTL = l;
+        }
+        return;
+    case POPT_CALLBACK_REASON_OPTION:
+        break;
+    }
+    Abort("unexpected call to ltl_popt");
+}
+
+struct poptOption ltl_options[] = {
+    {NULL, 0, POPT_ARG_CALLBACK | POPT_CBFLAG_POST | POPT_CBFLAG_SKIPOPTION, (void *)ltl_popt, 0, NULL, NULL},
+    {"ltl", 0, POPT_ARG_STRING, &ltl_file, 0, "LTL formula or file with LTL formula",
+     "<ltl-file>.ltl|<ltl formula>"},
+    {"ltl-semantics", 0, POPT_ARG_STRING | POPT_ARGFLAG_SHOW_DEFAULT, &ltl_semantics_name, 0,
+     "LTL semantics", "<spin|textbook|ltsmin>"},
+    POPT_TABLEEND
+};
+
+
 typedef struct ltl_context {
     model_t         parent;
     int             ltl_idx;
@@ -354,14 +400,18 @@ init_ltsmin_buchi(model_t model, const char *ltl_file)
  *            otherwise this parameter should be NULL
  */
 model_t
-GBaddLTL (model_t model, const char *ltl_file, pins_ltl_type_t type)
+GBaddLTL (model_t model)
 {
+    if (ltl_file == NULL) return model;
+
     lts_type_t ltstype = GBgetLTStype(model);
     int old_idx = GBgetAcceptingStateLabelIndex (model);
     if (old_idx != -1) {
         Print1 (info, "LTL layer: model already has a ``%s'' property, overriding",
                lts_type_get_state_label_name(ltstype, old_idx));
     }
+
+    if (PINS_LTL == PINS_LTL_NONE) PINS_LTL = PINS_LTL_SPIN;
 
     ltsmin_buchi_t* ba = init_ltsmin_buchi(model, ltl_file);
 
@@ -448,7 +498,7 @@ GBaddLTL (model_t model, const char *ltl_file, pins_ltl_type_t type)
     matrix_t       *p_dm_w = GBgetDMInfoWrite (model);
 
     int             groups = dm_nrows( GBgetDMInfo(model) );
-    int             new_ngroups = (PINS_LTL_SPIN != type ? groups : groups + ba->trans_count);
+    int             new_ngroups = (PINS_LTL_SPIN != PINS_LTL ? groups : groups + ba->trans_count);
 
     // mark the parts the buchi automaton uses for reading
     int formula_state_dep[len];
@@ -488,7 +538,7 @@ GBaddLTL (model_t model, const char *ltl_file, pins_ltl_type_t type)
     }
 
     // fill groups added by SPIN LTL deadlock behavior with guards dependencies
-    if (PINS_LTL_SPIN == type) {
+    if (PINS_LTL_SPIN == PINS_LTL) {
         for(int i = groups; i < new_ngroups; i++) {
             // add buchi as dependent
             dm_set(p_new_dm, i, ctx->ltl_idx);
@@ -568,13 +618,13 @@ GBaddLTL (model_t model, const char *ltl_file, pins_ltl_type_t type)
 
     // mark visible groups in POR layer: all groups that write to a variable
     // that influences the buchi's predicates.
-    if (GB_POR) {
+    if (PINS_POR) {
         for (int k=0; k < ba->predicate_count; k++) {
             mark_visible (model, ba->predicates[k], ba->env);
         }
     }
 
-    switch (type) {
+    switch (PINS_LTL) {
     case PINS_LTL_LTSMIN:
         GBsetNextStateLong  (ltlmodel, ltl_ltsmin_long);
         GBsetNextStateShort (ltlmodel, ltl_ltsmin_short);
@@ -598,7 +648,7 @@ GBaddLTL (model_t model, const char *ltl_file, pins_ltl_type_t type)
     int             s0[new_len];
     GBgetInitialState (model, s0+1);
     // set buchi initial state
-    s0[ctx->ltl_idx] = (type == PINS_LTL_TEXTBOOK ? -1 : 0);
+    s0[ctx->ltl_idx] = (PINS_LTL == PINS_LTL_TEXTBOOK ? -1 : 0);
 
     GBsetInitialState (ltlmodel, s0);
 

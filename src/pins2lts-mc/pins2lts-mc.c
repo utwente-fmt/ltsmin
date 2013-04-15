@@ -919,7 +919,7 @@ statics_init (model_t model)
 #endif
     W = HREpeers(HREglobal());
     if ((strategy[0] & Strat_DFSFIFO) && proviso != Proviso_None) Abort ("DFS_FIFO does not require a proviso.");
-    if (GB_POR && (strategy[0] & ~Strat_DFSFIFO)) {
+    if (PINS_POR && (strategy[0] & ~Strat_DFSFIFO)) {
         if (strategy[0] & Strat_OWCTY) Abort ("OWCTY with POR not implemented.");
         if (strategy[0] & Strat_LTL) {
             if (W > 1) Abort ("Cannot use POR with more than one thread/process.");
@@ -1033,7 +1033,7 @@ print_setup (wctx_t *ctx)
     if (strategy[0] & Strat_DFSFIFO)
             Warning (info, "Found %zu progress transitions.", ctx->progress_trans);
     Warning (info, "Successor permutation: %s", key_search(permutations, permutation));
-    if (GB_POR) {
+    if (PINS_POR) {
         int            *visibility = GBgetPorGroupVisibility (ctx->model);
         size_t          visibles = 0, labels = 0;
         for (size_t i = 0; i < K; i++)
@@ -1089,7 +1089,7 @@ local_init ()
         ctx->inv_expr = parse_file_env (inv_detect, pred_parse_file, model, ctx->env);
     }
 
-    if (GB_POR) {
+    if (PINS_POR) {
         if (strategy[0] & Strat_DFSFIFO) {
             int progress_sl = GBgetProgressStateLabelIndex (model);
             HREassert (progress_sl >= 0, "No progress labels defined for DFS_FIFO");

@@ -93,6 +93,7 @@ typedef struct por_context {
     ci_list       **guard_nes;      // transition groups that form a nes for a guard (guard -> [t1, t2, t..])
     ci_list       **guard_nds;      // transition groups that form a nds for a guard
     ci_list       **guard_dep;      // transition groups that depend on a guard
+    ci_list       **guard_nce;      // mapping from guards to transition groups that may not be co-enabled
 
     /**
      * The global data used for the search
@@ -103,11 +104,13 @@ typedef struct por_context {
     int             *group_score;   // score assigned to each group by heuristic function
     int              beam_width;    // maximum width of the beam search
     int              beam_used;     // number of search contexts in use
+    ci_list         *enabled_list;  // enabled groups
 
     // global nes/nds
     int             *nes_score;     // Template for the nes_score (TODO: check)
     ci_list        **ns;            // nes/nds combined
     ci_list        **group2ns;      // mapping group to each nes/nds in which it is used
+    ci_list        **group_has;     // mapping group to each nes/nds for it
 
     int              emit_limit;    // maximum number of transition groups that can be emitted
     int              emit_score;    // directly emit when search finishes with this score

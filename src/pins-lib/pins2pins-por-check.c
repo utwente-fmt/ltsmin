@@ -273,7 +273,7 @@ check_commute (dlk_check_context_t *ctx, int *dst)
             print_noncommuting_trans (ctx, src, dst, s1, tgt, s2);
 
             HREassert (diff == 0, "Stubborn trans %d/%d does not commute with NS trans: %d/%d "
-                       "(count: %d, idx: %d, stubborn enabled: %d)"
+                       "(count: %d, idx: %d, stubborn groups enabled: %d)"
                        ":\n\n%s\ndoes not commute with\n%s",
                        s1[ctx->len], s1[ctx->len+1], s2[ctx->len], s1[ctx->len + 1],
                        scount, i, ctx->ss_en_list->count,
@@ -457,12 +457,12 @@ check_por_all (model_t check_model, int *src, TransitionCB cb, void *user_contex
 }
 
 model_t
-GBaddPORCheck (model_t model, int por_check_ltl)
+GBaddPORCheck (model_t model)
 {
-    HREassert (!por_check_ltl, "Use --por-check without LTL");
+    HREassert (PINS_LTL == PINS_LTL_NONE, "Use --por-check without LTL");
 
     // init POR
-    model_t por_model = GBaddPOR (model, por_check_ltl);
+    model_t por_model = GBaddPOR (model);
 
     // create extra check layer
     model_t             check_model = GBcreateBase ();

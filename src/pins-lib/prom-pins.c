@@ -58,6 +58,7 @@ const int** (*prom_get_all_labels)  ();
 int         (*prom_get_label)       (void *, int g, int *src);
 const char* (*prom_get_label_name)  (int g);
 void        (*prom_get_labels_all)  (void *, int *src, int* labels);
+const int*  (*prom_get_trans_do_not_accord_matrix)(int t);
 const int*  (*prom_get_label_may_be_coenabled_matrix)(int g);
 const int*  (*prom_get_label_nes_matrix)(int g); // could be optional for POR
 const int*  (*prom_get_label_nds_matrix)(int g); // could be optional for POR
@@ -209,9 +210,11 @@ PromLoadDynamicLib(model_t model, const char *filename)
         RTdlsym( filename, dlHandle, "spins_get_label_name" );
     prom_get_labels_all = (void(*)(void*,int*,int*))
         RTdlsym( filename, dlHandle, "spins_get_labels_all" );
-    prom_get_label_may_be_coenabled_matrix = (const int*(*)(int))
-        RTdlsym( filename, dlHandle, "spins_get_label_may_be_coenabled_matrix" );
     // optional POR functionality (NES/NDS):
+    prom_get_trans_do_not_accord_matrix = (const int*(*)(int))
+        RTtrydlsym( dlHandle, "spins_get_trans_do_not_accord_matrix" );
+    prom_get_label_may_be_coenabled_matrix = (const int*(*)(int))
+        RTtrydlsym( dlHandle, "spins_get_label_may_be_coenabled_matrix" );
     prom_get_label_nes_matrix = (const int*(*)(int))
         RTtrydlsym( dlHandle, "spins_get_label_nes_matrix" );
     prom_get_label_nds_matrix = (const int*(*)(int))
@@ -406,17 +409,30 @@ PromLoadGreyboxModel(model_t model, const char *filename)
     // set the guards per transition group
     GBsetGuardsInfo(model, (guard_t**) prom_get_all_labels());
 
-    // set guard may be co-enabled relation
-    HREassert (prom_get_label_may_be_coenabled_matrix, "No coenabled matrix!");
-    matrix_t *gce_info = RTmalloc(sizeof(matrix_t));
-    dm_create(gce_info, ngroups, ngroups);
-    for (int i = 0; i < ngroups; i++) {
-        int *guardce = (int*)prom_get_label_may_be_coenabled_matrix(i);
-        for(int j = 0; j < ngroups; j++) {
-            if (guardce[j]) dm_set(gce_info, i, j);
+    if (prom_get_trans_do_not_accord_matrix != NULL) {
+        matrix_t *dna_info = RTmalloc(sizeof(matrix_t));
+        dm_create(dna_info, ngroups, ngroups);
+        for (int i = 0; i < ngroups; i++) {
+            int *dna = (int*)prom_get_trans_do_not_accord_matrix(i);
+            for(int j = 0; j < ngroups; j++) {
+                if (dna[j]) dm_set(dna_info, i, j);
+            }
         }
+        GBsetDoNotAccordInfo(model, dna_info);
     }
-    GBsetGuardCoEnabledInfo(model, gce_info);
+
+    // set guard may be co-enabled relation
+    if (prom_get_label_may_be_coenabled_matrix != NULL) {
+        matrix_t *gce_info = RTmalloc(sizeof(matrix_t));
+        dm_create(gce_info, sl_size, sl_size);
+        for (int i = 0; i < sl_size; i++) {
+            int *guardce = (int*)prom_get_label_may_be_coenabled_matrix(i);
+            for(int j = 0; j < sl_size; j++) {
+                if (guardce[j]) dm_set(gce_info, i, j);
+            }
+        }
+        GBsetGuardCoEnabledInfo(model, gce_info);
+    }
 
     // set guard necessary enabling set info
     if (prom_get_label_nes_matrix) {

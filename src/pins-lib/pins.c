@@ -17,6 +17,7 @@ struct grey_box_model {
     sl_group_t* sl_groups[GB_SL_GROUP_COUNT];
     guard_t** guards;
     matrix_t *gce_info; // guard co-enabled info
+    matrix_t *dna_info; // do not accord info
     matrix_t *gnes_info; // guard necessary enabling set
     matrix_t *gnds_info; // guard necessary disabling set
     int sl_idx_buchi_accept;
@@ -217,6 +218,7 @@ model_t GBcreateBase(){
     model->group_visibility=NULL;
     model->label_visibility=NULL;
     model->gce_info=NULL;
+    model->dna_info=NULL;
     model->gnes_info=NULL;
     model->gnds_info=NULL;
     model->sl_idx_buchi_accept = -1;
@@ -291,6 +293,9 @@ void GBinitModelDefaults (model_t *p_model, model_t default_src)
 
     if (model->gce_info == NULL)
         GBsetGuardCoEnabledInfo(model, GBgetGuardCoEnabledInfo (default_src));
+
+    if (model->dna_info == NULL)
+        GBsetDoNotAccordInfo(model, GBgetDoNotAccordInfo (default_src));
 
     if (model->group_visibility == NULL)
         GBsetPorGroupVisibility (model, GBgetPorGroupVisibility(default_src));
@@ -558,6 +563,11 @@ void GBsetGuardCoEnabledInfo(model_t model, matrix_t *info) {
     model->gce_info = info;
 }
 
+void GBsetDoNotAccordInfo(model_t model, matrix_t *info) {
+    HREassert (model->dna_info == NULL, "guard may be co-enabled info already set");
+    model->dna_info = info;
+}
+
 void GBsetPorGroupVisibility(model_t model, int*visibility) {
     HREassert (model->group_visibility == NULL, "POR group visibility already set");
     model->group_visibility = visibility;
@@ -578,6 +588,10 @@ int *GBgetPorStateLabelVisibility(model_t model) {
 
 matrix_t *GBgetGuardCoEnabledInfo(model_t model) {
     return model->gce_info;
+}
+
+matrix_t *GBgetDoNotAccordInfo(model_t model) {
+    return model->dna_info;
 }
 
 void GBsetGuardNESInfo(model_t model, matrix_t *info) {
@@ -729,60 +743,19 @@ void GBprintPORMatrix(FILE* file, model_t model) {
  * Grey box factory functionality
  */
 
-typedef enum {
-    POR_NONE,
-    POR,
-    POR_CHECK,
-} por_t;
-
-#define MAX_TYPES 16
-static char* model_type[MAX_TYPES];
-static pins_loader_t model_loader[MAX_TYPES];
-static int registered=0;
-static char* model_type_pre[MAX_TYPES];
-static pins_loader_t model_preloader[MAX_TYPES];
-static int registered_pre=0;
-static int matrix=0;
-static int labels=0;
-static int cache=0;
-int GB_POR=POR_NONE;
-static const char *regroup_options = NULL;
-
-static char *ltl_file = NULL;
-static const char *ltl_semantics = "spin";
-static pins_ltl_type_t ltl_type = PINS_LTL_SPIN;
-
-static si_map_entry db_ltl_semantics[]={
-    {"spin",    PINS_LTL_SPIN},
-    {"textbook",PINS_LTL_TEXTBOOK},
-    {"ltsmin",  PINS_LTL_LTSMIN},
-    {NULL, 0}
-};
-
-static void
-ltl_popt (poptContext con, enum poptCallbackReason reason,
-          const struct poptOption *opt, const char *arg, void *data)
-{
-    (void)con; (void)opt; (void)arg; (void)data;
-    switch (reason) {
-    case POPT_CALLBACK_REASON_PRE:
-        break;
-    case POPT_CALLBACK_REASON_POST:
-        {
-            int l = linear_search (db_ltl_semantics, ltl_semantics);
-            if (l < 0) {
-                Warning (error, "unknown ltl semantic %s", ltl_semantics);
-                HREprintUsage();
-                HREexit(LTSMIN_EXIT_FAILURE);
-            }
-            ltl_type = l;
-        }
-        return;
-    case POPT_CALLBACK_REASON_OPTION:
-        break;
-    }
-    Abort("unexpected call to ltl_popt");
-}
+#define                 MAX_TYPES 16
+static char*            model_type[MAX_TYPES];
+static pins_loader_t    model_loader[MAX_TYPES];
+static int              registered=0;
+static char            *model_type_pre[MAX_TYPES];
+static pins_loader_t    model_preloader[MAX_TYPES];
+static int              registered_pre=0;
+static int              matrix=0;
+static int              labels=0;
+static int              cache=0;
+pins_por_t              PINS_POR = PINS_POR_NONE;
+pins_ltl_type_t         PINS_LTL = PINS_LTL_NONE;
+static const char      *regroup_options = NULL;
 
 void chunk_table_print(log_t log, model_t model) {
     lts_type_t t = GBgetLTStype(model);
@@ -812,12 +785,11 @@ GBloadFile (model_t model, const char *filename, model_t *wrapped)
             if (0==strcmp (model_type[i], extension)) {
                 model_loader[i] (model, filename);
                 if (wrapped) {
-                    if (GB_POR == POR)
-                        model = GBaddPOR (model, ltl_file != NULL);
-                    else if (GB_POR == POR_CHECK)
-                        model = GBaddPORCheck (model, ltl_file != NULL);
-                    if (ltl_file)
-                        model = GBaddLTL (model, ltl_file, ltl_type);
+                    if (PINS_POR == PINS_POR_ON)
+                        model = GBaddPOR (model);
+                    else if (PINS_POR == PINS_POR_CHECK)
+                        model = GBaddPORCheck (model);
+                    model = GBaddLTL (model);
                     if (regroup_options != NULL)
                         model = GBregroup (model, regroup_options);
                     if (cache)
@@ -952,25 +924,15 @@ GBstateIsValidEnd (model_t model, int *state)
         GBgetStateLabelLong(model, model->sl_idx_valid_end, state);
 }
 
-struct poptOption ltl_options[] = {
-    {NULL, 0, POPT_ARG_CALLBACK | POPT_CBFLAG_POST | POPT_CBFLAG_SKIPOPTION, (void *)ltl_popt, 0, NULL, NULL},
-    {"ltl", 0, POPT_ARG_STRING, &ltl_file, 0, "LTL formula or file with LTL formula",
-     "<ltl-file>.ltl|<ltl formula>"},
-    {"ltl-semantics", 0, POPT_ARG_STRING | POPT_ARGFLAG_SHOW_DEFAULT, &ltl_semantics, 0,
-     "LTL semantics", "<spin|textbook|ltsmin>"},
-    POPT_TABLEEND
-};
-
 struct poptOption greybox_options[]={
     { "labels", 0, POPT_ARG_VAL, &labels, 1, "print state variable and type names, and state and action labels", NULL },
 	{ "matrix" , 'm' , POPT_ARG_VAL , &matrix , 1 , "print the dependency matrix for the model and exit" , NULL},
-	{ "por" , 'p' , POPT_ARG_VAL , &GB_POR , POR , "enable partial order reduction" , NULL },
-	{ "check-por" , 'p' , POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &GB_POR , POR_CHECK , "verify partial order reduction peristent sets" , NULL },
 	{ "cache" , 'c' , POPT_ARG_VAL , &cache , 1 , "enable caching of grey box calls" , NULL },
 	{ "regroup" , 'r' , POPT_ARG_STRING, &regroup_options , 0 ,
           "enable regrouping; available transformations T: "
           "gs, ga, gsa, gc, gr, cs, cn, cw, ca, csa, rs, rn, ru", "<(T,)+>" },
 	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, ltl_options , 0 , "LTL options", NULL },
+    { NULL, 0 , POPT_ARG_INCLUDE_TABLE, por_options , 0 , "Partial Order Reduction options", NULL },
 	POPT_TABLEEND	
 };
 

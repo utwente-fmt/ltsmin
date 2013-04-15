@@ -1471,7 +1471,7 @@ gsea_setup_default()
 static void
 set_cycle_proviso ()
 {
-    if (!GB_POR) return;
+    if (!PINS_POR) return;
     if (opt.proviso == P_None) {
         Warning (info, "Forcing the use of a cycle proviso. For best results use --proviso=color.");
         opt.proviso = opt.strategy == Strat_BFS ? P_ClosedSet : P_Stack;
@@ -1506,7 +1506,7 @@ gsea_setup(const char *output)
         chunk c = chunk_str(opt.act_detect);
         opt.act_index = GBchunkPut(opt.model, typeno, c);
         Warning(info, "Detecting action \"%s\"", opt.act_detect);
-        if (GB_POR) {
+        if (PINS_POR) {
             pins_add_edge_label_visible (opt.model, opt.act_label, opt.act_index);
             set_cycle_proviso ();
         }
@@ -1514,8 +1514,8 @@ gsea_setup(const char *output)
     if (opt.inv_detect) {
         opt.env = LTSminParseEnvCreate();
         opt.inv_expr = parse_file_env (opt.inv_detect, pred_parse_file, opt.model, opt.env);
-        if (GB_POR) {
-            mark_visible (opt.model, opt.inv_expr);
+        if (PINS_POR) {
+            mark_visible (opt.model, opt.inv_expr, opt.env);
             set_cycle_proviso ();
         }
     }
@@ -1579,7 +1579,7 @@ gsea_setup(const char *output)
         }
 
         // proviso: doens't work here
-        if (GB_POR && opt.proviso != P_ClosedSet)
+        if (PINS_POR && opt.proviso != P_ClosedSet)
             Abort("proviso does not work for bfs, use --proviso=closedset");
 
         break;
@@ -1653,7 +1653,7 @@ gsea_setup(const char *output)
             gc.queue.filo.stack = dfs_stack_create(global.N);
 
             // proviso: doens't work here
-            if (GB_POR && opt.proviso != P_ClosedSet)
+            if (PINS_POR && opt.proviso != P_ClosedSet)
                 Abort("proviso not implemented for dfs/vset combination");
 
             break;
@@ -1674,7 +1674,7 @@ gsea_setup(const char *output)
             gc.queue.filo.stack = dfs_stack_create(sizeof(ref_t)/sizeof(int));
 
             // proviso: dfs table specific
-            if (GB_POR)
+            if (PINS_POR)
             switch (opt.proviso) {
                 case P_Stack:
                     gc.queue.filo.proviso.stack.off_stack_set = bitset_create(128,128);
@@ -1803,7 +1803,7 @@ gsea_print_setup (const char *name)
     if (opt.act_detect) Warning(info, "Detecting action \"%s\"", opt.act_detect);
     Warning (info, "Running %s search strategy", key_search(strategies, opt.strategy));
     Warning (info, "Using a %s for state storage", key_search(db_types, opt.state_db));
-    if (GB_POR) {
+    if (PINS_POR) {
         int            *visibility = GBgetPorGroupVisibility (opt.model);
         size_t          visibles = 0, labels = 0;
         for (size_t i = 0; i < global.K; i++)
