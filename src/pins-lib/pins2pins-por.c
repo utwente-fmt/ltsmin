@@ -249,82 +249,80 @@ unmark_dynamic_labels (por_context* pctx)
  * For each state, this function sets up the current guard values etc
  * This setup is then reused by the analysis function
  */
-static void bs_setup(model_t model, por_context* pctx, int* src)
+static void bs_setup(model_t model, por_context* ctx, int* src)
 {
     // init globals
-    int nguards = pctx->nguards;
+    int nguards = ctx->nguards;
 
     // get number of transition
-    int ngroups = pctx->ngroups;
+    int ngroups = ctx->ngroups;
 
-    // clear global tables
-    memset(pctx->group_status, GS_ENABLED, ngroups * sizeof(group_status_t));
-    memset(pctx->nes_score, 0, (nguards * 2) * sizeof(int));
+    // number of necessary sets (halves if MC is absent, because no NDSs then)
+    int nns = NO_MC ? ctx->nguards : ctx->nguards * 2;
 
     // fill guard status, request all guard values,
-    GBgetStateLabelsAll(model, src, pctx->label_status);
+    GBgetStateLabelsAll (model, src, ctx->label_status);
 
-    mark_dynamic_labels (pctx);
+    mark_dynamic_labels (ctx);
 
-    // fill group status
-    for(int i=0; i<ngroups; i++) {
-        //pctx->group_status[i] = GS_ENABLED; // reset
+    ctx->enabled_list->count = 0;
+    // fill group status and score
+    for (int i=0; i<ngroups; i++) {
+        ctx->group_status[i] = GS_ENABLED; // reset
         // mark groups as disabled
         guard_t* gt = GBgetGuard(model, i);
-        for(int j=0; j < gt->count; j++) {
-            if (pctx->label_status[gt->guard[j]] == 0) {
-                pctx->group_status[i] |= GS_DISABLED;
+        for (int j=0; j < gt->count; j++) {
+            if (ctx->label_status[gt->guard[j]] == 0) {
+                ctx->group_status[i] = GS_DISABLED;
                 break;
             }
         }
-    }
 
-    for(int i=0; i<ngroups; i++) {
-        if (pctx->group_status[i] & GS_DISABLED) {
-            pctx->group_score[i] = 1;
-        } else {
-            // note: n*n won't work when n is very large (overflow)
-            pctx->group_score[i] = (pctx->group_visibility[i] || pctx->dynamic_visibility[i]) ? ngroups*ngroups : ngroups;
+        // set group score
+        if (ctx->group_status[i] == GS_ENABLED) {
+            ctx->group_score[i] = (ctx->group_visibility[i] ||
+                                   ctx->dynamic_visibility[i])
+                                   ? ngroups*ngroups : ngroups;
+            ctx->enabled_list->data[ctx->enabled_list->count++] = i;
+        } else { // disabled
+            ctx->group_score[i] = 1; // enabled
         }
     }
 
     // fill nes score
     // heuristic score h(x): 1 for disabled transition, n for enabled transition, n^2 for visible transition
     for (int i=0; i < nguards; i++) {
-        int idx = pctx->label_status[i] ? i + nguards : i;
-        pctx->nes_score[idx] = 0;
-        for (int j=0; j < pctx->ns[idx]->count; j++) {
-            pctx->nes_score[idx] += pctx->group_score[ pctx->ns[idx]->data[j] ];
-        }
-    }
+        if (ctx->label_status[i] && NO_MC) continue;
 
-    // reset search order
-    for(int i=0; i < pctx->beam_used; i++) {
-        pctx->search_order[i] = i;
+        int idx = ctx->label_status[i] ? i + nguards : i;
+        ctx->nes_score[idx] = 0;
+        for (int j=0; j < ctx->ns[idx]->count; j++) {
+            ctx->nes_score[idx] += ctx->group_score[ ctx->ns[idx]->data[j] ];
+        }
     }
 
     // select an enabled transition group
     int beam_idx = 0;
-    for(int z=0; z<ngroups; z++) {
-        if (!(pctx->group_status[z]&GS_DISABLED)) {
-            // add to beam search
-            pctx->search[beam_idx].work[0] = z;
-            // init work_enabled/work_disabled
-            pctx->search[beam_idx].work_enabled = 1;
-            pctx->search[beam_idx].work_disabled = ngroups;
-            // init score
-            pctx->search[beam_idx].score = 0; // 0 = uninitialized
-            memset(pctx->search[beam_idx].emit_status, 0, sizeof(emit_status_t[ngroups]));
-            memcpy(pctx->search[beam_idx].nes_score, pctx->nes_score, nguards * 2 * sizeof(int));
+    for(int i=0; i<ctx->enabled_list->count; i++) {
+        int group = ctx->enabled_list->data[i];
+        // add to beam search
+        ctx->search[beam_idx].work[0] = group;
+        // init work_enabled/work_disabled
+        ctx->search[beam_idx].work_enabled = 1;
+        ctx->search[beam_idx].work_disabled = ngroups;
+        // init score
+        ctx->search[beam_idx].score = 0; // 0 = uninitialized
+        memset(ctx->search[beam_idx].emit_status, 0, sizeof(emit_status_t[ngroups]));
+        memcpy(ctx->search[beam_idx].nes_score, ctx->nes_score, nns * sizeof(int));
 
-            beam_idx++;
-        }
+        ctx->search_order[beam_idx] = beam_idx;
+        beam_idx++;
     }
     // reset beam
-    pctx->beam_used = beam_idx;
+    ctx->beam_used = beam_idx;
     // clear emit status
-    pctx->emit_score = 1;
-    pctx->emit_limit = beam_idx; // if |persistent| = |en|, we can stop the search
+    ctx->emit_score = 1;
+    ctx->emit_limit = beam_idx; // if |persistent| = |en|, we can stop the search
 }
 
 /**
@@ -399,7 +397,7 @@ bs_analyze(model_t model, por_context* ctx, int* src)
             int selected_score = INT32_MAX;
 
             // for each possible nes for the current group
-            for(int k=0 ; k< ctx->group_has[current_group]->count; k++) {
+            for (int k=0 ; k < ctx->group_has[current_group]->count; k++) {
                 // get the nes
                 int ns = ctx->group_has[current_group]->data[k];
 
@@ -571,45 +569,45 @@ void ltl_hook_cb (void*context,transition_info_t *ti,int*dst) {
 }
 
 static inline int
-bs_emit (model_t model, por_context* pctx, int* src, TransitionCB cb, void* ctx)
+bs_emit (model_t model, por_context* ctx, int* src, TransitionCB cb, void* uctx)
 {
     // if no enabled transitions, return directly
-    if (pctx->beam_used == 0) return 0;
+    if (ctx->beam_used == 0) return 0;
     // if the score is larger then the number of enabled transitions, emit all
-    if (pctx->emitted == 0 && pctx->search[pctx->search_order[0]].score >= pctx->emit_limit) {
+    if (ctx->emitted == 0 && ctx->search[ctx->search_order[0]].score >= ctx->emit_limit) {
         // return all enabled
-        ltl_hook_context_t ltlctx = {cb, ctx, 0, 0, 1};
-        return GBgetTransitionsAll(pctx->parent, src, ltl_hook_cb, &ltlctx);
+        ltl_hook_context_t ltlctx = {cb, uctx, 0, 0, 1};
+        return GBgetTransitionsAll(ctx->parent, src, ltl_hook_cb, &ltlctx);
     // otherwise: try the persistent set, but enforce that all por_proviso flags are true
     } else {
-        // setup context
-        int n = dm_nrows(GBgetDMInfo(model));
-        ltl_hook_context_t ltlctx = {cb, ctx, 0, 0, 0};
+        ltl_hook_context_t ltlctx = {cb, uctx, 0, 0, 0};
 
         // emit select as long as por_proviso_false_cnt is 0
         int res = 0;
-        pctx->emitted = 0;
-        for(int i=0; i < n && (!pctx->ltl || ltlctx.por_proviso_false_cnt == 0); i++) {
-            // enabled && selected
-            if ( (!(pctx->group_status[i]&GS_DISABLED)) &&
-                 (pctx->search[pctx->search_order[0]].emit_status[i]&ES_SELECTED) ) {
-                pctx->search[pctx->search_order[0]].emit_status[i]|=ES_EMITTED;
-                res+=GBgetTransitionsLong(pctx->parent,i,src,ltl_hook_cb,&ltlctx);
+        ctx->emitted = 0;
+        for (int z=0; z < ctx->enabled_list->count &&
+                      (!ctx->ltl || ltlctx.por_proviso_false_cnt == 0); z++) {
+            int i = ctx->enabled_list->data[z];
+            // selected in winning search context
+            if ( ctx->search[ctx->search_order[0]].emit_status[i]&ES_SELECTED ) {
+                ctx->search[ctx->search_order[0]].emit_status[i]|=ES_EMITTED;
+                res+=GBgetTransitionsLong(ctx->parent,i,src,ltl_hook_cb,&ltlctx);
             }
         }
 
         // emit all if there is a transition group with por_proviso = false
-        if ( ( pctx->ltl && ltlctx.por_proviso_false_cnt != 0)  ||
-             (!pctx->ltl && ltlctx.por_proviso_true_cnt  == 0) ) {
+        if ( ( ctx->ltl && ltlctx.por_proviso_false_cnt != 0)  ||
+             (!ctx->ltl && ltlctx.por_proviso_true_cnt  == 0) ) {
             // reemmit, emit all unemmitted
-            for(int i=0; i < n; i++) {
+            for (int z=0; z < ctx->enabled_list->count &&
+                          (!ctx->ltl || ltlctx.por_proviso_false_cnt == 0); z++) {
+                int i = ctx->enabled_list->data[z];
                 // enabled && selected
-                if ( (!(pctx->group_status[i]&GS_DISABLED)) &&
-                    (!(pctx->search[pctx->search_order[0]].emit_status[i]&ES_EMITTED)) ) {
+                if ( !(ctx->search[ctx->search_order[0]].emit_status[i]&ES_EMITTED) ) {
                     // these should also be marked as emmitted, for consistency
                     // except that this data is not used anymore
                     // pctx->search[pctx->search_order[0]].emit_status[i]|=ES_EMITTED;
-                    res+=GBgetTransitionsLong(pctx->parent,i,src,cb,ctx);
+                    res+=GBgetTransitionsLong(ctx->parent,i,src,cb,uctx);
                 }
             }
         }
@@ -857,6 +855,7 @@ GBaddPOR (model_t model)
     }
 
     ctx->dynamic_visibility = RTmallocZero( groups * sizeof(int) );
+    ctx->enabled_list = RTmallocZero ((groups + 1) * sizeof(int));
     ctx->marked_list = NULL;
     ctx->label_list = NULL;
 
