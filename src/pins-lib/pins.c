@@ -848,7 +848,7 @@ GBloadFile (model_t model, const char *filename, model_t *wrapped)
                     if (mucalc_file) {
                         if (ltl_file)
                             Abort("The -mucalc option and -ltl options can not be combined.");
-                        if (por)
+                        if (GB_POR)
                             Abort("The -mucalc option and -por options can not be combined.");
                         model = GBaddMucalc (model, mucalc_file);
                     }
