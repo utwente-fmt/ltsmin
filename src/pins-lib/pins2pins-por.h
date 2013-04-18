@@ -105,6 +105,7 @@ typedef struct por_context {
     int              beam_width;    // maximum width of the beam search
     int              beam_used;     // number of search contexts in use
     ci_list         *enabled_list;  // enabled groups
+    ci_list         *visible_list;  // enabled groups
 
     // global nes/nds
     int             *nes_score;     // Template for the nes_score (TODO: check)

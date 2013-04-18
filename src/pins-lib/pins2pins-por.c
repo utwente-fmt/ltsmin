@@ -15,6 +15,7 @@ static int NO_NES = 0;
 static int NO_NDS = 0;
 static int NO_MC = 0;
 static int NO_DYNLAB = 0;
+static int NO_V = 0;
 
 struct poptOption por_options[]={
     { "por" , 'p' , POPT_ARG_VAL , &PINS_POR , PINS_POR_ON , "enable partial order reduction" , NULL },
@@ -24,6 +25,7 @@ struct poptOption por_options[]={
     { "no-nds" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_NDS , 1 , "without NDS (for dynamic label info)" , NULL },
     { "no-mc" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_MC , 1 , "without MC (for NDS)" , NULL },
     { "no-dynamic-labels" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_DYNLAB , 1 , "without dynamic labels" , NULL },
+    { "no-V" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_V , 1 , "without V proviso (use Peled's visibility proviso)" , NULL },
     POPT_TABLEEND
 };
 
@@ -144,7 +146,7 @@ bs_init_context(model_t model)
             dm_set(&group_has, ctx->guard2group[i]->data[k], i);
         }
         // nds
-        if (!NO_MC && !NO_NDS) { // add NDS range:
+        if (!NO_MC) { // add NDS range:
             for (int k=0; k < ctx->guard_nce[i]->count; k++) {
                 dm_set(&group_has, ctx->guard_nce[i]->data[k], i + ctx->nguards);
             }
@@ -192,6 +194,13 @@ init_dynamic_labels (por_context* pctx)
     for (int i = 0; i < labels; i++) {
         if (pctx->label_visibility[i]) {
             pctx->label_list->data[pctx->label_list->count++] = i;
+        }
+    }
+
+    // record visible groups
+    for (int i = 0; i < groups; i++) {
+        if (pctx->group_visibility[i]) {
+            pctx->visible_list->data[pctx->visible_list->count++] = i;
         }
     }
 
@@ -263,11 +272,13 @@ static void bs_setup(model_t model, por_context* ctx, int* src)
     // fill guard status, request all guard values,
     GBgetStateLabelsAll (model, src, ctx->label_status);
 
+    // fill dynamic groups
     mark_dynamic_labels (ctx);
 
+    int visible_enabled = 0;
     ctx->enabled_list->count = 0;
     // fill group status and score
-    for (int i=0; i<ngroups; i++) {
+    for (int i = 0; i < ngroups; i++) {
         ctx->group_status[i] = GS_ENABLED; // reset
         // mark groups as disabled
         guard_t* gt = GBgetGuard(model, i);
@@ -280,12 +291,20 @@ static void bs_setup(model_t model, por_context* ctx, int* src)
 
         // set group score
         if (ctx->group_status[i] == GS_ENABLED) {
-            ctx->group_score[i] = (ctx->group_visibility[i] ||
-                                   ctx->dynamic_visibility[i])
-                                   ? ngroups*ngroups : ngroups;
             ctx->enabled_list->data[ctx->enabled_list->count++] = i;
+            visible_enabled += ctx->group_visibility[i] || ctx->dynamic_visibility[i];
         } else { // disabled
-            ctx->group_score[i] = 1; // enabled
+            ctx->group_score[i] = 1;
+        }
+    }
+
+    // set score for enable transitions
+    for(int i=0; i<ctx->enabled_list->count; i++) {
+        int group = ctx->enabled_list->data[i];
+        if ((ctx->group_visibility[group] || ctx->dynamic_visibility[group])) {
+            ctx->group_score[group] = visible_enabled * ngroups;
+        } else {
+            ctx->group_score[group] = ngroups;
         }
     }
 
@@ -326,24 +345,62 @@ static void bs_setup(model_t model, por_context* ctx, int* src)
 }
 
 /**
- * The function select_group is called whenever a new group is added to the stubborn set
+ * The function update_score is called whenever a new group is added to the stubborn set
  * It takes care of updating the heuristic function for the nes based on the new group selection
  */
 static inline void
-select_group (model_t model, por_context* pctx, int group)
+update_score (por_context* ctx, int group)
 {
-    // get index of current search context
-    int so = pctx->search_order[0];
+    // get current search context
+    search_context *s = &ctx->search[ ctx->search_order[0] ];
 
     // change the heuristic function according to selected group
-    for(int k=0 ; k< pctx->group2ns[group]->count; k++) {
-        int ns = pctx->group2ns[group]->data[k];
+    for(int k=0 ; k< ctx->group2ns[group]->count; k++) {
+        int ns = ctx->group2ns[group]->data[k];
         // note: this selects some nesses that aren't used, but take the extra work
         // instead of accessing the guards to verify the work
-        pctx->search[so].nes_score[ns] -= pctx->group_score[group];
+        s->nes_score[ns] -= ctx->group_score[group];
     }
-    return;
-    (void)model;
+}
+
+
+static inline void
+select_group (por_context* ctx, int group)
+{
+    // get current search context
+    search_context *s = &ctx->search[ ctx->search_order[0] ];
+
+    // already selected?
+    if (s->emit_status[group] & ES_SELECTED) {
+        Printf (debug, "(%d), ", group);
+        return;
+    }
+
+    s->emit_status[group] |= ES_SELECTED;
+
+    update_score (ctx, group);
+
+    // and add to work array
+    if (ctx->group_status[group] & GS_DISABLED) {
+        s->work[s->work_disabled--] = group;
+    } else {
+        s->work[s->work_enabled++] = group;
+    }
+    Printf (debug, "%d, ", group);
+}
+
+static inline void
+add_visible (por_context* ctx)
+{
+    // Valmari's V-proviso: implicate all visible groups
+   for(int i=0; i<ctx->visible_list->count; i++) {
+       int group = ctx->visible_list->data[i];
+       select_group (ctx, group);
+   }
+   for (int i = 0; i < ctx->marked_list->count; i++) {
+       int group = ctx->marked_list->data[i];
+       select_group (ctx, group);
+   }
 }
 
 /**
@@ -424,21 +481,7 @@ bs_analyze(model_t model, por_context* ctx, int* src)
             for(int k=0; k < cil->count; k++) {
                 // find group to add
                 int group = cil->data[k];
-                // if already selected, continue
-                if (s[idx].emit_status[group] & ES_SELECTED) {
-                    Printf (debug, "(%d), ", group);
-                    continue;
-                }
-                // otherwise mark as selected
-                s[idx].emit_status[group] |= ES_SELECTED;
-                select_group (model, ctx, group);
-                // and add to work array
-                if (ctx->group_status[group] & GS_DISABLED) {
-                    s[idx].work[s[idx].work_disabled--] = group;
-                } else {
-                    s[idx].work[s[idx].work_enabled++] = group;
-                }
-                Printf (debug, "%d, ", group);
+                select_group (ctx, group);
             }
             Printf (debug, " (ns %d (%s), score %d)\n", selected_ns % n_guards,
                     selected_ns < n_guards ? "disabled" : "enabled", selected_score);
@@ -461,11 +504,11 @@ bs_analyze(model_t model, por_context* ctx, int* src)
             // emit_score is changed in the initialization. Should select_group be called at setup?
             // other idea is to init the search context only here, because we might need to
             // do a lot more work if we do it all at once and then just need one
-            if (s[idx].score == ctx->emit_score-1) select_group (model, ctx, current_group); /* init search context here? */
+            if (s[idx].score == ctx->emit_score-1)
+                update_score (ctx, current_group);
 
             // update the search score
-            s[idx].score += 1 + ( ctx->group_visibility[current_group] ||
-                                  ctx->dynamic_visibility[current_group] ? groups : 0);
+            s[idx].score += 1;
 
             // quit the search when emit_limit is reached
             // this block is just to skip useless work, everything is emitted anyway
@@ -479,24 +522,21 @@ bs_analyze(model_t model, por_context* ctx, int* src)
             // push all dependent unselected groups
             for (int j=0; j < ctx->not_accords_tg_tg[current_group]->count; j++) {
                 int dependent_group = ctx->not_accords_tg_tg[current_group]->data[j];
-                // already selected?
-                if (s[idx].emit_status[dependent_group] & ES_SELECTED) {
-                    Printf (debug, "(%d), ", dependent_group);
-                    continue;
-                }
-                // mark as selected
-                s[idx].emit_status[dependent_group] |= ES_SELECTED;
-                // and select
-                select_group (model, ctx, dependent_group);
-                // add to work, enabled in front, disabled at the end
-                if (ctx->group_status[dependent_group] & GS_DISABLED) {
-                    s[idx].work[s[idx].work_disabled--] = dependent_group;
-                } else {
-                    s[idx].work[s[idx].work_enabled++] = dependent_group;
-                }
-                Printf (debug, "%d, ", dependent_group);
+                select_group (ctx, dependent_group);
             }
             Printf (debug, "\n");
+
+            if ( ctx->group_visibility[current_group] ||
+                 ctx->dynamic_visibility[current_group] ) {
+                if (NO_V) {
+                    for (int z = 0; z < ctx->enabled_list->count; z++) {
+                        int group = ctx->enabled_list->data[z];
+                        select_group (ctx, group);
+                    }
+                } else {
+                    add_visible (ctx);
+                }
+            }
         }
         // move search context down based on score
         int score = s[idx].score;
@@ -532,8 +572,8 @@ bs_analyze(model_t model, por_context* ctx, int* src)
                 break;
             }
         }
-     }
-     return 0;
+    }
+    return 0;
     (void) src;
 }
 
@@ -596,7 +636,7 @@ bs_emit (model_t model, por_context* ctx, int* src, TransitionCB cb, void* uctx)
         }
 
         // emit all if there is a transition group with por_proviso = false
-        if ( ( ctx->ltl && ltlctx.por_proviso_false_cnt != 0)  ||
+        if ( ( ctx->ltl && ltlctx.por_proviso_false_cnt != 0) ||
              (!ctx->ltl && ltlctx.por_proviso_true_cnt  == 0) ) {
             // reemmit, emit all unemmitted
             for (int z=0; z < ctx->enabled_list->count &&
@@ -856,6 +896,7 @@ GBaddPOR (model_t model)
 
     ctx->dynamic_visibility = RTmallocZero( groups * sizeof(int) );
     ctx->enabled_list = RTmallocZero ((groups + 1) * sizeof(int));
+    ctx->visible_list = RTmallocZero ((groups + 1) * sizeof(int));
     ctx->marked_list = NULL;
     ctx->label_list = NULL;
 
