@@ -16,6 +16,7 @@ static int NO_NDS = 0;
 static int NO_MC = 0;
 static int NO_DYNLAB = 0;
 static int NO_V = 0;
+static int NO_L12 = 0;
 
 struct poptOption por_options[]={
     { "por" , 'p' , POPT_ARG_VAL , &PINS_POR , PINS_POR_ON , "enable partial order reduction" , NULL },
@@ -25,7 +26,8 @@ struct poptOption por_options[]={
     { "no-nds" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_NDS , 1 , "without NDS (for dynamic label info)" , NULL },
     { "no-mc" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_MC , 1 , "without MC (for NDS)" , NULL },
     { "no-dynamic-labels" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_DYNLAB , 1 , "without dynamic labels" , NULL },
-    { "no-V" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_V , 1 , "without V proviso (use Peled's visibility proviso)" , NULL },
+    { "no-V" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_V , 1 , "without V proviso, instead use Peled's visibility proviso, or V'     " , NULL },
+    { "no-L12" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_L12 , 1 , "without L1/L2 proviso, instead use Peled's cycle proviso, or L2'   " , NULL },
     POPT_TABLEEND
 };
 
@@ -254,6 +256,12 @@ unmark_dynamic_labels (por_context* pctx)
     }
 }
 
+static inline int
+is_visible (por_context* ctx, int group)
+{
+    return ctx->group_visibility[group] || ctx->dynamic_visibility[group];
+}
+
 /**
  * For each state, this function sets up the current guard values etc
  * This setup is then reused by the analysis function
@@ -275,7 +283,7 @@ static void bs_setup(model_t model, por_context* ctx, int* src)
     // fill dynamic groups
     mark_dynamic_labels (ctx);
 
-    int visible_enabled = 0;
+    ctx->visible_enabled = 0;
     ctx->enabled_list->count = 0;
     // fill group status and score
     for (int i = 0; i < ngroups; i++) {
@@ -292,7 +300,7 @@ static void bs_setup(model_t model, por_context* ctx, int* src)
         // set group score
         if (ctx->group_status[i] == GS_ENABLED) {
             ctx->enabled_list->data[ctx->enabled_list->count++] = i;
-            visible_enabled += ctx->group_visibility[i] || ctx->dynamic_visibility[i];
+            ctx->visible_enabled += ctx->group_visibility[i] || ctx->dynamic_visibility[i];
         } else { // disabled
             ctx->group_score[i] = 1;
         }
@@ -302,7 +310,7 @@ static void bs_setup(model_t model, por_context* ctx, int* src)
     for(int i=0; i<ctx->enabled_list->count; i++) {
         int group = ctx->enabled_list->data[i];
         if ((ctx->group_visibility[group] || ctx->dynamic_visibility[group])) {
-            ctx->group_score[group] = visible_enabled * ngroups;
+            ctx->group_score[group] = ctx->visible_enabled * ngroups;
         } else {
             ctx->group_score[group] = ngroups;
         }
@@ -333,6 +341,10 @@ static void bs_setup(model_t model, por_context* ctx, int* src)
         ctx->search[beam_idx].score = 0; // 0 = uninitialized
         memset(ctx->search[beam_idx].emit_status, 0, sizeof(emit_status_t[ngroups]));
         memcpy(ctx->search[beam_idx].nes_score, ctx->nes_score, nns * sizeof(int));
+        // reset counts
+        ctx->search[beam_idx].visibles_selected = 0;
+        ctx->search[beam_idx].enabled_selected = 0;
+        ctx->search[beam_idx].ve_selected = 0;
 
         ctx->search_order[beam_idx] = beam_idx;
         beam_idx++;
@@ -349,7 +361,7 @@ static void bs_setup(model_t model, por_context* ctx, int* src)
  * It takes care of updating the heuristic function for the nes based on the new group selection
  */
 static inline void
-update_score (por_context* ctx, int group)
+update_ns_scores (por_context* ctx, int group)
 {
     // get current search context
     search_context *s = &ctx->search[ ctx->search_order[0] ];
@@ -378,19 +390,36 @@ select_group (por_context* ctx, int group)
 
     s->emit_status[group] |= ES_SELECTED;
 
-    update_score (ctx, group);
+    update_ns_scores (ctx, group);
 
-    // and add to work array
+    // and add to work array and update counts
     if (ctx->group_status[group] & GS_DISABLED) {
         s->work[s->work_disabled--] = group;
     } else {
         s->work[s->work_enabled++] = group;
+        s->ve_selected += is_visible(ctx, group);
+        s->enabled_selected++;
     }
+    s->visibles_selected += is_visible(ctx, group);
     Printf (debug, "%d, ", group);
 }
 
 static inline void
-add_visible (por_context* ctx)
+select_one_invisible (por_context* ctx)
+{
+    // Valmari's L1 proviso requires one invisible transition (to include quiencent runs)
+   for(int i=0; i<ctx->enabled_list->count; i++) {
+       int group = ctx->enabled_list->data[i];
+       if (!is_visible(ctx, group)) {
+           select_group (ctx, group);
+           return;
+       }
+   }
+   HREassert (false, "Called select_one_invisible without enabled invisible transitions.");
+}
+
+static inline void
+select_all_visible (por_context* ctx)
 {
     // Valmari's V-proviso: implicate all visible groups
    for(int i=0; i<ctx->visible_list->count; i++) {
@@ -410,7 +439,7 @@ add_visible (por_context* ctx)
  * (based on heuristic function h(x) (nes_score)) isn't the lowest score anymore
  */
 static inline int
-bs_analyze(model_t model, por_context* ctx, int* src)
+bs_analyze (model_t model, por_context* ctx, int* src, bool fixed)
 {
     // if no search context is used, there are no transitions, nothing to analyze
     if (ctx->beam_used == 0) return 0;
@@ -505,10 +534,10 @@ bs_analyze(model_t model, por_context* ctx, int* src)
             // other idea is to init the search context only here, because we might need to
             // do a lot more work if we do it all at once and then just need one
             if (s[idx].score == ctx->emit_score-1)
-                update_score (ctx, current_group);
+                update_ns_scores (ctx, current_group);
 
             // update the search score
-            s[idx].score += 1;
+            s[idx].score += NO_V && is_visible(ctx, current_group) ? groups : 1;
 
             // quit the search when emit_limit is reached
             // this block is just to skip useless work, everything is emitted anyway
@@ -526,23 +555,15 @@ bs_analyze(model_t model, por_context* ctx, int* src)
             }
             Printf (debug, "\n");
 
-            if ( ctx->group_visibility[current_group] ||
-                 ctx->dynamic_visibility[current_group] ) {
-                if (NO_V) {
-                    for (int z = 0; z < ctx->enabled_list->count; z++) {
-                        int group = ctx->enabled_list->data[z];
-                        select_group (ctx, group);
-                    }
-                } else {
-                    add_visible (ctx);
-                }
+            if (!NO_V && (is_visible(ctx, current_group))) {
+                select_all_visible (ctx);
             }
         }
         // move search context down based on score
         int score = s[idx].score;
 
         // if it can't move, we found the best score
-        if (ctx->beam_used > 1 && score > s[ctx->search_order[1]].score) {
+        if (!fixed && ctx->beam_used > 1 && score > s[ctx->search_order[1]].score) {
             // if score is one, and we have no more work, we're ready too
             if (score == ctx->emit_score && s[idx].work_disabled == groups) {
                 Printf (debug, "bailing out, no disabled work and |ss|=1\n");
@@ -609,47 +630,71 @@ void ltl_hook_cb (void*context,transition_info_t *ti,int*dst) {
 }
 
 static inline int
+emit_new_selected (por_context* ctx, ltl_hook_context_t* ltlctx, int* src)
+{
+    search_context *s = &ctx->search[ctx->search_order[0]];
+    int res = 0;
+    for (int z = 0; z < ctx->enabled_list->count; z++) {
+        int i = ctx->enabled_list->data[z];
+        if (s->emit_status[i] & ES_EMITTED) continue;
+
+        if ((s->emit_status[i] & ES_SELECTED) || s->score >= ctx->emit_limit) {
+            s->emit_status[i] |= ES_EMITTED;
+            res += GBgetTransitionsLong (ctx->parent, i, src, ltl_hook_cb, ltlctx);
+        }
+    }
+    return res;
+}
+
+static inline int
+check_L1_L2_proviso (por_context* ctx)
+{
+    search_context *s = &ctx->search[ctx->search_order[0]];
+    return s->visibles_selected ==
+       ctx->visible_list->count + ctx->marked_list->count && // all visible selected
+     (ctx->visible_enabled == ctx->enabled_list->count ||     // no invisible is enabled
+      s->ve_selected != s->enabled_selected);                 // one invisible enabled selected
+}
+
+static inline int
 bs_emit (model_t model, por_context* ctx, int* src, TransitionCB cb, void* uctx)
 {
     // if no enabled transitions, return directly
     if (ctx->beam_used == 0) return 0;
+    // selected in winning search context
+    search_context *s = &ctx->search[ctx->search_order[0]];
     // if the score is larger then the number of enabled transitions, emit all
-    if (ctx->emitted == 0 && ctx->search[ctx->search_order[0]].score >= ctx->emit_limit) {
+    if (s->score >= ctx->emit_limit) {
         // return all enabled
         ltl_hook_context_t ltlctx = {cb, uctx, 0, 0, 1};
         return GBgetTransitionsAll(ctx->parent, src, ltl_hook_cb, &ltlctx);
     // otherwise: try the persistent set, but enforce that all por_proviso flags are true
     } else {
         ltl_hook_context_t ltlctx = {cb, uctx, 0, 0, 0};
+        ltlctx.force_proviso_true = !NO_L12 && check_L1_L2_proviso (ctx);
 
-        // emit select as long as por_proviso_false_cnt is 0
-        int res = 0;
-        ctx->emitted = 0;
-        for (int z=0; z < ctx->enabled_list->count &&
-                      (!ctx->ltl || ltlctx.por_proviso_false_cnt == 0); z++) {
-            int i = ctx->enabled_list->data[z];
-            // selected in winning search context
-            if ( ctx->search[ctx->search_order[0]].emit_status[i]&ES_SELECTED ) {
-                ctx->search[ctx->search_order[0]].emit_status[i]|=ES_EMITTED;
-                res+=GBgetTransitionsLong(ctx->parent,i,src,ltl_hook_cb,&ltlctx);
-            }
-        }
+        int res = emit_new_selected (ctx, &ltlctx, src);
 
-        // emit all if there is a transition group with por_proviso = false
+        // emit more if we need to fulfill a liveness / safety proviso
         if ( ( ctx->ltl && ltlctx.por_proviso_false_cnt != 0) ||
              (!ctx->ltl && ltlctx.por_proviso_true_cnt  == 0) ) {
-            // reemmit, emit all unemmitted
-            for (int z=0; z < ctx->enabled_list->count &&
-                          (!ctx->ltl || ltlctx.por_proviso_false_cnt == 0); z++) {
-                int i = ctx->enabled_list->data[z];
-                // enabled && selected
-                if ( !(ctx->search[ctx->search_order[0]].emit_status[i]&ES_EMITTED) ) {
-                    // these should also be marked as emmitted, for consistency
-                    // except that this data is not used anymore
-                    // pctx->search[pctx->search_order[0]].emit_status[i]|=ES_EMITTED;
-                    res+=GBgetTransitionsLong(ctx->parent,i,src,cb,uctx);
+
+            if (!NO_L12) {
+                // enforce L2 (include all visible transitions)
+                select_all_visible (ctx);
+                bs_analyze (model, ctx, src, true);
+
+                ltlctx.force_proviso_true = check_L1_L2_proviso (ctx);
+                // enforce L1 (one invisible transition)
+                // not to be worried about when using V'
+                if (!NO_V && !ltlctx.force_proviso_true) {
+                    select_one_invisible (ctx);
+                    bs_analyze (model, ctx, src, true);
                 }
+            } else {
+                s->score = ctx->emit_limit; // force all enabled
             }
+            res += emit_new_selected (ctx, &ltlctx, src);
         }
         return res;
     }
@@ -663,7 +708,7 @@ por_beam_search_all (model_t self, int *src, TransitionCB cb, void *user_context
 {
     por_context* pctx = ((por_context*)GBgetContext(self));
     bs_setup(self, pctx, src);
-    bs_analyze(self, pctx, src);
+    bs_analyze(self, pctx, src, false);
     unmark_dynamic_labels (pctx);
     return bs_emit (self, pctx, src, cb, user_context);
 }

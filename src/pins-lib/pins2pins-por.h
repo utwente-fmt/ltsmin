@@ -70,6 +70,9 @@ typedef struct search_context
 
     int             score;           // search weight
     int            *nes_score;       // nes score
+    int             visibles_selected; // selected number of visible transitions
+    int             ve_selected;       // selected number of visible and enabled transitions
+    int             enabled_selected;  // selected number of enabled transitions
 } search_context;
 
 
@@ -104,6 +107,7 @@ typedef struct por_context {
     int             *group_score;   // score assigned to each group by heuristic function
     int              beam_width;    // maximum width of the beam search
     int              beam_used;     // number of search contexts in use
+    int              visible_enabled;// number of enabled visible transitions
     ci_list         *enabled_list;  // enabled groups
     ci_list         *visible_list;  // enabled groups
 
