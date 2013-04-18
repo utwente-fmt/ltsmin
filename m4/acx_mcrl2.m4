@@ -29,6 +29,7 @@ if test x"$acx_mcrl2" = xyes; then
       8) MCRL2_PINS_CPPFLAGS="-DAT_64BIT" ;;
       *) AC_MSG_FAILURE([can only compile mCRL2 on 32- and 64-bit machines.]) ;;
     esac
+    AX_CHECK_COMPILE_FLAG([-std=c++0x], [CXXFLAGS="$CXXFLAGS -std=c++0x"])
     AC_SUBST(MCRL2_PINS_CPPFLAGS, ["$MCRL2_PINS_CPPFLAGS -I$with_mcrl2/include -I$with_mcrl2/include/dparser"])
     AC_SUBST(MCRL2_PINS_LDFLAGS,  ["-L${with_mcrl2}/lib/mcrl2"])
     AC_SUBST(MCRL2_LIBS, [""])
@@ -86,6 +87,10 @@ if test x"$acx_mcrl2" = xyes; then
        AX_CXX_CHECK_LIB([mcrl2_aterm], [main],
          [MCRL2_PINS_LIBS="-lmcrl2_aterm $MCRL2_PINS_LIBS"
           LIBS="-lmcrl2_aterm $LIBS"],
+         [acx_mcrl2_libs=no])
+       AX_CXX_CHECK_LIB([mcrl2_atermpp], [main],
+         [MCRL2_PINS_LIBS="-lmcrl2_atermpp $MCRL2_PINS_LIBS"
+          LIBS="-lmcrl2_atermpp $LIBS"],
          [acx_mcrl2_libs=no])
        AX_CXX_CHECK_LIB([mcrl2_core], [main],
          [MCRL2_PINS_LIBS="-lmcrl2_core $MCRL2_PINS_LIBS"

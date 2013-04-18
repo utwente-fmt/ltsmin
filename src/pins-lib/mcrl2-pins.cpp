@@ -227,6 +227,8 @@ private:
     std::vector< std::vector<int> > map_;
 };
 
+const int pins::IDX_NOT_FOUND;
+
 struct state_cb
 {
     typedef ltsmin::pins::state_vector state_vector;

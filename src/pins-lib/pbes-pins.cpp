@@ -219,6 +219,8 @@ public:
     }
 };
 
+const int explorer::IDX_NOT_FOUND;
+
 struct pbes_state_cb
 {
     model_t model;
