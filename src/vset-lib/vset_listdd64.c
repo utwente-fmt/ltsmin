@@ -663,7 +663,7 @@ mdd64_save_bin(FILE* f, uint64_t mdd)
     mdd64_clear_and_write_bin(s, mdd, &count, node_map);
     simplemap64_destroy(node_map);
     stream_flush(s);
-    stream_close(s);
+    stream_close(&s);
 }
 
 static uint64_t
@@ -702,7 +702,7 @@ mdd64_load_bin(FILE* f)
         mdd_load_node_count++;
     }
     RTfree(mdd_load_node_ids);
-    stream_close(s);
+    stream_close(&s);
     mdd_load_node_ids = NULL;
     mdd_load_node_count = 0;
     return mdd;
@@ -786,7 +786,7 @@ rel_save_proj64_bin(FILE* f, vrel_t rel)
         DSwriteS32(s, rel->proj[i]);
     }
     stream_flush(s);
-    stream_close(s);
+    stream_close(&s);
 }
 
 static void
@@ -804,7 +804,7 @@ rel_load_proj64_bin(FILE* f, vdom_t dom)
     for(int i=0; i<p_len; i++){
         proj[i] = DSreadS32(s);
     }
-    stream_close(s);
+    stream_close(&s);
     vrel_t result = rel_create_mdd64(dom, p_len, proj);
     return result;
 }

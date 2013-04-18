@@ -1977,7 +1977,7 @@ void init_spg(model_t model)
     if (GBhaveMucalc()) {
         num_vars = GBgetMucalcNodeCount(model); // number of mu-calculus subformulae
     }
-    Print(infoLong, "init_spg: var_type_no=%d, num_vars=%d", var_type_no, num_vars);
+    Print(infoLong, "init_spg: var_type_no=%d, num_vars=%zu", var_type_no, num_vars);
     priority = RTmalloc(num_vars * sizeof(int)); // priority of variables
     player = RTmalloc(num_vars * sizeof(int)); // player of variables
     for(size_t i=0; i<num_vars; i++)
@@ -2027,7 +2027,7 @@ parity_game* compute_symbolic_parity_game(vset_t visited, int* src)
     for(size_t i = 0; i < num_vars; i++)
     {
         // players
-        Print(infoLong, "Adding nodes for var %d (player %d).", i, player[i]);
+        Print(infoLong, "Adding nodes for var %zu (player %d).", i, player[i]);
         add_variable_subset(g->v_player[player[i]], g->v, g->domain, i);
         // priorities
         add_variable_subset(g->v_priority[priority[i]], g->v, g->domain, i);
