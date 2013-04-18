@@ -58,6 +58,12 @@ typedef struct ci_list
  * started form a different initial transition
  * The beam search will always start working on the
  * search context with the lowest score.
+ *
+ * The score of each search context is a sum:
+ * - disabled transition group 0
+ * - enabled  transition group 1
+ * - visible  transition group N
+ *
  */
 typedef struct search_context
 {
@@ -67,6 +73,7 @@ typedef struct search_context
                                      // [enabled0, enabled1, .. | free | workn-1, workn]
     int             work_enabled;    // number of enabled groups in work
     int             work_disabled;   // number of disabled groups in work
+    int             idx;             // index of this search context
 
     int             score;           // search weight
     int            *nes_score;       // nes score
