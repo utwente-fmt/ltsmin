@@ -138,6 +138,8 @@ typedef struct por_context {
     ci_list         *label_list;    // visible labels
     ci_list         *marked_list;   // labels dynamically marked as visible
     int             *dynamic_visibility; // idem
+
+    void            *scc_ctx;
 } por_context;
 
 #endif // PINS2PINS_POR

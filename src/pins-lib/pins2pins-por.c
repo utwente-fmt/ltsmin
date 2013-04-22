@@ -9,6 +9,8 @@
 #include <pins-lib/pins.h>
 #include <pins-lib/pins2pins-por.h>
 #include <pins-lib/pins-util.h>
+#include <util-lib/dfs-stack.h>
+#include <util-lib/util.h>
 
 static int NO_DNA = 0;
 static int NO_NES = 0;
@@ -17,6 +19,7 @@ static int NO_MC = 0;
 static int NO_DYNLAB = 0;
 static int NO_V = 0;
 static int NO_L12 = 0;
+static int USE_SCC = 0;
 
 struct poptOption por_options[]={
     { "por" , 'p' , POPT_ARG_VAL , &PINS_POR , PINS_POR_ON , "enable partial order reduction" , NULL },
@@ -28,6 +31,7 @@ struct poptOption por_options[]={
     { "no-dynamic-labels" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_DYNLAB , 1 , "without dynamic labels" , NULL },
     { "no-V" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_V , 1 , "without V proviso, instead use Peled's visibility proviso, or V'     " , NULL },
     { "no-L12" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_L12 , 1 , "without L1/L2 proviso, instead use Peled's cycle proviso, or L2'   " , NULL },
+    { "por-scc" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &USE_SCC , 1 , "use an incomplete SCC-based stubborn set algorithm" , NULL },
     POPT_TABLEEND
 };
 
@@ -43,7 +47,6 @@ init_dynamic_labels (por_context* pctx)
 
     model_t model = pctx->parent;
     int groups = dm_nrows(GBgetDMInfo(model));
-    int slots = dm_ncols(GBgetDMInfo(model));
     int labels = pins_get_state_label_count (model);
 
     // record visible labels
@@ -123,6 +126,107 @@ static inline int
 is_visible (por_context* ctx, int group)
 {
     return ctx->group_visibility[group] || ctx->dynamic_visibility[group];
+}
+
+typedef struct scc_state_s {
+    int              group;
+    int              lowest;
+} scc_state_t;
+
+typedef struct scc_context_s {
+    search_context  *search;           // context for each SCC search
+    int              index;         // depth index
+    int             *group_index;
+    dfs_stack_t      tarjan;
+    dfs_stack_t      stack;
+    ci_list         *scc_list;
+    ci_list        **stubborn_list;
+} scc_context_t;
+
+static const int SCC_SCC = -1;
+static const int SCC_NEW = 0;
+
+static scc_context_t *
+create_scc_ctx (por_context* ctx)
+{
+    scc_context_t *scc = RTmallocZero (sizeof(scc_context_t));
+    scc->group_index = RTmallocZero ((ctx->ngroups) * sizeof(int));
+    scc->scc_list = RTmallocZero ((ctx->ngroups + 1) * sizeof(int));
+    scc->stubborn_list = RTmallocZero (2 * sizeof(ci_list *));
+    scc->stubborn_list[0] = RTmallocZero ((ctx->ngroups + 1) * sizeof(int));
+    scc->stubborn_list[1] = RTmallocZero ((ctx->ngroups + 1) * sizeof(int));
+    scc->stack = dfs_stack_create (2); // only integers for groups
+    scc->tarjan = dfs_stack_create (1); // only integers for group
+    scc->search = &ctx->search[0];
+    ctx->search_order[0] = 0;
+    return scc;
+}
+
+/**
+ * For each state, this function sets up the current guard values etc
+ * This setup is then reused by the analysis function
+ */
+static void
+scc_setup (model_t model, por_context* ctx, int* src)
+{
+    // number of necessary sets (halves if MC is absent, because no NDSs then)
+    int nns = NO_MC ? ctx->nguards : ctx->nguards * 2;
+
+    // fill guard status, request all guard values,
+    GBgetStateLabelsAll (model, src, ctx->label_status);
+
+    // fill dynamic groups
+    mark_dynamic_labels (ctx);
+
+    ctx->visible_enabled = 0;
+    ctx->enabled_list->count = 0;
+    // fill group status and score
+    for (int i = 0; i < ctx->ngroups; i++) {
+        ctx->group_status[i] = GS_ENABLED; // reset
+        // mark groups as disabled
+        guard_t* gt = GBgetGuard(model, i);
+        for (int j=0; j < gt->count; j++) {
+            if (ctx->label_status[gt->guard[j]] == 0) {
+                ctx->group_status[i] = GS_DISABLED;
+                break;
+            }
+        }
+
+        // set group score
+        if (ctx->group_status[i] == GS_ENABLED) {
+            ctx->enabled_list->data[ctx->enabled_list->count++] = i;
+            ctx->visible_enabled += ctx->group_visibility[i] || ctx->dynamic_visibility[i];
+        } else { // disabled
+            ctx->group_score[i] = 1;
+        }
+    }
+
+    // set score for enable transitions
+    for(int i=0; i<ctx->enabled_list->count; i++) {
+        int group = ctx->enabled_list->data[i];
+        if ((ctx->group_visibility[group] || ctx->dynamic_visibility[group])) {
+            ctx->group_score[group] = ctx->visible_enabled * ctx->ngroups;
+        } else {
+            ctx->group_score[group] = ctx->ngroups;
+        }
+    }
+
+    // fill nes score
+    // heuristic score h(x): 1 for disabled transition, n for enabled transition, n^2 for visible transition
+    for (int i=0; i < ctx->nguards; i++) {
+        if (ctx->label_status[i] && NO_MC) continue;
+
+        int idx = ctx->label_status[i] ? i + ctx->nguards : i;
+        ctx->nes_score[idx] = 0;
+        for (int j=0; j < ctx->ns[idx]->count; j++) {
+            ctx->nes_score[idx] += ctx->group_score[ ctx->ns[idx]->data[j] ];
+        }
+    }
+
+    scc_context_t *scc = (scc_context_t *)ctx->scc_ctx;
+    memset(scc->search->emit_status, 0, sizeof(emit_status_t[ctx->ngroups]));
+    memcpy(scc->search->nes_score, ctx->nes_score, nns * sizeof(int));
+    memset(scc->group_index, SCC_NEW, ctx->ngroups * sizeof(int));
 }
 
 /**
@@ -220,11 +324,8 @@ bs_setup (model_t model, por_context* ctx, int* src)
  * It takes care of updating the heuristic function for the nes based on the new group selection
  */
 static inline void
-update_ns_scores (por_context* ctx, int group)
+update_ns_scores (por_context* ctx, search_context *s, int group)
 {
-    // get current search context
-    search_context *s = &ctx->search[ ctx->search_order[0] ];
-
     // change the heuristic function according to selected group
     for(int k=0 ; k< ctx->group2ns[group]->count; k++) {
         int ns = ctx->group2ns[group]->data[k];
@@ -251,7 +352,7 @@ select_group (por_context* ctx, int group)
 
     s->emit_status[group] |= ES_SELECTED;
 
-    update_ns_scores (ctx, group);
+    update_ns_scores (ctx, s, group);
 
     // and add to work array and update counts
     if (ctx->group_status[group] & GS_DISABLED) {
@@ -298,9 +399,8 @@ select_all_visible (por_context* ctx)
  * group.
  */
 static inline int
-find_cheapest_ns (por_context* ctx, int group)
+find_cheapest_ns (por_context* ctx, search_context *s, int group)
 {
-    search_context *s = &ctx->search[ ctx->search_order[0] ];
     int n_guards = ctx->nguards;
 
     // for a disabled transition we need to add the necessary set
@@ -390,8 +490,7 @@ bs_analyze (por_context* ctx)
         while(s->work_enabled == 0 && s->work_disabled < ctx->ngroups) {
             // one disabled transition less, increase the count (work_disabled = n -> no disabled transitions)
             s->work_disabled++;
-            int w = s->work_disabled;
-            int current_group = s->work[w];
+            int current_group = s->work[s->work_disabled];
 
             // bail out if already ready
             if (s->emit_status[current_group] & ES_READY) continue;
@@ -401,7 +500,7 @@ bs_analyze (por_context* ctx)
 
             Printf (debug, "BEAM-%d investigating group %d (disabled) --> ", s->idx, current_group);
 
-            int selected_ns = find_cheapest_ns (ctx, current_group);
+            int selected_ns = find_cheapest_ns (ctx, s, current_group);
 
             // add the selected nes to work
             for(int k=0; k < ctx->ns[selected_ns]->count; k++) {
@@ -416,8 +515,7 @@ bs_analyze (por_context* ctx)
         while (s->work_enabled > 0) {
             // one less enabled transition (work_enabled = 0 -> no enabled transitions)
             s->work_enabled--;
-            int w = s->work_enabled;
-            int current_group = s->work[w];
+            int current_group = s->work[s->work_enabled];
             Printf (debug, "BEAM-%d investigating group %d (enabled) --> ", s->idx, current_group);
 
             // select and mark as ready
@@ -430,7 +528,7 @@ bs_analyze (por_context* ctx)
             // other idea is to init the search context only here, because we might need to
             // do a lot more work if we do it all at once and then just need one
             if (s->score == ctx->emit_score-1)
-                update_ns_scores (ctx, current_group);
+                update_ns_scores (ctx, s, current_group);
 
             // update the search score
             s->score += NO_V && is_visible(ctx, current_group) ? ctx->ngroups : 1;
@@ -456,6 +554,140 @@ bs_analyze (por_context* ctx)
             }
         }
     } while (beam_sort(ctx));
+}
+
+static inline void
+scc_expand (por_context* ctx, int group)
+{
+    scc_context_t *scc = (scc_context_t *)ctx->scc_ctx;
+    ci_list *successors;
+    if (ctx->group_status[group] & GS_DISABLED) {
+        int ns = find_cheapest_ns (ctx, scc->search, group);
+        successors = ctx->ns[ns];
+    } else {
+        successors = ctx->not_accords_tg_tg[ group ];
+    }
+    for (int j=0; j < successors->count; j++) {
+        int next_group = successors->data[j];
+        if (scc->group_index[next_group] != SCC_SCC) {
+            scc_state_t next = { next_group, -1 };
+            dfs_stack_push (scc->stack, (int*)&next);
+        }
+    }
+}
+
+static inline void
+scc_root (por_context* ctx, int root)
+{
+    scc_state_t *x;
+    scc_context_t *scc = (scc_context_t *)ctx->scc_ctx;
+    scc->scc_list->count = 0;
+    scc->stubborn_list[1]->count = 0;
+    do {x = (scc_state_t *)dfs_stack_pop(scc->tarjan);
+        if (!(ctx->group_status[x->group] & GS_DISABLED)) {
+            scc->stubborn_list[1]->data[ scc->stubborn_list[1]->count++ ] = x->group;
+        }
+        scc->scc_list->data[ scc->scc_list->count++ ] = x->group;
+        scc->group_index[x->group] = SCC_SCC; // mark SCC
+    } while (x->group != root);
+    if (scc->stubborn_list[1]->count > 0 &&
+        scc->stubborn_list[1]->count < scc->stubborn_list[0]->count) {
+        swap (scc->stubborn_list[0], scc->stubborn_list[1]);
+    }
+}
+
+static void
+scc_search (por_context* ctx)
+{
+    scc_context_t *scc = (scc_context_t *)ctx->scc_ctx;
+    scc_state_t *state, *pred;
+
+    while (true) {
+        state = (scc_state_t *)dfs_stack_top(scc->stack);
+        if (state != NULL) {
+            if (scc->group_index[state->group] == SCC_SCC) {
+                dfs_stack_pop (scc->stack);
+                continue;
+            }
+
+            if (scc->group_index[state->group] == SCC_NEW) {
+                HREassert (state->lowest == -1);
+                // assign index
+                scc->group_index[state->group] = ++scc->index;
+                state->lowest = scc->index;
+                // add to tarjan stack
+                dfs_stack_push (scc->tarjan, &state->group);
+
+                // push successors
+                dfs_stack_enter (scc->stack);
+                scc_expand (ctx, state->group);
+            } else {
+                pred = (scc_state_t *)dfs_stack_peek_top (scc->stack, 1);
+                if (scc->group_index[state->group] < pred->lowest) {
+                    pred->lowest = scc->group_index[state->group];
+                }
+                dfs_stack_pop (scc->stack);
+            }
+        } else {
+            dfs_stack_leave (scc->stack);
+            state = (scc_state_t *)dfs_stack_pop (scc->stack);
+
+            // detected an SCC
+            if (scc->group_index[state->group] == state->lowest) {
+                scc_root (ctx, state->group);
+                if (scc->stubborn_list[0]->count > 0 &&
+                        scc->stubborn_list[0]->count != INT32_MAX) break;
+            }
+            update_ns_scores (ctx, scc->search, state->group); // remove from NS scores
+
+            if (dfs_stack_nframes(scc->stack) > 0) {
+                // (after recursive return call) update index
+                pred = (scc_state_t *)dfs_stack_peek_top (scc->stack, 1);
+                if (state->lowest < pred->lowest) {
+                    pred->lowest = state->lowest;
+                }
+            } else {
+                HREassert (scc->stubborn_list[0]->count > 0 &&
+                           scc->stubborn_list[0]->count != INT32_MAX);
+                break;
+            }
+        }
+    }
+}
+
+static void
+empty_stack (dfs_stack_t stack)
+{
+    while (dfs_stack_size(stack)) {
+        void *s = dfs_stack_pop (stack);
+        if (s == NULL) {
+            dfs_stack_leave (stack);
+        }
+    }
+}
+
+static void
+scc_analyze (por_context* ctx)
+{
+    scc_context_t *scc = (scc_context_t *)ctx->scc_ctx;
+
+    scc->index = 0;
+    empty_stack (scc->stack);
+    empty_stack (scc->tarjan);
+    scc->stubborn_list[0]->count = INT32_MAX;
+
+    for (int j=0; j < ctx->enabled_list->count; j++) {
+        int group = ctx->enabled_list->data[j];
+        if (scc->group_index[group] == SCC_NEW) {
+            scc_state_t next = { group, -1 };
+            dfs_stack_push (scc->stack, (int*)&next);
+            scc_search (ctx);
+            if (scc->stubborn_list[0]->count > 0 &&
+                    scc->stubborn_list[0]->count != INT32_MAX) {
+                return;
+            }
+        }
+    }
 }
 
 /**
@@ -512,12 +744,12 @@ check_L1_L2_proviso (por_context* ctx)
     search_context *s = &ctx->search[ctx->search_order[0]];
     return s->visibles_selected ==
        ctx->visible_list->count + ctx->marked_list->count && // all visible selected
-     (ctx->visible_enabled == ctx->enabled_list->count ||     // no invisible is enabled
-      s->ve_selected != s->enabled_selected);                 // one invisible enabled selected
+     (ctx->visible_enabled == ctx->enabled_list->count ||    // no invisible is enabled
+      s->ve_selected != s->enabled_selected);                // one invisible enabled selected
 }
 
 static inline int
-bs_emit (model_t model, por_context* ctx, int* src, TransitionCB cb, void* uctx)
+bs_emit (por_context* ctx, int* src, TransitionCB cb, void* uctx)
 {
     // if no enabled transitions, return directly
     if (ctx->beam_used == 0) return 0;
@@ -562,6 +794,28 @@ bs_emit (model_t model, por_context* ctx, int* src, TransitionCB cb, void* uctx)
     }
 }
 
+static int
+scc_emit (por_context* ctx, int* src, TransitionCB cb, void* uctx)
+{
+    scc_context_t *scc = (scc_context_t *)ctx->scc_ctx;
+
+    if (ctx->enabled_list->count == scc->stubborn_list[0]->count) {
+        // return all enabled
+        ltl_hook_context_t ltlctx = {cb, uctx, 0, 0, 1};
+        return GBgetTransitionsAll(ctx->parent, src, ltl_hook_cb, &ltlctx);
+    } else {
+        ltl_hook_context_t ltlctx = {cb, uctx, 0, 0, 0};
+        ltlctx.force_proviso_true = !NO_L12 && check_L1_L2_proviso (ctx);
+
+        int c = 0;
+        for (int z = 0; z < scc->stubborn_list[0]->count; z++) {
+            int i = scc->stubborn_list[0]->data[z];
+            c += GBgetTransitionsLong (ctx->parent, i, src, ltl_hook_cb, &ltlctx);
+        }
+        return c;
+    }
+}
+
 /**
  * Default functions for long and short
  * Note: these functions don't work for partial order reduction,
@@ -601,7 +855,22 @@ por_beam_search_all (model_t self, int *src, TransitionCB cb, void *user_context
     por_context* ctx = ((por_context*)GBgetContext(self));
     bs_setup (self, ctx, src);
     bs_analyze (ctx);
-    int emitted = bs_emit (self, ctx, src, cb, user_context);
+    int emitted = bs_emit (ctx, src, cb, user_context);
+    unmark_dynamic_labels (ctx);
+    return emitted;
+}
+
+/**
+ * Same but for Safety / Liveness using SCC algorithm
+ */
+static int
+por_scc_search_all (model_t self, int *src, TransitionCB cb, void *user_context)
+{
+    por_context* ctx = ((por_context*)GBgetContext(self));
+    scc_setup (self, ctx, src);
+    if (ctx->enabled_list->count == 0) return 0;
+    scc_analyze (ctx);
+    int emitted = scc_emit (ctx, src, cb, user_context);
     unmark_dynamic_labels (ctx);
     return emitted;
 }
@@ -935,7 +1204,11 @@ GBaddPOR (model_t model)
 
     GBsetNextStateLong  (pormodel, por_long);
     GBsetNextStateShort (pormodel, por_short);
-    GBsetNextStateAll   (pormodel, por_beam_search_all);
+    if (USE_SCC) {
+        GBsetNextStateAll   (pormodel, por_scc_search_all);
+    } else {
+        GBsetNextStateAll   (pormodel, por_beam_search_all);
+    }
 
     GBinitModelDefaults (&pormodel, model);
 
@@ -960,12 +1233,16 @@ GBaddPOR (model_t model)
     ctx->marked_list = NULL;
     ctx->label_list = NULL;
 
+
     int                 s0[len];
     GBgetInitialState (model, s0);
     GBsetInitialState (pormodel, s0);
 
     // after complete initialization
     bs_init_beam_context (pormodel);
+
+    // SCC search
+    ctx->scc_ctx = create_scc_ctx (ctx);
 
     return pormodel;
 }
