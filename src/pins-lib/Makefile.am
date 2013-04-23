@@ -1,4 +1,13 @@
 
+HRE_LIB = ../hre/libhre.la
+LIBS  =
+LIBS += ../util-lib/libutil.la
+LIBS += ../lts-io/liblts-io.la
+LIBS += ../hre-io/libhre-io.la
+LIBS += $(HRE_LIB)
+LIBS += ../ltsmin-lib/libltsmin.la
+LIBS += ../dm/libdm.la
+
 noinst_LTLIBRARIES  = libpins.la
 
 if HAVE_LIBSTEP_INFO
@@ -21,19 +30,19 @@ libmcrl_pins_la_SOURCES   = mcrl-pins.c mcrl-pins.h
 libmcrl_pins_la_SOURCES  += at-map.c at-map.h
 libmcrl_pins_la_CPPFLAGS  = -DMCRL -DNDEBUG $(MCRL_CPPFLAGS) $(AM_CPPFLAGS)
 libmcrl_pins_la_LDFLAGS   = $(MCRL_LDFLAGS) $(MCRL_LDFLAGS) $(AM_LDFLAGS)
-libmcrl_pins_la_LIBADD    = $(MCRL_LIBS) 
+libmcrl_pins_la_LIBADD    = $(MCRL_LIBS) $(LIBS) 
 
 # libmcrl2-pins
 libmcrl2_pins_la_SOURCES  = mcrl2-pins.cpp mcrl2-pins.h
 libmcrl2_pins_la_CPPFLAGS = -DMCRL2 -DNDEBUG $(MCRL2_PINS_CPPFLAGS) $(AM_CPPFLAGS)
 libmcrl2_pins_la_LDFLAGS  = $(MCRL2_PINS_LDFLAGS) $(MCRL2_LDFLAGS) $(AM_LDFLAGS)
-libmcrl2_pins_la_LIBADD   = $(MCRL2_PINS_LIBS)
+libmcrl2_pins_la_LIBADD   = $(MCRL2_PINS_LIBS) $(LIBS)
 
 # libpbes-pins
 libpbes_pins_la_SOURCES   = pbes-pins.cpp pbes-pins.h
 libpbes_pins_la_CPPFLAGS  = -DPBES -DNDEBUG $(MCRL2_PINS_CPPFLAGS) $(AM_CPPFLAGS)
 libpbes_pins_la_LDFLAGS   = $(MCRL2_PINS_LDFLAGS) $(MCRL2_LDFLAGS) $(AM_LDFLAGS)
-libpbes_pins_la_LIBADD    = $(MCRL2_PINS_LIBS)
+libpbes_pins_la_LIBADD    = $(MCRL2_PINS_LIBS) $(LIBS)
 
 # libpins
 libpins_la_SOURCES  =
