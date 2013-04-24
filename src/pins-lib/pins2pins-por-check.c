@@ -125,13 +125,14 @@ update_group_info (dlk_check_context_t *ctx, transition_info_t *ti)
     }
 }
 
-static void
+static int *
 push_trans (dlk_check_context_t* ctx, dfs_stack_t stack, int* dst)
 {
     int *space = dfs_stack_push (stack, NULL );
     memcpy (space, dst, sizeof(int[ctx->len]));
     space[ctx->len] = ctx->current; // from update group info
     space[ctx->len + 1] = ctx->current_idx; // from update group info
+    return space;
 }
 
 static void
@@ -158,9 +159,22 @@ print_diff (dlk_check_context_t *ctx, int *s1, int *s2)
 }
 
 static void
+print_search_path (dlk_check_context_t *ctx)
+{
+    Printf (error, "NS search path: ");
+    for (int i = 0; i < dfs_stack_nframes(ctx->stack); i++) {
+        int *path = dfs_stack_peek_top (ctx->stack, i);
+        Printf (error, "%d(%d), ", path[ctx->len], path[ctx->len+1]);
+    }
+    Printf (error, "\n");
+}
+
+static void
 print_noncommuting_trans (dlk_check_context_t *ctx, int *src, int *dst, int *s1,
                                                                int *tgt, int *s2)
 {
+    print_search_path (ctx);
+
     Printf (info, "\n");
     Printf (info, "src  ----ns---->  dst\n");
     Printf (info, " |                 |\n");
@@ -194,6 +208,8 @@ print_noncommuting_trans (dlk_check_context_t *ctx, int *src, int *dst, int *s1,
 static void
 print_disabled_trans (dlk_check_context_t *ctx, int *src, int *dst, int *tgt)
 {
+    print_search_path (ctx);
+
     Printf (info, "\n");
     Printf (info, "src  ----ns---->  dst\n");
     Printf (info, " |                 |\n");
@@ -214,6 +230,8 @@ print_disabled_trans (dlk_check_context_t *ctx, int *src, int *dst, int *tgt)
 static void
 print_enabled_trans (dlk_check_context_t *ctx, int *src, int *dst, int *s1)
 {
+    print_search_path (ctx);
+
     Printf (info, "\n");
     Printf (info, "src  ----ns---->  dst\n");
     Printf (info, "                   |\n");
@@ -343,10 +361,10 @@ get_nonstubborn_cb (void *context, transition_info_t *ti, int *dst)
     ctx->seen_list->data[ctx->seen_list->count++] = ti->group;
 
     if (ctx->stubborn[ti->group]) {
-        if (find_list(ctx->ss_en_list, ti->group)) {
-            // push (initially) enabled stubborn transitions
-            push_trans (ctx, ctx->tgt_in_stack, dst);
-        } else {
+        // push (initially) enabled stubborn transitions
+        dst = push_trans (ctx, ctx->tgt_in_stack, dst);
+
+        if (!find_list(ctx->ss_en_list, ti->group)) { // bail out
             int *src = dfs_stack_peek_top (ctx->stack, 2);
             print_enabled_trans (ctx, src, ctx->src, dst);
             HREassert (false, "Disabled stubborn transition %d was enabled by %d/%d, (ss: %s)"
