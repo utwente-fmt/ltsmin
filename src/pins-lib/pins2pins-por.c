@@ -12,6 +12,7 @@
 #include <util-lib/dfs-stack.h>
 #include <util-lib/util.h>
 
+static int NO_HEUR = 0;
 static int NO_DNA = 0;
 static int NO_NES = 0;
 static int NO_NDS = 0;
@@ -20,18 +21,25 @@ static int NO_DYNLAB = 0;
 static int NO_V = 0;
 static int NO_L12 = 0;
 static int USE_SCC = 0;
+static int PREFER_NDS = 0;
+static int RANDOM = 0;
+static int DYN_RANDOM = 0;
 
 struct poptOption por_options[]={
     { "por" , 'p' , POPT_ARG_VAL , &PINS_POR , PINS_POR_ON , "enable partial order reduction" , NULL },
     { "check-por" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &PINS_POR , PINS_POR_CHECK , "verify partial order reduction peristent sets" , NULL },
     { "no-dna" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_DNA , 1 , "without DNA" , NULL },
     { "no-nes" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_NES , 1 , "without NES" , NULL },
+    { "no-heur" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_HEUR , 1 , "without heuristic" , NULL },
     { "no-nds" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_NDS , 1 , "without NDS (for dynamic label info)" , NULL },
     { "no-mc" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_MC , 1 , "without MC (for NDS)" , NULL },
     { "no-dynamic-labels" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_DYNLAB , 1 , "without dynamic labels" , NULL },
     { "no-V" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_V , 1 , "without V proviso, instead use Peled's visibility proviso, or V'     " , NULL },
     { "no-L12" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_L12 , 1 , "without L1/L2 proviso, instead use Peled's cycle proviso, or L2'   " , NULL },
     { "por-scc" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &USE_SCC , 1 , "use an incomplete SCC-based stubborn set algorithm" , NULL },
+    { "prefer-nds" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &PREFER_NDS , 1 , "prefer MC+NDS over NES" , NULL },
+    { "por-random" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &RANDOM , 1 , "randomize necessary sets (static)" , NULL },
+    { "por-dynamic" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &DYN_RANDOM , 1 , "randomize necessary sets (dynamic)" , NULL },
     POPT_TABLEEND
 };
 
@@ -268,25 +276,27 @@ bs_setup (model_t model, por_context* ctx, int* src)
         }
     }
 
-    // set score for enable transitions
-    for(int i=0; i<ctx->enabled_list->count; i++) {
-        int group = ctx->enabled_list->data[i];
-        if ((ctx->group_visibility[group] || ctx->dynamic_visibility[group])) {
-            ctx->group_score[group] = ctx->visible_enabled * ctx->ngroups;
-        } else {
-            ctx->group_score[group] = ctx->ngroups;
+    if (!NO_HEUR) {
+        // set score for enable transitions
+        for(int i=0; i<ctx->enabled_list->count; i++) {
+            int group = ctx->enabled_list->data[i];
+            if ((ctx->group_visibility[group] || ctx->dynamic_visibility[group])) {
+                ctx->group_score[group] = ctx->visible_enabled * ctx->ngroups;
+            } else {
+                ctx->group_score[group] = ctx->ngroups;
+            }
         }
-    }
 
-    // fill nes score
-    // heuristic score h(x): 1 for disabled transition, n for enabled transition, n^2 for visible transition
-    for (int i=0; i < ctx->nguards; i++) {
-        if (ctx->label_status[i] && NO_MC) continue;
+        // fill nes score
+        // heuristic score h(x): 1 for disabled transition, n for enabled transition, n^2 for visible transition
+        for (int i=0; i < ctx->nguards; i++) {
+            if (ctx->label_status[i] && NO_MC) continue;
 
-        int idx = ctx->label_status[i] ? i + ctx->nguards : i;
-        ctx->nes_score[idx] = 0;
-        for (int j=0; j < ctx->ns[idx]->count; j++) {
-            ctx->nes_score[idx] += ctx->group_score[ ctx->ns[idx]->data[j] ];
+            int idx = ctx->label_status[i] ? i + ctx->nguards : i;
+            ctx->nes_score[idx] = 0;
+            for (int j=0; j < ctx->ns[idx]->count; j++) {
+                ctx->nes_score[idx] += ctx->group_score[ ctx->ns[idx]->data[j] ];
+            }
         }
     }
 
@@ -302,7 +312,8 @@ bs_setup (model_t model, por_context* ctx, int* src)
         // init score
         ctx->search[beam_idx].score = 0; // 0 = uninitialized
         memset(ctx->search[beam_idx].emit_status, 0, sizeof(emit_status_t[ctx->ngroups]));
-        memcpy(ctx->search[beam_idx].nes_score, ctx->nes_score, nns * sizeof(int));
+        if (!NO_HEUR)
+            memcpy(ctx->search[beam_idx].nes_score, ctx->nes_score, nns * sizeof(int));
         // reset counts
         ctx->search[beam_idx].visibles_selected = 0;
         ctx->search[beam_idx].enabled_selected = 0;
@@ -326,6 +337,8 @@ bs_setup (model_t model, por_context* ctx, int* src)
 static inline void
 update_ns_scores (por_context* ctx, search_context *s, int group)
 {
+    if (NO_HEUR) return;
+
     // change the heuristic function according to selected group
     for(int k=0 ; k< ctx->group2ns[group]->count; k++) {
         int ns = ctx->group2ns[group]->data[k];
@@ -395,7 +408,7 @@ select_all_visible (por_context* ctx)
 }
 
 /**
- * Based on the heuristic and find the cheapest NS (NES/NDS) for a disbaled
+ * Based on the heuristic and find the cheapest NS (NES/NDS) for a disabled
  * group.
  */
 static inline int
@@ -407,14 +420,19 @@ find_cheapest_ns (por_context* ctx, search_context *s, int group)
     // lookup which set has the lowest score on the heuristic function h(x)
     int selected_ns = -1;
     int selected_score = INT32_MAX;
+    int count = ctx->group_has[group]->count;
+
+    if (DYN_RANDOM)
+        randperm (ctx->random, count, ctx->seed++);
 
     // for each possible nes for the current group
-    for (int k=0 ; k < ctx->group_has[group]->count; k++) {
-        int ns = ctx->group_has[group]->data[k];
+    for (int k = 0; k < count; k++) {
+
+        int ns = ctx->group_has[group]->data[ ctx->random[k] ];
 
         // check the score by the heuristic function h(x)
-        if (s->nes_score[ns] < selected_score) {
-            // check nes is indeed for this group
+        if (NO_HEUR || s->nes_score[ns] < selected_score) {
+            // check gruard status for ns (nes for disabled and nds for enabled):
             if ((ns < n_guards && (ctx->label_status[ns] == 0))  ||
                 (ns >= n_guards && (ctx->label_status[ns-n_guards] != 0)) ) {
 
@@ -422,7 +440,7 @@ find_cheapest_ns (por_context* ctx, search_context *s, int group)
                 selected_ns = ns;
                 selected_score = s->nes_score[ns];
                 // if score is 0 it can't improve, break the loop
-                if (selected_score == 0) return selected_ns;
+                if (NO_HEUR || selected_score == 0) return selected_ns;
             }
         }
     }
@@ -658,7 +676,7 @@ scc_search (por_context* ctx)
 static void
 empty_stack (dfs_stack_t stack)
 {
-    while (dfs_stack_size(stack)) {
+    while (dfs_stack_size(stack) != 0) {
         void *s = dfs_stack_pop (stack);
         if (s == NULL) {
             dfs_stack_leave (stack);
@@ -875,6 +893,24 @@ por_scc_search_all (model_t self, int *src, TransitionCB cb, void *user_context)
     return emitted;
 }
 
+static void
+list_invert (ci_list *list)
+{
+    for (int i = 0; i < list->count / 2; i++) {
+        swap (list->data[i], list->data[list->count - i - 1]);
+    }
+}
+
+static void
+list_randomize (ci_list *list, int seed)
+{
+    int rand[list->count];
+    randperm (rand, list->count, seed);
+    for (int i = 0; i < list->count; i++) {
+        swap (list->data[i], list->data[ rand[i] ]);
+    }
+}
+
 /**
  * Function used to setup the beam search
  * Initialize and allocate all memory that is reused all the time
@@ -974,6 +1010,19 @@ bs_init_beam_context (model_t model)
     // build table group has
     ctx->group_has = (ci_list**) dm_rows_to_idx_table(&group_has);
     dm_free(&group_has);
+
+    if (PREFER_NDS) {
+        HREassert (!RANDOM, "--por-random incompatible with --prefer-nds");
+        for (int i=0; i < ctx->ngroups; i++) {
+            list_invert (ctx->group_has[i]);
+        }
+    }
+    if (RANDOM) {
+        HREassert (!PREFER_NDS, "--por-random incompatible with --prefer-nds");
+        for (int i=0; i < ctx->ngroups; i++) {
+            list_randomize (ctx->group_has[i], i);
+        }
+    }
 
     // init for each search context
     for(int i=0 ; i < BEAM_WIDTH; i++) {
@@ -1232,7 +1281,10 @@ GBaddPOR (model_t model)
     ctx->visible_list = RTmallocZero ((groups + 1) * sizeof(int));
     ctx->marked_list = NULL;
     ctx->label_list = NULL;
-
+    ctx->seed = 73783467;
+    ctx->random = RTmallocZero (guards*2 * sizeof(int));
+    if (!DYN_RANDOM)
+        for (int i = 0; i < guards*2; i++) ctx->random[i] = i;
 
     int                 s0[len];
     GBgetInitialState (model, s0);

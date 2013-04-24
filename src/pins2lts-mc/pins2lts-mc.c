@@ -1351,21 +1351,6 @@ print_thread_statistics (wctx_t *ctx)
     }}
 }
 
-/** Fisher / Yates GenRandPerm*/
-static void
-randperm (int *perm, int n, uint32_t seed)
-{
-    srandom (seed);
-    for (int i=0; i<n; i++)
-        perm[i] = i;
-    for (int i=0; i<n; i++) {
-        int                 j = random()%(n-i)+i;
-        int                 t = perm[j];
-        perm[j] = perm[i];
-        perm[i] = t;
-    }
-}
-
 static int
 sort_cmp (const void *a, const void *b, void *arg)
 {

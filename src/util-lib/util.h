@@ -2,6 +2,7 @@
 #define UTIL_LTSMIN_H
 
 #include <stdbool.h>
+#include <stdint.h>
 
 #define max(a,b) ({ \
     typeof(a) _a = (a); \
@@ -24,6 +25,8 @@
 extern char *gnu_basename (char *path);
 
 extern bool has_prefix (const char *name, const char *prefix);
+
+extern void randperm (int *perm, int n, uint32_t seed);
 
 #endif // UTIL_LTSMIN_H
 

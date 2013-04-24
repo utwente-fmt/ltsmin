@@ -140,6 +140,8 @@ typedef struct por_context {
     int             *dynamic_visibility; // idem
 
     void            *scc_ctx;
+    int              seed;
+    int             *random;
 } por_context;
 
 #endif // PINS2PINS_POR
