@@ -27,6 +27,9 @@ static int DYN_RANDOM = 0;
 
 struct poptOption por_options[]={
     { "por" , 'p' , POPT_ARG_VAL , &PINS_POR , PINS_POR_ON , "enable partial order reduction" , NULL },
+
+    /* HIDDEN OPTIONS FOR EXPERIMENTATION */
+
     { "check-por" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &PINS_POR , PINS_POR_CHECK , "verify partial order reduction peristent sets" , NULL },
     { "no-dna" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_DNA , 1 , "without DNA" , NULL },
     { "no-nes" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_NES , 1 , "without NES" , NULL },
@@ -170,6 +173,15 @@ create_scc_ctx (por_context* ctx)
     return scc;
 }
 
+static inline int
+visible_cost (por_context* ctx)
+{
+    return NO_V ? ctx->enabled_list->count * ctx->ngroups :
+                  ctx->visible_enabled * ctx->ngroups + // enabled transitions
+                          ctx->visible_list->count +    // disabled transitions
+                          ctx->marked_list->count - ctx->visible_enabled;
+}
+
 /**
  * For each state, this function sets up the current guard values etc
  * This setup is then reused by the analysis function
@@ -213,9 +225,7 @@ scc_setup (model_t model, por_context* ctx, int* src)
     for(int i=0; i<ctx->enabled_list->count; i++) {
         int group = ctx->enabled_list->data[i];
         if (is_visible(ctx, group)) {
-            ctx->group_score[group] = NO_V ?
-                    ctx->enabled_list->count * ctx->ngroups :
-                    ctx->visible_enabled * ctx->ngroups;
+            ctx->group_score[group] = visible_cost(ctx);
         } else {
             ctx->group_score[group] = ctx->ngroups;
         }
@@ -283,9 +293,7 @@ beam_setup (model_t model, por_context* ctx, int* src)
         for(int i=0; i<ctx->enabled_list->count; i++) {
             int group = ctx->enabled_list->data[i];
             if (is_visible(ctx, group)) {
-                ctx->group_score[group] = NO_V ?
-                        ctx->enabled_list->count * ctx->ngroups :
-                        ctx->visible_enabled * ctx->ngroups;
+                ctx->group_score[group] = visible_cost(ctx);
             } else {
                 ctx->group_score[group] = ctx->ngroups;
             }
