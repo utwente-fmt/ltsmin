@@ -66,13 +66,6 @@ init_dynamic_labels (por_context* pctx)
         }
     }
 
-    // record visible groups
-    for (int i = 0; i < groups; i++) {
-        if (pctx->group_visibility[i]) {
-            pctx->visible_list->data[pctx->visible_list->count++] = i;
-        }
-    }
-
     if (NO_DYNLAB) {
         // mark groups visible based on NES / NDS
         // (which may be based on read/write dependencies, if NO_NDS/NO_NES)
@@ -87,6 +80,13 @@ init_dynamic_labels (por_context* pctx)
 
         // Erase visible labels
         pctx->label_list->count = 0;
+    }
+
+    // record visible groups
+    for (int i = 0; i < groups; i++) {
+        if (pctx->group_visibility[i]) {
+            pctx->visible_list->data[pctx->visible_list->count++] = i;
+        }
     }
 }
 
@@ -203,7 +203,7 @@ scc_setup (model_t model, por_context* ctx, int* src)
         // set group score
         if (ctx->group_status[i] == GS_ENABLED) {
             ctx->enabled_list->data[ctx->enabled_list->count++] = i;
-            ctx->visible_enabled += ctx->group_visibility[i] || ctx->dynamic_visibility[i];
+            ctx->visible_enabled += is_visible(ctx, i);
         } else { // disabled
             ctx->group_score[i] = 1;
         }
@@ -212,8 +212,10 @@ scc_setup (model_t model, por_context* ctx, int* src)
     // set score for enable transitions
     for(int i=0; i<ctx->enabled_list->count; i++) {
         int group = ctx->enabled_list->data[i];
-        if ((ctx->group_visibility[group] || ctx->dynamic_visibility[group])) {
-            ctx->group_score[group] = ctx->visible_enabled * ctx->ngroups;
+        if (is_visible(ctx, group)) {
+            ctx->group_score[group] = NO_V ?
+                    ctx->enabled_list->count * ctx->ngroups :
+                    ctx->visible_enabled * ctx->ngroups;
         } else {
             ctx->group_score[group] = ctx->ngroups;
         }
@@ -242,7 +244,7 @@ scc_setup (model_t model, por_context* ctx, int* src)
  * This setup is then reused by the analysis function
  */
 static void
-bs_setup (model_t model, por_context* ctx, int* src)
+beam_setup (model_t model, por_context* ctx, int* src)
 {
     // number of necessary sets (halves if MC is absent, because no NDSs then)
     int nns = NO_MC ? ctx->nguards : ctx->nguards * 2;
@@ -270,7 +272,7 @@ bs_setup (model_t model, por_context* ctx, int* src)
         // set group score
         if (ctx->group_status[i] == GS_ENABLED) {
             ctx->enabled_list->data[ctx->enabled_list->count++] = i;
-            ctx->visible_enabled += ctx->group_visibility[i] || ctx->dynamic_visibility[i];
+            ctx->visible_enabled += is_visible(ctx, i);
         } else { // disabled
             ctx->group_score[i] = 1;
         }
@@ -280,8 +282,10 @@ bs_setup (model_t model, por_context* ctx, int* src)
         // set score for enable transitions
         for(int i=0; i<ctx->enabled_list->count; i++) {
             int group = ctx->enabled_list->data[i];
-            if ((ctx->group_visibility[group] || ctx->dynamic_visibility[group])) {
-                ctx->group_score[group] = ctx->visible_enabled * ctx->ngroups;
+            if (is_visible(ctx, group)) {
+                ctx->group_score[group] = NO_V ?
+                        ctx->enabled_list->count * ctx->ngroups :
+                        ctx->visible_enabled * ctx->ngroups;
             } else {
                 ctx->group_score[group] = ctx->ngroups;
             }
@@ -382,7 +386,7 @@ select_group (por_context* ctx, int group)
 static inline void
 select_one_invisible (por_context* ctx)
 {
-    // Valmari's L1 proviso requires one invisible transition (to include quiencent runs)
+    // Valmari's L1 proviso requires one invisible transition (to include quiescent runs)
    for(int i=0; i<ctx->enabled_list->count; i++) {
        int group = ctx->enabled_list->data[i];
        if (!is_visible(ctx, group)) {
@@ -871,7 +875,7 @@ static int
 por_beam_search_all (model_t self, int *src, TransitionCB cb, void *user_context)
 {
     por_context* ctx = ((por_context*)GBgetContext(self));
-    bs_setup (self, ctx, src);
+    beam_setup (self, ctx, src);
     bs_analyze (ctx);
     int emitted = bs_emit (ctx, src, cb, user_context);
     unmark_dynamic_labels (ctx);
