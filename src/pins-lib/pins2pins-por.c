@@ -301,13 +301,11 @@ beam_setup (model_t model, por_context* ctx, int* src)
 
         // fill nes score
         // heuristic score h(x): 1 for disabled transition, n for enabled transition, n^2 for visible transition
-        for (int i=0; i < ctx->nguards; i++) {
-            if (ctx->label_status[i] && NO_MC) continue;
-
-            int idx = ctx->label_status[i] ? i + ctx->nguards : i;
-            ctx->nes_score[idx] = 0;
-            for (int j=0; j < ctx->ns[idx]->count; j++) {
-                ctx->nes_score[idx] += ctx->group_score[ ctx->ns[idx]->data[j] ];
+        for (int i=0; i < nns; i++) {
+            ctx->nes_score[i] = 0;
+            for (int j=0; j < ctx->ns[i]->count; j++) {
+                int group = ctx->ns[i]->data[j];
+                ctx->nes_score[i] += ctx->group_score[group];
             }
         }
     }
@@ -444,7 +442,7 @@ find_cheapest_ns (por_context* ctx, search_context *s, int group)
 
         // check the score by the heuristic function h(x)
         if (NO_HEUR || s->nes_score[ns] < selected_score) {
-            // check gruard status for ns (nes for disabled and nds for enabled):
+            // check guard status for ns (nes for disabled and nds for enabled):
             if ((ns < n_guards && (ctx->label_status[ns] == 0))  ||
                 (ns >= n_guards && (ctx->label_status[ns-n_guards] != 0)) ) {
 
@@ -494,6 +492,38 @@ beam_sort (por_context *ctx)
         return false;
     }
     return true;
+}
+
+static void
+add_enabled (por_context *ctx, int group)
+{
+    // Add do-not-accord for LTL and accord left for not LTL:
+    for (int j=0; j < ctx->not_accords_tg_tg[group]->count; j++) {
+        int dependent_group = ctx->not_accords_tg_tg[group]->data[j];
+        select_group (ctx, dependent_group);
+    }
+
+    if (PINS_LTL) return;
+
+    // In the weak stubborn set, the selected enabled group might become
+    // disabled by some non-stubborn transition. This is allowed as long
+    // as it is never enabled again (by some non-stubborn transition).
+    // In other words: either a NES or an NDS need to be added for each guard.
+    search_context *s = &ctx->search[ ctx->search_order[0] ];
+
+    for (int g = 0; g < ctx->group2guard[group]->count; g++) {
+        int guard = ctx->group2guard[group]->data[g];
+
+        int disabled_score = s->nes_score[guard];
+        int enabled_score = s->nes_score[guard + ctx->nguards];
+        int ns = disabled_score < enabled_score ? guard : guard+ctx->nguards;
+
+        for(int k=0; k < ctx->ns[ns]->count; k++) {
+            int ns_group = ctx->ns[ns]->data[k];
+            if (!dm_is_set(&ctx->nce, group, ns_group))
+            select_group (ctx, ns_group);
+        }
+    }
 }
 
 /**
@@ -584,10 +614,7 @@ bs_analyze (por_context* ctx)
             }
 
             // push all dependent unselected ctx->ngroups
-            for (int j=0; j < ctx->not_accords_tg_tg[current_group]->count; j++) {
-                int dependent_group = ctx->not_accords_tg_tg[current_group]->data[j];
-                select_group (ctx, dependent_group);
-            }
+            add_enabled (ctx, current_group);
             Printf (debug, "\n");
         }
     } while (beam_sort(ctx));
@@ -999,12 +1026,13 @@ bs_init_beam_context (model_t model)
     // guard_status, using <n or >=n as conditions
     matrix_t group_in;
     dm_create(&group_in, ctx->nguards * 2, ctx->ngroups);
-    for(int i=0; i < ctx->nguards; i++) {
-        for(int j=0; j < nes[i]->count; j++) {
+    for (int i=0; i < ctx->nguards; i++) {
+        for (int j=0; j < nes[i]->count; j++) {
             dm_set(&group_in, i, nes[i]->data[j]);
         }
-        for(int j=0; j < nds[i]->count; j++) {
-            dm_set(&group_in, i+ctx->nguards, nds[i]->data[j]);
+        for (int j=0; j < nds[i]->count; j++) {
+            int group = nds[i]->data[j];
+            dm_set(&group_in, i+ctx->nguards, group);
         }
         Printf (debug, "Guard %4d: NESs %4d, NDSs %4d\n", i, nes[i]->count, nds[i]->count);
     }
@@ -1108,38 +1136,6 @@ GBaddPOR (model_t model)
 
     int groups = dm_nrows( p_dm );
     int len = dm_ncols( p_dm );
-
-    // extract accords with matrix
-    matrix_t *not_accords_with = NO_DNA ? NULL : GBgetDoNotAccordInfo(model);
-    NO_DNA = not_accords_with == NULL;
-
-    HREassert (NO_DNA ||
-               (dm_nrows(not_accords_with) == groups &&
-                dm_ncols(not_accords_with) == groups));
-
-    // Combine Do Not Accord with dependency information
-    dm_create(&ctx->not_accords_with, groups, groups);
-    for(int i=0; i < groups; i++) {
-        for(int j=0; j < groups; j++) {
-            if (i == j) {
-                dm_set(&ctx->not_accords_with, i, j);
-            } else {
-                if ( !NO_DNA && !dm_is_set(not_accords_with, i , j) ) {
-                    continue; // transitions accord with each other
-                }
-
-                // is dependent?
-                for (int k=0; k < len; k++)
-                {
-                    if ((dm_is_set( p_dm_w, i, k) && dm_is_set( p_dm, j, k)) ||
-                        (dm_is_set( p_dm, i, k) && dm_is_set( p_dm_w, j, k)) ) {
-                        dm_set( &ctx->not_accords_with, i, j );
-                        break;
-                    }
-                }
-            }
-        }
-    }
 
     // guard to group dependencies
     sl_group_t* sl_guards = GBgetStateLabelGroupInfo(model, GB_SL_ALL);
@@ -1245,24 +1241,88 @@ GBaddPOR (model_t model)
 
     if (!NO_MC) {
         HREassert (dm_ncols(p_gce_matrix) == guards && dm_nrows(p_gce_matrix) == guards);
-        matrix_t gnce_matrix;
-        dm_create(&gnce_matrix, guards, groups);
-        for(int g=0; g < guards; g++) {
+        dm_create(&ctx->gnce_matrix, guards, groups);
+        dm_create(&ctx->nce, groups, groups);
+        for (int g = 0; g < guards; g++) {
             // iterate over all guards
-            for (int gg=0; gg < guards; gg++) {
+            for (int gg = 0; gg < guards; gg++) {
                 // find all guards that may not be co-enabled
                 if (!dm_is_set(p_gce_matrix, g, gg)) {
                     // gg may not be co-enabled with g, find all
                     // transition groups in which it is used
-                    for( int tg=0; tg < ctx->guard2group[gg]->count; tg++) {
-                        dm_set(&gnce_matrix, g, ctx->guard2group[gg]->data[tg]);
+                    for (int tt = 0; tt < ctx->guard2group[gg]->count; tt++) {
+                        dm_set(&ctx->gnce_matrix, g, ctx->guard2group[gg]->data[tt]);
+
+                        for (int t = 0; t < ctx->guard2group[g]->count; t++) {
+                            dm_set(&ctx->nce, ctx->guard2group[g]->data[t],
+                                                ctx->guard2group[gg]->data[tt]);
+                        }
                     }
                 }
             }
         }
-        ctx->guard_nce             = (ci_list **) dm_rows_to_idx_table(&gnce_matrix);
-        dm_free(&gnce_matrix);
+        ctx->guard_nce             = (ci_list **) dm_rows_to_idx_table(&ctx->gnce_matrix);
+        ctx->group_nce             = (ci_list **) dm_rows_to_idx_table(&ctx->nce);
     }
+
+    // extract accords with matrix
+    matrix_t *not_accords_with = NO_DNA ? NULL : GBgetDoNotAccordInfo(model);
+    NO_DNA = not_accords_with == NULL;
+
+    /**
+     * TODO: for now we assume that GBgetDoNotAccordInfo contains only
+     * information on action commutativity (not NDS^2 / coenabled).
+     * We add either NDS^2 and coenabled for LTL, then we obtain the
+     * strong do-notaccord relation.
+     * Or for no LTL, we can create a weak stubborn set by combining the
+     * info on-the-fly when we add enabled transitions (see add_enabled)
+     */
+
+    HREassert (NO_DNA ||
+               (dm_nrows(not_accords_with) == groups &&
+                dm_ncols(not_accords_with) == groups));
+
+    // Combine Do Not Accord with dependency and other information
+    dm_create(&ctx->not_accords_with, groups, groups);
+    for(int i=0; i < groups; i++) {
+        for(int j=0; j < groups; j++) {
+            if (i == j) {
+                dm_set(&ctx->not_accords_with, i, j);
+            } else {
+                if ( !NO_MC && dm_is_set(&ctx->nce, i , j) ) {
+                    continue; // transitions never coenabled!
+                }
+
+                for (int g = 0; g < ctx->group2guard[j]->count; g++) {
+                    if (dm_is_set(&ctx->gnds_matrix, ctx->group2guard[j]->data[g], i)) {
+                        dm_set( &ctx->not_accords_with, i, j );
+                        continue;
+                    }
+                }
+                if (PINS_LTL)
+                for (int g = 0; g < ctx->group2guard[i]->count; g++) {
+                    if (dm_is_set(&ctx->gnds_matrix, ctx->group2guard[i]->data[g], j)) {
+                        dm_set( &ctx->not_accords_with, i, j );
+                        continue;
+                    }
+                }
+                if ( !NO_DNA && !dm_is_set(not_accords_with, i , j) ) {
+                    continue; // transitions commute with each other
+                }
+
+                // is dependent?
+                for (int k=0; k < len; k++)
+                {
+                    if ((dm_is_set( p_dm_w, i, k) && dm_is_set( p_dm, j, k)) ||
+                        (dm_is_set( p_dm, i, k) && dm_is_set( p_dm_w, j, k)) ) {
+                        dm_set( &ctx->not_accords_with, i, j );
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
 
     // set lookup tables
     ctx->not_accords_tg_tg     = (ci_list **) dm_rows_to_idx_table(&ctx->not_accords_with);

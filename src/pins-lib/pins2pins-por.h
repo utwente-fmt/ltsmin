@@ -149,6 +149,8 @@ typedef struct por_context {
     matrix_t        gnes_matrix;    //
     matrix_t        gnds_matrix;    //
     matrix_t        not_accords_with;   //
+    matrix_t        nce;            //
+    matrix_t        gnce_matrix;   //
     ci_list       **not_accords_tg_tg;  // mapping from transition group to groups that it accords with
     ci_list       **guard2group;    // mapping from guard to transition group
     ci_list       **group2guard;    // mapping from group to guards
@@ -156,6 +158,7 @@ typedef struct por_context {
     ci_list       **guard_nds;      // transition groups that form a nds for a guard
     ci_list       **guard_dep;      // transition groups that depend on a guard
     ci_list       **guard_nce;      // mapping from guards to transition groups that may not be co-enabled
+    ci_list       **group_nce;      // mapping from guards to transition groups that may not be co-enabled
 
     /**
      * The global data used for the search
