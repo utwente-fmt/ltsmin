@@ -183,7 +183,7 @@ extern void lts_read(char *name,lts_t lts);
  Write the given LTS to the given file. The file will
  have the given number of segments.
  */
-extern void lts_write(char *name,lts_t lts,int segments);
+extern void lts_write(char *name,lts_t lts,string_set_t filter,int segments);
 
 /**
  Read a Markov chain in TRA/LAB format given the name of the TRA file.

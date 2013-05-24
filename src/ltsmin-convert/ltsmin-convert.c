@@ -6,12 +6,14 @@
 #include <lts-lib/lts.h>
 #include <ltsmin-lib/ltsmin-standard.h>
 #include <util-lib/treedbs.h>
+#include <util-lib/string-map.h>
 
 typedef enum {Undefined,LTScopy,LTSrdwr,LTSindex} task_t;
 
 static task_t task=Undefined;
 static int wr_seg=0;
 static int rd_seg;
+static char* label_filter=NULL;
 static int encode=0;
 static int bfs_reorder=0;
 
@@ -24,6 +26,9 @@ static  struct poptOption options[] = {
     "transform the vector based <input> to indexed <output>" , NULL},
     { "segments" , 0 , POPT_ARG_INT , &wr_seg , 0 ,
       "set the number of segments for the output file" , "<N>" },
+    { "filter" , 0 , POPT_ARG_STRING , &label_filter , 0 ,
+      "Select the labels to be written to file from the state vector elements, "
+      "state labels and edge labels." , "<patternlist>" },
     { "encode" , 0 , POPT_ARG_VAL , &encode , 1 ,
       "encode any LTS as a single edge label LTS during a load/store copy" , NULL },
     { "bfs" , 0 , POPT_ARG_VAL , &bfs_reorder , 1 ,
@@ -40,6 +45,10 @@ int main(int argc, char *argv[]){
     int me=HREme(HREglobal());
     int peers=HREpeers(HREglobal());
     if (peers>1) Abort("parallelizing this tool is future work");(void)me;
+    string_set_t label_set=NULL;
+    if (label_filter!=NULL){
+        label_set=SSMcreateSWPset(label_filter);
+    }
     switch(task){
         case Undefined:
             Abort("task unspecified");
@@ -54,7 +63,12 @@ int main(int argc, char *argv[]){
             } else {
                 Abort("on-the-fly changing the number of segments is future work");
             }
-            lts_file_t out=lts_file_create(files[1],ltstype,wr_seg,in);
+            lts_file_t out;
+            if (label_set==NULL){
+                out=lts_file_create(files[1],ltstype,wr_seg,in);
+            } else {
+                out=lts_file_create_filter(files[1],ltstype,label_set,wr_seg,in);
+            }
             int N=lts_type_get_type_count(ltstype);
             for(int i=0;i<N;i++){
                 char*name=lts_type_get_type(ltstype,i);
@@ -93,7 +107,7 @@ int main(int argc, char *argv[]){
             }
             Print(infoShort,"storing in %s",files[1]);
             if(wr_seg==0) wr_seg=1;
-            lts_write(files[1],lts,wr_seg);
+            lts_write(files[1],lts,label_set,wr_seg);
             break;
         case LTSindex:{
             if (peers>1) Abort("parallelizing this tool is future work");

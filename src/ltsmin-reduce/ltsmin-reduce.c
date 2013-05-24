@@ -100,7 +100,7 @@ int main(int argc, char *argv[]){
                           lts->states,lts->transitions);
     if (files[1]){
         Debug("writing %s",files[1]);
-        lts_write(files[1],lts,segments);
+        lts_write(files[1],lts,NULL,segments);
         Debug("output written");
     } else {
         Debug("no output");

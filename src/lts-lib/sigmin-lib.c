@@ -243,7 +243,7 @@ void lts_read(char *name,lts_t lts){
     lts_file_close(dst);
 }
 
-void lts_write(char *name,lts_t lts,int segments){
+void lts_write(char *name,lts_t lts,string_set_t filter,int segments){
     int format=lts_guess_format(name);
     lts_type_t ltstype=lts->ltstype;
     switch(format){
@@ -268,7 +268,12 @@ void lts_write(char *name,lts_t lts,int segments){
         }
     default: {
         lts_file_t src=lts_reader(lts,segments,NULL);
-        lts_file_t dst=lts_file_create(name,lts->ltstype,segments,src);
+        lts_file_t dst;
+        if (filter==NULL){
+            dst=lts_file_create(name,lts->ltstype,segments,src);
+        } else {
+            dst=lts_file_create_filter(name,lts->ltstype,filter,segments,src);
+        }
         int T=lts_type_get_type_count(lts->ltstype);
         for(int i=0;i<T;i++){
             if (lts->values[i]) lts_file_set_table(dst,i,lts->values[i]);
