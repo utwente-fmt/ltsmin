@@ -24,6 +24,10 @@ if HAVE_LIBMCRL2
 bin_PROGRAMS += lps2lts-dist
 endif
 
+if HAVE_SCOOP
+bin_PROGRAMS += mapa2lts-dist
+endif
+
 if HAVE_LIBPBES
 bin_PROGRAMS += pbes2lts-dist
 endif
@@ -41,6 +45,13 @@ etf2lts_dist_SOURCES   = pins2lts-dist.c
 etf2lts_dist_SOURCES  += ../pins-lib/etf-pins.c ../pins-lib/etf-pins.h
 etf2lts_dist_LDADD     = $(PINS_LIBS)
 etf2lts_dist_CPPFLAGS  = -DETF $(DIST_CPPFLAGS)
+
+# mapa2lts-dist
+mapa2lts_dist_SOURCES   = pins2lts-dist.c
+mapa2lts_dist_LDADD     = ../pins-lib/libmapa-pins.la -lscoop
+mapa2lts_dist_LDADD    += $(PINS_LIBS)
+mapa2lts_dist_LDFLAGS   = -Wl,-rpath,$(DESTDIR)$(pkglibdir) -L${top_builddir}/scoop/src $(AM_LDFLAGS)
+mapa2lts_dist_CPPFLAGS  = -DMAPA $(DIST_CPPFLAGS)
 
 # pins2lts-dist
 pins2lts_dist_SOURCES   = pins2lts-dist.c

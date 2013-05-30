@@ -1,0 +1,29 @@
+//                           -*- mode: doc; outline-regexp: "==\(=*\) ." -*-
+mapa2lts-sym(1)
+===============
+:Author:  Stefan Blom
+:Email:   <s.c.c.blom@ewi.utwente.nl>
+:Date:    2013-06-21
+
+== NAME
+
+mapa2lts-sym - Symbolic reachability analysis for muCRL models.
+
+== SYNOPSIS
+
+*{manname}* [OPTION]... 'file.mapa' ['outfile.etf']
+
+== DESCRIPTION
+
+{manname} performs a reachability analysis on a specification provided
+in 'file.mapa'.  Specifications are in mapa or prcrl.  'outfile.etf'
+specifies the name of the output archive, written in manpage:etf[5]
+format.
+
+== OPTIONS
+
+include::inc/pins2lts-sym-options.txt[]
+
+include::inc/scoop-options.txt[]
+
+include::inc/pins2lts-sym.txt[]

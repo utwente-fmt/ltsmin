@@ -50,6 +50,9 @@ MANPAGES += lps2lts-dist.1
 MANPAGES += lps2lts-mc.1
 MANPAGES += lps2torx.1
 
+MANPAGES += mapa2lts-sym.1
+MANPAGES += mapa2lts-dist.1
+
 MANPAGES += pins2lts-sym.1
 MANPAGES += pins2lts-seq.1
 MANPAGES += pins2lts-dist.1
@@ -104,6 +107,7 @@ extra_ASCIIDOC += inc/pins2torx.txt
 extra_ASCIIDOC += inc/plugin-options.txt
 extra_ASCIIDOC += inc/prom.txt
 extra_ASCIIDOC += inc/reachability-options.txt
+extra_ASCIIDOC += inc/scoop-options.txt
 extra_ASCIIDOC += inc/spg-options.txt
 extra_ASCIIDOC += inc/spg-solve-options.txt
 extra_ASCIIDOC += inc/state-storage-options.txt

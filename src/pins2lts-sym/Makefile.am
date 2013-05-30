@@ -24,6 +24,10 @@ if HAVE_LIBMCRL2
 bin_PROGRAMS += lps2lts-sym
 endif
 
+if HAVE_SCOOP
+bin_PROGRAMS += mapa2lts-sym
+endif
+
 if HAVE_LIBPBES
 bin_PROGRAMS += pbes2lts-sym
 endif
@@ -67,6 +71,14 @@ lps2lts_sym_LDADD    += $(VSET_LIBS) $(MCRL2_LIBS)
 lps2lts_sym_CPPFLAGS  = -DMCRL2 $(SYM_CPPFLAGS)
 lps2lts_sym_LDFLAGS   = $(MCRL2_LDFLAGS) $(AM_LDFLAGS)
 nodist_EXTRA_lps2lts_sym_SOURCES = automake-force-linker.cxx # req. by mcrl2
+
+# mapa2lts-sym
+mapa2lts_sym_SOURCES   = pins2lts-sym.c
+mapa2lts_sym_LDADD     = ../pins-lib/libmapa-pins.la -lscoop
+mapa2lts_sym_LDADD    += $(PINS_LIBS) $(VSET_LIBS)
+mapa2lts_sym_LDFLAGS   = -Wl,-rpath,$(DESTDIR)$(pkglibdir) -L${top_builddir}/scoop/src $(AM_LDFLAGS)
+mapa2lts_sym_CPPFLAGS  = -DMAPA $(SYM_CPPFLAGS)
+nodist_EXTRA_mapa2lts_sym_SOURCES = automake-force-linker.cxx # req. by vset
 
 # pbes2lts-sym
 pbes2lts_sym_SOURCES   = pins2lts-sym.c

@@ -211,6 +211,11 @@ This produces a file ``model.dve2C'', which can also be passed to
 LTSmin tools.  (This step is done automatically by the LTSmin tools
 when passing in a ``.dve'' model, doing it manually is rarely needed.)
 
+
+*** Scoop
+
+See the scoop/README file.
+
 *** SpinS / Promela
 
 Use SpinS (distributed as submodule LTSmin) to compile PROMELA model

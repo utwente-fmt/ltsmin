@@ -1,0 +1,20 @@
+=== Scoop Options
+
+*--const=<var>=<val>*::
+    define constant <var> as <val>
+
+*--max-progress=<actions>*::
+    Specify the set of actions for which
+    maximal progress has to be enabled. The
+    default is 'all', meaning that all
+    actions are prioritised. The other
+    settings are 'tau', to prioritise just
+    the tau steps and 'none' to disable
+    maximal progress
+
+*--confluence*::
+    Detect confluent summands and write confluent matrix.
+    If the backend tool support tau confluence (e.g. pins2lts-dist) then
+    this lead to on-the-fly reduction of the state space.
+
+

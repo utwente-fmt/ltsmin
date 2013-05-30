@@ -377,7 +377,21 @@ AC_SUBST([SYLVAN_LDFLAGS])
 
 AC_CHECK_PROGS(OPAAL_LTSMIN, [opaal_ltsmin])
 
+AC_ARG_WITH([scoop],[AS_HELP_STRING([--with-scoop],[Compile scoop])],[],[
+    AC_CHECK_PROG(GHC, ghc, ghc)
+    if test -z "$GHC"; then
+        [with_scoop=yes]
+    else
+        [with_scoop=no]
+    fi
+])
+if test "x$with_scoop" == xyes; then
+    AC_CONFIG_SUBDIRS([scoop])
+    [have_scoop="yes"]
+fi
+
 AM_CONDITIONAL([HAVE_POSIX], [test x"$POSIX_SHARED" = "xyes"])
+AM_CONDITIONAL([HAVE_SCOOP], [test x"$have_scoop" = "xyes"])
 AM_CONDITIONAL([HAVE_SYLVAN], [test x"$have_sylvan" = "xyes"])
 AS_IF([test x"$have_sylvan" = "xyes"], [AC_DEFINE([HAVE_SYLVAN], [1], [Define if using sylvan.])])
 AM_CONDITIONAL([HAVE_OPAAL], [test x"$have_opaal" = "xyes"])
@@ -469,6 +483,7 @@ Configuration:
     MPICXX   = ${MPICXX:-NOT FOUND, building without MPI support}
     OPAAL    = ${have_opaal:-TBB malloc NOT FOUND, building without opaal support}
     PBES     = ${acx_pbes:-NOT FOUND, building without PBES support}
+    SCOOP    = ${have_scoop:-NO, either scoop was disabled or ghc could not be found}
     SPG      = ${have_libspg:-NO, not building pbes-reach and spgsolver (enable with --without-bignum)}
     SPINS    = ${acx_spins:-NO, JDK or Ant not found (override with --with-spins)}
     SYLVAN   = ${have_sylvan:-NO, only on 64-bit systems (override with --with-sylvan)}

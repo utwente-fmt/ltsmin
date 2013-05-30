@@ -18,12 +18,23 @@ if HAVE_LIBMCRL2
 noinst_LTLIBRARIES += libmcrl2-pins.la
 endif
 
+if HAVE_SCOOP
+noinst_LTLIBRARIES += libmapa-pins.la
+endif
+
 if HAVE_LIBPBES
 noinst_LTLIBRARIES += libpbes-pins.la
 endif
 
 # Warning overwriting user variable! (Avoid PBES warnings)
 #CXXFLAGS = @CXXFLAGS@ -Wno-unused-parameter
+
+# libmapa-pins
+libmapa_pins_la_SOURCES   = mapa-pins.c mapa-pins.h
+libmapa_pins_la_CPPFLAGS  = -I${top_srcdir}/scoop/src $(AM_CPPFLAGS)
+libmapa_pins_la_LDFLAGS   = $(AM_LDFLAGS)
+#libmapa_pins_la_LDFLAGS   = -L${top_builddir}/scoop/src $(AM_LDFLAGS)
+# libmapa_pins_la_LIBADD    = -lscoop 
 
 # libmcrl-pins
 libmcrl_pins_la_SOURCES   = mcrl-pins.c mcrl-pins.h

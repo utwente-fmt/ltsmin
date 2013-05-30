@@ -1,6 +1,9 @@
 #ifndef SPEC_GREYBOX_H
 #define SPEC_GREYBOX_H
 
+#if defined(MAPA)
+#include <pins-lib/mapa-pins.h>
+#endif
 #if defined(MCRL)
 #include <pins-lib/mcrl-pins.h>
 #endif
@@ -27,6 +30,11 @@
 #endif
 
 
+#if defined(MAPA)
+#define SPEC_POPT_OPTIONS { NULL, 0, POPT_ARG_INCLUDE_TABLE, mapa_options, 0, "Scoop options", NULL }
+#define SPEC_MT_SAFE 0
+#define SPEC_REL_PERF 1
+#endif
 #if defined(MCRL)
 #define SPEC_POPT_OPTIONS { NULL, 0, POPT_ARG_INCLUDE_TABLE, mcrl_options, 0, "mCRL options", NULL }
 #define SPEC_MT_SAFE 0
