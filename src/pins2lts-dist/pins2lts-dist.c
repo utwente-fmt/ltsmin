@@ -29,6 +29,9 @@
 struct dist_thread_context {
     model_t model;
     lts_file_t output;
+//    lts_file_t trace;
+    uint32_t trace_next;
+    hre_task_t extend_task;
     treedbs_t dbs;
     int mpi_me;
     int *tcount;
@@ -58,6 +61,7 @@ static int              mpi_nodes;
 static int              dst_ofs=2;
 static int              lbl_ofs;
 static char*            label_filter=NULL;
+static char*            trc_output=NULL;
 
 static  struct poptOption options[] = {
     { "filter" , 0 , POPT_ARG_STRING , &label_filter , 0 ,
@@ -71,9 +75,12 @@ static  struct poptOption options[] = {
     { "invariant", 'i', POPT_ARG_STRING, &inv_detect, 0, "detect invariant violations", NULL },
     { "no-exit", 'n', POPT_ARG_VAL, &no_exit, 1, "no exit on error, just count (for error counters use -v)", NULL },
     SPEC_POPT_OPTIONS,
+    {"trace", 0, POPT_ARG_STRING, &trc_output, 0, "file to write trace to", "<lts file>" },
     { NULL, 0, POPT_ARG_INCLUDE_TABLE, greybox_options, 0, "Greybox options", NULL },
     POPT_TABLEEND
 };
+
+static void start_trace(struct dist_thread_context* ctx,uint32_t seg,uint32_t ofs);
 
 static inline void
 deadlock_detect (struct dist_thread_context *ctx, int *state, int count)
@@ -82,7 +89,14 @@ deadlock_detect (struct dist_thread_context *ctx, int *state, int count)
     ctx->deadlocks++;
     if (GBbuchiIsValidEnd(ctx->model, state)) return;
     if ( !inv_expr ) ctx->violations++;
-    if (no_exit || !dlk_detect) return;
+    if (!dlk_detect) return;
+    if (trc_output!=NULL){
+        uint32_t ofs=TreeFold(ctx->dbs,(int32_t*)(state));
+        Warning(info,"deadlock: %u.%u",ctx->mpi_me,ofs);
+        start_trace(ctx,ctx->mpi_me,ofs);
+        return;
+    }
+    if (no_exit) return;
     Warning (info, " ");
     Warning (info, "deadlock found at depth %zu", ctx->level);
     HREabort(LTSMIN_EXIT_COUNTER_EXAMPLE);
@@ -150,6 +164,51 @@ static void callback(void*context,transition_info_t*info,int*dst){
     }
 }
 
+/********************************************************/
+
+static void extend_trace(struct dist_thread_context* ctx,uint32_t* trc_vector);
+
+static void start_trace(struct dist_thread_context* ctx,uint32_t seg,uint32_t ofs){
+    if (ctx->mpi_me!=seg) Abort("cannot start trace worker is not owner of segment %u",seg);
+    uint32_t trc_vector[4];
+    trc_vector[0]=seg;
+    trc_vector[1]=ofs;
+    trc_vector[2]=seg;
+    trc_vector[3]=ofs;
+    Warning(info,"generating trace to %u.%u: end point %u.%u",seg,ofs,seg,ctx->trace_next);
+    extend_trace(ctx,trc_vector);
+}
+
+static void extend_trace(struct dist_thread_context* ctx,uint32_t* trc_vector){
+    uint32_t seg=ctx->parent_seg[trc_vector[3]];
+    uint32_t ofs=ctx->parent_ofs[trc_vector[3]];
+    if (seg==trc_vector[2] && ofs==trc_vector[3]){
+        Warning(info,"generating trace to %u.%u: initial   %u.%u",trc_vector[0],trc_vector[1],seg,ctx->trace_next);
+        Warning(info,"TODO: initial state %u.%u",seg,ofs);
+        ctx->trace_next++;
+    } else {
+        Warning(info,"generating trace to %u.%u: next worker %u",trc_vector[0],trc_vector[1],seg);
+        uint32_t message[5];
+        message[0]=trc_vector[0];
+        message[1]=trc_vector[1];
+        message[2]=seg;
+        message[3]=ofs;
+        message[4]=ctx->trace_next;
+        ctx->trace_next++;
+        TaskSubmitFixed(ctx->extend_task,seg,message);
+    }
+}
+
+static void extend_trace_task(void*context,int src_seg,int len,void*arg){
+    struct dist_thread_context* ctx=(struct dist_thread_context*)context;
+    (void)len;
+    uint32_t *message=(uint32_t*)arg;
+    Warning(info,"generating trace to %u.%u: transition %u.%u <- %u.%u",message[0],message[1],src_seg,message[4],ctx->mpi_me,ctx->trace_next);
+    extend_trace(ctx,message);
+}
+
+/********************************************************/
+
 static void new_transition(void*context,int src_seg,int len,void*arg){
     struct dist_thread_context* ctx=(struct dist_thread_context*)context;
     (void)len;
@@ -157,7 +216,7 @@ static void new_transition(void*context,int src_seg,int len,void*arg){
     size_t temp=TreeFold(ctx->dbs,(int32_t*)(trans+dst_ofs));
     if (temp>=ctx->visited) {
         ctx->visited=temp+1;
-        if(dlk_detect){
+        if(trc_output!=NULL){
             ensure_access(ctx->state_man,temp);
             ctx->parent_seg[temp]=src_seg;
             ctx->parent_ofs[temp]=trans[0];
@@ -429,12 +488,19 @@ int main(int argc, char*argv[]){
         if (rv==-1) Warning(info,"failed to set nice");
     }
     /***************************************************/
-    if (dlk_detect) {
+    if (trc_output!=NULL) {
         ctx.state_man=create_manager(65536);
         ctx.parent_ofs=NULL;
         ADD_ARRAY(ctx.state_man,ctx.parent_ofs,uint32_t);
         ctx.parent_seg=NULL;
         ADD_ARRAY(ctx.state_man,ctx.parent_seg,uint16_t);
+        if (ctx.mpi_me==0) {
+            ensure_access(ctx.state_man,0);
+            ctx.parent_ofs[0]=0;
+            ctx.parent_seg[0]=0;
+        }
+        ctx.extend_task=TaskCreate(task_queue,2,65536,extend_trace_task,&ctx,20);
+        ctx.trace_next=0;
     }
     if (act_detect) {
         // table number of first edge label
@@ -619,6 +685,8 @@ int main(int argc, char*argv[]){
         HREreduce(HREglobal(),1,&ctx.explored,&global_explored,UInt64,Sum);
         HREreduce(HREglobal(),1,&ctx.transitions,&global_transitions,UInt64,Sum);
         HREreduce(HREglobal(),1,&ctx.targets,&global_targets,UInt64,Sum);
+        HREreduce(HREglobal(),1,&ctx.violations,&global_violations,UInt64,Sum);
+        if (!no_exit && global_violations>0) break;
         if (global_visited==global_explored) break;
     }
     RTstopTimer(timer);
@@ -643,7 +711,7 @@ int main(int argc, char*argv[]){
         }
         RTprintTimer (info, timer, "Exploration time");
 
-        if (no_exit || log_active(infoLong))
+        if (no_exit || trc_output != NULL || log_active(infoLong))
             HREprintf (info, "\nDeadlocks: %zu\nInvariant violations: %zu\n"
                      "Error actions: %zu\n", global_deadlocks,global_violations,
                      global_errors);
