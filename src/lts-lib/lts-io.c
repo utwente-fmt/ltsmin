@@ -76,7 +76,7 @@ static void write_edge(lts_file_t file,int src_seg,void* src_state,
 }
 
 static void write_close(lts_file_t file){
-    if (file->init_count!=1) Abort("missing initial state");
+    //if (file->init_count!=1) Abort("missing initial state"); in some cases no initial states makes sense!
     uint32_t pre_sum=0;
     for(int i=0;i<file->segments;i++) pre_sum+=file->state_perseg[i];
     uint32_t tmp;
