@@ -308,9 +308,9 @@ static void write_header(lts_file_t file){
         if (count) {
             uint32_t tmp;
             tmp=lts_get_max_src_p1(file,i);
-            if (tmp>count) Abort("edge source uses an unwritten state");
+            if (tmp>count) Abort("edge source uses an unwritten state (%d.%u, %u written)",i,tmp,count);
             tmp=lts_get_max_dst_p1(file,i);
-            if (tmp>count) Abort("edge target uses an unwritten state");
+            if (tmp>count) Abort("edge target uses an unwritten state (%d.%u, %u written)",i,tmp,count);
         } else {
             count=lts_get_max_src_p1(file,i);
             lts_set_state_count(file,i,count);
