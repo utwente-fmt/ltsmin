@@ -212,19 +212,21 @@ static void task_action(void* context,hre_msg_t msg){
                 ofs+=len;
             }
         }
-        int source=msg->source;
         task->queue->recv++;
         if (task->queue->status==Idle) task->queue->status=Dirty;
         HREmsgReady(msg);
         if (task->fifo!=NULL){
+            int source;
             if (task->len) {
                 char buffer[task->len];
                 while (!stream_empty(task->fifo)){
+                    source=DSreadS32(task->fifo);
                     DSread(task->fifo,buffer,task->len);
                     task->call(task->arg,source,task->len,buffer);
                 }
             } else {
                 while (!stream_empty(task->fifo)){
+                    source=DSreadS32(task->fifo);
                     uint16_t len=DSreadU16(task->fifo);
                     char buffer[len];
                     DSread(task->fifo,buffer,len);
@@ -235,7 +237,22 @@ static void task_action(void* context,hre_msg_t msg){
         task->working--;
         task->queue->current_task=old_task;
     } else {
-        stream_write(task->fifo,msg->buffer,msg->tail);
+        if (task->len) {
+            for(unsigned int ofs=0;ofs<msg->tail;ofs+=task->len){
+                DSwriteS32(task->fifo,msg->source);
+                stream_write(task->fifo,msg->buffer+ofs,task->len);
+            }
+        } else {
+            for(unsigned int ofs=0;ofs<msg->tail;){
+                uint16_t len;
+                memcpy(&len,msg->buffer+ofs,2);
+                ofs+=2;
+                DSwriteS32(task->fifo,msg->source);
+                DSwriteU16(task->fifo,len);
+                stream_write(task->fifo,msg->buffer+ofs,len);
+                ofs+=len;
+            }
+        }
         task->queue->recv++;
         if (task->queue->status==Idle) task->queue->status=Dirty;
         HREmsgReady(msg);

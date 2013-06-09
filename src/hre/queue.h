@@ -32,6 +32,17 @@ If arglen is greater than 0 then arglen is the fixed length of the argument.
 */
 extern hre_task_t TaskCreate(hre_task_queue_t q,uint32_t prio,uint32_t buffer_size,hre_task_exec_t call,void * call_ctx,int arglen);
 
+
+/**
+\brief Add a fifo buffer to a task.
+
+In normal operation tasks are not allow to call themselves because this
+could cause deadlocks. This operation add a fifo buffer to a task, which
+makes it safe for a task to call itself, at the price of potentiallly very big fifo
+queues.
+ */
+extern void TaskEnableFifo(hre_task_t task);
+
 /// Submit a fixed length task.
 extern void TaskSubmitFixed(hre_task_t task,int owner,void* arg);
 
