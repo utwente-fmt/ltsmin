@@ -5,6 +5,7 @@
 #include <stdint.h>
 
 #include <hre/user.h>
+#include <hre-io/user.h>
 #include <util-lib/dynamic-array.h>
 
 enum state {Terminated=0,Idle=1,Dirty=2,Active=3};
@@ -30,10 +31,13 @@ struct hre_task_queue_s {
     enum mode mode;
     uint32_t sent;
     uint32_t recv;
+    hre_task_t current_task;
 };
 
 struct hre_task_s {
     hre_task_queue_t queue;
+    stream_t fifo;
+    int working;
     int task_no;
     int comm;
     int tag;
@@ -191,26 +195,56 @@ void TQwait(hre_task_queue_t queue){
 
 static void task_action(void* context,hre_msg_t msg){
     hre_task_t task=(hre_task_t)context;
-    if (task->len) {
-        for(unsigned int ofs=0;ofs<msg->tail;ofs+=task->len){
-            task->call(task->arg,msg->source,task->len,msg->buffer+ofs);
+    if (task->fifo==NULL || task->working==0){
+        hre_task_t old_task=task->queue->current_task;
+        task->queue->current_task=task;
+        task->working++;
+        if (task->len) {
+            for(unsigned int ofs=0;ofs<msg->tail;ofs+=task->len){
+                task->call(task->arg,msg->source,task->len,msg->buffer+ofs);
+            }
+        } else {
+            for(unsigned int ofs=0;ofs<msg->tail;){
+                uint16_t len;
+                memcpy(&len,msg->buffer+ofs,2);
+                ofs+=2;
+                task->call(task->arg,msg->source,len,msg->buffer+ofs);
+                ofs+=len;
+            }
         }
+        int source=msg->source;
+        task->queue->recv++;
+        if (task->queue->status==Idle) task->queue->status=Dirty;
+        HREmsgReady(msg);
+        if (task->fifo!=NULL){
+            if (task->len) {
+                char buffer[task->len];
+                while (!stream_empty(task->fifo)){
+                    DSread(task->fifo,buffer,task->len);
+                    task->call(task->arg,source,task->len,buffer);
+                }
+            } else {
+                while (!stream_empty(task->fifo)){
+                    uint16_t len=DSreadU16(task->fifo);
+                    char buffer[len];
+                    DSread(task->fifo,buffer,len);
+                    task->call(task->arg,source,len,buffer);
+                }
+            }  
+        }
+        task->working--;
+        task->queue->current_task=old_task;
     } else {
-        for(unsigned int ofs=0;ofs<msg->tail;){
-            uint16_t len;
-            memcpy(&len,msg->buffer+ofs,2);
-            ofs+=2;
-            task->call(task->arg,msg->source,len,msg->buffer+ofs);
-            ofs+=len;
-        }
+        stream_write(task->fifo,msg->buffer,msg->tail);
+        task->queue->recv++;
+        if (task->queue->status==Idle) task->queue->status=Dirty;
+        HREmsgReady(msg);
     }
-    task->queue->recv++;
-    if (task->queue->status==Idle) task->queue->status=Dirty;
-    HREmsgReady(msg);
 }
 
 hre_task_queue_t HREcreateQueue(hre_context_t ctx){
     hre_task_queue_t queue=HRE_NEW(NULL,struct hre_task_queue_s);
+    queue->current_task=NULL;
     queue->ctx=ctx;
     queue->mode=Lazy;
     queue->man=create_manager(8);
@@ -239,6 +273,11 @@ hre_task_queue_t HREcreateQueue(hre_context_t ctx){
 }
 
 void TaskSubmitFixed(hre_task_t task,int owner,void* arg){
+    HREassert(
+        (task->queue->current_task==NULL) ||
+        (task->queue->current_task==task && task->fifo!=NULL)||
+        (task->queue->current_task->comm<task->comm),
+        "attempt to submit level %d task, while processing level %d",task->comm,task->queue->current_task->comm);
     int me=HREme(task->queue->ctx);
     if (me==owner) {
         task->call(task->arg,me,task->len,arg);
@@ -257,6 +296,11 @@ void TaskSubmitFixed(hre_task_t task,int owner,void* arg){
 
 void TaskSubmitFlex(hre_task_t task,int owner,int len,void* arg){
     HREassert(len>=0, "len < 0 (%d)", len);
+    HREassert(
+        (task->queue->current_task==NULL) ||
+        (task->queue->current_task==task && task->fifo!=NULL)||
+        (task->queue->current_task->comm<task->comm),
+        "attempt to submit level %d task, while processing level %d",task->comm,task->queue->current_task->comm);
     int me=HREme(task->queue->ctx);
     if (me==owner) {
         task->call(task->arg,me,len,arg);
@@ -295,10 +339,17 @@ static int new_no(hre_task_queue_t queue){
     return pos;
 }
 
+
+void TaskEnableFifo(hre_task_t task){
+    task->fifo=FIFOcreate(task->buffer_size);
+}
+
 hre_task_t TaskCreate(hre_task_queue_t queue,uint32_t prio,uint32_t buffer_size,
         hre_task_exec_t call,void * call_ctx,int arglen)
 {
     hre_task_t task=HRE_NEW(NULL,struct hre_task_s);
+    task->fifo=NULL;
+    task->working=0;
     task->queue=queue;
     task->task_no=new_no(queue);
     task->len=arglen;
