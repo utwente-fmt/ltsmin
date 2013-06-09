@@ -29,9 +29,10 @@
 struct dist_thread_context {
     model_t model;
     lts_file_t output;
-//    lts_file_t trace;
+    lts_file_t trace;
     uint32_t trace_next;
     hre_task_t extend_task;
+    hre_task_t initial_task;
     treedbs_t dbs;
     int mpi_me;
     int *tcount;
@@ -175,19 +176,27 @@ static void start_trace(struct dist_thread_context* ctx,uint32_t seg,uint32_t of
     trc_vector[1]=ofs;
     trc_vector[2]=seg;
     trc_vector[3]=ofs;
-    Warning(info,"generating trace to %u.%u: end point %u.%u",seg,ofs,seg,ctx->trace_next);
+    Debug("generating trace to %u.%u: end point %u.%u",seg,ofs,seg,ctx->trace_next);
     extend_trace(ctx,trc_vector);
 }
 
 static void extend_trace(struct dist_thread_context* ctx,uint32_t* trc_vector){
+    uint32_t real_vector[size];
+    TreeUnfold(ctx->dbs,trc_vector[3],real_vector);
+    Debug("writing state %d.%d",trc_vector[2],ctx->trace_next);
+    lts_write_state(ctx->trace,trc_vector[2],&ctx->trace_next,real_vector);
     uint32_t seg=ctx->parent_seg[trc_vector[3]];
     uint32_t ofs=ctx->parent_ofs[trc_vector[3]];
     if (seg==trc_vector[2] && ofs==trc_vector[3]){
-        Warning(info,"generating trace to %u.%u: initial   %u.%u",trc_vector[0],trc_vector[1],seg,ctx->trace_next);
-        Warning(info,"TODO: initial state %u.%u",seg,ofs);
+        Debug("generating trace to %u.%u: initial   %u.%u",trc_vector[0],trc_vector[1],seg,ctx->trace_next);
+        uint32_t message[3];
+        message[0]=trc_vector[0];
+        message[1]=trc_vector[1];
+        message[2]=ctx->trace_next;
         ctx->trace_next++;
+        TaskSubmitFixed(ctx->initial_task,0,message);
     } else {
-        Warning(info,"generating trace to %u.%u: next worker %u",trc_vector[0],trc_vector[1],seg);
+        Debug("generating trace to %u.%u: next worker %u",trc_vector[0],trc_vector[1],seg);
         uint32_t message[5];
         message[0]=trc_vector[0];
         message[1]=trc_vector[1];
@@ -203,8 +212,19 @@ static void extend_trace_task(void*context,int src_seg,int len,void*arg){
     struct dist_thread_context* ctx=(struct dist_thread_context*)context;
     (void)len;
     uint32_t *message=(uint32_t*)arg;
-    Warning(info,"generating trace to %u.%u: transition %u.%u <- %u.%u",message[0],message[1],src_seg,message[4],ctx->mpi_me,ctx->trace_next);
+    Debug("generating trace to %u.%u: transition %u.%u <- %u.%u",message[0],message[1],src_seg,message[4],ctx->mpi_me,ctx->trace_next);
+    lts_write_edge(ctx->trace,ctx->mpi_me,&(ctx->trace_next),src_seg,&(message[4]),NULL);
+    Debug("edge written");
     extend_trace(ctx,message);
+}
+
+static void initial_trace_task(void*context,int src_seg,int len,void*arg){
+    struct dist_thread_context* ctx=(struct dist_thread_context*)context;
+    (void)len;
+    uint32_t *message=(uint32_t*)arg;
+    Debug("generating trace to %u.%u: initial state %u.%u",message[0],message[1],src_seg,message[2]);
+    lts_write_init(ctx->trace,src_seg,&(message[2]));
+    Debug("initial state written");
 }
 
 /********************************************************/
@@ -443,6 +463,7 @@ int main(int argc, char*argv[]){
     HREbarrier(HREglobal());
     Warning(info,"model created");
     lts_type_t ltstype=GBgetLTStype(model);
+    size=lts_type_get_state_length(ltstype);
 
     int class_label=lts_type_find_edge_label(ltstype,LTSMIN_EDGE_TYPE_ACTION_CLASS);
     matrix_t *inhibit_matrix=NULL;
@@ -499,8 +520,36 @@ int main(int argc, char*argv[]){
             ctx.parent_ofs[0]=0;
             ctx.parent_seg[0]=0;
         }
-        ctx.extend_task=TaskCreate(task_queue,2,65536,extend_trace_task,&ctx,20);
+        ctx.extend_task=TaskCreate(task_queue,1,65536,extend_trace_task,&ctx,20);
+        TaskEnableFifo(ctx.extend_task);
+        ctx.initial_task=TaskCreate(task_queue,2,65536,initial_trace_task,&ctx,12);
         ctx.trace_next=0;
+        lts_file_t template=lts_index_template();
+        lts_file_set_edge_owner(template,SourceOwned);
+        lts_type_t trace_type=lts_type_create();
+        lts_type_set_state_label_count(trace_type,size);
+        for(int i=0;i<size;i++){
+            char*type_name=lts_type_get_state_type(ltstype,i);
+            if (ctx.mpi_me==0) Warning(info,"label %d is %s:%s",i,lts_type_get_state_name(ltstype,i),type_name);
+            lts_type_set_state_label_name(trace_type,i,lts_type_get_state_name(ltstype,i));
+            int is_new;
+            int typeno=lts_type_add_type(trace_type,type_name,&is_new);
+            if (is_new){
+                int type_orig=lts_type_get_state_typeno(ltstype,i);
+                lts_type_set_format(trace_type,typeno,lts_type_get_format(ltstype,type_orig));
+            }
+            lts_type_set_state_label_typeno(trace_type,i,typeno);
+        }
+        ctx.trace=lts_file_create(trc_output,trace_type,mpi_nodes,template);
+        int T=lts_type_get_type_count(trace_type);
+        for(int i=0;i<T;i++){
+            int typeno=lts_type_find_type(ltstype,lts_type_get_type(trace_type,i));
+            if (typeno<0) continue;
+            void *table=GBgetChunkMap(model,typeno);
+            Debug("address of table %d/%d: %lld",i,typeno,table);
+            lts_file_set_table(ctx.trace,i,table);
+        }
+        HREbarrier(HREglobal());
     }
     if (act_detect) {
         // table number of first edge label
@@ -520,7 +569,6 @@ int main(int argc, char*argv[]){
     }
     HREbarrier(HREglobal());
     /***************************************************/
-    size=lts_type_get_state_length(ltstype);
     if (size<2) Fatal(1,error,"there must be at least 2 parameters");
     ctx.dbs=TreeDBScreate(size);
     int src[size];
@@ -717,9 +765,13 @@ int main(int argc, char*argv[]){
                      global_errors);
     }
     /* State space was succesfully generated. */
-    HREbarrier(HREglobal());;
+    HREbarrier(HREglobal());
     if (write_lts) {
         lts_file_close(ctx.output);
+    }
+    HREbarrier(HREglobal());
+    if (trc_output!=NULL) {
+        lts_file_close(ctx.trace);
     }
     HREbarrier(HREglobal());
     HREexit(LTSMIN_EXIT_SUCCESS);
