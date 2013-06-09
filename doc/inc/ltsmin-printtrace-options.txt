@@ -22,3 +22,7 @@
 *-l*, *--list*::
         Output the trace in list form.  This option works for txt output.
 
+*--trace=INT*::
+        If the input contains multiple traces then this options may be used to select
+        the trace that will be printed.
+

@@ -56,6 +56,8 @@ output_popt (poptContext con, enum poptCallbackReason reason,
     Fatal (1, error, "unexpected call to output_popt");
 }
 
+static int arg_trace=-1;
+
 static  struct poptOption options[] = {
     { NULL, 0 , POPT_ARG_CALLBACK|POPT_CBFLAG_POST|POPT_CBFLAG_SKIPOPTION  , (void*)output_popt , 0 , NULL , NULL },
     { "csv-separator" , 's' , POPT_ARG_STRING , &arg_sep , 0 , "separator in csv output" , NULL },
@@ -65,6 +67,7 @@ static  struct poptOption options[] = {
     { "list" , 'l' , POPT_ARG_VAL , &arg_table , 0 , "output txt format as list", NULL },
     { "diff" , 'd' , POPT_ARG_VAL , &arg_all , 0 , "output state differences instead of all values" , NULL },
     { "all" , 'a' , POPT_ARG_VAL , &arg_all , 1 , "output all values instead of state differences" , NULL },
+    { "trace" , 0 , POPT_ARG_INT , &arg_trace , 0 , "select which trace to print from a multi-trace file" , NULL },
     POPT_TABLEEND
 };
 
@@ -484,6 +487,24 @@ main(int argc,char*argv[]){
 
     lts_t trace=lts_create();
     lts_read(files[0],trace);
+    if (trace->root_count==0){
+        Abort("no initial state(s)");
+    }
+    if (trace->root_count>1){
+        if (arg_trace>=0){
+            if (arg_trace>=trace->root_count) {
+                Abort("Illegal trace number: %d. File contains %d traces.",arg_trace,trace->root_count);
+            }
+        } else {
+            arg_trace = 0;
+        }
+        Warning(info,"File contains %d traces. Showing trace %d.",trace->root_count,arg_trace);
+        trace->root_count=1;
+        uint32_t tmp=trace->root_list[0];
+        trace->root_list[0]=trace->root_list[arg_trace];
+        trace->root_list[arg_trace]=tmp;
+        lts_bfs_reorder(trace);
+    }
     //lts_bfs_reorder(trace); //cannot reorder an LTS with state vectors
     lts_set_type(trace, LTS_BLOCK);
     Warning(info,"length of trace is %d",trace->transitions);
