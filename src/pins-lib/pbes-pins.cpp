@@ -28,6 +28,7 @@ static std::string mcrl2_rewriter_strategy = "jittyc";
 #else
 static std::string mcrl2_rewriter_strategy = "jitty";
 #endif
+static char const* mcrl2_args = "";
 
 using namespace mcrl2;
 using namespace mcrl2::core;
@@ -284,7 +285,42 @@ static void pbes_popt(poptContext con, enum poptCallbackReason reason,
             if (debug_flag) {
                 Warning(info,"Debug flag is set.");
             }
+
+            int argc;
+            const char **argv;
+            RTparseOptions (mcrl2_args,&argc,(char***)&argv);
+            argv[0] = (char*)"--mcrl2";
+            const char *opt_rewriter = mcrl2_rewriter_strategy.c_str();
+            int opt_verbosity = 0;
+            struct poptOption options[] = {
+                { "rewriter", 'r', POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT,
+                  &opt_rewriter, 0, "select rewriter: jittyc, jitty, ...", NULL },
+                { "verbose", 'v', POPT_ARG_INT, &opt_verbosity, 1,
+                  "increase verbosity", "INT" },
+                POPT_AUTOHELP
+                POPT_TABLEEND
+            };
+            poptContext optCon = poptGetContext(NULL, argc, argv, options, 0);
+            int res;
+            while ((res = poptGetNextOpt (optCon)) >= 0) {};
+            if (res < -1) {
+                Abort ("Bad mcrl2 option %s: %s (try --mcrl2=--help)",
+                       poptBadOption (optCon, POPT_BADOPTION_NOALIAS),
+                       poptStrerror (res));
+            } else if (poptPeekArg (optCon) != NULL) {
+                Abort ("Unknown mcrl2 option %s (try --mcrl2=--help)",
+                       poptPeekArg (optCon));
+            }
+            poptFreeContext(optCon);
+            mcrl2_rewriter_strategy = std::string(opt_rewriter);
+
             GBregisterLoader("pbes", PBESloadGreyboxModel);
+            if (opt_verbosity > 0) {
+                Warning(info, "increasing mcrl2 verbosity level by %d",
+                        opt_verbosity);
+                log::log_level_t log_level = static_cast<log::log_level_t>(static_cast<size_t>(log::mcrl2_logger::get_reporting_level()) + opt_verbosity);
+                log::mcrl2_logger::set_reporting_level(log_level);
+            }
             Warning(info,"PBES language module initialized");
             return;
         }
@@ -299,6 +335,7 @@ struct poptOption pbes_options[] = {
      { "reset" , 0 , POPT_ARG_NONE , &reset_flag, 0, "Indicate that unset parameters should be reset.","" },
      { "always-split" , 0 , POPT_ARG_NONE , &always_split_flag, 0, "Always use conjuncts and disjuncts as transition groups.","" },
      { "debug" , 0 , POPT_ARG_NONE , &debug_flag, 0, "Enable debug output.","" },
+     { "mcrl2", 0, POPT_ARG_STRING, &mcrl2_args, 0, "pass options to the mCRL2 library", "<mCRL2 options>" },
      POPT_TABLEEND };
 
 typedef struct grey_box_context
