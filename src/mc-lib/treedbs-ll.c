@@ -198,8 +198,11 @@ lookup (node_table_t *nodes,
     stats_t            *stat = &loc->stat;
     uint64_t            mem, hash, a;
     mem = hash = mix64 (data);
-    HREassert (data != EMPTY_1, "Value out of table range.");
+    HREassert (data != EMPTY_1, "Value (%zu) out of table range.\n"
+            "Avoid -1 value or modify EMPTY_1 reserved value to unused value and recompile LTSmin.", (size_t) data);
+            // (re-wire data == EMPTY to data := EMPTY_1 after the next loc)
     data += 1; // avoid EMPTY
+    // data = data == EMPTY ? EMPTY_1 : data;
     for (size_t probes = 0; probes < nodes->thres; probes++) {
         size_t              ref = hash & nodes->mask;
         size_t              line_end = (ref & CL_MASK) + CACHE_LINE_64;
