@@ -91,7 +91,7 @@ if test x"$acx_mcrl2" = xyes; then
        AX_CXX_CHECK_LIB([mcrl2_atermpp], [main],
          [MCRL2_PINS_LIBS="-lmcrl2_atermpp $MCRL2_PINS_LIBS"
           LIBS="-lmcrl2_atermpp $LIBS"],
-         [acx_mcrl2_libs=no])
+         [])
        AX_CXX_CHECK_LIB([mcrl2_core], [main],
          [MCRL2_PINS_LIBS="-lmcrl2_core $MCRL2_PINS_LIBS"
           LIBS="-lmcrl2_core $LIBS"],
