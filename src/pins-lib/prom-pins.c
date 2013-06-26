@@ -126,8 +126,8 @@ PromCompileGreyboxModel(model_t model, const char *filename)
         Abort("Cannot compile `%s', paths too long", filename);
 
     if ((ret = system(command)) != 0)
-        HREassert(ret >= 0, "Command failed with exit code %d: %s", ret, command);
-
+        HREassert(ret == 0, "Command failed with exit code %d: %s\\"
+                            "LTSmin not installed? Try running ltsmin/src/script/spins manually.", ret, command);
     char *basename = gnu_basename ((char *)filename);
     // check existence of bin file
     char *bin_fname = RTmallocZero(strlen(basename) + strlen(".spins") + 1);
