@@ -10,6 +10,8 @@ LIBS += ../dm/libdm.la
 
 noinst_LTLIBRARIES  = libpins.la
 
+pkginclude_HEADERS = dlopen-api.h pins.h
+
 if HAVE_LIBSTEP_INFO
 noinst_LTLIBRARIES += libmcrl-pins.la
 endif

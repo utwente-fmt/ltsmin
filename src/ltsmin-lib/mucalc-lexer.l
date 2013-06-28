@@ -6,6 +6,7 @@
 %option nodefault noyywrap reentrant noyyalloc noyyrealloc noyyfree batch noinput
 %option extra-type="mucalc_parse_env_t"
 %{
+#include <hre/config.h>
 #include <hre/user.h>
 #include <hre-io/user.h>
 #include <ltsmin-lib/mucalc-parse-env.h>

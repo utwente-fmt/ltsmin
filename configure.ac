@@ -32,6 +32,7 @@ AC_DEFINE([_LARGEFILE64_SOURCE])
 AC_DEFINE([_FILE_OFFSET_BITS], 64)
 
 AC_DEFINE([LTSMIN_PATHNAME_MAX], 1024, [Define maximal length of pathnames])
+AC_DEFINE([LTSMIN_CONFIG_INCLUDED], 1, [Controls where headers are included from])
 AC_DEFINE([DEFFILEMODE], 0666, [Define default file mode])
 
 #DejaGNU

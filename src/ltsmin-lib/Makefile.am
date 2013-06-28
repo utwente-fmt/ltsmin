@@ -1,6 +1,8 @@
 noinst_LTLIBRARIES  = libltsmin.la
 noinst_LTLIBRARIES += libmucalc.la
 
+pkginclude_HEADERS = lts-type.h
+
 # libltsmin
 libltsmin_la_SOURCES  =
 libltsmin_la_SOURCES += ltsmin-grammar.lemon

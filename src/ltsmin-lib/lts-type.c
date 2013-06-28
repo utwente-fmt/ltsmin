@@ -131,27 +131,27 @@ lts_type_t lts_type_permute(lts_type_t t0,int *pi){
     return t;
 }
 
-void lts_type_print(log_t log, lts_type_t t){
-	log_printf(log,"The state labels are:\n");
+void lts_type_printf(FILE* log, lts_type_t t){
+	printf(log,"The state labels are:\n");
 	for(int i=0;i<t->state_label_count;i++){
-	    log_printf(log,"%4d: %s:%s\n",i,
+	    printf(log,"%4d: %s:%s\n",i,
                    t->state_label_name[i],
                    SIget(t->type_db,t->state_label_type[i]));
 	}
-	log_printf(log,"The edge labels are:\n");
+	printf(log,"The edge labels are:\n");
 	for(int i=0;i<t->edge_label_count;i++){
-	    log_printf(log,"%4d: %s:%s\n",i,
+	    printf(log,"%4d: %s:%s\n",i,
                    t->edge_label_name[i],
                    SIget(t->type_db,t->edge_label_type[i]));
 	}
-    log_printf(log,"The registered types are:\n");
+    printf(log,"The registered types are:\n");
  	int N=SIgetCount(t->type_db);
 	for(int i=0;i<N;i++){
-	    log_printf(log,"%4d: %s (%s)\n",i,SIget(t->type_db,i),data_format_string(t,i));
+	    printf(log,"%4d: %s (%s)\n",i,SIget(t->type_db,i),data_format_string(t,i));
 	}
-    log_printf(log,"The state vector is:\n");
+    printf(log,"The state vector is:\n");
     for(int i=0;i<t->state_length;i++){
-        log_printf(log,"%4d: %s:%s\n",i,
+        printf(log,"%4d: %s:%s\n",i,
                    t->state_name[i],
                    SIget(t->type_db,t->state_type[i]));
     }
@@ -436,115 +436,5 @@ void lts_type_validate(lts_type_t t){
         }
         Abort("illegal format value: %d",t->type_format[i]);        
     }
-}
-
-void lts_type_serialize(lts_type_t t,stream_t ds){
-	DSwriteS(ds,"lts signature 1.1");
-	uint32_t N=lts_type_get_state_length(t);
-	Warning(debug,"state length is %d",N);
-	DSwriteU32(ds,N);
-	for(uint32_t i=0;i<N;i++){
-		char*x=lts_type_get_state_name(t,i);
-		if (x) DSwriteS(ds,x); else DSwriteS(ds,"");
-		DSwriteU32(ds,lts_type_get_state_typeno(t,i));
-	}
-	N=lts_type_get_state_label_count(t);
-	Warning(debug,"%d state labels",N);
-	DSwriteU32(ds,N);
-	for(uint32_t i=0;i<N;i++){
-		char*x=lts_type_get_state_label_name(t,i);
-		if (x) DSwriteS(ds,x); else DSwriteS(ds,"");
-		DSwriteU32(ds,lts_type_get_state_label_typeno(t,i));
-	}
-	N=lts_type_get_edge_label_count(t);
-	Warning(debug,"%d edge labels",N);
-	DSwriteU32(ds,N);
-	for(uint32_t i=0;i<N;i++){
-		char*x=lts_type_get_edge_label_name(t,i);
-		if (x) DSwriteS(ds,x); else DSwriteS(ds,"");
-		DSwriteU32(ds,lts_type_get_edge_label_typeno(t,i));
-		Warning(debug,"edge label %d is %s : %s",i,x,lts_type_get_edge_label_type(t,i));
-	}
-	N=lts_type_get_type_count(t);
-	Warning(debug,"%d types",N);
-	DSwriteU32(ds,N);
-	for(uint32_t i=0;i<N;i++){
-		DSwriteS(ds,lts_type_get_type(t,i));
-		DSwriteS(ds,(char*)data_format_string(t,i));
-	}
-}
-
-lts_type_t lts_type_deserialize(stream_t ds){
-	lts_type_t t=lts_type_create();
-	char version[1024];
-	DSreadS(ds,version,1024);
-	int has_format_info;
-	if (strcmp(version,"lts signature 1.1")==0){
-		has_format_info=1;
-	} else if (strcmp(version,"lts signature 1.0")==0){
-		has_format_info=0;
-	} else {
-		Abort("cannot deserialize %s",version);
-	}
-	uint32_t N=DSreadU32(ds);
-	Warning(debug,"state length is %d",N);
-	lts_type_set_state_length(t,N);
-	for(uint32_t i=0;i<N;i++){
-		char*x=DSreadSA(ds);
-		if (strlen(x)) lts_type_set_state_name(t,i,x);
-		RTfree(x);
-		lts_type_set_state_typeno(t,i,DSreadU32(ds));
-	}
-	N=DSreadU32(ds);
-	Warning(debug,"%d state labels",N);
-	lts_type_set_state_label_count(t,N);
-	for(uint32_t i=0;i<N;i++){
-		char*x=DSreadSA(ds);
-		if (strlen(x)) lts_type_set_state_label_name(t,i,x);
-		RTfree(x);
-		lts_type_set_state_label_typeno(t,i,DSreadU32(ds));
-	}
-	N=DSreadU32(ds);
-	Warning(debug,"%d edge labels",N);
-	lts_type_set_edge_label_count(t,N);
-	for(uint32_t i=0;i<N;i++){
-		char*x=DSreadSA(ds);
-		if (strlen(x)) lts_type_set_edge_label_name(t,i,x);
-		RTfree(x);
-		lts_type_set_edge_label_typeno(t,i,DSreadU32(ds));
-	}
-	N=DSreadU32(ds);
-	Warning(debug,"%d types",N);
-	for(uint32_t i=0;i<N;i++){
-		char*x=DSreadSA(ds);
-		SIputAt(t->type_db,x,i);
-		RTfree(x);
-		if (has_format_info) {
-			x=DSreadSA(ds);
-			if (strcmp(x,"direct")==0){
-				t->type_format[i]=LTStypeDirect;
-			} else if (strcmp(x,"chunk")==0){
-				t->type_format[i]=LTStypeChunk;
-			} else if (strcmp(x,"enum")==0){
-				t->type_format[i]=LTStypeEnum;
-			} else {
-			    int n=strlen(x);
-			    if (x[0]=='[' && x[n-1]==']') {
-			        int k=0;
-			        while(k<n && x[k]!=',') k++;
-			        if (k<n) {
-			            t->type_format[i]=LTStypeRange;
-			            t->type_min[i]=atoi(x+1);
-			            t->type_max[i]=atoi(x+k+1);
-			        }
-			    }
-				Abort("unsupported data format %s",x);
-			}
-			RTfree(x);
-		} else {
-		    t->type_format[i]=LTStypeChunk;
-		}
-	}
-	return t;
 }
 

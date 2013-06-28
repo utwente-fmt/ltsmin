@@ -991,7 +991,9 @@ GBloadFile (model_t model, const char *filename, model_t *wrapped)
                     HREabort (LTSMIN_EXIT_SUCCESS);
                 } else if (labels) {
                     if (HREme(HREglobal()) == 0) {
-                        lts_type_print(info, GBgetLTStype(model));
+                        if (log_active(info)){
+                            lts_type_printf(log_get_stream(info), GBgetLTStype(model));
+                        }
                         chunk_table_print(info, model);
                     }
                     HREabort (LTSMIN_EXIT_SUCCESS);

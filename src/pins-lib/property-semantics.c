@@ -4,6 +4,7 @@
  *  Created on: Aug 8, 2012
  *      Author: laarman
  */
+#include <hre/config.h>
 
 #include <stdbool.h>
 

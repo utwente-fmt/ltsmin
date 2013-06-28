@@ -95,43 +95,26 @@ void PINSpluginLoadLanguageModule(const char *name){
     Warning(info,"finished loading %s",name);
 }
 
-static int MCRLgetTransitionsAll(model_t model,int*src,TransitionCB cb,void*context){
-    return 0;
-}
-
-static void* dlHandle = NULL;
-
 void PINSpluginLoadGreyboxModel(model_t model,const char*name){
-    dlHandle=RTdlopen(name);
-    // TODO: close handle when finished.
+    void* dlHandle = RTdlopen(name);
+    char* pins_name=RTdlsym(name,dlHandle,"pins_plugin_name");
+    Warning(info,"loading model %s",pins_name);
+    init_proc init=RTtrydlsym(dlHandle,"init");
+    if (init!=NULL){
+        Warning(info,"Initializing %s plugin",pins_name);
+        char *argv[2];
+        argv[0]=get_label();
+        argv[1]=NULL;
+        init(1,argv);
+    }
     
-	lts_type_t ltstype=lts_type_create();
-	int int_type=lts_type_put_type(ltstype,"int",LTStypeDirect,NULL);
-		
-	int state_length=2;
-	lts_type_set_state_length(ltstype,state_length);
-	lts_type_set_state_name(ltstype,0,"x");
-	lts_type_set_state_type(ltstype,0,"int");
-	lts_type_set_state_name(ltstype,1,"y");
-	lts_type_set_state_type(ltstype,1,"int");
-
-	lts_type_set_edge_label_count(ltstype,0);
-	
-	GBsetLTStype(model,ltstype);
-
-    matrix_t dm_info;
-    dm_create(&dm_info, 1, state_length);
-    dm_set(&dm_info, 0, 0);
-    GBsetDMInfo(model, &dm_info);
+    pins_model_init_proc model_init=RTtrydlsym(dlHandle,"pins_model_init");
+    if (model_init!=NULL) {
+        model_init(model);
+    } else {
+        Abort("Could not find a model.");
+    }
     
-    matrix_t sl_info;
-    dm_create(&sl_info, 0, state_length);
-    GBsetStateLabelInfo(model, &sl_info);
-
-    int temp[state_length];
-	GBsetInitialState(model,temp);
-
-	GBsetNextStateAll(model,MCRLgetTransitionsAll);
-	Warning(info,"model %s loaded",name);
+	Warning(info,"completed loading model %s",pins_name);
 }
 

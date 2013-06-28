@@ -4,9 +4,17 @@
 #include <popt.h>
 #include <stdio.h>
 
+#ifdef LTSMIN_CONFIG_INCLUDED
+#include <util-lib/string-map.h>
 #include <dm/dm.h>
 #include <ltsmin-lib/lts-type.h>
 #include <util-lib/chunk_support.h>
+#else
+#include <ltsmin/dm.h>
+#include <ltsmin/string-map.h>
+#include <ltsmin/lts-type.h>
+#include <ltsmin/chunk_support.h>
+#endif
 
 /**
  @file pins.h

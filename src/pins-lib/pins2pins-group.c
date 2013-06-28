@@ -357,10 +357,14 @@ GBregroup (model_t model, const char *regroup_spec)
     }
 
     lts_type_t ltstype=GBgetLTStype (model);
-    lts_type_print(debug,ltstype);
+    if (log_active(debug)){
+        lts_type_printf(log_get_stream(debug),ltstype);
+    }
     Warning(debug,"permuting ltstype");
     ltstype=lts_type_permute(ltstype,ctx->statemap);
-    lts_type_print(debug,ltstype);
+    if (log_active(debug)){
+        lts_type_printf(log_get_stream(debug),ltstype);
+    }
     GBsetLTStype (group, ltstype);
 
     // Permute read and write matrices

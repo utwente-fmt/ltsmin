@@ -160,9 +160,13 @@ static lts_file_t lts_file_create_filtered(const char* name,lts_type_t ltstype,s
         lts_type_set_edge_label_typeno(filtertype,i,file->type_proj[type_no]);
     }
     Debug("full type is");
-    lts_type_print(debug,ltstype);
+    if (log_active(debug)){
+        lts_type_printf(log_get_stream(debug),ltstype);
+    }
     Debug("filtered type is");
-    lts_type_print(debug,filtertype);
+    if (log_active(debug)){
+        lts_type_printf(log_get_stream(debug),filtertype);
+    }
     for (int i=0;i<NT;i++){
         if (file->type_proj[i]==-1){
             Debug("type %d is dropped",i);

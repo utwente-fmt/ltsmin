@@ -4,6 +4,7 @@
 %option nodefault noyywrap reentrant noyyalloc noyyrealloc noyyfree batch noinput
 %option extra-type="ltsmin_parse_env_t"
 %{
+#include <hre/config.h>
 #include <hre/user.h>
 #include <hre-io/user.h>
 #include <util-lib/chunk_support.h>

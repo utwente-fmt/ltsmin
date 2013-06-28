@@ -280,5 +280,18 @@ void lts_file_sync(lts_file_t lts);
 */
 uint32_t lts_get_get_expected_value_count(lts_file_t lts,int type_no);
 
+/**
+\brief Write the serialization of an lts type to a stream.
+*/
+extern void lts_type_serialize(lts_type_t t,stream_t s);
+
+/**
+\brief Create an lts type by reading it's serialization from a stream.
+*/  
+extern lts_type_t lts_type_deserialize(stream_t s);
+
+/// Print the lts type to the log stream;
+extern void lts_type_print(log_t log, lts_type_t t);
+
 #endif
 

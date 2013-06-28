@@ -4,7 +4,7 @@ Language
 * No C/C++ header file may reference config.h.
 
 * All C/C++ source files must include config.h before any other included file:
-  #include <config.h>
+  #include <hre/config.h>
 
 * All other included headers should come in alphabetical order after config.h
   to enable easy lookup and avoid duplicates. This also applies to file 
