@@ -380,10 +380,11 @@ AC_CHECK_PROGS(OPAAL_LTSMIN, [opaal_ltsmin])
 
 AC_ARG_WITH([scoop],[AS_HELP_STRING([--with-scoop],[Compile scoop])],[],[
     AC_CHECK_PROG(GHC, ghc, ghc)
-    if test -z "$GHC"; then
-        [with_scoop=yes]
-    else
+    AC_CHECK_PROG(HAPPY, happy, happy)
+    if test -z "$GHC" -o -z "$HAPPY" ; then
         [with_scoop=no]
+    else
+        [with_scoop=yes]
     fi
 ])
 if test "x$with_scoop" == xyes; then
