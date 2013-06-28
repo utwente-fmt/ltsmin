@@ -12,6 +12,7 @@ pins2lts-sym - Symbolic reachability analysis for plugin models.
 == SYNOPSIS
 
 *pins2lts-sym* --loader=<plugin> [OPTION]... <input> ['output.etf']
+*pins2lts-sym* [OPTION]... <model.so> ['output.etf']
 
 == DESCRIPTION
 

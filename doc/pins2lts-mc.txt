@@ -12,6 +12,7 @@ pins2lts-mc - Concurrent state space generator for ETF models.
 == SYNOPSIS
 
 *{manname}* --loader=<plugin> [OPTION]... <input>
+*{manname}* [OPTION]... <model.so>
 
 == DESCRIPTION
 

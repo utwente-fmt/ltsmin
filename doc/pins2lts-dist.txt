@@ -12,6 +12,7 @@ pins2lts-dist - Distributed state space generator for plugin models.
 == SYNOPSIS
 
 *{manname}* --loader=<plugin> [OPTION]... <input> ['output.fmt']
+*{manname}* [OPTION]... <model.so> ['output.fmt']
 
 == DESCRIPTION
 
