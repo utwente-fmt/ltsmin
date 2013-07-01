@@ -270,10 +270,12 @@ void lts_write_edge(lts_file_t lts,int src_seg,void* src_state,int dst_seg,void*
     default:
         Abort("missing case in write edge %d",SYSTEM(lts)->edge_owner);
     }
-    if (*((uint32_t*)src_state)>=SYSTEM(lts)->max_src_p1[src_seg]){
+    if (SYSTEM(lts)->src_mode==Index
+    && *((uint32_t*)src_state)>=SYSTEM(lts)->max_src_p1[src_seg]){
         SYSTEM(lts)->max_src_p1[src_seg]=*((uint32_t*)src_state)+1;
     }
-    if (*((uint32_t*)dst_state)>=SYSTEM(lts)->max_dst_p1[dst_seg]){
+    if (SYSTEM(lts)->dst_mode==Index
+    && *((uint32_t*)dst_state)>=SYSTEM(lts)->max_dst_p1[dst_seg]){
         SYSTEM(lts)->max_dst_p1[dst_seg]=*((uint32_t*)dst_state)+1;
     }
     if (!SYSTEM(lts)->write_edge) Abort("write edge not set");

@@ -150,9 +150,14 @@ int main(int argc, char *argv[]){
                 uint32_t state[SV];
                 uint32_t label[SL];
                 db[i]=TreeDBScreate(SV);
+                int idx=0;
                 while(lts_read_state(in,&i,state,label)){
-                    int idx=TreeFold(db[i],(int*)state);
-                    lts_write_state(out,i,&idx,label);
+                    int tmp=TreeFold(db[i],(int*)state);
+                    if (idx!=tmp){
+                        Abort("unexpected index %u != %u",tmp,idx);
+                    }
+                    idx++;
+                    lts_write_state(out,i,(int*)state,label);
                 }
             }
             Print(info,"converting initial states");

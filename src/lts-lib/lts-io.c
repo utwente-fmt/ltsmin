@@ -59,9 +59,34 @@ static void write_state(lts_file_t file,int seg,void* state,void*labels){
 
 
 static void write_edge(lts_file_t file,int src_seg,void* src_state,
-                           int dst_seg,void*dst_state,void* labels){
-    uint32_t src_no=*((uint32_t*)src_state)*file->segments+src_seg;
-    uint32_t dst_no=*((uint32_t*)dst_state)*file->segments+dst_seg;
+                           int dst_seg,void*dst_state,void* labels
+){
+    uint32_t src_no;
+    switch(lts_file_source_mode(file)){
+    case Index:
+        src_no=*((uint32_t*)src_state)*file->segments+src_seg;
+        break;
+    case SegVector:
+    case Vector:
+        if (src_seg != 0) Abort("(Seg)Vector format with multiple segments unsupported");
+        src_no=TreeFold(file->lts->state_db,src_state);
+        break;
+    default:
+        Abort("missing case");
+    }
+    uint32_t dst_no;
+    switch(lts_file_dest_mode(file)){
+    case Index:
+        dst_no=*((uint32_t*)dst_state)*file->segments+dst_seg;
+        break;
+    case SegVector:
+    case Vector:
+        if (dst_seg != 0) Abort("(Seg)Vector format with multiple segments unsupported");
+        dst_no=TreeFold(file->lts->state_db,dst_state);
+        break;
+    default:
+        Abort("missing case");
+    }
     if (file->edge_count>=file->lts->transitions) {
         lts_set_size(file->lts,file->lts->root_count,file->lts->states,file->lts->transitions+32768);
     }
