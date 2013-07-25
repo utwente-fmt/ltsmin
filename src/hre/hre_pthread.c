@@ -103,6 +103,7 @@ static void area_free(void*area,void *rt_ptr){
 }
 
 static void queue_put(hre_context_t context,hre_msg_t msg,int queue){
+    Debug("enqueue message %llx",msg);
     if (msg->comm >= QUEUE_SIZE) Abort("number of communicators exceeds maximum of %d",QUEUE_SIZE);
     pthread_mutex_lock(&context->queues[queue].lock);
     hre_put_msg(&context->queues[queue].comm[msg->comm],msg);
@@ -111,6 +112,7 @@ static void queue_put(hre_context_t context,hre_msg_t msg,int queue){
 }
 
 static void queue_send(hre_context_t context,hre_msg_t msg){
+    Debug("sending message %llx",msg);
     queue_put(context,msg,msg->target);
 }
 
@@ -121,15 +123,15 @@ static void queue_while(hre_context_t ctx,int*condition){
     int comm;
     for(;;){
         pthread_mutex_lock(&ctx->queues[me].lock);
-        //Print(infoShort,"scanning queue %d below %d",me,max_comm);
+        Debug("scanning queue %d below %d",me,max_comm);
         for(comm=0;comm<max_comm;comm++){
             msg=hre_get_msg(&ctx->queues[me].comm[comm]);
             if (msg) break;
         }
         while(!msg && *condition) {
-            //Print(infoShort,"blocking %d",*condition);
+            Debug("blocking %d",*condition);
             pthread_cond_wait(&ctx->queues[me].cond, &ctx->queues[me].lock);
-            //Print(infoShort,"scanning queue %d below %d",me,max_comm);
+            Debug("scanning queue %d below %d",me,max_comm);
             for(comm=0;comm<max_comm;comm++){
                 msg=hre_get_msg(&ctx->queues[me].comm[comm]);
                 if (msg) break;
@@ -142,9 +144,11 @@ static void queue_while(hre_context_t ctx,int*condition){
         */
         msg->context=ctx;
         if (me==(int)msg->target) {
+            Debug("delivering message %llx",msg);
             // Message is sent to us.
             HREdeliverMessage(msg);
         } else {
+            Debug("completed message %llx",msg);
             // Message is being returned to us.
             HREmsgReady(msg);
         }

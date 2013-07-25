@@ -63,7 +63,11 @@ static void term_action(void* context,hre_msg_t msg){
 }
 
 static void TaskSend(hre_task_t task,int target){
-    if (task->pending[target]) HREyieldWhile(task->queue->ctx,&task->pending[target]);
+    if (task->pending[target]) {
+        Debug("waiting for previous send %d %llx",task->pending[target],task->buf[target]);
+        HREyieldWhile(task->queue->ctx,&task->pending[target]);
+        Debug("previous completed, sending...");
+    }
     hre_msg_t tmp=task->msg[target];
     task->msg[target]=task->buf[target];
     task->buf[target]=tmp;
@@ -195,10 +199,11 @@ void TQwait(hre_task_queue_t queue){
 
 static void task_action(void* context,hre_msg_t msg){
     hre_task_t task=(hre_task_t)context;
-    if (task->fifo==NULL || task->working==0){
+    task->working++;
+    if (task->fifo==NULL){
+        Debug("executing non-fifo task");
         hre_task_t old_task=task->queue->current_task;
         task->queue->current_task=task;
-        task->working++;
         if (task->len) {
             for(unsigned int ofs=0;ofs<msg->tail;ofs+=task->len){
                 task->call(task->arg,msg->source,task->len,msg->buffer+ofs);
@@ -215,28 +220,10 @@ static void task_action(void* context,hre_msg_t msg){
         task->queue->recv++;
         if (task->queue->status==Idle) task->queue->status=Dirty;
         HREmsgReady(msg);
-        if (task->fifo!=NULL){
-            int source;
-            if (task->len) {
-                char buffer[task->len];
-                while (!stream_empty(task->fifo)){
-                    source=DSreadS32(task->fifo);
-                    DSread(task->fifo,buffer,task->len);
-                    task->call(task->arg,source,task->len,buffer);
-                }
-            } else {
-                while (!stream_empty(task->fifo)){
-                    source=DSreadS32(task->fifo);
-                    uint16_t len=DSreadU16(task->fifo);
-                    char buffer[len];
-                    DSread(task->fifo,buffer,len);
-                    task->call(task->arg,source,len,buffer);
-                }
-            }  
-        }
-        task->working--;
         task->queue->current_task=old_task;
+        Debug("executing non-fifo task - done");
     } else {
+        Debug("queueing in fifo %d", task->working);
         if (task->len) {
             for(unsigned int ofs=0;ofs<msg->tail;ofs+=task->len){
                 DSwriteS32(task->fifo,msg->source);
@@ -256,7 +243,33 @@ static void task_action(void* context,hre_msg_t msg){
         task->queue->recv++;
         if (task->queue->status==Idle) task->queue->status=Dirty;
         HREmsgReady(msg);
+        Debug("queueing in fifo - done %d", task->working);
+        if (task->working==1){
+            Debug("checking fifo");
+            hre_task_t old_task=task->queue->current_task;
+            task->queue->current_task=task;
+            int source;
+            if (task->len) {
+                char buffer[task->len];
+                while (!stream_empty(task->fifo)){
+                    source=DSreadS32(task->fifo);
+                    DSread(task->fifo,buffer,task->len);
+                    task->call(task->arg,source,task->len,buffer);
+                }
+            } else {
+                while (!stream_empty(task->fifo)){
+                    source=DSreadS32(task->fifo);
+                    uint16_t len=DSreadU16(task->fifo);
+                    char buffer[len];
+                    DSread(task->fifo,buffer,len);
+                    task->call(task->arg,source,len,buffer);
+                }
+            }
+            task->queue->current_task=old_task;
+            Debug("fifo empty"); 
+        }
     }
+    task->working--;
 }
 
 hre_task_queue_t HREcreateQueue(hre_context_t ctx){
@@ -297,7 +310,31 @@ void TaskSubmitFixed(hre_task_t task,int owner,void* arg){
         "attempt to submit level %d task, while processing level %d",task->comm,task->queue->current_task->comm);
     int me=HREme(task->queue->ctx);
     if (me==owner) {
-        task->call(task->arg,me,task->len,arg);
+        if (task->fifo!=NULL){
+            if (task->working>0){
+                Debug("queueing local task");
+                DSwriteS32(task->fifo,me);
+                stream_write(task->fifo,arg,task->len);
+            } else {
+                Debug("running local task");
+                hre_task_t old_task=task->queue->current_task;
+                task->queue->current_task=task;
+                task->working++;
+                task->call(task->arg,me,task->len,arg);
+                char buffer[task->len];
+                Debug("running local task - fifo");
+                while (!stream_empty(task->fifo)){
+                    int source=DSreadS32(task->fifo);
+                    DSread(task->fifo,buffer,task->len);
+                    task->call(task->arg,source,task->len,buffer);
+                }
+                task->working--;
+                task->queue->current_task=old_task;
+                Debug("running local task - done");
+            }
+        } else {
+            task->call(task->arg,me,task->len,arg);
+        }
         return;
     }
     memcpy((task->msg[owner]->buffer)+(task->msg[owner]->tail),arg,task->len);

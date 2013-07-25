@@ -71,28 +71,37 @@ void event_post(event_queue_t queue,MPI_Request *request,event_callback cb,void*
 
 static void event_loop(event_queue_t queue,int block){
     while(queue->pending){
+        Debug("MPI waiting for %d events",queue->pending);
         int index[queue->pending];
         int completed;
         MPI_Status status[queue->pending];
         if (block) {
+            Debug("MPI_Waitsome");
+            //int res = MPI_Waitsome(queue->pending,queue->request,&completed,index,status);
             int res = MPI_Waitany(queue->pending,queue->request,index,status);
             completed=1;
+            Debug("MPI_Waitsome : %d",res);
             if (res != MPI_SUCCESS) Abort("MPI_Waitsome");
             queue->wait_some_calls++;
             if (completed>1) queue->wait_some_multi++;
             block=0;
         } else {
+            Debug("MPI_Testsome");
+            //int res = MPI_Testsome(queue->pending,queue->request,&completed,index,status);
             int flag;
             int res = MPI_Testany(queue->pending,queue->request,index,&flag,status);
-            if (res != MPI_SUCCESS) Abort("MPI_Testsome");
             completed=flag?1:0;
+            Debug("MPI_Testsome : %d",res);
+            if (res != MPI_SUCCESS) Abort("MPI_Testsome");
             queue->test_some_calls++;
             if (completed==0) {
                 queue->test_some_none++;
+                Debug("MPI exit event loop");
                 return;
             }
             if (completed>1) queue->test_some_multi++;
         }
+        Debug("MPI completion of %d events",completed);
         event_callback cb[completed];
         void *ctx[completed];
         for(int i=0;i<completed;i++){
@@ -113,9 +122,12 @@ static void event_loop(event_queue_t queue,int block){
         }
         queue->pending=k;
         for(int i=0;i<completed;i++) {
+            Debug("MPI call back");
             cb[i](ctx[i],&status[i]);
+            Debug("MPI call back done");
         }
     }
+    Debug("MPI exit loop");
 }
 
 void event_yield(event_queue_t queue){
@@ -133,9 +145,12 @@ void event_while(event_queue_t queue,int *condition){
         int index[queue->pending];
         int completed=1;
         MPI_Status status[queue->pending];
+        Debug("MPI_Waitsome in while");
+        //int res = MPI_Waitsome(queue->pending,queue->request,&completed,index,status);
         int res = MPI_Waitany(queue->pending,queue->request,index,status);
         // The Waitsome version led to deadlocks in case of multiple requests and nested call-backs.
         // To use Waitsome the callback queue must be moved to the queue data structure.
+        Debug("MPI_Waitsome : %d/%d",res,completed);
         if (res != MPI_SUCCESS) Abort("MPI_Waitsome");
         queue->wait_some_calls++;
         if (completed>1) queue->wait_some_multi++;
@@ -159,7 +174,9 @@ void event_while(event_queue_t queue,int *condition){
         }
         queue->pending=k;
         for(int i=0;i<completed;i++) {
+            Debug("MPI call back");
             cb[i](ctx[i],&status[i]);
+            Debug("MPI call back done");
         }
     }
 }

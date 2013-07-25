@@ -25,6 +25,15 @@
 #include <util-lib/treedbs.h>
 #include <util-lib/string-map.h>
 
+/** priorities of tasks */
+
+#define NEW_EDGE_PRIO 3
+#define TRACE_EXTEND_PRIO 2
+#define TRACE_INITIAL_PRIO 3
+
+//#define CHUNK_LOOKUP_PRIO 3
+//#define CHUNK_REPLY_PRIO 4
+
 
 struct dist_thread_context {
     model_t model;
@@ -520,9 +529,9 @@ int main(int argc, char*argv[]){
             ctx.parent_ofs[0]=0;
             ctx.parent_seg[0]=0;
         }
-        ctx.extend_task=TaskCreate(task_queue,1,65536,extend_trace_task,&ctx,20);
+        ctx.extend_task=TaskCreate(task_queue,TRACE_EXTEND_PRIO,65536,extend_trace_task,&ctx,20);
         TaskEnableFifo(ctx.extend_task);
-        ctx.initial_task=TaskCreate(task_queue,2,65536,initial_trace_task,&ctx,12);
+        ctx.initial_task=TaskCreate(task_queue,TRACE_INITIAL_PRIO,65536,initial_trace_task,&ctx,12);
         ctx.trace_next=0;
         lts_file_t template=lts_index_template();
         lts_file_set_edge_owner(template,SourceOwned);
@@ -649,7 +658,7 @@ int main(int argc, char*argv[]){
     lbl_ofs=dst_ofs+size;
     trans_len=lbl_ofs+edge_labels;
     struct src_info src_ctx;
-    src_ctx.new_trans=TaskCreate(task_queue,1,65536,new_transition,&ctx,trans_len*4);
+    src_ctx.new_trans=TaskCreate(task_queue,NEW_EDGE_PRIO,65536,new_transition,&ctx,trans_len*4);
     src_ctx.ctx = &ctx;
     if (confluence_matrix==NULL) {
         src_ctx.fifo=NULL;
@@ -727,7 +736,7 @@ int main(int argc, char*argv[]){
             }
             if ((lvl_scount%4)==0) HREyield(HREglobal());
         }
-        //Warning(infoLong,"saw %d states and %d transitions",lvl_scount,lvl_tcount);
+        Debug("saw %d states and %d transitions",lvl_scount,lvl_tcount);
         TQwait(task_queue);
         HREreduce(HREglobal(),1,&ctx.visited,&global_visited,UInt64,Sum);
         HREreduce(HREglobal(),1,&ctx.explored,&global_explored,UInt64,Sum);
