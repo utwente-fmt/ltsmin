@@ -23,29 +23,66 @@ esac
 
 if test x"$acx_mcrl2" = xyes; then
     AC_LANG_PUSH([C++])
+
+    MCRL2_PINS_CXXFLAGS=""
     AC_CHECK_SIZEOF([void *])
     case "$ac_cv_sizeof_void_p" in
       4) MCRL2_PINS_CPPFLAGS="-DAT_32BIT" ;;
       8) MCRL2_PINS_CPPFLAGS="-DAT_64BIT" ;;
       *) AC_MSG_FAILURE([can only compile mCRL2 on 32- and 64-bit machines.]) ;;
     esac
-    AX_CHECK_COMPILE_FLAG([-std=c++0x], [CXXFLAGS="$CXXFLAGS -std=c++0x"])
+    #AX_CHECK_COMPILE_FLAG([-std=c++0x], [CXXFLAGS="$CXXFLAGS -std=c++0x"])
     AC_SUBST(MCRL2_PINS_CPPFLAGS, ["$MCRL2_PINS_CPPFLAGS -I$with_mcrl2/include -I$with_mcrl2/include/dparser"])
     AC_SUBST(MCRL2_PINS_LDFLAGS,  ["-L${with_mcrl2}/lib/mcrl2"])
     AC_SUBST(MCRL2_LIBS, [""])
     AC_SUBST(MCRL2_LDFLAGS, ["$acx_cv_cc_export_dynamic"])
+
+    mcrl2_pins_header=mcrl2/lps/ltsmin.h
+    mcrl2_pins_cache_var=AS_TR_SH([ac_cv_header_$mcrl2_pins_header])
     AX_LET([CPPFLAGS], ["$MCRL2_PINS_CPPFLAGS $CPPFLAGS"],
-      [AC_CHECK_HEADER([mcrl2/lps/ltsmin.h],,
-         [AC_MSG_FAILURE([cannot find mCRL2 headers,
-see README on how to install mCRL2 properly.])]
+      [AC_CHECK_HEADER([$mcrl2_pins_header],[acx_mcrl2=yes],[acx_mcrl2=no]
          )])
+
+    pbes_header=mcrl2/pbes/pbes_explorer.h
+    pbes_cache_var=AS_TR_SH([ac_cv_header_$pbes_header])
     AX_LET([CPPFLAGS], ["$MCRL2_PINS_CPPFLAGS $CPPFLAGS"],
-      [AC_CHECK_HEADER([mcrl2/pbes/pbes_explorer.h],
-         [acx_pbes=yes],
-         [AC_MSG_WARN([cannot find headers for the PBES greybox,
-installing without PBES support.])]
+      [AC_CHECK_HEADER([$pbes_header],
+         [acx_pbes=yes],[acx_pbes=no]
          )])
+
+    if test x"$acx_mcrl2" = xno; then
+      # Check for C++ 11 support; needed for newer mCRL2
+      save_CXXFLAGS="$CXXFLAGS"
+      AX_CXX_COMPILE_STDCXX_11([noext], [optional])
+      ac_compile_cxx11=$ac_success
+      CXX11CXXFLAGS="$CXXFLAGS"
+      CXXFLAGS="$save_CXXFLAGS"
+ 
+      if test x"$ac_compile_cxx11" = xyes; then
+        AC_SUBST(MCRL2_PINS_CXXFLAGS, ["$MCRL2_PINS_CXXFLAGS $CXX11CXXFLAGS"])
+        $as_unset $mcrl2_pins_cache_var
+        $as_unset $pbes_cache_var
+        AX_LET([CPPFLAGS], ["$MCRL2_PINS_CPPFLAGS $CPPFLAGS"],
+               [CXXFLAGS], ["$MCRL2_PINS_CXXFLAGS $CXXFLAGS"],
+          [AC_CHECK_HEADER([$mcrl2_pins_header],[acx_mcrl2=yes],[acx_mcrl2=no]
+           )])
+
+    	AX_LET([CPPFLAGS], ["$MCRL2_PINS_CPPFLAGS $CPPFLAGS"],
+               [CXXFLAGS], ["$MCRL2_PINS_CXXFLAGS $CXXFLAGS"],
+          [AC_CHECK_HEADER([$pbes_header],[acx_pbes=yes],[acx_pbes=no]
+           )])
+      fi
+    fi
+
+    if test x"$acx_mcrl2" = xno; then
+	AC_MSG_FAILURE([cannot find mCRL2 headers, see README on how to install mCRL2 properly.])
+    fi
+    if test x"$acx_pbes" = xno; then
+	AC_MSG_WARN([cannot find headers for the PBES greybox, installing without PBES support.])
+    fi
+
     AC_LANG_POP([C++])
+
     $1
 else
     $2
@@ -74,6 +111,7 @@ if test x"$acx_mcrl2" = xyes; then
     AC_LANG_PUSH([C++])
     AX_LET([LIBS], ["$MCRL2_PINS_LIBS $LIBS"],
            [LDFLAGS], ["$MCRL2_PINS_LDFLAGS $LDFLAGS"],
+           [CXXFLAGS], ["$MCRL2_PINS_CXXFLAGS $CXXFLAGS"],
       [AX_CXX_CHECK_LIB([dparser], [main],
          [MCRL2_PINS_LIBS="-ldparser $MCRL2_PINS_LIBS"
           LIBS="-ldparser $LIBS"])
@@ -86,12 +124,10 @@ if test x"$acx_mcrl2" = xyes; then
          [acx_mcrl2_libs=no])
        AX_CXX_CHECK_LIB([mcrl2_aterm], [main],
          [MCRL2_PINS_LIBS="-lmcrl2_aterm $MCRL2_PINS_LIBS"
-          LIBS="-lmcrl2_aterm $LIBS"],
-         [acx_mcrl2_libs=no])
+          LIBS="-lmcrl2_aterm $LIBS"])
        AX_CXX_CHECK_LIB([mcrl2_atermpp], [main],
          [MCRL2_PINS_LIBS="-lmcrl2_atermpp $MCRL2_PINS_LIBS"
-          LIBS="-lmcrl2_atermpp $LIBS"],
-         [])
+          LIBS="-lmcrl2_atermpp $LIBS"])
        AX_CXX_CHECK_LIB([mcrl2_core], [main],
          [MCRL2_PINS_LIBS="-lmcrl2_core $MCRL2_PINS_LIBS"
           LIBS="-lmcrl2_core $LIBS"],
@@ -108,6 +144,9 @@ if test x"$acx_mcrl2" = xyes; then
          [MCRL2_PINS_LIBS="-lmcrl2_lps $MCRL2_PINS_LIBS"
           LIBS="-lmcrl2_lps $LIBS"],
          [acx_mcrl2_libs=no])
+       AX_CXX_CHECK_LIB([mcrl2_modal_formula], [main],
+         [MCRL2_PINS_LIBS="-lmcrl2_modal_formula $MCRL2_PINS_LIBS"
+          LIBS="-lmcrl2_modal_formula $LIBS"])
        AX_CXX_CHECK_LIB([mcrl2_bes], [main],
          [MCRL2_PINS_LIBS="-lmcrl2_bes $MCRL2_PINS_LIBS"
           LIBS="-lmcrl2_bes $LIBS"])
@@ -123,6 +162,7 @@ fi
 if test x"$acx_mcrl2_libs" = xyes; then :
   ifelse([$1],,
          [AC_SUBST(CPPFLAGS, ["$MCRL2_PINS_CPPFLAGS $CPPFLAGS"])
+          AC_SUBST(CXXFLAGS, ["$MCRL2_PINS_CXXFLAGS $CXXFLAGS"])
           AC_SUBST(LDFLAGS,  ["$MCRL2_PINS_LDFLAGS $LDFLAGS"])
           AC_SUBST(LIBS,     ["$MCRL2_PINS_LIBS $LIBS"])
           AC_SUBST(LDFLAGS,  ["$MCRL2_LDFLAGS $LDFLAGS"])

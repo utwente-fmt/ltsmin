@@ -221,13 +221,14 @@ public:
     }
 
 private:
-    static const int IDX_NOT_FOUND = -1;
+    static const int IDX_NOT_FOUND;
     model_t model_;
     std::vector< std::map<int,int> > rmap_;
     std::vector< std::vector<int> > map_;
 };
 
-const int pins::IDX_NOT_FOUND;
+// initialisation outside class to avoid linking error
+const int pins::IDX_NOT_FOUND = -1;
 
 struct state_cb
 {

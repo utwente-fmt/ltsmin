@@ -14,7 +14,7 @@ noinst_LTLIBRARIES += libpbes-pins.la
 endif
 
 # Warning overwriting user variable! (Avoid PBES warnings)
-CXXFLAGS = @CXXFLAGS@ -Wno-unused-parameter
+#CXXFLAGS = @CXXFLAGS@ -Wno-unused-parameter
 
 # libmcrl-pins
 libmcrl_pins_la_SOURCES   = mcrl-pins.c mcrl-pins.h
@@ -26,12 +26,14 @@ libmcrl_pins_la_LIBADD    = $(MCRL_LIBS)
 # libmcrl2-pins
 libmcrl2_pins_la_SOURCES  = mcrl2-pins.cpp mcrl2-pins.h
 libmcrl2_pins_la_CPPFLAGS = -DMCRL2 -DNDEBUG $(MCRL2_PINS_CPPFLAGS) $(AM_CPPFLAGS)
+libmcrl2_pins_la_CXXFLAGS = $(MCRL2_PINS_CXXFLAGS) $(AM_CXXFLAGS)
 libmcrl2_pins_la_LDFLAGS  = $(MCRL2_PINS_LDFLAGS) $(MCRL2_LDFLAGS) $(AM_LDFLAGS)
 libmcrl2_pins_la_LIBADD   = $(MCRL2_PINS_LIBS)
 
 # libpbes-pins
 libpbes_pins_la_SOURCES   = pbes-pins.cpp pbes-pins.h
 libpbes_pins_la_CPPFLAGS  = -DPBES -DNDEBUG $(MCRL2_PINS_CPPFLAGS) $(AM_CPPFLAGS)
+libpbes_pins_la_CXXFLAGS = $(MCRL2_PINS_CXXFLAGS) $(AM_CXXFLAGS)
 libpbes_pins_la_LDFLAGS   = $(MCRL2_PINS_LDFLAGS) $(MCRL2_LDFLAGS) $(AM_LDFLAGS)
 libpbes_pins_la_LIBADD    = $(MCRL2_PINS_LIBS)
 

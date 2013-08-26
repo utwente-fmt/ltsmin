@@ -44,7 +44,7 @@ private:
     std::vector<std::map<int,int> > local2global_maps;
     std::vector<std::vector<int> > global2local_maps;
     int* global_group_var_ids;
-    static const int IDX_NOT_FOUND = -1;
+    static const int IDX_NOT_FOUND;
 public:
     explorer(model_t& model, const std::string& filename, const std::string& rewrite_strategy, bool reset = false, bool always_split = false) :
 #ifdef PBES_EXPLORER_VERSION
@@ -220,7 +220,8 @@ public:
     }
 };
 
-const int explorer::IDX_NOT_FOUND;
+// initialisation outside class to avoid linking error
+const int explorer::IDX_NOT_FOUND = -1;
 
 struct pbes_state_cb
 {
