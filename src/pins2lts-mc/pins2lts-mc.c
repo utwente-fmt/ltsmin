@@ -1415,6 +1415,7 @@ perm_todo (permute_t *perm, state_data_t dst, transition_info_t *ti)
     next->ti.group = ti->group;
     next->ti.labels = ti->labels;
     perm->nstored++;
+    ti->por_proviso = 1; // Only DFS_FIFO combines POR and PERM; it requires no cycle proviso!
 }
 
 static char *
