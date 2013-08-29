@@ -1091,9 +1091,18 @@ local_init ()
 
     if (PINS_POR) {
         if (strategy[0] & Strat_DFSFIFO) {
-            int progress_sl = GBgetProgressStateLabelIndex (model);
-            HREassert (progress_sl >= 0, "No progress labels defined for DFS_FIFO");
-            pins_add_state_label_visible (model, progress_sl);
+            if (ctx->progress_trans > 0) {
+                int *visibles = GBgetPorGroupVisibility(model);
+                for (size_t i = 0; i < K; i++) {
+                    if (ctx->progress[i]) visibles[i] = 1;
+                }
+            } else {
+                Warning (info, "No progress transitions defined for DFS_FIFO, "
+                               "using progress states via progress state label")
+                int progress_sl = GBgetProgressStateLabelIndex (model);
+                HREassert (progress_sl >= 0, "No progress labels defined for DFS_FIFO");
+                pins_add_state_label_visible (model, progress_sl);
+            }
         }
         if (ctx->inv_expr) {
             mark_visible (model, ctx->inv_expr, ctx->env);
