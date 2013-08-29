@@ -1022,7 +1022,7 @@ print_setup (wctx_t *ctx)
     Warning (info, "State length is %zu, there are %zu groups", N, K);
     if (act_detect)
         Warning(info, "Detecting action \"%s\"", act_detect);
-    Warning (info, "Running %s on %zu %s", key_search(strategies, strategy[0] & ~Strat_TA),
+    Warning (info, "Running %s using %zu %s", key_search(strategies, strategy[0] & ~Strat_TA),
              W, W == 1 ? "core (sequential)" : (SPEC_MT_SAFE ? "threads" : "processes"));
     if (db_type == HashTable) {
         Warning (info, "Using a hash table with 2^%d elements", dbs_size);
@@ -1342,7 +1342,7 @@ print_thread_statistics (wctx_t *ctx)
     char                name[128];
     char               *format = "[%zu%s] saw in %.3f sec ";
     if (W < 4 || log_active(infoLong)) {
-    if ((Strat_Reach | Strat_OWCTY) & strategy[0]) {
+    if ((Strat_Reach | Strat_OWCTY | Strat_DFSFIFO) & strategy[0]) {
         snprintf (name, sizeof name, format, ctx->id, "", ctx->counters.runtime);
         print_state_space_total (name, &ctx->counters);
         if (Strat_ECD & strategy[1])
