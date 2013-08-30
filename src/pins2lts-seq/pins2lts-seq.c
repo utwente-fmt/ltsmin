@@ -1507,7 +1507,7 @@ gsea_setup(const char *output)
         opt.act_index = GBchunkPut(opt.model, typeno, c);
         Warning(info, "Detecting action \"%s\"", opt.act_detect);
         if (GB_POR) {
-            mark_edge_label_visible (opt.model, opt.act_label, opt.act_index);
+            pins_add_edge_label_visible (opt.model, opt.act_label, opt.act_index);
             set_cycle_proviso ();
         }
     }
@@ -1805,10 +1805,13 @@ gsea_print_setup (const char *name)
     Warning (info, "Using a %s for state storage", key_search(db_types, opt.state_db));
     if (GB_POR) {
         int            *visibility = GBgetPorGroupVisibility (opt.model);
-        size_t          visibles = 0;
+        size_t          visibles = 0, labels = 0;
         for (size_t i = 0; i < global.K; i++)
             visibles += visibility[i];
-        Warning (info, "Visible groups: %zu / %zu", visibles, global.K);
+        visibility = GBgetPorStateLabelVisibility (opt.model);
+        for (size_t i = 0; i < global.state_labels; i++)
+            labels += visibility[i];
+        Warning (info, "Visible groups: %zu / %zu, labels: %zu / %zu", visibles, global.K, labels, global.state_labels);
         Warning (info, "POR cycle proviso: %s %s", key_search(provisos, opt.proviso), opt.strategy == Strat_SCC ? "(ltl)" : "");
     }
 }

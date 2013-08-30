@@ -923,7 +923,7 @@ statics_init (model_t model)
         if (strategy[0] & Strat_OWCTY) Abort ("OWCTY with POR not implemented.");
         if (strategy[0] & Strat_LTL) {
             if (W > 1) Abort ("Cannot use POR with more than one thread/process.");
-            if (proviso == Proviso_None) Warning (info, "Forcing use of the stack cycle proviso.");
+            if (proviso == Proviso_None) Warning (info, "Forcing use of the stack cycle proviso");
             proviso = Proviso_Stack;
         } else if (inv_detect || act_detect) {
             if ((strategy[0] & ~Strat_DFS) || W > 1) Abort ("Cycle proviso for safety properties with this (parallel) search strategy is not yet implemented, use DFS.");
@@ -1028,17 +1028,20 @@ print_setup (wctx_t *ctx)
         Warning (info, "Using a hash table with 2^%d elements", dbs_size);
     } else
         Warning (info, "Using a%s tree table with 2^%d elements", indexing ? "" : " non-indexing", dbs_size);
-    Warning (info, "Global bits: %d, count bits: %d, local bits: %d.",
+    Warning (info, "Global bits: %d, count bits: %d, local bits: %d",
              global_bits, count_bits, local_bits);
     if (strategy[0] & Strat_DFSFIFO)
             Warning (info, "Found %zu progress transitions.", ctx->progress_trans);
     Warning (info, "Successor permutation: %s", key_search(permutations, permutation));
     if (GB_POR) {
         int            *visibility = GBgetPorGroupVisibility (ctx->model);
-        size_t          visibles = 0;
+        size_t          visibles = 0, labels = 0;
         for (size_t i = 0; i < K; i++)
             visibles += visibility[i];
-        Warning (info, "Visible groups: %zu / %zu", visibles, K);
+        visibility = GBgetPorStateLabelVisibility (ctx->model);
+        for (size_t i = 0; i < SL; i++)
+            labels += visibility[i];
+        Warning (info, "Visible groups: %zu / %zu, labels: %zu / %zu", visibles, K, labels, SL);
         Warning (info, "POR cycle proviso: %s %s", key_search(provisos, proviso), strategy[0] & Strat_LTL ? "(ltl)" : "");
     }
 }
@@ -1090,13 +1093,13 @@ local_init ()
         if (strategy[0] & Strat_DFSFIFO) {
             int progress_sl = GBgetProgressStateLabelIndex (model);
             HREassert (progress_sl >= 0, "No progress labels defined for DFS_FIFO");
-            GBaddStateLabelVisible (model, progress_sl);
+            pins_add_state_label_visible (model, progress_sl);
         }
         if (ctx->inv_expr) {
             mark_visible (model, ctx->inv_expr, ctx->env);
         }
         if (act_detect) {
-            mark_edge_label_visible (model, act_label, act_index);
+            pins_add_edge_label_visible (model, act_label, act_index);
         }
     }
 

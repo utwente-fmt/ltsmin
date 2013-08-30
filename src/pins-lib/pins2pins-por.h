@@ -82,6 +82,8 @@ typedef struct por_context {
     model_t         parent;         // parent PINS model
     int             ltl;
     int             nguards;        // number of guards
+    matrix_t        gnes_matrix;    //
+    matrix_t        gnds_matrix;    //
     matrix_t        is_dep_and_ce;  //
     matrix_t        gnce_tg_tg;     // mapping from group to not coenabled group
     int**           is_dep_and_ce_tg_tg; // mapping from transition group to dependent and coenabled transition groups
@@ -89,6 +91,7 @@ typedef struct por_context {
     int**           guard_nce;      // mapping from guards to transition groups that may not be co-enabled
     int**           guard_nes;      // transition groups that form a nes for a guard (guard -> [t1, t2, t..])
     int**           guard_nds;      // transition groups that form a nds for a guard
+    ci_list       **guard_dep;      // transition groups that depend on a guard
 
     /**
      * The global data used for the search
@@ -114,7 +117,11 @@ typedef struct por_context {
     int             *search_order;
     search_context  *search;        // context for each search
 
-    int             *group_visibility; // LTL specific
+    int             *group_visibility;
+    int             *label_visibility;
+    int             *dynamic_visibility;
+    ci_list         *marked_list;
+    ci_list         *label_list;
 } por_context;
 
 #endif // PINS2PINS_POR

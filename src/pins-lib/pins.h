@@ -389,28 +389,6 @@ extern void GBsetGuardNDSInfo(model_t model, matrix_t *info);
 */
 extern matrix_t *GBgetGuardNDSInfo(model_t model);
 
-/**
-\brief Set the label visibility matrix to a model
-*/
-extern void GBsetStateLabelVisibilityInfo(model_t model, matrix_t *info);
-
-/**
-\brief Get the label visibility matrix of a model.
-Visibility can also be over-estimated by combining StateLabelInfo and DMInfo
-*/
-extern matrix_t *GBgetStateLabelVisibilityInfo(model_t model);
-
-/**
-\brief Adds visibility info for a state label to the PorVisibility array.
-If the info is not present, the state label matrix is used
-*/
-extern void GBaddStateLabelVisible(model_t model, int label);
-
-/**
-\brief Adds visibility info for a state variable to the PorVisibility array.
-Uses DMWriteInfo (or DMInfo).
-*/
-extern void GBaddStateVariableVisible(model_t model, int index);
 
 /**
 \brief Set the POR group visibility info.
@@ -421,6 +399,17 @@ extern void GBsetPorGroupVisibility(model_t model, int*bv);
 \brief Get the POR group visibility info, i.e. which group touches an LTL variable.
 */
 extern int *GBgetPorGroupVisibility(model_t model);
+
+/**
+\brief Set the POR group visibility info.
+*/
+extern void GBsetPorStateLabelVisibility(model_t model, int*bv);
+
+/**
+\brief Get the POR group visibility info, i.e. which state labels are in the LTL formula.
+        This is dynamically added to the visibility info by the POR layer.
+*/
+extern int *GBgetPorStateLabelVisibility(model_t model);
 
 /**
 \brief Set the initial state.

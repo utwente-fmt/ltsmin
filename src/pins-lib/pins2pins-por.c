@@ -8,6 +8,7 @@
 #include <ltsmin-lib/ltsmin-standard.h>
 #include <pins-lib/pins.h>
 #include <pins-lib/pins2pins-por.h>
+#include <pins-lib/pins-util.h>
 
 
 /**
@@ -154,6 +155,56 @@ static void* bs_init_context(model_t model)
     return (void*)context;
 }
 
+static inline void
+init_dynamic_labels (por_context* pctx)
+{
+    if (pctx->marked_list == NULL ) {
+        model_t model = pctx->parent;
+        int n = dm_nrows(GBgetDMInfo(model));
+        int labels = pins_get_state_label_count (model);
+        pctx->marked_list = RTmallocZero ((n + 1) * sizeof(int));
+        pctx->label_list = RTmallocZero ((labels + 1) * sizeof(int));
+        for (int i = 0; i < labels; i++) {
+            if (pctx->label_visibility[i]) {
+                pctx->label_list->data[pctx->label_list->count++] = i;
+            }
+        }
+    }
+}
+
+static void
+mark_dynamic_labels (por_context* pctx)
+{
+    init_dynamic_labels (pctx);
+    pctx->marked_list->count = 0;
+    for (int i = 0; i < pctx->label_list->count; i++) {
+        int label = pctx->label_list->data[i];
+        for (int j = 0; j < pctx->guard_dep[label]->count; j++) {
+            int group = pctx->guard_dep[label]->data[j];
+            if (pctx->group_visibility[group] || pctx->dynamic_visibility[group])
+                continue;
+            if (pctx->guard_status[label]) {
+                pctx->dynamic_visibility[group] |= dm_is_set (&pctx->gnds_matrix, label, group);
+            } else {
+                pctx->dynamic_visibility[group] |= dm_is_set (&pctx->gnes_matrix, label, group);
+            }
+            // already statically marked
+            pctx->marked_list->data[pctx->marked_list->count] = group;
+            pctx->marked_list->count += pctx->dynamic_visibility[group];
+        }
+    }
+    Debug("Dynamically visible labels: %d", pctx->marked_list->count);
+}
+
+static void
+unmark_dynamic_labels (por_context* pctx)
+{
+    for (int i = 0; i < pctx->marked_list->count; i++) {
+        int group = pctx->marked_list->data[i];
+        pctx->dynamic_visibility[group] = 0;
+    }
+}
+
 /**
  * For each state, this function sets up the current guard values etc
  * This setup is then reused by the analysis function
@@ -171,7 +222,9 @@ static void bs_setup(model_t model, por_context* pctx, int* src)
     memset(pctx->nes_score, 0, (n_guards * 2) * sizeof(int));
 
     // fill guard status, request all guard values,
-    GBgetStateLabelsGroup(model, GB_SL_GUARDS, src, pctx->guard_status);
+    GBgetStateLabelsAll(model, src, pctx->guard_status);
+
+    mark_dynamic_labels (pctx);
 
     // fill group status
     for(int i=0; i<n; i++) {
@@ -191,7 +244,7 @@ static void bs_setup(model_t model, por_context* pctx, int* src)
             pctx->group_score[i] = 1;
         } else {
             // note: n*n won't work when n is very large (overflow)
-            pctx->group_score[i] = (pctx->group_visibility[i]) ? n*n : n;
+            pctx->group_score[i] = (pctx->group_visibility[i] || pctx->dynamic_visibility[i]) ? n*n : n;
         }
     }
     // fill nes score
@@ -364,7 +417,7 @@ bs_analyze(model_t model, por_context* pctx, int* src)
             if (s[idx].score == pctx->emit_score-1) select_group (model, pctx, current_group); /* init search context here? */
 
             // update the search score
-            s[idx].score += 1 + ( pctx->group_visibility[current_group] ? n : 0);
+            s[idx].score += 1 + ( pctx->group_visibility[current_group] || pctx->dynamic_visibility[current_group] ? n : 0);
 
             // quit the search when emit_limit is reached
             // this block is just to skip useless work, everything is emitted anyway
@@ -513,6 +566,7 @@ por_beam_search_all (model_t self, int *src, TransitionCB cb, void *user_context
     por_context* pctx = ((por_context*)GBgetContext(self));
     bs_setup(self, pctx, src);
     bs_analyze(self, pctx, src);
+    unmark_dynamic_labels (pctx);
     return bs_emit (self, pctx, src, cb, user_context);
 }
 
@@ -570,7 +624,7 @@ GBaddPOR (model_t model, int por_check_ltl)
     }
 
     // guard to group dependencies
-    sl_group_t* sl_guards = GBgetStateLabelGroupInfo(model, GB_SL_GUARDS);
+    sl_group_t* sl_guards = GBgetStateLabelGroupInfo(model, GB_SL_ALL);
     int guards = sl_guards->count;
     matrix_t        *p_sl = GBgetStateLabelInfo(model);
     // len is unchanged
@@ -606,6 +660,7 @@ GBaddPOR (model_t model, int por_check_ltl)
     // for a guard g, find all guards g' that may-not-be co-enabled with it
     // then, for each g', mark all groups in gnce_matrix
     matrix_t *p_gce_matrix = GBgetGuardCoEnabledInfo(model);
+    HREassert (dm_ncols(p_gce_matrix) == guards && dm_nrows(p_gce_matrix) == guards);
     matrix_t gnce_matrix;
     dm_create(&gnce_matrix, guards, groups);
     ci_list** g_tg              = (ci_list**)ctx->guard_tg;
@@ -652,9 +707,9 @@ GBaddPOR (model_t model, int por_check_ltl)
 
     // mark minimal necessary enabling set
     matrix_t *p_gnes_matrix = GBgetGuardNESInfo(model);
+    HREassert (dm_nrows(p_gnes_matrix) == guards && dm_ncols(p_gnes_matrix) == groups);
     // copy p_gnes_matrix to gnes_matrix, then optimize it
-    matrix_t gnes_matrix;
-    dm_copy(p_gnes_matrix, &gnes_matrix);
+    dm_copy(p_gnes_matrix, &ctx->gnes_matrix);
 
     // optimize nes
     // remove all transition groups that do not write to this guard
@@ -664,17 +719,17 @@ GBaddPOR (model_t model, int por_check_ltl)
             // the group writes to the same part of the state
             // vector the guard reads from, otherwise
             // this value can be removed
-            if (dm_is_set(&gnes_matrix, i, j)) {
+            if (dm_is_set(&ctx->gnes_matrix, i, j)) {
                 if (!dm_is_set(&guard_is_dependent, i, j))
-                    dm_unset(&gnes_matrix, i, j);
+                    dm_unset(&ctx->gnes_matrix, i, j);
             }
         }
     }
 
     // same for nds
     matrix_t *p_gnds_matrix = GBgetGuardNDSInfo(model);
-    matrix_t gnds_matrix;
-    dm_copy(p_gnds_matrix, &gnds_matrix);
+    HREassert (dm_nrows(p_gnds_matrix) == guards && dm_ncols(p_gnds_matrix) == groups);
+    dm_copy(p_gnds_matrix, &ctx->gnds_matrix);
 
     // optimize nds matrix
     // remove all transition groups that do not write to this guard
@@ -684,9 +739,9 @@ GBaddPOR (model_t model, int por_check_ltl)
             // the group writes to the same part of the state
             // vector the guard reads from, otherwise
             // this value can be removed
-            if (dm_is_set(&gnds_matrix, i, j)) {
+            if (dm_is_set(&ctx->gnds_matrix, i, j)) {
                 if (!dm_is_set(&guard_is_dependent, i, j))
-                    dm_unset(&gnds_matrix, i, j);
+                    dm_unset(&ctx->gnds_matrix, i, j);
             }
         }
     }
@@ -694,13 +749,12 @@ GBaddPOR (model_t model, int por_check_ltl)
     // set lookup tables
     ctx->is_dep_and_ce_tg_tg   = dm_rows_to_idx_table(&ctx->is_dep_and_ce);
     ctx->guard_nce             = dm_rows_to_idx_table(&gnce_matrix);
-    ctx->guard_nes             = dm_rows_to_idx_table(&gnes_matrix);
-    ctx->guard_nds             = dm_rows_to_idx_table(&gnds_matrix);
+    ctx->guard_nes             = dm_rows_to_idx_table(&ctx->gnes_matrix);
+    ctx->guard_nds             = dm_rows_to_idx_table(&ctx->gnds_matrix);
+    ctx->guard_dep             = (ci_list **) dm_rows_to_idx_table(&guard_is_dependent);
 
     // free temporary matrices
     dm_free(&gnce_matrix);
-    dm_free(&gnes_matrix);
-    dm_free(&gnds_matrix);
     dm_free(&guard_is_dependent);
 
 
@@ -722,6 +776,17 @@ GBaddPOR (model_t model, int por_check_ltl)
     } else {
         ctx->group_visibility = GBgetPorGroupVisibility(pormodel);
     }
+    if (GBgetPorStateLabelVisibility(pormodel) == NULL) {
+        // reserve memory for group visibility, will be provided by ltl layer or tool
+        ctx->label_visibility = RTmallocZero( guards * sizeof(int) );
+        GBsetPorStateLabelVisibility  (pormodel, ctx->label_visibility);
+    } else {
+        ctx->label_visibility = GBgetPorStateLabelVisibility (pormodel);
+    }
+
+    ctx->dynamic_visibility = RTmallocZero( groups * sizeof(int) );
+    ctx->marked_list = NULL;
+    ctx->label_list = NULL;
 
     int                 s0[len];
     GBgetInitialState (model, s0);

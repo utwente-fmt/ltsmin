@@ -8,6 +8,7 @@
 #include <stdbool.h>
 
 #include <pins-lib/property-semantics.h>
+#include <pins-lib/pins-util.h>
 
 /**
  * Enums need their values to be present in the tables, hence the strict lookup.
@@ -194,16 +195,14 @@ mark_visible(model_t model, ltsmin_expr_t e, ltsmin_parse_env_t env)
             mark_visible(model, e->arg2,env);
             break;
         case PRED_SVAR: {
-            lts_type_t          ltstype = GBgetLTStype (model);
-            matrix_t           *write_info = GBgetDMInfoWrite (model);
-            int                 N = dm_ncols (write_info);
+            int                 N = pins_get_state_variable_count (model);
             if (e->idx < N) {
-                GBaddStateVariableVisible (model, e->idx);
+                pins_add_state_variable_visible (model, e->idx);
             } else { // state label
-                HREassert (e->idx < N + (int)lts_type_get_state_label_count(ltstype));
-                GBaddStateLabelVisible (model, e->idx - N);
+                HREassert (e->idx < N + pins_get_state_label_count (model));
+                pins_add_state_label_visible (model, e->idx - N);
             }
-            } break;
+          } break;
         default:
             LTSminLogExpr (error, "Unhandled predicate expression: ", e, env);
             HREabort (LTSMIN_EXIT_FAILURE);

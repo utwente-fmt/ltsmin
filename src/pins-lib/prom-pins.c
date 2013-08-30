@@ -359,7 +359,7 @@ PromLoadGreyboxModel(model_t model, const char *filename)
     GBsetStateLabelsAll(model, (get_label_all_method_t)prom_get_labels_all);
 
     // check for properties (label order: guard,..,guard,accept,end,progress,etc)
-    for(int i = nguards; i < sl_size; i++) {
+    for(int i = 0; i < sl_size; i++) {
         const char *name = prom_get_label_name (i);
         if (strcmp (ACCEPTING_STATE_LABEL_NAME, name) == 0) {
             GBsetAcceptingStateLabelIndex (model, i);
@@ -395,16 +395,7 @@ PromLoadGreyboxModel(model_t model, const char *filename)
     GBsetDMInfoRead(model, dm_read_info);
     GBsetDMInfoWrite(model, dm_write_info);
 
-    dm_create(dm_visibility_info, sl_size, ngroups);
-    for (int i=0; i < dm_nrows(dm_visibility_info); i++) {
-        const int *visible = prom_get_label_visiblity_matrix(i);
-        for(int j=0; j<dm_ncols(dm_visibility_info); j++) {
-            if (visible[j]) {
-                dm_set(dm_visibility_info, i, j);
-            }
-        }
-    }
-    GBsetStateLabelVisibilityInfo(model, dm_visibility_info);
+    // Export dependencies for all state labels (NOT ONLY GUARDS)
 
     // initialize state label dependency matrix
     dm_create(sl_info, sl_size, state_length);
@@ -422,10 +413,10 @@ PromLoadGreyboxModel(model_t model, const char *filename)
     // set guard may be co-enabled relation
     if (prom_get_label_may_be_coenabled_matrix) {
         matrix_t *gce_info = RTmalloc(sizeof(matrix_t));
-        dm_create(gce_info, nguards, nguards);
-        for (int i = 0; i < nguards; i++) {
+        dm_create(gce_info, sl_size, sl_size);
+        for (int i = 0; i < sl_size; i++) {
             int *guardce = (int*)prom_get_label_may_be_coenabled_matrix(i);
-            for(int j = 0; j < nguards; j++) {
+            for(int j = 0; j < sl_size; j++) {
                 if (guardce[j]) dm_set(gce_info, i, j);
             }
         }
@@ -435,8 +426,8 @@ PromLoadGreyboxModel(model_t model, const char *filename)
     // set guard necessary enabling set info
     if (prom_get_label_nes_matrix) {
         matrix_t *gnes_info = RTmalloc(sizeof(matrix_t));
-        dm_create(gnes_info, nguards, ngroups);
-        for(int i = 0; i < nguards; i++) {
+        dm_create(gnes_info, sl_size, ngroups);
+        for(int i = 0; i < sl_size; i++) {
             int *guardnes = (int*)prom_get_label_nes_matrix(i);
             for(int j = 0; j < ngroups; j++) {
                 if (guardnes[j]) dm_set(gnes_info, i, j);
@@ -448,8 +439,8 @@ PromLoadGreyboxModel(model_t model, const char *filename)
     // set guard necessary disabling set info
     if (prom_get_label_nds_matrix) {
         matrix_t *gnds_info = RTmalloc(sizeof(matrix_t));
-        dm_create(gnds_info, nguards, ngroups);
-        for(int i = 0; i < nguards; i++) {
+        dm_create(gnds_info, sl_size, ngroups);
+        for(int i = 0; i < sl_size; i++) {
             int *guardnds = (int*)prom_get_label_nds_matrix(i);
             for(int j = 0; j < ngroups; j++) {
                 if (guardnds[j]) dm_set(gnds_info, i, j);
