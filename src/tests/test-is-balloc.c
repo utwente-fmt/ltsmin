@@ -10,7 +10,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include <mc-lib/is-balloc.h>
+#include <util-lib/is-balloc.h>
 
 static const size_t NUM = 10*1024*1024;
 static const int N = 5;
