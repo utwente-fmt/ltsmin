@@ -926,7 +926,11 @@ statics_init (model_t model)
             if (proviso == Proviso_None) Warning (info, "Forcing use of the stack cycle proviso");
             proviso = Proviso_Stack;
         } else if (inv_detect || act_detect) {
-            if ((strategy[0] & ~Strat_DFS) || W > 1) Abort ("Cycle proviso for safety properties with this (parallel) search strategy is not yet implemented, use DFS.");
+            if (W > 1) Abort ("Cycle proviso for safety properties with this parallel search strategy is not yet implemented, use one thread or sequential tool (-seq).");
+            if (strategy[0] & ~Strat_DFS) {
+                strategy[0] = Strat_DFS;
+                Warning (info, "Forcing DFS search to implement cycle proviso.");
+            }
             if (proviso == Proviso_None) Warning (info, "Forcing use of the stack cycle proviso.");
             proviso = Proviso_Stack;
         }
