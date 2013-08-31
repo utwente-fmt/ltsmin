@@ -162,7 +162,7 @@ static void
 print_search_path (dlk_check_context_t *ctx)
 {
     Printf (error, "NS search path: ");
-    for (int i = 0; i < dfs_stack_nframes(ctx->stack); i++) {
+    for (size_t i = 0; i < dfs_stack_nframes(ctx->stack); i++) {
         int *path = dfs_stack_peek_top (ctx->stack, i);
         Printf (error, "%d(%d), ", path[ctx->len], path[ctx->len+1]);
     }

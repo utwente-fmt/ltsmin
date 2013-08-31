@@ -1796,7 +1796,7 @@ gsea_finished(void *arg) {
 }
 
 static void
-gsea_print_setup (const char *name)
+gsea_print_setup ()
 {
     Warning (info, "There are %zu state labels and %zu edge labels", global.state_labels, global.edge_labels);
     Warning (info, "State length is %zu, there are %zu groups", global.N, global.K);
@@ -1847,7 +1847,7 @@ main (int argc, char *argv[])
 
     gsea_setup(files[1]);
     gsea_setup_default();
-    gsea_print_setup (files[0]);
+    gsea_print_setup ();
     gsea_search(src);
 
     HREexit(LTSMIN_EXIT_SUCCESS);
