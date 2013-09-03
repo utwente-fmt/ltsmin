@@ -39,39 +39,28 @@ if test x"$acx_mcrl2" = xyes; then
 
     mcrl2_pins_header=mcrl2/lps/ltsmin.h
     mcrl2_pins_cache_var=AS_TR_SH([ac_cv_header_$mcrl2_pins_header])
-    AX_LET([CPPFLAGS], ["$MCRL2_PINS_CPPFLAGS $CPPFLAGS"],
-      [AC_CHECK_HEADER([$mcrl2_pins_header],[acx_mcrl2=yes],[acx_mcrl2=no]
-         )])
-
     pbes_header=mcrl2/pbes/pbes_explorer.h
     pbes_cache_var=AS_TR_SH([ac_cv_header_$pbes_header])
-    AX_LET([CPPFLAGS], ["$MCRL2_PINS_CPPFLAGS $CPPFLAGS"],
-      [AC_CHECK_HEADER([$pbes_header],
-         [acx_pbes=yes],[acx_pbes=no]
+    # Check for C++ 11 support; needed for newer mCRL2
+    save_CXXFLAGS="$CXXFLAGS"
+    AX_CXX_COMPILE_STDCXX_11([noext], [optional])
+    ac_compile_cxx11=$ac_success
+    CXX11CXXFLAGS="$CXXFLAGS"
+    CXXFLAGS="$save_CXXFLAGS"
+ 
+    if test x"$ac_compile_cxx11" = xyes; then
+      AC_SUBST(MCRL2_PINS_CXXFLAGS, ["$MCRL2_PINS_CXXFLAGS $CXX11CXXFLAGS"])
+      $as_unset $mcrl2_pins_cache_var
+      $as_unset $pbes_cache_var
+      AX_LET([CPPFLAGS], ["$MCRL2_PINS_CPPFLAGS $CPPFLAGS"],
+             [CXXFLAGS], ["$MCRL2_PINS_CXXFLAGS $CXXFLAGS"],
+        [AC_CHECK_HEADER([$mcrl2_pins_header],[acx_mcrl2=yes],[acx_mcrl2=no]
          )])
 
-    if test x"$acx_mcrl2" = xno; then
-      # Check for C++ 11 support; needed for newer mCRL2
-      save_CXXFLAGS="$CXXFLAGS"
-      AX_CXX_COMPILE_STDCXX_11([noext], [optional])
-      ac_compile_cxx11=$ac_success
-      CXX11CXXFLAGS="$CXXFLAGS"
-      CXXFLAGS="$save_CXXFLAGS"
- 
-      if test x"$ac_compile_cxx11" = xyes; then
-        AC_SUBST(MCRL2_PINS_CXXFLAGS, ["$MCRL2_PINS_CXXFLAGS $CXX11CXXFLAGS"])
-        $as_unset $mcrl2_pins_cache_var
-        $as_unset $pbes_cache_var
-        AX_LET([CPPFLAGS], ["$MCRL2_PINS_CPPFLAGS $CPPFLAGS"],
-               [CXXFLAGS], ["$MCRL2_PINS_CXXFLAGS $CXXFLAGS"],
-          [AC_CHECK_HEADER([$mcrl2_pins_header],[acx_mcrl2=yes],[acx_mcrl2=no]
-           )])
-
-    	AX_LET([CPPFLAGS], ["$MCRL2_PINS_CPPFLAGS $CPPFLAGS"],
-               [CXXFLAGS], ["$MCRL2_PINS_CXXFLAGS $CXXFLAGS"],
-          [AC_CHECK_HEADER([$pbes_header],[acx_pbes=yes],[acx_pbes=no]
-           )])
-      fi
+    AX_LET([CPPFLAGS], ["$MCRL2_PINS_CPPFLAGS $CPPFLAGS"],
+             [CXXFLAGS], ["$MCRL2_PINS_CXXFLAGS $CXXFLAGS"],
+        [AC_CHECK_HEADER([$pbes_header],[acx_pbes=yes],[acx_pbes=no]
+         )])
     fi
 
     if test x"$acx_mcrl2" = xno; then
