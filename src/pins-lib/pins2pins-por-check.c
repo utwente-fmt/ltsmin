@@ -7,6 +7,7 @@
 #include <hre/user.h>
 #include <ltsmin-lib/ltsmin-standard.h>
 #include <pins-lib/pins.h>
+#include <pins-lib/pins-util.h>
 #include <pins-lib/pins2pins-por.h>
 #include <util-lib/fast_set.h>
 #include <util-lib/dfs-stack.h>
@@ -158,13 +159,36 @@ print_diff (dlk_check_context_t *ctx, int *s1, int *s2)
     }
 }
 
+
+static void
+print_group_name (dlk_check_context_t *ctx, int group, int idx)
+{
+    model_t model = ctx->pctx->parent;
+    lts_type_t      ltstype = GBgetLTStype (model);
+    int K = pins_get_group_count (model);
+
+    int             statement_label = lts_type_find_edge_label (
+                                     ltstype, LTSMIN_EDGE_TYPE_STATEMENT);
+    if (statement_label != -1) {
+        int             statement_type = lts_type_get_edge_label_typeno (
+                                                 ltstype, statement_label);
+        size_t          count = GBchunkCount (model, statement_type);
+        HREassert (count >= K, "Missing group names in LTSMIN_EDGE_TYPE_STATEMENT edge labels");
+        chunk c = GBchunkGet (model, statement_type, group);
+        Printf (error, "Group %d (%d) name: %s\n", group, idx, c.data);
+    } else {
+        Printf (error, "Group %d (%d)\n", group, idx);
+    }
+}
+
 static void
 print_search_path (dlk_check_context_t *ctx)
 {
-    Printf (error, "NS search path: ");
-    for (size_t i = 0; i < dfs_stack_nframes(ctx->stack); i++) {
+    Printf (error, "NS search path: \n");
+    size_t start = dfs_stack_frame_size(ctx->stack) == 0 ? 1 : 0;
+    for (size_t i = start; i < dfs_stack_nframes(ctx->stack); i++) {
         int *path = dfs_stack_peek_top (ctx->stack, i);
-        Printf (error, "%d(%d), ", path[ctx->len], path[ctx->len+1]);
+        print_group_name (ctx, path[ctx->len], path[ctx->len+1]);
     }
     Printf (error, "\n");
 }
@@ -186,18 +210,22 @@ print_noncommuting_trans (dlk_check_context_t *ctx, int *src, int *dst, int *s1,
 
     Printf (info, "\n");
     Printf (info, "src --> dst (group %d)\n", dst[ctx->len]);
+    print_group_name (ctx, dst[ctx->len], dst[ctx->len+1]);
     print_diff (ctx, src, dst);
 
     Printf (info, "\n");
     Printf (info, "dst --> s1 (group %d)\n", s1[ctx->len]);
+    print_group_name (ctx, s1[ctx->len], s1[ctx->len+1]);
     print_diff (ctx, dst, s1);
 
     Printf (info, "\n");
     Printf (info, "src --> tgt (group %d)\n", tgt[ctx->len]);
+    print_group_name (ctx, tgt[ctx->len], tgt[ctx->len+1]);
     print_diff (ctx, src, tgt);
 
     Printf (info, "\n");
     Printf (info, "tgt --> s2 (group %d)\n", s2[ctx->len]);
+    print_group_name (ctx, s2[ctx->len], s2[ctx->len+1]);
     print_diff (ctx, tgt, s2);
 
     Printf (info, "\n");
