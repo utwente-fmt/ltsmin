@@ -224,7 +224,7 @@ scc_setup (model_t model, por_context* ctx, int* src)
     // set score for enable transitions
     for(int i=0; i<ctx->enabled_list->count; i++) {
         int group = ctx->enabled_list->data[i];
-        if (ctx->ltl && is_visible(ctx, group)) { // V proviso only for LTL!
+        if (PINS_LTL && is_visible(ctx, group)) { // V proviso only for LTL!
             ctx->group_score[group] = visible_cost(ctx);
         } else {
             ctx->group_score[group] = ctx->ngroups;
@@ -292,7 +292,7 @@ beam_setup (model_t model, por_context* ctx, int* src)
         // set score for enable transitions
         for(int i=0; i<ctx->enabled_list->count; i++) {
             int group = ctx->enabled_list->data[i];
-            if (ctx->ltl && is_visible(ctx, group)) { // V proviso only for LTL!
+            if (PINS_LTL && is_visible(ctx, group)) { // V proviso only for LTL!
                 ctx->group_score[group] = visible_cost(ctx);
             } else {
                 ctx->group_score[group] = ctx->ngroups;
@@ -564,7 +564,7 @@ bs_analyze (por_context* ctx)
             s->score += 1;
 
             // V proviso only for LTL
-            if (ctx->ltl) {
+            if (PINS_LTL) {
                 if (is_visible(ctx, current_group)) {
                     if (NO_V) { // Use Peled's stronger visibility proviso:
                         s->score += ctx->ngroups; // selects all groups in this search context
@@ -787,7 +787,7 @@ check_L1_L2_proviso (por_context* ctx)
     search_context *s = &ctx->search[ctx->search_order[0]];
     return s->visibles_selected ==
        ctx->visible_list->count + ctx->marked_list->count && // all visible selected: satisfies (the conclusion of) L2
-     (!ctx->ltl || // safety!
+     (!PINS_LTL || // safety!
       ctx->visible_enabled == ctx->enabled_list->count ||    // no invisible is enabled: satisfies (the premise of) L1
       s->ve_selected != s->enabled_selected);                // one invisible enabled selected: satisfies (the conclusion of) L1
 }
@@ -812,8 +812,8 @@ bs_emit (por_context* ctx, int* src, TransitionCB cb, void* uctx)
         int emitted = emit_new_selected (ctx, &ltlctx, src);
 
         // emit more if we need to fulfill a liveness / safety proviso
-        if ( ( ctx->ltl && ltlctx.por_proviso_false_cnt != 0) ||
-             (!ctx->ltl && ltlctx.por_proviso_true_cnt  == 0) ) {
+        if ( ( PINS_LTL && ltlctx.por_proviso_false_cnt != 0) ||
+             (!PINS_LTL && ltlctx.por_proviso_true_cnt  == 0) ) {
 
             if (!NO_L12) {
                 ctx->beam_used = 1; // fix to current (partly emitted) search ctx
@@ -825,7 +825,7 @@ bs_emit (por_context* ctx, int* src, TransitionCB cb, void* uctx)
                 ltlctx.force_proviso_true = check_L1_L2_proviso (ctx);
                 // enforce L1 (one invisible transition)
                 // not to be worried about when using V'
-                if (ctx->ltl && !NO_V && !ltlctx.force_proviso_true) {
+                if (PINS_LTL && !NO_V && !ltlctx.force_proviso_true) {
                     select_one_invisible (ctx);
                     bs_analyze (ctx);
                 }
@@ -1099,7 +1099,6 @@ GBaddPOR (model_t model)
 
     por_context *ctx = RTmalloc (sizeof *ctx);
     ctx->parent = model;
-    ctx->ltl = PINS_LTL;
 
     // initializing dependency lookup table ( (t, t') \in D relation)
     Print1 (info, "Initializing dependency lookup table.");

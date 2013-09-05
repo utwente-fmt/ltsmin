@@ -143,7 +143,6 @@ typedef struct search_context
  */
 typedef struct por_context {
     model_t         parent;         // parent PINS model
-    int             ltl;
     int             nguards;        // number of guards
     int             nlabels;        // number of labels (including guards
     int             ngroups;        // number of groups
