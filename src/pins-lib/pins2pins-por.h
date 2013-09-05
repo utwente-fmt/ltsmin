@@ -24,6 +24,59 @@
  *      SCHOOL = {University of Twente},
  *      ADDRESS = {the Netherlands}
  * }
+ *
+ * Updated by Alfons Laarman and Elwin Pater to correspond more closely
+ * to the strong stubborn set theory of Valmari, as described in:
+ *
+ * @inproceedings {spin2013,
+        year = {2013},
+        isbn = {978-3-642-39175-0},
+        booktitle = {SPIN},
+        volume = {7976},
+        series = {Lecture Notes in Computer Science},
+        editor = {Bartocci, Ezio and Ramakrishnan, C.R.},
+        doi = {10.1007/978-3-642-39176-7_15},
+        title = {Guard-Based Partial-Order Reduction},
+        url = {http://dx.doi.org/10.1007/978-3-642-39176-7_15},
+        publisher = {Springer Berlin Heidelberg},
+        author = {Laarman, Alfons and Pater, Elwin and Pol, Jaco and Weber, Michael},
+        pages = {227-245}
+    }
+ *
+ * Improved safety / liveness provisos added by Alfons Laarman according to
+ * Valmari's "State Explosion Problem", Chapter 7:
+ *
+    @incollection {state-explosion,
+        year = {1998},
+        isbn = {978-3-540-65306-6},
+        booktitle = {Lectures on Petri Nets I: Basic Models},
+        volume = {1491},
+        series = {Lecture Notes in Computer Science},
+        editor = {Reisig, Wolfgang and Rozenberg, Grzegorz},
+        doi = {10.1007/3-540-65306-6_21},
+        title = {The state explosion problem},
+        url = {http://dx.doi.org/10.1007/3-540-65306-6_21},
+        publisher = {Springer Berlin Heidelberg},
+        author = {Valmari, Antti},
+        pages = {429-528}
+    }
+ *
+ * The S proviso here is implemented using the visible transitions. Meaning
+ * that if weak ignoring is detected, as communicated via the PINS
+ * transition_info_t struct by the lower algorithmic layer which performs the
+ * state space search, then all visible transitions are selected (similar to
+ * what happens in the L2 liveness proviso). The POR search ensures thereafter,
+ * that all ignored transitions that may enable visible ones are selected.
+ * Thus visible transitions / labels must be set for these safety properties,
+ * the visibility proviso is however only used for liveness properties
+ * (see ltl field in por_context_t struct below).
+ *
+ * TODO:
+ * - update BEAM score with selected transitions (earlier bail out). Also
+ * simplify data structures used in search (see ci_list)
+ * - detect bottom SCCs for weak cycle proviso (and communicate ignored
+ * transitions to this layer?)
+ *
  */
 
 /**

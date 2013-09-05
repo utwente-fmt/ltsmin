@@ -224,7 +224,7 @@ scc_setup (model_t model, por_context* ctx, int* src)
     // set score for enable transitions
     for(int i=0; i<ctx->enabled_list->count; i++) {
         int group = ctx->enabled_list->data[i];
-        if (is_visible(ctx, group)) {
+        if (ctx->ltl && is_visible(ctx, group)) { // V proviso only for LTL!
             ctx->group_score[group] = visible_cost(ctx);
         } else {
             ctx->group_score[group] = ctx->ngroups;
@@ -292,7 +292,7 @@ beam_setup (model_t model, por_context* ctx, int* src)
         // set score for enable transitions
         for(int i=0; i<ctx->enabled_list->count; i++) {
             int group = ctx->enabled_list->data[i];
-            if (is_visible(ctx, group)) {
+            if (ctx->ltl && is_visible(ctx, group)) { // V proviso only for LTL!
                 ctx->group_score[group] = visible_cost(ctx);
             } else {
                 ctx->group_score[group] = ctx->ngroups;
@@ -561,9 +561,20 @@ bs_analyze (por_context* ctx)
                 update_ns_scores (ctx, s, current_group);
 
             // update the search score
-            s->score += NO_V && is_visible(ctx, current_group) ? ctx->ngroups : 1;
+            s->score += 1;
 
-            // quit the search when emit_limit is reached
+            // V proviso only for LTL
+            if (ctx->ltl) {
+                if (is_visible(ctx, current_group)) {
+                    if (NO_V) { // Use Peled's stronger visibility proviso:
+                        s->score += ctx->ngroups; // selects all groups in this search context
+                    } else {
+                        select_all_visible (ctx);
+                    }
+                }
+            }
+
+            // quit the current search when emit_limit is reached
             // this block is just to skip useless work, everything is emitted anyway
             if (s->score >= ctx->emit_limit) {
                 s->work_enabled = 0;
@@ -578,10 +589,6 @@ bs_analyze (por_context* ctx)
                 select_group (ctx, dependent_group);
             }
             Printf (debug, "\n");
-
-            if (!NO_V && (is_visible(ctx, current_group))) {
-                select_all_visible (ctx);
-            }
         }
     } while (beam_sort(ctx));
 }
@@ -768,14 +775,21 @@ emit_new_selected (por_context* ctx, ltl_hook_context_t* ltlctx, int* src)
     return c;
 }
 
+/**
+ * Premature check whether L1 and L2 hold, i.e. before ignoring condition is
+ * known (the premise of L2).
+ * For safety (!ctx->ltl), we limit the proviso to L2. For details see
+ * implementation notes in the header.
+ */
 static inline int
 check_L1_L2_proviso (por_context* ctx)
 {
     search_context *s = &ctx->search[ctx->search_order[0]];
     return s->visibles_selected ==
-       ctx->visible_list->count + ctx->marked_list->count && // all visible selected
-     (ctx->visible_enabled == ctx->enabled_list->count ||    // no invisible is enabled
-      s->ve_selected != s->enabled_selected);                // one invisible enabled selected
+       ctx->visible_list->count + ctx->marked_list->count && // all visible selected: satisfies (the conclusion of) L2
+     (!ctx->ltl || // safety!
+      ctx->visible_enabled == ctx->enabled_list->count ||    // no invisible is enabled: satisfies (the premise of) L1
+      s->ve_selected != s->enabled_selected);                // one invisible enabled selected: satisfies (the conclusion of) L1
 }
 
 static inline int
@@ -811,7 +825,7 @@ bs_emit (por_context* ctx, int* src, TransitionCB cb, void* uctx)
                 ltlctx.force_proviso_true = check_L1_L2_proviso (ctx);
                 // enforce L1 (one invisible transition)
                 // not to be worried about when using V'
-                if (!NO_V && !ltlctx.force_proviso_true) {
+                if (ctx->ltl && !NO_V && !ltlctx.force_proviso_true) {
                     select_one_invisible (ctx);
                     bs_analyze (ctx);
                 }
@@ -836,6 +850,8 @@ scc_emit (por_context* ctx, int* src, TransitionCB cb, void* uctx)
     } else {
         ltl_hook_context_t ltlctx = {cb, uctx, 0, 0, 0};
         ltlctx.force_proviso_true = !NO_L12 && check_L1_L2_proviso (ctx);
+
+        //TODO: implement safety and liveness provisos
 
         int c = 0;
         for (int z = 0; z < scc->stubborn_list[0]->count; z++) {
