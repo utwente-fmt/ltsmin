@@ -729,6 +729,9 @@ void GBprintDependencyMatrixCombined(FILE* file, model_t model) {
 }
 
 void GBprintPORMatrix(FILE* file, model_t model) {
+    Printf (info, "\nDo Not Accord matrix:\n");
+    dm_print(file, GBgetDoNotAccordInfo(model));
+
     Printf (info, "\nMaybe coenabled matrix:\n");
     dm_print(file, GBgetGuardCoEnabledInfo(model));
 
