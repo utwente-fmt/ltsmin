@@ -751,7 +751,7 @@ void ltl_hook_cb (void*context,transition_info_t *ti,int*dst) {
     ti_new.por_proviso = infoctx->force_proviso_true;
     infoctx->cb(infoctx->user_context, &ti_new, dst);
     // catch transition info status
-    if (ti_new.por_proviso) {
+    if (infoctx->force_proviso_true || ti_new.por_proviso) {
         infoctx->por_proviso_true_cnt++;
     } else {
         infoctx->por_proviso_false_cnt++;
