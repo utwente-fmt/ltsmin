@@ -14,7 +14,7 @@
  */
 
 
-#include <mc-lib/is-balloc.h>
+#include <util-lib/is-balloc.h>
 
 typedef struct dfs_stack *dfs_stack_t;
 
@@ -36,6 +36,7 @@ extern int *dfs_stack_push(dfs_stack_t stack, const int *state);
 extern int *dfs_stack_pop(dfs_stack_t stack);
 extern int *dfs_stack_top(dfs_stack_t stack);
 extern int *dfs_stack_peek_top(dfs_stack_t stack, size_t frame_offset);
+extern int *dfs_stack_peek_top2(dfs_stack_t stack, size_t frame_offset, size_t o);
 
 extern int * dfs_stack_bottom (dfs_stack_t stack);
 /**

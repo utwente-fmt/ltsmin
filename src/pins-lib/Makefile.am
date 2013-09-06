@@ -1,10 +1,10 @@
 
 HRE_LIB = ../hre/libhre.la
 LIBS  =
-LIBS += ../util-lib/libutil.la
 LIBS += ../lts-io/liblts-io.la
 LIBS += ../hre-io/libhre-io.la
 LIBS += $(HRE_LIB)
+LIBS += ../util-lib/libutil.la
 LIBS += ../ltsmin-lib/libltsmin.la
 LIBS += ../dm/libdm.la
 
@@ -62,13 +62,16 @@ libpbes_pins_la_LIBADD    = $(MCRL2_PINS_LIBS) $(LIBS)
 # libpins
 libpins_la_SOURCES  =
 libpins_la_SOURCES += pins.c pins.h
+libpins_la_SOURCES += pins-util.c pins-util.h
 libpins_la_SOURCES += pins-impl.h
 libpins_la_SOURCES += pins2pins-cache.c
 libpins_la_SOURCES += pins2pins-group.c
 libpins_la_SOURCES += pg-types.c pg-types.h
 libpins_la_SOURCES += pins2pins-mucalc.c pins2pins-mucalc.h
 libpins_la_SOURCES += pins2pins-ltl.c
+libpins_la_SOURCES += pins2pins-por.h
 libpins_la_SOURCES += pins2pins-por.c
+libpins_la_SOURCES += pins2pins-por-check.c
 libpins_la_SOURCES += property-semantics.c property-semantics.h
 libpins_la_CPPFLAGS = -DNXT $(AM_CPPFLAGS) -I${top_srcdir}/ltl2ba
 libpins_la_LIBADD    =

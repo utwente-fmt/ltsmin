@@ -19,7 +19,7 @@ dict set commands test13_mc cmd "$binpaths(prom2lts-mc) --strategy=dfsfifo i4.sp
 dict set commands test13_mc exp "State space has 78977"
 
 dict set commands test13_por cmd "$binpaths(prom2lts-mc) --strategy=dfsfifo --por i4.spins"
-dict set commands test13_por exp "State space has 43299"
+dict set commands test13_por exp "State space has 39823"
 
 dict set commands test14_mc cmd "$binpaths(prom2lts-mc) --strategy=dfsfifo TimingWithoutTimeout9OnTheFlynessShallow.promela.spins"
 dict set commands test14_mc exp "Accepting cycle FOUND"

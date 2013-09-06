@@ -31,6 +31,7 @@ void        (*get_guard_all)(void*, int *src, int* guards);
 const int*  (*get_guard_may_be_coenabled_matrix)(int g);
 const int*  (*get_guard_nes_matrix)(int g);
 const int*  (*get_guard_nds_matrix)(int g);
+const int*  (*get_dna_matrix)(int g);
 
 int         (*get_state_variable_count)();
 const char* (*get_state_variable_name)(int var);
@@ -278,6 +279,9 @@ DVE2loadDynamicLib(model_t model, const char *filename)
     get_guard_nds_matrix = (const int*(*)(int))
     RTdlsym( filename, dlHandle, "get_guard_nds_matrix" );
 
+    get_dna_matrix = (const int*(*)(int))
+            RTtrydlsym( dlHandle, "get_dna_matrix" );
+
     // check system_with_property
     if (have_property()) {
         buchi_is_accepting = (int(*)(void*,int*))
@@ -479,6 +483,24 @@ DVE2loadGreyboxModel(model_t model, const char *filename)
             }
         }
         GBsetGuardNDSInfo(model, gnds_info);
+    }
+
+    if (!get_dna_matrix) {
+        Warning (info, "*** Warning ***");
+        Warning (info, "You are using an old version of our patched DiVinE compiler.");
+        Warning (info, "This might influence the performance of partial order reduction negatively.");
+        Warning (info, "Please download the latest from: http://fmt.cs.utwente.nl/tools/ltsmin/");
+        Warning (info, "*** Warning ***");
+    } else {
+        matrix_t *dna_info = RTmalloc(sizeof(matrix_t));
+        dm_create(dna_info, ngroups, ngroups);
+        for(int i=0; i < ngroups; i++) {
+            int* dna = (int*)get_dna_matrix(i);
+            for(int j=0; j<ngroups; j++) {
+                if (dna[j]) dm_set(dna_info, i, j);
+            }
+        }
+        GBsetDoNotAccordInfo(model, dna_info);
     }
 
     // set the group implementation

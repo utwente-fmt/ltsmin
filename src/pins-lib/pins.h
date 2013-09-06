@@ -172,13 +172,6 @@ typedef struct sl_group {
 } sl_group_t ;
 
 /**
-\brief Enum to describe the type of property already in the model provided by the frondend
- */
-typedef enum { PROPERTY_NONE, PROPERTY_LTL_SPIN, PROPERTY_LTL_TEXTBOOK, PROPERTY_CTL, PROPERTY_CTL_STAR, PROPERTY_MU } property_enum_t;
-typedef property_enum_t (*fn_has_property_t)();
-typedef int (*fn_buchi_is_accepting_t)(model_t model, int*src);
-
-/**
 \brief Options for greybox management module.
  */
 extern struct poptOption greybox_options[];
@@ -197,9 +190,46 @@ typedef struct guard {
 //@{
 
 /**
+\brief The POR mode:
+
+no POR, POR, or POR with correctness check (invisible)
+*/
+
+typedef enum {
+    PINS_POR_NONE,
+    PINS_POR_ON,
+    PINS_POR_CHECK,
+} pins_por_t;
+
+/**
  * \brief boolean indicating whether PINS uses POR
  */
-extern int GB_POR;
+extern pins_por_t PINS_POR;
+
+/**
+\brief The behaviour of the ltl buchi product
+
+PINS_LTL_TEXTBOOK adds an initial state to the model and labels
+the incoming edges with the properties of in the buchi automaton
+PINS_LTL_SPIN labels the outgoing edges with the properties of
+the buchi automaton. Additionally, the SPIN semantics accounts
+for deadlocks in the LTS by letting the buchi continues upon deadlock.
+PINS_LTL_LTSMIN Like SPIN semantics, but without the deadlock provision.
+This allows LTSmin to maintain an efficient dependency matrix as
+deadlock detection is non-local (it depends on the conjunction of all
+guards from all transition groups).
+*/
+typedef enum {
+    PINS_LTL_NONE,
+    PINS_LTL_TEXTBOOK,
+    PINS_LTL_SPIN,
+    PINS_LTL_LTSMIN
+} pins_ltl_type_t;
+
+/**
+ * \brief boolean indicating whether PINS uses LTL
+ */
+extern pins_ltl_type_t PINS_LTL;
 
 /**
 \brief Factory method for loading models.
@@ -381,7 +411,7 @@ extern int GBsetProgressStateLabelIndex(model_t model, int index);
 \brief Set index of progress state label
 */
 
-extern int GBbuchiIsProgress(model_t model, int* src);
+extern int GBstateIsProgress(model_t model, int* src);
 /**<
 \brief Return progress/non-progress for a given state, false if undefined
 */
@@ -396,7 +426,7 @@ extern int GBsetValidEndStateLabelIndex(model_t model, int index);
 \brief Set index of valid end state label
 */
 
-extern int GBbuchiIsValidEnd(model_t model, int* src);
+extern int GBstateIsValidEnd(model_t model, int* src);
 /**<
 \brief Return valid end/invalid end for a given state, false if undefined
 */
@@ -501,6 +531,26 @@ extern void GBsetGuard(model_t model, int group, guard_t* guard);
 extern void GBsetGuardCoEnabledInfo(model_t model, matrix_t *info);
 
 /**
+\brief Set the do not accord matrix to a model
+*/
+extern void GBsetDoNotAccordInfo(model_t model, matrix_t *info);
+
+/**
+\brief Get the do not accord matrix of a model.
+*/
+extern matrix_t *GBgetDoNotAccordInfo(model_t model);
+
+/**
+\brief Set the commutes matrix to a model
+*/
+extern void GBsetCommutesInfo(model_t model, matrix_t *info);
+
+/**
+\brief Get the commutes matrix of a model.
+*/
+extern matrix_t *GBgetCommutesInfo(model_t model);
+
+/**
 \brief Get the guard may be co-enabled matrix of a model.
 */
 extern matrix_t *GBgetGuardCoEnabledInfo(model_t model);
@@ -531,29 +581,6 @@ extern void GBsetGuardNDSInfo(model_t model, matrix_t *info);
 extern matrix_t *GBgetGuardNDSInfo(model_t model);
 
 /**
-\brief Set the label visibility matrix to a model
-*/
-extern void GBsetStateLabelVisibilityInfo(model_t model, matrix_t *info);
-
-/**
-\brief Get the label visibility matrix of a model.
-Visibility can also be over-estimated by combining StateLabelInfo and DMInfo
-*/
-extern matrix_t *GBgetStateLabelVisibilityInfo(model_t model);
-
-/**
-\brief Adds visibility info for a state label to the PorVisibility array.
-If the info is not present, the state label matrix is used
-*/
-extern void GBaddStateLabelVisible(model_t model, int label);
-
-/**
-\brief Adds visibility info for a state variable to the PorVisibility array.
-Uses DMWriteInfo (or DMInfo).
-*/
-extern void GBaddStateVariableVisible(model_t model, int index);
-
-/**
 \brief Set the POR group visibility info.
 */
 extern void GBsetPorGroupVisibility(model_t model, int*bv);
@@ -562,6 +589,17 @@ extern void GBsetPorGroupVisibility(model_t model, int*bv);
 \brief Get the POR group visibility info, i.e. which group touches an LTL variable.
 */
 extern int *GBgetPorGroupVisibility(model_t model);
+
+/**
+\brief Set the POR group visibility info.
+*/
+extern void GBsetPorStateLabelVisibility(model_t model, int*bv);
+
+/**
+\brief Get the POR group visibility info, i.e. which state labels are in the LTL formula.
+        This is dynamically added to the visibility info by the POR layer.
+*/
+extern int *GBgetPorStateLabelVisibility(model_t model);
 
 /**
 \brief Set the initial state.
@@ -768,29 +806,23 @@ extern void* GBgetChunkMap(model_t model,int type_no);
 extern model_t GBaddCache(model_t model);
 
 /**
-\brief The behaviour of the ltl buchi product
-
-PINS_LTL_TEXTBOOK adds an initial state to the model and labels
-the incoming edges with the properties of in the buchi automaton
-PINS_LTL_SPIN labels the outgoing edges with the properties of
-the buchi automaton. Additionally, the SPIN semantics accounts
-for deadlocks in the LTS by letting the buchi continues upon deadlock.
-PINS_LTL_LTSMIN Like SPIN semantics, but without the deadlock provision.
-This allows LTSmin to maintain an efficient dependency matrix as
-deadlock detection is non-local (it depends on the conjunction of all
-guards from all transition groups).
-*/
-typedef enum {PINS_LTL_TEXTBOOK, PINS_LTL_SPIN, PINS_LTL_LTSMIN} pins_ltl_type_t;
-
-/**
 \brief Add LTL layer on top all other pins layers
 */
-extern model_t GBaddLTL(model_t model, const char *ltl_file, pins_ltl_type_t type);
+extern model_t GBaddLTL(model_t model);
+
+extern struct poptOption ltl_options[];
 
 /**
 \brief Add POR layer before LTL layer
 */
-extern model_t GBaddPOR(model_t model, const int has_ltl);
+extern model_t GBaddPOR(model_t model);
+
+extern struct poptOption por_options[];
+
+/**
+\brief Add layer that checks vorrectness of POR reductions before LTL layer
+*/
+extern model_t GBaddPORCheck(model_t model);
 
 /**
 \brief Add mu-calculus layer

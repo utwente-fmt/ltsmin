@@ -97,7 +97,7 @@ deadlock_detect (struct dist_thread_context *ctx, int *state, int count)
 {
     if (count != 0) return;
     ctx->deadlocks++;
-    if (GBbuchiIsValidEnd(ctx->model, state)) return;
+    if (GBstateIsValidEnd(ctx->model, state)) return;
     if ( !inv_expr ) ctx->violations++;
     if (!dlk_detect) return;
     if (trc_output!=NULL){
@@ -172,6 +172,7 @@ static void callback(void*context,transition_info_t*info,int*dst){
     } else {
         stream_write(ctx->fifo,trans,sizeof(trans));
     }
+    info->por_proviso = 1;
 }
 
 /********************************************************/
@@ -561,6 +562,7 @@ int main(int argc, char*argv[]){
         HREbarrier(HREglobal());
     }
     if (act_detect) {
+        if (PINS_POR) Abort ("Distributed tool implements no cycle provisos.");
         // table number of first edge label
         act_label = lts_type_find_edge_label_prefix (ltstype, LTSMIN_EDGE_TYPE_ACTION_PREFIX);
         if (act_label == -1)
@@ -571,7 +573,7 @@ int main(int argc, char*argv[]){
         Warning(info, "Detecting action \"%s\"", act_detect);
     }
     if (inv_detect) {
-        if (GB_POR) Abort ("Distributed tool implements no cycle provisos.");
+        if (PINS_POR) Abort ("Distributed tool implements no cycle provisos.");
         ltsmin_parse_env_t env = LTSminParseEnvCreate();
         inv_expr = parse_file_env (inv_detect, pred_parse_file, model, env);
         ctx.env = env;

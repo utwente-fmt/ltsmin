@@ -20,14 +20,16 @@ struct grey_box_model {
 	matrix_t *sl_info;
     sl_group_t* sl_groups[GB_SL_GROUP_COUNT];
     guard_t** guards;
+    matrix_t *commutes_info; // commutes info
     matrix_t *gce_info; // guard co-enabled info
+    matrix_t *dna_info; // do not accord info
     matrix_t *gnes_info; // guard necessary enabling set
     matrix_t *gnds_info; // guard necessary disabling set
-    matrix_t *visibility_info; // label visibility info
     int sl_idx_buchi_accept;
     int sl_idx_progress;
     int sl_idx_valid_end;
     int *group_visibility;
+    int *label_visibility;
 	int *s0;
 	void*context;
 	next_method_grey_t next_short;
@@ -330,10 +332,12 @@ model_t GBcreateBase(){
         model->sl_groups[i]=NULL;
     model->guards=NULL;
     model->group_visibility=NULL;
+    model->label_visibility=NULL;
+    model->commutes_info=NULL;
     model->gce_info=NULL;
+    model->dna_info=NULL;
     model->gnes_info=NULL;
     model->gnds_info=NULL;
-    model->visibility_info=NULL;
     model->sl_idx_buchi_accept = -1;
     model->sl_idx_progress = -1;
     model->sl_idx_valid_end = -1;
@@ -412,17 +416,23 @@ void GBinitModelDefaults (model_t *p_model, model_t default_src)
     if (model->gce_info == NULL)
         GBsetGuardCoEnabledInfo(model, GBgetGuardCoEnabledInfo (default_src));
 
+    if (model->dna_info == NULL)
+        GBsetDoNotAccordInfo(model, GBgetDoNotAccordInfo (default_src));
+
+    if (model->commutes_info == NULL)
+        GBsetCommutesInfo(model, GBgetCommutesInfo (default_src));
+
     if (model->group_visibility == NULL)
         GBsetPorGroupVisibility (model, GBgetPorGroupVisibility(default_src));
+
+    if (model->label_visibility == NULL)
+        GBsetPorStateLabelVisibility (model, GBgetPorStateLabelVisibility(default_src));
 
     if (model->gnes_info == NULL)
         GBsetGuardNESInfo(model, GBgetGuardNESInfo (default_src));
 
     if (model->gnds_info == NULL)
         GBsetGuardNDSInfo(model, GBgetGuardNDSInfo (default_src));
-
-    if (model->visibility_info == NULL)
-        GBsetStateLabelVisibilityInfo(model, GBgetStateLabelVisibilityInfo (default_src));
 
     if (GBgetAcceptingStateLabelIndex (default_src) >= 0)
         GBsetAcceptingStateLabelIndex(model, GBgetAcceptingStateLabelIndex (default_src));
@@ -686,6 +696,16 @@ void GBsetGuardCoEnabledInfo(model_t model, matrix_t *info) {
     model->gce_info = info;
 }
 
+void GBsetDoNotAccordInfo(model_t model, matrix_t *info) {
+    HREassert (model->dna_info == NULL, "do-not-accord info already set");
+    model->dna_info = info;
+}
+
+void GBsetCommutesInfo(model_t model, matrix_t *info) {
+    HREassert (model->commutes_info == NULL, "transition commutes info already set");
+    model->commutes_info = info;
+}
+
 void GBsetPorGroupVisibility(model_t model, int*visibility) {
     HREassert (model->group_visibility == NULL, "POR group visibility already set");
     model->group_visibility = visibility;
@@ -695,8 +715,25 @@ int *GBgetPorGroupVisibility(model_t model) {
     return model->group_visibility;
 }
 
+void GBsetPorStateLabelVisibility(model_t model, int*visibility) {
+    HREassert (model->label_visibility == NULL, "POR label visibility already set");
+    model->label_visibility = visibility;
+}
+
+int *GBgetPorStateLabelVisibility(model_t model) {
+    return model->label_visibility;
+}
+
 matrix_t *GBgetGuardCoEnabledInfo(model_t model) {
     return model->gce_info;
+}
+
+matrix_t *GBgetDoNotAccordInfo(model_t model) {
+    return model->dna_info;
+}
+
+matrix_t *GBgetCommutesInfo(model_t model) {
+    return model->commutes_info;
 }
 
 void GBsetGuardNESInfo(model_t model, matrix_t *info) {
@@ -715,52 +752,6 @@ void GBsetGuardNDSInfo(model_t model, matrix_t *info) {
 
 matrix_t *GBgetGuardNDSInfo(model_t model) {
     return model->gnds_info;
-}
-
-void GBsetStateLabelVisibilityInfo(model_t model, matrix_t *info) {
-    HREassert (model->visibility_info == NULL, "State label visibility info already set");
-    model->visibility_info = info;
-}
-
-matrix_t *GBgetStateLabelVisibilityInfo(model_t model) {
-    return model->visibility_info;
-}
-
-void GBaddStateLabelVisible(model_t model, int label) {
-    int                *visible = GBgetPorGroupVisibility(model);
-    HREassert (visible != NULL, "GBaddStateLabelVisible: No (lower) PINS layer uses POR visibility.");
-    matrix_t           *wr_info = GBgetDMInfoWrite(model);
-    int                 ngroups = dm_nrows (wr_info);
-    matrix_t           *label_visibility = GBgetStateLabelVisibilityInfo(model);
-    if (label_visibility != NULL) {
-        for (int i = 0; i < ngroups; i++)
-            if (dm_is_set(label_visibility, label, i)) visible[i] = 1;
-    } else {
-        matrix_t           *sl_info = GBgetStateLabelInfo (model);
-        dm_row_iterator_t   ri;
-        dm_create_row_iterator (&ri, sl_info, label);
-        int                 j;
-        for (int i = 0; i < ngroups; i++) {
-            while ((j = dm_row_next (&ri)) != -1) {
-                if (dm_is_set(wr_info, i, j)) {
-                    visible[i] = 1;
-                    break;
-                }
-            }
-        }
-    }
-}
-
-void GBaddStateVariableVisible(model_t model, int index) {
-    int                *visible = GBgetPorGroupVisibility(model);
-    HREassert (visible != NULL, "GBaddStateVariableVisible: No (lower) PINS layer uses POR visibility.");
-    matrix_t           *wr_info = GBgetDMInfoWrite (model);
-    int                 ngroups = dm_nrows (wr_info);
-    for (int i = 0; i < ngroups; i++) {
-        if (dm_is_set(wr_info, i, index)) {
-            visible[i] = 1;
-        }
-    }
 }
 
 void GBsetTransitionInGroup(model_t model,transition_in_group_t method){
@@ -838,15 +829,18 @@ int GBchunkCount(model_t model,int type_no){
 
 
 void GBprintDependencyMatrix(FILE* file, model_t model) {
-	dm_print(file, GBgetDMInfo(model));
+    Printf (info, "\nDependency matrix (combined read/write):\n");
+    dm_print(file, GBgetDMInfo(model));
 }
 
 void GBprintDependencyMatrixRead(FILE* file, model_t model) {
-	dm_print(file, GBgetDMInfoRead(model));
+    Printf (info, "\nRead dependencies:\n");
+    dm_print(file, GBgetDMInfoRead(model));
 }
 
 void GBprintDependencyMatrixWrite(FILE* file, model_t model) {
-	dm_print(file, GBgetDMInfoWrite(model));
+    Printf (info, "\nWrite dependencies:\n");
+    dm_print(file, GBgetDMInfoWrite(model));
 }
 
 void GBprintDependencyMatrixCombined(FILE* file, model_t model) {
@@ -854,7 +848,13 @@ void GBprintDependencyMatrixCombined(FILE* file, model_t model) {
     matrix_t *dm_r = GBgetDMInfoRead(model);
     matrix_t *dm_w = GBgetDMInfoWrite(model);
 
+    Printf (info, "\nRead/write dependencies:\n");
+    fprintf(file, "      ");
+    for (int j = 0; j < dm_ncols(dm); j+=10)
+        fprintf(file, "0         ");
+    fprintf(file, " \n");
     for (int i = 0; i < dm_nrows(dm); i++) {
+        fprintf(file, "%4d: ", i);
         for (int j = 0; j < dm_ncols(dm); j++) {
             if (dm_is_set(dm_r, i, j) && dm_is_set(dm_w, i, j)) {
                 fprintf(file, "+");
@@ -870,59 +870,40 @@ void GBprintDependencyMatrixCombined(FILE* file, model_t model) {
     }
 }
 
+void GBprintPORMatrix(FILE* file, model_t model) {
+    Printf (info, "\nDo Not Accord matrix:\n");
+    dm_print(file, GBgetDoNotAccordInfo(model));
+
+    Printf (info, "\nCommutes matrix:\n");
+    dm_print(file, GBgetCommutesInfo(model));
+
+    Printf (info, "\nMaybe coenabled matrix:\n");
+    dm_print(file, GBgetGuardCoEnabledInfo(model));
+
+    Printf (info, "\nNecessary enabling matrix:\n");
+    dm_print(file, GBgetGuardNESInfo(model));
+
+    Printf (info, "\nNecessary disabling matrix:\n");
+    dm_print(file, GBgetGuardNDSInfo(model));
+}
 
 /**********************************************************************
  * Grey box factory functionality
  */
 
-#define MAX_TYPES 16
-static char* model_type[MAX_TYPES];
-static pins_loader_t model_loader[MAX_TYPES];
-static int registered=0;
-static char* model_type_pre[MAX_TYPES];
-static pins_loader_t model_preloader[MAX_TYPES];
-static int registered_pre=0;
-static int matrix=0;
-static int labels=0;
-static int cache=0;
-int GB_POR=0;
-static const char *regroup_options = NULL;
-
-static char *ltl_file = NULL;
-static const char *ltl_semantics = "spin";
-static pins_ltl_type_t ltl_type = PINS_LTL_SPIN;
-
-static si_map_entry db_ltl_semantics[]={
-    {"spin",    PINS_LTL_SPIN},
-    {"textbook",PINS_LTL_TEXTBOOK},
-    {"ltsmin",  PINS_LTL_LTSMIN},
-    {NULL, 0}
-};
-
-static void
-ltl_popt (poptContext con, enum poptCallbackReason reason,
-          const struct poptOption *opt, const char *arg, void *data)
-{
-    (void)con; (void)opt; (void)arg; (void)data;
-    switch (reason) {
-    case POPT_CALLBACK_REASON_PRE:
-        break;
-    case POPT_CALLBACK_REASON_POST:
-        {
-            int l = linear_search (db_ltl_semantics, ltl_semantics);
-            if (l < 0) {
-                Warning (error, "unknown ltl semantic %s", ltl_semantics);
-                HREprintUsage();
-                HREexit(LTSMIN_EXIT_FAILURE);
-            }
-            ltl_type = l;
-        }
-        return;
-    case POPT_CALLBACK_REASON_OPTION:
-        break;
-    }
-    Abort("unexpected call to ltl_popt");
-}
+#define                 MAX_TYPES 16
+static char*            model_type[MAX_TYPES];
+static pins_loader_t    model_loader[MAX_TYPES];
+static int              registered=0;
+static char            *model_type_pre[MAX_TYPES];
+static pins_loader_t    model_preloader[MAX_TYPES];
+static int              registered_pre=0;
+static int              matrix=0;
+static int              labels=0;
+static int              cache=0;
+pins_por_t              PINS_POR = PINS_POR_NONE;
+pins_ltl_type_t         PINS_LTL = PINS_LTL_NONE;
+static const char      *regroup_options = NULL;
 
 static char *mucalc_file = NULL;
 
@@ -967,16 +948,17 @@ GBloadFile (model_t model, const char *filename, model_t *wrapped)
             if (0==strcmp (model_type[i], extension)) {
                 model_loader[i] (model, filename);
                 if (wrapped) {
-                    if (GB_POR)
-                        model = GBaddPOR (model, ltl_file != NULL);
-                    if (ltl_file)
-                        model = GBaddLTL (model, ltl_file, ltl_type);
+                    if (PINS_POR == PINS_POR_ON)
+                        model = GBaddPOR (model);
+                    else if (PINS_POR == PINS_POR_CHECK)
+                        model = GBaddPORCheck (model);
+                    model = GBaddLTL (model);
                     if (regroup_options != NULL)
                         model = GBregroup (model, regroup_options);
                     if (mucalc_file) {
-                        if (ltl_file)
+                        if (PINS_LTL)
                             Abort("The -mucalc option and -ltl options can not be combined.");
-                        if (GB_POR)
+                        if (PINS_POR)
                             Abort("The -mucalc option and -por options can not be combined.");
                         model = GBaddMucalc (model, mucalc_file);
                     }
@@ -986,17 +968,21 @@ GBloadFile (model_t model, const char *filename, model_t *wrapped)
                 }
 
                 if (matrix) {
-                    if (HREme(HREglobal()) == 0)
+                    if (HREme(HREglobal()) == 0) {
                         GBprintDependencyMatrixCombined(stdout, model);
-                    HREabort (LTSMIN_EXIT_SUCCESS);
+                        if (log_active(infoLong)) {
+                            GBprintPORMatrix(stdout, model);
+                        }
+                        HREabort (LTSMIN_EXIT_SUCCESS);
+                    }
                 } else if (labels) {
                     if (HREme(HREglobal()) == 0) {
                         if (log_active(info)){
                             lts_type_printf(info, GBgetLTStype(model));
                         }
                         chunk_table_print(info, model);
+                        HREabort (LTSMIN_EXIT_SUCCESS);
                     }
-                    HREabort (LTSMIN_EXIT_SUCCESS);
                 } else {
                     return;
                 }
@@ -1083,7 +1069,7 @@ GBsetProgressStateLabelIndex (model_t model, int idx)
 }
 
 int
-GBbuchiIsProgress (model_t model, int *state)
+GBstateIsProgress (model_t model, int *state)
 {
     return model->sl_idx_progress >= 0 &&
         GBgetStateLabelLong(model, model->sl_idx_progress, state);
@@ -1104,25 +1090,15 @@ GBsetValidEndStateLabelIndex (model_t model, int idx)
 }
 
 int
-GBbuchiIsValidEnd (model_t model, int *state)
+GBstateIsValidEnd (model_t model, int *state)
 {
     return model->sl_idx_valid_end >= 0 &&
         GBgetStateLabelLong(model, model->sl_idx_valid_end, state);
 }
 
-struct poptOption ltl_options[] = {
-    {NULL, 0, POPT_ARG_CALLBACK | POPT_CBFLAG_POST | POPT_CBFLAG_SKIPOPTION, (void *)ltl_popt, 0, NULL, NULL},
-    {"ltl", 0, POPT_ARG_STRING, &ltl_file, 0, "LTL formula or file with LTL formula",
-     "<ltl-file>.ltl|<ltl formula>"},
-    {"ltl-semantics", 0, POPT_ARG_STRING | POPT_ARGFLAG_SHOW_DEFAULT, &ltl_semantics, 0,
-     "LTL semantics", "<spin|textbook|ltsmin>"},
-    POPT_TABLEEND
-};
-
 struct poptOption greybox_options[]={
     { "labels", 0, POPT_ARG_VAL, &labels, 1, "print state variable and type names, and state and action labels", NULL },
 	{ "matrix" , 'm' , POPT_ARG_VAL , &matrix , 1 , "print the dependency matrix for the model and exit" , NULL},
-	{ "por" , 'p' , POPT_ARG_VAL , &GB_POR , 1 , "enable partial order reduction" , NULL },
 	{ "cache" , 'c' , POPT_ARG_VAL , &cache , 1 , "enable caching of grey box calls" , NULL },
 	{ "regroup" , 'r' , POPT_ARG_STRING, &regroup_options , 0 ,
           "enable regrouping; available transformations T: "
@@ -1130,6 +1106,7 @@ struct poptOption greybox_options[]={
     {"mucalc", 0, POPT_ARG_STRING, &mucalc_file, 0, "modal mu-calculus formula or file with modal mu-calculus formula",
           "<mucalc-file>.mcf|<mucalc formula>"},
 	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, ltl_options , 0 , "LTL options", NULL },
+    { NULL, 0 , POPT_ARG_INCLUDE_TABLE, por_options , 0 , "Partial Order Reduction options", NULL },
 	POPT_TABLEEND	
 };
 

@@ -16,13 +16,14 @@
 #include <ltsmin-lib/ltsmin-tl.h>
 #include <pins-lib/pins.h>
 #include <pins-lib/pins-impl.h>
+#include <pins-lib/pins-util.h>
 #include <pins-lib/property-semantics.h>
 #include <mc-lib/dbs-ll.h>
-#include <mc-lib/dfs-stack.h>
-#include <mc-lib/is-balloc.h>
 #include <mc-lib/trace.h>
 #include <util-lib/bitset.h>
 #include <util-lib/dynamic-array.h>
+#include <util-lib/dfs-stack.h>
+#include <util-lib/is-balloc.h>
 #include <util-lib/tables.h>
 #include <util-lib/treedbs.h>
 #include <vset-lib/vector_set.h>
@@ -71,11 +72,11 @@ static struct {
 
     box_mode_t       call_mode;
     const char      *arg_strategy;
-    enum { Strat_BFS, Strat_DFS, Strat_SCC }        strategy;
+    enum { Strat_None, Strat_BFS, Strat_DFS, Strat_SCC }        strategy;
     const char      *arg_state_db;
-    enum { DB_DBSLL, DB_TreeDBS, DB_Vset }          state_db;
+    enum { DB_DBSLL, DB_TreeDBS, DB_Vset }                      state_db;
     const char      *arg_proviso;
-    enum { LTLP_ClosedSet, LTLP_Stack, LTLP_Color } proviso;
+    enum { P_None, P_ClosedSet, P_Stack, P_Color }              proviso;
 
     lts_file_t       lts_file;
     int              write_state;
@@ -98,15 +99,16 @@ static struct {
     .threshold      = THRESHOLD,
     .max            = SIZE_MAX,
     .call_mode      = UseBlackBox,
-    .arg_strategy   = "dfs",
-    .strategy       = Strat_DFS,
+    .arg_strategy   = "none",
+    .strategy       = Strat_None,
     .arg_state_db   = "tree",
     .state_db       = DB_TreeDBS,
-    .arg_proviso    = "stack",
-    .proviso        = LTLP_Stack,
+    .arg_proviso    = "none",
+    .proviso        = P_None,
 };
 
 static si_map_entry strategies[] = {
+    {"none",Strat_None},
     {"bfs", Strat_BFS},
     {"dfs", Strat_DFS},
     {"scc", Strat_SCC},
@@ -121,9 +123,10 @@ static si_map_entry db_types[]={
 };
 
 static si_map_entry provisos[]={
-    {"closedset", LTLP_ClosedSet},
-    {"stack",     LTLP_Stack},
-    {"color",     LTLP_Color},
+    {"none",      P_None},
+    {"closedset", P_ClosedSet},
+    {"stack",     P_Stack},
+    {"color",     P_Color},
     {NULL, 0}
 };
 
@@ -802,6 +805,11 @@ dfs_tree_stack_closed_color_proviso(gsea_state_t* state, int is_backtrack, void*
 static int
 dfs_tree_color_proviso(transition_info_t* ti, gsea_state_t* state)
 {
+    if (ti->por_proviso) { // POR layer set proviso, so state is fully expanded!
+        gc.queue.filo.proviso.color.fully_expanded = 1;
+        return 1;
+    }
+
     // assume it is oke
     int result = 1;
 
@@ -1246,7 +1254,7 @@ gsea_dlk_wrapper(gsea_state_t *state, void *arg)
 
     if (state->count != 0) return; // no deadlock
     global.deadlocks++;
-    if (GBbuchiIsValidEnd(opt.model, state->state)) return; // valid end state
+    if (GBstateIsValidEnd(opt.model, state->state)) return; // valid end state
     if ( !opt.inv_expr ) global.violations++;
     do_trace(NULL, arg, "deadlock", ""); // state still on stack
 }
@@ -1436,6 +1444,7 @@ gsea_setup_default()
         ADD_ARRAY(gc.store.scc.dfsnum_man, gc.store.scc.dfsnum, int);
         gc.store.scc.count = 0;
         break;
+    case Strat_None: Abort ("No strategy selected?");
     }
 
     // options setup
@@ -1470,6 +1479,30 @@ gsea_setup_default()
 }
 
 static void
+set_cycle_proviso ()
+{
+    if (!PINS_POR) return;
+    if (opt.proviso == P_None) {
+        Warning (info, "Forcing the use of a cycle proviso. For best results use --proviso=color.");
+        opt.proviso = opt.strategy == Strat_BFS ? P_ClosedSet : P_Stack;
+    }
+}
+
+static void
+set_strategy (const char *output)
+{
+    if (opt.strategy == Strat_None) {
+        if (GBgetAcceptingStateLabelIndex(opt.model) >= 0) {
+            opt.strategy = Strat_SCC;
+        } else if (output) {
+            opt.strategy = Strat_BFS;
+        } else {
+            opt.strategy = Strat_DFS;
+        }
+    }
+}
+
+static void
 gsea_setup(const char *output)
 {
     // setup error detection facilities
@@ -1483,11 +1516,20 @@ gsea_setup(const char *output)
         chunk c = chunk_str(opt.act_detect);
         opt.act_index = GBchunkPut(opt.model, typeno, c);
         Warning(info, "Detecting action \"%s\"", opt.act_detect);
+        if (PINS_POR) {
+            pins_add_edge_label_visible (opt.model, opt.act_label, opt.act_index);
+            set_cycle_proviso ();
+        }
     }
     if (opt.inv_detect) {
         opt.env = LTSminParseEnvCreate();
         opt.inv_expr = parse_file_env (opt.inv_detect, pred_parse_file, opt.model, opt.env);
+        if (PINS_POR) {
+            mark_visible (opt.model, opt.inv_expr, opt.env);
+            set_cycle_proviso ();
+        }
     }
+    set_strategy (output);
 
     // setup search algorithms and datastructures
     switch(opt.strategy) {
@@ -1547,7 +1589,7 @@ gsea_setup(const char *output)
         }
 
         // proviso: doens't work here
-        if (GB_POR && opt.proviso != LTLP_ClosedSet)
+        if (PINS_POR && opt.proviso != P_ClosedSet)
             Abort("proviso does not work for bfs, use --proviso=closedset");
 
         break;
@@ -1555,6 +1597,7 @@ gsea_setup(const char *output)
     case Strat_SCC:
         if (opt.dlk_detect || opt.act_detect || opt.inv_detect)
             Abort ("Verification of safety properties works only with reachability algorithms.");
+        set_cycle_proviso ();
     case Strat_DFS:
         if (output) Abort("Use BFS to write the state space to an lts file.");
         switch (opt.state_db) {
@@ -1577,12 +1620,12 @@ gsea_setup(const char *output)
 
             // proviso: dfs tree specific
             switch (opt.proviso) {
-                case LTLP_Stack:
+                case P_Stack:
                     gc.queue.filo.proviso.stack.off_stack_set = bitset_create(128,128);
                     gc.state_backtrack = dfs_tree_state_backtrack;
                     gc.state_proviso = dfs_tree_state_proviso;
                     break;
-                case LTLP_Color:
+                case P_Color:
                     gc.queue.filo.proviso.color.nongreen_stack = bitset_create(128,128);
                     gc.queue.filo.proviso.color.color = bitset_create(128,128);
                     gc.queue.filo.proviso.color.expanded_man = create_manager(65536);
@@ -1620,7 +1663,7 @@ gsea_setup(const char *output)
             gc.queue.filo.stack = dfs_stack_create(global.N);
 
             // proviso: doens't work here
-            if (GB_POR && opt.proviso != LTLP_ClosedSet)
+            if (PINS_POR && opt.proviso != P_ClosedSet)
                 Abort("proviso not implemented for dfs/vset combination");
 
             break;
@@ -1641,14 +1684,14 @@ gsea_setup(const char *output)
             gc.queue.filo.stack = dfs_stack_create(sizeof(ref_t)/sizeof(int));
 
             // proviso: dfs table specific
-            if (GB_POR)
+            if (PINS_POR)
             switch (opt.proviso) {
-                case LTLP_Stack:
+                case P_Stack:
                     gc.queue.filo.proviso.stack.off_stack_set = bitset_create(128,128);
                     gc.state_backtrack = dfs_table_state_backtrack;
                     gc.state_proviso = dfs_table_state_proviso;
                     break;
-                case LTLP_Color:
+                case P_Color:
                     Abort("proviso not implemented for dfs/table combination");
                 default:
                     break;
@@ -1660,6 +1703,7 @@ gsea_setup(const char *output)
         }
         break;
 
+    case Strat_None: Abort ("No strategy selected?");
     default:
         Abort ("unimplemented strategy");
     }
@@ -1731,7 +1775,7 @@ gsea_process(void *arg, transition_info_t *ti, int *dst)
         ti->por_proviso = 1;
         gc.open_insert(&s_next, arg);
     } else {
-        ti->por_proviso = gc.state_proviso ? gc.state_proviso(ti, &s_next) : 0;
+        ti->por_proviso = gc.state_proviso ? gc.state_proviso(ti, &s_next) : 1;
         if (gc.state_matched) gc.state_matched(&s_next, arg);
     }
     global.n_targets++;
@@ -1766,6 +1810,27 @@ gsea_finished(void *arg) {
     (void)arg;
 }
 
+static void
+gsea_print_setup ()
+{
+    Warning (info, "There are %zu state labels and %zu edge labels", global.state_labels, global.edge_labels);
+    Warning (info, "State length is %zu, there are %zu groups", global.N, global.K);
+    if (opt.act_detect) Warning(info, "Detecting action \"%s\"", opt.act_detect);
+    Warning (info, "Running %s search strategy", key_search(strategies, opt.strategy));
+    Warning (info, "Using a %s for state storage", key_search(db_types, opt.state_db));
+    if (PINS_POR) {
+        int            *visibility = GBgetPorGroupVisibility (opt.model);
+        size_t          visibles = 0, labels = 0;
+        for (size_t i = 0; i < global.K; i++)
+            visibles += visibility[i];
+        visibility = GBgetPorStateLabelVisibility (opt.model);
+        for (size_t i = 0; i < global.state_labels; i++)
+            labels += visibility[i];
+        Warning (info, "Visible groups: %zu / %zu, labels: %zu / %zu", visibles, global.K, labels, global.state_labels);
+        Warning (info, "POR cycle proviso: %s %s", key_search(provisos, opt.proviso), opt.strategy == Strat_SCC ? "(ltl)" : "");
+    }
+}
+
 int
 main (int argc, char *argv[])
 {
@@ -1775,7 +1840,7 @@ main (int argc, char *argv[])
     lts_lib_setup();
     HREinitStart(&argc,&argv,1,2,(char**)files,"<model> [<lts>]");
 
-    Warning(info,"loading model from %s",files[0]);
+    Warning (info, "Loading model from %s", files[0]);
     opt.model=GBcreateBase();
     GBsetChunkMethods(opt.model,new_string_index,NULL,
                       (int2chunk_t)HREgreyboxI2C,
@@ -1789,17 +1854,15 @@ main (int argc, char *argv[])
     global.N=lts_type_get_state_length(ltstype);
     global.K=dm_nrows(GBgetDMInfo(opt.model));
     global.T=lts_type_get_type_count(ltstype);
-    Warning(info,"length is %zu, there are %zu groups",global.N,global.K);
     global.state_labels=lts_type_get_state_label_count(ltstype);
     global.edge_labels=lts_type_get_edge_label_count(ltstype);
-    Warning(info,"There are %zu state labels and %zu edge labels",global.state_labels,global.edge_labels);
 
     int src[global.N];
     GBgetInitialState(opt.model,src);
-    Warning(info,"got initial state");
 
     gsea_setup(files[1]);
     gsea_setup_default();
+    gsea_print_setup ();
     gsea_search(src);
 
     HREexit(LTSMIN_EXIT_SUCCESS);

@@ -9,7 +9,7 @@
 
 #include <stdlib.h>
 
-#include <mc-lib/dfs-stack.c>
+#include <util-lib/dfs-stack.c>
 
 
 static const size_t NUM = 10*1024*1024;
