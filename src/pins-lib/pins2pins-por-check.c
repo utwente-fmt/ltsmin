@@ -165,7 +165,7 @@ print_group_name (dlk_check_context_t *ctx, int group, int idx)
 {
     model_t model = ctx->pctx->parent;
     lts_type_t      ltstype = GBgetLTStype (model);
-    int K = pins_get_group_count (model);
+    size_t K = pins_get_group_count (model);
 
     int             statement_label = lts_type_find_edge_label (
                                      ltstype, LTSMIN_EDGE_TYPE_STATEMENT);

@@ -77,7 +77,7 @@ static int gcf_stream_empty(stream_t stream){
 }
 
 static int gcf_meta_stream_empty(stream_t stream){
-    return stream->arch->meta_next>=raf_size(stream->arch->raf);
+    return stream->arch->meta_next>=(size_t)raf_size(stream->arch->raf);
 }
 
 static size_t gcf_stream_read_max(stream_t stream,void*buf,size_t count){

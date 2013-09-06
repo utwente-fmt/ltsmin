@@ -180,7 +180,7 @@ static void callback(void*context,transition_info_t*info,int*dst){
 static void extend_trace(struct dist_thread_context* ctx,uint32_t* trc_vector);
 
 static void start_trace(struct dist_thread_context* ctx,uint32_t seg,uint32_t ofs){
-    if (ctx->mpi_me!=seg) Abort("cannot start trace worker is not owner of segment %u",seg);
+    if (ctx->mpi_me!=(int)seg) Abort("cannot start trace worker is not owner of segment %u",seg);
     uint32_t trc_vector[4];
     trc_vector[0]=seg;
     trc_vector[1]=ofs;
@@ -280,6 +280,7 @@ struct repr_context {
 };
 
 static void discard_callback(void*context,transition_info_t*ti,int*dst){
+    (void) context; (void) ti; (void) dst;
 }
 
 static void repr_callback(void*context,transition_info_t*ti,int*dst){
@@ -295,6 +296,7 @@ static void repr_callback(void*context,transition_info_t*ti,int*dst){
     ensure_access(ctx->trans_man,ctx->trans_next);
     ctx->trans[ctx->trans_next]=idx;
     ctx->trans_next++;
+    (void) ti;
 }
 
 static void repr_explore(struct repr_context* ctx,model_t model,matrix_t* confluent,int idx,int *state){

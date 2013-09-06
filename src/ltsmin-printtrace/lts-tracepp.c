@@ -492,7 +492,7 @@ main(int argc,char*argv[]){
     }
     if (trace->root_count>1){
         if (arg_trace>=0){
-            if (arg_trace>=trace->root_count) {
+            if ( ((uint32_t)arg_trace)>=trace->root_count ) {
                 Abort("Illegal trace number: %d. File contains %d traces.",arg_trace,trace->root_count);
             }
         } else {

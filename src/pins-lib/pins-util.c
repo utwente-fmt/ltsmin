@@ -4,6 +4,7 @@
 #include <stdlib.h>
 
 #include <dm/dm.h>
+#include <hre/user.h>
 #include <pins-lib/pins-util.h>
 
 

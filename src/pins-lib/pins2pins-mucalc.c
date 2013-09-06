@@ -213,7 +213,7 @@ mucalc_long (model_t self, int group, int *src, TransitionCB cb,
     {  // this group is applicable for this type of expression
         if (log_active(infoLong))
         {
-            Print(infoLong, "");
+            Print(infoLong, "%s", "");
             Print(infoLong, "mucalc_long");
             mucalc_print_state(infoLong, ctx, src);
         }
@@ -333,7 +333,7 @@ mucalc_all (model_t self, int *src, TransitionCB cb, void *user_context)
     int group = -1;
     if (log_active(infoLong))
     {
-        Print(infoLong, "");
+        Print(infoLong, "%s", "");
         Print(infoLong, "mucalc_all");
         mucalc_print_state(infoLong, ctx, src);
     }
@@ -610,7 +610,7 @@ int mucalc_compute_nodes(mucalc_expr_t expr, mucalc_node_t* nodes, int* fixpoint
             break;
         default: Abort("mucalc_compute_nodes: unknown expression type: %d", expr->type);
     }
-
+    (void) player;
 }
 
 

@@ -39,7 +39,7 @@ void lts_write_imca(const char*imca_name,lts_t lts){
         for(uint32_t j=lts->begin[i];j<lts->begin[i+1];){
             uint32_t label[4];
             TreeUnfold(lts->edge_idx,lts->label[j],(int*)label);
-            int32_t group=label[1];
+            uint32_t group=label[1];
             if (label[0]==tau){
                 fprintf(imca,STATE_FMT " tau\n",i);
             } else if (label[0]==rate) {

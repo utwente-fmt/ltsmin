@@ -200,7 +200,7 @@ mark_visible(model_t model, ltsmin_expr_t e, ltsmin_parse_env_t env)
             if (e->idx < N) {
                 pins_add_state_variable_visible (model, e->idx);
             } else { // state label
-                HREassert (e->idx < N + pins_get_state_label_count (model));
+                HREassert (e->idx < N + (int)pins_get_state_label_count(model));
                 pins_add_state_label_visible (model, e->idx - N);
             }
           } break;

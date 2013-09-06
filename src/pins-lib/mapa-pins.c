@@ -177,7 +177,7 @@ typedef struct prcrl_context {
     matrix_t reach_info;
 } *prcrl_context_t;
 
-
+/*
 static int PRCRLgetTransitionsAll(model_t model,int*src,TransitionCB cb,void*context){
     prcrl_context_t ctx=GBgetContext(model);
     cb_ctx=context;
@@ -185,6 +185,7 @@ static int PRCRLgetTransitionsAll(model_t model,int*src,TransitionCB cb,void*con
     int res=prcrl_explore(ctx->spec,src,cb_dest,cb_label);
     return res;
 }
+*/
 
 static int PRCRLdelegateTransitionsLong(model_t model,int group,int*src,TransitionCB cb,void*context){
     prcrl_context_t ctx=GBgetContext(model);
@@ -199,9 +200,11 @@ static int PRCRLgetTransitionsLong(model_t model,int group,int*src,TransitionCB 
     return res;
 }
 
+/*
 static int label_actions(char*edge_class){
     return SIlookup(reach_actions,edge_class)>=0;
 }
+*/
 
 static int check_goal(model_t self,int label,int*src){
     (void)label;
@@ -256,7 +259,6 @@ void common_load_model(model_t model,const char*name,int mapa){
     lts_type_put_type(ltstype,"nat",LTStypeDirect,NULL);
     lts_type_put_type(ltstype,"pos",LTStypeDirect,NULL);
 
-    int class_type;
     lts_type_set_edge_label_count(ltstype,4);
     lts_type_set_edge_label_name(ltstype,0,LTSMIN_EDGE_TYPE_ACTION_PREFIX);
     lts_type_set_edge_label_type(ltstype,0,LTSMIN_EDGE_TYPE_ACTION_PREFIX);
