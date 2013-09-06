@@ -35,6 +35,7 @@ struct dist_thread_context {
     uint32_t *parent_ofs;
     uint16_t *parent_seg;
     size_t explored,visited,transitions,level,deadlocks,errors,violations;
+    ltsmin_parse_env_t env;
 };
 
 static const size_t         THRESHOLD = 100000 / 100 * SPEC_REL_PERF;
@@ -90,7 +91,7 @@ deadlock_detect (struct dist_thread_context *ctx, int *state, int count)
 static inline void
 invariant_detect (struct dist_thread_context *ctx, int *state)
 {
-    if ( !inv_expr || eval_predicate(ctx->model, inv_expr, NULL, state, size) ) return;
+    if ( !inv_expr || eval_predicate(ctx->model, inv_expr, NULL, state, size, ctx->env) ) return;
     ctx->violations++;
     if (no_exit) return;
 
@@ -227,8 +228,12 @@ int main(int argc, char*argv[]){
         act_index = GBchunkPut(model, typeno, c);
         Warning(info, "Detecting action \"%s\"", act_detect);
     }
-    if (inv_detect)
-        inv_expr = parse_file (inv_detect, pred_parse_file, model);
+    if (inv_detect) {
+        if (GB_POR) Abort ("Distributed tool implements no cycle provisos.");
+        ltsmin_parse_env_t env = LTSminParseEnvCreate();
+        inv_expr = parse_file_env (inv_detect, pred_parse_file, model, env);
+        ctx.env = env;
+    }
     HREbarrier(HREglobal());
     /***************************************************/
     size=lts_type_get_state_length(ltstype);

@@ -64,6 +64,7 @@ static struct {
     int              act_index;
     int              act_label;
     ltsmin_expr_t    inv_expr;
+    ltsmin_parse_env_t env;
 
     size_t           threshold;
     size_t           max;
@@ -1243,7 +1244,7 @@ gsea_dlk_wrapper(gsea_state_t *state, void *arg)
 static void
 gsea_invariant_check(gsea_state_t *state, void *arg)
 {
-    if ( eval_predicate(opt.model, opt.inv_expr, NULL, state->state, global.N) ) return; // invariant holds
+    if ( eval_predicate(opt.model, opt.inv_expr, NULL, state->state, global.N, opt.env) ) return; // invariant holds
 
     global.violations++;
     do_trace(NULL, arg, "Invariant violation", opt.inv_detect); // state still on stack
@@ -1473,8 +1474,10 @@ gsea_setup(const char *output)
         opt.act_index = GBchunkPut(opt.model, typeno, c);
         Warning(info, "Detecting action \"%s\"", opt.act_detect);
     }
-    if (opt.inv_detect)
-        opt.inv_expr = parse_file (opt.inv_detect, pred_parse_file, opt.model);
+    if (opt.inv_detect) {
+        opt.env = LTSminParseEnvCreate();
+        opt.inv_expr = parse_file_env (opt.inv_detect, pred_parse_file, opt.model, opt.env);
+    }
 
     // setup search algorithms and datastructures
     switch(opt.strategy) {
@@ -1747,7 +1750,7 @@ gsea_finished(void *arg) {
              global.errors);
     (void)arg;
 }
-
+
 int
 main (int argc, char *argv[])
 {

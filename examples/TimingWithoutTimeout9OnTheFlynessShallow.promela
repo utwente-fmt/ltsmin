@@ -1,0 +1,162 @@
+/* -*-promela-*- 
+*for emacs promela mode
+* Created 13.11.2012
+* 
+* (C) David Farago <farago@kit.edu>
+* based on A_timing, documentation: http://lfm.iti.kit.edu/files/theses/diploma/daDavidFarago.pdf
+*/ 
+
+bool someProgressHasBeenMade=false; 
+/* Some process (8 here) now is a nodeWithNPC, which makes a non-progress cycle 
+* iff it is the firstly traversed.
+* Possible tuning: 
+* * switch orders for non-determinism for worst traversal in algorithms 
+    other than \df.
+* * Change nodeWithNPC back to process 6!? But I do not know whether Spin starts considering process 0 or process 8 first.
+*/ 
+
+#define L 9	          /* size of FIFO-Buffers */
+
+byte nr_passive=false;       
+#define __instances_node 8
+#define __instances_nodeWithNPC 1
+
+#define N 9	           /* number of nodes $n$ */
+
+byte nr_leaders=0;
+typedef Msg {byte hop; bool unique};
+chan q0 = [L] of {byte, bool};
+chan q1 = [L] of {byte, bool};
+chan q2 = [L] of {byte, bool};
+chan q3 = [L] of {byte, bool};
+chan q4 = [L] of {byte, bool};
+chan q5 = [L] of {byte, bool};
+chan q6 = [L] of {byte, bool};
+chan q7 = [L] of {byte, bool};
+chan q8 = [L] of {byte, bool};
+
+proctype node (chan in, out)
+{
+  bool leader=false;
+  Msg curMsg;
+      
+  xr in;
+  xs out;
+
+START:
+  do
+    :: atomic{nempty(in) -> in?curMsg.hop,curMsg.unique; curMsg.hop++}; 
+         goto PASSIVE_SEND_AND_RECEIVE
+    :: else -> progress: if	
+                 :: skip  -> someProgressHasBeenMade=true;
+                 :: skip -> someProgressHasBeenMade=true;curMsg.hop=1; curMsg.unique=true; 
+                      goto ACTIVE_SEND_AND_RECEIVE
+	       fi
+  od;
+
+ACTIVE_SEND_AND_RECEIVE:
+  do
+    :: curMsg.hop==0 ->
+         in?curMsg.hop,curMsg.unique; if
+                      :: curMsg.hop==N && curMsg.unique ->
+	  	           curMsg.hop=0; curMsg.unique=false; 
+                           leader=true; nr_leaders++; 
+                           assert(nr_leaders==1); goto FINISH
+		      :: curMsg.hop==N && !curMsg.unique ->
+                           curMsg.hop=0; goto START
+  		      :: else -> skip
+	 	    fi;
+         curMsg.hop++; curMsg.unique=false
+    :: curMsg.hop>0  -> 
+         out!curMsg.hop,curMsg.unique; curMsg.hop=0; curMsg.unique=false
+  od;
+	    
+PASSIVE_SEND_AND_RECEIVE:
+  nr_passive++;
+  do
+    :: curMsg.hop==0 -> 
+endVALIDSTATE: in?curMsg.hop,curMsg.unique;
+         if
+	   :: curMsg.hop==N -> 
+                printf("Error: pas. node rec. roundtrip-msg"); 
+	   :: else -> skip                  
+         fi;
+         curMsg.hop++
+    :: curMsg.hop>0 -> 
+         out!curMsg.hop,curMsg.unique; curMsg.hop=0; curMsg.unique=false
+  od;
+
+FINISH:skip	    
+}
+
+proctype nodeWithNPC (chan in, out)
+{
+  bool leader=false;
+  Msg curMsg;
+      
+  xr in;
+  xs out;
+
+START:
+  do
+    :: atomic{nempty(in) -> in?curMsg.hop,curMsg.unique; curMsg.hop++}; 
+         goto PASSIVE_SEND_AND_RECEIVE
+    :: else -> if	
+                 :: someProgressHasBeenMade!=true -> progress:skip;
+                 :: someProgressHasBeenMade==true -> skip;
+                 :: skip -> progress2: someProgressHasBeenMade=true;curMsg.hop=1; curMsg.unique=true; 
+                      goto ACTIVE_SEND_AND_RECEIVE
+	       fi
+  od;
+
+ACTIVE_SEND_AND_RECEIVE:
+  do
+    :: curMsg.hop==0 ->
+         in?curMsg.hop,curMsg.unique; if
+                      :: curMsg.hop==N && curMsg.unique ->
+	  	           curMsg.hop=0; curMsg.unique=false; 
+                           leader=true; nr_leaders++; 
+                           assert(nr_leaders==1); goto FINISH
+		      :: curMsg.hop==N && !curMsg.unique ->
+                           curMsg.hop=0; goto START
+  		      :: else -> skip
+	 	    fi;
+         curMsg.hop++; curMsg.unique=false
+    :: curMsg.hop>0  -> 
+         out!curMsg.hop,curMsg.unique; curMsg.hop=0; curMsg.unique=false
+  od;
+	    
+PASSIVE_SEND_AND_RECEIVE:
+  nr_passive++;
+  do
+    :: curMsg.hop==0 -> 
+endVALIDSTATE: in?curMsg.hop,curMsg.unique;
+         if
+	   :: curMsg.hop==N -> 
+                printf("Error: pas. node rec. roundtrip-msg"); 
+	   :: else -> skip                  
+         fi;
+         curMsg.hop++
+    :: curMsg.hop>0 -> 
+         out!curMsg.hop,curMsg.unique; curMsg.hop=0; curMsg.unique=false
+  od;
+
+FINISH:skip	    
+}
+
+init {
+  byte lv;
+  atomic {	
+    run node(q0, q1); lv++;
+    run node(q1, q2); lv++;
+    run node(q2, q3); lv++;
+    run node(q3, q4); lv++;
+    run node(q4, q5); lv++;
+    run node(q5, q6); lv++;
+    run node(q6, q7); lv++;
+    run node(q7, q8); lv++;
+    run nodeWithNPC(q8, q0); lv++;
+  }
+  (nr_leaders+nr_passive == N) -> assert(nr_leaders==1); 
+  printf("Asserted: nr_leaders==1\n")
+}

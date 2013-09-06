@@ -2,6 +2,7 @@
 #define LTSMIN_BUCHI_H
 
 #include <ltsmin-lib/ltsmin-syntax.h>
+#include <ltsmin-lib/ltsmin-parse-env.h>
 
 typedef struct ltsmin_buchi_transition {
 //    ltsmin_expr_t condition;
@@ -22,6 +23,7 @@ typedef struct ltsmin_buchi {
     ltsmin_expr_t* predicates;
     int state_count;
     int trans_count;
+    ltsmin_parse_env_t env;
     ltsmin_buchi_state_t* states[]; /* 0 to n*/
 } ltsmin_buchi_t;
 

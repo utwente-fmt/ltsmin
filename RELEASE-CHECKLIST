@@ -1,6 +1,9 @@
 Release Checklist
 =================
 
+* finalize 'next' branch (include all feature branches and fixes from
+  'maint' branch
+
 * If first release of the year, update the copyright data in COPYING
 
 * Update NEWS with release notes
@@ -14,12 +17,13 @@ Release Checklist
   To test specific configurations:
     make distcheck DISTCHECK_CONFIGURE_FLAGS='...'
 
+* Create a copy of the website in a staging area (outside of tools/ltsmin/)
+
 * Generate and copy documentation to website (staging area);
   possibly add renamed files to .htaccess
 
-* Copy tarball and symlink to unversioned tar.gz to website (staging
-  area); Update link to tarball on website; Regenerate website (staging
-  area)
+* Copy tarball and symlink to unversioned tar.gz to website (staging area);
+  Update link to tarball on website; Regenerate website (staging area)
 
 * merge 'master' branch into 'next'
   git checkout next && git pull . master
@@ -27,13 +31,15 @@ Release Checklist
 * merge 'master' branch into 'maint'
   git checkout maint && git pull . master
 
-* Push 'master', 'maint' and 'next' branches to public repository
+* Push 'master', 'maint', 'next' and 'ltsmin-<version>' branches to public
+  repository
 
-* Upload website:
+* Update the website from the staging area (create a backup beforehand):
   cd staging-area &&
     rsync --delete -avuz . ewi1057:~fmt/public_html/tools/ltsmin/
 
-* Close all bugs marked as "resolved" in Redmine
+* Close all bugs marked as "resolved" in Redmine:
+  Create filter on "Target version" and "Status", select all, and right click.
   (ensure that Redmine's view on the FMT repository is current, e.g.,
   by visiting to "Repository" view.)
 

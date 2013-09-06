@@ -201,7 +201,6 @@ static char*            trc_output = NULL;
 static int              act_index = -1;
 static int              act_type = -1;
 static int              act_label = -1;
-static ltsmin_expr_t    inv_expr = NULL;
 static size_t           W = -1;
 static size_t           G = 1;
 static size_t           H = 1000;
@@ -497,6 +496,8 @@ struct thread_ctx_s {
     int                *progress;       // progress transitions
     size_t              progress_trans; // progress transitions
     lts_file_t          lts;
+    ltsmin_parse_env_t  env;
+    ltsmin_expr_t       inv_expr;
 };
 
 static void
@@ -788,6 +789,7 @@ wctx_create (model_t model, int depth, wctx_t *shared)
     ctx->counters.timer = RTcreateTimer ();
     statistics_init (&ctx->counters.lattice_ratio);
     ctx->red.time = 0;
+    ctx->inv_expr = NULL;
     if (~(Strat_ECD|Strat_MAP) & strategy[depth+1])
         ctx->rec_ctx = wctx_create (model, depth+1, ctx);
     return ctx;
@@ -941,8 +943,6 @@ statics_init (model_t model)
         chunk c = chunk_str(act_detect);
         act_index = GBchunkPut(model, act_type, c);
     }
-    if (inv_detect)
-        inv_expr = parse_file (inv_detect, pred_parse_file, model);
     char *end;
     dbs_size = strtol (table_size, &end, 10);
     if (dbs_size == 0) Abort ("Not a valid table size: -s %s", table_size);
@@ -1073,20 +1073,23 @@ local_init ()
     statics_init (model);
 #endif
 
+    wctx_t          *ctx = wctx_create (model, 0, NULL);
+
+    if (inv_detect) { // local parsing
+        ctx->env = LTSminParseEnvCreate();
+        ctx->inv_expr = parse_file_env (inv_detect, pred_parse_file, model, ctx->env);
+    }
+
     if (GB_POR) {
         if (strategy[0] & Strat_DFSFIFO) {
             int progress_sl = GBgetProgressStateLabelIndex (model);
             HREassert (progress_sl >= 0, "No progress labels defined for DFS_FIFO");
             GBaddStateLabelVisible (model, progress_sl);
-        } else if (inv_expr) {
-            mark_visible (model, inv_expr);
-        } else if (dlk_detect) {
-            int end_label = GBgetValidEndStateLabelIndex (model);
-            if (end_label != -1) GBaddStateLabelVisible (model, end_label);
+        } else if (ctx->inv_expr) {
+            mark_visible (model, ctx->inv_expr, ctx->env);
         }
     }
 
-    wctx_t          *ctx = wctx_create (model, 0, NULL);
     if (files[1]) {
         lts_type_t ltstype = GBgetLTStype (model);
         Print1 (info,"Writing output to %s",files[1]);
@@ -2481,7 +2484,7 @@ deadlock_detect (wctx_t *ctx, int count)
     if (count > 0) return;
     ctx->counters.deadlocks++; // counting is costless
     if (GBbuchiIsValidEnd(ctx->model, ctx->state.data)) return;
-    if ( !inv_expr ) ctx->counters.violations++;
+    if ( !ctx->inv_expr ) ctx->counters.violations++;
     if (dlk_detect && (!no_exit || trc_output) && lb_stop(global->lb)) {
         Warning (info, " ");
         Warning (info, "Deadlock found in state at depth %zu!", ctx->counters.level_cur);
@@ -2493,7 +2496,8 @@ deadlock_detect (wctx_t *ctx, int count)
 static inline void
 invariant_detect (wctx_t *ctx, raw_data_t state)
 {
-    if ( !inv_expr || eval_predicate(ctx->model, inv_expr, NULL, state, N) ) return;
+    if ( !ctx->inv_expr ||
+         eval_predicate(ctx->model, ctx->inv_expr, NULL, state, N, ctx->env) ) return;
     ctx->counters.violations++;
     if ((!no_exit || trc_output) && lb_stop(global->lb)) {
         Warning (info, " ");

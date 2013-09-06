@@ -121,16 +121,16 @@ parse_file(const char *file, parse_f parser, model_t model)
 }
 
 void
-mark_predicate (model_t m, ltsmin_expr_t e, int *dep)
+mark_predicate (model_t m, ltsmin_expr_t e, int *dep, ltsmin_parse_env_t env)
 {
     if (!e) return;
     switch(e->node_type) {
     case BINARY_OP:
-        mark_predicate(m,e->arg1,dep);
-        mark_predicate(m,e->arg2,dep);
+        mark_predicate(m,e->arg1,dep,env);
+        mark_predicate(m,e->arg2,dep,env);
         break;
     case UNARY_OP:
-        mark_predicate(m,e->arg1,dep);
+        mark_predicate(m,e->arg1,dep,env);
         break;
     default:
         switch(e->token) {
@@ -141,8 +141,8 @@ mark_predicate (model_t m, ltsmin_expr_t e, int *dep)
         case PRED_CHUNK:
             break;
         case PRED_EQ:
-            mark_predicate(m,e->arg1, dep);
-            mark_predicate(m,e->arg2, dep);
+            mark_predicate(m,e->arg1, dep,env);
+            mark_predicate(m,e->arg2, dep,env);
             break;
         case PRED_SVAR: {
             lts_type_t ltstype = GBgetLTStype(m);
@@ -160,25 +160,26 @@ mark_predicate (model_t m, ltsmin_expr_t e, int *dep)
             break;
         }
         default:
-            Abort("unhandled predicate expression in mark_predicate");
+            LTSminLogExpr (error, "Unhandled predicate expression: ", e, env);
+            HREabort (LTSMIN_EXIT_FAILURE);
         }
         break;
     }
 }
 
 void
-mark_visible(model_t model, ltsmin_expr_t e)
+mark_visible(model_t model, ltsmin_expr_t e, ltsmin_parse_env_t env)
 {
     int *visibility = GBgetPorGroupVisibility (model);
     HREassert (visibility != NULL, "POR layer present, but no visibility info found.");
     if (!e) return;
     switch(e->node_type) {
     case BINARY_OP:
-        mark_visible(model,e->arg1);
-        mark_visible(model,e->arg2);
+        mark_visible(model,e->arg1,env);
+        mark_visible(model,e->arg2,env);
         break;
     case UNARY_OP:
-        mark_visible(model,e->arg1);
+        mark_visible(model,e->arg1,env);
         break;
     default:
         switch(e->token) {
@@ -189,8 +190,8 @@ mark_visible(model_t model, ltsmin_expr_t e)
         case PRED_CHUNK:
             break;
         case PRED_EQ:
-            mark_visible(model, e->arg1);
-            mark_visible(model, e->arg2);
+            mark_visible(model, e->arg1,env);
+            mark_visible(model, e->arg2,env);
             break;
         case PRED_SVAR: {
             lts_type_t          ltstype = GBgetLTStype (model);
@@ -199,12 +200,13 @@ mark_visible(model_t model, ltsmin_expr_t e)
             if (e->idx < N) {
                 GBaddStateVariableVisible (model, e->idx);
             } else { // state label
-                HREassert (e->idx < N + lts_type_get_state_label_count(ltstype));
+                HREassert (e->idx < N + (int)lts_type_get_state_label_count(ltstype));
                 GBaddStateLabelVisible (model, e->idx - N);
             }
             } break;
         default:
-            Abort("unhandled predicate expression in mark_visible");
+            LTSminLogExpr (error, "Unhandled predicate expression: ", e, env);
+            HREabort (LTSMIN_EXIT_FAILURE);
         }
         break;
     }

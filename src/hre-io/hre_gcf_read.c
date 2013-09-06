@@ -33,6 +33,12 @@ typedef struct {
     part_list_t data_tail;
 } gcf_info_s;
 
+struct stream_s {
+    struct stream_obj procs;
+    archive_t arch;
+    part_list_t data;
+};
+
 struct archive_s {
     struct archive_obj procs;
     raf_t raf;
@@ -42,22 +48,36 @@ struct archive_s {
     gcf_info_s *gcf_info;
     allocater_t list_alloc;
     string_index_t stream_index;
+    stream_t meta_stream;
+    size_t meta_next;
+    size_t meta_block_size;
+    struct stream_s meta_low_level;
 };
 
-
-struct stream_s {
-    struct stream_obj procs;
-    archive_t arch;
-    part_list_t data;
-};
+static void seek(archive_t arch,size_t pos){
+    if (pos % arch->meta_block_size !=0) {
+        Abort("misaligned seek");
+    }
+    DSclose(&(arch->meta_stream));
+    arch->meta_next=pos;
+    arch->meta_stream=stream_buffer(&(arch->meta_low_level),arch->meta_block_size);
+}
 
 static void gcf_stream_read_close(stream_t *s){
     free(*s);
     *s=NULL;
 }
 
+static void gcf_meta_stream_read_close(stream_t *s){
+    *s=NULL;
+}
+
 static int gcf_stream_empty(stream_t stream){
     return (stream->data==NULL);
+}
+
+static int gcf_meta_stream_empty(stream_t stream){
+    return stream->arch->meta_next>=raf_size(stream->arch->raf);
 }
 
 static size_t gcf_stream_read_max(stream_t stream,void*buf,size_t count){
@@ -71,6 +91,14 @@ static size_t gcf_stream_read_max(stream_t stream,void*buf,size_t count){
     return res;
 }
 
+static size_t gcf_meta_stream_read_max(stream_t stream,void*buf,size_t count){
+    size_t res=stream->arch->meta_block_size;
+    if (count!=res) Abort("incorrect buffering");
+    raf_read(stream->arch->raf,buf,res,stream->arch->meta_next);
+    stream->arch->meta_next+=res;
+    return res;
+}
+
 static stream_t gcf_read_stream(archive_t arch,uint32_t id){
     stream_t s=(stream_t)HREmalloc(NULL,sizeof(struct stream_s));
     stream_init(s);
@@ -81,6 +109,18 @@ static stream_t gcf_read_stream(archive_t arch,uint32_t id){
     s->arch=arch;
     s->data=arch->gcf_info[id].data_head;
     return stream_buffer(s,arch->block_size);
+}
+
+static void meta_setup(archive_t arch){
+    arch->meta_block_size=4096;
+    arch->meta_next=0;
+    stream_init(&(arch->meta_low_level));
+    arch->meta_low_level.procs.close=gcf_meta_stream_read_close;
+    arch->meta_low_level.procs.read_max=gcf_meta_stream_read_max;
+    arch->meta_low_level.procs.read=stream_default_read;
+    arch->meta_low_level.procs.empty=gcf_meta_stream_empty;
+    arch->meta_low_level.arch=arch;
+    arch->meta_stream=stream_buffer(&(arch->meta_low_level),arch->meta_block_size);
 }
 
 static void gcf_close_read(archive_t *archive){
@@ -184,11 +224,9 @@ archive_t arch_gcf_read(raf_t raf){
     arch_init(arch);
     arch->raf=raf;
 
-    char buf[4096];
-    size_t used;
     char ident[LTSMIN_PATHNAME_MAX];
-    raf_read(raf,buf,4096,0);
-    stream_t  ds=stream_read_mem(buf,4096,&used);
+    meta_setup(arch);
+    stream_t ds=arch->meta_stream;
     DSreadS(ds,ident,LTSMIN_PATHNAME_MAX);
     if(strncmp(ident,"GCF",3)){
         Abort("I do not recognize %s as a GCF file.",ident);
@@ -260,9 +298,8 @@ archive_t arch_gcf_read(raf_t raf){
         if ((uint32_t)(raf_size(raf)%((off_t)arch->cluster_size))) cluster_count++;
         for(uint32_t i=0;i<cluster_count;i++){
             if (i) {
-                used=0;
-                Debug("reading alloc from offset %zu",i*arch->cluster_size);
-                raf_read(raf,buf,4096,i*arch->cluster_size);
+                seek(arch,i*arch->cluster_size);
+                ds=arch->meta_stream;
             }
             uint32_t id,offset,length;
             for(;(id=DSreadVL(ds));){

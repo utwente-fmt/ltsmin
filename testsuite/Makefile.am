@@ -20,7 +20,9 @@ DEJATOOL  =
 DEJATOOL +=	alg_backends_dve \
 			alg_backends_etf \
 			ltl_model_checking \
-			safety_model_checking
+			safety_model_checking \
+			partial_order_reduction \
+			dfs_fifo
 
 if HAVE_SPINS_COMPILER
 DEJATOOL +=	alg_backends_prom

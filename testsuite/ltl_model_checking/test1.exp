@@ -13,7 +13,7 @@ set commands [dict create]
 
 # TEST 16:
 
-set strategies {"cndfs" "lndfs" "endfs" "endfs,lndfs" "endfs,endfs,ndfs" "ndfs" "ndfs"}
+set strategies {"cndfs" "lndfs" "endfs" "endfs,lndfs" "endfs,endfs,ndfs" "ndfs"}
 
 # anderson:
 foreach s $strategies {

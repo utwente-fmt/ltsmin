@@ -18,7 +18,11 @@ This section is shared by the parsers for all LTSmin languages.
 %token_type { int } 
 %syntax_error {
     (void)yymajor;(void)yyminor;
-    HREmessage(error,"syntax error near line %d, pos %d",env->lineno+1,env->linepos+1);
+    if (env->lineno == 0) {
+        HREmessage(error,"syntax error near pos %d",env->linepos+1);
+    } else {
+        HREmessage(error,"syntax error near line %d, pos %d",env->lineno+1,env->linepos+1);
+    }
 }
 %parse_failure { HREabort(0); }
 %parse_accept { Warning(infoLong,"success!"); }
@@ -308,8 +312,8 @@ that can be reused for other languages (e.g. CTL, CTL* and LTL)
 
 %type expr { ltsmin_expr_t }
 %destructor expr {
-    (void)env;(void)$$;
-    Abort("Expressions are not supposed to be destroyed.");
+    (void)env;
+     LTSminExprDestroy($$);
 }
 
 input ::= EXPR expr(E) . {

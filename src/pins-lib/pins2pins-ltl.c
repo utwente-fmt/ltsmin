@@ -83,7 +83,8 @@ eval (cb_context *infoctx, transition_info_t *ti, int *state)
     ltl_context_t *ctx = infoctx->ctx;
     int pred_evals = 0; // assume < 32 predicates..
     for(int i=0; i < ctx->ba->predicate_count; i++) {
-        if (eval_predicate(infoctx->model, ctx->ba->predicates[i], ti, state, ctx->old_len))
+        if (eval_predicate(infoctx->model, ctx->ba->predicates[i], ti, state,
+                           ctx->old_len, ctx->ba->env))
             pred_evals |= (1 << i);
     }
     return pred_evals;
@@ -334,13 +335,13 @@ init_ltsmin_buchi(model_t model, const char *ltl_file)
         ltsmin_expr_t notltl = LTSminExpr(UNARY_OP, LTL_NOT, 0, ltl, NULL);
         ltsmin_ltl2ba(notltl);
         ltsmin_buchi_t *ba = ltsmin_buchi();
+        ba->env = env;
         if (NULL == ba)
             Abort ("Empty buchi automaton.");
         if (ba->predicate_count > 30)
             Abort("more than 30 predicates in buchi automaton are currently not supported");
         atomic_write (&shared_ba, ba);
         print_ltsmin_buchi(ba, env);
-        LTSminParseEnvDestroy (env);
     } else {
         while (NULL == atomic_read(&shared_ba)) {}
     }
@@ -453,7 +454,7 @@ GBaddLTL (model_t model, const char *ltl_file, pins_ltl_type_t type)
     int formula_state_dep[len];
     memset (&formula_state_dep, 0, sizeof(int[len]));
     for (int k=0; k < ba->predicate_count; k++) {
-        mark_predicate(model, ba->predicates[k], formula_state_dep);
+        mark_predicate(model, ba->predicates[k], formula_state_dep, ba->env);
     }
 
     // add one column to the matrix
@@ -569,7 +570,7 @@ GBaddLTL (model_t model, const char *ltl_file, pins_ltl_type_t type)
     // that influences the buchi's predicates.
     if (GB_POR) {
         for (int k=0; k < ba->predicate_count; k++) {
-            mark_visible (model, ba->predicates[k]);
+            mark_visible (model, ba->predicates[k], ba->env);
         }
     }
 
