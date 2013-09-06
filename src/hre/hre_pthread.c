@@ -103,7 +103,7 @@ static void area_free(void*area,void *rt_ptr){
 }
 
 static void queue_put(hre_context_t context,hre_msg_t msg,int queue){
-    Debug("enqueue message %llx",msg);
+    Debug("enqueue message %p",msg);
     if (msg->comm >= QUEUE_SIZE) Abort("number of communicators exceeds maximum of %d",QUEUE_SIZE);
     pthread_mutex_lock(&context->queues[queue].lock);
     hre_put_msg(&context->queues[queue].comm[msg->comm],msg);
@@ -112,7 +112,7 @@ static void queue_put(hre_context_t context,hre_msg_t msg,int queue){
 }
 
 static void queue_send(hre_context_t context,hre_msg_t msg){
-    Debug("sending message %llx",msg);
+    Debug("sending message %p",msg);
     queue_put(context,msg,msg->target);
 }
 
@@ -144,11 +144,11 @@ static void queue_while(hre_context_t ctx,int*condition){
         */
         msg->context=ctx;
         if (me==(int)msg->target) {
-            Debug("delivering message %llx",msg);
+            Debug("delivering message %p",msg);
             // Message is sent to us.
             HREdeliverMessage(msg);
         } else {
-            Debug("completed message %llx",msg);
+            Debug("completed message %p",msg);
             // Message is being returned to us.
             HREmsgReady(msg);
         }

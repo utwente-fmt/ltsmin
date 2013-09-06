@@ -190,7 +190,7 @@ static void start_trace(struct dist_thread_context* ctx,uint32_t seg,uint32_t of
 }
 
 static void extend_trace(struct dist_thread_context* ctx,uint32_t* trc_vector){
-    uint32_t real_vector[size];
+    int real_vector[size];
     TreeUnfold(ctx->dbs,trc_vector[3],real_vector);
     Debug("writing state %d.%d",trc_vector[2],ctx->trace_next);
     lts_write_state(ctx->trace,trc_vector[2],&ctx->trace_next,real_vector);
@@ -555,7 +555,7 @@ int main(int argc, char*argv[]){
             int typeno=lts_type_find_type(ltstype,lts_type_get_type(trace_type,i));
             if (typeno<0) continue;
             void *table=GBgetChunkMap(model,typeno);
-            Debug("address of table %d/%d: %lld",i,typeno,table);
+            Debug("address of table %d/%d: %p",i,typeno,table);
             lts_file_set_table(ctx.trace,i,table);
         }
         HREbarrier(HREglobal());
@@ -736,7 +736,7 @@ int main(int argc, char*argv[]){
             }
             if ((lvl_scount%4)==0) HREyield(HREglobal());
         }
-        Debug("saw %d states and %d transitions",lvl_scount,lvl_tcount);
+        Debug("saw %zu states and %zu transitions",lvl_scount,lvl_tcount);
         TQwait(task_queue);
         HREreduce(HREglobal(),1,&ctx.visited,&global_visited,UInt64,Sum);
         HREreduce(HREglobal(),1,&ctx.explored,&global_explored,UInt64,Sum);

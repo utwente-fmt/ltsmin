@@ -169,6 +169,9 @@ const char* mucalc_type_print(mucalc_type_enum_t type)
     }
 }
 
+/**
+ * FIXME: allocates strings
+ */
 const char* mucalc_fetch_value(mucalc_parse_env_t env, mucalc_type_enum_t type, int value)
 {
     switch(type)
@@ -185,12 +188,12 @@ const char* mucalc_fetch_value(mucalc_parse_env_t env, mucalc_type_enum_t type, 
             if (value_obj.type==MUCALC_VALUE_STRING) {
                 char* value = SIget(env->strings, value_obj.value);
                 int len = strlen(id)+strlen(value)+2;
-                char result[len];
+                char *result = RTmalloc(sizeof(char[len]));
                 snprintf(result, len, "%s=%s", id, value);
                 return result;
             } else {
                 int len = strlen(id)+12+2;
-                char result[len];
+                char *result = RTmalloc(sizeof(char[len]));
                 snprintf(result, len, "%s=%d", id, value_obj.value);
                 return result;
             }
@@ -209,6 +212,9 @@ const char* mucalc_fetch_value(mucalc_parse_env_t env, mucalc_type_enum_t type, 
     }
 }
 
+/**
+ * FIXME: allocates strings
+ */
 void mucalc_expr_print(mucalc_parse_env_t env, mucalc_expr_t e)
 {
     Print(infoLong, "mucalc_expr %d: %s %d %s %d %d",

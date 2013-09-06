@@ -29,7 +29,7 @@ noinst_LTLIBRARIES += libpbes-pins.la
 endif
 
 # Warning overwriting user variable! (Avoid PBES warnings)
-#CXXFLAGS = @CXXFLAGS@ -Wno-unused-parameter
+CXXFLAGS = @CXXFLAGS@ -Wno-unused-parameter
 
 # libmapa-pins
 libmapa_pins_la_SOURCES   = mapa-pins.c mapa-pins.h

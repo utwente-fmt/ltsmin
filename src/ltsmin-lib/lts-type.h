@@ -2,6 +2,7 @@
 #ifndef LTS_TYPE_H
 #define LTS_TYPE_H
 
+#include <hre/feedback.h>
 #include <stdio.h>
 
 /**
@@ -65,7 +66,7 @@ extern lts_type_t lts_type_permute(lts_type_t t,int *pi);
 extern void lts_type_destroy(lts_type_t *t);
 
 /// Print the lts type to the output stream;
-extern void lts_type_printf(FILE* out, lts_type_t t);
+extern void lts_type_printf(log_t log, lts_type_t t);
 
 /// Set state length.
 extern void lts_type_set_state_length(lts_type_t  t,int length);

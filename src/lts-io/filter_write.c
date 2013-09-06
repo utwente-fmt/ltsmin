@@ -161,11 +161,11 @@ static lts_file_t lts_file_create_filtered(const char* name,lts_type_t ltstype,s
     }
     Debug("full type is");
     if (log_active(debug)){
-        lts_type_printf(log_get_stream(debug),ltstype);
+        lts_type_printf(debug,ltstype);
     }
     Debug("filtered type is");
     if (log_active(debug)){
-        lts_type_printf(log_get_stream(debug),filtertype);
+        lts_type_printf(debug,filtertype);
     }
     for (int i=0;i<NT;i++){
         if (file->type_proj[i]==-1){

@@ -6,6 +6,7 @@
 #include <hre/user.h>
 #include <ltsmin-lib/lts-type.h>
 #include <util-lib/dynamic-array.h>
+#include <hre/feedback.h>
 #include <hre/stringindex.h>
 
 struct lts_type_s {
@@ -131,27 +132,27 @@ lts_type_t lts_type_permute(lts_type_t t0,int *pi){
     return t;
 }
 
-void lts_type_printf(FILE* log, lts_type_t t){
-	printf(log,"The state labels are:\n");
+void lts_type_printf(log_t log, lts_type_t t){
+	Printf(log,"The state labels are:\n");
 	for(int i=0;i<t->state_label_count;i++){
-	    printf(log,"%4d: %s:%s\n",i,
+	    Printf(log,"%4d: %s:%s\n",i,
                    t->state_label_name[i],
                    SIget(t->type_db,t->state_label_type[i]));
 	}
-	printf(log,"The edge labels are:\n");
+	Printf(log,"The edge labels are:\n");
 	for(int i=0;i<t->edge_label_count;i++){
-	    printf(log,"%4d: %s:%s\n",i,
+	    Printf(log,"%4d: %s:%s\n",i,
                    t->edge_label_name[i],
                    SIget(t->type_db,t->edge_label_type[i]));
 	}
-    printf(log,"The registered types are:\n");
+	Printf(log,"The registered types are:\n");
  	int N=SIgetCount(t->type_db);
 	for(int i=0;i<N;i++){
-	    printf(log,"%4d: %s (%s)\n",i,SIget(t->type_db,i),data_format_string(t,i));
+	    Printf(log,"%4d: %s (%s)\n",i,SIget(t->type_db,i),data_format_string(t,i));
 	}
-    printf(log,"The state vector is:\n");
+	Printf(log,"The state vector is:\n");
     for(int i=0;i<t->state_length;i++){
-        printf(log,"%4d: %s:%s\n",i,
+        Printf(log,"%4d: %s:%s\n",i,
                    t->state_name[i],
                    SIget(t->type_db,t->state_type[i]));
     }

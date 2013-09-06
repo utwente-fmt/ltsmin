@@ -992,7 +992,7 @@ GBloadFile (model_t model, const char *filename, model_t *wrapped)
                 } else if (labels) {
                     if (HREme(HREglobal()) == 0) {
                         if (log_active(info)){
-                            lts_type_printf(log_get_stream(info), GBgetLTStype(model));
+                            lts_type_printf(info, GBgetLTStype(model));
                         }
                         chunk_table_print(info, model);
                     }

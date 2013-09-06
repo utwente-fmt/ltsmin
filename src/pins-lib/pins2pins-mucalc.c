@@ -762,7 +762,7 @@ GBaddMucalc (model_t model, const char *mucalc_file)
     lts_type_validate(_ltstype);
 
     if (log_active(infoLong)){
-        lts_type_printf(log_get_stream(infoLong), _ltstype);
+        lts_type_printf(infoLong, _ltstype);
     }
 
     // Set the Next-State functions

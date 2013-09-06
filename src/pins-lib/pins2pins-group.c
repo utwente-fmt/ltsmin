@@ -358,12 +358,12 @@ GBregroup (model_t model, const char *regroup_spec)
 
     lts_type_t ltstype=GBgetLTStype (model);
     if (log_active(debug)){
-        lts_type_printf(log_get_stream(debug),ltstype);
+        lts_type_printf(debug,ltstype);
     }
     Warning(debug,"permuting ltstype");
     ltstype=lts_type_permute(ltstype,ctx->statemap);
     if (log_active(debug)){
-        lts_type_printf(log_get_stream(debug),ltstype);
+        lts_type_printf(debug,ltstype);
     }
     GBsetLTStype (group, ltstype);
 

@@ -64,7 +64,7 @@ static void term_action(void* context,hre_msg_t msg){
 
 static void TaskSend(hre_task_t task,int target){
     if (task->pending[target]) {
-        Debug("waiting for previous send %d %llx",task->pending[target],task->buf[target]);
+        Debug("waiting for previous send %d %p",task->pending[target],task->buf[target]);
         HREyieldWhile(task->queue->ctx,&task->pending[target]);
         Debug("previous completed, sending...");
     }
