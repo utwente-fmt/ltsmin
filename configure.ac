@@ -2,7 +2,7 @@ AC_PREREQ(2.60)
 AC_INIT([ltsmin],[2.0],[ltsmin-support@cs.utwente.nl])
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_AUX_DIR([autotools])
-AM_INIT_AUTOMAKE([foreign])
+AM_INIT_AUTOMAKE([foreign subdir-objects])
 AC_CONFIG_SRCDIR([src/pins-lib/pins.c])
 AC_CONFIG_HEADERS([src/hre/config.h])
 
