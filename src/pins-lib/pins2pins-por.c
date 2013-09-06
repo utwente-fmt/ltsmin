@@ -318,6 +318,7 @@ beam_setup (model_t model, por_context* ctx, int* src)
         int group = ctx->enabled_list->data[i];
         // add to beam search
         ctx->search[beam_idx].work[0] = group;
+        ctx->search[beam_idx].has_key = 0;
         // init work_enabled/work_disabled
         ctx->search[beam_idx].work_enabled = 1;
         ctx->search[beam_idx].work_disabled = ctx->ngroups;
@@ -513,20 +514,21 @@ add_enabled (por_context *ctx, int group)
     // In other words: either a NES or an NDS need to be added for each guard.
     search_context *s = &ctx->search[ ctx->search_order[0] ];
 
+    int is_key = 1; // key transitions have all their nds's included
     for (int g = 0; g < ctx->group2guard[group]->count; g++) {
         int guard = ctx->group2guard[group]->data[g];
-
-        // TODO: NES / NDS score
 
         int disabled_score = s->nes_score[guard];
         int enabled_score = s->nes_score[guard + ctx->nguards];
         int ns = disabled_score < enabled_score ? guard : guard+ctx->nguards;
+        is_key &= ns >= ctx->nguards;
 
         for (int k=0; k < ctx->ns[ns]->count; k++) {
             int ns_group = ctx->ns[ns]->data[k];
             select_group (ctx, ns_group);
         }
     }
+    s->has_key |= is_key;
 }
 
 /**
@@ -922,6 +924,56 @@ por_short (model_t self, int group, int *src, TransitionCB cb,
     Abort ("Using Partial Order Reduction in combination with -reach or --cached? Short call failed.");
 }
 
+static inline void
+ensure_key (por_context* ctx)
+{
+    // if no enabled transitions, return directly
+    if (!WEAK || ctx->beam_used == 0) return;
+
+    while ( 1 ) {
+        search_context *s = &ctx->search[ctx->search_order[0]]; // search context
+
+        if (s->has_key) return; // OK
+
+        size_t min_score = INT32_MAX;
+        int min_group = -1;
+        for (int i = 0; i < ctx->enabled_list->count; i++) {
+            int group = ctx->enabled_list->data[i];
+            if ( !((s->emit_status[group] & ES_SELECTED) ||
+                    s->score >= ctx->emit_limit) )
+                continue;
+
+            // check open NDSs
+            size_t nds_score = 0;
+            for (int g = 0; g < ctx->group2guard[group]->count; g++) {
+                int nds = ctx->group2guard[group]->data[g] + ctx->nguards;
+                nds_score += s->nes_score[nds];
+            }
+
+            if (nds_score == 0) return; // OK (all NDS's are in the SS)
+
+            if (nds_score < min_score) {
+                min_score = nds_score;
+                min_group = group;
+            }
+        }
+
+        // add all the NDS's for the transition for which it is cheapest
+        HREassert (min_group != -1);
+        for (int g = 0; g < ctx->group2guard[min_group]->count; g++) {
+            int nds = ctx->group2guard[min_group]->data[g] + ctx->nguards;
+
+            // add the selected ndss to work
+            for(int k=0; k < ctx->ns[nds]->count; k++) {
+                int group = ctx->ns[nds]->data[k];
+                select_group (ctx, group);
+            }
+        }
+
+        bs_analyze (ctx); // may select a different search context!
+    }
+}
+
 /**
  * Same but for Safety / Liveness
  */
@@ -931,6 +983,7 @@ por_beam_search_all (model_t self, int *src, TransitionCB cb, void *user_context
     por_context* ctx = ((por_context*)GBgetContext(self));
     beam_setup (self, ctx, src);
     bs_analyze (ctx);
+    ensure_key (ctx);
     int emitted = bs_emit (ctx, src, cb, user_context);
     unmark_dynamic_labels (ctx);
     return emitted;

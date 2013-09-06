@@ -133,6 +133,8 @@ typedef struct search_context
     int             visibles_selected; // selected number of visible transitions
     int             ve_selected;       // selected number of visible and enabled transitions
     int             enabled_selected;  // selected number of enabled transitions
+
+    int             has_key;
 } search_context;
 
 
