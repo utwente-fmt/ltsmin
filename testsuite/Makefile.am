@@ -9,6 +9,7 @@ EXTRA_DIST = \
 CLEANFILES = out/* *.log *.sum
 
 clean-local:
+	rm -rf out/*
 	rm -rf out
 
 DISTCLEANFILES = site.exp
