@@ -24,6 +24,7 @@ static int USE_SCC = 0;
 static int PREFER_NDS = 0;
 static int RANDOM = 0;
 static int DYN_RANDOM = 0;
+static int WEAK = 0; // TODO: implement combination with LTL
 
 struct poptOption por_options[]={
     { "por" , 'p' , POPT_ARG_VAL , &PINS_POR , PINS_POR_ON , "enable partial order reduction" , NULL },
@@ -43,6 +44,7 @@ struct poptOption por_options[]={
     { "prefer-nds" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &PREFER_NDS , 1 , "prefer MC+NDS over NES" , NULL },
     { "por-random" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &RANDOM , 1 , "randomize necessary sets (static)" , NULL },
     { "por-dynamic" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &DYN_RANDOM , 1 , "randomize necessary sets (dynamic)" , NULL },
+    { "weak" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &WEAK , 1 , "Weak stubborn set theory" , NULL },
     POPT_TABLEEND
 };
 
@@ -503,7 +505,7 @@ add_enabled (por_context *ctx, int group)
         select_group (ctx, dependent_group);
     }
 
-    if (PINS_LTL) return;
+    if (!WEAK) return;
 
     // In the weak stubborn set, the selected enabled group might become
     // disabled by some non-stubborn transition. This is allowed as long
@@ -514,13 +516,14 @@ add_enabled (por_context *ctx, int group)
     for (int g = 0; g < ctx->group2guard[group]->count; g++) {
         int guard = ctx->group2guard[group]->data[g];
 
+        // TODO: NES / NDS score
+
         int disabled_score = s->nes_score[guard];
         int enabled_score = s->nes_score[guard + ctx->nguards];
         int ns = disabled_score < enabled_score ? guard : guard+ctx->nguards;
 
-        for(int k=0; k < ctx->ns[ns]->count; k++) {
+        for (int k=0; k < ctx->ns[ns]->count; k++) {
             int ns_group = ctx->ns[ns]->data[k];
-            if (!dm_is_set(&ctx->nce, group, ns_group))
             select_group (ctx, ns_group);
         }
     }
@@ -1269,18 +1272,14 @@ GBaddPOR (model_t model)
     matrix_t *not_accords_with = NO_DNA ? NULL : GBgetDoNotAccordInfo(model);
     NO_DNA = not_accords_with == NULL;
 
-    /**
-     * TODO: for now we assume that GBgetDoNotAccordInfo contains only
-     * information on action commutativity (not NDS^2 / coenabled).
-     * We add either NDS^2 and coenabled for LTL, then we obtain the
-     * strong do-notaccord relation.
-     * Or for no LTL, we can create a weak stubborn set by combining the
-     * info on-the-fly when we add enabled transitions (see add_enabled)
-     */
+    HREassert (NO_DNA || (dm_nrows(not_accords_with) == groups &&
+                          dm_ncols(not_accords_with) == groups));
 
-    HREassert (NO_DNA ||
-               (dm_nrows(not_accords_with) == groups &&
-                dm_ncols(not_accords_with) == groups));
+    WEAK = PINS_LTL ? 0 : WEAK;
+
+    // extract COMMUTES MATRIX FOR WEAK LTL
+    matrix_t *commutes = GBgetCommutesInfo(model);
+    WEAK &= commutes != NULL;
 
     // Combine Do Not Accord with dependency and other information
     dm_create(&ctx->not_accords_with, groups, groups);
@@ -1289,25 +1288,26 @@ GBaddPOR (model_t model)
             if (i == j) {
                 dm_set(&ctx->not_accords_with, i, j);
             } else {
+
                 if ( !NO_MC && dm_is_set(&ctx->nce, i , j) ) {
                     continue; // transitions never coenabled!
                 }
 
-                for (int g = 0; g < ctx->group2guard[j]->count; g++) {
-                    if (dm_is_set(&ctx->gnds_matrix, ctx->group2guard[j]->data[g], i)) {
-                        dm_set( &ctx->not_accords_with, i, j );
-                        continue;
+                if (WEAK) {
+                    for (int g = 0; g < ctx->group2guard[j]->count; g++) {
+                        if (dm_is_set(&ctx->gnds_matrix, ctx->group2guard[j]->data[g], i)) {
+                            dm_set( &ctx->not_accords_with, i, j );
+                            continue;
+                        }
                     }
-                }
-                if (PINS_LTL)
-                for (int g = 0; g < ctx->group2guard[i]->count; g++) {
-                    if (dm_is_set(&ctx->gnds_matrix, ctx->group2guard[i]->data[g], j)) {
-                        dm_set( &ctx->not_accords_with, i, j );
-                        continue;
+
+                    if ( dm_is_set(commutes, i , j) ) {
+                        continue; // actions commute with each other
                     }
-                }
-                if ( !NO_DNA && !dm_is_set(not_accords_with, i , j) ) {
-                    continue; // transitions commute with each other
+                } else {
+                    if ( !NO_DNA && !dm_is_set(not_accords_with, i , j) ) {
+                        continue; // transitions accord with each other
+                    }
                 }
 
                 // is dependent?

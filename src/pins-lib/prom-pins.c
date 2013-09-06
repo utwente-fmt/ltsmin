@@ -58,6 +58,7 @@ const int** (*prom_get_all_labels)  ();
 int         (*prom_get_label)       (void *, int g, int *src);
 const char* (*prom_get_label_name)  (int g);
 void        (*prom_get_labels_all)  (void *, int *src, int* labels);
+const int*  (*prom_get_trans_commutes_matrix)(int t);
 const int*  (*prom_get_trans_do_not_accord_matrix)(int t);
 const int*  (*prom_get_label_may_be_coenabled_matrix)(int g);
 const int*  (*prom_get_label_nes_matrix)(int g); // could be optional for POR
@@ -213,6 +214,8 @@ PromLoadDynamicLib(model_t model, const char *filename)
     // optional POR functionality (NES/NDS):
     prom_get_trans_do_not_accord_matrix = (const int*(*)(int))
         RTtrydlsym( dlHandle, "spins_get_trans_do_not_accord_matrix" );
+    prom_get_trans_commutes_matrix = (const int*(*)(int))
+        RTtrydlsym( dlHandle, "spins_get_trans_commutes_matrix" );
     prom_get_label_may_be_coenabled_matrix = (const int*(*)(int))
         RTtrydlsym( dlHandle, "spins_get_label_may_be_coenabled_matrix" );
     prom_get_label_nes_matrix = (const int*(*)(int))
@@ -408,6 +411,18 @@ PromLoadGreyboxModel(model_t model, const char *filename)
 
     // set the guards per transition group
     GBsetGuardsInfo(model, (guard_t**) prom_get_all_labels());
+
+    if (prom_get_trans_commutes_matrix != NULL) {
+        matrix_t *commutes_info = RTmalloc(sizeof(matrix_t));
+        dm_create(commutes_info, ngroups, ngroups);
+        for (int i = 0; i < ngroups; i++) {
+            int *dna = (int*)prom_get_trans_commutes_matrix(i);
+            for(int j = 0; j < ngroups; j++) {
+                if (dna[j]) dm_set(commutes_info, i, j);
+            }
+        }
+        GBsetCommutesInfo(model, commutes_info);
+    }
 
     if (prom_get_trans_do_not_accord_matrix != NULL) {
         matrix_t *dna_info = RTmalloc(sizeof(matrix_t));

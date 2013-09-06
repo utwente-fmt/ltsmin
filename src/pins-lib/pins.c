@@ -16,6 +16,7 @@ struct grey_box_model {
 	matrix_t *sl_info;
     sl_group_t* sl_groups[GB_SL_GROUP_COUNT];
     guard_t** guards;
+    matrix_t *commutes_info; // commutes info
     matrix_t *gce_info; // guard co-enabled info
     matrix_t *dna_info; // do not accord info
     matrix_t *gnes_info; // guard necessary enabling set
@@ -217,6 +218,7 @@ model_t GBcreateBase(){
     model->guards=NULL;
     model->group_visibility=NULL;
     model->label_visibility=NULL;
+    model->commutes_info=NULL;
     model->gce_info=NULL;
     model->dna_info=NULL;
     model->gnes_info=NULL;
@@ -296,6 +298,9 @@ void GBinitModelDefaults (model_t *p_model, model_t default_src)
 
     if (model->dna_info == NULL)
         GBsetDoNotAccordInfo(model, GBgetDoNotAccordInfo (default_src));
+
+    if (model->commutes_info == NULL)
+        GBsetCommutesInfo(model, GBgetCommutesInfo (default_src));
 
     if (model->group_visibility == NULL)
         GBsetPorGroupVisibility (model, GBgetPorGroupVisibility(default_src));
@@ -564,8 +569,13 @@ void GBsetGuardCoEnabledInfo(model_t model, matrix_t *info) {
 }
 
 void GBsetDoNotAccordInfo(model_t model, matrix_t *info) {
-    HREassert (model->dna_info == NULL, "guard may be co-enabled info already set");
+    HREassert (model->dna_info == NULL, "do-not-accord info already set");
     model->dna_info = info;
+}
+
+void GBsetCommutesInfo(model_t model, matrix_t *info) {
+    HREassert (model->commutes_info == NULL, "transition commutes info already set");
+    model->commutes_info = info;
 }
 
 void GBsetPorGroupVisibility(model_t model, int*visibility) {
@@ -592,6 +602,10 @@ matrix_t *GBgetGuardCoEnabledInfo(model_t model) {
 
 matrix_t *GBgetDoNotAccordInfo(model_t model) {
     return model->dna_info;
+}
+
+matrix_t *GBgetCommutesInfo(model_t model) {
+    return model->commutes_info;
 }
 
 void GBsetGuardNESInfo(model_t model, matrix_t *info) {
@@ -731,6 +745,9 @@ void GBprintDependencyMatrixCombined(FILE* file, model_t model) {
 void GBprintPORMatrix(FILE* file, model_t model) {
     Printf (info, "\nDo Not Accord matrix:\n");
     dm_print(file, GBgetDoNotAccordInfo(model));
+
+    Printf (info, "\nCommutes matrix:\n");
+    dm_print(file, GBgetCommutesInfo(model));
 
     Printf (info, "\nMaybe coenabled matrix:\n");
     dm_print(file, GBgetGuardCoEnabledInfo(model));

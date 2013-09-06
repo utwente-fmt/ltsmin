@@ -400,6 +400,16 @@ extern void GBsetDoNotAccordInfo(model_t model, matrix_t *info);
 extern matrix_t *GBgetDoNotAccordInfo(model_t model);
 
 /**
+\brief Set the commutes matrix to a model
+*/
+extern void GBsetCommutesInfo(model_t model, matrix_t *info);
+
+/**
+\brief Get the commutes matrix of a model.
+*/
+extern matrix_t *GBgetCommutesInfo(model_t model);
+
+/**
 \brief Get the guard may be co-enabled matrix of a model.
 */
 extern matrix_t *GBgetGuardCoEnabledInfo(model_t model);
