@@ -508,8 +508,11 @@ static void fork_start(int* argc,char **argv[],int run_threads){
                 Debug("child %d terminated",i);
                 pid[i]=0;
                 children--;
-                if (WEXITSTATUS(status) || WIFSIGNALED(status)) {
+                if (WEXITSTATUS(status)) {
                     if (success) code = WEXITSTATUS(status);
+                    success=0;
+                } else if (WIFSIGNALED(status)) {
+                    if (success) code = 128+WTERMSIG(status);
                     success=0;
                 }
             }

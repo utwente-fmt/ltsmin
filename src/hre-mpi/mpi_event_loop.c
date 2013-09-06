@@ -75,14 +75,17 @@ static void event_loop(event_queue_t queue,int block){
         int completed;
         MPI_Status status[queue->pending];
         if (block) {
-            int res = MPI_Waitsome(queue->pending,queue->request,&completed,index,status);
+            int res = MPI_Waitany(queue->pending,queue->request,index,status);
+            completed=1;
             if (res != MPI_SUCCESS) Abort("MPI_Waitsome");
             queue->wait_some_calls++;
             if (completed>1) queue->wait_some_multi++;
             block=0;
         } else {
-            int res = MPI_Testsome(queue->pending,queue->request,&completed,index,status);
+            int flag;
+            int res = MPI_Testany(queue->pending,queue->request,index,&flag,status);
             if (res != MPI_SUCCESS) Abort("MPI_Testsome");
+            completed=flag?1:0;
             queue->test_some_calls++;
             if (completed==0) {
                 queue->test_some_none++;
@@ -128,9 +131,11 @@ void event_block(event_queue_t queue){
 void event_while(event_queue_t queue,int *condition){
     while(*condition){
         int index[queue->pending];
-        int completed;
+        int completed=1;
         MPI_Status status[queue->pending];
-        int res = MPI_Waitsome(queue->pending,queue->request,&completed,index,status);
+        int res = MPI_Waitany(queue->pending,queue->request,index,status);
+        // The Waitsome version led to deadlocks in case of multiple requests and nested call-backs.
+        // To use Waitsome the callback queue must be moved to the queue data structure.
         if (res != MPI_SUCCESS) Abort("MPI_Waitsome");
         queue->wait_some_calls++;
         if (completed>1) queue->wait_some_multi++;

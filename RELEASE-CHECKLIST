@@ -1,7 +1,7 @@
 Release Checklist
 =================
 
-* finalize 'next' branch (include all feuture branches and fixes from
+* finalize 'next' branch (include all feature branches and fixes from
   'maint' branch
 
 * If first release of the year, update the copyright data in COPYING
@@ -17,7 +17,7 @@ Release Checklist
   To test specific configurations:
     make distcheck DISTCHECK_CONFIGURE_FLAGS='...'
 
-* Create a copy of the website ina staging area (outside of tools/ltsmin/)
+* Create a copy of the website in a staging area (outside of tools/ltsmin/)
 
 * Generate and copy documentation to website (staging area);
   possibly add renamed files to .htaccess
