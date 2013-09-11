@@ -181,6 +181,10 @@ typedef struct por_context {
     ci_list        **ns;            // nes/nds combined
     ci_list        **group2ns;      // mapping group to each nes/nds in which it is used
     ci_list        **group_has;     // mapping group to each nes/nds for it
+    ci_list        **group_hasn;     // mapping group to each nes/nds for it
+    ci_list        **not_commutes;
+    ci_list        **nds;
+    ci_list        **ndsn;
 
     int              emit_limit;    // maximum number of transition groups that can be emitted
     int              emit_score;    // directly emit when search finishes with this score
@@ -198,6 +202,7 @@ typedef struct por_context {
     int             *dynamic_visibility; // idem
 
     void            *scc_ctx;
+    void            *del_ctx;
     int              seed;
     int             *random;
 } por_context;

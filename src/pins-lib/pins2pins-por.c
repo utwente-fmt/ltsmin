@@ -25,6 +25,7 @@ static int PREFER_NDS = 0;
 static int RANDOM = 0;
 static int DYN_RANDOM = 0;
 static int WEAK = 0; // TODO: implement combination with LTL
+static int DELETION = 0;
 
 struct poptOption por_options[]={
     { "por" , 'p' , POPT_ARG_VAL , &PINS_POR , PINS_POR_ON , "enable partial order reduction" , NULL },
@@ -41,6 +42,7 @@ struct poptOption por_options[]={
     { "no-V" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_V , 1 , "without V proviso, instead use Peled's visibility proviso, or V'     " , NULL },
     { "no-L12" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_L12 , 1 , "without L1/L2 proviso, instead use Peled's cycle proviso, or L2'   " , NULL },
     { "por-scc" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &USE_SCC , 1 , "use an incomplete SCC-based stubborn set algorithm" , NULL },
+    { "deletion" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &DELETION , 1 , "use the stubborn set deletion algorithm" , NULL },
     { "prefer-nds" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &PREFER_NDS , 1 , "prefer MC+NDS over NES" , NULL },
     { "por-random" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &RANDOM , 1 , "randomize necessary sets (static)" , NULL },
     { "por-dynamic" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &DYN_RANDOM , 1 , "randomize necessary sets (dynamic)" , NULL },
@@ -159,6 +161,83 @@ typedef struct scc_context_s {
 static const int SCC_SCC = -1;
 static const int SCC_NEW = 0;
 
+
+// number of necessary sets (halves if MC is absent, because no NDSs then)
+static inline int
+NS_SIZE (por_context* ctx)
+{
+    return NO_MC ? ctx->nguards : ctx->nguards * 2;
+}
+
+static inline int
+visible_cost (por_context* ctx)
+{
+    return NO_V ? ctx->enabled_list->count * ctx->ngroups :
+                  ctx->visible_enabled * ctx->ngroups + // enabled transitions
+                          ctx->visible_list->count +    // disabled transitions
+                          ctx->marked_list->count - ctx->visible_enabled;
+}
+
+static void
+por_init_transitions (model_t model, por_context* ctx, int* src)
+{
+    // fill guard status, request all guard values
+    GBgetStateLabelsAll (model, src, ctx->label_status);
+
+    // fill dynamic groups
+    mark_dynamic_labels (ctx);
+
+    ctx->visible_enabled = 0;
+    ctx->enabled_list->count = 0;
+    // fill group status and score
+    for (int i = 0; i < ctx->ngroups; i++) {
+        ctx->group_status[i] = GS_ENABLED; // reset
+        // mark groups as disabled
+        guard_t* gt = GBgetGuard (model, i);
+        for (int j = 0; j < gt->count; j++) {
+            if (ctx->label_status[gt->guard[j]] == 0) {
+                ctx->group_status[i] = GS_DISABLED;
+                break;
+            }
+        }
+        // set group score
+        if (ctx->group_status[i] == GS_ENABLED) {
+            ctx->enabled_list->data[ctx->enabled_list->count++] = i;
+            ctx->visible_enabled += is_visible (ctx, i);
+        } else {
+            // disabled
+            ctx->group_score[i] = 1;
+        }
+    }
+}
+
+void
+por_transition_costs (por_context* ctx)
+{
+    if (NO_HEUR) return;
+
+    // set score for enable transitions
+    for (int i = 0; i < ctx->enabled_list->count; i++) {
+        int group = ctx->enabled_list->data[i];
+        if (PINS_LTL && is_visible (ctx, group)) {
+            // V proviso only for LTL!
+            ctx->group_score[group] = visible_cost (ctx);
+        } else {
+            ctx->group_score[group] = ctx->ngroups;
+        }
+    }
+
+    // fill nes score
+    // heuristic score h(x): 1 for disabled transition, n for enabled transition, n^2 for visible transition
+    for (int i = 0; i < NS_SIZE(ctx); i++) {
+        ctx->nes_score[i] = 0;
+        for (int j = 0; j < ctx->ns[i]->count; j++) {
+            int group = ctx->ns[i]->data[j];
+            ctx->nes_score[i] += ctx->group_score[group];
+        }
+    }
+}
+
 static scc_context_t *
 create_scc_ctx (por_context* ctx)
 {
@@ -175,15 +254,6 @@ create_scc_ctx (por_context* ctx)
     return scc;
 }
 
-static inline int
-visible_cost (por_context* ctx)
-{
-    return NO_V ? ctx->enabled_list->count * ctx->ngroups :
-                  ctx->visible_enabled * ctx->ngroups + // enabled transitions
-                          ctx->visible_list->count +    // disabled transitions
-                          ctx->marked_list->count - ctx->visible_enabled;
-}
-
 /**
  * For each state, this function sets up the current guard values etc
  * This setup is then reused by the analysis function
@@ -191,63 +261,13 @@ visible_cost (por_context* ctx)
 static void
 scc_setup (model_t model, por_context* ctx, int* src)
 {
-    // number of necessary sets (halves if MC is absent, because no NDSs then)
-    int nns = NO_MC ? ctx->nguards : ctx->nguards * 2;
+    por_init_transitions (model, ctx, src);
 
-    // fill guard status, request all guard values,
-    GBgetStateLabelsAll (model, src, ctx->label_status);
-
-    // fill dynamic groups
-    mark_dynamic_labels (ctx);
-
-    ctx->visible_enabled = 0;
-    ctx->enabled_list->count = 0;
-    // fill group status and score
-    for (int i = 0; i < ctx->ngroups; i++) {
-        ctx->group_status[i] = GS_ENABLED; // reset
-        // mark groups as disabled
-        guard_t* gt = GBgetGuard(model, i);
-        for (int j=0; j < gt->count; j++) {
-            if (ctx->label_status[gt->guard[j]] == 0) {
-                ctx->group_status[i] = GS_DISABLED;
-                break;
-            }
-        }
-
-        // set group score
-        if (ctx->group_status[i] == GS_ENABLED) {
-            ctx->enabled_list->data[ctx->enabled_list->count++] = i;
-            ctx->visible_enabled += is_visible(ctx, i);
-        } else { // disabled
-            ctx->group_score[i] = 1;
-        }
-    }
-
-    // set score for enable transitions
-    for(int i=0; i<ctx->enabled_list->count; i++) {
-        int group = ctx->enabled_list->data[i];
-        if (PINS_LTL && is_visible(ctx, group)) { // V proviso only for LTL!
-            ctx->group_score[group] = visible_cost(ctx);
-        } else {
-            ctx->group_score[group] = ctx->ngroups;
-        }
-    }
-
-    // fill nes score
-    // heuristic score h(x): 1 for disabled transition, n for enabled transition, n^2 for visible transition
-    for (int i=0; i < ctx->nguards; i++) {
-        if (ctx->label_status[i] && NO_MC) continue;
-
-        int idx = ctx->label_status[i] ? i + ctx->nguards : i;
-        ctx->nes_score[idx] = 0;
-        for (int j=0; j < ctx->ns[idx]->count; j++) {
-            ctx->nes_score[idx] += ctx->group_score[ ctx->ns[idx]->data[j] ];
-        }
-    }
+    por_transition_costs (ctx);
 
     scc_context_t *scc = (scc_context_t *)ctx->scc_ctx;
     memset(scc->search->emit_status, 0, sizeof(emit_status_t[ctx->ngroups]));
-    memcpy(scc->search->nes_score, ctx->nes_score, nns * sizeof(int));
+    memcpy(scc->search->nes_score, ctx->nes_score, NS_SIZE(ctx) * sizeof(int));
     memset(scc->group_index, SCC_NEW, ctx->ngroups * sizeof(int));
 }
 
@@ -258,59 +278,9 @@ scc_setup (model_t model, por_context* ctx, int* src)
 static void
 beam_setup (model_t model, por_context* ctx, int* src)
 {
-    // number of necessary sets (halves if MC is absent, because no NDSs then)
-    int nns = NO_MC ? ctx->nguards : ctx->nguards * 2;
+    por_init_transitions (model, ctx, src);
 
-    // fill guard status, request all guard values,
-    GBgetStateLabelsAll (model, src, ctx->label_status);
-
-    // fill dynamic groups
-    mark_dynamic_labels (ctx);
-
-    ctx->visible_enabled = 0;
-    ctx->enabled_list->count = 0;
-    // fill group status and score
-    for (int i = 0; i < ctx->ngroups; i++) {
-        ctx->group_status[i] = GS_ENABLED; // reset
-        // mark groups as disabled
-        guard_t* gt = GBgetGuard(model, i);
-        for (int j=0; j < gt->count; j++) {
-            if (ctx->label_status[gt->guard[j]] == 0) {
-                ctx->group_status[i] = GS_DISABLED;
-                break;
-            }
-        }
-
-        // set group score
-        if (ctx->group_status[i] == GS_ENABLED) {
-            ctx->enabled_list->data[ctx->enabled_list->count++] = i;
-            ctx->visible_enabled += is_visible(ctx, i);
-        } else { // disabled
-            ctx->group_score[i] = 1;
-        }
-    }
-
-    if (!NO_HEUR) {
-        // set score for enable transitions
-        for(int i=0; i<ctx->enabled_list->count; i++) {
-            int group = ctx->enabled_list->data[i];
-            if (PINS_LTL && is_visible(ctx, group)) { // V proviso only for LTL!
-                ctx->group_score[group] = visible_cost(ctx);
-            } else {
-                ctx->group_score[group] = ctx->ngroups;
-            }
-        }
-
-        // fill nes score
-        // heuristic score h(x): 1 for disabled transition, n for enabled transition, n^2 for visible transition
-        for (int i=0; i < nns; i++) {
-            ctx->nes_score[i] = 0;
-            for (int j=0; j < ctx->ns[i]->count; j++) {
-                int group = ctx->ns[i]->data[j];
-                ctx->nes_score[i] += ctx->group_score[group];
-            }
-        }
-    }
+    por_transition_costs (ctx);
 
     // select an enabled transition group
     int beam_idx = 0;
@@ -326,7 +296,7 @@ beam_setup (model_t model, por_context* ctx, int* src)
         ctx->search[beam_idx].score = 0; // 0 = uninitialized
         memset(ctx->search[beam_idx].emit_status, 0, sizeof(emit_status_t[ctx->ngroups]));
         if (!NO_HEUR)
-            memcpy(ctx->search[beam_idx].nes_score, ctx->nes_score, nns * sizeof(int));
+            memcpy(ctx->search[beam_idx].nes_score, ctx->nes_score, NS_SIZE(ctx) * sizeof(int));
         // reset counts
         ctx->search[beam_idx].visibles_selected = 0;
         ctx->search[beam_idx].enabled_selected = 0;
@@ -883,8 +853,6 @@ scc_emit (por_context* ctx, int* src, TransitionCB cb, void* uctx)
         ltl_hook_context_t ltlctx = {cb, uctx, 0, 0, 0};
         ltlctx.force_proviso_true = !NO_L12 && check_L1_L2_proviso (ctx);
 
-        //TODO: implement safety and liveness provisos
-
         int c = 0;
         for (int z = 0; z < scc->stubborn_list[0]->count; z++) {
             int i = scc->stubborn_list[0]->data[z];
@@ -972,6 +940,377 @@ ensure_key (por_context* ctx)
 
         bs_analyze (ctx); // may select a different search context!
     }
+}
+
+/**
+ * Implementation of the deletion algorithm from an algorithm from Henri Hansen
+ * obtained via private communication.
+ * The elements of the set T of all enabled and disabled transitions (A U O) and
+ * disabled guards G are maintained as integers as follows:
+ * for t in T:
+ * t in {0, ... ngroups-1} <=> t is a transition of group t
+ * t in {ngroups, ... ngroups+nguards } <=> t is the guard (t - ngroups)
+ *
+ * The guards here are actually extended with the necessary disabling and
+ * not coenabled relations, so instead of disabled guards, we have necessary
+ * sets (ns) which are either enabling directly or indirectly because they
+ * are not coenabled and need to be disabled.
+ * ns in {1, ... nguards -1, nguards, ... nguards*2 - 1}
+ */
+typedef struct del_context_s {
+    char          *set;
+    ci_list       **lists;
+} del_context_t;
+
+/**
+ * Sets in deletion algorithm
+ * Some are maintained only as stack or as set with cardinality counter
+ * A "stack set" can both be iterated over and performed inclusion tests on,
+ * however it does not support element removal (as it messes up the stack).
+ */
+typedef enum {
+    DEL_T,  // set
+    DEL_K,  // count set (stack content may be corrupted)
+    DEL_C,  // stack
+    DEL_Z,  // stack set
+    DEL_R,  // set
+    DEL_KP, // stack
+    DEL_TP, // stack
+    DEL_COUNT
+} del_t;
+
+static del_context_t *
+create_del_ctx (por_context* ctx)
+{
+    del_context_t *del = RTmallocZero (sizeof(del_context_t));
+    del->set = RTmallocZero ((ctx->ngroups + NS_SIZE(ctx)));
+    del->lists = RTmallocZero (DEL_COUNT * sizeof(ci_list)); // see del_t
+    for (int i = 0; i < DEL_COUNT; i++)
+        del->lists[i] = RTmallocZero ((ctx->ngroups + NS_SIZE(ctx) + 1) * sizeof(int));
+    return del;
+}
+
+static inline bool
+del_G (por_context* ctx, int u)
+{
+    return u >= ctx->ngroups;
+}
+
+static inline bool
+del_O (por_context* ctx, int u)
+{
+    return u < ctx->ngroups && ctx->group_status[u] == GS_DISABLED;
+}
+
+static inline bool
+del_A (por_context* ctx, int u)
+{
+    return u < ctx->ngroups && ctx->group_status[u] == GS_ENABLED;
+}
+
+static inline bool
+del_has (del_context_t *del, del_t set, int u)
+{
+    return (del->set[ u ] & (1<<set)) != 0;
+}
+
+static bool
+del_nGT (por_context* ctx, int u)
+{
+    del_context_t *del = ctx->del_ctx;
+    return !(del_G(ctx,u) && del_has(del,DEL_T,u));
+}
+
+static inline int
+del_count (del_context_t *del, del_t set)
+{
+    return del->lists[set]->count;
+}
+
+typedef bool (*check_f)(por_context* ctx, int u);
+
+static inline bool
+del_apply_all_succ (por_context* ctx, int u, check_f check)
+{
+    if (del_G(ctx,u)) {
+        // for all g in G exists g ~~> b with b in O U A (including NDS)
+        int guard = u - ctx->ngroups;
+        for (int i = 0; i < ctx->ns[guard]->count; i++) {
+            int x = ctx->ns[guard]->data[i];
+            if (!check(ctx,x)) return false;
+        }
+    } else { // A U O:
+        if (del_A(ctx, u)) {
+            // for all a in A exists if (a,b) in C then a~~>b
+            for (int i = 0; i < ctx->not_commutes[u]->count; i++) {
+                int x = ctx->not_commutes[u]->data[i];
+                if (!check(ctx,x)) return false;
+            }
+        } else { // del_O:
+            // for all o = (g_1, .. ,g_k, e) in O exists g_i s.t. o ~~> g_i
+            // (including NCE)
+            for (int i = 0; i < ctx->group_has[u]->count; i++) {
+                int ns = ctx->group_has[u]->data[i];
+                if ( ((ns  < ctx->nguards && ctx->label_status[ns] == 0) ||
+                      (ns >= ctx->nguards && ctx->label_status[ns - ctx->nguards] != 0)) &&
+                        !check(ctx,ns+ctx->ngroups)) return false;
+            }
+        }
+        // for all a,b in A U O exists a ~~> b iff (a,b) in NDS
+        for (int i = 0; i < ctx->nds[u]->count; i++) {
+            int x = ctx->nds[u]->data[i];
+            if (!check(ctx,x)) return false;
+        }
+    }
+    return true;
+}
+
+static inline bool
+del_apply_all_pred (por_context* ctx, int u, check_f check)
+{
+    if (del_G(ctx,u)) {
+        // for all o = (g_1, .. ,g_k, e) in O exists g_i ~i~> o (including NCE)
+        int ns = u - ctx->ngroups;
+        for (int i = 0; i < ctx->group_hasn[ns]->count; i++) {
+            int x = ctx->group_hasn[ns]->data[i];
+            if (del_O(ctx,x) && !check(ctx,x)) return false;
+        }
+    } else { // A U O:
+        // for all a in A exists if (a,b) in C then b~i~>a
+        for (int i = 0; i < ctx->not_commutes[u]->count; i++) { // symmetric relation
+            int x = ctx->not_commutes[u]->data[i];
+            if (del_A(ctx,x) && !check(ctx,x)) return false;
+        }
+
+        // for all g in G exists b ~i~> g with b in O U A (including NDS)
+        for (int i = 0; i < ctx->group2ns[u]->count; i++) {
+            int ns = ctx->group2ns[u]->data[i];
+            if ( ((ns  < ctx->nguards && ctx->label_status[ns] == 0) ||
+                  (ns >= ctx->nguards && ctx->label_status[ns - ctx->nguards] != 0)) &&
+                    !check(ctx,ns+ctx->ngroups)) return false;
+        }
+
+        // for all a,b in A U O exists a ~i~> b iff (a,b) in NDS
+        for (int i = 0; i < ctx->ndsn[u]->count; i++) {
+            int x = ctx->ndsn[u]->data[i];
+            if (!check(ctx,x)) return false;
+        }
+    }
+    return true;
+}
+
+// Messes up stack, only stack counter is maintained. Not to be combined with pop!
+static inline bool
+del_rem (del_context_t *del, del_t set, int u)
+{
+    int seen = del_has (del, set, u);
+    del->set[ u ] &= ~(1 << set);
+    del->lists[set]->count -= seen;
+    return seen;
+}
+
+static inline bool
+del_add (del_context_t *del, del_t set, int u)
+{
+    int seen = del_has (del, set, u);
+    del->set[ u ] |= 1<<set;
+    del->lists[set]->count += !seen;
+    return !seen;
+}
+
+static inline void
+del_clear (del_context_t *del, del_t set)
+{
+    del->lists[set]->count = 0;
+}
+
+static inline void
+del_push (del_context_t *del, del_t set, int u)
+{
+    del->lists[set]->data[ del->lists[set]->count++ ] = u;
+}
+
+static inline bool
+del_push_new (del_context_t *del, del_t set, int u)
+{
+    int seen = del_has (del, set, u);
+    del->set[ u ] |= 1<<set;
+    if (!seen)
+        del_push (del, set, u);
+    return !seen;
+}
+
+static inline int
+del_pop (del_context_t *del, del_t set)
+{
+    HREassert (del_count(del, set) != 0, "Pop on empty set stack %d", set);
+    int v = del->lists[set]->data[ --del->lists[set]->count ];
+    del->set[ v ] &= ~(1 << set);
+    return v;
+}
+
+// assumes Z \ T = {} (Z is not reevaluated as in deletion algorithm)
+static bool
+del_add_inT_toZ (por_context *ctx, int u)
+{
+    del_context_t *del = ctx->del_ctx;
+    if (del_has(del, DEL_T, u))
+        del_push_new (del, DEL_Z, u);
+    return true;
+}
+
+static bool
+del_rem_fromK (por_context *ctx, int u)
+{
+    del_context_t *del = ctx->del_ctx;
+    if (del_rem(del, DEL_K, u)) del_push (del, DEL_KP, u);
+    return true;
+}
+
+
+static void
+deletion_setup (model_t model, por_context* ctx, int* src)
+{
+    por_init_transitions (model, ctx, src);
+    if (ctx->enabled_list->count == 0) return;
+
+    del_context_t *del = ctx->del_ctx;
+
+    // K = {}; C := {}; Z := {}; KP := {}; TP := {}; R := {}
+    // T := A U G U O;
+    for (int i = 0; i < ctx->ngroups + NS_SIZE(ctx); i++) {
+        del->set[i] = 0;
+        del_add (del, DEL_T, i);
+    }
+    for (int i = 0; i < DEL_COUNT; i++) {
+        del_clear (del, i);
+    }
+
+    // C := A \ R; K := A
+    for (int i = 0; i < ctx->enabled_list->count; i++) {
+        int group = ctx->enabled_list->data[i];
+        del_push_new (del, DEL_K, group);
+        if (!del_has(del, DEL_R, group)) {
+            del_push (del, DEL_C, group);
+        }
+    }
+}
+
+static inline void
+deletion_analyze (por_context* ctx)
+{
+    if (ctx->enabled_list->count == 0) return;
+    del_context_t *del = ctx->del_ctx;
+
+    Warning (debug, "Deletion init: |C| = %d \t|K| = %d", del_count(del, DEL_C), del_count(del, DEL_K));
+
+    // while C != {} /\ K != empty
+    while (del_count(del, DEL_C) != 0 && del_count(del, DEL_K) != 0) {
+        // C := C \ {v} for some v in C
+        int v = del_pop (del, DEL_C);
+
+        // Z := {v}
+        del_push_new (del, DEL_Z, v);
+        Warning (debug, "\nDeletion from v = %d", v);
+
+        // search the deletion space:
+        // while Z != {} /\ K != {}
+        bool RfromT = false;
+        Printf (debug, "Removing from T: ");
+        while (del_count(del, DEL_Z) != 0 && del_count(del, DEL_K) != 0) {
+            // Z := Z \ {u} for some u in Z
+            int u = del_pop (del, DEL_Z);
+
+            // if u in A U G \/ u* n G n T = {}
+            if (del_A(ctx,u) || del_G(ctx,u) ||
+                    del_apply_all_succ(ctx,u,del_nGT)) {
+
+                if (del_has(del,DEL_R,u)) {
+                    RfromT = true;
+                    break;
+                }
+
+                // K := K \ {u}; T := T \ {u};
+                if (del_rem(del, DEL_K, u)) del_push (del, DEL_KP, u);
+                if (del_rem(del, DEL_T, u)) {
+                    del_push (del, DEL_TP, u);
+                    Printf (debug, "%d, ", u);
+                }
+
+                // Z := (Z U *u) n T
+                del_apply_all_pred (ctx, u, del_add_inT_toZ);       (void) DEL_T; (void) DEL_Z;
+
+                // if u not in G; K := K \ u*
+                if (!del_G(ctx,u)) {
+                    del_apply_all_succ (ctx, u, del_rem_fromK);     (void) DEL_K;
+                }
+            }
+        }
+        Printf (debug, "\n");
+
+        while (del_count(del, DEL_Z) != 0) del_pop (del, DEL_Z);
+
+        // Reverting deletions if necessary
+        // if K == {} \/ R \ T != {}
+        if (del_count(del, DEL_K) == 0 || RfromT) {
+            Warning (debug, "Deletion rollback: |T'| = %d \t|K'| = %d", del_count(del, DEL_TP), del_count(del, DEL_KP));
+            while (del_count(del, DEL_KP) != 0) {
+                int x = del_pop (del, DEL_KP);
+                bool seen = del_push_new (del, DEL_K, x);
+                HREassert (seen, "DEL_K messed up");
+            }
+            while (del_count(del, DEL_TP) != 0) {
+                int x = del_pop (del, DEL_TP);
+                del->set[x] = del->set[x] | (1<<DEL_T);
+            }
+        } else {
+            del_clear (del, DEL_KP);
+            del_clear (del, DEL_TP);
+        }
+    }
+}
+
+static inline int
+deletion_emit_new (por_context* ctx, ltl_hook_context_t* ltlctx, int* src)
+{
+    del_context_t *del = ctx->del_ctx;
+    int c = 0;
+    for (int z = 0; z < ctx->enabled_list->count; z++) {
+        int i = ctx->enabled_list->data[z];
+        if (del_has(del,DEL_T,i) && !del_has(del,DEL_R,i)) {
+            del->set[i] |= 1<<DEL_R;
+            c += GBgetTransitionsLong (ctx->parent, i, src, ltl_hook_cb, ltlctx);
+        }
+    }
+    return c;
+}
+
+static inline int
+deletion_emit (por_context* ctx, int* src, TransitionCB cb, void* uctx)
+{
+    ltl_hook_context_t ltlctx = {cb, uctx, 0, 0, 0};
+    ltlctx.force_proviso_true = !NO_L12 && check_L1_L2_proviso (ctx);
+
+    int emitted = deletion_emit_new (ctx, &ltlctx, src);
+
+    //TODO: LTL and safety
+
+    return emitted;
+}
+
+
+/**
+ * Same but for Safety / Liveness
+ */
+static int
+por_deletion_all (model_t self, int *src, TransitionCB cb, void *user_context)
+{
+    por_context* ctx = ((por_context*)GBgetContext(self));
+    deletion_setup (self, ctx, src);
+    deletion_analyze (ctx);
+    int emitted = deletion_emit (ctx, src, cb, user_context);
+    unmark_dynamic_labels (ctx);
+    return emitted;
 }
 
 /**
@@ -1121,6 +1460,7 @@ bs_init_beam_context (model_t model)
     }
     // build table group has
     ctx->group_has = (ci_list**) dm_rows_to_idx_table(&group_has);
+    ctx->group_hasn = (ci_list**) dm_cols_to_idx_table(&group_has);
     dm_free(&group_has);
 
     if (PREFER_NDS) {
@@ -1331,7 +1671,7 @@ GBaddPOR (model_t model)
     WEAK = PINS_LTL ? 0 : WEAK;
 
     // extract COMMUTES MATRIX FOR WEAK LTL
-    matrix_t *commutes = GBgetCommutesInfo(model);
+    matrix_t *commutes = GBgetCommutesInfo (model);
     WEAK &= commutes != NULL;
 
     // Combine Do Not Accord with dependency and other information
@@ -1395,6 +1735,50 @@ GBaddPOR (model_t model)
     GBsetNextStateShort (pormodel, por_short);
     if (USE_SCC) {
         GBsetNextStateAll   (pormodel, por_scc_search_all);
+    } else if (DELETION) {
+        GBsetNextStateAll   (pormodel, por_deletion_all);
+
+        HREassert (commutes != NULL, "No commutes matrix");
+        matrix_t not_commutes;
+        dm_create(&not_commutes, groups, groups);
+        for (int i = 0; i < groups; i++) {
+            for (int j = 0; j < groups; j++) {
+                if (i == j) {
+                    dm_set(&not_commutes, i, j);
+                } else {
+                    if ( dm_is_set(commutes, i , j) ) {
+                        continue; // actions commute with each other
+                    }
+
+                    // is dependent?
+                    for (int k = 0; k < len; k++)
+                    {
+                        if ((dm_is_set( p_dm_w, i, k) && dm_is_set( p_dm, j, k)) ||
+                            (dm_is_set( p_dm, i, k) && dm_is_set( p_dm_w, j, k)) ) {
+                            dm_set( &not_commutes, i, j );
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        ctx->not_commutes     = (ci_list **) dm_rows_to_idx_table(&not_commutes);
+
+        matrix_t nds;
+        dm_create(&nds, groups, groups);
+        for (int i = 0; i < groups; i++) {
+            for (int j = 0; j < groups; j++) {
+                for (int g = 0; g < ctx->group2guard[j]->count; g++) {
+                    int guard = ctx->group2guard[j]->data[g];
+                    if (dm_is_set (&ctx->gnds_matrix, guard, i)) {
+                        dm_set( &nds, i, j );
+                        continue;
+                    }
+                }
+            }
+        }
+        ctx->nds     = (ci_list **) dm_rows_to_idx_table(&nds);
+        ctx->ndsn     = (ci_list **) dm_cols_to_idx_table(&nds);
     } else {
         GBsetNextStateAll   (pormodel, por_beam_search_all);
     }
@@ -1435,6 +1819,8 @@ GBaddPOR (model_t model)
 
     // SCC search
     ctx->scc_ctx = create_scc_ctx (ctx);
+
+    ctx->del_ctx = create_del_ctx (ctx);
 
     return pormodel;
 }
