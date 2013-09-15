@@ -356,19 +356,19 @@ static struct poptOption options[] = {
     {NULL, 0, POPT_ARG_CALLBACK | POPT_CBFLAG_POST | POPT_CBFLAG_SKIPOPTION,
      (void *)state_db_popt, 0, NULL, NULL},
     {"state", 0, POPT_ARG_STRING | POPT_ARGFLAG_SHOW_DEFAULT, &state_repr, 0,
-      "select the data structure for storing states. Beware for Cleary tree: size <= 28 + 2 * ratio.", "<tree|table|cleary-tree>"},
+     "select the data structure for storing states. Beware for Cleary tree: size <= 28 + 2 * ratio.", "<tree|table|cleary-tree>"},
     {"size", 's', POPT_ARG_STRING | POPT_ARGFLAG_SHOW_DEFAULT, &table_size, 0,
      "log2 size of the state store or maximum % of memory to use", NULL},
-     { "write-state", 0, POPT_ARG_VAL, &write_state, 1, "write the full state vector", NULL },
-     { "filter" , 0 , POPT_ARG_STRING , &label_filter , 0 ,
-       "Select the labels to be written to file from the state vector elements, "
-       "state labels and edge labels." , "<patternlist>" },
+    {"write-state", 0, POPT_ARG_VAL, &write_state, 1, "write the full state vector", NULL },
+    {"filter" , 0 , POPT_ARG_STRING , &label_filter , 0 ,
+     "Select the labels to be written to file from the state vector elements, "
+     "state labels and edge labels." , "<patternlist>" },
 #ifdef OPAAL
-    {"lattice-blocks", 'l', POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &LATTICE_BLOCK_SIZE, 0,
-      "Size of blocks preallocated for lattices (> 1). "
-         "Small blocks save memory when most states few lattices (< 4). "
-         "Larger blocks save memory in case a few states have many lattices. "
-         "For the best performance set this to: cache line size (usually 64) divided by lattice size of 8 byte.", NULL},
+    {"lattice-blocks", 'l', POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT | POPT_ARGFLAG_DOC_HIDDEN, &LATTICE_BLOCK_SIZE, 0,
+     "Size of blocks preallocated for lattices (> 1). "
+     "Small blocks save memory when most states few lattices (< 4). "
+     "Larger blocks save memory in case a few states have many lattices. "
+     "For the best performance set this to: cache line size (usually 64) divided by lattice size of 8 byte.", NULL},
     {"update", 'u', POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &UPDATE,
       0,"cover update strategy: 0 = simple, 1 = update waiting, 2 = update passed (may break traces)", NULL},
     {"non-blocking", 'n', POPT_ARG_VAL, &NONBLOCKING, 1, "Non-blocking TA reachability", NULL},
@@ -377,27 +377,30 @@ static struct poptOption options[] = {
 #else
     {"strategy", 0, POPT_ARG_STRING | POPT_ARGFLAG_SHOW_DEFAULT,
      &arg_strategy, 0, "select the search strategy", "<bfs|sbfs|dfs|cndfs|lndfs|endfs|endfs,lndfs|endfs,endfs,ndfs|ndfs>"},
-    {"no-red-perm", 0, POPT_ARG_VAL, &no_red_perm, 1, "turn off transition permutation for the red search", NULL},
+    {"no-red-perm", 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN, &no_red_perm, 1, "turn off transition permutation for the red search", NULL},
     {"grey", 0, POPT_ARG_VAL, &call_mode, UseGreyBox, "make use of GetTransitionsLong calls", NULL},
     {"max", 0, POPT_ARG_LONGLONG | POPT_ARGFLAG_SHOW_DEFAULT, &max_level, 0, "maximum search depth", "<int>"},
-    {"owcty-reset", 0, POPT_ARG_VAL, &owcty_do_reset, 1, "turn on reset in OWCTY algorithm", NULL},
-    {"all-ecd", 0, POPT_ARG_VAL, &owcty_ecd_all, 1, "turn on ECD during all iterations (normally only during initialization)", NULL},
-    { "proviso", 0, POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT, &arg_proviso , 0 ,
-      "select proviso for ltl/por (only single core!)", "<closedset|stack>"},
+    {"owcty-reset", 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN, &owcty_do_reset, 1, "turn on reset in OWCTY algorithm", NULL},
+    {"all-ecd", 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN, &owcty_ecd_all, 1, "turn on ECD during all iterations (normally only during initialization)", NULL},
+    {"proviso", 0, POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT, &arg_proviso , 0 ,
+     "select proviso for ltl/por (only single core!)", "<closedset|stack>"},
 #endif
-    {"nar", 0, POPT_ARG_VAL, &all_red, 0, "turn off red coloring in the blue search (NNDFS/MCNDFS)", NULL},
-    {"strict", 0, POPT_ARG_VAL, &strict_dfsfifo, 1, "turn onn struct BFS in DFS_FIFO", NULL},
-    {"no-ecd", 0, POPT_ARG_VAL, &ecd, 0, "turn off early cycle detection (NNDFS/MCNDFS)", NULL},
+    {"nar", 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN, &all_red, 0, "turn off red coloring in the blue search (NNDFS/MCNDFS)", NULL},
+    {"strict", 0, POPT_ARG_VAL, &strict_dfsfifo, 1, "turn on struct BFS in DFS_FIFO", NULL},
+    {"no-ecd", 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN, &ecd, 0, "turn off early cycle detection (NNDFS/MCNDFS)", NULL},
     {"perm", 'p', POPT_ARG_STRING | POPT_ARGFLAG_SHOW_DEFAULT,
-     &arg_perm, 0, "select the transition permutation method",
+     &arg_perm, 0, "Select the transition permutation method."
+     "Dynamic implements the fresh successor heuristic, rr implements the best"
+     "(static = cheaper) randomization technique, and shift implements the"
+     "cheapest technique.",
      "<dynamic|random|rr|sort|sr|shift|shiftall|otf|none>"},
-    {"gran", 'g', POPT_ARG_LONGLONG | POPT_ARGFLAG_SHOW_DEFAULT, &G, 0,
+    {"gran", 'g', POPT_ARG_LONGLONG | POPT_ARGFLAG_SHOW_DEFAULT | POPT_ARGFLAG_DOC_HIDDEN, &G, 0,
      "subproblem granularity ( T( work(P,g) )=min( T(P), g ) )", NULL},
-    {"handoff", 0, POPT_ARG_LONGLONG | POPT_ARGFLAG_SHOW_DEFAULT, &H, 0,
+    {"handoff", 0, POPT_ARG_LONGLONG | POPT_ARGFLAG_SHOW_DEFAULT | POPT_ARGFLAG_DOC_HIDDEN, &H, 0,
      "maximum balancing handoff (handoff=min(max, stack_size/2))", NULL},
     {"zobrist", 'z', POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &ZOBRIST, 0,
      "log2 size of zobrist random table (6 or 8 is good enough; 0 is no zobrist)", NULL},
-    {"noref", 0, POPT_ARG_VAL, &refs, 0, "store full states on the stack/queue instead of references (faster)", NULL},
+    {"noref", 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN, &refs, 0, "store full states on the stack/queue instead of references (faster)", NULL},
     {"ratio", 0, POPT_ARG_LONGLONG | POPT_ARGFLAG_SHOW_DEFAULT, &ratio, 0, "log2 tree root to leaf ratio", "<int>"},
     {"deadlock", 'd', POPT_ARG_VAL, &dlk_detect, 1, "detect deadlocks", NULL },
     {"action", 'a', POPT_ARG_STRING, &act_detect, 0, "detect error action", NULL },
