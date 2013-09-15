@@ -14,5 +14,3 @@
         is to exclude the label. Hence, all labels starting with
         an "x" are specified as "x*". The complement all labels,
         except those starting with an "x" are specified as "!x*;*".
-
-include::reachability-options.txt[]

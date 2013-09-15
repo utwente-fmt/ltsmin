@@ -1,11 +1,11 @@
-== BUCHI AUTOMATA BASED MODEL CHECKING
+== LTL MODEL CHECKING
 
-Buchi automata-based model checking requires states to be marked with
-an accepting state label, and a search strategy which takes these
-labels into account.
+LTL model checking requires a Buchi cross product with accepting states marked
+with accepting state labels, and a search strategy which takes these
+labels into account (see ndfs / scc strategies of the sequential and multi-core
+tools).
 
-For generating accepting state label information, the following
-options are supported:
+For generating a cross product, the following options are supported:
 
 . The input specification is already combined with a Buchi automaton,
   and states are appropriately marked with accepting labels.  Currently two
@@ -13,12 +13,12 @@ options are supported:
   tools), and DiVinE (see documentation on +dve+ tools).
 
 . LTSmin tools can build the cross product of input specification and
-  Buchi automaton (through a PINS layer) themselves, and will annotate
-  cross-product states appropriately when they are accepting. See also
-  +--labels+ option in the PINS tools.
+  Buchi automaton (through a PINS2PINS layer enabled with the --ltl option)
+  themselves, and will annotate cross-product states appropriately when they
+  are accepting. See also +--labels+ option in the PINS tools.
 
-NOTE: these options cannot be combined; only one can be active at a
-time.
+NOTE: Combination with the Partial Order Reduction PINS2PINS layer (--por)
+requires the latter option.
 
 NOTE: As of LTSmin release 1.9, our default LTL semantics mimics those of
 SPIN/DiVinE. Before that, LTSmin implemented textbook semantics. See

@@ -56,9 +56,6 @@ cndfs;;
   Multi-Core Nested Depth-First Search (Evangelista, Laarman, Petrucci, van de Pol).
 
 
-*--nar*::
-        No All Red. Turn off all-red optimization in NNDFS/MCNDFS.
-
 *--perm*='TYPE'::
         Select the transition permutation, which is used to guide
         different threads to different parts of the state space.
@@ -99,10 +96,6 @@ none;;
     use the same exploration order for all workers. Default for reachability.
 
 
-*--no-red-perm*::
-    Turns the permutation layer of for the nested DFSs of the swarmed algorithms.
-
-
 *--state*='TYPE'::
         Select type of data structure for storing visited states.
         'TYPE' can be one of the following options:
@@ -141,25 +134,6 @@ cleary-tree;;
         This is also used for the internal node table of the tree.
 
 
-*--handoff*='NUMBER'::
-        Maximum number of states to hand off to a thread requesting load
-        (default: NUMBER=100). The operation may be expensive, depending
-        on the size of the states.
-
-
-*--gran*='NUMBER'::
-        Granularity at which control is handed back to the load balancer
-        (default: NUMBER=100). Higher values may reduce runtime
-        overhead, but decrease the performance of the load balancer.
-        The state space explorer uses the number of transitions as work
-        counter.
-
-
-*--noref*::
-        Store full state vectors on queue/stack. This is usually a bit faster,
-        but requires more memory. Incompatible with the swarmed algorithms.
-
-
 *--zobrist*='NUMBER'::
         Save time by using zobrist incremental state hashing.
         NUMBER defines the (log_2) size of the random number table
@@ -175,4 +149,21 @@ cleary-tree;;
         Maximum search depth.
 
 
-include::reachability-options.txt[]
+*--proviso*='closedset|stack'::
+    Change the proviso implementation for partial order reduction (ltl)
++
+Change the proviso used to detect that an accepting cycle is closed.
+Three options are available, the default is 'closedset'.
+
+closedset;;
+    The closed set proviso is the default proviso which requires
+    almost no extra work/memory. It might however result in less
+    reduction than the 'stack' or 'color' proviso. It works with both
+    the dfs- and bfs exploration strategy.
+
+stack;;
+    The stack proviso is the proviso used for example by the spin
+    model checker. It requires some extra work/memory but may
+    result in a better reduction than 'closedset'. It works only
+    for a dfs/scc search strategy (since bfs has no stack).
+

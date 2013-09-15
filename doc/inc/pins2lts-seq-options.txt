@@ -13,9 +13,42 @@ scc;;
   algorithm (accepting cycle detection).  This requires an accepting
   state label to be present.  See below.
 
-include::state-storage-options.txt[]
+*--state*='TYPE'::
+        Select type of data structure for storing visited states.
+        'TYPE' can be one of the following options:
 
-include::reachability-options.txt[]
+tree;;
+  use a tree-compressed hash table (default).
+
+table;;
+  use a hash table.
+ 
+vset;;
+  use a vector set (decision diagram).
 
 *--max*='DEPTH'::
         Maximum search depth, search until 'DEPTH'.
+
+
+*--proviso*='closedset|stack|color'::
+    Change the proviso implementation for partial order reduction (ltl)
++
+Change the proviso used to detect that an accepting cycle is closed.
+Three options are available, the default is 'closedset'.
+
+closedset;;
+    The closed set proviso is the default proviso which requires
+    almost no extra work/memory. It might however result in less
+    reduction than the 'stack' or 'color' proviso. It works with both
+    the dfs- and bfs exploration strategy.
+
+stack;;
+    The stack proviso is the proviso used for example by the spin
+    model checker. It requires some extra work/memory but may
+    result in a better reduction than 'closedset'. It works only
+    for a dfs/scc search strategy (since bfs has no stack).
+
+color;;
+    The color proviso requires a lot of extra work and memory
+    but can significantly improve the reduction. It too works
+    only with the dfs/scc search strategies.

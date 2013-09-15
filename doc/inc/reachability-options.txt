@@ -1,4 +1,4 @@
-*-n*::
+*-n*, *--no-exit*::
       Do not exit when an error is found. Just count errors. Error counts are
       printed with +-v+.
 
