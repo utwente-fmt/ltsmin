@@ -1,49 +1,169 @@
-_ltsmin_opts=""
 
-declare EXTENSIONS_dve="dve|dve2C"
-declare EXTENSIONS_etf="etf"
-declare EXTENSIONS_lps="lps"
-declare EXTENSIONS_lpo="tbf"
-declare EXTENSIONS_prom="prom|pr|promela|spin|spins|"
-declare EXTENSIONS_mapa="prcrl|mapa"
-declare EXTENSIONS_opaal="so|xml"
-
-declare FILE_FORMATS="dir|dz|gcf|bcg|gcd|vac|aut|fsm|tra|lab|pg"
+#### Editing the options and their defaults below for the different language
+#### module/backend combinations should be fairly easy when referring to the
+#### structure of the man pages in ltsmin/doc
 
 declare MODULES="dve etf lps lpo mapa opaal prom"
+declare BACKENDS="dist mc seq sym"
 
-declare BASIC_OPTS="--deadlock -d --action -a --invariant -i --no-exit -n  --trace"
+declare INPUT_FORMATS_dve="dve|dve2C"
+declare INPUT_FORMATS_etf="etf"
+declare INPUT_FORMATS_lps="lps"
+declare INPUT_FORMATS_lpo="tbf"
+declare INPUT_FORMATS_prom="prom|pr|promela|spin|spins|"
+declare INPUT_FORMATS_mapa="prcrl|mapa"
+declare INPUT_FORMATS_opaal="so|xml"
 
-declare DIST_OPTS="$BASIC_OPTS --filter --nice"
-declare MC_OPTS="$BASIC_OPTS --filter --size -s --state --strategy --max \
-                 --proviso --strict --perm --zobrist -z --ratio"
-declare SEQ_OPTS="$BASIC_OPTS --state --strategy --proviso --max"
-declare SYM_OPTS="$BASIC_OPTS --order --saturation --sat-granularity \
-                  --save-sat-levels --guidance --mu --ctl-star --pg-solve \
-                  --pg-write"
+### Each backend has a different set of options (list with references)
+declare BACKEND_dist="REACH DIST PINS IO DEVEL RUNTIME"
+declare BACKEND_mc="REACH MC PINS IO DEVEL RUNTIME"
+declare BACKEND_seq="REACH SEQ PINS IO DEVEL RUNTIME VSET BUDDY LDD SYLVAN"
+declare BACKEND_sym="REACH SYM PINS RUNTIME VSET BUDDY LDD SYLVAN"
 
-declare MC_HIDDEN="--all-ecd --nar --no-red-perm --no-ref --no-ecd --gran \
-                   --handoff --owcty-reset" #unused
+### Each backend has a different output format (dictionary)
+declare OUTPUT_FORMATS="dir|dz|gcf|bcg|gcd|vac|aut|fsm|tra|lab|pg"
+declare OUTPUT_FORMATS_dist="$OUTPUT_FORMATS"
+declare OUTPUT_FORMATS_mc="$OUTPUT_FORMATS"
+declare OUTPUT_FORMATS_seq="$OUTPUT_FORMATS"
+declare OUTPUT_FORMATS_sym="etf"
 
-declare PG_OPTS="--chaining-attractor --saturating-attractor --pg-swap"
-declare LTL_OPTS="--ltl-semantics --ltl"
-declare IO_OPTS="--block-size --cluster-size"
-declare DEV_OPTS="--grey"
-declare GREY_OPTS="--matrix -m --labels --cache -c --regroup -r --por -p"
-declare RUNTIME_OPTS="-v -q --debug --version --help -h --usage --states --when --where"
+### Options are groups in sets (list)
+declare SET_DIST="filter nice"
+declare SET_MC="threads filter size state strategy max proviso strict perm zobrist ratio"
+declare SET_SEQ="state strategy proviso max"
+declare SET_SYM="order saturation sat-granularity save-sat-levels guidance mu \
+                 ctl-star pg-solve pg-write"
+declare SET_MC_HIDDEN="all-ecd nar no-red-perm no-ref no-ecd gran handoff owcty-reset"
+declare SET_POR_HIDDEN="check-por no-dna no-nes no-mc no-dynamic-labels -no-V \
+                        no-L12 por-scc deletion prefer-nds por-random
+                        por-dynamic weak"
 
-declare BUDDY_OPTS="--cache-ratio --max-increase --min-free-nodes --fdd-bits --fdd-reorder"
-declare SYLVAN_OPTS="--sylvan-threads --sylvan-dqsize --sylvan-bits --sylvan-tablesize --sylvan-cachesize --sylvan-granularity"
-declare LDD_OPTS="--ldd-step"
+### The sets of options (list)
+declare SET_IO="block-size cluster-size"
+declare SET_REACH="deadlock action invariant no-exit trace"
+declare SET_PG="chaining-attractor saturating-attractor pg-swap"
+declare SET_DEV="grey write-state"
+declare SET_PINS="matrix labels cache regroup por ltl ltl-semantics mucalc"
+declare SET_RUNTIME="verbose quite debug version help usage states when where"
 
-getExt ()
-{
-    local MODULE="$1"
-    MODULE="${MODULE%-*}"
-    MODULE="${MODULE/2lts/}"
-    local EXT="EXTENSIONS_$MODULE"
-    echo "${!EXT}"
+declare SET_VSET="vset"
+declare SET_BUDDY="cache-ratio max-increase min-free-nodes fdd-bits fdd-reorder"
+declare SET_SYLVAN="sylvan-threads sylvan-dqsize sylvan-bits sylvan-tablesize sylvan-cachesize sylvan-granularity"
+declare SET_LDD="ldd-step"
+
+### Dictionary for short option names (keys cannot have hyphens)
+declare SHORT_por="p"
+declare SHORT_size="s"
+declare SHORT_zobrist="z"
+declare SHORT_deadlock="d"
+declare SHORT_action="a"
+declare SHORT_invariant="i"
+declare SHORT_no_exit="n"
+declare SHORT_help="h"
+declare SHORT_verbose="v"
+declare SHORT_quite="q"
+declare SHORT_por="p"
+declare SHORT_regroup="r"
+declare SHORT_cache="c"
+declare SHORT_matrix="m"
+
+### Dictionary for default option values of option choices (keys cannot have hyphens)
+# MC (options may overlap with other backends):
+declare DEFAULTS_mc_strategy="bfs sbfs dfs ndfs cndfs lndfs endfs endfs,lndfs endfs,endfs,ndfs"
+declare DEFAULTS_perm="dynamic random rr sort sr shift shiftall otf none"
+declare DEFAULTS_zobrist="6"
+declare DEFAULTS_ratio="2"
+declare DEFAULTS_size="20%"
+# SEQ:
+declare DEFAULTS_seq_strategy="bfs sbfs scc"
+# SYM:
+declare DEFAULTS_order="bfs-prev bfs chain-prev chain"
+declare DEFAULTS_saturation="none sat-like sat-loop sat-fix sat"
+declare DEFAULTS_guidance="unguided directed"
+# REACH (option differ per module):
+declare DEFAULTS_mc_proviso="stack closed-set"
+declare DEFAULTS_mc_state="table tree cleary-tree"
+declare DEFAULTS_seq_proviso="stack closed-set color"
+declare DEFAULTS_seq_state="table tree vset"
+# PINS:
+declare DEFAULTS_ltl_semantics="spin textbook ltsmin"
+declare DEFAULTS_regroup='gs ga gsa gc gr cs cn cw ca csa rs rn ru'
+# IO:
+declare DEFAULTS_block_size="32768"
+declare DEFAULTS_cluster_size="32"
+# VSET:
+declare DEFAULTS_vset="ldd ldd64 list tree fdd ddd sylvan"
+# BUDDY:
+declare DEFAULTS_cache_ratio="64"
+declare DEFAULTS_max_increase="1000000"
+declare DEFAULTS_min_free_nodes="20"
+declare DEFAULTS_fdd_bits="16"
+declare DEFAULTS_fdd_reorder='none win2 win2ite win3 win3ite sift siftite random'
+# LDD:
+declare DEFAULTS_ldd_step="30"
+# SYLVAN:
+declare DEFAULTS_sylvan_threads="1"
+declare DEFAULTS_sylvan_dq_size="100000"
+declare DEFAULTS_sylvan_bits="16"
+declare DEFAULTS_sylvan_tablesize="23"
+declare DEFAULTS_sylvan_cachesize="23"
+declare DEFAULTS_sylvan_granularity="1"
+
+### Dictionary for file formats related to options
+# SYM:
+declare FILE_FORMATS_mu="mu"
+declare FILE_FORMATS_ctl_star="ctl"
+#declare FILE_FORMATS_pg_write="spg" # file does not exist yet!
+# REACH:
+#declare FILE_FORMATS_trace="$OUTPUT_FORMATS" # file does not exist yet!
+# PINS:
+declare FILE_FORMATS_ltl="ltl"
+declare FILE_FORMATS_mucalc="mcf"
+# RUNTIME:
+declare FILE_FORMATS_debug="c|h|cpp"
+
+##############################################################################
+
+_ltsmin_opts=""
+
+_trimHyphens() {
+    local var=$@
+    var="${var#"${var%%[!-]*}"}"   # remove leading hyphens
+    echo -n "$var"
 }
+
+_getTable ()
+{
+    local name="$1_${2/-/_}"
+    local result="${!name}"
+    echo -n "${result/_/-}"
+}
+
+# Bind short options to defaults
+for backend in $BACKENDS; do
+    OPTIONS=`_getTable BACKEND $backend`
+    for set in $OPTIONS; do
+        SET=`_getTable SET "$set"`
+        for option in $SET; do
+
+            SHORT=`_getTable SHORT "$option"`
+            if [ -z "$SHORT" ]; then
+                continue;
+            fi
+            DEFAULTS=`_getTable DEFAULTS $option`
+            if [ ! -z "$DEFAULTS" ]; then
+                declare DEFAULTS_$SHORT="$DEFAULTS"
+            else
+                # try backend specific table
+                DEFAULTS=`_getTable DEFAULTS_${BACKEND} $option`
+                if [ ! -z "$DEFAULTS" ]; then
+                    declare DEFAULTS_$backend_$SHORT="$DEFAULTS"
+                fi
+            fi
+
+        done
+    done
+done
 
 _ltsmin_set_reply ()
 {
@@ -93,155 +213,74 @@ _ltsmin_set_reply_file_ext ()
     COMPREPLY=( $(compgen -f -X '!*.@('$1')' -- "${cur}") )
 }
 
-_ltsmin_ltl_opts ()
+_pins2lts ()
 {
-    local prev
-    prev="${COMP_WORDS[COMP_CWORD-1]}"
+    # Deduce language module and backend
+    local MODULE="${1%%2*}"
+    local BACKEND="${1#**-}"
+    local OPTIONS=`_getTable BACKEND $BACKEND`
 
-    _ltsmin_append_reply "$LTL_OPTS"
+    # Collect set of options
+    local ALL_OPTIONS=""
+    for set in $OPTIONS; do
+        local SET=`_getTable SET "$set"`
+        for option in $SET; do
+            ALL_OPTIONS="$ALL_OPTIONS --$option"
+            local SHORT=`_getTable SHORT "$option"`
+            if [ ! -z "$SHORT" ]; then
+                ALL_OPTIONS="$ALL_OPTIONS -$SHORT"
+            fi
+        done
+    done
 
-    if [[ $prev == '--ltl-semantics' ]]; then
-        _ltsmin_set_reply "spin textbook ltsmin"
+    # Search for viable options
+    COMPREPLY=()
+    _ltsmin_append_reply "$ALL_OPTIONS"
+
+    # Provide suggestions based on previous word 
+    local prev="${COMP_WORDS[COMP_CWORD-1]}"
+    for option in $ALL_OPTIONS; do
+        if [[ $prev == "$option" ]]; then
+
+            # Provide default value or available options
+            local name=`_trimHyphens "$option"`
+            local DEFAULTS=`_getTable DEFAULTS $name`
+            if [ ! -z "$DEFAULTS" ]; then
+                _ltsmin_set_reply "$DEFAULTS"
+                return 0
+            else
+                # try backend specific table
+                local DEFAULTS=`_getTable DEFAULTS_${BACKEND} $name`
+                if [ ! -z "$DEFAULTS" ]; then
+                    _ltsmin_set_reply "$DEFAULTS"
+                    return 0
+                fi
+            fi
+
+            # Search for available files in the right format
+            local name=`_trimHyphens "$option"`
+            local FILE_FORMATS=`_getTable FILE_FORMATS $name`
+            if [ ! -z "$FILE_FORMATS" ]; then
+                _ltsmin_set_reply_file_ext "$FILE_FORMATS"
+                return 0
+            fi
+        fi
+    done
+
+    # Assume all words starting with hyphens are unknown options 
+    local cur="${COMP_WORDS[COMP_CWORD]}"
+    if [[ ${cur} == -* ]] ; then
         return 0
     fi
 
-    return 1
-}
+    # Check for available input files in the right format
+    local INPUT_FORMATS=`_getTable INPUT_FORMATS $MODULE`
+    _ltsmin_set_reply_file_ext $INPUT_FORMATS
+    _ltsmin_has_input_file $INPUT_FORMATS && return 0
 
-_ltsmin_io_opts ()
-{
-    local prev
-    prev="${COMP_WORDS[COMP_CWORD-1]}"
-
-    _ltsmin_append_reply "$IO_OPTS"
-
-    if [[ $prev == '--block-size' ]]; then
-        _ltsmin_set_reply "32768"
-        return 0
-    fi
-    if [[ $prev == '--cluster-size' ]]; then
-        _ltsmin_set_reply "32"
-        return 0
-    fi
-
-
-    return 1
-}
-
-_ltsmin_runtime_opts ()
-{
-    _ltsmin_append_reply "$RUNTIME_OPTS"
-    return 1
-}
-
-_ltsmin_greybox_opts ()
-{
-    _ltsmin_append_reply "$GREY_OPTS"
-
-    if [[ $prev == '--regroup' || $prev == '-r' ]]; then
-        _ltsmin_set_reply 'gs ga gsa gc gr cs cn cw ca csa rs rn ru'
-        return 0
-    fi
-
-    return 1
-}
-
-_ltsmin_buddy_opts ()
-{
-    _ltsmin_append_reply "$BUDDY_OPTS"
-
-    if [[ $prev == '--cache-ratio' ]]; then
-        _ltsmin_set_reply '64'
-        return 0
-    fi
-    if [[ $prev == '--max-increase' ]]; then
-        _ltsmin_set_reply '1000000'
-        return 0
-    fi
-    if [[ $prev == '--min-free-nodes' ]]; then
-        _ltsmin_set_reply '20'
-        return 0
-    fi
-    if [[ $prev == '--fdd-bits' ]]; then
-        _ltsmin_set_reply '16'
-        return 0
-    fi
-    if [[ $prev == '--fdd-reorder' ]]; then
-        _ltsmin_set_reply 'none win2 win2ite win3 win3ite sift siftite random'
-        return 0
-    fi
-
-    return 1
-}
-
-_ltsmin_ldd_opts ()
-{
-    _ltsmin_append_reply "$LDD_OPTS"
-
-    if [[ $prev == '--ldd-step' ]]; then
-        _ltsmin_set_reply '30'
-        return 0
-    fi
-    
-    return 1
-}
-
-_ltsmin_sylvan_opts ()
-{
-    _ltsmin_append_reply "$SYLVAN_OPTS"
-
-    if [[ $prev == '--sylvan-threads' ]]; then
-        _ltsmin_set_reply '1'
-        return 0
-    fi
-    if [[ $prev == '--sylvan-dqsize' ]]; then
-        _ltsmin_set_reply '100000'
-        return 0
-    fi
-    if [[ $prev == '--sylvan-bits' ]]; then
-        _ltsmin_set_reply '16'
-        return 0
-    fi
-    if [[ $prev == '--sylvan-tablesize' ]]; then
-        _ltsmin_set_reply '23'
-        return 0
-    fi
-    if [[ $prev == '--sylvan-cachesize' ]]; then
-        _ltsmin_set_reply '23'
-        return 0
-    fi
-    if [[ $prev == '--sylvan-granularity' ]]; then
-        _ltsmin_set_reply '1'
-        return 0
-    fi
-
-    return 1
-}
-
-_ltsmin_pg_opts ()
-{
-    _ltsmin_append_reply "$PG_OPTS"
-    return 1
-}
-
-_ltsmin_vset_opts ()
-{
-    _ltsmin_ldd_opts && return 0
-    _ltsmin_buddy_opts && return 0
-    _ltsmin_sylvan_opts && return 0
-    _ltsmin_append_reply "--vset"
-
-    if [[ $prev == '--vset' ]]; then
-        _ltsmin_set_reply "ldd ldd64 list tree fdd ddd sylvan"
-        return 0
-    fi
-
-    return 1
-}
-
-_ltsmin_development_opts ()
-{
-    _ltsmin_append_reply "$DEV_OPTS"
+    # Check for available output files in the right format
+    local OUTPUT_FORMATS=`_getTable OUTPUT_FORMATS $MODULE`
+    _ltsmin_set_reply_file_ext "$OUTPUT_FORMATS"
     return 1
 }
 
@@ -269,223 +308,10 @@ _ltsmin-printtrace ()
         return 0
     fi
 
-    _ltsmin_set_reply_file_ext "$FILE_FORMATS"
-    _ltsmin_has_input_file "$FILE_FORMATS" && return 0
+    _ltsmin_set_reply_file_ext "$OUTPUT_FORMATS"
+    _ltsmin_has_input_file "$OUTPUT_FORMATS" && return 0
     _ltsmin_set_reply_file_ext "txt|csv|aux"
 
-    return 1
-}
-
-_spec2lts-dist()
-{
-    local cur prev
-    COMPREPLY=()
-    cur="${COMP_WORDS[COMP_CWORD]}"
-    prev="${COMP_WORDS[COMP_CWORD-1]}"
-
-    _ltsmin_runtime_opts && return 0
-    _ltsmin_io_opts && return 0
-    _ltsmin_ltl_opts && return 0
-    _ltsmin_greybox_opts && return 0
-    _ltsmin_development_opts && return 0
-
-    _ltsmin_append_reply "$DIST_OPTS"
-
-    if [[ $prev == '--trace' ]]; then
-        _ltsmin_set_reply_file_ext "$FILE_FORMATS"
-        return 0
-    fi
-
-    if [[ ${cur} == -* ]] ; then
-        return 0
-    fi
-
-    return 1
-}
-
-_2lts-dist ()
-{
-    EXT=`getExt $1`
-    _ltsmin_set_reply ""
-    _spec2lts-dist && return 0
-    _ltsmin_set_reply_file_ext $EXT
-    _ltsmin_has_input_file $EXT && return 0
-    _ltsmin_set_reply_file_ext "$FILE_FORMATS"
-    return 1
-}
-
-_spec2lts-mc()
-{
-    local cur prev
-    COMPREPLY=()
-    cur="${COMP_WORDS[COMP_CWORD]}"
-    prev="${COMP_WORDS[COMP_CWORD-1]}"
-
-    _ltsmin_runtime_opts && return 0
-    _ltsmin_io_opts && return 0
-    _ltsmin_ltl_opts && return 0
-    _ltsmin_greybox_opts && return 0
-    _ltsmin_development_opts && return 0
-
-    _ltsmin_append_reply "$MC_OPTS"
-
-    if [[ $prev == '--trace' ]]; then
-        _ltsmin_set_reply_file_ext "$FILE_FORMATS"
-        return 0
-    fi
-    if [[ $prev == '--state' ]]; then
-        _ltsmin_set_reply "table tree cleary-tree"
-        return 0
-    fi
-    if [[ $prev == '--trace' ]]; then
-        _ltsmin_set_reply_file_ext "dir|dz|gcf"
-        return 0
-    fi
-    if [[ $prev == '--strategy' ]]; then
-        _ltsmin_set_reply "bfs sbfs dfs ndfs cndfs lndfs endfs endfs,lndfs endfs,endfs,ndfs"
-        return 0
-    fi
-    if [[ $prev == '--proviso' ]]; then
-        _ltsmin_set_reply "closedset stack"
-        return 0
-    fi
-    if [[ $prev == '--perm' ]]; then
-        _ltsmin_set_reply "dynamic random rr sort sr shift shiftall otf none"
-        return 0
-    fi
-
-    if [[ ${cur} == -* ]] ; then
-        return 0
-    fi
-
-    return 1
-}
-
-_2lts-mc ()
-{
-    EXT=`getExt $1`
-    _ltsmin_set_reply ""
-    _spec2lts-mc && return 0
-    _ltsmin_set_reply_file_ext $EXT
-    _ltsmin_has_input_file $EXT && return 0
-    _ltsmin_set_reply_file_ext "$FILE_FORMATS"
-    return 1
-}
-
-_spec2lts-seq()
-{
-    local cur prev
-    COMPREPLY=()
-    cur="${COMP_WORDS[COMP_CWORD]}"
-    prev="${COMP_WORDS[COMP_CWORD-1]}"
-
-    _ltsmin_runtime_opts && return 0
-    _ltsmin_io_opts && return 0
-    _ltsmin_greybox_opts && return 0
-    _ltsmin_vset_opts && return 0
-    _ltsmin_development_opts && return 0
-    _ltsmin_ltl_opts && return 0
-
-    _ltsmin_append_reply "$SEQ_OPTS"
-
-    if [[ $prev == '--state' ]]; then
-        _ltsmin_set_reply "table tree vset"
-        return 0
-    fi
-    if [[ $prev == '--trace' ]]; then
-        _ltsmin_set_reply_file_ext "$FILE_FORMATS"
-        return 0
-    fi
-    if [[ $prev == '--strategy' ]]; then
-        _ltsmin_set_reply "bfs dfs scc"
-        return 0
-    fi
-    if [[ $prev == '--proviso' ]]; then
-        _ltsmin_set_reply "closedset stack color"
-        return 0
-    fi
-    if [[ $prev == '--max' ]]; then
-        _ltsmin_set_reply ""
-        return 0
-    fi
-
-    if [[ ${cur} == -* ]] ; then
-        return 0
-    fi
-
-    return 1
-}
-
-_2lts-seq ()
-{
-    EXT=`getExt $1`
-    _ltsmin_set_reply ""
-    _spec2lts-seq && return 0
-    _ltsmin_set_reply_file_ext $EXT
-    _ltsmin_has_input_file $EXT && return 0
-    _ltsmin_set_reply_file_ext "$FILE_FORMATS"
-    return 1
-}
-
-_spec2lts-sym()
-{
-    local cur prev
-    COMPREPLY=()
-    cur="${COMP_WORDS[COMP_CWORD]}"
-    prev="${COMP_WORDS[COMP_CWORD-1]}"
-
-    _ltsmin_runtime_opts && return 0
-    _ltsmin_io_opts && return 0
-    _ltsmin_greybox_opts && return 0
-    _ltsmin_vset_opts && return 0
-    _ltsmin_pg_opts && return 0
-
-    _ltsmin_append_reply "$SYM_OPTS"
-
-    if [[ $prev == '--order' ]]; then
-        _ltsmin_set_reply "bfs-prev bfs chain-prev chain"
-        return 0
-    fi
-    if [[ $prev == '--saturation' ]]; then
-        _ltsmin_set_reply "none sat-like sat-loop sat-fix sat"
-        return 0
-    fi
-    if [[ $prev == '--guidance' ]]; then
-        _ltsmin_set_reply "unguided directed"
-        return 0
-    fi
-    if [[ $prev == '--trace' ]]; then
-        _ltsmin_set_reply_file_ext $FILE_FORMATS
-        return 0
-    fi
-    if [[ $prev == '--mu' ]]; then
-        _ltsmin_set_reply_file_ext "mu"
-        return 0
-    fi
-    if [[ $prev == '--ctl-star' ]]; then
-        _ltsmin_set_reply_file_ext "ctl"
-        return 0
-    fi
-    if [[ $prev == '--pg-write' ]]; then
-        _ltsmin_set_reply_file_ext "spg"
-        return 0
-    fi
-
-    if [[ ${cur} == -* ]] ; then
-        return 0
-    fi
-
-    return 1
-}
-
-_2lts-sym ()
-{
-    EXT=`getExt $1`
-    _ltsmin_set_reply ""
-    _spec2lts-sym && return 0
-    _ltsmin_set_reply_file_ext $EXT
-    _ltsmin_has_input_file $EXT && return 0
-    _ltsmin_set_reply_file_ext "etf"
     return 1
 }
 
@@ -493,19 +319,8 @@ shopt -s extglob
 
 complete -F _ltsmin-printtrace ltsmin-printtrace
 
-for module in $MODULES; do
-    complete -F _2lts-dist "${module}2lts-dist"
+for backend in $BACKENDS; do
+    for module in $MODULES; do
+        complete -F _pins2lts "${module}2lts-${backend}"
+    done
 done
-
-for module in $MODULES; do
-    complete -F _2lts-mc "${module}2lts-mc"
-done
-
-for module in $MODULES; do
-    complete -F _2lts-seq "${module}2lts-seq"
-done
-
-for module in $MODULES; do
-    complete -F _2lts-sym "${module}2lts-sym"
-done
-
