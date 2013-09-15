@@ -1,5 +1,50 @@
 _ltsmin_opts=""
 
+declare EXTENSIONS_dve="dve|dve2C"
+declare EXTENSIONS_etf="etf"
+declare EXTENSIONS_lps="lps"
+declare EXTENSIONS_lpo="tbf"
+declare EXTENSIONS_prom="prom|pr|promela|spin|spins|"
+declare EXTENSIONS_mapa="prcrl|mapa"
+declare EXTENSIONS_opaal="so|xml"
+
+declare FILE_FORMATS="dir|dz|gcf|bcg|gcd|vac|aut|fsm|tra|lab|pg"
+
+declare MODULES="dve etf lps lpo mapa opaal prom"
+
+declare BASIC_OPTS="--deadlock -d --action -a --invariant -i --no-exit -n  --trace"
+
+declare DIST_OPTS="$BASIC_OPTS --filter --nice"
+declare MC_OPTS="$BASIC_OPTS --filter --size -s --state --strategy --max \
+                 --proviso --strict --perm --zobrist -z --ratio"
+declare SEQ_OPTS="$BASIC_OPTS --state --strategy --proviso --max"
+declare SYM_OPTS="$BASIC_OPTS --order --saturation --sat-granularity \
+                  --save-sat-levels --guidance --mu --ctl-star --pg-solve \
+                  --pg-write"
+
+declare MC_HIDDEN="--all-ecd --nar --no-red-perm --no-ref --no-ecd --gran \
+                   --handoff --owcty-reset" #unused
+
+declare PG_OPTS="--chaining-attractor --saturating-attractor --pg-swap"
+declare LTL_OPTS="--ltl-semantics --ltl"
+declare IO_OPTS="--block-size --cluster-size"
+declare DEV_OPTS="--grey"
+declare GREY_OPTS="--matrix -m --labels --cache -c --regroup -r --por -p"
+declare RUNTIME_OPTS="-v -q --debug --version --help -h --usage --states --when --where"
+
+declare BUDDY_OPTS="--cache-ratio --max-increase --min-free-nodes --fdd-bits --fdd-reorder"
+declare SYLVAN_OPTS="--sylvan-threads --sylvan-dqsize --sylvan-bits --sylvan-tablesize --sylvan-cachesize --sylvan-granularity"
+declare LDD_OPTS="--ldd-step"
+
+getExt ()
+{
+    local MODULE="$1"
+    MODULE="${MODULE%-*}"
+    MODULE="${MODULE/2lts/}"
+    local EXT="EXTENSIONS_$MODULE"
+    echo "${!EXT}"
+}
+
 _ltsmin_set_reply ()
 {
     local cur
@@ -16,13 +61,18 @@ _ltsmin_append_reply ()
 _ltsmin_has_input_file ()
 {
 	local i ext c=1 f=0
+	
+	IFS_OLD=$IFS
+    IFS="|"
+	
 	while [ $c -lt $COMP_CWORD ]; do
 		i="${COMP_WORDS[c]}"
         for ext in $1
-        do
+        do 
             if [ ${i##*.} = $ext ]
             then
                 if [ -e $i ]; then
+                    IFS=$IFS_OLD
                     return 1;
                 fi
             fi
@@ -32,6 +82,7 @@ _ltsmin_has_input_file ()
 		c=$((++c))
     done
 
+    IFS=$IFS_OLD
     return 0
 }
 
@@ -42,12 +93,27 @@ _ltsmin_set_reply_file_ext ()
     COMPREPLY=( $(compgen -f -X '!*.@('$1')' -- "${cur}") )
 }
 
-_ltsmin_archive_io_opts ()
+_ltsmin_ltl_opts ()
 {
     local prev
     prev="${COMP_WORDS[COMP_CWORD-1]}"
 
-    _ltsmin_append_reply "--block-size --cluster-size --plain"
+    _ltsmin_append_reply "$LTL_OPTS"
+
+    if [[ $prev == '--ltl-semantics' ]]; then
+        _ltsmin_set_reply "spin textbook ltsmin"
+        return 0
+    fi
+
+    return 1
+}
+
+_ltsmin_io_opts ()
+{
+    local prev
+    prev="${COMP_WORDS[COMP_CWORD-1]}"
+
+    _ltsmin_append_reply "$IO_OPTS"
 
     if [[ $prev == '--block-size' ]]; then
         _ltsmin_set_reply "32768"
@@ -62,23 +128,18 @@ _ltsmin_archive_io_opts ()
     return 1
 }
 
-_ltsmin_io_opts ()
-{
-    _ltsmin_archive_io_opts && return 0
-    return 1
-}
-
 _ltsmin_runtime_opts ()
 {
-    _ltsmin_append_reply "-v -q --debug --version --help --usage"
+    _ltsmin_append_reply "$RUNTIME_OPTS"
     return 1
 }
 
 _ltsmin_greybox_opts ()
 {
-    _ltsmin_append_reply "--cache -c --regroup -r"
+    _ltsmin_append_reply "$GREY_OPTS"
+
     if [[ $prev == '--regroup' || $prev == '-r' ]]; then
-        _ltsmin_set_reply 'gs'
+        _ltsmin_set_reply 'gs ga gsa gc gr cs cn cw ca csa rs rn ru'
         return 0
     fi
 
@@ -87,7 +148,7 @@ _ltsmin_greybox_opts ()
 
 _ltsmin_buddy_opts ()
 {
-    _ltsmin_append_reply "--cache-ratio --max-increase --min-free-nodes --fdd-bits"
+    _ltsmin_append_reply "$BUDDY_OPTS"
 
     if [[ $prev == '--cache-ratio' ]]; then
         _ltsmin_set_reply '64'
@@ -105,39 +166,73 @@ _ltsmin_buddy_opts ()
         _ltsmin_set_reply '16'
         return 0
     fi
-
-    return 1
-}
-
-_ltsmin_atermdd_opts ()
-{
-    #_ltsmin_append_reply ""
-    return 1
-}
-
-
-_ltsmin_vset_setonly_opts ()
-{
-    _ltsmin_buddy_opts && return 0
-    _ltsmin_atermdd_opts && return 0
-    _ltsmin_append_reply "--vset"
-
-    if [[ $prev == '--vset' ]]; then
-        _ltsmin_set_reply "list tree fdd"
+    if [[ $prev == '--fdd-reorder' ]]; then
+        _ltsmin_set_reply 'none win2 win2ite win3 win3ite sift siftite random'
         return 0
     fi
 
     return 1
 }
 
-_ltsmin_vset_full_opts ()
+_ltsmin_ldd_opts ()
 {
+    _ltsmin_append_reply "$LDD_OPTS"
+
+    if [[ $prev == '--ldd-step' ]]; then
+        _ltsmin_set_reply '30'
+        return 0
+    fi
+    
+    return 1
+}
+
+_ltsmin_sylvan_opts ()
+{
+    _ltsmin_append_reply "$SYLVAN_OPTS"
+
+    if [[ $prev == '--sylvan-threads' ]]; then
+        _ltsmin_set_reply '1'
+        return 0
+    fi
+    if [[ $prev == '--sylvan-dqsize' ]]; then
+        _ltsmin_set_reply '100000'
+        return 0
+    fi
+    if [[ $prev == '--sylvan-bits' ]]; then
+        _ltsmin_set_reply '16'
+        return 0
+    fi
+    if [[ $prev == '--sylvan-tablesize' ]]; then
+        _ltsmin_set_reply '23'
+        return 0
+    fi
+    if [[ $prev == '--sylvan-cachesize' ]]; then
+        _ltsmin_set_reply '23'
+        return 0
+    fi
+    if [[ $prev == '--sylvan-granularity' ]]; then
+        _ltsmin_set_reply '1'
+        return 0
+    fi
+
+    return 1
+}
+
+_ltsmin_pg_opts ()
+{
+    _ltsmin_append_reply "$PG_OPTS"
+    return 1
+}
+
+_ltsmin_vset_opts ()
+{
+    _ltsmin_ldd_opts && return 0
     _ltsmin_buddy_opts && return 0
-    _ltsmin_atermdd_opts && return 0
+    _ltsmin_sylvan_opts && return 0
     _ltsmin_append_reply "--vset"
 
     if [[ $prev == '--vset' ]]; then
-        _ltsmin_set_reply "list fdd"
+        _ltsmin_set_reply "ldd ldd64 list tree fdd ddd sylvan"
         return 0
     fi
 
@@ -146,11 +241,11 @@ _ltsmin_vset_full_opts ()
 
 _ltsmin_development_opts ()
 {
-    _ltsmin_append_reply "--grey --matrix --write-state"
+    _ltsmin_append_reply "$DEV_OPTS"
     return 1
 }
 
-_ltsmin-tracepp () 
+_ltsmin-printtrace () 
 {
     local cur prev
     COMPREPLY=()
@@ -174,34 +269,139 @@ _ltsmin-tracepp ()
         return 0
     fi
 
-    _ltsmin_set_reply_file_ext "dir|dz|gcf"
-
-    _ltsmin_has_input_file "dir dz gcf" && return 0
+    _ltsmin_set_reply_file_ext "$FILE_FORMATS"
+    _ltsmin_has_input_file "$FILE_FORMATS" && return 0
     _ltsmin_set_reply_file_ext "txt|csv|aux"
 
     return 1
 }
 
-_spec2lts-grey()
+_spec2lts-dist()
 {
     local cur prev
     COMPREPLY=()
     cur="${COMP_WORDS[COMP_CWORD]}"
     prev="${COMP_WORDS[COMP_CWORD-1]}"
 
-    _ltsmin_append_reply "--deadlock -d --trace --state --strategy --max"
     _ltsmin_runtime_opts && return 0
     _ltsmin_io_opts && return 0
+    _ltsmin_ltl_opts && return 0
     _ltsmin_greybox_opts && return 0
-    _ltsmin_vset_setonly_opts && return 0
     _ltsmin_development_opts && return 0
 
+    _ltsmin_append_reply "$DIST_OPTS"
+
+    if [[ $prev == '--trace' ]]; then
+        _ltsmin_set_reply_file_ext "$FILE_FORMATS"
+        return 0
+    fi
+
+    if [[ ${cur} == -* ]] ; then
+        return 0
+    fi
+
+    return 1
+}
+
+_2lts-dist ()
+{
+    EXT=`getExt $1`
+    _ltsmin_set_reply ""
+    _spec2lts-dist && return 0
+    _ltsmin_set_reply_file_ext $EXT
+    _ltsmin_has_input_file $EXT && return 0
+    _ltsmin_set_reply_file_ext "$FILE_FORMATS"
+    return 1
+}
+
+_spec2lts-mc()
+{
+    local cur prev
+    COMPREPLY=()
+    cur="${COMP_WORDS[COMP_CWORD]}"
+    prev="${COMP_WORDS[COMP_CWORD-1]}"
+
+    _ltsmin_runtime_opts && return 0
+    _ltsmin_io_opts && return 0
+    _ltsmin_ltl_opts && return 0
+    _ltsmin_greybox_opts && return 0
+    _ltsmin_development_opts && return 0
+
+    _ltsmin_append_reply "$MC_OPTS"
+
+    if [[ $prev == '--trace' ]]; then
+        _ltsmin_set_reply_file_ext "$FILE_FORMATS"
+        return 0
+    fi
+    if [[ $prev == '--state' ]]; then
+        _ltsmin_set_reply "table tree cleary-tree"
+        return 0
+    fi
     if [[ $prev == '--trace' ]]; then
         _ltsmin_set_reply_file_ext "dir|dz|gcf"
         return 0
     fi
     if [[ $prev == '--strategy' ]]; then
-        _ltsmin_set_reply "bfs dfs"
+        _ltsmin_set_reply "bfs sbfs dfs ndfs cndfs lndfs endfs endfs,lndfs endfs,endfs,ndfs"
+        return 0
+    fi
+    if [[ $prev == '--proviso' ]]; then
+        _ltsmin_set_reply "closedset stack"
+        return 0
+    fi
+    if [[ $prev == '--perm' ]]; then
+        _ltsmin_set_reply "dynamic random rr sort sr shift shiftall otf none"
+        return 0
+    fi
+
+    if [[ ${cur} == -* ]] ; then
+        return 0
+    fi
+
+    return 1
+}
+
+_2lts-mc ()
+{
+    EXT=`getExt $1`
+    _ltsmin_set_reply ""
+    _spec2lts-mc && return 0
+    _ltsmin_set_reply_file_ext $EXT
+    _ltsmin_has_input_file $EXT && return 0
+    _ltsmin_set_reply_file_ext "$FILE_FORMATS"
+    return 1
+}
+
+_spec2lts-seq()
+{
+    local cur prev
+    COMPREPLY=()
+    cur="${COMP_WORDS[COMP_CWORD]}"
+    prev="${COMP_WORDS[COMP_CWORD-1]}"
+
+    _ltsmin_runtime_opts && return 0
+    _ltsmin_io_opts && return 0
+    _ltsmin_greybox_opts && return 0
+    _ltsmin_vset_opts && return 0
+    _ltsmin_development_opts && return 0
+    _ltsmin_ltl_opts && return 0
+
+    _ltsmin_append_reply "$SEQ_OPTS"
+
+    if [[ $prev == '--state' ]]; then
+        _ltsmin_set_reply "table tree vset"
+        return 0
+    fi
+    if [[ $prev == '--trace' ]]; then
+        _ltsmin_set_reply_file_ext "$FILE_FORMATS"
+        return 0
+    fi
+    if [[ $prev == '--strategy' ]]; then
+        _ltsmin_set_reply "bfs dfs scc"
+        return 0
+    fi
+    if [[ $prev == '--proviso' ]]; then
+        _ltsmin_set_reply "closedset stack color"
         return 0
     fi
     if [[ $prev == '--max' ]]; then
@@ -216,45 +416,58 @@ _spec2lts-grey()
     return 1
 }
 
-_etf2lts-grey ()
+_2lts-seq ()
 {
+    EXT=`getExt $1`
     _ltsmin_set_reply ""
-    _spec2lts-grey && return 0
-    _ltsmin_set_reply_file_ext "etf"
-    _ltsmin_has_input_file "etf" && return 0
-    _ltsmin_set_reply_file_ext "dir|dz|gcf"
+    _spec2lts-seq && return 0
+    _ltsmin_set_reply_file_ext $EXT
+    _ltsmin_has_input_file $EXT && return 0
+    _ltsmin_set_reply_file_ext "$FILE_FORMATS"
     return 1
 }
 
-_lpo2lts-grey ()
-{
-    _ltsmin_set_reply ""
-    _spec2lts-grey && return 0
-    _ltsmin_set_reply_file_ext "tbf"
-    _ltsmin_has_input_file "tbf" && return 0
-    _ltsmin_set_reply_file_ext "dir|dz|gcf"
-    return 1
-}
-
-_spec-reach()
+_spec2lts-sym()
 {
     local cur prev
     COMPREPLY=()
     cur="${COMP_WORDS[COMP_CWORD]}"
     prev="${COMP_WORDS[COMP_CWORD-1]}"
 
-    _ltsmin_append_reply "--deadlock -d --trace --order"
     _ltsmin_runtime_opts && return 0
     _ltsmin_io_opts && return 0
     _ltsmin_greybox_opts && return 0
-    _ltsmin_vset_full_opts && return 0
+    _ltsmin_vset_opts && return 0
+    _ltsmin_pg_opts && return 0
+
+    _ltsmin_append_reply "$SYM_OPTS"
 
     if [[ $prev == '--order' ]]; then
-        ltsmin_set_reply "bfs bfs2 chain"
+        _ltsmin_set_reply "bfs-prev bfs chain-prev chain"
+        return 0
+    fi
+    if [[ $prev == '--saturation' ]]; then
+        _ltsmin_set_reply "none sat-like sat-loop sat-fix sat"
+        return 0
+    fi
+    if [[ $prev == '--guidance' ]]; then
+        _ltsmin_set_reply "unguided directed"
         return 0
     fi
     if [[ $prev == '--trace' ]]; then
-        _ltsmin_set_reply_file_ext "dir|dz|gcf"
+        _ltsmin_set_reply_file_ext $FILE_FORMATS
+        return 0
+    fi
+    if [[ $prev == '--mu' ]]; then
+        _ltsmin_set_reply_file_ext "mu"
+        return 0
+    fi
+    if [[ $prev == '--ctl-star' ]]; then
+        _ltsmin_set_reply_file_ext "ctl"
+        return 0
+    fi
+    if [[ $prev == '--pg-write' ]]; then
+        _ltsmin_set_reply_file_ext "spg"
         return 0
     fi
 
@@ -265,36 +478,34 @@ _spec-reach()
     return 1
 }
 
-_etf-reach ()
+_2lts-sym ()
 {
+    EXT=`getExt $1`
     _ltsmin_set_reply ""
-    _spec-reach && return 0
+    _spec2lts-sym && return 0
+    _ltsmin_set_reply_file_ext $EXT
+    _ltsmin_has_input_file $EXT && return 0
     _ltsmin_set_reply_file_ext "etf"
-    _ltsmin_has_input_file "etf" && return 0
-    _ltsmin_set_reply_file_ext "dir|dz|gcf"
     return 1
 }
-
-_lpo-reach ()
-{
-    _ltsmin_set_reply ""
-    _spec-reach && return 0
-    _ltsmin_set_reply_file_ext "tbf"
-    _ltsmin_has_input_file "tbf" && return 0
-    _ltsmin_set_reply_file_ext "dir|dz|gcf"
-    return 1
-}
-
-
-
 
 shopt -s extglob
 
-complete -F _ltsmin-tracepp ltsmin-tracepp
+complete -F _ltsmin-printtrace ltsmin-printtrace
 
-complete -F _etf2lts-grey etf2lts-grey
-complete -F _lpo2lts-grey lpo2lts-grey
+for module in $MODULES; do
+    complete -F _2lts-dist "${module}2lts-dist"
+done
 
-complete -F _etf2-reach etf-reach
-complete -F _lpo-reach lpo-reach
+for module in $MODULES; do
+    complete -F _2lts-mc "${module}2lts-mc"
+done
+
+for module in $MODULES; do
+    complete -F _2lts-seq "${module}2lts-seq"
+done
+
+for module in $MODULES; do
+    complete -F _2lts-sym "${module}2lts-sym"
+done
 
