@@ -44,7 +44,7 @@ declare SET_REACH="deadlock action invariant no-exit trace"
 declare SET_PG="chaining-attractor saturating-attractor pg-swap"
 declare SET_DEV="grey write-state"
 declare SET_PINS="matrix labels cache regroup por ltl ltl-semantics mucalc"
-declare SET_RUNTIME="verbose quite debug version help usage states when where"
+declare SET_RUNTIME="verbose quite debug version help usage stats when where"
 
 declare SET_VSET="vset"
 declare SET_BUDDY="cache-ratio max-increase min-free-nodes fdd-bits fdd-reorder"
@@ -125,7 +125,7 @@ declare FILE_FORMATS_debug="c|h|cpp"
 ##############################################################################
 
 _ltsmin_opts=""
-
+    
 _trimHyphens() {
     local var=$@
     var="${var#"${var%%[!-]*}"}"   # remove leading hyphens
@@ -171,6 +171,15 @@ _ltsmin_set_reply ()
     cur="${COMP_WORDS[COMP_CWORD]}"
     _ltsmin_opts="$1"
     COMPREPLY=( $(compgen -W "$_ltsmin_opts" -- ${cur}) )
+
+    #COMPREPLY=("${COMPREPLY[@]/%/ }") # add trailing space
+    if [ ${#COMPREPLY[@]} = 1 ]; then
+        COMPREPLY="${COMPREPLY} "
+    else
+        for ((i=0; i < ${#COMPREPLY[@]}; i++)); do
+            COMPREPLY[$i]="${COMPREPLY[$i]} "
+        done
+    fi
 }
 
 _ltsmin_append_reply ()
@@ -181,10 +190,8 @@ _ltsmin_append_reply ()
 _ltsmin_has_input_file ()
 {
 	local i ext c=1 f=0
-	
-	IFS_OLD=$IFS
-    IFS="|"
-	
+
+    local IFS="|"
 	while [ $c -lt $COMP_CWORD ]; do
 		i="${COMP_WORDS[c]}"
         for ext in $1
@@ -192,25 +199,39 @@ _ltsmin_has_input_file ()
             if [ ${i##*.} = $ext ]
             then
                 if [ -e $i ]; then
-                    IFS=$IFS_OLD
                     return 1;
                 fi
             fi
         done
-        
-
 		c=$((++c))
     done
-
-    IFS=$IFS_OLD
     return 0
+}
+
+_dir_completion ()
+{
+    if [ -d "$1" ]; then
+        echo -n "$1/"
+    else
+        echo -n "$1 "
+    fi
 }
 
 _ltsmin_set_reply_file_ext ()
 {
     local cur
+    local IFS=$'\n'
     cur="${COMP_WORDS[COMP_CWORD]}"
-    COMPREPLY=( $(compgen -f -X '!*.@('$1')' -- "${cur}") )
+    COMPREPLY=( $(compgen -o plusdirs -f -X '!*.@('$1')' -- "${cur}") )
+
+    if [ ${#COMPREPLY[@]} = 1 ]; then
+        COMPREPLY=`_dir_completion "${COMPREPLY}"`
+    else
+        for ((i=0; i < ${#COMPREPLY[@]}; i++)); do
+            COMPREPLY[$i]=`_dir_completion "${COMPREPLY[$i]}"`
+        done
+    fi
+    return 0;
 }
 
 _pins2lts ()
@@ -321,6 +342,6 @@ complete -F _ltsmin-printtrace ltsmin-printtrace
 
 for backend in $BACKENDS; do
     for module in $MODULES; do
-        complete -F _pins2lts "${module}2lts-${backend}"
+        complete -o nospace -F _pins2lts "${module}2lts-${backend}"
     done
 done
