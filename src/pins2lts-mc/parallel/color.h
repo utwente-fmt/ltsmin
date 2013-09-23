@@ -68,10 +68,7 @@ enum { RED=0, GREEN=1, DANGEROUS=2 };
 #define GGREEN     GCOLOR(GREEN)    // bit 1
 #define GDANGEROUS GCOLOR(DANGEROUS)// bit 2
 
-extern void             color_set_dbs(void *dbs_);
-
-extern void             setup_colors(void *dbs_,
-                                     size_t count_bits_,
+extern void             setup_colors(size_t count_bits_,
                                      dbs_get_sat_f get_sat_bit_,
                                      dbs_try_set_sat_f try_set_sat_bit_,
                                      dbs_inc_sat_bits_f inc_sat_bits_,

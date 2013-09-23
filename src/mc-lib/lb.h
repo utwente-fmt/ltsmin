@@ -15,6 +15,7 @@
 #define LB_H_
 
 #include <stdint.h>
+#include <unistd.h>
 
 
 typedef struct lb_s lb_t;

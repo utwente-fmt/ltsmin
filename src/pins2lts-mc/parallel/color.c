@@ -1,10 +1,10 @@
 #include <hre/config.h>
 
-#include <mc-lib/color.h>
+#include <pins2lts-mc/parallel/color.h>
+#include <pins2lts-mc/parallel/global.h>
 
 static size_t               count_mask;
 static size_t               count_bits;
-static void                *dbs;
 static dbs_get_sat_f        get_sat_bit;
 //static dbs_unset_sat_f    unset_sat_bit;
 static dbs_try_set_sat_f    try_set_sat_bit;
@@ -12,15 +12,9 @@ static dbs_inc_sat_bits_f   inc_sat_bits;
 static dbs_dec_sat_bits_f   dec_sat_bits;
 static dbs_get_sat_bits_f   get_sat_bits;
 
-void
-color_set_dbs(void *dbs_)
-{
-    dbs = dbs_;
-}
 
 void
-setup_colors(void *dbs_,
-             size_t count_bits_,
+setup_colors(size_t count_bits_,
              dbs_get_sat_f get_sat_bit_,
              dbs_try_set_sat_f try_set_sat_bit_,
              dbs_inc_sat_bits_f inc_sat_bits_,
@@ -29,7 +23,6 @@ setup_colors(void *dbs_,
 {
     count_bits = count_bits_;
     count_mask = (1<<count_bits) - 1;
-    dbs = dbs_;
     get_sat_bit = get_sat_bit_;
     //unset_sat_bit;
     try_set_sat_bit = try_set_sat_bit_;
@@ -65,29 +58,29 @@ ndfs_try_color (bitvector_t *set, ref_t ref, ndfs_color_t color)
 int
 global_has_color (ref_t ref, global_color_t color, int rec_bits)
 {
-    return get_sat_bit(dbs, ref, rec_bits+count_bits+color.g);
+    return get_sat_bit(global->dbs, ref, rec_bits+count_bits+color.g);
 }
 
 int //RED and BLUE are independent
 global_try_color (ref_t ref, global_color_t color, int rec_bits)
 {
-    return try_set_sat_bit(dbs, ref, rec_bits+count_bits+color.g);
+    return try_set_sat_bit(global->dbs, ref, rec_bits+count_bits+color.g);
 }
 
 uint32_t
 inc_wip (ref_t ref)
 {
-    return inc_sat_bits(dbs, ref) & count_mask;
+    return inc_sat_bits(global->dbs, ref) & count_mask;
 }
 
 uint32_t
 dec_wip (ref_t ref)
 {
-    return dec_sat_bits(dbs, ref) & count_mask;
+    return dec_sat_bits(global->dbs, ref) & count_mask;
 }
 
 uint32_t
 get_wip (ref_t ref)
 {
-    return get_sat_bits(dbs, ref) & count_mask;
+    return get_sat_bits(global->dbs, ref) & count_mask;
 }

@@ -1,0 +1,405 @@
+/**
+ *
+ */
+
+#include <hre/config.h>
+
+#include <popt.h>
+
+#include <pins2lts-mc/parallel/permute.h>
+#include <pins2lts-mc/parallel/state-info.h>
+#include <pins2lts-mc/parallel/state-store.h>
+#include <pins2lts-mc/parallel/worker.h>
+#include <pins2lts-mc/algorithm/timed.h>
+#include <pins2lts-mc/algorithm/reach.h>
+#include <util-lib/util.h>
+
+// TODO: merge with reach algorithms
+
+int              LATTICE_BLOCK_SIZE = (1UL<<CACHE_LINE) / sizeof(lattice_t);
+int              UPDATE = TA_UPDATE_WAITING;
+int              NONBLOCKING = 0;
+
+struct poptOption timed_options[] = {
+    {"lattice-blocks", 'l', POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT | POPT_ARGFLAG_DOC_HIDDEN, &LATTICE_BLOCK_SIZE, 0,
+     "Size of blocks preallocated for lattices (> 1). "
+     "Small blocks save memory when most states few lattices (< 4). "
+     "Larger blocks save memory in case a few states have many lattices. "
+     "For the best performance set this to: cache line size (usually 64) divided by lattice size of 8 byte.", NULL},
+    {"update", 'u', POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &UPDATE,
+      0,"cover update strategy: 0 = simple, 1 = update waiting, 2 = update passed (may break traces)", NULL},
+    {"non-blocking", 'n', POPT_ARG_VAL, &NONBLOCKING, 1, "Non-blocking TA reachability", NULL},
+    POPT_TABLEEND
+};
+
+typedef struct ta_counter_s {
+    counter_t           reach;
+
+    size_t              deletes;        // lattice deletes
+    size_t              updates;        // lattice updates
+    size_t              inserts;        // lattice inserts
+    statistics_t        lattice_ratio;  // On-the-fly calc of stdev/mean of #lat
+} ta_counter_t;
+
+typedef struct ta_alg_local_s {
+    alg_local_t         reach;
+
+    int                 done;           // done flag
+    int                 subsumes;       // successor subsumes a state in LMAP
+    lm_loc_t            added_at;       // successor is added at location
+    lm_loc_t            last;           // last tombstone location
+    size_t              work;
+    state_info_t       *successor;      // current successor state
+
+    ta_counter_t        counters;
+} ta_alg_local_t;
+
+typedef enum ta_set_e {
+    TA_WAITING = 0,
+    TA_PASSED  = 1,
+} ta_set_e_t;
+
+lm_cb_t
+ta_covered (void *arg, lattice_t l, lm_status_t status, lm_loc_t lm)
+{
+    wctx_t             *ctx = (wctx_t*) arg;
+    ta_alg_local_t     *ta_loc = (ta_alg_local_t *) ctx->local;
+    lattice_t lattice = ta_loc->successor->lattice;
+    int *succ_l = (int*)&lattice;
+    if (UPDATE == TA_UPDATE_NONE
+            ? lattice == l
+            : !ta_loc->subsumes && GBisCoveredByShort(ctx->model, succ_l, (int*)&l) ) {
+        ta_loc->done = 1;
+        return LM_CB_STOP; //A l' : (E (s,l)eL : l>=l')=>(A (s,l)eL : l>=l')
+    } else if (TA_UPDATE_NONE != UPDATE &&
+            (TA_UPDATE_PASSED == UPDATE || TA_WAITING == (ta_set_e_t)status) &&
+            GBisCoveredByShort(ctx->model, (int*)&l, succ_l)) {
+        ta_loc->subsumes = 1;
+        lm_delete (global->lmap, lm);
+        ta_loc->last = (LM_NULL_LOC == ta_loc->last ? lm : ta_loc->last);
+        ta_loc->counters.deletes++;
+    }
+    ta_loc->work++;
+    return LM_CB_NEXT;
+}
+
+lm_cb_t
+ta_covered_nb (void *arg, lattice_t l, lm_status_t status, lm_loc_t lm)
+{
+    wctx_t             *ctx = (wctx_t*) arg;
+    ta_alg_local_t     *ta_loc = (ta_alg_local_t *) ctx->local;
+    lattice_t lattice = ta_loc->successor->lattice;
+    int *succ_l = (int*)&lattice;
+    if (UPDATE == TA_UPDATE_NONE
+            ? lattice == l
+            : GBisCoveredByShort(ctx->model, succ_l, (int*)&l) ) {
+        ta_loc->done = 1;
+        return LM_CB_STOP; //A l' : (E (s,l)eL : l>=l')=>(A (s,l)eL : l>=l')
+    } else if (TA_UPDATE_NONE != UPDATE &&
+            (TA_UPDATE_PASSED == UPDATE || TA_WAITING == (ta_set_e_t)status) &&
+            GBisCoveredByShort(ctx->model, (int*)&l, succ_l)) {
+        if (LM_NULL_LOC == ta_loc->added_at) { // replace first waiting, will be added to waiting set
+            if (!lm_cas_update (global->lmap, lm, l, status, lattice, (lm_status_t)TA_WAITING)) {
+                lattice_t n = lm_get (global->lmap, lm);
+                if (n == NULL_LATTICE) // deleted
+                    return LM_CB_NEXT;
+                lm_status_t s = lm_get_status (global->lmap, lm);
+                return ta_covered_nb (arg, n, s, lm); // retry
+            } else {
+                ta_loc->added_at = lm;
+            }
+        } else {                            // delete second etc
+            lm_cas_delete (global->lmap, lm, l, status);
+        }
+        ta_loc->last = (LM_NULL_LOC == ta_loc->last ? lm : ta_loc->last);
+        ta_loc->counters.deletes++;
+    }
+    ta_loc->work++;
+    return LM_CB_NEXT;
+}
+
+static void
+ta_queue_state_normal (wctx_t *ctx, state_info_t *successor)
+{
+    alg_global_t       *sm = ctx->global;
+    raw_data_t stack_loc = dfs_stack_push (sm->stack, NULL );
+    state_info_serialize (successor, stack_loc);
+}
+
+static void (*ta_queue_state)(wctx_t *, state_info_t *) = ta_queue_state_normal;
+
+static void
+ta_handle (void *arg, state_info_t *successor, transition_info_t *ti, int seen)
+{
+    wctx_t             *ctx = (wctx_t*) arg;
+    alg_local_t        *loc = ctx->local;
+    ta_alg_local_t     *ta_loc = (ta_alg_local_t *) ctx->local;
+    ta_loc->done = 0;
+    ta_loc->subsumes = 0; // if a successor subsumes one in the set, it cannot be subsumed itself (see invariant paper)
+    ta_loc->work = 0;
+    ta_loc->added_at = LM_NULL_LOC;
+    ta_loc->last = LM_NULL_LOC;
+    ta_loc->successor = successor;
+    lm_lock (global->lmap, successor->ref);
+    lm_loc_t last = lm_iterate (global->lmap, successor->ref, ta_covered, ctx);
+    if (!ta_loc->done) {
+        last = (LM_NULL_LOC == ta_loc->last ? last : ta_loc->last);
+        successor->loc = lm_insert_from (global->lmap, successor->ref,
+                                    successor->lattice, TA_WAITING, &last);
+        lm_unlock (global->lmap, successor->ref);
+        ta_loc->counters.inserts++;
+        if (0) { // quite costly: flops
+            if (ta_loc->work > 0)
+                statistics_unrecord (&ta_loc->counters.lattice_ratio, ta_loc->work);
+            statistics_record (&ta_loc->counters.lattice_ratio, ta_loc->work+1);
+        }
+        ta_queue_state (ctx, successor);
+        ta_loc->counters.updates += LM_NULL_LOC != ta_loc->last;
+        loc->counters.visited++;
+    } else {
+        lm_unlock (global->lmap, successor->ref);
+    }
+    action_detect (ctx, ti, successor);
+    if (EXPECT_FALSE(loc->lts != NULL)) {
+        int             src = loc->counters.explored;
+        int            *tgt = successor->data;
+        int             tgt_owner = ref_hash (successor->ref) % W;
+        lts_write_edge (loc->lts, ctx->id, &src, tgt_owner, tgt, ti->labels);
+    }
+    loc->counters.trans++;
+    (void) seen;
+}
+
+static void
+ta_handle_nb (void *arg, state_info_t *successor, transition_info_t *ti, int seen)
+{
+    wctx_t             *ctx = (wctx_t*) arg;
+    alg_local_t        *loc = ctx->local;
+    ta_alg_local_t     *ta_loc = (ta_alg_local_t *) loc;
+    ta_loc->done = 0;
+    ta_loc->subsumes = 0;
+    ta_loc->work = 0;
+    ta_loc->added_at = LM_NULL_LOC;
+    ta_loc->last = LM_NULL_LOC;
+    ta_loc->successor = successor;
+    lm_loc_t last = lm_iterate (global->lmap, successor->ref, ta_covered_nb, ctx);
+    if (!ta_loc->done) {
+        if (LM_NULL_LOC == ta_loc->added_at) {
+            last = (LM_NULL_LOC == ta_loc->last ? last : ta_loc->last);
+            successor->loc = lm_insert_from_cas (global->lmap, successor->ref,
+                                    successor->lattice, TA_WAITING, &last);
+            ta_loc->counters.inserts++;
+        } else {
+            successor->loc = ta_loc->added_at;
+        }
+        ta_queue_state (ctx, successor);
+        ta_loc->counters.updates += LM_NULL_LOC != ta_loc->last;
+        loc->counters.visited++;
+    }
+    loc->counters.trans++;
+    (void) ti; (void) seen;
+}
+
+static inline void
+ta_explore_state (wctx_t *ctx)
+{
+    alg_local_t        *loc = ctx->local;
+    counter_t          *cnt = &loc->counters;
+    size_t              count = 0;
+    if (ctx->local->counters.level_cur >= max_level)
+        return;
+    invariant_detect (ctx, ctx->state.data);
+    count = permute_trans (ctx->permute, &ctx->state,
+                           NONBLOCKING ? ta_handle_nb : ta_handle, ctx);
+    deadlock_detect (ctx, count);
+    maybe_report (cnt->explored, cnt->trans, cnt->level_max, "");
+    loc->counters.explored++;
+}
+
+static inline int
+grab_waiting (wctx_t *ctx, raw_data_t state_data)
+{
+    state_info_deserialize (&ctx->state, state_data, ctx->store);
+    if ((TA_UPDATE_NONE == UPDATE) && !NONBLOCKING)
+        return 1; // we don't need to update the global waiting info
+    return lm_cas_update(global->lmap, ctx->state.loc, ctx->state.lattice, TA_WAITING,
+                                               ctx->state.lattice, TA_PASSED);
+    // lockless! May cause newly created passed state to be deleted by a,
+    // waiting set update. However, this behavior is valid since it can be
+    // simulated by swapping these two operations in the schedule.
+}
+
+void
+ta_dfs (wctx_t *ctx)
+{
+    alg_local_t        *loc = ctx->local;
+    alg_global_t       *sm = ctx->global;
+    counter_t          *cnt = &loc->counters;
+    while (lb_balance(global->lb, ctx->id, dfs_stack_size(sm->stack), split_dfs)) {
+        raw_data_t          state_data = dfs_stack_top (sm->stack);
+        if (NULL != state_data) {
+            if (grab_waiting(ctx, state_data)) {
+                dfs_stack_enter (sm->stack);
+                increase_level (&cnt->level_cur, &cnt->level_max);
+                ta_explore_state (ctx);
+            } else {
+                dfs_stack_pop (sm->stack);
+            }
+        } else {
+            if (0 == dfs_stack_size (sm->stack))
+                continue;
+            dfs_stack_leave (sm->stack);
+            loc->counters.level_cur--;
+            dfs_stack_pop (sm->stack);
+        }
+    }
+}
+
+void
+ta_bfs (wctx_t *ctx)
+{
+    alg_local_t        *loc = ctx->local;
+    alg_global_t       *sm = ctx->global;
+    counter_t          *cnt = &loc->counters;
+    while (lb_balance(global->lb, ctx->id, bfs_load(sm), split_bfs)) {
+        raw_data_t          state_data = dfs_stack_pop (sm->in_stack);
+        if (NULL != state_data) {
+            if (grab_waiting(ctx, state_data)) {
+                ta_explore_state (ctx);
+            }
+        } else {
+            swap (sm->in_stack, sm->out_stack);
+            increase_level (&cnt->level_cur, &cnt->level_max);
+        }
+    }
+}
+
+void
+ta_sbfs (wctx_t *ctx)
+{
+    alg_global_t       *sm = ctx->global;
+    size_t              next_level_size, local_next_size;
+    do {
+        while (lb_balance(global->lb, ctx->id, in_load(sm), split_sbfs)) {
+            raw_data_t          state_data = dfs_stack_pop (sm->in_stack);
+            if (NULL != state_data) {
+                if (grab_waiting(ctx, state_data)) {
+                    ta_explore_state (ctx);
+                }
+            }
+        }
+        local_next_size = dfs_stack_frame_size(sm->out_stack);
+        next_level_size = sbfs_level (ctx, local_next_size);
+        lb_reinit (global->lb, ctx->id);
+        swap (sm->out_stack, sm->in_stack);
+        sm->stack = sm->out_stack;
+    } while (next_level_size > 0 && !lb_is_stopped(global->lb));
+}
+
+void
+ta_pbfs (wctx_t *ctx)
+{
+    alg_local_t        *loc = ctx->local;
+    alg_global_t       *sm = ctx->global;
+    size_t              count;
+    raw_data_t          state_data;
+    int                 labels[SL];
+    do {
+        loc->counters.level_size = 0; // count states in next level
+        loc->flip = 1 - loc->flip;
+        for (size_t i = 0; i < W; i++) {
+            size_t          current = (i << 1) + loc->flip;
+            while ((state_data = isba_pop_int (sm->queues[current])) &&
+                    !lb_is_stopped (global->lb)) {
+                if (grab_waiting(ctx, state_data)) {
+                    ta_explore_state (ctx);
+                    if (EXPECT_FALSE(loc->lts && write_state)){
+                        if (SL > 0)
+                            GBgetStateLabelsAll (ctx->model, ctx->state.data, labels);
+                        lts_write_state (loc->lts, ctx->id, ctx->state.data, labels);
+                    }
+                }
+            }
+        }
+        count = sbfs_level (ctx, loc->counters.level_size);
+    } while (count && !lb_is_stopped(global->lb));
+}
+
+void
+timed_local_init   (run_t *run, wctx_t *ctx)
+{
+    ta_alg_local_t *loc = RTmallocZero (sizeof(ta_alg_local_t));
+    ctx->local = (alg_local_t *) loc;
+    reach_local_setup (run, ctx);
+    statistics_init (&loc->counters.lattice_ratio);
+}
+
+void
+timed_global_init   (run_t *run, wctx_t *ctx)
+{
+    ctx->local = RTmallocZero (sizeof(alg_local_t));
+    reach_global_setup (run, ctx);
+}
+
+void
+timed_destroy   (run_t *run, wctx_t *ctx)
+{
+    reach_destroy (run, ctx);
+}
+
+void
+timed_print_stats   (run_t *run, wctx_t *ctx)
+{
+    reach_print_stats (run, ctx);
+
+    ta_alg_local_t     *ta_loc = (ta_alg_local_t *) ctx->local;
+    size_t              lattices = ta_loc->counters.inserts -
+                                   ta_loc->counters.updates;
+    size_t              db_elts = global->stats.elts;
+    size_t              alloc = lm_allocated (global->lmap);
+    size_t              mem3 = ((double)(sizeof(lattice_t[alloc + db_elts]))) / (1<<20);
+    double lm = ((double)(sizeof(lattice_t[alloc + (1UL<<dbs_size)]))) / (1<<20);
+    double redundancy = (((double)(db_elts + alloc)) / lattices - 1) * 100;
+    Warning (info, "Lattice map: %.1fMB (~%.1fMB paged-in) "
+                   "overhead: %.2f%%, allocated: %zu",
+                   mem3, lm, redundancy, alloc);
+}
+
+void
+timed_run (run_t *run, wctx_t *ctx)
+{
+    transition_info_t       ti = GB_NO_TRANSITION;
+    if (0 == ctx->id) { // only w1 receives load, as it is propagated later
+        if ( Strat_PBFS & strategy[0] )
+            ta_queue_state = pbfs_queue_state;
+        ta_handle (ctx, &ctx->initial, &ti, 0);
+    }
+    ctx->local->counters.trans = 0; //reset trans count
+
+    switch (get_strategy(run->alg)) {
+        case Strat_TA_PBFS:
+            ta_queue_state = pbfs_queue_state;
+            ta_pbfs (ctx);
+            break;
+        case Strat_TA_SBFS:
+            ta_sbfs (ctx);
+            break;
+        case Strat_TA_BFS:
+            ta_bfs (ctx);
+            break;
+        case Strat_TA_DFS:
+            ta_dfs (ctx);
+            break;
+        default: Abort ("Missing case in timed_run");
+    }
+}
+
+void
+timed_shared_init      (run_t *run)
+{
+    set_alg_local_init (run->alg, timed_local_init);
+    set_alg_global_init (run->alg, timed_global_init);
+    set_alg_destroy (run->alg, timed_destroy);
+    set_alg_print_stats (run->alg, timed_print_stats);
+    set_alg_run (run->alg, timed_run);
+}
