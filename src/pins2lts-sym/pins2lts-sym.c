@@ -70,7 +70,7 @@ static vset_t false_states;
 static matrix_t *inhibit_matrix=NULL;
 static matrix_t *class_matrix=NULL;
 
-static enum { BFS_P , BFS , CHAIN_P, CHAIN } strategy = BFS_P;
+static enum { BFS_P, BFS, PAR, PAR_P, CHAIN_P, CHAIN } strategy = BFS_P;
 
 static int expand_groups = 1; // set to 0 if transitions are loaded from file
 
@@ -83,6 +83,10 @@ static char* order = "bfs-prev";
 static si_map_entry ORDER[] = {
     {"bfs-prev", BFS_P},
     {"bfs", BFS},
+#if defined(HAVE_SYLVAN)
+    {"par", PAR},
+    {"par-prev", PAR_P},
+#endif
     {"chain-prev", CHAIN_P},
     {"chain", CHAIN},
     {NULL, 0}
@@ -160,7 +164,11 @@ reach_popt(poptContext con, enum poptCallbackReason reason,
 
 static  struct poptOption options[] = {
     { NULL, 0 , POPT_ARG_CALLBACK|POPT_CBFLAG_POST|POPT_CBFLAG_SKIPOPTION , (void*)reach_popt , 0 , NULL , NULL },
+#ifdef HAVE_SYLVAN
+    { "order" , 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &order , 0 , "set the exploration strategy to a specific order" , "<bfs-prev|bfs|chain-prev|chain|par-prev|par>" },
+#else
     { "order" , 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &order , 0 , "set the exploration strategy to a specific order" , "<bfs-prev|bfs|chain-prev|chain>" },
+#endif
     { "saturation" , 0, POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &saturation , 0 , "select the saturation strategy" , "<none|sat-like|sat-loop|sat-fix|sat>" },
     { "sat-granularity" , 0 , POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &sat_granularity , 0 , "set saturation granularity","<number>" },
     { "save-sat-levels", 0, POPT_ARG_VAL, &save_sat_levels, 1, "save previous states seen at saturation levels", NULL },
@@ -1059,6 +1067,208 @@ reach_bfs(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
         vset_destroy(dlk_temp);
     }
 }
+
+/**
+ * Parallel reachability implementation
+ */
+
+#if defined(HAVE_SYLVAN)
+
+struct reach_par_s
+{
+    vset_t container;
+    vset_t deadlocks; // only used if dlk_detect
+    vset_t temp; // only used if dlk_detect
+    struct reach_par_s *left;
+    struct reach_par_s *right;
+    int index;
+    int next_count;
+};
+
+VOID_TASK_2(reach_par_next, struct reach_par_s *, dummy, bitvector_t *, reach_groups)
+{
+    if (dummy->index >= 0) {
+        if (!bitvector_is_set(reach_groups, dummy->index)) {
+            dummy->next_count = 0;
+            return;
+        }
+        vset_next(dummy->container, dummy->container, group_next[dummy->index]);
+        dummy->next_count = 1;
+        if (dlk_detect) {
+            vset_prev(dummy->temp, dummy->container, group_next[dummy->index]);
+            vset_minus(dummy->deadlocks, dummy->temp);
+            vset_clear(dummy->temp);
+        }
+    } else {
+        vset_copy(dummy->left->container, dummy->container);
+        vset_copy(dummy->right->container, dummy->container);
+
+        if (dlk_detect) {
+            vset_copy(dummy->left->deadlocks, dummy->deadlocks);
+            vset_copy(dummy->right->deadlocks, dummy->deadlocks);
+        }
+
+        SPAWN(reach_par_next, dummy->left, reach_groups);
+        SPAWN(reach_par_next, dummy->right, reach_groups);
+        SYNC(reach_par_next);
+        SYNC(reach_par_next);
+
+        vset_copy(dummy->container, dummy->left->container);
+        vset_union(dummy->container, dummy->right->container);
+        vset_clear(dummy->left->container);
+        vset_clear(dummy->right->container);
+
+        if (dlk_detect) {
+            vset_copy(dummy->deadlocks, dummy->left->deadlocks);
+            vset_intersect(dummy->deadlocks, dummy->right->deadlocks);
+            vset_clear(dummy->left->deadlocks);
+            vset_clear(dummy->right->deadlocks);
+        }
+
+        dummy->next_count = dummy->left->next_count + dummy->right->next_count;
+    }
+}
+
+static struct reach_par_s*
+reach_par_prepare(size_t left, size_t right)
+{
+    struct reach_par_s *result = (struct reach_par_s *)RTmalloc(sizeof(struct reach_par_s));
+    if (right - left == 1) {
+        result->index = left;
+        result->left = NULL;
+        result->right = NULL;
+    } else {
+        result->index = -1;
+        result->left = reach_par_prepare(left, (left+right)/2);
+        result->right = reach_par_prepare((left+right)/2, right);
+    }
+    result->container = vset_create(domain, -1, NULL);
+    if (dlk_detect) {
+        result->temp = vset_create(domain, -1, NULL);
+        result->deadlocks = vset_create(domain, -1, NULL);
+    }
+    return result;
+}
+
+static void
+reach_par_destroy(struct reach_par_s *s)
+{
+    if (s->index == -1) {
+        reach_par_destroy(s->left);
+        reach_par_destroy(s->right);
+    }
+
+    vset_destroy(s->container);
+    if (dlk_detect) {
+        vset_destroy(s->temp);
+        vset_destroy(s->deadlocks);
+    }
+
+    RTfree(s);
+}
+
+static void
+reach_par(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
+              long *eg_count, long *next_count)
+{
+    if (inhibit_matrix!=NULL && dm_nrows(inhibit_matrix)!=0) {
+        Abort("Inhibit matrix not compatible with --order=par!");
+    }
+
+    vset_t old_vis = vset_create(domain, -1, NULL);
+
+    LACE_ME;
+
+    int level = 0;
+    struct reach_par_s *root = reach_par_prepare(0, nGrps);
+
+    while (!vset_equal(visited, old_vis)) {
+        vset_copy(old_vis, visited);
+        if (trc_output != NULL) save_level(visited);
+        stats_and_progress_report(NULL, visited, level);
+        level++;
+
+        // Expand transition relations
+        for (int i = 0; i < nGrps; i++) {
+            if (!bitvector_is_set(reach_groups,i)) continue;
+            expand_group_next(i, visited);
+            (*eg_count)++;
+        }
+
+        vset_copy(root->container, visited);
+        if (dlk_detect) vset_copy(root->deadlocks, visited);
+        CALL(reach_par_next, root, reach_groups);
+        if (dlk_detect) deadlock_check(root->deadlocks, reach_groups);
+
+        *next_count += root->next_count;
+
+        vset_union(visited, root->container);
+        vset_clear(root->container);
+        vset_reorder(domain);
+    }
+
+    reach_par_destroy(root);
+
+    return;
+    (void)visited_old;
+    (void)next_count;
+}
+
+static void
+reach_par_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
+              long *eg_count, long *next_count)
+{
+    if (inhibit_matrix!=NULL && dm_nrows(inhibit_matrix)!=0) {
+        Abort("Inhibit matrix not compatible with --order=par_prev!");
+    }
+
+    vset_t current_level = vset_create(domain, -1, NULL);
+    vset_copy(current_level, visited);
+    if (save_sat_levels) vset_minus(current_level, visited_old);
+
+    LACE_ME;
+
+    int level = 0;
+    struct reach_par_s *root = reach_par_prepare(0, nGrps);
+
+    while (!vset_is_empty(current_level)) {
+        if (trc_output != NULL) save_level(visited);
+        stats_and_progress_report(NULL, visited, level);
+        level++;
+
+        // Expand transition relations
+        for (int i = 0; i < nGrps; i++) {
+            if (!bitvector_is_set(reach_groups,i)) continue;
+            expand_group_next(i, current_level);
+            (*eg_count)++;
+        }
+
+        vset_copy(root->container, current_level);
+        if (dlk_detect) vset_copy(root->deadlocks, current_level);
+        CALL(reach_par_next, root, reach_groups);
+        if (dlk_detect) deadlock_check(root->deadlocks, reach_groups);
+
+        *next_count += root->next_count;
+
+        vset_minus(root->container, visited);
+
+#if defined(LTSMIN_PBES)
+        if (pgreduce_flag) reduce_parity_game(root->container, visited, true_states, false_states);
+#endif
+
+        vset_copy(current_level, root->container);
+        vset_clear(root->container);
+        vset_union(visited, current_level);
+        vset_reorder(domain);
+    }
+
+    reach_par_destroy(root);
+
+    return;
+    (void)next_count;
+}
+
+#endif
 
 static void
 reach_chain_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
@@ -2238,6 +2448,12 @@ actual_main(void)
     switch (strategy) {
     case BFS_P:
         reach_proc = reach_bfs_prev;
+        break;
+    case PAR:
+        reach_proc = reach_par;
+        break;
+    case PAR_P:
+        reach_proc = reach_par_prev;
         break;
     case BFS:
         reach_proc = reach_bfs;
