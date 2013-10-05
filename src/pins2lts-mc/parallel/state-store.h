@@ -53,6 +53,7 @@ extern int              local_bits;
 extern int              indexing;
 
 extern void init_dbs ();
+
 extern void *get_state (ref_t ref, void *arg);
 
 #endif // STATE_STORE_H

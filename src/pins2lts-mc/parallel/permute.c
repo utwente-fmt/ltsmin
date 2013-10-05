@@ -265,7 +265,7 @@ permute_one (void *arg, transition_info_t *ti, state_data_t dst)
         }
     case Perm_None:
         seen = state_info_initialize (&successor, dst, ti, perm->state,
-                                      ((wctx_t *)perm->ctx)->store2);
+                                      ((wctx_t *)perm->ctx)->store2); // TODO
         if (seen < 0)
             if (lb_stop(global->lb)) Warning (info, "Error: %s full! Change -s/--ratio.", full_msg(seen));
         perm->real_cb (perm->ctx, &successor, ti, seen);

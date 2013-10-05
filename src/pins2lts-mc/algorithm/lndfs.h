@@ -24,7 +24,6 @@
 
 #include <pins2lts-mc/algorithm/ndfs.h>
 
-
 extern void lndfs_blue (run_t *alg, wctx_t *ctx);
 
 #endif // LNDFS_H

@@ -6,7 +6,6 @@
 
 #include <stdlib.h>
 
-#include <pins-lib/pins-impl.h>
 #include <pins2lts-mc/algorithm/algorithm.h>
 #include <pins2lts-mc/algorithm/dfs-fifo.h>
 #include <pins2lts-mc/algorithm/ltl.h>
@@ -67,8 +66,8 @@ options_static_setup      (model_t model, bool timed)
         }
     }
 
-    if (PINS_POR && (strategy[0] & Strat_LTL)) {
-        if (W > 1) Abort ("Cannot use POR with more than one thread/process.");
+    if (PINS_POR && (strategy[0] & Strat_LTL & ~Strat_DFSFIFO)) {
+        if (W > 1) Abort ("Cannot use POR with more than one worker.");
         if (proviso == Proviso_None) {
             Warning (info, "Forcing use of the stack cycle proviso");
             proviso = Proviso_Stack;
@@ -103,7 +102,7 @@ print_options (model_t model)
     if (act_detect)
         Warning(info, "Detecting action \"%s\"", act_detect);
     Warning (info, "Running %s using %zu %s", key_search(strategies, strategy[0] & ~Strat_TA),
-             W, W == 1 ? "core (sequential)" : (SPEC_MT_SAFE ? "threads" : "processes"));
+             W, W == 1 ? "core (sequential)" : "cores");
     if (db_type == HashTable) {
         Warning (info, "Using a hash table with 2^%d elements", dbs_size);
     } else
@@ -197,7 +196,6 @@ struct poptOption alg_options_extra[] = {
     {NULL, 0, POPT_ARG_INCLUDE_TABLE, state_store_options, 0, "State store options", NULL},
     {NULL, 0, POPT_ARG_INCLUDE_TABLE, perm_options, 0, "Permutation options", NULL},
     {NULL, 0, POPT_ARG_INCLUDE_TABLE, greybox_options, 0, "Greybox options", NULL},
-    SPEC_POPT_OPTIONS,
     POPT_TABLEEND
 };
 

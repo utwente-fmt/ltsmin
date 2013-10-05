@@ -3,22 +3,20 @@
 #include <stdlib.h>
 
 #include <mc-lib/statistics.h>
-#include <pins2lts-mc/algorithm/cndfs.h>
 #include <pins2lts-mc/algorithm/ndfs.h>
+#include <pins2lts-mc/algorithm/cndfs.h>
+#include <pins2lts-mc/algorithm/timed.h>
 #include <pins2lts-mc/algorithm/timed-cndfs.h>
 
-typedef struct ta_counter_s {
-    counter_t           ndfs;
-
-    size_t              deletes;        // lattice deletes
-    size_t              updates;        // lattice updates
-    size_t              inserts;        // lattice inserts
-    statistics_t        lattice_ratio;  // On-the-fly calc of stdev/mean of #lat
+typedef struct cta_counter_s {
+    ta_counter_t        timed;
+    size_t              sub_cyan;       // subsumed by cyan
+    size_t              sub_red;        // subsumed by red
     rt_timer_t          timer;
-} ta_counter_t;
+} cta_counter_t;
 
 typedef struct ta_alg_local_s {
-    alg_local_t         ndfs;
+    cndfs_alg_local_t   cndfs;
 
     dfs_stack_t         out_stack;       //
     lm_loc_t            added_at;       // successor is added at location
@@ -27,9 +25,14 @@ typedef struct ta_alg_local_s {
     int                 subsumes;       // successor subsumes a state in LMAP
     int                 done;
 
-    ta_counter_t        counters;
-    ta_counter_t        red;
+    cta_counter_t       counters;
 } ta_alg_local_t;
+
+typedef struct ta_reduced_s {
+    cndfs_reduced_t     cndfs;
+    cta_counter_t       counters;
+    float               waittime;
+} ta_reduced_t;
 
 //static const lm_status_t LM_WHITE = 0;
 static const lm_status_t LM_RED  = 1;
@@ -50,7 +53,7 @@ ta_cndfs_covered (void *arg, lattice_t l, lm_status_t status, lm_loc_t lm)
     if (UPDATE != 0 && (color & status & LM_RED)) {
         if ( GBisCoveredByShort(ctx->model, succ_l, (int*)&l) ) {
             ta_loc->done = 1;
-            ta_loc->red.updates++; // count (strictly) subsumed by reds
+            ta_loc->counters.sub_red++; // count (strictly) subsumed by reds
             return LM_CB_STOP;
         }
     }
@@ -81,6 +84,7 @@ ta_cndfs_spray (void *arg, lattice_t l, lm_status_t status, lm_loc_t lm)
 {
     wctx_t             *ctx = (wctx_t *) arg;
     ta_alg_local_t     *ta_loc = (ta_alg_local_t *) ctx->local;
+    ta_counter_t       *cnt = (ta_counter_t *) &ta_loc->counters;
     lm_status_t         color = (lm_status_t)ta_loc->subsumes;
 
     if (UPDATE != 0) {
@@ -95,7 +99,7 @@ ta_cndfs_spray (void *arg, lattice_t l, lm_status_t status, lm_loc_t lm)
             if ( GBisCoveredByShort(ctx->model, (int*)&l, succ_l) ) {
                 lm_delete (global->lmap, lm);
                 ta_loc->last = (LM_NULL_LOC == ta_loc->last ? lm : ta_loc->last);
-                ta_loc->counters.deletes++;
+                cnt->deletes++;
             }
         }
     } else {
@@ -115,6 +119,7 @@ ta_cndfs_spray_nb (void *arg, lattice_t l, lm_status_t status, lm_loc_t lm)
 {
     wctx_t             *ctx = (wctx_t *) arg;
     ta_alg_local_t     *ta_loc = (ta_alg_local_t *) ctx->local;
+    ta_counter_t       *cnt = (ta_counter_t *) &ta_loc->counters;
     lm_status_t         color = (lm_status_t)ta_loc->subsumes;
     lattice_t           lattice = ta_loc->successor->lattice;
 
@@ -140,7 +145,7 @@ ta_cndfs_spray_nb (void *arg, lattice_t l, lm_status_t status, lm_loc_t lm)
                     }
                 } else {                            // delete second etc
                     lm_cas_delete (global->lmap, lm, l, status);
-                    ta_loc->counters.deletes++;
+                    cnt->deletes++;
                 }
             }
         }
@@ -166,6 +171,7 @@ static inline int
 ta_cndfs_mark (wctx_t *ctx, state_info_t *state, lm_status_t color)
 {
     ta_alg_local_t     *ta_loc = (ta_alg_local_t *) ctx->local;
+    ta_counter_t       *cnt = (ta_counter_t *) &ta_loc->counters;
     lm_loc_t            last;
     ta_loc->successor = state;
     ta_loc->subsumes = color;
@@ -176,7 +182,7 @@ ta_cndfs_mark (wctx_t *ctx, state_info_t *state, lm_status_t color)
         last = lm_iterate (global->lmap, state->ref, ta_cndfs_spray_nb, ctx);
         if (!ta_loc->done) {
             lm_insert_from_cas (global->lmap, state->ref, state->lattice, color, &last);
-            ta_loc->counters.inserts++;
+            cnt->inserts++;
         }
     } else {
         lm_lock (global->lmap, state->ref);
@@ -184,7 +190,7 @@ ta_cndfs_mark (wctx_t *ctx, state_info_t *state, lm_status_t color)
         if (!ta_loc->done) {
             last = (LM_NULL_LOC == ta_loc->last ? last : ta_loc->last);
             lm_insert_from (global->lmap, state->ref, state->lattice, color, &last);
-            ta_loc->counters.inserts++;
+            cnt->inserts++;
         }
         lm_unlock (global->lmap, state->ref);
     }
@@ -270,7 +276,7 @@ ta_cndfs_subsumes_cyan (wctx_t *ctx, state_info_t *s)
             return true;
         }
         if (GBisCoveredByShort(ctx->model, (int*)&state.lattice, (int*)&s->lattice)) {
-            ta_loc->red.deletes++;
+            ta_loc->counters.sub_cyan++;
             return true;
         }
         iteration++;
@@ -282,13 +288,14 @@ static void
 ta_cndfs_handle_nonseed_accepting (wctx_t *ctx)
 {
     alg_local_t        *loc = ctx->local;
+    cndfs_alg_local_t  *cndfs_loc = (cndfs_alg_local_t *) ctx->local;
     ta_alg_local_t     *ta_loc = (ta_alg_local_t *) ctx->local;
     size_t              nonred, accs;
     nonred = accs = dfs_stack_size (ta_loc->out_stack);
     if (nonred) {
         loc->red.waits++;
-        loc->counters.rec += accs;
-        RTstartTimer (ta_loc->red.timer);
+        cndfs_loc->counters.rec += accs;
+        RTstartTimer (ta_loc->counters.timer);
         while ( nonred && !lb_is_stopped(global->lb) ) {
             nonred = 0;
             for (size_t i = 0; i < accs; i++) {
@@ -299,7 +306,7 @@ ta_cndfs_handle_nonseed_accepting (wctx_t *ctx)
                 }
             }
         }
-        RTstopTimer (ta_loc->red.timer);
+        RTstopTimer (ta_loc->counters.timer);
     }
     for (size_t i = 0; i < accs; i++)
         dfs_stack_pop (ta_loc->out_stack);
@@ -385,7 +392,7 @@ ta_cndfs_explore_state_red (wctx_t *ctx, counter_t *cnt)
     increase_level (&cnt->level_cur, &cnt->level_max);
     cnt->trans += permute_trans (ctx->permute, &ctx->state, ta_cndfs_handle_red, ctx);
     cnt->explored++;
-    maybe_report (cnt->explored, cnt->trans, cnt->level_max, "[R] ");
+    maybe_report1 (cnt->explored, cnt->trans, cnt->level_max, "[R] ");
 }
 
 static inline void
@@ -526,9 +533,48 @@ ta_cndfs_destroy   (run_t *run, wctx_t *ctx)
 }
 
 void
+ta_cndfs_destroy_local   (run_t *run, wctx_t *ctx)
+{
+    (void) run; (void) ctx;
+}
+
+void
 ta_cndfs_print_stats   (run_t *run, wctx_t *ctx)
 {
     cndfs_print_stats (run, ctx);
+
+    ta_print_stats   (run, ctx);
+
+    ta_alg_local_t         *ta_loc = (ta_alg_local_t *) ctx->local;
+    ta_reduced_t           *reduced = (ta_reduced_t *) run->reduced;
+    Warning (infoLong, "Red subsumed: %zu", ta_loc->counters.sub_red);
+    Warning (infoLong, "Cyan subsumed: %zu", ta_loc->counters.sub_cyan);
+    Warning (infoLong, "Wait time: %.1f sec", reduced->waittime);
+}
+
+static void
+add_results (cta_counter_t *res, cta_counter_t *cnt)
+{
+    ta_add_results ((ta_counter_t *)res, (ta_counter_t *)cnt);
+    res->sub_cyan += cnt->sub_cyan;
+    res->sub_red += cnt->sub_red;
+}
+
+void
+ta_cndfs_reduce   (run_t *run, wctx_t *ctx)
+{
+    if (run->reduced == NULL) {
+        run->reduced = RTmallocZero (sizeof (ta_reduced_t));
+        ta_reduced_t           *reduced = (ta_reduced_t *) run->reduced;
+        reduced->waittime = 0;
+    }
+    ta_reduced_t           *reduced = (ta_reduced_t *) run->reduced;
+    ta_alg_local_t         *ta_loc = (ta_alg_local_t *) ctx->local;
+
+    reduced->waittime += RTrealTime(ta_loc->counters.timer);
+    add_results (&reduced->counters, &ta_loc->counters);
+
+    cndfs_reduce (run, ctx);
 }
 
 void
@@ -536,8 +582,10 @@ ta_cndfs_shared_init   (run_t *run)
 {
     set_alg_local_init (run->alg, ta_cndfs_local_init);
     set_alg_global_init (run->alg, ta_cndfs_global_init);
-    set_alg_destroy (run->alg, ta_cndfs_destroy);
+    set_alg_global_deinit (run->alg, ta_cndfs_destroy);
+    set_alg_local_deinit (run->alg, ta_cndfs_destroy);
     set_alg_print_stats (run->alg, ta_cndfs_print_stats);
     set_alg_run (run->alg, ta_cndfs_blue);
+    set_alg_reduce (run->alg, ta_cndfs_reduce);
 }
 

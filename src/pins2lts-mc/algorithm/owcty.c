@@ -303,7 +303,7 @@ owcty_reachability (wctx_t *ctx)
             permute_trans (ctx->permute, &ctx->state, handle, ctx);
             loc->counters.visited++;
             loc->counters.explored++;
-            maybe_report (cnt->explored, cnt->trans, cnt->level_max, "");
+            maybe_report1 (cnt->explored, cnt->trans, cnt->level_max, "");
         } else {
             if (0 == dfs_stack_nframes (sm->stack)) {
                 while ((state_data = dfs_stack_pop (sm->in_stack))) {
@@ -399,7 +399,7 @@ owcty_elimination (wctx_t *ctx)
             increase_level (&cnt->level_cur, &cnt->level_max);
             state_info_deserialize (&ctx->state, state_data, ctx->store);
             permute_trans (ctx->permute, &ctx->state, owcty_elimination_handle, ctx);
-            maybe_report (cnt->explored, cnt->trans, cnt->level_max, "");
+            maybe_report1 (cnt->explored, cnt->trans, cnt->level_max, "");
             loc->counters.explored++;
         } else {
             if (0 == dfs_stack_nframes (sm->stack))
@@ -482,8 +482,6 @@ owcty (run_t *run, wctx_t *ctx)
 }
 
 struct alg_reduced_s {
-    float               runtime;
-    float               maxtime;
     counter_t           counters;
 };
 
@@ -502,19 +500,16 @@ owcty_reduce  (run_t *run, wctx_t *ctx)
 {
     if (run->reduced == NULL) {
         run->reduced = RTmallocZero (sizeof (alg_reduced_t));
-        run->reduced->runtime = 0;
     }
     alg_reduced_t          *reduced = run->reduced;
     counter_t              *cnt = &ctx->local->counters;
-    float                   runtime = RTrealTime(ctx->timer);
 
-    reduced->runtime += runtime;
-    reduced->maxtime = max (runtime, reduced->maxtime);
     add_results (&reduced->counters, cnt);
 
     if (W >= 4 || !log_active(infoLong)) return;
 
     // print some local info
+    float                   runtime = RTrealTime(ctx->timer);
     Warning (info, "saw in %.3f sec %zu levels %zu states %zu transitions",
              runtime, cnt->level_max, cnt->explored, cnt->trans);
 
@@ -584,8 +579,8 @@ owcty_shared_init   (run_t *run)
 {
     set_alg_local_init (run->alg, owcty_local_init);
     set_alg_global_init (run->alg, owcty_global_init);
-    set_alg_destroy (run->alg, owcty_destroy);
-    set_alg_destroy_local (run->alg, owcty_destroy_local);
+    set_alg_global_deinit (run->alg, owcty_destroy);
+    set_alg_local_deinit (run->alg, owcty_destroy_local);
     set_alg_print_stats (run->alg, owcty_print_stats);
     set_alg_run (run->alg, owcty);
     set_alg_reduce (run->alg, owcty_reduce);

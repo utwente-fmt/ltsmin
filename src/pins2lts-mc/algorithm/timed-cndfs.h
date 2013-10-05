@@ -21,6 +21,4 @@
 #ifndef TIMED_CNDFS_H
 #define TIMED_CNDFS_H
 
-#include <pins2lts-mc/algorithm/timed.h>
-
 #endif // TIMED_CNDFS_H

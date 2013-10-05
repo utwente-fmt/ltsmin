@@ -38,7 +38,6 @@ add_results (counter_t *res, counter_t *cnt)
     res->allred += cnt->allred;
     res->waits += cnt->waits;
     res->bogus_red += cnt->bogus_red;
-    res->rec += cnt->rec;
     res->exit += cnt->exit;
 }
 
@@ -166,7 +165,7 @@ ndfs_explore_state_red (wctx_t *ctx)
     dfs_stack_enter (loc->stack);
     increase_level (&cnt->level_cur, &cnt->level_max);
     cnt->trans += permute_trans (ctx->permute, &ctx->state, ndfs_red_handle, ctx);
-    maybe_report (cnt->explored, cnt->trans, cnt->level_max, "[R] ");
+    maybe_report (cnt->explored, cnt->trans, cnt->level_max, "[Red ] ");
 }
 
 void
@@ -177,7 +176,7 @@ ndfs_explore_state_blue (wctx_t *ctx)
     increase_level (&cnt->level_cur, &cnt->level_max);
     cnt->trans += permute_trans (ctx->permute, &ctx->state, ndfs_blue_handle, ctx);
     cnt->explored++;
-    maybe_report (cnt->explored, cnt->trans, cnt->level_max, "[B] ");
+    maybe_report (cnt->explored, cnt->trans, cnt->level_max, "[Blue] ");
 }
 
 /* NNDFS dfs_red */
@@ -272,21 +271,18 @@ ndfs_reduce  (run_t *run, wctx_t *ctx)
 {
     if (run->reduced == NULL) {
         run->reduced = RTmallocZero (sizeof (alg_reduced_t));
-        run->reduced->runtime = 0;
     }
     alg_reduced_t          *reduced = run->reduced;
     counter_t              *cnt = &ctx->local->counters;
     counter_t              *red = &ctx->local->red;
-    float                   runtime = RTrealTime(ctx->timer);
 
-    reduced->runtime += runtime;
-    reduced->maxtime = max (runtime, reduced->maxtime);
     add_results (&reduced->blue, cnt);
     add_results (&reduced->red, red);
 
     if (W >= 4 || !log_active(infoLong)) return;
 
     // print some local info
+    float                   runtime = RTrealTime(ctx->timer);
     Warning (info, "[Blue] saw in %.3f sec %zu levels %zu states %zu transitions",
              runtime, cnt->level_max, cnt->explored, cnt->trans);
 
@@ -321,6 +317,17 @@ ndfs_local_setup   (run_t *run, wctx_t *ctx)
     loc->stack = dfs_stack_create (state_info_int_size());
 }
 
+void
+ndfs_destroy_local   (run_t *run, wctx_t *ctx)
+{
+    alg_local_t        *loc = ctx->local;
+    if (all_red)
+        bitvector_free (&loc->all_red);
+    bitvector_free (&loc->color_map);
+    dfs_stack_destroy (loc->stack);
+    RTfree (loc);
+}
+
 int
 ndfs_state_seen (void *ptr, ref_t ref, int seen)
 {
@@ -338,12 +345,7 @@ ndfs_global_init   (run_t *run, wctx_t *ctx)
 void
 ndfs_destroy   (run_t *run, wctx_t *ctx)
 {
-    alg_local_t        *loc = ctx->local;
-    if (all_red)
-        bitvector_free (&loc->all_red);
-    bitvector_free (&loc->color_map);
-    dfs_stack_destroy (loc->stack);
-    RTfree (loc);
+    (void) run; (void) ctx;
 }
 
 void
@@ -382,7 +384,7 @@ ndfs_print_stats   (run_t *run, wctx_t *ctx)
     size_t              accepting = run->reduced->blue.accepting / W;
 
     //RTprintTimer (info, ctx->timer, "Total exploration time ");
-    Warning (info, "Total exploration time %5.3f real", run->reduced->maxtime);
+    Warning (info, "Total exploration time %5.3f real", run->maxtime);
 
     Warning (info, " ");
     Warning (info, "State space has %zu states, %zu are accepting", db_elts, accepting);
@@ -395,10 +397,6 @@ ndfs_print_stats   (run_t *run, wctx_t *ctx)
     run->reduced->blue.allred /= W;
     run->reduced->red.allred /= W;
     ndfs_print_state_stats (run, ctx, 0, 0);
-
-    size_t mem3 = ((double)(((((size_t)local_bits)<<dbs_size))/8*W)) / (1UL<<20);
-    Warning (info, " ");
-    Warning (info, "Total memory used for local state coloring: %.1fMB", mem3);
 }
 
 void
@@ -406,7 +404,8 @@ ndfs_shared_init   (run_t *run)
 {
     set_alg_local_init (run->alg, ndfs_local_init);
     set_alg_global_init (run->alg, ndfs_global_init);
-    set_alg_destroy (run->alg, ndfs_destroy);
+    set_alg_global_deinit (run->alg, ndfs_destroy);
+    set_alg_local_deinit (run->alg, ndfs_destroy_local);
     set_alg_print_stats (run->alg, ndfs_print_stats);
     set_alg_run (run->alg, ndfs_blue);
     set_alg_state_seen (run->alg, ndfs_state_seen);

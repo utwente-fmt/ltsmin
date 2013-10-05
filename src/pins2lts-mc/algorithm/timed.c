@@ -32,15 +32,6 @@ struct poptOption timed_options[] = {
     POPT_TABLEEND
 };
 
-typedef struct ta_counter_s {
-    counter_t           reach;
-
-    size_t              deletes;        // lattice deletes
-    size_t              updates;        // lattice updates
-    size_t              inserts;        // lattice inserts
-    statistics_t        lattice_ratio;  // On-the-fly calc of stdev/mean of #lat
-} ta_counter_t;
-
 typedef struct ta_alg_local_s {
     alg_local_t         reach;
 
@@ -53,6 +44,11 @@ typedef struct ta_alg_local_s {
 
     ta_counter_t        counters;
 } ta_alg_local_t;
+
+typedef struct ta_reduced_s {
+    alg_reduced_t       reach;
+    ta_counter_t        counters;
+} ta_reduced_t;
 
 typedef enum ta_set_e {
     TA_WAITING = 0,
@@ -212,7 +208,7 @@ ta_explore_state (wctx_t *ctx)
     count = permute_trans (ctx->permute, &ctx->state,
                            NONBLOCKING ? ta_handle_nb : ta_handle, ctx);
     deadlock_detect (ctx, count);
-    maybe_report (cnt->explored, cnt->trans, cnt->level_max, "");
+    maybe_report1 (cnt->explored, cnt->trans, cnt->level_max, "");
     loc->counters.explored++;
 }
 
@@ -348,10 +344,14 @@ timed_destroy   (run_t *run, wctx_t *ctx)
 }
 
 void
-timed_print_stats   (run_t *run, wctx_t *ctx)
+timed_destroy_local (run_t *run, wctx_t *ctx)
 {
-    reach_print_stats (run, ctx);
+    reach_destroy_local (run, ctx);
+}
 
+void
+ta_print_stats   (run_t *run, wctx_t *ctx)
+{
     ta_alg_local_t     *ta_loc = (ta_alg_local_t *) ctx->local;
     size_t              lattices = ta_loc->counters.inserts -
                                    ta_loc->counters.updates;
@@ -363,6 +363,47 @@ timed_print_stats   (run_t *run, wctx_t *ctx)
     Warning (info, "Lattice map: %.1fMB (~%.1fMB paged-in) "
                    "overhead: %.2f%%, allocated: %zu",
                    mem3, lm, redundancy, alloc);
+
+    Warning (infoLong, " ");
+    Warning (infoLong, "Lattice map statistics:");
+    Warning (infoLong, "Memory usage: %.2f", mem3);
+    Warning (infoLong, "Ratio: %.2f",  ((double)lattices/db_elts));
+    Warning (infoLong, "Inserts: %zu", ta_loc->counters.inserts);
+    Warning (infoLong, "Updates: %zu", ta_loc->counters.updates);
+    Warning (infoLong, "Deletes: %zu", ta_loc->counters.deletes);
+    //TODO: detailed lmap overhead stats
+}
+
+void
+timed_print_stats   (run_t *run, wctx_t *ctx)
+{
+    reach_print_stats (run, ctx);
+
+    ta_print_stats (run, ctx);
+}
+
+void
+ta_add_results (ta_counter_t *res, ta_counter_t *cnt)
+{
+    res->deletes += cnt->deletes;
+    res->inserts += cnt->inserts;
+    res->updates += cnt->updates;
+    statistics_union (&res->lattice_ratio, &res->lattice_ratio,
+                      &cnt->lattice_ratio);
+}
+
+void
+timed_reduce (run_t *run, wctx_t *ctx)
+{
+    if (run->reduced == NULL) {
+        run->reduced = RTmallocZero (sizeof (ta_reduced_t));
+    }
+    ta_reduced_t           *reduced = (ta_reduced_t *) run->reduced;
+    ta_alg_local_t         *ta_loc = (ta_alg_local_t *) ctx->local;
+
+    ta_add_results (&reduced->counters, &ta_loc->counters);
+
+    reach_reduce (run, ctx);
 }
 
 void
@@ -399,7 +440,9 @@ timed_shared_init      (run_t *run)
 {
     set_alg_local_init (run->alg, timed_local_init);
     set_alg_global_init (run->alg, timed_global_init);
-    set_alg_destroy (run->alg, timed_destroy);
+    set_alg_global_deinit (run->alg, timed_destroy);
+    set_alg_local_deinit (run->alg, timed_destroy_local);
     set_alg_print_stats (run->alg, timed_print_stats);
     set_alg_run (run->alg, timed_run);
+    set_alg_reduce (run->alg, timed_reduce);
 }

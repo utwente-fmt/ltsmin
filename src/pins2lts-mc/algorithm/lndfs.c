@@ -4,7 +4,7 @@
 
 #include <hre/config.h>
 
-#include <pins2lts-mc/algorithm/ndfs.h>
+#include <pins2lts-mc/algorithm/lndfs.h>
 #include <pins2lts-mc/parallel/color.h>
 #include <pins2lts-mc/parallel/permute.h>
 #include <pins2lts-mc/parallel/state-info.h>
@@ -119,7 +119,11 @@ lndfs_destroy   (run_t *run, wctx_t *ctx)
 void
 lndfs_print_stats   (run_t *run, wctx_t *ctx)
 {
-    (void) run; (void) ctx;
+    ndfs_print_stats (run, ctx);
+
+    Warning (infoLong, " ");
+    Warning (infoLong, "LNDFS waits:");
+    Warning (infoLong, "Waits: %zu",  run->reduced->blue.waits);
 }
 
 void
@@ -127,7 +131,7 @@ lndfs_shared_init   (run_t *run)
 {
     set_alg_local_init (run->alg, lndfs_local_init);
     set_alg_global_init (run->alg, lndfs_global_init);
-    set_alg_destroy (run->alg, lndfs_destroy);
+    set_alg_global_deinit (run->alg, lndfs_destroy);
     set_alg_print_stats (run->alg, lndfs_print_stats);
     set_alg_run (run->alg, lndfs_blue);
     set_alg_state_seen (run->alg, ndfs_state_seen);

@@ -15,7 +15,6 @@
 
 extern int              all_red;
 
-
 // used for tracing // TODO
 typedef union ta_cndfs_state_u {
     struct val_s {
@@ -31,11 +30,10 @@ typedef struct counter_s {
     size_t              level_max;
     size_t              level_cur;
 
+    size_t              waits;
     size_t              accepting;
     size_t              allred;         // counter: allred states
-    size_t              waits;          // number of waits for WIP
     size_t              bogus_red;      // number of bogus red colorings
-    size_t              rec;            // recursive ndfss
     size_t              exit;           // recursive ndfss
 } counter_t;
 
@@ -57,8 +55,6 @@ struct alg_local_s {
 };
 
 struct alg_reduced_s {
-    float               maxtime;
-    float               runtime;
     counter_t           blue;
     counter_t           red;
 };
@@ -75,9 +71,11 @@ extern void ndfs_local_setup   (run_t *alg, wctx_t *ctx);
 
 extern void ndfs_global_init   (run_t *alg, wctx_t *ctx);
 
+extern void ndfs_print_stats   (run_t *alg, wctx_t *ctx);
+
 extern void ndfs_report_cycle (wctx_t *ctx, state_info_t *cycle_closing_state);
 
-extern int ndfs_state_seen (void *ptr, ref_t ref, int seen);
+extern int  ndfs_state_seen (void *ptr, ref_t ref, int seen);
 
 extern void ndfs_print_state_stats (run_t* run, wctx_t* ctx, int index,
                                     float waittime);

@@ -26,9 +26,29 @@
 #ifndef CNDFS_H
 #define CNDFS_H
 
-#include <pins2lts-mc/parallel/run.h>
-#include <pins2lts-mc/parallel/worker.h>
+#include <pins2lts-mc/algorithm/lndfs.h>
+
+typedef struct cndfs_counter_s {
+    size_t              rec;
+} cndfs_counter_t;
+
+typedef struct cndfs_alg_local_s {
+    alg_local_t         ndfs;
+
+    cndfs_counter_t     counters;
+    dfs_stack_t         out_stack;
+    rt_timer_t          timer;
+    alg_local_t        *rec;
+} cndfs_alg_local_t;
+
+typedef struct cndfs_reduced_s {
+    alg_reduced_t       ndfs;
+    size_t              rec;
+    float               waittime;
+} cndfs_reduced_t;
 
 extern void cndfs_print_stats   (run_t *run, wctx_t *ctx);
+
+extern void cndfs_reduce        (run_t *run, wctx_t *ctx);
 
 #endif // CNDFS_H

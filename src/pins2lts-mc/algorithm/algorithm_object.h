@@ -15,8 +15,8 @@ typedef struct alg_obj_s {
     alg_run_f               alg_run;
     alg_reduce_f            alg_reduce;
     alg_print_stats_f       alg_print_stats;
-    alg_destroy_f           alg_destroy;
-    alg_destroy_local_f     alg_destroy_local;
+    alg_global_deinit_f     alg_global_deinit;
+    alg_local_deinit_f      alg_local_deinit;
     alg_global_bits_f       alg_global_bits;
     alg_state_seen_f        alg_state_seen;
 } alg_obj_t;

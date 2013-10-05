@@ -20,7 +20,16 @@
 #ifndef TIMED_H
 #define TIMED_H
 
+#include <mc-lib/statistics.h>
+
 extern struct poptOption timed_options[];
+
+typedef struct ta_counter_s {
+    size_t              deletes;        // lattice deletes
+    size_t              updates;        // lattice updates
+    size_t              inserts;        // lattice inserts
+    statistics_t        lattice_ratio;  // On-the-fly calc of stdev/mean of #lat
+} ta_counter_t;
 
 typedef enum ta_update_e {
     TA_UPDATE_NONE = 0,
@@ -31,5 +40,9 @@ typedef enum ta_update_e {
 extern int              LATTICE_BLOCK_SIZE;
 extern int              UPDATE;
 extern int              NONBLOCKING;
+
+extern void ta_add_results (ta_counter_t *res, ta_counter_t *cnt);
+
+extern void ta_print_stats (run_t *run, wctx_t *ctx);
 
 #endif // TIMED_H

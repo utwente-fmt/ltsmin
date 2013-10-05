@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include <hre/user.h>
 #include <lts-io/user.h>
 #include <ltsmin-lib/ltsmin-standard.h>
 #include <mc-lib/trace.h>
@@ -189,7 +190,7 @@ explore_state (wctx_t *ctx)
     count = permute_trans (ctx->permute, &ctx->state, reach_handle, ctx);
     deadlock_detect (ctx, count);
     counter_t          *cnt = &ctx->local->counters;
-    maybe_report (cnt->explored, cnt->trans, cnt->level_max, "");
+    maybe_report1 (cnt->explored, cnt->trans, cnt->level_max, "");
 }
 
 void
@@ -297,7 +298,7 @@ pbfs_queue_state (wctx_t *ctx, state_info_t *successor)
 {
     alg_local_t        *loc = ctx->local;
     hash64_t            h = ref_hash (successor->ref);
-    alg_global_t       *remote = global->contexts[h % W]->global;
+    alg_global_t       *remote = ctx->run->contexts[h % W]->global;
     size_t              local_next = (ctx->id << 1) + (1 - loc->flip);
     raw_data_t stack_loc = isba_push_int (remote->queues[local_next], NULL); // communicate
     state_info_serialize (successor, stack_loc);
@@ -346,10 +347,10 @@ pbfs (wctx_t *ctx)
                     !lb_is_stopped(global->lb)) {
                 state_info_deserialize (&ctx->state, state_data, ctx->store);
                 invariant_detect (ctx, ctx->state.data);
-                count = permute_trans (ctx->permute, &ctx->state, pbfs_handle, loc);
+                count = permute_trans (ctx->permute, &ctx->state, pbfs_handle, ctx);
                 deadlock_detect (ctx, count);
                 counter_t          *cnt = &loc->counters;
-                maybe_report (cnt->explored, cnt->trans, cnt->level_max, "");
+                maybe_report1 (cnt->explored, cnt->trans, cnt->level_max, "");
                 if (EXPECT_FALSE(loc->lts && write_state)){
                     if (SL > 0)
                         GBgetStateLabelsAll (ctx->model, ctx->state.data, labels);
@@ -384,23 +385,20 @@ reach_reduce  (run_t *run, wctx_t *ctx)
 {
     if (run->reduced == NULL) {
         run->reduced = RTmallocZero (sizeof (alg_reduced_t));
-        run->reduced->runtime = 0;
         statistics_init (&run->reduced->state_stats);
         statistics_init (&run->reduced->trans_stats);
     }
     alg_reduced_t          *reduced = run->reduced;
     counter_t              *cnt = &ctx->local->counters;
-    float                   runtime = RTrealTime(ctx->timer);
 
     statistics_record (&reduced->state_stats, cnt->explored);
     statistics_record (&reduced->trans_stats, cnt->trans);
-    reduced->runtime += runtime;
-    reduced->maxtime = max (runtime, reduced->maxtime);
     add_results (&reduced->counters, cnt);
 
     if (W >= 4 || !log_active(infoLong)) return;
 
     // print some local info
+    float                   runtime = RTrealTime(ctx->timer);
     Warning (info, "saw in %.3f sec %zu levels %zu states %zu transitions",
              runtime, cnt->level_max, cnt->explored, cnt->trans);
 
@@ -428,33 +426,24 @@ reach_print_stats   (run_t *run, wctx_t *ctx)
 
     Warning (info, "State space has %zu states, %zu transitions",
              cnt->explored, cnt->trans);
-    Warning (info, "Total exploration time %5.3f real", reduced->maxtime);
+    Warning (info, "Total exploration time %5.3f real", run->maxtime);
     //RTprintTimer (info, timer, "Total exploration time");
     Warning(info, "States per second: %.0f, Transitions per second: %.0f",
-            cnt->explored/reduced->maxtime, cnt->trans/reduced->maxtime);
-    Warning(info, " ");
+            cnt->explored/run->maxtime, cnt->trans/run->maxtime);
 
-    if (no_exit || log_active(infoLong))
-        HREprintf (info, "\nDeadlocks: %zu\nInvariant/valid-end state violations: %zu\n"
-                 "Error actions: %zu\n\n", cnt->deadlocks, cnt->violations,
-                 cnt->errors);
+    if (no_exit) {
+        Warning (info, " ");
+        Warning (info, "Reachability properties:");
+        Warning (info, "Deadlocks: %zu", cnt->deadlocks);
+        Warning (info, "Invariant/valid-end state violations: %zu",
+                           cnt->violations);
+        Warning (info, "Error actions: %zu", cnt->errors);
+    }
 
-/*
-    HREprintf (infoLong, "\nInternal statistics:\n\n"
-             "Algorithm:\nWork time: %.2f sec\nUser time: %.2f sec\nExplored: %zu\n"
-                 "Transitions: %zu\nWaits: %zu\nRec. calls: %zu\n\n"
-             "Database:\nElements: %zu\nNodes: %zu\nMisses: %zu\nEq. tests: %zu\nRehashes: %zu\n\n"
-             "Memory:\nQueue: %.1f MB\nDB: %.1f MB\nDB alloc.: %.1f MB\nColors: %.1f MB\n\n"
-             "Load balancer:\nSplits: %zu\nLoad transfer: %zu\n\n"
-             "Lattice MAP:\nRatio: %.2f\nInserts: %zu\nUpdates: %zu\nDeletes: %zu\n"
-             "Red subsumed: %zu\nCyan is subsumed: %zu\n",
-             tot, reach->runtime, reach->explored, reach->trans, red->waits,
-             reach->rec, db_elts, db_nodes, stats->misses, stats->tests,
-             stats->rehashes, mem1, mem4, mem2, mem3,
-             reach->splits, reach->transfer,
-             ((double)lattices/db_elts), reach->inserts, reach->updates,
-             reach->deletes, red->updates, red->deletes);
-*/
+    Warning (infoLong, " ");
+    Warning (infoLong, "Load balancer:");
+    Warning (infoLong, "Splits: %zu", cnt->splits);
+    Warning (infoLong, "Load transfer: %zu",  cnt->transfer);
 }
 
 void
@@ -615,8 +604,8 @@ reach_shared_init   (run_t *run)
 {
     set_alg_local_init (run->alg, reach_local_init);
     set_alg_global_init (run->alg, reach_global_init);
-    set_alg_destroy (run->alg, reach_destroy);
-    set_alg_destroy_local (run->alg, reach_destroy_local);
+    set_alg_global_deinit (run->alg, reach_destroy);
+    set_alg_local_deinit (run->alg, reach_destroy_local);
     set_alg_print_stats (run->alg, reach_print_stats);
     set_alg_run (run->alg, reach_run);
     set_alg_reduce (run->alg, reach_reduce);

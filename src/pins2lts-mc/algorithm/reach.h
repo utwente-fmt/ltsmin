@@ -71,11 +71,9 @@ struct alg_local_s {
 };
 
 struct alg_reduced_s {
-    float               runtime;
-    float               maxtime;
+    counter_t           counters;
     statistics_t        state_stats;
     statistics_t        trans_stats;
-    counter_t           counters;
 };
 
 extern void pbfs_queue_state (wctx_t *ctx, state_info_t *successor);
@@ -96,6 +94,8 @@ extern void reach_global_setup   (run_t *alg, wctx_t *ctx);
 
 extern void reach_destroy   (run_t *run, wctx_t *ctx);
 
+extern void reach_destroy_local      (run_t *run, wctx_t *ctx);
+
 extern void reach_reduce  (run_t *run, wctx_t *ctx);
 
 extern void reach_print_stats  (run_t *run, wctx_t *ctx);
@@ -105,8 +105,10 @@ extern void handle_error_trace (wctx_t *ctx);
 static inline void
 deadlock_detect (wctx_t *ctx, size_t count)
 {
+    if (EXPECT_TRUE(count > 0))
+        return;
+
     alg_local_t        *loc = ctx->local;
-    if (count > 0) return;
     loc->counters.deadlocks++; // counting is costless
     if (GBstateIsValidEnd(ctx->model, ctx->state.data)) return;
     if ( !loc->inv_expr ) loc->counters.violations++;
@@ -122,8 +124,13 @@ static inline void
 invariant_detect (wctx_t *ctx, raw_data_t state)
 {
     alg_local_t        *loc = ctx->local;
-    if ( !loc->inv_expr ||
-         eval_predicate(ctx->model, loc->inv_expr, NULL, state, N, loc->env) ) return;
+    if (EXPECT_TRUE(!loc->inv_expr))
+        return;
+
+    if (EXPECT_TRUE(
+            eval_predicate(ctx->model, loc->inv_expr, NULL, state, N, loc->env)))
+        return;
+
     loc->counters.violations++;
     if ((!no_exit || trc_output) && lb_stop(global->lb)) {
         Warning (info, " ");
@@ -136,9 +143,14 @@ invariant_detect (wctx_t *ctx, raw_data_t state)
 static inline void
 action_detect (wctx_t *ctx, transition_info_t *ti, state_info_t *successor)
 {
+    if (EXPECT_TRUE(-1 == act_index))
+        return;
+
+    if (EXPECT_TRUE(NULL == ti->labels || ti->labels[act_label] != act_index))
+        return;
+
     alg_local_t        *loc = ctx->local;
     alg_global_t       *sm = ctx->global;
-    if (-1 == act_index || NULL == ti->labels || ti->labels[act_label] != act_index) return;
     loc->counters.errors++;
     if ((!no_exit || trc_output) && lb_stop(global->lb)) {
         if (trc_output && successor->ref != ctx->state.ref) // race, but ok:

@@ -31,11 +31,12 @@ typedef struct df_counter_s {
 } df_counter_t;
 
 typedef struct df_alg_local_s {
+    alg_local_t         reach;
+
     fset_t             *cyan;           // Proviso stack
     ref_t               seed;
     int                *progress;       // progress transitions
     size_t              progress_trans; // progress transitions
-    counter_t           counters;
     df_counter_t        df_counters;
 } df_alg_local_t;
 
@@ -58,7 +59,7 @@ dfs_fifo_handle (void *arg, state_info_t *successor, transition_info_t *ti,
     wctx_t             *ctx = (wctx_t *) arg;
     df_alg_local_t     *loc = (df_alg_local_t *) ctx->local;
     alg_global_t       *sm = ctx->global;
-    loc->counters.trans++;
+    ctx->local->counters.trans++;
     bool is_progress = loc->progress_trans > 0 ? loc->progress[ti->group] :  // ! progress transition
             GBstateIsProgress(ctx->model, get_state(successor->ref, ctx)); // ! progress state
 
@@ -72,7 +73,7 @@ dfs_fifo_handle (void *arg, state_info_t *successor, transition_info_t *ti,
     if (!is_progress) {
         raw_data_t stack_loc = dfs_stack_push (sm->stack, NULL);
         state_info_serialize (successor, stack_loc);
-        loc->counters.visited++;
+        ctx->local->counters.visited++;
     } else if (global_try_color(successor->ref, setF, 0)) { // new F state
         raw_data_t stack_loc = dfs_stack_push (sm->out_stack, NULL);
         state_info_serialize (successor, stack_loc);
@@ -90,7 +91,7 @@ dfs_fifo_dfs (wctx_t *ctx, ref_t seed,
 {
     df_alg_local_t     *loc = (df_alg_local_t *) ctx->local;
     alg_global_t       *sm = ctx->global;
-    counter_t          *cnt = &loc->counters;
+    counter_t          *cnt = &ctx->local->counters;
     while (!lb_is_stopped(global->lb)) {
         raw_data_t          state_data = dfs_stack_top (sm->stack);
         if (NULL != state_data) {
@@ -101,8 +102,8 @@ dfs_fifo_dfs (wctx_t *ctx, ref_t seed,
                 dfs_stack_enter (sm->stack);
                 increase_level (&cnt->level_cur, &cnt->level_max);
                 permute_trans (ctx->permute, &ctx->state, dfs_fifo_handle, ctx);
-                maybe_report (cnt->explored, cnt->trans, cnt->level_max, "");
-                loc->counters.explored++;
+                maybe_report1 (cnt->explored, cnt->trans, cnt->level_max, "");
+                ctx->local->counters.explored++;
             } else {
                 dfs_stack_pop (sm->stack);
             }
@@ -112,7 +113,7 @@ dfs_fifo_dfs (wctx_t *ctx, ref_t seed,
             dfs_stack_leave (sm->stack);
             state_data = dfs_stack_pop (sm->stack);
             state_info_deserialize_cheap (&ctx->state, state_data);
-            loc->counters.level_cur--;
+            ctx->local->counters.level_cur--;
             if (ctx->state.ref != seed && ctx->state.ref != loc->seed) {
                 ecd_remove_state (loc->cyan, &ctx->state);
             }
@@ -218,11 +219,11 @@ dfs_fifo_local_init   (run_t *run, wctx_t *ctx)
                if (loc->progress[i]) visibles[i] = 1;
            }
            if (strategy[0] & Strat_DFSFIFO)
-               Warning (info, "Found %zu progress transitions.", loc->progress_trans);
+               Print1 (info, "Found %zu progress transitions.", loc->progress_trans);
        } else {
            // Use progress states
-           Warning (info, "No progress transitions defined for DFS_FIFO, "
-                          "using progress states via progress state label")
+           Print1 (info, "No progress transitions defined for DFS_FIFO, "
+                         "using progress states via progress state label")
            int progress_sl = GBgetProgressStateLabelIndex (ctx->model);
            HREassert (progress_sl >= 0, "No progress labels defined for DFS_FIFO");
            pins_add_state_label_visible (ctx->model, progress_sl);
@@ -249,6 +250,7 @@ dfs_fifo_destroy_local   (run_t *run, wctx_t *ctx)
     fset_free (loc->cyan);
     RTfree (loc);
 }
+
 void
 dfs_fifo_run  (run_t *run, wctx_t *ctx)
 {
@@ -281,13 +283,13 @@ dfs_fifo_reduce  (run_t *run, wctx_t *ctx)
 {
     if (run->reduced == NULL) {
         run->reduced = RTmallocZero (sizeof (dfs_fifo_reduced_t));
-        run->reduced->runtime = 0;
     }
+
     reach_reduce (run, ctx);
 
     df_alg_local_t         *loc = (df_alg_local_t *) ctx->local;
-    dfs_fifo_reduced_t     *reduced = (dfs_fifo_reduced_t *) run->reduced;
     df_counter_t           *cnt = &loc->df_counters;
+    dfs_fifo_reduced_t     *reduced = (dfs_fifo_reduced_t *) run->reduced;
     add_results (&reduced->df_counter, cnt);
 }
 
@@ -305,8 +307,8 @@ dfs_fifo_shared_init   (run_t *run)
 {
     set_alg_local_init (run->alg, dfs_fifo_local_init);
     set_alg_global_init (run->alg, dfs_fifo_global_init);
-    set_alg_destroy (run->alg, reach_destroy);
-    set_alg_destroy_local (run->alg, dfs_fifo_destroy_local);
+    set_alg_global_deinit (run->alg, reach_destroy);
+    set_alg_local_deinit (run->alg, dfs_fifo_destroy_local);
     set_alg_print_stats (run->alg, dfs_fifo_print_stats);
     set_alg_run (run->alg, dfs_fifo_run);
     set_alg_reduce (run->alg, dfs_fifo_reduce);

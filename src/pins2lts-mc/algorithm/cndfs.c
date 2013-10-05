@@ -2,60 +2,24 @@
 
 #include <pins2lts-mc/algorithm/algorithm.h>
 #include <pins2lts-mc/algorithm/cndfs.h>
-#include <pins2lts-mc/algorithm/lndfs.h>
 #include <pins2lts-mc/parallel/color.h>
 #include <pins2lts-mc/parallel/options.h>
 #include <pins2lts-mc/parallel/permute.h>
 #include <pins2lts-mc/parallel/state-info.h>
 #include <pins2lts-mc/parallel/worker.h>
 
-
 struct alg_shared_s {
     run_t              *rec;
     run_t              *previous;
     int                 color_bit_shift;
+    int                 top_level;
 };
-
-typedef struct cndfs_alg_local_s {
-    alg_local_t         ndfs;
-
-    dfs_stack_t         out_stack;
-    rt_timer_t          timer;
-    alg_local_t        *rec;
-} cndfs_alg_local_t;
 
 struct alg_global_s {
     wctx_t             *rec;
     ref_t               work;           // ENDFS work for loadbalancer
     int                 done;           // ENDFS done for loadbalancer
 };
-
-typedef struct cndfs_reduced_s {
-    alg_reduced_t       ndfs;
-    float               waittime;
-} cndfs_reduced_t;
-
-void
-cndfs_reduce  (run_t *run, wctx_t *ctx)
-{
-    if (run->reduced == NULL) {
-        run->reduced = RTmallocZero (sizeof (cndfs_reduced_t));
-        cndfs_reduced_t        *reduced = (cndfs_reduced_t *) run->reduced;
-        run->reduced->runtime = 0;
-        reduced->waittime = 0;
-    }
-    cndfs_reduced_t        *reduced = (cndfs_reduced_t *) run->reduced;
-    cndfs_alg_local_t      *cndfs_loc = (cndfs_alg_local_t *) ctx->local;
-    float                   waittime = RTrealTime(cndfs_loc->timer);
-    reduced->waittime += waittime;
-
-    ndfs_reduce (run, ctx);
-
-    if (run->shared->rec) {
-        alg_global_t           *sm = ctx->global;
-        alg_reduce (run->shared->rec, sm->rec);
-    }
-}
 
 extern void rec_ndfs_call (wctx_t *ctx, ref_t state);
 
@@ -72,7 +36,7 @@ endfs_lb (wctx_t *ctx)
         for (size_t i = 0; i < W; i++) {
             if (0==workers[i])
                 continue;
-            alg_global_t           *remote = global->contexts[i]->global;
+            alg_global_t           *remote = ctx->run->contexts[i]->global;
             if (1 == atomic_read(&remote->done)) {
                 workers[i] = 0;
                 idle_count--;
@@ -114,11 +78,10 @@ cndfs_handle_nonseed_accepting (wctx_t *ctx)
     cndfs_alg_local_t  *cndfs_loc = (cndfs_alg_local_t *) ctx->local;
     size_t nonred, accs;
     nonred = accs = dfs_stack_size(cndfs_loc->out_stack);
+
     if (nonred) {
-        loc->red.waits++;
-        loc->counters.rec += accs;
-    }
-    if (nonred) {
+        loc->counters.waits++;
+        cndfs_loc->counters.rec += accs;
         RTstartTimer (cndfs_loc->timer);
         while ( nonred && !lb_is_stopped(global->lb) ) {
             nonred = 0;
@@ -214,7 +177,7 @@ endfs_explore_state_blue (wctx_t *ctx, counter_t *cnt)
     increase_level (&cnt->level_cur, &cnt->level_max);
     cnt->trans += permute_trans (ctx->permute, &ctx->state, endfs_handle_blue, ctx);
     cnt->explored++;
-    maybe_report (cnt->explored, cnt->trans, cnt->level_max, "[B] ");
+    maybe_report1 (cnt->explored, cnt->trans, cnt->level_max, "[B] ");
 }
 
 /* ENDFS dfs_red */
@@ -322,7 +285,7 @@ endfs_blue (run_t *run, wctx_t *ctx)
     // if the recursive strategy uses global bits (global pruning)
     // then do simple load balancing (only for the top-level strategy)
     if ( Strat_ENDFS == loc->strat &&
-         ctx == global->contexts[ctx->id] &&
+         run->shared->top_level &&
          (Strat_LTLG & sm->rec->local->strat) )
         endfs_lb (ctx);
 }
@@ -335,7 +298,7 @@ rec_ndfs_call (wctx_t *ctx, ref_t state)
     alg_local_t        *loc = ctx->local;
     strategy_t          rec_strat = get_strategy (ctx->run->shared->rec->alg);
     dfs_stack_push (sm->rec->local->stack, (int*)&state);
-    loc->counters.rec++;
+    cndfs_loc->counters.rec++;
     switch (rec_strat) {
     case Strat_ENDFS:
        endfs_blue (sm->rec->run, sm->rec); break;
@@ -407,7 +370,7 @@ cndfs_print_stats   (run_t *run, wctx_t *ctx)
 
 
     //RTprintTimer (info, ctx->timer, "Total exploration time ");
-    Warning (info, "Total exploration time %5.3f real", run->reduced->maxtime);
+    Warning (info, "Total exploration time %5.3f real", run->maxtime);
 
     Warning (info, " ");
     Warning (info, "State space has %zu states, %zu are accepting", db_elts, accepting);
@@ -424,6 +387,14 @@ cndfs_print_stats   (run_t *run, wctx_t *ctx)
         reduced->red.trans /= W;
         reduced->red.bogus_red /= W;
         ndfs_print_state_stats (cur->run, cur, index, creduced->waittime);
+
+        if (cur->local->strat & Strat_ENDFS) {
+            Warning (infoLong, " ");
+            Warning (infoLong, "ENDFS recursive calls:");
+            Warning (infoLong, "Calls: %zu",  creduced->rec);
+            Warning (infoLong, "Waits: %zu",  reduced->blue.waits);
+        }
+
         cur = cur->global != NULL ? cur->global->rec : NULL;
         index++;
     }
@@ -431,6 +402,29 @@ cndfs_print_stats   (run_t *run, wctx_t *ctx)
     size_t mem3 = ((double)(((((size_t)local_bits)<<dbs_size))/8*W)) / (1UL<<20);
     Warning (info, " ");
     Warning (info, "Total memory used for local state coloring: %.1fMB", mem3);
+
+}
+
+void
+cndfs_reduce  (run_t *run, wctx_t *ctx)
+{
+    if (run->reduced == NULL) {
+        run->reduced = RTmallocZero (sizeof (cndfs_reduced_t));
+        cndfs_reduced_t        *reduced = (cndfs_reduced_t *) run->reduced;
+        reduced->waittime = 0;
+    }
+    cndfs_reduced_t        *reduced = (cndfs_reduced_t *) run->reduced;
+    cndfs_alg_local_t      *cndfs_loc = (cndfs_alg_local_t *) ctx->local;
+    float                   waittime = RTrealTime(cndfs_loc->timer);
+    reduced->waittime += waittime;
+    reduced->rec += cndfs_loc->counters.rec;
+
+    ndfs_reduce (run, ctx);
+
+    if (run->shared->rec) {
+        alg_global_t           *sm = ctx->global;
+        alg_reduce (run->shared->rec, sm->rec);
+    }
 }
 
 void
@@ -442,8 +436,8 @@ cndfs_shared_init   (run_t *run)
 
     set_alg_local_init (run->alg, cndfs_local_init);
     set_alg_global_init (run->alg, cndfs_global_init);
-    set_alg_destroy (run->alg, cndfs_destroy);
-    set_alg_destroy_local (run->alg, cndfs_destroy_local);
+    set_alg_global_deinit (run->alg, cndfs_destroy);
+    set_alg_local_deinit (run->alg, cndfs_destroy_local);
     set_alg_print_stats (run->alg, cndfs_print_stats);
     set_alg_run (run->alg, endfs_blue);
     set_alg_state_seen (run->alg, ndfs_state_seen);
@@ -454,12 +448,13 @@ cndfs_shared_init   (run_t *run)
 
     run->shared = RTmallocZero (sizeof(alg_shared_t));
     run->shared->color_bit_shift = 0;
+    run->shared->top_level = 1;
 
     int             i = 1;
     run_t          *previous = run;
     run_t          *next = NULL;
     while (strategy[i] != Strat_None) {
-        next = alg_create_no_init ();
+        next = run_create ();
         next->shared = RTmallocZero (sizeof(alg_shared_t));
         next->shared->previous = previous;
         next->shared->color_bit_shift = previous->shared->color_bit_shift +

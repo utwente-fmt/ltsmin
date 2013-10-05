@@ -10,10 +10,9 @@
 
 extern struct poptOption ndfs_options[];
 extern struct poptOption owcty_options[];
+extern struct poptOption alg_ltl_options[];
 
 extern int              ecd;
-
-extern struct poptOption alg_ltl_options[];
 
 static inline bool
 ecd_has_state (fset_t *table, state_info_t *s)
