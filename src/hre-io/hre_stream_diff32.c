@@ -62,7 +62,7 @@ static void diff_write(stream_t stream,void*buf,size_t count){
 
 static void diff_close(stream_t *stream){
     stream_close(&((*stream)->s));
-    free(*stream);
+    RTfree(*stream);
     *stream=NULL;
 }
 
@@ -71,7 +71,7 @@ static void diff_flush(stream_t stream){
 }
 
 stream_t stream_diff32(stream_t s){
-    stream_t ds=(stream_t)HREmalloc(NULL,sizeof(struct stream_s));
+    stream_t ds=(stream_t)RTmalloc(sizeof(struct stream_s));
     stream_init(ds);
     ds->s=s;
     ds->prev_rd=0;
@@ -126,7 +126,7 @@ static void undiff_write(stream_t stream,void*buf,size_t count){
 }
 
 stream_t stream_undiff32(stream_t s){
-    stream_t ds=(stream_t)HREmalloc(NULL,sizeof(struct stream_s));
+    stream_t ds=(stream_t)RTmalloc(sizeof(struct stream_s));
     stream_init(ds);
     ds->s=s;
     ds->prev_rd=0;

@@ -112,7 +112,7 @@ void lowmem_strong_reduce(lts_t lts){
         // check if hash table is big enough.
         while((mask/5)<(count/3)){
             Print(infoLong,"Hash table resize prior to insertion!");
-            free(hash);
+            RTfree(hash);
             mask=mask+mask+1;
             hash=(int*)RTmalloc((mask+1)*sizeof(int));
         }
@@ -136,7 +136,7 @@ void lowmem_strong_reduce(lts_t lts){
                 newmap[i]=i;
                 if((mask/4)<(count/3)){
                     Print(infoLong,"Hash table resize during insertion!");
-                    free(hash);
+                    RTfree(hash);
                     mask=mask+mask+1;
                     hash=(int*)RTmalloc((mask+1)*sizeof(int));
                     for(j=0;j<=mask;j++){
@@ -170,9 +170,9 @@ void lowmem_strong_reduce(lts_t lts){
             newmap[i]=newmap[map[i]];
         }
     }
-    free(map);
+    RTfree(map);
     lts_quotient(lts,(uint32_t*)newmap);
-    free(newmap);
+    RTfree(newmap);
 }
 
 void lts_quotient(lts_t lts,uint32_t *map){

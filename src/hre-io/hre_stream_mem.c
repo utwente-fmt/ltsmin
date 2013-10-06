@@ -41,7 +41,7 @@ static void mem_write(stream_t stream,void*buf,size_t count){
 }
 
 static void mem_close(stream_t *stream){
-    free(*stream);
+    RTfree(*stream);
     *stream=NULL;
 }
 

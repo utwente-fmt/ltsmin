@@ -73,7 +73,7 @@ static void RAFclose(raf_t *raf){
     if (close((*raf)->fd)==-1){
         AbortCall("could not close %s",(*raf)->shared.name);
     }
-    free(*raf);
+    RTfree(*raf);
     *raf=NULL;
 }
 
@@ -113,7 +113,7 @@ void raf_init(raf_t raf,char*name){
 raf_t raf_unistd(char *name){
     int fd=open(name,O_RDWR|O_CREAT,DEFFILEMODE);
     if (fd==-1) AbortCall("could not open %s",name);
-    raf_t raf=(raf_t)HREmalloc(NULL,sizeof(struct raf_struct_s));
+    raf_t raf=(raf_t)RTmalloc(sizeof(struct raf_struct_s));
     raf_init(raf,name);
     raf->fd=fd;
     raf->shared.read=RAFread;

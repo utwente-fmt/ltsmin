@@ -326,7 +326,7 @@ opaalCompileGreyboxModel(model_t model, const char *filename)
         HREassert(ret >= 0, "File not found: %s", opaal_so_fname);
 
     opaalLoadDynamicLib(model, opaal_so_fname);
-    free (opaal_so_fname);
+    free (opaal_so_fname); // strdup
 }
 
 void

@@ -71,7 +71,7 @@ static void gcf_stream_close(stream_t *s){
     if ((*s)->id > (*s)->arch->worker_count) {
         ghf_write_len((*s)->arch->meta_stream,(*s)->id,(*s)->len);
     }
-    free(*s);
+    RTfree(*s);
     *s=NULL;
 }
 
@@ -84,7 +84,7 @@ static void gcf_stream_close_z(stream_t *s,uint64_t orig_size){
 }
 
 static stream_t gcf_create_stream(archive_t arch,uint32_t id){
-    stream_t s=(stream_t)HREmalloc(NULL,sizeof(struct stream_s));
+    stream_t s=(stream_t)RTmalloc(sizeof(struct stream_s));
     stream_init(s);
     s->procs.close=gcf_stream_close;
     s->procs.close_z=gcf_stream_close_z;
@@ -123,7 +123,7 @@ static void gcf_close_write(archive_t *archive){
     }
     raf_close(&arch(raf));
     #undef arch
-    free(*archive);
+    RTfree(*archive);
     *archive=NULL;
 }
 
