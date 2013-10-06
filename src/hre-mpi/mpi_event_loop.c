@@ -54,10 +54,8 @@ void event_queue_destroy(event_queue_t *queue){
     for(int i=0;i<(*queue)->pending;i++){
         MPI_Cancel(&(*queue)->request[i]);
     }
-    free((*queue)->request);
-    free((*queue)->cb);
-    free((*queue)->context);
-    free(*queue);
+    destroy_manager ((*queue)->man);
+    RTfree(*queue);
     *queue=NULL;
 }
 

@@ -93,7 +93,7 @@ static void setchecknode(){
     if (setnodenext>=setnodesize) {
         //Warning(info,"setnoderealloc");
         setnodesize+=SET_NODE_BLOCK;
-        setnodes=(struct setnode*)realloc(setnodes,setnodesize*sizeof(struct setnode));
+        setnodes=(struct setnode*)RTrealloc(setnodes,setnodesize*sizeof(struct setnode));
     }
 }
 
@@ -126,7 +126,7 @@ static void setcheckbucket(){
     if (setbucketnext>=setbucketsize){
         //Warning(info,"setbucketrealloc");
         setbucketsize+=SET_BUCKET_BLOCK;
-        setbuckets=(struct setbucket*)realloc(setbuckets,setbucketsize*sizeof(struct setbucket));
+        setbuckets=(struct setbucket*)RTrealloc(setbuckets,setbucketsize*sizeof(struct setbucket));
         if ((sethashmask/4)<(setbucketsize/3)){
             //Warning(info,"setrehash");
             if (sethash==listhash) {
@@ -135,7 +135,7 @@ static void setcheckbucket(){
             } else {
                 sethashmask=sethashmask+sethashmask+1;
             }
-            sethash=(int*)realloc(sethash,(sethashmask+1)*sizeof(int));
+            sethash=(int*)RTrealloc(sethash,(sethashmask+1)*sizeof(int));
             for(i=0;i<=sethashmask;i++){
                 sethash[i]=EMPTY_LIST;
             }
@@ -180,15 +180,15 @@ void SetPrintIndex(FILE *f,int set,char **index){
 
 void SetFree(){
     Warning(info,"Freeing set structure with %d nodes and %d edges.",setnodenext,setbucketnext);
-    free(setnodes);
+    RTfree(setnodes);
     setnodes=NULL;
     setnodesize=0;
     setnodenext=1;
-    free(setbuckets);
+    RTfree(setbuckets);
     setbuckets=NULL;
     setbucketsize=0;
     setbucketnext=0;
-    free(sethash);
+    RTfree(sethash);
     sethash=(int*)listhash;
     sethashmask=0;
 }

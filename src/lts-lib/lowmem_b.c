@@ -222,7 +222,7 @@ void lowmem_branching_reduce(lts_t lts,bitset_t diverging){
         //Warning(1,"Checking if hash table is big enough.");
         while((mask/5)<(count/3)){
             Print(infoLong,"Hash table resize prior to insertion!");
-            free(hash);
+            RTfree(hash);
             mask=mask+mask+1;
             hash=(int*)RTmalloc((mask+1)*sizeof(int));
         }
@@ -292,7 +292,7 @@ void lowmem_branching_reduce(lts_t lts,bitset_t diverging){
                 //Warning(1,"new assigning %d",i);
                 if((mask/4)<(count/3)){
                     Print(infoLong,"Hash table resize during insertion!");
-                    free(hash);
+                    RTfree(hash);
                     mask=mask+mask+1;
                     hash=(int*)RTmalloc((mask+1)*sizeof(int));
                     for(j=0;j<=mask;j++){
@@ -346,9 +346,9 @@ void lowmem_branching_reduce(lts_t lts,bitset_t diverging){
     }
     lts_set_size(lts,lts->root_count,lts->states,count);
     lts_uniq(lts);
-    free(hash);
-    free(oldmap);
-    free(newmap);
+    RTfree(hash);
+    RTfree(oldmap);
+    RTfree(newmap);
     Print(infoShort,"reduction took %d iterations",iter);
 }
 

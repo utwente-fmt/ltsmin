@@ -49,7 +49,7 @@ static void gzip_close_z(stream_t *stream,uint64_t orig_size){
         default:
             Abort("cleanup failed");
         }
-        free((*stream)->wr_buf);
+        RTfree((*stream)->wr_buf);
     }
     if ((*stream)->rd_buf) {
         if ((*stream)->compress) {
@@ -62,14 +62,14 @@ static void gzip_close_z(stream_t *stream,uint64_t orig_size){
         default:
             Abort("cleanup failed");
         }
-        free((*stream)->rd_buf);
+        RTfree((*stream)->rd_buf);
     }
     if (stream_writable(*stream)) {
         stream_close_z(&(*stream)->s,orig_size);
     } else {
         stream_close(&(*stream)->s);
     }
-    free (*stream);
+    RTfree (*stream);
     *stream=NULL;
 }
 
@@ -127,7 +127,7 @@ static void gzip_write(stream_t stream,void*buf,size_t count){
 }
 
 static stream_t stream_zip(stream_t parent,int compress,int level,int bufsize){
-    stream_t s=(stream_t)HREmallocZero(NULL,sizeof(struct stream_s));
+    stream_t s=(stream_t)RTmallocZero(sizeof(struct stream_s));
     stream_init(s);
     s->bufsize=bufsize;
     s->s=parent;
@@ -138,7 +138,7 @@ static stream_t stream_zip(stream_t parent,int compress,int level,int bufsize){
         s->wr.zalloc = Z_NULL;
         s->wr.zfree = Z_NULL;
         s->wr.opaque = Z_NULL;
-        s->wr_buf=(char*)HREmalloc(NULL,bufsize);
+        s->wr_buf=(char*)RTmalloc(bufsize);
         s->wr.next_in=Z_NULL;
         s->wr.avail_in=0;
         s->wr.next_out=s->wr_buf;
@@ -166,7 +166,7 @@ static stream_t stream_zip(stream_t parent,int compress,int level,int bufsize){
         s->rd.avail_in=0;
         s->rd.next_out=Z_NULL;
         s->rd.avail_out=0;
-        s->rd_buf=(char*)HREmalloc(NULL,bufsize);
+        s->rd_buf=(char*)RTmalloc(bufsize);
         if (compress) {
             if (inflateInit(&s->rd)!= Z_OK) {
                 Abort("gzip init failed");

@@ -144,7 +144,7 @@ static void file_write(stream_t stream,void*buf,size_t count){
 
 static void file_close(stream_t *stream){
     fclose((*stream)->f);
-    free(*stream);
+    RTfree(*stream);
     *stream=NULL;
 }
 
@@ -153,7 +153,7 @@ static void file_flush(stream_t stream){
 }
 
 stream_t stream_input(FILE*f){
-    stream_t s=(stream_t)HREmallocZero(NULL,sizeof(struct stream_s));
+    stream_t s=(stream_t)RTmallocZero(sizeof(struct stream_s));
     stream_init(s);
     setbuf(f,NULL);
     s->f=f;
@@ -165,7 +165,7 @@ stream_t stream_input(FILE*f){
 }
 
 stream_t stream_output(FILE*f){
-    stream_t s=(stream_t)HREmallocZero(NULL,sizeof(struct stream_s));
+    stream_t s=(stream_t)RTmallocZero(sizeof(struct stream_s));
     stream_init(s);
     setbuf(f,NULL);
     s->f=f;
@@ -254,7 +254,7 @@ void DSreadS(stream_t ds,char *s,int maxlen){
 
 char* DSreadSA(stream_t ds){
     uint16_t len=DSreadU16(ds);
-    char*s=HREmalloc(NULL,len+1);
+    char*s=RTmalloc(len+1);
     stream_read(ds,s,len);
     s[len]=0;
     return s;
@@ -265,7 +265,7 @@ char* DSreadLN(stream_t ds){
     for(int i=0;i<4096;i++){
         size_t res=stream_read_max(ds,tmp+i,1);
         if (res==0 || tmp[i]=='\n') {
-            char *s=HREmalloc(NULL,i+1);
+            char *s=RTmalloc(i+1);
             memcpy(s,tmp,i);
             s[i]=0;
             return s;

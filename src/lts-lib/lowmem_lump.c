@@ -178,7 +178,7 @@ void lowmem_lumping_reduce(lts_t lts){
         // check if hash table is big enough.
         while((mask/5)<((int)count/3)){
             Print(infoShort,"Hash table resize prior to insertion!");
-            free(hash);
+            RTfree(hash);
             mask=mask+mask+1;
             hash=(int*)RTmalloc((mask+1)*sizeof(int));
         }
@@ -202,7 +202,7 @@ void lowmem_lumping_reduce(lts_t lts){
                 newmap[i]=i;
                 if((mask/4)<((int)count/3)){
                     Print(infoLong,"Hash table resize during insertion!");
-                    free(hash);
+                    RTfree(hash);
                     mask=mask+mask+1;
                     hash=(int*)RTmalloc((mask+1)*sizeof(int));
                     for(j=0;j<=mask;j++){
@@ -243,7 +243,7 @@ void lowmem_lumping_reduce(lts_t lts){
                 newmap[i]=lts->states-1;
             }
         }
-        free(lts->properties);
+        RTfree(lts->properties);
         lts->properties=(uint32_t*)hash;
         hash=NULL;
         for(i=0;i<lts->root_count;i++){
@@ -253,16 +253,16 @@ void lowmem_lumping_reduce(lts_t lts){
             lts->src[m]=newmap[lts->src[m]];
             lts->dest[m]=newmap[map[lts->dest[m]]];
         }
-        free(map);
-        free(newmap);
+        RTfree(map);
+        RTfree(newmap);
 
         lts_set_type(lts,LTS_BLOCK);
         lts_set_size(lts,lts->root_count,oldcount,lts->begin[oldcount]);
 
         lts_lump(lts);
     } else {
-        free(hash);
-        free(map);
-        free(newmap);
+        RTfree(hash);
+        RTfree(map);
+        RTfree(newmap);
     }
 }

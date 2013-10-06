@@ -64,7 +64,7 @@ static void seek(archive_t arch,size_t pos){
 }
 
 static void gcf_stream_read_close(stream_t *s){
-    free(*s);
+    RTfree(*s);
     *s=NULL;
 }
 
@@ -100,7 +100,7 @@ static size_t gcf_meta_stream_read_max(stream_t stream,void*buf,size_t count){
 }
 
 static stream_t gcf_read_stream(archive_t arch,uint32_t id){
-    stream_t s=(stream_t)HREmalloc(NULL,sizeof(struct stream_s));
+    stream_t s=(stream_t)RTmalloc(sizeof(struct stream_s));
     stream_init(s);
     s->procs.close=gcf_stream_read_close;
     s->procs.read_max=gcf_stream_read_max;
@@ -128,7 +128,7 @@ static void gcf_close_read(archive_t *archive){
     // lots of freeing TODO.
     raf_close(&arch(raf));
 	#undef arch
-    free(*archive);
+    RTfree(*archive);
     *archive=NULL;
 }
 
@@ -176,12 +176,12 @@ static int gcf_enumerate(arch_enum_t e,struct arch_enum_callbacks *cb,void*arg){
 }
 
 static void gcf_enum_free(arch_enum_t *e){
-    free(*e);
+    RTfree(*e);
     *e=NULL;
 }
 
 static arch_enum_t gcf_enum(archive_t archive,char *regex){
-    arch_enum_t e=(arch_enum_t)HREmalloc(NULL,sizeof(struct arch_enum));
+    arch_enum_t e=(arch_enum_t)RTmalloc(sizeof(struct arch_enum));
     e->procs.enumerate=gcf_enumerate;
     e->procs.free=gcf_enum_free;
     e->pattern=regex;
@@ -220,7 +220,7 @@ static stream_t gcf_read_raw(archive_t archive,char *name,char**code){
 }
 
 archive_t arch_gcf_read(raf_t raf){
-    archive_t arch=(archive_t)HREmalloc(NULL,sizeof(struct archive_s));
+    archive_t arch=(archive_t)RTmalloc(sizeof(struct archive_s));
     arch_init(arch);
     arch->raf=raf;
 

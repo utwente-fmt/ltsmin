@@ -115,7 +115,7 @@ static void rle_close(stream_t *stream){
     } else {
         stream_close(&((*stream)->s));
     }
-    free(*stream);
+    RTfree(*stream);
     *stream=NULL;
 }
 

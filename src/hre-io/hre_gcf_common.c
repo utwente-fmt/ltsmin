@@ -15,7 +15,7 @@ void ghf_read_new(stream_t ds,uint32_t *id,char**name){
     uint32_t i=DSreadVL(ds);
     char*n=DSreadSA(ds);
     if(id) *id=i;
-    if(name) *name=n; else free(n);
+    if(name) *name=n; else RTfree(n);
 }
 
 void ghf_write_code(stream_t ds,uint32_t id,char*name){
@@ -27,7 +27,7 @@ void ghf_read_code(stream_t ds,uint32_t *id,char**name){
     uint32_t i=DSreadVL(ds);
     char*n=DSreadSA(ds);
     if(id) *id=i;
-    if(name) *name=n; else free(n);
+    if(name) *name=n; else RTfree(n);
 }
 
 

@@ -164,7 +164,7 @@ void lts_read_tra(const char*tra_name,lts_t lts){
 
     fclose(tra);
     fclose(lab);
-    free(lab_name);
+    free(lab_name); //strstr
 }
 
 void lts_write_tra(const char*tra_name,lts_t lts){
@@ -226,5 +226,5 @@ void lts_write_tra(const char*tra_name,lts_t lts){
     }
     fclose(tra);
     fclose(lab);
-    free(lab_name);
+    free(lab_name); // strstr
 }

@@ -116,7 +116,7 @@ static void write_close(lts_file_t file){
                 file->lts->properties[offset[i]+j]=temp[j*file->segments+i];
             }
         }
-        free(temp);
+        RTfree(temp);
     }
     lts_set_size(file->lts,file->init_count,file->state_count,file->edge_count);
     file->lts->tau=-1;

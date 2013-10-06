@@ -106,20 +106,20 @@ static void buf_flush(stream_t stream){
 
 static void buf_close_z(stream_t *stream,uint64_t orig_size){
     if((*stream)->rd_buf){
-        free((*stream)->rd_buf);
+        RTfree((*stream)->rd_buf);
     }
     if((*stream)->wr_buf){
         if((*stream)->wr_used){
             stream_write((*stream)->s,(*stream)->wr_buf,(*stream)->wr_used);
         }
-        free((*stream)->wr_buf);
+        RTfree((*stream)->wr_buf);
     }
     if (orig_size==(uint64_t)-1){
         stream_close(&((*stream)->s));
     } else {
         stream_close_z(&((*stream)->s),orig_size);
     }
-    free(*stream);
+    RTfree(*stream);
     *stream=NULL;
 }
 
@@ -128,10 +128,10 @@ static void buf_close(stream_t *stream){
 }
 
 stream_t stream_buffer(stream_t s,int size){
-    stream_t bs=(stream_t)HREmalloc(NULL,sizeof(struct stream_s));
+    stream_t bs=(stream_t)RTmalloc(sizeof(struct stream_s));
     stream_init(bs);
     if (stream_readable(s)) {
-        bs->rd_buf=HREmalloc(NULL,size);
+        bs->rd_buf=RTmalloc(size);
         bs->procs.read_max=buf_read_max;
         bs->procs.read=buf_read;
         bs->procs.empty=buf_empty;
@@ -142,7 +142,7 @@ stream_t stream_buffer(stream_t s,int size){
     bs->rd_next=0;
     bs->rd_used=0;
     if (stream_writable(s)){
-        bs->wr_buf=HREmalloc(NULL,size);
+        bs->wr_buf=RTmalloc(size);
         bs->procs.write=buf_write;
         bs->procs.flush=buf_flush;
     } else {
