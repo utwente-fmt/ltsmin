@@ -46,7 +46,7 @@ typedef enum {
 extern si_map_entry strategies[];
 extern si_map_entry provisos[];
 
-extern void options_static_setup        (model_t model, bool timed);
+extern void options_static_init        (model_t model, bool timed);
 
 extern void print_options               (model_t model);
 

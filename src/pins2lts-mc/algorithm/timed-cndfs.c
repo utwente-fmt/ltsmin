@@ -1,11 +1,5 @@
 #include <hre/config.h>
 
-#include <stdlib.h>
-
-#include <mc-lib/statistics.h>
-#include <pins2lts-mc/algorithm/ndfs.h>
-#include <pins2lts-mc/algorithm/cndfs.h>
-#include <pins2lts-mc/algorithm/timed.h>
 #include <pins2lts-mc/algorithm/timed-cndfs.h>
 
 typedef struct cta_counter_s {
@@ -296,7 +290,7 @@ ta_cndfs_handle_nonseed_accepting (wctx_t *ctx)
         loc->red.waits++;
         cndfs_loc->counters.rec += accs;
         RTstartTimer (ta_loc->counters.timer);
-        while ( nonred && !lb_is_stopped(global->lb) ) {
+        while ( nonred && !run_is_stopped(ctx->run) ) {
             nonred = 0;
             for (size_t i = 0; i < accs; i++) {
                 raw_data_t state_data = dfs_stack_peek (ta_loc->out_stack, i);
@@ -310,9 +304,9 @@ ta_cndfs_handle_nonseed_accepting (wctx_t *ctx)
     }
     for (size_t i = 0; i < accs; i++)
         dfs_stack_pop (ta_loc->out_stack);
-    size_t pre = dfs_stack_size (loc->in_stack);
-    while ( dfs_stack_size(loc->in_stack) ) {
-        raw_data_t state_data = dfs_stack_pop (loc->in_stack);
+    size_t pre = dfs_stack_size (cndfs_loc->in_stack);
+    while ( dfs_stack_size(cndfs_loc->in_stack) ) {
+        raw_data_t state_data = dfs_stack_pop (cndfs_loc->in_stack);
         state_info_deserialize_cheap (&ctx->state, state_data);
         ta_cndfs_mark (ctx, &ctx->state, LM_RED);
         //remove_state (loc->pink, &ctx->state);
@@ -385,25 +379,27 @@ ta_cndfs_handle_blue (void *arg, state_info_t *successor, transition_info_t *ti,
 }
 
 static inline void
-ta_cndfs_explore_state_red (wctx_t *ctx, counter_t *cnt)
+ta_cndfs_explore_state_red (wctx_t *ctx)
 {
     alg_local_t        *loc = ctx->local;
+    work_counter_t     *cnt = &loc->red_work;
     dfs_stack_enter (loc->stack);
-    increase_level (&cnt->level_cur, &cnt->level_max);
+    increase_level (ctx->counters);
     cnt->trans += permute_trans (ctx->permute, &ctx->state, ta_cndfs_handle_red, ctx);
     cnt->explored++;
-    maybe_report1 (cnt->explored, cnt->trans, cnt->level_max, "[R] ");
+    run_maybe_report (ctx->run, cnt, "[Red ] ");
 }
 
 static inline void
-ta_cndfs_explore_state_blue (wctx_t *ctx, counter_t *cnt)
+ta_cndfs_explore_state_blue (wctx_t *ctx)
 {
     alg_local_t        *loc = ctx->local;
+    work_counter_t     *cnt = ctx->counters;
     dfs_stack_enter (loc->stack);
-    increase_level (&cnt->level_cur, &cnt->level_max);
+    increase_level (cnt);
     cnt->trans += permute_trans (ctx->permute, &ctx->state, ta_cndfs_handle_blue, ctx);
     cnt->explored++;
-    maybe_report (cnt->explored, cnt->trans, cnt->level_max, "[B] ");
+    run_maybe_report1 (ctx->run, cnt, "[Blue] ");
 }
 
 /* ENDFS dfs_red */
@@ -411,19 +407,20 @@ static void
 ta_cndfs_red (wctx_t *ctx, ref_t seed, lattice_t l_seed)
 {
     alg_local_t        *loc = ctx->local;
+    cndfs_alg_local_t  *cndfs_loc = (cndfs_alg_local_t *) ctx->local;
     ta_alg_local_t     *ta_loc = (ta_alg_local_t *) ctx->local;
     size_t              seed_level = dfs_stack_nframes (loc->stack);
-    while ( !lb_is_stopped(global->lb) ) {
+    while ( !run_is_stopped(ctx->run) ) {
         raw_data_t          state_data = dfs_stack_top (loc->stack);
         if (NULL != state_data) {
             state_info_deserialize (&ctx->state, state_data, ctx->store);
             if ( !ta_cndfs_subsumed(ctx, &ctx->state, LM_RED) &&
                  !ta_cndfs_has_state(loc->pink, &ctx->state, true) ) {
-                dfs_stack_push (loc->in_stack, state_data);
+                dfs_stack_push (cndfs_loc->in_stack, state_data);
                 if ( ctx->state.ref != seed && ctx->state.lattice != l_seed &&
                      GBbuchiIsAccepting(ctx->model, ctx->state.data) )
                     dfs_stack_push (ta_loc->out_stack, state_data);
-                ta_cndfs_explore_state_red (ctx, &loc->red);
+                ta_cndfs_explore_state_red (ctx);
             } else {
                 if (seed_level == dfs_stack_nframes (loc->stack))
                     break;
@@ -431,8 +428,8 @@ ta_cndfs_red (wctx_t *ctx, ref_t seed, lattice_t l_seed)
             }
         } else { // backtrack
             dfs_stack_leave (loc->stack);
-            HREassert (loc->red.level_cur != 0);
-            loc->red.level_cur--;
+            HREassert (loc->red_work.level_cur != 0);
+            loc->red_work.level_cur--;
 
             /* exit search if backtrack hits seed, leave stack the way it was */
             if (seed_level == dfs_stack_nframes(loc->stack))
@@ -450,22 +447,22 @@ ta_cndfs_blue (run_t *run, wctx_t *ctx)
     alg_local_t            *loc = ctx->local;
     transition_info_t       ti = GB_NO_TRANSITION;
     ta_cndfs_handle_blue (ctx, &ctx->initial, &ti, 0);
-    loc->counters.trans = 0; //reset trans count
+    ctx->counters->trans = 0; //reset trans count
 
     lm_status_t BLUE_CHECK = (UPDATE != 0 ? LM_BOTH : LM_BLUE);
-    while ( !lb_is_stopped(global->lb) ) {
+    while ( !run_is_stopped(ctx->run) ) {
         raw_data_t          state_data = dfs_stack_top (loc->stack);
         if (NULL != state_data) {
             state_info_deserialize (&ctx->state, state_data, ctx->store);
             if ( !ta_cndfs_subsumed(ctx, &ctx->state, BLUE_CHECK) &&
                  !ta_cndfs_is_cyan(ctx, &ctx->state, state_data, true) ) {
                 if (all_red)
-                    bitvector_set (&loc->all_red, loc->counters.level_cur);
-                ta_cndfs_explore_state_blue (ctx, &loc->counters);
+                    bitvector_set (&loc->all_red, ctx->counters->level_cur);
+                ta_cndfs_explore_state_blue (ctx);
             } else {
-                if ( all_red && loc->counters.level_cur != 0 &&
+                if ( all_red && ctx->counters->level_cur != 0 &&
                      !ta_cndfs_subsumed(ctx, &ctx->state, LM_RED) )
-                    bitvector_unset (&loc->all_red, loc->counters.level_cur - 1);
+                    bitvector_unset (&loc->all_red, ctx->counters->level_cur - 1);
                 dfs_stack_pop (loc->stack);
             }
         } else { // backtrack
@@ -475,7 +472,7 @@ ta_cndfs_blue (run_t *run, wctx_t *ctx)
                 break;
             }
             dfs_stack_leave (loc->stack);
-            loc->counters.level_cur--;
+            ctx->counters->level_cur--;
             /* call red DFS for accepting states */
             state_data = dfs_stack_top (loc->stack);
             state_info_deserialize (&ctx->state, state_data, ctx->store);
@@ -489,7 +486,7 @@ ta_cndfs_blue (run_t *run, wctx_t *ctx)
             }
             /* Mark state BLUE on backtrack */
             ta_cndfs_mark (ctx, &ctx->state, LM_BLUE);
-            if ( all_red && bitvector_is_set(&loc->all_red, loc->counters.level_cur) ) {
+            if ( all_red && bitvector_is_set(&loc->all_red, ctx->counters->level_cur) ) {
                 /* all successors are red */
                 //permute_trans (loc->permute, &ctx->state, check, ctx);
                 int red = ta_cndfs_mark (ctx, &ctx->state, LM_RED);
@@ -498,16 +495,15 @@ ta_cndfs_blue (run_t *run, wctx_t *ctx)
             } else if ( GBbuchiIsAccepting(ctx->model, ctx->state.data) ) {
                 ta_cndfs_red (ctx, ctx->state.ref, ctx->state.lattice);
                 ta_cndfs_handle_nonseed_accepting (ctx);
-            } else if (all_red && loc->counters.level_cur > 0 &&
+            } else if (all_red && ctx->counters->level_cur > 0 &&
                        !ta_cndfs_subsumed(ctx, &ctx->state, LM_RED) ) {
                 /* unset the all-red flag (only for non-initial nodes) */
-                bitvector_unset (&loc->all_red, loc->counters.level_cur - 1);
+                bitvector_unset (&loc->all_red, ctx->counters->level_cur - 1);
             }
             dfs_stack_pop (loc->stack);
         }
     }
 }
-
 
 void
 ta_cndfs_local_init   (run_t *run, wctx_t *ctx)
@@ -517,7 +513,8 @@ ta_cndfs_local_init   (run_t *run, wctx_t *ctx)
     loc->cyan = fset_create (sizeof(ta_cndfs_state_t), 0, 10, 28);
     loc->pink = fset_create (sizeof(ta_cndfs_state_t), 0, FSET_MIN_SIZE, 20);
     loc->cyan2= fset_create (sizeof(ref_t), sizeof(void *), 10, 20);
-    (void) run;
+
+    cndfs_local_init (run, ctx);
 }
 
 void

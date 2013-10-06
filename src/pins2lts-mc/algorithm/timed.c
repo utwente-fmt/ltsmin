@@ -6,13 +6,8 @@
 
 #include <popt.h>
 
-#include <pins2lts-mc/parallel/permute.h>
-#include <pins2lts-mc/parallel/state-info.h>
-#include <pins2lts-mc/parallel/state-store.h>
-#include <pins2lts-mc/parallel/worker.h>
 #include <pins2lts-mc/algorithm/timed.h>
 #include <pins2lts-mc/algorithm/reach.h>
-#include <util-lib/util.h>
 
 // TODO: merge with reach algorithms
 
@@ -151,18 +146,18 @@ ta_handle (void *arg, state_info_t *successor, transition_info_t *ti, int seen)
         }
         ta_queue_state (ctx, successor);
         ta_loc->counters.updates += LM_NULL_LOC != ta_loc->last;
-        loc->counters.visited++;
+        loc->counters.level_size++;
     } else {
         lm_unlock (global->lmap, successor->ref);
     }
     action_detect (ctx, ti, successor);
     if (EXPECT_FALSE(loc->lts != NULL)) {
-        int             src = loc->counters.explored;
+        int             src = ctx->counters->explored;
         int            *tgt = successor->data;
         int             tgt_owner = ref_hash (successor->ref) % W;
         lts_write_edge (loc->lts, ctx->id, &src, tgt_owner, tgt, ti->labels);
     }
-    loc->counters.trans++;
+    ctx->counters->trans++;
     (void) seen;
 }
 
@@ -190,9 +185,9 @@ ta_handle_nb (void *arg, state_info_t *successor, transition_info_t *ti, int see
         }
         ta_queue_state (ctx, successor);
         ta_loc->counters.updates += LM_NULL_LOC != ta_loc->last;
-        loc->counters.visited++;
+        loc->counters.level_size++;
     }
-    loc->counters.trans++;
+    ctx->counters->trans++;
     (void) ti; (void) seen;
 }
 
@@ -200,16 +195,15 @@ static inline void
 ta_explore_state (wctx_t *ctx)
 {
     alg_local_t        *loc = ctx->local;
-    counter_t          *cnt = &loc->counters;
     size_t              count = 0;
-    if (ctx->local->counters.level_cur >= max_level)
+    if (ctx->counters->level_cur >= max_level)
         return;
     invariant_detect (ctx, ctx->state.data);
     count = permute_trans (ctx->permute, &ctx->state,
                            NONBLOCKING ? ta_handle_nb : ta_handle, ctx);
     deadlock_detect (ctx, count);
-    maybe_report1 (cnt->explored, cnt->trans, cnt->level_max, "");
-    loc->counters.explored++;
+    run_maybe_report1 (ctx->run, ctx->counters, "");
+    ctx->counters->explored++;
 }
 
 static inline int
@@ -231,12 +225,12 @@ ta_dfs (wctx_t *ctx)
     alg_local_t        *loc = ctx->local;
     alg_global_t       *sm = ctx->global;
     counter_t          *cnt = &loc->counters;
-    while (lb_balance(global->lb, ctx->id, dfs_stack_size(sm->stack), split_dfs)) {
+    while (lb_balance(ctx->run->shared->lb, ctx->id, dfs_stack_size(sm->stack), split_dfs)) {
         raw_data_t          state_data = dfs_stack_top (sm->stack);
         if (NULL != state_data) {
             if (grab_waiting(ctx, state_data)) {
                 dfs_stack_enter (sm->stack);
-                increase_level (&cnt->level_cur, &cnt->level_max);
+                increase_level (ctx->counters);
                 ta_explore_state (ctx);
             } else {
                 dfs_stack_pop (sm->stack);
@@ -245,7 +239,7 @@ ta_dfs (wctx_t *ctx)
             if (0 == dfs_stack_size (sm->stack))
                 continue;
             dfs_stack_leave (sm->stack);
-            loc->counters.level_cur--;
+            ctx->counters->level_cur--;
             dfs_stack_pop (sm->stack);
         }
     }
@@ -257,7 +251,7 @@ ta_bfs (wctx_t *ctx)
     alg_local_t        *loc = ctx->local;
     alg_global_t       *sm = ctx->global;
     counter_t          *cnt = &loc->counters;
-    while (lb_balance(global->lb, ctx->id, bfs_load(sm), split_bfs)) {
+    while (lb_balance(ctx->run->shared->lb, ctx->id, bfs_load(sm), split_bfs)) {
         raw_data_t          state_data = dfs_stack_pop (sm->in_stack);
         if (NULL != state_data) {
             if (grab_waiting(ctx, state_data)) {
@@ -265,7 +259,7 @@ ta_bfs (wctx_t *ctx)
             }
         } else {
             swap (sm->in_stack, sm->out_stack);
-            increase_level (&cnt->level_cur, &cnt->level_max);
+            increase_level (ctx->counters);
         }
     }
 }
@@ -276,7 +270,7 @@ ta_sbfs (wctx_t *ctx)
     alg_global_t       *sm = ctx->global;
     size_t              next_level_size, local_next_size;
     do {
-        while (lb_balance(global->lb, ctx->id, in_load(sm), split_sbfs)) {
+        while (lb_balance(ctx->run->shared->lb, ctx->id, in_load(sm), split_sbfs)) {
             raw_data_t          state_data = dfs_stack_pop (sm->in_stack);
             if (NULL != state_data) {
                 if (grab_waiting(ctx, state_data)) {
@@ -286,10 +280,10 @@ ta_sbfs (wctx_t *ctx)
         }
         local_next_size = dfs_stack_frame_size(sm->out_stack);
         next_level_size = sbfs_level (ctx, local_next_size);
-        lb_reinit (global->lb, ctx->id);
+        lb_reinit (ctx->run->shared->lb, ctx->id);
         swap (sm->out_stack, sm->in_stack);
         sm->stack = sm->out_stack;
-    } while (next_level_size > 0 && !lb_is_stopped(global->lb));
+    } while (next_level_size > 0 && !run_is_stopped(ctx->run));
 }
 
 void
@@ -306,7 +300,7 @@ ta_pbfs (wctx_t *ctx)
         for (size_t i = 0; i < W; i++) {
             size_t          current = (i << 1) + loc->flip;
             while ((state_data = isba_pop_int (sm->queues[current])) &&
-                    !lb_is_stopped (global->lb)) {
+                    !lb_is_stopped (ctx->run->shared->lb)) {
                 if (grab_waiting(ctx, state_data)) {
                     ta_explore_state (ctx);
                     if (EXPECT_FALSE(loc->lts && write_state)){
@@ -318,7 +312,7 @@ ta_pbfs (wctx_t *ctx)
             }
         }
         count = sbfs_level (ctx, loc->counters.level_size);
-    } while (count && !lb_is_stopped(global->lb));
+    } while (count && !run_is_stopped(ctx->run));
 }
 
 void
@@ -415,7 +409,7 @@ timed_run (run_t *run, wctx_t *ctx)
             ta_queue_state = pbfs_queue_state;
         ta_handle (ctx, &ctx->initial, &ti, 0);
     }
-    ctx->local->counters.trans = 0; //reset trans count
+    ctx->counters->trans = 0; //reset trans count
 
     switch (get_strategy(run->alg)) {
         case Strat_TA_PBFS:
@@ -445,4 +439,6 @@ timed_shared_init      (run_t *run)
     set_alg_print_stats (run->alg, timed_print_stats);
     set_alg_run (run->alg, timed_run);
     set_alg_reduce (run->alg, timed_reduce);
+
+    reach_init_shared (run);
 }

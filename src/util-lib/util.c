@@ -32,3 +32,14 @@ randperm (int *perm, int n, uint32_t seed)
         perm[i] = t;
     }
 }
+
+int
+char_array_search(char *args[], int length, char *key)
+{
+    for (int i = 0; i < length; i++) {
+        if (strcmp(args[i], key) == 0) {
+            return 1;
+        }
+    }
+    return 0;
+}

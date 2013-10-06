@@ -14,6 +14,7 @@
 #ifndef LB_H_
 #define LB_H_
 
+#include <stdlib.h>
 #include <stdint.h>
 #include <unistd.h>
 
@@ -75,8 +76,6 @@ lb_balance (lb_t *lb, int id, size_t my_load, lb_split_problem_f split)
 }
 
 extern int lb_stop (lb_t *lb);
-
-extern int lb_is_stopped (lb_t *lb);
 
 /**
  * requires barrier before!

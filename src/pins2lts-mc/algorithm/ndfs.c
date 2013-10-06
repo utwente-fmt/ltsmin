@@ -29,11 +29,6 @@ struct poptOption ndfs_options[] = {
 static void
 add_results (counter_t *res, counter_t *cnt)
 {
-    res->explored += cnt->explored;
-    res->trans += cnt->trans;
-    res->level_cur += cnt->level_cur;
-    res->level_max += cnt->level_max;
-
     res->accepting += cnt->accepting;
     res->allred += cnt->allred;
     res->waits += cnt->waits;
@@ -91,7 +86,7 @@ ndfs_report_cycle (wctx_t *ctx, state_info_t *cycle_closing_state)
 {
     alg_local_t        *loc = ctx->local;
     /* Stop other workers, exit if some other worker was first here */
-    if ( !lb_stop(global->lb) )
+    if ( !run_stop(ctx->run) )
         return;
     size_t              level = dfs_stack_nframes (loc->stack) + 1;
     Warning (info, " ");
@@ -130,7 +125,7 @@ ndfs_red_handle (void *arg, state_info_t *successor, transition_info_t *ti,
     (void) ti; (void) seen;
 }
 
-static void
+void
 ndfs_blue_handle (void *arg, state_info_t *successor, transition_info_t *ti,
                   int seen)
 {
@@ -161,22 +156,22 @@ void
 ndfs_explore_state_red (wctx_t *ctx)
 {
     alg_local_t        *loc = ctx->local;
-    counter_t          *cnt = &loc->red;
+    work_counter_t     *cnt = &loc->red_work;
     dfs_stack_enter (loc->stack);
-    increase_level (&cnt->level_cur, &cnt->level_max);
+    increase_level (cnt);
     cnt->trans += permute_trans (ctx->permute, &ctx->state, ndfs_red_handle, ctx);
-    maybe_report (cnt->explored, cnt->trans, cnt->level_max, "[Red ] ");
+    run_maybe_report (ctx->run, cnt, "[Red ] ");
 }
 
 void
 ndfs_explore_state_blue (wctx_t *ctx)
 {
-    counter_t *cnt = &ctx->local->counters;
+    work_counter_t     *cnt = ctx->counters;
     dfs_stack_enter (ctx->local->stack);
-    increase_level (&cnt->level_cur, &cnt->level_max);
+    increase_level (cnt);
     cnt->trans += permute_trans (ctx->permute, &ctx->state, ndfs_blue_handle, ctx);
     cnt->explored++;
-    maybe_report (cnt->explored, cnt->trans, cnt->level_max, "[Blue] ");
+    run_maybe_report (ctx->run, cnt, "[Blue] ");
 }
 
 /* NNDFS dfs_red */
@@ -186,7 +181,7 @@ ndfs_red (wctx_t *ctx, ref_t seed)
     alg_local_t        *loc = ctx->local;
     loc->counters.accepting++; //count accepting states
     ndfs_explore_state_red (ctx);
-    while ( !lb_is_stopped(global->lb) ) {
+    while ( !run_is_stopped(ctx->run) ) {
         raw_data_t          state_data = dfs_stack_top (loc->stack);
         if (NULL != state_data) {
             state_info_deserialize (&ctx->state, state_data, ctx->store);
@@ -194,7 +189,7 @@ ndfs_red (wctx_t *ctx, ref_t seed)
             if ( nn_color_eq(color, NNBLUE) ) {
                 nn_set_color (&loc->color_map, ctx->state.ref, NNPINK);
                 ndfs_explore_state_red (ctx);
-                loc->red.explored++;
+                loc->red_work.explored++;
             } else {
                 if (seed == ctx->state.ref)
                     break;
@@ -202,7 +197,7 @@ ndfs_red (wctx_t *ctx, ref_t seed)
             }
         } else { //backtrack
             dfs_stack_leave (loc->stack);
-            loc->red.level_cur--;
+            loc->red_work.level_cur--;
             state_data = dfs_stack_top (loc->stack);
             state_info_deserialize_cheap (&ctx->state, state_data);
             /* exit search if backtrack hits seed, leave stack the way it was */
@@ -217,35 +212,36 @@ ndfs_red (wctx_t *ctx, ref_t seed)
 void
 ndfs_blue (run_t *run, wctx_t *ctx)
 {
-    alg_local_t        *loc = ctx->local;
+    alg_local_t            *loc = ctx->local;
     transition_info_t       ti = GB_NO_TRANSITION;
     ndfs_blue_handle (ctx, &ctx->initial, &ti, 0);
-    ctx->local->counters.trans = 0; //reset trans count
+    ctx->counters->trans = 0; //reset trans count
 
-
-    while ( !lb_is_stopped(global->lb) ) {
+    while ( !run_is_stopped(run) ) {
         raw_data_t          state_data = dfs_stack_top (loc->stack);
         if (NULL != state_data) {
             state_info_deserialize (&ctx->state, state_data, ctx->store);
             nndfs_color_t color = nn_get_color (&loc->color_map, ctx->state.ref);
             if ( nn_color_eq(color, NNWHITE) ) {
-                bitvector_set ( &loc->all_red, loc->counters.level_cur );
+                if (all_red)
+                    bitvector_set ( &loc->all_red, ctx->counters->level_cur );
                 nn_set_color (&loc->color_map, ctx->state.ref, NNCYAN);
                 ndfs_explore_state_blue (ctx);
             } else {
-                if ( loc->counters.level_cur != 0 && !nn_color_eq(color, NNPINK) )
-                    bitvector_unset ( &loc->all_red, loc->counters.level_cur - 1);
+                if ( all_red && ctx->counters->level_cur != 0 &&
+                                !nn_color_eq(color, NNPINK) )
+                    bitvector_unset ( &loc->all_red, ctx->counters->level_cur - 1);
                 dfs_stack_pop (loc->stack);
             }
         } else { //backtrack
             if (0 == dfs_stack_nframes (loc->stack))
                 return;
             dfs_stack_leave (loc->stack);
-            loc->counters.level_cur--;
+            ctx->counters->level_cur--;
             state_data = dfs_stack_top (loc->stack);
             state_info_t            seed;
             state_info_deserialize (&seed, state_data, ctx->store);
-            if ( all_red && bitvector_is_set(&loc->all_red, loc->counters.level_cur) ) {
+            if ( all_red && bitvector_is_set(&loc->all_red, ctx->counters->level_cur) ) {
                 /* exit if backtrack hits seed, leave stack the way it was */
                 nn_set_color (&loc->color_map, seed.ref, NNPINK);
                 loc->counters.allred++;
@@ -256,42 +252,12 @@ ndfs_blue (run_t *run, wctx_t *ctx)
                 ndfs_red (ctx, seed.ref);
                 nn_set_color (&loc->color_map, seed.ref, NNPINK);
             } else {
-                if (loc->counters.level_cur > 0)
-                    bitvector_unset (&loc->all_red, loc->counters.level_cur - 1);
+                if (all_red && ctx->counters->level_cur > 0)
+                    bitvector_unset (&loc->all_red, ctx->counters->level_cur - 1);
                 nn_set_color (&loc->color_map, seed.ref, NNBLUE);
             }
             dfs_stack_pop (loc->stack);
         }
-    }
-    (void) run;
-}
-
-void
-ndfs_reduce  (run_t *run, wctx_t *ctx)
-{
-    if (run->reduced == NULL) {
-        run->reduced = RTmallocZero (sizeof (alg_reduced_t));
-    }
-    alg_reduced_t          *reduced = run->reduced;
-    counter_t              *cnt = &ctx->local->counters;
-    counter_t              *red = &ctx->local->red;
-
-    add_results (&reduced->blue, cnt);
-    add_results (&reduced->red, red);
-
-    if (W >= 4 || !log_active(infoLong)) return;
-
-    // print some local info
-    float                   runtime = RTrealTime(ctx->timer);
-    Warning (info, "[Blue] saw in %.3f sec %zu levels %zu states %zu transitions",
-             runtime, cnt->level_max, cnt->explored, cnt->trans);
-
-    Warning (info, "[Red ] saw in %.3f sec %zu levels %zu states %zu transitions",
-             runtime, red->level_max, red->explored, red->trans);
-
-    if (Strat_TA & strategy[0]) {
-        fset_print_statistics (ctx->local->cyan, "Cyan set");
-        fset_print_statistics (ctx->local->pink, "Pink set");
     }
 }
 
@@ -318,7 +284,7 @@ ndfs_local_setup   (run_t *run, wctx_t *ctx)
 }
 
 void
-ndfs_destroy_local   (run_t *run, wctx_t *ctx)
+ndfs_local_deinit   (run_t *run, wctx_t *ctx)
 {
     alg_local_t        *loc = ctx->local;
     if (all_red)
@@ -343,7 +309,7 @@ ndfs_global_init   (run_t *run, wctx_t *ctx)
 }
 
 void
-ndfs_destroy   (run_t *run, wctx_t *ctx)
+ndfs_global_deinit   (run_t *run, wctx_t *ctx)
 {
     (void) run; (void) ctx;
 }
@@ -352,10 +318,10 @@ void
 ndfs_print_state_stats (run_t* run, wctx_t* ctx, int index, float waittime)
 {
     size_t db_elts = global->stats.elts;
-    size_t explored = run->reduced->blue.explored;
-    size_t trans = run->reduced->blue.trans;
-    size_t rtrans = run->reduced->red.trans;
-    size_t rexplored = run->reduced->red.explored;
+    size_t explored = run->total.explored;
+    size_t trans = run->total.trans;
+    size_t rtrans = run->reduced->red_work.trans;
+    size_t rexplored = run->reduced->red_work.explored;
     size_t bogus = run->reduced->red.bogus_red;
     size_t waits = run->reduced->red.waits;
     size_t allred = run->reduced->blue.allred;
@@ -389,10 +355,10 @@ ndfs_print_stats   (run_t *run, wctx_t *ctx)
     Warning (info, " ");
     Warning (info, "State space has %zu states, %zu are accepting", db_elts, accepting);
 
-    run->reduced->blue.explored /= W;
-    run->reduced->blue.trans /= W;
-    run->reduced->red.trans /= W;
-    run->reduced->red.explored /= W;
+    run->total.explored /= W;
+    run->total.trans /= W;
+    run->reduced->red_work.trans /= W;
+    run->reduced->red_work.explored /= W;
     run->reduced->red.bogus_red /= W;
     run->reduced->blue.allred /= W;
     run->reduced->red.allred /= W;
@@ -400,14 +366,49 @@ ndfs_print_stats   (run_t *run, wctx_t *ctx)
 }
 
 void
+ndfs_reduce  (run_t *run, wctx_t *ctx)
+{
+    if (run->reduced == NULL) {
+        run->reduced = RTmallocZero (sizeof (alg_reduced_t));
+    }
+    alg_reduced_t          *reduced = run->reduced;
+    counter_t              *blue = &ctx->local->counters;
+    counter_t              *red = &ctx->local->red;
+    work_counter_t         *blue_work = ctx->counters;
+    work_counter_t         *red_work = &ctx->local->red_work;
+
+    add_results (&reduced->blue, blue);
+    add_results (&reduced->red, red);
+    work_add_results (&reduced->red_work, red_work);
+
+    // publish local memory statistics for run class
+    run->local_states += blue_work->level_max + red_work->level_max;
+
+    if (W >= 4 || !log_active(infoLong)) return;
+
+    // print some local info
+    float                   runtime = RTrealTime(ctx->timer);
+    Warning (info, "Nested depth-dirst search worker ran %.3f sec", runtime);
+    work_report ("[Blue]", blue_work);
+    work_report ("[Red ]", red_work);
+
+    if (Strat_TA & strategy[0]) {
+        fset_print_statistics (ctx->local->cyan, "Cyan set");
+        fset_print_statistics (ctx->local->pink, "Pink set");
+    }
+}
+
+void
 ndfs_shared_init   (run_t *run)
 {
     set_alg_local_init (run->alg, ndfs_local_init);
     set_alg_global_init (run->alg, ndfs_global_init);
-    set_alg_global_deinit (run->alg, ndfs_destroy);
-    set_alg_local_deinit (run->alg, ndfs_destroy_local);
+    set_alg_global_deinit (run->alg, ndfs_global_deinit);
+    set_alg_local_deinit (run->alg, ndfs_local_deinit);
     set_alg_print_stats (run->alg, ndfs_print_stats);
     set_alg_run (run->alg, ndfs_blue);
     set_alg_state_seen (run->alg, ndfs_state_seen);
     set_alg_reduce (run->alg, ndfs_reduce);
+
+    init_threshold = THRESHOLD; // Non-distributed counting (searches completely overlap)
 }

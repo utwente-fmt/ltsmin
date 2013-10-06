@@ -3,10 +3,7 @@
 #include <pthread.h>
 #include <signal.h>
 
-#include <hre/user.h>
 #include <lts-io/user.h>
-#include <ltsmin-lib/ltsmin-standard.h>
-#include <mc-lib/statistics.h>
 #include <pins-lib/pins.h>
 #include <pins-lib/pins-impl.h>
 #include <pins2lts-mc/parallel/global.h>
@@ -14,6 +11,8 @@
 #include <pins2lts-mc/parallel/run.h>
 #include <pins2lts-mc/parallel/worker.h>
 #include <util-lib/util.h>
+
+#define FORCE_STRING "force-procs"
 
 static int          HRE_PROCS = 0;
 
@@ -23,23 +22,11 @@ static struct poptOption options_mc[] = {
 #else
      {NULL, 0, POPT_ARG_INCLUDE_TABLE, options, 0, NULL, NULL},
 #endif
-     {"force-procs", 0, POPT_ARG_VAL | POPT_ARGFLAG_SHOW_DEFAULT | POPT_ARGFLAG_DOC_HIDDEN,
-      &HRE_PROCS, 1, "Force multi-process in favor of pthreads.", NULL},
+     {FORCE_STRING, 0, POPT_ARG_VAL | POPT_ARGFLAG_SHOW_DEFAULT | POPT_ARGFLAG_DOC_HIDDEN,
+      &HRE_PROCS, 1, "Force multi-process in favor of pthreads", NULL},
      SPEC_POPT_OPTIONS,
      POPT_TABLEEND
 };
-
-static void
-exit_ltsmin (int sig)
-{
-    if (HREme(HREglobal()) != 0)
-        return;
-    if ( !lb_stop(global->lb) ) { //TODO: separate stop functionality from LB
-        Abort ("UNGRACEFUL EXIT");
-    } else {
-        Warning (info, "PREMATURE EXIT (caught signal: %d)", sig);
-    }
-}
 
 #ifdef OPAAL
 static bool                timed_model = true;
@@ -48,6 +35,19 @@ static pthread_mutex_t    *mutex = NULL;          // global mutex
 static bool                timed_model = false;
 #endif
 
+static run_t              *run = NULL;
+
+static void
+exit_ltsmin (int sig)
+{
+    if (HREme(HREglobal()) == 0) {
+        if ( run_stop(run) ) {
+            Warning (info, "PREMATURE EXIT (caught signal: %d)", sig);
+        } else {
+            Abort ("UNGRACEFUL EXIT");
+        }
+    }
+}
 
 static void
 hre_init_and_spawn_workers (int argc, char *argv[])
@@ -59,10 +59,10 @@ hre_init_and_spawn_workers (int argc, char *argv[])
 
     lts_lib_setup ();
 
+    // Only use the multi-process environment if necessary:
     HRE_PROCS |= !SPEC_MT_SAFE;
-    for (int i = 0; i < argc && !HRE_PROCS; i++) {
-        if (strcmp(argv[i], "--force-procs") == 0) { HRE_PROCS = 1; break; }
-    }
+    HRE_PROCS |= char_array_search (argv, argc, "--" FORCE_STRING);
+
     if (HRE_PROCS) {
         HREenableFork (RTnumCPUs(), true);
     } else {
@@ -79,11 +79,8 @@ create_pins_model ()
     model_t             model = GBcreateBase ();
 
     cct_cont_t         *map = cct_create_cont (global->tables);
-    GBsetChunkMethods (model, (newmap_t)cct_create_vt, map,
-                       HREgreyboxI2C,
-                       HREgreyboxC2I,
-                       HREgreyboxCAtI,
-                       HREgreyboxCount);
+    GBsetChunkMethods (model, (newmap_t)cct_create_vt, map, HREgreyboxI2C,
+                       HREgreyboxC2I, HREgreyboxCAtI, HREgreyboxCount);
 
     Print1 (info, "Loading model from %s", files[0]);
 
@@ -122,8 +119,6 @@ global_and_model_init ()
     global_init (model, timed_model);
     global_print (model);
 
-    (void) signal (SIGINT, exit_ltsmin);
-
     return model;
 }
 
@@ -133,16 +128,28 @@ global_and_model_init ()
 wctx_t *
 local_init (model_t model)
 {
-    run_t              *run = NULL;
-    wctx_t             *ctx;
-
     if (HREme(HREglobal()) == 0)
-        run = run_create ();
+        run = run_create (true);
     HREreduce (HREglobal(), 1, &run, &run, Pointer, Max);
 
-    ctx = run_init (run, model);
+    (void) signal (SIGINT, exit_ltsmin);
 
-    return ctx;
+    return run_init (run, model);
+}
+
+/**
+ * Reduce statistics and print results
+ */
+wctx_t *
+reduce_and_print (wctx_t *ctx)
+{
+    run_reduce_stats (ctx);
+    global_reduce_stats (ctx->model);
+
+    if (HREme(HREglobal()) == 0) {
+        run_print_stats (ctx);
+        global_print_stats (ctx->model, run_local_state_infos(ctx));
+    }
 }
 
 static void
@@ -152,7 +159,7 @@ deinit_all (wctx_t *ctx)
 
     run = run_deinit (ctx);
 
-    if (0 == ctx->id) {
+    if (HREme(HREglobal()) == 0) {
         run_destroy (run);
         global_deinit ();
     }
@@ -176,11 +183,9 @@ main (int argc, char *argv[])
 
     run_alg (ctx);
 
-    run_reduce_and_print_stats (ctx);
-    global_reduce_and_print_stats (model);
+    reduce_and_print (ctx);
 
     deinit_all (ctx);
 
     HREexit (global->exit_status);
-    return -5; // should not be reached
 }

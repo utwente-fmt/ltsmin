@@ -46,7 +46,7 @@ char*            label_filter = NULL;
 char            *files[2];
 
 void
-options_static_setup      (model_t model, bool timed)
+options_static_init      (model_t model, bool timed)
 {
     if (strategy[0] == Strat_None)
         strategy[0] = (GBgetAcceptingStateLabelIndex(model) < 0 ?

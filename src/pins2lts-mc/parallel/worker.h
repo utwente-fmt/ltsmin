@@ -7,9 +7,8 @@
 
 #include <stdlib.h>
 
-#include <hre/user.h>
 #include <hre-io/user.h>
-#include <mc-lib/stats.h>
+#include <pins2lts-mc/parallel/counter.h>
 #include <pins2lts-mc/parallel/permute.h>
 #include <pins2lts-mc/parallel/run.h>
 #include <pins2lts-mc/parallel/state-info.h>
@@ -19,22 +18,22 @@ typedef struct alg_global_s alg_global_t;
 
 struct thread_ctx_s {
     size_t              id;             // thread id (0..NUM_THREADS)
-    model_t             model;          // Greybox model
     stream_t            out;            // raw file output stream
-    permute_t          *permute;        // transition permutor
     rt_timer_t          timer;          // Local exploration time timer
+    permute_t          *permute;        // transition permutor
+    work_counter_t     *counters;       // General work counters
+    state_info_t        initial;        // initial state
+    state_data_t        initial_state;  // initial state data
 
-    alg_local_t        *local;
-    alg_global_t       *global;
+    run_t              *run;            // The run info shared by all workers
+    model_t             model;          // PINS language module
+    alg_local_t        *local;          // Worker information, local to worker
+    alg_global_t       *global;         // Worker information, shared with others
 
     // state_info_t TODO:
     state_data_t        store;          // temporary state storage1
     state_data_t        store2;         // temporary state storage2
     state_info_t        state;          // currently explored state
-    state_info_t        initial;        // initial state
-    state_data_t        initial_state;  // initial state data
-
-    run_t              *run;
 };
 
 extern wctx_t *wctx_create (model_t model, run_t *run);

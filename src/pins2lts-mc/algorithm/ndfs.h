@@ -10,8 +10,6 @@
 
 #include <hre/stringindex.h>
 #include <pins2lts-mc/algorithm/ltl.h>
-#include <pins2lts-mc/parallel/color.h>
-#include <pins2lts-mc/parallel/state-store.h>
 
 extern int              all_red;
 
@@ -25,11 +23,6 @@ typedef union ta_cndfs_state_u {
 } ta_cndfs_state_t;
 
 typedef struct counter_s {
-    size_t              explored;
-    size_t              trans;
-    size_t              level_max;
-    size_t              level_cur;
-
     size_t              waits;
     size_t              accepting;
     size_t              allred;         // counter: allred states
@@ -39,9 +32,9 @@ typedef struct counter_s {
 
 struct alg_local_s {
     dfs_stack_t         stack;          // Successor stack
-    dfs_stack_t         in_stack;       //
     bitvector_t         color_map;      // Local NDFS coloring of states (ref-based)
     counter_t           counters;       // reachability/NDFS_blue counters
+    work_counter_t      red_work;
     counter_t           red;            // NDFS_red counters
     ref_t               seed;           // current NDFS seed
     bitvector_t         all_red;        // all_red gaiser/Schwoon
@@ -57,7 +50,11 @@ struct alg_local_s {
 struct alg_reduced_s {
     counter_t           blue;
     counter_t           red;
+    work_counter_t      red_work;
 };
+
+extern void ndfs_blue_handle (void *arg, state_info_t *successor,
+                              transition_info_t *ti, int seen);
 
 extern void ndfs_explore_state_red (wctx_t *ctx);
 
@@ -69,7 +66,11 @@ extern void ndfs_local_init   (run_t *alg, wctx_t *ctx);
 
 extern void ndfs_local_setup   (run_t *alg, wctx_t *ctx);
 
+extern void ndfs_local_deinit   (run_t *alg, wctx_t *ctx);
+
 extern void ndfs_global_init   (run_t *alg, wctx_t *ctx);
+
+extern void ndfs_global_deinit   (run_t *alg, wctx_t *ctx);
 
 extern void ndfs_print_stats   (run_t *alg, wctx_t *ctx);
 
@@ -86,7 +87,7 @@ static inline void
 wait_seed (wctx_t *ctx, ref_t seed)
 {
     int didwait = 0;
-    while (get_wip(seed) > 0 && !lb_is_stopped(global->lb)) { didwait = 1; } //wait
+    while (get_wip(seed) > 0 && !run_is_stopped(ctx->run)) { didwait = 1; } //wait
     if (didwait) {
         ctx->local->red.waits++;
     }
@@ -108,7 +109,7 @@ static inline void
 set_red (wctx_t *ctx, state_info_t *state)
 {
     if (global_try_color(state->ref, GRED, ctx->local->rec_bits)) {
-        ctx->local->red.explored++;
+        ctx->local->red_work.explored++;
         if ( GBbuchiIsAccepting(ctx->model, get_state(state->ref, ctx)) )
             ctx->local->counters.accepting++; /* count accepting states */
     } else {

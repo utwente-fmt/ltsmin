@@ -14,6 +14,8 @@ noinst_LTLIBRARIES = libparallel.la
 
 libparallel_la_SOURCES  = color.c
 libparallel_la_SOURCES += color.h
+libparallel_la_SOURCES += counter.c
+libparallel_la_SOURCES += counter.h
 libparallel_la_SOURCES += global.c
 libparallel_la_SOURCES += global.h
 libparallel_la_SOURCES += options.c

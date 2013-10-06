@@ -36,6 +36,7 @@ typedef struct cndfs_alg_local_s {
     alg_local_t         ndfs;
 
     cndfs_counter_t     counters;
+    dfs_stack_t         in_stack;
     dfs_stack_t         out_stack;
     rt_timer_t          timer;
     alg_local_t        *rec;
@@ -50,5 +51,7 @@ typedef struct cndfs_reduced_s {
 extern void cndfs_print_stats   (run_t *run, wctx_t *ctx);
 
 extern void cndfs_reduce        (run_t *run, wctx_t *ctx);
+
+extern void cndfs_local_init   (run_t *run, wctx_t *ctx);
 
 #endif // CNDFS_H

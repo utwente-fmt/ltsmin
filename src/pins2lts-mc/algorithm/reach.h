@@ -24,6 +24,7 @@
 
 #include <lts-io/user.h>
 #include <ltsmin-lib/ltsmin-syntax.h>
+#include <mc-lib/lb.h>
 #include <mc-lib/statistics.h>
 #include <pins-lib/property-semantics.h>
 #include <pins2lts-mc/algorithm/algorithm.h>
@@ -39,13 +40,7 @@ extern int              no_exit;
 extern size_t           max_level;
 
 typedef struct counter_s {
-    size_t              visited;        // counter: visited states
-    size_t              explored;       // counter: explored states
-    size_t              trans;          // counter: transitions
-    size_t              level_max;      // max level
-    size_t              level_cur;      // current level
     size_t              level_size;     // size of the SBFS level
-
     size_t              splits;         // Splits by LB
     size_t              transfer;       // load transfered by LB
     size_t              deadlocks;      // deadlock count
@@ -76,6 +71,13 @@ struct alg_reduced_s {
     statistics_t        trans_stats;
 };
 
+struct alg_shared_s {
+    lb_t               *lb;             // Load balancer
+    size_t              max_level_size;
+    size_t              total_explored; // used for level synchronizing BFSs (sbfs and pbfs)
+    ref_t              *parent_ref;     // trace reconstruction
+};
+
 extern void pbfs_queue_state (wctx_t *ctx, state_info_t *successor);
 
 extern ssize_t split_bfs (void *arg_src, void *arg_tgt, size_t handoff);
@@ -100,6 +102,8 @@ extern void reach_reduce  (run_t *run, wctx_t *ctx);
 
 extern void reach_print_stats  (run_t *run, wctx_t *ctx);
 
+extern void reach_init_shared (run_t *run);
+
 extern void handle_error_trace (wctx_t *ctx);
 
 static inline void
@@ -112,9 +116,10 @@ deadlock_detect (wctx_t *ctx, size_t count)
     loc->counters.deadlocks++; // counting is costless
     if (GBstateIsValidEnd(ctx->model, ctx->state.data)) return;
     if ( !loc->inv_expr ) loc->counters.violations++;
-    if (dlk_detect && (!no_exit || trc_output) && lb_stop(global->lb)) {
+    if (dlk_detect && (!no_exit || trc_output) && lb_stop(ctx->run->shared->lb)) {
         Warning (info, " ");
-        Warning (info, "Deadlock found in state at depth %zu!", loc->counters.level_cur);
+        Warning (info, "Deadlock found in state at depth %zu!",
+                 ctx->counters->level_cur);
         Warning (info, " ");
         handle_error_trace (ctx);
     }
@@ -132,9 +137,10 @@ invariant_detect (wctx_t *ctx, raw_data_t state)
         return;
 
     loc->counters.violations++;
-    if ((!no_exit || trc_output) && lb_stop(global->lb)) {
+    if ((!no_exit || trc_output) && lb_stop(ctx->run->shared->lb)) {
         Warning (info, " ");
-        Warning (info, "Invariant violation (%s) found at depth %zu!", inv_detect, loc->counters.level_cur);
+        Warning (info, "Invariant violation (%s) found at depth %zu!",
+                 inv_detect, ctx->counters->level_cur);
         Warning (info, " ");
         handle_error_trace (ctx);
     }
@@ -151,15 +157,18 @@ action_detect (wctx_t *ctx, transition_info_t *ti, state_info_t *successor)
 
     alg_local_t        *loc = ctx->local;
     alg_global_t       *sm = ctx->global;
+    alg_shared_t       *shared = ctx->run->shared;
+
     loc->counters.errors++;
-    if ((!no_exit || trc_output) && lb_stop(global->lb)) {
+    if ((!no_exit || trc_output) && lb_stop(ctx->run->shared->lb)) {
         if (trc_output && successor->ref != ctx->state.ref) // race, but ok:
-            atomic_write(&global->parent_ref[successor->ref], ctx->state.ref);
+            atomic_write(&shared->parent_ref[successor->ref], ctx->state.ref);
         state_data_t data = dfs_stack_push (sm->stack, NULL);
         state_info_serialize (successor, data);
         dfs_stack_enter (sm->stack);
         Warning (info, " ");
-        Warning (info, "Error action '%s' found at depth %zu!", act_detect, loc->counters.level_cur);
+        Warning (info, "Error action '%s' found at depth %zu!",
+                 act_detect, ctx->counters->level_cur);
         Warning (info, " ");
         handle_error_trace (ctx);
     }

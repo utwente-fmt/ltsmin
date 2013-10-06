@@ -9,15 +9,9 @@
 
 #include <stdlib.h>
 
-#include <hre/runtime.h>
 #include <mc-lib/dbs-ll.h>
-#include <mc-lib/lmap.h>
 #include <mc-lib/treedbs-ll.h>
-#include <pins2lts-mc/parallel/color.h>
 #include <pins2lts-mc/parallel/state-info.h>
-#include <util-lib/fast_hash.h>
-
-extern struct poptOption state_store_options[];
 
 typedef enum {
     HashTable   = 1,
@@ -26,7 +20,10 @@ typedef enum {
     Tree        = TreeTable | ClearyTree
 } db_type_t;
 
+extern struct poptOption state_store_options[];
+
 extern si_map_entry db_types[];
+
 
 /* predecessor --(transition_info)--> successor */
 typedef int         (*find_or_put_f)(state_info_t *successor,
@@ -52,8 +49,13 @@ extern int              global_bits;
 extern int              local_bits;
 extern int              indexing;
 
-extern void init_dbs ();
+
+extern void state_store_init (model_t model, bool timed);
+
+extern void state_store_static_init ();
 
 extern void *get_state (ref_t ref, void *arg);
+
+extern char *state_store_full_msg (int dbs_ret_value);
 
 #endif // STATE_STORE_H

@@ -28,5 +28,7 @@ extern bool has_prefix (const char *name, const char *prefix);
 
 extern void randperm (int *perm, int n, uint32_t seed);
 
+extern int char_array_search (char *args[], int length, char *key);
+
 #endif // UTIL_LTSMIN_H
 

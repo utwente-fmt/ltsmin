@@ -12,7 +12,6 @@
 
 #include <hre/user.h>
 #include <ltsmin-lib/ltsmin-standard.h>
-#include <mc-lib/lb.h>
 #include <pins-lib/pins.h>
 #include <pins2lts-mc/algorithm/algorithm.h>
 #include <pins2lts-mc/algorithm/reach.h>
@@ -21,10 +20,9 @@
 #include <pins2lts-mc/parallel/options.h>
 #include <pins2lts-mc/parallel/state-store.h>
 
-static const size_t     THRESHOLD = 10000;
-
 global_t        *global = NULL;
 
+size_t           init_threshold;
 int              act_index = -1;
 int              act_type = -1;
 int              act_label = -1;
@@ -38,7 +36,6 @@ size_t           N;                  // size of entire state
 size_t           K;                  // number of groups
 size_t           SL;                 // number of state labels
 size_t           EL;                 // number of edge labels
-size_t           max_level_size = 0; // TODO, max BFS level
 
 void
 global_alloc  (bool pthreads)
@@ -85,17 +82,6 @@ global_add_stats (stats_t *stat)
 }
 
 static void
-init_bits () //TODO: ditsibute
-{
-    int i = 0;
-    while (Strat_None != strategy[i] && i < MAX_STRATEGIES) {
-        global_bits += num_global_bits (strategy[i]);
-        local_bits += (~Strat_DFSFIFO & Strat_LTL & strategy[i++] ? 2 : 0);
-    }
-    count_bits = (Strat_LNDFS == strategy[i - 1] ? ceil (log2 (W + 1)) : 0);
-}
-
-static void
 init_action_labels (model_t model)
 {
     lts_type_t          ltstype = GBgetLTStype (model);
@@ -113,7 +99,7 @@ init_action_labels (model_t model)
 }
 
 static void
-global_statics_init (model_t model)
+global_static_init (model_t model)
 {
     lts_type_t          ltstype = GBgetLTStype (model);
     matrix_t           *m = GBgetDMInfo (model);
@@ -125,19 +111,17 @@ global_statics_init (model_t model)
     W = HREpeers(HREglobal());
 
     init_action_labels ( model);
-
-    init_dbs ();
-
-    init_bits ();
 }
 
 
 static void
 global_static_setup  (model_t model, bool timed)
 {
-    global_statics_init (model);
+    global_static_init (model);
 
-    options_static_setup (model, timed);
+    state_store_static_init ();
+
+    options_static_init (model, timed);
 }
 
 static void
@@ -145,23 +129,9 @@ global_setup  (model_t model, bool timed)
 {
     RTswitchAlloc (!global->pthreads);
 
-    matrix_t           *m = GBgetDMInfo (model);
-    size_t              bits = global_bits + count_bits;
+    state_store_init (model, timed);
 
-    if (db_type == HashTable) {
-        if (ZOBRIST)
-            global->zobrist = zobrist_create (D, ZOBRIST, m);
-        global->dbs = DBSLLcreate_sized (D, dbs_size, hasher, bits);
-    } else {
-        global->dbs = TreeDBSLLcreate_dm (D, dbs_size, ratio, m, bits,
-                                         db_type == ClearyTree, indexing);
-    }
-    if (strategy[1] == Strat_MAP || (trc_output && !(strategy[0] & (Strat_LTL | Strat_TA))))
-        global->parent_ref = RTmalloc (sizeof(ref_t[1UL<<dbs_size]));
-    if (timed)
-        global->lmap = lm_create (W, 1UL<<dbs_size, LATTICE_BLOCK_SIZE);
-    global->lb = lb_create_max (W, G, H);
-    global->threshold = strategy[0] & Strat_NDFS ? THRESHOLD : THRESHOLD / W;
+    init_threshold = THRESHOLD / W; // default for distibuted counting
 
     RTswitchAlloc (false);
 }
@@ -197,7 +167,7 @@ global_print  (model_t model)
 }
 
 void
-global_print_stats (model_t model)
+global_print_stats (model_t model, size_t local_state_infos)
 {
     // Print memory statistics
     double              memQ, pagesDB, memC, memDB, compr, fill, leafs;
@@ -207,16 +177,18 @@ global_print_stats (model_t model)
     double              el_size =
        db_type & Tree ? (db_type==ClearyTree?1:2) + (2.0 / (1UL<<ratio)) : D+.5;
     size_t              s = state_info_size();
-    size_t              max_load;
 
-    memQ = ((double)(s * max_load)) / (1 << 20);
-    Warning (info, " ");
-    Warning (info, "Queue width: %zuB, total height: %zu, memory: %.2fMB",
-             s, max_load, memQ);
     pagesDB = ((double)(1UL << (dbs_size)) / (1<<20)) * SLOT_SIZE * el_size;
     memC = ((double)(((((size_t)local_bits)<<dbs_size))/8*W)) / (1UL<<20);
     memDB = ((double)(db_nodes * SLOT_SIZE * el_size)) / (1<<20);
     fill = (double)((db_elts * 100) / (1UL << dbs_size));
+
+    // print additional local queue/stack memory statistics
+    Warning (info, " ");
+    memQ = ((double)(state_info_size() * local_state_infos)) / (1<<20);
+    Warning (info, "Queue width: %zuB, total height: %zu, memory: %.2fMB",
+             state_info_size(), local_state_infos, memQ);
+
     if (db_type & Tree) {
         compr = (double)(db_nodes * el_size) / ((D+1) * db_elts) * 100;
         leafs = (double)(((db_nodes - db_elts) * 100) / (1UL << (dbs_size-ratio)));
@@ -248,7 +220,7 @@ global_print_stats (model_t model)
 }
 
 void
-global_reduce_and_print_stats (model_t model)
+global_reduce_stats (model_t model)
 {
     size_t              id = HREme(HREglobal());
     for (size_t i = 0; i < W; i++) {
@@ -257,10 +229,6 @@ global_reduce_and_print_stats (model_t model)
             global_add_stats (stats);
         }
         HREbarrier (HREglobal());
-    }
-
-    if (id == 0) {
-        global_print_stats (model);
     }
 }
 
@@ -273,7 +241,6 @@ global_deinit ()
         DBSLLfree (global->dbs); //TODO
     else //TreeDBSLL
         TreeDBSLLfree (global->dbs);
-    lb_destroy (global->lb);
     if (global->lmap != NULL)
         lm_free (global->lmap);
     if (global->zobrist != NULL)

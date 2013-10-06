@@ -21,6 +21,7 @@
 #define TIMED_H
 
 #include <mc-lib/statistics.h>
+#include <pins2lts-mc/algorithm/algorithm.h>
 
 extern struct poptOption timed_options[];
 

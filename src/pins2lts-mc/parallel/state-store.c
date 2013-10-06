@@ -11,6 +11,9 @@
 
 #include <mc-lib/treedbs-ll.h>
 #include <mc-lib/dbs-ll.h>
+#include <pins2lts-mc/algorithm/algorithm.h>
+#include <pins2lts-mc/algorithm/timed.h> // LATTICE_BLOCK_SIZE
+#include <pins2lts-mc/parallel/color.h>
 #include <pins2lts-mc/parallel/global.h>
 #include <pins2lts-mc/parallel/options.h>
 #include <pins2lts-mc/parallel/state-store.h>
@@ -79,6 +82,14 @@ struct poptOption state_store_options[] = {
     POPT_TABLEEND
 };
 
+char *
+state_store_full_msg (int dbs_ret_value)
+{
+    return (DB_FULL == dbs_ret_value ? "hash table" :
+            (DB_ROOTS_FULL == dbs_ret_value ? "tree roots table" :
+                                              "tree leafs table"));
+}
+
 void *
 get_state (ref_t ref, void *arg)
 {
@@ -123,11 +134,24 @@ find_or_put_tree (state_info_t *state, transition_info_t *ti,
     return ret;
 }
 
-void
-init_dbs ()
+static void
+init_color_bits () //TODO: ditsibute
 {
-    // Determine size
+    int i = 0;
+    while (Strat_None != strategy[i] && i < MAX_STRATEGIES) {
+        global_bits += num_global_bits (strategy[i]);
+        local_bits += (~Strat_DFSFIFO & Strat_LTL & strategy[i++] ? 2 : 0);
+    }
+    count_bits = (Strat_LNDFS == strategy[i - 1] ? ceil (log2 (W + 1)) : 0);
+}
 
+void
+state_store_static_init ()
+{
+    // Color bits
+    init_color_bits ();
+
+    // Determine database size
     char* end;
     dbs_size = strtol (table_size, &end, 10);
     if (dbs_size == 0)
@@ -141,7 +165,7 @@ init_dbs ()
     }
 
     // Wrap functions
-    indexing = NULL != trc_output || ((Strat_TA | Strat_LTLG) & strategy[0]); //TODO
+    indexing = NULL != trc_output || ((Strat_TA | Strat_LTLG) & strategy[0]);
     switch (db_type) {
     case HashTable:
         if (ZOBRIST) {
@@ -160,7 +184,8 @@ init_dbs ()
                      (dbs_get_sat_bits_f)DBSLLget_sat_bits);
         break;
     case ClearyTree:
-        if (indexing) Abort ("Cleary tree not supported in combination with error trails or the MCNDFS algorithms.");
+        if (indexing) Abort ("Cleary tree not supported in combination with "
+                              "error trails or the MCNDFS algorithms.");
     case TreeTable:
         if (ZOBRIST)
             Abort ("Zobrist and treedbs is not implemented");
@@ -177,3 +202,21 @@ init_dbs ()
     }
 }
 
+void
+state_store_init (model_t model, bool timed)
+{
+    matrix_t           *m = GBgetDMInfo (model);
+    size_t              bits = global_bits + count_bits;
+
+    if (db_type == HashTable) {
+        if (ZOBRIST)
+            global->zobrist = zobrist_create (D, ZOBRIST, m);
+        global->dbs = DBSLLcreate_sized (D, dbs_size, hasher, bits);
+    } else {
+        global->dbs = TreeDBSLLcreate_dm (D, dbs_size, ratio, m, bits,
+                                         db_type == ClearyTree, indexing);
+    }
+    if (timed) {
+        global->lmap = lm_create (W, 1UL<<dbs_size, LATTICE_BLOCK_SIZE);
+    }
+}

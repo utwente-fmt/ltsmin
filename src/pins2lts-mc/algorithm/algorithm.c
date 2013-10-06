@@ -6,15 +6,9 @@
 
 #include <stdlib.h>
 
-#include <ltsmin-lib/ltsmin-standard.h>
-#include <mc-lib/cctables.h>
 #include <pins2lts-mc/algorithm/algorithm_object.h>
 #include <pins2lts-mc/algorithm/algorithm.h>
-#include <pins2lts-mc/algorithm/timed.h>
-#include <pins2lts-mc/parallel/color.h>
-#include <pins2lts-mc/parallel/global.h>
 #include <pins2lts-mc/parallel/options.h>
-#include <pins2lts-mc/parallel/state-store.h>
 
 struct alg_s {
     alg_obj_t           procs;

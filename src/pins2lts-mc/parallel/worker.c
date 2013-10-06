@@ -10,6 +10,28 @@
 #include <pins2lts-mc/parallel/global.h>
 #include <pins2lts-mc/parallel/worker.h>
 
+void
+work_add_results (work_counter_t *res, work_counter_t *cnt)
+{
+    res->explored += cnt->explored;
+    res->trans += cnt->trans;
+    res->level_cur += cnt->level_cur;
+    res->level_max += cnt->level_max;
+}
+void
+work_report (char *prefix, work_counter_t *cnt)
+{
+    Warning (info, "%s%zu levels %zu states %zu transitions",
+             prefix, cnt->level_max, cnt->explored, cnt->trans);
+}
+
+void
+work_report_estimate (char *prefix, work_counter_t *cnt)
+{
+    Warning (info, "%s~%zu levels ~%zu states ~%zu transitions",
+             prefix, cnt->level_max, cnt->explored, cnt->trans);
+}
+
 wctx_t *
 wctx_create (model_t model, run_t *run)
 {
@@ -28,11 +50,14 @@ wctx_init (wctx_t *ctx)
 {
     alg_t              *alg = ctx->run->alg;
     state_info_create_empty (&ctx->state);
-    ctx->store = RTalignZero (CACHE_LINE_SIZE, SLOT_SIZE * N * 2); //TODO
+    ctx->store = RTalignZero (CACHE_LINE_SIZE, SLOT_SIZE * N * 2);
     ctx->store2 = RTalignZero (CACHE_LINE_SIZE, SLOT_SIZE * N * 2);
     ctx->permute = permute_create (permutation, ctx->model,
-                                   get_alg_state_seen(alg), W, K, ctx->id);
+                                   get_alg_state_seen(alg), W, K, ctx->id,
+                                   ctx->run);
 
+    ctx->counters = RTalignZero (CACHE_LINE_SIZE,
+                                 sizeof(work_counter_t) + CACHE_LINE_SIZE);
 
     transition_info_t       ti = GB_NO_TRANSITION;
     ctx->initial_state = RTmalloc (sizeof(int[N]));
@@ -44,12 +69,10 @@ wctx_init (wctx_t *ctx)
 void
 wctx_deinit (wctx_t *ctx)
 {
-    // wctx destroy:
     RTfree (ctx->store);
     RTfree (ctx->store2);
     RTfree (ctx->initial_state);
     permute_free (ctx->permute);
-    (void) ctx;
 }
 
 void
@@ -57,5 +80,5 @@ wctx_destroy (wctx_t *ctx)
 {
     RTdeleteTimer (ctx->timer);
     RTfree (ctx);
-    (void) ctx;
 }
+

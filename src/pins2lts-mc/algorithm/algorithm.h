@@ -1,5 +1,13 @@
 /**
+ * By rule:
  *
+ * o Memory allocation happens prior to algorithm execution.
+ *   Except for chunks whose allcoation is carefully managed by the cctables.
+ *
+ * o
+ *
+ * o Local (de)initialization can access data globally initialized
+ *   but not vice versa.
  */
 
 #ifndef ALGORITHM_H
@@ -8,16 +16,21 @@
 #include <popt.h>
 #include <stdlib.h>
 
+/* HEADERS USED BY SUB CLASSES */
 #include <mc-lib/atomics.h>
-#include <mc-lib/lb.h>
 #include <mc-lib/stats.h>
 #include <mc-lib/trace.h>
+#include <pins2lts-mc/parallel/counter.h>
+#include <pins2lts-mc/parallel/global.h>
 #include <pins2lts-mc/parallel/options.h>
 #include <pins2lts-mc/parallel/run.h>
+#include <pins2lts-mc/parallel/state-info.h>
+#include <pins2lts-mc/parallel/state-store.h>
 #include <pins2lts-mc/parallel/worker.h>
 #include <util-lib/dfs-stack.h>
 #include <util-lib/fast_hash.h>
 #include <util-lib/is-balloc.h>
+#include <util-lib/util.h>
 
 /**
  * Class functionality
@@ -94,48 +107,5 @@ extern void find_and_write_dfs_stack_trace (wctx_t *ctx, int level); // TODO
 extern int num_global_bits (strategy_t s);
 
 extern strategy_t get_strategy (alg_t *alg);
-
-#include <pins2lts-mc/parallel/global.h>
-
-static inline void
-increase_level (size_t *level_cur, size_t *level_max)
-{
-    (*level_cur)++;
-    if (*level_cur > *level_max) {
-        *level_max = *level_cur;
-    }
-}
-
-static inline void
-maybe_report (size_t explored, size_t trans, size_t level_max, char *msg)
-{
-    if (EXPECT_TRUE(!log_active(info) || explored < global->threshold))
-        return;
-    if (!cas (&global->threshold, global->threshold, global->threshold << 1))
-        return;
-    if (W == 1) {
-        Warning (info, "%s%zu levels %zu states %zu transitions",
-                 msg, level_max, explored, trans);
-    } else {
-        Warning (info, "%s%zu levels ~%zu states ~%zu transitions", msg,
-                 level_max, global->threshold,  trans);
-    }
-}
-
-static inline void
-maybe_report1 (size_t explored, size_t trans, size_t level_max, char *msg)
-{
-    if (EXPECT_TRUE(!log_active(info) || explored < global->threshold))
-        return;
-    if (!cas (&global->threshold, global->threshold, global->threshold << 1))
-        return;
-    if (W == 1) {
-        Warning (info, "%s%zu levels %zu states %zu transitions",
-                 msg, level_max, explored, trans);
-    } else {
-        Warning (info, "%s%zu levels ~%zu states ~%zu transitions", msg,
-                 level_max, global->threshold,  W * trans);
-    }
-}
 
 #endif // ALGORITHM_H
