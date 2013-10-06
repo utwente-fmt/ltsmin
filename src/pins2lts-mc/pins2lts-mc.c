@@ -15,12 +15,16 @@
 #include <pins2lts-mc/parallel/worker.h>
 #include <util-lib/util.h>
 
-struct poptOption options_mc[] = {
+static int          HRE_PROCS = 0;
+
+static struct poptOption options_mc[] = {
 #ifdef OPAAL
      {NULL, 0, POPT_ARG_INCLUDE_TABLE, options_timed, 0, NULL, NULL},
 #else
      {NULL, 0, POPT_ARG_INCLUDE_TABLE, options, 0, NULL, NULL},
 #endif
+     {"force-procs", 0, POPT_ARG_VAL | POPT_ARGFLAG_SHOW_DEFAULT | POPT_ARGFLAG_DOC_HIDDEN,
+      &HRE_PROCS, 1, "Force multi-process in favor of pthreads.", NULL},
      SPEC_POPT_OPTIONS,
      POPT_TABLEEND
 };
@@ -55,13 +59,18 @@ hre_init_and_spawn_workers (int argc, char *argv[])
 
     lts_lib_setup ();
 
-#if SPEC_MT_SAFE == 1
-    HREenableThreads (1, true);
-#else
-    HREenableFork (1, true); // enable multi-process env for mCRL/mCrl2 and PBES
-#endif
+    HRE_PROCS |= !SPEC_MT_SAFE;
+    for (int i = 0; i < argc && !HRE_PROCS; i++) {
+        if (strcmp(argv[i], "--force-procs") == 0) { HRE_PROCS = 1; break; }
+    }
+    if (HRE_PROCS) {
+        HREenableFork (RTnumCPUs(), true);
+    } else {
+        HREenableThreads (RTnumCPUs(), true);
+    }
 
-    HREinitStart (&argc,&argv,1,2,files,"<model> [lts]");      // spawns threads!
+    // spawns threads:
+    HREinitStart (&argc, &argv, 1, 2, files, "<model> [lts]");
 }
 
 model_t
@@ -81,7 +90,7 @@ create_pins_model ()
     // some frontends (opaal) do not have a thread-safe initial state function
 #ifdef OPAAL
     if (HREme(HREglobal()) == 0) {
-        RTswitchAlloc (!SPEC_MT_SAFE);
+        RTswitchAlloc (HRE_PROCS);
         mutex = RTmalloc (sizeof(pthread_mutex_t));
         RTswitchAlloc (false);
         pthread_mutex_init (mutex, NULL);
@@ -106,7 +115,7 @@ global_and_model_init ()
 {
     model_t             model;
 
-    global_create (SPEC_MT_SAFE);
+    global_create (!HRE_PROCS);
 
     model = create_pins_model ();
 
