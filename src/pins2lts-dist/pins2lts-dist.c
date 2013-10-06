@@ -446,7 +446,7 @@ int main(int argc, char*argv[]){
     lts_lib_setup();
     HREenableAll();
     if (!SPEC_MT_SAFE){
-        HREenableThreads(0);
+        HREenableThreads(0, false);
     }
     HREinitStart(&argc,&argv,1,2,files,"<model> [<lts>]");
 

@@ -409,12 +409,12 @@ static void fork_popt(poptContext con,
             Abort("unexpected call to hre_popt");
         case POPT_CALLBACK_REASON_OPTION:
             if (!strcmp(opt->longName,"procs")){
-                fork_runtime.selected=1;
                 if (arg) {
                     fork_count=atoi(arg);
-                    if (fork_count<=0) {
+                    if (fork_count < 1) {
                         Abort("less than one process is impossible!");
                     }
+                    fork_runtime.selected = fork_count > 1;
                 }
                 return;
             }
@@ -531,7 +531,7 @@ static void fork_start(int* argc,char **argv[],int run_threads){
     (void)argc;(void)argv;
 }
 
-void HREenableFork(int procs){
+void HREenableFork(int procs, bool selected){
     Debug("Enabling process runtime environment.");
     pthread_condattr_t attr;
     pthread_condattr_init(&attr);
@@ -543,6 +543,7 @@ void HREenableFork(int procs){
     }
     fork_runtime.start=fork_start;
     fork_runtime.options=fork_options;
+    fork_runtime.selected = selected && procs > 1;
     fork_count=procs;
     HREregisterRuntime(&fork_runtime);
 }

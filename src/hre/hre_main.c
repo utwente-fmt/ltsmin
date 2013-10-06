@@ -143,13 +143,13 @@ static void hre_popt(poptContext con,
         case POPT_CALLBACK_REASON_OPTION:
             if (!strcmp(opt->longName,"threads")){
                 if (!thread_count) return; // ignore if threads disabled.
-                run_threads=1;
                 if (arg) {
                     thread_count=atoi(arg);
                     if (thread_count<=0) {
                         Abort("less than one thread is impossible!");
                     }
                 }
+                run_threads = thread_count > 1;
                 return;
             }
             Abort("unimplemented option: %s",opt->longName);
@@ -198,10 +198,13 @@ void HREregisterRuntime(hre_runtime_t runtime){
     runtime_count++;
 }
 
-void HREenableThreads(int threads){
+void HREenableThreads(int threads, bool selected){
     Debug("Enabling posix threads runtime environment.");
     if (HREmainThread()){
         thread_count=threads;
+        if (selected && thread_count > 1) {
+            run_threads = 1;
+        }
     }
 }
 
@@ -314,7 +317,7 @@ void HREinitStart(int *argc,char **argv[],int min_args,int max_args,char*args[],
 }
 
 void HREenableStandard(){
-    HREenableThreads(RTnumCPUs());
-    HREenableFork(RTnumCPUs());
+    HREenableThreads(RTnumCPUs(), false);
+    HREenableFork(RTnumCPUs(), false);
 }
 

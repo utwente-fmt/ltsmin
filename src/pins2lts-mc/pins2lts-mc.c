@@ -56,9 +56,9 @@ hre_init_and_spawn_workers (int argc, char *argv[])
     lts_lib_setup ();
 
 #if SPEC_MT_SAFE == 1
-    HREenableThreads (1);
+    HREenableThreads (1, true);
 #else
-    HREenableFork (1); // enable multi-process env for mCRL/mCrl2 and PBES
+    HREenableFork (1, true); // enable multi-process env for mCRL/mCrl2 and PBES
 #endif
 
     HREinitStart (&argc,&argv,1,2,files,"<model> [lts]");      // spawns threads!
