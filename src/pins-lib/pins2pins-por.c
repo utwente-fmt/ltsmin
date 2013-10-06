@@ -739,16 +739,16 @@ scc_analyze (por_context* ctx)
  * The client may (should) set the proviso always to true for deadlocks.
  */
 
-typedef struct ltl_hook_context {
+typedef struct proviso_hook_context {
     TransitionCB    cb;
     void*           user_context;
     int             por_proviso_true_cnt;
     int             por_proviso_false_cnt;
     int             force_proviso_true;     // feedback to algorithm that proviso already holds
-} ltl_hook_context_t;
+} proviso_hook_context_t;
 
-void ltl_hook_cb (void*context,transition_info_t *ti,int*dst) {
-    ltl_hook_context_t* infoctx = (ltl_hook_context_t*)context;
+void hook_cb (void*context,transition_info_t *ti,int*dst) {
+    proviso_hook_context_t* infoctx = (proviso_hook_context_t*)context;
     transition_info_t ti_new = GB_TI (ti->labels, ti->group);
     ti_new.por_proviso = infoctx->force_proviso_true;
     infoctx->cb(infoctx->user_context, &ti_new, dst);
@@ -761,7 +761,7 @@ void ltl_hook_cb (void*context,transition_info_t *ti,int*dst) {
 }
 
 static inline int
-emit_new_selected (por_context* ctx, ltl_hook_context_t* ltlctx, int* src)
+emit_new_selected (por_context* ctx, proviso_hook_context_t* provctx, int* src)
 {
     search_context *s = &ctx->search[ctx->search_order[0]];
     int c = 0;
@@ -771,7 +771,7 @@ emit_new_selected (por_context* ctx, ltl_hook_context_t* ltlctx, int* src)
 
         if ((s->emit_status[i] & ES_SELECTED) || s->score >= ctx->emit_limit) {
             s->emit_status[i] |= ES_EMITTED;
-            c += GBgetTransitionsLong (ctx->parent, i, src, ltl_hook_cb, ltlctx);
+            c += GBgetTransitionsLong (ctx->parent, i, src, hook_cb, provctx);
         }
     }
     return c;
@@ -804,18 +804,18 @@ bs_emit (por_context* ctx, int* src, TransitionCB cb, void* uctx)
     // if the score is larger then the number of enabled transitions, emit all
     if (s->score >= ctx->emit_limit) {
         // return all enabled
-        ltl_hook_context_t ltlctx = {cb, uctx, 0, 0, 1};
-        return GBgetTransitionsAll(ctx->parent, src, ltl_hook_cb, &ltlctx);
+        proviso_hook_context_t provctx = {cb, uctx, 0, 0, 1};
+        return GBgetTransitionsAll(ctx->parent, src, hook_cb, &provctx);
     // otherwise: try the persistent set, but enforce that all por_proviso flags are true
     } else {
-        ltl_hook_context_t ltlctx = {cb, uctx, 0, 0, 0};
-        ltlctx.force_proviso_true = !NO_L12 && check_L1_L2_proviso (ctx);
+        proviso_hook_context_t provctx = {cb, uctx, 0, 0, 0};
+        provctx.force_proviso_true = !NO_L12 && check_L1_L2_proviso (ctx);
 
-        int emitted = emit_new_selected (ctx, &ltlctx, src);
+        int emitted = emit_new_selected (ctx, &provctx, src);
 
         // emit more if we need to fulfill a liveness / safety proviso
-        if ( ( PINS_LTL && ltlctx.por_proviso_false_cnt != 0) ||
-             (!PINS_LTL && ltlctx.por_proviso_true_cnt  == 0) ) {
+        if ( ( PINS_LTL && provctx.por_proviso_false_cnt != 0) ||
+             (!PINS_LTL && provctx.por_proviso_true_cnt  == 0) ) {
 
             if (!NO_L12) {
                 ctx->beam_used = 1; // fix to current (partly emitted) search ctx
@@ -824,17 +824,17 @@ bs_emit (por_context* ctx, int* src, TransitionCB cb, void* uctx)
                 select_all_visible (ctx);
                 bs_analyze (ctx);
 
-                ltlctx.force_proviso_true = check_L1_L2_proviso (ctx);
+                provctx.force_proviso_true = check_L1_L2_proviso (ctx);
                 // enforce L1 (one invisible transition)
                 // not to be worried about when using V'
-                if (PINS_LTL && !NO_V && !ltlctx.force_proviso_true) {
+                if (PINS_LTL && !NO_V && !provctx.force_proviso_true) {
                     select_one_invisible (ctx);
                     bs_analyze (ctx);
                 }
             } else {
                 s->score = ctx->emit_limit; // force all enabled
             }
-            emitted += emit_new_selected (ctx, &ltlctx, src);
+            emitted += emit_new_selected (ctx, &provctx, src);
         }
         return emitted;
     }
@@ -847,16 +847,16 @@ scc_emit (por_context* ctx, int* src, TransitionCB cb, void* uctx)
 
     if (ctx->enabled_list->count == scc->stubborn_list[0]->count) {
         // return all enabled
-        ltl_hook_context_t ltlctx = {cb, uctx, 0, 0, 1};
-        return GBgetTransitionsAll(ctx->parent, src, ltl_hook_cb, &ltlctx);
+        proviso_hook_context_t provctx = {cb, uctx, 0, 0, 1};
+        return GBgetTransitionsAll(ctx->parent, src, hook_cb, &provctx);
     } else {
-        ltl_hook_context_t ltlctx = {cb, uctx, 0, 0, 0};
-        ltlctx.force_proviso_true = !NO_L12 && check_L1_L2_proviso (ctx);
+        proviso_hook_context_t provctx = {cb, uctx, 0, 0, 0};
+        provctx.force_proviso_true = !NO_L12 && check_L1_L2_proviso (ctx);
 
         int c = 0;
         for (int z = 0; z < scc->stubborn_list[0]->count; z++) {
             int i = scc->stubborn_list[0]->data[z];
-            c += GBgetTransitionsLong (ctx->parent, i, src, ltl_hook_cb, &ltlctx);
+            c += GBgetTransitionsLong (ctx->parent, i, src, hook_cb, &provctx);
         }
         return c;
     }
@@ -1271,7 +1271,7 @@ deletion_analyze (por_context* ctx)
 }
 
 static inline int
-deletion_emit_new (por_context* ctx, ltl_hook_context_t* ltlctx, int* src)
+deletion_emit_new (por_context* ctx, proviso_hook_context_t* provctx, int* src)
 {
     del_context_t *del = ctx->del_ctx;
     int c = 0;
@@ -1279,7 +1279,7 @@ deletion_emit_new (por_context* ctx, ltl_hook_context_t* ltlctx, int* src)
         int i = ctx->enabled_list->data[z];
         if (del_has(del,DEL_T,i) && !del_has(del,DEL_R,i)) {
             del->set[i] |= 1<<DEL_R;
-            c += GBgetTransitionsLong (ctx->parent, i, src, ltl_hook_cb, ltlctx);
+            c += GBgetTransitionsLong (ctx->parent, i, src, hook_cb, provctx);
         }
     }
     return c;
@@ -1288,10 +1288,10 @@ deletion_emit_new (por_context* ctx, ltl_hook_context_t* ltlctx, int* src)
 static inline int
 deletion_emit (por_context* ctx, int* src, TransitionCB cb, void* uctx)
 {
-    ltl_hook_context_t ltlctx = {cb, uctx, 0, 0, 0};
-    ltlctx.force_proviso_true = !NO_L12 && check_L1_L2_proviso (ctx);
+    proviso_hook_context_t provctx = {cb, uctx, 0, 0, 0};
+    provctx.force_proviso_true = !NO_L12 && check_L1_L2_proviso (ctx);
 
-    int emitted = deletion_emit_new (ctx, &ltlctx, src);
+    int emitted = deletion_emit_new (ctx, &provctx, src);
 
     //TODO: LTL and safety
 
