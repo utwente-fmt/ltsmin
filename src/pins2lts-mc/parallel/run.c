@@ -54,22 +54,22 @@ run_alg (wctx_t *ctx)
 size_t
 run_local_state_infos (wctx_t *ctx)
 {
-    return ctx->run->local_states;
+    return ctx->run->total.local_states;
 }
 
 void
 run_reduce_stats (wctx_t *ctx)
 {
-    RTswitchAlloc (!global->pthreads);
+    RTswitchAlloc (global->procs);
     for (size_t i = 0; i < W; i++) {
         if (i == ctx->id) {
             float                   runtime = RTrealTime(ctx->timer);
-            ctx->run->runtime += runtime;
-            ctx->run->maxtime = max(runtime, ctx->run->maxtime);
-
-            alg_reduce (ctx->run, ctx);
+            ctx->run->total.runtime += runtime;
+            ctx->run->total.maxtime = max(runtime, ctx->run->total.maxtime);
 
             work_add_results (&ctx->run->total, ctx->counters);
+
+            alg_reduce (ctx->run, ctx);
         }
         HREbarrier (HREglobal());
     }
@@ -91,7 +91,7 @@ run_deinit (wctx_t *ctx)
     alg_local_deinit (ctx->run, ctx);
     wctx_deinit (ctx);
 
-    RTswitchAlloc (!global->pthreads);
+    RTswitchAlloc (global->procs);
     alg_global_deinit (ctx->run, ctx);
     wctx_destroy (ctx);
     RTswitchAlloc (false);
@@ -104,14 +104,18 @@ run_deinit (wctx_t *ctx)
 wctx_t *
 run_init (run_t *run, model_t model)
 {
-    RTswitchAlloc (!global->pthreads);
+    RTswitchAlloc (global->procs);
     wctx_t          *ctx = wctx_create (model, run);
+    RTswitchAlloc (false);
+
     ctx->run = run;
     run->contexts[ctx->id] = ctx; // polygamy
+    wctx_init (ctx); // required in alg_global_init
+
+    RTswitchAlloc (global->procs);
     alg_global_init (ctx->run, ctx);
     RTswitchAlloc (false);
 
-    wctx_init (ctx);
     alg_local_init (run, ctx);
 
     return ctx;
@@ -144,12 +148,12 @@ run_is_stopped (run_t *run)
 run_t *
 run_create (bool init)
 {
-    RTswitchAlloc (!global->pthreads);
+    RTswitchAlloc (global->procs);
     run_t              *run = RTmallocZero (sizeof(run_t));
     run->contexts = RTmalloc (sizeof (wctx_t*[W]));
     run->syncer = RTmallocZero (sizeof (sync_t));
-    run->maxtime = 0;
-    run->runtime = 0;
+    run->total.maxtime = 0;
+    run->total.runtime = 0;
     run_set_is_stopped (run, run_is_stopped_impl);
     run_set_stop (run, run_stop_impl);
     run->syncer->stopped = 0;
@@ -165,10 +169,10 @@ run_create (bool init)
 void
 run_destroy (run_t *run)
 {
-    RTswitchAlloc (!global->pthreads);
+    RTswitchAlloc (global->procs);
     alg_destroy (run->alg);
     RTfree (run->contexts);
-    // TODO: shared and reduced, e.g.: lb_destroy (run->shared->lb);
+    // TODO: alg_shared and alg_reduced, e.g.: lb_destroy (run->shared->lb);
     RTfree (run);
     RTswitchAlloc (false);
 }
@@ -176,16 +180,17 @@ run_destroy (run_t *run)
 void
 run_report (run_t *run, work_counter_t *cnt, size_t trans, char *prefix)
 {
-    if (!cas (&run->threshold, run->threshold, run->threshold << 1))
+    if (!cas(&run->threshold, run->threshold, run->threshold << 1))
         return;
     work_counter_t              work;
-    work.explored = run->threshold;
     work.level_cur = cnt->level_cur;
     work.level_max = cnt->level_max;
     work.trans = trans;
     if (W == 1) {
+        work.explored = run->threshold >> 1;
         work_report (prefix, &work);
     } else {
+        work.explored = (run->threshold >> 1) * W;
         work_report_estimate (prefix, &work);
     }
 }

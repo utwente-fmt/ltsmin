@@ -2,10 +2,11 @@
 
 #include <pins-lib/pins-util.h>
 
-#include <pins2lts-mc/algorithm/ltl.h> // ecd_* TODO
+#include <pins2lts-mc/algorithm/ltl.h> // ecd_* && dfs_stack_trace
 #include <pins2lts-mc/algorithm/reach.h>
+#include <mc-lib/lmap.h>
 
-// TODO: split
+// TODO: split into separate files
 
 int              dlk_detect = 0;
 char            *act_detect = NULL;
@@ -15,18 +16,32 @@ size_t           max_level = SIZE_MAX;
 
 struct poptOption reach_options[] = {
     {"deadlock", 'd', POPT_ARG_VAL, &dlk_detect, 1, "detect deadlocks", NULL },
-    {"action", 'a', POPT_ARG_STRING, &act_detect, 0, "detect error action", NULL },
-    {"invariant", 'i', POPT_ARG_STRING, &inv_detect, 0, "detect invariant violations", NULL },
-    {"no-exit", 'n', POPT_ARG_VAL, &no_exit, 1, "no exit on error, just count (for error counters use -v)", NULL },
-    {"max", 0, POPT_ARG_LONGLONG | POPT_ARGFLAG_SHOW_DEFAULT, &max_level, 0, "maximum search depth", "<int>"},
+    {"action", 'a', POPT_ARG_STRING, &act_detect, 0,"detect error action", NULL },
+    {"invariant", 'i', POPT_ARG_STRING, &inv_detect, 0,
+     "detect invariant violations", NULL },
+    {"no-exit", 'n', POPT_ARG_VAL, &no_exit, 1,
+     "no exit on error, just count (for error counters use -v)", NULL },
+    {"max", 0, POPT_ARG_LONGLONG | POPT_ARGFLAG_SHOW_DEFAULT, &max_level, 0,
+     "maximum search depth", "<int>"},
+    {"gran", 'g', POPT_ARG_LONGLONG | POPT_ARGFLAG_SHOW_DEFAULT | POPT_ARGFLAG_DOC_HIDDEN, &G, 0,
+     "subproblem granularity ( T( work(P,g) )=min( T(P), g ) )", NULL},
+    {"handoff", 0, POPT_ARG_LONGLONG | POPT_ARGFLAG_SHOW_DEFAULT | POPT_ARGFLAG_DOC_HIDDEN, &H, 0,
+     "maximum balancing handoff (handoff=min(max, stack_size/2))", NULL},
     POPT_TABLEEND
 };
+
+void *
+get_state (ref_t state_no, void *arg)
+{
+    wctx_t             *ctx = (wctx_t *) arg;
+    state_info_set (ctx->state, state_no, LM_NULL_LATTICE);
+    return state_info_pins_state (ctx->state);
+}
 
 void
 handle_error_trace (wctx_t *ctx)
 {
-    alg_local_t        *loc = ctx->local;
-    alg_global_t        *sm = ctx->global;
+    alg_global_t       *sm = ctx->global;
     alg_shared_t       *shared = ctx->run->shared;
     size_t              level = ctx->counters->level_cur;
 
@@ -34,16 +49,13 @@ handle_error_trace (wctx_t *ctx)
         double uw = cct_finalize (global->tables, "BOGUS, you should not see this string.");
         Warning (infoLong, "Parallel chunk tables under-water mark: %.2f", uw);
         if (strategy[0] & Strat_TA) {
-            if (W != 1 || strategy[0] != Strat_TA_DFS)
-                Abort("Opaal error traces only supported with a single thread and DFS order");
             dfs_stack_leave (sm->stack);
-            level = dfs_stack_nframes (sm->stack) + 1;
-            find_and_write_dfs_stack_trace (ctx, level);
+            find_and_write_dfs_stack_trace (ctx->model, sm->stack);
         } else {
             trc_env_t  *trace_env = trc_create (ctx->model, get_state, ctx);
             Warning (info, "Writing trace to %s", trc_output);
-            trc_find_and_write (trace_env, trc_output, ctx->state.ref, level,
-                                shared->parent_ref, ctx->initial.ref);
+            trc_find_and_write (trace_env, trc_output, ctx->state->ref, level,
+                                shared->parent_ref, ctx->initial->ref);
         }
     }
     global->exit_status = LTSMIN_EXIT_COUNTER_EXAMPLE;
@@ -52,7 +64,6 @@ handle_error_trace (wctx_t *ctx)
 size_t
 sbfs_level (wctx_t *ctx, size_t local_size)
 {
-    alg_local_t        *loc = ctx->local;
     work_counter_t     *cnt = ctx->counters;
     size_t              next_level_size;
     HREreduce (HREglobal(), 1, &local_size, &next_level_size, SizeT, Sum);
@@ -161,10 +172,10 @@ reach_handle (void *arg, state_info_t *successor, transition_info_t *ti,
         raw_data_t stack_loc = dfs_stack_push (sm->out_stack, NULL);
         state_info_serialize (successor, stack_loc);
         if (EXPECT_FALSE( trc_output &&
-                          successor->ref != ctx->state.ref &&
+                          successor->ref != ctx->state->ref &&
                           shared->parent_ref[successor->ref] == 0 &&
                           ti != &GB_NO_TRANSITION )) // race, but ok:
-            atomic_write(&shared->parent_ref[successor->ref], ctx->state.ref);
+            atomic_write(&shared->parent_ref[successor->ref], ctx->state->ref);
     } else if (proviso == Proviso_Stack) {
         ti->por_proviso = !ecd_has_state (loc->cyan, successor);
     }
@@ -176,10 +187,9 @@ static inline void
 explore_state (wctx_t *ctx)
 {
     size_t              count;
-    size_t              i = K;
     if (ctx->counters->level_cur >= max_level)
         return;
-    count = permute_trans (ctx->permute, &ctx->state, reach_handle, ctx);
+    count = permute_trans (ctx->permute, ctx->state, reach_handle, ctx);
     deadlock_detect (ctx, count);
     work_counter_t     *cnt = ctx->counters;
     run_maybe_report1 (ctx->run, cnt, "");
@@ -194,11 +204,11 @@ dfs_proviso (wctx_t *ctx)
         raw_data_t          state_data = dfs_stack_top (sm->stack);
         // strict DFS (use extra bit because the permutor already adds successors to V)
         if (NULL != state_data) {
-            state_info_deserialize (&ctx->state, state_data, ctx->store);
-            if (global_try_color(ctx->state.ref, GRED, 0)) {
+            state_info_deserialize (ctx->state, state_data);
+            if (state_store_try_color(ctx->state->ref, GRED, 0)) {
                 dfs_stack_enter (sm->stack);
                 increase_level (ctx->counters);
-                ecd_add_state (loc->cyan, &ctx->state, NULL);
+                ecd_add_state (loc->cyan, ctx->state, NULL);
                 explore_state (ctx);
                 ctx->counters->explored++;
             } else {
@@ -210,8 +220,8 @@ dfs_proviso (wctx_t *ctx)
             dfs_stack_leave (sm->stack);
             ctx->counters->level_cur--;
             state_data = dfs_stack_pop (sm->stack);
-            state_info_deserialize_cheap (&ctx->state, state_data);
-            ecd_remove_state (loc->cyan, &ctx->state);
+            state_info_deserialize (ctx->state, state_data);
+            ecd_remove_state (loc->cyan, ctx->state);
         }
     }
     HREassert (run_is_stopped(ctx->run) || fset_count(loc->cyan) == 0);
@@ -220,15 +230,13 @@ dfs_proviso (wctx_t *ctx)
 void
 dfs (wctx_t *ctx)
 {
-    alg_local_t        *loc = ctx->local;
     alg_global_t       *sm = ctx->global;
-    counter_t          *cnt = &loc->counters;
     while (lb_balance(ctx->run->shared->lb, ctx->id, dfs_stack_size(sm->stack), split_dfs)) {
         raw_data_t          state_data = dfs_stack_top (sm->stack);
         if (NULL != state_data) {
             dfs_stack_enter (sm->stack);
             increase_level (ctx->counters);
-            state_info_deserialize (&ctx->state, state_data, ctx->store);
+            state_info_deserialize (ctx->state, state_data);
             explore_state (ctx);
             ctx->counters->explored++;
         } else {
@@ -244,13 +252,11 @@ dfs (wctx_t *ctx)
 void
 bfs (wctx_t *ctx)
 {
-    alg_local_t        *loc = ctx->local;
     alg_global_t       *sm = ctx->global;
-    counter_t          *cnt = &loc->counters;
     while (lb_balance(ctx->run->shared->lb, ctx->id, bfs_load(sm), split_bfs)) {
         raw_data_t          state_data = dfs_stack_pop (sm->in_stack);
         if (NULL != state_data) {
-            state_info_deserialize (&ctx->state, state_data, ctx->store);
+            state_info_deserialize (ctx->state, state_data);
             explore_state (ctx);
             ctx->counters->explored++;
         } else {
@@ -264,14 +270,13 @@ bfs (wctx_t *ctx)
 void
 sbfs (wctx_t *ctx)
 {
-    alg_local_t        *loc = ctx->local;
     alg_global_t       *sm = ctx->global;
     size_t              next_level_size, local_next_size;
     do {
         while (lb_balance (ctx->run->shared->lb, ctx->id, in_load(sm), split_sbfs)) {
             raw_data_t          state_data = dfs_stack_pop (sm->in_stack);
             if (NULL != state_data) {
-                state_info_deserialize (&ctx->state, state_data, ctx->store);
+                state_info_deserialize (ctx->state, state_data);
                 explore_state (ctx);
                 ctx->counters->explored++;
             }
@@ -308,14 +313,14 @@ pbfs_handle (void *arg, state_info_t *successor, transition_info_t *ti,
     if (!seen) {
         pbfs_queue_state (ctx, successor);
         if (EXPECT_FALSE( trc_output &&
-                          successor->ref != ctx->state.ref &&
+                          successor->ref != ctx->state->ref &&
                           shared->parent_ref[successor->ref] == 0) ) // race, but ok:
-            atomic_write(&shared->parent_ref[successor->ref], ctx->state.ref);
+            atomic_write(&shared->parent_ref[successor->ref], ctx->state->ref);
         loc->counters.level_size++;
     }
     if (EXPECT_FALSE(loc->lts != NULL)) {
         int             src = ctx->counters->explored;
-        int            *tgt = successor->data;
+        int            *tgt = state_info_state(successor);
         int             tgt_owner = ref_hash (successor->ref) % W;
         lts_write_edge (loc->lts, ctx->id, &src, tgt_owner, tgt, ti->labels);
     }
@@ -338,16 +343,17 @@ pbfs (wctx_t *ctx)
             size_t          current = (i << 1) + loc->flip;
             while ((state_data = isba_pop_int (sm->queues[current])) &&
                     !run_is_stopped(ctx->run)) {
-                state_info_deserialize (&ctx->state, state_data, ctx->store);
-                invariant_detect (ctx, ctx->state.data);
-                count = permute_trans (ctx->permute, &ctx->state, pbfs_handle, ctx);
+                state_info_deserialize (ctx->state, state_data);
+                state_data_t        state_data = state_info_state(ctx->state);
+                invariant_detect (ctx);
+                count = permute_trans (ctx->permute, ctx->state, pbfs_handle, ctx);
                 deadlock_detect (ctx, count);
                 ctx->counters->explored++;
                 run_maybe_report1 (ctx->run, ctx->counters, "");
                 if (EXPECT_FALSE(loc->lts && write_state)){
                     if (SL > 0)
-                        GBgetStateLabelsAll (ctx->model, ctx->state.data, labels);
-                    lts_write_state (loc->lts, ctx->id, ctx->state.data, labels);
+                        GBgetStateLabelsAll (ctx->model, state_data, labels);
+                    lts_write_state (loc->lts, ctx->id, state_data, labels);
                 }
             }
         }
@@ -386,8 +392,9 @@ reach_reduce  (run_t *run, wctx_t *ctx)
     // print some local info
     float                   runtime = RTrealTime(ctx->timer);
     Warning (info, "%s worker ran %.3f sec",
-             key_search(strategies, get_strategy(ctx->run->alg)), runtime);
-    work_report ("[Blue]", ctx->counters);
+             strupper(key_search(strategies, get_strategy(ctx->run->alg))),
+             runtime);
+    work_report ("", ctx->counters);
 
     if (Strat_ECD & strategy[1]) {
         fset_print_statistics (ctx->local->cyan, "ECD set");
@@ -411,10 +418,11 @@ reach_print_stats   (run_t *run, wctx_t *ctx)
 
     Warning (info, "State space has %zu states, %zu transitions",
              cnt_work->explored, cnt_work->trans);
-    Warning (info, "Total exploration time %5.3f sec", run->maxtime);
+    Warning (info, "Total exploration time %5.3f sec", cnt_work->maxtime);
     //RTprintTimer (info, timer, "Total exploration time");
     Warning(info, "States per second: %.0f, Transitions per second: %.0f",
-            cnt_work->explored/run->maxtime, cnt_work->trans/run->maxtime);
+            cnt_work->explored/cnt_work->maxtime,
+            cnt_work->trans/cnt_work->maxtime);
 
     counter_t          *cnt = &reduced->counters;
     if (no_exit) {
@@ -433,9 +441,9 @@ reach_print_stats   (run_t *run, wctx_t *ctx)
 
     // part of reduce (should happen only once), publishes mem stats for the run class
     if (get_strategy(run->alg) & (Strat_SBFS | Strat_PBFS)) {
-        run->local_states += run->shared->max_level_size;  // SBFS queues
+        cnt_work->local_states += run->shared->max_level_size;  // SBFS queues
     } else {
-        run->local_states += lb_max_load(ctx->run->shared->lb);
+        cnt_work->local_states += lb_max_load(ctx->run->shared->lb);
     }
 }
 
@@ -494,16 +502,16 @@ reach_local_init   (run_t *run, wctx_t *ctx)
 void
 reach_global_setup   (run_t *run, wctx_t *ctx)
 {
+    size_t              len = state_info_serialize_int_size (ctx->state);
     if (get_strategy(run->alg) & Strat_PBFS) {
         ctx->global->queues = RTmalloc (sizeof(isb_allocator_t[2][W]));
-        for (size_t q = 0; q < 2; q++)
-        for (size_t i = 0; i < W; i++)
-            ctx->global->queues[(i << 1) + q] = isba_create (state_info_int_size());
+        for (size_t i = 0; i < 2 * W; i++)
+            ctx->global->queues[i] = isba_create (len);
     } else {
         ctx->global->out_stack = ctx->global->stack =
-                dfs_stack_create (state_info_int_size());
+                dfs_stack_create (len);
         if (get_strategy(run->alg) & Strat_2Stacks) {
-            ctx->global->in_stack = dfs_stack_create (state_info_int_size());
+            ctx->global->in_stack = dfs_stack_create (len);
         }
     }
 
@@ -513,7 +521,6 @@ reach_global_setup   (run_t *run, wctx_t *ctx)
 void
 reach_global_init   (run_t *run, wctx_t *ctx)
 {
-
     if (PINS_POR && (inv_detect || act_detect)) {
         if (W > 1)
             Abort ("Cycle proviso for safety properties with this parallel "
@@ -555,12 +562,13 @@ reach_run (run_t *run, wctx_t *ctx)
     if (0 == ctx->id) { // only w1 receives load, as it is propagated later
         if ( Strat_PBFS & strategy[0] ) {
             if (ctx->local->lts != NULL) {
-                int             src_owner = ref_hash(ctx->initial.ref) % W;
-                lts_write_init (ctx->local->lts, src_owner, ctx->initial.data);
+                state_data_t        initial = state_info_state(ctx->initial);
+                int             src_owner = ref_hash(ctx->initial->ref) % W;
+                lts_write_init (ctx->local->lts, src_owner, initial);
             }
-            pbfs_queue_state (ctx, &ctx->initial);
+            pbfs_queue_state (ctx, ctx->initial);
         } else {
-            reach_handle (ctx, &ctx->initial, &ti, 0);
+            reach_handle (ctx, ctx->initial, &ti, 0);
         }
     }
     ctx->counters->trans = 0; //reset trans count
@@ -592,6 +600,7 @@ reach_destroy_local      (run_t *run, wctx_t *ctx)
         lts_file_close (ctx->local->lts);
     }
     RTfree (ctx->local);
+    (void) run;
 }
 
 static int
@@ -609,7 +618,8 @@ reach_is_stopped (run_t *run)
 void
 reach_init_shared (run_t *run)
 {
-    run->shared = RTmallocZero (sizeof (alg_shared_t));
+    if (run->shared == NULL)
+        run->shared = RTmallocZero (sizeof (alg_shared_t));
     run->shared->lb = lb_create_max (W, G, H);
     run_set_is_stopped (run, reach_is_stopped);
     run_set_stop (run, reach_stop);

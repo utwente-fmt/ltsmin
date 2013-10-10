@@ -53,20 +53,20 @@ dfs_fifo_handle (void *arg, state_info_t *successor, transition_info_t *ti,
     df_alg_local_t     *loc = (df_alg_local_t *) ctx->local;
     alg_global_t       *sm = ctx->global;
     ctx->counters->trans++;
-    bool is_progress = loc->progress_trans > 0 ? loc->progress[ti->group] :  // ! progress transition
-            GBstateIsProgress(ctx->model, get_state(successor->ref, ctx)); // ! progress state
+    bool is_progress = loc->progress_trans > 0 ? loc->progress[ti->group] : // ! progress transition
+            GBstateIsProgress(ctx->model, state_info_state(successor));     // ! progress state
 
     if (!is_progress && seen && ecd_has_state(loc->cyan, successor))
-         //ndfs_report_cycle (ctx, successor); //TODO alg_local
+        ndfs_report_cycle (ctx->run, ctx->model, sm->stack, successor);
         Abort ("cycle found!");
 
     // dfs_fifo_dfs/dfs_fifo_bfs also check this, but we want a clean stack for LB!
-    if (global_has_color(ctx->state.ref, setV, 0))
+    if (state_store_has_color(ctx->state->ref, setV, 0))
         return;
     if (!is_progress) {
         raw_data_t stack_loc = dfs_stack_push (sm->stack, NULL);
         state_info_serialize (successor, stack_loc);
-    } else if (global_try_color(successor->ref, setF, 0)) { // new F state
+    } else if (state_store_try_color(successor->ref, setF, 0)) { // new F state
         raw_data_t stack_loc = dfs_stack_push (sm->out_stack, NULL);
         state_info_serialize (successor, stack_loc);
         loc->df_counters.progress += !seen;
@@ -78,7 +78,7 @@ typedef size_t (*lb_load_f)(alg_global_t *);
 
 static void
 dfs_fifo_dfs (wctx_t *ctx, ref_t seed,
-              lb_load_f load, // TODO unify functions
+              lb_load_f load,
               lb_split_problem_f split)
 {
     df_alg_local_t     *loc = (df_alg_local_t *) ctx->local;
@@ -87,13 +87,13 @@ dfs_fifo_dfs (wctx_t *ctx, ref_t seed,
     while (!run_is_stopped(ctx->run)) {
         raw_data_t          state_data = dfs_stack_top (sm->stack);
         if (NULL != state_data) {
-            state_info_deserialize (&ctx->state, state_data, ctx->store);
-            if (!global_has_color(ctx->state.ref, setV, 0)) {
-                if (ctx->state.ref != seed && ctx->state.ref != loc->seed)
-                    ecd_add_state (loc->cyan, &ctx->state, NULL);
+            state_info_deserialize (ctx->state, state_data);
+            if (!state_store_has_color(ctx->state->ref, setV, 0)) {
+                if (ctx->state->ref != seed && ctx->state->ref != loc->seed)
+                    ecd_add_state (loc->cyan, ctx->state, NULL);
                 dfs_stack_enter (sm->stack);
                 increase_level (cnt);
-                permute_trans (ctx->permute, &ctx->state, dfs_fifo_handle, ctx);
+                permute_trans (ctx->permute, ctx->state, dfs_fifo_handle, ctx);
                 cnt->explored++;
                 run_maybe_report1 (ctx->run, cnt, "");
             } else {
@@ -104,12 +104,12 @@ dfs_fifo_dfs (wctx_t *ctx, ref_t seed,
                 break;
             dfs_stack_leave (sm->stack);
             state_data = dfs_stack_pop (sm->stack);
-            state_info_deserialize_cheap (&ctx->state, state_data);
+            state_info_deserialize (ctx->state, state_data);
             cnt->level_cur--;
-            if (ctx->state.ref != seed && ctx->state.ref != loc->seed) {
-                ecd_remove_state (loc->cyan, &ctx->state);
+            if (ctx->state->ref != seed && ctx->state->ref != loc->seed) {
+                ecd_remove_state (loc->cyan, ctx->state);
             }
-            global_try_color (ctx->state.ref, setV, 0);
+            state_store_try_color (ctx->state->ref, setV, 0);
         }
         // load balance the FIFO queue (this is a synchronizing affair)
         lb_balance (ctx->run->shared->lb, ctx->id, load(sm)+1, split); //never report 0 load!
@@ -130,10 +130,10 @@ dfs_fifo_sbfs (wctx_t *ctx)
         while (lb_balance (ctx->run->shared->lb, ctx->id, in_load(sm), split_sbfs)) {
             raw_data_t          state_data = dfs_stack_pop (sm->in_stack);
             if (NULL != state_data) {
-                state_info_deserialize_cheap (&ctx->state, state_data);
-                //if (!global_has_color(ctx->state.ref, setV, 0)) { //checked in dfs_fifo_dfs
+                state_info_deserialize (ctx->state, state_data);
+                //if (!global_has_color(ctx->state->ref, setV, 0)) { //checked in dfs_fifo_dfs
                     dfs_stack_push (sm->stack, state_data);
-                    dfs_fifo_dfs (ctx, ctx->state.ref, in_load, split_sbfs);
+                    dfs_fifo_dfs (ctx, ctx->state->ref, in_load, split_sbfs);
                 //}
             }
         }
@@ -162,10 +162,10 @@ dfs_fifo_bfs (wctx_t *ctx)
     while (lb_balance (ctx->run->shared->lb, ctx->id, bfs_load(sm), split_bfs)) {
         raw_data_t          state_data = dfs_stack_pop (sm->in_stack);
         if (NULL != state_data) {
-            state_info_deserialize_cheap (&ctx->state, state_data);
-            //if (!global_has_color(ctx->state.ref, GRED, 0)) { //checked in dfs_fifo_dfs
+            state_info_deserialize (ctx->state, state_data);
+            //if (!global_has_color(ctx->state->ref, GRED, 0)) { //checked in dfs_fifo_dfs
                 dfs_stack_push (sm->stack, state_data);
-                dfs_fifo_dfs (ctx, ctx->state.ref, bfs_load, split_bfs);
+                dfs_fifo_dfs (ctx, ctx->state->ref, bfs_load, split_bfs);
             //}
         } else {
             size_t out_size = dfs_stack_frame_size (sm->out_stack);
@@ -232,7 +232,8 @@ dfs_fifo_global_init   (run_t *run, wctx_t *ctx)
 {
     ctx->global = RTmallocZero (sizeof(alg_global_t));
     reach_global_setup (run, ctx);
-    ctx->global->out_stack = dfs_stack_create (state_info_int_size());
+    size_t len = state_info_serialize_int_size (ctx->state);
+    ctx->global->out_stack = dfs_stack_create (len);
 }
 
 void
@@ -249,11 +250,10 @@ void
 dfs_fifo_run  (run_t *run, wctx_t *ctx)
 {
     df_alg_local_t         *loc = (df_alg_local_t *) ctx->local;
-    alg_local_t            *df_loc = (alg_local_t *) loc;
     raw_data_t stack_loc = dfs_stack_push (ctx->global->in_stack, NULL);
-    state_info_serialize (&ctx->initial, stack_loc);
-    int acc = GBbuchiIsAccepting (ctx->model, ctx->initial.data);
-    loc->seed = acc ? (ref_t)-1 : ctx->initial.ref;
+    state_info_serialize (ctx->initial, stack_loc);
+    int acc = GBbuchiIsAccepting (ctx->model, state_info_state(ctx->initial));
+    loc->seed = acc ? (ref_t)-1 : ctx->initial->ref;
     loc->df_counters.progress += acc;
 
     if (strict_dfsfifo) {
@@ -283,9 +283,9 @@ dfs_fifo_reduce  (run_t *run, wctx_t *ctx)
     // publush memory statistics to run class:
     df_alg_local_t         *loc = (df_alg_local_t *) ctx->local;
     df_counter_t           *cnt = &loc->df_counters;
-    run->local_states += ctx->counters->level_max;  // DFS stacks
+    run->total.local_states += ctx->counters->level_max;  // DFS stacks
     if (!strict_dfsfifo) {
-        run->local_states += cnt->max_level_size;         // BFS queues
+        run->total.local_states += cnt->max_level_size;   // BFS queues
     }
 
     dfs_fifo_reduced_t     *reduced = (dfs_fifo_reduced_t *) run->reduced;
@@ -298,7 +298,7 @@ dfs_fifo_print_stats   (run_t *run, wctx_t *ctx)
     reach_print_stats (run, ctx);
 
     // part of reduce (should happen only once), publishes mem stats for the run class
-    // run->local_mem += run->shared->max_level_size;  // DONE BY REACH
+    // run->local_mem += run->shared->max_level_size;  // DONE BY REACH (SBFS queues)
 
     df_alg_local_t         *loc = (df_alg_local_t *) ctx->local;
     Warning (info, "Progress states detected: %zu", loc->df_counters.progress);

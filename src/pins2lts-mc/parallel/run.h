@@ -11,7 +11,7 @@
 
 #include <pins2lts-mc/parallel/counter.h>
 
-typedef struct alg_s            alg_t; // TODO?
+typedef struct alg_s            alg_t;
 typedef struct alg_shared_s     alg_shared_t;
 typedef struct alg_reduced_s    alg_reduced_t;
 typedef struct thread_ctx_s     wctx_t;
@@ -25,9 +25,6 @@ struct run_s {
     sync_t             *syncer;     // Worker synchronization mechanisms
 
     alg_reduced_t      *reduced;    // Reduced statistics from the run
-    float               maxtime;    // Max running time for this run
-    float               runtime;    // Total user time for this run (the sum of the runtimes of all workers)
-    size_t              local_states;//Number of states locally stored on stacks or queues
     work_counter_t      total;
 
     char                pad1[CACHE_LINE_SIZE];

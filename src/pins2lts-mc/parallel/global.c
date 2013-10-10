@@ -28,46 +28,39 @@ int              act_type = -1;
 int              act_label = -1;
 
 //TODO: rename/eliminate these variables
-size_t           W = -1;
-size_t           G = 1;
-size_t           H = 1000;
-size_t           D;                  // size of state in explicit state DB
-size_t           N;                  // size of entire state
-size_t           K;                  // number of groups
-size_t           SL;                 // number of state labels
-size_t           EL;                 // number of edge labels
+size_t           W = -1;            // Number of workers (threads or processes)
+size_t           G = 1;             // Granularity for load balancer
+size_t           H = 1000;          // Hand off size for load balancer
+size_t           D;                 // size of state in explicit state DB
+size_t           N;                 // size of entire state
+size_t           K;                 // number of groups
+size_t           SL;                // number of state labels
+size_t           EL;                // number of edge labels
 
 void
-global_alloc  (bool pthreads)
+global_alloc  (bool procs)
 {
-    RTswitchAlloc (!pthreads);
-
-    global = RTmallocZero (sizeof(global_t));
-
-    global->pthreads = pthreads;
-
-    global->exit_status = LTSMIN_EXIT_SUCCESS;
-
-
     GBloadFileShared (NULL, files[0]); // NOTE: no model argument
-
+    RTswitchAlloc (procs);
+    global = RTmallocZero (sizeof(global_t));
     RTswitchAlloc (false);
 
-    //                               multi-process && multiple processes
-    global->tables = cct_create_map (!pthreads && HREdefaultRegion(HREglobal()) != NULL);
+    global->procs = procs;
+    global->exit_status = LTSMIN_EXIT_SUCCESS;
+    global->tables = cct_create_map (procs); // HRE-aware object
 }
 
 void
-global_create  (bool pthreads)
+global_create  (bool procs)
 {
     if (HREme(HREglobal()) == 0) {
-        global_alloc (pthreads);
+        global_alloc (procs);
     }
 
-    if (pthreads) {
-        HREbarrier (HREglobal());
-    } else {
+    if (procs) {
         HREreduce (HREglobal(), 1, &global, &global, Pointer, Max);
+    } else {
+        HREbarrier (HREglobal());
     }
 }
 
@@ -99,25 +92,26 @@ init_action_labels (model_t model)
 }
 
 static void
-global_static_init (model_t model)
+global_static_init (model_t model, size_t speed, bool timed)
 {
     lts_type_t          ltstype = GBgetLTStype (model);
     matrix_t           *m = GBgetDMInfo (model);
     SL = lts_type_get_state_label_count (ltstype);
     EL = lts_type_get_edge_label_count (ltstype);
     N = lts_type_get_state_length (ltstype);
-    D = (strategy[0] & Strat_TA ? N - 2 : N);
+    D = (timed ? N - sizeof(lattice_t) / sizeof(int) : N);
     K = dm_nrows (m);
     W = HREpeers(HREglobal());
+    init_threshold = THRESHOLD / W / 100 * speed;
 
     init_action_labels ( model);
 }
 
 
 static void
-global_static_setup  (model_t model, bool timed)
+global_static_setup  (model_t model, size_t speed, bool timed)
 {
-    global_static_init (model);
+    global_static_init (model, speed, timed);
 
     state_store_static_init ();
 
@@ -127,29 +121,24 @@ global_static_setup  (model_t model, bool timed)
 static void
 global_setup  (model_t model, bool timed)
 {
-    RTswitchAlloc (!global->pthreads);
-
-    state_store_init (model, timed);
-
-    init_threshold = THRESHOLD / W; // default for distibuted counting
-
+    RTswitchAlloc (global->procs);
+    global->store = state_store_init (model, timed);
     RTswitchAlloc (false);
 }
 
 void
-global_init  (model_t model, bool timed)
+global_init  (model_t model, size_t speed, bool timed)
 {
-    if (global->pthreads) {
-        // for pthreads the shared variables need only be initialized once
-        if (HREme(HREglobal())==0) {
-            global_static_setup (model, timed);
-        }
-    } else {
+    if (global->procs) {
         // in the multi-process environment, the memory is local be default and
         // all workers need to do their own setup
-        global_static_setup (model, timed);
+        global_static_setup (model, speed, timed);
+    } else {
+        // for pthreads the shared variables need only be initialized once
+        if (HREme(HREglobal())==0) {
+            global_static_setup (model, speed, timed);
+        }
     }
-
 
     if (HREme(HREglobal())==0) {
         global_setup (model, timed);
@@ -159,15 +148,25 @@ global_init  (model_t model, bool timed)
 }
 
 void
+global_deinit ()
+{
+    RTswitchAlloc (global->procs);
+    state_store_deinit (global->store);
+    RTfree (global);
+    RTswitchAlloc (false);
+}
+
+void
 global_print  (model_t model)
 {
     if (HREme(HREglobal()) == 0) {
         print_options (model);
+        state_store_print (global->store);
     }
 }
 
 void
-global_print_stats (model_t model, size_t local_state_infos)
+global_print_stats (model_t model, size_t local_state_infos, size_t stack)
 {
     // Print memory statistics
     double              memQ, pagesDB, memC, memDB, compr, fill, leafs;
@@ -176,7 +175,7 @@ global_print_stats (model_t model, size_t local_state_infos)
     db_nodes = db_nodes == 0 ? db_elts : db_nodes;
     double              el_size =
        db_type & Tree ? (db_type==ClearyTree?1:2) + (2.0 / (1UL<<ratio)) : D+.5;
-    size_t              s = state_info_size();
+    size_t              local_bits = state_store_local_bits (global->store);
 
     pagesDB = ((double)(1UL << (dbs_size)) / (1<<20)) * SLOT_SIZE * el_size;
     memC = ((double)(((((size_t)local_bits)<<dbs_size))/8*W)) / (1UL<<20);
@@ -185,9 +184,9 @@ global_print_stats (model_t model, size_t local_state_infos)
 
     // print additional local queue/stack memory statistics
     Warning (info, " ");
-    memQ = ((double)(state_info_size() * local_state_infos)) / (1<<20);
+    memQ = ((double)(stack * local_state_infos)) / (1<<20);
     Warning (info, "Queue width: %zuB, total height: %zu, memory: %.2fMB",
-             state_info_size(), local_state_infos, memQ);
+             stack, local_state_infos, memQ);
 
     if (db_type & Tree) {
         compr = (double)(db_nodes * el_size) / ((D+1) * db_elts) * 100;
@@ -222,29 +221,15 @@ global_print_stats (model_t model, size_t local_state_infos)
 void
 global_reduce_stats (model_t model)
 {
+    RTswitchAlloc (global->procs);
     size_t              id = HREme(HREglobal());
     for (size_t i = 0; i < W; i++) {
         if (i == id) {
-            stats_t            *stats = statistics (global->dbs);
+            stats_t            *stats = state_store_stats (global->store);
             global_add_stats (stats);
         }
         HREbarrier (HREglobal());
     }
-}
-
-void
-global_deinit ()
-{
-    RTswitchAlloc (!global->pthreads);
-
-    if (HashTable & db_type)
-        DBSLLfree (global->dbs); //TODO
-    else //TreeDBSLL
-        TreeDBSLLfree (global->dbs);
-    if (global->lmap != NULL)
-        lm_free (global->lmap);
-    if (global->zobrist != NULL)
-        zobrist_free(global->zobrist);
-
     RTswitchAlloc (false);
+    (void) model;
 }

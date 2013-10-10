@@ -6,8 +6,6 @@
 
 #include <popt.h>
 
-#include <hre/stringindex.h>
-#include <ltsmin-lib/ltsmin-standard.h>
 #include <pins2lts-mc/algorithm/ndfs.h>
 #include <pins2lts-mc/parallel/permute.h>
 #include <pins2lts-mc/parallel/state-info.h>
@@ -36,73 +34,6 @@ add_results (counter_t *res, counter_t *cnt)
     res->exit += cnt->exit;
 }
 
-static void *
-get_stack_state (ref_t ref, void *arg)
-{
-    wctx_t             *ctx = (wctx_t *) arg;
-    alg_local_t        *loc = ctx->local;
-    ta_cndfs_state_t   *state = (ta_cndfs_state_t *) SIget(loc->si, ref);
-    state_data_t        data  = get_state (state->val.ref, ctx);
-    Debug ("Trace %zu (%zu,%zu)", ref, state->val.ref, state->val.lattice);
-    if (strategy[0] & Strat_TA) {
-        memcpy (ctx->store, data, D<<2);
-        ((lattice_t*)(ctx->store + D))[0] = state->val.lattice;
-        data = ctx->store;
-    }
-    return data;
-}
-
-static inline void
-new_state (ta_cndfs_state_t *out, state_info_t *si)
-{
-    out->val.ref = si->ref;
-    out->val.lattice = si->lattice;
-}
-
-void
-find_and_write_dfs_stack_trace (wctx_t *ctx, int level)
-{
-    alg_local_t        *loc = ctx->local;
-    ref_t          *trace = RTmalloc (sizeof(ref_t) * level);
-    loc->si = SIcreate();
-    for (int i = level - 1; i >= 0; i--) {
-        state_data_t data = dfs_stack_peek_top (loc->stack, i);
-        state_info_deserialize_cheap (&ctx->state, data);
-        ta_cndfs_state_t state;
-        new_state(&state, &ctx->state);
-        if (!(strategy[0] & Strat_TA)) state.val.lattice = 0;
-        int val = SIputC (loc->si, state.data, sizeof(struct val_s));
-        trace[level - i - 1] = (ref_t) val;
-    }
-    trc_env_t          *trace_env = trc_create (ctx->model, get_stack_state, ctx);
-    Warning (info, "Writing trace to %s", trc_output);
-    trc_write_trace (trace_env, trc_output, trace, level);
-    SIdestroy (&loc->si);
-    RTfree (trace);
-}
-
-void
-ndfs_report_cycle (wctx_t *ctx, state_info_t *cycle_closing_state)
-{
-    alg_local_t        *loc = ctx->local;
-    /* Stop other workers, exit if some other worker was first here */
-    if ( !run_stop(ctx->run) )
-        return;
-    size_t              level = dfs_stack_nframes (loc->stack) + 1;
-    Warning (info, " ");
-    Warning (info, "Accepting cycle FOUND at depth %zu!", level);
-    Warning (info, " ");
-    if (trc_output) {
-        double uw = cct_finalize (global->tables, "BOGUS, you should not see this string.");
-        Warning (infoLong, "Parallel chunk tables under-water mark: %.2f", uw);
-        /* Write last state to stack to close cycle */
-        state_data_t data = dfs_stack_push (loc->stack, NULL);
-        state_info_serialize (cycle_closing_state, data);
-        find_and_write_dfs_stack_trace (ctx, level);
-    }
-    global->exit_status = LTSMIN_EXIT_COUNTER_EXAMPLE;
-}
-
 static void
 ndfs_red_handle (void *arg, state_info_t *successor, transition_info_t *ti,
                   int seen)
@@ -116,9 +47,9 @@ ndfs_red_handle (void *arg, state_info_t *successor, transition_info_t *ti,
         return; // only revisit blue states to determinize POR
     if ( nn_color_eq(color, NNCYAN) ) {
         /* Found cycle back to the stack */
-        ndfs_report_cycle(ctx, successor);
+        ndfs_report_cycle (ctx->run, ctx->model, loc->stack, successor);
     } else if ( nn_color_eq(color, NNBLUE) && (loc->strat != Strat_LNDFS ||
-            !global_has_color(ctx->state.ref, GRED, loc->rec_bits)) ) {
+            !state_store_has_color(ctx->state->ref, GRED, loc->rec_bits)) ) {
         raw_data_t stack_loc = dfs_stack_push (loc->stack, NULL);
         state_info_serialize (successor, stack_loc);
     }
@@ -140,11 +71,11 @@ ndfs_blue_handle (void *arg, state_info_t *successor, transition_info_t *ti,
      * on the stack here, in order to calculate all-red correctly later.
      */
     if ( ecd && nn_color_eq(color, NNCYAN) &&
-            (GBbuchiIsAccepting(ctx->model, ctx->state.data) ||
-             GBbuchiIsAccepting(ctx->model, get_state(successor->ref, ctx))) ) {
+            (GBbuchiIsAccepting(ctx->model, state_info_state(ctx->state)) ||
+             GBbuchiIsAccepting(ctx->model, state_info_state(successor))) ) {
         /* Found cycle in blue search */
-        ndfs_report_cycle(ctx, successor);
-    } else if ((loc->strat == Strat_LNDFS && !global_has_color(ctx->state.ref, GRED, loc->rec_bits)) ||
+        ndfs_report_cycle (ctx->run, ctx->model, loc->stack, successor);
+    } else if ((loc->strat == Strat_LNDFS && !state_store_has_color(ctx->state->ref, GRED, loc->rec_bits)) ||
                (loc->strat != Strat_LNDFS && !nn_color_eq(color, NNPINK))) {
         raw_data_t stack_loc = dfs_stack_push (loc->stack, NULL);
         state_info_serialize (successor, stack_loc);
@@ -159,7 +90,7 @@ ndfs_explore_state_red (wctx_t *ctx)
     work_counter_t     *cnt = &loc->red_work;
     dfs_stack_enter (loc->stack);
     increase_level (cnt);
-    cnt->trans += permute_trans (ctx->permute, &ctx->state, ndfs_red_handle, ctx);
+    cnt->trans += permute_trans (ctx->permute, ctx->state, ndfs_red_handle, ctx);
     run_maybe_report (ctx->run, cnt, "[Red ] ");
 }
 
@@ -169,7 +100,7 @@ ndfs_explore_state_blue (wctx_t *ctx)
     work_counter_t     *cnt = ctx->counters;
     dfs_stack_enter (ctx->local->stack);
     increase_level (cnt);
-    cnt->trans += permute_trans (ctx->permute, &ctx->state, ndfs_blue_handle, ctx);
+    cnt->trans += permute_trans (ctx->permute, ctx->state, ndfs_blue_handle, ctx);
     cnt->explored++;
     run_maybe_report (ctx->run, cnt, "[Blue] ");
 }
@@ -184,14 +115,14 @@ ndfs_red (wctx_t *ctx, ref_t seed)
     while ( !run_is_stopped(ctx->run) ) {
         raw_data_t          state_data = dfs_stack_top (loc->stack);
         if (NULL != state_data) {
-            state_info_deserialize (&ctx->state, state_data, ctx->store);
-            nndfs_color_t color = nn_get_color (&loc->color_map, ctx->state.ref);
+            state_info_deserialize (ctx->state, state_data);
+            nndfs_color_t color = nn_get_color (&loc->color_map, ctx->state->ref);
             if ( nn_color_eq(color, NNBLUE) ) {
-                nn_set_color (&loc->color_map, ctx->state.ref, NNPINK);
+                nn_set_color (&loc->color_map, ctx->state->ref, NNPINK);
                 ndfs_explore_state_red (ctx);
                 loc->red_work.explored++;
             } else {
-                if (seed == ctx->state.ref)
+                if (seed == ctx->state->ref)
                     break;
                 dfs_stack_pop (loc->stack);
             }
@@ -199,9 +130,9 @@ ndfs_red (wctx_t *ctx, ref_t seed)
             dfs_stack_leave (loc->stack);
             loc->red_work.level_cur--;
             state_data = dfs_stack_top (loc->stack);
-            state_info_deserialize_cheap (&ctx->state, state_data);
+            state_info_deserialize (ctx->state, state_data);
             /* exit search if backtrack hits seed, leave stack the way it was */
-            if (seed == ctx->state.ref)
+            if (seed == ctx->state->ref)
                 break;
             dfs_stack_pop (loc->stack);
         }
@@ -214,18 +145,18 @@ ndfs_blue (run_t *run, wctx_t *ctx)
 {
     alg_local_t            *loc = ctx->local;
     transition_info_t       ti = GB_NO_TRANSITION;
-    ndfs_blue_handle (ctx, &ctx->initial, &ti, 0);
+    ndfs_blue_handle (ctx, ctx->initial, &ti, 0);
     ctx->counters->trans = 0; //reset trans count
 
     while ( !run_is_stopped(run) ) {
         raw_data_t          state_data = dfs_stack_top (loc->stack);
         if (NULL != state_data) {
-            state_info_deserialize (&ctx->state, state_data, ctx->store);
-            nndfs_color_t color = nn_get_color (&loc->color_map, ctx->state.ref);
+            state_info_deserialize (ctx->state, state_data);
+            nndfs_color_t color = nn_get_color (&loc->color_map, ctx->state->ref);
             if ( nn_color_eq(color, NNWHITE) ) {
                 if (all_red)
                     bitvector_set ( &loc->all_red, ctx->counters->level_cur );
-                nn_set_color (&loc->color_map, ctx->state.ref, NNCYAN);
+                nn_set_color (&loc->color_map, ctx->state->ref, NNCYAN);
                 ndfs_explore_state_blue (ctx);
             } else {
                 if ( all_red && ctx->counters->level_cur != 0 &&
@@ -239,22 +170,21 @@ ndfs_blue (run_t *run, wctx_t *ctx)
             dfs_stack_leave (loc->stack);
             ctx->counters->level_cur--;
             state_data = dfs_stack_top (loc->stack);
-            state_info_t            seed;
-            state_info_deserialize (&seed, state_data, ctx->store);
+            state_info_deserialize (loc->seed, state_data);
             if ( all_red && bitvector_is_set(&loc->all_red, ctx->counters->level_cur) ) {
                 /* exit if backtrack hits seed, leave stack the way it was */
-                nn_set_color (&loc->color_map, seed.ref, NNPINK);
+                nn_set_color (&loc->color_map, loc->seed->ref, NNPINK);
                 loc->counters.allred++;
-                if ( GBbuchiIsAccepting(ctx->model, seed.data) )
+                if ( GBbuchiIsAccepting(ctx->model, state_info_state(loc->seed)) )
                     loc->counters.accepting++;
-            } else if ( GBbuchiIsAccepting(ctx->model, seed.data) ) {
+            } else if ( GBbuchiIsAccepting(ctx->model, state_info_state(loc->seed)) ) {
                 /* call red DFS for accepting states */
-                ndfs_red (ctx, seed.ref);
-                nn_set_color (&loc->color_map, seed.ref, NNPINK);
+                ndfs_red (ctx, loc->seed->ref);
+                nn_set_color (&loc->color_map, loc->seed->ref, NNPINK);
             } else {
                 if (all_red && ctx->counters->level_cur > 0)
                     bitvector_unset (&loc->all_red, ctx->counters->level_cur - 1);
-                nn_set_color (&loc->color_map, seed.ref, NNBLUE);
+                nn_set_color (&loc->color_map, loc->seed->ref, NNBLUE);
             }
             dfs_stack_pop (loc->stack);
         }
@@ -280,7 +210,9 @@ ndfs_local_setup   (run_t *run, wctx_t *ctx)
     HREassert (res != -1, "Failure to allocate a all_red bitvector.");
     loc->rec_bits = 0;
     loc->strat = get_strategy (run->alg);
-    loc->stack = dfs_stack_create (state_info_int_size());
+    size_t len = state_info_serialize_int_size (ctx->state);
+    loc->stack = dfs_stack_create (len);
+    loc->seed = state_info_create ();
 }
 
 void
@@ -292,6 +224,7 @@ ndfs_local_deinit   (run_t *run, wctx_t *ctx)
     bitvector_free (&loc->color_map);
     dfs_stack_destroy (loc->stack);
     RTfree (loc);
+    (void) run;
 }
 
 int
@@ -319,7 +252,7 @@ ndfs_print_state_stats (run_t* run, wctx_t* ctx, int index, float waittime)
 {
     size_t db_elts = global->stats.elts;
     size_t explored = run->total.explored;
-    size_t trans = run->total.trans;
+    //size_t trans = run->total.trans;
     size_t rtrans = run->reduced->red_work.trans;
     size_t rexplored = run->reduced->red_work.explored;
     size_t bogus = run->reduced->red.bogus_red;
@@ -350,7 +283,7 @@ ndfs_print_stats   (run_t *run, wctx_t *ctx)
     size_t              accepting = run->reduced->blue.accepting / W;
 
     //RTprintTimer (info, ctx->timer, "Total exploration time ");
-    Warning (info, "Total exploration time %5.3f real", run->maxtime);
+    Warning (info, "Total exploration time %5.3f real", run->total.maxtime);
 
     Warning (info, " ");
     Warning (info, "State space has %zu states, %zu are accepting", db_elts, accepting);
@@ -382,20 +315,15 @@ ndfs_reduce  (run_t *run, wctx_t *ctx)
     work_add_results (&reduced->red_work, red_work);
 
     // publish local memory statistics for run class
-    run->local_states += blue_work->level_max + red_work->level_max;
+    run->total.local_states += blue_work->level_max + red_work->level_max;
 
     if (W >= 4 || !log_active(infoLong)) return;
 
     // print some local info
     float                   runtime = RTrealTime(ctx->timer);
-    Warning (info, "Nested depth-dirst search worker ran %.3f sec", runtime);
+    Warning (info, "Nested depth-first search worker ran %.3f sec", runtime);
     work_report ("[Blue]", blue_work);
     work_report ("[Red ]", red_work);
-
-    if (Strat_TA & strategy[0]) {
-        fset_print_statistics (ctx->local->cyan, "Cyan set");
-        fset_print_statistics (ctx->local->pink, "Pink set");
-    }
 }
 
 void

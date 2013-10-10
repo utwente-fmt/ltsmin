@@ -13,7 +13,7 @@
 
 typedef enum {
     Proviso_None,
-//    LTLP_ClosedSet, //TODO
+//    LTLP_ClosedSet, //TODO: implement closed-set proviso
     Proviso_Stack,
 } proviso_t;
 

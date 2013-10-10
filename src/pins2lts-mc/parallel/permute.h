@@ -52,7 +52,6 @@ extern permutation_perm_t permutation;
  */
 extern permute_t       *permute_create (permutation_perm_t permutation,
                                         model_t model, alg_state_seen_f ssf,
-                                        size_t workers, size_t trans,
                                         int worker_index, void *run_ctx);
 
 extern void             permute_free (permute_t *perm);

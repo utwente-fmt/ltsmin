@@ -71,6 +71,10 @@ hre_init_and_spawn_workers (int argc, char *argv[])
 
     // spawns threads:
     HREinitStart (&argc, &argv, 1, 2, files, "<model> [lts]");
+
+    // Only use shared allocation if available
+    // HRE only initiates this for more than one process
+    HRE_PROCS &= HREdefaultRegion(HREglobal()) != NULL;
 }
 
 model_t
@@ -90,9 +94,15 @@ create_pins_model ()
         RTswitchAlloc (HRE_PROCS);
         mutex = RTmalloc (sizeof(pthread_mutex_t));
         RTswitchAlloc (false);
-        pthread_mutex_init (mutex, NULL);
+        pthread_mutexattr_t    lock_attr;
+        pthread_mutexattr_init(&lock_attr);
+        int type = HRE_PROCS ? PTHREAD_PROCESS_SHARED : PTHREAD_PROCESS_PRIVATE;
+        if (pthread_mutexattr_setpshared(&lock_attr, type))
+            AbortCall("pthread_rwlockattr_setpshared");
+        pthread_mutex_init (mutex, &lock_attr);
     }
     HREreduce (HREglobal(), 1, &mutex, &mutex, Pointer, Max);
+
     pthread_mutex_lock (mutex);
     GBloadFile (model, files[0], &model);
     pthread_mutex_unlock (mutex);
@@ -112,11 +122,11 @@ global_and_model_init ()
 {
     model_t             model;
 
-    global_create (!HRE_PROCS);
+    global_create (HRE_PROCS);
 
     model = create_pins_model ();
 
-    global_init (model, timed_model);
+    global_init (model, SPEC_REL_PERF, timed_model);
     global_print (model);
 
     return model;
@@ -140,7 +150,7 @@ local_init (model_t model)
 /**
  * Reduce statistics and print results
  */
-wctx_t *
+void
 reduce_and_print (wctx_t *ctx)
 {
     run_reduce_stats (ctx);
@@ -148,7 +158,8 @@ reduce_and_print (wctx_t *ctx)
 
     if (HREme(HREglobal()) == 0) {
         run_print_stats (ctx);
-        global_print_stats (ctx->model, run_local_state_infos(ctx));
+        global_print_stats (ctx->model, run_local_state_infos(ctx),
+                            state_info_serialize_size (ctx->state));
     }
 }
 

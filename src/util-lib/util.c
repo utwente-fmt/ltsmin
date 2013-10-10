@@ -1,5 +1,6 @@
 #include <hre/config.h>
 
+#include <ctype.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -42,4 +43,20 @@ char_array_search(char *args[], int length, char *key)
         }
     }
     return 0;
+}
+
+void
+strtoupper(char *str, char *out, size_t outlen)
+{
+    for (size_t i = 0; i < outlen && str[i] != '\0'; i++) {
+        out[i] = toupper (str[i]);
+    }
+}
+
+char *
+strupper(char *str)
+{
+    str = strdup(str);
+    while( (*str=toupper(*str)) ) { str++; }
+    return str;
 }

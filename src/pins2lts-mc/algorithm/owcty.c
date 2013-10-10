@@ -123,16 +123,16 @@ owcty_reset (wctx_t *ctx)
     state_data_t            data;
     if (loc->iteration == 0) {
         while ((data = dfs_stack_pop (sm->in_stack)) && !run_is_stopped(ctx->run)) {
-            state_info_deserialize_cheap (&ctx->state, data);
-            owcty_pre_reset (ctx->run, ctx->state.ref, loc->flip, 1);
+            state_info_deserialize (ctx->state, data);
+            owcty_pre_reset (ctx->run, ctx->state->ref, loc->flip, 1);
             dfs_stack_push (sm->stack, data);
         }
     } else {
         while ((data = dfs_stack_pop (sm->in_stack)) && !run_is_stopped(ctx->run)) {
-            state_info_deserialize_cheap (&ctx->state, data);
-            if ( 0 != owcty_pre_count(ctx->run, ctx->state.ref) ) {
+            state_info_deserialize (ctx->state, data);
+            if ( 0 != owcty_pre_count(ctx->run, ctx->state->ref) ) {
                 dfs_stack_push (sm->stack, data);
-                owcty_pre_reset (ctx->run, ctx->state.ref, loc->flip, 1);
+                owcty_pre_reset (ctx->run, ctx->state->ref, loc->flip, 1);
             }
         }
     }
@@ -146,9 +146,9 @@ static inline void
 owcty_map (wctx_t *ctx, state_info_t *successor)
 {
     alg_shared_t       *shared = ctx->run->shared;
-    ref_t               map_pred = atomic_read (shared->parent_ref+ctx->state.ref);
-    if ( GBbuchiIsAccepting(ctx->model, get_state(successor->ref, ctx)) ) {
-        if (successor->ref == ctx->state.ref || map_pred == successor->ref) {
+    ref_t               map_pred = atomic_read (shared->parent_ref+ctx->state->ref);
+    if ( GBbuchiIsAccepting(ctx->model, state_info_state(successor)) ) {
+        if (successor->ref == ctx->state->ref || map_pred == successor->ref) {
             //ndfs_report_cycle (ctx, successor);
             Abort ("cycle found!");
         }
@@ -189,12 +189,12 @@ owcty_split (void *arg_src, void *arg_tgt, size_t handoff)
             one = dfs_stack_pop (src_sm->stack);
             if (((src_loc->iteration & 1) == 1 || src_loc->iteration == 0) && // only in the initialization / reachability phase
                     Strat_ECD == strategy[1]) {
-                state_info_deserialize (&source->state, one, source->store);
-                if (GBbuchiIsAccepting(source->model, source->state.data)) {
+                state_info_deserialize (source->state, one);
+                if (GBbuchiIsAccepting(source->model, state_info_state(source->state))) {
                     HREassert (src_loc->ecd.level_cur != 0, "Source accepting level counter is off");
                     src_loc->ecd.level_cur--;
                 }
-                ecd_remove_state (src_loc->cyan, &source->state);
+                ecd_remove_state (src_loc->cyan, source->state);
             }
         } else {
             dfs_stack_push (tgt_sm->stack, one);
@@ -218,7 +218,6 @@ owcty_initialize_handle (void *arg, state_info_t *successor, transition_info_t *
                          int seen)
 {
     wctx_t             *ctx = (wctx_t *) arg;
-    alg_local_t        *loc = ctx->local;
     alg_global_t       *sm = ctx->global;
     if (!seen) {
         raw_data_t stack_loc = dfs_stack_push (sm->stack, NULL);
@@ -278,25 +277,25 @@ owcty_reachability (wctx_t *ctx)
     while (lb_balance(ctx->run->shared->lb, ctx->id, owcty_load(ctx), owcty_split)) {
         raw_data_t          state_data = dfs_stack_top (sm->stack);
         if (NULL != state_data) {
-            state_info_deserialize (&ctx->state, state_data, ctx->store);
+            state_info_deserialize (ctx->state, state_data);
             dfs_stack_enter (sm->stack);
             increase_level (ctx->counters);
-            bool accepting = GBbuchiIsAccepting(ctx->model, ctx->state.data);
+            bool accepting = GBbuchiIsAccepting(ctx->model, state_info_state(ctx->state));
             if (strategy[1] == Strat_ECD) {
-                ecd_add_state (loc->cyan, &ctx->state, &loc->ecd.level_cur);
+                ecd_add_state (loc->cyan, ctx->state, &loc->ecd.level_cur);
                 loc->ecd.level_cur += accepting;
             }
             if ( accepting )
                 dfs_stack_push (sm->out_stack, state_data);
-            permute_trans (ctx->permute, &ctx->state, handle, ctx);
+            permute_trans (ctx->permute, ctx->state, handle, ctx);
             visited++;
             ctx->counters->explored++;
             run_maybe_report1 (ctx->run, ctx->counters, "");
         } else {
             if (0 == dfs_stack_nframes (sm->stack)) {
                 while ((state_data = dfs_stack_pop (sm->in_stack))) {
-                    state_info_deserialize_cheap (&ctx->state, state_data);
-                    if (owcty_pre_try_reset(ctx->run, ctx->state.ref, 0, loc->flip,
+                    state_info_deserialize (ctx->state, state_data);
+                    if (owcty_pre_try_reset(ctx->run, ctx->state->ref, 0, loc->flip,
                                             loc->iteration > 1)) { // grab & reset
                         dfs_stack_push (sm->stack, state_data);
                         break;
@@ -308,12 +307,12 @@ owcty_reachability (wctx_t *ctx)
             ctx->counters->level_cur--;
             if (strategy[1] == Strat_ECD) {
                 state_data = dfs_stack_top (sm->stack);
-                state_info_deserialize (&ctx->state, state_data, ctx->store);
-                if (GBbuchiIsAccepting(ctx->model, ctx->state.data)) {
+                state_info_deserialize (ctx->state, state_data);
+                if (GBbuchiIsAccepting(ctx->model, state_info_state(ctx->state))) {
                     HREassert (loc->ecd.level_cur != 0, "Accepting level counter is off");
                     loc->ecd.level_cur--;
                 }
-                ecd_remove_state (loc->cyan, &ctx->state);
+                ecd_remove_state (loc->cyan, ctx->state);
             }
             dfs_stack_pop (sm->stack);
         }
@@ -340,8 +339,8 @@ owcty_elimination_pre (wctx_t *ctx)
     alg_global_t       *sm = ctx->global;
     state_data_t            data;
     while ((data = dfs_stack_pop (sm->out_stack)) && !run_is_stopped(ctx->run)) {
-        state_info_deserialize_cheap (&ctx->state, data);
-        if (0 == owcty_pre_count(ctx->run, ctx->state.ref) ) {
+        state_info_deserialize (ctx->state, data);
+        if (0 == owcty_pre_count(ctx->run, ctx->state->ref) ) {
             dfs_stack_push (sm->stack, data); // to eliminate
         } else {
             dfs_stack_push (sm->in_stack, data); // to reachability (maybe eliminated)
@@ -358,7 +357,6 @@ owcty_elimination_handle (void *arg, state_info_t *successor, transition_info_t 
                           int seen)
 {
     wctx_t             *ctx = (wctx_t *) arg;
-    alg_local_t        *loc = ctx->local;
     alg_global_t       *sm = ctx->global;
     size_t num = owcty_pre_inc (ctx->run, successor->ref, -1);
     HREassert (num < 1ULL<<28); // overflow
@@ -376,7 +374,6 @@ owcty_elimination_handle (void *arg, state_info_t *successor, transition_info_t 
 size_t
 owcty_elimination (wctx_t *ctx)
 {
-    alg_local_t        *loc = ctx->local;
     alg_global_t       *sm = ctx->global;
     size_t before = ctx->counters->explored + dfs_stack_size(sm->stack);
 
@@ -386,8 +383,8 @@ owcty_elimination (wctx_t *ctx)
         if (NULL != state_data) {
             dfs_stack_enter (sm->stack);
             increase_level (ctx->counters);
-            state_info_deserialize (&ctx->state, state_data, ctx->store);
-            permute_trans (ctx->permute, &ctx->state, owcty_elimination_handle, ctx);
+            state_info_deserialize (ctx->state, state_data);
+            permute_trans (ctx->permute, ctx->state, owcty_elimination_handle, ctx);
             ctx->counters->explored++;
             run_maybe_report1 (ctx->run, ctx->counters, "");
         } else {
@@ -416,8 +413,7 @@ owcty_do (wctx_t *ctx, size_t *size, size_t (*phase)(wctx_t *ctx), char *name,
         if (owcty_ecd_all) {
             permute_free (ctx->permute); // reinitialize random exploration order:
             ctx->permute = permute_create (permutation, ctx->model,
-                                           alg_state_new_default, W, K,
-                                           ctx->id, ctx->run);
+                                     alg_state_new_default, ctx->id, ctx->run);
         }
         //ctx->run->threshold = init_threshold;
     }
@@ -441,12 +437,13 @@ owcty (run_t *run, wctx_t *ctx)
 
     if (0 == ctx->id) {
         transition_info_t       ti = GB_NO_TRANSITION;
-        owcty_initialize_handle (ctx, &ctx->initial, &ti, 0);
+        owcty_initialize_handle (ctx, ctx->initial, &ti, 0);
         ctx->counters->trans = 0; //reset trans count
     }
 
-    if (strategy[1] == Strat_MAP && 0 == ctx->id && GBbuchiIsAccepting(ctx->model, ctx->initial.data))
-        atomic_write (shared->parent_ref+ctx->initial.ref, ctx->initial.ref + 1);
+    if (strategy[1] == Strat_MAP && 0 == ctx->id &&
+            GBbuchiIsAccepting(ctx->model, state_info_state(ctx->initial)))
+        atomic_write (shared->parent_ref+ctx->initial->ref, ctx->initial->ref + 1);
     owcty_pre_t             reset = { .bit = 0, .acc = 0, .count = 1 };
     uint32_t               *r32 = (uint32_t *) &reset;
     HREassert (1 == *r32); fetch_add (r32, -1); HREassert (0 == reset.count);
@@ -494,7 +491,7 @@ owcty_reduce  (run_t *run, wctx_t *ctx)
     work_add_results (&reduced->counters, ecd);
 
     // publish local memory statistics for run class
-    run->local_states += ecd->level_max;
+    run->total.local_states += ecd->level_max;
 
     if (W >= 4 || !log_active(infoLong)) return;
 
@@ -522,6 +519,7 @@ owcty_print_stats   (run_t *run, wctx_t *ctx)
     if (loc->cyan != NULL) {
         fset_print_statistics (loc->cyan, "ECD set");
     }
+    (void) run;
 }
 
 void
@@ -541,9 +539,10 @@ void
 owcty_global_init   (run_t *run, wctx_t *ctx)
 {
     ctx->global = RTmallocZero (sizeof(alg_global_t));
-    ctx->global->stack = dfs_stack_create (state_info_int_size());
-    ctx->global->in_stack = dfs_stack_create (state_info_int_size());
-    ctx->global->out_stack = dfs_stack_create (state_info_int_size());
+    size_t len = state_info_serialize_int_size (ctx->state);
+    ctx->global->stack = dfs_stack_create (len);
+    ctx->global->in_stack = dfs_stack_create (len);
+    ctx->global->out_stack = dfs_stack_create (len);
 
     lb_local_init (run->shared->lb, ctx->id, ctx); // Barrier
     (void) run;
@@ -556,6 +555,7 @@ owcty_destroy   (run_t *run, wctx_t *ctx)
     dfs_stack_destroy (ctx->global->in_stack);
     dfs_stack_destroy (ctx->global->out_stack);
     RTfree (ctx->global);
+    (void) run;
 }
 
 void
@@ -565,6 +565,7 @@ owcty_destroy_local   (run_t *run, wctx_t *ctx)
         fset_free (ctx->local->cyan);
     }
     RTfree (ctx->local);
+    (void) run;
 }
 
 static int

@@ -114,9 +114,10 @@ deadlock_detect (wctx_t *ctx, size_t count)
 
     alg_local_t        *loc = ctx->local;
     loc->counters.deadlocks++; // counting is costless
-    if (GBstateIsValidEnd(ctx->model, ctx->state.data)) return;
+    state_data_t        state = state_info_state (ctx->state);
+    if (GBstateIsValidEnd(ctx->model, state)) return;
     if ( !loc->inv_expr ) loc->counters.violations++;
-    if (dlk_detect && (!no_exit || trc_output) && lb_stop(ctx->run->shared->lb)) {
+    if (dlk_detect && (!no_exit || trc_output) && run_stop(ctx->run)) {
         Warning (info, " ");
         Warning (info, "Deadlock found in state at depth %zu!",
                  ctx->counters->level_cur);
@@ -126,18 +127,19 @@ deadlock_detect (wctx_t *ctx, size_t count)
 }
 
 static inline void
-invariant_detect (wctx_t *ctx, raw_data_t state)
+invariant_detect (wctx_t *ctx)
 {
     alg_local_t        *loc = ctx->local;
     if (EXPECT_TRUE(!loc->inv_expr))
         return;
 
+    state_data_t        state = state_info_state (ctx->state);
     if (EXPECT_TRUE(
             eval_predicate(ctx->model, loc->inv_expr, NULL, state, N, loc->env)))
         return;
 
     loc->counters.violations++;
-    if ((!no_exit || trc_output) && lb_stop(ctx->run->shared->lb)) {
+    if ((!no_exit || trc_output) && run_stop(ctx->run)) {
         Warning (info, " ");
         Warning (info, "Invariant violation (%s) found at depth %zu!",
                  inv_detect, ctx->counters->level_cur);
@@ -160,10 +162,10 @@ action_detect (wctx_t *ctx, transition_info_t *ti, state_info_t *successor)
     alg_shared_t       *shared = ctx->run->shared;
 
     loc->counters.errors++;
-    if ((!no_exit || trc_output) && lb_stop(ctx->run->shared->lb)) {
-        if (trc_output && successor->ref != ctx->state.ref) // race, but ok:
-            atomic_write(&shared->parent_ref[successor->ref], ctx->state.ref);
-        state_data_t data = dfs_stack_push (sm->stack, NULL);
+    if ((!no_exit || trc_output) && run_stop(ctx->run)) {
+        if (trc_output && successor->ref != ctx->state->ref) // race, but ok:
+            atomic_write(&shared->parent_ref[successor->ref], ctx->state->ref);
+        raw_data_t          data = dfs_stack_push (sm->stack, NULL);
         state_info_serialize (successor, data);
         dfs_stack_enter (sm->stack);
         Warning (info, " ");

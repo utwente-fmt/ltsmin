@@ -55,6 +55,8 @@ options_static_init      (model_t model, bool timed)
     if (timed) {
         if (!(strategy[0] & (Strat_CNDFS|Strat_Reach)))
             Abort ("Wrong strategy for timed verification: %s", key_search(strategies, strategy[0]));
+        if (trc_output && (W != 1 || strategy[0] != Strat_DFS))
+            Abort("Opaal error traces only supported with a single thread and DFS order");
         strategy[0] |= Strat_TA;
     }
 
@@ -107,8 +109,6 @@ print_options (model_t model)
         Warning (info, "Using a hash table with 2^%d elements", dbs_size);
     } else
         Warning (info, "Using a%s tree table with 2^%d elements", indexing ? "" : " non-indexing", dbs_size);
-    Warning (info, "Global bits: %d, count bits: %d, local bits: %d",
-             global_bits, count_bits, local_bits);
     Warning (info, "Successor permutation: %s", key_search(permutations, permutation));
     if (PINS_POR) {
         int            *visibility = GBgetPorGroupVisibility (model);
@@ -186,15 +186,11 @@ struct poptOption alg_options_extra[] = {
     {"filter" , 0 , POPT_ARG_STRING , &label_filter , 0 ,
      "Select the labels to be written to file from the state vector elements, "
      "state labels and edge labels." , "<patternlist>" },
-    {"gran", 'g', POPT_ARG_LONGLONG | POPT_ARGFLAG_SHOW_DEFAULT | POPT_ARGFLAG_DOC_HIDDEN, &G, 0,
-     "subproblem granularity ( T( work(P,g) )=min( T(P), g ) )", NULL},
-    {"handoff", 0, POPT_ARG_LONGLONG | POPT_ARGFLAG_SHOW_DEFAULT | POPT_ARGFLAG_DOC_HIDDEN, &H, 0,
-     "maximum balancing handoff (handoff=min(max, stack_size/2))", NULL},
     {NULL, 0, POPT_ARG_INCLUDE_TABLE, reach_options, 0, "Reachability options", NULL},
-    {NULL, 0, POPT_ARG_INCLUDE_TABLE, alg_ltl_options, 0, "LTL options", NULL},
-    {NULL, 0, POPT_ARG_INCLUDE_TABLE, ndfs_options, 0, "NDFS options", NULL},
     {NULL, 0, POPT_ARG_INCLUDE_TABLE, state_store_options, 0, "State store options", NULL},
     {NULL, 0, POPT_ARG_INCLUDE_TABLE, perm_options, 0, "Permutation options", NULL},
+    {NULL, 0, POPT_ARG_INCLUDE_TABLE, alg_ltl_options, 0, /*"LTL options"*/ NULL, NULL},
+    {NULL, 0, POPT_ARG_INCLUDE_TABLE, ndfs_options, 0, /*"NDFS options"*/ NULL, NULL},
     {NULL, 0, POPT_ARG_INCLUDE_TABLE, greybox_options, 0, "Greybox options", NULL},
     POPT_TABLEEND
 };
@@ -203,12 +199,12 @@ struct poptOption options[] = {
     {NULL, 0, POPT_ARG_CALLBACK | POPT_CBFLAG_POST | POPT_CBFLAG_SKIPOPTION,
      (void *)alg_popt, 0, NULL, NULL},
     {"strategy", 0, POPT_ARG_STRING | POPT_ARGFLAG_SHOW_DEFAULT,
-     &arg_strategy, 0, "select the search strategy", "<bfs|sbfs|dfs|cndfs|lndfs|endfs|endfs,lndfs|endfs,endfs,ndfs|ndfs>"},
+     &arg_strategy, 0, "select the search strategy", "<bfs|sbfs|dfs|cndfs|lndfs|endfs|endfs,<strategy>|ndfs>"},
     {"proviso", 0, POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT, &arg_proviso , 0 ,
      "select proviso for ltl/por (only single core!)", "<closedset|stack>"},
     {NULL, 0, POPT_ARG_INCLUDE_TABLE, alg_options_extra, 0, NULL, NULL},
     {NULL, 0, POPT_ARG_INCLUDE_TABLE, dfs_fifo_options, 0, "DFS FIFO options", NULL},
-    {NULL, 0, POPT_ARG_INCLUDE_TABLE, owcty_options, 0, "OWCTY options", NULL},
+    {NULL, 0, POPT_ARG_INCLUDE_TABLE, owcty_options, 0, /*"OWCTY options"*/NULL, NULL},
      POPT_TABLEEND
 };
 

@@ -75,19 +75,21 @@ prom_popt (poptContext con,
 	case POPT_CALLBACK_REASON_PRE:
 		break;
 	case POPT_CALLBACK_REASON_POST:
+        GBregisterPreLoader("pm",       PromCompileGreyboxModel);
         GBregisterPreLoader("pr",       PromCompileGreyboxModel);
         GBregisterPreLoader("promela",  PromCompileGreyboxModel);
         GBregisterPreLoader("prom",     PromCompileGreyboxModel);
         GBregisterPreLoader("prm",      PromCompileGreyboxModel);
         GBregisterPreLoader("pml",      PromCompileGreyboxModel);
-		GBregisterPreLoader("spins",   PromLoadDynamicLib);
+		GBregisterPreLoader("spins",    PromLoadDynamicLib);
 
+        GBregisterLoader("pm",          PromLoadGreyboxModel);
         GBregisterLoader("pr",          PromLoadGreyboxModel);
         GBregisterLoader("promela",     PromLoadGreyboxModel);
         GBregisterLoader("prom",        PromLoadGreyboxModel);
         GBregisterLoader("pml",         PromLoadGreyboxModel);
         GBregisterLoader("prm",         PromLoadGreyboxModel);
-        GBregisterLoader("spins",      PromLoadGreyboxModel);
+        GBregisterLoader("spins",       PromLoadGreyboxModel);
 		Warning(info,"Precompiled spins module initialized");
 		return;
 	case POPT_CALLBACK_REASON_OPTION:

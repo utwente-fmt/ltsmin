@@ -15,6 +15,7 @@ work_add_results (work_counter_t *res, work_counter_t *cnt)
     res->level_cur += cnt->level_cur;
     res->level_max += cnt->level_max;
 }
+
 void
 work_report (char *prefix, work_counter_t *cnt)
 {

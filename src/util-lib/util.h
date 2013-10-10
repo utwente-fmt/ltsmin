@@ -30,5 +30,15 @@ extern void randperm (int *perm, int n, uint32_t seed);
 
 extern int char_array_search (char *args[], int length, char *key);
 
+extern void strtoupper (char *str, char *out, size_t outlen);
+
+extern char *strupper(char *str);
+
+static inline size_t
+INT_SIZE (size_t size)
+{
+    return (size + 3) / 4;
+}
+
 #endif // UTIL_LTSMIN_H
 

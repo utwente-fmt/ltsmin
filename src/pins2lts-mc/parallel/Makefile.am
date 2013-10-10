@@ -24,10 +24,12 @@ libparallel_la_SOURCES += permute.c
 libparallel_la_SOURCES += permute.h
 libparallel_la_SOURCES += run.h
 libparallel_la_SOURCES += run.c
-libparallel_la_SOURCES += state-store.c
-libparallel_la_SOURCES += state-store.h
 libparallel_la_SOURCES += state-info.c
 libparallel_la_SOURCES += state-info.h
+libparallel_la_SOURCES += state-store.c
+libparallel_la_SOURCES += state-store.h
+libparallel_la_SOURCES += stream-serializer.c
+libparallel_la_SOURCES += stream-serializer.h
 libparallel_la_SOURCES += worker.h
 libparallel_la_SOURCES += worker.c
 

@@ -102,8 +102,6 @@ extern void dfs_fifo_shared_init    (run_t *run);
 
 extern int alg_state_new_default    (void *ctx, ref_t ref, int seen);
 
-extern void find_and_write_dfs_stack_trace (wctx_t *ctx, int level); // TODO
-
 extern int num_global_bits (strategy_t s);
 
 extern strategy_t get_strategy (alg_t *alg);

@@ -86,9 +86,6 @@ sr;;
 shift;;
    shift the order of transitions by a fixed value per worker (fast/decent).
 
-shiftall;;
-   as shift, but with a equal load for all workers (a bit slower/decent).
-
 otf;;
     sort according to a dynamic permutation scheme (slow/perfect).
 
