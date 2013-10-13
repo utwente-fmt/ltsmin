@@ -416,7 +416,7 @@ reach_print_stats   (run_t *run, wctx_t *ctx)
     Warning (info, " ");
     cnt_work->level_max /= W;
 
-    Warning (info, "State space has %zu states, %zu transitions",
+    Warning (info, "State space has %zu states %zu transitions",
              cnt_work->explored, cnt_work->trans);
     Warning (info, "Total exploration time %5.3f sec", cnt_work->maxtime);
     //RTprintTimer (info, timer, "Total exploration time");

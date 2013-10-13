@@ -80,9 +80,6 @@ rr;;
 	than the previous option, but requires more pre-computation time for the
 	random array (decent/almost perfect).
 
-sr;;
-    sort according to one fixed random permutation scheme per worker (decent/decent).
-
 shift;;
    shift the order of transitions by a fixed value per worker (fast/decent).
 

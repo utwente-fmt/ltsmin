@@ -88,7 +88,7 @@ struct poptOption state_store_options[] = {
      "log2 size of the state store or maximum % of memory to use", NULL},
     {"ratio", 0, POPT_ARG_LONGLONG | POPT_ARGFLAG_SHOW_DEFAULT, &ratio, 0,
      "log2 tree root to leaf ratio", "<int>"},
-    {"noref", 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN, &refs, 0,
+    {"no-ref", 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN, &refs, 0,
      "store full states on the stack/queue instead of references (faster)", NULL},
     {"zobrist", 'z', POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &ZOBRIST, 0,
      "log2 size of zobrist random table (6 or 8 is good enough; 0 is no zobrist)", NULL},

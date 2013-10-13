@@ -7,7 +7,7 @@ set backends [dict create]
 # 1 row for every param and a list of possible values
 dict set backends mc params "--strategy=" {dfs bfs sbfs}
 dict set backends mc params "--state=" {tree table cleary-tree}
-dict set backends mc options {"-z6" "--noref" "-prr" "-pdynamic" ""}
+dict set backends mc options {"-z6" "--no-ref" "--perm=rr" "--perm=dynamic" ""}
 
 
 # 1 row for every param and a list of possible values

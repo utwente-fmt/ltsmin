@@ -108,7 +108,8 @@ stream_list_walk (stream_item_t *item, void *ctx,
                   raw_data_t data, stream_mode_t MODE)
 {
     item->serial->action[MODE] (ctx, item->serial->ptr, data);
-    item->rec->rec_f (item->rec, ctx, ((char*)data) + item->serial->size, MODE);
+    char* data_next = ((char*)data) + item->serial->size;
+    item->rec->rec_f (item->rec, ctx, (raw_data_t) data_next, MODE);
 }
 
 typedef struct stream_list_s {

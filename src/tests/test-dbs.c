@@ -5,8 +5,11 @@
  *      Author: laarman
  */
 
+#include <hre/config.h>
+
 #include <pthread.h>
 #include <stdlib.h>
+#include <strings.h>
 #include <sys/stat.h>
 #include <sys/times.h>
 #include <sys/types.h>
