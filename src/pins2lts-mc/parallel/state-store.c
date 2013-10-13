@@ -375,7 +375,7 @@ static void
 ta_ser (void *ctx, void *ptr, raw_data_t data)
 {
     lattice_t           lattice = *(lattice_t *)ptr;
-    HREassert (lattice != NULL_LATTICE);
+    HREassert (lattice != LM_NULL_LATTICE);
     ((lattice_t *)data)[0] = lattice;
     (void) ctx;
 }
@@ -385,7 +385,7 @@ ta_des (void *ctx, void *ptr, raw_data_t data)
 {
     lattice_t          *lattice = (lattice_t *)ptr;
     lattice[0] = ((lattice_t *)data)[0];
-    HREassert (lattice[0] != NULL_LATTICE);
+    HREassert (lattice[0] != LM_NULL_LATTICE);
     (void) ctx;
 }
 

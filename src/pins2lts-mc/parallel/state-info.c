@@ -91,7 +91,7 @@ static inline void
 state_info_clear (state_info_t* si)
 {
     si->ref = DUMMY_IDX;
-    si->lattice = NULL_LATTICE;
+    si->lattice = LM_NULL_LATTICE;
     store_clear (si->in->store);
 }
 

@@ -139,7 +139,7 @@ ta_cndfs_spray_nb (void *arg, lattice_t l, lm_status_t status, lm_loc_t lm)
                 if (!ta_loc->done) {
                     if (!lm_cas_update (shared->lmap, lm, l, status, lattice, color)) {
                         l = lm_get (shared->lmap, lm);
-                        if (l == NULL_LATTICE) // deleted
+                        if (l == LM_NULL_LATTICE) // deleted
                             return LM_CB_NEXT;
                         status = lm_get_status (shared->lmap, lm);
                         return ta_cndfs_spray_nb (arg, l, status, lm); // retry
@@ -156,7 +156,7 @@ ta_cndfs_spray_nb (void *arg, lattice_t l, lm_status_t status, lm_loc_t lm)
         if ( ta_loc->successor->lattice == l ) {
             if (!lm_cas_update (shared->lmap, lm, l, status, lattice, status|color)) {
                 l = lm_get (shared->lmap, lm);
-                if (l == NULL_LATTICE) // deleted
+                if (l == LM_NULL_LATTICE) // deleted
                     return LM_CB_NEXT;
                 status = lm_get_status (shared->lmap, lm);
                 return ta_cndfs_spray_nb (arg, l, status, lm); // retry

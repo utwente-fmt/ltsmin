@@ -101,7 +101,7 @@ ta_covered_nb (void *arg, lattice_t l, lm_status_t status, lm_loc_t lm)
         if (LM_NULL_LOC == ta_loc->added_at) { // replace first waiting, will be added to waiting set
             if (!lm_cas_update (shared->lmap, lm, l, status, lattice, (lm_status_t)TA_WAITING)) {
                 lattice_t n = lm_get (shared->lmap, lm);
-                if (n == NULL_LATTICE) // deleted
+                if (n == LM_NULL_LATTICE) // deleted
                     return LM_CB_NEXT;
                 lm_status_t s = lm_get_status (shared->lmap, lm);
                 return ta_covered_nb (arg, n, s, lm); // retry

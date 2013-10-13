@@ -26,7 +26,7 @@ typedef struct lm_s     lm_t;
 \brief A lattice is assumed to be represented by a 64bit pointer.
  */
 typedef size_t          lattice_t;
-static const lattice_t  NULL_LATTICE = -1;
+static const lattice_t  LM_NULL_LATTICE = -1;
 
 /**
 \typedef The location of the iterator.
