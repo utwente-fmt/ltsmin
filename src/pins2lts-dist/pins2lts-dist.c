@@ -96,10 +96,10 @@ static inline void
 deadlock_detect (struct dist_thread_context *ctx, int *state, int count)
 {
     if (count != 0) return;
-    ctx->deadlocks++;
     if (GBstateIsValidEnd(ctx->model, state)) return;
-    if ( !inv_expr ) ctx->violations++;
+    ctx->deadlocks++;
     if (!dlk_detect) return;
+    ctx->violations++;
     if (trc_output!=NULL){
         uint32_t ofs=TreeFold(ctx->dbs,(int32_t*)(state));
         Warning(info,"deadlock: %u.%u",ctx->mpi_me,ofs);
