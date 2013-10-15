@@ -135,21 +135,16 @@ invariant_detect (struct dist_thread_context *ctx, int *state)
 {
     if ( !inv_expr || eval_predicate(ctx->model, inv_expr, NULL, state, size, ctx->env) ) return;
     ctx->violations++;
+    if (trc_output!=NULL){
+        uint32_t ofs=TreeFold(ctx->dbs,(int32_t*)(state));
+        Warning(info,"Invariant violation (%s) found at %u.%u", inv_detect, ctx->mpi_me, ofs);
+        start_trace(ctx,ctx->mpi_me,ofs);
+        return;
+    }
     if (no_exit) return;
 
     Warning (info, " ");
     Warning (info, "Invariant violation (%s) found at depth %zu!", inv_detect, ctx->level);
-    HREabort(LTSMIN_EXIT_COUNTER_EXAMPLE);
-}
-
-static inline void
-action_detect (struct dist_thread_context *ctx, transition_info_t *ti)
-{
-    if (-1 == act_index || NULL == ti->labels || ti->labels[act_label] != act_index) return;
-    ctx->errors++;
-    if (no_exit) return;
-    Warning (info, " ");
-    Warning (info, "Error action '%s' found at depth %zu!", act_detect, ctx->level);
     HREabort(LTSMIN_EXIT_COUNTER_EXAMPLE);
 }
 
@@ -166,6 +161,8 @@ static inline int owner(int *state){
 
 /********************************************************/
 
+static void start_trace_edge(struct dist_thread_context* ctx,uint32_t seg,uint32_t ofs,uint32_t* dst);
+
 struct src_info {
     int seg;
     int ofs;
@@ -174,10 +171,28 @@ struct src_info {
     struct dist_thread_context *ctx;
 };
 
+static inline void
+action_detect (struct src_info *context, transition_info_t *ti , int *dst)
+{
+    struct dist_thread_context *ctx=context->ctx;
+    if (-1 == act_index || NULL == ti->labels || ti->labels[act_label] != act_index) return;
+    ctx->errors++;
+    if (trc_output!=NULL){
+        uint32_t ofs=context->ofs;
+        Warning(info,"Error action '%s'  found at %u.%u", act_detect, ctx->mpi_me, ofs);
+        start_trace_edge(ctx,ctx->mpi_me,ofs,dst);
+        return;
+    }
+    if (no_exit) return;
+    Warning (info, " ");
+    Warning (info, "Error action '%s' found at depth %zu!", act_detect, ctx->level);
+    HREabort(LTSMIN_EXIT_COUNTER_EXAMPLE);
+}
+
 static void callback(void*context,transition_info_t*info,int*dst,int*cpy){
     (void) cpy;
     struct src_info *ctx  = (struct src_info*)context;
-    action_detect (ctx->ctx, info);
+    action_detect (ctx, info, dst);
     uint32_t trans[trans_len];
     trans[0]=ctx->ofs;
     for(int i=0;i<size;i++){
@@ -207,6 +222,15 @@ static void start_trace(struct dist_thread_context* ctx,uint32_t seg,uint32_t of
     trc_vector[3]=ofs;
     Debug("generating trace to %u.%u: end point %u.%u",seg,ofs,seg,ctx->trace_next);
     extend_trace(ctx,trc_vector);
+}
+
+static void start_trace_edge(struct dist_thread_context* ctx,uint32_t seg,uint32_t ofs,uint32_t* dst){
+    if (ctx->mpi_me!=(int)seg) Abort("cannot start trace worker is not owner of segment %u",seg);
+    lts_write_state(ctx->trace,seg,&ctx->trace_next,dst);
+    uint32_t tmp=ctx->trace_next;
+    ctx->trace_next++;
+    lts_write_edge(ctx->trace,seg,&(ctx->trace_next),seg,&(tmp),NULL);
+    start_trace(ctx,seg,ofs);
 }
 
 static void extend_trace(struct dist_thread_context* ctx,uint32_t* trc_vector){
