@@ -66,6 +66,7 @@ run_reduce_stats (wctx_t *ctx)
             float                   runtime = RTrealTime(ctx->timer);
             ctx->run->total.runtime += runtime;
             ctx->run->total.maxtime = max(runtime, ctx->run->total.maxtime);
+            ctx->run->total.mintime = min(runtime, ctx->run->total.mintime);
 
             work_add_results (&ctx->run->total, ctx->counters);
 
@@ -153,6 +154,7 @@ run_create (bool init)
     run->contexts = RTmalloc (sizeof (wctx_t*[W]));
     run->syncer = RTmallocZero (sizeof (sync_t));
     run->total.maxtime = 0;
+    run->total.mintime = SIZE_MAX;
     run->total.runtime = 0;
     run_set_is_stopped (run, run_is_stopped_impl);
     run_set_stop (run, run_stop_impl);
@@ -175,6 +177,21 @@ run_destroy (run_t *run)
     // TODO: alg_shared and alg_reduced, e.g.: lb_destroy (run->shared->lb);
     RTfree (run);
     RTswitchAlloc (false);
+}
+
+void
+run_report_total (run_t *run)
+{
+    work_counter_t         *cnt_work = &run->total;
+    Warning (info, "Explored %zu states %zu transitions",
+                    cnt_work->explored, cnt_work->trans);
+    Warning (info, "Total exploration time %5.3f sec "
+                   "(%5.3f sec minimum, %5.3f sec on average)",
+                   cnt_work->maxtime, cnt_work->mintime, cnt_work->runtime / W);
+    //RTprintTimer (info, timer, "Total exploration time");
+    Warning(info, "States per second: %.0f, Transitions per second: %.0f",
+            cnt_work->explored/cnt_work->maxtime,
+            cnt_work->trans/cnt_work->maxtime);
 }
 
 void

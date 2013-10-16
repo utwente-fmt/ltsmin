@@ -79,6 +79,8 @@ extern int run_is_stopped (run_t *run);
 
 extern size_t run_local_state_infos (wctx_t *ctx);
 
+extern void run_report_total (run_t *run);
+
 extern void run_report (run_t *run, work_counter_t *cnt, size_t trans,
                         char *prefix);
 

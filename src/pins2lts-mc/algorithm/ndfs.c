@@ -282,8 +282,7 @@ ndfs_print_stats   (run_t *run, wctx_t *ctx)
     size_t              db_elts = global->stats.elts;
     size_t              accepting = run->reduced->blue.accepting / W;
 
-    //RTprintTimer (info, ctx->timer, "Total exploration time ");
-    Warning (info, "Total exploration time %5.3f real", run->total.maxtime);
+    run_report_total (run);
 
     Warning (info, " ");
     Warning (info, "State space has %zu states, %zu are accepting", db_elts, accepting);

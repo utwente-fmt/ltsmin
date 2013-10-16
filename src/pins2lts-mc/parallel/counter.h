@@ -13,6 +13,7 @@ typedef struct work_counter_s {
     size_t              level_max;
     size_t              level_cur;
     float               maxtime;    // Max running time for this run
+    float               mintime;    // Min running time for this run
     float               runtime;    // Total user time for this run (the sum of the runtimes of all workers)
     size_t              local_states;//Number of states locally stored on stacks or queues
 } work_counter_t;

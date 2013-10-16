@@ -510,9 +510,8 @@ void
 owcty_print_stats   (run_t *run, wctx_t *ctx)
 {
     alg_local_t        *loc = ctx->local;
-    work_counter_t         *cnt = ctx->counters;
-    Warning (info, "State space has %zu states %zu transitions",
-             cnt->explored, cnt->trans);
+
+    run_report_total (run);
 
     //TODO: detailed OWCTY stats
 
