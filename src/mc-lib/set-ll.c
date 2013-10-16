@@ -38,8 +38,8 @@ set_ll_init_allocator (bool shared)
 {
     size_t              workers = HREpeers(HREglobal());
     size_t              region_size = 0;
-    if (shared) {
-        hre_region_t        region = HREdefaultRegion(HREglobal());
+    hre_region_t        region = HREdefaultRegion(HREglobal());
+    if (shared && region != NULL) {
         region_size = HREgetRegionSize(region);
     } else {
         region_size = RTmemSize();
@@ -391,6 +391,6 @@ set_ll_destroy (set_ll_t *set)
     ht_free (set->ht);
     for (int i = 0; i < HREpeers(HREglobal()); i++)
         isba_destroy (set->local[i].balloc);
-    HREfree (HREdefaultRegion(HREglobal()), set);
+    RTfree (set);
     RTswitchAlloc (false);
 }

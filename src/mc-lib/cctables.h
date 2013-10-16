@@ -1,7 +1,7 @@
 /**
 \brief Concurrent Chunktables
 
-calling threads shpould take care of the construction of cache and table_map
+calling threads should take care of the construction of cache and table_map
 Usually, the cct_cont_t belongs in thread local storage and the map is global.
 This avoids internal calls to pthread_getspecific and makes the 
 cct interface more explicit.
