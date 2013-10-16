@@ -23,6 +23,7 @@
 #include <pins2lts-mc/parallel/counter.h>
 #include <pins2lts-mc/parallel/global.h>
 #include <pins2lts-mc/parallel/options.h>
+#include <pins2lts-mc/parallel/permute.h>
 #include <pins2lts-mc/parallel/run.h>
 #include <pins2lts-mc/parallel/state-info.h>
 #include <pins2lts-mc/parallel/state-store.h>
@@ -59,7 +60,6 @@ typedef void    (*alg_print_stats_f)(run_t *run, wctx_t *ctx);
 typedef void    (*alg_global_deinit_f)  (run_t *run, wctx_t *ctx);
 typedef void    (*alg_local_deinit_f)   (run_t *run, wctx_t *ctx);
 typedef size_t  (*alg_global_bits_f)(run_t *run, wctx_t *ctx);
-typedef int     (*alg_state_seen_f) (void *ctx, ref_t ref, int seen);
 
 /**
  * Function setters

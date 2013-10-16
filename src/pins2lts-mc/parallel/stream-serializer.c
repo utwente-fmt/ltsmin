@@ -12,11 +12,11 @@
 #include <hre/user.h>
 #include <pins2lts-mc/parallel/stream-serializer.h>
 
-typedef struct serializer_s {
+struct serializer_s {
     action_f            action[NR_MODES]; // serializer/deserializer/initializer
     size_t              size;   // size of info in stream
     void               *ptr;    // info location
-} serializer_t;
+};
 
 void
 dummy_action (void *ctx, void *ptr, raw_data_t data)
@@ -77,11 +77,11 @@ typedef struct stream_item_s stream_item_t;
 typedef void (*stream_recusife_f) (stream_item_t *stream, void *ctx,
                                    raw_data_t data, stream_mode_t index);
 
-typedef struct stream_item_s {
+struct stream_item_s {
     serializer_t       *serial;
     stream_item_t      *rec;
     stream_recusife_f   rec_f;
-} stream_item_t;
+};
 
 static stream_item_t *
 stream_item_create (serializer_t *serial, stream_recusife_f f)

@@ -244,6 +244,7 @@ dfs_fifo_destroy_local   (run_t *run, wctx_t *ctx)
         RTfree (loc->progress);
     fset_free (loc->cyan);
     RTfree (loc);
+    (void) run;
 }
 
 void

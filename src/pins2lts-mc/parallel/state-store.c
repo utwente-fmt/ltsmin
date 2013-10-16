@@ -39,7 +39,7 @@ si_map_entry db_types[] = {
    {NULL, 0}
 };
 
-typedef struct state_store_s {
+struct state_store_s {
     void               *dbs;            // Hash table/Tree table/Cleary tree
     lm_t               *lmap;           // Lattice map (Strat_TA)
     zobrist_t           zobrist;        // Zobrist hasher
@@ -55,7 +55,7 @@ typedef struct state_store_s {
     int                 global_bits;
     int                 local_bits;
     size_t              count_mask;
-} state_store_t;
+};
 
 void
 state_store_popt (poptContext con, enum poptCallbackReason reason,
