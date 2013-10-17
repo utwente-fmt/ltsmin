@@ -25,6 +25,8 @@ struct hre_task_queue_s {
     size_t task_size;
     int recv_pending;
     int send_pending;
+    int wait_pending;
+    int wait_cancelled;
     struct term_msg term_in;
     hre_msg_t msg;
     enum state status;
@@ -59,6 +61,7 @@ static void term_action(void* context,hre_msg_t msg){
     hre_task_queue_t queue=(hre_task_queue_t)context;
     memcpy(&queue->term_in,msg->buffer,sizeof(struct term_msg));
     queue->recv_pending=0;
+    queue->wait_pending=0;
     HREmsgReady(msg);
 }
 
@@ -100,19 +103,32 @@ void TQwhile(hre_task_queue_t queue,int*condition){
     queue->mode=Lazy;
 }
 
-void TQwait(hre_task_queue_t queue){
-    if (HREpeers(queue->ctx)==1) return;
+void TQwaitCancel(hre_task_queue_t queue){
+     queue->wait_pending=0;
+     queue->wait_cancelled=1;
+}
+
+int TQwait(hre_task_queue_t queue){
+    if (HREpeers(queue->ctx)==1) return 0;
     Debug("enter wait");
+    queue->wait_cancelled=0;
     queue->status=Dirty;
     queue->mode=Immediate;
     TaskFlush(queue);
     struct term_msg* msg_in=&queue->term_in;
     struct term_msg* msg_out=(struct term_msg*)queue->msg->buffer;
     if (HREme(queue->ctx)==0) {
-        queue->status=Idle;
+        queue->status=Dirty;
         int round=0;
         while(queue->status!=Terminated) {
-            HREyieldWhile(queue->ctx,&queue->recv_pending);
+            queue->wait_pending=queue->recv_pending;
+            HREyieldWhile(queue->ctx,&queue->wait_pending);
+            if (queue->wait_cancelled){
+                Debug("wait cancelled 1");
+                queue->status=Active;
+                queue->mode=Lazy;
+                return 1; // wait has been cancelled.
+            }
             switch(queue->status){
             case Idle:
             case Dirty:
@@ -121,23 +137,32 @@ void TQwait(hre_task_queue_t queue){
                     queue->status=Terminated;
                     break;
                 }
-                queue->status=Idle;
-                if (queue->send_pending) HREyieldWhile(queue->ctx,&queue->send_pending);
-                queue->recv_pending=1;
-                if (msg_in->status==Idle && msg_in->sent==msg_in->recv){
+                if (queue->send_pending) {
+                    HREyieldWhile(queue->ctx,&queue->send_pending);
+                    if (queue->wait_cancelled){
+                        Debug("wait cancelled 2");
+                        queue->status=Active;
+                        queue->mode=Lazy;
+                        return 1; // wait has been cancelled.
+                    }
+                }
+                if (queue->status==Idle && msg_in->status==Idle && msg_in->sent==msg_in->recv){
                     msg_out->status=Terminated;
                     Debug("termination detected in %d rounds",round);
                     queue->send_pending=1;
+                    queue->recv_pending=1;
                     HREpostSend(queue->msg);
                     break;
                 }
+                queue->status=Idle;
                 msg_out->status=Idle;
                 msg_out->sent=queue->sent;
                 msg_out->recv=queue->recv;
                 queue->status=Idle;
                 round++;
-                //Print(infoShort,"starting detection round %d",round);
+                Debug("starting detection round %d",round);
                 queue->send_pending=1;
+                queue->recv_pending=1;
                 HREpostSend(queue->msg);
                 break;
             case Active:
@@ -152,11 +177,26 @@ void TQwait(hre_task_queue_t queue){
     } else {
         queue->status=Dirty;
         while(queue->status!=Terminated) {
-            HREyieldWhile(queue->ctx,&queue->recv_pending);
+            queue->wait_pending=queue->recv_pending;
+            HREyieldWhile(queue->ctx,&queue->wait_pending);
+            if (queue->wait_cancelled){
+                Debug("wait cancelled 3");
+                queue->status=Active;
+                queue->mode=Lazy;
+                return 1; // wait has been cancelled.
+            }
             queue->recv_pending=1;
             switch(queue->status){
             case Idle:
-                if (queue->send_pending) HREyieldWhile(queue->ctx,&queue->send_pending);
+                if (queue->send_pending) {
+                    HREyieldWhile(queue->ctx,&queue->send_pending);
+                    if (queue->wait_cancelled){
+                        Debug("wait cancelled 4");
+                        queue->status=Active;
+                        queue->mode=Lazy;
+                        return 1;
+                    }
+                }
                 if (msg_in->status==Terminated){
                     msg_out->status=Terminated;
                     queue->status=Terminated;
@@ -174,7 +214,15 @@ void TQwait(hre_task_queue_t queue){
                 HREpostSend(queue->msg);
                 break;
             case Dirty:
-                if (queue->send_pending) HREyieldWhile(queue->ctx,&queue->send_pending);
+                if (queue->send_pending) {
+                    HREyieldWhile(queue->ctx,&queue->send_pending);
+                    if (queue->wait_cancelled){
+                        Debug("wait cancelled 5");
+                        queue->status=Active;
+                        queue->mode=Lazy;
+                        return 1;
+                    }
+                }
                 //Print(infoShort,"forward dirty");
                 msg_out->status=Dirty;
                 queue->status=Idle;
@@ -194,6 +242,7 @@ void TQwait(hre_task_queue_t queue){
     HREbarrier(queue->ctx);
     queue->mode=Lazy;
     Debug("leave wait");
+    return 0;
 }
 
 

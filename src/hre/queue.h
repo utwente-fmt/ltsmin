@@ -59,8 +59,13 @@ extern void TaskDestroy(hre_task_t task);
 
 /**
 \brief Wait for completion of all submitted tasks.
+
+This procedure returns 0 upon termination and 1 upon cancellation of the wait.
 */
-extern void TQwait(hre_task_queue_t q);
+extern int TQwait(hre_task_queue_t q);
+
+/// Cancel waiting for a queue.
+extern void TQwaitCancel(hre_task_queue_t q);
 
 /// Wait while the given interger is non-zero.
 extern void TQwhile(hre_task_queue_t queue,int*condition);

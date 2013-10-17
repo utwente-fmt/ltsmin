@@ -34,6 +34,16 @@
 //#define CHUNK_LOOKUP_PRIO 3
 //#define CHUNK_REPLY_PRIO 4
 
+struct cost_node {
+    int cost;
+    int next;
+    int prev;
+};
+
+struct cost_meta {
+    int head;
+    int tail;
+};
 
 struct dist_thread_context {
     model_t model;
@@ -48,8 +58,12 @@ struct dist_thread_context {
     array_manager_t state_man;
     uint32_t *parent_ofs;
     uint16_t *parent_seg;
+    struct cost_node *cost_queue; // nodes in the double linked list of open states in a cost level.
+    array_manager_t cost_man;
+    struct cost_meta *cost_list; // double linked lists of open states per cost level.
     size_t explored,visited,transitions,targets,level,deadlocks,errors,violations;
     ltsmin_parse_env_t env;
+    hre_task_queue_t task_queue;
 };
 
 static const size_t         THRESHOLD = 100000 / 100 * SPEC_REL_PERF;
@@ -70,8 +84,11 @@ static int              edge_labels;
 static int              mpi_nodes;
 static int              dst_ofs=2;
 static int              lbl_ofs;
+static int              cost_ofs;
 static char*            label_filter=NULL;
 static char*            trc_output=NULL;
+static char*            cost=NULL;
+
 
 static  struct poptOption options[] = {
     { "filter" , 0 , POPT_ARG_STRING , &label_filter , 0 ,
@@ -83,6 +100,7 @@ static  struct poptOption options[] = {
     { "deadlock", 'd', POPT_ARG_VAL, &dlk_detect, 1, "detect deadlocks", NULL },
     { "action", 'a', POPT_ARG_STRING, &act_detect, 0, "detect error action", NULL },
     { "invariant", 'i', POPT_ARG_STRING, &inv_detect, 0, "detect invariant violations", NULL },
+    { "cost", 0 , POPT_ARG_STRING, &cost, 0, "declare edge label containing cost and explore lowest cost states first", "<edge label>" },
     { "no-exit", 'n', POPT_ARG_VAL, &no_exit, 1, "no exit on error, just count (for error counters use -v)", NULL },
     SPEC_POPT_OPTIONS,
     {"trace", 0, POPT_ARG_STRING, &trc_output, 0, "file to write trace to", "<lts file>" },
@@ -247,10 +265,55 @@ static void new_transition(void*context,int src_seg,int len,void*arg){
     size_t temp=TreeFold(ctx->dbs,(int32_t*)(trans+dst_ofs));
     if (temp>=ctx->visited) {
         ctx->visited=temp+1;
-        if(trc_output!=NULL){
-            ensure_access(ctx->state_man,temp);
-            ctx->parent_seg[temp]=src_seg;
-            ctx->parent_ofs[temp]=trans[0];
+        ensure_access(ctx->state_man,temp);
+        if (cost!=NULL){
+            int scost=ctx->level+*(trans+cost_ofs);
+            ctx->cost_queue[temp].cost=scost;
+            ensure_access(ctx->state_man,scost);
+            if (ctx->cost_list[scost].head==-1){
+                ctx->cost_list[scost].head=temp;
+                ctx->cost_list[scost].tail=temp;
+                ctx->cost_queue[temp].next=-1;
+                ctx->cost_queue[temp].prev=-1;
+            } else {
+                ctx->cost_queue[temp].next=-1;
+                ctx->cost_queue[temp].prev=ctx->cost_list[scost].tail;
+                ctx->cost_queue[ctx->cost_list[scost].tail].next=temp;
+                ctx->cost_list[scost].tail=temp;
+            }
+        }
+    } else if (cost!=NULL){
+        int scost=ctx->level+*(trans+cost_ofs);
+        if (ctx->cost_queue[temp].cost>scost){
+            int oldcost=ctx->cost_queue[temp].cost;
+            int prev=ctx->cost_queue[temp].prev;
+            int next=ctx->cost_queue[temp].next;
+            if (prev==-1){
+                ctx->cost_list[oldcost].head=next;
+            } else {
+                ctx->cost_queue[prev].next=next;
+            }
+            if (next==-1){
+                ctx->cost_list[oldcost].tail=prev;
+            } else {
+                ctx->cost_queue[next].prev=prev;
+            }
+            ctx->cost_queue[temp].cost=scost;
+            if (ctx->cost_list[scost].head==-1){
+                ctx->cost_list[scost].head=temp;
+                ctx->cost_list[scost].tail=temp;
+                ctx->cost_queue[temp].next=-1;
+                ctx->cost_queue[temp].prev=-1;
+            } else {
+                ctx->cost_queue[temp].next=-1;
+                ctx->cost_queue[temp].prev=ctx->cost_list[scost].tail;
+                ctx->cost_queue[ctx->cost_list[scost].tail].next=temp;
+                ctx->cost_list[scost].tail=temp;
+            }
+            if(trc_output!=NULL){    
+                ctx->parent_seg[temp]=src_seg;
+                ctx->parent_ofs[temp]=trans[0];
+            }
         }
     }
     if (write_lts){
@@ -258,6 +321,10 @@ static void new_transition(void*context,int src_seg,int len,void*arg){
     }
     ctx->tcount[src_seg]++;
     ctx->targets++;
+    if (cost!=NULL && ctx->cost_queue[temp].cost==ctx->level){
+        // new state in current level, requires wait to be cancelled.
+        TQwaitCancel(ctx->task_queue);
+    }
 }
 
 
@@ -441,6 +508,13 @@ static void get_repr(model_t model,matrix_t* confluent,int *state){
     TreeDBSfree(ctx.dbs);
 }
 
+static void empty_cost_list(void*arg,void*old_array,int old_size,struct cost_meta *new_array,int new_size){
+    for(int i=old_size;i<new_size;i++){
+        new_array[i].head=-1;
+        new_array[i].tail=-1;
+    }
+}
+
 int main(int argc, char*argv[]){
     char *files[2];
     HREinitBegin(argv[0]);
@@ -457,6 +531,7 @@ int main(int argc, char*argv[]){
     ctx.mpi_me=HREme(HREglobal());
 
     hre_task_queue_t task_queue=HREcreateQueue(HREglobal());
+    ctx.task_queue=task_queue;
 
     ctx.tcount=(int*)RTmalloc(mpi_nodes*sizeof(int));
     memset(ctx.tcount,0,mpi_nodes*sizeof(int));
@@ -522,9 +597,10 @@ int main(int argc, char*argv[]){
         int rv = nice(nice_value);
         if (rv==-1) Warning(info,"failed to set nice");
     }
+    ctx.state_man=create_manager(65536);
+    ctx.cost_man=create_manager(65536);
     /***************************************************/
     if (trc_output!=NULL) {
-        ctx.state_man=create_manager(65536);
         ctx.parent_ofs=NULL;
         ADD_ARRAY(ctx.state_man,ctx.parent_ofs,uint32_t);
         ctx.parent_seg=NULL;
@@ -660,8 +736,29 @@ int main(int argc, char*argv[]){
         HREbarrier(HREglobal());
     }
     /***************************************************/
+    if (cost!=NULL){
+        cost_ofs=lts_type_find_edge_label(ltstype,cost);
+        if (cost_ofs<0) Abort("cost label %s does not exist",cost);
+        ctx.cost_queue=NULL;
+        ADD_ARRAY(ctx.state_man,ctx.cost_queue,struct cost_node);
+        ctx.cost_list=NULL;
+        ADD_ARRAY_CB(ctx.cost_man,ctx.cost_list,struct cost_meta,empty_cost_list,NULL);
+        ensure_access(ctx.cost_man,0);
+        if (ctx.mpi_me==0){
+            Warning(info,"lowest cost search for label %s",cost);
+            ensure_access(ctx.state_man,0);
+            ctx.cost_queue[0].cost=0;
+            ctx.cost_queue[0].next=-1;
+            ctx.cost_queue[0].prev=-1;            
+            
+            ctx.cost_list[0].head=0;
+            ctx.cost_list[0].tail=0;            
+        }
+    }
+    /***************************************************/
     dst_ofs=1;
     lbl_ofs=dst_ofs+size;
+    cost_ofs+=lbl_ofs;
     trans_len=lbl_ofs+edge_labels;
     struct src_info src_ctx;
     src_ctx.new_trans=TaskCreate(task_queue,NEW_EDGE_PRIO,65536,new_transition,&ctx,trans_len*4);
@@ -681,74 +778,95 @@ int main(int argc, char*argv[]){
         size_t lvl_scount=0;
         size_t lvl_tcount=0;
         HREbarrier(HREglobal());
-        if (ctx.mpi_me==0) {
-            Warning(info,"level %zu has %zu states, explored %zu states %zu transitions",
-                ctx.level,global_visited-global_explored,global_explored,global_transitions);
-        }
-        ctx.level++;
-        while(ctx.explored<limit){
-            TreeUnfold(ctx.dbs,ctx.explored,src);
-            src_ctx.seg=ctx.mpi_me;
-            src_ctx.ofs=ctx.explored;
-            ctx.explored++;
-            invariant_detect (&ctx, src);
-            int count;
-            if (inhibit_matrix!=NULL){
-                    int N=dm_nrows(inhibit_matrix);
-                    int class_count[N];
-                    count=0;
-                    for(int i=0;i<N;i++){
-                        class_count[i]=0;
-                        int j=0;
-                        for(;j<i;j++){
-                            if (class_count[j]>0 && dm_is_set(inhibit_matrix,j,i)) break;
-                        }
-                        if (j<i) continue;
-                        if (class_label>=0){
-                            class_count[i]=GBgetTransitionsMatching(model,class_label,i,src,callback,&src_ctx);
-                        } else if (class_matrix!=NULL) {
-                            class_count[i]=GBgetTransitionsMarked(model,class_matrix,i,src,callback,&src_ctx);
-                        } else {
-                            Abort("inhibit set, but no known classification found.");
-                        }
-                        count+=class_count[i];
+        do {
+            while(cost==NULL?ctx.explored<limit:ctx.cost_list[ctx.level].head!=-1){
+                if (cost==NULL){
+                    TreeUnfold(ctx.dbs,ctx.explored,src);
+                } else {
+                    int item=ctx.cost_list[ctx.level].head;
+                    TreeUnfold(ctx.dbs,item,src);
+                    if (ctx.cost_list[ctx.level].head==ctx.cost_list[ctx.level].tail){
+                        ctx.cost_list[ctx.level].head=-1;
+                        ctx.cost_list[ctx.level].tail=-1;
+                    } else {
+                        ctx.cost_list[ctx.level].head=ctx.cost_queue[item].next;
+                        ctx.cost_queue[ctx.cost_list[ctx.level].head].prev=-1;
                     }
-            } else {
-                count=GBgetTransitionsAll(model,src,callback,&src_ctx);
-            }
-            ctx.transitions+=count;
-            if(confluence_matrix!=NULL){
-              int trans[trans_len];
-              while(FIFOsize(src_ctx.fifo)>0){
-                stream_read(src_ctx.fifo,trans,sizeof(trans));
-                get_repr(model,confluence_matrix,trans+dst_ofs);
-                TaskSubmitFixed(src_ctx.new_trans,owner(trans+dst_ofs),trans);
-              }
-            }
-            if (count<0) Abort("error in GBgetTransitionsAll");
-            deadlock_detect (&ctx, src, count);
-            if(write_lts && write_state){
-                if (state_labels)
-                    GBgetStateLabelsAll(model,src,labels);
-                lts_write_state(ctx.output,ctx.mpi_me,src,labels);
-            }
+                    ctx.cost_queue[item].next=-1;
+                    ctx.cost_queue[item].prev=-1;
+                }
+                src_ctx.seg=ctx.mpi_me;
+                src_ctx.ofs=ctx.explored;
+                ctx.explored++;
+                invariant_detect (&ctx, src);
+                int count;
+                if (inhibit_matrix!=NULL){
+                        int N=dm_nrows(inhibit_matrix);
+                        int class_count[N];
+                        count=0;
+                        for(int i=0;i<N;i++){
+                            class_count[i]=0;
+                            int j=0;
+                            for(;j<i;j++){
+                                if (class_count[j]>0 && dm_is_set(inhibit_matrix,j,i)) break;
+                            }
+                            if (j<i) continue;
+                            if (class_label>=0){
+                                class_count[i]=GBgetTransitionsMatching(model,class_label,i,src,callback,&src_ctx);
+                            } else if (class_matrix!=NULL) {
+                                class_count[i]=GBgetTransitionsMarked(model,class_matrix,i,src,callback,&src_ctx);
+                            } else {
+                                Abort("inhibit set, but no known classification found.");
+                            }
+                            count+=class_count[i];
+                        }
+                } else {
+                    count=GBgetTransitionsAll(model,src,callback,&src_ctx);
+                }
+                ctx.transitions+=count;
+                if(confluence_matrix!=NULL){
+                  int trans[trans_len];
+                  while(FIFOsize(src_ctx.fifo)>0){
+                    stream_read(src_ctx.fifo,trans,sizeof(trans));
+                    get_repr(model,confluence_matrix,trans+dst_ofs);
+                    TaskSubmitFixed(src_ctx.new_trans,owner(trans+dst_ofs),trans);
+                  }
+                }
+                if (count<0) Abort("error in GBgetTransitionsAll");
+                deadlock_detect (&ctx, src, count);
+                if(write_lts && write_state){
+                    if (state_labels)
+                        GBgetStateLabelsAll(model,src,labels);
+                    lts_write_state(ctx.output,ctx.mpi_me,src,labels);
+                }
 
-            lvl_scount++;
-            lvl_tcount+=count;
-            if (ctx.mpi_me == 0 && lvl_scount >= threshold) {
-                Warning(info,"generated ~%zu transitions from ~%zu states",
-                    lvl_tcount * mpi_nodes,lvl_scount * mpi_nodes);
-                threshold <<= 1;
+                lvl_scount++;
+                lvl_tcount+=count;
+                if (ctx.mpi_me == 0 && lvl_scount >= threshold)
+                {
+                    Warning(info,"generated ~%zu transitions from ~%zu states",
+                        lvl_tcount * mpi_nodes,lvl_scount * mpi_nodes);
+                    threshold <<= 1;
+                }
+                if ((lvl_scount%4)==0) HREyield(HREglobal());
             }
-            if ((lvl_scount%4)==0) HREyield(HREglobal());
-        }
-        Debug("saw %zu states and %zu transitions",lvl_scount,lvl_tcount);
-        TQwait(task_queue);
+            Debug("saw %zu states and %zu transitions",lvl_scount,lvl_tcount);
+        } while(TQwait(task_queue));
+        size_t global_scount;
+        size_t global_tcount;
+        HREreduce(HREglobal(),1,&lvl_scount,&global_scount,UInt64,Sum);
+        HREreduce(HREglobal(),1,&lvl_tcount,&global_tcount,UInt64,Sum);
         HREreduce(HREglobal(),1,&ctx.visited,&global_visited,UInt64,Sum);
         HREreduce(HREglobal(),1,&ctx.explored,&global_explored,UInt64,Sum);
         HREreduce(HREglobal(),1,&ctx.transitions,&global_transitions,UInt64,Sum);
         HREreduce(HREglobal(),1,&ctx.targets,&global_targets,UInt64,Sum);
         HREreduce(HREglobal(),1,&ctx.violations,&global_violations,UInt64,Sum);
+        if (ctx.mpi_me==0) {
+            Warning(info,"level %zu has %zu states %zu transitions, explored %zu states %zu transitions, unexplored %zu states",
+                ctx.level,global_scount,global_tcount,global_explored,global_transitions,
+                global_visited-global_explored);
+        }      
+        ctx.level++;
         if (!no_exit && global_violations>0) break;
         if (global_visited==global_explored) break;
     }

@@ -14,3 +14,14 @@
         is to exclude the label. Hence, all labels starting with
         an "x" are specified as "x*". The complement all labels,
         except those starting with an "x" are specified as "!x*;*".
+
+*--cost*='<edge label>'::
+    The given edge labels defines the cost of an edge. Based on this cost,
+    the lowest cost for reaching every state is computed. Moreover, the order
+    in which states are explored is such that lower cost states are explored
+    before higher costs ones. The levels reported when this options is in effect are
+    cost levels. The counter-example traces are guaranteed to be a lowest cost path.
+    However, the length of the trace may not be minimal.
+
+include::reachability-options.txt[]
+
