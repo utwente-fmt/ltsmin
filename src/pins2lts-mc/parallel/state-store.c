@@ -423,45 +423,35 @@ store_create (state_info_t *si)
     store->data = NULL;
     store->tree = NULL;
 
-    serializer_t       *s;
     size_t              slat = sizeof(lattice_t*);
     size_t              stab = SLOT_SIZE * D;
     switch (db_type) {
     case HashTable:
         if (ZOBRIST) {
-            s = serializer_create (table_get, z_new, stab, store);
-            streamer_add (store->serializer, s);
-            s = serializer_create (dummy_action, z_first, stab, store);
-            streamer_add (store->first, s);
+            streamer_add (store->serializer, table_get, z_new, stab, store);
+            streamer_add (store->first, NULL, z_first, stab, store);
 
             // also add the hash serialization to the search stack!
-            s = serializer_create (z_ser, z_des, sizeof(hash64_t), &store->hash64);
-            state_info_add (si, s);
+            state_info_add (si, z_ser, z_des, sizeof(hash64_t), &store->hash64);
         } else {
-            s = serializer_create (table_get, table_new, stab, store);
-            streamer_add (store->serializer, s);
-            s = serializer_create (dummy_action, table_new, stab, store);
-            streamer_add (store->first, s);
+            streamer_add (store->serializer, table_get, table_new, stab, store);
+            streamer_add (store->first, NULL, table_new, stab, store);
         }
         break;
     case ClearyTree:
     case TreeTable:
-        s = serializer_create (tree_get, tree_new, stab, store);
-        streamer_add (store->serializer, s);
-        s = serializer_create (dummy_action, tree_first, stab, store);
-        streamer_add (store->first, s);
+        streamer_add (store->serializer, tree_get, tree_new, stab, store);
+        streamer_add (store->first, NULL, tree_first, stab, store);
         break;
     default: Abort ("State store not implemented");
     }
 
     if (strategy[0] & Strat_TA) {
-        s = serializer_create (dummy_action, ta_des, slat, &si->lattice);
-        streamer_add (store->serializer, s);
-        streamer_add (store->first, s);
+        streamer_add (store->serializer, NULL, ta_des, slat, &si->lattice);
+        streamer_add (store->first, NULL, ta_des, slat, &si->lattice);
 
         // also add the lattice serialization to the search stack!
-        s = serializer_create (ta_ser, ta_des, slat, &si->lattice);
-        state_info_add (si, s);
+        state_info_add (si, ta_ser, ta_des, slat, &si->lattice);
     }
 
     return store;

@@ -27,7 +27,10 @@ extern size_t   state_info_serialize_int_size (state_info_t *si);
 
 extern state_info_t *state_info_create       ();
 
-extern void     state_info_add (state_info_t *si, serializer_t *s);
+extern void     state_info_add (state_info_t *si, action_f ser, action_f des,
+                                size_t size, void *ptr);
+
+extern void     state_info_add_simple (state_info_t *si, size_t size, void *ptr);
 
 extern void     state_info_serialize    (state_info_t *state, raw_data_t data);
 

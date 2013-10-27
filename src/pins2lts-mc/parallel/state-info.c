@@ -98,35 +98,29 @@ state_info_clear (state_info_t* si)
 streamer_t *
 create_serializers (state_info_t *si)
 {
-    streamer_t         *stream = streamer_create ();
-    serializer_t       *s;
+    streamer_t         *s = streamer_create ();
     size_t              stab = SLOT_SIZE * D;
     size_t              stree = SLOT_SIZE * D * 2;
     switch (db_type) {
     case HashTable:
         if (refs) {
-            s = serializer_create (ref_ser, ref_des, sizeof(ref_t), &si->ref);
-            streamer_add (stream, s);
+            streamer_add (s, ref_ser, ref_des, sizeof(ref_t), &si->ref);
         } else {
-            s = serializer_create (ref_ser, ref_des, sizeof(ref_t), &si->ref);
-            streamer_add (stream, s);
-            s = serializer_create (table_ser, table_des, stab, si);
-            streamer_add (stream, s);
+            streamer_add (s, ref_ser, ref_des, sizeof(ref_t), &si->ref);
+            streamer_add (s, table_ser, table_des, stab, si);
         }
         break;
     case ClearyTree:
     case TreeTable:
         if (refs) {
-            s = serializer_create (ref_ser, ref_des, sizeof(ref_t), &si->ref);
-            streamer_add (stream, s);
+            streamer_add (s, ref_ser, ref_des, sizeof(ref_t), &si->ref);
         } else {
-            s = serializer_create (tree_ser, tree_des, stree, si);
-            streamer_add (stream, s);
+            streamer_add (s, tree_ser, tree_des, stree, si);
         }
         break;
     default: Abort ("State store not implemented");
     }
-    return stream;
+    return s;
 }
 
 /**
@@ -174,37 +168,43 @@ ta_tree_ref_pins (void *ctx, void *ptr, raw_data_t data)
 streamer_t *
 create_pins (state_info_t *si)
 {
-    streamer_t         *stream = streamer_create ();
-    serializer_t       *s;
+    streamer_t         *s = streamer_create ();
 
     if (strategy[0] & Strat_TA) {
         switch (db_type) {
         case HashTable:
-            s = serializer_create (ta_copy_pins, dummy_action, sizeof(void*), si);
+            streamer_add (s, ta_copy_pins, NULL, sizeof(void*), si);
             break;
         case ClearyTree:
         case TreeTable:
             if (refs) {
-                s = serializer_create (ta_tree_ref_pins, dummy_action, sizeof(void*), si);
+                streamer_add (s, ta_tree_ref_pins, NULL, sizeof(void*), si);
             } else {
-                s = serializer_create (ta_copy_pins, dummy_action, sizeof(void*), si);
+                streamer_add (s, ta_copy_pins, NULL, sizeof(void*), si);
             }
             break;
         default: Abort ("State store not implemented");
         }
     } else {
         // by default on the state data suffices (no lattice needs to be added)
-        s = serializer_create (pins_ptr, dummy_action, sizeof(void*), si);
+        streamer_add (s, pins_ptr, NULL, sizeof(void*), si);
     }
-    streamer_add (stream, s);
-    return stream;
+    return s;
 }
 
 void
-state_info_add (state_info_t *si, serializer_t *s)
+state_info_add (state_info_t *si, action_f ser, action_f des, size_t size,
+                void *ptr)
 {
-    streamer_add (si->in->stack_serialize, s);
+    streamer_add (si->in->stack_serialize, ser, des, size, ptr);
 }
+
+void
+state_info_add_simple (state_info_t *si, size_t size, void *ptr)
+{
+    streamer_add (si->in->stack_serialize, simple_ser, simple_des, size, ptr);
+}
+
 
 state_info_t *
 state_info_create ()

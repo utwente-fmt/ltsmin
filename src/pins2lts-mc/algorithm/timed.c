@@ -331,8 +331,7 @@ timed_local_init   (run_t *run, wctx_t *ctx)
     ta_alg_local_t *loc = RTmallocZero (sizeof(ta_alg_local_t));
 
     // Extend state info with a lattice location
-    serializer_t           *serializer = serializer_simple (sizeof(lm_loc_t), &loc->lloc);
-    state_info_add (ctx->state, serializer);
+    state_info_add_simple (ctx->state, sizeof(lm_loc_t), &loc->lloc);
 
     ctx->local = (alg_local_t *) loc;
     reach_local_setup (run, ctx);

@@ -521,8 +521,7 @@ ta_cndfs_local_init   (run_t *run, wctx_t *ctx)
     loc->cyan2= fset_create (sizeof(ref_t), sizeof(void *), 10, 20);
 
     // Extend state info with a lattice location
-    serializer_t           *serializer = serializer_simple (sizeof(lm_loc_t), &loc->lloc);
-    state_info_add (ctx->state, serializer);
+    state_info_add_simple (ctx->state, sizeof(lm_loc_t), &loc->lloc);
 
     cndfs_local_init (run, ctx);
 }
