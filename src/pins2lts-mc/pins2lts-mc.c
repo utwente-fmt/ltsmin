@@ -127,7 +127,6 @@ global_and_model_init ()
     model = create_pins_model ();
 
     global_init (model, SPEC_REL_PERF, timed_model);
-    global_print (model);
 
     return model;
 }
@@ -144,7 +143,9 @@ local_init (model_t model)
 
     (void) signal (SIGINT, exit_ltsmin);
 
-    return run_init (run, model);
+    wctx_t             *ctx = run_init (run, model);
+
+
 }
 
 /**
@@ -191,6 +192,8 @@ main (int argc, char *argv[])
     model = global_and_model_init ();
 
     ctx = local_init (model);
+
+    global_print (model);
 
     run_alg (ctx);
 

@@ -9,11 +9,13 @@
 #include <pins2lts-mc/algorithm/dfs-fifo.h>
 
 static int              strict_dfsfifo = 0;
-
+static int              force_progress_states = 0;
 //TODO: reuse reach
 
 struct poptOption dfs_fifo_options[] = {
     {"strict", 0, POPT_ARG_VAL, &strict_dfsfifo, 1, "turn on struct BFS in DFS_FIFO", NULL},
+    {"progress-states", 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN, &force_progress_states, 1,
+     "Use progress states", NULL},
     POPT_TABLEEND
 };
 
@@ -58,7 +60,6 @@ dfs_fifo_handle (void *arg, state_info_t *successor, transition_info_t *ti,
 
     if (!is_progress && seen && ecd_has_state(loc->cyan, successor))
         ndfs_report_cycle (ctx->run, ctx->model, sm->stack, successor);
-        Abort ("cycle found!");
 
     // dfs_fifo_dfs/dfs_fifo_bfs also check this, but we want a clean stack for LB!
     if (state_store_has_color(ctx->state->ref, setV, 0))
@@ -191,7 +192,7 @@ dfs_fifo_local_init   (run_t *run, wctx_t *ctx)
     lts_type_t      ltstype = GBgetLTStype (ctx->model);
     int             statement_label = lts_type_find_edge_label (
                                      ltstype, LTSMIN_EDGE_TYPE_STATEMENT);
-    if (statement_label != -1) {
+    if (statement_label != -1 && !force_progress_states) {
         int             statement_type = lts_type_get_edge_label_typeno (
                                                  ltstype, statement_label);
         size_t          count = GBchunkCount (ctx->model, statement_type);

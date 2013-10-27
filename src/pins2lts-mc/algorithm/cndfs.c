@@ -271,7 +271,7 @@ endfs_blue (run_t *run, wctx_t *ctx)
                 /* all successors are red */
                 //permute_trans (loc->permute, ctx->state, check, ctx);
                 set_all_red (ctx, loc->seed);
-            } else if ( GBbuchiIsAccepting(ctx->model, state_info_state(ctx->state)) ) {
+            } else if ( GBbuchiIsAccepting(ctx->model, state_info_state(loc->seed)) ) {
                 sm->work = loc->seed->ref;
                 endfs_red (ctx);
                 if (Strat_ENDFS == loc->strat)
