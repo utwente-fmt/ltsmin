@@ -342,6 +342,8 @@ void* hre_posix_shm_get(hre_context_t context,size_t size){
     Debug("Creating posix SHM");
     char                shm_name[LTSMIN_PATHNAME_MAX];
     shm_t               shm = { .ptr = 0, .id = 0 };
+
+    // The first worker sets up the shared memory
     if (HREme(context)==0){
         if (name_counter == 0) {
             struct timeval time;
@@ -368,7 +370,11 @@ void* hre_posix_shm_get(hre_context_t context,size_t size){
         }
         Debug("open shared memory %s at %p",shm_name,shm.ptr);
     }
+
+    // Share the data
     HREreduce(context,2,&shm,&shm,Pointer,Max);
+
+    // The other workers attempt to map the shared memory as well
     if (HREme(context)!=0) {
         snprintf(shm_name, LTSMIN_PATHNAME_MAX, "HREprocess%zu", shm.id);
         Debug("trying shared memory %s at %p", shm_name, shm.ptr);
@@ -383,9 +389,42 @@ void* hre_posix_shm_get(hre_context_t context,size_t size){
         }
         HREassert(tmp == shm.ptr, "OS did not respect MAP_FIXED");
     }
+
+    // Synchronize
     HREbarrier(context);
     shm_unlink(shm_name);
     return shm.ptr;
+}
+
+void* hre_privatefixedmem_get(hre_context_t context, size_t size){
+    Debug("Creating Private Memory at Fixed location");
+    void* fixedMemory = NULL;
+
+    // The first worker sets up the anonymous private memory
+    if (HREme(context)==0){
+        fixedMemory = mmap(NULL,size,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,-1,0);
+        if (fixedMemory == MAP_FAILED || fixedMemory == (void *)-1) {
+            AbortCall("mmap");
+        }
+        Debug("open private fixed memory at %p",fixedMemory);
+    }
+    
+    // Share the data
+    HREreduce(context, 1, &fixedMemory, &fixedMemory, Pointer, Max);
+
+    // The other workers attempt to map anoymous private memory to the same address
+    if (HREme(context)!=0) {
+        Debug("trying private fixed memory %s at %p", fixedMemory);
+        void* tmp = mmap(fixedMemory,size,PROT_READ|PROT_WRITE,MAP_FIXED|MAP_PRIVATE|MAP_ANONYMOUS,-1,0);
+        if (tmp == MAP_FAILED || tmp == (void *)-1) {
+            AbortCall("mmap");
+        }
+        HREassert(tmp == fixedMemory, "OS did not respect MAP_FIXED");
+    }
+
+    // Synchronize
+    HREbarrier(context);
+    return fixedMemory;
 }
 
 
