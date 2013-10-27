@@ -53,12 +53,36 @@ extern const char* HREappName();
 extern const char* HREpathName();
 
 /**
-\brief Generic method to allocate Posix SHM.
-
-This method works on Apple for multiple processes,
-even though Posix locks on Apple are single process only.
+ * \brief Generic method to allocate Posix SHM.
+ * This function guarantees to allocate shared memory of the
+ * specified size and the address is the same for all workers.
+ * Only call this function during synchronized phases of initialization and
+ * execution (e.g. the loading of the model). This is to make sure that ALL
+ * workers execute this in the SAME order (and thus avoiding crossed HREreduce
+ * calls).
+ * If this call fails, the execution is aborted.
+ * This function works on Apple for multiple processes,
+ * even though Posix locks on Apple are single process only.
+ * @param context The HRE context in which Posix SHM is to be allocated.
+ * @param size The size of the Posix SHM that is to be allocated.
+ * @return The address of the allocated Posix SHM.
 */
-extern void* hre_posix_shm_get(hre_context_t context,size_t size);
+extern void* hre_posix_shm_get(hre_context_t context, size_t size);
+
+/**
+ * \brief Generic method to allocate private memory at the same address.
+ * This function guarantees to allocate private anonymous memory of the
+ * specified size and the address is the same for all workers.
+ * Only call this function during synchronized phases of initialization and
+ * execution (e.g. the loading of the model). This is to make sure that ALL
+ * workers execute this in the SAME order (and thus avoiding crossed HREreduce
+ * calls).
+ * If this call fails, the execution is aborted.
+ * @param context The HRE context in which Posix SHM is to be allocated.
+ * @param size The size of the Posix SHM that is to be allocated.
+ * @return The address of the allocated Posix SHM.
+*/
+extern void* hre_privatefixedmem_get(hre_context_t context, size_t size);
 
 /**
 \brief Exit from the current thread.
