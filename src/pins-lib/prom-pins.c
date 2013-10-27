@@ -16,7 +16,7 @@
 #include <util-lib/util.h>
 
 static const char* ACCEPTING_STATE_LABEL_NAME       = "accept_";
-static const char* NON_PROGRESS_STATE_LABEL_NAME    = "np_";
+static const char* PROGRESS_STATE_LABEL_NAME        = "progress_";
 static const char* VALID_END_STATE_LABEL_NAME       = "end_";
 
 /**
@@ -368,7 +368,7 @@ PromLoadGreyboxModel(model_t model, const char *filename)
         if (strcmp (ACCEPTING_STATE_LABEL_NAME, name) == 0) {
             GBsetAcceptingStateLabelIndex (model, i);
         }
-        if(strcmp(NON_PROGRESS_STATE_LABEL_NAME, name) == 0) {
+        if(strcmp(PROGRESS_STATE_LABEL_NAME, name) == 0) {
             GBsetProgressStateLabelIndex (model, i);
         }
         if(strcmp(VALID_END_STATE_LABEL_NAME, name) == 0) {
