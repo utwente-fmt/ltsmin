@@ -13,7 +13,7 @@ static int              force_progress_states = 0;
 //TODO: reuse reach
 
 struct poptOption dfs_fifo_options[] = {
-    {"strict", 0, POPT_ARG_VAL, &strict_dfsfifo, 1, "turn on struct BFS in DFS_FIFO", NULL},
+    {"strict", 0, POPT_ARG_VAL, &strict_dfsfifo, 1, "turn on strict BFS in DFS_FIFO", NULL},
     {"progress-states", 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN, &force_progress_states, 1,
      "Use progress states", NULL},
     POPT_TABLEEND
@@ -180,7 +180,6 @@ dfs_fifo_bfs (wctx_t *ctx)
 void
 dfs_fifo_local_init   (run_t *run, wctx_t *ctx)
 {
-
     if (proviso != Proviso_None)
         Abort ("DFS_FIFO does not require a proviso.");
 
@@ -302,8 +301,11 @@ dfs_fifo_print_stats   (run_t *run, wctx_t *ctx)
     // part of reduce (should happen only once), publishes mem stats for the run class
     // run->local_mem += run->shared->max_level_size;  // DONE BY REACH (SBFS queues)
 
-    df_alg_local_t         *loc = (df_alg_local_t *) ctx->local;
-    Warning (info, "Progress states detected: %zu", loc->df_counters.progress);
+    dfs_fifo_reduced_t     *reduced = (dfs_fifo_reduced_t *) run->reduced;
+    Warning (info, "");
+    Warning (info, "Progress states detected: %zu", reduced->df_counter.progress);
+    Warning (info, "Redundant explorations: %.4f", 100 * run->total.explored /
+                                                   global->stats.elts - 100);
 }
 
 void
