@@ -16,6 +16,13 @@ pins_get_state_label_count (model_t model)
 }
 
 size_t
+pins_get_edge_label_count (model_t model)
+{
+    lts_type_t          ltstype = GBgetLTStype (model);
+    return lts_type_get_edge_label_count (ltstype);
+}
+
+size_t
 pins_get_state_variable_count (model_t model)
 {
     lts_type_t          ltstype = GBgetLTStype (model);

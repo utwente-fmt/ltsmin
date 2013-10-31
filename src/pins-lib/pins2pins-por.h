@@ -5,6 +5,7 @@
 #include <hre/user.h>
 #include <ltsmin-lib/ltsmin-standard.h>
 #include <pins-lib/pins.h>
+#include <util-lib/util.h>
 
 
 /*
@@ -93,16 +94,6 @@ typedef enum {
     ES_READY        = 0x02,
     ES_EMITTED      = 0x04,
 } emit_status_t;
-
-/**
- * ci = count, integer
- * frequently used to setup mappings
- */
-typedef struct ci_list
-{
-    int count;
-    int data[];
-} ci_list;
 
 /**
  * The analysis has global context (por_context)

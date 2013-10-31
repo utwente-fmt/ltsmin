@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <hre/user.h>
 #include <util-lib/util.h>
 
 char *
@@ -59,4 +60,16 @@ strupper(char *str)
     str = strdup(str);
     while( (*str=toupper(*str)) ) { str++; }
     return str;
+}
+
+ci_list *
+ci_create (size_t size)
+{
+    return RTmallocZero (sizeof(int[size + 1]));
+}
+
+void
+ci_free (ci_list *list)
+{
+    RTfree (list);
 }

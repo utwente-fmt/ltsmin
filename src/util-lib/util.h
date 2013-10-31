@@ -22,6 +22,44 @@
     b = tmp; \
 })
 
+/**
+ * ci = count, integer
+ */
+typedef struct ci_list
+{
+    int count;
+    int data[];
+} ci_list;
+
+extern ci_list *ci_create (size_t size);
+
+extern void ci_free (ci_list *list);
+
+static inline int
+ci_get (ci_list *list, int index)
+{
+    return list->data[index];
+}
+
+static inline void
+ci_clear (ci_list *list)
+{
+    list->count = 0;
+}
+
+static inline void
+ci_add (ci_list *list, int num)
+{
+    list->data[list->count++] = num;
+}
+
+static inline void
+ci_add_if (ci_list *list, int num, int condition)
+{
+    list->data[list->count] = num;
+    list->count += condition != 0;
+}
+
 extern char *gnu_basename (char *path);
 
 extern bool has_prefix (const char *name, const char *prefix);
