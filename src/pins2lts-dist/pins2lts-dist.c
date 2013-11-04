@@ -266,6 +266,10 @@ static void new_transition(void*context,int src_seg,int len,void*arg){
     if (temp>=ctx->visited) {
         ctx->visited=temp+1;
         ensure_access(ctx->state_man,temp);
+        if(trc_output!=NULL){    
+            ctx->parent_seg[temp]=src_seg;
+            ctx->parent_ofs[temp]=trans[0];
+        }
         if (cost!=NULL){
             int scost=ctx->level+*(trans+cost_ofs);
             ctx->cost_queue[temp].cost=scost;
