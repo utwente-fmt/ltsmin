@@ -55,9 +55,11 @@ struct dist_thread_context {
     treedbs_t dbs;
     int mpi_me;
     int *tcount;
+    treedbs_t edge_dbs;
     array_manager_t state_man;
     uint32_t *parent_ofs;
     uint16_t *parent_seg;
+    uint32_t *parent_edge;
     struct cost_node *cost_queue; // nodes in the double linked list of open states in a cost level.
     array_manager_t cost_man;
     struct cost_meta *cost_list; // double linked lists of open states per cost level.
@@ -161,7 +163,7 @@ static inline int owner(int *state){
 
 /********************************************************/
 
-static void start_trace_edge(struct dist_thread_context* ctx,uint32_t seg,uint32_t ofs,uint32_t* dst);
+static void start_trace_edge(struct dist_thread_context* ctx,uint32_t seg,uint32_t ofs,uint32_t* dst,uint32_t* labels);
 
 struct src_info {
     int seg;
@@ -177,10 +179,11 @@ action_detect (struct src_info *context, transition_info_t *ti , int *dst)
     struct dist_thread_context *ctx=context->ctx;
     if (-1 == act_index || NULL == ti->labels || ti->labels[act_label] != act_index) return;
     ctx->errors++;
+    ctx->violations++;
     if (trc_output!=NULL){
         uint32_t ofs=context->ofs;
         Warning(info,"Error action '%s'  found at %u.%u", act_detect, ctx->mpi_me, ofs);
-        start_trace_edge(ctx,ctx->mpi_me,ofs,dst);
+        start_trace_edge(ctx,ctx->mpi_me,ofs,dst,ti->labels);
         return;
     }
     if (no_exit) return;
@@ -224,12 +227,12 @@ static void start_trace(struct dist_thread_context* ctx,uint32_t seg,uint32_t of
     extend_trace(ctx,trc_vector);
 }
 
-static void start_trace_edge(struct dist_thread_context* ctx,uint32_t seg,uint32_t ofs,uint32_t* dst){
+static void start_trace_edge(struct dist_thread_context* ctx,uint32_t seg,uint32_t ofs,uint32_t* dst,uint32_t* labels){
     if (ctx->mpi_me!=(int)seg) Abort("cannot start trace worker is not owner of segment %u",seg);
     lts_write_state(ctx->trace,seg,&ctx->trace_next,dst);
     uint32_t tmp=ctx->trace_next;
     ctx->trace_next++;
-    lts_write_edge(ctx->trace,seg,&(ctx->trace_next),seg,&(tmp),NULL);
+    lts_write_edge(ctx->trace,seg,&(ctx->trace_next),seg,&(tmp),labels);
     start_trace(ctx,seg,ofs);
 }
 
@@ -250,12 +253,17 @@ static void extend_trace(struct dist_thread_context* ctx,uint32_t* trc_vector){
         TaskSubmitFixed(ctx->initial_task,0,message);
     } else {
         Debug("generating trace to %u.%u: next worker %u",trc_vector[0],trc_vector[1],seg);
-        uint32_t message[5];
+        uint32_t message[5+edge_labels];
         message[0]=trc_vector[0];
         message[1]=trc_vector[1];
         message[2]=seg;
         message[3]=ofs;
         message[4]=ctx->trace_next;
+        switch(edge_labels){
+            case 0: break;
+            case 1: message[5]=ctx->parent_edge[trc_vector[3]]; break;
+            default: TreeUnfold(ctx->edge_dbs,ctx->parent_edge[trc_vector[3]],message+5);
+        }
         ctx->trace_next++;
         TaskSubmitFixed(ctx->extend_task,seg,message);
     }
@@ -266,7 +274,7 @@ static void extend_trace_task(void*context,int src_seg,int len,void*arg){
     (void)len;
     uint32_t *message=(uint32_t*)arg;
     Debug("generating trace to %u.%u: transition %u.%u <- %u.%u",message[0],message[1],src_seg,message[4],ctx->mpi_me,ctx->trace_next);
-    lts_write_edge(ctx->trace,ctx->mpi_me,&(ctx->trace_next),src_seg,&(message[4]),NULL);
+    lts_write_edge(ctx->trace,ctx->mpi_me,&(ctx->trace_next),src_seg,&(message[4]),message+5);
     Debug("edge written");
     extend_trace(ctx,message);
 }
@@ -293,6 +301,12 @@ static void new_transition(void*context,int src_seg,int len,void*arg){
         if(trc_output!=NULL){    
             ctx->parent_seg[temp]=src_seg;
             ctx->parent_ofs[temp]=trans[0];
+            switch(edge_labels){
+                case 0: break;
+                case 1: ctx->parent_edge[temp]=*(trans+lbl_ofs); break;
+                default:
+                    ctx->parent_edge[temp]=TreeFold(ctx->edge_dbs,trans+lbl_ofs);
+            }
         }
         if (cost!=NULL){
             int scost=ctx->level+*(trans+cost_ofs);
@@ -341,6 +355,12 @@ static void new_transition(void*context,int src_seg,int len,void*arg){
             if(trc_output!=NULL){    
                 ctx->parent_seg[temp]=src_seg;
                 ctx->parent_ofs[temp]=trans[0];
+                switch(edge_labels){
+                    case 0: break;
+                    case 1: ctx->parent_edge[temp]=*(trans+lbl_ofs); break;
+                    default:
+                        ctx->parent_edge[temp]=TreeFold(ctx->edge_dbs,trans+lbl_ofs);
+                }
             }
         }
     }
@@ -581,6 +601,8 @@ int main(int argc, char*argv[]){
     Warning(info,"model created");
     lts_type_t ltstype=GBgetLTStype(model);
     size=lts_type_get_state_length(ltstype);
+    state_labels=lts_type_get_state_label_count(ltstype);
+    edge_labels=lts_type_get_edge_label_count(ltstype);
 
     int class_label=lts_type_find_edge_label(ltstype,LTSMIN_EDGE_TYPE_ACTION_CLASS);
     matrix_t *inhibit_matrix=NULL;
@@ -633,12 +655,19 @@ int main(int argc, char*argv[]){
         ADD_ARRAY(ctx.state_man,ctx.parent_ofs,uint32_t);
         ctx.parent_seg=NULL;
         ADD_ARRAY(ctx.state_man,ctx.parent_seg,uint16_t);
+        if (edge_labels>0){
+            ctx.parent_edge=NULL;
+            ADD_ARRAY(ctx.state_man,ctx.parent_edge,uint32_t);
+            if (edge_labels>1){
+                ctx.edge_dbs=TreeDBScreate(edge_labels);
+            }
+        }
         if (ctx.mpi_me==0) {
             ensure_access(ctx.state_man,0);
             ctx.parent_ofs[0]=0;
             ctx.parent_seg[0]=0;
         }
-        ctx.extend_task=TaskCreate(task_queue,TRACE_EXTEND_PRIO,65536,extend_trace_task,&ctx,20);
+        ctx.extend_task=TaskCreate(task_queue,TRACE_EXTEND_PRIO,65536,extend_trace_task,&ctx,20+4*edge_labels);
         TaskEnableFifo(ctx.extend_task);
         ctx.initial_task=TaskCreate(task_queue,TRACE_INITIAL_PRIO,65536,initial_trace_task,&ctx,12);
         ctx.trace_next=0;
@@ -657,6 +686,19 @@ int main(int argc, char*argv[]){
                 lts_type_set_format(trace_type,typeno,lts_type_get_format(ltstype,type_orig));
             }
             lts_type_set_state_label_typeno(trace_type,i,typeno);
+        }
+        lts_type_set_edge_label_count(trace_type,edge_labels);
+        for(int i=0;i<edge_labels;i++){
+            char*type_name=lts_type_get_edge_label_type(ltstype,i);
+            if (ctx.mpi_me==0) Warning(info,"edge label %d is %s:%s",i,lts_type_get_edge_label_name(ltstype,i),type_name);
+            lts_type_set_edge_label_name(trace_type,i,lts_type_get_edge_label_name(ltstype,i));
+            int is_new;
+            int typeno=lts_type_add_type(trace_type,type_name,&is_new);
+            if (is_new){
+                int type_orig=lts_type_get_edge_label_typeno(ltstype,i);
+                lts_type_set_format(trace_type,typeno,lts_type_get_format(ltstype,type_orig));
+            }
+            lts_type_set_edge_label_typeno(trace_type,i,typeno);
         }
         ctx.trace=lts_file_create(trc_output,trace_type,mpi_nodes,template);
         int T=lts_type_get_type_count(trace_type);
@@ -691,8 +733,6 @@ int main(int argc, char*argv[]){
     if (size<2) Fatal(1,error,"there must be at least 2 parameters");
     ctx.dbs=TreeDBScreate(size);
     int src[size];
-    state_labels=lts_type_get_state_label_count(ltstype);
-    edge_labels=lts_type_get_edge_label_count(ltstype);
     Warning(info,"there are %d state labels and %d edge labels",state_labels,edge_labels);
     int labels[state_labels];
     /***************************************************/
