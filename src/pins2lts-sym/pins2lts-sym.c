@@ -23,6 +23,9 @@
 #include <util-lib/dynamic-array.h>
 #include <hre/stringindex.h>
 
+#ifdef HAVE_SYLVAN
+#include <sylvan.h>
+#endif
 
 static ltsmin_expr_t mu_expr = NULL;
 static char* ctl_formula = NULL;
@@ -70,6 +73,11 @@ static matrix_t *class_matrix=NULL;
 static enum { BFS_P , BFS , CHAIN_P, CHAIN } strategy = BFS_P;
 
 static int expand_groups = 1; // set to 0 if transitions are loaded from file
+
+#ifdef HAVE_SYLVAN
+static size_t lace_n_workers = 1;
+static size_t lace_dqsize = 40960000; // can be very big, no problemo
+#endif
 
 static char* order = "bfs-prev";
 static si_map_entry ORDER[] = {
@@ -173,6 +181,10 @@ static  struct poptOption options[] = {
     { "pg-reduce" , 0 , POPT_ARG_NONE , &pgreduce_flag, 0, "Reduce the generated parity game on-the-fly (only for symbolic tool).","" },
 #endif
     { "pg-write" , 0 , POPT_ARG_STRING , &pg_output, 0, "file to write symbolic parity game to","<pg-file>.spg" },
+#endif
+#ifdef HAVE_SYLVAN
+    { "lace-workers", 0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &lace_n_workers , 0 , "set number of Lace workers (threads for parallelization)","<workers>"},
+    { "lace-dqsize",0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &lace_dqsize , 0 , "set length of Lace task queue","<dqsize>"},
 #endif
     SPEC_POPT_OPTIONS,
     { NULL, 0 , POPT_ARG_INCLUDE_TABLE, greybox_options , 0 , "PINS options",NULL},
@@ -2139,18 +2151,19 @@ parity_game* compute_symbolic_parity_game(vset_t visited, int* src)
 }
 #endif
 
-int
-main (int argc, char *argv[])
-{
-    char *files[2];
-    HREinitBegin(argv[0]);
-    HREaddOptions(options,"Perform a symbolic reachability analysis of <model>\n"
-                  "The optional output of this analysis is an ETF "
-                      "representation of the input\n\nOptions");
-    lts_lib_setup();
-    HREinitStart(&argc,&argv,1,2,files,"<model> [<etf>]");
 
+static char *files[2];
+hre_context_t ctx;
+
+static void
+actual_main(void)
+{
     vset_implementation_t vset_impl = VSET_IMPL_AUTOSELECT;
+
+#ifdef HAVE_SYLVAN
+    HREinitBegin(HREappName());
+    HREglobalSet(ctx);
+#endif
 
     int *src;
     vset_t initial;
@@ -2402,6 +2415,24 @@ main (int argc, char *argv[])
             RTfree(priority);
         }
     }
+}
+
+int
+main (int argc, char *argv[])
+{
+    HREinitBegin(argv[0]);
+    HREaddOptions(options,"Perform a symbolic reachability analysis of <model>\n"
+                  "The optional output of this analysis is an ETF "
+                      "representation of the input\n\nOptions");
+    lts_lib_setup(); // add options for LTS library
+    HREinitStart(&argc,&argv,1,2,files,"<model> [<etf>]");
+
+#ifdef HAVE_SYLVAN
+    ctx = HREglobal();
+    lace_boot(lace_n_workers, lace_dqsize, 0, actual_main);
+#else
+    actual_main();
+#endif
 
     HREexit (LTSMIN_EXIT_SUCCESS);
 }

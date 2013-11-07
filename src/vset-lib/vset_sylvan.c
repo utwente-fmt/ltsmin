@@ -13,10 +13,8 @@
 #include <sylvan.h>
 
 static int fddbits = 16;
-static int threads = 1;
 static int datasize = 23;
 static int cachesize = 23;
-static int dqsize = 100000;
 static int granularity = 1;
 
 static void
@@ -24,15 +22,12 @@ ltsmin_sylvan_init()
 {
     static int initialized=0;
     if (!initialized) {
-        lace_init(threads, dqsize, 0);
         sylvan_init(datasize, cachesize, granularity);
         initialized=1;
     }
 }
 
 struct poptOption sylvan_options[] = {
-    { "sylvan-threads",0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &threads , 0 , "set number of threads for parallelization","<threads>"},
-    { "sylvan-dqsize",0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &dqsize , 0 , "set length of task queue","<dqsize>"},
     { "sylvan-bits",0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &fddbits, 0, "set number of bits per integer in the state vector","<bits>"},
     { "sylvan-tablesize",0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &datasize , 0 , "set size of BDD table to 1<<datasize","<datasize>"},
     { "sylvan-cachesize",0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &cachesize , 0 , "set size of memoization cache to 1<<cachesize","<cachesize>"},
