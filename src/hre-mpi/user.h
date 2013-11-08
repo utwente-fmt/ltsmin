@@ -21,8 +21,7 @@ Otherwise MPI is not enabled by HREenableAll.
 */
 
 #include <hre/user.h>
-#include <hre-mpi/mpi_event_loop.h>
-
+typedef struct event_queue_s* event_queue_t;
 /**
 Enable the MPI run time.
 */

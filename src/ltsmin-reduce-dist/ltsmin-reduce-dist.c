@@ -7,6 +7,7 @@
 
 #include <hre/runtime.h>
 #include <hre-mpi/user.h>
+#include <hre-mpi/mpi_event_loop.h>
 #include <ltsmin-lib/ltsmin-standard.h>
 #include <ltsmin-reduce-dist/seg-lts.h>
 #include <ltsmin-reduce-dist/sigmin-array.h>

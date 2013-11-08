@@ -3,6 +3,7 @@
 
 #include <hre/user.h>
 #include <hre-mpi/user.h>
+#include <hre-mpi/mpi_event_loop.h>
 #include <util-lib/dynamic-array.h>
 
 struct event_queue_s{

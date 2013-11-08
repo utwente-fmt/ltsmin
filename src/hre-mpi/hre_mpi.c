@@ -12,6 +12,7 @@
 #include <unistd.h>
 
 #include <hre-mpi/user.h>
+#include <hre-mpi/mpi_event_loop.h>
 #include <hre/provider.h>
 #include <util-lib/dynamic-array.h>
 

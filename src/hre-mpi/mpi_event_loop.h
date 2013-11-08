@@ -15,7 +15,9 @@ requests can be inserted, together with a callback to be executed once the reque
 */
 
 /// Abstract type of event queue.
+#ifndef HRE_MPI_USER_H
 typedef struct event_queue_s* event_queue_t;
+#endif
 
 /**
 \brief Create a new event queue.
