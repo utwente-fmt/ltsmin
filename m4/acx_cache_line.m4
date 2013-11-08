@@ -17,6 +17,7 @@ AC_DEFUN([ACX_CLINE_DEF],[
 // Returns the cache line size (in bytes) of the processor, or 0 on failure
 
 #include <stddef.h>
+#include <math.h>
 size_t cache_line_size();
 
 #if defined(__APPLE__)
