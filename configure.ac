@@ -177,16 +177,16 @@ AC_ARG_WITH([bignum],
 AS_CASE(["$with_bignum"],
   [no],[],
   [yes|gmp|tommath],
-    [AS_IF([test x"$with_bignum" = xgmp],
+    [AS_IF([test x"$with_bignum" = xyes || test x"$with_bignum" = xgmp],
            [AC_CHECK_LIB([gmp], [__gmpz_init], 
               [with_bignum=gmp; have_libgmp=yes],
               [AS_IF([test x"$with_bignum" = xgmp],
-                     [AC_MSG_WARN([cannot use libgmp as bignum library.])])])])
-     AS_IF([test x"$with_bignum" = xyes || test x"$with_bignum" = xtommath],
+                     [with_bignum=no; AC_MSG_WARN([cannot use libgmp as bignum library.])])])])
+     AS_IF([test x"$with_bignum" = xtommath],
            [AC_CHECK_LIB([tommath], [mp_init], 
               [with_bignum=tommath; have_libtommath=yes],
               [AS_IF([test x"$with_bignum" = xtommath],
-                     [AC_MSG_WARN([cannot use libtommath as bignum library.])])])])],
+                     [with_bignum=no; AC_MSG_WARN([cannot use libtommath as bignum library.])])])])],
   [AC_MSG_WARN([unknown bignum library request (--with-bignum=$with_bignum) ignored.])])
 AS_CASE(["$with_bignum"],
   [yes|no|tommath],[have_libspg=yes],
@@ -459,6 +459,7 @@ cat <<EOM
 Configuration:
 ======================================================================
     ASCIIDOC = ${ASCIIDOC:-NOT FOUND, not building documentation}
+    BIGNUM   = ${with_bignum}
     CADP     = ${CADP:-NOT FOUND, building without CADP support}
     CC       = ${CC:-NOT FOUND}
     CXX      = ${CXX:-NOT FOUND}
