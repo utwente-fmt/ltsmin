@@ -1,3 +1,6 @@
+CC = $(MPICC)
+AM_CPPFLAGS = -DWITH_MPI -std=gnu99 -I../../src
+
 LTSMIN_LIBS  =
 LTSMIN_LIBS += ../lts-io/liblts-io.la
 LTSMIN_LIBS += ../hre-io/libhre-io.la

@@ -1,3 +1,6 @@
+CC = $(MPICC)
+AM_CPPFLAGS = -DWITH_MPI -std=gnu99 -I../../src
+
 bin_PROGRAMS = ltsmin-reduce-dist
 
 LTSMIN_LIBS = ../util-lib/libutil.la ../ltsmin-lib/libltsmin.la

@@ -109,23 +109,9 @@ AC_LANG_RESTORE
 dnl Checks for programs.
 ACX_SPINS([:], [AC_MSG_WARN([SpinS will not be compiled.])])
 
-ACX_MPI(
-  [CC="$MPICC"
-   LIBS="$MPILIBS $LIBS"
-   AC_ARG_VAR(MPICXX, [MPI C++ compiler command])
-   AC_CHECK_PROGS(MPICXX, [mpic++ mpicxx mpiCC hcp mpxlC_r mpxlC mpCC cmpic++, $CXX])
-   AC_SUBST(MPICXX)
-   ltsmin_save_CXX="$CXX"
-   CXX="$MPICXX"
-   AC_LANG_PUSH([C++])
-   AC_LINK_IFELSE([AC_LANG_PROGRAM([[#include <mpi.h>]], [[MPI::Init();]])],
-     [have_mpi=yes],
-     [have_mpi=
-      CXX="$ltsmin_save_CXX"
-      AC_MSG_WARN([no acceptable MPI C++ support found.])])
-   AC_LANG_POP([C++])],
-  [have_mpi=
-   AC_MSG_WARN([no acceptable MPI support found.])])
+AC_LANG_PUSH([C])
+AX_MPI([have_mpi=yes],[AC_MSG_WARN([unable to find working MPI C complier wrapper])])
+AC_LANG_POP([C])
 
 AC_PROG_CC_C99
 AS_IF([test x"$ac_cv_prog_cc_c99" = xno],
@@ -449,6 +435,8 @@ AC_CONFIG_FILES([
        src/ltsmin-reduce/Makefile
        src/ltsmin-reduce-dist/Makefile
        src/pins2lts-dist/Makefile
+       src/pins2lts-dist/gcc/Makefile
+       src/pins2lts-dist/mpicc/Makefile
        src/pins2lts-mc/Makefile
        src/pins2lts-seq/Makefile
        src/pins2lts-sym/Makefile
@@ -483,7 +471,6 @@ Configuration:
     MCRL     = ${with_mcrl:-NOT FOUND, building without muCRL support}
     MCRL2    = ${with_mcrl2:-NOT FOUND, building without mCRL2 support}
     MPICC    = ${MPICC:-NOT FOUND, building without MPI support}
-    MPICXX   = ${MPICXX:-NOT FOUND, building without MPI support}
     OPAAL    = ${have_opaal:-TBB malloc NOT FOUND, building without opaal support}
     PBES     = ${acx_pbes:-NOT FOUND, building without PBES support}
     SCOOP    = ${have_scoop:-NO, either scoop was disabled or ghc could not be found}

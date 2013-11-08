@@ -1,3 +1,6 @@
+CC = $(MPICC)
+AM_CPPFLAGS = -DWITH_MPI -std=gnu99
+
 HRE_CPPFLAGS = -I ${top_srcdir}/src $(AM_CPPFLAGS)
 
 noinst_LTLIBRARIES = libhre.la
