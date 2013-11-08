@@ -29,7 +29,7 @@ rt_timer_t RTcreateTimer(){
 }
 
 void RTdeleteTimer(rt_timer_t timer){
-    free(timer);
+    RTfree(timer);
 }
 
 void RTresetTimer(rt_timer_t timer){

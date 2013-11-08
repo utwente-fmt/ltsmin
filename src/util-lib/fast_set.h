@@ -1,3 +1,7 @@
+
+#ifndef FSET_H
+#define FSET_H
+
 #include <hre/config.h>
 
 #include <stdbool.h>
@@ -32,3 +36,5 @@ extern void     fset_free   (fset_t *dbs);
 extern void     fset_print_statistics (fset_t *dbs, char *s);
 
 extern size_t   fset_mem    (fset_t *dbs);
+
+#endif // FSET_H

@@ -32,7 +32,7 @@ stream_t arch_read_raw(archive_t archive,char *name,char**code){
     if (archive->procs.flags&ARCH_TRANSPARENT_COMPRESSION){
         stream_t s=archive->procs.read_raw(archive,name,NULL);
         char*hdr=DSreadSA(s);
-        if (code) *code=hdr; else free(hdr);
+        if (code) *code=hdr; else RTfree(hdr);
         return s;
     } else {
         return archive->procs.read_raw(archive,name,code);

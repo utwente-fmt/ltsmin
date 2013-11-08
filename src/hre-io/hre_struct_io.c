@@ -34,8 +34,8 @@ void DSstructClose(struct_stream_t *stream){
     for(int i=0;i<(*stream)->len;i++){
         DSclose(((*stream)->ds)+i);
     }
-    free((*stream)->ds);
-    free(*stream);
+    RTfree((*stream)->ds);
+    RTfree(*stream);
     *stream=NULL;
 }
 

@@ -22,7 +22,7 @@ void * yyrealloc (void * ptr, size_t bytes, void * yyscanner){
 
 void   yyfree (void * ptr, void * yyscanner){
     (void)yyscanner;
-    free(ptr);
+    RTfree(ptr);
 }
 
 

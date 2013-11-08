@@ -42,7 +42,7 @@ static stream_t dir_write(archive_t archive,char *name,char*code){
 }
 
 static void dir_close(archive_t *archive){
-    free(*archive);
+    RTfree(*archive);
     *archive=NULL;
 };
 
@@ -74,13 +74,13 @@ static void dir_enum_free(arch_enum_t *e){
     if ((*e)->e) {
         del_dir_enum((*e)->e);
     }
-    free(*e);
+    RTfree(*e);
     *e=NULL;
 }
 
 static arch_enum_t dir_enum(archive_t archive,char *regex){
     if (regex!=NULL) Abort("regex not supported");
-    arch_enum_t e=(arch_enum_t)HREmalloc(NULL,sizeof(struct arch_enum));
+    arch_enum_t e=(arch_enum_t)RTmalloc(sizeof(struct arch_enum));
     e->e=get_dir_enum(archive->dir);
     e->procs.enumerate=dir_enumerate;
     e->procs.free=dir_enum_free;
@@ -97,7 +97,7 @@ static int dir_contains(archive_t archive,char *name){
 
 
 archive_t arch_dir_create(char*dirname,int buf,int del){
-    archive_t arch=(archive_t)HREmalloc(NULL,sizeof(struct archive_s));
+    archive_t arch=(archive_t)RTmalloc(sizeof(struct archive_s));
     arch_init(arch);
     if(create_empty_dir(dirname,del)){
         AbortCall("could not create or clear directory %s",dirname);
@@ -116,7 +116,7 @@ archive_t arch_dir_create(char*dirname,int buf,int del){
 }
 
 archive_t arch_dir_open(char*dirname,int buf){
-    archive_t arch=(archive_t)HREmalloc(NULL,sizeof(struct archive_s));
+    archive_t arch=(archive_t)RTmalloc(sizeof(struct archive_s));
     arch_init(arch);
     if(!is_a_dir(dirname)){
         AbortCall("directory %s does not exist",dirname);

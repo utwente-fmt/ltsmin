@@ -19,11 +19,11 @@ lts_t lts_create(){
 }
 
 void lts_free(lts_t lts){
-    free(lts->begin);
-    free(lts->src);
-    free(lts->label);
-    free(lts->dest);
-    free(lts);
+    RTfree(lts->begin);
+    RTfree(lts->src);
+    RTfree(lts->label);
+    RTfree(lts->dest);
+    RTfree(lts);
 }
 
 static void build_block(uint32_t states,uint32_t transitions,u_int32_t *begin,u_int32_t *block,u_int32_t *label,u_int32_t *other){
@@ -107,17 +107,17 @@ void lts_set_type(lts_t lts,LTS_TYPE type){
     lts->type=type;
     switch(type){
         case LTS_LIST:
-            free(lts->begin);
+            RTfree(lts->begin);
             lts->begin=NULL;
             return;
         case LTS_BLOCK:
             build_block(lts->states,lts->transitions,lts->begin,lts->src,lts->label,lts->dest);
-            free(lts->src);
+            RTfree(lts->src);
             lts->src=NULL;
             return;
         case LTS_BLOCK_INV:
             build_block(lts->states,lts->transitions,lts->begin,lts->dest,lts->label,lts->src);
-            free(lts->dest);
+            RTfree(lts->dest);
             lts->dest=NULL;
             return;
     }
@@ -449,10 +449,10 @@ void lts_silent_cycle_elim(lts_t lts,silent_predicate silent,void*silent_ctx,bit
         }
     }
     lts_set_size(lts,lts->root_count,component,count);
-    free(map);
-    free(queue);
-    free(stack);
-    free(next);
+    RTfree(map);
+    RTfree(queue);
+    RTfree(stack);
+    RTfree(next);
     Debug("uniq");
     lts_uniq(lts);
     Debug("cycle elim done");

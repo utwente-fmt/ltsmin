@@ -41,7 +41,7 @@ static size_t fifo_read_max(stream_t fifo,void*buf,size_t count){
             memcpy(buf,fifo->read_block+fifo->read_idx,len);
             void*tmp=fifo->read_block;
             fifo->read_block=*((void**)tmp);
-            free(tmp);
+            RTfree(tmp);
             fifo->blocks--;
             fifo->read_idx=sizeof(void*);
             return len+fifo_read_max(fifo,buf+len,count-len);
