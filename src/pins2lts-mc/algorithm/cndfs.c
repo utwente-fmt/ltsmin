@@ -361,6 +361,9 @@ cndfs_local_init   (run_t *run, wctx_t *ctx)
 
     HREassert (ctx->global != NULL, "Run global before local init");
 
+    // We also need to finalize the worker initialization:
+    wctx_init (ctx->global->rec);
+
     alg_local_init (run->shared->rec, ctx->global->rec);
 
     // Recursive strategy maybe unaware of its caller, so here we update its
@@ -368,9 +371,6 @@ cndfs_local_init   (run_t *run, wctx_t *ctx)
     // is ensured by ndfs_local_setup):
     ctx->global->rec->local->rec_bits = run->shared->color_bit_shift;
     cndfs_loc->rec = ctx->global->rec->local;
-
-    // We also need to finalize the worker initialization:
-    wctx_init (ctx->global->rec);
 }
 
 void
