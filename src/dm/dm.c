@@ -1011,6 +1011,63 @@ dm_anneal (matrix_t *m)
     return 0;
 }
 
+
+int 
+est_first(matrix_t *m,int row, int i, int j, int first) {
+  // what would first be if column i is rotated to position j
+  if (first==-1) return -1;    // still no first
+  if (i<first)
+    if (j<first) return first; // permutation happens left of first
+    else return first-1;       // first is in segment rotated to the left
+  if (i>first)
+    if (j<=first)
+      if (dm_is_set (m, row, i))
+	return j;              // set position i is moved left of first
+      else return first+1;     // first is in segment rotated to the right
+    else return first;         // permutation happens right of first
+  // i==first
+  if (j<first)
+    return j;                  // first is moved to the left to position j
+  for (int k=i+1;k<=j;k++) 
+    if (dm_is_set(m,row,k))
+      return k-1;              // first is moved to the right, k is the new first, but moves one left
+  return j;                    // first is moved to the right to pos j, no k found, so j is new first
+}
+
+int 
+est_last(matrix_t *m,int row, int i, int j, int last) {
+  // what would first be if column i is rotated to position j
+  if (last==-1) return -1;     // still no last
+  if (i>last)
+    if (j>last) return last;   // permutation happens right of last
+    else return last+1;        // last is in segment rotated to the right
+  if (i<last)
+    if (j>=last)
+      if (dm_is_set (m, row, i))
+	return j;              // set position i is moved right of last
+      else return last-1;      // last is in segment rotated to the left
+    else return last;          // permutation happens left of last
+  // i==last
+  if (j>last)
+    return j;                  // last is moved to the right to position j
+  for (int k=i-1;k>=j;k--) 
+    if (dm_is_set(m,row,k))
+      return k+1;              // last is moved to the left, k is the new last, but moves one right
+  return j;                    // last is moved to the left to pos j, no k found, so j is new last
+}
+
+int 
+estimate_cost(matrix_t *m, int i, int j, int firsts[], int lasts[]) {
+  int row,ef,el,ec;
+  ec=0;
+  for (row=0;row<dm_nrows(m);row++) {
+    ef=est_first(m,row,i,j,firsts[row]);
+    el=est_last(m,row,i,j,lasts[row]);
+    ec += (el-ef+1);
+  }
+  return ec;
+}
+
 int
 dm_optimize (matrix_t *m)
 {
@@ -1022,74 +1079,51 @@ dm_optimize (matrix_t *m)
                         min = cost_ (m),
                         last_min = 0;
     int                 i, j, c, k, d;
+
+    int firsts[dm_nrows(m)];
+    int lasts[dm_nrows(m)];
+
     while (last_min != min) {
-        last_min = min;
-        // find best rotation
-        for (i = 0; i < dm_ncols (m); i++) {
-            for (j = 0; j < dm_ncols (m); j++) {
-                if (i != j) {
-                    d = i < j ? 1 : -1;
-                    // rotate
-                    dm_create_permutation_group (&rot, dm_ncols (m),
-                                                 d_rot);
+      last_min = min;
+      
+      // initialize first and last integers per row
+      for (i=0; i<dm_nrows(m); i++) {
+	firsts[i] = first_(m,i);
+	lasts[i]  = last_(m,i);
+      }
+      
+      // find best rotation
+      for (i = 0; i < dm_ncols (m); i++) {
+	for (j = 0; j < dm_ncols (m); j++) {
+	  if (i != j) {
+	    c=estimate_cost(m,i,j,firsts,lasts);
+	    if (c < min) {
+	      min = c;
+	      best_i = i;
+	      best_j = j;
+	    }
+	  }
+	}
+      }
+      
+      // rotate
+      if (best_i != best_j) {
+	d = best_i < best_j ? 1 : -1;
+	dm_create_permutation_group (&rot, dm_ncols (m), d_rot);
+	for (k = best_i; k != best_j; k += d)
+	  dm_add_to_permutation_group (&rot, k);
+	dm_add_to_permutation_group (&rot, best_j);
+	dm_permute_cols (m, &rot);
+	dm_free_permutation_group (&rot);
 
-                    for (k = i; k != j; k += d)
-                        dm_add_to_permutation_group (&rot, k);
-                    dm_add_to_permutation_group (&rot, j);
-
-                    dm_permute_cols (m, &rot);
-                    // dm_print(stdout, m);
-                    dm_free_permutation_group (&rot);
-
-                    // calculate new costs
-                    c = cost_ (m);
-                    if (c < min) {
-                        min = c;
-                        best_i = i;
-                        best_j = j;
-                    }
-                    // printf("rotate %d-%d, costs %d\n", i, j,
-                    // cost_ (m));
-
-                    // unrotate
-                    dm_create_permutation_group (&rot, dm_ncols (m),
-                                                 d_rot);
-
-                    for (k = j; k != i; k += -d)
-                        dm_add_to_permutation_group (&rot, k);
-                    dm_add_to_permutation_group (&rot, i);
-
-                    dm_permute_cols (m, &rot);
-                    dm_free_permutation_group (&rot);
-
-                    // dm_print(stdout, m);
-                    // printf("\n\n");
-                }
-            }
-        }
-
-        DMDBG (printf ("best rotation: %d-%d, costs %d\n", best_i, best_j, min));
-        // apply it
-        if (best_i != best_j) {
-            d = best_i < best_j ? 1 : -1;
-            // rotate
-            dm_create_permutation_group (&rot, dm_ncols (m), d_rot);
-
-            for (k = best_i; k != best_j; k += d)
-                dm_add_to_permutation_group (&rot, k);
-            dm_add_to_permutation_group (&rot, best_j);
-
-            dm_permute_cols (m, &rot);
-            dm_free_permutation_group (&rot);
-
-            DMDBG (dm_print (stdout, m));
-        }
-
-        best_i = best_j = 0;
+	DMDBG (printf("best rotation: %d-%d, costs %d\n", best_i, best_j, min));
+	DMDBG (dm_print (stdout, m));
+	
+	best_i = best_j = 0;
+      }
     }
-
     DMDBG (printf ("cost: %d ", cost_ (m)));
-
+    
     return 0;
 }
 
