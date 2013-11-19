@@ -16,7 +16,7 @@ AX_LET_AUX([m4_if([$1],[],[],[$1
 ])dnl
 AS_VAR_PUSHDEF([var],[ax_let_$2_[]AX_LET_counter_])dnl
 AS_VAR_SET([var],[[$]$2])
-AS_VAR_SET([$2],[$tmpvar])], m4_shiftn(3,$@))
+AS_VAR_SET([$2],[$ax_let_$2_[]AX_LET_counter_[]_tmp_])], m4_shiftn(3,$@))
 AS_VAR_SET([$2],[$var])
 AS_VAR_POPDEF([var])dnl
 AS_VAR_POPDEF([tmpvar])])])dnl
