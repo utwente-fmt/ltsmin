@@ -9,6 +9,8 @@
 #include <lts-lib/lts.h>
 #include <hre/stringindex.h>
 
+#define STATE_FMT "S%06u"
+
 static char* tra_get_lab(const char *name){
     char *lab_name=strdup(name);
     char *tra=strstr(lab_name,".tra");
@@ -34,6 +36,46 @@ static char* tra_get_sta(const char *name){
     tra[3]='a';
     return sta_name;
 }
+
+static void write_imca_trans(FILE* imca,const char* state_fmt,lts_t lts,uint32_t first){
+    int action_type=lts_type_get_edge_label_typeno(lts->ltstype,0);
+    uint32_t tau=(uint32_t)VTputChunk(lts->values[action_type],chunk_str("tau"));
+    Warning(info,"tau = %u",tau);
+    uint32_t rate=(uint32_t)VTputChunk(lts->values[action_type],chunk_str("rate"));
+    Warning(info,"rate = %u",rate);
+    for(uint32_t i=0;i<lts->states;i++){
+        for(uint32_t j=lts->begin[i];j<lts->begin[i+1];){
+            uint32_t label[4];
+            TreeUnfold(lts->edge_idx,lts->label[j],(int*)label);
+            uint32_t group=label[1];
+            if (label[0]==tau){
+                fprintf(imca,state_fmt,first+i);
+                fprintf(imca," tau\n");
+            } else if (label[0]==rate) {
+                if (j==lts->begin[i]){
+                    fprintf(imca,state_fmt,first+i);
+                    fprintf(imca," !\n");
+                }
+            } else {
+                chunk label_c=VTgetChunk(lts->values[action_type],label[0]);
+                char label_s[label_c.len*2+6];
+                chunk2string(label_c,sizeof label_s,label_s);
+                fprintf(imca,state_fmt,first+i);
+                fprintf(imca," %s\n",label_s);
+            }
+            do {
+                fprintf(imca,"* ");
+                fprintf(imca,state_fmt,first+lts->dest[j]);
+                fprintf(imca," %.15e\n",((float)label[2])/(float)label[3]);
+                j++;
+                if (j<lts->begin[i+1])
+                    TreeUnfold(lts->edge_idx,lts->label[j],(int*)label);
+            } while (j<lts->begin[i+1]&&group==label[1]);
+        }
+    }
+  
+}
+
 
 #define BUFFER_SIZE 100000
 
@@ -261,6 +303,20 @@ void lts_read_tra(const char*tra_name,lts_t lts){
     free(lab_name); //strstr
 }
 
+static int storm_edge_gte(lts_t lts,int k1,int k2){
+    // lexicographic order.
+    // first compare labels.
+    int l1=TreeDBSGet(lts->edge_idx,lts->label[k1],0);
+    int l2=TreeDBSGet(lts->edge_idx,lts->label[k2],0);
+    if (l1<l2) return 0;
+    // then compare hyper edge group.
+    int g1=TreeDBSGet(lts->edge_idx,lts->label[k1],1);
+    int g2=TreeDBSGet(lts->edge_idx,lts->label[k2],1);
+    if (g1<g2) return 0;
+    // finally compare destination state number.
+    return lts->dest[k1]>=lts->dest[k2];
+}
+
 void lts_write_tra(const char*tra_name,lts_t lts){
     char *lab_name=tra_get_lab(tra_name);
     Print(infoShort,"writing %s/%s",tra_name,lab_name);
@@ -273,40 +329,81 @@ void lts_write_tra(const char*tra_name,lts_t lts){
         AbortCall("Could not open %s for writing",lab_name);
     }
     lts_set_type(lts,LTS_BLOCK);
-    // The funny thing with TRA is that it needs both src and dst sorted.
-    // sort transitions (bubble sort)
-    for(uint32_t i=0;i<lts->states;i++){
-        for(uint32_t m=lts->begin[i];m<lts->begin[i+1];m++){
-            for(uint32_t k=m;k>lts->begin[i];k--){
-                if(lts->dest[k]>=lts->dest[k-1]) break;
-                uint32_t tmp=lts->label[k];
-                lts->label[k]=lts->label[k-1];
-                lts->label[k-1]=tmp;
-                tmp=lts->dest[k];
-                lts->dest[k]=lts->dest[k-1];
-                lts->dest[k-1]=tmp;
+    if (lts_type_get_edge_label_count(lts->ltstype)==2){
+        // The funny thing with TRA is that it needs both src and dst sorted.
+        // sort transitions (bubble sort)
+        for(uint32_t i=0;i<lts->states;i++){
+            for(uint32_t m=lts->begin[i];m<lts->begin[i+1];m++){
+                for(uint32_t k=m;k>lts->begin[i];k--){
+                    if(lts->dest[k]>=lts->dest[k-1]) break;
+                    uint32_t tmp=lts->label[k];
+                    lts->label[k]=lts->label[k-1];
+                    lts->label[k-1]=tmp;
+                    tmp=lts->dest[k];
+                    lts->dest[k]=lts->dest[k-1];
+                    lts->dest[k-1]=tmp;
+                }
             }
         }
-    }
-    fprintf(tra,"STATES %d\n",lts->states);
-    fprintf(tra,"TRANSITIONS %d\n",lts->transitions);
-    for(uint32_t i=0;i<lts->states;i++){
-        for(uint32_t m=lts->begin[i];m<lts->begin[i+1];m++){
-            uint32_t rate[2];
-            TreeUnfold(lts->edge_idx,lts->label[m],(int*)rate);
-            fprintf(tra,"%d %d %g\n",i+1,lts->dest[m]+1,((double)rate[0])/((double)rate[1]));
+        fprintf(tra,"STATES %d\n",lts->states);
+        fprintf(tra,"TRANSITIONS %d\n",lts->transitions);
+        for(uint32_t i=0;i<lts->states;i++){
+            for(uint32_t m=lts->begin[i];m<lts->begin[i+1];m++){
+                uint32_t rate[2];
+                TreeUnfold(lts->edge_idx,lts->label[m],(int*)rate);
+                fprintf(tra,"%d %d %g\n",i+1,lts->dest[m]+1,((double)rate[0])/((double)rate[1]));
+            }
         }
+    } else {
+        // storm format sort transitions (bubble sort)
+        for(uint32_t i=0;i<lts->states;i++){
+            for(uint32_t m=lts->begin[i];m<lts->begin[i+1];m++){
+                for(uint32_t k=m;k>lts->begin[i];k--){
+                    if(storm_edge_gte(lts,k,k-1)) break;
+                    uint32_t tmp=lts->label[k];
+                    lts->label[k]=lts->label[k-1];
+                    lts->label[k-1]=tmp;
+                    tmp=lts->dest[k];
+                    lts->dest[k]=lts->dest[k-1];
+                    lts->dest[k-1]=tmp;
+                }
+            }
+        }
+        fprintf(tra,"STATES %d\n",lts->states);
+        fprintf(tra,"TRANSITIONS %d\n",lts->transitions);
+        write_imca_trans(tra,"%u",lts,1);
     }
+    fclose(tra);
     int N=lts_type_get_state_label_count(lts->ltstype);
     fprintf(lab,"#DECLARATION\n");
+    if (lts_type_get_edge_label_count(lts->ltstype)!=2){
+        fprintf(lab,"init ");
+    }
     for(int i=0;i<N;i++){
         fprintf(lab,i?" %s":"%s",lts_type_get_state_label_name(lts->ltstype,i));
     }
     fprintf(lab,"\n#END\n");
     int label[N];
     for(uint32_t i=0;i<lts->states;i++){
-        TreeUnfold(lts->prop_idx,lts->properties[i],label);
+        switch(N){
+            case 0:
+                break;
+            case 1:
+                label[0]=lts->properties[i];
+                break;
+            default:
+                TreeUnfold(lts->prop_idx,lts->properties[i],label);
+        }
         int first=1;
+        if (lts_type_get_edge_label_count(lts->ltstype)!=2){
+            for(int j=0;j<lts->root_count;j++){
+                if (lts->root_list[j]==i){
+                    fprintf(lab,"%u init",i+1);
+                    first=0;
+                    break;
+                }
+            }
+        }
         for(int j=0;j<N;j++){
             if(label[j]){
                 if(first){
@@ -318,7 +415,38 @@ void lts_write_tra(const char*tra_name,lts_t lts){
         }
         if(!first) fprintf(lab,"\n");
     }
-    fclose(tra);
     fclose(lab);
     free(lab_name); // strstr
 }
+
+#define IMCA_STATE_FMT "S%06u"
+void lts_write_imca(const char*imca_name,lts_t lts){
+    FILE* imca=fopen(imca_name,"w");
+    if (imca == NULL) {
+        AbortCall("Could not open %s for writing",imca_name);
+    }
+    lts_set_type(lts,LTS_BLOCK);
+    int action_type=lts_type_get_edge_label_typeno(lts->ltstype,0);
+    uint32_t tau=(uint32_t)VTputChunk(lts->values[action_type],chunk_str("tau"));
+    Warning(info,"tau = %u",tau);
+    uint32_t rate=(uint32_t)VTputChunk(lts->values[action_type],chunk_str("rate"));
+    Warning(info,"rate = %u",rate);
+    
+    fprintf(imca,"#INITIALS\n");
+    for(uint32_t i=0;i<lts->root_count;i++){
+      fprintf(imca,IMCA_STATE_FMT "\n",lts->root_list[i]);
+    }
+    fprintf(imca,"#GOALS\n");
+    if (lts->properties!=NULL){
+        for(uint32_t i=0;i<lts->states;i++){
+            if (lts->properties[i]!=0){
+                fprintf(imca,IMCA_STATE_FMT "\n",i);
+            }
+        }
+    }
+    fprintf(imca,"#TRANSITIONS\n");
+    write_imca_trans(imca,IMCA_STATE_FMT,lts,0);
+    fclose(imca);
+}
+
+
