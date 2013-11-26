@@ -45,7 +45,7 @@ static void write_imca_trans(FILE* imca,const char* state_fmt,lts_t lts,uint32_t
     int param_pos=lts_type_find_edge_label(lts->ltstype,"numerator");
     int NE=lts_type_get_edge_label_count(lts->ltstype);
 
-    int action_type=lts_type_get_edge_label_typeno(lts->ltstype,0);
+    int action_type=lts_type_get_edge_label_typeno(lts->ltstype,action_pos);
     uint32_t tau=(uint32_t)VTputChunk(lts->values[action_type],chunk_str("tau"));
     Warning(info,"tau = %u",tau);
     uint32_t rate=(uint32_t)VTputChunk(lts->values[action_type],chunk_str("rate"));

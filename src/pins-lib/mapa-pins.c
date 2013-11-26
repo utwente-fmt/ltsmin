@@ -233,6 +233,11 @@ static int label_actions(char*edge_class){
 static int check_goal(model_t self,int label,int*src){
     (void)label;
     prcrl_context_t ctx=GBgetContext(self);
+
+    uint32_t reward[2];
+    prcrl_get_state_reward(ctx->spec,src,reward);
+    Warning(info,"state reward %u/%u",reward[0],reward[1]);
+
     matrix_t *dm_reach=&ctx->reach_info;
     int N=dm_ncols(dm_reach);
     for (int i=0;i<N;i++){
@@ -265,6 +270,9 @@ void common_load_model(model_t model,const char*name,int mapa){
 
 	int N=prcrl_pars(context->spec);
 	int nSmds=prcrl_summands(context->spec);
+	int nRewards=prcrl_rewards(context->spec);
+	Warning(info,"spec has %d rewards",nRewards);
+
 	state_length=N;
 	lts_type_set_state_length(ltstype,N);
 	Warning(infoLong,"spec has %d parameters",N);
@@ -411,6 +419,9 @@ void common_load_model(model_t model,const char*name,int mapa){
     }
 
     if (enable_rewards){
+        if (nRewards>0) {
+            Warning(info,"Ignoring state rewards.");
+        }
         GBsetDefaultFilter(model,SSMcreateSWPset("reward_numerator;reward_denominator;goal;action;group;numerator;denominator"));
     } else {
         GBsetDefaultFilter(model,SSMcreateSWPset("goal;action;group;numerator;denominator"));
