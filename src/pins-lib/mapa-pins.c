@@ -109,21 +109,27 @@ void report_reach(char* str){
     SIput(reach_actions,str);
 }
 
-void write_prob_label(char *str,int*label){
-    label[4]=atoi(str);
+
+static void scoop_rationalize(char*str,int*label){
     char* ptr=strrchr(str,'/');
     if (ptr==NULL) {
-        label[5]=1;
+        float f=atof(str);
+        rationalize32(f,(uint32_t*)label+4,(uint32_t*)label+5);
     } else {
+        label[4]=atoi(str);
         ptr++;
         label[5]=atoi(ptr);
     }
 }
+void write_prob_label(char *str,int*label){
+    Warning(infoLong,"prob label %s=",str);
+    scoop_rationalize(str,label);
+    Warning(infoLong,"  %d/%d",label[4],label[5]);
+}
 
 void write_rate_label(char *str,int*label){
     Warning(infoLong,"rate label %s=",str);
-    float f=atof(str+5);
-    rationalize32(f,(uint32_t*)label+4,(uint32_t*)label+5);
+    scoop_rationalize(str+5,label);
     Warning(infoLong,"  %d/%d",label[4],label[5]);
 }
 
