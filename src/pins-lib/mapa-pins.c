@@ -10,6 +10,7 @@
 #include <scoop.h>
 
 static int check_confluence=0;
+static int enable_rewards=0;
 
 static const char const_long[]="const";
 static const char progress_long[]="max-progress";
@@ -88,6 +89,7 @@ struct poptOption mapa_options[]= {
      " The default is 'all', meaning that all actions are prioritised."
      " The other settings are 'tau', to prioritise just the tau steps"
      " and 'none' to disable maximal progress","<actions>"},
+    { "rewards" , 0 , POPT_ARG_VAL, &enable_rewards , 1, "enable edge rewards" , NULL },
     { "confluence", 0, POPT_ARG_VAL, &check_confluence, 1, "detect confluent summands and write confluent matrix", NULL },
 	POPT_TABLEEND
 };
@@ -98,7 +100,7 @@ static int state_length;
 static int *state_type;
 static model_t main_model;
 static int *cb_dest;
-static int cb_label[5];
+static int cb_label[7];
 
 static TransitionCB user_cb;
 static void* cb_ctx;
@@ -108,21 +110,28 @@ void report_reach(char* str){
 }
 
 void write_prob_label(char *str,int*label){
-    label[2]=atoi(str);
+    label[4]=atoi(str);
     char* ptr=strrchr(str,'/');
     if (ptr==NULL) {
-        label[3]=1;
+        label[5]=1;
     } else {
         ptr++;
-        label[3]=atoi(ptr);
+        label[5]=atoi(ptr);
     }
 }
 
 void write_rate_label(char *str,int*label){
-    Warning(infoLong,"label %s=",str);
+    Warning(infoLong,"rate label %s=",str);
     float f=atof(str+5);
-    rationalize32(f,(uint32_t*)label+2,(uint32_t*)label+3);
-    Warning(infoLong,"  %d/%d",label[2],label[3]);
+    rationalize32(f,(uint32_t*)label+4,(uint32_t*)label+5);
+    Warning(infoLong,"  %d/%d",label[4],label[5]);
+}
+
+void write_reward_label(char *str,int*label){
+    Warning(infoLong,"reward label %s=",str);
+    float f=atof(str);
+    rationalize32(f,(uint32_t*)label+0,(uint32_t*)label+1);
+    Warning(infoLong,"  %d/%d",label[0],label[1]);
 }
 int get_numerator(char *str){
     return atoi(str);
@@ -268,6 +277,7 @@ void common_load_model(model_t model,const char*name,int mapa){
     lts_type_put_type(ltstype,"nat",LTStypeDirect,NULL);
     lts_type_put_type(ltstype,"pos",LTStypeDirect,NULL);
 
+/*  old type that cannot handle rewards.
     lts_type_set_edge_label_count(ltstype,4);
     lts_type_set_edge_label_name(ltstype,0,LTSMIN_EDGE_TYPE_ACTION_PREFIX);
     lts_type_set_edge_label_type(ltstype,0,LTSMIN_EDGE_TYPE_ACTION_PREFIX);
@@ -277,6 +287,21 @@ void common_load_model(model_t model,const char*name,int mapa){
     lts_type_set_edge_label_type(ltstype,2,"nat");
     lts_type_set_edge_label_name(ltstype,3,"denominator");
     lts_type_set_edge_label_type(ltstype,3,"pos");
+*/
+    int class_type;
+    lts_type_set_edge_label_count(ltstype,6);
+    lts_type_set_edge_label_name(ltstype,0,"reward_numerator");
+    lts_type_set_edge_label_type(ltstype,0,"nat");
+    lts_type_set_edge_label_name(ltstype,1,"reward_denominator");
+    lts_type_set_edge_label_type(ltstype,1,"pos");
+    lts_type_set_edge_label_name(ltstype,2,LTSMIN_EDGE_TYPE_ACTION_PREFIX);
+    lts_type_set_edge_label_type(ltstype,2,LTSMIN_EDGE_TYPE_ACTION_PREFIX);
+    lts_type_set_edge_label_name(ltstype,3,"group");
+    lts_type_set_edge_label_type(ltstype,3,"nat");
+    lts_type_set_edge_label_name(ltstype,4,"numerator");
+    lts_type_set_edge_label_type(ltstype,4,"nat");
+    lts_type_set_edge_label_name(ltstype,5,"denominator");
+    lts_type_set_edge_label_type(ltstype,5,"pos");
     
     static matrix_t class_matrix;
     dm_create(&class_matrix,3,nSmds);
@@ -379,7 +404,11 @@ void common_load_model(model_t model,const char*name,int mapa){
         GBsetStateLabelLong(model,check_goal);
     }
 
-    GBsetDefaultFilter(model,SSMcreateSWPset("goal;action;group;numerator;denominator"));
+    if (enable_rewards){
+        GBsetDefaultFilter(model,SSMcreateSWPset("reward_numerator;reward_denominator;goal;action;group;numerator;denominator"));
+    } else {
+        GBsetDefaultFilter(model,SSMcreateSWPset("goal;action;group;numerator;denominator"));
+    }
 
     if(check_confluence){
         Warning(info,"setting confluence matrix");

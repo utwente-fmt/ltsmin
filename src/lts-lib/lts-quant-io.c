@@ -38,39 +38,52 @@ static char* tra_get_sta(const char *name){
 }
 
 static void write_imca_trans(FILE* imca,const char* state_fmt,lts_t lts,uint32_t first){
+    int reward_pos=lts_type_find_edge_label(lts->ltstype,"reward_numerator");
+    int action_pos=lts_type_find_edge_label(lts->ltstype,"action");
+    if (action_pos<0) Abort("imca format requires actions");
+    int group_pos=lts_type_find_edge_label(lts->ltstype,"group");
+    int param_pos=lts_type_find_edge_label(lts->ltstype,"numerator");
+    int NE=lts_type_get_edge_label_count(lts->ltstype);
+
     int action_type=lts_type_get_edge_label_typeno(lts->ltstype,0);
     uint32_t tau=(uint32_t)VTputChunk(lts->values[action_type],chunk_str("tau"));
     Warning(info,"tau = %u",tau);
     uint32_t rate=(uint32_t)VTputChunk(lts->values[action_type],chunk_str("rate"));
     Warning(info,"rate = %u",rate);
+
     for(uint32_t i=0;i<lts->states;i++){
         for(uint32_t j=lts->begin[i];j<lts->begin[i+1];){
-            uint32_t label[4];
+            uint32_t label[NE];
             TreeUnfold(lts->edge_idx,lts->label[j],(int*)label);
-            uint32_t group=label[1];
-            if (label[0]==tau){
+            uint32_t group=label[group_pos];
+            if (label[action_pos]==tau){
                 fprintf(imca,state_fmt,first+i);
-                fprintf(imca," tau\n");
-            } else if (label[0]==rate) {
+                fprintf(imca," tau");
+            } else if (label[action_pos]==rate) {
                 if (j==lts->begin[i]){
                     fprintf(imca,state_fmt,first+i);
-                    fprintf(imca," !\n");
+                    fprintf(imca," !");
                 }
             } else {
-                chunk label_c=VTgetChunk(lts->values[action_type],label[0]);
+                chunk label_c=VTgetChunk(lts->values[action_type],label[action_pos]);
                 char label_s[label_c.len*2+6];
                 chunk2string(label_c,sizeof label_s,label_s);
                 fprintf(imca,state_fmt,first+i);
-                fprintf(imca," %s\n",label_s);
+                fprintf(imca," %s",label_s);
+            }
+            if (reward_pos>=0 && label[reward_pos]!=0){
+                fprintf(imca," %.15e\n",((float)label[reward_pos])/(float)label[reward_pos+1]);
+            } else {
+                fprintf(imca,"\n");
             }
             do {
                 fprintf(imca,"* ");
                 fprintf(imca,state_fmt,first+lts->dest[j]);
-                fprintf(imca," %.15e\n",((float)label[2])/(float)label[3]);
+                fprintf(imca," %.15e\n",((float)label[param_pos])/(float)label[param_pos+1]);
                 j++;
                 if (j<lts->begin[i+1])
                     TreeUnfold(lts->edge_idx,lts->label[j],(int*)label);
-            } while (j<lts->begin[i+1]&&group==label[1]);
+            } while (j<lts->begin[i+1]&&group==label[group_pos]);
         }
     }
   

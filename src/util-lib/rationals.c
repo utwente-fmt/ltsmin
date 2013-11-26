@@ -60,7 +60,14 @@ rationalize32 (float f,uint32_t *numerator,uint32_t *denominator)
     // try x for 32 bit x
     j=1;
     i=nearbyintf(((float)j)*f);
-    if (fequal(f,(float)i)){
+    if (i==0){
+        i=nearbyintf(1000000000*f);
+        if (i==0){
+            *numerator=0;
+            *denominator=1;
+            return;           
+        }
+    } else if (fequal(f,(float)i)){
         *numerator=i;
         *denominator=1;
         return;
