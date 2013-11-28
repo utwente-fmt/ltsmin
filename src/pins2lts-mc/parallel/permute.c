@@ -190,6 +190,7 @@ permute_one (void *arg, transition_info_t *ti, state_data_t dst)
     int                 seen;
     seen = state_info_new_state (perm->next, dst, ti, perm->state);
     if (EXPECT_FALSE(seen < 0)) {
+        seen = 0;
         if (run_stop(perm->run_ctx)) {
             Warning (info, "Error: %s full! Change -s/--ratio.",
                            state_store_full_msg(seen));
