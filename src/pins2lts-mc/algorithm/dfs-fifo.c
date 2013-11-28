@@ -302,9 +302,10 @@ dfs_fifo_print_stats   (run_t *run, wctx_t *ctx)
     // run->local_mem += run->shared->max_level_size;  // DONE BY REACH (SBFS queues)
 
     dfs_fifo_reduced_t     *reduced = (dfs_fifo_reduced_t *) run->reduced;
-    Warning (info, "");
+    Warning (info, " ");
     Warning (info, "Progress states detected: %zu", reduced->df_counter.progress);
-    Warning (info, "Redundant explorations: %.4f", 100 * run->total.explored /
+    Warning (info, "Redundant explorations: %.4f", ((double)100 *
+                                                   run->total.explored) /
                                                    global->stats.elts - 100);
 }
 
