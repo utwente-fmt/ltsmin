@@ -23,7 +23,8 @@
 #define add_fetch(a, b)     __sync_add_and_fetch(a,b)
 #define fetch_sub(a, b)     __sync_fetch_and_sub(a,b)
 #define sub_fetch(a, b)     __sync_sub_and_fetch(a,b)
-#define sfence              asm volatile( "sfence" )
-#define mfence              asm volatile( "mfence" ) // __sync_synchronize
 #define prefetch(a)         __builtin_prefetch(a)
+
+#define mfence() { asm volatile("mfence" ::: "memory"); }
+
 #endif
