@@ -145,7 +145,7 @@ local_init (model_t model)
 
     wctx_t             *ctx = run_init (run, model);
 
-
+    return ctx;
 }
 
 /**

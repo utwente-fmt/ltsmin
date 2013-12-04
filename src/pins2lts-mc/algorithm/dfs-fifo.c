@@ -281,7 +281,7 @@ dfs_fifo_reduce  (run_t *run, wctx_t *ctx)
 
     reach_reduce (run, ctx);
 
-    // publush memory statistics to run class:
+    // publish memory statistics to run class:
     df_alg_local_t         *loc = (df_alg_local_t *) ctx->local;
     df_counter_t           *cnt = &loc->df_counters;
     run->total.local_states += ctx->counters->level_max;  // DFS stacks
