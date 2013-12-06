@@ -49,7 +49,17 @@ if [ -f "$output_file" ]; then
     rm -f "$output_file";
 fi
 
-java -Xss8M -Xms120m -Xmx1024m -cp $CP spins.Compile ${1+"$@"}
+# Total memory in KB
+if [ -e /proc/meminfo ]; then 
+    totalMemKB=`awk '/MemTotal:/ { print $2 }' /proc/meminfo`
+    totalMemMB=$(( $totalMemKB/1024 ))
+else
+    totalMemMB=`top -l 1 | grep PhysMem: | sed "s/PhysMem:[ ]*\([0-9]*\)M.*/\1/g"`
+fi
+heapMB=$(( $totalMemMB*100/75 ))
+commitedMB=$(( $heapMB/2 ))
+
+java -Xms${commitedMB}m -Xmx${heapMB}m -Xss64m -cp $CP spins.Compile ${1+"$@"}
 ERROR=$?
 if [ $ERROR -ne 0 ]; then
     echo "Compilation of $promela_file failed"
