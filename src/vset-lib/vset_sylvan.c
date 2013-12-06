@@ -217,26 +217,25 @@ sylvan_print_optimal_bits_per_state()
 static BDD
 state_to_bdd(const int* e, size_t vec_length, BDDVAR* vec_to_bddvar, BDD projection)
 {
-    BDD bdd = sylvan_true;
     check_state(e, vec_length);
 
-    sylvan_gc_disable();
+    size_t varcount = vec_length * fddbits;
+    char* cube = (char*)alloca(varcount*sizeof(char));
+    memset(cube, 0, varcount*sizeof(char));
 
-    // Construct BDD from state (go from last variable to first variable)
-    for(int i=vec_length;i-->0;) {
-        unsigned int b = e[i]; // convert from signed to unsigned...
-        for (int j=fddbits;j-->0;) {
-            BDD val = sylvan_ithvar(vec_to_bddvar[i*fddbits+j]);
-            if (!(b&1)) val = sylvan_not(val);
-            bdd = sylvan_and(val, bdd);
-            b >>= 1;
-        } 
+    size_t i;
+    int j;
+    for (i=0;i<vec_length;i++) {
+        for (j=0;j<fddbits;j++) {
+            if (e[i] & (1<<(fddbits-j-1))) cube[i*fddbits+j] = 1;
+        }
     }
 
-    bdd = sylvan_ref(sylvan_exists(bdd, projection));
-    sylvan_gc_enable();
+    BDD bdd = sylvan_ref(sylvan_cube(vec_to_bddvar, varcount, cube));
+    BDD proj = sylvan_ref(sylvan_exists(bdd, projection));
+    sylvan_deref(bdd);
 
-    return bdd;
+    return proj;
 }
 
 /**
@@ -358,34 +357,6 @@ set_enum(vset_t set, vset_element_cb cb, void* context)
     set_enum_do(set->bdd, set->variables, vec, 0, cb, context);
 }
 
-static int
-set_example_do(BDD root, BDD variables, int *vec, int n)
-{
-    if (root == sylvan_false) return 0;
-    if (sylvan_set_isempty(variables)) {
-        // Make sure that there are no variables left
-        assert(root == sylvan_true);
-        // We have at least one satisfying assignment!
-        return 1;
-    } else {
-        BDDVAR var = sylvan_var(variables);
-        BDD variables_next = sylvan_set_next(variables);
-        if (root == sylvan_true || var != sylvan_var(root)) {
-            // n is skipped, just take assignment 0
-            return set_example_do(root, variables_next, vec, n+1);
-        } else {
-            int i = n / fddbits;
-            int j = n % fddbits;
-            uint32_t bitmask = 1 << (fddbits-1-j);
-            vec[i] |= bitmask;
-            if (set_example_do(sylvan_high(root), variables_next, vec, n+1)) return 1;
-            vec[i] &= ~bitmask;
-            int result = set_example_do(sylvan_low(root), variables_next, vec, n+1);
-            return result;
-        }
-    }
-}
-
 /**
  * Generate one possible state
  */
@@ -393,7 +364,19 @@ static void
 set_example(vset_t set, int *e)
 {
     assert(set->bdd != sylvan_false);
-    set_example_do(set->bdd, set->variables, e, 0);
+
+    memset(e, 0, sizeof(int)*set->vector_size);
+
+    char* cube = (char*)alloca(set->vector_size*fddbits*sizeof(char));
+    sylvan_sat_one(set->bdd, set->vec_to_bddvar, set->vector_size*fddbits, cube);
+
+    size_t i;
+    int j;
+    for (i=0;i<set->vector_size;i++) {
+        for (j=0;j<fddbits;j++) {
+            if (cube[i*fddbits+j]==1) e[i] |= 1<<(fddbits-j-1);
+        }
+    }
 }
 
 /**
