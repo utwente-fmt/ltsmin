@@ -323,6 +323,12 @@ permute_create (permutation_perm_t permutation, model_t model, alg_state_seen_f 
     return perm;
 }
 
+state_info_t *
+permute_state_info (permute_t *perm)
+{
+    return perm->next;
+}
+
 void
 permute_free (permute_t *perm)
 {

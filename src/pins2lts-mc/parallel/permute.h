@@ -59,4 +59,6 @@ extern void             permute_free (permute_t *perm);
 extern int              permute_trans (permute_t *perm, state_info_t *state,
                                        perm_cb_f cb, void *ctx);
 
+extern state_info_t    *permute_state_info (permute_t *perm);
+
 #endif // PERMUTE_H

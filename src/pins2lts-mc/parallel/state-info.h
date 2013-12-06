@@ -7,6 +7,8 @@
 
 #include <stdlib.h>
 
+#include <mc-lib/lmap.h>
+#include <pins-lib/pins.h>
 #include <pins2lts-mc/parallel/stream-serializer.h>
 
 typedef int                *state_data_t;

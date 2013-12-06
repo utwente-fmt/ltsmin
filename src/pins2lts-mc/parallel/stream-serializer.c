@@ -10,6 +10,7 @@
 #include <string.h>
 
 #include <hre/user.h>
+#include <pins2lts-mc/parallel/state-info.h>
 #include <pins2lts-mc/parallel/stream-serializer.h>
 
 #define         MAX_SERIALIZERS 20
@@ -60,7 +61,7 @@ stream_list_add (streamer_t *s, stream_mode_t MODE,
     size_t              len = s->length[MODE];
     HREassert (len < MAX_SERIALIZERS);
     s->list[MODE][len].action = a;
-    s->list[MODE][len].size = size;
+    s->list[MODE][len].size = size / SLOT_SIZE;
     s->list[MODE][len].ptr = ptr;
     s->length[MODE]++;
 }
@@ -86,6 +87,16 @@ streamer_add (streamer_t *streamer, action_f ser, action_f des,
 }
 
 void
+streamer_add_simple (streamer_t *streamer, size_t size, void *ptr)
+{
+    simple_ctx_t *ctx = RTmalloc (sizeof (simple_ctx_t));
+    ctx->ptr = ptr;
+    ctx->size = size;
+    streamer_add (streamer, simple_ser, simple_des, size, ctx);
+}
+
+
+void
 streamer_walk (streamer_t *streamer, void *ctx, raw_data_t data,
                stream_mode_t MODE)
 {
@@ -93,6 +104,7 @@ streamer_walk (streamer_t *streamer, void *ctx, raw_data_t data,
     for (size_t i = 0; i < len; i++) {
         serializer_t       *serializer = &streamer->list[MODE][i];
         serializer->action (ctx, serializer->ptr, data);
+        data += serializer->size;
     }
 }
 

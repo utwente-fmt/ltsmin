@@ -21,9 +21,7 @@ typedef struct streamer_s streamer_t;
 
 extern streamer_t *streamer_create ();
 
-extern void simple_ser (void *ctx, void *ptr, raw_data_t data);
-
-extern void simple_des (void *ctx, void *ptr, raw_data_t data);
+extern void streamer_add_simple (streamer_t *streamer, size_t size, void *ptr);
 
 extern void streamer_add (streamer_t *streamer, action_f ser, action_f des,
                           size_t size, void *ptr);

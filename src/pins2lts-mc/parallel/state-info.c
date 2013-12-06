@@ -14,7 +14,7 @@
  *                                               v   | new
  *                                         /-----------------\
  *                                         |                 |
- *                                         | State store |
+ *                                         |    State store  |
  *                                         |      (PINS)     |
  *                                         \-----------------/
  */
@@ -143,7 +143,7 @@ ta_copy_pins (void *ctx, void *ptr, raw_data_t data)
 {
     state_info_t       *si = (state_info_t *) ptr;
     memcpy (si->in->tmp_pins, state_info_state(si), SLOT_SIZE * D);
-    ((lattice_t *)si->in->tmp_pins + D)[0] = si->lattice;
+    ((lattice_t *) (si->in->tmp_pins + D))[0] = si->lattice;
     ((state_data_t *)data)[0] = si->in->tmp_pins;
     (void) ctx;
 }
@@ -157,7 +157,7 @@ ta_tree_ref_pins (void *ctx, void *ptr, raw_data_t data)
 {
     state_info_t       *si = (state_info_t *) ptr;
     state_data_t        state = state_info_state (si);
-    ((lattice_t *)state + D)[0] = si->lattice;
+    ((lattice_t *) (state + D))[0] = si->lattice;
     ((state_data_t *)data)[0] = state;
     (void) ctx;
 }
@@ -186,7 +186,7 @@ create_pins (state_info_t *si)
         default: Abort ("State store not implemented");
         }
     } else {
-        // by default on the state data suffices (no lattice needs to be added)
+        // by default the state data suffices (no lattice needs to be added)
         streamer_add (s, pins_ptr, NULL, sizeof(void*), si);
     }
     return s;
@@ -202,7 +202,7 @@ state_info_add (state_info_t *si, action_f ser, action_f des, size_t size,
 void
 state_info_add_simple (state_info_t *si, size_t size, void *ptr)
 {
-    streamer_add (si->in->stack_serialize, simple_ser, simple_des, size, ptr);
+    streamer_add_simple (si->in->stack_serialize, size, ptr);
 }
 
 

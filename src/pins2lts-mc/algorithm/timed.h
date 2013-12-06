@@ -20,6 +20,7 @@
 #ifndef TIMED_H
 #define TIMED_H
 
+#include <mc-lib/lmap.h>
 #include <mc-lib/statistics.h>
 #include <pins2lts-mc/algorithm/algorithm.h>
 
@@ -44,6 +45,6 @@ extern int              NONBLOCKING;
 
 extern void ta_add_results (ta_counter_t *res, ta_counter_t *cnt);
 
-extern void ta_print_stats (run_t *run, wctx_t *ctx);
+extern void ta_print_stats (lm_t *lmap, wctx_t *ctx);
 
 #endif // TIMED_H

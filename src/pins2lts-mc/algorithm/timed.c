@@ -28,12 +28,17 @@ struct poptOption timed_options[] = {
     POPT_TABLEEND
 };
 
+typedef struct ta_alg_global_s {
+    alg_global_t         reach;
+
+    lm_loc_t            lloc;       // lattice location (serialized by state-info)
+} ta_alg_global_t;
+
 typedef struct ta_alg_local_s {
     alg_local_t         reach;
 
     int                 done;       // done flag
     int                 subsumes;   // successor subsumes a state in LMAP
-    lm_loc_t            lloc;       // lattice location (serialized by state-info)
     lm_loc_t            added_at;   // successor is added at location
     lm_loc_t            last;       // last tombstone location
     size_t              work;       //
@@ -122,7 +127,7 @@ static void
 ta_queue_state_normal (wctx_t *ctx, state_info_t *successor)
 {
     alg_global_t       *sm = ctx->global;
-    raw_data_t stack_loc = dfs_stack_push (sm->stack, NULL );
+    raw_data_t stack_loc = dfs_stack_push (sm->stack, NULL);
     state_info_serialize (successor, stack_loc);
 }
 
@@ -135,6 +140,7 @@ ta_handle (void *arg, state_info_t *successor, transition_info_t *ti, int seen)
     ta_alg_shared_t    *shared = (ta_alg_shared_t *) ctx->run->shared;
     alg_local_t        *loc = ctx->local;
     ta_alg_local_t     *ta_loc = (ta_alg_local_t *) ctx->local;
+    ta_alg_global_t    *sm = (ta_alg_global_t *) ctx->global;
     ta_loc->done = 0;
     ta_loc->subsumes = 0; // if a successor subsumes one in the set, it cannot be subsumed itself (see invariant paper)
     ta_loc->work = 0;
@@ -145,8 +151,8 @@ ta_handle (void *arg, state_info_t *successor, transition_info_t *ti, int seen)
     lm_loc_t last = lm_iterate (shared->lmap, successor->ref, ta_covered, ctx);
     if (!ta_loc->done) {
         last = (LM_NULL_LOC == ta_loc->last ? last : ta_loc->last);
-        ta_loc->lloc = lm_insert_from (shared->lmap, successor->ref,
-                                       successor->lattice, TA_WAITING, &last);
+        sm->lloc = lm_insert_from (shared->lmap, successor->ref,
+                                   successor->lattice, TA_WAITING, &last);
         lm_unlock (shared->lmap, successor->ref);
         ta_loc->counters.inserts++;
         if (0) { // quite costly: flops
@@ -178,6 +184,7 @@ ta_handle_nb (void *arg, state_info_t *successor, transition_info_t *ti, int see
     ta_alg_shared_t    *shared = (ta_alg_shared_t *) ctx->run->shared;
     alg_local_t        *loc = ctx->local;
     ta_alg_local_t     *ta_loc = (ta_alg_local_t *) loc;
+    ta_alg_global_t    *sm = (ta_alg_global_t *) ctx->global;
     ta_loc->done = 0;
     ta_loc->subsumes = 0;
     ta_loc->work = 0;
@@ -188,11 +195,11 @@ ta_handle_nb (void *arg, state_info_t *successor, transition_info_t *ti, int see
     if (!ta_loc->done) {
         if (LM_NULL_LOC == ta_loc->added_at) {
             last = (LM_NULL_LOC == ta_loc->last ? last : ta_loc->last);
-            ta_loc->lloc = lm_insert_from_cas (shared->lmap, successor->ref,
+            sm->lloc = lm_insert_from_cas (shared->lmap, successor->ref,
                                     successor->lattice, TA_WAITING, &last);
             ta_loc->counters.inserts++;
         } else {
-            ta_loc->lloc = ta_loc->added_at;
+            sm->lloc = ta_loc->added_at;
         }
         ta_queue_state (ctx, successor);
         ta_loc->counters.updates += LM_NULL_LOC != ta_loc->last;
@@ -220,12 +227,12 @@ static inline int
 grab_waiting (wctx_t *ctx, raw_data_t state_data)
 {
     ta_alg_shared_t    *shared = (ta_alg_shared_t *) ctx->run->shared;
-    ta_alg_local_t     *loc = (ta_alg_local_t *) ctx->local;
+    ta_alg_global_t    *sm = (ta_alg_global_t *) ctx->global;
     state_info_deserialize (ctx->state, state_data);
     if ((TA_UPDATE_NONE == UPDATE) && !NONBLOCKING)
         return 1; // we don't need to update the global waiting info
-    return lm_cas_update(shared->lmap, loc->lloc, ctx->state->lattice, TA_WAITING,
-                                               ctx->state->lattice, TA_PASSED);
+    return lm_cas_update(shared->lmap, sm->lloc, ctx->state->lattice, TA_WAITING,
+                                                 ctx->state->lattice, TA_PASSED);
     // lockless! May cause newly created passed state to be deleted by a,
     // waiting set update. However, this behavior is valid since it can be
     // simulated by swapping these two operations in the schedule.
@@ -328,10 +335,7 @@ ta_pbfs (wctx_t *ctx)
 void
 timed_local_init   (run_t *run, wctx_t *ctx)
 {
-    ta_alg_local_t *loc = RTmallocZero (sizeof(ta_alg_local_t));
-
-    // Extend state info with a lattice location
-    state_info_add_simple (ctx->state, sizeof(lm_loc_t), &loc->lloc);
+    ta_alg_local_t     *loc = RTmallocZero (sizeof(ta_alg_local_t));
 
     ctx->local = (alg_local_t *) loc;
     reach_local_setup (run, ctx);
@@ -341,7 +345,17 @@ timed_local_init   (run_t *run, wctx_t *ctx)
 void
 timed_global_init   (run_t *run, wctx_t *ctx)
 {
-    ctx->local = RTmallocZero (sizeof(alg_local_t));
+    if (PINS_POR)
+        Abort ("POR not compatible with timed automata");
+    ctx->global = RTmallocZero (sizeof(ta_alg_global_t));
+    ta_alg_global_t    *sm = (ta_alg_global_t *) ctx->global;
+
+    // Extend state info with a lattice location
+    state_info_add_simple (ctx->state, sizeof(lm_loc_t), &sm->lloc);
+    state_info_add_simple (ctx->initial, sizeof(lm_loc_t), &sm->lloc);
+    state_info_t       *si_perm = permute_state_info(ctx->permute);
+    state_info_add_simple (si_perm, sizeof(lm_loc_t), &sm->lloc);
+
     reach_global_setup (run, ctx);
 }
 
@@ -358,14 +372,13 @@ timed_destroy_local (run_t *run, wctx_t *ctx)
 }
 
 void
-ta_print_stats   (run_t *run, wctx_t *ctx)
+ta_print_stats   (lm_t *lmap, wctx_t *ctx)
 {
     ta_alg_local_t     *ta_loc = (ta_alg_local_t *) ctx->local;
-    ta_alg_shared_t    *shared = (ta_alg_shared_t *) run->shared;
     size_t              lattices = ta_loc->counters.inserts -
                                    ta_loc->counters.updates;
     size_t              db_elts = global->stats.elts;
-    size_t              alloc = lm_allocated (shared->lmap);
+    size_t              alloc = lm_allocated (lmap);
     double              mem3 = ((double)(sizeof(lattice_t[alloc + db_elts]))) / (1<<20);
     double lm = ((double)(sizeof(lattice_t[alloc + (1UL<<dbs_size)]))) / (1<<20);
     double redundancy = (((double)(db_elts + alloc)) / lattices - 1) * 100;
@@ -388,7 +401,8 @@ timed_print_stats   (run_t *run, wctx_t *ctx)
 {
     reach_print_stats (run, ctx);
 
-    ta_print_stats (run, ctx);
+    ta_alg_shared_t    *shared = (ta_alg_shared_t *) ctx->run->shared;
+    ta_print_stats (shared->lmap, ctx);
 }
 
 void
@@ -405,7 +419,7 @@ void
 timed_reduce (run_t *run, wctx_t *ctx)
 {
     if (run->reduced == NULL) {
-        run->reduced = RTmallocZero (sizeof (ta_reduced_t));
+        run->reduced = RTmallocZero (sizeof (ta_reduced_t) + CACHE_LINE_SIZE);
     }
     ta_reduced_t           *reduced = (ta_reduced_t *) run->reduced;
     ta_alg_local_t         *ta_loc = (ta_alg_local_t *) ctx->local;
@@ -426,8 +440,8 @@ timed_run (run_t *run, wctx_t *ctx)
 
     if (0 == ctx->id) { // only w1 receives load, as it is propagated later
         ta_handle (ctx, ctx->initial, &ti, 0);
+        ctx->counters->trans = 0; //reset trans count
     }
-    ctx->counters->trans = 0; //reset trans count
 
     switch (get_strategy(run->alg)) {
         case Strat_TA_PBFS:

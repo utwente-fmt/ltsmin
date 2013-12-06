@@ -3,15 +3,6 @@
 
 #include <pins2lts-mc/algorithm/cndfs.h>
 
-struct alg_shared_s {
-    run_t              *rec;
-    run_t              *previous;
-    int                 color_bit_shift;
-    run_t              *top_level;
-    stop_f              run_stop;
-    is_stopped_f        run_is_stopped;
-};
-
 struct alg_global_s {
     wctx_t             *rec;
     ref_t               work;           // ENDFS work for loadbalancer
@@ -341,21 +332,20 @@ cndfs_global_deinit   (run_t *run, wctx_t *ctx)
 }
 
 void
-cndfs_local_init   (run_t *run, wctx_t *ctx)
+cndfs_local_setup   (run_t *run, wctx_t *ctx)
 {
-    alg_local_t        *loc = RTmallocZero (sizeof(cndfs_alg_local_t));
-    cndfs_alg_local_t  *cndfs_loc = (cndfs_alg_local_t *) loc;
+    cndfs_alg_local_t  *cndfs_loc = (cndfs_alg_local_t *) ctx->local;
     cndfs_loc->timer = RTcreateTimer ();
-    ctx->local = loc;
     ndfs_local_setup (run, ctx);
     size_t len = state_info_serialize_int_size (ctx->state);
     cndfs_loc->in_stack = dfs_stack_create (len);
     cndfs_loc->out_stack = dfs_stack_create (len);
 
+    if (get_strategy(run->alg) & Strat_CNDFS) return;
+
     if (run->shared->rec == NULL) {
-        HREassert (get_strategy(run->alg) & Strat_CNDFS,
-                   "Missing recusive strategy for %s!",
-                   key_search(strategies, get_strategy(run->alg)));
+        Abort ("Missing recusive strategy for %s!",
+               key_search(strategies, get_strategy(run->alg)));
         return;
     }
 
@@ -371,6 +361,15 @@ cndfs_local_init   (run_t *run, wctx_t *ctx)
     // is ensured by ndfs_local_setup):
     ctx->global->rec->local->rec_bits = run->shared->color_bit_shift;
     cndfs_loc->rec = ctx->global->rec->local;
+}
+
+void
+cndfs_local_init   (run_t *run, wctx_t *ctx)
+{
+    alg_local_t        *loc = RTmallocZero (sizeof(cndfs_alg_local_t));
+    ctx->local = loc;
+
+    cndfs_local_setup (run, ctx);
 }
 
 void
@@ -446,7 +445,7 @@ cndfs_reduce  (run_t *run, wctx_t *ctx)
 
     ndfs_reduce (run, ctx);
 
-    if (run->shared->rec) {
+    if (run->shared->rec != NULL) {
         alg_global_t           *sm = ctx->global;
         alg_reduce (run->shared->rec, sm->rec);
     }

@@ -48,10 +48,19 @@ typedef struct cndfs_reduced_s {
     float               waittime;
 } cndfs_reduced_t;
 
+struct alg_shared_s {
+    run_t              *rec;
+    run_t              *previous;
+    int                 color_bit_shift;
+    run_t              *top_level;
+    stop_f              run_stop;
+    is_stopped_f        run_is_stopped;
+};
+
 extern void cndfs_print_stats   (run_t *run, wctx_t *ctx);
 
 extern void cndfs_reduce        (run_t *run, wctx_t *ctx);
 
-extern void cndfs_local_init   (run_t *run, wctx_t *ctx);
+extern void cndfs_local_setup   (run_t *run, wctx_t *ctx);
 
 #endif // CNDFS_H

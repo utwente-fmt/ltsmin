@@ -6,7 +6,6 @@ typedef struct cta_counter_s {
     ta_counter_t        timed;
     size_t              sub_cyan;       // subsumed by cyan
     size_t              sub_red;        // subsumed by red
-    rt_timer_t          timer;
 } cta_counter_t;
 
 typedef struct ta_alg_local_s {
@@ -15,7 +14,6 @@ typedef struct ta_alg_local_s {
     fset_t             *cyan;       // Cyan states
     fset_t             *pink;       // Pink states
     fset_t             *cyan2;      // Cyan states
-    dfs_stack_t         out_stack;  //
     lm_loc_t            added_at;   // successor is added at location
     lm_loc_t            last;       // last tombstone location
     state_info_t       *successor;  // current successor state
@@ -30,9 +28,10 @@ typedef struct ta_reduced_s {
     float               waittime;
 } ta_reduced_t;
 
-struct alg_shared_s {
+typedef struct ta_alg_shared_s {
+    alg_shared_t        cndfs;
     lm_t               *lmap;
-};
+} ta_alg_shared_t;
 
 //static const lm_status_t LM_WHITE = 0;
 static const lm_status_t LM_RED  = 1;
@@ -66,7 +65,7 @@ int
 ta_cndfs_subsumed (wctx_t *ctx, state_info_t *state, lm_status_t color)
 {
     ta_alg_local_t     *ta_loc = (ta_alg_local_t *) ctx->local;
-    alg_shared_t       *shared = ctx->run->shared;
+    ta_alg_shared_t    *shared = (ta_alg_shared_t*) ctx->run->shared;
     ta_loc->subsumes = color;
     ta_loc->done = 0;
     ta_loc->successor = state;
@@ -85,7 +84,7 @@ ta_cndfs_spray (void *arg, lattice_t l, lm_status_t status, lm_loc_t lm)
 {
     wctx_t             *ctx = (wctx_t *) arg;
     ta_alg_local_t     *ta_loc = (ta_alg_local_t *) ctx->local;
-    alg_shared_t       *shared = ctx->run->shared;
+    ta_alg_shared_t    *shared = (ta_alg_shared_t*) ctx->run->shared;
     ta_counter_t       *cnt = (ta_counter_t *) &ta_loc->counters;
     lm_status_t         color = (lm_status_t)ta_loc->subsumes;
 
@@ -122,7 +121,7 @@ ta_cndfs_spray_nb (void *arg, lattice_t l, lm_status_t status, lm_loc_t lm)
     wctx_t             *ctx = (wctx_t *) arg;
     ta_alg_local_t     *ta_loc = (ta_alg_local_t *) ctx->local;
     ta_counter_t       *cnt = (ta_counter_t *) &ta_loc->counters;
-    alg_shared_t       *shared = ctx->run->shared;
+    ta_alg_shared_t    *shared = (ta_alg_shared_t*) ctx->run->shared;
     lm_status_t         color = (lm_status_t)ta_loc->subsumes;
     lattice_t           lattice = ta_loc->successor->lattice;
 
@@ -175,7 +174,7 @@ ta_cndfs_mark (wctx_t *ctx, state_info_t *state, lm_status_t color)
 {
     ta_alg_local_t     *ta_loc = (ta_alg_local_t *) ctx->local;
     ta_counter_t       *cnt = (ta_counter_t *) &ta_loc->counters;
-    alg_shared_t       *shared = ctx->run->shared;
+    ta_alg_shared_t    *shared = (ta_alg_shared_t*) ctx->run->shared;
     lm_loc_t            last;
     ta_loc->successor = state;
     ta_loc->subsumes = color;
@@ -272,7 +271,7 @@ ta_cndfs_subsumes_cyan (wctx_t *ctx, state_info_t *s)
         if (loc->seed->lattice == s->lattice) {
             return true;
         }
-        if (GBisCoveredByShort(ctx->model, (int*)loc->seed->lattice, (int*)&s->lattice)) {
+        if (GBisCoveredByShort(ctx->model, (int*)loc->seed->lattice, (int*)s->lattice)) {
             ta_loc->counters.sub_cyan++;
             return true;
         }
@@ -288,25 +287,25 @@ ta_cndfs_handle_nonseed_accepting (wctx_t *ctx)
     ta_alg_local_t     *ta_loc = (ta_alg_local_t *) ctx->local;
     cndfs_alg_local_t  *cndfs_loc = (cndfs_alg_local_t *) ctx->local;
     size_t              nonred, accs;
-    nonred = accs = dfs_stack_size (ta_loc->out_stack);
+    nonred = accs = dfs_stack_size (cndfs_loc->out_stack);
     if (nonred) {
         loc->red.waits++;
         cndfs_loc->counters.rec += accs;
-        RTstartTimer (ta_loc->counters.timer);
+        RTstartTimer (cndfs_loc->timer);
         while ( nonred && !run_is_stopped(ctx->run) ) {
             nonred = 0;
             for (size_t i = 0; i < accs; i++) {
-                raw_data_t state_data = dfs_stack_peek (ta_loc->out_stack, i);
+                raw_data_t state_data = dfs_stack_peek (cndfs_loc->out_stack, i);
                 state_info_deserialize (ctx->state, state_data);
                 if (!ta_cndfs_subsumed(ctx, ctx->state, LM_RED)) {
                     nonred++;
                 }
             }
         }
-        RTstopTimer (ta_loc->counters.timer);
+        RTstopTimer (cndfs_loc->timer);
     }
     for (size_t i = 0; i < accs; i++)
-        dfs_stack_pop (ta_loc->out_stack);
+        dfs_stack_pop (cndfs_loc->out_stack);
     size_t pre = dfs_stack_size (cndfs_loc->in_stack);
     while ( dfs_stack_size(cndfs_loc->in_stack) ) {
         raw_data_t state_data = dfs_stack_pop (cndfs_loc->in_stack);
@@ -362,23 +361,28 @@ ta_cndfs_handle_red (void *arg, state_info_t *successor, transition_info_t *ti, 
     (void) ti; (void) seen;
 }
 
+static inline int
+is_acc (wctx_t* ctx, state_info_t *si)
+{
+    return GBbuchiIsAccepting (ctx->model, state_info_state(si));
+}
+
 static void
 ta_cndfs_handle_blue (void *arg, state_info_t *successor, transition_info_t *ti, int seen)
 {
     wctx_t             *ctx = (wctx_t *) arg;
     alg_local_t        *loc = ctx->local;
-    state_data_t        succ_data = state_info_state (successor);
-    state_data_t        state_data = state_info_state (ctx->state);
-    int acc = GBbuchiIsAccepting(ctx->model, succ_data);
-    loc->counters.accepting += ~seen & acc;
     int cyan = ta_cndfs_is_cyan (ctx, successor, NULL, false);
-    if ( ecd && cyan && (GBbuchiIsAccepting(ctx->model, state_data) || acc) ) {
+    if (ecd && cyan && (is_acc(ctx, successor) || is_acc(ctx, ctx->state)) ) {
         /* Found cycle in blue search */
         ndfs_report_cycle (ctx->run, ctx->model, loc->stack, successor);
     }
     if ( all_red || !cyan ) {
         raw_data_t stack_loc = dfs_stack_push (loc->stack, NULL);
         state_info_serialize (successor, stack_loc);
+        if (!seen) {
+            loc->counters.accepting += is_acc(ctx, successor);
+        }
     }
     (void) ti; (void) seen;
 }
@@ -389,7 +393,7 @@ ta_cndfs_explore_state_red (wctx_t *ctx)
     alg_local_t        *loc = ctx->local;
     work_counter_t     *cnt = &loc->red_work;
     dfs_stack_enter (loc->stack);
-    increase_level (ctx->counters);
+    increase_level (cnt);
     cnt->trans += permute_trans (ctx->permute, ctx->state, ta_cndfs_handle_red, ctx);
     cnt->explored++;
     run_maybe_report (ctx->run, cnt, "[Red ] ");
@@ -424,7 +428,7 @@ ta_cndfs_red (wctx_t *ctx, ref_t seed, lattice_t l_seed)
                 dfs_stack_push (cndfs_loc->in_stack, state_data);
                 if ( ctx->state->ref != seed && ctx->state->lattice != l_seed &&
                      GBbuchiIsAccepting(ctx->model, state_info_state(ctx->state)) )
-                    dfs_stack_push (ta_loc->out_stack, state_data);
+                    dfs_stack_push (cndfs_loc->out_stack, state_data);
                 ta_cndfs_explore_state_red (ctx);
             } else {
                 if (seed_level == dfs_stack_nframes (loc->stack))
@@ -522,8 +526,13 @@ ta_cndfs_local_init   (run_t *run, wctx_t *ctx)
 
     // Extend state info with a lattice location
     state_info_add_simple (ctx->state, sizeof(lm_loc_t), &loc->lloc);
+    // Extend state info with a lattice location
+    state_info_add_simple (ctx->initial, sizeof(lm_loc_t), &loc->lloc);
+    state_info_t       *si_perm = permute_state_info(ctx->permute);
+    state_info_add_simple (si_perm, sizeof(lm_loc_t), &loc->lloc);
 
-    cndfs_local_init (run, ctx);
+    cndfs_local_setup (run, ctx);
+    state_info_add_simple (((alg_local_t*)loc)->seed, sizeof(lm_loc_t), &loc->lloc);
 }
 
 void
@@ -549,7 +558,8 @@ ta_cndfs_print_stats   (run_t *run, wctx_t *ctx)
 {
     cndfs_print_stats (run, ctx);
 
-    ta_print_stats   (run, ctx);
+    ta_alg_shared_t    *shared = (ta_alg_shared_t*) run->shared;
+    ta_print_stats   (shared->lmap, ctx);
 
     ta_alg_local_t         *ta_loc = (ta_alg_local_t *) ctx->local;
     ta_reduced_t           *reduced = (ta_reduced_t *) run->reduced;
@@ -577,7 +587,6 @@ ta_cndfs_reduce   (run_t *run, wctx_t *ctx)
     ta_reduced_t           *reduced = (ta_reduced_t *) run->reduced;
     ta_alg_local_t         *ta_loc = (ta_alg_local_t *) ctx->local;
 
-    reduced->waittime += RTrealTime(ta_loc->counters.timer);
     add_results (&reduced->counters, &ta_loc->counters);
 
     cndfs_reduce (run, ctx);
@@ -601,7 +610,8 @@ ta_cndfs_shared_init   (run_t *run)
     set_alg_run (run->alg, ta_cndfs_blue);
     set_alg_reduce (run->alg, ta_cndfs_reduce);
 
-    run->shared = RTmallocZero (sizeof (alg_shared_t));
-    run->shared->lmap = state_store_lmap (global->store);
+    run->shared = RTmallocZero (sizeof (ta_alg_shared_t));
+    ta_alg_shared_t    *shared = (ta_alg_shared_t*) run->shared;
+    shared->lmap = state_store_lmap (global->store);
 }
 
