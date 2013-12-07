@@ -30,7 +30,6 @@ static struct poptOption options_mc[] = {
 
 #ifdef OPAAL
 static bool                timed_model = true;
-static pthread_mutex_t    *mutex = NULL;          // global mutex
 #else
 static bool                timed_model = false;
 #endif
@@ -75,6 +74,8 @@ hre_init_and_spawn_workers (int argc, char *argv[])
     // Only use shared allocation if available
     // HRE only initiates this for more than one process
     HRE_PROCS &= HREdefaultRegion(HREglobal()) != NULL;
+
+    if (HREpeers(HREglobal()) > 64) Abort("No more than 64 threads are supported.");
 }
 
 model_t
@@ -88,34 +89,14 @@ create_pins_model ()
 
     Print1 (info, "Loading model from %s", files[0]);
 
-    // some frontends (opaal) do not have a thread-safe initial state function
-#ifdef OPAAL
-    if (HREme(HREglobal()) == 0) {
-        RTswitchAlloc (HRE_PROCS);
-        mutex = RTmalloc (sizeof(pthread_mutex_t));
-        RTswitchAlloc (false);
-        pthread_mutexattr_t    lock_attr;
-        pthread_mutexattr_init(&lock_attr);
-        int type = HRE_PROCS ? PTHREAD_PROCESS_SHARED : PTHREAD_PROCESS_PRIVATE;
-        if (pthread_mutexattr_setpshared(&lock_attr, type))
-            AbortCall("pthread_rwlockattr_setpshared");
-        pthread_mutex_init (mutex, &lock_attr);
-    }
-    HREreduce (HREglobal(), 1, &mutex, &mutex, Pointer, Max);
-
-    pthread_mutex_lock (mutex);
     GBloadFile (model, files[0], &model);
-    pthread_mutex_unlock (mutex);
-#else
-    GBloadFile (model, files[0], &model);
-#endif
 
     return model;
 }
 
 /**
  * Performs those allocations that are absolutely necessary for local initiation
- * It initializes a mutex and a table of chunk tables.
+ * It initializes a table of chunk tables and the PINS model.
  */
 model_t
 global_and_model_init ()
