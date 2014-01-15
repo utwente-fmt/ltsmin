@@ -1,4 +1,7 @@
 CC = $(MPICC)
+CXX = $(MPICXX)
+CCLD = $(MPICC)
+CXXLD = $(MPICXX)
 AM_CPPFLAGS = -DWITH_MPI -std=gnu99
 
 HRE_CPPFLAGS = -I ${top_srcdir}/src $(AM_CPPFLAGS)
