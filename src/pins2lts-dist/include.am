@@ -74,7 +74,7 @@ nodist_EXTRA_lps2lts_dist_SOURCES = automake-force-linker.cxx
 pbes2lts_dist_SOURCES   = ../pins2lts-dist.c
 pbes2lts_dist_LDADD     = $(PINS_LIBS)
 pbes2lts_dist_LDADD    += ../../pins-lib/libpbes-pins.la
-pbes2lts_dist_CPPFLAGS  = -DPBES $(DIST_CPPFLAGS)
+pbes2lts_dist_CPPFLAGS  = -DLTSMIN_PBES $(DIST_CPPFLAGS)
 pbes2lts_dist_LDFLAGS   = $(MCRL2_LDFLAGS) $(AM_LDFLAGS)
 nodist_EXTRA_pbes2lts_dist_SOURCES = automake-force-linker.cxx
 

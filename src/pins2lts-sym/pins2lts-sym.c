@@ -38,7 +38,7 @@ static int   sat_granularity = 10;
 static int   save_sat_levels = 0;
 
 static int   pgsolve_flag = 0;
-#if defined(PBES)
+#if defined(LTSMIN_PBES)
 static int   pgreduce_flag = 0;
 #endif
 static char* pg_output = NULL;
@@ -159,7 +159,7 @@ static  struct poptOption options[] = {
 #ifdef HAVE_LIBSPG
     { "pg-solve" , 0 , POPT_ARG_NONE , &pgsolve_flag, 0, "Solve the generated parity game (only for symbolic tool).","" },
     { NULL, 0 , POPT_ARG_INCLUDE_TABLE, spg_solve_options , 0, "Symbolic parity game solver options", NULL},
-#if defined(PBES)
+#if defined(LTSMIN_PBES)
     { "pg-reduce" , 0 , POPT_ARG_NONE , &pgreduce_flag, 0, "Reduce the generated parity game on-the-fly (only for symbolic tool).","" },
 #endif
     { "pg-write" , 0 , POPT_ARG_STRING , &pg_output, 0, "file to write symbolic parity game to","<pg-file>.spg" },
@@ -743,7 +743,7 @@ static inline void add_variable_subset(vset_t dst, vset_t src, vdom_t domain, in
     vset_destroy(u);
 }
 
-#if defined(PBES)
+#if defined(LTSMIN_PBES)
 static inline void reduce_parity_game(vset_t next_level, vset_t visited, vset_t true_states, vset_t false_states)
 {
     int p_len = 1;
@@ -968,7 +968,7 @@ reach_bfs_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
         }
         if (dlk_detect) deadlock_check(deadlocks, reach_groups);
 
-#if defined(PBES)
+#if defined(LTSMIN_PBES)
         if (pgreduce_flag) reduce_parity_game(next_level, visited, true_states, false_states);
 #endif
 
@@ -1070,7 +1070,7 @@ reach_chain_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
         // no deadlocks in old new_states
         if (dlk_detect) deadlock_check(deadlocks, reach_groups);
 
-#if defined(PBES)
+#if defined(LTSMIN_PBES)
         if (pgreduce_flag) reduce_parity_game(new_states, visited, true_states, false_states);
 #endif
 
@@ -2228,7 +2228,7 @@ main (int argc, char *argv[])
         vset_destroy(x);
     }
     bool spg = false;
-#ifdef PBES
+#ifdef LTSMIN_PBES
     spg = true;
 #endif
     if (GBhaveMucalc()) { // mu-calculus pins2pins layer

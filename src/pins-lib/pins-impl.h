@@ -10,7 +10,7 @@
 #if defined(MCRL2)
 #include <pins-lib/mcrl2-pins.h>
 #endif
-#if defined(PBES)
+#if defined(LTSMIN_PBES)
 #include <pins-lib/pbes-pins.h>
 #endif
 #if defined(ETF)
@@ -45,7 +45,7 @@
 #define SPEC_MT_SAFE 0
 #define SPEC_REL_PERF 1
 #endif
-#if defined(PBES)
+#if defined(LTSMIN_PBES)
 #define SPEC_POPT_OPTIONS { NULL, 0 , POPT_ARG_INCLUDE_TABLE, pbes_options , 0 , "PBES options", NULL }
 #define SPEC_MT_SAFE 0
 #define SPEC_REL_PERF 1

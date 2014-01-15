@@ -49,7 +49,7 @@ nodist_EXTRA_liblps_open_la_SOURCES = automake-force-linker.cxx
 
 # libpbes-open.la
 libpbes_open_la_SOURCES   = pins-open.c
-libpbes_open_la_CPPFLAGS  = -DPBES $(CADP_CPPFLAGS) $(AM_CPPFLAGS)
+libpbes_open_la_CPPFLAGS  = -DLTSMIN_PBES $(CADP_CPPFLAGS) $(AM_CPPFLAGS)
 libpbes_open_la_LIBADD    = ../pins-lib/libpbes-pins.la $(PINS_LIB)
 nodist_EXTRA_libpbes_open_la_SOURCES = automake-force-linker.cxx
 

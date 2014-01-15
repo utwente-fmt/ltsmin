@@ -84,7 +84,7 @@ nodist_EXTRA_mapa2lts_sym_SOURCES = automake-force-linker.cxx # req. by vset
 pbes2lts_sym_SOURCES   = pins2lts-sym.c
 pbes2lts_sym_LDADD     = $(PINS_LIBS)
 pbes2lts_sym_LDADD    += $(VSET_LIBS) ../pins-lib/libpbes-pins.la
-pbes2lts_sym_CPPFLAGS  = -DPBES $(SYM_CPPFLAGS)
+pbes2lts_sym_CPPFLAGS  = -DLTSMIN_PBES $(SYM_CPPFLAGS)
 pbes2lts_sym_LDFLAGS   = $(MCRL2_LDFLAGS) $(AM_LDFLAGS)
 nodist_EXTRA_pbes2lts_sym_SOURCES = automake-force-linker.cxx # req. by pbes
 

@@ -70,7 +70,7 @@ nodist_EXTRA_lps2lts_seq_SOURCES = automake-force-linker.cxx #req. by mcrl2s
 pbes2lts_seq_SOURCES   = pins2lts-seq.c
 pbes2lts_seq_LDADD     = $(HRE_LIB) $(PINS_LIBS)
 pbes2lts_seq_LDADD    += $(VSET_LIBS) ../pins-lib/libpbes-pins.la
-pbes2lts_seq_CPPFLAGS  = -DPBES $(SEQ_CPPFLAGS)
+pbes2lts_seq_CPPFLAGS  = -DLTSMIN_PBES $(SEQ_CPPFLAGS)
 pbes2lts_seq_LDFLAGS   = $(MCRL2_LDFLAGS) $(AM_LDFLAGS)
 nodist_EXTRA_pbes2lts_seq_SOURCES = automake-force-linker.cxx #req. by pbes
 
