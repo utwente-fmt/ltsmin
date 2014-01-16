@@ -190,6 +190,7 @@ explore_state (wctx_t *ctx)
     if (ctx->counters->level_cur >= max_level)
         return;
     count = permute_trans (ctx->permute, ctx->state, reach_handle, ctx);
+    ctx->counters->explored++;
     deadlock_detect (ctx, count);
     work_counter_t     *cnt = ctx->counters;
     run_maybe_report1 (ctx->run, cnt, "");
@@ -210,7 +211,6 @@ dfs_proviso (wctx_t *ctx)
                 increase_level (ctx->counters);
                 ecd_add_state (loc->cyan, ctx->state, NULL);
                 explore_state (ctx);
-                ctx->counters->explored++;
             } else {
                 dfs_stack_pop (sm->stack);
             }
@@ -238,7 +238,6 @@ dfs (wctx_t *ctx)
             increase_level (ctx->counters);
             state_info_deserialize (ctx->state, state_data);
             explore_state (ctx);
-            ctx->counters->explored++;
         } else {
             if (0 == dfs_stack_nframes (sm->stack))
                 continue;
@@ -258,7 +257,6 @@ bfs (wctx_t *ctx)
         if (NULL != state_data) {
             state_info_deserialize (ctx->state, state_data);
             explore_state (ctx);
-            ctx->counters->explored++;
         } else {
             swap (sm->out_stack, sm->in_stack);
             sm->stack = sm->out_stack;
@@ -278,7 +276,6 @@ sbfs (wctx_t *ctx)
             if (NULL != state_data) {
                 state_info_deserialize (ctx->state, state_data);
                 explore_state (ctx);
-                ctx->counters->explored++;
             }
         }
         local_next_size = dfs_stack_frame_size (sm->out_stack);

@@ -77,10 +77,10 @@ extern store_t *store_create (state_info_t *si);
 
 extern void store_clear (store_t* store);
 
-extern bool store_new_state (store_t *store, state_data_t data,
+extern int  store_new_state (store_t *store, state_data_t data,
                             transition_info_t *ti, store_t *src);
 
-extern bool store_first (store_t *store, state_data_t data);
+extern int  store_first (store_t *store, state_data_t data);
 
 extern void store_set_state (store_t *store, state_data_t state);
 

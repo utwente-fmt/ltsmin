@@ -241,7 +241,7 @@ state_info_pins_state (state_info_t *si)
     return state;
 }
 
-bool
+int
 state_info_new_state (state_info_t *si, state_data_t data,
                       transition_info_t *ti, state_info_t *src)
 {
@@ -275,7 +275,7 @@ state_info_set (state_info_t *si, ref_t ref, lattice_t lat)
     si->lattice = lat;
 }
 
-bool
+int
 state_info_first (state_info_t *si, state_data_t data)
 {
     return store_first (si->in->store, data);

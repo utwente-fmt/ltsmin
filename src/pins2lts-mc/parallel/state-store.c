@@ -464,7 +464,7 @@ store_clear (store_t* store)
     store->data = NULL;
 }
 
-bool
+int
 store_new_state (store_t *store, state_data_t data,
                  transition_info_t *ti, store_t *src)
 {
@@ -479,7 +479,7 @@ store_new_state (store_t *store, state_data_t data,
     return ctx.seen;
 }
 
-bool
+int
 store_first (store_t *store, state_data_t data)
 {
     init_ctx_t          ctx;
