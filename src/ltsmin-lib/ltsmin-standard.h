@@ -22,6 +22,12 @@
 #define LTSMIN_EXIT_SUCCESS             HRE_EXIT_SUCCESS
 #define LTSMIN_EXIT_FAILURE             HRE_EXIT_FAILURE
 
+/**
+ * Matrices
+ */
+
+#define LTSMIN_MATRIX_ACTIONS_READS     "dm_actions_reads"
+
 
 /**
  * Types

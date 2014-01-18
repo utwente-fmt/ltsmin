@@ -34,6 +34,8 @@ struct grey_box_model {
 	void*context;
 	next_method_grey_t next_short;
 	next_method_grey_t next_long;
+    next_method_grey_t actions_short;
+    next_method_grey_t actions_long;
 	next_method_matching_t next_matching;
 	next_method_black_t next_all;
 	get_label_method_t state_labels_short;
@@ -165,6 +167,35 @@ int default_long(model_t self,int group,int*src,TransitionCB cb,void*context){
 	return self->next_short(self,group,src_short,expand_dest,&info);
 }
 
+int default_actions_short(model_t self,int group,int*src,TransitionCB cb,void*context){
+    struct nested_cb info;
+    info.model = self;
+    info.group = group;
+    info.src=src;
+    info.cb=cb;
+    info.user_ctx=context;
+
+    int long_src[dm_ncols(GBgetDMInfo(self))];
+    dm_expand_vector(GBgetDMInfo(self), group, self->s0, src, long_src);
+    return self->actions_long(self,group,long_src,project_dest,&info);
+}
+
+int default_actions_long(model_t self,int group,int*src,TransitionCB cb,void*context){
+    struct nested_cb info;
+    info.model = self;
+    info.group = group;
+    info.src=src;
+    info.cb=cb;
+    info.user_ctx=context;
+
+    int len = dm_ones_in_row(GBgetDMInfo(self), group);
+    int src_short[len];
+    dm_project_vector(GBgetDMInfo(self), group, src, src_short);
+
+    return self->actions_short(self,group,src_short,expand_dest,&info);
+}
+
+
 
 int GBgetTransitionsMarked(model_t self,matrix_t* matrix,int row,int*src,TransitionCB cb,void*context){
     int N=dm_ncols(matrix);
@@ -247,6 +278,18 @@ wrapped_default_short (model_t self,int group,int*src,TransitionCB cb,void*conte
 
 int
 wrapped_default_long (model_t self,int group,int*src,TransitionCB cb,void*context)
+{
+    return GBgetTransitionsLong (GBgetParent(self), group, src, cb, context);
+}
+
+int
+wrapped_default_actions_short (model_t self,int group,int*src,TransitionCB cb,void*context)
+{
+    return GBgetTransitionsShort (GBgetParent(self), group, src, cb, context);
+}
+
+int
+wrapped_default_actions_long (model_t self,int group,int*src,TransitionCB cb,void*context)
 {
     return GBgetTransitionsLong (GBgetParent(self), group, src, cb, context);
 }
@@ -345,6 +388,8 @@ model_t GBcreateBase(){
 	model->context=0;
 	model->next_short=default_short;
 	model->next_long=default_long;
+    model->actions_short=default_actions_short;
+    model->actions_long=default_actions_long;
 	model->next_matching=next_matching_default;
 	model->next_all=default_all;
 	model->state_labels_short=state_labels_default_short;
@@ -474,10 +519,14 @@ void GBinitModelDefaults (model_t *p_model, model_t default_src)
      */
     if (model->next_short == default_short &&
         model->next_long == default_long &&
+        model->actions_short == default_short &&
+        model->actions_long == default_long &&
         model->next_all == default_all) {
         GBsetNextStateShort (model, wrapped_default_short);
         GBsetNextStateLong (model, wrapped_default_long);
         GBsetNextStateAll (model, wrapped_default_all);
+        GBsetActionsLong (model, wrapped_default_actions_long);
+        GBsetActionsShort (model, wrapped_default_actions_short);
     }
 
     if (model->state_labels_short == state_labels_default_short &&
@@ -578,6 +627,22 @@ void GBgetInitialState(model_t model,int *state){
 	for(int i=0;i<len;i++){
 		state[i]=model->s0[i];
 	}
+}
+
+void GBsetActionsShort(model_t model,next_method_grey_t method){
+    model->actions_short=method;
+}
+
+int GBgetActionsShort(model_t model,int group,int*src,TransitionCB cb,void*context){
+    return model->actions_short(model,group,src,cb,context);
+}
+
+void GBsetActionsLong(model_t model,next_method_grey_t method){
+    model->actions_long=method;
+}
+
+int GBgetActionsLong(model_t model,int group,int*src,TransitionCB cb,void*context){
+    return model->actions_long(model,group,src,cb,context);
 }
 
 void GBsetNextStateShort(model_t model,next_method_grey_t method){
