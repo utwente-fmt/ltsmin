@@ -25,12 +25,14 @@ static const char* VALID_END_STATE_LABEL_NAME       = "end_";
 
 /* Next-state functions */
 next_method_grey_t  prom_get_successor;
+next_method_grey_t  prom_get_actions;
 next_method_black_t prom_get_successor_all;
 void        (*prom_get_initial_state)(int *to);
 
 /* PINS dependency matrix info */
 int         (*prom_get_state_size)();
 int         (*prom_get_transition_groups)();
+const int*  (*prom_get_actions_read_dependencies)(int t);
 const int*  (*prom_get_transition_read_dependencies)(int t);
 const int*  (*prom_get_transition_write_dependencies)(int t);
 
@@ -167,6 +169,8 @@ PromLoadDynamicLib(model_t model, const char *filename)
         RTdlsym( filename, dlHandle, "spins_get_initial_state" );
     prom_get_successor = (next_method_grey_t)
         RTdlsym( filename, dlHandle, "spins_get_successor" );
+    prom_get_actions = (next_method_grey_t)
+        RTtrydlsym( dlHandle, "spins_get_actions" );
     prom_get_successor_all = (next_method_black_t)
         RTdlsym( filename, dlHandle, "spins_get_successor_all" );
     prom_get_state_size = (int(*)())
@@ -175,6 +179,8 @@ PromLoadDynamicLib(model_t model, const char *filename)
         RTdlsym( filename, dlHandle, "spins_get_transition_groups" );
     prom_get_transition_read_dependencies = (const int*(*)(int))
         RTdlsym( filename, dlHandle, "spins_get_transition_read_dependencies" );
+    prom_get_actions_read_dependencies = (const int*(*)(int))
+        RTtrydlsym( dlHandle, "spins_get_actions_read_dependencies" );
     prom_get_transition_write_dependencies = (const int*(*)(int))
         RTdlsym( filename, dlHandle, "spins_get_transition_write_dependencies" );
     prom_get_state_variable_name = (const char*(*)(int))
@@ -241,6 +247,7 @@ PromLoadGreyboxModel(model_t model, const char *filename)
 {
     lts_type_t ltstype;
     matrix_t *dm_info = RTmalloc (sizeof *dm_info);
+    matrix_t *dm_actions_read_info = RTmalloc(sizeof(matrix_t));
     matrix_t *dm_read_info = RTmalloc(sizeof(matrix_t));
     matrix_t *dm_write_info = RTmalloc(sizeof(matrix_t));
     matrix_t *sl_info = RTmalloc (sizeof *sl_info);
@@ -313,6 +320,7 @@ PromLoadGreyboxModel(model_t model, const char *filename)
     // get next state
     GBsetNextStateAll  (model, prom_get_successor_all);
     GBsetNextStateLong (model, prom_get_successor);
+    GBsetActionsLong (model, prom_get_actions);
 
     if (bool_is_new) {
         GBchunkPutAt(model, bool_type, chunk_str(LTSMIN_VALUE_BOOL_FALSE), 0);
@@ -377,6 +385,7 @@ PromLoadGreyboxModel(model_t model, const char *filename)
     // initialize the state read/write dependency matrices
     int ngroups = prom_get_transition_groups();
     dm_create(dm_info, ngroups, state_length);
+    dm_create(dm_actions_read_info, ngroups, state_length);
     dm_create(dm_read_info, ngroups, state_length);
     dm_create(dm_write_info, ngroups, state_length);
     for (int i=0; i < dm_nrows(dm_info); i++) {
@@ -392,10 +401,19 @@ PromLoadGreyboxModel(model_t model, const char *filename)
             if (proj[j]) dm_set(dm_info, i, j);
             if (proj[j]) dm_set(dm_write_info, i, j);
         }
+        if (prom_get_actions_read_dependencies != NULL) {
+            proj = (int*)prom_get_actions_read_dependencies(i);
+            for(int j=0; j<state_length; j++) {
+                if (proj[j]) dm_set(dm_actions_read_info, i, j);
+            }
+        }
     }
     GBsetDMInfo(model, dm_info);
     GBsetDMInfoRead(model, dm_read_info);
     GBsetDMInfoWrite(model, dm_write_info);
+
+    GBsetMatrix(model, "actions_reads", dm_actions_read_info, PINS_MAY_SET,
+                PINS_INDEX_GROUP, PINS_INDEX_STATE_VECTOR);
 
     // Export dependencies for all state labels (NOT ONLY GUARDS)
 
