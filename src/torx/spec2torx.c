@@ -19,7 +19,7 @@
 static struct poptOption options[] = {
     SPEC_POPT_OPTIONS,
     {NULL, 0, POPT_ARG_INCLUDE_TABLE, greybox_options, 0,
-     "Greybox options", NULL},
+     "PINS options", NULL},
     POPT_TABLEEND
 };
 

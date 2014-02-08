@@ -440,6 +440,8 @@ AC_CONFIG_FILES([
        src/pins2lts-dist/Makefile
        src/pins2lts-dist/gcc/Makefile
        src/pins2lts-dist/mpicc/Makefile
+       src/pins2lts-mc/parallel/Makefile
+       src/pins2lts-mc/algorithm/Makefile
        src/pins2lts-mc/Makefile
        src/pins2lts-seq/Makefile
        src/pins2lts-sym/Makefile

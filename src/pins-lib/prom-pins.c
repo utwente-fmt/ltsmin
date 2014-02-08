@@ -16,7 +16,7 @@
 #include <util-lib/util.h>
 
 static const char* ACCEPTING_STATE_LABEL_NAME       = "accept_";
-static const char* NON_PROGRESS_STATE_LABEL_NAME    = "np_";
+static const char* PROGRESS_STATE_LABEL_NAME        = "progress_";
 static const char* VALID_END_STATE_LABEL_NAME       = "end_";
 
 /**
@@ -77,19 +77,21 @@ prom_popt (poptContext con,
 	case POPT_CALLBACK_REASON_PRE:
 		break;
 	case POPT_CALLBACK_REASON_POST:
+        GBregisterPreLoader("pm",       PromCompileGreyboxModel);
         GBregisterPreLoader("pr",       PromCompileGreyboxModel);
         GBregisterPreLoader("promela",  PromCompileGreyboxModel);
         GBregisterPreLoader("prom",     PromCompileGreyboxModel);
         GBregisterPreLoader("prm",      PromCompileGreyboxModel);
         GBregisterPreLoader("pml",      PromCompileGreyboxModel);
-		GBregisterPreLoader("spins",   PromLoadDynamicLib);
+		GBregisterPreLoader("spins",    PromLoadDynamicLib);
 
+        GBregisterLoader("pm",          PromLoadGreyboxModel);
         GBregisterLoader("pr",          PromLoadGreyboxModel);
         GBregisterLoader("promela",     PromLoadGreyboxModel);
         GBregisterLoader("prom",        PromLoadGreyboxModel);
         GBregisterLoader("pml",         PromLoadGreyboxModel);
         GBregisterLoader("prm",         PromLoadGreyboxModel);
-        GBregisterLoader("spins",      PromLoadGreyboxModel);
+        GBregisterLoader("spins",       PromLoadGreyboxModel);
 		Warning(info,"Precompiled spins module initialized");
 		return;
 	case POPT_CALLBACK_REASON_OPTION:
@@ -374,7 +376,7 @@ PromLoadGreyboxModel(model_t model, const char *filename)
         if (strcmp (ACCEPTING_STATE_LABEL_NAME, name) == 0) {
             GBsetAcceptingStateLabelIndex (model, i);
         }
-        if(strcmp(NON_PROGRESS_STATE_LABEL_NAME, name) == 0) {
+        if(strcmp(PROGRESS_STATE_LABEL_NAME, name) == 0) {
             GBsetProgressStateLabelIndex (model, i);
         }
         if(strcmp(VALID_END_STATE_LABEL_NAME, name) == 0) {

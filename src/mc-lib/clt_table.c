@@ -288,7 +288,7 @@ clt_find_or_put (const clt_dbs_t* dbs, uint64_t k)
             dbs->table[q].change   = 0;
         }
     }
-    mfence; // TODO: use atomic_reads+atomic_writes instead
+    mfence(); // TODO: use atomic_reads+atomic_writes instead
     /* End of CS */
     /* ========= */
 	clt_unlock (dbs, t_left);

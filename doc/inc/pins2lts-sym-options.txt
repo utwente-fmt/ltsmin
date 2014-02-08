@@ -59,4 +59,3 @@ space.
     The formula is translated to a mu-formula (see manpage:ltsmin-mu[5]),
     which is evaluated after computing all reachable states.
 
-include::reachability-options.txt[]

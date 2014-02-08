@@ -68,16 +68,6 @@ enum { RED=0, GREEN=1, DANGEROUS=2 };
 #define GGREEN     GCOLOR(GREEN)    // bit 1
 #define GDANGEROUS GCOLOR(DANGEROUS)// bit 2
 
-extern void             color_set_dbs(void *dbs_);
-
-extern void             setup_colors(void *dbs_,
-                                     size_t count_bits_,
-                                     dbs_get_sat_f get_sat_bit_,
-                                     dbs_try_set_sat_f try_set_sat_bit_,
-                                     dbs_inc_sat_bits_f inc_sat_bits_,
-                                     dbs_dec_sat_bits_f dec_sat_bits_,
-                                     dbs_get_sat_bits_f get_sat_bits_);
-
 extern nndfs_color_t    nn_get_color (bitvector_t *set, ref_t ref);
 
 extern int      nn_set_color (bitvector_t *set, ref_t ref, nndfs_color_t color);
@@ -87,16 +77,5 @@ extern int      nn_color_eq (const nndfs_color_t a, const nndfs_color_t b);
 extern int      ndfs_has_color (bitvector_t *set, ref_t ref, ndfs_color_t color);
 
 extern int      ndfs_try_color (bitvector_t *set, ref_t ref, ndfs_color_t color);
-
-extern int      global_has_color (ref_t ref, global_color_t color, int rec_bits);
-
-//RED and BLUE are independent
-extern int      global_try_color (ref_t ref, global_color_t color, int rec_bits);
-
-extern uint32_t inc_wip (ref_t ref);
-
-extern uint32_t dec_wip (ref_t ref);
-
-extern uint32_t get_wip (ref_t ref);
 
 #endif

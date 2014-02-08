@@ -110,7 +110,6 @@ extra_ASCIIDOC += inc/reachability-options.txt
 extra_ASCIIDOC += inc/scoop-options.txt
 extra_ASCIIDOC += inc/spg-options.txt
 extra_ASCIIDOC += inc/spg-solve-options.txt
-extra_ASCIIDOC += inc/state-storage-options.txt
 extra_ASCIIDOC += inc/support.txt
 extra_ASCIIDOC += inc/sylvan-options.txt
 extra_ASCIIDOC += inc/vset-options.txt

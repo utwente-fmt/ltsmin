@@ -11,9 +11,9 @@ AC_ARG_WITH([libddd],
   [AS_HELP_STRING([--with-libddd=<prefix>],[libDDD prefix directory])])
 
 case "$with_libddd" in
-  '') TRY_LIBDDD_CPPFLAGS="$CPPFLAGS -I/usr/local/include" ;;
-  no) TRY_LIBDDD_CPPFLAGS="" ;;
-   *) TRY_LIBDDD_CPPFLAGS="-I$with_libddd/include" ;;
+  '') CHECK_DIR="/usr/local /usr /opt/local /opt/install" ;;
+  no) CHECK_DIR="" ;;
+   *) CHECK_DIR="$with_libddd" ;;
 esac
 
   
@@ -22,18 +22,15 @@ dnl libddd should be used via #include <ddd/DDD.h>, but this does not work
 dnl currently because internal libddd header files expect the "ddd" directory
 dnl in the include path.  Hence, some hoops to autodetect where libddd is
 dnl installed.
-for f in $TRY_LIBDDD_CPPFLAGS; do
-    case "$f" in
-      -I*) if test -f "${f#-I}/ddd/DDD.h"; then
-             LIBDDD_INCLUDE="${f#-I}"
-             AC_SUBST([DDD_CPPFLAGS],[$f/ddd])
-             AC_SUBST([LIBDDD],[${LIBDDD_INCLUDE/\/include/}])
-             AC_SUBST([DDD_LDFLAGS],[-L${LIBDDD}/lib])
-             acx_libddd=yes
-             break
-           fi
-           ;;
-    esac
+for f in $CHECK_DIR; do
+    if test -f "${f}/include/ddd/DDD.h"; then
+        LIBDDD_INCLUDE="${f}"
+        AC_SUBST([DDD_CPPFLAGS],["-I${f}/include/ddd"])
+        AC_SUBST([LIBDDD],["${f}"])
+        AC_SUBST([DDD_LDFLAGS],["-L${f}/lib"])
+        acx_libddd=yes
+        break
+    fi
 done
             
 if test x"$acx_libddd"=xyes; then
@@ -48,9 +45,8 @@ if test x"$acx_libddd"=xyes; then
         fi
     ])
     AC_LANG_POP([C++])
-fi
-
-if test x"$acx_libddd" = xyes; then
+    AC_SUBST(CPPFLAGS, ["${DDD_CPPFLAGS} $CPPFLAGS"])
+    AC_SUBST(LDFLAGS,  ["${DDD_LDFLAGS} $LDFLAGS"])
     $1
 else
     $2

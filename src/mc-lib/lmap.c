@@ -347,7 +347,7 @@ lm_get (lm_t *map, lm_loc_t location)
         return store.lattice;
     case LM_STATUS_TOMBSTONE:
     case LM_STATUS_TOMBSTONE_END:
-        return NULL_LATTICE;
+        return LM_NULL_LATTICE;
     default:
         Abort ("Lattice map get on empty store!.");
     }

@@ -72,7 +72,7 @@ static struct {
 
     box_mode_t       call_mode;
     const char      *arg_strategy;
-    enum { Strat_None, Strat_BFS, Strat_DFS, Strat_SCC }        strategy;
+    enum { Strategy_None, Strategy_BFS, Strategy_DFS, Strategy_SCC } strategy;
     const char      *arg_state_db;
     enum { DB_DBSLL, DB_TreeDBS, DB_Vset }                      state_db;
     const char      *arg_proviso;
@@ -100,7 +100,7 @@ static struct {
     .max            = SIZE_MAX,
     .call_mode      = UseBlackBox,
     .arg_strategy   = "none",
-    .strategy       = Strat_None,
+    .strategy       = Strategy_None,
     .arg_state_db   = "tree",
     .state_db       = DB_TreeDBS,
     .arg_proviso    = "none",
@@ -108,10 +108,10 @@ static struct {
 };
 
 static si_map_entry strategies[] = {
-    {"none",Strat_None},
-    {"bfs", Strat_BFS},
-    {"dfs", Strat_DFS},
-    {"scc", Strat_SCC},
+    {"none",Strategy_None},
+    {"bfs", Strategy_BFS},
+    {"dfs", Strategy_DFS},
+    {"scc", Strategy_SCC},
     {NULL, 0}
 };
 
@@ -189,7 +189,7 @@ static struct poptOption options[] = {
       "select proviso for ltl/por", "<closedset|stack|color>"},
     { "max" , 0 , POPT_ARG_LONGLONG|POPT_ARGFLAG_SHOW_DEFAULT , &opt.max , 0 ,"maximum search depth", "<int>"},
     SPEC_POPT_OPTIONS,
-    { NULL, 0 , POPT_ARG_INCLUDE_TABLE, greybox_options , 0 , "Greybox options", NULL },
+    { NULL, 0 , POPT_ARG_INCLUDE_TABLE, greybox_options , 0 , "PINS options", NULL },
     { NULL, 0 , POPT_ARG_INCLUDE_TABLE, vset_options , 0 , "Vector set options", NULL },
     { NULL, 0 , POPT_ARG_INCLUDE_TABLE, development_options , 0 , "Development options" , NULL },
     POPT_TABLEEND
@@ -1365,7 +1365,7 @@ gsea_setup_default()
     if (!gc.report_finished)            gc.report_finished = gsea_finished;
 
     switch (opt.strategy) {
-    case Strat_BFS:
+    case Strategy_BFS:
         // check required functions
         if (!gc.goal_trace)             gc.goal_trace = gsea_goal_trace_default;
         if (!gc.has_open)               gc.has_open = (gsea_int) error_state_arg;
@@ -1384,14 +1384,14 @@ gsea_setup_default()
             if (!gc.state_next)         gc.state_next = gsea_state_next_all_default;
         }
         break;
-    case Strat_SCC:
+    case Strategy_SCC:
         // exception for Strat_SCC, only works in combination with ltl formula
         if (GBgetAcceptingStateLabelIndex(opt.model) < 0) {
             Abort("SCC search only works in combination with an accepting state label"
                   " (see LTL options)");
         }
         /* fall-through */
-    case Strat_DFS:
+    case Strategy_DFS:
         // init filo  queue
         if (!gc.queue.filo.push)        Abort ("GSEA push() not implemented");
         if (!gc.queue.filo.pop)         gc.queue.filo.pop = dfs_pop;
@@ -1425,7 +1425,7 @@ gsea_setup_default()
         if (!gc.goal_trace)             gc.goal_trace = dfs_goal_trace;
 
         // scc specifics
-        if (opt.strategy == Strat_DFS) break;
+        if (opt.strategy == Strategy_DFS) break;
 
         /* scc wrapper functions */
         gc.scc_open_extract = gc.open_extract;
@@ -1444,7 +1444,7 @@ gsea_setup_default()
         ADD_ARRAY(gc.store.scc.dfsnum_man, gc.store.scc.dfsnum, int);
         gc.store.scc.count = 0;
         break;
-    case Strat_None: Abort ("No strategy selected?");
+    case Strategy_None: Abort ("No strategy selected?");
     }
 
     // options setup
@@ -1484,20 +1484,20 @@ set_cycle_proviso ()
     if (!PINS_POR) return;
     if (opt.proviso == P_None) {
         Warning (info, "Forcing the use of a cycle proviso. For best results use --proviso=color.");
-        opt.proviso = opt.strategy == Strat_BFS ? P_ClosedSet : P_Stack;
+        opt.proviso = opt.strategy == Strategy_BFS ? P_ClosedSet : P_Stack;
     }
 }
 
 static void
 set_strategy (const char *output)
 {
-    if (opt.strategy == Strat_None) {
+    if (opt.strategy == Strategy_None) {
         if (GBgetAcceptingStateLabelIndex(opt.model) >= 0) {
-            opt.strategy = Strat_SCC;
+            opt.strategy = Strategy_SCC;
         } else if (output) {
-            opt.strategy = Strat_BFS;
+            opt.strategy = Strategy_BFS;
         } else {
-            opt.strategy = Strat_DFS;
+            opt.strategy = Strategy_DFS;
         }
     }
 }
@@ -1533,7 +1533,7 @@ gsea_setup(const char *output)
 
     // setup search algorithms and datastructures
     switch(opt.strategy) {
-    case Strat_BFS:
+    case Strategy_BFS:
         switch (opt.state_db) {
         case DB_TreeDBS:
             if (output) {
@@ -1594,11 +1594,11 @@ gsea_setup(const char *output)
 
         break;
 
-    case Strat_SCC:
+    case Strategy_SCC:
         if (opt.dlk_detect || opt.act_detect || opt.inv_detect)
             Abort ("Verification of safety properties works only with reachability algorithms.");
         set_cycle_proviso ();
-    case Strat_DFS:
+    case Strategy_DFS:
         if (output) Abort("Use BFS to write the state space to an lts file.");
         switch (opt.state_db) {
         case DB_TreeDBS:
@@ -1703,7 +1703,7 @@ gsea_setup(const char *output)
         }
         break;
 
-    case Strat_None: Abort ("No strategy selected?");
+    case Strategy_None: Abort ("No strategy selected?");
     default:
         Abort ("unimplemented strategy");
     }
@@ -1827,7 +1827,7 @@ gsea_print_setup ()
         for (size_t i = 0; i < global.state_labels; i++)
             labels += visibility[i];
         Warning (info, "Visible groups: %zu / %zu, labels: %zu / %zu", visibles, global.K, labels, global.state_labels);
-        Warning (info, "POR cycle proviso: %s %s", key_search(provisos, opt.proviso), opt.strategy == Strat_SCC ? "(ltl)" : "");
+        Warning (info, "POR cycle proviso: %s %s", key_search(provisos, opt.proviso), opt.strategy == Strategy_SCC ? "(ltl)" : "");
     }
 }
 

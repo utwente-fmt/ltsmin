@@ -1,3 +1,5 @@
+include::reachability-options.txt[]
+
 include::pins-options.txt[]
 
 include::lts-io-options.txt[]

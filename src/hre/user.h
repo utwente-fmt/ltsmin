@@ -59,14 +59,14 @@ Good choices for a default number of threads are 1 and RTnumCPUs().
 
 Thread support can be disabled by calling this function with 0 as argument.
 */
-extern void HREenableThreads(int threads);
+extern void HREenableThreads(int threads, bool selected);
 
 /**
 \brief Enable the multi process runtime.
 
 The argument sets the default number of processes used when this runtime is selected.
 */
-extern void HREenableFork(int procs);
+extern void HREenableFork(int procs, bool selected);
 
 /**
 \brief Disable the single process runtime.

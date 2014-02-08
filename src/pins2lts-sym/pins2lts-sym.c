@@ -37,11 +37,13 @@ static int   act_label;
 static int   sat_granularity = 10;
 static int   save_sat_levels = 0;
 
+#ifdef HAVE_LIBSPG
 static int   pgsolve_flag = 0;
+static char* pg_output = NULL;
+#endif
 #if defined(LTSMIN_PBES)
 static int   pgreduce_flag = 0;
 #endif
-static char* pg_output = NULL;
 static int var_pos = 0;
 static int var_type_no = 0;
 static int variable_projection = 0;
@@ -165,7 +167,7 @@ static  struct poptOption options[] = {
     { "pg-write" , 0 , POPT_ARG_STRING , &pg_output, 0, "file to write symbolic parity game to","<pg-file>.spg" },
 #endif
     SPEC_POPT_OPTIONS,
-    { NULL, 0 , POPT_ARG_INCLUDE_TABLE, greybox_options , 0 , "Greybox options",NULL},
+    { NULL, 0 , POPT_ARG_INCLUDE_TABLE, greybox_options , 0 , "PINS options",NULL},
     { NULL, 0 , POPT_ARG_INCLUDE_TABLE, vset_options , 0 , "Vector set options",NULL},
     POPT_TABLEEND
 };
@@ -704,6 +706,7 @@ final_stat_reporting(vset_t visited, rt_timer_t timer)
     }
 }
 
+#if defined(HAVE_LIBSPG) || defined(PBES)
 static bool debug_output_enabled = false;
 
 /**
@@ -742,6 +745,7 @@ static inline void add_variable_subset(vset_t dst, vset_t src, vdom_t domain, in
     vset_union(dst, u);
     vset_destroy(u);
 }
+#endif
 
 #if defined(LTSMIN_PBES)
 static inline void reduce_parity_game(vset_t next_level, vset_t visited, vset_t true_states, vset_t false_states)
@@ -2145,6 +2149,7 @@ main (int argc, char *argv[])
     if (act_detect != NULL) init_action();
     if (inv_detect) Abort("Invariant violation detection is not implemented.");
     if (no_exit) Abort("Error counting (--no-exit) is not implemented.");
+    if (PINS_POR != PINS_POR_NONE) Abort("Partial-order reduction and symbolic model checking are not compatible.");
 
 
     if (inhibit_matrix!=NULL){

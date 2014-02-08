@@ -6,6 +6,7 @@
 #include <hre/stringindex.h>
 #include <ltsmin-lib/ltsmin-standard.h>
 #include <pins-lib/pins.h>
+#include <pins-lib/pins-util.h>
 #include <pins-lib/pins2pins-mucalc.h>
 #include <util-lib/treedbs.h>
 
@@ -31,6 +32,7 @@ struct grey_box_model {
     int *group_visibility;
     int *label_visibility;
 	int *s0;
+	int *guard_status;
 	void*context;
 	next_method_grey_t next_short;
 	next_method_grey_t next_long;
@@ -952,10 +954,32 @@ void GBprintPORMatrix(FILE* file, model_t model) {
     dm_print(file, GBgetGuardNDSInfo(model));
 }
 
+
+int guards_all(model_t self,int*src,TransitionCB cb,void*context){
+
+    // fill guard status, request all guard values
+    GBgetStateLabelsAll (self, src, self->guard_status);
+
+    int res = 0;
+    for (size_t i = 0; i < pins_get_group_count(self); i++) {
+        guard_t *gt = self->guards[i];
+        int enabled = 1;
+        for (int j = 0; j < gt->count && enabled; j++) {
+            enabled &= self->guard_status[gt->guard[j]] != 0;
+        }
+        if (enabled) {
+            res+=self->next_long(self,i,src,cb,context);
+        }
+    }
+
+    return res;
+}
+
 /**********************************************************************
  * Grey box factory functionality
  */
 
+#define                 USE_GUARDS_OPTION "pins-guards"
 #define                 MAX_TYPES 16
 static char*            model_type[MAX_TYPES];
 static pins_loader_t    model_loader[MAX_TYPES];
@@ -964,6 +988,7 @@ static char            *model_type_pre[MAX_TYPES];
 static pins_loader_t    model_preloader[MAX_TYPES];
 static int              registered_pre=0;
 static int              matrix=0;
+static int              use_guards=0;
 static int              labels=0;
 static int              cache=0;
 pins_por_t              PINS_POR = PINS_POR_NONE;
@@ -1031,6 +1056,15 @@ GBloadFile (model_t model, const char *filename, model_t *wrapped)
                         model = GBaddCache (model);
                     *wrapped = model;
                 }
+                if (use_guards) {
+                    if (model->next_long == default_long)
+                        Abort ("No long next-state function implemented for this language module (--"USE_GUARDS_OPTION").");
+                    sl_group_t* guards = GBgetStateLabelGroupInfo (model, GB_SL_GUARDS);
+                    if (model->guards == NULL || guards == NULL || guards->count == 0)
+                        Abort ("No long next-state function implemented for this language module (--"USE_GUARDS_OPTION").");
+                    model->guard_status = RTmalloc (sizeof(int[pins_get_state_label_count(model)]));
+                    model->next_all = guards_all;
+                }
 
                 if (matrix) {
                     if (HREme(HREglobal()) == 0) {
@@ -1038,19 +1072,22 @@ GBloadFile (model_t model, const char *filename, model_t *wrapped)
                         if (log_active(infoLong)) {
                             GBprintPORMatrix(stdout, model);
                         }
+                        HREbarrier (HREglobal());
                         HREabort (LTSMIN_EXIT_SUCCESS);
                     }
+                    HREbarrier (HREglobal());
                 } else if (labels) {
                     if (HREme(HREglobal()) == 0) {
                         if (log_active(info)){
                             lts_type_printf(info, GBgetLTStype(model));
                         }
                         chunk_table_print(info, model);
+                        HREbarrier (HREglobal());
                         HREabort (LTSMIN_EXIT_SUCCESS);
                     }
-                } else {
-                    return;
+                    HREbarrier (HREglobal());
                 }
+                return;
             }
         }
         Abort("No factory method has been registered for %s models",
@@ -1164,7 +1201,8 @@ GBstateIsValidEnd (model_t model, int *state)
 struct poptOption greybox_options[]={
     { "labels", 0, POPT_ARG_VAL, &labels, 1, "print state variable and type names, and state and action labels", NULL },
 	{ "matrix" , 'm' , POPT_ARG_VAL , &matrix , 1 , "print the dependency matrix for the model and exit" , NULL},
-	{ "cache" , 'c' , POPT_ARG_VAL , &cache , 1 , "enable caching of grey box calls" , NULL },
+	{ USE_GUARDS_OPTION , 0 , POPT_ARG_VAL , &use_guards , 1 , "use guards in combination with the long next-state function to speed up the next-state function" , NULL},
+	{ "cache" , 'c' , POPT_ARG_VAL , &cache , 1 , "enable caching of PINS calls" , NULL },
 	{ "regroup" , 'r' , POPT_ARG_STRING, &regroup_options , 0 ,
           "enable regrouping; available transformations T: "
           "gs, ga, gsa, gc, gr, cs, cn, cw, ca, csa, rs, rn, ru", "<(T,)+>" },
