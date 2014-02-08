@@ -48,6 +48,14 @@ char            *files[2];
 void
 options_static_init      (model_t model, bool timed)
 {
+    if (files[1]) {
+        Print1 (info,"Writing output to %s", files[1]);
+        if (strategy[0] & ~Strat_PBFS) {
+            Print1 (info,"Switching to PBFS algorithm for LTS write");
+            strategy[0] = Strat_PBFS;
+        }
+    }
+
     if (strategy[0] == Strat_None)
         strategy[0] = (GBgetAcceptingStateLabelIndex(model) < 0 ?
               (strategy[0] == Strat_TA ? Strat_SBFS : Strat_BFS) : Strat_CNDFS);
@@ -58,14 +66,6 @@ options_static_init      (model_t model, bool timed)
         if (trc_output && (W != 1 || strategy[0] != Strat_DFS))
             Abort("Opaal error traces only supported with a single thread and DFS order");
         strategy[0] |= Strat_TA;
-    }
-
-    if (files[1]) {
-        Print1 (info,"Writing output to %s", files[1]);
-        if (strategy[0] & ~Strat_PBFS) {
-            Print1 (info,"Switching to PBFS algorithm for LTS write");
-            strategy[0] = Strat_PBFS;
-        }
     }
 
     if (PINS_POR && (strategy[0] & Strat_LTL & ~Strat_DFSFIFO)) {

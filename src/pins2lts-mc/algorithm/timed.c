@@ -439,6 +439,13 @@ timed_run (run_t *run, wctx_t *ctx)
     }
 
     if (0 == ctx->id) { // only w1 receives load, as it is propagated later
+        if ( Strat_PBFS & strategy[0] ) {
+            if (ctx->local->lts != NULL) {
+                state_data_t        initial = state_info_state(ctx->initial);
+                int             src_owner = ref_hash(ctx->initial->ref) % W;
+                lts_write_init (ctx->local->lts, src_owner, initial);
+            }
+        }
         ta_handle (ctx, ctx->initial, &ti, 0);
         ctx->counters->trans = 0; //reset trans count
     }
