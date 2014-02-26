@@ -17,6 +17,7 @@ static int NO_HEUR = 0;
 static int NO_DNA = 0;
 static int NO_NES = 0;
 static int NO_NDS = 0;
+static int NO_MDS = 0;
 static int NO_MC = 0;
 static int NO_DYNLAB = 0;
 static int NO_V = 0;
@@ -37,6 +38,7 @@ struct poptOption por_options[]={
     { "no-dna" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_DNA , 1 , "without DNA" , NULL },
     { "no-nes" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_NES , 1 , "without NES" , NULL },
     { "no-heur" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_HEUR , 1 , "without heuristic" , NULL },
+    { "no-mds" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_MDS , 1 , "without MDS" , NULL },
     { "no-nds" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_NDS , 1 , "without NDS (for dynamic label info)" , NULL },
     { "no-mc" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_MC , 1 , "without MC (for NDS)" , NULL },
     { "no-dynamic-labels" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_DYNLAB , 1 , "without dynamic labels" , NULL },
@@ -1700,7 +1702,7 @@ GBaddPOR (model_t model)
                 if (i == j) {
                     dm_set(&not_left_accords, i, j);
                 } else {
-                    if (must_disable != NULL) {
+                    if (must_disable != NULL && !NO_MDS) {
                         for (int g = 0; g < ctx->group2guard[i]->count; g++) {
                             int guard = ctx->group2guard[i]->data[g];
                             if (dm_is_set (must_disable, guard, j)) {
