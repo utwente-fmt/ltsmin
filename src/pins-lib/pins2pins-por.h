@@ -173,6 +173,7 @@ typedef struct por_context {
     ci_list        **group_has;     // mapping group to each nes/nds for it
     ci_list        **group_hasn;     // mapping group to each nes/nds for it
     ci_list        **not_left_accords;
+    ci_list        **not_left_accordsn;
     ci_list        **nds;
     ci_list        **ndsn;
 

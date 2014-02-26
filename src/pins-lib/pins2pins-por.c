@@ -190,13 +190,14 @@ por_init_transitions (model_t model, por_context* ctx, int* src)
 
     ctx->visible_enabled = 0;
     ctx->enabled_list->count = 0;
+
     // fill group status and score
     for (int i = 0; i < ctx->ngroups; i++) {
         ctx->group_status[i] = GS_ENABLED; // reset
         // mark groups as disabled
-        guard_t* gt = GBgetGuard (model, i);
-        for (int j = 0; j < gt->count; j++) {
-            if (ctx->label_status[gt->guard[j]] == 0) {
+        for (int j = 0; j < ctx->group2guard[i]->count; j++) {
+            int guard = ctx->group2guard[i]->data[j];
+            if (ctx->label_status[guard] == 0) {
                 ctx->group_status[i] = GS_DISABLED;
                 break;
             }
@@ -965,7 +966,8 @@ typedef enum {
     DEL_Z,  // stack set
     DEL_R,  // set
     DEL_KP, // stack
-    DEL_TP, // stack
+    DEL_TN, // stack
+    DEL_TD, // stack
     DEL_COUNT
 } del_t;
 
@@ -996,28 +998,6 @@ static inline int
 del_count (del_context_t *del, del_t set)
 {
     return del->lists[set]->count;
-}
-
-static inline bool
-del_has_stubborn_nes (por_context* ctx, int u)
-{
-    del_context_t *del = ctx->del_ctx;
-    for (int i = 0; i < ctx->group_has[u]->count; i++) {
-        int ns = ctx->group_has[u]->data[i];
-        if ( ((ns  < ctx->nguards && ctx->label_status[ns] == 0) ||
-              (ns >= ctx->nguards && ctx->label_status[ns - ctx->nguards] != 0))) {
-
-            bool all_stubborn = true;
-            for (int i = 0; i < ctx->ns[ns]->count && all_stubborn; i++) {
-                int x = ctx->ns[ns]->data[i];
-                if (!del_has(del,DEL_N,x) && !del_has(del,DEL_N,x)) {
-                    all_stubborn = false;
-                }
-            }
-            if (all_stubborn) return true;
-        }
-    }
-    return false;
 }
 
 // Messes up stack, only stack counter is maintained. Not to be combined with pop!
@@ -1078,20 +1058,21 @@ deletion_setup (model_t model, por_context* ctx, int* src)
 
     del_context_t *del = ctx->del_ctx;
 
-    for (int ns = 0; ns < ctx->nguards; ns++) {
-        ctx->nes_score[ns] = ctx->label_status[ns] == 0;
+    // use -1 for deactivated NESs
+    for (int ns = 0; ns < ctx->nguards; ns++) { // guard should be false
+        ctx->nes_score[ns] = 0 - (ctx->label_status[ns] != 0); // 0 for false!
     }
-    for (int ns = ctx->nguards; ns < NS_SIZE(ctx); ns++) {
-        ctx->nes_score[ns] = ctx->label_status[ns - ctx->nguards] == 1;
+    for (int ns = ctx->nguards; ns < NS_SIZE(ctx); ns++) { // guard should be true
+        ctx->nes_score[ns] = 0 - (ctx->label_status[ns - ctx->nguards] == 0); // 0 for true!
     }
 
-    // initially all ns's are in:
+    // initially all active ns's are in:
     for (int t = 0; t < ctx->ngroups; t++) {
         ctx->group_score[t] = 0;
         if (del_enabled(ctx,t)) continue;
         for (int i = 0; i < ctx->group_has[t]->count; i++) {
             int ns = ctx->group_has[t]->data[i];
-            ctx->group_score[t] += ctx->nes_score[ns];
+            ctx->group_score[t] += ctx->nes_score[ns] >= 0;
         }
     }
 
@@ -1113,6 +1094,7 @@ deletion_setup (model_t model, por_context* ctx, int* src)
             del_push (del, DEL_C, group);
         }
     }
+    Warning (debug, "Deletion init |en| = %d \t|R| = %d", ctx->enabled_list->count, del_count(del, DEL_R));
 }
 
 static inline void
@@ -1121,95 +1103,112 @@ deletion_analyze (por_context* ctx)
     if (ctx->enabled_list->count == 0) return;
     del_context_t *del = ctx->del_ctx;
 
-    Warning (debug, "Deletion init: |C| = %d \t|K| = %d", del_count(del, DEL_C), del_count(del, DEL_K));
-
-    while (del_count(del, DEL_C) != 0 && del_count(del, DEL_K) != 0) {
+    while (del_count(del, DEL_C) != 0 && del_count(del, DEL_K) > 1) {
         int v = del_pop (del, DEL_C);
         if (del_rem(del, DEL_K, v)) del_push (del, DEL_KP, v);
-        if (del_rem(del, DEL_N, v)) del_push (del, DEL_TP, v);
+        if (del_rem(del, DEL_N, v)) del_push (del, DEL_TN, v);
         del_push_new (del, DEL_Z, v);
 
+        Warning (debug, "Deletion start from v = %d: |C| = %d \t|K| = %d", v, del_count(del, DEL_C), del_count(del, DEL_K));
 
         // search the deletion space:
         bool RfromT = false;
-        Printf (debug, "Removing from N: ");
         while (del_count(del, DEL_Z) != 0 && del_count(del, DEL_K) != 0) {
-            int u = del_pop (del, DEL_Z);
+            int z = del_pop (del, DEL_Z);
+            Warning (debug, "Checking u = %d", z);
 
-            // if u is enabled, and a key, or other stubborn, then continue
-            if (del_enabled(ctx,u) && (del_has(del,DEL_K,u)||del_has(del,DEL_N,u)))
-                continue;
-
-            // if u is disabled and still has a stubborn NES, then continue
-            if (!del_enabled(ctx,u) && del_has_stubborn_nes(ctx,u))
-                continue;
-
-            if (del_has(del,DEL_R,u)) {
+            if (del_has(del,DEL_R,z)) {
                 RfromT = true;
                 break;
             }
 
-            Warning (debug, "\nDeletion from v = %d", v);
-            if (del_rem(del, DEL_K, u)) del_push (del, DEL_KP, u);
-            if (del_rem(del, DEL_N, u)) del_push (del, DEL_TP, u);
-
             // Firstly, the enabled transitions x that are still stubborn and
             // belong to DNA_u, need to be removed from key stubborn and put to Z.
-            for (int i = 0; i < ctx->not_accords[u]->count; i++) {
-                int x = ctx->not_accords[u]->data[i];
+            for (int i = 0; i < ctx->not_accords[z]->count; i++) {
+                int x = ctx->not_accords[z]->data[i];
                 if (del_has(del,DEL_K,x)) {
-                    if (!del_has(del,DEL_N,x))
+                    if (!del_has(del,DEL_N,x)) {
+                        if (ctx->group_score[x] == -1) {  RfromT = true; break; }
                         del_push_new (del, DEL_Z, x);
+                    }
                     if (del_rem(del, DEL_K, x)) del_push (del, DEL_KP, x);
                 }
             }
+            if (del_count(del, DEL_K) == 0 || RfromT) break;
 
             // Secondly, the enabled transitions x that are still stubborn and
             // belong to DNB_u need to be removed from other stubborn and put to Z.
-            for (int i = 0; i < ctx->not_left_accords[u]->count; i++) {
-                int x = ctx->not_left_accords[u]->data[i];
+            for (int i = 0; i < ctx->not_left_accordsn[z]->count; i++) {
+                int x = ctx->not_left_accordsn[z]->data[i];
                 if (del_enabled(ctx,x) && del_has(del,DEL_N,x)) {
-                    if (!del_has(del,DEL_K,x))
+                    if (!del_has(del,DEL_K,x)) {
+                        if (ctx->group_score[x] == -1) { RfromT = true; break; }
                         del_push_new (del, DEL_Z, x);
-                    if (del_rem(del, DEL_N, x)) del_push (del, DEL_TP, x);
+                    }
+                    if (del_rem(del, DEL_N, x)) del_push (del, DEL_TN, x);
                 }
             }
+            if (RfromT) break;
 
+            del_push (del, DEL_TD, z);
             // Thirdly, the disabled transitions x, whose NES was stubborn
             // before removal of u, need to be put to Z.
-            for (int i = 0; i < ctx->group2ns[u]->count; i++) {
-                int ns = ctx->group2ns[u]->data[i];
-                if ( ((ns  < ctx->nguards && ctx->label_status[ns] == 0) ||
-                      (ns >= ctx->nguards && ctx->label_status[ns - ctx->nguards] != 0))) {
-                    for (int i = 0; i < ctx->group_hasn[ns]->count; i++) {
-                        int x = ctx->group_hasn[ns]->data[i];
-                        if (!del_enabled(ctx,x) && !(del_has(del,DEL_N,x) || del_has(del,DEL_K,x))) {
+            for (int i = 0; i < ctx->group2ns[z]->count; i++) {
+                int ns = ctx->group2ns[z]->data[i];
+                if (ctx->nes_score[ns] == -1) continue; // -1 is inactive!
+
+                // not the first transition removed from NES?
+                int score = ctx->nes_score[ns]++;
+                if (score != 0) continue;
+
+                for (int i = 0; i < ctx->group_hasn[ns]->count; i++) {
+                    int x = ctx->group_hasn[ns]->data[i];
+                    if (!del_enabled(ctx,x)) {
+                        ctx->group_score[x]--;
+                        HREassert (ctx->group_score[x] >= 0, "Wrong counting!");
+                        if (ctx->group_score[x] == 0 && del_has(del,DEL_N,x)) {
                             del_push_new (del, DEL_Z, x);
+                            HREassert (!del_has(del, DEL_K, x)); // x is disabled
+                            if (del_rem(del, DEL_N, x)) del_push (del, DEL_TN, x);
                         }
                     }
                 }
             }
         }
-        Printf (debug, "\n");
 
         while (del_count(del, DEL_Z) != 0) del_pop (del, DEL_Z);
 
         // Reverting deletions if necessary
-        // if K == {} \/ R \ T != {}
         if (del_count(del, DEL_K) == 0 || RfromT) {
-            Warning (debug, "Deletion rollback: |T'| = %d \t|K'| = %d", del_count(del, DEL_TP), del_count(del, DEL_KP));
+            Warning (debug, "Deletion rollback: |T'| = %d \t|K'| = %d \t|D'| = %d",
+                     del_count(del, DEL_TN), del_count(del, DEL_KP), del_count(del, DEL_TD));
+            ctx->group_score[v] = -1; // fail transition!
             while (del_count(del, DEL_KP) != 0) {
                 int x = del_pop (del, DEL_KP);
                 bool seen = del_push_new (del, DEL_K, x);
                 HREassert (seen, "DEL_K messed up");
             }
-            while (del_count(del, DEL_TP) != 0) {
-                int x = del_pop (del, DEL_TP);
+            while (del_count(del, DEL_TN) != 0) {
+                int x = del_pop (del, DEL_TN);
                 del->set[x] = del->set[x] | (1<<DEL_N);
+            }
+            while (del_count(del, DEL_TD) != 0) {
+                int x = del_pop (del, DEL_TD);
+                for (int i = 0; i < ctx->group2ns[x]->count; i++) {
+                    int ns = ctx->group2ns[x]->data[i];
+                    ctx->nes_score[ns] -= (ctx->nes_score[ns] >= 0);
+                    if (ctx->nes_score[ns] != 0) continue; // NES not readded
+
+                    for (int i = 0; i < ctx->group_hasn[ns]->count; i++) {
+                        int x = ctx->group_hasn[ns]->data[i];
+                        ctx->group_score[x] += !del_enabled(ctx,x);
+                    }
+                }
             }
         } else {
             del_clear (del, DEL_KP);
-            del_clear (del, DEL_TP);
+            del_clear (del, DEL_TN);
+            del_clear (del, DEL_TD);
         }
     }
 }
@@ -1471,8 +1470,14 @@ GBaddPOR (model_t model)
     // initializing dependency lookup table ( (t, t') \in D relation)
     Print1 (info, "Initializing dependency lookup table.");
 
-    matrix_t           *p_dm = GBgetDMInfo (model);
+    matrix_t           *p_dm = NULL;
     matrix_t           *p_dm_w = GBgetDMInfoMayWrite (model);
+    int id = GBgetMatrixID (model, LTSMIN_MATRIX_ACTIONS_READS);
+    if (id == SI_INDEX_FAILED) {
+        p_dm = GBgetDMInfo (model);
+    } else {
+        p_dm = GBgetMatrix (model, id);
+    }
 
     int groups = dm_nrows( p_dm );
     int len = dm_ncols( p_dm );
@@ -1572,6 +1577,22 @@ GBaddPOR (model_t model)
         }
     }
 
+    matrix_t nds;
+    dm_create(&nds, groups, groups);
+    for (int i = 0; i < groups; i++) {
+        for (int j = 0; j < groups; j++) {
+            for (int g = 0; g < ctx->group2guard[j]->count; g++) {
+                int guard = ctx->group2guard[j]->data[g];
+                if (dm_is_set (&ctx->gnds_matrix, guard, i)) {
+                    dm_set( &nds, j, i);
+                    continue;
+                }
+            }
+        }
+    }
+    ctx->nds     = (ci_list **) dm_rows_to_idx_table(&nds);
+    ctx->ndsn     = (ci_list **) dm_cols_to_idx_table(&nds);
+
     // extract guard not co-enabled and guard-nes information
     // from guard may-be-co-enabled with guard relation:
     // for a guard g, find all guards g' that may-not-be co-enabled with it
@@ -1628,9 +1649,13 @@ GBaddPOR (model_t model)
                     continue; // transitions accord with each other
                 }
 
+                if (dm_is_set(&nds,i,j) || dm_is_set(&nds,j,i)) {
+                    dm_set( &ctx->not_accords_with, i, j );
+                    continue;
+                }
+
                 // is dependent?
-                for (int k=0; k < len; k++)
-                {
+                for (int k=0; k < len; k++) {
                     if ((dm_is_set( p_dm_w, i, k) && dm_is_set( p_dm, j, k)) ||
                         (dm_is_set( p_dm, i, k) && dm_is_set( p_dm_w, j, k)) ) {
                         dm_set( &ctx->not_accords_with, i, j );
@@ -1640,7 +1665,6 @@ GBaddPOR (model_t model)
             }
         }
     }
-
 
     // set lookup tables
     ctx->not_accords = (ci_list **) dm_rows_to_idx_table(&ctx->not_accords_with);
@@ -1658,8 +1682,17 @@ GBaddPOR (model_t model)
     }
 
     if (!WEAK) {
-        ctx->not_left_accords = ctx->not_accords;
+        ctx->not_left_accords  = ctx->not_accords;
+        ctx->not_left_accordsn = ctx->not_accords;
     } else {
+        matrix_t *must_disable = NULL;
+        int id = GBgetMatrixID(model, LTSMIN_MUST_DISABLE_MATRIX);
+        if (id != SI_INDEX_FAILED) {
+            must_disable = GBgetMatrix(model, id);
+        } else {
+            Print1 (info, "No must-disable matrix available for weak sets");
+        }
+
         matrix_t not_left_accords;
         dm_create(&not_left_accords, groups, groups);
         for (int i = 0; i < groups; i++) {
@@ -1667,6 +1700,15 @@ GBaddPOR (model_t model)
                 if (i == j) {
                     dm_set(&not_left_accords, i, j);
                 } else {
+                    if (must_disable != NULL) {
+                        for (int g = 0; g < ctx->group2guard[i]->count; g++) {
+                            int guard = ctx->group2guard[i]->data[g];
+                            if (dm_is_set (must_disable, guard, j)) {
+                                continue;
+                            }
+                        }
+                    }
+
                     for (int g = 0; g < ctx->group2guard[i]->count; g++) {
                         int guard = ctx->group2guard[i]->data[g];
                         if (dm_is_set (&ctx->gnes_matrix, guard, j)) {
@@ -1680,8 +1722,7 @@ GBaddPOR (model_t model)
                     }
 
                     // is even dependent? Front-end might miss it.
-                    for (int k = 0; k < len; k++)
-                    {
+                    for (int k = 0; k < len; k++) {
                         if ((dm_is_set( p_dm_w, i, k) && dm_is_set( p_dm, j, k)) ||
                             (dm_is_set( p_dm, i, k) && dm_is_set( p_dm_w, j, k)) ) {
                             dm_set( &not_left_accords, i, j );
@@ -1692,6 +1733,7 @@ GBaddPOR (model_t model)
             }
         }
         ctx->not_left_accords = (ci_list **) dm_rows_to_idx_table(&not_left_accords);
+        ctx->not_left_accordsn= (ci_list **) dm_cols_to_idx_table(&not_left_accords);
     }
 
     // init por model
