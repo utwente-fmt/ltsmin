@@ -144,8 +144,7 @@ typedef struct por_context {
     matrix_t        not_accords_with;   //
     matrix_t        nce;            //
     matrix_t        gnce_matrix;   //
-    ci_list       **not_accords_tg_tg;  // mapping from transition group to groups that it accords with
-                                        // accord with left for weak stubborn sets
+    ci_list       **not_accords;  // mapping from transition group to groups that it accords with
     ci_list       **guard2group;    // mapping from guard to transition group
     ci_list       **group2guard;    // mapping from group to guards
     ci_list       **guard_nes;      // transition groups that form a nes for a guard (guard -> [t1, t2, t..])
@@ -173,7 +172,7 @@ typedef struct por_context {
     ci_list        **group2ns;      // mapping group to each nes/nds in which it is used
     ci_list        **group_has;     // mapping group to each nes/nds for it
     ci_list        **group_hasn;     // mapping group to each nes/nds for it
-    ci_list        **not_commutes;
+    ci_list        **not_left_accords;
     ci_list        **nds;
     ci_list        **ndsn;
 
