@@ -67,6 +67,13 @@ const int*  (*prom_get_label_may_be_coenabled_matrix)(int g);
 const int*  (*prom_get_label_nes_matrix)(int g); // could be optional for POR
 const int*  (*prom_get_label_nds_matrix)(int g); // could be optional for POR
 
+/* PINS flexible matrices */
+const int*  (*prom_get_matrix)(int m, int x);
+const int   (*prom_get_matrix_count)();
+const char* (*prom_get_matrix_name)(int m);
+const int   (*prom_get_matrix_row_count)(int m);
+const int   (*prom_get_matrix_col_count)(int m);
+
 static void
 prom_popt (poptContext con,
              enum poptCallbackReason reason,
@@ -93,12 +100,12 @@ prom_popt (poptContext con,
         GBregisterLoader("pml",         PromLoadGreyboxModel);
         GBregisterLoader("prm",         PromLoadGreyboxModel);
         GBregisterLoader("spins",       PromLoadGreyboxModel);
-		Warning(info,"Precompiled spins module initialized");
+		Warning(info,"Precompiled SpinS module initialized");
 		return;
 	case POPT_CALLBACK_REASON_OPTION:
 		break;
 	}
-	Abort("unexpected call to spins_popt");
+	Abort("unexpected call to prom_popt");
 }
 
 struct poptOption prom_options[]= {
@@ -234,6 +241,16 @@ PromLoadDynamicLib(model_t model, const char *filename)
     prom_get_label_nds_matrix = (const int*(*)(int))
         RTtrydlsym( dlHandle, "spins_get_label_nds_matrix" );
 
+    prom_get_matrix = (const int*(*)(int, int))
+        RTtrydlsym( dlHandle, "spins_get_matrix" );
+    prom_get_matrix_count = (const int (*)())
+        RTtrydlsym( dlHandle, "spins_get_matrix_count" );
+    prom_get_matrix_name = (const char*(*)(int))
+        RTtrydlsym( dlHandle, "spins_get_matrix_name" );
+    prom_get_matrix_row_count = (const int (*)(int m))
+        RTtrydlsym( dlHandle, "spins_get_matrix_row_count" );
+    prom_get_matrix_col_count = (const int (*)(int m))
+            RTtrydlsym( dlHandle, "spins_get_matrix_col_count" );
     (void)model;
 }
 
@@ -420,13 +437,36 @@ PromLoadGreyboxModel(model_t model, const char *filename)
             }
         }
     }
-    GBsetMatrix(model, LTSMIN_MATRIX_ACTIONS_READS, dm_actions_read_info, PINS_MAY_SET,
-                                            PINS_INDEX_GROUP, PINS_INDEX_STATE_VECTOR);
+    GBsetDMInfo(model, dm_info);
     GBsetDMInfoRead(model, dm_read_info);
     GBsetDMInfoMayWrite(model, dm_may_write_info);
     GBsetDMInfoMustWrite(model, dm_must_write_info);
-    GBsetDMInfo(model, dm_info);
     GBsetSupportsCopy(model);
+
+    GBsetMatrix(model, LTSMIN_MATRIX_ACTIONS_READS, dm_actions_read_info,
+                PINS_MAY_SET, PINS_INDEX_GROUP, PINS_INDEX_STATE_VECTOR);
+
+    if (prom_get_matrix != NULL) {
+        int matrices = prom_get_matrix_count();
+        for (int m = 0; m < matrices; m++) {
+            int rows = prom_get_matrix_row_count(m);
+            int cols = prom_get_matrix_col_count(m);
+            matrix_t *dm_other = RTmalloc(sizeof(matrix_t));
+            dm_create(dm_other, rows, cols);
+            const char *name = prom_get_matrix_name(m);
+
+            for (int i = 0; i < rows; i++) {
+                int *proj = (int*)prom_get_matrix(m,i);
+                HREassert (proj != NULL, "No matrix '%s' found", name);
+                for (int j = 0; j < cols; j++) {
+                    if (proj[j]) dm_set(dm_other, i, j);
+                }
+            }
+
+            GBsetMatrix(model, name, dm_other, PINS_STRICT, PINS_INDEX_OTHER,
+                                                            PINS_INDEX_OTHER);
+        }
+    }
 
     // Export dependencies for all state labels (NOT ONLY GUARDS)
 
