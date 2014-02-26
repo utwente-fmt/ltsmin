@@ -22,15 +22,55 @@ static int NO_MC = 0;
 static int NO_DYNLAB = 0;
 static int NO_V = 0;
 static int NO_L12 = 0;
-static int USE_SCC = 0;
 static int PREFER_NDS = 0;
 static int RANDOM = 0;
 static int DYN_RANDOM = 0;
-static int WEAK = 0; // TODO: implement combination with LTL
-static int DELETION = 0;
+static int WEAK = 0;
+static const char *algorithm = "heur";
+
+typedef enum {
+    POR_HEUR,
+    POR_DEL,
+    POR_SCC,
+} por_alg_t;
+
+static por_alg_t alg = -1;
+
+static si_map_entry por_algorithm[]={
+    {"",        POR_HEUR},
+    {"heur",    POR_HEUR},
+    {"del",     POR_DEL},
+    {"scc",     POR_SCC},
+    {NULL, 0}
+};
+
+static void
+por_popt (poptContext con, enum poptCallbackReason reason,
+          const struct poptOption *opt, const char *arg, void *data)
+{
+    (void)con; (void)data;
+    switch (reason) {
+    case POPT_CALLBACK_REASON_PRE: break;
+    case POPT_CALLBACK_REASON_POST: break;
+    case POPT_CALLBACK_REASON_OPTION:
+        if (opt->shortName != 'p') return;
+        if (algorithm == NULL) algorithm = "";
+        alg = linear_search (por_algorithm, algorithm);
+        if (alg < 0) {
+            Warning (error, "unknown POR algorithm %s", algorithm);
+            HREprintUsage();
+            HREexit(LTSMIN_EXIT_FAILURE);
+        }
+        PINS_POR = PINS_POR_ON;
+        return;
+    }
+    Abort("unexpected call to por_popt");
+}
 
 struct poptOption por_options[]={
-    { "por" , 'p' , POPT_ARG_VAL , &PINS_POR , PINS_POR_ON , "enable partial order reduction" , NULL },
+    {NULL, 0, POPT_ARG_CALLBACK, (void *)por_popt, 0, NULL, NULL},
+    { "por", 'p', POPT_ARG_STRING | POPT_ARGFLAG_OPTIONAL | POPT_ARGFLAG_SHOW_DEFAULT,
+      &algorithm, 0, "enable partial order reduction", "<|heur|del|scc>" },
 
     /* HIDDEN OPTIONS FOR EXPERIMENTATION */
 
@@ -44,8 +84,6 @@ struct poptOption por_options[]={
     { "no-dynamic-labels" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_DYNLAB , 1 , "without dynamic labels" , NULL },
     { "no-V" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_V , 1 , "without V proviso, instead use Peled's visibility proviso, or V'     " , NULL },
     { "no-L12" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_L12 , 1 , "without L1/L2 proviso, instead use Peled's cycle proviso, or L2'   " , NULL },
-    { "por-scc" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &USE_SCC , 1 , "use an incomplete SCC-based stubborn set algorithm" , NULL },
-    { "deletion" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &DELETION , 1 , "use the stubborn set deletion algorithm" , NULL },
     { "prefer-nds" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &PREFER_NDS , 1 , "prefer MC+NDS over NES" , NULL },
     { "por-random" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &RANDOM , 1 , "randomize necessary sets (static)" , NULL },
     { "por-dynamic" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &DYN_RANDOM , 1 , "randomize necessary sets (dynamic)" , NULL },
@@ -474,13 +512,20 @@ beam_sort (por_context *ctx)
 static void
 add_enabled (por_context *ctx, int group)
 {
-    // Add do-not-accord for LTL and accord left for not LTL:
-    for (int j=0; j < ctx->not_accords[group]->count; j++) {
-        int dependent_group = ctx->not_accords[group]->data[j];
+    if (!WEAK) {
+        // Add do-not-accord for LTL and accord left for not LTL:
+        for (int j=0; j < ctx->not_accords[group]->count; j++) {
+            int dependent_group = ctx->not_accords[group]->data[j];
+            select_group (ctx, dependent_group);
+        }
+        return;
+    }
+    // Weak sets:
+
+    for (int j=0; j < ctx->not_left_accords[group]->count; j++) {
+        int dependent_group = ctx->not_left_accords[group]->data[j];
         select_group (ctx, dependent_group);
     }
-
-    if (!WEAK) return;
 
     // In the weak stubborn set, the selected enabled group might become
     // disabled by some non-stubborn transition. This is allowed as long
@@ -608,7 +653,7 @@ scc_expand (por_context* ctx, int group)
         int ns = find_cheapest_ns (ctx, scc->search, group);
         successors = ctx->ns[ns];
     } else {
-        successors = ctx->not_accords[ group ];
+        successors = WEAK ? ctx->not_left_accords[group] : ctx->not_accords[group];
     }
     for (int j=0; j < successors->count; j++) {
         int next_group = successors->data[j];
@@ -900,7 +945,7 @@ static inline void
 ensure_key (por_context* ctx)
 {
     // if no enabled transitions, return directly
-    if (!WEAK || DELETION || ctx->beam_used == 0) return;
+    if (!WEAK || alg == POR_DEL || ctx->beam_used == 0) return;
 
     while ( 1 ) {
         search_context *s = &ctx->search[ctx->search_order[0]]; // search context
@@ -1501,6 +1546,7 @@ GBaddPOR (model_t model)
             }
         }
     }
+    ctx->guard_dep   = (ci_list **) dm_rows_to_idx_table(&guard_is_dependent);
 
     // extract inverse relation, transition group to guard
     matrix_t gg_matrix;
@@ -1546,6 +1592,7 @@ GBaddPOR (model_t model)
             }
         }
     }
+    ctx->guard_nes   = (ci_list **) dm_rows_to_idx_table(&ctx->gnes_matrix);
 
     // same for nds
     matrix_t *p_gnds_matrix = NO_NDS ? NULL : GBgetGuardNDSInfo(model);
@@ -1578,6 +1625,7 @@ GBaddPOR (model_t model)
             }
         }
     }
+    ctx->guard_nds   = (ci_list **) dm_rows_to_idx_table(&ctx->gnds_matrix);
 
     matrix_t nds;
     dm_create(&nds, groups, groups);
@@ -1670,9 +1718,6 @@ GBaddPOR (model_t model)
 
     // set lookup tables
     ctx->not_accords = (ci_list **) dm_rows_to_idx_table(&ctx->not_accords_with);
-    ctx->guard_nes   = (ci_list **) dm_rows_to_idx_table(&ctx->gnes_matrix);
-    ctx->guard_nds   = (ci_list **) dm_rows_to_idx_table(&ctx->gnds_matrix);
-    ctx->guard_dep   = (ci_list **) dm_rows_to_idx_table(&guard_is_dependent);
 
     // free temporary matrices
     dm_free(&guard_is_dependent);
@@ -1744,12 +1789,11 @@ GBaddPOR (model_t model)
 
     GBsetNextStateLong  (pormodel, por_long);
     GBsetNextStateShort (pormodel, por_short);
-    if (USE_SCC) {
-        GBsetNextStateAll   (pormodel, por_scc_search_all);
-    } else if (DELETION) {
-        GBsetNextStateAll   (pormodel, por_deletion_all);
-    } else {
-        GBsetNextStateAll   (pormodel, por_beam_search_all);
+    switch (alg) {
+    case POR_HEUR: GBsetNextStateAll   (pormodel, por_beam_search_all); break;
+    case POR_SCC:  GBsetNextStateAll   (pormodel, por_scc_search_all);  break;
+    case POR_DEL: GBsetNextStateAll   (pormodel, por_deletion_all);     break;
+    default: Abort ("Unknown POR algorithm: '%s'", key_search(por_algorithm, alg));
     }
 
     GBinitModelDefaults (&pormodel, model);
