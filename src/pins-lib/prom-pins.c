@@ -69,10 +69,10 @@ const int*  (*prom_get_label_nds_matrix)(int g); // could be optional for POR
 
 /* PINS flexible matrices */
 const int*  (*prom_get_matrix)(int m, int x);
-const int   (*prom_get_matrix_count)();
+int         (*prom_get_matrix_count)();
 const char* (*prom_get_matrix_name)(int m);
-const int   (*prom_get_matrix_row_count)(int m);
-const int   (*prom_get_matrix_col_count)(int m);
+int         (*prom_get_matrix_row_count)(int m);
+int         (*prom_get_matrix_col_count)(int m);
 
 static void
 prom_popt (poptContext con,
@@ -243,14 +243,14 @@ PromLoadDynamicLib(model_t model, const char *filename)
 
     prom_get_matrix = (const int*(*)(int, int))
         RTtrydlsym( dlHandle, "spins_get_matrix" );
-    prom_get_matrix_count = (const int (*)())
+    prom_get_matrix_count = (int (*)())
         RTtrydlsym( dlHandle, "spins_get_matrix_count" );
     prom_get_matrix_name = (const char*(*)(int))
         RTtrydlsym( dlHandle, "spins_get_matrix_name" );
-    prom_get_matrix_row_count = (const int (*)(int m))
+    prom_get_matrix_row_count = (int (*)(int m))
         RTtrydlsym( dlHandle, "spins_get_matrix_row_count" );
-    prom_get_matrix_col_count = (const int (*)(int m))
-            RTtrydlsym( dlHandle, "spins_get_matrix_col_count" );
+    prom_get_matrix_col_count = (int (*)(int m))
+         RTtrydlsym( dlHandle, "spins_get_matrix_col_count" );
     (void)model;
 }
 
