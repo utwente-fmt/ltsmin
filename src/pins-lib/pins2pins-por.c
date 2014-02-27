@@ -661,7 +661,7 @@ scc_is_scc (scc_context_t *scc, int group)
     return SCC_CUR;
 }
 
-static inline bool
+static inline int
 scc_expand (por_context *ctx, int group)
 {
     scc_context_t *scc = (scc_context_t *)ctx->scc_ctx;
@@ -674,18 +674,20 @@ scc_expand (por_context *ctx, int group)
     } else {
         successors = ctx->not_accords[group];
     }
+    int count = 0;
     for (int j = 0; j < successors->count; j++) {
         int next_group = successors->data[j];
         switch (scc_is_scc(scc, next_group)) {
-        case SCC_BAD: return true;
+        case SCC_BAD: return -1;
         case SCC_NO: {
             scc_state_t next = { next_group, -1 };
             dfs_stack_push (scc->stack, (int*)&next);
+            count++;
         }
         default: break;
         }
     }
-    return false;
+    return count;
 }
 
 static inline void
@@ -700,13 +702,36 @@ reset_ns_scores (por_context* ctx, search_context *s, int group)
     }
 }
 
-static inline bool
-scc_ensure_key (por_context* ctx)
+static inline int
+scc_ensure_key (por_context* ctx, int root)
 {
-    // if no enabled transitions, return directly
     scc_context_t *scc = (scc_context_t *)ctx->scc_ctx;
-    if (!WEAK || scc->stubborn_list[1]->count == ctx->enabled_list->count)
-        return true;
+    int lowest = scc->group_index[root];
+
+    // collect accepting states
+    scc->stubborn_list[1]->count = 0;
+    scc_state_t *x;
+    for (int i = scc->scc_list->count - 1; i >= 0; i--) {
+        int index = scc->scc_list->data[i];
+        x = (scc_state_t *)dfs_stack_index (scc->tarjan, index);
+        if (x->lowest < lowest)
+            break;
+        HREassert (!(ctx->group_status[x->group] & GS_DISABLED));
+        scc->stubborn_list[1]->data[ scc->stubborn_list[1]->count++ ] = x->group;
+    }
+
+    // if no enabled transitions, return directly
+    if (!WEAK || scc->stubborn_list[1]->count == 0 ||
+            scc->stubborn_list[1]->count == ctx->enabled_list->count) {
+        return 0;
+    }
+
+    // mark SCC as lowest
+    for (int i = 0; ; i++) {
+        x = (scc_state_t *)dfs_stack_peek(scc->tarjan, i);
+        scc->group_index[x->group] = lowest; // mark as current SCC
+        if (x->group == root) break;
+    }
 
     // Check
     for (int j=0; j < scc->stubborn_list[1]->count; j++) {
@@ -717,21 +742,31 @@ scc_ensure_key (por_context* ctx)
             int nds = ctx->group2guard[group]->data[g] + ctx->nguards;
             for (int k = 0; k < ctx->ns[nds]->count && allin; k++) {
                 int ndsgroup = ctx->ns[nds]->data[k];
-                allin &= (scc_is_scc(scc, ndsgroup) == SCC_CUR);
+                allin &= scc->group_index[ndsgroup] == lowest;
             }
         }
         if (allin) {
-            Warning (debug, "Found key transition!");
-            return true; // all ok!
+            Warning (debug, "Found key");
+            return 0; // all ok!
         }
     }
 
-    WEAK = 0; // strongly expand one enabled state:
-    bool exit = scc_expand (ctx, scc->stubborn_list[1]->data[0]);
-    WEAK = 1;
-    if (exit) Warning (debug, "Failed adding key transition!");
-    if (!exit) Warning (debug, "Continuing search with key transition!");
-    return !exit;
+    // strongly expand one enabled state:
+    int count = 0;
+    int group = scc->stubborn_list[1]->data[0];
+    for (int j = 0; j < ctx->not_accords[group]->count; j++) {
+        int next_group = ctx->not_accords[group]->data[j];
+        switch (scc_is_scc(scc, next_group)) {
+        case SCC_BAD: return -1;
+        case SCC_NO:
+            if (scc->group_index[next_group] >= lowest) break; // skip
+            scc_state_t next = { next_group, -1 };
+            dfs_stack_push (scc->stack, (int*)&next);
+            count++;
+        default: break;
+        }
+    }
+    return count;
 }
 
 static inline bool
@@ -739,31 +774,30 @@ scc_root (por_context* ctx, int root)
 {
     scc_state_t *x;
     scc_context_t *scc = (scc_context_t *)ctx->scc_ctx;
-    scc->scc_list->count = 0;
-    scc->stubborn_list[1]->count = 0;
-    do {x = (scc_state_t *)dfs_stack_pop(scc->tarjan);
-        if (!(ctx->group_status[x->group] & GS_DISABLED)) {
-            scc->stubborn_list[1]->data[ scc->stubborn_list[1]->count++ ] = x->group;
-        }
-        reset_ns_scores (ctx, scc->search, x->group);
-        scc->scc_list->data[ scc->scc_list->count++ ] = x->group;
-        scc->group_index[x->group] = SCC_SCC; // mark as current SCC
-    } while (x->group != root);
-    if (scc->stubborn_list[1]->count > 0)
-        Warning (debug, "Found stubborn SCC of size %d,%d!", scc->stubborn_list[1]->count, scc->scc_list->count);
 
-    bool success = false;
-    if (scc->stubborn_list[1]->count > 0 &&
-        scc->stubborn_list[1]->count < scc->stubborn_list[0]->count) {
-        success = scc_ensure_key(ctx);
-        if (success) {
+    int count = 0;
+    do {x = (scc_state_t *)dfs_stack_pop(scc->tarjan);
+        reset_ns_scores (ctx, scc->search, x->group);
+        scc->group_index[x->group] = SCC_SCC; // mark as current SCC
+        count++;
+    } while (x->group != root);
+
+    // stubborn list was set by scc_ensure_key
+    bool found_enabled = scc->stubborn_list[1]->count > 0;
+    if (found_enabled) {
+        //remove accepting
+        scc->scc_list->count -= scc->stubborn_list[1]->count;
+
+        Warning (debug, "Found stubborn SCC of size %d,%d!", scc->stubborn_list[1]->count, count);
+        int count = scc->stubborn_list[0]->count;
+        if (scc->stubborn_list[1]->count < count) {
             swap (scc->stubborn_list[0], scc->stubborn_list[1]);
             scc->bad_scc->data[scc->bad_scc->count++] = SCC_SCC; // remember stubborn SCC
-            Warning (debug, "Update stubborn set --> %d!", scc->stubborn_list[0]->count);
+            Warning (debug, "Update stubborn set %d --> %d!", count < INT32_MAX ? count : -1, scc->stubborn_list[0]->count);
         }
     }
     SCC_SCC--; // update to next SCC layer
-    return success;
+    return found_enabled;
 }
 
 static void
@@ -771,8 +805,9 @@ scc_search (por_context* ctx)
 {
     scc_context_t *scc = (scc_context_t *)ctx->scc_ctx;
     scc_state_t *state, *pred;
+    scc->scc_list->count = 0;
 
-    while (true) {
+    while (scc->stubborn_list[0]->count != ctx->enabled_list->count) {
         state = (scc_state_t *)dfs_stack_top(scc->stack);
         if (state != NULL) {
             switch (scc_is_scc(scc, state->group)) {
@@ -790,13 +825,15 @@ scc_search (por_context* ctx)
                 scc->group_index[state->group] = ++scc->index;
                 state->lowest = scc->index;
                 // add to tarjan stack
+                if (!(ctx->group_status[state->group] & GS_DISABLED))
+                    scc->scc_list->data[ scc->scc_list->count++ ] = dfs_stack_size(scc->tarjan);
                 dfs_stack_push (scc->tarjan, &state->group);
 
                 // push successors
                 dfs_stack_enter (scc->stack);
-                bool exit = scc_expand (ctx, state->group);
-                if (exit) break;
-            } else {
+                int count = scc_expand(ctx, state->group);
+                if (count == -1) break; // bad SCC encountered
+            } else if (dfs_stack_nframes(scc->stack) > 0){
                 pred = (scc_state_t *)dfs_stack_peek_top (scc->stack, 1);
                 if (scc->group_index[state->group] < pred->lowest) {
                     pred->lowest = scc->group_index[state->group];
@@ -805,28 +842,43 @@ scc_search (por_context* ctx)
             }
         } else {
             dfs_stack_leave (scc->stack);
-            state = (scc_state_t *)dfs_stack_pop (scc->stack);
+            state = (scc_state_t *)dfs_stack_top (scc->stack);
 
             // detected an SCC
             if (scc->group_index[state->group] == state->lowest) {
-                bool success = scc_root (ctx, state->group);
-                if (success) break;
-            }
-            update_ns_scores (ctx, scc->search, state->group); // remove from NS scores
-
-            if (dfs_stack_nframes(scc->stack) > 0) {
+                dfs_stack_enter (scc->stack);
+                int to_explore = scc_ensure_key(ctx, state->group);
+                if (to_explore == -1) { // bad state
+                    dfs_stack_leave (scc->stack);
+                    dfs_stack_pop (scc->stack);
+                    Warning (debug, "Failed adding key");
+                    break;
+                } else if (to_explore > 0) {
+                    Warning (debug, "Continuing search");
+                    continue;
+                } else {
+                    Warning (debug, "Key added nothing or not needed");
+                    dfs_stack_leave (scc->stack);
+                }
+                bool found = scc_root (ctx, state->group);
+                if (found) {
+                    dfs_stack_pop (scc->stack);
+                    break;
+                }
+            } else if (dfs_stack_nframes(scc->stack) > 0) {
                 // (after recursive return call) update index
                 pred = (scc_state_t *)dfs_stack_peek_top (scc->stack, 1);
                 if (state->lowest < pred->lowest) {
                     pred->lowest = state->lowest;
                 }
-            } else {
-                HREassert (scc->stubborn_list[0]->count > 0 &&
-                           scc->stubborn_list[0]->count != INT32_MAX);
-                break;
             }
+            dfs_stack_pop (scc->stack);
+
+            update_ns_scores (ctx, scc->search, state->group); // remove from NS scores
         }
     }
+    HREassert (scc->stubborn_list[0]->count > 0 &&
+               scc->stubborn_list[0]->count != INT32_MAX);
 }
 
 static void
@@ -848,7 +900,7 @@ scc_analyze (por_context* ctx)
     scc_context_t *scc = (scc_context_t *)ctx->scc_ctx;
     scc->stubborn_list[0]->count = INT32_MAX;
 
-    Warning (debug, "SCC start");
+    Warning (debug, "");
     scc->bad_scc->count = 0; // not SCC yet
     SCC_SCC = -1;
     for (int j=0; j < ctx->enabled_list->count; j++) {

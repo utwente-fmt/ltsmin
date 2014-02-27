@@ -160,6 +160,12 @@ dfs_stack_peek (dfs_stack_t stack, size_t offset)
     return isba_peek_int(stack->states, offset);
 }
 
+int *
+dfs_stack_index (dfs_stack_t stack, size_t index)
+{
+    return isba_index(stack->states, index);
+}
+
 void
 dfs_stack_discard (dfs_stack_t stack, size_t num)
 {
