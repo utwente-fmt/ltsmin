@@ -29,6 +29,7 @@ static int WEAK = 0;
 static const char *algorithm = "heur";
 
 typedef enum {
+    POR_NONE,
     POR_HEUR,
     POR_DEL,
     POR_SCC,
@@ -38,6 +39,7 @@ typedef enum {
 static por_alg_t alg = -1;
 
 static si_map_entry por_algorithm[]={
+    {"none",    POR_NONE},
     {"",        POR_HEUR},
     {"heur",    POR_HEUR},
     {"del",     POR_DEL},
@@ -56,14 +58,15 @@ por_popt (poptContext con, enum poptCallbackReason reason,
     case POPT_CALLBACK_REASON_POST: break;
     case POPT_CALLBACK_REASON_OPTION:
         if (opt->shortName != 'p') return;
-        if (algorithm == NULL) algorithm = "";
-        alg = linear_search (por_algorithm, algorithm);
+        if (arg == NULL) arg = "";
+        alg = linear_search (por_algorithm, arg);
         if (alg < 0) {
-            Warning (error, "unknown POR algorithm %s", algorithm);
+            Warning (error, "unknown POR algorithm %s", arg);
             HREprintUsage();
             HREexit(LTSMIN_EXIT_FAILURE);
         }
-        PINS_POR = PINS_POR_ON;
+        if (alg != POR_NONE)
+            PINS_POR = PINS_POR_ON;
         return;
     }
     Abort("unexpected call to por_popt");
