@@ -32,6 +32,7 @@ typedef enum {
     POR_HEUR,
     POR_DEL,
     POR_SCC,
+    POR_SCC1,
 } por_alg_t;
 
 static por_alg_t alg = -1;
@@ -41,6 +42,7 @@ static si_map_entry por_algorithm[]={
     {"heur",    POR_HEUR},
     {"del",     POR_DEL},
     {"scc",     POR_SCC},
+    {"scc1",    POR_SCC1},
     {NULL, 0}
 };
 
@@ -197,9 +199,11 @@ typedef struct scc_context_s {
     dfs_stack_t      stack;
     ci_list         *scc_list;
     ci_list        **stubborn_list;
+    ci_list         *bad_scc;
+    int              current_scc;
 } scc_context_t;
 
-static const int SCC_SCC = -1;
+static int SCC_SCC = -1;
 static const int SCC_NEW = 0;
 
 
@@ -289,6 +293,7 @@ create_scc_ctx (por_context* ctx)
     scc->stubborn_list = RTmallocZero (2 * sizeof(ci_list *));
     scc->stubborn_list[0] = RTmallocZero ((ctx->ngroups + 1) * sizeof(int));
     scc->stubborn_list[1] = RTmallocZero ((ctx->ngroups + 1) * sizeof(int));
+    scc->bad_scc = RTmallocZero ((ctx->ngroups + 1) * sizeof(int));
     scc->stack = dfs_stack_create (2); // only integers for groups
     scc->tarjan = dfs_stack_create (1); // only integers for group
     scc->search = &ctx->search[0];
@@ -530,22 +535,12 @@ add_enabled (por_context *ctx, int group)
     // In the weak stubborn set, the selected enabled group might become
     // disabled by some non-stubborn transition. This is allowed as long
     // as it is never enabled again (by some non-stubborn transition).
-    // In other words: either a NES or an NDS need to be added for each guard.
     search_context *s = &ctx->search[ ctx->search_order[0] ];
 
     int is_key = 1; // key transitions have all their nds's included
     for (int g = 0; g < ctx->group2guard[group]->count; g++) {
-        int guard = ctx->group2guard[group]->data[g];
-
-        int disabled_score = s->nes_score[guard];
-        int enabled_score = s->nes_score[guard + ctx->nguards];
-        int ns = disabled_score < enabled_score ? guard : guard+ctx->nguards;
-        is_key &= ns >= ctx->nguards;
-
-        for (int k=0; k < ctx->ns[ns]->count; k++) {
-            int ns_group = ctx->ns[ns]->data[k];
-            select_group (ctx, ns_group);
-        }
+        int nds = ctx->group2guard[group]->data[g] + ctx->nguards;
+        is_key &= s->nes_score[nds] == 0;
     }
     s->has_key |= is_key;
 }
@@ -644,27 +639,102 @@ bs_analyze (por_context* ctx)
     } while (beam_sort(ctx));
 }
 
-static inline void
-scc_expand (por_context* ctx, int group)
+typedef enum {
+    SCC_NO,
+    SCC_OLD,
+    SCC_BAD,
+    SCC_CUR
+} scc_type_e;
+
+static inline scc_type_e
+scc_is_scc (scc_context_t *scc, int group)
+{
+    int index = scc->group_index[group];
+    if (index >= 0)
+        return SCC_NO;
+    if (scc->current_scc < index && index < 0) { // old SCC
+        for (int i = 0; i < scc->bad_scc->count; i++) {
+            if (index == scc->bad_scc->data[i]) return SCC_BAD;
+        }
+        return SCC_OLD;
+    }
+    return SCC_CUR;
+}
+
+static inline bool
+scc_expand (por_context *ctx, int group)
 {
     scc_context_t *scc = (scc_context_t *)ctx->scc_ctx;
     ci_list *successors;
     if (ctx->group_status[group] & GS_DISABLED) {
         int ns = find_cheapest_ns (ctx, scc->search, group);
         successors = ctx->ns[ns];
+    } else if (WEAK) {
+        successors = ctx->not_left_accords[group];
     } else {
-        successors = WEAK ? ctx->not_left_accords[group] : ctx->not_accords[group];
+        successors = ctx->not_accords[group];
     }
-    for (int j=0; j < successors->count; j++) {
+    for (int j = 0; j < successors->count; j++) {
         int next_group = successors->data[j];
-        if (scc->group_index[next_group] != SCC_SCC) {
+        switch (scc_is_scc(scc, next_group)) {
+        case SCC_BAD: return true;
+        case SCC_NO: {
             scc_state_t next = { next_group, -1 };
             dfs_stack_push (scc->stack, (int*)&next);
         }
+        default: break;
+        }
     }
+    return false;
 }
 
 static inline void
+reset_ns_scores (por_context* ctx, search_context *s, int group)
+{
+    if (NO_HEUR) return;
+
+    // change the heuristic function according to selected group
+    for (int k = 0 ; k < ctx->group2ns[group]->count; k++) {
+        int ns = ctx->group2ns[group]->data[k];
+        s->nes_score[ns] += ctx->group_score[group] << 1; // Make extra expensive
+    }
+}
+
+static inline bool
+scc_ensure_key (por_context* ctx)
+{
+    // if no enabled transitions, return directly
+    scc_context_t *scc = (scc_context_t *)ctx->scc_ctx;
+    if (!WEAK || scc->stubborn_list[1]->count == ctx->enabled_list->count)
+        return true;
+
+    // Check
+    for (int j=0; j < scc->stubborn_list[1]->count; j++) {
+        bool allin = true;
+
+        int group = scc->stubborn_list[1]->data[j];
+        for (int g = 0; g < ctx->group2guard[group]->count && allin; g++) {
+            int nds = ctx->group2guard[group]->data[g] + ctx->nguards;
+            for (int k = 0; k < ctx->ns[nds]->count && allin; k++) {
+                int ndsgroup = ctx->ns[nds]->data[k];
+                allin &= (scc_is_scc(scc, ndsgroup) == SCC_CUR);
+            }
+        }
+        if (allin) {
+            Warning (debug, "Found key transition!");
+            return true; // all ok!
+        }
+    }
+
+    WEAK = 0; // strongly expand one enabled state:
+    bool exit = scc_expand (ctx, scc->stubborn_list[1]->data[0]);
+    WEAK = 1;
+    if (exit) Warning (debug, "Failed adding key transition!");
+    if (!exit) Warning (debug, "Continuing search with key transition!");
+    return !exit;
+}
+
+static inline bool
 scc_root (por_context* ctx, int root)
 {
     scc_state_t *x;
@@ -675,13 +745,25 @@ scc_root (por_context* ctx, int root)
         if (!(ctx->group_status[x->group] & GS_DISABLED)) {
             scc->stubborn_list[1]->data[ scc->stubborn_list[1]->count++ ] = x->group;
         }
+        reset_ns_scores (ctx, scc->search, x->group);
         scc->scc_list->data[ scc->scc_list->count++ ] = x->group;
-        scc->group_index[x->group] = SCC_SCC; // mark SCC
+        scc->group_index[x->group] = SCC_SCC; // mark as current SCC
     } while (x->group != root);
+    if (scc->stubborn_list[1]->count > 0)
+        Warning (debug, "Found stubborn SCC of size %d,%d!", scc->stubborn_list[1]->count, scc->scc_list->count);
+
+    bool success = false;
     if (scc->stubborn_list[1]->count > 0 &&
         scc->stubborn_list[1]->count < scc->stubborn_list[0]->count) {
-        swap (scc->stubborn_list[0], scc->stubborn_list[1]);
+        success = scc_ensure_key(ctx);
+        if (success) {
+            swap (scc->stubborn_list[0], scc->stubborn_list[1]);
+            scc->bad_scc->data[scc->bad_scc->count++] = SCC_SCC; // remember stubborn SCC
+            Warning (debug, "Update stubborn set --> %d!", scc->stubborn_list[0]->count);
+        }
     }
+    SCC_SCC--; // update to next SCC layer
+    return success;
 }
 
 static void
@@ -693,9 +775,13 @@ scc_search (por_context* ctx)
     while (true) {
         state = (scc_state_t *)dfs_stack_top(scc->stack);
         if (state != NULL) {
-            if (scc->group_index[state->group] == SCC_SCC) {
+            switch (scc_is_scc(scc, state->group)) {
+            case SCC_BAD: return;
+            case SCC_OLD:
+            case SCC_CUR:
                 dfs_stack_pop (scc->stack);
                 continue;
+            case SCC_NO: break;
             }
 
             if (scc->group_index[state->group] == SCC_NEW) {
@@ -708,7 +794,8 @@ scc_search (por_context* ctx)
 
                 // push successors
                 dfs_stack_enter (scc->stack);
-                scc_expand (ctx, state->group);
+                bool exit = scc_expand (ctx, state->group);
+                if (exit) break;
             } else {
                 pred = (scc_state_t *)dfs_stack_peek_top (scc->stack, 1);
                 if (scc->group_index[state->group] < pred->lowest) {
@@ -722,9 +809,8 @@ scc_search (por_context* ctx)
 
             // detected an SCC
             if (scc->group_index[state->group] == state->lowest) {
-                scc_root (ctx, state->group);
-                if (scc->stubborn_list[0]->count > 0 &&
-                        scc->stubborn_list[0]->count != INT32_MAX) break;
+                bool success = scc_root (ctx, state->group);
+                if (success) break;
             }
             update_ns_scores (ctx, scc->search, state->group); // remove from NS scores
 
@@ -744,12 +830,14 @@ scc_search (por_context* ctx)
 }
 
 static void
-empty_stack (dfs_stack_t stack)
+empty_stack (scc_context_t *scc, dfs_stack_t stack)
 {
     while (dfs_stack_size(stack) != 0) {
-        void *s = dfs_stack_pop (stack);
+        scc_state_t *s = (scc_state_t *)dfs_stack_pop (stack);
         if (s == NULL) {
             dfs_stack_leave (stack);
+        } else {
+            scc->group_index[s->group] = SCC_NEW;
         }
     }
 }
@@ -758,21 +846,26 @@ static void
 scc_analyze (por_context* ctx)
 {
     scc_context_t *scc = (scc_context_t *)ctx->scc_ctx;
-
-    scc->index = 0;
-    empty_stack (scc->stack);
-    empty_stack (scc->tarjan);
     scc->stubborn_list[0]->count = INT32_MAX;
 
+    Warning (debug, "SCC start");
+    scc->bad_scc->count = 0; // not SCC yet
+    SCC_SCC = -1;
     for (int j=0; j < ctx->enabled_list->count; j++) {
         int group = ctx->enabled_list->data[j];
         if (scc->group_index[group] == SCC_NEW) {
+            Warning (debug, "SCC search from %d", group);
+            scc->index = 0;
+            // SCC from current search will be leq the current value of SCC_SCC
+            scc->current_scc = SCC_SCC;
             scc_state_t next = { group, -1 };
             dfs_stack_push (scc->stack, (int*)&next);
             scc_search (ctx);
-            if (scc->stubborn_list[0]->count > 0 &&
-                    scc->stubborn_list[0]->count != INT32_MAX) {
-                return;
+            empty_stack (scc, scc->stack);  // clear stacks (and indices)
+            empty_stack (scc, scc->tarjan); //    for next run
+            int count = scc->stubborn_list[0]->count;
+            if (alg == POR_SCC1 || count == 1 || count == ctx->enabled_list->count) {
+                break; // early exit (one iteration or can't do better)
             }
         }
     }
@@ -945,20 +1038,15 @@ static inline void
 ensure_key (por_context* ctx)
 {
     // if no enabled transitions, return directly
-    if (!WEAK || alg == POR_DEL || ctx->beam_used == 0) return;
+    search_context *s = &ctx->search[ctx->search_order[0]];
+    if (!WEAK || ctx->beam_used == 0 || s->score >= ctx->emit_limit) return;
 
-    while ( 1 ) {
-        search_context *s = &ctx->search[ctx->search_order[0]]; // search context
-
-        if (s->has_key) return; // OK
-
+    while ( !s->has_key ) {
         size_t min_score = INT32_MAX;
         int min_group = -1;
         for (int i = 0; i < ctx->enabled_list->count; i++) {
             int group = ctx->enabled_list->data[i];
-            if ( !((s->emit_status[group] & ES_SELECTED) ||
-                    s->score >= ctx->emit_limit) )
-                continue;
+            if ( !(s->emit_status[group] & ES_SELECTED) ) continue;
 
             // check open NDSs
             size_t nds_score = 0;
@@ -979,6 +1067,7 @@ ensure_key (por_context* ctx)
         HREassert (min_group != -1);
         for (int g = 0; g < ctx->group2guard[min_group]->count; g++) {
             int nds = ctx->group2guard[min_group]->data[g] + ctx->nguards;
+            if (s->nes_score[nds] == 0) continue; // already emitted!
 
             // add the selected ndss to work
             for(int k=0; k < ctx->ns[nds]->count; k++) {
@@ -988,6 +1077,7 @@ ensure_key (por_context* ctx)
         }
 
         bs_analyze (ctx); // may select a different search context!
+        s = &ctx->search[ctx->search_order[0]];
     }
 }
 
@@ -1790,9 +1880,10 @@ GBaddPOR (model_t model)
     GBsetNextStateLong  (pormodel, por_long);
     GBsetNextStateShort (pormodel, por_short);
     switch (alg) {
+    case POR_SCC:
+    case POR_SCC1: GBsetNextStateAll   (pormodel, por_scc_search_all);  break;
     case POR_HEUR: GBsetNextStateAll   (pormodel, por_beam_search_all); break;
-    case POR_SCC:  GBsetNextStateAll   (pormodel, por_scc_search_all);  break;
-    case POR_DEL: GBsetNextStateAll   (pormodel, por_deletion_all);     break;
+    case POR_DEL:  GBsetNextStateAll   (pormodel, por_deletion_all);     break;
     default: Abort ("Unknown POR algorithm: '%s'", key_search(por_algorithm, alg));
     }
 
