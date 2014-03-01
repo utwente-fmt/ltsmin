@@ -320,6 +320,9 @@ void TreeDBSfree(treedbs_t dbs){
 			RTfree(dbs->db_right[i]);
 			RTfree(dbs->db_bucket[i]);
 			RTfree(dbs->db_hash[i]);
+	    }
+	    for(int i=0;i<dbs->nPars;i++){
+			RTfree(dbs->db_tree_path[i]);
 		}
 		RTfree(dbs->db_left);
 		RTfree(dbs->db_right);
@@ -330,6 +333,7 @@ void TreeDBSfree(treedbs_t dbs){
 		RTfree(dbs->db_mask);
 		RTfree(dbs->db_tree_left);
 		RTfree(dbs->db_tree_right);
+		RTfree(dbs->db_tree_path);
 		RTfree(dbs->db_hash_size);
 		RTfree(dbs);
 	}
