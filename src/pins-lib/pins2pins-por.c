@@ -1258,6 +1258,72 @@ deletion_setup (model_t model, por_context* ctx, int* src)
     Warning (debug, "Deletion init |en| = %d \t|R| = %d", ctx->enabled_list->count, del_count(del, DEL_R));
 }
 
+static inline bool
+deletion_delete (por_context* ctx, int v)
+{
+    del_context_t *del = ctx->del_ctx;
+
+    // search the deletion space:
+    while (del_count(del, DEL_Z) != 0 && del_count(del, DEL_K) != 0) {
+        int z = del_pop (del, DEL_Z);
+        Warning (debug, "Checking u = %d", z);
+
+        if (del_has(del,DEL_R,z)) return true;
+
+        // Firstly, the enabled transitions x that are still stubborn and
+        // belong to DNA_u, need to be removed from key stubborn and put to Z.
+        for (int i = 0; i < ctx->not_accords[z]->count; i++) {
+            int x = ctx->not_accords[z]->data[i];
+            if (del_has(del,DEL_K,x)) {
+                if (!del_has(del,DEL_N,x)) {
+                    if (del_has(del,DEL_R,x)) return true;
+                    del_push_new (del, DEL_Z, x);
+                }
+                if (del_rem(del, DEL_K, x)) del_push (del, DEL_KP, x);
+            }
+        }
+        if (del_count(del, DEL_K) == 0) return true;
+
+        // Secondly, the enabled transitions x that are still stubborn and
+        // belong to DNB_u need to be removed from other stubborn and put to Z.
+        for (int i = 0; i < ctx->not_left_accordsn[z]->count; i++) {
+            int x = ctx->not_left_accordsn[z]->data[i];
+            if (del_enabled(ctx,x) && del_has(del,DEL_N,x)) {
+                if (!del_has(del,DEL_K,x)) {
+                    if (del_has(del,DEL_R,x)) return true;
+                    del_push_new (del, DEL_Z, x);
+                }
+                if (del_rem(del, DEL_N, x)) del_push (del, DEL_NP, x);
+            }
+        }
+
+        del_push (del, DEL_DP, z);
+        // Thirdly, the disabled transitions x, whose NES was stubborn
+        // before removal of u, need to be put to Z.
+        for (int i = 0; i < ctx->group2ns[z]->count; i++) {
+            int ns = ctx->group2ns[z]->data[i];
+            if (ctx->nes_score[ns] == -1) continue; // -1 is inactive!
+
+            // not the first transition removed from NES?
+            int score = ctx->nes_score[ns]++;
+            if (score != 0) continue;
+
+            for (int i = 0; i < ctx->group_hasn[ns]->count; i++) {
+                int x = ctx->group_hasn[ns]->data[i];
+                if (!del_enabled(ctx,x)) {
+                    ctx->group_score[x]--;
+                    HREassert (ctx->group_score[x] >= 0, "Wrong counting!");
+                    if (ctx->group_score[x] == 0 && del_has(del,DEL_N,x)) {
+                        del_push_new (del, DEL_Z, x);
+                        HREassert (!del_has(del, DEL_K, x)); // x is disabled
+                        if (del_rem(del, DEL_N, x)) del_push (del, DEL_NP, x);
+                    }
+                }
+            }
+        }
+    }
+}
+
 static inline void
 deletion_analyze (por_context* ctx)
 {
@@ -1272,75 +1338,12 @@ deletion_analyze (por_context* ctx)
 
         Warning (debug, "Deletion start from v = %d: |C| = %d \t|K| = %d", v, del_count(del, DEL_C), del_count(del, DEL_K));
 
-        // search the deletion space:
-        bool RfromT = false;
-        while (del_count(del, DEL_Z) != 0 && del_count(del, DEL_K) != 0) {
-            int z = del_pop (del, DEL_Z);
-            Warning (debug, "Checking u = %d", z);
-
-            if (del_has(del,DEL_R,z)) {
-                RfromT = true;
-                break;
-            }
-
-            // Firstly, the enabled transitions x that are still stubborn and
-            // belong to DNA_u, need to be removed from key stubborn and put to Z.
-            for (int i = 0; i < ctx->not_accords[z]->count; i++) {
-                int x = ctx->not_accords[z]->data[i];
-                if (del_has(del,DEL_K,x)) {
-                    if (!del_has(del,DEL_N,x)) {
-                        if (del_has(del,DEL_R,x)) { RfromT = true; break; }
-                        del_push_new (del, DEL_Z, x);
-                    }
-                    if (del_rem(del, DEL_K, x)) del_push (del, DEL_KP, x);
-                }
-            }
-            if (del_count(del, DEL_K) == 0 || RfromT) break;
-
-            // Secondly, the enabled transitions x that are still stubborn and
-            // belong to DNB_u need to be removed from other stubborn and put to Z.
-            for (int i = 0; i < ctx->not_left_accordsn[z]->count; i++) {
-                int x = ctx->not_left_accordsn[z]->data[i];
-                if (del_enabled(ctx,x) && del_has(del,DEL_N,x)) {
-                    if (!del_has(del,DEL_K,x)) {
-                        if (del_has(del,DEL_R,x)) { RfromT = true; break; }
-                        del_push_new (del, DEL_Z, x);
-                    }
-                    if (del_rem(del, DEL_N, x)) del_push (del, DEL_NP, x);
-                }
-            }
-            if (RfromT) break;
-
-            del_push (del, DEL_DP, z);
-            // Thirdly, the disabled transitions x, whose NES was stubborn
-            // before removal of u, need to be put to Z.
-            for (int i = 0; i < ctx->group2ns[z]->count; i++) {
-                int ns = ctx->group2ns[z]->data[i];
-                if (ctx->nes_score[ns] == -1) continue; // -1 is inactive!
-
-                // not the first transition removed from NES?
-                int score = ctx->nes_score[ns]++;
-                if (score != 0) continue;
-
-                for (int i = 0; i < ctx->group_hasn[ns]->count; i++) {
-                    int x = ctx->group_hasn[ns]->data[i];
-                    if (!del_enabled(ctx,x)) {
-                        ctx->group_score[x]--;
-                        HREassert (ctx->group_score[x] >= 0, "Wrong counting!");
-                        if (ctx->group_score[x] == 0 && del_has(del,DEL_N,x)) {
-                            del_push_new (del, DEL_Z, x);
-                            HREassert (!del_has(del, DEL_K, x)); // x is disabled
-                            if (del_rem(del, DEL_N, x)) del_push (del, DEL_NP, x);
-                        }
-                    }
-                }
-            }
-        }
+        bool revert = deletion_delete (ctx, v);
 
         while (del_count(del, DEL_Z) != 0) del_pop (del, DEL_Z);
 
         // Reverting deletions if necessary
-        if (del_count(del, DEL_K) == 0 || RfromT) {
+        if (revert) {
             Warning (debug, "Deletion rollback: |T'| = %d \t|K'| = %d \t|D'| = %d",
                      del_count(del, DEL_NP), del_count(del, DEL_KP), del_count(del, DEL_DP));
             del_add (del, DEL_R, v); // fail transition!
