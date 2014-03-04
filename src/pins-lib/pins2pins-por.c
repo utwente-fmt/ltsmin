@@ -13,6 +13,8 @@
 #include <util-lib/dfs-stack.h>
 #include <util-lib/util.h>
 
+int POR_WEAK = 0; //extern
+
 static int NO_HEUR = 0;
 static int NO_DNA = 0;
 static int NO_NES = 0;
@@ -25,7 +27,6 @@ static int NO_L12 = 0;
 static int PREFER_NDS = 0;
 static int RANDOM = 0;
 static int DYN_RANDOM = 0;
-static int WEAK = 0;
 static const char *algorithm = "heur";
 
 typedef enum {
@@ -59,13 +60,13 @@ por_popt (poptContext con, enum poptCallbackReason reason,
     case POPT_CALLBACK_REASON_OPTION:
         if (opt->shortName != 'p') return;
         if (arg == NULL) arg = "";
-        alg = linear_search (por_algorithm, arg);
-        if (alg < 0) {
+        int num = linear_search (por_algorithm, arg);
+        if (num < 0) {
             Warning (error, "unknown POR algorithm %s", arg);
             HREprintUsage();
             HREexit(LTSMIN_EXIT_FAILURE);
         }
-        if (alg != POR_NONE)
+        if ((alg = num) != POR_NONE)
             PINS_POR = PINS_POR_ON;
         return;
     }
@@ -92,7 +93,7 @@ struct poptOption por_options[]={
     { "prefer-nds" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &PREFER_NDS , 1 , "prefer MC+NDS over NES" , NULL },
     { "por-random" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &RANDOM , 1 , "randomize necessary sets (static)" , NULL },
     { "por-dynamic" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &DYN_RANDOM , 1 , "randomize necessary sets (dynamic)" , NULL },
-    { "weak" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &WEAK , 1 , "Weak stubborn set theory" , NULL },
+    { "weak" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &POR_WEAK , 1 , "Weak stubborn set theory" , NULL },
     POPT_TABLEEND
 };
 
@@ -520,32 +521,11 @@ beam_sort (por_context *ctx)
 static void
 add_enabled (por_context *ctx, int group)
 {
-    if (!WEAK) {
-        // Add do-not-accord for LTL and accord left for not LTL:
-        for (int j=0; j < ctx->not_accords[group]->count; j++) {
-            int dependent_group = ctx->not_accords[group]->data[j];
-            select_group (ctx, dependent_group);
-        }
-        return;
-    }
-    // Weak sets:
-
-    for (int j=0; j < ctx->not_left_accords[group]->count; j++) {
-        int dependent_group = ctx->not_left_accords[group]->data[j];
+    ci_list **accords = POR_WEAK ? ctx->not_left_accords : ctx->not_accords;
+    for (int j = 0; j < accords[group]->count; j++) {
+        int dependent_group = accords[group]->data[j];
         select_group (ctx, dependent_group);
     }
-
-    // In the weak stubborn set, the selected enabled group might become
-    // disabled by some non-stubborn transition. This is allowed as long
-    // as it is never enabled again (by some non-stubborn transition).
-    search_context *s = &ctx->search[ ctx->search_order[0] ];
-
-    int is_key = 1; // key transitions have all their nds's included
-    for (int g = 0; g < ctx->group2guard[group]->count; g++) {
-        int nds = ctx->group2guard[group]->data[g] + ctx->nguards;
-        is_key &= s->nes_score[nds] == 0;
-    }
-    s->has_key |= is_key;
 }
 
 /**
@@ -672,7 +652,7 @@ scc_expand (por_context *ctx, int group)
     if (ctx->group_status[group] & GS_DISABLED) {
         int ns = find_cheapest_ns (ctx, scc->search, group);
         successors = ctx->ns[ns];
-    } else if (WEAK) {
+    } else if (POR_WEAK) {
         successors = ctx->not_left_accords[group];
     } else {
         successors = ctx->not_accords[group];
@@ -723,8 +703,10 @@ scc_ensure_key (por_context* ctx, int root)
         scc->stubborn_list[1]->data[ scc->stubborn_list[1]->count++ ] = x->group;
     }
 
+    Warning (debug, "Found %d enabled transitions in SCC",scc->stubborn_list[1]->count);
+
     // if no enabled transitions, return directly
-    if (!WEAK || scc->stubborn_list[1]->count == 0 ||
+    if (!POR_WEAK || scc->stubborn_list[1]->count == 0 ||
             scc->stubborn_list[1]->count == ctx->enabled_list->count) {
         return 0;
     }
@@ -760,7 +742,15 @@ scc_ensure_key (por_context* ctx, int root)
     for (int j = 0; j < ctx->not_accords[group]->count; j++) {
         int next_group = ctx->not_accords[group]->data[j];
         switch (scc_is_scc(scc, next_group)) {
-        case SCC_BAD: return -1;
+        case SCC_BAD:
+            // mark SCC as SCC
+            for (int i = 0; ; i++) {
+                x = (scc_state_t *)dfs_stack_peek(scc->tarjan, i);
+                scc->group_index[x->group] = SCC_SCC; // mark as current SCC
+                if (x->group == root) break;
+            }
+            SCC_SCC--;
+            return -1;
         case SCC_NO:
             if (scc->group_index[next_group] >= lowest) break; // skip
             scc_state_t next = { next_group, -1 };
@@ -844,12 +834,8 @@ scc_search (por_context* ctx)
                 dfs_stack_pop (scc->stack);
             }
         } else {
-            dfs_stack_leave (scc->stack);
-            state = (scc_state_t *)dfs_stack_top (scc->stack);
-
-            // detected an SCC
+            state = (scc_state_t *)dfs_stack_peek_top (scc->stack, 1);
             if (scc->group_index[state->group] == state->lowest) {
-                dfs_stack_enter (scc->stack);
                 int to_explore = scc_ensure_key(ctx, state->group);
                 if (to_explore == -1) { // bad state
                     dfs_stack_leave (scc->stack);
@@ -863,11 +849,17 @@ scc_search (por_context* ctx)
                     Warning (debug, "Key added nothing or not needed");
                     dfs_stack_leave (scc->stack);
                 }
+            }
+
+            dfs_stack_leave (scc->stack);
+            state = (scc_state_t *)dfs_stack_top (scc->stack);
+
+            update_ns_scores (ctx, scc->search, state->group); // remove from NS scores
+
+            // detected an SCC
+            if (scc->group_index[state->group] == state->lowest) {
                 bool found = scc_root (ctx, state->group);
-                if (found) {
-                    dfs_stack_pop (scc->stack);
-                    break;
-                }
+                if (found) break;
             } else if (dfs_stack_nframes(scc->stack) > 0) {
                 // (after recursive return call) update index
                 pred = (scc_state_t *)dfs_stack_peek_top (scc->stack, 1);
@@ -875,9 +867,6 @@ scc_search (por_context* ctx)
                     pred->lowest = state->lowest;
                 }
             }
-            dfs_stack_pop (scc->stack);
-
-            update_ns_scores (ctx, scc->search, state->group); // remove from NS scores
         }
     }
     HREassert (scc->stubborn_list[0]->count > 0 &&
@@ -903,7 +892,7 @@ scc_analyze (por_context* ctx)
     scc_context_t *scc = (scc_context_t *)ctx->scc_ctx;
     scc->stubborn_list[0]->count = INT32_MAX;
 
-    Warning (debug, "");
+    Warning (debug, "%s", "");
     scc->bad_scc->count = 0; // not SCC yet
     SCC_SCC = -1;
     for (int j=0; j < ctx->enabled_list->count; j++) {
@@ -1059,77 +1048,57 @@ scc_emit (por_context* ctx, int* src, TransitionCB cb, void* uctx)
     }
 }
 
-/**
- * Default functions for long and short
- * Note: these functions don't work for partial order reduction,
- *       because partial order reduction selects a subset of the transition
- *       group and doesn't know beforehand whether to emit this group or not
- */
-static int
-por_long (model_t self, int group, int *src, TransitionCB cb,
-           void *user_context)
-{
-    (void)self;
-    (void)group;
-    (void)src;
-    (void)cb;
-    (void)user_context;
-    Abort ("Using Partial Order Reduction in combination with --grey or -reach? Long call failed.");
-}
-
-static int
-por_short (model_t self, int group, int *src, TransitionCB cb,
-           void *user_context)
-{
-    (void)self;
-    (void)group;
-    (void)src;
-    (void)cb;
-    (void)user_context;
-    Abort ("Using Partial Order Reduction in combination with -reach or --cached? Short call failed.");
-}
-
 static inline void
-ensure_key (por_context* ctx)
+bs_ensure_key (por_context* ctx)
 {
     // if no enabled transitions, return directly
     search_context *s = &ctx->search[ctx->search_order[0]];
-    if (!WEAK || ctx->beam_used == 0 || s->score >= ctx->emit_limit) return;
+    if (!POR_WEAK || ctx->beam_used == 0 || s->score >= ctx->emit_limit) return;
+
+    if (s->has_key)
+        Warning (debug, "Key included");
 
     while ( !s->has_key ) {
         size_t min_score = INT32_MAX;
         int min_group = -1;
+        ctx->nds_list[0]->count = 0;
         for (int i = 0; i < ctx->enabled_list->count; i++) {
             int group = ctx->enabled_list->data[i];
             if ( !(s->emit_status[group] & ES_SELECTED) ) continue;
 
             // check open NDSs
-            size_t nds_score = 0;
-            for (int g = 0; g < ctx->group2guard[group]->count; g++) {
-                int nds = ctx->group2guard[group]->data[g] + ctx->nguards;
-                nds_score += s->nes_score[nds];
+            size_t score = 0;
+            ctx->nds_list[1]->count = 0;
+            // First: all nds for the group's guards
+            for (int g = 0; g < ctx->not_accords[group]->count && score < min_score; g++) {
+                int gg = ctx->not_accords[group]->data[g];
+                int fresh = (s->emit_status[gg] & ES_SELECTED) == 0;
+                score += fresh ? ctx->group_score[gg] : 0;
+                ctx->nds_list[1]->data[ctx->nds_list[1]->count] = gg;
+                ctx->nds_list[1]->count += fresh;
             }
 
-            if (nds_score == 0) return; // OK (all NDS's are in the SS)
+            if (score == 0) {
+                Warning (debug, "Key is %d (all NDSs included)", group);
+                return; // OK (all NDS's are in the SS)
+            }
 
-            if (nds_score < min_score) {
-                min_score = nds_score;
+            if (score < min_score) {
+                min_score = score;
                 min_group = group;
+                swap (ctx->nds_list[0], ctx->nds_list[1]);
             }
         }
 
         // add all the NDS's for the transition for which it is cheapest
-        HREassert (min_group != -1);
-        for (int g = 0; g < ctx->group2guard[min_group]->count; g++) {
-            int nds = ctx->group2guard[min_group]->data[g] + ctx->nguards;
-            if (s->nes_score[nds] == 0) continue; // already emitted!
-
-            // add the selected ndss to work
-            for(int k=0; k < ctx->ns[nds]->count; k++) {
-                int group = ctx->ns[nds]->data[k];
-                select_group (ctx, group);
-            }
+        HREassert (ctx->nds_list[0]->count != 0);
+        Printf (debug, "Adding NDSs: ");
+        for (int g = 0; g < ctx->nds_list[0]->count; g++) {
+            int gg = ctx->nds_list[0]->data[g];
+            select_group (ctx, gg);
         }
+        s->has_key = 1;
+        Warning (debug, "\nKey is %d (forced inclusion of NDSs: %s)", min_group);
 
         bs_analyze (ctx); // may select a different search context!
         s = &ctx->search[ctx->search_order[0]];
@@ -1158,8 +1127,8 @@ typedef enum {
     DEL_Z,  // stack set
     DEL_R,  // set
     DEL_KP, // stack
-    DEL_TN, // stack
-    DEL_TD, // stack
+    DEL_NP, // stack
+    DEL_DP, // stack
     DEL_COUNT
 } del_t;
 
@@ -1298,7 +1267,7 @@ deletion_analyze (por_context* ctx)
     while (del_count(del, DEL_C) != 0 && del_count(del, DEL_K) > 1) {
         int v = del_pop (del, DEL_C);
         if (del_rem(del, DEL_K, v)) del_push (del, DEL_KP, v);
-        if (del_rem(del, DEL_N, v)) del_push (del, DEL_TN, v);
+        if (del_rem(del, DEL_N, v)) del_push (del, DEL_NP, v);
         del_push_new (del, DEL_Z, v);
 
         Warning (debug, "Deletion start from v = %d: |C| = %d \t|K| = %d", v, del_count(del, DEL_C), del_count(del, DEL_K));
@@ -1320,7 +1289,7 @@ deletion_analyze (por_context* ctx)
                 int x = ctx->not_accords[z]->data[i];
                 if (del_has(del,DEL_K,x)) {
                     if (!del_has(del,DEL_N,x)) {
-                        if (ctx->group_score[x] == -1) {  RfromT = true; break; }
+                        if (del_has(del,DEL_R,x)) { RfromT = true; break; }
                         del_push_new (del, DEL_Z, x);
                     }
                     if (del_rem(del, DEL_K, x)) del_push (del, DEL_KP, x);
@@ -1334,15 +1303,15 @@ deletion_analyze (por_context* ctx)
                 int x = ctx->not_left_accordsn[z]->data[i];
                 if (del_enabled(ctx,x) && del_has(del,DEL_N,x)) {
                     if (!del_has(del,DEL_K,x)) {
-                        if (ctx->group_score[x] == -1) { RfromT = true; break; }
+                        if (del_has(del,DEL_R,x)) { RfromT = true; break; }
                         del_push_new (del, DEL_Z, x);
                     }
-                    if (del_rem(del, DEL_N, x)) del_push (del, DEL_TN, x);
+                    if (del_rem(del, DEL_N, x)) del_push (del, DEL_NP, x);
                 }
             }
             if (RfromT) break;
 
-            del_push (del, DEL_TD, z);
+            del_push (del, DEL_DP, z);
             // Thirdly, the disabled transitions x, whose NES was stubborn
             // before removal of u, need to be put to Z.
             for (int i = 0; i < ctx->group2ns[z]->count; i++) {
@@ -1361,7 +1330,7 @@ deletion_analyze (por_context* ctx)
                         if (ctx->group_score[x] == 0 && del_has(del,DEL_N,x)) {
                             del_push_new (del, DEL_Z, x);
                             HREassert (!del_has(del, DEL_K, x)); // x is disabled
-                            if (del_rem(del, DEL_N, x)) del_push (del, DEL_TN, x);
+                            if (del_rem(del, DEL_N, x)) del_push (del, DEL_NP, x);
                         }
                     }
                 }
@@ -1373,19 +1342,19 @@ deletion_analyze (por_context* ctx)
         // Reverting deletions if necessary
         if (del_count(del, DEL_K) == 0 || RfromT) {
             Warning (debug, "Deletion rollback: |T'| = %d \t|K'| = %d \t|D'| = %d",
-                     del_count(del, DEL_TN), del_count(del, DEL_KP), del_count(del, DEL_TD));
-            ctx->group_score[v] = -1; // fail transition!
+                     del_count(del, DEL_NP), del_count(del, DEL_KP), del_count(del, DEL_DP));
+            del_add (del, DEL_R, v); // fail transition!
             while (del_count(del, DEL_KP) != 0) {
                 int x = del_pop (del, DEL_KP);
                 bool seen = del_push_new (del, DEL_K, x);
                 HREassert (seen, "DEL_K messed up");
             }
-            while (del_count(del, DEL_TN) != 0) {
-                int x = del_pop (del, DEL_TN);
+            while (del_count(del, DEL_NP) != 0) {
+                int x = del_pop (del, DEL_NP);
                 del->set[x] = del->set[x] | (1<<DEL_N);
             }
-            while (del_count(del, DEL_TD) != 0) {
-                int x = del_pop (del, DEL_TD);
+            while (del_count(del, DEL_DP) != 0) {
+                int x = del_pop (del, DEL_DP);
                 for (int i = 0; i < ctx->group2ns[x]->count; i++) {
                     int ns = ctx->group2ns[x]->data[i];
                     ctx->nes_score[ns] -= (ctx->nes_score[ns] >= 0);
@@ -1399,8 +1368,8 @@ deletion_analyze (por_context* ctx)
             }
         } else {
             del_clear (del, DEL_KP);
-            del_clear (del, DEL_TN);
-            del_clear (del, DEL_TD);
+            del_clear (del, DEL_NP);
+            del_clear (del, DEL_DP);
         }
     }
 }
@@ -1412,8 +1381,8 @@ deletion_emit_new (por_context* ctx, proviso_hook_context_t* provctx, int* src)
     int c = 0;
     for (int z = 0; z < ctx->enabled_list->count; z++) {
         int i = ctx->enabled_list->data[z];
-        if (del_has(del,DEL_N,i) && !del_has(del,DEL_R,i)) {
-            del->set[i] |= 1<<DEL_R;
+        if (del_has(del,DEL_N,i)) { // && !del_has(del,DEL_R,i)
+            //del->set[i] |= 1<<DEL_R;
             c += GBgetTransitionsLong (ctx->parent, i, src, hook_cb, provctx);
         }
     }
@@ -1457,7 +1426,7 @@ por_beam_search_all (model_t self, int *src, TransitionCB cb, void *user_context
     por_context* ctx = ((por_context*)GBgetContext(self));
     beam_setup (self, ctx, src);
     bs_analyze (ctx);
-    ensure_key (ctx);
+    bs_ensure_key (ctx);
     int emitted = bs_emit (ctx, src, cb, user_context);
     unmark_dynamic_labels (ctx);
     return emitted;
@@ -1633,6 +1602,38 @@ bs_init_beam_context (model_t model)
 }
 
 /**
+ * Default functions for long and short
+ * Note: these functions don't work for partial order reduction,
+ *       because partial order reduction selects a subset of the transition
+ *       group and doesn't know beforehand whether to emit this group or not
+ */
+static int
+por_long (model_t self, int group, int *src, TransitionCB cb, void *ctx)
+{
+    (void)self; (void)group; (void)src; (void)cb; (void)ctx;
+    Abort ("Using Partial Order Reduction in combination with --grey or -reach? Long call failed.");
+}
+
+static int
+por_short (model_t self, int group, int *src, TransitionCB cb, void *ctx)
+{
+    (void)self; (void)group; (void)src; (void)cb; (void)ctx;
+    Abort ("Using Partial Order Reduction in combination with -reach or --cached? Short call failed.");
+}
+
+static inline bool
+guard_of (por_context *ctx, int i, matrix_t *m, int j)
+{
+    for (int g = 0; g < ctx->group2guard[i]->count; g++) {
+        int guard = ctx->group2guard[i]->data[g];
+        if (dm_is_set (m, guard, j)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
  * Setup the partial order reduction layer.
  * Reads available dependencies, i.e. read/writes dependencies when no
  * NDA/NES/NDS is provided.
@@ -1771,17 +1772,14 @@ GBaddPOR (model_t model)
         }
     }
     ctx->guard_nds   = (ci_list **) dm_rows_to_idx_table(&ctx->gnds_matrix);
+    ctx->group_nds   = (ci_list **) dm_cols_to_idx_table(&ctx->gnds_matrix);
 
     matrix_t nds;
     dm_create(&nds, groups, groups);
     for (int i = 0; i < groups; i++) {
         for (int j = 0; j < groups; j++) {
-            for (int g = 0; g < ctx->group2guard[j]->count; g++) {
-                int guard = ctx->group2guard[j]->data[g];
-                if (dm_is_set (&ctx->gnds_matrix, guard, i)) {
-                    dm_set( &nds, j, i);
-                    continue;
-                }
+            if (guard_of(ctx, i, &ctx->gnds_matrix, j)) {
+                dm_set( &nds, i, j);
             }
         }
     }
@@ -1803,16 +1801,16 @@ GBaddPOR (model_t model)
             // iterate over all guards
             for (int gg = 0; gg < guards; gg++) {
                 // find all guards that may not be co-enabled
-                if (!dm_is_set(p_gce_matrix, g, gg)) {
-                    // gg may not be co-enabled with g, find all
-                    // transition groups in which it is used
-                    for (int tt = 0; tt < ctx->guard2group[gg]->count; tt++) {
-                        dm_set(&ctx->gnce_matrix, g, ctx->guard2group[gg]->data[tt]);
+                if (dm_is_set(p_gce_matrix, g, gg)) continue;
 
-                        for (int t = 0; t < ctx->guard2group[g]->count; t++) {
-                            dm_set(&ctx->nce, ctx->guard2group[g]->data[t],
-                                                ctx->guard2group[gg]->data[tt]);
-                        }
+                // gg may not be co-enabled with g, find all
+                // transition groups in which it is used
+                for (int tt = 0; tt < ctx->guard2group[gg]->count; tt++) {
+                    dm_set(&ctx->gnce_matrix, g, ctx->guard2group[gg]->data[tt]);
+
+                    for (int t = 0; t < ctx->guard2group[g]->count; t++) {
+                        dm_set(&ctx->nce, ctx->guard2group[g]->data[t],
+                                            ctx->guard2group[gg]->data[tt]);
                     }
                 }
             }
@@ -1830,8 +1828,8 @@ GBaddPOR (model_t model)
 
     // Combine Do Not Accord with dependency and other information
     dm_create(&ctx->not_accords_with, groups, groups);
-    for(int i=0; i < groups; i++) {
-        for(int j=0; j < groups; j++) {
+    for (int i = 0; i < groups; i++) {
+        for (int j = 0; j < groups; j++) {
             if (i == j) {
                 dm_set(&ctx->not_accords_with, i, j);
             } else {
@@ -1850,7 +1848,7 @@ GBaddPOR (model_t model)
                 }
 
                 // is dependent?
-                for (int k=0; k < len; k++) {
+                for (int k = 0; k < len; k++) {
                     if ((dm_is_set( p_dm_w, i, k) && dm_is_set( p_dm, j, k)) ||
                         (dm_is_set( p_dm, i, k) && dm_is_set( p_dm_w, j, k)) ) {
                         dm_set( &ctx->not_accords_with, i, j );
@@ -1868,12 +1866,12 @@ GBaddPOR (model_t model)
     dm_free(&guard_is_dependent);
 
     matrix_t *commutes = GBgetCommutesInfo (model);
-    if (WEAK && (commutes == NULL || NO_NES || PINS_LTL)) {
+    if (POR_WEAK && (commutes == NULL || NO_NES || PINS_LTL)) {
         Print1 (info, "LTL used (unimplemented) or no dependency info for weak relations, switching to strong stubborn sets.");
-        WEAK = 0;
+        POR_WEAK = 0;
     }
 
-    if (!WEAK) {
+    if (!POR_WEAK) {
         ctx->not_left_accords  = ctx->not_accords;
         ctx->not_left_accordsn = ctx->not_accords;
     } else {
@@ -1893,20 +1891,15 @@ GBaddPOR (model_t model)
                     dm_set(&not_left_accords, i, j);
                 } else {
                     if (must_disable != NULL && !NO_MDS) {
-                        for (int g = 0; g < ctx->group2guard[i]->count; g++) {
-                            int guard = ctx->group2guard[i]->data[g];
-                            if (dm_is_set (must_disable, guard, j)) {
-                                continue;
-                            }
+                        if (guard_of(ctx, i, must_disable, j)) {
+                            continue;
                         }
                     }
 
-                    for (int g = 0; g < ctx->group2guard[i]->count; g++) {
-                        int guard = ctx->group2guard[i]->data[g];
-                        if (dm_is_set (&ctx->gnes_matrix, guard, j)) {
-                            dm_set( &not_left_accords, i, j );
-                            continue;
-                        }
+                    if (guard_of(ctx, i, &ctx->gnes_matrix, j) ||
+                            dm_is_set(&nds, j, i)) {
+                        dm_set( &not_left_accords, i, j );
+                        continue;
                     }
 
                     if ( dm_is_set(commutes, i , j) ) {
@@ -1962,6 +1955,8 @@ GBaddPOR (model_t model)
     ctx->dynamic_visibility = RTmallocZero( groups * sizeof(int) );
     ctx->enabled_list = RTmallocZero ((groups + 1) * sizeof(int));
     ctx->visible_list = RTmallocZero ((groups + 1) * sizeof(int));
+    ctx->nds_list[0] = RTmallocZero ((guards + 1) * sizeof(int));
+    ctx->nds_list[1] = RTmallocZero ((guards + 1) * sizeof(int));
     ctx->marked_list = NULL;
     ctx->label_list = NULL;
     ctx->seed = 73783467;

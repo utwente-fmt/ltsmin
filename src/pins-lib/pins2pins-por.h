@@ -80,6 +80,8 @@
  *
  */
 
+extern int POR_WEAK;
+
 /**
  * Beam search algorithm for persistent sets
  * Using the NES and NDS information
@@ -149,6 +151,7 @@ typedef struct por_context {
     ci_list       **group2guard;    // mapping from group to guards
     ci_list       **guard_nes;      // transition groups that form a nes for a guard (guard -> [t1, t2, t..])
     ci_list       **guard_nds;      // transition groups that form a nds for a guard
+    ci_list       **group_nds;      // transition guards that have a group in nds
     ci_list       **guard_dep;      // transition groups that depend on a guard
     ci_list       **guard_nce;      // mapping from guards to transition groups that may not be co-enabled
     ci_list       **group_nce;      // mapping from guards to transition groups that may not be co-enabled
@@ -165,6 +168,7 @@ typedef struct por_context {
     int              visible_enabled;// number of enabled visible transitions
     ci_list         *enabled_list;  // enabled groups
     ci_list         *visible_list;  // enabled groups
+    ci_list         *nds_list[2];   // nds list for key
 
     // global nes/nds
     int             *nes_score;     // Template for the nes_score (TODO: check)
