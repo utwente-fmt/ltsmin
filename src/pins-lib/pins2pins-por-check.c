@@ -30,6 +30,9 @@
  *
  */
 
+/**
+ * stacks contain: state, src_group, src_idx_in_group
+ */
 typedef struct dlk_hook_context {
     por_context    *pctx;
     void*           user_context;
@@ -93,6 +96,10 @@ find_list (ci_list *list, int num)
     return false;
 }
 
+/**
+ * tgt_out_stack: state, src_group, src_idx_in_group, src_src_group, src_src_idx_in_group
+ * to remember from what transition we mimiced the NS transition!
+ */
 static inline dlk_check_context_t *
 create_check_ctx (por_context *ctx)
 {
@@ -107,7 +114,7 @@ create_check_ctx (por_context *ctx)
     check_ctx->seen_list = RTalignZero (CACHE_LINE_SIZE, sizeof (int[check_ctx->groups+1]));
     check_ctx->stack = dfs_stack_create (check_ctx->len + 2);
     check_ctx->tgt_in_stack = dfs_stack_create (check_ctx->len + 2);
-    check_ctx->tgt_out_stack = dfs_stack_create (check_ctx->len + 2);
+    check_ctx->tgt_out_stack = dfs_stack_create (check_ctx->len + 4);
     //loc->tree = TreeDBScreate (loc->len);
     check_ctx->set = fset_create (check_ctx->len, 0, 4, 26);
     check_ctx->pctx = ctx;
@@ -286,53 +293,94 @@ print_enabled_trans (dlk_check_context_t *ctx, int *src, int *dst, int *s1)
  *  |             |
  * stub*         stub*
  *  |             |
- *  v             v s1
- * tgt* --ns--> tgtdst*
- *           s2
+ *  v             v s1 in tgt_in_stack
+ * tgt* --ns-->
+ *           s2 in tgt_out_stack
+ *
+ * Also checks key transitions for weak POR (at least one should remain enabled
+ * after a NS transition).
  */
 static void
 check_commute (dlk_check_context_t *ctx, int *dst)
 {
-    int group = dst[ctx->len];
-    int group_idx = dst[ctx->len + 1];
-
-    if (group == -1) return;
+    int nsgroup = dst[ctx->len];
+    int nsgroup_idx = dst[ctx->len + 1];
+    if (nsgroup == -1) return;
 
     int scount = dfs_stack_frame_size(ctx->tgt_in_stack);
     int nscount = dfs_stack_frame_size(ctx->tgt_out_stack);
-    if (scount != nscount)
+    if ((!POR_WEAK && scount != nscount) || scount > nscount)
         Warning (error, "Stubborn trans %s disappeared after NS %d/%d (|src| = %d, |dst| = %d):\n %s <--> %s",
-                 str_list(ctx->ss_en_list), group, group_idx, scount, nscount,
-                 str_group(ctx,ctx->ss_en_list->data[0]), str_group(ctx, group));
+                 str_list(ctx->ss_en_list), nsgroup, nsgroup_idx, scount, nscount,
+                 str_group(ctx,ctx->ss_en_list->data[0]), str_group(ctx, nsgroup));
 
-    for (int i = scount - 1; i >= 0; i--) {
-        int *s1 = dfs_stack_peek (ctx->tgt_in_stack, i);
-        int *s2 = dfs_stack_peek (ctx->tgt_out_stack, i);
-        HREassert (s2[ctx->len] == group);
-        HREassert (s2[ctx->len + 1] == group_idx);
+    // check commutes ( tgt_out is superset of tgt_in for weak POR )
+    int s_i = scount - 1;
+    for (int ns_i = nscount - 1; ns_i >= 0 && s_i >= 0; ns_i--) {
+        int *s2 = dfs_stack_peek (ctx->tgt_out_stack, ns_i);
+        HREassert (s2[ctx->len] == nsgroup, "Minic group failed? %d != %d", s2[ctx->len], nsgroup);
+        HREassert (s2[ctx->len + 1] == nsgroup_idx, "Minic transition in group failed? %d != %d", s2[ctx->len+1], nsgroup_idx);
+
+        int *s1 = dfs_stack_peek (ctx->tgt_in_stack, s_i);
+        if (POR_WEAK) {
+            if (s1[ctx->len] != s2[ctx->len+2] || s1[ctx->len + 1] != s2[ctx->len + 3]) {
+                continue; // non-key transition may have been disabled
+            }
+        }
+        s_i--;
+
         int diff = memcmp (s1, s2, sizeof(int[ctx->len]));
-
         if (diff != 0) {
             int *src = dfs_stack_peek_top (ctx->stack, 2);
-            int *tgt = dfs_stack_peek_top2 (ctx->tgt_in_stack, 1, i);
+            int *tgt = dfs_stack_peek_top2 (ctx->tgt_in_stack, 1, ns_i);
 
             print_noncommuting_trans (ctx, src, dst, s1, tgt, s2);
 
             HREassert (diff == 0, "Stubborn trans %d/%d does not commute with NS trans: %d/%d "
                        "(count: %d, idx: %d, stubborn groups enabled: %d)"
-                       ":\n\n%s\ndoes not commute with\n%s",
-                       s1[ctx->len], s1[ctx->len+1], s2[ctx->len], s1[ctx->len + 1],
-                       scount, i, ctx->ss_en_list->count,
-                       str_group(ctx, s1[ctx->len]),
-                       str_group(ctx, s2[ctx->len]));
+                       ":\n\n%s\ndoes not commute with\n%s", s1[ctx->len],
+                       s1[ctx->len+1], s2[ctx->len], s1[ctx->len + 1],
+                       scount, ns_i, ctx->ss_en_list->count,
+                       str_group(ctx, s1[ctx->len]), str_group(ctx, s2[ctx->len]));
         }
 
         //Debug ("Stubborn trans %d/%d commutes with %d/%d",
         //      s1[ctx->len], s1[ctx->len+1], s2[ctx->len], s1[ctx->len + 1]);
     }
-    for (int i = scount - 1; i >= 0; i--) {
+
+    if (scount == 0) { HREassert (POR_WEAK);
+        // first we print commute info on all missing transitions
+        for (int ns_i = nscount - 1; ns_i >= 0 && s_i >= 0; ns_i--) {
+            int *s2 = dfs_stack_peek (ctx->tgt_out_stack, ns_i);
+            int space[ctx->len + 2]; // create the disabled stubborn transition
+            for (int i = 0; i < ctx->len; i++) space[i] = -1;
+            space[ctx->len] = nsgroup;
+            space[ctx->len + 1] = nsgroup_idx;
+            int *src = dfs_stack_peek_top (ctx->stack, 2);
+            int *tgt = dfs_stack_peek_top2 (ctx->tgt_in_stack, 1, ns_i);
+            print_noncommuting_trans (ctx, src, dst, space, tgt, s2);
+        }
+        HREassert (false, "No key transition in weak set after NS %d/%d. "
+                 "pers set: %s\n\n", nsgroup, nsgroup_idx, str_list(ctx->ss_en_list));
+    }
+
+    // additional check whether all stubborn transitions have been considered
+    if (POR_WEAK && s_i != -1) {
+        for (int i = nscount - 1; i >= 0; i--) {
+            int *s1 = dfs_stack_peek (ctx->tgt_in_stack, s_i);
+            HREassert (false, "Newly introduced stubborn transition %d/%d "
+                        "after NS transition %d/%d",
+                       s1[ctx->len], s1[ctx->len+1], nsgroup, nsgroup_idx);
+        }
+    }
+
+    // clean
+    for (int i = nscount - 1; i >= 0; i--) {
         dfs_stack_pop (ctx->tgt_out_stack);
     }
+    Debug ("Stubborn transitions (%d x) commute with NS transition %d/%d (%d x)."
+           "%d key transitions found (%d - %d)",
+          scount, nsgroup, nsgroup_idx, nscount, nscount - scount, nscount, scount);
 }
 
 static void
@@ -345,12 +393,15 @@ follow_dfs_cb (void *context, transition_info_t *ti, int *dst, int *cpy)
     if (ti->group != ctx->follow_group) return;
     if (ctx->current_idx != ctx->follow_group_idx) return;
 
-    push_trans (ctx, ctx->tgt_out_stack, dst);
+    int *space = push_trans (ctx, ctx->tgt_out_stack, dst);
+    // copy the group info from the transition that we mimiced!
+    space[ctx->len + 2] = ctx->src[ctx->len];
+    space[ctx->len + 3] = ctx->src[ctx->len + 1];
     ctx->p_count++;
 }
 
 /**
- * Explore same transition from stubborn state and put results on out stack
+ * Explore same transition from stubborn state and put results on tgt_out stack.
  */
 static void
 mimic (dlk_check_context_t *ctx, int *state)
@@ -365,7 +416,7 @@ mimic (dlk_check_context_t *ctx, int *state)
         int *t = dfs_stack_peek (ctx->tgt_in_stack, i);
         explore_state (ctx, t, follow_dfs_cb);
 
-        if (ctx->p_count != 1) {
+        if (!POR_WEAK && ctx->p_count != 1) {
             int *src = dfs_stack_peek_top (ctx->stack, 1);
             print_disabled_trans (ctx, src, state, t);
 
@@ -376,8 +427,7 @@ mimic (dlk_check_context_t *ctx, int *state)
                      t[ctx->len + 1], ctx->p_count, str_list(ctx->ss_en_list),
                      str_group(ctx, state[ctx->len]),
                      str_group(ctx, t[ctx->len]));
-
-        }
+        } // for weak sets, we check whether tgt_out is a nonempty subset of tgt_in
     }
 }
 
@@ -409,6 +459,14 @@ get_nonstubborn_cb (void *context, transition_info_t *ti, int *dst, int *cpy)
     }
 }
 
+/**
+ * Invariants:
+ * - Both stack and tgt_in_stack have an equal nr of frame levels (enter / leave)
+ * - stack only contains the src state and states reachable of NS transitions
+ * - forall level in stack : stubborn (stack.frame(level).top) = tgt.frame(level)
+ *   (tgt_in contains the stubborn successors of the currently expanded state
+ *   on the stack of the NS search)
+ */
 static void
 do_dfs_over_ns (dlk_check_context_t *ctx)
 {
@@ -422,16 +480,16 @@ do_dfs_over_ns (dlk_check_context_t *ctx)
             // For every explored NS transition, we check commutativity with
             // the stubborn transitions enabled at the initial state.
             mimic (ctx, state);         // fill tgt_out
-            dfs_stack_enter (ctx->stack);
             dfs_stack_enter (ctx->tgt_in_stack);
+            dfs_stack_enter (ctx->stack);
             explore_state (ctx, state, get_nonstubborn_cb);
             check_commute (ctx, state); // empty tgt_out
 
             int seen = fset_find (ctx->set, NULL, state, NULL, true);
             if (seen) {
+                dfs_stack_leave (ctx->tgt_in_stack);
                 dfs_stack_leave (ctx->stack); // throw away NS successors (next)
                 dfs_stack_pop (ctx->stack); // throw away state
-                dfs_stack_leave (ctx->tgt_in_stack);
             }
         } else if (dfs_stack_nframes(ctx->stack) == 0) {
             break;
