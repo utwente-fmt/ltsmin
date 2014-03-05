@@ -1123,7 +1123,7 @@ typedef struct del_context_s {
 typedef enum {
     DEL_N,  // set
     DEL_K,  // count set (stack content may be corrupted)
-    DEL_C,  // stack
+    DEL_E,  // set (EMITTED)
     DEL_Z,  // stack set
     DEL_R,  // set
     DEL_KP, // stack
@@ -1237,7 +1237,7 @@ deletion_setup (model_t model, por_context* ctx, int* src)
         }
     }
 
-    // K = {}; C := {}; Z := {}; KP := {}; TP := {}; R := {}
+    // K = {}; Z := {}; KP := {}; TP := {}; R := {}
     // N := T
     for (int i = 0; i < ctx->ngroups; i++) {
         del->set[i] = 0;
@@ -1247,13 +1247,10 @@ deletion_setup (model_t model, por_context* ctx, int* src)
         del_clear (del, i);
     }
 
-    // C := A \ R; K := A
+    //  K := A
     for (int i = 0; i < ctx->enabled_list->count; i++) {
         int group = ctx->enabled_list->data[i];
         del_push_new (del, DEL_K, group);
-        if (!del_has(del, DEL_R, group)) {
-            del_push (del, DEL_C, group);
-        }
     }
     Warning (debug, "Deletion init |en| = %d \t|R| = %d", ctx->enabled_list->count, del_count(del, DEL_R));
 }
@@ -1330,13 +1327,16 @@ deletion_analyze (por_context* ctx)
     if (ctx->enabled_list->count == 0) return;
     del_context_t *del = ctx->del_ctx;
 
-    while (del_count(del, DEL_C) != 0 && del_count(del, DEL_K) > 1) {
-        int v = del_pop (del, DEL_C);
+
+    for (int i = 0; i < ctx->enabled_list->count && del_count(del, DEL_K) > 1; i++) {
+        int v = ctx->enabled_list->data[i];
+        if (del_has(del, DEL_R, v)) continue;
+
         if (del_rem(del, DEL_K, v)) del_push (del, DEL_KP, v);
         if (del_rem(del, DEL_N, v)) del_push (del, DEL_NP, v);
         del_push_new (del, DEL_Z, v);
 
-        Warning (debug, "Deletion start from v = %d: |C| = %d \t|K| = %d", v, del_count(del, DEL_C), del_count(del, DEL_K));
+        Warning (debug, "Deletion start from v = %d: |E| = %d \t|K| = %d", v, ctx->enabled_list->count, del_count(del, DEL_K));
 
         bool revert = deletion_delete (ctx, v);
 
@@ -1384,8 +1384,8 @@ deletion_emit_new (por_context* ctx, proviso_hook_context_t* provctx, int* src)
     int c = 0;
     for (int z = 0; z < ctx->enabled_list->count; z++) {
         int i = ctx->enabled_list->data[z];
-        if (del_has(del,DEL_N,i)) { // && !del_has(del,DEL_R,i)
-            //del->set[i] |= 1<<DEL_R;
+        if (del_has(del,DEL_N,i) && !del_has(del,DEL_E,i)) {
+            del->set[i] |= 1<<DEL_E | 1<<DEL_R;
             c += GBgetTransitionsLong (ctx->parent, i, src, hook_cb, provctx);
         }
     }
