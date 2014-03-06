@@ -193,7 +193,7 @@ typedef struct por_context {
     int             *label_visibility; // visible labels
 
     void            *scc_ctx;
-    bms_t           *del_ctx;
+    void            *del_ctx;
     int              seed;
     int             *random;
 } por_context;

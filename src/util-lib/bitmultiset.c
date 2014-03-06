@@ -11,11 +11,11 @@ bms_create (size_t elements, size_t types)
     HREassert (types <= sizeof(char) * 8, "int multisets unimplemented");
     bms_t *bms = RTmallocZero (sizeof(bms_t));
     bms->set = RTmallocZero (elements);
-    bms->lists = RTmallocZero (types * sizeof(ci_list)); // see bms_t
+    bms->lists = RTmallocZero (types * sizeof(ci_list *)); // see bms_t
     bms->types = types;
     bms->elements = elements;
     for (size_t i = 0; i < types; i++)
-        bms->lists[i] = RTmallocZero ((elements + 1) * sizeof(int));
+        bms->lists[i] = ci_create(elements);
     return bms;
 }
 

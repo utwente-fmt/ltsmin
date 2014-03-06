@@ -41,6 +41,19 @@ ci_get (ci_list *list, int index)
     return list->data[index];
 }
 
+static inline int
+ci_pop (ci_list *list)
+{
+    HREassert(list->count >= 0);
+    return list->data[--list->count];
+}
+
+static inline int
+ci_count (ci_list *list)
+{
+    return list->count;
+}
+
 static inline void
 ci_clear (ci_list *list)
 {

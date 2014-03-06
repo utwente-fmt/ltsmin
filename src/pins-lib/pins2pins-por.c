@@ -30,6 +30,8 @@ static int RANDOM = 0;
 static int DYN_RANDOM = 0;
 static const char *algorithm = "heur";
 
+static int SAFETY = 0;
+
 typedef enum {
     POR_NONE,
     POR_HEUR,
@@ -149,6 +151,7 @@ init_visible_labels (por_context* ctx)
         Print1 (info, "Turning of dynamic visibility in presence of visible groups");
         NO_DYN_VIS = 1;
     }
+    SAFETY = bms_count(ctx->visible, VISIBLE) != 0;
 }
 
 static void
@@ -369,6 +372,16 @@ emit_new_selected (por_context* ctx, proviso_hook_context_t* provctx, int* src)
 }
 
 /**
+ * Visible transtions:      Tv
+ * Invisible transtions:    Ti = T \ Tv
+ * Stubborn set:            Ts
+ * Keys in stubborn set:    Tk
+ * Cycle in reduced graph:  C
+ *
+ * V  =  Tv n Ts != {}     ==>  Tv C Ts
+ * L1 =  Ti n en(s) != {}  ==>  Tk n Ts != {}
+ * L2 =  forall C : exists s in C : Tv C Ts
+ *
  * Premature check whether L1 and L2 hold, i.e. before ignoring condition is
  * known (the premise of L2).
  * For safety (!PINS_LTL), we limit the proviso to L2. For details see
@@ -579,7 +592,7 @@ beam_emit (por_context* ctx, int* src, TransitionCB cb, void* uctx)
             int i = ctx->enabled_list->data[z];
             emitted += GBgetTransitionsLong (ctx->parent, i, src, hook_cb, &provctx);
         }
-    } if (!PINS_LTL && bms_count(ctx->visible,VISIBLE) == 0) {
+    } if (!PINS_LTL && !SAFETY) { // deadlocks are easy:
         proviso_hook_context_t provctx = {cb, uctx, 0, 0, 1};
         emitted = emit_new_selected (ctx, &provctx, src);
     } else { // otherwise enforce that all por_proviso flags are true
@@ -716,8 +729,7 @@ por_beam_search_all (model_t self, int *src, TransitionCB cb, void *user_context
     beam_setup (self, ctx, src);
     beam_search (ctx);
     beam_ensure_key (ctx);
-    int emitted = beam_emit (ctx, src, cb, user_context);
-    return emitted;
+    return beam_emit (ctx, src, cb, user_context);
 }
 
 /**
@@ -1103,11 +1115,26 @@ typedef enum {
     DEL_E,  // set (EMITTED)
     DEL_Z,  // stack set
     DEL_R,  // set
-    DEL_KP, // stack
-    DEL_NP, // stack
-    DEL_DP, // stack
     DEL_COUNT
 } del_t;
+
+typedef struct del_ctx_s {
+    bms_t              *del;
+    ci_list            *Kprime;
+    ci_list            *Nprime;
+    ci_list            *Dprime;
+} del_ctx_t;
+
+static del_ctx_t *
+deletion_create (por_context* ctx)
+{
+    del_ctx_t *delctx = RTmalloc (sizeof(del_ctx_t));
+    delctx->del = bms_create (ctx->ngroups, DEL_COUNT);
+    delctx->Kprime = ci_create(ctx->ngroups);
+    delctx->Nprime = ci_create(ctx->ngroups);
+    delctx->Dprime = ci_create(ctx->ngroups);
+    return delctx;
+}
 
 static inline bool
 del_enabled (por_context* ctx, int u)
@@ -1118,7 +1145,8 @@ del_enabled (por_context* ctx, int u)
 static void
 deletion_setup (model_t model, por_context* ctx, int* src)
 {
-    bms_t *del = ctx->del_ctx;
+    del_ctx_t       *delctx = (del_ctx_t *) ctx->del_ctx;
+    bms_t           *del = delctx->del;
     por_init_transitions (model, ctx, src);
     if (ctx->enabled_list->count == 0) return;
 
@@ -1144,6 +1172,9 @@ deletion_setup (model_t model, por_context* ctx, int* src)
     // N := T
     bms_clear_lists (del);
     bms_set_all (del, DEL_N);
+    ci_clear (delctx->Kprime);
+    ci_clear (delctx->Nprime);
+    ci_clear (delctx->Dprime);
 
     //  K := A
     for (int i = 0; i < ctx->enabled_list->count; i++) {
@@ -1156,7 +1187,11 @@ deletion_setup (model_t model, por_context* ctx, int* src)
 static inline bool
 deletion_delete (por_context* ctx, int v)
 {
-    bms_t *del = ctx->del_ctx;
+    del_ctx_t       *delctx = (del_ctx_t *) ctx->del_ctx;
+    bms_t           *del = delctx->del;
+    bool included_visibles = false;
+    bool included_visible_nes = false;
+    bool included_visible_nds = false;
 
     // search the deletion space:
     while (bms_count(del, DEL_Z) != 0 && bms_count(del, DEL_K) != 0) {
@@ -1174,7 +1209,7 @@ deletion_delete (por_context* ctx, int v)
                     if (bms_has(del,DEL_R,x)) return true;
                     bms_push_new (del, DEL_Z, x);
                 }
-                if (bms_rem(del, DEL_K, x)) bms_push (del, DEL_KP, x);
+                if (bms_rem(del, DEL_K, x)) ci_add (delctx->Kprime, x);
             }
         }
         if (bms_count(del, DEL_K) == 0) return true;
@@ -1188,11 +1223,11 @@ deletion_delete (por_context* ctx, int v)
                     if (bms_has(del,DEL_R,x)) return true;
                     bms_push_new (del, DEL_Z, x);
                 }
-                if (bms_rem(del, DEL_N, x)) bms_push (del, DEL_NP, x);
+                if (bms_rem(del, DEL_N, x)) ci_add (delctx->Nprime, x);
             }
         }
 
-        bms_push (del, DEL_DP, z);
+        ci_add (delctx->Dprime, z);
         // Thirdly, the disabled transitions x, whose NES was stubborn
         // before removal of u, need to be put to Z.
         for (int i = 0; i < ctx->group2ns[z]->count; i++) {
@@ -1211,7 +1246,7 @@ deletion_delete (por_context* ctx, int v)
                     if (ctx->group_score[x] == 0 && bms_has(del,DEL_N,x)) {
                         bms_push_new (del, DEL_Z, x);
                         HREassert (!bms_has(del, DEL_K, x)); // x is disabled
-                        if (bms_rem(del, DEL_N, x)) bms_push (del, DEL_NP, x);
+                        if (bms_rem(del, DEL_N, x)) ci_add (delctx->Nprime, x);
                     }
                 }
             }
@@ -1223,15 +1258,15 @@ static inline void
 deletion_analyze (por_context* ctx)
 {
     if (ctx->enabled_list->count == 0) return;
-    bms_t              *del = ctx->del_ctx;
-
+    del_ctx_t       *delctx = (del_ctx_t *) ctx->del_ctx;
+    bms_t           *del = delctx->del;
 
     for (int i = 0; i < ctx->enabled_list->count && bms_count(del, DEL_K) > 1; i++) {
         int v = ctx->enabled_list->data[i];
         if (bms_has(del, DEL_R, v)) continue;
 
-        if (bms_rem(del, DEL_K, v)) bms_push (del, DEL_KP, v);
-        if (bms_rem(del, DEL_N, v)) bms_push (del, DEL_NP, v);
+        if (bms_rem(del, DEL_K, v)) ci_add (delctx->Kprime, v);
+        if (bms_rem(del, DEL_N, v)) ci_add (delctx->Nprime, v);
         bms_push_new (del, DEL_Z, v);
 
         Warning (debug, "Deletion start from v = %d: |E| = %d \t|K| = %d", v, ctx->enabled_list->count, bms_count(del, DEL_K));
@@ -1243,19 +1278,19 @@ deletion_analyze (por_context* ctx)
         // Reverting deletions if necessary
         if (revert) {
             Warning (debug, "Deletion rollback: |T'| = %d \t|K'| = %d \t|D'| = %d",
-                     bms_count(del, DEL_NP), bms_count(del, DEL_KP), bms_count(del, DEL_DP));
+                     ci_count(delctx->Nprime), ci_count(delctx->Kprime), ci_count(delctx->Dprime));
             bms_add (del, DEL_R, v); // fail transition!
-            while (bms_count(del, DEL_KP) != 0) {
-                int x = bms_pop (del, DEL_KP);
+            while (ci_count(delctx->Kprime) != 0) {
+                int x = ci_pop (delctx->Kprime);
                 bool seen = bms_push_new (del, DEL_K, x);
                 HREassert (seen, "DEL_K messed up");
             }
-            while (bms_count(del, DEL_NP) != 0) {
-                int x = bms_pop (del, DEL_NP);
+            while (ci_count(delctx->Nprime) != 0) {
+                int x = ci_pop (delctx->Nprime);
                 del->set[x] = del->set[x] | (1<<DEL_N);
             }
-            while (bms_count(del, DEL_DP) != 0) {
-                int x = bms_pop (del, DEL_DP);
+            while (ci_count(delctx->Dprime) != 0) {
+                int x = ci_pop (delctx->Dprime);
                 for (int i = 0; i < ctx->group2ns[x]->count; i++) {
                     int ns = ctx->group2ns[x]->data[i];
                     ctx->nes_score[ns] -= (ctx->nes_score[ns] >= 0);
@@ -1268,9 +1303,9 @@ deletion_analyze (por_context* ctx)
                 }
             }
         } else {
-            bms_clear (del, DEL_KP);
-            bms_clear (del, DEL_NP);
-            bms_clear (del, DEL_DP);
+            ci_clear (delctx->Kprime);
+            ci_clear (delctx->Nprime);
+            ci_clear (delctx->Dprime);
         }
     }
 }
@@ -1278,7 +1313,8 @@ deletion_analyze (por_context* ctx)
 static inline int
 deletion_emit_new (por_context* ctx, proviso_hook_context_t* provctx, int* src)
 {
-    bms_t *del = ctx->del_ctx;
+    del_ctx_t       *delctx = (del_ctx_t *) ctx->del_ctx;
+    bms_t           *del = delctx->del;
     int c = 0;
     for (int z = 0; z < ctx->enabled_list->count; z++) {
         int i = ctx->enabled_list->data[z];
@@ -1854,7 +1890,7 @@ GBaddPOR (model_t model)
     // SCC search
     ctx->scc_ctx = create_scc_ctx (ctx);
 
-    ctx->del_ctx = bms_create (groups, DEL_COUNT);
+    ctx->del_ctx = deletion_create (ctx);
 
     return pormodel;
 }
