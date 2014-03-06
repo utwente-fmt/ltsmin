@@ -179,7 +179,8 @@ global_print_stats (model_t model, size_t local_state_infos, size_t stack)
 
     pagesDB = ((double)(1UL << (dbs_size)) / (1<<20)) * SLOT_SIZE * el_size;
     memC = ((double)(((((size_t)local_bits)<<dbs_size))/8*W)) / (1UL<<20);
-    memDB = ((double)(db_nodes * SLOT_SIZE * el_size)) / (1<<20);
+    double memBytes = db_nodes * SLOT_SIZE * el_size;
+    memDB = memBytes / (1 << 20);
     fill = (double)((db_elts * 100) / (1UL << dbs_size));
 
     // print additional local queue/stack memory statistics
@@ -191,8 +192,9 @@ global_print_stats (model_t model, size_t local_state_infos, size_t stack)
     if (db_type & Tree) {
         compr = (double)(db_nodes * el_size) / ((D+1) * db_elts) * 100;
         leafs = (double)(((db_nodes - db_elts) * 100) / (1UL << (dbs_size-ratio)));
-        Warning (info, "Tree memory: %.1fMB, compr.: %.1f%%, fill (roots/leafs): "
-                "%.1f%%/%.1f%%", memDB, compr, fill, leafs);
+        Warning (info, "Tree memory: %.1fMB, %.1f B/state, compr.: %.1f%%",
+                 memDB, memBytes/db_elts, compr);
+        Warning (info, "Tree fill ratio (roots/leafs): %.1f%%/%.1f%%", fill, leafs);
     } else {
         Warning (info, "Table memory: %.1fMB, fill ratio: %.1f%%", memDB, fill);
     }
