@@ -128,6 +128,7 @@ static inline void
 init_visible_labels (por_context* ctx)
 {
     if (ctx->visible != NULL) return;
+    NO_DYN_VIS |= NO_V;
 
     model_t model = ctx->parent;
     int groups = dm_nrows (GBgetDMInfo(model));
@@ -376,11 +377,14 @@ emit_new_selected (por_context* ctx, proviso_hook_context_t* provctx, int* src)
  * Invisible transtions:    Ti = T \ Tv
  * Stubborn set:            Ts
  * Keys in stubborn set:    Tk
- * Cycle in reduced graph:  C
  *
  * V  =  Tv n Ts != {}     ==>  Tv C Ts
- * L1 =  Ti n en(s) != {}  ==>  Tk n Ts != {}
- * L2 =  forall C : exists s in C : Tv C Ts
+ * L1 =  Ti n en(s) != {}  ==>  Tk n Ti != {}
+ * L2 =  s closes cycle    ==>  Tv C Ts
+ *
+ * Whether s closes a cycle is determined by the search algorithm, which may
+ * employ DFS with the condition s in stack, or a more complicated search
+ * algorithm such as the color proviso.
  *
  * Premature check whether L1 and L2 hold, i.e. before ignoring condition is
  * known (the premise of L2).
@@ -598,14 +602,14 @@ beam_emit (por_context* ctx, int* src, TransitionCB cb, void* uctx)
     } else { // otherwise enforce that all por_proviso flags are true
         proviso_hook_context_t provctx = {cb, uctx, 0, 0, 0};
 
-        provctx.force_proviso_true = !NO_L12 && check_L1_L2_proviso(ctx);
+        provctx.force_proviso_true = !NO_L12 && !NO_V && check_L1_L2_proviso(ctx);
         emitted = emit_new_selected (ctx, &provctx, src);
 
         // emit more if we need to fulfill a liveness / safety proviso
         if ( ( PINS_LTL && provctx.por_proviso_false_cnt != 0) ||
              (!PINS_LTL && provctx.por_proviso_true_cnt  == 0) ) {
 
-            if (!NO_L12) {
+            if (!NO_L12 && !NO_V) {
                 // enforce L2 (include all visible transitions)
                 select_all_visible (ctx, VISIBLE);
                 ctx->beam_used = 1; // fix to current (partly emitted) search ctx
@@ -614,7 +618,7 @@ beam_emit (por_context* ctx, int* src, TransitionCB cb, void* uctx)
                 // enforce L1 (one invisible transition)
                 // not to be worried about when using Peled's visibility
                 provctx.force_proviso_true = check_L1_L2_proviso(ctx);
-                if (PINS_LTL && !NO_V && !provctx.force_proviso_true) {
+                if (PINS_LTL && !provctx.force_proviso_true) {
                     select_one_invisible (ctx);
                     beam_search (ctx);
                 }
@@ -1127,6 +1131,8 @@ typedef struct del_ctx_s {
     ci_list            *Dprime;
     int                 invisible_enabled;
     bool                has_invisible;
+    bool                del_nes;
+    bool                del_nds;
 } del_ctx_t;
 
 static del_ctx_t *
@@ -1147,7 +1153,7 @@ del_enabled (por_context* ctx, int u)
 }
 
 static void
-deletion_setup (model_t model, por_context* ctx, int* src)
+deletion_setup (model_t model, por_context* ctx, int* src, bool reset)
 {
     del_ctx_t       *delctx = (del_ctx_t *) ctx->del_ctx;
     bms_t           *del = delctx->del;
@@ -1175,7 +1181,11 @@ deletion_setup (model_t model, por_context* ctx, int* src)
     // K = {}; Z := {}; KP := {}; TP := {}; R := {}
     // N := T
     bms_clear_lists (del);
-    bms_set_all (del, DEL_N);
+    if (reset) {
+        bms_set_all (del, DEL_N);
+    } else {
+        bms_and_or_all (del, DEL_R, DEL_E, DEL_N); // save emitted and revert
+    }
     ci_clear (delctx->Kprime);
     ci_clear (delctx->Nprime);
     ci_clear (delctx->Dprime);
@@ -1221,7 +1231,9 @@ deletion_delete (por_context* ctx, int v, bool *del_nes, bool *del_nds)
                 }
                 if (bms_rem(del, DEL_K, x)) ci_add (delctx->Kprime, x);
                 delctx->invisible_enabled -= !is_visible(ctx, x);
-                if (delctx->has_invisible && delctx->invisible_enabled == 0) return true;
+                if (delctx->has_invisible && delctx->invisible_enabled == 0 && !NO_V) {
+                    return true;
+                }
             }
         }
         if (bms_count(del, DEL_K) == 0) return true;
@@ -1265,7 +1277,8 @@ deletion_delete (por_context* ctx, int v, bool *del_nes, bool *del_nds)
         }
 
         // Fourth, if a visible is deleted, then remove all enabled visible
-        if ((SAFETY || PINS_LTL) && !*del_nds && !*del_nes && is_visible(ctx,z)) {
+        if ((SAFETY || PINS_LTL) && !*del_nds && !*del_nes &&
+                (NO_V ? del_enabled(ctx,z) : is_visible(ctx,z))) {
             if (NO_DYN_VIS || bms_has(ctx->visible, VISIBLE_NES, z)) {
                 for (int i = 0; i < del->lists[DEL_VD]->count; i++) {
                     int x = del->lists[DEL_VD]->data[i];
@@ -1282,7 +1295,7 @@ deletion_delete (por_context* ctx, int v, bool *del_nes, bool *del_nds)
                     }
                 }
                 *del_nds  = true;
-                *del_nes |= !NO_DYN_VIS;
+                *del_nes |= NO_DYN_VIS;
             }
             if (!NO_DYN_VIS && bms_has(ctx->visible, VISIBLE_NDS, z)) {
                 for (int i = 0; i < del->lists[DEL_VE]->count; i++) {
@@ -1309,10 +1322,10 @@ static inline void
 deletion_analyze (por_context* ctx)
 {
     if (ctx->enabled_list->count == 0) return;
-    del_ctx_t       *delctx = (del_ctx_t *) ctx->del_ctx;
-    bms_t           *del = delctx->del;
-    bool            del_nes = false;
-    bool            del_nds = false;
+    del_ctx_t          *delctx = (del_ctx_t *) ctx->del_ctx;
+    bms_t              *del = delctx->del;
+    bool                del_nes = false;
+    bool                del_nds = false;
 
     for (int i = 0; i < ctx->enabled_list->count && bms_count(del, DEL_K) > 1; i++) {
         int v = ctx->enabled_list->data[i];
@@ -1366,6 +1379,9 @@ deletion_analyze (por_context* ctx)
             ci_clear (delctx->Dprime);
         }
     }
+
+    delctx->del_nes = del_nes;
+    delctx->del_nds = del_nds;
 }
 
 static inline int
@@ -1385,14 +1401,52 @@ deletion_emit_new (por_context* ctx, proviso_hook_context_t* provctx, int* src)
 }
 
 static inline int
-deletion_emit (por_context* ctx, int* src, TransitionCB cb, void* uctx)
+deletion_emit (model_t model, por_context* ctx, int* src, TransitionCB cb,
+               void* uctx)
 {
+    del_ctx_t          *delctx = (del_ctx_t *) ctx->del_ctx;
+    bms_t              *del = delctx->del;
     proviso_hook_context_t provctx = {cb, uctx, 0, 0, 0};
-    provctx.force_proviso_true = !NO_L12 && check_L1_L2_proviso (ctx);
+
+    if (PINS_LTL || SAFETY) {
+        if (NO_L12) {
+            int selected = 0;
+            for (int i = 0; i < ctx->enabled_list->count; i++) {
+                int x = ctx->enabled_list->data[i];
+                selected += bms_has(del,DEL_N,x);
+            }
+            provctx.force_proviso_true = selected == ctx->enabled_list->count;
+        } else { // Deletion guarantees that I holds, but does V hold?
+            provctx.force_proviso_true = !delctx->del_nds && !delctx->del_nes;
+        }
+    }
 
     int emitted = deletion_emit_new (ctx, &provctx, src);
 
-    //TODO: LTL and safety
+    // emit more if we need to fulfill a liveness / safety proviso
+    if ( ( PINS_LTL && provctx.por_proviso_false_cnt != 0) ||
+         (!PINS_LTL && provctx.por_proviso_true_cnt  == 0) ) {
+        if (NO_L12) {
+            for (int i = 0; i < ctx->enabled_list->count; i++) {
+                int x = ctx->enabled_list->data[i];
+                del->set[x] |= (1 << DEL_N);
+            }
+            emitted += deletion_emit_new (ctx, &provctx, src);
+        } else {
+            for (int i = 0; i < del->lists[DEL_VD]->count; i++) {
+                int x = del->lists[DEL_VD]->data[i];
+                del->set[i] |= 1<<DEL_R;
+            }
+            for (int i = 0; i < del->lists[DEL_VE]->count && !NO_DYN_VIS; i++) {
+                int x = del->lists[DEL_VE]->data[i];
+                del->set[i] |= 1<<DEL_R;
+            }
+            deletion_setup (model, ctx, src, false);
+            deletion_analyze (ctx);
+
+            emitted += deletion_emit_new (ctx, &provctx, src);
+        }
+    }
 
     return emitted;
 }
@@ -1401,10 +1455,9 @@ static int
 por_deletion_all (model_t self, int *src, TransitionCB cb, void *user_context)
 {
     por_context* ctx = ((por_context*)GBgetContext(self));
-    deletion_setup (self, ctx, src);
+    deletion_setup (self, ctx, src, true);
     deletion_analyze (ctx);
-    int emitted = deletion_emit (ctx, src, cb, user_context);
-    return emitted;
+    return deletion_emit (self, ctx, src, cb, user_context);
 }
 
 static void

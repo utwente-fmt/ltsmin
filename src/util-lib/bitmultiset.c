@@ -20,6 +20,18 @@ bms_create (size_t elements, size_t types)
 }
 
 void
+bms_and_or_all (bms_t *bms, int and1, int and2, int or)
+{
+    int AND1 = 1 << and1;
+    int AND2 = 1 << and2;
+    int OR = 1 << or;
+    for (size_t i = 0; i < bms->elements; i++) {
+        bms->set[i] &= AND1 | AND2;
+        bms->set[i] |= OR;
+    }
+}
+
+void
 bms_set_all (bms_t *bms, int set)
 {
     int s = 1 << set;

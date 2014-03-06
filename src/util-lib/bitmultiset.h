@@ -86,6 +86,8 @@ bms_rem (bms_t *bms, int set, int u)
     return seen;
 }
 
+extern void bms_and_or_all (bms_t *bms, int and1, int and2, int or);
+
 extern void bms_set_all (bms_t *bms, int set);
 
 extern void bms_clear_all(bms_t *bms);
