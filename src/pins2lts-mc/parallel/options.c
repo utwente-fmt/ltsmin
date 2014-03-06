@@ -74,7 +74,7 @@ options_static_init      (model_t model, bool timed)
             Warning (info, "Forcing use of the stack cycle proviso");
             proviso = Proviso_Stack;
         }
-        if (strategy[0] & Strat_NDFS) {
+        if (permutation != Perm_None) {
             Warning (info, "Warning turning off successor permutation to solve NDFS revisiting problem.");
             permutation = Perm_None;
         }
