@@ -706,7 +706,7 @@ final_stat_reporting(vset_t visited, rt_timer_t timer)
     }
 }
 
-#if defined(HAVE_LIBSPG) || defined(PBES)
+#if defined(HAVE_LIBSPG) || defined(LTSMIN_PBES)
 static bool debug_output_enabled = false;
 
 /**
@@ -2013,7 +2013,7 @@ void init_spg(model_t model)
     for(int i=0; i<N; i++)
     {
         //Printf(infoLong, "%d: %s (%d [%s])\n", i, lts_type_get_state_name(type, i), lts_type_get_state_typeno(type, i), lts_type_get_state_type(type, i));
-#ifdef PBES
+#ifdef LTSMIN_PBES
         char* str1 = "string"; // for the PBES language module
 #else
         char* str1 = "mu"; // for the mu-calculus PINS layer
