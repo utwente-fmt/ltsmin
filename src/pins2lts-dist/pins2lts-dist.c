@@ -90,7 +90,8 @@ static int              cost_ofs;
 static char*            label_filter=NULL;
 static char*            trc_output=NULL;
 static char*            cost=NULL;
-
+static int              inhibit=0;
+static int              representatives=0;
 
 static  struct poptOption options[] = {
     { "filter" , 0 , POPT_ARG_STRING , &label_filter , 0 ,
@@ -106,6 +107,8 @@ static  struct poptOption options[] = {
     { "no-exit", 'n', POPT_ARG_VAL, &no_exit, 1, "no exit on error, just count (for error counters use -v)", NULL },
     SPEC_POPT_OPTIONS,
     {"trace", 0, POPT_ARG_STRING, &trc_output, 0, "file to write trace to", "<lts file>" },
+    {"inhibit", 0, POPT_ARG_VAL, &inhibit, 1, "Obey the inhibit matrix if the model defines it.", NULL },
+    {"representatives", 0, POPT_ARG_VAL, &representatives, 1, "Compute reporesentatives if the model defines a confluence matrix.", NULL },
     { NULL, 0, POPT_ARG_INCLUDE_TABLE, greybox_options, 0, "PINS options", NULL },
     POPT_TABLEEND
 };
@@ -608,7 +611,7 @@ int main(int argc, char*argv[]){
     matrix_t *inhibit_matrix=NULL;
     matrix_t *class_matrix=NULL;
     matrix_t *confluence_matrix=NULL;
-    {
+    if (inhibit){
         int id=GBgetMatrixID(model,"inhibit");
         if (id>=0){
             inhibit_matrix=GBgetMatrix(model,id);
@@ -630,7 +633,9 @@ int main(int argc, char*argv[]){
         } else {
             Warning(infoLong,"no inhibit class label");
         }
-        id = GBgetMatrixID(model,"confluent");
+    }
+    if (representatives){
+        int id = GBgetMatrixID(model,"confluent");
         if (id>=0){
             confluence_matrix=GBgetMatrix(model,id);
             Warning(infoLong,"confluence matrix is:");

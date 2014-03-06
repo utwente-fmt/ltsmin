@@ -11,6 +11,7 @@
 
 static int check_confluence=0;
 static int enable_rewards=0;
+static int internal_max_progress=1;
 
 static const char const_long[]="const";
 static const char progress_long[]="max-progress";
@@ -91,6 +92,9 @@ struct poptOption mapa_options[]= {
      " and 'none' to disable maximal progress","<actions>"},
     { "rewards" , 0 , POPT_ARG_VAL, &enable_rewards , 1, "enable edge rewards" , NULL },
     { "confluence", 0, POPT_ARG_VAL, &check_confluence, 1, "detect confluent summands and write confluent matrix", NULL },
+    { "external-max-progress", 0 , POPT_ARG_VAL , & internal_max_progress , 0 ,
+      "By default the getTransitionsAll method will apply maximal progress."
+      " This option allows external handling of maximal progress for that call." , NULL },
 	POPT_TABLEEND
 };
 
@@ -199,17 +203,8 @@ typedef struct prcrl_context {
     HsStablePtr spec;
     string_index_t reach_actions;
     matrix_t reach_info;
+    matrix_t class_matrix;
 } *prcrl_context_t;
-
-/*
-static int PRCRLgetTransitionsAll(model_t model,int*src,TransitionCB cb,void*context){
-    prcrl_context_t ctx=GBgetContext(model);
-    cb_ctx=context;
-    user_cb=cb;
-    int res=prcrl_explore(ctx->spec,src,cb_dest,cb_label);
-    return res;
-}
-*/
 
 static int PRCRLdelegateTransitionsLong(model_t model,int group,int*src,TransitionCB cb,void*context){
     prcrl_context_t ctx=GBgetContext(model);
@@ -224,11 +219,41 @@ static int PRCRLgetTransitionsLong(model_t model,int group,int*src,TransitionCB 
     return res;
 }
 
-/*
+
+static int PRCRLgetTransitionsAll(model_t model,int*src,TransitionCB cb,void*context){
+    int res=0;
+    switch(max_progress){
+    case MAX_PROGRESS_NONE:{
+        int N=dm_nrows(GBgetDMInfo(model));
+      	for(int i=0; i < N ; i++) {
+    		res+=GBgetTransitionsLong(model,i,src,cb,context);
+    	}
+    	break;
+	}
+    case MAX_PROGRESS_TAU:{
+        prcrl_context_t ctx=GBgetContext(model);
+        res=GBgetTransitionsMarked(model,&ctx->class_matrix,0,src,cb,context);
+        if (res==0){
+            res+=GBgetTransitionsMarked(model,&ctx->class_matrix,2,src,cb,context);
+        }
+        res+=GBgetTransitionsMarked(model,&ctx->class_matrix,1,src,cb,context);
+        break;
+    }
+    case MAX_PROGRESS_ALL:{
+        prcrl_context_t ctx=GBgetContext(model);
+        res=GBgetTransitionsMarked(model,&ctx->class_matrix,0,src,cb,context);
+        res+=GBgetTransitionsMarked(model,&ctx->class_matrix,1,src,cb,context);
+        if (res==0){
+            res+=GBgetTransitionsMarked(model,&ctx->class_matrix,2,src,cb,context);
+        }
+        break;
+    }}
+    return res;
+}
+
 static int label_actions(char*edge_class){
     return SIlookup(reach_actions,edge_class)>=0;
 }
-*/
 
 static int check_goal(model_t self,int label,int*src){
     (void)label;
@@ -317,8 +342,7 @@ void common_load_model(model_t model,const char*name,int mapa){
     lts_type_set_edge_label_name(ltstype,5,"denominator");
     lts_type_set_edge_label_type(ltstype,5,"pos");
     
-    static matrix_t class_matrix;
-    dm_create(&class_matrix,3,nSmds);
+    dm_create(&context->class_matrix,3,nSmds);
 
     int reach_smds=0;
     static matrix_t sl_info;
@@ -350,13 +374,13 @@ void common_load_model(model_t model,const char*name,int mapa){
             if(check_confluence){ // mark entry as silent
                 dm_set(&conf_info,1,i);
             }
-            dm_set(&class_matrix,0,i);
+            dm_set(&context->class_matrix,0,i);
         } else if (strncmp(action,"rate",4)==0) {
-            dm_set(&class_matrix,2,i);
+            dm_set(&context->class_matrix,2,i);
             // rate steps do not make a tau step non-confluent
         } else {
             if (strcmp(action,"reachConditionAction")!=0) {
-                dm_set(&class_matrix,1,i);
+                dm_set(&context->class_matrix,1,i);
                 if(check_confluence){ // other steps make tau steps non-confluent
                     dm_set(&conf_info,2,i);
                 }
@@ -368,7 +392,7 @@ void common_load_model(model_t model,const char*name,int mapa){
     GBchunkPutAt(model,bool_type,chunk_str("F"),0);
     GBchunkPutAt(model,bool_type,chunk_str("T"),1);
 
-    GBsetMatrix(model,LTSMIN_EDGE_TYPE_ACTION_CLASS,&class_matrix,PINS_STRICT,PINS_INDEX_OTHER,PINS_INDEX_GROUP);
+    GBsetMatrix(model,LTSMIN_EDGE_TYPE_ACTION_CLASS,&context->class_matrix,PINS_STRICT,PINS_INDEX_OTHER,PINS_INDEX_GROUP);
     
     if (max_progress != MAX_PROGRESS_NONE){
         static matrix_t progress_matrix;
@@ -385,7 +409,9 @@ void common_load_model(model_t model,const char*name,int mapa){
 	prcrl_get_init(context->spec,state);
     GBsetInitialState(model,state);
     
-//    GBsetNextStateAll(model,PRCRLgetTransitionsAll);
+    if (internal_max_progress){
+        GBsetNextStateAll(model,PRCRLgetTransitionsAll);
+    }
     
     static matrix_t dm_info;
     Warning(info,"spec has %d summands",nSmds);
