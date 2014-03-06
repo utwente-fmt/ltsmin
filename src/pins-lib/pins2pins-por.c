@@ -1115,6 +1115,8 @@ typedef enum {
     DEL_E,  // set (EMITTED)
     DEL_Z,  // stack set
     DEL_R,  // set
+    DEL_VD,
+    DEL_VE,
     DEL_COUNT
 } del_t;
 
@@ -1123,6 +1125,8 @@ typedef struct del_ctx_s {
     ci_list            *Kprime;
     ci_list            *Nprime;
     ci_list            *Dprime;
+    int                 invisible_enabled;
+    bool                has_invisible;
 } del_ctx_t;
 
 static del_ctx_t *
@@ -1177,21 +1181,27 @@ deletion_setup (model_t model, por_context* ctx, int* src)
     ci_clear (delctx->Dprime);
 
     //  K := A
+    delctx->invisible_enabled = 0;
     for (int i = 0; i < ctx->enabled_list->count; i++) {
         int group = ctx->enabled_list->data[i];
         bms_push_new (del, DEL_K, group);
+
+        bool d = bms_has(ctx->visible, NO_DYN_VIS ? VISIBLE : VISIBLE_NDS, group);
+        bms_push_if (del, DEL_VD, group, d);
+        bool e = NO_DYN_VIS && bms_has(ctx->visible, VISIBLE_NES, group);
+        bms_push_if (del, DEL_VE, group, e);
+        delctx->invisible_enabled += !is_visible(ctx, group);
     }
-    Warning (debug, "Deletion init |en| = %d \t|R| = %d", ctx->enabled_list->count, bms_count(del, DEL_R));
+    delctx->has_invisible = delctx->invisible_enabled != 0;
+    Warning (debug, "Deletion init |en| = %d \t|R| = %d",
+             ctx->enabled_list->count, bms_count(del, DEL_R));
 }
 
 static inline bool
-deletion_delete (por_context* ctx, int v)
+deletion_delete (por_context* ctx, int v, bool *del_nes, bool *del_nds)
 {
     del_ctx_t       *delctx = (del_ctx_t *) ctx->del_ctx;
     bms_t           *del = delctx->del;
-    bool included_visibles = false;
-    bool included_visible_nes = false;
-    bool included_visible_nds = false;
 
     // search the deletion space:
     while (bms_count(del, DEL_Z) != 0 && bms_count(del, DEL_K) != 0) {
@@ -1200,9 +1210,9 @@ deletion_delete (por_context* ctx, int v)
 
         if (bms_has(del,DEL_R,z)) return true;
 
-        // Firstly, the enabled transitions x that are still stubborn and
+        // First, the enabled transitions x that are still stubborn and
         // belong to DNA_u, need to be removed from key stubborn and put to Z.
-        for (int i = 0; i < ctx->not_accords[z]->count; i++) {
+        for (int i = 0; i < ctx->not_accords[z]->count && bms_count(del, DEL_K) > 0; i++) {
             int x = ctx->not_accords[z]->data[i];
             if (bms_has(del,DEL_K,x)) {
                 if (!bms_has(del,DEL_N,x)) {
@@ -1210,11 +1220,13 @@ deletion_delete (por_context* ctx, int v)
                     bms_push_new (del, DEL_Z, x);
                 }
                 if (bms_rem(del, DEL_K, x)) ci_add (delctx->Kprime, x);
+                delctx->invisible_enabled -= !is_visible(ctx, x);
+                if (delctx->has_invisible && delctx->invisible_enabled == 0) return true;
             }
         }
         if (bms_count(del, DEL_K) == 0) return true;
 
-        // Secondly, the enabled transitions x that are still stubborn and
+        // Second, the enabled transitions x that are still stubborn and
         // belong to DNB_u need to be removed from other stubborn and put to Z.
         for (int i = 0; i < ctx->not_left_accordsn[z]->count; i++) {
             int x = ctx->not_left_accordsn[z]->data[i];
@@ -1228,7 +1240,7 @@ deletion_delete (por_context* ctx, int v)
         }
 
         ci_add (delctx->Dprime, z);
-        // Thirdly, the disabled transitions x, whose NES was stubborn
+        // Third, the disabled transitions x, whose NES was stubborn
         // before removal of u, need to be put to Z.
         for (int i = 0; i < ctx->group2ns[z]->count; i++) {
             int ns = ctx->group2ns[z]->data[i];
@@ -1251,6 +1263,45 @@ deletion_delete (por_context* ctx, int v)
                 }
             }
         }
+
+        // Fourth, if a visible is deleted, then remove all enabled visible
+        if ((SAFETY || PINS_LTL) && !*del_nds && !*del_nes && is_visible(ctx,z)) {
+            if (NO_DYN_VIS || bms_has(ctx->visible, VISIBLE_NES, z)) {
+                for (int i = 0; i < del->lists[DEL_VD]->count; i++) {
+                    int x = del->lists[DEL_VD]->data[i];
+                    if (bms_has(del, DEL_N, x) || bms_has(del, DEL_K, x)) {
+                        if (bms_rem(del, DEL_N, x)) ci_add (delctx->Nprime, x);
+                        if (bms_rem(del, DEL_K, x)) {
+                            ci_add (delctx->Kprime, x);
+                            if (bms_count(del, DEL_K) == 0) return true;
+                            delctx->invisible_enabled -= !is_visible(ctx, x);
+                            if (delctx->has_invisible && delctx->invisible_enabled == 0) return true;
+                        }
+                        if (bms_has(del,DEL_R,x)) return true; // enabled
+                        bms_push_new (del, DEL_Z, x);
+                    }
+                }
+                *del_nds  = true;
+                *del_nes |= !NO_DYN_VIS;
+            }
+            if (!NO_DYN_VIS && bms_has(ctx->visible, VISIBLE_NDS, z)) {
+                for (int i = 0; i < del->lists[DEL_VE]->count; i++) {
+                    int x = del->lists[DEL_VE]->data[i];
+                    if (bms_has(del, DEL_N, x) || bms_has(del, DEL_K, x)) {
+                        if (bms_rem(del, DEL_N, x)) ci_add (delctx->Nprime, x);
+                        if (bms_rem(del, DEL_K, x)) {
+                            ci_add (delctx->Kprime, x);
+                            if (bms_count(del, DEL_K) == 0) return true;
+                            delctx->invisible_enabled -= !is_visible(ctx, x);
+                            if (delctx->has_invisible && delctx->invisible_enabled == 0) return true;
+                        }
+                        if (bms_has(del,DEL_R,x)) return true; // enabled
+                        bms_push_new (del, DEL_Z, x);
+                    }
+                }
+                *del_nes = true;
+            }
+        }
     }
 }
 
@@ -1260,6 +1311,8 @@ deletion_analyze (por_context* ctx)
     if (ctx->enabled_list->count == 0) return;
     del_ctx_t       *delctx = (del_ctx_t *) ctx->del_ctx;
     bms_t           *del = delctx->del;
+    bool            del_nes = false;
+    bool            del_nds = false;
 
     for (int i = 0; i < ctx->enabled_list->count && bms_count(del, DEL_K) > 1; i++) {
         int v = ctx->enabled_list->data[i];
@@ -1271,7 +1324,9 @@ deletion_analyze (por_context* ctx)
 
         Warning (debug, "Deletion start from v = %d: |E| = %d \t|K| = %d", v, ctx->enabled_list->count, bms_count(del, DEL_K));
 
-        bool revert = deletion_delete (ctx, v);
+        bool            del_nes_old = del_nes;
+        bool            del_nds_old = del_nds;
+        bool revert = deletion_delete (ctx, v, &del_nes, &del_nds);
 
         while (bms_count(del, DEL_Z) != 0) bms_pop (del, DEL_Z);
 
@@ -1283,6 +1338,7 @@ deletion_analyze (por_context* ctx)
             while (ci_count(delctx->Kprime) != 0) {
                 int x = ci_pop (delctx->Kprime);
                 bool seen = bms_push_new (del, DEL_K, x);
+                delctx->invisible_enabled += !is_visible(ctx, x);
                 HREassert (seen, "DEL_K messed up");
             }
             while (ci_count(delctx->Nprime) != 0) {
@@ -1302,6 +1358,8 @@ deletion_analyze (por_context* ctx)
                     }
                 }
             }
+            del_nes &= del_nes_old; // remain only true if successfully removed before
+            del_nds &= del_nds_old; // remain only true if successfully removed before
         } else {
             ci_clear (delctx->Kprime);
             ci_clear (delctx->Nprime);
