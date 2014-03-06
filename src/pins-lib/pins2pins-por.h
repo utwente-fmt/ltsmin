@@ -6,6 +6,7 @@
 #include <ltsmin-lib/ltsmin-standard.h>
 #include <pins-lib/pins.h>
 #include <util-lib/util.h>
+#include <util-lib/bitmultiset.h>
 
 
 /*
@@ -130,7 +131,6 @@ typedef struct search_context
     int             has_key;
 } search_context;
 
-
 /**
  * Additional context with por_model returned by this layer
  * Contains dependency relation, co-enabled information
@@ -166,8 +166,9 @@ typedef struct por_context {
     int              beam_width;    // maximum width of the beam search
     int              beam_used;     // number of search contexts in use
     int              visible_enabled;// number of enabled visible transitions
+    int              visible_nes_enabled;// number of enabled visible transitions
+    int              visible_nds_enabled;// number of enabled visible transitions
     ci_list         *enabled_list;  // enabled groups
-    ci_list         *visible_list;  // enabled groups
     ci_list         *nds_list[2];   // nds list for key
 
     // global nes/nds
@@ -181,23 +182,18 @@ typedef struct por_context {
     ci_list        **nds;
     ci_list        **ndsn;
 
-    int              emit_limit;    // maximum number of transition groups that can be emitted
-    int              emit_score;    // directly emit when search finishes with this score
     int              emitted;       // number of already emitted transitions
 
     // location in search array (extra indirection for quick switching between contexts)
     int             *search_order;
     search_context  *search;        // context for each search
 
-    int             *group_visibility; // visible groups (static)
-    int             *label_visibility; // visible labels (for dynamic visibility)
-
-    ci_list         *label_list;    // visible labels
-    ci_list         *marked_list;   // labels dynamically marked as visible
-    int             *dynamic_visibility; // idem
+    bms_t           *visible;
+    int             *group_visibility; // visible groups
+    int             *label_visibility; // visible labels
 
     void            *scc_ctx;
-    void            *del_ctx;
+    bms_t           *del_ctx;
     int              seed;
     int             *random;
 } por_context;

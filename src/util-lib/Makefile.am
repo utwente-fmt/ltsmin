@@ -5,6 +5,7 @@ pkginclude_HEADERS = chunk_support.h string-map.h
 # libutil
 libutil_la_SOURCES  = balloc.c balloc.h
 libutil_la_SOURCES += bitset.c bitset.h
+libutil_la_SOURCES += bitmultiset.c bitmultiset.h
 libutil_la_SOURCES += chunk_support.c chunk_support.h
 libutil_la_SOURCES += chunk_table_factory.c
 libutil_la_SOURCES += dfs-stack.c dfs-stack.h

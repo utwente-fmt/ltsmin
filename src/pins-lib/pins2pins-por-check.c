@@ -166,7 +166,6 @@ print_diff (dlk_check_context_t *ctx, int *s1, int *s2)
     }
 }
 
-
 static void
 print_group_name (dlk_check_context_t *ctx, int group, int idx)
 {
@@ -510,7 +509,7 @@ static void
 check_semistubborn (dlk_check_context_t *ctx, int *src)
 {
     if (ctx->ss_list->count == 0) return; // no pers set
-    HREassert (ctx->pctx->emit_limit != ctx->ss_en_list->count, "Pers == En?");
+    HREassert (ctx->pctx->enabled_list->count != ctx->ss_en_list->count, "Pers == En?");
     int *space = dfs_stack_push (ctx->stack, NULL);
     memcpy (space, src, sizeof(int[ctx->len]));
     space[ctx->len] = -1;
@@ -528,7 +527,7 @@ bs_emit_dlk_check (model_t model, por_context *pctx, int *src, TransitionCB cb,
         HREassert (successors == 0, "Deadlock state introduced by POR!");
     }
 
-    if (pctx->search[pctx->search_order[0]].score >= pctx->emit_limit)
+    if (pctx->search[pctx->search_order[0]].score >= pctx->enabled_list->count)
         return;
 
     dlk_check_context_t *ctx = GBgetContext(model);
