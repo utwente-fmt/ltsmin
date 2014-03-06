@@ -3,11 +3,12 @@
 
 #include <hre/user.h>
 #include <lts-io/user.h>
+#include <util-lib/rationals.h>
 #include <lts-lib/lts.h>
 #include <lts-lib/lowmem.h>
 #include <ltsmin-lib/ltsmin-standard.h>
 
-typedef enum {Undefined=0,Strong,Branching,Cycle,Determinize,Copy,Silent,Lumping} task_t;
+typedef enum {Undefined=0,Strong,Branching,Cycle,Determinize,Copy,Silent,Lumping,Merge} task_t;
 
 static task_t task=Undefined;
 static int segments=1;
@@ -33,6 +34,59 @@ static void silent_compression(lts_t lts){
     }
 }
 
+static void lts_merge_hyperedges(lts_t lts){
+    if (lts->transitions==0) return;
+    lts_set_type(lts,LTS_LIST);
+    int group_pos=lts_type_find_edge_label(lts->ltstype,"group");
+    int param_pos=lts_type_find_edge_label(lts->ltstype,"numerator");
+    uint32_t e=1;
+    uint32_t t=0;
+    uint32_t label[6];
+    TreeUnfold(lts->edge_idx,lts->label[0],(int*)label);
+    for(uint32_t i=1;i<lts->transitions;i++){
+        uint32_t next[6];
+        TreeUnfold(lts->edge_idx,lts->label[i],(int*)next);
+        int k=0;
+        if (lts->src[t]==lts->src[i]){
+            for(;k<=group_pos;k++){
+                if (label[k]!=next[k]) break;
+            }
+        }
+        if (k<=group_pos){
+            e++;
+        }
+        if (lts->dest[t]!=lts->dest[i]){
+            k=0;
+        }
+        if (k==group_pos && label[param_pos]==1 && label[param_pos+1]==1 && next[param_pos]==1 && next[param_pos+1]==1){
+            // identical non-hyperedge: skip;
+            e--;
+        } else if (k<=group_pos) {
+            // difference: ship out.
+            lts->label[t]=TreeFold(lts->edge_idx,label);
+            t++;
+            lts->src[t]=lts->src[i];
+            lts->dest[t]=lts->dest[i];
+            TreeUnfold(lts->edge_idx,lts->label[i],(int*)label);
+        } else {
+            // same: add;
+            fprintf(stderr,"merge %u/%u + %u/%u = ",label[param_pos],label[param_pos+1],next[param_pos],next[param_pos+1]);
+            uint64_t teller=((uint64_t)label[param_pos])*((uint64_t)next[param_pos+1]);
+                    teller+=((uint64_t)next[param_pos])*((uint64_t)label[param_pos+1]);
+            uint64_t noemer=((uint64_t)next[param_pos+1])*((uint64_t)label[param_pos+1]);
+            uint64_t gcd=gcd64(teller,noemer);
+            label[param_pos]=teller/gcd;
+            label[param_pos+1]=noemer/gcd;
+            fprintf(stderr,"%u/%u\n",label[param_pos],label[param_pos+1]);
+        }
+    }
+    lts->label[t]=TreeFold(lts->edge_idx,label);
+    t++;
+    fprintf(stderr,"result has %u real edges\n",e);
+    lts_set_size(lts,lts->root_count,lts->states,t);
+}
+
+
 static  struct poptOption options[] = {
     { "strong" , 's' , POPT_ARG_VAL , &task , Strong , "minimize module strong bisimulation" , NULL },
     { "branching" , 'b' , POPT_ARG_VAL , &task, Branching , "minimize module branching bisimulation" , NULL },
@@ -42,6 +96,7 @@ static  struct poptOption options[] = {
     { "silent" , 0 , POPT_ARG_VAL , &task, Silent  , "silent step bisimulation" , NULL },
     { "cycle" , 0 , POPT_ARG_VAL , &task , Cycle , "cycle elimination" , NULL },
     { "determinize" , 0 , POPT_ARG_VAL , &task , Determinize , "compute deterministic variant" , NULL },
+    { "merge" , 0 , POPT_ARG_VAL , &task , Merge , "merge alternatives in hyper edges by summation" , NULL },
     { "segments" , 0 , POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT , &segments , 0 ,
       "set the number of segment for the output file" , "<N>" },
     POPT_TABLEEND
@@ -92,6 +147,10 @@ int main(int argc, char *argv[]){
         }
         case Cycle:{
             lts_cycle_elim(lts);
+            break;
+        }
+        case Merge:{
+            lts_merge_hyperedges(lts);
             break;
         }
         default: Abort("missing case");
