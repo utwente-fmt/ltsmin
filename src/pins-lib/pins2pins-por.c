@@ -16,6 +16,7 @@
 
 int POR_WEAK = 0; //extern
 
+static int NO_COMMUTES = 0;
 static int NO_HEUR = 0;
 static int NO_DNA = 0;
 static int NO_NES = 0;
@@ -85,6 +86,7 @@ struct poptOption por_options[]={
 
     { "check-por" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &PINS_POR , PINS_POR_CHECK , "verify partial order reduction peristent sets" , NULL },
     { "no-dna" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_DNA , 1 , "without DNA" , NULL },
+    { "no-commutes" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_COMMUTES , 1 , "without commutes (for left-accordance)" , NULL },
     { "no-nes" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_NES , 1 , "without NES" , NULL },
     { "no-heur" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_HEUR , 1 , "without heuristic" , NULL },
     { "no-mds" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_MDS , 1 , "without MDS" , NULL },
@@ -197,7 +199,7 @@ por_transition_costs (por_context* ctx)
     if (NO_HEUR) return;
 
     // set score for enable transitions
-    if (PINS_LTL) {
+    if (PINS_LTL || SAFETY) {
         for (int i = 0; i < ctx->enabled_list->count; i++) {
             int group = ctx->enabled_list->data[i];
             int vis = ctx->visible->set[group];
@@ -541,11 +543,11 @@ beam_search (por_context* ctx)
             int current_group = s->work[s->work_enabled];
             Printf (debug, "BEAM-%d investigating group %d (enabled) --> ", s->idx, current_group);
 
-            // init search
-            if (s->score == 0) select_group (ctx, current_group);
-
             // select and mark as ready
             s->emit_status[current_group] |= ES_SELECTED | ES_READY;
+
+            // init search
+            if (s->score == 0) update_ns_scores (ctx, s, current_group);
 
             // update the search score
             s->score += 1;
@@ -570,7 +572,7 @@ beam_search (por_context* ctx)
                 s->work_enabled = 0;
                 s->work_disabled = ctx->ngroups;
                 Printf (debug, " (quitting |ss|=|en|)\n");
-                break;
+                continue;
             }
 
             // push all dependent unselected ctx->ngroups
@@ -596,7 +598,7 @@ beam_emit (por_context* ctx, int* src, TransitionCB cb, void* uctx)
             int i = ctx->enabled_list->data[z];
             emitted += GBgetTransitionsLong (ctx->parent, i, src, hook_cb, &provctx);
         }
-    } if (!PINS_LTL && !SAFETY) { // deadlocks are easy:
+    } else if (!PINS_LTL && !SAFETY) { // deadlocks are easy:
         proviso_hook_context_t provctx = {cb, uctx, 0, 0, 1};
         emitted = emit_new_selected (ctx, &provctx, src);
     } else { // otherwise enforce that all por_proviso flags are true
@@ -716,10 +718,12 @@ beam_setup (model_t model, por_context* ctx, int* src)
         memset(ctx->search[i].emit_status, 0, sizeof(emit_status_t[ctx->ngroups]));
         if (!NO_HEUR)
             memcpy(ctx->search[i].nes_score, ctx->nes_score, NS_SIZE(ctx) * sizeof(int));
+
+        int visible = is_visible (ctx, i);
         // reset counts
-        ctx->search[i].visibles_selected = 0;
-        ctx->search[i].enabled_selected = 0;
-        ctx->search[i].ve_selected = 0;
+        ctx->search[i].visibles_selected = visible;
+        ctx->search[i].enabled_selected = 1;
+        ctx->search[i].ve_selected = visible;
         ctx->search[i].idx = i;
 
         ctx->search_order[i] = i;
@@ -1897,8 +1901,10 @@ GBaddPOR (model_t model)
     dm_free(&guard_is_dependent);
 
     matrix_t *commutes = GBgetCommutesInfo (model);
-    if (POR_WEAK && (commutes == NULL || NO_NES || PINS_LTL)) {
-        Print1 (info, "LTL used (unimplemented) or no dependency info for weak relations, switching to strong stubborn sets.");
+    NO_COMMUTES |= commutes == NULL;
+
+    if (POR_WEAK && (NO_NES || NO_NDS)) {
+        Print1 (info, "No NES/NDS, which is required for weak relations. Switching to strong stubborn sets.");
         POR_WEAK = 0;
     }
 
@@ -1918,32 +1924,31 @@ GBaddPOR (model_t model)
         dm_create(&not_left_accords, groups, groups);
         for (int i = 0; i < groups; i++) {
             for (int j = 0; j < groups; j++) {
-                if (i == j) {
-                    dm_set(&not_left_accords, i, j);
-                } else {
-                    if (must_disable != NULL && !NO_MDS) {
-                        if (guard_of(ctx, i, must_disable, j)) {
-                            continue;
-                        }
-                    }
+                if (i == j) continue;
 
-                    if (guard_of(ctx, i, &ctx->gnes_matrix, j) ||
-                            dm_is_set(&nds, j, i)) {
-                        dm_set( &not_left_accords, i, j );
+                if (must_disable != NULL && !NO_MDS) {
+                    if (guard_of(ctx, i, must_disable, j)) {
                         continue;
                     }
+                }
 
-                    if ( dm_is_set(commutes, i , j) ) {
-                        continue; // actions commute with each other
-                    }
+                if (guard_of(ctx, i, &ctx->gnes_matrix, j) || dm_is_set(&nds, j, i)) {
+                    dm_set( &not_left_accords, i, j );
+                    continue;
+                }
 
-                    // is even dependent? Front-end might miss it.
-                    for (int k = 0; k < len; k++) {
-                        if ((dm_is_set( p_dm_w, i, k) && dm_is_set( p_dm, j, k)) ||
-                            (dm_is_set( p_dm, i, k) && dm_is_set( p_dm_w, j, k)) ) {
-                            dm_set( &not_left_accords, i, j );
-                            break;
-                        }
+                if (NO_COMMUTES) {
+                    if (!dm_is_set(&ctx->not_accords_with, i, j)) continue;
+                } else {
+                    if ( dm_is_set(commutes, i , j) ) continue;
+                }
+
+                // is even dependent? Front-end might miss it.
+                for (int k = 0; k < len; k++) {
+                    if ((dm_is_set( p_dm_w, i, k) && dm_is_set( p_dm, j, k)) ||
+                        (dm_is_set( p_dm, i, k) && dm_is_set( p_dm_w, j, k)) ) {
+                        dm_set( &not_left_accords, i, j );
+                        break;
                     }
                 }
             }
