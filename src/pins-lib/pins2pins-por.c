@@ -22,6 +22,7 @@ static int NO_DNA = 0;
 static int NO_NES = 0;
 static int NO_NDS = 0;
 static int NO_MDS = 0;
+static int NO_MCNDS = 0;
 static int NO_MC = 0;
 static int NO_DYN_VIS = 0;
 static int NO_V = 0;
@@ -91,7 +92,8 @@ struct poptOption por_options[]={
     { "no-heur" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_HEUR , 1 , "without heuristic" , NULL },
     { "no-mds" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_MDS , 1 , "without MDS" , NULL },
     { "no-nds" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_NDS , 1 , "without NDS (for dynamic label info)" , NULL },
-    { "no-mc" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_MC , 1 , "without MC (for NDS)" , NULL },
+    { "no-mc" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_MC , 1 , "without MC" , NULL },
+    { "no-mcnds" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_MCNDS , 1 , "Do not create NESs from MC and NDS" , NULL },
     { "no-dynamic-labels" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_DYN_VIS , 1 , "without dynamic visibility" , NULL },
     { "no-V" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_V , 1 , "without V proviso, instead use Peled's visibility proviso, or V'     " , NULL },
     { "no-L12" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_L12 , 1 , "without L1/L2 proviso, instead use Peled's cycle proviso, or L2'   " , NULL },
@@ -120,7 +122,7 @@ is_visible (por_context* ctx, int group)
 static inline int
 NS_SIZE (por_context* ctx)
 {
-    return NO_MC ? ctx->nguards : ctx->nguards * 2;
+    return NO_MCNDS ? ctx->nguards : ctx->nguards << 1;
 }
 
 /**
@@ -134,24 +136,31 @@ init_visible_labels (por_context* ctx)
 
     model_t model = ctx->parent;
     int groups = dm_nrows (GBgetDMInfo(model));
-    int labels = pins_get_state_label_count (model);
     ctx->visible = bms_create (groups, VISIBLE_COUNT);
 
-    for (int i = 0; i < labels; i++) {
+    for (int i = 0; i < groups; i++) {
+        if (!ctx->group_visibility[i]) continue;
+        bms_push_new (ctx->visible, VISIBLE, i);
+        bms_push_new (ctx->visible, VISIBLE_GROUP, i);
+    }
+
+    for (int i = 0; i < ctx->nlabels; i++) {
         if (!ctx->label_visibility[i]) continue;
-        for (int j = 0; j < groups; j++) {
-            int nes = dm_is_set (&ctx->gnes_matrix, i, j);
-            int nds = dm_is_set (&ctx->gnds_matrix, i, j);
-            if (nes) bms_push_new (ctx->visible, VISIBLE_NES, j);
-            if (nds) bms_push_new (ctx->visible, VISIBLE_NDS, j);
-            int visible = ctx->group_visibility[j];
-            if (visible) bms_push_new (ctx->visible, VISIBLE_GROUP, j);
-            if (nes || nds || visible) bms_push_new (ctx->visible, VISIBLE, j);
+
+        for (int j = 0; j < ctx->label_nes[i]->count; j++) {
+            int group = ctx->label_nes[i]->data[j];
+            bms_push_new (ctx->visible, VISIBLE_NES, group);
+            bms_push_new (ctx->visible, VISIBLE, group);
+        }
+        for (int j = 0; j < ctx->label_nds[i]->count; j++) {
+            int group = ctx->label_nds[i]->data[j];
+            bms_push_new (ctx->visible, VISIBLE_NDS, group);
+            bms_push_new (ctx->visible, VISIBLE, group);
         }
     }
     int vgroups = bms_count(ctx->visible, VISIBLE_GROUP);
     if (!NO_DYN_VIS && vgroups > 0 && vgroups != bms_count(ctx->visible, VISIBLE)) {
-        Print1 (info, "Turning of dynamic visibility in presence of visible groups");
+        Print1 (info, "Turning off dynamic visibility in presence of visible groups");
         NO_DYN_VIS = 1;
     }
     SAFETY = bms_count(ctx->visible, VISIBLE) != 0;
@@ -163,7 +172,7 @@ por_init_transitions (model_t model, por_context *ctx, int *src)
     init_visible_labels (ctx);
 
     // fill guard status, request all guard values
-    GBgetStateLabelsAll (model, src, ctx->label_status);
+    GBgetStateLabelsGroup (model, GB_SL_GUARDS, src, ctx->label_status);
 
     ctx->visible_enabled = 0;
     ctx->visible_nes_enabled = 0;
@@ -360,15 +369,14 @@ void hook_cb (void *context, transition_info_t *ti, int *dst, int *cpy) {
 }
 
 static inline int
-emit_new_selected (por_context* ctx, proviso_hook_context_t* provctx, int* src)
+emit_new_selected (por_context *ctx, proviso_hook_context_t *provctx, int *src)
 {
     search_context *s = &ctx->search[ctx->search_order[0]];
     int c = 0;
     for (int z = 0; z < ctx->enabled_list->count; z++) {
         int i = ctx->enabled_list->data[z];
-        if (s->emit_status[i] & ES_EMITTED) continue;
 
-        if ((s->emit_status[i] & ES_SELECTED) || s->score >= ctx->enabled_list->count) {
+        if (por_is_stubborn(ctx,i) && !(s->emit_status[i] & ES_EMITTED)) {
             s->emit_status[i] |= ES_EMITTED;
             c += GBgetTransitionsLong (ctx->parent, i, src, hook_cb, provctx);
         }
@@ -382,9 +390,9 @@ emit_new_selected (por_context* ctx, proviso_hook_context_t* provctx, int* src)
  * Stubborn set:            Ts
  * Keys in stubborn set:    Tk
  *
- * V  =  Tv n Ts != {}     ==>  Tv C Ts
- * L1 =  Ti n en(s) != {}  ==>  Tk n Ti != {}
- * L2 =  s closes cycle    ==>  Tv C Ts
+ * V  = Tv n Ts != {}     ==>  Tv C Ts
+ * L1 = Ti n en(s) != {}  ==>  Tk n Ti != {}
+ * L2 = s closes cycle    ==>  Tv C Ts
  *
  * Whether s closes a cycle is determined by the search algorithm, which may
  * employ DFS with the condition s in stack, or a more complicated search
@@ -545,7 +553,7 @@ beam_search (por_context* ctx)
             // init search
             if (!s->initialized) {
                 if (!NO_HEUR)
-                    memcpy(s->nes_score, ctx->nes_score, NS_SIZE(ctx) * sizeof(int));
+                    memcpy(s->nes_score, ctx->nes_score, sizeof(int[NS_SIZE(ctx)]));
                 update_ns_scores (ctx, s, current_group);
                 s->initialized = 1;
             } else {
@@ -658,11 +666,11 @@ beam_ensure_key (por_context* ctx)
             size_t score = 0;
             ctx->nds_list[1]->count = 0;
             // First: all nds for the group's guards
-            for (int g = 0; g < ctx->not_accords[group]->count && score < min_score; g++) {
-                int gg = ctx->not_accords[group]->data[g];
-                int fresh = (s->emit_status[gg] & ES_SELECTED) == 0;
-                score += fresh ? ctx->group_score[gg] : 0;
-                ctx->nds_list[1]->data[ctx->nds_list[1]->count] = gg;
+            for (int t = 0; t < ctx->not_accords[group]->count && score < min_score; t++) {
+                int tt = ctx->not_accords[group]->data[t];
+                int fresh = (s->emit_status[tt] & ES_SELECTED) == 0;
+                score += fresh ? ctx->group_score[tt] : 0;
+                ctx->nds_list[1]->data[ctx->nds_list[1]->count] = tt;
                 ctx->nds_list[1]->count += fresh;
             }
 
@@ -681,9 +689,9 @@ beam_ensure_key (por_context* ctx)
         // add all the NDS's for the transition for which it is cheapest
         HREassert (ctx->nds_list[0]->count != 0);
         Printf (debug, "Adding NDSs: ");
-        for (int g = 0; g < ctx->nds_list[0]->count; g++) {
-            int gg = ctx->nds_list[0]->data[g];
-            select_group (ctx, gg);
+        for (int t = 0; t < ctx->nds_list[0]->count; t++) {
+            int tt = ctx->nds_list[0]->data[t];
+            select_group (ctx, tt);
         }
         s->has_key = is_visible(ctx, min_group) ? -1 : 1;
         Warning (debug, "\nKey is %d (forced inclusion of NDSs)", min_group);
@@ -1220,7 +1228,7 @@ deletion_delete (por_context* ctx, bool *del_nes, bool *del_nds)
     // search the deletion space:
     while (bms_count(del, DEL_Z) != 0 && bms_count(del, DEL_K) != 0) {
         int z = bms_pop (del, DEL_Z);
-        Warning (debug, "Checking u = %d", z);
+        Warning (debug, "Checking z = %d", z);
 
         if (bms_has(del,DEL_R,z)) return true;
 
@@ -1490,10 +1498,10 @@ create_scc_ctx (por_context* ctx)
     scc_context_t *scc = RTmallocZero (sizeof(scc_context_t));
     scc->group_index = RTmallocZero ((ctx->ngroups) * sizeof(int));
     scc->scc_list = RTmallocZero ((ctx->ngroups + 1) * sizeof(int));
-    scc->stubborn_list = RTmallocZero (2 * sizeof(ci_list *));
-    scc->stubborn_list[0] = RTmallocZero ((ctx->ngroups + 1) * sizeof(int));
-    scc->stubborn_list[1] = RTmallocZero ((ctx->ngroups + 1) * sizeof(int));
-    scc->bad_scc = RTmallocZero ((ctx->ngroups + 1) * sizeof(int));
+    scc->stubborn_list = RTmallocZero (sizeof(ci_list *[2]));
+    scc->stubborn_list[0] = ci_create (ctx->ngroups);
+    scc->stubborn_list[1] = ci_create (ctx->ngroups);
+    scc->bad_scc = ci_create (ctx->ngroups);
     scc->stack = dfs_stack_create (2); // only integers for groups
     scc->tarjan = dfs_stack_create (1); // only integers for group
     scc->search = &ctx->search[0];
@@ -1508,134 +1516,33 @@ create_scc_ctx (por_context* ctx)
  *
  * Additionally, it combines gaurd info with MCE for quick NES/NDS access.
  */
-static void *
-create_beam_context (model_t model)
+static search_context *
+create_beam_context (por_context *ctx)
 {
-    por_context* ctx = (por_context*) GBgetContext(model);
-
-    // get number of transition groups
-    ctx->ngroups = dm_nrows(GBgetDMInfo(model));
-    sl_group_t *guardLabels = GBgetStateLabelGroupInfo (model, GB_SL_GUARDS);
-    HREassert (guardLabels->sl_idx[0] == 0);
-    // get the number of guards
-    ctx->nguards = guardLabels->count;
-    // get the number of labels
-    ctx->nlabels = pins_get_state_label_count(model);
-
-    Debug ("Groups %d, labels %d, guards %d\n", ctx->ngroups, ctx->nlabels, ctx->nguards);
-
     // setup a fixed maximum of number of search contexts
     // since we use at most one search context per transition group, use n
     const int BEAM_WIDTH = ctx->ngroups;
 
-    // set number of guards used
-    // alloc search contexts
-    ctx->search = RTmallocZero( BEAM_WIDTH * sizeof(search_context) );
-    // set #emitted to zero, meaning that a new analysis should start
-    ctx->emitted = 0;
-    // init group status array
-    ctx->group_status = RTmallocZero(ctx->ngroups * sizeof(char) );
-    ctx->group_score  = RTmallocZero(ctx->ngroups * sizeof(int) );
-
-    // init guard_status array
-    ctx->label_status = RTmallocZero(ctx->nlabels * sizeof(int) );
-
-    // init beam_width/beam_used
+    search_context *search = RTmallocZero(sizeof(search_context[BEAM_WIDTH]));
+    ctx->group_status = RTmallocZero(ctx->ngroups * sizeof(char));
+    ctx->group_score  = RTmallocZero(ctx->ngroups * sizeof(int));
+    ctx->label_status = RTmallocZero(ctx->nguards * sizeof(int));
+    ctx->search_order = RTmallocZero(BEAM_WIDTH * sizeof(int));
+    ctx->nes_score    = RTmallocZero(NS_SIZE(ctx) * sizeof(int));
     ctx->beam_width = BEAM_WIDTH;
     ctx->beam_used = BEAM_WIDTH;
+    ctx->emitted = 0;
 
-    // init search_order;
-    ctx->search_order = RTmallocZero(BEAM_WIDTH * sizeof(int) );
-
-    // init nes score template
-    ctx->nes_score = RTmallocZero( (ctx->nguards * 2) * sizeof(int) );
-
-    // get local variables pointing to nes/nds
-    ci_list** nes = ctx->guard_nes;
-    ci_list** nds = ctx->guard_nds;
-
-    // setup global group_in/group_has relation
-    // idea, combine nes and nds in one data structure (ns, necessary set)
-    // each guard is either disabled (use nes) or enabled (nds)
-    // setup: ns = [0...n_guards-1] nes, [n_guards..2n_guards-1] nds
-    // this way the search algorithm can skip the nes/nds that isn't needed based on
-    // guard_status, using <n or >=n as conditions
-    matrix_t group_in;
-    dm_create(&group_in, ctx->nguards * 2, ctx->ngroups);
-    for (int i=0; i < ctx->nguards; i++) {
-        for (int j=0; j < nes[i]->count; j++) {
-            dm_set(&group_in, i, nes[i]->data[j]);
-        }
-        for (int j=0; j < nds[i]->count; j++) {
-            int group = nds[i]->data[j];
-            dm_set(&group_in, i+ctx->nguards, group);
-        }
-        Printf (debug, "Guard %4d: NESs %4d, NDSs %4d\n", i, nes[i]->count, nds[i]->count);
-    }
-    // build tables ns, and group in
-    ctx->ns = (ci_list**) dm_rows_to_idx_table(&group_in);
-    ctx->group2ns = (ci_list**) dm_cols_to_idx_table(&group_in);
-    dm_free(&group_in);
-
-    // group has relation
-    // mapping [0...n_guards-1] disabled guard (nes)
-    // mapping [n_guards..2*n_guards-1] enabled guard (nds)
-    // group has relation is more difficult because nds
-    // needs not co-enabled info and transition groups
-
-    // setup group has relation
-    matrix_t group_has;
-    dm_create(&group_has, ctx->ngroups, ctx->nguards * 2);
-    for (int i=0; i < ctx->nguards; i++) {
-        // nes
-        for (int k=0; k < ctx->guard2group[i]->count; k++) {
-            dm_set(&group_has, ctx->guard2group[i]->data[k], i);
-        }
-        // nds
-        if (!NO_MC) { // add NDS range:
-            for (int k=0; k < ctx->guard_nce[i]->count; k++) {
-                dm_set(&group_has, ctx->guard_nce[i]->data[k], i + ctx->nguards);
-            }
-            Printf (debug, "Guard %4d: !MCs %4d\n", i, ctx->guard_nce[i]->count);
-        }
-    }
-    // build table group has
-    ctx->group_has = (ci_list**) dm_rows_to_idx_table(&group_has);
-    ctx->group_hasn = (ci_list**) dm_cols_to_idx_table(&group_has);
-    dm_free(&group_has);
-
-    if (PREFER_NDS) {
-        HREassert (!RANDOM, "--por-random incompatible with --prefer-nds");
-        for (int i=0; i < ctx->ngroups; i++) {
-            list_invert (ctx->group_has[i]);
-        }
-    }
-    if (RANDOM) {
-        HREassert (!PREFER_NDS, "--por-random incompatible with --prefer-nds");
-        for (int i=0; i < ctx->ngroups; i++) {
-            list_randomize (ctx->group_has[i], i);
-        }
-    }
-
-    // init for each search context
-    for(int i=0 ; i < BEAM_WIDTH; i++) {
-        // init default search order
+    for (int i = 0 ; i < BEAM_WIDTH; i++) {
         ctx->search_order[i] = i;
-        // init emit status
-        ctx->search[i].emit_status = RTmallocZero( ctx->ngroups * sizeof(emit_status_t) );
-        // init work_array
-        // note, n+1 to initialize work_disabled on n
-        ctx->search[i].work = RTmallocZero( (ctx->ngroups+1) * sizeof(int) );
-        // init work_enabled/work_disabled
-        ctx->search[i].work_enabled = 0;
-        ctx->search[i].work_disabled = ctx->ngroups;
-        // init score
-        ctx->search[i].score = 0;
-        // note, n+1 to initialize work_disabled on n
-        ctx->search[i].nes_score = RTmallocZero( (ctx->nguards * 2) * sizeof(int) );
+        search[i].emit_status = RTmallocZero(ctx->ngroups * sizeof(emit_status_t));
+        search[i].work = RTmallocZero(ctx->ngroups * sizeof(int));
+        search[i].work_enabled = 0;
+        search[i].work_disabled = ctx->ngroups;
+        search[i].score = 0;
+        search[i].nes_score = RTmallocZero(sizeof(int[NS_SIZE(ctx)]));
     }
-
-    return ctx;
+    return search;
 }
 
 /**
@@ -1683,8 +1590,6 @@ GBaddPOR (model_t model)
         Print1  (info, "POR layer: use LTSmin's own LTL layer (--ltl) for correct POR.");
     }
 
-    Print1 (info,"Initializing partial order reduction layer..");
-
     // check support for guards, fail without
     if (!GBhasGuardsInfo(model)) {
         Print1 (info, "Frontend doesn't have guards. Ignoring --por.");
@@ -1697,8 +1602,17 @@ GBaddPOR (model_t model)
     por_context *ctx = RTmalloc (sizeof *ctx);
     ctx->parent = model;
 
-    // initializing dependency lookup table ( (t, t') \in D relation)
-    Print1 (info, "Initializing dependency lookup table.");
+    sl_group_t *guardLabels = GBgetStateLabelGroupInfo (model, GB_SL_GUARDS);
+    sl_group_t* sl_guards = GBgetStateLabelGroupInfo(model, GB_SL_ALL);
+    ctx->nguards = guardLabels->count;
+    ctx->nlabels = pins_get_state_label_count(model);
+    ctx->ngroups = pins_get_group_count(model);
+    ctx->nslots = pins_get_state_variable_count (model);
+    HREassert (ctx->nguards <= ctx->nlabels);
+    HREassert (guardLabels->sl_idx[0] == 0, "Expecting guards at index 0 of all labels.");
+
+    Print1 (info, "Initializing POR dependencies: labels %d, guards %d",
+            ctx->nlabels, ctx->nguards);
 
     matrix_t           *p_dm = NULL;
     matrix_t           *p_dm_w = GBgetDMInfoMayWrite (model);
@@ -1708,36 +1622,30 @@ GBaddPOR (model_t model)
     } else {
         p_dm = GBgetMatrix (model, id);
     }
-
-    int groups = dm_nrows( p_dm );
-    int len = dm_ncols( p_dm );
+    HREassert (dm_ncols(p_dm) == ctx->nslots && dm_nrows(p_dm) == ctx->ngroups);
 
     // guard to group dependencies
-    sl_group_t* sl_guards = GBgetStateLabelGroupInfo(model, GB_SL_ALL);
-    int guards = sl_guards->count;
     matrix_t        *p_sl = GBgetStateLabelInfo(model);
-    // len is unchanged
-    matrix_t guard_is_dependent;
-    dm_create(&guard_is_dependent, guards, groups);
-    for(int i=0; i < guards; i++) {
-        for(int j=0; j < groups; j++) {
-            for(int k=0; k < len; k++) {
-                if (dm_is_set( p_sl, sl_guards->sl_idx[i], k ) && dm_is_set( p_dm_w, j, k )) {
-                    dm_set( &guard_is_dependent, i, j );
+    matrix_t label_is_dependent;
+    dm_create(&label_is_dependent, ctx->nlabels, ctx->ngroups);
+    for (int i = 0; i < ctx->nlabels; i++) {
+        for (int j = 0; j < ctx->ngroups; j++) {
+            for (int k = 0; k < ctx->nslots; k++) {
+                if (dm_is_set(p_sl, sl_guards->sl_idx[i], k) && dm_is_set(p_dm_w, j, k)) {
+                    dm_set( &label_is_dependent, i, j );
                     break;
                 }
             }
         }
     }
-    ctx->guard_dep   = (ci_list **) dm_rows_to_idx_table(&guard_is_dependent);
 
     // extract inverse relation, transition group to guard
     matrix_t gg_matrix;
-    dm_create(&gg_matrix, groups, guards);
-    for(int i=0; i < groups; i++) {
-        guard_t* g = GBgetGuard(model, i);
-        HREassert(g != NULL, "GUARD RETURNED NULL %d", i);
-        for(int j=0; j < g->count; j++) {
+    dm_create(&gg_matrix, ctx->ngroups, ctx->nguards);
+    for (int i = 0; i < ctx->ngroups; i++) {
+        guard_t *g = GBgetGuard(model, i);
+        HREassert (g != NULL, "GUARD RETURNED NULL %d", i);
+        for (int j = 0; j < g->count; j++) {
             dm_set(&gg_matrix, i, g->guard[j]);
         }
     }
@@ -1746,99 +1654,105 @@ GBaddPOR (model_t model)
     dm_free(&gg_matrix);
 
     // mark minimal necessary enabling set
-    matrix_t *p_gnes_matrix = NO_NES ? NULL : GBgetGuardNESInfo(model);
-    NO_NES = p_gnes_matrix == NULL;
+    matrix_t *p_gnes_matrix = GBgetGuardNESInfo(model);
+    NO_NES |= p_gnes_matrix == NULL;
 
-    if (p_gnes_matrix != NULL) {
-        HREassert (dm_nrows(p_gnes_matrix) == guards && dm_ncols(p_gnes_matrix) == groups);
+    if (!NO_NES) {
+        HREassert (dm_nrows(p_gnes_matrix) == ctx->nlabels &&
+                   dm_ncols(p_gnes_matrix) == ctx->ngroups);
         // copy p_gnes_matrix to gnes_matrix, then optimize it
-        dm_copy(p_gnes_matrix, &ctx->gnes_matrix);
+        dm_copy(p_gnes_matrix, &ctx->label_nes_matrix);
     } else {
-        dm_create(&ctx->gnes_matrix, guards, groups);
-        for(int i=0; i < guards; i++) {
-            for(int j=0; j < groups; j++) {
-                dm_set (&ctx->gnes_matrix, i, j);
+        dm_create(&ctx->label_nes_matrix, ctx->nlabels, ctx->ngroups);
+        for (int i = 0; i < ctx->nlabels; i++) {
+            for (int j = 0; j < ctx->ngroups; j++) {
+                dm_set (&ctx->label_nes_matrix, i, j);
             }
         }
     }
     // optimize nes
     // remove all transition groups that do not write to this guard
-    for(int i=0; i < guards; i++) {
-        for(int j=0; j < groups; j++) {
+    for (int i = 0; i < ctx->nlabels; i++) {
+        for (int j = 0; j < ctx->ngroups; j++) {
             // if guard i has group j in the nes, make sure
             // the group writes to the same part of the state
             // vector the guard reads from, otherwise
             // this value can be removed
-            if (dm_is_set(&ctx->gnes_matrix, i, j)) {
-                if (!dm_is_set(&guard_is_dependent, i, j))
-                    dm_unset(&ctx->gnes_matrix, i, j);
+            if (dm_is_set(&ctx->label_nes_matrix, i, j)) {
+                if (!dm_is_set(&label_is_dependent, i, j)) {
+                    dm_unset(&ctx->label_nes_matrix, i, j);
+                }
             }
         }
     }
-    ctx->guard_nes   = (ci_list **) dm_rows_to_idx_table(&ctx->gnes_matrix);
+    ctx->label_nes   = (ci_list **) dm_rows_to_idx_table(&ctx->label_nes_matrix);
 
     // same for nds
-    matrix_t *p_gnds_matrix = NO_NDS ? NULL : GBgetGuardNDSInfo(model);
-    NO_NDS = p_gnds_matrix == NULL;
+    matrix_t *label_nds_matrix = GBgetGuardNDSInfo(model);
+    NO_NDS |= label_nds_matrix == NULL;
 
-    if (p_gnds_matrix != NULL) {
-        HREassert (dm_nrows(p_gnds_matrix) == guards && dm_ncols(p_gnds_matrix) == groups);
+    if (!NO_NDS) {
+        HREassert (dm_nrows(label_nds_matrix) == ctx->nlabels &&
+                   dm_ncols(label_nds_matrix) == ctx->ngroups);
         // copy p_gnds_matrix to gnes_matrix, then optimize it
-        dm_copy(p_gnds_matrix, &ctx->gnds_matrix);
+        dm_copy(label_nds_matrix, &ctx->label_nds_matrix);
     } else {
-        dm_create(&ctx->gnds_matrix, guards, groups);
-        for(int i=0; i < guards; i++) {
-            for(int j=0; j < groups; j++) {
-                dm_set (&ctx->gnds_matrix, i, j);
+        dm_create(&ctx->label_nds_matrix, ctx->nlabels, ctx->ngroups);
+        for (int i = 0; i < ctx->nlabels; i++) {
+            for (int j = 0; j < ctx->ngroups; j++) {
+                dm_set (&ctx->label_nds_matrix, i, j);
             }
         }
     }
 
     // optimize nds matrix
     // remove all transition groups that do not write to this guard
-    for(int i=0; i < guards; i++) {
-        for(int j=0; j < groups; j++) {
+    for (int i = 0; i < ctx->nlabels; i++) {
+        for (int j = 0; j < ctx->ngroups; j++) {
             // if guard i has group j in the nes, make sure
             // the group writes to the same part of the state
             // vector the guard reads from, otherwise
             // this value can be removed
-            if (dm_is_set(&ctx->gnds_matrix, i, j)) {
-                if (!dm_is_set(&guard_is_dependent, i, j))
-                    dm_unset(&ctx->gnds_matrix, i, j);
+            if (dm_is_set(&ctx->label_nds_matrix, i, j)) {
+                if (!dm_is_set(&label_is_dependent, i, j)) {
+                    dm_unset(&ctx->label_nds_matrix, i, j);
+                }
             }
         }
     }
-    ctx->guard_nds   = (ci_list **) dm_rows_to_idx_table(&ctx->gnds_matrix);
-    ctx->group_nds   = (ci_list **) dm_cols_to_idx_table(&ctx->gnds_matrix);
+    ctx->label_nds   = (ci_list **) dm_rows_to_idx_table(&ctx->label_nds_matrix);
 
     matrix_t nds;
-    dm_create(&nds, groups, groups);
-    for (int i = 0; i < groups; i++) {
-        for (int j = 0; j < groups; j++) {
-            if (guard_of(ctx, i, &ctx->gnds_matrix, j)) {
+    dm_create(&nds, ctx->ngroups, ctx->ngroups);
+    for (int i = 0; i < ctx->ngroups; i++) {
+        for (int j = 0; j < ctx->ngroups; j++) {
+            if (guard_of(ctx, i, &ctx->label_nds_matrix, j)) {
                 dm_set( &nds, i, j);
             }
         }
     }
-    ctx->nds     = (ci_list **) dm_rows_to_idx_table(&nds);
-    ctx->ndsn     = (ci_list **) dm_cols_to_idx_table(&nds);
 
     // extract guard not co-enabled and guard-nes information
     // from guard may-be-co-enabled with guard relation:
     // for a guard g, find all guards g' that may-not-be co-enabled with it
     // then, for each g', mark all groups in gnce_matrix
-    matrix_t *p_gce_matrix = NO_MC ? NULL : GBgetGuardCoEnabledInfo(model);
-    NO_MC = p_gce_matrix == NULL;
+    matrix_t *label_mce_matrix = GBgetGuardCoEnabledInfo(model);
+    NO_MC |= label_mce_matrix == NULL;
+    if (NO_MC && !NO_MCNDS) {
+        Print1 (info, "No maybe-coenabled matrix found. Turning off NESs from NDS+MC.");
+        NO_MCNDS = 1;
+    }
 
     if (!NO_MC) {
-        HREassert (dm_ncols(p_gce_matrix) == guards && dm_nrows(p_gce_matrix) == guards);
-        dm_create(&ctx->gnce_matrix, guards, groups);
-        dm_create(&ctx->nce, groups, groups);
-        for (int g = 0; g < guards; g++) {
+        HREassert (dm_ncols(label_mce_matrix) >= ctx->nguards &&
+                   dm_nrows(label_mce_matrix) >= ctx->nguards);
+        dm_create(&ctx->gnce_matrix, ctx->nguards, ctx->ngroups);
+        dm_create(&ctx->nce, ctx->ngroups, ctx->ngroups);
+        for (int g = 0; g < ctx->nguards; g++) {
             // iterate over all guards
-            for (int gg = 0; gg < guards; gg++) {
+            for (int gg = 0; gg < ctx->nguards; gg++) {
                 // find all guards that may not be co-enabled
-                if (dm_is_set(p_gce_matrix, g, gg)) continue;
+                if (dm_is_set(label_mce_matrix, g, gg)) continue;
 
                 // gg may not be co-enabled with g, find all
                 // transition groups in which it is used
@@ -1853,20 +1767,19 @@ GBaddPOR (model_t model)
             }
         }
         ctx->guard_nce             = (ci_list **) dm_rows_to_idx_table(&ctx->gnce_matrix);
-        ctx->group_nce             = (ci_list **) dm_rows_to_idx_table(&ctx->nce);
     }
 
     // extract accords with matrix
-    matrix_t *not_accords_with = NO_DNA ? NULL : GBgetDoNotAccordInfo(model);
-    NO_DNA = not_accords_with == NULL;
+    matrix_t *not_accords_with = GBgetDoNotAccordInfo(model);
+    NO_DNA |= not_accords_with == NULL;
 
-    HREassert (NO_DNA || (dm_nrows(not_accords_with) == groups &&
-                          dm_ncols(not_accords_with) == groups));
+    HREassert (NO_DNA || (dm_nrows(not_accords_with) == ctx->ngroups &&
+                          dm_ncols(not_accords_with) == ctx->ngroups));
 
     // Combine Do Not Accord with dependency and other information
-    dm_create(&ctx->not_accords_with, groups, groups);
-    for (int i = 0; i < groups; i++) {
-        for (int j = 0; j < groups; j++) {
+    dm_create(&ctx->not_accords_with, ctx->ngroups, ctx->ngroups);
+    for (int i = 0; i < ctx->ngroups; i++) {
+        for (int j = 0; j < ctx->ngroups; j++) {
             if (i == j) {
                 dm_set(&ctx->not_accords_with, i, j);
             } else {
@@ -1885,7 +1798,7 @@ GBaddPOR (model_t model)
                 }
 
                 // is dependent?
-                for (int k = 0; k < len; k++) {
+                for (int k = 0; k < ctx->nslots; k++) {
                     if ((dm_is_set( p_dm_w, i, k) && dm_is_set( p_dm, j, k)) ||
                         (dm_is_set( p_dm, i, k) && dm_is_set( p_dm_w, j, k)) ) {
                         dm_set( &ctx->not_accords_with, i, j );
@@ -1895,12 +1808,7 @@ GBaddPOR (model_t model)
             }
         }
     }
-
-    // set lookup tables
     ctx->not_accords = (ci_list **) dm_rows_to_idx_table(&ctx->not_accords_with);
-
-    // free temporary matrices
-    dm_free(&guard_is_dependent);
 
     matrix_t *commutes = GBgetCommutesInfo (model);
     NO_COMMUTES |= commutes == NULL;
@@ -1919,21 +1827,21 @@ GBaddPOR (model_t model)
         if (id != SI_INDEX_FAILED) {
             must_disable = GBgetMatrix(model, id);
         } else {
-            Print1 (info, "No must-disable matrix available for weak sets");
+            Print1 (info, "No must-disable matrix available for weak sets.");
             NO_MDS = 1;
         }
 
         matrix_t not_left_accords;
-        dm_create(&not_left_accords, groups, groups);
-        for (int i = 0; i < groups; i++) {
-            for (int j = 0; j < groups; j++) {
+        dm_create(&not_left_accords, ctx->ngroups, ctx->ngroups);
+        for (int i = 0; i < ctx->ngroups; i++) {
+            for (int j = 0; j < ctx->ngroups; j++) {
                 if (i == j) continue;
 
                 if (!NO_MDS && guard_of(ctx, i, must_disable, j)) {
                     continue;
                 }
 
-                if (guard_of(ctx, i, &ctx->gnes_matrix, j) || dm_is_set(&nds, j, i)) {
+                if (guard_of(ctx, i, &ctx->label_nes_matrix, j) || dm_is_set(&nds, j, i)) {
                     dm_set( &not_left_accords, i, j );
                     continue;
                 }
@@ -1945,7 +1853,7 @@ GBaddPOR (model_t model)
                 }
 
                 // is even dependent? Front-end might miss it.
-                for (int k = 0; k < len; k++) {
+                for (int k = 0; k < ctx->nslots; k++) {
                     if ((dm_is_set( p_dm_w, i, k) && dm_is_set( p_dm, j, k)) ||
                         (dm_is_set( p_dm, i, k) && dm_is_set( p_dm_w, j, k)) ) {
                         dm_set( &not_left_accords, i, j );
@@ -1958,10 +1866,75 @@ GBaddPOR (model_t model)
         ctx->not_left_accordsn= (ci_list **) dm_cols_to_idx_table(&not_left_accords);
     }
 
-    // init por model
-    Print1 (info, "Initializing dependency lookup table done.");
-    GBsetContext (pormodel, ctx);
+    // free temporary matrices
+    dm_free (&label_is_dependent);
+    dm_free (&nds);
 
+    // setup global group_in/group_has relation
+    // idea, combine nes and nds in one data structure (ns, necessary set)
+    // each guard is either disabled (use nes) or enabled (nds)
+    // setup: ns = [0...n_guards-1] nes, [n_guards..2n_guards-1] nds
+    // this way the search algorithm can skip the nes/nds that isn't needed based on
+    // guard_status, using <n or >=n as conditions
+    matrix_t group_in;
+    dm_create (&group_in, NS_SIZE(ctx), ctx->ngroups);
+    for (int i = 0; i < ctx->nguards; i++) {
+        for (int j = 0; j < ctx->label_nes[i]->count; j++) {
+            dm_set(&group_in, i, ctx->label_nes[i]->data[j]);
+        }
+        if (!NO_MCNDS) { // add NDS range:
+            for (int j = 0; j < ctx->label_nds[i]->count; j++) {
+                int group = ctx->label_nds[i]->data[j];
+                dm_set(&group_in, i+ctx->nguards, group);
+            }
+        }
+    }
+    // build tables ns, and group in
+    ctx->ns = (ci_list**) dm_rows_to_idx_table(&group_in);
+    ctx->group2ns = (ci_list**) dm_cols_to_idx_table(&group_in);
+    dm_free (&group_in);
+
+    // group has relation
+    // mapping [0...n_guards-1] disabled guard (nes)
+    // mapping [n_guards..2*n_guards-1] enabled guard (nds)
+    // group has relation is more difficult because nds
+    // needs not co-enabled info and transition groups
+    matrix_t group_has;
+    dm_create (&group_has, ctx->ngroups, NS_SIZE(ctx));
+    for (int i = 0; i < ctx->nguards; i++) {
+        // nes
+        for (int j = 0; j < ctx->guard2group[i]->count; j++) {
+            dm_set(&group_has, ctx->guard2group[i]->data[j], i);
+        }
+        // nds
+        if (!NO_MCNDS) { // add NDS range:
+            for (int j = 0; j < ctx->guard_nce[i]->count; j++) {
+                dm_set(&group_has, ctx->guard_nce[i]->data[j], i + ctx->nguards);
+            }
+        }
+    }
+    // build table group has
+    ctx->group_has = (ci_list**) dm_rows_to_idx_table(&group_has);
+    ctx->group_hasn = (ci_list**) dm_cols_to_idx_table(&group_has);
+    dm_free (&group_has);
+
+    ctx->random = RTmallocZero (NS_SIZE(ctx) * sizeof(int));
+    for (int i = 0; i < NS_SIZE(ctx); i++) ctx->random[i] = i;
+
+    if (PREFER_NDS) {
+        HREassert (!RANDOM, "--por-random incompatible with --prefer-nds");
+        for (int i = 0; i < ctx->ngroups; i++) {
+            list_invert (ctx->group_has[i]);
+        }
+    }
+    if (RANDOM) {
+        HREassert (!PREFER_NDS, "--por-random incompatible with --prefer-nds");
+        for (int i = 0; i < ctx->ngroups; i++) {
+            list_randomize (ctx->group_has[i], i);
+        }
+    }
+
+    GBsetContext (pormodel, ctx);
     GBsetNextStateLong  (pormodel, por_long);
     GBsetNextStateShort (pormodel, por_short);
     switch (alg) {
@@ -1976,37 +1949,30 @@ GBaddPOR (model_t model)
 
     if (GBgetPorGroupVisibility(pormodel) == NULL) {
         // reserve memory for group visibility, will be provided by ltl layer or tool
-        ctx->group_visibility = RTmallocZero( groups * sizeof(int) );
+        ctx->group_visibility = RTmallocZero( ctx->ngroups * sizeof(int) );
         GBsetPorGroupVisibility  (pormodel, ctx->group_visibility);
     } else {
         ctx->group_visibility = GBgetPorGroupVisibility(pormodel);
     }
     if (GBgetPorStateLabelVisibility(pormodel) == NULL) {
         // reserve memory for group visibility, will be provided by ltl layer or tool
-        ctx->label_visibility = RTmallocZero( guards * sizeof(int) );
+        ctx->label_visibility = RTmallocZero( ctx->nlabels * sizeof(int) );
         GBsetPorStateLabelVisibility  (pormodel, ctx->label_visibility);
     } else {
         ctx->label_visibility = GBgetPorStateLabelVisibility (pormodel);
     }
 
-    ctx->enabled_list = RTmallocZero ((groups + 1) * sizeof(int));
-    ctx->nds_list[0] = RTmallocZero ((guards + 1) * sizeof(int));
-    ctx->nds_list[1] = RTmallocZero ((guards + 1) * sizeof(int));
+    ctx->enabled_list = ci_create (ctx->ngroups);
+    ctx->nds_list[0] = ci_create (ctx->ngroups);
+    ctx->nds_list[1] = ci_create (ctx->ngroups);
     ctx->seed = 73783467;
-    ctx->random = RTmallocZero (guards*2 * sizeof(int));
-    if (!DYN_RANDOM)
-        for (int i = 0; i < guards*2; i++) ctx->random[i] = i;
 
-    int                 s0[len];
+    int                 s0[ctx->nslots];
     GBgetInitialState (model, s0);
     GBsetInitialState (pormodel, s0);
 
-    // after complete initialization
-    create_beam_context (pormodel);
-
-    // SCC search
+    ctx->search  = create_beam_context (ctx);
     ctx->scc_ctx = create_scc_ctx (ctx);
-
     ctx->del_ctx = deletion_create (ctx);
 
     return pormodel;

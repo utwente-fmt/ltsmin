@@ -38,10 +38,10 @@ typedef struct dlk_hook_context {
     void*           user_context;
     int             len;
     int             groups;
-    int            *stubborn;
+    char           *stubborn;
     ci_list        *ss_list;
     ci_list        *ss_en_list;
-    ci_list        *ss_count_list;
+    ci_list        *por_emitted_list;
     ci_list        *en_list;
     ci_list        *seen_list;
     int             pgroup_count; // persistent groups encountered
@@ -57,12 +57,15 @@ typedef struct dlk_hook_context {
     dfs_stack_t     tgt_out_stack;
     treedbs_t       tree;
     fset_t         *set;
+    TransitionCB    user_cb;
 } dlk_check_context_t;
 
 static char *
 str_list (ci_list *list)
 {
-    HREassert (list->count > 0);
+    if (list->count == 0) {
+        return "{}";
+    }
     char *set = RTmalloc (4096);
     char *ptr = set;
     char *end = set + 4096;
@@ -107,11 +110,12 @@ create_check_ctx (por_context *ctx)
     dlk_check_context_t *check_ctx = RTalign (CACHE_LINE_SIZE, sizeof (dlk_check_context_t));
     check_ctx->groups = dm_nrows(m);
     check_ctx->len = dm_ncols(m);
-    check_ctx->stubborn = RTalignZero (CACHE_LINE_SIZE, sizeof (int[check_ctx->groups]));
-    check_ctx->ss_list = RTalignZero (CACHE_LINE_SIZE, sizeof (int[check_ctx->groups+1]));
-    check_ctx->ss_en_list = RTalignZero (CACHE_LINE_SIZE, sizeof (int[check_ctx->groups+1]));
-    check_ctx->en_list = RTalignZero (CACHE_LINE_SIZE, sizeof (int[check_ctx->groups+1]));
-    check_ctx->seen_list = RTalignZero (CACHE_LINE_SIZE, sizeof (int[check_ctx->groups+1]));
+    check_ctx->stubborn = RTalignZero (CACHE_LINE_SIZE, sizeof (char[check_ctx->groups]));
+    check_ctx->ss_list = ci_create(check_ctx->groups);
+    check_ctx->ss_en_list = ci_create(check_ctx->groups);
+    check_ctx->por_emitted_list = ci_create(check_ctx->groups);
+    check_ctx->en_list = ci_create(check_ctx->groups);
+    check_ctx->seen_list = ci_create(check_ctx->groups);
     check_ctx->stack = dfs_stack_create (check_ctx->len + 2);
     check_ctx->tgt_in_stack = dfs_stack_create (check_ctx->len + 2);
     check_ctx->tgt_out_stack = dfs_stack_create (check_ctx->len + 4);
@@ -446,10 +450,10 @@ get_nonstubborn_cb (void *context, transition_info_t *ti, int *dst, int *cpy)
         if (!find_list(ctx->ss_en_list, ti->group)) { // bail out
             int *src = dfs_stack_peek_top (ctx->stack, 2);
             print_enabled_trans (ctx, src, ctx->src, dst);
-            HREassert (false, "Disabled stubborn transition %d was enabled by %d/%d, (ss: %s)"
-                           ":\n\n%s\nwas enabled by:\n%s",
+            HREassert (false, "Disabled stubborn transition %d was enabled by %d/%d, "
+                           "(ss: %s, enss: %s):\n\n%s\nwas enabled by:\n%s",
                            ti->group, ctx->src[ctx->len], ctx->src[ctx->len+1],
-                           str_list(ctx->ss_list),
+                           str_list(ctx->ss_list), str_list(ctx->ss_en_list),
                            str_group(ctx, ti->group),
                            str_group(ctx, ctx->src[ctx->len]));
         }
@@ -508,7 +512,6 @@ do_dfs_over_ns (dlk_check_context_t *ctx)
 static void
 check_semistubborn (dlk_check_context_t *ctx, int *src)
 {
-    if (ctx->ss_list->count == 0) return; // no pers set
     HREassert (ctx->pctx->enabled_list->count != ctx->ss_en_list->count, "Pers == En?");
     int *space = dfs_stack_push (ctx->stack, NULL);
     memcpy (space, src, sizeof(int[ctx->len]));
@@ -520,44 +523,73 @@ check_semistubborn (dlk_check_context_t *ctx, int *src)
 
 static inline void
 bs_emit_dlk_check (model_t model, por_context *pctx, int *src, TransitionCB cb,
-                   void *org)
+                   void *org, int successors)
 {
-    if (pctx->beam_used == 0) { // check real deadlock
+    if (successors == 0) { // check real deadlock
         int successors = GBgetTransitionsAll (pctx->parent, src, cb, org);
-        HREassert (successors == 0, "Deadlock state introduced by POR!");
+        HREassert (successors == 0, "Deadlock state introduced by POR! Enabled: %s",
+                   str_list(pctx->enabled_list));
     }
 
-    if (pctx->search[pctx->search_order[0]].score >= pctx->enabled_list->count)
+    if (successors >= pctx->enabled_list->count) // stubborn
         return;
 
     dlk_check_context_t *ctx = GBgetContext(model);
-    ctx->ss_list->count = 0;
+
     ctx->en_list->count = 0;
+    ctx->ss_list->count = 0;
     ctx->ss_en_list->count = 0;
     for (int i = 0; i < ctx->groups; i++) {
-        if (!(pctx->group_status[i] & GS_DISABLED))
-            ctx->en_list->data[ctx->en_list->count++] = i;
+        bool enabled  = !(pctx->group_status[i] & GS_DISABLED);
+        bool stubborn = por_is_stubborn(pctx, i);
 
-        if (pctx->search[pctx->search_order[0]].emit_status[i]&ES_SELECTED) { // selected
-            ctx->stubborn[i] = 1;
-            ctx->ss_list->data[ctx->ss_list->count++] = i;
-            if (!(pctx->group_status[i] & GS_DISABLED)) {
-                ctx->ss_en_list->data[ctx->ss_en_list->count++] = i;
-            }
-        } else {
-            ctx->stubborn[i] = 0;
-        }
+        ctx->en_list->data[ctx->en_list->count] = i;
+        ctx->ss_list->data[ctx->ss_list->count] = i;
+        ctx->ss_en_list->data[ctx->ss_en_list->count] = i;
+
+        ctx->ss_list->count += stubborn;
+        ctx->en_list->count += enabled;
+        ctx->ss_en_list->count += enabled & stubborn;
+
+        ctx->stubborn[i] = stubborn;
     }
+
+    bool same = ctx->ss_en_list->count == ctx->por_emitted_list->count;
+    for (int i = 0; i < ctx->ss_en_list->count && same; i++) {
+        same &= (ctx->ss_en_list->data[i] == ctx->por_emitted_list->data[i]);
+    }
+    if (!same) {
+        Abort ("POR layer emitted (%s) conflicts with stubborn set (%s)",
+               str_list(ctx->por_emitted_list), str_list(ctx->ss_en_list));
+    }
+
     check_semistubborn (ctx, src);
+}
+
+static void
+por_cb (void *context, transition_info_t *ti, int *dst, int *cpy)
+{
+    dlk_check_context_t *ctx = (dlk_check_context_t*)context;
+
+    if (ctx->por_emitted_list->count == 0 ||
+            ctx->por_emitted_list->data[ctx->por_emitted_list->count-1] != ti->group)
+        ctx->por_emitted_list->data[ctx->por_emitted_list->count++] = ti->group;
+
+    ctx->user_cb (ctx->user_context, ti, dst, cpy);
 }
 
 static int
 check_por_all (model_t check_model, int *src, TransitionCB cb, void *user_context)
 {
     model_t por_model = GBgetParent (check_model);
-    int successors = GBgetTransitionsAll (por_model, src, cb, user_context);
+    dlk_check_context_t *check_ctx = GBgetContext(check_model);
+    check_ctx->user_cb = cb;
+    check_ctx->user_context = user_context;
+    check_ctx->por_emitted_list->count = 0;
+    int successors = GBgetTransitionsAll (por_model, src, por_cb, check_ctx);
+
     por_context *por_ctx = GBgetContext (por_model);
-    bs_emit_dlk_check (check_model, por_ctx, src, cb, user_context);
+    bs_emit_dlk_check (check_model, por_ctx, src, cb, user_context, successors);
     return successors;
 }
 

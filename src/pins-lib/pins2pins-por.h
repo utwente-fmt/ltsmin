@@ -140,22 +140,20 @@ typedef struct search_context
 typedef struct por_context {
     model_t         parent;         // parent PINS model
     int             nguards;        // number of guards
-    int             nlabels;        // number of labels (including guards
+    int             nlabels;        // number of labels (including guards)
     int             ngroups;        // number of groups
-    matrix_t        gnes_matrix;    //
-    matrix_t        gnds_matrix;    //
+    int             nslots;         // state variable slots
+    matrix_t        label_nes_matrix;    //
+    matrix_t        label_nds_matrix;    //
     matrix_t        not_accords_with;   //
     matrix_t        nce;            //
     matrix_t        gnce_matrix;   //
     ci_list       **not_accords;  // mapping from transition group to groups that it accords with
     ci_list       **guard2group;    // mapping from guard to transition group
     ci_list       **group2guard;    // mapping from group to guards
-    ci_list       **guard_nes;      // transition groups that form a nes for a guard (guard -> [t1, t2, t..])
-    ci_list       **guard_nds;      // transition groups that form a nds for a guard
-    ci_list       **group_nds;      // transition guards that have a group in nds
-    ci_list       **guard_dep;      // transition groups that depend on a guard
+    ci_list       **label_nes;      // transition groups that form a nes for a guard (guard -> [t1, t2, t..])
+    ci_list       **label_nds;      // transition groups that form a nds for a guard
     ci_list       **guard_nce;      // mapping from guards to transition groups that may not be co-enabled
-    ci_list       **group_nce;      // mapping from guards to transition groups that may not be co-enabled
 
     /**
      * The global data used for the search
@@ -180,8 +178,6 @@ typedef struct por_context {
     ci_list        **group_hasn;     // mapping group to each nes/nds for it
     ci_list        **not_left_accords;
     ci_list        **not_left_accordsn;
-    ci_list        **nds;
-    ci_list        **ndsn;
 
     int              emitted;       // number of already emitted transitions
 
