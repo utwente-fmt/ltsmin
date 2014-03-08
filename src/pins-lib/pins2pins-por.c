@@ -322,7 +322,7 @@ static inline void
 select_all_visible (por_context* ctx, int set)
 {
     // Valmari's V-proviso: implicate all visible groups
-   for (size_t i = 0; i < bms_count(ctx->visible, set); i++) {
+   for (int i = 0; i < bms_count(ctx->visible, set); i++) {
        int group = ctx->visible->lists[set]->data[i];
        select_group (ctx, group);
    }
@@ -686,7 +686,7 @@ beam_ensure_key (por_context* ctx)
             select_group (ctx, gg);
         }
         s->has_key = is_visible(ctx, min_group) ? -1 : 1;
-        Warning (debug, "\nKey is %d (forced inclusion of NDSs: %s)", min_group);
+        Warning (debug, "\nKey is %d (forced inclusion of NDSs)", min_group);
 
         beam_search (ctx); // may select a different search context!
         s = &ctx->search[ctx->search_order[0]];
@@ -1212,7 +1212,7 @@ deletion_setup (model_t model, por_context* ctx, int* src, bool reset)
 }
 
 static inline bool
-deletion_delete (por_context* ctx, int v, bool *del_nes, bool *del_nds)
+deletion_delete (por_context* ctx, bool *del_nes, bool *del_nds)
 {
     del_ctx_t       *delctx = (del_ctx_t *) ctx->del_ctx;
     bms_t           *del = delctx->del;
@@ -1320,6 +1320,7 @@ deletion_delete (por_context* ctx, int v, bool *del_nes, bool *del_nds)
             }
         }
     }
+    return bms_count(del, DEL_K) == 0;
 }
 
 static inline void
@@ -1343,7 +1344,7 @@ deletion_analyze (por_context* ctx)
 
         bool            del_nes_old = del_nes;
         bool            del_nds_old = del_nds;
-        bool revert = deletion_delete (ctx, v, &del_nes, &del_nds);
+        bool revert = deletion_delete (ctx, &del_nes, &del_nds);
 
         while (bms_count(del, DEL_Z) != 0) bms_pop (del, DEL_Z);
 
@@ -1439,11 +1440,11 @@ deletion_emit (model_t model, por_context* ctx, int* src, TransitionCB cb,
         } else {
             for (int i = 0; i < del->lists[DEL_VD]->count; i++) {
                 int x = del->lists[DEL_VD]->data[i];
-                del->set[i] |= 1<<DEL_R;
+                del->set[x] |= 1<<DEL_R;
             }
             for (int i = 0; i < del->lists[DEL_VE]->count && !NO_DYN_VIS; i++) {
                 int x = del->lists[DEL_VE]->data[i];
-                del->set[i] |= 1<<DEL_R;
+                del->set[x] |= 1<<DEL_R;
             }
             deletion_setup (model, ctx, src, false);
             deletion_analyze (ctx);
