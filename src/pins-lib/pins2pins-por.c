@@ -1324,7 +1324,7 @@ deletion_delete (por_context* ctx, bool *del_nes, bool *del_nds)
 }
 
 static inline void
-deletion_analyze (por_context* ctx)
+deletion_analyze (por_context *ctx)
 {
     if (ctx->enabled_list->count == 0) return;
     del_ctx_t          *delctx = (del_ctx_t *) ctx->del_ctx;
@@ -1390,14 +1390,14 @@ deletion_analyze (por_context* ctx)
 }
 
 static inline int
-deletion_emit_new (por_context* ctx, proviso_hook_context_t* provctx, int* src)
+deletion_emit_new (por_context *ctx, proviso_hook_context_t *provctx, int* src)
 {
     del_ctx_t       *delctx = (del_ctx_t *) ctx->del_ctx;
     bms_t           *del = delctx->del;
     int c = 0;
     for (int z = 0; z < ctx->enabled_list->count; z++) {
         int i = ctx->enabled_list->data[z];
-        if (bms_has(del,DEL_N,i) && !bms_has(del,DEL_E,i)) {
+        if (por_is_stubborn(ctx,i) && !bms_has(del,DEL_E,i)) {
             del->set[i] |= 1<<DEL_E | 1<<DEL_R;
             c += GBgetTransitionsLong (ctx->parent, i, src, hook_cb, provctx);
         }
@@ -1406,8 +1406,8 @@ deletion_emit_new (por_context* ctx, proviso_hook_context_t* provctx, int* src)
 }
 
 static inline int
-deletion_emit (model_t model, por_context* ctx, int* src, TransitionCB cb,
-               void* uctx)
+deletion_emit (model_t model, por_context *ctx, int *src, TransitionCB cb,
+               void *uctx)
 {
     del_ctx_t          *delctx = (del_ctx_t *) ctx->del_ctx;
     bms_t              *del = delctx->del;
@@ -1418,9 +1418,9 @@ deletion_emit (model_t model, por_context* ctx, int* src, TransitionCB cb,
             int selected = 0;
             for (int i = 0; i < ctx->enabled_list->count; i++) {
                 int x = ctx->enabled_list->data[i];
-                selected += bms_has(del,DEL_N,x);
+                selected += por_is_stubborn(ctx,x);
             }
-            provctx.force_proviso_true = selected == ctx->enabled_list->count;
+            provctx.force_proviso_true = (selected == ctx->enabled_list->count);
         } else { // Deletion guarantees that I holds, but does V hold?
             provctx.force_proviso_true = !delctx->del_nds && !delctx->del_nes;
         }
@@ -2012,3 +2012,22 @@ GBaddPOR (model_t model)
     return pormodel;
 }
 
+bool
+por_is_stubborn (por_context *ctx, int group)
+{
+    switch (alg) {
+        case POR_SCC:
+        case POR_SCC1: Abort ("Unimplemented SCC + check");
+        case POR_HEUR: {
+            search_context *s = &ctx->search[ctx->search_order[0]];
+            return s->score >= ctx->enabled_list->count ||
+                  (s->emit_status[group] & ES_SELECTED);
+        }
+        case POR_DEL: {
+            del_ctx_t *del_ctx = (del_ctx_t *)ctx->del_ctx;
+            bms_t* del = del_ctx->del;
+            return bms_has(del, DEL_N, group) || bms_has(del, DEL_K, group);
+        }
+    default: Abort ("Unknown POR algorithm: '%s'", key_search(por_algorithm, alg));
+    }
+}

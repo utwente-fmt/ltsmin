@@ -199,4 +199,6 @@ typedef struct por_context {
     int             *random;
 } por_context;
 
+extern bool por_is_stubborn (por_context *ctx, int group);
+
 #endif // PINS2PINS_POR
