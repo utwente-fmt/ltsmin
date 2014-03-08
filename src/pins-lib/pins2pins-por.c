@@ -84,7 +84,7 @@ struct poptOption por_options[]={
 
     /* HIDDEN OPTIONS FOR EXPERIMENTATION */
 
-    { "check-por" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &PINS_POR , PINS_POR_CHECK , "verify partial order reduction peristent sets" , NULL },
+    { "check" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &PINS_POR , PINS_POR_CHECK , "verify partial order reduction peristent sets" , NULL },
     { "no-dna" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_DNA , 1 , "without DNA" , NULL },
     { "no-commutes" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_COMMUTES , 1 , "without commutes (for left-accordance)" , NULL },
     { "no-nes" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_NES , 1 , "without NES" , NULL },
@@ -157,8 +157,21 @@ init_visible_labels (por_context* ctx)
     SAFETY = bms_count(ctx->visible, VISIBLE) != 0;
 }
 
+static inline void
+incr_ns_update (por_context *ctx, int group, int new_group_score)
+{
+    int oldgroup_score = ctx->group_score[group];
+    ctx->group_score[group] = new_group_score;
+    if (NO_HEUR || oldgroup_score == new_group_score) return;
+
+    for (int i = 0; i < ctx->group2ns[group]->count; i++) {
+        int ns = ctx->group2ns[group]->data[i];
+        ctx->nes_score[ns] += new_group_score - oldgroup_score;
+    }
+}
+
 static void
-por_init_transitions (model_t model, por_context* ctx, int* src)
+por_init_transitions (model_t model, por_context *ctx, int *src)
 {
     init_visible_labels (ctx);
 
@@ -188,13 +201,13 @@ por_init_transitions (model_t model, por_context* ctx, int* src)
             ctx->visible_nds_enabled += ctx->visible->set[i] & (1 << VISIBLE_NDS);
         } else {
             // disabled
-            ctx->group_score[i] = 1;
+            incr_ns_update (ctx, i, 1);
         }
     }
 }
 
 static void
-por_transition_costs (por_context* ctx)
+por_transition_costs (por_context *ctx)
 {
     if (NO_HEUR) return;
 
@@ -204,39 +217,31 @@ por_transition_costs (por_context* ctx)
             int group = ctx->enabled_list->data[i];
             int vis = ctx->visible->set[group];
 
+            int new_score;
             if (vis) {
                 if (NO_V) {
-                    ctx->group_score[group] = ctx->enabled_list->count * ctx->ngroups;
+                    new_score = ctx->enabled_list->count * ctx->ngroups;
                 } else {
-                    if (NO_DYN_VIS || (vis & ((1 << VISIBLE_NES) |  (1 << VISIBLE_NDS)))) {
-                        ctx->group_score[group] = ctx->visible_enabled * ctx->ngroups +
+                    if (NO_DYN_VIS || (vis & ((1 << VISIBLE_NES) | (1 << VISIBLE_NDS)))) {
+                        new_score = ctx->visible_enabled * ctx->ngroups +
                                 bms_count(ctx->visible, VISIBLE) - ctx->visible_enabled;
                     } else if (vis & (1 << VISIBLE_NES)) {
-                        ctx->group_score[group] = ctx->visible_nds_enabled * ctx->ngroups +
+                        new_score = ctx->visible_nds_enabled * ctx->ngroups +
                                 bms_count(ctx->visible, VISIBLE_NDS) - ctx->visible_nds_enabled;
                     } else { // VISIBLE_NDS:
-                        ctx->group_score[group] = ctx->visible_nes_enabled * ctx->ngroups +
+                        new_score = ctx->visible_nes_enabled * ctx->ngroups +
                                 bms_count(ctx->visible, VISIBLE_NES) - ctx->visible_nes_enabled;
                     }
                 }
             } else {
-                ctx->group_score[group] = ctx->ngroups;
+                new_score = ctx->ngroups;
             }
+            incr_ns_update (ctx, group, new_score);
         }
     } else {
         for (int i = 0; i < ctx->enabled_list->count; i++) {
             int group = ctx->enabled_list->data[i];
-            ctx->group_score[group] = ctx->ngroups;
-        }
-    }
-
-    // fill nes score
-    // heuristic score h(x): 1 for disabled transition, n for enabled transition, n^2 for visible transition
-    for (int i = 0; i < NS_SIZE(ctx); i++) {
-        ctx->nes_score[i] = 0;
-        for (int j = 0; j < ctx->ns[i]->count; j++) {
-            int group = ctx->ns[i]->data[j];
-            ctx->nes_score[i] += ctx->group_score[group];
+            incr_ns_update (ctx, group, ctx->ngroups);
         }
     }
 }
@@ -465,12 +470,6 @@ beam_sort (por_context *ctx)
 
     // if it can't move, we found the best score
     if (ctx->beam_used > 1 && s->score > ctx->search[ctx->search_order[1]].score) {
-        // if score is one, and we have no more work, we're ready too
-        if (s->score == 1 && s->work_disabled == ctx->ngroups) {
-            Printf (debug, "bailing out, no disabled work and |ss|=1\n");
-            return false;
-        }
-
         // bubble current context down the search, continue with other context
         // this is known by the above conditions
         ctx->search_order[0] = ctx->search_order[1];
@@ -547,13 +546,18 @@ beam_search (por_context* ctx)
             s->emit_status[current_group] |= ES_SELECTED | ES_READY;
 
             // init search
-            if (s->score == 0) update_ns_scores (ctx, s, current_group);
-
-            // update the search score
-            s->score += 1;
+            if (!s->initialized) {
+                if (!NO_HEUR)
+                    memcpy(s->nes_score, ctx->nes_score, NS_SIZE(ctx) * sizeof(int));
+                update_ns_scores (ctx, s, current_group);
+                s->initialized = 1;
+            } else {
+                // update the search score
+                s->score += 1;
+            }
 
             // V proviso only for LTL
-            if (PINS_LTL && is_visible(ctx, current_group)) {
+            if ((PINS_LTL || SAFETY) && is_visible(ctx, current_group)) {
                 if (NO_V) { // Use Peled's stronger visibility proviso:
                     s->score += ctx->ngroups; // selects all groups in this search context
                 } else if (NO_DYN_VIS) {
@@ -714,10 +718,9 @@ beam_setup (model_t model, por_context* ctx, int* src)
         ctx->search[i].work_enabled = 1;
         ctx->search[i].work_disabled = ctx->ngroups;
         // init score
-        ctx->search[i].score = 0; // 0 = uninitialized
-        memset(ctx->search[i].emit_status, 0, sizeof(emit_status_t[ctx->ngroups]));
-        if (!NO_HEUR)
-            memcpy(ctx->search[i].nes_score, ctx->nes_score, NS_SIZE(ctx) * sizeof(int));
+        ctx->search[i].score = 1;
+        ctx->search[i].initialized = 0;
+        memset(ctx->search[i].emit_status, 0, sizeof(char[ctx->ngroups]));
 
         int visible = is_visible (ctx, i);
         // reset counts
@@ -1533,8 +1536,9 @@ create_beam_context (model_t model)
     // set #emitted to zero, meaning that a new analysis should start
     ctx->emitted = 0;
     // init group status array
-    ctx->group_status = RTmallocZero(ctx->ngroups * sizeof (group_status_t) );
+    ctx->group_status = RTmallocZero(ctx->ngroups * sizeof(char) );
     ctx->group_score  = RTmallocZero(ctx->ngroups * sizeof(int) );
+
     // init guard_status array
     ctx->label_status = RTmallocZero(ctx->nlabels * sizeof(int) );
 
@@ -1918,6 +1922,7 @@ GBaddPOR (model_t model)
             must_disable = GBgetMatrix(model, id);
         } else {
             Print1 (info, "No must-disable matrix available for weak sets");
+            NO_MDS = 1;
         }
 
         matrix_t not_left_accords;
@@ -1926,10 +1931,8 @@ GBaddPOR (model_t model)
             for (int j = 0; j < groups; j++) {
                 if (i == j) continue;
 
-                if (must_disable != NULL && !NO_MDS) {
-                    if (guard_of(ctx, i, must_disable, j)) {
-                        continue;
-                    }
+                if (!NO_MDS && guard_of(ctx, i, must_disable, j)) {
+                    continue;
                 }
 
                 if (guard_of(ctx, i, &ctx->gnes_matrix, j) || dm_is_set(&nds, j, i)) {

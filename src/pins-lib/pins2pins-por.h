@@ -114,7 +114,7 @@ typedef enum {
  */
 typedef struct search_context
 {
-    emit_status_t   *emit_status;    // status of each transition group
+    char            *emit_status;    // status of each transition group
     int             *work;           // list of size n+1, enabled transitions start at 0 upwards,
                                      // disabled transitions start at n downwards
                                      // [enabled0, enabled1, .. | free | workn-1, workn]
@@ -122,6 +122,7 @@ typedef struct search_context
     int             work_disabled;   // number of disabled groups in work
     int             idx;             // index of this search context
 
+    int             initialized;     // search weight
     int             score;           // search weight
     int            *nes_score;       // nes score
     int             visibles_selected; // selected number of visible transitions
@@ -161,7 +162,7 @@ typedef struct por_context {
      * This data is setup one time for each state that is processed
      */
     int             *label_status;  // status of the guards in current state
-    group_status_t  *group_status;  // status of the transition groups in the current state
+    char            *group_status;  // status of the transition groups in the current state
     int             *group_score;   // score assigned to each group by heuristic function
     int              beam_width;    // maximum width of the beam search
     int              beam_used;     // number of search contexts in use
