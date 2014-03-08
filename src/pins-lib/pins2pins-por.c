@@ -157,19 +157,6 @@ init_visible_labels (por_context* ctx)
     SAFETY = bms_count(ctx->visible, VISIBLE) != 0;
 }
 
-static inline void
-incr_ns_update (por_context *ctx, int group, int new_group_score)
-{
-    int oldgroup_score = ctx->group_score[group];
-    ctx->group_score[group] = new_group_score;
-    if (NO_HEUR || oldgroup_score == new_group_score) return;
-
-    for (int i = 0; i < ctx->group2ns[group]->count; i++) {
-        int ns = ctx->group2ns[group]->data[i];
-        ctx->nes_score[ns] += new_group_score - oldgroup_score;
-    }
-}
-
 static void
 por_init_transitions (model_t model, por_context *ctx, int *src)
 {
@@ -199,10 +186,20 @@ por_init_transitions (model_t model, por_context *ctx, int *src)
             ctx->visible_enabled += is_visible (ctx, i);
             ctx->visible_nes_enabled += ctx->visible->set[i] & (1 << VISIBLE_NES);
             ctx->visible_nds_enabled += ctx->visible->set[i] & (1 << VISIBLE_NDS);
-        } else {
-            // disabled
-            incr_ns_update (ctx, i, 1);
         }
+    }
+}
+
+static inline void
+incr_ns_update (por_context *ctx, int group, int new_group_score)
+{
+    int oldgroup_score = ctx->group_score[group];
+    ctx->group_score[group] = new_group_score;
+    if (oldgroup_score == new_group_score) return;
+
+    for (int i = 0; i < ctx->group2ns[group]->count; i++) {
+        int ns = ctx->group2ns[group]->data[i];
+        ctx->nes_score[ns] += new_group_score - oldgroup_score;
     }
 }
 
@@ -213,12 +210,12 @@ por_transition_costs (por_context *ctx)
 
     // set score for enable transitions
     if (PINS_LTL || SAFETY) {
-        for (int i = 0; i < ctx->enabled_list->count; i++) {
-            int group = ctx->enabled_list->data[i];
-            int vis = ctx->visible->set[group];
-
+        int vis;
+        for (int i = 0; i < ctx->ngroups; i++) {
             int new_score;
-            if (vis) {
+            if (ctx->group_status[i] == GS_DISABLED) {
+                new_score = 1;
+            } else if ((vis = ctx->visible->set[i])) {
                 if (NO_V) {
                     new_score = ctx->enabled_list->count * ctx->ngroups;
                 } else {
@@ -236,12 +233,12 @@ por_transition_costs (por_context *ctx)
             } else {
                 new_score = ctx->ngroups;
             }
-            incr_ns_update (ctx, group, new_score);
+            incr_ns_update (ctx, i, new_score);
         }
     } else {
-        for (int i = 0; i < ctx->enabled_list->count; i++) {
-            int group = ctx->enabled_list->data[i];
-            incr_ns_update (ctx, group, ctx->ngroups);
+        for (int i = 0; i < ctx->ngroups; i++) {
+            int enabled = ctx->group_status[i] == GS_ENABLED;
+            incr_ns_update (ctx, i, enabled ? ctx->ngroups : 1);
         }
     }
 }
