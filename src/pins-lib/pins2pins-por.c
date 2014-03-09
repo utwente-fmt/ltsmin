@@ -428,22 +428,18 @@ find_cheapest_ns (por_context* ctx, search_context *s, int group)
     int count = ctx->group_has[group]->count;
     HREassert (count > 0, "Group %d has no NES", group);
 
-    if (NO_HEUR) {
-        if (RANDOM)
-            return ctx->group_has[group]->data[ clock() % count ];
-        return ctx->group_has[group]->data[ 0 ];
-    }
-
     // for a disabled transition we need to add the necessary set
     // lookup which set has the lowest score on the heuristic function h(x)
     int selected_ns = -1;
     int selected_score = INT32_MAX;
-    for (int k = 0; k < count; k++) {
-
-        int ns = ctx->group_has[group]->data[ k ];
+    int c = RANDOM ? clock() : 0;
+    for (int i = 0; i < count; i++) {
+        int index = i;
+        if (RANDOM) index = (i + c) % count;
+        int ns = ctx->group_has[group]->data[ index ];
 
         // check the score by the heuristic function h(x)
-        if (s->nes_score[ns] < selected_score) {
+        if (NO_HEUR || s->nes_score[ns] < selected_score) {
             // check guard status for ns (nes for disabled and nds for enabled):
             if ((ns < n_guards && (ctx->label_status[ns] == 0))  ||
                 (ns >= n_guards && (ctx->label_status[ns-n_guards] != 0)) ) {
@@ -452,7 +448,7 @@ find_cheapest_ns (por_context* ctx, search_context *s, int group)
                 selected_ns = ns;
                 selected_score = s->nes_score[ns];
                 // if score is 0 it can't improve, break the loop
-                if (selected_score == 0) return selected_ns;
+                if (NO_HEUR || selected_score == 0) return selected_ns;
             }
         }
     }
