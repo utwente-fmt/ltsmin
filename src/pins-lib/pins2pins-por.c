@@ -2,6 +2,7 @@
 
 #include <limits.h>
 #include <stdlib.h>
+#include <time.h>
 
 #include <dm/dm.h>
 #include <hre/stringindex.h>
@@ -31,7 +32,6 @@ static int NO_V = 0;
 static int NO_L12 = 0;
 static int PREFER_NDS = 0;
 static int RANDOM = 0;
-static int DYN_RANDOM = 0;
 static const char *algorithm = "heur";
 
 static int SAFETY = 0;
@@ -102,8 +102,7 @@ struct poptOption por_options[]={
     { "no-V" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_V , 1 , "without V proviso, instead use Peled's visibility proviso, or V'     " , NULL },
     { "no-L12" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_L12 , 1 , "without L1/L2 proviso, instead use Peled's cycle proviso, or L2'   " , NULL },
     { "prefer-nds" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &PREFER_NDS , 1 , "prefer MC+NDS over NES" , NULL },
-    { "por-random" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &RANDOM , 1 , "randomize necessary sets (static)" , NULL },
-    { "por-dynamic" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &DYN_RANDOM , 1 , "randomize necessary sets (dynamic)" , NULL },
+    { "por-random" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &RANDOM , 1 , "randomize enabled and NES selection" , NULL },
     { "weak" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &POR_WEAK , 1 , "Weak stubborn set theory" , NULL },
     POPT_TABLEEND
 };
@@ -426,23 +425,25 @@ static inline int
 find_cheapest_ns (por_context* ctx, search_context *s, int group)
 {
     int n_guards = ctx->nguards;
+    int count = ctx->group_has[group]->count;
+    HREassert (count > 0, "Group %d has no NES", group);
+
+    if (NO_HEUR) {
+        if (RANDOM)
+            return ctx->group_has[group]->data[ clock() % count ];
+        return ctx->group_has[group]->data[ 0 ];
+    }
 
     // for a disabled transition we need to add the necessary set
     // lookup which set has the lowest score on the heuristic function h(x)
     int selected_ns = -1;
     int selected_score = INT32_MAX;
-    int count = ctx->group_has[group]->count;
-
-    if (DYN_RANDOM)
-        randperm (ctx->random, count, ctx->seed++);
-
-    // for each possible nes for the current group
     for (int k = 0; k < count; k++) {
 
-        int ns = ctx->group_has[group]->data[ ctx->random[k] ];
+        int ns = ctx->group_has[group]->data[ k ];
 
         // check the score by the heuristic function h(x)
-        if (NO_HEUR || s->nes_score[ns] < selected_score) {
+        if (s->nes_score[ns] < selected_score) {
             // check guard status for ns (nes for disabled and nds for enabled):
             if ((ns < n_guards && (ctx->label_status[ns] == 0))  ||
                 (ns >= n_guards && (ctx->label_status[ns-n_guards] != 0)) ) {
@@ -451,11 +452,10 @@ find_cheapest_ns (por_context* ctx, search_context *s, int group)
                 selected_ns = ns;
                 selected_score = s->nes_score[ns];
                 // if score is 0 it can't improve, break the loop
-                if (NO_HEUR || selected_score == 0) return selected_ns;
+                if (selected_score == 0) return selected_ns;
             }
         }
     }
-    if (selected_ns == -1) Abort ("selected nes -1");
     return selected_ns;
 }
 
@@ -717,9 +717,12 @@ beam_setup (model_t model, por_context* ctx, int* src)
     por_transition_costs (ctx);
 
     // select an enabled transition group
+    int c = RANDOM ? clock() : 0;
     ctx->beam_used = NO_BEAM ? 1 : ctx->enabled_list->count;
     for (int i = 0; i < ctx->beam_used; i++) {
-        int group = ctx->enabled_list->data[i];
+        int enabled = i;
+        if (RANDOM) enabled = (enabled + c) % ctx->beam_used;
+        int group = ctx->enabled_list->data[enabled];
         // add to beam search
         ctx->search[i].work[0] = group;
         ctx->search[i].has_key = 0;
@@ -1485,17 +1488,6 @@ list_invert (ci_list *list)
     }
 }
 
-static void
-list_randomize (ci_list *list, int seed)
-{
-    int rand[list->count];
-    randperm (rand, list->count, seed);
-    for (int i = 0; i < list->count; i++) {
-        swap (list->data[i], list->data[ rand[i] ]);
-    }
-}
-
-
 static scc_context_t *
 create_scc_ctx (por_context* ctx)
 {
@@ -1600,6 +1592,11 @@ GBaddPOR (model_t model)
         return model;
     }
     if (NO_HEUR_BEAM) NO_HEUR = NO_BEAM = 1;
+    if (!RANDOM && (NO_HEUR || NO_BEAM)) {
+        if (__sync_bool_compare_and_swap(&RANDOM, 0, 1)) { // static variable
+            Warning (info, "Using random selection instead of heuristics / multiple Beam searches.");
+        }
+    }
 
     // do the setup
     model_t             pormodel = GBcreateBase ();
@@ -1744,8 +1741,9 @@ GBaddPOR (model_t model)
     matrix_t *label_mce_matrix = GBgetGuardCoEnabledInfo(model);
     NO_MC |= label_mce_matrix == NULL;
     if (NO_MC && !NO_MCNDS) {
-        Print1 (info, "No maybe-coenabled matrix found. Turning off NESs from NDS+MC.");
-        NO_MCNDS = 1;
+        if (__sync_bool_compare_and_swap(&NO_MCNDS, 0, 1)) { // static variable
+            Warning (info, "No maybe-coenabled matrix found. Turning off NESs from NDS+MC.");
+        }
     }
 
     if (!NO_MC) {
@@ -1819,8 +1817,9 @@ GBaddPOR (model_t model)
     NO_COMMUTES |= commutes == NULL;
 
     if (POR_WEAK && (NO_NES || NO_NDS)) {
-        Print1 (info, "No NES/NDS, which is required for weak relations. Switching to strong stubborn sets.");
-        POR_WEAK = 0;
+        if (__sync_bool_compare_and_swap(&POR_WEAK, 1, 0)) { // static variable
+            Warning (info, "No NES/NDS, which is required for weak relations. Switching to strong stubborn sets.");
+        }
     }
 
     if (!POR_WEAK) {
@@ -1923,19 +1922,9 @@ GBaddPOR (model_t model)
     ctx->group_hasn = (ci_list**) dm_cols_to_idx_table(&group_has);
     dm_free (&group_has);
 
-    ctx->random = RTmallocZero (NS_SIZE(ctx) * sizeof(int));
-    for (int i = 0; i < NS_SIZE(ctx); i++) ctx->random[i] = i;
-
     if (PREFER_NDS) {
-        HREassert (!RANDOM, "--por-random incompatible with --prefer-nds");
         for (int i = 0; i < ctx->ngroups; i++) {
             list_invert (ctx->group_has[i]);
-        }
-    }
-    if (RANDOM) {
-        HREassert (!PREFER_NDS, "--por-random incompatible with --prefer-nds");
-        for (int i = 0; i < ctx->ngroups; i++) {
-            list_randomize (ctx->group_has[i], i);
         }
     }
 
@@ -1970,7 +1959,6 @@ GBaddPOR (model_t model)
     ctx->enabled_list = ci_create (ctx->ngroups);
     ctx->nds_list[0] = ci_create (ctx->ngroups);
     ctx->nds_list[1] = ci_create (ctx->ngroups);
-    ctx->seed = 73783467;
 
     int                 s0[ctx->nslots];
     GBgetInitialState (model, s0);

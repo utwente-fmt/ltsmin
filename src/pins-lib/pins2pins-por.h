@@ -191,8 +191,6 @@ typedef struct por_context {
 
     void            *scc_ctx;
     void            *del_ctx;
-    int              seed;
-    int             *random;
 } por_context;
 
 extern bool por_is_stubborn (por_context *ctx, int group);
