@@ -183,8 +183,9 @@ void
 run_report_total (run_t *run)
 {
     work_counter_t         *cnt_work = &run->total;
-    Warning (info, "Explored %zu states %zu transitions",
-                    cnt_work->explored, cnt_work->trans);
+    Warning (info, "Explored %zu states %zu transitions, fanout: %.3f",
+                    cnt_work->explored, cnt_work->trans,
+                    ((double)cnt_work->trans) / cnt_work->explored);
     Warning (info, "Total exploration time %5.3f sec "
                    "(%5.3f sec minimum, %5.3f sec on average)",
                    cnt_work->maxtime, cnt_work->mintime, cnt_work->runtime / W);
