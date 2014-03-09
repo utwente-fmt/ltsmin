@@ -19,7 +19,7 @@ int POR_WEAK = 0; //extern
 
 static int NO_COMMUTES = 0;
 static int NO_HEUR = 0;
-static int NO_BEAM = 0;
+static int MAX_BEAM = -1;
 static int NO_HEUR_BEAM = 0;
 static int NO_DNA = 0;
 static int NO_NES = 0;
@@ -92,7 +92,7 @@ struct poptOption por_options[]={
     { "no-commutes" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_COMMUTES , 1 , "without commutes (for left-accordance)" , NULL },
     { "no-nes" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_NES , 1 , "without NES" , NULL },
     { "no-heur" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_HEUR , 1 , "without heuristic" , NULL },
-    { "no-beam" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_BEAM , 1 , "without beam search" , NULL },
+    { "beam" , 0, POPT_ARG_INT | POPT_ARGFLAG_DOC_HIDDEN , &MAX_BEAM , 1 , "maximum number of beam searches" , NULL },
     { "no-heur-beam" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_HEUR_BEAM , 1 , "without heuristic / beam search" , NULL },
     { "no-mds" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_MDS , 1 , "without MDS" , NULL },
     { "no-nds" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_NDS , 1 , "without NDS (for dynamic label info)" , NULL },
@@ -714,7 +714,9 @@ beam_setup (model_t model, por_context* ctx, int* src)
 
     // select an enabled transition group
     int c = RANDOM ? clock() : 0;
-    ctx->beam_used = NO_BEAM ? 1 : ctx->enabled_list->count;
+    ctx->beam_used = ctx->enabled_list->count;
+    if (MAX_BEAM != -1 && ctx->beam_used > MAX_BEAM)
+        ctx->beam_used = MAX_BEAM;
     for (int i = 0; i < ctx->beam_used; i++) {
         int enabled = i;
         if (RANDOM) enabled = (enabled + c) % ctx->beam_used;
@@ -1587,8 +1589,8 @@ GBaddPOR (model_t model)
         Print1 (info, "Frontend doesn't have guards. Ignoring --por.");
         return model;
     }
-    if (NO_HEUR_BEAM) NO_HEUR = NO_BEAM = 1;
-    if (!RANDOM && (NO_HEUR || NO_BEAM)) {
+    if (NO_HEUR_BEAM) NO_HEUR = MAX_BEAM = 1;
+    if (!RANDOM && (NO_HEUR || MAX_BEAM != -1)) {
         if (__sync_bool_compare_and_swap(&RANDOM, 0, 1)) { // static variable
             Warning (info, "Using random selection instead of heuristics / multiple Beam searches.");
         }
