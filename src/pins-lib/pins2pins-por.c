@@ -300,6 +300,7 @@ select_group (por_context* ctx, int group)
         s->work[s->work_enabled++] = group;
         s->ve_selected += visible;
         s->enabled_selected++;
+        s->score += 1;
     }
     s->visibles_selected += visible;
     Printf (debug, "%d, ", group);
@@ -547,19 +548,17 @@ beam_search (por_context* ctx)
             int current_group = s->work[s->work_enabled];
             Printf (debug, "BEAM-%d investigating group %d (enabled) --> ", s->idx, current_group);
 
-            // select and mark as ready
-            s->emit_status[current_group] |= ES_SELECTED | ES_READY;
-
-            // init search
+            // init search (expensive)
             if (!s->initialized) {
                 if (!NO_HEUR)
                     memcpy(s->nes_score, ctx->nes_score, sizeof(int[NS_SIZE(ctx)]));
+                memset(s->emit_status, 0, sizeof(char[ctx->ngroups]));
                 update_ns_scores (ctx, s, current_group);
                 s->initialized = 1;
-            } else {
-                // update the search score
-                s->score += 1;
             }
+
+            // select and mark as ready
+            s->emit_status[current_group] |= ES_SELECTED | ES_READY;
 
             // V proviso only for LTL
             if ((PINS_LTL || SAFETY) && is_visible(ctx, current_group)) {
@@ -730,7 +729,6 @@ beam_setup (model_t model, por_context* ctx, int* src)
         // init score
         ctx->search[i].score = 1;
         ctx->search[i].initialized = 0;
-        memset(ctx->search[i].emit_status, 0, sizeof(char[ctx->ngroups]));
 
         int visible = is_visible (ctx, i);
         // reset counts
