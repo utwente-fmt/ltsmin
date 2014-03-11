@@ -6,6 +6,7 @@
 
 #include <dm/dm.h>
 #include <hre/stringindex.h>
+#include <hre/unix.h>
 #include <hre/user.h>
 #include <ltsmin-lib/ltsmin-standard.h>
 #include <pins-lib/pins.h>
@@ -277,7 +278,7 @@ update_ns_scores (por_context* ctx, search_context *s, int group)
  * Mark a group selected, update counters and NS scores.
  */
 static inline void
-select_group (por_context* ctx, int group)
+select_group (por_context* ctx, int group, bool update_scores)
 {
     // get current search context
     search_context *s = &ctx->search[ ctx->search_order[0] ];
@@ -290,7 +291,8 @@ select_group (por_context* ctx, int group)
 
     s->emit_status[group] |= ES_SELECTED;
 
-    update_ns_scores (ctx, s, group);
+    if (update_scores)
+        update_ns_scores (ctx, s, group);
 
     // and add to work array and update counts
     int visible = is_visible (ctx, group);
@@ -316,12 +318,12 @@ select_one_invisible (por_context* ctx)
     for (int i = 0; i < ctx->enabled_list->count; i++) {
         int group = ctx->enabled_list->data[i];
         if (!is_visible(ctx, group)) {
-            select_group (ctx, group);
+            select_group (ctx, group, false);
             Printf (debug, "Added extra invisible: %d\n", group);
             if (POR_WEAK && s->has_key == -1) { // make it a key as well
                 for (int g = 0; g < ctx->not_accords[group]->count; g++) {
                     int gg = ctx->not_accords[group]->data[g];
-                    select_group (ctx, gg);
+                    select_group (ctx, gg, false);
                 }
                 Printf (debug, "Made added invisible also key: %d\n", group);
             }
@@ -332,12 +334,12 @@ select_one_invisible (por_context* ctx)
 }
 
 static inline void
-select_all_visible (por_context* ctx, int set)
+select_all_visible (por_context* ctx, int set, bool update_scores)
 {
     // Valmari's V-proviso: implicate all visible groups
    for (int i = 0; i < bms_count(ctx->visible, set); i++) {
        int group = ctx->visible->lists[set]->data[i];
-       select_group (ctx, group);
+       select_group (ctx, group, update_scores);
    }
 }
 
@@ -457,12 +459,28 @@ find_cheapest_ns (por_context* ctx, search_context *s, int group)
 }
 
 static void
-beam_add_dna_for_enabled (por_context *ctx, int group)
+beam_add_all_for_enabled (por_context *ctx, int group, bool update_scores)
 {
+    search_context *s = &ctx->search[ ctx->search_order[0] ];
+
+    // V proviso only for LTL
+    if ((PINS_LTL || SAFETY) && is_visible(ctx, group)) {
+        if (NO_V) { // Use Peled's stronger visibility proviso:
+            s->score += ctx->ngroups; // selects all groups in this search context
+        } else if (NO_DYN_VIS) {
+            select_all_visible (ctx, VISIBLE, update_scores);
+        } else {
+            if (ctx->visible->set[group] & (1 << VISIBLE_NES))
+                select_all_visible (ctx, VISIBLE_NDS, update_scores);
+            if (ctx->visible->set[group] & (1 << VISIBLE_NDS))
+                select_all_visible (ctx, VISIBLE_NES, update_scores);
+        }
+    }
+
     ci_list **accords = POR_WEAK ? ctx->not_left_accords : ctx->not_accords;
     for (int j = 0; j < accords[group]->count; j++) {
         int dependent_group = accords[group]->data[j];
-        select_group (ctx, dependent_group);
+        select_group (ctx, dependent_group, update_scores);
     }
 }
 
@@ -481,7 +499,8 @@ beam_sort (por_context *ctx)
         ctx->search_order[0] = ctx->search_order[1];
         // continue with 2
         int bubble = 2;
-        while(bubble < ctx->beam_used && s->score >= ctx->search[ctx->search_order[bubble]].score) {
+        while (bubble < ctx->beam_used &&
+               s->score > ctx->search[ctx->search_order[bubble]].score) {
             ctx->search_order[bubble-1] = ctx->search_order[bubble];
             bubble++;
         }
@@ -496,6 +515,18 @@ beam_sort (por_context *ctx)
     return true;
 }
 
+static int
+score_cmp (const void *a, const void *b, void *arg)
+{
+    por_context        *ctx = (por_context *) arg;
+    int                 A = *((int*)a);
+    int                 B = *((int*)b);
+    if (ctx->search[A].score == ctx->search[B].score) {
+        return ctx->search[A].work_disabled - ctx->search[B].work_disabled;
+    }
+    return ctx->search[A].score - ctx->search[B].score;
+}
+
 /**
  * Analyze NS is the function called to find the smallest persistent set
  * It builds stubborn sets in multiple search contexts, by using a beam
@@ -503,10 +534,21 @@ beam_sort (por_context *ctx)
  * (based on heuristic function h(x) (nes_score)) isn't the lowest score anymore
  */
 static inline void
-beam_search (por_context* ctx)
+beam_search (por_context *ctx)
 {
     // if no search context is used, there are no transitions, nothing to analyze
     if (ctx->beam_used == 0) return;
+
+    // Do initial unfolding of DNA
+    for (int i = ctx->beam_used - 1; i >= 0; i--) {
+        ctx->search_order[0] = i;
+        search_context *s = &ctx->search[ i ];
+        int current_group = s->work[0];
+        s->emit_status[current_group] |= ES_SELECTED | ES_READY;
+        beam_add_all_for_enabled (ctx, current_group, false);
+    }
+    // Find best scape goat
+    qsortr (ctx->search_order, ctx->beam_used, sizeof(int), score_cmp, ctx);
 
     // infinite loop searching in multiple context, will bail out
     // when persistent set is found
@@ -515,6 +557,18 @@ beam_search (por_context* ctx)
         // the search order is a sorted array based on the score of the search context
         // start with the context in search_order[0] = best current score
         search_context *s = &ctx->search[ ctx->search_order[0] ];
+
+        // init search (expensive)
+        if (!s->initialized) {
+            if (!NO_HEUR)
+                memcpy(s->nes_score, ctx->nes_score, sizeof(int[NS_SIZE(ctx)]));
+            memset(s->emit_status, 0, sizeof(char[ctx->ngroups]));
+            for (int i = 0; i < s->work_enabled; i++) {
+                int group = s->work[i];
+                update_ns_scores (ctx, s, group);
+            }
+            s->initialized = 1;
+        }
 
         // while there are disabled transitions:
         while (s->work_enabled == 0 && s->work_disabled < ctx->ngroups) {
@@ -535,7 +589,7 @@ beam_search (por_context* ctx)
             // add the selected nes to work
             for(int k=0; k < ctx->ns[selected_ns]->count; k++) {
                 int group = ctx->ns[selected_ns]->data[k];
-                select_group (ctx, group);
+                select_group (ctx, group, true);
             }
             Printf (debug, " (ns %d (%s))\n", selected_ns % ctx->nguards,
                     selected_ns < ctx->nguards ? "disabled" : "enabled");
@@ -548,43 +602,22 @@ beam_search (por_context* ctx)
             int current_group = s->work[s->work_enabled];
             Printf (debug, "BEAM-%d investigating group %d (enabled) --> ", s->idx, current_group);
 
-            // init search (expensive)
-            if (!s->initialized) {
-                if (!NO_HEUR)
-                    memcpy(s->nes_score, ctx->nes_score, sizeof(int[NS_SIZE(ctx)]));
-                memset(s->emit_status, 0, sizeof(char[ctx->ngroups]));
-                update_ns_scores (ctx, s, current_group);
-                s->initialized = 1;
-            }
-
+            // bail out if already ready
+            if (s->emit_status[current_group] & ES_READY) continue;
             // select and mark as ready
             s->emit_status[current_group] |= ES_SELECTED | ES_READY;
-
-            // V proviso only for LTL
-            if ((PINS_LTL || SAFETY) && is_visible(ctx, current_group)) {
-                if (NO_V) { // Use Peled's stronger visibility proviso:
-                    s->score += ctx->ngroups; // selects all groups in this search context
-                } else if (NO_DYN_VIS) {
-                    select_all_visible (ctx, VISIBLE);
-                } else {
-                    if (ctx->visible->set[current_group] & (1 << VISIBLE_NES))
-                        select_all_visible (ctx, VISIBLE_NDS);
-                    if (ctx->visible->set[current_group] & (1 << VISIBLE_NDS))
-                        select_all_visible (ctx, VISIBLE_NES);
-                }
-            }
 
             // quit the current search when emit_limit is reached
             // this block is just to skip useless work, everything is emitted anyway
             if (s->score >= ctx->enabled_list->count) {
                 s->work_enabled = 0;
                 s->work_disabled = ctx->ngroups;
-                Printf (debug, " (quitting |ss|=|en|)\n");
+                Printf (debug, " (abandoning BEAM %d |ss|=|en|)\n", ctx->search_order[0]);
                 break; // enabled loop
             }
 
             // push all dependent unselected ctx->ngroups
-            beam_add_dna_for_enabled (ctx, current_group);
+            beam_add_all_for_enabled (ctx, current_group, true);
             Printf (debug, "\n");
         }
     } while (beam_sort(ctx));
@@ -621,8 +654,8 @@ beam_emit (por_context* ctx, int* src, TransitionCB cb, void* uctx)
 
             if (!NO_L12 && !NO_V) {
                 // enforce L2 (include all visible transitions)
-                select_all_visible (ctx, VISIBLE);
                 ctx->beam_used = 1; // fix to current (partly emitted) search ctx
+                select_all_visible (ctx, VISIBLE, false);
                 beam_search (ctx);
 
                 // enforce L1 (one invisible transition)
@@ -690,7 +723,7 @@ beam_ensure_key (por_context* ctx)
         Printf (debug, "Adding NDSs: ");
         for (int t = 0; t < ctx->nds_list[0]->count; t++) {
             int tt = ctx->nds_list[0]->data[t];
-            select_group (ctx, tt);
+            select_group (ctx, tt, true);
         }
         s->has_key = is_visible(ctx, min_group) ? -1 : 1;
         Warning (debug, "\nKey is %d (forced inclusion of NDSs)", min_group);
