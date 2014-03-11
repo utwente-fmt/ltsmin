@@ -313,7 +313,7 @@ select_one_invisible (por_context* ctx)
     HREassert (s->has_key);
 
     // Valmari's L1 proviso requires one invisible transition (to include quiescent runs)
-    for(int i=0; i<ctx->enabled_list->count; i++) {
+    for (int i = 0; i < ctx->enabled_list->count; i++) {
         int group = ctx->enabled_list->data[i];
         if (!is_visible(ctx, group)) {
             select_group (ctx, group);
@@ -427,7 +427,6 @@ find_cheapest_ns (por_context* ctx, search_context *s, int group)
 {
     int n_guards = ctx->nguards;
     int count = ctx->group_has[group]->count;
-    HREassert (count > 0, "Group %d has no NES", group);
 
     // for a disabled transition we need to add the necessary set
     // lookup which set has the lowest score on the heuristic function h(x)
@@ -453,6 +452,7 @@ find_cheapest_ns (por_context* ctx, search_context *s, int group)
             }
         }
     }
+    HREassert (selected_ns != -1, "No NES found for group %d", group);
     return selected_ns;
 }
 
@@ -580,7 +580,7 @@ beam_search (por_context* ctx)
                 s->work_enabled = 0;
                 s->work_disabled = ctx->ngroups;
                 Printf (debug, " (quitting |ss|=|en|)\n");
-                continue;
+                break; // enabled loop
             }
 
             // push all dependent unselected ctx->ngroups
@@ -730,7 +730,7 @@ beam_setup (model_t model, por_context* ctx, int* src)
         ctx->search[i].score = 1;
         ctx->search[i].initialized = 0;
 
-        int visible = is_visible (ctx, i);
+        int visible = is_visible (ctx, group);
         // reset counts
         ctx->search[i].visibles_selected = visible;
         ctx->search[i].enabled_selected = 1;
@@ -1528,7 +1528,7 @@ create_beam_context (por_context *ctx)
     for (int i = 0 ; i < BEAM_WIDTH; i++) {
         ctx->search_order[i] = i;
         search[i].emit_status = RTmallocZero(ctx->ngroups * sizeof(emit_status_t));
-        search[i].work = RTmallocZero(ctx->ngroups * sizeof(int));
+        search[i].work = RTmallocZero((ctx->ngroups + 1) * sizeof(int));
         search[i].work_enabled = 0;
         search[i].work_disabled = ctx->ngroups;
         search[i].score = 0;
