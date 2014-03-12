@@ -518,17 +518,6 @@ beam_sort (por_context *ctx)
     return true;
 }
 
-static int
-score_cmp (const void *a, const void *b, void *arg)
-{
-    por_context        *ctx = (por_context *) arg;
-    int                 A = *((int*)a);
-    int                 B = *((int*)b);
-    if (ctx->search[A].score == ctx->search[B].score)
-        return ctx->search[A].work_disabled - ctx->search[B].work_disabled;
-    return ctx->search[A].score - ctx->search[B].score;
-}
-
 /**
  * Analyze NS is the function called to find the smallest persistent set
  * It builds stubborn sets in multiple search contexts, by using a beam
@@ -541,22 +530,6 @@ beam_search (por_context *ctx)
     // if no search context is used, there are no transitions, nothing to analyze
     if (ctx->enabled_list->count == 0) return;
 
-    ctx->beam_used = ctx->enabled_list->count;
-    if (ctx->beam_used == -1) {
-        ctx->beam_used = ctx->enabled_list->count;
-        // Do initial unfolding of DNA
-        for (int i = ctx->beam_used - 1; i >= 0; i--) {
-            search_context *s = &ctx->search[i];
-            int current_group = s->work[0];
-            s->emit_status[current_group] |= ES_SELECTED | ES_READY;
-            ctx->search_order[0] = i; // for beam_add_all_for_enabled
-            beam_add_all_for_enabled (ctx, current_group, false);
-        }
-        ctx->search_order[0] = 0;
-        // Find best scape goat
-        qsortr (ctx->search_order, ctx->beam_used, sizeof(int), score_cmp, ctx);
-    }
-
     // infinite loop searching in multiple context, will bail out
     // when persistent set is found
     do {
@@ -567,9 +540,9 @@ beam_search (por_context *ctx)
 
         // init search (expensive)
         if (!s->initialized) {
+            memset(s->emit_status, 0, sizeof(char[ctx->ngroups]));
             if (!NO_HEUR)
                 memcpy(s->nes_score, ctx->nes_score, sizeof(int[NS_SIZE(ctx)]));
-            memset(s->emit_status, 0, sizeof(char[ctx->ngroups]));
             for (int i = 0; i < s->work_enabled; i++) {
                 int group = s->work[i];
                 update_ns_scores (ctx, s, group);
@@ -781,7 +754,6 @@ beam_setup (model_t model, por_context* ctx, int* src)
 
         ctx->search_order[i] = i;
     }
-    ctx->beam_used = -1; // uninitialized
 }
 
 static int
