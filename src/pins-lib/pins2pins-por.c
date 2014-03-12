@@ -298,6 +298,7 @@ select_group (por_context* ctx, int group, bool update_scores)
     int visible = is_visible (ctx, group);
     if (ctx->group_status[group] & GS_DISABLED) {
         s->work[s->work_disabled--] = group;
+        s->disabled_score += 1;
     } else {
         s->work[s->work_enabled++] = group;
         s->ve_selected += visible;
@@ -484,31 +485,33 @@ beam_add_all_for_enabled (por_context *ctx, int group, bool update_scores)
     }
 }
 
+static inline int
+beam_cmp (search_context *s1, search_context *s2)
+{
+    //if (s1->score != s2->score)
+        return s1->score - s2->score;
+    //int a = s1->disabled_score + s1->score- s1->work_disabled;
+    //int b = s2->disabled_score + s2->score - s2->work_disabled;
+    //return (a << 15) / s1->work_disabled - (b << 15) / s2->work_disabled;
+}
+
 /**
  * Sorts BEAM search contexts.
  */
-static bool
+static inline bool
 beam_sort (por_context *ctx)
 {
     search_context *s = &ctx->search[ ctx->search_order[0] ];
 
-    // if it can't move, we found the best score
-    if (ctx->beam_used > 1 && s->score > ctx->search[ctx->search_order[1]].score) {
-        // bubble current context down the search, continue with other context
-        // this is known by the above conditions
-        ctx->search_order[0] = ctx->search_order[1];
-        // continue with 2
-        int bubble = 2;
-        while (bubble < ctx->beam_used &&
-               s->score > ctx->search[ctx->search_order[bubble]].score) {
-            ctx->search_order[bubble-1] = ctx->search_order[bubble];
-            bubble++;
-        }
-        bubble--;
+    int bubble = 1;
+    while (bubble < ctx->beam_used && beam_cmp(s, &ctx->search[ctx->search_order[bubble]]) > 0) {
+           // s->score > ctx->search[ctx->search_order[bubble]].score) {
+        ctx->search_order[bubble-1] = ctx->search_order[bubble];
+        bubble++;
+    }
+    ctx->search_order[bubble-1] = s->idx;
 
-        if (bubble < ctx->beam_used)
-            ctx->search_order[bubble] = s->idx;
-    } else if (s->work_disabled == ctx->ngroups) {
+    if (ctx->search_order[0] == s->idx && s->work_disabled == ctx->ngroups) {
         Printf (debug, "bailing out, no disabled work\n");
         return false;
     }
@@ -521,9 +524,8 @@ score_cmp (const void *a, const void *b, void *arg)
     por_context        *ctx = (por_context *) arg;
     int                 A = *((int*)a);
     int                 B = *((int*)b);
-    if (ctx->search[A].score == ctx->search[B].score) {
+    if (ctx->search[A].score == ctx->search[B].score)
         return ctx->search[A].work_disabled - ctx->search[B].work_disabled;
-    }
     return ctx->search[A].score - ctx->search[B].score;
 }
 
@@ -537,18 +539,23 @@ static inline void
 beam_search (por_context *ctx)
 {
     // if no search context is used, there are no transitions, nothing to analyze
-    if (ctx->beam_used == 0) return;
+    if (ctx->enabled_list->count == 0) return;
 
-    // Do initial unfolding of DNA
-    for (int i = ctx->beam_used - 1; i >= 0; i--) {
-        ctx->search_order[0] = i;
-        search_context *s = &ctx->search[ i ];
-        int current_group = s->work[0];
-        s->emit_status[current_group] |= ES_SELECTED | ES_READY;
-        beam_add_all_for_enabled (ctx, current_group, false);
+    ctx->beam_used = ctx->enabled_list->count;
+    if (ctx->beam_used == -1) {
+        ctx->beam_used = ctx->enabled_list->count;
+        // Do initial unfolding of DNA
+        for (int i = ctx->beam_used - 1; i >= 0; i--) {
+            search_context *s = &ctx->search[i];
+            int current_group = s->work[0];
+            s->emit_status[current_group] |= ES_SELECTED | ES_READY;
+            ctx->search_order[0] = i; // for beam_add_all_for_enabled
+            beam_add_all_for_enabled (ctx, current_group, false);
+        }
+        ctx->search_order[0] = 0;
+        // Find best scape goat
+        qsortr (ctx->search_order, ctx->beam_used, sizeof(int), score_cmp, ctx);
     }
-    // Find best scape goat
-    qsortr (ctx->search_order, ctx->beam_used, sizeof(int), score_cmp, ctx);
 
     // infinite loop searching in multiple context, will bail out
     // when persistent set is found
@@ -578,14 +585,11 @@ beam_search (por_context *ctx)
 
             // bail out if already ready
             if (s->emit_status[current_group] & ES_READY) continue;
-
-            // mark as selected and ready
             s->emit_status[current_group] |= ES_SELECTED | ES_READY;
-
-            Printf (debug, "BEAM-%d investigating group %d (disabled) --> ", s->idx, current_group);
 
             int selected_ns = find_cheapest_ns (ctx, s, current_group);
 
+            Printf (debug, "BEAM-%d investigating group %d (disabled) --> ", s->idx, current_group);
             // add the selected nes to work
             for(int k=0; k < ctx->ns[selected_ns]->count; k++) {
                 int group = ctx->ns[selected_ns]->data[k];
@@ -600,11 +604,9 @@ beam_search (por_context *ctx)
             // one less enabled transition (work_enabled = 0 -> no enabled transitions)
             s->work_enabled--;
             int current_group = s->work[s->work_enabled];
-            Printf (debug, "BEAM-%d investigating group %d (enabled) --> ", s->idx, current_group);
 
             // bail out if already ready
             if (s->emit_status[current_group] & ES_READY) continue;
-            // select and mark as ready
             s->emit_status[current_group] |= ES_SELECTED | ES_READY;
 
             // quit the current search when emit_limit is reached
@@ -616,6 +618,7 @@ beam_search (por_context *ctx)
                 break; // enabled loop
             }
 
+            Printf (debug, "BEAM-%d investigating group %d (enabled) --> ", s->idx, current_group);
             // push all dependent unselected ctx->ngroups
             beam_add_all_for_enabled (ctx, current_group, true);
             Printf (debug, "\n");
@@ -678,15 +681,22 @@ static inline void
 beam_ensure_key (por_context* ctx)
 {
     // if no enabled transitions, return directly
-    search_context *s = &ctx->search[ctx->search_order[0]];
     int enabled = ctx->enabled_list->count;
-    if (!POR_WEAK || enabled <= 1 || s->score >= enabled) {
-        Warning (debug, "Key already included");
+    search_context *s = &ctx->search[ctx->search_order[0]];
+    if (!POR_WEAK) {
         s->has_key = 1;
         return;
     }
 
-    while ( !s->has_key ) {
+    while (true) {
+        s = &ctx->search[ctx->search_order[0]];
+
+        if (s->has_key || s->score >= enabled) {
+            Warning (debug, "BEAM %d has key (enabled = selected)", s->idx);
+            s->has_key = 1;
+            return;
+        }
+
         size_t min_score = INT32_MAX;
         int min_group = -1;
         ctx->nds_list[0]->count = 0;
@@ -707,7 +717,7 @@ beam_ensure_key (por_context* ctx)
             }
 
             if (score == 0) {
-                Warning (debug, "Key is %d (all NDSs included)", group);
+                Warning (debug, "BEAM %d has key: %d (all NDSs already included)", s->idx, group);
                 return; // OK (all NDS's are in the SS)
             }
 
@@ -720,16 +730,14 @@ beam_ensure_key (por_context* ctx)
 
         // add all the NDS's for the transition for which it is cheapest
         HREassert (ctx->nds_list[0]->count != 0);
-        Printf (debug, "Adding NDSs: ");
         for (int t = 0; t < ctx->nds_list[0]->count; t++) {
             int tt = ctx->nds_list[0]->data[t];
             select_group (ctx, tt, true);
         }
         s->has_key = is_visible(ctx, min_group) ? -1 : 1;
-        Warning (debug, "\nKey is %d (forced inclusion of NDSs)", min_group);
+        Warning (debug, "\nBEAM %d now has key: %d (forced inclusion of NDSs)", s->idx, min_group);
 
         beam_search (ctx); // may select a different search context!
-        s = &ctx->search[ctx->search_order[0]];
     }
 }
 
@@ -761,6 +769,7 @@ beam_setup (model_t model, por_context* ctx, int* src)
         ctx->search[i].work_disabled = ctx->ngroups;
         // init score
         ctx->search[i].score = 1;
+        ctx->search[i].disabled_score = 0;
         ctx->search[i].initialized = 0;
 
         int visible = is_visible (ctx, group);
@@ -772,6 +781,7 @@ beam_setup (model_t model, por_context* ctx, int* src)
 
         ctx->search_order[i] = i;
     }
+    ctx->beam_used = -1; // uninitialized
 }
 
 static int

@@ -124,6 +124,7 @@ typedef struct search_context
 
     int             initialized;     // search weight
     int             score;           // search weight
+    int             disabled_score;  // search weight
     int            *nes_score;       // nes score
     int             visibles_selected; // selected number of visible transitions
     int             ve_selected;       // selected number of visible and enabled transitions
