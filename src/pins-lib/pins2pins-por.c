@@ -316,7 +316,7 @@ select_group (por_context* ctx, int group, bool update_scores)
     search_context_t *s = beam->search[0];
 
     if (s->emit_status[group] & ES_SELECTED) { // already selected
-        Printf (debug, "(%d), ", group);
+        Debugf ("(%d), ", group);
         return;
     }
     s->emit_status[group] |= ES_SELECTED;
@@ -336,7 +336,7 @@ select_group (por_context* ctx, int group, bool update_scores)
         s->score_enabled++;
     }
     s->score_visible += visible;
-    Printf (debug, "%d, ", group);
+    Debugf ("%d, ", group);
 }
 
 static inline void
@@ -351,13 +351,13 @@ select_one_invisible (por_context* ctx)
         int group = ctx->enabled_list->data[i];
         if (!is_visible(ctx, group)) {
             select_group (ctx, group, false);
-            Printf (debug, "Added extra invisible: %d\n", group);
+            Debugf ("Added extra invisible: %d\n", group);
             if (POR_WEAK && s->has_key == -1) { // make it a key as well
                 for (int g = 0; g < ctx->not_accords[group]->count; g++) {
                     int gg = ctx->not_accords[group]->data[g];
                     select_group (ctx, gg, false);
                 }
-                Printf (debug, "Made added invisible also key: %d\n", group);
+                Debugf ("Made added invisible also key: %d\n", group);
             }
             return;
         }
@@ -458,7 +458,7 @@ check_L1_L2_proviso (por_context* ctx)
  * group.
  */
 static inline int
-find_cheapest_ns (por_context* ctx, search_context_t *s, int group)
+find_cheapest_ns (por_context* ctx, search_context_t *s, int group, int *cost)
 {
     int n_guards = ctx->nguards;
     int count = ctx->group_has[group]->count;
@@ -466,7 +466,7 @@ find_cheapest_ns (por_context* ctx, search_context_t *s, int group)
     // for a disabled transition we need to add the necessary set
     // lookup which set has the lowest score on the heuristic function h(x)
     int selected_ns = -1;
-    int selected_score = INT32_MAX;
+    *cost = INT32_MAX;
     int c = RANDOM ? clock() : 0;
     for (int i = 0; i < count; i++) {
         int index = i;
@@ -474,16 +474,16 @@ find_cheapest_ns (por_context* ctx, search_context_t *s, int group)
         int ns = ctx->group_has[group]->data[ index ];
 
         // check the score by the heuristic function h(x)
-        if (NO_HEUR || s->nes_score[ns] < selected_score) {
+        if (NO_HEUR || s->nes_score[ns] < *cost) {
             // check guard status for ns (nes for disabled and nds for enabled):
             if ((ns < n_guards && (ctx->label_status[ns] == 0))  ||
                 (ns >= n_guards && (ctx->label_status[ns-n_guards] != 0)) ) {
 
                 // make this the current best
                 selected_ns = ns;
-                selected_score = s->nes_score[ns];
+                *cost = s->nes_score[ns];
                 // if score is 0 it can't improve, break the loop
-                if (NO_HEUR || selected_score == 0) return selected_ns;
+                if (NO_HEUR || *cost == 0) return selected_ns;
             }
         }
     }
@@ -546,7 +546,7 @@ beam_sort (por_context *ctx)
 
     // didn't move and no more work
     if (beam->search[0] == s && s->work_disabled->count == 0) {
-        Printf (debug, "bailing out, no disabled work\n");
+        Debugf ("bailing out, no disabled work\n");
         HREassert (s->work_enabled->count == 0);
         return false;
     }
@@ -562,18 +562,13 @@ beam_sort (por_context *ctx)
 static inline void
 beam_search (por_context *ctx)
 {
-    // if no search context is used, there are no transitions, nothing to analyze
     if (ctx->enabled_list->count == 0) return;
 
     do {
-        // start searching in multiple contexts
-        // the search order is a sorted array based on the score of the search context
-        // start with the context in search_order[0] = best current score
         beam_t             *beam = (beam_t *) ctx->beam_ctx;
         search_context_t   *s = beam->search[0];
 
-        // init search (expensive)
-        if (!s->initialized) {
+        if (!s->initialized) { // init search (expensive)
             memset(s->emit_status, 0, sizeof(char[ctx->ngroups]));
             if (!NO_HEUR) {
                 memcpy(s->nes_score, ctx->nes_score, sizeof(int[NS_SIZE(ctx)]));
@@ -590,13 +585,16 @@ beam_search (por_context *ctx)
             s->emit_status[group] |= ES_SELECTED | ES_READY;
 
             // Add a NES:
-            Printf (debug, "BEAM-%d investigating group %d (disabled) --> ", s->idx, group);
-            int selected_ns = find_cheapest_ns (ctx, s, group);
-            for (int i = 0; i < ctx->ns[selected_ns]->count; i++) {
-                int group = ctx->ns[selected_ns]->data[i];
-                select_group (ctx, group, true);
+            Debugf ("BEAM-%d investigating group %d (disabled) --> ", s->idx, group);
+            int         cost;
+            int         selected_ns = find_cheapest_ns (ctx, s, group, &cost);
+            if (cost != 0) { // only if cheapest NES has cost
+                for (int i = 0; i < ctx->ns[selected_ns]->count; i++) {
+                    int group = ctx->ns[selected_ns]->data[i];
+                    select_group (ctx, group, true);
+                }
             }
-            Printf (debug, " (ns %d (%s))\n", selected_ns % ctx->nguards,
+            Debugf (" (ns %d (%s))\n", selected_ns % ctx->nguards,
                     selected_ns < ctx->nguards ? "disabled" : "enabled");
         }
 
@@ -609,13 +607,13 @@ beam_search (por_context *ctx)
             // quit the current search when all transitions are included
             if (s->score_enabled >= ctx->enabled_list->count) {
                 s->work_enabled->count = s->work_disabled->count = 0;
-                Printf (debug, " (abandoning BEAM %d |ss|=|en|)\n", s->idx);
+                Debugf (" (abandoning BEAM %d |ss|=|en|)\n", s->idx);
                 break; // enabled loop
             }
 
-            Printf (debug, "BEAM-%d investigating group %d (enabled) --> ", s->idx, group);
+            Debugf ("BEAM-%d investigating group %d (enabled) --> ", s->idx, group);
             beam_add_all_for_enabled (ctx, group, true); // add DNA
-            Printf (debug, "\n");
+            Debugf ("\n");
         }
     } while (beam_sort(ctx));
 }
@@ -743,11 +741,8 @@ static void
 beam_setup (model_t model, por_context* ctx, int* src)
 {
     por_init_transitions (model, ctx, src);
-
     por_transition_costs (ctx);
 
-
-    // select an enabled transition group
     beam_t         *beam = ctx->beam_ctx;
     int             c = RANDOM ? clock() : 0;
     beam->beam_used = ctx->enabled_list->count;
@@ -837,7 +832,8 @@ scc_expand (por_context *ctx, int group)
     scc_context_t *scc = (scc_context_t *)ctx->scc_ctx;
     ci_list *successors;
     if (ctx->group_status[group] & GS_DISABLED) {
-        int ns = find_cheapest_ns (ctx, scc->search, group);
+        int         cost;
+        int         ns = find_cheapest_ns (ctx, scc->search, group, &cost);
         successors = ctx->ns[ns];
     } else if (POR_WEAK) {
         successors = ctx->not_left_accords[group];
