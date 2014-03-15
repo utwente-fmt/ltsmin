@@ -120,6 +120,7 @@ typedef struct por_context {
     ci_list       **group_hasn;     // mapping group to each nes/nds for it
     ci_list       **not_left_accords;
     ci_list       **not_left_accordsn;
+    ci_list       **dna_diff;       // group in dna but not in dns (for finding keys)
 
     int             *group_visibility; // visible groups
     int             *label_visibility; // visible labels
@@ -136,6 +137,8 @@ typedef struct por_context {
     char            *group_status;  // status of the transition groups in the current state
     ci_list         *enabled_list;  // enabled groups
     bms_t           *visible;
+    bms_t           *visible_nes;
+    bms_t           *visible_nds;
     int              visible_enabled;// number of enabled visible transitions
     int              visible_nes_enabled;// number of enabled visible transitions
     int              visible_nds_enabled;// number of enabled visible transitions
