@@ -29,6 +29,7 @@
 
 #define LTSMIN_MATRIX_ACTIONS_READS     "dm_actions_reads"
 #define LTSMIN_MUST_DISABLE_MATRIX      "dm_must_disable"
+#define LTSMIN_MUST_ENABLE_MATRIX       "dm_must_enable"
 
 /**
  * Types

@@ -16,7 +16,6 @@
 #include <util-lib/dfs-stack.h>
 #include <util-lib/util.h>
 
-int POR_WEAK = 0; //extern
 
 static int NO_COMMUTES = 0;
 static int NO_HEUR = 0;
@@ -34,8 +33,25 @@ static int NO_L12 = 0;
 static int PREFER_NDS = 0;
 static int RANDOM = 0;
 static const char *algorithm = "heur";
+static const char *weak = "no";
 
 static int SAFETY = 0;
+
+typedef enum {
+    WEAK_NONE = 0,
+    WEAK_HANSEN,
+    WEAK_VALMARI
+} por_weak_t;
+
+static si_map_entry por_weak[]={
+    {"no",      WEAK_NONE},
+    {"",        WEAK_NONE},
+    {"hansen",  WEAK_HANSEN},
+    {"valmari", WEAK_VALMARI},
+    {NULL, 0}
+};
+
+int POR_WEAK = 0; //extern
 
 typedef enum {
     POR_NONE,
@@ -66,16 +82,29 @@ por_popt (poptContext con, enum poptCallbackReason reason,
     case POPT_CALLBACK_REASON_PRE: break;
     case POPT_CALLBACK_REASON_POST: break;
     case POPT_CALLBACK_REASON_OPTION:
-        if (opt->shortName != 'p') return;
-        if (arg == NULL) arg = "";
-        int num = linear_search (por_algorithm, arg);
-        if (num < 0) {
-            Warning (error, "unknown POR algorithm %s", arg);
-            HREprintUsage();
-            HREexit(LTSMIN_EXIT_FAILURE);
+        if (opt->shortName == 'p') {
+            if (arg == NULL) arg = "";
+            int num = linear_search (por_algorithm, arg);
+            if (num < 0) {
+                Warning (error, "unknown POR algorithm %s", arg);
+                HREprintUsage();
+                HREexit(LTSMIN_EXIT_FAILURE);
+            }
+            if ((alg = num) != POR_NONE)
+                PINS_POR = PINS_POR_ON;
+            return;
+        } else if (opt->shortName == -1) {
+            if (arg == NULL) arg = "";
+            int num = linear_search (por_weak, arg);
+            if (num < 0) {
+                Warning (error, "unknown weak setting %s", arg);
+                HREprintUsage();
+                HREexit(LTSMIN_EXIT_FAILURE);
+            } else {
+                POR_WEAK = num;
+            }
+            return;
         }
-        if ((alg = num) != POR_NONE)
-            PINS_POR = PINS_POR_ON;
         return;
     }
     Abort("unexpected call to por_popt");
@@ -104,7 +133,7 @@ struct poptOption por_options[]={
     { "no-L12" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_L12 , 1 , "without L1/L2 proviso, instead use Peled's cycle proviso, or L2'   " , NULL },
     { "prefer-nds" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &PREFER_NDS , 1 , "prefer MC+NDS over NES" , NULL },
     { "por-random" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &RANDOM , 1 , "randomize enabled and NES selection" , NULL },
-    { "weak" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &POR_WEAK , 1 , "Weak stubborn set theory" , NULL },
+    { "weak" , -1, POPT_ARG_STRING  | POPT_ARGFLAG_OPTIONAL | POPT_ARGFLAG_DOC_HIDDEN , &POR_WEAK , 0 , "Weak stubborn set theory" , NULL },
     POPT_TABLEEND
 };
 
@@ -217,7 +246,6 @@ por_init_transitions (model_t model, por_context *ctx, int *src)
         }
     }
 }
-
 
 typedef enum {
     ES_SELECTED     = 0x01,
@@ -429,7 +457,6 @@ beam_cheapest_ns (por_context* ctx, search_context_t *s, int group, int *cost)
             if (NO_HEUR || *cost == 0) return selected_ns; // can't improve
         }
     }
-    HREassert (selected_ns != -1, "No NES found for group %d", group);
     return selected_ns;
 }
 
@@ -443,6 +470,18 @@ select_all (por_context* ctx, search_context_t *s, ci_list *list,
         added_new |= select_group (ctx, s, group, update_scores);
     }
     return added_new;
+}
+
+static inline int
+beam_is_key (por_context *ctx, search_context_t *s, int group, int max_score)
+{
+    int                 score = 0;
+    for (int t = 0; t < ctx->dna_diff[group]->count && score < max_score; t++) {
+        int tt = ctx->dna_diff[group]->data[t];
+        int fresh = (s->emit_status[tt] & ES_SELECTED) == 0;
+        score += fresh ? ctx->group_score[tt] : 0;
+    }
+    return score;
 }
 
 static void
@@ -478,6 +517,23 @@ beam_add_all_for_enabled (por_context *ctx, search_context_t *s, int group,
     for (int j = 0; j < accords[group]->count; j++) {
         int dependent_group = accords[group]->data[j];
         select_group (ctx, s, dependent_group, update_scores);
+    }
+
+    if (POR_WEAK == WEAK_VALMARI) {
+        int         cost_ndss = beam_is_key (ctx, s, group, INT32_MAX);
+        int         cost_nes  = INT32_MAX;
+        int         selected_ns = -1;
+        if (cost_ndss != 0)
+            selected_ns = beam_cheapest_ns (ctx, s, group, &cost_nes); //maybe -1
+        if (cost_ndss <= cost_nes) {
+            if (s->has_key == KEY_VISIBLE || s->has_key == KEY_ANY)
+                s->has_key = !is_visible(ctx, group) ? KEY_INVISIBLE : KEY_VISIBLE;
+            if (cost_ndss > 0) {
+                select_all (ctx, s, ctx->dna_diff[group], true);
+            }
+        } else if (cost_nes > 0){
+            select_all (ctx, s, ctx->ns[selected_ns], true);
+        }
     }
 }
 
@@ -552,11 +608,9 @@ beam_search (por_context *ctx)
             Debugf ("BEAM-%d investigating group %d (disabled) --> ", s->idx, group);
             int         cost;
             int         selected_ns = beam_cheapest_ns (ctx, s, group, &cost);
+            HREassert (selected_ns != -1, "No NES found for group %d", group);
             if (cost != 0) { // only if cheapest NES has cost
-                for (int i = 0; i < ctx->ns[selected_ns]->count; i++) {
-                    int group = ctx->ns[selected_ns]->data[i];
-                    select_group (ctx, s, group, true);
-                }
+                select_all (ctx, s, ctx->ns[selected_ns], true);
             }
             Debugf (" (ns %d (%s))\n", selected_ns % ctx->nguards,
                     selected_ns < ctx->nguards ? "disabled" : "enabled");
@@ -680,28 +734,6 @@ beam_emit (por_context* ctx, int* src, TransitionCB cb, void* uctx)
     return emitted;
 }
 
-
-static inline int
-beam_make_key (por_context* ctx, search_context_t *s, int group)
-{
-    for (int j = 0; j < ctx->dna_diff[group]->count; j++) {
-        int dependent_group = ctx->dna_diff[group]->data[j];
-        select_group (ctx, s, dependent_group, true);
-    }
-}
-
-static inline int
-beam_is_key (por_context* ctx, search_context_t *s, int group, int max_score)
-{
-    int                 score = 0;
-    for (int t = 0; t < ctx->dna_diff[group]->count && score < max_score; t++) {
-        int tt = ctx->dna_diff[group]->data[t];
-        int fresh = (s->emit_status[tt] & ES_SELECTED) == 0;
-        score += fresh ? ctx->group_score[tt] : 0;
-    }
-    return score;
-}
-
 static inline int
 beam_min_key_group (por_context* ctx, search_context_t *s, bool invisible)
 {
@@ -773,7 +805,7 @@ beam_ensure_invisible_and_key (por_context* ctx)
             select_group (ctx, s, i_group, true);
             if (POR_WEAK) { // make it also key
                 s->emit_status[i_group] |= ES_SELECTED | ES_READY;
-                beam_make_key (ctx, s, i_group);
+                select_all (ctx, s, ctx->dna_diff[i_group], true);
             }
             s->has_key = KEY_INVISIBLE;
         } else if (POR_WEAK) {
@@ -786,7 +818,7 @@ beam_ensure_invisible_and_key (por_context* ctx)
                 s->has_key = KEY_VISIBLE;
             }
             if (key_group != -1) {
-                beam_make_key (ctx, s, key_group);
+                select_all (ctx, s, ctx->dna_diff[key_group], true);
             }
         } else {
             s->has_key = KEY_ANY;
@@ -1435,7 +1467,8 @@ deletion_delete (por_context* ctx, int *del_nes, int *del_nds)
 
             for (int i = 0; i < ctx->group_hasn[ns]->count; i++) {
                 int x = ctx->group_hasn[ns]->data[i];
-                if (!del_enabled(ctx,x)) {
+                if (!del_enabled(ctx,x) ||
+                        (POR_WEAK==WEAK_VALMARI && !bms_has(del,DEL_K,x))) {
                     delctx->group_score[x]--;
                     HREassert (delctx->group_score[x] >= 0, "Wrong counting!");
                     if (delctx->group_score[x] == 0 && bms_has(del,DEL_N,x)) {
@@ -1944,6 +1977,13 @@ GBaddPOR (model_t model)
             Print1 (info, "No must-disable matrix available for weak sets.");
             NO_MDS = 1;
         }
+        matrix_t *must_enable = NULL;
+        id = GBgetMatrixID(model, LTSMIN_MUST_ENABLE_MATRIX);
+        if (id != SI_INDEX_FAILED) {
+            must_enable = GBgetMatrix(model, id);
+        } else if (POR_WEAK == 2) {
+            Print1 (info, "No must-enable matrix available for Valmari's weak sets.");
+        }
 
         matrix_t not_left_accords;
         dm_create(&not_left_accords, ctx->ngroups, ctx->ngroups);
@@ -1955,9 +1995,19 @@ GBaddPOR (model_t model)
                     continue;
                 }
 
-                if (guard_of(ctx, i, &ctx->label_nes_matrix, j) || dm_is_set(&nds, j, i)) {
-                    dm_set( &not_left_accords, i, j );
-                    continue;
+                if (POR_WEAK == WEAK_VALMARI) {
+                    if (must_enable!= NULL && guard_of(ctx, i, must_enable, j)) {
+                        continue;
+                    }
+
+                    if ( !NO_MC && dm_is_set(&ctx->nce, i , j) ) {
+                        continue; // transitions never coenabled!
+                    }
+                } else {
+                    if (guard_of(ctx, i, &ctx->label_nes_matrix, j) || dm_is_set(&nds, j, i)) {
+                        dm_set( &not_left_accords, i, j );
+                        continue;
+                    }
                 }
 
                 if (NO_COMMUTES) {
@@ -1978,6 +2028,18 @@ GBaddPOR (model_t model)
         }
         ctx->not_left_accords = (ci_list **) dm_rows_to_idx_table(&not_left_accords);
         ctx->not_left_accordsn= (ci_list **) dm_cols_to_idx_table(&not_left_accords);
+
+        matrix_t dna_diff;
+        dm_create(&dna_diff, ctx->ngroups, ctx->ngroups);
+        for (int i = 0; i < ctx->ngroups; i++) {
+            for (int j = 0; j < ctx->ngroups; j++) {
+                if ( dm_is_set(&ctx->not_accords_with, i , j) &&
+                    !dm_is_set(&not_left_accords, i , j) ) {
+                    dm_set (&dna_diff, i, j);
+                }
+            }
+        }
+        ctx->dna_diff = (ci_list **) dm_rows_to_idx_table(&dna_diff);
     }
 
     // free temporary matrices
