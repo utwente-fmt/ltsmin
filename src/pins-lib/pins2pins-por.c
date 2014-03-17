@@ -45,7 +45,7 @@ typedef enum {
 
 static si_map_entry por_weak[]={
     {"no",      WEAK_NONE},
-    {"",        WEAK_NONE},
+    {"",        WEAK_HANSEN},
     {"hansen",  WEAK_HANSEN},
     {"valmari", WEAK_VALMARI},
     {NULL, 0}
@@ -133,7 +133,7 @@ struct poptOption por_options[]={
     { "no-L12" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_L12 , 1 , "without L1/L2 proviso, instead use Peled's cycle proviso, or L2'   " , NULL },
     { "prefer-nds" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &PREFER_NDS , 1 , "prefer MC+NDS over NES" , NULL },
     { "por-random" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &RANDOM , 1 , "randomize enabled and NES selection" , NULL },
-    { "weak" , -1, POPT_ARG_STRING  | POPT_ARGFLAG_OPTIONAL | POPT_ARGFLAG_DOC_HIDDEN , &POR_WEAK , 0 , "Weak stubborn set theory" , NULL },
+    { "weak" , -1, POPT_ARG_STRING  | POPT_ARGFLAG_OPTIONAL | POPT_ARGFLAG_DOC_HIDDEN , &weak , 0 , "Weak stubborn set theory" , NULL },
     POPT_TABLEEND
 };
 
@@ -844,6 +844,15 @@ beam_ensure_invisible_and_key (por_context* ctx)
     Debug (">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>");
 }
 
+static int
+score_cmp (const void *a, const void *b, void *arg)
+{
+    por_context        *ctx = (por_context *) arg;
+    search_context_t *A = ((search_context_t *)a);
+    search_context_t *B = ((search_context_t *)b);
+    return ctx->group_score[A->group] - ctx->group_score[B->group];
+}
+
 /**
  * For each state, this function sets up the current guard values etc
  * This setup is then reused by the analysis function
@@ -882,6 +891,9 @@ beam_setup (model_t model, por_context* ctx, int* src)
         search->score_vis_en = visible;
         search->idx = i;
         search->group = group;
+    }
+    if (SAFETY || PINS_LTL) {
+        qsortr (beam->search, beam->beam_used, sizeof(void *), score_cmp, ctx);
     }
 }
 
