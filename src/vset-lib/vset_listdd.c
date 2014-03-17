@@ -1070,6 +1070,7 @@ mdd_next(uint32_t p_id, uint32_t set, uint32_t rel, int idx, int *proj, int len)
     }
     uint32_t op=OP_NEXT|(p_id<<16);
     uint32_t slot_hash=hash(op,set,rel);
+    uint32_t old_rel=rel;
     uint32_t slot=slot_hash%cache_size;
     if (op_cache[slot].op==op && op_cache[slot].arg1==set
         && op_cache[slot].res.other.arg2==rel) {
@@ -1099,7 +1100,7 @@ mdd_next(uint32_t p_id, uint32_t set, uint32_t rel, int idx, int *proj, int len)
     slot=slot_hash%cache_size;
     op_cache[slot].op=op;
     op_cache[slot].arg1=set;
-    op_cache[slot].res.other.arg2=rel;
+    op_cache[slot].res.other.arg2=old_rel;
     op_cache[slot].res.other.res=res;
     return res;
 }
