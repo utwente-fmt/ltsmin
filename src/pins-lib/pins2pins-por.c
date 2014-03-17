@@ -241,10 +241,13 @@ por_init_transitions (model_t model, por_context *ctx, int *src)
         if (ctx->group_status[i] == GS_ENABLED) {
             ctx->enabled_list->data[ctx->enabled_list->count++] = i;
             ctx->visible_enabled += is_visible (ctx, i);
-            ctx->visible_nes_enabled += ctx->visible->set[i] & (1 << VISIBLE_NES);
-            ctx->visible_nds_enabled += ctx->visible->set[i] & (1 << VISIBLE_NDS);
+            char vis = ctx->visible->set[i];
+            ctx->visible_nes_enabled += (vis & (1 << VISIBLE_NES)) != 0;
+            ctx->visible_nds_enabled += (vis & (1 << VISIBLE_NDS)) != 0;
         }
     }
+    Debug ("Visible %d, +enabled %d/%d (NES: %d, NDS: %d)", bms_count(ctx->visible,VISIBLE),
+           ctx->visible_enabled, ctx->enabled_list->count, ctx->visible_nes_enabled, ctx->visible_nds_enabled);
 }
 
 typedef enum {
@@ -286,9 +289,9 @@ static inline void
 incr_ns_update (por_context *ctx, int group, int new_group_score)
 {
     int oldgroup_score = ctx->group_score[group];
-    ctx->group_score[group] = new_group_score;
     if (oldgroup_score == new_group_score) return;
 
+    ctx->group_score[group] = new_group_score;
     for (int i = 0; i < ctx->group2ns[group]->count; i++) {
         int ns = ctx->group2ns[group]->data[i];
         ctx->nes_score[ns] += new_group_score - oldgroup_score;
@@ -311,10 +314,12 @@ por_transition_costs (por_context *ctx)
                 if (NO_V) {
                     new_score = ctx->enabled_list->count * ctx->ngroups;
                 } else {
-                    if (NO_DYN_VIS || (vis & ((1 << VISIBLE_NES) | (1 << VISIBLE_NDS)))) {
+                    bool nes = vis & (1 << VISIBLE_NES);
+                    bool nds = vis & (1 << VISIBLE_NDS);
+                    if (NO_DYN_VIS || (nes && nds)) {
                         new_score = ctx->visible_enabled * ctx->ngroups +
                                 bms_count(ctx->visible, VISIBLE) - ctx->visible_enabled;
-                    } else if (vis & (1 << VISIBLE_NES)) {
+                    } else if (nes) {
                         new_score = ctx->visible_nds_enabled * ctx->ngroups +
                                 bms_count(ctx->visible, VISIBLE_NDS) - ctx->visible_nds_enabled;
                     } else { // VISIBLE_NDS:
@@ -783,7 +788,9 @@ beam_min_invisible_group (por_context* ctx, search_context_t *s)
 static inline void
 beam_ensure_invisible_and_key (por_context* ctx)
 {
-    Debug ( "ADDING KEY <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<" );
+    if (!POR_WEAK && !(SAFETY || PINS_LTL)) return;
+
+    Debug ("ADDING KEY <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<");
     beam_t             *beam = (beam_t *) ctx->beam_ctx;
     while (true) {
         search_context_t   *s = beam->search[0];
@@ -791,13 +798,18 @@ beam_ensure_invisible_and_key (por_context* ctx)
             Debug ("BEAM %d needs no (invisible) key", s->idx);
             break;
         }
-        if (s->has_key != KEY_NONE) {
+
+        bool need_invisible = (SAFETY || PINS_LTL) &&
+                                 ctx->visible_enabled != ctx->enabled_list->count;
+        if (need_invisible && s->has_key == KEY_INVISIBLE) {
+            Debug ("BEAM %d has invisible key", s->idx);
+            break;
+        }
+        if (!need_invisible && s->has_key != KEY_NONE) {
             Debug ("BEAM %d has key (%s)", s->idx, keyNames[s->has_key]);
             break;
         }
 
-        bool need_invisible = (SAFETY || PINS_LTL) &&
-                                 ctx->visible_enabled != ctx->enabled_list->count;
         bool has_invisible = s->score_vis_en != s->enabled->count;
         if (need_invisible && !has_invisible) {
             int i_group = beam_min_invisible_group (ctx, s);
@@ -822,6 +834,7 @@ beam_ensure_invisible_and_key (por_context* ctx)
             }
         } else {
             s->has_key = KEY_ANY;
+            Debug ("BEAM %d invisible already included", s->idx);
             break;
         }
 
