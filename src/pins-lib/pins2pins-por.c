@@ -491,7 +491,7 @@ beam_add_all_for_enabled (por_context *ctx, search_context_t *s, int group,
     // V proviso only for LTL
     if ((PINS_LTL || SAFETY) && is_visible(ctx, group)) {
         if (NO_V) { // Use Peled's stronger visibility proviso:
-            s->enabled->count = ctx->ngroups; // selects all groups in this search context
+            s->enabled->count = ctx->enabled_list->count; // selects all enabled
             return;
         } else if (NO_DYN_VIS) {
             select_all (ctx, s, ctx->visible->lists[VISIBLE], update_scores);
@@ -565,7 +565,7 @@ beam_sort (por_context *ctx)
 
     // didn't move and no more work
     if (beam->search[0] == s && s->work_disabled->count == 0 && s->work_enabled->count == 0) {
-        Debugf ("bailing out, no more work\n");
+        Debugf ("bailing out, no more work (selected: %d)\n", s->enabled->count);
         return false;
     }
     return true;
@@ -580,11 +580,10 @@ beam_sort (por_context *ctx)
 static inline void
 beam_search (por_context *ctx)
 {
-    if (ctx->enabled_list->count == 0) return;
+    if (ctx->enabled_list->count <= 1) return;
     beam_t             *beam = (beam_t *) ctx->beam_ctx;
 
-
-    Debug ("BEAM search (re)started");
+    Debug ("BEAM search (re)started (enabled: %d)", ctx->enabled_list->count);
     do {
         search_context_t   *s = beam->search[0];
 
@@ -625,7 +624,7 @@ beam_search (por_context *ctx)
             // quit the current search when all transitions are included
             if (s->enabled->count >= ctx->enabled_list->count) {
                 s->work_enabled->count = s->work_disabled->count = 0;
-                Debugf (" (abandoning BEAM %d |ss|=|en|)\n", s->idx);
+                Debugf (" (abandoning BEAM %d |ss|=|en|=%d)\n", s->idx, ctx->enabled_list->count);
                 break; // enabled loop
             }
 
@@ -784,16 +783,17 @@ beam_min_invisible_group (por_context* ctx, search_context_t *s)
 static inline void
 beam_ensure_invisible_and_key (por_context* ctx)
 {
+    Debug ( "ADDING KEY <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<" );
     beam_t             *beam = (beam_t *) ctx->beam_ctx;
     while (true) {
         search_context_t   *s = beam->search[0];
-        if (s->enabled->count >= ctx->enabled_list->count) {
+        if (s->enabled->count == ctx->enabled_list->count) {
             Debug ("BEAM %d needs no (invisible) key", s->idx);
-            return;
+            break;
         }
         if (s->has_key != KEY_NONE) {
             Debug ("BEAM %d has key (%s)", s->idx, keyNames[s->has_key]);
-            return;
+            break;
         }
 
         bool need_invisible = (SAFETY || PINS_LTL) &&
@@ -813,7 +813,7 @@ beam_ensure_invisible_and_key (por_context* ctx)
             if (need_invisible && has_invisible) {
                 key_group = beam_min_key_group (ctx, s, true);
                 s->has_key = KEY_INVISIBLE;
-            } else {
+            } else { // only visible available:
                 key_group = beam_min_key_group (ctx, s, false);
                 s->has_key = KEY_VISIBLE;
             }
@@ -822,12 +822,13 @@ beam_ensure_invisible_and_key (por_context* ctx)
             }
         } else {
             s->has_key = KEY_ANY;
-            return;
+            break;
         }
 
         beam_sort (ctx);
         beam_search (ctx); // may switch context
     }
+    Debug (">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>");
 }
 
 /**
@@ -1587,8 +1588,9 @@ deletion_emit (model_t model, por_context *ctx, int *src, TransitionCB cb,
         if (NO_L12) {
             provctx.force_proviso_true = del_all_stubborn(ctx,ctx->enabled_list);
         } else { // Deletion guarantees that I holds, but does V hold?
-            provctx.force_proviso_true = !delctx->del_nds && !delctx->del_nes &&
-                            del_all_stubborn(ctx,ctx->visible->lists[VISIBLE]);
+            provctx.force_proviso_true = !delctx->del_nds && !delctx->del_nes;
+            HREassert (provctx.force_proviso_true ==
+                    del_all_stubborn(ctx,ctx->visible->lists[VISIBLE]));
         }
     }
 
