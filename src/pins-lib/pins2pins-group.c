@@ -40,22 +40,24 @@ static int
 group_long (model_t self, int group, int *newsrc, TransitionCB cb,
             void *user_context)
 {
-    group_context_t     ctx = (group_context_t)GBgetContext (self);
-    model_t             parent = GBgetParent (self);
-    int                 len = ctx->len;
-    int                 oldsrc[len];
-    int                 Ntrans = 0;
-    int                 begin = ctx->transbegin[group];
-    int                 end = ctx->transbegin[group + 1];
-    ctx->cb = cb;
-    ctx->user_context = user_context;
+    struct group_context ctx;
+    group_context_t     _ctx = (group_context_t)GBgetContext (self);
+    memcpy(&ctx, _ctx, sizeof(struct group_context));
+    ctx.cb = cb;
+    ctx.user_context = user_context;
 
-    for (int i = 0; i < len; i++)
-        oldsrc[ctx->statemap[i]] = newsrc[i];
+    model_t             parent = GBgetParent (self);
+    int                 oldsrc[ctx.len];
+    int                 Ntrans = 0;
+    int                 begin = ctx.transbegin[group];
+    int                 end = ctx.transbegin[group + 1];
+
+    for (int i = 0; i < ctx.len; i++)
+        oldsrc[ctx.statemap[i]] = newsrc[i];
 
     for (int j = begin; j < end; j++) {
-        int                 g = ctx->transmap[j];
-        Ntrans += GBgetTransitionsLong (parent, g, oldsrc, group_cb, ctx);
+        int                 g = ctx.transmap[j];
+        Ntrans += GBgetTransitionsLong (parent, g, oldsrc, group_cb, &ctx);
     }
 
     return Ntrans;
