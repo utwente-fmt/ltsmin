@@ -91,7 +91,7 @@ static char*            label_filter=NULL;
 static char*            trc_output=NULL;
 static char*            cost=NULL;
 static int              inhibit=0;
-static int              representatives=0;
+static int              representatives=1;
 
 static  struct poptOption options[] = {
     { "filter" , 0 , POPT_ARG_STRING , &label_filter , 0 ,
@@ -108,7 +108,7 @@ static  struct poptOption options[] = {
     SPEC_POPT_OPTIONS,
     {"trace", 0, POPT_ARG_STRING, &trc_output, 0, "file to write trace to", "<lts file>" },
     {"inhibit", 0, POPT_ARG_VAL, &inhibit, 1, "Obey the inhibit matrix if the model defines it.", NULL },
-    {"representatives", 0, POPT_ARG_VAL, &representatives, 1, "Compute reporesentatives if the model defines a confluence matrix.", NULL },
+    {"no-representatives", 0, POPT_ARG_VAL, &representatives, 0, "Do not compute representatives if the model defines a confluence matrix.", NULL },
     { NULL, 0, POPT_ARG_INCLUDE_TABLE, greybox_options, 0, "PINS options", NULL },
     POPT_TABLEEND
 };
