@@ -255,26 +255,28 @@ static int label_actions(char*edge_class){
     return SIlookup(reach_actions,edge_class)>=0;
 }
 
-static int check_goal(model_t self,int label,int*src){
-    (void)label;
+static void get_state_labels(model_t self,int*src,int *label){
     prcrl_context_t ctx=GBgetContext(self);
 
-    uint32_t reward[2];
-    prcrl_get_state_reward(ctx->spec,src,reward);
-    Warning(info,"state reward %u/%u",reward[0],reward[1]);
-
+    if (enable_rewards){
+        prcrl_get_state_reward(ctx->spec,src,label+1);
+        Warning(info,"state reward %u/%u",label[1],label[2]);
+    } else {
+        label[1]=0;
+        label[2]=1;
+    }
+    
     matrix_t *dm_reach=&ctx->reach_info;
     int N=dm_ncols(dm_reach);
+    label[0]=0;
     for (int i=0;i<N;i++){
       if (dm_is_set(dm_reach,0,i)){
         if (GBgetTransitionsLong(ctx->cached,i,src,discard_callback,NULL)){
-            // A reach transition is enabled, goal is true.
-            return 1;
+            label[0]=1;
+            break;
         }
       }
     }
-    // No reach transition is enabled, goal is false.
-    return 0;
 }
 
 void common_load_model(model_t model,const char*name,int mapa){
@@ -316,17 +318,6 @@ void common_load_model(model_t model,const char*name,int mapa){
     lts_type_put_type(ltstype,"nat",LTStypeDirect,NULL);
     lts_type_put_type(ltstype,"pos",LTStypeDirect,NULL);
 
-/*  old type that cannot handle rewards.
-    lts_type_set_edge_label_count(ltstype,4);
-    lts_type_set_edge_label_name(ltstype,0,LTSMIN_EDGE_TYPE_ACTION_PREFIX);
-    lts_type_set_edge_label_type(ltstype,0,LTSMIN_EDGE_TYPE_ACTION_PREFIX);
-    lts_type_set_edge_label_name(ltstype,1,"group");
-    lts_type_set_edge_label_type(ltstype,1,"nat");
-    lts_type_set_edge_label_name(ltstype,2,"numerator");
-    lts_type_set_edge_label_type(ltstype,2,"nat");
-    lts_type_set_edge_label_name(ltstype,3,"denominator");
-    lts_type_set_edge_label_type(ltstype,3,"pos");
-*/
     int class_type;
     lts_type_set_edge_label_count(ltstype,6);
     lts_type_set_edge_label_name(ltstype,0,"reward_numerator");
@@ -344,9 +335,21 @@ void common_load_model(model_t model,const char*name,int mapa){
     
     dm_create(&context->class_matrix,3,nSmds);
 
+    lts_type_set_state_label_count(ltstype,3);
+    lts_type_set_state_label_name(ltstype,0,"goal");
+    lts_type_set_state_label_type(ltstype,0,"Bool");
+    lts_type_set_state_label_name(ltstype,1,"state_reward_numerator");
+    lts_type_set_state_label_type(ltstype,1,"nat");
+    lts_type_set_state_label_name(ltstype,2,"state_reward_denominator");
+    lts_type_set_state_label_type(ltstype,2,"pos");
+
     int reach_smds=0;
     static matrix_t sl_info;
-    dm_create(&sl_info, 1, state_length);
+    dm_create(&sl_info, 3, state_length);
+    for(int i=0;i<state_length;i++){
+        dm_set(&sl_info, 1, i);
+        dm_set(&sl_info, 2, i);
+    }
     dm_create(&context->reach_info, 1, nSmds);
     static matrix_t conf_info;
     if(check_confluence){
@@ -379,7 +382,8 @@ void common_load_model(model_t model,const char*name,int mapa){
             dm_set(&context->class_matrix,2,i);
             // rate steps do not make a tau step non-confluent
         } else {
-            if (strcmp(action,"reachConditionAction")!=0) {
+            if (strcmp(action,"reachConditionAction")!=0 &&
+                strcmp(action,"stateRewardAction")!=0) {
                 dm_set(&context->class_matrix,1,i);
                 if(check_confluence){ // other steps make tau steps non-confluent
                     dm_set(&conf_info,2,i);
@@ -435,22 +439,20 @@ void common_load_model(model_t model,const char*name,int mapa){
     GBsetNextStateLong(raw_model,PRCRLgetTransitionsLong);
     context->cached=GBaddCache(raw_model);
 
-    if (reach_smds>0){
-        Warning(info,"adding goal state label");
-        lts_type_set_state_label_count(ltstype,1);
-        lts_type_set_state_label_name(ltstype,0,"goal");
-        lts_type_set_state_label_type(ltstype,0,"Bool");
-        GBsetStateLabelInfo(model, &sl_info);
-        GBsetStateLabelLong(model,check_goal);
-    }
-
+    GBsetStateLabelsAll(model,get_state_labels);
+    
     if (enable_rewards){
-        if (nRewards>0) {
-            Warning(info,"Ignoring state rewards.");
+        if (reach_smds>0){
+            GBsetDefaultFilter(model,SSMcreateSWPset("*_numerator;*_denominator;goal;action;group;numerator;denominator"));
+        } else {
+            GBsetDefaultFilter(model,SSMcreateSWPset("*_numerator;*_denominator;action;group;numerator;denominator"));
         }
-        GBsetDefaultFilter(model,SSMcreateSWPset("reward_numerator;reward_denominator;goal;action;group;numerator;denominator"));
     } else {
-        GBsetDefaultFilter(model,SSMcreateSWPset("goal;action;group;numerator;denominator"));
+        if (reach_smds>0){
+            GBsetDefaultFilter(model,SSMcreateSWPset("goal;action;group;numerator;denominator"));
+        } else {
+            GBsetDefaultFilter(model,SSMcreateSWPset("action;group;numerator;denominator"));
+        }
     }
 
     if(check_confluence){
