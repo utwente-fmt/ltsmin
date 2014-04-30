@@ -169,18 +169,18 @@ void
 global_print_stats (model_t model, size_t local_state_infos, size_t stack)
 {
     // Print memory statistics
-    double              memQ, pagesDB, memC, memDB, compr, fill, leafs;
+    double              memQ, pagesDB, memC, memDB, memDBB, memT, memTB, compr,
+                        fill, leaves, el_size;
     size_t              db_elts = global->stats.elts;
     size_t              db_nodes = global->stats.nodes;
-    db_nodes = db_nodes == 0 ? db_elts : db_nodes;
-    double              el_size =
-       db_type & Tree ? (db_type==ClearyTree?1:2) + (2.0 / (1UL<<ratio)) : D+.5;
     size_t              local_bits = state_store_local_bits (global->store);
 
-    pagesDB = ((double)(1UL << (dbs_size)) / (1<<20)) * SLOT_SIZE * el_size;
+    db_nodes = db_nodes == 0 ? db_elts : db_nodes;
+    el_size = db_type & Tree ? (db_type == ClearyTree ? 1 : 2) : D + .5;
+    pagesDB = ((double)(1UL << dbs_size) * SLOT_SIZE * el_size) / (1UL<<20);
     memC = ((double)(((((size_t)local_bits)<<dbs_size))/8*W)) / (1UL<<20);
-    double memBytes = db_nodes * SLOT_SIZE * el_size;
-    memDB = memBytes / (1 << 20);
+    memDBB = db_elts * SLOT_SIZE * (D + .5); // D slots + 16bit memoized hash
+    memDB = memDBB / (1UL<<20);
     fill = (double)((db_elts * 100) / (1UL << dbs_size));
 
     // print additional local queue/stack memory statistics
@@ -190,11 +190,19 @@ global_print_stats (model_t model, size_t local_state_infos, size_t stack)
              stack, local_state_infos, memQ);
 
     if (db_type & Tree) {
-        compr = (double)(db_nodes * el_size) / ((D+1) * db_elts) * 100;
-        leafs = (double)(((db_nodes - db_elts) * 100) / (1UL << (dbs_size-ratio)));
+        size_t          db_leaves = db_nodes - db_elts;
+        memTB = db_elts * SLOT_SIZE * (db_type == ClearyTree ? 1 : 2);
+        memTB += db_leaves * SLOT_SIZE * 2.0;
+        memT = memTB / (1UL<<20);
+        compr = (memTB / memDBB) * 100;
+
         Warning (info, "Tree memory: %.1fMB, %.1f B/state, compr.: %.1f%%",
-                 memDB, memBytes/db_elts, compr);
-        Warning (info, "Tree fill ratio (roots/leafs): %.1f%%/%.1f%%", fill, leafs);
+                 memT, memTB / db_elts, compr);
+        leaves = (double)((db_leaves * 100) / (1UL << (dbs_size - ratio)));
+        Warning (info, "Tree fill ratio (roots/leafs): %.1f%%/%.1f%%", fill, leaves);
+
+        memDB = memT;
+
     } else {
         Warning (info, "Table memory: %.1fMB, fill ratio: %.1f%%", memDB, fill);
     }
