@@ -238,7 +238,7 @@ static void mdd64_collect(uint64_t a,uint64_t b){
         Warning(debug,"insufficient free nodes, resizing");
         resize=1;
         new_cache_size=fib(nodes_fib+cache_fib);
-        new_cache=RTmalloc(new_cache_size*sizeof(struct op_rec));
+        new_cache=RTalign(CACHE_LINE_SIZE,new_cache_size*sizeof(struct op_rec));
         for(uint64_t i=0;i<new_cache_size;i++){
             new_cache[i].op=0;
         }
@@ -1555,7 +1555,7 @@ vdom_t vdom_create_list64_native(int n){
 
         unique_table=RTmalloc(uniq_size*sizeof(uint64_t));
         node_table=RTmalloc(mdd_nodes*sizeof(struct mdd_node));
-        op_cache=RTmalloc(cache_size*sizeof(struct op_rec));
+        op_cache=RTalign(CACHE_LINE_SIZE,cache_size*sizeof(struct op_rec));
 
         for(uint64_t i=0;i<uniq_size;i++){
             unique_table[i]=0;
