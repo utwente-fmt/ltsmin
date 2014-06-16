@@ -5,8 +5,10 @@
 #include <math.h>
 #include <stdarg.h>
 #include <stdlib.h>
+#include <alloca.h>
 
 #include <hre/user.h>
+#include <hre-io/user.h>
 #include <vset-lib/vdom_object.h>
 #include <sylvan.h>
 
@@ -28,9 +30,9 @@ ltsmin_sylvan_init()
     }
 }
 
-struct poptOption sylvan_options[]= {
-  { "sylvan-threads",0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &threads , 0 , "set number of threads for parallelization","<threads>"},
-  { "sylvan-dqsize",0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &dqsize , 0 , "set length of task queue","<dqsize>"},
+struct poptOption sylvan_options[] = {
+    { "sylvan-threads",0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &threads , 0 , "set number of threads for parallelization","<threads>"},
+    { "sylvan-dqsize",0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &dqsize , 0 , "set length of task queue","<dqsize>"},
     { "sylvan-bits",0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &fddbits, 0, "set number of bits per integer in the state vector","<bits>"},
     { "sylvan-tablesize",0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &datasize , 0 , "set size of BDD table to 1<<datasize","<datasize>"},
     { "sylvan-cachesize",0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &cachesize , 0 , "set size of memoization cache to 1<<cachesize","<cachesize>"},
@@ -41,6 +43,14 @@ struct poptOption sylvan_options[]= {
 struct vector_domain
 {
     struct vector_domain_shared shared;
+    BDDVAR *vec_to_bddvar;      // Translation of bit to BDDVAR for X
+    BDDVAR *prime_vec_to_bddvar;// Translation of bit to BDDVAR for X'
+
+    size_t bits_per_integer;
+
+    // Generated based on vec_to_bddvar and prime_vec_to_bddvar
+    BDD universe;               // Every BDDVAR used for X
+    BDD prime_universe;         // Every BDDVAR used for X'
 };
 
 struct vector_set
@@ -48,10 +58,12 @@ struct vector_set
     vdom_t dom;
 
     BDD bdd;                    // Represented BDD
+    size_t vector_size;         // How long is the vector in integers
+    BDDVAR *vec_to_bddvar;      // Translation of bit to BDDVAR
+
+    // Generated based on vec_to_bddvar and vector_size
     BDD projection;             // Universe \ X (for projection)
-    BDD variables_set;          // X (for satcount etc)
-    BDDVAR *variables_arr;      // for enum and other purposes
-    int variables_size; 
+    BDD variables;              // X (for satcount etc)
 };
 
 struct vector_relation
@@ -61,13 +73,14 @@ struct vector_relation
     void *expand_ctx;
 
     BDD bdd;                    // Represented BDD
-    BDD projection;             // Universe \ (X U X') (for projection)
-    BDD variables_set;          // X U X'
-    BDD variables_prime_set;    // X
-    BDD variables_nonprime_set; // X'
+    size_t vector_size;         // How long is the vector in integers
+    BDDVAR *vec_to_bddvar;      // Translation of bit to BDDVAR for X
+    BDDVAR *prime_vec_to_bddvar;// Translation of bit to BDDVAR for X'
 
-    BDDVAR *variables_arr;      // for enum and other internal purposes
-    int variables_size; 
+    // Generated based on vec_to_bddvar and vector_size
+    BDD variables;              // X
+    BDD prime_variables;        // X'
+    BDD all_variables;          // X U X'
 };
 
 /**
@@ -79,54 +92,30 @@ struct vector_relation
 static vset_t
 set_create(vdom_t dom, int k, int* proj) 
 {
-    sylvan_gc_disable();
-
     vset_t set = (vset_t)RTmalloc(sizeof(struct vector_set));
 
     set->dom = dom;
     set->bdd = sylvan_false; // Initialize with an empty BDD
 
     if (k>=0 && k<dom->shared.size) {
-        // We are creating a projection set, including only variables in "proj"
-        // Variables not in proj will be existentially quantified 
-        set->projection = sylvan_false;
-        set->variables_set = sylvan_false;
-
-        set->variables_size = fddbits * k;
-        set->variables_arr = RTmalloc(sizeof(BDDVAR[k*fddbits]));
-
-        int j=k-1, m=(k*fddbits)-1, n=0;
-        for (int i=dom->shared.size-1;i>=0;i--) {
-            if (j>=0 && j<k && proj[j] == i) {
-                j--;
-                for (n=fddbits-1;n>=0;n--) {
-                    set->variables_arr[m--] = (i*fddbits+n) * 2;
-                    set->variables_set = sylvan_or(set->variables_set, sylvan_ithvar((i*fddbits+n)*2));
-                }
-            } else {
-                // to be quantified
-                for (n=fddbits-1;n>=0;n--) { // note starting with last
-                    set->projection = sylvan_or(set->projection, sylvan_ithvar((i*fddbits+n)*2));
-                }
+        // We are creating a projection
+        set->vector_size = k;
+        set->vec_to_bddvar = (BDDVAR*)RTmalloc(sizeof(BDDVAR) * fddbits * set->vector_size);
+        for (int i=0; i<k; i++) {
+            for (int j=0; j<fddbits; j++) {
+                set->vec_to_bddvar[i*fddbits + j] = dom->vec_to_bddvar[proj[i]*fddbits + j];
             }
         }
     } else {
-        set->projection = sylvan_false;
-        set->variables_set = sylvan_false;
-        set->variables_size = dom->shared.size*fddbits;
-        set->variables_arr = RTmalloc(sizeof(BDDVAR) * set->variables_size);
-
-        // start with last
-        for (int i=dom->shared.size-1;i>=0;i--) {
-            for (int j=fddbits-1;j>=0;j--) {
-                set->variables_arr[(i*fddbits+j)] = (i*fddbits+j) * 2;
-                set->variables_set = sylvan_or(set->variables_set, sylvan_ithvar((i*fddbits+j)*2));
-            }
-        }
+        // Use all variables
+        set->vector_size = dom->shared.size;
+        set->vec_to_bddvar = (BDDVAR*)RTmalloc(sizeof(BDDVAR) * fddbits * set->vector_size);
+        memcpy(set->vec_to_bddvar, dom->vec_to_bddvar, sizeof(BDDVAR) * fddbits * set->vector_size);
     }
 
-    sylvan_ref(set->projection);
-    sylvan_ref(set->variables_set);
+    sylvan_gc_disable();
+    set->variables = sylvan_ref(sylvan_set_fromarray(set->vec_to_bddvar, fddbits * set->vector_size));
+    set->projection = sylvan_ref(sylvan_set_removeall(dom->universe, set->variables));
     sylvan_gc_enable();
 
     return set;
@@ -141,14 +130,14 @@ set_destroy(vset_t set)
 {
     sylvan_deref(set->bdd);
     sylvan_deref(set->projection);
-    sylvan_deref(set->variables_set);
-    RTfree(set->variables_arr);
+    sylvan_deref(set->variables);
+    RTfree(set->vec_to_bddvar);
     RTfree(set);
 }
 
 /**
  * Create a "relation" (Dom x Dom)
- * k must not be 0
+ * 0 < k <= dom->shared.size
  * The integers in proj, a k-length array, are indices of the 
  * state vector.
  */
@@ -165,56 +154,50 @@ rel_create(vdom_t dom, int k, int* proj)
     // Relations are always projections.
     assert (k >= 0 && k<=dom->shared.size); 
 
-    rel->projection = sylvan_false;
-    rel->variables_set = sylvan_false;
-    rel->variables_prime_set = sylvan_false;
-    rel->variables_nonprime_set = sylvan_false;
+    rel->vector_size = k;
+    rel->vec_to_bddvar = (BDDVAR*)RTmalloc(sizeof(BDDVAR) * fddbits * rel->vector_size);
+    rel->prime_vec_to_bddvar = (BDDVAR*)RTmalloc(sizeof(BDDVAR) * fddbits * rel->vector_size);
 
-    rel->variables_size = 2 * fddbits * k;
-    rel->variables_arr = RTmalloc(sizeof(BDDVAR[rel->variables_size]));
-
-    int j=k-1, m=(k*fddbits)*2-1, n=0;
-    for (int i=dom->shared.size-1; i>=0; i--) {
-        if (j>=0 && proj[j] == i) {
-            j--;
-            for (n=fddbits-1; n>=0; n--) {
-                BDDVAR x = (i*fddbits+n) * 2;
-                BDDVAR x_prime = (i*fddbits+n) * 2 + 1;
-                rel->variables_arr[m--] = x_prime;
-                rel->variables_arr[m--] = x;
-
-                BDD bdd_x_prime, bdd_x;
-
-                rel->variables_set = sylvan_or(rel->variables_set, sylvan_or(sylvan_ithvar(x_prime), sylvan_ithvar(x)));
-                rel->variables_prime_set = sylvan_or(rel->variables_prime_set, sylvan_ithvar(x_prime));
-                rel->variables_nonprime_set = sylvan_or(rel->variables_nonprime_set, sylvan_ithvar(x));
-            }
-        } else {
-            for (n=fddbits-1; n>=0; n--) {
-                BDDVAR x = (i*fddbits+n) * 2;
-                BDDVAR x_prime = (i*fddbits+n) * 2 + 1;
-                rel->projection = sylvan_or(rel->projection, sylvan_or(sylvan_ithvar(x_prime), sylvan_ithvar(x)));
-            }
+    for (int i=0; i<k; i++) {
+        for (int j=0; j<fddbits; j++) {
+            rel->vec_to_bddvar[i*fddbits + j] = dom->vec_to_bddvar[proj[i]*fddbits + j];
+            rel->prime_vec_to_bddvar[i*fddbits + j] = dom->prime_vec_to_bddvar[proj[i]*fddbits + j];
         }
     }
 
-    sylvan_ref(rel->variables_set);
-    sylvan_ref(rel->variables_prime_set);
-    sylvan_ref(rel->variables_nonprime_set);
-    sylvan_ref(rel->projection);
+    sylvan_gc_disable();
+    rel->variables = sylvan_ref(sylvan_set_fromarray(rel->vec_to_bddvar, fddbits * rel->vector_size));
+    rel->prime_variables = sylvan_ref(sylvan_set_fromarray(rel->prime_vec_to_bddvar, fddbits * rel->vector_size));
+    rel->all_variables = sylvan_ref(sylvan_set_addall(rel->prime_variables, rel->variables));
     sylvan_gc_enable();
 
     return rel;
 }
+
+/**
+ * Destroy a relation.
+ */
+static void
+rel_destroy(vrel_t rel)
+{
+    sylvan_deref(rel->bdd);
+    sylvan_deref(rel->variables);
+    sylvan_deref(rel->prime_variables);
+    sylvan_deref(rel->all_variables);
+    RTfree(rel->vec_to_bddvar);
+    RTfree(rel->prime_vec_to_bddvar);
+    RTfree(rel);
+}
+
 
 static int optimal_bits_per_state = 0;
 
 /* Helper function to detect problems with the number of bits per stats 
 TODO: handle negative numbers?? */
 static void
-check_state(const int *e, int N) 
+check_state(const int *e, unsigned int N)
 {
-    for (int i=0; i<N; i++) {
+    for (unsigned int i=0; i<N; i++) {
         if (e[i] != 0) {
             register int X = 32 - __builtin_clz(e[i]);
             if (X > optimal_bits_per_state) optimal_bits_per_state = X;
@@ -237,35 +220,26 @@ sylvan_print_optimal_bits_per_state()
  * Order: [0]<[1]<[n] and hi < lo
  */
 static BDD
-state_to_bdd(vset_t set, const int* e)
+state_to_bdd(const int* e, size_t vec_length, BDDVAR* vec_to_bddvar, BDD projection)
 {
-    int N = set->dom->shared.size;
     BDD bdd = sylvan_true;
+    check_state(e, vec_length);
 
-    check_state(e, N);
+    sylvan_gc_disable();
 
     // Construct BDD from state (go from last variable to first variable)
-    for(int i=N-1;i>=0;i--) { // start with last byte (N-1)
-        uint32_t b = e[i];
-
-        for (int j=fddbits-1;j>=0;j--) { // start with last bit (=lowest)
-            int x = i*fddbits+j;
-            // TODO: fix this. if in variables_arr then do else not...
-            BDD val = sylvan_ref(sylvan_ithvar(x * 2));
-            BDD old = bdd; 
-            if ((b & 1) == 0) val = sylvan_not(val);
-            bdd = sylvan_ref(sylvan_and(val, bdd));
-            sylvan_deref(old);
-            sylvan_deref(val);
+    for(int i=vec_length;i-->0;) {
+        unsigned int b = e[i]; // convert from signed to unsigned...
+        for (int j=fddbits;j-->0;) {
+            BDD val = sylvan_ithvar(vec_to_bddvar[i*fddbits+j]);
+            if (!(b&1)) val = sylvan_not(val);
+            bdd = sylvan_and(val, bdd);
             b >>= 1;
         } 
     }
 
-    if (set->projection != sylvan_false) {
-        BDD old = bdd;
-        bdd = sylvan_ref(sylvan_exists(old, set->projection)); // NOTE: this can be more efficient
-        sylvan_deref(old);
-    }
+    bdd = sylvan_ref(sylvan_exists(bdd, projection));
+    sylvan_gc_enable();
 
     return bdd;
 }
@@ -276,7 +250,8 @@ state_to_bdd(vset_t set, const int* e)
 static void
 set_add(vset_t set, const int* e)
 {
-    BDD bdd = state_to_bdd(set,e);
+    // For some reason, we never get projected e, we get full e.
+    BDD bdd = state_to_bdd(e, set->dom->shared.size, set->dom->vec_to_bddvar, set->projection);
     BDD prev = set->bdd;
     set->bdd = sylvan_ref(sylvan_or(prev, bdd));
     sylvan_deref(bdd);
@@ -289,9 +264,10 @@ set_add(vset_t set, const int* e)
 static int
 set_member(vset_t set, const int* e)
 {
-    BDD ebdd = state_to_bdd(set, e);
-    int res = sylvan_and(set->bdd, ebdd) != sylvan_false ? 1 : 0;
-    sylvan_deref(ebdd);
+    // For some reason, we never get projected e, we get full e.
+    BDD bdd = state_to_bdd(e, set->dom->shared.size, set->dom->vec_to_bddvar, set->projection);
+    int res = sylvan_and(set->bdd, bdd) != sylvan_false ? 1 : 0;
+    sylvan_deref(bdd);
     return res;
 }
 
@@ -342,32 +318,34 @@ set_copy(vset_t dst, vset_t src)
  * 0 <= n < k
  */
 static void
-set_enum_do(BDD root, const int variables_size, const BDDVAR *variables, int *vec, int n, vset_element_cb cb, void* context)
+set_enum_do(BDD root, const BDD variables, int *vec, int n, vset_element_cb cb, void* context)
 {
     if (root == sylvan_false) return;
-    if (n == variables_size) {
-        // We're at the tail
+    if (sylvan_set_isempty(variables)) {
+        // Make sure that there are no variables left
         assert(root == sylvan_true);
-        cb(context,vec);
+        // We have one satisfying assignment!
+        cb(context, vec);
     } else {
-        uint32_t v = variables[n]; 
+        BDDVAR var = sylvan_var(variables);
+        BDD variables_next = sylvan_set_next(variables);
 
         int i = n / fddbits;        // which slot in the state vector
         int j = n % fddbits;        // which bit? 
 
         uint32_t bitmask = 1 << (fddbits-1-j);
 
-        if (root == sylvan_true || v != sylvan_var(root)) {
+        if (root == sylvan_true || var != sylvan_var(root)) {
             // n is skipped, take both
             vec[i] |= bitmask;
-            set_enum_do(root, variables_size, variables, vec, n+1, cb, context);
+            set_enum_do(root, variables_next, vec, n+1, cb, context);
             vec[i] &= ~bitmask;
-            set_enum_do(root, variables_size, variables, vec, n+1, cb, context);
+            set_enum_do(root, variables_next, vec, n+1, cb, context);
         } else {
             vec[i] |= bitmask;
-            set_enum_do((sylvan_high(root)), variables_size, variables, vec, n+1, cb, context);
+            set_enum_do((sylvan_high(root)), variables_next, vec, n+1, cb, context);
             vec[i] &= ~bitmask;
-            set_enum_do((sylvan_low(root)), variables_size, variables, vec, n+1, cb, context);
+            set_enum_do((sylvan_low(root)), variables_next, vec, n+1, cb, context);
         }
     }
 }
@@ -380,35 +358,34 @@ set_enum_do(BDD root, const int variables_size, const BDDVAR *variables, int *ve
 static void
 set_enum(vset_t set, vset_element_cb cb, void* context)
 {
-    int vec[set->variables_size/fddbits];
-    memset(vec, 0, sizeof(int)*set->variables_size/fddbits);
-    set_enum_do(set->bdd, set->variables_size, set->variables_arr, vec, 0, cb, context);
+    int vec[set->vector_size];
+    memset(vec, 0, sizeof(int)*set->vector_size);
+    set_enum_do(set->bdd, set->variables, vec, 0, cb, context);
 }
 
 static int
-set_example_do(vset_t set, BDD root, int *vec, int n)
+set_example_do(BDD root, BDD variables, int *vec, int n)
 {
     if (root == sylvan_false) return 0;
-    if (n == set->variables_size) {
-        // We found one!
+    if (sylvan_set_isempty(variables)) {
+        // Make sure that there are no variables left
         assert(root == sylvan_true);
+        // We have at least one satisfying assignment!
         return 1;
     } else {
-        uint32_t v = set->variables_arr[n]; // figure out level
-        int i = n / fddbits;
-        int j = n % fddbits;
-        uint32_t bitmask = 1 << (fddbits-1-j);
-        if (root == sylvan_true || v != sylvan_var(root)) {
-            // n is skipped, try any
-            vec[i] |= bitmask;
-            return set_example_do(set, root, vec, n+1);
+        BDDVAR var = sylvan_var(variables);
+        BDD variables_next = sylvan_set_next(variables);
+        if (root == sylvan_true || var != sylvan_var(root)) {
+            // n is skipped, just take assignment 0
+            return set_example_do(root, variables_next, vec, n+1);
         } else {
+            int i = n / fddbits;
+            int j = n % fddbits;
+            uint32_t bitmask = 1 << (fddbits-1-j);
             vec[i] |= bitmask;
-            if (set_example_do(set, (sylvan_high(root)), vec, n+1)) {
-                return 1;
-            }
+            if (set_example_do(sylvan_high(root), variables_next, vec, n+1)) return 1;
             vec[i] &= ~bitmask;
-            int result = set_example_do(set, (sylvan_low(root)), vec, n+1);
+            int result = set_example_do(sylvan_low(root), variables_next, vec, n+1);
             return result;
         }
     }
@@ -421,7 +398,7 @@ static void
 set_example(vset_t set, int *e)
 {
     assert(set->bdd != sylvan_false);
-    set_example_do(set, set->bdd, e, 0);
+    set_example_do(set->bdd, set->variables, e, 0);
 }
 
 /**
@@ -432,32 +409,30 @@ set_example(vset_t set, int *e)
 static void
 set_enum_match(vset_t set, int p_len, int* proj, int* match, vset_element_cb cb, void* context) 
 {
-
     // Create bdd of "match"
     // Assumption: proj is ordered (if not, you get bad performance)
 
+    sylvan_gc_disable();
     BDD match_bdd = sylvan_true;
-    for (int i=p_len-1;i>=0;i--) {
-        int j = proj[i];
+    for (int i=p_len;i-->0;) {
         uint32_t b = match[i];
-        for (int p=fddbits-1;p>=0;p--) {
-            BDD p_bdd = sylvan_ref(sylvan_ithvar(j*fddbits*2+p*2));
-            BDD old = match_bdd;
-            if (b & 1) match_bdd = sylvan_ref(sylvan_and(p_bdd, match_bdd));
-            else match_bdd = sylvan_ref(sylvan_and(sylvan_not(p_bdd), match_bdd));
-            sylvan_deref(p_bdd);
-            sylvan_deref(old);
-            b>>=1;
+        for (int j=fddbits;j-->0;) {
+            BDD val = sylvan_ithvar(set->dom->vec_to_bddvar[proj[i]*fddbits+j]);
+            if (!(b&1)) val = sylvan_not(val);
+            match_bdd = sylvan_and(val, match_bdd);
+            b >>= 1;
         }
     }
+    sylvan_ref(match_bdd);
+    sylvan_gc_enable();
 
     BDD old = match_bdd;
     match_bdd = sylvan_ref(sylvan_and(match_bdd, set->bdd));
     sylvan_deref(old);
 
-    int vec[set->variables_size/fddbits];
-    memset(vec, 0, sizeof(int)*set->variables_size/fddbits);
-    set_enum_do(match_bdd, set->variables_size, set->variables_arr, vec, 0, cb, context);
+    int vec[set->vector_size];
+    memset(vec, 0, sizeof(int)*set->vector_size);
+    set_enum_do(match_bdd, set->variables, vec, 0, cb, context);
     sylvan_deref(match_bdd);
 }
 
@@ -467,22 +442,22 @@ set_copy_match(vset_t dst, vset_t src, int p_len, int* proj, int*match)
     // Create bdd of "match"
     // Assumption: proj is ordered (if not, you get bad performance)
 
+    sylvan_deref(dst->bdd);
+
+    sylvan_gc_disable();
     BDD match_bdd = sylvan_true;
-    for (int i=p_len-1; i>=0; i--) {
-        int j = proj[i];
+    for (int i=p_len;i-->0;) {
         uint32_t b = match[i];
-        for (int p=fddbits-1; p>=0; p--) {
-            BDD p_bdd = sylvan_ref(sylvan_ithvar(j*fddbits*2+p*2));
-            BDD old = match_bdd;
-            if (b & 1) match_bdd = sylvan_ref(sylvan_and(p_bdd, match_bdd));
-            else match_bdd = sylvan_ref(sylvan_and(sylvan_not(p_bdd), match_bdd));
-            sylvan_deref(p_bdd);
-            sylvan_deref(old);
-            b>>=1;
+        for (int j=fddbits;j-->0;) {
+            BDD val = sylvan_ithvar(src->dom->vec_to_bddvar[proj[i]*fddbits+j]);
+            if (!(b&1)) val = sylvan_not(val);
+            match_bdd = sylvan_and(val, match_bdd);
+            b >>= 1;
         }
     }
+    sylvan_ref(match_bdd);
+    sylvan_gc_enable();
 
-    sylvan_deref(dst->bdd);
     dst->bdd = sylvan_ref(sylvan_and(match_bdd, src->bdd));
     sylvan_deref(match_bdd);
 }
@@ -491,7 +466,7 @@ static void
 set_count(vset_t set, long *nodes, bn_int_t *elements) 
 {
     *nodes = sylvan_nodecount(set->bdd);
-    double count = (double)sylvan_satcount(set->bdd, set->variables_set);
+    double count = (double)sylvan_satcount(set->bdd, set->variables);
     bn_double2int(count, elements);
 }
 
@@ -499,7 +474,7 @@ static void
 rel_count(vrel_t rel, long *nodes, bn_int_t *elements)
 {
     *nodes = sylvan_nodecount(rel->bdd);
-    double count = (double)sylvan_satcount(rel->bdd, rel->variables_set);
+    double count = (double)sylvan_satcount(rel->bdd, rel->all_variables);
     bn_double2int(count, elements);
 }
 
@@ -544,7 +519,7 @@ set_next(vset_t dst, vset_t src, vrel_t rel)
 {
     assert(dst->projection == src->projection);
     sylvan_deref(dst->bdd);
-    dst->bdd = sylvan_ref(sylvan_relprods(src->bdd, rel->bdd, rel->variables_set));
+    dst->bdd = sylvan_ref(sylvan_relprods(src->bdd, rel->bdd, rel->all_variables));
 
     // To use RelProd instead of RelProdS, uncomment the following lines and comment the preceding line
     // BDD temp = sylvan_relprod(src->bdd, rel->bdd, rel->variables_nonprime_set);
@@ -559,7 +534,7 @@ set_prev(vset_t dst, vset_t src, vrel_t rel)
 {
     assert(dst->projection == src->projection);
     sylvan_deref(dst->bdd);
-    dst->bdd = sylvan_ref(sylvan_relprods_reversed(src->bdd, rel->bdd, rel->variables_set));
+    dst->bdd = sylvan_ref(sylvan_relprods_reversed(src->bdd, rel->bdd, rel->all_variables));
 }
 
 /**
@@ -597,46 +572,17 @@ set_zip(vset_t dst, vset_t src)
 static void
 rel_add(vrel_t rel, const int *src, const int *dst)
 {
-    int N = rel->variables_size / (fddbits*2);
-    BDD bdd = sylvan_true;
+    BDD bdd_src = state_to_bdd(src, rel->vector_size, rel->vec_to_bddvar, sylvan_false);
+    BDD bdd_dst = state_to_bdd(dst, rel->vector_size, rel->prime_vec_to_bddvar, sylvan_false);
 
-    check_state(src, N);
-    check_state(dst, N);
-
-    // Construct BDD from state (go from last variable to first variable)
-    for(int i=N-1;i>=0;i--) { // bytes, begin with last
-        int s = src[i];
-        int d = dst[i];
-
-        // k is the last variable...
-        BDDVAR k = rel->variables_arr[(i*fddbits+fddbits-1)*2];
-
-        for (int j=fddbits-1;j>=0;j--) { // bits, begin with last
-            BDD x = sylvan_ref(sylvan_ithvar(k));
-            BDD x_prime = sylvan_ref(sylvan_ithvar(k+1));
-
-            BDD old = bdd;
-            if (d & 1) bdd = sylvan_ref(sylvan_and(bdd, x_prime));
-            else bdd = sylvan_ref(sylvan_and(bdd, sylvan_not(x_prime)));
-            sylvan_deref(old);
-            d >>= 1;
-
-            old = bdd;
-            if (s & 1) bdd = sylvan_ref(sylvan_and(bdd, x));
-            else bdd = sylvan_ref(sylvan_and(bdd, sylvan_not(x)));
-            sylvan_deref(old);
-            s >>= 1;
-
-            k-=2;
-            sylvan_deref(x);
-            sylvan_deref(x_prime);
-        } 
-    }
+    BDD part = sylvan_ref(sylvan_and(bdd_src, bdd_dst));
+    sylvan_deref(bdd_src);
+    sylvan_deref(bdd_dst);
 
     BDD old = rel->bdd;
-    rel->bdd = sylvan_ref(sylvan_or(rel->bdd, bdd));
+    rel->bdd = sylvan_ref(sylvan_or(rel->bdd, part));
     sylvan_deref(old);
-    sylvan_deref(bdd);
+    sylvan_deref(part);
 }
 
 static void
@@ -688,6 +634,22 @@ vdom_create_sylvan(int n)
     vdom_t dom = (vdom_t)RTmalloc(sizeof(struct vector_domain));
     vdom_init_shared(dom,n);
     dom_set_function_pointers(dom);
+    dom->bits_per_integer = fddbits;
+
+    // Create universe
+    dom->vec_to_bddvar = (BDDVAR*)RTmalloc(sizeof(BDDVAR) * fddbits * n);
+    dom->prime_vec_to_bddvar = (BDDVAR*)RTmalloc(sizeof(BDDVAR) * fddbits * n);
+    for (int i=0; i<n; i++) {
+        for (int j=0; j<fddbits; j++) {
+            dom->vec_to_bddvar[i*fddbits+j] = 2*(i*fddbits+j);
+            dom->prime_vec_to_bddvar[i*fddbits+j] = 2*(i*fddbits+j)+1;
+        }
+    }
+
+    sylvan_gc_disable();
+    dom->universe = sylvan_ref(sylvan_set_fromarray(dom->vec_to_bddvar, fddbits * n));
+    dom->prime_universe = sylvan_ref(sylvan_set_fromarray(dom->prime_vec_to_bddvar, fddbits * n));
+    sylvan_gc_enable();
 
     return dom;
 }
