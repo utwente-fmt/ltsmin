@@ -391,3 +391,8 @@ vdom_save(FILE *f, vdom_t dom)
     }
 }
 
+int
+vdom_vector_size(vdom_t dom)
+{
+    return dom->shared.size;
+}

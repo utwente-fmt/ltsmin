@@ -62,6 +62,8 @@ extern vdom_t vdom_create_domain(int n, vset_implementation_t impl);
 */
 extern vdom_t vdom_create_domain_from_file(FILE *f, vset_implementation_t impl);
 
+int vdom_vector_size(vdom_t dom);
+
 /**
 \brief Create a set.
 
