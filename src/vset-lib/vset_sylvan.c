@@ -514,7 +514,7 @@ set_next(vset_t dst, vset_t src, vrel_t rel)
 {
     assert(dst->projection == src->projection);
     sylvan_deref(dst->bdd);
-    dst->bdd = sylvan_ref(sylvan_relprods(src->bdd, rel->bdd, rel->all_variables));
+    dst->bdd = sylvan_ref(sylvan_relprod_paired(src->bdd, rel->bdd, rel->all_variables));
 
     // To use RelProd instead of RelProdS, uncomment the following lines and comment the preceding line
     // BDD temp = sylvan_relprod(src->bdd, rel->bdd, rel->variables_nonprime_set);
@@ -529,7 +529,7 @@ set_prev(vset_t dst, vset_t src, vrel_t rel)
 {
     assert(dst->projection == src->projection);
     sylvan_deref(dst->bdd);
-    dst->bdd = sylvan_ref(sylvan_relprods_reversed(src->bdd, rel->bdd, rel->all_variables));
+    dst->bdd = sylvan_ref(sylvan_relprod_paired_prev(src->bdd, rel->bdd, rel->all_variables));
 }
 
 /**

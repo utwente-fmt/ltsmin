@@ -2155,8 +2155,12 @@ parity_game* compute_symbolic_parity_game(vset_t visited, int* src)
 static char *files[2];
 hre_context_t ctx;
 
+#ifdef HAVE_SYLVAN
+LACE_CALLBACK(actual_main)
+#else
 static void
 actual_main(void)
+#endif
 {
     vset_implementation_t vset_impl = VSET_IMPL_AUTOSELECT;
 
@@ -2415,6 +2419,10 @@ actual_main(void)
             RTfree(priority);
         }
     }
+
+#ifdef HAVE_SYLVAN
+    return 0;
+#endif
 }
 
 int
@@ -2429,7 +2437,8 @@ main (int argc, char *argv[])
 
 #ifdef HAVE_SYLVAN
     ctx = HREglobal();
-    lace_boot(lace_n_workers, lace_dqsize, 0, actual_main);
+    lace_init(lace_n_workers, lace_dqsize);
+    lace_startup(0, actual_main, 0);
 #else
     actual_main();
 #endif
