@@ -585,6 +585,128 @@ rel_add(vrel_t rel, const int *src, const int *dst)
     sylvan_deref(part);
 }
 
+/* SAVING */
+static void
+post_save(FILE* f, vdom_t dom)
+{
+    sylvan_serialize_reset();
+    return;
+    (void)f;
+    (void)dom;
+}
+
+static void
+set_save(FILE* f, vset_t set)
+{
+    size_t bdd = sylvan_serialize_add(set->bdd);
+    sylvan_serialize_tofile(f);
+    fwrite(&bdd, sizeof(size_t), 1, f);
+    fwrite(&set->vector_size, sizeof(size_t), 1, f);
+    fwrite(set->vec_to_bddvar, sizeof(BDDVAR), set->vector_size*fddbits, f);
+}
+
+static void
+rel_save_proj(FILE* f, vrel_t rel)
+{
+    return; // Do not store anything
+    (void)f;
+    (void)rel;
+}
+
+static void
+rel_save(FILE* f, vrel_t rel)
+{
+    size_t bdd = sylvan_serialize_add(rel->bdd);
+    sylvan_serialize_tofile(f);
+    fwrite(&bdd, sizeof(size_t), 1, f);
+    fwrite(&rel->vector_size, sizeof(size_t), 1, f);
+    fwrite(rel->vec_to_bddvar, sizeof(BDDVAR), rel->vector_size*fddbits, f);
+    fwrite(rel->prime_vec_to_bddvar, sizeof(BDDVAR), rel->vector_size*fddbits, f);
+}
+
+/* LOADING */
+static void
+post_load(FILE* f, vdom_t dom)
+{
+    sylvan_serialize_reset();
+    return;
+    (void)f;
+    (void)dom;
+}
+
+static vset_t
+set_load(FILE* f, vdom_t dom)
+{
+    vset_t set = (vset_t)RTmalloc(sizeof(struct vector_set));
+    set->dom = dom;
+
+    sylvan_serialize_fromfile(f);
+
+    size_t bdd;
+    fread(&bdd, sizeof(size_t), 1, f);
+    set->bdd = sylvan_ref(sylvan_serialize_get_reversed(bdd));
+
+    fread(&set->vector_size, sizeof(size_t), 1, f);
+    set->vec_to_bddvar = (BDDVAR*)RTmalloc(sizeof(BDDVAR) * fddbits * set->vector_size);
+    fread(set->vec_to_bddvar, sizeof(BDDVAR), fddbits * set->vector_size, f);
+
+    sylvan_gc_disable();
+    set->variables = sylvan_ref(sylvan_set_fromarray(set->vec_to_bddvar, fddbits * set->vector_size));
+    set->projection = sylvan_ref(sylvan_set_removeall(dom->universe, set->variables));
+    sylvan_gc_enable();
+
+    return set;
+}
+
+static void
+rel_load_proj(FILE* f, vdom_t dom)
+{
+    vrel_t rel = (vrel_t)RTmalloc(sizeof(struct vector_relation));
+    memset(rel, 0, sizeof(struct vector_relation));
+    rel->dom = dom;
+    return rel; // Do not actually load anything from file
+}
+
+static void
+rel_load(FILE* f, vrel_t rel)
+{
+    if (rel->bdd) sylvan_deref(rel->bdd);
+    if (rel->vec_to_bddvar) RTfree(rel->vec_to_bddvar);
+    if (rel->prime_vec_to_bddvar) RTfree(rel->prime_vec_to_bddvar);
+    if (rel->variables) sylvan_deref(rel->variables);
+    if (rel->prime_variables) sylvan_deref(rel->prime_variables);
+    if (rel->all_variables) sylvan_deref(rel->all_variables);
+
+    sylvan_serialize_fromfile(f);
+
+    size_t bdd;
+    fread(&bdd, sizeof(size_t), 1, f);
+    rel->bdd = sylvan_ref(sylvan_serialize_get_reversed(bdd));
+
+    fread(&rel->vector_size, sizeof(size_t), 1, f);
+    rel->vec_to_bddvar = (BDDVAR*)RTmalloc(sizeof(BDDVAR) * fddbits * rel->vector_size);
+    rel->prime_vec_to_bddvar = (BDDVAR*)RTmalloc(sizeof(BDDVAR) * fddbits * rel->vector_size);
+    fread(rel->vec_to_bddvar, sizeof(BDDVAR), rel->vector_size*fddbits, f);
+    fread(rel->prime_vec_to_bddvar, sizeof(BDDVAR), rel->vector_size*fddbits, f);
+
+    sylvan_gc_disable();
+    rel->variables = sylvan_ref(sylvan_set_fromarray(rel->vec_to_bddvar, fddbits * rel->vector_size));
+    rel->prime_variables = sylvan_ref(sylvan_set_fromarray(rel->prime_vec_to_bddvar, fddbits * rel->vector_size));
+    rel->all_variables = sylvan_ref(sylvan_set_addall(rel->prime_variables, rel->variables));
+    sylvan_gc_enable();
+}
+
+static void
+dom_save(FILE* f, vdom_t dom)
+{
+    size_t vector_size = dom->shared.size;
+    size_t bits_per_integer = fddbits;
+    fwrite(&vector_size, sizeof(size_t), 1, f);
+    fwrite(&bits_per_integer, sizeof(size_t), 1, f);
+    fwrite(dom->vec_to_bddvar, sizeof(BDDVAR), vector_size*bits_per_integer, f);
+    fwrite(dom->prime_vec_to_bddvar, sizeof(BDDVAR), vector_size*bits_per_integer, f);
+}
+
 static void
 dom_set_function_pointers(vdom_t dom)
 {
@@ -617,6 +739,17 @@ dom_set_function_pointers(vdom_t dom)
     // set_least_fixpoint
     // set_dot
     // rel_dot
+
+    // no pre_load or pre_save
+    dom->shared.post_save=post_save;
+    dom->shared.post_load=post_load;
+    dom->shared.dom_save=dom_save;
+    dom->shared.set_save=set_save;
+    dom->shared.set_load=set_load;
+    dom->shared.rel_save_proj=rel_save_proj;
+    dom->shared.rel_save=rel_save;
+    dom->shared.rel_load_proj=rel_load_proj;
+    dom->shared.rel_load=rel_load;
 }
 
 /**
@@ -654,3 +787,34 @@ vdom_create_sylvan(int n)
     return dom;
 }
 
+vdom_t
+vdom_create_sylvan_from_file(FILE *f)
+{
+    Warning(info,"Creating a Sylvan domain.");
+
+    // Call initializator of library (if needed)
+    ltsmin_sylvan_init();
+
+    size_t vector_size, bits_per_integer;
+    fread(&vector_size, sizeof(size_t), 1, f);
+    fread(&bits_per_integer, sizeof(size_t), 1, f);
+
+    // Create data structure of domain
+    vdom_t dom = (vdom_t)RTmalloc(sizeof(struct vector_domain));
+    vdom_init_shared(dom, vector_size);
+    dom_set_function_pointers(dom);
+    fddbits = dom->bits_per_integer = bits_per_integer;
+
+    dom->vec_to_bddvar = (BDDVAR*)RTmalloc(sizeof(BDDVAR) * bits_per_integer * vector_size);
+    dom->prime_vec_to_bddvar = (BDDVAR*)RTmalloc(sizeof(BDDVAR) * bits_per_integer * vector_size);
+
+    fread(dom->vec_to_bddvar, sizeof(BDDVAR), vector_size * bits_per_integer, f);
+    fread(dom->prime_vec_to_bddvar, sizeof(BDDVAR), vector_size * bits_per_integer, f);
+
+    sylvan_gc_disable();
+    dom->universe = sylvan_ref(sylvan_set_fromarray(dom->vec_to_bddvar, fddbits * vector_size));
+    dom->prime_universe = sylvan_ref(sylvan_set_fromarray(dom->prime_vec_to_bddvar, fddbits * vector_size));
+    sylvan_gc_enable();
+
+    return dom;
+}

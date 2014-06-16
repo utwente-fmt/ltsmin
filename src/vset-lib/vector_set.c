@@ -23,8 +23,11 @@ extern vdom_t vdom_create_list_native(int n);
 extern struct poptOption listdd64_options[];
 extern vdom_t vdom_create_list64_native(int n);
 
+#ifdef HAVE_SYLVAN
 extern struct poptOption sylvan_options[];
 extern vdom_t vdom_create_sylvan(int n);
+extern vdom_t vdom_create_sylvan_from_file(FILE *f);
+#endif
 
 vset_implementation_t vset_default_domain = VSET_IMPL_AUTOSELECT;
 
@@ -120,6 +123,9 @@ vdom_create_domain_from_file(FILE *f, vset_implementation_t impl)
     if (impl == VSET_IMPL_AUTOSELECT)
         impl = vset_default_domain;
     switch(impl) {
+#ifdef HAVE_SYLVAN
+    case VSET_Sylvan: return vdom_create_sylvan_from_file(f);
+#endif // HAVE_SYLVAN
     default: return NULL;
     }
 }
