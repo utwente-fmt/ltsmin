@@ -639,21 +639,9 @@ rel_add(vrel_t rel, const int *src, const int *dst)
     sylvan_deref(bdd);
 }
 
-/**
- * Create a domain with object size n
- */
-vdom_t
-vdom_create_sylvan(int n)
+static void
+dom_set_function_pointers(vdom_t dom)
 {
-    Warning(info,"Creating a Sylvan domain.");
-
-    // Call initializator of library (if needed)
-    ltsmin_sylvan_init();
-
-    // Create data structure of domain
-    vdom_t dom = (vdom_t)RTmalloc(sizeof(struct vector_domain));
-    vdom_init_shared(dom,n);
-
     // Set function pointers
     dom->shared.set_create=set_create;
     dom->shared.set_destroy=set_destroy;
@@ -683,6 +671,23 @@ vdom_create_sylvan(int n)
     // set_least_fixpoint
     // set_dot
     // rel_dot
+}
+
+/**
+ * Create a domain with object size n
+ */
+vdom_t
+vdom_create_sylvan(int n)
+{
+    Warning(info,"Creating a Sylvan domain.");
+
+    // Call initializator of library (if needed)
+    ltsmin_sylvan_init();
+
+    // Create data structure of domain
+    vdom_t dom = (vdom_t)RTmalloc(sizeof(struct vector_domain));
+    vdom_init_shared(dom,n);
+    dom_set_function_pointers(dom);
 
     return dom;
 }
