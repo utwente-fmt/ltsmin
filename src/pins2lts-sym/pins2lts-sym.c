@@ -1,5 +1,6 @@
 #include <hre/config.h>
 
+#include <alloca.h>
 #include <assert.h>
 #include <limits.h>
 #include <stdint.h>
@@ -26,6 +27,9 @@
 static ltsmin_expr_t mu_expr = NULL;
 static char* ctl_formula = NULL;
 static char* mu_formula  = NULL;
+
+static char* transitions_save_filename = NULL;
+static char* transitions_load_filename = NULL;
 
 static char* trc_output = NULL;
 static int   dlk_detect = 0;
@@ -64,6 +68,8 @@ static matrix_t *inhibit_matrix=NULL;
 static matrix_t *class_matrix=NULL;
 
 static enum { BFS_P , BFS , CHAIN_P, CHAIN } strategy = BFS_P;
+
+static int expand_groups = 1; // set to 0 if transitions are loaded from file
 
 static char* order = "bfs-prev";
 static si_map_entry ORDER[] = {
@@ -156,6 +162,8 @@ static  struct poptOption options[] = {
     { "invariant", 'i', POPT_ARG_STRING, &inv_detect, 1, "detect deadlocks", NULL },
     { "no-exit", 'n', POPT_ARG_VAL, &no_exit, 1, "no exit on error, just count (for error counters use -v)", NULL },
     { "trace" , 0 , POPT_ARG_STRING , &trc_output , 0 , "file to write trace to" , "<lts-file>.gcf" },
+    { "save-transitions", 0 , POPT_ARG_STRING, &transitions_save_filename, 0, "file to write transition relations to", "<outputfile>" },
+    { "load-transitions", 0 , POPT_ARG_STRING, &transitions_load_filename, 0, "file to read transition relations from", "<inputfile>" },
     { "mu" , 0 , POPT_ARG_STRING , &mu_formula , 0 , "file with a mu formula" , "<mu-file>.mu" },
     { "ctl-star" , 0 , POPT_ARG_STRING , &ctl_formula , 0 , "file with a ctl* formula" , "<ctl-file>.ctl" },
 #ifdef HAVE_LIBSPG
@@ -518,6 +526,8 @@ explore_cb(void *context, int *src)
 static inline void
 expand_group_next(int group, vset_t set)
 {
+    if (!expand_groups) return; // assume transitions loaded from file cannot expand further
+
     struct group_add_info ctx;
     int explored = 0;
 
@@ -1791,10 +1801,9 @@ init_model(char *file)
 }
 
 static void
-init_domain(vset_implementation_t impl, vset_t *visited)
+init_domain(vset_implementation_t impl)
 {
     domain = vdom_create_domain(N, impl);
-    *visited = vset_create(domain, -1, NULL);
 
     group_next     = (vrel_t*)RTmalloc(nGrps * sizeof(vrel_t));
     group_explored = (vset_t*)RTmalloc(nGrps * sizeof(vset_t));
@@ -2142,15 +2151,63 @@ main (int argc, char *argv[])
     HREinitStart(&argc,&argv,1,2,files,"<model> [<etf>]");
 
     vset_implementation_t vset_impl = VSET_IMPL_AUTOSELECT;
-    vset_t visited;
+
+    int *src;
+    vset_t initial;
 
     init_model(files[0]);
-    init_domain(vset_impl, &visited);
     if (act_detect != NULL) init_action();
     if (inv_detect) Abort("Invariant violation detection is not implemented.");
     if (no_exit) Abort("Error counting (--no-exit) is not implemented.");
     if (PINS_POR != PINS_POR_NONE) Abort("Partial-order reduction and symbolic model checking are not compatible.");
 
+    if (transitions_load_filename != NULL) {
+        FILE *f = fopen(transitions_load_filename, "r");
+        if (f == 0) Abort("Cannot open '%s' for reading!", transitions_load_filename);
+
+        domain = vdom_create_domain_from_file(f, vset_impl);
+
+        /* Call hook */
+        vset_pre_load(f, domain);
+
+        /* Read initial state */
+        initial = vset_load(f, domain);
+
+        /* Read number of transitions and all transitions */
+        if (fread(&nGrps, sizeof(int), 1, f)!=1) Abort("Invalid file format.");
+        group_next = (vrel_t*)RTmalloc(nGrps * sizeof(vrel_t));
+        for(int i = 0; i < nGrps; i++) group_next[i] = vrel_load_proj(f, domain);
+        for(int i = 0; i < nGrps; i++) vrel_load(f, group_next[i]);
+
+        /* Call hook */
+        vset_post_load(f, domain);
+
+        /* Done! */
+        fclose(f);
+
+        /* Load state into src and initialize globals */
+        N = vdom_vector_size(domain);
+        src = (int*)alloca(sizeof(int)*N);
+        vset_example(initial, src);
+        // we do not need group_explored, group_tmp, projs
+        group_explored = group_tmp = NULL;
+        projs = NULL;
+
+        Print(infoShort, "Loaded transition relations from '%s'...", files[0]);
+        expand_groups = 0;
+    } else {
+        init_domain(vset_impl);
+        initial = vset_create(domain, -1, NULL);
+        src = (int*)alloca(sizeof(int)*N);
+        GBgetInitialState(model, src);
+        vset_add(initial, src);
+
+        Print(infoShort, "got initial state");
+        expand_groups = 1;
+    }
+
+    vset_t visited = vset_create(domain, -1, NULL);
+    vset_copy(visited, initial);
 
     if (inhibit_matrix!=NULL){
         if (strategy != BFS_P) Abort("maximal progress works for bfs-prev only.");
@@ -2217,12 +2274,6 @@ main (int argc, char *argv[])
         mu_formula = ctl_formula;
     }
 
-    int src[N];
-
-    GBgetInitialState(model, src);
-    vset_add(visited, src);
-    Warning(info, "got initial state");
-
     if (mu_expr) { // run a small test to check correctness of mu formula
         // and cause a segfault, because mu_var_man is not initialised yet...
         // setup var manager
@@ -2249,6 +2300,33 @@ main (int argc, char *argv[])
     RTstartTimer(timer);
     guided_proc(sat_proc, reach_proc, visited, files[1]);
     RTstopTimer(timer);
+
+    if (transitions_save_filename != NULL) {
+        FILE *f = fopen(transitions_save_filename, "w");
+        if (f == NULL) Abort("Cannot open '%s' for writing!", transitions_save_filename);
+
+        /* Call hook */
+        vset_pre_save(f, domain);
+
+        /* Write domain */
+        vdom_save(f, domain);
+
+        /* Write initial state */
+        vset_save(f, initial);
+
+        /* Write number of transitions and all transitions */
+        fwrite(&nGrps, sizeof(int), 1, f);
+        for (int i=0; i<nGrps; i++) vrel_save_proj(f, group_next[i]);
+        for (int i=0; i<nGrps; i++) vrel_save(f, group_next[i]);
+
+        /* Call hook */
+        vset_post_save(f, domain);
+
+        /* Done! */
+        fclose(f);
+
+        Print(infoShort, "Transition relations written to '%s'\n", transitions_save_filename);
+    }
 
     if (mu_expr) {
         Print(infoLong, "Starting mu-calculus model checking.");
