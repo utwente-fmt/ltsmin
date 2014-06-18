@@ -543,8 +543,13 @@ explore_cb(void *context, int *src)
     }
 }
 
+#ifdef HAVE_SYLVAN
+#define expand_group_next(g, s) CALL(expand_group_next, (g), (s))
+VOID_TASK_2(expand_group_next, int, group, vset_t, set)
+#else
 static inline void
 expand_group_next(int group, vset_t set)
+#endif
 {
     if (!expand_groups) return; // assume transitions loaded from file cannot expand further
 
