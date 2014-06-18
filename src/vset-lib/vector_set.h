@@ -230,6 +230,16 @@ extern void vrel_load(FILE* f, vrel_t rel);
 extern void vrel_add(vrel_t rel,const int* src,const int* dst);
 
 /**
+\brief Callback for vrel_update. Given state vector e, add new relations to rel.
+*/
+typedef void(*vrel_update_cb)(vrel_t rel, void *context, int *e);
+
+/**
+\brief Update a relation with new transitions, obtained by calling cb for every state in set.
+*/
+extern void vrel_update(vrel_t rel, vset_t set, vrel_update_cb cb, void *context);
+
+/**
 \brief Count the number of diagram nodes and the number of elements stored.
 
 \param elements Pointer to bignum that will contain the count; this bignum

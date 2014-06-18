@@ -159,12 +159,37 @@ default_least_fixpoint(vset_t dst, vset_t src, vrel_t rels[], int rel_count)
     Abort("Decision diagram package does not support least fixpoint");
 }
 
+struct default_rel_update_context
+{
+    vrel_t rel;
+    vrel_update_cb cb;
+    void *context;
+};
+
+static void
+default_rel_update_cb(void *context, int *src)
+{
+    struct default_rel_update_context *ctx = (struct default_rel_update_context*)context;
+    ctx->cb(ctx->rel, ctx->context, src);
+}
+
+static void
+default_rel_update(vrel_t rel, vset_t set, vrel_update_cb cb, void *context)
+{
+    struct default_rel_update_context ctx;
+    ctx.rel = rel;
+    ctx.cb = cb;
+    ctx.context = context;
+    vset_enum(set, default_rel_update_cb, &ctx);
+}
+
 void vdom_init_shared(vdom_t dom,int n)
 {
     memset(&dom->shared, 0, sizeof(dom->shared));
 
 	dom->shared.size=n;
 	dom->shared.set_zip=default_zip;
+    dom->shared.rel_update=default_rel_update;
 	dom->shared.reorder=default_reorder;
 	dom->shared.set_least_fixpoint=default_least_fixpoint;
 }
@@ -322,6 +347,10 @@ void vset_project(vset_t dst,vset_t src){
 
 void vrel_add(vrel_t rel,const int* src, const int* dst){
 	rel->dom->shared.rel_add(rel,src,dst);
+}
+
+void vrel_update(vrel_t rel, vset_t set, vrel_update_cb cb, void *context) {
+    rel->dom->shared.rel_update(rel, set, cb, context);
 }
 
 void vset_reorder(vdom_t dom) {

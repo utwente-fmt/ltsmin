@@ -39,6 +39,8 @@ struct vector_domain_shared {
 	vrel_t (*rel_load_proj)(FILE* f, vdom_t dom);
     void (*rel_load)(FILE* f, vrel_t rel);
 	void (*rel_add)(vrel_t rel,const int* src,const int* dst);
+    void (*rel_update)(vrel_t rel, vset_t set, vrel_update_cb cb, void *context);
+
 	void (*set_next)(vset_t dst,vset_t src,vrel_t rel);
 	void (*set_prev)(vset_t dst,vset_t src,vrel_t rel);
 	void (*reorder)();
