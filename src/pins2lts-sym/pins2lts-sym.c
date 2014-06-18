@@ -75,7 +75,7 @@ static enum { BFS_P, BFS, PAR, PAR_P, CHAIN_P, CHAIN } strategy = BFS_P;
 static int expand_groups = 1; // set to 0 if transitions are loaded from file
 
 #ifdef HAVE_SYLVAN
-static size_t lace_n_workers = 1;
+static size_t lace_n_workers = 0;
 static size_t lace_dqsize = 40960000; // can be very big, no problemo
 #endif
 
