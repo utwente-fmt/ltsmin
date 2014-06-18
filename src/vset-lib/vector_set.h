@@ -43,6 +43,7 @@ typedef enum {
     VSET_ListDD,
     VSET_ListDD64,
     VSET_Sylvan,
+    VSET_LDDmc,
 } vset_implementation_t;
 
 /**

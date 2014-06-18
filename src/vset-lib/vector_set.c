@@ -27,6 +27,10 @@ extern vdom_t vdom_create_list64_native(int n);
 extern struct poptOption sylvan_options[];
 extern vdom_t vdom_create_sylvan(int n);
 extern vdom_t vdom_create_sylvan_from_file(FILE *f);
+
+extern struct poptOption lddmc_options[];
+extern vdom_t vdom_create_lddmc(int n);
+extern vdom_t vdom_create_lddmc_from_file(FILE *f);
 #endif
 
 vset_implementation_t vset_default_domain = VSET_IMPL_AUTOSELECT;
@@ -68,6 +72,7 @@ static si_map_entry vset_table[]={
 #endif
 #ifdef HAVE_SYLVAN
     {"sylvan",VSET_Sylvan},
+    {"lddmc",VSET_LDDmc},
 #endif // HAVE_SYLVAN
 	{NULL,0}
 };
@@ -79,7 +84,7 @@ struct poptOption vset_options[]={
       "select a vector set implementation from native ListDD (32-bit or 64-bit),"
       " ATermDD with *list* encoding,"
       " ATermDD with *tree* encoding, BuDDy using the *fdd* feature,"
-      " DDD, or Sylvan (default: first available)" , "<ldd64|ldd|list|tree|fdd|ddd|sylvan>" },
+      " DDD, Sylvan, or multicore ListDD (default: first available)" , "<ldd64|ldd|list|tree|fdd|ddd|sylvan|lddmc>" },
     { NULL,0 , POPT_ARG_INCLUDE_TABLE , listdd_options , 0 , "ListDD options" , NULL},
     { NULL,0 , POPT_ARG_INCLUDE_TABLE , listdd64_options , 0 , "ListDD64 options" , NULL},
 #ifdef HAVE_ATERM2_H
@@ -88,6 +93,7 @@ struct poptOption vset_options[]={
     { NULL,0 , POPT_ARG_INCLUDE_TABLE , buddy_options , 0 , "BuDDy options" , NULL},
 #ifdef HAVE_SYLVAN
 	{ NULL,0 , POPT_ARG_INCLUDE_TABLE , sylvan_options , 0 , "Sylvan options" , NULL},
+	{ NULL,0 , POPT_ARG_INCLUDE_TABLE , lddmc_options , 0 , "LDDmc options" , NULL},
 #endif // HAVE_SYLVAN
     POPT_TABLEEND
 };
@@ -112,6 +118,7 @@ vdom_create_domain(int n, vset_implementation_t impl)
 #endif
 #ifdef HAVE_SYLVAN
     case VSET_Sylvan: return vdom_create_sylvan(n);
+    case VSET_LDDmc: return vdom_create_lddmc(n);
 #endif // HAVE_SYLVAN
     default: return NULL;
     }
@@ -125,6 +132,7 @@ vdom_create_domain_from_file(FILE *f, vset_implementation_t impl)
     switch(impl) {
 #ifdef HAVE_SYLVAN
     case VSET_Sylvan: return vdom_create_sylvan_from_file(f);
+    case VSET_LDDmc: return vdom_create_lddmc_from_file(f);
 #endif // HAVE_SYLVAN
     default: return NULL;
     }
