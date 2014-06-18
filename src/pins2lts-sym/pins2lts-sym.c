@@ -1220,8 +1220,12 @@ reach_par(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
         // Expand transition relations
         for (int i = 0; i < nGrps; i++) {
             if (!bitvector_is_set(reach_groups,i)) continue;
-            expand_group_next(i, visited);
+            SPAWN(expand_group_next, i, visited);
             (*eg_count)++;
+        }
+        for (int i = 0; i < nGrps; i++) {
+            if (!bitvector_is_set(reach_groups,i)) continue;
+            SYNC(expand_group_next);
         }
 
         vset_copy(root->container, visited);
@@ -1268,8 +1272,12 @@ reach_par_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
         // Expand transition relations
         for (int i = 0; i < nGrps; i++) {
             if (!bitvector_is_set(reach_groups,i)) continue;
-            expand_group_next(i, current_level);
+            SPAWN(expand_group_next, i, current_level);
             (*eg_count)++;
+        }
+        for (int i = 0; i < nGrps; i++) {
+            if (!bitvector_is_set(reach_groups,i)) continue;
+            SYNC(expand_group_next);
         }
 
         vset_copy(root->container, current_level);
