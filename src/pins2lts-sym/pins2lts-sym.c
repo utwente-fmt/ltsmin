@@ -51,10 +51,8 @@ static bitset_t   seen_actions;
 static int   sat_granularity = 10;
 static int   save_sat_levels = 0;
 
-#ifdef HAVE_LIBSPG
 static int   pgsolve_flag = 0;
 static char* pg_output = NULL;
-#endif
 #if defined(LTSMIN_PBES)
 static int   pgreduce_flag = 0;
 #endif
@@ -190,14 +188,12 @@ static  struct poptOption options[] = {
     { "mu" , 0 , POPT_ARG_STRING , &mu_formula , 0 , "file with a mu formula" , "<mu-file>.mu" },
     { "ctl-star" , 0 , POPT_ARG_STRING , &ctl_formula , 0 , "file with a ctl* formula" , "<ctl-file>.ctl" },
     { "dot", 0, POPT_ARG_STRING, &dot_dir, 0, "directory to write dot representation of vector sets to", NULL },
-#ifdef HAVE_LIBSPG
     { "pg-solve" , 0 , POPT_ARG_NONE , &pgsolve_flag, 0, "Solve the generated parity game (only for symbolic tool).","" },
     { NULL, 0 , POPT_ARG_INCLUDE_TABLE, spg_solve_options , 0, "Symbolic parity game solver options", NULL},
 #if defined(LTSMIN_PBES)
     { "pg-reduce" , 0 , POPT_ARG_NONE , &pgreduce_flag, 0, "Reduce the generated parity game on-the-fly (only for symbolic tool).","" },
 #endif
     { "pg-write" , 0 , POPT_ARG_STRING , &pg_output, 0, "file to write symbolic parity game to","<pg-file>.spg" },
-#endif
 #ifdef HAVE_SYLVAN
     { "lace-workers", 0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &lace_n_workers , 0 , "set number of Lace workers (threads for parallelization)","<workers>"},
     { "lace-dqsize",0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &lace_dqsize , 0 , "set length of Lace task queue","<dqsize>"},
@@ -821,7 +817,6 @@ final_stat_reporting(vset_t visited, rt_timer_t timer)
     }
 }
 
-#if defined(HAVE_LIBSPG) || defined(LTSMIN_PBES)
 static bool debug_output_enabled = false;
 
 /**
@@ -839,17 +834,6 @@ static inline void add_variable_subset(vset_t dst, vset_t src, vdom_t domain, in
 
     if (debug_output_enabled && log_active(infoLong))
     {
-        /*
-        chunk c = GBchunkGet(model, var_type_no, var_index);
-        if (c.len == 0) {
-            Abort("lookup of %d failed", var_index);
-        }
-        char s[c.len + 1];
-        for (unsigned int i = 0; i < c.len; i++) {
-            s[i] = c.data[i];
-        }
-        s[c.len] = 0;
-        */
         long   n_count;
         char   elem_str[1024];
         double e_count;
@@ -860,7 +844,6 @@ static inline void add_variable_subset(vset_t dst, vset_t src, vdom_t domain, in
     vset_union(dst, u);
     vset_destroy(u);
 }
-#endif
 
 #if defined(LTSMIN_PBES)
 static inline void reduce_parity_game(vset_t next_level, vset_t visited, vset_t true_states, vset_t false_states)
@@ -2401,13 +2384,12 @@ void init_spg(model_t model)
     false_states = vset_create(domain, -1, NULL);
 }
 
-#if defined(HAVE_LIBSPG)
 /**
  * \brief Creates a symbolic parity game from the generated LTS.
  */
 parity_game* compute_symbolic_parity_game(vset_t visited, int* src)
 {
-    Print(infoLong, "Computing symbolic parity game.");
+    Print(infoShort, "Computing symbolic parity game.");
     debug_output_enabled = true;
 
     // num_vars and player have been pre-computed by init_pbes.
@@ -2456,7 +2438,6 @@ parity_game* compute_symbolic_parity_game(vset_t visited, int* src)
     }
     return g;
 }
-#endif
 
 static char *files[2];
 hre_context_t ctx;
@@ -2725,15 +2706,14 @@ actual_main(void)
     if (spg) { // converting the LTS to a symbolic parity game, save and solve.
         vset_destroy(true_states);
         vset_destroy(false_states);
-#ifdef HAVE_LIBSPG
         if (pg_output || pgsolve_flag) {
-            RTresetTimer(timer);
-            RTstartTimer(timer);
+            rt_timer_t compute_pg_timer = RTcreateTimer();
+            RTstartTimer(compute_pg_timer);
             parity_game * g = compute_symbolic_parity_game(visited, src);
-            RTstopTimer(timer);
-            RTprintTimer(info, timer, "computing symbolic parity game took");
+            RTstopTimer(compute_pg_timer);
+            RTprintTimer(info, compute_pg_timer, "computing symbolic parity game took");
             if (pg_output) {
-                Print(info,"Writing symbolic parity game to %s",pg_output);
+                Print(info,"Writing symbolic parity game to %s.",pg_output);
                 FILE *f = fopen(pg_output, "w");
                 spg_save(f, g);
                 fclose(f);
@@ -2741,19 +2721,20 @@ actual_main(void)
             if (pgsolve_flag) {
                 spgsolver_options* spg_options = spg_get_solver_options();
                 rt_timer_t pgsolve_timer = RTcreateTimer();
+                Print(info, "Solving symbolic partity game.");
                 RTstartTimer(pgsolve_timer);
                 bool result = spg_solve(g, spg_options);
                 Print(info, " ");
-                Print(info, "The result is: %s", result ? "true":"false");
+                Print(info, "The result is: %s.", result ? "true":"false");
                 RTstopTimer(pgsolve_timer);
                 Print(info, " ");
-                RTprintTimer(info, timer, "generation took");
-                RTprintTimer(info, pgsolve_timer, "solving took");
+                RTprintTimer(info, timer,               "reachability took   ");
+                RTprintTimer(info, compute_pg_timer,    "computing game took ");
+                RTprintTimer(info, pgsolve_timer,       "solving took        ");
             } else {
                 spg_destroy(g);
             }
         }
-#endif
         if (player != 0) {
             RTfree(player);
             RTfree(priority);
@@ -2775,11 +2756,21 @@ main (int argc, char *argv[])
 
 #ifdef HAVE_SYLVAN
     ctx = HREglobal();
+    if (lace_n_workers == 0 &&
+            (vset_default_domain==VSET_Sylvan || strategy==PAR || strategy==PAR_P)) {
+        lace_n_workers = get_cpu_count();
+    }
+    else {
+        lace_n_workers = 1;
+        Warning(info, "Using 1 CPU");
+    }
     lace_init(lace_n_workers, lace_dqsize);
     lace_startup(0, TASK(actual_main), 0);
 #else
     actual_main();
 #endif
 
-    HREexit (LTSMIN_EXIT_SUCCESS);
+#ifdef HAVE_SYLVAN
+    return 0;
+#endif
 }

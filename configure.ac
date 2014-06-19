@@ -178,9 +178,6 @@ AS_CASE(["$with_bignum"],
               [AS_IF([test x"$with_bignum" = xtommath],
                      [with_bignum=no; AC_MSG_WARN([cannot use libtommath as bignum library.])])])])],
   [AC_MSG_WARN([unknown bignum library request (--with-bignum=$with_bignum) ignored.])])
-AS_CASE(["$with_bignum"],
-  [yes|no|tommath],[have_libspg=yes],
-  [gmp],[have_libspg=no; AC_MSG_WARN([not installing pbes-reach and spgsolver, because of a bug in libgmp. Use --with-bignum=no to enable spgsolver.])])
 
 if test "x$acx_mcrl" = xyes; then
   ACX_MCRL_LIBS(
@@ -395,7 +392,6 @@ AM_CONDITIONAL([HAVE_LIBTOMMATH],
 AM_CONDITIONAL([HAVE_LIBMCRL], [test x"$acx_mcrl" = xyes])
 AM_CONDITIONAL([HAVE_LIBMCRL2], [test x"$acx_mcrl2" = xyes])
 AM_CONDITIONAL([HAVE_LIBPBES], [test x"$acx_pbes" = xyes])
-AM_CONDITIONAL([HAVE_LIBSPG], [test x"$have_libspg" = xyes])
 AM_CONDITIONAL([HAVE_LIBSTEP_INFO], [test x"$have_libstep_info" = xyes])
 AM_CONDITIONAL([HAVE_LIBDDD], [test x"$acx_libddd" = xyes])
 AM_CONDITIONAL([HAVE_ASCIIDOC], [test x"$ASCIIDOC" != x])
@@ -482,7 +478,6 @@ Configuration:
     OPAAL    = ${have_opaal:-TBB malloc NOT FOUND, building without opaal support}
     PBES     = ${acx_pbes:-NOT FOUND, building without PBES support}
     SCOOP    = ${have_scoop:-NO, either scoop was disabled or ghc could not be found}
-    SPG      = ${have_libspg:-NO, not building pbes-reach and spgsolver (enable with --without-bignum)}
     SPINS    = ${acx_spins:-NO, JDK or Ant not found (override with --with-spins)}
     SYLVAN   = ${have_sylvan:-NO, only on 64-bit systems (override with --with-sylvan)}
     XMLTO    = ${XMLTO:-NOT FOUND, not building manpages}

@@ -69,12 +69,10 @@ SUBDIRS += torx
 # vset (BDD/MDD) lib
 SUBDIRS += vset-lib
 
-if HAVE_LIBSPG
 # symbolic parity game lib
 SUBDIRS += spg-lib
 
 SUBDIRS += spg
-endif
 SUBDIRS += pins2lts-sym
 
 if HAVE_ATOMICS

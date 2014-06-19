@@ -479,7 +479,7 @@ void
 vdom_save(FILE *f, vdom_t dom)
 {
     if (dom->shared.dom_save == NULL) {
-        Abort("Saving of domains not supported by the current VSet implementation.")
+        //Abort("Saving of domains not supported by the current VSet implementation.")
     } else {
         dom->shared.dom_save(f, dom);
     }

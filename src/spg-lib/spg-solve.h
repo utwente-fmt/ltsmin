@@ -1,5 +1,5 @@
 /*
- * \file pg-solve.h
+ * \file spg-solve.h
  *
  *  Created on: 23 Jan 2012
  *      Author: kant
@@ -11,35 +11,13 @@
 
 #include <hre/runtime.h>
 #include <spg-lib/spg.h>
+#include <spg-lib/spg-attr.h>
+#include <spg-lib/spg-options.h>
 
 typedef struct
 {
     vset_t win[2];
 } recursive_result;
-
-typedef struct
-{
-    bool swap;
-    bool dot;
-    bool chaining;
-    bool saturation;
-    rt_timer_t spg_solve_timer;
-} spgsolver_options;
-
-
-extern struct poptOption spg_solve_options[];
-
-
-/**
- * \brief Creates a new spgsolver_options object.
- */
-spgsolver_options* spg_get_solver_options();
-
-
-/**
- * \brief Destroy options object
- */
-void spg_destroy_solver_options(spgsolver_options* options);
 
 
 /**
@@ -63,16 +41,64 @@ recursive_result spg_solve_recursive(parity_game* g, const spgsolver_options* op
 void spg_game_restrict(parity_game *g, vset_t a, const spgsolver_options* options);
 
 
-/**
- * \brief Computes attractor set
- */
-void spg_attractor(int player, const parity_game* g, vset_t u, const spgsolver_options* options);
+#ifdef LTSMIN_DEBUG
+#define SPG_OUTPUT_DOT(DOT,SET,NAME,...)  {                    \
+    char dotfilename[255];                                          \
+    FILE* dotfile;                                                  \
+    if (DOT)                                                        \
+    {                                                               \
+        sprintf(dotfilename, NAME, __VA_ARGS__);                    \
+        dotfile = fopen(dotfilename,"w");                           \
+        vset_dot(dotfile, U);                                       \
+        fclose(dotfile);                                            \
+    }                                                               \
+}
+#else
+#define SPG_OUTPUT_DOT(DOT,SET,NAME,...)
+#endif
 
+#define VSET_COUNT_NODES(SET, N_COUNT) {    \
+    bn_int_t elem_count;                    \
+    vset_count(SET, &N_COUNT, &elem_count); \
+    bn_clear(&elem_count);                  \
+}
 
-/**
- * \brief Computes attractor set
- */
-void spg_attractor_chaining(int player, const parity_game* g, vset_t u, const spgsolver_options* options);
+#define SPG_REPORT_RECURSIVE_RESULT {                               \
+    if (log_active(infoLong))                                       \
+    {                                                               \
+        long   n_count;                                             \
+        bn_int_t elem_count;                                        \
+        vset_count(result.win[0], &n_count, &elem_count);           \
+        Print(infoLong, "result.win[0]: %ld nodes.", n_count);    \
+        vset_count(result.win[1], &n_count, &elem_count);           \
+        bn_clear(&elem_count);                                      \
+        Print(infoLong, "result.win[1]: %ld nodes.", n_count);    \
+    }                                                               \
+}
 
+#define SPG_REPORT_MIN_PRIORITY(M, U) {                                    \
+    if (log_active(infoLong))                                       \
+    {                                                               \
+        long   n_count;                                             \
+        bn_int_t elem_count;                                        \
+        vset_count(U, &n_count, &elem_count);                       \
+        bn_clear(&elem_count);                                      \
+        Print(infoLong, "m = %d, u has %ld nodes.", M, n_count);  \
+    }                                                               \
+}
+
+#define SPG_REPORT_DEADLOCK_STATES(PLAYER) {                                                \
+    if(log_active(infoLong))                                                                \
+    {                                                                                       \
+        long   n_count;                                                                     \
+        bn_int_t elem_count;                                                                \
+        vset_count(deadlock_states[PLAYER], &n_count, &elem_count);                         \
+        char s[1024];                                                                       \
+        bn_int2string(s, sizeof(s), &elem_count);                                           \
+        Print(infoLong, "%s deadlock states (%ld nodes) with result '%s' (p=%d).",      \
+              s, n_count, ((PLAYER==0)?"false":"true"), PLAYER);                           \
+        bn_clear(&elem_count);                                                              \
+    }                                                                                       \
+}
 
 #endif /* SPG_SOLVE_H_ */

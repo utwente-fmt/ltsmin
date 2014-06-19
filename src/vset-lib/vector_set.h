@@ -46,6 +46,8 @@ typedef enum {
     VSET_LDDmc,
 } vset_implementation_t;
 
+extern vset_implementation_t vset_default_domain;
+
 /**
 \brief Create a domain that uses some vector set implementation.
 

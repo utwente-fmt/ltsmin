@@ -692,7 +692,7 @@ mdd_save_bin(FILE* f, uint32_t mdd)
     mdd_clear_and_write_bin(s, mdd, &count, node_map);
     simplemap_destroy(node_map);
     stream_flush(s);
-    stream_close(&s);
+    RTfree(s); //stream_close(&s);
 }
 
 static uint32_t
@@ -733,7 +733,7 @@ mdd_load_bin(FILE* f)
         mdd_load_node_count++;
     }
     RTfree(mdd_load_node_ids);
-    stream_close(&s);
+    RTfree(s); //stream_close(&s);
     mdd_load_node_ids = NULL;
     mdd_load_node_count = 0;
     return mdd;
@@ -817,7 +817,7 @@ rel_save_proj_bin(FILE* f, vrel_t rel)
         DSwriteS32(s, rel->proj[i]);
     }
     stream_flush(s);
-    stream_close(&s);
+    RTfree(s); //stream_close(&s);
 }
 
 static void
@@ -835,7 +835,7 @@ rel_load_proj_bin(FILE* f, vdom_t dom)
     for(int i=0; i<p_len; i++){
         proj[i] = DSreadS32(s);
     }
-    stream_close(&s);
+    RTfree(s); //stream_close(&s);
     vrel_t result = rel_create_mdd(dom, p_len, proj);
     return result;
 }
@@ -894,7 +894,7 @@ static void
 set_count_mdd(vset_t set, long *nodes, bn_int_t *elements)
 {
     double e_count   = mdd_count(set->mdd);
-    uint32_t n_count = mdd_node_count(set->mdd);
+    long n_count = mdd_node_count(set->mdd);
 
     bn_double2int(e_count, elements);
     *nodes = n_count;
@@ -904,7 +904,7 @@ static void
 rel_count_mdd(vrel_t rel, long *nodes, bn_int_t *elements)
 {
     double e_count   = mdd_count(rel->mdd);
-    uint32_t n_count = mdd_node_count(rel->mdd);
+    long n_count = mdd_node_count(rel->mdd);
 
     bn_double2int(e_count, elements);
     *nodes = n_count;
