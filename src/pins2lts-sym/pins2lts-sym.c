@@ -561,6 +561,30 @@ expand_group_next(int group, vset_t set)
     vset_clear(group_tmp[group]);
 }
 
+struct expand_info {
+    int group;
+    vset_t group_explored;
+    long *eg_count;
+};
+
+static inline void
+expand_group_next_projected(vrel_t rel, vset_t set, void *context)
+{
+    struct expand_info *expand_ctx = (struct expand_info*)context;
+    struct group_add_info group_ctx;
+    int group = expand_ctx->group;
+    vset_t group_explored = expand_ctx->group_explored;
+    int explored = 0;
+
+    group_ctx.group = group;
+    group_ctx.set = NULL;
+    group_ctx.rel = rel;
+    group_ctx.explored = &explored;
+    (*expand_ctx->eg_count)++;
+    vset_zip(group_explored, set);
+    vset_enum(set, explore_cb, &group_ctx);
+}
+
 static void
 valid_end_cb(void *context, int *src)
 {
@@ -1575,30 +1599,6 @@ reach_sat_loop(reach_proc_t reach_proc, vset_t visited,
     vset_destroy(old_vis);
     if (save_sat_levels)
         for (int i = 0; i < max_sat_levels; i++) vset_destroy(prev_vis[i]);
-}
-
-struct expand_info {
-    int group;
-    vset_t group_explored;
-    long *eg_count;
-};
-
-static inline void
-expand_group_next_projected(vrel_t rel, vset_t set, void *context)
-{
-    struct expand_info *expand_ctx = (struct expand_info*)context;
-    struct group_add_info group_ctx;
-    int group = expand_ctx->group;
-    vset_t group_explored = expand_ctx->group_explored;
-    int explored = 0;
-
-    group_ctx.group = group;
-    group_ctx.set = NULL;
-    group_ctx.rel = rel;
-    group_ctx.explored = &explored;
-    (*expand_ctx->eg_count)++;
-    vset_zip(group_explored, set);
-    vset_enum(set, explore_cb, &group_ctx);
 }
 
 static void
