@@ -4,7 +4,7 @@ CCLD = $(MPICC)
 CXXLD = $(MPICXX)
 AM_CPPFLAGS = -DWITH_MPI -std=gnu99
 
-HRE_CPPFLAGS = -I ${top_srcdir}/src $(AM_CPPFLAGS)
+HRE_CPPFLAGS = -I${top_builddir}/src -I${top_srcdir}/src $(AM_CPPFLAGS)
 
 noinst_LTLIBRARIES = libhre.la
 

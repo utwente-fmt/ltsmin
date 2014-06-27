@@ -1,5 +1,5 @@
 CC = $(MPICC)
-AM_CPPFLAGS = -DWITH_MPI -std=gnu99 -I../../src
+AM_CPPFLAGS = -DWITH_MPI -std=gnu99 -I${top_srcdir}/src -I${top_builddir}/src
 
 LTSMIN_LIBS  =
 LTSMIN_LIBS += ../lts-io/liblts-io.la
