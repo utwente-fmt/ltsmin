@@ -36,6 +36,7 @@ static uint64_t fib(int n){
 
 struct poptOption listdd64_options[]= {
     { "ldd-step", 0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &nodes_fib, 0, "set intial step in node size", "<step>"},
+    { "ldd-cache",0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &cache_fib , 0 , "set Fibonacci difference between operation op cache and nodes (may be negative)","<diff>"},
     POPT_TABLEEND
 };
 
