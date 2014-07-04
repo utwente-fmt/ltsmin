@@ -41,6 +41,7 @@ struct vector_domain_shared {
 	void (*rel_add)(vrel_t rel,const int* src,const int* dst);
 	void (*set_next)(vset_t dst,vset_t src,vrel_t rel);
 	void (*set_prev)(vset_t dst,vset_t src,vrel_t rel);
+    void (*set_universe)(vset_t dst, vset_t src);
 	void (*reorder)();
 	void (*set_destroy)(vset_t set);
 	void (*set_least_fixpoint)(vset_t dst,vset_t src,vrel_t rels[],int rel_count);
