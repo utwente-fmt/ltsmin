@@ -75,6 +75,7 @@ static struct op_rec *op_cache=NULL;
 #define OP_INTERSECT 8
 #define OP_SAT 9
 #define OP_RELPROD 10
+#define OP_UNIVERSE 11
 
 struct vector_domain {
     struct vector_domain_shared shared;
@@ -266,6 +267,7 @@ static void mdd64_collect(uint64_t a,uint64_t b){
                 else continue;
             }
             case OP_PROJECT:
+            case OP_UNIVERSE:
             {
                 arg1=op_cache[i].arg1;
                 if (!(node_table[arg1].flags&0x80000000)) {
@@ -1172,6 +1174,54 @@ set_prev_mdd64(vset_t dst, vset_t src, vrel_t rel)
     dst->mdd = mdd64_prev(rel->p_id, src->mdd, rel->mdd, 0, rel->proj,rel->p_len);
 }
 
+static uint64_t
+mdd64_universe(uint64_t p_id, uint64_t dst, uint64_t src, int n) {
+
+    if (src == 0) return 0;
+
+    uint64_t slot_hash=hash64(OP_UNIVERSE,src,p_id);
+    uint64_t slot=slot_hash%cache_size;
+    if(op_cache[slot].op==OP_UNIVERSE && op_cache[slot].arg1==src) {
+        return op_cache[slot].res.other.res;
+    }
+
+    mdd64_push(mdd64_universe(p_id, dst, node_table[src].right, n));
+
+    if (n == 0) {
+        dst = mdd64_create_node(node_table[src].val, dst, 0);
+    } else {
+        dst = mdd64_universe(p_id, dst, node_table[src].down, n-1);
+    }
+
+    uint64_t res = mdd64_union(dst, mdd64_pop());
+
+    slot=slot_hash%cache_size;
+    op_cache[slot].op=OP_UNIVERSE;
+    op_cache[slot].arg1=src;
+    op_cache[slot].res.other.arg2=p_id;
+    op_cache[slot].res.other.res=res;
+
+    return res;
+
+}
+
+static void
+set_universe_mdd64(vset_t dst, vset_t src) {
+
+    assert(src->p_len == -1 && dst->mdd == 0);
+
+    dst->mdd = 1;
+
+    int l = dst->p_len > 0 ? dst->p_len : src->dom->shared.size;
+
+    uint64_t p_id = dst->p_id;
+
+    for (int n = l-1; n >= 0; n--) {
+        dst->mdd = mdd64_universe(p_id, dst->mdd, src->mdd, dst->proj[n]);
+        p_id = node_table[p_id].down;
+    }
+}
+
 typedef struct {
     int tg_len;
     int *top_groups;
@@ -1604,6 +1654,7 @@ vdom_t vdom_create_list64_native(int n){
     dom->shared.set_copy_match_proj=set_copy_match_proj_mdd64;
     dom->shared.proj_create=proj_create_mdd64;
     dom->shared.set_intersect=set_intersect_mdd64;
+    dom->shared.set_universe=set_universe_mdd64;
     // default implementation for dom->shared.set_zip
     dom->shared.reorder=set_reorder_mdd64;
     dom->shared.set_destroy=set_destroy_mdd64;
