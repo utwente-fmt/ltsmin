@@ -238,6 +238,7 @@ static void mdd64_collect(uint64_t a,uint64_t b){
     if (mdd_used > fib(nodes_fib-1) && mdd_nodes != UINT64_MAX) {
         Warning(debug,"insufficient free nodes, resizing");
         resize=1;
+        nodes_fib++;
         new_cache_size=fib(nodes_fib+cache_fib);
         new_cache=RTalign(CACHE_LINE_SIZE,new_cache_size*sizeof(struct op_rec));
         for(uint64_t i=0;i<new_cache_size;i++){
@@ -322,7 +323,6 @@ static void mdd64_collect(uint64_t a,uint64_t b){
         RTfree(op_cache);
         op_cache=new_cache;
         cache_size=new_cache_size;
-        nodes_fib++;
         uint64_t old_size=mdd_nodes;
         mdd_nodes=fib(nodes_fib);
 
