@@ -20,7 +20,7 @@ static int nodes_fib=30;
 /** Maximum fibonacci number before overflow. */
 static const int FIB_MAX = 93;
 /** difference between the fibonacci numbers of the sizes of the node table and the cache. */
-static int cache_fib=0;
+static int cache_fib=1;
 
 static uint64_t fib(int n){
     uint64_t tmp1=0;
