@@ -279,7 +279,7 @@ recursive_result spg_solve_recursive(parity_game* g,  const spgsolver_options* o
                 vset_t t = vset_create(g->domain, -1, NULL, -1, NULL);
                 for(int group=0; group<g->num_groups; group++) {
                     vset_clear(t);
-                    vset_prev(t, g->v, g->e[group],deadlock_states[p]);
+                    vset_prev(t, g->v, g->e[group], g->v);
                     vset_minus(deadlock_states[p], t);
                 }
                 vset_destroy(t);
@@ -550,8 +550,8 @@ void spg_attractor(int player, const parity_game* g, vset_t u, const spgsolver_o
         vset_t tmp = vset_create(g->domain, -1, NULL, -1, NULL);
         for(int group=0; group<g->num_groups; group++) {
             vset_clear(tmp);
-            vset_prev(tmp, v_level, g->e[group],g->v);
-            vset_intersect(tmp, g->v);
+            vset_prev(tmp, v_level, g->e[group], g->v);
+            //vset_intersect(tmp, g->v);
             vset_union(prev_attr, tmp);
         }
         vset_clear(tmp);
@@ -592,7 +592,7 @@ void spg_attractor(int player, const parity_game* g, vset_t u, const spgsolver_o
         for(int group=0; group<g->num_groups; group++) {
             vset_clear(tmp);
             vset_prev(tmp, b, g->e[group], g->v);
-            vset_intersect(tmp, g->v);
+            //vset_intersect(tmp, g->v);
             vset_union(prev_b, tmp);
         }
         vset_destroy(tmp);
@@ -703,7 +703,7 @@ void spg_attractor_chaining(int player, const parity_game* g, vset_t u, const sp
                 vset_t prev_attr = vset_create(g->domain, -1, NULL, -1, NULL);
                 vset_prev(prev_attr, v_group, g->e[group], g->v_player[player]);
                 vset_copy(v_group, prev_attr);
-                vset_intersect(v_group, g->v_player[player]);
+                //vset_intersect(v_group, g->v_player[player]);
 
                 vset_t prev_attr_other_player = prev_attr;
                 vset_intersect(prev_attr_other_player, g->v_player[1-player]);
@@ -725,7 +725,7 @@ void spg_attractor_chaining(int player, const parity_game* g, vset_t u, const sp
                 for(int group=0; group<g->num_groups; group++) {
                     vset_clear(tmp);
                     vset_prev(tmp, b, g->e[group], g->v);
-                    vset_intersect(tmp, g->v);
+                    //vset_intersect(tmp, g->v);
                     vset_union(prev_b, tmp);
                 }
                 vset_destroy(tmp);
