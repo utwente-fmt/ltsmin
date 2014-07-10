@@ -136,6 +136,8 @@ extern int          dm_expand_vector (matrix_t *, int row, int *s0, int *src,
 
 extern void         dm_print_perm (const matrix_header_t *p);
 
+extern int          dm_clear(matrix_t *m);
+
 /**
  * Applies logical or to each element of both matrices into a. 
  *
