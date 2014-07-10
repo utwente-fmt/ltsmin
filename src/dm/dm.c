@@ -1439,3 +1439,64 @@ dm_cols_to_idx_table(const matrix_t* m)
     }
     return result;
 }
+
+int
+dm_apply_or(matrix_t* a, const matrix_t* b)
+{
+    if (dm_ncols(a) != dm_ncols(b) || dm_nrows(a) != dm_nrows(b)) {
+        return -1;
+    }
+        
+    for (int i = 0; i < dm_nrows(a); i++) {
+        for (int j = 0; j < dm_ncols(a); j++) {
+            if (dm_is_set(b, i, j)) {
+                dm_set(a, i, j);
+            }
+        }
+    }
+    
+    return 0;
+}
+
+int
+dm_equals(const matrix_t* a, const matrix_t* b)
+{
+    if (dm_ncols(a) != dm_ncols(b) || dm_nrows(a) != dm_nrows(b)) {
+        return -1;
+    }
+
+    for (int i = 0; i < dm_nrows(a); i++) {
+        for (int j = 0; j < dm_ncols(a); j++) {
+            if (dm_is_set(a, i, j) != dm_is_set(b, i, j)) return 0;
+        }
+    }
+
+    return 1;
+}
+
+
+int
+dm_apply_xor(matrix_t* a, const matrix_t* b)
+{
+    if (dm_ncols(a) != dm_ncols(b) || dm_nrows(a) != dm_nrows(b)) {
+        return -1;
+    }
+
+    for (int i = 0; i < dm_nrows(a); i++) {
+        for (int j = 0; j < dm_ncols(a); j++) {
+            if (dm_is_set(a, i, j) != dm_is_set(b, i, j)) dm_set(a, i, j);
+            else dm_unset(a, i, j);
+        }
+    }
+
+    return 0;
+}
+
+int
+dm_is_empty(const matrix_t* m)
+{
+    for (int i = 0; i < dm_nrows(m); i++)
+        for (int j = 0; j < dm_ncols(m); j++)
+            if (dm_is_set(m, i, j)) return 0;
+    return 1;
+}

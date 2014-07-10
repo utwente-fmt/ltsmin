@@ -137,6 +137,44 @@ extern int          dm_expand_vector (matrix_t *, int row, int *s0, int *src,
 extern void         dm_print_perm (const matrix_header_t *p);
 
 /**
+ * Applies logical or to each element of both matrices into a. 
+ *
+ * return value:
+ *  0: bitvector copied, no errors
+ * -1: error
+ */
+extern int          dm_apply_or(matrix_t* a, const matrix_t* b);
+
+/**
+ * Applies logical equivalence (i.e. a == b).
+ *
+ * return value:
+ *  1: when equals
+ *  0: when not equal
+ * -1: error
+ */
+extern int          dm_equals(const matrix_t* a, const matrix_t* b);
+
+/**
+ * Applies exclusive or (xor) to each element of both matrices into a.
+ *
+ * return value:
+ *  1: when equals
+ *  0: when not equal
+ * -1: error
+ */
+extern int          dm_apply_xor(matrix_t* a, const matrix_t* b);
+
+/**
+ * Returns whether every element in m is 0.
+ *
+ * return value:
+ *  1: when empty
+ *  0: otherwise
+ */
+extern int          dm_is_empty(const matrix_t* m);
+
+/**
  * dm_bitvector_row/col
  *  Copy a row/column of the matrix to a bitvector
  *  (with the current permutation applied)
