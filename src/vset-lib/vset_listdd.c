@@ -1602,7 +1602,7 @@ static void mdd_clear_and_print(FILE* fp,uint32_t mdd){
 }
 
 
-void set_dot_mdd(FILE* fp, vset_t src) {
+static void set_dot_mdd(FILE* fp, vset_t src) {
   uint32_t mdd = src->mdd;
   fprintf(fp,"digraph setbdd {\nnode [shape=record];\n");
   mdd_mark_for_dot(mdd);
@@ -1612,7 +1612,7 @@ void set_dot_mdd(FILE* fp, vset_t src) {
 }
 
 
-void rel_dot_mdd(FILE* fp, vrel_t src) {
+static void rel_dot_mdd(FILE* fp, vrel_t src) {
   uint32_t mdd = src->mdd;
   fprintf(fp,"digraph relbdd {\nnode [shape=record];\n");
   mdd_mark_for_dot(mdd); // this changes mdd_used; does it matter?
@@ -1693,4 +1693,3 @@ vdom_t vdom_create_list_native(int n){
     dom->shared.rel_dot=rel_dot_mdd;
     return dom;
 }
-
