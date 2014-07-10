@@ -1,10 +1,10 @@
 === ListDD Options
 
-*--ldd-step*='STEP'::
+*--ldd64-step*='STEP'::
         The internal tables of ListDD resize according to the Fibonacci series.
         This option sets the initial size to the Fibonacci number 'STEP'.
         Defaults to 30.
 
-*--ldd-cache*='DIFF'::
+*--ldd64-cache*='DIFF'::
         Set Fibonacci difference 'DIFF' between the cache and nodes (DIFF may be negative).
         Defaults to 1.
