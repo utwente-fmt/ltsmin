@@ -2324,12 +2324,18 @@ main (int argc, char *argv[])
         double e_count;
 
         long total_count = 0;
+        long explored_total_count = 0;
         for(int i=0; i<nGrps; i++) {
             get_vrel_size(group_next[i], &n_count, &e_count, elem_str, sizeof(elem_str));
             Print(infoLong, "group_next[%d]: %ld nodes", i, n_count);
             total_count += n_count;
+
+            get_vset_size(group_explored[i], &n_count, &e_count, elem_str, sizeof(elem_str));
+            Print(infoLong, "group_explored[%d]: %s (~%1.2e) states, %ld nodes", i, elem_str, e_count, n_count);
+            explored_total_count += n_count;
         }
         Print(infoLong, "group_next: %ld nodes total", total_count);
+        Print(infoLong, "group_explored: %ld nodes total", explored_total_count);
     }
 
     if (files[1] != NULL)
