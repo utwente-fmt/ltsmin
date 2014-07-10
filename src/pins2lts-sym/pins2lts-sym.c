@@ -26,6 +26,7 @@
 static ltsmin_expr_t mu_expr = NULL;
 static char* ctl_formula = NULL;
 static char* mu_formula  = NULL;
+static char* dot_dir = NULL;
 
 static char* trc_output = NULL;
 static int   dlk_detect = 0;
@@ -158,6 +159,7 @@ static  struct poptOption options[] = {
     { "trace" , 0 , POPT_ARG_STRING , &trc_output , 0 , "file to write trace to" , "<lts-file>.gcf" },
     { "mu" , 0 , POPT_ARG_STRING , &mu_formula , 0 , "file with a mu formula" , "<mu-file>.mu" },
     { "ctl-star" , 0 , POPT_ARG_STRING , &ctl_formula , 0 , "file with a ctl* formula" , "<ctl-file>.ctl" },
+    { "dot", 0, POPT_ARG_STRING, &dot_dir, 0, "directory to write dot representation of vector sets to", NULL },
 #ifdef HAVE_LIBSPG
     { "pg-solve" , 0 , POPT_ARG_NONE , &pgsolve_flag, 0, "Solve the generated parity game (only for symbolic tool).","" },
     { NULL, 0 , POPT_ARG_INCLUDE_TABLE, spg_solve_options , 0, "Symbolic parity game solver options", NULL},
@@ -669,6 +671,41 @@ stats_and_progress_report(vset_t current, vset_t visited, int level)
         }
       }
     }
+    
+    if (dot_dir != NULL) {
+        
+        FILE *fp;
+        char *file;
+
+        file = "%s/current-l%d.dot";
+        char fcbuf[snprintf(NULL, 0, file, dot_dir, level)];
+        sprintf(fcbuf, file, dot_dir, level);
+
+        fp = fopen(fcbuf, "w+");
+        vset_dot(fp, current);
+        fclose(fp);
+
+        file = "%s/visited-l%d.dot";
+        char fvbuf[snprintf(NULL, 0, file, dot_dir, level)];
+        sprintf(fvbuf, file, dot_dir, level);
+
+        fp = fopen(fvbuf, "w+");
+        vset_dot(fp, visited);
+        fclose(fp);
+
+        for (int i = 0; i < nGrps; i++) {
+            file = "%s/group_next-l%d-k%d.dot";
+            char fgbuf[snprintf(NULL, 0, file, dot_dir, level, i)];
+            sprintf(fgbuf, file, dot_dir, level, i);
+
+            fp = fopen(fgbuf, "w+");
+
+            vrel_dot(fp, group_next[i]);
+
+            fclose(fp);
+
+        }
+    }    
 }
 
 static void
@@ -2156,7 +2193,18 @@ main (int argc, char *argv[])
         if (strategy != BFS_P) Abort("maximal progress works for bfs-prev only.");
         if (sat_strategy != NO_SAT) Abort("maximal progress is incompatibale with saturation");
     }
-
+    
+    if (dot_dir != NULL) {
+        DIR* dir = opendir(dot_dir);
+        if (dir) {
+            closedir(dir);
+        } else if (ENOENT == errno) {
+            Abort(sprintf("Option 'dot-dir': directory '%s' does not exist", dot_dir));
+        } else {
+            Abort(sprintf("Option 'dot-dir': failed opening directory '%s'", dot_dir));
+        }
+    }
+    
     sat_proc_t sat_proc = NULL;
     reach_proc_t reach_proc = NULL;
     guided_proc_t guided_proc = NULL;

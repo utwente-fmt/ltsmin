@@ -43,6 +43,16 @@ to saturate levels.
         groups. The 'directed' strategy focuses the search on the transition
         groups in which the action occurs. Defaults to 'unguided'.
 
+*--dot*='DIR'::
+    If this option is supplied 'DIR' is a directory to which dot files of vector sets are written to.
+    Note that this option should only be used for smaller vector sets because of disk space.
++
+Three type of dot files are (over)written:
+
+ . current-l<L>.dot: the nodes in the vector set at level L (and only level L),
+ . visited-l<L>.dot: the nodes in the vector set up to and included level L,
+ . group_next-l<L>-k<K>.dot: the nodes in the transition relation of group K at level L.
+
 *--mu*='MUFILE|MUFORMULA'::
     After computing all reachable states, evaluate the mu-formula in 'MUFILE'
 +
@@ -58,4 +68,3 @@ space.
     'CTLFORMULA'.
     The formula is translated to a mu-formula (see manpage:ltsmin-mu[5]),
     which is evaluated after computing all reachable states.
-
