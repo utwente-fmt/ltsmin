@@ -76,7 +76,7 @@ struct poptOption vset_options[]={
       "select a vector set implementation from native ListDD (32-bit or 64-bit),"
       " ATermDD with *list* encoding,"
       " ATermDD with *tree* encoding, BuDDy using the *fdd* feature,"
-      " DDD, or Sylvan (default: first available)" , "<ldd|ldd64|list|tree|fdd|ddd|sylvan>" },
+      " DDD, or Sylvan (default: first available)" , "<ldd64|ldd|list|tree|fdd|ddd|sylvan>" },
     { NULL,0 , POPT_ARG_INCLUDE_TABLE , listdd_options , 0 , "ListDD options" , NULL},
     { NULL,0 , POPT_ARG_INCLUDE_TABLE , listdd64_options , 0 , "ListDD64 options" , NULL},
 #ifdef HAVE_ATERM2_H
@@ -97,8 +97,8 @@ vdom_create_domain(int n, vset_implementation_t impl)
     switch(impl){
     case VSET_IMPL_AUTOSELECT:
         /* fall-through */
-    case VSET_ListDD: return vdom_create_list_native(n);
     case VSET_ListDD64: return vdom_create_list64_native(n);
+    case VSET_ListDD: return vdom_create_list_native(n);
 #ifdef HAVE_ATERM2_H
     case VSET_AtermDD_list: return vdom_create_list(n);
     case VSET_AtermDD_tree: return vdom_create_tree(n);
