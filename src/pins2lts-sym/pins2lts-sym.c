@@ -6,6 +6,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
+#include <dirent.h>
+#include <inttypes.h>
 
 #include <dm/dm.h>
 #include <hre/user.h>
@@ -21,7 +23,6 @@
 #include <vset-lib/vector_set.h>
 #include <util-lib/dynamic-array.h>
 #include <hre/stringindex.h>
-
 
 static ltsmin_expr_t mu_expr = NULL;
 static char* ctl_formula = NULL;
@@ -518,7 +519,7 @@ explore_cb(void *context, int *src)
 }
 
 static inline void
-expand_group_next(int group, vset_t set)
+expand_group_next(int group, vset_t set, long *next_count)
 {
     struct group_add_info ctx;
     int explored = 0;
@@ -531,6 +532,7 @@ expand_group_next(int group, vset_t set)
     vset_zip(group_explored[group], group_tmp[group]);
     vset_enum(group_tmp[group], explore_cb, &ctx);
     vset_clear(group_tmp[group]);
+    if (next_count != NULL) (*next_count) += explored;
 }
 
 static void
@@ -960,7 +962,7 @@ reach_bfs_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
         level++;
         for (int i = 0; i < nGrps; i++){
             if (!bitvector_is_set(reach_groups, i)) continue;
-            expand_group_next(i, current_level);
+            expand_group_next(i, current_level, next_count);
             (*eg_count)++;
         }
         for(int i=0;i<N;i++){
@@ -978,7 +980,6 @@ reach_bfs_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
                 for (int i = 0; i < nGrps; i++) {
                     if (!bitvector_is_set(reach_groups,i)) continue;
                     if (!dm_is_set(class_matrix,c,i)) continue;
-                    (*next_count)++;
                     vset_next(temp, current_class, group_next[i]);
                     vset_prev(dlk_temp, temp, group_next[i]);
                     if (dlk_detect) {
@@ -1047,13 +1048,12 @@ reach_bfs(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
         level++;
         for (int i = 0; i < nGrps; i++) {
             if (!bitvector_is_set(reach_groups,i)) continue;
-            expand_group_next(i, visited);
+            expand_group_next(i, visited, next_count);
             (*eg_count)++;
         }
         if (dlk_detect) vset_copy(deadlocks, visited);
         for (int i = 0; i < nGrps; i++) {
             if (!bitvector_is_set(reach_groups,i)) continue;
-            (*next_count)++;
             vset_next(temp, old_vis, group_next[i]);
             if (dlk_detect) {
                 vset_prev(dlk_temp, temp, group_next[i]);
@@ -1095,9 +1095,9 @@ reach_chain_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
         if (dlk_detect) vset_copy(deadlocks, new_states);
         for (int i = 0; i < nGrps; i++) {
             if (!bitvector_is_set(reach_groups, i)) continue;
-            expand_group_next(i, new_states);
+
+            expand_group_next(i, new_states, next_count);
             (*eg_count)++;
-            (*next_count)++;
             vset_next(temp, new_states, group_next[i]);
             if (dlk_detect) {
                 vset_prev(dlk_temp, temp, group_next[i]);
@@ -1147,9 +1147,8 @@ reach_chain(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
         if (dlk_detect) vset_copy(deadlocks, visited);
         for (int i = 0; i < nGrps; i++) {
             if (!bitvector_is_set(reach_groups, i)) continue;
-            expand_group_next(i, visited);
+            expand_group_next(i, visited, next_count);
             (*eg_count)++;
-            (*next_count)++;
             vset_next(temp, visited, group_next[i]);
             vset_union(visited, temp);
             if (dlk_detect) {
@@ -1199,12 +1198,11 @@ reach_sat_fix(reach_proc_t reach_proc, vset_t visited,
         level++;
         for(int i = 0; i < nGrps; i++){
             if (!bitvector_is_set(reach_groups, i)) continue;
-            expand_group_next(i, visited);
+            expand_group_next(i, visited, next_count);
             (*eg_count)++;
         }
         if (dlk_detect) vset_copy(deadlocks, visited);
         vset_least_fixpoint(visited, visited, group_next, nGrps);
-        (*next_count)++;
         if (dlk_detect) {
             for (int i = 0; i < nGrps; i++) {
                 vset_prev(dlk_temp, visited, group_next[i]);
@@ -1386,6 +1384,7 @@ struct expand_info {
     int group;
     vset_t group_explored;
     long *eg_count;
+    long *next_count;
 };
 
 static inline void
@@ -1404,6 +1403,7 @@ expand_group_next_projected(vrel_t rel, vset_t set, void *context)
     (*expand_ctx->eg_count)++;
     vset_zip(group_explored, set);
     vset_enum(set, explore_cb, &group_ctx);
+    (*expand_ctx->next_count) += explored;
 }
 
 static void
@@ -1421,6 +1421,7 @@ reach_sat(reach_proc_t reach_proc, vset_t visited,
             ctx->group = i;
             ctx->group_explored = group_explored[i];
             ctx->eg_count = eg_count;
+            ctx->next_count = next_count;
 
             vrel_set_expand(group_next[i], expand_group_next_projected, ctx);
         }
