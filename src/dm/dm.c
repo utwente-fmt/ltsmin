@@ -7,11 +7,27 @@
 
 #include <dm/dm.h>
 
+#include <hre/user.h>
+#include <util-lib/util.h>
+
 #ifdef DMDEBUG
 #define DMDBG(x) x
 #else
 #define DMDBG(x)
 #endif
+
+int
+dm_clear_header(matrix_header_t *p)
+{
+    int i;
+    // TODO: null ptr exception
+    for (i = 0; i < p->size; i++) {
+        p->data[i].becomes = p->data[i].at = p->data[i].group = i;
+        p->count[i] = 0;
+    }
+
+    return (p->data == NULL);
+}
 
 int
 dm_create_header (matrix_header_t *p, int size)
@@ -117,6 +133,15 @@ dm_close_group (permutation_group_t *o)
         return -1;
 
     dm_add_to_permutation_group (o, o->data[o->size - 1]);
+    return 0;
+}
+
+int
+dm_clear(matrix_t *m)
+{
+    bitvector_clear(&(m->bits));
+    dm_clear_header(&(m->row_perm));
+    dm_clear_header(&(m->col_perm));
     return 0;
 }
 
