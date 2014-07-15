@@ -31,7 +31,9 @@ void simplemap_test()
 }
 
 int main(int argc, char *argv[]){
+    HREinitBegin(argv[0]);
+    HREinitStart(&argc,&argv,0,-1,NULL,NULL);
+
     simplemap_test();
-    return 0;
-    (void) argc; (void) argv;
+    HREexit(0);
 }

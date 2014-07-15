@@ -16,9 +16,6 @@ check_PROGRAMS += test-dfs-stack
 check_PROGRAMS += test-dbs
 check_PROGRAMS += test-dm
 check_PROGRAMS += test-hre
-if HAVE_MPI
-check_PROGRAMS += test-mpi-hre
-endif
 check_PROGRAMS += test-is-balloc
 check_PROGRAMS += test-ltsmin-parse
 check_PROGRAMS += test-mucalc-parser
@@ -59,12 +56,11 @@ test_hre_LDADD 				= ../hre/libhre.la ../hre-io/libhre-io.la
 test_hre_LDADD 			   += ../util-lib/libutil.la
 
 # test-hre-mpi
-test_mpi_hre_SOURCES 		= test-hre.c
-test_mpi_hre_CPPFLAGS 		= -DTESTMPI $(AM_CPPFLAGS)
-test_mpi_hre_LDADD 		    =
-test_mpi_hre_LDADD         += ../hre-io/libhre-io.la
-test_mpi_hre_LDADD  	   += ../hre-mpi/libhre.la
-test_mpi_hre_LDADD 		   += ../util-lib/libutil.la
+if HAVE_MPI
+SUBDIRS = mpicc
+else
+SUBDIRS = gcc
+endif
 
 # test-ltsmin-parse
 test_ltsmin_parse_SOURCES 	= test-ltsmin-parse.c

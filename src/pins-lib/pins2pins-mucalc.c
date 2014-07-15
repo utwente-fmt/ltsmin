@@ -1,6 +1,8 @@
 #include <hre/config.h>
 
+#include <assert.h>
 #include <limits.h>
+#include <stdbool.h>
 #include <stdlib.h>
 
 #include <dm/dm.h>
@@ -90,36 +92,39 @@ mucalc_sl_all(model_t model, int *state, int *labels)
  */
 void mucalc_print_state(log_t log, mucalc_context_t* ctx, int* state)
 {
-    mucalc_node_t node = ctx->groupinfo.nodes[state[ctx->mu_idx]];
-    const char* type_s = mucalc_type_print(node.expression->type);
-    Printf(log, "[node %d, type=%s, ", state[ctx->mu_idx], type_s);
-    lts_type_t ltstype = GBgetLTStype(ctx->parent);
-    int state_length = lts_type_get_state_length(ltstype);
-    for(int i=0; i<state_length; i++)
+    if (log_active(log))
     {
-        if (i > 0) Printf(log, ", ");
-        char* name = lts_type_get_state_name(ltstype, i);
-        int type_no = lts_type_get_state_typeno(ltstype, i);
-        data_format_t format = lts_type_get_format(ltstype, type_no);
-        switch(format)
+        mucalc_node_t node = ctx->groupinfo.nodes[state[ctx->mu_idx]];
+        const char* type_s = mucalc_type_print(node.expression->type);
+        Printf(log, "[node %d, type=%s, ", state[ctx->mu_idx], type_s);
+        lts_type_t ltstype = GBgetLTStype(ctx->parent);
+        int state_length = lts_type_get_state_length(ltstype);
+        for(int i=0; i<state_length; i++)
         {
-            case LTStypeDirect:
-            case LTStypeRange:
+            if (i > 0) Printf(log, ", ");
+            char* name = lts_type_get_state_name(ltstype, i);
+            int type_no = lts_type_get_state_typeno(ltstype, i);
+            data_format_t format = lts_type_get_format(ltstype, type_no);
+            switch(format)
             {
-                Printf(log, "%s=%d", name, state[i]);
+                case LTStypeDirect:
+                case LTStypeRange:
+                {
+                    Printf(log, "%s=%d", name, state[i]);
+                }
+                break;
+                default:
+                {
+                    chunk c = GBchunkGet(ctx->parent, type_no, state[i]);
+                    char value[c.len*2+6];
+                    chunk2string(c, sizeof value, value);
+                    Printf(log, "%s=%s", name, value);
+                }
+                break;
             }
-            break;
-            default:
-            {
-                chunk c = GBchunkGet(ctx->parent, type_no, state[i]);
-                char value[c.len*2+6];
-                chunk2string(c, sizeof value, value);
-                Printf(log, "%s=%s", name, value);
-            }
-            break;
         }
+        Printf(log, "]\n");
     }
-    Printf(log, "]\n");
 }
 
 
@@ -140,8 +145,8 @@ void mucalc_cb (void* context, transition_info_t* ti, int* dst, int*cpy) {
     mucalc_node_t node = cb_ctx->node;
     mucalc_action_expression_t action_expr = ctx->env->action_expressions[node.expression->value];
     bool negated = action_expr.negated;
-    const char* action_expr_string = mucalc_fetch_value(ctx->env, node.expression->type, node.expression->value);
-    Print(infoLong, "mucalc_cb: negated=%s, action_expr=%s", (action_expr.negated ? "true":"false"), action_expr_string);
+    const char* action_expr_string = mucalc_fetch_action_value(ctx->env, action_expr);
+    Debug("mucalc_cb: negated=%s, action_expr=%s", (action_expr.negated ? "true":"false"), action_expr_string);
 
     bool valid_transition = negated;
     if (node.expression->value==-1 || strlen(action_expr_string)==0) // empty string
@@ -154,11 +159,14 @@ void mucalc_cb (void* context, transition_info_t* ti, int* dst, int*cpy) {
         chunk c = GBchunkGet(parent, ctx->action_label_type_no, edge_labels[ctx->action_label_index]);
         char label[c.len*2+6];
         chunk2string(c, sizeof label, label);
-        Print(infoLong, "mucalc_cb: action label=%s (%d)", label, edge_labels[ctx->action_label_index]);
+        assert(strlen(label) >= 2);
+        label[strlen(label) - 1] = '\0';
+        char* l = label + sizeof(char);
+        Debug("mucalc_cb: action label=%s (%d)", l, edge_labels[ctx->action_label_index]);
         // TODO: this part can be easily optimised by storing the action_expr in the same chunktable
         // as the labels.
         // But... if we want to extend this and use, e.g., regular expressions, that is not the way to go.
-        if (strlen(action_expr_string)==strlen(label) && strncmp(action_expr_string, label, strlen(action_expr_string))==0)
+        if (strlen(action_expr_string)==strlen(l) && strncmp(action_expr_string, l, strlen(action_expr_string))==0)
         {
             valid_transition = !negated;
         }
@@ -170,11 +178,11 @@ void mucalc_cb (void* context, transition_info_t* ti, int* dst, int*cpy) {
         int _dst[ctx->len];
         memcpy(_dst, dst, ctx->len*sizeof(int)-1);
         _dst[ctx->mu_idx] = cb_ctx->target_idx;
-        cb_ctx->cb(cb_ctx->user_context, &_ti, _dst,cpy);
-        if (log_active(infoLong))
+        cb_ctx->cb(cb_ctx->user_context, &_ti, _dst);
+        if (log_active(debug))
         {
-            Print(infoLong, "mucalc_cb: successor:");
-            mucalc_print_state(infoLong, ctx, _dst);
+            Debug("mucalc_cb: successor:");
+            mucalc_print_state(debug, ctx, _dst);
         }
     }
 }
@@ -187,8 +195,8 @@ static inline void mucalc_successor(model_t self, int *dst, int group, int* tran
     transition_info_t ti = GB_TI(edge_labels, group);
     cb(user_context, &ti, dst,NULL);
     ++(*transition_count);
-    Print(infoLong, "mucalc_successor:");
-    mucalc_print_state(infoLong, ctx, dst);
+    Debug("mucalc_successor:");
+    mucalc_print_state(debug, ctx, dst);
 }
 
 
@@ -211,11 +219,11 @@ mucalc_long (model_t self, int group, int *src, TransitionCB cb,
     mucalc_node_t node = ctx->groupinfo.nodes[mucalc_node_idx];
     if (ctx->groupinfo.entries[group].node.expression->idx == node.expression->idx)
     {  // this group is applicable for this type of expression
-        if (log_active(infoLong))
+        if (log_active(debug))
         {
-            Print(infoLong, "%s", "");
-            Print(infoLong, "mucalc_long");
-            mucalc_print_state(infoLong, ctx, src);
+            Debug(" ");
+            Debug("mucalc_long");
+            mucalc_print_state(debug, ctx, src);
         }
         int transition_count = 0;
         switch(node.expression->type)
@@ -258,12 +266,12 @@ mucalc_long (model_t self, int group, int *src, TransitionCB cb,
                 if (src[proposition.state_idx]==proposition.value_idx)
                 { // proposition is true
                     dst[ctx->mu_idx] = ctx->env->true_expr->idx;
-                    Print(infoLong, "Proposition %s is true.", mucalc_fetch_value(ctx->env, MUCALC_PROPOSITION, node.expression->value));
+                    Debug("Proposition %s is true.", mucalc_fetch_value(ctx->env, MUCALC_PROPOSITION, node.expression->value));
                 }
                 else
                 {
                     dst[ctx->mu_idx] = ctx->env->false_expr->idx;
-                    Print(infoLong, "Proposition %s is false (src[state_idx]=%d, value_idx=%d)).",
+                    Debug("Proposition %s is false (src[state_idx]=%d, value_idx=%d)).",
                           mucalc_fetch_value(ctx->env, MUCALC_PROPOSITION, node.expression->value),
                           src[proposition.state_idx], proposition.value_idx);
                 }
@@ -298,9 +306,49 @@ mucalc_long (model_t self, int group, int *src, TransitionCB cb,
             }
             break;
             case MUCALC_NOT:
-                // TODO: check if successor is only T, F or proposition.
-                Abort("Negation not yet supported.");
-                break;
+            {
+                // check if successor is T, F or proposition (only then negation is allowed).
+                mucalc_node_t child = ctx->groupinfo.nodes[node.expression->arg1->idx];
+                switch(child.expression->type)
+                {
+                    case MUCALC_FALSE:
+                    case MUCALC_TRUE:
+                    {
+                        // generate the inverse as a successor instead
+                        int dst[ctx->len];
+                        memcpy(dst, src, ctx->len*sizeof(int));
+                        dst[ctx->mu_idx] = (child.expression->type == MUCALC_FALSE) ?
+                                ctx->env->true_expr->idx :
+                                ctx->env->false_expr->idx;
+                        mucalc_successor(self, dst, group, &transition_count, cb, user_context);
+                    }
+                    break;
+                    case MUCALC_PROPOSITION:
+                    {
+                        // evaluate the proposition and write the inverse boolean result as successor
+                        int dst[ctx->len];
+                        memcpy(dst, src, ctx->len*sizeof(int));
+                        mucalc_proposition_t proposition = ctx->env->propositions[node.expression->value];
+                        if (src[proposition.state_idx]==proposition.value_idx)
+                        { // proposition is true, negation is false
+                            dst[ctx->mu_idx] = ctx->env->false_expr->idx;
+                            Debug("Proposition !(%s) is false.", mucalc_fetch_value(ctx->env, MUCALC_PROPOSITION, node.expression->value));
+                        }
+                        else
+                        {
+                            dst[ctx->mu_idx] = ctx->env->true_expr->idx;
+                            Debug("Proposition !(%s) is true (src[state_idx]=%d, value_idx=%d)).",
+                                  mucalc_fetch_value(ctx->env, MUCALC_PROPOSITION, node.expression->value),
+                                  src[proposition.state_idx], proposition.value_idx);
+                        }
+                        mucalc_successor(self, dst, group, &transition_count, cb, user_context);
+                    }
+                    break;
+                    default: Abort("Negation only allowed on leaf nodes, "
+                            "before true, false or propositions.");
+                }
+            }
+            break;
             default: Abort("mucalc_long: unknown expression type: %d", node.expression->type);
         }
         //Print(infoLong, "  transitions: %d.", transition_count);
@@ -331,11 +379,11 @@ mucalc_all (model_t self, int *src, TransitionCB cb, void *user_context)
     int mucalc_node_idx = src[ctx->mu_idx];
     mucalc_node_t node = ctx->groupinfo.nodes[mucalc_node_idx];
     int group = -1;
-    if (log_active(infoLong))
+    if (log_active(debug))
     {
-        Print(infoLong, "%s", "");
-        Print(infoLong, "mucalc_all");
-        mucalc_print_state(infoLong, ctx, src);
+        Debug(" ");
+        Debug("mucalc_all");
+        mucalc_print_state(debug, ctx, src);
     }
     int transition_count = 0;
     switch(node.expression->type)
@@ -378,12 +426,12 @@ mucalc_all (model_t self, int *src, TransitionCB cb, void *user_context)
             if (src[proposition.state_idx]==proposition.value_idx)
             { // proposition is true
                 dst[ctx->mu_idx] = ctx->env->true_expr->idx;
-                Print(infoLong, "Proposition %s is true.", mucalc_fetch_value(ctx->env, MUCALC_PROPOSITION, node.expression->value));
+                Debug("Proposition %s is true.", mucalc_fetch_value(ctx->env, MUCALC_PROPOSITION, node.expression->value));
             }
             else
             {
                 dst[ctx->mu_idx] = ctx->env->false_expr->idx;
-                Print(infoLong, "Proposition %s is false (src[state_idx]=%d, value_idx=%d)).",
+                Debug("Proposition %s is false (src[state_idx]=%d, value_idx=%d)).",
                                           mucalc_fetch_value(ctx->env, MUCALC_PROPOSITION, node.expression->value),
                                           src[proposition.state_idx], proposition.value_idx);
             }
@@ -447,9 +495,8 @@ void mucalc_parse_file(const char *file, mucalc_parse_env_t env)
     env->parser=mucalc_parse_alloc(RTmalloc);
     mucalc_parse(env->parser, TOKEN_EXPR, 0, env);
     mucalc_lex_init_extra(env, &scanner);
-    Print(infoLong, "Start lexer.");
     mucalc_lex(scanner);
-    Print(infoLong, "Lexer done.");
+    mucalc_check_formula(env, env->formula_tree);
     mucalc_lex_destroy(scanner);
     stream_close(&env->input);
     mucalc_parse_free(env->parser, RTfree);
@@ -653,11 +700,12 @@ mucalc_groupinfo_t mucalc_compute_groupinfo(mucalc_parse_env_t env, int parent_g
     {
         mucalc_group_entry_t entry = groupinfo.entries[i];
         const char* type_s = mucalc_type_print(entry.node.expression->type);
-        Print(infoLong, "Group %d: node=%d, type=%s, parent_group=%d, priority=%d, player=%d, value=%s, arg1=%d, arg2=%d.",
+        Debug("Group %d: node=%d, type=%s, parent_group=%d, priority=%d, player=%d, value=%s, arg1=%d, arg2=%d.",
               entry.node.expression->idx, i, type_s, entry.parent_group, entry.node.priority, entry.node.player,
               mucalc_fetch_value(env, entry.node.expression->type, entry.node.expression->value),
               (entry.node.expression->arg1==NULL ? -1 : entry.node.expression->arg1->idx),
               (entry.node.expression->arg2==NULL ? -1 : entry.node.expression->arg2->idx));
+        (void)type_s;
     }
     Print(infoLong, "Done computing groupinfo.");
     return groupinfo;

@@ -68,8 +68,8 @@ action_expr(A) ::= NOT STRING(S).           { A = mucalc_add_action_expression(e
 proposition(P) ::= LBRACKET ID(I) EQUALS value(V) RBRACKET.  { P = mucalc_add_proposition(env, I, V); }
 
 %type value { int }
-value(V) ::= STRING(S).                     { printf("STRING\n"); V = mucalc_add_value(env, MUCALC_VALUE_STRING, S); }
-value(V) ::= NUMBER(N).                     { printf("NUMBER: %d\n", N); V = mucalc_add_value(env, MUCALC_VALUE_NUMBER, N); }
+value(V) ::= STRING(S).                     { /*printf("STRING\n");*/ V = mucalc_add_value(env, MUCALC_VALUE_STRING, S); }
+value(V) ::= NUMBER(N).                     { /*printf("NUMBER: %d\n", N);*/ V = mucalc_add_value(env, MUCALC_VALUE_NUMBER, N); }
 
 %type variable { int }
 variable(V) ::= ID(I).                     { V = I; }

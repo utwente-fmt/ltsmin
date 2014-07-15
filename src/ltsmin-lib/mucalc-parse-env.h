@@ -21,8 +21,10 @@ struct mucalc_parse_env_s
                               Otherwise an EOL token is generated. */
     int         linepos;
     char        buffer[ENV_BUFFER_SIZE];
-    //string_index_t  variables;
-    int         variable_count; // number of fixpoint variables
+
+    string_index_t  variables; // (secondary) storage for variable identifiers (for context check)
+    int             variable_count; // number of fixpoint variables
+
     string_index_t  ids; // storage for identifiers
     string_index_t  strings; // storage for string values
 

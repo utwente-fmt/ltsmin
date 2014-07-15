@@ -25,3 +25,8 @@ libtool
 bin/
 share/
 include/
+/src/ltsmin-lib/mucalc-grammar.c
+/src/ltsmin-lib/mucalc-grammar.h
+/src/ltsmin-lib/mucalc-grammar.out
+/src/ltsmin-lib/mucalc-lexer.c
+/src/ltsmin-lib/mucalc-lexer.h

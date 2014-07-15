@@ -7,6 +7,9 @@
 %option extra-type="mucalc_parse_env_t"
 %{
 #include <hre/config.h>
+
+#include <assert.h>
+
 #include <hre/user.h>
 #include <hre-io/user.h>
 #include <ltsmin-lib/mucalc-parse-env.h>
@@ -81,21 +84,27 @@ EOL         (\n|\r|\n\r|\r\n)
 {ID}     {
     yyextra->linepos+=strlen(yytext);
     int value = SIput(yyextra->ids, yytext);
-    printf("lexer: ID: %s (%d)\n", yytext, value);
+    //Print(infoLong, "lexer: ID: %s (%d)", yytext, value);
     mucalc_parse(yyextra->parser,TOKEN_ID,value,yyextra);
 }
 
 {STRING} {
     yyextra->linepos+=strlen(yytext);
-    int value = SIput(yyextra->strings, yytext);
-    printf("lexer: STRING: %s (%d)\n", yytext, value);
+    assert(strlen(yytext) >= 2);
+    // trim the quote characters
+    yytext[strlen(yytext) - 1] = '\0';
+    char* str = yytext + sizeof(char);
+    // unescape escaped strings
+    char* unescaped = mucalc_unescape_string(str);
+    int value = SIput(yyextra->strings, unescaped);
+    //Print(infoLong, "lexer: STRING: %s %s (%d)", str, unescaped, value);
     mucalc_parse(yyextra->parser,TOKEN_STRING,value,yyextra);
 }
 
 {NUMBER} {
     yyextra->linepos+=strlen(yytext);
     int value = atoi(yytext);
-    printf("lexer: NUMBER: %d\n", value);
+    //Print(infoLong, "lexer: NUMBER: %d", value);
     mucalc_parse(yyextra->parser,TOKEN_NUMBER,value,yyextra);
 }
 

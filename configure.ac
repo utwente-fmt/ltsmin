@@ -453,6 +453,8 @@ AC_CONFIG_FILES([
        src/torx/Makefile
        src/scripts/Makefile
        src/tests/Makefile
+       src/tests/gcc/Makefile
+       src/tests/mpicc/Makefile
        doc/Makefile
        lemon/Makefile
        testsuite/Makefile

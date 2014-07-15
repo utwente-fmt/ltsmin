@@ -1114,7 +1114,7 @@ int GBgetMucalcNodeCount(model_t model) {
     // FIXME: this assumes that the mu-calc layer is the topmost layer!
     // (will break with caching option, for instance)
     mucalc_context_t *ctx = (mucalc_context_t*)GBgetContext(model);
-    Print(infoLong, "GBgetMucalcNodeCount: %d", ctx->groupinfo.node_count);
+    //Print(infoLong, "GBgetMucalcNodeCount: %d", ctx->groupinfo.node_count);
     return ctx->groupinfo.node_count;
 }
 

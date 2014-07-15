@@ -150,6 +150,16 @@ int mucalc_add_value(mucalc_parse_env_t env, mucalc_value_type_enum_t type, int 
  */
 const char* mucalc_type_print(mucalc_type_enum_t type);
 
+/**
+ * \brief Fetches the string version of action expression <tt>action_expr</tt>.
+ */
+const char* mucalc_fetch_action_value(mucalc_parse_env_t env, mucalc_action_expression_t action_expr);
+
+/**
+ * \brief Gets the action expression for the modal operator at index <tt>value</tt>.
+ */
+mucalc_action_expression_t mucalc_get_action_expression(mucalc_parse_env_t env, int value);
+
 
 /**
  * \brief Fetches the string version of index <tt>value</tt> for type <tt>type</tt>.
@@ -158,8 +168,35 @@ const char* mucalc_fetch_value(mucalc_parse_env_t env, mucalc_type_enum_t type, 
 
 
 /**
- * \brief Prints a string representation of an expression to infoLong.
+ * \brief Prints a string representation of an expression object to infoLong.
  */
 void mucalc_expr_print(mucalc_parse_env_t env, mucalc_expr_t e);
+
+/**
+ * \brief Prints the expression to f.
+ */
+void mucalc_print_formula(FILE* f, mucalc_parse_env_t env, mucalc_expr_t expr);
+
+/**
+ * \brief Checks if variables in the formula are in the scope of a corresponding
+ * fixpoint operator.
+ */
+bool mucalc_check_formula(mucalc_parse_env_t env, mucalc_expr_t expr);
+
+static const char   MUCALC_ESCAPE_CHAR = '\\';
+static const size_t MUCALC_ESCAPE_N = 6;
+static const char   MUCALC_ESCAPE_LITERALS[] = {'\\', '\"', '\'', '\n', '\r', '\t'};
+static const char   MUCALC_ESCAPE_SYMBOLS[]  = {'\\', '\"', '\'', 'n', 'r', 't'};
+
+/**
+ * \brief Escapes a string. Allocates a string using malloc.
+ * Replaces '\', '"', ''', '\n', '\t', '\r' by their escaped string representations.
+ */
+char* mucalc_escape_string(const char* input);
+
+/**
+ * \brief Unescapes a string. The reverse of escape_string. Allocates a string using malloc.
+ */
+char* mucalc_unescape_string(const char* input);
 
 #endif
