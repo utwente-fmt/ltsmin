@@ -139,7 +139,7 @@ eval (cb_context *infoctx, transition_info_t *ti, int *state)
 /*
  * TYPE LTSMIN
  */
-void ltl_ltsmin_cb (void*context,transition_info_t*ti,int*dst) {
+void ltl_ltsmin_cb (void*context,transition_info_t*ti,int*dst,int*cpy) {
     cb_context *infoctx = (cb_context*)context;
     ltl_context_t *ctx = infoctx->ctx;
     // copy dst, append ltl never claim in lockstep
@@ -160,7 +160,7 @@ void ltl_ltsmin_cb (void*context,transition_info_t*ti,int*dst) {
             dst_buchi[ctx->ltl_idx] = ctx->ba->states[i]->transitions[j].to_state;
 
             // callback, emit new state, move allowed
-            infoctx->cb(infoctx->user_context, ti, dst_buchi);
+            infoctx->cb(infoctx->user_context, ti, dst_buchi,cpy);
             ++infoctx->ntbtrans;
         }
     }
@@ -200,7 +200,7 @@ ltl_ltsmin_all (model_t self, int *src, TransitionCB cb,
 /*
  * TYPE SPIN
  */
-void ltl_spin_cb (void*context,transition_info_t*ti,int*dst) {
+void ltl_spin_cb (void*context,transition_info_t*ti,int*dst,int*cpy) {
     cb_context *infoctx = (cb_context*)context;
     ltl_context_t *ctx = infoctx->ctx;
     // copy dst, append ltl never claim in lockstep
@@ -217,7 +217,7 @@ void ltl_spin_cb (void*context,transition_info_t*ti,int*dst) {
             dst_buchi[ctx->ltl_idx] = ctx->ba->states[i]->transitions[j].to_state;
 
             // callback, emit new state, move allowed
-            infoctx->cb(infoctx->user_context, ti, dst_buchi);
+            infoctx->cb(infoctx->user_context, ti, dst_buchi,cpy);
             ++infoctx->ntbtrans;
         }
     }
@@ -268,7 +268,7 @@ ltl_spin_all (model_t self, int *src, TransitionCB cb,
                 HREassert (group < ctx->groups, "Group %d larger than expected nr of groups %d, buchi idx: %d",
                            group, ctx->groups, ctx->ba->states[i]->transitions[j].index);
                 transition_info_t ti = GB_TI(labels, group);
-                cb(user_context, &ti, dst_buchi);
+                cb(user_context, &ti, dst_buchi,NULL);
                 ++new_ctx.ntbtrans;
             }
         }
@@ -279,7 +279,7 @@ ltl_spin_all (model_t self, int *src, TransitionCB cb,
 /*
  * TYPE TEXTBOOK
  */
-void ltl_textbook_cb (void*context,transition_info_t*ti,int*dst) {
+void ltl_textbook_cb (void*context,transition_info_t*ti,int*dst,int*cpy) {
     cb_context *infoctx = (cb_context*)context;
     ltl_context_t *ctx = infoctx->ctx;
     // copy dst, append ltl never claim in lockstep
@@ -297,7 +297,7 @@ void ltl_textbook_cb (void*context,transition_info_t*ti,int*dst) {
             dst_buchi[ctx->ltl_idx] = ctx->ba->states[i]->transitions[j].to_state;
 
             // callback, emit new state, move allowed
-            infoctx->cb(infoctx->user_context, ti, dst_buchi);
+            infoctx->cb(infoctx->user_context, ti, dst_buchi,cpy);
             ++infoctx->ntbtrans;
         }
     }
@@ -329,7 +329,7 @@ ltl_textbook_all (model_t self, int *src, TransitionCB cb, void *user_context)
         int labels[ctx->edge_labels];
         memset (labels, 0, sizeof(int) * ctx->edge_labels);
         transition_info_t ti = GB_TI(labels, -1);
-        ltl_textbook_cb(&new_ctx, &ti, src + 1);
+        ltl_textbook_cb(&new_ctx, &ti, src + 1,NULL);
         return new_ctx.ntbtrans;
     } else {
         GBgetTransitionsAll(ctx->parent, src+1, ltl_textbook_cb, &new_ctx);
@@ -495,7 +495,7 @@ GBaddLTL (model_t model)
     matrix_t       *p_new_dm_w = (matrix_t*) RTmalloc(sizeof(matrix_t));
     matrix_t       *p_dm = GBgetDMInfo (model);
     matrix_t       *p_dm_r = GBgetDMInfoRead (model);
-    matrix_t       *p_dm_w = GBgetDMInfoWrite (model);
+    matrix_t       *p_dm_w = GBgetDMInfoMayWrite (model);
 
     int             groups = dm_nrows( GBgetDMInfo(model) );
     int             new_ngroups = (PINS_LTL_SPIN != PINS_LTL ? groups : groups + ba->trans_count);
@@ -582,7 +582,7 @@ GBaddLTL (model_t model)
 
     GBsetDMInfo(ltlmodel, p_new_dm);
     GBsetDMInfoRead(ltlmodel, p_new_dm_r);
-    GBsetDMInfoWrite(ltlmodel, p_new_dm_w);
+    GBsetDMInfoMayWrite(ltlmodel, p_new_dm_w);
 
     // create new state label matrix
     matrix_t       *p_new_sl = RTmalloc (sizeof *p_new_sl);

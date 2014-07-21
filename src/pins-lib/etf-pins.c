@@ -53,18 +53,18 @@ static int etf_short(model_t self,int group,int*src,TransitionCB cb,void*user_co
         switch(ctx->edge_labels){
             case 0: {
                 transition_info_t ti = GB_TI(NULL, group);
-                cb(user_context,&ti,dst);
+                cb(user_context,&ti,dst,NULL);
                 break;
             }
             case 1: {
                 int lbl=(int)row[2];
                 transition_info_t ti = GB_TI(&lbl, group);
-                cb(user_context,&ti,dst);
+                cb(user_context,&ti,dst,NULL);
                 break;
             }
             default: {
                 transition_info_t ti = GB_TI((int*)SIgetC(ctx->label_idx,(int)row[2],NULL), group);
-                cb(user_context,&ti,dst);
+                cb(user_context,&ti,dst,NULL);
                 break;
             }
         }
@@ -219,7 +219,8 @@ ETFloadGreyboxModel(model_t model, const char *name)
     }
     GBsetDMInfo(model, p_dm_info);
     GBsetDMInfoRead(model, p_dm_read_info);
-    GBsetDMInfoWrite(model, p_dm_write_info);
+    GBsetDMInfoMustWrite(model, p_dm_write_info);
+    GBsetSupportsCopy(model); // no may-write so we support copy.
     GBsetNextStateShort(model,etf_short);
 
     matrix_t *p_sl_info = RTmalloc(sizeof *p_sl_info);

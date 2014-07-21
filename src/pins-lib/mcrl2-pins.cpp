@@ -251,7 +251,7 @@ struct state_cb
         int dst[pins->process_parameter_count()];
         pins->make_pins_state(next_state, dst);
         transition_info_t ti = GB_TI(lbl,group);
-        cb (ctx, &ti, dst);
+        cb (ctx, &ti, dst,NULL);
         ++count;
     }
 
@@ -454,7 +454,7 @@ MCRL2loadGreyboxModel (model_t m, const char *model_name)
 
     GBsetDMInfo (m, p_dm_info);
     GBsetDMInfoRead (m, p_dm_read_info);
-    GBsetDMInfoWrite (m, p_dm_write_info);
+    GBsetDMInfoMustWrite (m, p_dm_write_info);
     matrix_t *p_sl_info = new matrix_t;
     dm_create (p_sl_info, 0, pins->process_parameter_count());
     GBsetStateLabelInfo (m, p_sl_info);

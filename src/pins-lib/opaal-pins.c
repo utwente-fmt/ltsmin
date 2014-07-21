@@ -251,7 +251,7 @@ cb_wrapper(void *context, transition_info_t *transition_info, int *dst)
                   NULL);
     //*lattice = clone;
     Debug ("Lattice of next state: %zu --> %zu", old_lattice, (size_t)*lattice);
-    ctx->user_cb (ctx->user_context, transition_info, dst);
+    ctx->user_cb (ctx->user_context, transition_info, dst,NULL);
     (void) old_lattice;
 }
 
@@ -428,7 +428,8 @@ opaalLoadGreyboxModel(model_t model, const char *filename)
     lts_type_t ltstype;
     matrix_t *dm_info = RTmalloc(sizeof(matrix_t));
     matrix_t *dm_read_info = RTmalloc(sizeof(matrix_t));
-    matrix_t *dm_write_info = RTmalloc(sizeof(matrix_t));
+    matrix_t *dm_may_write_info = RTmalloc(sizeof(matrix_t));
+    matrix_t *dm_must_write_info = RTmalloc(sizeof(matrix_t));
     matrix_t *sl_info = RTmalloc(sizeof(matrix_t));
     matrix_t *gce_info = RTmalloc(sizeof(matrix_t));  // guard may be co-enabled information
     matrix_t *gnes_info = RTmalloc(sizeof(matrix_t)); // guard necessary enabling set information
@@ -535,7 +536,8 @@ opaalLoadGreyboxModel(model_t model, const char *filename)
     int ngroups = get_transition_count();
 	dm_create(dm_info, ngroups, state_length);
 	dm_create(dm_read_info, ngroups, state_length);
-	dm_create(dm_write_info, ngroups, state_length);
+    dm_create(dm_may_write_info, ngroups, state_length);
+    dm_create(dm_must_write_info, ngroups, state_length);
     for(int i=0; i < dm_nrows(dm_info); i++) {
         int* proj = (int*)get_transition_read_dependencies(i);
 		for(int j=0; j<state_length; j++) {
@@ -548,13 +550,16 @@ opaalLoadGreyboxModel(model_t model, const char *filename)
 		for(int j=0; j<state_length; j++) {
             if (proj[j]) {
                 dm_set(dm_info, i, j);
-                dm_set(dm_write_info, i, j);
+                dm_set(dm_may_write_info, i, j);
             }
         }
     }
     GBsetDMInfo(model, dm_info);
     GBsetDMInfoRead(model, dm_read_info);
-    GBsetDMInfoWrite(model, dm_write_info);
+    // copy is not yet implemented in opaal, so we set the may-write matrix and keep the must-write matrix empty.
+    // pins knows copy is not supported, so the symbolic tool will over-approximate may-write \ must-write to read+write.
+    GBsetDMInfoMayWrite(model, dm_may_write_info);
+    GBsetDMInfoMustWrite(model, dm_must_write_info);
 
     // set state label matrix (accepting label and guards)
     get_label_method_t sl_long = NULL;

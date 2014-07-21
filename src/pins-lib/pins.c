@@ -17,7 +17,9 @@ struct grey_box_model {
 	lts_type_t ltstype;
 	matrix_t *dm_info;
 	matrix_t *dm_read_info;
-	matrix_t *dm_write_info;
+	matrix_t *dm_may_write_info;
+	matrix_t *dm_must_write_info;
+	int supports_copy;
 	matrix_t *sl_info;
     sl_group_t* sl_groups[GB_SL_GROUP_COUNT];
     guard_t** guards;
@@ -34,7 +36,8 @@ struct grey_box_model {
 	int *s0;
 	int *guard_status;
 	void*context;
-	next_method_grey_t next_short;
+    next_method_grey_t next_short;
+    next_method_grey_t next_short_r2w;
 	next_method_grey_t next_long;
     next_method_grey_t actions_short;
     next_method_grey_t actions_long;
@@ -124,33 +127,75 @@ struct nested_cb {
 	void* user_ctx;
 };
 
-void project_dest(void*context,transition_info_t*ti,int*dst){
+void project_dest(void*context,transition_info_t*ti,int*dst,int*cpy){
 #define info ((struct nested_cb*)context)
-	int len = dm_ones_in_row(GBgetDMInfo(info->model), info->group);
-	int short_dst[len];
-	dm_project_vector(GBgetDMInfo(info->model), info->group, dst, short_dst);
-	info->cb(info->user_ctx,ti,short_dst);
+    int len = dm_ones_in_row(GBgetDMInfo(info->model), info->group);
+    int short_dst[len];
+    dm_project_vector(GBgetDMInfo(info->model), info->group, dst, short_dst);
+    info->cb(info->user_ctx,ti,short_dst,NULL);
+#undef info
+}
+
+void project_dest_w(void*context,transition_info_t*ti,int*dst,int*cpy){
+#define info ((struct nested_cb*)context)
+    int len = dm_ones_in_row(GBgetDMInfoMayWrite(info->model), info->group);
+    int short_dst[len];
+
+//    fprintf(stdout, "\n    ");
+//    for (int i = 0; i < dm_ncols(GBgetDMInfo(info->model)); i++) {
+//        fprintf(stdout, "%d,", dst[i]);
+//    }
+
+    dm_project_vector(GBgetDMInfoMayWrite(info->model), info->group, dst, short_dst);
+    if (cpy != NULL) {
+        int short_cpy[len];
+        dm_project_vector(GBgetDMInfoMayWrite(info->model), info->group, cpy, short_cpy);
+        info->cb(info->user_ctx,ti,short_dst,short_cpy);
+    } else {
+        info->cb(info->user_ctx,ti,short_dst,NULL);
+    }
 #undef info
 }
 
 int default_short(model_t self,int group,int*src,TransitionCB cb,void*context){
-	struct nested_cb info;
-	info.model = self;
-	info.group = group;
-	info.src=src;
-	info.cb=cb;
-	info.user_ctx=context;
+    struct nested_cb info;
+    info.model = self;
+    info.group = group;
+    info.src=src;
+    info.cb=cb;
+    info.user_ctx=context;
 
-	int long_src[dm_ncols(GBgetDMInfo(self))];
-	dm_expand_vector(GBgetDMInfo(self), group, self->s0, src, long_src);
-	return self->next_long(self,group,long_src,project_dest,&info);
+    int long_src[dm_ncols(GBgetDMInfo(self))];
+    dm_expand_vector(GBgetDMInfo(self), group, self->s0, src, long_src);
+    return self->next_long(self,group,long_src,project_dest,&info);
 }
 
-void expand_dest(void*context,transition_info_t*ti,int*dst){
+int default_short_r2w(model_t self,int group,int*src,TransitionCB cb,void*context){
+    struct nested_cb info;
+    info.model = self;
+    info.group = group;
+    info.src=src;
+    info.cb=cb;
+    info.user_ctx=context;
+
+    int long_src[dm_ncols(GBgetDMInfoRead(self))];
+    dm_expand_vector(GBgetDMInfoRead(self), group, self->s0, src, long_src);
+
+//    fprintf(stdout, "\n%d: ", group);
+//
+//    for (int i = 0; i < dm_ncols(GBgetDMInfo(info.model)); i++) {
+//        fprintf(stdout, "%d,", long_src[i]);
+//    }
+//
+//    fprintf(stdout, " -> ");
+    return self->next_long(self,group,long_src,project_dest_w,&info);
+}
+
+void expand_dest(void*context,transition_info_t*ti,int*dst, int*cpy){
 #define info ((struct nested_cb*)context)
 	int long_dst[dm_ncols(GBgetDMInfo(info->model))];
 	dm_expand_vector(GBgetDMInfo(info->model), info->group, info->src, dst, long_dst);
-	info->cb(info->user_ctx,ti,long_dst);
+	info->cb(info->user_ctx,ti,long_dst,cpy);
 #undef info
 }
 
@@ -279,6 +324,12 @@ wrapped_default_short (model_t self,int group,int*src,TransitionCB cb,void*conte
 }
 
 int
+wrapped_default_short_r2w (model_t self,int group,int*src,TransitionCB cb,void*context)
+{
+    return GBgetTransitionsShortR2W (GBgetParent(self), group, src, cb, context);
+}
+
+int
 wrapped_default_long (model_t self,int group,int*src,TransitionCB cb,void*context)
 {
     return GBgetTransitionsLong (GBgetParent(self), group, src, cb, context);
@@ -336,10 +387,10 @@ struct filter_context {
     int group_val;
 };
 
-static void matching_callback(void*context,transition_info_t*ti,int*dst){
+static void matching_callback(void*context,transition_info_t*ti,int*dst,int*cpy){
     struct filter_context* ctx=(struct filter_context*)context;
     if (ti->labels[ctx->idx]==ctx->value){
-        ctx->user_cb(ctx->user_ctx,ti,dst);
+        ctx->user_cb(ctx->user_ctx,ti,dst,cpy);
         if (ctx->group_idx>=0){
             if (ti->labels[ctx->group_idx]==0 || ti->labels[ctx->group_idx]!=ctx->group_val){
                 ctx->group_val=ti->labels[ctx->group_idx];
@@ -371,7 +422,9 @@ model_t GBcreateBase(){
 	model->ltstype=NULL;
 	model->dm_info=NULL;
 	model->dm_read_info=NULL;
-	model->dm_write_info=NULL;
+	model->dm_may_write_info=NULL;
+	model->dm_must_write_info=NULL;
+	model->supports_copy=0;
 	model->sl_info=NULL;
     for(int i=0; i < GB_SL_GROUP_COUNT; i++)
         model->sl_groups[i]=NULL;
@@ -388,7 +441,8 @@ model_t GBcreateBase(){
     model->sl_idx_valid_end = -1;
 	model->s0=NULL;
 	model->context=0;
-	model->next_short=default_short;
+    model->next_short=default_short;
+    model->next_short_r2w=default_short_r2w;
 	model->next_long=default_long;
     model->actions_short=default_actions_short;
     model->actions_long=default_actions_long;
@@ -442,12 +496,19 @@ void GBinitModelDefaults (model_t *p_model, model_t default_src)
         else
             model->dm_read_info = model->dm_info;
     }
-    if (model->dm_write_info == NULL) {
+    if (model->dm_may_write_info == NULL) {
         if (model->dm_info == NULL)
-            model->dm_write_info = default_src->dm_write_info;
+            model->dm_may_write_info = default_src->dm_may_write_info;
         else
-            model->dm_write_info = model->dm_info;
+            model->dm_may_write_info = model->dm_info;
     }
+    if (model->dm_must_write_info == NULL) {
+        if (model->dm_info == NULL)
+            model->dm_must_write_info = default_src->dm_must_write_info;
+        else
+            model->dm_must_write_info = model->dm_info;
+    }
+    model->supports_copy = default_src->supports_copy;
     if (model->dm_info == NULL)
         model->dm_info = default_src->dm_info;
 
@@ -520,11 +581,13 @@ void GBinitModelDefaults (model_t *p_model, model_t default_src)
      * implements a next_all.
      */
     if (model->next_short == default_short &&
+        model->next_short_r2w == default_short_r2w &&
         model->next_long == default_long &&
         model->actions_short == default_short &&
         model->actions_long == default_long &&
         model->next_all == default_all) {
         GBsetNextStateShort (model, wrapped_default_short);
+        GBsetNextStateShortR2W (model, wrapped_default_short_r2w);
         GBsetNextStateLong (model, wrapped_default_long);
         GBsetNextStateAll (model, wrapped_default_all);
         GBsetActionsLong (model, wrapped_default_actions_long);
@@ -570,6 +633,7 @@ lts_type_t GBgetLTStype(model_t model){
 }
 
 void GBsetDMInfo(model_t model, matrix_t *dm_info) {
+    if (dm_info == NULL) Abort("use GBunsetDMInfo")
 	if (model->dm_info != NULL) Abort("dependency matrix already set");
 	model->dm_info=dm_info;
 }
@@ -585,23 +649,62 @@ void GBsetDMInfoRead(model_t model, matrix_t *dm_info) {
 
 matrix_t *GBgetDMInfoRead(model_t model) {
 	if (model->dm_read_info == NULL) {
-        Warning(info, "read dependency matrix not set, returning combined matrix");
+        Warning(debug, "read dependency matrix not set, returning combined matrix");
         return model->dm_info;
     }
 	return model->dm_read_info;
 }
 
-void GBsetDMInfoWrite(model_t model, matrix_t *dm_info) {
-	if (model->dm_write_info != NULL) Abort("dependency matrix already set");
-	model->dm_write_info=dm_info;
+static int write_checked=0;
+
+static void check_write_matrices(model_t model) {
+
+    if (write_checked) return;
+    write_checked=1;
+
+    matrix_t* test = RTmalloc(sizeof(matrix_t));
+    dm_copy(GBgetDMInfoMayWrite(model), test);
+    dm_apply_or(test, GBgetDMInfoMustWrite(model));
+    if (!dm_equals(test, GBgetDMInfoMayWrite(model)))
+        Abort("Must-write matrix should be a subset of the may-write matrix.");
 }
 
-matrix_t *GBgetDMInfoWrite(model_t model) {
-	if (model->dm_write_info == NULL) {
-        Warning(info, "write dependency matrix not set, returning combined matrix");
+void GBsetDMInfoMayWrite(model_t model, matrix_t *dm_info) {
+	if (model->dm_may_write_info != NULL) Abort("dependency matrix already set");
+	model->dm_may_write_info=dm_info;
+}
+
+matrix_t *GBgetDMInfoMayWrite(model_t model) {
+    check_write_matrices(model);
+	if (model->dm_may_write_info == NULL) {
+        Warning(debug, "May-write dependency matrix not set, returning must-write matrix");
+        return GBgetDMInfoMustWrite(model);
+    }
+	return model->dm_may_write_info;
+}
+
+void GBsetDMInfoMustWrite(model_t model, matrix_t *dm_info) {
+    if (model->dm_must_write_info != NULL) Abort("dependency matrix already set");
+    model->dm_must_write_info=dm_info;
+}
+
+matrix_t *GBgetDMInfoMustWrite(model_t model) {
+    check_write_matrices(model);
+    if (model->dm_must_write_info == NULL) {
+        if (model->dm_may_write_info != NULL) {
+            Abort("If the must-write matrix is set, then the must-write matrix must also be set");
+        }
+        Warning(debug, "must-write dependency matrix not set, returning combined matrix");
         return model->dm_info;
     }
-	return model->dm_write_info;
+    return model->dm_must_write_info;
+}
+
+int GBsupportsCopy(model_t model) {
+    return model->supports_copy;
+}
+void GBsetSupportsCopy(model_t model) {
+    model->supports_copy = 1;
 }
 
 void GBsetStateLabelInfo(model_t model, matrix_t *info){
@@ -626,9 +729,12 @@ void GBsetInitialState(model_t model,int *state){
 
 void GBgetInitialState(model_t model,int *state){
 	int len=lts_type_get_state_length(model->ltstype);
+//	fprintf(stdout, "init: ");
 	for(int i=0;i<len;i++){
+//	    fprintf(stdout, "%d,", model->s0[i]);
 		state[i]=model->s0[i];
 	}
+//	fprintf(stdout, "\n");
 }
 
 void GBsetActionsShort(model_t model,next_method_grey_t method){
@@ -648,11 +754,19 @@ int GBgetActionsLong(model_t model,int group,int*src,TransitionCB cb,void*contex
 }
 
 void GBsetNextStateShort(model_t model,next_method_grey_t method){
-	model->next_short=method;
+    model->next_short=method;
 }
 
 int GBgetTransitionsShort(model_t model,int group,int*src,TransitionCB cb,void*context){
-	return model->next_short(model,group,src,cb,context);
+    return model->next_short(model,group,src,cb,context);
+}
+
+void GBsetNextStateShortR2W(model_t model,next_method_grey_t method){
+    model->next_short_r2w=method;
+}
+
+int GBgetTransitionsShortR2W(model_t model,int group,int*src,TransitionCB cb,void*context){
+    return model->next_short_r2w(model,group,src,cb,context);
 }
 
 void GBsetNextStateLong(model_t model,next_method_grey_t method){
@@ -905,30 +1019,38 @@ void GBprintDependencyMatrixRead(FILE* file, model_t model) {
     dm_print(file, GBgetDMInfoRead(model));
 }
 
-void GBprintDependencyMatrixWrite(FILE* file, model_t model) {
-    Printf (info, "\nWrite dependencies:\n");
-    dm_print(file, GBgetDMInfoWrite(model));
+void GBprintDependencyMatrixMayWrite(FILE* file, model_t model) {
+    Printf (info, "\nMay-write dependencies:\n");
+    dm_print(file, GBgetDMInfoMayWrite(model));
+}
+
+void GBprintDependencyMatrixMustWrite(FILE* file, model_t model) {
+    Printf (info, "\nMust-write dependencies:\n");
+    dm_print(file, GBgetDMInfoMustWrite(model));
 }
 
 void GBprintDependencyMatrixCombined(FILE* file, model_t model) {
     matrix_t *dm   = GBgetDMInfo(model);
     matrix_t *dm_r = GBgetDMInfoRead(model);
-    matrix_t *dm_w = GBgetDMInfoWrite(model);
+    matrix_t *dm_may_w = GBgetDMInfoMayWrite(model);
+    matrix_t *dm_must_w = GBgetDMInfoMustWrite(model);
 
     Printf (info, "\nRead/write dependencies:\n");
-    fprintf(file, "      ");
-    for (int j = 0; j < dm_ncols(dm); j+=10)
-        fprintf(file, "0         ");
+    fprintf(file, "      0");
+    for (int j = 9; j < dm_ncols(dm); j+=10)
+        fprintf(file, "%10d",j+1);
     fprintf(file, " \n");
     for (int i = 0; i < dm_nrows(dm); i++) {
         fprintf(file, "%4d: ", i);
         for (int j = 0; j < dm_ncols(dm); j++) {
-            if (dm_is_set(dm_r, i, j) && dm_is_set(dm_w, i, j)) {
+            if (dm_is_set(dm_r, i, j) && (dm_is_set(dm_may_w, i, j))) {
                 fprintf(file, "+");
             } else if (dm_is_set(dm_r, i, j)) {
                 fprintf(file, "r");
-            } else if (dm_is_set(dm_w, i, j)) {
+            } else if (dm_is_set(dm_must_w, i, j)) {
                 fprintf(file, "w");
+            } else if (dm_is_set(dm_may_w, i, j)) {
+                fprintf(file, "W");
             } else {
                 fprintf(file, "-");
             }
@@ -1205,7 +1327,7 @@ struct poptOption greybox_options[]={
 	{ "cache" , 'c' , POPT_ARG_VAL , &cache , 1 , "enable caching of PINS calls" , NULL },
 	{ "regroup" , 'r' , POPT_ARG_STRING, &regroup_options , 0 ,
           "enable regrouping; available transformations T: "
-          "gs, ga, gsa, gc, gr, cs, cn, cw, ca, csa, rs, rn, ru", "<(T,)+>" },
+          "gs, ga, gsa, gc, gr, cs, cn, cw, ca, csa, rs, rn, ru, w2W, r2+, w2+, W2+", "<(T,)+>" },
     {"mucalc", 0, POPT_ARG_STRING, &mucalc_file, 0, "modal mu-calculus formula or file with modal mu-calculus formula",
           "<mucalc-file>.mcf|<mucalc formula>"},
 	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, ltl_options , 0 , "LTL options", NULL },

@@ -44,7 +44,7 @@ count_cb(void *ctx, int *e)
 void
 create_project_test()
 {
-    vset_t set = vset_create(domain, -1, NULL);
+    vset_t set = vset_create(domain, -1, NULL, -1, NULL);
 
     int count = 0;
     vset_enum(set, count_cb, &count);
@@ -67,7 +67,7 @@ create_project_test()
 
     int proj[1] = {1};
     int match_element[1] = {0};
-    vset_t match = vset_create(domain, -1, NULL);
+    vset_t match = vset_create(domain, -1, NULL, -1, NULL);
 
     vset_copy_match(match, set, 1, proj, match_element);
 
@@ -114,9 +114,9 @@ create_project_test()
 void
 empty_projection_set_test()
 {
-    vset_t singleton = vset_create(domain, 0, NULL);
-    vset_t copy      = vset_create(domain, 0, NULL);
-    vset_t empty     = vset_create(domain, 0, NULL);
+    vset_t singleton = vset_create(domain, 0, NULL, 0, NULL);
+    vset_t copy      = vset_create(domain, 0, NULL, 0, NULL);
+    vset_t empty     = vset_create(domain, 0, NULL, 0, NULL);
     int    element_local[0];
 
     vset_add(singleton, element_global);
@@ -225,10 +225,10 @@ empty_projection_set_test()
     Warning(info, "Empty has %ld nodes and %s elements", nodes, str);
 
     int element_2[2] = {0, 0};
-    vset_t singleton_2 = vset_create(domain, -1, NULL);
-    vset_t empty_2     = vset_create(domain, -1, NULL);
-    vset_t set_2       = vset_create(domain, -1, NULL);
-    vset_t projection  = vset_create(domain, 0, NULL);
+    vset_t singleton_2 = vset_create(domain, -1, NULL, -1, NULL);
+    vset_t empty_2     = vset_create(domain, -1, NULL, -1, NULL);
+    vset_t set_2       = vset_create(domain, -1, NULL, -1, NULL);
+    vset_t projection  = vset_create(domain, 0, NULL, 0, NULL);
 
     vset_add(singleton_2, element_2);
 
@@ -296,8 +296,8 @@ empty_projection_set_test()
 void
 empty_projection_rel_test()
 {
-    vrel_t singleton = vrel_create(domain, 0, NULL);
-    vrel_t empty     = vrel_create(domain, 0, NULL);
+    vrel_t singleton = vrel_create(domain, 0, NULL, 0, NULL, 0, NULL);
+    vrel_t empty     = vrel_create(domain, 0, NULL, 0, NULL, 0, NULL);
     int    element_local[0];
 
     vrel_add(singleton, element_local, element_global);
@@ -316,9 +316,9 @@ empty_projection_rel_test()
     bn_clear(&elements);
     Warning(info, "Empty rel has %ld nodes and %s elements", nodes, str);
 
-    vset_t singleton_set = vset_create(domain, -1, NULL);
-    vset_t empty_set = vset_create(domain, -1, NULL);
-    vset_t set = vset_create(domain, -1, NULL);
+    vset_t singleton_set = vset_create(domain, -1, NULL, -1, NULL);
+    vset_t empty_set = vset_create(domain, -1, NULL, -1, NULL);
+    vset_t set = vset_create(domain, -1, NULL, -1, NULL);
 
     int element[2] = {0, 1};
 
@@ -343,7 +343,7 @@ empty_projection_rel_test()
     if (!vset_is_empty(set)) Abort("Next empty, singleton incorrect");
     Warning(info, "Next empty correct");
 
-    vset_prev(set, singleton_set, singleton);
+    vset_prev(set, singleton_set, singleton, singleton_set);
 
     count = 0;
     vset_enum(set, count_cb, &count);
@@ -354,11 +354,11 @@ empty_projection_rel_test()
         Abort("Prev count singleton incorrect");
     }
 
-    vset_prev(set, singleton_set, empty);
+    vset_prev(set, singleton_set, empty, singleton_set);
     if (!vset_is_empty(set)) Abort("Prev singleton, empty incorrect");
-    vset_prev(set, empty_set, empty);
+    vset_prev(set, empty_set, empty, empty_set);
     if (!vset_is_empty(set)) Abort("Prev empty, empty incorrect");
-    vset_prev(set, empty_set, singleton);
+    vset_prev(set, empty_set, singleton, empty_set);
     if (!vset_is_empty(set)) Abort("Prev empty, singleton incorrect");
     Warning(info, "Prev empty correct");
 

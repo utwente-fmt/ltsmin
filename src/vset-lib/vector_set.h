@@ -59,7 +59,7 @@ extern vdom_t vdom_create_domain(int n, vset_implementation_t impl);
 \param k If non-negative this indicates the length of the sub-domain.
 \param proj If non-NULL this is a sorted list of the indices of the sub-domain.
 */
-extern vset_t vset_create(vdom_t dom,int k,int* proj);
+extern vset_t vset_create(vdom_t dom,int k,int* proj,int r_k, int *r_proj);
 
 /**
  * \brief Saves a set to a file.
@@ -182,7 +182,7 @@ extern void vset_count(vset_t set,long *nodes,bn_int_t *elements);
 /**
 \brief Create a relation
 */
-extern vrel_t vrel_create(vdom_t dom,int k,int* proj);
+extern vrel_t vrel_create(vdom_t dom,int k, int * proj,int r_k,int* r_proj,int w_k,int* w_proj);
 
 /**
  * \brief Saves the projection of a relation to a file.
@@ -216,7 +216,7 @@ extern void vrel_load(FILE* f, vrel_t rel);
 /**
 \brief Add an element to a relation.
 */
-extern void vrel_add(vrel_t rel,const int* src,const int* dst);
+extern void vrel_add(vrel_t rel,const int* src,const int* dst,const int* cpy);
 
 /**
 \brief Count the number of diagram nodes and the number of elements stored.
@@ -232,9 +232,11 @@ extern void vrel_count(vrel_t rel,long *nodes,bn_int_t *elements);
 extern void vset_next(vset_t dst,vset_t src,vrel_t rel);
 
 /**
-\brief dst := { x | exists y in src : x rel y }
+\brief  univ = NULL => dst := { x | exists y in src : x rel y }
+        univ != NULL => dst := { x | exists y in src : x rel y } ...
 */
-extern void vset_prev(vset_t dst,vset_t src,vrel_t rel);
+extern void vset_prev(vset_t dst,vset_t src,vrel_t rel, vset_t univ);
+
 extern void vset_universe(vset_t dst, vset_t src);
 
 extern void vset_reorder(vdom_t dom);

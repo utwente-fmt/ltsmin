@@ -261,7 +261,8 @@ extern lts_type_t GBgetLTStype(model_t model);
 */
 extern void GBprintDependencyMatrix(FILE* file, model_t model);
 extern void GBprintDependencyMatrixRead(FILE* file, model_t model);
-extern void GBprintDependencyMatrixWrite(FILE* file, model_t model);
+extern void GBprintDependencyMatrixMayWrite(FILE* file, model_t model);
+extern void GBprintDependencyMatrixMustWrite(FILE* file, model_t model);
 extern void GBprintDependencyMatrixCombined(FILE* file, model_t model);
 
 /**
@@ -269,19 +270,23 @@ extern void GBprintDependencyMatrixCombined(FILE* file, model_t model);
 */
 extern matrix_t *GBgetDMInfo(model_t model);
 extern matrix_t *GBgetDMInfoRead(model_t model);
-extern matrix_t *GBgetDMInfoWrite(model_t model);
+extern matrix_t *GBgetDMInfoMayWrite(model_t model);
+extern matrix_t *GBgetDMInfoMustWrite(model_t model);
+extern int      GBsupportsCopy(model_t model);
+extern void     GBsetSupportsCopy(model_t model);
 
 /**
 \brief Set the dependency matrix of the model
 */
 extern void GBsetDMInfo(model_t model, matrix_t *dm_info);
 extern void GBsetDMInfoRead(model_t model, matrix_t *dm_info);
-extern void GBsetDMInfoWrite(model_t model, matrix_t *dm_info);
+extern void GBsetDMInfoMayWrite(model_t model, matrix_t *dm_info);
+extern void GBsetDMInfoMustWrite(model_t model, matrix_t *dm_info);
 
 extern void GBgetInitialState(model_t model,int *state);
 /**< @brief Write the initial state of model into state. */
 
-typedef void(*TransitionCB)(void*context,transition_info_t*transition_info,int*dst);
+typedef void(*TransitionCB)(void*context,transition_info_t*transition_info,int*dst,int*cpy);
 /**< @brief Type of the callback function for returning lists of transitions.
 
 We produce the list of transitions by means of a call back, which
@@ -290,6 +295,15 @@ is provided with a user context, an array of labels and a state vector.
 
 extern int GBgetTransitionsShort(model_t model,int group,int*src,TransitionCB cb,void*context);
 /**< @brief Enumerate the transition of a group for a short state.
+
+Given a group number and a short vector for that group, enumerate the local
+    transitions. This function may be non-reentrant. A short state means just the values for the influenced positions.
+ */
+
+extern int GBgetTransitionsShortR2W(model_t model,int group,int*src,TransitionCB cb,void*context);
+/**< @brief Enumerate the transition of a group for a short state.
+A short vector is either projected using read dependencies (source state)
+or write dependencies (target state).
 
 Given a group number and a short vector for that group, enumerate the local
     transitions. This function may be non-reentrant. A short state means just the values for the influenced positions.
@@ -643,6 +657,15 @@ extern void GBsetNextStateLong(model_t model,next_method_grey_t method);
 If this method is not set then the long version is used.
 */
 extern void GBsetNextStateShort(model_t model,next_method_grey_t method);
+
+/**
+\brief Set the next state method that works on short vectors.
+A short vector is either projected using read dependencies (source state)
+or write dependencies (target state).
+
+If this method is not set then the long version is used.
+*/
+extern void GBsetNextStateShortR2W(model_t model,next_method_grey_t method);
 
 /**
 \brief Set the next state method that works on long vectors.

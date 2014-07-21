@@ -27,6 +27,7 @@ typedef struct {
     header_entry_t     *data;
     int                *count;
 } matrix_header_t;
+    
 
 extern int          dm_create_header (matrix_header_t *, int);
 extern int          dm_copy_header (const matrix_header_t *, matrix_header_t *);
@@ -57,7 +58,7 @@ typedef struct matrix {
     bitvector_t         bits;
 } matrix_t;
 
-typedef int         (*dm_comparator_fn) (matrix_t *, int, int);
+typedef int         (*dm_comparator_fn) (matrix_t *, matrix_t *, int, int);
 
 extern int          dm_create (matrix_t *, const int, const int);
 extern void         dm_free (matrix_t *);
@@ -80,14 +81,14 @@ extern int          dm_copy (const matrix_t *, matrix_t *);
 extern int          dm_make_sparse (matrix_t *);
 extern int          dm_flatten (matrix_t *);
 
-extern int          dm_sort_rows (matrix_t *, const dm_comparator_fn);
-extern int          dm_sort_cols (matrix_t *, const dm_comparator_fn);
+extern int          dm_sort_rows (matrix_t *, matrix_t *, matrix_t *, const dm_comparator_fn);
+extern int          dm_sort_cols (matrix_t *, matrix_t *, matrix_t *, const dm_comparator_fn);
 
-extern int          dm_nub_rows (matrix_t *);
-extern int          dm_nub_cols (matrix_t *);
+extern int          dm_nub_rows (matrix_t *, matrix_t *, matrix_t *);
+extern int          dm_nub_cols (matrix_t *, matrix_t *, matrix_t *);
 
-extern int          dm_subsume_rows (matrix_t *);
-extern int          dm_subsume_cols (matrix_t *);
+extern int          dm_subsume_rows (matrix_t *, matrix_t *, matrix_t *);
+extern int          dm_subsume_cols (matrix_t *, matrix_t *, matrix_t *);
 
 // NOTE: rewrite nub & subsume to dm_group_rows/cols(matrix_t *, dm_group_fn)?
 extern int          dm_ungroup_rows (matrix_t *);
@@ -95,9 +96,9 @@ extern int          dm_ungroup_cols (matrix_t *);
 
 extern int          dm_print (FILE *, const matrix_t *);
 
-extern int          dm_anneal (matrix_t *);
-extern int          dm_optimize (matrix_t *);
-extern int          dm_all_perm (matrix_t *);
+extern int          dm_anneal (matrix_t *, matrix_t *, matrix_t *);
+extern int          dm_optimize (matrix_t *, matrix_t *, matrix_t *);
+extern int          dm_all_perm (matrix_t *, matrix_t *, matrix_t *);
 
 /**
  * return the matrix as index table per row/col

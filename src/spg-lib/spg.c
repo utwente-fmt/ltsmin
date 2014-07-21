@@ -25,16 +25,16 @@ parity_game* spg_create(const vdom_t domain, int state_length, int num_groups, i
     result->domain = domain;
     result->state_length = state_length;
     result->src = (int*)RTmalloc(state_length * sizeof(int));
-    result->v = vset_create(domain, -1, NULL);
+    result->v = vset_create(domain, -1, NULL, -1, NULL);
     for(int i=0; i<2; i++) {
-        result->v_player[i] = vset_create(domain, -1, NULL);
+        result->v_player[i] = vset_create(domain, -1, NULL, -1, NULL);
     }
     result->min_priority = min_priority;
     result->max_priority = max_priority;
     result->v_priority = (vset_t*)RTmalloc((max_priority+1) * sizeof(vset_t));
     result->v_priority_swapfile = RTmalloc((max_priority+1) * sizeof(tmp_file_t *));
     for(int i=min_priority; i<=max_priority; i++) {
-        result->v_priority[i] = vset_create(domain, -1, NULL);
+        result->v_priority[i] = vset_create(domain, -1, NULL, -1, NULL);
     }
     result->num_groups = num_groups;
     result->e = (vrel_t*)RTmalloc(num_groups * sizeof(vrel_t));

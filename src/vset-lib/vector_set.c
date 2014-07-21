@@ -185,10 +185,32 @@ void vdom_init_shared(vdom_t dom,int n){
 	dom->shared.set_least_fixpoint=default_least_fixpoint;
 	dom->shared.set_dot=NULL;
 	dom->shared.rel_dot=NULL;
+	dom->shared.separates_rw=NULL;
+    
+    dom->shared.names = RTmalloc(n * sizeof(char*));    
+    for (int i = 0; i < n; i++) {
+        dom->shared.names[i] = NULL;
+    }
 }
 
-vset_t vset_create(vdom_t dom,int k,int* proj){
-	return dom->shared.set_create(dom,k,proj);
+void vdom_set_name(vdom_t dom, int i, char* name) {
+    if (i >= dom->shared.size) Abort("Variable does not exist");
+    dom->shared.names[i] = name;
+}
+
+char* vdom_get_name(vdom_t dom, int i) {
+    if (i >= dom->shared.size)
+        Abort("Variable does not exist");
+    return dom->shared.names[i];
+}
+
+int vdom_separates_rw(vdom_t dom) {
+    if (dom->shared.separates_rw == NULL) return 0;
+    return dom->shared.separates_rw();
+}
+
+vset_t vset_create(vdom_t dom,int k,int* proj,int r_k,int* r_proj){
+	return dom->shared.set_create(dom,k,proj,r_k,r_proj);
 }
 
 void vset_save(FILE* f, vset_t set){
@@ -207,8 +229,8 @@ vset_t vset_load(FILE* f, vdom_t dom){
     }
 }
 
-vrel_t vrel_create(vdom_t dom,int k,int* proj){
-	vrel_t rel = dom->shared.rel_create(dom,k,proj);
+vrel_t vrel_create(vdom_t dom,int k, int *proj,int r_k,int* r_proj,int w_k,int* w_proj){
+	vrel_t rel = dom->shared.rel_create(dom, k, proj, r_k, r_proj, w_k, w_proj);
     rel->expand = NULL;
     rel->expand_ctx = NULL;
     return rel;
@@ -330,8 +352,10 @@ void vset_next(vset_t dst,vset_t src,vrel_t rel){
 	dst->dom->shared.set_next(dst,src,rel);
 }
 
-void vset_prev(vset_t dst,vset_t src,vrel_t rel){
-	dst->dom->shared.set_prev(dst,src,rel);
+void vset_prev(vset_t dst,vset_t src,vrel_t rel,vset_t univ){
+	dst->dom->shared.set_prev(dst,src,rel,univ);
+}
+
 void vset_universe(vset_t dst,vset_t src){
     dst->dom->shared.set_universe(dst,src);
 }
@@ -340,8 +364,8 @@ void vset_project(vset_t dst,vset_t src){
 	dst->dom->shared.set_project(dst,src);
 }
 
-void vrel_add(vrel_t rel,const int* src, const int* dst){
-	rel->dom->shared.rel_add(rel,src,dst);
+void vrel_add(vrel_t rel,const int* src, const int* dst, const int* cpy){
+    rel->dom->shared.rel_add(rel,src,dst,cpy);
 }
 
 void vset_reorder(vdom_t dom) {

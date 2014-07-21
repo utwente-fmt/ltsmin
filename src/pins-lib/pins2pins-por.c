@@ -747,11 +747,11 @@ typedef struct proviso_hook_context {
     int             force_proviso_true;     // feedback to algorithm that proviso already holds
 } proviso_hook_context_t;
 
-void hook_cb (void*context,transition_info_t *ti,int*dst) {
+void hook_cb (void*context,transition_info_t *ti,int*dst,int*cpy) {
     proviso_hook_context_t* infoctx = (proviso_hook_context_t*)context;
     transition_info_t ti_new = GB_TI (ti->labels, ti->group);
     ti_new.por_proviso = infoctx->force_proviso_true;
-    infoctx->cb(infoctx->user_context, &ti_new, dst);
+    infoctx->cb(infoctx->user_context, &ti_new, dst,cpy);
     // catch transition info status
     if (infoctx->force_proviso_true || ti_new.por_proviso) {
         infoctx->por_proviso_true_cnt++;
@@ -1528,7 +1528,7 @@ GBaddPOR (model_t model)
     Print1 (info, "Initializing dependency lookup table.");
 
     matrix_t           *p_dm = GBgetDMInfo (model);
-    matrix_t           *p_dm_w = GBgetDMInfoWrite (model);
+    matrix_t           *p_dm_w = GBgetDMInfoMayWrite (model);
 
     int groups = dm_nrows( p_dm );
     int len = dm_ncols( p_dm );

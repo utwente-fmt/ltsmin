@@ -243,7 +243,7 @@ struct pbes_state_cb
         explorer->local_to_global(next_state, dst);
         int* edge_labels = NULL;
         transition_info_t ti = GB_TI(edge_labels, group);
-        cb(ctx, &ti, dst);
+        cb(ctx, &ti, dst,NULL);
         count++;
     }
 
@@ -500,7 +500,7 @@ void PBESloadGreyboxModel(model_t model, const char*name)
     }
     GBsetDMInfo(model, p_dm_info);
     GBsetDMInfoRead(model, p_rm_info);
-    GBsetDMInfoWrite(model, p_wm_info);
+    GBsetDMInfoMustWrite(model, p_wm_info);
 
     int num_state_labels = info->get_lts_type().get_number_of_state_labels();
     dm_create(&sl_info, num_state_labels, state_length);

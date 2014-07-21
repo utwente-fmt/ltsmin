@@ -34,7 +34,8 @@ int         (*prom_get_state_size)();
 int         (*prom_get_transition_groups)();
 const int*  (*prom_get_actions_read_dependencies)(int t);
 const int*  (*prom_get_transition_read_dependencies)(int t);
-const int*  (*prom_get_transition_write_dependencies)(int t);
+const int*  (*prom_get_transition_may_write_dependencies)(int t);
+const int*  (*prom_get_transition_must_write_dependencies)(int t);
 
 /* PINS state type/value info */
 const char* (*prom_get_state_variable_name)(int var);
@@ -183,8 +184,10 @@ PromLoadDynamicLib(model_t model, const char *filename)
         RTdlsym( filename, dlHandle, "spins_get_transition_read_dependencies" );
     prom_get_actions_read_dependencies = (const int*(*)(int))
         RTtrydlsym( dlHandle, "spins_get_actions_read_dependencies" );
-    prom_get_transition_write_dependencies = (const int*(*)(int))
-        RTdlsym( filename, dlHandle, "spins_get_transition_write_dependencies" );
+    prom_get_transition_may_write_dependencies = (const int*(*)(int))
+        RTdlsym( filename, dlHandle, "spins_get_transition_may_write_dependencies" );
+    prom_get_transition_must_write_dependencies = (const int*(*)(int))
+        RTdlsym( filename, dlHandle, "spins_get_transition_must_write_dependencies" );
     prom_get_state_variable_name = (const char*(*)(int))
         RTdlsym( filename, dlHandle, "spins_get_state_variable_name" );
     prom_get_state_variable_type = (int (*)(int))
@@ -251,7 +254,8 @@ PromLoadGreyboxModel(model_t model, const char *filename)
     matrix_t *dm_info = RTmalloc (sizeof *dm_info);
     matrix_t *dm_actions_read_info = RTmalloc(sizeof(matrix_t));
     matrix_t *dm_read_info = RTmalloc(sizeof(matrix_t));
-    matrix_t *dm_write_info = RTmalloc(sizeof(matrix_t));
+    matrix_t *dm_may_write_info = RTmalloc(sizeof(matrix_t));
+    matrix_t *dm_must_write_info = RTmalloc(sizeof(matrix_t));
     matrix_t *sl_info = RTmalloc (sizeof *sl_info);
 
     // assume sequential use (preLoader may not have been called):
@@ -389,7 +393,8 @@ PromLoadGreyboxModel(model_t model, const char *filename)
     dm_create(dm_info, ngroups, state_length);
     dm_create(dm_actions_read_info, ngroups, state_length);
     dm_create(dm_read_info, ngroups, state_length);
-    dm_create(dm_write_info, ngroups, state_length);
+    dm_create(dm_may_write_info, ngroups, state_length);
+    dm_create(dm_must_write_info, ngroups, state_length);
     for (int i=0; i < dm_nrows(dm_info); i++) {
         int* proj = (int*)prom_get_transition_read_dependencies(i);
         HREassert (proj != NULL, "No SpinS read dependencies");
@@ -397,11 +402,16 @@ PromLoadGreyboxModel(model_t model, const char *filename)
             if (proj[j]) dm_set(dm_info, i, j);
             if (proj[j]) dm_set(dm_read_info, i, j);
         }
-        proj = (int*)prom_get_transition_write_dependencies(i);
-        HREassert (proj != NULL, "No SpinS write dependencies");
+        proj = (int*)prom_get_transition_may_write_dependencies(i);
+        HREassert (proj != NULL, "No SpinS may write dependencies");
         for(int j=0; j<state_length; j++) {
             if (proj[j]) dm_set(dm_info, i, j);
-            if (proj[j]) dm_set(dm_write_info, i, j);
+            if (proj[j]) dm_set(dm_may_write_info, i, j);
+        }
+        proj = (int*)prom_get_transition_must_write_dependencies(i);
+        HREassert (proj != NULL, "No SpinS must write dependencies");
+        for(int j=0; j<state_length; j++) {
+            if (proj[j]) dm_set(dm_must_write_info, i, j);
         }
         if (prom_get_actions_read_dependencies != NULL) {
             proj = (int*)prom_get_actions_read_dependencies(i);
@@ -412,7 +422,9 @@ PromLoadGreyboxModel(model_t model, const char *filename)
     }
     GBsetDMInfo(model, dm_info);
     GBsetDMInfoRead(model, dm_read_info);
-    GBsetDMInfoWrite(model, dm_write_info);
+    GBsetDMInfoMayWrite(model, dm_may_write_info);
+    GBsetDMInfoMustWrite(model, dm_must_write_info);
+    GBsetSupportsCopy(model);
 
     GBsetMatrix(model, "actions_reads", dm_actions_read_info, PINS_MAY_SET,
                 PINS_INDEX_GROUP, PINS_INDEX_STATE_VECTOR);

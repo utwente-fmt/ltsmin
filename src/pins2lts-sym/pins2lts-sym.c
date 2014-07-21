@@ -21,6 +21,7 @@
 #include <ltsmin-lib/ltsmin-tl.h>
 #include <spg-lib/spg-solve.h>
 #include <vset-lib/vector_set.h>
+#include <vset-lib/vdom_object.h>
 #include <util-lib/dynamic-array.h>
 #include <hre/stringindex.h>
 
@@ -186,7 +187,9 @@ static int eLbls;
 static int sLbls;
 static int nGrps;
 static int max_sat_levels;
-static proj_info *projs;
+static proj_info *rw_projs;
+static proj_info *r_projs;
+static proj_info *w_projs;
 static vdom_t domain;
 static vset_t *levels = NULL;
 static int max_levels = 0;
@@ -211,6 +214,10 @@ typedef void (*sat_proc_t)(reach_proc_t reach_proc, vset_t visited,
 typedef void (*guided_proc_t)(sat_proc_t sat_proc, reach_proc_t reach_proc,
                               vset_t visited, char *etf_output);
 
+typedef void (*short_proc_t)(model_t model,int group,int*src,TransitionCB cb,void*context);
+
+static short_proc_t short_proc = NULL; // which function to call for the next states.
+
 static inline void
 grow_levels(int new_levels)
 {
@@ -219,7 +226,7 @@ grow_levels(int new_levels)
         levels = RTrealloc(levels, max_levels * sizeof(vset_t));
 
         for(int i = global_level; i < max_levels; i++)
-            levels[i] = vset_create(domain, -1, NULL);
+            levels[i] = vset_create(domain, -1, NULL, -1, NULL);
     }
 }
 
@@ -309,9 +316,9 @@ find_trace_to(int trace_end[][N], int end_count, int level, vset_t *levels,
               lts_file_t trace_handle)
 {
     int    prev_level   = level - 2;
-    vset_t src_set      = vset_create(domain, -1, NULL);
-    vset_t dst_set      = vset_create(domain, -1, NULL);
-    vset_t temp         = vset_create(domain, -1, NULL);
+    vset_t src_set      = vset_create(domain, -1, NULL, -1, NULL);
+    vset_t dst_set      = vset_create(domain, -1, NULL, -1, NULL);
+    vset_t temp         = vset_create(domain, -1, NULL, -1, NULL);
 
     int   max_states    = 1024 + end_count;
     int   current_state = end_count;
@@ -327,7 +334,7 @@ find_trace_to(int trace_end[][N], int end_count, int level, vset_t *levels,
     vset_t *int_levels     = RTmalloc(sizeof(vset_t[max_int_level]));
 
     for(int i = 0; i < max_int_level; i++)
-        int_levels[i] = vset_create(domain, -1, NULL);
+        int_levels[i] = vset_create(domain, -1, NULL, -1, NULL);
 
     while (prev_level >= 0) {
         int int_level = 0;
@@ -350,11 +357,11 @@ find_trace_to(int trace_end[][N], int end_count, int level, vset_t *levels,
                                            sizeof(vset_t[max_int_level]));
 
                 for(int i = int_level; i < max_int_level; i++)
-                    int_levels[i] = vset_create(domain, -1, NULL);
+                    int_levels[i] = vset_create(domain, -1, NULL, -1, NULL);
             }
 
             for (int i=0; i < nGrps; i++) {
-                vset_prev(temp, int_levels[int_level - 1], group_next[i]);
+                vset_prev(temp, int_levels[int_level - 1], group_next[i], levels[prev_level+1]);
                 vset_union(int_levels[int_level], temp);
             }
 
@@ -439,6 +446,7 @@ find_trace(int trace_end[][N], int end_count, int level, vset_t *levels)
 struct find_action_info {
     int  group;
     int *dst;
+    int *cpy;
 };
 
 static void
@@ -454,17 +462,17 @@ find_action_cb(void* context, int* src)
     }
 
     // Set dst of the last step of the trace to its proper value
-    for (int i = 0; i < projs[group].len; i++)
-        trace_end[0][projs[group].proj[i]] = ctx->dst[i];
-
-    // src and dst may both be new, e.g. in case of chaining
-    if (vset_member(levels[global_level - 1], src)) {
-        Warning(debug, "source found at level %d", global_level - 1);
-        find_trace(trace_end, 2, global_level, levels);
+    if (vdom_separates_rw(domain)) {
+        for (int i = 0; i < w_projs[group].len; i++)
+            if (ctx->cpy == NULL || !ctx->cpy[i]) {
+                trace_end[0][w_projs[group].proj[i]] = ctx->dst[i];
+            }
     } else {
-        Warning(debug, "source not found at level %d", global_level - 1);
-        find_trace(trace_end, 2, global_level + 1, levels);
+        for (int i = 0; i < rw_projs[group].len; i++)
+            trace_end[0][rw_projs[group].proj[i]] = ctx->dst[i];
     }
+
+    find_trace(trace_end, 2, global_level, levels);
 
     Warning(info, "exiting now");
     HREabort(LTSMIN_EXIT_COUNTER_EXAMPLE);
@@ -479,11 +487,11 @@ struct group_add_info {
 };
 
 static void
-group_add(void *context, transition_info_t *ti, int *dst)
+group_add(void *context, transition_info_t *ti, int *dst, int *cpy)
 {
     struct group_add_info *ctx = (struct group_add_info*)context;
 
-    vrel_add(ctx->rel, ctx->src, dst);
+    vrel_add(ctx->rel, ctx->src, dst, cpy);
 
     if (act_detect != NULL && ti->labels[act_label] == act_index) {
         Warning(info, "found action: %s", act_detect);
@@ -498,8 +506,15 @@ group_add(void *context, transition_info_t *ti, int *dst)
 
         action_ctx.group = group;
         action_ctx.dst = dst;
-        vset_enum_match(ctx->set,projs[group].len, projs[group].proj,
-                            ctx->src, find_action_cb, &action_ctx);
+        action_ctx.cpy = cpy;
+
+        if (vdom_separates_rw(domain)) {
+            vset_enum_match(ctx->set,r_projs[group].len, r_projs[group].proj,
+                                ctx->src, find_action_cb, &action_ctx);
+        } else {
+            vset_enum_match(ctx->set,rw_projs[group].len, rw_projs[group].proj,
+                                ctx->src, find_action_cb, &action_ctx);
+        }
     }
 }
 
@@ -509,7 +524,7 @@ explore_cb(void *context, int *src)
     struct group_add_info *ctx = (struct group_add_info*)context;
 
     ctx->src = src;
-    GBgetTransitionsShort(model, ctx->group, src, group_add, context);
+    short_proc(model, ctx->group, src, group_add, context);
     (*ctx->explored)++;
 
     if ((*ctx->explored) % 10000 == 0) {
@@ -551,16 +566,16 @@ deadlock_check(vset_t deadlocks, bitvector_t *reach_groups)
     if (vset_is_empty(deadlocks))
         return;
 
-    vset_t next_temp = vset_create(domain, -1, NULL);
-    vset_t prev_temp = vset_create(domain, -1, NULL);
+    vset_t next_temp = vset_create(domain, -1, NULL, -1, NULL);
+    vset_t prev_temp = vset_create(domain, -1, NULL, -1, NULL);
 
     Warning(debug, "Potential deadlocks found");
 
     for (int i = 0; i < nGrps; i++) {
         if (bitvector_is_set(reach_groups, i)) continue;
-        expand_group_next(i, deadlocks);
+        expand_group_next(i, deadlocks, NULL);
         vset_next(next_temp, deadlocks, group_next[i]);
-        vset_prev(prev_temp, next_temp, group_next[i]);
+        vset_prev(prev_temp, next_temp, group_next[i],deadlocks);
         vset_minus(deadlocks, prev_temp);
     }
 
@@ -758,7 +773,7 @@ static inline void add_variable_subset(vset_t dst, vset_t src, vdom_t domain, in
     int p_len = 1;
     int proj[1] = {var_pos}; // position 0 encodes the variable
     int match[1] = {var_index}; // the variable
-    vset_t u = vset_create(domain, -1, NULL);
+    vset_t u = vset_create(domain, -1, NULL, -1, NULL);
     vset_copy_match_proj(u, src, p_len, proj, variable_projection, match);
 
     if (debug_output_enabled && log_active(infoLong))
@@ -796,11 +811,11 @@ static inline void reduce_parity_game(vset_t next_level, vset_t visited, vset_t 
     long   n_count;
     char   elem_str[1024];
     double e_count;
-    vset_t tmp = vset_create(domain, -1, NULL);
+    vset_t tmp = vset_create(domain, -1, NULL, -1, NULL);
 
-    vset_t next_level_prev = vset_create(domain, -1, NULL);
+    vset_t next_level_prev = vset_create(domain, -1, NULL, -1, NULL);
     for (int i = 0; i < nGrps; i++) {
-        vset_prev(tmp, next_level, group_next[i]);
+        vset_prev(tmp, next_level, group_next[i],visited);
         vset_union(next_level_prev, tmp);
         vset_clear(tmp);
     }
@@ -812,9 +827,9 @@ static inline void reduce_parity_game(vset_t next_level, vset_t visited, vset_t 
         //get_vset_size(true_states, &n_count, &e_count, elem_str, sizeof(elem_str));
         //Print(infoLong, "reduce_parity_game: %s (~%1.2e) TRUE states", elem_str, e_count);
     }
-    vset_t true_prev = vset_create(domain, -1, NULL);
+    vset_t true_prev = vset_create(domain, -1, NULL, -1, NULL);
     for (int i = 0; i < nGrps; i++) {
-        vset_prev(tmp, true_states, group_next[i]);
+        vset_prev(tmp, true_states, group_next[i],next_level_prev);
         vset_union(true_prev, tmp);
         vset_clear(tmp);
     }
@@ -831,9 +846,9 @@ static inline void reduce_parity_game(vset_t next_level, vset_t visited, vset_t 
         //get_vset_size(false_states, &n_count, &e_count, elem_str, sizeof(elem_str));
         //Print(infoLong, "reduce_parity_game: %s (~%1.2e) FALSE states", elem_str, e_count);
     }
-    vset_t false_prev = vset_create(domain, -1, NULL);
+    vset_t false_prev = vset_create(domain, -1, NULL, -1, NULL);
     for (int i = 0; i < nGrps; i++) {
-        vset_prev(tmp, false_states, group_next[i]);
+        vset_prev(tmp, false_states, group_next[i],NULL);
         vset_union(false_prev, tmp);
         vset_clear(tmp);
     }
@@ -848,7 +863,7 @@ static inline void reduce_parity_game(vset_t next_level, vset_t visited, vset_t 
     // computes AND states with FALSE successor, OR states with TRUE successor.
     vset_t v_player[2];
     for(int p=0; p<2; p++) {
-        v_player[p] = vset_create(domain, -1, NULL);
+        v_player[p] = vset_create(domain, -1, NULL, -1, NULL);
     }
     for(size_t i = 0; i < num_vars; i++)
     {
@@ -865,7 +880,7 @@ static inline void reduce_parity_game(vset_t next_level, vset_t visited, vset_t 
     // R == visited
     // now compute next(P) - next(R-P) - {true, false}
 
-    vset_t P_next = vset_create(domain, -1, NULL);
+    vset_t P_next = vset_create(domain, -1, NULL, -1, NULL);
     for(int p=0; p<2; p++) {
         get_vset_size(v_player[p], &n_count, &e_count, elem_str, sizeof(elem_str));
         //Print(infoLong, "reduce_parity_game: %s (~%1.2e) %s states with a successor %s.", elem_str, e_count, (p==1)?"AND":"OR", (p==1)?"FALSE":"TRUE");
@@ -879,13 +894,13 @@ static inline void reduce_parity_game(vset_t next_level, vset_t visited, vset_t 
 
     if (!vset_is_empty(P_next))
     {
-        vset_t R_minus_P = vset_create(domain, -1, NULL);
+        vset_t R_minus_P = vset_create(domain, -1, NULL, -1, NULL);
         vset_copy(R_minus_P, visited);
         for(int p=0; p<2; p++) {
             vset_minus(R_minus_P, v_player[p]);
         }
 
-        vset_t R_minus_P_next = vset_create(domain, -1, NULL);
+        vset_t R_minus_P_next = vset_create(domain, -1, NULL, -1, NULL);
         for (int i = 0; i < nGrps; i++) {
             vset_next(tmp, R_minus_P, group_next[i]);
             vset_union(R_minus_P_next, tmp);
@@ -942,24 +957,26 @@ reach_bfs_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
         N=dm_nrows(inhibit_matrix);
     }
     int level = 0;
-    vset_t current_level = vset_create(domain, -1, NULL);
-    vset_t current_class = vset_create(domain, -1, NULL);
-    vset_t next_level = vset_create(domain, -1, NULL);
-    vset_t temp = vset_create(domain, -1, NULL);
-    vset_t deadlocks = dlk_detect?vset_create(domain, -1, NULL):NULL;
-    vset_t dlk_temp = (dlk_detect||N>0)?vset_create(domain, -1, NULL):NULL;
+    vset_t current_level = vset_create(domain, -1, NULL, -1, NULL);
+    vset_t current_class = vset_create(domain, -1, NULL, -1, NULL);
+    vset_t next_level = vset_create(domain, -1, NULL, -1, NULL);
+    vset_t temp = vset_create(domain, -1, NULL, -1, NULL);
+    vset_t deadlocks = dlk_detect?vset_create(domain, -1, NULL, -1, NULL):NULL;
+    vset_t dlk_temp = (dlk_detect||N>0)?vset_create(domain, -1, NULL, -1, NULL):NULL;
     vset_t enabled[N];
     for(int i=0;i<N;i++){
-        enabled[i]=vset_create(domain, -1, NULL);
+        enabled[i]=vset_create(domain, -1, NULL, -1, NULL);
     }
 
     vset_copy(current_level, visited);
     if (save_sat_levels) vset_minus(current_level, visited_old);
 
     while (!vset_is_empty(current_level)) {
+//        if (level == 20) break;
         if (trc_output != NULL) save_level(visited);
         stats_and_progress_report(current_level, visited, level);
         level++;
+        
         for (int i = 0; i < nGrps; i++){
             if (!bitvector_is_set(reach_groups, i)) continue;
             expand_group_next(i, current_level, next_count);
@@ -981,7 +998,7 @@ reach_bfs_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
                     if (!bitvector_is_set(reach_groups,i)) continue;
                     if (!dm_is_set(class_matrix,c,i)) continue;
                     vset_next(temp, current_class, group_next[i]);
-                    vset_prev(dlk_temp, temp, group_next[i]);
+                    vset_prev(dlk_temp, temp, group_next[i],deadlocks);
                     if (dlk_detect) {
                         vset_minus(deadlocks, dlk_temp);
                     }
@@ -994,12 +1011,12 @@ reach_bfs_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
                 vset_clear(current_class);
             }
         } else {
-            for (int i = 0; i < nGrps; i++) {
+            for (int i = nGrps-1; i >= 0; i--) {
                 if (!bitvector_is_set(reach_groups,i)) continue;
                 (*next_count)++;
                 vset_next(temp, current_level, group_next[i]);
                 if (dlk_detect) {
-                    vset_prev(dlk_temp, temp, group_next[i]);
+                    vset_prev(dlk_temp, temp, group_next[i], deadlocks);
                     vset_minus(deadlocks, dlk_temp);
                     vset_clear(dlk_temp);
                 }
@@ -1036,10 +1053,10 @@ reach_bfs(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
     (void)visited_old;
 
     int level = 0;
-    vset_t old_vis = vset_create(domain, -1, NULL);
-    vset_t temp = vset_create(domain, -1, NULL);
-    vset_t deadlocks = dlk_detect?vset_create(domain, -1, NULL):NULL;
-    vset_t dlk_temp = dlk_detect?vset_create(domain, -1, NULL):NULL;
+    vset_t old_vis = vset_create(domain, -1, NULL, -1, NULL);
+    vset_t temp = vset_create(domain, -1, NULL, -1, NULL);
+    vset_t deadlocks = dlk_detect?vset_create(domain, -1, NULL, -1, NULL):NULL;
+    vset_t dlk_temp = dlk_detect?vset_create(domain, -1, NULL, -1, NULL):NULL;
 
     while (!vset_equal(visited, old_vis)) {
         if (trc_output != NULL) save_level(visited);
@@ -1056,7 +1073,7 @@ reach_bfs(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
             if (!bitvector_is_set(reach_groups,i)) continue;
             vset_next(temp, old_vis, group_next[i]);
             if (dlk_detect) {
-                vset_prev(dlk_temp, temp, group_next[i]);
+                vset_prev(dlk_temp, temp, group_next[i],deadlocks);
                 vset_minus(deadlocks, dlk_temp);
                 vset_clear(dlk_temp);
             }
@@ -1080,30 +1097,31 @@ reach_chain_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
                      long *eg_count, long *next_count)
 {
     int level = 0;
-    vset_t new_states = vset_create(domain, -1, NULL);
-    vset_t temp = vset_create(domain, -1, NULL);
-    vset_t deadlocks = dlk_detect?vset_create(domain, -1, NULL):NULL;
-    vset_t dlk_temp = dlk_detect?vset_create(domain, -1, NULL):NULL;
+    vset_t new_states = vset_create(domain, -1, NULL, -1, NULL);
+    vset_t temp = vset_create(domain, -1, NULL, -1, NULL);
+    vset_t deadlocks = dlk_detect?vset_create(domain, -1, NULL, -1, NULL):NULL;
+    vset_t dlk_temp = dlk_detect?vset_create(domain, -1, NULL, -1, NULL):NULL;
 
     vset_copy(new_states, visited);
     if (save_sat_levels) vset_minus(new_states, visited_old);
 
     while (!vset_is_empty(new_states)) {
-        if (trc_output != NULL) save_level(visited);
         stats_and_progress_report(new_states, visited, level);
         level++;
         if (dlk_detect) vset_copy(deadlocks, new_states);
         for (int i = 0; i < nGrps; i++) {
             if (!bitvector_is_set(reach_groups, i)) continue;
+            if (trc_output != NULL) save_level(new_states);
 
             expand_group_next(i, new_states, next_count);
             (*eg_count)++;
             vset_next(temp, new_states, group_next[i]);
             if (dlk_detect) {
-                vset_prev(dlk_temp, temp, group_next[i]);
+                vset_prev(dlk_temp, temp, group_next[i],deadlocks);
                 vset_minus(deadlocks, dlk_temp);
                 vset_clear(dlk_temp);
             }
+
             vset_minus(temp, visited);
             vset_union(new_states, temp);
             vset_clear(temp);
@@ -1134,25 +1152,25 @@ reach_chain(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
     (void)visited_old;
 
     int level = 0;
-    vset_t old_vis = vset_create(domain, -1, NULL);
-    vset_t temp = vset_create(domain, -1, NULL);
-    vset_t deadlocks = dlk_detect?vset_create(domain, -1, NULL):NULL;
-    vset_t dlk_temp = dlk_detect?vset_create(domain, -1, NULL):NULL;
+    vset_t old_vis = vset_create(domain, -1, NULL, -1, NULL);
+    vset_t temp = vset_create(domain, -1, NULL, -1, NULL);
+    vset_t deadlocks = dlk_detect?vset_create(domain, -1, NULL, -1, NULL):NULL;
+    vset_t dlk_temp = dlk_detect?vset_create(domain, -1, NULL, -1, NULL):NULL;
 
     while (!vset_equal(visited, old_vis)) {
-        if (trc_output != NULL) save_level(visited);
         vset_copy(old_vis, visited);
         stats_and_progress_report(NULL, visited, level);
         level++;
         if (dlk_detect) vset_copy(deadlocks, visited);
         for (int i = 0; i < nGrps; i++) {
             if (!bitvector_is_set(reach_groups, i)) continue;
+            if (trc_output != NULL) save_level(visited);
             expand_group_next(i, visited, next_count);
             (*eg_count)++;
             vset_next(temp, visited, group_next[i]);
             vset_union(visited, temp);
             if (dlk_detect) {
-                vset_prev(dlk_temp, temp, group_next[i]);
+                vset_prev(dlk_temp, temp, group_next[i],deadlocks);
                 vset_minus(deadlocks, dlk_temp);
                 vset_clear(dlk_temp);
             }
@@ -1174,7 +1192,7 @@ static void
 reach_no_sat(reach_proc_t reach_proc, vset_t visited, bitvector_t *reach_groups,
                  long *eg_count, long *next_count)
 {
-    vset_t old_visited = save_sat_levels?vset_create(domain, -1, NULL):NULL;
+    vset_t old_visited = save_sat_levels?vset_create(domain, -1, NULL, -1, NULL):NULL;
 
     reach_proc(visited, old_visited, reach_groups, eg_count, next_count);
 
@@ -1187,9 +1205,9 @@ reach_sat_fix(reach_proc_t reach_proc, vset_t visited,
 {
     (void) reach_proc;
     int level = 0;
-    vset_t old_vis = vset_create(domain, -1, NULL);
-    vset_t deadlocks = dlk_detect?vset_create(domain, -1, NULL):NULL;
-    vset_t dlk_temp = dlk_detect?vset_create(domain, -1, NULL):NULL;
+    vset_t old_vis = vset_create(domain, -1, NULL, -1, NULL);
+    vset_t deadlocks = dlk_detect?vset_create(domain, -1, NULL, -1, NULL):NULL;
+    vset_t dlk_temp = dlk_detect?vset_create(domain, -1, NULL, -1, NULL):NULL;
 
     while (!vset_equal(visited, old_vis)) {
         if (trc_output != NULL) save_level(visited);
@@ -1205,7 +1223,7 @@ reach_sat_fix(reach_proc_t reach_proc, vset_t visited,
         vset_least_fixpoint(visited, visited, group_next, nGrps);
         if (dlk_detect) {
             for (int i = 0; i < nGrps; i++) {
-                vset_prev(dlk_temp, visited, group_next[i]);
+                vset_prev(dlk_temp, visited, group_next[i],deadlocks);
                 vset_minus(deadlocks, dlk_temp);
                 vset_clear(dlk_temp);
             }
@@ -1308,7 +1326,7 @@ reach_sat_like(reach_proc_t reach_proc, vset_t visited,
     int back[max_sat_levels];
     int k = 0;
     int last = -1;
-    vset_t old_vis = vset_create(domain, -1, NULL);
+    vset_t old_vis = vset_create(domain, -1, NULL, -1, NULL);
     vset_t prev_vis[nGrps];
 
     for (int k = 0; k < max_sat_levels; k++)
@@ -1317,7 +1335,7 @@ reach_sat_like(reach_proc_t reach_proc, vset_t visited,
     initialize_levels(groups, empty_groups, back, reach_groups);
 
     for (int i = 0; i < max_sat_levels; i++)
-        prev_vis[i] = save_sat_levels?vset_create(domain, -1, NULL):NULL;
+        prev_vis[i] = save_sat_levels?vset_create(domain, -1, NULL, -1, NULL):NULL;
 
     while (k < max_sat_levels) {
         if (k == last || empty_groups[k]) {
@@ -1351,7 +1369,7 @@ reach_sat_loop(reach_proc_t reach_proc, vset_t visited,
 {
     bitvector_t groups[max_sat_levels];
     int empty_groups[max_sat_levels];
-    vset_t old_vis = vset_create(domain, -1, NULL);
+    vset_t old_vis = vset_create(domain, -1, NULL, -1, NULL);
     vset_t prev_vis[nGrps];
 
     for (int k = 0; k < max_sat_levels; k++)
@@ -1360,7 +1378,7 @@ reach_sat_loop(reach_proc_t reach_proc, vset_t visited,
     initialize_levels(groups, empty_groups, NULL, reach_groups);
 
     for (int i = 0; i < max_sat_levels; i++)
-        prev_vis[i] = save_sat_levels?vset_create(domain, -1, NULL):NULL;
+        prev_vis[i] = save_sat_levels?vset_create(domain, -1, NULL, -1, NULL):NULL;
 
     while (!vset_equal(old_vis, visited)) {
         vset_copy(old_vis, visited);
@@ -1430,15 +1448,14 @@ reach_sat(reach_proc_t reach_proc, vset_t visited,
     if (trc_output != NULL) save_level(visited);
     stats_and_progress_report(NULL, visited, 0);
     vset_least_fixpoint(visited, visited, group_next, nGrps);
-    (*next_count)++;
     stats_and_progress_report(NULL, visited, 1);
 
     if (dlk_detect) {
-        vset_t deadlocks = vset_create(domain, -1, NULL);
-        vset_t dlk_temp = vset_create(domain, -1, NULL);
+        vset_t deadlocks = vset_create(domain, -1, NULL, -1, NULL);
+        vset_t dlk_temp = vset_create(domain, -1, NULL, -1, NULL);
         vset_copy(deadlocks, visited);
         for (int i = 0; i < nGrps; i++) {
-            vset_prev(dlk_temp, visited, group_next[i]);
+            vset_prev(dlk_temp, visited, group_next[i],deadlocks);
             vset_minus(deadlocks, dlk_temp);
             vset_clear(dlk_temp);
         }
@@ -1586,7 +1603,7 @@ output_lbls(FILE *tbl_file, vset_t visited)
                 used[pk++] = pi;
         }
 
-        vset_t patterns = vset_create(domain, len, used);
+        vset_t patterns = vset_create(domain, len, used, -1, NULL);
         map_context ctx;
 
         vset_project(patterns, visited);
@@ -1691,7 +1708,7 @@ find_overlapping_group(bitvector_t *found_groups, int *group)
 
         for(int j = 0; j < nGrps; j++) {
             if (bitvector_is_set(found_groups, j)) continue;
-            dm_bitvector_row(&row_new, GBgetDMInfoWrite(model), j);
+            dm_bitvector_row(&row_new, GBgetDMInfoMayWrite(model), j);
             bitvector_intersect(&row_new, &row_found);
 
             if (!bitvector_is_empty(&row_new)) {
@@ -1832,27 +1849,67 @@ static void
 init_domain(vset_implementation_t impl, vset_t *visited)
 {
     domain = vdom_create_domain(N, impl);
-    *visited = vset_create(domain, -1, NULL);
+
+    for (int i = 0; i < dm_ncols(GBgetDMInfo(model)); i++) {
+        vdom_set_name(domain, i, lts_type_get_state_name(ltstype, i));
+    }
+    
+    *visited = vset_create(domain, -1, NULL, -1, NULL);
 
     group_next     = (vrel_t*)RTmalloc(nGrps * sizeof(vrel_t));
     group_explored = (vset_t*)RTmalloc(nGrps * sizeof(vset_t));
     group_tmp      = (vset_t*)RTmalloc(nGrps * sizeof(vset_t));
-    projs          = (proj_info*)RTmalloc(nGrps * sizeof(proj_info));
+    rw_projs       = (proj_info*)RTmalloc(nGrps * sizeof(proj_info));
+    r_projs        = (proj_info*) RTmalloc(nGrps * sizeof(proj_info));
+    w_projs        = (proj_info*) RTmalloc(nGrps * sizeof(proj_info));
+
+    matrix_t *read_matrix = RTmalloc (sizeof (matrix_t));
+    dm_copy(GBgetDMInfoRead(model), read_matrix);
+
+    if (!GBsupportsCopy(model)) {
+        Warning(info, "May-write does not support copy; over-approximating may-write \\ must-write to read + write");
+        matrix_t *w = RTmalloc(sizeof(matrix_t));
+        dm_copy(GBgetDMInfoMayWrite(model), w);
+        dm_apply_xor(w, GBgetDMInfoMustWrite(model));
+        dm_apply_or(read_matrix, w);
+        dm_free(w);
+    }
 
     for(int i = 0; i < nGrps; i++) {
-        projs[i].len  = dm_ones_in_row(GBgetDMInfo(model), i);
-        projs[i].proj = (int*)RTmalloc(projs[i].len * sizeof(int));
+        rw_projs[i].len  = dm_ones_in_row(GBgetDMInfo(model), i);
+        rw_projs[i].proj = (int*)RTmalloc(rw_projs[i].len * sizeof(int));
+
+        r_projs[i].len   = dm_ones_in_row(read_matrix, i);
+        r_projs[i].proj  = (int*)RTmalloc(r_projs[i].len * sizeof(int));
+
+        w_projs[i].len   = dm_ones_in_row(GBgetDMInfoMayWrite(model), i);
+        w_projs[i].proj  = (int*)RTmalloc(w_projs[i].len * sizeof(int));
 
         // temporary replacement for e_info->indices[i]
         for(int j = 0, k = 0; j < dm_ncols(GBgetDMInfo(model)); j++) {
-            if (dm_is_set(GBgetDMInfo(model), i, j))
-                projs[i].proj[k++] = j;
+            if (dm_is_set(GBgetDMInfo(model), i, j)) {
+                rw_projs[i].proj[k++] = j;
+            }
         }
 
-        group_next[i]     = vrel_create(domain,projs[i].len,projs[i].proj);
-        group_explored[i] = vset_create(domain,projs[i].len,projs[i].proj);
-        group_tmp[i]      = vset_create(domain,projs[i].len,projs[i].proj);
+        for(int j = 0, k = 0; j < dm_ncols(read_matrix); j++) {
+            if (dm_is_set(read_matrix, i, j)) {
+                r_projs[i].proj[k++] = j;
+            }
+        }
+
+        for(int j = 0, k = 0; j < dm_ncols(GBgetDMInfoMayWrite(model)); j++) {
+            if (dm_is_set(GBgetDMInfoMayWrite(model), i, j)) {
+                w_projs[i].proj[k++] = j;
+            }
+        }
+
+        group_next[i]     = vrel_create(
+                domain,rw_projs[i].len,rw_projs[i].proj,r_projs[i].len,r_projs[i].proj,w_projs[i].len,w_projs[i].proj);
+        group_explored[i] = vset_create(domain,rw_projs[i].len,rw_projs[i].proj,r_projs[i].len,r_projs[i].proj);
+        group_tmp[i]      = vset_create(domain,rw_projs[i].len,rw_projs[i].proj,r_projs[i].len,r_projs[i].proj);
     }
+    dm_free(read_matrix);
 }
 
 static void
@@ -1871,7 +1928,7 @@ init_action()
 static vset_t
 get_svar_eq_int_set (int state_idx, int state_match, vset_t visited)
 {
-  vset_t result=vset_create(domain, -1, NULL);
+  vset_t result=vset_create(domain, -1, NULL, -1, NULL);
   int proj[1] = {state_idx};
   int match[1] = {state_match};
   vset_copy_match(result, visited, 1, proj, match);
@@ -1893,11 +1950,11 @@ mu_compute (ltsmin_expr_t mu_expr, vset_t visited)
     vset_t result = NULL;
     switch(mu_expr->token) {
     case MU_TRUE:
-        result = vset_create(domain, -1, NULL);
+        result = vset_create(domain, -1, NULL, -1, NULL);
         vset_copy(result, visited);
         return result;
     case MU_FALSE:
-        return vset_create(domain, -1, NULL);
+        return vset_create(domain, -1, NULL, -1, NULL);
     case MU_EQ: { // svar == int
         /* Currently MU_EQ works only in the context of an SVAR/INTEGER pair */
         if (!mu_expr->arg1->token == MU_SVAR)
@@ -1919,7 +1976,7 @@ mu_compute (ltsmin_expr_t mu_expr, vset_t visited)
         vset_destroy(mc);
     } break;
     case MU_NOT: { // NEGATION
-        result = vset_create(domain, -1, NULL);
+        result = vset_create(domain, -1, NULL, -1, NULL);
         vset_copy(result, visited);
         vset_t mc = mu_compute(mu_expr->arg1, visited);
         vset_minus(result, mc);
@@ -1930,12 +1987,12 @@ mu_compute (ltsmin_expr_t mu_expr, vset_t visited)
         break;
     case MU_EXIST: { // E
         if (mu_expr->arg1->token == MU_NEXT) {
-            vset_t temp = vset_create(domain, -1, NULL);
-            result = vset_create(domain, -1, NULL);
+            vset_t temp = vset_create(domain, -1, NULL, -1, NULL);
+            result = vset_create(domain, -1, NULL, -1, NULL);
             vset_t g = mu_compute(mu_expr->arg1->arg1, visited);
 
             for(int i=0;i<nGrps;i++){
-                vset_prev(temp,g,group_next[i]);
+                vset_prev(temp,g,group_next[i],visited);
                 vset_union(result,temp);
                 vset_clear(temp);
             }
@@ -1961,29 +2018,29 @@ mu_compute (ltsmin_expr_t mu_expr, vset_t visited)
         break;
     case MU_VAR:
         ensure_access(mu_var_man, mu_expr->idx);
-        result = vset_create(domain, -1, NULL);
+        result = vset_create(domain, -1, NULL, -1, NULL);
         vset_copy(result, mu_var[mu_expr->idx]);
         break;
     case MU_ALL:
         if (mu_expr->arg1->token == MU_NEXT) {
             // implemented as AX phi = ! EX ! phi
 
-            result = vset_create(domain, -1, NULL);
+            result = vset_create(domain, -1, NULL, -1, NULL);
             vset_copy(result, visited);
 
             // compute ! phi
-            vset_t notphi = vset_create(domain, -1, NULL);
+            vset_t notphi = vset_create(domain, -1, NULL, -1, NULL);
             vset_copy(notphi, visited);
             vset_t phi = mu_compute(mu_expr->arg1->arg1, visited);
             vset_minus(notphi, phi);
             vset_destroy(phi);
 
-            vset_t temp = vset_create(domain, -1, NULL);
-            vset_t prev = vset_create(domain, -1, NULL);
+            vset_t temp = vset_create(domain, -1, NULL, -1, NULL);
+            vset_t prev = vset_create(domain, -1, NULL, -1, NULL);
 
             // EX !phi
             for(int i=0;i<nGrps;i++){
-                vset_prev(temp,notphi,group_next[i]);
+                vset_prev(temp,notphi,group_next[i],visited);
                 vset_union(prev,temp);
                 vset_clear(temp);
             }
@@ -2004,8 +2061,8 @@ mu_compute (ltsmin_expr_t mu_expr, vset_t visited)
             ensure_access(mu_var_man, mu_expr->idx);
             // backup old var reference
             vset_t old = mu_var[mu_expr->idx];
-            result = mu_var[mu_expr->idx] = vset_create(domain, -1, NULL);
-            vset_t tmp = vset_create(domain, -1, NULL);
+            result = mu_var[mu_expr->idx] = vset_create(domain, -1, NULL, -1, NULL);
+            vset_t tmp = vset_create(domain, -1, NULL, -1, NULL);
             do {
                 vset_copy(mu_var[mu_expr->idx], tmp);
                 vset_clear(tmp);
@@ -2021,8 +2078,8 @@ mu_compute (ltsmin_expr_t mu_expr, vset_t visited)
             ensure_access(mu_var_man, mu_expr->idx);
             // backup old var reference
             vset_t old = mu_var[mu_expr->idx];
-            result = mu_var[mu_expr->idx] = vset_create(domain, -1, NULL);
-            vset_t tmp = vset_create(domain, -1, NULL);
+            result = mu_var[mu_expr->idx] = vset_create(domain, -1, NULL, -1, NULL);
+            vset_t tmp = vset_create(domain, -1, NULL, -1, NULL);
             vset_copy(tmp, visited);
             do {
                 vset_copy(mu_var[mu_expr->idx], tmp);
@@ -2107,8 +2164,8 @@ void init_spg(model_t model)
         player[i] = label;
         //Print(infoLong, "  label %d (player): %d", 1, label);
     }
-    true_states = vset_create(domain, -1, NULL);
-    false_states = vset_create(domain, -1, NULL);
+    true_states = vset_create(domain, -1, NULL, -1, NULL);
+    false_states = vset_create(domain, -1, NULL, -1, NULL);
 }
 
 #if defined(HAVE_LIBSPG)
@@ -2167,7 +2224,6 @@ parity_game* compute_symbolic_parity_game(vset_t visited, int* src)
     return g;
 }
 #endif
-
 int
 main (int argc, char *argv[])
 {
@@ -2250,6 +2306,16 @@ main (int argc, char *argv[])
     case DIRECTED:
         guided_proc = directed;
         break;
+    }
+
+    if (vdom_separates_rw(domain)) {
+        Warning(info, "vset implementation supports read/write separation.");
+        Warning(info, "Using GBgetTransitionsShortR2W as next-state function.");
+        short_proc = GBgetTransitionsShortR2W;
+    } else {
+        Warning(info, "vset implementation does not support read/write separation.");
+        Warning(info, "Using GBgetTransitionsShort as next-state function.");
+        short_proc = GBgetTransitionsShort;
     }
 
     // temporal logics
