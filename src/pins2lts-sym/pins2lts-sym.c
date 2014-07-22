@@ -22,6 +22,7 @@
 #include <spg-lib/spg-solve.h>
 #include <vset-lib/vector_set.h>
 #include <util-lib/dynamic-array.h>
+#include <util-lib/bitset.h>
 #include <hre/stringindex.h>
 
 #ifdef HAVE_SYLVAN
@@ -43,6 +44,10 @@ static char* inv_detect = NULL;
 static int   no_exit = 0;
 static int   act_index;
 static int   act_label;
+static int   action_typeno;
+static int   ErrorActions = 0; // count number of found errors (action/deadlock/invariant)
+static bitset_t   seen_actions;
+
 static int   sat_granularity = 10;
 static int   save_sat_levels = 0;
 
@@ -176,8 +181,8 @@ static  struct poptOption options[] = {
     { "save-sat-levels", 0, POPT_ARG_VAL, &save_sat_levels, 1, "save previous states seen at saturation levels", NULL },
     { "guidance", 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &guidance, 0 , "select the guided search strategy" , "<unguided|directed>" },
     { "deadlock" , 'd' , POPT_ARG_VAL , &dlk_detect , 1 , "detect deadlocks" , NULL },
-    { "action" , 0 , POPT_ARG_STRING , &act_detect , 0 , "detect action" , "<action>" },
-    { "invariant", 'i', POPT_ARG_STRING, &inv_detect, 1, "detect deadlocks", NULL },
+    { "action" , 0 , POPT_ARG_STRING , &act_detect , 0 , "detect action prefix" , "<action prefix>" },
+    { "invariant", 'i', POPT_ARG_STRING, &inv_detect, 1, "detect invariant violations", NULL },
     { "no-exit", 'n', POPT_ARG_VAL, &no_exit, 1, "no exit on error, just count (for error counters use -v)", NULL },
     { "trace" , 0 , POPT_ARG_STRING , &trc_output , 0 , "file to write trace to" , "<lts-file>.gcf" },
     { "save-transitions", 0 , POPT_ARG_STRING, &transitions_save_filename, 0, "file to write transition relations to", "<outputfile>" },
@@ -441,7 +446,7 @@ find_trace_to(int trace_end[][N], int end_count, int level, vset_t *levels,
 }
 
 static void
-find_trace(int trace_end[][N], int end_count, int level, vset_t *levels)
+find_trace(int trace_end[][N], int end_count, int level, vset_t *levels, char* file_prefix)
 {
     // Find initial state and open output file
     int             init_state[N];
@@ -450,7 +455,10 @@ find_trace(int trace_end[][N], int end_count, int level, vset_t *levels)
 
     GBgetInitialState(model, init_state);
 
-    trace_output = lts_file_create(trc_output, ltstype, 1, lts_vset_template());
+    char* file_name=malloc((4+strlen(trc_output)+strlen(file_prefix))*sizeof(char));
+    stpcpy(stpcpy(stpcpy(file_name,trc_output),file_prefix),".gcf");
+    Warning(info,"writing to file: %s",file_name);
+    trace_output = lts_file_create(file_name, ltstype, 1, lts_vset_template());
     lts_write_init(trace_output, 0, (uint32_t*)init_state);
     int T=lts_type_get_type_count(ltstype);
     for(int i=0;i<T;i++){
@@ -473,6 +481,7 @@ struct find_action_info {
     int  group;
     int *dst;
     int *cpy;
+    char* action;
 };
 
 static void
@@ -495,10 +504,7 @@ find_action_cb(void* context, int* src)
         }
     }
 
-    find_trace(trace_end, 2, global_level, levels);
-
-    Warning(info, "exiting now");
-    HREabort(LTSMIN_EXIT_COUNTER_EXAMPLE);
+    find_trace(trace_end, 2, global_level, levels, ctx->action);
 }
 
 struct group_add_info {
@@ -520,23 +526,34 @@ group_add(void *context, transition_info_t *ti, int *dst, int *cpy)
         vrel_add(ctx->rel, ctx->src, dst);
     }
 
-    if (act_detect != NULL && ti->labels[act_label] == act_index) {
-        Warning(info, "found action: %s", act_detect);
+    if (act_detect) {
+	    int act_index = ti->labels[act_label];
+        if (bitset_set(seen_actions,act_index)) { // first time we encounter this action
+            char *action=GBchunkGet(model,action_typeno,act_index).data;
 
-        if (trc_output == NULL){
-            Warning(info, "exiting now");
-            HREabort(LTSMIN_EXIT_COUNTER_EXAMPLE);
+            if (strncmp(act_detect,action,strlen(act_detect))==0)  {
+                Warning(info, "found action: %s", action);
+
+                if (trc_output) {
+                    struct find_action_info action_ctx;
+                    int group = ctx->group;
+
+                    action_ctx.group = group;
+                    action_ctx.dst = dst;
+                    action_ctx.cpy = cpy;
+                    action_ctx.action = action;
+
+                    vset_enum_match(ctx->set,r_projs[group].len, r_projs[group].proj,
+                                    ctx->src, find_action_cb, &action_ctx);
+                }
+                if (no_exit) {
+                    ErrorActions++;
+                } else {
+                    Warning(info, "exiting now");
+                    HREabort(LTSMIN_EXIT_COUNTER_EXAMPLE);
+                }
+            }
         }
-
-        struct find_action_info action_ctx;
-        int group = ctx->group;
-
-        action_ctx.group = group;
-        action_ctx.dst = dst;
-        action_ctx.cpy = cpy;
-
-        vset_enum_match(ctx->set,r_projs[group].len, r_projs[group].proj,
-                        ctx->src, find_action_cb, &action_ctx);
     }
 }
 
@@ -614,6 +631,7 @@ valid_end_cb(void *context, int *src)
 
 static void
 deadlock_check(vset_t deadlocks, bitvector_t *reach_groups)
+// checks for deadlocks, generate trace if requested, and unsets dlk_detect
 {
     if (vset_is_empty(deadlocks))
         return;
@@ -650,11 +668,15 @@ deadlock_check(vset_t deadlocks, bitvector_t *reach_groups)
     Warning(info, "deadlock found");
 
     if (trc_output) {
-        find_trace(dlk_state, 1, global_level, levels);
+        find_trace(dlk_state, 1, global_level, levels, "deadlock");
     }
 
-    Warning(info, "exiting now");
-    HREabort(LTSMIN_EXIT_COUNTER_EXAMPLE);
+    if (no_exit) {
+        dlk_detect=0; // avoids checking for more deadlocks; as long as dlk_detect==1, no deadlocks have been found.
+    } else {
+        Warning(info, "exiting now");
+        HREabort(LTSMIN_EXIT_COUNTER_EXAMPLE);
+    }
 }
 
 static inline void
@@ -790,7 +812,7 @@ final_stat_reporting(vset_t visited, rt_timer_t timer)
         Warning(info, "No deadlocks found");
 
     if (act_detect != NULL)
-        Warning(info, "Action \"%s\" not found", act_detect);
+        Warning(info, "%d different actions with prefix \"%s\" are found", ErrorActions, act_detect);
 
     get_vset_size(visited, &n_count, &e_count, elem_str, sizeof(elem_str));
     Print(infoShort, "state space has %s (~%1.2e) states, %ld BDD nodes", elem_str, e_count,n_count);
@@ -2005,6 +2027,9 @@ directed(sat_proc_t sat_proc, reach_proc_t reach_proc, vset_t visited,
     if (act_detect == NULL)
         Abort("Guided forward search requires action");
 
+    chunk c = chunk_str(act_detect);
+    act_index = GBchunkPut(model, action_typeno, c); // now only used for guidance heuristics
+
     total_count = establish_group_order(group_order, &initial_count);
 
     if (total_count == 0)
@@ -2143,10 +2168,9 @@ init_action()
     act_label = lts_type_find_edge_label_prefix (ltstype, LTSMIN_EDGE_TYPE_ACTION_PREFIX);
     if (act_label == -1)
         Abort("No edge label '%s...' for action detection", LTSMIN_EDGE_TYPE_ACTION_PREFIX);
-    int typeno = lts_type_get_edge_label_typeno(ltstype, act_label);
-    chunk c = chunk_str(act_detect);
-    act_index = GBchunkPut(model, typeno, c);
-    Warning(info, "Detecting action \"%s\"", act_detect);
+    action_typeno = lts_type_get_edge_label_typeno(ltstype, act_label);
+    seen_actions = bitset_create(32,32);
+    Warning(info, "Detecting actions with prefix \"%s\"", act_detect);
 }
 
 static vset_t
@@ -2464,7 +2488,7 @@ actual_main(void)
     init_model(files[0]);
     if (act_detect != NULL) init_action();
     if (inv_detect) Abort("Invariant violation detection is not implemented.");
-    if (no_exit) Abort("Error counting (--no-exit) is not implemented.");
+
     if (PINS_POR != PINS_POR_NONE) Abort("Partial-order reduction and symbolic model checking are not compatible.");
 
     if (transitions_load_filename != NULL) {
