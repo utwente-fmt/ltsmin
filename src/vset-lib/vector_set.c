@@ -157,6 +157,15 @@ default_reorder()
     Warning(info,"reorder request ignored");
 }
 
+static void 
+default_set_example_match(vset_t set, int *e, int p_len, int* proj, int* match) {
+  vdom_t domain = set->dom;
+  vset_t dst = domain->shared.set_create(domain, -1, NULL);
+  domain->shared.set_copy_match(dst,set,p_len,proj,match);
+  domain->shared.set_example(dst,e);
+  vset_destroy(dst);
+}
+
 static void
 default_least_fixpoint(vset_t dst, vset_t src, vrel_t rels[], int rel_count)
 {
@@ -194,6 +203,7 @@ void vdom_init_shared(vdom_t dom,int n)
     memset(&dom->shared, 0, sizeof(dom->shared));
 
 	dom->shared.size=n;
+	dom->shared.set_example_match=default_set_example_match;
 	dom->shared.set_zip=default_zip;
     dom->shared.rel_update=default_rel_update;
 	dom->shared.reorder=default_reorder;
@@ -341,7 +351,11 @@ int vproj_create(vdom_t dom, int p_len, int* proj){
 }
 
 void vset_example(vset_t set,int *e){
-	set->dom->shared.set_example(set,e);
+       set->dom->shared.set_example(set,e);
+}
+
+void vset_example_match(vset_t set,int *e, int p_len, int* proj, int* match){
+        set->dom->shared.set_example_match(set,e,p_len,proj,match);
 }
 
 void vset_count(vset_t set,long *nodes,bn_int_t *elements){

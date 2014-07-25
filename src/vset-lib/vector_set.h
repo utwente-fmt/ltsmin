@@ -153,6 +153,11 @@ extern int vproj_create(vdom_t dom, int p_len, int* proj);
 extern void vset_example(vset_t set,int *e);
 
 /**
+\brief Produce a member of a non-empty set that matches the given projection.
+*/
+extern void vset_example_match(vset_t set, int *e, int p_len, int* proj, int*match);
+
+/**
 \brief Copy a vset.
 */
 extern void vset_copy(vset_t dst,vset_t src);
