@@ -246,7 +246,7 @@ por_init_transitions (model_t model, por_context *ctx, int *src)
             ctx->visible_nds_enabled += (vis & (1 << VISIBLE_NDS)) != 0;
         }
     }
-    Debug ("Visible %d, +enabled %d/%d (NES: %d, NDS: %d)", bms_count(ctx->visible,VISIBLE),
+    Debugf ("Visible %d, +enabled %d/%d (NES: %d, NDS: %d)\n", bms_count(ctx->visible,VISIBLE),
            ctx->visible_enabled, ctx->enabled_list->count, ctx->visible_nes_enabled, ctx->visible_nds_enabled);
 }
 
@@ -398,16 +398,16 @@ select_group (por_context* ctx, search_context_t *s, int group,
  * The client may (should) set the proviso always to true for deadlocks.
  */
 
-typedef struct proviso_hook_context {
+typedef struct proviso_s {
     TransitionCB    cb;
     void           *user_context;
     int             por_proviso_true_cnt;
     int             por_proviso_false_cnt;
     int             force_proviso_true;     // feedback to algorithm that proviso already holds
-} proviso_hook_context_t;
+} proviso_t;
 
 void hook_cb (void *context, transition_info_t *ti, int *dst, int *cpy) {
-    proviso_hook_context_t* infoctx = (proviso_hook_context_t*)context;
+    proviso_t *infoctx = (proviso_t *)context;
     transition_info_t ti_new = GB_TI (ti->labels, ti->group);
     ti_new.por_proviso = infoctx->force_proviso_true;
     infoctx->cb(infoctx->user_context, &ti_new, dst, cpy);
@@ -420,13 +420,13 @@ void hook_cb (void *context, transition_info_t *ti, int *dst, int *cpy) {
 }
 
 static inline int
-emit_new_selected (por_context *ctx, proviso_hook_context_t *provctx, int *src)
+emit_new_selected (por_context *ctx, ci_list *list, proviso_t *provctx, int *src)
 {
     beam_t             *beam = (beam_t *) ctx->beam_ctx;
     search_context_t   *s = beam->search[0];
     int c = 0;
-    for (int z = 0; z < s->enabled->count; z++) {
-        int i = s->enabled->data[z];
+    for (int z = 0; z < list->count; z++) {
+        int i = list->data[z];
         if (s->emit_status[i] & ES_EMITTED) continue;
         s->emit_status[i] |= ES_EMITTED;
         s->emitted->data[s->emitted->count++] = i;
@@ -498,13 +498,15 @@ beam_add_all_for_enabled (por_context *ctx, search_context_t *s, int group,
         if (NO_V) { // Use Peled's stronger visibility proviso:
             s->enabled->count = ctx->enabled_list->count; // selects all enabled
             return;
-        } else if (NO_DYN_VIS) {
+        }
+        Debugf ("visible=[ ");
+        if (NO_DYN_VIS) {
             select_all (ctx, s, ctx->visible->lists[VISIBLE], update_scores);
         } else {
             int newNDS = ctx->visible_nes->set[group] ^ s->visible_nds; // g in NES ==> NDS C Ts
             int newNES = ctx->visible_nds->set[group] ^ s->visible_nes; // g in NDS ==> NES C Ts
             if (newNES || newNDS) {
-                for (int i = 0; i < ctx->visible_nds->types; i++) {
+                for (size_t i = 0; i < ctx->visible_nds->types; i++) {
                     if ((1 << i) & newNDS) {
                         select_all (ctx, s, ctx->visible_nds->lists[i], update_scores);
                     }
@@ -516,6 +518,7 @@ beam_add_all_for_enabled (por_context *ctx, search_context_t *s, int group,
                 s->visible_nes |= newNES;
             }
         }
+        Debugf ("] ");
     }
 
     ci_list **accords = POR_WEAK ? ctx->not_left_accords : ctx->not_accords;
@@ -525,6 +528,7 @@ beam_add_all_for_enabled (por_context *ctx, search_context_t *s, int group,
     }
 
     if (POR_WEAK == WEAK_VALMARI) {
+        Debugf ("weak=[ ");
         int         cost_ndss = beam_is_key (ctx, s, group, INT32_MAX);
         int         cost_nes  = INT32_MAX;
         int         selected_ns = -1;
@@ -539,6 +543,7 @@ beam_add_all_for_enabled (por_context *ctx, search_context_t *s, int group,
         } else if (cost_nes > 0){
             select_all (ctx, s, ctx->ns[selected_ns], true);
         }
+        Debugf ("] ");
     }
 }
 
@@ -550,6 +555,13 @@ beam_cmp (search_context_t *s1, search_context_t *s2)
     //int a = s1->disabled_score + s1->score- s1->work_disabled;
     //int b = s2->disabled_score + s2->score - s2->work_disabled;
     //return (a << 15) / s1->work_disabled - (b << 15) / s2->work_disabled;
+}
+
+bool check_sort (por_context *ctx) {
+    beam_t             *beam = (beam_t *) ctx->beam_ctx;
+    for (int i = 0; i < beam->beam_used; i++)
+        if (i > 0 && beam_cmp(beam->search[i-1], beam->search[i]) > 0) return false;
+    return true;
 }
 
 /**
@@ -571,6 +583,7 @@ beam_sort (por_context *ctx)
     // didn't move and no more work
     if (beam->search[0] == s && s->work_disabled->count == 0 && s->work_enabled->count == 0) {
         Debugf ("bailing out, no more work (selected: %d)\n", s->enabled->count);
+        HRE_ASSERT (check_sort(ctx), "unsorted!");
         return false;
     }
     return true;
@@ -581,6 +594,8 @@ beam_sort (por_context *ctx)
  * It builds stubborn sets in multiple search contexts, by using a beam
  * search it switches search context each time the score of the current context
  * (based on heuristic function h(x) (nes_score)) isn't the lowest score anymore
+ *
+ * Assumes sorted beam contexts array
  */
 static inline void
 beam_search (por_context *ctx)
@@ -588,9 +603,15 @@ beam_search (por_context *ctx)
     if (ctx->enabled_list->count <= 1) return;
     beam_t             *beam = (beam_t *) ctx->beam_ctx;
 
-    Debug ("BEAM search (re)started (enabled: %d)", ctx->enabled_list->count);
+    Debugf ("BEAM search (re)started (enabled: %d)\n", ctx->enabled_list->count);
     do {
         search_context_t   *s = beam->search[0];
+        // quit the current search when all transitions are included
+        if (s->enabled->count >= ctx->enabled_list->count) {
+            s->work_enabled->count = s->work_disabled->count = 0;
+            Debugf ("BEAM-%d abandoning search |ss|=|en|=%d\n", s->idx, ctx->enabled_list->count);
+            break;
+        }
 
         if (!s->initialized) { // init search (expensive)
             memset(s->emit_status, 0, sizeof(char[ctx->ngroups]));
@@ -599,6 +620,7 @@ beam_search (por_context *ctx)
                 update_ns_scores (ctx, s, s->group);
             }
             s->initialized = 1;
+            Debugf ("BEAM-%d Initializing scores for group %d\n", s->idx, s->group);
         }
 
         // while there are no enabled, but some disabled transitions:
@@ -608,7 +630,6 @@ beam_search (por_context *ctx)
             if (s->emit_status[group] & ES_READY) continue;
             s->emit_status[group] |= ES_SELECTED | ES_READY;
 
-            // Add a NES:
             Debugf ("BEAM-%d investigating group %d (disabled) --> ", s->idx, group);
             int         cost;
             int         selected_ns = beam_cheapest_ns (ctx, s, group, &cost);
@@ -621,23 +642,125 @@ beam_search (por_context *ctx)
         }
 
         // if the current search context has enabled transitions, handle all of them
-        while (s->work_enabled->count > 0) {
+        while (s->work_enabled->count > 0 && beam_cmp(s, beam->search[1]) <= 0) {
             group = s->work_enabled->data[--s->work_enabled->count];
             if (s->emit_status[group] & ES_READY) continue;
             s->emit_status[group] |= ES_SELECTED | ES_READY;
-
-            // quit the current search when all transitions are included
-            if (s->enabled->count >= ctx->enabled_list->count) {
-                s->work_enabled->count = s->work_disabled->count = 0;
-                Debugf (" (abandoning BEAM %d |ss|=|en|=%d)\n", s->idx, ctx->enabled_list->count);
-                break; // enabled loop
-            }
 
             Debugf ("BEAM-%d investigating group %d (enabled) --> ", s->idx, group);
             beam_add_all_for_enabled (ctx, s, group, true); // add DNA
             Debugf ("\n");
         }
     } while (beam_sort(ctx));
+}
+
+static inline int
+beam_min_key_group (por_context* ctx, search_context_t *s, bool invisible)
+{
+    size_t min_score = INT32_MAX;
+    int min_group = -1;
+    for (int i = 0; i < s->enabled->count; i++) {
+        int group = s->enabled->data[i];
+        if (invisible && is_visible(ctx, group)) continue;
+
+        size_t score = beam_is_key (ctx, s, group, min_score);
+        if (score == 0) {
+            Debugf ("BEAM %d has key: %d (all NDSs already included)\n", s->idx, group);
+            return -1;
+        }
+        if (score < min_score) {
+            min_score = score;
+            min_group = group;
+        }
+    }
+    return min_group;
+}
+
+static inline int
+beam_min_invisible_group (por_context* ctx, search_context_t *s)
+{
+    size_t min_score = INT32_MAX;
+    int min_group = -1;
+    for (int i = 0; i < ctx->enabled_list->count; i++) {
+        int group = ctx->enabled_list->data[i];
+        if ((s->emit_status[group] & ES_SELECTED) || is_visible(ctx, group)) continue;
+
+        size_t              score = 0;
+        ci_list **accords = POR_WEAK ? ctx->not_left_accords : ctx->not_accords;
+        for (int j = 0; j < accords[group]->count; j++) {
+            int dependent = accords[group]->data[j];
+            int fresh = (s->emit_status[dependent] & ES_SELECTED) == 0;
+            score += fresh ? ctx->group_score[dependent] : 0;
+        }
+        if (score == 0) return group;
+        if (score < min_score) {
+            min_score = score;
+            min_group = group;
+        }
+    }
+    return min_group;
+}
+
+static inline void
+beam_ensure_invisible_and_key (por_context* ctx)
+{
+    if (!POR_WEAK && !(SAFETY || PINS_LTL)) return;
+
+    Debugf ("ADDING KEY <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<\n");
+    beam_t             *beam = (beam_t *) ctx->beam_ctx;
+    while (true) {
+        search_context_t   *s = beam->search[0];
+        if (s->enabled->count == ctx->enabled_list->count) {
+            Debugf ("BEAM %d needs no (invisible) key\n", s->idx);
+            break;
+        }
+
+        bool need_invisible = (SAFETY || PINS_LTL) &&
+                                 ctx->visible_enabled != ctx->enabled_list->count;
+        if (need_invisible && s->has_key == KEY_INVISIBLE) {
+            Debugf ("BEAM %d has invisible key\n", s->idx);
+            break;
+        }
+        if (!need_invisible && s->has_key != KEY_NONE) {
+            Debugf ("BEAM %d has key (%s)\n", s->idx, keyNames[s->has_key]);
+            break;
+        }
+
+        bool has_invisible = s->score_vis_en != s->enabled->count;
+        if (need_invisible && !has_invisible) {
+            int i_group = beam_min_invisible_group (ctx, s);
+            Debugf ("BEAM %d adding invisible key: ", s->idx, i_group);
+            select_group (ctx, s, i_group, true);
+            if (POR_WEAK) { // make it also key
+                Debugf (" +strong[ ");
+                select_all (ctx, s, ctx->dna_diff[i_group], true);
+                Debugf ("]\n");
+            }
+            s->has_key = KEY_INVISIBLE;
+        } else if (POR_WEAK) {
+            int key_group = -1;
+            if (need_invisible && has_invisible) {
+                key_group = beam_min_key_group (ctx, s, true);
+                s->has_key = KEY_INVISIBLE;
+            } else { // only visible available:
+                key_group = beam_min_key_group (ctx, s, false);
+                s->has_key = KEY_VISIBLE;
+            }
+            if (key_group != -1) {
+                Debugf ("BEAM %d making %d key: ", s->idx, key_group);
+                select_all (ctx, s, ctx->dna_diff[key_group], true);
+                Debugf (".\n");
+            }
+        } else {
+            s->has_key = KEY_ANY;
+            Debugf ("BEAM %d key is available and I proviso met\n", s->idx);
+            break;
+        }
+
+        beam_sort (ctx);
+        beam_search (ctx); // may switch context
+    }
+    Debugf (">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n");
 }
 
 /**
@@ -674,23 +797,23 @@ beam_enforce_L2 (por_context* ctx)
         search_context_t   *s = beam->search[0];
         if (check_L2_proviso(ctx, s)) {
             if (s == s1) {
-                Debug ("BEAM %d has all visibles and finished search (previously emitted BEAM %d)", s->idx, s1->idx);
+                Debugf ("BEAM %d has all visibles and finished search (previously emitted BEAM %d)\n", s->idx, s1->idx);
                 return;
             } else { // if context changed, it should include emitted transitions:
-                if (!select_all(ctx, s, s1->emitted, true)) {
-                    Debug ("BEAM %d has all previously emitted (previously emitted BEAM %d)", s->idx, s1->idx);
-                    return;
-                } else {
-                    Debug ("BEAM %d adding all previously emitted (previously emitted BEAM %d)", s->idx, s1->idx);
-                }
+                Debugf ("BEAM %d adding previously emitted from BEAM %d: ", s->idx, s1->idx);
+                bool new = select_all(ctx, s, s1->emitted, true);
+                Debugf (".\n");
+                if (!new) return;
             }
         } else {
-            Debug ("BEAM %d adding all visibles", s->idx);
+            Debugf ("BEAM %d adding all visibles: ", s->idx);
             bool new = select_all (ctx, s, ctx->visible->lists[VISIBLE], true);
+            Debugf (".\n");
             HREassert (new);
         }
         beam_sort (ctx);
         beam_search (ctx); // may switch context
+        beam_ensure_invisible_and_key (ctx);
     }
 }
 
@@ -706,151 +829,46 @@ beam_emit (por_context* ctx, int* src, TransitionCB cb, void* uctx)
     // if the score is larger then the number of enabled transitions, emit all
     if (s->enabled->count >= ctx->enabled_list->count) {
         // return all enabled
-        proviso_hook_context_t provctx = {cb, uctx, 0, 0, 1};
+        proviso_t provctx = {cb, uctx, 0, 0, 1};
         for (int i = 0; i < ctx->enabled_list->count; i++) {
             int group = ctx->enabled_list->data[i];
             emitted += GBgetTransitionsLong(ctx->parent, group, src, hook_cb, &provctx);
         }
     } else if (!PINS_LTL && !SAFETY) { // deadlocks are easy:
-        proviso_hook_context_t provctx = {cb, uctx, 0, 0, 1};
-        emitted = emit_new_selected (ctx, &provctx, src);
+        proviso_t provctx = {cb, uctx, 0, 0, 1};
+        emitted = emit_new_selected (ctx, s->enabled, &provctx, src);
     } else { // otherwise enforce that all por_proviso flags are true
-        proviso_hook_context_t provctx = {cb, uctx, 0, 0, 0};
+        proviso_t provctx = {cb, uctx, 0, 0, 0};
 
         search_context_t   *s = beam->search[0];
         provctx.force_proviso_true = !NO_L12 && !NO_V && check_L2_proviso(ctx, s);
-        emitted = emit_new_selected (ctx, &provctx, src);
+        emitted = emit_new_selected (ctx, s->enabled, &provctx, src);
 
         // emit more if we need to fulfill a liveness / safety proviso
         if ( ( PINS_LTL && provctx.por_proviso_false_cnt != 0) ||
              (!PINS_LTL && provctx.por_proviso_true_cnt  == 0) ) {
 
-            Debug ("BEAM %d has may cause ignoring", s->idx);
-            if (!NO_L12 && !NO_V) {
+            Debugf ("BEAM %d may cause ignoring\n", s->idx);
+            if (!NO_L12 && !NO_V && ctx->visible_enabled < ctx->enabled_list->count - 1) {
                 // enforce L2 (include all visible transitions)
                 beam_enforce_L2 (ctx);
+                if (beam->search[0]->enabled->count == ctx->enabled_list->count) {
+                    emitted += emit_new_selected (ctx, ctx->enabled_list, &provctx, src);
+                } else {
+                    emitted += emit_new_selected (ctx, s->enabled, &provctx, src);
+                }
             } else {
-                s->enabled->count = ctx->enabled_list->count; // force all enabled
+                Debugf ("BEAM %d emitting all\n", s->idx);
+                emitted += emit_new_selected (ctx, ctx->enabled_list, &provctx, src);
             }
-            emitted += emit_new_selected (ctx, &provctx, src);
         }
     }
     return emitted;
 }
 
-static inline int
-beam_min_key_group (por_context* ctx, search_context_t *s, bool invisible)
-{
-    size_t min_score = INT32_MAX;
-    int min_group = -1;
-    for (int i = 0; i < s->enabled->count; i++) {
-        int group = s->enabled->data[i];
-        if (invisible && is_visible(ctx, group)) continue;
-
-        size_t score = beam_is_key (ctx, s, group, min_score);
-        if (score == 0) {
-            Debug ("BEAM %d has key: %d (all NDSs already included)", s->idx, group);
-            return -1;
-        }
-        if (score < min_score) {
-            min_score = score;
-            min_group = group;
-        }
-    }
-    return min_group;
-}
-
-static inline int
-beam_min_invisible_group (por_context* ctx, search_context_t *s)
-{
-    size_t min_score = INT32_MAX;
-    int min_group = -1;
-    for (int i = 0; i < ctx->enabled_list->count; i++) {
-        int group = ctx->enabled_list->data[i];
-        if ((s->emit_status[group] & ES_SELECTED) || is_visible(ctx, group)) continue;
-
-        int                 score = 0;
-        ci_list **accords = POR_WEAK ? ctx->not_left_accords : ctx->not_accords;
-        for (int j = 0; j < accords[group]->count; j++) {
-            int dependent = accords[group]->data[j];
-            int fresh = (s->emit_status[dependent] & ES_SELECTED) == 0;
-            score += fresh ? ctx->group_score[dependent] : 0;
-        }
-        if (score == 0) return group;
-        if (score < min_score) {
-            min_score = score;
-            min_group = group;
-        }
-    }
-    return min_group;
-}
-
-static inline void
-beam_ensure_invisible_and_key (por_context* ctx)
-{
-    if (!POR_WEAK && !(SAFETY || PINS_LTL)) return;
-
-    Debug ("ADDING KEY <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<");
-    beam_t             *beam = (beam_t *) ctx->beam_ctx;
-    while (true) {
-        search_context_t   *s = beam->search[0];
-        if (s->enabled->count == ctx->enabled_list->count) {
-            Debug ("BEAM %d needs no (invisible) key", s->idx);
-            break;
-        }
-
-        bool need_invisible = (SAFETY || PINS_LTL) &&
-                                 ctx->visible_enabled != ctx->enabled_list->count;
-        if (need_invisible && s->has_key == KEY_INVISIBLE) {
-            Debug ("BEAM %d has invisible key", s->idx);
-            break;
-        }
-        if (!need_invisible && s->has_key != KEY_NONE) {
-            Debug ("BEAM %d has key (%s)", s->idx, keyNames[s->has_key]);
-            break;
-        }
-
-        bool has_invisible = s->score_vis_en != s->enabled->count;
-        if (need_invisible && !has_invisible) {
-            int i_group = beam_min_invisible_group (ctx, s);
-            Debug ("BEAM %d adding invisible key: %d", s->idx, i_group);
-            select_group (ctx, s, i_group, true);
-            if (POR_WEAK) { // make it also key
-                s->emit_status[i_group] |= ES_SELECTED | ES_READY;
-                select_all (ctx, s, ctx->dna_diff[i_group], true);
-            }
-            s->has_key = KEY_INVISIBLE;
-        } else if (POR_WEAK) {
-            int key_group = -1;
-            if (need_invisible && has_invisible) {
-                key_group = beam_min_key_group (ctx, s, true);
-                s->has_key = KEY_INVISIBLE;
-            } else { // only visible available:
-                key_group = beam_min_key_group (ctx, s, false);
-                s->has_key = KEY_VISIBLE;
-            }
-            if (key_group != -1) {
-                select_all (ctx, s, ctx->dna_diff[key_group], true);
-            }
-        } else {
-            s->has_key = KEY_ANY;
-            Debug ("BEAM %d invisible already included", s->idx);
-            break;
-        }
-
-        beam_sort (ctx);
-        beam_search (ctx); // may switch context
-    }
-    Debug (">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>");
-}
-
-static int
-score_cmp (const void *a, const void *b, void *arg)
-{
-    por_context        *ctx = (por_context *) arg;
-    search_context_t *A = ((search_context_t *)a);
-    search_context_t *B = ((search_context_t *)b);
-    return ctx->group_score[A->group] - ctx->group_score[B->group];
+static int score_cmp (const void *a, const void *b, void *arg) {
+    return beam_cmp((search_context_t *)a, (search_context_t *)b);
+    (void) arg;
 }
 
 /**
@@ -868,6 +886,7 @@ beam_setup (model_t model, por_context* ctx, int* src)
     beam->beam_used = ctx->enabled_list->count;
     if (MAX_BEAM != -1 && beam->beam_used > MAX_BEAM)
         beam->beam_used = MAX_BEAM;
+    Debugf ("Initializing searches: ");
     for (int i = 0; i < beam->beam_used; i++) {
         int enabled = i;
         if (RANDOM) enabled = (enabled + c) % beam->beam_used;
@@ -891,7 +910,9 @@ beam_setup (model_t model, por_context* ctx, int* src)
         search->score_vis_en = visible;
         search->idx = i;
         search->group = group;
+        Debugf ("BEAM-%d=%d, ", i, group);
     }
+    Debugf ("\n");
     if (SAFETY || PINS_LTL) {
         qsortr (beam->search, beam->beam_used, sizeof(void *), score_cmp, ctx);
     }
@@ -1232,10 +1253,10 @@ scc_emit (por_context *ctx, int *src, TransitionCB cb, void *uctx)
 
     if (ctx->enabled_list->count == scc->stubborn_list[0]->count) {
         // return all enabled
-        proviso_hook_context_t provctx = {cb, uctx, 0, 0, 1};
+        proviso_t provctx = {cb, uctx, 0, 0, 1};
         return GBgetTransitionsAll(ctx->parent, src, hook_cb, &provctx);
     } else {
-        proviso_hook_context_t provctx = {cb, uctx, 0, 0, 0};
+        proviso_t provctx = {cb, uctx, 0, 0, 0};
         search_context_t *s = scc->search;
         provctx.force_proviso_true = !NO_L12 && check_L2_proviso(ctx,s); // TODO
 
@@ -1578,7 +1599,7 @@ deletion_analyze (por_context *ctx)
 }
 
 static inline int
-deletion_emit_new (por_context *ctx, proviso_hook_context_t *provctx, int* src)
+deletion_emit_new (por_context *ctx, proviso_t *provctx, int* src)
 {
     del_ctx_t       *delctx = (del_ctx_t *) ctx->del_ctx;
     bms_t           *del = delctx->del;
@@ -1607,15 +1628,15 @@ deletion_emit (model_t model, por_context *ctx, int *src, TransitionCB cb,
 {
     del_ctx_t          *delctx = (del_ctx_t *) ctx->del_ctx;
     bms_t              *del = delctx->del;
-    proviso_hook_context_t provctx = {cb, uctx, 0, 0, 0};
+    proviso_t provctx = {cb, uctx, 0, 0, 0};
 
     if (PINS_LTL || SAFETY) {
         if (NO_L12) {
             provctx.force_proviso_true = del_all_stubborn(ctx,ctx->enabled_list);
         } else { // Deletion guarantees that I holds, but does V hold?
             provctx.force_proviso_true = !delctx->del_nds && !delctx->del_nes;
-            HREassert (provctx.force_proviso_true ==
-                    del_all_stubborn(ctx,ctx->visible->lists[VISIBLE]));
+            HRE_ASSERT (provctx.force_proviso_true ==
+                        del_all_stubborn(ctx,ctx->visible->lists[VISIBLE]));
         }
     }
 
