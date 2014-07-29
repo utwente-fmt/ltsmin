@@ -17,8 +17,13 @@
  * \brief Computes the attractor set for G, U.
  * The resulting set is stored in U.
  */
-void spg_attractor(int player, const parity_game* g, vset_t u, const spg_attr_options* options)
+void spg_attractor(int player, const parity_game* g, vset_t u, const spg_attr_options* options, int depth)
 {
+    int indent = 2 * depth;
+    RTstopTimer(options->timer);
+    Print(info, "[%7.3f] " "%*s" "attractor: player=%d", RTrealTime(options->timer), indent, "", player);
+    RTstartTimer(options->timer);
+
     SPG_OUTPUT_DOT(options->dot,u,"spg_set_%05d_u.dot",dot_count++);
     vset_t v_level = vset_create(g->domain, -1, NULL);
     vset_copy(v_level, u);
@@ -26,13 +31,13 @@ void spg_attractor(int player, const parity_game* g, vset_t u, const spg_attr_op
 
     // Compute fixpoint
     while (!vset_is_empty(v_level)) {
-        SPG_ATTR_REPORT_LEVEL(options,player,u,v_level,l);
+        SPG_ATTR_REPORT_LEVEL(indent, options,player,u,v_level,l);
 
         // prev_attr = V \intersect prev(attr^k)
         vset_t prev_attr = vset_create(g->domain, -1, NULL);
         vset_t tmp = vset_create(g->domain, -1, NULL);
         for(int group=0; group<g->num_groups; group++) {
-            vset_clear(tmp);
+            vset_copy(tmp, g->v);
             vset_prev(tmp, v_level, g->e[group]);
             vset_intersect(tmp, g->v);
             vset_union(prev_attr, tmp);
@@ -60,7 +65,7 @@ void spg_attractor(int player, const parity_game* g, vset_t u, const spg_attr_op
         // prev_b = V \intersect prev(B)
         vset_t prev_b = vset_create(g->domain, -1, NULL);
         for(int group=0; group<g->num_groups; group++) {
-            vset_clear(tmp);
+            vset_copy(tmp, g->v);
             vset_prev(tmp, b, g->e[group]);
             vset_intersect(tmp, g->v);
             vset_union(prev_b, tmp);
@@ -87,7 +92,9 @@ void spg_attractor(int player, const parity_game* g, vset_t u, const spg_attr_op
         SPG_OUTPUT_DOT(options->dot,u,"spg_set_%05d_u_level_%d.dot",dot_count++,l);
         l++;
     }
-    Print(infoLong, "attr_%d: %d levels.", player, l);
+    RTstopTimer(options->timer);
+    Print(infoLong, "[%7.3f] " "%*s" "attr_%d: %d levels.", RTrealTime(options->timer), indent, "", player, l);
+    RTstartTimer(options->timer);
     vset_destroy(v_level);
     (void)options;
 }
@@ -136,6 +143,7 @@ VOID_TASK_3(attr_par_prev, vset_t, states, struct reach_par_s *, dummy, const pa
 {
     if (dummy->index >= 0) {
         //fprintf(stderr, "begin next[%d] on worker %d\n", dummy->index, LACE_WORKER_ID);
+        vset_copy(dummy->container, g->v);
         vset_prev(dummy->container, states, g->e[dummy->index]);
         vset_intersect(dummy->container, g->v);
         //fprintf(stderr, "end next[%d] on worker %d\n", dummy->index, LACE_WORKER_ID);
@@ -176,7 +184,6 @@ VOID_TASK_3(attr_par_next, vset_t, states, struct reach_par_s *, dummy, const pa
 
 VOID_TASK_2(task_intersect, vset_t, dst, vset_t, src)
 {
-    //printf("task_intersect: dst = %p\n", dst);
     vset_intersect(dst, src);
 }
 
@@ -190,17 +197,23 @@ VOID_TASK_2(task_union, vset_t, dst, vset_t, src)
  * \brief Computes the attractor set for G, U. (parallel version)
  * The resulting set is stored in U.
  */
-void spg_attractor_par(int player, const parity_game* g, vset_t u, const spg_attr_options* options)
+void spg_attractor_par(int player, const parity_game* g, vset_t u, const spg_attr_options* options, int depth)
 {
+    int indent = 2*depth;
+    RTstopTimer(options->timer);
+    Print(info, "[%7.3f] attractor_par: player=%d", RTrealTime(options->timer), player);
+    RTstartTimer(options->timer);
     SPG_OUTPUT_DOT(options->dot,u,"spg_set_%05d_u.dot",dot_count++);
     vset_t v_level = vset_create(g->domain, -1, NULL);
     vset_copy(v_level, u);
     struct reach_par_s *root = attr_par_prepare(g, 0, g->num_groups);
     int l = 0;
 
+    LACE_ME;
+
     // Compute fixpoint
     while (!vset_is_empty(v_level)) {
-        SPG_ATTR_REPORT_LEVEL(options,player,u,v_level,l);
+        SPG_ATTR_REPORT_LEVEL(indent,options,player,u,v_level,l);
 
         // prev_attr = V \intersect prev(attr^k)
         vset_t prev_attr = vset_create(g->domain, -1, NULL);
@@ -254,7 +267,9 @@ void spg_attractor_par(int player, const parity_game* g, vset_t u, const spg_att
     }
     attr_par_destroy(root);
     vset_destroy(v_level);
-    Print(infoLong, "attr_%d: %d levels.", player, l);
+    RTstopTimer(options->timer);
+    Print(infoLong, "[%7.3f] " "%*s" "attr_%d: %d levels.", RTrealTime(options->timer), indent, "", player, l);
+    RTstartTimer(options->timer);
     (void)options;
 }
 
@@ -310,6 +325,7 @@ VOID_TASK_4(attr_par_step, vset_t, states, vset_t, u, struct reach_par2_s *, dum
 {
     if (dummy->index >= 0) {
         //fprintf(stderr, "begin next[%d] on worker %d\n", dummy->index, LACE_WORKER_ID);
+        vset_copy(dummy->container, g->v);
         vset_prev(dummy->container, states, g->e[dummy->index]);
         vset_intersect(dummy->container, g->v);
 
@@ -352,8 +368,12 @@ VOID_TASK_4(attr_par_step, vset_t, states, vset_t, u, struct reach_par2_s *, dum
  * Parallel version. Does backward and then forward steps together for each transition group.
  * The resulting set is stored in U.
  */
-void spg_attractor_par2(int player, const parity_game* g, vset_t u, const spg_attr_options* options)
+void spg_attractor_par2(int player, const parity_game* g, vset_t u, const spg_attr_options* options, int depth)
 {
+    int indent = 2*depth;
+    RTstopTimer(options->timer);
+    Print(info, "[%7.3f] attractor_par2: player=%d", RTrealTime(options->timer), player);
+    RTstartTimer(options->timer);
     SPG_OUTPUT_DOT(options->dot,u,"spg_set_%05d_u.dot",dot_count++);
     vset_t v_level = vset_create(g->domain, -1, NULL);
     vset_copy(v_level, u);
@@ -361,7 +381,7 @@ void spg_attractor_par2(int player, const parity_game* g, vset_t u, const spg_at
 
     // Compute fixpoint
     while (!vset_is_empty(v_level)) {
-        SPG_ATTR_REPORT_LEVEL(options,player,u,v_level,l);
+        SPG_ATTR_REPORT_LEVEL(indent,options,player,u,v_level,l);
 
         // prev_attr = V \intersect prev(attr^k)
         vset_t prev_attr = vset_create(g->domain, -1, NULL);
@@ -403,7 +423,9 @@ void spg_attractor_par2(int player, const parity_game* g, vset_t u, const spg_at
         SPG_OUTPUT_DOT(options->dot,u,"spg_set_%05d_u_level_%d.dot",dot_count++,l);
         l++;
     }
-    Print(infoLong, "attr_%d: %d levels.", player, l);
+    RTstopTimer(options->timer);
+    Print(infoLong, "[%7.3f] " "%*s" "attr_%d: %d levels.", RTrealTime(options->timer), indent, "", player, l);
+    RTstartTimer(options->timer);
     vset_destroy(v_level);
     (void)options;
 }
@@ -416,8 +438,12 @@ void spg_attractor_par2(int player, const parity_game* g, vset_t u, const spg_at
  * The resulting set is stored in U.
  * FIXME: review, refactor, rewrite [properly implement chaining/saturation]
  */
-void spg_attractor_chaining(int player, const parity_game* g, vset_t u, const spg_attr_options* options)
+void spg_attractor_chaining(int player, const parity_game* g, vset_t u, const spg_attr_options* options, int depth)
 {
+    int indent = 2*depth;
+    RTstopTimer(options->timer);
+    Print(info, "[%5.3f] " "%*s" "attractor_chain: player=%d", RTrealTime(options->timer), indent, "", player);
+    RTstartTimer(options->timer);
     //vdom_t domain = g->domain;
     vset_t v_level = vset_create(g->domain, -1, NULL);
     vset_t v_previous_level = vset_create(g->domain, -1, NULL);
@@ -440,8 +466,8 @@ void spg_attractor_chaining(int player, const parity_game* g, vset_t u, const sp
             vset_count(u, &u_count, &u_elem_count);
             vset_count(v_level, &v_level_count, &v_level_elem_count);
             RTstopTimer(options->timer);
-            Print(infoLong, "attr_%d^%d [%5.3f]: u has %ld nodes, v_level has %ld nodes, v_group has %ld nodes max.",
-                    player, l, RTrealTime(options->timer), u_count, v_level_count, peak_group_count);
+            Print(infoLong, "[%7.3f] attr_%d^%d: u has %ld nodes, v_level has %ld nodes, v_group has %ld nodes max.",
+                  RTrealTime(options->timer), player, l, u_count, v_level_count, peak_group_count);
             RTstartTimer(options->timer);
             peak_group_count = 0;
         }
@@ -465,6 +491,7 @@ void spg_attractor_chaining(int player, const parity_game* g, vset_t u, const sp
 
                 // prev_attr = V \intersect prev(attr^k)
                 vset_t prev_attr = vset_create(g->domain, -1, NULL);
+                vset_copy(prev_attr, g->v);
                 vset_prev(prev_attr, v_group, g->e[group]);
                 vset_copy(v_group, prev_attr);
                 vset_intersect(v_group, g->v_player[player]);
@@ -487,7 +514,7 @@ void spg_attractor_chaining(int player, const parity_game* g, vset_t u, const sp
                 // prev_b = V \intersect prev(B)
                 vset_t prev_b = vset_create(g->domain, -1, NULL);
                 for(int group=0; group<g->num_groups; group++) {
-                    vset_clear(tmp);
+                    vset_copy(tmp, g->v);
                     vset_prev(tmp, b, g->e[group]);
                     vset_intersect(tmp, g->v);
                     vset_union(prev_b, tmp);
@@ -512,7 +539,9 @@ void spg_attractor_chaining(int player, const parity_game* g, vset_t u, const sp
         }
         l++;
     }
-    Print(infoLong, "attr_%d: %d levels.", player, l);
+    RTstopTimer(options->timer);
+    Print(infoLong, "[%7.3f] attr_%d: %d levels.", RTrealTime(options->timer), player, l);
+    RTstartTimer(options->timer);
     vset_destroy(v_group);
     vset_destroy(v_level);
     vset_destroy(v_previous_level);

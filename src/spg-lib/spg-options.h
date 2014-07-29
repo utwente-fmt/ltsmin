@@ -18,7 +18,7 @@ typedef struct
 } spg_attr_options;
 
 
-typedef void (*spg_attractor_t)(int player, const parity_game* g, vset_t u, const spg_attr_options* options);
+typedef void (*spg_attractor_t)(int player, const parity_game* g, vset_t u, const spg_attr_options* options, int depth);
 
 
 typedef struct

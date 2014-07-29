@@ -12,11 +12,6 @@
 
 #include <vset-lib/vector_set.h>
 
-typedef struct tmp_file_s {
-    int                 fd;
-    char                buffer[256];
-} tmp_file_t;
-
 typedef struct
 {
     vdom_t domain;
@@ -27,7 +22,6 @@ typedef struct
     int min_priority;
     int max_priority;
     vset_t *v_priority;
-    tmp_file_t** v_priority_swapfile;
     int num_groups;
     vrel_t *e;
 } parity_game;

@@ -779,13 +779,19 @@ GBaddMucalc (model_t model, const char *mucalc_file)
 
     matrix_t *p_dm = GBgetDMInfo (model);
     int parent_groups = dm_nrows( p_dm );
+    matrix_t *p_dm_r = GBgetDMInfoRead(model);
+    matrix_t *p_dm_w = GBgetDMInfoWrite(model);
 
     // Compute transition groups
     ctx->groupinfo = mucalc_compute_groupinfo(env, parent_groups);
 
     // Compute dependency matrix, add mucalc node
     matrix_t *_p_dm = (matrix_t*) RTmalloc(sizeof(matrix_t));
+    matrix_t *_p_dm_r = (matrix_t*) RTmalloc(sizeof(matrix_t));
+    matrix_t *_p_dm_w = (matrix_t*) RTmalloc(sizeof(matrix_t));
     dm_create(_p_dm, ctx->groupinfo.group_count, ctx->len);
+    dm_create(_p_dm_r, ctx->groupinfo.group_count, ctx->len);
+    dm_create(_p_dm_w, ctx->groupinfo.group_count, ctx->len);
     for(int i=0; i < ctx->groupinfo.group_count; i++) {
         // copy old matrix rows
         int parent_group = ctx->groupinfo.entries[i].parent_group;
@@ -794,13 +800,21 @@ GBaddMucalc (model_t model, const char *mucalc_file)
             for(int j=0; j < ctx->len-1; j++) {
                 if (dm_is_set(p_dm, parent_group, j))
                     dm_set(_p_dm, i, j);
+                if (dm_is_set(p_dm_r, parent_group, j))
+                    dm_set(_p_dm_r, i, j);
+                if (dm_is_set(p_dm_w, parent_group, j))
+                    dm_set(_p_dm_w, i, j);
             }
         }
         // Set mucalc node as dependent
         dm_set(_p_dm, i, ctx->mu_idx);
+        dm_set(_p_dm_r, i, ctx->mu_idx);
+        dm_set(_p_dm_w, i, ctx->mu_idx);
     }
 
     GBsetDMInfo(_model, _p_dm);
+    GBsetDMInfoRead(_model, _p_dm_r);
+    GBsetDMInfoWrite(_model, _p_dm_w);
 
     // Set the state label functions for parity games
     GBsetStateLabelShort(_model, mucalc_sl_short);

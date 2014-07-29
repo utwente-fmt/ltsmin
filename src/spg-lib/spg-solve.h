@@ -32,7 +32,7 @@ bool spg_solve(parity_game* g, spgsolver_options* options);
  * \param v
  * \return true iff ...
  */
-recursive_result spg_solve_recursive(parity_game* g, const spgsolver_options* options);
+recursive_result spg_solve_recursive(parity_game* g, const spgsolver_options* options, int depth);
 
 
 /**
@@ -63,31 +63,40 @@ void spg_game_restrict(parity_game *g, vset_t a, const spgsolver_options* option
     bn_clear(&elem_count);                  \
 }
 
-#define SPG_REPORT_RECURSIVE_RESULT {                               \
-    if (log_active(infoLong))                                       \
-    {                                                               \
-        long   n_count;                                             \
-        bn_int_t elem_count;                                        \
-        vset_count(result.win[0], &n_count, &elem_count);           \
-        Print(infoLong, "result.win[0]: %ld nodes.", n_count);    \
-        vset_count(result.win[1], &n_count, &elem_count);           \
-        bn_clear(&elem_count);                                      \
-        Print(infoLong, "result.win[1]: %ld nodes.", n_count);    \
-    }                                                               \
+#define SPG_REPORT_RECURSIVE_RESULT(OPT,INDENT,RESULT) {                 \
+    if (log_active(infoLong))                                            \
+    {                                                                    \
+        long   n_count;                                                  \
+        bn_int_t elem_count;                                             \
+        vset_count(RESULT.win[0], &n_count, &elem_count);                \
+        RTstopTimer(OPT->timer);                                         \
+        Print(infoLong, "[%7.3f] " "%*s" "solve_recursive: result.win[0]: %ld nodes.", \
+        		RTrealTime(OPT->timer), INDENT, "", n_count);            \
+        RTstartTimer(OPT->timer);                                        \
+        vset_count(RESULT.win[1], &n_count, &elem_count);                \
+        RTstopTimer(OPT->timer);                                         \
+        Print(infoLong, "[%7.3f] " "%*s" "solve_recursive: result.win[1]: %ld nodes.", \
+                RTrealTime(OPT->timer), INDENT, "", n_count);            \
+        RTstartTimer(OPT->timer);                                        \
+        bn_clear(&elem_count);                                           \
+    }                                                                    \
 }
 
-#define SPG_REPORT_MIN_PRIORITY(M, U) {                                    \
+#define SPG_REPORT_MIN_PRIORITY(OPT,INDENT,M, U) {                  \
     if (log_active(infoLong))                                       \
     {                                                               \
         long   n_count;                                             \
         bn_int_t elem_count;                                        \
         vset_count(U, &n_count, &elem_count);                       \
+        RTstopTimer(OPT->timer);                                    \
+        Print(infoLong, "[%7.3f] " "%*s" "solve_recursive: m=%d, u has %ld nodes.", \
+        		RTrealTime(OPT->timer), INDENT, "", M, n_count);    \
+        RTstartTimer(OPT->timer);                                   \
         bn_clear(&elem_count);                                      \
-        Print(infoLong, "m = %d, u has %ld nodes.", M, n_count);  \
     }                                                               \
 }
 
-#define SPG_REPORT_DEADLOCK_STATES(PLAYER) {                                                \
+#define SPG_REPORT_DEADLOCK_STATES(OPT,INDENT,PLAYER) {                                     \
     if(log_active(infoLong))                                                                \
     {                                                                                       \
         long   n_count;                                                                     \
@@ -95,10 +104,51 @@ void spg_game_restrict(parity_game *g, vset_t a, const spgsolver_options* option
         vset_count(deadlock_states[PLAYER], &n_count, &elem_count);                         \
         char s[1024];                                                                       \
         bn_int2string(s, sizeof(s), &elem_count);                                           \
-        Print(infoLong, "%s deadlock states (%ld nodes) with result '%s' (p=%d).",      \
-              s, n_count, ((PLAYER==0)?"false":"true"), PLAYER);                           \
+        RTstopTimer(OPT->timer);                                                            \
+        Print(infoLong, "[%7.3f] " "%*s" "solve_recursive: %s deadlock states (%ld nodes) with result '%s' (player=%d).", \
+        		RTrealTime(OPT->timer), INDENT, "", s, n_count, ((PLAYER==0)?"false":"true"), PLAYER);  \
+        RTstartTimer(OPT->timer);                                                           \
         bn_clear(&elem_count);                                                              \
     }                                                                                       \
 }
+
+#define SPG_REPORT_SET(OPT,INDENT,SET) {                                                        \
+    if (log_active(infoLong))                                                                   \
+    {                                                                                           \
+        RTstopTimer(OPT->timer);                                                                \
+        Print(infoLong, "[%7.3f] " "%*s" "counting " #SET ".",                                \
+                RTrealTime(OPT->timer), indent, "");                                            \
+        RTstartTimer(OPT->timer);                                                               \
+        long   s_count;                                                                         \
+        bn_int_t s_elem_count;                                                                  \
+        vset_count(SET, &s_count, &s_elem_count);                                               \
+        RTstopTimer(OPT->timer);                                                                \
+        Print(infoLong, "[%7.3f] " "%*s" #SET " has %ld nodes.",                              \
+                RTrealTime(OPT->timer), indent, "", s_count);                                   \
+        RTstartTimer(OPT->timer);                                                               \
+        bn_clear(&s_elem_count);                                                                \
+    }                                                                                           \
+}
+
+#define SPG_REPORT_ELEMENTS(OPT,INDENT,SET) {                                                   \
+    if (log_active(infoLong))                                                                   \
+    {                                                                                           \
+        RTstopTimer(OPT->timer);                                                                \
+        Print(infoLong, "[%7.3f] " "%*s" "counting " #SET ".",                                \
+                RTrealTime(OPT->timer), indent, "");                                            \
+        RTstartTimer(OPT->timer);                                                               \
+        long   s_count;                                                                         \
+        bn_int_t s_elem_count;                                                                  \
+        vset_count(SET, &s_count, &s_elem_count);                                               \
+        char s[1024];                                                                           \
+        bn_int2string(s, sizeof(s), &s_elem_count);                                             \
+        RTstopTimer(OPT->timer);                                                                \
+        Print(infoLong, "[%7.3f] " "%*s" #SET " has %s states (%ld nodes).",                 \
+                RTrealTime(OPT->timer), indent, "", s, s_count);                                \
+        RTstartTimer(OPT->timer);                                                               \
+        bn_clear(&s_elem_count);                                                                \
+    }                                                                                           \
+}
+
 
 #endif /* SPG_SOLVE_H_ */
