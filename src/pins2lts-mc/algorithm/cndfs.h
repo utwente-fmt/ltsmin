@@ -28,6 +28,12 @@
 
 #include <pins2lts-mc/algorithm/lndfs.h>
 
+typedef enum cndfs_successors_e {
+    CYCLE   = 0, // a (volatile) successor closes a cycle (lies on the stack)
+    NONEC   = 1, // no (volatile) successor closes a cyc;e
+    SRCINV  = 2, // source state is involatile (this takes priority)
+} cndfs_successors_t;
+
 typedef struct cndfs_counter_s {
     size_t              rec;
 } cndfs_counter_t;
@@ -40,6 +46,8 @@ typedef struct cndfs_alg_local_s {
     dfs_stack_t         out_stack;
     rt_timer_t          timer;
     alg_local_t        *rec;
+    fset_t             *fset;
+    cndfs_successors_t  successors;
 } cndfs_alg_local_t;
 
 typedef struct cndfs_reduced_s {

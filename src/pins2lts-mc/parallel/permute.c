@@ -98,6 +98,7 @@ struct permute_s {
     state_info_t       *next;       /* state info serializer */
     size_t              labels;     /* number of transition labels */
     alg_state_seen_f    state_seen;
+    int                 por_proviso;
 };
 
 static int
@@ -161,10 +162,11 @@ perm_todo (permute_t *perm, transition_info_t *ti, int seen)
     todo->ref = perm->next->ref;
     todo->lattice = perm->next->lattice;
     todo->ti.group = ti->group;
-    if (act_detect || files[1])
+    todo->ti.por_proviso = ti->por_proviso;
+    if (EXPECT_FALSE(act_detect || files[1]))
         memcpy (todo->ti.labels, ti->labels, sizeof(int*[perm->labels]));
     perm->nstored++;
-    ti->por_proviso = 1; // Only DFS_FIFO combines POR and PERM; it requires no cycle proviso!
+    ti->por_proviso = perm->por_proviso;
 }
 
 static inline void
@@ -278,6 +280,17 @@ permute_trans (permute_t *perm, state_info_t *state, perm_cb_f cb, void *ctx)
     return count;
 }
 
+void
+permute_set_model (permute_t *perm, model_t model)
+{
+    perm->model = model;
+}
+
+void
+permute_set_por (permute_t *perm, int por)
+{
+    perm->por_proviso = por;
+}
 
 permute_t *
 permute_create (permutation_perm_t permutation, model_t model, alg_state_seen_f ssf,
@@ -291,6 +304,7 @@ permute_create (permutation_perm_t permutation, model_t model, alg_state_seen_f 
     perm->start_group = perm->shift * worker_index;
     perm->model = model;
     perm->state_seen = ssf;
+    perm->por_proviso = 1;
     perm->permutation = permutation;
     perm->run_ctx = run_ctx;
     perm->next = state_info_create ();

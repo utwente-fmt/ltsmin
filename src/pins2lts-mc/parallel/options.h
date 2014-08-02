@@ -15,6 +15,7 @@ typedef enum {
     Proviso_None,
 //    LTLP_ClosedSet, //TODO: implement closed-set proviso
     Proviso_Stack,
+    Proviso_CNDFS,
 } proviso_t;
 
 typedef enum {

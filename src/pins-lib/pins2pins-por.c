@@ -848,6 +848,7 @@ beam_emit (por_context* ctx, int* src, TransitionCB cb, void* uctx)
         if ( ( PINS_LTL && provctx.por_proviso_false_cnt != 0) ||
              (!PINS_LTL && provctx.por_proviso_true_cnt  == 0) ) {
 
+            provctx.force_proviso_true = 3;
             Debugf ("BEAM %d may cause ignoring\n", s->idx);
             if (!NO_L12 && !NO_V && ctx->visible_enabled < ctx->enabled_list->count - 1) {
                 // enforce L2 (include all visible transitions)

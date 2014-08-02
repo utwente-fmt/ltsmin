@@ -34,6 +34,7 @@ si_map_entry strategies[] = {
 si_map_entry provisos[] = {
     {"none",    Proviso_None},
     {"stack",   Proviso_Stack},
+    {"cndfs",   Proviso_CNDFS},
     {NULL, 0}
 };
 
@@ -69,14 +70,14 @@ options_static_init      (model_t model, bool timed)
     }
 
     if (PINS_POR && (strategy[0] & Strat_LTL & ~Strat_DFSFIFO)) {
-        if (W > 1) Abort ("Cannot use POR with more than one worker.");
+        if (HREpeers(HREglobal()) > 1 && (strategy[0] & ~Strat_CNDFS))
+            Abort ("Can only use POR with more than one worker in CNDFS!");
         if (proviso == Proviso_None) {
-            Warning (info, "Forcing use of the stack cycle proviso");
-            proviso = Proviso_Stack;
+            Warning (info, "Forcing use of the a cycle proviso");
+            proviso = strategy[0] & ~Strat_CNDFS ? Proviso_CNDFS : Proviso_Stack;
         }
-        if (permutation != Perm_None) {
-            Warning (info, "Warning turning off successor permutation to solve NDFS revisiting problem.");
-            permutation = Perm_None;
+        if ((strategy[0] & Strat_CNDFS) && proviso != Proviso_CNDFS) {
+            Abort ("Only the CNDFS proviso works in CNDFS!");
         }
     }
 

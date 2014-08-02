@@ -228,7 +228,6 @@ state_info_serialize_size (state_info_t *si)
 size_t
 state_info_serialize_int_size (state_info_t *si)
 {
-
     return INT_SIZE (state_info_serialize_size (si));
 }
 

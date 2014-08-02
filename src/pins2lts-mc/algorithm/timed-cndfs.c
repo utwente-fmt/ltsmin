@@ -467,12 +467,12 @@ ta_cndfs_blue (run_t *run, wctx_t *ctx)
             if ( !ta_cndfs_subsumed(ctx, ctx->state, BLUE_CHECK) &&
                  !ta_cndfs_is_cyan(ctx, ctx->state, state_data, true) ) {
                 if (all_red)
-                    bitvector_set (&loc->all_red, ctx->counters->level_cur);
+                    bitvector_set (&loc->stackbits, ctx->counters->level_cur);
                 ta_cndfs_explore_state_blue (ctx);
             } else {
                 if ( all_red && ctx->counters->level_cur != 0 &&
                      !ta_cndfs_subsumed(ctx, ctx->state, LM_RED) )
-                    bitvector_unset (&loc->all_red, ctx->counters->level_cur - 1);
+                    bitvector_unset (&loc->stackbits, ctx->counters->level_cur - 1);
                 dfs_stack_pop (loc->stack);
             }
         } else { // backtrack
@@ -496,7 +496,7 @@ ta_cndfs_blue (run_t *run, wctx_t *ctx)
             }
             /* Mark state BLUE on backtrack */
             ta_cndfs_mark (ctx, ctx->state, LM_BLUE);
-            if ( all_red && bitvector_is_set(&loc->all_red, ctx->counters->level_cur) ) {
+            if ( all_red && bitvector_is_set(&loc->stackbits, ctx->counters->level_cur) ) {
                 /* all successors are red */
                 //permute_trans (loc->permute, ctx->state, check, ctx);
                 int red = ta_cndfs_mark (ctx, ctx->state, LM_RED);
@@ -508,7 +508,7 @@ ta_cndfs_blue (run_t *run, wctx_t *ctx)
             } else if (all_red && ctx->counters->level_cur > 0 &&
                        !ta_cndfs_subsumed(ctx, ctx->state, LM_RED) ) {
                 /* unset the all-red flag (only for non-initial nodes) */
-                bitvector_unset (&loc->all_red, ctx->counters->level_cur - 1);
+                bitvector_unset (&loc->stackbits, ctx->counters->level_cur - 1);
             }
             dfs_stack_pop (loc->stack);
         }

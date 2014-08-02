@@ -147,7 +147,7 @@ extern index_class_t GBgetMatrixColumnInfo(model_t model,int ID);
 typedef struct transition_info {
     int* labels;                    // edge labels, NULL, or pointer to the edge label(s)
     int  group;                     // holds transition group or -1 if unknown
-    int  por_proviso;               // provides infomation on the cycle proviso (ltl) to the por layer
+    int  por_proviso;               // provides information on the cycle proviso (ltl) to the por layer
 } transition_info_t;
 
 #define GB_UNKNOWN_GROUP -1

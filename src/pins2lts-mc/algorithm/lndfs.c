@@ -64,13 +64,13 @@ lndfs_blue (run_t *run, wctx_t *ctx)
             if ( nn_color_eq(color, NNWHITE) &&
                  !state_store_has_color(ctx->state->ref, GRED, loc->rec_bits) ) {
                 if (all_red)
-                    bitvector_set (&loc->all_red, ctx->counters->level_cur);
+                    bitvector_set (&loc->stackbits, ctx->counters->level_cur);
                 nn_set_color (&loc->color_map, ctx->state->ref, NNCYAN);
                 ndfs_explore_state_blue (ctx);
             } else {
                 if ( all_red && ctx->counters->level_cur != 0 &&
                      !state_store_has_color(ctx->state->ref, GRED, loc->rec_bits) )
-                    bitvector_unset (&loc->all_red, ctx->counters->level_cur - 1);
+                    bitvector_unset (&loc->stackbits, ctx->counters->level_cur - 1);
                 dfs_stack_pop (loc->stack);
             }
         } else { //backtrack
@@ -80,7 +80,7 @@ lndfs_blue (run_t *run, wctx_t *ctx)
             ctx->counters->level_cur--;
             state_data = dfs_stack_top (loc->stack);
             state_info_deserialize (loc->seed, state_data);
-            if ( all_red && bitvector_is_set(&loc->all_red, ctx->counters->level_cur) ) {
+            if ( all_red && bitvector_is_set(&loc->stackbits, ctx->counters->level_cur) ) {
                 /* all successors are red */
                 wait_seed (ctx, loc->seed->ref);
                 set_all_red (ctx, loc->seed);
@@ -90,7 +90,7 @@ lndfs_blue (run_t *run, wctx_t *ctx)
             } else if (all_red && ctx->counters->level_cur > 0 &&
                        !state_store_has_color(loc->seed->ref, GRED, loc->rec_bits)) {
                 /* unset the all-red flag (only for non-initial nodes) */
-                bitvector_unset (&loc->all_red, ctx->counters->level_cur - 1);
+                bitvector_unset (&loc->stackbits, ctx->counters->level_cur - 1);
             }
             nn_set_color (&loc->color_map, loc->seed->ref, NNBLUE);
             dfs_stack_pop (loc->stack);

@@ -13,6 +13,11 @@
 
 extern int              all_red;
 
+typedef enum ndfs_bits_e {
+    ALLRED = 1,
+    NOCYAN = 2,
+} ndfs_bits_t;
+
 typedef struct counter_s {
     size_t              waits;
     size_t              accepting;
@@ -27,10 +32,12 @@ struct alg_local_s {
     counter_t           counters;       // reachability/NDFS_blue counters
     work_counter_t      red_work;
     counter_t           red;            // NDFS_red counters
-    bitvector_t         all_red;        // all_red gaiser/Schwoon
+    bitvector_t         stackbits;      // all_red gaiser/Schwoon + other stack bits
     size_t              rec_bits;
     strategy_t          strat;
     state_info_t       *seed;
+    int                 bits;
+    int                 seed_bits;
 };
 
 struct alg_reduced_s {

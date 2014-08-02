@@ -155,13 +155,13 @@ ndfs_blue (run_t *run, wctx_t *ctx)
             nndfs_color_t color = nn_get_color (&loc->color_map, ctx->state->ref);
             if ( nn_color_eq(color, NNWHITE) ) {
                 if (all_red)
-                    bitvector_set ( &loc->all_red, ctx->counters->level_cur );
+                    bitvector_set ( &loc->stackbits, ctx->counters->level_cur );
                 nn_set_color (&loc->color_map, ctx->state->ref, NNCYAN);
                 ndfs_explore_state_blue (ctx);
             } else {
                 if ( all_red && ctx->counters->level_cur != 0 &&
                                 !nn_color_eq(color, NNPINK) )
-                    bitvector_unset ( &loc->all_red, ctx->counters->level_cur - 1);
+                    bitvector_unset ( &loc->stackbits, ctx->counters->level_cur - 1);
                 dfs_stack_pop (loc->stack);
             }
         } else { //backtrack
@@ -171,7 +171,7 @@ ndfs_blue (run_t *run, wctx_t *ctx)
             ctx->counters->level_cur--;
             state_data = dfs_stack_top (loc->stack);
             state_info_deserialize (loc->seed, state_data);
-            if ( all_red && bitvector_is_set(&loc->all_red, ctx->counters->level_cur) ) {
+            if ( all_red && bitvector_is_set(&loc->stackbits, ctx->counters->level_cur) ) {
                 /* exit if backtrack hits seed, leave stack the way it was */
                 nn_set_color (&loc->color_map, loc->seed->ref, NNPINK);
                 loc->counters.allred++;
@@ -183,7 +183,7 @@ ndfs_blue (run_t *run, wctx_t *ctx)
                 nn_set_color (&loc->color_map, loc->seed->ref, NNPINK);
             } else {
                 if (all_red && ctx->counters->level_cur > 0)
-                    bitvector_unset (&loc->all_red, ctx->counters->level_cur - 1);
+                    bitvector_unset (&loc->stackbits, ctx->counters->level_cur - 1);
                 nn_set_color (&loc->color_map, loc->seed->ref, NNBLUE);
             }
             dfs_stack_pop (loc->stack);
@@ -202,17 +202,21 @@ void
 ndfs_local_setup   (run_t *run, wctx_t *ctx)
 {
     alg_local_t        *loc = ctx->local;
-    size_t local_bits = 2;
+    size_t              local_bits = 2;
     int res = bitvector_create (&loc->color_map, local_bits<<dbs_size);
     HREassert (res != -1, "Failure to allocate a color_map bitvector.");
     if (all_red)
-        res = bitvector_create (&loc->all_red, MAX_STACK);
+        res = bitvector_create (&loc->stackbits, MAX_STACK);
     HREassert (res != -1, "Failure to allocate a all_red bitvector.");
     loc->rec_bits = 0;
     loc->strat = get_strategy (run->alg);
-    size_t len = state_info_serialize_int_size (ctx->state);
-    loc->stack = dfs_stack_create (len);
     loc->seed = state_info_create ();
+    size_t              len = state_info_serialize_int_size (ctx->state);
+
+    //state_info_add_simple (ctx->state, sizeof(int), &loc->bits);
+    //state_info_add_simple (ctx->local->seed, sizeof(int), &loc->seed_bits);
+
+    loc->stack = dfs_stack_create (len);
 }
 
 void
@@ -220,7 +224,7 @@ ndfs_local_deinit   (run_t *run, wctx_t *ctx)
 {
     alg_local_t        *loc = ctx->local;
     if (all_red)
-        bitvector_free (&loc->all_red);
+        bitvector_free (&loc->stackbits);
     bitvector_free (&loc->color_map);
     dfs_stack_destroy (loc->stack);
     RTfree (loc);

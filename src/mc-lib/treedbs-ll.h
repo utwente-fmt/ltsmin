@@ -102,6 +102,10 @@ extern void         TreeDBSLLunset_sat_bit (const treedbs_ll_t dbs, const tree_r
 extern uint32_t     TreeDBSLLget_sat_bits (const treedbs_ll_t dbs, const tree_ref_t ref);
 extern uint32_t     TreeDBSLLinc_sat_bits (const treedbs_ll_t dbs, const tree_ref_t ref);
 extern uint32_t     TreeDBSLLdec_sat_bits (const treedbs_ll_t dbs, const tree_ref_t ref);
+extern int          TreeDBSLLtry_set_sat_bits (const treedbs_ll_t dbs,
+                                               const tree_ref_t ref,
+                                               size_t bits, uint64_t exp,
+                                               uint64_t new_val);
 
 extern int          TreeDBSLLlookup (const treedbs_ll_t dbs, const int *v);
 extern int          TreeDBSLLlookup_incr (const treedbs_ll_t dbs, const int *v,

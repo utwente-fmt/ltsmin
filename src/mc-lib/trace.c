@@ -58,6 +58,7 @@ write_trace_next (void *arg, transition_info_t *ti, int *dst, int *cpy)
 {
     (void) cpy;
     write_trace_step_t *ctx = (write_trace_step_t*)arg;
+    ti->por_proviso = 0;
     if (ctx->found) return;
     if (0 != memcmp(ctx->dst, dst, sizeof(int[ctx->env->N]))) return;
     ctx->found = 1;

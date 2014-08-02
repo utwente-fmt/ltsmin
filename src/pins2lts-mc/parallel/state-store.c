@@ -48,6 +48,7 @@ struct state_store_s {
     dbs_stats_f         statistics;
     dbs_get_sat_f       get_sat_bit;
     dbs_try_set_sat_f   try_set_sat_bit;
+    dbs_try_set_sats_f  try_set_sat_bits;
     dbs_inc_sat_bits_f  inc_sat_bits;
     dbs_dec_sat_bits_f  dec_sat_bits;
     dbs_get_sat_bits_f  get_sat_bits;
@@ -140,7 +141,8 @@ state_store_init (model_t model, bool timed)
         store->global_bits += num_global_bits (strategy[i]);
         store->local_bits += (~Strat_DFSFIFO & Strat_LTL & strategy[i++] ? 2 : 0);
     }
-    store->count_bits = (Strat_LNDFS == strategy[i - 1] ? ceil (log2 (W + 1)) : 0);
+    store->count_bits = (Strat_LNDFS == strategy[i - 1] ? ceil (log2 (W + 1)) :
+            (Strat_CNDFS == strategy[i - 1] && PINS_POR ? 2 : 0) );
     store->count_mask = (1<<store->count_bits) - 1;
     size_t              bits = store->global_bits + store->count_bits;
 
@@ -152,6 +154,7 @@ state_store_init (model_t model, bool timed)
         //store->get = (dbs_get_f) DBSLLget;
         store->get_sat_bit     = (dbs_get_sat_f) DBSLLget_sat_bit;
         store->try_set_sat_bit = (dbs_try_set_sat_f)  DBSLLtry_set_sat_bit;
+        store->try_set_sat_bits= (dbs_try_set_sats_f) DBSLLtry_set_sat_bits;
         store->inc_sat_bits    = (dbs_inc_sat_bits_f) DBSLLinc_sat_bits;
         store->dec_sat_bits    = (dbs_dec_sat_bits_f) DBSLLdec_sat_bits;
         store->get_sat_bits    = (dbs_get_sat_bits_f) DBSLLget_sat_bits;
@@ -173,6 +176,7 @@ state_store_init (model_t model, bool timed)
         //store->get = (dbs_get_f) TreeDBSLLget;
         store->get_sat_bit     = (dbs_get_sat_f)      TreeDBSLLget_sat_bit;
         store->try_set_sat_bit = (dbs_try_set_sat_f)  TreeDBSLLtry_set_sat_bit;
+        store->try_set_sat_bits= (dbs_try_set_sats_f) TreeDBSLLtry_set_sat_bits;
         store->inc_sat_bits    = (dbs_inc_sat_bits_f) TreeDBSLLinc_sat_bits;
         store->dec_sat_bits    = (dbs_dec_sat_bits_f) TreeDBSLLdec_sat_bits;
         store->get_sat_bits    = (dbs_get_sat_bits_f) TreeDBSLLget_sat_bits;
@@ -270,6 +274,14 @@ state_store_get_wip (ref_t ref)
 {
     return global->store->get_sat_bits (global->store->dbs, ref)
             & global->store->count_mask;
+}
+
+int
+state_store_try_set_colors (ref_t ref, size_t bits, uint64_t old_val,
+                            uint64_t new_val)
+{
+    return global->store->try_set_sat_bits (global->store->dbs, ref, bits,
+                                            old_val, new_val);
 }
 
 struct store_s {

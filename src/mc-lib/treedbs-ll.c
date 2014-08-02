@@ -157,6 +157,23 @@ cas_sat_bits (const treedbs_ll_t dbs, const tree_ref_t ref,
     return cas (dbs->root.table+ref, read, value);
 }
 
+int
+TreeDBSLLtry_set_sat_bits (const treedbs_ll_t dbs, const tree_ref_t ref,
+                           size_t bits, uint64_t exp, uint64_t new_val)
+{
+    uint64_t            old_val, old_bits, new_v;
+    uint64_t            mask = (1ULL << bits) - 1;
+    HREassert (new_val < (1UL << dbs->root.sat_bits), "new_val too high");
+    HREassert ((new_val & mask) == new_val, "new_val too high w.r.t. bits");
+
+    old_bits = atomic_read (dbs->root.table+ref);
+    old_val = b2s (dbs, old_bits);
+    if ((old_val & mask) != exp) return false;
+
+    new_v = (old_val & ~mask) | new_val;
+    return cas_sat_bits(dbs, ref, old_bits, new_v);
+}
+
 uint32_t
 TreeDBSLLinc_sat_bits (const treedbs_ll_t dbs, const tree_ref_t ref)
 {
