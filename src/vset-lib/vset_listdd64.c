@@ -1516,7 +1516,6 @@ set_least_fixpoint_mdd(vset_t dst, vset_t src, vrel_t rels[], int rel_count)
     RTfree(top_groups);
 }
 
-
 static void mdd_mark_for_dot(uint64_t mdd){
   // only heads of mdd-nodes are marked
   // note that head of one mdd-node might be in the middle of another one!
@@ -1550,7 +1549,13 @@ static void mdd_clear_and_print(FILE* fp,uint64_t mdd){
     fprintf(fp," n%" PRIu64 " [shape=record,label=\"",mdd);
     while (x) {
       if (i>0) fprintf(fp,"|");
-      fprintf(fp,"<f%d> %"PRIu32, i, node_table[x].val);
+
+      char *c = "";
+      if (node_table[x].copy == COPY_WRITE) c = ", w";
+      else if(node_table[x].copy == COPY_COPY) c = ", c";
+      else if(node_table[x].copy == COPY_DONT_CARE) c = "";
+
+      fprintf(fp,"<f%d> %"PRIu32" (%" PRIu64 "%s)", i, node_table[x].val, x, c);
       x=node_table[x].right;
       i++;
     }
@@ -1574,20 +1579,97 @@ static void mdd_clear_and_print(FILE* fp,uint64_t mdd){
   }
 }
 
+static void set_dot_name (FILE* fp, vset_t set)
+{
+    fprintf(fp, "node [shape=oval];\n");
 
-void set_dot_mdd(FILE* fp, vset_t src) {
+    if (set->p_len < 0) {
+
+        for (int i = 0; i < set->dom->shared.size; i++) {
+
+            fprintf(fp, "l%d [label=\"%s\"];\n", i, vdom_get_name(set->dom, i));
+
+            if (i > 0 && i < set->dom->shared.size) {
+                fprintf(fp, "l%d -> l%d[style=invis];\n", i-1, i);
+            }
+        }
+
+    } else {
+
+        for (int i = 0; i < set->p_len; i++) {
+
+            fprintf(fp, "l%d [label=\"%s\"];\n", i, vdom_get_name(set->dom, set->proj[i]));
+
+            if (i > 0 && i < set->p_len) {
+                fprintf(fp, "l%d -> l%d[style=invis];\n", i-1, i);
+            }
+        }
+    }
+}
+
+static void rel_dot_name (FILE *fp, vrel_t rel)
+{
+    fprintf(fp, "node [shape=oval];\n");
+
+    int to_read = 0;
+    int from_read = 0;
+
+    for (int i = 0,r=0,w=0; i < rel->p_len; i++) {
+
+        int read = w >= rel->w_p_len || (r < rel->r_p_len && w < rel->w_p_len && rel->r_proj[r] <= rel->w_proj[w]);
+        int write = r >= rel->r_p_len || (r < rel->r_p_len && w < rel->w_p_len && rel->w_proj[w] <= rel->r_proj[r]);
+
+        int proj = -1;
+        char *bg_color = NULL;
+        if (read && write) {
+            bg_color = "grey75";
+            proj = rel->r_proj[r];
+        } else if(read) {
+            bg_color = "white";
+            proj = rel->r_proj[r];
+        } else if(write) {
+            bg_color = "grey45";
+            proj = rel->w_proj[w];
+        }
+
+        char *var_name = vdom_get_name(rel->dom, proj);
+        if (read) fprintf(fp, "l%d [style=filled, label=\"%s\", fillcolor=%s];\n", i, var_name, bg_color);
+        if (write) fprintf(fp, "ln%d [style=filled, label=\"%s'\", fillcolor=%s];\n", i, var_name, bg_color);
+        if (read && write) fprintf(fp, "l%d -> ln%d[style=invis];\n", i, i);
+
+        if (write) to_read = 0;
+        if (read) to_read = 1;
+
+        if (i > 0 && i < rel->p_len)
+            fprintf(fp, "l%s%d -> l%s%d[style=invis];\n", from_read ? "" : "n", i-1, to_read ? "" : "n", i);
+
+        if (read) {
+            from_read = 1;
+            r++;
+        }
+        if (write) {
+            from_read = 0;
+            w++;
+        }
+    }
+}
+
+static void set_dot_mdd(FILE* fp, vset_t src) {
   uint64_t mdd = src->mdd;
-  fprintf(fp,"digraph setbdd {\nnode [shape=record];\n");
+  fprintf(fp,"digraph setbdd {\n");
+  set_dot_name(fp, src);
+  fprintf(fp, "node [shape=record];\n");
   mdd_mark_for_dot(mdd);
   trueprinted=0;
   mdd_clear_and_print(fp,mdd);
   fprintf(fp,"}\n");
 }
 
-
-void rel_dot_mdd(FILE* fp, vrel_t src) {
+static void rel_dot_mdd(FILE* fp, vrel_t src) {
   uint64_t mdd = src->mdd;
-  fprintf(fp,"digraph relbdd {\nnode [shape=record];\n");
+  fprintf(fp,"digraph relbdd {\n");
+  rel_dot_name(fp, src);
+  fprintf(fp, "node [shape=record];\n");
   mdd_mark_for_dot(mdd); // this changes mdd_used; does it matter?
   trueprinted=0;
   mdd_clear_and_print(fp,mdd);
