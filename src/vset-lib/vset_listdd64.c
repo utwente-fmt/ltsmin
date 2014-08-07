@@ -245,7 +245,7 @@ static void mdd_collect(uint64_t a,uint64_t b){
         new_cache_size=fib(nodes_fib+cache_fib);
         new_cache=RTalign(CACHE_LINE_SIZE,new_cache_size*sizeof(struct op_rec));
         for(uint64_t i=0;i<new_cache_size;i++){
-            new_cache[i].op=0;
+            new_cache[i].op=OP_UNUSED;
         }
         if (new_cache_size < cache_size) {
             Warning(debug, "op cache reached maximum size");
