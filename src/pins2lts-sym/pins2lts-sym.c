@@ -477,18 +477,9 @@ find_trace(int trace_end[][N], int end_count, int level, vset_t *levels, char* f
     lts_file_close(trace_output);
 }
 
-struct find_action_info {
-    int  group;
-    int *dst;
-    int *cpy;
-    char* action;
-};
-
 static void
-find_action_cb(void* context, int* src)
+find_action(int* src, int* dst, int* cpy, int group, char* action)
 {
-    struct find_action_info* ctx = (struct find_action_info*)context;
-    int group=ctx->group;
     int trace_end[2][N];
 
     for (int i = 0; i < N; i++) {
@@ -499,12 +490,12 @@ find_action_cb(void* context, int* src)
     // Set dst of the last step of the trace to its proper value
     for (int i = 0; i < w_projs[group].len; i++) {
         // TODO: check case where we have no R/W but copy is used... ?
-        if (ctx->cpy == NULL || !ctx->cpy[i]) {
-            trace_end[0][w_projs[group].proj[i]] = ctx->dst[i];
+        if (cpy == NULL || cpy[i]) {
+            trace_end[0][w_projs[group].proj[i]] = dst[i];
         }
     }
 
-    find_trace(trace_end, 2, global_level, levels, ctx->action);
+    find_trace(trace_end, 2, global_level, levels, action);
 }
 
 struct group_add_info {
@@ -527,7 +518,7 @@ group_add(void *context, transition_info_t *ti, int *dst, int *cpy)
     }
 
     if (act_detect) {
-	    int act_index = ti->labels[act_label];
+        int act_index = ti->labels[act_label];
         if (bitset_set(seen_actions,act_index)) { // first time we encounter this action
             char *action=GBchunkGet(model,action_typeno,act_index).data;
 
@@ -535,16 +526,11 @@ group_add(void *context, transition_info_t *ti, int *dst, int *cpy)
                 Warning(info, "found action: %s", action);
 
                 if (trc_output) {
-                    struct find_action_info action_ctx;
                     int group = ctx->group;
-
-                    action_ctx.group = group;
-                    action_ctx.dst = dst;
-                    action_ctx.cpy = cpy;
-                    action_ctx.action = action;
-
-                    vset_enum_match(ctx->set,r_projs[group].len, r_projs[group].proj,
-                                    ctx->src, find_action_cb, &action_ctx);
+                    int* src=malloc(N*sizeof(int));
+                    vset_example_match(ctx->set,src,r_projs[group].len, r_projs[group].proj,ctx->src);
+                    
+                    find_action(src,dst,cpy,group,action);
                 }
                 if (no_exit) {
                     ErrorActions++;
