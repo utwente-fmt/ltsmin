@@ -44,7 +44,7 @@ static uint64_t free_node=1;
 static uint64_t* unique_table=NULL;
 struct mdd_node {
     uint64_t next;
-    uint32_t flags;
+    uint32_t reachable;
     uint32_t val;
     uint64_t down;
     uint64_t right;
@@ -162,17 +162,17 @@ mdd64_pop()
 
 static void mdd64_mark(uint64_t mdd){
     if (mdd<=1) return;
-    if (node_table[mdd].flags&0x80000000) return;
+    if (node_table[mdd].reachable) return;
     mdd_used++;
-    node_table[mdd].flags=node_table[mdd].flags|0x80000000;
+    node_table[mdd].reachable=1;
     mdd64_mark(node_table[mdd].down);
     mdd64_mark(node_table[mdd].right);
 }
 
 static void mdd64_clear_and_count(uint64_t mdd,uint64_t *count){
     if (mdd<=1) return;
-    if (node_table[mdd].flags&0x80000000) {
-        node_table[mdd].flags=node_table[mdd].flags&0x7fffffff;
+    if (node_table[mdd].reachable) {
+        node_table[mdd].reachable=0;
         (*count)++;
         mdd64_clear_and_count(node_table[mdd].down,count);
         mdd64_clear_and_count(node_table[mdd].right,count);
@@ -193,8 +193,8 @@ mdd64_node_count(uint64_t mdd)
 static uint64_t mdd64_sweep_bucket(uint64_t mdd){
     if (mdd==0) return 0;
     if (mdd==1) Abort("data corruption");
-    if (node_table[mdd].flags&0x80000000){
-        node_table[mdd].flags=node_table[mdd].flags&0x7fffffff;
+    if (node_table[mdd].reachable){
+        node_table[mdd].reachable=0;
         node_table[mdd].next=mdd64_sweep_bucket(node_table[mdd].next);
         return mdd;
     } else {
@@ -259,7 +259,7 @@ static void mdd64_collect(uint64_t a,uint64_t b){
             case OP_COUNT: {
                 arg1=op_cache[i].arg1;
                 arg2=0;
-                if (!(node_table[arg1].flags&0x80000000)){
+                if (!(node_table[arg1].reachable)){
                     op_cache[i].op=OP_UNUSED;
                     continue;
                 }
@@ -270,13 +270,13 @@ static void mdd64_collect(uint64_t a,uint64_t b){
             case OP_UNIVERSE:
             {
                 arg1=op_cache[i].arg1;
-                if (!(node_table[arg1].flags&0x80000000)) {
+                if (!(node_table[arg1].reachable)) {
                     op_cache[i].op=OP_UNUSED;
                     continue;
                 }
                 arg2=op_cache[i].res.other.arg2;
                 res=op_cache[i].res.other.res;
-                if (!(node_table[res].flags&0x80000000)) {
+                if (!(node_table[res].reachable)) {
                     op_cache[i].op=OP_UNUSED;
                     continue;
                 }
@@ -293,17 +293,17 @@ static void mdd64_collect(uint64_t a,uint64_t b){
             case OP_RELPROD:
             {
                 arg1=op_cache[i].arg1;
-                if (!(node_table[arg1].flags&0x80000000)) {
+                if (!(node_table[arg1].reachable)) {
                     op_cache[i].op=OP_UNUSED;
                     continue;
                 }
                 arg2=op_cache[i].res.other.arg2;
-                if (!(node_table[arg2].flags&0x80000000)) {
+                if (!(node_table[arg2].reachable)) {
                     op_cache[i].op=OP_UNUSED;
                     continue;
                 }
                 res=op_cache[i].res.other.res;
-                if (!(node_table[res].flags&0x80000000)) {
+                if (!(node_table[res].reachable)) {
                     op_cache[i].op=OP_UNUSED;
                     continue;
                 }
@@ -350,8 +350,8 @@ static void mdd64_collect(uint64_t a,uint64_t b){
         }
         node_table[mdd_nodes-1].next=0;
         for(uint64_t i=2;i<old_size;i++){
-            if (node_table[i].flags&0x80000000){
-                node_table[i].flags=node_table[i].flags&0x7fffffff;
+            if (node_table[i].reachable){
+                node_table[i].reachable=0;
                 uint64_t slot=hash64(node_table[i].val,node_table[i].down,node_table[i].right)%uniq_size;
                 node_table[i].next=unique_table[slot];
                 unique_table[slot]=i;
@@ -638,8 +638,8 @@ mdd64_intersect(uint64_t a, uint64_t b)
 
 static void mdd64_clear_and_write_bin(stream_t s, uint64_t mdd, uint64_t* n_count, map64_t node_map){
     if (mdd<=1) return;
-    if (node_table[mdd].flags&0x80000000) {
-        node_table[mdd].flags=node_table[mdd].flags&0x7fffffff;
+    if (node_table[mdd].reachable) {
+        node_table[mdd].reachable=0;
         mdd64_clear_and_write_bin(s,node_table[mdd].down, n_count, node_map);
         mdd64_clear_and_write_bin(s,node_table[mdd].right, n_count, node_map);
         simplemap64_put(node_map, mdd, (uint64_t)*n_count);
@@ -1519,8 +1519,8 @@ static void mdd64_mark_for_dot(uint64_t mdd){
   // note that head of one mdd-node might be in the middle of another one!
   // this means that "sharing within mdd-nodes" is not represented in dot.
     if (mdd<=1) return;
-    if (node_table[mdd].flags&0x80000000) return;
-    node_table[mdd].flags = node_table[mdd].flags | 0x80000000;
+    if (node_table[mdd].reachable) return;
+    node_table[mdd].reachable=1;
     uint64_t x = mdd;
     while (x) {
       mdd64_mark_for_dot(node_table[x].down);
@@ -1538,8 +1538,8 @@ static void mdd64_clear_and_print(FILE* fp,uint64_t mdd){
       trueprinted=1;
     }
   }
-  else if (node_table[mdd].flags & 0x80000000) {
-    node_table[mdd].flags=node_table[mdd].flags & 0x7fffffff;
+  else if (node_table[mdd].reachable) {
+    node_table[mdd].reachable=0;
 
     // print the mdd-node with values
     uint64_t x=mdd;
