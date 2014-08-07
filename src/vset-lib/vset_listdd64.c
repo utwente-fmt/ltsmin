@@ -44,26 +44,40 @@ static uint64_t free_node=1;
 static uint64_t* unique_table=NULL;
 struct mdd_node {
     uint64_t next;
-    uint32_t reachable;
+    uint16_t reachable;
+    uint16_t copy;
     uint32_t val;
     uint64_t down;
     uint64_t right;
 };
 
+#define COPY_WRITE 0
+#define COPY_COPY 1
+#define COPY_DONT_CARE 2
+
+static uint32_t *set_copy;
+
 static struct mdd_node *node_table=NULL;
 struct op_rec {
-    uint32_t dummy;
+    uint32_t p_id;
     uint32_t op;
     uint64_t arg1;
     union {
         double count;
         struct {
             uint64_t arg2;
+            uint64_t arg3;
             uint64_t res;
+            uint64_t dummy1;
+            uint64_t dummy2;
+            uint64_t dummy3;
         } other;
     } res;
 };
+
 static struct op_rec *op_cache=NULL;
+
+// op cache operations
 #define OP_UNUSED 0
 #define OP_COUNT 1
 #define OP_UNION 2
@@ -76,6 +90,22 @@ static struct op_rec *op_cache=NULL;
 #define OP_SAT 9
 #define OP_RELPROD 10
 #define OP_UNIVERSE 11
+
+static void cache_put(uint64_t slot_hash,
+                      uint32_t op,
+                      uint64_t p_id,
+                      uint64_t arg1,
+                      uint64_t arg2,
+                      uint64_t arg3,
+                      uint64_t res) {
+    uint64_t slot=slot_hash%cache_size;
+    op_cache[slot].op=op;
+    op_cache[slot].p_id=(uint32_t)p_id;
+    op_cache[slot].arg1=arg1;
+    op_cache[slot].res.other.arg2=arg2;
+    op_cache[slot].res.other.arg3=arg3;
+    op_cache[slot].res.other.res=res;
+}
 
 struct vector_domain {
     struct vector_domain_shared shared;
@@ -101,15 +131,40 @@ struct vector_relation {
     uint64_t mdd;
     uint64_t p_id;
     int p_len;
-    int proj[];
+    int r_p_len;
+    int w_p_len;
+    int* r_proj;
+    int* w_proj;
 };
 
-static inline uint64_t hash(uint32_t a,uint64_t b,uint64_t c){
+static uint64_t hash2(uint32_t a,uint64_t b){
+    uint64_t x[1];
+    x[0] = b;
+    return MurmurHash64(x, sizeof(uint64_t), a);
+}
+
+static uint64_t hash3(uint32_t a,uint64_t b,uint64_t c){
     uint64_t x[2];
     x[0] = b;
     x[1] = c;
     return MurmurHash64(x, 2*sizeof(uint64_t), a);
-    //return MurmurHash64(&c, sizeof(uint64_t), MurmurHash64(&b, sizeof(uint64_t), MurmurHash64(&a, sizeof(uint32_t), 0)));
+}
+
+static uint64_t hash4(uint32_t a,uint64_t b,uint64_t c,uint64_t d){
+    uint64_t x[3];
+    x[0] = b;
+    x[1] = c;
+    x[2] = d;
+    return MurmurHash64(x, 3*sizeof(uint64_t), a);
+}
+
+static uint64_t hash5(uint32_t a,uint64_t b,uint64_t c,uint64_t d,uint64_t e){
+    uint64_t x[4];
+    x[0] = b;
+    x[1] = c;
+    x[2] = d;
+    x[3] = e;
+    return MurmurHash64(x, 4*sizeof(uint64_t), a);
 }
 
 static vset_t protected_sets=NULL;
@@ -254,67 +309,108 @@ static void mdd_collect(uint64_t a,uint64_t b){
         Warning(debug, "new op cache has %"PRIu64" entries", new_cache_size);
     }
     for(uint64_t i=0;i<cache_size;i++){
-        uint64_t slot,arg1,arg2,res; uint32_t op;
-        op=op_cache[i].op&0xffff;
-        switch(op){
+        uint64_t slot;
+        switch(op_cache[i].op){
             case OP_UNUSED: continue;
             case OP_COUNT: {
-                arg1=op_cache[i].arg1;
-                arg2=0;
-                if (!(node_table[arg1].reachable)){
+                if (!node_table[op_cache[i].arg1].reachable){
                     op_cache[i].op=OP_UNUSED;
                     continue;
                 }
-                if (resize) break;
+                if (resize) {
+                    slot=hash2(op_cache[i].op,op_cache[i].arg1)%new_cache_size;
+                    break;
+                }
                 else continue;
             }
             case OP_PROJECT:
             case OP_UNIVERSE:
             {
-                arg1=op_cache[i].arg1;
-                if (!(node_table[arg1].reachable)) {
+                if (!node_table[op_cache[i].arg1].reachable) {
                     op_cache[i].op=OP_UNUSED;
                     continue;
                 }
-                arg2=op_cache[i].res.other.arg2;
-                res=op_cache[i].res.other.res;
-                if (!(node_table[res].reachable)) {
+                if (!node_table[op_cache[i].res.other.res].reachable) {
                     op_cache[i].op=OP_UNUSED;
                     continue;
                 }
-                if (resize) break;
+                if (resize) {
+                    slot=hash3(op_cache[i].op,op_cache[i].arg1,op_cache[i].p_id)%new_cache_size;
+                    break;
+                }
                 else continue;
             }
             case OP_UNION:
             case OP_MINUS:
-            case OP_NEXT:
-            case OP_PREV:
-            case OP_COPY_MATCH:
             case OP_INTERSECT:
             case OP_SAT:
+            {
+                if (!node_table[op_cache[i].arg1].reachable) {
+                    op_cache[i].op=OP_UNUSED;
+                    continue;
+                }
+                if (!node_table[op_cache[i].res.other.arg2].reachable) {
+                    op_cache[i].op=OP_UNUSED;
+                    continue;
+                }
+                if (!node_table[op_cache[i].res.other.res].reachable) {
+                    op_cache[i].op=OP_UNUSED;
+                    continue;
+                }
+                if (resize) {
+                    slot=hash3(op_cache[i].op,op_cache[i].arg1,op_cache[i].res.other.arg2)%new_cache_size;
+                    break;
+                }
+                else continue;
+            }
+            case OP_COPY_MATCH:
+            case OP_NEXT:
             case OP_RELPROD:
             {
-                arg1=op_cache[i].arg1;
-                if (!(node_table[arg1].reachable)) {
+                if (!node_table[op_cache[i].arg1].reachable) {
                     op_cache[i].op=OP_UNUSED;
                     continue;
                 }
-                arg2=op_cache[i].res.other.arg2;
-                if (!(node_table[arg2].reachable)) {
+                if (!node_table[op_cache[i].res.other.arg2].reachable) {
                     op_cache[i].op=OP_UNUSED;
                     continue;
                 }
-                res=op_cache[i].res.other.res;
-                if (!(node_table[res].reachable)) {
+                if (!node_table[op_cache[i].res.other.res].reachable) {
                     op_cache[i].op=OP_UNUSED;
                     continue;
                 }
-                if (resize) break;
+                if (resize) {
+                    slot=hash4(op_cache[i].op,op_cache[i].arg1,op_cache[i].res.other.arg2, op_cache[i].p_id)%new_cache_size;
+                    break;
+                }
+                else continue;
+            }
+            case OP_PREV:
+            {
+                if (!node_table[op_cache[i].arg1].reachable) {
+                    op_cache[i].op=OP_UNUSED;
+                    continue;
+                }
+                if (!node_table[op_cache[i].res.other.arg2].reachable) {
+                    op_cache[i].op=OP_UNUSED;
+                    continue;
+                }
+                if (!node_table[op_cache[i].res.other.arg3].reachable) {
+                    op_cache[i].op=OP_UNUSED;
+                    continue;
+                }
+                if (!node_table[op_cache[i].res.other.res].reachable) {
+                    op_cache[i].op=OP_UNUSED;
+                    continue;
+                }
+                if (resize) {
+                    slot=hash5(op_cache[i].op,op_cache[i].arg1,op_cache[i].res.other.arg2,op_cache[i].res.other.arg3,op_cache[i].p_id)%new_cache_size;
+                    break;
+                }
                 else continue;
             }
             default: Abort("missing case");
         }
-        slot=hash(op,arg1,arg2)%new_cache_size;
         copy_count++;
         new_cache[slot]=op_cache[i];
     }
@@ -341,6 +437,7 @@ static void mdd_collect(uint64_t a,uint64_t b){
             Warning(debug, "node table reached maximum size");
             mdd_nodes = UINT64_MAX;
         }
+
         node_table=RTrealloc(node_table,mdd_nodes*sizeof(struct mdd_node));
         for(uint64_t i=0;i<uniq_size;i++){
             unique_table[i]=0;
@@ -348,13 +445,14 @@ static void mdd_collect(uint64_t a,uint64_t b){
         free_node=old_size;
         for(uint64_t i=old_size;i<mdd_nodes;i++){
             node_table[i].val=0;
+            node_table[i].copy=COPY_COPY;
             node_table[i].next=i+1;
         }
         node_table[mdd_nodes-1].next=0;
         for(uint64_t i=2;i<old_size;i++){
             if (node_table[i].reachable){
                 node_table[i].reachable=0;
-                uint64_t slot=hash(node_table[i].val,node_table[i].down,node_table[i].right)%uniq_size;
+                uint64_t slot=hash4(node_table[i].val,node_table[i].down,node_table[i].right,node_table[i].copy)%uniq_size;
                 node_table[i].next=unique_table[slot];
                 unique_table[slot]=i;
             } else {
@@ -368,7 +466,8 @@ static void mdd_collect(uint64_t a,uint64_t b){
 
 static double mdd_count(uint64_t mdd){
     if (mdd<=1) return mdd;
-    uint64_t slot=hash(OP_COUNT,mdd,0)%cache_size;
+    uint64_t slot_hash=hash2(OP_COUNT,mdd);
+    uint64_t slot = slot_hash%cache_size;
     if (op_cache[slot].op==OP_COUNT && op_cache[slot].arg1==mdd){
         return op_cache[slot].res.count;
     }
@@ -380,18 +479,22 @@ static double mdd_count(uint64_t mdd){
     return res;
 }
 
-static uint64_t mdd_create_node(uint32_t val,uint64_t down,uint64_t right){
+static uint64_t mdd_create_node(uint32_t val,uint64_t down,uint64_t right,uint32_t copy){
     if (down==0) return right;
-    if (right > 1 && val >= node_table[right].val)
-        Abort("bad order %u %u", val, node_table[right].val);
-    uint64_t slot_hash=hash(val,down,right);
+    if (right > 1 &&
+            ((val >= node_table[right].val && copy == node_table[right].copy) ||
+            (val == node_table[right].val && copy >= node_table[right].copy)))
+        Abort("bad order %u (%u) %u (%u)", val, copy, node_table[right].val, node_table[right].copy);
+
+    uint64_t slot_hash=hash4(val,down,right,copy);
     uint64_t slot=slot_hash%uniq_size;
     uint64_t res=unique_table[slot];
     //Warning(debug, "mdd_create_node: slot_hash=%u, slot=%u, res=%u", slot_hash, slot, res);
     while(res){
         if (node_table[res].val==val
             && node_table[res].down==down
-            && node_table[res].right==right) {
+            && node_table[res].right==right
+            && node_table[res].copy==copy) {
             return res;
         }
         res=node_table[res].next;
@@ -408,6 +511,7 @@ static uint64_t mdd_create_node(uint32_t val,uint64_t down,uint64_t right){
     node_table[res].val=val;
     node_table[res].down=down;
     node_table[res].right=right;
+    node_table[res].copy=copy;
     return res;
 }
 
@@ -417,7 +521,7 @@ static uint64_t mdd_union(uint64_t a,uint64_t b){
     if(b==0) return a;
     if(a==1 || b==1) Abort("missing case in union");
     if (b<a) { uint64_t tmp=a;a=b;b=tmp; }
-    uint64_t slot_hash=hash(OP_UNION,a,b);
+    uint64_t slot_hash=hash3(OP_UNION,a,b);
     uint64_t slot=slot_hash%cache_size;
     if(op_cache[slot].op==OP_UNION && op_cache[slot].arg1==a && op_cache[slot].res.other.arg2==b) {
         return op_cache[slot].res.other.res;
@@ -425,21 +529,17 @@ static uint64_t mdd_union(uint64_t a,uint64_t b){
     uint64_t tmp;
     if (node_table[a].val<node_table[b].val){
         tmp=mdd_union(node_table[a].right,b);
-        tmp=mdd_create_node(node_table[a].val,node_table[a].down,tmp);
+        tmp=mdd_create_node(node_table[a].val,node_table[a].down,tmp,COPY_DONT_CARE);
     } else if (node_table[a].val==node_table[b].val){
         tmp=mdd_union(node_table[a].down,node_table[b].down);
         mdd_push(tmp);
         tmp=mdd_union(node_table[a].right,node_table[b].right);
-        tmp=mdd_create_node(node_table[a].val,mdd_pop(),tmp);
+        tmp=mdd_create_node(node_table[a].val,mdd_pop(),tmp,COPY_DONT_CARE);
     } else { //(node_table[a].val>node_table[b].val)
         tmp=mdd_union(a,node_table[b].right);
-        tmp=mdd_create_node(node_table[b].val,node_table[b].down,tmp);
+        tmp=mdd_create_node(node_table[b].val,node_table[b].down,tmp,COPY_DONT_CARE);
     }
-    slot=slot_hash%cache_size;
-    op_cache[slot].op=OP_UNION;
-    op_cache[slot].arg1=a;
-    op_cache[slot].res.other.arg2=b;
-    op_cache[slot].res.other.res=tmp;
+    cache_put(slot_hash, OP_UNION, 0, a, b, 0, tmp);
     return tmp;
 }
 
@@ -448,7 +548,7 @@ static uint64_t mdd_minus(uint64_t a,uint64_t b){
     if(a==0) return 0;
     if(b==0) return a;
     if(a==1||b==1) Abort("missing case in minus");
-    uint64_t slot_hash=hash(OP_MINUS,a,b);
+    uint64_t slot_hash=hash3(OP_MINUS,a,b);
     uint64_t slot=slot_hash%cache_size;
     if(op_cache[slot].op==OP_MINUS && op_cache[slot].arg1==a && op_cache[slot].res.other.arg2==b) {
         return op_cache[slot].res.other.res;
@@ -456,19 +556,15 @@ static uint64_t mdd_minus(uint64_t a,uint64_t b){
     uint64_t tmp;
     if (node_table[a].val<node_table[b].val){
         tmp=mdd_minus(node_table[a].right,b);
-        tmp=mdd_create_node(node_table[a].val,node_table[a].down,tmp);
+        tmp=mdd_create_node(node_table[a].val,node_table[a].down,tmp,COPY_DONT_CARE);
     } else if (node_table[a].val==node_table[b].val){
         mdd_push(mdd_minus(node_table[a].down,node_table[b].down));
         tmp=mdd_minus(node_table[a].right,node_table[b].right);
-        tmp=mdd_create_node(node_table[a].val,mdd_pop(),tmp);
+        tmp=mdd_create_node(node_table[a].val,mdd_pop(),tmp,COPY_DONT_CARE);
     } else { //(node_table[a].val>node_table[b].val)
         tmp=mdd_minus(a,node_table[b].right);
     }
-    slot=slot_hash%cache_size;
-    op_cache[slot].op=OP_MINUS;
-    op_cache[slot].arg1=a;
-    op_cache[slot].res.other.arg2=b;
-    op_cache[slot].res.other.res=tmp;
+    cache_put(slot_hash,OP_MINUS, 0, a, b, 0, tmp);
     return tmp;
 }
 
@@ -493,7 +589,7 @@ mdd_member(uint64_t mdd, const uint32_t *vec, int len)
     return 0;
 }
 
-static uint64_t mdd_put(uint64_t mdd,const uint32_t *vec,int len,int* is_new){
+static uint64_t mdd_put(uint64_t mdd,const uint32_t *vec,int len,int* is_new, const uint32_t *cpy_vec){
     if (len==0) {
         if (mdd==0) {
             if(is_new) *is_new=1;
@@ -503,32 +599,32 @@ static uint64_t mdd_put(uint64_t mdd,const uint32_t *vec,int len,int* is_new){
             if(is_new) *is_new=0;
             return 1;
        }
-       uint64_t tmp=mdd_put(node_table[mdd].right,vec,len,is_new);
+       uint64_t tmp=mdd_put(node_table[mdd].right,vec,len,is_new, cpy_vec);
        if (tmp!=node_table[mdd].right){
-           return mdd_create_node(node_table[mdd].val,node_table[mdd].down,tmp);
+           return mdd_create_node(node_table[mdd].val,node_table[mdd].down,tmp,node_table[mdd].copy);
        } else {
            return mdd;
        }
     }
     if (mdd>1) {
-        if (node_table[mdd].val<vec[0]) {
-            uint64_t right=mdd_put(node_table[mdd].right,vec,len,is_new);
+        if (node_table[mdd].val<vec[0] || node_table[mdd].copy < cpy_vec[0]) {
+            uint64_t right=mdd_put(node_table[mdd].right,vec,len,is_new,cpy_vec);
             if (right==node_table[mdd].right){
                 return mdd;
             } else {
-                return mdd_create_node(node_table[mdd].val,node_table[mdd].down,right);
+                return mdd_create_node(node_table[mdd].val,node_table[mdd].down,right,node_table[mdd].copy);
             }
         }
-        if (node_table[mdd].val==vec[0]) {
-            uint64_t down=mdd_put(node_table[mdd].down,vec+1,len-1,is_new);
+        if (node_table[mdd].val==vec[0] && node_table[mdd].copy==cpy_vec[0]) {
+            uint64_t down=mdd_put(node_table[mdd].down,vec+1,len-1,is_new,cpy_vec+1);
             if (down==node_table[mdd].down){
                 return mdd;
             } else {
-                return mdd_create_node(node_table[mdd].val,down,node_table[mdd].right);
+                return mdd_create_node(node_table[mdd].val,down,node_table[mdd].right,node_table[mdd].copy);
             }
         }
     }
-    return mdd_create_node(vec[0],mdd_put(0,vec+1,len-1,is_new),mdd);
+    return mdd_create_node(vec[0],mdd_put(0,vec+1,len-1,is_new,cpy_vec+1),mdd,cpy_vec[0]);
 }
 
 static void
@@ -557,12 +653,12 @@ mdd_copy_match(uint64_t p_id, uint64_t mdd, uint64_t pattern, int idx,
     if (mdd == 1) return 1;
     if (len == 0) return mdd;
 
-    uint32_t op        = OP_COPY_MATCH | (p_id << 16);
-    uint64_t slot_hash = hash(op, mdd, pattern);
+    uint64_t slot_hash = hash4(OP_COPY_MATCH, mdd, pattern, p_id);
     uint64_t slot      = slot_hash % cache_size;
 
-    if (op_cache[slot].op == op && op_cache[slot].arg1 == mdd
-        && op_cache[slot].res.other.arg2 == pattern) {
+    if (op_cache[slot].op == OP_COPY_MATCH && op_cache[slot].arg1 == mdd
+        && op_cache[slot].res.other.arg2 == pattern
+        && op_cache[slot].p_id == p_id) {
         return op_cache[slot].res.other.res;
     }
 
@@ -577,14 +673,14 @@ mdd_copy_match(uint64_t p_id, uint64_t mdd, uint64_t pattern, int idx,
         if (mdd > 1 && node_table[mdd].val == node_table[pattern].val) {
             tmp = mdd_copy_match(node_table[p_id].down, node_table[mdd].down,
                                  node_table[pattern].down,idx+1, proj+1, len-1);
-            res = mdd_create_node(node_table[mdd].val, tmp, 0);
+            res = mdd_create_node(node_table[mdd].val, tmp, 0, COPY_DONT_CARE);
         }
     } else {
         while (mdd > 1) {
             mdd_push(res);
             tmp = mdd_copy_match(p_id, node_table[mdd].down, pattern, idx+1,
                                  proj, len);
-            tmp = mdd_create_node(node_table[mdd].val, tmp, 0);
+            tmp = mdd_create_node(node_table[mdd].val, tmp, 0, COPY_DONT_CARE);
             mdd_push(tmp);
             res = mdd_union(res, tmp);
             mdd_pop(); mdd_pop();
@@ -592,12 +688,7 @@ mdd_copy_match(uint64_t p_id, uint64_t mdd, uint64_t pattern, int idx,
         }
     }
 
-    slot = slot_hash % cache_size;
-    op_cache[slot].op = op;
-    op_cache[slot].arg1 = mdd_original;
-    op_cache[slot].res.other.arg2 = pattern;
-    op_cache[slot].res.other.res  = res;
-
+    cache_put(slot_hash,OP_COPY_MATCH, p_id, mdd_original, pattern, 0, res);
     return res;
 }
 
@@ -608,7 +699,7 @@ mdd_intersect(uint64_t a, uint64_t b)
     if (a == 0 || b == 0) return 0;
     if (a == 1 || b == 1) Abort("missing case in intersect");
 
-    uint64_t slot_hash = hash(OP_INTERSECT, a, b);
+    uint64_t slot_hash = hash3(OP_INTERSECT, a, b);
     uint64_t slot = slot_hash % cache_size;
 
     if (op_cache[slot].op == OP_INTERSECT && op_cache[slot].arg1 == a
@@ -622,19 +713,14 @@ mdd_intersect(uint64_t a, uint64_t b)
         tmp = mdd_intersect(node_table[a].down, node_table[b].down);
         mdd_push(tmp);
         tmp = mdd_intersect(node_table[a].right, node_table[b].right);
-        tmp = mdd_create_node(node_table[a].val, mdd_pop(), tmp);
+        tmp = mdd_create_node(node_table[a].val, mdd_pop(), tmp, COPY_DONT_CARE);
     } else if (node_table[a].val < node_table[b].val) {
         tmp = mdd_intersect(node_table[a].right, b);
     } else { /* node_table[a].val > node_table[b].val */
         tmp = mdd_intersect(a, node_table[b].right);
     }
 
-    slot = slot_hash % cache_size;
-    op_cache[slot].op = OP_INTERSECT;
-    op_cache[slot].arg1 = a;
-    op_cache[slot].res.other.arg2 = b;
-    op_cache[slot].res.other.res = tmp;
-
+    cache_put(slot_hash,OP_INTERSECT, 0, a, b, 0, tmp);
     return tmp;
 }
 
@@ -649,6 +735,7 @@ static void mdd_clear_and_write_bin(stream_t s, uint64_t mdd, uint64_t* n_count,
         DSwriteU32(s, node_table[mdd].val);
         DSwriteU64(s, simplemap64_get(node_map, node_table[mdd].down));
         DSwriteU64(s, simplemap64_get(node_map, node_table[mdd].right));
+        DSwriteU32(s, node_table[mdd].copy);
         (*n_count)++;
     }
 }
@@ -690,18 +777,20 @@ mdd_load_bin(FILE* f)
     uint32_t val;
     uint64_t down;
     uint64_t right;
+    uint32_t copy;
     while (mdd_load_node_count < n_count && !stream_empty(s)) {
         id = DSreadU64(s);
         val = DSreadU32(s);
         down = DSreadU64(s);
         right = DSreadU64(s);
+        copy = DSreadU32(s);
         if (mdd_load_node_count != id)
             Abort("Nodes have to be numbered consecutively from 2 till n-1.");
         //Warning(debug, "id=%llu, val=%u, down=%llu [%llu], right=%llu [%llu]",
         //        id, val, down, mdd_load_node_ids[down], right, mdd_load_node_ids[right]);
         assert(down==0 || mdd_load_node_ids[down]!=0);
         assert(right==0 || mdd_load_node_ids[right]!=0);
-        mdd = mdd_create_node(val, mdd_load_node_ids[down], mdd_load_node_ids[right]);
+        mdd = mdd_create_node(val, mdd_load_node_ids[down], mdd_load_node_ids[right], copy);
         //Warning(debug, "id=%llu [%llu]", id, mdd);
         mdd_load_node_ids[id] = mdd;
         mdd_load_node_count++;
@@ -729,7 +818,9 @@ set_create_mdd(vdom_t dom, int k, int *proj)
     set->p_id  = 1;
     for(int i = k - 1; i >= 0; i--) {
         set->proj[i] = proj[i];
-        set->p_id    = mdd_create_node(proj[i], set->p_id, 0);
+        set->p_id    = mdd_create_node(proj[i], set->p_id, 0, COPY_DONT_CARE);
+        // The p_id of a relation is shifted in hash keys; check this is ok
+        if ((set->p_id >> 32) > 0) Abort("set_create_mdd: projection identifier too large");
     }
     return set;
 }
@@ -760,26 +851,65 @@ static void set_destroy_mdd(vset_t set)
 static void set_reorder_mdd() { }
 
 static vrel_t
-rel_create_mdd(vdom_t dom, int k, int *proj)
+rel_create_mdd_rw(vdom_t dom, int r_k, int *r_proj, int w_k, int *w_proj)
 {
-    assert(0 <= k && k <= dom->shared.size);
-    vrel_t rel = (vrel_t)RTmalloc(sizeof(struct vector_relation)
-                                                         + sizeof(int[k]));
+
+    assert(0 <= r_k && r_k <= dom->shared.size && 0 <= w_k && w_k <= dom->shared.size);
+
+    int k = 0;
+    for (int i = 0, r = 0, w = 0; i < dom->shared.size; i++) {
+        int is_read = 0;
+        if (r_proj[r] == i) {
+            r++;
+            k++;
+            is_read = 1;
+        }
+        if (w_proj[w] == i) {
+            w++;
+            if (!is_read) k++;
+        }
+    }
+
+    vrel_t rel = (vrel_t)RTmalloc(sizeof(struct vector_relation) + sizeof(int[k]) + sizeof(int[r_k]) + sizeof(int[w_k]));
     rel->dom  = dom;
     rel->mdd  = 0;
     rel->next = protected_rels;
     rel->prev = NULL;
     if (protected_rels != NULL) protected_rels->prev = rel;
     protected_rels = rel;
-    rel->p_len = k;
     rel->p_id  = 1;
-    for(int i = k - 1; i >= 0; i--) {
-        rel->proj[i] = proj[i];
-        rel->p_id    = mdd_create_node(proj[i], rel->p_id, 0);
-        // The p_id of a relation is shifted in hash keys; check this is ok
-        if ((rel->p_id >> 16) > 0) Abort("rel_create_mdd: projection identifier too large");
+    rel->p_len = k;
+    rel->r_p_len = r_k;
+    rel->w_p_len = w_k;
+    rel->r_proj = (int*) ((char*) rel + sizeof(struct vector_relation) + sizeof(int[k]));
+    rel->w_proj = (int*) ((char*) rel + sizeof(struct vector_relation) + sizeof(int[k]) + sizeof(int[r_k]));
+
+    for (int i = k-1, r=r_k-1,w=w_k-1; i >=0; i--) {
+
+        if(w >= 0 && (r == -1 ||  w_proj[w] >= r_proj[r])) {
+            rel->w_proj[w] = w_proj[w];
+            rel->p_id = mdd_create_node(w_proj[w], rel->p_id, 1, COPY_DONT_CARE);
+            // The p_id of a relation is shifted in hash keys; check this is ok
+            if ((rel->p_id >> 32) > 0) Abort("rel_create_mdd: projection identifier too large");
+            w--;
+        }
+
+        if(r >= 0 && (w == -1 || r_proj[r] >= w_proj[w])) {
+           rel->r_proj[r] = r_proj[r];
+           rel->p_id = mdd_create_node(r_proj[r], rel->p_id, 0, COPY_DONT_CARE);
+           // The p_id of a relation is shifted in hash keys; check this is ok
+           if ((rel->p_id >> 32) > 0) Abort("rel_create_mdd: projection identifier too large");
+           r--;
+        }
     }
+
     return rel;
+}
+
+static vrel_t
+rel_create_mdd(vdom_t dom, int k, int *proj)
+{
+    return rel_create_mdd_rw(dom,k,proj,k,proj);
 }
 
 static void
@@ -787,8 +917,14 @@ rel_save_proj_bin(FILE* f, vrel_t rel)
 {
     stream_t s = stream_output(f);
     DSwriteS32(s, rel->p_len);
-    for(int i=0; i<rel->p_len; i++){
-        DSwriteS32(s, rel->proj[i]);
+
+    DSwriteS32(s, rel->r_p_len);
+    for(int i=0; i<rel->r_p_len; i++){
+        DSwriteS32(s, rel->r_proj[i]);
+    }
+    DSwriteS32(s, rel->w_p_len);
+    for(int i=0; i<rel->w_p_len; i++){
+        DSwriteS32(s, rel->w_proj[i]);
     }
     stream_flush(s);
     stream_close(&s);
@@ -805,12 +941,18 @@ rel_load_proj_bin(FILE* f, vdom_t dom)
 {
     stream_t s = stream_input(f);
     int p_len = DSreadS32(s);
-    int proj[p_len];
-    for(int i=0; i<p_len; i++){
-        proj[i] = DSreadS32(s);
+    int r_p_len = DSreadS32(s);
+    int r_proj[r_p_len];
+    for(int i=0; i<r_p_len; i++){
+        r_proj[i] = DSreadS32(s);
+    }
+    int w_p_len = DSreadS32(s);
+    int w_proj[w_p_len];
+    for(int i=0; i<w_p_len; i++){
+        w_proj[i] = DSreadS32(s);
     }
     stream_close(&s);
-    vrel_t result = rel_create_mdd(dom, p_len, proj);
+    vrel_t result = rel_create_mdd_rw(dom, r_p_len, r_proj, w_p_len, w_proj);
     return result;
 }
 
@@ -824,7 +966,7 @@ static void
 set_add_mdd(vset_t set, const int* e)
 {
     int len = (set->p_len < 0)?set->dom->shared.size:set->p_len;
-    set->mdd = mdd_put(set->mdd, (uint32_t*)e, len, NULL);
+    set->mdd = mdd_put(set->mdd, (uint32_t*)e, len, NULL, set_copy);
 }
 
 static int
@@ -909,13 +1051,13 @@ static void
 set_copy_match_mdd(vset_t dst, vset_t src, int p_len, int *proj, int *match)
 {
     assert(src->p_len == -1 && dst->p_len == -1 && p_len >= 0);
-    uint64_t singleton = mdd_put(0, (uint32_t*)match, p_len, NULL);
+    uint64_t singleton = mdd_put(0, (uint32_t*)match, p_len, NULL, set_copy);
     mdd_push(singleton);
 
-    uint64_t p_id = mdd_put(0, (uint32_t*)proj, p_len, NULL); // FIXME: enable to pass a projection to this function!
+    uint64_t p_id = mdd_put(0, (uint32_t*)proj, p_len, NULL, set_copy); // FIXME: enable to pass a projection to this function!
     //Warning(info, "set_copy_match_mdd: p_id=%d", p_id);
     // The p_id of is shifted in hash keys; check this is ok
-    if ((p_id >> 16) > 0) Abort("set_copy_match_mdd: projection identifier too large");
+    if ((p_id >> 32) > 0) Abort("set_copy_match_mdd: projection identifier too large");
     mdd_push(p_id);
 
     dst->mdd = mdd_copy_match(p_id, src->mdd, singleton, 0, proj, p_len);
@@ -926,12 +1068,8 @@ static void
 set_copy_match_proj_mdd(vset_t dst, vset_t src, int p_len, int *proj, int p_id, int *match)
 {
     assert(src->p_len == -1 && dst->p_len == -1 && p_len >= 0);
-    uint64_t singleton = mdd_put(0, (uint32_t*)match, p_len, NULL);
+    uint64_t singleton = mdd_put(0, (uint32_t*)match, p_len, NULL, set_copy);
     mdd_push(singleton);
-
-    //Warning(info, "set_copy_match_proj_mdd: p_id=%d", p_id);
-    // The p_id of is shifted in hash keys; check this is ok
-    if ((p_id >> 16) > 0) Abort("set_copy_match_proj_mdd: projection identifier too large");
     mdd_push(p_id);
 
     dst->mdd = mdd_copy_match(p_id, src->mdd, singleton, 0, proj, p_len);
@@ -942,10 +1080,10 @@ static int
 proj_create_mdd(int p_len, int *proj)
 {
     assert(p_len >= 0);
-    uint64_t p_id = mdd_put(0, (uint32_t*)proj, p_len, NULL); // FIXME: enable to pass a projection to this function!
+    uint64_t p_id = mdd_put(0, (uint32_t*)proj, p_len, NULL, set_copy); // FIXME: enable to pass a projection to this function!
     //Warning(info, "proj_create_mdd: p_id=%d", p_id);
     // The p_id of is shifted in hash keys; check this is ok
-    if ((p_id >> 16) > 0) Abort("set_copy_match_mdd: projection identifier too large");
+    if ((p_id >> 32) > 0) Abort("set_copy_match_mdd: projection identifier too large");
     return p_id;
 }
 
@@ -954,12 +1092,12 @@ set_enum_match_mdd(vset_t set, int p_len, int *proj, int *match,
                        vset_element_cb cb, void *context)
 {
     assert(set->p_len == -1 && p_len >= 0);
-    uint64_t singleton = mdd_put(0, (uint32_t*)match, p_len, NULL);
+    uint64_t singleton = mdd_put(0, (uint32_t*)match, p_len, NULL, set_copy);
     mdd_push(singleton);
 
-    uint64_t p_id = mdd_put(0, (uint32_t*)proj, p_len, NULL);
+    uint64_t p_id = mdd_put(0, (uint32_t*)proj, p_len, NULL, set_copy);
     // The p_id of is shifted in hash keys; check this is ok
-    if ((p_id >> 16) > 0) Abort("set_enum_match_mdd: projection identifier too large");
+    if ((p_id >> 32) > 0) Abort("set_enum_match_mdd: projection identifier too large");
     mdd_push(p_id);
 
     uint64_t tmp = mdd_copy_match(p_id, set->mdd, singleton, 0, proj, p_len);
@@ -971,16 +1109,53 @@ set_enum_match_mdd(vset_t set, int p_len, int *proj, int *match,
 }
 
 static void
-rel_add_mdd(vrel_t rel, const int *src, const int *dst)
-{
-    int N = (rel->p_len < 0)?rel->dom->shared.size:rel->p_len;
-    uint32_t vec[2*N];
-    for(int i = 0; i < N; i++) {
-        vec[i+i]   = src[i];
-        vec[i+i+1] = dst[i];
+rel_add_mdd_cpy(vrel_t rel, const int *src, const int *dst, const int *cpy) {
+
+    uint32_t vec[rel->r_p_len + rel->w_p_len];
+    uint32_t cpy_vec[rel->r_p_len + rel->w_p_len];
+
+    for (int i = 0,j=0, r=0,w=0; i < rel->p_len; i++) {
+
+        int is_read = 0;
+
+        if  (r < rel->r_p_len && (w == rel->w_p_len || rel->r_proj[r] <= rel->w_proj[w])) {
+            vec[j] = src[r];
+            cpy_vec[j] = COPY_DONT_CARE;
+            j++;
+            is_read = 1;
+        }
+
+        if (w < rel->w_p_len && (r == rel->r_p_len ||  rel->w_proj[w] <= rel->r_proj[r])) {
+            if (is_read) {
+                vec[j] = dst[w];
+                cpy_vec[j] = COPY_DONT_CARE;
+            } else {
+                if (cpy != NULL && cpy[w]) {
+                    // note here we use 0 as node value. It could be the case that any other value is used
+                    // in mdd_put and mdd_create_node to achieve more sharing. The value does not matter when
+                    // copying values.
+                    vec[j] = 0;
+                    cpy_vec[j] = COPY_COPY;
+                } else {
+                    vec[j] = dst[w];
+                    cpy_vec[j] = COPY_WRITE;
+                }
+            }
+            j++; w++;
+        }
+
+        if (is_read) {
+            r++;
+        }
+
     }
 
-    rel->mdd = mdd_put(rel->mdd, vec, 2*N, NULL);
+    rel->mdd = mdd_put(rel->mdd, vec, rel->r_p_len + rel->w_p_len, NULL, cpy_vec);
+}
+
+static void
+rel_add_mdd(vrel_t rel, const int *src, const int *dst) {
+    rel_add_mdd_cpy(rel,src,dst,NULL);
 }
 
 static uint64_t
@@ -989,10 +1164,10 @@ mdd_project(uint64_t p_id, uint64_t mdd, int idx, int *proj, int len)
     if(mdd == 0) return 0; //projection of empty is empty.
     if(len == 0) return 1; //projection of non-empty is epsilon.
 
-    uint64_t slot_hash=hash(OP_PROJECT,mdd,p_id);
+    uint64_t slot_hash=hash3(OP_PROJECT,mdd,p_id);
     uint64_t slot=slot_hash%cache_size;
     if(op_cache[slot].op==OP_PROJECT && op_cache[slot].arg1==mdd
-       && op_cache[slot].res.other.arg2==p_id) {
+       && op_cache[slot].p_id==p_id) {
         return op_cache[slot].res.other.res;
     }
 
@@ -1001,35 +1176,40 @@ mdd_project(uint64_t p_id, uint64_t mdd, int idx, int *proj, int len)
 
     if (proj[0]==idx){
         mdd_push(mdd_project(p_id,node_table[mdd].right,idx,proj,len));
-        uint32_t tmp=mdd_project(node_table[p_id].down, node_table[mdd].down,
+        uint64_t tmp=mdd_project(node_table[p_id].down, node_table[mdd].down,
                                  idx+1, proj+1, len-1);
-        res=mdd_create_node(node_table[mdd].val,tmp,mdd_pop());
+        res=mdd_create_node(node_table[mdd].val,tmp,mdd_pop(),COPY_DONT_CARE);
     } else {
         while(mdd>1){
             mdd_push(res);
-            uint32_t tmp=mdd_project(p_id,node_table[mdd].down,idx+1,proj,len);
+            uint64_t tmp=mdd_project(p_id,node_table[mdd].down,idx+1,proj,len);
             mdd_push(tmp);
             res=mdd_union(res,tmp);
             mdd_pop();mdd_pop();
             mdd=node_table[mdd].right;
         }
     }
-
-    slot=slot_hash%cache_size;
-    op_cache[slot].op=OP_PROJECT;
-    op_cache[slot].arg1=mdd_original;
-    op_cache[slot].res.other.arg2=p_id;
-    op_cache[slot].res.other.res=res;
+    cache_put(slot_hash, OP_PROJECT, p_id, mdd_original, 0, 0, res);
     return res;
 }
 
 static uint64_t
-mdd_next(uint64_t p_id, uint64_t set, uint64_t rel, int idx, int *proj, int len)
+mdd_next(uint64_t p_id, uint64_t set, uint64_t rel, int idx, int *r_proj, int r_len, int* w_proj, int w_len)
 {
+    if (r_len < 0 || w_len < 0) Abort("Rel out of bounds");
     if (rel==0||set==0) return 0;
-    if (len==0) return set;
-    if (rel==1||set==1) Abort("missing case in next");
-    if (proj[0]==idx){ // current level is affected => find match.
+    if (w_len ==0 && r_len == 0) return set;
+    if (rel==1||set==1)Abort("missing case in next; set: %" PRIu64 ", rel: %" PRIu64 "", set, rel);
+
+    uint64_t slot_hash;
+    uint64_t old_rel;
+    uint64_t old_set;
+    uint64_t slot;
+
+    uint64_t res=0;
+
+    if ((r_len > 0 && r_proj[0]==idx) && (w_len > 0 && w_proj[0] == idx)) { // +
+
         while(node_table[set].val!=node_table[rel].val){
             if(node_table[set].val < node_table[rel].val) {
                 set=node_table[set].right;
@@ -1040,40 +1220,109 @@ mdd_next(uint64_t p_id, uint64_t set, uint64_t rel, int idx, int *proj, int len)
                 if (rel<=1) return 0;
             }
         }
-    }
-    uint32_t op=OP_NEXT|(p_id<<16);
-    uint64_t slot_hash=hash(op,set,rel);
-    uint64_t slot=slot_hash%cache_size;
-    if (op_cache[slot].op==op && op_cache[slot].arg1==set
-        && op_cache[slot].res.other.arg2==rel) {
-        return op_cache[slot].res.other.res;
-    }
-    uint64_t res=0;
-    if (proj[0]==idx){
-        res = mdd_next(p_id, node_table[set].right, node_table[rel].right,
-                       idx, proj, len);
+
+        slot_hash=hash4(OP_NEXT,set,rel,p_id);
+        slot=slot_hash%cache_size;
+        if (op_cache[slot].op==OP_NEXT && op_cache[slot].arg1==set
+            && op_cache[slot].res.other.arg2==rel
+            && op_cache[slot].p_id==p_id) {
+            return op_cache[slot].res.other.res;
+        }
+
+        old_rel=rel;
+        old_set=set;
+
+        res = mdd_next(p_id, node_table[set].right, node_table[rel].right, idx, r_proj, r_len, w_proj, w_len);
+
         rel=node_table[rel].down;
+        p_id=node_table[p_id].down;
+
         while(rel>1){
             mdd_push(res);
             uint64_t tmp = mdd_next(node_table[p_id].down, node_table[set].down,
-                                    node_table[rel].down, idx+1, proj+1, len-1);
-            tmp=mdd_create_node(node_table[rel].val,tmp,0);
+                                    node_table[rel].down, idx+1, r_proj+1, r_len-1, w_proj+1, w_len - 1);
+            tmp=mdd_create_node(node_table[rel].val,tmp,0,COPY_DONT_CARE);
             mdd_push(tmp);
             res=mdd_union(res,tmp);
             mdd_pop();mdd_pop();
             rel=node_table[rel].right;
         }
-    } else {
-        mdd_push(mdd_next(p_id,node_table[set].right,rel,idx,proj,len));
-        res=mdd_next(p_id,node_table[set].down,rel,idx+1,proj,len);
-        res=mdd_create_node(node_table[set].val,res,mdd_pop());
+
+    } else if (r_len > 0 && r_proj[0]==idx) { // r
+
+        while(node_table[set].val!=node_table[rel].val){
+            if(node_table[set].val < node_table[rel].val) {
+                set=node_table[set].right;
+                if (set<=1) return 0;
+            }
+            if(node_table[rel].val < node_table[set].val) {
+                rel=node_table[rel].right;
+                if (rel<=1) return 0;
+            }
+        }
+
+        slot_hash=hash4(OP_NEXT,set,rel,p_id);
+        slot=slot_hash%cache_size;
+        if (op_cache[slot].op==OP_NEXT && op_cache[slot].arg1==set
+            && op_cache[slot].res.other.arg2==rel
+            && op_cache[slot].p_id==p_id) {
+            return op_cache[slot].res.other.res;
+        }
+        old_rel=rel;
+        old_set=set;
+
+        res = mdd_next(p_id, node_table[set].right, node_table[rel].right, idx, r_proj, r_len, w_proj, w_len);
+
+        mdd_push(res);
+        uint64_t tmp = mdd_next(node_table[p_id].down, node_table[set].down,
+                                node_table[rel].down, idx+1, r_proj+1, r_len-1, w_proj, w_len);
+        res=mdd_create_node(node_table[set].val,tmp,mdd_pop(),COPY_DONT_CARE);
+
+    } else if (w_len > 0 && w_proj[0] == idx) { // w
+
+        slot_hash=hash4(OP_NEXT,set,rel,p_id);
+        slot=slot_hash%cache_size;
+        if (op_cache[slot].op==OP_NEXT && op_cache[slot].arg1==set
+            && op_cache[slot].res.other.arg2==rel
+            && op_cache[slot].p_id==p_id) {
+            return op_cache[slot].res.other.res;
+        }
+        old_rel=rel;
+        old_set=set;
+
+        res = mdd_next(p_id, node_table[set].right, rel, idx, r_proj, r_len, w_proj, w_len);
+
+        while(rel>1){
+            mdd_push(res);
+            uint64_t tmp = mdd_next(node_table[p_id].down, node_table[set].down,
+                                    node_table[rel].down, idx+1, r_proj, r_len, w_proj+1, w_len - 1);
+            tmp=mdd_create_node(node_table[rel].copy == COPY_COPY ? node_table[set].val : node_table[rel].val,tmp,0,COPY_DONT_CARE);
+
+            mdd_push(tmp);
+            res=mdd_union(res,tmp);
+            mdd_pop();mdd_pop();
+            rel=node_table[rel].right;
+
+        }
+
+    } else { // -
+
+        slot_hash=hash4(OP_NEXT,set,rel,p_id);
+        slot=slot_hash%cache_size;
+        if (op_cache[slot].op==OP_NEXT && op_cache[slot].arg1==set
+            && op_cache[slot].res.other.arg2==rel
+            && op_cache[slot].p_id==p_id) {
+            return op_cache[slot].res.other.res;
+        }
+        old_rel=rel;
+        old_set=set;
+
+        mdd_push(mdd_next(p_id,node_table[set].right,rel,idx,r_proj,r_len, w_proj, w_len));
+        res=mdd_next(p_id,node_table[set].down,rel,idx+1,r_proj,r_len, w_proj, w_len);
+        res=mdd_create_node(node_table[set].val,res,mdd_pop(),COPY_DONT_CARE);
     }
 
-    slot=slot_hash%cache_size;
-    op_cache[slot].op=op;
-    op_cache[slot].arg1=set;
-    op_cache[slot].res.other.arg2=rel;
-    op_cache[slot].res.other.res=res;
+    cache_put(slot_hash, OP_NEXT, p_id, old_set, old_rel, 0, res);
     return res;
 }
 
@@ -1093,10 +1342,8 @@ static void
 set_next_mdd(vset_t dst, vset_t src, vrel_t rel)
 {
     assert(src->p_len == -1 && dst->p_len == -1);
-
-    dst->mdd = mdd_next(rel->p_id, src->mdd, rel->mdd, 0, rel->proj,rel->p_len);
+    dst->mdd = mdd_next(rel->p_id, src->mdd, rel->mdd, 0, rel->r_proj, rel->r_p_len, rel->w_proj, rel->w_p_len);
 }
-
 
 static void
 set_example_mdd(vset_t set, int *e)
@@ -1115,66 +1362,193 @@ set_example_mdd(vset_t set, int *e)
     if (mdd != 1) Abort("non-uniform length");
 }
 
+static uint64_t
+mdd_prev_write(uint64_t p_id, uint64_t set, uint64_t rel, uint64_t univ, uint64_t val, int idx, int *r_proj, int r_len, int *w_proj, int w_len);
 
 static uint64_t
-mdd_prev(uint64_t p_id, uint64_t set, uint64_t rel, int idx, int *proj, int len)
+mdd_prev_copy(uint64_t p_id, uint64_t set, uint64_t rel, uint64_t univ, int idx, int *r_proj, int r_len, int *w_proj, int w_len);
+
+static uint64_t
+mdd_prev(uint64_t p_id, uint64_t set, uint64_t rel, uint64_t univ, int idx, int *r_proj, int r_len, int *w_proj, int w_len)
 {
-    if (rel==0||set==0) return 0;
-    if (len==0) return set;
-    if (rel==1||set==1) Abort("missing case in prev");
-    uint32_t op=OP_PREV|(p_id<<16);
-    uint64_t slot_hash=hash(op,set,rel);
-    uint64_t slot=slot_hash%cache_size;
-    if (op_cache[slot].op==op && op_cache[slot].arg1==set
-        && op_cache[slot].res.other.arg2==rel) {
-        return op_cache[slot].res.other.res;
-    }
-    uint64_t res=0;
-    if (proj[0]==idx){
-        uint64_t right=mdd_prev(p_id,set,node_table[rel].right,idx,proj,len);
-        mdd_push(right);
-        uint32_t val=node_table[rel].val;
-        rel=node_table[rel].down;
-        while(rel>1 && set>1) {
-            if (node_table[rel].val < node_table[set].val){
+    if (r_len < 0 || w_len < 0) Abort("rel out of bounds");
+    if (set == 0 || rel == 0 || univ == 0) return 0;
+    if (r_len==0 && w_len==0) return mdd_intersect(univ, set);
+    if (rel==1 || set==1 || univ==1) Abort("missing case in prev; set: %" PRIu64 ", rel: %" PRIu64 ", univ: %" PRIu64 "", set, rel, univ);
+
+    uint64_t slot_hash, slot, res;
+
+    if ((r_len > 0 && r_proj[0] == idx) && (w_len > 0 && w_proj[0] == idx)) { // +
+
+        while(node_table[rel].val!=node_table[univ].val){
+            if(node_table[rel].val < node_table[univ].val) {
                 rel=node_table[rel].right;
-                continue;
+                if (rel<=1) return 0;
             }
-            if (node_table[set].val < node_table[rel].val){
-                set=node_table[set].right;
-                continue;
+            if(node_table[univ].val < node_table[rel].val) {
+                univ=node_table[univ].right;
+                if (univ<=1) return 0;
             }
-            mdd_push(res);
-            uint64_t tmp=mdd_prev(node_table[p_id].down, node_table[set].down,
-                                  node_table[rel].down, idx+1, proj+1, len-1);
-            mdd_push(tmp);
-            res=mdd_union(res,tmp);
-            mdd_pop();mdd_pop();
-            rel=node_table[rel].right;
-            set=node_table[set].right;
         }
-        res=mdd_create_node(val,res,mdd_pop());
-    } else {
-        mdd_push(mdd_prev(p_id,node_table[set].right,rel,idx,proj,len));
-        res=mdd_prev(p_id,node_table[set].down,rel,idx+1,proj,len);
-        res=mdd_create_node(node_table[set].val,res,mdd_pop());
+
+        slot_hash=hash5(OP_PREV,set,rel,univ,p_id);
+        slot=slot_hash%cache_size;
+        if (op_cache[slot].op==OP_PREV && op_cache[slot].arg1==set
+            && op_cache[slot].res.other.arg2==rel
+            && op_cache[slot].res.other.arg3==univ
+            && op_cache[slot].p_id==p_id) {
+            return op_cache[slot].res.other.res;
+        }
+
+        mdd_push(mdd_prev(p_id, set, node_table[rel].right, node_table[univ].right, idx, r_proj, r_len, w_proj, w_len));
+        res = mdd_prev_write(node_table[p_id].down, set, node_table[rel].down, univ, node_table[rel].val, idx, r_proj+1, r_len-1, w_proj+1, w_len-1);
+        res = mdd_union(res, mdd_pop());
+
+        cache_put(slot_hash, OP_PREV, p_id, set, rel, univ, res);
+
+    } else if (r_len > 0 && r_proj[0] == idx) { // r
+
+        while(node_table[rel].val!=node_table[set].val){
+            if(node_table[rel].val < node_table[set].val) {
+                rel=node_table[rel].right;
+                if (rel<=1) return 0;
+            }
+            if(node_table[set].val < node_table[rel].val) {
+                set=node_table[set].right;
+                if (set<=1) return 0;
+            }
+        }
+
+        while(node_table[rel].val!=node_table[univ].val){
+            if(node_table[rel].val < node_table[univ].val) {
+                rel=node_table[rel].right;
+                if (rel<=1) return 0;
+            }
+            if(node_table[univ].val < node_table[rel].val) {
+                univ=node_table[univ].right;
+                if (univ<=1) return 0;
+            }
+        }
+
+        slot_hash=hash5(OP_PREV,set,rel,univ,p_id);
+        slot=slot_hash%cache_size;
+        if (op_cache[slot].op==OP_PREV && op_cache[slot].arg1==set
+            && op_cache[slot].res.other.arg2==rel
+            && op_cache[slot].res.other.arg3==univ
+            && op_cache[slot].p_id==p_id) {
+            return op_cache[slot].res.other.res;
+        }
+
+        mdd_push(mdd_prev(p_id, node_table[set].right, node_table[rel].right, node_table[univ].right, idx, r_proj, r_len, w_proj, w_len));
+        res = mdd_create_node(
+                node_table[set].val,
+                mdd_prev(node_table[p_id].down, node_table[set].down, node_table[rel].down, node_table[univ].down, idx+1, r_proj+1, r_len-1, w_proj, w_len),
+                mdd_pop(),
+                COPY_DONT_CARE);
+
+        cache_put(slot_hash, OP_PREV, p_id, set, rel, univ, res);
+
+    } else if(w_len > 0 && w_proj[0] == idx) { // w
+
+        slot_hash=hash5(OP_PREV,set,rel,univ,p_id);
+        slot=slot_hash%cache_size;
+        if (op_cache[slot].op==OP_PREV && op_cache[slot].arg1==set
+            && op_cache[slot].res.other.arg2==rel
+            && op_cache[slot].res.other.arg3==univ
+            && op_cache[slot].p_id==p_id) {
+            return op_cache[slot].res.other.res;
+        }
+
+        if (node_table[rel].copy == COPY_COPY) {
+            mdd_push(mdd_prev(p_id, set, node_table[rel].right, univ, idx, r_proj, r_len, w_proj, w_len));
+            res = mdd_prev_copy(node_table[p_id].down, set, node_table[rel].down, univ, idx, r_proj, r_len, w_proj+1, w_len-1);
+            res = mdd_union(res, mdd_pop());
+
+        } else {
+            mdd_push(mdd_prev(p_id, set, rel, node_table[univ].right, idx, r_proj, r_len, w_proj, w_len));
+            res = mdd_prev_write(p_id, set, rel, univ, node_table[univ].val, idx, r_proj, r_len, w_proj+1, w_len-1);
+            res = mdd_union(res, mdd_pop());
+        }
+
+        cache_put(slot_hash, OP_PREV, p_id, set, rel, univ, res);
+
+    } else { // -
+        res = mdd_prev_copy(p_id, set, rel, univ, idx, r_proj, r_len, w_proj, w_len);
     }
 
-    slot=slot_hash%cache_size;
-    op_cache[slot].op=op;
-    op_cache[slot].arg1=set;
-    op_cache[slot].res.other.arg2=rel;
-    op_cache[slot].res.other.res=res;
+    return res;
+}
+
+static uint64_t
+mdd_prev_write(uint64_t p_id, uint64_t set, uint64_t rel, uint64_t univ, uint64_t val, int idx, int *r_proj, int r_len, int *w_proj, int w_len)
+{
+    if (r_len < 0 || w_len < 0) Abort("rel out of bounds");
+    if (set == 0 || rel == 0) return 0;
+    if (rel==1 || set==1) Abort("missing case in prev_write; set: %" PRIu64 ", rel: %" PRIu64 ", univ: %" PRIu64 "", set, rel, univ);
+
+    uint64_t res = 0;
+
+    while(rel>1 && set>1) {
+        if (node_table[rel].val < node_table[set].val){
+            rel=node_table[rel].right;
+            continue;
+        }
+        if (node_table[set].val < node_table[rel].val){
+            set=node_table[set].right;
+            continue;
+        }
+        mdd_push(res);
+        uint64_t tmp=mdd_prev(node_table[p_id].down, node_table[set].down, node_table[rel].down, node_table[univ].down, idx+1, r_proj, r_len, w_proj, w_len);
+        res=mdd_union(tmp, mdd_pop());
+
+        rel=node_table[rel].right;
+        set=node_table[set].right;
+    }
+    return mdd_create_node(val,res,0,COPY_DONT_CARE);
+}
+
+static uint64_t
+mdd_prev_copy(uint64_t p_id, uint64_t set, uint64_t rel, uint64_t univ, int idx, int *r_proj, int r_len, int *w_proj, int w_len) {
+
+    if (set == 0 || univ == 0) return 0;
+
+    uint64_t res;
+
+    while(node_table[set].val!=node_table[univ].val){
+        if(node_table[set].val < node_table[univ].val) {
+            set=node_table[set].right;
+            if (set<=1) return 0;
+        }
+        if(node_table[univ].val < node_table[set].val) {
+            univ=node_table[univ].right;
+            if (univ<=1) return 0;
+        }
+    }
+
+    uint64_t slot_hash=hash5(OP_PREV,set,rel,univ,p_id);
+    uint64_t slot=slot_hash%cache_size;
+    if (op_cache[slot].op==OP_PREV && op_cache[slot].arg1==set
+        && op_cache[slot].res.other.arg2==rel
+        && op_cache[slot].res.other.arg3==univ
+        && op_cache[slot].p_id==p_id) {
+        return op_cache[slot].res.other.res;
+    }
+
+    mdd_push(mdd_prev_copy(p_id, node_table[set].right, rel, node_table[univ].right, idx, r_proj, r_len, w_proj, w_len));
+    res = mdd_prev(p_id, node_table[set].down, rel, node_table[univ].down, idx+1, r_proj, r_len, w_proj, w_len);
+    res = mdd_create_node(node_table[set].val, res, mdd_pop(), COPY_DONT_CARE);
+
+    cache_put(slot_hash, OP_PREV, p_id, set, rel, univ, res);
+
     return res;
 }
 
 static void
 set_prev_mdd(vset_t dst, vset_t src, vrel_t rel, vset_t univ)
 {
-    assert(src->p_len == -1 && dst->p_len == -1);
+    assert(src->p_len == -1 && dst->p_len == -1 && src->p_id == univ->p_id && src->p_len == univ->p_len);
 
-    dst->mdd = mdd_prev(rel->p_id, src->mdd, rel->mdd, 0, rel->proj,rel->p_len);
-    set_intersect_mdd(dst, univ);
+    dst->mdd = mdd_prev(rel->p_id,src->mdd, rel->mdd, univ->mdd, 0, rel->r_proj,rel->r_p_len, rel->w_proj, rel->w_p_len);
 }
 
 static uint64_t
@@ -1182,27 +1556,24 @@ mdd_universe(uint64_t p_id, uint64_t dst, uint64_t src, int n) {
 
     if (src == 0) return 0;
 
-    uint64_t slot_hash=hash(OP_UNIVERSE,src,p_id);
+    uint64_t slot_hash=hash3(OP_UNIVERSE,src,p_id);
     uint64_t slot=slot_hash%cache_size;
-    if(op_cache[slot].op==OP_UNIVERSE && op_cache[slot].arg1==src) {
+    if(op_cache[slot].op==OP_UNIVERSE && op_cache[slot].arg1==src
+       && op_cache[slot].p_id==p_id) {
         return op_cache[slot].res.other.res;
     }
 
     mdd_push(mdd_universe(p_id, dst, node_table[src].right, n));
 
     if (n == 0) {
-        dst = mdd_create_node(node_table[src].val, dst, 0);
+        dst = mdd_create_node(node_table[src].val, dst, 0, COPY_DONT_CARE);
     } else {
         dst = mdd_universe(p_id, dst, node_table[src].down, n-1);
     }
 
     uint64_t res = mdd_union(dst, mdd_pop());
 
-    slot=slot_hash%cache_size;
-    op_cache[slot].op=OP_UNIVERSE;
-    op_cache[slot].arg1=src;
-    op_cache[slot].res.other.arg2=p_id;
-    op_cache[slot].res.other.res=res;
+    cache_put(slot_hash, OP_UNIVERSE, p_id, src, 0, 0, res);
 
     return res;
 
@@ -1237,19 +1608,19 @@ static top_groups_info *top_groups;
 
 static uint64_t saturate(int level, uint64_t mdd);
 static uint64_t sat_rel_prod(uint64_t p_id, uint64_t set, uint64_t rel,
-                             int idx, int *proj, int len);
+                             int idx, int *r_proj, int r_len, int *w_proj, int w_len);
 
 static uint64_t
 copy_level_sat(uint64_t p_id, uint64_t set, uint64_t rel, int idx,
-               int *proj, int len)
+               int *r_proj, int r_len, int *w_proj, int w_len)
 {
     uint64_t res = 0;
 
     while (set > 0) {
         mdd_push(res);
         uint64_t tmp = sat_rel_prod(p_id, node_table[set].down, rel, idx + 1,
-                                    proj, len);
-        tmp = mdd_create_node(node_table[set].val, tmp, 0);
+                                    r_proj, r_len, w_proj, w_len);
+        tmp = mdd_create_node(node_table[set].val, tmp, 0, COPY_DONT_CARE);
         mdd_push(tmp);
         res = mdd_union(res, tmp);
         mdd_pop(); mdd_pop();
@@ -1261,34 +1632,88 @@ copy_level_sat(uint64_t p_id, uint64_t set, uint64_t rel, int idx,
 
 static uint64_t
 apply_rel_prod(uint64_t p_id, uint64_t set, uint64_t rel, int idx,
-               int *proj, int len)
+               int *r_proj, int r_len, int *w_proj, int w_len)
 {
     uint64_t res = 0;
 
-    while (set > 1 && rel > 1) {
-        if (node_table[set].val < node_table[rel].val)
-            set = node_table[set].right;
-        else if (node_table[rel].val < node_table[set].val)
-            rel = node_table[rel].right;
-        else {
-            uint64_t rel_down = node_table[rel].down;
+    if (r_len > 0 && r_proj[0]==idx && w_len > 0 && w_proj[0] == idx) { // +
 
-            while (rel_down > 1) {
+        while (set > 1 && rel > 1) {
+            if (node_table[set].val < node_table[rel].val)
+                set = node_table[set].right;
+            else if (node_table[rel].val < node_table[set].val)
+                rel = node_table[rel].right;
+            else {
+                uint64_t rel_down = node_table[rel].down;
+
+                while (rel_down > 1) {
+                    mdd_push(res);
+                    uint64_t tmp = sat_rel_prod(node_table[node_table[p_id].down].down,
+                                                node_table[set].down,
+                                                node_table[rel_down].down,
+                                                idx + 1, r_proj + 1, r_len - 1, w_proj+1, w_len-1);
+                    tmp = mdd_create_node(node_table[rel_down].val, tmp, 0, COPY_DONT_CARE);
+                    mdd_push(tmp);
+                    res = mdd_union(res, tmp);
+                    mdd_pop(); mdd_pop();
+                    rel_down = node_table[rel_down].right;
+                }
+
+                set = node_table[set].right;
+                rel = node_table[rel].right;
+            }
+        }
+
+    } else if (w_len > 0 && w_proj[0] == idx) { // w
+
+        uint64_t old_rel = rel;
+
+        while (set > 1) {
+            while (rel > 1) {
                 mdd_push(res);
                 uint64_t tmp = sat_rel_prod(node_table[p_id].down,
                                             node_table[set].down,
-                                            node_table[rel_down].down,
-                                            idx + 1, proj + 1, len - 1);
-                tmp = mdd_create_node(node_table[rel_down].val, tmp, 0);
+                                            node_table[rel].down,
+                                            idx + 1, r_proj, r_len, w_proj+1, w_len-1);
+                tmp = mdd_create_node(
+                        node_table[rel].copy == COPY_COPY ? node_table[set].val : node_table[rel].val,
+                        tmp, 0, COPY_DONT_CARE);
                 mdd_push(tmp);
                 res = mdd_union(res, tmp);
                 mdd_pop(); mdd_pop();
-                rel_down = node_table[rel_down].right;
+                rel = node_table[rel].right;
             }
 
             set = node_table[set].right;
-            rel = node_table[rel].right;
+            rel = old_rel;
+
         }
+
+    } else { // r
+
+        while (set > 1 && rel > 1) {
+            if (node_table[set].val < node_table[rel].val)
+                set = node_table[set].right;
+            else if (node_table[rel].val < node_table[set].val)
+                rel = node_table[rel].right;
+            else {
+
+                mdd_push(res);
+                uint64_t tmp = sat_rel_prod(node_table[p_id].down,
+                                            node_table[set].down,
+                                            node_table[rel].down,
+                                            idx + 1, r_proj + 1, r_len - 1, w_proj, w_len);
+                tmp = mdd_create_node(node_table[rel].val, tmp, 0, COPY_DONT_CARE);
+                mdd_push(tmp);
+                res = mdd_union(res, tmp);
+                mdd_pop(); mdd_pop();
+
+                set = node_table[set].right;
+                rel = node_table[rel].right;
+
+            }
+        }
+
     }
 
     return res;
@@ -1296,74 +1721,130 @@ apply_rel_prod(uint64_t p_id, uint64_t set, uint64_t rel, int idx,
 
 static uint64_t
 sat_rel_prod(uint64_t p_id, uint64_t set, uint64_t rel, int idx,
-                int *proj, int len)
+                int *r_proj, int r_len, int *w_proj, int w_len)
 {
-    if (len == 0) return set;
+    if (r_len == 0 && w_len == 0) return set;
     if (set == 0 || rel == 0) return 0;
-    if (set == 1 || rel == 1) Abort("missing case in set_reach_sat");
+    if (set == 1 || rel == 1) Abort("missing case in set_reach_sat %d, %d, %d, %d", r_proj[0], r_len, w_proj[0], w_len);
 
-    uint32_t op = OP_RELPROD | (p_id << 16);
-    uint64_t slot_hash = hash(op, set, rel);
+    uint64_t slot_hash = hash4(OP_RELPROD, set, rel, p_id);
     uint64_t slot = slot_hash % cache_size;
 
-    if (op_cache[slot].op == op
+    if (op_cache[slot].op == OP_RELPROD
           && op_cache[slot].arg1 == set
-          && op_cache[slot].res.other.arg2 == rel)
+          && op_cache[slot].res.other.arg2 == rel
+          && op_cache[slot].p_id==p_id)
         return op_cache[slot].res.other.res;
 
     uint64_t res = 0;
 
-    if (proj[0] == idx)
-        res = apply_rel_prod(p_id, set, rel, idx, proj, len);
+    if ((r_len > 0 && r_proj[0]==idx) || (w_len > 0 && w_proj[0] == idx))
+        res = apply_rel_prod(p_id, set, rel, idx, r_proj, r_len, w_proj, w_len);
     else
-        res = copy_level_sat(p_id, set, rel, idx, proj, len);
+        res = copy_level_sat(p_id, set, rel, idx, r_proj, r_len, w_proj, w_len);
 
     mdd_push(res);
     res = saturate(idx, res);
     mdd_pop();
 
-    slot = slot_hash % cache_size;
-    op_cache[slot].op=op;
-    op_cache[slot].arg1=set;
-    op_cache[slot].res.other.arg2=rel;
-    op_cache[slot].res.other.res=res;
+    cache_put(slot_hash, OP_RELPROD, p_id, set, rel, 0, res);
     return res;
 }
 
 static uint64_t
 apply_rel_fixpoint(uint64_t p_id, uint64_t set, uint64_t rel, int idx,
-                   int *proj, int len)
+                   int *r_proj, int r_len, int *w_proj, int w_len)
 {
     uint64_t res = set;
 
-    while (set > 1 && rel > 1) {
-        if (node_table[set].val < node_table[rel].val)
-            set = node_table[set].right;
-        else if (node_table[rel].val < node_table[set].val)
-            rel = node_table[rel].right;
-        else {
-            uint64_t new_res = res;
-            uint64_t rel_down = node_table[rel].down;
+    if (r_len > 0 && r_proj[0]==idx && w_len > 0 && w_proj[0] == idx) { // +
 
-            while (node_table[rel].val != node_table[new_res].val)
-                new_res = node_table[new_res].right;
+        while (set > 1 && rel > 1) {
+            if (node_table[set].val < node_table[rel].val)
+                set = node_table[set].right;
+            else if (node_table[rel].val < node_table[set].val)
+                rel = node_table[rel].right;
+            else {
+                uint64_t new_res = res;
+                uint64_t rel_down = node_table[rel].down;
 
-            while (rel_down > 1) {
+                while (node_table[rel].val != node_table[new_res].val)
+                    new_res = node_table[new_res].right;
+
+                while (rel_down > 1) {
+                    mdd_push(res);
+                    uint64_t tmp = sat_rel_prod(node_table[node_table[p_id].down].down,
+                                                node_table[new_res].down,
+                                                node_table[rel_down].down,
+                                                idx + 1, r_proj + 1, r_len - 1, w_proj+1, w_len-1);
+                    tmp = mdd_create_node(node_table[rel_down].val, tmp, 0, COPY_DONT_CARE);
+                    mdd_push(tmp);
+                    res = mdd_union(res, tmp);
+                    mdd_pop(); mdd_pop();
+                    rel_down = node_table[rel_down].right;
+                }
+
+                set = node_table[set].right;
+                rel = node_table[rel].right;
+            }
+        }
+
+    } else if (w_len > 0 && w_proj[0] == idx) { // w
+
+        uint64_t old_rel = rel;
+
+        while (set > 1) {
+
+            while (rel > 1) {
                 mdd_push(res);
                 uint64_t tmp = sat_rel_prod(node_table[p_id].down,
-                                            node_table[new_res].down,
-                                            node_table[rel_down].down,
-                                            idx + 1, proj + 1, len - 1);
-                tmp = mdd_create_node(node_table[rel_down].val, tmp, 0);
+                                            node_table[set].down,
+                                            node_table[rel].down,
+                                            idx + 1, r_proj, r_len, w_proj+1, w_len-1);
+                tmp = mdd_create_node(
+                        node_table[rel].copy == COPY_COPY ? node_table[set].val : node_table[rel].val,
+                        tmp, 0, COPY_DONT_CARE);
                 mdd_push(tmp);
                 res = mdd_union(res, tmp);
                 mdd_pop(); mdd_pop();
-                rel_down = node_table[rel_down].right;
+                rel = node_table[rel].right;
             }
 
             set = node_table[set].right;
-            rel = node_table[rel].right;
+            rel = old_rel;
+
         }
+
+    } else { // r
+
+        while (set > 1 && rel > 1) {
+            if (node_table[set].val < node_table[rel].val)
+                set = node_table[set].right;
+            else if (node_table[rel].val < node_table[set].val)
+                rel = node_table[rel].right;
+            else {
+                uint64_t new_res = res;
+
+                while (node_table[rel].val != node_table[new_res].val)
+                    new_res = node_table[new_res].right;
+
+                mdd_push(res);
+                uint64_t tmp = sat_rel_prod(node_table[p_id].down,
+                                            node_table[new_res].down,
+                                            node_table[rel].down,
+                                            idx + 1, r_proj + 1, r_len - 1, w_proj, w_len);
+                tmp = mdd_create_node(node_table[rel].val, tmp, 0, COPY_DONT_CARE);
+                mdd_push(tmp);
+                res = mdd_union(res, tmp);
+                mdd_pop(); mdd_pop();
+
+                set = node_table[set].right;
+                rel = node_table[rel].right;
+
+            }
+
+        }
+
     }
 
     return res;
@@ -1401,8 +1882,10 @@ sat_fixpoint(int level, uint64_t set)
 
             new_set = apply_rel_fixpoint(rel_set[grp]->p_id, new_set,
                                          rel_set[grp]->mdd, level,
-                                         rel_set[grp]->proj,
-                                         rel_set[grp]->p_len);
+                                         rel_set[grp]->r_proj,
+                                         rel_set[grp]->r_p_len,
+                                         rel_set[grp]->w_proj,
+                                         rel_set[grp]->w_p_len);
             mdd_pop();
         }
     }
@@ -1416,7 +1899,7 @@ saturate(int idx, uint64_t mdd)
 {
     if (mdd == 0 || mdd == 1) return mdd;
 
-    uint64_t slot_hash = hash(OP_SAT, mdd, rels_tot);
+    uint64_t slot_hash = hash3(OP_SAT, mdd, rels_tot);
     uint64_t slot = slot_hash % cache_size;
 
     if (op_cache[slot].op == OP_SAT
@@ -1429,8 +1912,8 @@ saturate(int idx, uint64_t mdd)
 
     while (mdd_right > 1) {
         mdd_push(res);
-        uint32_t tmp = saturate(idx + 1, node_table[mdd_right].down);
-        tmp = mdd_create_node(node_table[mdd_right].val, tmp, 0);
+        uint64_t tmp = saturate(idx + 1, node_table[mdd_right].down);
+        tmp = mdd_create_node(node_table[mdd_right].val, tmp, 0, COPY_DONT_CARE);
         mdd_push(tmp);
         res = mdd_union(res, tmp);
         mdd_pop(); mdd_pop();
@@ -1441,11 +1924,8 @@ saturate(int idx, uint64_t mdd)
     res = sat_fixpoint(idx, res);
     mdd_pop();
 
-    slot = slot_hash % cache_size;
-    op_cache[slot].op = OP_SAT;
-    op_cache[slot].arg1 = mdd;
-    op_cache[slot].res.other.arg2 = rels_tot;
-    op_cache[slot].res.other.res = res;
+
+    cache_put(slot_hash, OP_SAT, 0, mdd, rels_tot, 0, res);
     return res;
 }
 
@@ -1462,7 +1942,7 @@ set_least_fixpoint_mdd(vset_t dst, vset_t src, vrel_t rels[], int rel_count)
     uint64_t rels_tmp = 0;
 
     for (int i = 0; i < rel_count; i++)
-        rels_tmp = mdd_create_node(rel_count - i, rels[i]->mdd, rels_tmp);
+        rels_tmp = mdd_create_node(rel_count - i, rels[i]->mdd, rels_tmp, COPY_DONT_CARE);
 
     mdd_push(rels_tmp);
     rels_tot = rels_tmp;
@@ -1479,13 +1959,17 @@ set_least_fixpoint_mdd(vset_t dst, vset_t src, vrel_t rels[], int rel_count)
     }
 
     for (int grp = 0; grp < rel_count; grp++) {
-        proj_set[grp] = set_create_mdd(rels[grp]->dom, rels[grp]->p_len,
-                                       rels[grp]->proj);
+        proj_set[grp] = set_create_mdd(rels[grp]->dom, rels[grp]->r_p_len,
+                                       rels[grp]->r_proj);
 
         if (rels[grp]->p_len == 0)
             continue;
 
-        int top_lvl = rels[grp]->proj[0];
+        // top_lvl = min(rels[grp]->r_proj[0], rels[grp]->w_p_len[0])
+        int top_lvl
+                = rels[grp]->w_p_len == 0
+                || (rels[grp]->r_p_len > 0 && rels[grp]->r_proj[0] < rels[grp]->w_proj[0])
+                ? rels[grp]->r_proj[0] : rels[grp]->w_proj[0];
         top_groups[top_lvl].top_groups[top_groups[top_lvl].tg_len] = grp;
         top_groups[top_lvl].tg_len++;
     }
@@ -1495,7 +1979,7 @@ set_least_fixpoint_mdd(vset_t dst, vset_t src, vrel_t rels[], int rel_count)
 
     // Clean-up
     for (int grp = 0; grp < rel_count; grp++) {
-        if (rels[grp]->p_len == 0 && rels[grp]->expand != NULL) {
+        if (rels[grp]->r_p_len == 0 && rels[grp]->expand != NULL) {
             proj_set[grp]->mdd = mdd_project(rels[grp]->p_id, dst->mdd,
                                              0, NULL, 0);
             rel_set[grp]->expand(rel_set[grp], proj_set[grp],
@@ -1676,6 +2160,8 @@ static void rel_dot_mdd(FILE* fp, vrel_t src) {
   fprintf(fp,"}\n");
 }
 
+static int separates_rw() { return 1; }
+static int supports_cpy() { return 1; }
 
 vdom_t vdom_create_list64_native(int n){
     Warning(info,"Creating a native ListDD 64-bit domain.");
@@ -1697,18 +2183,24 @@ vdom_t vdom_create_list64_native(int n){
             unique_table[i]=0;
         }
         node_table[0].val=0;
+        node_table[0].copy=COPY_COPY;
         node_table[1].val=0;
+        node_table[1].copy=COPY_COPY;
         for(uint64_t i=2;i<mdd_nodes;i++){
             node_table[i].val=0;
             node_table[i].next=i+1;
+            node_table[i].copy=COPY_COPY;
         }
         node_table[mdd_nodes-1].next=0;
         free_node=2;
         for(uint64_t i=0;i<cache_size;i++){
-            op_cache[i].op=0;
+            op_cache[i].op=OP_UNUSED;
         }
 
         mdd_create_stack();
+
+        set_copy = RTmalloc(sizeof(uint32_t)*n);
+        for (int i=0; i < n; i++) set_copy[i] = COPY_DONT_CARE;
     }
     dom->shared.set_create=set_create_mdd;
     dom->shared.set_save=set_save_mdd;
@@ -1724,28 +2216,31 @@ vdom_t vdom_create_list64_native(int n){
     dom->shared.set_union=set_union_mdd;
     dom->shared.set_minus=set_minus_mdd;
     dom->shared.rel_create=rel_create_mdd;
+    dom->shared.rel_create_rw=rel_create_mdd_rw;
     dom->shared.rel_save_proj=rel_save_proj_bin;
     dom->shared.rel_save=rel_save_mdd;
     dom->shared.rel_load_proj=rel_load_proj_bin;
     dom->shared.rel_load=rel_load_mdd;
     dom->shared.rel_add=rel_add_mdd;
+    dom->shared.rel_add_cpy=rel_add_mdd_cpy;
     dom->shared.rel_count=rel_count_mdd;
     dom->shared.set_project=set_project_mdd;
     dom->shared.set_next=set_next_mdd;
     dom->shared.set_prev=set_prev_mdd;
+    dom->shared.set_universe=set_universe_mdd;
     dom->shared.set_example=set_example_mdd;
     dom->shared.set_enum_match=set_enum_match_mdd;
     dom->shared.set_copy_match=set_copy_match_mdd;
     dom->shared.set_copy_match_proj=set_copy_match_proj_mdd;
     dom->shared.proj_create=proj_create_mdd;
     dom->shared.set_intersect=set_intersect_mdd;
-    dom->shared.set_universe=set_universe_mdd;
     // default implementation for dom->shared.set_zip
     dom->shared.reorder=set_reorder_mdd;
     dom->shared.set_destroy=set_destroy_mdd;
     dom->shared.set_least_fixpoint=set_least_fixpoint_mdd;
     dom->shared.set_dot=set_dot_mdd;
     dom->shared.rel_dot=rel_dot_mdd;
+    dom->shared.separates_rw=separates_rw;
+    dom->shared.supports_cpy=supports_cpy;
     return dom;
 }
-
