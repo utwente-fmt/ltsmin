@@ -229,13 +229,15 @@ static void mdd_collect(uint64_t a,uint64_t b){
     }
     Warning(debug, "ListDD garbage collection: %"PRIu64" of %"PRIu64" nodes used",
             mdd_used, mdd_nodes);
+    if (mdd_used == UINT64_MAX)
+        Abort("Node table full at maximum size");
+
     int resize=0;
     // The two assignments below are not needed, but silence compiler warnings
     uint64_t new_cache_size = cache_size;
     struct op_rec *new_cache = op_cache;
     uint64_t copy_count=0;
-    if (mdd_used == UINT64_MAX)
-        Abort("Node table full at maximum size");
+
     if (mdd_used > fib(nodes_fib-1) && mdd_nodes != UINT64_MAX) {
         Warning(debug,"insufficient free nodes, resizing");
         resize=1;
