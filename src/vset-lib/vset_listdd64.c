@@ -104,7 +104,7 @@ struct vector_relation {
     int proj[];
 };
 
-static inline uint64_t hash64(uint32_t a,uint64_t b,uint64_t c){
+static inline uint64_t hash(uint32_t a,uint64_t b,uint64_t c){
     uint64_t x[2];
     x[0] = b;
     x[1] = c;
@@ -128,7 +128,7 @@ static uint64_t *mdd_stack = NULL;
 static uint64_t mdd_top=0;
 
 static void
-mdd64_create_stack()
+mdd_create_stack()
 {
     stack_size = fib(stack_fib);
     mdd_stack = RTmalloc(sizeof(uint64_t[stack_size]));
@@ -136,7 +136,7 @@ mdd64_create_stack()
 }
 
 static void
-mdd64_push(uint64_t mdd)
+mdd_push(uint64_t mdd)
 {
     if (mdd_top==stack_size) {
         uint64_t stack_size_new = fib(++stack_fib);
@@ -153,79 +153,79 @@ mdd64_push(uint64_t mdd)
 }
 
 static uint64_t
-mdd64_pop()
+mdd_pop()
 {
     if (mdd_top==0) Abort("stack underflow");
     mdd_top--;
     return mdd_stack[mdd_top];
 }
 
-static void mdd64_mark(uint64_t mdd){
+static void mdd_mark(uint64_t mdd){
     if (mdd<=1) return;
     if (node_table[mdd].reachable) return;
     mdd_used++;
     node_table[mdd].reachable=1;
-    mdd64_mark(node_table[mdd].down);
-    mdd64_mark(node_table[mdd].right);
+    mdd_mark(node_table[mdd].down);
+    mdd_mark(node_table[mdd].right);
 }
 
-static void mdd64_clear_and_count(uint64_t mdd,uint64_t *count){
+static void mdd_clear_and_count(uint64_t mdd,uint64_t *count){
     if (mdd<=1) return;
     if (node_table[mdd].reachable) {
         node_table[mdd].reachable=0;
         (*count)++;
-        mdd64_clear_and_count(node_table[mdd].down,count);
-        mdd64_clear_and_count(node_table[mdd].right,count);
+        mdd_clear_and_count(node_table[mdd].down,count);
+        mdd_clear_and_count(node_table[mdd].right,count);
     }
 }
 
 static uint64_t
-mdd64_node_count(uint64_t mdd)
+mdd_node_count(uint64_t mdd)
 {
     if (mdd <= 1) return 1; // emptyset or singleton
 
     uint64_t res = 0;
-    mdd64_mark(mdd);
-    mdd64_clear_and_count(mdd, &res);
+    mdd_mark(mdd);
+    mdd_clear_and_count(mdd, &res);
     return res+2; // real nodes plus emptyset(0) and singleton epsilon(1).
 }
 
-static uint64_t mdd64_sweep_bucket(uint64_t mdd){
+static uint64_t mdd_sweep_bucket(uint64_t mdd){
     if (mdd==0) return 0;
     if (mdd==1) Abort("data corruption");
     if (node_table[mdd].reachable){
         node_table[mdd].reachable=0;
-        node_table[mdd].next=mdd64_sweep_bucket(node_table[mdd].next);
+        node_table[mdd].next=mdd_sweep_bucket(node_table[mdd].next);
         return mdd;
     } else {
         uint64_t tmp=node_table[mdd].next;
         node_table[mdd].next=free_node;
         free_node=mdd;
-        return mdd64_sweep_bucket(tmp);
+        return mdd_sweep_bucket(tmp);
     }
 }
 
-static void mdd64_collect(uint64_t a,uint64_t b){
+static void mdd_collect(uint64_t a,uint64_t b){
     mdd_used=0;
-    mdd64_mark(a);
-    mdd64_mark(b);
+    mdd_mark(a);
+    mdd_mark(b);
     vset_t set=protected_sets;
     while(set!=NULL){
-        mdd64_mark(set->mdd);
-        mdd64_mark(set->p_id);
+        mdd_mark(set->mdd);
+        mdd_mark(set->p_id);
         set=set->next;
     }
     vrel_t rel=protected_rels;
     while(rel!=NULL){
-        mdd64_mark(rel->mdd);
-        mdd64_mark(rel->p_id);
+        mdd_mark(rel->mdd);
+        mdd_mark(rel->p_id);
         rel=rel->next;
     }
     for(uint64_t i=0;i<mdd_top;i++){
-        mdd64_mark(mdd_stack[i]);
+        mdd_mark(mdd_stack[i]);
     }
     for(uint64_t i=0;i<mdd_load_node_count;i++){
-        mdd64_mark(mdd_load_node_ids[i]);
+        mdd_mark(mdd_load_node_ids[i]);
     }
     Warning(debug, "ListDD garbage collection: %"PRIu64" of %"PRIu64" nodes used",
             mdd_used, mdd_nodes);
@@ -312,13 +312,13 @@ static void mdd64_collect(uint64_t a,uint64_t b){
             }
             default: Abort("missing case");
         }
-        slot=hash64(op,arg1,arg2)%new_cache_size;
+        slot=hash(op,arg1,arg2)%new_cache_size;
         copy_count++;
         new_cache[slot]=op_cache[i];
     }
     if (!resize){
         for(uint64_t i=0;i<uniq_size;i++){
-            unique_table[i]=mdd64_sweep_bucket(unique_table[i]);
+            unique_table[i]=mdd_sweep_bucket(unique_table[i]);
         }
     } else {
         Warning(debug,"copied %"PRIu64" op cache nodes",copy_count);
@@ -352,7 +352,7 @@ static void mdd64_collect(uint64_t a,uint64_t b){
         for(uint64_t i=2;i<old_size;i++){
             if (node_table[i].reachable){
                 node_table[i].reachable=0;
-                uint64_t slot=hash64(node_table[i].val,node_table[i].down,node_table[i].right)%uniq_size;
+                uint64_t slot=hash(node_table[i].val,node_table[i].down,node_table[i].right)%uniq_size;
                 node_table[i].next=unique_table[slot];
                 unique_table[slot]=i;
             } else {
@@ -364,25 +364,25 @@ static void mdd64_collect(uint64_t a,uint64_t b){
     }
 }
 
-static double mdd64_count(uint64_t mdd){
+static double mdd_count(uint64_t mdd){
     if (mdd<=1) return mdd;
-    uint64_t slot=hash64(OP_COUNT,mdd,0)%cache_size;
+    uint64_t slot=hash(OP_COUNT,mdd,0)%cache_size;
     if (op_cache[slot].op==OP_COUNT && op_cache[slot].arg1==mdd){
         return op_cache[slot].res.count;
     }
-    double res=mdd64_count(node_table[mdd].down);
-    res+=mdd64_count(node_table[mdd].right);
+    double res=mdd_count(node_table[mdd].down);
+    res+=mdd_count(node_table[mdd].right);
     op_cache[slot].op=OP_COUNT;
     op_cache[slot].arg1=mdd;
     op_cache[slot].res.count=res;
     return res;
 }
 
-static uint64_t mdd64_create_node(uint32_t val,uint64_t down,uint64_t right){
+static uint64_t mdd_create_node(uint32_t val,uint64_t down,uint64_t right){
     if (down==0) return right;
     if (right > 1 && val >= node_table[right].val)
         Abort("bad order %u %u", val, node_table[right].val);
-    uint64_t slot_hash=hash64(val,down,right);
+    uint64_t slot_hash=hash(val,down,right);
     uint64_t slot=slot_hash%uniq_size;
     uint64_t res=unique_table[slot];
     //Warning(debug, "mdd_create_node: slot_hash=%u, slot=%u, res=%u", slot_hash, slot, res);
@@ -395,7 +395,7 @@ static uint64_t mdd64_create_node(uint32_t val,uint64_t down,uint64_t right){
         res=node_table[res].next;
     }
     if (free_node==0) {
-        mdd64_collect(down,right);
+        mdd_collect(down,right);
         // recompute slot in case of resize.
         slot=slot_hash%uniq_size;
     }
@@ -409,29 +409,29 @@ static uint64_t mdd64_create_node(uint32_t val,uint64_t down,uint64_t right){
     return res;
 }
 
-static uint64_t mdd64_union(uint64_t a,uint64_t b){
+static uint64_t mdd_union(uint64_t a,uint64_t b){
     if(a==b) return a;
     if(a==0) return b;
     if(b==0) return a;
     if(a==1 || b==1) Abort("missing case in union");
     if (b<a) { uint64_t tmp=a;a=b;b=tmp; }
-    uint64_t slot_hash=hash64(OP_UNION,a,b);
+    uint64_t slot_hash=hash(OP_UNION,a,b);
     uint64_t slot=slot_hash%cache_size;
     if(op_cache[slot].op==OP_UNION && op_cache[slot].arg1==a && op_cache[slot].res.other.arg2==b) {
         return op_cache[slot].res.other.res;
     }
     uint64_t tmp;
     if (node_table[a].val<node_table[b].val){
-        tmp=mdd64_union(node_table[a].right,b);
-        tmp=mdd64_create_node(node_table[a].val,node_table[a].down,tmp);
+        tmp=mdd_union(node_table[a].right,b);
+        tmp=mdd_create_node(node_table[a].val,node_table[a].down,tmp);
     } else if (node_table[a].val==node_table[b].val){
-        tmp=mdd64_union(node_table[a].down,node_table[b].down);
-        mdd64_push(tmp);
-        tmp=mdd64_union(node_table[a].right,node_table[b].right);
-        tmp=mdd64_create_node(node_table[a].val,mdd64_pop(),tmp);
+        tmp=mdd_union(node_table[a].down,node_table[b].down);
+        mdd_push(tmp);
+        tmp=mdd_union(node_table[a].right,node_table[b].right);
+        tmp=mdd_create_node(node_table[a].val,mdd_pop(),tmp);
     } else { //(node_table[a].val>node_table[b].val)
-        tmp=mdd64_union(a,node_table[b].right);
-        tmp=mdd64_create_node(node_table[b].val,node_table[b].down,tmp);
+        tmp=mdd_union(a,node_table[b].right);
+        tmp=mdd_create_node(node_table[b].val,node_table[b].down,tmp);
     }
     slot=slot_hash%cache_size;
     op_cache[slot].op=OP_UNION;
@@ -441,26 +441,26 @@ static uint64_t mdd64_union(uint64_t a,uint64_t b){
     return tmp;
 }
 
-static uint64_t mdd64_minus(uint64_t a,uint64_t b){
+static uint64_t mdd_minus(uint64_t a,uint64_t b){
     if(a==b) return 0;
     if(a==0) return 0;
     if(b==0) return a;
     if(a==1||b==1) Abort("missing case in minus");
-    uint64_t slot_hash=hash64(OP_MINUS,a,b);
+    uint64_t slot_hash=hash(OP_MINUS,a,b);
     uint64_t slot=slot_hash%cache_size;
     if(op_cache[slot].op==OP_MINUS && op_cache[slot].arg1==a && op_cache[slot].res.other.arg2==b) {
         return op_cache[slot].res.other.res;
     }
     uint64_t tmp;
     if (node_table[a].val<node_table[b].val){
-        tmp=mdd64_minus(node_table[a].right,b);
-        tmp=mdd64_create_node(node_table[a].val,node_table[a].down,tmp);
+        tmp=mdd_minus(node_table[a].right,b);
+        tmp=mdd_create_node(node_table[a].val,node_table[a].down,tmp);
     } else if (node_table[a].val==node_table[b].val){
-        mdd64_push(mdd64_minus(node_table[a].down,node_table[b].down));
-        tmp=mdd64_minus(node_table[a].right,node_table[b].right);
-        tmp=mdd64_create_node(node_table[a].val,mdd64_pop(),tmp);
+        mdd_push(mdd_minus(node_table[a].down,node_table[b].down));
+        tmp=mdd_minus(node_table[a].right,node_table[b].right);
+        tmp=mdd_create_node(node_table[a].val,mdd_pop(),tmp);
     } else { //(node_table[a].val>node_table[b].val)
-        tmp=mdd64_minus(a,node_table[b].right);
+        tmp=mdd_minus(a,node_table[b].right);
     }
     slot=slot_hash%cache_size;
     op_cache[slot].op=OP_MINUS;
@@ -472,7 +472,7 @@ static uint64_t mdd64_minus(uint64_t a,uint64_t b){
 
 
 static uint64_t
-mdd64_member(uint64_t mdd, const uint32_t *vec, int len)
+mdd_member(uint64_t mdd, const uint32_t *vec, int len)
 {
     if (len == 0) {
         if (mdd > 1) Abort("non-uniform length");
@@ -483,7 +483,7 @@ mdd64_member(uint64_t mdd, const uint32_t *vec, int len)
         if (node_table[mdd].val < vec[0]) {
             mdd = node_table[mdd].right;
         } else if (node_table[mdd].val == vec[0]) {
-            return mdd64_member(node_table[mdd].down, vec+1, len-1);
+            return mdd_member(node_table[mdd].down, vec+1, len-1);
         } else {
             return 0;
         }
@@ -491,7 +491,7 @@ mdd64_member(uint64_t mdd, const uint32_t *vec, int len)
     return 0;
 }
 
-static uint64_t mdd64_put(uint64_t mdd,const uint32_t *vec,int len,int* is_new){
+static uint64_t mdd_put(uint64_t mdd,const uint32_t *vec,int len,int* is_new){
     if (len==0) {
         if (mdd==0) {
             if(is_new) *is_new=1;
@@ -501,36 +501,36 @@ static uint64_t mdd64_put(uint64_t mdd,const uint32_t *vec,int len,int* is_new){
             if(is_new) *is_new=0;
             return 1;
        }
-       uint64_t tmp=mdd64_put(node_table[mdd].right,vec,len,is_new);
+       uint64_t tmp=mdd_put(node_table[mdd].right,vec,len,is_new);
        if (tmp!=node_table[mdd].right){
-           return mdd64_create_node(node_table[mdd].val,node_table[mdd].down,tmp);
+           return mdd_create_node(node_table[mdd].val,node_table[mdd].down,tmp);
        } else {
            return mdd;
        }
     }
     if (mdd>1) {
         if (node_table[mdd].val<vec[0]) {
-            uint64_t right=mdd64_put(node_table[mdd].right,vec,len,is_new);
+            uint64_t right=mdd_put(node_table[mdd].right,vec,len,is_new);
             if (right==node_table[mdd].right){
                 return mdd;
             } else {
-                return mdd64_create_node(node_table[mdd].val,node_table[mdd].down,right);
+                return mdd_create_node(node_table[mdd].val,node_table[mdd].down,right);
             }
         }
         if (node_table[mdd].val==vec[0]) {
-            uint64_t down=mdd64_put(node_table[mdd].down,vec+1,len-1,is_new);
+            uint64_t down=mdd_put(node_table[mdd].down,vec+1,len-1,is_new);
             if (down==node_table[mdd].down){
                 return mdd;
             } else {
-                return mdd64_create_node(node_table[mdd].val,down,node_table[mdd].right);
+                return mdd_create_node(node_table[mdd].val,down,node_table[mdd].right);
             }
         }
     }
-    return mdd64_create_node(vec[0],mdd64_put(0,vec+1,len-1,is_new),mdd);
+    return mdd_create_node(vec[0],mdd_put(0,vec+1,len-1,is_new),mdd);
 }
 
 static void
-mdd64_enum(uint64_t mdd, uint32_t *vec, int idx, int len,
+mdd_enum(uint64_t mdd, uint32_t *vec, int idx, int len,
          vset_element_cb callback, void *context)
 {
     if (idx == len) {
@@ -540,7 +540,7 @@ mdd64_enum(uint64_t mdd, uint32_t *vec, int idx, int len,
     } else {
         while (mdd > 1) {
             vec[idx] = node_table[mdd].val;
-            mdd64_enum(node_table[mdd].down, vec, idx+1, len, callback, context);
+            mdd_enum(node_table[mdd].down, vec, idx+1, len, callback, context);
             mdd = node_table[mdd].right;
         }
         if (mdd != 0) Abort("non-uniform length");
@@ -548,7 +548,7 @@ mdd64_enum(uint64_t mdd, uint32_t *vec, int idx, int len,
 }
 
 static uint64_t
-mdd64_copy_match(uint64_t p_id, uint64_t mdd, uint64_t pattern, int idx,
+mdd_copy_match(uint64_t p_id, uint64_t mdd, uint64_t pattern, int idx,
                int *proj, int len)
 {
     if (mdd == 0) return 0;
@@ -556,7 +556,7 @@ mdd64_copy_match(uint64_t p_id, uint64_t mdd, uint64_t pattern, int idx,
     if (len == 0) return mdd;
 
     uint32_t op        = OP_COPY_MATCH | (p_id << 16);
-    uint64_t slot_hash = hash64(op, mdd, pattern);
+    uint64_t slot_hash = hash(op, mdd, pattern);
     uint64_t slot      = slot_hash % cache_size;
 
     if (op_cache[slot].op == op && op_cache[slot].arg1 == mdd
@@ -573,19 +573,19 @@ mdd64_copy_match(uint64_t p_id, uint64_t mdd, uint64_t pattern, int idx,
             mdd = node_table[mdd].right;
 
         if (mdd > 1 && node_table[mdd].val == node_table[pattern].val) {
-            tmp = mdd64_copy_match(node_table[p_id].down, node_table[mdd].down,
+            tmp = mdd_copy_match(node_table[p_id].down, node_table[mdd].down,
                                  node_table[pattern].down,idx+1, proj+1, len-1);
-            res = mdd64_create_node(node_table[mdd].val, tmp, 0);
+            res = mdd_create_node(node_table[mdd].val, tmp, 0);
         }
     } else {
         while (mdd > 1) {
-            mdd64_push(res);
-            tmp = mdd64_copy_match(p_id, node_table[mdd].down, pattern, idx+1,
+            mdd_push(res);
+            tmp = mdd_copy_match(p_id, node_table[mdd].down, pattern, idx+1,
                                  proj, len);
-            tmp = mdd64_create_node(node_table[mdd].val, tmp, 0);
-            mdd64_push(tmp);
-            res = mdd64_union(res, tmp);
-            mdd64_pop(); mdd64_pop();
+            tmp = mdd_create_node(node_table[mdd].val, tmp, 0);
+            mdd_push(tmp);
+            res = mdd_union(res, tmp);
+            mdd_pop(); mdd_pop();
             mdd =  node_table[mdd].right;
         }
     }
@@ -600,13 +600,13 @@ mdd64_copy_match(uint64_t p_id, uint64_t mdd, uint64_t pattern, int idx,
 }
 
 static uint64_t
-mdd64_intersect(uint64_t a, uint64_t b)
+mdd_intersect(uint64_t a, uint64_t b)
 {
     if (a == b) return a;
     if (a == 0 || b == 0) return 0;
     if (a == 1 || b == 1) Abort("missing case in intersect");
 
-    uint64_t slot_hash = hash64(OP_INTERSECT, a, b);
+    uint64_t slot_hash = hash(OP_INTERSECT, a, b);
     uint64_t slot = slot_hash % cache_size;
 
     if (op_cache[slot].op == OP_INTERSECT && op_cache[slot].arg1 == a
@@ -617,14 +617,14 @@ mdd64_intersect(uint64_t a, uint64_t b)
     uint64_t tmp;
 
     if (node_table[a].val == node_table[b].val) {
-        tmp = mdd64_intersect(node_table[a].down, node_table[b].down);
-        mdd64_push(tmp);
-        tmp = mdd64_intersect(node_table[a].right, node_table[b].right);
-        tmp = mdd64_create_node(node_table[a].val, mdd64_pop(), tmp);
+        tmp = mdd_intersect(node_table[a].down, node_table[b].down);
+        mdd_push(tmp);
+        tmp = mdd_intersect(node_table[a].right, node_table[b].right);
+        tmp = mdd_create_node(node_table[a].val, mdd_pop(), tmp);
     } else if (node_table[a].val < node_table[b].val) {
-        tmp = mdd64_intersect(node_table[a].right, b);
+        tmp = mdd_intersect(node_table[a].right, b);
     } else { /* node_table[a].val > node_table[b].val */
-        tmp = mdd64_intersect(a, node_table[b].right);
+        tmp = mdd_intersect(a, node_table[b].right);
     }
 
     slot = slot_hash % cache_size;
@@ -636,12 +636,12 @@ mdd64_intersect(uint64_t a, uint64_t b)
     return tmp;
 }
 
-static void mdd64_clear_and_write_bin(stream_t s, uint64_t mdd, uint64_t* n_count, map64_t node_map){
+static void mdd_clear_and_write_bin(stream_t s, uint64_t mdd, uint64_t* n_count, map64_t node_map){
     if (mdd<=1) return;
     if (node_table[mdd].reachable) {
         node_table[mdd].reachable=0;
-        mdd64_clear_and_write_bin(s,node_table[mdd].down, n_count, node_map);
-        mdd64_clear_and_write_bin(s,node_table[mdd].right, n_count, node_map);
+        mdd_clear_and_write_bin(s,node_table[mdd].down, n_count, node_map);
+        mdd_clear_and_write_bin(s,node_table[mdd].right, n_count, node_map);
         simplemap64_put(node_map, mdd, (uint64_t)*n_count);
         DSwriteU64(s, (uint64_t)*n_count);
         DSwriteU32(s, node_table[mdd].val);
@@ -652,25 +652,25 @@ static void mdd64_clear_and_write_bin(stream_t s, uint64_t mdd, uint64_t* n_coun
 }
 
 static void
-mdd64_save_bin(FILE* f, uint64_t mdd)
+mdd_save_bin(FILE* f, uint64_t mdd)
 {
     stream_t s = stream_output(f);
-    uint64_t n_count = mdd64_node_count(mdd);
+    uint64_t n_count = mdd_node_count(mdd);
     Print(infoLong,"mdd_save: %" PRIu64 " / %" PRIu64 " (%.0f%%)", n_count, mdd_nodes, 100*(((float)n_count)/(float)mdd_nodes));
     DSwriteU64(s, n_count);
-    mdd64_mark(mdd);
+    mdd_mark(mdd);
     map64_t node_map = simplemap64_create(n_count * 1.1 + 2);
     simplemap64_put(node_map, 0, 0);
     simplemap64_put(node_map, 1, 1);
     uint64_t count = 2;
-    mdd64_clear_and_write_bin(s, mdd, &count, node_map);
+    mdd_clear_and_write_bin(s, mdd, &count, node_map);
     simplemap64_destroy(node_map);
     stream_flush(s);
     stream_close(&s);
 }
 
 static uint64_t
-mdd64_load_bin(FILE* f)
+mdd_load_bin(FILE* f)
 {
     stream_t s = stream_input(f);
     uint64_t n_count;
@@ -699,7 +699,7 @@ mdd64_load_bin(FILE* f)
         //        id, val, down, mdd_load_node_ids[down], right, mdd_load_node_ids[right]);
         assert(down==0 || mdd_load_node_ids[down]!=0);
         assert(right==0 || mdd_load_node_ids[right]!=0);
-        mdd = mdd64_create_node(val, mdd_load_node_ids[down], mdd_load_node_ids[right]);
+        mdd = mdd_create_node(val, mdd_load_node_ids[down], mdd_load_node_ids[right]);
         //Warning(debug, "id=%llu [%llu]", id, mdd);
         mdd_load_node_ids[id] = mdd;
         mdd_load_node_count++;
@@ -712,7 +712,7 @@ mdd64_load_bin(FILE* f)
 }
 
 static vset_t
-set_create_mdd64(vdom_t dom, int k, int *proj)
+set_create_mdd(vdom_t dom, int k, int *proj)
 {
     assert(k <= dom->shared.size);
     int l = (k < 0)?0:k;
@@ -727,26 +727,26 @@ set_create_mdd64(vdom_t dom, int k, int *proj)
     set->p_id  = 1;
     for(int i = k - 1; i >= 0; i--) {
         set->proj[i] = proj[i];
-        set->p_id    = mdd64_create_node(proj[i], set->p_id, 0);
+        set->p_id    = mdd_create_node(proj[i], set->p_id, 0);
     }
     return set;
 }
 
 static void
-set_save_mdd64(FILE* f, vset_t set)
+set_save_mdd(FILE* f, vset_t set)
 {
-    mdd64_save_bin(f, set->mdd);
+    mdd_save_bin(f, set->mdd);
 }
 
 static vset_t
-set_load_mdd64(FILE* f, vdom_t dom)
+set_load_mdd(FILE* f, vdom_t dom)
 {
-    vset_t result = set_create_mdd64(dom, -1, NULL);
-    result->mdd = mdd64_load_bin(f);
+    vset_t result = set_create_mdd(dom, -1, NULL);
+    result->mdd = mdd_load_bin(f);
     return result;
 }
 
-static void set_destroy_mdd64(vset_t set)
+static void set_destroy_mdd(vset_t set)
 {
     if (protected_sets == set) protected_sets = set->next;
     if (set->prev != NULL) set->prev->next = set->next;
@@ -755,10 +755,10 @@ static void set_destroy_mdd64(vset_t set)
     RTfree(set);
 }
 
-static void set_reorder_mdd64() { }
+static void set_reorder_mdd() { }
 
 static vrel_t
-rel_create_mdd64(vdom_t dom, int k, int *proj)
+rel_create_mdd(vdom_t dom, int k, int *proj)
 {
     assert(0 <= k && k <= dom->shared.size);
     vrel_t rel = (vrel_t)RTmalloc(sizeof(struct vector_relation)
@@ -773,7 +773,7 @@ rel_create_mdd64(vdom_t dom, int k, int *proj)
     rel->p_id  = 1;
     for(int i = k - 1; i >= 0; i--) {
         rel->proj[i] = proj[i];
-        rel->p_id    = mdd64_create_node(proj[i], rel->p_id, 0);
+        rel->p_id    = mdd_create_node(proj[i], rel->p_id, 0);
         // The p_id of a relation is shifted in hash keys; check this is ok
         if ((rel->p_id >> 16) > 0) Abort("rel_create_mdd: projection identifier too large");
     }
@@ -781,7 +781,7 @@ rel_create_mdd64(vdom_t dom, int k, int *proj)
 }
 
 static void
-rel_save_proj64_bin(FILE* f, vrel_t rel)
+rel_save_proj_bin(FILE* f, vrel_t rel)
 {
     stream_t s = stream_output(f);
     DSwriteS32(s, rel->p_len);
@@ -793,13 +793,13 @@ rel_save_proj64_bin(FILE* f, vrel_t rel)
 }
 
 static void
-rel_save_mdd64(FILE* f, vrel_t rel)
+rel_save_mdd(FILE* f, vrel_t rel)
 {
-    mdd64_save_bin(f, rel->mdd);
+    mdd_save_bin(f, rel->mdd);
 }
 
 static vrel_t
-rel_load_proj64_bin(FILE* f, vdom_t dom)
+rel_load_proj_bin(FILE* f, vdom_t dom)
 {
     stream_t s = stream_input(f);
     int p_len = DSreadS32(s);
@@ -808,139 +808,139 @@ rel_load_proj64_bin(FILE* f, vdom_t dom)
         proj[i] = DSreadS32(s);
     }
     stream_close(&s);
-    vrel_t result = rel_create_mdd64(dom, p_len, proj);
+    vrel_t result = rel_create_mdd(dom, p_len, proj);
     return result;
 }
 
 static void
-rel_load_mdd64(FILE* f, vrel_t rel)
+rel_load_mdd(FILE* f, vrel_t rel)
 {
-    rel->mdd = mdd64_load_bin(f);
+    rel->mdd = mdd_load_bin(f);
 }
 
 static void
-set_add_mdd64(vset_t set, const int* e)
+set_add_mdd(vset_t set, const int* e)
 {
     int len = (set->p_len < 0)?set->dom->shared.size:set->p_len;
-    set->mdd = mdd64_put(set->mdd, (uint32_t*)e, len, NULL);
+    set->mdd = mdd_put(set->mdd, (uint32_t*)e, len, NULL);
 }
 
 static int
-set_is_empty_mdd64(vset_t set)
+set_is_empty_mdd(vset_t set)
 {
     return (set->mdd == 0);
 }
 
 static int
-set_equal_mdd64(vset_t set1, vset_t set2)
+set_equal_mdd(vset_t set1, vset_t set2)
 {
     return (set1->mdd == set2->mdd);
 }
 
-static void set_clear_mdd64(vset_t set){
+static void set_clear_mdd(vset_t set){
     set->mdd=0;
 }
 
 static void
-set_copy_mdd64(vset_t dst, vset_t src)
+set_copy_mdd(vset_t dst, vset_t src)
 {
     assert(dst->p_id == src->p_id);
     dst->mdd = src->mdd;
 }
 
 static void
-set_enum_mdd64(vset_t set, vset_element_cb cb, void* context)
+set_enum_mdd(vset_t set, vset_element_cb cb, void* context)
 {
     int len = (set->p_len < 0)?set->dom->shared.size:set->p_len;
     uint32_t vec[len];
-    mdd64_enum(set->mdd, vec, 0, len, cb, context);
+    mdd_enum(set->mdd, vec, 0, len, cb, context);
 }
 
-static int set_member_mdd64(vset_t set, const int* e)
+static int set_member_mdd(vset_t set, const int* e)
 {
     int len = (set->p_len < 0)?set->dom->shared.size:set->p_len;
-    return mdd64_member(set->mdd, (uint32_t*)e, len);
+    return mdd_member(set->mdd, (uint32_t*)e, len);
 }
 
 static void
-set_count_mdd64(vset_t set, long *nodes, bn_int_t *elements)
+set_count_mdd(vset_t set, long *nodes, bn_int_t *elements)
 {
-    double e_count   = mdd64_count(set->mdd);
-    uint64_t n_count = mdd64_node_count(set->mdd);
+    double e_count   = mdd_count(set->mdd);
+    uint64_t n_count = mdd_node_count(set->mdd);
 
     bn_double2int(e_count, elements);
     *nodes = n_count;
 }
 
 static void
-rel_count_mdd64(vrel_t rel, long *nodes, bn_int_t *elements)
+rel_count_mdd(vrel_t rel, long *nodes, bn_int_t *elements)
 {
-    double e_count   = mdd64_count(rel->mdd);
-    uint64_t n_count = mdd64_node_count(rel->mdd);
+    double e_count   = mdd_count(rel->mdd);
+    uint64_t n_count = mdd_node_count(rel->mdd);
 
     bn_double2int(e_count, elements);
     *nodes = n_count;
 }
 
 static void
-set_union_mdd64(vset_t dst, vset_t src)
+set_union_mdd(vset_t dst, vset_t src)
 {
     assert(dst->p_id == src->p_id);
-    dst->mdd = mdd64_union(dst->mdd, src->mdd);
+    dst->mdd = mdd_union(dst->mdd, src->mdd);
 }
 
 static void
-set_minus_mdd64(vset_t dst, vset_t src)
+set_minus_mdd(vset_t dst, vset_t src)
 {
     assert(dst->p_id == src->p_id && dst->p_len == src->p_len);
-    dst->mdd = mdd64_minus(dst->mdd, src->mdd);
+    dst->mdd = mdd_minus(dst->mdd, src->mdd);
 }
 
 static void
-set_intersect_mdd64(vset_t dst, vset_t src)
+set_intersect_mdd(vset_t dst, vset_t src)
 {
     assert(dst->p_id == src->p_id);
-    dst->mdd = mdd64_intersect(dst->mdd, src->mdd);
+    dst->mdd = mdd_intersect(dst->mdd, src->mdd);
 }
 
 static void
-set_copy_match_mdd64(vset_t dst, vset_t src, int p_len, int *proj, int *match)
+set_copy_match_mdd(vset_t dst, vset_t src, int p_len, int *proj, int *match)
 {
     assert(src->p_len == -1 && dst->p_len == -1 && p_len >= 0);
-    uint64_t singleton = mdd64_put(0, (uint32_t*)match, p_len, NULL);
-    mdd64_push(singleton);
+    uint64_t singleton = mdd_put(0, (uint32_t*)match, p_len, NULL);
+    mdd_push(singleton);
 
-    uint64_t p_id = mdd64_put(0, (uint32_t*)proj, p_len, NULL); // FIXME: enable to pass a projection to this function!
+    uint64_t p_id = mdd_put(0, (uint32_t*)proj, p_len, NULL); // FIXME: enable to pass a projection to this function!
     //Warning(info, "set_copy_match_mdd: p_id=%d", p_id);
     // The p_id of is shifted in hash keys; check this is ok
     if ((p_id >> 16) > 0) Abort("set_copy_match_mdd: projection identifier too large");
-    mdd64_push(p_id);
+    mdd_push(p_id);
 
-    dst->mdd = mdd64_copy_match(p_id, src->mdd, singleton, 0, proj, p_len);
-    mdd64_pop(); mdd64_pop();
+    dst->mdd = mdd_copy_match(p_id, src->mdd, singleton, 0, proj, p_len);
+    mdd_pop(); mdd_pop();
 }
 
 static void
-set_copy_match_proj_mdd64(vset_t dst, vset_t src, int p_len, int *proj, int p_id, int *match)
+set_copy_match_proj_mdd(vset_t dst, vset_t src, int p_len, int *proj, int p_id, int *match)
 {
     assert(src->p_len == -1 && dst->p_len == -1 && p_len >= 0);
-    uint64_t singleton = mdd64_put(0, (uint32_t*)match, p_len, NULL);
-    mdd64_push(singleton);
+    uint64_t singleton = mdd_put(0, (uint32_t*)match, p_len, NULL);
+    mdd_push(singleton);
 
     //Warning(info, "set_copy_match_proj_mdd: p_id=%d", p_id);
     // The p_id of is shifted in hash keys; check this is ok
     if ((p_id >> 16) > 0) Abort("set_copy_match_proj_mdd: projection identifier too large");
-    mdd64_push(p_id);
+    mdd_push(p_id);
 
-    dst->mdd = mdd64_copy_match(p_id, src->mdd, singleton, 0, proj, p_len);
-    mdd64_pop(); mdd64_pop();
+    dst->mdd = mdd_copy_match(p_id, src->mdd, singleton, 0, proj, p_len);
+    mdd_pop(); mdd_pop();
 }
 
 static int
-proj_create_mdd64(int p_len, int *proj)
+proj_create_mdd(int p_len, int *proj)
 {
     assert(p_len >= 0);
-    uint64_t p_id = mdd64_put(0, (uint32_t*)proj, p_len, NULL); // FIXME: enable to pass a projection to this function!
+    uint64_t p_id = mdd_put(0, (uint32_t*)proj, p_len, NULL); // FIXME: enable to pass a projection to this function!
     //Warning(info, "proj_create_mdd: p_id=%d", p_id);
     // The p_id of is shifted in hash keys; check this is ok
     if ((p_id >> 16) > 0) Abort("set_copy_match_mdd: projection identifier too large");
@@ -948,28 +948,28 @@ proj_create_mdd64(int p_len, int *proj)
 }
 
 static void
-set_enum_match_mdd64(vset_t set, int p_len, int *proj, int *match,
+set_enum_match_mdd(vset_t set, int p_len, int *proj, int *match,
                        vset_element_cb cb, void *context)
 {
     assert(set->p_len == -1 && p_len >= 0);
-    uint64_t singleton = mdd64_put(0, (uint32_t*)match, p_len, NULL);
-    mdd64_push(singleton);
+    uint64_t singleton = mdd_put(0, (uint32_t*)match, p_len, NULL);
+    mdd_push(singleton);
 
-    uint64_t p_id = mdd64_put(0, (uint32_t*)proj, p_len, NULL);
+    uint64_t p_id = mdd_put(0, (uint32_t*)proj, p_len, NULL);
     // The p_id of is shifted in hash keys; check this is ok
     if ((p_id >> 16) > 0) Abort("set_enum_match_mdd: projection identifier too large");
-    mdd64_push(p_id);
+    mdd_push(p_id);
 
-    uint64_t tmp = mdd64_copy_match(p_id, set->mdd, singleton, 0, proj, p_len);
-    mdd64_pop(); mdd64_pop();
+    uint64_t tmp = mdd_copy_match(p_id, set->mdd, singleton, 0, proj, p_len);
+    mdd_pop(); mdd_pop();
 
     int len = set->dom->shared.size;
     uint32_t vec[len];
-    mdd64_enum(tmp, vec, 0, len , cb, context);
+    mdd_enum(tmp, vec, 0, len , cb, context);
 }
 
 static void
-rel_add_mdd64(vrel_t rel, const int *src, const int *dst)
+rel_add_mdd(vrel_t rel, const int *src, const int *dst)
 {
     int N = (rel->p_len < 0)?rel->dom->shared.size:rel->p_len;
     uint32_t vec[2*N];
@@ -978,16 +978,16 @@ rel_add_mdd64(vrel_t rel, const int *src, const int *dst)
         vec[i+i+1] = dst[i];
     }
 
-    rel->mdd = mdd64_put(rel->mdd, vec, 2*N, NULL);
+    rel->mdd = mdd_put(rel->mdd, vec, 2*N, NULL);
 }
 
 static uint64_t
-mdd64_project(uint64_t p_id, uint64_t mdd, int idx, int *proj, int len)
+mdd_project(uint64_t p_id, uint64_t mdd, int idx, int *proj, int len)
 {
     if(mdd == 0) return 0; //projection of empty is empty.
     if(len == 0) return 1; //projection of non-empty is epsilon.
 
-    uint64_t slot_hash=hash64(OP_PROJECT,mdd,p_id);
+    uint64_t slot_hash=hash(OP_PROJECT,mdd,p_id);
     uint64_t slot=slot_hash%cache_size;
     if(op_cache[slot].op==OP_PROJECT && op_cache[slot].arg1==mdd
        && op_cache[slot].res.other.arg2==p_id) {
@@ -998,17 +998,17 @@ mdd64_project(uint64_t p_id, uint64_t mdd, int idx, int *proj, int len)
     uint64_t mdd_original = mdd;
 
     if (proj[0]==idx){
-        mdd64_push(mdd64_project(p_id,node_table[mdd].right,idx,proj,len));
-        uint32_t tmp=mdd64_project(node_table[p_id].down, node_table[mdd].down,
+        mdd_push(mdd_project(p_id,node_table[mdd].right,idx,proj,len));
+        uint32_t tmp=mdd_project(node_table[p_id].down, node_table[mdd].down,
                                  idx+1, proj+1, len-1);
-        res=mdd64_create_node(node_table[mdd].val,tmp,mdd64_pop());
+        res=mdd_create_node(node_table[mdd].val,tmp,mdd_pop());
     } else {
         while(mdd>1){
-            mdd64_push(res);
-            uint32_t tmp=mdd64_project(p_id,node_table[mdd].down,idx+1,proj,len);
-            mdd64_push(tmp);
-            res=mdd64_union(res,tmp);
-            mdd64_pop();mdd64_pop();
+            mdd_push(res);
+            uint32_t tmp=mdd_project(p_id,node_table[mdd].down,idx+1,proj,len);
+            mdd_push(tmp);
+            res=mdd_union(res,tmp);
+            mdd_pop();mdd_pop();
             mdd=node_table[mdd].right;
         }
     }
@@ -1022,7 +1022,7 @@ mdd64_project(uint64_t p_id, uint64_t mdd, int idx, int *proj, int len)
 }
 
 static uint64_t
-mdd64_next(uint64_t p_id, uint64_t set, uint64_t rel, int idx, int *proj, int len)
+mdd_next(uint64_t p_id, uint64_t set, uint64_t rel, int idx, int *proj, int len)
 {
     if (rel==0||set==0) return 0;
     if (len==0) return set;
@@ -1040,7 +1040,7 @@ mdd64_next(uint64_t p_id, uint64_t set, uint64_t rel, int idx, int *proj, int le
         }
     }
     uint32_t op=OP_NEXT|(p_id<<16);
-    uint64_t slot_hash=hash64(op,set,rel);
+    uint64_t slot_hash=hash(op,set,rel);
     uint64_t slot=slot_hash%cache_size;
     if (op_cache[slot].op==op && op_cache[slot].arg1==set
         && op_cache[slot].res.other.arg2==rel) {
@@ -1048,23 +1048,23 @@ mdd64_next(uint64_t p_id, uint64_t set, uint64_t rel, int idx, int *proj, int le
     }
     uint64_t res=0;
     if (proj[0]==idx){
-        res = mdd64_next(p_id, node_table[set].right, node_table[rel].right,
+        res = mdd_next(p_id, node_table[set].right, node_table[rel].right,
                        idx, proj, len);
         rel=node_table[rel].down;
         while(rel>1){
-            mdd64_push(res);
-            uint64_t tmp = mdd64_next(node_table[p_id].down, node_table[set].down,
+            mdd_push(res);
+            uint64_t tmp = mdd_next(node_table[p_id].down, node_table[set].down,
                                     node_table[rel].down, idx+1, proj+1, len-1);
-            tmp=mdd64_create_node(node_table[rel].val,tmp,0);
-            mdd64_push(tmp);
-            res=mdd64_union(res,tmp);
-            mdd64_pop();mdd64_pop();
+            tmp=mdd_create_node(node_table[rel].val,tmp,0);
+            mdd_push(tmp);
+            res=mdd_union(res,tmp);
+            mdd_pop();mdd_pop();
             rel=node_table[rel].right;
         }
     } else {
-        mdd64_push(mdd64_next(p_id,node_table[set].right,rel,idx,proj,len));
-        res=mdd64_next(p_id,node_table[set].down,rel,idx+1,proj,len);
-        res=mdd64_create_node(node_table[set].val,res,mdd64_pop());
+        mdd_push(mdd_next(p_id,node_table[set].right,rel,idx,proj,len));
+        res=mdd_next(p_id,node_table[set].down,rel,idx+1,proj,len);
+        res=mdd_create_node(node_table[set].val,res,mdd_pop());
     }
 
     slot=slot_hash%cache_size;
@@ -1076,28 +1076,28 @@ mdd64_next(uint64_t p_id, uint64_t set, uint64_t rel, int idx, int *proj, int le
 }
 
 static void
-set_project_mdd64(vset_t dst, vset_t src)
+set_project_mdd(vset_t dst, vset_t src)
 {
     assert(src->p_len == -1);
     if (dst->p_len == -1) {
         dst->mdd = src->mdd;
     } else {
         dst->mdd = 0;
-        dst->mdd = mdd64_project(dst->p_id, src->mdd, 0, dst->proj, dst->p_len);
+        dst->mdd = mdd_project(dst->p_id, src->mdd, 0, dst->proj, dst->p_len);
     }
 }
 
 static void
-set_next_mdd64(vset_t dst, vset_t src, vrel_t rel)
+set_next_mdd(vset_t dst, vset_t src, vrel_t rel)
 {
     assert(src->p_len == -1 && dst->p_len == -1);
 
-    dst->mdd = mdd64_next(rel->p_id, src->mdd, rel->mdd, 0, rel->proj,rel->p_len);
+    dst->mdd = mdd_next(rel->p_id, src->mdd, rel->mdd, 0, rel->proj,rel->p_len);
 }
 
 
 static void
-set_example_mdd64(vset_t set, int *e)
+set_example_mdd(vset_t set, int *e)
 {
     int len = (set->p_len < 0)?set->dom->shared.size:set->p_len;
     uint64_t mdd = set->mdd;
@@ -1115,13 +1115,13 @@ set_example_mdd64(vset_t set, int *e)
 
 
 static uint64_t
-mdd64_prev(uint64_t p_id, uint64_t set, uint64_t rel, int idx, int *proj, int len)
+mdd_prev(uint64_t p_id, uint64_t set, uint64_t rel, int idx, int *proj, int len)
 {
     if (rel==0||set==0) return 0;
     if (len==0) return set;
     if (rel==1||set==1) Abort("missing case in prev");
     uint32_t op=OP_PREV|(p_id<<16);
-    uint64_t slot_hash=hash64(op,set,rel);
+    uint64_t slot_hash=hash(op,set,rel);
     uint64_t slot=slot_hash%cache_size;
     if (op_cache[slot].op==op && op_cache[slot].arg1==set
         && op_cache[slot].res.other.arg2==rel) {
@@ -1129,8 +1129,8 @@ mdd64_prev(uint64_t p_id, uint64_t set, uint64_t rel, int idx, int *proj, int le
     }
     uint64_t res=0;
     if (proj[0]==idx){
-        uint64_t right=mdd64_prev(p_id,set,node_table[rel].right,idx,proj,len);
-        mdd64_push(right);
+        uint64_t right=mdd_prev(p_id,set,node_table[rel].right,idx,proj,len);
+        mdd_push(right);
         uint32_t val=node_table[rel].val;
         rel=node_table[rel].down;
         while(rel>1 && set>1) {
@@ -1142,20 +1142,20 @@ mdd64_prev(uint64_t p_id, uint64_t set, uint64_t rel, int idx, int *proj, int le
                 set=node_table[set].right;
                 continue;
             }
-            mdd64_push(res);
-            uint64_t tmp=mdd64_prev(node_table[p_id].down, node_table[set].down,
+            mdd_push(res);
+            uint64_t tmp=mdd_prev(node_table[p_id].down, node_table[set].down,
                                   node_table[rel].down, idx+1, proj+1, len-1);
-            mdd64_push(tmp);
-            res=mdd64_union(res,tmp);
-            mdd64_pop();mdd64_pop();
+            mdd_push(tmp);
+            res=mdd_union(res,tmp);
+            mdd_pop();mdd_pop();
             rel=node_table[rel].right;
             set=node_table[set].right;
         }
-        res=mdd64_create_node(val,res,mdd64_pop());
+        res=mdd_create_node(val,res,mdd_pop());
     } else {
-        mdd64_push(mdd64_prev(p_id,node_table[set].right,rel,idx,proj,len));
-        res=mdd64_prev(p_id,node_table[set].down,rel,idx+1,proj,len);
-        res=mdd64_create_node(node_table[set].val,res,mdd64_pop());
+        mdd_push(mdd_prev(p_id,node_table[set].right,rel,idx,proj,len));
+        res=mdd_prev(p_id,node_table[set].down,rel,idx+1,proj,len);
+        res=mdd_create_node(node_table[set].val,res,mdd_pop());
     }
 
     slot=slot_hash%cache_size;
@@ -1167,33 +1167,33 @@ mdd64_prev(uint64_t p_id, uint64_t set, uint64_t rel, int idx, int *proj, int le
 }
 
 static void
-set_prev_mdd64(vset_t dst, vset_t src, vrel_t rel)
+set_prev_mdd(vset_t dst, vset_t src, vrel_t rel)
 {
     assert(src->p_len == -1 && dst->p_len == -1);
 
-    dst->mdd = mdd64_prev(rel->p_id, src->mdd, rel->mdd, 0, rel->proj,rel->p_len);
+    dst->mdd = mdd_prev(rel->p_id, src->mdd, rel->mdd, 0, rel->proj,rel->p_len);
 }
 
 static uint64_t
-mdd64_universe(uint64_t p_id, uint64_t dst, uint64_t src, int n) {
+mdd_universe(uint64_t p_id, uint64_t dst, uint64_t src, int n) {
 
     if (src == 0) return 0;
 
-    uint64_t slot_hash=hash64(OP_UNIVERSE,src,p_id);
+    uint64_t slot_hash=hash(OP_UNIVERSE,src,p_id);
     uint64_t slot=slot_hash%cache_size;
     if(op_cache[slot].op==OP_UNIVERSE && op_cache[slot].arg1==src) {
         return op_cache[slot].res.other.res;
     }
 
-    mdd64_push(mdd64_universe(p_id, dst, node_table[src].right, n));
+    mdd_push(mdd_universe(p_id, dst, node_table[src].right, n));
 
     if (n == 0) {
-        dst = mdd64_create_node(node_table[src].val, dst, 0);
+        dst = mdd_create_node(node_table[src].val, dst, 0);
     } else {
-        dst = mdd64_universe(p_id, dst, node_table[src].down, n-1);
+        dst = mdd_universe(p_id, dst, node_table[src].down, n-1);
     }
 
-    uint64_t res = mdd64_union(dst, mdd64_pop());
+    uint64_t res = mdd_union(dst, mdd_pop());
 
     slot=slot_hash%cache_size;
     op_cache[slot].op=OP_UNIVERSE;
@@ -1206,7 +1206,7 @@ mdd64_universe(uint64_t p_id, uint64_t dst, uint64_t src, int n) {
 }
 
 static void
-set_universe_mdd64(vset_t dst, vset_t src) {
+set_universe_mdd(vset_t dst, vset_t src) {
 
     assert(src->p_len == -1 && dst->mdd == 0);
 
@@ -1217,7 +1217,7 @@ set_universe_mdd64(vset_t dst, vset_t src) {
     uint64_t p_id = dst->p_id;
 
     for (int n = l-1; n >= 0; n--) {
-        dst->mdd = mdd64_universe(p_id, dst->mdd, src->mdd, dst->proj[n]);
+        dst->mdd = mdd_universe(p_id, dst->mdd, src->mdd, dst->proj[n]);
         p_id = node_table[p_id].down;
     }
 }
@@ -1232,24 +1232,24 @@ static vset_t *proj_set;
 static uint64_t rels_tot;
 static top_groups_info *top_groups;
 
-static uint64_t saturate64(int level, uint64_t mdd);
-static uint64_t sat_rel_prod64(uint64_t p_id, uint64_t set, uint64_t rel,
+static uint64_t saturate(int level, uint64_t mdd);
+static uint64_t sat_rel_prod(uint64_t p_id, uint64_t set, uint64_t rel,
                              int idx, int *proj, int len);
 
 static uint64_t
-copy_level_sat64(uint64_t p_id, uint64_t set, uint64_t rel, int idx,
+copy_level_sat(uint64_t p_id, uint64_t set, uint64_t rel, int idx,
                int *proj, int len)
 {
     uint64_t res = 0;
 
     while (set > 0) {
-        mdd64_push(res);
-        uint64_t tmp = sat_rel_prod64(p_id, node_table[set].down, rel, idx + 1,
+        mdd_push(res);
+        uint64_t tmp = sat_rel_prod(p_id, node_table[set].down, rel, idx + 1,
                                     proj, len);
-        tmp = mdd64_create_node(node_table[set].val, tmp, 0);
-        mdd64_push(tmp);
-        res = mdd64_union(res, tmp);
-        mdd64_pop(); mdd64_pop();
+        tmp = mdd_create_node(node_table[set].val, tmp, 0);
+        mdd_push(tmp);
+        res = mdd_union(res, tmp);
+        mdd_pop(); mdd_pop();
         set = node_table[set].right;
     }
 
@@ -1257,7 +1257,7 @@ copy_level_sat64(uint64_t p_id, uint64_t set, uint64_t rel, int idx,
 }
 
 static uint64_t
-apply_rel_prod64(uint64_t p_id, uint64_t set, uint64_t rel, int idx,
+apply_rel_prod(uint64_t p_id, uint64_t set, uint64_t rel, int idx,
                int *proj, int len)
 {
     uint64_t res = 0;
@@ -1271,15 +1271,15 @@ apply_rel_prod64(uint64_t p_id, uint64_t set, uint64_t rel, int idx,
             uint64_t rel_down = node_table[rel].down;
 
             while (rel_down > 1) {
-                mdd64_push(res);
-                uint64_t tmp = sat_rel_prod64(node_table[p_id].down,
+                mdd_push(res);
+                uint64_t tmp = sat_rel_prod(node_table[p_id].down,
                                             node_table[set].down,
                                             node_table[rel_down].down,
                                             idx + 1, proj + 1, len - 1);
-                tmp = mdd64_create_node(node_table[rel_down].val, tmp, 0);
-                mdd64_push(tmp);
-                res = mdd64_union(res, tmp);
-                mdd64_pop(); mdd64_pop();
+                tmp = mdd_create_node(node_table[rel_down].val, tmp, 0);
+                mdd_push(tmp);
+                res = mdd_union(res, tmp);
+                mdd_pop(); mdd_pop();
                 rel_down = node_table[rel_down].right;
             }
 
@@ -1292,7 +1292,7 @@ apply_rel_prod64(uint64_t p_id, uint64_t set, uint64_t rel, int idx,
 }
 
 static uint64_t
-sat_rel_prod64(uint64_t p_id, uint64_t set, uint64_t rel, int idx,
+sat_rel_prod(uint64_t p_id, uint64_t set, uint64_t rel, int idx,
                 int *proj, int len)
 {
     if (len == 0) return set;
@@ -1300,7 +1300,7 @@ sat_rel_prod64(uint64_t p_id, uint64_t set, uint64_t rel, int idx,
     if (set == 1 || rel == 1) Abort("missing case in set_reach_sat");
 
     uint32_t op = OP_RELPROD | (p_id << 16);
-    uint64_t slot_hash = hash64(op, set, rel);
+    uint64_t slot_hash = hash(op, set, rel);
     uint64_t slot = slot_hash % cache_size;
 
     if (op_cache[slot].op == op
@@ -1311,13 +1311,13 @@ sat_rel_prod64(uint64_t p_id, uint64_t set, uint64_t rel, int idx,
     uint64_t res = 0;
 
     if (proj[0] == idx)
-        res = apply_rel_prod64(p_id, set, rel, idx, proj, len);
+        res = apply_rel_prod(p_id, set, rel, idx, proj, len);
     else
-        res = copy_level_sat64(p_id, set, rel, idx, proj, len);
+        res = copy_level_sat(p_id, set, rel, idx, proj, len);
 
-    mdd64_push(res);
-    res = saturate64(idx, res);
-    mdd64_pop();
+    mdd_push(res);
+    res = saturate(idx, res);
+    mdd_pop();
 
     slot = slot_hash % cache_size;
     op_cache[slot].op=op;
@@ -1328,7 +1328,7 @@ sat_rel_prod64(uint64_t p_id, uint64_t set, uint64_t rel, int idx,
 }
 
 static uint64_t
-apply_rel_fixpoint64(uint64_t p_id, uint64_t set, uint64_t rel, int idx,
+apply_rel_fixpoint(uint64_t p_id, uint64_t set, uint64_t rel, int idx,
                    int *proj, int len)
 {
     uint64_t res = set;
@@ -1346,15 +1346,15 @@ apply_rel_fixpoint64(uint64_t p_id, uint64_t set, uint64_t rel, int idx,
                 new_res = node_table[new_res].right;
 
             while (rel_down > 1) {
-                mdd64_push(res);
-                uint64_t tmp = sat_rel_prod64(node_table[p_id].down,
+                mdd_push(res);
+                uint64_t tmp = sat_rel_prod(node_table[p_id].down,
                                             node_table[new_res].down,
                                             node_table[rel_down].down,
                                             idx + 1, proj + 1, len - 1);
-                tmp = mdd64_create_node(node_table[rel_down].val, tmp, 0);
-                mdd64_push(tmp);
-                res = mdd64_union(res, tmp);
-                mdd64_pop(); mdd64_pop();
+                tmp = mdd_create_node(node_table[rel_down].val, tmp, 0);
+                mdd_push(tmp);
+                res = mdd_union(res, tmp);
+                mdd_pop(); mdd_pop();
                 rel_down = node_table[rel_down].right;
             }
 
@@ -1370,7 +1370,7 @@ apply_rel_fixpoint64(uint64_t p_id, uint64_t set, uint64_t rel, int idx,
 // whose top is at that level. Continue performing fixpoint calculations until
 // the MDD does not change anymore.
 static uint64_t
-sat_fixpoint64(int level, uint64_t set)
+sat_fixpoint(int level, uint64_t set)
 {
     if (set == 0) return 0;
     if (set == 1) Abort("missing case in sat_fixpoint");
@@ -1378,17 +1378,17 @@ sat_fixpoint64(int level, uint64_t set)
     top_groups_info groups_info = top_groups[level];
     uint64_t new_set = set;
 
-    mdd64_push(0);
+    mdd_push(0);
 
-    while (new_set != mdd64_pop()) {
-        mdd64_push(new_set);
+    while (new_set != mdd_pop()) {
+        mdd_push(new_set);
         for (int i = 0; i < groups_info.tg_len; i++) {
             int grp = groups_info.top_groups[i];
-            mdd64_push(new_set);
+            mdd_push(new_set);
             assert(rel_set[grp]->p_len != 0);
 
             if (rel_set[grp]->expand != NULL) {
-                proj_set[grp]->mdd = mdd64_project(rel_set[grp]->p_id, new_set,
+                proj_set[grp]->mdd = mdd_project(rel_set[grp]->p_id, new_set,
                                                  level, proj_set[grp]->proj,
                                                  proj_set[grp]->p_len);
                 rel_set[grp]->expand(rel_set[grp], proj_set[grp],
@@ -1396,11 +1396,11 @@ sat_fixpoint64(int level, uint64_t set)
                 proj_set[grp]->mdd = 0;
             }
 
-            new_set = apply_rel_fixpoint64(rel_set[grp]->p_id, new_set,
+            new_set = apply_rel_fixpoint(rel_set[grp]->p_id, new_set,
                                          rel_set[grp]->mdd, level,
                                          rel_set[grp]->proj,
                                          rel_set[grp]->p_len);
-            mdd64_pop();
+            mdd_pop();
         }
     }
 
@@ -1409,11 +1409,11 @@ sat_fixpoint64(int level, uint64_t set)
 
 // Saturation process for the MDD at a given level
 static uint64_t
-saturate64(int idx, uint64_t mdd)
+saturate(int idx, uint64_t mdd)
 {
     if (mdd == 0 || mdd == 1) return mdd;
 
-    uint64_t slot_hash = hash64(OP_SAT, mdd, rels_tot);
+    uint64_t slot_hash = hash(OP_SAT, mdd, rels_tot);
     uint64_t slot = slot_hash % cache_size;
 
     if (op_cache[slot].op == OP_SAT
@@ -1425,18 +1425,18 @@ saturate64(int idx, uint64_t mdd)
     uint64_t mdd_right = mdd;
 
     while (mdd_right > 1) {
-        mdd64_push(res);
-        uint32_t tmp = saturate64(idx + 1, node_table[mdd_right].down);
-        tmp = mdd64_create_node(node_table[mdd_right].val, tmp, 0);
-        mdd64_push(tmp);
-        res = mdd64_union(res, tmp);
-        mdd64_pop(); mdd64_pop();
+        mdd_push(res);
+        uint32_t tmp = saturate(idx + 1, node_table[mdd_right].down);
+        tmp = mdd_create_node(node_table[mdd_right].val, tmp, 0);
+        mdd_push(tmp);
+        res = mdd_union(res, tmp);
+        mdd_pop(); mdd_pop();
         mdd_right = node_table[mdd_right].right;
     }
 
-    mdd64_push(res);
-    res = sat_fixpoint64(idx, res);
-    mdd64_pop();
+    mdd_push(res);
+    res = sat_fixpoint(idx, res);
+    mdd_pop();
 
     slot = slot_hash % cache_size;
     op_cache[slot].op = OP_SAT;
@@ -1448,7 +1448,7 @@ saturate64(int idx, uint64_t mdd)
 
 // Perform fixpoint calculations using the "General Basic Saturation" algorithm
 static void
-set_least_fixpoint_mdd64(vset_t dst, vset_t src, vrel_t rels[], int rel_count)
+set_least_fixpoint_mdd(vset_t dst, vset_t src, vrel_t rels[], int rel_count)
 {
     // Only implemented if not projected
     assert(src->p_len == -1 && dst->p_len == -1);
@@ -1459,9 +1459,9 @@ set_least_fixpoint_mdd64(vset_t dst, vset_t src, vrel_t rels[], int rel_count)
     uint64_t rels_tmp = 0;
 
     for (int i = 0; i < rel_count; i++)
-        rels_tmp = mdd64_create_node(rel_count - i, rels[i]->mdd, rels_tmp);
+        rels_tmp = mdd_create_node(rel_count - i, rels[i]->mdd, rels_tmp);
 
-    mdd64_push(rels_tmp);
+    mdd_push(rels_tmp);
     rels_tot = rels_tmp;
 
     // Initialize top_groups_info array
@@ -1476,7 +1476,7 @@ set_least_fixpoint_mdd64(vset_t dst, vset_t src, vrel_t rels[], int rel_count)
     }
 
     for (int grp = 0; grp < rel_count; grp++) {
-        proj_set[grp] = set_create_mdd64(rels[grp]->dom, rels[grp]->p_len,
+        proj_set[grp] = set_create_mdd(rels[grp]->dom, rels[grp]->p_len,
                                        rels[grp]->proj);
 
         if (rels[grp]->p_len == 0)
@@ -1488,12 +1488,12 @@ set_least_fixpoint_mdd64(vset_t dst, vset_t src, vrel_t rels[], int rel_count)
     }
 
     // Saturation on initial state set
-    dst->mdd = saturate64(0, src->mdd);
+    dst->mdd = saturate(0, src->mdd);
 
     // Clean-up
     for (int grp = 0; grp < rel_count; grp++) {
         if (rels[grp]->p_len == 0 && rels[grp]->expand != NULL) {
-            proj_set[grp]->mdd = mdd64_project(rels[grp]->p_id, dst->mdd,
+            proj_set[grp]->mdd = mdd_project(rels[grp]->p_id, dst->mdd,
                                              0, NULL, 0);
             rel_set[grp]->expand(rel_set[grp], proj_set[grp],
                                  rel_set[grp]->expand_ctx);
@@ -1507,14 +1507,14 @@ set_least_fixpoint_mdd64(vset_t dst, vset_t src, vrel_t rels[], int rel_count)
 
     rel_set = NULL;
     rels_tot = 0;
-    mdd64_pop();
+    mdd_pop();
 
     RTfree(proj_set);
     RTfree(top_groups);
 }
 
 
-static void mdd64_mark_for_dot(uint64_t mdd){
+static void mdd_mark_for_dot(uint64_t mdd){
   // only heads of mdd-nodes are marked
   // note that head of one mdd-node might be in the middle of another one!
   // this means that "sharing within mdd-nodes" is not represented in dot.
@@ -1523,14 +1523,14 @@ static void mdd64_mark_for_dot(uint64_t mdd){
     node_table[mdd].reachable=1;
     uint64_t x = mdd;
     while (x) {
-      mdd64_mark_for_dot(node_table[x].down);
+      mdd_mark_for_dot(node_table[x].down);
       x=node_table[x].right;
     }
 }
 
 static char trueprinted;
 
-static void mdd64_clear_and_print(FILE* fp,uint64_t mdd){
+static void mdd_clear_and_print(FILE* fp,uint64_t mdd){
   if (mdd==0) {fprintf(fp," n0 [shape=record,label=\"<f0> False\"]\n");}
   else if (mdd==1) {
     if (!trueprinted) {
@@ -1565,29 +1565,29 @@ static void mdd64_clear_and_print(FILE* fp,uint64_t mdd){
     // recursively print the sub-mdds
     x=mdd;
     while (x) {
-      mdd64_clear_and_print(fp,node_table[x].down);
+      mdd_clear_and_print(fp,node_table[x].down);
       x=node_table[x].right;
     }
   }
 }
 
 
-void set_dot_mdd64(FILE* fp, vset_t src) {
+void set_dot_mdd(FILE* fp, vset_t src) {
   uint64_t mdd = src->mdd;
   fprintf(fp,"digraph setbdd {\nnode [shape=record];\n");
-  mdd64_mark_for_dot(mdd);
+  mdd_mark_for_dot(mdd);
   trueprinted=0;
-  mdd64_clear_and_print(fp,mdd);
+  mdd_clear_and_print(fp,mdd);
   fprintf(fp,"}\n");
 }
 
 
-void rel_dot_mdd64(FILE* fp, vrel_t src) {
+void rel_dot_mdd(FILE* fp, vrel_t src) {
   uint64_t mdd = src->mdd;
   fprintf(fp,"digraph relbdd {\nnode [shape=record];\n");
-  mdd64_mark_for_dot(mdd); // this changes mdd_used; does it matter?
+  mdd_mark_for_dot(mdd); // this changes mdd_used; does it matter?
   trueprinted=0;
-  mdd64_clear_and_print(fp,mdd);
+  mdd_clear_and_print(fp,mdd);
   fprintf(fp,"}\n");
 }
 
@@ -1623,44 +1623,44 @@ vdom_t vdom_create_list64_native(int n){
             op_cache[i].op=0;
         }
 
-        mdd64_create_stack();
+        mdd_create_stack();
     }
-    dom->shared.set_create=set_create_mdd64;
-    dom->shared.set_save=set_save_mdd64;
-    dom->shared.set_load=set_load_mdd64;
-    dom->shared.set_member=set_member_mdd64;
-    dom->shared.set_add=set_add_mdd64;
-    dom->shared.set_is_empty=set_is_empty_mdd64;
-    dom->shared.set_equal=set_equal_mdd64;
-    dom->shared.set_clear=set_clear_mdd64;
-    dom->shared.set_copy=set_copy_mdd64;
-    dom->shared.set_enum=set_enum_mdd64;
-    dom->shared.set_count=set_count_mdd64;
-    dom->shared.set_union=set_union_mdd64;
-    dom->shared.set_minus=set_minus_mdd64;
-    dom->shared.rel_create=rel_create_mdd64;
-    dom->shared.rel_save_proj=rel_save_proj64_bin;
-    dom->shared.rel_save=rel_save_mdd64;
-    dom->shared.rel_load_proj=rel_load_proj64_bin;
-    dom->shared.rel_load=rel_load_mdd64;
-    dom->shared.rel_add=rel_add_mdd64;
-    dom->shared.rel_count=rel_count_mdd64;
-    dom->shared.set_project=set_project_mdd64;
-    dom->shared.set_next=set_next_mdd64;
-    dom->shared.set_prev=set_prev_mdd64;
-    dom->shared.set_example=set_example_mdd64;
-    dom->shared.set_enum_match=set_enum_match_mdd64;
-    dom->shared.set_copy_match=set_copy_match_mdd64;
-    dom->shared.set_copy_match_proj=set_copy_match_proj_mdd64;
-    dom->shared.proj_create=proj_create_mdd64;
-    dom->shared.set_intersect=set_intersect_mdd64;
-    dom->shared.set_universe=set_universe_mdd64;
+    dom->shared.set_create=set_create_mdd;
+    dom->shared.set_save=set_save_mdd;
+    dom->shared.set_load=set_load_mdd;
+    dom->shared.set_member=set_member_mdd;
+    dom->shared.set_add=set_add_mdd;
+    dom->shared.set_is_empty=set_is_empty_mdd;
+    dom->shared.set_equal=set_equal_mdd;
+    dom->shared.set_clear=set_clear_mdd;
+    dom->shared.set_copy=set_copy_mdd;
+    dom->shared.set_enum=set_enum_mdd;
+    dom->shared.set_count=set_count_mdd;
+    dom->shared.set_union=set_union_mdd;
+    dom->shared.set_minus=set_minus_mdd;
+    dom->shared.rel_create=rel_create_mdd;
+    dom->shared.rel_save_proj=rel_save_proj_bin;
+    dom->shared.rel_save=rel_save_mdd;
+    dom->shared.rel_load_proj=rel_load_proj_bin;
+    dom->shared.rel_load=rel_load_mdd;
+    dom->shared.rel_add=rel_add_mdd;
+    dom->shared.rel_count=rel_count_mdd;
+    dom->shared.set_project=set_project_mdd;
+    dom->shared.set_next=set_next_mdd;
+    dom->shared.set_prev=set_prev_mdd;
+    dom->shared.set_example=set_example_mdd;
+    dom->shared.set_enum_match=set_enum_match_mdd;
+    dom->shared.set_copy_match=set_copy_match_mdd;
+    dom->shared.set_copy_match_proj=set_copy_match_proj_mdd;
+    dom->shared.proj_create=proj_create_mdd;
+    dom->shared.set_intersect=set_intersect_mdd;
+    dom->shared.set_universe=set_universe_mdd;
     // default implementation for dom->shared.set_zip
-    dom->shared.reorder=set_reorder_mdd64;
-    dom->shared.set_destroy=set_destroy_mdd64;
-    dom->shared.set_least_fixpoint=set_least_fixpoint_mdd64;
-    dom->shared.set_dot=set_dot_mdd64;
-    dom->shared.rel_dot=rel_dot_mdd64;
+    dom->shared.reorder=set_reorder_mdd;
+    dom->shared.set_destroy=set_destroy_mdd;
+    dom->shared.set_least_fixpoint=set_least_fixpoint_mdd;
+    dom->shared.set_dot=set_dot_mdd;
+    dom->shared.rel_dot=rel_dot_mdd;
     return dom;
 }
 
