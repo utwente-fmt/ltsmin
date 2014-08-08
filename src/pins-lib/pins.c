@@ -1025,12 +1025,12 @@ void GBprintDependencyMatrixCombined(FILE* file, model_t model) {
     matrix_t *dm_must_w = GBgetDMInfoMustWrite(model);
 
     Printf (info, "\nRead/write dependencies:\n");
-    fprintf(file, "      0");
-    for (int j = 9; j < dm_ncols(dm); j+=10)
-        fprintf(file, "%10d",j+1);
+    fprintf(file, "      1");
+    for (int j = 0; j+10 < dm_ncols(dm); j+=10)
+        fprintf(file, j == 0 ? "%9d" : "%10d", j+10);
     fprintf(file, " \n");
     for (int i = 0; i < dm_nrows(dm); i++) {
-        fprintf(file, "%4d: ", i);
+        fprintf(file, "%4d: ", i+1);
         for (int j = 0; j < dm_ncols(dm); j++) {
             if (dm_is_set(dm_r, i, j) && (dm_is_set(dm_may_w, i, j))) {
                 fprintf(file, "+");
