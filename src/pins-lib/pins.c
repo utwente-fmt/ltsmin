@@ -684,7 +684,7 @@ matrix_t *GBgetDMInfoMustWrite(model_t model) {
     check_write_matrices(model);
     if (model->dm_must_write_info == NULL) {
         if (model->dm_may_write_info != NULL) {
-            Abort("If the must-write matrix is set, then the must-write matrix must also be set");
+            Abort("If the may-write matrix is set, then the must-write matrix must also be set");
         }
         Warning(debug, "must-write dependency matrix not set, returning combined matrix");
         return model->dm_info;
