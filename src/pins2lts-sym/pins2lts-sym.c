@@ -8,6 +8,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
+#include <sys/mman.h>
+#include <sys/socket.h>
 
 #include <dm/dm.h>
 #include <hre/user.h>
@@ -82,6 +84,8 @@ static int expand_groups = 1; // set to 0 if transitions are loaded from file
 #ifdef HAVE_SYLVAN
 static size_t lace_n_workers = 0;
 static size_t lace_dqsize = 40960000; // can be very big, no problemo
+
+static bool multi_process = false;
 #endif
 
 static char* order = "bfs-prev";
@@ -167,6 +171,12 @@ reach_popt(poptContext con, enum poptCallbackReason reason,
     }
 }
 
+static struct poptOption lace_options[] = {
+    { "lace-workers", 0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &lace_n_workers , 0 , "set number of Lace workers (threads for parallelization)","<workers>"},
+    { "lace-dqsize",0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &lace_dqsize , 0 , "set length of Lace task queue","<dqsize>"},
+POPT_TABLEEND
+};
+
 static  struct poptOption options[] = {
     { NULL, 0 , POPT_ARG_CALLBACK|POPT_CBFLAG_POST|POPT_CBFLAG_SKIPOPTION , (void*)reach_popt , 0 , NULL , NULL },
 #ifdef HAVE_SYLVAN
@@ -195,8 +205,7 @@ static  struct poptOption options[] = {
 #endif
     { "pg-write" , 0 , POPT_ARG_STRING , &pg_output, 0, "file to write symbolic parity game to","<pg-file>.spg" },
 #ifdef HAVE_SYLVAN
-    { "lace-workers", 0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &lace_n_workers , 0 , "set number of Lace workers (threads for parallelization)","<workers>"},
-    { "lace-dqsize",0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &lace_dqsize , 0 , "set length of Lace task queue","<dqsize>"},
+    { NULL, 0 , POPT_ARG_INCLUDE_TABLE, lace_options , 0 , "Lace options",NULL},
 #endif
     SPEC_POPT_OPTIONS,
     { NULL, 0 , POPT_ARG_INCLUDE_TABLE, greybox_options , 0 , "PINS options",NULL},
@@ -540,12 +549,19 @@ group_add(void *context, transition_info_t *ti, int *dst, int *cpy)
 }
 
 static void
+master_get_transitions_short(model_t model, int group, int* src, TransitionCB cb, void* context);
+
+static void
 explore_cb(void *context, int *src)
 {
     struct group_add_info *ctx = (struct group_add_info*)context;
 
     ctx->src = src;
-    short_proc(model, ctx->group, src, group_add, context);
+    if (multi_process) {
+        master_get_transitions_short(model, ctx->group, src, group_add, context);
+    } else {
+        short_proc(model, ctx->group, src, group_add, context);
+    }
     (*ctx->explored)++;
 
     if ((*ctx->explored) % 10000 == 0) {
@@ -797,7 +813,12 @@ final_stat_reporting(vset_t visited, rt_timer_t timer)
     if (act_detect != NULL)
         Warning(info, "%d different actions with prefix \"%s\" are found", ErrorActions, act_detect);
 
+    Print(infoShort, "counting visited states...");
+    rt_timer_t t = RTcreateTimer();
+    RTstartTimer(t);
     get_vset_size(visited, &n_count, &e_count, elem_str, sizeof(elem_str));
+    RTstopTimer(t);
+    RTprintTimer(infoShort, t, "counting took");
     Print(infoShort, "state space has %s (~%1.2e) states, %ld BDD nodes", elem_str, e_count,n_count);
 
     if (log_active(infoLong)) {
@@ -2053,9 +2074,13 @@ init_model(char *file)
                       HREgreyboxCAtI,
                       HREgreyboxCount);
 
+    HREbarrier(HREglobal());
+
     GBloadFile(model, file, &model);
 
-    if (log_active(infoLong)) {
+    HREbarrier(HREglobal());
+
+    if (HREme(HREglobal())==0 && log_active(infoLong)) {
         fprintf(stderr, "Dependency Matrix:\n");
         GBprintDependencyMatrixCombined(stderr, model);
     }
@@ -2066,20 +2091,28 @@ init_model(char *file)
     sLbls = lts_type_get_state_label_count(ltstype);
     nGrps = dm_nrows(GBgetDMInfo(model));
     max_sat_levels = (N / sat_granularity) + 1;
-    Warning(info, "state vector length is %d; there are %d groups", N, nGrps);
+    if (HREme(HREglobal())==0) {
+        Warning(info, "state vector length is %d; there are %d groups", N, nGrps);
+    }
 
     int id=GBgetMatrixID(model,"inhibit");
     if (id>=0){
         inhibit_matrix=GBgetMatrix(model,id);
-        Warning(infoLong,"inhibit matrix is:");
-        if (log_active(infoLong)) dm_print(stderr,inhibit_matrix);
+        if (HREme(HREglobal())==0) {
+            Warning(infoLong,"inhibit matrix is:");
+            if (log_active(infoLong)) dm_print(stderr,inhibit_matrix);
+        }
     }
     id = GBgetMatrixID(model,LTSMIN_EDGE_TYPE_ACTION_CLASS);
     if (id>=0){
         class_matrix=GBgetMatrix(model,id);
-        Warning(infoLong,"inhibit class matrix is:");
-        if (log_active(infoLong)) dm_print(stderr,class_matrix);
+        if (HREme(HREglobal())==0) {
+            Warning(infoLong,"inhibit class matrix is:");
+            if (log_active(infoLong)) dm_print(stderr,class_matrix);
+        }
     }
+
+    HREbarrier(HREglobal());
 }
 
 static void
@@ -2442,6 +2475,170 @@ parity_game* compute_symbolic_parity_game(vset_t visited, int* src)
 static char *files[2];
 hre_context_t ctx;
 
+static int* parent_sockets;
+static int* child_sockets;
+static int** callback_signals;
+
+void init_multi_process(size_t workers)
+{
+    HREenableFork(workers + 1, true);
+    parent_sockets = RTmalloc(sizeof(int)*workers);
+    child_sockets = RTmalloc(sizeof(int)*workers);
+    callback_signals = RTmalloc(sizeof(void*)*workers);
+    for(size_t i=0; i<workers; i++)
+    {
+        int fd[2];
+        socketpair(PF_LOCAL, SOCK_STREAM, 0, fd);
+        parent_sockets[i] = fd[0];
+        child_sockets[i] = fd[1];
+        callback_signals[i] = mmap(NULL,sizeof(int),PROT_READ|PROT_WRITE,MAP_SHARED|MAP_ANONYMOUS,0,0);
+        *(callback_signals[i]) = 0;
+    }
+}
+
+static void
+master_get_transitions_short(model_t model, int group, int* src, TransitionCB cb, void* context)
+{
+    // get my lace thread id
+#if HAVE_SYLVAN
+    int id = lace_get_worker()->worker + 1;
+#else
+    Abort("Multi-process environment not available without Lace.");
+#endif
+
+    int length = dm_ones_in_row(GBgetDMInfo(model), group);
+    Print(infoLong, "master: writing state to slave (id=%d, group=%d, length=%d).", id, group, length);
+    stream_t os = fd_output(parent_sockets[id-1]);
+    DSwriteS32(os, 1); // signal that a state will be sent next
+    DSwriteS32(os, group);
+    for(int i=0; i<length; i++)
+    {
+        DSwriteS32(os, src[i]);
+    }
+    stream_flush(os);
+    RTfree(os);
+
+    // at this point the slave may request chunks
+    Debug("master: callback_signal: %d", *(callback_signals[id-1]));
+    while (!cas(callback_signals[id-1], 1, 0)) {
+        HREyield(ctx);
+    }
+    Debug("master: callback_signal: %d", *(callback_signals[id-1]));
+
+    Print(infoLong, "master: waiting for reply (id=%d).", id);
+    stream_t is = fd_input(parent_sockets[id-1]);
+    int labels = lts_type_get_edge_label_count(GBgetLTStype(model));
+    int next = DSreadS32(is);
+    while(next==1)
+    {
+        Print(infoLong, "master: reading state from slave.");
+        int dst[length];
+        for(int i=0; i<length; i++)
+        {
+            dst[i] = DSreadS32(is);
+        }
+        transition_info_t* ti = RTmalloc(sizeof(transition_info_t));
+        ti->group = group;
+        ti->labels = RTmalloc(labels*sizeof(int));
+        for(int i=0; i<labels; i++)
+        {
+            ti->labels[i] = DSreadS32(is);
+        }
+        ti->por_proviso = DSreadS32(is);
+        cb(context, ti, dst);
+
+        // at this point the slave may request chunks
+        Debug("master: callback_signal: %d", *(callback_signals[id-1]));
+        while (!cas(callback_signals[id-1], 1, 0)) {
+            HREyield(ctx);
+        }
+        Debug("master: callback_signal: %d", *(callback_signals[id-1]));
+
+        next = DSreadS32(is);
+    }
+    RTfree(is);
+    Print(infoLong, "master: done (id=%d).", id);
+}
+
+static void
+master_exit()
+{
+    for(size_t id=1; id<=lace_n_workers; id++)
+    {
+        Print(infoShort, "master: stopping slave (id=%zu).", id);
+        stream_t os = fd_output(parent_sockets[id-1]);
+        DSwriteS32(os, 0); // signal that no states will be sent anymore
+        stream_flush(os);
+        RTfree(os);
+    }
+}
+
+static void
+slave_cb(void* context, transition_info_t* ti, int* dst)
+{
+    int id = HREme(HREglobal());
+    Debug("slave_cb: id=%d.", id);
+    stream_t os = fd_output(child_sockets[id-1]);
+    int group = ti->group;
+    int length = dm_ones_in_row(GBgetDMInfo(model), group);
+    int labels = lts_type_get_edge_label_count(GBgetLTStype(model));
+    Print(infoLong, "slave_cb: writing state to master: id=%d, group=%d, length=%d.", id, group, length);
+    Debug("slave_cb: callback_signal: %d", *(callback_signals[id-1]));
+    while (!cas(callback_signals[id-1], 0, 1)) { }
+    Debug("slave_cb: callback_signal: %d", *(callback_signals[id-1]));
+
+    DSwriteS32(os, 1);
+    for (int i=0; i<length; i++)
+    {
+        DSwriteS32(os, dst[i]);
+    }
+    for(int i=0; i<labels; i++)
+    {
+        DSwriteS32(os, ti->labels[i]);
+    }
+    DSwriteS32(os, ti->por_proviso);
+    stream_flush(os);
+    RTfree(os);
+    (void)context;
+}
+
+static void
+start_slave()
+{
+    init_model(files[0]);
+
+    int id = HREme(HREglobal());
+    Print(infoLong, "slave: ready, id=%d.", id);
+    stream_t is = fd_input(child_sockets[id-1]);
+    int next = DSreadS32(is);
+    while (next==1)
+    {
+        Debug("slave: start reading (id=%d).", id);
+        int group = DSreadS32(is);
+        int length = dm_ones_in_row(GBgetDMInfo(model), group);
+        Debug("slave: group=%d, reading %d values (id=%d).", group, length, id);
+        int src[length];
+        for(int i=0; i < length; i++)
+        {
+            src[i] = DSreadS32(is);
+        }
+        Print(infoLong, "slave: received state (id=%d, group=%d, length=%d).", id, group, length);
+        GBgetTransitionsShort(model, group, src, slave_cb, NULL);
+        Debug("slave: returned from greybox (id=%d, group=%d).", id, group);
+        Debug("slave: callback_signal: %d", *(callback_signals[id-1]));
+        while (!cas(callback_signals[id-1], 0, 1)) { }
+        Debug("slave: callback_signal: %d", *(callback_signals[id-1]));
+        stream_t os = fd_output(child_sockets[id-1]);
+        DSwriteS32(os, 0);
+        stream_flush(os);
+        RTfree(os);
+        Debug("slave: done (id=%d, group=%d).", id, group);
+        next = DSreadS32(is);
+    }
+    Print(infoShort, "slave: exiting (id=%d).", id);
+    RTfree(is);
+}
+
 #ifdef HAVE_SYLVAN
 TASK_1(void*, actual_main, void*, arg)
 #else
@@ -2461,6 +2658,14 @@ actual_main(void)
     vset_t initial;
 
     init_model(files[0]);
+
+    Print(info, "Master ready: %d.", HREme(HREglobal()));
+    //for(int i=0; i < HREpeers(HREglobal()); i++)
+    //{
+    //    const char msg[] = "Test message";
+    //    write(parent_sockets[i], msg, sizeof(msg));
+    //}
+
     if (act_detect != NULL) init_action();
     if (inv_detect) Abort("Invariant violation detection is not implemented.");
 
@@ -2633,6 +2838,10 @@ actual_main(void)
     guided_proc(sat_proc, reach_proc, visited, files[1]);
     RTstopTimer(timer);
 
+    if (multi_process) {
+        master_exit();
+    }
+
     if (transitions_save_filename != NULL) {
         FILE *f = fopen(transitions_save_filename, "w");
         if (f == NULL) Abort("Cannot open '%s' for writing!", transitions_save_filename);
@@ -2752,20 +2961,50 @@ main (int argc, char *argv[])
                   "The optional output of this analysis is an ETF "
                       "representation of the input\n\nOptions");
     lts_lib_setup(); // add options for LTS library
-    HREinitStart(&argc,&argv,1,2,files,"<model> [<etf>]");
 
 #ifdef HAVE_SYLVAN
-    ctx = HREglobal();
-    if (lace_n_workers == 0 &&
-            (vset_default_domain==VSET_Sylvan || strategy==PAR || strategy==PAR_P)) {
-        lace_n_workers = get_cpu_count();
-    }
-    else {
+    static  struct poptOption par_options[] = {
+        { NULL, 0 , POPT_ARG_INCLUDE_TABLE, lace_options , 0 , "Lace options",NULL},
+        { NULL, 0 , POPT_ARG_INCLUDE_TABLE, vset_options , 0 , "Vector set options",NULL},
+        POPT_TABLEEND
+    };
+    poptContext optCon = poptGetContext(NULL, argc, (const char**)argv, par_options, 0);
+    int res;
+    while((res = poptGetNextOpt(optCon)) != -1 ) { /* ignore errors */ }
+    poptFreeContext(optCon);
+
+    if (!(vset_default_domain==VSET_Sylvan || vset_default_domain==VSET_LDDmc)) {
         lace_n_workers = 1;
-        Warning(info, "Using 1 CPU");
     }
     lace_init(lace_n_workers, lace_dqsize);
-    lace_startup(0, TASK(actual_main), 0);
+    size_t n_workers = lace_workers();
+    Warning(info, "Using %zu CPUs", n_workers);
+
+    if (!SPEC_MT_SAFE && n_workers > 1) {
+        multi_process = true;
+    }
+#endif
+
+    // Use the multi-process environment if necessary:
+    if (multi_process) {
+        init_multi_process(n_workers);
+    }
+
+    HREinitStart(&argc,&argv,1,2,files,"<model> [<etf>]");
+
+    lace_n_workers = n_workers;
+
+#ifdef HAVE_SYLVAN
+    Print(info, "Worker %d / %d (pid = %d).", HREme(HREglobal()), HREpeers(HREglobal()), getpid());
+
+    if (!multi_process || HREme(HREglobal())==0){
+        Print(info, "Main process: %d.", HREme(HREglobal()));
+        ctx = HREglobal();
+        lace_startup(0, TASK(actual_main), 0);
+        Print(info, "Main done.");
+    } else {
+        start_slave();
+    }
 #else
     actual_main();
 #endif

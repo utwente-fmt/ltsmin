@@ -227,11 +227,11 @@ struct pbes_state_cb
 {
     model_t model;
     ltsmin::explorer* explorer;
-    TransitionCB& cb;
+    TransitionCB cb;
     void* ctx;
     size_t count;
 
-    pbes_state_cb (model_t& model_, ltsmin::explorer* explorer_, TransitionCB& cb_, void *ctx_)
+    pbes_state_cb (model_t& model_, ltsmin::explorer* explorer_, TransitionCB cb_, void *ctx_)
         : model(model_), explorer(explorer_), cb(cb_), ctx(ctx_), count(0)
     {}
 
