@@ -132,6 +132,7 @@ void project_dest(void*context,transition_info_t*ti,int*dst,int*cpy){
 	int len = dm_ones_in_row(GBgetDMInfo(info->model), info->group);
 	int short_dst[len];
 	dm_project_vector(GBgetDMInfo(info->model), info->group, dst, short_dst);
+    ti->group = info->group;
     info->cb(info->user_ctx,ti,short_dst,NULL);
 #undef info
     return;
@@ -144,6 +145,7 @@ void project_dest_w(void*context,transition_info_t*ti,int*dst,int*cpy){
     int short_dst[len];
 
     dm_project_vector(GBgetDMInfoMayWrite(info->model), info->group, dst, short_dst);
+    ti->group = info->group;
     if (cpy != NULL) {
         int short_cpy[len];
         dm_project_vector(GBgetDMInfoMayWrite(info->model), info->group, cpy, short_cpy);
