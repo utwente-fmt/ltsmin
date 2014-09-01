@@ -2086,6 +2086,10 @@ init_domain(vset_implementation_t impl)
 {
     domain = vdom_create_domain(N, impl);
 
+    for (int i = 0; i < dm_ncols(GBgetDMInfo(model)); i++) {
+        vdom_set_name(domain, i, lts_type_get_state_name(ltstype, i));
+    }
+
     group_next     = (vrel_t*)RTmalloc(nGrps * sizeof(vrel_t));
     group_explored = (vset_t*)RTmalloc(nGrps * sizeof(vset_t));
     group_tmp      = (vset_t*)RTmalloc(nGrps * sizeof(vset_t));
