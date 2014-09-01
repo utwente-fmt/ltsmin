@@ -46,6 +46,15 @@ struct vector_domain_shared {
 	void (*set_least_fixpoint)(vset_t dst,vset_t src,vrel_t rels[],int rel_count);
 	void (*set_dot)(FILE* fp, vset_t src);
 	void (*rel_dot)(FILE* fp, vrel_t src);
+
+    // Hooks called before/after all save/load operations on f
+    void (*pre_save)(FILE* f, vdom_t dom);
+    void (*pre_load)(FILE* f, vdom_t dom);
+    void (*post_save)(FILE* f, vdom_t dom);
+    void (*post_load)(FILE* f, vdom_t dom);
+
+    void (*dom_save)(FILE *f, vdom_t dom);
+    // creating a domain from a saved dom: vdom_create_domain_from_file
 };
 
 /** Initialise the shared part of the domain. */

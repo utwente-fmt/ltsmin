@@ -54,6 +54,15 @@ typedef enum {
 extern vdom_t vdom_create_domain(int n, vset_implementation_t impl);
 
 /**
+\brief Create a domain that uses some vector set implementation from a file where the same
+       vector set implementation was saved earlier using vdom_save.
+
+\param f a file
+\param impl The particular vector set implementation identifier
+*/
+extern vdom_t vdom_create_domain_from_file(FILE *f, vset_implementation_t impl);
+
+/**
 \brief Create a set.
 
 \param k If non-negative this indicates the length of the sub-domain.
@@ -268,6 +277,33 @@ void vset_least_fixpoint(vset_t dst, vset_t src, vrel_t rels[], int rel_count);
 void vset_dot(FILE* fp, vset_t src);
 
 void vrel_dot(FILE* fp, vrel_t src);
+
+/**
+\brief Hook to call before all loading.
+*/
+void vset_pre_load(FILE* f, vdom_t dom);
+
+/**
+\brief Hook to call after all loading.
+*/
+void vset_post_load(FILE* f, vdom_t dom);
+
+/**
+\brief Hook to call before all saving.
+*/
+void vset_pre_save(FILE* f, vdom_t dom);
+
+/**
+\brief Hook to call after all saving.
+*/
+void vset_post_save(FILE* f, vdom_t dom);
+
+/**
+ * \brief Saves domain information to a file;
+ * \param f the file
+ * \param dom the domain
+ */
+void vdom_save(FILE *f, vdom_t dom);
 
 //@}
 

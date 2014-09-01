@@ -114,6 +114,16 @@ vdom_create_domain(int n, vset_implementation_t impl)
     }
 }
 
+vdom_t
+vdom_create_domain_from_file(FILE *f, vset_implementation_t impl)
+{
+    if (impl == VSET_IMPL_AUTOSELECT)
+        impl = vset_default_domain;
+    switch(impl) {
+    default: return NULL;
+    }
+}
+
 struct vector_domain {
 	struct vector_domain_shared shared;
 };
@@ -149,42 +159,14 @@ default_least_fixpoint(vset_t dst, vset_t src, vrel_t rels[], int rel_count)
     Abort("Decision diagram package does not support least fixpoint");
 }
 
-void vdom_init_shared(vdom_t dom,int n){
+void vdom_init_shared(vdom_t dom,int n)
+{
+    memset(&dom->shared, 0, sizeof(dom->shared));
+
 	dom->shared.size=n;
-	dom->shared.set_create=NULL;
-	dom->shared.set_save=NULL;
-	dom->shared.set_load=NULL;
-	dom->shared.set_add=NULL;
-	dom->shared.set_member=NULL;
-	dom->shared.set_is_empty=NULL;
-	dom->shared.set_equal=NULL;
-	dom->shared.set_clear=NULL;
-	dom->shared.set_copy=NULL;
-	dom->shared.set_enum=NULL;
-	dom->shared.set_enum_match=NULL;
-	dom->shared.set_copy_match=NULL;
-	dom->shared.set_copy_match_proj=NULL;
-	dom->shared.proj_create=NULL;
-	dom->shared.set_count=NULL;
-	dom->shared.set_union=NULL;
-	dom->shared.set_intersect=NULL;
-	dom->shared.set_minus=NULL;
 	dom->shared.set_zip=default_zip;
-	dom->shared.set_project=NULL;
-	dom->shared.rel_create=NULL;
-	dom->shared.rel_save_proj=NULL;
-    dom->shared.rel_save=NULL;
-    dom->shared.rel_load_proj=NULL;
-    dom->shared.rel_load=NULL;
-	dom->shared.rel_add=NULL;
-	dom->shared.rel_count=NULL;
-	dom->shared.set_next=NULL;
-	dom->shared.set_prev=NULL;
 	dom->shared.reorder=default_reorder;
-	dom->shared.set_destroy=NULL;
 	dom->shared.set_least_fixpoint=default_least_fixpoint;
-	dom->shared.set_dot=NULL;
-	dom->shared.rel_dot=NULL;
 }
 
 vset_t vset_create(vdom_t dom,int k,int* proj){
@@ -374,3 +356,38 @@ void vrel_dot(FILE* fp, vrel_t src) {
         src->dom->shared.rel_dot(fp,src);
     }
 }
+
+void
+vset_pre_save(FILE *f, vdom_t dom)
+{
+    if (dom->shared.pre_save != NULL) dom->shared.pre_save(f, dom);
+}
+
+void
+vset_post_save(FILE *f, vdom_t dom)
+{
+    if (dom->shared.post_save != NULL) dom->shared.post_save(f, dom);
+}
+
+void
+vset_pre_load(FILE *f, vdom_t dom)
+{
+    if (dom->shared.pre_load != NULL) dom->shared.pre_load(f, dom);
+}
+
+void
+vset_post_load(FILE *f, vdom_t dom)
+{
+    if (dom->shared.post_load != NULL) dom->shared.post_load(f, dom);
+}
+
+void
+vdom_save(FILE *f, vdom_t dom)
+{
+    if (dom->shared.dom_save == NULL) {
+        Abort("Saving of domains not supported by the current VSet implementation.")
+    } else {
+        dom->shared.dom_save(f, dom);
+    }
+}
+
