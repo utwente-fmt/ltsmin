@@ -505,14 +505,15 @@ set_next(vset_t dst, vset_t src, vrel_t rel)
 } 
 
 /**
- * Calculate dst = prev(src, rel)
+ * Calculate dst = prev(src, rel) intersected with univ
  */
 static void
-set_prev(vset_t dst, vset_t src, vrel_t rel)
+set_prev(vset_t dst, vset_t src, vrel_t rel, vset_t univ)
 {
     assert(dst->projection == src->projection);
     sylvan_deref(dst->bdd);
     dst->bdd = sylvan_ref(sylvan_relprod_paired_prev(src->bdd, rel->bdd, rel->all_variables));
+    set_intersect(dst, univ);
 }
 
 /**

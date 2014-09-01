@@ -382,7 +382,7 @@ find_trace_to(int trace_end[][N], int end_count, int level, vset_t *levels,
             }
 
             for (int i=0; i < nGrps; i++) {
-                vset_prev(temp, int_levels[int_level - 1], group_next[i]);
+                vset_prev(temp, int_levels[int_level - 1], group_next[i], levels[prev_level+1]);
                 vset_union(int_levels[int_level], temp);
             }
 
@@ -618,7 +618,7 @@ deadlock_check(vset_t deadlocks, bitvector_t *reach_groups)
         if (bitvector_is_set(reach_groups, i)) continue;
         expand_group_next(i, deadlocks);
         vset_next(next_temp, deadlocks, group_next[i]);
-        vset_prev(prev_temp, next_temp, group_next[i]);
+        vset_prev(prev_temp, next_temp, group_next[i],deadlocks);
         vset_minus(deadlocks, prev_temp);
     }
 
@@ -858,7 +858,7 @@ static inline void reduce_parity_game(vset_t next_level, vset_t visited, vset_t 
 
     vset_t next_level_prev = vset_create(domain, -1, NULL);
     for (int i = 0; i < nGrps; i++) {
-        vset_prev(tmp, next_level, group_next[i]);
+        vset_prev(tmp, next_level, group_next[i],visited);
         vset_union(next_level_prev, tmp);
         vset_clear(tmp);
     }
@@ -872,7 +872,7 @@ static inline void reduce_parity_game(vset_t next_level, vset_t visited, vset_t 
     }
     vset_t true_prev = vset_create(domain, -1, NULL);
     for (int i = 0; i < nGrps; i++) {
-        vset_prev(tmp, true_states, group_next[i]);
+        vset_prev(tmp, true_states, group_next[i],next_level_prev);
         vset_union(true_prev, tmp);
         vset_clear(tmp);
     }
@@ -891,7 +891,7 @@ static inline void reduce_parity_game(vset_t next_level, vset_t visited, vset_t 
     }
     vset_t false_prev = vset_create(domain, -1, NULL);
     for (int i = 0; i < nGrps; i++) {
-        vset_prev(tmp, false_states, group_next[i]);
+        vset_prev(tmp, false_states, group_next[i],NULL);
         vset_union(false_prev, tmp);
         vset_clear(tmp);
     }
@@ -1040,7 +1040,7 @@ reach_bfs_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
                     if (!dm_is_set(class_matrix,c,i)) continue;
                     (*next_count)++;
                     vset_next(temp, current_class, group_next[i]);
-                    vset_prev(dlk_temp, temp, group_next[i]);
+                    vset_prev(dlk_temp, temp, group_next[i],deadlocks);
                     if (dlk_detect) {
                         vset_minus(deadlocks, dlk_temp);
                     }
@@ -1058,7 +1058,7 @@ reach_bfs_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
                 (*next_count)++;
                 vset_next(temp, current_level, group_next[i]);
                 if (dlk_detect) {
-                    vset_prev(dlk_temp, temp, group_next[i]);
+                    vset_prev(dlk_temp, temp, group_next[i], deadlocks);
                     vset_minus(deadlocks, dlk_temp);
                     vset_clear(dlk_temp);
                 }
@@ -1116,7 +1116,7 @@ reach_bfs(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
             (*next_count)++;
             vset_next(temp, old_vis, group_next[i]);
             if (dlk_detect) {
-                vset_prev(dlk_temp, temp, group_next[i]);
+                vset_prev(dlk_temp, temp, group_next[i],deadlocks);
                 vset_minus(deadlocks, dlk_temp);
                 vset_clear(dlk_temp);
             }
@@ -1162,7 +1162,7 @@ VOID_TASK_2(reach_par_next, struct reach_par_s *, dummy, bitvector_t *, reach_gr
         vset_next(dummy->container, dummy->container, group_next[dummy->index]);
         dummy->next_count = 1;
         if (dlk_detect) {
-            vset_prev(dummy->temp, dummy->container, group_next[dummy->index]);
+            vset_prev(dummy->temp, dummy->container, group_next[dummy->index], dummy->deadlocks);
             vset_minus(dummy->deadlocks, dummy->temp);
             vset_clear(dummy->temp);
         }
@@ -1370,7 +1370,7 @@ reach_chain_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
             (*next_count)++;
             vset_next(temp, new_states, group_next[i]);
             if (dlk_detect) {
-                vset_prev(dlk_temp, temp, group_next[i]);
+                vset_prev(dlk_temp, temp, group_next[i],deadlocks);
                 vset_minus(deadlocks, dlk_temp);
                 vset_clear(dlk_temp);
             }
@@ -1423,7 +1423,7 @@ reach_chain(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
             vset_next(temp, visited, group_next[i]);
             vset_union(visited, temp);
             if (dlk_detect) {
-                vset_prev(dlk_temp, temp, group_next[i]);
+                vset_prev(dlk_temp, temp, group_next[i],deadlocks);
                 vset_minus(deadlocks, dlk_temp);
                 vset_clear(dlk_temp);
             }
@@ -1477,7 +1477,7 @@ reach_sat_fix(reach_proc_t reach_proc, vset_t visited,
         (*next_count)++;
         if (dlk_detect) {
             for (int i = 0; i < nGrps; i++) {
-                vset_prev(dlk_temp, visited, group_next[i]);
+                vset_prev(dlk_temp, visited, group_next[i],deadlocks);
                 vset_minus(deadlocks, dlk_temp);
                 vset_clear(dlk_temp);
             }
@@ -1683,7 +1683,7 @@ reach_sat(reach_proc_t reach_proc, vset_t visited,
         vset_t dlk_temp = vset_create(domain, -1, NULL);
         vset_copy(deadlocks, visited);
         for (int i = 0; i < nGrps; i++) {
-            vset_prev(dlk_temp, visited, group_next[i]);
+            vset_prev(dlk_temp, visited, group_next[i],deadlocks);
             vset_minus(deadlocks, dlk_temp);
             vset_clear(dlk_temp);
         }
@@ -2179,17 +2179,11 @@ mu_compute (ltsmin_expr_t mu_expr, vset_t visited)
             vset_t g = mu_compute(mu_expr->arg1->arg1, visited);
 
             for(int i=0;i<nGrps;i++){
-                vset_prev(temp,g,group_next[i]);
+                vset_prev(temp,g,group_next[i],visited);
                 vset_union(result,temp);
                 vset_clear(temp);
             }
-            // destroy..
             vset_destroy(temp);
-            // this is somewhat strange, but it appears that vset_prev generates
-            // states that are never visited before? can this happen or is this a bug?
-            // when?
-            // in order to prevent this, intersect with visited
-            vset_intersect(result, visited);
         } else {
             Abort("invalid operator following MU_EXIST, expecting MU_NEXT");
         }
@@ -2227,13 +2221,11 @@ mu_compute (ltsmin_expr_t mu_expr, vset_t visited)
 
             // EX !phi
             for(int i=0;i<nGrps;i++){
-                vset_prev(temp,notphi,group_next[i]);
+                vset_prev(temp,notphi,group_next[i],visited);
                 vset_union(prev,temp);
                 vset_clear(temp);
             }
             vset_destroy(temp);
-            // intersect: see EX
-            vset_intersect(prev, visited);
 
             // and negate result again
             vset_minus(result, prev);

@@ -343,7 +343,7 @@ empty_projection_rel_test()
     if (!vset_is_empty(set)) Abort("Next empty, singleton incorrect");
     Warning(info, "Next empty correct");
 
-    vset_prev(set, singleton_set, singleton);
+    vset_prev(set, singleton_set, singleton, singleton_set);
 
     count = 0;
     vset_enum(set, count_cb, &count);
@@ -354,11 +354,11 @@ empty_projection_rel_test()
         Abort("Prev count singleton incorrect");
     }
 
-    vset_prev(set, singleton_set, empty);
+    vset_prev(set, singleton_set, empty, singleton_set);
     if (!vset_is_empty(set)) Abort("Prev singleton, empty incorrect");
-    vset_prev(set, empty_set, empty);
+    vset_prev(set, empty_set, empty, empty_set);
     if (!vset_is_empty(set)) Abort("Prev empty, empty incorrect");
-    vset_prev(set, empty_set, singleton);
+    vset_prev(set, empty_set, singleton, empty_set);
     if (!vset_is_empty(set)) Abort("Prev empty, singleton incorrect");
     Warning(info, "Prev empty correct");
 

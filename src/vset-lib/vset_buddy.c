@@ -454,11 +454,12 @@ static void set_next_appex_fdd(vset_t dst,vset_t src,vrel_t rel){
   bdd_delref(tmp);
 }
 
-static void set_prev_appex_fdd(vset_t dst, vset_t src, vrel_t rel) {
+static void set_prev_appex_fdd(vset_t dst, vset_t src, vrel_t rel, vset_t univ) {
     BDD tmp1=bdd_addref(bdd_replace(src->bdd,rel->inv_pairs));
     bdd_delref(dst->bdd);
     dst->bdd=bdd_addref(bdd_appex(tmp1,rel->bdd,bddop_and,rel->p_prime_set));
     bdd_delref(tmp1);
+    set_intersect_fdd(dst,univ);
 }
 
 static void set_project_fdd(vset_t dst,vset_t src){

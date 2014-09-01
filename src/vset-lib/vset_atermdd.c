@@ -1455,10 +1455,11 @@ static ATerm set_prev_tree_2(ATerm set, ATerm trans, int *proj, int p_len, int o
     }
 }
 
-void set_prev_tree(vset_t dst,vset_t src,vrel_t rel){
+void set_prev_tree(vset_t dst,vset_t src,vrel_t rel,vset_t univ){
     assert(dst->p_len < 0 && src->p_len < 0);
     dst->set=set_prev_tree_2(src->set, rel->rel, rel->proj, rel->p_len, 0, 0);
     ATtableReset(global_ct);
+    set_intersect_list(dst,univ);
 }
 
 

@@ -1169,11 +1169,12 @@ mdd_prev(uint64_t p_id, uint64_t set, uint64_t rel, int idx, int *proj, int len)
 }
 
 static void
-set_prev_mdd(vset_t dst, vset_t src, vrel_t rel)
+set_prev_mdd(vset_t dst, vset_t src, vrel_t rel, vset_t univ)
 {
     assert(src->p_len == -1 && dst->p_len == -1);
 
     dst->mdd = mdd_prev(rel->p_id, src->mdd, rel->mdd, 0, rel->proj,rel->p_len);
+    set_intersect_mdd(dst, univ);
 }
 
 static uint64_t

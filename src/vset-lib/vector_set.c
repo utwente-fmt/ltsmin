@@ -343,8 +343,8 @@ void vset_next(vset_t dst,vset_t src,vrel_t rel){
 	dst->dom->shared.set_next(dst,src,rel);
 }
 
-void vset_prev(vset_t dst,vset_t src,vrel_t rel){
-	dst->dom->shared.set_prev(dst,src,rel);
+void vset_prev(vset_t dst,vset_t src,vrel_t rel,vset_t univ){
+	dst->dom->shared.set_prev(dst,src,rel,univ);
 }
 
 void vset_universe(vset_t dst,vset_t src){

@@ -389,10 +389,11 @@ set_next_ddd(vset_t dst, vset_t src, vrel_t rel)
 }
 
 void
-set_prev_ddd(vset_t dst, vset_t src, vrel_t rel)
+set_prev_ddd(vset_t dst, vset_t src, vrel_t rel, vset_t univ)
 {
     *dst->ddd = (*rel->prev)(*src->ddd);
     assert(*dst->ddd != SDD::top);
+    set_intersect_ddd(dst,univ);
 }
 
 void
