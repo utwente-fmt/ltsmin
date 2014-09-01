@@ -34,11 +34,13 @@ struct vector_domain_shared {
 	void (*set_count)(vset_t set,long *nodes,bn_int_t *elements);
 	void (*rel_count)(vrel_t rel,long *nodes,bn_int_t *elements);
 	vrel_t (*rel_create)(vdom_t dom,int k,int* proj);
+    vrel_t (*rel_create_rw)(vdom_t dom,int r_k,int* r_proj,int w_k,int* w_proj);
 	void (*rel_save_proj)(FILE* f, vrel_t rel);
 	void (*rel_save)(FILE* f, vrel_t rel);
 	vrel_t (*rel_load_proj)(FILE* f, vdom_t dom);
     void (*rel_load)(FILE* f, vrel_t rel);
 	void (*rel_add)(vrel_t rel,const int* src,const int* dst);
+    void (*rel_add_cpy)(vrel_t rel,const int* src,const int* dst,const int* cpy);
     void (*rel_update)(vrel_t rel, vset_t set, vrel_update_cb cb, void *context);
 
 	void (*set_next)(vset_t dst,vset_t src,vrel_t rel);
@@ -58,6 +60,9 @@ struct vector_domain_shared {
 
     void (*dom_save)(FILE *f, vdom_t dom);
     // creating a domain from a saved dom: vdom_create_domain_from_file
+
+	int (*separates_rw)();
+	int (*supports_cpy)();
 };
 
 /** Initialise the shared part of the domain. */

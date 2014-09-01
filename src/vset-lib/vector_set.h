@@ -196,6 +196,11 @@ extern void vset_count(vset_t set,long *nodes,bn_int_t *elements);
 extern vrel_t vrel_create(vdom_t dom,int k,int* proj);
 
 /**
+\brief Create a relation with read write separation
+*/
+extern vrel_t vrel_create_rw(vdom_t dom,int r_k,int* r_proj,int w_k,int* w_proj);
+
+/**
  * \brief Saves the projection of a relation to a file.
  * \param f the file
  * \param rel the relation
@@ -238,6 +243,11 @@ typedef void(*vrel_update_cb)(vrel_t rel, void *context, int *e);
 \brief Update a relation with new transitions, obtained by calling cb for every state in set.
 */
 extern void vrel_update(vrel_t rel, vset_t set, vrel_update_cb cb, void *context);
+
+/**
+\brief Add an element to a relation, with a copy vector.
+*/
+extern void vrel_add_cpy(vrel_t rel,const int* src,const int* dst,const int* cpy);
 
 /**
 \brief Count the number of diagram nodes and the number of elements stored.
@@ -319,6 +329,16 @@ void vset_post_save(FILE* f, vdom_t dom);
  * \param dom the domain
  */
 void vdom_save(FILE *f, vdom_t dom);
+
+/**
+\brief returns whether the vset implementation separates read and write dependencies.
+*/
+int vdom_separates_rw(vdom_t dom);
+
+/**
+\brief returns whether the vset implementation supports copying values.
+*/
+int vdom_supports_cpy(vdom_t dom);
 
 //@}
 

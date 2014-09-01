@@ -200,6 +200,16 @@ void vdom_init_shared(vdom_t dom,int n)
 	dom->shared.set_least_fixpoint=default_least_fixpoint;
 }
 
+int vdom_separates_rw(vdom_t dom) {
+    if (dom->shared.separates_rw == NULL) return 0;
+    return dom->shared.separates_rw();
+}
+
+int vdom_supports_cpy(vdom_t dom) {
+    if (dom->shared.supports_cpy == NULL) return 0;
+    return dom->shared.supports_cpy();
+}
+
 vset_t vset_create(vdom_t dom,int k,int* proj){
 	return dom->shared.set_create(dom,k,proj);
 }
@@ -221,7 +231,14 @@ vset_t vset_load(FILE* f, vdom_t dom){
 }
 
 vrel_t vrel_create(vdom_t dom,int k,int* proj){
-	vrel_t rel = dom->shared.rel_create(dom,k,proj);
+    vrel_t rel = dom->shared.rel_create(dom, k, proj);
+    rel->expand = NULL;
+    rel->expand_ctx = NULL;
+    return rel;
+}
+
+vrel_t vrel_create_rw(vdom_t dom,int r_k,int* r_proj,int w_k,int* w_proj){
+    vrel_t rel = dom->shared.rel_create_rw(dom, r_k, r_proj, w_k, w_proj);
     rel->expand = NULL;
     rel->expand_ctx = NULL;
     return rel;
@@ -357,6 +374,10 @@ void vset_project(vset_t dst,vset_t src){
 
 void vrel_add(vrel_t rel,const int* src, const int* dst){
 	rel->dom->shared.rel_add(rel,src,dst);
+}
+
+void vrel_add_cpy(vrel_t rel,const int* src, const int* dst, const int* cpy){
+    rel->dom->shared.rel_add_cpy(rel,src,dst,cpy);
 }
 
 void vrel_update(vrel_t rel, vset_t set, vrel_update_cb cb, void *context) {
