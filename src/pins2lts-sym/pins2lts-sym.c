@@ -1684,7 +1684,6 @@ reach_sat(reach_proc_t reach_proc, vset_t visited,
     if (trc_output != NULL) save_level(visited);
     stats_and_progress_report(NULL, visited, 0);
     vset_least_fixpoint(visited, visited, group_next, nGrps);
-    (*next_count)++;
     stats_and_progress_report(NULL, visited, 1);
 
     if (dlk_detect) {
