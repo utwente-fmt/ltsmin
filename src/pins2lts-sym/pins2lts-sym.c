@@ -1368,12 +1368,12 @@ reach_chain_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
     if (save_sat_levels) vset_minus(new_states, visited_old);
 
     while (!vset_is_empty(new_states)) {
-        if (trc_output != NULL) save_level(visited);
         stats_and_progress_report(new_states, visited, level);
         level++;
         if (dlk_detect) vset_copy(deadlocks, new_states);
         for (int i = 0; i < nGrps; i++) {
             if (!bitvector_is_set(reach_groups, i)) continue;
+            if (trc_output != NULL) save_level(new_states);
             expand_group_next(i, new_states);
             (*eg_count)++;
             (*next_count)++;
@@ -1419,13 +1419,13 @@ reach_chain(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
     vset_t dlk_temp = dlk_detect?vset_create(domain, -1, NULL):NULL;
 
     while (!vset_equal(visited, old_vis)) {
-        if (trc_output != NULL) save_level(visited);
         vset_copy(old_vis, visited);
         stats_and_progress_report(NULL, visited, level);
         level++;
         if (dlk_detect) vset_copy(deadlocks, visited);
         for (int i = 0; i < nGrps; i++) {
             if (!bitvector_is_set(reach_groups, i)) continue;
+            if (trc_output != NULL) save_level(visited);
             expand_group_next(i, visited);
             (*eg_count)++;
             (*next_count)++;
