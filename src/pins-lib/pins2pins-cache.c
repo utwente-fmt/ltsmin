@@ -63,12 +63,42 @@ edge_info_sz (struct group_cache *cache)
 }
 
 static void
-add_cache_entry (void *context, transition_info_t *ti, int *dst)
+add_cache_entry (void *context, transition_info_t *ti, int *dst, int *cpy)
 {
     struct group_cache *ctx = (struct group_cache *)context;
     int                 dst_index =
         SIputC (ctx->idx, (char *)dst, ctx->len);
     
+    int offset=ctx->begin[ctx->source].first+ctx->begin[ctx->source].edges*edge_info_sz(ctx);
+    ensure_access (ctx->dest_man,offset+edge_info_sz(ctx));
+
+    int *pe_info = &ctx->dest[offset];
+    *pe_info = dst_index;
+    if (ti->labels != NULL)
+        memcpy(pe_info + EL_OFFSET, ti->labels, ctx->Nedge_labels * sizeof *pe_info);
+
+    ctx->edges++;
+    ctx->begin[ctx->source].edges++;
+
+    return;
+    (void)cpy;
+}
+
+static void
+add_cache_entry_r2w (void *context, transition_info_t *ti, int *dst, int *cpy)
+{
+    struct group_cache *ctx = (struct group_cache *)context;
+
+    int dst_index;
+    if (cpy == NULL) {
+        dst_index = SIputC (ctx->idx, (char *) dst, ctx->w_len);
+    } else {
+        char dst_cpy[ctx->w_len*2];
+        memcpy(dst_cpy, dst, ctx->w_len);
+        memcpy(dst_cpy+ctx->w_len, cpy, ctx->w_len);
+        dst_index = SIputC (ctx->idx, dst_cpy, ctx->w_len*2);
+    }
+
     int offset=ctx->begin[ctx->source].first+ctx->begin[ctx->source].edges*edge_info_sz(ctx);
     ensure_access (ctx->dest_man,offset+edge_info_sz(ctx));
 
@@ -108,7 +138,7 @@ cached_short (model_t self, int group, int *src, TransitionCB cb,
                 cache->len);
         int *labels = cache->Nedge_labels == 0 ? NULL : &(cache->dest[i+EL_OFFSET]);
         transition_info_t cbti = GB_TI(labels, group);
-        cb (user_context, &cbti, dst);
+        cb (user_context, &cbti, dst, NULL);
     }
     return cache->begin[src_idx].trans;
 }
@@ -122,14 +152,12 @@ cached_short_r2w (model_t self, int group, int *src, TransitionCB cb, void *user
     int src_idx = SIputC (cache->idx, (char *)src, cache->r_len);
 
     ensure_access(cache->begin_man,src_idx);
-
     if (cache->begin[src_idx].first==-1) {
             cache->source=src_idx;
             cache->begin[src_idx].first = cache->edges * edge_info_sz (cache);
             cache->begin[cache->source].edges=0;
-            cache->begin[src_idx].trans = GBgetTransitionsShortR2W (GBgetParent(self), group, src, add_cache_entry, cache);
+            cache->begin[src_idx].trans = GBgetTransitionsShortR2W (GBgetParent(self), group, src, add_cache_entry_r2w, cache);
     }
-
     int N=cache->begin[src_idx].edges;
     for (int i = cache->begin[src_idx].first ; N>0 ; N--,i += edge_info_sz (cache)) {
         // MW: remove if edge label becomes "const int *"?
@@ -137,9 +165,15 @@ cached_short_r2w (model_t self, int group, int *src, TransitionCB cb, void *user
         memcpy (dst, SIgetC (cache->idx, cache->dest[i], NULL), cache->w_len);
         int *labels = cache->Nedge_labels == 0 ? NULL : &(cache->dest[i+EL_OFFSET]);
         transition_info_t cbti = GB_TI(labels, group);
-        cb(user_context, &cbti, dst);
-    }
 
+        if (GBsupportsCopy(self)) {
+            int cpy[w_len];
+            memcpy(cpy, SIgetC (cache->idx, cache->dest[i], NULL)+cache->w_len, cache->w_len);
+            cb(user_context, &cbti, dst, cpy);
+        } else {
+            cb(user_context, &cbti, dst, NULL);
+        }
+    }
     return cache->begin[src_idx].trans;
 }
 

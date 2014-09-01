@@ -272,6 +272,8 @@ extern matrix_t *GBgetDMInfo(model_t model);
 extern matrix_t *GBgetDMInfoRead(model_t model);
 extern matrix_t *GBgetDMInfoMayWrite(model_t model);
 extern matrix_t *GBgetDMInfoMustWrite(model_t model);
+extern int      GBsupportsCopy(model_t model);
+extern void     GBsetSupportsCopy(model_t model);
 
 /**
 \brief Set the dependency matrix of the model
@@ -284,7 +286,7 @@ extern void GBsetDMInfoMustWrite(model_t model, matrix_t *dm_info);
 extern void GBgetInitialState(model_t model,int *state);
 /**< @brief Write the initial state of model into state. */
 
-typedef void(*TransitionCB)(void*context,transition_info_t*transition_info,int*dst);
+typedef void(*TransitionCB)(void*context,transition_info_t*transition_info,int*dst,int*cpy);
 /**< @brief Type of the callback function for returning lists of transitions.
 
 We produce the list of transitions by means of a call back, which

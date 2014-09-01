@@ -159,13 +159,14 @@ void prcrl_callback(void){
 //	int lbl=ATfindIndex(actionmap,label);
 //    transition_info_t ti = GB_TI(&lbl, -1);
     transition_info_t ti = GB_TI(cb_label, -1);
-	user_cb(cb_ctx,&ti,cb_dest);
+	user_cb(cb_ctx,&ti,cb_dest,NULL);
 }
 
-static void discard_callback(void*context,transition_info_t*info,int*dst){
+static void discard_callback(void*context,transition_info_t*info,int*dst,int*src){
     (void)context;
     (void)info;
     (void)dst;
+    (void)src;
 }
 
 #define HsStablePtr void*

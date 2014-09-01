@@ -131,7 +131,7 @@ void mucalc_print_state(log_t log, mucalc_context_t* ctx, int* state)
  * a combination of the target state in the parent LTS and the mu-calculus subformula argument
  * of the modal operator.
  */
-void mucalc_cb (void* context, transition_info_t* ti, int* dst) {
+void mucalc_cb (void* context, transition_info_t* ti, int* dst, int*cpy) {
     //Print(infoLong, "mucalc_cb");
     cb_context_t cb_ctx = (cb_context_t)context;
     mucalc_context_t *ctx = cb_ctx->ctx;
@@ -170,7 +170,7 @@ void mucalc_cb (void* context, transition_info_t* ti, int* dst) {
         int _dst[ctx->len];
         memcpy(_dst, dst, ctx->len*sizeof(int)-1);
         _dst[ctx->mu_idx] = cb_ctx->target_idx;
-        cb_ctx->cb(cb_ctx->user_context, &_ti, _dst);
+        cb_ctx->cb(cb_ctx->user_context, &_ti, _dst,cpy);
         if (log_active(infoLong))
         {
             Print(infoLong, "mucalc_cb: successor:");
@@ -185,7 +185,7 @@ static inline void mucalc_successor(model_t self, int *dst, int group, int* tran
     mucalc_context_t *ctx = GBgetContext(self);
     int* edge_labels = NULL;
     transition_info_t ti = GB_TI(edge_labels, group);
-    cb(user_context, &ti, dst);
+    cb(user_context, &ti, dst,NULL);
     ++(*transition_count);
     Print(infoLong, "mucalc_successor:");
     mucalc_print_state(infoLong, ctx, dst);

@@ -54,8 +54,9 @@ write_trace_state(trc_env_t *env, int *state)
 }
 
 static void 
-write_trace_next (void *arg, transition_info_t *ti, int *dst)
+write_trace_next (void *arg, transition_info_t *ti, int *dst, int *cpy)
 {
+    (void) cpy;
     write_trace_step_t *ctx = (write_trace_step_t*)arg;
     if (ctx->found) return;
     if (0 != memcmp(ctx->dst, dst, sizeof(int[ctx->env->N]))) return;

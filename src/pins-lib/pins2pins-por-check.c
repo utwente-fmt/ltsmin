@@ -336,8 +336,9 @@ check_commute (dlk_check_context_t *ctx, int *dst)
 }
 
 static void
-follow_dfs_cb (void *context, transition_info_t *ti, int *dst)
+follow_dfs_cb (void *context, transition_info_t *ti, int *dst, int *cpy)
 {
+    (void) cpy;
     dlk_check_context_t *ctx = (dlk_check_context_t*)context;
     update_group_info (ctx, ti);
 
@@ -381,8 +382,9 @@ mimic (dlk_check_context_t *ctx, int *state)
 }
 
 static void
-get_nonstubborn_cb (void *context, transition_info_t *ti, int *dst)
+get_nonstubborn_cb (void *context, transition_info_t *ti, int *dst, int *cpy)
 {
+    (void) cpy;
     dlk_check_context_t *ctx = (dlk_check_context_t*)context;
 
     update_group_info (ctx, ti);

@@ -184,8 +184,11 @@ perm_do_all (permute_t *perm)
 }
 
 static void
-permute_one (void *arg, transition_info_t *ti, state_data_t dst)
+permute_one (void *arg, transition_info_t *ti, state_data_t dst, int *cpy)
 {
+
+    (void) cpy;
+
     permute_t          *perm = (permute_t*) arg;
     int                 seen;
     seen = state_info_new_state (perm->next, dst, ti, perm->state);

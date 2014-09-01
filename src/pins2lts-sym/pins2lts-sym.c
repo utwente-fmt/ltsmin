@@ -286,7 +286,7 @@ struct write_trace_step_s {
 };
 
 static void
-write_trace_next(void *arg, transition_info_t *ti, int *dst)
+write_trace_next(void *arg, transition_info_t *ti, int *dst, int *cpy)
 {
     struct write_trace_step_s *ctx = (struct write_trace_step_s*)arg;
 
@@ -472,6 +472,7 @@ find_trace(int trace_end[][N], int end_count, int level, vset_t *levels)
 struct find_action_info {
     int  group;
     int *dst;
+    int *cpy;
 };
 
 static void
@@ -487,8 +488,12 @@ find_action_cb(void* context, int* src)
     }
 
     // Set dst of the last step of the trace to its proper value
-    for (int i = 0; i < w_projs[group].len; i++)
-        trace_end[0][w_projs[group].proj[i]] = ctx->dst[i];
+    for (int i = 0; i < w_projs[group].len; i++) {
+        // TODO: check case where we have no R/W but copy is used... ?
+        if (ctx->cpy == NULL || !ctx->cpy[i]) {
+            trace_end[0][w_projs[group].proj[i]] = ctx->dst[i];
+        }
+    }
 
     find_trace(trace_end, 2, global_level, levels);
 
@@ -505,11 +510,15 @@ struct group_add_info {
 };
 
 static void
-group_add(void *context, transition_info_t *ti, int *dst)
+group_add(void *context, transition_info_t *ti, int *dst, int *cpy)
 {
     struct group_add_info *ctx = (struct group_add_info*)context;
 
-    vrel_add(ctx->rel, ctx->src, dst);
+    if (vdom_supports_cpy(domain)) {
+        vrel_add_cpy(ctx->rel, ctx->src, dst, cpy);
+    } else {
+        vrel_add(ctx->rel, ctx->src, dst);
+    }
 
     if (act_detect != NULL && ti->labels[act_label] == act_index) {
         Warning(info, "found action: %s", act_detect);
@@ -524,6 +533,7 @@ group_add(void *context, transition_info_t *ti, int *dst)
 
         action_ctx.group = group;
         action_ctx.dst = dst;
+        action_ctx.cpy = cpy;
 
         vset_enum_match(ctx->set,r_projs[group].len, r_projs[group].proj,
                         ctx->src, find_action_cb, &action_ctx);
@@ -1701,7 +1711,7 @@ typedef struct {
 } output_context;
 
 static void
-etf_edge(void *context, transition_info_t *ti, int *dst)
+etf_edge(void *context, transition_info_t *ti, int *dst, int *cpy)
 {
     output_context* ctx = (output_context*)context;
 
@@ -2083,8 +2093,18 @@ init_domain(vset_implementation_t impl)
     r_projs        = (proj_info*)RTmalloc(nGrps * sizeof(proj_info));
     w_projs        = (proj_info*)RTmalloc(nGrps * sizeof(proj_info));
 
-    matrix_t *read_matrix = vdom_separates_rw(domain) ? GBgetDMInfoRead(model) : GBgetDMInfo(model);
+    matrix_t *read_matrix = RTmalloc(sizeof (matrix_t));
+    dm_copy(vdom_separates_rw(domain) ? GBgetDMInfoRead(model) : GBgetDMInfo(model), read_matrix);
     matrix_t *write_matrix = vdom_separates_rw(domain) ? GBgetDMInfoMayWrite(model) : GBgetDMInfo(model);
+
+    if (!GBsupportsCopy(model) || !vdom_supports_cpy(domain)) {
+        Warning(info, "May-write does not support copy; over-approximating may-write \\ must-write to read + write");
+        matrix_t *w = RTmalloc(sizeof(matrix_t));
+        dm_copy(GBgetDMInfoMayWrite(model), w);
+        dm_apply_xor(w, GBgetDMInfoMustWrite(model));
+        dm_apply_or(read_matrix, w);
+        dm_free(w);
+    }
 
     for(int i = 0; i < nGrps; i++) {
         r_projs[i].len   = dm_ones_in_row(read_matrix, i);
@@ -2109,6 +2129,8 @@ init_domain(vset_implementation_t impl)
         group_explored[i] = vset_create(domain,r_projs[i].len,r_projs[i].proj);
         group_tmp[i]      = vset_create(domain,r_projs[i].len,r_projs[i].proj);
     }
+
+    dm_free(read_matrix);
 }
 
 static void
@@ -2415,7 +2437,6 @@ parity_game* compute_symbolic_parity_game(vset_t visited, int* src)
     return g;
 }
 #endif
-
 
 static char *files[2];
 hre_context_t ctx;

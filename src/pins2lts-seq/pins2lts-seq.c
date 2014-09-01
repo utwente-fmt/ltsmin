@@ -324,7 +324,7 @@ typedef void(*gsea_void)(gsea_state_t*,void*);
 typedef int(*gsea_int)(gsea_state_t*,void*);
 typedef void (*foreach_open_cb)(gsea_state_t*, void*);
 
-static void gsea_process(void *arg, transition_info_t *ti, int *dst);
+static void gsea_process(void *arg, transition_info_t *ti, int *dst, int *cpy);
 static void gsea_foreach_open(foreach_open_cb open_cb, void *arg);
 static void gsea_finished(void *arg);
 static void gsea_progress(void *arg);
@@ -1107,8 +1107,9 @@ typedef struct write_trace_step_s {
 } write_trace_step_t;
 
 static void
-write_trace_next (void *arg, transition_info_t *ti, int *dst)
+write_trace_next (void *arg, transition_info_t *ti, int *dst, int *cpy)
 {
+    (void) cpy;
     write_trace_step_t *ctx = (write_trace_step_t*)arg;
     gsea_state_t next;
     next.state = dst;
@@ -1766,8 +1767,9 @@ gsea_foreach_open_cb(gsea_state_t *s_open, void *arg)
 }
 
 static void
-gsea_process(void *arg, transition_info_t *ti, int *dst)
+gsea_process(void *arg, transition_info_t *ti, int *dst, int *cpy)
 {
+    (void) cpy;
     gsea_state_t s_next;
     s_next.state = dst;
     // this should be in here.

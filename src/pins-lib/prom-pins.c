@@ -424,6 +424,7 @@ PromLoadGreyboxModel(model_t model, const char *filename)
     GBsetDMInfoRead(model, dm_read_info);
     GBsetDMInfoMayWrite(model, dm_may_write_info);
     GBsetDMInfoMustWrite(model, dm_must_write_info);
+    GBsetSupportsCopy(model);
 
     GBsetMatrix(model, "actions_reads", dm_actions_read_info, PINS_MAY_SET,
                 PINS_INDEX_GROUP, PINS_INDEX_STATE_VECTOR);

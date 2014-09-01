@@ -251,7 +251,7 @@ struct state_cb
         int dst[pins->process_parameter_count()];
         pins->make_pins_state(next_state, dst);
         transition_info_t ti = GB_TI(lbl,group);
-        cb (ctx, &ti, dst);
+        cb (ctx, &ti, dst, NULL);
         ++count;
     }
 

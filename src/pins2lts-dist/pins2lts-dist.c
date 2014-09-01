@@ -156,7 +156,8 @@ struct src_info {
     struct dist_thread_context *ctx;
 };
 
-static void callback(void*context,transition_info_t*info,int*dst){
+static void callback(void*context,transition_info_t*info,int*dst,int*cpy){
+    (void) cpy;
     struct src_info *ctx  = (struct src_info*)context;
     action_detect (ctx->ctx, info);
     uint32_t trans[trans_len];
@@ -279,11 +280,12 @@ struct repr_context {
     int trans_next;
 };
 
-static void discard_callback(void*context,transition_info_t*ti,int*dst){
-    (void) context; (void) ti; (void) dst;
+static void discard_callback(void*context,transition_info_t*ti,int*dst,int*cpy){
+    (void) context; (void) ti; (void) dst; (void) cpy;
 }
 
-static void repr_callback(void*context,transition_info_t*ti,int*dst){
+static void repr_callback(void*context,transition_info_t*ti,int*dst,int*cpy){
+    (void)cpy;
     struct repr_context *ctx  = (struct repr_context*)context;
     int idx;
     if (!TreeFold_ret(ctx->dbs,dst,&idx)){

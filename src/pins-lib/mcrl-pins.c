@@ -144,7 +144,7 @@ static void callback(void){
 			dst_p[i]=ATfindIndex(termmap,dst[i]);
 		}
 	}
-	user_cb(user_context,&ti,dst_p);
+	user_cb(user_context,&ti,dst_p,NULL);
 }
 
 

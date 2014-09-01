@@ -19,26 +19,31 @@ typedef struct group_context {
     int                *groupmap;
     TransitionCB        cb;
     void               *user_context;
+    int                **group_cpy;
+    int                *cpy;
 }                  *group_context_t;
 
 
 static void
-group_cb (void *context, transition_info_t *ti, int *olddst)
+group_cb (void *context, transition_info_t *ti, int *olddst, int*cpy)
 {
     group_context_t     ctx = (group_context_t)(context);
     int                 len = ctx->len;
     int                 newdst[len];
+    int                 newcpy[len];
 
     // possibly fix group and cpy in case it is merged
     if (ti->group != -1) {
+        if (ctx->cpy == NULL) ctx->cpy = ctx->group_cpy[ti->group];
         ti->group = ctx->groupmap[ti->group];
     }
 
     for (int i = 0; i < len; i++) {
         newdst[i] = olddst[ctx->statemap[i]];
+        newcpy[i] = (ctx->cpy[i] || (cpy != NULL && cpy[ctx->statemap[i]]));
     }
 
-    ctx->cb (ctx->user_context, ti, newdst);
+    ctx->cb (ctx->user_context, ti, newdst, newcpy);
 }
 
 static int
@@ -62,6 +67,7 @@ group_long (model_t self, int group, int *newsrc, TransitionCB cb,
 
     for (int j = begin; j < end; j++) {
         int                 g = ctx.transmap[j];
+        ctx.cpy = ctx.group_cpy[g];
         Ntrans += GBgetTransitionsLong (parent, g, oldsrc, group_cb, &ctx);
     }
 
@@ -427,6 +433,13 @@ GBregroup (model_t model, const char *regroup_spec)
         ctx->transmap = RTmalloc (oldNgroups * sizeof (int));
         // maps old group to new group
         ctx->groupmap = RTmalloc (oldNgroups * sizeof (int));
+
+        // stores which states slots have to be copied
+        ctx->group_cpy = RTmalloc (oldNgroups * sizeof(int*));
+
+        for (int i = 0; i < oldNgroups; i++)
+            ctx->group_cpy[i] = RTmalloc (dm_ncols(mayw) * sizeof(int));
+
         int                 p = 0;
         for (int i = 0; i < newNgroups; i++) {
             int                 first = r->row_perm.data[i].becomes;
@@ -434,6 +447,19 @@ GBregroup (model_t model, const char *regroup_spec)
             ctx->transbegin[i] = p;
             int                 n = 0;
             do {
+
+                // for each old transition group set for each slot whether the value
+                // needs to be copied. The value needs to be copied if the new dependency
+                // is a may-write (W) and the old dependency is a copy (-).
+                for (int j = 0; j < dm_ncols(mayw); j++) {
+                    if (    dm_is_set(mayw, i, j) &&
+                            !dm_is_set(mustw, i, j) &&
+                            !dm_is_set(original_may_write, all_in_group, ctx->statemap[j])) {
+                        ctx->group_cpy[all_in_group][j] = 1;
+                    } else {
+                        ctx->group_cpy[all_in_group][j] = 0;
+                    }
+                }
 
                 ctx->groupmap[all_in_group] = i;
                 ctx->transmap[p + n] = all_in_group;
@@ -486,6 +512,11 @@ GBregroup (model_t model, const char *regroup_spec)
     GBsetTransitionInGroup (group, group_transition_in_group);
 
     GBinitModelDefaults (&group, model);
+
+    // apparently we have over-approximated w to W.
+    // so now we support copy.
+    if (dm_is_empty(mustw) && original_must_write == original_may_write)
+        GBsetSupportsCopy(group);
 
     // permute initial state
     {

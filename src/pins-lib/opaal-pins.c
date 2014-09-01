@@ -238,8 +238,10 @@ typedef struct context_wrapper_s {
 } context_wrapper_t;
 
 void
-cb_wrapper(void *context, transition_info_t *transition_info, int *dst)
+cb_wrapper(void *context, transition_info_t *transition_info, int *dst, int *cpy)
 {
+    (void) cpy;
+
     context_wrapper_t *ctx = (context_wrapper_t *) context;
     void **lattice = (void **) &dst[ctx->lattice_idx];
     //void *clone;
@@ -251,7 +253,7 @@ cb_wrapper(void *context, transition_info_t *transition_info, int *dst)
                   NULL);
     //*lattice = clone;
     Debug ("Lattice of next state: %zu --> %zu", old_lattice, (size_t)*lattice);
-    ctx->user_cb (ctx->user_context, transition_info, dst);
+    ctx->user_cb (ctx->user_context, transition_info, dst,NULL);
     (void) old_lattice;
 }
 

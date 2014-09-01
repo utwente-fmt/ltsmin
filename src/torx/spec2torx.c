@@ -43,9 +43,10 @@ static int          edge_labels;
 static treedbs_t    dbs;
 
 static void
-torx_transition (void *arg, transition_info_t *ti, int *dst)
+torx_transition (void *arg, transition_info_t *ti, int *dst, int *cpy)
 {
 
+    (void) cpy;
     torx_ctx_t         *ctx = (torx_ctx_t *)arg;
 
     int                 tmp = TreeFold (dbs, dst);

@@ -243,7 +243,7 @@ struct pbes_state_cb
         explorer->local_to_global(next_state, dst);
         int* edge_labels = NULL;
         transition_info_t ti = GB_TI(edge_labels, group);
-        cb(ctx, &ti, dst);
+        cb(ctx, &ti, dst, NULL);
         count++;
     }
 

@@ -19,6 +19,7 @@ struct grey_box_model {
 	matrix_t *dm_read_info;
 	matrix_t *dm_may_write_info;
 	matrix_t *dm_must_write_info;
+	int supports_copy;
 	matrix_t *sl_info;
     sl_group_t* sl_groups[GB_SL_GROUP_COUNT];
     guard_t** guards;
@@ -126,12 +127,30 @@ struct nested_cb {
 	void* user_ctx;
 };
 
-void project_dest(void*context,transition_info_t*ti,int*dst){
+void project_dest(void*context,transition_info_t*ti,int*dst,int*cpy){
 #define info ((struct nested_cb*)context)
 	int len = dm_ones_in_row(GBgetDMInfo(info->model), info->group);
 	int short_dst[len];
 	dm_project_vector(GBgetDMInfo(info->model), info->group, dst, short_dst);
-	info->cb(info->user_ctx,ti,short_dst);
+    info->cb(info->user_ctx,ti,short_dst,NULL);
+#undef info
+    return;
+    (void)cpy;
+}
+
+void project_dest_w(void*context,transition_info_t*ti,int*dst,int*cpy){
+#define info ((struct nested_cb*)context)
+    int len = dm_ones_in_row(GBgetDMInfoMayWrite(info->model), info->group);
+    int short_dst[len];
+
+    dm_project_vector(GBgetDMInfoMayWrite(info->model), info->group, dst, short_dst);
+    if (cpy != NULL) {
+        int short_cpy[len];
+        dm_project_vector(GBgetDMInfoMayWrite(info->model), info->group, cpy, short_cpy);
+        info->cb(info->user_ctx,ti,short_dst,short_cpy);
+    } else {
+        info->cb(info->user_ctx,ti,short_dst,NULL);
+    }
 #undef info
 }
 
@@ -159,14 +178,14 @@ int default_short_r2w(model_t self,int group,int*src,TransitionCB cb,void*contex
     int long_src[dm_ncols(GBgetDMInfoRead(self))];
     dm_expand_vector(GBgetDMInfoRead(self), group, self->s0, src, long_src);
 
-    return self->next_long(self,group,long_src,project_dest,&info);
+    return self->next_long(self,group,long_src,project_dest_w,&info);
 }
 
-void expand_dest(void*context,transition_info_t*ti,int*dst){
+void expand_dest(void*context,transition_info_t*ti,int*dst, int*cpy){
 #define info ((struct nested_cb*)context)
 	int long_dst[dm_ncols(GBgetDMInfo(info->model))];
 	dm_expand_vector(GBgetDMInfo(info->model), info->group, info->src, dst, long_dst);
-	info->cb(info->user_ctx,ti,long_dst);
+	info->cb(info->user_ctx,ti,long_dst,cpy);
 #undef info
 }
 
@@ -358,10 +377,10 @@ struct filter_context {
     int group_val;
 };
 
-static void matching_callback(void*context,transition_info_t*ti,int*dst){
+static void matching_callback(void*context,transition_info_t*ti,int*dst,int*cpy){
     struct filter_context* ctx=(struct filter_context*)context;
     if (ti->labels[ctx->idx]==ctx->value){
-        ctx->user_cb(ctx->user_ctx,ti,dst);
+        ctx->user_cb(ctx->user_ctx,ti,dst,cpy);
         if (ctx->group_idx>=0){
             if (ti->labels[ctx->group_idx]==0 || ti->labels[ctx->group_idx]!=ctx->group_val){
                 ctx->group_val=ti->labels[ctx->group_idx];
@@ -395,6 +414,7 @@ model_t GBcreateBase(){
 	model->dm_read_info=NULL;
 	model->dm_may_write_info=NULL;
 	model->dm_must_write_info=NULL;
+	model->supports_copy=0;
 	model->sl_info=NULL;
     for(int i=0; i < GB_SL_GROUP_COUNT; i++)
         model->sl_groups[i]=NULL;
@@ -478,6 +498,7 @@ void GBinitModelDefaults (model_t *p_model, model_t default_src)
         else
             model->dm_must_write_info = model->dm_info;
     }
+    model->supports_copy = default_src->supports_copy;
     if (model->dm_info == NULL)
         model->dm_info = default_src->dm_info;
 
@@ -667,6 +688,13 @@ matrix_t *GBgetDMInfoMustWrite(model_t model) {
         return model->dm_info;
     }
     return model->dm_must_write_info;
+}
+
+int GBsupportsCopy(model_t model) {
+    return model->supports_copy;
+}
+void GBsetSupportsCopy(model_t model) {
+    model->supports_copy = 1;
 }
 
 void GBsetStateLabelInfo(model_t model, matrix_t *info){
