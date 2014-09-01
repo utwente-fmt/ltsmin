@@ -1167,18 +1167,21 @@ int
 est_first(matrix_t *m,int row, int i, int j, int first) {
     // what would first be if column i is rotated to position j
     if (first==-1) return -1; // still no first
-    if (i<first)
+    if (i<first) {
         if (j<first) return first; // permutation happens left of first
         else return first-1; // first is in segment rotated to the left
-    if (i>first)
-        if (j<=first)
+    }
+    if (i>first) {
+        if (j<=first) {
             if (dm_is_set (m, row, i)) return j; // set position i is moved left of first
             else return first+1; // first is in segment rotated to the right
+        }
         else return first; // permutation happens right of first
+    }
     // i==first
     if (j<first) return j; // first is moved to the left to position j
-        for (int k=i+1;k<=j;k++)
-            if (dm_is_set(m,row,k)) return k-1; // first is moved to the right, k is the new first, but moves one left
+    for (int k=i+1;k<=j;k++)
+        if (dm_is_set(m,row,k)) return k-1; // first is moved to the right, k is the new first, but moves one left
     return j; // first is moved to the right to pos j, no k found, so j is new first
 }
 
