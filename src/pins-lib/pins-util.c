@@ -55,7 +55,7 @@ pins_add_state_variable_visible (model_t model, int index)
 {
     int                *visible = GBgetPorGroupVisibility(model);
     HREassert (visible != NULL, "pins_add_state_variable_visible: No (lower) PINS layer uses POR visibility.");
-    matrix_t           *wr_info = GBgetDMInfoWrite (model);
+    matrix_t           *wr_info = GBgetDMInfoMayWrite (model);
     int                 ngroups = dm_nrows (wr_info);
     for (int i = 0; i < ngroups; i++) {
         if (dm_is_set(wr_info, i, index)) {

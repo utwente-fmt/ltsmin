@@ -495,7 +495,7 @@ GBaddLTL (model_t model)
     matrix_t       *p_new_dm_w = (matrix_t*) RTmalloc(sizeof(matrix_t));
     matrix_t       *p_dm = GBgetDMInfo (model);
     matrix_t       *p_dm_r = GBgetDMInfoRead (model);
-    matrix_t       *p_dm_w = GBgetDMInfoWrite (model);
+    matrix_t       *p_dm_w = GBgetDMInfoMayWrite (model);
 
     int             groups = dm_nrows( GBgetDMInfo(model) );
     int             new_ngroups = (PINS_LTL_SPIN != PINS_LTL ? groups : groups + ba->trans_count);
@@ -582,7 +582,7 @@ GBaddLTL (model_t model)
 
     GBsetDMInfo(ltlmodel, p_new_dm);
     GBsetDMInfoRead(ltlmodel, p_new_dm_r);
-    GBsetDMInfoWrite(ltlmodel, p_new_dm_w);
+    GBsetDMInfoMayWrite(ltlmodel, p_new_dm_w);
 
     // create new state label matrix
     matrix_t       *p_new_sl = RTmalloc (sizeof *p_new_sl);

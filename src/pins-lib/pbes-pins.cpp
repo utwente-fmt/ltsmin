@@ -500,7 +500,7 @@ void PBESloadGreyboxModel(model_t model, const char*name)
     }
     GBsetDMInfo(model, p_dm_info);
     GBsetDMInfoRead(model, p_rm_info);
-    GBsetDMInfoWrite(model, p_wm_info);
+    GBsetDMInfoMustWrite(model, p_wm_info);
 
     int num_state_labels = info->get_lts_type().get_number_of_state_labels();
     dm_create(&sl_info, num_state_labels, state_length);

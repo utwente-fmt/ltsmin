@@ -28,11 +28,16 @@ group_cb (void *context, transition_info_t *ti, int *olddst)
     group_context_t     ctx = (group_context_t)(context);
     int                 len = ctx->len;
     int                 newdst[len];
-    for (int i = 0; i < len; i++)
-        newdst[i] = olddst[ctx->statemap[i]];
-    // possibly fix group in case it is merged
-    if (ti->group != -1)
+
+    // possibly fix group and cpy in case it is merged
+    if (ti->group != -1) {
         ti->group = ctx->groupmap[ti->group];
+    }
+
+    for (int i = 0; i < len; i++) {
+        newdst[i] = olddst[ctx->statemap[i]];
+    }
+
     ctx->cb (ctx->user_context, ti, newdst);
 }
 
@@ -156,46 +161,99 @@ group_transition_in_group (model_t self, int* labels, int group)
 }
 
 int
-max_row_first (matrix_t *m, int rowa, int rowb)
+max_row_first (matrix_t *r, matrix_t *w, int rowa, int rowb)
 {
+    HREassert(
+                dm_ncols(r) == dm_ncols(w) &&
+                dm_nrows(r) == dm_nrows(w), "matrix sizes do not match");
+    
     int                 i,
-                        ra,
-                        rb;
+                        raw,
+                        rbw;
 
-    for (i = 0; i < dm_ncols (m); i++) {
-        ra = dm_is_set (m, rowa, i);
-        rb = dm_is_set (m, rowb, i);
+    for (i = 0; i < dm_ncols (r); i++) {
+        raw = dm_is_set (w, rowa, i);
+        rbw = dm_is_set (w, rowb, i);
 
-        if ((ra && rb) || (!ra && !rb))
+        if (((raw) && (rbw)) || (!raw && !rbw))
             continue;
-        return (rb - ra);
+        return ((rbw) - (raw));
     }
 
     return 0;
 }
 
 int
-max_col_first (matrix_t *m, int cola, int colb)
+max_col_first (matrix_t *r, matrix_t *w, int cola, int colb)
 {
+    HREassert(dm_ncols(r) == dm_ncols(w) && dm_nrows(r) == dm_nrows(w), "matrix sizes do not match");
+
     int                 i,
-                        ca,
-                        cb;
+                        car,
+                        cbr;
 
-    for (i = 0; i < dm_nrows (m); i++) {
-        ca = dm_is_set (m, i, cola);
-        cb = dm_is_set (m, i, colb);
+    for (i = 0; i < dm_nrows (r); i++) {
+        car = dm_is_set (r, i, cola);
+        cbr = dm_is_set (r, i, colb);
 
-        if ((ca && cb) || (!ca && !cb))
+        if ((car && cbr) || (!car && !cbr))
             continue;
-        return (cb - ca);
+        return (cbr - car);
     }
 
     return 0;
 }
 
-static void
-apply_regroup_spec (matrix_t *m, const char *spec_)
+int
+write_before_read (matrix_t *r, matrix_t *w, int rowa, int rowb)
 {
+    HREassert(
+                dm_ncols(r) == dm_ncols(w) &&
+                dm_nrows(r) == dm_nrows(w), "matrix sizes do not match");
+
+    int i;
+
+    int ra = 0;
+    int rb = 0;
+
+    for (i = 0; i < dm_ncols (r); i++) {
+        if (dm_is_set (w, rowa, i)) ra += (i);
+        if (dm_is_set (w, rowb, i)) rb += (i);
+    }
+
+    return rb - ra;
+}
+
+int
+read_before_write (matrix_t *r, matrix_t *w, int cola, int colb)
+{
+    HREassert(
+                dm_ncols(r) == dm_ncols(w) &&
+                dm_nrows(r) == dm_nrows(w), "matrix sizes do not match");
+    
+    int i;
+
+    int ca = 0;
+    int cb = 0;
+
+    for (i = 0; i < dm_nrows (r); i++) {
+        if (dm_is_set (r, i, cola)) ca += (i);
+        if (dm_is_set (r, i, colb)) cb += (i);
+    }
+
+    return cb - ca;
+}
+
+static void
+apply_regroup_spec (matrix_t* r, matrix_t* mayw, matrix_t* mustw, const char *spec_)
+{
+    
+    HREassert(
+            dm_ncols(r) == dm_ncols(mayw) &&
+            dm_nrows(r) == dm_nrows(mayw) &&
+            dm_ncols(r) == dm_ncols(mustw) &&
+            dm_nrows(r) == dm_nrows(mustw), "matrix sizes do not match");
+    
     // parse regrouping arguments
     if (spec_ != NULL) {
         char               *spec = strdup (spec_);
@@ -204,50 +262,70 @@ apply_regroup_spec (matrix_t *m, const char *spec_)
 
         char               *tok;
         while ((tok = strsep (&spec, ",")) != NULL) {
-            if (strcasecmp (tok, "cs") == 0) {
+            if (strcasecmp (tok, "w2W") == 0) {
+                Print1 (info, "Regroup over-approximate must-write to may-write");
+                dm_clear(mustw);
+            } else if (strcasecmp (tok, "r2+") == 0) {
+                Print1 (info, "Regroup over-approximate read to read + write");
+                dm_apply_or(mayw, r);
+            } else if (strcmp (tok, "W2+") == 0) {
+                Print1 (info, "Regroup over-approximate may-write \\ must-write to read + write");
+                matrix_t *w = RTmalloc(sizeof(matrix_t));
+                dm_copy(mayw, w);
+                dm_apply_xor(w, mustw);
+                dm_apply_or(r, w);
+                dm_free(w);
+            } else if (strcmp (tok, "w2+") == 0) {
+                Print1 (info, "Regroup over-approximate must-write to read + write");
+                dm_apply_or(r, mustw);
+            } else if (strcasecmp (tok, "rb4w") == 0) {
+                Print1 (info, "Regroup Read BeFore Write");
+                dm_sort_cols (r, mayw, mustw, &read_before_write);
+                dm_sort_rows (r, mayw, mustw, &write_before_read);
+            } else if (strcasecmp (tok, "cs") == 0) {
                 Print1 (info, "Regroup Column Sort");
-                dm_sort_cols (m, &max_col_first);
+                dm_sort_cols (r, mayw, mustw, &max_col_first);
             } else if (strcasecmp (tok, "cn") == 0) {
                 Print1 (info, "Regroup Column Nub");
-                dm_nub_cols (m);
+                dm_nub_cols (r, mayw, mustw);
             } else if (strcasecmp (tok, "csa") == 0) {
                 Print1 (info, "Regroup Column swap with Simulated Annealing");
-                dm_anneal (m);
+                dm_anneal (r, mayw, mustw);
             } else if (strcasecmp (tok, "cw") == 0) {
                 Print1 (info, "Regroup Column sWaps");
-                dm_optimize (m);
+                dm_optimize (r, mayw, mustw);
             } else if (strcasecmp (tok, "ca") == 0) {
                 Print1 (info, "Regroup Column All permutations");
-                dm_all_perm (m);
+                dm_all_perm (r, mayw, mustw);
             } else if (strcasecmp (tok, "rs") == 0) {
                 Print1 (info, "Regroup Row Sort");
-                dm_sort_rows (m, &max_row_first);
+                dm_sort_rows (r, mayw, mustw, &max_row_first);
             } else if (strcasecmp (tok, "rn") == 0) {
                 Print1 (info, "Regroup Row Nub");
-                dm_nub_rows (m);
+                dm_nub_rows (r, mayw, mustw);
             } else if (strcasecmp (tok, "ru") == 0) {
                 Print1 (info, "Regroup Row sUbsume");
-                dm_subsume_rows (m);
+                dm_subsume_rows (r, mayw, mustw);
             } else if (strcasecmp (tok, "gsa") == 0) {
                 const char         *macro = "gc,gr,csa,rs";
                 Print1 (info, "Regroup macro Simulated Annealing: %s", macro);
-                apply_regroup_spec (m, macro);
+                apply_regroup_spec (r, mayw, mustw, macro);
             } else if (strcasecmp (tok, "gs") == 0) {
                 const char         *macro = "gc,gr,cw,rs";
                 Print1 (info, "Regroup macro Group Safely: %s", macro);
-                apply_regroup_spec (m, macro);
+                apply_regroup_spec (r, mayw, mustw, macro);
             } else if (strcasecmp (tok, "ga") == 0) {
-                const char         *macro = "gc,rs,ru,cw,rs";
+                const char         *macro = "ru,gc,rs,cw,rs";
                 Print1 (info, "Regroup macro Group Aggressively: %s", macro);
-                apply_regroup_spec (m, macro);
+                apply_regroup_spec (r, mayw, mustw, macro);
             } else if (strcasecmp (tok, "gc") == 0) {
                 const char         *macro = "cs,cn";
                 Print1 (info, "Regroup macro Cols: %s", macro);
-                apply_regroup_spec (m, macro);
+                apply_regroup_spec (r, mayw, mustw, macro);
             } else if (strcasecmp (tok, "gr") == 0) {
                 const char         *macro = "rs,rn";
                 Print1 (info, "Regroup macro Rows: %s", macro);
-                apply_regroup_spec (m, macro);
+                apply_regroup_spec (r, mayw, mustw, macro);
             } else if (tok[0] != '\0') {
                 Fatal (1, error, "Unknown regrouping specification: '%s'",
                        tok);
@@ -294,17 +372,25 @@ GBregroup (model_t model, const char *regroup_spec)
 {
     // note: context information is available via matrix, doesn't need to
     // be stored again
-    matrix_t           *m  = RTmalloc (sizeof (matrix_t));
-    matrix_t           *mr = RTmalloc (sizeof (matrix_t));
-    matrix_t           *mw = RTmalloc (sizeof (matrix_t));
+    matrix_t           *r       = RTmalloc (sizeof (matrix_t));
+    matrix_t           *mayw    = RTmalloc (sizeof (matrix_t));
+    matrix_t           *mustw   = RTmalloc (sizeof (matrix_t));
+    matrix_t           *m       = GBgetDMInfo (model);
 
-    dm_copy (GBgetDMInfo (model), m);
+    matrix_t           *original_may_write = GBgetDMInfoMayWrite (model);
+    matrix_t           *original_must_write = GBgetDMInfoMustWrite (model);
+
+    dm_copy (GBgetDMInfoRead (model), r);
+    dm_copy (original_may_write, mayw);
+    dm_copy (original_must_write, mustw);
 
     Print1 (info, "Regroup specification: %s", regroup_spec);
-    apply_regroup_spec (m, regroup_spec);
+    apply_regroup_spec (r, mayw, mustw, regroup_spec);
     // post processing regroup specification
     // undo column grouping
-    dm_ungroup_cols(m);
+    dm_ungroup_cols(r);
+    dm_ungroup_cols(mayw);
+    dm_ungroup_cols(mustw);
 
     // create new model
     model_t             group = GBcreateBase ();
@@ -319,22 +405,22 @@ GBregroup (model_t model, const char *regroup_spec)
 
     // fill statemapping: assumption this is a bijection
     {
-        int                 Nparts = dm_ncols (m);
+        int                 Nparts = dm_ncols (r);
         if (Nparts != lts_type_get_state_length (GBgetLTStype (model)))
             Fatal (1, error,
                    "state mapping in file doesn't match the specification");
         ctx->len = Nparts;
         ctx->statemap = RTmalloc (Nparts * sizeof (int));
         for (int i = 0; i < Nparts; i++) {
-            int                 s = m->col_perm.data[i].becomes;
+            int                 s = r->col_perm.data[i].becomes;
             ctx->statemap[i] = s;
         }
     }
-
+    
     // fill transition mapping: assumption: this is a surjection
     {
-        int                 oldNgroups = dm_nrows (GBgetDMInfo (model));
-        int                 newNgroups = dm_nrows (m);
+        int                 oldNgroups = dm_nrows (m);
+        int                 newNgroups = dm_nrows (r);
         Print1  (info, "Regrouping: %d->%d groups", oldNgroups,
                  newNgroups);
         ctx->transbegin = RTmalloc ((1 + newNgroups) * sizeof (int));
@@ -343,20 +429,23 @@ GBregroup (model_t model, const char *regroup_spec)
         ctx->groupmap = RTmalloc (oldNgroups * sizeof (int));
         int                 p = 0;
         for (int i = 0; i < newNgroups; i++) {
-            int                 first = m->row_perm.data[i].becomes;
+            int                 first = r->row_perm.data[i].becomes;
             int                 all_in_group = first;
             ctx->transbegin[i] = p;
             int                 n = 0;
             do {
+
                 ctx->groupmap[all_in_group] = i;
                 ctx->transmap[p + n] = all_in_group;
                 n++;
-                all_in_group = m->row_perm.data[all_in_group].group;
+                all_in_group = r->row_perm.data[all_in_group].group;
             } while (all_in_group != first);
             p = p + n;
         }
         ctx->transbegin[newNgroups] = p;
+
     }
+
 
     lts_type_t ltstype=GBgetLTStype (model);
     if (log_active(debug)){
@@ -368,21 +457,16 @@ GBregroup (model_t model, const char *regroup_spec)
         lts_type_printf(debug,ltstype);
     }
     GBsetLTStype (group, ltstype);
+    
+    matrix_t           *new_dm = RTmalloc (sizeof (matrix_t));
+    dm_copy(r, new_dm);
+    dm_apply_or(new_dm, mayw);
 
-    // Permute read and write matrices
-    dm_create(mr, dm_nrows (m), dm_ncols (m));
-    dm_create(mw, dm_nrows (m), dm_ncols (m));
-    combine_rows(mr, GBgetDMInfoRead (model), dm_nrows (m), ctx->transbegin,
-                     ctx->transmap);
-    combine_rows(mw, GBgetDMInfoWrite (model), dm_nrows (m), ctx->transbegin,
-                     ctx->transmap);
-    dm_copy_header(&(m->col_perm), &(mr->col_perm));
-    dm_copy_header(&(m->col_perm), &(mw->col_perm));
-
-    // fill edge_info
-    GBsetDMInfo (group, m);
-    GBsetDMInfoRead (group, mr);
-    GBsetDMInfoWrite (group, mw);
+    // set new dependency matrices
+    GBsetDMInfo (group, new_dm);
+    GBsetDMInfoRead(group, r);
+    GBsetDMInfoMayWrite (group, mayw);
+    GBsetDMInfoMustWrite(group, mustw);
 
     // copy state label matrix and apply the same permutation
     matrix_t           *s = RTmalloc (sizeof (matrix_t));
@@ -392,7 +476,7 @@ GBregroup (model_t model, const char *regroup_spec)
 
     // probably better to write some functions to do this,
     // i.e. dm_get_column_permutation
-    dm_copy_header(&(m->col_perm), &(s->col_perm));
+    dm_copy_header(&(r->col_perm), &(s->col_perm));
 
     GBsetStateLabelInfo(group, s);
 

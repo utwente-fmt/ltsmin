@@ -26,6 +26,8 @@ static void init_state_info(void*arg,void*old_array,int old_size,void*new_array,
 
 struct group_cache {
     int                 len;
+    int                 r_len;
+    int                 w_len;
     string_index_t      idx;
 //    int                 explored;
     int                 source;
@@ -88,7 +90,7 @@ cached_short (model_t self, int group, int *src, TransitionCB cb,
     struct group_cache *cache = &(ctx->cache[group]);
     int len = dm_ones_in_row(GBgetDMInfo(self), group);
 
-    int                 tmp[len];
+    int                 dst[len];
     int                 src_idx =
         SIputC (cache->idx, (char *)src, cache->len);
 
@@ -102,12 +104,42 @@ cached_short (model_t self, int group, int *src, TransitionCB cb,
     int N=cache->begin[src_idx].edges;
     for (int i = cache->begin[src_idx].first ; N>0 ; N--,i += edge_info_sz (cache)) {
         // MW: remove if edge label becomes "const int *"?
-        memcpy (tmp, SIgetC (cache->idx, cache->dest[i], NULL),
+        memcpy (dst, SIgetC (cache->idx, cache->dest[i], NULL),
                 cache->len);
         int *labels = cache->Nedge_labels == 0 ? NULL : &(cache->dest[i+EL_OFFSET]);
         transition_info_t cbti = GB_TI(labels, group);
-        cb (user_context, &cbti, tmp);
+        cb (user_context, &cbti, dst);
     }
+    return cache->begin[src_idx].trans;
+}
+
+static int
+cached_short_r2w (model_t self, int group, int *src, TransitionCB cb, void *user_context)
+{
+    struct cache_context *ctx = (struct cache_context *)GBgetContext (self);
+    struct group_cache *cache = &(ctx->cache[group]);
+    int w_len = dm_ones_in_row(GBgetDMInfoMayWrite(self), group);
+    int src_idx = SIputC (cache->idx, (char *)src, cache->r_len);
+
+    ensure_access(cache->begin_man,src_idx);
+
+    if (cache->begin[src_idx].first==-1) {
+            cache->source=src_idx;
+            cache->begin[src_idx].first = cache->edges * edge_info_sz (cache);
+            cache->begin[cache->source].edges=0;
+            cache->begin[src_idx].trans = GBgetTransitionsShortR2W (GBgetParent(self), group, src, add_cache_entry, cache);
+    }
+
+    int N=cache->begin[src_idx].edges;
+    for (int i = cache->begin[src_idx].first ; N>0 ; N--,i += edge_info_sz (cache)) {
+        // MW: remove if edge label becomes "const int *"?
+        int dst[w_len];
+        memcpy (dst, SIgetC (cache->idx, cache->dest[i], NULL), cache->w_len);
+        int *labels = cache->Nedge_labels == 0 ? NULL : &(cache->dest[i+EL_OFFSET]);
+        transition_info_t cbti = GB_TI(labels, group);
+        cb(user_context, &cbti, dst);
+    }
+
     return cache->begin[src_idx].trans;
 }
 
@@ -123,12 +155,17 @@ GBaddCache (model_t model)
     HREassert (model != NULL, "No model");
     matrix_t           *p_dm = GBgetDMInfo (model);
     matrix_t           *p_dm_read = GBgetDMInfoRead (model);
-    matrix_t           *p_dm_write = GBgetDMInfoWrite (model);
+    matrix_t           *p_dm_may_write = GBgetDMInfoMayWrite (model);
+    matrix_t           *p_dm_must_write = GBgetDMInfoMustWrite (model);
     int                 N = dm_nrows (p_dm);
     struct group_cache *cache = RTmalloc (N * sizeof (struct group_cache));
     for (int i = 0; i < N; i++) {
-        int                 len = dm_ones_in_row (p_dm, i);
+        int len = dm_ones_in_row (p_dm, i);
         cache[i].len = len * sizeof (int);
+        int r_len = dm_ones_in_row (p_dm_read, i);
+        cache[i].r_len = r_len * sizeof (int);
+        int w_len = dm_ones_in_row (p_dm_may_write, i);
+        cache[i].w_len = w_len * sizeof (int);
         cache[i].idx = SIcreate ();
         cache[i].edges = 0;
         cache[i].begin_man = create_manager (256);
@@ -145,10 +182,12 @@ GBaddCache (model_t model)
     
     GBsetDMInfo (cached, p_dm);
     GBsetDMInfoRead (cached, p_dm_read);
-    GBsetDMInfoWrite (cached, p_dm_write);
+    GBsetDMInfoMayWrite (cached, p_dm_may_write);
+    GBsetDMInfoMustWrite (cached, p_dm_must_write);
     GBsetContext (cached, ctx);
     
     GBsetNextStateShort (cached, cached_short);
+    GBsetNextStateShortR2W(cached, cached_short_r2w);
     GBsetTransitionInGroup (cached, cached_transition_in_group);
 
     GBinitModelDefaults (&cached, model);

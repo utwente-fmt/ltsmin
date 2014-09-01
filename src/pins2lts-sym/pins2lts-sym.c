@@ -214,7 +214,8 @@ static int eLbls;
 static int sLbls;
 static int nGrps;
 static int max_sat_levels;
-static proj_info *projs;
+static proj_info *r_projs = NULL;
+static proj_info *w_projs = NULL;
 static vdom_t domain;
 static vset_t *levels = NULL;
 static int max_levels = 0;
@@ -238,6 +239,10 @@ typedef void (*sat_proc_t)(reach_proc_t reach_proc, vset_t visited,
 
 typedef void (*guided_proc_t)(sat_proc_t sat_proc, reach_proc_t reach_proc,
                               vset_t visited, char *etf_output);
+
+typedef void (*short_proc_t)(model_t model,int group,int*src,TransitionCB cb,void*context);
+
+static short_proc_t short_proc = NULL; // which function to call for the next states.
 
 static inline void
 grow_levels(int new_levels)
@@ -482,17 +487,10 @@ find_action_cb(void* context, int* src)
     }
 
     // Set dst of the last step of the trace to its proper value
-    for (int i = 0; i < projs[group].len; i++)
-        trace_end[0][projs[group].proj[i]] = ctx->dst[i];
+    for (int i = 0; i < w_projs[group].len; i++)
+        trace_end[0][w_projs[group].proj[i]] = ctx->dst[i];
 
-    // src and dst may both be new, e.g. in case of chaining
-    if (vset_member(levels[global_level - 1], src)) {
-        Warning(debug, "source found at level %d", global_level - 1);
-        find_trace(trace_end, 2, global_level, levels);
-    } else {
-        Warning(debug, "source not found at level %d", global_level - 1);
-        find_trace(trace_end, 2, global_level + 1, levels);
-    }
+    find_trace(trace_end, 2, global_level, levels);
 
     Warning(info, "exiting now");
     HREabort(LTSMIN_EXIT_COUNTER_EXAMPLE);
@@ -526,8 +524,9 @@ group_add(void *context, transition_info_t *ti, int *dst)
 
         action_ctx.group = group;
         action_ctx.dst = dst;
-        vset_enum_match(ctx->set,projs[group].len, projs[group].proj,
-                            ctx->src, find_action_cb, &action_ctx);
+
+        vset_enum_match(ctx->set,r_projs[group].len, r_projs[group].proj,
+                        ctx->src, find_action_cb, &action_ctx);
     }
 }
 
@@ -537,7 +536,7 @@ explore_cb(void *context, int *src)
     struct group_add_info *ctx = (struct group_add_info*)context;
 
     ctx->src = src;
-    GBgetTransitionsShort(model, ctx->group, src, group_add, context);
+    short_proc(model, ctx->group, src, group_add, context);
     (*ctx->explored)++;
 
     if ((*ctx->explored) % 10000 == 0) {
@@ -1936,7 +1935,7 @@ find_overlapping_group(bitvector_t *found_groups, int *group)
 
         for(int j = 0; j < nGrps; j++) {
             if (bitvector_is_set(found_groups, j)) continue;
-            dm_bitvector_row(&row_new, GBgetDMInfoWrite(model), j);
+            dm_bitvector_row(&row_new, GBgetDMInfoMayWrite(model), j);
             bitvector_intersect(&row_new, &row_found);
 
             if (!bitvector_is_empty(&row_new)) {
@@ -2081,21 +2080,34 @@ init_domain(vset_implementation_t impl)
     group_next     = (vrel_t*)RTmalloc(nGrps * sizeof(vrel_t));
     group_explored = (vset_t*)RTmalloc(nGrps * sizeof(vset_t));
     group_tmp      = (vset_t*)RTmalloc(nGrps * sizeof(vset_t));
-    projs          = (proj_info*)RTmalloc(nGrps * sizeof(proj_info));
+    r_projs        = (proj_info*)RTmalloc(nGrps * sizeof(proj_info));
+    w_projs        = (proj_info*)RTmalloc(nGrps * sizeof(proj_info));
+
+    matrix_t *read_matrix = vdom_separates_rw(domain) ? GBgetDMInfoRead(model) : GBgetDMInfo(model);
+    matrix_t *write_matrix = vdom_separates_rw(domain) ? GBgetDMInfoMayWrite(model) : GBgetDMInfo(model);
 
     for(int i = 0; i < nGrps; i++) {
-        projs[i].len  = dm_ones_in_row(GBgetDMInfo(model), i);
-        projs[i].proj = (int*)RTmalloc(projs[i].len * sizeof(int));
+        r_projs[i].len   = dm_ones_in_row(read_matrix, i);
+        r_projs[i].proj  = (int*)RTmalloc(r_projs[i].len * sizeof(int));
+        w_projs[i].len   = dm_ones_in_row(write_matrix, i);
+        w_projs[i].proj  = (int*)RTmalloc(w_projs[i].len * sizeof(int));
 
-        // temporary replacement for e_info->indices[i]
-        for(int j = 0, k = 0; j < dm_ncols(GBgetDMInfo(model)); j++) {
-            if (dm_is_set(GBgetDMInfo(model), i, j))
-                projs[i].proj[k++] = j;
+        for(int j = 0, k = 0; j < dm_ncols(read_matrix); j++) {
+            if (dm_is_set(read_matrix, i, j)) r_projs[i].proj[k++] = j;
         }
 
-        group_next[i]     = vrel_create(domain,projs[i].len,projs[i].proj);
-        group_explored[i] = vset_create(domain,projs[i].len,projs[i].proj);
-        group_tmp[i]      = vset_create(domain,projs[i].len,projs[i].proj);
+        for(int j = 0, k = 0; j < dm_ncols(write_matrix); j++) {
+            if (dm_is_set(write_matrix, i, j)) w_projs[i].proj[k++] = j;
+        }
+
+        if (vdom_separates_rw(domain)) {
+            group_next[i]     = vrel_create_rw(domain,r_projs[i].len,r_projs[i].proj,w_projs[i].len,w_projs[i].proj);
+        } else {
+            group_next[i]     = vrel_create(domain,r_projs[i].len,r_projs[i].proj);
+        }
+
+        group_explored[i] = vset_create(domain,r_projs[i].len,r_projs[i].proj);
+        group_tmp[i]      = vset_create(domain,r_projs[i].len,r_projs[i].proj);
     }
 }
 
@@ -2461,7 +2473,7 @@ actual_main(void)
         vset_example(initial, src);
         // we do not need group_explored, group_tmp, projs
         group_explored = group_tmp = NULL;
-        projs = NULL;
+        r_projs = w_projs = NULL;
 
         Print(infoShort, "Loaded transition relations from '%s'...", files[0]);
         expand_groups = 0;
@@ -2545,6 +2557,16 @@ actual_main(void)
     case DIRECTED:
         guided_proc = directed;
         break;
+    }
+
+    if (vdom_separates_rw(domain)) {
+        Warning(info, "vset implementation supports read/write separation.");
+        Warning(info, "Using GBgetTransitionsShortR2W as next-state function.");
+        short_proc = GBgetTransitionsShortR2W;
+    } else {
+        Warning(info, "vset implementation does not support read/write separation.");
+        Warning(info, "Using GBgetTransitionsShort as next-state function.");
+        short_proc = GBgetTransitionsShort;
     }
 
     // temporal logics

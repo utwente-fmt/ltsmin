@@ -219,7 +219,7 @@ ETFloadGreyboxModel(model_t model, const char *name)
     }
     GBsetDMInfo(model, p_dm_info);
     GBsetDMInfoRead(model, p_dm_read_info);
-    GBsetDMInfoWrite(model, p_dm_write_info);
+    GBsetDMInfoMustWrite(model, p_dm_write_info);
     GBsetNextStateShort(model,etf_short);
 
     matrix_t *p_sl_info = RTmalloc(sizeof *p_sl_info);

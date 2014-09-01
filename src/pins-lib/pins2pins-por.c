@@ -1528,7 +1528,7 @@ GBaddPOR (model_t model)
     Print1 (info, "Initializing dependency lookup table.");
 
     matrix_t           *p_dm = GBgetDMInfo (model);
-    matrix_t           *p_dm_w = GBgetDMInfoWrite (model);
+    matrix_t           *p_dm_w = GBgetDMInfoMayWrite (model);
 
     int groups = dm_nrows( p_dm );
     int len = dm_ncols( p_dm );
