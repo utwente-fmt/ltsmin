@@ -340,6 +340,16 @@ int vdom_separates_rw(vdom_t dom);
 */
 int vdom_supports_cpy(vdom_t dom);
 
+/**
+\brief sets the name of the ith variable.
+*/
+void vdom_set_name(vdom_t dom, int i, char* name);
+
+/**
+\brief get the name of the ith variable.
+*/
+char* vdom_get_name(vdom_t dom, int i);
+
 //@}
 
 #endif

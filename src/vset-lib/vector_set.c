@@ -198,6 +198,18 @@ void vdom_init_shared(vdom_t dom,int n)
     dom->shared.rel_update=default_rel_update;
 	dom->shared.reorder=default_reorder;
 	dom->shared.set_least_fixpoint=default_least_fixpoint;
+    dom->shared.names = RTmalloc(n * sizeof(char*));
+    for (int i = 0; i < n; i++) dom->shared.names[i] = NULL;
+}
+
+void vdom_set_name(vdom_t dom, int i, char* name) {
+    if (i >= dom->shared.size) Abort("Variable does not exist");
+    dom->shared.names[i] = name;
+}
+
+char* vdom_get_name(vdom_t dom, int i) {
+    if (i >= dom->shared.size) Abort("Variable does not exist");
+    return dom->shared.names[i];
 }
 
 int vdom_separates_rw(vdom_t dom) {

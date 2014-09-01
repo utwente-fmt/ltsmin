@@ -63,6 +63,7 @@ struct vector_domain_shared {
 
 	int (*separates_rw)();
 	int (*supports_cpy)();
+	char **names;
 };
 
 /** Initialise the shared part of the domain. */
