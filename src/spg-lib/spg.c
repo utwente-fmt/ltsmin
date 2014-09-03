@@ -146,7 +146,7 @@ parity_game* spg_load(FILE* f, vset_implementation_t impl)
     }
     for(int i=0; i<num_groups; i++) {
         fgets(buf, size, f); // "rel e[%d]\n"
-        result->e[i] = vrel_load_into(f, result->e[i], domain);
+        vrel_load(f, result->e[i]);
     }
     fgets(buf, size, f); // "set v\n"
     result->v = vset_load(f, domain);

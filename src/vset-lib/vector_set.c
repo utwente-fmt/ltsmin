@@ -302,7 +302,7 @@ void vrel_load(FILE* f, vrel_t rel){
     if (rel->dom->shared.rel_load==NULL){
         Abort("Loading of relations not supported by the current BDD implementation.")
     } else {
-        return rel->dom->shared.rel_load(f,rel);
+        rel->dom->shared.rel_load(f,rel);
     }
 }
 
