@@ -666,13 +666,14 @@ set_load(FILE* f, vdom_t dom)
     return set;
 }
 
-static void
+static vrel_t 
 rel_load_proj(FILE* f, vdom_t dom)
 {
     vrel_t rel = (vrel_t)RTmalloc(sizeof(struct vector_relation));
     memset(rel, 0, sizeof(struct vector_relation));
     rel->dom = dom;
     return rel; // Do not actually load anything from file
+    (void)f;
 }
 
 static void

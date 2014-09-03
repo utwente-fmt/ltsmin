@@ -1680,6 +1680,7 @@ reach_sat(reach_proc_t reach_proc, vset_t visited,
           bitvector_t *reach_groups, long *eg_count, long *next_count)
 {
     (void) reach_proc;
+    (void) next_count;
 
     if (act_detect != NULL && trc_output != NULL)
         Abort("Action detection with trace generation not supported");
