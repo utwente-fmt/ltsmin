@@ -138,7 +138,7 @@ reach_popt(poptContext con, enum poptCallbackReason reason,
         if (res < 0) {
             Warning(error, "unknown exploration order %s", order);
             HREexitUsage(LTSMIN_EXIT_FAILURE);
-        } else {
+        } else if (HREme(HREglobal())==0) {
             Warning(info, "Exploration order is %s", order);
         }
         strategy = res;
@@ -147,7 +147,7 @@ reach_popt(poptContext con, enum poptCallbackReason reason,
         if (res < 0) {
             Warning(error, "unknown saturation strategy %s", saturation);
             HREexitUsage(LTSMIN_EXIT_FAILURE);
-        } else {
+        } else if (HREme(HREglobal())==0) {
             Warning(info, "Saturation strategy is %s", saturation);
         }
         sat_strategy = res;
@@ -156,12 +156,12 @@ reach_popt(poptContext con, enum poptCallbackReason reason,
         if (res < 0) {
             Warning(error, "unknown guided search strategy %s", guidance);
             HREexitUsage(LTSMIN_EXIT_FAILURE);
-        } else {
+        } else if (HREme(HREglobal())==0) {
             Warning(info, "Guided search strategy is %s", guidance);
         }
         guide_strategy = res;
 
-        if (trc_output != NULL && !dlk_detect && act_detect == NULL)
+        if (trc_output != NULL && !dlk_detect && act_detect == NULL && HREme(HREglobal())==0)
             Warning(info, "Ignoring trace output");
 
         return;
@@ -250,9 +250,10 @@ typedef void (*sat_proc_t)(reach_proc_t reach_proc, vset_t visited,
 typedef void (*guided_proc_t)(sat_proc_t sat_proc, reach_proc_t reach_proc,
                               vset_t visited, char *etf_output);
 
-typedef void (*short_proc_t)(model_t model,int group,int*src,TransitionCB cb,void*context);
+typedef int (*short_proc_t)(model_t model,int group,int*src,TransitionCB cb,void*context);
 
-static short_proc_t short_proc = NULL; // which function to call for the next states.
+static short_proc_t* short_proc; // which function to call for the next states.
+static short_proc_t* short_multi_proc; // which function to call in the multi-process environment.
 
 static inline void
 grow_levels(int new_levels)
@@ -549,19 +550,12 @@ group_add(void *context, transition_info_t *ti, int *dst, int *cpy)
 }
 
 static void
-master_get_transitions_short(model_t model, int group, int* src, TransitionCB cb, void* context);
-
-static void
 explore_cb(void *context, int *src)
 {
     struct group_add_info *ctx = (struct group_add_info*)context;
 
     ctx->src = src;
-    if (multi_process) {
-        master_get_transitions_short(model, ctx->group, src, group_add, context);
-    } else {
-        short_proc(model, ctx->group, src, group_add, context);
-    }
+    (*short_proc)(model, ctx->group, src, group_add, context);
     (*ctx->explored)++;
 
     if ((*ctx->explored) % 10000 == 0) {
@@ -2135,7 +2129,9 @@ init_domain(vset_implementation_t impl)
     matrix_t *write_matrix = vdom_separates_rw(domain) ? GBgetDMInfoMayWrite(model) : GBgetDMInfo(model);
 
     if (!GBsupportsCopy(model) || !vdom_supports_cpy(domain)) {
-        Warning(info, "May-write does not support copy; over-approximating may-write \\ must-write to read + write");
+        if (HREme(HREglobal())==0) {
+            Warning(info, "May-write does not support copy; over-approximating may-write \\ must-write to read + write");
+        }
         matrix_t *w = RTmalloc(sizeof(matrix_t));
         dm_copy(GBgetDMInfoMayWrite(model), w);
         dm_apply_xor(w, GBgetDMInfoMustWrite(model));
@@ -2157,14 +2153,17 @@ init_domain(vset_implementation_t impl)
             if (dm_is_set(write_matrix, i, j)) w_projs[i].proj[k++] = j;
         }
 
-        if (vdom_separates_rw(domain)) {
-            group_next[i]     = vrel_create_rw(domain,r_projs[i].len,r_projs[i].proj,w_projs[i].len,w_projs[i].proj);
-        } else {
-            group_next[i]     = vrel_create(domain,r_projs[i].len,r_projs[i].proj);
-        }
+        if (HREme(HREglobal())==0)
+        {
+            if (vdom_separates_rw(domain)) {
+                group_next[i]     = vrel_create_rw(domain,r_projs[i].len,r_projs[i].proj,w_projs[i].len,w_projs[i].proj);
+            } else {
+                group_next[i]     = vrel_create(domain,r_projs[i].len,r_projs[i].proj);
+            }
 
-        group_explored[i] = vset_create(domain,r_projs[i].len,r_projs[i].proj);
-        group_tmp[i]      = vset_create(domain,r_projs[i].len,r_projs[i].proj);
+            group_explored[i] = vset_create(domain,r_projs[i].len,r_projs[i].proj);
+            group_tmp[i]      = vset_create(domain,r_projs[i].len,r_projs[i].proj);
+        }
     }
 
     dm_free(read_matrix);
@@ -2440,7 +2439,7 @@ parity_game* compute_symbolic_parity_game(vset_t visited, int* src)
         // priorities
         add_variable_subset(g->v_priority[priority[i]], g->v, g->domain, i);
     }
-    if (log_active(infoShort))
+    if (log_active(infoLong))
     {
         for(int p = 0; p < 2; p++)
         {
@@ -2451,7 +2450,7 @@ parity_game* compute_symbolic_parity_game(vset_t visited, int* src)
             vset_count(g->v_player[p], &n_count, &elem_count);
             bn_int2string(s, size, &elem_count);
             bn_clear(&elem_count);
-            Print(infoShort, "player %d: %ld nodes, %s elements.", p, n_count, s);
+            Print(infoLong, "player %d: %ld nodes, %s elements.", p, n_count, s);
         }
         for(int p = min_priority; p <= max_priority; p++)
         {
@@ -2462,7 +2461,7 @@ parity_game* compute_symbolic_parity_game(vset_t visited, int* src)
             vset_count(g->v_priority[p], &n_count, &elem_count);
             bn_int2string(s, size, &elem_count);
             bn_clear(&elem_count);
-            Print(infoShort, "priority %d: %ld nodes, %s elements.", p, n_count, s);
+            Print(infoLong, "priority %d: %ld nodes, %s elements.", p, n_count, s);
         }
     }
     for(int i = 0; i < nGrps; i++)
@@ -2496,7 +2495,7 @@ void init_multi_process(size_t workers)
     }
 }
 
-static void
+static int
 master_get_transitions_short(model_t model, int group, int* src, TransitionCB cb, void* context)
 {
     // get my lace thread id
@@ -2506,12 +2505,12 @@ master_get_transitions_short(model_t model, int group, int* src, TransitionCB cb
     Abort("Multi-process environment not available without Lace.");
 #endif
 
-    int length = dm_ones_in_row(GBgetDMInfo(model), group);
-    Print(infoLong, "master: writing state to slave (id=%d, group=%d, length=%d).", id, group, length);
+    int r_length = r_projs[group].len;
+    Print(infoLong, "master: writing state to slave (id=%d, group=%d, length=%d).", id, group, r_length);
     stream_t os = fd_output(parent_sockets[id-1]);
     DSwriteS32(os, 1); // signal that a state will be sent next
     DSwriteS32(os, group);
-    for(int i=0; i<length; i++)
+    for(int i=0; i<r_length; i++)
     {
         DSwriteS32(os, src[i]);
     }
@@ -2527,15 +2526,29 @@ master_get_transitions_short(model_t model, int group, int* src, TransitionCB cb
 
     Print(infoLong, "master: waiting for reply (id=%d).", id);
     stream_t is = fd_input(parent_sockets[id-1]);
+    int w_length = w_projs[group].len;
     int labels = lts_type_get_edge_label_count(GBgetLTStype(model));
     int next = DSreadS32(is);
     while(next==1)
     {
         Print(infoLong, "master: reading state from slave.");
-        int dst[length];
-        for(int i=0; i<length; i++)
+        int dst[w_length];
+        for(int i=0; i<w_length; i++)
         {
             dst[i] = DSreadS32(is);
+        }
+        int* cpy;
+        int cpy_vector = DSreadS32(is);
+        if (cpy_vector)
+        {
+            int cpy_[w_length];
+            for(int i=0; i<w_length; i++)
+            {
+                cpy_[i] = DSreadS32(is);
+            }
+            cpy = cpy_;
+        } else {
+            cpy = NULL;
         }
         transition_info_t* ti = RTmalloc(sizeof(transition_info_t));
         ti->group = group;
@@ -2545,7 +2558,7 @@ master_get_transitions_short(model_t model, int group, int* src, TransitionCB cb
             ti->labels[i] = DSreadS32(is);
         }
         ti->por_proviso = DSreadS32(is);
-        cb(context, ti, dst);
+        cb(context, ti, dst, cpy);
 
         // at this point the slave may request chunks
         Debug("master: callback_signal: %d", *(callback_signals[id-1]));
@@ -2558,6 +2571,7 @@ master_get_transitions_short(model_t model, int group, int* src, TransitionCB cb
     }
     RTfree(is);
     Print(infoLong, "master: done (id=%d).", id);
+    return 0;
 }
 
 static void
@@ -2565,7 +2579,7 @@ master_exit()
 {
     for(size_t id=1; id<=lace_n_workers; id++)
     {
-        Print(infoShort, "master: stopping slave (id=%zu).", id);
+        Print(infoLong, "master: stopping slave (id=%zu).", id);
         stream_t os = fd_output(parent_sockets[id-1]);
         DSwriteS32(os, 0); // signal that no states will be sent anymore
         stream_flush(os);
@@ -2574,13 +2588,13 @@ master_exit()
 }
 
 static void
-slave_cb(void* context, transition_info_t* ti, int* dst)
+slave_cb(void* context, transition_info_t* ti, int* dst, int* cpy)
 {
     int id = HREme(HREglobal());
     Debug("slave_cb: id=%d.", id);
     stream_t os = fd_output(child_sockets[id-1]);
     int group = ti->group;
-    int length = dm_ones_in_row(GBgetDMInfo(model), group);
+    int length = w_projs[group].len;
     int labels = lts_type_get_edge_label_count(GBgetLTStype(model));
     Print(infoLong, "slave_cb: writing state to master: id=%d, group=%d, length=%d.", id, group, length);
     Debug("slave_cb: callback_signal: %d", *(callback_signals[id-1]));
@@ -2591,6 +2605,15 @@ slave_cb(void* context, transition_info_t* ti, int* dst)
     for (int i=0; i<length; i++)
     {
         DSwriteS32(os, dst[i]);
+    }
+    if (cpy==NULL){
+        DSwriteS32(os, 0);
+    } else {
+        DSwriteS32(os, 1);
+        for (int i=0; i<length; i++)
+        {
+            DSwriteS32(os, cpy[i]);
+        }
     }
     for(int i=0; i<labels; i++)
     {
@@ -2607,6 +2630,10 @@ start_slave()
 {
     init_model(files[0]);
 
+    init_domain(VSET_IMPL_AUTOSELECT);
+
+    HREbarrier(HREglobal()); // wait for short_proc to be set
+
     int id = HREme(HREglobal());
     Print(infoLong, "slave: ready, id=%d.", id);
     stream_t is = fd_input(child_sockets[id-1]);
@@ -2615,15 +2642,14 @@ start_slave()
     {
         Debug("slave: start reading (id=%d).", id);
         int group = DSreadS32(is);
-        int length = dm_ones_in_row(GBgetDMInfo(model), group);
-        Debug("slave: group=%d, reading %d values (id=%d).", group, length, id);
+        int length = r_projs[group].len;
         int src[length];
         for(int i=0; i < length; i++)
         {
             src[i] = DSreadS32(is);
         }
         Print(infoLong, "slave: received state (id=%d, group=%d, length=%d).", id, group, length);
-        GBgetTransitionsShort(model, group, src, slave_cb, NULL);
+        (*short_multi_proc)(model, group, src, slave_cb, NULL);
         Debug("slave: returned from greybox (id=%d, group=%d).", id, group);
         Debug("slave: callback_signal: %d", *(callback_signals[id-1]));
         while (!cas(callback_signals[id-1], 0, 1)) { }
@@ -2635,7 +2661,7 @@ start_slave()
         Debug("slave: done (id=%d, group=%d).", id, group);
         next = DSreadS32(is);
     }
-    Print(infoShort, "slave: exiting (id=%d).", id);
+    Print(infoLong, "slave: exiting (id=%d).", id);
     RTfree(is);
 }
 
@@ -2659,7 +2685,7 @@ actual_main(void)
 
     init_model(files[0]);
 
-    Print(info, "Master ready: %d.", HREme(HREglobal()));
+    Print(infoLong, "Master ready: %d.", HREme(HREglobal()));
     //for(int i=0; i < HREpeers(HREglobal()); i++)
     //{
     //    const char msg[] = "Test message";
@@ -2707,6 +2733,21 @@ actual_main(void)
         expand_groups = 0;
     } else {
         init_domain(vset_impl);
+
+        if (vdom_separates_rw(domain)) {
+            Warning(info, "vset implementation supports read/write separation.");
+            Warning(info, "Using GBgetTransitionsShortR2W as next-state function.");
+            *short_proc = GBgetTransitionsShortR2W;
+        } else {
+            Warning(info, "vset implementation does not support read/write separation.");
+            Warning(info, "Using GBgetTransitionsShort as next-state function.");
+            *short_proc = GBgetTransitionsShort;
+        }
+        if (multi_process) {
+            *short_multi_proc = *short_proc;
+            *short_proc = master_get_transitions_short;
+        }
+
         initial = vset_create(domain, -1, NULL);
         src = (int*)alloca(sizeof(int)*N);
         GBgetInitialState(model, src);
@@ -2715,6 +2756,8 @@ actual_main(void)
         Print(infoShort, "got initial state");
         expand_groups = 1;
     }
+
+    HREbarrier(HREglobal()); // synchronise with slave processes
 
     vset_t visited = vset_create(domain, -1, NULL);
     vset_copy(visited, initial);
@@ -2785,16 +2828,6 @@ actual_main(void)
     case DIRECTED:
         guided_proc = directed;
         break;
-    }
-
-    if (vdom_separates_rw(domain)) {
-        Warning(info, "vset implementation supports read/write separation.");
-        Warning(info, "Using GBgetTransitionsShortR2W as next-state function.");
-        short_proc = GBgetTransitionsShortR2W;
-    } else {
-        Warning(info, "vset implementation does not support read/write separation.");
-        Warning(info, "Using GBgetTransitionsShort as next-state function.");
-        short_proc = GBgetTransitionsShort;
     }
 
     // temporal logics
@@ -2989,19 +3022,27 @@ main (int argc, char *argv[])
     if (multi_process) {
         init_multi_process(n_workers);
     }
+    short_proc = mmap(NULL,sizeof(short_proc_t),PROT_READ|PROT_WRITE,MAP_SHARED|MAP_ANONYMOUS,0,0);
+    short_multi_proc = mmap(NULL,sizeof(short_proc_t),PROT_READ|PROT_WRITE,MAP_SHARED|MAP_ANONYMOUS,0,0);
+    *(short_proc) = NULL;
+    *(short_multi_proc) = NULL;
 
     HREinitStart(&argc,&argv,1,2,files,"<model> [<etf>]");
 
     lace_n_workers = n_workers;
 
 #ifdef HAVE_SYLVAN
-    Print(info, "Worker %d / %d (pid = %d).", HREme(HREglobal()), HREpeers(HREglobal()), getpid());
+    Print(infoLong, "Worker %d / %d (pid = %d).", HREme(HREglobal()), HREpeers(HREglobal()), getpid());
 
     if (!multi_process || HREme(HREglobal())==0){
         Print(info, "Main process: %d.", HREme(HREglobal()));
+        if (multi_process)
+        {
+            Print(info, "%zu slave processes started.", n_workers);
+        }
         ctx = HREglobal();
         lace_startup(0, TASK(actual_main), 0);
-        Print(info, "Main done.");
+        Print(infoLong, "Main done.");
     } else {
         start_slave();
     }

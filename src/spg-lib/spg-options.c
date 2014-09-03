@@ -47,7 +47,7 @@ spg_solve_popt(poptContext con, enum poptCallbackReason reason,
         if (res < 0) {
             Print(error, "unknown attractor strategy %s", attr_str);
             HREexitUsage(HRE_EXIT_FAILURE);
-        } else {
+        } else if (HREme(HREglobal())==0) {
             Print(info, "Attractor strategy is %s", attr_str);
         }
         attr_strategy = res;

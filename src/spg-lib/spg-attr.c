@@ -37,9 +37,8 @@ void spg_attractor(int player, const parity_game* g, vset_t u, const spg_attr_op
         vset_t prev_attr = vset_create(g->domain, -1, NULL);
         vset_t tmp = vset_create(g->domain, -1, NULL);
         for(int group=0; group<g->num_groups; group++) {
-            vset_copy(tmp, g->v);
-            vset_prev(tmp, v_level, g->e[group]);
-            vset_intersect(tmp, g->v);
+            vset_clear(tmp);
+            vset_prev(tmp, v_level, g->e[group], g->v);
             vset_union(prev_attr, tmp);
         }
         vset_clear(tmp);
@@ -65,9 +64,8 @@ void spg_attractor(int player, const parity_game* g, vset_t u, const spg_attr_op
         // prev_b = V \intersect prev(B)
         vset_t prev_b = vset_create(g->domain, -1, NULL);
         for(int group=0; group<g->num_groups; group++) {
-            vset_copy(tmp, g->v);
-            vset_prev(tmp, b, g->e[group]);
-            vset_intersect(tmp, g->v);
+            vset_clear(tmp);
+            vset_prev(tmp, b, g->e[group], g->v);
             vset_union(prev_b, tmp);
         }
         vset_destroy(tmp);
@@ -143,9 +141,8 @@ VOID_TASK_3(attr_par_prev, vset_t, states, struct reach_par_s *, dummy, const pa
 {
     if (dummy->index >= 0) {
         //fprintf(stderr, "begin next[%d] on worker %d\n", dummy->index, LACE_WORKER_ID);
-        vset_copy(dummy->container, g->v);
-        vset_prev(dummy->container, states, g->e[dummy->index]);
-        vset_intersect(dummy->container, g->v);
+        vset_clear(dummy->container);
+        vset_prev(dummy->container, states, g->e[dummy->index], g->v);
         //fprintf(stderr, "end next[%d] on worker %d\n", dummy->index, LACE_WORKER_ID);
     } else {
         SPAWN(attr_par_prev, states, dummy->left, g);
@@ -325,9 +322,8 @@ VOID_TASK_4(attr_par_step, vset_t, states, vset_t, u, struct reach_par2_s *, dum
 {
     if (dummy->index >= 0) {
         //fprintf(stderr, "begin next[%d] on worker %d\n", dummy->index, LACE_WORKER_ID);
-        vset_copy(dummy->container, g->v);
-        vset_prev(dummy->container, states, g->e[dummy->index]);
-        vset_intersect(dummy->container, g->v);
+        vset_clear(dummy->container);
+        vset_prev(dummy->container, states, g->e[dummy->index], g->v);
 
         // B = V \intersect next(prev_attr)
         CALL(attr_par_next, dummy->container, dummy->nested, g);
@@ -491,8 +487,8 @@ void spg_attractor_chaining(int player, const parity_game* g, vset_t u, const sp
 
                 // prev_attr = V \intersect prev(attr^k)
                 vset_t prev_attr = vset_create(g->domain, -1, NULL);
-                vset_copy(prev_attr, g->v);
-                vset_prev(prev_attr, v_group, g->e[group]);
+                vset_clear(prev_attr);
+                vset_prev(prev_attr, v_group, g->e[group], g->v);
                 vset_copy(v_group, prev_attr);
                 vset_intersect(v_group, g->v_player[player]);
 
@@ -514,9 +510,8 @@ void spg_attractor_chaining(int player, const parity_game* g, vset_t u, const sp
                 // prev_b = V \intersect prev(B)
                 vset_t prev_b = vset_create(g->domain, -1, NULL);
                 for(int group=0; group<g->num_groups; group++) {
-                    vset_copy(tmp, g->v);
-                    vset_prev(tmp, b, g->e[group]);
-                    vset_intersect(tmp, g->v);
+                    vset_clear(tmp);
+                    vset_prev(tmp, b, g->e[group], g->v);
                     vset_union(prev_b, tmp);
                 }
                 vset_destroy(tmp);

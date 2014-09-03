@@ -46,6 +46,8 @@ main (int argc, char *argv[])
 
 #ifdef HAVE_SYLVAN
     lace_init(lace_n_workers, lace_dqsize);
+    size_t n_workers = lace_workers();
+    Warning(info, "Using %zu CPUs", n_workers);
     size_t stacksize = 256*1024*1024; // 256 megabytes
     lace_startup(stacksize, 0, 0);
 #endif

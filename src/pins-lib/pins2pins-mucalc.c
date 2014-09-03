@@ -136,7 +136,7 @@ void mucalc_print_state(log_t log, mucalc_context_t* ctx, int* state)
  * a combination of the target state in the parent LTS and the mu-calculus subformula argument
  * of the modal operator.
  */
-void mucalc_cb (void* context, transition_info_t* ti, int* dst, int*cpy) {
+void mucalc_cb (void* context, transition_info_t* ti, int* dst, int* cpy) {
     //Print(infoLong, "mucalc_cb");
     cb_context_t cb_ctx = (cb_context_t)context;
     mucalc_context_t *ctx = cb_ctx->ctx;
@@ -178,7 +178,17 @@ void mucalc_cb (void* context, transition_info_t* ti, int* dst, int*cpy) {
         int _dst[ctx->len];
         memcpy(_dst, dst, ctx->len*sizeof(int)-1);
         _dst[ctx->mu_idx] = cb_ctx->target_idx;
-        cb_ctx->cb(cb_ctx->user_context, &_ti, _dst);
+        if (cpy == NULL)
+        {
+            cb_ctx->cb(cb_ctx->user_context, &_ti, _dst, NULL);
+        }
+        else
+        {
+            int _cpy[ctx->len];
+            memcpy(_cpy, cpy, ctx->len*sizeof(int)-1);
+            _cpy[ctx->mu_idx] = 0; // 0=write, 1=copy
+            cb_ctx->cb(cb_ctx->user_context, &_ti, _dst, _cpy);
+        }
         if (log_active(debug))
         {
             Debug("mucalc_cb: successor:");
@@ -188,12 +198,12 @@ void mucalc_cb (void* context, transition_info_t* ti, int* dst, int*cpy) {
 }
 
 
-static inline void mucalc_successor(model_t self, int *dst, int group, int* transition_count, TransitionCB cb, void *user_context)
+static inline void mucalc_successor(model_t self, int *dst, int *cpy, int group, int* transition_count, TransitionCB cb, void *user_context)
 {
     mucalc_context_t *ctx = GBgetContext(self);
     int* edge_labels = NULL;
     transition_info_t ti = GB_TI(edge_labels, group);
-    cb(user_context, &ti, dst,NULL);
+    cb(user_context, &ti, dst, cpy);
     ++(*transition_count);
     Debug("mucalc_successor:");
     mucalc_print_state(debug, ctx, dst);
@@ -215,6 +225,13 @@ mucalc_long (model_t self, int group, int *src, TransitionCB cb,
            void *user_context)
 {
     mucalc_context_t *ctx = GBgetContext(self);
+    /* Fill copy vector with value 1 (copy), for all slots except the formula slot (mu_idx).
+     * This copy vector is used for all operators except the modal operators.
+     * Because all non-formula slots have '-' in the dependency matrix, except for the
+     * rows for modal operators, this copy vector has no effect.*/
+    int cpy[ctx->len];
+    cpy[ctx->mu_idx] = 0; // 0=write, 1=copy
+    for(int i=0; i<ctx->mu_idx; i++) { cpy[i] = 1; }
     int mucalc_node_idx = src[ctx->mu_idx];
     mucalc_node_t node = ctx->groupinfo.nodes[mucalc_node_idx];
     if (ctx->groupinfo.entries[group].node.expression->idx == node.expression->idx)
@@ -235,7 +252,7 @@ mucalc_long (model_t self, int group, int *src, TransitionCB cb,
                 int dst[ctx->len];
                 memcpy(dst, src, ctx->len*sizeof(int));
                 dst[ctx->mu_idx] = node.expression->arg1->idx;
-                mucalc_successor(self, dst, group, &transition_count, cb, user_context);
+                mucalc_successor(self, dst, cpy, group, &transition_count, cb, user_context);
             }
             break;
             case MUCALC_AND:
@@ -245,17 +262,17 @@ mucalc_long (model_t self, int group, int *src, TransitionCB cb,
                 // left branch
                 memcpy(dst, src, ctx->len*sizeof(int));
                 dst[ctx->mu_idx] = node.expression->arg1->idx;
-                mucalc_successor(self, dst, group, &transition_count, cb, user_context);
+                mucalc_successor(self, dst, cpy, group, &transition_count, cb, user_context);
                 // right branch
                 memcpy(dst, src, ctx->len*sizeof(int));
                 dst[ctx->mu_idx] = node.expression->arg2->idx;
-                mucalc_successor(self, dst, group, &transition_count, cb, user_context);
+                mucalc_successor(self, dst, cpy, group, &transition_count, cb, user_context);
             }
             break;
             case MUCALC_TRUE:
             case MUCALC_FALSE:
             {
-                mucalc_successor(self, src, group, &transition_count, cb, user_context); // self loop
+                mucalc_successor(self, src, cpy, group, &transition_count, cb, user_context); // self loop
             }
             break;
             case MUCALC_PROPOSITION:
@@ -275,7 +292,7 @@ mucalc_long (model_t self, int group, int *src, TransitionCB cb,
                           mucalc_fetch_value(ctx->env, MUCALC_PROPOSITION, node.expression->value),
                           src[proposition.state_idx], proposition.value_idx);
                 }
-                mucalc_successor(self, dst, group, &transition_count, cb, user_context);
+                mucalc_successor(self, dst, cpy, group, &transition_count, cb, user_context);
             }
             break;
             case MUCALC_VAR:
@@ -283,7 +300,7 @@ mucalc_long (model_t self, int group, int *src, TransitionCB cb,
                 int dst[ctx->len];
                 memcpy(dst, src, ctx->len*sizeof(int));
                 dst[ctx->mu_idx] = node.expression->arg1->idx;
-                mucalc_successor(self, dst, group, &transition_count, cb, user_context);
+                mucalc_successor(self, dst, cpy, group, &transition_count, cb, user_context);
             }
             break;
             case MUCALC_MUST:
@@ -320,7 +337,7 @@ mucalc_long (model_t self, int group, int *src, TransitionCB cb,
                         dst[ctx->mu_idx] = (child.expression->type == MUCALC_FALSE) ?
                                 ctx->env->true_expr->idx :
                                 ctx->env->false_expr->idx;
-                        mucalc_successor(self, dst, group, &transition_count, cb, user_context);
+                        mucalc_successor(self, dst, cpy, group, &transition_count, cb, user_context);
                     }
                     break;
                     case MUCALC_PROPOSITION:
@@ -341,7 +358,7 @@ mucalc_long (model_t self, int group, int *src, TransitionCB cb,
                                   mucalc_fetch_value(ctx->env, MUCALC_PROPOSITION, node.expression->value),
                                   src[proposition.state_idx], proposition.value_idx);
                         }
-                        mucalc_successor(self, dst, group, &transition_count, cb, user_context);
+                        mucalc_successor(self, dst, cpy, group, &transition_count, cb, user_context);
                     }
                     break;
                     default: Abort("Negation only allowed on leaf nodes, "
@@ -376,6 +393,13 @@ mucalc_all (model_t self, int *src, TransitionCB cb, void *user_context)
 {
     //Print(infoLong, "mucalc_all");
     mucalc_context_t *ctx = GBgetContext(self);
+    /* Fill copy vector with value 1 (copy), for all slots except the formula slot (mu_idx).
+     * This copy vector is used for all operators except the modal operators.
+     * Because all non-formula slots have '-' in the dependency matrix, except for the
+     * rows for modal operators, this copy vector has no effect.*/
+    int cpy[ctx->len];
+    cpy[ctx->mu_idx] = 0; // 0=write, 1=copy
+    for(int i=0; i<ctx->mu_idx; i++) { cpy[i] = 1; }
     int mucalc_node_idx = src[ctx->mu_idx];
     mucalc_node_t node = ctx->groupinfo.nodes[mucalc_node_idx];
     int group = -1;
@@ -395,7 +419,7 @@ mucalc_all (model_t self, int *src, TransitionCB cb, void *user_context)
             int dst[ctx->len];
             memcpy(dst, src, ctx->len*sizeof(int));
             dst[ctx->mu_idx] = node.expression->arg1->idx;
-            mucalc_successor(self, dst, group, &transition_count, cb, user_context);
+            mucalc_successor(self, dst, cpy, group, &transition_count, cb, user_context);
         }
         break;
         case MUCALC_AND:
@@ -405,17 +429,17 @@ mucalc_all (model_t self, int *src, TransitionCB cb, void *user_context)
             // left branch
             memcpy(dst, src, ctx->len*sizeof(int));
             dst[ctx->mu_idx] = node.expression->arg1->idx;
-            mucalc_successor(self, dst, group, &transition_count, cb, user_context);
+            mucalc_successor(self, dst, cpy, group, &transition_count, cb, user_context);
             // right branch
             memcpy(dst, src, ctx->len*sizeof(int));
             dst[ctx->mu_idx] = node.expression->arg2->idx;
-            mucalc_successor(self, dst, group, &transition_count, cb, user_context);
+            mucalc_successor(self, dst, cpy, group, &transition_count, cb, user_context);
         }
         break;
         case MUCALC_TRUE:
         case MUCALC_FALSE:
         {
-            mucalc_successor(self, src, group, &transition_count, cb, user_context); // self loop
+            mucalc_successor(self, src, cpy, group, &transition_count, cb, user_context); // self loop
         }
         break;
         case MUCALC_PROPOSITION:
@@ -435,7 +459,7 @@ mucalc_all (model_t self, int *src, TransitionCB cb, void *user_context)
                                           mucalc_fetch_value(ctx->env, MUCALC_PROPOSITION, node.expression->value),
                                           src[proposition.state_idx], proposition.value_idx);
             }
-            mucalc_successor(self, dst, group, &transition_count, cb, user_context);
+            mucalc_successor(self, dst, cpy, group, &transition_count, cb, user_context);
         }
         break;
         case MUCALC_VAR:
@@ -443,7 +467,7 @@ mucalc_all (model_t self, int *src, TransitionCB cb, void *user_context)
             int dst[ctx->len];
             memcpy(dst, src, ctx->len*sizeof(int));
             dst[ctx->mu_idx] = node.expression->arg1->idx;
-            mucalc_successor(self, dst, group, &transition_count, cb, user_context);
+            mucalc_successor(self, dst, cpy, group, &transition_count, cb, user_context);
         }
         break;
         case MUCALC_MUST:
@@ -780,7 +804,8 @@ GBaddMucalc (model_t model, const char *mucalc_file)
     matrix_t *p_dm = GBgetDMInfo (model);
     int parent_groups = dm_nrows( p_dm );
     matrix_t *p_dm_r = GBgetDMInfoRead(model);
-    matrix_t *p_dm_w = GBgetDMInfoWrite(model);
+    matrix_t *p_dm_mw = GBgetDMInfoMayWrite(model);
+    matrix_t *p_dm_w = GBgetDMInfoMustWrite(model);
 
     // Compute transition groups
     ctx->groupinfo = mucalc_compute_groupinfo(env, parent_groups);
@@ -788,9 +813,11 @@ GBaddMucalc (model_t model, const char *mucalc_file)
     // Compute dependency matrix, add mucalc node
     matrix_t *_p_dm = (matrix_t*) RTmalloc(sizeof(matrix_t));
     matrix_t *_p_dm_r = (matrix_t*) RTmalloc(sizeof(matrix_t));
+    matrix_t *_p_dm_mw = (matrix_t*) RTmalloc(sizeof(matrix_t));
     matrix_t *_p_dm_w = (matrix_t*) RTmalloc(sizeof(matrix_t));
     dm_create(_p_dm, ctx->groupinfo.group_count, ctx->len);
     dm_create(_p_dm_r, ctx->groupinfo.group_count, ctx->len);
+    dm_create(_p_dm_mw, ctx->groupinfo.group_count, ctx->len);
     dm_create(_p_dm_w, ctx->groupinfo.group_count, ctx->len);
     for(int i=0; i < ctx->groupinfo.group_count; i++) {
         // copy old matrix rows
@@ -802,6 +829,8 @@ GBaddMucalc (model_t model, const char *mucalc_file)
                     dm_set(_p_dm, i, j);
                 if (dm_is_set(p_dm_r, parent_group, j))
                     dm_set(_p_dm_r, i, j);
+                if (dm_is_set(p_dm_mw, parent_group, j))
+                    dm_set(_p_dm_mw, i, j);
                 if (dm_is_set(p_dm_w, parent_group, j))
                     dm_set(_p_dm_w, i, j);
             }
@@ -809,12 +838,14 @@ GBaddMucalc (model_t model, const char *mucalc_file)
         // Set mucalc node as dependent
         dm_set(_p_dm, i, ctx->mu_idx);
         dm_set(_p_dm_r, i, ctx->mu_idx);
+        dm_set(_p_dm_mw, i, ctx->mu_idx);
         dm_set(_p_dm_w, i, ctx->mu_idx);
     }
 
     GBsetDMInfo(_model, _p_dm);
     GBsetDMInfoRead(_model, _p_dm_r);
-    GBsetDMInfoWrite(_model, _p_dm_w);
+    GBsetDMInfoMayWrite(_model, _p_dm_mw);
+    GBsetDMInfoMustWrite(_model, _p_dm_w);
 
     // Set the state label functions for parity games
     GBsetStateLabelShort(_model, mucalc_sl_short);

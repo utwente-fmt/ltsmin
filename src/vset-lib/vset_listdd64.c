@@ -130,7 +130,6 @@ struct vector_relation {
     vrel_t prev; //
     uint64_t mdd;
     uint64_t p_id;
-    int p_len;
     int r_p_len;
     int w_p_len;
     int* r_proj;
@@ -856,21 +855,7 @@ rel_create_mdd_rw(vdom_t dom, int r_k, int *r_proj, int w_k, int *w_proj)
 
     assert(0 <= r_k && r_k <= dom->shared.size && 0 <= w_k && w_k <= dom->shared.size);
 
-    int k = 0;
-    for (int i = 0, r = 0, w = 0; i < dom->shared.size; i++) {
-        int is_read = 0;
-        if (r_proj[r] == i) {
-            r++;
-            k++;
-            is_read = 1;
-        }
-        if (w_proj[w] == i) {
-            w++;
-            if (!is_read) k++;
-        }
-    }
-
-    vrel_t rel = (vrel_t)RTmalloc(sizeof(struct vector_relation) + sizeof(int[k]) + sizeof(int[r_k]) + sizeof(int[w_k]));
+    vrel_t rel = (vrel_t)RTmalloc(sizeof(struct vector_relation) + sizeof(int[r_k]) + sizeof(int[w_k]));
     rel->dom  = dom;
     rel->mdd  = 0;
     rel->next = protected_rels;
@@ -878,13 +863,14 @@ rel_create_mdd_rw(vdom_t dom, int r_k, int *r_proj, int w_k, int *w_proj)
     if (protected_rels != NULL) protected_rels->prev = rel;
     protected_rels = rel;
     rel->p_id  = 1;
-    rel->p_len = k;
     rel->r_p_len = r_k;
     rel->w_p_len = w_k;
-    rel->r_proj = (int*) ((char*) rel + sizeof(struct vector_relation) + sizeof(int[k]));
-    rel->w_proj = (int*) ((char*) rel + sizeof(struct vector_relation) + sizeof(int[k]) + sizeof(int[r_k]));
+    rel->r_proj = (int*) ((char*) rel + sizeof(struct vector_relation));
+    rel->w_proj = (int*) ((char*) rel + sizeof(struct vector_relation) + sizeof(int[r_k]));
 
-    for (int i = k-1, r=r_k-1,w=w_k-1; i >=0; i--) {
+    int r = r_k-1;
+    int w = w_k-1;
+    while (r >= 0 || w >= 0) {
 
         if(w >= 0 && (r == -1 ||  w_proj[w] >= r_proj[r])) {
             rel->w_proj[w] = w_proj[w];
@@ -916,7 +902,6 @@ static void
 rel_save_proj_bin(FILE* f, vrel_t rel)
 {
     stream_t s = stream_output(f);
-    DSwriteS32(s, rel->p_len);
 
     DSwriteS32(s, rel->r_p_len);
     for(int i=0; i<rel->r_p_len; i++){
@@ -1114,7 +1099,10 @@ rel_add_mdd_cpy(vrel_t rel, const int *src, const int *dst, const int *cpy) {
     uint32_t vec[rel->r_p_len + rel->w_p_len];
     uint32_t cpy_vec[rel->r_p_len + rel->w_p_len];
 
-    for (int i = 0,j=0, r=0,w=0; i < rel->p_len; i++) {
+    int j=0;
+    int r=0;
+    int w=0;
+    while (r < rel->r_p_len || w < rel->w_p_len) {
 
         int is_read = 0;
 
@@ -1869,7 +1857,7 @@ sat_fixpoint(int level, uint64_t set)
         for (int i = 0; i < groups_info.tg_len; i++) {
             int grp = groups_info.top_groups[i];
             mdd_push(new_set);
-            assert(rel_set[grp]->p_len != 0);
+            assert(rel_set[grp]->r_p_len != 0 || rel_set[grp]->w_p_len != 0);
 
             if (rel_set[grp]->expand != NULL) {
                 proj_set[grp]->mdd = mdd_project(rel_set[grp]->p_id, new_set,
@@ -1962,7 +1950,7 @@ set_least_fixpoint_mdd(vset_t dst, vset_t src, vrel_t rels[], int rel_count)
         proj_set[grp] = set_create_mdd(rels[grp]->dom, rels[grp]->r_p_len,
                                        rels[grp]->r_proj);
 
-        if (rels[grp]->p_len == 0)
+        if (rels[grp]->r_p_len == 0 && rels[grp]->w_p_len == 0)
             continue;
 
         // top_lvl = min(rels[grp]->r_proj[0], rels[grp]->w_p_len[0])
@@ -2098,7 +2086,10 @@ static void rel_dot_name (FILE *fp, vrel_t rel)
     int to_read = 0;
     int from_read = 0;
 
-    for (int i = 0,r=0,w=0; i < rel->p_len; i++) {
+    int i=0;
+    int r=0;
+    int w=0;
+    while (r < rel->r_p_len || w < rel->w_p_len) {
 
         int read = w >= rel->w_p_len || (r < rel->r_p_len && w < rel->w_p_len && rel->r_proj[r] <= rel->w_proj[w]);
         int write = r >= rel->r_p_len || (r < rel->r_p_len && w < rel->w_p_len && rel->w_proj[w] <= rel->r_proj[r]);
@@ -2124,7 +2115,7 @@ static void rel_dot_name (FILE *fp, vrel_t rel)
         if (write) to_read = 0;
         if (read) to_read = 1;
 
-        if (i > 0 && i < rel->p_len)
+        if (i > 0)
             fprintf(fp, "l%s%d -> l%s%d[style=invis];\n", from_read ? "" : "n", i-1, to_read ? "" : "n", i);
 
         if (read) {
@@ -2135,6 +2126,7 @@ static void rel_dot_name (FILE *fp, vrel_t rel)
             from_read = 0;
             w++;
         }
+        i++;
     }
 }
 
