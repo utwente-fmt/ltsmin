@@ -89,6 +89,8 @@ set_create(vdom_t dom, int k, int* proj)
 {
     vset_t set = (vset_t)RTmalloc(sizeof(struct vector_set));
 
+    LACE_ME;
+
     set->dom = dom;
     set->bdd = sylvan_false; // Initialize with an empty BDD
 
@@ -139,6 +141,8 @@ set_destroy(vset_t set)
 static vrel_t
 rel_create(vdom_t dom, int k, int* proj)
 {
+    LACE_ME;
+
     sylvan_gc_disable();
 
     vrel_t rel = (vrel_t)RTmalloc(sizeof(struct vector_relation));
@@ -217,6 +221,8 @@ sylvan_print_optimal_bits_per_state()
 static BDD
 state_to_bdd(const int* e, size_t vec_length, BDDVAR* vec_to_bddvar, BDD projection)
 {
+    LACE_ME;
+
     check_state(e, vec_length);
 
     size_t varcount = vec_length * fddbits;
@@ -244,6 +250,8 @@ state_to_bdd(const int* e, size_t vec_length, BDDVAR* vec_to_bddvar, BDD project
 static void
 set_add(vset_t set, const int* e)
 {
+    LACE_ME;
+
     // For some reason, we never get projected e, we get full e.
     BDD bdd = state_to_bdd(e, set->dom->shared.size, set->dom->vec_to_bddvar, set->projection);
     BDD prev = set->bdd;
@@ -258,6 +266,8 @@ set_add(vset_t set, const int* e)
 static int
 set_member(vset_t set, const int* e)
 {
+    LACE_ME;
+
     // For some reason, we never get projected e, we get full e.
     BDD bdd = state_to_bdd(e, set->dom->shared.size, set->dom->vec_to_bddvar, set->projection);
     int res = sylvan_and(set->bdd, bdd) != sylvan_false ? 1 : 0;
@@ -387,6 +397,8 @@ set_example(vset_t set, int *e)
 static void
 set_enum_match(vset_t set, int p_len, int* proj, int* match, vset_element_cb cb, void* context) 
 {
+    LACE_ME;
+
     // Create bdd of "match"
     // Assumption: proj is ordered (if not, you get bad performance)
 
@@ -417,6 +429,8 @@ set_enum_match(vset_t set, int p_len, int* proj, int* match, vset_element_cb cb,
 static void
 set_copy_match(vset_t dst, vset_t src, int p_len, int* proj, int*match)
 {
+    LACE_ME;
+
     // Create bdd of "match"
     // Assumption: proj is ordered (if not, you get bad performance)
 
@@ -443,6 +457,7 @@ set_copy_match(vset_t dst, vset_t src, int p_len, int* proj, int*match)
 static void
 set_count(vset_t set, long *nodes, bn_int_t *elements) 
 {
+    LACE_ME;
     *nodes = sylvan_nodecount(set->bdd);
     double count = (double)sylvan_satcount(set->bdd, set->variables);
     bn_double2int(count, elements);
@@ -451,6 +466,7 @@ set_count(vset_t set, long *nodes, bn_int_t *elements)
 static void
 rel_count(vrel_t rel, long *nodes, bn_int_t *elements)
 {
+    LACE_ME;
     *nodes = sylvan_nodecount(rel->bdd);
     double count = (double)sylvan_satcount(rel->bdd, rel->all_variables);
     bn_double2int(count, elements);
@@ -462,6 +478,8 @@ rel_count(vrel_t rel, long *nodes, bn_int_t *elements)
 static void
 set_union(vset_t dst, vset_t src)
 {
+    LACE_ME;
+
     BDD old = dst->bdd;
     dst->bdd = sylvan_ref(sylvan_or(dst->bdd, src->bdd));
     sylvan_deref(old);
@@ -473,6 +491,8 @@ set_union(vset_t dst, vset_t src)
 static void
 set_intersect(vset_t dst, vset_t src)
 {
+    LACE_ME;
+
     BDD old = dst->bdd;
     dst->bdd = sylvan_ref(sylvan_and(dst->bdd, src->bdd));
     sylvan_deref(old);
@@ -484,6 +504,8 @@ set_intersect(vset_t dst, vset_t src)
 static void
 set_minus(vset_t dst, vset_t src)
 {
+    LACE_ME;
+
     BDD old = dst->bdd;
     dst->bdd = sylvan_ref(sylvan_diff(dst->bdd, src->bdd));
     sylvan_deref(old);
@@ -495,13 +517,11 @@ set_minus(vset_t dst, vset_t src)
 static void
 set_next(vset_t dst, vset_t src, vrel_t rel)
 {
+    LACE_ME;
+
     assert(dst->projection == src->projection);
     sylvan_deref(dst->bdd);
     dst->bdd = sylvan_ref(sylvan_relprod_paired(src->bdd, rel->bdd, rel->all_variables));
-
-    // To use RelProd instead of RelProdS, uncomment the following lines and comment the preceding line
-    // BDD temp = sylvan_relprod(src->bdd, rel->bdd, rel->variables_nonprime_set);
-    // dst->bdd = sylvan_substitute(temp, rel->variables_prime_set);
 } 
 
 /**
@@ -510,6 +530,8 @@ set_next(vset_t dst, vset_t src, vrel_t rel)
 static void
 set_prev(vset_t dst, vset_t src, vrel_t rel, vset_t univ)
 {
+    LACE_ME;
+
     assert(dst->projection == src->projection);
     sylvan_deref(dst->bdd);
     dst->bdd = sylvan_ref(sylvan_relprod_paired_prev(src->bdd, rel->bdd, rel->all_variables));
@@ -522,6 +544,8 @@ set_prev(vset_t dst, vset_t src, vrel_t rel, vset_t univ)
 static void
 set_project(vset_t dst,vset_t src)
 {
+    LACE_ME;
+
     sylvan_deref(dst->bdd);
     if (dst->projection != 0) dst->bdd = sylvan_exists(src->bdd, dst->projection);
     else dst->bdd = src->bdd;
@@ -536,6 +560,8 @@ set_project(vset_t dst,vset_t src)
 static void
 set_zip(vset_t dst, vset_t src)
 {
+    LACE_ME;
+
     BDD tmp1 = dst->bdd;
     BDD tmp2 = src->bdd;
     dst->bdd = sylvan_ref(sylvan_or(tmp1, tmp2));
@@ -551,6 +577,8 @@ set_zip(vset_t dst, vset_t src)
 static void
 rel_add(vrel_t rel, const int *src, const int *dst)
 {
+    LACE_ME;
+
     BDD bdd_src = state_to_bdd(src, rel->vector_size, rel->vec_to_bddvar, sylvan_false);
     BDD bdd_dst = state_to_bdd(dst, rel->vector_size, rel->prime_vec_to_bddvar, sylvan_false);
 
@@ -629,6 +657,7 @@ set_load(FILE* f, vdom_t dom)
     set->vec_to_bddvar = (BDDVAR*)RTmalloc(sizeof(BDDVAR) * fddbits * set->vector_size);
     fread(set->vec_to_bddvar, sizeof(BDDVAR), fddbits * set->vector_size, f);
 
+    LACE_ME;
     sylvan_gc_disable();
     set->variables = sylvan_ref(sylvan_set_fromarray(set->vec_to_bddvar, fddbits * set->vector_size));
     set->projection = sylvan_ref(sylvan_set_removeall(dom->universe, set->variables));
@@ -669,6 +698,7 @@ rel_load(FILE* f, vrel_t rel)
     fread(rel->prime_vec_to_bddvar, sizeof(BDDVAR), rel->vector_size*fddbits, f);
 
     sylvan_gc_disable();
+    LACE_ME;
     rel->variables = sylvan_ref(sylvan_set_fromarray(rel->vec_to_bddvar, fddbits * rel->vector_size));
     rel->prime_variables = sylvan_ref(sylvan_set_fromarray(rel->prime_vec_to_bddvar, fddbits * rel->vector_size));
     rel->all_variables = sylvan_ref(sylvan_set_addall(rel->prime_variables, rel->variables));
@@ -737,6 +767,8 @@ dom_set_function_pointers(vdom_t dom)
 vdom_t
 vdom_create_sylvan(int n)
 {
+    LACE_ME;
+
     Warning(info,"Creating a Sylvan domain.");
 
     // Call initializator of library (if needed)
@@ -769,6 +801,8 @@ vdom_create_sylvan(int n)
 vdom_t
 vdom_create_sylvan_from_file(FILE *f)
 {
+    LACE_ME;
+
     Warning(info,"Creating a Sylvan domain.");
 
     // Call initializator of library (if needed)

@@ -627,6 +627,7 @@ deadlock_check(vset_t deadlocks, bitvector_t *reach_groups)
 
     Warning(debug, "Potential deadlocks found");
 
+    LACE_ME;
     for (int i = 0; i < nGrps; i++) {
         if (bitvector_is_set(reach_groups, i)) continue;
         expand_group_next(i, deadlocks);
@@ -1031,6 +1032,7 @@ reach_bfs_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
     vset_copy(current_level, visited);
     if (save_sat_levels) vset_minus(current_level, visited_old);
 
+    LACE_ME;
     while (!vset_is_empty(current_level)) {
         if (trc_output != NULL) save_level(visited);
         stats_and_progress_report(current_level, visited, level);
@@ -1117,6 +1119,7 @@ reach_bfs(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
     vset_t deadlocks = dlk_detect?vset_create(domain, -1, NULL):NULL;
     vset_t dlk_temp = dlk_detect?vset_create(domain, -1, NULL):NULL;
 
+    LACE_ME;
     while (!vset_equal(visited, old_vis)) {
         if (trc_output != NULL) save_level(visited);
         vset_copy(old_vis, visited);
@@ -1375,6 +1378,7 @@ reach_chain_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
     vset_copy(new_states, visited);
     if (save_sat_levels) vset_minus(new_states, visited_old);
 
+    LACE_ME;
     while (!vset_is_empty(new_states)) {
         stats_and_progress_report(new_states, visited, level);
         level++;
@@ -1426,6 +1430,7 @@ reach_chain(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
     vset_t deadlocks = dlk_detect?vset_create(domain, -1, NULL):NULL;
     vset_t dlk_temp = dlk_detect?vset_create(domain, -1, NULL):NULL;
 
+    LACE_ME;
     while (!vset_equal(visited, old_vis)) {
         vset_copy(old_vis, visited);
         stats_and_progress_report(NULL, visited, level);
@@ -1479,6 +1484,7 @@ reach_sat_fix(reach_proc_t reach_proc, vset_t visited,
     vset_t deadlocks = dlk_detect?vset_create(domain, -1, NULL):NULL;
     vset_t dlk_temp = dlk_detect?vset_create(domain, -1, NULL):NULL;
 
+    LACE_ME;
     while (!vset_equal(visited, old_vis)) {
         if (trc_output != NULL) save_level(visited);
         vset_copy(old_vis, visited);
@@ -2455,9 +2461,9 @@ static char *files[2];
 hre_context_t ctx;
 
 #ifdef HAVE_SYLVAN
-LACE_CALLBACK(actual_main)
+TASK_1(void*, actual_main, void*, arg)
 #else
-static void
+static void*
 actual_main(void)
 #endif
 {
@@ -2466,6 +2472,7 @@ actual_main(void)
 #ifdef HAVE_SYLVAN
     HREinitBegin(HREappName());
     HREglobalSet(ctx);
+    (void)arg;
 #endif
 
     int *src;
@@ -2752,9 +2759,7 @@ actual_main(void)
         }
     }
 
-#ifdef HAVE_SYLVAN
     return 0;
-#endif
 }
 
 int
@@ -2770,7 +2775,7 @@ main (int argc, char *argv[])
 #ifdef HAVE_SYLVAN
     ctx = HREglobal();
     lace_init(lace_n_workers, lace_dqsize);
-    lace_startup(0, actual_main, 0);
+    lace_startup(0, TASK(actual_main), 0);
 #else
     actual_main();
 #endif
