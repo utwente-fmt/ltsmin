@@ -455,8 +455,8 @@ find_trace(int trace_end[][N], int end_count, int level, vset_t *levels, char* f
 
     GBgetInitialState(model, init_state);
 
-    char* file_name=malloc((4+strlen(trc_output)+strlen(file_prefix))*sizeof(char));
-    stpcpy(stpcpy(stpcpy(file_name,trc_output),file_prefix),".gcf");
+    char* file_name=malloc((5+strlen(trc_output)+strlen(file_prefix))*sizeof(char));
+    sprintf(file_name, "%s%s.gcf", trc_output, file_prefix);
     Warning(info,"writing to file: %s",file_name);
     trace_output = lts_file_create(file_name, ltstype, 1, lts_vset_template());
     lts_write_init(trace_output, 0, (uint32_t*)init_state);
