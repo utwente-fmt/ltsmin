@@ -264,6 +264,8 @@ extern void GBprintDependencyMatrixRead(FILE* file, model_t model);
 extern void GBprintDependencyMatrixMayWrite(FILE* file, model_t model);
 extern void GBprintDependencyMatrixMustWrite(FILE* file, model_t model);
 extern void GBprintDependencyMatrixCombined(FILE* file, model_t model);
+extern void GBprintStateLabelMatrix(FILE* file, model_t model);
+extern void GBprintStateLabelGroupInfo(FILE* file, model_t model);
 
 /**
 \brief Get the dependency matrix of the model

@@ -1062,8 +1062,25 @@ void GBprintPORMatrix(FILE* file, model_t model) {
     }
 }
 
+void GBprintStateLabelInfo(FILE* file, model_t model) {
+    Printf (info, "\nState labeling dependencies:\n");
+    dm_print(file, GBgetStateLabelInfo(model));
 }
 
+void GBprintStateLabelGroupInfo(FILE* file, model_t model) {
+
+    int nGroups = dm_nrows (GBgetDMInfo (model));
+
+    Printf(info, "State label group info:\n");
+    for (int i = 0; i < nGroups; i++) {
+        guard_t* guards = GBgetGuard (model, i);
+        fprintf (file, "%d (%d): ", i, guards->count);
+        for (int j = 0; j < guards->count; j++) {
+            fprintf (file, "%d,", guards->guard[j]);
+        }
+        fprintf (file, "\n");
+    }
+}
 
 int guards_all(model_t self,int*src,TransitionCB cb,void*context){
 
@@ -1180,6 +1197,8 @@ GBloadFile (model_t model, const char *filename, model_t *wrapped)
                     if (HREme(HREglobal()) == 0) {
                         GBprintDependencyMatrixCombined(stdout, model);
                         if (log_active(infoLong)) {
+                            GBprintStateLabelInfo(stdout, model);
+                            GBprintStateLabelGroupInfo(stdout, model);
                             GBprintPORMatrix(stdout, model);
                         }
                         HREbarrier (HREglobal());
