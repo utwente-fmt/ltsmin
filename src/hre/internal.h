@@ -71,6 +71,7 @@ struct hre_context_s{
     hre_exit_m exit;
     hre_yield_m yield;
     hre_yield_while_m yield_while;
+    hre_cond_signal_m cond_signal;
     hre_xfer_m send;
     hre_recv_t recv_type;
     hre_xfer_m recv;

@@ -176,6 +176,12 @@ static void queue_yield(hre_context_t ctx){
     queue_while(ctx,&dummy);
 }
 
+static void queue_cond_signal(hre_context_t ctx, int id){
+    pthread_mutex_lock(&(ctx->queues[id].lock));
+    pthread_cond_signal(&(ctx->queues[id].cond));
+    pthread_mutex_unlock(&(ctx->queues[id].lock));
+}
+
 extern int main(int,char**);
 
 static void* thread_main(void*arg){
@@ -296,6 +302,7 @@ void HREpthreadRun(int threads){
         HREsetExit(thr_ctx[i],hre_thread_exit);
         HREyieldSet(thr_ctx[i],queue_yield);
         HREyieldWhileSet(thr_ctx[i],queue_while);
+        HREcondSignalSet(thr_ctx[i], queue_cond_signal);
         HREsendSet(thr_ctx[i],queue_send);
         HRErecvSet(thr_ctx[i],queue_recv,HRErecvActive);
         HREmsgRegionSet(thr_ctx[i],region);
@@ -467,6 +474,7 @@ static void fork_start(int* argc,char **argv[],int run_threads){
             hre_ctx->queues=queues;
             HREyieldSet(hre_ctx,queue_yield);
             HREyieldWhileSet(hre_ctx,queue_while);
+            HREcondSignalSet(hre_ctx, queue_cond_signal);
             HREsendSet(hre_ctx,queue_send);
             HRErecvSet(hre_ctx,queue_recv,HRErecvActive);
             HREmsgRegionSet(hre_ctx,region);

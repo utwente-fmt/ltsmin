@@ -161,6 +161,14 @@ void HREyieldWhile(hre_context_t ctx,int *condition){
     }
 }
 
+void HREcondSignalSet(hre_context_t ctx, hre_cond_signal_m method){
+    USR2SYS(ctx)->cond_signal=method;
+}
+
+void HREcondSignal(hre_context_t ctx, int id){
+    if (USR2SYS(ctx)->cond_signal) USR2SYS(ctx)->cond_signal(ctx, id);
+}
+
 hre_msg_t HREnewMessage(hre_context_t context,uint32_t size){
     hre_msg_t res=(hre_msg_t)HREmallocZero(USR2SYS(context)->msg_region,sizeof(struct hre_msg_s)+size);
     res->context=context;

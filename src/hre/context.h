@@ -114,6 +114,17 @@ This functions allows background work to progress.
 */
 extern void HREyieldWhile(hre_context_t ctx,int*condition);
 
+typedef void(*hre_cond_signal_m)(hre_context_t ctx, int id);
+
+extern void HREcondSignalSet(hre_context_t ctx, hre_cond_signal_m method);
+
+/**
+\brief Signals queue id.
+
+Useful in the case that two processes need to exchange messages, but do
+not both have HREyieldWhile in their main loop.
+*/
+extern void HREcondSignal(hre_context_t ctx, int id);
 
 /**
 \defgroup hre-message-api Messaging Passing Interface for Hybrid Runtime Environment.

@@ -2476,23 +2476,23 @@ hre_context_t ctx;
 
 static int* parent_sockets;
 static int* child_sockets;
-static int** callback_signals;
+static int* run_chunk_thread;
+static pthread_t chunk_thread;
 
 void init_multi_process(size_t workers)
 {
     HREenableFork(workers + 1, true);
     parent_sockets = RTmalloc(sizeof(int)*workers);
     child_sockets = RTmalloc(sizeof(int)*workers);
-    callback_signals = RTmalloc(sizeof(void*)*workers);
     for(size_t i=0; i<workers; i++)
     {
         int fd[2];
         socketpair(PF_LOCAL, SOCK_STREAM, 0, fd);
         parent_sockets[i] = fd[0];
         child_sockets[i] = fd[1];
-        callback_signals[i] = mmap(NULL,sizeof(int),PROT_READ|PROT_WRITE,MAP_SHARED|MAP_ANONYMOUS,0,0);
-        *(callback_signals[i]) = 0;
     }
+    run_chunk_thread = mmap(NULL,sizeof(int),PROT_READ|PROT_WRITE,MAP_SHARED|MAP_ANONYMOUS,0,0);
+    *run_chunk_thread = 1;
 }
 
 static int
@@ -2506,7 +2506,7 @@ master_get_transitions_short(model_t model, int group, int* src, TransitionCB cb
 #endif
 
     int r_length = r_projs[group].len;
-    Print(infoLong, "master: writing state to slave (id=%d, group=%d, length=%d).", id, group, r_length);
+    Print(infoLong, "master %d: writing state to slave (group=%d, length=%d).", id, group, r_length);
     stream_t os = fd_output(parent_sockets[id-1]);
     DSwriteS32(os, 1); // signal that a state will be sent next
     DSwriteS32(os, group);
@@ -2515,23 +2515,16 @@ master_get_transitions_short(model_t model, int group, int* src, TransitionCB cb
         DSwriteS32(os, src[i]);
     }
     stream_flush(os);
-    RTfree(os);
 
-    // at this point the slave may request chunks
-    Debug("master: callback_signal: %d", *(callback_signals[id-1]));
-    while (!cas(callback_signals[id-1], 1, 0)) {
-        HREyield(ctx);
-    }
-    Debug("master: callback_signal: %d", *(callback_signals[id-1]));
-
-    Print(infoLong, "master: waiting for reply (id=%d).", id);
     stream_t is = fd_input(parent_sockets[id-1]);
     int w_length = w_projs[group].len;
     int labels = lts_type_get_edge_label_count(GBgetLTStype(model));
+
+    Debug("master %d: waiting for reply.", id);
     int next = DSreadS32(is);
     while(next==1)
     {
-        Print(infoLong, "master: reading state from slave.");
+        Print(infoLong, "master %d: reading state from slave.", id);
         int dst[w_length];
         for(int i=0; i<w_length; i++)
         {
@@ -2560,17 +2553,11 @@ master_get_transitions_short(model_t model, int group, int* src, TransitionCB cb
         ti->por_proviso = DSreadS32(is);
         cb(context, ti, dst, cpy);
 
-        // at this point the slave may request chunks
-        Debug("master: callback_signal: %d", *(callback_signals[id-1]));
-        while (!cas(callback_signals[id-1], 1, 0)) {
-            HREyield(ctx);
-        }
-        Debug("master: callback_signal: %d", *(callback_signals[id-1]));
-
         next = DSreadS32(is);
     }
+    RTfree(os);
     RTfree(is);
-    Print(infoLong, "master: done (id=%d).", id);
+    Print(infoLong, "master %d: done.", id);
     return 0;
 }
 
@@ -2591,15 +2578,12 @@ static void
 slave_cb(void* context, transition_info_t* ti, int* dst, int* cpy)
 {
     int id = HREme(HREglobal());
-    Debug("slave_cb: id=%d.", id);
+    Debug("slave_cb %d.", id);
     stream_t os = fd_output(child_sockets[id-1]);
     int group = ti->group;
     int length = w_projs[group].len;
     int labels = lts_type_get_edge_label_count(GBgetLTStype(model));
-    Print(infoLong, "slave_cb: writing state to master: id=%d, group=%d, length=%d.", id, group, length);
-    Debug("slave_cb: callback_signal: %d", *(callback_signals[id-1]));
-    while (!cas(callback_signals[id-1], 0, 1)) { }
-    Debug("slave_cb: callback_signal: %d", *(callback_signals[id-1]));
+    Print(infoLong, "slave_cb %d: writing state to master: group=%d, length=%d.", id, group, length);
 
     DSwriteS32(os, 1);
     for (int i=0; i<length; i++)
@@ -2635,12 +2619,12 @@ start_slave()
     HREbarrier(HREglobal()); // wait for short_proc to be set
 
     int id = HREme(HREglobal());
-    Print(infoLong, "slave: ready, id=%d.", id);
+    Print(infoLong, "slave %d: ready.", id);
     stream_t is = fd_input(child_sockets[id-1]);
     int next = DSreadS32(is);
     while (next==1)
     {
-        Debug("slave: start reading (id=%d).", id);
+        Print(infoLong, "slave %d: start reading.", id);
         int group = DSreadS32(is);
         int length = r_projs[group].len;
         int src[length];
@@ -2648,21 +2632,27 @@ start_slave()
         {
             src[i] = DSreadS32(is);
         }
-        Print(infoLong, "slave: received state (id=%d, group=%d, length=%d).", id, group, length);
+        Print(infoLong, "slave %d: received state (group=%d, length=%d).", id, group, length);
         (*short_multi_proc)(model, group, src, slave_cb, NULL);
-        Debug("slave: returned from greybox (id=%d, group=%d).", id, group);
-        Debug("slave: callback_signal: %d", *(callback_signals[id-1]));
-        while (!cas(callback_signals[id-1], 0, 1)) { }
-        Debug("slave: callback_signal: %d", *(callback_signals[id-1]));
+        Debug("slave %d: returned from greybox (group=%d).", id, group);
+
         stream_t os = fd_output(child_sockets[id-1]);
-        DSwriteS32(os, 0);
+        DSwriteS32(os, 0); // signal that all successor states have been sent
         stream_flush(os);
         RTfree(os);
-        Debug("slave: done (id=%d, group=%d).", id, group);
+        Print(infoLong, "slave %d: done (group=%d).", id, group);
         next = DSreadS32(is);
     }
-    Print(infoLong, "slave: exiting (id=%d).", id);
+    Print(infoLong, "slave %d: exiting.", id);
     RTfree(is);
+}
+
+static void*
+start_chunk_thread(void* arg){
+    Print(infoLong, "Starting chunk thread.");
+    HREyieldWhile(ctx, run_chunk_thread);
+    return 0;
+    (void)arg;
 }
 
 #ifdef HAVE_SYLVAN
@@ -2755,6 +2745,12 @@ actual_main(void)
 
         Print(infoShort, "got initial state");
         expand_groups = 1;
+
+        if (multi_process) {
+            // FIXME: somehow, sometimes there is a deadlock at startup...
+            // start chunk tread
+            pthread_create(&chunk_thread, NULL, start_chunk_thread, (void*) 0);
+        }
     }
 
     HREbarrier(HREglobal()); // synchronise with slave processes
@@ -2873,6 +2869,13 @@ actual_main(void)
 
     if (multi_process) {
         master_exit();
+        if (transitions_load_filename == NULL) {
+            // signal chunk thread that all work is done.
+            Print(infoLong, "Wait for chunk thread to finish.");
+            *run_chunk_thread = 0;
+            HREcondSignal(ctx, 0);
+            pthread_join(chunk_thread, NULL);
+        }
     }
 
     if (transitions_save_filename != NULL) {
@@ -3044,6 +3047,7 @@ main (int argc, char *argv[])
         lace_startup(0, TASK(actual_main), 0);
         Print(infoLong, "Main done.");
     } else {
+        ctx = HREglobal();
         start_slave();
     }
 #else
