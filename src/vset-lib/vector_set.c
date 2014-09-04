@@ -451,6 +451,10 @@ void vrel_dot(FILE* fp, vrel_t src) {
     }
 }
 
+void vset_join(vset_t dst, vset_t left, vset_t right) {
+    dst->dom->shared.set_join(dst,left,right);
+}
+
 void
 vset_pre_save(FILE *f, vdom_t dom)
 {

@@ -52,6 +52,7 @@ struct vector_domain_shared {
 	void (*set_least_fixpoint)(vset_t dst,vset_t src,vrel_t rels[],int rel_count);
 	void (*set_dot)(FILE* fp, vset_t src);
 	void (*rel_dot)(FILE* fp, vrel_t src);
+	void (*set_join)(vset_t dst,vset_t left,vset_t right);
 
     // Hooks called before/after all save/load operations on f
     void (*pre_save)(FILE* f, vdom_t dom);

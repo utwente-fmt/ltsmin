@@ -312,6 +312,12 @@ void vset_dot(FILE* fp, vset_t src);
 void vrel_dot(FILE* fp, vrel_t src);
 
 /**
+\brief res := (a | a in left and a in right), like join in relational databases.
+Put result in dst.
+*/
+extern void vset_join(vset_t dst, vset_t left, vset_t right);
+
+/**
 \brief Hook to call before all loading.
 */
 void vset_pre_load(FILE* f, vdom_t dom);
