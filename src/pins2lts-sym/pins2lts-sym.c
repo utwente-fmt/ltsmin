@@ -2157,7 +2157,7 @@ init_domain(vset_implementation_t impl)
     dm_copy(vdom_separates_rw(domain) ? GBgetDMInfoRead(model) : GBgetDMInfo(model), read_matrix);
     matrix_t *write_matrix = vdom_separates_rw(domain) ? GBgetDMInfoMayWrite(model) : GBgetDMInfo(model);
 
-    if (!GBsupportsCopy(model) || !vdom_supports_cpy(domain)) {
+    if (vdom_separates_rw(domain) && (!GBsupportsCopy(model) || !vdom_supports_cpy(domain))) {
         if (HREme(HREglobal())==0) {
             Warning(info, "May-write does not support copy; over-approximating may-write \\ must-write to read + write");
         }
