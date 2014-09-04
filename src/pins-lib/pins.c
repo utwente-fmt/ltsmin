@@ -1036,20 +1036,32 @@ void GBprintDependencyMatrixCombined(FILE* file, model_t model) {
 }
 
 void GBprintPORMatrix(FILE* file, model_t model) {
-    Printf (info, "\nDo Not Accord matrix:\n");
-    dm_print(file, GBgetDoNotAccordInfo(model));
+    if (GBgetDoNotAccordInfo(model) != NULL) {
+        Printf (info, "\nDo Not Accord matrix:\n");
+        dm_print(file, GBgetDoNotAccordInfo(model));
+    }
 
-    Printf (info, "\nCommutes matrix:\n");
-    dm_print(file, GBgetCommutesInfo(model));
+    if (GBgetCommutesInfo(model) != NULL) {
+        Printf (info, "\nCommutes matrix:\n");
+        dm_print(file, GBgetCommutesInfo(model));
+    }
 
-    Printf (info, "\nMaybe coenabled matrix:\n");
-    dm_print(file, GBgetGuardCoEnabledInfo(model));
+    if (GBgetGuardCoEnabledInfo(model) != NULL) {
+        Printf (info, "\nMaybe coenabled matrix:\n");
+        dm_print(file, GBgetGuardCoEnabledInfo(model));
+    }
 
-    Printf (info, "\nNecessary enabling matrix:\n");
-    dm_print(file, GBgetGuardNESInfo(model));
+    if (GBgetGuardNESInfo(model) != NULL) {
+        Printf (info, "\nNecessary enabling matrix:\n");
+        dm_print(file, GBgetGuardNESInfo(model));
+    }
 
-    Printf (info, "\nNecessary disabling matrix:\n");
-    dm_print(file, GBgetGuardNDSInfo(model));
+    if (GBgetGuardNDSInfo(model) != NULL) {
+        Printf (info, "\nNecessary disabling matrix:\n");
+        dm_print(file, GBgetGuardNDSInfo(model));
+    }
+}
+
 }
 
 
