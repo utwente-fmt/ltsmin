@@ -68,3 +68,6 @@ space.
     'CTLFORMULA'.
     The formula is translated to a mu-formula (see manpage:ltsmin-mu[5]),
     which is evaluated after computing all reachable states.
+    
+*--no-matrix*::
+        Do not print the dependency matrix if -v (verbose) is used.

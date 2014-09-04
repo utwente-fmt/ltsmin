@@ -48,6 +48,7 @@ static int   dlk_detect = 0;
 static char* act_detect = NULL;
 static char* inv_detect = NULL;
 static int   no_exit = 0;
+static int   no_matrix = 0;
 static int   act_index;
 static int   act_label;
 static int   action_typeno;
@@ -212,6 +213,7 @@ static  struct poptOption options[] = {
 #ifdef HAVE_SYLVAN
     { NULL, 0 , POPT_ARG_INCLUDE_TABLE, lace_options , 0 , "Lace options",NULL},
 #endif
+    { "no-matrix" , 0 , POPT_ARG_VAL , &no_matrix , 1 , "do not print the dependency matrix when -v (verbose) is used" , NULL},
     SPEC_POPT_OPTIONS,
     { NULL, 0 , POPT_ARG_INCLUDE_TABLE, greybox_options , 0 , "PINS options",NULL},
     { NULL, 0 , POPT_ARG_INCLUDE_TABLE, vset_options , 0 , "Vector set options",NULL},
@@ -2103,7 +2105,7 @@ init_model(char *file)
 
     HREbarrier(HREglobal());
 
-    if (HREme(HREglobal())==0 && log_active(infoLong)) {
+    if (HREme(HREglobal())==0 && log_active(infoLong) && !no_matrix) {
         fprintf(stderr, "Dependency Matrix:\n");
         GBprintDependencyMatrixCombined(stderr, model);
     }
