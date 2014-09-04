@@ -805,7 +805,7 @@ static vset_t
 set_create_mdd(vdom_t dom, int k, int *proj)
 {
     assert(k <= dom->shared.size);
-    int l = (k < 0)?0:k;
+    int l = (k < 0)?dom->shared.size:k;
     vset_t set = (vset_t)RTmalloc(sizeof(struct vector_set) + sizeof(int[l]));
     set->dom  = dom;
     set->mdd  = 0;
@@ -813,11 +813,11 @@ set_create_mdd(vdom_t dom, int k, int *proj)
     set->prev = NULL;
     if (protected_sets != NULL) protected_sets->prev = set;
     protected_sets = set;
-    set->p_len = k;
+    set->p_len = l;
     set->p_id  = 1;
-    for(int i = k - 1; i >= 0; i--) {
-        set->proj[i] = proj[i];
-        set->p_id    = mdd_create_node(proj[i], set->p_id, 0, COPY_DONT_CARE);
+    for(int i = l - 1; i >= 0; i--) {
+        set->proj[i] = k < 0 ? i : proj[i];
+        set->p_id    = mdd_create_node(k < 0 ? i : proj[i], set->p_id, 0, COPY_DONT_CARE);
         // The p_id of a relation is shifted in hash keys; check this is ok
         if ((set->p_id >> 32) > 0) Abort("set_create_mdd: projection identifier too large");
     }
@@ -1040,7 +1040,7 @@ set_intersect_mdd(vset_t dst, vset_t src)
 static void
 set_copy_match_mdd(vset_t dst, vset_t src, int p_len, int *proj, int *match)
 {
-    assert(src->p_len == -1 && dst->p_len == -1 && p_len >= 0);
+    assert(src->p_len == src->dom->shared.size && dst->p_len == dst->dom->shared.size && p_len >= 0);
     uint64_t singleton = mdd_put(0, (uint32_t*)match, p_len, NULL, set_copy);
     mdd_push(singleton);
 
@@ -1057,7 +1057,7 @@ set_copy_match_mdd(vset_t dst, vset_t src, int p_len, int *proj, int *match)
 static void
 set_copy_match_proj_mdd(vset_t dst, vset_t src, int p_len, int *proj, int p_id, int *match)
 {
-    assert(src->p_len == -1 && dst->p_len == -1 && p_len >= 0);
+    assert(src->p_len == src->dom->shared.size && dst->p_len == dst->dom->shared.size && p_len >= 0);
     uint64_t singleton = mdd_put(0, (uint32_t*)match, p_len, NULL, set_copy);
     mdd_push(singleton);
     mdd_push(p_id);
@@ -1081,7 +1081,7 @@ static void
 set_enum_match_mdd(vset_t set, int p_len, int *proj, int *match,
                        vset_element_cb cb, void *context)
 {
-    assert(set->p_len == -1 && p_len >= 0);
+    assert(set->p_len == set->dom->shared.size && p_len >= 0);
     uint64_t singleton = mdd_put(0, (uint32_t*)match, p_len, NULL, set_copy);
     mdd_push(singleton);
 
@@ -1322,7 +1322,7 @@ mdd_next(uint64_t p_id, uint64_t set, uint64_t rel, int idx, int *r_proj, int r_
 static void
 set_project_mdd(vset_t dst, vset_t src)
 {
-    assert(src->p_len == -1);
+    assert(src->p_len == src->dom->shared.size);
     if (dst->p_len == -1) {
         dst->mdd = src->mdd;
     } else {
@@ -1334,7 +1334,7 @@ set_project_mdd(vset_t dst, vset_t src)
 static void
 set_next_mdd(vset_t dst, vset_t src, vrel_t rel)
 {
-    assert(src->p_len == -1 && dst->p_len == -1);
+    assert(src->p_len == src->dom->shared.size && dst->p_len == dst->dom->shared.size);
     dst->mdd = mdd_next(rel->p_id, src->mdd, rel->mdd, 0, rel->r_proj, rel->r_p_len, rel->w_proj, rel->w_p_len);
 }
 
@@ -1539,7 +1539,7 @@ mdd_prev_copy(uint64_t p_id, uint64_t set, uint64_t rel, uint64_t univ, int idx,
 static void
 set_prev_mdd(vset_t dst, vset_t src, vrel_t rel, vset_t univ)
 {
-    assert(src->p_len == -1 && dst->p_len == -1 && src->p_id == univ->p_id && src->p_len == univ->p_len);
+    assert(src->p_len == src->dom->shared.size && dst->p_len == dst->dom->shared.size && src->p_id == univ->p_id && src->p_len == univ->p_len);
 
     dst->mdd = mdd_prev(rel->p_id,src->mdd, rel->mdd, univ->mdd, 0, rel->r_proj,rel->r_p_len, rel->w_proj, rel->w_p_len);
 }
@@ -1575,7 +1575,7 @@ mdd_universe(uint64_t p_id, uint64_t dst, uint64_t src, int n) {
 static void
 set_universe_mdd(vset_t dst, vset_t src) {
 
-    assert(src->p_len == -1 && dst->mdd == 0);
+    assert(src->p_len == src->dom->shared.size && dst->mdd == 0);
 
     dst->mdd = 1;
 
@@ -1927,7 +1927,7 @@ static void
 set_least_fixpoint_mdd(vset_t dst, vset_t src, vrel_t rels[], int rel_count)
 {
     // Only implemented if not projected
-    assert(src->p_len == -1 && dst->p_len == -1);
+    assert(src->p_len == src->dom->shared.size && dst->p_len == dst->dom->shared.size);
 
     // Initialize partitioned transition relations.
     rel_set = rels;
