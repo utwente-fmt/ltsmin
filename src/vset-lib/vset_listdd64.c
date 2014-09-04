@@ -90,6 +90,7 @@ static struct op_rec *op_cache=NULL;
 #define OP_SAT 9
 #define OP_RELPROD 10
 #define OP_UNIVERSE 11
+#define OP_JOIN 12
 
 static void cache_put(uint64_t slot_hash,
                       uint32_t op,
@@ -395,6 +396,26 @@ static void mdd_collect(uint64_t a,uint64_t b){
                     continue;
                 }
                 if (!node_table[op_cache[i].res.other.arg3].reachable) {
+                    op_cache[i].op=OP_UNUSED;
+                    continue;
+                }
+                if (!node_table[op_cache[i].res.other.res].reachable) {
+                    op_cache[i].op=OP_UNUSED;
+                    continue;
+                }
+                if (resize) {
+                    slot=hash5(op_cache[i].op,op_cache[i].arg1,op_cache[i].res.other.arg2,op_cache[i].res.other.arg3,op_cache[i].res.other.arg4)%new_cache_size;
+                    break;
+                }
+                else continue;
+            }
+            case OP_JOIN:
+            {
+                if (!node_table[op_cache[i].arg1].reachable) {
+                    op_cache[i].op=OP_UNUSED;
+                    continue;
+                }
+                if (!node_table[op_cache[i].res.other.arg2].reachable) {
                     op_cache[i].op=OP_UNUSED;
                     continue;
                 }
@@ -2157,6 +2178,94 @@ static void rel_dot_mdd(FILE* fp, vrel_t src) {
   fprintf(fp,"}\n");
 }
 
+static uint64_t
+mdd_join(uint64_t a_pid, uint64_t b_pid, uint64_t a, uint64_t b, int a_p_len, int* a_proj, int b_p_len, int* b_proj)
+{
+    if (a_p_len < 0 || b_p_len < 0) Abort("missing projection information");
+    if (a == 0 || b == 0)  return 0;
+    if (a == b) return a;
+    if (a_p_len == 0) return b;
+    if (b_p_len == 0) return a;
+
+    uint64_t res;
+    uint64_t slot_hash;
+    uint64_t slot;
+
+    if (a_proj[0] == b_proj[0]) {
+
+        uint64_t old_a=a;
+        uint64_t old_b=b;
+
+        while(node_table[a].val!=node_table[b].val){
+            if(node_table[a].val < node_table[b].val) {
+              a=node_table[a].right;
+              if (a<=1) return 0;
+            }
+            if(node_table[b].val < node_table[a].val) {
+              b=node_table[b].right;
+              if (b<=1) return 0;
+            }
+        }
+
+        slot_hash = hash5(OP_JOIN, a, b, a_pid, b_pid);
+        slot = slot_hash % cache_size;
+
+        if (op_cache[slot].op == OP_JOIN && op_cache[slot].arg1 == a
+                && op_cache[slot].res.other.arg2 == b
+                && op_cache[slot].res.other.arg3 == a_pid
+                && op_cache[slot].res.other.arg4 == b_pid) {
+            return op_cache[slot].res.other.res;
+        }
+
+        res = mdd_join(a_pid, b_pid, node_table[a].right, node_table[b].right, a_p_len, a_proj, b_p_len, b_proj);
+        mdd_push(res);
+        res = mdd_join(node_table[a_pid].down, node_table[b_pid].down, node_table[a].down, node_table[b].down, a_p_len-1, a_proj+1, b_p_len-1, b_proj+1);
+        res = mdd_create_node(node_table[b].val, res, mdd_pop(), COPY_DONT_CARE);
+
+        cache_put(slot_hash, OP_JOIN, old_a, old_b, a_pid, b_pid, res);
+
+    } else {
+
+        slot_hash = hash5(OP_JOIN, a, b, a_pid, b_pid);
+        slot = slot_hash % cache_size;
+
+        if (op_cache[slot].op == OP_JOIN && op_cache[slot].arg1 == a
+                && op_cache[slot].res.other.arg2 == b
+                && op_cache[slot].res.other.arg3 == a_pid
+                && op_cache[slot].res.other.arg4 == b_pid) {
+            return op_cache[slot].res.other.res;
+        }
+
+        if(a_proj[0] > b_proj[0]) {
+            res = mdd_join(a_pid, b_pid, a, node_table[b].right, a_p_len, a_proj, b_p_len, b_proj);
+            mdd_push(res);
+            res = mdd_join(a_pid, node_table[b_pid].down, a, node_table[b].down, a_p_len, a_proj, b_p_len-1, b_proj+1);
+            res = mdd_create_node(node_table[b].val, res, mdd_pop(), COPY_DONT_CARE);
+        } else { //b_proj[0] > a_proj[0]
+            res = mdd_join(a_pid, b_pid, node_table[a].right, b, a_p_len, a_proj, b_p_len, b_proj);
+            mdd_push(res);
+            res = mdd_join(node_table[a_pid].down, b_pid, node_table[a].down, b, a_p_len-1, a_proj+1, b_p_len, b_proj);
+            res = mdd_create_node(node_table[a].val, res, mdd_pop(), COPY_DONT_CARE);
+        }
+
+        cache_put(slot_hash, OP_JOIN, a, b, a_pid, b_pid, res);
+    }
+
+    return res;
+
+}
+
+
+static void
+set_join_mdd(vset_t dst, vset_t left, vset_t right)
+{
+    dst->mdd = mdd_join(
+            left->p_id, right->p_id,
+            left->mdd,right->mdd,
+            left->p_len, left->proj,
+            right->p_len, right->proj);
+}
+
 static int separates_rw() { return 1; }
 static int supports_cpy() { return 1; }
 
@@ -2237,6 +2346,7 @@ vdom_t vdom_create_list64_native(int n){
     dom->shared.set_least_fixpoint=set_least_fixpoint_mdd;
     dom->shared.set_dot=set_dot_mdd;
     dom->shared.rel_dot=rel_dot_mdd;
+    dom->shared.set_join=set_join_mdd;
     dom->shared.separates_rw=separates_rw;
     dom->shared.supports_cpy=supports_cpy;
     return dom;
