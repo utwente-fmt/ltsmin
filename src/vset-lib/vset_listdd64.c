@@ -59,7 +59,7 @@ static uint32_t *set_copy;
 
 static struct mdd_node *node_table=NULL;
 struct op_rec {
-    uint32_t p_id;
+    uint32_t dummy;
     uint32_t op;
     uint64_t arg1;
     union {
@@ -67,10 +67,10 @@ struct op_rec {
         struct {
             uint64_t arg2;
             uint64_t arg3;
+            uint64_t arg4;
             uint64_t res;
             uint64_t dummy1;
             uint64_t dummy2;
-            uint64_t dummy3;
         } other;
     } res;
 };
@@ -93,17 +93,17 @@ static struct op_rec *op_cache=NULL;
 
 static void cache_put(uint64_t slot_hash,
                       uint32_t op,
-                      uint64_t p_id,
                       uint64_t arg1,
                       uint64_t arg2,
                       uint64_t arg3,
+                      uint64_t arg4,
                       uint64_t res) {
     uint64_t slot=slot_hash%cache_size;
     op_cache[slot].op=op;
-    op_cache[slot].p_id=(uint32_t)p_id;
     op_cache[slot].arg1=arg1;
     op_cache[slot].res.other.arg2=arg2;
     op_cache[slot].res.other.arg3=arg3;
+    op_cache[slot].res.other.arg4=arg4;
     op_cache[slot].res.other.res=res;
 }
 
@@ -334,7 +334,7 @@ static void mdd_collect(uint64_t a,uint64_t b){
                     continue;
                 }
                 if (resize) {
-                    slot=hash3(op_cache[i].op,op_cache[i].arg1,op_cache[i].p_id)%new_cache_size;
+                    slot=hash3(op_cache[i].op,op_cache[i].arg1,op_cache[i].res.other.arg2)%new_cache_size;
                     break;
                 }
                 else continue;
@@ -379,7 +379,7 @@ static void mdd_collect(uint64_t a,uint64_t b){
                     continue;
                 }
                 if (resize) {
-                    slot=hash4(op_cache[i].op,op_cache[i].arg1,op_cache[i].res.other.arg2, op_cache[i].p_id)%new_cache_size;
+                    slot=hash4(op_cache[i].op,op_cache[i].arg1,op_cache[i].res.other.arg2, op_cache[i].res.other.arg3)%new_cache_size;
                     break;
                 }
                 else continue;
@@ -403,7 +403,7 @@ static void mdd_collect(uint64_t a,uint64_t b){
                     continue;
                 }
                 if (resize) {
-                    slot=hash5(op_cache[i].op,op_cache[i].arg1,op_cache[i].res.other.arg2,op_cache[i].res.other.arg3,op_cache[i].p_id)%new_cache_size;
+                    slot=hash5(op_cache[i].op,op_cache[i].arg1,op_cache[i].res.other.arg2,op_cache[i].res.other.arg3,op_cache[i].res.other.arg4)%new_cache_size;
                     break;
                 }
                 else continue;
@@ -538,7 +538,7 @@ static uint64_t mdd_union(uint64_t a,uint64_t b){
         tmp=mdd_union(a,node_table[b].right);
         tmp=mdd_create_node(node_table[b].val,node_table[b].down,tmp,COPY_DONT_CARE);
     }
-    cache_put(slot_hash, OP_UNION, 0, a, b, 0, tmp);
+    cache_put(slot_hash, OP_UNION, a, b, 0, 0, tmp);
     return tmp;
 }
 
@@ -563,7 +563,7 @@ static uint64_t mdd_minus(uint64_t a,uint64_t b){
     } else { //(node_table[a].val>node_table[b].val)
         tmp=mdd_minus(a,node_table[b].right);
     }
-    cache_put(slot_hash,OP_MINUS, 0, a, b, 0, tmp);
+    cache_put(slot_hash,OP_MINUS, a, b, 0, 0, tmp);
     return tmp;
 }
 
@@ -657,7 +657,7 @@ mdd_copy_match(uint64_t p_id, uint64_t mdd, uint64_t pattern, int idx,
 
     if (op_cache[slot].op == OP_COPY_MATCH && op_cache[slot].arg1 == mdd
         && op_cache[slot].res.other.arg2 == pattern
-        && op_cache[slot].p_id == p_id) {
+        && op_cache[slot].res.other.arg3 == p_id) {
         return op_cache[slot].res.other.res;
     }
 
@@ -687,7 +687,7 @@ mdd_copy_match(uint64_t p_id, uint64_t mdd, uint64_t pattern, int idx,
         }
     }
 
-    cache_put(slot_hash,OP_COPY_MATCH, p_id, mdd_original, pattern, 0, res);
+    cache_put(slot_hash,OP_COPY_MATCH, mdd_original, pattern, p_id, 0, res);
     return res;
 }
 
@@ -719,7 +719,7 @@ mdd_intersect(uint64_t a, uint64_t b)
         tmp = mdd_intersect(a, node_table[b].right);
     }
 
-    cache_put(slot_hash,OP_INTERSECT, 0, a, b, 0, tmp);
+    cache_put(slot_hash,OP_INTERSECT, a, b, 0, 0, tmp);
     return tmp;
 }
 
@@ -1161,7 +1161,7 @@ mdd_project(uint64_t p_id, uint64_t mdd, int idx, int *proj, int len)
     uint64_t slot_hash=hash3(OP_PROJECT,mdd,p_id);
     uint64_t slot=slot_hash%cache_size;
     if(op_cache[slot].op==OP_PROJECT && op_cache[slot].arg1==mdd
-       && op_cache[slot].p_id==p_id) {
+       && op_cache[slot].res.other.arg2==p_id) {
         return op_cache[slot].res.other.res;
     }
 
@@ -1183,7 +1183,7 @@ mdd_project(uint64_t p_id, uint64_t mdd, int idx, int *proj, int len)
             mdd=node_table[mdd].right;
         }
     }
-    cache_put(slot_hash, OP_PROJECT, p_id, mdd_original, 0, 0, res);
+    cache_put(slot_hash, OP_PROJECT, mdd_original, p_id, 0, 0, res);
     return res;
 }
 
@@ -1219,7 +1219,7 @@ mdd_next(uint64_t p_id, uint64_t set, uint64_t rel, int idx, int *r_proj, int r_
         slot=slot_hash%cache_size;
         if (op_cache[slot].op==OP_NEXT && op_cache[slot].arg1==set
             && op_cache[slot].res.other.arg2==rel
-            && op_cache[slot].p_id==p_id) {
+            && op_cache[slot].res.other.arg3==p_id) {
             return op_cache[slot].res.other.res;
         }
 
@@ -1259,7 +1259,7 @@ mdd_next(uint64_t p_id, uint64_t set, uint64_t rel, int idx, int *r_proj, int r_
         slot=slot_hash%cache_size;
         if (op_cache[slot].op==OP_NEXT && op_cache[slot].arg1==set
             && op_cache[slot].res.other.arg2==rel
-            && op_cache[slot].p_id==p_id) {
+            && op_cache[slot].res.other.arg3==p_id) {
             return op_cache[slot].res.other.res;
         }
         old_rel=rel;
@@ -1278,7 +1278,7 @@ mdd_next(uint64_t p_id, uint64_t set, uint64_t rel, int idx, int *r_proj, int r_
         slot=slot_hash%cache_size;
         if (op_cache[slot].op==OP_NEXT && op_cache[slot].arg1==set
             && op_cache[slot].res.other.arg2==rel
-            && op_cache[slot].p_id==p_id) {
+            && op_cache[slot].res.other.arg3==p_id) {
             return op_cache[slot].res.other.res;
         }
         old_rel=rel;
@@ -1305,7 +1305,7 @@ mdd_next(uint64_t p_id, uint64_t set, uint64_t rel, int idx, int *r_proj, int r_
         slot=slot_hash%cache_size;
         if (op_cache[slot].op==OP_NEXT && op_cache[slot].arg1==set
             && op_cache[slot].res.other.arg2==rel
-            && op_cache[slot].p_id==p_id) {
+            && op_cache[slot].res.other.arg3==p_id) {
             return op_cache[slot].res.other.res;
         }
         old_rel=rel;
@@ -1316,7 +1316,7 @@ mdd_next(uint64_t p_id, uint64_t set, uint64_t rel, int idx, int *r_proj, int r_
         res=mdd_create_node(node_table[set].val,res,mdd_pop(),COPY_DONT_CARE);
     }
 
-    cache_put(slot_hash, OP_NEXT, p_id, old_set, old_rel, 0, res);
+    cache_put(slot_hash, OP_NEXT, old_set, old_rel, p_id, 0, res);
     return res;
 }
 
@@ -1390,7 +1390,7 @@ mdd_prev(uint64_t p_id, uint64_t set, uint64_t rel, uint64_t univ, int idx, int 
         if (op_cache[slot].op==OP_PREV && op_cache[slot].arg1==set
             && op_cache[slot].res.other.arg2==rel
             && op_cache[slot].res.other.arg3==univ
-            && op_cache[slot].p_id==p_id) {
+            && op_cache[slot].res.other.arg4==p_id) {
             return op_cache[slot].res.other.res;
         }
 
@@ -1398,7 +1398,7 @@ mdd_prev(uint64_t p_id, uint64_t set, uint64_t rel, uint64_t univ, int idx, int 
         res = mdd_prev_write(node_table[p_id].down, set, node_table[rel].down, univ, node_table[rel].val, idx, r_proj+1, r_len-1, w_proj+1, w_len-1);
         res = mdd_union(res, mdd_pop());
 
-        cache_put(slot_hash, OP_PREV, p_id, set, rel, univ, res);
+        cache_put(slot_hash, OP_PREV, set, rel, univ, p_id, res);
 
     } else if (r_len > 0 && r_proj[0] == idx) { // r
 
@@ -1429,7 +1429,7 @@ mdd_prev(uint64_t p_id, uint64_t set, uint64_t rel, uint64_t univ, int idx, int 
         if (op_cache[slot].op==OP_PREV && op_cache[slot].arg1==set
             && op_cache[slot].res.other.arg2==rel
             && op_cache[slot].res.other.arg3==univ
-            && op_cache[slot].p_id==p_id) {
+            && op_cache[slot].res.other.arg4==p_id) {
             return op_cache[slot].res.other.res;
         }
 
@@ -1440,7 +1440,7 @@ mdd_prev(uint64_t p_id, uint64_t set, uint64_t rel, uint64_t univ, int idx, int 
                 mdd_pop(),
                 COPY_DONT_CARE);
 
-        cache_put(slot_hash, OP_PREV, p_id, set, rel, univ, res);
+        cache_put(slot_hash, OP_PREV, set, rel, univ, p_id, res);
 
     } else if(w_len > 0 && w_proj[0] == idx) { // w
 
@@ -1449,7 +1449,7 @@ mdd_prev(uint64_t p_id, uint64_t set, uint64_t rel, uint64_t univ, int idx, int 
         if (op_cache[slot].op==OP_PREV && op_cache[slot].arg1==set
             && op_cache[slot].res.other.arg2==rel
             && op_cache[slot].res.other.arg3==univ
-            && op_cache[slot].p_id==p_id) {
+            && op_cache[slot].res.other.arg4==p_id) {
             return op_cache[slot].res.other.res;
         }
 
@@ -1464,7 +1464,7 @@ mdd_prev(uint64_t p_id, uint64_t set, uint64_t rel, uint64_t univ, int idx, int 
             res = mdd_union(res, mdd_pop());
         }
 
-        cache_put(slot_hash, OP_PREV, p_id, set, rel, univ, res);
+        cache_put(slot_hash, OP_PREV, set, rel, univ, p_id, res);
 
     } else { // -
         res = mdd_prev_copy(p_id, set, rel, univ, idx, r_proj, r_len, w_proj, w_len);
@@ -1524,7 +1524,7 @@ mdd_prev_copy(uint64_t p_id, uint64_t set, uint64_t rel, uint64_t univ, int idx,
     if (op_cache[slot].op==OP_PREV && op_cache[slot].arg1==set
         && op_cache[slot].res.other.arg2==rel
         && op_cache[slot].res.other.arg3==univ
-        && op_cache[slot].p_id==p_id) {
+        && op_cache[slot].res.other.arg4==p_id) {
         return op_cache[slot].res.other.res;
     }
 
@@ -1532,7 +1532,7 @@ mdd_prev_copy(uint64_t p_id, uint64_t set, uint64_t rel, uint64_t univ, int idx,
     res = mdd_prev(p_id, node_table[set].down, rel, node_table[univ].down, idx+1, r_proj, r_len, w_proj, w_len);
     res = mdd_create_node(node_table[set].val, res, mdd_pop(), COPY_DONT_CARE);
 
-    cache_put(slot_hash, OP_PREV, p_id, set, rel, univ, res);
+    cache_put(slot_hash, OP_PREV, set, rel, univ, p_id, res);
 
     return res;
 }
@@ -1553,7 +1553,7 @@ mdd_universe(uint64_t p_id, uint64_t dst, uint64_t src, int n) {
     uint64_t slot_hash=hash3(OP_UNIVERSE,src,p_id);
     uint64_t slot=slot_hash%cache_size;
     if(op_cache[slot].op==OP_UNIVERSE && op_cache[slot].arg1==src
-       && op_cache[slot].p_id==p_id) {
+       && op_cache[slot].res.other.arg2==p_id) {
         return op_cache[slot].res.other.res;
     }
 
@@ -1567,7 +1567,7 @@ mdd_universe(uint64_t p_id, uint64_t dst, uint64_t src, int n) {
 
     uint64_t res = mdd_union(dst, mdd_pop());
 
-    cache_put(slot_hash, OP_UNIVERSE, p_id, src, 0, 0, res);
+    cache_put(slot_hash, OP_UNIVERSE, src, p_id, 0, 0, res);
 
     return res;
 
@@ -1727,7 +1727,7 @@ sat_rel_prod(uint64_t p_id, uint64_t set, uint64_t rel, int idx,
     if (op_cache[slot].op == OP_RELPROD
           && op_cache[slot].arg1 == set
           && op_cache[slot].res.other.arg2 == rel
-          && op_cache[slot].p_id==p_id)
+          && op_cache[slot].res.other.arg3==p_id)
         return op_cache[slot].res.other.res;
 
     uint64_t res = 0;
@@ -1741,7 +1741,7 @@ sat_rel_prod(uint64_t p_id, uint64_t set, uint64_t rel, int idx,
     res = saturate(idx, res);
     mdd_pop();
 
-    cache_put(slot_hash, OP_RELPROD, p_id, set, rel, 0, res);
+    cache_put(slot_hash, OP_RELPROD, set, rel, p_id, 0, res);
     return res;
 }
 
@@ -1919,7 +1919,7 @@ saturate(int idx, uint64_t mdd)
     mdd_pop();
 
 
-    cache_put(slot_hash, OP_SAT, 0, mdd, rels_tot, 0, res);
+    cache_put(slot_hash, OP_SAT, mdd, rels_tot, 0, 0, res);
     return res;
 }
 
