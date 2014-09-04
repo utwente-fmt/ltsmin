@@ -375,6 +375,8 @@ void spg_attractor_par2(int player, const parity_game* g, vset_t u, const spg_at
     vset_copy(v_level, u);
     int l = 0;
 
+    LACE_ME;
+
     // Compute fixpoint
     while (!vset_is_empty(v_level)) {
         SPG_ATTR_REPORT_LEVEL(indent,options,player,u,v_level,l);
