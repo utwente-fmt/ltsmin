@@ -2168,6 +2168,9 @@ init_domain(vset_implementation_t impl)
         dm_free(w);
     }
 
+    GBsetExpandMatrix(model, read_matrix);
+    GBsetProjectMatrix(model, write_matrix);
+
     for(int i = 0; i < nGrps; i++) {
         r_projs[i].len   = dm_ones_in_row(read_matrix, i);
         r_projs[i].proj  = (int*)RTmalloc(r_projs[i].len * sizeof(int));
@@ -2194,8 +2197,6 @@ init_domain(vset_implementation_t impl)
             group_tmp[i]      = vset_create(domain,r_projs[i].len,r_projs[i].proj);
         }
     }
-
-    dm_free(read_matrix);
 }
 
 static void
@@ -2754,15 +2755,8 @@ actual_main(void)
     } else {
         init_domain(vset_impl);
 
-        if (vdom_separates_rw(domain)) {
-            Warning(info, "vset implementation supports read/write separation.");
-            Warning(info, "Using GBgetTransitionsShortR2W as next-state function.");
-            *short_proc = GBgetTransitionsShortR2W;
-        } else {
-            Warning(info, "vset implementation does not support read/write separation.");
-            Warning(info, "Using GBgetTransitionsShort as next-state function.");
-            *short_proc = GBgetTransitionsShort;
-        }
+        *short_proc = GBgetTransitionsShort;
+
         if (multi_process) {
             *short_multi_proc = *short_proc;
             *short_proc = master_get_transitions_short;
