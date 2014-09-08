@@ -35,9 +35,11 @@ static void atermdd_popt(poptContext con,
 		break;
 	case POPT_CALLBACK_REASON_POST: {
 		char*argv[]={"xxx",NULL};
-		ATinit(1, argv, (ATerm*) HREstackBottom());
-		ATsetWarningHandler(WarningHandler);
-		ATsetErrorHandler(ErrorHandler);
+		if (HREglobal()!=NULL) { // work around for the case when HRE is not yet initialised
+            ATinit(1, argv, (ATerm*) HREstackBottom());
+            ATsetWarningHandler(WarningHandler);
+            ATsetErrorHandler(ErrorHandler);
+        }
 		return;
 	}
 	case POPT_CALLBACK_REASON_OPTION:
