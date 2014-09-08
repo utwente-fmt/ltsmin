@@ -2955,8 +2955,12 @@ actual_main(void)
 
         if(0==strcmp(GBgetUseGuards(model),"evaluate")) {
             Abort("not yet implemented");
-        } else { // "assume-true" || "false"
+        } else if(0==strcmp(GBgetUseGuards(model),"assume-true")) {
+            *short_proc = GBgetActionsShort;
+            Print(infoShort, "Using GBgetActionsShort as next-state function");
+        } else { // false
             *short_proc = GBgetTransitionsShort;
+            Print(infoShort, "Using GBgetTransitionsShort as next-state function");
         }
 
 #ifdef HAVE_SYLVAN
