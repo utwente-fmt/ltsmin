@@ -2227,8 +2227,13 @@ init_domain(vset_implementation_t impl)
     w_projs        = (proj_info*)RTmalloc(nGrps * sizeof(proj_info));
 
     matrix_t *read_matrix = RTmalloc(sizeof (matrix_t));
-    dm_copy(vdom_separates_rw(domain) ? GBgetDMInfoRead(model) : GBgetDMInfo(model), read_matrix);
-    matrix_t *write_matrix = vdom_separates_rw(domain) ? GBgetDMInfoMayWrite(model) : GBgetDMInfo(model);
+    dm_copy(GBgetExpandMatrix(model), read_matrix);
+    matrix_t *write_matrix = RTmalloc(sizeof (matrix_t));
+    dm_copy(GBgetProjectMatrix(model), write_matrix);
+    if (!vdom_separates_rw(domain)) {
+        dm_apply_or(read_matrix, GBgetProjectMatrix(model));
+        dm_apply_or(write_matrix, GBgetExpandMatrix(model));
+    }
 
     if (vdom_separates_rw(domain) && (!GBsupportsCopy(model) || !vdom_supports_cpy(domain))) {
         if (HREme(HREglobal())==0) {
