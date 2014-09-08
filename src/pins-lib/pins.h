@@ -900,4 +900,9 @@ int GBgetMucalcNodeCount(model_t model);
 
 //@}
 
+/**
+ * \brief Whether to use guards to speed up next-state computation.
+ */
+extern char* GBgetUseGuards(model_t model);
+
 #endif

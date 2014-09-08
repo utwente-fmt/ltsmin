@@ -35,6 +35,7 @@ struct grey_box_model {
     int *label_visibility;
 	int *s0;
 	int *guard_status;
+	char* use_guards;
 	void*context;
     next_method_grey_t next_short;
 	next_method_grey_t next_long;
@@ -1114,7 +1115,7 @@ static char            *model_type_pre[MAX_TYPES];
 static pins_loader_t    model_preloader[MAX_TYPES];
 static int              registered_pre=0;
 static int              matrix=0;
-static int              use_guards=0;
+static char*            use_guards="false";
 static int              labels=0;
 static int              cache=0;
 pins_por_t              PINS_POR = PINS_POR_NONE;
@@ -1163,6 +1164,18 @@ GBloadFile (model_t model, const char *filename, model_t *wrapped)
         for (int i = 0; i < registered; i++) {
             if (0==strcmp (model_type[i], extension)) {
                 model_loader[i] (model, filename);
+                model->use_guards = use_guards;
+                if (0!=strcmp(use_guards,"false")) {
+                   if (model->next_long == default_long)
+                       Abort ("No long next-state function implemented for this language module (--"USE_GUARDS_OPTION").");
+                   sl_group_t* guards = GBgetStateLabelGroupInfo (model, GB_SL_GUARDS);
+                   if (model->guards == NULL || guards == NULL || guards->count == 0)
+                       Abort ("No long next-state function implemented for this language module (--"USE_GUARDS_OPTION").");
+                   model->guard_status = RTmalloc (sizeof(int[pins_get_state_label_count(model)]));
+                   model->next_all = guards_all;
+                   model->expand_matrix=GBgetMatrix(model, GBgetMatrixID(model, LTSMIN_MATRIX_ACTIONS_READS));
+                }
+
                 if (wrapped) {
                     if (PINS_POR == PINS_POR_ON)
                         model = GBaddPOR (model);
@@ -1181,15 +1194,6 @@ GBloadFile (model_t model, const char *filename, model_t *wrapped)
                     if (cache)
                         model = GBaddCache (model);
                     *wrapped = model;
-                }
-                if (use_guards) {
-                    if (model->next_long == default_long)
-                        Abort ("No long next-state function implemented for this language module (--"USE_GUARDS_OPTION").");
-                    sl_group_t* guards = GBgetStateLabelGroupInfo (model, GB_SL_GUARDS);
-                    if (model->guards == NULL || guards == NULL || guards->count == 0)
-                        Abort ("No long next-state function implemented for this language module (--"USE_GUARDS_OPTION").");
-                    model->guard_status = RTmalloc (sizeof(int[pins_get_state_label_count(model)]));
-                    model->next_all = guards_all;
                 }
 
                 if (matrix) {
@@ -1329,7 +1333,7 @@ GBstateIsValidEnd (model_t model, int *state)
 struct poptOption greybox_options[]={
     { "labels", 0, POPT_ARG_VAL, &labels, 1, "print state variable and type names, and state and action labels", NULL },
 	{ "matrix" , 'm' , POPT_ARG_VAL , &matrix , 1 , "print the dependency matrix for the model and exit" , NULL},
-	{ USE_GUARDS_OPTION , 0 , POPT_ARG_VAL , &use_guards , 1 , "use guards in combination with the long next-state function to speed up the next-state function" , NULL},
+	{ USE_GUARDS_OPTION , 'g' , POPT_ARG_STRING | POPT_ARGFLAG_SHOW_DEFAULT , &use_guards , 0 , "use guards in combination with the long next-state function to speed up the next-state function" , "<false|assume-true|evaluate>"},
 	{ "cache" , 'c' , POPT_ARG_VAL , &cache , 1 , "enable caching of PINS calls" , NULL },
 	{ "regroup" , 'r' , POPT_ARG_STRING, &regroup_options , 0 ,
           "enable regrouping; available transformations T: "
@@ -1340,6 +1344,11 @@ struct poptOption greybox_options[]={
     { NULL, 0 , POPT_ARG_INCLUDE_TABLE, por_options , 0 , "Partial Order Reduction options", NULL },
 	POPT_TABLEEND	
 };
+
+char*
+GBgetUseGuards(model_t model) {
+   return model->use_guards;
+}
 
 void*
 GBgetChunkMap(model_t model,int type_no)
