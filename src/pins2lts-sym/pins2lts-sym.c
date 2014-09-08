@@ -578,7 +578,19 @@ expand_group_next(int group, vset_t set)
     ctx.set = set;
     vset_project(group_tmp[group], set);
     vset_zip(group_explored[group], group_tmp[group]);
-    // todo: if verbose, count number of states (satcount) to be explored as next-state calls
+
+    if (log_active(infoLong)) {
+        bn_int_t elem_count;
+        vset_count(group_tmp[group], NULL, &elem_count);
+
+        size_t size = 40;
+        char s[size];
+        bn_int2string(s, size, &elem_count);
+        bn_clear(&elem_count);
+
+        Print(infoLong, "expanding group %d for %s states.", group, s);
+    }
+
     vrel_update(group_next[group], group_tmp[group], explore_cb, &ctx);
     vset_clear(group_tmp[group]);
 }
