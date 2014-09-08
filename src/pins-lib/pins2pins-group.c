@@ -10,6 +10,7 @@
 #include <pins-lib/pins.h>
 #include <ltsmin-lib/lts-type.h>
 #include <util-lib/dynamic-array.h>
+#include <ltsmin-lib/ltsmin-standard.h>
 
 typedef struct group_context {
     int                 len;
@@ -251,8 +252,143 @@ read_before_write (matrix_t *r, matrix_t *w, int cola, int colb)
     return cb - ca;
 }
 
+struct group_info {
+    guard_t **guards;
+};
+
+static int
+eq_guards(const guard_t** guards, int i, int j) {
+    if (guards[i]->count != guards[j]->count) return 0;
+
+    for (int g = 0; g < guards[i]->count; g++) {
+        if (guards[i]->guard[g] != guards[j]->guard[g]) return 0;
+    }
+
+    return 1;
+}
+
+static int
+eq_rows(matrix_t *r, matrix_t *mayw, matrix_t *mustw, int rowa, int rowb, void *context) {
+    HREassert(
+                dm_ncols(r) == dm_ncols(mayw) &&
+                dm_nrows(r) == dm_nrows(mayw) &&
+                dm_ncols(r) == dm_ncols(mustw) &&
+                dm_nrows(r) == dm_nrows(mustw), "matrix sizes do not match");
+
+    struct group_info *ctx = (struct group_info*)context;
+    if (ctx->guards == NULL || eq_guards(ctx->guards, rowa, rowb)) {
+
+        if (
+                dm_ones_in_row (r, rowa) != dm_ones_in_row (r, rowb) ||
+                dm_ones_in_row (mayw, rowa) != dm_ones_in_row (mayw, rowb) ||
+                dm_ones_in_row (mustw, rowa) != dm_ones_in_row (mustw, rowb))
+            return 0;
+
+        int                 i;
+        for (i = 0; i < dm_ncols (r); i++) {
+            int                 ar = dm_is_set (r, rowa, i);
+            int                 br = dm_is_set (r, rowb, i);
+            int                 amayw = dm_is_set (mayw, rowa, i);
+            int                 bmayw = dm_is_set (mayw, rowb, i);
+            int                 amustw = dm_is_set (mustw, rowa, i);
+            int                 bmustw = dm_is_set (mustw, rowb, i);
+            if (ar != br || amayw != bmayw || amustw != bmustw)
+                return 0;                  // unequal
+        }
+        return 1;                          // equal
+    }
+    return 0;                              // unequal
+}
+
+int
+subsume_rows(matrix_t *r, matrix_t *mayw, matrix_t *mustw, int rowa, int rowb, void *context) {
+    HREassert(
+                dm_ncols(r) == dm_ncols(mayw) &&
+                dm_nrows(r) == dm_nrows(mayw) &&
+                dm_ncols(r) == dm_ncols(mustw) &&
+                dm_nrows(r) == dm_nrows(mustw), "matrix sizes do not match");
+
+    struct group_info *ctx = (struct group_info*)context;
+    if (ctx->guards == NULL || eq_guards(ctx->guards, rowa, rowb)) {
+
+        int                 i;
+        for (i = 0; i < dm_ncols (r); i++) {
+            int a = 4;
+            if (dm_is_set(mayw, rowa, i)) a |= 1;
+            if (dm_is_set(mustw, rowa, i)) a = 1;
+            if (dm_is_set(r, rowa, i)) a |= 6;
+
+            int b = 4;
+            if (dm_is_set(mayw, rowb, i)) b |= 1;
+            if (dm_is_set(mustw, rowb, i)) b = 1;
+            if (dm_is_set(r, rowb, i)) b |= 6;
+
+            if (a < (a|b))
+                return 0;                  // not subsumed
+        }
+        return 1;                          // subsumed
+    }
+    return 0;                              // not subsumed
+}
+
+int
+eq_cols(matrix_t *r, matrix_t *mayw, matrix_t *mustw, int cola, int colb) {
+
+    HREassert(
+                dm_ncols(r) == dm_ncols(mayw) &&
+                dm_nrows(r) == dm_nrows(mayw) &&
+                dm_ncols(r) == dm_ncols(mustw) &&
+                dm_nrows(r) == dm_nrows(mustw), "matrix sizes do not match");
+
+    if (
+            dm_ones_in_col (r, cola) != dm_ones_in_col (r, colb) ||
+            dm_ones_in_col (mayw, cola) != dm_ones_in_col (mayw, colb) ||
+            dm_ones_in_col (mustw, cola) != dm_ones_in_col (mustw, colb))
+        return 0;
+
+    int                 i;
+    for (i = 0; i < dm_nrows (r); i++) {
+        int                 ar = dm_is_set (r, i, cola);
+        int                 br = dm_is_set (r, i, colb);
+        int                 amayw = dm_is_set (mayw, i, cola);
+        int                 bmayw = dm_is_set (mayw, i, colb);
+        int                 amustw = dm_is_set (mustw, i, cola);
+        int                 bmustw = dm_is_set (mustw, i, colb);
+        if (ar != br || amayw != bmayw || amustw != bmustw)
+            return 0;                  // unequal
+    }
+    return 1;                          // equal
+}
+
+int
+subsume_cols(matrix_t *r, matrix_t *mayw, matrix_t *mustw, int cola, int colb) {
+
+    HREassert(
+                dm_ncols(r) == dm_ncols(mayw) &&
+                dm_nrows(r) == dm_nrows(mayw) &&
+                dm_ncols(r) == dm_ncols(mustw) &&
+                dm_nrows(r) == dm_nrows(mustw), "matrix sizes do not match");
+
+    int                 i;
+    for (i = 0; i < dm_nrows (r); i++) {
+        int a = 4;
+        if (dm_is_set(mayw, i, cola)) a |= 1;
+        if (dm_is_set(mustw, i, cola)) a = 1;
+        if (dm_is_set(r, i, cola)) a |= 6;
+
+        int b = 4;
+        if (dm_is_set(mayw, i, colb)) b |= 1;
+        if (dm_is_set(mustw, i, colb)) b = 1;
+        if (dm_is_set(r, i, colb)) b |= 6;
+
+        if (a < (a|b))
+            return 0;                  // not subsumed
+    }
+    return 1;                          // equal
+}
+
 static void
-apply_regroup_spec (matrix_t* r, matrix_t* mayw, matrix_t* mustw, const char *spec_)
+apply_regroup_spec (matrix_t* r, matrix_t* mayw, matrix_t* mustw, const char *spec_, const guard_t **guards)
 {
     
     HREassert(
@@ -266,6 +402,8 @@ apply_regroup_spec (matrix_t* r, matrix_t* mayw, matrix_t* mustw, const char *sp
         char               *spec = strdup (spec_);
         char               *spec_full = spec;
         HREassert (spec != NULL, "No spec");
+        struct group_info context;
+        context.guards = guards;
 
         char               *tok;
         while ((tok = strsep (&spec, ",")) != NULL) {
@@ -294,7 +432,7 @@ apply_regroup_spec (matrix_t* r, matrix_t* mayw, matrix_t* mustw, const char *sp
                 dm_sort_cols (r, mayw, mustw, &max_col_first);
             } else if (strcasecmp (tok, "cn") == 0) {
                 Print1 (info, "Regroup Column Nub");
-                dm_nub_cols (r, mayw, mustw);
+                dm_nub_cols (r, mayw, mustw, &eq_cols);
             } else if (strcasecmp (tok, "csa") == 0) {
                 Print1 (info, "Regroup Column swap with Simulated Annealing");
                 dm_anneal (r, mayw, mustw);
@@ -309,30 +447,30 @@ apply_regroup_spec (matrix_t* r, matrix_t* mayw, matrix_t* mustw, const char *sp
                 dm_sort_rows (r, mayw, mustw, &max_row_first);
             } else if (strcasecmp (tok, "rn") == 0) {
                 Print1 (info, "Regroup Row Nub");
-                dm_nub_rows (r, mayw, mustw);
+                dm_nub_rows (r, mayw, mustw, &eq_rows, &context);
             } else if (strcasecmp (tok, "ru") == 0) {
                 Print1 (info, "Regroup Row sUbsume");
-                dm_subsume_rows (r, mayw, mustw);
+                dm_subsume_rows (r, mayw, mustw, &subsume_rows, &context);
             } else if (strcasecmp (tok, "gsa") == 0) {
                 const char         *macro = "gc,gr,csa,rs";
                 Print1 (info, "Regroup macro Simulated Annealing: %s", macro);
-                apply_regroup_spec (r, mayw, mustw, macro);
+                apply_regroup_spec (r, mayw, mustw, macro, guards);
             } else if (strcasecmp (tok, "gs") == 0) {
                 const char         *macro = "gc,gr,cw,rs";
                 Print1 (info, "Regroup macro Group Safely: %s", macro);
-                apply_regroup_spec (r, mayw, mustw, macro);
+                apply_regroup_spec (r, mayw, mustw, macro, guards);
             } else if (strcasecmp (tok, "ga") == 0) {
                 const char         *macro = "ru,gc,rs,cw,rs";
                 Print1 (info, "Regroup macro Group Aggressively: %s", macro);
-                apply_regroup_spec (r, mayw, mustw, macro);
+                apply_regroup_spec (r, mayw, mustw, macro, guards);
             } else if (strcasecmp (tok, "gc") == 0) {
                 const char         *macro = "cs,cn";
                 Print1 (info, "Regroup macro Cols: %s", macro);
-                apply_regroup_spec (r, mayw, mustw, macro);
+                apply_regroup_spec (r, mayw, mustw, macro, guards);
             } else if (strcasecmp (tok, "gr") == 0) {
                 const char         *macro = "rs,rn";
                 Print1 (info, "Regroup macro Rows: %s", macro);
-                apply_regroup_spec (r, mayw, mustw, macro);
+                apply_regroup_spec (r, mayw, mustw, macro, guards);
             } else if (tok[0] != '\0') {
                 Fatal (1, error, "Unknown regrouping specification: '%s'",
                        tok);
@@ -392,7 +530,7 @@ GBregroup (model_t model, const char *regroup_spec)
     dm_copy (original_must_write, mustw);
 
     Print1 (info, "Regroup specification: %s", regroup_spec);
-    apply_regroup_spec (r, mayw, mustw, regroup_spec);
+        apply_regroup_spec (r, mayw, mustw, regroup_spec, NULL);
     // post processing regroup specification
     // undo column grouping
     dm_ungroup_cols(r);

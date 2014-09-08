@@ -5,7 +5,6 @@
 #include <stdio.h>
 #include <string.h>
 
-
 #ifdef LTSMIN_CONFIG_INCLUDED
 #include <dm/bitvector.h>
 #else
@@ -58,6 +57,10 @@ typedef struct matrix {
 } matrix_t;
 
 typedef int         (*dm_comparator_fn) (matrix_t *, matrix_t *, int, int);
+typedef int         (*dm_subsume_rows_fn) (matrix_t *, matrix_t *, matrix_t *, int, int, void *);
+typedef int         (*dm_nub_rows_fn) (matrix_t *, matrix_t *, matrix_t *, int, int, void *);
+typedef int         (*dm_subsume_cols_fn) (matrix_t *, matrix_t *, matrix_t *, int, int);
+typedef int         (*dm_nub_cols_fn) (matrix_t *, matrix_t *, matrix_t *, int, int);
 
 extern int          dm_create (matrix_t *, const int, const int);
 extern void         dm_free (matrix_t *);
@@ -83,13 +86,12 @@ extern int          dm_flatten (matrix_t *);
 extern int          dm_sort_rows (matrix_t *, matrix_t *, matrix_t *, const dm_comparator_fn);
 extern int          dm_sort_cols (matrix_t *, matrix_t *, matrix_t *, const dm_comparator_fn);
 
-extern int          dm_nub_rows (matrix_t *, matrix_t *, matrix_t *);
-extern int          dm_nub_cols (matrix_t *, matrix_t *, matrix_t *);
+extern int          dm_nub_rows (matrix_t *, matrix_t *, matrix_t *, const dm_nub_rows_fn, void *);
+extern int          dm_nub_cols (matrix_t *, matrix_t *, matrix_t *, const dm_nub_cols_fn);
 
-extern int          dm_subsume_rows (matrix_t *, matrix_t *, matrix_t *);
-extern int          dm_subsume_cols (matrix_t *, matrix_t *, matrix_t *);
+extern int          dm_subsume_rows (matrix_t *, matrix_t *, matrix_t *, const dm_subsume_rows_fn, void *);
+extern int          dm_subsume_cols (matrix_t *, matrix_t *, matrix_t *, const dm_subsume_cols_fn);
 
-// NOTE: rewrite nub & subsume to dm_group_rows/cols(matrix_t *, dm_group_fn)?
 extern int          dm_ungroup_rows (matrix_t *);
 extern int          dm_ungroup_cols (matrix_t *);
 

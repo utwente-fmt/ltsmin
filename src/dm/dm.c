@@ -485,122 +485,6 @@ dm_sort_cols (matrix_t *r, matrix_t *mayw, matrix_t *mustw, dm_comparator_fn cmp
     return sort_ (r, mayw, mustw, cmp, dm_ncols (r), dm_swap_cols);
 }
 
-// return 0 or 1?
-static int
-eq_rows_ (matrix_t *r, matrix_t *mayw, matrix_t *mustw, int rowa, int rowb)
-{
-    HREassert(
-                dm_ncols(r) == dm_ncols(mayw) &&
-                dm_nrows(r) == dm_nrows(mayw) &&
-                dm_ncols(r) == dm_ncols(mustw) &&
-                dm_nrows(r) == dm_nrows(mustw), "matrix sizes do not match");
-    
-    if (
-            dm_ones_in_row (r, rowa) != dm_ones_in_row (r, rowb) ||
-            dm_ones_in_row (mayw, rowa) != dm_ones_in_row (mayw, rowb) ||
-            dm_ones_in_row (mustw, rowa) != dm_ones_in_row (mustw, rowb))
-        return 0;
-
-    int                 i;
-    for (i = 0; i < dm_ncols (r); i++) {
-        int                 ar = dm_is_set (r, rowa, i);
-        int                 br = dm_is_set (r, rowb, i);
-        int                 amayw = dm_is_set (mayw, rowa, i);
-        int                 bmayw = dm_is_set (mayw, rowb, i);
-        int                 amustw = dm_is_set (mustw, rowa, i);
-        int                 bmustw = dm_is_set (mustw, rowb, i);
-        if (ar != br || amayw != bmayw || amustw != bmustw)
-            return 0;                  // unequal
-    }
-    return 1;                          // equal
-}
-
-// return 0 or 1?
-static int
-subsume_rows_ (matrix_t *r, matrix_t *mayw, matrix_t *mustw, int rowa, int rowb)
-{
-    HREassert(
-                dm_ncols(r) == dm_ncols(mayw) &&
-                dm_nrows(r) == dm_nrows(mayw) &&
-                dm_ncols(r) == dm_ncols(mustw) &&
-                dm_nrows(r) == dm_nrows(mustw), "matrix sizes do not match");
-
-    int                 i;
-    for (i = 0; i < dm_ncols (r); i++) {
-        int a = 4;
-        if (dm_is_set(mayw, rowa, i)) a |= 1;
-        if (dm_is_set(mustw, rowa, i)) a = 1;
-        if (dm_is_set(r, rowa, i)) a |= 6;
-
-        int b = 4;
-        if (dm_is_set(mayw, rowb, i)) b |= 1;
-        if (dm_is_set(mustw, rowb, i)) b = 1;
-        if (dm_is_set(r, rowb, i)) b |= 6;
-
-        if (a < (a|b))
-            return 0;                  // not subsumed
-    }
-    return 1;                          // subsumed
-}
-
-// return 0 or 1?
-static int
-eq_cols_ (matrix_t *r, matrix_t *mayw, matrix_t *mustw, int cola, int colb)
-{
-    HREassert(
-                dm_ncols(r) == dm_ncols(mayw) &&
-                dm_nrows(r) == dm_nrows(mayw) &&
-                dm_ncols(r) == dm_ncols(mustw) &&
-                dm_nrows(r) == dm_nrows(mustw), "matrix sizes do not match");
-    
-    if (
-            dm_ones_in_col (r, cola) != dm_ones_in_col (r, colb) ||
-            dm_ones_in_col (mayw, cola) != dm_ones_in_col (mayw, colb) ||
-            dm_ones_in_col (mustw, cola) != dm_ones_in_col (mustw, colb))
-        return 0;
-
-    int                 i;
-    for (i = 0; i < dm_nrows (r); i++) {
-        int                 ar = dm_is_set (r, i, cola);
-        int                 br = dm_is_set (r, i, colb);
-        int                 amayw = dm_is_set (mayw, i, cola);
-        int                 bmayw = dm_is_set (mayw, i, colb);
-        int                 amustw = dm_is_set (mustw, i, cola);
-        int                 bmustw = dm_is_set (mustw, i, colb);
-        if (ar != br || amayw != bmayw || amustw != bmustw)
-            return 0;                  // unequal
-    }
-    return 1;                          // equal
-}
-
-// return 0 or 1?
-static int
-subsume_cols_ (matrix_t *r, matrix_t *mayw, matrix_t *mustw, int cola, int colb)
-{
-    HREassert(
-                dm_ncols(r) == dm_ncols(mayw) &&
-                dm_nrows(r) == dm_nrows(mayw) &&
-                dm_ncols(r) == dm_ncols(mustw) &&
-                dm_nrows(r) == dm_nrows(mustw), "matrix sizes do not match");
-    
-    int                 i;
-    for (i = 0; i < dm_nrows (r); i++) {
-        int a = 4;
-        if (dm_is_set(mayw, i, cola)) a |= 1;
-        if (dm_is_set(mustw, i, cola)) a = 1;
-        if (dm_is_set(r, i, cola)) a |= 6;
-
-        int b = 4;
-        if (dm_is_set(mayw, i, colb)) b |= 1;
-        if (dm_is_set(mustw, i, colb)) b = 1;
-        if (dm_is_set(r, i, colb)) b |= 6;
-        
-        if (a < (a|b))
-            return 0;                  // not subsumed
-    }
-    return 1;                          // equal
-}
-
 static int
 last_in_group_ (matrix_header_t *h, int group)
 {
@@ -872,7 +756,7 @@ unmerge_col_ (matrix_t *m, int col)
 }
 
 int
-dm_nub_rows (matrix_t *r, matrix_t *mayw, matrix_t *mustw)
+dm_nub_rows (matrix_t *r, matrix_t *mayw, matrix_t *mustw, const dm_nub_rows_fn fn, void *context)
 {
     HREassert(
                 dm_ncols(r) == dm_ncols(mayw) &&
@@ -883,7 +767,7 @@ dm_nub_rows (matrix_t *r, matrix_t *mayw, matrix_t *mustw)
                         j;
     for (i = 0; i < dm_nrows (r); i++) {
         for (j = i + 1; j < dm_nrows (r); j++) {
-            if (eq_rows_ (r, mayw, mustw, i, j)) {
+            if (fn(r, mayw, mustw, i, j, context)) {
                 merge_rows_ (r, i, j);
                 merge_rows_ (mayw, i, j);
                 merge_rows_ (mustw, i, j);
@@ -897,7 +781,7 @@ dm_nub_rows (matrix_t *r, matrix_t *mayw, matrix_t *mustw)
 }
 
 int
-dm_subsume_rows (matrix_t *r, matrix_t *mayw, matrix_t *mustw)
+dm_subsume_rows (matrix_t *r, matrix_t *mayw, matrix_t *mustw, const dm_subsume_rows_fn fn, void *context)
 {
     HREassert(
                 dm_ncols(r) == dm_ncols(mayw) &&
@@ -912,7 +796,7 @@ dm_subsume_rows (matrix_t *r, matrix_t *mayw, matrix_t *mustw)
         int row_i_removed = 0;
         for (j = i + 1; j < dm_nrows (r); j++) {
             // is row j subsumed by row i?
-            if (subsume_rows_ (r, mayw, mustw, i, j)) {
+            if (fn (r, mayw, mustw, i, j, context)) {
                 merge_rows_ (r, i, j);
                 merge_rows_ (mayw, i, j);
                 merge_rows_ (mustw, i, j);
@@ -921,7 +805,7 @@ dm_subsume_rows (matrix_t *r, matrix_t *mayw, matrix_t *mustw)
                 j--;
             } else {
                 // is row i subsumed by row j?
-                if (subsume_rows_ (r, mayw, mustw, j, i)) {
+                if (fn (r, mayw, mustw, j, i, context)) {
                     merge_rows_ (r, j, i);
                     merge_rows_ (mayw, j, i);
                     merge_rows_ (mustw, j, i);
@@ -930,6 +814,7 @@ dm_subsume_rows (matrix_t *r, matrix_t *mayw, matrix_t *mustw)
                     row_i_removed=1;
                 }
             }
+
         }
 
         if (row_i_removed) i--;
@@ -938,7 +823,7 @@ dm_subsume_rows (matrix_t *r, matrix_t *mayw, matrix_t *mustw)
 }
 
 int
-dm_nub_cols (matrix_t *r, matrix_t *mayw, matrix_t *mustw)
+dm_nub_cols (matrix_t *r, matrix_t *mayw, matrix_t *mustw, const dm_nub_cols_fn fn)
 {
     HREassert(
                 dm_ncols(r) == dm_ncols(mayw) &&
@@ -950,7 +835,7 @@ dm_nub_cols (matrix_t *r, matrix_t *mayw, matrix_t *mustw)
                         j;
     for (i = 0; i < dm_ncols (r); i++) {
         for (j = i + 1; j < dm_ncols (r); j++) {
-            if (eq_cols_ (r, mayw, mustw, i, j)) {
+            if (fn (r, mayw, mustw, i, j)) {
                 merge_cols_ (r, i, j);
                 merge_cols_ (mayw, i, j);
                 merge_cols_ (mustw, i, j);
@@ -963,7 +848,7 @@ dm_nub_cols (matrix_t *r, matrix_t *mayw, matrix_t *mustw)
 }
 
 int
-dm_subsume_cols (matrix_t *r, matrix_t *mayw, matrix_t *mustw)
+dm_subsume_cols (matrix_t *r, matrix_t *mayw, matrix_t *mustw, const dm_subsume_cols_fn fn)
 {
     HREassert(
                 dm_ncols(r) == dm_ncols(mayw) &&
@@ -977,7 +862,7 @@ dm_subsume_cols (matrix_t *r, matrix_t *mayw, matrix_t *mustw)
         int col_i_removed;
         for (j = i + 1; j < dm_ncols (r); j++) {
             // is col i subsumed by row j?
-            if (subsume_cols_ (r, mayw, mustw, i, j)) {
+            if (fn (r, mayw, mustw, i, j)) {
                 merge_cols_ (r, i, j);
                 merge_cols_ (mayw, i, j);
                 merge_cols_ (mustw, i, j);
@@ -985,7 +870,7 @@ dm_subsume_cols (matrix_t *r, matrix_t *mayw, matrix_t *mustw)
                 col_i_removed=1;
             } else {
                 // is col j subsumed by row i?
-                if (subsume_cols_ (r, mayw, mustw, j, i)) {
+                if (fn (r, mayw, mustw, j, i)) {
                     merge_cols_ (r, j, i);
                     merge_cols_ (mayw, j, i);
                     merge_cols_ (mustw, j, i);
