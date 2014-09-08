@@ -2111,8 +2111,13 @@ unguided(sat_proc_t sat_proc, reach_proc_t reach_proc, vset_t visited,
     bitvector_invert(&reach_groups);
     sat_proc(reach_proc, visited, &reach_groups, &eg_count, &next_count, &guard_count);
     bitvector_free(&reach_groups);
-    Warning(info, "Exploration took %ld group checks, %ld next state calls and %ld guard evaluation calls",
-            eg_count, next_count, guard_count);
+    if (0!=strcmp(GBgetUseGuards(model), "false")) {
+        Warning(info, "Exploration took %ld group checks, %ld next state calls and %ld guard evaluation calls",
+                eg_count, next_count, guard_count);
+    } else {
+        Warning(info, "Exploration took %ld group checks and %ld next state calls",
+                eg_count, next_count);
+    }
 }
 
 /**
