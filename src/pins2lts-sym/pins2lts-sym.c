@@ -238,7 +238,7 @@ typedef struct {
 static lts_type_t ltstype;
 static int N;
 static int eLbls;
-static int sLbls;
+static int nGuards;
 static int nGrps;
 static int max_sat_levels;
 static proj_info *r_projs = NULL;
@@ -297,11 +297,11 @@ save_level(vset_t visited)
 static void
 write_trace_state(lts_file_t trace_handle, int src_no, int *state)
 {
-  int labels[sLbls];
+  int labels[nGuards];
 
   Warning(debug, "dumping state %d", src_no);
 
-  if (sLbls != 0)
+  if (nGuards != 0)
       GBgetStateLabelsAll(model, state, labels);
 
   lts_write_state(trace_handle, 0, state, labels);
@@ -1939,12 +1939,12 @@ output_lbls(FILE *tbl_file, vset_t visited)
 {
     matrix_t *sl_info = GBgetStateLabelInfo(model);
 
-    sLbls = dm_nrows(sl_info);
+    nGuards = dm_nrows(sl_info);
 
     if (dm_nrows(sl_info) != lts_type_get_state_label_count(ltstype))
         Warning(error, "State label count mismatch!");
 
-    for (int i = 0; i < sLbls; i++){
+    for (int i = 0; i < nGuards; i++){
         int len = dm_ones_in_row(sl_info, i);
         int used[len];
 
@@ -2084,8 +2084,8 @@ establish_group_order(int *group_order, int *initial_count)
 
     bitvector_create(&found_groups, nGrps);
 
-    int labels[sLbls];
-    for (int i = 0; i < sLbls; i++)
+    int labels[nGuards];
+    for (int i = 0; i < nGuards; i++)
         labels[i] = act_label == i ? act_index : -1;
     for (int i = 0; i < nGrps; i++){
         if (GBtransitionInGroup(model, labels, i)) {
@@ -2184,11 +2184,11 @@ init_model(char *file)
     ltstype = GBgetLTStype(model);
     N = lts_type_get_state_length(ltstype);
     eLbls = lts_type_get_edge_label_count(ltstype);
-    sLbls = lts_type_get_state_label_count(ltstype);
+    nGuards = GBgetStateLabelGroupInfo(model, GB_SL_GUARDS)->count;
     nGrps = dm_nrows(GBgetDMInfo(model));
     max_sat_levels = (N / sat_granularity) + 1;
     if (HREme(HREglobal())==0) {
-        Warning(info, "state vector length is %d; there are %d groups", N, nGrps);
+        Warning(info, "state vector length is %d; there are %d groups and %d guards", N, nGrps, nGuards);
     }
 
     int id=GBgetMatrixID(model,"inhibit");
