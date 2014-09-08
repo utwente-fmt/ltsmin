@@ -72,6 +72,9 @@ set_create(vdom_t dom, int k, int *proj)
         // set _proj to [-1] (= keep rest)
         _proj[0] = -1;
         set->proj = lddmc_ref(lddmc_cube((uint32_t*)_proj, 1));
+    } else if (k == 0) {
+        _proj[0] = -2;
+        set->proj = lddmc_ref(lddmc_cube((uint32_t*)_proj, 1));
     } else {
         // fill _proj with 0 (= quantify)
         memset(_proj, 0, sizeof(int[dom->shared.size+1]));
