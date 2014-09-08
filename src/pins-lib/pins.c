@@ -599,7 +599,6 @@ lts_type_t GBgetLTStype(model_t model){
 }
 
 void GBsetDMInfo(model_t model, matrix_t *dm_info) {
-    if (dm_info == NULL) Abort("use GBunsetDMInfo")
 	if (model->dm_info != NULL) Abort("dependency matrix already set");
 	model->dm_info=dm_info;
 }
