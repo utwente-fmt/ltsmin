@@ -1199,6 +1199,7 @@ struct reach_par_s
     struct reach_par_s *right;
     int index;
     int next_count;
+    int eg_count;
 };
 
 VOID_TASK_2(reach_par_next, struct reach_par_s *, dummy, bitvector_t *, reach_groups)
@@ -1206,8 +1207,14 @@ VOID_TASK_2(reach_par_next, struct reach_par_s *, dummy, bitvector_t *, reach_gr
     if (dummy->index >= 0) {
         if (!bitvector_is_set(reach_groups, dummy->index)) {
             dummy->next_count = 0;
+            dummy->eg_count=0;
             return;
         }
+
+        // Compute successor states
+        CALL(expand_group_next, dummy->index, dummy->container);
+        dummy->eg_count = 1;
+
         vset_next(dummy->container, dummy->container, group_next[dummy->index]);
         dummy->next_count = 1;
         if (dlk_detect) {
@@ -1242,6 +1249,7 @@ VOID_TASK_2(reach_par_next, struct reach_par_s *, dummy, bitvector_t *, reach_gr
         }
 
         dummy->next_count = dummy->left->next_count + dummy->right->next_count;
+        dummy->eg_count = dummy->left->eg_count + dummy->right->eg_count;
     }
 }
 
@@ -1304,23 +1312,13 @@ reach_par(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
         stats_and_progress_report(NULL, visited, level);
         level++;
 
-        // Expand transition relations
-        for (int i = 0; i < nGrps; i++) {
-            if (!bitvector_is_set(reach_groups,i)) continue;
-            SPAWN(expand_group_next, i, visited);
-            (*eg_count)++;
-        }
-        for (int i = 0; i < nGrps; i++) {
-            if (!bitvector_is_set(reach_groups,i)) continue;
-            SYNC(expand_group_next);
-        }
-
         vset_copy(root->container, visited);
         if (dlk_detect) vset_copy(root->deadlocks, visited);
         CALL(reach_par_next, root, reach_groups);
         if (dlk_detect) deadlock_check(root->deadlocks, reach_groups);
 
         *next_count += root->next_count;
+        *eg_count += root->eg_count;
 
         vset_union(visited, root->container);
         vset_clear(root->container);
@@ -1356,23 +1354,13 @@ reach_par_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
         stats_and_progress_report(NULL, visited, level);
         level++;
 
-        // Expand transition relations
-        for (int i = 0; i < nGrps; i++) {
-            if (!bitvector_is_set(reach_groups,i)) continue;
-            SPAWN(expand_group_next, i, current_level);
-            (*eg_count)++;
-        }
-        for (int i = 0; i < nGrps; i++) {
-            if (!bitvector_is_set(reach_groups,i)) continue;
-            SYNC(expand_group_next);
-        }
-
         vset_copy(root->container, current_level);
         if (dlk_detect) vset_copy(root->deadlocks, current_level);
         CALL(reach_par_next, root, reach_groups);
         if (dlk_detect) deadlock_check(root->deadlocks, reach_groups);
 
         *next_count += root->next_count;
+        *eg_count += root->eg_count;
 
         vset_minus(root->container, visited);
 
