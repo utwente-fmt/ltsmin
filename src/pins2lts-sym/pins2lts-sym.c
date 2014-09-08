@@ -509,11 +509,10 @@ find_action(int* src, int* dst, int* cpy, int group, char* action)
 }
 
 struct group_add_info {
-    int    group;
-    int   *src;
-    int   *explored;
-    vset_t set;
-    vrel_t rel;
+    vrel_t rel; // target relation
+    vset_t set; // source set
+    int group; // which transition group
+    int *src; // state vector
 };
 
 static void
@@ -554,18 +553,14 @@ group_add(void *context, transition_info_t *ti, int *dst, int *cpy)
 }
 
 static void
-explore_cb(void *context, int *src)
+explore_cb(vrel_t rel, void *context, int *src)
 {
-    struct group_add_info *ctx = (struct group_add_info*)context;
-
-    ctx->src = src;
-    (*short_proc)(model, ctx->group, src, group_add, context);
-    (*ctx->explored)++;
-
-    if ((*ctx->explored) % 10000 == 0) {
-        Warning(infoLong, "explored %d short vectors for group %d",
-                    *ctx->explored, ctx->group);
-    }
+    struct group_add_info ctx;
+    ctx.group = ((struct group_add_info*)context)->group;
+    ctx.set = ((struct group_add_info*)context)->set;
+    ctx.rel = rel;
+    ctx.src = src;
+    (*short_proc)(model, ctx.group, src, group_add, &ctx);
 }
 
 #ifdef HAVE_SYLVAN
@@ -579,15 +574,12 @@ expand_group_next(int group, vset_t set)
     if (!expand_groups) return; // assume transitions loaded from file cannot expand further
 
     struct group_add_info ctx;
-    int explored = 0;
-
     ctx.group = group;
     ctx.set = set;
-    ctx.rel = group_next[group];
-    ctx.explored = &explored;
     vset_project(group_tmp[group], set);
     vset_zip(group_explored[group], group_tmp[group]);
-    vset_enum(group_tmp[group], explore_cb, &ctx);
+    // todo: if verbose, count number of states (satcount) to be explored as next-state calls
+    vrel_update(group_next[group], group_tmp[group], explore_cb, &ctx);
     vset_clear(group_tmp[group]);
 }
 
@@ -600,19 +592,19 @@ struct expand_info {
 static inline void
 expand_group_next_projected(vrel_t rel, vset_t set, void *context)
 {
+    if (!expand_groups) return; // assume transitions loaded from file cannot expand further
+
     struct expand_info *expand_ctx = (struct expand_info*)context;
+    (*expand_ctx->eg_count)++;
+
+    vset_t group_explored = expand_ctx->group_explored;
+    vset_zip(group_explored, set);
+
     struct group_add_info group_ctx;
     int group = expand_ctx->group;
-    vset_t group_explored = expand_ctx->group_explored;
-    int explored = 0;
-
     group_ctx.group = group;
     group_ctx.set = NULL;
-    group_ctx.rel = rel;
-    group_ctx.explored = &explored;
-    (*expand_ctx->eg_count)++;
-    vset_zip(group_explored, set);
-    vset_enum(set, explore_cb, &group_ctx);
+    vrel_update(rel, set, explore_cb, &group_ctx);
 }
 
 static void
