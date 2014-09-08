@@ -374,6 +374,7 @@ bool mucalc_check_formula(mucalc_parse_env_t env, mucalc_expr_t expr)
                     Abort("Parse error: variable \"%s\" not in scope of "
                             "fixpoint operator mu or nu.", SIget(env->ids, expr->value));
                 }
+                return true;
             }
             break;
         case MUCALC_MUST:
