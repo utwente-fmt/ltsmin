@@ -1,5 +1,9 @@
 #include <hre/config.h>
 
+#ifdef __APPLE__
+#define _DARWIN_C_SOURCE
+#endif
+
 #include <alloca.h>
 #include <assert.h>
 #include <dirent.h>
@@ -2487,11 +2491,11 @@ void init_multi_process(size_t workers)
     for(size_t i=0; i<workers; i++)
     {
         int fd[2];
-        socketpair(PF_LOCAL, SOCK_STREAM, 0, fd);
+        socketpair(AF_UNIX, SOCK_STREAM, 0, fd);
         parent_sockets[i] = fd[0];
         child_sockets[i] = fd[1];
     }
-    run_chunk_thread = mmap(NULL,sizeof(int),PROT_READ|PROT_WRITE,MAP_SHARED|MAP_ANONYMOUS,0,0);
+    run_chunk_thread = mmap(NULL,sizeof(int),PROT_READ|PROT_WRITE,MAP_SHARED|MAP_ANON,0,0);
     *run_chunk_thread = 1;
 }
 
@@ -3025,8 +3029,8 @@ main (int argc, char *argv[])
     if (multi_process) {
         init_multi_process(n_workers);
     }
-    short_proc = mmap(NULL,sizeof(short_proc_t),PROT_READ|PROT_WRITE,MAP_SHARED|MAP_ANONYMOUS,0,0);
-    short_multi_proc = mmap(NULL,sizeof(short_proc_t),PROT_READ|PROT_WRITE,MAP_SHARED|MAP_ANONYMOUS,0,0);
+    short_proc = mmap(NULL,sizeof(short_proc_t),PROT_READ|PROT_WRITE,MAP_SHARED|MAP_ANON,0,0);
+    short_multi_proc = mmap(NULL,sizeof(short_proc_t),PROT_READ|PROT_WRITE,MAP_SHARED|MAP_ANON,0,0);
     *(short_proc) = NULL;
     *(short_multi_proc) = NULL;
 
