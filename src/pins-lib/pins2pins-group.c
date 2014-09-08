@@ -49,8 +49,8 @@ group_cb (void *context, transition_info_t *ti, int *olddst, int*cpy)
 }
 
 static int
-group_long (model_t self, int group, int *newsrc, TransitionCB cb,
-            void *user_context)
+long_ (model_t self, int group, int *newsrc, TransitionCB cb,
+      void *user_context, int (*long_proc)(model_t,int,int*,TransitionCB,void*))
 {
     struct group_context ctx;
     group_context_t     _ctx = (group_context_t)GBgetContext (self);
@@ -70,10 +70,24 @@ group_long (model_t self, int group, int *newsrc, TransitionCB cb,
     for (int j = begin; j < end; j++) {
         int                 g = ctx.transmap[j];
         ctx.cpy = ctx.group_cpy[g];
-        Ntrans += GBgetTransitionsLong (parent, g, oldsrc, group_cb, &ctx);
+        Ntrans += long_proc (parent, g, oldsrc, group_cb, &ctx);
     }
 
     return Ntrans;
+}
+
+static int
+group_long (model_t self, int group, int *newsrc, TransitionCB cb,
+            void *user_context)
+{
+    return long_(self, group, newsrc, cb, user_context, &GBgetTransitionsLong);
+}
+
+static int
+actions_long (model_t self, int group, int *newsrc, TransitionCB cb,
+            void *user_context)
+{
+    return long_(self, group, newsrc, cb, user_context, &GBgetActionsLong);
 }
 
 static int
@@ -257,11 +271,17 @@ struct group_info {
 };
 
 static int
-eq_guards(const guard_t** guards, int i, int j) {
+eq_guards(guard_t** guards, int i, int j, matrix_t *m) {
+
+    // information about guards has not changed.
+    // thus we refer to old rows numbers.
+    int old_i = m->row_perm.data[i].becomes;
+    int old_j = m->row_perm.data[j].becomes;
+
     if (guards[i]->count != guards[j]->count) return 0;
 
-    for (int g = 0; g < guards[i]->count; g++) {
-        if (guards[i]->guard[g] != guards[j]->guard[g]) return 0;
+    for (int g = 0; g < guards[old_i]->count; g++) {
+        if (guards[old_i]->guard[g] != guards[old_j]->guard[g]) return 0;
     }
 
     return 1;
@@ -276,7 +296,7 @@ eq_rows(matrix_t *r, matrix_t *mayw, matrix_t *mustw, int rowa, int rowb, void *
                 dm_nrows(r) == dm_nrows(mustw), "matrix sizes do not match");
 
     struct group_info *ctx = (struct group_info*)context;
-    if (ctx->guards == NULL || eq_guards(ctx->guards, rowa, rowb)) {
+    if (ctx->guards == NULL || eq_guards(ctx->guards, rowa, rowb, r)) {
 
         if (
                 dm_ones_in_row (r, rowa) != dm_ones_in_row (r, rowb) ||
@@ -309,7 +329,7 @@ subsume_rows(matrix_t *r, matrix_t *mayw, matrix_t *mustw, int rowa, int rowb, v
                 dm_nrows(r) == dm_nrows(mustw), "matrix sizes do not match");
 
     struct group_info *ctx = (struct group_info*)context;
-    if (ctx->guards == NULL || eq_guards(ctx->guards, rowa, rowb)) {
+    if (ctx->guards == NULL || eq_guards(ctx->guards, rowa, rowb, r)) {
 
         int                 i;
         for (i = 0; i < dm_ncols (r); i++) {
@@ -388,7 +408,7 @@ subsume_cols(matrix_t *r, matrix_t *mayw, matrix_t *mustw, int cola, int colb) {
 }
 
 static void
-apply_regroup_spec (matrix_t* r, matrix_t* mayw, matrix_t* mustw, const char *spec_, const guard_t **guards)
+apply_regroup_spec (matrix_t* r, matrix_t* mayw, matrix_t* mustw, const char *spec_, guard_t **guards)
 {
     
     HREassert(
@@ -525,12 +545,18 @@ GBregroup (model_t model, const char *regroup_spec)
     matrix_t           *original_may_write = GBgetDMInfoMayWrite (model);
     matrix_t           *original_must_write = GBgetDMInfoMustWrite (model);
 
-    dm_copy (GBgetDMInfoRead (model), r);
     dm_copy (original_may_write, mayw);
     dm_copy (original_must_write, mustw);
 
     Print1 (info, "Regroup specification: %s", regroup_spec);
+    if (0==strcmp(GBgetUseGuards(model), "assume-true")) {
+        dm_copy (GBgetMatrix(model, GBgetMatrixID(model, LTSMIN_MATRIX_ACTIONS_READS)), r);
+        apply_regroup_spec (r, mayw, mustw, regroup_spec, GBgetGuardsInfo(model));
+    } else {
+        dm_copy (GBgetDMInfoRead(model), r);
         apply_regroup_spec (r, mayw, mustw, regroup_spec, NULL);
+    }
+
     // post processing regroup specification
     // undo column grouping
     dm_ungroup_cols(r);
@@ -546,6 +572,7 @@ GBregroup (model_t model, const char *regroup_spec)
     GBsetContext (group, ctx);
 
     GBsetNextStateLong (group, group_long);
+    GBsetActionsLong(group, actions_long);
     GBsetNextStateAll (group, group_all);
 
     // fill statemapping: assumption this is a bijection
@@ -622,16 +649,47 @@ GBregroup (model_t model, const char *regroup_spec)
         lts_type_printf(debug,ltstype);
     }
     GBsetLTStype (group, ltstype);
-    
-    matrix_t           *new_dm = RTmalloc (sizeof (matrix_t));
-    dm_copy(r, new_dm);
-    dm_apply_or(new_dm, mayw);
 
     // set new dependency matrices
-    GBsetDMInfo (group, new_dm);
-    GBsetDMInfoRead(group, r);
     GBsetDMInfoMayWrite (group, mayw);
     GBsetDMInfoMustWrite(group, mustw);
+    GBsetProjectMatrix(group, mayw);
+
+    // here we either transform the read matrix or the actions read matrix
+    if (0==strcmp(GBgetUseGuards(model), "assume-true")) { // we have transformed the actions read matrix
+
+        // set the new actions read matrix
+        GBsetMatrix(group, LTSMIN_MATRIX_ACTIONS_READS, r, PINS_MAY_SET,
+                    PINS_INDEX_GROUP, PINS_INDEX_STATE_VECTOR);
+
+        // transform the read matrix and set it
+        matrix_t *read = RTmalloc (sizeof (matrix_t));
+        dm_create(read, dm_nrows (r), dm_ncols (r));
+        combine_rows(read, GBgetDMInfoRead (model), dm_nrows (r), ctx->transbegin,
+                         ctx->transmap);
+        dm_copy_header(&(r->col_perm), &(read->col_perm));
+        GBsetDMInfoRead(group, read);
+        GBsetExpandMatrix(group, r);
+    } else { // we have transformed the read matrix
+
+        // transform the actions read matrix and set it
+        matrix_t *read = RTmalloc (sizeof (matrix_t));
+        dm_create(read, dm_nrows (r), dm_ncols (r));
+        combine_rows(read, GBgetMatrix(model, GBgetMatrixID(model, LTSMIN_MATRIX_ACTIONS_READS)), dm_nrows (r), ctx->transbegin,
+                         ctx->transmap);
+        dm_copy_header(&(r->col_perm), &(read->col_perm));
+        GBsetMatrix(group, LTSMIN_MATRIX_ACTIONS_READS, read, PINS_MAY_SET,
+                    PINS_INDEX_GROUP, PINS_INDEX_STATE_VECTOR);
+        // set the new read matrix
+        GBsetDMInfoRead(group, r);
+        GBsetExpandMatrix(group, r);
+    }
+
+    // create a new combined dependency matrix
+    matrix_t *new_dm = RTmalloc (sizeof (matrix_t));
+    dm_copy (GBgetDMInfoRead(group), new_dm);
+    dm_apply_or(new_dm, mayw);
+    GBsetDMInfo (group, new_dm);
 
     // copy state label matrix and apply the same permutation
     matrix_t           *s = RTmalloc (sizeof (matrix_t));
@@ -644,6 +702,21 @@ GBregroup (model_t model, const char *regroup_spec)
     dm_copy_header(&(r->col_perm), &(s->col_perm));
 
     GBsetStateLabelInfo(group, s);
+
+    // set the guards per transition group
+    if (GBhasGuardsInfo(model)) {
+        guard_t** guards_info = RTmalloc(sizeof(guard_t*) * dm_nrows(r));
+        for (int i = 0; i < dm_nrows(r); i++) {
+            int oldGroup = r->row_perm.data[i].becomes;
+            guard_t* guards = RTmalloc(sizeof(guard_t) + sizeof(int[GBgetGuard(model, oldGroup)->count]));
+            guards->count = GBgetGuard(model, oldGroup)->count;
+            for (int g = 0; g < guards->count; g++) {
+                guards->guard[g] = GBgetGuard(model, oldGroup)->guard[g];
+            }
+            guards_info[i] = guards;
+        }
+        GBsetGuardsInfo(group, guards_info);
+    }
 
     GBsetStateLabelShort (group, group_state_labels_short);
     GBsetStateLabelLong (group, group_state_labels_long);

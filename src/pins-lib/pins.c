@@ -423,6 +423,7 @@ model_t GBcreateBase(){
 	model->get_count=NULL;
 	model->expand_matrix=NULL;
 	model->project_matrix=NULL;
+	model->use_guards=NULL;
 	
 	model->static_info_index=SIcreate();
 	model->static_info_matrices=NULL;
@@ -472,7 +473,7 @@ void GBinitModelDefaults (model_t *p_model, model_t default_src)
         else
             model->dm_must_write_info = model->dm_info;
     }
-    model->supports_copy = default_src->supports_copy;
+    if (model->supports_copy == NULL) model->supports_copy = default_src->supports_copy;
     if (model->dm_info == NULL)
         model->dm_info = default_src->dm_info;
 
@@ -569,8 +570,9 @@ void GBinitModelDefaults (model_t *p_model, model_t default_src)
     if (model->covered_by_short == NULL)
         GBsetIsCoveredByShort(model, default_src->covered_by_short);
 
-    model->expand_matrix=default_src->expand_matrix;
-    model->project_matrix=default_src->project_matrix;
+    if (model->expand_matrix == NULL) model->expand_matrix=default_src->expand_matrix;
+    if (model->project_matrix == NULL) model->project_matrix=default_src->project_matrix;
+    if (model->use_guards == NULL) model->use_guards=default_src->use_guards;
 }
 
 void* GBgetContext(model_t model){
@@ -1016,7 +1018,7 @@ void GBprintDependencyMatrixMustWrite(FILE* file, model_t model) {
 }
 
 void GBprintDependencyMatrixCombined(FILE* file, model_t model) {
-    matrix_t *dm_r = GBgetDMInfoRead(model);
+    matrix_t *dm_r = GBgetExpandMatrix(model);
     matrix_t *dm_may_w = GBgetDMInfoMayWrite(model);
     matrix_t *dm_must_w = GBgetDMInfoMustWrite(model);
 
