@@ -191,10 +191,8 @@ int default_actions_short(model_t self,int group,int*src,TransitionCB cb,void*co
     info.cb=cb;
     info.user_ctx=context;
 
-    int long_src[dm_ncols(GBgetDMInfo(self))];
-    dm_expand_vector(
-        GBgetMatrix(self, GBgetMatrixID(self, LTSMIN_MATRIX_ACTIONS_READS)),
-        group, self->s0, src, long_src);
+    int long_src[dm_ncols(self->expand_matrix)];
+    dm_expand_vector(self->expand_matrix, group, self->s0, src, long_src);
     return self->actions_long(self,group,long_src,project_dest,&info);
 }
 
@@ -206,9 +204,9 @@ int default_actions_long(model_t self,int group,int*src,TransitionCB cb,void*con
     info.cb=cb;
     info.user_ctx=context;
 
-    int len = dm_ones_in_row(GBgetDMInfo(self), group);
+    int len = dm_ones_in_row(self->expand_matrix, group);
     int src_short[len];
-    dm_project_vector(GBgetDMInfo(self), group, src, src_short);
+    dm_project_vector(self->expand_matrix, group, src, src_short);
 
     return self->actions_short(self,group,src_short,expand_dest,&info);
 }
@@ -1184,7 +1182,11 @@ GBloadFile (model_t model, const char *filename, model_t *wrapped)
                        Abort ("No long next-state function implemented for this language module (--"USE_GUARDS_OPTION").");
                    model->guard_status = RTmalloc (sizeof(int[pins_get_state_label_count(model)]));
                    model->next_all = guards_all;
-                   model->expand_matrix=GBgetMatrix(model, GBgetMatrixID(model, LTSMIN_MATRIX_ACTIONS_READS));
+                   if (0==strcmp(use_guards,"assume-true")) {
+                       model->expand_matrix=GBgetMatrix(model, GBgetMatrixID(model, LTSMIN_MATRIX_ACTIONS_READS));
+                   } else if (0==strcmp(use_guards,"evaluate")) {
+                       model->expand_matrix=GBgetDMInfoRead(model);
+                   }
                 }
 
                 if (wrapped) {
