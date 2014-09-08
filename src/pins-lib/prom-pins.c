@@ -420,14 +420,13 @@ PromLoadGreyboxModel(model_t model, const char *filename)
             }
         }
     }
-    GBsetDMInfo(model, dm_info);
+    GBsetMatrix(model, LTSMIN_MATRIX_ACTIONS_READS, dm_actions_read_info, PINS_MAY_SET,
+                                            PINS_INDEX_GROUP, PINS_INDEX_STATE_VECTOR);
     GBsetDMInfoRead(model, dm_read_info);
     GBsetDMInfoMayWrite(model, dm_may_write_info);
     GBsetDMInfoMustWrite(model, dm_must_write_info);
+    GBsetDMInfo(model, dm_info);
     GBsetSupportsCopy(model);
-
-    GBsetMatrix(model, "actions_reads", dm_actions_read_info, PINS_MAY_SET,
-                PINS_INDEX_GROUP, PINS_INDEX_STATE_VECTOR);
 
     // Export dependencies for all state labels (NOT ONLY GUARDS)
 
