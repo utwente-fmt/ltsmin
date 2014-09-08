@@ -249,9 +249,8 @@ static void
 set_count(vset_t set, long *nodes, bn_int_t *elements)
 {
     LACE_ME;
-    *nodes = lddmc_nodecount(set->mdd);
-    double count = lddmc_satcount(set->mdd);
-    bn_double2int(count, elements);
+    if (nodes != NULL) *nodes = lddmc_nodecount(set->mdd);
+    if (elements != NULL) bn_double2int(lddmc_satcount(set->mdd), elements);
 }
 
 static void

@@ -458,9 +458,8 @@ static void
 set_count(vset_t set, long *nodes, bn_int_t *elements) 
 {
     LACE_ME;
-    *nodes = sylvan_nodecount(set->bdd);
-    double count = (double)sylvan_satcount(set->bdd, set->variables);
-    bn_double2int(count, elements);
+    if (nodes != NULL) *nodes = sylvan_nodecount(set->bdd);
+    if (elements != NULL) bn_double2int((double)sylvan_satcount(set->bdd, set->variables), elements);
 }
 
 static void

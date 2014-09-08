@@ -230,7 +230,7 @@ set_count_t(ATerm set, long *nodes, bn_int_t *elements)
   assert(idx<elem_size);
   bn_set_digit(&elem_count[idx],1);
   idx=count_set_t2(set);
-  bn_init_copy(elements,&elem_count[idx]);
+  if (elements != NULL) bn_init_copy(elements,&elem_count[idx]);
   ATindexedSetDestroy(count_is);
   for(int i=0;i<elem_size;i++) bn_clear(&elem_count[i]);
   RTfree(elem_count);
@@ -238,7 +238,7 @@ set_count_t(ATerm set, long *nodes, bn_int_t *elements)
   if (set == Atom || set == Empty)
       node_count = 1;
 
-  *nodes=node_count;
+  if (nodes != NULL) *nodes=node_count;
 }
 
 static void set_count_tree(vset_t set,long *nodes,bn_int_t *elements){

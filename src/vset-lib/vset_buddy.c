@@ -397,17 +397,19 @@ static void set_copy_match_fdd(vset_t dst,vset_t src,int p_len,int* proj,int*mat
 
 static void count_fdd(BDD bdd, BDD p_set,long *nodes,bn_int_t *elements)
 {
-    *nodes=bdd_nodecount(bdd);
-    double count=bdd_satcountlnset(bdd,p_set);
-    //Warning(info,"log of satcount is %f",count);
-    if (count == 0.0 && bdd != bddtrue) {
-        // count is zero or one
-        count=bdd_satcountset(bdd, p_set);
-    } else {
-        count=pow(2.0, count);
+    if (nodes != NULL) *nodes=bdd_nodecount(bdd);
+    if (elements != NULL) {
+        double count=bdd_satcountlnset(bdd,p_set);
+        //Warning(info,"log of satcount is %f",count);
+        if (count == 0.0 && bdd != bddtrue) {
+            // count is zero or one
+            count=bdd_satcountset(bdd, p_set);
+        } else {
+            count=pow(2.0, count);
+        }
+        //Warning(info,"satcount is %f",count);
+        bn_double2int(count,elements);
     }
-    //Warning(info,"satcount is %f",count);
-    bn_double2int(count,elements);
 }
 
 static void set_count_fdd(vset_t set,long *nodes,bn_int_t *elements){

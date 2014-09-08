@@ -304,9 +304,11 @@ set_minus_ddd(vset_t dst, vset_t src)
 void
 set_count_ddd(vset_t set, long *nodes, bn_int_t *elements)
 {
-    *nodes = set->ddd->size();
-    double count = set->ddd->nbStates();
-    bn_double2int(count, elements);
+    if (nodes != NULL) *nodes = set->ddd->size();
+    if (elements != NULL) {
+        double count = set->ddd->nbStates();
+        bn_double2int(count, elements);
+    }
 }
 
 vrel_t
