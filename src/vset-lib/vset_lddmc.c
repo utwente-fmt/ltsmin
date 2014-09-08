@@ -451,6 +451,14 @@ set_example(vset_t set, int *e)
 }
 
 static void
+set_join(vset_t dst, vset_t left, vset_t right)
+{
+    LACE_ME;
+    lddmc_deref(dst->mdd);
+    dst->mdd = lddmc_ref(lddmc_join(left->mdd, right->mdd, left->proj, right->proj));
+}
+
+static void
 set_dot(FILE* fp, vset_t src)
 {
     lddmc_fprintdot(fp, src->mdd);
@@ -604,6 +612,7 @@ set_function_pointers(vdom_t dom)
 
     dom->shared.set_next=set_next;
     dom->shared.set_prev=set_prev;
+    dom->shared.set_join=set_join;
     //dom->shared.set_least_fixpoint=set_least_fixpoint;
 	//void (*set_least_fixpoint)(vset_t dst,vset_t src,vrel_t rels[],int rel_count);
 
