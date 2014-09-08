@@ -52,7 +52,8 @@ static int   act_index;
 static int   act_label;
 static int   action_typeno;
 static int   ErrorActions = 0; // count number of found errors (action/deadlock/invariant)
-static bitset_t   seen_actions;
+
+static uint64_t *seen_actions = 0;
 
 static int   sat_granularity = 10;
 static int   save_sat_levels = 0;
@@ -516,6 +517,24 @@ struct group_add_info {
 };
 
 static void
+seen_actions_prepare(int count)
+{
+    seen_actions = (uint64_t*)RTalignZero(8, sizeof(uint64_t) * ((count+63)/64));
+}
+
+static int
+seen_actions_test(int idx)
+{
+    volatile uint64_t *p = seen_actions+(idx/64);
+    const uint64_t m = 1ULL<<(idx&63);
+    for (;;) {
+        uint64_t v = *p;
+        if (v & m) return 0;
+        if (cas(p, v, v|m)) return 1;
+    }
+}
+
+static void
 group_add(void *context, transition_info_t *ti, int *dst, int *cpy)
 {
     struct group_add_info *ctx = (struct group_add_info*)context;
@@ -528,7 +547,7 @@ group_add(void *context, transition_info_t *ti, int *dst, int *cpy)
 
     if (act_detect) {
         int act_index = ti->labels[act_label];
-        if (bitset_set(seen_actions,act_index)) { // first time we encounter this action
+        if (seen_actions_test(act_index)) { // is this the first time we encounter this action?
             char *action=GBchunkGet(model,action_typeno,act_index).data;
 
             if (strncmp(act_detect,action,strlen(act_detect))==0)  {
@@ -2185,7 +2204,8 @@ init_action()
     if (act_label == -1)
         Abort("No edge label '%s...' for action detection", LTSMIN_EDGE_TYPE_ACTION_PREFIX);
     action_typeno = lts_type_get_edge_label_typeno(ltstype, act_label);
-    seen_actions = bitset_create(32,32);
+    int count = GBchunkCount(model, action_typeno);
+    seen_actions_prepare(count);
     Warning(info, "Detecting actions with prefix \"%s\"", act_detect);
 }
 
