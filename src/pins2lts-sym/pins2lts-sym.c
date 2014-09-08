@@ -243,6 +243,7 @@ static int nGrps;
 static int max_sat_levels;
 static proj_info *r_projs = NULL;
 static proj_info *w_projs = NULL;
+static proj_info *g_projs;
 static vdom_t domain;
 static vset_t *levels = NULL;
 static int max_levels = 0;
@@ -255,14 +256,17 @@ static model_t model;
 static vrel_t *group_next;
 static vset_t *group_explored;
 static vset_t *group_tmp;
+static vset_t *guard_false;
+static vset_t *guard_true;
+static vset_t *guard_tmp;
 
 typedef void (*reach_proc_t)(vset_t visited, vset_t visited_old,
                              bitvector_t *reach_groups,
-                             long *eg_count, long *next_count);
+                             long *eg_count, long *next_count, long *guard_count);
 
 typedef void (*sat_proc_t)(reach_proc_t reach_proc, vset_t visited,
                            bitvector_t *reach_groups,
-                           long *eg_count, long *next_count);
+                           long *eg_count, long *next_count, long *guard_count);
 
 typedef void (*guided_proc_t)(sat_proc_t sat_proc, reach_proc_t reach_proc,
                               vset_t visited, char *etf_output);
@@ -525,6 +529,58 @@ find_action(int* src, int* dst, int* cpy, int group, char* action)
     }
 
     find_trace(trace_end, 2, global_level, levels, action);
+}
+
+struct guard_add_info
+{
+    int guard;
+    int *src;
+    int *explored;
+    vset_t set;
+};
+
+static void eval_cb (void *context, int *src)
+{
+    struct guard_add_info *ctx = (struct guard_add_info*)context;
+    ctx->src = src;
+
+    int result = GBgetStateLabelShort(model, ctx->guard, src);
+
+    if (result) {
+        vset_add(guard_true[ctx->guard], ctx->src);
+    } else {
+        vset_add(guard_false[ctx->guard], ctx->src);
+    }
+
+    (*ctx->explored)++;
+
+    if ((*ctx->explored) % 10000 == 0) {
+        Warning(infoLong, "explored %d short vectors for guard %d",
+                *ctx->explored, ctx->guard);
+    }
+}
+#ifdef HAVE_SYLVAN
+#define eval_guard(g, s) CALL(eval_guard, (g), (s))
+TASK_2(long, eval_guard, int, guard, vset_t, set)
+#else
+static inline long
+eval_guard (int guard, vset_t set)
+#endif
+{
+    struct guard_add_info ctx;
+    int explored = 0;
+
+    ctx.guard = guard;
+    ctx.set = set;
+    ctx.explored = &explored;
+
+    vset_project(guard_tmp[guard], set);
+    vset_minus(guard_tmp[guard], guard_false[guard]);
+    vset_minus(guard_tmp[guard], guard_true[guard]);
+    vset_enum(guard_tmp[guard], eval_cb, &ctx);
+    vset_clear(guard_tmp[guard]);
+    return explored;
+
 }
 
 struct group_add_info {
@@ -826,13 +882,25 @@ stats_and_progress_report(vset_t current, vset_t visited, int level)
             file = "%s/group_next-l%d-k%d.dot";
             char fgbuf[snprintf(NULL, 0, file, dot_dir, level, i)];
             sprintf(fgbuf, file, dot_dir, level, i);
-
             fp = fopen(fgbuf, "w+");
-
             vrel_dot(fp, group_next[i]);
+            fclose(fp);
+        }
 
+        for (int g = 0; g < nGuards; g++) {
+            file = "%s/guard_false-l%d-g%d.dot";
+            char fgfbuf[snprintf(NULL, 0, file, dot_dir, level, g)];
+            sprintf(fgfbuf, file, dot_dir, level, g);
+            fp = fopen(fgfbuf, "w+");
+            vset_dot(fp, guard_false[g]);
             fclose(fp);
 
+            file = "%s/guard_true-l%d-g%d.dot";
+            char fgtbuf[snprintf(NULL, 0, file, dot_dir, level, g)];
+            sprintf(fgtbuf, file, dot_dir, level, g);
+            fp = fopen(fgtbuf, "w+");
+            vset_dot(fp, guard_true[g]);
+            fclose(fp);
         }
     }    
 }
@@ -1053,7 +1121,7 @@ reach_bfs_next(struct reach_s *dummy, bitvector_t *reach_groups)
 
 static void
 reach_bfs_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
-                   long *eg_count, long *next_count)
+                   long *eg_count, long *next_count, long *guard_count)
 {
     vset_t current_level = vset_create(domain, -1, NULL);
     vset_t next_level = vset_create(domain, -1, NULL);
@@ -1136,7 +1204,7 @@ reach_bfs_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
 
 static void
 reach_bfs(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
-              long *eg_count, long *next_count)
+              long *eg_count, long *next_count, long *guard_count)
 {
     vset_t old_vis = vset_create(domain, -1, NULL);
     vset_t next_level = vset_create(domain, -1, NULL);
@@ -1385,7 +1453,7 @@ reach_par(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
 
 static void
 reach_par_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
-              long *eg_count, long *next_count)
+              long *eg_count, long *next_count, long *guard_count)
 {
     vset_t current_level = vset_create(domain, -1, NULL);
     vset_t next_level = vset_create(domain, -1, NULL);
@@ -1470,7 +1538,7 @@ reach_par_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
 
 static void
 reach_chain_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
-                     long *eg_count, long *next_count)
+                     long *eg_count, long *next_count, long *guard_count)
 {
     int level = 0;
     vset_t new_states = vset_create(domain, -1, NULL);
@@ -1519,7 +1587,7 @@ reach_chain_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
 
 static void
 reach_chain(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
-                long *eg_count, long *next_count)
+                long *eg_count, long *next_count, long *guard_count)
 {
     (void)visited_old;
 
@@ -1564,20 +1632,25 @@ reach_chain(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
 
 static void
 reach_no_sat(reach_proc_t reach_proc, vset_t visited, bitvector_t *reach_groups,
-                 long *eg_count, long *next_count)
+                 long *eg_count, long *next_count, long *guard_count)
 {
     vset_t old_visited = save_sat_levels?vset_create(domain, -1, NULL):NULL;
 
-    reach_proc(visited, old_visited, reach_groups, eg_count, next_count);
+    reach_proc(visited, old_visited, reach_groups, eg_count, next_count, guard_count);
 
     if (save_sat_levels) vset_destroy(old_visited);
 }
 
 static void
 reach_sat_fix(reach_proc_t reach_proc, vset_t visited,
-                 bitvector_t *reach_groups, long *eg_count, long *next_count)
+                 bitvector_t *reach_groups, long *eg_count, long *next_count, long *guard_count)
 {
     (void) reach_proc;
+    (void) guard_count;
+
+    if (0!=strcmp(GBgetUseGuards(model), "false"))
+        Abort("guard-splitting not supported with saturation=sat-fix");
+
     int level = 0;
     vset_t old_vis = vset_create(domain, -1, NULL);
     vset_t deadlocks = dlk_detect?vset_create(domain, -1, NULL):NULL;
@@ -1695,7 +1768,7 @@ initialize_levels(bitvector_t *groups, int *empty_groups, int *back,
 
 static void
 reach_sat_like(reach_proc_t reach_proc, vset_t visited,
-                   bitvector_t *reach_groups, long *eg_count, long *next_count)
+                   bitvector_t *reach_groups, long *eg_count, long *next_count, long *guard_count)
 {
     bitvector_t groups[max_sat_levels];
     int empty_groups[max_sat_levels];
@@ -1721,7 +1794,7 @@ reach_sat_like(reach_proc_t reach_proc, vset_t visited,
 
         Warning(info, "Saturating level: %d", k);
         vset_copy(old_vis, visited);
-        reach_proc(visited, prev_vis[k], &groups[k], eg_count, next_count);
+        reach_proc(visited, prev_vis[k], &groups[k], eg_count, next_count,guard_count);
         if (save_sat_levels) vset_copy(prev_vis[k], visited);
         if (vset_equal(old_vis, visited))
             k++;
@@ -1741,7 +1814,7 @@ reach_sat_like(reach_proc_t reach_proc, vset_t visited,
 
 static void
 reach_sat_loop(reach_proc_t reach_proc, vset_t visited,
-                   bitvector_t *reach_groups, long *eg_count, long *next_count)
+                   bitvector_t *reach_groups, long *eg_count, long *next_count, long *guard_count)
 {
     bitvector_t groups[max_sat_levels];
     int empty_groups[max_sat_levels];
@@ -1761,7 +1834,7 @@ reach_sat_loop(reach_proc_t reach_proc, vset_t visited,
         for (int k = 0; k < max_sat_levels; k++) {
             if (empty_groups[k]) continue;
             Warning(info, "Saturating level: %d", k);
-            reach_proc(visited, prev_vis[k], &groups[k], eg_count, next_count);
+            reach_proc(visited, prev_vis[k], &groups[k], eg_count, next_count,guard_count);
             if (save_sat_levels) vset_copy(prev_vis[k], visited);
         }
     }
@@ -1776,10 +1849,11 @@ reach_sat_loop(reach_proc_t reach_proc, vset_t visited,
 
 static void
 reach_sat(reach_proc_t reach_proc, vset_t visited,
-          bitvector_t *reach_groups, long *eg_count, long *next_count)
+          bitvector_t *reach_groups, long *eg_count, long *next_count, long *guard_count)
 {
     (void) reach_proc;
     (void) next_count;
+    (void) guard_count;
 
     if (act_detect != NULL && trc_output != NULL)
         Abort("Action detection with trace generation not supported");
@@ -2031,13 +2105,14 @@ unguided(sat_proc_t sat_proc, reach_proc_t reach_proc, vset_t visited,
     bitvector_t reach_groups;
     long eg_count = 0;
     long next_count = 0;
+    long guard_count = 0;
 
     bitvector_create(&reach_groups, nGrps);
     bitvector_invert(&reach_groups);
-    sat_proc(reach_proc, visited, &reach_groups, &eg_count, &next_count);
+    sat_proc(reach_proc, visited, &reach_groups, &eg_count, &next_count, &guard_count);
     bitvector_free(&reach_groups);
-    Warning(info, "Exploration took %ld group checks and %ld next state calls",
-                eg_count, next_count);
+    Warning(info, "Exploration took %ld group checks, %ld next state calls and %ld guard evaluation calls",
+            eg_count, next_count, guard_count);
 }
 
 /**
@@ -2134,15 +2209,16 @@ directed(sat_proc_t sat_proc, reach_proc_t reach_proc, vset_t visited,
 
     long eg_count = 0;
     long next_count = 0;
+    long guard_count = 0;
 
     // Assumption: reach_proc does not return in case action is found
     Warning(info, "Searching for action using initial groups");
-    sat_proc(reach_proc, visited, &reach_groups, &eg_count, &next_count);
+    sat_proc(reach_proc, visited, &reach_groups, &eg_count, &next_count, &guard_count);
 
     for (int i = initial_count; i < total_count; i++) {
         Warning(info, "Extending action search with group %d", group_order[i]);
         bitvector_set(&reach_groups, group_order[i]);
-        sat_proc(reach_proc, visited, &reach_groups, &eg_count, &next_count);
+        sat_proc(reach_proc, visited, &reach_groups, &eg_count, &next_count, &guard_count);
     }
 
     if (etf_output != NULL || dlk_detect) {
@@ -2151,11 +2227,11 @@ directed(sat_proc_t sat_proc, reach_proc_t reach_proc, vset_t visited,
         for(int i = 0; i < nGrps; i++)
             bitvector_set(&reach_groups, i);
 
-        sat_proc(reach_proc, visited, &reach_groups, &eg_count, &next_count);
+        sat_proc(reach_proc, visited, &reach_groups, &eg_count, &next_count, &guard_count);
     }
 
-    Warning(info, "Exploration took %ld group checks and %ld next state calls",
-            eg_count, next_count);
+    Warning(info, "Exploration took %ld group checks, %ld next state calls and %ld guard evaluation calls",
+            eg_count, next_count, guard_count);
     bitvector_free(&reach_groups);
 }
 
@@ -2231,6 +2307,11 @@ init_domain(vset_implementation_t impl)
     group_tmp      = (vset_t*)RTmalloc(nGrps * sizeof(vset_t));
     r_projs        = (proj_info*)RTmalloc(nGrps * sizeof(proj_info));
     w_projs        = (proj_info*)RTmalloc(nGrps * sizeof(proj_info));
+    g_projs        = (proj_info*) RTmalloc(nGuards * sizeof(proj_info));
+
+    guard_false    = (vset_t*)RTmalloc(nGuards * sizeof(vset_t));
+    guard_true     = (vset_t*)RTmalloc(nGuards * sizeof(vset_t));
+    guard_tmp      = (vset_t*)RTmalloc(nGuards * sizeof(vset_t));
 
     matrix_t *read_matrix = RTmalloc(sizeof (matrix_t));
     dm_copy(GBgetExpandMatrix(model), read_matrix);
@@ -2287,6 +2368,25 @@ init_domain(vset_implementation_t impl)
                     class_enabled[i] = vset_create(domain, -1, NULL);
                 }
             }
+        }
+    }
+
+    for (int i = 0; i < nGuards; i++) {
+
+        g_projs[i].len     = dm_ones_in_row(GBgetStateLabelInfo(model), i);
+        g_projs[i].proj    = (int*)RTmalloc(g_projs[i].len * sizeof(int));
+
+        for (int j = 0, k = 0; j < dm_ncols(GBgetStateLabelInfo(model)); j++) {
+            if (dm_is_set(GBgetStateLabelInfo(model), i, j)) {
+                g_projs[i].proj[k++] = j;
+            }
+        }
+
+        if (HREme(HREglobal())==0)
+        {
+            guard_false[i]  = vset_create(domain, g_projs[i].len, g_projs[i].proj);
+            guard_true[i]   = vset_create(domain, g_projs[i].len, g_projs[i].proj);
+            guard_tmp[i]    = vset_create(domain, g_projs[i].len, g_projs[i].proj);
         }
     }
 }
@@ -2846,7 +2946,14 @@ actual_main(void)
     } else {
         init_domain(vset_impl);
 
-        *short_proc = GBgetTransitionsShort;
+
+
+        if(0==strcmp(GBgetUseGuards(model),"evaluate")) {
+            Abort("not yet implemented");
+        } else { // "assume-true" || "false"
+            *short_proc = GBgetTransitionsShort;
+        }
+
 #ifdef HAVE_SYLVAN
         if (multi_process) {
             *short_multi_proc = *short_proc;
@@ -3066,6 +3173,22 @@ actual_main(void)
         }
         Print(infoLong, "group_next: %ld nodes total", total_count);
         Print(infoLong, "group_explored: %ld nodes total", explored_total_count);
+
+        if (0!=strcmp(GBgetUseGuards(model), "false")) {
+            long total_false = 0;
+            long total_true = 0;
+            for(int i=0;i<nGuards; i++) {
+                get_vset_size(guard_false[i], &n_count, &e_count, elem_str, sizeof(elem_str));
+                Print(infoLong, "guard_false[%d]: %s (~%1.2e) short vectors, %ld nodes", i, elem_str, e_count, n_count);
+                total_false += n_count;
+
+                get_vset_size(guard_true[i], &n_count, &e_count, elem_str, sizeof(elem_str));
+                Print(infoLong, "guard_true[%d]: %s (~%1.2e) short vectors, %ld nodes", i, elem_str, e_count, n_count);
+                total_true += n_count;
+            }
+            Print(infoLong, "guard_false: %ld nodes total", total_false);
+            Print(infoLong, "guard_true: %ld nodes total", total_true);
+        }
     }
 
     if (files[1] != NULL)
