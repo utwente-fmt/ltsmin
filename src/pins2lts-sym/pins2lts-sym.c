@@ -2184,11 +2184,17 @@ init_model(char *file)
     ltstype = GBgetLTStype(model);
     N = lts_type_get_state_length(ltstype);
     eLbls = lts_type_get_edge_label_count(ltstype);
-    nGuards = GBgetStateLabelGroupInfo(model, GB_SL_GUARDS)->count;
     nGrps = dm_nrows(GBgetDMInfo(model));
     max_sat_levels = (N / sat_granularity) + 1;
-    if (HREme(HREglobal())==0) {
-        Warning(info, "state vector length is %d; there are %d groups and %d guards", N, nGrps, nGuards);
+    if (GBhasGuardsInfo(model)) {
+        nGuards = GBgetStateLabelGroupInfo(model, GB_SL_GUARDS)->count;
+        if (HREme(HREglobal())==0) {
+            Warning(info, "state vector length is %d; there are %d groups and %d guards", N, nGrps, nGuards);
+        }
+    } else {
+        if (HREme(HREglobal())==0) {
+            Warning(info, "state vector length is %d; there are %d groups", N, nGrps);
+        }
     }
 
     int id=GBgetMatrixID(model,"inhibit");
