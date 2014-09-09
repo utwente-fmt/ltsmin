@@ -169,7 +169,7 @@ rel_add_cpy(vrel_t rel, const int *src, const int *dst, const int *cpy)
             cpy_vec[k] = 0; // not supported yet for read levels
             vec[k++] = src[i++];
         } else if (v == 2 || v == 4) {
-            cpy_vec[k] = (cpy && cpy[j]) ? 1 : 0;
+            cpy_vec[k] = (v == 4 && cpy && cpy[j]) ? 1 : 0;
             vec[k++] = dst[j++];
         } else if (v == (uint32_t)-1) {
             break;
