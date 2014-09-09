@@ -95,6 +95,16 @@ extern vset_t vset_load(FILE* f, vdom_t dom);
 extern void vset_add(vset_t set,const int* e);
 
 /**
+\brief Callback for vset_update. Given state vector e, add new states to set.
+*/
+typedef void(*vset_update_cb)(vset_t rel, void *context, int *e);
+
+/**
+\brief Update a set with new states, obtained by calling cb for every state in set.
+*/
+extern void vset_update(vset_t rel, vset_t set, vset_update_cb cb, void *context);
+
+/**
 \brief Test if an element is a member.
 */
 extern int vset_member(vset_t set,const int* e);

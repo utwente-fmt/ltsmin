@@ -360,6 +360,38 @@ set_enum(vset_t set, vset_element_cb cb, void* context)
     lddmc_sat_all_nopar(set->mdd, (lddmc_sat_cb)TASK(enumer), &ctx);
 }
 
+struct set_update_context
+{
+    vset_t set;
+    vset_update_cb cb;
+    void* context;
+};
+
+TASK_3(MDD, set_updater, uint32_t*, values, size_t, count, struct set_update_context*, ctx)
+{
+    struct vector_set dummyset;
+    dummyset.dom = ctx->set->dom;
+    dummyset.mdd = lddmc_false; // start with empty set
+    dummyset.size = ctx->set->size; // same as result
+    dummyset.proj = ctx->set->proj;
+    ctx->cb(&dummyset, ctx->context, (int*)values);
+    lddmc_deref(dummyset.mdd); // return without ref
+    return dummyset.mdd;
+    (void)count;
+}
+
+static void
+set_update(vset_t dst, vset_t set, vset_update_cb cb, void* context)
+{
+    LACE_ME;
+    struct set_update_context ctx = (struct set_update_context){dst, cb, context};
+    MDD old = dst->mdd;
+    MDD result = lddmc_ref(lddmc_collect(set->mdd, (lddmc_sat_cb)TASK(set_updater), &ctx));
+    dst->mdd = lddmc_ref(lddmc_union(dst->mdd, result));
+    lddmc_deref(old);
+    lddmc_deref(result);
+}
+
 struct rel_update_context
 {
     vrel_t rel;
@@ -606,6 +638,7 @@ set_function_pointers(vdom_t dom)
     dom->shared.rel_update=rel_update;
 
     dom->shared.set_add=set_add;
+    dom->shared.set_update=set_update;
     dom->shared.set_member=set_member;
     dom->shared.set_example=set_example;
     dom->shared.set_enum=set_enum;

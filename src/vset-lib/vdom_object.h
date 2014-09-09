@@ -15,6 +15,7 @@ struct vector_domain_shared {
 	void (*set_save)(FILE* f, vset_t set);
 	vset_t (*set_load)(FILE* f, vdom_t dom);
 	void  (*set_add)(vset_t set,const int* e);
+    void (*set_update)(vset_t rel, vset_t set, vset_update_cb cb, void *context);
 	int (*set_member)(vset_t set,const int* e);
 	int (*set_equal)(vset_t set1,vset_t set2);
 	int (*set_is_empty)(vset_t set);
