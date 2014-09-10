@@ -534,52 +534,52 @@ find_action(int* src, int* dst, int* cpy, int group, char* action)
 struct guard_add_info
 {
     int guard;
-    int *src;
-    int *explored;
-    vset_t set;
+    int result;
 };
 
-static void eval_cb (void *context, int *src)
+static void eval_cb (vset_t set, void *context, int *src)
 {
-    struct guard_add_info *ctx = (struct guard_add_info*)context;
-    ctx->src = src;
-
-    int result = GBgetStateLabelShort(model, ctx->guard, src);
-
-    if (result) {
-        vset_add(guard_true[ctx->guard], ctx->src);
-    } else {
-        vset_add(guard_false[ctx->guard], ctx->src);
-    }
-
-    (*ctx->explored)++;
-
-    if ((*ctx->explored) % 10000 == 0) {
-        Warning(infoLong, "explored %d short vectors for guard %d",
-                *ctx->explored, ctx->guard);
-    }
+    int result = GBgetStateLabelShort(model, ((struct guard_add_info*)context)->guard, src);
+    if (((struct guard_add_info*)context)->result == result) vset_add(set, src);
 }
+
 #ifdef HAVE_SYLVAN
 #define eval_guard(g, s) CALL(eval_guard, (g), (s))
-TASK_2(long, eval_guard, int, guard, vset_t, set)
+VOID_TASK_2(eval_guard, int, guard, vset_t, set)
 #else
-static inline long
+static inline void
 eval_guard (int guard, vset_t set)
 #endif
 {
-    struct guard_add_info ctx;
-    int explored = 0;
+    struct guard_add_info ctx_false;
 
-    ctx.guard = guard;
-    ctx.set = set;
-    ctx.explored = &explored;
+    ctx_false.guard = guard;
+    ctx_false.result = 0;
+
+    struct guard_add_info ctx_true;
+
+    ctx_true.guard = guard;
+    ctx_true.result = 1;
 
     vset_project(guard_tmp[guard], set);
     vset_minus(guard_tmp[guard], guard_false[guard]);
     vset_minus(guard_tmp[guard], guard_true[guard]);
-    vset_enum(guard_tmp[guard], eval_cb, &ctx);
+
+    if (log_active(infoLong)) {
+        bn_int_t elem_count;
+        vset_count(guard_tmp[guard], NULL, &elem_count);
+
+        size_t size = 40;
+        char s[size];
+        bn_int2string(s, size, &elem_count);
+        bn_clear(&elem_count);
+
+        Print(infoLong, "expanding guard %d for %s states.", guard, s);
+    }
+
+    vset_update(guard_false[guard], guard_tmp[guard], eval_cb, &ctx_false);
+    vset_update(guard_true[guard], guard_tmp[guard], eval_cb, &ctx_true);
     vset_clear(guard_tmp[guard]);
-    return explored;
 
 }
 
