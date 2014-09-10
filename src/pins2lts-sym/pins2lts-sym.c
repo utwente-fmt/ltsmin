@@ -393,24 +393,30 @@ find_trace_to(int trace_end[][N], int end_count, int level, vset_t *levels,
         do {
             int_level++;
 
+            // grow int_levels if needed
             if (int_level == max_int_level) {
                 max_int_level += 32;
-                int_levels = RTrealloc(int_levels,
-                                           sizeof(vset_t[max_int_level]));
+                int_levels = RTrealloc(int_levels, sizeof(vset_t[max_int_level]));
 
                 for(int i = int_level; i < max_int_level; i++)
                     int_levels[i] = vset_create(domain, -1, NULL);
             }
 
             for (int i=0; i < nGrps; i++) {
-                vset_prev(temp, int_levels[int_level - 1], group_next[i], levels[prev_level+1]);
+                vset_prev(temp, int_levels[int_level - 1], group_next[i], levels[level-1]); // just use last level as universe // TODO FIXME
                 vset_union(int_levels[int_level], temp);
+                vset_intersect(temp, levels[prev_level]);
+                if (!vset_is_empty(temp)) break; // found a good ancestor! we can leave now!
+                else vset_clear(temp);
             }
 
-            vset_copy(temp, levels[prev_level]);
-            vset_minus(temp, int_levels[int_level]);
-        } while (vset_equal(levels[prev_level], temp));
+            // if there was no ancestor, abort (this should be impossible!)
+            if (vset_is_empty(int_levels[int_level])) Abort("Error trying to trace action!");
 
+            // do this until we find an actual state from levels[prev_level], i.e., temp is not empty
+        } while (vset_is_empty(temp));
+
+        // grow states if needed
         if (current_state + int_level >= max_states) {
             int old_max_states = max_states;
 
@@ -421,14 +427,11 @@ find_trace_to(int trace_end[][N], int end_count, int level, vset_t *levels,
                 states[i] = RTmalloc(sizeof(int[N]));
         }
 
-        // here: temp = levels[prev_level] - int_levels[int_level]
-        vset_copy(src_set, levels[prev_level]);
-        vset_minus(src_set, temp);
-        vset_example(src_set, states[current_state + int_level - 1]);
-        vset_clear(src_set);
+        vset_example(temp, states[current_state + int_level - 1]);
 
         // find the states that give us a trace to states[current_state - 1]
         for(int i = int_level - 1; i > 0; i--) {
+            vset_clear(src_set);
             vset_add(src_set, states[current_state + i]);
 
             for(int j = 0; j < nGrps; j++) {
@@ -436,9 +439,8 @@ find_trace_to(int trace_end[][N], int end_count, int level, vset_t *levels,
                 vset_union(dst_set, temp);
             }
 
-            vset_copy(temp, dst_set);
-            vset_minus(temp, int_levels[i]);
-            vset_minus(dst_set, temp);
+            vset_intersect(dst_set, int_levels[i]);
+            vset_minus(dst_set, src_set);
             vset_example(dst_set, states[current_state + i - 1]);
             vset_clear(src_set);
             vset_clear(dst_set);
