@@ -734,7 +734,7 @@ static void mdd_clear_and_write_bin(stream_t s, uint64_t mdd, uint64_t* n_count,
         DSwriteU32(s, node_table[mdd].val);
         DSwriteU64(s, simplemap64_get(node_map, node_table[mdd].down));
         DSwriteU64(s, simplemap64_get(node_map, node_table[mdd].right));
-        DSwriteU32(s, node_table[mdd].copy);
+        DSwriteU32(s, (uint32_t)node_table[mdd].copy);
         (*n_count)++;
     }
 }
@@ -754,7 +754,7 @@ mdd_save_bin(FILE* f, uint64_t mdd)
     mdd_clear_and_write_bin(s, mdd, &count, node_map);
     simplemap64_destroy(node_map);
     stream_flush(s);
-    stream_close(&s);
+    RTfree(s); //stream_close(&s);
 }
 
 static uint64_t
@@ -795,7 +795,7 @@ mdd_load_bin(FILE* f)
         mdd_load_node_count++;
     }
     RTfree(mdd_load_node_ids);
-    stream_close(&s);
+    RTfree (s); //stream_close(&s);
     mdd_load_node_ids = NULL;
     mdd_load_node_count = 0;
     return mdd;
@@ -912,7 +912,7 @@ rel_save_proj_bin(FILE* f, vrel_t rel)
         DSwriteS32(s, rel->w_proj[i]);
     }
     stream_flush(s);
-    stream_close(&s);
+    RTfree(s); //stream_close(&s);
 }
 
 static void
@@ -925,7 +925,6 @@ static vrel_t
 rel_load_proj_bin(FILE* f, vdom_t dom)
 {
     stream_t s = stream_input(f);
-    int p_len = DSreadS32(s);
     int r_p_len = DSreadS32(s);
     int r_proj[r_p_len];
     for(int i=0; i<r_p_len; i++){
@@ -936,7 +935,7 @@ rel_load_proj_bin(FILE* f, vdom_t dom)
     for(int i=0; i<w_p_len; i++){
         w_proj[i] = DSreadS32(s);
     }
-    stream_close(&s);
+    RTfree(s); //stream_close(&s);
     vrel_t result = rel_create_mdd_rw(dom, r_p_len, r_proj, w_p_len, w_proj);
     return result;
 }
