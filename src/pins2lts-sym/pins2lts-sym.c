@@ -503,7 +503,7 @@ find_action(int* src, int* dst, int* cpy, int group, char* action)
     // Set dst of the last step of the trace to its proper value
     for (int i = 0; i < w_projs[group].len; i++) {
         // TODO: check case where we have no R/W but copy is used... ?
-        if (cpy == NULL || cpy[i]) {
+        if (cpy == NULL || cpy[i] == 0) {
             trace_end[0][w_projs[group].proj[i]] = dst[i];
         }
     }
