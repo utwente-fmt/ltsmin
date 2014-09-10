@@ -1,10 +1,13 @@
 === Symbolic Parity Game Options
 
+A symbolic parity game can be generated either by using the +--mucalc+
+option or by using the PBES language module.
+
 *--pg-solve*::
         Solve the generated parity game.
 
 *--pg-reduce*::
-        Reduce the generated parity game on-the-fly.
+        Reduce the generated parity game on-the-fly (experimental).
         
-*--pg-write='file'*::
-        Writes a symbolic parity game to 'file'.        
+*--pg-write='FILE'*::
+        Writes a symbolic parity game to 'FILE'.        

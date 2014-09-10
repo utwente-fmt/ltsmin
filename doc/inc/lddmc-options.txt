@@ -1,0 +1,10 @@
+=== LDDmc Options
+
+*--lddmc-tablesize*='NUMBER'::
+        Sets the size of the BDD table to 1<<N nodes. Defaults to 23.
+        Maximum of 29.
+
+*--lddmc-cachesize*='NUMBER'::
+        Set the size of the memoization table to 1<<N entries. 
+        Defaults to 23.
+ 

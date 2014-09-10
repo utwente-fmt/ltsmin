@@ -1,0 +1,98 @@
+//                           -*- mode: doc; outline-regexp: "==\(=*\) ." -*-
+ltsminmucalc(5)
+=============
+:Author:  Gijs Kant
+:Email:   <kant@cs.utwente.nl>
+:Date:    2014-09-08
+
+== NAME
+ltsmin-mucalc - Mu-calculus layer 
+
+== SYNOPSIS
+Syntax for mu-calculus formulas, used by the LTSmin toolset to
+generate parity games.
+
+== DESCRIPTION
+A mu-calculus formula +f+ can be passed to the reachability tools, 
+together with a model +M+ in any of the supported languages,
+which will generate a parity game that encodes +M |= f+.
+For the symbolic tools (+pins2lts-sym+), a symbolic parity game
+solver manpage:spgsolver[1] is available. The explicit state tools
+(+pins2lts-seq+, +pins2lts-mc+, +pins2lts-dist+) generate a parity game
+that can be converted by manpage:ltsmin-convert[1] to a format that is 
+readable by the solvers https://github.com/tcsprojects/pgsolver[PGSolver] 
+and http://mcrl2.org/release/user_manual/tools/pbespgsolve.html[pbespgsolve] (part of http://mcrl2.org[mCRL2]). 
+
+=== Syntax
+----
+f ::= true | false | {v=e} | !{v=e} | f1 && f2 | f1 || f2 |
+nu Z . f | mu Z . f | [a]f | <a>f
+----
+
+Propositions are of the form \{v=e\}, where +v+ is a state variable
+and +e+ a value. A value is either a number or a quoted string.
+The modal operators [] and <> can either be empty or contain an
+action expressions +a+, which is a quoted string that is equal to
+the action label is should match.
+
+.Mu-calculus operators and priorities
+[options="header"]
+
+|===================================================================
+|Priority | Operator   | Meaning
+|0        | true       | Constant true
+|0        | false      | Constant false
+|0        | \{v=e\}    | Proposition
+|1        | !\{v=e\}   | Negated proposition
+|2        | f1 && f2   | Logical conjunction (and)
+|3        | f1 \|\| f2 | Logical disjunction (or)
+|4        | nu Z. f    | Greatest fixpoint operator
+|5        | mu Z. f    | Least fixpoint operator
+|6        | [a]f       | Necessity modality (must)
+|7        | <a>f       | Possibility modality (may)
+|===================================================================
+
+== EXAMPLES
+=== Basic formulae
+Absence of deadlocks:
+----
+nu Z. <>true && []Z
+----
+Invariance:
+----
+mu Z. {x=1} && []Z
+----
+=== Liveness and reachability
+From every state, a state where +x=2+ holds should be reachable:
+----
+nu Z. []Z && (mu Y. {x=2} || <>Y) 
+----
+After every (finite) +a+-path, there should be an infinite +b+-path:
+----
+mu Z. ["a"](Z && nu Y. <"b">true && ["b"]Y)
+----
+
+=== Usage
+Explicit-state tools:
+----
+pins2lts-mc --mucalc=<formula>.mcf <model> <game>.dir
+ltsmin-convert --rdwr <game>.dir <game>.pg
+pbespgsolve -ipgsolver <game>.pg
+----
+Symbolic tools:
+----
+pins2lts-sym [vset-options] --mucalc=<formula>.mcf <model> --pg-write=<game>.spg
+spgsolver [vset-options] <game>.spg
+----
+
+For variable naming consult the +--labels+ option in the PINS tools.
+
+
+== SEE ALSO
+manpage:ltsmin[7],
+manpage:etf2lts-seq[1],
+manpage:etf2lts-sym[1],
+manpage:etf2lts-sym[1],
+manpage:spgsolver[1],
+manpage:ltsmin-convert[1]
+

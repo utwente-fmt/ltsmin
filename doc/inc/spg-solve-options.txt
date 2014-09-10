@@ -1,13 +1,25 @@
 === Symbolic Parity Game Solver Options
 
-*--chaining-attractor*::
-        Use attractor with chaining.
+*--attr*='default'|'chain'|'par'|'par2'::
+        Choose attractor function.
++
+Available attractor functions:
+
+'default';;
+    Straightforward attractor computation. 
+'chain';;
+    Chaining attractor, applies transition groups in a different order
+    than 'default' in computing an attractor level.
+'par';;
+    Spawns parallel tasks to compute forward and backward steps for each 
+    attractor level.
+'par2';;
+    Spawns more parallel tasks than 'par', by applying forward steps in
+    parallel to the result of the backward steps of the different 
+    transition groups.
         
 *--saturating-attractor*::
-        Use attractor with saturating.
-        
-*--pg-swap*::
-        Swap parity games to disk during parity game solving.
+        Use saturation in the chaining attractor.
         
 *--pg-write-dot*::
         Write dot files to disk during parity game solving for debugging.

@@ -23,6 +23,7 @@ include::support.txt[]
 == SEE ALSO
 manpage:ltsmin[7],
 manpage:ltsmin-printtrace[1],
+manpage:ltsmin-mucalc[5],
 manpage:etf[5],
 http://divine.fi.muni.cz/[DiVinE-2.2],
 https://code.launchpad.net/~opaal-developers/opaal/opaal-ltsmin-succgen[opaal],

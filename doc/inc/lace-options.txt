@@ -1,0 +1,11 @@
+=== Lace Options
+
+*--lace-workers*='NUMBER'::
+        Set number of Lace workers (threads for parallelization). 
+        Defaults to the number of available cores if parallel algorithms
+        are used, 1 otherwise.
+
+*--lace-dqsize*='NUMBER'::
+        Set length of Lace task queue. 
+        Defaults to 40960000.
+ 

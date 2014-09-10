@@ -12,7 +12,6 @@
 #include <spg-lib/spg-options.h>
 #include <spg-lib/spg-attr.h>
 
-static int chaining_attractor_flag = 0;
 static int saturating_attractor_flag = 0;
 
 #ifdef LTSMIN_DEBUG
@@ -62,7 +61,6 @@ spg_solve_popt(poptContext con, enum poptCallbackReason reason,
 struct poptOption spg_solve_options[]={
     { NULL, 0 , POPT_ARG_CALLBACK|POPT_CBFLAG_POST|POPT_CBFLAG_SKIPOPTION , (void*)spg_solve_popt , 0 , NULL , NULL },
     { "attr" , 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &attr_str , 0 , "set the attractor strategy" , "<default|chain|par|par2>" },
-    { "chaining-attractor" , 0 , POPT_ARG_NONE , &chaining_attractor_flag, 0, "Use attractor with chaining.","" },
     { "saturating-attractor" , 0 , POPT_ARG_NONE , &saturating_attractor_flag, 0, "Use attractor with saturation.","" },
 #ifdef LTSMIN_DEBUG
     { "pg-write-dot" , 0 , POPT_ARG_NONE , &dot_flag, 0, "Write dot files to disk.","" },

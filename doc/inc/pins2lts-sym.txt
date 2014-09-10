@@ -2,6 +2,10 @@ include::reachability-options.txt[]
 
 include::pins-options.txt[]
 
+include::spg-options.txt[]
+
+include::spg-solve-options.txt[]
+
 include::vset-options.txt[]
 
 include::general-options.txt[]
@@ -20,6 +24,7 @@ include::support.txt[]
 manpage:ltsmin[7],
 manpage:etf[5],
 manpage:ltsmin-mpi[1],
+manpage:ltsmin-mucalc[5],
 manpage:ltsmin-convert[1],
 manpage:ltsmin-printtrace[1],
 http://dx.doi.org/10.1007/978-3-540-85762-4_6[ICTAC 2008, LNCS 5160],

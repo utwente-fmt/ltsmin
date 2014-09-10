@@ -74,6 +74,13 @@ ru;;
   Row sUbsume; try to remove more rows than nubbing, thereby trading
   speed for memory.  Requires *rs*.
 
+*--mucalc*='FILE'|'FORMULA'::
+    Compute a parity game for the mu-calculus formula.
++
+The mu-calculus formula is provided in the file 'FILE' or directly
+as a string 'FORMULA'. The syntax and tool support are described in 
+manpage:ltsmin-mucalc[5].
+
 *--ltl*='LTLFILE|LTLFORMULA'::
     Compute cross-product of a Buchi automaton and the specification
 +
@@ -113,4 +120,3 @@ ltsmin;;
 +
 Partial Order Reduction can reduce the state space when searching
 for deadlocks (-d) or accepting cycles (--ltl).
-

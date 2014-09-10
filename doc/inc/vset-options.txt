@@ -1,7 +1,7 @@
 === Vector Set Options
 
 *--vset*='TYPE'::
-        Select type of vector set: 'ldd64', 'ldd', 'list', 'tree', 'fdd', 'ddd', or 'sylvan'.
+        Select type of vector set: 'ldd64', 'ldd', 'list', 'tree', 'fdd', 'ddd', 'sylvan', or 'lddmc'.
         With 'ldd64', the 64-bit ListDD list encoding is used (non-ATerm based).
         With 'ldd', the 32-bit ListDD list encoding is used (non-ATerm based).
         With 'list', ATermDD with list encoding is used.
@@ -9,6 +9,7 @@
         With 'fdd', BuDDy FDDs are used.
         With 'ddd', libDDD SDDs are used.
         With 'sylvan', the parallel BDD package Sylvan is used.
+        With 'lddmc', the parallel LDD package LDDmc is used.
         Defaults to first available type in the list.
 
 include::listdd-options.txt[]
@@ -19,3 +20,6 @@ include::buddy-options.txt[]
 
 include::sylvan-options.txt[]
 
+include::lddmc-options.txt[]
+
+include::lace-options.txt[]
