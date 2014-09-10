@@ -120,7 +120,7 @@ recursive_result spg_solve_recursive(parity_game* g,  const spgsolver_options* o
     }
     RTstartTimer(options->attr_options->timer);
 
-    SPG_OUTPUT_DOT(options->attr_options->dot,g->v,"spg_set_%05d_v.dot",dot_count++)
+    SPG_OUTPUT_DOT(options->attr_options->dot,g->v,"spg_set_%05zu_v.dot",options->attr_options->dot_count++)
 
     recursive_result result;
     // Check if game is empty
@@ -272,8 +272,8 @@ recursive_result spg_solve_recursive(parity_game* g,  const spgsolver_options* o
     }
     SPG_REPORT_RECURSIVE_RESULT(options->attr_options,indent,result);
 
-    SPG_OUTPUT_DOT(options->attr_options->dot,result.win[0],"spg_set_%05d_win0.dot",dot_count++);
-    SPG_OUTPUT_DOT(options->attr_options->dot,result.win[1],"spg_set_%05d_win1.dot",dot_count++);
+    SPG_OUTPUT_DOT(options->attr_options->dot,result.win[0],"spg_set_%05zu_win0.dot",options->attr_options->dot_count++);
+    SPG_OUTPUT_DOT(options->attr_options->dot,result.win[1],"spg_set_%05zu_win1.dot",options->attr_options->dot_count++);
     return result;
 }
 

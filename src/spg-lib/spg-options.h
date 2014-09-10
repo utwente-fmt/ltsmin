@@ -13,6 +13,9 @@
 typedef struct
 {
     bool dot;
+#ifdef LTSMIN_DEBUG
+    size_t dot_count;
+#endif
     bool saturation;
     rt_timer_t timer;
 } spg_attr_options;

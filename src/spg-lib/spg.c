@@ -152,7 +152,6 @@ parity_game* spg_load(FILE* f, vset_implementation_t impl)
     result->v = vset_load(f, domain);
     for(int i=0; i<2; i++) {
         fgets(buf, size, f); // "set v_player[%d]\n"
-        //printf("Reading v_player[%d]. | buf = %s\n", i, buf);
         result->v_player[i] = vset_load(f, domain);
     }
     for(int i=min_priority; i<=max_priority; i++) {

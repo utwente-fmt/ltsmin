@@ -16,7 +16,6 @@ static int saturating_attractor_flag = 0;
 
 #ifdef LTSMIN_DEBUG
 static int dot_flag = 0;
-static int dot_count = 0;
 #endif
 
 static enum { DEFAULT, CHAIN, PAR, PAR2 } attr_strategy = DEFAULT;
@@ -25,8 +24,10 @@ static char *attr_str = "default";
 static si_map_entry ATTR[] = {
     {"default", DEFAULT},
     {"chain",   CHAIN},
+#ifdef HAVE_SYLVAN
     {"par",     PAR},
     {"par2",    PAR2},
+#endif
     {NULL, 0}
 };
 
@@ -60,7 +61,11 @@ spg_solve_popt(poptContext con, enum poptCallbackReason reason,
 
 struct poptOption spg_solve_options[]={
     { NULL, 0 , POPT_ARG_CALLBACK|POPT_CBFLAG_POST|POPT_CBFLAG_SKIPOPTION , (void*)spg_solve_popt , 0 , NULL , NULL },
+#ifdef HAVE_SYLVAN
     { "attr" , 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &attr_str , 0 , "set the attractor strategy" , "<default|chain|par|par2>" },
+#else
+    { "attr" , 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &attr_str , 0 , "set the attractor strategy" , "<default|chain>" },
+#endif
     { "saturating-attractor" , 0 , POPT_ARG_NONE , &saturating_attractor_flag, 0, "Use attractor with saturation.","" },
 #ifdef LTSMIN_DEBUG
     { "pg-write-dot" , 0 , POPT_ARG_NONE , &dot_flag, 0, "Write dot files to disk.","" },
@@ -80,6 +85,7 @@ spgsolver_options* spg_get_solver_options()
         options->attr = spg_attractor_chaining;
         Print(infoLong, "attractor: chaining");
         break;
+#ifdef HAVE_SYLVAN
     case PAR:
         options->attr = spg_attractor_par;
         Print(infoLong, "attractor: par");
@@ -88,6 +94,7 @@ spgsolver_options* spg_get_solver_options()
         options->attr = spg_attractor_par2;
         Print(infoLong, "attractor: par2");
         break;
+#endif
     default:
         options->attr = spg_attractor;
         Print(infoLong, "attractor: default");
@@ -97,6 +104,7 @@ spgsolver_options* spg_get_solver_options()
     options->attr_options->dot = false;
 #ifdef LTSMIN_DEBUG
     options->attr_options->dot = (dot_flag > 0);
+    options->attr_options->dot_count = 0;
 #endif
     options->attr_options->saturation = (saturating_attractor_flag > 0);
     options->attr_options->timer = RTcreateTimer();

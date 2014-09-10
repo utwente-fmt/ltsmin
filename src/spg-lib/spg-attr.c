@@ -17,14 +17,14 @@
  * \brief Computes the attractor set for G, U.
  * The resulting set is stored in U.
  */
-void spg_attractor(int player, const parity_game* g, vset_t u, const spg_attr_options* options, int depth)
+void spg_attractor(int player, const parity_game* g, vset_t u, spg_attr_options* options, int depth)
 {
     int indent = 2 * depth;
     RTstopTimer(options->timer);
     Print(info, "[%7.3f] " "%*s" "attractor: player=%d", RTrealTime(options->timer), indent, "", player);
     RTstartTimer(options->timer);
 
-    SPG_OUTPUT_DOT(options->dot,u,"spg_set_%05d_u.dot",dot_count++);
+    SPG_OUTPUT_DOT(options->dot,u,"spg_set_%05zu_u.dot",options->dot_count++);
     vset_t v_level = vset_create(g->domain, -1, NULL);
     vset_copy(v_level, u);
     int l = 0;
@@ -87,7 +87,7 @@ void spg_attractor(int player, const parity_game* g, vset_t u, const spg_attr_op
         // v_level := v_level - U
         vset_zip(u, v_level);
 
-        SPG_OUTPUT_DOT(options->dot,u,"spg_set_%05d_u_level_%d.dot",dot_count++,l);
+        SPG_OUTPUT_DOT(options->dot,u,"spg_set_%05zu_u_level_%d.dot",options->dot_count++,l);
         l++;
     }
     RTstopTimer(options->timer);
@@ -98,7 +98,7 @@ void spg_attractor(int player, const parity_game* g, vset_t u, const spg_attr_op
 }
 
 
-#if defined(HAVE_SYLVAN)
+#ifdef HAVE_SYLVAN
 
 struct reach_par_s
 {
@@ -194,13 +194,13 @@ VOID_TASK_2(task_union, vset_t, dst, vset_t, src)
  * \brief Computes the attractor set for G, U. (parallel version)
  * The resulting set is stored in U.
  */
-void spg_attractor_par(int player, const parity_game* g, vset_t u, const spg_attr_options* options, int depth)
+void spg_attractor_par(int player, const parity_game* g, vset_t u, spg_attr_options* options, int depth)
 {
     int indent = 2*depth;
     RTstopTimer(options->timer);
     Print(info, "[%7.3f] attractor_par: player=%d", RTrealTime(options->timer), player);
     RTstartTimer(options->timer);
-    SPG_OUTPUT_DOT(options->dot,u,"spg_set_%05d_u.dot",dot_count++);
+    SPG_OUTPUT_DOT(options->dot,u,"spg_set_%05zu_u.dot",options->dot_count++);
     vset_t v_level = vset_create(g->domain, -1, NULL);
     vset_copy(v_level, u);
     struct reach_par_s *root = attr_par_prepare(g, 0, g->num_groups);
@@ -259,7 +259,7 @@ void spg_attractor_par(int player, const parity_game* g, vset_t u, const spg_att
         // v_level := v_level - U
         vset_zip(u, v_level);
 
-        SPG_OUTPUT_DOT(options->dot,u,"spg_set_%05d_u_level_%d.dot",dot_count++,l);
+        SPG_OUTPUT_DOT(options->dot,u,"spg_set_%05zu_u_level_%d.dot",options->dot_count++,l);
         l++;
     }
     attr_par_destroy(root);
@@ -364,13 +364,13 @@ VOID_TASK_4(attr_par_step, vset_t, states, vset_t, u, struct reach_par2_s *, dum
  * Parallel version. Does backward and then forward steps together for each transition group.
  * The resulting set is stored in U.
  */
-void spg_attractor_par2(int player, const parity_game* g, vset_t u, const spg_attr_options* options, int depth)
+void spg_attractor_par2(int player, const parity_game* g, vset_t u, spg_attr_options* options, int depth)
 {
     int indent = 2*depth;
     RTstopTimer(options->timer);
     Print(info, "[%7.3f] attractor_par2: player=%d", RTrealTime(options->timer), player);
     RTstartTimer(options->timer);
-    SPG_OUTPUT_DOT(options->dot,u,"spg_set_%05d_u.dot",dot_count++);
+    SPG_OUTPUT_DOT(options->dot,u,"spg_set_%05zu_u.dot",options->dot_count++);
     vset_t v_level = vset_create(g->domain, -1, NULL);
     vset_copy(v_level, u);
     int l = 0;
@@ -418,7 +418,7 @@ void spg_attractor_par2(int player, const parity_game* g, vset_t u, const spg_at
         // v_level := v_level - U
         vset_zip(u, v_level);
 
-        SPG_OUTPUT_DOT(options->dot,u,"spg_set_%05d_u_level_%d.dot",dot_count++,l);
+        SPG_OUTPUT_DOT(options->dot,u,"spg_set_%05zu_u_level_%d.dot",options->dot_count++,l);
         l++;
     }
     RTstopTimer(options->timer);
@@ -436,7 +436,7 @@ void spg_attractor_par2(int player, const parity_game* g, vset_t u, const spg_at
  * The resulting set is stored in U.
  * FIXME: review, refactor, rewrite [properly implement chaining/saturation]
  */
-void spg_attractor_chaining(int player, const parity_game* g, vset_t u, const spg_attr_options* options, int depth)
+void spg_attractor_chaining(int player, const parity_game* g, vset_t u, spg_attr_options* options, int depth)
 {
     int indent = 2*depth;
     RTstopTimer(options->timer);

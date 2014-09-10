@@ -33,6 +33,9 @@
 
 #ifdef HAVE_SYLVAN
 #include <sylvan.h>
+#else
+#include <mc-lib/atomics.h>
+#define LACE_ME
 #endif
 
 static ltsmin_expr_t mu_expr = NULL;
@@ -82,7 +85,16 @@ static matrix_t *class_matrix=NULL;
 static int inhibit_class_count=0;
 static vset_t *class_enabled = NULL;
 
-static enum { BFS_P, BFS, PAR, PAR_P, CHAIN_P, CHAIN } strategy = BFS_P;
+static enum {
+    BFS_P,
+    BFS,
+#ifdef HAVE_SYLVAN
+    PAR,
+    PAR_P,
+#endif
+    CHAIN_P,
+    CHAIN
+} strategy = BFS_P;
 
 static int expand_groups = 1; // set to 0 if transitions are loaded from file
 
@@ -97,7 +109,7 @@ static char* order = "bfs-prev";
 static si_map_entry ORDER[] = {
     {"bfs-prev", BFS_P},
     {"bfs", BFS},
-#if defined(HAVE_SYLVAN)
+#ifdef HAVE_SYLVAN
     {"par", PAR},
     {"par-prev", PAR_P},
 #endif
@@ -176,11 +188,13 @@ reach_popt(poptContext con, enum poptCallbackReason reason,
     }
 }
 
+#ifdef HAVE_SYLVAN
 static struct poptOption lace_options[] = {
     { "lace-workers", 0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &lace_n_workers , 0 , "set number of Lace workers (threads for parallelization)","<workers>"},
     { "lace-dqsize",0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &lace_dqsize , 0 , "set length of Lace task queue","<dqsize>"},
 POPT_TABLEEND
 };
+#endif
 
 static  struct poptOption options[] = {
     { NULL, 0 , POPT_ARG_CALLBACK|POPT_CBFLAG_POST|POPT_CBFLAG_SKIPOPTION , (void*)reach_popt , 0 , NULL , NULL },
@@ -256,7 +270,9 @@ typedef void (*guided_proc_t)(sat_proc_t sat_proc, reach_proc_t reach_proc,
 typedef int (*short_proc_t)(model_t model,int group,int*src,TransitionCB cb,void*context);
 
 static short_proc_t* short_proc; // which function to call for the next states.
+#ifdef HAVE_SYLVAN
 static short_proc_t* short_multi_proc; // which function to call in the multi-process environment.
+#endif
 
 static inline void
 grow_levels(int new_levels)
@@ -314,6 +330,7 @@ write_trace_next(void *arg, transition_info_t *ti, int *dst, int *cpy)
 
     ctx->found = 1;
     lts_write_edge(ctx->trace_handle, 0, &ctx->src_no, 0, dst, ti->labels);
+    (void)cpy;
 }
 
 static void
@@ -1826,6 +1843,7 @@ etf_edge(void *context, transition_info_t *ti, int *dst, int *cpy)
         fprintf(ctx->tbl_file, " %d", ti->labels[i]);
 
     fprintf(ctx->tbl_file,"\n");
+    (void)cpy;
 }
 
 static void enum_edges(void *context, int *src)
@@ -2568,6 +2586,8 @@ parity_game* compute_symbolic_parity_game(vset_t visited, int* src)
 static char *files[2];
 hre_context_t ctx;
 
+
+#ifdef HAVE_SYLVAN
 static int* parent_sockets;
 static int* child_sockets;
 static int* run_chunk_thread;
@@ -2593,11 +2613,7 @@ static int
 master_get_transitions_short(model_t model, int group, int* src, TransitionCB cb, void* context)
 {
     // get my lace thread id
-#if HAVE_SYLVAN
     int id = lace_get_worker()->worker + 1;
-#else
-    Abort("Multi-process environment not available without Lace.");
-#endif
 
     int r_length = r_projs[group].len;
     Print(infoLong, "master %d: writing state to slave (group=%d, length=%d).", id, group, r_length);
@@ -2748,6 +2764,7 @@ start_chunk_thread(void* arg){
     return 0;
     (void)arg;
 }
+#endif
 
 #ifdef HAVE_SYLVAN
 TASK_1(void*, actual_main, void*, arg)
@@ -2819,11 +2836,12 @@ actual_main(void)
         init_domain(vset_impl);
 
         *short_proc = GBgetTransitionsShort;
-
+#ifdef HAVE_SYLVAN
         if (multi_process) {
             *short_multi_proc = *short_proc;
             *short_proc = master_get_transitions_short;
         }
+#endif
 
         initial = vset_create(domain, -1, NULL);
         src = (int*)alloca(sizeof(int)*N);
@@ -2833,14 +2851,18 @@ actual_main(void)
         Print(infoShort, "got initial state");
         expand_groups = 1;
 
+#ifdef HAVE_SYLVAN
         if (multi_process) {
             // FIXME: somehow, sometimes there is a deadlock at startup...
             // start chunk tread
             pthread_create(&chunk_thread, NULL, start_chunk_thread, (void*) 0);
         }
+#endif
     }
 
+#ifdef HAVE_SYLVAN
     HREbarrier(HREglobal()); // synchronise with slave processes
+#endif
 
     vset_t visited = vset_create(domain, -1, NULL);
     vset_copy(visited, initial);
@@ -2868,12 +2890,14 @@ actual_main(void)
     case BFS_P:
         reach_proc = reach_bfs_prev;
         break;
+#ifdef HAVE_SYLVAN
     case PAR:
         reach_proc = reach_par;
         break;
     case PAR_P:
         reach_proc = reach_par_prev;
         break;
+#endif
     case BFS:
         reach_proc = reach_bfs;
         break;
@@ -2953,6 +2977,7 @@ actual_main(void)
     guided_proc(sat_proc, reach_proc, visited, files[1]);
     RTstopTimer(timer);
 
+#ifdef HAVE_SYLVAN
     if (multi_process) {
         master_exit();
         if (transitions_load_filename == NULL) {
@@ -2963,6 +2988,7 @@ actual_main(void)
             pthread_join(chunk_thread, NULL);
         }
     }
+#endif
 
     if (transitions_save_filename != NULL) {
         FILE *f = fopen(transitions_save_filename, "w");
@@ -3105,7 +3131,6 @@ main (int argc, char *argv[])
     if (!SPEC_MT_SAFE && n_workers > 1) {
         multi_process = true;
     }
-#endif
 
     // Use the multi-process environment if necessary:
     if (multi_process) {
@@ -3115,12 +3140,16 @@ main (int argc, char *argv[])
     short_multi_proc = mmap(NULL,sizeof(short_proc_t),PROT_READ|PROT_WRITE,MAP_SHARED|MAP_ANON,0,0);
     *(short_proc) = NULL;
     *(short_multi_proc) = NULL;
+#else
+    short_proc = RTmalloc(sizeof(short_proc_t));
+    *(short_proc) = NULL;
+#endif
 
     HREinitStart(&argc,&argv,1,2,files,"<model> [<etf>]");
 
+#ifdef HAVE_SYLVAN
     lace_n_workers = n_workers;
 
-#ifdef HAVE_SYLVAN
     Print(infoLong, "Worker %d / %d (pid = %d).", HREme(HREglobal()), HREpeers(HREglobal()), getpid());
 
     if (!multi_process || HREme(HREglobal())==0){

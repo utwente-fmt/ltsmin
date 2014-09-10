@@ -49,7 +49,7 @@ void spg_game_restrict(parity_game *g, vset_t a, const spgsolver_options* option
     {                                                               \
         sprintf(dotfilename, NAME, __VA_ARGS__);                    \
         dotfile = fopen(dotfilename,"w");                           \
-        vset_dot(dotfile, U);                                       \
+        vset_dot(dotfile, SET);                                       \
         fclose(dotfile);                                            \
     }                                                               \
 }
