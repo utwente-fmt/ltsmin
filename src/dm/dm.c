@@ -1189,18 +1189,22 @@ int
 est_last(matrix_t *m,int row, int i, int j, int last) {
     // what would first be if column i is rotated to position j
     if (last==-1) return -1; // still no last
-    if (i>last)
+    if (i>last) {
         if (j>last) return last; // permutation happens right of last
         else return last+1; // last is in segment rotated to the right
-    if (i<last)
-        if (j>=last)
+    }
+    if (i<last) {
+        if (j>=last) {
             if (dm_is_set (m, row, i)) return j; // set position i is moved right of last
             else return last-1; // last is in segment rotated to the left
+        }
         else return last; // permutation happens left of last
+    }
     // i==last
     if (j>last) return j; // last is moved to the right to position j
-    for (int k=i-1;k>=j;k--)
+    for (int k=i-1;k>=j;k--) {
         if (dm_is_set(m,row,k)) return k+1; // last is moved to the left, k is the new last, but moves one right
+    }
     return j; // last is moved to the left to pos j, no k found, so j is new last
 }
 
