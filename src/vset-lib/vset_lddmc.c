@@ -154,50 +154,22 @@ set_add(vset_t set, const int* e)
 }
 
 static void
-rel_add(vrel_t rel, const int *src, const int *dst)
-{
-    int i=0, j=0, k=0;
-
-    int32_t vec[rel->size];
-
-    MDD m = rel->meta;
-    uint32_t v = lddmc_value(m);
-    while (v != (uint32_t)-1) {
-        if (v == 1 || v == 3) vec[k++] = src[i++]; // read or only-read
-        if (v == 2 || v == 4) vec[k++] = dst[j++]; // write or only-write
-        m = lddmc_follow(m, v);
-        v = lddmc_value(m);
-    }
-
-    assert(k == rel->size);
-
-    LACE_ME;
-    MDD old = rel->mdd;
-    rel->mdd = lddmc_ref(lddmc_union_cube(rel->mdd, (uint32_t*)vec, k));
-    lddmc_deref(old);
-}
-
-static void
 rel_add_cpy(vrel_t rel, const int *src, const int *dst, const int *cpy)
 {
-    if (cpy == NULL) {
-        rel_add(rel, src, dst);
-        return;
-    }
-
     int i=0, j=0, k=0;
 
-    int32_t vec[rel->size];
+    uint32_t vec[rel->size];
     int cpy_vec[rel->size];
 
     MDD meta = rel->meta;
     for (;;) {
         const uint32_t v = lddmc_value(meta);
         if (v == 1 || v == 3) {
-            cpy_vec[k] = 0; // not supported yet for read
+            // read or only-read
+            cpy_vec[k] = 0; // not supported yet for read levels
             vec[k++] = src[i++];
         } else if (v == 2 || v == 4) {
-            cpy_vec[k] = cpy[j] ? 1 : 0;
+            cpy_vec[k] = (cpy && cpy[j]) ? 1 : 0;
             vec[k++] = dst[j++];
         } else if (v == (uint32_t)-1) {
             break;
@@ -211,6 +183,12 @@ rel_add_cpy(vrel_t rel, const int *src, const int *dst, const int *cpy)
     MDD old = rel->mdd;
     rel->mdd = lddmc_ref(lddmc_union_cube_copy(rel->mdd, (uint32_t*)vec, cpy_vec, k));
     lddmc_deref(old);
+}
+
+static void
+rel_add(vrel_t rel, const int *src, const int *dst)
+{
+    return rel_add_cpy(rel, src, dst, NULL);
 }
 
 static int
