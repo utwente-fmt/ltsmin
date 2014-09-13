@@ -236,7 +236,7 @@ static int
 state_labels_default_short(model_t model, int label, int *state)
 {
     matrix_t *sl_info = GBgetStateLabelInfo(model);
-    int long_state[dm_nrows(sl_info)];
+    int long_state[dm_ncols(sl_info)];
     dm_expand_vector(sl_info, label, model->s0, state, long_state);
     return model->state_labels_long(model, label, long_state);
 }
