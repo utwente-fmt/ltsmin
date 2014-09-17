@@ -568,13 +568,14 @@ eval_guard (int guard, vset_t set)
     if (log_active(infoLong)) {
         bn_int_t elem_count;
         vset_count(guard_tmp[guard], NULL, &elem_count);
-
-        size_t size = 40;
-        char s[size];
-        bn_int2string(s, size, &elem_count);
+        if (bn_int2double(&elem_count) >= 10000.0) {
+            size_t size = 40;
+            char s[size];
+            bn_int2string(s, size, &elem_count);
+            Print(infoLong, "expanding guard %d for %s states.", guard, s);
+        }
         bn_clear(&elem_count);
 
-        Print(infoLong, "expanding guard %d for %s states.", guard, s);
     }
 
     vset_update(guard_false[guard], guard_tmp[guard], eval_cb, &ctx_false);
@@ -676,12 +677,14 @@ expand_group_next(int group, vset_t set)
         bn_int_t elem_count;
         vset_count(group_tmp[group], NULL, &elem_count);
 
-        size_t size = 40;
-        char s[size];
-        bn_int2string(s, size, &elem_count);
-        bn_clear(&elem_count);
+        if (bn_int2double(&elem_count) >= 10000.0) {
+            size_t size = 40;
+            char s[size];
+            bn_int2string(s, size, &elem_count);
 
-        Print(infoLong, "expanding group %d for %s states.", group, s);
+            Print(infoLong, "expanding group %d for %s states.", group, s);
+        }
+        bn_clear(&elem_count);
     }
 
     vrel_update(group_next[group], group_tmp[group], explore_cb, &ctx);
