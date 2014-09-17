@@ -79,6 +79,8 @@ static vset_t false_states;
  */
 static matrix_t *inhibit_matrix=NULL;
 static matrix_t *class_matrix=NULL;
+static int inhibit_class_count=0;
+static vset_t *class_enabled = NULL;
 
 static enum { BFS_P, BFS, PAR, PAR_P, CHAIN_P, CHAIN } strategy = BFS_P;
 
@@ -890,10 +892,11 @@ struct reach_s
 {
     vset_t container;
     vset_t deadlocks; // only used if dlk_detect
-    vset_t temp; // only used if dlk_detect
+    vset_t ancestors;
     struct reach_s *left;
     struct reach_s *right;
     int index;
+    int class;
     int next_count;
     int eg_count;
 };
@@ -912,8 +915,12 @@ reach_prepare(size_t left, size_t right)
         result->right = reach_prepare((left+right)/2, right);
     }
     result->container = vset_create(domain, -1, NULL);
+    result->ancestors = NULL;
+    result->deadlocks = NULL;
+    if (inhibit_matrix != NULL || dlk_detect) {
+        result->ancestors = vset_create(domain, -1, NULL);
+    }
     if (dlk_detect) {
-        result->temp = vset_create(domain, -1, NULL);
         result->deadlocks = vset_create(domain, -1, NULL);
     }
     return result;
@@ -928,154 +935,263 @@ reach_destroy(struct reach_s *s)
     }
 
     vset_destroy(s->container);
-    if (dlk_detect) {
-        vset_destroy(s->temp);
-        vset_destroy(s->deadlocks);
-    }
+    if (s->ancestors != NULL) vset_destroy(s->ancestors);
+    if (s->deadlocks != NULL) vset_destroy(s->deadlocks);
 
     RTfree(s);
+}
+
+#ifdef HAVE_SYLVAN
+#define reach_bfs_next(dummy, reach_groups) CALL(reach_bfs_next, dummy, reach_groups)
+VOID_TASK_2(reach_bfs_next, struct reach_s *, dummy, bitvector_t *, reach_groups)
+#else
+static inline void
+reach_bfs_next(struct reach_s *dummy, bitvector_t *reach_groups)
+#endif
+{
+    if (dummy->index >= 0) {
+        if (!bitvector_is_set(reach_groups, dummy->index)) {
+            if (dummy->ancestors != NULL) vset_clear(dummy->ancestors);
+            dummy->next_count = 0;
+            dummy->eg_count=0;
+            return;
+        }
+
+        // Check if in current class...
+        if (inhibit_matrix != NULL) {
+            if (!dm_is_set(class_matrix, dummy->class, dummy->index)) {
+                if (dummy->ancestors != NULL) vset_clear(dummy->ancestors);
+                dummy->next_count = 0;
+                dummy->eg_count=0;
+                return;
+            }
+        }
+
+        // Learn new states
+        expand_group_next(dummy->index, dummy->container);
+        dummy->eg_count = 1;
+
+        // Compute successor states
+        vset_next(dummy->container, dummy->container, group_next[dummy->index]);
+        dummy->next_count = 1;
+
+        // Compute ancestor states
+        if (dummy->ancestors != NULL) vset_prev(dummy->ancestors, dummy->container, group_next[dummy->index], dummy->ancestors);
+
+        // Remove ancestor states from potential deadlock states
+        if (dummy->deadlocks != NULL) vset_minus(dummy->deadlocks, dummy->ancestors);
+
+        // If we don't need ancestor states, clear the set
+        if (dummy->ancestors != NULL && inhibit_matrix == NULL) vset_clear(dummy->ancestors);
+    } else {
+        // Send set of states downstream
+        vset_copy(dummy->left->container, dummy->container);
+        vset_copy(dummy->right->container, dummy->container);
+
+        if (dummy->deadlocks != NULL) {
+            vset_copy(dummy->left->deadlocks, dummy->deadlocks);
+            vset_copy(dummy->right->deadlocks, dummy->deadlocks);
+        }
+
+        if (dummy->ancestors != NULL) {
+            vset_copy(dummy->left->ancestors, dummy->ancestors);
+            vset_copy(dummy->right->ancestors, dummy->ancestors);
+        }
+
+        dummy->left->class = dummy->class;
+        dummy->right->class = dummy->class;
+
+        // Sequentially go left/right (BFS, not PAR)
+        reach_bfs_next(dummy->left, reach_groups);
+        reach_bfs_next(dummy->right, reach_groups);
+
+        // Perform union
+        vset_copy(dummy->container, dummy->left->container);
+        vset_union(dummy->container, dummy->right->container);
+
+        // Clear
+        vset_clear(dummy->left->container);
+        vset_clear(dummy->right->container);
+
+        // Intersect deadlocks
+        if (dummy->deadlocks != NULL) {
+            vset_copy(dummy->deadlocks, dummy->left->deadlocks);
+            vset_intersect(dummy->deadlocks, dummy->right->deadlocks);
+            vset_clear(dummy->left->deadlocks);
+            vset_clear(dummy->right->deadlocks);
+        }
+
+        // Merge ancestors
+        if (inhibit_matrix != NULL) {
+            vset_copy(dummy->ancestors, dummy->left->ancestors);
+            vset_union(dummy->ancestors, dummy->right->ancestors);
+            vset_clear(dummy->left->ancestors);
+            vset_clear(dummy->right->ancestors);
+        }
+
+        dummy->next_count = dummy->left->next_count + dummy->right->next_count;
+        dummy->eg_count = dummy->left->eg_count + dummy->right->eg_count;
+    }
 }
 
 static void
 reach_bfs_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
                    long *eg_count, long *next_count)
 {
-    int N=0;
-    if (inhibit_matrix!=NULL){
-        N=dm_nrows(inhibit_matrix);
-    }
-    int level = 0;
     vset_t current_level = vset_create(domain, -1, NULL);
-    vset_t current_class = vset_create(domain, -1, NULL);
     vset_t next_level = vset_create(domain, -1, NULL);
-    vset_t temp = vset_create(domain, -1, NULL);
-    vset_t deadlocks = dlk_detect?vset_create(domain, -1, NULL):NULL;
-    vset_t dlk_temp = (dlk_detect||N>0)?vset_create(domain, -1, NULL):NULL;
-    vset_t enabled[N];
-    for(int i=0;i<N;i++){
-        enabled[i]=vset_create(domain, -1, NULL);
-    }
 
     vset_copy(current_level, visited);
     if (save_sat_levels) vset_minus(current_level, visited_old);
 
     LACE_ME;
+    struct reach_s *root = reach_prepare(0, nGrps);
+
+    int level = 0;
     while (!vset_is_empty(current_level)) {
         if (trc_output != NULL) save_level(visited);
         stats_and_progress_report(current_level, visited, level);
         level++;
-        for (int i = 0; i < nGrps; i++){
-            if (!bitvector_is_set(reach_groups, i)) continue;
-            expand_group_next(i, current_level);
-            (*eg_count)++;
-        }
-        for(int i=0;i<N;i++){
-            vset_clear(enabled[i]);
-        }
-        if (dlk_detect) vset_copy(deadlocks, current_level);
-        if (N>0){
-            for(int c=0;c<N;c++){
-                vset_copy(current_class,current_level);
-                for(int i=0;i<c;i++){
-                    if (dm_is_set(inhibit_matrix,i,c)){
-                        vset_minus(current_class, enabled[i]);
-                    }
-                }
-                for (int i = 0; i < nGrps; i++) {
-                    if (!bitvector_is_set(reach_groups,i)) continue;
-                    if (!dm_is_set(class_matrix,c,i)) continue;
-                    (*next_count)++;
-                    vset_next(temp, current_class, group_next[i]);
-                    vset_prev(dlk_temp, temp, group_next[i],deadlocks);
-                    if (dlk_detect) {
-                        vset_minus(deadlocks, dlk_temp);
-                    }
-                    vset_union(enabled[c],dlk_temp);
-                    vset_clear(dlk_temp);
-                    vset_minus(temp, visited);
-                    vset_union(next_level, temp);
-                    vset_clear(temp);
-                }
-                vset_clear(current_class);
+
+        if (dlk_detect) vset_copy(root->deadlocks, current_level);
+
+        if (inhibit_matrix != NULL) {
+            // class_enabled holds all states in the current level with transitions in class c
+            // only use current_level, so clear class_enabled...
+            for (int c=0; c<inhibit_class_count; c++) vset_clear(class_enabled[c]);
+
+            // for every class, compute successors, add to next_level
+            for (int c=0; c<inhibit_class_count; c++) {
+                // set container to current level minus enabled transitions from all inhibiting classes
+                vset_copy(root->container, current_level);
+                for (int i=0; i<c; i++) if (dm_is_set(inhibit_matrix,i,c)) vset_minus(root->container, class_enabled[i]);
+                // set ancestors to container
+                vset_copy(root->ancestors, root->container);
+                // carry over root->deadlocks from previous iteration
+                // set class and call next function
+                root->class = c;
+                reach_bfs_next(root, reach_groups);
+                // update counters
+                *next_count += root->next_count;
+                *eg_count += root->eg_count;
+                // add enabled transitions to class_enabled
+                vset_copy(class_enabled[c], root->ancestors);
+                vset_clear(root->ancestors);
+                // remove visited states
+                vset_minus(root->container, visited);
+                // add new states to next_level
+                vset_union(next_level, root->container);
+                vset_clear(root->container);
             }
         } else {
-            for (int i = 0; i < nGrps; i++) {
-                if (!bitvector_is_set(reach_groups,i)) continue;
-                (*next_count)++;
-                vset_next(temp, current_level, group_next[i]);
-                if (dlk_detect) {
-                    vset_prev(dlk_temp, temp, group_next[i], deadlocks);
-                    vset_minus(deadlocks, dlk_temp);
-                    vset_clear(dlk_temp);
-                }
-                vset_minus(temp, visited);
-                vset_union(next_level, temp);
-                vset_clear(temp);
-            }
+            // set container to current level
+            vset_copy(root->container, current_level);
+            // set ancestors to container
+            if (root->ancestors != NULL) vset_copy(root->ancestors, current_level);
+            // call next function
+            reach_bfs_next(root, reach_groups);
+            // update counters
+            *next_count += root->next_count;
+            *eg_count += root->eg_count;
+            // set next_level to new states (root->container - visited states)
+            vset_copy(next_level, root->container);
+            vset_clear(root->container);
+            vset_minus(next_level, visited);
         }
-        if (dlk_detect) deadlock_check(deadlocks, reach_groups);
 
-        vset_union(visited, next_level);
+        // set current_level to next_level
         vset_copy(current_level, next_level);
         vset_clear(next_level);
+
+        if (dlk_detect) {
+            deadlock_check(root->deadlocks, reach_groups);
+            vset_clear(root->deadlocks);
+        }
+
+        vset_union(visited, current_level);
         vset_reorder(domain);
     }
 
+    reach_destroy(root);
     vset_destroy(current_level);
     vset_destroy(next_level);
-    vset_destroy(temp);
-    if (dlk_detect) {
-        vset_destroy(deadlocks);
-        vset_destroy(dlk_temp);
-    }
 }
 
 static void
 reach_bfs(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
               long *eg_count, long *next_count)
 {
-    (void)visited_old;
-
-    int level = 0;
     vset_t old_vis = vset_create(domain, -1, NULL);
-    vset_t temp = vset_create(domain, -1, NULL);
-    vset_t deadlocks = dlk_detect?vset_create(domain, -1, NULL):NULL;
-    vset_t dlk_temp = dlk_detect?vset_create(domain, -1, NULL):NULL;
+    vset_t next_level = vset_create(domain, -1, NULL);
+    //if (save_sat_levels) vset_minus(current_level, visited_old); // ???
 
     LACE_ME;
+    struct reach_s *root = reach_prepare(0, nGrps);
+
+    int level = 0;
     while (!vset_equal(visited, old_vis)) {
-        if (trc_output != NULL) save_level(visited);
         vset_copy(old_vis, visited);
+
+        if (trc_output != NULL) save_level(visited);
         stats_and_progress_report(NULL, visited, level);
         level++;
-        for (int i = 0; i < nGrps; i++) {
-            if (!bitvector_is_set(reach_groups,i)) continue;
-            expand_group_next(i, visited);
-            (*eg_count)++;
-        }
-        if (dlk_detect) vset_copy(deadlocks, visited);
-        for (int i = 0; i < nGrps; i++) {
-            if (!bitvector_is_set(reach_groups,i)) continue;
-            (*next_count)++;
-            vset_next(temp, old_vis, group_next[i]);
-            if (dlk_detect) {
-                vset_prev(dlk_temp, temp, group_next[i],deadlocks);
-                vset_minus(deadlocks, dlk_temp);
-                vset_clear(dlk_temp);
+
+        if (dlk_detect) vset_copy(root->deadlocks, visited);
+
+        if (inhibit_matrix != NULL) {
+            // for every class, compute successors, add to next_level
+            for (int c=0; c<inhibit_class_count; c++) {
+                // set container to current level minus enabled transitions from all inhibiting classes
+                vset_copy(root->container, visited);
+                for (int i=0; i<c; i++) if (dm_is_set(inhibit_matrix,i,c)) vset_minus(root->container, class_enabled[i]);
+                // set ancestors to container
+                vset_copy(root->ancestors, root->container);
+                // carry over root->deadlocks from previous iteration
+                // set class and call next function
+                root->class = c;
+                reach_bfs_next(root, reach_groups);
+                // update counters
+                *next_count += root->next_count;
+                *eg_count += root->eg_count;
+                // add enabled transitions to class_enabled
+                vset_union(class_enabled[c], root->ancestors);
+                vset_clear(root->ancestors);
+                // remove visited states
+                vset_minus(root->container, visited);
+                // add new states to next_level
+                vset_union(next_level, root->container);
+                vset_clear(root->container);
             }
-            vset_union(visited, temp);
+            vset_union(visited, next_level);
+            vset_clear(next_level);
+        } else {
+            // set container to current level
+            vset_copy(root->container, visited);
+            // set ancestors to container
+            if (root->ancestors != NULL) vset_copy(root->ancestors, visited);
+            // call next function
+            reach_bfs_next(root, reach_groups);
+            // update counters
+            *next_count += root->next_count;
+            *eg_count += root->eg_count;
+            // add successors to visited set
+            vset_union(visited, root->container);
         }
-        if (dlk_detect) deadlock_check(deadlocks, reach_groups);
-        vset_clear(temp);
+
+        if (dlk_detect) {
+            deadlock_check(root->deadlocks, reach_groups);
+            vset_clear(root->deadlocks);
+        }
+
         vset_reorder(domain);
     }
 
+    reach_destroy(root);
     vset_destroy(old_vis);
-    vset_destroy(temp);
-    if (dlk_detect) {
-        vset_destroy(deadlocks);
-        vset_destroy(dlk_temp);
-    }
+    vset_destroy(next_level);
+
+    return;
+    (void)visited_old;
 }
 
 /**
@@ -1088,46 +1204,84 @@ VOID_TASK_2(reach_par_next, struct reach_s *, dummy, bitvector_t *, reach_groups
 {
     if (dummy->index >= 0) {
         if (!bitvector_is_set(reach_groups, dummy->index)) {
+            if (dummy->ancestors != NULL) vset_clear(dummy->ancestors);
             dummy->next_count = 0;
             dummy->eg_count=0;
             return;
         }
 
-        // Compute successor states
-        CALL(expand_group_next, dummy->index, dummy->container);
+        // Check if in current class...
+        if (inhibit_matrix != NULL) {
+            if (!dm_is_set(class_matrix, dummy->class, dummy->index)) {
+                if (dummy->ancestors != NULL) vset_clear(dummy->ancestors);
+                dummy->next_count = 0;
+                dummy->eg_count=0;
+                return;
+            }
+        }
+
+        // Learn new states
+        expand_group_next(dummy->index, dummy->container);
         dummy->eg_count = 1;
 
+        // Compute successor states
         vset_next(dummy->container, dummy->container, group_next[dummy->index]);
         dummy->next_count = 1;
-        if (dlk_detect) {
-            vset_prev(dummy->temp, dummy->container, group_next[dummy->index], dummy->deadlocks);
-            vset_minus(dummy->deadlocks, dummy->temp);
-            vset_clear(dummy->temp);
-        }
+
+        // Compute ancestor states
+        if (dummy->ancestors != NULL) vset_prev(dummy->ancestors, dummy->container, group_next[dummy->index], dummy->ancestors);
+
+        // Remove ancestor states from potential deadlock states
+        if (dummy->deadlocks != NULL) vset_minus(dummy->deadlocks, dummy->ancestors);
+
+        // If we don't need ancestor states, clear the set
+        if (dummy->ancestors != NULL && inhibit_matrix == NULL) vset_clear(dummy->ancestors);
     } else {
+        // Send set of states downstream
         vset_copy(dummy->left->container, dummy->container);
         vset_copy(dummy->right->container, dummy->container);
 
-        if (dlk_detect) {
+        if (dummy->deadlocks != NULL) {
             vset_copy(dummy->left->deadlocks, dummy->deadlocks);
             vset_copy(dummy->right->deadlocks, dummy->deadlocks);
         }
 
+        if (dummy->ancestors != NULL) {
+            vset_copy(dummy->left->ancestors, dummy->ancestors);
+            vset_copy(dummy->right->ancestors, dummy->ancestors);
+        }
+
+        dummy->left->class = dummy->class;
+        dummy->right->class = dummy->class;
+
+        // Go left/right in parallel
         SPAWN(reach_par_next, dummy->left, reach_groups);
         SPAWN(reach_par_next, dummy->right, reach_groups);
         SYNC(reach_par_next);
         SYNC(reach_par_next);
 
+        // Perform union
         vset_copy(dummy->container, dummy->left->container);
         vset_union(dummy->container, dummy->right->container);
+
+        // Clear
         vset_clear(dummy->left->container);
         vset_clear(dummy->right->container);
 
-        if (dlk_detect) {
+        // Intersect deadlocks
+        if (dummy->deadlocks != NULL) {
             vset_copy(dummy->deadlocks, dummy->left->deadlocks);
             vset_intersect(dummy->deadlocks, dummy->right->deadlocks);
             vset_clear(dummy->left->deadlocks);
             vset_clear(dummy->right->deadlocks);
+        }
+
+        // Merge ancestors
+        if (inhibit_matrix != NULL) {
+            vset_copy(dummy->ancestors, dummy->left->ancestors);
+            vset_union(dummy->ancestors, dummy->right->ancestors);
+            vset_clear(dummy->left->ancestors);
+            vset_clear(dummy->right->ancestors);
         }
 
         dummy->next_count = dummy->left->next_count + dummy->right->next_count;
@@ -1139,85 +1293,160 @@ static void
 reach_par(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
               long *eg_count, long *next_count)
 {
-    if (inhibit_matrix!=NULL && dm_nrows(inhibit_matrix)!=0) {
-        Abort("Inhibit matrix not compatible with --order=par!");
-    }
-
     vset_t old_vis = vset_create(domain, -1, NULL);
+    vset_t next_level = vset_create(domain, -1, NULL);
+    //if (save_sat_levels) vset_minus(current_level, visited_old); // ???
 
     LACE_ME;
-
-    int level = 0;
     struct reach_s *root = reach_prepare(0, nGrps);
 
+    int level = 0;
     while (!vset_equal(visited, old_vis)) {
         vset_copy(old_vis, visited);
+
         if (trc_output != NULL) save_level(visited);
         stats_and_progress_report(NULL, visited, level);
         level++;
 
-        vset_copy(root->container, visited);
         if (dlk_detect) vset_copy(root->deadlocks, visited);
-        CALL(reach_par_next, root, reach_groups);
-        if (dlk_detect) deadlock_check(root->deadlocks, reach_groups);
 
-        *next_count += root->next_count;
-        *eg_count += root->eg_count;
+        if (inhibit_matrix != NULL) {
+            // for every class, compute successors, add to next_level
+            for (int c=0; c<inhibit_class_count; c++) {
+                // set container to current level minus enabled transitions from all inhibiting classes
+                vset_copy(root->container, visited);
+                for (int i=0; i<c; i++) if (dm_is_set(inhibit_matrix,i,c)) vset_minus(root->container, class_enabled[i]);
+                // set ancestors to container
+                vset_copy(root->ancestors, root->container);
+                // carry over root->deadlocks from previous iteration
+                // set class and call next function
+                root->class = c;
+                CALL(reach_par_next, root, reach_groups);
+                // update counters
+                *next_count += root->next_count;
+                *eg_count += root->eg_count;
+                // add enabled transitions to class_enabled
+                vset_union(class_enabled[c], root->ancestors);
+                vset_clear(root->ancestors);
+                // remove visited states
+                vset_minus(root->container, visited);
+                // add new states to next_level
+                vset_union(next_level, root->container);
+                vset_clear(root->container);
+            }
+            vset_union(visited, next_level);
+            vset_clear(next_level);
+        } else {
+            // set container to current level
+            vset_copy(root->container, visited);
+            // set ancestors to container
+            if (root->ancestors != NULL) vset_copy(root->ancestors, visited);
+            // call next function
+            CALL(reach_par_next, root, reach_groups);
+            // update counters
+            *next_count += root->next_count;
+            *eg_count += root->eg_count;
+            // add successors to visited set
+            vset_union(visited, root->container);
+        }
 
-        vset_union(visited, root->container);
-        vset_clear(root->container);
+        if (dlk_detect) {
+            deadlock_check(root->deadlocks, reach_groups);
+            vset_clear(root->deadlocks);
+        }
+
         vset_reorder(domain);
     }
 
     reach_destroy(root);
+    vset_destroy(old_vis);
+    vset_destroy(next_level);
 
     return;
     (void)visited_old;
-    (void)next_count;
 }
 
 static void
 reach_par_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
               long *eg_count, long *next_count)
 {
-    if (inhibit_matrix!=NULL && dm_nrows(inhibit_matrix)!=0) {
-        Abort("Inhibit matrix not compatible with --order=par_prev!");
-    }
-
     vset_t current_level = vset_create(domain, -1, NULL);
+    vset_t next_level = vset_create(domain, -1, NULL);
+
     vset_copy(current_level, visited);
     if (save_sat_levels) vset_minus(current_level, visited_old);
 
     LACE_ME;
-
-    int level = 0;
     struct reach_s *root = reach_prepare(0, nGrps);
 
+    int level = 0;
     while (!vset_is_empty(current_level)) {
         if (trc_output != NULL) save_level(visited);
-        stats_and_progress_report(NULL, visited, level);
+        stats_and_progress_report(current_level, visited, level);
         level++;
 
-        vset_copy(root->container, current_level);
         if (dlk_detect) vset_copy(root->deadlocks, current_level);
-        CALL(reach_par_next, root, reach_groups);
-        if (dlk_detect) deadlock_check(root->deadlocks, reach_groups);
 
-        *next_count += root->next_count;
-        *eg_count += root->eg_count;
+        if (inhibit_matrix != NULL) {
+            // class_enabled holds all states in the current level with transitions in class c
+            // only use current_level, so clear class_enabled...
+            for (int c=0; c<inhibit_class_count; c++) vset_clear(class_enabled[c]);
 
-        vset_minus(root->container, visited);
+            // for every class, compute successors, add to next_level
+            for (int c=0; c<inhibit_class_count; c++) {
+                // set container to current level minus enabled transitions from all inhibiting classes
+                vset_copy(root->container, current_level);
+                for (int i=0; i<c; i++) if (dm_is_set(inhibit_matrix,i,c)) vset_minus(root->container, class_enabled[i]);
+                // set ancestors to container
+                vset_copy(root->ancestors, root->container);
+                // carry over root->deadlocks from previous iteration
+                // set class and call next function
+                root->class = c;
+                CALL(reach_par_next, root, reach_groups);
+                // update counters
+                *next_count += root->next_count;
+                *eg_count += root->eg_count;
+                // add enabled transitions to class_enabled
+                vset_copy(class_enabled[c], root->ancestors);
+                vset_clear(root->ancestors);
+                // remove visited states
+                vset_minus(root->container, visited);
+                // add new states to next_level
+                vset_union(next_level, root->container);
+                vset_clear(root->container);
+            }
+        } else {
+            // set container to current level
+            vset_copy(root->container, current_level);
+            // set ancestors to container
+            if (root->ancestors != NULL) vset_copy(root->ancestors, current_level);
+            // call next function
+            CALL(reach_par_next, root, reach_groups);
+            // update counters
+            *next_count += root->next_count;
+            *eg_count += root->eg_count;
+            // set next_level to new states (root->container - visited states)
+            vset_copy(next_level, root->container);
+            vset_clear(root->container);
+            vset_minus(next_level, visited);
+        }
 
-        vset_copy(current_level, root->container);
-        vset_clear(root->container);
+        // set current_level to next_level
+        vset_copy(current_level, next_level);
+        vset_clear(next_level);
+
+        if (dlk_detect) {
+            deadlock_check(root->deadlocks, reach_groups);
+            vset_clear(root->deadlocks);
+        }
+
         vset_union(visited, current_level);
         vset_reorder(domain);
     }
 
     reach_destroy(root);
-
-    return;
-    (void)next_count;
+    vset_destroy(current_level);
+    vset_destroy(next_level);
 }
 
 #endif
@@ -2021,6 +2250,14 @@ init_domain(vset_implementation_t impl)
 
             group_explored[i] = vset_create(domain,r_projs[i].len,r_projs[i].proj);
             group_tmp[i]      = vset_create(domain,r_projs[i].len,r_projs[i].proj);
+
+            if (inhibit_matrix != NULL) {
+                inhibit_class_count = dm_nrows(inhibit_matrix);
+                class_enabled = (vset_t*)RTmalloc(inhibit_class_count * sizeof(vset_t));
+                for(int i=0; i<inhibit_class_count; i++) {
+                    class_enabled[i] = vset_create(domain, -1, NULL);
+                }
+            }
         }
     }
 }
@@ -2609,7 +2846,6 @@ actual_main(void)
     vset_copy(visited, initial);
 
     if (inhibit_matrix!=NULL){
-        if (strategy != BFS_P) Abort("maximal progress works for bfs-prev only.");
         if (sat_strategy != NO_SAT) Abort("maximal progress is incompatibale with saturation");
     }
     
