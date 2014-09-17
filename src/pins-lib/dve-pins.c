@@ -20,6 +20,7 @@ void        (*get_initial_state)(char *to);
 int         (*have_property)();
 int         (*buchi_is_accepting)(void* m, int* in);
 int         (*get_successor)( void* m, int t, int *in, TransitionCB, void *arg );
+int         (*get_action)( void* m, int t, int *in, TransitionCB, void *arg );
 int         (*get_successors)( void* m, int *in, TransitionCB, void *arg );
 
 int         (*get_guard_count)();
@@ -42,6 +43,7 @@ int         (*get_state_variable_type_value_count)(int type);
 const char* (*get_state_variable_type_value)(int type, int value);
 int         (*get_transition_count)();
 const int*  (*get_transition_read_dependencies)(int t);
+const int*  (*get_transition_actions_read_dependencies)(int t);
 const int*  (*get_transition_may_write_dependencies)(int t);
 const int*  (*get_transition_must_write_dependencies)(int t);
 covered_by_grey_t   covered_by;
@@ -237,6 +239,8 @@ DVE2loadDynamicLib(model_t model, const char *filename)
     RTdlsym( filename, dlHandle, "have_property" );
     get_successor = (int(*)(void*, int, int*, TransitionCB, void*))
     RTdlsym( filename, dlHandle, "get_successor" );
+    get_action = (int(*)(void*, int, int*, TransitionCB, void*))
+    RTdlsym( filename, dlHandle, "get_action" );
     get_successors = (int(*)(void*, int*, TransitionCB, void*))
     RTdlsym( filename, dlHandle, "get_successors" );
     get_state_variable_count = (int(*)())
@@ -257,6 +261,8 @@ DVE2loadDynamicLib(model_t model, const char *filename)
     RTdlsym( filename, dlHandle, "get_transition_count" );
     get_transition_read_dependencies = (const int*(*)(int))
     RTdlsym( filename, dlHandle, "get_transition_read_dependencies" );
+    get_transition_actions_read_dependencies = (const int*(*)(int))
+    RTdlsym( filename, dlHandle, "get_transition_actions_read_dependencies" );
     get_transition_may_write_dependencies = (const int*(*)(int))
     RTdlsym( filename, dlHandle, "get_transition_may_write_dependencies" );
     get_transition_must_write_dependencies = (const int*(*)(int))
@@ -298,6 +304,7 @@ DVE2loadGreyboxModel(model_t model, const char *filename)
     lts_type_t ltstype;
     matrix_t *dm_info = RTmalloc(sizeof(matrix_t));
     matrix_t *dm_read_info = RTmalloc(sizeof(matrix_t));
+    matrix_t *dm_actions_read_info = RTmalloc(sizeof(matrix_t));
     matrix_t *dm_may_write_info = RTmalloc(sizeof(matrix_t));
     matrix_t *dm_must_write_info = RTmalloc(sizeof(matrix_t));
     matrix_t *sl_info = RTmalloc(sizeof(matrix_t));
@@ -391,15 +398,22 @@ DVE2loadGreyboxModel(model_t model, const char *filename)
 
     int ngroups = get_transition_count();
 	dm_create(dm_info, ngroups, state_length);
-	dm_create(dm_read_info, ngroups, state_length);
+    dm_create(dm_read_info, ngroups, state_length);
+    dm_create(dm_actions_read_info, ngroups, state_length);
     dm_create(dm_may_write_info, ngroups, state_length);
     dm_create(dm_must_write_info, ngroups, state_length);
     for(int i=0; i < dm_nrows(dm_info); i++) {
         int* proj = (int*)get_transition_read_dependencies(i);
-		for(int j=0; j<state_length; j++) {
+        for(int j=0; j<state_length; j++) {
             if (proj[j]) {
                 dm_set(dm_info, i, j);
                 dm_set(dm_read_info, i, j);
+            }
+        }
+        proj = (int*)get_transition_actions_read_dependencies(i);
+        for(int j=0; j<state_length; j++) {
+            if (proj[j]) {
+                dm_set(dm_actions_read_info, i, j);
             }
         }
         proj = (int*)get_transition_may_write_dependencies(i);
@@ -418,6 +432,8 @@ DVE2loadGreyboxModel(model_t model, const char *filename)
     }
     GBsetDMInfo(model, dm_info);
     GBsetDMInfoRead(model, dm_read_info);
+    GBsetMatrix(model, LTSMIN_MATRIX_ACTIONS_READS, dm_actions_read_info, PINS_MAY_SET,
+                                            PINS_INDEX_GROUP, PINS_INDEX_STATE_VECTOR);
     GBsetDMInfoMayWrite(model, dm_may_write_info);
     GBsetDMInfoMustWrite(model, dm_must_write_info);
     GBsetSupportsCopy(model);
@@ -538,6 +554,7 @@ DVE2loadGreyboxModel(model_t model, const char *filename)
 
     GBsetNextStateAll  (model, (next_method_black_t) get_successors);
     GBsetNextStateLong (model, (next_method_grey_t)  get_successor);
+    GBsetActionsLong (model, (next_method_grey_t) get_action);
     GBsetIsCoveredBy (model, covered_by);
     GBsetIsCoveredByShort (model, covered_by_short);
 }
