@@ -886,30 +886,30 @@ static inline void add_variable_subset(vset_t dst, vset_t src, vdom_t domain, in
     vset_destroy(u);
 }
 
-struct reach_par_s
+struct reach_s
 {
     vset_t container;
     vset_t deadlocks; // only used if dlk_detect
     vset_t temp; // only used if dlk_detect
-    struct reach_par_s *left;
-    struct reach_par_s *right;
+    struct reach_s *left;
+    struct reach_s *right;
     int index;
     int next_count;
     int eg_count;
 };
 
-static struct reach_par_s*
-reach_par_prepare(size_t left, size_t right)
+static struct reach_s*
+reach_prepare(size_t left, size_t right)
 {
-    struct reach_par_s *result = (struct reach_par_s *)RTmalloc(sizeof(struct reach_par_s));
+    struct reach_s *result = (struct reach_s *)RTmalloc(sizeof(struct reach_s));
     if (right - left == 1) {
         result->index = left;
         result->left = NULL;
         result->right = NULL;
     } else {
         result->index = -1;
-        result->left = reach_par_prepare(left, (left+right)/2);
-        result->right = reach_par_prepare((left+right)/2, right);
+        result->left = reach_prepare(left, (left+right)/2);
+        result->right = reach_prepare((left+right)/2, right);
     }
     result->container = vset_create(domain, -1, NULL);
     if (dlk_detect) {
@@ -920,11 +920,11 @@ reach_par_prepare(size_t left, size_t right)
 }
 
 static void
-reach_par_destroy(struct reach_par_s *s)
+reach_destroy(struct reach_s *s)
 {
     if (s->index == -1) {
-        reach_par_destroy(s->left);
-        reach_par_destroy(s->right);
+        reach_destroy(s->left);
+        reach_destroy(s->right);
     }
 
     vset_destroy(s->container);
@@ -1084,7 +1084,7 @@ reach_bfs(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
 
 #if defined(HAVE_SYLVAN)
 
-VOID_TASK_2(reach_par_next, struct reach_par_s *, dummy, bitvector_t *, reach_groups)
+VOID_TASK_2(reach_par_next, struct reach_s *, dummy, bitvector_t *, reach_groups)
 {
     if (dummy->index >= 0) {
         if (!bitvector_is_set(reach_groups, dummy->index)) {
@@ -1148,7 +1148,7 @@ reach_par(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
     LACE_ME;
 
     int level = 0;
-    struct reach_par_s *root = reach_par_prepare(0, nGrps);
+    struct reach_s *root = reach_prepare(0, nGrps);
 
     while (!vset_equal(visited, old_vis)) {
         vset_copy(old_vis, visited);
@@ -1169,7 +1169,7 @@ reach_par(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
         vset_reorder(domain);
     }
 
-    reach_par_destroy(root);
+    reach_destroy(root);
 
     return;
     (void)visited_old;
@@ -1191,7 +1191,7 @@ reach_par_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
     LACE_ME;
 
     int level = 0;
-    struct reach_par_s *root = reach_par_prepare(0, nGrps);
+    struct reach_s *root = reach_prepare(0, nGrps);
 
     while (!vset_is_empty(current_level)) {
         if (trc_output != NULL) save_level(visited);
@@ -1214,7 +1214,7 @@ reach_par_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
         vset_reorder(domain);
     }
 
-    reach_par_destroy(root);
+    reach_destroy(root);
 
     return;
     (void)next_count;
