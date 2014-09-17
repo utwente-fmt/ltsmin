@@ -61,9 +61,6 @@ static int   save_sat_levels = 0;
 
 static int   pgsolve_flag = 0;
 static char* pg_output = NULL;
-#if defined(LTSMIN_PBES)
-static int   pgreduce_flag = 0;
-#endif
 static int var_pos = 0;
 static int var_type_no = 0;
 static int variable_projection = 0;
@@ -206,9 +203,6 @@ static  struct poptOption options[] = {
     { "dot", 0, POPT_ARG_STRING, &dot_dir, 0, "directory to write dot representation of vector sets to", NULL },
     { "pg-solve" , 0 , POPT_ARG_NONE , &pgsolve_flag, 0, "Solve the generated parity game (only for symbolic tool).","" },
     { NULL, 0 , POPT_ARG_INCLUDE_TABLE, spg_solve_options , 0, "Symbolic parity game solver options", NULL},
-#if defined(LTSMIN_PBES)
-    { "pg-reduce" , 0 , POPT_ARG_NONE , &pgreduce_flag, 0, "Reduce the generated parity game on-the-fly (only for symbolic tool).","" },
-#endif
     { "pg-write" , 0 , POPT_ARG_STRING , &pg_output, 0, "file to write symbolic parity game to","<pg-file>.spg" },
 #ifdef HAVE_SYLVAN
     { NULL, 0 , POPT_ARG_INCLUDE_TABLE, lace_options , 0 , "Lace options",NULL},
@@ -892,153 +886,6 @@ static inline void add_variable_subset(vset_t dst, vset_t src, vdom_t domain, in
     vset_destroy(u);
 }
 
-#if defined(LTSMIN_PBES)
-static inline void reduce_parity_game(vset_t next_level, vset_t visited, vset_t true_states, vset_t false_states)
-{
-    int p_len = 1;
-    int proj[1] = {var_pos}; // position 0 encodes the variable
-    int true_match[1] = {true_index}; // the variable
-    int false_match[1] = {false_index}; // the variable
-    long   n_count;
-    char   elem_str[1024];
-    double e_count;
-    vset_t tmp = vset_create(domain, -1, NULL);
-
-    vset_t next_level_prev = vset_create(domain, -1, NULL);
-    for (int i = 0; i < nGrps; i++) {
-        vset_prev(tmp, next_level, group_next[i],visited);
-        vset_union(next_level_prev, tmp);
-        vset_clear(tmp);
-    }
-    vset_intersect(next_level_prev, visited);
-
-    vset_copy_match_proj(true_states, next_level, p_len, proj, variable_projection, true_match);
-    if (log_active(infoLong))
-    {
-        //get_vset_size(true_states, &n_count, &e_count, elem_str, sizeof(elem_str));
-        //Print(infoLong, "reduce_parity_game: %s (~%1.2e) TRUE states", elem_str, e_count);
-    }
-    vset_t true_prev = vset_create(domain, -1, NULL);
-    for (int i = 0; i < nGrps; i++) {
-        vset_prev(tmp, true_states, group_next[i],next_level_prev);
-        vset_union(true_prev, tmp);
-        vset_clear(tmp);
-    }
-    vset_intersect(true_prev, next_level_prev);
-    if (log_active(infoLong))
-    {
-        //get_vset_size(true_prev, &n_count, &e_count, elem_str, sizeof(elem_str));
-        //Print(infoLong, "reduce_parity_game: %s (~%1.2e) TRUE prev states", elem_str, e_count);
-    }
-
-    vset_copy_match_proj(false_states, next_level, p_len, proj, variable_projection, false_match);
-    if (log_active(infoLong))
-    {
-        //get_vset_size(false_states, &n_count, &e_count, elem_str, sizeof(elem_str));
-        //Print(infoLong, "reduce_parity_game: %s (~%1.2e) FALSE states", elem_str, e_count);
-    }
-    vset_t false_prev = vset_create(domain, -1, NULL);
-    for (int i = 0; i < nGrps; i++) {
-        vset_prev(tmp, false_states, group_next[i],NULL);
-        vset_union(false_prev, tmp);
-        vset_clear(tmp);
-    }
-    vset_intersect(false_prev, next_level_prev);
-    if (log_active(infoLong))
-    {
-        //get_vset_size(false_prev, &n_count, &e_count, elem_str, sizeof(elem_str));
-        //Print(infoLong, "reduce_parity_game: %s (~%1.2e) FALSE prev states", elem_str, e_count);
-    }
-
-    // compute which states in visited are AND/OR states
-    // computes AND states with FALSE successor, OR states with TRUE successor.
-    vset_t v_player[2];
-    for(int p=0; p<2; p++) {
-        v_player[p] = vset_create(domain, -1, NULL);
-    }
-    for(size_t i = 0; i < num_vars; i++)
-    {
-        if (i != false_index && i != true_index)
-        {
-            //Print(infoLong, "Adding nodes for var %d (player %d).", i, player[i]);
-            add_variable_subset(v_player[player[i]], (player[i] == 1) ? false_prev : true_prev, domain, i); // AND is player 1, OR is player 0
-        }
-    }
-
-    // compute successors of true_prev are in next_level that are not 'true' states.
-    //       These can be discarded.
-    // P == v_player[0] \setunion v_player[1]
-    // R == visited
-    // now compute next(P) - next(R-P) - {true, false}
-
-    vset_t P_next = vset_create(domain, -1, NULL);
-    for(int p=0; p<2; p++) {
-        get_vset_size(v_player[p], &n_count, &e_count, elem_str, sizeof(elem_str));
-        //Print(infoLong, "reduce_parity_game: %s (~%1.2e) %s states with a successor %s.", elem_str, e_count, (p==1)?"AND":"OR", (p==1)?"FALSE":"TRUE");
-        for (int i = 0; i < nGrps; i++) {
-            vset_next(tmp, v_player[p], group_next[i]);
-            vset_union(P_next, tmp);
-            vset_clear(tmp);
-        }
-    }
-    vset_intersect(P_next, next_level);
-
-    if (!vset_is_empty(P_next))
-    {
-        vset_t R_minus_P = vset_create(domain, -1, NULL);
-        vset_copy(R_minus_P, visited);
-        for(int p=0; p<2; p++) {
-            vset_minus(R_minus_P, v_player[p]);
-        }
-
-        vset_t R_minus_P_next = vset_create(domain, -1, NULL);
-        for (int i = 0; i < nGrps; i++) {
-            vset_next(tmp, R_minus_P, group_next[i]);
-            vset_union(R_minus_P_next, tmp);
-            vset_clear(tmp);
-        }
-
-        if (log_active(infoLong))
-        {
-            get_vset_size(P_next, &n_count, &e_count, elem_str, sizeof(elem_str));
-            Print(infoLong, "reduce_parity_game: %s (~%1.2e) P_next states.", elem_str, e_count);
-            get_vset_size(R_minus_P_next, &n_count, &e_count, elem_str, sizeof(elem_str));
-            Print(infoLong, "reduce_parity_game: %s (~%1.2e) R_minus_P_next states.", elem_str, e_count);
-        }
-        vset_minus(P_next, R_minus_P_next);
-        if (log_active(infoLong))
-        {
-            get_vset_size(P_next, &n_count, &e_count, elem_str, sizeof(elem_str));
-            Print(infoLong, "reduce_parity_game: %s (~%1.2e) [P_next - R_minus_P_next]", elem_str, e_count);
-        }
-        vset_minus(P_next, true_states);
-        vset_minus(P_next, false_states);
-        if (log_active(infoShort))
-        {
-            get_vset_size(P_next, &n_count, &e_count, elem_str, sizeof(elem_str));
-            Print(infoShort, "reduce_parity_game: %s (~%1.2e) states can be skipped.", elem_str, e_count);
-        }
-
-        vset_minus(next_level, P_next);
-
-        vset_destroy(R_minus_P);
-        vset_destroy(R_minus_P_next);
-    }
-
-    vset_destroy(P_next);
-    for(int p=0; p<2; p++) {
-        vset_destroy(v_player[p]);
-    }
-    vset_destroy(true_prev);
-    vset_destroy(false_prev);
-    vset_destroy(next_level_prev);
-    vset_destroy(tmp);
-
-    vset_clear(true_states);
-    vset_clear(false_states);
-}
-#endif
-
 static void
 reach_bfs_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
                    long *eg_count, long *next_count)
@@ -1117,10 +964,6 @@ reach_bfs_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
             }
         }
         if (dlk_detect) deadlock_check(deadlocks, reach_groups);
-
-#if defined(LTSMIN_PBES)
-        if (pgreduce_flag) reduce_parity_game(next_level, visited, true_states, false_states);
-#endif
 
         vset_union(visited, next_level);
         vset_copy(current_level, next_level);
@@ -1365,10 +1208,6 @@ reach_par_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
 
         vset_minus(root->container, visited);
 
-#if defined(LTSMIN_PBES)
-        if (pgreduce_flag) reduce_parity_game(root->container, visited, true_states, false_states);
-#endif
-
         vset_copy(current_level, root->container);
         vset_clear(root->container);
         vset_union(visited, current_level);
@@ -1419,10 +1258,6 @@ reach_chain_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
         }
         // no deadlocks in old new_states
         if (dlk_detect) deadlock_check(deadlocks, reach_groups);
-
-#if defined(LTSMIN_PBES)
-        if (pgreduce_flag) reduce_parity_game(new_states, visited, true_states, false_states);
-#endif
 
         vset_zip(visited, new_states);
         vset_reorder(domain);
