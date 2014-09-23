@@ -533,13 +533,16 @@ find_action(int* src, int* dst, int* cpy, int group, char* action)
 
 struct guard_add_info
 {
-    int guard;
-    int result;
+    int guard; // guard number being evaluated
+    int result; // desired result of the guard
 };
 
 static void eval_cb (vset_t set, void *context, int *src)
 {
+    // evaluate the guard
     int result = GBgetStateLabelShort(model, ((struct guard_add_info*)context)->guard, src);
+
+    // add to the correct set dependening on the result
     if (((struct guard_add_info*)context)->result == result) vset_add(set, src);
 }
 
@@ -551,6 +554,8 @@ static inline void
 eval_guard (int guard, vset_t set)
 #endif
 {
+
+    // we evaluate guards twice, because we can not yet add to two different sets.
     struct guard_add_info ctx_false;
 
     ctx_false.guard = guard;
@@ -561,10 +566,13 @@ eval_guard (int guard, vset_t set)
     ctx_true.guard = guard;
     ctx_true.result = 1;
 
+    // get the short vectors we need to evaluate
     vset_project(guard_tmp[guard], set);
+    // minus what we have already evaluated
     vset_minus(guard_tmp[guard], guard_false[guard]);
     vset_minus(guard_tmp[guard], guard_true[guard]);
 
+    // count when verbose
     if (log_active(infoLong)) {
         bn_int_t elem_count;
         vset_count(guard_tmp[guard], NULL, &elem_count);
@@ -578,7 +586,9 @@ eval_guard (int guard, vset_t set)
 
     }
 
+    // evaluate guards and add to guard_false[guard] when false
     vset_update(guard_false[guard], guard_tmp[guard], eval_cb, &ctx_false);
+    // evaluate guards and add to guard_true[guard] when true
     vset_update(guard_true[guard], guard_tmp[guard], eval_cb, &ctx_true);
     vset_clear(guard_tmp[guard]);
 
@@ -976,6 +986,45 @@ static inline void add_variable_subset(vset_t dst, vset_t src, vdom_t domain, in
     vset_destroy(u);
 }
 
+struct reach_red_s
+{
+    vset_t container;
+    struct reach_red_s *left;
+    struct reach_red_s *right;
+    int index; // which guard
+    int group; // which transition group
+};
+
+static struct reach_red_s*
+reach_red_prepare(size_t left, size_t right, int group)
+{
+    struct reach_red_s *result = (struct reach_red_s *)RTmalloc(sizeof(struct reach_red_s));
+    if (right - left == 1) {
+        result->index = left;
+        result->left = NULL;
+        result->right = NULL;
+    } else {
+        result->index = -1;
+        result->left = reach_red_prepare(left, (left+right)/2, group);
+        result->right = reach_red_prepare((left+right)/2, right, group);
+    }
+    result->group = group;
+    result->container = vset_create(domain, -1, NULL);
+
+    return result;
+}
+
+static void
+reach_red_destroy(struct reach_red_s *s)
+{
+    if (s->index == -1) {
+        reach_red_destroy(s->left);
+        reach_red_destroy(s->right);
+    }
+    vset_destroy(s->container);
+    RTfree(s);
+}
+
 struct reach_s
 {
     vset_t container;
@@ -987,6 +1036,7 @@ struct reach_s
     int class;
     int next_count;
     int eg_count;
+    struct reach_red_s *red;
 };
 
 static struct reach_s*
@@ -997,10 +1047,12 @@ reach_prepare(size_t left, size_t right)
         result->index = left;
         result->left = NULL;
         result->right = NULL;
+        result->red = 0!=strcmp(GBgetUseGuards(model), "false") ? reach_red_prepare(0, GBgetGuard(model, left)->count, left) : NULL;
     } else {
         result->index = -1;
         result->left = reach_prepare(left, (left+right)/2);
         result->right = reach_prepare((left+right)/2, right);
+        result->red = NULL;
     }
     result->container = vset_create(domain, -1, NULL);
     result->ancestors = NULL;
@@ -1026,7 +1078,39 @@ reach_destroy(struct reach_s *s)
     if (s->ancestors != NULL) vset_destroy(s->ancestors);
     if (s->deadlocks != NULL) vset_destroy(s->deadlocks);
 
+    if (s->red != NULL) reach_red_destroy(s->red);
+
     RTfree(s);
+}
+
+#ifdef HAVE_SYLVAN
+#define reach_bfs_reduce(dummy) CALL(reach_bfs_reduce, dummy)
+VOID_TASK_1(reach_bfs_reduce, struct reach_red_s *, dummy)
+#else
+static inline void
+reach_bfs_reduce(struct reach_red_s *dummy)
+#endif
+{
+    if (dummy->index >= 0) { // base case
+        // check if no states which satisfy other guards
+        if (vset_is_empty(dummy->container)) return;
+        // reduce states in transition group
+        vset_join(dummy->container, dummy->container, guard_true[GBgetGuard(model, dummy->group)->guard[dummy->index]]);
+    } else { // recursive case
+        // send set of states downstream
+        vset_copy(dummy->left->container, dummy->container);
+        vset_copy(dummy->right->container, dummy->container);
+
+        // sequentially go left/right (not parallel)
+        reach_bfs_reduce(dummy->left);
+        reach_bfs_reduce(dummy->right);
+
+        // we intersect every leaf, since we want to reduce the states in the group
+        vset_copy(dummy->container, dummy->left->container);
+        vset_intersect(dummy->container, dummy->right->container);
+        vset_clear(dummy->left->container);
+        vset_clear(dummy->right->container);
+    }
 }
 
 #ifdef HAVE_SYLVAN
@@ -1055,16 +1139,44 @@ reach_bfs_next(struct reach_s *dummy, bitvector_t *reach_groups)
             }
         }
 
-        // Learn new states
-        expand_group_next(dummy->index, dummy->container);
-        dummy->eg_count = 1;
+        if (dummy->red != NULL) { // we have guard-splitting; reduce the set
+            // Reduce current level
+            vset_copy(dummy->red->container, dummy->container);
+            reach_bfs_reduce(dummy->red);
 
-        // Compute successor states
-        vset_next(dummy->container, dummy->container, group_next[dummy->index]);
-        dummy->next_count = 1;
+            if (vset_is_empty(dummy->red->container)) {
+                dummy->next_count = 0;
+                dummy->eg_count=0;
+                return;
+            }
+        }
 
-        // Compute ancestor states
-        if (dummy->ancestors != NULL) vset_prev(dummy->ancestors, dummy->container, group_next[dummy->index], dummy->ancestors);
+        // Expand transition relations
+        if (dummy->red != NULL) { // we have guard-splitting; use reduced set
+            // Learn new states
+            expand_group_next(dummy->index, dummy->red->container);
+            dummy->eg_count = 1;
+
+            // Compute successor states
+            vset_next(dummy->container, dummy->red->container, group_next[dummy->index]);
+            dummy->next_count = 1;
+
+            // Compute ancestor states
+            if (dummy->ancestors != NULL) vset_prev(dummy->ancestors, dummy->red->container, group_next[dummy->index], dummy->ancestors);
+
+            vset_clear(dummy->red->container);
+        } else {
+            // Learn new states
+            expand_group_next(dummy->index, dummy->container);
+            dummy->eg_count = 1;
+
+            // Compute successor states
+            vset_next(dummy->container, dummy->container, group_next[dummy->index]);
+            dummy->next_count = 1;
+
+            // Compute ancestor states
+            if (dummy->ancestors != NULL) vset_prev(dummy->ancestors, dummy->container, group_next[dummy->index], dummy->ancestors);
+        }
 
         // Remove ancestor states from potential deadlock states
         if (dummy->deadlocks != NULL) vset_minus(dummy->deadlocks, dummy->ancestors);
@@ -1122,6 +1234,28 @@ reach_bfs_next(struct reach_s *dummy, bitvector_t *reach_groups)
     }
 }
 
+static inline void
+learn_guards(vset_t states, long *guard_count) {
+    #ifdef HAVE_SYLVAN
+    LACE_ME;
+    if (0!=strcmp(GBgetUseGuards(model), "false")) {
+        for (int g = 0; g < nGuards; g++) {
+            (*guard_count)++;
+            SPAWN(eval_guard, g, states);
+        }
+    }
+    if (0!=strcmp(GBgetUseGuards(model), "false"))
+        for (int g = 0; g < nGuards; g++) SYNC(eval_guard);
+    #else
+    if (0!=strcmp(GBgetUseGuards(model), "false")) {
+        for (int g = 0; g < nGuards; g++) {
+            (*guard_count)++;
+            eval_guard(g, states);
+        }
+    }
+    #endif
+}
+
 static void
 reach_bfs_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
                    long *eg_count, long *next_count, long *guard_count)
@@ -1153,6 +1287,8 @@ reach_bfs_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
                 // set container to current level minus enabled transitions from all inhibiting classes
                 vset_copy(root->container, current_level);
                 for (int i=0; i<c; i++) if (dm_is_set(inhibit_matrix,i,c)) vset_minus(root->container, class_enabled[i]);
+                // evaluate all guards
+                learn_guards(root->container, guard_count);
                 // set ancestors to container
                 vset_copy(root->ancestors, root->container);
                 // carry over root->deadlocks from previous iteration
@@ -1174,6 +1310,8 @@ reach_bfs_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
         } else {
             // set container to current level
             vset_copy(root->container, current_level);
+            // evaluate all guards
+            learn_guards(root->container, guard_count);
             // set ancestors to container
             if (root->ancestors != NULL) vset_copy(root->ancestors, current_level);
             // call next function
@@ -1232,6 +1370,8 @@ reach_bfs(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
                 // set container to current level minus enabled transitions from all inhibiting classes
                 vset_copy(root->container, visited);
                 for (int i=0; i<c; i++) if (dm_is_set(inhibit_matrix,i,c)) vset_minus(root->container, class_enabled[i]);
+                // evaluate all guards
+                learn_guards(root->container, guard_count);
                 // set ancestors to container
                 vset_copy(root->ancestors, root->container);
                 // carry over root->deadlocks from previous iteration
@@ -1255,6 +1395,8 @@ reach_bfs(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
         } else {
             // set container to current level
             vset_copy(root->container, visited);
+            // evaluate all guards
+            learn_guards(root->container, guard_count);
             // set ancestors to container
             if (root->ancestors != NULL) vset_copy(root->ancestors, visited);
             // call next function
@@ -1288,6 +1430,32 @@ reach_bfs(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
 
 #if defined(HAVE_SYLVAN)
 
+VOID_TASK_1(reach_par_reduce, struct reach_red_s *, dummy)
+{
+    if (dummy->index >= 0) { // base case
+        // check if no states which satisfy other guards
+        if (vset_is_empty(dummy->container)) return;
+        // reduce states in transition group
+        vset_join(dummy->container, dummy->container, guard_true[GBgetGuard(model, dummy->group)->guard[dummy->index]]);
+    } else { //recursive case
+        // send set of states downstream
+        vset_copy(dummy->left->container, dummy->container);
+        vset_copy(dummy->right->container, dummy->container);
+
+        // go left/right in parallel
+        SPAWN(reach_par_reduce, dummy->left);
+        SPAWN(reach_par_reduce, dummy->right);
+        SYNC(reach_par_reduce);
+        SYNC(reach_par_reduce);
+
+        // we intersect every leaf, since we want to reduce the states in the group
+        vset_copy(dummy->container, dummy->left->container);
+        vset_intersect(dummy->container, dummy->right->container);
+        vset_clear(dummy->left->container);
+        vset_clear(dummy->right->container);
+    }
+}
+
 VOID_TASK_2(reach_par_next, struct reach_s *, dummy, bitvector_t *, reach_groups)
 {
     if (dummy->index >= 0) {
@@ -1308,16 +1476,44 @@ VOID_TASK_2(reach_par_next, struct reach_s *, dummy, bitvector_t *, reach_groups
             }
         }
 
-        // Learn new states
-        expand_group_next(dummy->index, dummy->container);
-        dummy->eg_count = 1;
+        if (dummy->red != NULL) { // we have guard-splitting; reduce the set
+            // Reduce current level
+            vset_copy(dummy->red->container, dummy->container);
+            CALL(reach_par_reduce, dummy->red);
 
-        // Compute successor states
-        vset_next(dummy->container, dummy->container, group_next[dummy->index]);
-        dummy->next_count = 1;
+            if (vset_is_empty(dummy->red->container)) {
+                dummy->next_count = 0;
+                dummy->eg_count=0;
+                return;
+            }
+        }
 
-        // Compute ancestor states
-        if (dummy->ancestors != NULL) vset_prev(dummy->ancestors, dummy->container, group_next[dummy->index], dummy->ancestors);
+        // Expand transition relations
+        if (dummy->red != NULL) { // we have guard-splitting; use reduced set
+            // Learn new states
+            expand_group_next(dummy->index, dummy->red->container);
+            dummy->eg_count = 1;
+
+            // Compute successor states
+            vset_next(dummy->container, dummy->red->container, group_next[dummy->index]);
+            dummy->next_count = 1;
+
+            // Compute ancestor states
+            if (dummy->ancestors != NULL) vset_prev(dummy->ancestors, dummy->red->container, group_next[dummy->index], dummy->ancestors);
+
+            vset_clear(dummy->red->container);
+        } else {
+            // Learn new states
+            expand_group_next(dummy->index, dummy->container);
+            dummy->eg_count = 1;
+
+            // Compute successor states
+            vset_next(dummy->container, dummy->container, group_next[dummy->index]);
+            dummy->next_count = 1;
+
+            // Compute ancestor states
+            if (dummy->ancestors != NULL) vset_prev(dummy->ancestors, dummy->container, group_next[dummy->index], dummy->ancestors);
+        }
 
         // Remove ancestor states from potential deadlock states
         if (dummy->deadlocks != NULL) vset_minus(dummy->deadlocks, dummy->ancestors);
@@ -1379,7 +1575,7 @@ VOID_TASK_2(reach_par_next, struct reach_s *, dummy, bitvector_t *, reach_groups
 
 static void
 reach_par(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
-              long *eg_count, long *next_count)
+              long *eg_count, long *next_count, long *guard_count)
 {
     vset_t old_vis = vset_create(domain, -1, NULL);
     vset_t next_level = vset_create(domain, -1, NULL);
@@ -1404,6 +1600,8 @@ reach_par(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
                 // set container to current level minus enabled transitions from all inhibiting classes
                 vset_copy(root->container, visited);
                 for (int i=0; i<c; i++) if (dm_is_set(inhibit_matrix,i,c)) vset_minus(root->container, class_enabled[i]);
+                // evaluate all guards
+                learn_guards(root->container, guard_count);
                 // set ancestors to container
                 vset_copy(root->ancestors, root->container);
                 // carry over root->deadlocks from previous iteration
@@ -1427,6 +1625,8 @@ reach_par(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
         } else {
             // set container to current level
             vset_copy(root->container, visited);
+            // evaluate all guards
+            learn_guards(root->container, guard_count);
             // set ancestors to container
             if (root->ancestors != NULL) vset_copy(root->ancestors, visited);
             // call next function
@@ -1485,6 +1685,8 @@ reach_par_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
                 // set container to current level minus enabled transitions from all inhibiting classes
                 vset_copy(root->container, current_level);
                 for (int i=0; i<c; i++) if (dm_is_set(inhibit_matrix,i,c)) vset_minus(root->container, class_enabled[i]);
+                // evaluate all guards
+                learn_guards(root->container, guard_count);
                 // set ancestors to container
                 vset_copy(root->ancestors, root->container);
                 // carry over root->deadlocks from previous iteration
@@ -1506,6 +1708,8 @@ reach_par_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
         } else {
             // set container to current level
             vset_copy(root->container, current_level);
+            // evaluate all guards
+            learn_guards(root->container, guard_count);
             // set ancestors to container
             if (root->ancestors != NULL) vset_copy(root->ancestors, current_level);
             // call next function
@@ -1539,6 +1743,19 @@ reach_par_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
 
 #endif
 
+static inline void
+learn_guards_reduce(vset_t states, int t, long *guard_count) {
+    LACE_ME;
+    if (0!=strcmp(GBgetUseGuards(model), "false")) {
+        guard_t* guards = GBgetGuard(model, t);
+        for (int g = 0; g < guards->count && !vset_is_empty(states); g++) {
+            (*guard_count)++;
+            eval_guard(guards->guard[g], states);
+            vset_join(states, states, guard_true[guards->guard[g]]);
+        }
+    }
+}
+
 static void
 reach_chain_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
                      long *eg_count, long *next_count, long *guard_count)
@@ -1566,14 +1783,7 @@ reach_chain_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
             if (!bitvector_is_set(reach_groups, i)) continue;
             if (trc_output != NULL) save_level(new_states);
             vset_copy(new_reduced[i], new_states);
-            if (0!=strcmp(GBgetUseGuards(model), "false")) {
-                guard_t* guards = GBgetGuard(model, i);
-
-                for (int g = 0; g < guards->count && !vset_is_empty(new_reduced[i]); g++) {
-                    *guard_count += eval_guard(guards->guard[g], new_reduced[i]);
-                    vset_join(new_reduced[i], new_reduced[i], guard_true[guards->guard[g]]);
-                }
-            }
+            learn_guards_reduce(new_reduced[i], i, guard_count);
 
             if (!vset_is_empty(new_reduced[i])) {
                 expand_group_next(i, new_reduced[i]);
@@ -1621,6 +1831,11 @@ reach_chain(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
     vset_t temp = vset_create(domain, -1, NULL);
     vset_t deadlocks = dlk_detect?vset_create(domain, -1, NULL):NULL;
     vset_t dlk_temp = dlk_detect?vset_create(domain, -1, NULL):NULL;
+    vset_t new_reduced[nGrps];
+
+    for(int i=0;i<nGrps;i++) {
+        new_reduced[i]=vset_create(domain, -1, NULL);
+    }
 
     LACE_ME;
     while (!vset_equal(visited, old_vis)) {
@@ -1631,10 +1846,12 @@ reach_chain(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
         for (int i = 0; i < nGrps; i++) {
             if (!bitvector_is_set(reach_groups, i)) continue;
             if (trc_output != NULL) save_level(visited);
-            expand_group_next(i, visited);
+            vset_copy(new_reduced[i], visited);
+            learn_guards_reduce(new_reduced[i], i, guard_count);
+            expand_group_next(i, new_reduced[i]);
             (*eg_count)++;
             (*next_count)++;
-            vset_next(temp, visited, group_next[i]);
+            vset_next(temp, new_reduced[i], group_next[i]);
             vset_union(visited, temp);
             if (dlk_detect) {
                 vset_prev(dlk_temp, temp, group_next[i],deadlocks);
@@ -1649,6 +1866,9 @@ reach_chain(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
 
     vset_destroy(old_vis);
     vset_destroy(temp);
+    for(int i=0;i<nGrps;i++) {
+        vset_destroy(new_reduced[i]);
+    }
     if (dlk_detect) {
         vset_destroy(deadlocks);
         vset_destroy(dlk_temp);
