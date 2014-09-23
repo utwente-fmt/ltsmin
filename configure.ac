@@ -477,7 +477,7 @@ Configuration:
     MPICXX   = ${MPICXX:-NOT FOUND, building without MPI support}
     OPAAL    = ${have_opaal:-TBB malloc NOT FOUND, building without opaal support}
     PBES     = ${acx_pbes:-NOT FOUND, building without PBES support}
-    SCOOP    = ${have_scoop:-NO, either scoop was disabled or ghc could not be found}
+    SCOOP    = ${have_scoop:-NO, either scoop was disabled or ghc/happy could not be found}
     SPINS    = ${acx_spins:-NO, JDK or Ant not found (override with --with-spins)}
     SYLVAN   = ${have_sylvan:-NO, only on 64-bit systems (override with --with-sylvan)}
     XMLTO    = ${XMLTO:-NOT FOUND, not building manpages}
