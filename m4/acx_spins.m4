@@ -31,6 +31,7 @@ case "$with_spins" in
                 then :
                 else
                     AC_MSG_WARN([Apache Ant (Java build tool) not found.])
+                    acx_spins=no
                 fi
              ;;
           *) : ;;
