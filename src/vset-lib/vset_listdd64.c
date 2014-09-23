@@ -1981,8 +1981,8 @@ set_least_fixpoint_mdd(vset_t dst, vset_t src, vrel_t rels[], int rel_count)
 
         // top_lvl = min(rels[grp]->r_proj[0], rels[grp]->w_p_len[0])
         int top_lvl
-                = rels[grp]->w_p_len == 0
-                || (rels[grp]->r_p_len > 0 && rels[grp]->r_proj[0] < rels[grp]->w_proj[0])
+                = (rels[grp]->w_p_len == 0
+                || (rels[grp]->r_p_len > 0 && rels[grp]->r_proj[0] < rels[grp]->w_proj[0]))
                 ? rels[grp]->r_proj[0] : rels[grp]->w_proj[0];
         top_groups[top_lvl].top_groups[top_groups[top_lvl].tg_len] = grp;
         top_groups[top_lvl].tg_len++;
