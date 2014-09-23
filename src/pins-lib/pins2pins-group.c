@@ -44,8 +44,7 @@ group_cb (void *context, transition_info_t *ti, int *olddst, int*cpy)
         newcpy[i] = (ctx->cpy[i] || (cpy != NULL && cpy[ctx->statemap[i]]));
     }
 
-    //ctx->cb (ctx->user_context, ti, newdst, newcpy);
-    ctx->cb (ctx->user_context, ti, newdst, NULL);
+    ctx->cb (ctx->user_context, ti, newdst, newcpy);
 }
 
 static int
