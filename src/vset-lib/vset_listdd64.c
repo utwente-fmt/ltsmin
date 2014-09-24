@@ -10,6 +10,7 @@
 #include <vset-lib/vdom_object.h>
 #include <util-lib/simplemap.h>
 #include <util-lib/fast_hash.h>
+#include <util-lib/util.h>
 
 static uint64_t mdd_nodes;
 static uint64_t uniq_size;
@@ -1976,14 +1977,13 @@ set_least_fixpoint_mdd(vset_t dst, vset_t src, vrel_t rels[], int rel_count)
         proj_set[grp] = set_create_mdd(rels[grp]->dom, rels[grp]->r_p_len,
                                        rels[grp]->r_proj);
 
-        if (rels[grp]->r_p_len == 0 && rels[grp]->w_p_len == 0)
-            continue;
+        if (rels[grp]->r_p_len == 0 && rels[grp]->w_p_len == 0) continue;
 
-        // top_lvl = min(rels[grp]->r_proj[0], rels[grp]->w_p_len[0])
-        int top_lvl
-                = (rels[grp]->w_p_len == 0
-                || (rels[grp]->r_p_len > 0 && rels[grp]->r_proj[0] < rels[grp]->w_proj[0]))
-                ? rels[grp]->r_proj[0] : rels[grp]->w_proj[0];
+        int top_lvl; // = minimum of rels[grp]->r_proj[0] and rels[grp]->w_proj[0]
+        if (rels[grp]->r_p_len == 0) top_lvl = rels[grp]->w_proj[0];
+        else if (rels[grp]->w_p_len == 0) top_lvl = rels[grp]->r_proj[0];
+        else top_lvl = min(rels[grp]->r_proj[0], rels[grp]->w_proj[0]);
+
         top_groups[top_lvl].top_groups[top_groups[top_lvl].tg_len] = grp;
         top_groups[top_lvl].tg_len++;
     }
