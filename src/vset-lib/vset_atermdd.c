@@ -1088,10 +1088,11 @@ static ATerm set_inv_reach(ATerm set, ATerm trans, int *proj, int p_len, int ofs
     }
 }
 
-void set_prev_list(vset_t dst, vset_t src, vrel_t rel) {
+void set_prev_list(vset_t dst, vset_t src, vrel_t rel, vset_t univ) {
     assert(dst->p_len < 0 && src->p_len < 0);
     dst->set=set_inv_reach(src->set, rel->rel, rel->proj, rel->p_len, 0, 0);
     ATtableReset(global_ct);
+    set_intersect_list(dst, univ);
 }
 
 
