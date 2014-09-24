@@ -2100,6 +2100,9 @@ reach_sat(reach_proc_t reach_proc, vset_t visited,
     (void) next_count;
     (void) guard_count;
 
+    if (0!=strcmp(GBgetUseGuards(model), "false"))
+        Abort("guard-splitting not supported with saturation=sat");
+
     if (act_detect != NULL && trc_output != NULL)
         Abort("Action detection with trace generation not supported");
 
