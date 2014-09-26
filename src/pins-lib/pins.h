@@ -177,6 +177,12 @@ typedef struct sl_group {
 extern struct poptOption greybox_options[];
 
 /**
+\brief Options for greybox management module including
+LTL options.
+ */
+extern struct poptOption greybox_options_ltl[];
+
+/**
 \brief A struct to store guards per transition group
 */
 typedef struct guard {

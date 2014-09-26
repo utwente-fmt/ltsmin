@@ -81,6 +81,7 @@ The mu-calculus formula is provided in the file 'FILE' or directly
 as a string 'FORMULA'. The syntax and tool support are described in 
 manpage:ltsmin-mucalc[5].
 
+ifdef::ltl[]
 *--ltl*='LTLFILE|LTLFORMULA'::
     Compute cross-product of a Buchi automaton and the specification
 +
@@ -113,10 +114,10 @@ textbook;;
 ltsmin;;
     Same as spin semantics, but now deadlocks in the LTS do NOT cause the Buchi
     to progress independently.
-
+endif::ltl[]
 
 *--por*::
     Activate partial order reduction
 +
 Partial Order Reduction can reduce the state space when searching
-for deadlocks (-d) or accepting cycles (--ltl).
+for deadlocks (+-d+) or accepting cycles (+--ltl+).

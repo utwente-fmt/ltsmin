@@ -1,3 +1,5 @@
+:ltl:     available
+
 include::reachability-options.txt[]
 
 include::pins-options.txt[]

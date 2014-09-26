@@ -192,7 +192,7 @@ struct poptOption alg_options_extra[] = {
     {NULL, 0, POPT_ARG_INCLUDE_TABLE, perm_options, 0, "Permutation options", NULL},
     {NULL, 0, POPT_ARG_INCLUDE_TABLE, alg_ltl_options, 0, /*"LTL options"*/ NULL, NULL},
     {NULL, 0, POPT_ARG_INCLUDE_TABLE, ndfs_options, 0, /*"NDFS options"*/ NULL, NULL},
-    {NULL, 0, POPT_ARG_INCLUDE_TABLE, greybox_options, 0, "PINS options", NULL},
+    {NULL, 0, POPT_ARG_INCLUDE_TABLE, greybox_options_ltl, 0, "PINS options", NULL},
     POPT_TABLEEND
 };
 
