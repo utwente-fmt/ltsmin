@@ -21,7 +21,8 @@ solver manpage:spgsolver[1] is available. The explicit state tools
 (+pins2lts-seq+, +pins2lts-mc+, +pins2lts-dist+) generate a parity game
 that can be converted by manpage:ltsmin-convert[1] to a format that is 
 readable by the solvers https://github.com/tcsprojects/pgsolver[PGSolver] 
-and http://mcrl2.org/release/user_manual/tools/pbespgsolve.html[pbespgsolve] (part of http://mcrl2.org[mCRL2]). 
+and http://mcrl2.org/release/user_manual/tools/pbespgsolve.html[pbespgsolve] 
+(part of http://mcrl2.org[mCRL2]). 
 
 === Syntax
 ----
