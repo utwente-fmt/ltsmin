@@ -52,6 +52,7 @@ static char* act_detect = NULL;
 static char* inv_detect = NULL;
 static int   no_exit = 0;
 static int   no_matrix = 0;
+static int   no_soundness_check = 0;
 static int   act_index;
 static int   act_label;
 static int   action_typeno;
@@ -227,6 +228,7 @@ static  struct poptOption options[] = {
     SPEC_POPT_OPTIONS,
     { NULL, 0 , POPT_ARG_INCLUDE_TABLE, greybox_options , 0 , "PINS options",NULL},
     { NULL, 0 , POPT_ARG_INCLUDE_TABLE, vset_options , 0 , "Vector set options",NULL},
+    { "no-soundness-check", 0, POPT_ARG_VAL, &no_soundness_check, 1, "disable checking whether the model specification is sound for guards", NULL },
     POPT_TABLEEND
 };
 
@@ -256,8 +258,9 @@ static model_t model;
 static vrel_t *group_next;
 static vset_t *group_explored;
 static vset_t *group_tmp;
-static vset_t *guard_false;
-static vset_t *guard_true;
+static vset_t *guard_false; // 0
+static vset_t *guard_true;  // 1
+static vset_t *guard_maybe; // 2
 static vset_t *guard_tmp;
 
 typedef void (*reach_proc_t)(vset_t visited, vset_t visited_old,
@@ -276,6 +279,28 @@ typedef int (*short_proc_t)(model_t model,int group,int*src,TransitionCB cb,void
 static short_proc_t* short_proc; // which function to call for the next states.
 #ifdef HAVE_SYLVAN
 static short_proc_t* short_multi_proc; // which function to call in the multi-process environment.
+#endif
+
+
+/*
+ * Add parallel operations
+ */
+#ifdef HAVE_SYLVAN
+// join
+#define vset_join_par(dst, left, right) SPAWN(vset_join_par, dst, left, right)
+VOID_TASK_3(vset_join_par, vset_t, dst, vset_t, left, vset_t, right) { vset_join(dst, left, right); }
+
+// union
+#define vset_union_par(dst, src) SPAWN(vset_union_par, dst, src)
+VOID_TASK_2(vset_union_par, vset_t, dst, vset_t, src) { vset_union(dst, src); }
+
+// intersect
+#define vset_intersect_par(dst, src) SPAWN(vset_intersect_par, dst, src)
+VOID_TASK_2(vset_intersect_par, vset_t, dst, vset_t, src) { vset_intersect(dst, src); }
+
+// minus
+#define vset_minus_par(dst, src) SPAWN(vset_minus_par, dst, src)
+VOID_TASK_2(vset_minus_par, vset_t, dst, vset_t, src) { vset_minus(dst, src); }
 #endif
 
 #ifdef HAVE_SYLVAN
@@ -555,7 +580,8 @@ static void eval_cb (vset_t set, void *context, int *src)
     int result = GBgetStateLabelShort(model, ((struct guard_add_info*)context)->guard, src);
 
     // add to the correct set dependening on the result
-    if (((struct guard_add_info*)context)->result == result) vset_add(set, src);
+    int dresult = ((struct guard_add_info*)context)->result;
+    if (dresult == result || (dresult == 0 && result == 2 && no_soundness_check)) vset_add(set, src);
 }
 
 #ifdef HAVE_SYLVAN
@@ -603,6 +629,17 @@ eval_guard (int guard, vset_t set)
     // evaluate guards and add to guard_true[guard] when true
     SPAWN(vset_update_par, guard_true[guard], guard_tmp[guard], eval_cb, &ctx_true);
 
+    if (!no_soundness_check) {
+        struct guard_add_info ctx_maybe;
+
+        ctx_maybe.guard = guard;
+        ctx_maybe.result = 2;
+
+        // evaluate guards and add to guard_maybe[guard] when maybe
+        SPAWN(vset_update_par, guard_maybe[guard], guard_tmp[guard], eval_cb, &ctx_maybe);
+    }
+
+    if (!no_soundness_check) SYNC(vset_update_par);
     SYNC(vset_update_par); SYNC(vset_update_par);
 
     vset_clear(guard_tmp[guard]);
@@ -1000,9 +1037,41 @@ static inline void add_variable_subset(vset_t dst, vset_t src, vdom_t domain, in
     vset_destroy(u);
 }
 
+/**
+ * Tree structure to evaluate the condition of a transition group.
+ * If we disable the soundness check of guard-splitting then if we
+ * have SPEC_MAYBE_AND_FALSE_IS_FALSE (like mCRL(2) and SCOOP) then
+ * (maybe && false == false) or (false && maybe == false) is not checked.
+ * If we have !SPEC_MAYBE_AND_FALSE_IS_FALSE (like Java, Promela and DVE) then only
+ * (maybe && false == false) is not checked.
+ * For guard-splitting ternary logic is used; i.e. (false,true,maybe) = (0,1,2) = (0,1,?).
+ * Truth table for SPEC_MAYBE_AND_FALSE_IS_FALSE:
+ *      0 1 ?
+ *      -----
+ *  0 | 0 0 0
+ *  1 | 0 1 ?
+ *  ? | 0 ? ?
+ * Truth table for !SPEC_MAYBE_AND_FALSE_IS_FALSE:
+ *      0 1 ?
+ *      -----
+ *  0 | 0 0 0
+ *  1 | 0 1 ?
+ *  ? | ? ? ?
+ *
+ *  Soundness check: vset_is_empty(root(reach_red_s)->maybe_container).
+ *  Algorithm to carry all maybe states to the root:
+ *  X = (F,T,M)
+ *  ∩X = Y ∩ Z = (Fy,Ty,My) ∩ (Fz,Tz,Mz):
+ *   - T = Ty ∩ Tz
+ *   - F = Fy ∪ Fz
+ *   - M = SPEC_MAYBE_AND_FALSE_IS_FALSE  => (My ∖ Fz) ∪ (Mz ∖ Fy) &&
+ *         !SPEC_MAYBE_AND_FALSE_IS_FALSE => My ∪ (Mz ∖ Fy)
+ */
 struct reach_red_s
 {
-    vset_t container;
+    vset_t true_container;
+    vset_t maybe_container;
+    vset_t false_container;
     struct reach_red_s *left;
     struct reach_red_s *right;
     int index; // which guard
@@ -1023,7 +1092,11 @@ reach_red_prepare(size_t left, size_t right, int group)
         result->right = reach_red_prepare((left+right)/2, right, group);
     }
     result->group = group;
-    result->container = vset_create(domain, -1, NULL);
+    result->true_container = vset_create(domain, -1, NULL);
+    if (!no_soundness_check) {
+        result->maybe_container = vset_create(domain, -1, NULL);
+        result->false_container = vset_create(domain, -1, NULL);
+    }
 
     return result;
 }
@@ -1035,7 +1108,11 @@ reach_red_destroy(struct reach_red_s *s)
         reach_red_destroy(s->left);
         reach_red_destroy(s->right);
     }
-    vset_destroy(s->container);
+    vset_destroy(s->true_container);
+    if (!no_soundness_check) {
+        vset_destroy(s->maybe_container);
+        vset_destroy(s->false_container);
+    }
     RTfree(s);
 }
 
@@ -1051,6 +1128,7 @@ struct reach_s
     int next_count;
     int eg_count;
     struct reach_red_s *red;
+    int unsound_group;
 };
 
 static struct reach_s*
@@ -1061,7 +1139,8 @@ reach_prepare(size_t left, size_t right)
         result->index = left;
         result->left = NULL;
         result->right = NULL;
-        result->red = 0!=strcmp(GBgetUseGuards(model), "false") ? reach_red_prepare(0, GBgetGuard(model, left)->count, left) : NULL;
+        if (0!=strcmp(GBgetUseGuards(model), "false")) result->red = reach_red_prepare(0, GBgetGuard(model, left)->count, left);
+        else result->red = NULL;
     } else {
         result->index = -1;
         result->left = reach_prepare(left, (left+right)/2);
@@ -1071,6 +1150,7 @@ reach_prepare(size_t left, size_t right)
     result->container = vset_create(domain, -1, NULL);
     result->ancestors = NULL;
     result->deadlocks = NULL;
+    result->unsound_group = -1;
     if (inhibit_matrix != NULL || dlk_detect) {
         result->ancestors = vset_create(domain, -1, NULL);
     }
@@ -1107,23 +1187,44 @@ reach_bfs_reduce(struct reach_red_s *dummy)
 {
     if (dummy->index >= 0) { // base case
         // check if no states which satisfy other guards
-        if (vset_is_empty(dummy->container)) return;
+        if (vset_is_empty(dummy->true_container)) return;
         // reduce states in transition group
-        vset_join(dummy->container, dummy->container, guard_true[GBgetGuard(model, dummy->group)->guard[dummy->index]]);
+        int guard = GBgetGuard(model, dummy->group)->guard[dummy->index];
+        if (!no_soundness_check) {
+            vset_copy(dummy->false_container, dummy->true_container);
+            vset_copy(dummy->maybe_container, dummy->true_container);
+            vset_join(dummy->false_container, dummy->false_container, guard_false[guard]);
+            vset_join(dummy->maybe_container, dummy->maybe_container, guard_maybe[guard]);
+        }
+        vset_join(dummy->true_container, dummy->true_container, guard_true[guard]);
     } else { // recursive case
         // send set of states downstream
-        vset_copy(dummy->left->container, dummy->container);
-        vset_copy(dummy->right->container, dummy->container);
+        vset_copy(dummy->left->true_container, dummy->true_container);
+        vset_copy(dummy->right->true_container, dummy->true_container);
 
         // sequentially go left/right (not parallel)
         reach_bfs_reduce(dummy->left);
         reach_bfs_reduce(dummy->right);
 
         // we intersect every leaf, since we want to reduce the states in the group
-        vset_copy(dummy->container, dummy->left->container);
-        vset_intersect(dummy->container, dummy->right->container);
-        vset_clear(dummy->left->container);
-        vset_clear(dummy->right->container);
+        vset_copy(dummy->true_container, dummy->left->true_container);
+        vset_intersect(dummy->true_container, dummy->right->true_container);
+        vset_clear(dummy->left->true_container);
+        vset_clear(dummy->right->true_container);
+
+        if (!no_soundness_check) {
+            vset_copy(dummy->false_container, dummy->left->false_container);
+            vset_union(dummy->false_container, dummy->right->false_container);
+            vset_clear(dummy->left->false_container);
+            vset_clear(dummy->right->false_container);
+
+            vset_minus(dummy->right->maybe_container, dummy->left->false_container);
+            if (SPEC_MAYBE_AND_FALSE_IS_FALSE) vset_minus(dummy->left->maybe_container, dummy->right->false_container);
+            vset_copy(dummy->maybe_container, dummy->left->maybe_container);
+            vset_union(dummy->maybe_container, dummy->right->maybe_container);
+            vset_clear(dummy->left->maybe_container);
+            vset_clear(dummy->right->maybe_container);
+        }
     }
 }
 
@@ -1155,30 +1256,34 @@ reach_bfs_next(struct reach_s *dummy, bitvector_t *reach_groups)
 
         if (dummy->red != NULL) { // we have guard-splitting; reduce the set
             // Reduce current level
-            vset_copy(dummy->red->container, dummy->container);
+            vset_copy(dummy->red->true_container, dummy->container);
             reach_bfs_reduce(dummy->red);
 
-            if (vset_is_empty(dummy->red->container)) {
+            if (vset_is_empty(dummy->red->true_container)) {
                 dummy->next_count = 0;
                 dummy->eg_count=0;
                 return;
             }
+
+            // soundness check
+            if (!no_soundness_check && !vset_is_empty(dummy->red->maybe_container)) dummy->unsound_group = dummy->index;
+
         }
 
         // Expand transition relations
         if (dummy->red != NULL) { // we have guard-splitting; use reduced set
             // Learn new states
-            expand_group_next(dummy->index, dummy->red->container);
+            expand_group_next(dummy->index, dummy->red->true_container);
             dummy->eg_count = 1;
 
             // Compute successor states
-            vset_next(dummy->container, dummy->red->container, group_next[dummy->index]);
+            vset_next(dummy->container, dummy->red->true_container, group_next[dummy->index]);
             dummy->next_count = 1;
 
             // Compute ancestor states
-            if (dummy->ancestors != NULL) vset_prev(dummy->ancestors, dummy->red->container, group_next[dummy->index], dummy->ancestors);
+            if (dummy->ancestors != NULL) vset_prev(dummy->ancestors, dummy->red->true_container, group_next[dummy->index], dummy->ancestors);
 
-            vset_clear(dummy->red->container);
+            vset_clear(dummy->red->true_container);
         } else {
             // Learn new states
             expand_group_next(dummy->index, dummy->container);
@@ -1245,6 +1350,9 @@ reach_bfs_next(struct reach_s *dummy, bitvector_t *reach_groups)
 
         dummy->next_count = dummy->left->next_count + dummy->right->next_count;
         dummy->eg_count = dummy->left->eg_count + dummy->right->eg_count;
+
+        if (dummy->left->unsound_group > -1) dummy->unsound_group = dummy->left->unsound_group;
+        if (dummy->right->unsound_group > -1) dummy->unsound_group = dummy->right->unsound_group;
     }
 }
 
@@ -1309,6 +1417,17 @@ reach_bfs_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
                 // set class and call next function
                 root->class = c;
                 reach_bfs_next(root, reach_groups);
+                if (root->unsound_group > -1) {
+                    Warning(info, "Condition in group %d does not always evaluate to true or false", root->unsound_group);
+                    HREabort(LTSMIN_EXIT_COUNTER_EXAMPLE);
+                }
+                if (!no_soundness_check && 0!=strcmp(GBgetUseGuards(model), "false")) {
+                    // clear all maybe sets such that we only check soundness of the spec for only new states.
+                    for (int g = 0; g < nGuards; g++) {
+                        vset_union(guard_false[g], guard_maybe[g]);
+                        vset_clear(guard_maybe[g]);
+                    }
+                }
                 // update counters
                 *next_count += root->next_count;
                 *eg_count += root->eg_count;
@@ -1330,6 +1449,17 @@ reach_bfs_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
             if (root->ancestors != NULL) vset_copy(root->ancestors, current_level);
             // call next function
             reach_bfs_next(root, reach_groups);
+            if (root->unsound_group > -1) {
+                Warning(info, "Condition in group %d does not always evaluate to true or false", root->unsound_group);
+                HREabort(LTSMIN_EXIT_COUNTER_EXAMPLE);
+            }
+            if (!no_soundness_check && 0!=strcmp(GBgetUseGuards(model), "false")) {
+                // clear all maybe sets such that we only check soundness of the spec for only new states.
+                for (int g = 0; g < nGuards; g++) {
+                    vset_union(guard_false[g], guard_maybe[g]);
+                    vset_clear(guard_maybe[g]);
+                }
+            }
             // update counters
             *next_count += root->next_count;
             *eg_count += root->eg_count;
@@ -1392,6 +1522,17 @@ reach_bfs(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
                 // set class and call next function
                 root->class = c;
                 reach_bfs_next(root, reach_groups);
+                if (root->unsound_group > -1) {
+                    Warning(info, "Condition in group %d does not always evaluate to true or false", root->unsound_group);
+                    HREabort(LTSMIN_EXIT_COUNTER_EXAMPLE);
+                }
+                if (!no_soundness_check && 0!=strcmp(GBgetUseGuards(model), "false")) {
+                    // clear all maybe sets such that we only check soundness of the spec for only new states.
+                    for (int g = 0; g < nGuards; g++) {
+                        vset_union(guard_false[g], guard_maybe[g]);
+                        vset_clear(guard_maybe[g]);
+                    }
+                }
                 // update counters
                 *next_count += root->next_count;
                 *eg_count += root->eg_count;
@@ -1415,6 +1556,17 @@ reach_bfs(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
             if (root->ancestors != NULL) vset_copy(root->ancestors, visited);
             // call next function
             reach_bfs_next(root, reach_groups);
+            if (root->unsound_group > -1) {
+                Warning(info, "Condition in group %d does not always evaluate to true or false", root->unsound_group);
+                HREabort(LTSMIN_EXIT_COUNTER_EXAMPLE);
+            }
+            if (!no_soundness_check && 0!=strcmp(GBgetUseGuards(model), "false")) {
+                // clear all maybe sets such that we only check soundness of the spec for only new states.
+                for (int g = 0; g < nGuards; g++) {
+                    vset_union(guard_false[g], guard_maybe[g]);
+                    vset_clear(guard_maybe[g]);
+                }
+            }
             // update counters
             *next_count += root->next_count;
             *eg_count += root->eg_count;
@@ -1448,13 +1600,27 @@ VOID_TASK_1(reach_par_reduce, struct reach_red_s *, dummy)
 {
     if (dummy->index >= 0) { // base case
         // check if no states which satisfy other guards
-        if (vset_is_empty(dummy->container)) return;
-        // reduce states in transition group
-        vset_join(dummy->container, dummy->container, guard_true[GBgetGuard(model, dummy->group)->guard[dummy->index]]);
+        if (vset_is_empty(dummy->true_container)) return;
+        int guard = GBgetGuard(model, dummy->group)->guard[dummy->index];
+        if (!no_soundness_check) {
+            vset_copy(dummy->false_container, dummy->true_container);
+            vset_copy(dummy->maybe_container, dummy->true_container);
+
+            vset_join_par(dummy->false_container, dummy->false_container, guard_false[guard]);
+            vset_join_par(dummy->maybe_container, dummy->maybe_container, guard_maybe[guard]);
+        }
+        vset_join_par(dummy->true_container, dummy->true_container, guard_true[guard]);
+
+        SYNC(vset_join_par);
+
+        if (!no_soundness_check) {
+            SYNC(vset_join_par);
+            SYNC(vset_join_par);
+        }
     } else { //recursive case
         // send set of states downstream
-        vset_copy(dummy->left->container, dummy->container);
-        vset_copy(dummy->right->container, dummy->container);
+        vset_copy(dummy->left->true_container, dummy->true_container);
+        vset_copy(dummy->right->true_container, dummy->true_container);
 
         // go left/right in parallel
         SPAWN(reach_par_reduce, dummy->left);
@@ -1463,10 +1629,33 @@ VOID_TASK_1(reach_par_reduce, struct reach_red_s *, dummy)
         SYNC(reach_par_reduce);
 
         // we intersect every leaf, since we want to reduce the states in the group
-        vset_copy(dummy->container, dummy->left->container);
-        vset_intersect(dummy->container, dummy->right->container);
-        vset_clear(dummy->left->container);
-        vset_clear(dummy->right->container);
+        vset_copy(dummy->true_container, dummy->left->true_container);
+        vset_intersect_par(dummy->true_container, dummy->right->true_container);
+
+        if (!no_soundness_check) {
+            vset_copy(dummy->false_container, dummy->left->false_container);
+            vset_union_par(dummy->false_container, dummy->right->false_container);
+
+            vset_minus_par(dummy->right->maybe_container, dummy->left->false_container);
+            if (SPEC_MAYBE_AND_FALSE_IS_FALSE) vset_minus_par(dummy->left->maybe_container, dummy->right->false_container);
+            if (SPEC_MAYBE_AND_FALSE_IS_FALSE) SYNC(vset_minus_par);
+            SYNC(vset_minus_par);
+            vset_copy(dummy->maybe_container, dummy->left->maybe_container);
+            vset_union_par(dummy->maybe_container, dummy->right->maybe_container);
+        }
+
+        if (!no_soundness_check) {
+            SYNC(vset_union_par);
+            vset_clear(dummy->left->maybe_container);
+            vset_clear(dummy->right->maybe_container);
+            SYNC(vset_union_par);
+            vset_clear(dummy->left->false_container);
+            vset_clear(dummy->right->false_container);
+        }
+
+        SYNC(vset_intersect_par);
+        vset_clear(dummy->left->true_container);
+        vset_clear(dummy->right->true_container);
     }
 }
 
@@ -1492,30 +1681,33 @@ VOID_TASK_2(reach_par_next, struct reach_s *, dummy, bitvector_t *, reach_groups
 
         if (dummy->red != NULL) { // we have guard-splitting; reduce the set
             // Reduce current level
-            vset_copy(dummy->red->container, dummy->container);
+            vset_copy(dummy->red->true_container, dummy->container);
             CALL(reach_par_reduce, dummy->red);
 
-            if (vset_is_empty(dummy->red->container)) {
+            if (vset_is_empty(dummy->red->true_container)) {
                 dummy->next_count = 0;
                 dummy->eg_count=0;
                 return;
             }
+
+            // soundness check
+            if (!no_soundness_check && !vset_is_empty(dummy->red->maybe_container)) dummy->unsound_group = dummy->index;
         }
 
         // Expand transition relations
         if (dummy->red != NULL) { // we have guard-splitting; use reduced set
             // Learn new states
-            expand_group_next(dummy->index, dummy->red->container);
+            expand_group_next(dummy->index, dummy->red->true_container);
             dummy->eg_count = 1;
 
             // Compute successor states
-            vset_next(dummy->container, dummy->red->container, group_next[dummy->index]);
+            vset_next(dummy->container, dummy->red->true_container, group_next[dummy->index]);
             dummy->next_count = 1;
 
             // Compute ancestor states
-            if (dummy->ancestors != NULL) vset_prev(dummy->ancestors, dummy->red->container, group_next[dummy->index], dummy->ancestors);
+            if (dummy->ancestors != NULL) vset_prev(dummy->ancestors, dummy->red->true_container, group_next[dummy->index], dummy->ancestors);
 
-            vset_clear(dummy->red->container);
+            vset_clear(dummy->red->true_container);
         } else {
             // Learn new states
             expand_group_next(dummy->index, dummy->container);
@@ -1584,6 +1776,9 @@ VOID_TASK_2(reach_par_next, struct reach_s *, dummy, bitvector_t *, reach_groups
 
         dummy->next_count = dummy->left->next_count + dummy->right->next_count;
         dummy->eg_count = dummy->left->eg_count + dummy->right->eg_count;
+
+        if (dummy->left->unsound_group > -1) dummy->unsound_group = dummy->left->unsound_group;
+        if (dummy->right->unsound_group > -1) dummy->unsound_group = dummy->right->unsound_group;
     }
 }
 
@@ -1622,6 +1817,18 @@ reach_par(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
                 // set class and call next function
                 root->class = c;
                 CALL(reach_par_next, root, reach_groups);
+                if (root->unsound_group > -1) {
+                    Warning(info, "Condition in group %d does not always evaluate to true or false", root->unsound_group);
+                    HREabort(LTSMIN_EXIT_COUNTER_EXAMPLE);
+                }
+                if (!no_soundness_check && 0!=strcmp(GBgetUseGuards(model), "false")) {
+                    // clear all maybe sets such that we only check soundness of the spec for only new states.
+                    for (int g = 0; g < nGuards; g++) vset_union_par(guard_false[g], guard_maybe[g]);
+                    for (int g = nGuards-1; g >= 0; g--) {
+                        SYNC(vset_union_par);
+                        vset_clear(guard_maybe[g]);
+                    }
+                }
                 // update counters
                 *next_count += root->next_count;
                 *eg_count += root->eg_count;
@@ -1645,6 +1852,18 @@ reach_par(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
             if (root->ancestors != NULL) vset_copy(root->ancestors, visited);
             // call next function
             CALL(reach_par_next, root, reach_groups);
+            if (root->unsound_group > -1) {
+                Warning(info, "Condition in group %d does not always evaluate to true or false", root->unsound_group);
+                HREabort(LTSMIN_EXIT_COUNTER_EXAMPLE);
+            }
+            if (!no_soundness_check && 0!=strcmp(GBgetUseGuards(model), "false")) {
+                // clear all maybe sets such that we only check soundness of the spec for only new states.
+                for (int g = 0; g < nGuards; g++) vset_union_par(guard_false[g], guard_maybe[g]);
+                for (int g = nGuards-1; g >= 0; g--) {
+                    SYNC(vset_union_par);
+                    vset_clear(guard_maybe[g]);
+                }
+            }
             // update counters
             *next_count += root->next_count;
             *eg_count += root->eg_count;
@@ -1707,6 +1926,18 @@ reach_par_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
                 // set class and call next function
                 root->class = c;
                 CALL(reach_par_next, root, reach_groups);
+                if (root->unsound_group > -1) {
+                    Warning(info, "Condition in group %d does not always evaluate to true or false", root->unsound_group);
+                    HREabort(LTSMIN_EXIT_COUNTER_EXAMPLE);
+                }
+                if (!no_soundness_check && 0!=strcmp(GBgetUseGuards(model), "false")) {
+                    // clear all maybe sets such that we only check soundness of the spec for only new states.
+                    for (int g = 0; g < nGuards; g++) vset_union_par(guard_false[g], guard_maybe[g]);
+                    for (int g = nGuards-1; g >= 0; g--) {
+                        SYNC(vset_union_par);
+                        vset_clear(guard_maybe[g]);
+                    }
+                }
                 // update counters
                 *next_count += root->next_count;
                 *eg_count += root->eg_count;
@@ -1728,6 +1959,18 @@ reach_par_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
             if (root->ancestors != NULL) vset_copy(root->ancestors, current_level);
             // call next function
             CALL(reach_par_next, root, reach_groups);
+            if (root->unsound_group > -1) {
+                Warning(info, "Condition in group %d does not always evaluate to true or false", root->unsound_group);
+                HREabort(LTSMIN_EXIT_COUNTER_EXAMPLE);
+            }
+            if (!no_soundness_check && 0!=strcmp(GBgetUseGuards(model), "false")) {
+                // clear all maybe sets such that we only check soundness of the spec for only new states.
+                for (int g = 0; g < nGuards; g++) vset_union_par(guard_false[g], guard_maybe[g]);
+                for (int g = nGuards-1; g >= 0; g--) {
+                    SYNC(vset_union_par);
+                    vset_clear(guard_maybe[g]);
+                }
+            }
             // update counters
             *next_count += root->next_count;
             *eg_count += root->eg_count;
@@ -1766,6 +2009,30 @@ learn_guards_reduce(vset_t states, int t, long *guard_count) {
             (*guard_count)++;
             eval_guard(guards->guard[g], states);
             vset_join(states, states, guard_true[guards->guard[g]]);
+        }
+
+        if (!no_soundness_check) {
+            for (int g = 0; g < guards->count; g++) {
+                int guard = guards->guard[g];
+                if (!vset_is_empty(guard_maybe[guard])) {
+                    vset_t test = vset_create(domain, -1, NULL);
+                    vset_join(test, states, guard_maybe[guard]);
+                    for (int h = 0; h < guards->count; h++) {
+                        int other_guard = guards->guard[h];
+                        if (guard != other_guard) vset_join(test, test, guard_false[other_guard]);
+                        else if (!SPEC_MAYBE_AND_FALSE_IS_FALSE) break;
+                    }
+                    if (!vset_is_empty(test)) {
+                        Warning(info, "Condition in group %d does not evaluate to true or false", t);
+                        HREabort(LTSMIN_EXIT_UNSOUND);
+                    }
+                    vset_destroy(test);
+
+                    // all states in guard_maybe, should be in guard_false, so move them.
+                    vset_union(guard_false[guard], guard_maybe[guard]);
+                    vset_clear(guard_maybe[guard]);
+                }
+            }
         }
     }
 }
@@ -2578,6 +2845,7 @@ init_domain(vset_implementation_t impl)
 
     guard_false    = (vset_t*)RTmalloc(nGuards * sizeof(vset_t));
     guard_true     = (vset_t*)RTmalloc(nGuards * sizeof(vset_t));
+    guard_maybe     = (vset_t*)RTmalloc(nGuards * sizeof(vset_t));
     guard_tmp      = (vset_t*)RTmalloc(nGuards * sizeof(vset_t));
 
     matrix_t *read_matrix = RTmalloc(sizeof (matrix_t));
@@ -2653,6 +2921,7 @@ init_domain(vset_implementation_t impl)
         {
             guard_false[i]  = vset_create(domain, g_projs[i].len, g_projs[i].proj);
             guard_true[i]   = vset_create(domain, g_projs[i].len, g_projs[i].proj);
+            guard_maybe[i]   = vset_create(domain, g_projs[i].len, g_projs[i].proj);
             guard_tmp[i]    = vset_create(domain, g_projs[i].len, g_projs[i].proj);
         }
     }
@@ -3223,6 +3492,12 @@ actual_main(void)
         } else { // false
             *short_proc = GBgetTransitionsShort;
             Print(infoShort, "Using GBgetTransitionsShort as next-state function");
+        }
+
+        if (0!=strcmp(GBgetUseGuards(model), "false")) {
+            if (no_soundness_check) {
+                Warning(info, "Guard-splitting: not checking soundness of the specification, this may result in an incorrect state space!");
+            } else Warning(info, "Guard-splitting: checking soundness of specification, this may be slow!");
         }
 
 #ifdef HAVE_SYLVAN
