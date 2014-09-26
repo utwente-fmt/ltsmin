@@ -181,6 +181,14 @@ group_transition_in_group (model_t self, int* labels, int group)
     return 0;
 }
 
+static int
+group_chunk_pretty_print (model_t self, int i, int chunk_no)
+{
+    group_context_t  ctx    = (group_context_t)GBgetContext (self);
+    model_t          parent = GBgetParent (self);
+    return GBchunkPrettyPrint(parent, ctx->statemap[i], chunk_no);
+}
+
 int
 max_row_first (matrix_t *r, matrix_t *w, int rowa, int rowb)
 {
@@ -721,6 +729,7 @@ GBregroup (model_t model, const char *regroup_spec)
     GBsetStateLabelLong (group, group_state_labels_long);
     GBsetStateLabelsAll (group, group_state_labels_all);
     GBsetTransitionInGroup (group, group_transition_in_group);
+    GBsetPrettyPrint (group, group_chunk_pretty_print);
 
     GBinitModelDefaults (&group, model);
 

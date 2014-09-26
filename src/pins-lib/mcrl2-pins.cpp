@@ -88,6 +88,36 @@ public:
         }
     }
 
+    int pretty_index (int i, int idx)
+    {
+        if (i >= (int)process_parameter_count())
+            Abort("Parameter index exceeds number of parameters.");
+        int mt = process_parameter_type (i);
+        int pt = lts_type_get_state_typeno (GBgetLTStype (model_), i);
+
+        data_format_t format = lts_type_get_format (GBgetLTStype (model_), pt);
+        switch (format) {
+        case LTStypeDirect:
+        case LTStypeRange:
+            return idx;
+        case LTStypeChunk:
+        case LTStypeEnum:
+            break;
+        }
+
+        chunk c = GBchunkGet (model_, pt, idx);
+        if (c.len == 0)
+            Abort ("lookup of %d failed", idx);
+
+        std::string s = std::string(reinterpret_cast<char*>(c.data), c.len);
+
+        std::string pretty = data_type(mt).print(data_type(mt).deserialize(s));
+
+        int pidx = GBchunkPut (model_, pt,
+                                       chunk_str(const_cast<char*>(pretty.c_str())));
+        return pidx;
+    }
+
     inline int find_pins_index (int mt, int pt, int idx, int pretty = 0)
     {
         data_format_t format = lts_type_get_format (GBgetLTStype (model_), pt);
@@ -367,6 +397,13 @@ MCRL2transitionInGroup (model_t m, int* labels, int group)
     return pins->transition_in_group(labels, group);
 }
 
+static int
+MCRL2prettyPrint (model_t m, int pos, int idx)
+{
+    ltsmin::pins *pins = reinterpret_cast<ltsmin::pins*>(GBgetContext (m));
+    return pins->pretty_index(pos, idx);
+}
+
 ltsmin::pins *pins;
 
 void
@@ -461,6 +498,7 @@ MCRL2loadGreyboxModel (model_t m, const char *model_name)
     GBsetNextStateLong (m, MCRL2getTransitionsLong);
     GBsetNextStateAll (m, MCRL2getTransitionsAll);
     GBsetTransitionInGroup(m, MCRL2transitionInGroup);
+    GBsetPrettyPrint(m, MCRL2prettyPrint);
 
     atexit(MCRL2exit);
 }

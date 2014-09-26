@@ -56,11 +56,14 @@ struct grey_box_model {
 	chunk2int_t chunk2int;
     chunkatint_t chunkatint;
 	get_count_t get_count;
+	chunk2pretty_t chunk2pretty;
 	void** map;
 	string_set_t default_filter;
 	matrix_t *expand_matrix;
 	matrix_t *project_matrix;
 	
+	int mucalc_node_count;
+
 	/** Index of static information matrices. */
 	string_index_t static_info_index;
 	/** Array of static information matrices. */
@@ -131,14 +134,14 @@ struct nested_cb {
 
 void project_dest(void*context,transition_info_t*ti,int*dst,int*cpy){
 #define info ((struct nested_cb*)context)
-    int len = dm_ones_in_row(info->model->project_matrix, info->group);
+    int len = dm_ones_in_row(GBgetProjectMatrix(info->model), info->group);
     int short_dst[len];
 
-    dm_project_vector(info->model->project_matrix, info->group, dst, short_dst);
+    dm_project_vector(GBgetProjectMatrix(info->model), info->group, dst, short_dst);
     ti->group = info->group;
     if (cpy != NULL) {
         int short_cpy[len];
-        dm_project_vector(info->model->project_matrix, info->group, cpy, short_cpy);
+        dm_project_vector(GBgetProjectMatrix(info->model), info->group, cpy, short_cpy);
         info->cb(info->user_ctx,ti,short_dst,short_cpy);
     } else {
         info->cb(info->user_ctx,ti,short_dst,NULL);
@@ -154,16 +157,16 @@ int default_short(model_t self,int group,int*src,TransitionCB cb,void*context){
 	info.cb=cb;
 	info.user_ctx=context;
 
-    int long_src[dm_ncols(self->expand_matrix)];
-    dm_expand_vector(self->expand_matrix, group, self->s0, src, long_src);
+    int long_src[dm_ncols(GBgetExpandMatrix(self))];
+    dm_expand_vector(GBgetExpandMatrix(self), group, self->s0, src, long_src);
 
     return self->next_long(self,group,long_src,project_dest,&info);
 }
 
 void expand_dest(void*context,transition_info_t*ti,int*dst, int*cpy){
 #define info ((struct nested_cb*)context)
-	int long_dst[dm_ncols(info->model->project_matrix)];
-	dm_expand_vector(info->model->project_matrix, info->group, info->src, dst, long_dst);
+	int long_dst[dm_ncols(GBgetProjectMatrix(info->model))];
+	dm_expand_vector(GBgetProjectMatrix(info->model), info->group, info->src, dst, long_dst);
 	info->cb(info->user_ctx,ti,long_dst,cpy);
 #undef info
 }
@@ -176,9 +179,9 @@ int default_long(model_t self,int group,int*src,TransitionCB cb,void*context){
 	info.cb=cb;
 	info.user_ctx=context;
 
-	int len = dm_ones_in_row(self->expand_matrix, group);
+	int len = dm_ones_in_row(GBgetExpandMatrix(self), group);
 	int src_short[len];
-	dm_project_vector(self->expand_matrix, group, src, src_short);
+	dm_project_vector(GBgetExpandMatrix(self), group, src, src_short);
 
 	return self->next_short(self,group,src_short,expand_dest,&info);
 }
@@ -191,8 +194,8 @@ int default_actions_short(model_t self,int group,int*src,TransitionCB cb,void*co
     info.cb=cb;
     info.user_ctx=context;
 
-    int long_src[dm_ncols(self->expand_matrix)];
-    dm_expand_vector(self->expand_matrix, group, self->s0, src, long_src);
+    int long_src[dm_ncols(GBgetExpandMatrix(self))];
+    dm_expand_vector(GBgetExpandMatrix(self), group, self->s0, src, long_src);
     return self->actions_long(self,group,long_src,project_dest,&info);
 }
 
@@ -204,9 +207,9 @@ int default_actions_long(model_t self,int group,int*src,TransitionCB cb,void*con
     info.cb=cb;
     info.user_ctx=context;
 
-    int len = dm_ones_in_row(self->expand_matrix, group);
+    int len = dm_ones_in_row(GBgetExpandMatrix(self), group);
     int src_short[len];
-    dm_project_vector(self->expand_matrix, group, src, src_short);
+    dm_project_vector(GBgetExpandMatrix(self), group, src, src_short);
 
     return self->actions_short(self,group,src_short,expand_dest,&info);
 }
@@ -419,11 +422,13 @@ model_t GBcreateBase(){
 	model->newmap=NULL;
 	model->int2chunk=NULL;
 	model->chunk2int=NULL;
+	model->chunk2pretty=NULL;
 	model->map=NULL;
 	model->get_count=NULL;
 	model->expand_matrix=NULL;
 	model->project_matrix=NULL;
 	model->use_guards=NULL;
+	model->mucalc_node_count = 0;
 	
 	model->static_info_index=SIcreate();
 	model->static_info_matrices=NULL;
@@ -573,6 +578,7 @@ void GBinitModelDefaults (model_t *p_model, model_t default_src)
     if (model->expand_matrix == NULL) model->expand_matrix=default_src->expand_matrix;
     if (model->project_matrix == NULL) model->project_matrix=default_src->project_matrix;
     if (model->use_guards == NULL) model->use_guards=default_src->use_guards;
+    if (model->mucalc_node_count==0) model->mucalc_node_count = default_src->mucalc_node_count;
 }
 
 void* GBgetContext(model_t model){
@@ -992,6 +998,22 @@ chunk GBchunkGet(model_t model,int type_no,int chunk_no){
 	return chunk_ld(len,data);
 }
 
+int GBchunkPrettyPrint(model_t model,int pos,int chunk_no){
+    if (model->chunk2pretty == NULL)
+    {
+        if (model->parent == NULL)
+        {
+            return chunk_no;
+        }
+        return GBchunkPrettyPrint(model->parent, pos, chunk_no);
+    }
+    return model->chunk2pretty(model, pos, chunk_no);
+}
+
+void GBsetPrettyPrint(model_t model,chunk2pretty_t chunk2pretty){
+    model->chunk2pretty = chunk2pretty;
+}
+
 int GBchunkCount(model_t model,int type_no){
 	return model->get_count(model->map[type_no]);
 }
@@ -1023,12 +1045,12 @@ void GBprintDependencyMatrixCombined(FILE* file, model_t model) {
     matrix_t *dm_must_w = GBgetDMInfoMustWrite(model);
 
     Printf (info, "\nRead/write dependencies:\n");
-    fprintf(file, "      1");
+    fprintf(file, "      0");
     for (int j = 0; j+10 < dm_ncols(dm_r); j+=10)
-        fprintf(file, j == 0 ? "%9d" : "%10d", j+10);
+        fprintf(file, "%10d", j+10);
     fprintf(file, " \n");
     for (int i = 0; i < dm_nrows(dm_r); i++) {
-        fprintf(file, "%4d: ", i+1);
+        fprintf(file, "%4d: ", i);
         for (int j = 0; j < dm_ncols(dm_r); j++) {
             if (dm_is_set(dm_r, i, j) && (dm_is_set(dm_may_w, i, j))) {
                 fprintf(file, "+");
@@ -1079,17 +1101,18 @@ void GBprintStateLabelInfo(FILE* file, model_t model) {
 }
 
 void GBprintStateLabelGroupInfo(FILE* file, model_t model) {
-
-    int nGroups = dm_nrows (GBgetDMInfo (model));
-
-    Printf(info, "State label group info:\n");
-    for (int i = 0; i < nGroups; i++) {
-        guard_t* guards = GBgetGuard (model, i);
-        fprintf (file, "%d (%d): ", i, guards->count);
-        for (int j = 0; j < guards->count; j++) {
-            fprintf (file, "%d,", guards->guard[j]);
+    if (GBhasGuardsInfo(model))
+    {
+        int nGroups = dm_nrows (GBgetDMInfo (model));
+        Printf(info, "State label group info:\n");
+        for (int i = 0; i < nGroups; i++) {
+            guard_t* guards = GBgetGuard (model, i);
+            fprintf (file, "%d (%d): ", i, guards->count);
+            for (int j = 0; j < guards->count; j++) {
+                fprintf (file, "%d,", guards->guard[j]);
+            }
+            fprintf (file, "\n");
         }
-        fprintf (file, "\n");
     }
 }
 
@@ -1140,13 +1163,12 @@ int GBhaveMucalc() {
 }
 
 int GBgetMucalcNodeCount(model_t model) {
-    // FIXME: this assumes that the mu-calc layer is the topmost layer!
-    // (will break with caching option, for instance)
-    mucalc_context_t *ctx = (mucalc_context_t*)GBgetContext(model);
-    //Print(infoLong, "GBgetMucalcNodeCount: %d", ctx->groupinfo.node_count);
-    return ctx->groupinfo.node_count;
+    return model->mucalc_node_count;
 }
 
+void GBsetMucalcNodeCount(model_t model, int node_count) {
+    model->mucalc_node_count = node_count;
+}
 
 void chunk_table_print(log_t log, model_t model) {
     lts_type_t t = GBgetLTStype(model);

@@ -839,6 +839,23 @@ will keep its contents forever. The user is not allowed to change the contents.
 */
 extern chunk GBchunkGet(model_t model,int type_no,int chunk_no);
 
+/**
+\brief Fetch a chunk, pretty print it and put the pretty printed
+       chunk into a table.
+
+\param type_no The number of the type.
+\param chunk_no The numer of the chunk.
+\returns The number of the pretty printed version.
+*/
+extern int GBchunkPrettyPrint(model_t model,int type_no,int chunk_no);
+
+typedef int (*chunk2pretty_t) (model_t model, int pos, int idx);
+
+/**
+*/
+extern void GBsetPrettyPrint(model_t model,chunk2pretty_t chunk2pretty);
+
+
 /** Retrieve the map used for a specific type. */
 extern void* GBgetChunkMap(model_t model,int type_no);
 
