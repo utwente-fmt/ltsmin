@@ -278,6 +278,18 @@ static short_proc_t* short_proc; // which function to call for the next states.
 static short_proc_t* short_multi_proc; // which function to call in the multi-process environment.
 #endif
 
+#ifdef HAVE_SYLVAN
+// update
+#define vset_update_par(dst, src, cb, ctx) CALL(vset_update_par, dst, src, cb, ctx)
+VOID_TASK_4(vset_update_par, vset_t, dst, vset_t, src, vset_update_cb, cb, void*, ctx)
+#else
+void
+vset_update_par(vset_t dst, vset_t src, vset_update_cb cb, void *ctx)
+#endif
+{
+    vset_update(dst, src, cb, ctx);
+}
+
 static inline void
 grow_levels(int new_levels)
 {
@@ -554,18 +566,6 @@ static inline void
 eval_guard (int guard, vset_t set)
 #endif
 {
-
-    // we evaluate guards twice, because we can not yet add to two different sets.
-    struct guard_add_info ctx_false;
-
-    ctx_false.guard = guard;
-    ctx_false.result = 0;
-
-    struct guard_add_info ctx_true;
-
-    ctx_true.guard = guard;
-    ctx_true.result = 1;
-
     // get the short vectors we need to evaluate
     vset_project(guard_tmp[guard], set);
     // minus what we have already evaluated
@@ -586,12 +586,26 @@ eval_guard (int guard, vset_t set)
 
     }
 
-    // evaluate guards and add to guard_false[guard] when false
-    vset_update(guard_false[guard], guard_tmp[guard], eval_cb, &ctx_false);
-    // evaluate guards and add to guard_true[guard] when true
-    vset_update(guard_true[guard], guard_tmp[guard], eval_cb, &ctx_true);
-    vset_clear(guard_tmp[guard]);
+    // we evaluate guards twice, because we can not yet add to two different sets.
+    struct guard_add_info ctx_false;
 
+    ctx_false.guard = guard;
+    ctx_false.result = 0;
+
+    // evaluate guards and add to guard_false[guard] when false
+    SPAWN(vset_update_par, guard_false[guard], guard_tmp[guard], eval_cb, &ctx_false);
+
+    struct guard_add_info ctx_true;
+
+    ctx_true.guard = guard;
+    ctx_true.result = 1;
+
+    // evaluate guards and add to guard_true[guard] when true
+    SPAWN(vset_update_par, guard_true[guard], guard_tmp[guard], eval_cb, &ctx_true);
+
+    SYNC(vset_update_par); SYNC(vset_update_par);
+
+    vset_clear(guard_tmp[guard]);
 }
 
 struct group_add_info {
