@@ -466,9 +466,8 @@ static void
 rel_count(vrel_t rel, long *nodes, bn_int_t *elements)
 {
     LACE_ME;
-    *nodes = sylvan_nodecount(rel->bdd);
-    double count = (double)sylvan_satcount(rel->bdd, rel->all_variables);
-    bn_double2int(count, elements);
+    if (nodes != NULL) *nodes = sylvan_nodecount(rel->bdd);
+    if (elements != NULL) bn_double2int((double)sylvan_satcount(rel->bdd, rel->all_variables), elements);
 }
 
 /**
