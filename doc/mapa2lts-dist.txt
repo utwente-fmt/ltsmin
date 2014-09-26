@@ -7,7 +7,8 @@ mapa2lts-dist(1)
 
 == NAME
 
-mapa2lts-dist - Distributed state space generator for muCRL models.
+mapa2lts-dist - Distributed state space generator for MAPA or prCRL models,
+using the Scoop tool.
 
 == SYNOPSIS
 

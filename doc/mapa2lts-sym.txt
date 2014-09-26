@@ -7,7 +7,8 @@ mapa2lts-sym(1)
 
 == NAME
 
-mapa2lts-sym - Symbolic reachability analysis for muCRL models.
+mapa2lts-sym - Symbolic reachability analysis for MAPA or prCRL models,
+using the Scoop tool.
 
 == SYNOPSIS
 
