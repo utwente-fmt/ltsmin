@@ -45,6 +45,7 @@ ltl_popt (poptContext con, enum poptCallbackReason reason,
                 HREprintUsage();
                 HREexit(LTSMIN_EXIT_FAILURE);
             }
+            Print (infoLong, "LTL semantics: %s", ltl_semantics_name);
             PINS_LTL = l;
         }
         return;
@@ -385,10 +386,14 @@ init_ltsmin_buchi(model_t model, const char *ltl_file)
         ltsmin_ltl2ba(notltl);
         ltsmin_buchi_t *ba = ltsmin_buchi();
         ba->env = env;
-        if (NULL == ba)
-            Abort ("Empty buchi automaton.");
-        if (ba->predicate_count > 30)
+        if (NULL == ba) {
+            Print(info, "Empty buchi automaton.");
+            Print(info, "The property is TRUE.");
+            HREexit(LTSMIN_EXIT_SUCCESS);
+        }
+        if (ba->predicate_count > 30) {
             Abort("more than 30 predicates in buchi automaton are currently not supported");
+        }
         atomic_write (&shared_ba, ba);
         print_ltsmin_buchi(ba, env);
     } else {
