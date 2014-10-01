@@ -277,11 +277,16 @@ typedef void (*guided_proc_t)(sat_proc_t sat_proc, reach_proc_t reach_proc,
 typedef int (*transitions_short_t)(model_t model,int group,int*src,TransitionCB cb,void*context);
 
 static transitions_short_t* transitions_short; // which function to call for the next states.
+
+typedef int (*label_short_t)(model_t model,int label,int *state);
+
+static label_short_t* label_short;
 #ifdef HAVE_SYLVAN
 
-enum MULTI_PROC_GB_CALL { NOOP = 0, TRANSITION = 1 };
+enum MULTI_PROC_GB_CALL { NOOP = 0, TRANSITION = 1, LABEL = 2 };
 
 static transitions_short_t* transitions_short_multi; // which function to call in the multi-process environment.
+static label_short_t* label_short_multi;
 #endif
 
 
@@ -580,7 +585,7 @@ struct guard_add_info
 static void eval_cb (vset_t set, void *context, int *src)
 {
     // evaluate the guard
-    int result = GBgetStateLabelShort(model, ((struct guard_add_info*)context)->guard, src);
+    int result = (*label_short)(model, ((struct guard_add_info*)context)->guard, src);
 
     // add to the correct set dependening on the result
     int dresult = ((struct guard_add_info*)context)->result;
@@ -3320,6 +3325,34 @@ master_get_transitions_short(model_t model, int group, int* src, TransitionCB cb
     return 0;
 }
 
+static int
+master_get_label_short(model_t model,int label,int *state)
+{
+    (void) model;
+    // get my lace thread id
+    int id = lace_get_worker()->worker + 1;
+
+    int p_length = g_projs[label].len;
+    Print(infoLong, "master %d: writing state to slave (label=%d, length=%d).", id, label, p_length);
+    stream_t os = fd_output(parent_sockets[id-1]);
+    DSwriteS32(os, LABEL); // signal that a state will be sent next
+    DSwriteS32(os, label);
+    for(int i=0; i<p_length; i++)
+    {
+        DSwriteS32(os, state[i]);
+    }
+    stream_flush(os);
+
+    stream_t is = fd_input(parent_sockets[id-1]);
+
+    Debug("master %d: waiting for result.", id);
+    int result = DSreadS32(is);
+    RTfree(os);
+    RTfree(is);
+    Print(infoLong, "master %d: done (result=%d).", id, result);
+    return result;
+}
+
 static void
 master_exit()
 {
@@ -3327,7 +3360,7 @@ master_exit()
     {
         Print(infoLong, "master: stopping slave (id=%zu).", id);
         stream_t os = fd_output(parent_sockets[id-1]);
-        DSwriteS32(os, 0); // signal that no states will be sent anymore
+        DSwriteS32(os, NOOP); // signal that no states will be sent anymore
         stream_flush(os);
         RTfree(os);
     }
@@ -3384,7 +3417,7 @@ start_slave()
     while (next!=NOOP)
     {
         if (next == TRANSITION) {
-            Print(infoLong, "slave %d: start reading.", id);
+            Print(infoLong, "slave %d: start reading transition.", id);
             int group = DSreadS32(is);
             int length = r_projs[group].len;
             int src[length];
@@ -3401,6 +3434,23 @@ start_slave()
             stream_flush(os);
             RTfree(os);
             Print(infoLong, "slave %d: done (group=%d).", id, group);
+        } else if (next == LABEL) {
+            Print(infoLong, "slave %d: start reading label.", id);
+            int label = DSreadS32(is);
+            int length = g_projs[label].len;
+            int src[length];
+            for(int i=0; i < length; i++)
+            {
+                src[i] = DSreadS32(is);
+            }
+            Print(infoLong, "slave %d: received state (label=%d, length=%d).", id, label, length);
+            int res = (*label_short_multi)(model, label, src);
+            Debug("slave %d: returned from greybox (label=%d, result=%d).", id, label, res);
+            stream_t os = fd_output(child_sockets[id-1]);
+            DSwriteS32(os, res); // signal the result of the label evaluation
+            stream_flush(os);
+            RTfree(os);
+            Print(infoLong, "slave %d: done (label=%d, res=%d).", id, label, res);
         } else {
             Warning(error, "unsupported operation");
             HREexit(LTSMIN_EXIT_FAILURE);
@@ -3501,6 +3551,8 @@ actual_main(void)
             Print(infoShort, "Using GBgetTransitionsShort as next-state function");
         }
 
+        *label_short = GBgetStateLabelShort;
+
         if (0!=strcmp(GBgetUseGuards(model), "false")) {
             if (no_soundness_check) {
                 Warning(info, "Guard-splitting: not checking soundness of the specification, this may result in an incorrect state space!");
@@ -3511,6 +3563,8 @@ actual_main(void)
         if (multi_process) {
             *transitions_short_multi = *transitions_short;
             *transitions_short = master_get_transitions_short;
+            *label_short_multi = *label_short;
+            *label_short = *master_get_label_short;
         }
 #endif
 
@@ -3827,9 +3881,17 @@ main (int argc, char *argv[])
     transitions_short_multi = mmap(NULL,sizeof(transitions_short_t),PROT_READ|PROT_WRITE,MAP_SHARED|MAP_ANON,0,0);
     *(transitions_short) = NULL;
     *(transitions_short_multi) = NULL;
+
+    label_short = mmap(NULL,sizeof(label_short_t),PROT_READ|PROT_WRITE,MAP_SHARED|MAP_ANON,0,0);
+    label_short_multi = mmap(NULL,sizeof(label_short_t),PROT_READ|PROT_WRITE,MAP_SHARED|MAP_ANON,0,0);
+    *(label_short) = NULL;
+    *(label_short_multi) = NULL;
+
 #else
     transitions_short = RTmalloc(sizeof(transitions_short_t));
     *(transitions_short) = NULL;
+    label_short = RTmalloc(sizeof(label_short_t));
+    *(label_short) = NULL;
 #endif
 
     HREinitStart(&argc,&argv,1,2,files,"<model> [<etf>]");
