@@ -20,6 +20,7 @@ extern "C" {
 #include <dm/dm.h>
 #include <hre/user.h>
 #include <pins-lib/mcrl2-pins.h>
+#include <ltsmin-lib/ltsmin-standard.h>
 }
 
 #ifdef MCRL2_JITTYC_AVAILABLE
@@ -56,6 +57,32 @@ public:
         }
         mcrl2::lps::pins::next_state_long (state, group, f, dest, labels);
     }
+
+#ifdef MCRL2_GUARDS
+    template <typename callback>
+    void update_long(state_vector const& src, std::size_t group, callback& f,
+                         state_vector const& dest, label_vector const& labels)
+    {
+        int state[process_parameter_count()];
+        for (size_t i = 0; i < process_parameter_count(); ++i) {
+            int mt = process_parameter_type (i);
+            int pt = lts_type_get_state_typeno (GBgetLTStype (model_), i);
+            state[i] = find_mcrl2_index (mt, pt, src[i]);
+        }
+        mcrl2::lps::pins::update_long (state, group, f, dest, labels);
+    }
+
+    GUARD_EVALUATION eval_guard_long(state_vector const& src, std::size_t guard)
+    {
+        int state[process_parameter_count()];
+        for (size_t i = 0; i < process_parameter_count(); ++i) {
+            int mt = process_parameter_type (i);
+            int pt = lts_type_get_state_typeno (GBgetLTStype (model_), i);
+            state[i] = find_mcrl2_index (mt, pt, src[i]);
+        }
+        return mcrl2::lps::pins::eval_guard_long(state, guard);
+    }
+#endif
 
     template <typename callback>
     void next_state_all(state_vector const& src, callback& f,
@@ -379,6 +406,19 @@ MCRL2getTransitionsLong (model_t m, int group, int *src, TransitionCB cb, void *
     return f.get_count();
 }
 
+#ifdef MCRL2_GUARDS
+static int
+MCRL2getUpdateLong (model_t m, int group, int *src, TransitionCB cb, void *ctx)
+{
+    ltsmin::pins *pins = reinterpret_cast<ltsmin::pins*>(GBgetContext (m));
+    int dst[pins->process_parameter_count()];
+    int labels[pins->edge_label_count()];
+    ltsmin::state_cb f(pins, cb, ctx);
+    pins->update_long(src, group, f, dst, labels);
+    return f.get_count();
+}
+#endif
+
 static int
 MCRL2getTransitionsAll (model_t m, int* src, TransitionCB cb, void *ctx)
 {
@@ -406,11 +446,36 @@ MCRL2prettyPrint (model_t m, int pos, int idx)
 
 ltsmin::pins *pins;
 
+#ifdef MCRL2_GUARDS
+
+guard_t** guards;
+
+void
+MCRL2exit ()
+{
+    RTfree(guards);
+    delete pins;
+}
+
+int MCRL2getLabelLong(model_t m, int function, int *src) {
+
+    ltsmin::pins *pins = reinterpret_cast<ltsmin::pins*>(GBgetContext (m));
+    return pins->eval_guard_long(src, function);
+}
+
+guard_t** MCRL2getAllGuards() {
+    return guards;
+}
+
+#else
+
 void
 MCRL2exit ()
 {
     delete pins;
 }
+
+#endif
 
 void
 MCRL2loadGreyboxModel (model_t m, const char *model_name)
@@ -476,6 +541,12 @@ MCRL2loadGreyboxModel (model_t m, const char *model_name)
     dm_create(p_dm_write_info, pins->group_count(),
               pins->process_parameter_count());
 
+#ifdef MCRL2_GUARDS
+        matrix_t *p_dm_update_info = new matrix_t;
+        dm_create(p_dm_update_info, pins->group_count(),
+                  pins->process_parameter_count());
+#endif
+
     for (int i = 0; i <dm_nrows (p_dm_info); i++) {
         std::vector<size_t> const& vec_r = pins->read_group(i);
         for (size_t j=0; j <vec_r.size(); j++) {
@@ -487,14 +558,76 @@ MCRL2loadGreyboxModel (model_t m, const char *model_name)
             dm_set (p_dm_info, i, vec_w[j]);
             dm_set (p_dm_write_info, i, vec_w[j]);
         }
+
+#ifdef MCRL2_GUARDS
+        std::vector<size_t> const& vec_u = pins->update_group(i);
+        for (size_t j=0; j <vec_u.size(); j++) {
+            dm_set(p_dm_update_info, i, vec_u[j]);
+        }
+        GBsetMatrix(m, LTSMIN_MATRIX_ACTIONS_READS, p_dm_update_info, PINS_MAY_SET,
+                                                PINS_INDEX_GROUP, PINS_INDEX_STATE_VECTOR);
+#endif
     }
+
+#ifdef MCRL2_GUARDS
+    int bool_is_new, bool_type = lts_type_add_type (ltstype, LTSMIN_TYPE_BOOL, &bool_is_new);
+    // init state labels
+    int nguards = pins->guard_count();
+    int sl_size = nguards;
+    lts_type_set_state_label_count (ltstype, sl_size);
+
+    for(int i = 0;i < sl_size; i++) {
+        const std::string& name = pins->guard_name(i);
+        lts_type_set_state_label_name (ltstype, i, name.c_str());
+        lts_type_set_state_label_typeno (ltstype, i, bool_type);
+    }
+
+    lts_type_validate(ltstype); // done with ltstype
+
+    // set the label group implementation
+    sl_group_t* sl_group_all = (sl_group_t*) RTmallocZero(sizeof(sl_group_t) + sl_size * sizeof(int));
+    sl_group_all->count = sl_size;
+    for(int i=0; i < sl_group_all->count; i++) sl_group_all->sl_idx[i] = i;
+    GBsetStateLabelGroupInfo(m, GB_SL_ALL, sl_group_all);
+    if (nguards > 0) {
+        sl_group_t* sl_group_guards = (sl_group_t*) RTmallocZero(sizeof(sl_group_t) + nguards * sizeof(int));
+        sl_group_guards->count = nguards;
+        for(int i=0; i < sl_group_guards->count; i++) sl_group_guards->sl_idx[i] = i;
+        GBsetStateLabelGroupInfo(m, GB_SL_GUARDS, sl_group_guards);
+    }
+
+    matrix_t *p_sl_info = new matrix_t;
+    dm_create (p_sl_info, sl_size, pins->process_parameter_count());
+
+    for (int i = 0; i < dm_nrows(p_sl_info); i++) {
+        std::vector<size_t> const& vec = pins->guard_parameters(i);
+        for (size_t j=0; j < vec.size(); j++) {
+            dm_set (p_sl_info, i, vec[j]);
+        }
+    }
+    GBsetStateLabelInfo (m, p_sl_info);
+
+    guards = (guard_t**) RTmalloc(pins->group_count()*sizeof(guard_t*));
+    for (size_t i = 0; i < pins->group_count(); i++) {
+        std::vector<size_t> const& vec = pins->guard_info(i);
+        guards[i] = (guard_t*) RTmalloc(sizeof(int) + sizeof(int[vec.size()]));
+        guards[i]->count = vec.size();
+        for (size_t j = 0; j < vec.size(); j++) {
+            guards[i]->guard[j] = vec[j];
+        }
+    }
+    GBsetGuardsInfo(m, MCRL2getAllGuards());
+    GBsetActionsLong(m, MCRL2getUpdateLong);
+    GBsetStateLabelLong(m, (get_label_method_t)MCRL2getLabelLong);
+#else
+    matrix_t *p_sl_info = new matrix_t;
+    dm_create (p_sl_info, 0, pins->process_parameter_count());
+    GBsetStateLabelInfo (m, p_sl_info);
+#endif
 
     GBsetDMInfo (m, p_dm_info);
     GBsetDMInfoRead (m, p_dm_read_info);
     GBsetDMInfoMustWrite (m, p_dm_write_info);
-    matrix_t *p_sl_info = new matrix_t;
-    dm_create (p_sl_info, 0, pins->process_parameter_count());
-    GBsetStateLabelInfo (m, p_sl_info);
     GBsetNextStateLong (m, MCRL2getTransitionsLong);
     GBsetNextStateAll (m, MCRL2getTransitionsAll);
     GBsetTransitionInGroup(m, MCRL2transitionInGroup);
