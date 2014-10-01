@@ -274,11 +274,14 @@ typedef void (*sat_proc_t)(reach_proc_t reach_proc, vset_t visited,
 typedef void (*guided_proc_t)(sat_proc_t sat_proc, reach_proc_t reach_proc,
                               vset_t visited, char *etf_output);
 
-typedef int (*short_proc_t)(model_t model,int group,int*src,TransitionCB cb,void*context);
+typedef int (*transitions_short_t)(model_t model,int group,int*src,TransitionCB cb,void*context);
 
-static short_proc_t* short_proc; // which function to call for the next states.
+static transitions_short_t* transitions_short; // which function to call for the next states.
 #ifdef HAVE_SYLVAN
-static short_proc_t* short_multi_proc; // which function to call in the multi-process environment.
+
+enum MULTI_PROC_GB_CALL { NOOP = 0, TRANSITION = 1 };
+
+static transitions_short_t* transitions_short_multi; // which function to call in the multi-process environment.
 #endif
 
 
@@ -715,7 +718,7 @@ explore_cb(vrel_t rel, void *context, int *src)
     ctx.set = ((struct group_add_info*)context)->set;
     ctx.rel = rel;
     ctx.src = src;
-    (*short_proc)(model, ctx.group, src, group_add, &ctx);
+    (*transitions_short)(model, ctx.group, src, group_add, &ctx);
 }
 
 #ifdef HAVE_SYLVAN
@@ -1060,7 +1063,6 @@ static inline void add_variable_subset(vset_t dst, vset_t src, vdom_t domain, in
  *
  *  Soundness check: vset_is_empty(root(reach_red_s)->maybe_container).
  *  Algorithm to carry all maybe states to the root:
- *  X = (F,T,M)
  *  ∩X = Y ∩ Z = (Fy,Ty,My) ∩ (Fz,Tz,Mz):
  *   - T = Ty ∩ Tz
  *   - F = Fy ∪ Fz
@@ -3265,7 +3267,7 @@ master_get_transitions_short(model_t model, int group, int* src, TransitionCB cb
     int r_length = r_projs[group].len;
     Print(infoLong, "master %d: writing state to slave (group=%d, length=%d).", id, group, r_length);
     stream_t os = fd_output(parent_sockets[id-1]);
-    DSwriteS32(os, 1); // signal that a state will be sent next
+    DSwriteS32(os, TRANSITION); // signal that a state will be sent next
     DSwriteS32(os, group);
     for(int i=0; i<r_length; i++)
     {
@@ -3279,7 +3281,7 @@ master_get_transitions_short(model_t model, int group, int* src, TransitionCB cb
 
     Debug("master %d: waiting for reply.", id);
     int next = DSreadS32(is);
-    while(next==1)
+    while(next!=NOOP)
     {
         Print(infoLong, "master %d: reading state from slave.", id);
         int dst[w_length];
@@ -3332,17 +3334,17 @@ master_exit()
 }
 
 static void
-slave_cb(void* context, transition_info_t* ti, int* dst, int* cpy)
+slave_transition_cb(void* context, transition_info_t* ti, int* dst, int* cpy)
 {
     int id = HREme(HREglobal());
-    Debug("slave_cb %d.", id);
+    Debug("slave_transition_cb %d.", id);
     stream_t os = fd_output(child_sockets[id-1]);
     int group = ti->group;
     int length = w_projs[group].len;
     int labels = lts_type_get_edge_label_count(GBgetLTStype(model));
-    Print(infoLong, "slave_cb %d: writing state to master: group=%d, length=%d.", id, group, length);
+    Print(infoLong, "slave_transition_cb %d: writing state to master: group=%d, length=%d.", id, group, length);
 
-    DSwriteS32(os, 1);
+    DSwriteS32(os, TRANSITION);
     for (int i=0; i<length; i++)
     {
         DSwriteS32(os, dst[i]);
@@ -3373,31 +3375,36 @@ start_slave()
 
     init_domain(VSET_IMPL_AUTOSELECT);
 
-    HREbarrier(HREglobal()); // wait for short_proc to be set
+    HREbarrier(HREglobal()); // wait for transition_short to be set
 
     int id = HREme(HREglobal());
     Print(infoLong, "slave %d: ready.", id);
     stream_t is = fd_input(child_sockets[id-1]);
     int next = DSreadS32(is);
-    while (next==1)
+    while (next!=NOOP)
     {
-        Print(infoLong, "slave %d: start reading.", id);
-        int group = DSreadS32(is);
-        int length = r_projs[group].len;
-        int src[length];
-        for(int i=0; i < length; i++)
-        {
-            src[i] = DSreadS32(is);
-        }
-        Print(infoLong, "slave %d: received state (group=%d, length=%d).", id, group, length);
-        (*short_multi_proc)(model, group, src, slave_cb, NULL);
-        Debug("slave %d: returned from greybox (group=%d).", id, group);
+        if (next == TRANSITION) {
+            Print(infoLong, "slave %d: start reading.", id);
+            int group = DSreadS32(is);
+            int length = r_projs[group].len;
+            int src[length];
+            for(int i=0; i < length; i++)
+            {
+                src[i] = DSreadS32(is);
+            }
+            Print(infoLong, "slave %d: received state (group=%d, length=%d).", id, group, length);
+            (*transitions_short_multi)(model, group, src, slave_transition_cb, NULL);
+            Debug("slave %d: returned from greybox (group=%d).", id, group);
 
-        stream_t os = fd_output(child_sockets[id-1]);
-        DSwriteS32(os, 0); // signal that all successor states have been sent
-        stream_flush(os);
-        RTfree(os);
-        Print(infoLong, "slave %d: done (group=%d).", id, group);
+            stream_t os = fd_output(child_sockets[id-1]);
+            DSwriteS32(os, NOOP); // signal that all successor states have been sent
+            stream_flush(os);
+            RTfree(os);
+            Print(infoLong, "slave %d: done (group=%d).", id, group);
+        } else {
+            Warning(error, "unsupported operation");
+            HREexit(LTSMIN_EXIT_FAILURE);
+        }
         next = DSreadS32(is);
     }
     Print(infoLong, "slave %d: exiting.", id);
@@ -3487,10 +3494,10 @@ actual_main(void)
         if(0==strcmp(GBgetUseGuards(model),"evaluate")) {
             Abort("not yet implemented");
         } else if(0==strcmp(GBgetUseGuards(model),"assume-true")) {
-            *short_proc = GBgetActionsShort;
+            *transitions_short = GBgetActionsShort;
             Print(infoShort, "Using GBgetActionsShort as next-state function");
         } else { // false
-            *short_proc = GBgetTransitionsShort;
+            *transitions_short = GBgetTransitionsShort;
             Print(infoShort, "Using GBgetTransitionsShort as next-state function");
         }
 
@@ -3502,8 +3509,8 @@ actual_main(void)
 
 #ifdef HAVE_SYLVAN
         if (multi_process) {
-            *short_multi_proc = *short_proc;
-            *short_proc = master_get_transitions_short;
+            *transitions_short_multi = *transitions_short;
+            *transitions_short = master_get_transitions_short;
         }
 #endif
 
@@ -3816,13 +3823,13 @@ main (int argc, char *argv[])
     if (multi_process) {
         init_multi_process(n_workers);
     }
-    short_proc = mmap(NULL,sizeof(short_proc_t),PROT_READ|PROT_WRITE,MAP_SHARED|MAP_ANON,0,0);
-    short_multi_proc = mmap(NULL,sizeof(short_proc_t),PROT_READ|PROT_WRITE,MAP_SHARED|MAP_ANON,0,0);
-    *(short_proc) = NULL;
-    *(short_multi_proc) = NULL;
+    transitions_short = mmap(NULL,sizeof(transitions_short_t),PROT_READ|PROT_WRITE,MAP_SHARED|MAP_ANON,0,0);
+    transitions_short_multi = mmap(NULL,sizeof(transitions_short_t),PROT_READ|PROT_WRITE,MAP_SHARED|MAP_ANON,0,0);
+    *(transitions_short) = NULL;
+    *(transitions_short_multi) = NULL;
 #else
-    short_proc = RTmalloc(sizeof(short_proc_t));
-    *(short_proc) = NULL;
+    transitions_short = RTmalloc(sizeof(transitions_short_t));
+    *(transitions_short) = NULL;
 #endif
 
     HREinitStart(&argc,&argv,1,2,files,"<model> [<etf>]");
