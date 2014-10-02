@@ -33,8 +33,8 @@ nu Z . f | mu Z . f | [a]f | <a>f
 Propositions are of the form \{v=e\}, where +v+ is a state variable
 and +e+ a value. A value is either a number or a quoted string.
 The modal operators [] and <> can either be empty or contain an
-action expressions +a+, which is a quoted string that is equal to
-the action label is should match.
+action expression +a+, which is a quoted string that is equal to
+the action label it should match.
 
 .Mu-calculus operators and priorities
 [options="header"]

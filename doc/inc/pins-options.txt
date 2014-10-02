@@ -24,55 +24,8 @@ substantial speedups.
 '<(_T_,)+>' which are applied in this order to the
 dependency matrix.  The following transformations _T_ are available:
 
-gs;;
-  Group Safely; macro for "*gc*,*gr*,*cw*,*rs*"; almost
-  always a win.
+include::regroup-options.txt[]
 
-ga;;
-  Group Aggressively (row subsumption); macro for
-  "*gc*,*rs*,*ru*,*cw*,*rs*"; can be a huge win, but in some
-  cases causes slower state space generation.
-
-gsa;;
-  Group Simulated Annealing; macro for "*gc*,*gr*,*csa*,*rs*"; almost
-  always a win; usually better than *gs*.
-
-gc;;
-  Group Columns; macro for "*cs*,*cn*".
-
-gr;;
-  Group Rows; macro for "*rs*,*rn*".
-
-cs;;
-  Column Sort; sort columns lexicographically.
-
-cn;;
-  Column Nub; (temporarily) group duplicate columns, thereby making
-  'ca' more tractable.  Requires *cs*.
-
-cw;;
-  Column sWap; minimize distance between columns by swapping them
-  heuristically.  This reordering improves performance of the symbolic
-  data structures.
-
-ca;;
-  Column All permutations; try to find the column permutation with the
-  best cost metric.  Potentially, this is an expensive operation.
-
-csa;;
-  Column Simulated Annealing; minimize distance between columns by
-  swapping them using simulated annealing.
-
-rs;;
-  Row Sort; sort rows lexicographically.
-
-rn;;
-  Row Nub; remove duplicate rows from the dependency matrix.  This is
-  always a win.  Requires *rs*.
-
-ru;;
-  Row sUbsume; try to remove more rows than nubbing, thereby trading
-  speed for memory.  Requires *rs*.
 
 *--mucalc*='FILE'|'FORMULA'::
     Compute a parity game for the mu-calculus formula.
