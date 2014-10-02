@@ -1426,7 +1426,7 @@ reach_bfs_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
                 reach_bfs_next(root, reach_groups);
                 if (root->unsound_group > -1) {
                     Warning(info, "Condition in group %d does not always evaluate to true or false", root->unsound_group);
-                    HREabort(LTSMIN_EXIT_COUNTER_EXAMPLE);
+                    HREabort(LTSMIN_EXIT_UNSOUND);
                 }
                 if (!no_soundness_check && 0!=strcmp(GBgetUseGuards(model), "false")) {
                     // clear all maybe sets such that we only check soundness of the spec for only new states.
@@ -1458,7 +1458,7 @@ reach_bfs_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
             reach_bfs_next(root, reach_groups);
             if (root->unsound_group > -1) {
                 Warning(info, "Condition in group %d does not always evaluate to true or false", root->unsound_group);
-                HREabort(LTSMIN_EXIT_COUNTER_EXAMPLE);
+                HREabort(LTSMIN_EXIT_UNSOUND);
             }
             if (!no_soundness_check && 0!=strcmp(GBgetUseGuards(model), "false")) {
                 // clear all maybe sets such that we only check soundness of the spec for only new states.
@@ -1531,7 +1531,7 @@ reach_bfs(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
                 reach_bfs_next(root, reach_groups);
                 if (root->unsound_group > -1) {
                     Warning(info, "Condition in group %d does not always evaluate to true or false", root->unsound_group);
-                    HREabort(LTSMIN_EXIT_COUNTER_EXAMPLE);
+                    HREabort(LTSMIN_EXIT_UNSOUND);
                 }
                 if (!no_soundness_check && 0!=strcmp(GBgetUseGuards(model), "false")) {
                     // clear all maybe sets such that we only check soundness of the spec for only new states.
@@ -1565,7 +1565,7 @@ reach_bfs(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
             reach_bfs_next(root, reach_groups);
             if (root->unsound_group > -1) {
                 Warning(info, "Condition in group %d does not always evaluate to true or false", root->unsound_group);
-                HREabort(LTSMIN_EXIT_COUNTER_EXAMPLE);
+                HREabort(LTSMIN_EXIT_UNSOUND);
             }
             if (!no_soundness_check && 0!=strcmp(GBgetUseGuards(model), "false")) {
                 // clear all maybe sets such that we only check soundness of the spec for only new states.
@@ -1826,7 +1826,7 @@ reach_par(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
                 CALL(reach_par_next, root, reach_groups);
                 if (root->unsound_group > -1) {
                     Warning(info, "Condition in group %d does not always evaluate to true or false", root->unsound_group);
-                    HREabort(LTSMIN_EXIT_COUNTER_EXAMPLE);
+                    HREabort(LTSMIN_EXIT_UNSOUND);
                 }
                 if (!no_soundness_check && 0!=strcmp(GBgetUseGuards(model), "false")) {
                     // clear all maybe sets such that we only check soundness of the spec for only new states.
@@ -1861,7 +1861,7 @@ reach_par(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
             CALL(reach_par_next, root, reach_groups);
             if (root->unsound_group > -1) {
                 Warning(info, "Condition in group %d does not always evaluate to true or false", root->unsound_group);
-                HREabort(LTSMIN_EXIT_COUNTER_EXAMPLE);
+                HREabort(LTSMIN_EXIT_UNSOUND);
             }
             if (!no_soundness_check && 0!=strcmp(GBgetUseGuards(model), "false")) {
                 // clear all maybe sets such that we only check soundness of the spec for only new states.
@@ -1935,7 +1935,7 @@ reach_par_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
                 CALL(reach_par_next, root, reach_groups);
                 if (root->unsound_group > -1) {
                     Warning(info, "Condition in group %d does not always evaluate to true or false", root->unsound_group);
-                    HREabort(LTSMIN_EXIT_COUNTER_EXAMPLE);
+                    HREabort(LTSMIN_EXIT_UNSOUND);
                 }
                 if (!no_soundness_check && 0!=strcmp(GBgetUseGuards(model), "false")) {
                     // clear all maybe sets such that we only check soundness of the spec for only new states.
@@ -1968,7 +1968,7 @@ reach_par_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
             CALL(reach_par_next, root, reach_groups);
             if (root->unsound_group > -1) {
                 Warning(info, "Condition in group %d does not always evaluate to true or false", root->unsound_group);
-                HREabort(LTSMIN_EXIT_COUNTER_EXAMPLE);
+                HREabort(LTSMIN_EXIT_UNSOUND);
             }
             if (!no_soundness_check && 0!=strcmp(GBgetUseGuards(model), "false")) {
                 // clear all maybe sets such that we only check soundness of the spec for only new states.
