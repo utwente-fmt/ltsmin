@@ -390,7 +390,7 @@ model_t GBcreateBase(){
 	model->dm_read_info=NULL;
 	model->dm_may_write_info=NULL;
 	model->dm_must_write_info=NULL;
-	model->supports_copy=0;
+	model->supports_copy=-1;
 	model->sl_info=NULL;
     for(int i=0; i < GB_SL_GROUP_COUNT; i++)
         model->sl_groups[i]=NULL;
@@ -478,7 +478,7 @@ void GBinitModelDefaults (model_t *p_model, model_t default_src)
         else
             model->dm_must_write_info = model->dm_info;
     }
-    if (model->supports_copy == NULL) model->supports_copy = default_src->supports_copy;
+    if (model->supports_copy == -1) model->supports_copy = default_src->supports_copy;
     if (model->dm_info == NULL)
         model->dm_info = default_src->dm_info;
 
@@ -706,6 +706,7 @@ matrix_t *GBgetDMInfoMustWrite(model_t model) {
 }
 
 int GBsupportsCopy(model_t model) {
+    if (model->supports_copy == -1) model->supports_copy = 0;
     return model->supports_copy;
 }
 void GBsetSupportsCopy(model_t model) {
