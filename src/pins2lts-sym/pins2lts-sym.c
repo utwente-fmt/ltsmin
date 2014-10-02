@@ -3294,18 +3294,15 @@ master_get_transitions_short(model_t model, int group, int* src, TransitionCB cb
         {
             dst[i] = DSreadS32(is);
         }
-        int* cpy;
+        int* cpy = NULL;
         int cpy_vector = DSreadS32(is);
         if (cpy_vector)
         {
-            int cpy_[w_length];
+            cpy = (int*) RTmalloc(sizeof(int[w_length]));
             for(int i=0; i<w_length; i++)
             {
-                cpy_[i] = DSreadS32(is);
+                cpy[i] = DSreadS32(is);
             }
-            cpy = cpy_;
-        } else {
-            cpy = NULL;
         }
         transition_info_t* ti = RTmalloc(sizeof(transition_info_t));
         ti->group = group;
@@ -3316,7 +3313,7 @@ master_get_transitions_short(model_t model, int group, int* src, TransitionCB cb
         }
         ti->por_proviso = DSreadS32(is);
         cb(context, ti, dst, cpy);
-
+        if (cpy != NULL) RTfree(cpy);
         next = DSreadS32(is);
     }
     RTfree(os);
