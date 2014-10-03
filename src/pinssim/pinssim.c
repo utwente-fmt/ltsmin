@@ -2,7 +2,7 @@
  * pinssim.c - LTSmin
  *		Created by   Tobias J. Uebbing on 20140917
  *		Modified by  -
- *		Based on     LTSmin pins2lts-sym.c
+ *		Based on     LTSmin pins2lts-sym.c & lts-tracepp.c
  *		Copyright    Formal Methods & Tools
  *				     EEMCS faculty - University of Twente - 2014
  *		Supervisor 	 Jeroen Meijer
@@ -57,15 +57,15 @@
 #include <hre/stringindex.h>
 
 // Colors for console output
-#define RESET   "\033[0m"
-#define BLACK   "\033[30m"      		   /* Black */
-#define RED     "\033[31m"      		   /* Red */
-#define GREEN   "\033[32m"      		   /* Green */
-#define YELLOW  "\033[33m"      		   /* Yellow */
-#define BLUE    "\033[34m"     			   /* Blue */
-#define MAGENTA "\033[35m"      		   /* Magenta */
-#define CYAN    "\033[36m"      		   /* Cyan */
-#define WHITE   "\033[37m"     			   /* White */
+#define RESET   	"\033[0m"
+#define BLACK   	"\033[30m"      	   /* Black */
+#define RED     	"\033[31m"     		   /* Red */
+#define GREEN   	"\033[32m"      	   /* Green */
+#define YELLOW  	"\033[33m"     		   /* Yellow */
+#define BLUE    	"\033[34m"  		   /* Blue */
+#define MAGENTA 	"\033[35m"      	   /* Magenta */
+#define CYAN    	"\033[36m"     		   /* Cyan */
+#define WHITE   	"\033[37m"    		   /* White */
 #define BOLDBLACK   "\033[1m\033[30m"      /* Bold Black */
 #define BOLDRED     "\033[1m\033[31m"      /* Bold Red */
 #define BOLDGREEN   "\033[1m\033[32m"      /* Bold Green */
@@ -74,6 +74,8 @@
 #define BOLDMAGENTA "\033[1m\033[35m"      /* Bold Magenta */
 #define BOLDCYAN    "\033[1m\033[36m"      /* Bold Cyan */
 #define BOLDWHITE   "\033[1m\033[37m"      /* Bold White */
+
+#define BUFLEN 4096						   /* Buffer length for temporal buffer */
 
 /* * SECTION * * * * * * * * * * * * * * * * * * * * * * * * * * * * 
  *
@@ -129,8 +131,7 @@ typedef struct _trace_node{
 
 // Variables necessary for model checking
 static lts_type_t ltstype;
-static int N;
-static int nGrps;
+static int N, nGrps,eLbls, sLbls, nGuards;
 static int maxTreeDepth;
 static model_t model;
 static int * src;
@@ -180,7 +181,7 @@ static char * helpText[21] =
 // static int arg_table=0;
 // static char *arg_value="name";
 // static enum { FF_TXT, FF_CSV } file_format = FF_TXT;
-// static char *arg_sep=",";
+static char *arg_sep=",";
 // static enum { IDX, NAME } output_value = NAME;
 
 // static si_map_entry output_values[] = {
@@ -391,6 +392,12 @@ resetNode(trace_node * node){
  *
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
+
+static void
+array2PtrArray(int array[], int size, int * ptrArray){
+	for (int i = 0; i < size; ++i) ptrArray[i] = array[i];
+}
+
 static bool
 isSameState(int * s1, int * s2){
 	for (int i = 0; i < N; i++) if(s1[i] != s2[i]) return false;
@@ -472,7 +479,28 @@ proceed(int transNum, bool printOut){
 		i++;
 	}
 	if (i >= numSucc){ 
-		fprintf(stdout, RED "\t ERROR: " RESET " this transition is not available from this state.\n\t Enter 'trans' to see all available transitions and there states.");
+		fprintf(stdout, RED "\t ERROR: " RESET " this transition is not available from this state.\n\t Enter 'trans' to see all available transitions and there states.\n");
+		return false;
+	} else return true;
+}
+
+/*proceedByState()
+ proceeds from the current node to its successor with index in the successor array.
+ Explores successor states of the new current node*/
+bool 
+proceedByState(int * state, bool printOut){
+	int i = 0;
+	int numSucc = current->numSuccessors;
+	while (i < numSucc){
+		if(isSameState(current->successors[i].state,state)){
+			current = &(current->successors[i]);
+			explore_states(current,printOut);
+			break;
+		}
+		i++;
+	}
+	if (i >= numSucc){ 
+		fprintf(stdout, RED "\t ERROR: " RESET " this state is not as successor of this state.\n\t Enter 'trans' to see all available transitions and there states.\n");
 		return false;
 	} else return true;
 }
@@ -503,8 +531,11 @@ restart(bool clearMem){
 	printNode(current, 1);
 }
 
+/*replayTransitions()
+  Attempts to take all transition in the 'transNumbers' array after each other.
+  Stops if a transition is at the current state not available.*/
 void 
-replayTransitions(int * transNumbers, int amountOf, bool printOut){
+replayTransitions(int transNumbers[], int amountOf, bool printOut){
 	int i = 0;
 	bool success = true;
 	while (i < amountOf && success){
@@ -516,9 +547,68 @@ replayTransitions(int * transNumbers, int amountOf, bool printOut){
 		fprintf(stdout, RED "\t ERROR: " RESET " Stopped replaying transitions. Transition at index %d is not available in this state.\n",i);
 	 	fprintf(stdout, "\t Enter 'trans' to see all available transitions and successor states.\n");
 	} else if (printOut) {
-		fprintf(stdout, "\n Took %d transitions leading to following states:\n", amountOf);
+		fprintf(stdout, "\n Took %d transitions leading to following state:\n", amountOf);
 		printNode(current,1);
 	}
+}
+
+/*replayTransitionsByStates()
+  Attempts to take all transition in the 'transNumbers' array after each other.
+  Stops if a transition is at the current state not available.*/
+void 
+replayTransitionsByStates(int ** states, int amountOf, bool printOut){
+	int * succ_state = (int*)alloca(N*sizeof(int));
+	array2PtrArray(states[0],N,succ_state);
+	int i;
+	if(isSameState(succ_state,current->state)) i = 1;
+	else i = 0;
+	
+	bool success = true;
+	while (i < amountOf && success){
+		array2PtrArray(states[i],N,succ_state);
+		success = proceedByState(succ_state,false);
+		if(!success) break;
+		i++;
+	}
+	if(!success){ 
+		fprintf(stdout, RED "\t ERROR: " RESET " Stopped replaying transitions. Transition at index %d is not available in this state.\n",i);
+	 	fprintf(stdout, "\t Enter 'trans' to see all available transitions and successor states.\n");
+	} else if (printOut) {
+		fprintf(stdout, "\n Took %d transitions leading to following state:\n", amountOf);
+		printNode(current,1);
+	}
+}
+
+/*trc_get_type_str() from lts-tracepp.c
+  TODO: Add description	*/
+static void
+trace_get_type_str(lts_t trace, int typeno, int type_idx, size_t dst_size, char* dst) {
+    if (typeno==-1) Abort("illegal type");
+    // if ( output_value == IDX ) {
+    //     snprintf(dst, dst_size, "%d", type_idx);
+    //     return;
+    // }
+    switch(lts_type_get_format(trace->ltstype,typeno)){
+        case LTStypeDirect:
+        case LTStypeRange:
+            snprintf(dst, dst_size, "%d", type_idx);
+            break;
+        case LTStypeChunk:
+        case LTStypeEnum:
+            {
+            chunk c=VTgetChunk(trace->values[typeno],type_idx);
+            chunk2string(c,dst_size,dst);
+            }
+            break;
+    }
+}
+
+/*trc_get_edge_label() from lts-tracepp.c
+  TODO: Add description	*/
+static void
+trc_get_edge_label (lts_t trace, int i, int * dst){
+    if (trace->edge_idx) TreeUnfold(trace->edge_idx, trace->label[i], dst);
+    else dst[0]=trace->label[i];
 }
 
 /* * SECTION * * * * * * * * * * * * * * * * * * * * * * * * * * * * 
@@ -720,8 +810,15 @@ int main (int argc, char *argv[]){
 
     ltstype = GBgetLTStype(model);				//LTS Type
     N = lts_type_get_state_length(ltstype);		//State length
-    //eLbls = lts_type_get_edge_label_count(ltstype);
+    eLbls = lts_type_get_edge_label_count(ltstype);
+    sLbls = lts_type_get_state_label_count(ltstype);
     nGrps = dm_nrows(GBgetDMInfo(model));
+    if (GBhasGuardsInfo(model)){
+        nGuards = GBgetStateLabelGroupInfo(model, GB_SL_ALL)->count;
+        fprintf(stdout,CYAN "INFO: " RESET " Number of guards %d.", nGuards);
+    }
+        
+  
 
     fprintf(stdout,CYAN "INFO: " RESET " State vector length is %d; there are %d groups\n", N, nGrps);
 
@@ -753,9 +850,68 @@ int main (int argc, char *argv[]){
     if (argc >= 2){
     	fprintf(stdout, "\n");
     	opf = stdout;
-    	lts_t trace=lts_create();
+    	lts_t trace = lts_create();
     	lts_read(files[1],trace);
-    	fprintf(stdout,CYAN "INFO: " RESET " Loaded trace from file: %s \n",files[1]);
+    	fprintf(stdout,CYAN "\t INFO: " RESET " Loaded trace from file: %s \n\n",files[1]);
+    	if (lts_type_get_state_length(trace->ltstype) != N ||
+    	    lts_type_get_edge_label_count(trace->ltstype) != eLbls ||
+    		lts_type_get_state_label_count(trace->ltstype) != sLbls){
+    		fprintf(stdout, RED "\t ERROR:" RESET " This trace does not match the loaded model.\n");
+    	}
+    	else{
+    		fprintf(stdout, CYAN "\t INFO:" RESET " Parameteres of trace match model.\n");
+    		int ** trace_states = (int**)alloca(trace->transitions*sizeof(int*));
+    		//char tmp[BUFLEN];
+            for(uint32_t x=0; x<=trace->transitions; ++x) {
+            	uint32_t i = (x != trace->transitions ? x : trace->dest[x-1]);
+            	trace_states[i] = (int*)alloca(N*sizeof(int));
+            	if (N){
+            		int temp[N];
+            		TreeUnfold(trace->state_db, i, temp);
+            		array2PtrArray(temp,N,trace_states[i]);
+            	}
+          //   	if (trace->label != NULL) {
+		        //     int edge_lbls[eLbls];
+		        //     trc_get_edge_label(trace, i, edge_lbls);
+		        //     //replayTransitions(edge_lbls,eLbls,1);
+		        //     for(int j=1; j<eLbls; ++j) {
+		        //         if ((i+1)<trace->states) {
+		        //             int typeno = lts_type_get_edge_label_typeno(trace->ltstype, j);
+		        //             trace_get_type_str(trace, typeno, edge_lbls[j], BUFLEN, tmp);
+		        //             fprintf(opf, "%s%s\n", arg_sep, tmp);
+		        //             fprintf(opf, "edge_lbls[%d]: %d\n", j, edge_lbls[j]);
+		        //             chunk c = chunk_str(tmp);
+    						// int act_index = GBchunkPut(model, typeno, c);
+    						// if (GBhasGuardsInfo(model)){
+	    					// 	int labels[189];
+	    					// 	for (int k = 0; k < 189; k++)
+	        	// 					labels[k] = edge_lbls[j] == k ? act_index : -1;
+	    					// 	int transNum = -1;
+	    					// 	int i = 0;
+	    					// 	while (i < nGrps){
+	    					// 		if (GBtransitionInGroup(model, labels, i)){
+	    					// 			transNum = i;
+	    					// 			break;
+	    					// 		}
+	    					// 		i++;
+	    					// 	}
+	    					// 	fprintf(opf, "Group Transition number: %d\n", transNum);
+	    					// }
+		        //         } else {
+		        //             //fprintf(opf, "%s", arg_sep);
+		        //         }
+		        //     }
+		        // }
+       		}
+       		for (uint32_t i = 0; i < trace->transitions; ++i){
+       			for (int j = 0; j < N; ++j){
+       				fprintf(stdout, "%d,", trace_states[i][j]);
+       			}
+       			fprintf(stdout, "\n");
+       		}
+       		replayTransitionsByStates(trace_states,(int)trace->transitions,1);
+
+    	}
     }
 
     // Start IO procedure
