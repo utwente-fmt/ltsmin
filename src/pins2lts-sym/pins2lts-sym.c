@@ -310,18 +310,6 @@ VOID_TASK_2(vset_intersect_par, vset_t, dst, vset_t, src) { vset_intersect(dst, 
 VOID_TASK_2(vset_minus_par, vset_t, dst, vset_t, src) { vset_minus(dst, src); }
 #endif
 
-#ifdef HAVE_SYLVAN
-// update
-#define vset_update_par(dst, src, cb, ctx) CALL(vset_update_par, dst, src, cb, ctx)
-VOID_TASK_4(vset_update_par, vset_t, dst, vset_t, src, vset_update_cb, cb, void*, ctx)
-#else
-void
-vset_update_par(vset_t dst, vset_t src, vset_update_cb cb, void *ctx)
-#endif
-{
-    vset_update(dst, src, cb, ctx);
-}
-
 static inline void
 grow_levels(int new_levels)
 {
@@ -632,7 +620,7 @@ eval_guard (int guard, vset_t set)
     ctx_false.result = 0;
 
     // evaluate guards and add to guard_false[guard] when false
-    SPAWN(vset_update_par, guard_false[guard], guard_tmp[guard], eval_cb, &ctx_false);
+    vset_update(guard_false[guard], guard_tmp[guard], eval_cb, &ctx_false);
 
     struct guard_add_info ctx_true;
 
@@ -640,9 +628,7 @@ eval_guard (int guard, vset_t set)
     ctx_true.result = 1;
 
     // evaluate guards and add to guard_true[guard] when true
-    SPAWN(vset_update_par, guard_true[guard], guard_tmp[guard], eval_cb, &ctx_true);
-
-    SYNC(vset_update_par); SYNC(vset_update_par);
+    vset_update(guard_true[guard], guard_tmp[guard], eval_cb, &ctx_true);
 
     vset_clear(guard_tmp[guard]);
 }
