@@ -260,7 +260,6 @@ static vset_t *group_explored;
 static vset_t *group_tmp;
 static vset_t *guard_false; // 0
 static vset_t *guard_true;  // 1
-static vset_t *guard_maybe; // 2
 static vset_t *guard_tmp;
 
 typedef void (*reach_proc_t)(vset_t visited, vset_t visited_old,
@@ -589,7 +588,13 @@ static void eval_cb (vset_t set, void *context, int *src)
 
     // add to the correct set dependening on the result
     int dresult = ((struct guard_add_info*)context)->result;
-    if (dresult == result || (dresult == 0 && result == 2 && no_soundness_check)) vset_add(set, src);
+    if (
+            dresult == result ||  // we have true or false (just add)
+            (dresult == 0 && result == 2) ||  // always add maybe to false
+            (dresult == 1 && result == 2 && !no_soundness_check)) { // if we want to do soundness
+            vset_add(set, src);                                     // check then also add maybe to true.
+                                                                    // maybe = false \cap true
+    }
 }
 
 #ifdef HAVE_SYLVAN
@@ -637,17 +642,6 @@ eval_guard (int guard, vset_t set)
     // evaluate guards and add to guard_true[guard] when true
     SPAWN(vset_update_par, guard_true[guard], guard_tmp[guard], eval_cb, &ctx_true);
 
-    if (!no_soundness_check) {
-        struct guard_add_info ctx_maybe;
-
-        ctx_maybe.guard = guard;
-        ctx_maybe.result = 2;
-
-        // evaluate guards and add to guard_maybe[guard] when maybe
-        SPAWN(vset_update_par, guard_maybe[guard], guard_tmp[guard], eval_cb, &ctx_maybe);
-    }
-
-    if (!no_soundness_check) SYNC(vset_update_par);
     SYNC(vset_update_par); SYNC(vset_update_par);
 
     vset_clear(guard_tmp[guard]);
@@ -1066,19 +1060,21 @@ static inline void add_variable_subset(vset_t dst, vset_t src, vdom_t domain, in
  *  1 | 0 1 ?
  *  ? | ? ? ?
  *
- *  Soundness check: vset_is_empty(root(reach_red_s)->maybe_container).
+ *  Note that if a guard evaluates to maybe then we add it to both guard_false and guard_true, i.e. F \cap T != \emptyset.
+ *  Soundness check: vset_is_empty(root(reach_red_s)->true_container \cap root(reach_red_s)->false_container) holds.
  *  Algorithm to carry all maybe states to the root:
- *  ∩X = Y ∩ Z = (Fy,Ty,My) ∩ (Fz,Tz,Mz):
- *   - T = Ty ∩ Tz
- *   - F = Fy ∪ Fz
- *   - M = SPEC_MAYBE_AND_FALSE_IS_FALSE  => (My ∖ Fz) ∪ (Mz ∖ Fy) &&
- *         !SPEC_MAYBE_AND_FALSE_IS_FALSE => My ∪ (Mz ∖ Fy)
+ *  \bigcap X = Y \cap Z = (Fy,Ty) \cap (Fz,Tz):
+ *   - T = (Ty \cap Tz) U M
+ *   - F = Fy U Fz U M
+ *   - M = SPEC_MAYBE_AND_FALSE_IS_FALSE  => ((Fy \cap Ty) \ Fz) U ((Fz \cap Tz) \ Fy) &&
+ *         !SPEC_MAYBE_AND_FALSE_IS_FALSE => (Fy \cap Ty) U ((Fz \cap Tz) \ Fy)
  */
 struct reach_red_s
 {
     vset_t true_container;
-    vset_t maybe_container;
     vset_t false_container;
+    vset_t left_maybe; // temporary vset so that we don't have to create/destroy at each level
+    vset_t right_maybe; // temporary vset so that we don't have to create/destroy at each level
     struct reach_red_s *left;
     struct reach_red_s *right;
     int index; // which guard
@@ -1101,8 +1097,9 @@ reach_red_prepare(size_t left, size_t right, int group)
     result->group = group;
     result->true_container = vset_create(domain, -1, NULL);
     if (!no_soundness_check) {
-        result->maybe_container = vset_create(domain, -1, NULL);
         result->false_container = vset_create(domain, -1, NULL);
+        result->left_maybe = vset_create(domain, -1, NULL);
+        result->right_maybe = vset_create(domain, -1, NULL);
     }
 
     return result;
@@ -1117,8 +1114,9 @@ reach_red_destroy(struct reach_red_s *s)
     }
     vset_destroy(s->true_container);
     if (!no_soundness_check) {
-        vset_destroy(s->maybe_container);
         vset_destroy(s->false_container);
+        vset_destroy(s->left_maybe);
+        vset_destroy(s->right_maybe);
     }
     RTfree(s);
 }
@@ -1199,9 +1197,7 @@ reach_bfs_reduce(struct reach_red_s *dummy)
         int guard = GBgetGuard(model, dummy->group)->guard[dummy->index];
         if (!no_soundness_check) {
             vset_copy(dummy->false_container, dummy->true_container);
-            vset_copy(dummy->maybe_container, dummy->true_container);
             vset_join(dummy->false_container, dummy->false_container, guard_false[guard]);
-            vset_join(dummy->maybe_container, dummy->maybe_container, guard_maybe[guard]);
         }
         vset_join(dummy->true_container, dummy->true_container, guard_true[guard]);
     } else { // recursive case
@@ -1216,22 +1212,36 @@ reach_bfs_reduce(struct reach_red_s *dummy)
         // we intersect every leaf, since we want to reduce the states in the group
         vset_copy(dummy->true_container, dummy->left->true_container);
         vset_intersect(dummy->true_container, dummy->right->true_container);
-        vset_clear(dummy->left->true_container);
-        vset_clear(dummy->right->true_container);
 
         if (!no_soundness_check) {
+
+            // compute maybe set
+            vset_copy(dummy->left_maybe, dummy->left->false_container);
+            vset_intersect(dummy->left_maybe, dummy->left->true_container);
+            if (SPEC_MAYBE_AND_FALSE_IS_FALSE) vset_minus(dummy->left_maybe, dummy->right->false_container);
+
+            vset_copy(dummy->right_maybe, dummy->right->false_container);
+            vset_intersect(dummy->right_maybe, dummy->right->true_container);
+            vset_minus(dummy->right_maybe, dummy->left->false_container);
+
+            vset_union(dummy->left_maybe, dummy->right_maybe);
+            vset_clear(dummy->right_maybe);
+
+            // compute false set
             vset_copy(dummy->false_container, dummy->left->false_container);
             vset_union(dummy->false_container, dummy->right->false_container);
+            vset_union(dummy->false_container, dummy->left_maybe);
             vset_clear(dummy->left->false_container);
             vset_clear(dummy->right->false_container);
 
-            vset_minus(dummy->right->maybe_container, dummy->left->false_container);
-            if (SPEC_MAYBE_AND_FALSE_IS_FALSE) vset_minus(dummy->left->maybe_container, dummy->right->false_container);
-            vset_copy(dummy->maybe_container, dummy->left->maybe_container);
-            vset_union(dummy->maybe_container, dummy->right->maybe_container);
-            vset_clear(dummy->left->maybe_container);
-            vset_clear(dummy->right->maybe_container);
+            // compute true set
+            vset_union(dummy->true_container, dummy->left_maybe);
+
+            vset_clear(dummy->left_maybe);
         }
+
+        vset_clear(dummy->left->true_container);
+        vset_clear(dummy->right->true_container);
     }
 }
 
@@ -1273,8 +1283,15 @@ reach_bfs_next(struct reach_s *dummy, bitvector_t *reach_groups)
             }
 
             // soundness check
-            if (!no_soundness_check && !vset_is_empty(dummy->red->maybe_container)) dummy->unsound_group = dummy->index;
+            if (!no_soundness_check) {
+                vset_t maybe = vset_create(domain, -1, NULL);
+                vset_copy(maybe, dummy->red->true_container);
+                vset_intersect(maybe, dummy->red->false_container);
 
+                // we don't abort immediately so that other threads can finish cleanly.
+                if (!vset_is_empty(maybe)) dummy->unsound_group = dummy->index;
+                vset_destroy(maybe);
+            }
         }
 
         // Expand transition relations
@@ -1429,10 +1446,11 @@ reach_bfs_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
                     HREabort(LTSMIN_EXIT_UNSOUND);
                 }
                 if (!no_soundness_check && 0!=strcmp(GBgetUseGuards(model), "false")) {
-                    // clear all maybe sets such that we only check soundness of the spec for only new states.
+                    // For the current level the spec is sound.
+                    // This means that every maybe is actually false.
+                    // We thus remove all maybe's
                     for (int g = 0; g < nGuards; g++) {
-                        vset_union(guard_false[g], guard_maybe[g]);
-                        vset_clear(guard_maybe[g]);
+                        vset_minus(guard_true[g], guard_false[g]);
                     }
                 }
                 // update counters
@@ -1461,10 +1479,11 @@ reach_bfs_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
                 HREabort(LTSMIN_EXIT_UNSOUND);
             }
             if (!no_soundness_check && 0!=strcmp(GBgetUseGuards(model), "false")) {
-                // clear all maybe sets such that we only check soundness of the spec for only new states.
+                // For the current level the spec is sound.
+                // This means that every maybe is actually false.
+                // We thus remove all maybe's
                 for (int g = 0; g < nGuards; g++) {
-                    vset_union(guard_false[g], guard_maybe[g]);
-                    vset_clear(guard_maybe[g]);
+                    vset_minus(guard_true[g], guard_false[g]);
                 }
             }
             // update counters
@@ -1534,10 +1553,11 @@ reach_bfs(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
                     HREabort(LTSMIN_EXIT_UNSOUND);
                 }
                 if (!no_soundness_check && 0!=strcmp(GBgetUseGuards(model), "false")) {
-                    // clear all maybe sets such that we only check soundness of the spec for only new states.
+                    // For the current level the spec is sound.
+                    // This means that every maybe is actually false.
+                    // We thus remove all maybe's
                     for (int g = 0; g < nGuards; g++) {
-                        vset_union(guard_false[g], guard_maybe[g]);
-                        vset_clear(guard_maybe[g]);
+                        vset_minus(guard_true[g], guard_false[g]);
                     }
                 }
                 // update counters
@@ -1568,10 +1588,11 @@ reach_bfs(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
                 HREabort(LTSMIN_EXIT_UNSOUND);
             }
             if (!no_soundness_check && 0!=strcmp(GBgetUseGuards(model), "false")) {
-                // clear all maybe sets such that we only check soundness of the spec for only new states.
+                // For the current level the spec is sound.
+                // This means that every maybe is actually false.
+                // We thus remove all maybe's
                 for (int g = 0; g < nGuards; g++) {
-                    vset_union(guard_false[g], guard_maybe[g]);
-                    vset_clear(guard_maybe[g]);
+                    vset_minus(guard_true[g], guard_false[g]);
                 }
             }
             // update counters
@@ -1603,6 +1624,23 @@ reach_bfs(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
 
 #if defined(HAVE_SYLVAN)
 
+VOID_TASK_3(compute_left_maybe, vset_t, left_maybe, vset_t, left_true, vset_t, right_false)
+{
+    vset_intersect(left_maybe, left_true);
+    if (SPEC_MAYBE_AND_FALSE_IS_FALSE) vset_minus(left_maybe, right_false);
+}
+
+VOID_TASK_3(compute_right_maybe, vset_t, right_maybe, vset_t, right_true, vset_t, left_false)
+{
+    vset_intersect(right_maybe, right_true);
+    vset_minus(right_maybe, left_false);
+}
+
+VOID_TASK_3(compute_false, vset_t, false_c, vset_t, right_false, vset_t, maybe) {
+    vset_union(false_c, right_false);
+    vset_union(false_c, maybe);
+}
+
 VOID_TASK_1(reach_par_reduce, struct reach_red_s *, dummy)
 {
     if (dummy->index >= 0) { // base case
@@ -1611,19 +1649,11 @@ VOID_TASK_1(reach_par_reduce, struct reach_red_s *, dummy)
         int guard = GBgetGuard(model, dummy->group)->guard[dummy->index];
         if (!no_soundness_check) {
             vset_copy(dummy->false_container, dummy->true_container);
-            vset_copy(dummy->maybe_container, dummy->true_container);
-
             vset_join_par(dummy->false_container, dummy->false_container, guard_false[guard]);
-            vset_join_par(dummy->maybe_container, dummy->maybe_container, guard_maybe[guard]);
         }
         vset_join_par(dummy->true_container, dummy->true_container, guard_true[guard]);
-
         SYNC(vset_join_par);
-
-        if (!no_soundness_check) {
-            SYNC(vset_join_par);
-            SYNC(vset_join_par);
-        }
+        if (!no_soundness_check) SYNC(vset_join_par);
     } else { //recursive case
         // send set of states downstream
         vset_copy(dummy->left->true_container, dummy->true_container);
@@ -1635,32 +1665,41 @@ VOID_TASK_1(reach_par_reduce, struct reach_red_s *, dummy)
         SYNC(reach_par_reduce);
         SYNC(reach_par_reduce);
 
-        // we intersect every leaf, since we want to reduce the states in the group
-        vset_copy(dummy->true_container, dummy->left->true_container);
-        vset_intersect_par(dummy->true_container, dummy->right->true_container);
-
         if (!no_soundness_check) {
+            // compute maybe set
+            vset_copy(dummy->left_maybe, dummy->left->false_container);
+            SPAWN(compute_left_maybe, dummy->left_maybe, dummy->left->true_container, dummy->right->false_container);
+
+            vset_copy(dummy->right_maybe, dummy->right->false_container);
+            SPAWN(compute_right_maybe, dummy->right_maybe, dummy->right->true_container, dummy->left->false_container);
+
+            SYNC(compute_right_maybe);
+            SYNC(compute_left_maybe);
+
+            // compute maybe
+            vset_union(dummy->left_maybe, dummy->right_maybe);
+            vset_clear(dummy->right_maybe);
+
+            // compute false set
             vset_copy(dummy->false_container, dummy->left->false_container);
-            vset_union_par(dummy->false_container, dummy->right->false_container);
+            SPAWN(compute_false, dummy->false_container, dummy->right->false_container, dummy->left_maybe);
 
-            vset_minus_par(dummy->right->maybe_container, dummy->left->false_container);
-            if (SPEC_MAYBE_AND_FALSE_IS_FALSE) vset_minus_par(dummy->left->maybe_container, dummy->right->false_container);
-            if (SPEC_MAYBE_AND_FALSE_IS_FALSE) SYNC(vset_minus_par);
-            SYNC(vset_minus_par);
-            vset_copy(dummy->maybe_container, dummy->left->maybe_container);
-            vset_union_par(dummy->maybe_container, dummy->right->maybe_container);
-        }
+            // compute true set
+            // we intersect every leaf, since we want to reduce the states in the group
+            vset_copy(dummy->true_container, dummy->left->true_container);
+            vset_intersect(dummy->true_container, dummy->right->true_container);
+            vset_union(dummy->true_container, dummy->left_maybe);
+            vset_clear(dummy->left_maybe);
 
-        if (!no_soundness_check) {
-            SYNC(vset_union_par);
-            vset_clear(dummy->left->maybe_container);
-            vset_clear(dummy->right->maybe_container);
-            SYNC(vset_union_par);
+            SYNC(compute_false);
             vset_clear(dummy->left->false_container);
             vset_clear(dummy->right->false_container);
+        } else {
+            // we intersect every leaf, since we want to reduce the states in the group
+            vset_copy(dummy->true_container, dummy->left->true_container);
+            vset_intersect(dummy->true_container, dummy->right->true_container);
         }
 
-        SYNC(vset_intersect_par);
         vset_clear(dummy->left->true_container);
         vset_clear(dummy->right->true_container);
     }
@@ -1698,7 +1737,15 @@ VOID_TASK_2(reach_par_next, struct reach_s *, dummy, bitvector_t *, reach_groups
             }
 
             // soundness check
-            if (!no_soundness_check && !vset_is_empty(dummy->red->maybe_container)) dummy->unsound_group = dummy->index;
+            if (!no_soundness_check) {
+                vset_t maybe = vset_create(domain, -1, NULL);
+                vset_copy(maybe, dummy->red->true_container);
+                vset_intersect(maybe, dummy->red->false_container);
+
+                // we don't abort immediately so that other threads can finish cleanly.
+                if (!vset_is_empty(maybe)) dummy->unsound_group = dummy->index;
+                vset_destroy(maybe);
+            }
         }
 
         // Expand transition relations
@@ -1829,12 +1876,11 @@ reach_par(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
                     HREabort(LTSMIN_EXIT_UNSOUND);
                 }
                 if (!no_soundness_check && 0!=strcmp(GBgetUseGuards(model), "false")) {
-                    // clear all maybe sets such that we only check soundness of the spec for only new states.
-                    for (int g = 0; g < nGuards; g++) vset_union_par(guard_false[g], guard_maybe[g]);
-                    for (int g = nGuards-1; g >= 0; g--) {
-                        SYNC(vset_union_par);
-                        vset_clear(guard_maybe[g]);
-                    }
+                    // For the current level the spec is sound.
+                    // This means that every maybe is actually false.
+                    // We thus remove all maybe's
+                    for (int g = 0; g < nGuards; g++) vset_minus_par(guard_true[g], guard_false[g]);
+                    for (int g = nGuards-1; g >= 0; g--) SYNC(vset_minus_par);
                 }
                 // update counters
                 *next_count += root->next_count;
@@ -1864,12 +1910,11 @@ reach_par(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
                 HREabort(LTSMIN_EXIT_UNSOUND);
             }
             if (!no_soundness_check && 0!=strcmp(GBgetUseGuards(model), "false")) {
-                // clear all maybe sets such that we only check soundness of the spec for only new states.
-                for (int g = 0; g < nGuards; g++) vset_union_par(guard_false[g], guard_maybe[g]);
-                for (int g = nGuards-1; g >= 0; g--) {
-                    SYNC(vset_union_par);
-                    vset_clear(guard_maybe[g]);
-                }
+                // For the current level the spec is sound.
+                // This means that every maybe is actually false.
+                // We thus remove all maybe's
+                for (int g = 0; g < nGuards; g++) vset_minus_par(guard_true[g], guard_false[g]);
+                for (int g = nGuards-1; g >= 0; g--) SYNC(vset_minus_par);
             }
             // update counters
             *next_count += root->next_count;
@@ -1938,12 +1983,11 @@ reach_par_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
                     HREabort(LTSMIN_EXIT_UNSOUND);
                 }
                 if (!no_soundness_check && 0!=strcmp(GBgetUseGuards(model), "false")) {
-                    // clear all maybe sets such that we only check soundness of the spec for only new states.
-                    for (int g = 0; g < nGuards; g++) vset_union_par(guard_false[g], guard_maybe[g]);
-                    for (int g = nGuards-1; g >= 0; g--) {
-                        SYNC(vset_union_par);
-                        vset_clear(guard_maybe[g]);
-                    }
+                    // For the current level the spec is sound.
+                    // This means that every maybe is actually false.
+                    // We thus remove all maybe's
+                    for (int g = 0; g < nGuards; g++) vset_minus_par(guard_true[g], guard_false[g]);
+                    for (int g = nGuards-1; g >= 0; g--) SYNC(vset_minus_par);
                 }
                 // update counters
                 *next_count += root->next_count;
@@ -1971,12 +2015,11 @@ reach_par_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
                 HREabort(LTSMIN_EXIT_UNSOUND);
             }
             if (!no_soundness_check && 0!=strcmp(GBgetUseGuards(model), "false")) {
-                // clear all maybe sets such that we only check soundness of the spec for only new states.
-                for (int g = 0; g < nGuards; g++) vset_union_par(guard_false[g], guard_maybe[g]);
-                for (int g = nGuards-1; g >= 0; g--) {
-                    SYNC(vset_union_par);
-                    vset_clear(guard_maybe[g]);
-                }
+                // For the current level the spec is sound.
+                // This means that every maybe is actually false.
+                // We thus remove all maybe's
+                for (int g = 0; g < nGuards; g++) vset_minus_par(guard_true[g], guard_false[g]);
+                for (int g = nGuards-1; g >= 0; g--) SYNC(vset_minus_par);
             }
             // update counters
             *next_count += root->next_count;
@@ -2008,37 +2051,57 @@ reach_par_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
 #endif
 
 static inline void
-learn_guards_reduce(vset_t states, int t, long *guard_count) {
+learn_guards_reduce(vset_t true_states, int t, long *guard_count, vset_t *guard_maybe, vset_t false_states, vset_t maybe_states, vset_t tmp) {
+
     LACE_ME;
     if (0!=strcmp(GBgetUseGuards(model), "false")) {
         guard_t* guards = GBgetGuard(model, t);
-        for (int g = 0; g < guards->count && !vset_is_empty(states); g++) {
+        for (int g = 0; g < guards->count && !vset_is_empty(true_states); g++) {
             (*guard_count)++;
-            eval_guard(guards->guard[g], states);
-            vset_join(states, states, guard_true[guards->guard[g]]);
+            eval_guard(guards->guard[g], true_states);
+
+            if (!no_soundness_check) {
+
+                // compute guard_maybe (= guard_true \cap guard_false)
+                vset_copy(guard_maybe[guards->guard[g]], guard_true[guards->guard[g]]);
+                vset_intersect(guard_maybe[guards->guard[g]], guard_false[guards->guard[g]]);
+
+                if (!SPEC_MAYBE_AND_FALSE_IS_FALSE) {
+                    // If we have Promela, Java etc. then if we encounter a maybe guard then this is an error.
+                    // Because every guard is evaluated in order.
+                    if (!vset_is_empty(guard_maybe[guards->guard[g]])) {
+                        Warning(info, "Condition in group %d does not evaluate to true or false", t);
+                        HREabort(LTSMIN_EXIT_UNSOUND);
+                    }
+                } else {
+                    // If we have mCRL2 etc., then we need to store all (real) false states and maybe states
+                    // and see if after evaluating all guards there are still maybe states left.
+                    vset_join(tmp, true_states, guard_false[guards->guard[g]]);
+                    vset_union(false_states, tmp);
+                    vset_join(tmp, true_states, guard_maybe[guards->guard[g]]);
+                    vset_minus(false_states,tmp);
+                    vset_union(maybe_states, tmp);
+                }
+                vset_clear(guard_maybe[guards->guard[g]]);
+            }
+            vset_join(true_states, true_states, guard_true[guards->guard[g]]);
+        }
+
+        if (!no_soundness_check && SPEC_MAYBE_AND_FALSE_IS_FALSE) {
+            vset_copy(tmp, maybe_states);
+            vset_minus(tmp, false_states);
+            if (!vset_is_empty(tmp)) {
+                Warning(info, "Condition in group %d does not evaluate to true or false", t);
+                HREabort(LTSMIN_EXIT_UNSOUND);
+            }
+            vset_clear(tmp);
+            vset_clear(maybe_states);
+            vset_clear(false_states);
         }
 
         if (!no_soundness_check) {
             for (int g = 0; g < guards->count; g++) {
-                int guard = guards->guard[g];
-                if (!vset_is_empty(guard_maybe[guard])) {
-                    vset_t test = vset_create(domain, -1, NULL);
-                    vset_join(test, states, guard_maybe[guard]);
-                    for (int h = 0; h < guards->count; h++) {
-                        int other_guard = guards->guard[h];
-                        if (guard != other_guard) vset_join(test, test, guard_false[other_guard]);
-                        else if (!SPEC_MAYBE_AND_FALSE_IS_FALSE) break;
-                    }
-                    if (!vset_is_empty(test)) {
-                        Warning(info, "Condition in group %d does not evaluate to true or false", t);
-                        HREabort(LTSMIN_EXIT_UNSOUND);
-                    }
-                    vset_destroy(test);
-
-                    // all states in guard_maybe, should be in guard_false, so move them.
-                    vset_union(guard_false[guard], guard_maybe[guard]);
-                    vset_clear(guard_maybe[guard]);
-                }
+                vset_minus(guard_true[guards->guard[g]], guard_false[guards->guard[g]]);
             }
         }
     }
@@ -2059,6 +2122,19 @@ reach_chain_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
         new_reduced[i]=vset_create(domain, -1, NULL);
     }
 
+    vset_t guard_maybe[nGuards];
+    vset_t tmp = NULL;
+    vset_t false_states = NULL;
+    vset_t maybe_states = NULL;
+    if (!no_soundness_check) {
+        for(int i=0;i<nGuards;i++) {
+            guard_maybe[i] = vset_create(domain, g_projs[i].len, g_projs[i].proj);
+        }
+        false_states = vset_create(domain, -1, NULL);
+        maybe_states = vset_create(domain, -1, NULL);
+        tmp = vset_create(domain, -1, NULL);
+    }
+
     vset_copy(new_states, visited);
     if (save_sat_levels) vset_minus(new_states, visited_old);
 
@@ -2071,7 +2147,7 @@ reach_chain_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
             if (!bitvector_is_set(reach_groups, i)) continue;
             if (trc_output != NULL) save_level(new_states);
             vset_copy(new_reduced[i], new_states);
-            learn_guards_reduce(new_reduced[i], i, guard_count);
+            learn_guards_reduce(new_reduced[i], i, guard_count, guard_maybe, false_states, maybe_states, tmp);
 
             if (!vset_is_empty(new_reduced[i])) {
                 expand_group_next(i, new_reduced[i]);
@@ -2106,6 +2182,14 @@ reach_chain_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
         vset_destroy(deadlocks);
         vset_destroy(dlk_temp);
     }
+    if(!no_soundness_check) {
+        for(int i=0;i<nGuards;i++) {
+            vset_destroy(guard_maybe[i]);
+        }
+        vset_destroy(tmp);
+        vset_destroy(false_states);
+        vset_destroy(maybe_states);
+    }
 }
 
 static void
@@ -2125,6 +2209,19 @@ reach_chain(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
         new_reduced[i]=vset_create(domain, -1, NULL);
     }
 
+    vset_t guard_maybe[nGuards];
+    vset_t tmp = NULL;
+    vset_t false_states = NULL;
+    vset_t maybe_states = NULL;
+    if (!no_soundness_check) {
+        for(int i=0;i<nGuards;i++) {
+            guard_maybe[i] = vset_create(domain, g_projs[i].len, g_projs[i].proj);
+        }
+        false_states = vset_create(domain, -1, NULL);
+        maybe_states = vset_create(domain, -1, NULL);
+        tmp = vset_create(domain, -1, NULL);
+    }
+
     LACE_ME;
     while (!vset_equal(visited, old_vis)) {
         vset_copy(old_vis, visited);
@@ -2135,7 +2232,7 @@ reach_chain(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
             if (!bitvector_is_set(reach_groups, i)) continue;
             if (trc_output != NULL) save_level(visited);
             vset_copy(new_reduced[i], visited);
-            learn_guards_reduce(new_reduced[i], i, guard_count);
+            learn_guards_reduce(new_reduced[i], i, guard_count, guard_maybe, false_states, maybe_states, tmp);
             expand_group_next(i, new_reduced[i]);
             (*eg_count)++;
             (*next_count)++;
@@ -2160,6 +2257,14 @@ reach_chain(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
     if (dlk_detect) {
         vset_destroy(deadlocks);
         vset_destroy(dlk_temp);
+    }
+    if(!no_soundness_check) {
+        for(int i=0;i<nGuards;i++) {
+            vset_destroy(guard_maybe[i]);
+        }
+        vset_destroy(tmp);
+        vset_destroy(false_states);
+        vset_destroy(maybe_states);
     }
 }
 
@@ -2852,7 +2957,6 @@ init_domain(vset_implementation_t impl)
 
     guard_false    = (vset_t*)RTmalloc(nGuards * sizeof(vset_t));
     guard_true     = (vset_t*)RTmalloc(nGuards * sizeof(vset_t));
-    guard_maybe     = (vset_t*)RTmalloc(nGuards * sizeof(vset_t));
     guard_tmp      = (vset_t*)RTmalloc(nGuards * sizeof(vset_t));
 
     matrix_t *read_matrix = RTmalloc(sizeof (matrix_t));
@@ -2928,7 +3032,6 @@ init_domain(vset_implementation_t impl)
         {
             guard_false[i]  = vset_create(domain, g_projs[i].len, g_projs[i].proj);
             guard_true[i]   = vset_create(domain, g_projs[i].len, g_projs[i].proj);
-            guard_maybe[i]   = vset_create(domain, g_projs[i].len, g_projs[i].proj);
             guard_tmp[i]    = vset_create(domain, g_projs[i].len, g_projs[i].proj);
         }
     }
