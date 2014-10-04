@@ -1232,11 +1232,11 @@ reach_bfs_reduce(struct reach_red_s *dummy)
 }
 
 #ifdef HAVE_SYLVAN
-#define reach_bfs_next(dummy, reach_groups) CALL(reach_bfs_next, dummy, reach_groups)
-VOID_TASK_2(reach_bfs_next, struct reach_s *, dummy, bitvector_t *, reach_groups)
+#define reach_bfs_next(dummy, reach_groups, maybe) CALL(reach_bfs_next, dummy, reach_groups, maybe)
+VOID_TASK_3(reach_bfs_next, struct reach_s *, dummy, bitvector_t *, reach_groups, vset_t*, maybe)
 #else
 static inline void
-reach_bfs_next(struct reach_s *dummy, bitvector_t *reach_groups)
+reach_bfs_next(struct reach_s *dummy, bitvector_t *reach_groups, vset_t* maybe)
 #endif
 {
     if (dummy->index >= 0) {
@@ -1270,13 +1270,12 @@ reach_bfs_next(struct reach_s *dummy, bitvector_t *reach_groups)
 
             // soundness check
             if (!no_soundness_check) {
-                vset_t maybe = vset_create(domain, -1, NULL);
-                vset_copy(maybe, dummy->red->true_container);
-                vset_intersect(maybe, dummy->red->false_container);
+                vset_copy(maybe[dummy->index], dummy->red->true_container);
+                vset_intersect(maybe[dummy->index], dummy->red->false_container);
 
                 // we don't abort immediately so that other threads can finish cleanly.
-                if (!vset_is_empty(maybe)) dummy->unsound_group = dummy->index;
-                vset_destroy(maybe);
+                if (!vset_is_empty(maybe[dummy->index])) dummy->unsound_group = dummy->index;
+                vset_clear(maybe[dummy->index]);
             }
         }
 
@@ -1331,8 +1330,8 @@ reach_bfs_next(struct reach_s *dummy, bitvector_t *reach_groups)
         dummy->right->class = dummy->class;
 
         // Sequentially go left/right (BFS, not PAR)
-        reach_bfs_next(dummy->left, reach_groups);
-        reach_bfs_next(dummy->right, reach_groups);
+        reach_bfs_next(dummy->left, reach_groups, maybe);
+        reach_bfs_next(dummy->right, reach_groups, maybe);
 
         // Perform union
         vset_copy(dummy->container, dummy->left->container);
@@ -1398,6 +1397,13 @@ reach_bfs_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
     vset_copy(current_level, visited);
     if (save_sat_levels) vset_minus(current_level, visited_old);
 
+    vset_t maybe[nGrps];
+    if (!no_soundness_check) {
+        for (int i = 0; i < nGrps; i++) {
+            maybe[i] = vset_create(domain, -1, NULL);
+        }
+    }
+
     LACE_ME;
     struct reach_s *root = reach_prepare(0, nGrps);
 
@@ -1426,7 +1432,7 @@ reach_bfs_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
                 // carry over root->deadlocks from previous iteration
                 // set class and call next function
                 root->class = c;
-                reach_bfs_next(root, reach_groups);
+                reach_bfs_next(root, reach_groups, maybe);
                 if (root->unsound_group > -1) {
                     Warning(info, "Condition in group %d does not always evaluate to true or false", root->unsound_group);
                     HREabort(LTSMIN_EXIT_UNSOUND);
@@ -1459,7 +1465,7 @@ reach_bfs_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
             // set ancestors to container
             if (root->ancestors != NULL) vset_copy(root->ancestors, current_level);
             // call next function
-            reach_bfs_next(root, reach_groups);
+            reach_bfs_next(root, reach_groups, maybe);
             if (root->unsound_group > -1) {
                 Warning(info, "Condition in group %d does not always evaluate to true or false", root->unsound_group);
                 HREabort(LTSMIN_EXIT_UNSOUND);
@@ -1497,6 +1503,12 @@ reach_bfs_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
     reach_destroy(root);
     vset_destroy(current_level);
     vset_destroy(next_level);
+
+    if (!no_soundness_check) {
+        for(int i = 0; i < nGrps; i++) {
+            vset_destroy(maybe[i]);
+        }
+    }
 }
 
 static void
@@ -1506,6 +1518,13 @@ reach_bfs(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
     vset_t old_vis = vset_create(domain, -1, NULL);
     vset_t next_level = vset_create(domain, -1, NULL);
     //if (save_sat_levels) vset_minus(current_level, visited_old); // ???
+
+    vset_t maybe[nGrps];
+    if (!no_soundness_check) {
+        for (int i = 0; i < nGrps; i++) {
+            maybe[i] = vset_create(domain, -1, NULL);
+        }
+    }
 
     LACE_ME;
     struct reach_s *root = reach_prepare(0, nGrps);
@@ -1533,7 +1552,7 @@ reach_bfs(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
                 // carry over root->deadlocks from previous iteration
                 // set class and call next function
                 root->class = c;
-                reach_bfs_next(root, reach_groups);
+                reach_bfs_next(root, reach_groups, maybe);
                 if (root->unsound_group > -1) {
                     Warning(info, "Condition in group %d does not always evaluate to true or false", root->unsound_group);
                     HREabort(LTSMIN_EXIT_UNSOUND);
@@ -1568,7 +1587,7 @@ reach_bfs(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
             // set ancestors to container
             if (root->ancestors != NULL) vset_copy(root->ancestors, visited);
             // call next function
-            reach_bfs_next(root, reach_groups);
+            reach_bfs_next(root, reach_groups, maybe);
             if (root->unsound_group > -1) {
                 Warning(info, "Condition in group %d does not always evaluate to true or false", root->unsound_group);
                 HREabort(LTSMIN_EXIT_UNSOUND);
@@ -1599,6 +1618,12 @@ reach_bfs(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
     reach_destroy(root);
     vset_destroy(old_vis);
     vset_destroy(next_level);
+
+    if (!no_soundness_check) {
+        for(int i = 0; i < nGrps; i++) {
+            vset_destroy(maybe[i]);
+        }
+    }
 
     return;
     (void)visited_old;
@@ -1691,7 +1716,7 @@ VOID_TASK_1(reach_par_reduce, struct reach_red_s *, dummy)
     }
 }
 
-VOID_TASK_2(reach_par_next, struct reach_s *, dummy, bitvector_t *, reach_groups)
+VOID_TASK_3(reach_par_next, struct reach_s *, dummy, bitvector_t *, reach_groups, vset_t*, maybe)
 {
     if (dummy->index >= 0) {
         if (!bitvector_is_set(reach_groups, dummy->index)) {
@@ -1724,13 +1749,12 @@ VOID_TASK_2(reach_par_next, struct reach_s *, dummy, bitvector_t *, reach_groups
 
             // soundness check
             if (!no_soundness_check) {
-                vset_t maybe = vset_create(domain, -1, NULL);
-                vset_copy(maybe, dummy->red->true_container);
-                vset_intersect(maybe, dummy->red->false_container);
+                vset_copy(maybe[dummy->index], dummy->red->true_container);
+                vset_intersect(maybe[dummy->index], dummy->red->false_container);
 
                 // we don't abort immediately so that other threads can finish cleanly.
-                if (!vset_is_empty(maybe)) dummy->unsound_group = dummy->index;
-                vset_destroy(maybe);
+                if (!vset_is_empty(maybe[dummy->index])) dummy->unsound_group = dummy->index;
+                vset_clear(maybe[dummy->index]);
             }
         }
 
@@ -1785,8 +1809,8 @@ VOID_TASK_2(reach_par_next, struct reach_s *, dummy, bitvector_t *, reach_groups
         dummy->right->class = dummy->class;
 
         // Go left/right in parallel
-        SPAWN(reach_par_next, dummy->left, reach_groups);
-        SPAWN(reach_par_next, dummy->right, reach_groups);
+        SPAWN(reach_par_next, dummy->left, reach_groups, maybe);
+        SPAWN(reach_par_next, dummy->right, reach_groups, maybe);
         SYNC(reach_par_next);
         SYNC(reach_par_next);
 
@@ -1830,6 +1854,13 @@ reach_par(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
     vset_t next_level = vset_create(domain, -1, NULL);
     //if (save_sat_levels) vset_minus(current_level, visited_old); // ???
 
+    vset_t maybe[nGrps];
+    if (!no_soundness_check) {
+        for (int i = 0; i < nGrps; i++) {
+            maybe[i] = vset_create(domain, -1, NULL);
+        }
+    }
+
     LACE_ME;
     struct reach_s *root = reach_prepare(0, nGrps);
 
@@ -1856,7 +1887,7 @@ reach_par(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
                 // carry over root->deadlocks from previous iteration
                 // set class and call next function
                 root->class = c;
-                CALL(reach_par_next, root, reach_groups);
+                CALL(reach_par_next, root, reach_groups, maybe);
                 if (root->unsound_group > -1) {
                     Warning(info, "Condition in group %d does not always evaluate to true or false", root->unsound_group);
                     HREabort(LTSMIN_EXIT_UNSOUND);
@@ -1890,7 +1921,7 @@ reach_par(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
             // set ancestors to container
             if (root->ancestors != NULL) vset_copy(root->ancestors, visited);
             // call next function
-            CALL(reach_par_next, root, reach_groups);
+            CALL(reach_par_next, root, reach_groups, maybe);
             if (root->unsound_group > -1) {
                 Warning(info, "Condition in group %d does not always evaluate to true or false", root->unsound_group);
                 HREabort(LTSMIN_EXIT_UNSOUND);
@@ -1921,6 +1952,12 @@ reach_par(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
     vset_destroy(old_vis);
     vset_destroy(next_level);
 
+    if (!no_soundness_check) {
+        for(int i = 0; i < nGrps; i++) {
+            vset_destroy(maybe[i]);
+        }
+    }
+
     return;
     (void)visited_old;
 }
@@ -1934,6 +1971,13 @@ reach_par_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
 
     vset_copy(current_level, visited);
     if (save_sat_levels) vset_minus(current_level, visited_old);
+
+    vset_t maybe[nGrps];
+    if (!no_soundness_check) {
+        for (int i = 0; i < nGrps; i++) {
+            maybe[i] = vset_create(domain, -1, NULL);
+        }
+    }
 
     LACE_ME;
     struct reach_s *root = reach_prepare(0, nGrps);
@@ -1963,7 +2007,7 @@ reach_par_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
                 // carry over root->deadlocks from previous iteration
                 // set class and call next function
                 root->class = c;
-                CALL(reach_par_next, root, reach_groups);
+                CALL(reach_par_next, root, reach_groups, maybe);
                 if (root->unsound_group > -1) {
                     Warning(info, "Condition in group %d does not always evaluate to true or false", root->unsound_group);
                     HREabort(LTSMIN_EXIT_UNSOUND);
@@ -1995,7 +2039,7 @@ reach_par_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
             // set ancestors to container
             if (root->ancestors != NULL) vset_copy(root->ancestors, current_level);
             // call next function
-            CALL(reach_par_next, root, reach_groups);
+            CALL(reach_par_next, root, reach_groups, maybe);
             if (root->unsound_group > -1) {
                 Warning(info, "Condition in group %d does not always evaluate to true or false", root->unsound_group);
                 HREabort(LTSMIN_EXIT_UNSOUND);
@@ -2032,6 +2076,12 @@ reach_par_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
     reach_destroy(root);
     vset_destroy(current_level);
     vset_destroy(next_level);
+
+    if (!no_soundness_check) {
+        for(int i = 0; i < nGrps; i++) {
+            vset_destroy(maybe[i]);
+        }
+    }
 }
 
 #endif
