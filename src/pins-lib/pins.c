@@ -1199,7 +1199,7 @@ GBloadFile (model_t model, const char *filename, model_t *wrapped)
             if (0==strcmp (model_type[i], extension)) {
                 model_loader[i] (model, filename);
                 model->use_guards = use_guards;
-                if (0!=strcmp(use_guards,"false")) {
+                if (GBgetUseGuards(model) != GUARDS_DISABLED) {
                    if (model->next_long == default_long)
                        Abort ("No long next-state function implemented for this language module (--"USE_GUARDS_OPTION").");
                    sl_group_t* guards = GBgetStateLabelGroupInfo (model, GB_SL_GUARDS);
@@ -1207,9 +1207,9 @@ GBloadFile (model_t model, const char *filename, model_t *wrapped)
                        Abort ("No long next-state function implemented for this language module (--"USE_GUARDS_OPTION").");
                    model->guard_status = RTmalloc (sizeof(int[pins_get_state_label_count(model)]));
                    model->next_all = guards_all;
-                   if (0==strcmp(use_guards,"assume-true")) {
+                   if (GBgetUseGuards(model) == GUARDS_ASSUMED) {
                        model->expand_matrix=GBgetMatrix(model, GBgetMatrixID(model, LTSMIN_MATRIX_ACTIONS_READS));
-                   } else if (0==strcmp(use_guards,"evaluate")) {
+                   } else if (GBgetUseGuards(model) == GUARDS_EVALUATE) {
                        model->expand_matrix=GBgetDMInfoRead(model);
                    }
                 }
@@ -1397,9 +1397,11 @@ struct poptOption greybox_options_ltl[]={
     POPT_TABLEEND
 };
 
-char*
+pins_guards_t
 GBgetUseGuards(model_t model) {
-   return model->use_guards;
+    if (0==strcmp(model->use_guards,"assume-true")) return GUARDS_ASSUMED;
+    if (0==strcmp(model->use_guards,"evaluate")) return GUARDS_EVALUATE;
+    else return GUARDS_DISABLED;
 }
 
 void*

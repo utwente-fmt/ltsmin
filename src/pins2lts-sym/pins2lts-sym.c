@@ -1141,7 +1141,7 @@ reach_prepare(size_t left, size_t right)
         result->index = left;
         result->left = NULL;
         result->right = NULL;
-        if (0!=strcmp(GBgetUseGuards(model), "false")) result->red = reach_red_prepare(0, GBgetGuard(model, left)->count, left);
+        if (GBgetUseGuards(model) != GUARDS_DISABLED) result->red = reach_red_prepare(0, GBgetGuard(model, left)->count, left);
         else result->red = NULL;
     } else {
         result->index = -1;
@@ -1368,16 +1368,16 @@ static inline void
 learn_guards(vset_t states, long *guard_count) {
     #ifdef HAVE_SYLVAN
     LACE_ME;
-    if (0!=strcmp(GBgetUseGuards(model), "false")) {
+    if (GBgetUseGuards(model) != GUARDS_DISABLED) {
         for (int g = 0; g < nGuards; g++) {
             (*guard_count)++;
             SPAWN(eval_guard, g, states);
         }
     }
-    if (0!=strcmp(GBgetUseGuards(model), "false"))
+    if (GBgetUseGuards(model) != GUARDS_DISABLED)
         for (int g = 0; g < nGuards; g++) SYNC(eval_guard);
     #else
-    if (0!=strcmp(GBgetUseGuards(model), "false")) {
+    if (GBgetUseGuards(model) != GUARDS_DISABLED) {
         for (int g = 0; g < nGuards; g++) {
             (*guard_count)++;
             eval_guard(g, states);
@@ -2069,7 +2069,7 @@ static inline void
 learn_guards_reduce(vset_t true_states, int t, long *guard_count, vset_t *guard_maybe, vset_t false_states, vset_t maybe_states, vset_t tmp) {
 
     LACE_ME;
-    if (0!=strcmp(GBgetUseGuards(model), "false")) {
+    if (GBgetUseGuards(model) != GUARDS_DISABLED) {
         guard_t* guards = GBgetGuard(model, t);
         for (int g = 0; g < guards->count && !vset_is_empty(true_states); g++) {
             (*guard_count)++;
@@ -2299,7 +2299,7 @@ reach_sat_fix(reach_proc_t reach_proc, vset_t visited,
     (void) reach_proc;
     (void) guard_count;
 
-    if (0!=strcmp(GBgetUseGuards(model), "false"))
+    if (GBgetUseGuards(model) != GUARDS_DISABLED)
         Abort("guard-splitting not supported with saturation=sat-fix");
 
     int level = 0;
@@ -2506,7 +2506,7 @@ reach_sat(reach_proc_t reach_proc, vset_t visited,
     (void) next_count;
     (void) guard_count;
 
-    if (0!=strcmp(GBgetUseGuards(model), "false"))
+    if (GBgetUseGuards(model) != GUARDS_DISABLED)
         Abort("guard-splitting not supported with saturation=sat");
 
     if (act_detect != NULL && trc_output != NULL)
@@ -2765,7 +2765,7 @@ unguided(sat_proc_t sat_proc, reach_proc_t reach_proc, vset_t visited,
     bitvector_invert(&reach_groups);
     sat_proc(reach_proc, visited, &reach_groups, &eg_count, &next_count, &guard_count);
     bitvector_free(&reach_groups);
-    if (0!=strcmp(GBgetUseGuards(model), "false")) {
+    if (GBgetUseGuards(model) != GUARDS_DISABLED) {
         Warning(info, "Exploration took %ld group checks, %ld next state calls and %ld guard evaluation calls",
                 eg_count, next_count, guard_count);
     } else {
@@ -2911,7 +2911,7 @@ init_model(char *file)
 
     HREbarrier(HREglobal());
 
-    if (HREme(HREglobal())==0 && 0==strcmp(GBgetUseGuards(model),"false") && no_soundness_check) {
+    if (HREme(HREglobal())==0 && GBgetUseGuards(model) == GUARDS_DISABLED && no_soundness_check) {
         Abort("Option --no-soundness-check is incompatible with --pins-guards=false");
     }
 
@@ -3658,9 +3658,9 @@ actual_main(void)
 
 
 
-        if(0==strcmp(GBgetUseGuards(model),"evaluate")) {
+        if(GBgetUseGuards(model) == GUARDS_EVALUATE) {
             Abort("not yet implemented");
-        } else if(0==strcmp(GBgetUseGuards(model),"assume-true")) {
+        } else if(GBgetUseGuards(model) == GUARDS_ASSUMED) {
             *transitions_short = GBgetActionsShort;
             Print(infoShort, "Using GBgetActionsShort as next-state function");
         } else { // false
@@ -3670,7 +3670,7 @@ actual_main(void)
 
         *label_short = GBgetStateLabelShort;
 
-        if (0!=strcmp(GBgetUseGuards(model), "false")) {
+        if (GBgetUseGuards(model) != GUARDS_DISABLED) {
             if (no_soundness_check) {
                 Warning(info, "Guard-splitting: not checking soundness of the specification, this may result in an incorrect state space!");
             } else Warning(info, "Guard-splitting: checking soundness of specification, this may be slow!");
@@ -3898,7 +3898,7 @@ actual_main(void)
         Print(infoLong, "group_next: %ld nodes total", total_count);
         Print(infoLong, "group_explored: %ld nodes total", explored_total_count);
 
-        if (0!=strcmp(GBgetUseGuards(model), "false")) {
+        if (GBgetUseGuards(model) != GUARDS_DISABLED) {
             long total_false = 0;
             long total_true = 0;
             for(int i=0;i<nGuards; i++) {
