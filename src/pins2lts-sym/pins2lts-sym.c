@@ -1276,35 +1276,23 @@ reach_bfs_next(struct reach_s *dummy, bitvector_t *reach_groups, vset_t* maybe)
                 // we don't abort immediately so that other threads can finish cleanly.
                 if (!vset_is_empty(maybe[dummy->index])) dummy->unsound_group = dummy->index;
                 vset_clear(maybe[dummy->index]);
+                vset_clear(dummy->red->false_container);
             }
+
+            vset_copy(dummy->container, dummy->red->true_container);
+            vset_clear(dummy->red->true_container);
         }
 
         // Expand transition relations
-        if (dummy->red != NULL) { // we have guard-splitting; use reduced set
-            // Learn new states
-            expand_group_next(dummy->index, dummy->red->true_container);
-            dummy->eg_count = 1;
+        expand_group_next(dummy->index, dummy->container);
+        dummy->eg_count = 1;
 
-            // Compute successor states
-            vset_next(dummy->container, dummy->red->true_container, group_next[dummy->index]);
-            dummy->next_count = 1;
+        // Compute successor states
+        vset_next(dummy->container, dummy->container, group_next[dummy->index]);
+        dummy->next_count = 1;
 
-            // Compute ancestor states
-            if (dummy->ancestors != NULL) vset_prev(dummy->ancestors, dummy->red->true_container, group_next[dummy->index], dummy->ancestors);
-
-            vset_clear(dummy->red->true_container);
-        } else {
-            // Learn new states
-            expand_group_next(dummy->index, dummy->container);
-            dummy->eg_count = 1;
-
-            // Compute successor states
-            vset_next(dummy->container, dummy->container, group_next[dummy->index]);
-            dummy->next_count = 1;
-
-            // Compute ancestor states
-            if (dummy->ancestors != NULL) vset_prev(dummy->ancestors, dummy->container, group_next[dummy->index], dummy->ancestors);
-        }
+        // Compute ancestor states
+        if (dummy->ancestors != NULL) vset_prev(dummy->ancestors, dummy->container, group_next[dummy->index], dummy->ancestors);
 
         // Remove ancestor states from potential deadlock states
         if (dummy->deadlocks != NULL) vset_minus(dummy->deadlocks, dummy->ancestors);
@@ -1755,35 +1743,23 @@ VOID_TASK_3(reach_par_next, struct reach_s *, dummy, bitvector_t *, reach_groups
                 // we don't abort immediately so that other threads can finish cleanly.
                 if (!vset_is_empty(maybe[dummy->index])) dummy->unsound_group = dummy->index;
                 vset_clear(maybe[dummy->index]);
+                vset_clear(dummy->red->false_container);
             }
+
+            vset_copy(dummy->container, dummy->red->true_container);
+            vset_clear(dummy->red->true_container);
         }
 
         // Expand transition relations
-        if (dummy->red != NULL) { // we have guard-splitting; use reduced set
-            // Learn new states
-            expand_group_next(dummy->index, dummy->red->true_container);
-            dummy->eg_count = 1;
+        expand_group_next(dummy->index, dummy->container);
+        dummy->eg_count = 1;
 
-            // Compute successor states
-            vset_next(dummy->container, dummy->red->true_container, group_next[dummy->index]);
-            dummy->next_count = 1;
+        // Compute successor states
+        vset_next(dummy->container, dummy->container, group_next[dummy->index]);
+        dummy->next_count = 1;
 
-            // Compute ancestor states
-            if (dummy->ancestors != NULL) vset_prev(dummy->ancestors, dummy->red->true_container, group_next[dummy->index], dummy->ancestors);
-
-            vset_clear(dummy->red->true_container);
-        } else {
-            // Learn new states
-            expand_group_next(dummy->index, dummy->container);
-            dummy->eg_count = 1;
-
-            // Compute successor states
-            vset_next(dummy->container, dummy->container, group_next[dummy->index]);
-            dummy->next_count = 1;
-
-            // Compute ancestor states
-            if (dummy->ancestors != NULL) vset_prev(dummy->ancestors, dummy->container, group_next[dummy->index], dummy->ancestors);
-        }
+        // Compute ancestor states
+        if (dummy->ancestors != NULL) vset_prev(dummy->ancestors, dummy->container, group_next[dummy->index], dummy->ancestors);
 
         // Remove ancestor states from potential deadlock states
         if (dummy->deadlocks != NULL) vset_minus(dummy->deadlocks, dummy->ancestors);
