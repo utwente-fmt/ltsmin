@@ -71,3 +71,12 @@ space.
     
 *--no-matrix*::
         Do not print the dependency matrix if -v (verbose) is used.
+
+*--no-soundness-check*::
+        When using '--pins-guards=assume-true' disable the soundness check of the model specification.
+        The soundness check may be expensive and can be disabled when the model specification is known to be sound.
+        A guard may not evaluate to true or false but to maybe. A guard which evaluates to maybe depends on
+        the evaluation of another guard. For languages such as Promela and DVE it checks whether if 
+        a guard evaluates to maybe there is another guard on the left which evaluates to false. For languages such as
+        mCRL2 it also checks whether a guard on the right evaluates to false. If for all states this holds then the
+        model specification is sound for guard-splitting.
