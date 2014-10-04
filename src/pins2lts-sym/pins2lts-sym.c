@@ -1435,7 +1435,7 @@ reach_bfs_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
                 if (root->unsound_group > -1) {
                     Abort("Condition in group %d does not always evaluate to true or false", root->unsound_group);
                 }
-                if (!no_soundness_check && 0!=strcmp(GBgetUseGuards(model), "false")) {
+                if (!no_soundness_check) {
                     // For the current level the spec is sound.
                     // This means that every maybe is actually false.
                     // We thus remove all maybe's
@@ -1467,7 +1467,7 @@ reach_bfs_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
             if (root->unsound_group > -1) {
                 Abort("Condition in group %d does not always evaluate to true or false", root->unsound_group);
             }
-            if (!no_soundness_check && 0!=strcmp(GBgetUseGuards(model), "false")) {
+            if (!no_soundness_check) {
                 // For the current level the spec is sound.
                 // This means that every maybe is actually false.
                 // We thus remove all maybe's
@@ -1553,7 +1553,7 @@ reach_bfs(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
                 if (root->unsound_group > -1) {
                     Abort("Condition in group %d does not always evaluate to true or false", root->unsound_group);
                 }
-                if (!no_soundness_check && 0!=strcmp(GBgetUseGuards(model), "false")) {
+                if (!no_soundness_check) {
                     // For the current level the spec is sound.
                     // This means that every maybe is actually false.
                     // We thus remove all maybe's
@@ -1587,7 +1587,7 @@ reach_bfs(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
             if (root->unsound_group > -1) {
                 Abort("Condition in group %d does not always evaluate to true or false", root->unsound_group);
             }
-            if (!no_soundness_check && 0!=strcmp(GBgetUseGuards(model), "false")) {
+            if (!no_soundness_check) {
                 // For the current level the spec is sound.
                 // This means that every maybe is actually false.
                 // We thus remove all maybe's
@@ -1874,7 +1874,7 @@ reach_par(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
                 if (root->unsound_group > -1) {
                     Abort("Condition in group %d does not always evaluate to true or false", root->unsound_group);
                 }
-                if (!no_soundness_check && 0!=strcmp(GBgetUseGuards(model), "false")) {
+                if (!no_soundness_check) {
                     // For the current level the spec is sound.
                     // This means that every maybe is actually false.
                     // We thus remove all maybe's
@@ -1907,7 +1907,7 @@ reach_par(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
             if (root->unsound_group > -1) {
                 Abort("Condition in group %d does not always evaluate to true or false", root->unsound_group);
             }
-            if (!no_soundness_check && 0!=strcmp(GBgetUseGuards(model), "false")) {
+            if (!no_soundness_check) {
                 // For the current level the spec is sound.
                 // This means that every maybe is actually false.
                 // We thus remove all maybe's
@@ -1992,7 +1992,7 @@ reach_par_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
                 if (root->unsound_group > -1) {
                     Abort("Condition in group %d does not always evaluate to true or false", root->unsound_group);
                 }
-                if (!no_soundness_check && 0!=strcmp(GBgetUseGuards(model), "false")) {
+                if (!no_soundness_check) {
                     // For the current level the spec is sound.
                     // This means that every maybe is actually false.
                     // We thus remove all maybe's
@@ -2023,7 +2023,7 @@ reach_par_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
             if (root->unsound_group > -1) {
                 Abort("Condition in group %d does not always evaluate to true or false", root->unsound_group);
             }
-            if (!no_soundness_check && 0!=strcmp(GBgetUseGuards(model), "false")) {
+            if (!no_soundness_check) {
                 // For the current level the spec is sound.
                 // This means that every maybe is actually false.
                 // We thus remove all maybe's
@@ -2910,6 +2910,10 @@ init_model(char *file)
     GBloadFile(model, file, &model);
 
     HREbarrier(HREglobal());
+
+    if (HREme(HREglobal())==0 && 0==strcmp(GBgetUseGuards(model),"false") && no_soundness_check) {
+        Abort("Option --no-soundness-check is incompatible with --pins-guards=false");
+    }
 
     if (HREme(HREglobal())==0 && log_active(infoLong) && !no_matrix) {
         fprintf(stderr, "Dependency Matrix:\n");
