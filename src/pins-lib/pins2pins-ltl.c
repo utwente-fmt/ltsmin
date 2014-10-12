@@ -370,7 +370,10 @@ print_ltsmin_buchi(const ltsmin_buchi_t *ba, ltsmin_parse_env_t env)
 static ltsmin_buchi_t  *shared_ba = NULL;
 static int              grab_ba = 0;
 
-/* NOTE: this is hack around non-thread-safe ltl2ba */
+/* NOTE: this is hack around non-thread-safe ltl2ba
+ * In multi-process environment, all processes create their own buchi,
+ * which is what we want anyway, because ltsmin_ltl2ba uses strdup.
+ */
 ltsmin_buchi_t *
 init_ltsmin_buchi(model_t model, const char *ltl_file)
 {

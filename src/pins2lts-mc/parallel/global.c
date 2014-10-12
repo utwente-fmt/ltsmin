@@ -104,7 +104,7 @@ global_static_init (model_t model, size_t speed, bool timed)
     W = HREpeers(HREglobal());
     init_threshold = THRESHOLD / W / 100 * speed;
 
-    init_action_labels ( model);
+    init_action_labels (model);
 }
 
 

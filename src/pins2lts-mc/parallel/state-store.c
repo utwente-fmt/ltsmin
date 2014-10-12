@@ -1,7 +1,5 @@
 /**
- * Next-state permutator
- *
- * Integrated state storage f the multi-core tool to increase efficiency
+ * Integrated state storage for the multi-core tool to increase efficiency
  */
 
 #include <hre/config.h>
