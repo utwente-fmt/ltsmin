@@ -38,7 +38,7 @@ static  struct poptOption options[] = {
     { "branching" , 'b' , POPT_ARG_VAL , &task, Branching , "minimize module branching bisimulation" , NULL },
     { "divergence" , 0 , POPT_ARG_VAL , &divergence_sensitive , 1 , "make branching bisimulation divergence sensitive" , NULL },
     { "copy" , 'c' , POPT_ARG_VAL , &task , Copy , "perform a load/store copy"  , NULL },
-    { "lump" , 'l' , POPT_ARG_VAL , &task, Lumping , "minimize module lumping of CTMC" , NULL },
+    { "lump" , 'l' , POPT_ARG_VAL , &task, Lumping , "minimize modulo lumping of CTMC" , NULL },
     { "silent" , 0 , POPT_ARG_VAL , &task, Silent  , "silent step bisimulation" , NULL },
     { "cycle" , 0 , POPT_ARG_VAL , &task , Cycle , "cycle elimination" , NULL },
     { "determinize" , 0 , POPT_ARG_VAL , &task , Determinize , "compute deterministic variant" , NULL },
