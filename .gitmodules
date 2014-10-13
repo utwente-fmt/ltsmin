@@ -12,4 +12,4 @@
 	url = http://fmt.cs.utwente.nl/tools/scm/sylvan.git
 [submodule "scoop"]
 	path = scoop
-	url = https://github.com/sccblom/scoop.git
+	url = https://github.com/utwente-fmt/scoop.git
