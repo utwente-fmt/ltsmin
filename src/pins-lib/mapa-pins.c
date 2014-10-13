@@ -135,6 +135,10 @@ int get_denominator(char *str){
     return atoi(ptr);
 }
 
+void write_reward_label(char *str, int *label) {
+    (void) str; (void) label;
+    Warning(info, "Rewards labels not implemented!");
+}
 
 int action_get_index(char* val){
     int res=GBchunkPut(main_model,action_type,chunk_str(val));
