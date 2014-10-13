@@ -3,7 +3,7 @@
 	url = http://fmt.cs.utwente.nl/tools/scm/buddy.git
 [submodule "spins"]
 	path = spins
-	url = http://fmt.cs.utwente.nl/tools/scm/spins.git
+	url = https://github.com/utwente-fmt/spins.git
 [submodule "ltl2ba"]
 	path = ltl2ba
 	url = http://fmt.cs.utwente.nl/tools/scm/ltl2ba.git
