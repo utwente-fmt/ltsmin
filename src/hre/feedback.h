@@ -78,8 +78,8 @@ extern void log_message(log_t log,const char*file,int line,int errnum,
 \brief Output directly to a log stream.
 \deprecated Please use the Printf macro instead.
 */
-extern void log_printf(log_t log,const char *fmt,...)
-                       __attribute__ ((format (printf, 2, 3)));
+extern void log_printf(log_t log,const char*file,const char *fmt,...)
+                       __attribute__ ((format (printf, 3, 4)));
 
 /**
 \brief Test if the given log is active.
@@ -124,7 +124,7 @@ extern log_t hre_debug;
 
 #define HREprintf(log,...) {\
     if (log && log_active(log)) {\
-        log_printf(log,__VA_ARGS__);\
+        log_printf(log,__FILE__,__VA_ARGS__);\
     }\
 }
 

@@ -172,12 +172,29 @@ FILE* log_get_stream(log_t log){
     }
 }
 
-int log_active(log_t log){
-    return log && (log->flags & LOG_PRINT);
+static inline int
+is_active(log_t log,const char*file)
+{
+    if (log == NULL || (log->flags & LOG_PRINT)==0) return false;
+    if (file != NULL && log->index){
+        const char *tmp=file;
+        for(;;){
+            int idx=SIlookup(log->index,tmp);
+            if (idx!=SI_INDEX_FAILED) break; // found match.
+            tmp=strstr(tmp,"/");
+            if (!tmp) return false; // not found.
+            tmp=tmp+1; // try again with shorter prefix.
+        }
+    }
+    return true;
 }
 
-void log_printf(log_t log,const char *fmt,...){
-    if (log && (log->flags & LOG_PRINT)){
+int log_active(log_t log) {
+    return is_active(log, NULL);
+}
+
+void log_printf(log_t log,const char*file,const char *fmt,...){
+    if (is_active(log,file)) {
         va_list args;
         va_start(args,fmt);
         vfprintf(log->f?log->f:stderr,fmt,args);
@@ -186,17 +203,7 @@ void log_printf(log_t log,const char *fmt,...){
 }
 
 void log_message(log_t log,const char*file,int line,int errnum,const char *fmt,...){
-    if (log == NULL || (log->flags & LOG_PRINT)==0) return;
-    if (log->index){
-        const char *tmp=file;
-        for(;;){
-            int idx=SIlookup(log->index,tmp);
-            if (idx!=SI_INDEX_FAILED) break; // found match.
-            tmp=strstr(tmp,"/");
-            if (!tmp) return; // not found.
-            tmp=tmp+1; // try again with shorter prefix.
-        }
-    }
+    if (!is_active(log,file)) return;
     FILE*f=log->f?log->f:stderr;
     struct thread_context *ctx=pthread_getspecific(hre_key);
     // If needed put the time in the string when.

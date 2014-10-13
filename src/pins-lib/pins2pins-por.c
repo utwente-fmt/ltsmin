@@ -729,7 +729,7 @@ beam_ensure_invisible_and_key (por_context* ctx)
         bool has_invisible = s->score_vis_en != s->enabled->count;
         if (need_invisible && !has_invisible) {
             int i_group = beam_min_invisible_group (ctx, s);
-            Debugf ("BEAM %d adding invisible key: ", s->idx, i_group);
+            Debugf ("BEAM %d adding invisible key: %d", s->idx, i_group);
             select_group (ctx, s, i_group, true);
             if (POR_WEAK) { // make it also key
                 Debugf (" +strong[ ");

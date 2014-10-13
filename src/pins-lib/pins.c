@@ -1150,7 +1150,7 @@ int GBgetMucalcNodeCount(model_t model) {
 
 void chunk_table_print(log_t log, model_t model) {
     lts_type_t t = GBgetLTStype(model);
-    log_printf(log,"The registered types values are:\n");
+    HREprintf(log,"The registered types values are:\n");
     int N=lts_type_get_type_count(t);
     int idx = 0;
     for(int i=0;i<N;i++){
@@ -1160,7 +1160,7 @@ void chunk_table_print(log_t log, model_t model) {
             chunk c = GBchunkGet(model, i, j);
             char name[c.len*2+6];
             chunk2string(c, sizeof name, name);
-            log_printf(log,"%4d: %s (%s)\n",idx, name, type);
+            HREprintf(log,"%4d: %s (%s)\n",idx, name, type);
             idx++;
         }
     }
