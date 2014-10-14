@@ -1795,6 +1795,7 @@ GBaddPOR (model_t model)
 
     por_context *ctx = RTmalloc (sizeof *ctx);
     ctx->parent = model;
+    ctx->visible = NULL; // initialized on demand
 
     sl_group_t *guardLabels = GBgetStateLabelGroupInfo (model, GB_SL_GUARDS);
     sl_group_t* sl_guards = GBgetStateLabelGroupInfo(model, GB_SL_ALL);
