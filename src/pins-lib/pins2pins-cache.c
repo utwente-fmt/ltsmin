@@ -86,7 +86,7 @@ add_cache_entry (void *context, transition_info_t *ti, int *dst, int *cpy)
 
 static int
 cached_short (model_t self, int group, int *src, TransitionCB cb,
-              void *user_context)
+              void *user_context, int (*short_proc)(model_t,int,int*,TransitionCB,void*))
 {
     struct cache_context *ctx =
         (struct cache_context *)GBgetContext (self);
@@ -102,7 +102,7 @@ cached_short (model_t self, int group, int *src, TransitionCB cb,
             cache->source=src_idx;
             cache->begin[src_idx].first = cache->edges * edge_info_sz (cache);
             cache->begin[cache->source].edges=0;
-            cache->begin[src_idx].trans = GBgetTransitionsShort (GBgetParent(self), group, src, add_cache_entry, cache);
+            cache->begin[src_idx].trans = short_proc (GBgetParent(self), group, src, add_cache_entry, cache);
     }
     int N=cache->begin[src_idx].edges;
     for (int i = cache->begin[src_idx].first ; N>0 ; N--,i += edge_info_sz (cache)) {
@@ -117,6 +117,18 @@ cached_short (model_t self, int group, int *src, TransitionCB cb,
 }
 
 static int
+cached_next_short (model_t self, int group, int *src, TransitionCB cb,
+                   void *user_context) {
+    return cached_short(self, group, src, cb, user_context, &GBgetTransitionsShort);
+}
+
+static int
+cached_actions_short (model_t self, int group, int *src, TransitionCB cb,
+                   void *user_context) {
+    return cached_short(self, group, src, cb, user_context, &GBgetActionsShort);
+}
+
+static int
 cached_transition_in_group (model_t self, int* labels, int group)
 {
   return GBtransitionInGroup(GBgetParent(self), labels, group);
@@ -127,8 +139,8 @@ GBaddCache (model_t model)
 {
     HREassert (model != NULL, "No model");
     matrix_t           *p_dm = GBgetDMInfo (model);
-    matrix_t           *p_dm_read = GBgetDMInfoRead (model);
-    matrix_t           *p_dm_may_write = GBgetDMInfoMayWrite (model);
+    matrix_t           *p_dm_read = GBgetExpandMatrix (model);
+    matrix_t           *p_dm_may_write = GBgetProjectMatrix (model);
     matrix_t           *p_dm_must_write = GBgetDMInfoMustWrite (model);
     int                 N = dm_nrows (p_dm);
     struct group_cache *cache = RTmalloc (N * sizeof (struct group_cache));
@@ -153,13 +165,10 @@ GBaddCache (model_t model)
     model_t             cached = GBcreateBase ();
     ctx->cache = cache;
     
-    GBsetDMInfo (cached, p_dm);
-    GBsetDMInfoRead (cached, p_dm_read);
-    GBsetDMInfoMayWrite (cached, p_dm_may_write);
-    GBsetDMInfoMustWrite (cached, p_dm_must_write);
     GBsetContext (cached, ctx);
-    
-    GBsetNextStateShort (cached, cached_short);
+
+    GBsetNextStateShort (cached, cached_next_short);
+    GBsetActionsShort (cached, cached_actions_short);
     GBsetTransitionInGroup (cached, cached_transition_in_group);
 
     GBinitModelDefaults (&cached, model);
