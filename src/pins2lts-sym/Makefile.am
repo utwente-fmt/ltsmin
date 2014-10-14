@@ -56,7 +56,7 @@ pins2lts_sym_SOURCES   = pins2lts-sym.c
 pins2lts_sym_SOURCES  += ../pins-lib/dlopen-pins.c ../pins-lib/dlopen-pins.h
 pins2lts_sym_LDADD     = $(PINS_LIBS) $(VSET_LIBS)
 pins2lts_sym_CPPFLAGS  = -DPINS_DLL $(SYM_CPPFLAGS)
-pins2lts_sym_LDFLAGS   = $(SYM_LDFLAGS)
+pins2lts_sym_LDFLAGS   = -Wl,-E $(SYM_LDFLAGS)
 nodist_EXTRA_pins2lts_sym_SOURCES = automake-force-linker.cxx # req. by vset
 
 # lpo2lts-sym

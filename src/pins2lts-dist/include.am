@@ -52,6 +52,7 @@ pins2lts_dist_SOURCES   = ../pins2lts-dist.c
 pins2lts_dist_SOURCES  += ../../pins-lib/dlopen-pins.c ../../pins-lib/dlopen-pins.h
 pins2lts_dist_LDADD     = $(PINS_LIBS)
 pins2lts_dist_CPPFLAGS  = -DPINS_DLL $(DIST_CPPFLAGS)
+pins2lts_dist_LDFLAGS   = -Wl,-E 
 
 # lpo2lts-dist
 lpo2lts_dist_SOURCES   = ../pins2lts-dist.c

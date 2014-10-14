@@ -55,6 +55,7 @@ pins2lts_mc_SOURCES   = $(mc_sources)
 pins2lts_mc_SOURCES  += ../pins-lib/dlopen-pins.c ../pins-lib/dlopen-pins.h
 pins2lts_mc_LDADD     = $(MC_LIBS) 
 pins2lts_mc_CPPFLAGS  = -DPINS_DLL $(MC_CPPFLAGS)
+pins2lts_mc_LDFLAGS  = -Wl,-E 
 
 ## lpo2lts-mc
 lpo2lts_mc_SOURCES   = $(mc_sources)

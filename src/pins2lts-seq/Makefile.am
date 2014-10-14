@@ -39,6 +39,7 @@ pins2lts_seq_SOURCES  += ../pins-lib/dlopen-pins.c ../pins-lib/dlopen-pins.h
 pins2lts_seq_LDADD     = $(HRE_LIB) $(PINS_LIBS)
 pins2lts_seq_LDADD    += $(VSET_LIBS)
 pins2lts_seq_CPPFLAGS  = -DPINS_DLL $(SEQ_CPPFLAGS)
+pins2lts_seq_LDFLAGS   = -Wl,-E 
 nodist_EXTRA_pins2lts_seq_SOURCES = automake-force-linker.cxx # req. by vset
 
 
