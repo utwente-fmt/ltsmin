@@ -12,6 +12,7 @@ cct interface more explicit.
 
 #include <stdbool.h>
 
+#include <hre/feedback.h>
 #include <ltsmin-lib/lts-type.h>
 #include <util-lib/tables.h>
 
