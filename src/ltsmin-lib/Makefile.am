@@ -1,7 +1,7 @@
 noinst_LTLIBRARIES  = libltsmin.la
 noinst_LTLIBRARIES += libmucalc.la
 
-pkginclude_HEADERS = lts-type.h
+pkginclude_HEADERS = lts-type.h ltsmin-standard.h
 
 # libltsmin
 libltsmin_la_SOURCES  =
