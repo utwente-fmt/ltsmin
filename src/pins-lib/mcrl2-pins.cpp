@@ -72,7 +72,7 @@ public:
         mcrl2::lps::pins::update_long (state, group, f, dest, labels);
     }
 
-    GUARD_EVALUATION eval_guard_long(state_vector const& src, std::size_t guard)
+    guard_evaluation_t eval_guard_long(state_vector const& src, std::size_t guard)
     {
         int state[process_parameter_count()];
         for (size_t i = 0; i < process_parameter_count(); ++i) {
