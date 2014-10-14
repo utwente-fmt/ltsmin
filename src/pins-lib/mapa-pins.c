@@ -135,9 +135,11 @@ int get_denominator(char *str){
     return atoi(ptr);
 }
 
-void write_reward_label(char *str, int *label) {
-    (void) str; (void) label;
-    Warning(info, "Rewards labels not implemented!");
+void write_reward_label(char *str,int*label){
+    Warning(infoLong,"reward label %s=",str);
+    float f=atof(str);
+    rationalize32(f,(uint32_t*)label+0,(uint32_t*)label+1);
+    Warning(infoLong,"  %d/%d",label[0],label[1]);
 }
 
 int action_get_index(char* val){
