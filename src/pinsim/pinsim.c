@@ -102,11 +102,11 @@ int main (int argc, char *argv[]){
     // Warning(info, "opening %s", files[0]);
     model = GBcreateBase();
 
-    // GBsetChunkMethods(model,HREgreyboxNewmap,HREglobal(),
-    //                   HREgreyboxI2C,
-    //                   HREgreyboxC2I,
-    //                   HREgreyboxCAtI,
-    //                   HREgreyboxCount);
+    GBsetChunkMethods(model,HREgreyboxNewmap,HREglobal(),
+                      HREgreyboxI2C,
+                      HREgreyboxC2I,
+                      HREgreyboxCAtI,
+                      HREgreyboxCount);
 
     //HREbarrier(HREglobal());
     const char * extension = strrchr (files[0], '.');
