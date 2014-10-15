@@ -1,0 +1,32 @@
+PINSsim - Feature|To-do list
+
+PINSsim internal:
+- Free memory properly
+- Store/load trace - .gcf file format (sufficiency of this format for the purpose?)
+	- lts_t trace
+	- Take a look at .gcf format
+	- Search for functionality to print to this file format within ltsmin (--trace=)
+- Set initial state to another state
+	- Get list of available states
+- GUI - IO:
+	- text-output:
+		- Coloured makrings of read write dependencies
+		- Model depending representation of state:
+			- file to specifiy representation?
+		- Tree printing
+			- simple - DONE
+	- Graphical output:
+		- take a look at OCIS
+		- Ask Axel for demonstration of his visualization
+- (Detect loops) - reoccurence of states - DONE
+
+
+Depending on LTSmin API:
+- Reachability of a state (from another state)
+- Request trace (from this state) on from model checker
+	- to final state
+	- breakpoint like (e.g. until this transition, action, state occured)
+	- to another specific state
+	- cancel process
+- Threading - 1st thread PINSsim - 2nd thread model checker
+

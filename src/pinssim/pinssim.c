@@ -125,29 +125,38 @@ typedef struct _trace_node{
 static lts_type_t ltstype;
 static int N;
 static int nGrps;
+static int maxTreeDepth;
 static model_t model;
 static int * src;
 static matrix_t * initial_DM = NULL;
 static matrix_t * dm_r = NULL;
 static matrix_t * dm_may_w = NULL;
 static matrix_t * dm_must_w = NULL;
+static matrix_t * stateLabel = NULL;
 static trace_node * head;
 static trace_node * current;
+
+//Options
+static bool loopDetection = false;
+
 // I/O variables
 FILE * opf;
 static char * files[2]; 
-static int numCommands = 10;
+static int numCommands = 13;
 static char * com[5];
-static char * helpText[10] =
+static char * helpText[13] =
    {"COMMANDS:",
 	"  help                           show all options",
 	"  current                        print info of current node",
 	"  state                          print current state",
 	"  trans                          print available transitions and subsequent states",
-	"  path (states) (rw)             print path of transitions takes (with states and read-write dependencies)",
+	"  path (states) (rw)             print path of transitions taken (with states and read-write dependencies)",
+	"  tree (states)                  print tree of transitions explored (with states)",
 	"  go / > [TRANSNUMBER]           take transition with TRANSNUMBER and explore potential successor states",
 	"  goback / ..                    go back to parent state",
 	"  restart                        restart exploration from INITIAL state",
+	"  set [OPTION] [VALUE]           Set OPTION to VALUe. OPTIONS:",
+	"      loopDetection              true/false",
 	"  quit / q                       quit PINSsim"};
 
 
@@ -270,6 +279,34 @@ printPath(trace_node * start, bool withStates, bool withRW){
 
 }
 
+/*printTreeNode()
+  Helper function for printTree() printing a node according to its content.*/
+static void
+printTreeNode(trace_node * node, bool withStates, char * sign){
+	for (int i = 0; i < node->treeDepth; i++) fprintf(stdout, " ");
+	fprintf(stdout, "%s ", sign);
+	if (node->grpNum >= 0) fprintf(stdout, "%d ", node->grpNum);
+	else fprintf(stdout, GREEN "INITAL " RESET);
+	if(withStates){ 
+		fprintf(stdout, "- ");
+		printState(node,0);
+	}
+	else fprintf(stdout, "\n");
+}
+
+/*printTree()
+  Prints a simple tree of 'node' and all its explored successors recursively.
+  Showing the transition group only by default. If 'withStates' is true
+  also teh states will be printed.*/
+static void
+printTree(trace_node * node, bool withStates, char * sign){
+	printTreeNode(node,withStates, sign);
+	for (int i = 0; i < node->numSuccessors; i++){
+		if(i == node->numSuccessors-1) printTree(&(node->successors[i]),withStates,"\\");
+		else printTree(&(node->successors[i]),withStates,"|");
+	}
+}
+
 void 
 freeNodeMem(trace_node * node){
 	//free(node->parent);
@@ -289,13 +326,39 @@ freeNodeMem(trace_node * node){
  *
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
+static bool
+isSameState(int * s1, int * s2){
+	for (int i = 0; i < N; i++) if(s1[i] != s2[i]) return false;
+	return true;
+}
+
+/*detectLoops()
+  Checks whether 'comp->states' occured before in 'start' and its successors*/
+static void
+detectLoops(trace_node * start, trace_node * comp){
+	if(isSameState(start->state,comp->state) && start->treeDepth != comp->treeDepth){
+		fprintf(stdout, CYAN "-> Found reoccurence of state:\n" RESET);
+		printNode(start,0);
+		printNode(comp,0);
+	}
+	if(start->numSuccessors > 0){
+		for (int i = 0; i < start->numSuccessors; i++) detectLoops(&(start->successors[i]),comp);
+	}
+}
+
+/*group_add()
+ Call back function necessary for GBgetTransitionLong(). 
+ Creates successor nodes and adds pointers to the the parent node. 
+ Checks whether the new explored states occurred before in the search tree
+ if 'loopDetection' is set to true by the user.*/
 static void
 group_add(void *context, transition_info_t *ti, int *dst, int *cpy){
-
 	trace_node * node = (trace_node*)context;
 	node->numSuccessors += 1;
 	if (node->numSuccessors==1) node->successors = malloc(sizeof(trace_node)*node->numSuccessors);
 	else  node->successors = realloc(node->successors,sizeof(trace_node)*node->numSuccessors);
+
+	if (node->treeDepth+1 > maxTreeDepth) maxTreeDepth = node->treeDepth+1;
 
 	node->successors[node->numSuccessors-1].grpNum = ti->group;
 	node->successors[node->numSuccessors-1].state = (int*)malloc(sizeof(int)*N);
@@ -304,14 +367,14 @@ group_add(void *context, transition_info_t *ti, int *dst, int *cpy){
 	node->successors[node->numSuccessors-1].numSuccessors = 0;
 	node->successors[node->numSuccessors-1].explored = 0;
 	node->successors[node->numSuccessors-1].treeDepth = node->treeDepth+1;
- 
-	// TESTs
-	//printNode(&node->successors[node->numSuccessors-1]);
-	//fprintf(stdout, "group %d: ", ti->group);
-	//printState(node->successors[node->numSuccessors-1].state);
+ 	
+ 	if(loopDetection) detectLoops(head,&(node->successors[node->numSuccessors-1]));
 
 }
 
+/*explore_states()
+  Explores potential successor states of the current node by going through all possible transitions.
+  Does not explore an previously explored node again.*/
 void
 explore_states(trace_node * node){
 	
@@ -326,6 +389,9 @@ explore_states(trace_node * node){
 	printNode(node, 1);
 }
 
+/*proceed()
+ proceeds from the current node to its successor with index in the successor array.
+ Explores successor states of the new current node*/
 void 
 proceed(int index){
 	current = &(current->successors[index]);
@@ -344,9 +410,9 @@ goBack(){
 	else fprintf(stdout, CYAN "\t INFO:" RESET " This is the INITIAL state! You can't go back!\n");
 }
 
+
 void
 restart(){
-
 	current = head;
 	//TODO:
 	//Should delete former tree and free memory here
@@ -361,8 +427,9 @@ restart(){
  *
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
-int phraseComLine(char * separator, char * line){
-
+/*parseComLine()
+ splits a char array into separate char arrays by the separator*/
+int parseComLine(char * separator, char * line){
 	int n = 0;
 	if(strstr(line,separator)){
 		char * split = strtok(line,separator);
@@ -377,18 +444,15 @@ int phraseComLine(char * separator, char * line){
 		com[n] = line;
 		n++;
 	}
-
 	return n;
 }
 
-/*actOnInput()*/
+/*handleIO()
+  Takes a input a char array read from the console. Splits it up in separate commands.
+  Executes functioanlities according to commands and arguments.*/
 bool handleIO(char * input){
 
-	int nCom= phraseComLine(" ",input);
-	
-	//TEST to control parsed input commands
-	//fprintf(stdout, "Num of commands %d\n", nCom);
-	//for(int i = 0; i < nCom; i++) fprintf(stdout, "|%s|\n", com[i]);
+	int nCom = parseComLine(" ", input);
 
 	if (strcmp(com[0],"help") == 0) printHelp();
 	else if (strcmp(com[0],"current") == 0) printNode(current, 1);
@@ -403,6 +467,13 @@ bool handleIO(char * input){
 			else fprintf(stdout, RED "\t ERROR: " RESET " Entered argument for 'path' unknown\n\t See 'help' for description.\n");
 		}
 		else printPath(current, 0, 0);
+	}
+	else if (strcmp(com[0],"tree") == 0){
+		if (nCom >= 2){
+			if(strcmp(com[1],"states") == 0) printTree(head, 1, "\\");
+			else fprintf(stdout, RED "\t ERROR: " RESET " Entered argument for 'tree' unknown\n\t See 'help' for description.\n");
+		}
+		else printTree(head, 0, "\\");
 	} 
 	else if (strcmp(com[0],"go") == 0 || strcmp(com[0],">") == 0){
 		if (nCom >= 2){
@@ -424,10 +495,18 @@ bool handleIO(char * input){
 	}
 	else if (strcmp(com[0],"goback") == 0 || strcmp(com[0],"..") == 0) goBack();
 	else if (strcmp(com[0],"restart") == 0) restart();
+	else if (strcmp(com[0],"set") == 0){
+		if(nCom >= 3){
+			if (strcmp(com[1],"set") == 0){ 
+				if(strcmp(com[2],"true") == 0 || strcmp(com[2],"1") == 0)loopDetection = 1;
+				if(strcmp(com[2],"false") == 0 || strcmp(com[2],"0") == 0)loopDetection = 0;
+			}
+		}
+		else fprintf(stdout, RED "\t ERROR: " RESET " 'set' needs a option name and a values as argument.\n\t See 'help' for description.\n");
+	}
 	else if ((strcmp(com[0],"q") == 0)||(strcmp(com[0],"quit") == 0)) return 0;
 	else fprintf(stdout, RED "\t ERROR: " RESET " Command unknown - enter 'help' for available options.\n");
 	return 1;
-
 }
 
 /*runIO()*/
@@ -482,30 +561,28 @@ int main (int argc, char *argv[]){
                       HREgreyboxCAtI,
                       HREgreyboxCount);
 
-    // const char * extension = strrchr (files[0], '.');
-    // printf("Parsed extension: %s \n",extension);
-
+    // Load model from file
     GBloadFile(model, files[0], &model);
     fprintf(stdout,CYAN "INFO: " RESET " Loaded file: %s \n",files[0]);
   
+    // if (argc >= 2){
+    // 	opf = fopen(files[1],"w");
+    // 	if (opf != NULL){ 
+    // 		GBprintDependencyMatrixCombined(opf, model);
+    // 		fprintf(stdout, CYAN "INFO:" RESET " Saved dependency matrix to file: %s \n",files[1]);
+    // 	}
+    // 	//GBprintStateLabelMatrix(opf, model);
+    // }
 
-    if (argc >= 2){
-    	opf = fopen(files[1],"w");
-    	if (opf != NULL){ 
-    		GBprintDependencyMatrixCombined(opf, model);
-    		fprintf(stdout, CYAN "INFO:" RESET " Saved dependency matrix to file: %s \n",files[1]);
-    	}
-    	//GBprintStateLabelMatrix(opf, model);
-    }
-
-
-    initial_DM = GBgetDMInfo(model);
+    // Initialize global variables
+    initial_DM = GBgetDMInfo(model); 			//Dependency matrices
     dm_r = GBgetExpandMatrix(model);
     dm_may_w = GBgetDMInfoMayWrite(model);
     dm_must_w = GBgetDMInfoMustWrite(model);
+    stateLabel = GBgetStateLabelInfo(model);	// State labels
 
-    ltstype = GBgetLTStype(model);
-    N = lts_type_get_state_length(ltstype);
+    ltstype = GBgetLTStype(model);				//LTS Type
+    N = lts_type_get_state_length(ltstype);		//State length
     //eLbls = lts_type_get_edge_label_count(ltstype);
     nGrps = dm_nrows(GBgetDMInfo(model));
 
@@ -514,6 +591,8 @@ int main (int argc, char *argv[]){
     src = (int*)alloca(sizeof(int)*N);
     GBgetInitialState(model, src);
 
+    maxTreeDepth = 0;
+
     head = (trace_node*)malloc(sizeof(trace_node));
     head->grpNum = -1;
     head->state = (int*)malloc(sizeof(int)*N);
@@ -521,21 +600,30 @@ int main (int argc, char *argv[]){
     head->parent = NULL;
     head->numSuccessors = 0;
     head->explored = 0;
-    head->treeDepth = 0;
+    head->treeDepth = maxTreeDepth;
 
     fprintf(stdout,"\n-----------------------------------------------------------------------------------------------\n");
     fprintf(stdout, GREEN "\nINITIAL " RESET "state:\n");
     explore_states(head);
 
-    //current = (trace_node*)malloc(sizeof(*head));
+    // Set current node to head
     current = head;
-    //memcpy(current,head,sizeof(*head));
-
+    
+    // Start IO procedure
 	runIO();
 
+	// Free memory before quitting the program
 	//freeNodeMem(head);
 
 	return 0;
 
 }
+
+ // trc_env_t          *trace = RTmalloc(sizeof(trc_env_t));
+ //    lts_type_t          ltstype = GBgetLTStype (model);
+ //    trace->N = lts_type_get_state_length (ltstype);
+ //    trace->state_labels = lts_type_get_state_label_count (ltstype);
+ //    trace->get_state = get;
+ //    trace->get_state_arg = arg;
+ //    trace->model = model;
 
