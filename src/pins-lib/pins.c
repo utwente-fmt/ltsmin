@@ -1409,4 +1409,6 @@ string_set_t GBgetDefaultFilter(model_t model){
     return model->default_filter;
 }
 
-
+void ltsmin_abort(int code) {
+    HREabort (code);
+}
