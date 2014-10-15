@@ -59,6 +59,8 @@ static int   action_typeno;
 static int   ErrorActions = 0; // count number of found errors (action/deadlock/invariant)
 
 static uint64_t *seen_actions = 0;
+static int seen_actions_size = 0;
+static int* seen_actions_warning = 0;
 
 static int   sat_granularity = 10;
 static int   save_sat_levels = 0;
@@ -644,11 +646,20 @@ static void
 seen_actions_prepare(int count)
 {
     seen_actions = (uint64_t*)RTalignZero(8, sizeof(uint64_t) * ((count+63)/64));
+    seen_actions_size = count;
+    seen_actions_warning = RTmallocZero(sizeof(int));
+    Print(infoLong, "Prepare action cache for %d action labels.", seen_actions_size);
 }
 
 static int
 seen_actions_test(int idx)
 {
+    if (idx >= seen_actions_size) {
+        if (cas(seen_actions_warning, 0, 1)) {
+            Warning(info, "Warning: Action cache full. Caching currently limited to %d labels.", seen_actions_size);
+        }
+        return 1;
+    }
     volatile uint64_t *p = seen_actions+(idx/64);
     const uint64_t m = 1ULL<<(idx&63);
     for (;;) {
@@ -3047,7 +3058,7 @@ init_action()
     if (act_label == -1)
         Abort("No edge label '%s...' for action detection", LTSMIN_EDGE_TYPE_ACTION_PREFIX);
     action_typeno = lts_type_get_edge_label_typeno(ltstype, act_label);
-    int count = GBchunkCount(model, action_typeno);
+    int count = 256; // GBchunkCount(model, action_typeno);
     seen_actions_prepare(count);
     Warning(info, "Detecting actions with prefix \"%s\"", act_detect);
 }
