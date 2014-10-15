@@ -1383,17 +1383,8 @@ struct poptOption greybox_options[]={
 };
 
 struct poptOption greybox_options_ltl[]={
-    { "labels", 0, POPT_ARG_VAL, &labels, 1, "print state variable and type names, and state and action labels", NULL },
-    { "matrix" , 'm' , POPT_ARG_VAL , &matrix , 1 , "print the dependency matrix for the model and exit" , NULL},
-    { USE_GUARDS_OPTION , 'g' , POPT_ARG_STRING | POPT_ARGFLAG_SHOW_DEFAULT , &use_guards , 0 , "use guards in combination with the long next-state function to speed up the next-state function" , "<false|assume-true|evaluate>"},
-    { "cache" , 'c' , POPT_ARG_VAL , &cache , 1 , "enable caching of PINS calls" , NULL },
-    { "regroup" , 'r' , POPT_ARG_STRING, &regroup_options , 0 ,
-          "enable regrouping; available transformations T: "
-          "gs, ga, gsa, gc, gr, cs, cn, cw, ca, csa, rs, rn, ru, w2W, r2+, w2+, W2+", "<(T,)+>" },
-    {"mucalc", 0, POPT_ARG_STRING, &mucalc_file, 0, "modal mu-calculus formula or file with modal mu-calculus formula",
-          "<mucalc-file>.mcf|<mucalc formula>"},
+    { NULL, 0 , POPT_ARG_INCLUDE_TABLE, greybox_options , 0 , NULL, NULL },
     { NULL, 0 , POPT_ARG_INCLUDE_TABLE, ltl_options , 0 , "LTL options", NULL },
-    { NULL, 0 , POPT_ARG_INCLUDE_TABLE, por_options , 0 , "Partial Order Reduction options", NULL },
     POPT_TABLEEND
 };
 
