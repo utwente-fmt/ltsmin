@@ -31,7 +31,7 @@
 #include <hre/stringindex.h>
 
 static  struct poptOption options[] = {
-//     { NULL, 0 , POPT_ARG_CALLBACK|POPT_CBFLAG_POST|POPT_CBFLAG_SKIPOPTION , (void*)reach_popt , 0 , NULL , NULL },
+//	{ NULL, 0 , POPT_ARG_CALLBACK|POPT_CBFLAG_POST|POPT_CBFLAG_SKIPOPTION , (void*)reach_popt , 0 , NULL , NULL },
 // #ifdef HAVE_SYLVAN
 //     { "order" , 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &order , 0 , "set the exploration strategy to a specific order" , "<bfs-prev|bfs|chain-prev|chain|par-prev|par>" },
 // #else
@@ -58,9 +58,9 @@ static  struct poptOption options[] = {
 // #endif
 //     { "pg-write" , 0 , POPT_ARG_STRING , &pg_output, 0, "file to write symbolic parity game to","<pg-file>.spg" },
 //     { "no-matrix" , 0 , POPT_ARG_VAL , &no_matrix , 1 , "do not print the dependency matrix when -v (verbose) is used" , NULL},
-//     SPEC_POPT_OPTIONS,
-//     { NULL, 0 , POPT_ARG_INCLUDE_TABLE, greybox_options , 0 , "PINS options",NULL},
-//     { NULL, 0 , POPT_ARG_INCLUDE_TABLE, vset_options , 0 , "Vector set options",NULL},
+   	SPEC_POPT_OPTIONS,
+  	{ NULL, 0 , POPT_ARG_INCLUDE_TABLE, greybox_options , 0 , "PINS options",NULL},
+    { NULL, 0 , POPT_ARG_INCLUDE_TABLE, vset_options , 0 , "Vector set options",NULL},
     POPT_TABLEEND
 };
 
@@ -78,7 +78,7 @@ char * getIOString(){
 
 	while((read = getline(&line, &len, stdin)) != -1){
 		if(read > 0){
-			printf("\n read %zd chars from stdin, allocated %zd bytes for line %s",read,len,line);
+			printf("\n-> read %zd chars from stdin, allocated %zd bytes for line %s",read,len,line);
 			return line;
 		}
 		printf("\nEnter string below - [ctrl + d] to quit\n");
@@ -114,7 +114,7 @@ int main (int argc, char *argv[]){
 
     //PINSpluginLoadLanguageModule(extension);
     GBloadFile(model, files[0], &model);
-
+    printf("pinsim.c - main: loaded file\n");
     //HREbarrier(HREglobal());
 	
 	getIOString();
