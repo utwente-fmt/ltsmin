@@ -24,7 +24,7 @@
 #include <ltsmin-lib/ltsmin-standard.h>
 #include <ltsmin-lib/ltsmin-syntax.h>
 #include <ltsmin-lib/ltsmin-tl.h>
-//#include <spg-lib/spg-solve.h>
+#include <spg-lib/spg-solve.h>
 #include <vset-lib/vector_set.h>
 #include <util-lib/dynamic-array.h>
 #include <util-lib/bitset.h>
@@ -110,9 +110,9 @@ int main (int argc, char *argv[]){
 
     //HREbarrier(HREglobal());
     const char * extension = strrchr (files[0], '.');
-    printf("Parsed extension: %s",extension);
+    printf("Parsed extension: %s \n",extension);
 
-    PINSpluginLoadLanguageModule(extension);
+    //PINSpluginLoadLanguageModule(extension);
     GBloadFile(model, files[0], &model);
 
     //HREbarrier(HREglobal());
