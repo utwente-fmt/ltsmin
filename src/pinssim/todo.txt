@@ -1,20 +1,21 @@
 PINSsim - Feature|To-do list
 
 PINSsim internal:
-- Free memory properly
-- Store/load trace - .gcf file format (sufficiency of this format for the purpose?)
+- Free memory properly - DONE
+- Store/load trace - .gcf file format (sufficiency of this format for the purpose?) - ???
 	- lts_t trace
-	- Take a look at .gcf format
+	- Take a look at .gcf format 
 	- Search for functionality to print to this file format within ltsmin (--trace=)
 - Set initial state to another state
-	- Get list of available states
+	- Get list of available states - ???
 - GUI - IO:
 	- text-output:
-		- Coloured makrings of read write dependencies
+		- Coloured highlighting of read write dependencies
 		- Model depending representation of state:
 			- file to specifiy representation?
 		- Tree printing
 			- simple - DONE
+				- marked current path - DONE
 	- Graphical output:
 		- take a look at OCIS
 		- Ask Axel for demonstration of his visualization

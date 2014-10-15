@@ -2,6 +2,7 @@ HRE_LIB = ../hre/libhre.la
 SYM_CPPFLAGS = $(AM_CPPFLAGS) $(PROFILER_CPPFLAGS)
 SYM_LDFLAGS = $(AM_LDFLAGS) $(PROFILER_LDFLAGS)
 PINS_LIBS  =
+PINS_LIBS += ../lts-lib/liblts-lib.la
 PINS_LIBS += ../lts-io/liblts-io.la
 PINS_LIBS += ../hre-io/libhre-io.la
 PINS_LIBS += $(HRE_LIB)
@@ -10,6 +11,7 @@ PINS_LIBS += ../ltsmin-lib/libltsmin.la
 PINS_LIBS += ../util-lib/libutil.la
 PINS_LIBS += ../dm/libdm.la
 PINS_LIBS += ../spg-lib/libspg.la
+
 
 VSET_LIBS = ../vset-lib/libvset.la
 

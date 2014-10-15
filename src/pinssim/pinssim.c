@@ -35,6 +35,11 @@
 #include <hre/config.h>
 #include <dm/dm.h>
 #include <hre/user.h>
+// From lts.h:
+#include <hre/runtime.h>
+#include <lts-lib/lts.h>
+#include <util-lib/chunk_support.h>
+// -----------
 #include <lts-io/user.h>
 #include <pins-lib/pg-types.h>
 #include <pins-lib/pins.h>
@@ -118,6 +123,7 @@ typedef struct _trace_node{
 	int numSuccessors;
     struct _trace_node * successors;
     bool explored;
+    bool isPath;
     int treeDepth;
 } trace_node;
 
@@ -128,7 +134,6 @@ static int nGrps;
 static int maxTreeDepth;
 static model_t model;
 static int * src;
-static matrix_t * initial_DM = NULL;
 static matrix_t * dm_r = NULL;
 static matrix_t * dm_may_w = NULL;
 static matrix_t * dm_must_w = NULL;
@@ -138,31 +143,68 @@ static trace_node * current;
 
 //Options
 static bool loopDetection = false;
+static bool clearMemOnGoBack = false;
+static bool clearMemOnRestart = true;
 
 // I/O variables
 FILE * opf;
 static char * files[2]; 
-static int numCommands = 13;
 static char * com[5];
-static char * helpText[13] =
+static int numTextLines = 21;
+static char * helpText[21] =
    {"COMMANDS:",
 	"  help                           show all options",
+	" PRINT OUT",
 	"  current                        print info of current node",
 	"  state                          print current state",
 	"  trans                          print available transitions and subsequent states",
 	"  path (states) (rw)             print path of transitions taken (with states and read-write dependencies)",
 	"  tree (states)                  print tree of transitions explored (with states)",
+	" STATE EXPLORATION",
 	"  go / > [TRANSNUMBER]           take transition with TRANSNUMBER and explore potential successor states",
-	"  goback / ..                    go back to parent state",
-	"  restart                        restart exploration from INITIAL state",
-	"  set [OPTION] [VALUE]           Set OPTION to VALUe. OPTIONS:",
-	"      loopDetection              true/false",
+	"  goback / .. (clear/keep)       go back to parent state.",
+	"                                 (and clears/keeps the state. See 'set' to change default.)",
+	"  restart (clear/keep)           restart exploration from initial state",
+	"                                 (and clears/keeps the explored states. See 'set' to change default.)",
+	" SETTINGS",
+	"  set [OPTION] [VALUE]           Set OPTION to VALUE. OPTIONS:",
+	"      loopDetection              true/false - default: false",
+	"      clearMemOnGoBack           true/false - default: false",
+	"      clearMemOnGoRestart        true/false - default: true",
+	" EXIT",
 	"  quit / q                       quit PINSsim"};
 
 
+//From lts.h
+// static int arg_all=0;
+// static int arg_table=0;
+// static char *arg_value="name";
+// static enum { FF_TXT, FF_CSV } file_format = FF_TXT;
+// static char *arg_sep=",";
+// static enum { IDX, NAME } output_value = NAME;
+
+// static si_map_entry output_values[] = {
+//     {"name",    NAME},
+//     {"idx",     IDX},
+//     {NULL, 0}
+// };
+
+// static si_map_entry file_formats[] = {
+//     {"txt",     FF_TXT},
+//     {"csv",     FF_CSV},
+//     {NULL, 0}
+// };
+//END IMPORT lts.h ////////////////////////////////////////////
+
+/* * SECTION * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ *
+ *	 Print out functionalities
+ *
+ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+
 void
 printHelp(){
-	for (int i = 0; i < numCommands; i++) fprintf(stdout, "%s\n", helpText[i]);
+	for (int i = 0; i < numTextLines; i++) fprintf(stdout, "%s\n", helpText[i]);
 }
 
 void
@@ -180,7 +222,6 @@ printDMrow(trace_node * node){
         } else {
             rw[i] = '-';
         }
-		//rw[i] = (char*)(dm_is_set (initial_DM, node->grpNum, i) ? '+' : '-');
 		
 		int absVal = node->state[i];
 		if (absVal < 0) absVal *= -1;
@@ -284,7 +325,8 @@ printPath(trace_node * start, bool withStates, bool withRW){
 static void
 printTreeNode(trace_node * node, bool withStates, char * sign){
 	for (int i = 0; i < node->treeDepth; i++) fprintf(stdout, " ");
-	fprintf(stdout, "%s ", sign);
+	if(node->isPath) fprintf(stdout, CYAN "%s " RESET, sign);
+	else fprintf(stdout, "%s ", sign);
 	if (node->grpNum >= 0) fprintf(stdout, "%d ", node->grpNum);
 	else fprintf(stdout, GREEN "INITAL " RESET);
 	if(withStates){ 
@@ -297,7 +339,7 @@ printTreeNode(trace_node * node, bool withStates, char * sign){
 /*printTree()
   Prints a simple tree of 'node' and all its explored successors recursively.
   Showing the transition group only by default. If 'withStates' is true
-  also teh states will be printed.*/
+  also the states will be printed.*/
 static void
 printTree(trace_node * node, bool withStates, char * sign){
 	printTreeNode(node,withStates, sign);
@@ -307,17 +349,40 @@ printTree(trace_node * node, bool withStates, char * sign){
 	}
 }
 
+/* * SECTION * * * * * * * * * * * * * * * * * * * * * * * * * * * * 
+ *
+ *	 Memory deallocation & node reset functionalities
+ *
+ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+
 void 
-freeNodeMem(trace_node * node){
-	//free(node->parent);
-	//free(node->state);
+freeTreeMem(trace_node * node){
 	if (node->numSuccessors > 0){
 		for (int i = 0; i < node->numSuccessors; i++){
-			freeNodeMem(&(node->successors[i]));
+			freeTreeMem(&(node->successors[i]));
 		}
-		//free(node->successors);
+		free(node->successors);
+		if(node->parent != NULL) node->parent->numSuccessors -= 1;
+		if(node->parent == NULL) free(node);
+		return;
 	}
-	free(node);
+	else{
+		if(node->parent != NULL) node->parent->numSuccessors -= 1;
+		if(node->parent == NULL) free(node);
+		return;
+	} 
+}
+
+static void 
+resetNode(trace_node * node){
+	for (int i = 0; i < node->numSuccessors; i++){
+		for (int j = 0; j < node->successors[i].numSuccessors; j++){
+			freeTreeMem(&(node->successors[i].successors[j]));
+		}
+		free(node->successors);
+		node->numSuccessors = 0;
+		node->explored = false;
+	}
 }
 
 /* * SECTION * * * * * * * * * * * * * * * * * * * * * * * * * * * * 
@@ -366,6 +431,7 @@ group_add(void *context, transition_info_t *ti, int *dst, int *cpy){
 	node->successors[node->numSuccessors-1].parent = node;
 	node->successors[node->numSuccessors-1].numSuccessors = 0;
 	node->successors[node->numSuccessors-1].explored = 0;
+	node->successors[node->numSuccessors-1].isPath = 0;
 	node->successors[node->numSuccessors-1].treeDepth = node->treeDepth+1;
  	
  	if(loopDetection) detectLoops(head,&(node->successors[node->numSuccessors-1]));
@@ -376,50 +442,84 @@ group_add(void *context, transition_info_t *ti, int *dst, int *cpy){
   Explores potential successor states of the current node by going through all possible transitions.
   Does not explore an previously explored node again.*/
 void
-explore_states(trace_node * node){
+explore_states(trace_node * node, bool printOut){
 	
 	if(node->explored == 0){
-		if (node->grpNum >= 0) fprintf(stdout,  MAGENTA "Taking transition %d - exploring potential successor states.\n\n" RESET, node->grpNum);
+		if (node->grpNum >= 0 && printOut) fprintf(stdout,  MAGENTA "Taking transition %d - exploring potential successor states.\n\n" RESET, node->grpNum);
 		for (int i = 0; i < nGrps; i++){
 			 GBgetTransitionsLong(model,i,node->state,group_add,node);
 		}
 		node->explored = 1;
 	}
 	else fprintf(stdout, CYAN "\n\t INFO:" RESET " Successors already explored!\n\n");
-	printNode(node, 1);
+	node->isPath = true;
+	if (printOut) printNode(node, 1);
 }
 
 /*proceed()
  proceeds from the current node to its successor with index in the successor array.
  Explores successor states of the new current node*/
-void 
-proceed(int index){
-	current = &(current->successors[index]);
-	explore_states(current);
+bool 
+proceed(int transNum, bool printOut){
+	int i = 0;
+	int numSucc = current->numSuccessors;
+	while (i < numSucc){
+		if(current->successors[i].grpNum == transNum){
+			current = &(current->successors[i]);
+			explore_states(current,printOut);
+			break;
+		}
+		i++;
+	}
+	if (i >= numSucc){ 
+		fprintf(stdout, RED "\t ERROR: " RESET " this transition is not available from this state.\n\t Enter 'trans' to see all available transitions and there states.");
+		return false;
+	} else return true;
 }
 
 void
-goBack(){
+goBack(bool clearMem){
 	if(current->grpNum != -1){
-		//trace_node * temp = current;
+		if (clearMem && current->explored) resetNode(current);
+		current->isPath = false;
 		current = current->parent;
-		//freeNodeMem(temp);
 		fprintf(stdout,  MAGENTA "Going back to parent state.\n\n" RESET);
-		printNode(current, 1);
+		printNode(current,1);
 	}
 	else fprintf(stdout, CYAN "\t INFO:" RESET " This is the INITIAL state! You can't go back!\n");
 }
 
 
 void
-restart(){
+restart(bool clearMem){
 	current = head;
-	//TODO:
-	//Should delete former tree and free memory here
+	if(clearMem){
+		for (int i = 0; i < current->numSuccessors; i++){
+			resetNode(&(current->successors[i]));
+			current->successors[i].isPath = false;
+		}
+	}
 	fprintf(stdout,  MAGENTA "Going back to " RESET GREEN "INITIAL" RESET MAGENTA " state.\n\n" RESET);
 	printNode(current, 1);
 }
 
+void 
+replayTransitions(int * transNumbers, int amountOf, bool printOut){
+	int i = 0;
+	bool success = true;
+	while (i < amountOf && success){
+		success = proceed(transNumbers[i],false);
+		if(!success) break;
+		i++;
+	}
+	if(!success){ 
+		fprintf(stdout, RED "\t ERROR: " RESET " Stopped replaying transitions. Transition at index %d is not available in this state.\n",i);
+	 	fprintf(stdout, "\t Enter 'trans' to see all available transitions and successor states.\n");
+	} else if (printOut) {
+		fprintf(stdout, "\n Took %d transitions leading to following states:\n", amountOf);
+		printNode(current,1);
+	}
+}
 
 /* * SECTION * * * * * * * * * * * * * * * * * * * * * * * * * * * * 
  *
@@ -454,6 +554,8 @@ bool handleIO(char * input){
 
 	int nCom = parseComLine(" ", input);
 
+	//////////////////////////////////////////
+	// PRINT OUT COMMANDS
 	if (strcmp(com[0],"help") == 0) printHelp();
 	else if (strcmp(com[0],"current") == 0) printNode(current, 1);
 	else if (strcmp(com[0],"state") == 0) printState(current,0);
@@ -474,36 +576,72 @@ bool handleIO(char * input){
 			else fprintf(stdout, RED "\t ERROR: " RESET " Entered argument for 'tree' unknown\n\t See 'help' for description.\n");
 		}
 		else printTree(head, 0, "\\");
-	} 
+	}
+	//////////////////////////////////////////
+	// EXPLORATION COMMANDS
 	else if (strcmp(com[0],"go") == 0 || strcmp(com[0],">") == 0){
 		if (nCom >= 2){
 			int transNum;
 			sscanf(com[1],"%d",&transNum);
-			
-			int i = 0;
-			int numSucc = current->numSuccessors;
-			while (i < numSucc){
-				if(current->successors[i].grpNum == transNum){
-					proceed(i);
-					break;
-				}
-				i++;
-			}
-			if (i >= numSucc) fprintf(stdout, RED "\t ERROR: " RESET " this transition is not available from this state.\n\t Enter 'trans' to see all available transitions and there states.");
+			proceed(transNum,true);
 		}
 		else fprintf(stdout, RED "\t ERROR: " RESET " explore needs as argument the number of the transition to take.\n");
 	}
-	else if (strcmp(com[0],"goback") == 0 || strcmp(com[0],"..") == 0) goBack();
-	else if (strcmp(com[0],"restart") == 0) restart();
+	else if (strcmp(com[0],"goback") == 0 || strcmp(com[0],"..") == 0){ 
+		if (nCom >= 2){
+			if (strcmp(com[1],"clear") == 0) goBack(1);
+			else if (strcmp(com[1],"keep") == 0) goBack(0);
+			else fprintf(stdout, RED "\t ERROR: " RESET " unknown argument for 'goback'.\n");
+		}
+		else goBack(clearMemOnGoBack);
+	}
+	else if (strcmp(com[0],"restart") == 0){
+		if (nCom >= 2){
+			if (strcmp(com[1],"clear") == 0) restart(1);
+			else if (strcmp(com[1],"keep") == 0) restart(0);
+			else fprintf(stdout, RED "\t ERROR: " RESET " unknown argument for 'restart'.\n");
+		}
+		else restart(clearMemOnRestart);
+	}
+	//////////////////////////////////////////
+	// CHANGE SETTING COMMAND
 	else if (strcmp(com[0],"set") == 0){
 		if(nCom >= 3){
-			if (strcmp(com[1],"set") == 0){ 
-				if(strcmp(com[2],"true") == 0 || strcmp(com[2],"1") == 0)loopDetection = 1;
-				if(strcmp(com[2],"false") == 0 || strcmp(com[2],"0") == 0)loopDetection = 0;
+			if (strcmp(com[1],"loopDetection") == 0){ 
+				if(strcmp(com[2],"true") == 0 || strcmp(com[2],"1") == 0){
+					loopDetection = 1;
+					fprintf(stdout, CYAN "\t set" RESET " loopDetection = true\n");
+				}
+				if(strcmp(com[2],"false") == 0 || strcmp(com[2],"0") == 0){
+					loopDetection = 0;
+					fprintf(stdout, CYAN "\t set" RESET " loopDetection = false\n");
+				}
+			}
+			else if (strcmp(com[1],"clearMemOnGoBack") == 0){ 
+				if(strcmp(com[2],"true") == 0 || strcmp(com[2],"1") == 0){
+					clearMemOnGoBack = 1;
+					fprintf(stdout, CYAN "\t set" RESET " clearMemOnGoBack = true\n");
+				}
+				if(strcmp(com[2],"false") == 0 || strcmp(com[2],"0") == 0){
+					clearMemOnGoBack = 0;
+					fprintf(stdout, CYAN "\t set" RESET " clearMemOnGoBack = false\n");
+				}
+			}
+			else if (strcmp(com[1],"clearMemOnRestart") == 0){ 
+				if(strcmp(com[2],"true") == 0 || strcmp(com[2],"1") == 0){
+					clearMemOnRestart = 1;
+					fprintf(stdout, CYAN "\t set" RESET " clearMemOnRestart = true\n");
+				}
+				if(strcmp(com[2],"false") == 0 || strcmp(com[2],"0") == 0){
+					clearMemOnRestart = 0;
+					fprintf(stdout, CYAN "\t set" RESET " clearMemOnRestart = false\n");
+				}
 			}
 		}
 		else fprintf(stdout, RED "\t ERROR: " RESET " 'set' needs a option name and a values as argument.\n\t See 'help' for description.\n");
 	}
+	//////////////////////////////////////////
+	// EXIT COMMAND & DEFAULT ERROR
 	else if ((strcmp(com[0],"q") == 0)||(strcmp(com[0],"quit") == 0)) return 0;
 	else fprintf(stdout, RED "\t ERROR: " RESET " Command unknown - enter 'help' for available options.\n");
 	return 1;
@@ -575,8 +713,7 @@ int main (int argc, char *argv[]){
     // }
 
     // Initialize global variables
-    initial_DM = GBgetDMInfo(model); 			//Dependency matrices
-    dm_r = GBgetExpandMatrix(model);
+    dm_r = GBgetExpandMatrix(model);	        //Dependency matrices
     dm_may_w = GBgetDMInfoMayWrite(model);
     dm_must_w = GBgetDMInfoMustWrite(model);
     stateLabel = GBgetStateLabelInfo(model);	// State labels
@@ -604,19 +741,36 @@ int main (int argc, char *argv[]){
 
     fprintf(stdout,"\n-----------------------------------------------------------------------------------------------\n");
     fprintf(stdout, GREEN "\nINITIAL " RESET "state:\n");
-    explore_states(head);
+    explore_states(head,true);
 
     // Set current node to head
     current = head;
+
+    // int *replayTest = (int*)alloca(sizeof(int)*8);
+    // replayTest = (int[8]){130,56,127,99,130,101,127,79};
+    // replayTransitions(replayTest,8,true);
     
+    if (argc >= 2){
+    	fprintf(stdout, "\n");
+    	opf = stdout;
+    	lts_t trace=lts_create();
+    	lts_read(files[1],trace);
+    	fprintf(stdout,CYAN "INFO: " RESET " Loaded trace from file: %s \n",files[1]);
+    }
+
     // Start IO procedure
 	runIO();
 
-	// Free memory before quitting the program
-	//freeNodeMem(head);
+	// Free allocated memory before exit 
+	freeTreeMem(head);
+	head = NULL;
+	current = NULL;
+	dm_free(dm_r);
+	dm_free(dm_may_w);
+	dm_free(dm_must_w);
+	//dm_free(stateLabel);
 
 	return 0;
-
 }
 
  // trc_env_t          *trace = RTmalloc(sizeof(trc_env_t));
