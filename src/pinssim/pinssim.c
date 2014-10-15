@@ -91,55 +91,21 @@ static int nGrps;
 static model_t model;
 static int * src;
 static matrix_t * initial_DM = NULL;
-static trace_node head;
+static trace_node * head;
 static trace_node * current;
 
 // I/O variables
-static char *files[2];
-static char * com;
+static char * files[2];
+static char * com[5];
 FILE * opf;
 
 
-
-static void
-group_add(void *context, transition_info_t *ti, int *dst, int *cpy){
-
-	trace_node * node = (trace_node*)context;
-	
-	node->numSuccessors += 1;
-	if (node->numSuccessors==1) node->successors = malloc(sizeof(trace_node)*node->numSuccessors);
-	else  node->successors = realloc(node->successors,(sizeof(trace_node)+sizeof(int)*N)*node->numSuccessors);
-
-	// trace_node * newNode = (trace_node*)malloc(sizeof(trace_node)+sizeof(int)*N);
-	// //trace_node * newNode;
-	// newNode->grpNum = ti->group;
-	// //newNode->state = (int*)alloca(sizeof(int)*N);
-	// newNode->state = dst;
-	// newNode->parent = node;
-	// newNode->numSuccessors = 0;
-
-	// node->successors[node->numSuccessors-1] = *newNode;
-
-	trace_node newNode;
-	newNode.grpNum = ti->group;
-	//newNode.state = (int*)alloca(sizeof(int)*N);
-	memcpy(newNode.state,dst,sizeof(*newNode.state)+1);
-	//*(newNode.state) = *dst;
-	newNode.parent = node; // This will probably have the same issue as the state pointer
-	newNode.numSuccessors = 0;
-
-	node->successors[node->numSuccessors-1] = newNode;
-
-	fprintf(stdout, "group %d: ", ti->group);
-	for (int i = 0; i < N; i++){
-		fprintf(stdout, "%d,", dst[i]);
+static void 
+printState(int * state){
+	for (int j = 0; j < N; j++){
+		 	fprintf(stdout, "%d,", state[j]);
 	}
 	fprintf(stdout,"\n");
-	// fprintf(stdout, "group %d: ", node->successors[node->numSuccessors-1].grpNum);
-	// for (int i = 0; i < N; i++){
-	// 	fprintf(stdout, "%d,", node->successors[node->numSuccessors-1].state[i]);
-	// }
-	// fprintf(stdout,"\n");
 }
 
 static void 
@@ -148,18 +114,67 @@ printTransitions(trace_node * node){
 	fprintf(stdout,"\n");
 	for (int i = 0; i < node->numSuccessors; i++){
 		fprintf(stdout, "group %d: ", node->successors[i].grpNum);
-		for (int j = 0; j < N; j++){
-		 	fprintf(stdout, "%d,", node->successors[i].state[j]);
-		}
-		fprintf(stdout,"\n");
+		printState(node->successors[i].state);
 	}
+	if(node->numSuccessors <= 0) fprintf(stdout, "No transitions available from here!");
 	fprintf(stdout,"\n");
+
+}
+
+static void 
+printNode(trace_node * node){
+	fprintf(stdout, "\n");
+	fprintf(stdout, "----------------------------------------------------------------\n");
+	fprintf(stdout, "Transition that lead here: %d\n", node->grpNum);
+	fprintf(stdout, "State of this note:\n");
+	printState(node->state);
+	fprintf(stdout, "Transitions available from here:\n");
+	printTransitions(node);
+	if(node->grpNum >= 0){
+		fprintf(stdout, "State of parent node:\n");
+		printState(node->parent->state);
+	}
+	else{
+		fprintf(stdout, "This is the INITIAL state!\n");
+	}
+	fprintf(stdout, "----------------------------------------------------------------\n");
+	fprintf(stdout, "\n");
+}
+
+static void
+group_add(void *context, transition_info_t *ti, int *dst, int *cpy){
+
+	trace_node * node = (trace_node*)context;
+	fprintf(stdout, "node->grpNum %d\n",node->grpNum);
+	node->numSuccessors += 1;
+	if (node->numSuccessors==1) node->successors = malloc(sizeof(trace_node)*node->numSuccessors);
+	else  node->successors = realloc(node->successors,sizeof(trace_node)*node->numSuccessors);
+
+	node->successors[node->numSuccessors-1].grpNum = ti->group;
+	node->successors[node->numSuccessors-1].state = (int*)malloc(sizeof(int)*N);
+	memcpy(node->successors[node->numSuccessors-1].state,dst,sizeof(int)*N);
+	node->successors[node->numSuccessors-1].parent = (trace_node*)malloc(sizeof(trace_node));
+	memcpy(node->successors[node->numSuccessors-1].parent,node,sizeof(trace_node));
+	node->successors[node->numSuccessors-1].numSuccessors = 0;
+
+	// trace_node * newNode = (trace_node*)malloc(sizeof(trace_node)+sizeof(int)*N);
+	// newNode->grpNum = ti->group;
+	// newNode->state = (int*)alloca(sizeof(int)*N);
+	// memcpy(newNode->state,dst,sizeof(int)*N);
+	// newNode->parent = (trace_node*)alloca(sizeof(trace_node));
+	// memcpy(newNode->parent,node,sizeof(trace_node));
+	// newNode->numSuccessors = 0;
+
+	// node->successors[node->numSuccessors-1] = *newNode;
+	//printNode(&node->successors[node->numSuccessors-1]);
+	fprintf(stdout, "group %d: ", ti->group);
+	printState(node->successors[node->numSuccessors-1].state);
 
 }
 
 static void
 explore_states(trace_node * node){
-	fprintf(stdout, "\nTaking transition %d - exploring potential successor states.\n\n", node->numSuccessors);
+	fprintf(stdout, "\nTaking transition %d - exploring potential successor states.\n\n", node->grpNum);
 	for (int i = 0; i < nGrps; i++){
 		 GBgetTransitionsLong(model,i,node->state,group_add,node);
 	}
@@ -172,16 +187,39 @@ explore_states(trace_node * node){
 	} 
 }
 
+static void 
+proceed(int index){
+	current = (trace_node*)realloc(current, sizeof(current->successors[index]));
+	memcpy(current,&(current->successors[index]),sizeof(current->successors[index]));
+	explore_states(current);
+}
 
-int numPhrasesBetween(char * separator, char * line){
+static void
+goBack(){
+	if(current->grpNum != -1){
+		// TO DO:
+		// FREE MEMORY OF SUCCESSORS AND THE CURRENT NODE
+		current = (trace_node*)realloc(current, sizeof(*(current->parent)));
+		memcpy(current,current->parent,sizeof(*(current->parent)));
+	}
+	else fprintf(stdout, "INFO: This is the INITIAL state! You can't go back!\n");
+}
+
+
+int phraseComLine(char * separator, char * line){
 
 	int n = 0;
 	if(strstr(line,separator)){
 		char * split = strtok(line,separator);
+		com[n] = split;
 		while (split!=NULL){
-			n++;
 			split = strtok(NULL,separator);
+			n++;
+			com[n] = split;
 		}
+	}
+	else{
+		com[0] = line;
 	}
 
 	return n;
@@ -190,8 +228,10 @@ int numPhrasesBetween(char * separator, char * line){
 /*actOnInput()*/
 void actOnInput(char * input){
 
-	int nCom= numPhrasesBetween(" ",input);
-	com = (char*)alloca(sizeof(char)*nCom);
+	int nCom= phraseComLine(" ",input);
+	fprintf(stdout, "Num of commands %d\n", nCom);
+
+	for(int i = 0; i < nCom; i++) fprintf(stdout, "%s\n", com[i]);
 
 	int transNum;
 	sscanf(input,"%d",&transNum);
@@ -199,9 +239,8 @@ void actOnInput(char * input){
 	int i = 0;
 	for (i; i < current->numSuccessors; i++){
 		if(current->successors[i].grpNum == transNum){
-			fprintf(stdout, "MATCH!");
-			//current = &current->successors[i];
-			//explore_states(current->successors[i]);
+			//fprintf(stdout, "MATCH!");
+			proceed(i);
 			break;
 		}
 	}
@@ -304,16 +343,32 @@ int main (int argc, char *argv[]){
     src = (int*)alloca(sizeof(int)*N);
     GBgetInitialState(model, src);
 
-    head.grpNum = NULL;
-    head.state = src;
-    head.parent = NULL;
-    head.numSuccessors = 0;
-    
-    current = &head;
+    head = (trace_node*)alloca(sizeof(trace_node));
+    head->grpNum = -1;
+    head->state = (int*)alloca(sizeof(int)*N);
+    head->state = src;
+    head->parent = NULL;
+    head->numSuccessors = 0;
 
-    explore_states(&head);
-    
+    explore_states(head);
+
+    current = (trace_node*)malloc(sizeof(*head));
+    memcpy(current,head,sizeof(*head));
+
+    // printState(src);
+    // printState(head->state);
+    // printState(current->state);
+
+    printTransitions(head);
+    printTransitions(current);
+
+    printNode(head);
+
+    printTransitions(head);
+
 	handleIO();
+
+
 
 	// Ask for initial state - specify leave empty for default
 	// 
