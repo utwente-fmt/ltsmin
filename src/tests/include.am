@@ -1,5 +1,4 @@
 
-HRE_LIB = ../../hre/libhre.la
 PINS_LIBS  =
 PINS_LIBS += ../../pins-lib/libpins.la
 PINS_LIBS += ../../ltsmin-lib/libltsmin.la

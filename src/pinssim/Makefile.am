@@ -1,6 +1,6 @@
 HRE_LIB = ../hre/libhre.la
-SYM_CPPFLAGS = $(AM_CPPFLAGS) $(PROFILER_CPPFLAGS)
-SYM_LDFLAGS = $(AM_LDFLAGS) $(PROFILER_LDFLAGS)
+SYM_CPP_FLAGS = $(AM_CPPFLAGS) $(PROFILER_CPPFLAGS)
+SYM_LD_FLAGS = $(AM_LDFLAGS) $(PROFILER_LDFLAGS)
 PINS_LIBS  =
 PINS_LIBS += ../lts-lib/liblts-lib.la
 PINS_LIBS += ../lts-io/liblts-io.la
@@ -42,23 +42,23 @@ bin_PROGRAMS += pinssim-prom
 endif
 
 if HAVE_SYLVAN
-SYM_CPPFLAGS += $(SYLVAN_CPPFLAGS)
+SYM_CPP_FLAGS += $(SYLVAN_CPPFLAGS)
 endif
 
 # pinssim-etf
 pinssim_etf_SOURCES   = pinssim.c
 pinssim_etf_SOURCES  += ../pins-lib/etf-pins.c ../pins-lib/etf-pins.h
 pinssim_etf_LDADD     = $(PINS_LIBS) $(VSET_LIBS)
-pinssim_etf_CPPFLAGS  = -DETF $(SYM_CPPFLAGS)
-pinssim_etf_sym_LDFLAGS   = $(SYM_LDFLAGS)
+pinssim_etf_CPPFLAGS  = -DETF $(SYM_CPP_FLAGS)
+pinssim_etf_LDFLAGS   = $(SYM_LD_FLAGS)
 nodist_EXTRA_pinssim_etf_SOURCES = automake-force-linker.cxx # req. by vset
 
 # pinssim
 pinssim_SOURCES   = pinssim.c
 pinssim_SOURCES  += ../pins-lib/dlopen-pins.c ../pins-lib/dlopen-pins.h
 pinssim_LDADD     = $(PINS_LIBS) $(VSET_LIBS)
-pinssim_CPPFLAGS  = -DPINS_DLL $(SYM_CPPFLAGS)
-pinssim_LDFLAGS   = $(SYM_LDFLAGS)
+pinssim_CPPFLAGS  = -DPINS_DLL $(SYM_CPP_FLAGS)
+pinssim_LDFLAGS   = $(SYM_LD_FLAGS)
 nodist_EXTRA_pinssim_SOURCES = automake-force-linker.cxx # req. by vset
 
 # pinssim-lpo
@@ -66,8 +66,8 @@ pinssim_lpo_SOURCES   = pinssim.c
 pinssim_lpo_LDADD     = $(PINS_LIBS)
 pinssim_lpo_LDADD    += ../pins-lib/libmcrl-pins.la
 pinssim_lpo_LDADD    += $(VSET_LIBS) $(MCRL_LIBS)
-pinssim_lpo_CPPFLAGS  = -DMCRL $(MCRL_CPPFLAGS) $(SYM_CPPFLAGS)
-pinssim_lpo_LDFLAGS   = $(MCRL_LDFLAGS) $(SYM_LDFLAGS)
+pinssim_lpo_CPPFLAGS  = -DMCRL $(MCRL_CPPFLAGS) $(SYM_CPP_FLAGS)
+pinssim_lpo_LDFLAGS   = $(MCRL_LDFLAGS) $(SYM_LD_FLAGS)
 nodist_EXTRA_pinssim_lpo_SOURCES = automake-force-linker.cxx # req. by mcrl
 
 # pinssim-lps
@@ -75,24 +75,24 @@ pinssim_lps_SOURCES   = pinssim.c
 pinssim_lps_LDADD     = $(PINS_LIBS)
 pinssim_lps_LDADD    += ../pins-lib/libmcrl2-pins.la
 pinssim_lps_LDADD    += $(VSET_LIBS) $(MCRL2_LIBS)
-pinssim_lps_CPPFLAGS  = -DMCRL2 $(SYM_CPPFLAGS)
-pinssim_lps_LDFLAGS   = $(MCRL2_LDFLAGS) $(SYM_LDFLAGS)
+pinssim_lps_CPPFLAGS  = -DMCRL2 $(SYM_CPP_FLAGS)
+pinssim_lps_LDFLAGS   = $(MCRL2_LDFLAGS) $(SYM_LD_FLAGS)
 nodist_EXTRA_pinssim_lps_SOURCES = automake-force-linker.cxx # req. by mcrl2
 
 # pinssim-mapa
 pinssim_mapa_SOURCES   = pinssim.c
 pinssim_mapa_LDADD     = ../pins-lib/libmapa-pins.la -lscoop
 pinssim_mapa_LDADD    += $(PINS_LIBS) $(VSET_LIBS)
-pinssim_mapa_LDFLAGS   = -Wl,-rpath,$(DESTDIR)$(pkglibdir) -L${top_builddir}/scoop/src $(SYM_LDFLAGS)
-pinssim_mapa_CPPFLAGS  = -DMAPA $(SYM_CPPFLAGS)
+pinssim_mapa_LDFLAGS   = -Wl,-rpath,$(DESTDIR)$(pkglibdir) -L${top_builddir}/scoop/src $(SYM_LD_FLAGS)
+pinssim_mapa_CPPFLAGS  = -DMAPA $(SYM_CPP_FLAGS)
 nodist_EXTRA_pinssim_mapa_SOURCES = automake-force-linker.cxx # req. by vset
 
 # pinssim-pbes
 pinssim_pbes_SOURCES   = pinssim.c
 pinssim_pbes_LDADD     = $(PINS_LIBS)
 pinssim_pbes_LDADD    += $(VSET_LIBS) ../pins-lib/libpbes-pins.la
-pinssim_pbes_CPPFLAGS  = -DLTSMIN_PBES $(SYM_CPPFLAGS)
-pinssim_pbes_LDFLAGS   = $(MCRL2_LDFLAGS) $(SYM_LDFLAGS)
+pinssim_pbes_CPPFLAGS  = -DLTSMIN_PBES $(SYM_CPP_FLAGS)
+pinssim_pbes_LDFLAGS   = $(MCRL2_LDFLAGS) $(SYM_LD_FLAGS)
 nodist_EXTRA_pinssim_pbes_SOURCES = automake-force-linker.cxx # req. by pbes
 
 # pinssim-dve

@@ -3375,7 +3375,7 @@ master_get_transitions_short(model_t model, int group, int* src, TransitionCB cb
     int id = lace_get_worker()->worker + 1;
 
     int r_length = r_projs[group].len;
-    Print(infoLong, "master %d: writing state to slave (group=%d, length=%d).", id, group, r_length);
+    Print(hre_debug, "master %d: writing state to slave (group=%d, length=%d).", id, group, r_length);
     stream_t os = fd_output(parent_sockets[id-1]);
     DSwriteS32(os, TRANSITION); // signal that a state will be sent next
     DSwriteS32(os, group);
@@ -3393,7 +3393,7 @@ master_get_transitions_short(model_t model, int group, int* src, TransitionCB cb
     int next = DSreadS32(is);
     while(next!=NOOP)
     {
-        Print(infoLong, "master %d: reading state from slave.", id);
+        Print(hre_debug, "master %d: reading state from slave.", id);
         int dst[w_length];
         for(int i=0; i<w_length; i++)
         {
@@ -3423,7 +3423,7 @@ master_get_transitions_short(model_t model, int group, int* src, TransitionCB cb
     }
     RTfree(os);
     RTfree(is);
-    Print(infoLong, "master %d: done.", id);
+    Print(hre_debug, "master %d: done.", id);
     return 0;
 }
 
@@ -3435,7 +3435,7 @@ master_get_label_short(model_t model,int label,int *state)
     int id = lace_get_worker()->worker + 1;
 
     int p_length = g_projs[label].len;
-    Print(infoLong, "master %d: writing state to slave (label=%d, length=%d).", id, label, p_length);
+    Print(hre_debug, "master %d: writing state to slave (label=%d, length=%d).", id, label, p_length);
     stream_t os = fd_output(parent_sockets[id-1]);
     DSwriteS32(os, LABEL); // signal that a state will be sent next
     DSwriteS32(os, label);
@@ -3451,7 +3451,7 @@ master_get_label_short(model_t model,int label,int *state)
     int result = DSreadS32(is);
     RTfree(os);
     RTfree(is);
-    Print(infoLong, "master %d: done (result=%d).", id, result);
+    Print(hre_debug, "master %d: done (result=%d).", id, result);
     return result;
 }
 
@@ -3460,7 +3460,7 @@ master_exit()
 {
     for(size_t id=1; id<=lace_n_workers; id++)
     {
-        Print(infoLong, "master: stopping slave (id=%zu).", id);
+        Print(hre_debug, "master: stopping slave (id=%zu).", id);
         stream_t os = fd_output(parent_sockets[id-1]);
         DSwriteS32(os, NOOP); // signal that no states will be sent anymore
         stream_flush(os);
@@ -3477,7 +3477,7 @@ slave_transition_cb(void* context, transition_info_t* ti, int* dst, int* cpy)
     int group = ti->group;
     int length = w_projs[group].len;
     int labels = lts_type_get_edge_label_count(GBgetLTStype(model));
-    Print(infoLong, "slave_transition_cb %d: writing state to master: group=%d, length=%d.", id, group, length);
+    Print(hre_debug, "slave_transition_cb %d: writing state to master: group=%d, length=%d.", id, group, length);
 
     DSwriteS32(os, TRANSITION);
     for (int i=0; i<length; i++)
@@ -3519,7 +3519,7 @@ start_slave()
     while (next!=NOOP)
     {
         if (next == TRANSITION) {
-            Print(infoLong, "slave %d: start reading transition.", id);
+            Print(hre_debug, "slave %d: start reading transition.", id);
             int group = DSreadS32(is);
             int length = r_projs[group].len;
             int src[length];
@@ -3527,7 +3527,7 @@ start_slave()
             {
                 src[i] = DSreadS32(is);
             }
-            Print(infoLong, "slave %d: received state (group=%d, length=%d).", id, group, length);
+            Print(hre_debug, "slave %d: received state (group=%d, length=%d).", id, group, length);
             (*transitions_short_multi)(model, group, src, slave_transition_cb, NULL);
             Debug("slave %d: returned from greybox (group=%d).", id, group);
 
@@ -3535,9 +3535,9 @@ start_slave()
             DSwriteS32(os, NOOP); // signal that all successor states have been sent
             stream_flush(os);
             RTfree(os);
-            Print(infoLong, "slave %d: done (group=%d).", id, group);
+            Print(hre_debug, "slave %d: done (group=%d).", id, group);
         } else if (next == LABEL) {
-            Print(infoLong, "slave %d: start reading label.", id);
+            Print(hre_debug, "slave %d: start reading label.", id);
             int label = DSreadS32(is);
             int length = g_projs[label].len;
             int src[length];
@@ -3545,14 +3545,14 @@ start_slave()
             {
                 src[i] = DSreadS32(is);
             }
-            Print(infoLong, "slave %d: received state (label=%d, length=%d).", id, label, length);
+            Print(hre_debug, "slave %d: received state (label=%d, length=%d).", id, label, length);
             int res = (*label_short_multi)(model, label, src);
             Debug("slave %d: returned from greybox (label=%d, result=%d).", id, label, res);
             stream_t os = fd_output(child_sockets[id-1]);
             DSwriteS32(os, res); // signal the result of the label evaluation
             stream_flush(os);
             RTfree(os);
-            Print(infoLong, "slave %d: done (label=%d, res=%d).", id, label, res);
+            Print(hre_debug, "slave %d: done (label=%d, res=%d).", id, label, res);
         } else {
             Warning(error, "unsupported operation");
             HREexit(LTSMIN_EXIT_FAILURE);
