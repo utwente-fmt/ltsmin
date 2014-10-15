@@ -1,3 +1,45 @@
+October XX, 2014 - Release 2.1 of the LTSmin toolset
+
+* New parallel MDD package: LDDmc [TODO] (--vset=lddmc)
+
+
+* Improvements to symbolic backend (*2lts-sym)
+    o Parallelized transition relation learning via Lace [TODO] 
+    o Added must-write and dynamic copy dependencies [TODO]
+    o Use guards in symbolic algorithm (--pins-guards?)
+    o Improved regrouping (-r)  TODO
+
+* New mu-calculus PINS layer [TODO] 
+
+
+* New frontend for MAPA: Scoop (mapa2{sym,dist})
+
+
+* Parity game solver?
+
+
+* New frontend for dl-open (pins2*) TODO
+
+
+* Improvements to the POR layer (PINS2PINS wrapper)
+    o Added Valmari's weak POR dependencies (--weak)
+    o Added deletion algorithm [1] (--por=del)
+    o Added Valmari's SCC-based algorithm (--por=scc)
+* Improvements to the multi-core backend (*2lts-mc):
+    o Added CNDFS proviso for efficient POR in LTL (--proviso=cndfs) [2]
+    o Refactored code and separated search algorithms in objects
+* Improvements to distributed backend (*2lts-dist)
+    o Added tracing TODO
+
+
+
+[1] Guard-based Partial-Order Reduction
+    To appear in STTT Journal (SPIN Special Issue)
+[2] Partial-Order Reduction for Multi-Core LTL Model Checking -
+    http://wwwhome.ewi.utwente.nl/~laarman/papers/multi-core-por.pdf
+
+
+
 March 4, 2012 - Release 2.0 of the LTSmin toolset
 
 * Refactored runtime and IO libraries, organized source and renamed tools:
@@ -10,7 +52,7 @@ March 4, 2012 - Release 2.0 of the LTSmin toolset
     o ltsmin-tracepp-> ltsmin-printtrace    (Trace pretty printing)
     o ltsmin(-mpi)  -> ltsmin-reduce(-dist) (LTS minimization:LTSmin's origin)
     o ltstrans      -> lts-convert          (LTS file format conversion)
-* New parallel BBD package: Sylvan [1,2]
+* New parallel BDD package: Sylvan [1,2]
     o BDD operations are parallelized using the Wool framework (included)
     o Use: *2lts-sym --vset=sylvan
            *2lts-seq --state=vset --vset=sylvan
