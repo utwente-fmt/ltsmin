@@ -442,7 +442,7 @@ AC_CONFIG_FILES([
        src/pins2lts-seq/Makefile
        src/pins2lts-sym/Makefile
        src/pins-open/Makefile
-       src/pinsim/Makefile
+       src/pinssim/Makefile
        src/spg/Makefile
        src/dm/Makefile
        src/bignum/Makefile
