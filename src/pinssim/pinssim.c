@@ -3,7 +3,7 @@
  *		Created by   Tobias J. Uebbing on 20140917
  *		Modified by  -
  *		Based on     LTSmin pins2lts-sym.c
- *		Copyright    Formal Methods & Tools Chair
+ *		Copyright    Formal Methods & Tools
  *				     EEMCS faculty - University of Twente - 2014
  *		Supervisor 	 Jeroen Meijer
  *		Description  
@@ -16,10 +16,11 @@
  *
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
+//#include "pinssim.h"
+
 // Includes from pins2lts-sym.c
 // TODO:
 // Which of these are really necessary should be discussed later on
-#include "pinssim.h"
 
 // include "config.h"
 
@@ -50,15 +51,16 @@
 #include <util-lib/bitset.h>
 #include <hre/stringindex.h>
 
+// Colors for console output
 #define RESET   "\033[0m"
-#define BLACK   "\033[30m"      /* Black */
-#define RED     "\033[31m"      /* Red */
-#define GREEN   "\033[32m"      /* Green */
-#define YELLOW  "\033[33m"      /* Yellow */
-#define BLUE    "\033[34m"      /* Blue */
-#define MAGENTA "\033[35m"      /* Magenta */
-#define CYAN    "\033[36m"      /* Cyan */
-#define WHITE   "\033[37m"      /* White */
+#define BLACK   "\033[30m"      		   /* Black */
+#define RED     "\033[31m"      		   /* Red */
+#define GREEN   "\033[32m"      		   /* Green */
+#define YELLOW  "\033[33m"      		   /* Yellow */
+#define BLUE    "\033[34m"     			   /* Blue */
+#define MAGENTA "\033[35m"      		   /* Magenta */
+#define CYAN    "\033[36m"      		   /* Cyan */
+#define WHITE   "\033[37m"     			   /* White */
 #define BOLDBLACK   "\033[1m\033[30m"      /* Bold Black */
 #define BOLDRED     "\033[1m\033[31m"      /* Bold Red */
 #define BOLDGREEN   "\033[1m\033[32m"      /* Bold Green */
@@ -126,41 +128,72 @@ static int nGrps;
 static model_t model;
 static int * src;
 static matrix_t * initial_DM = NULL;
+static matrix_t * dm_r = NULL;
+static matrix_t * dm_may_w = NULL;
+static matrix_t * dm_must_w = NULL;
 static trace_node * head;
 static trace_node * current;
-
 // I/O variables
 FILE * opf;
 static char * files[2]; 
 static int numCommands = 10;
 static char * com[5];
 static char * helpText[10] =
-   {"\nCOMMANDS:",
+   {"COMMANDS:",
 	"  help                           show all options",
 	"  current                        print info of current node",
 	"  state                          print current state",
 	"  trans                          print available transitions and subsequent states",
-	"  path (states)                  print path of transitions (with states) from CURRENT to INITIAL",
-	"  take   / > [TRANSNUMBER]       take transition with TRANSNUMBER and explore potential successor states",
+	"  path (states) (rw)             print path of transitions takes (with states and read-write dependencies)",
+	"  go / > [TRANSNUMBER]           take transition with TRANSNUMBER and explore potential successor states",
 	"  goback / ..                    go back to parent state",
 	"  restart                        restart exploration from INITIAL state",
-	"  quit   / q                     quit PINSsim"};
+	"  quit / q                       quit PINSsim"};
 
 
-static void
+void
 printHelp(){
 	for (int i = 0; i < numCommands; i++) fprintf(stdout, "%s\n", helpText[i]);
 }
 
-static void 
-printState(int * state){
-	for (int j = 0; j < N; j++){
-		 	fprintf(stdout, "%d,", state[j]);
+void
+printDMrow(trace_node * node){
+	char rw[N];
+	for (int i = 0; i < N; i++){
+		if (dm_is_set(dm_r, node->grpNum, i) && (dm_is_set(dm_may_w, node->grpNum, i))) {
+            rw[i] = '+';
+        } else if (dm_is_set(dm_r, node->grpNum, i)) {
+            rw[i] = 'r';
+        } else if (dm_is_set(dm_must_w, node->grpNum, i)) {
+            rw[i] = 'w';
+        } else if (dm_is_set(dm_may_w, node->grpNum, i)) {
+            rw[i] = 'W';
+        } else {
+            rw[i] = '-';
+        }
+		//rw[i] = (char*)(dm_is_set (initial_DM, node->grpNum, i) ? '+' : '-');
+		
+		int absVal = node->state[i];
+		if (absVal < 0) absVal *= -1;
+		if (node->state[i]>=10000) fprintf(stdout, "    ");
+		else if (node->state[i]>=1000) fprintf(stdout, "   ");
+		else if (node->state[i]>=100) fprintf(stdout, "  ");
+		else if (node->state[i]>=10) fprintf(stdout, " ");
+	 	fprintf(stdout, "%c,",  rw[i]);
 	}
 	fprintf(stdout,"\n");
 }
 
-static void 
+void 
+printState(trace_node * node, bool withRW){
+	if(withRW) printDMrow(node);
+	for (int i = 0; i < N; i++){
+		 	fprintf(stdout, "%d,", node->state[i]);
+	}
+	fprintf(stdout,"\n");
+}
+
+void 
 printTransitions(trace_node * node, bool withSuccStates){
 
 	//fprintf(stdout,"\n");
@@ -174,7 +207,7 @@ printTransitions(trace_node * node, bool withSuccStates){
 			else if(absVal<1000)fprintf(stdout, "group   %d - ", node->successors[i].grpNum);
 			else if(absVal<10000)fprintf(stdout, "group  %d - ", node->successors[i].grpNum);
 			else if(absVal<100000)fprintf(stdout, "group %d - ", node->successors[i].grpNum);
-			if (withSuccStates) printState(node->successors[i].state);
+			if (withSuccStates) printState(&(node->successors[i]),0);
 		}
 		if (!withSuccStates) fprintf(stdout,"\n");
 	}
@@ -182,21 +215,21 @@ printTransitions(trace_node * node, bool withSuccStates){
 	
 }
 
-static void 
+void 
 printNode(trace_node * node, bool withSuccStates){
 	//fprintf(stdout, "\n");
 	fprintf(stdout, BOLDWHITE "---- NODE -----------------------\n" RESET);
 	if(node->grpNum >= 0){
 		fprintf(stdout, CYAN "State of parent node:\n" RESET);
 		fprintf(stdout, "              ");
-		printState(node->parent->state);
+		printState(node->parent,0);
 	}
 	else{
 		fprintf(stdout, "-> This is the " GREEN "INITIAL" RESET " state!\n");
 	}
 	fprintf(stdout, CYAN "State of this node:\n" RESET);
 	fprintf(stdout, "              ");
-	printState(node->state);
+	printState(node,0);
 	printTransitions(node, withSuccStates);
 	if(node->grpNum >= 0) fprintf(stdout, CYAN "Transition that lead here: " RESET "%d ", node->grpNum);
 	fprintf(stdout, CYAN "Tree depth: " RESET "%d\n", node->treeDepth);
@@ -204,8 +237,8 @@ printNode(trace_node * node, bool withSuccStates){
 	//fprintf(stdout, "\n");
 }
 
-static void 
-printPath(trace_node * start, bool withStates){
+void 
+printPath(trace_node * start, bool withStates, bool withRW){
 
 	trace_node * temp = start;
 
@@ -215,7 +248,8 @@ printPath(trace_node * start, bool withStates){
 	if(withStates) fprintf(stdout, "\n");
 	while(temp->grpNum >= 0){
 		if(withStates){
-			printState(temp->state);
+			if (withRW) printState(temp,1);
+			else printState(temp, 0);
 			fprintf(stdout, BOLDWHITE "  |\n" RESET);
 			fprintf(stdout, "%d\n", temp->grpNum);
 			fprintf(stdout, BOLDWHITE "  |\n" RESET);
@@ -228,7 +262,7 @@ printPath(trace_node * start, bool withStates){
 	}
 	if (temp->grpNum < 0){
 		if(withStates){
-			printState(temp->state);
+			printState(temp,0);
 			fprintf(stdout, GREEN "INITIAL\n" RESET);
 		}
 		else fprintf(stdout, GREEN " INITIAL\n" RESET);
@@ -236,7 +270,7 @@ printPath(trace_node * start, bool withStates){
 
 }
 
-static void 
+void 
 freeNodeMem(trace_node * node){
 	//free(node->parent);
 	//free(node->state);
@@ -278,7 +312,7 @@ group_add(void *context, transition_info_t *ti, int *dst, int *cpy){
 
 }
 
-static void
+void
 explore_states(trace_node * node){
 	
 	if(node->explored == 0){
@@ -292,13 +326,13 @@ explore_states(trace_node * node){
 	printNode(node, 1);
 }
 
-static void 
+void 
 proceed(int index){
 	current = &(current->successors[index]);
 	explore_states(current);
 }
 
-static void
+void
 goBack(){
 	if(current->grpNum != -1){
 		//trace_node * temp = current;
@@ -310,7 +344,7 @@ goBack(){
 	else fprintf(stdout, CYAN "\t INFO:" RESET " This is the INITIAL state! You can't go back!\n");
 }
 
-static void
+void
 restart(){
 
 	current = head;
@@ -358,16 +392,19 @@ bool handleIO(char * input){
 
 	if (strcmp(com[0],"help") == 0) printHelp();
 	else if (strcmp(com[0],"current") == 0) printNode(current, 1);
-	else if (strcmp(com[0],"state") == 0) printState(current->state);
+	else if (strcmp(com[0],"state") == 0) printState(current,0);
 	else if (strcmp(com[0],"trans") == 0) printTransitions(current, 1);
 	else if (strcmp(com[0],"path") == 0){
 		if (nCom >= 2){
-			if(strcmp(com[1],"states") == 0) printPath(current, 1);
+			if(strcmp(com[1],"states") == 0){
+				if (nCom >= 3 && strcmp(com[2],"rw") == 0) printPath(current, 1, 1);
+				else printPath(current, 1, 0);
+			} 
 			else fprintf(stdout, RED "\t ERROR: " RESET " Entered argument for 'path' unknown\n\t See 'help' for description.\n");
 		}
-		else printPath(current, 0);
+		else printPath(current, 0, 0);
 	} 
-	else if (strcmp(com[0],"take") == 0 || strcmp(com[0],">") == 0){
+	else if (strcmp(com[0],"go") == 0 || strcmp(com[0],">") == 0){
 		if (nCom >= 2){
 			int transNum;
 			sscanf(com[1],"%d",&transNum);
@@ -463,14 +500,16 @@ int main (int argc, char *argv[]){
 
 
     initial_DM = GBgetDMInfo(model);
+    dm_r = GBgetExpandMatrix(model);
+    dm_may_w = GBgetDMInfoMayWrite(model);
+    dm_must_w = GBgetDMInfoMustWrite(model);
+
     ltstype = GBgetLTStype(model);
     N = lts_type_get_state_length(ltstype);
     //eLbls = lts_type_get_edge_label_count(ltstype);
     nGrps = dm_nrows(GBgetDMInfo(model));
 
     fprintf(stdout,CYAN "INFO: " RESET " State vector length is %d; there are %d groups\n", N, nGrps);
-
-    //dm_print(stderr, GBgetStateLabelInfo(model));
 
     src = (int*)alloca(sizeof(int)*N);
     GBgetInitialState(model, src);
