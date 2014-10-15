@@ -7,6 +7,7 @@
  *
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
+
 // Includes from pins2lts-sym.c
 // Which of these are really necessary should be discussed later on
 #include "pinssim.h"
@@ -39,6 +40,24 @@
 #include <util-lib/dynamic-array.h>
 #include <util-lib/bitset.h>
 #include <hre/stringindex.h>
+
+#define RESET   "\033[0m"
+#define BLACK   "\033[30m"      /* Black */
+#define RED     "\033[31m"      /* Red */
+#define GREEN   "\033[32m"      /* Green */
+#define YELLOW  "\033[33m"      /* Yellow */
+#define BLUE    "\033[34m"      /* Blue */
+#define MAGENTA "\033[35m"      /* Magenta */
+#define CYAN    "\033[36m"      /* Cyan */
+#define WHITE   "\033[37m"      /* White */
+#define BOLDBLACK   "\033[1m\033[30m"      /* Bold Black */
+#define BOLDRED     "\033[1m\033[31m"      /* Bold Red */
+#define BOLDGREEN   "\033[1m\033[32m"      /* Bold Green */
+#define BOLDYELLOW  "\033[1m\033[33m"      /* Bold Yellow */
+#define BOLDBLUE    "\033[1m\033[34m"      /* Bold Blue */
+#define BOLDMAGENTA "\033[1m\033[35m"      /* Bold Magenta */
+#define BOLDCYAN    "\033[1m\033[36m"      /* Bold Cyan */
+#define BOLDWHITE   "\033[1m\033[37m"      /* Bold White */
 
 // poptOption structure for HREaddOptions()
 // to be adapted!
@@ -82,6 +101,8 @@ typedef struct _trace_node{
 	struct _trace_node * parent;
 	int numSuccessors;
     struct _trace_node * successors;
+    bool explored;
+    int treeDepth;
 } trace_node;
 
 // Variables necessary for model checking
@@ -95,10 +116,25 @@ static trace_node * head;
 static trace_node * current;
 
 // I/O variables
-static char * files[2];
-static char * com[5];
 FILE * opf;
+static char * files[2]; 
+static int numCommands = 8;
+static char * com[5];
+static char * helpText[8] =
+   {"\n COMMANDS:",
+	"\t help                 \t show all options",
+	"\t current              \t print info of current node",
+	"\t state                \t print current state",
+	"\t trans                \t print available transitions and subsequent states",
+	"\t path (states)        \t print path of transitions (with states) from CURRENT to INITIAL",
+	"\t take [TRANSNUMBER]   \t take transition with TRANSNUMBER and explore potential successor states",
+	"\t goback               \t go back to parent state"};
 
+
+static void
+printHelp(){
+	for (int i = 0; i < numCommands; i++) fprintf(stdout, "%s\n", helpText[i]);
+}
 
 static void 
 printState(int * state){
@@ -109,100 +145,148 @@ printState(int * state){
 }
 
 static void 
-printTransitions(trace_node * node){
+printTransitions(trace_node * node, bool withSuccStates){
 
-	fprintf(stdout,"\n");
-	for (int i = 0; i < node->numSuccessors; i++){
-		fprintf(stdout, "group %d: ", node->successors[i].grpNum);
-		printState(node->successors[i].state);
+	//fprintf(stdout,"\n");
+	if(node->numSuccessors > 0){ 
+		fprintf(stdout, "Transitions available from here:\n");
+		for (int i = 0; i < node->numSuccessors; i++){
+			fprintf(stdout, "group %d - ", node->successors[i].grpNum);
+			if (withSuccStates) printState(node->successors[i].state);
+		}
+		if (!withSuccStates) fprintf(stdout,"\n");
 	}
-	if(node->numSuccessors <= 0) fprintf(stdout, "No transitions available from here!");
-	fprintf(stdout,"\n");
+	else fprintf(stdout, "No transitions available from here!\n Enter 'goback' to go back to the parent state.parent\n");
+	
 
 }
 
 static void 
-printNode(trace_node * node){
-	fprintf(stdout, "\n");
-	fprintf(stdout, "----------------------------------------------------------------\n");
-	fprintf(stdout, "Transition that lead here: %d\n", node->grpNum);
-	fprintf(stdout, "State of this note:\n");
-	printState(node->state);
-	fprintf(stdout, "Transitions available from here:\n");
-	printTransitions(node);
+printNode(trace_node * node, bool withSuccStates){
+	//fprintf(stdout, "\n");
+	fprintf(stdout, "-------------- NODE -------------\n");
 	if(node->grpNum >= 0){
 		fprintf(stdout, "State of parent node:\n");
 		printState(node->parent->state);
 	}
 	else{
-		fprintf(stdout, "This is the INITIAL state!\n");
+		fprintf(stdout, "This is the " GREEN "INITIAL" RESET " state!\n");
 	}
-	fprintf(stdout, "----------------------------------------------------------------\n");
-	fprintf(stdout, "\n");
+	fprintf(stdout, "State of this node:\n");
+	printState(node->state);
+	if(node->grpNum >= 0) fprintf(stdout, "Transition that lead here: %d\n", node->grpNum);
+	printTransitions(node, withSuccStates);
+	fprintf(stdout, "---------------------------------\n");
+	//fprintf(stdout, "\n");
+}
+
+static void 
+printPath(trace_node * start, bool withStates){
+
+	trace_node * temp = start;
+
+	fprintf(stdout, "Path from " RED " CURRENT" RESET " to " GREEN "INITIAL" RESET " state:\n\n");
+	fprintf(stdout, RED "CURRENT" RESET);
+
+	if(withStates) fprintf(stdout, "\n");
+	while(temp->grpNum >= 0){
+		if(withStates){
+			printState(temp->state);
+			fprintf(stdout, BOLDWHITE "  |\n" RESET);
+			fprintf(stdout, "%d\n", temp->grpNum);
+			fprintf(stdout, BOLDWHITE "  |\n" RESET);
+		}
+		else{
+			fprintf(stdout, " %d ", temp->grpNum);
+			fprintf(stdout, BOLDWHITE "->" RESET);
+		}
+		temp = temp->parent;
+	}
+	if (temp->grpNum < 0){
+		if(withStates){
+			printState(temp->state);
+			fprintf(stdout, GREEN "INITIAL\n" RESET);
+		}
+		else fprintf(stdout, GREEN " INITIAL\n" RESET);
+	}
+
+}
+
+static void 
+freeNodeMem(trace_node * node){
+	//free(node->parent);
+	//free(node->state);
+	if (node->numSuccessors > 0){
+		for (int i = 0; i < node->numSuccessors; i++){
+			freeNodeMem(&(node->successors[i]));
+		}
+		//free(node->successors);
+	}
+	free(node);
 }
 
 static void
 group_add(void *context, transition_info_t *ti, int *dst, int *cpy){
 
+	fprintf(stdout, "ENTERED group_add()\n");
 	trace_node * node = (trace_node*)context;
-	fprintf(stdout, "node->grpNum %d\n",node->grpNum);
+	if(node->grpNum >= 0) printTransitions(node->parent,1);
 	node->numSuccessors += 1;
 	if (node->numSuccessors==1) node->successors = malloc(sizeof(trace_node)*node->numSuccessors);
 	else  node->successors = realloc(node->successors,sizeof(trace_node)*node->numSuccessors);
 
+	if(node->grpNum >= 0) printTransitions(node->parent,1);
 	node->successors[node->numSuccessors-1].grpNum = ti->group;
 	node->successors[node->numSuccessors-1].state = (int*)malloc(sizeof(int)*N);
 	memcpy(node->successors[node->numSuccessors-1].state,dst,sizeof(int)*N);
 	node->successors[node->numSuccessors-1].parent = (trace_node*)malloc(sizeof(trace_node));
 	memcpy(node->successors[node->numSuccessors-1].parent,node,sizeof(trace_node));
 	node->successors[node->numSuccessors-1].numSuccessors = 0;
-
-	// trace_node * newNode = (trace_node*)malloc(sizeof(trace_node)+sizeof(int)*N);
-	// newNode->grpNum = ti->group;
-	// newNode->state = (int*)alloca(sizeof(int)*N);
-	// memcpy(newNode->state,dst,sizeof(int)*N);
-	// newNode->parent = (trace_node*)alloca(sizeof(trace_node));
-	// memcpy(newNode->parent,node,sizeof(trace_node));
-	// newNode->numSuccessors = 0;
-
-	// node->successors[node->numSuccessors-1] = *newNode;
+	node->successors[node->numSuccessors-1].explored = 0;
+	node->successors[node->numSuccessors-1].treeDepth = node->treeDepth+1;
+    if(node->grpNum >= 0) printTransitions(node->parent,1);
+	// TESTs
 	//printNode(&node->successors[node->numSuccessors-1]);
-	fprintf(stdout, "group %d: ", ti->group);
-	printState(node->successors[node->numSuccessors-1].state);
+	//fprintf(stdout, "group %d: ", ti->group);
+	//printState(node->successors[node->numSuccessors-1].state);
 
 }
 
 static void
 explore_states(trace_node * node){
-	fprintf(stdout, "\nTaking transition %d - exploring potential successor states.\n\n", node->grpNum);
-	for (int i = 0; i < nGrps; i++){
-		 GBgetTransitionsLong(model,i,node->state,group_add,node);
+	
+	fprintf(stdout, "ENTERED explore_states()\n");
+	if(node->explored == 0){
+		fprintf(stdout, "Taking transition %d - exploring potential successor states.\n\n", node->grpNum);
+		if(node->grpNum >= 0) printTransitions(node->parent,1);
+		for (int i = 0; i < nGrps; i++){
+			 GBgetTransitionsLong(model,i,node->state,group_add,node);
+		}
+		if(node->grpNum >= 0) printTransitions(node->parent,1);
 	}
-	if(node->numSuccessors > 0){
-		fprintf(stdout, "\nFound %d successor states by following transitions:\n\n", node->numSuccessors);
-		printTransitions(node);
-	}
-	else{
-		fprintf(stdout, "\nThis states has no successor states\n\n");
-	} 
+	else fprintf(stdout, CYAN "\n\t INFO:" RESET " Successors already explored!\n");
+	printNode(node, 1);
 }
 
 static void 
 proceed(int index){
-	current = (trace_node*)realloc(current, sizeof(current->successors[index]));
-	memcpy(current,&(current->successors[index]),sizeof(current->successors[index]));
+	//current = (trace_node*)realloc(current, sizeof(current->successors[index]));
+	//memcpy(current,&(current->successors[index]),sizeof(current->successors[index]));
+	current = &(current->successors[index]);
 	explore_states(current);
 }
 
 static void
 goBack(){
 	if(current->grpNum != -1){
-		// TO DO:
-		// FREE MEMORY OF SUCCESSORS AND THE CURRENT NODE
-		current = (trace_node*)realloc(current, sizeof(*(current->parent)));
-		memcpy(current,current->parent,sizeof(*(current->parent)));
+		printTransitions(current->parent,1);
+		trace_node * temp = current;
+		current = current->parent;
+		//freeNodeMem(temp);
+		printTransitions(current,1);
+		printNode(current, 1);
 	}
-	else fprintf(stdout, "INFO: This is the INITIAL state! You can't go back!\n");
+	else fprintf(stdout, CYAN "\t INFO:" RESET " This is the INITIAL state! You can't go back!\n");
 }
 
 
@@ -219,75 +303,80 @@ int phraseComLine(char * separator, char * line){
 		}
 	}
 	else{
-		com[0] = line;
+		com[n] = line;
+		n++;
 	}
 
 	return n;
 }
 
 /*actOnInput()*/
-void actOnInput(char * input){
+void handleIO(char * input){
 
 	int nCom= phraseComLine(" ",input);
-	fprintf(stdout, "Num of commands %d\n", nCom);
-
-	for(int i = 0; i < nCom; i++) fprintf(stdout, "%s\n", com[i]);
-
-	int transNum;
-	sscanf(input,"%d",&transNum);
-
-	int i = 0;
-	for (i; i < current->numSuccessors; i++){
-		if(current->successors[i].grpNum == transNum){
-			//fprintf(stdout, "MATCH!");
-			proceed(i);
-			break;
-		}
-	}
-
-	// if(nCom>0){
-
-	// 	char * split = strtok(input,"");
-	// 	while (split!=NULL){
-	// 		fprintf(stdout, "%s\n",split);
-	// 		split = strtok(NULL," ");
-	// 		fprintf(stdout, "%s\n",split);
-	// 	}
-
-	// 	// if(strcmp(com[0],"explore")){
-
-	// 	// 	fprintf(stdout, "Explore!");
-	// 	// }
-
-	// }
-
 	
+	//TEST to control parsed input commands
+	//fprintf(stdout, "Num of commands %d\n", nCom);
+	//for(int i = 0; i < nCom; i++) fprintf(stdout, "|%s|\n", com[i]);
+
+	if (strcmp(com[0],"help") == 0) printHelp();
+	else if (strcmp(com[0],"current") == 0) printNode(current, 0);
+	else if (strcmp(com[0],"state") == 0) printState(current->state);
+	else if (strcmp(com[0],"trans") == 0) printTransitions(current, 1);
+	else if (strcmp(com[0],"path") == 0){
+		if (nCom >= 2){
+			if(strcmp(com[1],"states") == 0) printPath(current, 1);
+			else fprintf(stdout, RED "\t ERROR: " RESET " Entered argument for 'path' unknown\n\t See 'help' for description.\n");
+		}
+		else printPath(current, 0);
+	} 
+	else if (strcmp(com[0],"take") == 0){
+		if (nCom >= 2){
+			int transNum;
+			sscanf(com[1],"%d",&transNum);
+			
+			int i = 0;
+			int numSucc = current->numSuccessors;
+			while (i < numSucc){
+				if(current->successors[i].grpNum == transNum){
+					printTransitions(current,1);
+					proceed(i);
+					printTransitions(current->parent,1);
+					break;
+				}
+				i++;
+			}
+			if (i >= numSucc) fprintf(stdout, RED "\t ERROR: " RESET " this transition is not available from this state.\n\t Enter 'trans' to see all available transitions and there states.");
+		}
+		else fprintf(stdout, RED "\t ERROR: " RESET " explore needs as argument the number of the transition to take.\n");
+	}
+	else if (strcmp(com[0],"goback") == 0) goBack();
+	else fprintf(stdout, RED "\t ERROR: " RESET " Command unknown - enter 'help' for available options.\n");
 
 }
 
-/*handleIO()*/
-bool handleIO(){
-
+/*runIO()*/
+void runIO(){
 
 	char * line = NULL;
 	size_t len = 0;
 	ssize_t read;
 
-	printf("\nEnter string below - [ctrl + d] to quit\n");
+	fprintf(stdout,"\n-----------------------------------------------------------------------------------------------\n");
+	fprintf(stdout, CYAN "\nEnter command below - help for options -[ctrl + d] to quit\n" RESET);
 
 	while((read = getline(&line, &len, stdin)) != -1){
 		if(read > 0){
-			printf("\n-> read %zd chars from stdin, allocated %zd bytes for line %s",read,len,line);
-			actOnInput(line);
+			//printf("\n-> read %zd chars from stdin, allocated %zd bytes for line %s",read,len,line);
+			line[strlen(line)-1] = '\0';
+			fprintf(stdout,"\n-----------------------------------------------------------------------------------------------\n\n");
+			handleIO(line);
 		}
-		printf("\nEnter string below - [ctrl + d] to quit\n");
+		fprintf(stdout,"\n-----------------------------------------------------------------------------------------------\n");
+		fprintf(stdout, CYAN "\nEnter command below - help for options -[ctrl + d] to quit\n" RESET);
 	}
-
 	//free (line);
-	return 1;
-
 }
-
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
  *
@@ -297,6 +386,9 @@ bool handleIO(){
 
 int main (int argc, char *argv[]){
 
+	fprintf(stdout, CYAN "\n Start up PINSsim\n" RESET);
+	fprintf(stdout,"\n-----------------------------------------------------------------------------------------------\n");
+	
 	// Initate model and HRE
 	HREinitBegin(argv[0]);
     HREaddOptions(options,"representation of the input\n\nOptions");
@@ -317,14 +409,14 @@ int main (int argc, char *argv[]){
     // printf("Parsed extension: %s \n",extension);
 
     GBloadFile(model, files[0], &model);
-    fprintf(stdout,"pinssim.c - main: loaded file %s \n",files[0]);
+    fprintf(stdout,CYAN "INFO: " RESET " Loaded file: %s \n",files[0]);
   
 
     if (argc >= 2){
     	opf = fopen(files[1],"w");
     	if (opf != NULL){ 
     		GBprintDependencyMatrixCombined(opf, model);
-    		fprintf(stdout,"pinssim.c - main: saved dependency matrix to file %s \n",files[1]);
+    		fprintf(stdout, CYAN "INFO:" RESET " Saved dependency matrix to file: %s \n",files[1]);
     	}
     	//GBprintStateLabelMatrix(opf, model);
     }
@@ -336,42 +428,31 @@ int main (int argc, char *argv[]){
     //eLbls = lts_type_get_edge_label_count(ltstype);
     nGrps = dm_nrows(GBgetDMInfo(model));
 
-    fprintf(stdout,"state vector length is %d; there are %d groups\n", N, nGrps);
+    fprintf(stdout,CYAN "INFO: " RESET " State vector length is %d; there are %d groups\n", N, nGrps);
 
     //dm_print(stderr, GBgetStateLabelInfo(model));
 
     src = (int*)alloca(sizeof(int)*N);
     GBgetInitialState(model, src);
 
-    head = (trace_node*)alloca(sizeof(trace_node));
+    head = (trace_node*)malloc(sizeof(trace_node));
     head->grpNum = -1;
-    head->state = (int*)alloca(sizeof(int)*N);
+    head->state = (int*)malloc(sizeof(int)*N);
     head->state = src;
     head->parent = NULL;
     head->numSuccessors = 0;
+    head->explored = 0;
+    head->treeDepth = 0;
 
+    fprintf(stdout,"\n-----------------------------------------------------------------------------------------------\n");
+    fprintf(stdout, GREEN "INITIAL STATE:\n" RESET);
     explore_states(head);
 
-    current = (trace_node*)malloc(sizeof(*head));
-    memcpy(current,head,sizeof(*head));
+    //current = (trace_node*)malloc(sizeof(*head));
+    current = head;
+    //memcpy(current,head,sizeof(*head));
 
-    // printState(src);
-    // printState(head->state);
-    // printState(current->state);
-
-    printTransitions(head);
-    printTransitions(current);
-
-    printNode(head);
-
-    printTransitions(head);
-
-	handleIO();
-
-
-
-	// Ask for initial state - specify leave empty for default
-	// 
+	runIO();
 
 	return 0;
 
