@@ -431,6 +431,34 @@ dm_print (FILE * f, const matrix_t *m)
     return 0;
 }
 
+int
+dm_print_combined (FILE * f, const matrix_t *r, const matrix_t *mayw, const matrix_t *mustw)
+{
+    fprintf(f, "      0");
+    for (int j = 0; j+10 < dm_ncols(r); j+=10)
+        fprintf(f, "%10d", j+10);
+    fprintf(f, " \n");
+    for (int i = 0; i < dm_nrows(r); i++) {
+        fprintf(f, "%4d: ", i);
+        for (int j = 0; j < dm_ncols(r); j++) {
+            if (dm_is_set(r, i, j) && (dm_is_set(mayw, i, j))) {
+                fprintf(f, "+");
+            } else if (dm_is_set(r, i, j)) {
+                fprintf(f, "r");
+            } else if (dm_is_set(mustw, i, j)) {
+                fprintf(f, "w");
+            } else if (dm_is_set(mayw, i, j)) {
+                fprintf(f, "W");
+            } else {
+                fprintf(f, "-");
+            }
+        }
+        fprintf(f, "\n");
+    }
+    return 0;
+}
+
+
 static void
 sift_down_ (matrix_t *r, matrix_t *mayw, matrix_t *mustw, int root, int bottom, dm_comparator_fn cmp,
             int (*dm_swap_fn) (matrix_t *, int, int))
@@ -1042,7 +1070,7 @@ dm_anneal (matrix_t *r, matrix_t *mayw, matrix_t *mustw)
             temp /= COOL_FRAC;
     }
 
-    DMDBG (printf ("cost: %d ", cost_ (r, mayw, mustw)));
+    DMDBG (printf ("cost: %d ", cost_ (r, mayw)));
 
     return 0;
 }
@@ -1168,7 +1196,7 @@ dm_optimize (matrix_t *r, matrix_t *mayw, matrix_t *mustw)
             dm_free_permutation_group (&rot);
 
             DMDBG (printf("best rotation: %d-%d, costs %d\n", best_i, best_j, min));
-            DMDBG (dm_print (stdout, m));
+            DMDBG (dm_print_combined (stdout, r, mayw, mustw));
 
             best_i = best_j = 0;
         }
@@ -1291,7 +1319,7 @@ dm_all_perm (matrix_t *r, matrix_t *mayw, matrix_t *mustw)
     }
     DMDBG (printf ("current:"));
     DMDBG (current_all_perm_ (perm, len));
-    DMDBG (printf ("cost: %d ", cost_ (r, mayw, mustw)));
+    DMDBG (printf ("cost: %d ", cost_ (r, mayw)));
 
     return 0;
 }

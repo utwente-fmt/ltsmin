@@ -96,6 +96,8 @@ extern int          dm_ungroup_rows (matrix_t *);
 extern int          dm_ungroup_cols (matrix_t *);
 
 extern int          dm_print (FILE *, const matrix_t *);
+extern int          dm_print_combined (FILE * f, const matrix_t *, const matrix_t *, const matrix_t *);
+
 
 extern int          dm_anneal (matrix_t *, matrix_t *, matrix_t *);
 extern int          dm_optimize (matrix_t *, matrix_t *, matrix_t *);

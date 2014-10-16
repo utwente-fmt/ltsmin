@@ -1046,27 +1046,7 @@ void GBprintDependencyMatrixCombined(FILE* file, model_t model) {
     matrix_t *dm_must_w = GBgetDMInfoMustWrite(model);
 
     Printf (info, "\nRead/write dependencies:\n");
-    fprintf(file, "      0");
-    for (int j = 0; j+10 < dm_ncols(dm_r); j+=10)
-        fprintf(file, "%10d", j+10);
-    fprintf(file, " \n");
-    for (int i = 0; i < dm_nrows(dm_r); i++) {
-        fprintf(file, "%4d: ", i);
-        for (int j = 0; j < dm_ncols(dm_r); j++) {
-            if (dm_is_set(dm_r, i, j) && (dm_is_set(dm_may_w, i, j))) {
-                fprintf(file, "+");
-            } else if (dm_is_set(dm_r, i, j)) {
-                fprintf(file, "r");
-            } else if (dm_is_set(dm_must_w, i, j)) {
-                fprintf(file, "w");
-            } else if (dm_is_set(dm_may_w, i, j)) {
-                fprintf(file, "W");
-            } else {
-                fprintf(file, "-");
-            }
-        }
-        fprintf(file, "\n");
-    }
+    dm_print_combined(file, dm_r, dm_may_w, dm_must_w);
 }
 
 void GBprintPORMatrix(FILE* file, model_t model) {
