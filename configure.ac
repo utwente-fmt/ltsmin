@@ -406,6 +406,12 @@ AM_CONDITIONAL([HAVE_VERSION_CONTROL], [test -d "${srcdir}/.git"])
 AM_CONDITIONAL([HAVE_LIBZIP], [test x"$acx_libzip" = xyes])
 AM_CONDITIONAL([HAVE_PROFILER], [test x"$acx_profiler" = xyes])
 
+AM_CONDITIONAL(BUILD_OS_IS_DARWIN,
+[case "${build_os}" in
+  darwin*)  true ;;
+  *)        false ;;
+esac])
+
 AC_CONFIG_COMMANDS_POST(
   [ac_configure_args="$ac_configure_args --enable-keep-terminated-procs dnl
                                          --disable-shared dnl
