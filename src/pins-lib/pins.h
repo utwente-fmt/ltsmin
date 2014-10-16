@@ -922,13 +922,19 @@ extern model_t GBregroup(model_t model, const char *group_spec);
 /**
  * \brief Returns 1 if the mucalc wrapper is active; 0 otherwise.
  */
-int GBhaveMucalc();
+extern int GBhaveMucalc();
 
 /**
  * \brief Gets the number of subformulae of the mu-calculus property that is being checked.
  * Needed for the parity game solver.
  */
-int GBgetMucalcNodeCount(model_t model);
+extern int GBgetMucalcNodeCount(model_t model);
+
+/**
+ * \brief Sets the number of subformulae of the mu-calculus property that is being checked.
+ * Needed for the parity game solver.
+ */
+extern void GBsetMucalcNodeCount(model_t model, int node_count);
 
 //@}
 
