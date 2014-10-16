@@ -35,7 +35,7 @@ struct grey_box_model {
     int *label_visibility;
 	int *s0;
 	int *guard_status;
-	char* use_guards;
+	pins_guards_t use_guards;
 	void*context;
     next_method_grey_t next_short;
 	next_method_grey_t next_long;
@@ -427,7 +427,7 @@ model_t GBcreateBase(){
 	model->get_count=NULL;
 	model->expand_matrix=NULL;
 	model->project_matrix=NULL;
-	model->use_guards=NULL;
+	model->use_guards=GUARDS_DISABLED;
 	model->mucalc_node_count = 0;
 	
 	model->static_info_index=SIcreate();
@@ -577,7 +577,7 @@ void GBinitModelDefaults (model_t *p_model, model_t default_src)
 
     if (model->expand_matrix == NULL) model->expand_matrix=default_src->expand_matrix;
     if (model->project_matrix == NULL) model->project_matrix=default_src->project_matrix;
-    if (model->use_guards == NULL) model->use_guards=default_src->use_guards;
+    if (model->use_guards == GUARDS_DISABLED) model->use_guards=default_src->use_guards;
     if (model->mucalc_node_count==0) model->mucalc_node_count = default_src->mucalc_node_count;
 }
 
@@ -1178,7 +1178,19 @@ GBloadFile (model_t model, const char *filename, model_t *wrapped)
         for (int i = 0; i < registered; i++) {
             if (0==strcmp (model_type[i], extension)) {
                 model_loader[i] (model, filename);
-                model->use_guards = use_guards;
+
+                if (0==strcmp(use_guards, "assume-true")) {
+                    model->use_guards = GUARDS_ASSUMED;
+                } else if (0==strcmp(use_guards, "evaluate")) {
+                    model->use_guards = GUARDS_EVALUATE;
+                } else if (0==strcmp(use_guards, "false")) {
+                    model->use_guards = GUARDS_DISABLED;
+                } else {
+                    Warning (info, "Wrong value for "USE_GUARDS_OPTION": '%s'", use_guards);
+                    HREprintUsage();
+                    HREabort (LTSMIN_EXIT_FAILURE);
+                }
+
                 if (GBgetUseGuards(model) != GUARDS_DISABLED) {
                    if (model->next_long == default_long)
                        Abort ("No long next-state function implemented for this language module (--"USE_GUARDS_OPTION").");
@@ -1191,6 +1203,9 @@ GBloadFile (model_t model, const char *filename, model_t *wrapped)
                        model->expand_matrix=GBgetMatrix(model, GBgetMatrixID(model, LTSMIN_MATRIX_ACTIONS_READS));
                    } else if (GBgetUseGuards(model) == GUARDS_EVALUATE) {
                        model->expand_matrix=GBgetDMInfoRead(model);
+                   }
+                   if (model->expand_matrix == NULL) {
+                       Abort ("Matrix not available for --"USE_GUARDS_OPTION"=%s", use_guards);
                    }
                 }
 
@@ -1370,9 +1385,7 @@ struct poptOption greybox_options_ltl[]={
 
 pins_guards_t
 GBgetUseGuards(model_t model) {
-    if (0==strcmp(model->use_guards,"assume-true")) return GUARDS_ASSUMED;
-    if (0==strcmp(model->use_guards,"evaluate")) return GUARDS_EVALUATE;
-    else return GUARDS_DISABLED;
+    return model->use_guards;
 }
 
 void*
