@@ -11,14 +11,14 @@ dict set backends mc options {"-z6" "--no-ref" "--perm=rr" "--perm=dynamic" ""}
 
 
 # 1 row for every param and a list of possible values
-dict set backends sym params "--order=" {bfs-prev bfs chain-prev chain}
+dict set backends sym params "--order=" {bfs-prev bfs chain-prev chain par par-prev}
 dict set backends sym params "--saturation=" {none sat-like sat-loop sat-fix sat}
 # internal and BuDDy
-dict set backends sym params "--vset=" {ldd fdd}
+dict set backends sym params "--vset=" {ldd fdd ldd64 sylvan lddmc}
 dict set backends sym options {""}
 
 # 1 row for every param and a list of possible values
-dict set backends seq params "--strategy=" {dfs bfs}
+dict set backends seq params "--strategy=" {dfs bfs scc}
 dict set backends seq params "--state=" {tree table vset}
 dict set backends seq options {""}
 

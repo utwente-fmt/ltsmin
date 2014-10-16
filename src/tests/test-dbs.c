@@ -298,6 +298,8 @@ int main2(const int argc, const char **args) {
 int
 main (int c, char **v)
 {
+    HREinitBegin(v[0]);
+    HREinitStart(&c,&v,0,0,NULL,NULL);
     treedbs_ll_t dbs = TreeDBSLLcreate_sized (4, 10, 2, 5, 0, 1);
     int s[4] = {1,2,3,4};
     int t[8];
@@ -370,7 +372,9 @@ main (int c, char **v)
     printf("%u ", val); val = TreeDBSLLdec_sat_bits (dbs, ref);
     HREassert ( val == 0, "no empty");
     printf("%u ", val); val = TreeDBSLLdec_sat_bits (dbs, ref);
+    printf("\n");
     //TreeDBSLLinc_sat_bits (dbs, ref);
+    HREexit(0);
     (void)c;(void)v;
 }
 

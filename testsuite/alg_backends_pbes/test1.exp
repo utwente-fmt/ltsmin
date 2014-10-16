@@ -22,7 +22,7 @@ set langs [dict create]
 # -------------------
 
 # pbes:
-dict set langs pbes model "brp-nodeadlock.pbes"
+dict set langs pbes model "brp.pbes"
 dict set langs pbes options mc "--procs=$num_threads"
 dict set langs pbes exp_output "10548 states 12168 transitions"
 set alg_be [ find_alg_backends "{dist,mc,seq}" ]

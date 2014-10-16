@@ -46,7 +46,7 @@ test_dfs_stack_CPPFLAGS 	= $(AM_CPPFLAGS)
 
 # test-dm
 test_dm_SOURCES 			= test-dm.c
-test_dm_LDADD 				= ../dm/libdm_debug.la $(AM_LDFLAGS)
+test_dm_LDADD 				= ../dm/libdm_debug.la $(PINS_LIBS) $(AM_LDFLAGS)
 test_dm_CPPFLAGS 			= -DDMDEBUG $(AM_CPPFLAGS)
 
 # test-hre
@@ -75,7 +75,7 @@ test_mucalc_parser_LDADD     = $(HRE_LIB) ../hre-io/libhre-io.la ../ltsmin-lib/l
 
 # test-regroup
 test_regroup_SOURCES 		= test-regroup.c
-test_regroup_LDADD 			= ../dm/libdm.la $(AM_LDFLAGS)
+test_regroup_LDADD 			= ../dm/libdm.la $(PINS_LIBS) $(AM_LDFLAGS)
 test_regroup_CPPFLAGS 		= $(AM_CPPFLAGS)
 
 # test-simplemap
