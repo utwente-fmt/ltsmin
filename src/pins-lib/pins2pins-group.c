@@ -556,7 +556,7 @@ GBregroup (model_t model, const char *regroup_spec)
     dm_copy (original_must_write, mustw);
 
     Print1 (info, "Regroup specification: %s", regroup_spec);
-    if (GBgetUseGuards(model) == GUARDS_ASSUMED) {
+    if (GBgetUseGuards(model)) {
         dm_copy (GBgetMatrix(model, GBgetMatrixID(model, LTSMIN_MATRIX_ACTIONS_READS)), r);
         apply_regroup_spec (r, mayw, mustw, regroup_spec, GBgetGuardsInfo(model));
     } else {
@@ -663,7 +663,7 @@ GBregroup (model_t model, const char *regroup_spec)
     GBsetProjectMatrix(group, mayw);
 
     // here we either transform the read matrix or the actions read matrix
-    if (GBgetUseGuards(model) == GUARDS_ASSUMED) { // we have transformed the actions read matrix
+    if (GBgetUseGuards(model)) { // we have transformed the actions read matrix
 
         // set the new actions read matrix
         GBsetMatrix(group, LTSMIN_MATRIX_ACTIONS_READS, r, PINS_MAY_SET,

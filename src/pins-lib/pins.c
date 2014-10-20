@@ -35,7 +35,7 @@ struct grey_box_model {
     int *label_visibility;
 	int *s0;
 	int *guard_status;
-	pins_guards_t use_guards;
+	int use_guards;
 	void*context;
     next_method_grey_t next_short;
 	next_method_grey_t next_long;
@@ -427,7 +427,7 @@ model_t GBcreateBase(){
 	model->get_count=NULL;
 	model->expand_matrix=NULL;
 	model->project_matrix=NULL;
-	model->use_guards=GUARDS_DISABLED;
+	model->use_guards=0;
 	model->mucalc_node_count = 0;
 	
 	model->static_info_index=SIcreate();
@@ -577,7 +577,7 @@ void GBinitModelDefaults (model_t *p_model, model_t default_src)
 
     if (model->expand_matrix == NULL) model->expand_matrix=default_src->expand_matrix;
     if (model->project_matrix == NULL) model->project_matrix=default_src->project_matrix;
-    if (model->use_guards == GUARDS_DISABLED) model->use_guards=default_src->use_guards;
+    if (model->use_guards == 0) model->use_guards=default_src->use_guards;
     if (model->mucalc_node_count==0) model->mucalc_node_count = default_src->mucalc_node_count;
 }
 
@@ -1130,7 +1130,7 @@ static char            *model_type_pre[MAX_TYPES];
 static pins_loader_t    model_preloader[MAX_TYPES];
 static int              registered_pre=0;
 static int              matrix=0;
-static char*            use_guards="false";
+static int              use_guards=0;
 static int              labels=0;
 static int              cache=0;
 pins_por_t              PINS_POR = PINS_POR_NONE;
@@ -1178,20 +1178,9 @@ GBloadFile (model_t model, const char *filename, model_t *wrapped)
         for (int i = 0; i < registered; i++) {
             if (0==strcmp (model_type[i], extension)) {
                 model_loader[i] (model, filename);
+                model->use_guards=use_guards;
 
-                if (0==strcmp(use_guards, "assume-true")) {
-                    model->use_guards = GUARDS_ASSUMED;
-                } else if (0==strcmp(use_guards, "evaluate")) {
-                    model->use_guards = GUARDS_EVALUATE;
-                } else if (0==strcmp(use_guards, "false")) {
-                    model->use_guards = GUARDS_DISABLED;
-                } else {
-                    Warning (info, "Wrong value for "USE_GUARDS_OPTION": '%s'", use_guards);
-                    HREprintUsage();
-                    HREabort (LTSMIN_EXIT_FAILURE);
-                }
-
-                if (GBgetUseGuards(model) != GUARDS_DISABLED) {
+                if (GBgetUseGuards(model)) {
                    if (model->next_long == default_long)
                        Abort ("No long next-state function implemented for this language module (--"USE_GUARDS_OPTION").");
                    sl_group_t* guards = GBgetStateLabelGroupInfo (model, GB_SL_GUARDS);
@@ -1199,13 +1188,9 @@ GBloadFile (model_t model, const char *filename, model_t *wrapped)
                        Abort ("No long next-state function implemented for this language module (--"USE_GUARDS_OPTION").");
                    model->guard_status = RTmalloc (sizeof(int[pins_get_state_label_count(model)]));
                    model->next_all = guards_all;
-                   if (GBgetUseGuards(model) == GUARDS_ASSUMED) {
-                       model->expand_matrix=GBgetMatrix(model, GBgetMatrixID(model, LTSMIN_MATRIX_ACTIONS_READS));
-                   } else if (GBgetUseGuards(model) == GUARDS_EVALUATE) {
-                       model->expand_matrix=GBgetDMInfoRead(model);
-                   }
+                   model->expand_matrix=GBgetMatrix(model, GBgetMatrixID(model, LTSMIN_MATRIX_ACTIONS_READS));
                    if (model->expand_matrix == NULL) {
-                       Abort ("Matrix not available for --"USE_GUARDS_OPTION"=%s", use_guards);
+                       Abort ("Matrix not available for --"USE_GUARDS_OPTION);
                    }
                 }
 
@@ -1366,7 +1351,7 @@ GBstateIsValidEnd (model_t model, int *state)
 struct poptOption greybox_options[]={
     { "labels", 0, POPT_ARG_VAL, &labels, 1, "print state variable and type names, and state and action labels", NULL },
 	{ "matrix" , 'm' , POPT_ARG_VAL , &matrix , 1 , "print the dependency matrix for the model and exit" , NULL},
-	{ USE_GUARDS_OPTION , 'g' , POPT_ARG_STRING | POPT_ARGFLAG_SHOW_DEFAULT , &use_guards , 0 , "use guards in combination with the long next-state function to speed up the next-state function" , "<false|assume-true|evaluate>"},
+	{ USE_GUARDS_OPTION , 'g' , POPT_ARG_VAL , &use_guards , 1 , "use guards in combination with the long next-state function to speed up the next-state function" , NULL},
 	{ "cache" , 'c' , POPT_ARG_VAL , &cache , 1 , "enable caching of PINS calls" , NULL },
 	{ "regroup" , 'r' , POPT_ARG_STRING, &regroup_options , 0 ,
           "enable regrouping; available transformations T: "
@@ -1383,7 +1368,7 @@ struct poptOption greybox_options_ltl[]={
     POPT_TABLEEND
 };
 
-pins_guards_t
+int
 GBgetUseGuards(model_t model) {
     return model->use_guards;
 }

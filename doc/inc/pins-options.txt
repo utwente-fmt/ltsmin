@@ -17,14 +17,8 @@ short version of the greybox next-state function and memoizes the
 results. If the next-state function is expensive this will yield
 substantial speedups.
 
-*--pins-guards*="MODE"::
-    Enable guard-splitting in a particular 'MODE'.
-+
-If 'MODE' is set to 'assume-true' then guards are evaluated for every state
-before computing successor states, thus resulting in fewer next-state calls.
-If 'MODE' is set to 'evaluate' then guards are both evaluated before next-state calls
-and during next-state calls. This allows for combining rows in the dependency matrix.
-The 'MODE' 'false' is default, which disables guard-splitting.
+*--pins-guards*::
+    Use guards in combination with the long next-state function to speed up the next-state function.
 
 *-r*, *--regroup*='SPEC'::
     Enable regrouping optimizations on the dependency matrix.

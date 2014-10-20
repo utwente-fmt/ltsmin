@@ -213,15 +213,6 @@ typedef enum {
 extern pins_por_t PINS_POR;
 
 /**
-\brief the guard-splitting mode:
-*/
-typedef enum {
-    GUARDS_DISABLED, // don't use guard-splitting
-    GUARDS_ASSUMED, // next-state assumes condition is true
-    GUARDS_EVALUATE // next-state re-evaluates condition
-} pins_guards_t;
-
-/**
 \brief The behaviour of the ltl buchi product
 
 PINS_LTL_TEXTBOOK adds an initial state to the model and labels
@@ -941,6 +932,6 @@ extern void GBsetMucalcNodeCount(model_t model, int node_count);
 /**
  * \brief Whether to use guards to speed up next-state computation.
  */
-extern pins_guards_t GBgetUseGuards(model_t model);
+extern int GBgetUseGuards(model_t model);
 
 #endif
