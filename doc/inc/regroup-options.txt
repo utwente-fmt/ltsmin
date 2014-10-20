@@ -47,3 +47,18 @@ rn;;
 ru;;
   Row sUbsume; try to remove more rows than nubbing, thereby trading
   speed for memory.  Requires *rs*.
+
+w2W;;
+  Over-approximate all must-write to may-write. May-write supports the copy (-) dependency.
+    
+r2+;;
+  Over-approximate read to read+write. Allows read dependencies to also subsume write dependencies.
+  
+w2+;;
+  Over-approximate must-write to read+write. Allows must-write dependencies to also subsume read dependencies.
+
+W2+;;
+  Over-approximate may-write to read+write. Allows must-write dependencies to also subsume read dependencies.
+
+rb4w;;
+  Use special heuristics to move read dependencies before write dependences. Often a win in symbolic state space generation.
