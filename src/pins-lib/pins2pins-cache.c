@@ -141,7 +141,6 @@ GBaddCache (model_t model)
     matrix_t           *p_dm = GBgetDMInfo (model);
     matrix_t           *p_dm_read = GBgetExpandMatrix (model);
     matrix_t           *p_dm_may_write = GBgetProjectMatrix (model);
-    matrix_t           *p_dm_must_write = GBgetDMInfoMustWrite (model);
     int                 N = dm_nrows (p_dm);
     struct group_cache *cache = RTmalloc (N * sizeof (struct group_cache));
     for (int i = 0; i < N; i++) {
