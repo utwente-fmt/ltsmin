@@ -611,16 +611,14 @@ void GBsetDMInfo(model_t model, matrix_t *dm_info) {
 }
 
 matrix_t *GBgetDMInfo(model_t model) {
+    if (model->dm_info == NULL) Abort("dependency matrix not set");
 	return model->dm_info;
 }
 
 void GBsetDMInfoRead(model_t model, matrix_t *dm_info) {
 	if (model->dm_read_info != NULL) Abort("dependency matrix already set");
-//    if (GBgetMatrixID(model, LTSMIN_MATRIX_ACTIONS_READS) == SI_INDEX_FAILED)
-//        Abort("The actions read matrix must be set before the read matrix");
 
 	model->dm_read_info=dm_info;
-
 
 	// Since the "actions_reads" matrix is a subset of the dependencies
 	// of the read matrix we may also set the "actions_reads" matrix.
