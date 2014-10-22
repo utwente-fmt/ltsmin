@@ -3363,7 +3363,11 @@ hre_context_t ctx;
 
 #ifdef HAVE_SYLVAN
 static int* parent_sockets;
+static stream_t* parent_socket_is;
+static stream_t* parent_socket_os;
 static int* child_sockets;
+static stream_t* child_socket_is;
+static stream_t* child_socket_os;
 static int* run_chunk_thread;
 static pthread_t chunk_thread;
 
@@ -3371,13 +3375,21 @@ void init_multi_process(size_t workers)
 {
     HREenableFork(workers + 1, true);
     parent_sockets = RTmalloc(sizeof(int)*workers);
+    parent_socket_is = RTmalloc(sizeof(stream_t)*workers);
+    parent_socket_os = RTmalloc(sizeof(stream_t)*workers);
     child_sockets = RTmalloc(sizeof(int)*workers);
+    child_socket_is = RTmalloc(sizeof(stream_t)*workers);
+    child_socket_os = RTmalloc(sizeof(stream_t)*workers);
     for(size_t i=0; i<workers; i++)
     {
         int fd[2];
         socketpair(AF_UNIX, SOCK_STREAM, 0, fd);
         parent_sockets[i] = fd[0];
+        parent_socket_is[i] = fd_input(parent_sockets[i]);
+        parent_socket_os[i] = fd_output(parent_sockets[i]);
         child_sockets[i] = fd[1];
+        child_socket_is[i] = fd_input(child_sockets[i]);
+        child_socket_os[i] = fd_output(child_sockets[i]);
     }
     run_chunk_thread = mmap(NULL,sizeof(int),PROT_READ|PROT_WRITE,MAP_SHARED|MAP_ANON,0,0);
     *run_chunk_thread = 1;
@@ -3391,7 +3403,8 @@ master_get_transitions_short(model_t model, int group, int* src, TransitionCB cb
 
     int r_length = r_projs[group].len;
     Print(hre_debug, "master %d: writing state to slave (group=%d, length=%d).", id, group, r_length);
-    stream_t os = fd_output(parent_sockets[id-1]);
+    //stream_t os = fd_output(parent_sockets[id-1]);
+    stream_t os = parent_socket_os[id-1];
     DSwriteS32(os, TRANSITION); // signal that a state will be sent next
     DSwriteS32(os, group);
     for(int i=0; i<r_length; i++)
@@ -3400,7 +3413,8 @@ master_get_transitions_short(model_t model, int group, int* src, TransitionCB cb
     }
     stream_flush(os);
 
-    stream_t is = fd_input(parent_sockets[id-1]);
+    //stream_t is = fd_input(parent_sockets[id-1]);
+    stream_t is = parent_socket_is[id-1];
     int w_length = w_projs[group].len;
     int labels = lts_type_get_edge_label_count(GBgetLTStype(model));
 
@@ -3414,30 +3428,35 @@ master_get_transitions_short(model_t model, int group, int* src, TransitionCB cb
         {
             dst[i] = DSreadS32(is);
         }
-        int* cpy = NULL;
+        int cpy[w_length];
         int cpy_vector = DSreadS32(is);
         if (cpy_vector)
         {
-            cpy = (int*) RTmalloc(sizeof(int[w_length]));
             for(int i=0; i<w_length; i++)
             {
                 cpy[i] = DSreadS32(is);
             }
         }
-        transition_info_t* ti = RTmalloc(sizeof(transition_info_t));
-        ti->group = group;
-        ti->labels = RTmalloc(labels*sizeof(int));
+        transition_info_t ti;
+        ti.group = group;
+        ti.labels = alloca(labels*sizeof(int));
         for(int i=0; i<labels; i++)
         {
-            ti->labels[i] = DSreadS32(is);
+            ti.labels[i] = DSreadS32(is);
         }
-        ti->por_proviso = DSreadS32(is);
-        cb(context, ti, dst, cpy);
-        if (cpy != NULL) RTfree(cpy);
+        ti.por_proviso = DSreadS32(is);
+        if (cpy_vector)
+        {
+            cb(context, &ti, dst, cpy);
+        }
+        else
+        {
+            cb(context, &ti, dst, NULL);
+        }
         next = DSreadS32(is);
     }
-    RTfree(os);
-    RTfree(is);
+    //RTfree(os);
+    //RTfree(is);
     Print(hre_debug, "master %d: done.", id);
     return 0;
 }
@@ -3451,7 +3470,8 @@ master_get_label_short(model_t model,int label,int *state)
 
     int p_length = g_projs[label].len;
     Print(hre_debug, "master %d: writing state to slave (label=%d, length=%d).", id, label, p_length);
-    stream_t os = fd_output(parent_sockets[id-1]);
+    //stream_t os = fd_output(parent_sockets[id-1]);
+    stream_t os = parent_socket_os[id-1];
     DSwriteS32(os, LABEL); // signal that a state will be sent next
     DSwriteS32(os, label);
     for(int i=0; i<p_length; i++)
@@ -3460,12 +3480,13 @@ master_get_label_short(model_t model,int label,int *state)
     }
     stream_flush(os);
 
-    stream_t is = fd_input(parent_sockets[id-1]);
+    //stream_t is = fd_input(parent_sockets[id-1]);
+    stream_t is = parent_socket_is[id-1];
 
     Debug("master %d: waiting for result.", id);
     int result = DSreadS32(is);
-    RTfree(os);
-    RTfree(is);
+    //RTfree(os);
+    //RTfree(is);
     Print(hre_debug, "master %d: done (result=%d).", id, result);
     return result;
 }
@@ -3476,7 +3497,8 @@ master_exit()
     for(size_t id=1; id<=lace_n_workers; id++)
     {
         Print(hre_debug, "master: stopping slave (id=%zu).", id);
-        stream_t os = fd_output(parent_sockets[id-1]);
+        //stream_t os = fd_output(parent_sockets[id-1]);
+        stream_t os = parent_socket_os[id-1];
         DSwriteS32(os, NOOP); // signal that no states will be sent anymore
         stream_flush(os);
         RTfree(os);
@@ -3488,7 +3510,8 @@ slave_transition_cb(void* context, transition_info_t* ti, int* dst, int* cpy)
 {
     int id = HREme(HREglobal());
     Debug("slave_transition_cb %d.", id);
-    stream_t os = fd_output(child_sockets[id-1]);
+    //stream_t os = fd_output(child_sockets[id-1]);
+    stream_t os = child_socket_os[id-1];
     int group = ti->group;
     int length = w_projs[group].len;
     int labels = lts_type_get_edge_label_count(GBgetLTStype(model));
@@ -3514,7 +3537,7 @@ slave_transition_cb(void* context, transition_info_t* ti, int* dst, int* cpy)
     }
     DSwriteS32(os, ti->por_proviso);
     stream_flush(os);
-    RTfree(os);
+    //RTfree(os);
     (void)context;
 }
 
@@ -3529,7 +3552,8 @@ start_slave()
 
     int id = HREme(HREglobal());
     Print(infoLong, "slave %d: ready.", id);
-    stream_t is = fd_input(child_sockets[id-1]);
+    //stream_t is = fd_input(child_sockets[id-1]);
+    stream_t is = child_socket_is[id-1];
     int next = DSreadS32(is);
     while (next!=NOOP)
     {
@@ -3546,10 +3570,11 @@ start_slave()
             (*transitions_short_multi)(model, group, src, slave_transition_cb, NULL);
             Debug("slave %d: returned from greybox (group=%d).", id, group);
 
-            stream_t os = fd_output(child_sockets[id-1]);
+            //stream_t os = fd_output(child_sockets[id-1]);
+            stream_t os = child_socket_os[id-1];
             DSwriteS32(os, NOOP); // signal that all successor states have been sent
             stream_flush(os);
-            RTfree(os);
+            //RTfree(os);
             Print(hre_debug, "slave %d: done (group=%d).", id, group);
         } else if (next == LABEL) {
             Print(hre_debug, "slave %d: start reading label.", id);
@@ -3563,10 +3588,11 @@ start_slave()
             Print(hre_debug, "slave %d: received state (label=%d, length=%d).", id, label, length);
             int res = (*label_short_multi)(model, label, src);
             Debug("slave %d: returned from greybox (label=%d, result=%d).", id, label, res);
-            stream_t os = fd_output(child_sockets[id-1]);
+            //stream_t os = fd_output(child_sockets[id-1]);
+            stream_t os = child_socket_os[id-1];
             DSwriteS32(os, res); // signal the result of the label evaluation
             stream_flush(os);
-            RTfree(os);
+            //RTfree(os);
             Print(hre_debug, "slave %d: done (label=%d, res=%d).", id, label, res);
         } else {
             Warning(error, "unsupported operation");
