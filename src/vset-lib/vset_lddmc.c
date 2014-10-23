@@ -440,6 +440,15 @@ set_project(vset_t dst, vset_t src)
 }
 
 static void
+set_project_minus(vset_t dst, vset_t src, vset_t minus)
+{
+    LACE_ME;
+    assert(src->size == dst->dom->shared.size);
+    lddmc_deref(dst->mdd);
+    dst->mdd = lddmc_ref(lddmc_project_minus(src->mdd, dst->proj, minus->mdd));
+}
+
+static void
 set_next(vset_t dst, vset_t src, vrel_t rel)
 {
     LACE_ME;
@@ -605,6 +614,7 @@ set_function_pointers(vdom_t dom)
     dom->shared.set_copy=set_copy;
     dom->shared.set_count=set_count;
     dom->shared.set_project=set_project;
+    dom->shared.set_project_minus=set_project_minus;
     dom->shared.set_union=set_union;
     dom->shared.set_intersect=set_intersect;
     dom->shared.set_minus=set_minus;
