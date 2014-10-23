@@ -1386,6 +1386,13 @@ learn_guards(vset_t states, long *guard_count) {
 }
 
 static void
+reach_stop(struct reach_s node) {
+    if (node->unsound_group > -1) {
+        Abort("Condition in group %d does not always evaluate to true or false", node->unsound_group);
+    }
+}
+
+static void
 reach_bfs_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
                    long *eg_count, long *next_count, long *guard_count)
 {
@@ -1431,9 +1438,7 @@ reach_bfs_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
                 // set class and call next function
                 root->class = c;
                 reach_bfs_next(root, reach_groups, maybe);
-                if (root->unsound_group > -1) {
-                    Abort("Condition in group %d does not always evaluate to true or false", root->unsound_group);
-                }
+                reach_stop(root);
                 if (!no_soundness_check && GBgetUseGuards(model)) {
                     // For the current level the spec is sound.
                     // This means that every maybe is actually false.
@@ -1463,9 +1468,7 @@ reach_bfs_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
             if (root->ancestors != NULL) vset_copy(root->ancestors, current_level);
             // call next function
             reach_bfs_next(root, reach_groups, maybe);
-            if (root->unsound_group > -1) {
-                Abort("Condition in group %d does not always evaluate to true or false", root->unsound_group);
-            }
+            reach_stop(root);
             if (!no_soundness_check && GBgetUseGuards(model)) {
                 // For the current level the spec is sound.
                 // This means that every maybe is actually false.
@@ -1549,9 +1552,7 @@ reach_bfs(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
                 // set class and call next function
                 root->class = c;
                 reach_bfs_next(root, reach_groups, maybe);
-                if (root->unsound_group > -1) {
-                    Abort("Condition in group %d does not always evaluate to true or false", root->unsound_group);
-                }
+                reach_stop(root);
                 if (!no_soundness_check && GBgetUseGuards(model)) {
                     // For the current level the spec is sound.
                     // This means that every maybe is actually false.
@@ -1583,9 +1584,7 @@ reach_bfs(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
             if (root->ancestors != NULL) vset_copy(root->ancestors, visited);
             // call next function
             reach_bfs_next(root, reach_groups, maybe);
-            if (root->unsound_group > -1) {
-                Abort("Condition in group %d does not always evaluate to true or false", root->unsound_group);
-            }
+            reach_stop(root);
             if (!no_soundness_check && GBgetUseGuards(model)) {
                 // For the current level the spec is sound.
                 // This means that every maybe is actually false.
@@ -1870,9 +1869,7 @@ reach_par(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
                 // set class and call next function
                 root->class = c;
                 CALL(reach_par_next, root, reach_groups, maybe);
-                if (root->unsound_group > -1) {
-                    Abort("Condition in group %d does not always evaluate to true or false", root->unsound_group);
-                }
+                reach_stop(root);
                 if (!no_soundness_check && GBgetUseGuards(model)) {
                     // For the current level the spec is sound.
                     // This means that every maybe is actually false.
@@ -1903,9 +1900,7 @@ reach_par(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
             if (root->ancestors != NULL) vset_copy(root->ancestors, visited);
             // call next function
             CALL(reach_par_next, root, reach_groups, maybe);
-            if (root->unsound_group > -1) {
-                Abort("Condition in group %d does not always evaluate to true or false", root->unsound_group);
-            }
+            reach_stop(root);
             if (!no_soundness_check && GBgetUseGuards(model)) {
                 // For the current level the spec is sound.
                 // This means that every maybe is actually false.
@@ -1988,9 +1983,7 @@ reach_par_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
                 // set class and call next function
                 root->class = c;
                 CALL(reach_par_next, root, reach_groups, maybe);
-                if (root->unsound_group > -1) {
-                    Abort("Condition in group %d does not always evaluate to true or false", root->unsound_group);
-                }
+                reach_stop(root);
                 if (!no_soundness_check && GBgetUseGuards(model)) {
                     // For the current level the spec is sound.
                     // This means that every maybe is actually false.
@@ -2019,9 +2012,7 @@ reach_par_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
             if (root->ancestors != NULL) vset_copy(root->ancestors, current_level);
             // call next function
             CALL(reach_par_next, root, reach_groups, maybe);
-            if (root->unsound_group > -1) {
-                Abort("Condition in group %d does not always evaluate to true or false", root->unsound_group);
-            }
+            reach_stop(root);
             if (!no_soundness_check && GBgetUseGuards(model)) {
                 // For the current level the spec is sound.
                 // This means that every maybe is actually false.
