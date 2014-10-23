@@ -64,7 +64,7 @@ extern void RTrestartTimer(rt_timer_t timer);
 extern void RTstopTimer(rt_timer_t timer);
 
 /// Report the time accumulated in this timer.
-extern void RTprintTimer(log_t log,rt_timer_t timer,char *msg);
+extern void RTprintTimer(log_t log,rt_timer_t timer,char *msg, ...);
 
 /// Return the real time as a float.
 extern float RTrealTime(rt_timer_t timer);

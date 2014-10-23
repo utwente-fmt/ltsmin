@@ -77,7 +77,7 @@ void RTstopTimer(rt_timer_t timer){
     }
 }
 
-void RTprintTimer(log_t log,rt_timer_t timer,char *msg){
+void RTprintTimer(log_t log,rt_timer_t timer,char *msg, ...){
     clock_t tick=sysconf(_SC_CLK_TCK);
     float tm_real, tm_user, tm_sys;
     if (timer->running) {
@@ -92,7 +92,13 @@ void RTprintTimer(log_t log,rt_timer_t timer,char *msg){
         tm_user=((float)(timer->times.tms_utime))/((float)tick);
         tm_sys=((float)(timer->times.tms_stime))/((float)tick);
     }
-    Print(log,"%s %5.3f real %5.3f user %5.3f sys",msg,tm_real,tm_user,tm_sys);
+
+    va_list argptr;
+    va_start(argptr, msg);
+    char buf[255];
+    vsnprintf(buf, 255, msg, argptr);
+    va_end(argptr);
+    Print(log,"%s %5.3f real %5.3f user %5.3f sys",buf,tm_real,tm_user,tm_sys);
 }
 
 float RTrealTime(rt_timer_t timer){
