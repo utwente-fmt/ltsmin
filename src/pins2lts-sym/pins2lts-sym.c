@@ -1388,7 +1388,8 @@ learn_guards(vset_t states, long *guard_count) {
 static void
 reach_stop(struct reach_s node) {
     if (node->unsound_group > -1) {
-        Abort("Condition in group %d does not always evaluate to true or false", node->unsound_group);
+        Warning(info, "Condition in group %d does not always evaluate to true or false", node->unsound_group);
+        HREabort(LTSMIN_EXIT_FAILURE);
     }
 }
 
@@ -2075,7 +2076,8 @@ learn_guards_reduce(vset_t true_states, int t, long *guard_count, vset_t *guard_
                     // If we have Promela, Java etc. then if we encounter a maybe guard then this is an error.
                     // Because every guard is evaluated in order.
                     if (!vset_is_empty(guard_maybe[guards->guard[g]])) {
-                        Abort("Condition in group %d does not evaluate to true or false", t);
+                        Warning(info, "Condition in group %d does not evaluate to true or false", t);
+                        HREabort(LTSMIN_EXIT_FAILURE);
                     }
                 } else {
                     // If we have mCRL2 etc., then we need to store all (real) false states and maybe states
@@ -2095,7 +2097,8 @@ learn_guards_reduce(vset_t true_states, int t, long *guard_count, vset_t *guard_
             vset_copy(tmp, maybe_states);
             vset_minus(tmp, false_states);
             if (!vset_is_empty(tmp)) {
-                Abort("Condition in group %d does not evaluate to true or false", t);
+                Warning(info, "Condition in group %d does not evaluate to true or false", t);
+                HREabort(LTSMIN_EXIT_FAILURE);
             }
             vset_clear(tmp);
             vset_clear(maybe_states);
