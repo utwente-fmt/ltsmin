@@ -47,6 +47,7 @@ static char* transitions_save_filename = NULL;
 static char* transitions_load_filename = NULL;
 
 static char* trc_output = NULL;
+static char* trc_type   = "gcf";
 static int   dlk_detect = 0;
 static char* act_detect = NULL;
 static char* inv_detect = NULL;
@@ -214,7 +215,8 @@ static  struct poptOption options[] = {
     { "action" , 0 , POPT_ARG_STRING , &act_detect , 0 , "detect action prefix" , "<action prefix>" },
     { "invariant", 'i', POPT_ARG_STRING, &inv_detect, 1, "detect invariant violations", NULL },
     { "no-exit", 'n', POPT_ARG_VAL, &no_exit, 1, "no exit on error, just count (for error counters use -v)", NULL },
-    { "trace" , 0 , POPT_ARG_STRING , &trc_output , 0 , "file to write trace to" , "<lts-file>.gcf" },
+    { "trace" , 0 , POPT_ARG_STRING , &trc_output , 0 , "file to write trace to" , "<lts-file>" },
+    { "type", 0, POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT, &trc_type, 0, "trace type to write", "<aut|gcd|gcf|dir|fsm|bcg>" },
     { "save-transitions", 0 , POPT_ARG_STRING, &transitions_save_filename, 0, "file to write transition relations to", "<outputfile>" },
     { "load-transitions", 0 , POPT_ARG_STRING, &transitions_load_filename, 0, "file to read transition relations from", "<inputfile>" },
     { "mu" , 0 , POPT_ARG_STRING , &mu_formula , 0 , "file with a mu formula" , "<mu-file>.mu" },
@@ -521,8 +523,8 @@ find_trace(int trace_end[][N], int end_count, int level, vset_t *levels, char* f
 
     GBgetInitialState(model, init_state);
 
-    char* file_name=malloc((5+strlen(trc_output)+strlen(file_prefix))*sizeof(char));
-    sprintf(file_name, "%s%s.gcf", trc_output, file_prefix);
+    char* file_name=alloca((5+strlen(trc_output)+strlen(file_prefix))*sizeof(char));
+    sprintf(file_name, "%s%s.%s", trc_output, file_prefix, trc_type);
     Warning(info,"writing to file: %s",file_name);
     trace_output = lts_file_create(file_name, ltstype, 1, lts_vset_template());
     lts_write_init(trace_output, 0, (uint32_t*)init_state);
