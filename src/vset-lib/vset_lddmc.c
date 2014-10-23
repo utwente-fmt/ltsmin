@@ -300,21 +300,24 @@ set_copy_match(vset_t dst, vset_t src, int p_len, int *proj, int *match)
 
     lddmc_deref(dst->mdd);
 
-    vdom_t dom = src->dom;
-    int _proj[dom->shared.size+1];
-    // fill _proj with 0 (= not in match)
-    memset(_proj, 0, sizeof(int[dom->shared.size+1]));
-    // set _proj to 1 (= match) for every variable in proj
-    for (int i=0; i<p_len; i++) _proj[proj[i]] = 1;
-    // end sequence with -1 (= rest not in match)
-    _proj[proj[p_len-1]+1] = -1;
-    MDD mdd_proj = lddmc_ref(lddmc_cube((uint32_t*)_proj, proj[p_len-1]+2));
+    if (p_len == 0) dst->mdd = lddmc_ref(src->mdd);
+    else {
+        vdom_t dom = src->dom;
+        int _proj[dom->shared.size+1];
+        // fill _proj with 0 (= not in match)
+        memset(_proj, 0, sizeof(int[dom->shared.size+1]));
+        // set _proj to 1 (= match) for every variable in proj
+        for (int i=0; i<p_len; i++) _proj[proj[i]] = 1;
+        // end sequence with -1 (= rest not in match)
+        _proj[proj[p_len-1]+1] = -1;
+        MDD mdd_proj = lddmc_ref(lddmc_cube((uint32_t*)_proj, proj[p_len-1]+2));
 
-    MDD cube = lddmc_ref(lddmc_cube((uint32_t*)match, p_len));
+        MDD cube = lddmc_ref(lddmc_cube((uint32_t*)match, p_len));
 
-    dst->mdd = lddmc_ref(lddmc_match(src->mdd, cube, mdd_proj));
-    lddmc_deref(cube);
-    lddmc_deref(mdd_proj);
+        dst->mdd = lddmc_ref(lddmc_match(src->mdd, cube, mdd_proj));
+        lddmc_deref(cube);
+        lddmc_deref(mdd_proj);
+    }
 }
 
 struct enum_context
