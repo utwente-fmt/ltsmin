@@ -1389,7 +1389,7 @@ static void
 reach_stop(struct reach_s node) {
     if (node->unsound_group > -1) {
         Warning(info, "Condition in group %d does not always evaluate to true or false", node->unsound_group);
-        HREabort(LTSMIN_EXIT_FAILURE);
+        HREabort(LTSMIN_EXIT_UNSOUND);
     }
 }
 
@@ -2077,7 +2077,7 @@ learn_guards_reduce(vset_t true_states, int t, long *guard_count, vset_t *guard_
                     // Because every guard is evaluated in order.
                     if (!vset_is_empty(guard_maybe[guards->guard[g]])) {
                         Warning(info, "Condition in group %d does not evaluate to true or false", t);
-                        HREabort(LTSMIN_EXIT_FAILURE);
+                        HREabort(LTSMIN_EXIT_UNSOUND);
                     }
                 } else {
                     // If we have mCRL2 etc., then we need to store all (real) false states and maybe states
@@ -2098,7 +2098,7 @@ learn_guards_reduce(vset_t true_states, int t, long *guard_count, vset_t *guard_
             vset_minus(tmp, false_states);
             if (!vset_is_empty(tmp)) {
                 Warning(info, "Condition in group %d does not evaluate to true or false", t);
-                HREabort(LTSMIN_EXIT_FAILURE);
+                HREabort(LTSMIN_EXIT_UNSOUND);
             }
             vset_clear(tmp);
             vset_clear(maybe_states);

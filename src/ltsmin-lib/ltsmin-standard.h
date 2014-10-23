@@ -18,6 +18,7 @@
 #define LTSMIN_EXIT_COUNTER_EXAMPLE     1
 #define LTSMIN_EXIT_SUCCESS             0
 #define LTSMIN_EXIT_FAILURE             255
+#define LTSMIN_EXIT_UNSOUND             2
 
 /**
  * Matrices
