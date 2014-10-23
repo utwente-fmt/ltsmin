@@ -679,7 +679,7 @@ group_add(void *context, transition_info_t *ti, int *dst, int *cpy)
         vrel_add(ctx->rel, ctx->src, dst);
     }
 
-    if (act_detect) {
+    if (act_detect && (no_exit || ErrorActions == 0)) {
         int act_index = ti->labels[act_label];
         if (seen_actions_test(act_index)) { // is this the first time we encounter this action?
             char *action=GBchunkGet(model,action_typeno,act_index).data;
@@ -694,12 +694,9 @@ group_add(void *context, transition_info_t *ti, int *dst, int *cpy)
                     
                     find_action(src,dst,cpy,group,action);
                 }
-                if (no_exit) {
-                    ErrorActions++;
-                } else {
-                    Warning(info, "exiting now");
-                    HREabort(LTSMIN_EXIT_COUNTER_EXAMPLE);
-                }
+
+                // ErrorActions++
+                add_fetch(ErrorActions, 1);
             }
         }
     }
@@ -1386,11 +1383,20 @@ learn_guards(vset_t states, long *guard_count) {
 }
 
 static void
-reach_stop(struct reach_s node) {
+reach_chain_stop() {
+    if (!no_exit && ErrorActions > 0) {
+        Warning(info, "Exiting now");
+        HREabort(LTSMIN_EXIT_COUNTER_EXAMPLE);
+    }
+}
+
+static void
+reach_stop(struct reach_s* node) {
     if (node->unsound_group > -1) {
         Warning(info, "Condition in group %d does not always evaluate to true or false", node->unsound_group);
         HREabort(LTSMIN_EXIT_UNSOUND);
     }
+    reach_chain_stop();
 }
 
 static void
@@ -2157,6 +2163,7 @@ reach_chain_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
 
             if (!vset_is_empty(new_reduced[i])) {
                 expand_group_next(i, new_reduced[i]);
+                reach_chain_stop();
                 (*eg_count)++;
                 (*next_count)++;
                 vset_next(temp, new_reduced[i], group_next[i]);
@@ -2240,6 +2247,7 @@ reach_chain(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
             vset_copy(new_reduced[i], visited);
             learn_guards_reduce(new_reduced[i], i, guard_count, guard_maybe, false_states, maybe_states, tmp);
             expand_group_next(i, new_reduced[i]);
+            reach_chain_stop();
             (*eg_count)++;
             (*next_count)++;
             vset_next(temp, new_reduced[i], group_next[i]);
@@ -2309,6 +2317,7 @@ reach_sat_fix(reach_proc_t reach_proc, vset_t visited,
         for(int i = 0; i < nGrps; i++){
             if (!bitvector_is_set(reach_groups, i)) continue;
             expand_group_next(i, visited);
+            reach_chain_stop();
             (*eg_count)++;
         }
         if (dlk_detect) vset_copy(deadlocks, visited);
