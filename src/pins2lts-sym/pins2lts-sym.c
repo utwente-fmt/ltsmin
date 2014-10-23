@@ -38,6 +38,8 @@
 #define LACE_ME
 #endif
 
+hre_context_t ctx;
+
 static ltsmin_expr_t mu_expr = NULL;
 static char* ctl_formula = NULL;
 static char* mu_formula  = NULL;
@@ -518,15 +520,16 @@ find_trace(int trace_end[][N], int end_count, int level, vset_t *levels, char* f
 {
     // Find initial state and open output file
     int             init_state[N];
-    lts_file_t      trace_output;
+    lts_file_t      trace_output = lts_vset_template();
     lts_type_t      ltstype = GBgetLTStype(model);
 
     GBgetInitialState(model, init_state);
+    lts_file_set_context(trace_output, ctx);
 
     char* file_name=alloca((5+strlen(trc_output)+strlen(file_prefix))*sizeof(char));
     sprintf(file_name, "%s%s.%s", trc_output, file_prefix, trc_type);
     Warning(info,"writing to file: %s",file_name);
-    trace_output = lts_file_create(file_name, ltstype, 1, lts_vset_template());
+    trace_output = lts_file_create(file_name, ltstype, 1, trace_output);
     lts_write_init(trace_output, 0, (uint32_t*)init_state);
     int T=lts_type_get_type_count(ltstype);
     for(int i=0;i<T;i++){
@@ -3364,7 +3367,6 @@ parity_game* compute_symbolic_parity_game(vset_t visited, int* src)
 }
 
 static char *files[2];
-hre_context_t ctx;
 
 
 #ifdef HAVE_SYLVAN
