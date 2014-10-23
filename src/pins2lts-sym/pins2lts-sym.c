@@ -538,11 +538,10 @@ find_trace(int trace_end[][N], int end_count, int level, vset_t *levels, char* f
 
     // Generate trace
     rt_timer_t  timer = RTcreateTimer();
-
     RTstartTimer(timer);
     find_trace_to(trace_end, end_count, level, levels, trace_output);
     RTstopTimer(timer);
-    RTprintTimer(info, timer, "constructing trace took");
+    RTprintTimer(info, timer, "constructing trace for '%s' took", file_prefix);
 
     // Close output file
     lts_file_close(trace_output);
