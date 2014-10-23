@@ -596,9 +596,8 @@ eval_guard (int guard, vset_t set)
 #endif
 {
     // get the short vectors we need to evaluate
-    vset_project(guard_tmp[guard], set);
     // minus what we have already evaluated
-    vset_minus(guard_tmp[guard], guard_false[guard]);
+    vset_project_minus(guard_tmp[guard], set, guard_false[guard]);
     vset_minus(guard_tmp[guard], guard_true[guard]);
 
     // count when verbose
@@ -730,8 +729,8 @@ expand_group_next(int group, vset_t set)
     struct group_add_info ctx;
     ctx.group = group;
     ctx.set = set;
-    vset_project(group_tmp[group], set);
-    vset_zip(group_explored[group], group_tmp[group]);
+    vset_project_minus(group_tmp[group], set, group_explored[group]);
+    vset_union(group_explored[group], group_tmp[group]);
 
     if (log_active(infoLong)) {
         bn_int_t elem_count;
