@@ -237,7 +237,11 @@ state_to_bdd(const int* e, size_t vec_length, BDDVAR* vec_to_bddvar, BDD project
         }
     }
 
-    BDD bdd = sylvan_ref(sylvan_cube(vec_to_bddvar, varcount, cube));
+    // check if in right order
+    for (i=0;i<varcount-1;i++) assert(vec_to_bddvar[i]<vec_to_bddvar[i+1]);
+
+    BDDSET meta = sylvan_set_fromarray(vec_to_bddvar, varcount);
+    BDD bdd = sylvan_ref(sylvan_cube(meta, cube));
     BDD proj = sylvan_ref(sylvan_exists(bdd, projection));
     sylvan_deref(bdd);
 
