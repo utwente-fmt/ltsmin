@@ -181,6 +181,11 @@ extern void vset_copy(vset_t dst,vset_t src);
 extern void vset_project(vset_t dst,vset_t src);
 
 /**
+\brief Project src down to dst and minus with minus.
+*/
+extern void vset_project_minus(vset_t dst,vset_t src,vset_t minus);
+
+/**
 \brief dst := dst U src
 */
 extern void vset_union(vset_t dst,vset_t src);

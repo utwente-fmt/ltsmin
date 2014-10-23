@@ -29,6 +29,7 @@ struct vector_domain_shared {
         void (*set_example_match)(vset_t set,int *e, int p_len, int* proj, int*match);
 	void (*set_copy)(vset_t dst,vset_t src);
 	void (*set_project)(vset_t dst,vset_t src);
+    void (*set_project_minus)(vset_t dst,vset_t src,vset_t minus);
 	void (*set_union)(vset_t dst,vset_t src);
 	void (*set_intersect)(vset_t dst, vset_t src);
 	void (*set_minus)(vset_t dst,vset_t src);

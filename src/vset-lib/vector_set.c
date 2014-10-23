@@ -160,6 +160,13 @@ default_zip(vset_t dst, vset_t src)
 }
 
 static void
+default_set_project_minus(vset_t dst, vset_t src, vset_t minus)
+{
+    dst->dom->shared.set_project(dst, src);
+    dst->dom->shared.set_minus(dst, minus);
+}
+
+static void
 default_reorder()
 {
     Warning(info,"reorder request ignored");
@@ -241,6 +248,7 @@ void vdom_init_shared(vdom_t dom,int n)
     dom->shared.set_update=default_set_update;
 	dom->shared.reorder=default_reorder;
 	dom->shared.set_least_fixpoint=default_least_fixpoint;
+    dom->shared.set_project_minus=default_set_project_minus;
     dom->shared.names = RTmalloc(n * sizeof(char*));
     for (int i = 0; i < n; i++) dom->shared.names[i] = NULL;
 }
@@ -429,6 +437,10 @@ void vset_universe(vset_t dst,vset_t src){
 
 void vset_project(vset_t dst,vset_t src){
 	dst->dom->shared.set_project(dst,src);
+}
+
+void vset_project_minus(vset_t dst,vset_t src,vset_t minus){
+    dst->dom->shared.set_project_minus(dst,src,minus);
 }
 
 void vrel_add(vrel_t rel,const int* src, const int* dst){
