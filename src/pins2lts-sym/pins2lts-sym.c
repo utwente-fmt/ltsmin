@@ -608,7 +608,7 @@ eval_guard (int guard, vset_t set)
     if (log_active(infoLong)) {
         bn_int_t elem_count;
         vset_count(guard_tmp[guard], NULL, &elem_count);
-        if (bn_int2double(&elem_count) >= 10000.0) {
+        if (bn_int2double(&elem_count) >= 10000.0 * SPEC_REL_PERF) {
             size_t size = 40;
             char s[size];
             bn_int2string(s, size, &elem_count);
@@ -737,7 +737,7 @@ expand_group_next(int group, vset_t set)
         bn_int_t elem_count;
         vset_count(group_tmp[group], NULL, &elem_count);
 
-        if (bn_int2double(&elem_count) >= 10000.0) {
+        if (bn_int2double(&elem_count) >= 10000.0 * SPEC_REL_PERF) {
             size_t size = 40;
             char s[size];
             bn_int2string(s, size, &elem_count);
