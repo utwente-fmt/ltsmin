@@ -246,6 +246,7 @@ typedef struct {
 static lts_type_t ltstype;
 static int N;
 static int eLbls;
+static int sLbls;
 static int nGuards;
 static int nGrps;
 static int max_sat_levels;
@@ -339,12 +340,13 @@ save_level(vset_t visited)
 static void
 write_trace_state(lts_file_t trace_handle, int src_no, int *state)
 {
-  int labels[nGuards];
+  int labels[sLbls];
 
   Warning(debug, "dumping state %d", src_no);
 
-  if (nGuards != 0)
+  for (int i = 0; i < sLbls; i++) {
       GBgetStateLabelsAll(model, state, labels);
+  }
 
   lts_write_state(trace_handle, 0, state, labels);
 }
@@ -2929,6 +2931,7 @@ init_model(char *file)
     ltstype = GBgetLTStype(model);
     N = lts_type_get_state_length(ltstype);
     eLbls = lts_type_get_edge_label_count(ltstype);
+    sLbls = dm_nrows(GBgetStateLabelInfo(model));
     nGrps = dm_nrows(GBgetDMInfo(model));
     max_sat_levels = (N / sat_granularity) + 1;
     if (GBhasGuardsInfo(model)) {
