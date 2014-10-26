@@ -522,11 +522,12 @@ find_trace(int trace_end[][N], int end_count, int level, vset_t *levels, char* f
 {
     // Find initial state and open output file
     int             init_state[N];
+    hre_context_t   n = HREctxCreate(0, 1, "blah", 0);
     lts_file_t      trace_output = lts_vset_template();
     lts_type_t      ltstype = GBgetLTStype(model);
 
     GBgetInitialState(model, init_state);
-    lts_file_set_context(trace_output, ctx);
+    lts_file_set_context(trace_output, n);
 
     char* file_name=alloca((5+strlen(trc_output)+strlen(file_prefix))*sizeof(char));
     sprintf(file_name, "%s%s.%s", trc_output, file_prefix, trc_type);
