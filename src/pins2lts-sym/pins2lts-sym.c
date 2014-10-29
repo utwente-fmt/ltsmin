@@ -696,7 +696,7 @@ group_add(void *context, transition_info_t *ti, int *dst, int *cpy)
 
                 if (trc_output) {
                     int group = ctx->group;
-                    int* src=malloc(N*sizeof(int));
+                    int src[N];
                     vset_example_match(ctx->set,src,r_projs[group].len, r_projs[group].proj,ctx->src);
                     
                     find_action(src,dst,cpy,group,action);
