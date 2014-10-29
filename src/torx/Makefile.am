@@ -18,7 +18,9 @@ bin_PROGRAMS += pins2torx
 pins2torx_SOURCES  = spec2torx.c
 pins2torx_SOURCES += ../pins-lib/dlopen-pins.c ../pins-lib/dlopen-pins.h
 pins2torx_LDADD    = $(PINS_LIBS)
-pins2torx_LDFLAGS  = $(AM_LDFLAGS)
+if !BUILD_OS_IS_DARWIN
+pins2torx_LDFLAGS   = -Wl,-E $(AM_LDFLAGS)
+endif
 pins2torx_CPPFLAGS = -DPINS_DLL $(TORX_CPPFLAGS) $(AM_CPPFLAGS)
 
 # dve2torx
