@@ -350,7 +350,7 @@ write_trace_state(lts_file_t trace_handle, int src_no, int *state)
   Warning(debug, "dumping state %d", src_no);
 
   for (int i = 0; i < sLbls; i++) {
-      GBgetStateLabelsAll(model, state, labels);
+      labels[i] = (*label_long)(model, i, state);
   }
 
   lts_write_state(trace_handle, 0, state, labels);
@@ -395,7 +395,9 @@ write_trace_step(lts_file_t trace_handle, int src_no, int *src,
     ctx.dst = dst;
     ctx.found = 0;
 
-    GBgetTransitionsAll(model, src, write_trace_next, &ctx);
+    for (int i = 0; i < nGrps && !ctx.found; i++) {
+        (*transitions_long)(model, i, src, write_trace_next, &ctx);
+    }
 
     if (!ctx.found)
         Abort("no matching transition found");
