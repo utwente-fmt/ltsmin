@@ -641,11 +641,19 @@ eval_guard (int guard, vset_t set)
     vset_clear(guard_tmp[guard]);
 }
 
+struct trace_action {
+    int *dst;
+    int *cpy;
+    char *action;
+};
+
 struct group_add_info {
     vrel_t rel; // target relation
     vset_t set; // source set
     int group; // which transition group
     int *src; // state vector
+    int trace_count; // number of actions to trace after next-state call
+    struct trace_action *trace_action;
 };
 
 static void
@@ -695,11 +703,19 @@ group_add(void *context, transition_info_t *ti, int *dst, int *cpy)
                 Warning(info, "found action: %s", action);
 
                 if (trc_output) {
-                    int group = ctx->group;
-                    int src[N];
-                    vset_example_match(ctx->set,src,r_projs[group].len, r_projs[group].proj,ctx->src);
-                    
-                    find_action(src,dst,cpy,group,action);
+
+                    ctx->trace_action = (struct trace_action*) realloc(ctx->trace_action, (sizeof(struct trace_action) + sizeof(int[N])*2) * (ctx->trace_count+1));
+
+                    // set the right addresses in the allocated block
+                    ctx->trace_action[ctx->trace_count].dst = (int*) (&ctx->trace_action[ctx->trace_count] + sizeof(struct trace_action));
+                    ctx->trace_action[ctx->trace_count].cpy = (int*) (&ctx->trace_action[ctx->trace_count].dst + sizeof(int[N]));
+
+                    // set the required values in order to find the trace after the next-state call
+                    memcpy(ctx->trace_action[ctx->trace_count].dst, dst, w_projs[ctx->group].len);
+                    memcpy(ctx->trace_action[ctx->trace_count].cpy, cpy, w_projs[ctx->group].len);
+                    ctx->trace_action[ctx->trace_count].action = action;
+
+                    ctx->trace_count++;
                 }
 
                 // ErrorActions++
@@ -717,7 +733,19 @@ explore_cb(vrel_t rel, void *context, int *src)
     ctx.set = ((struct group_add_info*)context)->set;
     ctx.rel = rel;
     ctx.src = src;
+    ctx.trace_count = 0;
+    ctx.trace_action = NULL;
     (*transitions_short)(model, ctx.group, src, group_add, &ctx);
+
+    if (ctx.trace_count > 0) {
+        int long_src[N];
+        for (int i = 0; i < ctx.trace_count; i++) {
+            vset_example_match(ctx.set,long_src,r_projs[ctx.group].len, r_projs[ctx.group].proj,src);
+            find_action(long_src,ctx.trace_action[i].dst,ctx.trace_action[i].cpy,ctx.group,ctx.trace_action[i].action);
+        }
+
+        free(ctx.trace_action);
+    }
 }
 
 #ifdef HAVE_SYLVAN
