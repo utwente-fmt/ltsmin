@@ -950,7 +950,7 @@ stats_and_progress_report(vset_t current, vset_t visited, int level)
             fclose(fp);
         }
 
-        for (int g = 0; g < nGuards; g++) {
+        for (int g = 0; g < nGuards && GBgetUseGuards(model); g++) {
             file = "%s/guard_false-l%d-g%d.dot";
             char fgfbuf[snprintf(NULL, 0, file, dot_dir, level, g)];
             sprintf(fgfbuf, file, dot_dir, level, g);
@@ -1435,7 +1435,7 @@ reach_bfs_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
                 if (root->unsound_group > -1) {
                     Abort("Condition in group %d does not always evaluate to true or false", root->unsound_group);
                 }
-                if (!no_soundness_check) {
+                if (!no_soundness_check && GBgetUseGuards(model)) {
                     // For the current level the spec is sound.
                     // This means that every maybe is actually false.
                     // We thus remove all maybe's
@@ -1467,7 +1467,7 @@ reach_bfs_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
             if (root->unsound_group > -1) {
                 Abort("Condition in group %d does not always evaluate to true or false", root->unsound_group);
             }
-            if (!no_soundness_check) {
+            if (!no_soundness_check && GBgetUseGuards(model)) {
                 // For the current level the spec is sound.
                 // This means that every maybe is actually false.
                 // We thus remove all maybe's
@@ -1553,7 +1553,7 @@ reach_bfs(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
                 if (root->unsound_group > -1) {
                     Abort("Condition in group %d does not always evaluate to true or false", root->unsound_group);
                 }
-                if (!no_soundness_check) {
+                if (!no_soundness_check && GBgetUseGuards(model)) {
                     // For the current level the spec is sound.
                     // This means that every maybe is actually false.
                     // We thus remove all maybe's
@@ -1587,7 +1587,7 @@ reach_bfs(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
             if (root->unsound_group > -1) {
                 Abort("Condition in group %d does not always evaluate to true or false", root->unsound_group);
             }
-            if (!no_soundness_check) {
+            if (!no_soundness_check && GBgetUseGuards(model)) {
                 // For the current level the spec is sound.
                 // This means that every maybe is actually false.
                 // We thus remove all maybe's
@@ -1874,7 +1874,7 @@ reach_par(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
                 if (root->unsound_group > -1) {
                     Abort("Condition in group %d does not always evaluate to true or false", root->unsound_group);
                 }
-                if (!no_soundness_check) {
+                if (!no_soundness_check && GBgetUseGuards(model)) {
                     // For the current level the spec is sound.
                     // This means that every maybe is actually false.
                     // We thus remove all maybe's
@@ -1907,7 +1907,7 @@ reach_par(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
             if (root->unsound_group > -1) {
                 Abort("Condition in group %d does not always evaluate to true or false", root->unsound_group);
             }
-            if (!no_soundness_check) {
+            if (!no_soundness_check && GBgetUseGuards(model)) {
                 // For the current level the spec is sound.
                 // This means that every maybe is actually false.
                 // We thus remove all maybe's
@@ -1992,7 +1992,7 @@ reach_par_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
                 if (root->unsound_group > -1) {
                     Abort("Condition in group %d does not always evaluate to true or false", root->unsound_group);
                 }
-                if (!no_soundness_check) {
+                if (!no_soundness_check && GBgetUseGuards(model)) {
                     // For the current level the spec is sound.
                     // This means that every maybe is actually false.
                     // We thus remove all maybe's
@@ -2023,7 +2023,7 @@ reach_par_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
             if (root->unsound_group > -1) {
                 Abort("Condition in group %d does not always evaluate to true or false", root->unsound_group);
             }
-            if (!no_soundness_check) {
+            if (!no_soundness_check && GBgetUseGuards(model)) {
                 // For the current level the spec is sound.
                 // This means that every maybe is actually false.
                 // We thus remove all maybe's
@@ -2970,11 +2970,13 @@ init_domain(vset_implementation_t impl)
     group_tmp      = (vset_t*)RTmalloc(nGrps * sizeof(vset_t));
     r_projs        = (proj_info*)RTmalloc(nGrps * sizeof(proj_info));
     w_projs        = (proj_info*)RTmalloc(nGrps * sizeof(proj_info));
-    g_projs        = (proj_info*) RTmalloc(nGuards * sizeof(proj_info));
 
-    guard_false    = (vset_t*)RTmalloc(nGuards * sizeof(vset_t));
-    guard_true     = (vset_t*)RTmalloc(nGuards * sizeof(vset_t));
-    guard_tmp      = (vset_t*)RTmalloc(nGuards * sizeof(vset_t));
+    if (GBgetUseGuards(model)) {
+        g_projs        = (proj_info*) RTmalloc(nGuards * sizeof(proj_info));
+        guard_false    = (vset_t*)RTmalloc(nGuards * sizeof(vset_t));
+        guard_true     = (vset_t*)RTmalloc(nGuards * sizeof(vset_t));
+        guard_tmp      = (vset_t*)RTmalloc(nGuards * sizeof(vset_t));
+    }
 
     matrix_t *read_matrix = RTmalloc(sizeof (matrix_t));
     dm_copy(GBgetExpandMatrix(model), read_matrix);
@@ -3034,7 +3036,7 @@ init_domain(vset_implementation_t impl)
         }
     }
 
-    for (int i = 0; i < nGuards; i++) {
+    for (int i = 0; i < nGuards && GBgetUseGuards(model); i++) {
 
         g_projs[i].len     = dm_ones_in_row(GBgetStateLabelInfo(model), i);
         g_projs[i].proj    = (int*)RTmalloc(g_projs[i].len * sizeof(int));
