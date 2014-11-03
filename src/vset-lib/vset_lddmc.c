@@ -543,8 +543,14 @@ set_join(vset_t dst, vset_t left, vset_t right)
 {
     entermt(dst);
     LACE_ME;
-    lddmc_deref(dst->mdd);
-    dst->mdd = lddmc_ref(lddmc_join(left->mdd, right->mdd, left->proj, right->proj));
+    if (dst == left || dst == right) {
+        MDD old = dst->mdd;
+        dst->mdd = lddmc_ref(lddmc_join(left->mdd, right->mdd, left->proj, right->proj));
+        lddmd_deref(old);
+    } else {
+        lddmc_deref(dst->mdd);
+        dst->mdd = lddmc_ref(lddmc_join(left->mdd, right->mdd, left->proj, right->proj));
+    }
     leavemt(dst);
 }
 
