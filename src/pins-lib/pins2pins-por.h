@@ -72,6 +72,7 @@
  * Thus visible transitions / labels must be set for these safety properties,
  * the visibility proviso is however only used for liveness properties
  * (see ltl field in por_context_t struct below).
+ * This implements A5' in Valmari's "Stubborn Set Methods for Process Algebras".
  *
  * TODO:
  * - detect bottom SCCs for weak cycle proviso (and communicate ignored
@@ -129,6 +130,7 @@ typedef struct por_context {
     void            *beam_ctx;      // BEAM search struct
     void            *scc_ctx;       // SCC search struct
     void            *del_ctx;       // Deletion struct
+    void            *ample_ctx;     // Ample set context
 
     /**
      * The global data used for the search
