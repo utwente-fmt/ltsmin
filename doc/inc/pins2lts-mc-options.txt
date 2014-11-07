@@ -143,21 +143,30 @@ cleary-tree;;
         Maximum search depth.
 
 
-*--proviso*='closedset|stack'::
-    Change the proviso implementation for partial order reduction (ltl)
-+
-Change the proviso used to detect that an accepting cycle is closed.
-Three options are available, the default is 'closedset'.
+*--proviso*='PROVISO'::
+    Change the proviso implementation for partial order reduction in presence
+    of safety properties or liveness properties. Parallel LTL is only supported
+    with the cndfs proviso in the cndfs search strategy. Sequentially, LTL is
+    also supported the stack proviso in the ndfs search strategy.
+    PROVISO can be either:
 
-closedset;;
+force-none;;
+    Disables the ignoring proviso check (only useful for benchmarking or
+    bug hunting).
+
+closed-set;;
     The closed set proviso is the default proviso which requires
     almost no extra work/memory. It might however result in less
-    reduction than the 'stack' or 'color' proviso. It works with both
-    the dfs- and bfs exploration strategy.
+    reduction than the 'stack' proviso. It works with both
+    the dfs and (p/s)bfs exploration strategies.
 
 stack;;
     The stack proviso is the proviso used for example by the spin
     model checker. It requires some extra work/memory but may
     result in a better reduction than 'closedset'. It works only
-    for a dfs/scc search strategy (since bfs has no stack).
+    for a dfs or ndfs search strategy (for resp. safety or LTL properties).
+
+cndfs;;
+    A special parallel cycle proviso is used to enable POR with multi-core
+    LTL model checking using the cndfs search strategy.
 

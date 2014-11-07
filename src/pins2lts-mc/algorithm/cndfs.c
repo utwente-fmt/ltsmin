@@ -250,12 +250,12 @@ endfs_handle_all (void *arg, state_info_t *successor, transition_info_t *ti, int
     alg_local_t        *loc = ctx->local;
     raw_data_t stack_loc = dfs_stack_push (loc->stack, NULL);
     state_info_serialize (successor, stack_loc);
-    ti->por_proviso = 1;
+    ti->por_proviso = 0;
     (void) seen;
 }
 
 void
-explore_all (wctx_t *ctx, state_info_t *state)
+reach_explore_all (wctx_t *ctx, state_info_t *state)
 {
     alg_local_t        *loc = ctx->local;
     
@@ -331,7 +331,7 @@ endfs_red (wctx_t *ctx)
             state_info_deserialize (ctx->state, state_data);
 
             if (check_cndfs_proviso(ctx)) {
-                explore_all (ctx, ctx->state);
+                reach_explore_all (ctx, ctx->state);
                 continue;
             }
             if (PINS_POR && proviso == Proviso_CNDFS) {
@@ -393,7 +393,7 @@ endfs_blue (run_t *run, wctx_t *ctx)
             state_info_deserialize (loc->seed, state_data);
 
             if (check_cndfs_proviso(ctx)) {
-                explore_all (ctx, loc->seed);
+                reach_explore_all (ctx, loc->seed);
                 continue;
             }
 

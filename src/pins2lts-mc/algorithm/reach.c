@@ -157,9 +157,8 @@ split_dfs (void *arg_src, void *arg_tgt, size_t handoff)
     return handoff;
 }
 
-static void
-reach_handle (void *arg, state_info_t *successor, transition_info_t *ti,
-              int seen)
+static inline void
+reach_queue (void *arg, state_info_t *successor, transition_info_t *ti, int new)
 {
     wctx_t             *ctx = (wctx_t *) arg;
     alg_local_t        *loc = ctx->local;
@@ -167,29 +166,62 @@ reach_handle (void *arg, state_info_t *successor, transition_info_t *ti,
     alg_shared_t       *shared = ctx->run->shared;
 
     action_detect (ctx, ti, successor);
-    ti->por_proviso = 1;
-    if (!seen) {
+    if (new) {
         raw_data_t stack_loc = dfs_stack_push (sm->out_stack, NULL);
         state_info_serialize (successor, stack_loc);
-        if (EXPECT_FALSE( trc_output &&
-                          successor->ref != ctx->state->ref &&
+        if (EXPECT_FALSE( trc_output && successor->ref != ctx->state->ref &&
                           shared->parent_ref[successor->ref] == 0 &&
                           ti != &GB_NO_TRANSITION )) // race, but ok:
             atomic_write(&shared->parent_ref[successor->ref], ctx->state->ref);
+        loc->proviso |= proviso == Proviso_ClosedSet;
     } else if (proviso == Proviso_Stack) {
-        ti->por_proviso = !ecd_has_state (loc->cyan, successor);
+        loc->proviso |= !ecd_has_state (loc->cyan, successor);
     }
-    ctx->counters->trans++;
-    (void) ti;
+    ti->por_proviso = 1;
+}
+
+static void
+reach_handle (void *arg, state_info_t *successor, transition_info_t *ti,
+              int seen)
+{
+    reach_queue (arg, successor, ti, !seen);
+}
+
+static void
+reach_handle_dfs (void *arg, state_info_t *successor, transition_info_t *ti,
+                  int seen)
+{
+    int             red = state_store_has_color(successor->ref, GRED, 0);
+    reach_queue (arg, successor, ti, !red);
+}
+
+static inline size_t
+reach_fulfil_ignoring_proviso (wctx_t *ctx, size_t successors, perm_cb_f cb)
+{
+    alg_local_t        *loc = ctx->local;
+    if (proviso != Proviso_None && !loc->proviso && successors > 0) {
+        // proviso does not hold, explore all:
+        permute_set_por (ctx->permute, 0);
+        successors = permute_trans (ctx->permute, ctx->state, cb, ctx);
+        permute_set_por (ctx->permute, 1);
+    }
+    return successors;
 }
 
 static inline void
-explore_state (wctx_t *ctx)
+explore_state (wctx_t *ctx, perm_cb_f cb)
 {
+    alg_local_t        *loc = ctx->local;
     size_t              count;
     if (ctx->counters->level_cur >= max_level)
         return;
-    count = permute_trans (ctx->permute, ctx->state, reach_handle, ctx);
+
+    invariant_detect (ctx);
+    loc->proviso = 0;
+    count = permute_trans (ctx->permute, ctx->state, cb, ctx);
+    count = reach_fulfil_ignoring_proviso (ctx, count, cb);
+
+    ctx->counters->trans += count;
     ctx->counters->explored++;
     deadlock_detect (ctx, count);
     work_counter_t     *cnt = ctx->counters;
@@ -210,7 +242,7 @@ dfs_proviso (wctx_t *ctx)
                 dfs_stack_enter (sm->stack);
                 increase_level (ctx->counters);
                 ecd_add_state (loc->cyan, ctx->state, NULL);
-                explore_state (ctx);
+                explore_state (ctx, reach_handle_dfs);
             } else {
                 dfs_stack_pop (sm->stack);
             }
@@ -237,7 +269,7 @@ dfs (wctx_t *ctx)
             dfs_stack_enter (sm->stack);
             increase_level (ctx->counters);
             state_info_deserialize (ctx->state, state_data);
-            explore_state (ctx);
+            explore_state (ctx, reach_handle);
         } else {
             if (0 == dfs_stack_nframes (sm->stack))
                 continue;
@@ -256,7 +288,7 @@ bfs (wctx_t *ctx)
         raw_data_t          state_data = dfs_stack_pop (sm->in_stack);
         if (NULL != state_data) {
             state_info_deserialize (ctx->state, state_data);
-            explore_state (ctx);
+            explore_state (ctx, reach_handle);
         } else {
             swap (sm->out_stack, sm->in_stack);
             sm->stack = sm->out_stack;
@@ -275,7 +307,7 @@ sbfs (wctx_t *ctx)
             raw_data_t          state_data = dfs_stack_pop (sm->in_stack);
             if (NULL != state_data) {
                 state_info_deserialize (ctx->state, state_data);
-                explore_state (ctx);
+                explore_state (ctx, reach_handle);
             }
         }
         local_next_size = dfs_stack_frame_size (sm->out_stack);
@@ -314,6 +346,7 @@ pbfs_handle (void *arg, state_info_t *successor, transition_info_t *ti,
                           shared->parent_ref[successor->ref] == 0) ) // race, but ok:
             atomic_write(&shared->parent_ref[successor->ref], ctx->state->ref);
         loc->counters.level_size++;
+        loc->proviso |= 1;
     }
     if (EXPECT_FALSE(loc->lts != NULL)) {
         int             src = ctx->counters->explored;
@@ -321,8 +354,6 @@ pbfs_handle (void *arg, state_info_t *successor, transition_info_t *ti,
         int             tgt_owner = ref_hash (successor->ref) % W;
         lts_write_edge (loc->lts, ctx->id, &src, tgt_owner, tgt, ti->labels);
     }
-    ctx->counters->trans++;
-    (void) ti;
 }
 
 void
@@ -331,6 +362,7 @@ pbfs (wctx_t *ctx)
     alg_local_t        *loc = ctx->local;
     alg_global_t       *sm = ctx->global;
     size_t              count;
+    size_t              successors;
     raw_data_t          state_data;
     int                 labels[SL];
     do {
@@ -343,9 +375,13 @@ pbfs (wctx_t *ctx)
                 state_info_deserialize (ctx->state, state_data);
                 state_data_t        state_data = state_info_state(ctx->state);
                 invariant_detect (ctx);
-                count = permute_trans (ctx->permute, ctx->state, pbfs_handle, ctx);
-                deadlock_detect (ctx, count);
+                loc->proviso = 0;
+                successors = permute_trans (ctx->permute, ctx->state, pbfs_handle, ctx);
+                successors = reach_fulfil_ignoring_proviso (ctx, successors, pbfs_handle);
+                ctx->counters->trans += successors;
+                deadlock_detect (ctx, successors);
                 ctx->counters->explored++;
+
                 run_maybe_report1 (ctx->run, ctx->counters, "");
                 if (EXPECT_FALSE(loc->lts && write_state)){
                     if (SL > 0)
@@ -512,15 +548,6 @@ reach_global_setup   (run_t *run, wctx_t *ctx)
 void
 reach_global_init   (run_t *run, wctx_t *ctx)
 {
-    if (PINS_POR && (inv_detect || act_detect)) {
-        if (W > 1)
-            Abort ("Cycle proviso for safety properties with this parallel "
-                    "search strategy is not yet implemented, use one thread or "
-                    "sequential tool (*2lts-seq).");
-        if (get_strategy(run->alg) != Strat_DFS)
-            Abort ("Use DFS with ignoring proviso: --strategy=dfs --proviso=stack");
-    }
-
     ctx->global = RTmallocZero (sizeof(alg_global_t));
     reach_global_setup (run, ctx);
 }
@@ -574,7 +601,7 @@ reach_run (run_t *run, wctx_t *ctx)
     case Strat_BFS:
         bfs (ctx); break;
     case Strat_DFS:
-        if (proviso == Proviso_Stack) {
+        if (PINS_POR && (proviso == Proviso_Stack || proviso == Proviso_ClosedSet)) {
             dfs_proviso (ctx);
         } else {
             dfs (ctx);

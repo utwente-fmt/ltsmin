@@ -33,6 +33,8 @@ si_map_entry strategies[] = {
 
 si_map_entry provisos[] = {
     {"none",    Proviso_None},
+    {"force-none",Proviso_ForceNone},
+    {"closed-set",  Proviso_ClosedSet},
     {"stack",   Proviso_Stack},
     {"cndfs",   Proviso_CNDFS},
     {NULL, 0}
@@ -46,6 +48,7 @@ int              write_state = 0;
 char*            label_filter = NULL;
 char            *files[2];
 
+// TODO: move this to algorithm objects
 void
 options_static_init      (model_t model, bool timed)
 {
@@ -71,15 +74,38 @@ options_static_init      (model_t model, bool timed)
 
     if (PINS_POR && (strategy[0] & Strat_LTL & ~Strat_DFSFIFO)) {
         if (HREpeers(HREglobal()) > 1 && (strategy[0] & ~Strat_CNDFS))
-            Abort ("Can only use POR with more than one worker in CNDFS!");
+            Abort ("POR with more than one worker only works in CNDFS!");
         if (proviso == Proviso_None) {
-            Warning (info, "Forcing use of the a cycle proviso");
+            Warning (info, "Forcing use of the an ignoring proviso");
             proviso = strategy[0] & ~Strat_CNDFS ? Proviso_CNDFS : Proviso_Stack;
         }
-        if ((strategy[0] & Strat_CNDFS) && proviso != Proviso_CNDFS) {
-            Abort ("Only the CNDFS proviso works in CNDFS!");
+        if (proviso != Proviso_ForceNone) {
+            if ((strategy[0] & Strat_CNDFS) && proviso != Proviso_CNDFS)
+                Abort ("Only the CNDFS proviso works in CNDFS!");
+            if ((strategy[0] & Strat_NDFS) && proviso != Proviso_Stack)
+                Abort ("Only the stack proviso works in NDFS!");
+            if ( (strategy[0] & (Strat_OWCTY|Strat_LNDFS|Strat_ENDFS)) )
+                Abort ("No POR proviso supported in OWCTY/LNDFS/ENDFS!");
         }
     }
+
+    if (PINS_POR && (strategy[0] & Strat_Reach) && (inv_detect || act_detect)) {
+        if (proviso == Proviso_None) {
+            Warning (info, "Forcing use of the an ignoring proviso");
+            proviso = strategy[0] & Strat_DFS ? Proviso_Stack : Proviso_ClosedSet;
+        }
+        if (proviso != Proviso_ForceNone) {
+            if ((strategy[0] & Strat_DFS) && proviso != Proviso_Stack && proviso != Proviso_ClosedSet)
+                Abort ("Only the Stack/ClosedSet proviso works in DFS!");
+            if ((strategy[0] & ~Strat_DFS) && proviso != Proviso_ClosedSet)
+                Abort ("Only the ClosedSet proviso works in (S)BFS!");
+            if (proviso == Proviso_Stack && W > 1)
+                Abort ("Stack proviso not implemented for parallel dfs.");
+        }
+    }
+
+    if (proviso == Proviso_ForceNone)
+        proviso = Proviso_None;
 
     if (!ecd && strategy[1] != Strat_None)
         Abort ("Conflicting options --no-ecd and %s.", key_search(strategies, strategy[1]));
@@ -202,7 +228,7 @@ struct poptOption options[] = {
     {"strategy", 0, POPT_ARG_STRING | POPT_ARGFLAG_SHOW_DEFAULT,
      &arg_strategy, 0, "select the search strategy", "<bfs|sbfs|dfs|cndfs|lndfs|endfs|endfs,<strategy>|ndfs>"},
     {"proviso", 0, POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT, &arg_proviso , 0 ,
-     "select proviso for ltl/por (only single core!)", "<closedset|stack>"},
+     "select proviso for LTL+POR or safety+POR", "<force-none|closed-set|stack|cndfs>"},
     {NULL, 0, POPT_ARG_INCLUDE_TABLE, alg_options_extra, 0, NULL, NULL},
     {NULL, 0, POPT_ARG_INCLUDE_TABLE, dfs_fifo_options, 0, "DFS FIFO options", NULL},
     {NULL, 0, POPT_ARG_INCLUDE_TABLE, owcty_options, 0, /*"OWCTY options"*/NULL, NULL},

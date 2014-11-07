@@ -59,6 +59,7 @@ struct alg_local_s {
     counter_t           counters;       // Stats counters
     fset_t             *cyan;           // Proviso stack
     int                 flip;           // PBFS queue counter
+    int                 proviso;        // proviso check
 
     lts_file_t          lts;
     ltsmin_parse_env_t  env;
