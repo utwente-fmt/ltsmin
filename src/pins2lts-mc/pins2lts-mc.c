@@ -1,3 +1,31 @@
+/**
+ *
+ * Multi-core LTL and reachability model checking tool.
+ *
+ * Described in Laarman's PhD thesis:
+    @phdthesis{mcmc,
+           title = {{Scalable Multi-Core Model Checking}},
+          author = {Alfons W. Laarman},
+         address = {Enschede, The Netherlands},
+       publisher = {University of Twente},
+            year = {2014},
+             url = {fmt.cs.utwente.nl/tools/ltsmin/laarman_thesis/}
+    }
+ *
+ * Partial order-reduction for LTL added as described in:
+    @inproceedings{cndfs,
+     Author = {Alfons. W. Laarman and Wijs, Anton J.},
+     Booktitle = {HVC 2014},
+     Editor = {E. {Yahav}},
+     Pages = {16},
+     Publisher = {Springer},
+     Series = {LNCS},
+     Title = {{Partial-Order Reduction for Multi-Core LTL Model Checking}},
+     Volume = {(accepted for publication)},
+     Year = {2014}
+    }
+ */
+
 #include <hre/config.h>
 
 #include <pthread.h>

@@ -14,8 +14,7 @@ static int              force_progress_states = 0;
 
 struct poptOption dfs_fifo_options[] = {
     {"strict", 0, POPT_ARG_VAL, &strict_dfsfifo, 1, "turn on strict BFS in DFS_FIFO", NULL},
-    {"progress-states", 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN, &force_progress_states, 1,
-     "Use progress states", NULL},
+    {"progress-states", 0, POPT_ARG_VAL, &force_progress_states, 1, "Use progress states", NULL},
     POPT_TABLEEND
 };
 
