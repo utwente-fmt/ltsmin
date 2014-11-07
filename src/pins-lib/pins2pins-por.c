@@ -27,6 +27,7 @@ static int NO_NDS = 0;
 static int NO_MDS = 0;
 static int NO_MCNDS = 0;
 static int NO_MC = 0;
+static int USE_MC = 0;
 static int NO_DYN_VIS = 0;
 static int NO_V = 0;
 static int NO_L12 = 0;
@@ -127,6 +128,7 @@ struct poptOption por_options[]={
     { "no-mds" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_MDS , 1 , "without MDS" , NULL },
     { "no-nds" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_NDS , 1 , "without NDS (for dynamic label info)" , NULL },
     { "no-mc" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_MC , 1 , "without MC" , NULL },
+    { "use-mc" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &USE_MC , 1 , "Use MC to reduce search path" , NULL },
     { "no-mcnds" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_MCNDS , 1 , "Do not create NESs from MC and NDS" , NULL },
     { "no-dynamic-labels" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_DYN_VIS , 1 , "without dynamic visibility" , NULL },
     { "no-V" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_V , 1 , "without V proviso, instead use Peled's visibility proviso, or V'     " , NULL },
@@ -420,7 +422,7 @@ void hook_cb (void *context, transition_info_t *ti, int *dst, int *cpy) {
 }
 
 static inline int
-emit_new_selected (por_context *ctx, ci_list *list, proviso_t *provctx, int *src)
+emit_new (por_context *ctx, ci_list *list, proviso_t *provctx, int *src)
 {
     beam_t             *beam = (beam_t *) ctx->beam_ctx;
     search_context_t   *s = beam->search[0];
@@ -467,7 +469,7 @@ beam_cheapest_ns (por_context* ctx, search_context_t *s, int group, int *cost)
 
 static inline bool
 select_all (por_context* ctx, search_context_t *s, ci_list *list,
-                    bool update_scores)
+            bool update_scores)
 {
     bool added_new = false;
     for (int i = 0; i < list->count; i++) {
@@ -493,6 +495,27 @@ static void
 beam_add_all_for_enabled (por_context *ctx, search_context_t *s, int group,
                           bool update_scores)
 {
+
+    if (POR_WEAK == WEAK_NONE && USE_MC) {
+        // include all never coenabled transitions without searching from them!
+
+        for (int i = 0; i < ctx->group_nce[group]->count; i++) {
+            int nce = ctx->group_nce[group]->data[i];
+            HREassert (ctx->group_status[nce] & GS_DISABLED, "Error in maybe-coenabled relation: %d - %d are coenabled.", group, nce);
+
+            if (s->emit_status[nce] & ES_READY) continue;
+            if (s->emit_status[nce] & ES_SELECTED) {
+                s->emit_status[nce] |= ES_READY; // skip in search
+                continue;
+            }
+
+            if (!NO_HEUR)
+                update_ns_scores (ctx, s, nce);
+            s->score_disabled += 1;
+            s->score_visible += is_visible (ctx, nce);
+        }
+    }
+
     // V proviso only for LTL
     if ((PINS_LTL || SAFETY) && is_visible(ctx, group)) {
         if (NO_V) { // Use Peled's stronger visibility proviso:
@@ -836,13 +859,13 @@ beam_emit (por_context* ctx, int* src, TransitionCB cb, void* uctx)
         }
     } else if (!PINS_LTL && !SAFETY) { // deadlocks are easy:
         proviso_t provctx = {cb, uctx, 0, 0, 1};
-        emitted = emit_new_selected (ctx, s->enabled, &provctx, src);
+        emitted = emit_new (ctx, s->enabled, &provctx, src);
     } else { // otherwise enforce that all por_proviso flags are true
         proviso_t provctx = {cb, uctx, 0, 0, 0};
 
         search_context_t   *s = beam->search[0];
         provctx.force_proviso_true = !NO_L12 && !NO_V && check_L2_proviso(ctx, s);
-        emitted = emit_new_selected (ctx, s->enabled, &provctx, src);
+        emitted = emit_new (ctx, s->enabled, &provctx, src);
 
         // emit more if we need to fulfill a liveness / safety proviso
         if ( ( PINS_LTL && provctx.por_proviso_false_cnt != 0) ||
@@ -854,13 +877,13 @@ beam_emit (por_context* ctx, int* src, TransitionCB cb, void* uctx)
                 // enforce L2 (include all visible transitions)
                 beam_enforce_L2 (ctx);
                 if (beam->search[0]->enabled->count == ctx->enabled_list->count) {
-                    emitted += emit_new_selected (ctx, ctx->enabled_list, &provctx, src);
+                    emitted += emit_new (ctx, ctx->enabled_list, &provctx, src);
                 } else {
-                    emitted += emit_new_selected (ctx, s->enabled, &provctx, src);
+                    emitted += emit_new (ctx, s->enabled, &provctx, src);
                 }
             } else {
                 Debugf ("BEAM %d emitting all\n", s->idx);
-                emitted += emit_new_selected (ctx, ctx->enabled_list, &provctx, src);
+                emitted += emit_new (ctx, ctx->enabled_list, &provctx, src);
             }
         }
     }
@@ -1963,6 +1986,7 @@ GBaddPOR (model_t model)
             }
         }
         ctx->guard_nce             = (ci_list **) dm_rows_to_idx_table(&ctx->gnce_matrix);
+        ctx->group_nce             = (ci_list **) dm_rows_to_idx_table(&ctx->nce);
     }
 
     // extract accords with matrix
@@ -2031,7 +2055,7 @@ GBaddPOR (model_t model)
         id = GBgetMatrixID(model, LTSMIN_MUST_ENABLE_MATRIX);
         if (id != SI_INDEX_FAILED) {
             must_enable = GBgetMatrix(model, id);
-        } else if (POR_WEAK == 2) {
+        } else if (POR_WEAK == WEAK_VALMARI) {
             Print1 (info, "No must-enable matrix available for Valmari's weak sets.");
         }
 
@@ -2046,7 +2070,7 @@ GBaddPOR (model_t model)
                 }
 
                 if (POR_WEAK == WEAK_VALMARI) {
-                    if (must_enable!= NULL && guard_of(ctx, i, must_enable, j)) {
+                    if (must_enable != NULL && guard_of(ctx, i, must_enable, j)) {
                         continue;
                     }
 

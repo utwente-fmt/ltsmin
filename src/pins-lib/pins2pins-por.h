@@ -114,6 +114,7 @@ typedef struct por_context {
     ci_list       **label_nes;      // transition groups that form a nes for a guard (guard -> [t1, t2, t..])
     ci_list       **label_nds;      // transition groups that form a nds for a guard
     ci_list       **guard_nce;      // mapping from guards to transition groups that may not be co-enabled
+    ci_list       **group_nce;      // mapping from guards to transition groups that may not be co-enabled
     ci_list       **ns;             // nes/nds combined
     ci_list       **group2ns;       // mapping group to each nes/nds in which it is used
     ci_list       **group_has;      // mapping group to each nes/nds for it
