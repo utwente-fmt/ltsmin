@@ -221,7 +221,7 @@ init_visible_labels (por_context* ctx)
         Print1 (info, "Turning off dynamic visibility for ample-set algorithm.");
         NO_DYN_VIS = 1;
     }
-    SAFETY = bms_count(ctx->visible, VISIBLE) != 0;
+    SAFETY = bms_count(ctx->visible, VISIBLE) != 0 || NO_L12;
 }
 
 static void
@@ -861,10 +861,7 @@ beam_emit (por_context* ctx, int* src, TransitionCB cb, void* uctx)
     if (s->enabled->count >= ctx->enabled_list->count) {
         // return all enabled
         proviso_t provctx = {cb, uctx, 0, 0, 1};
-        for (int i = 0; i < ctx->enabled_list->count; i++) {
-            int group = ctx->enabled_list->data[i];
-            emitted += GBgetTransitionsLong(ctx->parent, group, src, hook_cb, &provctx);
-        }
+        emitted += emit_new (ctx, ctx->enabled_list, &provctx, src);
     } else if (!PINS_LTL && !SAFETY) { // deadlocks are easy:
         proviso_t provctx = {cb, uctx, 0, 0, 1};
         emitted = emit_new (ctx, s->enabled, &provctx, src);
@@ -879,7 +876,7 @@ beam_emit (por_context* ctx, int* src, TransitionCB cb, void* uctx)
         if ( ( PINS_LTL && provctx.por_proviso_false_cnt != 0) ||
              (!PINS_LTL && provctx.por_proviso_true_cnt  == 0) ) {
 
-            provctx.force_proviso_true = 3;
+            provctx.force_proviso_true = 1;
             Debugf ("BEAM %d may cause ignoring\n", s->idx);
             if (!NO_L12 && !NO_V && ctx->visible_enabled < ctx->enabled_list->count - 1) {
                 // enforce L2 (include all visible transitions)

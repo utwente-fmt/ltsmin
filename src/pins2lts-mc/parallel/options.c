@@ -104,8 +104,11 @@ options_static_init      (model_t model, bool timed)
         }
     }
 
-    if (proviso == Proviso_ForceNone)
+    if (proviso == Proviso_ForceNone) {
         proviso = Proviso_None;
+    } else if (proviso != Proviso_None && act_detect == NULL && inv_detect == NULL) {
+        Warning (info, "POR layer will ignoring proviso in absence of safety property (--invariant or --action). To enforce the (stronger) proviso, use: --no-L12.");
+    }
 
     if (!ecd && strategy[1] != Strat_None)
         Abort ("Conflicting options --no-ecd and %s.", key_search(strategies, strategy[1]));

@@ -177,7 +177,9 @@ reach_queue (void *arg, state_info_t *successor, transition_info_t *ti, int new)
     } else if (proviso == Proviso_Stack) {
         loc->proviso |= !ecd_has_state (loc->cyan, successor);
     }
-    ti->por_proviso = 1;
+    loc->proviso |= ti->por_proviso;
+    ti->por_proviso = 1; // inform POR layer that everything is a-ok.
+    // We will call next-state again if loc->proviso is not set.
 }
 
 static void
@@ -199,11 +201,13 @@ static inline size_t
 reach_fulfil_ignoring_proviso (wctx_t *ctx, size_t successors, perm_cb_f cb)
 {
     alg_local_t        *loc = ctx->local;
+    counter_t          *cnt = &ctx->local->counters;
     if (proviso != Proviso_None && !loc->proviso && successors > 0) {
         // proviso does not hold, explore all:
         permute_set_por (ctx->permute, 0);
         successors = permute_trans (ctx->permute, ctx->state, cb, ctx);
         permute_set_por (ctx->permute, 1);
+        cnt->ignoring++;
     }
     return successors;
 }
@@ -403,6 +407,7 @@ add_results (counter_t *res, counter_t *cnt)
     res->deadlocks += cnt->deadlocks;
     res->violations += cnt->violations;
     res->errors += cnt->errors;
+    res->ignoring += cnt->ignoring;
 }
 
 void
@@ -459,6 +464,9 @@ reach_print_stats   (run_t *run, wctx_t *ctx)
         Warning (info, "Invariant/valid-end state violations: %zu",
                        cnt->violations);
         Warning (info, "Error actions: %zu", cnt->errors);
+    }
+    if (proviso != Proviso_None) {
+        Warning (info, "Ignoring proviso: %zu", cnt->ignoring);
     }
 
     Warning (infoLong, " ");

@@ -46,6 +46,7 @@ typedef struct counter_s {
     size_t              deadlocks;      // deadlock count
     size_t              violations;     // invariant violation count
     size_t              errors;         // assertion error count
+    size_t              ignoring;       // times the ignoring proviso was fulfilled
 } counter_t;
 
 struct alg_global_s {
