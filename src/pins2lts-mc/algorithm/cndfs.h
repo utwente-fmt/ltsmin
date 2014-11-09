@@ -16,17 +16,20 @@
      Year = {2012}
     }
 
- * o Partial-order reductionfor CNDFSis described in:
-    @inproceedings{cndfs,
-     Author = {Alfons. W. Laarman and Wijs, Anton J.},
-     Booktitle = {HVC 2014},
-     Editor = {E. {Yahav}},
-     Pages = {16},
-     Publisher = {Springer},
-     Series = {LNCS},
-     Title = {{Partial-Order Reduction for Multi-Core LTL Model Checking}},
-     Volume = {(accepted for publication)},
-     Year = {2014}
+ * o Partial-order reduction for CNDFS is described in:
+    @incollection{cycleproviso,
+     year={2014},
+     isbn={978-3-319-13337-9},
+     booktitle={HVC 2014},
+     volume={8855},
+     series={LNCS},
+     editor={Yahav, Eran},
+     doi={10.1007/978-3-319-13338-6_20},
+     title={Partial-Order Reduction for Multi-core LTL Model Checking},
+     url={http://dx.doi.org/10.1007/978-3-319-13338-6_20},
+     publisher={Springer},
+     author={Laarman, Alfons W. and Wijs, Anton J.},
+     pages={267-283},
     }
 
  * o Combination of ENDFS and LNDFS (NMCNDFS)
