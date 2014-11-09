@@ -363,6 +363,7 @@ update_ns_scores (por_context* ctx, search_context_t *s, int group)
         // note: this selects some nesses that aren't used, but take the extra work
         // instead of accessing the guards to verify the work
         s->nes_score[ns] -= ctx->group_score[group];
+        HRE_ASSERT (s->nes_score[ns] >= 0, "FAILURE! NS: %s%zu, group: %zu", ns < ctx->nguards ? "+" : "-", ns, group);
     }
 }
 

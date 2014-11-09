@@ -60,7 +60,7 @@ const int*  (*prom_get_labels)      (int t);
 const int** (*prom_get_all_labels)  ();
 int         (*prom_get_label)       (void *, int g, int *src);
 const char* (*prom_get_label_name)  (int g);
-void        (*prom_get_labels_all)  (void *, int *src, int* labels);
+void        (*prom_get_labels_many)  (void *, int *src, int* labels, bool guards_only);
 const int*  (*prom_get_trans_commutes_matrix)(int t);
 const int*  (*prom_get_trans_do_not_accord_matrix)(int t);
 const int*  (*prom_get_label_may_be_coenabled_matrix)(int g);
@@ -227,8 +227,8 @@ PromLoadDynamicLib(model_t model, const char *filename)
         RTdlsym( filename, dlHandle, "spins_get_label" );
     prom_get_label_name = (const char*(*)(int))
         RTdlsym( filename, dlHandle, "spins_get_label_name" );
-    prom_get_labels_all = (void(*)(void*,int*,int*))
-        RTdlsym( filename, dlHandle, "spins_get_labels_all" );
+    prom_get_labels_many = (void(*)(void*,int*,int*,bool))
+        RTdlsym( filename, dlHandle, "spins_get_labels_many" );
     // optional POR functionality (NES/NDS):
     prom_get_trans_do_not_accord_matrix = (const int*(*)(int))
         RTtrydlsym( dlHandle, "spins_get_trans_do_not_accord_matrix" );
@@ -257,7 +257,14 @@ PromLoadDynamicLib(model_t model, const char *filename)
 void
 sl_group (model_t model, sl_group_enum_t group, int*src, int *label)
 {
-    prom_get_labels_all (model, src, label);
+    prom_get_labels_many (model, src, label, group == GB_SL_GUARDS);
+    (void) group; // Both groups overlap, and start at index 0!
+}
+
+void
+sl_all (model_t model, sl_group_enum_t group, int*src, int *label)
+{
+    prom_get_labels_many (model, src, label, false);
     (void) group; // Both groups overlap, and start at index 0!
 }
 
@@ -389,7 +396,7 @@ PromLoadGreyboxModel(model_t model, const char *filename)
     // get state labels
     GBsetStateLabelsGroup(model, sl_group);
     GBsetStateLabelLong(model, (get_label_method_t)prom_get_label);
-    GBsetStateLabelsAll(model, (get_label_all_method_t)prom_get_labels_all);
+    GBsetStateLabelsAll(model, (get_label_all_method_t)sl_all);
 
     // check for properties (label order: guard,..,guard,accept,end,progress,etc)
     for(int i = 0; i < sl_size; i++) {
