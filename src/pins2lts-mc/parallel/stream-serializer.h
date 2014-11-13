@@ -23,6 +23,8 @@ extern streamer_t *streamer_create ();
 
 extern void streamer_add_simple (streamer_t *streamer, size_t size, void *ptr);
 
+extern void streamer_add_rel (streamer_t *streamer, size_t size, void *ptr, void *offset);
+
 extern void streamer_add (streamer_t *streamer, action_f ser, action_f des,
                           size_t size, void *ptr);
 

@@ -34,6 +34,7 @@ void
 simple_ser (void *ctx, void *ptr, raw_data_t data)
 {
     simple_ctx_t       *sctx = (simple_ctx_t *) ptr;
+    //Warning(info, "simple ser memcpy(%p, %p, %zu)", data, sctx->ptr, sctx->size);
     memcpy (data, sctx->ptr, sctx->size);
     (void) ctx;
 }
@@ -95,16 +96,42 @@ streamer_add_simple (streamer_t *streamer, size_t size, void *ptr)
     streamer_add (streamer, simple_ser, simple_des, size, ctx);
 }
 
+void
+streamer_add_rel (streamer_t *streamer, size_t size, void *ptr, void *offset)
+{
+    //Warning(info, "streamer_add_rel");
+    simple_ctx_t *ctx = RTmalloc (sizeof (simple_ctx_t));
+
+    // Note: assuming ptr of SERIALIZE = ptr of DESERIALIZE
+    //size_t              len = streamer->length[SERIALIZE];
+    //HREassert (len > 0);
+    serializer_t       *serializer = &streamer->list[SERIALIZE][0];
+
+    // set ctx->ptr to (si->ref + offset)
+    ctx->ptr = (void *) (serializer->ptr + (offset-ptr));
+    ctx->size = size;
+
+    streamer_add (streamer, simple_ser, simple_des, size, ctx);
+    //Warning(info, "- serializer->ptr: %p", serializer->ptr);
+    //Warning(info, "- ctx->ptr       : %p", ctx->ptr);
+}
 
 void
 streamer_walk (streamer_t *streamer, void *ctx, raw_data_t data,
                stream_mode_t MODE)
 {
     size_t              len = streamer->length[MODE];
+    //if (MODE==SERIALIZE) {
+    //    Warning(info, "SERIALIZE   : size %zu", len);
+    //} else if (MODE==DESERIALIZE) {
+    //    Warning(info, "DESERIALIZE : size %zu", len);
+    //}
     for (size_t i = 0; i < len; i++) {
         serializer_t       *serializer = &streamer->list[MODE][i];
         serializer->action (ctx, serializer->ptr, data);
         data += serializer->size;
+        //Warning(info, "%zu/%zu: ptr: %p, size: %zu", 
+        //    i, len, serializer->ptr, serializer->size);
     }
 }
 
