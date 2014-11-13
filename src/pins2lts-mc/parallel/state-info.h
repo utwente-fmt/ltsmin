@@ -34,6 +34,9 @@ extern void     state_info_add (state_info_t *si, action_f ser, action_f des,
 
 extern void     state_info_add_simple (state_info_t *si, size_t size, void *ptr);
 
+// Adds state information to the relative address
+extern void     state_info_add_rel (state_info_t *si, size_t size, void *ptr, void *offset);
+
 extern void     state_info_serialize    (state_info_t *state, raw_data_t data);
 
 extern void     state_info_deserialize  (state_info_t *state, raw_data_t data);

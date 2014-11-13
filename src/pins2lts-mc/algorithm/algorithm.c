@@ -141,6 +141,9 @@ alg_shared_init_strategy      (run_t *run, strategy_t strat)
     case Strat_DFSFIFO:
         dfs_fifo_shared_init (run);
         break;
+    case Strat_SCC:
+        tarjan_scc_shared_init (run);
+        break;
     default: Abort ("Strategy (%s) is unknown or incompatible with the current "
                     "language module.", key_search(strategies, strategy[0]));
     }

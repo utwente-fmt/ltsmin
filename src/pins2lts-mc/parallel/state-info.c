@@ -205,6 +205,11 @@ state_info_add_simple (state_info_t *si, size_t size, void *ptr)
     streamer_add_simple (si->in->stack_serialize, size, ptr);
 }
 
+void
+state_info_add_rel (state_info_t *si, size_t size, void *ptr, void *offset)
+{
+    streamer_add_rel (si->in->stack_serialize, size, ptr, offset);
+}
 
 state_info_t *
 state_info_create ()
@@ -250,28 +255,40 @@ state_info_new_state (state_info_t *si, state_data_t data,
 void
 state_info_serialize (state_info_t *si, raw_data_t data)
 {
+    //Warning(info, "  serialize : si = %p, si->ref = %zu, data = %p", si, si->ref, data);
     HREassert (si->ref != DUMMY_IDX);
     streamer_walk (si->in->stack_serialize, NULL, data, SERIALIZE);
     Debug ("Serialized state %"PRIu32", %zu at %p",
            MurmurHash32 (store_state(si->in->store), D*4, 0), si->ref, data);
+    //Warning(info, "  data = {%d,%d,%d,%d}", *data, *(data+1), *(data+2), *(data+3));
 }
 
 void
 state_info_deserialize (state_info_t *si, raw_data_t data)
 {
+    //Warning(info, "deserialize : si = %p, si->ref = %zu, data = %p", si, si->ref, data);
     state_info_clear (si);
     streamer_walk (si->in->stack_serialize, NULL, data, DESERIALIZE);
     Debug ("Deserialized state %"PRIu32", %zu at %p",
            MurmurHash32 (store_state(si->in->store), D*4, 0), si->ref, data);
     HREassert (si->ref != DUMMY_IDX);
+    //Warning(info, "deserialize : si = %p, si->ref = %zu, data = %p", si, si->ref, data);
+    //Warning(info, "  data = {%d,%d,%d,%d}", *data, *(data+1), *(data+2), *(data+3));
 }
 
 void
 state_info_set (state_info_t *si, ref_t ref, lattice_t lat)
 {
+    // si = ctx->state, ref = pointer
     state_info_clear (si);
     si->ref = ref;
     si->lattice = lat;
+}
+
+void
+state_info_set_rel (state_info_t *si, raw_data_t data)
+{
+    store_set_state(si->in->store, data);
 }
 
 int
