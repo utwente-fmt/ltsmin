@@ -26,15 +26,19 @@ typedef struct tarjan_state_s { // TODO: make relative serializer / deserializer
     tarjan_set_t        set;
 } tarjan_state_t;
 
+typedef struct counter_s {
+    uint32_t            cycle_count;          // Counts the number of simple cycles (backedges)
+    uint32_t            self_loop_count;      // Counts the number of self-loops
+    uint32_t            scc_count;            // TODO: Counts the number of SCCs
+} counter_t;
+
 // SCC information for each worker (1 in sequential Tarjan)
 struct alg_local_s {
     dfs_stack_t         stack;                // Successor stack
     dfs_stack_t         tarjan;               // Tarjan stack
     fset_t             *states;             // states point to stack entries
 
-    uint32_t            cycle_count;          // Counts the number of simple cycles (backedges)
-    uint32_t            self_loop_count;      // Counts the number of self-loops
-    uint32_t            scc_count;            // TODO: Counts the number of SCCs
+    counter_t           cnt;
 
     uint32_t            tarjan_index_counter; // Counter used for tarjan_index
 
@@ -44,6 +48,7 @@ struct alg_local_s {
     state_info_t       *target;
     tarjan_state_t      targett;
 };
+
 
 
 void
@@ -63,10 +68,6 @@ tarjan_scc_local_init   (run_t *run, wctx_t *ctx)
 {
     ctx->local = RTmallocZero (sizeof(alg_local_t));
 
-    //Warning(info, "dummy %p, si: %p, index: %p, lowlink: %p",
-    //    &dummy, &dummy.info,  &dummy.tarjan_index,  &dummy.tarjan_lowlink);
-
-
     ctx->local->target = state_info_create ();
     state_info_add_simple (ctx->local->target, sizeof(uint32_t), &ctx->local->targett.tarjan_index);
     state_info_add_simple (ctx->local->target, sizeof(uint32_t), &ctx->local->targett.tarjan_lowlink);
@@ -75,26 +76,18 @@ tarjan_scc_local_init   (run_t *run, wctx_t *ctx)
     state_info_add_simple (ctx->state, sizeof(uint32_t), &ctx->local->state.tarjan_index);
     state_info_add_simple (ctx->state, sizeof(uint32_t), &ctx->local->state.tarjan_lowlink);
     state_info_add_simple (ctx->state, sizeof(tarjan_set_t), &ctx->local->state.set);
-    
-    state_info_add_simple (ctx->initial, sizeof(uint32_t), &ctx->local->initial.tarjan_index);
-    state_info_add_simple (ctx->initial, sizeof(uint32_t), &ctx->local->initial.tarjan_lowlink);
-    state_info_add_simple (ctx->initial, sizeof(tarjan_set_t), &ctx->local->initial.set);
 
     size_t len = state_info_serialize_int_size (ctx->state);
     ctx->local->stack = dfs_stack_create (len);
     ctx->local->tarjan = dfs_stack_create (len);
 
-    //Warning(info,"state size = %zu", state_info_serialize_int_size(ctx->state));
-    //Warning(info,"initial size = %zu", state_info_serialize_int_size(ctx->initial));
-    
-    ctx->local->cycle_count             = 0;
-    ctx->local->self_loop_count         = 0;
-    ctx->local->scc_count               = 0;
-    ctx->local->tarjan_index_counter    = 1;
+    ctx->local->cnt.cycle_count             = 0;
+    ctx->local->cnt.self_loop_count         = 0;
+    ctx->local->cnt.scc_count               = 0;
+    ctx->local->tarjan_index_counter    = 0;
 
     // create set (ref_t -> pointer to stack item)
     ctx->local->states = fset_create (sizeof(ref_t), sizeof(raw_data_t), 10, 20);
-
 
     (void) run; 
 }
@@ -118,26 +111,29 @@ tarjan_handle (void *arg, state_info_t *successor, transition_info_t *ti, int se
 
     ctx->counters->trans++;
 
-    if (ctx->state->ref == successor->ref) { // avoid *addr == 0
-        loc->self_loop_count++;
+    if (ctx->state->ref == successor->ref) {
+        loc->cnt.self_loop_count++;
+        return;
+    }
+
+    if (state_store_has_color(successor->ref, SCC_STATE, 0)) { // SCC
         return;
     }
 
     raw_data_t         *addr;
-    hash32_t             hash = ref_hash (successor->ref);
+    hash32_t            hash = ref_hash (successor->ref);
     int found = fset_find (loc->states, &hash, &successor->ref, (void **)&addr, false);
 
     if (found) { // stack state or Tarjan stack state (handle immediately)
 
-        raw_data_t      data = *addr;
-        state_info_deserialize (ctx->local->target, data);
-        loc->cycle_count += loc->targett.set == STACK_STATE;
+        state_info_deserialize (loc->target, *addr);
+        loc->cnt.cycle_count += loc->targett.set == STACK_STATE;
 
-        if (ctx->local->state.tarjan_lowlink > ctx->local->targett.tarjan_lowlink) {
-            ctx->local->state.tarjan_lowlink = ctx->local->targett.tarjan_lowlink;
+        if (loc->state.tarjan_lowlink > loc->targett.tarjan_lowlink) {
+            loc->state.tarjan_lowlink = loc->targett.tarjan_lowlink;
         }
 
-    } else if (!state_store_has_color(ctx->state->ref, SCC_STATE, 0)) { // !SCC
+    } else { // NEW
 
         raw_data_t stack_loc = dfs_stack_push (loc->stack, NULL);
         state_info_serialize (successor, stack_loc);
@@ -150,6 +146,12 @@ tarjan_handle (void *arg, state_info_t *successor, transition_info_t *ti, int se
 static inline void
 explore_state (wctx_t *ctx)
 {
+    alg_local_t            *loc = ctx->local;
+
+    dfs_stack_enter (loc->stack);
+    increase_level (ctx->counters);
+
+    Debug ("Exploring %zu (%d, %d)", ctx->state->ref, loc->tarjan_index_counter, loc->tarjan_index_counter)
     permute_trans (ctx->permute, ctx->state, tarjan_handle, ctx);
 
     ctx->counters->explored++;
@@ -171,7 +173,7 @@ tarjan_scc_init  (wctx_t *ctx)
 
 
 static void
-update_parent (wctx_t *ctx, uint32_t low)
+update_parent (wctx_t *ctx, uint32_t low_child)
 {
     alg_local_t            *loc = ctx->local;
 
@@ -179,34 +181,77 @@ update_parent (wctx_t *ctx, uint32_t low)
 
     // update the lowlink of the predecessor state
     raw_data_t state_data = dfs_stack_peek_top (loc->stack, 1);
-    state_info_deserialize (loc->target, state_data); // update dummy
-    if (loc->targett.tarjan_lowlink > low) {
-        Debug ("Updating %zu from low %d --> %d", loc->target->ref, loc->targett.tarjan_lowlink, low);
-        loc->targett.tarjan_lowlink = low;
+    state_info_deserialize (loc->target, state_data);
+    if (loc->targett.tarjan_lowlink > low_child) {
+        Debug ("Updating %zu from low %d --> %d", loc->target->ref, loc->targett.tarjan_lowlink, low_child);
+        loc->targett.tarjan_lowlink = low_child;
         state_info_serialize (loc->target, state_data);
     }
 }
 
+// Move a DFS stack state to the Tarjan stack
 static void
-move_scc (wctx_t *ctx, state_info_t *state)
+move_tarjan (wctx_t *ctx, state_info_t *state, raw_data_t state_data)
 {
     alg_local_t            *loc = ctx->local;
+    raw_data_t             *addr;
 
+    // Add to Tarjan incomplete SCC stack
+    loc->state.set = TARJAN_STATE; // set before serialize
+    raw_data_t tarjan_loc = dfs_stack_push (loc->tarjan, NULL);
+    state_info_serialize (state, tarjan_loc);
+
+    // Update reference to new stack
     hash32_t            hash    = ref_hash (state->ref);
-    int success = fset_delete (loc->states, &hash, &state->ref);
+    int found = fset_find (loc->states, &hash, &state->ref, (void**)&addr, false);
+    HREassert (*addr == state_data, "Wrong addr?");
+    HREassert (found, "Could not find key in set");
+    *addr = tarjan_loc;
+}
+
+// Move a stack state to the SCC set
+static void
+move_scc (wctx_t *ctx, ref_t state)
+{
+    alg_local_t            *loc = ctx->local;
+    Debug ("Marking %zu as SCC", state);
+
+    hash32_t            hash    = ref_hash (state);
+    int success = fset_delete (loc->states, &hash, &state);
     HREassert (success, "Could not remove SCC state from set");
 
-    state_store_try_color (state->ref, SCC_STATE, 0); // set SCC globally!
+    state_store_try_color (state, SCC_STATE, 0); // set SCC globally!
+}
+
+static void
+pop_scc (wctx_t *ctx, ref_t root, uint32_t root_low)
+{
+    alg_local_t            *loc = ctx->local;
+    raw_data_t              state_data;
+    Debug ("Found SCC with root %zu", root);
+
+    // Mark SCC!
+    loc->cnt.scc_count++;
+    while (( state_data = dfs_stack_top (loc->tarjan) )) {
+
+        state_info_deserialize (loc->target, state_data); // update dummy
+        if (loc->targett.tarjan_lowlink < root_low) break;
+
+        move_scc (ctx, loc->target->ref);
+        dfs_stack_pop (loc->tarjan);
+    }
+    move_scc (ctx, root); // move the root!
 }
 
 void
 tarjan_scc_run  (run_t *run, wctx_t *ctx)
 {
-    tarjan_scc_init  (ctx);
+    tarjan_scc_init (ctx);
     
     alg_local_t            *loc = ctx->local;
     raw_data_t             *addr;
     raw_data_t              state_data;
+    bool                    on_stack;
 
     while ( !run_is_stopped(run) ) {
 
@@ -214,29 +259,34 @@ tarjan_scc_run  (run_t *run, wctx_t *ctx)
         if (state_data != NULL) {
 
             state_info_deserialize (ctx->state, state_data);
-            hash32_t            hash = ref_hash (ctx->state->ref);
-            int found = fset_find (loc->states, &hash, &ctx->state->ref, (void**)&addr, true);
 
-            if (!found && !state_store_has_color(ctx->state->ref, SCC_STATE, 0)) {
+            if (state_store_has_color (ctx->state->ref, SCC_STATE, 0)) { // SCC
+                dfs_stack_pop (loc->stack);
+                continue;
+            }
+
+            hash32_t            hash = ref_hash (ctx->state->ref);
+            on_stack = fset_find (loc->states, &hash, &ctx->state->ref, (void **)&addr, true);
+
+            if (!on_stack) { // NEW state
 
                 HREassert (loc->tarjan_index_counter != UINT32_MAX);
-                loc->state.tarjan_index   = loc->tarjan_index_counter;
-                loc->state.tarjan_lowlink = loc->tarjan_index_counter++;
-                loc->state.set   = STACK_STATE;
+                loc->state.tarjan_index   = ++loc->tarjan_index_counter;
+                loc->state.tarjan_lowlink = loc->tarjan_index_counter;
+                loc->state.set            = STACK_STATE;
+                *addr = state_data; // point fset data to stack
 
-                dfs_stack_enter (loc->stack);
-                increase_level (ctx->counters);
                 explore_state (ctx);
 
-                if (loc->tarjan_index_counter - 1 != loc->state.tarjan_lowlink)
-                    Debug ("Fpdating %zu from low %d --> %d", ctx->state->ref, loc->tarjan_index_counter - 1, loc->state.tarjan_lowlink);
+                if (loc->tarjan_index_counter != loc->state.tarjan_lowlink) {
+                    Debug ("Forward %zu from low %d --> %d", ctx->state->ref, loc->tarjan_index_counter, loc->state.tarjan_lowlink);
+                }
                 state_info_serialize (ctx->state, state_data);
-                *addr = state_data; // point fset data to stack
 
             } else {
 
-                if (found)
-                    update_parent (ctx, loc->state.tarjan_lowlink);
+                state_info_deserialize (ctx->state, *addr); // necessary as it might be on Tarjan stack! (actually it can only be there)
+                update_parent (ctx, loc->state.tarjan_lowlink);
                 dfs_stack_pop (loc->stack);
 
             }
@@ -248,67 +298,58 @@ tarjan_scc_run  (run_t *run, wctx_t *ctx)
             dfs_stack_leave (loc->stack);
             ctx->counters->level_cur--;
 
-            state_data = dfs_stack_pop (loc->stack);
-            state_info_deserialize (ctx->state, state_data);
-            uint32_t            low     = loc->state.tarjan_lowlink;
+            state_data = dfs_stack_top (loc->stack);
+            state_info_deserialize (ctx->state, state_data); // Stack state
+            Debug ("Backtracking %zu (%d, %d)", ctx->state->ref, loc->state.tarjan_index, loc->state.tarjan_lowlink)
 
             if (loc->state.tarjan_index == loc->state.tarjan_lowlink) {
 
-                Debug ("Found SCC with root %zu", ctx->state->ref);
-                // Mark SCC!
-                loc->scc_count++;
-                while (( state_data = dfs_stack_top (loc->tarjan) )) {
-
-                    state_info_deserialize (loc->target, state_data); // update dummy
-                    if (loc->targett.tarjan_lowlink < low) break;
-
-                    move_scc (ctx, loc->target);
-                    dfs_stack_pop (loc->tarjan);
-                }
-                move_scc (ctx, ctx->state);
+                pop_scc (ctx, ctx->state->ref, loc->state.tarjan_lowlink);
 
             } else {
 
-                // Add to Tarjan incomplete SCC stack
-                loc->state.set = TARJAN_STATE; // set before serialize
-                raw_data_t tarjan_loc = dfs_stack_push (loc->tarjan, NULL);
-                state_info_serialize (ctx->state, tarjan_loc);
-
-                hash32_t            hash    = ref_hash (ctx->state->ref);
-                int found = fset_find (loc->states, &hash, &ctx->state->ref, (void**)&addr, false);
-                HREassert (found, "Could not find key in set");
-                *addr = tarjan_loc;
-
-                update_parent (ctx, low);
+                move_tarjan (ctx, ctx->state, state_data);
+                update_parent (ctx, loc->state.tarjan_lowlink);
 
             }
+
+            dfs_stack_pop (loc->stack);
         }
     }
 
     if (!run_is_stopped(run) && dfs_stack_size(loc->tarjan) != 0)
         Warning (info, "Tarjan stack not empty: %zu (stack %zu)", dfs_stack_size(loc->tarjan), dfs_stack_size(loc->stack));
-    (void) run;
+    if (!run_is_stopped(run) && fset_count(loc->states) != 0)
+        Warning (info, "Stack-set not empty: %zu", fset_count(loc->states));
 }
 
 void
 tarjan_scc_reduce  (run_t *run, wctx_t *ctx)
 {
-    (void) run; (void) ctx;
+    if (run->reduced == NULL) {
+        run->reduced = RTmallocZero (sizeof (counter_t));
+    }
+    counter_t              *reduced = (counter_t *) run->reduced;
+    counter_t              *cnt = &ctx->local->cnt;
+
+    reduced->cycle_count += cnt->cycle_count;
+    reduced->scc_count += cnt->scc_count;
+    reduced->self_loop_count += cnt->self_loop_count;
 }
 
 void
 tarjan_scc_print_stats   (run_t *run, wctx_t *ctx)
 {
+    counter_t              *reduced = (counter_t *) run->reduced;
+
     // SCC statistics
-    Warning(info,"simple cycle count: %d", ctx->local->cycle_count);
-    Warning(info,"self-loop count:    %d", ctx->local->self_loop_count);
-    Warning(info,"scc count:          %d", ctx->local->scc_count);
-    Warning(info,"avg scc size:       %.3f", ((double)ctx->counters->explored) / ctx->local->scc_count);
+    Warning(info,"simple cycle count: %d", reduced->cycle_count);
+    Warning(info,"self-loop count:    %d", reduced->self_loop_count);
+    Warning(info,"scc count:          %d", reduced->scc_count);
+    Warning(info,"avg scc size:       %.3f", ((double)ctx->counters->explored) / reduced->scc_count);
     Warning(info," ");
 
     run_report_total (run);
-    //fset_print_statistics (ctx->local->on_stack, "set");
-    (void) ctx;
 }
 
 void
