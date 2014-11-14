@@ -95,6 +95,7 @@ extern void lndfs_shared_init       (run_t *run);
 extern void cndfs_shared_init       (run_t *run);
 extern void owcty_shared_init       (run_t *run);
 extern void dfs_fifo_shared_init    (run_t *run);
+extern void tarjan_scc_shared_init  (run_t *run);
 
 /**
  * Helper functions
