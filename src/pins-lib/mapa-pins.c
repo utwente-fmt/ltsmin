@@ -137,12 +137,6 @@ void write_rate_label(char *str,int*label){
     Warning(infoLong,"  %d/%d",label[4],label[5]);
 }
 
-void write_reward_label(char *str,int*label){
-    Warning(infoLong,"reward label %s=",str);
-    float f=atof(str);
-    rationalize32(f,(uint32_t*)label+0,(uint32_t*)label+1);
-    Warning(infoLong,"  %d/%d",label[0],label[1]);
-}
 int get_numerator(char *str){
     return atoi(str);
 }
