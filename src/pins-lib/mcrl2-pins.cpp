@@ -571,6 +571,7 @@ MCRL2loadGreyboxModel (model_t m, const char *model_name)
 
 #ifdef MCRL2_GUARDS
     int bool_is_new, bool_type = lts_type_add_type (ltstype, LTSMIN_TYPE_BOOL, &bool_is_new);
+    lts_type_set_format (ltstype, bool_type, LTStypeDirect);
     // init state labels
     int nguards = pins->guard_count();
     int sl_size = nguards;
@@ -620,6 +621,7 @@ MCRL2loadGreyboxModel (model_t m, const char *model_name)
     GBsetActionsLong(m, MCRL2getUpdateLong);
     GBsetStateLabelLong(m, (get_label_method_t)MCRL2getLabelLong);
 #else
+    lts_type_validate(ltstype); // done with ltstype
     matrix_t *p_sl_info = new matrix_t;
     dm_create (p_sl_info, 0, pins->process_parameter_count());
     GBsetStateLabelInfo (m, p_sl_info);
