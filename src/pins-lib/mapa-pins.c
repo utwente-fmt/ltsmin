@@ -440,6 +440,7 @@ void common_load_model(model_t model,const char*name,int mapa){
     context->cached=GBaddCache(raw_model);
 
     GBsetStateLabelsAll(model,get_state_labels);
+    GBsetStateLabelInfo(model, &sl_info);
     
     if (enable_rewards){
         if (reach_smds>0){
