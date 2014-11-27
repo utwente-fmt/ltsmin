@@ -726,7 +726,7 @@ group_add(void *context, transition_info_t *ti, int *dst, int *cpy)
                 }
 
                 // ErrorActions++
-                add_fetch(ErrorActions, 1);
+                add_fetch(&ErrorActions, 1);
             }
         }
     }
