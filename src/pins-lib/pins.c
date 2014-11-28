@@ -304,13 +304,13 @@ wrapped_default_long (model_t self,int group,int*src,TransitionCB cb,void*contex
 int
 wrapped_default_actions_short (model_t self,int group,int*src,TransitionCB cb,void*context)
 {
-    return GBgetTransitionsShort (GBgetParent(self), group, src, cb, context);
+    return GBgetActionsShort (GBgetParent(self), group, src, cb, context);
 }
 
 int
 wrapped_default_actions_long (model_t self,int group,int*src,TransitionCB cb,void*context)
 {
-    return GBgetTransitionsLong (GBgetParent(self), group, src, cb, context);
+    return GBgetActionsLong (GBgetParent(self), group, src, cb, context);
 }
 
 int
