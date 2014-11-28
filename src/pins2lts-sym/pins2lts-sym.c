@@ -725,8 +725,11 @@ group_add(void *context, transition_info_t *ti, int *dst, int *cpy)
                     ctx->trace_count++;
                 }
 
-                // ErrorActions++
-                add_fetch(&ErrorActions, 1);
+#ifdef HAVE_SYLVAN
+                add_fetch(ErrorActions, 1);
+#else
+                ErrorActions++;
+#endif
             }
         }
     }
