@@ -58,6 +58,9 @@ ACX_PTHREAD(
    CC="$PTHREAD_CC"],
   [AC_MSG_FAILURE([no pthread support found.])])
 
+# explicitly link if necessary  
+AC_CHECK_LIB(pthread, pthread_create, [LIBS="$LIBS -lpthread"])
+
 dnl Newer libtool allows this instead:
 dnl LT_PREREQ(2.2)
 dnl LT_INIT([disable-shared])
