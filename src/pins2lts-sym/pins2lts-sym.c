@@ -2183,7 +2183,7 @@ reach_chain_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
     vset_t tmp = NULL;
     vset_t false_states = NULL;
     vset_t maybe_states = NULL;
-    if (!no_soundness_check) {
+    if (!no_soundness_check && GBgetUseGuards(model)) {
         for(int i=0;i<nGuards;i++) {
             guard_maybe[i] = vset_create(domain, g_projs[i].len, g_projs[i].proj);
         }
@@ -2240,7 +2240,7 @@ reach_chain_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
         vset_destroy(deadlocks);
         vset_destroy(dlk_temp);
     }
-    if(!no_soundness_check) {
+    if(!no_soundness_check && GBgetUseGuards(model)) {
         for(int i=0;i<nGuards;i++) {
             vset_destroy(guard_maybe[i]);
         }
@@ -2271,7 +2271,7 @@ reach_chain(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
     vset_t tmp = NULL;
     vset_t false_states = NULL;
     vset_t maybe_states = NULL;
-    if (!no_soundness_check) {
+    if (!no_soundness_check && GBgetUseGuards(model)) {
         for(int i=0;i<nGuards;i++) {
             guard_maybe[i] = vset_create(domain, g_projs[i].len, g_projs[i].proj);
         }
@@ -2317,7 +2317,7 @@ reach_chain(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
         vset_destroy(deadlocks);
         vset_destroy(dlk_temp);
     }
-    if(!no_soundness_check) {
+    if(!no_soundness_check && GBgetUseGuards(model)) {
         for(int i=0;i<nGuards;i++) {
             vset_destroy(guard_maybe[i]);
         }
