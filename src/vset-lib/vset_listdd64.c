@@ -283,7 +283,7 @@ static void mdd_collect(uint64_t a,uint64_t b){
     for(uint64_t i=0;i<mdd_load_node_count;i++){
         mdd_mark(mdd_load_node_ids[i]);
     }
-    Warning(debug, "ListDD garbage collection: %"PRIu64" of %"PRIu64" nodes used",
+    Warning(debug, "ListDD64 garbage collection: %"PRIu64" of %"PRIu64" nodes used",
             mdd_used, mdd_nodes);
     if (mdd_used == UINT64_MAX)
         Abort("Node table full at maximum size");
@@ -430,7 +430,7 @@ static void mdd_collect(uint64_t a,uint64_t b){
                 }
                 else continue;
             }
-            default: Abort("missing case");
+            default: Abort("missing case in collect");
         }
         copy_count++;
         new_cache[slot]=op_cache[i];
@@ -540,7 +540,7 @@ static uint64_t mdd_union(uint64_t a,uint64_t b){
     if(a==b) return a;
     if(a==0) return b;
     if(b==0) return a;
-    if(a==1 || b==1) Abort("missing case in union");
+    if(a==1 || b==1) Abort("missing case in union: a=%" PRIu64 ", b=%" PRIu64 "", a, b);
     if (b<a) { uint64_t tmp=a;a=b;b=tmp; }
     uint64_t slot_hash=hash3(OP_UNION,a,b);
     uint64_t slot=slot_hash%cache_size;
@@ -1214,7 +1214,7 @@ mdd_next(uint64_t p_id, uint64_t set, uint64_t rel, int idx, int *r_proj, int r_
     if (r_len < 0 || w_len < 0) Abort("Rel out of bounds");
     if (rel==0||set==0) return 0;
     if (w_len ==0 && r_len == 0) return set;
-    if (rel==1||set==1)Abort("missing case in next; set: %" PRIu64 ", rel: %" PRIu64 "", set, rel);
+    if (rel==1||set==1)Abort("missing case in next; set: %" PRIu64 ", rel: %" PRIu64 " idx=%d, r_len=%d, w_len=%d", set, rel, idx, r_len, w_len);
 
     uint64_t slot_hash;
     uint64_t old_rel;
@@ -1371,6 +1371,30 @@ set_example_mdd(vset_t set, int *e)
     for(int i = 0; i < len; i++){
         if (mdd == 1) Abort("non-uniform length");
         e[i] = node_table[mdd].val;
+        mdd  = node_table[mdd].down;
+    }
+
+    if (mdd != 1) Abort("non-uniform length");
+}
+
+static void
+set_random_mdd(vset_t set, int *e)
+{
+    int len = (set->p_len < 0)?set->dom->shared.size:set->p_len;
+    //printf("set_random_mdd: len=%d\n", len);
+    uint64_t mdd = set->mdd;
+
+    if (mdd == 0) Abort("empty set");
+
+    for(int i = 0; i < len; i++){
+        if (mdd == 1) Abort("non-uniform length");
+        int j = 0;
+        for(uint64_t right = node_table[mdd].right; right != 0; right = node_table[right].right) { j++; }
+        int r = rand() % (j+1);
+        //printf("%d: %d/%d\n", i, r, j+1);
+        for(j=0; j < r; j++) { /*printf("%d: %d\n", i, node_table[mdd].val);*/ mdd = node_table[mdd].right; }
+        e[i] = node_table[mdd].val;
+        //printf("%d: %d\n", i, e[i]);
         mdd  = node_table[mdd].down;
     }
 
@@ -2335,6 +2359,7 @@ vdom_t vdom_create_list64_native(int n){
     dom->shared.set_prev=set_prev_mdd;
     dom->shared.set_universe=set_universe_mdd;
     dom->shared.set_example=set_example_mdd;
+    dom->shared.set_random=set_random_mdd;
     dom->shared.set_enum_match=set_enum_match_mdd;
     dom->shared.set_copy_match=set_copy_match_mdd;
     dom->shared.set_copy_match_proj=set_copy_match_proj_mdd;

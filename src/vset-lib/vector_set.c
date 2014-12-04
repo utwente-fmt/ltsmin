@@ -259,7 +259,7 @@ void vdom_set_name(vdom_t dom, int i, char* name) {
 }
 
 char* vdom_get_name(vdom_t dom, int i) {
-    if (i >= dom->shared.size) Abort("Variable does not exist");
+    if (i >= dom->shared.size) { Abort("Variable %d does not exist", i); }
     return dom->shared.names[i];
 }
 
@@ -393,6 +393,15 @@ int vproj_create(vdom_t dom, int p_len, int* proj){
 
 void vset_example(vset_t set,int *e){
        set->dom->shared.set_example(set,e);
+}
+
+void vset_random(vset_t set,int *e){
+    if (set->dom->shared.set_random==NULL) {
+        Warning(hre_debug, "Generating random elements not supported.");
+        set->dom->shared.set_example(set, e);
+    } else {
+       set->dom->shared.set_random(set, e);
+    }
 }
 
 void vset_example_match(vset_t set,int *e, int p_len, int* proj, int* match){

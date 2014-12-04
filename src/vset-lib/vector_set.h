@@ -171,6 +171,11 @@ extern void vset_example(vset_t set,int *e);
 extern void vset_example_match(vset_t set, int *e, int p_len, int* proj, int*match);
 
 /**
+\brief Randomly produce a member of a non-empty set.
+*/
+extern void vset_random(vset_t set,int *e);
+
+/**
 \brief Copy a vset.
 */
 extern void vset_copy(vset_t dst,vset_t src);
