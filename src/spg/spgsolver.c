@@ -66,7 +66,7 @@ main (int argc, char *argv[])
     rt_timer_t spgsolve_timer = RTcreateTimer();
     RTstartTimer(spgsolve_timer);
     recursive_result strategy;
-    parity_game* copy;
+    parity_game* copy = NULL;
     if (spg_options->check_strategy || spg_options->interactive_strategy_play) {
         copy = spg_copy(g);
     }
