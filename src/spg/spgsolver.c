@@ -6,6 +6,7 @@
  */
 #include <hre/config.h>
 
+#include <assert.h>
 #include <limits.h>
 
 #include <hre/user.h>
@@ -39,10 +40,10 @@ static  struct poptOption options[] = {
 int
 main (int argc, char *argv[])
 {
-    char *files[1];
+    char *files[2];
     HREinitBegin(argv[0]);
-    HREaddOptions(options,"Symbolic parity game solver. Solves <game>.\n");
-    HREinitStart(&argc,&argv,1,1,files,"<game>");
+    HREaddOptions(options,"Symbolic parity game solver. Solves <game>, plays according to <strategy>.\n");
+    HREinitStart(&argc,&argv,1,2,files,"<game> [<strategy]");
 
 #ifdef HAVE_SYLVAN
     if (vset_default_domain==VSET_Sylvan || vset_default_domain==VSET_LDDmc) {
@@ -64,12 +65,49 @@ main (int argc, char *argv[])
     spgsolver_options* spg_options = spg_get_solver_options();
     rt_timer_t spgsolve_timer = RTcreateTimer();
     RTstartTimer(spgsolve_timer);
-    bool result = spg_solve(g, spg_options);
-    Print(infoShort, " ");
-    Print(infoShort, "The result is: %s", result ? "true":"false");
-    RTstopTimer(spgsolve_timer);
-    Print(infoShort, " ");
-    RTprintTimer(infoShort, spgsolve_timer, "solving took");
+    recursive_result strategy;
+    parity_game* copy;
+    if (spg_options->check_strategy || spg_options->interactive_strategy_play) {
+        copy = spg_copy(g);
+    }
+    bool result;
+    if (files[1] == NULL)
+    {
+        result = spg_solve(g, &strategy, spg_options);
+        Print(infoShort, " ");
+        Print(infoShort, "The result is: %s", result ? "true":"false");
+        RTstopTimer(spgsolve_timer);
+        Print(infoShort, " ");
+        RTprintTimer(infoShort, spgsolve_timer, "solving took");
+
+        if (spg_options->strategy_filename != NULL)
+        {
+            Print(info, "Writing winning strategies to %s", spg_options->strategy_filename);
+            FILE* f = fopen(spg_options->strategy_filename, "w");
+            result_save(f, strategy);
+            fclose(f);
+        }
+    }
+    else
+    {
+        Print(info, "Loading strategy from file %s...", files[1]);
+        FILE* f = fopen(files[1], "r");
+        strategy = result_load(f, vset_default_domain, g->domain);
+        fclose(f);
+        result = vset_member(strategy.win[spg_options->player], g->src);
+        Print(infoLong, "There is a winning strategy for player %d.",
+              result ? spg_options->player : 1 - spg_options->player);
+    }
+    if (spg_options->check_strategy)
+    {
+        Print(info, "Testing the computed strategy.");
+        check_strategy(copy, &strategy, spg_options->player, result, 10);
+    }
+    if (spg_options->interactive_strategy_play)
+    {
+        Print(info, "Start playing interactively.");
+        play_strategy_interactive(copy, &strategy, spg_options->player);
+    }
 
     HREexit(HRE_EXIT_SUCCESS);
 }

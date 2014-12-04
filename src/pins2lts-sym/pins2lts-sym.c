@@ -4057,9 +4057,14 @@ actual_main(void)
             if (pgsolve_flag) {
                 spgsolver_options* spg_options = spg_get_solver_options();
                 rt_timer_t pgsolve_timer = RTcreateTimer();
-                Print(info, "Solving symbolic partity game.");
+                Print(info, "Solving symbolic parity game for player %d.", spg_options->player);
                 RTstartTimer(pgsolve_timer);
-                bool result = spg_solve(g, spg_options);
+                recursive_result strategy;
+                parity_game* copy;
+                if (spg_options->check_strategy) {
+                    copy = spg_copy(g);
+                }
+                bool result = spg_solve(g, &strategy, spg_options);
                 Print(info, " ");
                 Print(info, "The result is: %s.", result ? "true":"false");
                 RTstopTimer(pgsolve_timer);
@@ -4067,6 +4072,17 @@ actual_main(void)
                 RTprintTimer(info, timer,               "reachability took   ");
                 RTprintTimer(info, compute_pg_timer,    "computing game took ");
                 RTprintTimer(info, pgsolve_timer,       "solving took        ");
+                if (spg_options->strategy_filename != NULL)
+                {
+                    Print(info, "Writing winning strategies to %s", spg_options->strategy_filename);
+                    FILE* f = fopen(spg_options->strategy_filename, "w");
+                    result_save(f, strategy);
+                    fclose(f);
+                }
+                if (spg_options->check_strategy)
+                {
+                    check_strategy(copy, &strategy, spg_options->player, result, 10);
+                }
             } else {
                 spg_destroy(g);
             }

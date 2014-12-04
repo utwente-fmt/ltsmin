@@ -108,20 +108,21 @@ void spg_save(FILE* f, parity_game* g)
 parity_game* spg_load(FILE* f, vset_implementation_t impl)
 {
     size_t size = 1024;
-    char buf[size];
+    char* buf = malloc(sizeof(char)*size);
     int state_length = 0;
     int num_groups = 0;
     int min_priority = 0;
     int max_priority = 0;
-    int res = fscanf(f,"symbolic parity game\n");
-    //if (res <= 0) {
-    //    Abort("Wrong file format: %d.", res)
-    //}
+    ssize_t res = fscanf(f,"symbolic parity game\n");
+
+    if (res == EOF) {
+        Abort("Wrong file format: %d.", res)
+    }
     res &= fscanf(f,"state_length=%d\n", &state_length);
     res &= fscanf(f,"num_groups=%d\n", &num_groups);
     res &= fscanf(f,"min_priority=%d\n", &min_priority);
     res &= fscanf(f,"max_priority=%d", &max_priority);
-    fgets(buf, size, f); // "\n"
+    res &= getline(&buf, &size, f); // "\n"
     Print(infoShort, "Loading symbolic parity game. "
             "state_length=%d, num_groups=%d, min_priority=%d, max_priority=%d",
             state_length, num_groups, min_priority, max_priority);
@@ -138,27 +139,28 @@ parity_game* spg_load(FILE* f, vset_implementation_t impl)
     for(int i=0; i<state_length; i++) {
         res &= fscanf(f,((i<state_length-1)?"%d ":"%d"), &(result->src[i]));
     }
-    fgets(buf, size, f); // "\n"
+    res &= getline(&buf, &size, f); // "\n"
 
     for(int i=0; i<num_groups; i++) {
-        fgets(buf, size, f); // "rel proj e[%d]\n"
+        res &= getline(&buf, &size, f); // "rel proj e[%d]\n"
         result->e[i] = vrel_load_proj(f, domain);
     }
     for(int i=0; i<num_groups; i++) {
-        fgets(buf, size, f); // "rel e[%d]\n"
+        res &= getline(&buf, &size, f); // "rel e[%d]\n"
         vrel_load(f, result->e[i]);
     }
-    fgets(buf, size, f); // "set v\n"
+    res &= getline(&buf, &size, f); // "set v\n"
     result->v = vset_load(f, domain);
     for(int i=0; i<2; i++) {
-        fgets(buf, size, f); // "set v_player[%d]\n"
+        res &= getline(&buf, &size, f); // "set v_player[%d]\n"
         result->v_player[i] = vset_load(f, domain);
     }
     for(int i=min_priority; i<=max_priority; i++) {
-        fgets(buf, size, f); // "set v_priority[%d]\n"
+        res &= getline(&buf, &size, f); // "set v_priority[%d]\n"
         result->v_priority[i] = vset_load(f, domain);
     }
     vset_post_load(f, domain);
+    free(buf);
     Print(infoShort, "Done loading symbolic parity game.");
     return result;
 }

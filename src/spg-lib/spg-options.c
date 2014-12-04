@@ -18,6 +18,14 @@ static int saturating_attractor_flag = 0;
 static int dot_flag = 0;
 #endif
 
+static char* strategy_filename = NULL;
+
+static int check_strategy_flag = 0;
+
+static int interactive_strategy_play_flag = 0;
+
+static int player = 0;
+
 static enum { DEFAULT, CHAIN, PAR, PAR2 } attr_strategy = DEFAULT;
 
 static char *attr_str = "default";
@@ -45,7 +53,7 @@ spg_solve_popt(poptContext con, enum poptCallbackReason reason,
 
         res = linear_search(ATTR, attr_str);
         if (res < 0) {
-            Print(error, "unknown attractor strategy %s", attr_str);
+            Print(error, "Unknown attractor strategy %s", attr_str);
             HREexitUsage(HRE_EXIT_FAILURE);
         } else if (HREme(HREglobal())==0) {
             Print(info, "Attractor strategy is %s", attr_str);
@@ -70,6 +78,10 @@ struct poptOption spg_solve_options[]={
 #ifdef LTSMIN_DEBUG
     { "pg-write-dot" , 0 , POPT_ARG_NONE , &dot_flag, 0, "Write dot files to disk.","" },
 #endif
+    { "write-strategy" , 0 , POPT_ARG_STRING , &strategy_filename, 0, "file to write the computed strategy to","<strategy>.spg" },
+    { "check-strategy" , 0 , POPT_ARG_NONE , &check_strategy_flag, 0, "run random plays to test the strategy" },
+    { "interactive-play" , 0 , POPT_ARG_NONE , &interactive_strategy_play_flag, 0, "play interactively according to the strategy" },
+    { "player" , 0 , POPT_ARG_NONE , &player, 0, "player (default: 0)" },
     POPT_TABLEEND
 };
 
@@ -108,6 +120,21 @@ spgsolver_options* spg_get_solver_options()
 #endif
     options->attr_options->saturation = (saturating_attractor_flag > 0);
     options->attr_options->timer = RTcreateTimer();
+    options->strategy_filename = strategy_filename;
+    options->attr_options->compute_strategy = (strategy_filename != NULL);
+    if (options->attr_options->compute_strategy) {
+        if (options->attr == spg_attractor_chaining) {
+            Abort("Computing stategy not supported in chaining attractor. Use, e.g., '--attr=default'.");
+        }
+        Print(info, "Writing winning strategies to %s", strategy_filename);
+    }
+    options->check_strategy = (check_strategy_flag > 0);
+    options->interactive_strategy_play = (interactive_strategy_play_flag > 0);
+    if (player == 0 || player == 1) {
+        options->player = player;
+    } else {
+        Abort("Invalid player: %d", player);
+    }
     return options;
 }
 

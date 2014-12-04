@@ -13,17 +13,13 @@
 #include <spg-lib/spg.h>
 #include <spg-lib/spg-attr.h>
 #include <spg-lib/spg-options.h>
-
-typedef struct
-{
-    vset_t win[2];
-} recursive_result;
+#include <spg-lib/spg-strategy.h>
 
 
 /**
  * \brief
  */
-bool spg_solve(parity_game* g, spgsolver_options* options);
+bool spg_solve(parity_game* g, recursive_result* result, spgsolver_options* options);
 
 
 /**
