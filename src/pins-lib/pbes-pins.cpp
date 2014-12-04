@@ -257,7 +257,6 @@ struct pbes_state_cb
 
 extern "C" {
 
-static int debug_flag = 0;
 static int reset_flag = 0;
 static int always_split_flag = 0;
 
@@ -282,9 +281,6 @@ static void pbes_popt(poptContext con, enum poptCallbackReason reason,
             }
             if (always_split_flag) {
                 Warning(info,"Always split flag is set.");
-            }
-            if (debug_flag) {
-                Warning(info,"Debug flag is set.");
             }
 
             int argc;
@@ -335,7 +331,6 @@ struct poptOption pbes_options[] = {
      { NULL, 0, POPT_ARG_CALLBACK | POPT_CBFLAG_POST | POPT_CBFLAG_SKIPOPTION, (void*)pbes_popt, 0, NULL, NULL },
      { "reset" , 0 , POPT_ARG_NONE , &reset_flag, 0, "Indicate that unset parameters should be reset.","" },
      { "always-split" , 0 , POPT_ARG_NONE , &always_split_flag, 0, "Always use conjuncts and disjuncts as transition groups.","" },
-     { "debug" , 0 , POPT_ARG_NONE , &debug_flag, 0, "Enable debug output.","" },
      { "mcrl2", 0, POPT_ARG_STRING, &mcrl2_args, 0, "pass options to the mCRL2 library", "<mCRL2 options>" },
      POPT_TABLEEND };
 
