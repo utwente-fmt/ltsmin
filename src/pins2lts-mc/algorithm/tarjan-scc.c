@@ -87,7 +87,7 @@ tarjan_scc_local_init   (run_t *run, wctx_t *ctx)
     ctx->local->tarjan_index_counter    = 0;
 
     // create set (ref_t -> pointer to stack item)
-    ctx->local->states = fset_create (sizeof(ref_t), sizeof(raw_data_t), 10, 20);
+    ctx->local->states = fset_create (sizeof(ref_t), sizeof(raw_data_t), 10, dbs_size);
 
     (void) run; 
 }
