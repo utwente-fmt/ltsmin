@@ -1474,7 +1474,7 @@ learn_guards(vset_t states, long *guard_count) {
     LACE_ME;
     if (GBgetUseGuards(model)) {
         for (int g = 0; g < nGuards; g++) {
-            (*guard_count)++;
+            if (guard_count != NULL) (*guard_count)++;
             SPAWN(eval_guard, g, states);
         }
     }
@@ -1483,7 +1483,7 @@ learn_guards(vset_t states, long *guard_count) {
     #else
     if (GBgetUseGuards(model)) {
         for (int g = 0; g < nGuards; g++) {
-            (*guard_count)++;
+            if (guard_count != NULL) (*guard_count)++;
             eval_guard(g, states);
         }
     }
