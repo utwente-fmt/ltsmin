@@ -2261,7 +2261,7 @@ reach_chain_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
         if (dlk_detect) vset_copy(deadlocks, new_states);
         for (int i = 0; i < nGrps; i++) {
             if (!bitvector_is_set(reach_groups, i)) continue;
-            if (trc_output != NULL) save_level(new_states);
+            if (trc_output != NULL) save_level(visited);
             vset_copy(new_reduced[i], new_states);
             learn_guards_reduce(new_reduced[i], i, guard_count, guard_maybe, false_states, maybe_states, tmp);
 
