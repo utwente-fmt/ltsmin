@@ -910,22 +910,55 @@ deadlock_check(vset_t deadlocks, bitvector_t *reach_groups)
     if (vset_is_empty(deadlocks))
         return;
 
+    Warning(debug, "Potential deadlocks found");
+
     vset_t next_temp = vset_create(domain, -1, NULL);
     vset_t prev_temp = vset_create(domain, -1, NULL);
+    vset_t new_reduced[nGrps];
 
-    Warning(debug, "Potential deadlocks found");
+    for(int i=0;i<nGrps;i++) {
+        new_reduced[i]=vset_create(domain, -1, NULL);
+    }
+
+    vset_t guard_maybe[nGuards];
+    vset_t tmp = NULL;
+    vset_t false_states = NULL;
+    vset_t maybe_states = NULL;
+    if (!no_soundness_check && GBgetUseGuards(model)) {
+        for(int i=0;i<nGuards;i++) {
+            guard_maybe[i] = vset_create(domain, g_projs[i].len, g_projs[i].proj);
+        }
+        false_states = vset_create(domain, -1, NULL);
+        maybe_states = vset_create(domain, -1, NULL);
+        tmp = vset_create(domain, -1, NULL);
+    }
 
     LACE_ME;
     for (int i = 0; i < nGrps; i++) {
         if (bitvector_is_set(reach_groups, i)) continue;
-        expand_group_next(i, deadlocks);
-        vset_next(next_temp, deadlocks, group_next[i]);
-        vset_prev(prev_temp, next_temp, group_next[i],deadlocks);
+        vset_copy(new_reduced[i], deadlocks);
+        learn_guards_reduce(new_reduced[i], i, NULL, guard_maybe, false_states, maybe_states, tmp);
+        expand_group_next(i, new_reduced[i]);
+        vset_next(next_temp, new_reduced[i], group_next[i]);
+        vset_prev(prev_temp, next_temp, group_next[i],new_reduced[i]);
+        reduce(i, prev_temp);
         vset_minus(deadlocks, prev_temp);
     }
 
     vset_destroy(next_temp);
     vset_destroy(prev_temp);
+
+    for(int i=0;i<nGrps;i++) {
+        vset_destroy(new_reduced[i]);
+    }
+    if(!no_soundness_check && GBgetUseGuards(model)) {
+        for(int i=0;i<nGuards;i++) {
+            vset_destroy(guard_maybe[i]);
+        }
+        vset_destroy(tmp);
+        vset_destroy(false_states);
+        vset_destroy(maybe_states);
+    }
 
     if (vset_is_empty(deadlocks))
         return;
