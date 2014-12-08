@@ -832,6 +832,63 @@ valid_end_cb(void *context, int *src)
     }
 }
 
+static inline void
+learn_guards_reduce(vset_t true_states, int t, long *guard_count, vset_t *guard_maybe, vset_t false_states, vset_t maybe_states, vset_t tmp) {
+
+    LACE_ME;
+    if (GBgetUseGuards(model)) {
+        guard_t* guards = GBgetGuard(model, t);
+        for (int g = 0; g < guards->count && !vset_is_empty(true_states); g++) {
+            if (guard_count != NULL) (*guard_count)++;
+            eval_guard(guards->guard[g], true_states);
+
+            if (!no_soundness_check) {
+
+                // compute guard_maybe (= guard_true \cap guard_false)
+                vset_copy(guard_maybe[guards->guard[g]], guard_true[guards->guard[g]]);
+                vset_intersect(guard_maybe[guards->guard[g]], guard_false[guards->guard[g]]);
+
+                if (!SPEC_MAYBE_AND_FALSE_IS_FALSE) {
+                    // If we have Promela, Java etc. then if we encounter a maybe guard then this is an error.
+                    // Because every guard is evaluated in order.
+                    if (!vset_is_empty(guard_maybe[guards->guard[g]])) {
+                        Warning(info, "Condition in group %d does not evaluate to true or false", t);
+                        HREabort(LTSMIN_EXIT_UNSOUND);
+                    }
+                } else {
+                    // If we have mCRL2 etc., then we need to store all (real) false states and maybe states
+                    // and see if after evaluating all guards there are still maybe states left.
+                    vset_join(tmp, true_states, guard_false[guards->guard[g]]);
+                    vset_union(false_states, tmp);
+                    vset_join(tmp, true_states, guard_maybe[guards->guard[g]]);
+                    vset_minus(false_states,tmp);
+                    vset_union(maybe_states, tmp);
+                }
+                vset_clear(guard_maybe[guards->guard[g]]);
+            }
+            vset_join(true_states, true_states, guard_true[guards->guard[g]]);
+        }
+
+        if (!no_soundness_check && SPEC_MAYBE_AND_FALSE_IS_FALSE) {
+            vset_copy(tmp, maybe_states);
+            vset_minus(tmp, false_states);
+            if (!vset_is_empty(tmp)) {
+                Warning(info, "Condition in group %d does not evaluate to true or false", t);
+                HREabort(LTSMIN_EXIT_UNSOUND);
+            }
+            vset_clear(tmp);
+            vset_clear(maybe_states);
+            vset_clear(false_states);
+        }
+
+        if (!no_soundness_check) {
+            for (int g = 0; g < guards->count; g++) {
+                vset_minus(guard_true[guards->guard[g]], guard_false[guards->guard[g]]);
+            }
+        }
+    }
+}
+
 static void
 deadlock_check(vset_t deadlocks, bitvector_t *reach_groups)
 // checks for deadlocks, generate trace if requested, and unsets dlk_detect
@@ -2112,63 +2169,6 @@ reach_par_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
 }
 
 #endif
-
-static inline void
-learn_guards_reduce(vset_t true_states, int t, long *guard_count, vset_t *guard_maybe, vset_t false_states, vset_t maybe_states, vset_t tmp) {
-
-    LACE_ME;
-    if (GBgetUseGuards(model)) {
-        guard_t* guards = GBgetGuard(model, t);
-        for (int g = 0; g < guards->count && !vset_is_empty(true_states); g++) {
-            (*guard_count)++;
-            eval_guard(guards->guard[g], true_states);
-
-            if (!no_soundness_check) {
-
-                // compute guard_maybe (= guard_true \cap guard_false)
-                vset_copy(guard_maybe[guards->guard[g]], guard_true[guards->guard[g]]);
-                vset_intersect(guard_maybe[guards->guard[g]], guard_false[guards->guard[g]]);
-
-                if (!SPEC_MAYBE_AND_FALSE_IS_FALSE) {
-                    // If we have Promela, Java etc. then if we encounter a maybe guard then this is an error.
-                    // Because every guard is evaluated in order.
-                    if (!vset_is_empty(guard_maybe[guards->guard[g]])) {
-                        Warning(info, "Condition in group %d does not evaluate to true or false", t);
-                        HREabort(LTSMIN_EXIT_UNSOUND);
-                    }
-                } else {
-                    // If we have mCRL2 etc., then we need to store all (real) false states and maybe states
-                    // and see if after evaluating all guards there are still maybe states left.
-                    vset_join(tmp, true_states, guard_false[guards->guard[g]]);
-                    vset_union(false_states, tmp);
-                    vset_join(tmp, true_states, guard_maybe[guards->guard[g]]);
-                    vset_minus(false_states,tmp);
-                    vset_union(maybe_states, tmp);
-                }
-                vset_clear(guard_maybe[guards->guard[g]]);
-            }
-            vset_join(true_states, true_states, guard_true[guards->guard[g]]);
-        }
-
-        if (!no_soundness_check && SPEC_MAYBE_AND_FALSE_IS_FALSE) {
-            vset_copy(tmp, maybe_states);
-            vset_minus(tmp, false_states);
-            if (!vset_is_empty(tmp)) {
-                Warning(info, "Condition in group %d does not evaluate to true or false", t);
-                HREabort(LTSMIN_EXIT_UNSOUND);
-            }
-            vset_clear(tmp);
-            vset_clear(maybe_states);
-            vset_clear(false_states);
-        }
-
-        if (!no_soundness_check) {
-            for (int g = 0; g < guards->count; g++) {
-                vset_minus(guard_true[guards->guard[g]], guard_false[guards->guard[g]]);
-            }
-        }
-    }
-}
 
 static void
 reach_chain_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
