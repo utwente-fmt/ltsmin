@@ -711,15 +711,19 @@ group_add(void *context, transition_info_t *ti, int *dst, int *cpy)
 
                 if (trc_output) {
 
-                    ctx->trace_action = (struct trace_action*) realloc(ctx->trace_action, (sizeof(struct trace_action) + sizeof(int[N])*2) * (ctx->trace_count+1));
+                    size_t vec_bytes = sizeof(int[w_projs[ctx->group].len]);
 
-                    // set the right addresses in the allocated block
-                    ctx->trace_action[ctx->trace_count].dst = (int*) (&ctx->trace_action[ctx->trace_count] + sizeof(struct trace_action));
-                    ctx->trace_action[ctx->trace_count].cpy = (int*) (&ctx->trace_action[ctx->trace_count].dst + sizeof(int[N]));
+                    ctx->trace_action = (struct trace_action*) RTrealloc(ctx->trace_action, sizeof(struct trace_action) * (ctx->trace_count+1));
+                    ctx->trace_action[ctx->trace_count].dst = (int*) RTmalloc(vec_bytes);
+                    if (cpy != NULL) {
+                        ctx->trace_action[ctx->trace_count].cpy = (int*) RTmalloc(vec_bytes);
+                    } else {
+                        ctx->trace_action[ctx->trace_count].cpy = NULL;
+                    }
 
                     // set the required values in order to find the trace after the next-state call
-                    memcpy(ctx->trace_action[ctx->trace_count].dst, dst, w_projs[ctx->group].len);
-                    memcpy(ctx->trace_action[ctx->trace_count].cpy, cpy, w_projs[ctx->group].len);
+                    memcpy(ctx->trace_action[ctx->trace_count].dst, dst, vec_bytes);
+                    if (cpy != NULL) memcpy(ctx->trace_action[ctx->trace_count].cpy, cpy, vec_bytes);
                     ctx->trace_action[ctx->trace_count].action = action;
 
                     ctx->trace_count++;
@@ -752,9 +756,11 @@ explore_cb(vrel_t rel, void *context, int *src)
         for (int i = 0; i < ctx.trace_count; i++) {
             vset_example_match(ctx.set,long_src,r_projs[ctx.group].len, r_projs[ctx.group].proj,src);
             find_action(long_src,ctx.trace_action[i].dst,ctx.trace_action[i].cpy,ctx.group,ctx.trace_action[i].action);
+            RTfree(ctx.trace_action[i].dst);
+            if (ctx.trace_action[i].cpy != NULL) RTfree(ctx.trace_action[i].cpy);
         }
 
-        free(ctx.trace_action);
+        RTfree(ctx.trace_action);
     }
 }
 
