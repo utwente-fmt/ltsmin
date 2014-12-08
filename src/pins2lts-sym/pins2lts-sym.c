@@ -323,6 +323,17 @@ VOID_TASK_2(vset_minus_par, vset_t, dst, vset_t, src) { vset_minus(dst, src); }
 #endif
 
 static inline void
+reduce(int group, vset_t set)
+{
+    if (GBgetUseGuards(model)) {
+        guard_t* guards = GBgetGuard(model, group);
+        for (int g = 0; g < guards->count && !vset_is_empty(set); g++) {
+            vset_join(set, set, guard_true[guards->guard[g]]);
+        }
+    }
+}
+
+static inline void
 grow_levels(int new_levels)
 {
     if (global_level == max_levels) {
@@ -470,6 +481,8 @@ find_trace_to(int trace_end[][N], int end_count, int level, vset_t *levels,
 
             for (int i=0; i < nGrps; i++) {
                 vset_prev(temp, int_levels[int_level - 1], group_next[i], levels[level-1]); // just use last level as universe // TODO FIXME
+                reduce(i, temp);
+
                 vset_union(int_levels[int_level], temp);
                 vset_intersect(temp, levels[prev_level]);
                 if (!vset_is_empty(temp)) break; // found a good ancestor! we can leave now!
@@ -501,6 +514,7 @@ find_trace_to(int trace_end[][N], int end_count, int level, vset_t *levels,
             vset_add(src_set, states[current_state + i]);
 
             for(int j = 0; j < nGrps; j++) {
+                reduce(j, temp);
                 vset_next(temp, src_set, group_next[j]);
                 vset_union(dst_set, temp);
             }
@@ -1407,7 +1421,10 @@ reach_bfs_next(struct reach_s *dummy, bitvector_t *reach_groups, vset_t* maybe)
         dummy->next_count = 1;
 
         // Compute ancestor states
-        if (dummy->ancestors != NULL) vset_prev(dummy->ancestors, dummy->container, group_next[dummy->index], dummy->ancestors);
+        if (dummy->ancestors != NULL) {
+            vset_prev(dummy->ancestors, dummy->container, group_next[dummy->index], dummy->ancestors);
+            reduce(dummy->index, dummy->ancestors);
+        }
 
         // Remove ancestor states from potential deadlock states
         if (dummy->deadlocks != NULL) vset_minus(dummy->deadlocks, dummy->ancestors);
@@ -1879,7 +1896,10 @@ VOID_TASK_3(reach_par_next, struct reach_s *, dummy, bitvector_t *, reach_groups
         dummy->next_count = 1;
 
         // Compute ancestor states
-        if (dummy->ancestors != NULL) vset_prev(dummy->ancestors, dummy->container, group_next[dummy->index], dummy->ancestors);
+        if (dummy->ancestors != NULL) {
+            vset_prev(dummy->ancestors, dummy->container, group_next[dummy->index], dummy->ancestors);
+            reduce(dummy->index, dummy->ancestors);
+        }
 
         // Remove ancestor states from potential deadlock states
         if (dummy->deadlocks != NULL) vset_minus(dummy->deadlocks, dummy->ancestors);
@@ -2220,6 +2240,7 @@ reach_chain_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
                 vset_next(temp, new_reduced[i], group_next[i]);
                 if (dlk_detect) {
                     vset_prev(dlk_temp, temp, group_next[i], deadlocks);
+                    reduce(i, dlk_temp);
                     vset_minus(deadlocks, dlk_temp);
                     vset_clear(dlk_temp);
                 }
@@ -2305,6 +2326,7 @@ reach_chain(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
             vset_union(visited, temp);
             if (dlk_detect) {
                 vset_prev(dlk_temp, temp, group_next[i],deadlocks);
+                reduce(i, dlk_temp);
                 vset_minus(deadlocks, dlk_temp);
                 vset_clear(dlk_temp);
             }
@@ -2377,6 +2399,7 @@ reach_sat_fix(reach_proc_t reach_proc, vset_t visited,
         if (dlk_detect) {
             for (int i = 0; i < nGrps; i++) {
                 vset_prev(dlk_temp, visited, group_next[i],deadlocks);
+                reduce(i, dlk_temp);
                 vset_minus(deadlocks, dlk_temp);
                 vset_clear(dlk_temp);
             }
@@ -2587,6 +2610,7 @@ reach_sat(reach_proc_t reach_proc, vset_t visited,
         vset_copy(deadlocks, visited);
         for (int i = 0; i < nGrps; i++) {
             vset_prev(dlk_temp, visited, group_next[i],deadlocks);
+            reduce(i, dlk_temp);
             vset_minus(deadlocks, dlk_temp);
             vset_clear(dlk_temp);
         }
@@ -3191,6 +3215,7 @@ mu_compute (ltsmin_expr_t mu_expr, vset_t visited)
 
             for(int i=0;i<nGrps;i++){
                 vset_prev(temp,g,group_next[i],visited);
+                reduce(i, temp);
                 vset_union(result,temp);
                 vset_clear(temp);
             }
@@ -3233,6 +3258,7 @@ mu_compute (ltsmin_expr_t mu_expr, vset_t visited)
             // EX !phi
             for(int i=0;i<nGrps;i++){
                 vset_prev(temp,notphi,group_next[i],visited);
+                reduce(i, temp);
                 vset_union(prev,temp);
                 vset_clear(temp);
             }
