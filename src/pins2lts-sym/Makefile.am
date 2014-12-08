@@ -83,7 +83,7 @@ nodist_EXTRA_lps2lts_sym_SOURCES = automake-force-linker.cxx # req. by mcrl2
 mapa2lts_sym_SOURCES   = pins2lts-sym.c
 mapa2lts_sym_LDADD     = ../pins-lib/libmapa-pins.la -lscoop
 mapa2lts_sym_LDADD    += $(PINS_LIBS) $(VSET_LIBS)
-mapa2lts_sym_LDFLAGS   = -Wl,-rpath,$(DESTDIR)$(pkglibdir) -L${top_builddir}/scoop/src $(SYM_LD_FLAGS)
+mapa2lts_sym_LDFLAGS   = -Wl,-rpath,$(DESTDIR)$(pkglibdir) $(SCOOP_LDFLAGS) -L${top_builddir}/scoop/src $(SYM_LD_FLAGS)
 mapa2lts_sym_CPPFLAGS  = -DMAPA $(SYM_CPP_FLAGS)
 nodist_EXTRA_mapa2lts_sym_SOURCES = automake-force-linker.cxx # req. by vset
 
