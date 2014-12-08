@@ -35,7 +35,7 @@ if test x"$acx_mcrl2" = xyes; then
     AC_SUBST(MCRL2_PINS_CPPFLAGS, ["$MCRL2_PINS_CPPFLAGS -I$with_mcrl2/include -I$with_mcrl2/include/dparser"])
     AC_SUBST(MCRL2_PINS_LDFLAGS,  ["-L${with_mcrl2}/lib/mcrl2"])
     AC_SUBST(MCRL2_LIBS, [""])
-    AC_SUBST(MCRL2_LDFLAGS, ["$acx_cv_cc_export_dynamic"])
+    AC_SUBST(MCRL2_LDFLAGS, ["$acx_cv_cc_export_dynamic -Wl,-rpath,${with_mcrl2}/lib/mcrl2"])
 
     mcrl2_pins_header=mcrl2/lps/ltsmin.h
     mcrl2_pins_cache_var=AS_TR_SH([ac_cv_header_$mcrl2_pins_header])
