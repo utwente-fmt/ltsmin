@@ -1072,6 +1072,18 @@ void GBprintPORMatrix(FILE* file, model_t model) {
         Printf (info, "\nNecessary disabling matrix:\n");
         dm_print(file, GBgetGuardNDSInfo(model));
     }
+
+    for (int i = 0; i < GBgetMatrixCount(model); i++) {
+        matrix_t *m = GBgetMatrix(model, i);
+        const char *name = GBgetMatrixName(model, i);
+        //index_class_t k = GBgetMatrixRowInfo(model, i);
+        //index_class_t n = GBgetMatrixColumnInfo(model, i);
+        pins_strictness_t s = GBgetMatrixStrictness(model, i);
+        char *S = (s == PINS_MAY_CLEAR ? "may_clear" :
+                   (s == PINS_MAY_SET ? "may_set" : "strict"));
+        Printf (info, "\n%s : %s (%d X %d):\n", name, S, dm_nrows(m), dm_ncols(m));
+        dm_print(file, m);
+    }
 }
 
 void GBprintStateLabelInfo(FILE* file, model_t model) {
