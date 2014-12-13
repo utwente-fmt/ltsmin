@@ -27,6 +27,7 @@ struct alg_global_s {
     dfs_stack_t         stack;          // Successor stack
     dfs_stack_t         in_stack;       // Input stack
     dfs_stack_t         out_stack;      // Output stack
+    work_counter_t      ecd;            //
 };
 
 struct alg_local_s {
@@ -34,7 +35,6 @@ struct alg_local_s {
     ssize_t             iteration;      // OWCTY: 0=init, uneven=reach, even=elim
     fset_t             *cyan;           // OWCTY: cyan ECD set
     rt_timer_t          timer;
-    work_counter_t      ecd;            //
 };
 
 static int              owcty_do_reset = 0;
@@ -163,7 +163,7 @@ owcty_ecd (wctx_t *ctx, state_info_t *successor)
 {
     alg_local_t        *loc = ctx->local;
     uint32_t acc_level = ecd_get_state (loc->cyan, successor);
-    if (acc_level < loc->ecd.level_cur) {
+    if (acc_level < ctx->global->ecd.level_cur) {
         //ndfs_report_cycle (ctx, successor);
         Abort ("Cycle found!");
     }
@@ -177,8 +177,7 @@ owcty_split (void *arg_src, void *arg_tgt, size_t handoff)
     alg_local_t        *src_loc = source->local;
     alg_global_t       *src_sm = source->global;
     alg_global_t       *tgt_sm = target->global;
-    alg_local_t        *tgt_loc = target->local;
-    HREassert (tgt_loc->ecd.level_cur == 0, "Target accepting level counter is off");
+    HREassert (tgt_sm->ecd.level_cur == 0, "Target accepting level counter is off");
     size_t              in_size = dfs_stack_size (src_sm->stack);
     size_t              todo = min (in_size >> 1, handoff);
     for (size_t i = 0; i < todo; i++) {
@@ -191,8 +190,8 @@ owcty_split (void *arg_src, void *arg_tgt, size_t handoff)
                     Strat_ECD == strategy[1]) {
                 state_info_deserialize (source->state, one);
                 if (GBbuchiIsAccepting(source->model, state_info_state(source->state))) {
-                    HREassert (src_loc->ecd.level_cur != 0, "Source accepting level counter is off");
-                    src_loc->ecd.level_cur--;
+                    HREassert (src_sm->ecd.level_cur != 0, "Source accepting level counter is off");
+                    src_sm->ecd.level_cur--;
                 }
                 ecd_remove_state (src_loc->cyan, source->state);
             }
@@ -282,8 +281,8 @@ owcty_reachability (wctx_t *ctx)
             increase_level (ctx->counters);
             bool accepting = GBbuchiIsAccepting(ctx->model, state_info_state(ctx->state));
             if (strategy[1] == Strat_ECD) {
-                ecd_add_state (loc->cyan, ctx->state, &loc->ecd.level_cur);
-                loc->ecd.level_cur += accepting;
+                ecd_add_state (loc->cyan, ctx->state, &sm->ecd.level_cur);
+                sm->ecd.level_cur += accepting;
             }
             if ( accepting )
                 dfs_stack_push (sm->out_stack, state_data);
@@ -309,8 +308,8 @@ owcty_reachability (wctx_t *ctx)
                 state_data = dfs_stack_top (sm->stack);
                 state_info_deserialize (ctx->state, state_data);
                 if (GBbuchiIsAccepting(ctx->model, state_info_state(ctx->state))) {
-                    HREassert (loc->ecd.level_cur != 0, "Accepting level counter is off");
-                    loc->ecd.level_cur--;
+                    HREassert (sm->ecd.level_cur != 0, "Accepting level counter is off");
+                    sm->ecd.level_cur--;
                 }
                 ecd_remove_state (loc->cyan, ctx->state);
             }
@@ -319,9 +318,9 @@ owcty_reachability (wctx_t *ctx)
     }
 
     if (strategy[1] == Strat_ECD && !run_is_stopped(ctx->run))
-        HREassert (fset_count(loc->cyan) == 0 && loc->ecd.level_cur == 0,
+        HREassert (fset_count(loc->cyan) == 0 && sm->ecd.level_cur == 0,
                    "ECD stack not empty, size: %zu, depth: %zu",
-                   fset_count(loc->cyan), loc->ecd.level_cur);
+                   fset_count(loc->cyan), sm->ecd.level_cur);
 
     size_t size[2] = { visited, dfs_stack_size(sm->out_stack) };
     HREreduce (HREglobal(), 2, &size, &size, SizeT, Sum);
@@ -486,7 +485,7 @@ owcty_reduce  (run_t *run, wctx_t *ctx)
         run->reduced = RTmallocZero (sizeof (alg_reduced_t));
     }
     alg_reduced_t          *reduced = run->reduced;
-    work_counter_t         *ecd = &ctx->local->ecd;
+    work_counter_t         *ecd = &ctx->global->ecd;
 
     work_add_results (&reduced->counters, ecd);
 
