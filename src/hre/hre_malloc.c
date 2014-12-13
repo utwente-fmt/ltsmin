@@ -55,7 +55,7 @@ void* RTmallocZero(size_t size){
 void* RTalign(size_t align, size_t size) {
     if (region)
         return HREalign(region, align, size);
-    void *ret;
+    void *ret = NULL;
     errno = posix_memalign(&ret, align, size);
     if (errno) {
     switch (errno) {

@@ -107,7 +107,8 @@ cct_create_map(bool shared)
     int type = map->shared ? PTHREAD_PROCESS_SHARED : PTHREAD_PROCESS_PRIVATE;
     if (pthread_rwlockattr_setpshared(&lock_attr, type))
         AbortCall("pthread_rwlockattr_setpshared");
-    pthread_rwlock_init(&map->map_lock, &lock_attr);
+    int error = pthread_rwlock_init(&map->map_lock, &lock_attr);
+    HREassert (error == 0);
 
     map->set_allocator = set_ll_init_allocator(shared);
     return map;

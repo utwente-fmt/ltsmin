@@ -38,9 +38,7 @@ typedef struct
     bool compute_strategy;
 } spg_attr_options;
 
-
-typedef void (*spg_attractor_t)(int player, const parity_game* g, recursive_result* result, vset_t u, spg_attr_options* options, int depth);
-
+typedef void (*spg_attractor_t)(const int player, const parity_game* g, recursive_result* result, vset_t u, const spg_attr_options* options, int depth);
 
 typedef struct
 {

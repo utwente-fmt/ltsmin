@@ -37,7 +37,7 @@ struct lb_s {
     size_t             threads;
     size_t             granularity;
     size_t             max_handoff;
-    lb_status_t     **local;
+    lb_status_t      **local;
     size_t  __attribute__ ((aligned(CACHE_LINE_SIZE))) barrier_count;
     size_t  __attribute__ ((aligned(CACHE_LINE_SIZE))) barrier_wait;
     size_t  __attribute__ ((aligned(CACHE_LINE_SIZE))) reduce_count;

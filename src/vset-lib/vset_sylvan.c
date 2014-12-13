@@ -774,6 +774,7 @@ dom_set_function_pointers(vdom_t dom)
     dom->shared.rel_save=rel_save;
     dom->shared.rel_load_proj=rel_load_proj;
     dom->shared.rel_load=rel_load;
+    dom->shared.rel_destroy=rel_destroy;
 }
 
 /**

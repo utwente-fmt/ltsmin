@@ -46,6 +46,7 @@ struct vector_domain_shared {
 	void (*rel_add)(vrel_t rel,const int* src,const int* dst);
     void (*rel_add_cpy)(vrel_t rel,const int* src,const int* dst,const int* cpy);
     void (*rel_update)(vrel_t rel, vset_t set, vrel_update_cb cb, void *context);
+    void (*rel_destroy)(vrel_t rel);
 
 	void (*set_next)(vset_t dst,vset_t src,vrel_t rel);
 	void (*set_prev)(vset_t dst,vset_t src,vrel_t rel,vset_t univ);
