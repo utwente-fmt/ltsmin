@@ -267,7 +267,7 @@ void
 set_ll_install (set_ll_t *set, char *name, int len, int idx)
 {
     size_t              workers = HREpeers (HREglobal());
-    size_t              worker = idx % workers;
+    size_t              worker = HREme (HREglobal());
     size_t              index = idx / workers;
     size_t              offset = set->local[worker].offset;
     isb_allocator_t     balloc = set->local[worker].balloc;
