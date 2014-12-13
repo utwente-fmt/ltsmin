@@ -146,7 +146,7 @@ split_dfs (void *arg_src, void *arg_tgt, size_t handoff)
             one = dfs_stack_pop (source->global->stack);
             dfs_stack_push (target->global->stack, one);
             dfs_stack_enter (target->global->stack);
-            target->counters->level_cur++;
+            target->counters->level_cur++; // Dangerous to touch remote non-global (see allocation in worker.c)
         } else {
             dfs_stack_push (target->global->stack, one);
             dfs_stack_pop (source->global->stack);
