@@ -1767,8 +1767,8 @@ create_beam_context (por_context *ctx)
  */
 
 typedef struct process_s {
-    size_t              first_group;
-    size_t              last_group;
+    int                 first_group;
+    int                 last_group;
     ci_list            *enabled;
 } process_t;
 
@@ -1799,7 +1799,7 @@ ample_one (model_t self, int *src, TransitionCB cb, void *uctx)
     size_t              p = 0;
     process_t          *proc = &ample->procs[p];
     ci_clear (proc->enabled);
-    for (size_t i = 0; i < ctx->enabled_list->count; i++) {
+    for (int i = 0; i < ctx->enabled_list->count; i++) {
         int             group = ctx->enabled_list->data[i];
         if (proc->last_group < group) {
             proc = &ample->procs[++p];
@@ -1859,10 +1859,10 @@ create_ample_ctx (por_context *ctx)
     matrix_t group_deps;
     matrix_t *deps = GBgetDMInfo (ctx->parent);
     dm_create(&group_deps, ctx->ngroups, ctx->ngroups);
-    for (size_t i = 0; i < ctx->ngroups; i++) {
-        for (size_t j = 0; j < ctx->nslots; j++) {
+    for (int i = 0; i < ctx->ngroups; i++) {
+        for (int j = 0; j < ctx->nslots; j++) {
             if (dm_is_set(deps, i, j)) {
-                for (size_t h = 0; h <= i; h++) {
+                for (int h = 0; h <= i; h++) {
                     if (dm_is_set(deps, h, j)) {
                         dm_set (&group_deps, i, h);
                         dm_set (&group_deps, h, i);
@@ -1876,11 +1876,11 @@ create_ample_ctx (por_context *ctx)
     // find processes:
     size_t pbegin = 0;
     ample->num_procs = 0;
-    for (size_t i = pbegin; i <= ctx->ngroups; i++) {
+    for (int i = pbegin; i <= ctx->ngroups; i++) {
         size_t num_set = 0;
         if (i != ctx->ngroups) {
             HREassert (dm_is_set(&group_deps, i, i), "Cannot detect processes for ample set POR in incomplete gorup/slot dependency matrix (diagonal not set in derived group/group relation).");
-            for (size_t j = pbegin; j <= i; j++) {
+            for (int j = pbegin; j <= i; j++) {
                 num_set += dm_is_set(&group_deps, i, j);
             }
         }
@@ -1894,7 +1894,7 @@ create_ample_ctx (por_context *ctx)
 
             // remove dependencies with other groups to avoid confusion in detection
             for (size_t j = pbegin; j <= pend; j++) {
-                for (size_t h = 0; h < ctx->ngroups; h++) {
+                for (int h = 0; h < ctx->ngroups; h++) {
                     dm_unset (&group_deps, j, h);
                     dm_unset (&group_deps, h, j);
                 }
