@@ -431,6 +431,20 @@ void hook_cb (void *context, transition_info_t *ti, int *dst, int *cpy) {
 }
 
 static inline int
+emit_all (por_context *ctx, ci_list *list, proviso_t *provctx, int *src)
+{
+    beam_t             *beam = (beam_t *) ctx->beam_ctx;
+    search_context_t   *s = beam->search[0];
+    int c = 0;
+    int x = s->emit_status[list->data[0]];
+    for (int z = 0; z < list->count; z++) {
+        int i = list->data[z];
+        c += GBgetTransitionsLong (ctx->parent, i, src, hook_cb, provctx);
+    }
+    return c;
+}
+
+static inline int
 emit_new (por_context *ctx, ci_list *list, proviso_t *provctx, int *src)
 {
     beam_t             *beam = (beam_t *) ctx->beam_ctx;
@@ -862,7 +876,7 @@ beam_emit (por_context* ctx, int* src, TransitionCB cb, void* uctx)
     if (s->enabled->count >= ctx->enabled_list->count) {
         // return all enabled
         proviso_t provctx = {cb, uctx, 0, 0, 1};
-        emitted += emit_new (ctx, ctx->enabled_list, &provctx, src);
+        emitted = emit_all (ctx, s->enabled, &provctx, src);
     } else if (!PINS_LTL && !SAFETY) { // deadlocks are easy:
         proviso_t provctx = {cb, uctx, 0, 0, 1};
         emitted = emit_new (ctx, s->enabled, &provctx, src);
