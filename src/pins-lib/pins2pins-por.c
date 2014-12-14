@@ -2219,34 +2219,81 @@ GBaddPOR (model_t model)
             Print1 (info, "No must-enable matrix available for Valmari's weak sets.");
         }
 
+        /**
+         *
+         * WEAK relations
+         *
+         *  Guard-based POR (Journal):
+         *
+         *           j                    j
+         *      s —------>s1         s ------->s1
+         *                 |         |         |
+         *                 | i  ==>  |         | i
+         *                 |         |         |
+         *                 v         v         v
+         *                s1’        s’------>s1'
+         *
+         *  Valmari's weak definition (requires algorithmic changes):
+         *
+         *           j                    j
+         *      s —------>s1         s ------>s1
+         *      |          |         |         |
+         *      |          | i  ==>  |         | i
+         *      |          |         |         |
+         *      v          v         v         v
+         *      s'        s1’        s’------>s1'
+         *
+         *
+         * Combine DNA / Commutes with must_disable and may enable
+         *
+         * (may enable is inverse of NES)
+         *
+         */
+
         matrix_t not_left_accords;
         dm_create(&not_left_accords, ctx->ngroups, ctx->ngroups);
         for (int i = 0; i < ctx->ngroups; i++) {
             for (int j = 0; j < ctx->ngroups; j++) {
                 if (i == j) continue;
 
+                // j may disable i (OK)
                 if (!NO_MDS && guard_of(ctx, i, must_disable, j)) {
                     continue;
                 }
 
                 if (POR_WEAK == WEAK_VALMARI) {
+                    // j must enable i (OK)
                     if (must_enable != NULL && guard_of(ctx, i, must_enable, j)) {
                         continue;
                     }
 
+                    // i and j are never coenabled (OK)
                     if ( !NO_MC && dm_is_set(&ctx->nce, i , j) ) {
-                        continue; // transitions never coenabled!
+                        continue;
                     }
                 } else {
-                    if (guard_of(ctx, i, &ctx->label_nes_matrix, j) || dm_is_set(&nds, j, i)) {
+                    // j may enable i (NOK)
+                    if (guard_of(ctx, i, &ctx->label_nes_matrix, j)) {
                         dm_set( &not_left_accords, i, j );
                         continue;
                     }
                 }
 
                 if (NO_COMMUTES) {
+                    // !DNA (OK)
                     if (!dm_is_set(&ctx->not_accords_with, i, j)) continue;
                 } else {
+                    // i may disable j (NOK)
+                    if (dm_is_set(&nds, j, i)) {
+                        dm_set( &not_left_accords, i, j );
+                        continue;
+                    }
+                    // i may enable j (NOK)
+                    if (guard_of(ctx, j, &ctx->label_nes_matrix, i)) {
+                        dm_set( &not_left_accords, i, j );
+                        continue;
+                    }
+                    // i,j commute (OK)
                     if ( dm_is_set(commutes, i , j) ) continue;
                 }
 
