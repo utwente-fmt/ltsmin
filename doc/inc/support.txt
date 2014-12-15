@@ -1,3 +1,3 @@
 == SUPPORT
 Send questions, bug reports, comments and feature suggestions to the
-mailto:ltsmin-support@cs.utwente.nl[LTSmin Support Team].
+mailto:ltsmin-support@lists.utwente.nl[LTSmin Support Team].
