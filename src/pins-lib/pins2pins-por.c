@@ -1962,6 +1962,18 @@ guard_of (por_context *ctx, int i, matrix_t *m, int j)
     return false;
 }
 
+static inline bool
+all_guards (por_context *ctx, int i, matrix_t *m, int j)
+{
+    for (int g = 0; g < ctx->group2guard[i]->count; g++) {
+        int guard = ctx->group2guard[i]->data[g];
+        if (!dm_is_set (m, guard, j)) {
+            return false;
+        }
+    }
+    return true;
+}
+
 /**
  * Setup the partial order reduction layer.
  * Reads available dependencies, i.e. read/writes dependencies when no
@@ -2271,13 +2283,13 @@ GBaddPOR (model_t model)
                 if (i == j) continue;
 
                 // j may disable i (OK)
-                if (!NO_MDS && guard_of(ctx, i, must_disable, j)) {
+                if (!NO_MDS && all_guards(ctx, i, must_disable, j)) {
                     continue;
                 }
 
                 if (POR_WEAK == WEAK_VALMARI) {
                     // j must enable i (OK)
-                    if (must_enable != NULL && guard_of(ctx, i, must_enable, j)) {
+                    if (must_enable != NULL && all_guards(ctx, i, must_enable, j)) {
                         continue;
                     }
 
