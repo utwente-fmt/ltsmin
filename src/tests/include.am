@@ -4,6 +4,7 @@ PINS_LIBS += ../../pins-lib/libpins.la
 PINS_LIBS += ../../ltsmin-lib/libltsmin.la
 PINS_LIBS += ../../hre-io/libhre-io.la
 PINS_LIBS += ../../lts-io/liblts-io.la
+PINS_LIBS += ../../util-lib/libutil.la
 PINS_LIBS += $(HRE_LIB)
 
 check_PROGRAMS  =
@@ -11,8 +12,5 @@ check_PROGRAMS += test-mpi-hre
 
 # test-hre-mpi
 test_mpi_hre_SOURCES 		= ../test-hre.c
-test_mpi_hre_CPPFLAGS 		= -DTESTMPI $(AM_CPPFLAGS) $(DIST_CPPFLAGS)
-test_mpi_hre_LDADD 		    = $(AM_LDFLAGS)
-test_mpi_hre_LDADD         += ../../hre-io/libhre-io.la
-test_mpi_hre_LDADD  	   += ../../hre-mpi/libhre.la
-test_mpi_hre_LDADD 		   += ../../util-lib/libutil.la
+test_mpi_hre_CPPFLAGS 		= $(DIST_CPPFLAGS)
+test_mpi_hre_LDADD 		    = $(AM_LDFLAGS) $(PINS_LIBS)
