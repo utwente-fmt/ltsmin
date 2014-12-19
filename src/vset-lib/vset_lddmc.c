@@ -514,8 +514,14 @@ set_next(vset_t dst, vset_t src, vrel_t rel)
     entermt(dst);
     LACE_ME;
     assert(dst->size == src->size);
-    lddmc_deref(dst->mdd);
-    dst->mdd = lddmc_ref(lddmc_relprod(src->mdd, rel->mdd, rel->meta));
+    if (dst == src) {
+        MDD old = dst->mdd;
+        dst->mdd = lddmc_ref(lddmc_relprod(src->mdd, rel->mdd, rel->meta));
+        lddmc_deref(old);
+    } else {
+        lddmc_deref(dst->mdd);
+        dst->mdd = lddmc_ref(lddmc_relprod(src->mdd, rel->mdd, rel->meta));
+    }
     leavemt(dst);
 }
 
@@ -526,8 +532,14 @@ set_prev(vset_t dst, vset_t src, vrel_t rel, vset_t universe)
     LACE_ME;
     assert(dst->size == src->size);
     assert(dst->size == universe->size);
-    lddmc_deref(dst->mdd);
-    dst->mdd = lddmc_ref(lddmc_relprev(src->mdd, rel->mdd, rel->meta, universe->mdd));
+    if (dst == src) {
+        MDD old = dst->mdd;
+        dst->mdd = lddmc_ref(lddmc_relprev(src->mdd, rel->mdd, rel->meta, universe->mdd));
+        lddmc_deref(old);
+    } else {
+        lddmc_deref(dst->mdd);
+        dst->mdd = lddmc_ref(lddmc_relprev(src->mdd, rel->mdd, rel->meta, universe->mdd));
+    }
     leavemt(dst);
 }
 
