@@ -2850,6 +2850,37 @@ do_output(char *etf_output, vset_t visited)
     if (tbl_file == NULL)
         AbortCall("could not open %s", etf_output);
 
+    if (vdom_separates_rw(domain)) {
+        /*
+         * This part is necessary because the ETF format does not yet support
+         * read, write and copy. This part should thus be removed when ETF is
+         * extended.
+         */
+        Warning(info, "Note: ETF format does not yet support read, write and copy.");
+        GBsetExpandMatrix(model, GBgetDMInfo(model));
+        GBsetProjectMatrix(model, GBgetDMInfo(model));
+
+        for (int i = 0; i < nGrps; i++) {
+            vset_destroy(group_explored[i]);
+
+            RTfree(r_projs[i].proj);
+            r_projs[i].len   = dm_ones_in_row(GBgetDMInfo(model), i);
+            r_projs[i].proj  = (int*)RTmalloc(r_projs[i].len * sizeof(int));
+            RTfree(w_projs[i].proj);
+            w_projs[i].len   = dm_ones_in_row(GBgetDMInfo(model), i);
+            w_projs[i].proj  = (int*)RTmalloc(w_projs[i].len * sizeof(int));
+
+            for(int j = 0, k = 0; j < dm_ncols(GBgetDMInfo(model)); j++) {
+                if (dm_is_set(GBgetDMInfo(model), i, j)) {
+                    r_projs[i].proj[k] = j;
+                    w_projs[i].proj[k++] = j;
+                }
+            }
+            group_explored[i] = vset_create(domain,r_projs[i].len,r_projs[i].proj);
+            vset_project(group_explored[i], visited);
+        }
+    }
+
     output_init(tbl_file);
     output_trans(tbl_file);
     output_lbls(tbl_file, visited);
@@ -3068,8 +3099,7 @@ init_model(char *file)
 }
 
 static void
-init_domain(vset_implementation_t impl)
-{
+init_domain(vset_implementation_t impl) {
     domain = vdom_create_domain(N, impl);
 
     for (int i = 0; i < dm_ncols(GBgetDMInfo(model)); i++) {

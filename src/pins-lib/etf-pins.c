@@ -41,7 +41,7 @@ typedef struct grey_box_context {
 
 static int etf_short(model_t self,int group,int*src,TransitionCB cb,void*user_context){
     gb_context_t ctx=(gb_context_t)GBgetContext(self);
-    int len=dm_ones_in_row(GBgetDMInfoRead(self), group);
+    int len=dm_ones_in_row(GBgetDMInfo(self), group);
     uint32_t src_no=(uint32_t)SIlookupC(ctx->trans_key_idx[group],(char*)src,len<<2);
     matrix_table_t mt=ctx->trans_table[group];
     if ((src_no)>=MTclusterCount(mt)) return 0;
@@ -49,8 +49,7 @@ static int etf_short(model_t self,int group,int*src,TransitionCB cb,void*user_co
     for(int i=0;i<K;i++){
         uint32_t row[3];
         MTclusterGetRow(mt,src_no,i,row);
-        int len;
-        int *dst=(int*)SIgetC(ctx->trans_key_idx[group],(int)row[1],&len);
+        int *dst=(int*)SIgetC(ctx->trans_key_idx[group],(int)row[1],NULL);
         switch(ctx->edge_labels){
             case 0: {
                 transition_info_t ti = GB_TI(NULL, group);
@@ -149,25 +148,29 @@ ETFloadGreyboxModel(model_t model, const char *name)
         int src[state_length];
         int dst[state_length];
         int lbl[ctx->edge_labels];
-        int r_proj[state_length];
-        int w_proj[state_length];
+        int proj[state_length];
         ETFrelIterate(trans);
         if (!ETFrelNext(trans,src,dst,lbl)){
             Abort("unexpected empty transition section");
         }
-        int r_len=0;
+        int len=0;
         for(int j=0;j<state_length;j++){
             if (src[j]) {
-                r_proj[r_len]=j;
-                Warning(debug,"pi[%d]=%d",r_len,r_proj[r_len]);
-                r_len++;
+                proj[len]=j;
+                Warning(debug,"pi[%d]=%d",len,proj[len]);
+                len++;
                 dm_set(p_dm_info, i, j);
                 used[j]=1;
             } else {
                 used[j]=0;
             }
         }
-        // Pass one: getting the dependency matrices.
+        Warning(infoLong,"length is %d",len);
+        ctx->trans_key_idx[i]=SIcreate();
+        ctx->trans_table[i]=MTcreate(3);
+        int src_short[len];
+        int dst_short[len];
+        uint32_t row[3];
         do {
             /*
              * If an element is non-zero, we always consider it a read. If the
@@ -179,42 +182,22 @@ ETFloadGreyboxModel(model_t model, const char *name)
             for(int k=0;k<state_length;k++) {
                 if (src[k] != 0) {
                     dm_set(p_dm_read_info, i, k);
-                    if (src[k] != dst[k]) {
-                        dm_set(p_dm_write_info, i, k);
-                    }
+                    if (src[k] != dst[k]) dm_set(p_dm_write_info, i, k);
                 }
             }
-        } while(ETFrelNext(trans,src,dst,lbl));
-        int w_len = 0;
-        for(int k=0;k<state_length;k++) {
-            if (dm_is_set(p_dm_write_info, i, k)) {
-                w_proj[w_len] = k;
-                w_len++;
-            }
-        }
-        // Pass two
-        Warning(infoLong, "read length is %d, write length is %d.", r_len, w_len);
-        ctx->trans_key_idx[i]=SIcreate();
-        ctx->trans_table[i]=MTcreate(3);
-        uint32_t row[3];
-        ETFrelIterate(trans);
-        ETFrelNext(trans,src,dst,lbl);
-        do {
-            int src_short[r_len];
-            int dst_short[w_len];
             for(int k=0;k<state_length;k++) {
                 if(used[k]?(src[k]==0):(src[k]!=0)){
                     Abort("inconsistent section in src vector");
                 }
             }
-            for(int k=0;k<r_len;k++) src_short[k]=src[r_proj[k]]-1;
+            for(int k=0;k<len;k++) src_short[k]=src[proj[k]]-1;
             for(int k=0;k<state_length;k++) {
                 if(used[k]?(dst[k]==0):(dst[k]!=0)){
                     Abort("inconsistent section in dst vector");
                 }
             }
-            for(int k=0;k<w_len;k++) dst_short[k]=dst[w_proj[k]]-1;
-            row[0]=(uint32_t)SIputC(ctx->trans_key_idx[i],(char*)src_short,r_len<<2);
+            for(int k=0;k<len;k++) dst_short[k]=dst[proj[k]]-1;
+            row[0]=(uint32_t)SIputC(ctx->trans_key_idx[i],(char*)src_short,len<<2);
             switch(ctx->edge_labels){
             case 0:
                 row[2]=0;
@@ -226,7 +209,7 @@ ETFloadGreyboxModel(model_t model, const char *name)
                 row[2]=(uint32_t)SIputC(ctx->label_idx,(char*)lbl,(ctx->edge_labels)<<2);
                 break;
             }
-            row[1]=(int32_t)SIputC(ctx->trans_key_idx[i],(char*)dst_short,w_len<<2);
+            row[1]=(int32_t)SIputC(ctx->trans_key_idx[i],(char*)dst_short,len<<2);
             MTaddRow(ctx->trans_table[i],row);
         } while(ETFrelNext(trans,src,dst,lbl));
         Warning(infoLong,"table %d has %d states and %d transitions",
@@ -235,9 +218,13 @@ ETFloadGreyboxModel(model_t model, const char *name)
         MTclusterBuild(ctx->trans_table[i],0,SIgetCount(ctx->trans_key_idx[i]));
     }
     GBsetDMInfo(model, p_dm_info);
-    GBsetDMInfoRead(model, p_dm_read_info);
-    GBsetDMInfoMustWrite(model, p_dm_write_info);
-    GBsetSupportsCopy(model); // no may-write so we support copy.
+
+    /*
+     * Set these again when ETF supports read, write and copy.
+       GBsetDMInfoRead(model, p_dm_read_info);
+       GBsetDMInfoMustWrite(model, p_dm_write_info);
+       GBsetSupportsCopy(model); // no may-write so we support copy.
+     */
     GBsetNextStateShort(model,etf_short);
 
     matrix_t *p_sl_info = RTmalloc(sizeof *p_sl_info);
