@@ -2,6 +2,7 @@
 #include <hre/config.h>
 
 #include <assert.h>
+#include <libgen.h>
 #include <string.h>
 
 #include <hre/dir_ops.h>
@@ -252,8 +253,9 @@ static void write_header(lts_file_t file){
 // Identify format
     DSwriteS(ds,"vector 1.0");
 // Comment
-    char*comment="archive I/O";
-    Warning(infoLong,"comment is %s (%s)",comment, basename(lts_file_get_name(file)));
+    char *comment="archive I/O";
+    char *fname = (char *) lts_file_get_name(file);
+    Warning(infoLong,"comment is %s (%s)",comment, basename(fname));
     DSwriteS(ds,comment);
 // the LTS type
     lts_type_serialize(ltstype,fs);
@@ -301,7 +303,7 @@ static void write_header(lts_file_t file){
     long long unsigned int total_edges=0;
     {
         uint32_t count=lts_get_init_count(file);
-        Print(infoLong,"LTS has %u initial state(s) (%s)",count, basename(lts_file_get_name(file)));
+        Print(infoLong,"LTS has %u initial state(s) (%s)",count, basename(fname));
         DSwriteU32(fs,count);
     }
     for(int i=0;i<N;i++){
@@ -318,17 +320,17 @@ static void write_header(lts_file_t file){
             count=lts_get_max_dst_p1(file,i);
             lts_set_state_count(file,i,count);
         }
-        Print(infoLong,"segment %d has %u states (%s)",i,count, basename(lts_file_get_name(file)));
+        Print(infoLong,"segment %d has %u states (%s)",i,count, basename(fname));
         total_states+=count;
         DSwriteU32(fs,count);
     }
     for(int i=0;i<N;i++){
         uint32_t count=(uint32_t)lts_get_edge_count(file,i);
-        Print(infoLong,"segment %d has %u transitions (%s)",i,count, basename(lts_file_get_name(file)));
+        Print(infoLong,"segment %d has %u transitions (%s)",i,count, basename(fname));
         total_edges+=count;
         DSwriteU32(fs,count);
     }
-    Print(infoLong,"accounted for %llu states and %llu transitions (%s)",total_states,total_edges, basename(lts_file_get_name(file)));
+    Print(infoLong,"accounted for %llu states and %llu transitions (%s)",total_states,total_edges, basename(fname));
     N=lts_type_get_type_count(ltstype);
     for(int i=0;i<N;i++){
         switch(lts_type_get_format(ltstype,i)){

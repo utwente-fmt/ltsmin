@@ -17,7 +17,9 @@
  * \brief Computes the attractor set for G, U.
  * The resulting set is stored in U.
  */
-void spg_attractor(int player, const parity_game* g, recursive_result* result, vset_t u, spg_attr_options* options, int depth)
+void
+spg_attractor(const int player, const parity_game* g, recursive_result* result,
+              vset_t u, spg_attr_options* options, int depth)
 {
     int indent = 2 * depth;
     RTstopTimer(options->timer);
@@ -197,7 +199,9 @@ VOID_TASK_2(task_union, vset_t, dst, vset_t, src)
  * \brief Computes the attractor set for G, U. (parallel version)
  * The resulting set is stored in U.
  */
-void spg_attractor_par(int player, const parity_game* g, recursive_result* result, vset_t u, spg_attr_options* options, int depth)
+void
+spg_attractor_par(const int player, const parity_game* g, recursive_result* result,
+                  vset_t u, spg_attr_options* options, int depth)
 {
     int indent = 2*depth;
     RTstopTimer(options->timer);
@@ -370,7 +374,9 @@ VOID_TASK_4(attr_par_step, vset_t, states, vset_t, u, struct reach_par2_s *, dum
  * Parallel version. Does backward and then forward steps together for each transition group.
  * The resulting set is stored in U.
  */
-void spg_attractor_par2(int player, const parity_game* g, recursive_result* result, vset_t u, spg_attr_options* options, int depth)
+void
+spg_attractor_par2(const int player, const parity_game* g, recursive_result* result,
+                   vset_t u, spg_attr_options* options, int depth)
 {
     int indent = 2*depth;
     RTstopTimer(options->timer);
@@ -445,7 +451,9 @@ void spg_attractor_par2(int player, const parity_game* g, recursive_result* resu
  * The resulting set is stored in U.
  * FIXME: review, refactor, rewrite [properly implement chaining/saturation]
  */
-void spg_attractor_chaining(int player, const parity_game* g, recursive_result* result, vset_t u, spg_attr_options* options, int depth)
+void
+spg_attractor_chaining(const int player, const parity_game* g, recursive_result* result,
+                       vset_t u, spg_attr_options* options, int depth)
 {
     int indent = 2*depth;
     RTstopTimer(options->timer);
@@ -554,4 +562,5 @@ void spg_attractor_chaining(int player, const parity_game* g, recursive_result* 
     bn_clear(&u_elem_count);
     bn_clear(&v_level_elem_count);
     bn_clear(&v_group_elem_count);
+    (void) result;
 }

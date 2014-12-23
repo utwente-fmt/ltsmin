@@ -30,9 +30,20 @@ void update_strategy_levels(recursive_result* result, int player, vset_t level);
 /**
  * \brief Combines strategy levels for player.
  */
-void concat_strategy_levels(vdom_t domain, vset_t** dst, int* dst_count, int** dst_boundaries, int* dst_boundary_count,
-                            vset_t** src, int* src_count, int** src_boundaries, int* src_boundary_count);
+void concat_strategy_levels(vdom_t domain, vset_t** dst, int* dst_count,
+                            int** dst_boundaries, int* dst_boundary_count,
+                            vset_t** src, int* src_count, int** src_boundaries,
+                            int* src_boundary_count);
 
+/**
+ * \brief TODO
+ */
+extern void
+concat_strategy_levels_player (int player, vdom_t domain, vset_t** dst,
+                               int* dst_count, int** dst_boundaries,
+                               int* dst_boundary_count, vset_t** src,
+                               int* src_count, int** src_boundaries,
+                               int* src_boundary_count);
 
 /**
  * \brief Destroys vrels in the result and frees dynamically allocated arrays.

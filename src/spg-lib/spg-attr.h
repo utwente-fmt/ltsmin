@@ -14,7 +14,8 @@
 /**
  * \brief Computes attractor set
  */
-void spg_attractor(int player, const parity_game* g, recursive_result* result, vset_t u, spg_attr_options* options, int depth);
+void spg_attractor(const int player, const parity_game* g, recursive_result* result,
+                   vset_t u, spg_attr_options* options, int depth);
 
 
 #ifdef HAVE_SYLVAN
@@ -22,13 +23,15 @@ void spg_attractor(int player, const parity_game* g, recursive_result* result, v
 /**
  * \brief Computes attractor set
  */
-void spg_attractor_par(int player, const parity_game* g, recursive_result* result, vset_t u, spg_attr_options* options, int depth);
+void spg_attractor_par(const int player, const parity_game* g, recursive_result* result,
+                       vset_t u, spg_attr_options* options, int depth);
 
 
 /**
  * \brief Computes attractor set
  */
-void spg_attractor_par2(int player, const parity_game* g, recursive_result* result, vset_t u, spg_attr_options* options, int depth);
+void spg_attractor_par2(const int player, const parity_game* g, recursive_result* result,
+                        vset_t u, spg_attr_options* options, int depth);
 
 #endif
 
@@ -36,7 +39,8 @@ void spg_attractor_par2(int player, const parity_game* g, recursive_result* resu
 /**
  * \brief Computes attractor set
  */
-void spg_attractor_chaining(int player, const parity_game* g, recursive_result* result, vset_t u, spg_attr_options* options, int depth);
+void spg_attractor_chaining(const int player, const parity_game* g, recursive_result* result,
+                            vset_t u, spg_attr_options* options, int depth);
 
 #define SPG_ATTR_REPORT_LEVEL(INDENT,OPT,PLAYER,U,V_LEVEL,LEVEL) {                              \
     if (log_active(infoLong))                                                                   \

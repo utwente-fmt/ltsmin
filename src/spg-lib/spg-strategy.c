@@ -84,8 +84,12 @@ void update_strategy_levels(recursive_result* result, int player, vset_t level)
 /**
  * \brief Combines strategy levels for player.
  */
-void concat_strategy_levels_player(int player, vdom_t domain, vset_t** dst, int* dst_count, int** dst_boundaries, int* dst_boundary_count,
-                            vset_t** src, int* src_count, int** src_boundaries, int* src_boundary_count)
+void
+concat_strategy_levels_player (int player, vdom_t domain, vset_t** dst,
+                               int* dst_count, int** dst_boundaries,
+                               int* dst_boundary_count, vset_t** src,
+                               int* src_count, int** src_boundaries,
+                               int* src_boundary_count)
 {
     //printf("concat_strategy_levels: player=%d, dst_count=%d, src_count=%d, dst_boundary_count=%d, src_boundary_count=%d.\n",
     //       player, dst_count[player], src_count[player], dst_boundary_count[player], src_boundary_count[player]);
@@ -108,8 +112,10 @@ void concat_strategy_levels_player(int player, vdom_t domain, vset_t** dst, int*
 /**
  * \brief Combines strategy levels for both players.
  */
-void concat_strategy_levels(vdom_t domain, vset_t** dst, int* dst_count, int** dst_boundaries, int* dst_boundary_count,
-                            vset_t** src, int* src_count, int** src_boundaries, int* src_boundary_count)
+void
+concat_strategy_levels(vdom_t domain, vset_t** dst, int* dst_count,int** dst_boundaries,
+                       int* dst_boundary_count, vset_t** src, int* src_count,
+                       int** src_boundaries, int* src_boundary_count)
 {
     for (int player=0; player < 2; player++) {
         concat_strategy_levels_player(player, domain, dst, dst_count, dst_boundaries, dst_boundary_count,

@@ -79,9 +79,9 @@ struct poptOption spg_solve_options[]={
     { "pg-write-dot" , 0 , POPT_ARG_NONE , &dot_flag, 0, "Write dot files to disk.","" },
 #endif
     { "write-strategy" , 0 , POPT_ARG_STRING , &strategy_filename, 0, "file to write the computed strategy to","<strategy>.spg" },
-    { "check-strategy" , 0 , POPT_ARG_NONE , &check_strategy_flag, 0, "run random plays to test the strategy" },
-    { "interactive-play" , 0 , POPT_ARG_NONE , &interactive_strategy_play_flag, 0, "play interactively according to the strategy" },
-    { "player" , 0 , POPT_ARG_NONE , &player, 0, "player (default: 0)" },
+    { "check-strategy" , 0 , POPT_ARG_NONE , &check_strategy_flag, 0, "run random plays to test the strategy", NULL },
+    { "interactive-play" , 0 , POPT_ARG_NONE , &interactive_strategy_play_flag, 0, "play interactively according to the strategy", NULL },
+    { "player" , 0 , POPT_ARG_NONE , &player, 0, "player", "(default: 0)" },
     POPT_TABLEEND
 };
 

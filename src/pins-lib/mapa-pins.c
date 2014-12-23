@@ -357,7 +357,7 @@ void common_load_model(model_t model,const char*name,int mapa){
     for(int i=0;i<nSmds;i++){
         char *action=prcrl_get_action(context->spec,i);
         Warning(infoLong,"summand %d is a %s summand",i,action);
-        if (SIlookup(reach_actions,action)>=0 || strcmp(action,"reachConditionAction")==0){
+        if (label_actions(action) || strcmp(action,"reachConditionAction")==0){
             Warning(infoLong,"summand %d is a %s reach marked summand",i,action);
             reach_smds++;
             dm_set(&context->reach_info, 0, i);

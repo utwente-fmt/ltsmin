@@ -47,7 +47,10 @@ This macro wraps a call to add_array in such a way that no warnings are produced
 
 This macro wraps a call to add_array in such a way that no warnings are produced.
 */
-#define ADD_ARRAY_CB(man,array_var,element_type,cb,cbarg) {element_type**ptr=&array_var;add_array(man,(void**)ptr,sizeof(element_type),cb,cbarg);}
+#define ADD_ARRAY_CB(man, array_var, element_type, cb, cbarg) { \
+    element_type **ptr = &array_var; \
+    add_array(man, (void**)ptr, sizeof(element_type), (array_resize_cb)cb, cbarg); \
+}
 
 /**
 \brief Ensure that all managed array are big enough for the given index to be valid.

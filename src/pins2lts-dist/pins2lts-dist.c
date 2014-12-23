@@ -559,11 +559,14 @@ static void get_repr(model_t model,matrix_t* confluent,int *state){
     TreeDBSfree(ctx.dbs);
 }
 
-static void empty_cost_list(void*arg,void*old_array,int old_size,struct cost_meta *new_array,int new_size){
+static void
+empty_cost_list (void*arg,void*old_array,int old_size,struct cost_meta *new_array,int new_size)
+{
     for(int i=old_size;i<new_size;i++){
         new_array[i].head=-1;
         new_array[i].tail=-1;
     }
+    (void) old_array; (void) arg;
 }
 
 int main(int argc, char*argv[]){
