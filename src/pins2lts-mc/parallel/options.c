@@ -6,6 +6,7 @@
 
 #include <stdlib.h>
 
+#include <pins-lib/pins2pins-por.h>
 #include <pins2lts-mc/algorithm/algorithm.h>
 #include <pins2lts-mc/algorithm/dfs-fifo.h>
 #include <pins2lts-mc/algorithm/ltl.h>
@@ -106,7 +107,7 @@ options_static_init      (model_t model, bool timed)
 
     if (proviso == Proviso_ForceNone) {
         proviso = Proviso_None;
-    } else if (proviso != Proviso_None && act_detect == NULL && inv_detect == NULL) {
+    } else if (proviso != Proviso_None && act_detect == NULL && inv_detect == NULL && !NO_L12) {
         Warning (info, "POR layer will ignoring proviso in absence of safety property (--invariant or --action). To enforce the (stronger) proviso, use: --no-L12.");
     }
 

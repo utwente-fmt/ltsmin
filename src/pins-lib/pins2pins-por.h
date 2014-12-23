@@ -81,6 +81,7 @@
  */
 
 extern int POR_WEAK;
+extern int NO_L12;
 
 /**
  * Beam search algorithm for persistent sets

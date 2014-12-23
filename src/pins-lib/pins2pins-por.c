@@ -17,6 +17,7 @@
 #include <util-lib/util.h>
 
 
+int NO_L12 = 0;
 static int NO_COMMUTES = 0;
 static int NO_HEUR = 0;
 static int MAX_BEAM = -1;
@@ -30,7 +31,6 @@ static int NO_MC = 0;
 static int USE_MC = 0;
 static int NO_DYN_VIS = 0;
 static int NO_V = 0;
-static int NO_L12 = 0;
 static int PREFER_NDS = 0;
 static int RANDOM = 0;
 static const char *algorithm = "heur";

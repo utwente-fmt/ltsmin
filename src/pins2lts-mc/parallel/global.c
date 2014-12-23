@@ -107,7 +107,6 @@ global_static_init (model_t model, size_t speed, bool timed)
     init_action_labels (model);
 }
 
-
 static void
 global_static_setup  (model_t model, size_t speed, bool timed)
 {
