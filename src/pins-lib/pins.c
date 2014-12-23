@@ -608,6 +608,13 @@ lts_type_t GBgetLTStype(model_t model){
 void GBsetDMInfo(model_t model, matrix_t *dm_info) {
 	if (model->dm_info != NULL) Abort("dependency matrix already set");
 	model->dm_info=dm_info;
+
+    // Since the "actions_reads" matrix is a subset of the dependencies
+    // of the combined matrix we may also set the "actions_reads" matrix.
+    if (GBgetMatrixID(model, LTSMIN_MATRIX_ACTIONS_READS) == SI_INDEX_FAILED) {
+        GBsetMatrix(model, LTSMIN_MATRIX_ACTIONS_READS, dm_info, PINS_MAY_SET,
+            PINS_INDEX_GROUP, PINS_INDEX_STATE_VECTOR);
+    }
 }
 
 matrix_t *GBgetDMInfo(model_t model) {
