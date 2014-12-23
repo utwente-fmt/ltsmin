@@ -241,7 +241,7 @@ int get_priority(const parity_game* g, const int* s)
 /**
  * Computes the next level from src according to the strategy in result.
  */
-inline void compute_strategy_level(vset_t strategy_level, const int* src, const int player, const recursive_result* strategy) {
+static inline void compute_strategy_level(vset_t strategy_level, const int* src, const int player, const recursive_result* strategy) {
     // Initialise strategy level to the empty set
     vset_clear(strategy_level);
     // Find the right strategy level. For each level that contains src, there is either a transition
