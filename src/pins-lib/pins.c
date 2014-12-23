@@ -960,6 +960,7 @@ void GBcopyChunkMaps(model_t dst, model_t src)
  * copying, bad things are likely to happen when dst is used.
  */
 {
+
     dst->newmap_context = src->newmap_context;
     dst->newmap = src->newmap;
     dst->int2chunk = src->int2chunk;
@@ -969,8 +970,10 @@ void GBcopyChunkMaps(model_t dst, model_t src)
 
     int N    = lts_type_get_type_count(GBgetLTStype(src));
     dst->map = RTmallocZero(N*sizeof(void*));
-    for(int i = 0; i < N; i++)
+    for(int i = 0; i < N; i++) {
+        HREassert(src->map != NULL, "Map not correctly initialized, make sure to call GBsetLTStype, before using chunk mapping.");
         dst->map[i] = src->map[i];
+    }
 }
 
 void GBgrowChunkMaps(model_t model, int old_n)
@@ -979,6 +982,7 @@ void GBgrowChunkMaps(model_t model, int old_n)
     int N=lts_type_get_type_count(GBgetLTStype(model));
     model->map=RTmallocZero(N*sizeof(void*));
     for(int i=0;i<N;i++){
+        HREassert(old_map != NULL, "Map not correctly initialized, make sure to call GBsetLTStype, before using chunk mapping.");
         if (i < old_n) {
             model->map[i] = old_map[i];
         } else {
@@ -989,14 +993,17 @@ void GBgrowChunkMaps(model_t model, int old_n)
 }
 
 void GBchunkPutAt(model_t model,int type_no,const chunk c,int pos){
+    HREassert(model->map != NULL, "Map not correctly initialized, make sure to call GBsetLTStype, before using chunk mapping.");
     model->chunkatint(model->map[type_no],c.data,c.len,pos);
 }
 
 int GBchunkPut(model_t model,int type_no,const chunk c){
+    HREassert(model->map != NULL, "Map not correctly initialized, make sure to call GBsetLTStype, before using chunk mapping.");
 	return model->chunk2int(model->map[type_no],c.data,c.len);
 }
 
 chunk GBchunkGet(model_t model,int type_no,int chunk_no){
+    HREassert(model->map != NULL, "Map not correctly initialized, make sure to call GBsetLTStype, before using chunk mapping.");
 	chunk_len len;
 	int tmp;
 	char* data=(char*)model->int2chunk(model->map[type_no],chunk_no,&tmp);
@@ -1021,6 +1028,7 @@ void GBsetPrettyPrint(model_t model,chunk2pretty_t chunk2pretty){
 }
 
 int GBchunkCount(model_t model,int type_no){
+    HREassert(model->map != NULL, "Map not correctly initialized, make sure to call GBsetLTStype, before using chunk mapping.");
 	return model->get_count(model->map[type_no]);
 }
 
@@ -1393,6 +1401,7 @@ GBgetUseGuards(model_t model) {
 void*
 GBgetChunkMap(model_t model,int type_no)
 {
+    HREassert(model->map != NULL, "Map not correctly initialized, make sure to call GBsetLTStype, before using chunk mapping.");
 	return model->map[type_no];
 }
 
