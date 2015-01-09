@@ -13,13 +13,21 @@ set LTSMIN_SRCDIR "[makeAbsolute $srcdir]/.."
 # The directory containing all the models used for testing.
 set EXAMPLES_PATH "$LTSMIN_SRCDIR/examples"
 
-# filter: filter a specific (list of) backend(s): {mc,sym,seq}
+# filter: filter a specific (list of) backend(s): {mc,sym,seq,dist}
 proc find_alg_backends { filter } {
     global base_dir
     set backends [list]
     set lts_backends [glob -directory "$base_dir/../src" -type d pins2lts-$filter ]
     foreach dir $lts_backends {
         set lts_bins [glob -nocomplain -directory $dir -type f *2lts-$filter ]
+        foreach path $lts_bins {
+            lappend backends $path
+        }
+        set lts_bins [glob -nocomplain -directory $dir/gcc -type f *2lts-$filter ]
+        foreach path $lts_bins {
+            lappend backends $path
+        }
+        set lts_bins [glob -nocomplain -directory $dir/mpicc -type f *2lts-$filter ]
         foreach path $lts_bins {
             lappend backends $path
         }
