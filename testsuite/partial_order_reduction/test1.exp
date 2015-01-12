@@ -65,7 +65,7 @@ dict set commands test16_mc exp "violations: 3"
 # LTL TESTS
 
 # TEST 18:
-dict set commands test18_mc cmd "$binpaths(dve2lts-mc) --por --strategy=ndfs \
+dict set commands test18_mc cmd "$binpaths(dve2lts-mc) --por --proviso=cndfs --strategy=cndfs \
 	-s22 $EXAMPLES_PATH/iprotocol.2.dve --ltl=$EXAMPLES_PATH/iprotocol.2.ltl"
 dict set commands test18_mc exp "Accepting cycle FOUND"
 
@@ -82,8 +82,8 @@ dict set commands test18_color exp "accepting cycle found"
 
 # TEST 19:
 
-dict set commands test19_mc cmd [subst "$binpaths(dve2lts-mc) --strategy=ndfs \
-	--por \
+dict set commands test19_mc cmd [subst "$binpaths(dve2lts-mc) --strategy=cndfs \
+	--por --proviso=cndfs \
 	-s22 $EXAMPLES_PATH/elevator.3.dve --ltl=$EXAMPLES_PATH/elevator.3.ltl"]
 dict set commands test19_mc exp "461430 states"
 
