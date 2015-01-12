@@ -103,6 +103,18 @@ proc runmytest { test_name command_line exp_output} {
             catch { exp_close }
             return
         }
+        
+        "BCG support was not enabled at compile time." {
+            xfail "BCG support was not enabled at compile time."
+            catch { exp_close }
+            return
+        }
+        
+        "cannot write state labels to AUT file" {
+            xfail "cannot write state labels to AUT file"
+            catch { exp_close }
+            return
+        }
 
         # Check for any warning messages in the output first
         Warning {
