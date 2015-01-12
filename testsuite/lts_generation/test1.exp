@@ -29,11 +29,11 @@ dict set commands test8_check exp "2689 states 3567 transitions"
 
 # TEST 9:
 
-dict set commands test9_seq cmd "$binpaths(lps2lts-seq) --strategy=bfs $EXAMPLES_PATH/ieee-11073.lps model.gcf"
+dict set commands test9_seq cmd "$binpaths(lps2lts-seq) --strategy=bfs $EXAMPLES_PATH/ieee-11073.lps model.gcf --mcrl2=-rjitty"
 dict set commands test9_seq exp ""
 #"1760 states 6583 transitions"
 
-dict set commands test9_dist cmd "$binpaths(lps2lts-dist) $EXAMPLES_PATH/ieee-11073.lps model.gcf"
+dict set commands test9_dist cmd "$binpaths(lps2lts-dist) $EXAMPLES_PATH/ieee-11073.lps model.gcf --mcrl2=-rjitty"
 dict set commands test9_dist exp ""
 #"1760 states 6583 transitions"
 
@@ -55,23 +55,23 @@ dict set commands test10_sym exp "deadlock found"
 
 # TEST 11:
 # gcf is already tested and created in test 9.
-#dict set commands test11_gcf cmd "$binpaths(lps2lts-seq) $EXAMPLES_PATH/ieee-11073.lps model.gcf"
+#dict set commands test11_gcf cmd "$binpaths(lps2lts-seq) $EXAMPLES_PATH/ieee-11073.lps model.gcf --mcrl2=-rjitty"
 #dict set commands test11_gcf exp ""
 
-dict set commands test11_bcg cmd "$binpaths(lps2lts-seq) --strategy=bfs $EXAMPLES_PATH/ieee-11073.lps model.bcg"
+dict set commands test11_bcg cmd "$binpaths(lps2lts-seq) --strategy=bfs $EXAMPLES_PATH/ieee-11073.lps model.bcg --mcrl2=-rjitty"
 dict set commands test11_bcg exp ""
 #"1760 states 6583 transitions"
 
-dict set commands test11_aut cmd "$binpaths(lps2lts-seq) --strategy=bfs $EXAMPLES_PATH/ieee-11073.lps model.aut"
+dict set commands test11_aut cmd "$binpaths(lps2lts-seq) --strategy=bfs $EXAMPLES_PATH/ieee-11073.lps model.aut --mcrl2=-rjitty"
 dict set commands test11_aut exp ""
 #"1760 states 6583 transitions"
 
-dict set commands test11_dir cmd "$binpaths(lps2lts-seq) --strategy=bfs $EXAMPLES_PATH/ieee-11073.lps model.dir"
+dict set commands test11_dir cmd "$binpaths(lps2lts-seq) --strategy=bfs $EXAMPLES_PATH/ieee-11073.lps model.dir --mcrl2=-rjitty"
 dict set commands test11_dir exp ""
 #"1760 states 6583 transitions"
 
 # can only be written a posteriori
-dict set commands test11_fsm cmd "$binpaths(lps2lts-sym) $EXAMPLES_PATH/ieee-11073.lps model.fsm"
+dict set commands test11_fsm cmd "$binpaths(lps2lts-sym) $EXAMPLES_PATH/ieee-11073.lps model.fsm --mcrl2=-rjitty"
 dict set commands test11_fsm exp ""
 #"1760 states 6583 transitions"
 
@@ -80,7 +80,6 @@ dict set commands test11_fsm exp ""
 #TODO: selecting an appropriate comparing method, now just using "-b" because that one does not crash
 dict set commands test11_check1 cmd "$binpaths(ltsmin-compare) -b model.gcf model.bcg"
 dict set commands test11_check1 exp "LTSs are equivalent"
-#dict set commands test11_check1 exp "BCG support was not enabled at compile time"
 
 dict set commands test11_check2 cmd "$binpaths(ltsmin-compare) -b model.gcf model.aut"
 dict set commands test11_check2 exp "LTSs are equivalent"
@@ -98,10 +97,10 @@ dict set commands test11_check5 exp "LTSs are equivalent"
 
 # TEST 12:
 
-dict set commands test12_gcf cmd "$binpaths(lps2lts-dist) $EXAMPLES_PATH/ieee-11073.lps model_dist.gcf"
+dict set commands test12_gcf cmd "$binpaths(lps2lts-dist) $EXAMPLES_PATH/ieee-11073.lps model_dist.gcf --mcrl2=-rjitty"
 dict set commands test12_gcf exp ""
 
-dict set commands test12_dir cmd "$binpaths(lps2lts-dist) $EXAMPLES_PATH/ieee-11073.lps model_dist.dir"
+dict set commands test12_dir cmd "$binpaths(lps2lts-dist) $EXAMPLES_PATH/ieee-11073.lps model_dist.dir --mcrl2=-rjitty"
 dict set commands test12_dir exp ""
 
 # NOTE: The working of the following code has never been tested since no correct output was available
