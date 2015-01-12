@@ -28,12 +28,12 @@ dict set langs lps options dist "--mcrl2=-rjitty"
 dict set langs lps options seq "--mcrl2=-rjitty"
 dict set langs lps options sym "--mcrl2=-rjitty"
 
-dict set langs lps exp_output "1760 states 6583 transitions"
+dict set langs lps exp_output "831 states 2893 transitions"
 set alg_be [ find_alg_backends "{dist,mc,seq}" ]
 run_test_for_alg_backends $alg_be $langs $backends
 
 # different output for symbolic tool:
-dict set langs lps exp_output "state space has 1760"
+dict set langs lps exp_output "state space has 831"
 set alg_be [ find_alg_backends "{sym}" ]
 run_test_for_alg_backends $alg_be $langs $backends
 
