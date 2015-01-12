@@ -97,6 +97,12 @@ proc runmytest { test_name command_line exp_output} {
 	    catch { exp_close }
 	    return
         }
+        
+        "SCC search only works in combination with an accepting state label" {
+            xfail "SCC search only works in combination with an accepting state label";
+            catch { exp_close }
+            return
+        }
 
         # Check for any warning messages in the output first
         Warning {
