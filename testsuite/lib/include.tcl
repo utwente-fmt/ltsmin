@@ -115,6 +115,18 @@ proc runmytest { test_name command_line exp_output} {
             catch { exp_close }
             return
         }
+        
+        "Vector set implementation does not support vset_join operation." {
+            xfail "Vector set implementation does not support vset_join operation."
+            catch { exp_close }
+            return
+        }
+        
+        "guard-splitting not supported with saturation=" {
+            xfail "guard-splitting not supported with saturation="
+            catch { exp_close }
+            return
+        }
 
         # Check for any warning messages in the output first
         Warning {

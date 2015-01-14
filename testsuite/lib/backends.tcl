@@ -15,7 +15,7 @@ dict set backends sym params "--order=" {bfs-prev bfs chain-prev chain par par-p
 dict set backends sym params "--saturation=" {none sat-like sat-loop sat-fix sat}
 # internal and BuDDy
 dict set backends sym params "--vset=" {ldd fdd ldd64 sylvan lddmc}
-dict set backends sym options {""}
+dict set backends sym options {"-g" "-rga" "-g -rga" ""}
 
 # 1 row for every param and a list of possible values
 dict set backends seq params "--strategy=" {dfs bfs scc}
