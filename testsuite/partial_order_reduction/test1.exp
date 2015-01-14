@@ -87,14 +87,15 @@ dict set commands test19_mc cmd [subst "$binpaths(dve2lts-mc) --strategy=cndfs \
 	-s22 $EXAMPLES_PATH/elevator.3.dve --ltl=$EXAMPLES_PATH/elevator.3.ltl"]
 dict set commands test19_mc exp "461430 states"
 
-dict set commands test19_seq cmd "$binpaths(dve2lts-seq) --strategy=scc --por \
-	$EXAMPLES_PATH/elevator.3.dve --ltl=$EXAMPLES_PATH/elevator.3.ltl"
-dict set commands test19_seq exp "461430 states"
+dict set commands test19_seq cmd "$binpaths(dve2lts-seq) --strategy=scc \
+	$EXAMPLES_PATH/elevator.3.dve --ltl=$EXAMPLES_PATH/elevator.3.ltl \
+	--por"
+dict set commands test19_seq exp "469532 states"
 
 dict set commands test19_color cmd "$binpaths(dve2lts-seq) --strategy=scc --por \
 	--proviso=color \
 	$EXAMPLES_PATH/elevator.3.dve --ltl=$EXAMPLES_PATH/elevator.3.ltl"
-dict set commands test19_color exp "459751 states"
+dict set commands test19_color exp "469305 states"
 
 foreach testcase [dict keys $commands] {
     set command [dict get $commands $testcase cmd]
