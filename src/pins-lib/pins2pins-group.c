@@ -285,7 +285,7 @@ eq_guards(guard_t** guards, int i, int j, matrix_t *m) {
     int old_i = m->row_perm.data[i].becomes;
     int old_j = m->row_perm.data[j].becomes;
 
-    if (guards[i]->count != guards[j]->count) return 0;
+    if (guards[old_i]->count != guards[old_j]->count) return 0;
 
     for (int g = 0; g < guards[old_i]->count; g++) {
         if (guards[old_i]->guard[g] != guards[old_j]->guard[g]) return 0;
