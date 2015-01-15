@@ -87,15 +87,15 @@ proc runmytest { test_name command_line exp_output} {
         }
 	    
         "unimplemented combination --strategy=bfs, --state=table" {
-	    xfail "unimplemented combination --strategy=bfs, --state=table";
-	    catch { exp_close }
-	    return
-	}
+    	    xfail "unimplemented combination --strategy=bfs, --state=table";
+    	    catch { exp_close }
+    	    return
+	    }
 
         "Decision diagram package does not support least fixpoint" {
-	    xfail "Decision diagram package does not support least fixpoint";
-	    catch { exp_close }
-	    return
+    	    xfail "Decision diagram package does not support least fixpoint";
+    	    catch { exp_close }
+    	    return
         }
         
         "SCC search only works in combination with an accepting state label" {
