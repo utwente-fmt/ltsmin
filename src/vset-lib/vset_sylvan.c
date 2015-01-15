@@ -200,7 +200,7 @@ check_state(const int *e, unsigned int N)
         if (e[i] != 0) {
             register int X = 32 - __builtin_clz(e[i]);
             if (X > optimal_bits_per_state) optimal_bits_per_state = X;
-            if (X > fddbits) Abort("%d bits are not enough for the state vector (try %d)!", fddbits, X);
+            if (X > fddbits) Abort("%d bits are not enough for the state vector (try option --sylvan-bits=%d)!", fddbits, X);
         }
     }
 }
