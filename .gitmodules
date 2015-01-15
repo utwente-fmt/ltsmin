@@ -1,6 +1,6 @@
 [submodule "buddy"]
 	path = buddy
-	url = http://fmt.cs.utwente.nl/tools/scm/buddy.git
+	url = git@github.com:utwente-fmt/buddy.git
 [submodule "spins"]
 	path = spins
 	url = https://github.com/utwente-fmt/spins.git
