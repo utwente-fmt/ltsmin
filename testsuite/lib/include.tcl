@@ -127,7 +127,13 @@ proc runmytest { test_name command_line exp_output} {
             catch { exp_close }
             return
         }
-
+        
+        "No long next-state function implemented for this language module (--pins-guards)." {
+            xfail "No long next-state function implemented for this language module (--pins-guards)."
+            catch { exp_close }
+            return
+        }
+        
         # Check for any warning messages in the output first
         Warning {
             fail "$test_name: warning: $expect_out(buffer)"
