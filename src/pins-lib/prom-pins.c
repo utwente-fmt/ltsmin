@@ -262,10 +262,9 @@ sl_group (model_t model, sl_group_enum_t group, int*src, int *label)
 }
 
 void
-sl_all (model_t model, sl_group_enum_t group, int*src, int *label)
+sl_all (model_t model, int*src, int *label)
 {
     prom_get_labels_many (model, src, label, false);
-    (void) group; // Both groups overlap, and start at index 0!
 }
 
 /**
