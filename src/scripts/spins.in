@@ -2,7 +2,7 @@
 # Simple bash shell script to launch SpinS using the LTSmin backend
 
 
-COMMAND="$(readlink -f `dirname "$0"`)"
+COMMAND=`perl -e 'use Cwd "abs_path";print abs_path(shift)' $0`
 
 # the following variables are initialised by "configure"
 LTSMIN_VERSION="@VERSION@"
