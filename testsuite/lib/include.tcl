@@ -134,6 +134,12 @@ proc runmytest { test_name command_line exp_output} {
             return
         }
         
+        "Cannot apply branching bisimulation to an LTS with state labels." {
+            xfail "Cannot apply branching bisimulation to an LTS with state labels."
+            catch { exp_close }
+            return
+        }
+        
         # Check for any warning messages in the output first
         Warning {
             fail "$test_name: warning: $expect_out(buffer)"
