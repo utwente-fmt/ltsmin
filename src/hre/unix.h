@@ -65,5 +65,78 @@ extern void qsortr(void *base, size_t num, size_t width,
                    int (*comp)(const void *, const void *,void *ExtraArgs),
                    void *ExtraArgs);
 
+
+/**
+ * Spin lock implementation (for incomplete pthread libraries as on OSX)
+ */
+
+#if defined(__APPLE__)
+#ifndef PTHREAD_SPIN_LOCK_SHIM
+#define PTHREAD_SPIN_LOCK_SHIM
+
+
+#include <mc-lib/atomics.h>
+
+
+typedef int pthread_spinlock_t;
+
+#ifndef PTHREAD_PROCESS_SHARED
+# define PTHREAD_PROCESS_SHARED 1
+#endif
+#ifndef PTHREAD_PROCESS_PRIVATE
+# define PTHREAD_PROCESS_PRIVATE 2
+#endif
+
+static inline int
+pthread_spin_init(pthread_spinlock_t *lock, int pshared)
+{
+    compile_barrier ();
+    *lock = 0;
+    return 0;
+}
+
+static inline int
+pthread_spin_destroy (pthread_spinlock_t *lock)
+{
+    return 0;
+}
+
+static inline int
+pthread_spin_lock (pthread_spinlock_t *lock)
+{
+    while (1) {
+        int i;
+        for (i=0; i < 10000; i++) {
+            if (atomic_read(lock) == 0) {
+                if (cas(lock, 0, 1)) {
+                    return 0;
+                }
+            }
+        }
+
+        mfence ();
+    }
+}
+
+static inline int
+pthread_spin_trylock (pthread_spinlock_t *lock)
+{
+    if (cas(lock, 0, 1)) {
+        return 0;
+    }
+    return EBUSY;
+}
+
+static inline int
+pthread_spin_unlock (pthread_spinlock_t *lock)
+{
+    compile_barrier ();
+    *lock = 0;
+    return 0;
+}
+
+#endif
+#endif
+
 #endif
 

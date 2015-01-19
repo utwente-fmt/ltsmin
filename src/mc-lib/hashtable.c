@@ -224,7 +224,8 @@ static hti_t *hti_alloc (hashtable_t *parent, size_t scale) {
     hti->ref_count = 1; // one for the parent
     HREassert(hti->scale >= MIN_SCALE && hti->scale < 63); // size must be a power of 2
     HREassert(sizeof(entry_t) * ENTRIES_PER_BUCKET % CACHE_LINE_SIZE == 0); // divisible into cache
-    HREassert((size_t)hti->table % CACHE_LINE_SIZE == 0); // cache aligned
+    HREassert((((size_t)hti->table) % CACHE_LINE_SIZE) == 0,
+              "Table %p not aligned at %d", hti->table, CACHE_LINE_SIZE); // cache aligned
 
     return hti;
 }

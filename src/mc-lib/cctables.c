@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #include <hre/user.h>
+#include <mc-lib/atomics.h>
 #include <mc-lib/cctables.h>
 #include <mc-lib/set-ll.h>
 #include <util-lib/chunk_support.h>
@@ -48,7 +49,7 @@ use malloc
 typedef struct table_s table_t;
 
 struct cct_map_s {
-    pthread_rwlock_t        map_lock;
+    ticket_rwlock_t         rw_lock;
     bool                    shared;   // shared or private allocation
     table_t                *table;
     set_ll_allocator_t     *set_allocator;
@@ -102,13 +103,8 @@ cct_create_map(bool shared)
 
     for (size_t i = 0; i < MAX_TABLES; i++)
         map->table[i].string_set = NULL;
-    pthread_rwlockattr_t    lock_attr;
-    pthread_rwlockattr_init(&lock_attr);
-    int type = map->shared ? PTHREAD_PROCESS_SHARED : PTHREAD_PROCESS_PRIVATE;
-    if (pthread_rwlockattr_setpshared(&lock_attr, type))
-        AbortCall("pthread_rwlockattr_setpshared");
-    int error = pthread_rwlock_init(&map->map_lock, &lock_attr);
-    HREassert (error == 0);
+
+    rwticket_init (&map->rw_lock);
 
     map->set_allocator = set_ll_init_allocator(shared);
     return map;
@@ -135,9 +131,9 @@ static void
 put_at_chunk(value_table_t vt,chunk item,value_index_t pos)
 {
     table_t            *table = *((table_t **)vt);
-    pthread_rwlock_wrlock(&table->map->map_lock);
+    rwticket_wrlock (&table->map->rw_lock);
     set_ll_install(table->string_set, item.data, item.len, pos);
-    pthread_rwlock_unlock(&table->map->map_lock);
+    rwticket_wrunlock (&table->map->rw_lock);
 }
 
 static chunk
@@ -161,18 +157,18 @@ new_map(void* context)
 {
     cct_cont_t *cont = context;
     cct_map_t *map = cont->map;
-    pthread_rwlock_rdlock(&map->map_lock);
+    rwticket_rdlock (&map->rw_lock);
     if (cont->map_index >= MAX_TABLES)
         Abort("Chunk table limit reached: %zu.", MAX_TABLES);
     table_t *table = &map->table[cont->map_index++];
-    pthread_rwlock_unlock(&map->map_lock);
+    rwticket_rdunlock (&map->rw_lock);
     if (!table->string_set) {
-        pthread_rwlock_wrlock(&map->map_lock);
+        rwticket_wrlock (&map->rw_lock);
         if (!table->string_set) {
             table->string_set = set_ll_create(map->set_allocator);
             table->map = map;
         }
-        pthread_rwlock_unlock(&map->map_lock);
+        rwticket_wrunlock (&map->rw_lock);
     }
     return table;
 }
@@ -180,13 +176,13 @@ new_map(void* context)
 value_table_t
 cct_create_vt(cct_cont_t *ctx)
 {
-    cct_cont_t         *map = ctx;
+    cct_cont_t         *cont = ctx;
     value_table_t vt = VTcreateBase("CCT map", sizeof(table_t *));
     VTdestroySet(vt,NULL);
     VTputChunkSet(vt,put_chunk);
     VTputAtChunkSet(vt,put_at_chunk);
     VTgetChunkSet(vt,get_chunk);
     VTgetCountSet(vt,get_count);
-    *((void **)vt) = new_map(map);
+    *((void **)vt) = new_map(cont);
     return vt;
 }
