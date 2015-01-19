@@ -9,7 +9,7 @@ LTSMIN_VERSION="@VERSION@"
 LTSMIN_PREFIX="@prefix@"
 LTSMIN_LIB="@pkglibdir@"
 LTSMIN_SRCDIR="@top_srcdir@"
-LTSMIN_SRCDIR="$COMMAND/$LTSMIN_SRCDIR"
+LTSMIN_SRCDIR="`dirname $COMMAND`/$LTSMIN_SRCDIR"
 
 spins_dir="$LTSMIN_PREFIX/share/ltsmin"
 spins_dir2="$LTSMIN_SRCDIR/spins"
@@ -54,7 +54,12 @@ if [ -e /proc/meminfo ]; then
     totalMemKB=`awk '/MemTotal:/ { print $2 }' /proc/meminfo`
     totalMemMB=$(( $totalMemKB/1024 ))
 else
-    totalMemMB=`top -l 1 | grep PhysMem: | sed "s/PhysMem:[ ]*\([0-9]*\)M.*/\1/g"`
+    totalMem=`top -l 1 | grep PhysMem:`
+    totalMemMB=`echo "$totalMem" | sed "s/PhysMem:[ ]*\([0-9]*\)M.*/\1/g"`
+    if [ "$totalMem" = "$totalMemMB" ]; then
+        totalMemGB=`echo "$totalMem" | sed "s/PhysMem:[ ]*\([0-9]*\)G.*/\1/g"`
+        totalMemMB=$(( $totalMemGB*1024 ))
+    fi
 fi
 heapMB=$(( $totalMemMB*100/75 ))
 commitedMB=$(( $heapMB/2 ))
