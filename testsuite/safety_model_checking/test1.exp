@@ -38,8 +38,8 @@ dict set commands test14_seq exp ""
 dict set commands test14_mc cmd "$binpaths(prom2lts-mc) p312.pml.spins --action=assert --trace=t14_mc.gcf"
 dict set commands test14_mc exp ""
 
-dict set commands test14_sym cmd "$binpaths(prom2lts-sym) p312.pml.spins --action=assert --trace=t14_sym.gcf"
-dict set commands test14_sym exp ""
+dict set commands test14_sym cmd "$binpaths(prom2lts-sym) p312.pml.spins --action=assert --trace=t14_sym-"
+dict set commands test14_sym exp "found action: assert"
 
 # TEST 15:
 
