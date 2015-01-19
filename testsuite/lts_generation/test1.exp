@@ -81,8 +81,9 @@ dict set commands test11_fsm exp ""
 dict set commands test11_check1 cmd "$binpaths(ltsmin-compare) -b model.gcf model.bcg"
 dict set commands test11_check1 exp "LTSs are equivalent"
 
-dict set commands test11_check2 cmd "$binpaths(ltsmin-compare) -b model.gcf model.aut"
-dict set commands test11_check2 exp "LTSs are equivalent"
+# dict set commands test11_check2 cmd "$binpaths(ltsmin-compare) -b model.gcf model.aut"
+# dict set commands test11_check2 exp "LTSs are equivalent"
+# AUT file does not support state labels
 
 #dict set commands test11_check3 cmd "$binpaths(ltsmin-compare) -b model.gcf model.fsm"
 #dict set commands test11_check3 exp "LTSs are equivalent"
