@@ -49,7 +49,7 @@ endif
 
 if HAVE_LIBMCRL
 # Test disabled due to bug in mcrl path parsing
-#DEJATOOL +=	alg_backends_lpo
+DEJATOOL +=	alg_backends_lpo
 endif
 
 endif
