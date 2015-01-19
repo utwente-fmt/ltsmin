@@ -7,7 +7,7 @@ cd $binpaths(out)
 
 
 puts "\n----------------------------------------------"
-puts   "TESTING: LTS generation: state spaces, traces and ETFs"
+puts   "TESTING: safety model checking"
 puts   "----------------------------------------------\n"
 
 
