@@ -405,7 +405,7 @@ static void count_fdd(BDD bdd, BDD p_set,long *nodes,bn_int_t *elements)
             // count is zero or one
             count=bdd_satcountset(bdd, p_set);
         } else {
-            count=pow(2.0, count);
+            count=round(pow(2.0, count));
         }
         //Warning(info,"satcount is %f",count);
         bn_double2int(count,elements);
