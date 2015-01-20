@@ -165,7 +165,6 @@ reach_queue (void *arg, state_info_t *successor, transition_info_t *ti, int new)
     alg_global_t       *sm = ctx->global;
     alg_shared_t       *shared = ctx->run->shared;
 
-    action_detect (ctx, ti, successor);
     if (new) {
         raw_data_t stack_loc = dfs_stack_push (sm->out_stack, NULL);
         state_info_serialize (successor, stack_loc);
@@ -177,6 +176,9 @@ reach_queue (void *arg, state_info_t *successor, transition_info_t *ti, int new)
     } else if (proviso == Proviso_Stack) {
         loc->proviso |= !ecd_has_state (loc->cyan, successor);
     }
+
+    action_detect (ctx, ti, successor);
+
     loc->proviso |= ti->por_proviso;
     ti->por_proviso = 1; // inform POR layer that everything is a-ok.
     // We will call next-state again if loc->proviso is not set.
@@ -342,7 +344,6 @@ pbfs_handle (void *arg, state_info_t *successor, transition_info_t *ti,
     alg_local_t        *loc = ctx->local;
     alg_shared_t       *shared = ctx->run->shared;
 
-    action_detect (ctx, ti, successor);
     if (!seen) {
         pbfs_queue_state (ctx, successor);
         if (EXPECT_FALSE( trc_output &&
@@ -352,6 +353,9 @@ pbfs_handle (void *arg, state_info_t *successor, transition_info_t *ti,
         loc->counters.level_size++;
         loc->proviso |= 1;
     }
+
+    action_detect (ctx, ti, successor);
+
     if (EXPECT_FALSE(loc->lts != NULL)) {
         int             src = ctx->counters->explored;
         int            *tgt = state_info_state(successor);
