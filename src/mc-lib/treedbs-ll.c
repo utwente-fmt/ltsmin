@@ -9,6 +9,7 @@
 #include <mc-lib/clt_table.h>
 #include <mc-lib/treedbs-ll.h>
 #include <util-lib/fast_hash.h>
+#include <util-lib/util.h>
 
 
 static const int        TABLE_SIZE = 26;
@@ -444,6 +445,7 @@ create_nodes (node_table_t *nodes, size_t log_size, size_t sat_bits, int alloc,
     nodes->size = 1ULL << log_size;
     nodes->log_size = log_size;
     nodes->thres = nodes->size / 64;
+    nodes->thres = min (nodes->thres, 1ULL << 18);
     nodes->mask = nodes->size - 1;
     nodes->error_num = error_num;
     nodes->sat_bits = sat_bits;

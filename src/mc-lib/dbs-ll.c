@@ -9,6 +9,7 @@
 #include <hre/user.h>
 #include <mc-lib/atomics.h>
 #include <mc-lib/dbs-ll.h>
+#include <util-lib/util.h>
 
 
 static const int        TABLE_SIZE = 24;
@@ -249,6 +250,7 @@ DBSLLcreate_sized (int length, int size, hash64_f hash64, int satellite_bits)
     dbs->bytes = length * sizeof (int);
     dbs->size = 1UL << size;
     dbs->threshold = dbs->size / 100;
+    dbs->threshold = min (dbs->threshold, 1ULL << 16);
     dbs->mask = ((uint64_t)dbs->size) - 1;
     dbs->table = RTalignZero (CACHE_LINE_SIZE, sizeof (mem_hash_t[dbs->size]));
     dbs->data = RTalign (CACHE_LINE_SIZE, dbs->size * dbs->bytes);
