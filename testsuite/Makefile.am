@@ -36,7 +36,7 @@ endif
 endif
 
 if HAVE_OPAAL_COMPILER
-#DEJATOOL +=	alg_backends_opaal
+DEJATOOL +=	alg_backends_opaal
 endif
 
 if HAVE_POSIX

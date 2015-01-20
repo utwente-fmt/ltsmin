@@ -140,6 +140,12 @@ proc runmytest { test_name command_line exp_output} {
             return
         }
         
+        "Cleary tree not supported in combination with error trails or the MCNDFS algorithms." {
+            xfail "Cleary tree not supported in combination with error trails or the MCNDFS algorithms."
+            catch { exp_close }
+            return
+        }
+        
         # Check for any warning messages in the output first
         Warning {
             fail "$test_name: warning: $expect_out(buffer)"

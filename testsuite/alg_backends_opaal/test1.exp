@@ -23,13 +23,13 @@ set langs [dict create]
 
 # opaal:
 dict set langs opaal model "fischer4.xml"
-dict set langs opaal options mc "--threads=$num_threads"
-dict set langs opaal exp_output "268 states 552 transitions"
+dict set langs opaal options mc "--threads=$num_threads -v"
+dict set langs opaal exp_output "Elements: 752"
 set alg_be [ find_alg_backends "{dist,mc,seq}" ]
 run_test_for_alg_backends $alg_be $langs $backends
 
 # different output for symbolic tool:
-dict set langs opaal exp_output "state space has 268"
+dict set langs opaal exp_output "state space has 752"
 set alg_be [ find_alg_backends "{sym}" ]
 run_test_for_alg_backends $alg_be $langs $backends
 
