@@ -450,6 +450,8 @@ timed_run (run_t *run, wctx_t *ctx)
         ctx->counters->trans = 0; //reset trans count
     }
 
+    HREbarrier (HREglobal());
+
     switch (get_strategy(run->alg)) {
         case Strat_TA_PBFS:
             ta_pbfs (ctx);

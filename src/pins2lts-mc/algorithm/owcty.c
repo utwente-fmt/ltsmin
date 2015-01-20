@@ -440,6 +440,8 @@ owcty (run_t *run, wctx_t *ctx)
         ctx->counters->trans = 0; //reset trans count
     }
 
+    HREbarrier (HREglobal());
+
     if (strategy[1] == Strat_MAP && 0 == ctx->id &&
             GBbuchiIsAccepting(ctx->model, state_info_state(ctx->initial)))
         atomic_write (shared->parent_ref+ctx->initial->ref, ctx->initial->ref + 1);

@@ -596,8 +596,10 @@ reach_run (run_t *run, wctx_t *ctx)
         } else {
             reach_handle (ctx, ctx->initial, &ti, 0);
         }
+        ctx->counters->trans = 0; //reset trans count
     }
-    ctx->counters->trans = 0; //reset trans count
+
+    HREbarrier (HREglobal());
 
     switch (get_strategy(run->alg)) {
     case Strat_SBFS:
