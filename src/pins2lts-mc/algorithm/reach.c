@@ -171,7 +171,7 @@ reach_queue (void *arg, state_info_t *successor, transition_info_t *ti, int new)
         if (EXPECT_FALSE( trc_output && successor->ref != ctx->state->ref &&
                           shared->parent_ref[successor->ref] == 0 &&
                           ti != &GB_NO_TRANSITION )) // race, but ok:
-            atomic_write(&shared->parent_ref[successor->ref], ctx->state->ref);
+            cas (&shared->parent_ref[successor->ref], 0, ctx->state->ref);
         loc->proviso |= proviso == Proviso_ClosedSet;
     } else if (proviso == Proviso_Stack) {
         loc->proviso |= !ecd_has_state (loc->cyan, successor);
@@ -346,10 +346,10 @@ pbfs_handle (void *arg, state_info_t *successor, transition_info_t *ti,
 
     if (!seen) {
         pbfs_queue_state (ctx, successor);
-        if (EXPECT_FALSE( trc_output &&
-                          successor->ref != ctx->state->ref &&
-                          shared->parent_ref[successor->ref] == 0) ) // race, but ok:
-            atomic_write(&shared->parent_ref[successor->ref], ctx->state->ref);
+        if (EXPECT_FALSE( trc_output && successor->ref != ctx->state->ref
+                          &&  shared->parent_ref[successor->ref] == 0
+                          && ti != &GB_NO_TRANSITION )) // race, but ok:
+            cas (&shared->parent_ref[successor->ref], 0, ctx->state->ref);
         loc->counters.level_size++;
         loc->proviso |= 1;
     }
