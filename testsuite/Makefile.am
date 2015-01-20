@@ -30,9 +30,9 @@ DEJATOOL +=	alg_backends_prom
 endif
 
 if HAVE_LIBMCRL2
-if HAVE_CADP
+#if HAVE_CADP
 DEJATOOL +=	lts_generation
-endif
+#endif
 endif
 
 if HAVE_OPAAL_COMPILER

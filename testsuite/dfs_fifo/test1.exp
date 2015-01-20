@@ -19,7 +19,7 @@ dict set commands test13_mc cmd "$binpaths(prom2lts-mc) --strategy=dfsfifo -v i4
 dict set commands test13_mc exp "Elements: 78977"
 
 dict set commands test13_por cmd "$binpaths(prom2lts-mc) --strategy=dfsfifo --por -v i4.spins"
-dict set commands test13_por exp "Elements: 47453"
+dict set commands test13_por exp "Elements: 33696"
 
 dict set commands test14_mc cmd "$binpaths(prom2lts-mc) --strategy=dfsfifo TimingWithoutTimeout9OnTheFlynessShallow.promela.spins"
 dict set commands test14_mc exp "Accepting cycle FOUND"
