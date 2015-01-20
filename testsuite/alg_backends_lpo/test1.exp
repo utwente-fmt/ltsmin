@@ -23,9 +23,10 @@ set langs [dict create]
 dict set langs lpo model "hef_wrong.tbf"
 dict set langs lpo options mc "--procs=$num_threads"
 
-dict set langs lpo exp_output "15557 states 27300 transitions"
-set alg_be [ find_alg_backends "{dist,mc,seq}" ]
-run_test_for_alg_backends $alg_be $langs $backends
+# dict set langs lpo exp_output "15557 states 27300 transitions"
+# set alg_be [ find_alg_backends "{dist,mc,seq}" ]
+# run_test_for_alg_backends $alg_be $langs $backends
+# disable mCRL tests for above backends, they hang.
 
 # different output for symbolic tool:
 dict set langs lpo exp_output "state space has 15557"
