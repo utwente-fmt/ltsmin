@@ -4160,7 +4160,7 @@ actual_main(void)
                 Print(info, "Solving symbolic parity game for player %d.", spg_options->player);
                 RTstartTimer(pgsolve_timer);
                 recursive_result strategy;
-                parity_game* copy;
+                parity_game* copy = NULL;
                 if (spg_options->check_strategy) {
                     copy = spg_copy(g);
                 }

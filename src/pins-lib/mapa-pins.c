@@ -253,7 +253,7 @@ static void get_state_labels(model_t self,int*src,int *label){
     prcrl_context_t ctx=GBgetContext(self);
 
     if (enable_rewards){
-        prcrl_get_state_reward(ctx->spec,src,label+1);
+        prcrl_get_state_reward(ctx->spec,(uint32_t*)src,(uint32_t*)label+1);
         Warning(info,"state reward %u/%u",label[1],label[2]);
     } else {
         label[1]=0;
@@ -312,7 +312,6 @@ void common_load_model(model_t model,const char*name,int mapa){
     lts_type_put_type(ltstype,"nat",LTStypeDirect,NULL);
     lts_type_put_type(ltstype,"pos",LTStypeDirect,NULL);
 
-    int class_type;
     lts_type_set_edge_label_count(ltstype,6);
     lts_type_set_edge_label_name(ltstype,0,"reward_numerator");
     lts_type_set_edge_label_type(ltstype,0,"nat");

@@ -35,7 +35,7 @@ typedef struct {
 /**
 Convert a standard C string to a chunk.
 */
-#define chunk_str(s) ((chunk){(chunk_len)strlen(s),(s)})
+#define chunk_str(s) ((chunk){(chunk_len)strlen(s),((char*)s)})
 
 /**
 Wrap a length and a pointer as a chunk.

@@ -433,10 +433,7 @@ void hook_cb (void *context, transition_info_t *ti, int *dst, int *cpy) {
 static inline int
 emit_all (por_context *ctx, ci_list *list, proviso_t *provctx, int *src)
 {
-    beam_t             *beam = (beam_t *) ctx->beam_ctx;
-    search_context_t   *s = beam->search[0];
     int c = 0;
-    int x = s->emit_status[list->data[0]];
     for (int z = 0; z < list->count; z++) {
         int i = list->data[z];
         c += GBgetTransitionsLong (ctx->parent, i, src, hook_cb, provctx);

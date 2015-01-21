@@ -186,7 +186,7 @@ action_detect (struct src_info *context, transition_info_t *ti , int *dst)
     if (trc_output!=NULL){
         uint32_t ofs=context->ofs;
         Warning(info,"Error action '%s'  found at %u.%u", act_detect, ctx->mpi_me, ofs);
-        start_trace_edge(ctx,ctx->mpi_me,ofs,dst,ti->labels);
+        start_trace_edge(ctx,ctx->mpi_me,ofs,(uint32_t*)dst,(uint32_t*)ti->labels);
         return;
     }
     if (no_exit) return;
@@ -265,7 +265,7 @@ static void extend_trace(struct dist_thread_context* ctx,uint32_t* trc_vector){
         switch(edge_labels){
             case 0: break;
             case 1: message[5]=ctx->parent_edge[trc_vector[3]]; break;
-            default: TreeUnfold(ctx->edge_dbs,ctx->parent_edge[trc_vector[3]],message+5);
+            default: TreeUnfold(ctx->edge_dbs,ctx->parent_edge[trc_vector[3]],(int*)message+5);
         }
         ctx->trace_next++;
         TaskSubmitFixed(ctx->extend_task,seg,message);
@@ -308,7 +308,7 @@ static void new_transition(void*context,int src_seg,int len,void*arg){
                 case 0: break;
                 case 1: ctx->parent_edge[temp]=*(trans+lbl_ofs); break;
                 default:
-                    ctx->parent_edge[temp]=TreeFold(ctx->edge_dbs,trans+lbl_ofs);
+                    ctx->parent_edge[temp]=TreeFold(ctx->edge_dbs,(int*)trans+lbl_ofs);
             }
         }
         if (cost!=NULL){
@@ -362,7 +362,7 @@ static void new_transition(void*context,int src_seg,int len,void*arg){
                     case 0: break;
                     case 1: ctx->parent_edge[temp]=*(trans+lbl_ofs); break;
                     default:
-                        ctx->parent_edge[temp]=TreeFold(ctx->edge_dbs,trans+lbl_ofs);
+                        ctx->parent_edge[temp]=TreeFold(ctx->edge_dbs,(int*)trans+lbl_ofs);
                 }
             }
         }
@@ -372,7 +372,7 @@ static void new_transition(void*context,int src_seg,int len,void*arg){
     }
     ctx->tcount[src_seg]++;
     ctx->targets++;
-    if (cost!=NULL && ctx->cost_queue[temp].cost==ctx->level){
+    if (cost!=NULL && ctx->cost_queue[temp].cost==(int)ctx->level){
         // new state in current level, requires wait to be cancelled.
         TQwaitCancel(ctx->task_queue);
     }

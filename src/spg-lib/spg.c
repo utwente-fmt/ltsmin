@@ -116,7 +116,7 @@ parity_game* spg_load(FILE* f, vset_implementation_t impl)
     ssize_t res = fscanf(f,"symbolic parity game\n");
 
     if (res == EOF) {
-        Abort("Wrong file format: %d.", res)
+        Abort("Wrong file format: %zd.", res)
     }
     res &= fscanf(f,"state_length=%d\n", &state_length);
     res &= fscanf(f,"num_groups=%d\n", &num_groups);

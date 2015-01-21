@@ -195,6 +195,7 @@ static void
 reach_handle_dfs (void *arg, state_info_t *successor, transition_info_t *ti,
                   int seen)
 {
+    (void) seen;
     int             red = state_store_has_color(successor->ref, GRED, 0);
     reach_queue (arg, successor, ti, !red);
 }
