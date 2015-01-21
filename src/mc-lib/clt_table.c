@@ -10,7 +10,9 @@
 #include <hre/user.h>
 #include <mc-lib/atomics.h>
 #include <mc-lib/clt_table.h>
+#include <mc-lib/dbs-ll.h>
 #include <util-lib/fast_hash.h>
+#include <util-lib/util.h>
 
 static const struct timespec BO = {0, 2500};
 
@@ -34,6 +36,7 @@ struct clt_dbs_s {
     clt_bucket_t       *table;
     uint32_t            keysize; // in bits
     size_t              size;
+    size_t              thresh;
     size_t              mask;
     size_t              log_size;
     size_t              diff;
@@ -159,6 +162,9 @@ clt_find_or_put (const clt_dbs_t* dbs, uint64_t k)
     }
     size_t          t_left = clt_find_left_from (dbs, idx);
     size_t          t_right = clt_find_right_from (dbs, idx);
+
+    if (t_right - t_left >= dbs->thresh)
+        return DB_FULL;
 
 	if (!clt_try_lock(dbs, t_left)) {
         nanosleep (&BO, NULL);
@@ -309,6 +315,8 @@ clt_create (uint32_t ksize, uint32_t log_size)
                "(logsize:2^%u, keysize: %u)", log_size, ksize);
     clt_dbs_t              *dbs = RTmalloc (sizeof(clt_dbs_t));
     dbs->size = 1UL << log_size;
+    dbs->thresh = dbs->size / 64;
+    dbs->thresh = min (dbs->thresh, 1ULL << 20);
     dbs->mask = dbs->size - 1;
     dbs->log_size = log_size;
     dbs->keysize = ksize;
