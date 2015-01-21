@@ -63,7 +63,7 @@ static void lts_merge_hyperedges(lts_t lts){
             e--;
         } else if (k<=group_pos) {
             // difference: ship out.
-            lts->label[t]=TreeFold(lts->edge_idx,label);
+            lts->label[t]=TreeFold(lts->edge_idx,(int*)label);
             t++;
             lts->src[t]=lts->src[i];
             lts->dest[t]=lts->dest[i];
@@ -80,7 +80,7 @@ static void lts_merge_hyperedges(lts_t lts){
             fprintf(stderr,"%u/%u\n",label[param_pos],label[param_pos+1]);
         }
     }
-    lts->label[t]=TreeFold(lts->edge_idx,label);
+    lts->label[t]=TreeFold(lts->edge_idx,(int*)label);
     t++;
     fprintf(stderr,"result has %u real edges\n",e);
     lts_set_size(lts,lts->root_count,lts->states,t);
