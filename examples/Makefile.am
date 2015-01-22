@@ -22,7 +22,6 @@ BUILT_SOURCES =
 BUILT_SOURCES += brp.lps
 BUILT_SOURCES += brp.pbes
 BUILT_SOURCES += ieee-11073.lps
-bindir = $(dirname "$MCRL2")
 endif
 
 CLEANFILES =
@@ -31,8 +30,8 @@ CLEANFILES += brp.pbes
 CLEANFILES += ieee-11073.lps
 
 %.lps: %.mcrl2
-	$(bindir)/mcrl22lps -nDf $< $@
+	$(MCRL2) -nDf $< $@
 
 %.pbes: %.lps
-	$(bindir)/lps2pbes -f nodeadlock.mu $< $@
+	$(PBES) -f nodeadlock.mu $< $@
     
