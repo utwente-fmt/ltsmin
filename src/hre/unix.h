@@ -90,6 +90,7 @@ typedef int pthread_spinlock_t;
 static inline int
 pthread_spin_init(pthread_spinlock_t *lock, int pshared)
 {
+    (void) pshared;
     compile_barrier ();
     *lock = 0;
     return 0;
@@ -98,6 +99,7 @@ pthread_spin_init(pthread_spinlock_t *lock, int pshared)
 static inline int
 pthread_spin_destroy (pthread_spinlock_t *lock)
 {
+    (void) lock;
     return 0;
 }
 
