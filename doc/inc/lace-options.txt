@@ -8,4 +8,8 @@
 *--lace-dqsize*='NUMBER'::
         Set length of Lace task queue. 
         Defaults to 40960000.
+        
+*--lace-stacksize*='NUMBER'::
+        Set size of program stack in kilo bytes.
+        Defaults to 0, which means using the default stack size.
  
