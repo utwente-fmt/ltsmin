@@ -107,6 +107,7 @@ static int expand_groups = 1; // set to 0 if transitions are loaded from file
 #ifdef HAVE_SYLVAN
 static size_t lace_n_workers = 0;
 static size_t lace_dqsize = 40960000; // can be very big, no problemo
+static size_t lace_stacksize = 0; // use default
 
 static bool multi_process = false;
 #endif
@@ -198,6 +199,7 @@ reach_popt(poptContext con, enum poptCallbackReason reason,
 static struct poptOption lace_options[] = {
     { "lace-workers", 0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &lace_n_workers , 0 , "set number of Lace workers (threads for parallelization)","<workers>"},
     { "lace-dqsize",0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &lace_dqsize , 0 , "set length of Lace task queue","<dqsize>"},
+    { "lace-stacksize", 0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &lace_stacksize, 0, "set size of program stack in kilo bytes (0=default stack size)", "<stacksize>"},
 POPT_TABLEEND
 };
 #endif
@@ -4274,7 +4276,7 @@ main (int argc, char *argv[])
             Print(info, "%zu slave processes started.", n_workers);
         }
         ctx = HREglobal();
-        lace_startup(0, TASK(actual_main), 0);
+        lace_startup(lace_stacksize, TASK(actual_main), 0);
         Print(infoLong, "Main done.");
     } else {
         ctx = HREglobal();
