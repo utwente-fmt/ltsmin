@@ -1,46 +1,58 @@
-October XX, 2014 - Release 2.1 of the LTSmin toolset
+January 23, 2015 - Release 2.1 of the LTSmin toolset
+This release is accompanied by the tool paper:
+LTSmin: High-Performance Language-Independent Model Checking [6].
 
-* New parallel MDD package: LDDmc [TODO] (--vset=lddmc)
+* Improvements to symbolic backend (*2lts-sym):
+    o Parallelized transition relation learning and application using Lace [5] 
+    o Exploiting read, write and copy dependencies [3]
+    o Parallelized guard learning and application (--pins-guards, --no-soundness-check) [1]
+    o Improved regrouping algorithm for bandwidth reduction (-rcw)
+    o New parallel MDD implementation from the Sylvan package: LDDmc (--vset=lddmc) [5,7]
+    o Support maximal progress for probabilistic LTSs
 
+* New mu-calculus PINS layer (--mucalc):
+    o Enables verification of mu-calculus properties 
+      for any of the supported languages and all backends
+    o A parity game is generated (instead of an LTS), 
+      which can be solved with --pg-solve in the symbolic tool, 
+      or with any parity game solver that supports the pgsolver format.
 
-* Improvements to symbolic backend (*2lts-sym)
-    o Parallelized transition relation learning via Lace [TODO] 
-    o Added must-write and dynamic copy dependencies [TODO]
-    o Use guards in symbolic algorithm (--pins-guards?)
-    o Improved regrouping (-r)  TODO
+* Symbolic Parity game solver (--pg-solve, spgsolver) [4]:
+    o Added parallel attractor computation (--attr=par)
 
-* New mu-calculus PINS layer [TODO] 
+* New frontend for MAPA: Scoop (mapa2lts{sym,dist})
 
+* New frontend for dl-open (pins2*):
+    o Example can be found in section 3.4 in [6].
 
-* New frontend for MAPA: Scoop (mapa2{sym,dist})
-
-
-* Parity game solver?
-
-
-* New frontend for dl-open (pins2*) TODO
-
-
-* Improvements to the POR layer (PINS2PINS wrapper)
+* Improvements to the POR layer (PINS2PINS wrapper):
     o Added Valmari's weak POR dependencies (--weak)
     o Added deletion algorithm [1] (--por=del)
     o Added Valmari's SCC-based algorithm (--por=scc)
 * Improvements to the multi-core backend (*2lts-mc):
     o Added CNDFS proviso for efficient POR in LTL (--proviso=cndfs) [2]
     o Refactored code and separated search algorithms in objects
-* Improvements to distributed backend (*2lts-dist)
-    o Added tracing TODO
+* Improvements to distributed backend (*2lts-dist):
+    o Added counter example tracing
+    o Tau confluence detection
+    o Support maximal progress for probabilistic LTSs
 
-
-
-[1] Guard-based Partial-Order Reduction
-    To appear in STTT Journal (SPIN Special Issue)
+[1] Guard-based Partial-Order Reduction -
+    http://dx.doi.org/10.1007/978-3-642-39176-7_15
 [2] Partial-Order Reduction for Multi-Core LTL Model Checking -
-    http://wwwhome.ewi.utwente.nl/~laarman/papers/multi-core-por.pdf
+    http://dx.doi.org/10.1007/978-3-319-13338-6_20
+[3] Read, Write and Copy Dependencies for Symbolic Model Checking -
+    http://dx.doi.org/10.1007/978-3-319-13338-6_16
+[4] Generating and Solving Symbolic Parity Games -
+    http://dx.doi.org/10.4204/EPTCS.159.2
+[5] Lace: non-blocking split deque for work-stealing -
+    http://dx.doi.org/10.1007/978-3-319-14313-2_18
+[6] LTSmin: High-Performance Language-Independent Model Checking -
+    http://wwwhome.ewi.utwente.nl/~meijerjjg/LTSmin_High-performance_Language-Independent_Model_Checking.pdf
+[7] Sylvan: Multi-core Decision Diagrams -
+    http://www.tvandijk.nl/wp-content/uploads/2015/01/sylvan_tacas15.pdf
 
-
-
-March 4, 2012 - Release 2.0 of the LTSmin toolset
+March 4, 2013 - Release 2.0 of the LTSmin toolset
 
 * Refactored runtime and IO libraries, organized source and renamed tools:
     o *-reach       -> *2lts-sym  (Symbolic CTL/mu model checking, ETF output)
