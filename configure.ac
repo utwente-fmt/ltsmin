@@ -131,7 +131,7 @@ AX_CC_COMPILE_CXX_LINK
 
 ACX_MCRL([:],
   [AC_MSG_WARN([no acceptable muCRL installation found.])])
-ACX_MCRL2([AC_SUBST(PBES, [$(dirname "$MCRL2")/lps2pbes])],
+ACX_MCRL2([:],
   [AC_MSG_WARN([no acceptable mCRL2 installation found.])])
 AC_CHECK_PROGS(ASCIIDOC, [asciidoc])
 if test x"$ASCIIDOC" = x && test -d "${srcdir}/.git"; then
