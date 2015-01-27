@@ -89,6 +89,7 @@ extra_ASCIIDOC += inc/hre-startup.txt
 extra_ASCIIDOC += inc/lace-options.txt
 extra_ASCIIDOC += inc/lddmc-options.txt
 extra_ASCIIDOC += inc/listdd-options.txt
+extra_ASCIIDOC += inc/listdd64-options.txt
 extra_ASCIIDOC += inc/lts-io-options.txt
 extra_ASCIIDOC += inc/ltsmin-printtrace-options.txt
 extra_ASCIIDOC += inc/mcrl-options.txt
@@ -116,6 +117,7 @@ extra_ASCIIDOC += inc/spg-solve-options.txt
 extra_ASCIIDOC += inc/support.txt
 extra_ASCIIDOC += inc/sylvan-options.txt
 extra_ASCIIDOC += inc/vset-options.txt
+extra_ASCIIDOC += inc/regroup-options.txt
 
 EXTRA_DIST  = asciidoc.conf
 EXTRA_DIST += manpage-base.xsl
