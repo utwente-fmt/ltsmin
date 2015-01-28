@@ -273,6 +273,13 @@ static void get_state_labels(model_t self,int*src,int *label){
     }
 }
 
+static int get_state_label(model_t self, int l, int *src) {
+    HREassert(l >=0 && l < 3, "invalid state label %d", l);
+    int labels[3];
+    get_state_labels(self, src, labels);
+    return labels[l];
+}
+
 void common_load_model(model_t model,const char*name,int mapa){
     Warning(infoLong,"Loading %s",name);
     prcrl_context_t context=RT_NEW(struct prcrl_context);
@@ -433,6 +440,7 @@ void common_load_model(model_t model,const char*name,int mapa){
     context->cached=GBaddCache(raw_model);
 
     GBsetStateLabelsAll(model,get_state_labels);
+    GBsetStateLabelLong(model, get_state_label);
     GBsetStateLabelInfo(model, &sl_info);
     
     if (enable_rewards){
