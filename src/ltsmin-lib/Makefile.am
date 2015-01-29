@@ -27,6 +27,7 @@ libltsmin_la_CPPFLAGS+= -I${top_srcdir}/ltl2ba $(AM_CPPFLAGS)
 
 # mu-calculus parser
 libmucalc_la_SOURCES  =
+libmucalc_la_SOURCES += mucalc-grammar.lemon
 libmucalc_la_SOURCES += mucalc-parse-env.h
 libmucalc_la_SOURCES += mucalc-syntax.c mucalc-syntax.h
 libmucalc_la_SOURCES += mucalc-lexer.c mucalc-lexer.h
