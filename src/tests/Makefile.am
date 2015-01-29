@@ -18,7 +18,9 @@ check_PROGRAMS += test-dm
 check_PROGRAMS += test-hre
 check_PROGRAMS += test-is-balloc
 check_PROGRAMS += test-ltsmin-parse
+if !BUILD_OS_IS_DARWIN
 check_PROGRAMS += test-mucalc-parser
+endif
 check_PROGRAMS += test-regroup
 check_PROGRAMS += test-simplemap
 check_PROGRAMS += test-treedbs
