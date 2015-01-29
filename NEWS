@@ -29,16 +29,18 @@ LTSmin: High-Performance Language-Independent Model Checking [6].
     o Added Valmari's weak POR dependencies (--weak)
     o Added deletion algorithm [1] (--por=del)
     o Added Valmari's SCC-based algorithm (--por=scc)
+
 * Improvements to the multi-core backend (*2lts-mc):
     o Added CNDFS proviso for efficient POR in LTL (--proviso=cndfs) [2]
     o Refactored code and separated search algorithms in objects
+
 * Improvements to distributed backend (*2lts-dist):
     o Added counter example tracing
     o Tau confluence detection
     o Support maximal progress for probabilistic LTSs
 
-[1] Guard-based Partial-Order Reduction -
-    http://dx.doi.org/10.1007/978-3-642-39176-7_15
+[1] Guard-based Partial-Order Reduction (Extended Version) -
+    http://dx.doi.org/10.1007/s10009-014-0363-9
 [2] Partial-Order Reduction for Multi-Core LTL Model Checking -
     http://dx.doi.org/10.1007/978-3-319-13338-6_20
 [3] Read, Write and Copy Dependencies for Symbolic Model Checking -
