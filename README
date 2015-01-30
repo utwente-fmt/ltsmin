@@ -7,7 +7,7 @@ a full (LTL/CTL) model checker, while maintaining its language-independent
 characteristics.
 
 To obtain its input, LTSmin connects a sizeable number of existing
-(verification) tools: muCRL, mcrl2, DiVinE, SPIN (SpinS), UPPAAL (opaal)
+(verification) tools: muCRL, mCRL2, DiVinE, SPIN (SpinS), UPPAAL (opaal), SCOOP
 and CADP. Moreover, it allows to reuse existing tools with new state space
 generation techniques by exporting LTSs into various formats.
 
@@ -29,8 +29,8 @@ independent parts: language modules, PINS optimizations, and model
 checking algorithms.
 
 On the other hand, the implementation of a verification algorithm
-based on the PINS matrix automatically has access to muCRL, mcrl2,
-DVE, PROMELA, UPPAAL xml and ETF language modules.
+based on the PINS matrix automatically has access to muCRL, mCRL2,
+DVE, PROMELA, SCOOP, UPPAAL xml and ETF language modules.
 
 Finally, all tools benefit from PINS2PINS optimizations, like local
 transition caching (which speeds up slow state space generators),
@@ -39,7 +39,9 @@ consumption of symbolic algorithms), partial order reduction and
 linear temporal logic.
 
 * Supported Systems
- - GNU/Linux (tested on Ubuntu, Debian, OpenSuSE 11.2)
+ - GNU/Linux (tested on Arch Linu, Ubuntu, Debian,
+    OpenSuSE 11.2 and Red Hat Enterprise Linux 6)
+ - MacOS X, version 10.10 "Yosemite"
  - MacOS X, version 10.7 "Lion"
  - MacOS X, version 10.6 "Snow Leopard" (no multi-core muCRL/mCRL2)
  - MacOS X, version 10.5 "Leopard" (no multi-core muCRL/mCRL2)
@@ -70,6 +72,10 @@ all dependencies were found.
 
     # Install
     $ make install
+    
+You can also run tests with
+    # Run tests
+    $ make check
 
 ** Additional Build Options
 *** configure options
@@ -196,8 +202,9 @@ Build with:
     make
     make install
 
-(On MacOS X, option ``-DHOARD=OFF'' might have to be added to the
-cmake command line to make it compile without errors.)
+On MacOS X, option -DHOARD=OFF might have to be added to the cmake command line to make it compile without errors. 
+Also, on MacOS X Divine2 only compiles with the GNU std C++ library.
+Thus on MacOS X one has to provide the option -DCMAKE_CXX_FLAGS="-stdlib=libstdc++"
 
 The LTSmin configure script will find the DiVinE installation
 automatically, if the ``divine'' binary is in the search path.
@@ -313,11 +320,9 @@ See above.
 For support/questions, email:
     <ltsmin-support@lists.utwente.nl>
 For bug reports and feature suggestions, visit:
-    <http://fmt.cs.utwente.nl/redmine/projects/ltsmin/>
-For future version, visit:
-    <http://fmt.cs.utwente.nl/tools/ltsmin/> 
+    <https://github.com/utwente-fmt/ltsmin/issues>
 and subscribe to our mailing list:
-    <ltsmin-devel-subscribe-request@lists.utwente.nl>
+    <ltsmin-users-subscribe-request@lists.utwente.nl>
 
 
 ;; Local Variables:
