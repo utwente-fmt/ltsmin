@@ -770,7 +770,7 @@ vdom_create_lddmc(int n)
     /* Initialize library if necessary */
     static int initialized = 0;
     if (!initialized) {
-        lddmc_init(datasize, cachesize);
+        lddmc_init(datasize, datasize, cachesize);
         initialized = 1;
     }
 

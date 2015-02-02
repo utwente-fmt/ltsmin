@@ -22,7 +22,7 @@ ltsmin_sylvan_init()
 {
     static int initialized=0;
     if (!initialized) {
-        sylvan_init(datasize, cachesize, granularity);
+        sylvan_init(datasize, datasize, cachesize, granularity);
         initialized=1;
     }
 }
