@@ -10,11 +10,13 @@
 
 #include <lddmc.h>
 
-static int datasize = 25; // 25 = 1024 MB
+static int datasize = 22; // 23 = 128 MB
+static int maxsize = 26;  // 26 = 2048 MB
 static int cachesize = 24; // 24 = 576 MB
 
 struct poptOption lddmc_options[]= {
-    { "lddmc-tablesize", 0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &datasize , 0 , "log2 size of LDD nodes table", "<datasize>"},
+    { "lddmc-tablesize", 0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &datasize , 0 , "log2 initial size of LDD nodes table", "<datasize>"},
+    { "lddmc-maxsize", 0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &maxsize , 0 , "log2 maximum size of LDD nodes table", "<maxsize>"},
     { "lddmc-cachesize", 0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &cachesize , 0 , "log2 size of memoization cache", "<cachesize>"},
     POPT_TABLEEND
 };
@@ -770,7 +772,7 @@ vdom_create_lddmc(int n)
     /* Initialize library if necessary */
     static int initialized = 0;
     if (!initialized) {
-        lddmc_init(datasize, datasize, cachesize);
+        lddmc_init(datasize, maxsize, cachesize);
         initialized = 1;
     }
 
