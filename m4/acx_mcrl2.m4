@@ -31,11 +31,19 @@ if test x"$acx_mcrl2" = xyes; then
       8) MCRL2_PINS_CPPFLAGS="-DAT_64BIT" ;;
       *) AC_MSG_FAILURE([can only compile mCRL2 on 32- and 64-bit machines.]) ;;
     esac
+    
+    mcrl2_lib_dir=""
+    if test -d ${with_mcrl2}/lib/mcrl2; then
+        mcrl2_lib_dir="${with_mcrl2}/lib/mcrl2"
+    else
+        mcrl2_lib_dir="${with_mcrl2}/lib"
+    fi
+    
     #AX_CHECK_COMPILE_FLAG([-std=c++0x], [CXXFLAGS="$CXXFLAGS -std=c++0x"])
-    AC_SUBST(MCRL2_PINS_CPPFLAGS, ["$MCRL2_PINS_CPPFLAGS -I$with_mcrl2/include -I$with_mcrl2/include/dparser"])
-    AC_SUBST(MCRL2_PINS_LDFLAGS,  ["-L${with_mcrl2}/lib/mcrl2"])
+    AC_SUBST(MCRL2_PINS_CPPFLAGS, ["$MCRL2_PINS_CPPFLAGS -I$with_mcrl2/include"])
+    AC_SUBST(MCRL2_PINS_LDFLAGS,  ["-L${mcrl2_lib_dir}"])
     AC_SUBST(MCRL2_LIBS, [""])
-    AC_SUBST(MCRL2_LDFLAGS, ["$acx_cv_cc_export_dynamic -Wl,-rpath,${with_mcrl2}/lib/mcrl2"])
+    AC_SUBST(MCRL2_LDFLAGS, ["$acx_cv_cc_export_dynamic -Wl,-rpath,${mcrl2_lib_dir}"])
     AC_SUBST(MCRL2, ["${with_mcrl2}/bin/mcrl22lps"])
     AC_SUBST(PBES, ["${with_mcrl2}/bin/lps2pbes"])
 
@@ -93,9 +101,6 @@ if test x"$acx_mcrl2" = xyes; then
     AX_LET([LIBS], ["$LIBS"],
            [LDFLAGS], ["$MCRL2_PINS_LDFLAGS $LDFLAGS"],
       [acx_mcrl2_libs=yes
-       AC_CHECK_LIB([dparser], [main],
-         [MCRL2_PINS_LIBS="-ldparser $MCRL2_PINS_LIBS"
-          LIBS="-ldparser $LIBS"])
       ])
     AC_LANG_POP([C])
 
@@ -103,19 +108,13 @@ if test x"$acx_mcrl2" = xyes; then
     AX_LET([LIBS], ["$MCRL2_PINS_LIBS $LIBS"],
            [LDFLAGS], ["$MCRL2_PINS_LDFLAGS $LDFLAGS"],
            [CXXFLAGS], ["$MCRL2_PINS_CXXFLAGS $CXXFLAGS"],
-      [AX_CXX_CHECK_LIB([dparser], [main],
-         [MCRL2_PINS_LIBS="-ldparser $MCRL2_PINS_LIBS"
-          LIBS="-ldparser $LIBS"])
-       AX_CXX_CHECK_LIB([mcrl2_syntax], [main],
+       [AX_CXX_CHECK_LIB([mcrl2_syntax], [main],
          [MCRL2_PINS_LIBS="-lmcrl2_syntax $MCRL2_PINS_LIBS"
           LIBS="-lmcrl2_syntax $LIBS"])
        AX_CXX_CHECK_LIB([mcrl2_utilities], [main],
          [MCRL2_PINS_LIBS="-lmcrl2_utilities $MCRL2_PINS_LIBS"
           LIBS="-lmcrl2_utilities $LIBS"],
          [acx_mcrl2_libs=no])
-       AX_CXX_CHECK_LIB([mcrl2_aterm], [main],
-         [MCRL2_PINS_LIBS="-lmcrl2_aterm $MCRL2_PINS_LIBS"
-          LIBS="-lmcrl2_aterm $LIBS"])
        AX_CXX_CHECK_LIB([mcrl2_atermpp], [main],
          [MCRL2_PINS_LIBS="-lmcrl2_atermpp $MCRL2_PINS_LIBS"
           LIBS="-lmcrl2_atermpp $LIBS"])
