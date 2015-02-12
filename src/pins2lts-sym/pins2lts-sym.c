@@ -3203,11 +3203,8 @@ init_domain(vset_implementation_t impl) {
 static void
 init_action_detection()
 {
-    // table number of first edge label
-    act_label = lts_type_find_edge_label_prefix (ltstype, LTSMIN_EDGE_TYPE_ACTION_PREFIX);
     if (act_label == -1)
         Abort("No edge label '%s...' for action detection", LTSMIN_EDGE_TYPE_ACTION_PREFIX);
-    action_typeno = lts_type_get_edge_label_typeno(ltstype, act_label);
     int count = 256; // GBchunkCount(model, action_typeno);
     seen_actions_prepare(count);
     Warning(info, "Detecting actions with prefix \"%s\"", act_detect);
@@ -3832,6 +3829,9 @@ actual_main(void)
     //    write(parent_sockets[i], msg, sizeof(msg));
     //}
 
+    // table number of first edge label
+    act_label = lts_type_find_edge_label_prefix (ltstype, LTSMIN_EDGE_TYPE_ACTION_PREFIX);
+    if (act_label != -1) action_typeno = lts_type_get_edge_label_typeno(ltstype, act_label);
     if (act_detect != NULL) init_action_detection();
 
     if (inv_detect) Abort("Invariant violation detection is not implemented.");
