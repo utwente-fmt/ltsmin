@@ -3201,7 +3201,7 @@ init_domain(vset_implementation_t impl) {
 }
 
 static void
-init_action()
+init_action_detection()
 {
     // table number of first edge label
     act_label = lts_type_find_edge_label_prefix (ltstype, LTSMIN_EDGE_TYPE_ACTION_PREFIX);
@@ -3832,7 +3832,8 @@ actual_main(void)
     //    write(parent_sockets[i], msg, sizeof(msg));
     //}
 
-    if (act_detect != NULL) init_action();
+    if (act_detect != NULL) init_action_detection();
+
     if (inv_detect) Abort("Invariant violation detection is not implemented.");
 
     if (PINS_POR != PINS_POR_NONE) Abort("Partial-order reduction and symbolic model checking are not compatible.");
