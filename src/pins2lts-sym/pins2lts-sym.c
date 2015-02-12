@@ -698,14 +698,18 @@ group_add(void *context, transition_info_t *ti, int *dst, int *cpy)
 {
     struct group_add_info *ctx = (struct group_add_info*)context;
 
-    if (vdom_supports_cpy(domain)) {
-        vrel_add_cpy(ctx->rel, ctx->src, dst, cpy);
-    } else {
-        vrel_add(ctx->rel, ctx->src, dst);
-    }
+    int act_index = 0;
+    if (ti->labels != NULL && act_label != -1) act_index = ti->labels[act_label];
+    vrel_add_act(ctx->rel, ctx->src, dst, cpy, act_index);
 
     if (act_detect && (no_exit || ErrorActions == 0)) {
-        int act_index = ti->labels[act_label];
+        // note: in theory, it might be possible that ti->labels == NULL,
+        // even though we are using action detection and act_label != -1,
+        // which was checked earlier in init_action_detection().
+        // this indicates an incorrect implementation of the pins model
+        if (ti->labels == NULL) {
+            Abort("ti->labels is null");
+        }
         if (seen_actions_test(act_index)) { // is this the first time we encounter this action?
             char *action=GBchunkGet(model,action_typeno,act_index).data;
 
