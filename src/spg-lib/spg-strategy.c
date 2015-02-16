@@ -364,10 +364,6 @@ int choose_strategy_move(const parity_game* g, const recursive_result* strategy,
                            *result ? "true" : "false");
         } else if (!*strategy_play) {
             //Print(info, "choose randomly");
-            long int nodes;
-            bn_int_t states;
-            bn_init(&states);
-            vset_count(level, &nodes, &states);
             vset_random(level, dst);
         }
     }

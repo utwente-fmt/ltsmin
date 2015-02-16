@@ -467,19 +467,16 @@ spg_attractor_chaining(const int player, const parity_game* g, recursive_result*
     int l = 0;
 
     long peak_group_count = 0;
-    long   u_count;
-    bn_int_t u_elem_count;
-    long   v_level_count;
-    bn_int_t v_level_elem_count;
-    long   v_group_count;
-    bn_int_t v_group_elem_count;
+    long u_count;
+    long v_level_count;
+    long v_group_count;
 
     // Compute fixpoint
     while (!vset_is_empty(v_level)) {
         if (log_active(infoLong))
         {
-            vset_count(u, &u_count, &u_elem_count);
-            vset_count(v_level, &v_level_count, &v_level_elem_count);
+            vset_count(u, &u_count, NULL);
+            vset_count(v_level, &v_level_count, NULL);
             RTstopTimer(options->timer);
             Print(infoLong, "[%7.3f] attr_%d^%d: u has %ld nodes, v_level has %ld nodes, v_group has %ld nodes max.",
                   RTrealTime(options->timer), player, l, u_count, v_level_count, peak_group_count);
@@ -495,9 +492,9 @@ spg_attractor_chaining(const int player, const parity_game* g, recursive_result*
             while ((options->saturation || k < 1) && !vset_is_empty(v_group)) {
                 if (log_active(infoLong))
                 {
-                    vset_count(u, &u_count, &u_elem_count);
-                    vset_count(v_level, &v_level_count, &v_level_elem_count);
-                    vset_count(v_group, &v_group_count, &v_group_elem_count);
+                    vset_count(u, &u_count, NULL);
+                    vset_count(v_level, &v_level_count, NULL);
+                    vset_count(v_group, &v_group_count, NULL);
                     Print(infoLong, "  %d: u has %ld nodes, v_level has %ld nodes, v_group has %ld nodes.", k, u_count, v_level_count, v_group_count);
                     if (v_group_count > peak_group_count) {
                         peak_group_count = v_group_count;
@@ -559,8 +556,5 @@ spg_attractor_chaining(const int player, const parity_game* g, recursive_result*
     vset_destroy(v_group);
     vset_destroy(v_level);
     vset_destroy(v_previous_level);
-    bn_clear(&u_elem_count);
-    bn_clear(&v_level_elem_count);
-    bn_clear(&v_group_elem_count);
     (void) result;
 }
