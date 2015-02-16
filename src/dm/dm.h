@@ -103,6 +103,9 @@ extern int          dm_anneal (matrix_t *, matrix_t *, matrix_t *);
 extern int          dm_optimize (matrix_t *, matrix_t *, matrix_t *);
 extern int          dm_all_perm (matrix_t *, matrix_t *, matrix_t *);
 
+extern int          dm_horizontal_flip (matrix_t *, matrix_t *, matrix_t *);
+extern int          dm_vertical_flip (matrix_t *, matrix_t *, matrix_t *);
+
 /**
  * return the matrix as index table per row/col
  * result[row/col] = pointer to struct (count, index0, .. , index_[count])
