@@ -4,9 +4,13 @@
 #include <inttypes.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <math.h>
 
 #include <hre/user.h>
 #include <vset-lib/vdom_object.h>
+#include <vset-lib/vector_set.h>
+#include <mc-lib/atomics.h>
+#include <util-lib/fast_hash.h>
 
 
 #include <sylvan.h>
@@ -271,6 +275,206 @@ set_count(vset_t set, long *nodes, double *elements)
     if (nodes != NULL) *nodes = lddmc_nodecount(set->mdd);
     if (elements != NULL) *elements = lddmc_satcount_cached(set->mdd);
     leavemt(set);
+}
+
+/* For counting precisely we use a thread-safe operation cache that allows overwriting entries.
+ * Invariants for read and write locks:
+ *  - if there is a write lock then the read lock me not be incremented
+ *  - the write lock can only be claimed by one thread
+ *  - a cache entry is only changed when there are no read locks
+ *  - a cache entry is only changed by a thread when that thread has claimed the write lock
+ * The implementation will:
+ *  - wait for an entry to become write-unlocked when getting an entry from the cache
+ *      I think waiting is beneficial, because the entry will probably get the right data.
+ *  - not wait for entry to become write-unlocked when putting an entry in the cache
+ *
+ *  I have left some code (which is commented out) which does not overwrite a cache entry.
+ *  Not overwriting requires a cache minimally 2^3 as large to achieve the same performance.
+ *  A smaller operation cache for bignums is nice because it saves a lot of memory.
+ *  The worst (and probably average) amount of initialized bignums with this implementation is
+ *  num_lace_workers * 3 (down, right, me) + cache size. */
+
+#define BN_WRITE_LOCK ((uint64_t) 0x8000000000000000)
+#define BN_READ_LOCK  ((uint64_t) 0x7FFFFC0000000000)
+#define BN_MDD ((uint64_t) 0x3FFFFFFFFFF)
+
+#define BN_IS_WRITE_UNLOCKED(foo) ((foo & BN_READ_LOCK) | (foo & ~BN_WRITE_LOCK) | (foo & BN_MDD))
+#define BN_READ_LOCK_INC(foo) (((((foo & BN_READ_LOCK) >> 42) + 1) << 42) | (foo & BN_MDD))
+#define BN_READ_LOCK_DEC(foo) (((((foo & BN_READ_LOCK) >> 42) - 1) << 42) | (foo & BN_MDD) | (foo & BN_WRITE_LOCK))
+
+struct bignum_cache {
+    uint64_t node; /* 1 bit for write lock, 21 bits for read-counter, 42 bits for MDD */
+    bn_int_t bignum;
+};
+
+struct bignum_info {
+    bn_int_t*               bignum_false;
+    bn_int_t*               bignum_true;
+    struct bignum_cache*    bignum_cache;
+    uint64_t                bignum_cache_mask;
+    uint64_t                slot;
+    bn_int_t                bignum;
+    struct bignum_info*     down;
+    struct bignum_info*     right;
+};
+
+
+TASK_2(int, lddmc_cache_get, MDD, mdd, void*, context)
+{
+    struct bignum_info* ctx = (struct bignum_info*) context;
+
+    if (mdd == lddmc_false) {
+        bn_init_copy(&ctx->bignum, ctx->bignum_false);
+        return 0;
+    }
+    if (mdd == lddmc_true) {
+        bn_init_copy(&ctx->bignum, ctx->bignum_true);
+        return 0;
+    }
+    ctx->slot = MurmurHash64(&mdd, sizeof(MDD), 0) & ctx->bignum_cache_mask;
+
+    // uncomment this to not overwrite the cache
+    //for (;;) {
+    //    uint64_t cache_node = atomic_read(&ctx->bignum_cache[ctx->slot].node);
+    //    if ((cache_node & BN_MDD) != mdd) return 0;
+    //    if (!(cache_node & BN_WRITE_LOCK)) {
+    //        bn_init_copy(&ctx->bignum, &ctx->bignum_cache[ctx->slot].bignum);
+    //        return 1;
+    //    }
+    //}
+    //return 0;
+
+    /* acquire a read lock when there is no write lock. Relax bus,
+     * because we may need to wait for some read locks and a write lock. */
+    volatile uint64_t* ptr = &ctx->bignum_cache[ctx->slot].node;
+    uint64_t n = *ptr;
+    while (!cas(ptr, BN_IS_WRITE_UNLOCKED(n), BN_READ_LOCK_INC(n))) {
+        cpu_relax();
+        n = *ptr;
+    }
+
+    /* use result if same node */
+    int res = 1;
+    if ((n & BN_MDD) == mdd) {
+        bn_init_copy(&ctx->bignum, &ctx->bignum_cache[ctx->slot].bignum);
+        res = 0;
+    }
+
+    /* release read lock */
+    do n = *ptr;
+    while (!cas(ptr, n, BN_READ_LOCK_DEC(n)));
+
+    return res;
+}
+
+VOID_TASK_3(lddmc_copy_context, void*, context, void*, parent, int, succ)
+{
+    struct bignum_info* ctx = (struct bignum_info*) context;
+
+    struct bignum_info* p = (struct bignum_info*) parent;
+
+    ctx->bignum_false = p->bignum_false;
+    ctx->bignum_true = p->bignum_true;
+    ctx->bignum_cache = p->bignum_cache;
+    ctx->bignum_cache_mask = p->bignum_cache_mask;
+
+    if (succ == 1) p->down = ctx;
+    if (succ == 0) p->right = ctx;
+}
+
+VOID_TASK_2(lddmc_cache_put, MDD, mdd, void*, context)
+{
+    struct bignum_info* ctx = (struct bignum_info*) context;
+
+    bn_init(&ctx->bignum);
+    bn_add(&ctx->down->bignum, &ctx->right->bignum, &ctx->bignum);
+    bn_clear(&ctx->down->bignum);
+    bn_clear(&ctx->right->bignum);
+
+    // uncomment this to not overwrite the cache
+    //if (cas(&ctx->bignum_cache[ctx->slot].node, 0, mdd | BN_WRITE_LOCK)) {
+    //    // major victory
+    //    bn_init_copy(&ctx->bignum_cache[ctx->slot].bignum, &ctx->bignum);
+    //    // release lock
+    //    atomic_write(&ctx->bignum_cache[ctx->slot].node, mdd & BN_MDD);
+    //}
+
+    /* acquire the write lock, but don't wait for unlock */
+    volatile uint64_t* ptr = &ctx->bignum_cache[ctx->slot].node;
+    uint64_t n;
+    do {
+        n = *ptr;
+        if (n & BN_WRITE_LOCK) return;
+    } while (!cas(ptr, n & ~BN_WRITE_LOCK, n | BN_WRITE_LOCK));
+
+    /* Wait for all read locks to be released.
+     * Also relax bus, because we may need to wait for a number
+     * of read locks to be released */
+    n = *ptr;
+    while (n & BN_READ_LOCK) { cpu_relax(); n = *ptr; }
+
+    /* clear bignum only if there was one previously. */
+    if ((n & BN_MDD) != 0) bn_clear(&ctx->bignum_cache[ctx->slot].bignum);
+
+    /* put bignum in cache */
+    bn_init_copy(&ctx->bignum_cache[ctx->slot].bignum, &ctx->bignum);
+
+    /* write the node number, note that this will also release the write lock */
+    *ptr = mdd;
+}
+
+/* compute most significant high bit */
+static inline size_t
+mshb(long num)
+{
+    size_t r = 0;
+    while (num >>= 1) r++;
+    return r;
+}
+
+static void
+set_count_precise(vset_t set, long *nodes, bn_int_t *elements)
+{
+    *nodes = lddmc_nodecount(set->mdd);
+
+    struct bignum_info ctx;
+
+    bn_int_t bignum_false;
+    bn_init(&bignum_false);
+    ctx.bignum_false = &bignum_false;
+
+    bn_int_t bignum_true;
+    bn_init(&bignum_true);
+    bn_set_digit(&bignum_true, 1);
+    ctx.bignum_true = &bignum_true;
+
+    uint64_t cache_size;
+    if (_cache_diff() <= 0) {
+        cache_size = pow(2, mshb(*nodes >> (_cache_diff() * -1)));
+    } else {
+        cache_size = pow(2, mshb(*nodes << _cache_diff()));
+    }
+
+    Warning(infoLong, "Bignum cache size is %" PRIu64 " entries", cache_size);
+
+    ctx.bignum_cache_mask = cache_size - 1;
+    ctx.bignum_cache = RTalignZero(CACHE_LINE_SIZE, cache_size * sizeof(struct bignum_cache));
+
+    lddmc_visit_callbacks_t cbs;
+    cbs.lddmc_visit_pre = TASK(lddmc_cache_get);
+    cbs.lddmc_visit_init_context = TASK(lddmc_copy_context);
+    cbs.lddmc_visit_post = TASK(lddmc_cache_put);
+
+    LACE_ME;
+    lddmc_visit_par(set->mdd, &cbs, sizeof(struct bignum_info), &ctx);
+
+    bn_init_copy(elements, &ctx.bignum);
+
+    for (uint64_t i = 0; i < cache_size; i++) {
+        if (ctx.bignum_cache[i].node) bn_clear(&ctx.bignum_cache[i].bignum);
+    }
+
+    RTfree(ctx.bignum_cache);
 }
 
 static void
@@ -709,6 +913,7 @@ set_function_pointers(vdom_t dom)
     dom->shared.set_clear=set_clear;
     dom->shared.set_copy=set_copy;
     dom->shared.set_count=set_count;
+    dom->shared.set_count_precise=set_count_precise;
     dom->shared.set_project=set_project;
     dom->shared.set_project_minus=set_project_minus;
     dom->shared.set_union=set_union;
