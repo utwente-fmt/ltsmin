@@ -957,37 +957,19 @@ last_ (matrix_t *m, int row)
 }
 
 static inline int
-row_costs_ (matrix_t *r, matrix_t *mayw, int row)
+row_costs_ (matrix_t *m, int row)
 {
-    HREassert(
-                dm_ncols(r) == dm_ncols(mayw) &&
-                dm_nrows(r) == dm_nrows(mayw), "matrix sizes do not match");
-    
-    int writes = 0;
-    int cost = 0;
-    for (int i = 0; i < dm_ncols(r); i++) {
-        if (dm_is_set(mayw, row, i)) writes++;
-        if (dm_is_set(r, row, i)) cost += writes;
-    }
-
-    cost += max(last_ (mayw, row), last_ (r, row)) - min(first_ (mayw, row), first_ (r, row)) + 1;
-
-    return cost;
-
+    return last_ (m, row) - first_ (m, row) + 1;
 }
 
 static int
-cost_ (matrix_t *r, matrix_t *mayw)
+cost_ (matrix_t *m)
 {
-    HREassert(
-                dm_ncols(r) == dm_ncols(mayw) &&
-                dm_nrows(r) == dm_nrows(mayw), "matrix sizes do not match");
-    
     int                 i,
                         result;
     result = 0;
-    for (i = 0; i < dm_nrows (r); i++)
-        result += row_costs_ (r, mayw, i);
+    for (i = 0; i < dm_nrows (m); i++)
+        result += row_costs_ (m, i);
     return result;
 }
 
@@ -1008,8 +990,8 @@ dm_anneal (matrix_t *r, matrix_t *mayw, matrix_t *mustw)
                 dm_ncols(r) == dm_ncols(mustw) &&
                 dm_nrows(r) == dm_nrows(mustw), "matrix sizes do not match");
     
-    int ncols = dm_ncols(r);
-    double cur_cost = cost_(r, mayw);
+    int ncols = dm_ncols(mayw);
+    double cur_cost = cost_(mayw);
     double temp = INIT_TEMP;
 
     srandom(time(NULL));
@@ -1037,7 +1019,7 @@ dm_anneal (matrix_t *r, matrix_t *mayw, matrix_t *mustw)
                 dm_free_permutation_group(&rot);
             }
 
-            double delta = cost_(r, mayw) - cur_cost;
+            double delta = cost_(mayw) - cur_cost;
 
             if (delta < 0) {
                 cur_cost += delta;
@@ -1070,7 +1052,7 @@ dm_anneal (matrix_t *r, matrix_t *mayw, matrix_t *mustw)
             temp /= COOL_FRAC;
     }
 
-    DMDBG (printf ("cost: %d ", cost_ (r, mayw)));
+    DMDBG (printf ("cost: %d ", cost_ (mayw)));
 
     return 0;
 }
@@ -1141,38 +1123,33 @@ dm_optimize (matrix_t *r, matrix_t *mayw, matrix_t *mustw)
                 dm_nrows(r) == dm_nrows(mayw) &&
                 dm_ncols(r) == dm_ncols(mustw) &&
                 dm_nrows(r) == dm_nrows(mustw), "matrix sizes do not match");
-    
-    matrix_t* test = RTmalloc(sizeof(matrix_t));
-    dm_create(test, dm_nrows(r), dm_ncols(r));
-    dm_copy(r, test);
-    dm_apply_or(test, mayw);
 
-    int                 d_rot[dm_ncols (r)];
+    int                 d_rot[dm_ncols (mayw)];
     permutation_group_t rot;
 
     int best_i = 0,
     best_j = 0,
-    min = cost_ (r, mayw),
+    min = cost_ (mayw),
     last_min = 0;
     int i, j, c, k, d;
 
-    int firsts[dm_nrows(r)];
-    int lasts[dm_nrows(r)];
+    int firsts[dm_nrows(mayw)];
+    int lasts[dm_nrows(mayw)];
 
     while (last_min != min) {
         last_min = min;
 
         // initialize first and last integers per row
-        for (i=0; i<dm_nrows(r); i++) {
-            firsts[i] = first_(test,i);
-            lasts[i]  = last_(test,i);
+        for (i=0; i<dm_nrows(mayw); i++) {
+            firsts[i] = first_(mayw,i);
+            lasts[i]  = last_(mayw,i);
         }
 
         // find best rotation
-        for (i = 0; i < dm_ncols (r); i++) {
-            for (j = 0; j < dm_ncols (r); j++) {
+        for (i = 0; i < dm_ncols (mayw); i++) {
+            for (j = 0; j < dm_ncols (mayw); j++) {
                 if (i != j) {
-                    c=estimate_cost(test,i,j,firsts,lasts);
+                    c=estimate_cost(mayw,i,j,firsts,lasts);
                     if (c < min) {
                         min = c;
                         best_i = i;
@@ -1185,14 +1162,13 @@ dm_optimize (matrix_t *r, matrix_t *mayw, matrix_t *mustw)
         // rotate
         if (best_i != best_j) {
             d = best_i < best_j ? 1 : -1;
-            dm_create_permutation_group (&rot, dm_ncols (r), d_rot);
+            dm_create_permutation_group (&rot, dm_ncols (mayw), d_rot);
             for (k = best_i; k != best_j; k += d)
                 dm_add_to_permutation_group (&rot, k);
             dm_add_to_permutation_group (&rot, best_j);
             dm_permute_cols (r, &rot);
             dm_permute_cols (mayw, &rot);
             dm_permute_cols (mustw, &rot);
-            dm_permute_cols (test, &rot);
             dm_free_permutation_group (&rot);
 
             DMDBG (printf("best rotation: %d-%d, costs %d\n", best_i, best_j, min));
@@ -1201,8 +1177,7 @@ dm_optimize (matrix_t *r, matrix_t *mayw, matrix_t *mustw)
             best_i = best_j = 0;
         }
     }
-    DMDBG (printf ("cost: %d ", cost_ (r, mayw)));
-    dm_free(test);
+    DMDBG (printf ("cost: %d ", cost_ (mayw)));
     return 0;
 }
 
@@ -1232,13 +1207,13 @@ int
 dm_all_perm (matrix_t *r, matrix_t *mayw, matrix_t *mustw)
 {
     // http://www.freewebz.com/permute/soda_submit.html
-    int                 len = dm_ncols (r);
+    int                 len = dm_ncols (mayw);
     int                 perm[len];
     int                 best_perm[len];
     int                 min,
                         last_min;
 
-    min = cost_ (r, mayw);
+    min = cost_ (mayw);
 
     int                 i,
                         j;
@@ -1248,7 +1223,7 @@ dm_all_perm (matrix_t *r, matrix_t *mayw, matrix_t *mustw)
     }
 
     while (1) {
-        last_min = cost_ (r, mayw);
+        last_min = cost_ (mayw);
         if (last_min < min) {
             memcpy (best_perm, perm, len * sizeof (int));
             min = last_min;
@@ -1319,7 +1294,7 @@ dm_all_perm (matrix_t *r, matrix_t *mayw, matrix_t *mustw)
     }
     DMDBG (printf ("current:"));
     DMDBG (current_all_perm_ (perm, len));
-    DMDBG (printf ("cost: %d ", cost_ (r, mayw)));
+    DMDBG (printf ("cost: %d ", cost_ (mayw)));
 
     return 0;
 }
