@@ -66,6 +66,11 @@ endif
 SUBDIRS += pins2lts-dist
 SUBDIRS += torx
 
+if HAVE_ATOMICS
+# multi-core lib, lockless data structures and a load balancer
+SUBDIRS += mc-lib
+endif
+
 # vset (BDD/MDD) lib
 SUBDIRS += vset-lib
 
@@ -79,9 +84,6 @@ SUBDIRS += pins2lts-sym
 endif
 
 if HAVE_ATOMICS
-# multi-core lib, lockless data structures and a load balancer
-SUBDIRS += mc-lib
-
 SUBDIRS += pins2lts-mc
 SUBDIRS += pins2lts-seq
 endif
