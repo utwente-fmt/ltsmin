@@ -35,6 +35,8 @@ extern vdom_t vdom_create_lddmc_from_file(FILE *f);
 
 vset_implementation_t vset_default_domain = VSET_IMPL_AUTOSELECT;
 
+int vset_cache_diff = -2;
+
 static void vset_popt(poptContext con,
  		enum poptCallbackReason reason,
                             const struct poptOption * opt,
@@ -54,6 +56,7 @@ static void vset_popt(poptContext con,
 			vset_default_domain=res;
 			return;
 		}
+		if (!strcmp(opt->longName,"vset-cache-diff")) return;
 		Abort("unexpected call to vset_popt");
 	}
 }
@@ -95,6 +98,8 @@ struct poptOption vset_options[]={
 	{ NULL,0 , POPT_ARG_INCLUDE_TABLE , sylvan_options , 0 , "Sylvan options" , NULL},
 	{ NULL,0 , POPT_ARG_INCLUDE_TABLE , lddmc_options , 0 , "LDDmc options" , NULL},
 #endif // HAVE_SYLVAN
+    { "vset-cache-diff", 0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &vset_cache_diff , 0 ,
+      "Influences size of operations cache when counting precisely with bignums: cache size = floor(2log('nodes-to-count')) + <diff>", "<diff>"},
     POPT_TABLEEND
 };
 
@@ -408,11 +413,19 @@ void vset_example_match(vset_t set,int *e, int p_len, int* proj, int* match){
         set->dom->shared.set_example_match(set,e,p_len,proj,match);
 }
 
-void vset_count(vset_t set,long *nodes,bn_int_t *elements){
-	set->dom->shared.set_count(set,nodes,elements);
+void vset_count(vset_t set,long *nodes,double *elements){
+	return set->dom->shared.set_count(set,nodes,elements);
 }
 
-void vrel_count(vrel_t rel,long *nodes,bn_int_t *elements){
+void vset_count_precise(vset_t set,long *nodes,bn_int_t *elements){
+	return set->dom->shared.set_count_precise(set,nodes,elements);
+}
+
+int vdom_supports_precise_counting(vdom_t dom) {
+	return dom->shared.set_count_precise != NULL;
+}
+
+void vrel_count(vrel_t rel,long *nodes,double *elements){
 	rel->dom->shared.rel_count(rel,nodes,elements);
 }
 
@@ -578,4 +591,10 @@ int
 vdom_vector_size(vdom_t dom)
 {
     return dom->shared.size;
+}
+
+int
+_cache_diff()
+{
+    return vset_cache_diff;
 }

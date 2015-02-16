@@ -395,28 +395,26 @@ static void set_copy_match_fdd(vset_t dst,vset_t src,int p_len,int* proj,int*mat
     }
 }
 
-static void count_fdd(BDD bdd, BDD p_set,long *nodes,bn_int_t *elements)
+static void count_fdd(BDD bdd, BDD p_set,long *nodes,double *elements)
 {
     if (nodes != NULL) *nodes=bdd_nodecount(bdd);
     if (elements != NULL) {
-        double count=bdd_satcountlnset(bdd,p_set);
+        *elements=bdd_satcountlnset(bdd,p_set);
         //Warning(info,"log of satcount is %f",count);
-        if (count == 0.0 && bdd != bddtrue) {
+        if (*elements == 0.0 && bdd != bddtrue) {
             // count is zero or one
-            count=bdd_satcountset(bdd, p_set);
+            *elements=bdd_satcountset(bdd, p_set);
         } else {
-            count=round(pow(2.0, count));
+            *elements=round(pow(2.0, *elements));
         }
-        //Warning(info,"satcount is %f",count);
-        bn_double2int(count,elements);
     }
 }
 
-static void set_count_fdd(vset_t set,long *nodes,bn_int_t *elements){
+static void set_count_fdd(vset_t set,long *nodes,double *elements){
   count_fdd(set->bdd,set->p_set,nodes,elements);
 }
 
-static void rel_count_fdd(vrel_t rel,long *nodes,bn_int_t *elements){
+static void rel_count_fdd(vrel_t rel,long *nodes,double *elements){
   count_fdd(rel->bdd,rel->rel_set,nodes,elements);
 }
 
