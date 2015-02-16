@@ -2133,11 +2133,7 @@ reach_chain_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
     vset_t temp = vset_create(domain, -1, NULL);
     vset_t deadlocks = dlk_detect?vset_create(domain, -1, NULL):NULL;
     vset_t dlk_temp = dlk_detect?vset_create(domain, -1, NULL):NULL;
-    vset_t new_reduced[nGrps];
-
-    for(int i=0;i<nGrps;i++) {
-        new_reduced[i]=vset_create(domain, -1, NULL);
-    }
+    vset_t new_reduced = vset_create(domain, -1, NULL);
 
     vset_t guard_maybe[nGuards];
     vset_t tmp = NULL;
@@ -2163,15 +2159,18 @@ reach_chain_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
         for (int i = 0; i < nGrps; i++) {
             if (!bitvector_is_set(reach_groups, i)) continue;
             if (trc_output != NULL) save_level(visited);
-            vset_copy(new_reduced[i], new_states);
-            learn_guards_reduce(new_reduced[i], i, guard_count, guard_maybe, false_states, maybe_states, tmp);
 
-            if (!vset_is_empty(new_reduced[i])) {
-                expand_group_next(i, new_reduced[i]);
+
+            vset_copy(new_reduced, new_states);
+            learn_guards_reduce(new_reduced, i, guard_count, guard_maybe, false_states, maybe_states, tmp);
+
+            if (!vset_is_empty(new_reduced)) {
+                expand_group_next(i, new_reduced);
                 reach_chain_stop();
                 (*eg_count)++;
                 (*next_count)++;
-                vset_next(temp, new_reduced[i], group_next[i]);
+                vset_next(temp, new_reduced, group_next[i]);
+                vset_clear(new_reduced);
                 if (dlk_detect) {
                     vset_prev(dlk_temp, temp, group_next[i], deadlocks);
                     reduce(i, dlk_temp);
@@ -2183,7 +2182,6 @@ reach_chain_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
                 vset_union(new_states, temp);
                 vset_clear(temp);
             }
-            vset_clear(new_reduced[i]);
         }
         // no deadlocks in old new_states
         if (dlk_detect) deadlock_check(deadlocks, reach_groups);
@@ -2194,9 +2192,8 @@ reach_chain_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
 
     vset_destroy(new_states);
     vset_destroy(temp);
-    for(int i=0;i<nGrps;i++) {
-        vset_destroy(new_reduced[i]);
-    }
+    vset_destroy(new_reduced);
+
     if (dlk_detect) {
         vset_destroy(deadlocks);
         vset_destroy(dlk_temp);
@@ -2222,11 +2219,7 @@ reach_chain(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
     vset_t temp = vset_create(domain, -1, NULL);
     vset_t deadlocks = dlk_detect?vset_create(domain, -1, NULL):NULL;
     vset_t dlk_temp = dlk_detect?vset_create(domain, -1, NULL):NULL;
-    vset_t new_reduced[nGrps];
-
-    for(int i=0;i<nGrps;i++) {
-        new_reduced[i]=vset_create(domain, -1, NULL);
-    }
+    vset_t new_reduced = vset_create(domain, -1, NULL);
 
     vset_t guard_maybe[nGuards];
     vset_t tmp = NULL;
@@ -2250,13 +2243,14 @@ reach_chain(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
         for (int i = 0; i < nGrps; i++) {
             if (!bitvector_is_set(reach_groups, i)) continue;
             if (trc_output != NULL) save_level(visited);
-            vset_copy(new_reduced[i], visited);
-            learn_guards_reduce(new_reduced[i], i, guard_count, guard_maybe, false_states, maybe_states, tmp);
-            expand_group_next(i, new_reduced[i]);
+            vset_copy(new_reduced, visited);
+            learn_guards_reduce(new_reduced, i, guard_count, guard_maybe, false_states, maybe_states, tmp);
+            expand_group_next(i, new_reduced);
             reach_chain_stop();
             (*eg_count)++;
             (*next_count)++;
-            vset_next(temp, new_reduced[i], group_next[i]);
+            vset_next(temp, new_reduced, group_next[i]);
+            vset_clear(new_reduced);
             vset_union(visited, temp);
             if (dlk_detect) {
                 vset_prev(dlk_temp, temp, group_next[i],deadlocks);
@@ -2264,6 +2258,7 @@ reach_chain(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
                 vset_minus(deadlocks, dlk_temp);
                 vset_clear(dlk_temp);
             }
+            vset_clear(temp);
         }
         // no deadlocks in old_vis
         if (dlk_detect) deadlock_check(deadlocks, reach_groups);
@@ -2272,9 +2267,8 @@ reach_chain(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
 
     vset_destroy(old_vis);
     vset_destroy(temp);
-    for(int i=0;i<nGrps;i++) {
-        vset_destroy(new_reduced[i]);
-    }
+    vset_destroy(new_reduced);
+
     if (dlk_detect) {
         vset_destroy(deadlocks);
         vset_destroy(dlk_temp);
