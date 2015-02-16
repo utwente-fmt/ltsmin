@@ -80,3 +80,7 @@ space.
         a guard evaluates to maybe there is another guard on the left which evaluates to false. For languages such as
         mCRL2 it also checks whether a guard on the right evaluates to false. If for all states this holds then the
         model specification is sound for guard-splitting.
+        
+*--precise*::
+        Compute the final number of states precisely.
+        

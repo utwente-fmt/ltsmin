@@ -4,6 +4,7 @@
 #define _DARWIN_C_SOURCE
 #endif
 
+#include <float.h>
 #include <alloca.h>
 #include <assert.h>
 #include <dirent.h>
@@ -57,6 +58,7 @@ static int   act_index;
 static int   act_label;
 static int   action_typeno;
 static int   ErrorActions = 0; // count number of found errors (action/deadlock/invariant)
+static int   precise = 0;
 
 static uint64_t *seen_actions = 0;
 static int seen_actions_size = 0;
@@ -219,6 +221,7 @@ static  struct poptOption options[] = {
     { NULL, 0 , POPT_ARG_INCLUDE_TABLE, greybox_options , 0 , "PINS options",NULL},
     { NULL, 0 , POPT_ARG_INCLUDE_TABLE, vset_options , 0 , "Vector set options",NULL},
     { "no-soundness-check", 0, POPT_ARG_VAL, &no_soundness_check, 1, "disable checking whether the model specification is sound for guards", NULL },
+    { "precise", 0, POPT_ARG_NONE, &precise, 0, "Compute the final number of states precisely", NULL},
     POPT_TABLEEND
 };
 
@@ -590,16 +593,11 @@ VOID_TASK_2(eval_guard, int, guard, vset_t, set)
 
     // count when verbose
     if (log_active(infoLong)) {
-        bn_int_t elem_count;
+        double elem_count;
         vset_count(guard_tmp[guard], NULL, &elem_count);
-        if (bn_int2double(&elem_count) >= 10000.0 * SPEC_REL_PERF) {
-            size_t size = 40;
-            char s[size];
-            bn_int2string(s, size, &elem_count);
-            Print(infoLong, "expanding guard %d for %s states.", guard, s);
+        if (elem_count >= 10000.0 * SPEC_REL_PERF) {
+            Print(infoLong, "expanding guard %d for %.*g states.", DBL_DIG, guard, elem_count);
         }
-        bn_clear(&elem_count);
-
     }
 
     // we evaluate guards twice, because we can not yet add to two different sets.
@@ -750,17 +748,12 @@ VOID_TASK_2(expand_group_next, int, group, vset_t, set)
     vset_union(group_explored[group], group_tmp[group]);
 
     if (log_active(infoLong)) {
-        bn_int_t elem_count;
+        double elem_count;
         vset_count(group_tmp[group], NULL, &elem_count);
 
-        if (bn_int2double(&elem_count) >= 10000.0 * SPEC_REL_PERF) {
-            size_t size = 40;
-            char s[size];
-            bn_int2string(s, size, &elem_count);
-
-            Print(infoLong, "expanding group %d for %s states.", group, s);
+        if (elem_count >= 10000.0 * SPEC_REL_PERF) {
+            Print(infoLong, "expanding group %d for %.*g states.", group, DBL_DIG, elem_count);
         }
-        bn_clear(&elem_count);
     }
 
     vrel_update(group_next[group], group_tmp[group], explore_cb, &ctx);
@@ -942,88 +935,45 @@ deadlock_check(vset_t deadlocks, bitvector_t *reach_groups)
     }
 }
 
-static inline void
-get_vset_size(vset_t set, long *node_count, double *elem_approximation,
-                  char *elem_str, ssize_t str_len)
-{
-    bn_int_t elem_count;
-    int      len;
-
-    vset_count(set, node_count, &elem_count);
-    len = bn_int2string(elem_str, str_len, &elem_count);
-
-    if (len >= str_len)
-        Abort("Error converting number to string");
-
-    *elem_approximation = bn_int2double(&elem_count);
-
-    bn_clear(&elem_count);
-}
-
-static inline void
-get_vrel_size(vrel_t rel, long *node_count, double *elem_approximation,
-                  char *elem_str, ssize_t str_len)
-{
-    bn_int_t elem_count;
-    int      len;
-
-    vrel_count(rel, node_count, &elem_count);
-    len = bn_int2string(elem_str, str_len, &elem_count);
-
-    if (len >= str_len)
-        Abort("Error converting number to string");
-
-    *elem_approximation = bn_int2double(&elem_count);
-
-    bn_clear(&elem_count);
-}
-
 static void
 stats_and_progress_report(vset_t current, vset_t visited, int level)
 {
     long   n_count;
-    char   elem_str[1024];
     double e_count;
     
-    if (sat_strategy == NO_SAT || log_active(infoLong)) Print(infoShort, "level %d is finished",level);
-    if (log_active(infoLong)) {
-      if (current != NULL) {
-        get_vset_size(current, &n_count, &e_count, elem_str, sizeof(elem_str));
-        Print(infoLong, "level %d has %s (~%1.2e) states ( %ld nodes )",
-	      level, elem_str, e_count, n_count);
-        if (n_count > max_lev_count)
-	  max_lev_count = n_count;
-      }
-      get_vset_size(visited, &n_count, &e_count, elem_str, sizeof(elem_str));
-      Print(infoLong, "visited %d has %s (~%1.2e) states ( %ld nodes )",
-	    level, elem_str, e_count, n_count);
-      
-      if (n_count > max_vis_count)
-        max_vis_count = n_count;
-      
-      if (log_active(debug)) {
-        Debug("transition caches ( grp nds elts ):");
-	
-        for (int i = 0; i < nGrps; i++) {
-	  get_vrel_size(group_next[i], &n_count, &e_count, elem_str,
-			sizeof(elem_str));
-	  Debug("( %d %ld %s ) ", i, n_count, elem_str);
-	  
-	  if (n_count > max_trans_count)
-	    max_trans_count = n_count;
+    if (sat_strategy == NO_SAT || log_active (infoLong)) {
+        Print(infoShort, "level %d is finished", level);
+    }
+    if (log_active (infoLong)) {
+        if (current != NULL) {
+            vset_count (current, &n_count, &e_count);
+            Print(infoLong, "level %d has %.*g states ( %ld nodes )", level, DBL_DIG, e_count, n_count);
+            if (n_count > max_lev_count) max_lev_count = n_count;
         }
-	
-        Debug("\ngroup explored    ( grp nds elts ): ");
-	
-        for (int i = 0; i < nGrps; i++) {
-	  get_vset_size(group_explored[i], &n_count, &e_count, elem_str,
-			sizeof(elem_str));
-	  Debug("( %d %ld %s ) ", i, n_count, elem_str);
-	  
-	  if (n_count > max_grp_count)
-	    max_grp_count = n_count;
+        vset_count (visited, &n_count, &e_count);
+        Print(infoLong, "visited %d has %.*g states ( %ld nodes )", level, DBL_DIG, e_count, n_count);
+
+        if (n_count > max_vis_count) max_vis_count = n_count;
+
+        if (log_active (debug)) {
+            Debug("transition caches ( grp nds elts ):");
+
+            for (int i = 0; i < nGrps; i++) {
+                vrel_count(group_next[i], &n_count, NULL);
+                Debug("( %d %ld ) ", i, n_count);
+
+                if (n_count > max_trans_count) max_trans_count = n_count;
+            }
+
+            Debug("\ngroup explored    ( grp nds elts ): ");
+
+            for (int i = 0; i < nGrps; i++) {
+                vset_count(group_explored[i], &n_count, NULL);
+                Debug("( %d %ld) ", i, n_count);
+
+                if (n_count > max_grp_count) max_grp_count = n_count;
+            }
         }
-      }
     }
     
     if (dot_dir != NULL) {
@@ -1077,40 +1027,61 @@ stats_and_progress_report(vset_t current, vset_t visited, int level)
 static void
 final_stat_reporting(vset_t visited, rt_timer_t timer)
 {
-    long   n_count;
-    char   elem_str[1024];
-    double e_count;
-
     RTprintTimer(info,timer, "reachability took");
 
-    if (dlk_detect)
-        Warning(info, "No deadlocks found");
+    if (dlk_detect) Warning(info, "No deadlocks found");
 
-    if (act_detect != NULL)
+    if (act_detect != NULL) {
         Warning(info, "%d different actions with prefix \"%s\" are found", ErrorActions, act_detect);
+    }
 
+    long n_count;
     Print(infoShort, "counting visited states...");
     rt_timer_t t = RTcreateTimer();
     RTstartTimer(t);
-    get_vset_size(visited, &n_count, &e_count, elem_str, sizeof(elem_str));
+    double e_count;
+    vset_count(visited, &n_count, &e_count);
     RTstopTimer(t);
     RTprintTimer(infoShort, t, "counting took");
-    Print(infoShort, "state space has %s (~%1.2e) states, %ld BDD nodes", elem_str, e_count,n_count);
 
-    if (log_active(infoLong)) {
-      if (max_lev_count == 0) {
-        Print(infoLong, "( %ld final BDD nodes; %ld peak nodes )",
-	      n_count, max_vis_count);
-      } else {
-        Print(infoLong, "( %ld final BDD nodes; %ld peak nodes; "
-	      "%ld peak nodes per level )",
-	      n_count, max_vis_count, max_lev_count);
-      }
-      
-      if (log_active(debug)) {
-	Debug("( peak transition cache: %ld nodes; peak group explored: "
-	      "%ld nodes )\n", max_trans_count, max_grp_count);
-      }
+    char states[128];
+    snprintf(states, 128, "%.*g", DBL_DIG, e_count);
+
+    int is_precise = strstr(states, "e") == NULL && strstr(states, "inf") == NULL;
+
+    Print(infoShort, "state space has%s %s states, %ld nodes", precise && is_precise ? " precisely" : "", states, n_count);
+
+    if (!is_precise && precise) {
+        if (vdom_supports_precise_count(domain)) {
+            Print(infoShort, "counting visited states precisely...");
+            rt_timer_t t = RTcreateTimer();
+            RTstartTimer(t);
+            bn_int_t e_count;
+            vset_count_precise(visited, &n_count, &e_count);
+            RTstopTimer(t);
+            RTprintTimer(infoShort, t, "counting took");
+
+            size_t len = bn_strlen(&e_count);
+            char e_str[len];
+            bn_int2string(e_str, len, &e_count);
+
+            Print(infoShort, "state space has precisely %s states (%zu digits), %ld nodes", e_str, strlen(e_str), n_count);
+        } else Warning(info, "vset implementation does not support precise counting");
+    }
+
+    if (log_active (infoLong)) {
+        if (max_lev_count == 0) {
+            Print(infoLong, "( %ld final BDD nodes; %ld peak nodes )", n_count, max_vis_count);
+        } else {
+            Print(infoLong,
+                  "( %ld final BDD nodes; %ld peak nodes; %ld peak nodes per level )",
+                  n_count, max_vis_count, max_lev_count);
+        }
+
+        if (log_active (debug)) {
+            Debug("( peak transition cache: %ld nodes; peak group explored: " "%ld nodes )\n",
+                  max_trans_count, max_grp_count);
+        }
     }
 }
 
@@ -1131,11 +1102,9 @@ static inline void add_variable_subset(vset_t dst, vset_t src, vdom_t domain, in
 
     if (debug_output_enabled && log_active(infoLong))
     {
-        long   n_count;
-        char   elem_str[1024];
         double e_count;
-        get_vset_size(u, &n_count, &e_count, elem_str, sizeof(elem_str));
-        if (e_count > 0) Print(infoLong, "add_variable_subset: %d:  %s (~%1.2e) states", var_index, elem_str, e_count);
+        vset_count(u, NULL, &e_count);
+        if (e_count > 0) Print(infoLong, "add_variable_subset: %d: %.*g states", var_index, DBL_DIG, e_count);
     }
 
     vset_union(dst, u);
@@ -3409,24 +3378,16 @@ parity_game* compute_symbolic_parity_game(vset_t visited, int* src)
         for(int p = 0; p < 2; p++)
         {
             long   n_count;
-            bn_int_t elem_count;
-            size_t size = 20;
-            char s[size];
+            double elem_count;
             vset_count(g->v_player[p], &n_count, &elem_count);
-            bn_int2string(s, size, &elem_count);
-            bn_clear(&elem_count);
-            Print(infoLong, "player %d: %ld nodes, %s elements.", p, n_count, s);
+            Print(infoLong, "player %d: %ld nodes, %.*g elements.", p, n_count, DBL_DIG, elem_count);
         }
         for(int p = min_priority; p <= max_priority; p++)
         {
             long   n_count;
-            bn_int_t elem_count;
-            size_t size = 20;
-            char s[size];
+            double elem_count;
             vset_count(g->v_priority[p], &n_count, &elem_count);
-            bn_int2string(s, size, &elem_count);
-            bn_clear(&elem_count);
-            Print(infoLong, "priority %d: %ld nodes, %s elements.", p, n_count, s);
+            Print(infoLong, "priority %d: %ld nodes, %.*g elements.", p, n_count, DBL_DIG, elem_count);
         }
     }
     for(int i = 0; i < nGrps; i++)
@@ -3707,18 +3668,18 @@ VOID_TASK_1(actual_main, void*, arg)
     /* optionally print counts of all group_next and group_explored sets */
     if (log_active(infoLong)) {
         long   n_count;
-        char   elem_str[1024];
         double e_count;
 
         long total_count = 0;
         long explored_total_count = 0;
         for(int i=0; i<nGrps; i++) {
-            get_vrel_size(group_next[i], &n_count, &e_count, elem_str, sizeof(elem_str));
-            Print(infoLong, "group_next[%d]: %s (~%1.2e) short vectors %ld nodes", i, elem_str, e_count, n_count);
+
+            vrel_count(group_next[i], &n_count, &e_count);
+            Print(infoLong, "group_next[%d]: %.*g short vectors %ld nodes", i, DBL_DIG, e_count, n_count);
             total_count += n_count;
 
-            get_vset_size(group_explored[i], &n_count, &e_count, elem_str, sizeof(elem_str));
-            Print(infoLong, "group_explored[%d]: %s (~%1.2e) states, %ld nodes", i, elem_str, e_count, n_count);
+            vset_count(group_explored[i], &n_count, &e_count);
+            Print(infoLong, "group_explored[%d]: %.*g states, %ld nodes", i, DBL_DIG, e_count, n_count);
             explored_total_count += n_count;
         }
         Print(infoLong, "group_next: %ld nodes total", total_count);
@@ -3728,12 +3689,12 @@ VOID_TASK_1(actual_main, void*, arg)
             long total_false = 0;
             long total_true = 0;
             for(int i=0;i<nGuards; i++) {
-                get_vset_size(guard_false[i], &n_count, &e_count, elem_str, sizeof(elem_str));
-                Print(infoLong, "guard_false[%d]: %s (~%1.2e) short vectors, %ld nodes", i, elem_str, e_count, n_count);
+                vset_count(guard_false[i], &n_count, &e_count);
+                Print(infoLong, "guard_false[%d]: %.*g short vectors, %ld nodes", i, DBL_DIG, e_count, n_count);
                 total_false += n_count;
 
-                get_vset_size(guard_true[i], &n_count, &e_count, elem_str, sizeof(elem_str));
-                Print(infoLong, "guard_true[%d]: %s (~%1.2e) short vectors, %ld nodes", i, elem_str, e_count, n_count);
+                vset_count(guard_true[i], &n_count, &e_count);
+                Print(infoLong, "guard_true[%d]: %.*g short vectors, %ld nodes", i, DBL_DIG, e_count, n_count);
                 total_true += n_count;
             }
             Print(infoLong, "guard_false: %ld nodes total", total_false);
@@ -3746,13 +3707,12 @@ VOID_TASK_1(actual_main, void*, arg)
         vset_t x = mu_compute(mu_expr, visited);
 
         if (x) {
-            long   n_count;
-            char   elem_str[1024];
             double e_count;
 
-            get_vset_size(x, &n_count, &e_count, elem_str, sizeof(elem_str));
-            Warning(info, "mu formula holds for %s (~%1.2e) states\n", elem_str, e_count);
-            Warning(info, " the initial state is %sin the set\n", vset_member(x, src) ? "" : "not ");
+            vset_count(x, NULL, &e_count);
+            Warning(info, "mu formula holds for %.*g states\n", DBL_DIG, e_count);
+            Warning(info, " the initial state is %sin the set\n",
+                        vset_member(x, src) ? "" : "not ");
             vset_destroy(x);
         }
     }
