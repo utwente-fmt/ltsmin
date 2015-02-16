@@ -4,9 +4,11 @@
 #include <inttypes.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <math.h>
 
 #include <hre/user.h>
 #include <vset-lib/vdom_object.h>
+#include <vset-lib/vector_set.h>
 #include <hre-io/user.h>
 #include <util-lib/simplemap.h>
 
@@ -891,29 +893,95 @@ static int set_member_mdd(vset_t set, const int* e)
 }
 
 static void
-set_count_mdd(vset_t set, long *nodes, bn_int_t *elements)
+set_count_mdd(vset_t set, long *nodes, double *elements)
 {
-    if (nodes != NULL) {
-        long n_count = mdd_node_count(set->mdd);
-        *nodes = n_count;
+    if (nodes != NULL) *nodes = mdd_node_count(set->mdd);
+    if (elements != NULL) *elements = mdd_count(set->mdd);
+}
+
+struct bignum_cache {
+    uint32_t node;
+    bn_int_t bignum;
+};
+
+bn_int_t                bignum_false;
+bn_int_t                bignum_true;
+struct bignum_cache*    bignum_cache = NULL;
+uint32_t                bignum_cache_size = 0;
+
+static void
+mdd_count_precise(uint32_t node, bn_int_t* bignum)
+{
+    if (node == 0) {
+        bn_init_copy(bignum, &bignum_false);
+        return;
     }
-    if (elements != NULL) {
-        double e_count   = mdd_count(set->mdd);
-        bn_double2int(e_count, elements);
+    if (node == 1) {
+        bn_init_copy(bignum, &bignum_true);
+        return;
     }
+
+    uint32_t slot = hash(node, 0, 0) % bignum_cache_size;
+    if (bignum_cache[slot].node == node) {
+        bn_init_copy(bignum, &bignum_cache[slot].bignum);
+        return;
+    }
+
+    bn_int_t down;
+    bn_int_t right;
+    mdd_count_precise(node_table[node].down, &down);
+    mdd_count_precise(node_table[node].right, &right);
+
+    bn_init(bignum);
+    bn_add(&down, &right, bignum);
+    bn_clear(&down);
+    bn_clear(&right);
+
+    if (bignum_cache[slot].node) {
+        bn_clear(&bignum_cache[slot].bignum);
+    }
+
+    bignum_cache[slot].node = node;
+    bn_init_copy(&bignum_cache[slot].bignum, bignum);
 }
 
 static void
-rel_count_mdd(vrel_t rel, long *nodes, bn_int_t *elements)
+set_count_precise_mdd(vset_t set, long* nodes, bn_int_t *elements)
 {
-    if (nodes != NULL) {
-        long n_count = mdd_node_count(rel->mdd);
-        *nodes = n_count;
+    *nodes = mdd_node_count(set->mdd);
+
+    bn_init(&bignum_false);
+    bn_init(&bignum_true);
+    bn_set_digit(&bignum_true, 1);
+
+    uint64_t cache_size;
+    if (_cache_diff() <= 0) {
+        cache_size = *nodes >> (_cache_diff() * -1);
+    } else {
+        cache_size = *nodes << _cache_diff();
     }
-    if (elements != NULL) {
-        double e_count   = mdd_count(rel->mdd);
-        bn_double2int(e_count, elements);
+
+    Warning(infoLong, "Bignum cache size is %zu entries", cache_size);
+
+    bignum_cache_size = *nodes >> (_cache_diff() * -1);
+    bignum_cache = (struct bignum_cache*) RTalignZero(CACHE_LINE_SIZE, cache_size * sizeof(struct bignum_cache));
+
+    mdd_count_precise(set->mdd, elements);
+
+    for (uint32_t i = 0; i < cache_size; i++) {
+        if (bignum_cache[i].node) bn_clear(&bignum_cache[i].bignum);
     }
+
+    RTfree(bignum_cache);
+    bn_clear(&bignum_false);
+    bn_clear(&bignum_true);
+}
+
+static void
+rel_count_mdd(vrel_t rel, long *nodes, double *elements)
+{
+    if (nodes != NULL) *nodes = mdd_node_count(rel->mdd);
+    if (elements != NULL) *elements = mdd_count(rel->mdd);
 }
 
 static void
@@ -1673,6 +1741,7 @@ vdom_t vdom_create_list_native(int n){
     dom->shared.set_copy=set_copy_mdd;
     dom->shared.set_enum=set_enum_mdd;
     dom->shared.set_count=set_count_mdd;
+    dom->shared.set_count_precise=set_count_precise_mdd;
     dom->shared.set_union=set_union_mdd;
     dom->shared.set_minus=set_minus_mdd;
     dom->shared.rel_create=rel_create_mdd;
