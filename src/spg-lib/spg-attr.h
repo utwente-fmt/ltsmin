@@ -46,21 +46,17 @@ void spg_attractor_chaining(const int player, const parity_game* g, recursive_re
     if (log_active(infoLong))                                                                   \
     {                                                                                           \
         long   u_count;                                                                         \
-        bn_int_t u_elem_count;                                                                  \
         long   level_count;                                                                     \
-        bn_int_t level_elem_count;                                                              \
-        vset_count(U, &u_count, &u_elem_count);                                                 \
-        vset_count(V_LEVEL, &level_count, &level_elem_count);                                   \
+        vset_count(U, &u_count, NULL);                                                          \
+        vset_count(V_LEVEL, &level_count, NULL);                                                \
         RTstopTimer(OPT->timer);                                                                \
-        Print(infoLong, "[%7.3f] " "%*s" "attr_%d^%d: u has %ld nodes, v_level has %ld nodes.",   \
+        Print(infoLong, "[%7.3f] " "%*s" "attr_%d^%d: u has %ld nodes, v_level has %ld nodes.", \
         		RTrealTime(OPT->timer), INDENT, "", PLAYER, LEVEL, u_count, level_count);       \
         RTstartTimer(OPT->timer);                                                               \
-        bn_clear(&u_elem_count);                                                                \
-        bn_clear(&level_elem_count);                                                            \
     }                                                                                           \
     else                                                                                        \
     {                                                                                           \
-        Print(info, "[%7.3f] " "%*s" "attr_%d: level %d.",                                    \
+        Print(info, "[%7.3f] " "%*s" "attr_%d: level %d.",                                      \
                 RTrealTime(OPT->timer), INDENT, "", PLAYER, LEVEL);                             \
     }                                                                                           \
 }
@@ -69,15 +65,13 @@ void spg_attractor_chaining(const int player, const parity_game* g, recursive_re
     if (log_active(infoLong))                                                                   \
     {                                                                                           \
         RTstopTimer(OPT->timer);                                                                \
-        Print(infoLong, "[%7.3f] " "%*s" "attr_%d^%d: counting " #SET ".",                   \
+        Print(infoLong, "[%7.3f] " "%*s" "attr_%d^%d: counting " #SET ".",                      \
         		RTrealTime(OPT->timer), INDENT, "", PLAYER, LEVEL);                             \
         long   s_count;                                                                         \
-        bn_int_t s_elem_count;                                                                  \
-        vset_count(SET, &s_count, &s_elem_count);                                               \
-        Print(infoLong, "[%7.3f] " "%*s" "attr_%d^%d: " #SET " has %ld nodes.",              \
+        vset_count(SET, &s_count, NULL);                                                        \
+        Print(infoLong, "[%7.3f] " "%*s" "attr_%d^%d: " #SET " has %ld nodes.",                 \
         		RTrealTime(OPT->timer), INDENT, "", PLAYER, LEVEL, s_count);                    \
         RTstartTimer(OPT->timer);                                                               \
-        bn_clear(&s_elem_count);                                                                \
     }                                                                                           \
 }
 
@@ -85,15 +79,12 @@ void spg_attractor_chaining(const int player, const parity_game* g, recursive_re
     if (log_active(infoLong))                                                                   \
     {                                                                                           \
         long   s_count;                                                                         \
-        bn_int_t s_elem_count;                                                                  \
+        double s_elem_count;                                                                    \
         vset_count(SET, &s_count, &s_elem_count);                                               \
-        char s[1024];                                                                           \
-        bn_int2string(s, sizeof(s), &s_elem_count);                                             \
         RTstopTimer(OPT->timer);                                                                \
-        Print(infoLong, "[%7.3f] " "%*s" "attr_%d^%d: " #SET " has %s elements (%ld nodes).",  \
-                RTrealTime(OPT->timer), INDENT, "", PLAYER, LEVEL, s, s_count);                 \
+        Print(infoLong, "[%7.3f] " "%*s" "attr_%d^%d: " #SET " has %.*g elements (%ld nodes).", \
+                RTrealTime(OPT->timer), INDENT, "", PLAYER, LEVEL, DBL_DIG, s_elem_count, s_count);      \
         RTstartTimer(OPT->timer);                                                               \
-        bn_clear(&s_elem_count);                                                                \
     }                                                                                           \
 }
 
@@ -101,15 +92,13 @@ void spg_attractor_chaining(const int player, const parity_game* g, recursive_re
     if (log_active(infoLong))                                                                   \
     {                                                                                           \
         RTstopTimer(OPT->timer);                                                                \
-        Print(infoLong, "[%7.3f] " "%*s" "attr_%d^%d: counting rel " #REL ".",               \
+        Print(infoLong, "[%7.3f] " "%*s" "attr_%d^%d: counting rel " #REL ".",                  \
         		RTrealTime(OPT->timer), INDENT, "", PLAYER, LEVEL);                             \
         long   s_count;                                                                         \
-        bn_int_t s_elem_count;                                                                  \
-        vrel_count(REL, &s_count, &s_elem_count);                                               \
-        Print(infoLong, "[%7.3f] " "%*s" "attr_%d^%d: " #REL " has %ld nodes.",              \
+        vrel_count(REL, &s_count, NULL);                                                        \
+        Print(infoLong, "[%7.3f] " "%*s" "attr_%d^%d: " #REL " has %ld nodes.",                 \
         		RTrealTime(OPT->timer), INDENT, "", PLAYER, LEVEL, s_count);                    \
         RTstartTimer(OPT->timer);                                                               \
-        bn_clear(&s_elem_count);                                                                \
     }                                                                                           \
 }
 
