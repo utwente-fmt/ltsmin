@@ -200,7 +200,7 @@ max_row_first (matrix_t *r, matrix_t *w, int rowa, int rowb)
                         raw,
                         rbw;
 
-    for (i = 0; i < dm_ncols (r); i++) {
+    for (i = 0; i < dm_ncols (w); i++) {
         raw = dm_is_set (w, rowa, i);
         rbw = dm_is_set (w, rowb, i);
 
@@ -221,9 +221,9 @@ max_col_first (matrix_t *r, matrix_t *w, int cola, int colb)
                         car,
                         cbr;
 
-    for (i = 0; i < dm_nrows (r); i++) {
-        car = dm_is_set (r, i, cola);
-        cbr = dm_is_set (r, i, colb);
+    for (i = 0; i < dm_nrows (w); i++) {
+        car = dm_is_set (w, i, cola);
+        cbr = dm_is_set (w, i, colb);
 
         if ((car && cbr) || (!car && !cbr))
             continue;
