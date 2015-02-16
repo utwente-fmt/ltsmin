@@ -478,6 +478,12 @@ apply_regroup_spec (matrix_t* r, matrix_t* mayw, matrix_t* mustw, const char *sp
             } else if (strcasecmp (tok, "ru") == 0) {
                 Print1 (info, "Regroup Row sUbsume");
                 dm_subsume_rows (r, mayw, mustw, &subsume_rows, &context);
+            } else if (strcasecmp (tok, "hf") == 0) {
+                Print1 (info, "Reqroup Horizontal Flip");
+                dm_horizontal_flip (r, mayw, mustw);
+            } else if (strcasecmp (tok, "vf") == 0) {
+                Print1 (info, "Reqroup Vertical Flip");
+                dm_vertical_flip (r, mayw, mustw);
             } else if (strcasecmp (tok, "gsa") == 0) {
                 const char         *macro = "gc,gr,csa,rs";
                 Print1 (info, "Regroup macro Simulated Annealing: %s", macro);
