@@ -35,8 +35,9 @@ struct vector_domain_shared {
 	void (*set_intersect)(vset_t dst, vset_t src);
 	void (*set_minus)(vset_t dst,vset_t src);
 	void (*set_zip)(vset_t dst,vset_t src);
-	void (*set_count)(vset_t set,long *nodes,bn_int_t *elements);
-	void (*rel_count)(vrel_t rel,long *nodes,bn_int_t *elements);
+	void (*set_count)(vset_t set,long *nodes,double *elements);
+	void (*set_count_precise)(vset_t set,long *nodes,bn_int_t *elements);
+	void (*rel_count)(vrel_t rel,long *nodes,double *elements);
 	vrel_t (*rel_create)(vdom_t dom,int k,int* proj);
     vrel_t (*rel_create_rw)(vdom_t dom,int r_k,int* r_proj,int w_k,int* w_proj);
 	void (*rel_save_proj)(FILE* f, vrel_t rel);
@@ -70,6 +71,7 @@ struct vector_domain_shared {
 
 	int (*separates_rw)();
 	int (*supports_cpy)();
+	int (*supports_precise_counting)();
 	char **names;
 };
 

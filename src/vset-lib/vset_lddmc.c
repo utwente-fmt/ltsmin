@@ -264,23 +264,22 @@ set_member(vset_t set, const int* e)
 }
 
 static void
-set_count(vset_t set, long *nodes, bn_int_t *elements)
+set_count(vset_t set, long *nodes, double *elements)
 {
     entermt(set);
     LACE_ME;
     if (nodes != NULL) *nodes = lddmc_nodecount(set->mdd);
-    if (elements != NULL) bn_double2int(lddmc_satcount_cached(set->mdd), elements);
+    if (elements != NULL) *elements = lddmc_satcount_cached(set->mdd);
     leavemt(set);
 }
 
 static void
-rel_count(vrel_t rel, long *nodes, bn_int_t *elements)
+rel_count(vrel_t rel, long *nodes, double *elements)
 {
     entermt(rel);
     LACE_ME;
-    *nodes = lddmc_nodecount(rel->mdd);
-    double count = lddmc_satcount(rel->mdd);
-    bn_double2int(count, elements);
+    if (nodes != NULL) *nodes = lddmc_nodecount(rel->mdd);
+    if (elements != NULL) *elements = lddmc_satcount(rel->mdd);
     leavemt(rel);
 }
 

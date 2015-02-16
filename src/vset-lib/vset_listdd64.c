@@ -1013,29 +1013,17 @@ static int set_member_mdd(vset_t set, const int* e)
 }
 
 static void
-set_count_mdd(vset_t set, long *nodes, bn_int_t *elements)
+set_count_mdd(vset_t set, long *nodes, double *elements)
 {
-    if (nodes != NULL) {
-        uint64_t n_count = mdd_node_count(set->mdd);
-        *nodes = n_count;
-    }
-    if (elements != NULL) {
-        double e_count   = mdd_count(set->mdd);
-        bn_double2int(e_count, elements);
-    }
+    if (nodes != NULL) *nodes = mdd_node_count(set->mdd);
+    if (elements != NULL) *elements = mdd_count(set->mdd);
 }
 
 static void
-rel_count_mdd(vrel_t rel, long *nodes, bn_int_t *elements)
+rel_count_mdd(vrel_t rel, long *nodes, double *elements)
 {
-    if (nodes != NULL) {
-        uint64_t n_count = mdd_node_count(rel->mdd);
-        *nodes = n_count;
-    }
-    if (elements != NULL) {
-        double e_count   = mdd_count(rel->mdd);
-        bn_double2int(e_count, elements);
-    }
+    if (nodes != NULL) *nodes = mdd_node_count(rel->mdd);
+    if (elements != NULL) *elements = mdd_count(rel->mdd);
 }
 
 static void

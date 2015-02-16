@@ -210,19 +210,14 @@ empty_projection_set_test()
     vset_clear(empty);
     Warning(info, "Zip correct");
 
-    bn_int_t elements;
+    double elements;
     long nodes;
-    char str[1024];
 
     vset_count(singleton, &nodes, &elements);
-    bn_int2string(str, sizeof(str), &elements);
-    bn_clear(&elements);
-    Warning(info, "Singeton has %ld nodes and %s elements", nodes, str);
+    Warning(info, "Singeton has %ld nodes and %f elements", nodes, elements);
 
     vset_count(empty, &nodes, &elements);
-    bn_int2string(str, sizeof(str), &elements);
-    bn_clear(&elements);
-    Warning(info, "Empty has %ld nodes and %s elements", nodes, str);
+    Warning(info, "Empty has %ld nodes and %f elements", nodes, elements);
 
     int element_2[2] = {0, 0};
     vset_t singleton_2 = vset_create(domain, -1, NULL);
@@ -302,19 +297,14 @@ empty_projection_rel_test()
 
     vrel_add(singleton, element_local, element_global);
 
-    bn_int_t elements;
+    double elements;
     long nodes;
-    char str[1024];
 
     vrel_count(singleton, &nodes, &elements);
-    bn_int2string(str, sizeof(str), &elements);
-    bn_clear(&elements);
-    Warning(info, "Singeton rel has %ld nodes and %s elements", nodes, str);
+    Warning(info, "Singeton rel has %ld nodes and %f elements", nodes, elements);
 
     vrel_count(empty, &nodes, &elements);
-    bn_int2string(str, sizeof(str), &elements);
-    bn_clear(&elements);
-    Warning(info, "Empty rel has %ld nodes and %s elements", nodes, str);
+    Warning(info, "Empty rel has %ld nodes and %f elements", nodes, elements);
 
     vset_t singleton_set = vset_create(domain, -1, NULL);
     vset_t empty_set = vset_create(domain, -1, NULL);

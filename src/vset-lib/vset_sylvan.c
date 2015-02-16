@@ -499,19 +499,19 @@ set_copy_match(vset_t dst, vset_t src, int p_len, int* proj, int*match)
 }
 
 static void
-set_count(vset_t set, long *nodes, bn_int_t *elements) 
+set_count(vset_t set, long *nodes, double *elements)
 {
     LACE_ME;
     if (nodes != NULL) *nodes = sylvan_nodecount(set->bdd);
-    if (elements != NULL) bn_double2int((double)sylvan_satcount(set->bdd, set->state_variables), elements);
+    if (elements != NULL) *elements = (double) sylvan_satcount(set->bdd, set->state_variables);
 }
 
 static void
-rel_count(vrel_t rel, long *nodes, bn_int_t *elements)
+rel_count(vrel_t rel, long *nodes, double *elements)
 {
     LACE_ME;
     if (nodes != NULL) *nodes = sylvan_nodecount(rel->bdd);
-    if (elements != NULL) bn_double2int((double)sylvan_satcount(rel->bdd, rel->all_action_variables), elements);
+    if (elements != NULL) *elements = (double)sylvan_satcount(rel->bdd, rel->all_action_variables);
 }
 
 /**
