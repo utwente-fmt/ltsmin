@@ -92,25 +92,14 @@ bn_int2double (mp_int *a)
     return value;
 }
 
-int
+void
 bn_int2string (char *string, size_t size, mp_int *a)
 {
-    const unsigned int  BASE = 10;
-    int                 ret,
-                        needed_size;
-
-    assert (string != NULL && size > 0);
-    ret = mp_radix_size (a, BASE, &needed_size);
+    (void) size;
+    int ret;
+    ret = mp_toradix (a, string, 10);
     if (ret != MP_OKAY)
-        Fatal (1, error, "Error getting radix size");
-    if ((size_t) needed_size <= size) { // needed_size is always positive
-        ret = mp_toradix (a, string, 10);
-        if (ret != MP_OKAY)
-            Fatal (1, error, "Error converting number to string");
-    } else {
-        string[0] = '\0';
-    }
-    return needed_size - 1;
+        Fatal (1, error, "Error converting number to string");
 }
 
 void
@@ -122,7 +111,18 @@ bn_add (mp_int *a, mp_int *b, mp_int *c)
 };
 
 void
-bn_set_digit (mp_int *a, unsigned int digit)
+bn_set_digit (mp_int *a, int digit)
 {
     mp_set (a, digit);
+}
+
+size_t
+bn_strlen (mp_int *a)
+{
+    int needed_size;
+    int ret = mp_radix_size (a, 10, &needed_size);
+    if (ret != MP_OKAY)
+            Fatal (1, error, "Error getting radix size");
+
+    return needed_size - 1;
 }

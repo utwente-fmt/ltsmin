@@ -53,17 +53,14 @@ extern void         bn_double2int (double a, bn_int_t *b);
 \brief Convert bignum to string.
 
 \param string Pointer to buffer to contain the string.
-\param size Size of the buffer pointer to by the string argument.
 \param a Pointer to initialized bignum to be converted.
 
 This function converts bignums to strings. Its behavior is similar
 to that of snprintf: If the string argument is non-NULL, the buffer
 pointed to by this argument will contain a NULL-terminated string
-representing at most size-1 digits of the bignum. The return value
-of the function is equal to the number of digits that would have been
-in the buffer in case its size would have been infinite.
+representing at most size-1 digits of the bignum.
 */
-int                 bn_int2string (char *string, size_t size, bn_int_t *a);
+void                bn_int2string (char *string, size_t size, bn_int_t *a);
 
 /**
 \brief Convert bignum to double.
@@ -93,6 +90,13 @@ extern void         bn_add (bn_int_t *a, bn_int_t *b, bn_int_t *c);
 
 \param digit A small positive integer.
  */
-extern void         bn_set_digit (bn_int_t *a, unsigned int digit);
+extern void         bn_set_digit (bn_int_t *a, int digit);
+
+/**
+\brief Returns the length of the string representation of bignum a.
+
+\param a Pointer to initialized bignum whos string length should be given.
+ */
+extern size_t       bn_strlen (bn_int_t *a);
 
 #endif
