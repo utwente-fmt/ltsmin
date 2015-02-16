@@ -504,13 +504,13 @@ sort_ (matrix_t *r, matrix_t *mayw, matrix_t *mustw, dm_comparator_fn cmp, int s
 int
 dm_sort_rows (matrix_t *r, matrix_t *mayw, matrix_t *mustw, dm_comparator_fn cmp)
 {
-    return sort_ (r, mayw, mustw, cmp, dm_nrows (r), dm_swap_rows);
+    return sort_ (r, mayw, mustw, cmp, dm_nrows (mayw), dm_swap_rows);
 }
 
 int
 dm_sort_cols (matrix_t *r, matrix_t *mayw, matrix_t *mustw, dm_comparator_fn cmp)
 {
-    return sort_ (r, mayw, mustw, cmp, dm_ncols (r), dm_swap_cols);
+    return sort_ (r, mayw, mustw, cmp, dm_ncols (mayw), dm_swap_cols);
 }
 
 static int
@@ -1320,6 +1320,40 @@ dm_all_perm (matrix_t *r, matrix_t *mayw, matrix_t *mustw)
     DMDBG (printf ("current:"));
     DMDBG (current_all_perm_ (perm, len));
     DMDBG (printf ("cost: %d ", cost_ (r, mayw)));
+
+    return 0;
+}
+
+int dm_horizontal_flip (matrix_t* r, matrix_t* mayw, matrix_t* mustw)
+{
+    HREassert(
+        dm_ncols(r) == dm_ncols(mayw) &&
+        dm_nrows(r) == dm_nrows(mayw) &&
+        dm_ncols(r) == dm_ncols(mustw) &&
+        dm_nrows(r) == dm_nrows(mustw), "matrix sizes do not match");
+
+    for (int i = 0; i < dm_nrows(r) / 2; i++) {
+        dm_swap_rows(r, i, dm_nrows(r) - i - 1);
+        dm_swap_rows(mayw, i, dm_nrows(mayw) - i - 1);
+        dm_swap_rows(mustw, i, dm_nrows(mustw) - i - 1);
+    }
+
+    return 0;
+}
+
+int dm_vertical_flip (matrix_t* r, matrix_t* mayw, matrix_t* mustw)
+{
+    HREassert(
+        dm_ncols(r) == dm_ncols(mayw) &&
+        dm_nrows(r) == dm_nrows(mayw) &&
+        dm_ncols(r) == dm_ncols(mustw) &&
+        dm_nrows(r) == dm_nrows(mustw), "matrix sizes do not match");
+
+    for (int i = 0; i < dm_ncols(r) / 2; i++) {
+        dm_swap_cols(r, i, dm_ncols(r) - i - 1);
+        dm_swap_cols(mayw, i, dm_ncols(mayw) - i - 1);
+        dm_swap_cols(mustw, i, dm_ncols(mustw) - i - 1);
+    }
 
     return 0;
 }
