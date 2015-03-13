@@ -425,6 +425,14 @@ int vdom_supports_precise_counting(vdom_t dom) {
 	return dom->shared.set_count_precise != NULL;
 }
 
+void vset_ccount(vset_t set,long *nodes,long double *elements) {
+    return set->dom->shared.set_ccount(set,nodes,elements);
+}
+
+int vdom_supports_ccount(vdom_t dom) {
+    return dom->shared.set_ccount!=NULL;
+}
+
 void vrel_count(vrel_t rel,long *nodes,double *elements){
 	rel->dom->shared.rel_count(rel,nodes,elements);
 }
