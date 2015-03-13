@@ -242,6 +242,13 @@ default_rel_update(vrel_t rel, vset_t set, vrel_update_cb cb, void *context)
     vset_enum(set, default_rel_update_cb, &ctx);
 }
 
+static void
+default_set_next_union(vset_t dst,vset_t src,vrel_t rel,vset_t uni)
+{
+    vset_next(dst,src,rel);
+    vset_union(dst,uni);
+}
+
 void vdom_init_shared(vdom_t dom,int n)
 {
     memset(&dom->shared, 0, sizeof(dom->shared));
@@ -254,6 +261,7 @@ void vdom_init_shared(vdom_t dom,int n)
 	dom->shared.reorder=default_reorder;
 	dom->shared.set_least_fixpoint=default_least_fixpoint;
     dom->shared.set_project_minus=default_set_project_minus;
+    dom->shared.set_next_union=default_set_next_union;
     dom->shared.names = RTmalloc(n * sizeof(char*));
     for (int i = 0; i < n; i++) dom->shared.names[i] = NULL;
 }
@@ -455,6 +463,10 @@ void vset_zip(vset_t dst,vset_t src){
 
 void vset_next(vset_t dst,vset_t src,vrel_t rel){
 	dst->dom->shared.set_next(dst,src,rel);
+}
+
+void vset_next_union(vset_t dst,vset_t src,vrel_t rel,vset_t uni){
+    dst->dom->shared.set_next_union(dst,src,rel,uni);
 }
 
 void vset_prev(vset_t dst,vset_t src,vrel_t rel,vset_t univ){
