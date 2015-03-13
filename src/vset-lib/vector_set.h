@@ -222,6 +222,10 @@ extern void vset_count_precise(vset_t set,long *nodes,bn_int_t *elements);
 
 extern int vdom_supports_precise_counting(vdom_t dom);
 
+extern void vset_ccount(vset_t set,long *nodes,long double *elements);
+
+extern int vdom_supports_ccount(vdom_t dom);
+
 /**
 \brief Create a relation
 */
