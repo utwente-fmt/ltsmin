@@ -2961,7 +2961,7 @@ init_model(char *file)
     ltstype = GBgetLTStype(model);
     N = lts_type_get_state_length(ltstype);
     eLbls = lts_type_get_edge_label_count(ltstype);
-    sLbls = dm_nrows(GBgetStateLabelInfo(model));
+    sLbls = GBgetStateLabelInfo(model) == NULL ? 0 : dm_nrows(GBgetStateLabelInfo(model));
     nGrps = dm_nrows(GBgetDMInfo(model));
     max_sat_levels = (N / sat_granularity) + 1;
     if (GBhasGuardsInfo(model)) {

@@ -707,14 +707,17 @@ GBregroup (model_t model, const char *regroup_spec)
     // copy state label matrix and apply the same permutation
     matrix_t           *s = RTmalloc (sizeof (matrix_t));
 
-    dm_copy (GBgetStateLabelInfo (model), s);
-    HREassert (dm_ncols(m) == dm_ncols(s), "Error in DM copy");
+    if (GBgetStateLabelInfo(model) != NULL) {
+        dm_copy (GBgetStateLabelInfo (model), s);
 
-    // probably better to write some functions to do this,
-    // i.e. dm_get_column_permutation
-    dm_copy_header(&(r->col_perm), &(s->col_perm));
+        HREassert (dm_ncols(m) == dm_ncols(s), "Error in DM copy");
 
-    GBsetStateLabelInfo(group, s);
+        // probably better to write some functions to do this,
+        // i.e. dm_get_column_permutation
+        dm_copy_header(&(r->col_perm), &(s->col_perm));
+
+        GBsetStateLabelInfo(group, s);
+    }
 
     // set the guards per transition group
     if (GBhasGuardsInfo(model)) {
