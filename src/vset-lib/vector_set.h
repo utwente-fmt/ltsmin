@@ -303,6 +303,8 @@ extern void vrel_count(vrel_t rel,long *nodes,double *elements);
 */
 extern void vset_next(vset_t dst,vset_t src,vrel_t rel);
 
+extern void vset_next_union(vset_t dst,vset_t src,vrel_t rel,vset_t uni);
+
 /**
 \brief  univ = NULL => dst := { x | exists y in src : x rel y }
         univ != NULL => dst := { x | exists y in src : x rel y } ...

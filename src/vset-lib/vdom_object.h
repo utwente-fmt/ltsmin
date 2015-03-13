@@ -52,6 +52,7 @@ struct vector_domain_shared {
     void (*rel_destroy)(vrel_t rel);
 
 	void (*set_next)(vset_t dst,vset_t src,vrel_t rel);
+	void (*set_next_union)(vset_t dst,vset_t src,vrel_t rel,vset_t uni);
 	void (*set_prev)(vset_t dst,vset_t src,vrel_t rel,vset_t univ);
 	void (*set_universe)(vset_t dst, vset_t src);
 	void (*reorder)();
