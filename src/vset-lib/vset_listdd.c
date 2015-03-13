@@ -60,6 +60,7 @@ struct op_rec {
             uint32_t arg2;
             uint32_t res;
         } other;
+        uint64_t count_part;
     } res;
 };
 static struct op_rec *op_cache=NULL;
@@ -75,6 +76,8 @@ static struct op_rec *op_cache=NULL;
 #define OP_SAT 9
 #define OP_RELPROD 10
 #define OP_UNIVERSE 11
+#define OP_CCOUNT1 12
+#define OP_CCOUNT2 13
 
 struct vector_domain {
     struct vector_domain_shared shared;
@@ -136,7 +139,7 @@ mdd_create_stack()
 {
     stack_size = fib(stack_fib);
     mdd_stack = RTmalloc(sizeof(uint32_t[stack_size]));
-    Warning(info, "initial stack size %u", stack_size);
+    Warning(info, "initial stack size %" PRIu32, stack_size);
 }
 
 static void
@@ -150,7 +153,7 @@ mdd_push(uint32_t mdd)
 
         mdd_stack = RTrealloc(mdd_stack, sizeof(uint32_t[stack_size_new]));
         stack_size = stack_size_new;
-        Warning(debug, "new stack size %u", stack_size);
+        Warning(debug, "new stack size %" PRIu32, stack_size);
     }
     mdd_stack[mdd_top]=mdd;
     mdd_top++;
@@ -237,7 +240,7 @@ static void mdd_collect(uint32_t a,uint32_t b){
        but the memory use went up considerably.
        Still it may be useful for saturation.
     */
-    Warning(debug, "ListDD garbage collection: %u of %u nodes used",
+    Warning(debug, "ListDD garbage collection: %" PRIu32" of %" PRIu32" nodes used",
             mdd_used, mdd_nodes);
     int resize=0;
     // The two assignments below are not needed, but silence compiler warnings
@@ -259,14 +262,17 @@ static void mdd_collect(uint32_t a,uint32_t b){
             Warning(debug, "op cache reached maximum size");
             new_cache_size = UINT32_MAX;
         }
-        Warning(debug, "new op cache has %u entries", new_cache_size);
+        Warning(debug, "new op cache has %" PRIu32 " entries", new_cache_size);
     }
     for(uint32_t i=0;i<cache_size;i++){
         uint32_t slot,op,arg1,arg2,res;
         op=op_cache[i].op&0xffff;
         switch(op){
             case OP_UNUSED: continue;
-            case OP_COUNT: {
+            case OP_COUNT:
+            case OP_CCOUNT1:
+            case OP_CCOUNT2:
+            {
                 arg1=op_cache[i].arg1;
                 arg2=0;
                 if (!(node_table[arg1].next&0x80000000)){
@@ -331,7 +337,7 @@ static void mdd_collect(uint32_t a,uint32_t b){
             unique_table[i]=mdd_sweep_bucket(unique_table[i]);
         }
     } else {
-        Warning(debug,"copied %u op cache nodes",copy_count);
+        Warning(debug,"copied %" PRIu32" op cache nodes",copy_count);
         RTfree(op_cache);
         op_cache=new_cache;
         cache_size=new_cache_size;
@@ -904,10 +910,10 @@ struct bignum_cache {
     bn_int_t bignum;
 };
 
-bn_int_t                bignum_false;
-bn_int_t                bignum_true;
-struct bignum_cache*    bignum_cache = NULL;
-uint32_t                bignum_cache_size = 0;
+static bn_int_t                bignum_false;
+static bn_int_t                bignum_true;
+static struct bignum_cache*    bignum_cache = NULL;
+static uint32_t                bignum_cache_size = 0;
 
 static void
 mdd_count_precise(uint32_t node, bn_int_t* bignum)
@@ -954,14 +960,14 @@ set_count_precise_mdd(vset_t set, long* nodes, bn_int_t *elements)
     bn_init(&bignum_true);
     bn_set_digit(&bignum_true, 1);
 
-    uint64_t cache_size;
+    uint32_t cache_size;
     if (_cache_diff() <= 0) {
         cache_size = *nodes >> (_cache_diff() * -1);
     } else {
         cache_size = *nodes << _cache_diff();
     }
 
-    Warning(infoLong, "Bignum cache size is %zu entries", cache_size);
+    Warning(infoLong, "Bignum cache size is %" PRIu32 " entries", cache_size);
 
     bignum_cache_size = *nodes >> (_cache_diff() * -1);
     bignum_cache = (struct bignum_cache*) RTalignZero(CACHE_LINE_SIZE, cache_size * sizeof(struct bignum_cache));
@@ -1696,6 +1702,43 @@ static void rel_dot_mdd(FILE* fp, vrel_t src) {
   fprintf(fp,"}\n");
 }
 
+static long double mdd_ccount(uint32_t mdd){
+    if (mdd<=1) return mdd;
+    uint32_t slot1=hash(OP_CCOUNT1,mdd,0)%cache_size;
+    uint32_t slot2=hash(OP_CCOUNT2,mdd,0)%cache_size;
+
+    union {
+        long double count;
+        struct {
+            uint64_t p1;
+            uint64_t p2;
+        } s;
+    } res;
+
+    res.count=0.0;
+    if (op_cache[slot1].op==OP_CCOUNT1 && op_cache[slot1].arg1==mdd
+            && op_cache[slot2].op==OP_CCOUNT2 && op_cache[slot2].arg1==mdd){
+        res.s.p1=op_cache[slot1].res.count_part;
+        res.s.p2=op_cache[slot2].res.count_part;
+        return res.count;
+    }
+    res.count=mdd_ccount(node_table[mdd].down);
+    res.count+=mdd_ccount(node_table[mdd].right);
+    op_cache[slot1].op=OP_CCOUNT1;
+    op_cache[slot1].arg1=mdd;
+    op_cache[slot1].res.count_part=res.s.p1;
+    op_cache[slot2].op=OP_CCOUNT2;
+    op_cache[slot2].arg1=mdd;
+    op_cache[slot2].res.count_part=res.s.p2;
+    return res.count;
+}
+
+static void
+set_ccount_mdd(vset_t set, long *nodes, long double *elements)
+{
+    if (nodes != NULL) *nodes = mdd_node_count(set->mdd);
+    if (elements != NULL) *elements = mdd_ccount(set->mdd);
+}
 
 vdom_t vdom_create_list_native(int n){
     Warning(info,"Creating a native ListDD domain.");
@@ -1703,11 +1746,11 @@ vdom_t vdom_create_list_native(int n){
     vdom_init_shared(dom,n);
     if (unique_table==NULL) {
         mdd_nodes=(nodes_fib <= FIB_MAX)?fib(nodes_fib):UINT32_MAX;
-        Warning(info,"initial node table has %u entries",mdd_nodes);
+        Warning(info,"initial node table has %" PRIu32 " entries",mdd_nodes);
         uniq_size=(nodes_fib + 1 <= FIB_MAX)?fib(nodes_fib+1):UINT32_MAX;
-        Warning(info,"initial uniq table has %u entries",uniq_size);
+        Warning(info,"initial uniq table has %" PRIu32 " entries",uniq_size);
         cache_size=(nodes_fib+cache_fib <= FIB_MAX)?fib(nodes_fib+cache_fib):UINT32_MAX;
-        Warning(info,"initial op cache has %u entries",cache_size);
+        Warning(info,"initial op cache has %" PRIu32" entries",cache_size);
 
         unique_table=RTmalloc(uniq_size*sizeof(uint32_t));
         node_table=RTmalloc(mdd_nodes*sizeof(struct mdd_node));
@@ -1742,6 +1785,7 @@ vdom_t vdom_create_list_native(int n){
     dom->shared.set_enum=set_enum_mdd;
     dom->shared.set_count=set_count_mdd;
     dom->shared.set_count_precise=set_count_precise_mdd;
+    dom->shared.set_ccount=set_ccount_mdd;
     dom->shared.set_union=set_union_mdd;
     dom->shared.set_minus=set_minus_mdd;
     dom->shared.rel_create=rel_create_mdd;
