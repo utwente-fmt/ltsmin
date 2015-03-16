@@ -13,6 +13,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
+#include <math.h>
 #include <sys/mman.h>
 #include <sys/socket.h>
 
@@ -267,6 +268,40 @@ typedef void (*guided_proc_t)(sat_proc_t sat_proc, reach_proc_t reach_proc,
 typedef int (*transitions_t)(model_t model,int group,int*src,TransitionCB cb,void*context);
 
 static transitions_t transitions_short = NULL; // which function to call for the next states.
+
+typedef int(*vset_count_t)(vset_t set, long* nodes, long double* elements);
+
+static int vset_count_dbl(vset_t set, long* nodes, long double* elements);
+static int vset_count_ldbl(vset_t set, long* nodes, long double* elements);
+
+static vset_count_t vset_count_fn = &vset_count_dbl;
+
+static int
+vset_count_dbl(vset_t set, long* nodes, long double* elements)
+{
+    if (elements != NULL) {
+        *elements = 0.0;
+        double e;
+        vset_count(set, nodes, &e);
+        *elements += e;
+        if(vdom_supports_ccount(domain) && isinf(e)) {
+            vset_count_fn = &vset_count_ldbl;
+            vset_count_fn(set, nodes, elements);
+            return LDBL_DIG;
+        }
+    } else {
+        vset_count(set, nodes, NULL);
+    }
+    return DBL_DIG;
+}
+
+static int
+vset_count_ldbl(vset_t set, long* nodes, long double* elements)
+{
+    vset_ccount(set, nodes, elements);
+    return LDBL_DIG;
+}
+
 
 /*
  * Add parallel operations
@@ -936,19 +971,19 @@ static void
 stats_and_progress_report(vset_t current, vset_t visited, int level)
 {
     long   n_count;
-    double e_count;
+    long double e_count;
     
     if (sat_strategy == NO_SAT || log_active (infoLong)) {
         Print(infoShort, "level %d is finished", level);
     }
     if (log_active (infoLong)) {
         if (current != NULL) {
-            vset_count (current, &n_count, &e_count);
-            Print(infoLong, "level %d has %.*g states ( %ld nodes )", level, DBL_DIG, e_count, n_count);
+            int digs = vset_count_fn (current, &n_count, &e_count);
+            Print(infoLong, "level %d has %.*Lg states ( %ld nodes )", level, digs, e_count, n_count);
             if (n_count > max_lev_count) max_lev_count = n_count;
         }
-        vset_count (visited, &n_count, &e_count);
-        Print(infoLong, "visited %d has %.*g states ( %ld nodes )", level, DBL_DIG, e_count, n_count);
+        int digs = vset_count_fn (visited, &n_count, &e_count);
+        Print(infoLong, "visited %d has %.*Lg states ( %ld nodes )", level, digs, e_count, n_count);
 
         if (n_count > max_vis_count) max_vis_count = n_count;
 
@@ -1036,20 +1071,20 @@ final_stat_reporting(vset_t visited, rt_timer_t timer)
     Print(infoShort, "counting visited states...");
     rt_timer_t t = RTcreateTimer();
     RTstartTimer(t);
-    double e_count;
-    vset_count(visited, &n_count, &e_count);
+    char states[128];
+    long double e_count;
+    int digs = vset_count_fn(visited, &n_count, &e_count);
+    snprintf(states, 128, "%.*Lg", digs, e_count);
+
     RTstopTimer(t);
     RTprintTimer(infoShort, t, "counting took");
-
-    char states[128];
-    snprintf(states, 128, "%.*g", DBL_DIG, e_count);
 
     int is_precise = strstr(states, "e") == NULL && strstr(states, "inf") == NULL;
 
     Print(infoShort, "state space has%s %s states, %ld nodes", precise && is_precise ? " precisely" : "", states, n_count);
 
     if (!is_precise && precise) {
-        if (vdom_supports_precise_count(domain)) {
+        if (vdom_supports_precise_counting(domain)) {
             Print(infoShort, "counting visited states precisely...");
             rt_timer_t t = RTcreateTimer();
             RTstartTimer(t);
@@ -2156,7 +2191,6 @@ reach_chain_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
         for (int i = 0; i < nGrps; i++) {
             if (!bitvector_is_set(reach_groups, i)) continue;
             if (trc_output != NULL) save_level(visited);
-
 
             vset_copy(new_reduced, new_states);
             learn_guards_reduce(new_reduced, i, guard_count, guard_maybe, false_states, maybe_states, tmp);
