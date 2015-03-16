@@ -227,6 +227,20 @@ permute_one (void *arg, transition_info_t *ti, state_data_t dst, int *cpy)
 }
 
 int
+permute_next (permute_t *perm, state_info_t *state, int group, perm_cb_f cb, void *ctx)
+{
+    perm->permutation   = Perm_None;
+    perm->call_ctx      = ctx;
+    perm->real_cb       = cb;
+    perm->state         = state;
+    perm->nstored       = perm->start_group_index = 0;
+    int                 count;
+    state_data_t        data = state_info_pins_state (state);
+    count = GBgetTransitionsLong (((wctx_t *)ctx)->model, group, data, permute_one, perm);
+    return count;
+}
+
+int
 permute_trans (permute_t *perm, state_info_t *state, perm_cb_f cb, void *ctx)
 {
     perm->call_ctx = ctx;

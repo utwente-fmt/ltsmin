@@ -59,6 +59,9 @@ extern void             permute_set_por (permute_t *perm, int por);
 
 extern void             permute_free (permute_t *perm);
 
+extern int              permute_next (permute_t *perm, state_info_t *state,
+                                       int group, perm_cb_f cb, void *ctx);
+
 extern int              permute_trans (permute_t *perm, state_info_t *state,
                                        perm_cb_f cb, void *ctx);
 

@@ -30,6 +30,8 @@ libparallel_la_SOURCES += state-store.c
 libparallel_la_SOURCES += state-store.h
 libparallel_la_SOURCES += stream-serializer.c
 libparallel_la_SOURCES += stream-serializer.h
+libparallel_la_SOURCES += unionfind.c
+libparallel_la_SOURCES += unionfind.h
 libparallel_la_SOURCES += worker.h
 libparallel_la_SOURCES += worker.c
 
