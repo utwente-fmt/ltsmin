@@ -92,6 +92,8 @@ static struct op_rec *op_cache=NULL;
 #define OP_RELPROD 10
 #define OP_UNIVERSE 11
 #define OP_JOIN 12
+#define OP_CCOUNT1 13
+#define OP_CCOUNT2 14
 
 static void cache_put(uint64_t slot_hash,
                       uint32_t op,
@@ -313,7 +315,10 @@ static void mdd_collect(uint64_t a,uint64_t b){
         uint64_t slot;
         switch(op_cache[i].op){
             case OP_UNUSED: continue;
-            case OP_COUNT: {
+            case OP_COUNT:
+            case OP_CCOUNT1:
+            case OP_CCOUNT2:
+            {
                 if (!node_table[op_cache[i].arg1].reachable){
                     op_cache[i].op=OP_UNUSED;
                     continue;
@@ -2273,6 +2278,44 @@ set_join_mdd(vset_t dst, vset_t left, vset_t right)
 static int separates_rw() { return 1; }
 static int supports_cpy() { return 1; }
 
+static long double mdd_ccount(uint32_t mdd){
+    if (mdd<=1) return mdd;
+    uint32_t slot1=hash3(OP_CCOUNT1,mdd,0)%cache_size;
+    uint32_t slot2=hash3(OP_CCOUNT2,mdd,0)%cache_size;
+
+    union {
+        long double count;
+        struct {
+            uint64_t p1;
+            uint64_t p2;
+        } s;
+    } res;
+
+    res.count=0.0;
+    if (op_cache[slot1].op==OP_CCOUNT1 && op_cache[slot1].arg1==mdd
+            && op_cache[slot2].op==OP_CCOUNT2 && op_cache[slot2].arg1==mdd){
+        res.s.p1=op_cache[slot1].res.other.arg2;
+        res.s.p2=op_cache[slot2].res.other.arg3;
+        return res.count;
+    }
+    res.count=mdd_ccount(node_table[mdd].down);
+    res.count+=mdd_ccount(node_table[mdd].right);
+    op_cache[slot1].op=OP_CCOUNT1;
+    op_cache[slot1].arg1=mdd;
+    op_cache[slot1].res.other.arg2=res.s.p1;
+    op_cache[slot2].op=OP_CCOUNT2;
+    op_cache[slot2].arg1=mdd;
+    op_cache[slot2].res.other.arg3=res.s.p2;
+    return res.count;
+}
+
+static void
+set_ccount_mdd(vset_t set, long *nodes, long double *elements)
+{
+    if (nodes != NULL) *nodes = mdd_node_count(set->mdd);
+    if (elements != NULL) *elements = mdd_ccount(set->mdd);
+}
+
 vdom_t vdom_create_list64_native(int n){
     Warning(info,"Creating a native ListDD 64-bit domain.");
     vdom_t dom=(vdom_t)RTmalloc(sizeof(struct vector_domain));
@@ -2323,6 +2366,7 @@ vdom_t vdom_create_list64_native(int n){
     dom->shared.set_copy=set_copy_mdd;
     dom->shared.set_enum=set_enum_mdd;
     dom->shared.set_count=set_count_mdd;
+    dom->shared.set_ccount=set_ccount_mdd;
     dom->shared.set_union=set_union_mdd;
     dom->shared.set_minus=set_minus_mdd;
     dom->shared.rel_create=rel_create_mdd;
