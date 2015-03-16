@@ -277,6 +277,16 @@ set_count(vset_t set, long *nodes, double *elements)
     leavemt(set);
 }
 
+static void
+set_ccount(vset_t set, long *nodes, long double *elements)
+{
+    entermt(set);
+    LACE_ME;
+    if (nodes != NULL) *nodes = lddmc_nodecount(set->mdd);
+    if (elements != NULL) *elements = lddmc_satcount(set->mdd);
+    leavemt(set);
+}
+
 /* For counting precisely we use a thread-safe operation cache that allows overwriting entries.
  * Invariants for read and write locks:
  *  - if there is a write lock then the read lock me not be incremented
@@ -913,6 +923,7 @@ set_function_pointers(vdom_t dom)
     dom->shared.set_clear=set_clear;
     dom->shared.set_copy=set_copy;
     dom->shared.set_count=set_count;
+    dom->shared.set_ccount=set_ccount;
     dom->shared.set_count_precise=set_count_precise;
     dom->shared.set_project=set_project;
     dom->shared.set_project_minus=set_project_minus;
