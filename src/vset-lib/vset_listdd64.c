@@ -1024,6 +1024,84 @@ set_count_mdd(vset_t set, long *nodes, double *elements)
     if (elements != NULL) *elements = mdd_count(set->mdd);
 }
 
+struct bignum_cache {
+    uint64_t node;
+    bn_int_t bignum;
+};
+
+static bn_int_t                bignum_false;
+static bn_int_t                bignum_true;
+static struct bignum_cache*    bignum_cache = NULL;
+static uint64_t                bignum_cache_size = 0;
+
+static void
+mdd_count_precise(uint64_t node, bn_int_t* bignum)
+{
+    if (node == 0) {
+        bn_init_copy(bignum, &bignum_false);
+        return;
+    }
+    if (node == 1) {
+        bn_init_copy(bignum, &bignum_true);
+        return;
+    }
+
+    uint64_t slot = hash2(node, 0) % bignum_cache_size;
+    if (bignum_cache[slot].node == node) {
+        bn_init_copy(bignum, &bignum_cache[slot].bignum);
+        return;
+    }
+
+    bn_int_t down;
+    bn_int_t right;
+    mdd_count_precise(node_table[node].down, &down);
+    mdd_count_precise(node_table[node].right, &right);
+
+    bn_init(bignum);
+    bn_add(&down, &right, bignum);
+    bn_clear(&down);
+    bn_clear(&right);
+
+    if (bignum_cache[slot].node) {
+        bn_clear(&bignum_cache[slot].bignum);
+    }
+
+    bignum_cache[slot].node = node;
+    bn_init_copy(&bignum_cache[slot].bignum, bignum);
+}
+
+static void
+set_count_precise_mdd(vset_t set, long* nodes, bn_int_t *elements)
+{
+    *nodes = mdd_node_count(set->mdd);
+
+    bn_init(&bignum_false);
+    bn_init(&bignum_true);
+    bn_set_digit(&bignum_true, 1);
+
+    uint64_t cache_size;
+    if (_cache_diff() <= 0) {
+        cache_size = *nodes >> (_cache_diff() * -1);
+    } else {
+        cache_size = *nodes << _cache_diff();
+    }
+
+    Warning(infoLong, "Bignum cache size is %" PRIu64 " entries", cache_size);
+
+    bignum_cache_size = *nodes >> (_cache_diff() * -1);
+    bignum_cache = (struct bignum_cache*) RTalignZero(CACHE_LINE_SIZE, cache_size * sizeof(struct bignum_cache));
+
+    mdd_count_precise(set->mdd, elements);
+
+    for (uint64_t i = 0; i < cache_size; i++) {
+        if (bignum_cache[i].node) bn_clear(&bignum_cache[i].bignum);
+    }
+
+    RTfree(bignum_cache);
+    bn_clear(&bignum_false);
+    bn_clear(&bignum_true);
+}
+
 static void
 rel_count_mdd(vrel_t rel, long *nodes, double *elements)
 {
@@ -2366,6 +2444,7 @@ vdom_t vdom_create_list64_native(int n){
     dom->shared.set_copy=set_copy_mdd;
     dom->shared.set_enum=set_enum_mdd;
     dom->shared.set_count=set_count_mdd;
+    dom->shared.set_count_precise=set_count_precise_mdd;
     dom->shared.set_ccount=set_ccount_mdd;
     dom->shared.set_union=set_union_mdd;
     dom->shared.set_minus=set_minus_mdd;
