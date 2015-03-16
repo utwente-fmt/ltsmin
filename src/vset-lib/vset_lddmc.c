@@ -752,6 +752,23 @@ set_next(vset_t dst, vset_t src, vrel_t rel)
 }
 
 static void
+set_next_union(vset_t dst, vset_t src, vrel_t rel, vset_t uni)
+{
+    entermt(dst);
+    LACE_ME;
+    assert(dst->size == src->size && uni->size == dst->size);
+    if (dst == src) {
+        MDD old = dst->mdd;
+        dst->mdd = lddmc_ref(lddmc_relprod_union(src->mdd, rel->mdd, rel->meta, uni->mdd));
+        lddmc_deref(old);
+    } else {
+        lddmc_deref(dst->mdd);
+        dst->mdd = lddmc_ref(lddmc_relprod_union(src->mdd, rel->mdd, rel->meta, uni->mdd));
+    }
+    leavemt(dst);
+}
+
+static void
 set_prev(vset_t dst, vset_t src, vrel_t rel, vset_t universe)
 {
     entermt(dst);
@@ -949,6 +966,7 @@ set_function_pointers(vdom_t dom)
     dom->shared.set_copy_match=set_copy_match;
 
     dom->shared.set_next=set_next;
+    dom->shared.set_next_union=set_next_union;
     dom->shared.set_prev=set_prev;
     dom->shared.set_join=set_join;
     //dom->shared.set_least_fixpoint=set_least_fixpoint;
