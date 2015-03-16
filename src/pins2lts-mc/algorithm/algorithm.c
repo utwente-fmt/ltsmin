@@ -21,7 +21,7 @@ num_global_bits (strategy_t s)
     return (Strat_ENDFS  & s ? 3 :
            ((Strat_CNDFS | Strat_DFSFIFO) & s ? 2 :
            ((Strat_LNDFS | Strat_OWCTY | Strat_TA) & s ? 1 :
-           ((Strat_SCC) & s ? 1 :
+           ((Strat_TARSCC | Strat_UFSCC) & s ? 1 :
            ((Strat_DFS & s) && proviso == Proviso_Stack ? 1 : 0) ))));
 }
 
@@ -142,8 +142,11 @@ alg_shared_init_strategy      (run_t *run, strategy_t strat)
     case Strat_DFSFIFO:
         dfs_fifo_shared_init (run);
         break;
-    case Strat_SCC:
+    case Strat_TARSCC:
         tarjan_scc_shared_init (run);
+        break;
+    case Strat_UFSCC:
+        ufscc_shared_init (run);
         break;
     default: Abort ("Strategy (%s) is unknown or incompatible with the current "
                     "language module.", key_search(strategies, strategy[0]));
