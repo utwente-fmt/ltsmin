@@ -84,3 +84,7 @@ space.
 *--precise*::
         Compute the final number of states precisely.
         
+*--next-union*::
+        If supported by the vset implementation; perform the computation of successor states simultaneously with unifying
+        the current states. Simultaneously, means with a single BDD/MDD operation.
+        
