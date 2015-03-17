@@ -10,7 +10,7 @@
  * TODO: documentation
  */
 
-typedef uint32_t    sz_w;
+typedef uint64_t    sz_w;
 
 typedef struct uf_node_s {
     ref_t           parent;         // The parent in the UF tree

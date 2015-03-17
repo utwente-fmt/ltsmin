@@ -15,7 +15,7 @@ static char         LIST_REMOVED  = 2;
 uf_t *
 uf_create ()
 {
-    HREassert (sizeof(sz_w)*8 >= W, "Too many workers for the current structure, please redefine sz_w to a larger size");
+    HREassert (sizeof(sz_w)*8 >= W, "Too many workers for the current structure; please redefine sz_w to a larger size");
     uf_t           *uf = RTmalloc (sizeof(uf_t));
     uf->array          = RTmallocZero ( sizeof(uf_node_t) * (1ULL << dbs_size) );
     return uf;
