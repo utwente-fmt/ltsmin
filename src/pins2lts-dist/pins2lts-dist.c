@@ -984,5 +984,8 @@ int main(int argc, char*argv[]){
         lts_file_close(ctx.trace);
     }
     HREbarrier(HREglobal());
+
+    if (HREme(HREglobal()) == 0) GBExit(model);
+
     HREexit(LTSMIN_EXIT_SUCCESS);
 }

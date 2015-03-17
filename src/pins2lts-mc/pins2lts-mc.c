@@ -211,5 +211,7 @@ main (int argc, char *argv[])
 
     deinit_all (ctx);
 
+    GBExit(model);
+
     HREexit (global->exit_status);
 }

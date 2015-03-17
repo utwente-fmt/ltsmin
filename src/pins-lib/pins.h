@@ -953,4 +953,16 @@ extern void GBsetMucalcNodeCount(model_t model, int node_count);
  */
 extern int GBgetUseGuards(model_t model);
 
+typedef void(*ExitCB)(model_t model);
+
+/**
+ * \brief Set the exit function.
+ */
+extern void GBsetExit(model_t model, ExitCB exit);
+
+/**
+ * \brief Run the exit function.
+ */
+extern void GBExit(model_t model);
+
 #endif

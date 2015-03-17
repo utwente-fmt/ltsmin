@@ -3816,6 +3816,8 @@ VOID_TASK_1(actual_main, void*, arg)
     if (vset_default_domain!=VSET_Sylvan && vset_default_domain!=VSET_LDDmc) {
         lace_resume();
     }
+
+    GBExit(model);
 }
 
 int
