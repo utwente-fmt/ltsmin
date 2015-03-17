@@ -24,6 +24,7 @@ typedef struct uf_node_s {
 
 struct uf_s {
     uf_node_t      *array;   // array: [ref_t] -> uf_node
+    bool finished;
 };
 typedef struct uf_s uf_t;
 

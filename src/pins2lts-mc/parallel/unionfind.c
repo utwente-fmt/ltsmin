@@ -15,7 +15,7 @@ static char         LIST_REMOVED  = 2;
 uf_t *
 uf_create ()
 {
-    HREassert (sizeof(sz_w)*8 >= W, "Too many workers for the current structure; please redefine sz_w to a larger size");
+    //HREassert (sizeof(sz_w)*8 >= W, "Too many workers for the current structure; please redefine sz_w to a larger size");
     uf_t           *uf = RTmalloc (sizeof(uf_t));
     uf->array          = RTmallocZero ( sizeof(uf_node_t) * (1ULL << dbs_size) );
     return uf;
@@ -121,7 +121,7 @@ uf_make_claim (const uf_t* uf, ref_t state, sz_w w_id)
     // Add our worker ID to the set (and make sure it is the UF representative)
     do {
         f = uf->array[f].parent;
-        while (uf->array[f].uf_status == UF_LOCKED); // not sure if this helps
+        //while (uf->array[f].uf_status == UF_LOCKED); // not sure if this helps
         __sync_or_and_fetch(&uf->array[f].w_set, w_id);
     } while (uf->array[f].parent != f 
           || uf->array[f].uf_status == UF_LOCKED);
@@ -135,7 +135,7 @@ uf_merge_list(const uf_t* uf, ref_t list_x, ref_t list_y)
     // assert \exists x' \in List(x) (also for y) 
     // - because states are locked and union(x,y) did not take place yet
 
-    HREassert(!uf_sameset(uf, list_x, list_y))
+    //HREassert(!uf_sameset(uf, list_x, list_y))
     ref_t x = list_x;
     ref_t y = list_y;
 
@@ -171,13 +171,15 @@ uf_sameset (const uf_t* uf, ref_t state_x, ref_t state_y)
 {
     ref_t x_f = state_x;
     ref_t y_f = state_y;
-    // do-while loop is necessary, in case uf root gets updated
+    // while loop is necessary, in case uf root gets updated
     // otherwise sameset might return false if it is actually true
-    do {
-        x_f = uf_find (uf, x_f);
-        y_f = uf_find (uf, y_f);
-    } while ((uf->array[x_f].parent != x_f) ||
-             (uf->array[y_f].parent != y_f));
+    while ((uf->array[x_f].uf_status == UF_LOCKED) ||
+           (uf->array[y_f].uf_status == UF_LOCKED) ||
+           (uf->array[x_f].parent != x_f) ||
+           (uf->array[y_f].parent != y_f)) {
+        x_f = uf->array[x_f].parent;
+        y_f = uf->array[y_f].parent;
+    }
     // TODO: possibly change
 
     return x_f == y_f;
@@ -194,8 +196,9 @@ uf_union_aux (const uf_t* uf, ref_t root, ref_t other)
 void
 uf_union (const uf_t* uf, ref_t state_x, ref_t state_y)
 {
+    
     if (uf_lock(uf, state_x, state_y)) {
-        HREassert (!uf_sameset(uf, state_x, state_y), "uf_union: states should not be in the same set");
+        //HREassert (!uf_sameset(uf, state_x, state_y), "uf_union: states should not be in the same set");
 
         ref_t x_f = uf_find(uf, state_x);
         ref_t y_f = uf_find(uf, state_y);
@@ -218,7 +221,7 @@ uf_union (const uf_t* uf, ref_t state_x, ref_t state_y)
         uf_unlock(uf, x_f);
         uf_unlock(uf, y_f);
     }
-    HREassert (uf_sameset(uf, state_x, state_y), "uf_union: states should be in the same set");
+    //HREassert (uf_sameset(uf, state_x, state_y), "uf_union: states should be in the same set");
 }
 
 // dead
@@ -241,7 +244,7 @@ uf_mark_dead (const uf_t* uf, ref_t state)
     }
 
 
-    HREassert (uf_is_dead(uf, state), "state should be dead");
+    //HREassert (uf_is_dead(uf, state), "state should be dead");
 
     return result;
 }
@@ -296,6 +299,7 @@ uf_lock (const uf_t* uf, ref_t state_x, ref_t state_y)
 void      
 uf_unlock (const uf_t* uf, ref_t state)
 {
+    HREassert(uf->array[state].uf_status == UF_LOCKED)
     uf->array[state].uf_status = UF_LIVE;
 }
 

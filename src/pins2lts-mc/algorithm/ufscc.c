@@ -125,6 +125,7 @@ explore_state (wctx_t *ctx)
     state_info_set(ctx->state, loc->target->ref, LM_NULL_LATTICE);  // get state info
     state_info_set(loc->root,  loc->target->ref, LM_NULL_LATTICE);  // get state info
 
+    increase_level (ctx->counters);
 
     loc->state_ufscc.group_index  = loc->start_group;
     loc->root_ufscc.group_index   = loc->start_group;
@@ -134,6 +135,8 @@ explore_state (wctx_t *ctx)
 
     root_data = dfs_stack_push (loc->rstack, NULL);
     state_info_serialize (loc->root, root_data);
+
+    run_maybe_report1 (ctx->run, ctx->counters, "");
 
     //state_data = dfs_stack_top (loc->dstack);
     //state_info_deserialize (ctx->state, state_data); // DFS Stack TOP
@@ -216,6 +219,7 @@ ufscc_run  (run_t *run, wctx_t *ctx)
             
             //Warning(info, "Done exploring %zu", v);
             dfs_stack_pop (loc->dstack);  // D Stack POP
+            ctx->counters->level_cur--;
 
             
             if (dfs_stack_size(loc->dstack) > 0) { 
@@ -308,7 +312,7 @@ ufscc_run  (run_t *run, wctx_t *ctx)
             }
 
             char result = uf_make_claim(shared->uf, loc->target->ref, (1ULL << ctx->id));
-
+            
             // (TO == DEAD) ==> get next successor
             if (result == CLAIM_DEAD) 
                 continue;
@@ -341,7 +345,13 @@ ufscc_run  (run_t *run, wctx_t *ctx)
                 root_data = dfs_stack_top (loc->rstack);
                 state_info_deserialize (loc->root, root_data); // Roots Stack TOP
 
-                HREassert(uf_sameset(shared->uf, loc->root->ref, ctx->state->ref)); 
+                if (!uf_sameset(shared->uf, loc->root->ref, ctx->state->ref)) {
+                    uf_debug (shared->uf, loc->root->ref);
+                    uf_debug (shared->uf, ctx->state->ref);
+                    bool a = 1;
+                }
+
+                HREassert(uf_sameset(shared->uf, loc->root->ref, ctx->state->ref) == 1); 
 
                 // not SameSet(FROM,TO) ==> unite cycle
                 while (!uf_sameset(shared->uf, ctx->state->ref, loc->target->ref)) {
@@ -350,6 +360,7 @@ ufscc_run  (run_t *run, wctx_t *ctx)
                     // - Union(R.TOP, D.TOP)
                     // (eventually, SameSet(R.TOP, TO) )
 
+                    
                     dfs_stack_pop (loc->rstack); // UF Stack POP
 
                     HREassert(dfs_stack_size(loc->rstack) != 0);
@@ -361,7 +372,13 @@ ufscc_run  (run_t *run, wctx_t *ctx)
 
                     uf_union(shared->uf, loc->root->ref, ctx->state->ref);
 
-                    HREassert(uf_sameset(shared->uf, loc->root->ref, ctx->state->ref));
+
+                    if (!uf_sameset(shared->uf, loc->root->ref, ctx->state->ref)) {
+                        uf_debug (shared->uf, loc->root->ref);
+                        uf_debug (shared->uf, ctx->state->ref);
+                        bool a = 1;
+                    }
+                    HREassert(uf_sameset(shared->uf, loc->root->ref, ctx->state->ref) == 1);
 
                 }
 
