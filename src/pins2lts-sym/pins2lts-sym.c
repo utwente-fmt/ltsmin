@@ -58,6 +58,7 @@ static int   act_label;
 static int   action_typeno;
 static int   ErrorActions = 0; // count number of found errors (action/deadlock/invariant)
 static int   precise = 0;
+static int   next_union = 0;
 
 static uint64_t *seen_actions = 0;
 static int seen_actions_size = 0;
@@ -220,6 +221,7 @@ static  struct poptOption options[] = {
     { NULL, 0 , POPT_ARG_INCLUDE_TABLE, vset_options , 0 , "Vector set options",NULL},
     { "no-soundness-check", 0, POPT_ARG_VAL, &no_soundness_check, 1, "disable checking whether the model specification is sound for guards", NULL },
     { "precise", 0, POPT_ARG_NONE, &precise, 0, "Compute the final number of states precisely", NULL},
+    { "next-union", 0, POPT_ARG_NONE, &next_union, 0, "While computing successor states; unify simultaneously with current states", NULL },
     POPT_TABLEEND
 };
 
@@ -302,6 +304,15 @@ vset_count_ldbl(vset_t set, long* nodes, long double* elements)
     return LDBL_DIG;
 }
 
+typedef void(*vset_next_t)(vset_t dst, vset_t src, vrel_t rel);
+
+static vset_next_t vset_next_fn = vset_next;
+
+static void
+vset_next_union_src(vset_t dst, vset_t src, vrel_t rel)
+{
+    vset_next_union(dst, src, rel, src);
+}
 
 /*
  * Add parallel operations
@@ -515,7 +526,7 @@ find_trace_to(int trace_end[][N], int end_count, int level, vset_t *levels,
 
             for(int j = 0; j < nGrps; j++) {
                 reduce(j, temp);
-                vset_next(temp, src_set, group_next[j]);
+                vset_next_fn(temp, src_set, group_next[j]);
                 vset_union(dst_set, temp);
             }
 
@@ -919,7 +930,7 @@ deadlock_check(vset_t deadlocks, bitvector_t *reach_groups)
         vset_copy(new_reduced[i], deadlocks);
         learn_guards_reduce(new_reduced[i], i, NULL, guard_maybe, false_states, maybe_states, tmp);
         expand_group_next(i, new_reduced[i]);
-        vset_next(next_temp, new_reduced[i], group_next[i]);
+        vset_next_fn(next_temp, new_reduced[i], group_next[i]);
         vset_prev(prev_temp, next_temp, group_next[i],new_reduced[i]);
         reduce(i, prev_temp);
         vset_minus(deadlocks, prev_temp);
@@ -1396,7 +1407,7 @@ VOID_TASK_3(reach_bfs_next, struct reach_s *, dummy, bitvector_t *, reach_groups
         dummy->eg_count = 1;
 
         // Compute successor states
-        vset_next(dummy->container, dummy->container, group_next[dummy->index]);
+        vset_next_fn(dummy->container, dummy->container, group_next[dummy->index]);
         dummy->next_count = 1;
 
         // Compute ancestor states
@@ -1860,7 +1871,7 @@ VOID_TASK_3(reach_par_next, struct reach_s *, dummy, bitvector_t *, reach_groups
         dummy->eg_count = 1;
 
         // Compute successor states
-        vset_next(dummy->container, dummy->container, group_next[dummy->index]);
+        vset_next_fn(dummy->container, dummy->container, group_next[dummy->index]);
         dummy->next_count = 1;
 
         // Compute ancestor states
@@ -2200,7 +2211,7 @@ reach_chain_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
                 reach_chain_stop();
                 (*eg_count)++;
                 (*next_count)++;
-                vset_next(temp, new_reduced, group_next[i]);
+                vset_next_fn(temp, new_reduced, group_next[i]);
                 vset_clear(new_reduced);
                 if (dlk_detect) {
                     vset_prev(dlk_temp, temp, group_next[i], deadlocks);
@@ -2280,7 +2291,7 @@ reach_chain(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
             reach_chain_stop();
             (*eg_count)++;
             (*next_count)++;
-            vset_next(temp, new_reduced, group_next[i]);
+            vset_next_fn(temp, new_reduced, group_next[i]);
             vset_clear(new_reduced);
             vset_union(visited, temp);
             if (dlk_detect) {
@@ -3536,6 +3547,8 @@ VOID_TASK_1(actual_main, void*, arg)
 
     int *src;
     vset_t initial;
+
+    if (next_union) vset_next_fn = vset_next_union_src;
 
     if (transitions_load_filename != NULL) {
         FILE *f = fopen(transitions_load_filename, "r");
