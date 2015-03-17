@@ -1871,5 +1871,7 @@ main (int argc, char *argv[])
     gsea_print_setup ();
     gsea_search(src);
 
+    GBExit(opt.model);
+
     HREexit(LTSMIN_EXIT_SUCCESS);
 }

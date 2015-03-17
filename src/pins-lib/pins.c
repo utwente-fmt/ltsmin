@@ -68,6 +68,8 @@ struct grey_box_model {
 	string_index_t static_info_index;
 	/** Array of static information matrices. */
 	struct static_info_matrix * static_info_matrices;
+
+	ExitCB exit;
 };
 
 struct static_info_matrix{
@@ -343,6 +345,12 @@ wrapped_state_labels_default_all(model_t model, int *state, int *labels)
     return GBgetStateLabelsAll(GBgetParent(model), state, labels);
 }
 
+static void
+wrapped_exit_default(model_t model)
+{
+    GBExit(GBgetParent(model));
+}
+
 struct filter_context {
     void *user_ctx;
     TransitionCB user_cb;
@@ -582,6 +590,8 @@ void GBinitModelDefaults (model_t *p_model, model_t default_src)
 
     model->static_info_index = default_src->static_info_index;
     model->static_info_matrices = default_src->static_info_matrices;
+
+    model->exit = wrapped_exit_default;
 }
 
 void* GBgetContext(model_t model){
@@ -1457,4 +1467,14 @@ string_set_t GBgetDefaultFilter(model_t model){
 
 void ltsmin_abort(int code) {
     HREabort (code);
+}
+
+void GBsetExit(model_t model, ExitCB exit)
+{
+    model->exit = exit;
+}
+
+void GBExit(model_t model)
+{
+    if (model->exit != NULL) model->exit(model);
 }
