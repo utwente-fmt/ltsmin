@@ -415,7 +415,7 @@ subsume_cols(matrix_t *r, matrix_t *mayw, matrix_t *mustw, int cola, int colb) {
 }
 
 static void
-apply_regroup_spec (matrix_t* r, matrix_t* mayw, matrix_t* mustw, const char *spec_, guard_t **guards)
+apply_regroup_spec (matrix_t* r, matrix_t* mayw, matrix_t* mustw, const char *spec_, guard_t **guards, const char* sep)
 {
     
     HREassert(
@@ -433,7 +433,7 @@ apply_regroup_spec (matrix_t* r, matrix_t* mayw, matrix_t* mustw, const char *sp
         context.guards = guards;
 
         char               *tok;
-        while ((tok = strsep (&spec, ",")) != NULL) {
+        while ((tok = strsep (&spec, sep)) != NULL) {
             if (strcasecmp (tok, "w2W") == 0) {
                 Print1 (info, "Regroup over-approximate must-write to may-write");
                 dm_clear(mustw);
@@ -487,23 +487,23 @@ apply_regroup_spec (matrix_t* r, matrix_t* mayw, matrix_t* mustw, const char *sp
             } else if (strcasecmp (tok, "gsa") == 0) {
                 const char         *macro = "gc,gr,csa,rs";
                 Print1 (info, "Regroup macro Simulated Annealing: %s", macro);
-                apply_regroup_spec (r, mayw, mustw, macro, guards);
+                apply_regroup_spec (r, mayw, mustw, macro, guards, sep);
             } else if (strcasecmp (tok, "gs") == 0) {
                 const char         *macro = "gc,gr,cw,rs";
                 Print1 (info, "Regroup macro Group Safely: %s", macro);
-                apply_regroup_spec (r, mayw, mustw, macro, guards);
+                apply_regroup_spec (r, mayw, mustw, macro, guards, sep);
             } else if (strcasecmp (tok, "ga") == 0) {
                 const char         *macro = "ru,gc,rs,cw,rs";
                 Print1 (info, "Regroup macro Group Aggressively: %s", macro);
-                apply_regroup_spec (r, mayw, mustw, macro, guards);
+                apply_regroup_spec (r, mayw, mustw, macro, guards, sep);
             } else if (strcasecmp (tok, "gc") == 0) {
                 const char         *macro = "cs,cn";
                 Print1 (info, "Regroup macro Cols: %s", macro);
-                apply_regroup_spec (r, mayw, mustw, macro, guards);
+                apply_regroup_spec (r, mayw, mustw, macro, guards, sep);
             } else if (strcasecmp (tok, "gr") == 0) {
                 const char         *macro = "rs,rn";
                 Print1 (info, "Regroup macro Rows: %s", macro);
-                apply_regroup_spec (r, mayw, mustw, macro, guards);
+                apply_regroup_spec (r, mayw, mustw, macro, guards, sep);
             } else if (tok[0] != '\0') {
                 Fatal (1, error, "Unknown regrouping specification: '%s'",
                        tok);
@@ -564,10 +564,10 @@ GBregroup (model_t model, const char *regroup_spec)
     Print1 (info, "Regroup specification: %s", regroup_spec);
     if (GBgetUseGuards(model)) {
         dm_copy (GBgetMatrix(model, GBgetMatrixID(model, LTSMIN_MATRIX_ACTIONS_READS)), r);
-        apply_regroup_spec (r, mayw, mustw, regroup_spec, GBgetGuardsInfo(model));
+        apply_regroup_spec (r, mayw, mustw, regroup_spec, GBgetGuardsInfo(model), ",");
     } else {
         dm_copy (GBgetDMInfoRead(model), r);
-        apply_regroup_spec (r, mayw, mustw, regroup_spec, NULL);
+        apply_regroup_spec (r, mayw, mustw, regroup_spec, NULL, ",");
     }
 
     // post processing regroup specification
