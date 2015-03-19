@@ -103,29 +103,27 @@ uf_make_claim (const uf_t* uf, ref_t state, sz_w w_id)
 
     // Is someone currently initializing the state?
     while (uf->array[state].uf_status == UF_INIT);
-
     ref_t f = uf_find(uf, state); 
-    
     // Is the state dead?
     if (uf->array[f].uf_status == UF_DEAD) {
         return CLAIM_DEAD;
     }
-
     // Did I already explore `this' state?
     if (((uf->array[f].w_set) & w_id ) != 0) {
         return CLAIM_FOUND;
         // NB: cycle is possibly missed (in case f got updated)
         // - but next iterations should fix this
     }
-
     // Add our worker ID to the set (and make sure it is the UF representative)
-    do {
+    __sync_or_and_fetch(&uf->array[f].w_set, w_id);
+    while (uf->array[f].parent != f || uf->array[f].uf_status == UF_LOCKED) {
         f = uf->array[f].parent;
         //while (uf->array[f].uf_status == UF_LOCKED); // not sure if this helps
         __sync_or_and_fetch(&uf->array[f].w_set, w_id);
-    } while (uf->array[f].parent != f 
-          || uf->array[f].uf_status == UF_LOCKED);
-
+        if (uf->array[f].uf_status == UF_DEAD) {
+            return CLAIM_DEAD;
+        }
+    }
     return CLAIM_SUCCESS;
 }
 
