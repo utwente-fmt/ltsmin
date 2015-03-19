@@ -167,18 +167,14 @@ uf_find (const uf_t* uf, ref_t state)
 bool
 uf_sameset (const uf_t* uf, ref_t state_x, ref_t state_y)
 {
-    ref_t x_f = state_x;
-    ref_t y_f = state_y;
+    ref_t x_f = uf_find(state_x);
+    ref_t y_f = uf_find(state_y);
     // while loop is necessary, in case uf root gets updated
     // otherwise sameset might return false if it is actually true
-    while ((uf->array[x_f].uf_status == UF_LOCKED) ||
-           (uf->array[y_f].uf_status == UF_LOCKED) ||
-           (uf->array[x_f].parent != x_f) ||
-           (uf->array[y_f].parent != y_f)) {
-        x_f = uf->array[x_f].parent;
-        y_f = uf->array[y_f].parent;
+    while ((uf->array[x_f].parent != x_f)) {
+        y_f = uf_find(y_f);
+        x_f = uf_find(x_f);
     }
-    // TODO: possibly change
 
     return x_f == y_f;
 }
