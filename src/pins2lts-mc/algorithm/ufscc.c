@@ -345,12 +345,6 @@ ufscc_run  (run_t *run, wctx_t *ctx)
                 root_data = dfs_stack_top (loc->rstack);
                 state_info_deserialize (loc->root, root_data); // Roots Stack TOP
 
-                if (!uf_sameset(shared->uf, loc->root->ref, ctx->state->ref)) {
-                    uf_debug (shared->uf, loc->root->ref);
-                    uf_debug (shared->uf, ctx->state->ref);
-                    bool a = 1;
-                }
-
                 HREassert(uf_sameset(shared->uf, loc->root->ref, ctx->state->ref) == 1); 
 
                 // not SameSet(FROM,TO) ==> unite cycle
@@ -373,11 +367,6 @@ ufscc_run  (run_t *run, wctx_t *ctx)
                     uf_union(shared->uf, loc->root->ref, ctx->state->ref);
 
 
-                    if (!uf_sameset(shared->uf, loc->root->ref, ctx->state->ref)) {
-                        uf_debug (shared->uf, loc->root->ref);
-                        uf_debug (shared->uf, ctx->state->ref);
-                        bool a = 1;
-                    }
                     HREassert(uf_sameset(shared->uf, loc->root->ref, ctx->state->ref) == 1);
 
                 }
