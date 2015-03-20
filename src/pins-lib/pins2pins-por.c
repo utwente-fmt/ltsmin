@@ -2226,22 +2226,6 @@ GBaddPOR (model_t model)
         ctx->not_left_accords  = ctx->not_accords;
         ctx->not_left_accordsn = ctx->not_accords;
     } else {
-        matrix_t *must_disable = NULL;
-        int id = GBgetMatrixID(model, LTSMIN_MUST_DISABLE_MATRIX);
-        if (id != SI_INDEX_FAILED) {
-            must_disable = GBgetMatrix(model, id);
-        } else {
-            Print1 (info, "No must-disable matrix available for weak sets.");
-            NO_MDS = 1;
-        }
-        matrix_t *must_enable = NULL;
-        id = GBgetMatrixID(model, LTSMIN_MUST_ENABLE_MATRIX);
-        if (id != SI_INDEX_FAILED) {
-            must_enable = GBgetMatrix(model, id);
-        } else if (POR_WEAK == WEAK_VALMARI) {
-            Print1 (info, "No must-enable matrix available for Valmari's weak sets.");
-        }
-
         /**
          *
          * WEAK relations
@@ -2273,72 +2257,94 @@ GBaddPOR (model_t model)
          *
          */
 
-        matrix_t not_left_accords;
-        dm_create(&not_left_accords, ctx->ngroups, ctx->ngroups);
-        for (int i = 0; i < ctx->ngroups; i++) {
-            for (int j = 0; j < ctx->ngroups; j++) {
-                if (i == j) continue;
+        matrix_t* not_left_accords;
+        id = GBgetMatrixID(model, LTSMIN_NOT_LEFT_ACCORDS);
+        if (id != SI_INDEX_FAILED) {
+            not_left_accords = GBgetMatrix(model, id);
+        } else {
+            matrix_t *must_disable = NULL;
+            int id = GBgetMatrixID(model, LTSMIN_MUST_DISABLE_MATRIX);
+            if (id != SI_INDEX_FAILED) {
+                must_disable = GBgetMatrix(model, id);
+            } else {
+                Print1 (info, "No must-disable matrix available for weak sets.");
+                NO_MDS = 1;
+            }
+            matrix_t *must_enable = NULL;
+            id = GBgetMatrixID(model, LTSMIN_MUST_ENABLE_MATRIX);
+            if (id != SI_INDEX_FAILED) {
+                must_enable = GBgetMatrix(model, id);
+            } else if (POR_WEAK == WEAK_VALMARI) {
+                Print1 (info, "No must-enable matrix available for Valmari's weak sets.");
+            }
 
-                // j may disable i (OK)
-                if (!NO_MDS && all_guards(ctx, i, must_disable, j)) {
-                    continue;
-                }
+            not_left_accords = RTmalloc(sizeof(matrix_t));
+            dm_create(not_left_accords, ctx->ngroups, ctx->ngroups);
+            for (int i = 0; i < ctx->ngroups; i++) {
+                for (int j = 0; j < ctx->ngroups; j++) {
+                    if (i == j) continue;
 
-                if (POR_WEAK == WEAK_VALMARI) {
-                    // j must enable i (OK)
-                    if (must_enable != NULL && all_guards(ctx, i, must_enable, j)) {
+                    // j may disable i (OK)
+                    if (!NO_MDS && all_guards(ctx, i, must_disable, j)) {
                         continue;
                     }
 
-                    // i and j are never coenabled (OK)
-                    if ( !NO_MC && dm_is_set(&ctx->nce, i , j) ) {
-                        continue;
-                    }
-                } else {
-                    // j may enable i (NOK)
-                    if (guard_of(ctx, i, &ctx->label_nes_matrix, j)) {
-                        dm_set( &not_left_accords, i, j );
-                        continue;
-                    }
-                }
+                    if (POR_WEAK == WEAK_VALMARI) {
+                        // j must enable i (OK)
+                        if (must_enable != NULL && all_guards(ctx, i, must_enable, j)) {
+                            continue;
+                        }
 
-                if (NO_COMMUTES) {
-                    // !DNA (OK)
-                    if (!dm_is_set(&ctx->not_accords_with, i, j)) continue;
-                } else {
-                    // i may disable j (NOK)
-                    if (dm_is_set(&nds, j, i)) {
-                        dm_set( &not_left_accords, i, j );
-                        continue;
+                        // i and j are never coenabled (OK)
+                        if ( !NO_MC && dm_is_set(&ctx->nce, i , j) ) {
+                            continue;
+                        }
+                    } else {
+                        // j may enable i (NOK)
+                        if (guard_of(ctx, i, &ctx->label_nes_matrix, j)) {
+                            dm_set( not_left_accords, i, j );
+                            continue;
+                        }
                     }
-                    // i may enable j (NOK)
-                    if (guard_of(ctx, j, &ctx->label_nes_matrix, i)) {
-                        dm_set( &not_left_accords, i, j );
-                        continue;
-                    }
-                    // i,j commute (OK)
-                    if ( dm_is_set(commutes, i , j) ) continue;
-                }
 
-                // is even dependent? Front-end might miss it.
-                for (int k = 0; k < ctx->nslots; k++) {
-                    if ((dm_is_set( p_dm_w, i, k) && dm_is_set( p_dm, j, k)) ||
-                        (dm_is_set( p_dm, i, k) && dm_is_set( p_dm_w, j, k)) ) {
-                        dm_set( &not_left_accords, i, j );
-                        break;
+                    if (NO_COMMUTES) {
+                        // !DNA (OK)
+                        if (!dm_is_set(&ctx->not_accords_with, i, j)) continue;
+                    } else {
+                        // i may disable j (NOK)
+                        if (dm_is_set(&nds, j, i)) {
+                            dm_set( not_left_accords, i, j );
+                            continue;
+                        }
+                        // i may enable j (NOK)
+                        if (guard_of(ctx, j, &ctx->label_nes_matrix, i)) {
+                            dm_set( not_left_accords, i, j );
+                            continue;
+                        }
+                        // i,j commute (OK)
+                        if ( dm_is_set(commutes, i , j) ) continue;
+                    }
+
+                    // is even dependent? Front-end might miss it.
+                    for (int k = 0; k < ctx->nslots; k++) {
+                        if ((dm_is_set( p_dm_w, i, k) && dm_is_set( p_dm, j, k)) ||
+                            (dm_is_set( p_dm, i, k) && dm_is_set( p_dm_w, j, k)) ) {
+                            dm_set( not_left_accords, i, j );
+                            break;
+                        }
                     }
                 }
             }
         }
-        ctx->not_left_accords = (ci_list **) dm_rows_to_idx_table(&not_left_accords);
-        ctx->not_left_accordsn= (ci_list **) dm_cols_to_idx_table(&not_left_accords);
+        ctx->not_left_accords = (ci_list **) dm_rows_to_idx_table(not_left_accords);
+        ctx->not_left_accordsn= (ci_list **) dm_cols_to_idx_table(not_left_accords);
 
         matrix_t dna_diff;
         dm_create(&dna_diff, ctx->ngroups, ctx->ngroups);
         for (int i = 0; i < ctx->ngroups; i++) {
             for (int j = 0; j < ctx->ngroups; j++) {
                 if ( dm_is_set(&ctx->not_accords_with, i , j) &&
-                    !dm_is_set(&not_left_accords, i , j) ) {
+                    !dm_is_set(not_left_accords, i , j) ) {
                     dm_set (&dna_diff, i, j);
                 }
             }
