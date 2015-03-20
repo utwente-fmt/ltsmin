@@ -529,6 +529,14 @@ void GBinitModelDefaults (model_t *p_model, model_t default_src)
     if (GBgetValidEndStateLabelIndex (default_src) >= 0)
         GBsetValidEndStateLabelIndex(model, GBgetValidEndStateLabelIndex (default_src));
 
+    for (int i = 0; i < GBgetMatrixCount(default_src); i++) {
+        const char* name = GBgetMatrixName(default_src, i);
+        pins_strictness_t strictness = GBgetMatrixStrictness(default_src, i);
+        index_class_t row_info = GBgetMatrixRowInfo(default_src, i);
+        index_class_t column_info = GBgetMatrixColumnInfo(default_src, i);
+        GBsetMatrix(model, name, GBgetMatrix(default_src, i), strictness, row_info, column_info);
+    }
+
     if (model->s0 == NULL) {
         int N = lts_type_get_state_length (GBgetLTStype (default_src));
         int s0[N];
