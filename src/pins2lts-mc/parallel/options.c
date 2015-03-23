@@ -31,6 +31,7 @@ si_map_entry strategies[] = {
     {"dfsfifo", Strat_DFSFIFO},
     {"tarscc",  Strat_TARSCC},
     {"ufscc",   Strat_UFSCC},
+    {"rentarscc",   Strat_RENTARSCC},
     {NULL, 0}
 };
 

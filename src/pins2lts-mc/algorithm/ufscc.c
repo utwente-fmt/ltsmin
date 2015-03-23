@@ -390,7 +390,7 @@ ufscc_run  (run_t *run, wctx_t *ctx)
 
     }
 
-    Warning(info, "finished");
+    //Warning(info, "finished");
 
     if (!run_is_stopped(run) && dfs_stack_size(loc->dstack) != 0)
         Warning (info, "Stack not empty: %zu ", dfs_stack_size(loc->dstack));
