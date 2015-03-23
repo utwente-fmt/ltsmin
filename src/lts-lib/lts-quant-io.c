@@ -56,14 +56,13 @@ static void write_imca_trans(FILE* imca,const char* state_fmt,lts_t lts,uint32_t
             uint32_t label[NE];
             TreeUnfold(lts->edge_idx,lts->label[j],(int*)label);
             uint32_t group=label[group_pos];
+            if (j==lts->begin[i]){
             if (label[action_pos]==tau){
                 fprintf(imca,state_fmt,first+i);
                 fprintf(imca," tau");
             } else if (label[action_pos]==rate) {
-                if (j==lts->begin[i]){
                     fprintf(imca,state_fmt,first+i);
                     fprintf(imca," !");
-                }
             } else {
                 chunk label_c=VTgetChunk(lts->values[action_type],label[action_pos]);
                 char label_s[label_c.len*2+6];
@@ -76,6 +75,7 @@ static void write_imca_trans(FILE* imca,const char* state_fmt,lts_t lts,uint32_t
             } else {
                 fprintf(imca,"\n");
             }
+            }
             do {
                 fprintf(imca,"* ");
                 fprintf(imca,state_fmt,first+lts->dest[j]);
@@ -85,6 +85,7 @@ static void write_imca_trans(FILE* imca,const char* state_fmt,lts_t lts,uint32_t
                     TreeUnfold(lts->edge_idx,lts->label[j],(int*)label);
             } while (j<lts->begin[i+1]&&group==label[group_pos]);
         }
+        //fprintf(imca,"\n");
     }
   
 }
