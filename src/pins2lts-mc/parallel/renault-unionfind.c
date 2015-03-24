@@ -2,17 +2,33 @@
 
 #include <pins2lts-mc/parallel/renault-unionfind.h>
 
-static char         r_UF_UNSEEN     = 0; // initial
-static char         r_UF_INIT       = 1;
-static char         r_UF_LIVE       = 2;
-static char         r_UF_LOCKED     = 3;
-static char         r_UF_DEAD       = 4;
+#include <mc-lib/atomics.h>
+
+typedef enum r_uf_status_e {
+    r_UF_UNSEEN     = 0, // initial
+    r_UF_INIT       = 1,
+    r_UF_LIVE       = 2,
+    r_UF_LOCKED     = 3,
+    r_UF_DEAD       = 4
+} r_uf_status;
+
+struct r_uf_node_s {
+    ref_t           parent;                 // The parent in the UF tree
+    unsigned char   rank;                   // The height of the UF tree
+    unsigned char   r_uf_status;              // {UNSEEN, INIT, LIVE, LOCKED, DEAD}
+};
+
+typedef struct r_uf_node_s r_uf_node_t;
+
+struct r_uf_s {
+    r_uf_node_t      *array;   // array: [ref_t] -> uf_node
+};
 
 r_uf_t *
 r_uf_create ()
 {
     //HREassert (sizeof(sz_w)*8 >= W, "Too many workers for the current structure; please redefine sz_w to a larger size");
-    r_uf_t           *uf = RTmalloc (sizeof(r_uf_t));
+    r_uf_t         *uf = RTmalloc (sizeof(r_uf_t));
     uf->array          = RTmallocZero ( sizeof(r_uf_node_t) * (1ULL << dbs_size) );
     return uf;
 }
@@ -26,14 +42,14 @@ r_uf_make_claim (const r_uf_t* uf, ref_t state)
     if (cas(&uf->array[state].r_uf_status, r_UF_UNSEEN, r_UF_INIT)) {
         // create state and add worker
 
-        uf->array[state].parent       = state;
-        uf->array[state].r_uf_status  = r_UF_LIVE;
+        atomic_write (&uf->array[state].parent, state);
+        atomic_write (&uf->array[state].r_uf_status, r_UF_LIVE);
 
         return CLAIM_FIRST;
     }
 
     // Is someone currently initializing the state?
-    while (uf->array[state].r_uf_status == r_UF_INIT);
+    while (atomic_read (&uf->array[state].r_uf_status) == r_UF_INIT);
 
     // Is the state dead?
     if (r_uf_is_dead(uf, state))
@@ -57,16 +73,14 @@ r_uf_find (const r_uf_t* uf, ref_t state)
 bool
 r_uf_sameset (const r_uf_t* uf, ref_t state_x, ref_t state_y)
 {
-    ref_t x_f = r_uf_find(uf, state_x);
-    ref_t y_f = r_uf_find(uf, state_y);
+    ref_t x_f = state_x;
+    ref_t y_f = state_y;
     // while loop is necessary, in case uf root gets updated
     // otherwise sameset might return false if it is actually true
-    while ((uf->array[x_f].r_uf_status == r_UF_LOCKED) ||
-           (uf->array[y_f].r_uf_status == r_UF_LOCKED) ||
-           (uf->array[x_f].parent != x_f) ||
-           (uf->array[y_f].parent != y_f)) {
-        x_f = r_uf_find(uf, x_f);
-        y_f = r_uf_find(uf, y_f);
+    while ((atomic_read(&uf->array[y_f].parent) != y_f) ||
+           (atomic_read(&uf->array[x_f].parent) != x_f)) {
+        x_f = atomic_read(&uf->array[x_f].parent);
+        y_f = atomic_read(&uf->array[y_f].parent);
     }
     // TODO: possibly change
 
@@ -119,7 +133,7 @@ r_uf_mark_dead (const r_uf_t* uf, ref_t state)
     while (!r_uf_is_dead(uf, f)) {
         f = r_uf_find(uf, f); 
 
-        char tmp = uf->array[f].r_uf_status;
+        char tmp = atomic_read (&uf->array[f].r_uf_status);
         if (tmp != r_UF_DEAD) {
             result = cas(&uf->array[f].r_uf_status, tmp, r_UF_DEAD);
         }
@@ -134,11 +148,11 @@ r_uf_mark_dead (const r_uf_t* uf, ref_t state)
 bool
 r_uf_is_dead (const r_uf_t* uf, ref_t state)
 {
-    if (uf->array[state].r_uf_status == r_UF_UNSEEN ||
-        uf->array[state].r_uf_status == r_UF_INIT) 
+    if (atomic_read(&uf->array[state].r_uf_status) == r_UF_UNSEEN ||
+        atomic_read(&uf->array[state].r_uf_status) == r_UF_INIT) 
         return false;
     ref_t f = r_uf_find(uf, state); 
-    return uf->array[f].r_uf_status == r_UF_DEAD;
+    return atomic_read(&uf->array[f].r_uf_status) == r_UF_DEAD;
 }
 
 
@@ -166,17 +180,17 @@ r_uf_lock (const r_uf_t* uf, ref_t state_x, ref_t state_y)
 
         // lock smallest ref first
         if (cas(&uf->array[a].r_uf_status, r_UF_LIVE, r_UF_LOCKED)) {
-            if (uf->array[a].parent == a) {
+            if (atomic_read(&uf->array[a].parent) == a) {
                 // a is successfully locked
                 if (cas(&uf->array[b].r_uf_status, r_UF_LIVE, r_UF_LOCKED)) {
-                    if (uf->array[b].parent == b) {
+                    if (atomic_read(&uf->array[b].parent) == b) {
                         // b is successfully locked
                         return true;
                     } 
-                    uf->array[b].r_uf_status = r_UF_LIVE;
+                    atomic_write (&uf->array[b].r_uf_status, r_UF_LIVE);
                 } 
             } 
-            uf->array[a].r_uf_status = r_UF_LIVE;
+            atomic_write (&uf->array[a].r_uf_status, r_UF_LIVE);
         }
     }
 }
@@ -185,7 +199,7 @@ void
 r_uf_unlock (const r_uf_t* uf, ref_t state)
 {
     HREassert(uf->array[state].r_uf_status == r_UF_LOCKED)
-    uf->array[state].r_uf_status = r_UF_LIVE;
+    atomic_write (&uf->array[state].r_uf_status, r_UF_LIVE);
 }
 
 // testing
