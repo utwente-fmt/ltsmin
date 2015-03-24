@@ -24,6 +24,7 @@
 #define fetch_and(a, b)     __sync_fetch_and_and(a,b)
 #define fetch_add(a, b)     __sync_fetch_and_add(a,b)
 #define add_fetch(a, b)     __sync_add_and_fetch(a,b)
+#define or_fetch(a, b)      __sync_or_and_fetch(a,b)
 #define fetch_sub(a, b)     __sync_fetch_and_sub(a,b)
 #define sub_fetch(a, b)     __sync_sub_and_fetch(a,b)
 #define prefetch(a)         __builtin_prefetch(a)
