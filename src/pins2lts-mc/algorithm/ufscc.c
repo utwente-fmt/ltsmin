@@ -154,7 +154,7 @@ ufscc_init  (wctx_t *ctx)
     loc->target = ctx->initial;
     explore_state (ctx);
 
-    char result = uf_make_claim(shared->uf, ctx->initial->ref, (1ULL << ctx->id));
+    char result = uf_make_claim(shared->uf, ctx->initial->ref, ctx->id);
     
     if (result == CLAIM_FIRST) {
         ctx->counters->explored ++; // increase global counters
@@ -311,7 +311,7 @@ ufscc_run  (run_t *run, wctx_t *ctx)
                 continue;
             }
 
-            char result = uf_make_claim(shared->uf, loc->target->ref, (1ULL << ctx->id));
+            char result = uf_make_claim(shared->uf, loc->target->ref, ctx->id);
             
             // (TO == DEAD) ==> get next successor
             if (result == CLAIM_DEAD) 
