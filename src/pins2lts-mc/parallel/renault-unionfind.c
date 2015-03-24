@@ -77,8 +77,8 @@ r_uf_sameset (const r_uf_t* uf, ref_t state_x, ref_t state_y)
     ref_t y_f = state_y;
     // while loop is necessary, in case uf root gets updated
     // otherwise sameset might return false if it is actually true
-    while (atomic_read(&uf->array[x_f].r_uf_status) != r_UF_LOCKED ||
-           atomic_read(&uf->array[y_f].r_uf_status) != r_UF_LOCKED ||
+    while (atomic_read(&uf->array[x_f].r_uf_status) == r_UF_LOCKED ||
+           atomic_read(&uf->array[y_f].r_uf_status) == r_UF_LOCKED ||
            atomic_read(&uf->array[y_f].parent) != y_f ||
            atomic_read(&uf->array[x_f].parent) != x_f) {
         x_f = atomic_read(&uf->array[x_f].parent);
