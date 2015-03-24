@@ -10,27 +10,17 @@
  * TODO: documentation
  */
 
-typedef struct r_uf_node_s {
-    ref_t           parent;         // The parent in the UF tree
-    unsigned char   rank;           // The height of the UF tree
-    char            r_uf_status;      // {UNSEEN, INIT, LIVE, LOCKED, DEAD}
-} r_uf_node_t;
-
-
-struct r_uf_s {
-    r_uf_node_t      *array;   // array: [ref_t] -> r_uf_node
-};
 typedef struct r_uf_s r_uf_t;
 
 #define CLAIM_DEAD      1
 #define CLAIM_FIRST     2
 #define CLAIM_SUCCESS   3
 
-extern r_uf_t     *r_uf_create ();
+extern r_uf_t   *r_uf_create ();
 
 // successor handling
 
-extern char     r_uf_make_claim (const r_uf_t* uf, ref_t state);
+extern char      r_uf_make_claim (const r_uf_t* uf, ref_t state);
 
 // 'basic' union find
 

@@ -339,7 +339,7 @@ tarjan_scc_print_stats   (run_t *run, wctx_t *ctx)
     counter_t              *reduced = (counter_t *) run->reduced;
 
     // SCC statistics
-    Warning(info,"unique states found:   %d", ctx->counters->explored);
+    Warning(info,"unique states found:   %zu", ctx->counters->explored);
     Warning(info,"simple cycle count: %d", reduced->cycle_count);
     Warning(info,"self-loop count:    %d", reduced->self_loop_count);
     Warning(info,"scc count:          %d", reduced->scc_count);

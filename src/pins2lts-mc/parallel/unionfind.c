@@ -34,7 +34,6 @@ typedef struct uf_node_s uf_node_t;
 
 struct uf_s {
     uf_node_t      *array;   // array: [ref_t] -> uf_node
-    bool            finished;
 };
 
 uf_t *
