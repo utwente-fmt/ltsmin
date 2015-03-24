@@ -136,7 +136,7 @@ tarjan_handle (void *arg, state_info_t *successor, transition_info_t *ti, int se
 
     }
 
-    (void) ti;
+    (void) ti; (void) seen;
 }
 
 static inline void
