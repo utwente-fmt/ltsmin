@@ -257,6 +257,9 @@ ufscc_run  (run_t *run, wctx_t *ctx)
                     break;
 
 
+                if (uf_sameset(shared->uf, ctx->state->ref, v)) {
+                    continue; // backtrack in same set
+                }
                 // pop states from Roots until !sameset(v, Roots.TOP)
                 // (Roots.TOP might not be the actual root)
                 root_data = dfs_stack_top (loc->rstack);
@@ -273,6 +276,8 @@ ufscc_run  (run_t *run, wctx_t *ctx)
                     root_data = dfs_stack_top (loc->rstack);
                     state_info_deserialize (loc->root, root_data);  // Roots Stack TOP
                 }
+                HREassert(uf_sameset(shared->uf, ctx->state->ref, loc->root->ref));
+
                 continue; // Backtrack
             }
             else {
@@ -370,6 +375,8 @@ ufscc_run  (run_t *run, wctx_t *ctx)
                     HREassert(uf_sameset(shared->uf, loc->root->ref, ctx->state->ref) == 1);
 
                 }
+                HREassert(uf_sameset(shared->uf, loc->root->ref, ctx->state->ref) == 1); 
+                HREassert(uf_sameset(shared->uf, loc->root->ref, loc->target->ref) == 1); 
 
                 // cycle is now merged (and DFS stack is unchanged)
                 // so we can continue exploring successors from ctx->state
