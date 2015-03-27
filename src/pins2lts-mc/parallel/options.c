@@ -29,9 +29,9 @@ si_map_entry strategies[] = {
     {"map",     Strat_MAP},
     {"ecd",     Strat_ECD},
     {"dfsfifo", Strat_DFSFIFO},
-    {"tarscc",  Strat_TARSCC},
+    {"tarjan",  Strat_TARSCC},
     {"ufscc",   Strat_UFSCC},
-    {"rentarscc",   Strat_RENTARSCC},
+    {"renault", Strat_RENTARSCC},
     {NULL, 0}
 };
 

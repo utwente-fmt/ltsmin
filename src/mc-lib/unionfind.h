@@ -13,9 +13,11 @@
 
 typedef struct uf_s uf_t;
 
-#define PICK_DEAD       1
-#define PICK_SUCCESS    2
-#define PICK_MARK_DEAD  3
+typedef enum pick_result {
+    PICK_DEAD = 1,
+    PICK_SUCCESS,
+    PICK_MARK_DEAD,
+} pick_e;
 
 #define CLAIM_DEAD      1
 #define CLAIM_FIRST     2
@@ -26,7 +28,7 @@ extern uf_t     *uf_create ();
 
 // successor handling
 
-extern char     uf_pick_from_list (const uf_t* uf, ref_t state, ref_t *node);
+extern pick_e   uf_pick_from_list (const uf_t* uf, ref_t state, ref_t *node);
 
 extern void     uf_remove_from_list (const uf_t* uf, ref_t state);
 
@@ -60,7 +62,9 @@ extern void      uf_unlock (const uf_t* uf, ref_t state);
 
 extern bool      uf_mark_undead (const uf_t* uf, ref_t state);
 
-extern void      uf_debug (const uf_t* uf, ref_t state);
+extern int       uf_print_list(const uf_t* uf, ref_t state);
+
+extern int       uf_debug (const uf_t* uf, ref_t state);
 
 extern void      uf_free (uf_t* uf);
 

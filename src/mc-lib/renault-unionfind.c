@@ -1,6 +1,6 @@
 #include <hre/config.h>
 
-#include <pins2lts-mc/parallel/renault-unionfind.h>
+#include <mc-lib/renault-unionfind.h>
 
 #include <mc-lib/atomics.h>
 
