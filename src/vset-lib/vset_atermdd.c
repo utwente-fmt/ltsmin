@@ -300,12 +300,12 @@ count_set(ATerm set, long *nodes, bn_int_t *elements)
   *nodes=node_count;
 }
 
-static void set_count_list(vset_t set,long *nodes,bn_int_t *elements){
-  count_set(set->set,nodes,elements);
+static void set_count_list(vset_t set,long *nodes,double *elements){
+  count_set(set->set,nodes,(bn_int_t *)elements);
 }
 
-static void rel_count_list(vrel_t rel,long *nodes,bn_int_t *elements){
-  count_set(rel->rel,nodes,elements);
+static void rel_count_list(vrel_t rel,long *nodes,double *elements){
+  count_set(rel->rel,nodes,(bn_int_t *)elements);
 }
 
 static ATbool set_member(ATerm set,ATerm *a){
