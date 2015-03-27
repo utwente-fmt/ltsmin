@@ -30,7 +30,7 @@ extern uf_t     *uf_create ();
 
 extern pick_e   uf_pick_from_list (const uf_t* uf, ref_t state, ref_t *node);
 
-extern void     uf_remove_from_list (const uf_t* uf, ref_t state);
+extern bool     uf_remove_from_list (const uf_t* uf, ref_t state);
 
 extern bool     uf_is_in_list (const uf_t* uf, ref_t state);
 
@@ -44,7 +44,7 @@ extern ref_t     uf_find (const uf_t* uf, ref_t state);
 
 extern bool      uf_sameset (const uf_t* uf, ref_t state_x, ref_t state_y);
 
-extern void      uf_union (const uf_t* uf, ref_t state_x, ref_t state_y);
+extern bool      uf_union (const uf_t* uf, ref_t state_x, ref_t state_y);
 
 // dead
 
