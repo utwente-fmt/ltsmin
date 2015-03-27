@@ -7,7 +7,7 @@
 #include <pins2lts-mc/algorithm/renault-tarjan.h>
 #include <pins2lts-mc/parallel/permute.h>
 #include <pins2lts-mc/parallel/state-info.h>
-#include <pins2lts-mc/parallel/renault-unionfind.h>
+#include <mc-lib/renault-unionfind.h>
 #include <pins2lts-mc/parallel/worker.h>
 #include <util-lib/fast_set.h>
 
