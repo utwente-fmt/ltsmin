@@ -101,7 +101,7 @@ uf_pick_from_list (const uf_t* uf, ref_t state, ref_t *node)
     return PICK_SUCCESS;
 }
 
-void    
+bool    
 uf_remove_from_list (const uf_t* uf, ref_t state)
 {
     // only remove if it has LIST_LIVE , otherwise (LIST_BUSY) wait
@@ -110,9 +110,9 @@ uf_remove_from_list (const uf_t* uf, ref_t state)
         list_status list_s = atomic_read(&uf->array[state].list_status);
         if (list_s == LIST_LIVE) {
             if (cas(&uf->array[state].list_status, LIST_LIVE, LIST_TOMBSTONE))
-                break;
+                return 1;
         } else if (list_s == LIST_TOMBSTONE)
-            break;
+            return 0;
     }
 }
 
@@ -129,15 +129,17 @@ uf_make_claim (const uf_t* uf, ref_t state, size_t worker)
     sz_w            w_id = 1ULL << worker;
 
     // Is the state unseen? ==> Initialize it
-    if (cas(&uf->array[state].uf_status, UF_UNSEEN, UF_INIT)) {
-        // create state and add worker
+    if (atomic_read(&uf->array[state].uf_status) == UF_UNSEEN) {
+        if (cas(&uf->array[state].uf_status, UF_UNSEEN, UF_INIT)) {
+            // create state and add worker
 
-        atomic_write (&uf->array[state].parent, state);
-        atomic_write (&uf->array[state].list_next, state);
-        uf->array[state].w_set = w_id;
-        atomic_write (&uf->array[state].uf_status, UF_LIVE);
+            atomic_write (&uf->array[state].parent, state);
+            atomic_write (&uf->array[state].list_next, state);
+            uf->array[state].w_set = w_id;
+            atomic_write (&uf->array[state].uf_status, UF_LIVE);
 
-        return CLAIM_FIRST;
+            return CLAIM_FIRST;
+        }
     }
 
     // Is someone currently initializing the state?
@@ -231,11 +233,12 @@ uf_find (const uf_t* uf, ref_t state)
 {
     // recursively find and update the parent (path compression)
     ref_t parent = atomic_read(&uf->array[state].parent);
-    if (parent != state) {
-        atomic_write(&uf->array[state].parent, uf_find (uf, parent));
-    }
-
-    return atomic_read(&uf->array[state].parent);
+    if (parent == state)
+        return parent;
+    ref_t root = uf_find (uf, parent);
+    if (root != parent)
+        atomic_write(&uf->array[state].parent, root);
+    return root;
 }
 
 bool
@@ -270,7 +273,7 @@ uf_union_aux (const uf_t* uf, ref_t root, ref_t other)
     atomic_write(&uf->array[other].parent, root);
 }
 
-void
+bool
 uf_union (const uf_t* uf, ref_t state_x, ref_t state_y)
 {
     if (uf_lock(uf, state_x, state_y)) {
@@ -298,8 +301,13 @@ uf_union (const uf_t* uf, ref_t state_x, ref_t state_y)
         }
         uf_unlock(uf, x_f);
         uf_unlock(uf, y_f);
+        HREassert (uf_sameset(uf, state_x, state_y), "uf_union: states should be in the same set");
+        return 1;
     }
-    HREassert (uf_sameset(uf, state_x, state_y), "uf_union: states should be in the same set");
+    else {
+        HREassert (uf_sameset(uf, state_x, state_y), "uf_union: states should be in the same set");
+        return 0;
+    }
 }
 
 // dead
@@ -312,15 +320,22 @@ uf_mark_dead (const uf_t* uf, ref_t state)
 
     ref_t f = uf_find(uf, state); 
 
-    while (!uf_is_dead(uf, f)) {
+    /*while (!uf_is_dead(uf, f)) {
         f = uf_find(uf, f); 
 
         uf_status tmp = atomic_read (&uf->array[f].uf_status);
         if (tmp == UF_LIVE) {
             result = cas (&uf->array[f].uf_status, tmp, UF_DEAD);
         }
-    }
+    }*/
+    uf_status tmp = atomic_read (&uf->array[f].uf_status);
 
+    HREassert (tmp != UF_LOCKED);
+
+    if (tmp == UF_LIVE) 
+        result = cas (&uf->array[f].uf_status, tmp, UF_DEAD);
+
+    HREassert (atomic_read (&uf->array[f].parent) == f);
 
     HREassert (uf_is_dead(uf, state), "state should be dead");
 
@@ -358,18 +373,22 @@ uf_lock (const uf_t* uf, ref_t state_x, ref_t state_y)
         }
 
         // lock smallest ref first
-        if (cas(&uf->array[a].uf_status, UF_LIVE, UF_LOCKED)) {
-            if (atomic_read(&uf->array[a].parent) == a) {
-                // a is successfully locked
-                if (cas(&uf->array[b].uf_status, UF_LIVE, UF_LOCKED)) {
-                    if (atomic_read(&uf->array[b].parent) == b) {
-                        // b is successfully locked
-                        return true;
-                    } 
-                    atomic_write (&uf->array[b].uf_status, UF_LIVE);
+        if (atomic_read(&uf->array[a].uf_status) == UF_LIVE) {
+            if (cas(&uf->array[a].uf_status, UF_LIVE, UF_LOCKED)) {
+                if (atomic_read(&uf->array[a].parent) == a) {
+                    // a is successfully locked
+                    if (atomic_read(&uf->array[b].uf_status) == UF_LIVE) {
+                        if (cas(&uf->array[b].uf_status, UF_LIVE, UF_LOCKED)) {
+                            if (atomic_read(&uf->array[b].parent) == b) {
+                                // b is successfully locked
+                                return true;
+                            } 
+                            atomic_write (&uf->array[b].uf_status, UF_LIVE);
+                        } 
+                    }
                 } 
-            } 
-            atomic_write (&uf->array[a].uf_status, UF_LIVE);
+                atomic_write (&uf->array[a].uf_status, UF_LIVE);
+            }
         }
     }
 }

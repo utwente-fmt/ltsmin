@@ -24,6 +24,11 @@ typedef struct counter_s {
     uint32_t            unique_states_count;
     uint32_t            self_loop_count;     // Counts the number of self-loops
     uint32_t            scc_count;           // Counts the number of SCCs
+    uint32_t            first_claim_count;   // Number of states that this worker first claimed
+    uint32_t            multiple_claim_count;   // Number of states that this worker did not first claimed
+    uint32_t            marked_dead_count;   // Number of SCCs that this worker marked dead
+    uint32_t            union_count;         // Number of states that this worker united
+    uint32_t            removed_from_list_count; // Number of states that this worker removed from list
 } counter_t;
 
 // SCC information for each worker
@@ -75,6 +80,11 @@ ufscc_local_init   (run_t *run, wctx_t *ctx)
     ctx->local->cnt.unique_states_count     = 0;
     ctx->local->cnt.self_loop_count         = 0;
     ctx->local->cnt.scc_count               = 0;
+    ctx->local->cnt.first_claim_count       = 0;
+    ctx->local->cnt.multiple_claim_count    = 0;
+    ctx->local->cnt.marked_dead_count       = 0;
+    ctx->local->cnt.union_count             = 0;
+    ctx->local->cnt.removed_from_list_count = 0;
 
     size_t                          nGroups = pins_get_group_count(ctx->model);
     // according to the internet, 73 is the best prime number
@@ -157,6 +167,7 @@ ufscc_init  (wctx_t *ctx)
     char result = uf_make_claim(shared->uf, ctx->initial->ref, ctx->id);
     
     if (result == CLAIM_FIRST) {
+        loc->cnt.first_claim_count ++;
         ctx->counters->explored ++; // increase global counters
     }
 }
@@ -197,6 +208,18 @@ getNextSuccessor(wctx_t *ctx, state_info_t *si, size_t *next_group)
 
     *next_group = nGroups;
     return false;
+}
+
+void 
+print_worker_stats(wctx_t *ctx)
+{
+    alg_local_t            *loc = ctx->local;
+    Warning(info, "First claim count:         %d", loc->cnt.first_claim_count);
+    Warning(info, "Multiple claim count:      %d", loc->cnt.multiple_claim_count);
+    Warning(info, "Union count:               %d", loc->cnt.union_count);
+    Warning(info, "Removed from list count:   %d", loc->cnt.removed_from_list_count);
+    Warning(info, "Marked dead count:         %d", loc->cnt.marked_dead_count);
+
 }
 
 void
@@ -251,8 +274,10 @@ ufscc_run  (run_t *run, wctx_t *ctx)
                 HREassert(uf_is_dead(shared->uf, v));
 
                 // were we the one that marked it dead?
-                if (pick == PICK_MARK_DEAD)
+                if (pick == PICK_MARK_DEAD) {
+                    loc->cnt.marked_dead_count ++;
                     loc->cnt.scc_count ++;
+                }
 
 
                 // last state marked dead ==> done with algorithm
@@ -328,8 +353,11 @@ ufscc_run  (run_t *run, wctx_t *ctx)
             else if (result == CLAIM_SUCCESS || result == CLAIM_FIRST) {
                 if (result == CLAIM_FIRST) { 
                     // increase unique states count
+                    loc->cnt.first_claim_count ++;
                     ctx->counters->explored ++;
                     //Warning(info, "DOT: A%zu [color=chocolate,style=filled];", loc->target->ref);
+                } else {
+                    loc->cnt.multiple_claim_count ++;
                 }
 
                 // save next_group index on stack
@@ -373,7 +401,9 @@ ufscc_run  (run_t *run, wctx_t *ctx)
 
                     //Warning(info, "Union(F:%zu, T:%zu) (%zu)", loc->root->ref, ctx->state->ref, loc->root_ufscc.group_index);
 
-                    uf_union(shared->uf, loc->root->ref, ctx->state->ref);
+                    if (uf_union(shared->uf, loc->root->ref, ctx->state->ref)) {
+                        loc->cnt.union_count ++;
+                    }
 
 
                     HREassert(uf_sameset(shared->uf, loc->root->ref, ctx->state->ref));
@@ -392,13 +422,17 @@ ufscc_run  (run_t *run, wctx_t *ctx)
         if (!explore_new_state && !state_is_dead) {
             //Warning(info, "Fully explored state %zu (%zu, %zu)", ctx->state->ref, loc->state_ufscc.group_index, next_group);
             // all successors explored ==> remove from List
-            uf_remove_from_list(shared->uf, ctx->state->ref);
+            if (uf_remove_from_list(shared->uf, ctx->state->ref)) {
+                loc->cnt.removed_from_list_count ++;
+            }
         }
         /*else {
             // assert D.TOP = R.TOP = TO
             // assert D.TOP.group_index = loc->start_group
         }*/
     }
+
+    //print_worker_stats(ctx);
 
     if (!run_is_stopped(run) && dfs_stack_size(loc->dstack) != 0)
         Warning (info, "Stack not empty: %zu ", dfs_stack_size(loc->dstack));
