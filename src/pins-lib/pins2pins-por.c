@@ -2138,7 +2138,13 @@ GBaddPOR (model_t model)
     // for a guard g, find all guards g' that may-not-be co-enabled with it
     // then, for each g', mark all groups in gnce_matrix
     matrix_t *label_mce_matrix = GBgetGuardCoEnabledInfo(model);
-    NO_MC |= label_mce_matrix == NULL;
+    matrix_t *guard_group_not_coen = NULL;
+    id = GBgetMatrixID(model, LTSMIN_GUARD_GROUP_NOT_COEN);
+    if (id != SI_INDEX_FAILED) {
+        guard_group_not_coen = GBgetMatrix(model, id);
+    }
+
+    NO_MC |= label_mce_matrix == NULL && guard_group_not_coen == NULL;
     if (NO_MC && !NO_MCNDS) {
         if (__sync_bool_compare_and_swap(&NO_MCNDS, 0, 1)) { // static variable
             Warning (info, "No maybe-coenabled matrix found. Turning off NESs from NDS+MC.");
@@ -2146,29 +2152,42 @@ GBaddPOR (model_t model)
     }
 
     if (!NO_MC) {
-        HREassert (dm_ncols(label_mce_matrix) >= ctx->nguards &&
-                   dm_nrows(label_mce_matrix) >= ctx->nguards);
-        dm_create(&ctx->gnce_matrix, ctx->nguards, ctx->ngroups);
-        dm_create(&ctx->nce, ctx->ngroups, ctx->ngroups);
-        for (int g = 0; g < ctx->nguards; g++) {
-            // iterate over all guards
-            for (int gg = 0; gg < ctx->nguards; gg++) {
-                // find all guards that may not be co-enabled
-                if (dm_is_set(label_mce_matrix, g, gg)) continue;
+        if (guard_group_not_coen) {
+            HREassert (dm_ncols(guard_group_not_coen) >= ctx->ngroups &&
+                       dm_nrows(guard_group_not_coen) >= ctx->nguards);
 
-                // gg may not be co-enabled with g, find all
-                // transition groups in which it is used
-                for (int tt = 0; tt < ctx->guard2group[gg]->count; tt++) {
-                    dm_set(&ctx->gnce_matrix, g, ctx->guard2group[gg]->data[tt]);
+            dm_copy (guard_group_not_coen, &ctx->gnce_matrix);
+        } else {
+            HREassert (dm_ncols(label_mce_matrix) >= ctx->nguards &&
+                       dm_nrows(label_mce_matrix) >= ctx->nguards);
 
-                    for (int t = 0; t < ctx->guard2group[g]->count; t++) {
-                        dm_set(&ctx->nce, ctx->guard2group[g]->data[t],
-                                            ctx->guard2group[gg]->data[tt]);
+            dm_create(&ctx->gnce_matrix, ctx->nguards, ctx->ngroups);
+            for (int g = 0; g < ctx->nguards; g++) {
+                // iterate over all guards
+                for (int gg = 0; gg < ctx->nguards; gg++) {
+                    // find all guards that may not be co-enabled
+                    if (dm_is_set(label_mce_matrix, g, gg)) continue;
+
+                    // gg may not be co-enabled with g, find all
+                    // transition groups in which it is used
+                    for (int tt = 0; tt < ctx->guard2group[gg]->count; tt++) {
+                        dm_set(&ctx->gnce_matrix, g, ctx->guard2group[gg]->data[tt]);
                     }
                 }
             }
         }
         ctx->guard_nce             = (ci_list **) dm_rows_to_idx_table(&ctx->gnce_matrix);
+
+        dm_create(&ctx->nce, ctx->ngroups, ctx->ngroups);
+        for (int g = 0; g < ctx->nguards; g++) {
+            for (int j = 0; j < ctx->guard_nce[g]->count; j++) {
+                int t1 = ctx->guard_nce[g]->data[j];
+                for (int h = 0; h < ctx->guard2group[g]->count; h++) {
+                    int t2 = ctx->guard2group[g]->data[h];
+                    dm_set (&ctx->nce, t1, t2);
+                }
+            }
+        }
         ctx->group_nce             = (ci_list **) dm_rows_to_idx_table(&ctx->nce);
     }
 
