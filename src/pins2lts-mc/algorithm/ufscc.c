@@ -14,12 +14,6 @@
 #include <pins-lib/pins.h>
 #include <util-lib/fast_set.h>
 
-// SCC state info struct
-typedef struct ufscc_state_s { 
-    size_t              group_index;
-} ufscc_state_t;
-
-
 typedef struct counter_s {
     uint32_t            unique_states_count;
     uint32_t            self_loop_count;     // Counts the number of self-loops
@@ -38,10 +32,7 @@ struct alg_local_s {
     counter_t           cnt;
     state_info_t       *target;              // Successor
     state_info_t       *root;                // Root
-    ufscc_state_t       state_ufscc;
-    ufscc_state_t       target_ufscc;
-    ufscc_state_t       root_ufscc;
-    size_t              start_group;          // starting group (actually a static value)
+    size_t              start_group;         // starting group (actually a static value)
 };
 
 typedef struct uf_alg_shared_s {
@@ -68,10 +59,6 @@ ufscc_local_init   (run_t *run, wctx_t *ctx)
 
     ctx->local->target = state_info_create ();
     ctx->local->root   = state_info_create ();
-    state_info_add_simple (ctx->local->target, sizeof(size_t), &ctx->local->target_ufscc.group_index);
-    state_info_add_simple (ctx->local->root, sizeof(size_t), &ctx->local->root_ufscc.group_index);
-    
-    state_info_add_simple (ctx->state, sizeof(size_t), &ctx->local->state_ufscc.group_index);
 
     size_t len                              = state_info_serialize_int_size (ctx->state);
     ctx->local->dstack                      = dfs_stack_create (len);
@@ -85,11 +72,6 @@ ufscc_local_init   (run_t *run, wctx_t *ctx)
     ctx->local->cnt.marked_dead_count       = 0;
     ctx->local->cnt.union_count             = 0;
     ctx->local->cnt.removed_from_list_count = 0;
-
-    size_t                          nGroups = pins_get_group_count(ctx->model);
-    // according to the internet, 73 is the best prime number
-    // (this is used to divide the workers over the successors)
-    ctx->local->start_group                     = (ctx->id * 73) % nGroups;
 
     (void) run; 
 }
@@ -108,15 +90,23 @@ ufscc_local_deinit   (run_t *run, wctx_t *ctx)
 static void
 ufscc_handle (void *arg, state_info_t *successor, transition_info_t *ti, int seen)
 {
-    // sets loc->target = successor
-
-    //Warning(info, "Initializing successor  %zu", successor->ref);
     wctx_t              *ctx        = (wctx_t *) arg;
     alg_local_t         *loc        = ctx->local;
 
     ctx->counters->trans++;
 
-    loc->target = successor;
+    if (ctx->state->ref == successor->ref) {
+        loc->cnt.self_loop_count++;
+        return;
+    }
+
+    //Warning(info, "Initializing successor  %zu", successor->ref);
+
+    // TODO better to do sameset/dead check here?
+    // - for now, just put all successors on the stack
+
+    raw_data_t stack_loc = dfs_stack_push (loc->dstack, NULL);
+    state_info_serialize (successor, stack_loc);
 
     (void) arg; (void) ti; (void) seen;
 }
@@ -124,45 +114,34 @@ ufscc_handle (void *arg, state_info_t *successor, transition_info_t *ti, int see
 static void
 explore_state (wctx_t *ctx)
 {
-    // puts the loc->target state on the DFS and Roots stacks
+    // enter stack and put successors on it
 
-    //Warning(info, "Exploring  %zu", ctx->local->target->ref);
     alg_local_t            *loc        = ctx->local;
-    raw_data_t              state_data, root_data;
+    //Warning(info, "Exploring  %zu", ctx->state->ref);
 
-    // TODO: Is there a better way to save the state info on the root and dfs stacks?
-    //       It seems that the group_index is not stored, unless we use state_info_set
-    state_info_set(ctx->state, loc->target->ref, LM_NULL_LATTICE);  // get state info
-    state_info_set(loc->root,  loc->target->ref, LM_NULL_LATTICE);  // get state info
+    // push the state on the roots stack
+    state_info_set(loc->root,  ctx->state->ref, LM_NULL_LATTICE);
+    raw_data_t stack_loc = dfs_stack_push (loc->rstack, NULL);
+    state_info_serialize (loc->root, stack_loc);
+    //Warning(info, "Explored Roots top = %zu", loc->root->ref);
 
     increase_level (ctx->counters);
-
-    loc->state_ufscc.group_index  = loc->start_group;
-    loc->root_ufscc.group_index   = loc->start_group;
-
-    state_data = dfs_stack_push (loc->dstack, NULL);
-    state_info_serialize (ctx->state, state_data);
-
-    root_data = dfs_stack_push (loc->rstack, NULL);
-    state_info_serialize (loc->root, root_data);
+    dfs_stack_enter (loc->dstack);
+    permute_trans (ctx->permute, ctx->state, ufscc_handle, ctx);
 
     run_maybe_report1 (ctx->run, ctx->counters, "");
 
-    //state_data = dfs_stack_top (loc->dstack);
-    //state_info_deserialize (ctx->state, state_data); // DFS Stack TOP
-    //HREassert(loc->state_ufscc.group_index == loc->start_group, "%zu != %zu", loc->state_ufscc.group_index, loc->start_group);
 }  
 
 static void
 ufscc_init  (wctx_t *ctx)
 {
-    // put the initial state on the stack
-
     alg_local_t            *loc        = ctx->local;
     uf_alg_shared_t        *shared     = (uf_alg_shared_t*) ctx->run->shared;
+    transition_info_t       ti = GB_NO_TRANSITION;
 
-    loc->target = ctx->initial;
-    explore_state (ctx);
+    // put the initial state on the stack
+    ufscc_handle (ctx, ctx->initial, &ti, 0);
 
     char result = uf_make_claim(shared->uf, ctx->initial->ref, ctx->id);
     
@@ -173,7 +152,7 @@ ufscc_init  (wctx_t *ctx)
 }
 
 bool
-getNextSuccessor(wctx_t *ctx, state_info_t *si, size_t *next_group) 
+getNextSuccessor (wctx_t *ctx, state_info_t *si, size_t *next_group) 
 {
     // Iterates over the pins groups and searches for successors
     // returns true if a successor is found, also sets next_group
@@ -211,7 +190,7 @@ getNextSuccessor(wctx_t *ctx, state_info_t *si, size_t *next_group)
 }
 
 void 
-print_worker_stats(wctx_t *ctx)
+print_worker_stats (wctx_t *ctx)
 {
     alg_local_t            *loc = ctx->local;
     Warning(info, "First claim count:         %d", loc->cnt.first_claim_count);
@@ -222,214 +201,245 @@ print_worker_stats(wctx_t *ctx)
 
 }
 
+
+void
+successor (wctx_t *ctx)
+{
+    alg_local_t            *loc = ctx->local;
+    uf_alg_shared_t        *shared = (uf_alg_shared_t*) ctx->run->shared;
+
+    raw_data_t state_data = dfs_stack_peek_top (loc->dstack, 1);
+    state_info_deserialize (loc->target, state_data);
+
+    // successor = ctx->state->ref
+    // parent    = loc->target->ref
+
+    // early backtrack if parent = explored (not in list)
+    if (!uf_is_in_list(shared->uf, loc->target->ref)) {
+
+        //Warning(info, "Early backtrack (%zu !in list)", loc->target->ref);
+
+        // remove stackframe
+        //dfs_stack_leave (loc->dstack);
+        //ctx->counters->level_cur--;
+
+        // TODO do we also need to pop? What is on top now?
+        dfs_stack_pop (loc->dstack);
+        return;
+    }
+
+    //Warning(info, "FROM = %zu TO = %zu", loc->target->ref, ctx->state->ref);
+    // FROM   = loc->target->ref;
+    // TO     = ctx->state->ref;
+
+    char result = uf_make_claim(shared->uf, ctx->state->ref, ctx->id);
+    
+    // (TO == DEAD) ==> get next successor
+    if (result == CLAIM_DEAD) {
+        dfs_stack_pop (loc->dstack);
+        return;
+    }
+
+    // (TO == 'new' state) ==> 'recursively' explore
+    else if (result == CLAIM_SUCCESS || result == CLAIM_FIRST) {
+        if (result == CLAIM_FIRST) { 
+            // increase unique states count
+            loc->cnt.first_claim_count ++;
+            ctx->counters->explored ++;
+            //Warning(info, "DOT: A%zu [color=chocolate,style=filled];", loc->target->ref);
+        } else {
+            loc->cnt.multiple_claim_count ++;
+        }
+
+        // explore new state
+        explore_state(ctx);
+        return;
+    }
+
+    // (TO == found state) ==> cycle found
+    else  { // result == CLAIM_FOUND
+
+        if (uf_sameset(shared->uf, loc->target->ref, ctx->state->ref))  {
+            dfs_stack_pop (loc->dstack);
+            return;
+        }
+
+        raw_data_t root_data = dfs_stack_top (loc->rstack);
+        state_info_deserialize (loc->root, root_data); // Roots Stack TOP
+        //Warning(info, "CLAIM_FOUND Roots top = %zu", loc->root->ref);
+
+        HREassert(uf_sameset(shared->uf, loc->root->ref, loc->target->ref),
+            "Root: %d\nState: %d", uf_debug(shared->uf, loc->root->ref),
+            uf_debug(shared->uf, loc->target->ref)); 
+
+        // not SameSet(FROM,TO) ==> unite cycle
+        while (!uf_sameset(shared->uf, ctx->state->ref, loc->target->ref)) {
+            // in every step:
+            // - R.POP
+            // - Union(R.TOP, D.TOP)
+            // (eventually, SameSet(R.TOP, TO) )
+
+            
+            dfs_stack_pop (loc->rstack); // UF Stack POP
+
+            HREassert(dfs_stack_size(loc->rstack) != 0);
+
+            root_data = dfs_stack_top (loc->rstack);
+            state_info_deserialize (loc->root, root_data); // Roots Stack TOP
+
+            //Warning(info, "Union(F:%zu, T:%zu)", loc->root->ref, loc->target->ref);
+
+            if (uf_union(shared->uf, loc->root->ref, loc->target->ref)) {
+                loc->cnt.union_count ++;
+            }
+
+
+            HREassert(uf_sameset(shared->uf, loc->root->ref, loc->target->ref));
+
+        }
+        HREassert(uf_sameset(shared->uf, loc->root->ref, ctx->state->ref)); 
+        HREassert(uf_sameset(shared->uf, loc->root->ref, loc->target->ref)); 
+        //Warning(info, "UNIONED Roots top = %zu", loc->root->ref);
+
+        // cycle is now merged (and DFS stack is unchanged)
+        dfs_stack_pop (loc->dstack);
+        return;
+    }
+}
+
+void
+backtrack (wctx_t *ctx)
+{
+
+    alg_local_t            *loc = ctx->local;
+    uf_alg_shared_t        *shared = (uf_alg_shared_t*) ctx->run->shared;
+
+    dfs_stack_leave (loc->dstack);
+    ctx->counters->level_cur--;
+
+    raw_data_t state_data = dfs_stack_top (loc->dstack);
+    state_info_deserialize (ctx->state, state_data); // Stack state
+    ref_t v = ctx->state->ref;
+    dfs_stack_pop (loc->dstack);
+
+    bool is_last_state = (0 == dfs_stack_nframes (loc->dstack));
+    if (!is_last_state) {
+        state_data = dfs_stack_peek_top (loc->dstack, 1);
+        state_info_deserialize (loc->target, state_data);
+        //Warning(info, "Backtrack : Popped = %zu, parent = %zu", v, loc->target->ref);
+    }
+    
+    // ctx->state->ref == globalDone ==> remove from list
+    if (uf_remove_from_list(shared->uf, v)) {
+        loc->cnt.removed_from_list_count ++;
+    }
+
+    // check if previous state is part of the same SCC
+    // - if so, no problem
+    // - else, pick from list
+    if (!is_last_state && uf_sameset(shared->uf, loc->target->ref, v)) {
+        return; // backtrack in same set
+    }
+
+    // v is the last KNOWN state in the uf[v] set
+    // ==> check if we can find another one with pick_from_list
+
+    ref_t v_p;
+    char pick = uf_pick_from_list(shared->uf, v, &v_p);
+
+    if (pick != PICK_SUCCESS) {
+        // List(v) = \emptyset ==> GlobalDead(v)
+        // state is dead ==> backtrack
+
+        //Warning(info, "DOT: A%zu [color=gray,style=filled];", v);
+        //Warning(info, "State %zu is DEAD;", v);
+
+        HREassert(uf_is_dead(shared->uf, v));
+
+        // were we the one that marked it dead?
+        if (pick == PICK_MARK_DEAD) {
+            loc->cnt.marked_dead_count ++;
+            loc->cnt.scc_count ++;
+        }
+
+        if (is_last_state) {
+            return;
+        }
+
+        if (uf_sameset(shared->uf, loc->target->ref, v)) {
+            return; // backtrack in same set 
+            // (state is marked dead after previous sameset check)
+        }
+
+        // pop states from Roots until !sameset(v, Roots.TOP)
+        // (Roots.TOP might not be the actual root)
+        raw_data_t root_data = dfs_stack_top (loc->rstack);
+        state_info_deserialize (loc->root, root_data);      // Roots Stack TOP
+        //Warning(info, "DEAD Roots top = %zu", loc->root->ref);
+
+        HREassert(uf_sameset(shared->uf, v, loc->root->ref), "%d != %d",
+            uf_debug(shared->uf, v), uf_debug(shared->uf, loc->root->ref));
+
+        // pop from Roots
+        while (uf_sameset(shared->uf, v, loc->root->ref)) {
+            dfs_stack_pop (loc->rstack);                    // Roots Stack POP
+
+            HREassert(dfs_stack_size(loc->rstack) != 0);
+
+            root_data = dfs_stack_top (loc->rstack);
+            state_info_deserialize (loc->root, root_data);  // Roots Stack TOP
+        }
+        //Warning(info, "UNDEAD Roots top = %zu", loc->root->ref);
+        if (!uf_sameset(shared->uf, loc->target->ref, loc->root->ref)) {
+            uf_debug(shared->uf, loc->target->ref);
+            uf_debug(shared->uf, loc->root->ref);
+        }
+        HREassert(uf_sameset(shared->uf, loc->target->ref, loc->root->ref));
+    }
+    else {
+        // Found w \in List(v) ==> push w on stack and search its successors
+
+        state_info_set(ctx->state, v_p, LM_NULL_LATTICE);  // get state info
+        state_data = dfs_stack_push (loc->dstack, NULL);
+        state_info_serialize (ctx->state, state_data);
+        explore_state (ctx);
+        // TODO: do we need to add the worker ID??
+        // - no, is sameset
+
+        //Warning(info, "found unexplored state %zu in uf[%zu]", ctx->state->ref, v);
+    }
+    
+}
+
 void
 ufscc_run  (run_t *run, wctx_t *ctx)
 {
     alg_local_t            *loc = ctx->local;
-    raw_data_t              state_data, root_data;
-    uf_alg_shared_t        *shared = (uf_alg_shared_t*) ctx->run->shared;
+    raw_data_t              state_data;
+    //uf_alg_shared_t        *shared = (uf_alg_shared_t*) ctx->run->shared;
 
     ufscc_init (ctx);
 
+    // explore initial state
+    state_data = dfs_stack_top (loc->dstack);
+    state_info_deserialize (ctx->state, state_data); // DFS Stack TOP
+    explore_state(ctx);
+
     while ( !run_is_stopped(run) ) {
+        if (0 == dfs_stack_nframes (loc->dstack))
+            break;
 
         state_data = dfs_stack_top (loc->dstack);
-        state_info_deserialize (ctx->state, state_data); // DFS Stack TOP
 
-        ref_t v = ctx->state->ref;
-        if (uf_is_dead(shared->uf, v)) {
-            HREassert(!uf_is_in_list(shared->uf, v), "%d %d", 
-                uf_debug(shared->uf, v), uf_print_list(shared->uf, v));
+        if (state_data != NULL) {
+            // unexplored successor
+            state_info_deserialize (ctx->state, state_data); // DFS Stack TOP
+            successor(ctx);
         }
-        if (!uf_is_in_list(shared->uf, v)) {
-            // assert GlobalDone(v) (all successors are explored)
-
-
-            dfs_stack_pop (loc->dstack);  // D Stack POP
-            ctx->counters->level_cur--;
-
-            
-            if (dfs_stack_size(loc->dstack) > 0) { 
-                // get new D.TOP
-                state_data = dfs_stack_top (loc->dstack);
-                state_info_deserialize (ctx->state, state_data); // DFS Stack TOP
-
-                if (uf_sameset(shared->uf, ctx->state->ref, v)) {
-                    continue; // backtrack in same set
-                }
-            }
-
-            // v is the last KNOWN state in the uf[v] set
-            // ==> check if we can find another one with pick_from_list
-
-            ref_t v_p;
-            char pick = uf_pick_from_list(shared->uf, v, &v_p);
-
-            if (pick != PICK_SUCCESS) {
-                // List(v) = \emptyset ==> GlobalDead(v)
-                // state is dead ==> backtrack
-
-                //Warning(info, "DOT: A%zu [color=gray,style=filled];", v);
-
-                HREassert(uf_is_dead(shared->uf, v));
-
-                // were we the one that marked it dead?
-                if (pick == PICK_MARK_DEAD) {
-                    loc->cnt.marked_dead_count ++;
-                    loc->cnt.scc_count ++;
-                }
-
-
-                // last state marked dead ==> done with algorithm
-                if (dfs_stack_size(loc->dstack) == 0) 
-                    break;
-
-                if (uf_sameset(shared->uf, ctx->state->ref, v)) {
-                    continue; // backtrack in same set
-                }
-                // pop states from Roots until !sameset(v, Roots.TOP)
-                // (Roots.TOP might not be the actual root)
-                root_data = dfs_stack_top (loc->rstack);
-                state_info_deserialize (loc->root, root_data);      // Roots Stack TOP
-
-                HREassert(uf_sameset(shared->uf, v, loc->root->ref));
-
-                // pop from Roots
-                while (uf_sameset(shared->uf, v, loc->root->ref)) {
-                    dfs_stack_pop (loc->rstack);                    // Roots Stack POP
-
-                    HREassert(dfs_stack_size(loc->rstack) != 0);
-
-                    root_data = dfs_stack_top (loc->rstack);
-                    state_info_deserialize (loc->root, root_data);  // Roots Stack TOP
-                }
-                HREassert(uf_sameset(shared->uf, ctx->state->ref, loc->root->ref));
-
-                continue; // Backtrack
-            }
-            else {
-                // Found w \in List(v) ==> push w on stack and search its successors
-
-                state_info_set(ctx->state, v_p, LM_NULL_LATTICE);  // get state info
-                loc->state_ufscc.group_index = loc->start_group;    // 'explore state'
-                state_data = dfs_stack_push (loc->dstack, NULL);
-                state_info_serialize (ctx->state, state_data);
-                //Warning(info, "found unexplored state %zu in uf[%zu]", ctx->state->ref, v);
-            }
+        else {
+            // all successors explored/removed from stack -> backtrack
+            backtrack(ctx);
         }
-
-        size_t next_group = loc->state_ufscc.group_index;
-        //Warning(info, "D.TOP = %zu (%zu)", ctx->state->ref, next_group);
-
-        // Iterate over Next(ctx->state) until no new successors are found
-        bool explore_new_state = false;
-        bool state_is_dead     = false;
-        while (getNextSuccessor(ctx, ctx->state, &next_group)) {
-
-            // (early) backtrack if state is marked dead by another worker
-            if (uf_is_dead(shared->uf, ctx->state->ref)) {
-                // assert List = \emptyset
-                state_is_dead = true;
-                // TODO: removing the state here should improve performance a little bit
-                break; // state will be removed in next iteration
-            }
-
-            //Warning(info, "FROM = %zu TO = %zu (%zu)", ctx->state->ref, loc->target->ref, next_group);
-            // FROM = ctx->state->ref;
-            // TO   = loc->target->ref;
-
-            if (ctx->state->ref == loc->target->ref) { // self-loop
-                loc->cnt.self_loop_count++;
-                continue;
-            }
-
-            char result = uf_make_claim(shared->uf, loc->target->ref, ctx->id);
-            
-            // (TO == DEAD) ==> get next successor
-            if (result == CLAIM_DEAD) 
-                continue;
-
-            // (TO == 'new' state) ==> 'recursively' explore
-            else if (result == CLAIM_SUCCESS || result == CLAIM_FIRST) {
-                if (result == CLAIM_FIRST) { 
-                    // increase unique states count
-                    loc->cnt.first_claim_count ++;
-                    ctx->counters->explored ++;
-                    //Warning(info, "DOT: A%zu [color=chocolate,style=filled];", loc->target->ref);
-                } else {
-                    loc->cnt.multiple_claim_count ++;
-                }
-
-                // save next_group index on stack
-                loc->state_ufscc.group_index = next_group;
-                state_info_serialize(ctx->state, state_data);  
-
-                // explore new state
-                explore_state(ctx);
-                explore_new_state = true;
-                break; // exit the while loop
-            }
-
-            // (TO == found state) ==> cycle found
-            else  { // result == CLAIM_FOUND
-
-                if (uf_sameset(shared->uf, ctx->state->ref, loc->target->ref)) 
-                    continue;
-
-                HREassert(dfs_stack_size(loc->rstack) != 0);
-                root_data = dfs_stack_top (loc->rstack);
-                state_info_deserialize (loc->root, root_data); // Roots Stack TOP
-
-                HREassert(uf_sameset(shared->uf, loc->root->ref, ctx->state->ref),
-                    "Root: %d\nState: %d", uf_debug(shared->uf, loc->root->ref),
-                    uf_debug(shared->uf, ctx->state->ref)); 
-
-                // not SameSet(FROM,TO) ==> unite cycle
-                while (!uf_sameset(shared->uf, ctx->state->ref, loc->target->ref)) {
-                    // in every step:
-                    // - R.POP
-                    // - Union(R.TOP, D.TOP)
-                    // (eventually, SameSet(R.TOP, TO) )
-
-                    
-                    dfs_stack_pop (loc->rstack); // UF Stack POP
-
-                    HREassert(dfs_stack_size(loc->rstack) != 0);
-
-                    root_data = dfs_stack_top (loc->rstack);
-                    state_info_deserialize (loc->root, root_data); // Roots Stack TOP
-
-                    //Warning(info, "Union(F:%zu, T:%zu) (%zu)", loc->root->ref, ctx->state->ref, loc->root_ufscc.group_index);
-
-                    if (uf_union(shared->uf, loc->root->ref, ctx->state->ref)) {
-                        loc->cnt.union_count ++;
-                    }
-
-
-                    HREassert(uf_sameset(shared->uf, loc->root->ref, ctx->state->ref));
-
-                }
-                HREassert(uf_sameset(shared->uf, loc->root->ref, ctx->state->ref)); 
-                HREassert(uf_sameset(shared->uf, loc->root->ref, loc->target->ref)); 
-
-                // cycle is now merged (and DFS stack is unchanged)
-                // so we can continue exploring successors from ctx->state
-                continue;
-            }
-
-        }
-
-        if (!explore_new_state && !state_is_dead) {
-            //Warning(info, "Fully explored state %zu (%zu, %zu)", ctx->state->ref, loc->state_ufscc.group_index, next_group);
-            // all successors explored ==> remove from List
-            if (uf_remove_from_list(shared->uf, ctx->state->ref)) {
-                loc->cnt.removed_from_list_count ++;
-            }
-        }
-        /*else {
-            // assert D.TOP = R.TOP = TO
-            // assert D.TOP.group_index = loc->start_group
-        }*/
     }
 
     //print_worker_stats(ctx);
