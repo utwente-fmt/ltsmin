@@ -45,6 +45,14 @@
         pages = {227-245}
     }
  *
+ * @Article{BBR10,
+        author={Laarman, Alfons W. and Pater, Elwin and van de Pol, Jaco C. and Weber, Michael},
+        title =        "{Guard-based Partial-Order Reduction (Extended Version)}",
+        journal =      "International Journal on Software Tools for Technology Transfer (STTT)",
+        year =         "2014",
+        optnote =      "Special Section on SPIN 13"
+    }
+ *
  * Improved safety / liveness provisos added by Alfons Laarman according to
  * Valmari's "State Explosion Problem", Chapter 7:
  *
@@ -80,77 +88,12 @@
  *
  */
 
-extern int POR_WEAK;
 extern int NO_L12;
 
-/**
- * Beam search algorithm for persistent sets
- * Using the NES and NDS information
- */
-typedef enum {
-    GS_ENABLED      = 0x00, // should be zero (memset)
-    GS_DISABLED     = 0x01,
-} group_status_t;
-
-/**
- * Additional context with por_model returned by this layer
- * Contains dependency relation, co-enabled information
- * of guards, necessary enabling/disabling sets (nes/nds) etc
- */
-typedef struct por_context {
-    model_t         parent;         // parent PINS model
-
-    int             nguards;        // number of guards
-    int             nlabels;        // number of labels (including guards)
-    int             ngroups;        // number of groups
-    int             nslots;         // state variable slots
-
-    matrix_t        label_nes_matrix;
-    matrix_t        label_nds_matrix;
-    matrix_t        not_accords_with;
-    matrix_t        nce;            // not-coenabled
-    matrix_t        gnce_matrix;    // guard not-coenabled
-    ci_list       **not_accords;    // mapping from transition group to groups that it accords with
-    ci_list       **guard2group;    // mapping from guard to transition group
-    ci_list       **group2guard;    // mapping from group to guards
-    ci_list       **label_nes;      // transition groups that form a nes for a guard (guard -> [t1, t2, t..])
-    ci_list       **label_nds;      // transition groups that form a nds for a guard
-    ci_list       **guard_nce;      // mapping from guards to transition groups that may not be co-enabled
-    ci_list       **group_nce;      // mapping from guards to transition groups that may not be co-enabled
-    ci_list       **ns;             // nes/nds combined
-    ci_list       **group2ns;       // mapping group to each nes/nds in which it is used
-    ci_list       **group_has;      // mapping group to each nes/nds for it
-    ci_list       **group_hasn;     // mapping group to each nes/nds for it
-    ci_list       **not_left_accords;
-    ci_list       **not_left_accordsn;
-    ci_list       **dna_diff;       // group in dna but not in dns (for finding keys)
-
-    int             *group_visibility; // visible groups
-    int             *label_visibility; // visible labels
-
-    void            *beam_ctx;      // BEAM search struct
-    void            *scc_ctx;       // SCC search struct
-    void            *del_ctx;       // Deletion struct
-    void            *ample_ctx;     // Ample set context
-
-    /**
-     * The global data used for the search
-     * This data is setup one time for each state that is processed
-     */
-    int             *label_status;  // status of the guards in current state
-    char            *group_status;  // status of the transition groups in the current state
-    ci_list         *enabled_list;  // enabled groups
-    bms_t           *visible;
-    bms_t           *visible_nes;
-    bms_t           *visible_nds;
-    int              visible_enabled;// number of enabled visible transitions
-    int              visible_nes_enabled;// number of enabled visible transitions
-    int              visible_nds_enabled;// number of enabled visible transitions
-
-    int             *group_score;   // score assigned to each group by heuristic function
-    int             *nes_score;     // Template for the nes_score
-} por_context;
+typedef struct por_ctx por_context;
 
 extern bool por_is_stubborn (por_context *ctx, int group);
+
+extern void por_init_transitions (model_t model, por_context *ctx, int *src);
 
 #endif // PINS2PINS_POR
