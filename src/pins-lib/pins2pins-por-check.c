@@ -9,6 +9,7 @@
 #include <pins-lib/pins.h>
 #include <pins-lib/pins-util.h>
 #include <pins-lib/pins2pins-por.h>
+#include <pins-lib/por-internal.h>
 #include <util-lib/fast_set.h>
 #include <util-lib/dfs-stack.h>
 #include <util-lib/treedbs.h>

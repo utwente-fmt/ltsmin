@@ -73,6 +73,14 @@ ci_add_if (ci_list *list, int num, int condition)
     list->count += condition != 0;
 }
 
+static inline void
+list_invert (ci_list *list)
+{
+    for (int i = 0; i < list->count / 2; i++) {
+        swap (list->data[i], list->data[list->count - i - 1]);
+    }
+}
+
 extern char *gnu_basename (char *path);
 
 extern bool has_prefix (const char *name, const char *prefix);
