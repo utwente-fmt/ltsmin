@@ -330,7 +330,12 @@ uf_mark_dead (const uf_t* uf, ref_t state)
     }*/
     uf_status tmp = atomic_read (&uf->array[f].uf_status);
 
-    HREassert (tmp != UF_LOCKED);
+    while (tmp == UF_LOCKED) {
+        tmp = atomic_read (&uf->array[f].uf_status);
+    }
+    
+    HREassert (tmp != UF_LOCKED); // this can fail
+
 
     if (tmp == UF_LIVE) 
         result = cas (&uf->array[f].uf_status, tmp, UF_DEAD);
