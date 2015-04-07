@@ -38,7 +38,7 @@ ample_search_all (model_t self, int *src, TransitionCB cb, void *uctx)
 {
     por_context *ctx = ((por_context *)GBgetContext(self));
 
-    ample_ctx_t *ample = (ample_ctx_t *)ctx->ample_ctx;
+    ample_ctx_t *ample = (ample_ctx_t *)ctx->alg;
     por_init_transitions (ctx->parent, ctx, src);
 
     size_t              p = 0;
