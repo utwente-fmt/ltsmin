@@ -193,7 +193,7 @@ emit_all (por_context *ctx, ci_list *list, proviso_t *provctx, int *src)
 static inline int
 emit_new (por_context *ctx, ci_list *list, proviso_t *provctx, int *src)
 {
-    beam_t             *beam = (beam_t *) ctx->beam_ctx;
+    beam_t             *beam = (beam_t *) ctx->alg;
     search_context_t   *s = beam->search[0];
     int c = 0;
     for (int z = 0; z < list->count; z++) {
@@ -350,7 +350,7 @@ beam_cmp (search_context_t *s1, search_context_t *s2)
 }
 
 bool check_sort (por_context *ctx) {
-    beam_t             *beam = (beam_t *) ctx->beam_ctx;
+    beam_t             *beam = (beam_t *) ctx->alg;
     for (int i = 0; i < beam->beam_used; i++)
         if (i > 0 && beam_cmp(beam->search[i-1], beam->search[i]) > 0) return false;
     return true;
@@ -362,7 +362,7 @@ bool check_sort (por_context *ctx) {
 static inline bool
 beam_sort (por_context *ctx)
 {
-    beam_t             *beam = (beam_t *) ctx->beam_ctx;
+    beam_t             *beam = (beam_t *) ctx->alg;
     search_context_t   *s = beam->search[0];
 
     int bubble = 1;
@@ -393,7 +393,7 @@ static inline void
 beam_search (por_context *ctx)
 {
     if (ctx->enabled_list->count <= 1) return;
-    beam_t             *beam = (beam_t *) ctx->beam_ctx;
+    beam_t             *beam = (beam_t *) ctx->alg;
 
     Debugf ("BEAM search (re)started (enabled: %d)\n", ctx->enabled_list->count);
     do {
@@ -499,7 +499,7 @@ beam_ensure_invisible_and_key (por_context* ctx)
     if (!POR_WEAK && !(SAFETY || PINS_LTL)) return;
 
     Debugf ("ADDING KEY <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<\n");
-    beam_t             *beam = (beam_t *) ctx->beam_ctx;
+    beam_t             *beam = (beam_t *) ctx->alg;
     while (true) {
         search_context_t   *s = beam->search[0];
         if (s->enabled->count == ctx->enabled_list->count) {
@@ -583,7 +583,7 @@ check_L2_proviso (por_context* ctx, search_context_t *s)
 static inline void
 beam_enforce_L2 (por_context* ctx)
 {
-    beam_t             *beam = (beam_t *) ctx->beam_ctx;
+    beam_t             *beam = (beam_t *) ctx->alg;
     search_context_t   *s1 = beam->search[0];
     while (true) {
         search_context_t   *s = beam->search[0];
@@ -613,7 +613,7 @@ static inline int
 beam_emit (por_context* ctx, int* src, TransitionCB cb, void* uctx)
 {
     // selected in winning search context
-    beam_t             *beam = (beam_t *) ctx->beam_ctx;
+    beam_t             *beam = (beam_t *) ctx->alg;
     // if no enabled transitions, return directly
     if (beam->beam_used == 0) return 0;
     search_context_t   *s = beam->search[0];
@@ -671,7 +671,7 @@ beam_setup (model_t model, por_context* ctx, int* src)
     por_init_transitions (model, ctx, src);
     por_transition_costs (ctx);
 
-    beam_t         *beam = ctx->beam_ctx;
+    beam_t         *beam = ctx->alg;
     int             c = RANDOM ? clock() : 0;
     beam->beam_used = ctx->enabled_list->count;
     if (MAX_BEAM != -1 && beam->beam_used > MAX_BEAM)
@@ -756,7 +756,7 @@ beam_create_context (por_context *ctx)
 bool
 beam_is_stubborn (por_context *ctx, int group)
 {
-    beam_t             *beam = (beam_t *) ctx->beam_ctx;
+    beam_t             *beam = (beam_t *) ctx->alg;
     search_context_t   *s = beam->search[0];
     return s->enabled->count >= ctx->enabled_list->count ||
           (s->emit_status[group] & ES_SELECTED);
