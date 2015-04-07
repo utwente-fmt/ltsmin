@@ -44,6 +44,7 @@ typedef enum {
  */
 struct por_ctx {
     model_t         parent;         // parent PINS model
+    void            *alg;           // Algorithm context
 
     int             nguards;        // number of guards
     int             nlabels;        // number of labels (including guards)
@@ -72,11 +73,6 @@ struct por_ctx {
 
     int             *group_visibility; // visible groups
     int             *label_visibility; // visible labels
-
-    void            *beam_ctx;      // BEAM search struct
-    void            *scc_ctx;       // SCC search struct
-    void            *del_ctx;       // Deletion struct
-    void            *ample_ctx;     // Ample set context
 
     /**
      * The global data used for the search

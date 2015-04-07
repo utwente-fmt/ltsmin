@@ -72,7 +72,7 @@ del_enabled (por_context* ctx, int u)
 static void
 deletion_setup (model_t model, por_context* ctx, int* src, bool reset)
 {
-    del_ctx_t       *delctx = (del_ctx_t *) ctx->del_ctx;
+    del_ctx_t       *delctx = (del_ctx_t *) ctx->alg;
     bms_t           *del = delctx->del;
     por_init_transitions (model, ctx, src);
     if (ctx->enabled_list->count == 0) return;
@@ -130,7 +130,7 @@ deletion_setup (model_t model, por_context* ctx, int* src, bool reset)
 static inline bool
 deletion_delete (por_context* ctx, int *del_nes, int *del_nds)
 {
-    del_ctx_t       *delctx = (del_ctx_t *) ctx->del_ctx;
+    del_ctx_t       *delctx = (del_ctx_t *) ctx->alg;
     bms_t           *del = delctx->del;
 
     // search the deletion space:
@@ -255,7 +255,7 @@ static inline void
 deletion_analyze (por_context *ctx)
 {
     if (ctx->enabled_list->count == 0) return;
-    del_ctx_t          *delctx = (del_ctx_t *) ctx->del_ctx;
+    del_ctx_t          *delctx = (del_ctx_t *) ctx->alg;
     bms_t              *del = delctx->del;
     int                 del_nes = false;
     int                 del_nds = false;
@@ -320,7 +320,7 @@ deletion_analyze (por_context *ctx)
 static inline int
 deletion_emit_new (por_context *ctx, proviso_t *provctx, int* src)
 {
-    del_ctx_t       *delctx = (del_ctx_t *) ctx->del_ctx;
+    del_ctx_t       *delctx = (del_ctx_t *) ctx->alg;
     bms_t           *del = delctx->del;
     int c = 0;
     for (int z = 0; z < ctx->enabled_list->count; z++) {
@@ -345,7 +345,7 @@ static inline int
 deletion_emit (model_t model, por_context *ctx, int *src, TransitionCB cb,
                void *uctx)
 {
-    del_ctx_t          *delctx = (del_ctx_t *) ctx->del_ctx;
+    del_ctx_t          *delctx = (del_ctx_t *) ctx->alg;
     bms_t              *del = delctx->del;
     proviso_t provctx = {cb, uctx, 0, 0, 0};
 
@@ -402,7 +402,7 @@ del_por_all (model_t self, int *src, TransitionCB cb, void *user_context)
 bool
 del_is_stubborn (por_context *ctx, int group)
 {
-    del_ctx_t *del_ctx = (del_ctx_t *)ctx->del_ctx;
+    del_ctx_t *del_ctx = (del_ctx_t *)ctx->alg;
     bms_t* del = del_ctx->del;
     return bms_has(del, DEL_N, group) || bms_has(del, DEL_K, group);
 }
