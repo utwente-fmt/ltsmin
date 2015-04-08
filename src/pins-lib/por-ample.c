@@ -37,6 +37,7 @@ int
 ample_search_all (model_t self, int *src, TransitionCB cb, void *uctx)
 {
     por_context *ctx = ((por_context *)GBgetContext(self));
+    HREassert (ctx->exclude == NULL, "Not implemented for ample sets.");
 
     ample_ctx_t *ample = (ample_ctx_t *)ctx->alg;
     por_init_transitions (ctx->parent, ctx, src);
@@ -166,5 +167,6 @@ ample_create_context (por_context *ctx, bool all)
 bool
 ample_is_stubborn (por_context *ctx, int group)
 {
+    HREassert (false, "ample set incompletely implemented");
     return 1;
 }

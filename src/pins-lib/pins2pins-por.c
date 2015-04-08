@@ -16,6 +16,7 @@
 #include <pins-lib/por-beam.h>
 #include <pins-lib/por-deletion.h>
 #include <pins-lib/por-internal.h>
+#include <pins-lib/por-leap.h>
 #include <util-lib/bitmultiset.h>
 #include <util-lib/dfs-stack.h>
 #include <util-lib/util.h>
@@ -33,6 +34,7 @@ static int NO_NES = 0;
 static int NO_NDS = 0;
 static int NO_MDS = 0;
 static int NO_MC = 0;
+static int leap = 0;
 static const char *algorithm = "heur";
 static const char *weak = "no";
 
@@ -108,6 +110,8 @@ struct poptOption por_options[]={
     {NULL, 0, POPT_ARG_CALLBACK, (void *)por_popt, 0, NULL, NULL},
     { "por", 'p', POPT_ARG_STRING | POPT_ARGFLAG_OPTIONAL | POPT_ARGFLAG_SHOW_DEFAULT,
       &algorithm, 0, "enable partial order reduction", "<|heur|del|scc>" },
+    { "weak" , -1, POPT_ARG_STRING  | POPT_ARGFLAG_OPTIONAL , &weak , 0 , "Weak stubborn set theory" , NULL },
+    { "leap" , 0, POPT_ARG_VAL  | POPT_ARGFLAG_OPTIONAL , &leap , 1 , "Leaping POR (Cartesian product of several disjoint stubborn sets)" , NULL },
 
     /* HIDDEN OPTIONS FOR EXPERIMENTATION */
     {NULL, 0, POPT_ARG_INCLUDE_TABLE, beam_options, 0, NULL, NULL},
@@ -123,7 +127,6 @@ struct poptOption por_options[]={
     { "no-dynamic-labels" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_DYN_VIS , 1 , "without dynamic visibility" , NULL },
     { "no-V" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_V , 1 , "without V proviso, instead use Peled's visibility proviso, or V'     " , NULL },
     { "no-L12" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_L12 , 1 , "without L1/L2 proviso, instead use Peled's cycle proviso, or L2'   " , NULL },
-    { "weak" , -1, POPT_ARG_STRING  | POPT_ARGFLAG_OPTIONAL | POPT_ARGFLAG_DOC_HIDDEN , &weak , 0 , "Weak stubborn set theory" , NULL },
     POPT_TABLEEND
 };
 
@@ -714,28 +717,36 @@ GBaddPOR (model_t model)
     GBsetContext (pormodel, ctx);
     GBsetNextStateLong  (pormodel, por_long);
     GBsetNextStateShort (pormodel, por_short);
+    next_method_black_t next_all;
     switch (alg) {
     case POR_AMPLE: {
-        GBsetNextStateAll   (pormodel, ample_search_all);
-        ctx->ample_ctx = ample_create_context (ctx, true);
+        next_all = ample_search_all;
+        ctx->alg = ample_create_context (ctx, true);
         break;
     }
     case POR_AMPLE1: {
-        GBsetNextStateAll   (pormodel, ample_search_all);
-        ctx->ample_ctx = ample_create_context (ctx, false);
+        next_all = ample_search_all;
+        ctx->alg = ample_create_context (ctx, false);
         break;
     }
     case POR_BEAM: {
-        GBsetNextStateAll   (pormodel, beam_search_all);
-        ctx->beam_ctx  = beam_create_context (ctx);
+        next_all = beam_search_all;
+        ctx->alg  = beam_create_context (ctx);
         break;
     }
     case POR_DEL: {
-        GBsetNextStateAll   (pormodel, del_por_all);
-        ctx->del_ctx = del_create (ctx);
+        next_all = del_por_all;
+        ctx->alg = del_create (ctx);
         break;
     }
     default: Abort ("Unknown POR algorithm: '%s'", key_search(por_algorithm, alg));
+    }
+    GBsetNextStateAll   (pormodel, next_all);
+
+    if (leap) {
+        // changes POR model (sets modified r/w matrices)
+        ctx->alg = leap_create_context (&pormodel, model, next_all);
+        GBsetNextStateAll   (pormodel, leap_search_all);
     }
 
     GBinitModelDefaults (&pormodel, model);
@@ -766,6 +777,7 @@ GBaddPOR (model_t model)
 
     ctx->nes_score    = RTmallocZero(NS_SIZE(ctx) * sizeof(int));
     ctx->group_score  = RTmallocZero(ctx->ngroups * sizeof(int));
+    ctx->exclude = NULL;
 
     return pormodel;
 }
@@ -776,12 +788,20 @@ por_is_stubborn (por_context *ctx, int group)
     switch (alg) {
     case POR_BEAM:  return beam_is_stubborn (ctx, group);
     case POR_DEL:   return del_is_stubborn (ctx, group);
+    case POR_AMPLE:   return ample_is_stubborn (ctx, group);
     default: Abort ("Unknown POR algorithm: '%s'", key_search(por_algorithm, alg));
     }
 }
 
 void
-hook_cb (void *context, transition_info_t *ti, int *dst, int *cpy) {
+por_exclude (por_context *ctx, ci_list *groups)
+{
+    ctx->exclude = groups;
+}
+
+void
+hook_cb (void *context, transition_info_t *ti, int *dst, int *cpy)
+{
     proviso_t *infoctx = (proviso_t *)context;
     transition_info_t ti_new = GB_TI (ti->labels, ti->group);
     ti_new.por_proviso = infoctx->force_proviso_true;

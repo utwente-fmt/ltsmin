@@ -252,16 +252,16 @@ deletion_delete (por_context* ctx, int *del_nes, int *del_nds)
 }
 
 static inline void
-deletion_analyze (por_context *ctx)
+deletion_analyze (por_context *ctx, ci_list *delete)
 {
-    if (ctx->enabled_list->count == 0) return;
+    if (delete->count == 0) return;
     del_ctx_t          *delctx = (del_ctx_t *) ctx->alg;
     bms_t              *del = delctx->del;
     int                 del_nes = false;
     int                 del_nds = false;
 
-    for (int i = 0; i < ctx->enabled_list->count && bms_count(del, DEL_K) > 1; i++) {
-        int v = ctx->enabled_list->data[i];
+    for (int i = 0; i < delete->count && bms_count(del, DEL_K) > 1; i++) {
+        int v = delete->data[i];
         if (bms_has(del, DEL_R, v)) continue;
 
         if (bms_rem(del, DEL_K, v)) ci_add (delctx->Kprime, v);
@@ -325,7 +325,7 @@ deletion_emit_new (por_context *ctx, proviso_t *provctx, int* src)
     int c = 0;
     for (int z = 0; z < ctx->enabled_list->count; z++) {
         int i = ctx->enabled_list->data[z];
-        if (por_is_stubborn(ctx,i) && !bms_has(del,DEL_E,i)) {
+        if (del_is_stubborn(ctx,i) && !bms_has(del,DEL_E,i)) {
             del->set[i] |= 1<<DEL_E | 1<<DEL_R;
             c += GBgetTransitionsLong (ctx->parent, i, src, hook_cb, provctx);
         }
@@ -337,7 +337,7 @@ static inline bool
 del_all_stubborn (por_context *ctx, ci_list *list)
 {
     for (int i = 0; i < list->count; i++)
-        if (!por_is_stubborn(ctx, list->data[i])) return false;
+        if (!del_is_stubborn(ctx, list->data[i])) return false;
     return true;
 }
 
@@ -380,7 +380,7 @@ deletion_emit (model_t model, por_context *ctx, int *src, TransitionCB cb,
                 del->set[x] |= 1<<DEL_R;
             }
             deletion_setup (model, ctx, src, false);
-            deletion_analyze (ctx);
+            deletion_analyze (ctx, ctx->enabled_list);
 
             emitted += deletion_emit_new (ctx, &provctx, src);
         }
@@ -394,7 +394,10 @@ del_por_all (model_t self, int *src, TransitionCB cb, void *user_context)
 {
     por_context* ctx = ((por_context*)GBgetContext(self));
     deletion_setup (self, ctx, src, true);
-    deletion_analyze (ctx);
+    if (ctx->exclude) {
+        deletion_analyze (ctx, ctx->exclude);
+    }
+    deletion_analyze (ctx, ctx->enabled_list);
     return deletion_emit (self, ctx, src, cb, user_context);
 }
 

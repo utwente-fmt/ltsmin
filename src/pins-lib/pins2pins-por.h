@@ -92,6 +92,8 @@ extern int NO_L12;
 
 typedef struct por_ctx por_context;
 
+extern void por_exclude (por_context *ctx, ci_list *groups);
+
 extern bool por_is_stubborn (por_context *ctx, int group);
 
 extern void por_init_transitions (model_t model, por_context *ctx, int *src);

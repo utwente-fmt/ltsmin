@@ -44,7 +44,7 @@ typedef enum {
  */
 struct por_ctx {
     model_t         parent;         // parent PINS model
-    void            *alg;           // Algorithm context
+    void           *alg;            // Algorithm context
 
     int             nguards;        // number of guards
     int             nlabels;        // number of labels (including guards)
@@ -90,6 +90,8 @@ struct por_ctx {
 
     int             *group_score;   // score assigned to each group by heuristic function
     int             *nes_score;     // Template for the nes_score
+
+    ci_list         *exclude;
 };
 
 /**
