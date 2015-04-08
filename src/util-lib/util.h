@@ -35,10 +35,23 @@ extern ci_list *ci_create (size_t size);
 
 extern void ci_free (ci_list *list);
 
+extern void ci_print (ci_list *list);
+
+extern void ci_debug (ci_list *list);
+
+extern void ci_sort (ci_list *list);
+
 static inline int
 ci_get (ci_list *list, int index)
 {
     return list->data[index];
+}
+
+static inline int
+ci_top (ci_list *list)
+{
+    HREassert(list->count >= 0);
+    return list->data[list->count - 1];
 }
 
 static inline int
@@ -64,6 +77,24 @@ static inline void
 ci_add (ci_list *list, int num)
 {
     list->data[list->count++] = num;
+}
+
+static inline int
+ci_binary_search (ci_list *list, int key)
+{
+    int             imin = 0;
+    int             imax = list->count - 1;
+    while (imax >= imin) {
+        int imid = imin + ((imax - imin) >> 1);
+        if (list->data[imid] == key) {
+            return imid;
+        } else if (list->data[imid] < key) {
+            imin = imid + 1;
+        } else {
+            imax = imid - 1;
+        }
+    }
+    return -1;
 }
 
 static inline void

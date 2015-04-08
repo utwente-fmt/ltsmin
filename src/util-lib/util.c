@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include <hre/user.h>
+#include <hre/unix.h>
 #include <util-lib/util.h>
 
 char *
@@ -72,4 +73,40 @@ void
 ci_free (ci_list *list)
 {
     RTfree (list);
+}
+
+static inline void
+ci_print_int (log_t log, ci_list *list)
+{
+    if (list->count > 0)
+        Printf (log, "%d", ci_get(list, 0));
+    for (int g = 1; g < list->count; g++) {
+        Printf (log, ", %d", ci_get(list, g));
+    }
+}
+
+void
+ci_debug (ci_list *list)
+{
+    if (debug == NULL) return;
+    ci_print_int (debug, list);
+}
+
+void
+ci_print (ci_list *list)
+{
+    ci_print_int (info, list);
+}
+
+static int
+compint (const void *a, const void *b, void *ctx)
+{
+    return *(int *)a - *(int *)b;
+    (void) ctx;
+}
+
+void
+ci_sort (ci_list *list)
+{
+    qsortr (list->data, list->count, sizeof(int), compint, NULL);
 }
