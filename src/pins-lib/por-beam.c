@@ -95,6 +95,15 @@ por_transition_costs (por_context *ctx)
 
     // set score for enable transitions
     if (PINS_LTL || SAFETY) {
+        int visible = ctx->visible_enabled * ctx->ngroups
+                        + bms_count (ctx->visible, VISIBLE)
+                        - ctx->visible_enabled;
+        int visibleNds = ctx->visible_nds_enabled * ctx->ngroups
+                        + bms_count (ctx->visible, VISIBLE_NDS)
+                        - ctx->visible_nds_enabled;
+        int visibleNes = ctx->visible_nes_enabled * ctx->ngroups
+                        + bms_count (ctx->visible, VISIBLE_NES)
+                        - ctx->visible_nes_enabled;
         for (int i = 0; i < ctx->ngroups; i++) {
             int             new_score;
             int             vis;
@@ -107,14 +116,11 @@ por_transition_costs (por_context *ctx)
                     bool nes = vis & (1 << VISIBLE_NES);
                     bool nds = vis & (1 << VISIBLE_NDS);
                     if (NO_DYN_VIS || (nes && nds)) {
-                        new_score = ctx->visible_enabled * ctx->ngroups +
-                                bms_count(ctx->visible, VISIBLE) - ctx->visible_enabled;
+                        new_score = visible;
                     } else if (nes) {
-                        new_score = ctx->visible_nds_enabled * ctx->ngroups +
-                                bms_count(ctx->visible, VISIBLE_NDS) - ctx->visible_nds_enabled;
-                    } else { // VISIBLE_NDS:
-                        new_score = ctx->visible_nes_enabled * ctx->ngroups +
-                                bms_count(ctx->visible, VISIBLE_NES) - ctx->visible_nes_enabled;
+                        new_score = visibleNds;
+                    } else {
+                        new_score = visibleNes;
                     }
                 }
             } else {
@@ -127,6 +133,14 @@ por_transition_costs (por_context *ctx)
             int enabled = ctx->group_status[i] == GS_ENABLED;
             incr_ns_update (ctx, i, enabled ? ctx->ngroups : 1);
         }
+    }
+
+    if (ctx->exclude == NULL) return;
+    // try avoid excluded groups
+    int max_score = ctx->enabled_list->count * ctx->ngroups;
+    for (int g = 0; g < ctx->exclude->count; g++) {
+        int group = ctx->exclude->data[g];
+        incr_ns_update (ctx, group, max_score);
     }
 }
 
@@ -703,7 +717,7 @@ beam_setup (model_t model, por_context* ctx, int* src)
         Debugf ("BEAM-%d=%d, ", i, group);
     }
     Debugf ("\n");
-    if (SAFETY || PINS_LTL) {
+    if (SAFETY || PINS_LTL || ctx->exclude != NULL) {
         qsortr (beam->search, beam->beam_used, sizeof(void *), score_cmp, ctx);
     }
 }
@@ -761,3 +775,4 @@ beam_is_stubborn (por_context *ctx, int group)
     return s->enabled->count >= ctx->enabled_list->count ||
           (s->emit_status[group] & ES_SELECTED);
 }
+
