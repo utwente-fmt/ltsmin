@@ -41,8 +41,8 @@ typedef enum {
 } key_type_t;
 
 typedef enum {
-    ES_SELECTED     = 0x01,
-    ES_READY        = 0x02,
+    ES_QUEUED       = 0x01,
+    ES_VISITED      = 0x02,
     ES_EMITTED      = 0x04,
 } emit_status_t;
 
@@ -151,6 +151,7 @@ por_transition_costs (por_context *ctx)
 static inline void
 update_ns_scores (por_context* ctx, search_context_t *s, int group)
 {
+    if (NO_HEUR) return;
     // change the heuristic function according to selected group
     for(int k=0 ; k< ctx->group2ns[group]->count; k++) {
         int ns = ctx->group2ns[group]->data[k];
@@ -165,18 +166,15 @@ update_ns_scores (por_context* ctx, search_context_t *s, int group)
  * Mark a group selected, update counters and NS scores.
  */
 static inline bool
-select_group (por_context* ctx, search_context_t *s, int group,
-              bool update_scores)
+select_group (por_context* ctx, search_context_t *s, int group)
 {
-    if (s->emit_status[group] & ES_SELECTED) { // already selected
+    if (s->emit_status[group] & ES_QUEUED) { // already selected
         Debugf ("(%d), ", group);
         return false;
     }
-    s->emit_status[group] |= ES_SELECTED;
+    s->emit_status[group] |= ES_QUEUED;
 
-    if (!NO_HEUR && update_scores) {
-        update_ns_scores (ctx, s, group);
-    }
+    update_ns_scores (ctx, s, group);
 
     // and add to work array and update counts
     int visible = is_visible (ctx, group);
@@ -251,13 +249,12 @@ beam_cheapest_ns (por_context* ctx, search_context_t *s, int group, int *cost)
 }
 
 static inline bool
-select_all (por_context* ctx, search_context_t *s, ci_list *list,
-            bool update_scores)
+select_all (por_context* ctx, search_context_t *s, ci_list *list)
 {
     bool added_new = false;
     for (int i = 0; i < list->count; i++) {
         int group = list->data[i];
-        added_new |= select_group (ctx, s, group, update_scores);
+        added_new |= select_group (ctx, s, group);
     }
     return added_new;
 }
@@ -268,15 +265,14 @@ beam_is_key (por_context *ctx, search_context_t *s, int group, int max_score)
     int                 score = 0;
     for (int t = 0; t < ctx->dna_diff[group]->count && score < max_score; t++) {
         int tt = ctx->dna_diff[group]->data[t];
-        int fresh = (s->emit_status[tt] & ES_SELECTED) == 0;
+        int fresh = (s->emit_status[tt] & ES_QUEUED) == 0;
         score += fresh ? ctx->group_score[tt] : 0;
     }
     return score;
 }
 
 static void
-beam_add_all_for_enabled (por_context *ctx, search_context_t *s, int group,
-                          bool update_scores)
+beam_add_all_for_enabled (por_context *ctx, search_context_t *s, int group)
 {
 
     if (POR_WEAK == WEAK_NONE && USE_MC) {
@@ -286,16 +282,16 @@ beam_add_all_for_enabled (por_context *ctx, search_context_t *s, int group,
             int nce = ctx->group_nce[group]->data[i];
             HREassert (ctx->group_status[nce] & GS_DISABLED, "Error in maybe-coenabled relation: %d - %d are coenabled.", group, nce);
 
-            if (s->emit_status[nce] & ES_READY) continue;
-            if (s->emit_status[nce] & ES_SELECTED) {
-                s->emit_status[nce] |= ES_READY; // skip in search
+            if (s->emit_status[nce] & ES_VISITED) continue;
+            if (s->emit_status[nce] & ES_QUEUED) {
+                s->emit_status[nce] |= ES_VISITED; // skip in search
                 continue;
             }
 
-            if (!NO_HEUR)
-                update_ns_scores (ctx, s, nce);
+            update_ns_scores (ctx, s, nce);
             s->score_disabled += 1;
             s->score_visible += is_visible (ctx, nce);
+            s->emit_status[nce] |= ES_VISITED | ES_QUEUED; // skip in search
         }
     }
 
@@ -307,17 +303,17 @@ beam_add_all_for_enabled (por_context *ctx, search_context_t *s, int group,
         }
         Debugf ("visible=[ ");
         if (NO_DYN_VIS) {
-            select_all (ctx, s, ctx->visible->lists[VISIBLE], update_scores);
+            select_all (ctx, s, ctx->visible->lists[VISIBLE]);
         } else {
             int newNDS = ctx->visible_nes->set[group] ^ s->visible_nds; // g in NES ==> NDS C Ts
             int newNES = ctx->visible_nds->set[group] ^ s->visible_nes; // g in NDS ==> NES C Ts
             if (newNES || newNDS) {
                 for (size_t i = 0; i < ctx->visible_nds->types; i++) {
                     if ((1 << i) & newNDS) {
-                        select_all (ctx, s, ctx->visible_nds->lists[i], update_scores);
+                        select_all (ctx, s, ctx->visible_nds->lists[i]);
                     }
                     if ((1 << i) & newNES) {
-                        select_all (ctx, s, ctx->visible_nes->lists[i], update_scores);
+                        select_all (ctx, s, ctx->visible_nes->lists[i]);
                     }
                 }
                 s->visible_nds |= newNDS;
@@ -330,7 +326,7 @@ beam_add_all_for_enabled (por_context *ctx, search_context_t *s, int group,
     ci_list **accords = POR_WEAK ? ctx->not_left_accords : ctx->not_accords;
     for (int j = 0; j < accords[group]->count; j++) {
         int dependent_group = accords[group]->data[j];
-        select_group (ctx, s, dependent_group, update_scores);
+        select_group (ctx, s, dependent_group);
     }
 
     if (POR_WEAK == WEAK_VALMARI) {
@@ -344,10 +340,10 @@ beam_add_all_for_enabled (por_context *ctx, search_context_t *s, int group,
             if (s->has_key == KEY_VISIBLE || s->has_key == KEY_ANY)
                 s->has_key = !is_visible(ctx, group) ? KEY_INVISIBLE : KEY_VISIBLE;
             if (cost_ndss > 0) {
-                select_all (ctx, s, ctx->dna_diff[group], true);
+                select_all (ctx, s, ctx->dna_diff[group]);
             }
         } else if (cost_nes > 0){
-            select_all (ctx, s, ctx->ns[selected_ns], true);
+            select_all (ctx, s, ctx->ns[selected_ns]);
         }
         Debugf ("] ");
     }
@@ -423,8 +419,8 @@ beam_search (por_context *ctx)
             memset(s->emit_status, 0, sizeof(char[ctx->ngroups]));
             if (!NO_HEUR) {
                 memcpy(s->nes_score, ctx->nes_score, sizeof(int[NS_SIZE(ctx)]));
-                update_ns_scores (ctx, s, s->group);
             }
+            select_group (ctx, s, s->group);
             s->initialized = 1;
             Debugf ("BEAM-%d Initializing scores for group %d\n", s->idx, s->group);
         }
@@ -433,15 +429,15 @@ beam_search (por_context *ctx)
         int             group;
         while (s->work_enabled->count == 0 && s->work_disabled->count > 0) {
             group = s->work_disabled->data[--s->work_disabled->count];
-            if (s->emit_status[group] & ES_READY) continue;
-            s->emit_status[group] |= ES_SELECTED | ES_READY;
+            if (s->emit_status[group] & ES_VISITED) continue;
+            s->emit_status[group] |= ES_VISITED;
 
             Debugf ("BEAM-%d investigating group %d (disabled) --> ", s->idx, group);
             int         cost;
             int         selected_ns = beam_cheapest_ns (ctx, s, group, &cost);
             HREassert (selected_ns != -1, "No NES found for group %d", group);
             if (cost != 0) { // only if cheapest NES has cost
-                select_all (ctx, s, ctx->ns[selected_ns], true);
+                select_all (ctx, s, ctx->ns[selected_ns]);
             }
             Debugf (" (ns %d (%s))\n", selected_ns % ctx->nguards,
                     selected_ns < ctx->nguards ? "disabled" : "enabled");
@@ -450,11 +446,11 @@ beam_search (por_context *ctx)
         // if the current search context has enabled transitions, handle all of them
         while (s->work_enabled->count > 0 && beam_cmp(s, beam->search[1]) <= 0) {
             group = s->work_enabled->data[--s->work_enabled->count];
-            if (s->emit_status[group] & ES_READY) continue;
-            s->emit_status[group] |= ES_SELECTED | ES_READY;
+            if (s->emit_status[group] & ES_VISITED) continue;
+            s->emit_status[group] |= ES_VISITED;
 
             Debugf ("BEAM-%d investigating group %d (enabled) --> ", s->idx, group);
-            beam_add_all_for_enabled (ctx, s, group, true); // add DNA
+            beam_add_all_for_enabled (ctx, s, group); // add DNA
             Debugf ("\n");
         }
     } while (beam_sort(ctx));
@@ -489,13 +485,13 @@ beam_min_invisible_group (por_context* ctx, search_context_t *s)
     int min_group = -1;
     for (int i = 0; i < ctx->enabled_list->count; i++) {
         int group = ctx->enabled_list->data[i];
-        if ((s->emit_status[group] & ES_SELECTED) || is_visible(ctx, group)) continue;
+        if ((s->emit_status[group] & ES_QUEUED) || is_visible(ctx, group)) continue;
 
         size_t              score = 0;
         ci_list **accords = POR_WEAK ? ctx->not_left_accords : ctx->not_accords;
         for (int j = 0; j < accords[group]->count; j++) {
             int dependent = accords[group]->data[j];
-            int fresh = (s->emit_status[dependent] & ES_SELECTED) == 0;
+            int fresh = (s->emit_status[dependent] & ES_QUEUED) == 0;
             score += fresh ? ctx->group_score[dependent] : 0;
         }
         if (score == 0) return group;
@@ -536,10 +532,10 @@ beam_ensure_invisible_and_key (por_context* ctx)
         if (need_invisible && !has_invisible) {
             int i_group = beam_min_invisible_group (ctx, s);
             Debugf ("BEAM %d adding invisible key: %d", s->idx, i_group);
-            select_group (ctx, s, i_group, true);
+            select_group (ctx, s, i_group);
             if (POR_WEAK) { // make it also key
                 Debugf (" +strong[ ");
-                select_all (ctx, s, ctx->dna_diff[i_group], true);
+                select_all (ctx, s, ctx->dna_diff[i_group]);
                 Debugf ("]\n");
             }
             s->has_key = KEY_INVISIBLE;
@@ -554,7 +550,7 @@ beam_ensure_invisible_and_key (por_context* ctx)
             }
             if (key_group != -1) {
                 Debugf ("BEAM %d making %d key: ", s->idx, key_group);
-                select_all (ctx, s, ctx->dna_diff[key_group], true);
+                select_all (ctx, s, ctx->dna_diff[key_group]);
                 Debugf (".\n");
             }
         } else {
@@ -607,13 +603,13 @@ beam_enforce_L2 (por_context* ctx)
                 return;
             } else { // if context changed, it should include emitted transitions:
                 Debugf ("BEAM %d adding previously emitted from BEAM %d: ", s->idx, s1->idx);
-                bool new = select_all(ctx, s, s1->emitted, true);
+                bool new = select_all(ctx, s, s1->emitted);
                 Debugf (".\n");
                 if (!new) return;
             }
         } else {
             Debugf ("BEAM %d adding all visibles: ", s->idx);
-            bool new = select_all (ctx, s, ctx->visible->lists[VISIBLE], true);
+            bool new = select_all (ctx, s, ctx->visible->lists[VISIBLE]);
             Debugf (".\n");
             HREassert (new);
         }
@@ -633,10 +629,11 @@ beam_emit (por_context* ctx, int* src, TransitionCB cb, void* uctx)
     search_context_t   *s = beam->search[0];
     int emitted = 0;
     // if the score is larger then the number of enabled transitions, emit all
-    if (s->enabled->count >= ctx->enabled_list->count) {
+    if (ctx->enabled_list->count <= 1 ||
+            s->enabled->count >= ctx->enabled_list->count) {
         // return all enabled
         proviso_t provctx = {cb, uctx, 0, 0, 1};
-        emitted = emit_all (ctx, s->enabled, &provctx, src);
+        emitted = emit_all (ctx, ctx->enabled_list, &provctx, src);
     } else if (!PINS_LTL && !SAFETY) { // deadlocks are easy:
         proviso_t provctx = {cb, uctx, 0, 0, 1};
         emitted = emit_new (ctx, s->enabled, &provctx, src);
@@ -701,25 +698,18 @@ beam_setup (model_t model, por_context* ctx, int* src)
         search->visible_nds = 0;
         search->visible_nes = 0;
         search->work_disabled->count = 0;
-        search->work_enabled->count = 1;
-        search->work_enabled->data[0] = group;
-        search->enabled->count = 1;
-        search->enabled->data[0] = group;
+        search->work_enabled->count = 0;
+        search->enabled->count = 0;
         search->emitted->count = 0;
         search->score_disabled = 0;
         search->initialized = 0;
-
-        int visible = is_visible(ctx, group);
-        search->score_visible = visible;
-        search->score_vis_en = visible;
+        search->score_visible = 0;
+        search->score_vis_en = 0;
         search->idx = i;
         search->group = group;
         Debugf ("BEAM-%d=%d, ", i, group);
     }
     Debugf ("\n");
-    if (SAFETY || PINS_LTL || ctx->exclude != NULL) {
-        qsortr (beam->search, beam->beam_used, sizeof(void *), score_cmp, ctx);
-    }
 }
 
 int
@@ -773,6 +763,6 @@ beam_is_stubborn (por_context *ctx, int group)
     beam_t             *beam = (beam_t *) ctx->alg;
     search_context_t   *s = beam->search[0];
     return s->enabled->count >= ctx->enabled_list->count ||
-          (s->emit_status[group] & ES_SELECTED);
+          (s->emit_status[group] & ES_QUEUED);
 }
 
