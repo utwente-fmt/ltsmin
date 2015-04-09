@@ -13,6 +13,7 @@
 #include <pins-lib/pins-util.h>
 #include <pins-lib/pins.h>
 #include <util-lib/fast_set.h>
+#include <pins2lts-mc/algorithm/ltl.h>
 
 typedef struct counter_s {
     uint32_t            unique_states_count;
@@ -37,7 +38,6 @@ struct alg_local_s {
 
 typedef struct uf_alg_shared_s {
     uf_t               *uf;                  // Union-Find structure
-    bool                found_acc;           // LTL acceptance check
 } uf_alg_shared_t;
 
 
@@ -93,16 +93,15 @@ ufscc_handle (void *arg, state_info_t *successor, transition_info_t *ti, int see
 {
     wctx_t              *ctx        = (wctx_t *) arg;
     alg_local_t         *loc        = ctx->local;
-    uf_alg_shared_t     *shared     = (uf_alg_shared_t*) ctx->run->shared;
 
     ctx->counters->trans++;
 
     if (ctx->state->ref == successor->ref) {
         loc->cnt.self_loop_count++;
-        if (GBbuchiIsAccepting(ctx->model, state_info_state(ctx->state))) {
+        /*if (GBbuchiIsAccepting(ctx->model, state_info_state(ctx->state))) {
             // DONE
-            atomic_write(&shared->found_acc, true);
-        }
+            ndfs_report_cycle (ctx->run, ctx->model, loc->dstack, successor);
+        }*/
         return;
     }
 
@@ -295,11 +294,11 @@ successor (wctx_t *ctx)
 
             //Warning(info, "Union(F:%zu, T:%zu)", loc->root->ref, loc->target->ref);
 
-            if (GBbuchiIsAccepting(ctx->model, state_info_state(loc->root)) ||
+            /*if (GBbuchiIsAccepting(ctx->model, state_info_state(loc->root)) ||
                 GBbuchiIsAccepting(ctx->model, state_info_state(loc->target))) {
                 // DONE
-                atomic_write(&shared->found_acc, true);
-            }
+                ndfs_report_cycle (ctx->run, ctx->model, loc->dstack, loc->root);
+            }*/
 
             if (uf_union(shared->uf, loc->root->ref, loc->target->ref)) {
                 loc->cnt.union_count ++;
@@ -428,7 +427,6 @@ ufscc_run  (run_t *run, wctx_t *ctx)
 {
     alg_local_t            *loc = ctx->local;
     raw_data_t              state_data;
-    uf_alg_shared_t        *shared = (uf_alg_shared_t*) ctx->run->shared;
 
     ufscc_init (ctx);
 
@@ -437,7 +435,7 @@ ufscc_run  (run_t *run, wctx_t *ctx)
     state_info_deserialize (ctx->state, state_data); // DFS Stack TOP
     explore_state(ctx);
 
-    while ( !run_is_stopped(run) && atomic_read(&shared->found_acc) == false) {
+    while ( !run_is_stopped(run)) {
         if (0 == dfs_stack_nframes (loc->dstack))
             break;
 
@@ -485,12 +483,6 @@ ufscc_print_stats   (run_t *run, wctx_t *ctx)
     counter_t              *reduced = (counter_t *) run->reduced;
     uf_alg_shared_t        *shared = (uf_alg_shared_t*) ctx->run->shared;
 
-    if (atomic_read(&shared->found_acc) == true) {
-        Warning(info," ");
-        Warning(info,"Found accepting cycle!");
-        Warning(info," ");
-    }
-
     // SCC statistics
     Warning(info,"unique states found:   %d", reduced->unique_states_count);
     Warning(info,"self-loop count:       %d", reduced->self_loop_count);
@@ -499,7 +491,8 @@ ufscc_print_stats   (run_t *run, wctx_t *ctx)
     Warning(info,"avg scc size:          %.3f", ((double)reduced->unique_states_count) / reduced->scc_count);
     Warning(info," ");
 
-    uf_free(shared->uf);
+    //if (ctx->id==0) // TODO: make this more elegant
+    //    uf_free(shared->uf);
 
     run_report_total (run);
 }
@@ -518,5 +511,4 @@ ufscc_shared_init   (run_t *run)
     run->shared                = RTmallocZero (sizeof (uf_alg_shared_t));
     uf_alg_shared_t    *shared = (uf_alg_shared_t*) run->shared;
     shared->uf                 = uf_create();
-    shared->found_acc          = false;
 }
