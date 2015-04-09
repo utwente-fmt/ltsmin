@@ -78,13 +78,13 @@ get_local (treedbs_ll_t dbs)
  *
  *      left         right             <-- part
  */
-static inline uint64_t
+static uint64_t
 bit_pos (uint16_t bits, uint16_t index)
 {
     uint16_t            half = (bits + 1) >> 1; // ceil (bits / 2)
     uint16_t            part = (index >= half); // 0 for right, 1 for left
     uint64_t            bit = (32 << part) - (half << part) + index; // see function comment
-    return 1UL << bit;
+    return 1ULL << bit;
 }
 
 static inline uint64_t
@@ -160,17 +160,21 @@ cas_sat_bits (const treedbs_ll_t dbs, const tree_ref_t ref,
 
 int
 TreeDBSLLtry_set_sat_bits (const treedbs_ll_t dbs, const tree_ref_t ref,
-                           size_t bits, uint64_t exp, uint64_t new_val)
+                           size_t bits, size_t offs,
+                           uint64_t exp, uint64_t new_val)
 {
     uint64_t            old_val, old_bits, new_v;
     uint64_t            mask = (1ULL << bits) - 1;
     HREassert (new_val < (1UL << dbs->root.sat_bits), "new_val too high");
     HREassert ((new_val & mask) == new_val, "new_val too high w.r.t. bits");
 
+    mask <<= offs;
+    exp <<= offs;
     old_bits = atomic_read (dbs->root.table+ref);
     old_val = b2s (dbs, old_bits);
     if ((old_val & mask) != exp) return false;
 
+    new_val <<= offs;
     new_v = (old_val & ~mask) | new_val;
     return cas_sat_bits(dbs, ref, old_bits, new_v);
 }

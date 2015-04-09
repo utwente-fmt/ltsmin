@@ -57,19 +57,23 @@ DBSLLget_sat_bits (const dbs_ll_t dbs, const dbs_ref_t ref)
 
 int
 DBSLLtry_set_sat_bits (const dbs_ll_t dbs, const ref_t ref,
-                           size_t bits, uint64_t exp, uint64_t new_val)
+                       size_t bits, size_t offs,
+                       uint64_t exp, uint64_t new_val)
 {
     mem_hash_t         old_val, new_v;
     mem_hash_t         mask = (1UL << bits) - 1;
     HREassert (new_val < (1UL << dbs->sat_bits), "new_val too high");
     HREassert ((new_val & mask) == new_val, "new_val too high wrt bits");
 
+    mask <<= offs;
+    new_val <<= offs;
+    exp <<= offs;
     mem_hash_t      hash_and_sat = atomic_read (dbs->table+ref);
     old_val = hash_and_sat & dbs->sat_mask;
     if ((old_val & mask) != exp) return false;
 
     new_v = (hash_and_sat & ~mask) | new_val;
-    return cas(dbs->table + ref, old_val, new_v);
+    return cas(dbs->table + ref, hash_and_sat, new_v);
 }
 
 int

@@ -275,10 +275,10 @@ state_store_get_wip (ref_t ref)
 }
 
 int
-state_store_try_set_colors (ref_t ref, size_t bits, uint64_t old_val,
-                            uint64_t new_val)
+state_store_try_set_colors (ref_t ref, size_t bits, size_t offs,
+                            uint64_t old_val, uint64_t new_val)
 {
-    return global->store->try_set_sat_bits (global->store->dbs, ref, bits,
+    return global->store->try_set_sat_bits (global->store->dbs, ref, bits, offs,
                                             old_val, new_val);
 }
 
