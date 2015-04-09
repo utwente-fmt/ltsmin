@@ -47,6 +47,20 @@ ci_get (ci_list *list, int index)
     return list->data[index];
 }
 
+/* begin iterator */
+static inline int *
+ci_begin (ci_list *list)
+{
+    return &list->data[0];
+}
+
+static inline int *
+ci_end (ci_list *list)
+{
+    return &list->data[list->count - 1];
+}
+/* end iterator */
+
 static inline int
 ci_top (ci_list *list)
 {
