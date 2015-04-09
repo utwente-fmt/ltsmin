@@ -38,7 +38,7 @@ si_map_entry strategies[] = {
 si_map_entry provisos[] = {
     {"none",    Proviso_None},
     {"force-none",Proviso_ForceNone},
-    {"closed-set",  Proviso_ClosedSet},
+    {"closed-set",Proviso_ClosedSet},
     {"stack",   Proviso_Stack},
     {"cndfs",   Proviso_CNDFS},
     {NULL, 0}
@@ -85,7 +85,7 @@ options_static_init      (model_t model, bool timed)
         }
         if (proviso != Proviso_ForceNone) {
             if ((strategy[0] & Strat_CNDFS) && proviso != Proviso_CNDFS)
-                Abort ("Only the CNDFS proviso works in CNDFS!");
+                Abort ("Only the CNDFS proviso works in CNDFS (use --proviso=cndfs)!");
             if ((strategy[0] & Strat_NDFS) && proviso != Proviso_Stack)
                 Abort ("Only the stack proviso works in NDFS!");
             if ( (strategy[0] & (Strat_OWCTY|Strat_LNDFS|Strat_ENDFS)) )
