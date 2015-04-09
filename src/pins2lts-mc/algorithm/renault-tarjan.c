@@ -377,7 +377,8 @@ renault_tarjan_scc_print_stats   (run_t *run, wctx_t *ctx)
     Warning(info,"avg scc size:          %.3f", ((double)reduced->unique_states_count) / reduced->scc_count);
     Warning(info," ");
 
-    r_uf_free(shared->uf);
+    //if (ctx->id==0) // TODO: make this more elegant
+    //    r_uf_free(shared->uf);
 
     run_report_total (run);
 }
