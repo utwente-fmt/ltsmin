@@ -284,7 +284,7 @@ check_cndfs_proviso (wctx_t *ctx)
     bool no_cycle = bitvector_is_set (&loc->stackbits, cur(ctx,NOCYCLE));
     cndfs_proviso_t prov = no_cycle ? VOLATILE : INVOLATILE;
 
-    int success = state_store_try_set_colors (ctx->state->ref, 2, UNKNOWN, prov);
+    int success = state_store_try_set_colors (ctx->state->ref, 2, 0, UNKNOWN, prov);
     if (( success && prov == INVOLATILE) ||
         (!success && state_store_get_wip(ctx->state->ref) == INVOLATILE)) {
         bitvector_set (&loc->stackbits, cur(ctx,INVOL));
@@ -369,6 +369,7 @@ endfs_blue (run_t *run, wctx_t *ctx)
         raw_data_t          state_data = dfs_stack_top (loc->stack);
         if (NULL != state_data) {
             state_info_deserialize (ctx->state, state_data);
+            state_store_try_color (loc->seed->ref, GDANGEROUS, loc->rec_bits);
             nndfs_color_t color = nn_get_color (&loc->color_map, ctx->state->ref);
             if ( !nn_color_eq(color, NNCYAN) && !nn_color_eq(color, NNBLUE) &&
                  !state_store_has_color(ctx->state->ref, GGREEN, loc->rec_bits) ) {
@@ -591,6 +592,21 @@ cndfs_reduce  (run_t *run, wctx_t *ctx)
     }
 }
 
+int
+cndfs_state_seen (void *ptr, transition_info_t *ti, ref_t ref, int seen)
+{
+    wctx_t             *ctx = (wctx_t *) ptr;
+    alg_local_t        *loc = ctx->local;
+
+    seen = seen && !nn_color_eq(nn_get_color(&ctx->local->color_map, ref), NNWHITE);
+    if (seen) return 1;
+
+    int other = state_store_has_color(ref, GDANGEROUS, loc->rec_bits) != 0;
+
+    return -other;
+    (void) ti;
+}
+
 static int
 cndfs_stop (run_t *run)
 {
@@ -618,7 +634,7 @@ cndfs_shared_init   (run_t *run)
     set_alg_local_deinit    (run->alg, cndfs_local_deinit);
     set_alg_print_stats     (run->alg, cndfs_print_stats);
     set_alg_run             (run->alg, endfs_blue);
-    set_alg_state_seen      (run->alg, ndfs_state_seen);
+    set_alg_state_seen      (run->alg, cndfs_state_seen);
     set_alg_reduce          (run->alg, cndfs_reduce);
 
     if (run->shared != NULL)
