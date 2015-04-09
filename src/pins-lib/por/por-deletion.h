@@ -2,7 +2,7 @@
 #define DELETION_POR
 
 #include <stdlib.h>
-#include <pins-lib/pins2pins-por.h>
+#include <pins-lib/por/pins2pins-por.h>
 
 typedef struct del_ctx_s del_ctx_t;
 

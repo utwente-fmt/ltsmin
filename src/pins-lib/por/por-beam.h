@@ -2,7 +2,7 @@
 #define BEAM_POR
 
 
-#include <pins-lib/pins2pins-por.h>
+#include <pins-lib/por/pins2pins-por.h>
 
 
 extern struct poptOption beam_options[];

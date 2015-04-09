@@ -2,7 +2,7 @@
 #define AMPLE_POR
 
 
-#include <pins-lib/pins2pins-por.h>
+#include <pins-lib/por/pins2pins-por.h>
 
 
 typedef struct ample_ctx_s ample_ctx_t;

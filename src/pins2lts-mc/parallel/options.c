@@ -6,7 +6,7 @@
 
 #include <stdlib.h>
 
-#include <pins-lib/pins2pins-por.h>
+#include <pins-lib/por/pins2pins-por.h>
 #include <pins2lts-mc/algorithm/algorithm.h>
 #include <pins2lts-mc/algorithm/dfs-fifo.h>
 #include <pins2lts-mc/algorithm/ltl.h>

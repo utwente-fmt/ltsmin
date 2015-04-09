@@ -19,7 +19,7 @@
 #define LEAP_POR
 
 
-#include <pins-lib/pins2pins-por.h>
+#include <pins-lib/por/pins2pins-por.h>
 
 
 typedef struct leap_s leap_t;
