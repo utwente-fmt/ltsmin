@@ -21,6 +21,7 @@ typedef enum list_status_e {
 } list_status;
 
 typedef uint64_t sz_w;
+#define WORKER_BITS 64
 
 struct uf_node_s {
     sz_w            w_set;                  // Set of worker IDs (one bit for each worker)
@@ -114,6 +115,18 @@ uf_remove_from_list (const uf_t* uf, ref_t state)
         } else if (list_s == LIST_TOMBSTONE)
             return 0;
     }
+}
+
+/**
+ * return -1 for states owner by other workers
+ * return 1 for states locally owned
+ */
+int
+uf_owner (const uf_t* uf, ref_t state, size_t worker)
+{
+    sz_w            w_id = 1ULL << worker;
+    sz_w            W = atomic_read (&uf->array[state].w_set);
+    return W & w_id ? 1 : (W & ~w_id ? -1 : 0);
 }
 
 bool    

@@ -497,6 +497,15 @@ ufscc_print_stats   (run_t *run, wctx_t *ctx)
     run_report_total (run);
 }
 
+int
+ufscc_state_seen (void *ptr, ref_t ref, int seen)
+{
+    wctx_t                 *ctx = (wctx_t *) ptr;
+    uf_alg_shared_t        *shared = (uf_alg_shared_t*) ctx->run->shared;
+    return uf_owner (shared->uf, ref, ctx->id);
+    (void) seen;
+}
+
 void
 ufscc_shared_init   (run_t *run)
 {
@@ -507,6 +516,8 @@ ufscc_shared_init   (run_t *run)
     set_alg_print_stats (run->alg, ufscc_print_stats); 
     set_alg_run (run->alg, ufscc_run); 
     set_alg_reduce (run->alg, ufscc_reduce); 
+
+    set_alg_state_seen      (run->alg, ufscc_state_seen);
 
     run->shared                = RTmallocZero (sizeof (uf_alg_shared_t));
     uf_alg_shared_t    *shared = (uf_alg_shared_t*) run->shared;

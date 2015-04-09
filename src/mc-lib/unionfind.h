@@ -32,6 +32,8 @@ extern pick_e   uf_pick_from_list (const uf_t* uf, ref_t state, ref_t *node);
 
 extern bool     uf_remove_from_list (const uf_t* uf, ref_t state);
 
+extern int      uf_owner (const uf_t* uf, ref_t state, size_t worker);
+
 extern bool     uf_is_in_list (const uf_t* uf, ref_t state);
 
 extern char     uf_make_claim (const uf_t* uf, ref_t state, size_t w_id);
