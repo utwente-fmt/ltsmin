@@ -513,7 +513,11 @@ ufscc_print_stats   (run_t *run, wctx_t *ctx)
                                                                ((double)reduced->unique_states) / reduced->union_success);
     Warning(info," ");
 
-    //if (ctx->id==0) // TODO: make this more elegant
+    Warning(info,"UF memory usage:       %.3f MB (add to 'Est. total memory use')",
+            ((double)reduced->unique_states) * sizeof(int[8]) / (1ULL << 20)); // TODO: hardcoded UFset node size
+
+    Warning(info," ");
+    //if (ctx->id==0) // TODO: make this more elegant (implement alg_destoy callback)
     //    uf_free(shared->uf);
 
     run_report_total (run);
