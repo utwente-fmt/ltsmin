@@ -203,6 +203,14 @@ set_alg_run                 (alg_t *alg, alg_run_f alg_run)
     alg->procs.alg_run = alg_run;
 }
 
+/**
+ * Fresh successor heuristic implementation.
+ * Used by permutor.
+ *
+ * Return a positive integer when a state has been visited locally
+ * Return a negative integer when a state has only been visited by another worker
+ * Or zero when unknown.
+ */
 alg_state_seen_f
 get_alg_state_seen          (alg_t *alg)
 {
