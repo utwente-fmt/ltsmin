@@ -16,13 +16,15 @@
 #include <pins2lts-mc/algorithm/ltl.h>
 
 typedef struct counter_s {
-    uint32_t            unique_states_count;
-    uint32_t            self_loop_count;     // Counts the number of self-loops
-    uint32_t            scc_count;           // Counts the number of SCCs
-    uint32_t            first_claim_count;   // Number of states that this worker first claimed
-    uint32_t            multiple_claim_count;   // Number of states that this worker did not first claimed
-    uint32_t            marked_dead_count;   // Number of SCCs that this worker marked dead
-    uint32_t            union_count;         // Number of states that this worker united
+    uint32_t            self_loop_count;         // Counts the number of self-loops
+    uint32_t            scc_count;               // Counts the number of SCCs
+    uint32_t            unique_states;           // Number of states that this worker first claimed
+    uint32_t            unique_trans;            // Number of unique transitions
+    uint32_t            trans_tried;             // Number of transitions tried to explore
+    uint32_t            multiple_claim_count;    // Number of states that this worker did not first claimed
+    uint32_t            marked_dead_count;       // Number of SCCs that this worker marked dead
+    uint32_t            union_count;             // Number of states that this worker united
+    uint32_t            union_success;           // Number of states that this worker united
     uint32_t            removed_from_list_count; // Number of states that this worker removed from list
 } counter_t;
 
@@ -65,13 +67,15 @@ ufscc_local_init   (run_t *run, wctx_t *ctx)
     ctx->local->dstack                      = dfs_stack_create (len);
     ctx->local->rstack                      = dfs_stack_create (len);
 
-    ctx->local->cnt.unique_states_count     = 0;
+    ctx->local->cnt.trans_tried             = 0;
     ctx->local->cnt.self_loop_count         = 0;
     ctx->local->cnt.scc_count               = 0;
-    ctx->local->cnt.first_claim_count       = 0;
+    ctx->local->cnt.unique_states           = 0;
+    ctx->local->cnt.unique_trans            = 0;
     ctx->local->cnt.multiple_claim_count    = 0;
     ctx->local->cnt.marked_dead_count       = 0;
     ctx->local->cnt.union_count             = 0;
+    ctx->local->cnt.union_success           = 0;
     ctx->local->cnt.removed_from_list_count = 0;
 
     (void) run; 
@@ -116,7 +120,7 @@ ufscc_handle (void *arg, state_info_t *successor, transition_info_t *ti, int see
     (void) arg; (void) ti; (void) seen;
 }
 
-static void
+static size_t
 explore_state (wctx_t *ctx)
 {
     // enter stack and put successors on it
@@ -132,10 +136,12 @@ explore_state (wctx_t *ctx)
 
     increase_level (ctx->counters);
     dfs_stack_enter (loc->dstack);
-    permute_trans (ctx->permute, ctx->state, ufscc_handle, ctx);
+    size_t trans = permute_trans (ctx->permute, ctx->state, ufscc_handle, ctx);
 
+    ctx->counters->explored ++;
     run_maybe_report1 (ctx->run, ctx->counters, "");
 
+    return trans;
 }  
 
 static void
@@ -151,7 +157,7 @@ ufscc_init  (wctx_t *ctx)
     char result = uf_make_claim(shared->uf, ctx->initial->ref, ctx->id);
     
     if (result == CLAIM_FIRST) {
-        loc->cnt.first_claim_count ++;
+        loc->cnt.unique_states ++;
         ctx->counters->explored ++; // increase global counters
     }
 }
@@ -198,7 +204,7 @@ void
 print_worker_stats (wctx_t *ctx)
 {
     alg_local_t            *loc = ctx->local;
-    Warning(info, "First claim count:         %d", loc->cnt.first_claim_count);
+    Warning(info, "First claim count:         %d", loc->cnt.unique_states);
     Warning(info, "Multiple claim count:      %d", loc->cnt.multiple_claim_count);
     Warning(info, "Union count:               %d", loc->cnt.union_count);
     Warning(info, "Removed from list count:   %d", loc->cnt.removed_from_list_count);
@@ -237,6 +243,7 @@ successor (wctx_t *ctx)
     // FROM   = loc->target->ref;
     // TO     = ctx->state->ref;
 
+    loc->cnt.trans_tried ++;
     char result = uf_make_claim(shared->uf, ctx->state->ref, ctx->id);
     
     // (TO == DEAD) ==> get next successor
@@ -249,15 +256,18 @@ successor (wctx_t *ctx)
     else if (result == CLAIM_SUCCESS || result == CLAIM_FIRST) {
         if (result == CLAIM_FIRST) { 
             // increase unique states count
-            loc->cnt.first_claim_count ++;
-            ctx->counters->explored ++;
+            loc->cnt.unique_states ++;
             //Warning(info, "DOT: A%zu [color=chocolate,style=filled];", loc->target->ref);
         } else {
             loc->cnt.multiple_claim_count ++;
         }
 
         // explore new state
-        explore_state(ctx);
+        size_t trans = explore_state(ctx);
+
+        if (result == CLAIM_FIRST) {
+            loc->cnt.unique_trans += trans;
+        }
         return;
     }
 
@@ -300,8 +310,9 @@ successor (wctx_t *ctx)
                 ndfs_report_cycle (ctx->run, ctx->model, loc->dstack, loc->root);
             }*/
 
+            loc->cnt.union_count ++;
             if (uf_union(shared->uf, loc->root->ref, loc->target->ref)) {
-                loc->cnt.union_count ++;
+                loc->cnt.union_success ++;
             }
 
 
@@ -472,9 +483,16 @@ ufscc_reduce  (run_t *run, wctx_t *ctx)
     counter_t              *reduced = (counter_t *) run->reduced;
     counter_t              *cnt     = &ctx->local->cnt;
 
-    reduced->unique_states_count    += ctx->counters->explored;
+    reduced->unique_trans           += cnt->unique_trans;
+    reduced->trans_tried            += cnt->trans_tried;
+    reduced->unique_states          += cnt->unique_states;
     reduced->scc_count              += cnt->scc_count;
     reduced->self_loop_count        += cnt->self_loop_count;
+    reduced->multiple_claim_count   += cnt->multiple_claim_count;
+    reduced->marked_dead_count      += cnt->marked_dead_count;
+    reduced->union_count            += cnt->union_count;
+    reduced->union_success          += cnt->union_success;
+    reduced->removed_from_list_count+= cnt->removed_from_list_count;
 }
 
 void
@@ -484,11 +502,15 @@ ufscc_print_stats   (run_t *run, wctx_t *ctx)
     uf_alg_shared_t        *shared = (uf_alg_shared_t*) ctx->run->shared;
 
     // SCC statistics
-    Warning(info,"unique states found:   %d", reduced->unique_states_count);
+    Warning(info,"unique states found:   %d", reduced->unique_states);
     Warning(info,"self-loop count:       %d", reduced->self_loop_count);
     //Warning(info,"correct count:         %d", correct_count);
     Warning(info,"scc count:             %d", reduced->scc_count);
-    Warning(info,"avg scc size:          %.3f", ((double)reduced->unique_states_count) / reduced->scc_count);
+    Warning(info,"avg scc size:          %.3f", ((double)reduced->unique_states) / reduced->scc_count);
+    Warning(info,"re-explorations:       %.3f", ((double)run->total.explored) / reduced->unique_states);
+    Warning(info,"re-tried transitions:  %.3f", ((double)reduced->trans_tried) / reduced->unique_trans);
+    Warning(info,"unions:                %.3f (%.3f success)", ((double)reduced->unique_states) / reduced->union_count,
+                                                               ((double)reduced->unique_states) / reduced->union_success);
     Warning(info," ");
 
     //if (ctx->id==0) // TODO: make this more elegant
