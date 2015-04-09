@@ -745,7 +745,7 @@ GBaddPOR (model_t model)
 
     if (leap) {
         // changes POR model (sets modified r/w matrices)
-        ctx->alg = leap_create_context (&pormodel, model, next_all);
+        ctx->leap = leap_create_context (&pormodel, model, next_all);
         GBsetNextStateAll   (pormodel, leap_search_all);
     }
 

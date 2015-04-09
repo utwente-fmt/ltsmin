@@ -556,6 +556,8 @@ bs_emit_dlk_check (model_t model, por_context *pctx, int *src, TransitionCB cb,
     }
 
     bool same = ctx->ss_en_list->count == ctx->por_emitted_list->count;
+    ci_sort (ctx->ss_en_list);
+    ci_sort (ctx->por_emitted_list);
     for (int i = 0; i < ctx->ss_en_list->count && same; i++) {
         same &= (ctx->ss_en_list->data[i] == ctx->por_emitted_list->data[i]);
     }

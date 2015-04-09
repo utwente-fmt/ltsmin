@@ -3,6 +3,7 @@
 
 #include <pins-lib/pins.h>
 #include <pins-lib/pins2pins-por.h>
+#include <pins-lib/por-leap.h>
 #include <util-lib/bitmultiset.h>
 #include <util-lib/util.h>
 
@@ -92,6 +93,7 @@ struct por_ctx {
     int             *nes_score;     // Template for the nes_score
 
     ci_list         *exclude;
+    leap_t          *leap;
 };
 
 /**
