@@ -10,9 +10,8 @@
 #include <util-lib/util.h>
 
 
-typedef struct leap_s {
+struct leap_s {
     next_method_black_t     next_por;
-    void                   *alg;
     size_t                  groups;
     size_t                  slots;
     size_t                  round;
@@ -23,7 +22,7 @@ typedef struct leap_s {
     dfs_stack_t             inout[2];
     void                   *uctx;
     TransitionCB            ucb;
-} leap_t;
+};
 
 static void
 forward_cb (void *context, transition_info_t *ti, int *dst, int *cpy)
@@ -165,7 +164,7 @@ static size_t
 handle_proviso (model_t self, int *src, size_t total)
 {
     por_context        *ctx = ((por_context *)GBgetContext(self));
-    leap_t             *leap = (leap_t *)ctx->alg;
+    leap_t             *leap = ctx->leap;
     // 1 round is taken care of by POR layer
     if ((PINS_LTL && leap->proviso.por_proviso_false_cnt != 0) ||
         (SAFETY && leap->proviso.por_proviso_true_cnt != 0)) {
@@ -180,7 +179,7 @@ int
 leap_search_all (model_t self, int *src, TransitionCB cb, void *uctx)
 {
     por_context        *ctx = ((por_context *)GBgetContext(self));
-    leap_t             *leap = (leap_t *)ctx->alg;
+    leap_t             *leap = ctx->leap;
     size_t              total;
     size_t              stubborn, cross = 1;
     bool                disjoint;
@@ -196,9 +195,7 @@ leap_search_all (model_t self, int *src, TransitionCB cb, void *uctx)
         ci_clear (groups);
 
         por_exclude (ctx, all);
-        ctx->alg = leap->alg;
         stubborn = leap->next_por (self, src, leap_cb, leap);
-        ctx->alg = leap;
         por_exclude (ctx, NULL);
 
         HREassert (!stubborn == 0 || leap->round == 0);
@@ -210,15 +207,13 @@ leap_search_all (model_t self, int *src, TransitionCB cb, void *uctx)
         leap->round++;
     }
 
-    // TODO: visibility
-
     leap->uctx = uctx;
     leap->ucb = cb;
     total = leap_emit (leap, src);
     if (!SAFETY && !PINS_LTL) {
         HREassert (total == cross, "Wrong number of sets %zu, expected %zu (rounds: %zu)",
                    total, cross, leap->round);
-    } else if (leap->round > 1) { // 1 round is taked care of by POR layer
+    } else if (leap->round > 1) { // 1 round is taken care of by POR layer
         total = handle_proviso (self, src, total);
     }
     return total;
@@ -278,7 +273,6 @@ leap_create_context (model_t *por_model, model_t pre_por,
 
     leap_t             *leap = RTmalloc (sizeof(leap_t));
     leap->next_por = next_all;
-    leap->alg = ctx->alg;
     leap->slots = pins_get_state_variable_count (ctx->parent);
     leap->inout[0] = dfs_stack_create (leap->slots);
     leap->inout[1] = dfs_stack_create (leap->slots);
