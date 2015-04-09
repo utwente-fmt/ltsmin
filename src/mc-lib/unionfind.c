@@ -257,8 +257,8 @@ uf_find (const uf_t* uf, ref_t state)
 bool
 uf_sameset (const uf_t* uf, ref_t state_x, ref_t state_y)
 {
+retry:{
     // TODO check if correct
-
     ref_t x_f = uf_find(uf, state_x);
     ref_t y_f = uf_find(uf, state_y);
 
@@ -272,11 +272,13 @@ uf_sameset (const uf_t* uf, ref_t state_x, ref_t state_y)
         atomic_read(&uf->array[x_f].uf_status) == UF_LOCKED ||
         atomic_read(&uf->array[y_f].uf_status) == UF_LOCKED) {
         // if parent got updated, try again
-        return uf_sameset(uf, x_p, y_p);
+        state_x = x_p;
+        state_y = y_p;
+        goto retry;
     }
 
     return x_f == y_f;
-}
+}}
 
 void
 uf_union_aux (const uf_t* uf, ref_t root, ref_t other)
