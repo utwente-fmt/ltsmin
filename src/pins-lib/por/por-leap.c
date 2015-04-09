@@ -2,10 +2,10 @@
 
 #include <stdbool.h>
 
-#include <pins-util.h>
-#include <pins2pins-por.h>
-#include <por-leap.h>
-#include <por-internal.h>
+#include <pins-lib/pins-util.h>
+#include <pins-lib/por/pins2pins-por.h>
+#include <pins-lib/por/por-leap.h>
+#include <pins-lib/por/por-internal.h>
 #include <util-lib/dfs-stack.h>
 #include <util-lib/util.h>
 

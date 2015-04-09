@@ -8,10 +8,10 @@
 #include <hre/user.h>
 #include <ltsmin-lib/ltsmin-standard.h>
 #include <pins-lib/pins.h>
-#include <pins-lib/pins2pins-por.h>
+#include <pins-lib/por/por-deletion.h>
+#include <pins-lib/por/por-internal.h>
+#include <pins-lib/por/pins2pins-por.h>
 #include <pins-lib/pins-util.h>
-#include <pins-lib/por-deletion.h>
-#include <pins-lib/por-internal.h>
 #include <util-lib/bitmultiset.h>
 #include <util-lib/util.h>
 
