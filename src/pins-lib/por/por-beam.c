@@ -11,8 +11,8 @@
 #include <ltsmin-lib/ltsmin-standard.h>
 #include <pins-lib/pins.h>
 #include <pins-lib/pins-util.h>
-#include <pins-lib/por-beam.h>
-#include <pins-lib/por-internal.h>
+#include <pins-lib/por/por-beam.h>
+#include <pins-lib/por/por-internal.h>
 #include <util-lib/bitmultiset.h>
 #include <util-lib/util.h>
 

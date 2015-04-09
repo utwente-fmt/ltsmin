@@ -2,9 +2,9 @@
 
 #include <stdbool.h>
 
-#include <pins2pins-por.h>
-#include <por-ample.h>
-#include <por-internal.h>
+#include <pins-lib/por/pins2pins-por.h>
+#include <pins-lib/por/por-ample.h>
+#include <pins-lib/por/por-internal.h>
 
 
 /**
