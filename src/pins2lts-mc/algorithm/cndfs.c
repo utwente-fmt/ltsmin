@@ -21,6 +21,38 @@ typedef enum cndfs_stack_e {
     INVOL   = 2, // involatile state
 } cndfs_stack_t;
 
+typedef enum cndfs_color_e {
+    CWHITE  = 0,
+    CCYAN   = 1,
+    CBLUE   = 2,
+    CRED    = 3
+} cndfs_color_t;
+
+static int
+update_color (wctx_t *ctx, ref_t ref, uint32_t color, int check)
+{
+    alg_local_t        *loc = ctx->local;
+    uint32_t old = state_store_get_colors (ref) & 3;
+    if (old >= color)
+        return 0;
+    int success = state_store_try_set_colors (ref, 2 + loc->rec_bits, old, color);
+    if (!success && check)
+        return update_color (ctx, ref, color, check); // tail-call: can happen max 3 times
+    return success;
+}
+
+static inline void
+set_all_red2 (wctx_t *ctx, state_info_t *state)
+{
+    if (update_color(ctx, state->ref, CRED, 1)) {
+        ctx->local->counters.allred++;
+        if ( GBbuchiIsAccepting(ctx->model, state_info_state(state)) )
+            ctx->local->counters.accepting++; /* count accepting states */
+    } else {
+        ctx->local->red.allred++;
+    }
+}
+
 static inline size_t
 pred (wctx_t *ctx, cndfs_stack_t idx) { if (ctx->counters->level_cur == 0) return idx;
                                  return ((ctx->counters->level_cur - 1) << 2) | idx; }
@@ -67,10 +99,10 @@ endfs_handle_dangerous (wctx_t *ctx)
         state_info_deserialize (ctx->state, state_data);
         if ( !state_store_has_color(ctx->state->ref, GDANGEROUS, loc->rec_bits) &&
               ctx->state->ref != loc->seed->ref )
-            if (state_store_try_color(ctx->state->ref, GRED, loc->rec_bits))
+            if (update_color(ctx, ctx->state->ref, CRED, 1))
                 loc->red_work.explored++;
     }
-    if (state_store_try_color(loc->seed->ref, GRED, loc->rec_bits)) {
+    if (update_color(ctx, ctx->state->ref, CRED, 1)) {
         loc->red_work.explored++;
         loc->counters.accepting++;
     }
@@ -96,7 +128,7 @@ cndfs_handle_nonseed_accepting (wctx_t *ctx)
             for (size_t i = 0; i < accs; i++) {
                 raw_data_t state_data = dfs_stack_peek (cloc->out_stack, i);
                 state_info_deserialize (ctx->state, state_data);
-                if (!state_store_has_color(ctx->state->ref, GRED, loc->rec_bits))
+                if (state_store_get_colors (ctx->state->ref) != CRED)
                     nonred++;
             }
         }
@@ -107,7 +139,7 @@ cndfs_handle_nonseed_accepting (wctx_t *ctx)
     while ( dfs_stack_size(cloc->in_stack) ) {
         raw_data_t state_data = dfs_stack_pop (cloc->in_stack);
         state_info_deserialize (ctx->state, state_data);
-        if (state_store_try_color(ctx->state->ref, GRED, loc->rec_bits))
+        if (update_color(ctx, ctx->state->ref, CRED, 1))
             loc->red_work.explored++;
     }
 }
@@ -127,11 +159,11 @@ endfs_handle_red (void *arg, state_info_t *successor, transition_info_t *ti, int
     /* Mark states dangerous if necessary */
     if ( Strat_ENDFS == loc->strat &&
          GBbuchiIsAccepting(ctx->model, state_info_state(successor)) &&
-         !state_store_has_color(successor->ref, GRED, loc->rec_bits) )
+         state_store_get_colors (successor->ref) != CRED )
         state_store_try_color(successor->ref, GDANGEROUS, loc->rec_bits);
 
     if ( !nn_color_eq(color, NNPINK) &&
-         !state_store_has_color(successor->ref, GRED, loc->rec_bits) ) {
+         state_store_get_colors (ctx->state->ref) != CRED ) {
         raw_data_t stack_loc = dfs_stack_push (loc->stack, NULL);
         state_info_serialize (successor, stack_loc);
     }
@@ -284,7 +316,7 @@ check_cndfs_proviso (wctx_t *ctx)
     bool no_cycle = bitvector_is_set (&loc->stackbits, cur(ctx,NOCYCLE));
     cndfs_proviso_t prov = no_cycle ? VOLATILE : INVOLATILE;
 
-    int success = state_store_try_set_colors (ctx->state->ref, 2, 0, UNKNOWN, prov);
+    int success = state_store_try_set_counters (ctx->state->ref, 2, UNKNOWN, prov);
     if (( success && prov == INVOLATILE) ||
         (!success && state_store_get_wip(ctx->state->ref) == INVOLATILE)) {
         bitvector_set (&loc->stackbits, cur(ctx,INVOL));
@@ -306,7 +338,7 @@ endfs_red (wctx_t *ctx)
             state_info_deserialize (ctx->state, state_data);
             nndfs_color_t color = nn_get_color (&loc->color_map, ctx->state->ref);
             if ( !nn_color_eq(color, NNPINK) &&
-                 !state_store_has_color(ctx->state->ref, GRED, loc->rec_bits) ) {
+                  state_store_get_colors (ctx->state->ref) != CRED ) {
                 nn_set_color (&loc->color_map, ctx->state->ref, NNPINK);
                 bitvector_unset (&loc->stackbits, cur(ctx,INVOL));
                 dfs_stack_push (cloc->in_stack, state_data);
@@ -369,18 +401,19 @@ endfs_blue (run_t *run, wctx_t *ctx)
         raw_data_t          state_data = dfs_stack_top (loc->stack);
         if (NULL != state_data) {
             state_info_deserialize (ctx->state, state_data);
-            state_store_try_color (loc->seed->ref, GDANGEROUS, loc->rec_bits);
             nndfs_color_t color = nn_get_color (&loc->color_map, ctx->state->ref);
+            uint32_t global_color = state_store_get_colors (ctx->state->ref);
             if ( !nn_color_eq(color, NNCYAN) && !nn_color_eq(color, NNBLUE) &&
-                 !state_store_has_color(ctx->state->ref, GGREEN, loc->rec_bits) ) {
+                  global_color < CBLUE ) {
+                if (global_color == CWHITE)
+                    update_color (ctx, ctx->state->ref, CCYAN, 0);
                 if (all_red)
                     bitvector_set (&loc->stackbits, cur(ctx,REDALL));
                 bitvector_unset (&loc->stackbits, cur(ctx,INVOL));
                 nn_set_color (&loc->color_map, ctx->state->ref, NNCYAN);
                 endfs_explore_state_blue (ctx);
             } else {
-                if ( all_red && ctx->counters->level_cur != 0 &&
-                     !state_store_has_color(ctx->state->ref, GRED, loc->rec_bits) )
+                if ( all_red && ctx->counters->level_cur != 0 && global_color != CRED )
                     bitvector_unset (&loc->stackbits, pred(ctx,REDALL));
                 dfs_stack_pop (loc->stack);
             }
@@ -399,12 +432,12 @@ endfs_blue (run_t *run, wctx_t *ctx)
             }
 
             /* Mark state GGREEN on backtrack */
-            state_store_try_color (loc->seed->ref, GGREEN, loc->rec_bits);
+            update_color (ctx, loc->seed->ref, CBLUE, 1);
             nn_set_color (&loc->color_map, loc->seed->ref, NNBLUE);
             if ( all_red && bitvector_is_set(&loc->stackbits, cur(ctx,REDALL)) ) {
                 /* all successors are red */
                 //permute_trans (loc->permute, ctx->state, check, ctx);
-                set_all_red (ctx, loc->seed);
+                set_all_red2 (ctx, loc->seed);
             } else if ( GBbuchiIsAccepting(ctx->model, state_info_state(loc->seed)) ) {
                 sm->work = loc->seed->ref;
                 endfs_red (ctx);
@@ -601,9 +634,9 @@ cndfs_state_seen (void *ptr, transition_info_t *ti, ref_t ref, int seen)
     seen = seen && !nn_color_eq(nn_get_color(&ctx->local->color_map, ref), NNWHITE);
     if (seen) return 1;
 
-    int other = state_store_has_color(ref, GDANGEROUS, loc->rec_bits) != 0;
+    uint32_t old = state_store_get_colors (ref) & 3;
 
-    return -other;
+    return -(old == CCYAN);
     (void) ti;
 }
 

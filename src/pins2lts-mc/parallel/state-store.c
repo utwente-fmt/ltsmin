@@ -274,11 +274,27 @@ state_store_get_wip (ref_t ref)
             & global->store->count_mask;
 }
 
+uint32_t
+state_store_get_colors (ref_t ref)
+{
+    return global->store->get_sat_bits (global->store->dbs, ref)
+            >> global->store->count_bits;
+}
+
 int
-state_store_try_set_colors (ref_t ref, size_t bits, size_t offs,
+state_store_try_set_counters (ref_t ref, size_t bits,
+                              uint64_t old_val, uint64_t new_val)
+{
+    return global->store->try_set_sat_bits (global->store->dbs, ref, bits, 0,
+                                            old_val, new_val);
+}
+
+int
+state_store_try_set_colors (ref_t ref, size_t bits,
                             uint64_t old_val, uint64_t new_val)
 {
-    return global->store->try_set_sat_bits (global->store->dbs, ref, bits, offs,
+    return global->store->try_set_sat_bits (global->store->dbs, ref, bits,
+                                            global->store->count_bits,
                                             old_val, new_val);
 }
 
