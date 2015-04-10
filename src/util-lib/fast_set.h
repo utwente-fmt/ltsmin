@@ -21,10 +21,15 @@ typedef struct fset_s fset_t;
 
 extern size_t   fset_count  (fset_t *dbs);
 
+extern size_t   fset_max_load(fset_t *dbs);
+
 extern int      fset_find   (fset_t *dbs, hash32_t *h, void *key, void **data,
                              bool insert_absent);
 
 extern bool     fset_delete (fset_t *dbs, hash32_t *mem, void *key);
+
+extern bool     fset_delete_get_data (fset_t *dbs, hash32_t *mem, void *key,
+                                      void **data);
 
 extern void     fset_clear  (fset_t *dbs);
 
