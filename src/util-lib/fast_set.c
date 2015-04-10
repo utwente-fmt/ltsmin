@@ -26,6 +26,7 @@ struct fset_s {
     void               *data;
     mem_hash_t         *todo;
     void               *todo_data;
+    void               *delled_data;
     size_t              load;
     size_t              tombs;
     size_t              lookups;
@@ -215,8 +216,8 @@ fset_find_loc (fset_t *dbs, mem_hash_t mem, void *key, size_t *ref,
     return FSET_FULL;
 }
 
-bool
-fset_delete (fset_t *dbs, mem_hash_t *mem, void *key)
+static inline bool
+internal_delete (fset_t *dbs, mem_hash_t *mem, void *key, void **data)
 {
     size_t              ref;
     size_t              k = dbs->key_length;
@@ -229,14 +230,36 @@ fset_delete (fset_t *dbs, mem_hash_t *mem, void *key)
     *memoized(dbs,ref) = TOMB;
     dbs->tombs++;
     dbs->load--;
+
+    *data = bucket(dbs, dbs->data, ref) + k;
+
     if (dbs->load < dbs->size >> 3 && dbs->size != dbs->init_size) {
+        memcpy (dbs->delled_data, *data, dbs->data_length);
+        *data = dbs->delled_data;
+
         bool res = resize (dbs, SHRINK);                // <12.5% keys ==> shrink
         HREassert (res, "Cannot shrink table?");
     } else if (dbs->tombs << 1 > dbs->size) {
+        memcpy (dbs->delled_data, *data, dbs->data_length);
+        *data = dbs->delled_data;
+
         bool res = resize (dbs, REHASH);                // >50% tombs ==> rehash
         HREassert (res, "Cannot rehash table?");
     }
     return true;
+}
+
+bool
+fset_delete_get_data (fset_t *dbs, mem_hash_t *mem, void *key, void **data)
+{
+    return internal_delete (dbs, mem, key, data);
+}
+
+bool
+fset_delete (fset_t *dbs, mem_hash_t *mem, void *key)
+{
+    void *data;
+    return internal_delete (dbs, mem, key, &data);
 }
 
 int
@@ -286,6 +309,12 @@ fset_count (fset_t *dbs)
     return dbs->load;
 }
 
+size_t
+fset_max_load (fset_t *dbs)
+{
+    return dbs->max_load;
+}
+
 void
 fset_clear (fset_t *dbs)
 {
@@ -318,6 +347,7 @@ fset_create (size_t key_length, size_t data_length, size_t init_size,
     }
     dbs->hash = RTalignZero (CACHE_LINE_SIZE, sizeof(mem_hash_t) * dbs->size_max);
     dbs->todo = RTalign (CACHE_LINE_SIZE, 2 * sizeof(mem_hash_t) * dbs->size_max);
+    dbs->delled_data = RTalign (CACHE_LINE_SIZE, data_length);
     dbs->init_size = 1UL<<init_size;
     dbs->init_size3 = dbs->init_size * 3;
     dbs->size = dbs->init_size;
