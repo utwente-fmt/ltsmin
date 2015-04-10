@@ -137,7 +137,7 @@ state_store_init (model_t model, bool timed)
     store->local_bits = 0;
     while (Strat_None != strategy[i] && i < MAX_STRATEGIES) {
         store->global_bits += num_global_bits (strategy[i]);
-        store->local_bits += (~Strat_DFSFIFO & Strat_LTL & strategy[i++] ? 2 : 0);
+        store->local_bits += (~Strat_DFSFIFO & Strat_LTL & ~Strat_CNDFS & strategy[i++] ? 2 : 0);
     }
     store->count_bits = (Strat_LNDFS == strategy[i - 1] ? ceil (log2 (W + 1)) :
             (Strat_CNDFS == strategy[i - 1] && PINS_POR ? 2 : 0) );

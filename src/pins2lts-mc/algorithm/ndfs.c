@@ -195,19 +195,23 @@ void
 ndfs_local_init   (run_t *run, wctx_t *ctx)
 {
     ctx->local = RTmallocZero (sizeof(alg_local_t));
+
     ndfs_local_setup (run, ctx);
+
+    size_t              local_bits = 2;
+    alg_local_t        *loc = ctx->local;
+    int res = bitvector_create (&loc->color_map, local_bits<<dbs_size);
+    HREassert (res != -1, "Failure to allocate a color_map bitvector.");
 }
 
 void
 ndfs_local_setup   (run_t *run, wctx_t *ctx)
 {
     alg_local_t        *loc = ctx->local;
-    size_t              local_bits = 2;
-    int res = bitvector_create (&loc->color_map, local_bits<<dbs_size);
-    HREassert (res != -1, "Failure to allocate a color_map bitvector.");
-    if (all_red)
-        res = bitvector_create (&loc->stackbits, MAX_STACK);
-    HREassert (res != -1, "Failure to allocate a all_red bitvector.");
+    if (all_red) {
+        int res = bitvector_create (&loc->stackbits, MAX_STACK);
+        HREassert (res != -1, "Failure to allocate a all_red bitvector.");
+    }
     loc->rec_bits = 0;
     loc->strat = get_strategy (run->alg);
     loc->seed = state_info_create ();
