@@ -19,11 +19,10 @@ int
 num_global_bits (strategy_t s)
 {
     return (Strat_ENDFS  & s ? 3 :
-           ((Strat_DFSFIFO) & s ? 2 :
-           ((Strat_CNDFS) & s ? 3 :
+           ((Strat_CNDFS | Strat_DFSFIFO) & s ? 2 :
            ((Strat_LNDFS | Strat_OWCTY | Strat_TA) & s ? 1 :
            ((Strat_TARJAN | Strat_UFSCC | Strat_RENAULT ) & s ? 1 :
-           ((Strat_DFS & s) && proviso == Proviso_Stack ? 1 : 0) )))));
+           ((Strat_DFS & s) && proviso == Proviso_Stack ? 1 : 0) ))));
 }
 
 /*************************************************************************/
