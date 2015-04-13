@@ -23,7 +23,7 @@ struct ample_ctx_s {
 };
 
 static inline size_t
-ample_emit (por_context *ctx, ci_list *list, int *src, proviso_t *provctx)
+ample_emit (por_context *ctx, ci_list *list, int *src, prov_t *provctx)
 {
     size_t emitted = 0;
     for (int j = 0; j < list->count; j++) {
@@ -55,7 +55,7 @@ ample_search_all (model_t self, int *src, TransitionCB cb, void *uctx)
     }
     HREassert (p <= ample->num_procs);
 
-    proviso_t provctx = {cb, uctx, 0, 0, 0};
+    prov_t provctx = {cb, uctx, 0, 0, 0};
     for (size_t p = 0; p < ample->num_procs; p++) {
         process_t          *proc = &ample->procs[p];
 

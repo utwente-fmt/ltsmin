@@ -802,7 +802,7 @@ por_exclude (por_context *ctx, ci_list *groups)
 void
 hook_cb (void *context, transition_info_t *ti, int *dst, int *cpy)
 {
-    proviso_t *infoctx = (proviso_t *)context;
+    prov_t *infoctx = (prov_t *)context;
     transition_info_t ti_new = GB_TI (ti->labels, ti->group);
     ti_new.por_proviso = infoctx->force_proviso_true;
     infoctx->cb(infoctx->user_context, &ti_new, dst, cpy);

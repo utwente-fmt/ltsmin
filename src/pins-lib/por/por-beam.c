@@ -192,7 +192,7 @@ select_group (por_context* ctx, search_context_t *s, int group)
 }
 
 static inline int
-emit_all (por_context *ctx, ci_list *list, proviso_t *provctx, int *src)
+emit_all (por_context *ctx, ci_list *list, prov_t *provctx, int *src)
 {
     int c = 0;
     for (int z = 0; z < list->count; z++) {
@@ -203,7 +203,7 @@ emit_all (por_context *ctx, ci_list *list, proviso_t *provctx, int *src)
 }
 
 static inline int
-emit_new (por_context *ctx, ci_list *list, proviso_t *provctx, int *src)
+emit_new (por_context *ctx, ci_list *list, prov_t *provctx, int *src)
 {
     beam_t             *beam = (beam_t *) ctx->alg;
     search_context_t   *s = beam->search[0];
@@ -632,13 +632,13 @@ beam_emit (por_context* ctx, int* src, TransitionCB cb, void* uctx)
     if (ctx->enabled_list->count <= 1 ||
             s->enabled->count >= ctx->enabled_list->count) {
         // return all enabled
-        proviso_t provctx = {cb, uctx, 0, 0, 1};
+        prov_t provctx = {cb, uctx, 0, 0, 1};
         emitted = emit_all (ctx, ctx->enabled_list, &provctx, src);
     } else if (!PINS_LTL && !SAFETY) { // deadlocks are easy:
-        proviso_t provctx = {cb, uctx, 0, 0, 1};
+        prov_t provctx = {cb, uctx, 0, 0, 1};
         emitted = emit_new (ctx, s->enabled, &provctx, src);
     } else { // otherwise enforce that all por_proviso flags are true
-        proviso_t provctx = {cb, uctx, 0, 0, 0};
+        prov_t provctx = {cb, uctx, 0, 0, 0};
 
         search_context_t   *s = beam->search[0];
         provctx.force_proviso_true = !NO_L12 && !NO_V && check_L2_proviso(ctx, s);
@@ -665,11 +665,6 @@ beam_emit (por_context* ctx, int* src, TransitionCB cb, void* uctx)
         }
     }
     return emitted;
-}
-
-static int score_cmp (const void *a, const void *b, void *arg) {
-    return beam_cmp((search_context_t *)a, (search_context_t *)b);
-    (void) arg;
 }
 
 /**
