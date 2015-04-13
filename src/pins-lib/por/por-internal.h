@@ -112,7 +112,7 @@ typedef struct proviso_s {
     int             por_proviso_true_cnt;
     int             por_proviso_false_cnt;
     int             force_proviso_true;     // feedback to algorithm that proviso already holds
-} proviso_t;
+} prov_t;
 
 extern void hook_cb (void *context, transition_info_t *ti, int *dst, int *cpy);
 

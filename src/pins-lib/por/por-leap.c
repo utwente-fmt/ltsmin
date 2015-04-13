@@ -15,7 +15,7 @@ struct leap_s {
     size_t                  groups;
     size_t                  slots;
     size_t                  round;
-    proviso_t               proviso;
+    prov_t                  proviso;
     bool                    visible;
     ci_list               **lists;
     por_context            *por;

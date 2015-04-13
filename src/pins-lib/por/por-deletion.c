@@ -318,7 +318,7 @@ deletion_analyze (por_context *ctx, ci_list *delete)
 }
 
 static inline int
-deletion_emit_new (por_context *ctx, proviso_t *provctx, int* src)
+deletion_emit_new (por_context *ctx, prov_t *provctx, int* src)
 {
     del_ctx_t       *delctx = (del_ctx_t *) ctx->alg;
     bms_t           *del = delctx->del;
@@ -347,7 +347,7 @@ deletion_emit (model_t model, por_context *ctx, int *src, TransitionCB cb,
 {
     del_ctx_t          *delctx = (del_ctx_t *) ctx->alg;
     bms_t              *del = delctx->del;
-    proviso_t provctx = {cb, uctx, 0, 0, 0};
+    prov_t              provctx = {cb, uctx, 0, 0, 0};
 
     if (PINS_LTL || SAFETY) {
         if (NO_L12) {
