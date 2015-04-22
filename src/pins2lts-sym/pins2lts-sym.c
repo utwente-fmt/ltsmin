@@ -2489,7 +2489,7 @@ reach_sat_like(reach_proc_t reach_proc, vset_t visited,
             continue;
         }
 
-        Warning(info, "Saturating level: %d", k);
+        Warning(infoLong, "Saturating level: %d", k);
         vset_copy(old_vis, visited);
         reach_proc(visited, prev_vis[k], &groups[k], eg_count, next_count,guard_count);
         if (save_sat_levels) vset_copy(prev_vis[k], visited);
@@ -2530,7 +2530,7 @@ reach_sat_loop(reach_proc_t reach_proc, vset_t visited,
         vset_copy(old_vis, visited);
         for (int k = 0; k < max_sat_levels; k++) {
             if (empty_groups[k]) continue;
-            Warning(info, "Saturating level: %d", k);
+            Warning(infoLong, "Saturating level: %d", k);
             reach_proc(visited, prev_vis[k], &groups[k], eg_count, next_count,guard_count);
             if (save_sat_levels) vset_copy(prev_vis[k], visited);
         }
