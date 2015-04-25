@@ -15,8 +15,8 @@ extern ltsmin_expr_t parse_file(const char *file, parse_f parser, model_t model)
 extern ltsmin_expr_t parse_file_env(const char *file, parse_f parser,
                                     model_t model, ltsmin_parse_env_t env);
 
-/* mark touched variables in a state-sized array */
-extern void mark_predicate(model_t m, ltsmin_expr_t e, int *dep, ltsmin_parse_env_t env);
+/* mark touched variables in a state-sized array, returns 1s in *dep */
+extern int mark_predicate(model_t m, ltsmin_expr_t e, int *dep, ltsmin_parse_env_t env);
 
 /* mark all groups that WRITE to a variable influencing the expression */
 extern void mark_visible(model_t model, ltsmin_expr_t e, ltsmin_parse_env_t env);
