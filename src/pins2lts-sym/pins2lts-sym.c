@@ -1488,6 +1488,21 @@ learn_guards(vset_t states, long *guard_count) {
         for (int g = 0; g < nGuards; g++) SYNC(eval_guard);
 }
 
+static inline void
+learn_guards_par(vset_t states, long *guard_count)
+{
+    LACE_ME;
+    if (GBgetUseGuards(model)) {
+        for (int g = 0; g < nGuards; g++) {
+            if (guard_count != NULL) (*guard_count)++;
+            SPAWN(eval_guard, g, states);
+        }
+    }
+    if (GBgetUseGuards(model)) {
+        for (int g = 0; g < nGuards; g++) SYNC(eval_guard);
+    }
+}
+
 static void
 reach_chain_stop() {
     if (!no_exit && ErrorActions > 0) {
@@ -1976,7 +1991,7 @@ reach_par(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
                 vset_copy(root->container, visited);
                 for (int i=0; i<c; i++) if (dm_is_set(inhibit_matrix,i,c)) vset_minus(root->container, class_enabled[i]);
                 // evaluate all guards
-                learn_guards(root->container, guard_count);
+                learn_guards_par(root->container, guard_count);
                 // set ancestors to container
                 vset_copy(root->ancestors, root->container);
                 // carry over root->deadlocks from previous iteration
@@ -2009,7 +2024,7 @@ reach_par(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
             // set container to current level
             vset_copy(root->container, visited);
             // evaluate all guards
-            learn_guards(root->container, guard_count);
+            learn_guards_par(root->container, guard_count);
             // set ancestors to container
             if (root->ancestors != NULL) vset_copy(root->ancestors, visited);
             // call next function
@@ -2090,7 +2105,7 @@ reach_par_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
                 vset_copy(root->container, current_level);
                 for (int i=0; i<c; i++) if (dm_is_set(inhibit_matrix,i,c)) vset_minus(root->container, class_enabled[i]);
                 // evaluate all guards
-                learn_guards(root->container, guard_count);
+                learn_guards_par(root->container, guard_count);
                 // set ancestors to container
                 vset_copy(root->ancestors, root->container);
                 // carry over root->deadlocks from previous iteration
@@ -2121,7 +2136,7 @@ reach_par_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
             // set container to current level
             vset_copy(root->container, current_level);
             // evaluate all guards
-            learn_guards(root->container, guard_count);
+            learn_guards_par(root->container, guard_count);
             // set ancestors to container
             if (root->ancestors != NULL) vset_copy(root->ancestors, current_level);
             // call next function
