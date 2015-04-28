@@ -24,6 +24,7 @@
 #include <pins-lib/pins.h>
 #include <pins-lib/pins-impl.h>
 #include <pins-lib/property-semantics.h>
+#include <pins-lib/pins-util.h>
 #include <ltsmin-lib/ltsmin-standard.h>
 #include <ltsmin-lib/ltsmin-syntax.h>
 #include <ltsmin-lib/ltsmin-tl.h>
@@ -49,7 +50,8 @@ static char* trc_output = NULL;
 static char* trc_type   = "gcf";
 static int   dlk_detect = 0;
 static char* act_detect = NULL;
-static char* inv_detect = NULL;
+static char** inv_detect = NULL;
+static int   num_inv = 0;
 static int   no_exit = 0;
 static int   no_matrix = 0;
 static int   no_soundness_check = 0;
@@ -81,6 +83,8 @@ static int min_priority = INT_MAX;
 static int max_priority = INT_MIN;
 static vset_t true_states;
 static vset_t false_states;
+static int inv_par = 0;
+static int inv_bin_par = 0;
 
 /*
   The inhibit and class matrices are used for maximal progress.
@@ -137,6 +141,9 @@ static si_map_entry GUIDED[] = {
     {NULL, 0}
 };
 
+static const char invariant_long[]="invariant";
+#define IF_LONG(long) if(((opt->longName)&&!strcmp(opt->longName,long)))
+
 static void
 reach_popt(poptContext con, enum poptCallbackReason reason,
                const struct poptOption * opt, const char * arg, void * data)
@@ -179,10 +186,21 @@ reach_popt(poptContext con, enum poptCallbackReason reason,
         if (trc_output != NULL && !dlk_detect && act_detect == NULL && HREme(HREglobal())==0)
             Warning(info, "Ignoring trace output");
 
+        if (inv_bin_par == 1 && inv_par == 0) {
+            Warning(error, "--inv-bin-par requires --inv-par");
+            HREexitUsage(LTSMIN_EXIT_FAILURE);
+        }
+
         return;
     }
     case POPT_CALLBACK_REASON_OPTION:
-        Abort("unexpected call to reach_popt");
+        IF_LONG(invariant_long) {
+            num_inv++;
+            inv_detect = (char**) RTrealloc(inv_detect, sizeof(char*) * num_inv);
+            inv_detect[num_inv - 1] = (char*) RTmalloc(strlen(arg) + 1);
+            memcpy(inv_detect[num_inv - 1], arg, strlen(arg) + 1);
+        }
+        return;
     }
 }
 
@@ -194,15 +212,17 @@ POPT_TABLEEND
 };
 
 static  struct poptOption options[] = {
-    { NULL, 0 , POPT_ARG_CALLBACK|POPT_CBFLAG_POST|POPT_CBFLAG_SKIPOPTION , (void*)reach_popt , 0 , NULL , NULL },
+    { NULL, 0 , POPT_ARG_CALLBACK|POPT_CBFLAG_POST , (void*)reach_popt , 0 , NULL , NULL },
     { "order" , 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &order , 0 , "set the exploration strategy to a specific order" , "<bfs-prev|bfs|chain-prev|chain|par-prev|par>" },
+    { "inv-par", 0, POPT_ARG_VAL, &inv_par, 1, "parallelize invariant detection", NULL },
+    { "inv-bin-par", 0, POPT_ARG_VAL, &inv_bin_par, 1, "also parallelize every binary operand, may be slow when lots of state labels are to be evaluated (requires --inv-par)", NULL },
     { "saturation" , 0, POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &saturation , 0 , "select the saturation strategy" , "<none|sat-like|sat-loop|sat-fix|sat>" },
     { "sat-granularity" , 0 , POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &sat_granularity , 0 , "set saturation granularity","<number>" },
     { "save-sat-levels", 0, POPT_ARG_VAL, &save_sat_levels, 1, "save previous states seen at saturation levels", NULL },
     { "guidance", 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &guidance, 0 , "select the guided search strategy" , "<unguided|directed>" },
     { "deadlock" , 'd' , POPT_ARG_VAL , &dlk_detect , 1 , "detect deadlocks" , NULL },
     { "action" , 0 , POPT_ARG_STRING , &act_detect , 0 , "detect action prefix" , "<action prefix>" },
-    { "invariant", 'i', POPT_ARG_STRING, &inv_detect, 1, "detect invariant violations", NULL },
+    { invariant_long , 'i' , POPT_ARG_STRING , NULL , 0, "detect invariant violations (can be given multiple times)", NULL },
     { "no-exit", 'n', POPT_ARG_VAL, &no_exit, 1, "no exit on error, just count (for error counters use -v)", NULL },
     { "trace" , 0 , POPT_ARG_STRING , &trc_output , 0 , "file to write trace to" , "<lts-file>" },
     { "type", 0, POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT, &trc_type, 0, "trace type to write", "<aut|gcd|gcf|dir|fsm|bcg>" },
@@ -239,7 +259,7 @@ static int nGrps;
 static int max_sat_levels;
 static proj_info *r_projs = NULL;
 static proj_info *w_projs = NULL;
-static proj_info *g_projs;
+static proj_info *l_projs = NULL;
 static vdom_t domain;
 static vset_t *levels = NULL;
 static int max_levels = 0;
@@ -252,9 +272,30 @@ static model_t model;
 static vrel_t *group_next;
 static vset_t *group_explored;
 static vset_t *group_tmp;
-static vset_t *guard_false; // 0
-static vset_t *guard_true;  // 1
-static vset_t *guard_tmp;
+static vset_t *label_false; // 0
+static vset_t *label_true;  // 1
+static vset_t *label_tmp;
+
+struct inv_check_s
+{
+    vset_t container;
+    struct inv_check_s* left;
+    struct inv_check_s* right;
+    double num_states;
+};
+
+struct inv_check_s** inv_expr_info = NULL;
+
+static int* label_locks = NULL;
+
+static ltsmin_parse_env_t* inv_parse_env;
+static ltsmin_expr_t* inv_expr;
+static proj_info* inv_proj = NULL;
+static vset_t* inv_set = NULL;
+static int* inv_violated = NULL;
+static int num_inv_violated = 0;
+static int num_inv_sl_used = 0;
+static int* inv_state_labels = NULL;
 
 typedef void (*reach_proc_t)(vset_t visited, vset_t visited_old,
                              bitvector_t *reach_groups,
@@ -339,7 +380,7 @@ reduce(int group, vset_t set)
     if (GBgetUseGuards(model)) {
         guard_t* guards = GBgetGuard(model, group);
         for (int g = 0; g < guards->count && !vset_is_empty(set); g++) {
-            vset_join(set, set, guard_true[guards->guard[g]]);
+            vset_join(set, set, label_true[guards->guard[g]]);
         }
     }
 }
@@ -604,19 +645,19 @@ find_action(int* src, int* dst, int* cpy, int group, char* action)
     find_trace(trace_end, 2, global_level, levels, action);
 }
 
-struct guard_add_info
+struct label_add_info
 {
-    int guard; // guard number being evaluated
-    int result; // desired result of the guard
+    int label; // label number being evaluated
+    int result; // desired result of the label
 };
 
 static void eval_cb (vset_t set, void *context, int *src)
 {
-    // evaluate the guard
-    int result = GBgetStateLabelShort(model, ((struct guard_add_info*)context)->guard, src);
+    // evaluate the label
+    int result = GBgetStateLabelShort(model, ((struct label_add_info*)context)->label, src);
 
     // add to the correct set dependening on the result
-    int dresult = ((struct guard_add_info*)context)->result;
+    int dresult = ((struct label_add_info*)context)->result;
     if (
             dresult == result ||  // we have true or false (just add)
             (dresult == 0 && result == 2) ||  // always add maybe to false
@@ -626,42 +667,427 @@ static void eval_cb (vset_t set, void *context, int *src)
     }
 }
 
-#define eval_guard(g, s) CALL(eval_guard, (g), (s))
-VOID_TASK_2(eval_guard, int, guard, vset_t, set)
+#define eval_label(l, s) CALL(eval_label, (l), (s))
+VOID_TASK_2(eval_label, int, label, vset_t, set)
 {
     // get the short vectors we need to evaluate
     // minus what we have already evaluated
-    vset_project_minus(guard_tmp[guard], set, guard_false[guard]);
-    vset_minus(guard_tmp[guard], guard_true[guard]);
+    vset_project_minus(label_tmp[label], set, label_false[label]);
+    vset_minus(label_tmp[label], label_true[label]);
 
     // count when verbose
     if (log_active(infoLong)) {
         double elem_count;
-        vset_count(guard_tmp[guard], NULL, &elem_count);
+        vset_count(label_tmp[label], NULL, &elem_count);
         if (elem_count >= 10000.0 * SPEC_REL_PERF) {
-            Print(infoLong, "expanding guard %d for %.*g states.", DBL_DIG, guard, elem_count);
+            Print(infoLong, "expanding label %d for %.*g states.", label, DBL_DIG, elem_count);
         }
     }
 
-    // we evaluate guards twice, because we can not yet add to two different sets.
-    struct guard_add_info ctx_false;
+    // we evaluate labels twice, because we can not yet add to two different sets.
+    struct label_add_info ctx_false;
 
-    ctx_false.guard = guard;
+    ctx_false.label = label;
     ctx_false.result = 0;
 
-    // evaluate guards and add to guard_false[guard] when false
-    vset_update(guard_false[guard], guard_tmp[guard], eval_cb, &ctx_false);
+    // evaluate labels and add to label_false[guard] when false
+    vset_update(label_false[label], label_tmp[label], eval_cb, &ctx_false);
 
-    struct guard_add_info ctx_true;
+    struct label_add_info ctx_true;
 
-    ctx_true.guard = guard;
+    ctx_true.label = label;
     ctx_true.result = 1;
 
-    // evaluate guards and add to guard_true[guard] when true
-    vset_update(guard_true[guard], guard_tmp[guard], eval_cb, &ctx_true);
+    // evaluate labels and add to label_true[label] when true
+    vset_update(label_true[label], label_tmp[label], eval_cb, &ctx_true);
 
-    vset_clear(guard_tmp[guard]);
+    vset_clear(label_tmp[label]);
 }
+
+#define eval_predicate_set_par(e, env, c, s) CALL(eval_predicate_set_par, (e), (env), (c), (s))
+VOID_TASK_4(eval_predicate_set_par, ltsmin_expr_t, e, ltsmin_parse_env_t, env, struct inv_check_s*, c, vset_t, states)
+{
+    switch (e->token) {
+        case PRED_TRUE: {
+            // do nothing (c->container already contains everything)
+        } break;
+        case PRED_FALSE: {
+            vset_clear(c->container);
+        } break;
+        case PRED_SVAR: {
+            if (e->idx < N) { // state variable
+                Abort("Unhandled PRED_SVAR");
+            } else { // state label
+                vset_join(c->container, c->container, label_true[e->idx - N]);
+            }
+        } break;
+        case PRED_EQ: {
+            vset_join(c->container, c->container, c->left->container);
+        } break;
+        case PRED_NOT: {
+            if (c->right != NULL) { // perform faster set minus for PRED_SVAR
+                /* following line is necessary, because we can't project
+                 * to a projected set. */
+                vset_project(c->right->container, states);
+                vset_minus(c->right->container, c->left->left->container);
+                vset_join(c->container, c->container, c->right->container);
+                vset_clear(c->right->container);
+            } else {
+                vset_copy(c->left->container, c->container);
+                eval_predicate_set_par(e->arg1, env, c->left, states);
+                vset_minus(c->container, c->left->container);
+                vset_clear(c->left->container);
+            }
+        } break;
+        case PRED_AND: {
+            vset_copy(c->left->container, c->container);
+            SPAWN(eval_predicate_set_par, e->arg1, env, c->left, states);
+            vset_copy(c->right->container, c->container);
+            vset_clear(c->container);
+            eval_predicate_set_par(e->arg2, env, c->right, states);
+            SYNC(eval_predicate_set_par);
+            vset_copy(c->container, c->left->container);
+            vset_clear(c->left->container);
+            vset_intersect(c->container, c->right->container);
+            vset_clear(c->right->container);
+        } break;
+        case PRED_OR: {
+            vset_copy(c->left->container, c->container);
+            SPAWN(eval_predicate_set_par, e->arg1, env, c->left, states);
+            vset_copy(c->right->container, c->container);
+            vset_clear(c->container);
+            eval_predicate_set_par(e->arg2, env, c->right, states);
+            SYNC(eval_predicate_set_par);
+            vset_copy(c->container, c->left->container);
+            vset_clear(c->left->container);
+            vset_union(c->container, c->right->container);
+            vset_clear(c->right->container);
+        } break;
+        default:
+            LTSminLogExpr (error, "Unhandled predicate expression: ", e, env);
+            HREabort (LTSMIN_EXIT_FAILURE);
+    }
+}
+
+#define compute_num_states(e, env, s, c, t) CALL(compute_num_states, (e), (env), (s), (c), (t))
+VOID_TASK_5(compute_num_states, ltsmin_expr_t, e, ltsmin_parse_env_t, env, vset_t, states, struct inv_check_s*, c, int, t)
+{
+    switch(e->token) {
+        case PRED_EQ: {
+            c->num_states = 0;
+        } break;
+        case PRED_SVAR: {
+            if (e->idx < N) { // state variable
+                Abort("Unhandled PRED_SVAR");
+            } else {
+                /* following join is necessary because vset does not yet support
+                 * set projection of a projected set. */
+                vset_join(c->left->container, c->container, states);
+                vset_project(c->right->container, c->left->container);
+                vset_clear(c->left->container);
+                vset_count(c->right->container, NULL, &c->num_states);
+                vset_clear(c->right->container);
+            }
+        } break;
+        case PRED_NOT: {
+            vset_copy(c->left->container, c->container);
+            if (inv_par) {
+                SPAWN(compute_num_states, e->arg1, env, states, c->left, t);
+            } else {
+                compute_num_states(e->arg1, env, states, c->left, t);
+            }
+            vset_count(c->container, NULL, &c->num_states);
+            if (inv_par) SYNC(compute_num_states);
+            vset_clear(c->left->container);
+            c->num_states = c->num_states - c->left->num_states;
+            c->left->num_states = 0;
+        } break;
+        case PRED_OR: {
+            vset_copy(c->left->container, c->container);
+            if (inv_par) {
+                SPAWN(compute_num_states, e->arg1, env, states, c->left, t);
+            } else {
+                compute_num_states(e->arg1, env, states, c->left, t);
+            }
+            vset_clear(c->left->container);
+            vset_copy(c->right->container, c->container);
+            compute_num_states(e->arg2, env, states, c->right, t);
+            if (inv_par) SYNC(compute_num_states);
+            vset_clear(c->right->container);
+            c->num_states = c->left->num_states + c->right->num_states;
+            c->left->num_states = 0;
+            c->right->num_states = 0;
+        } break;
+        case PRED_AND: {
+            vset_copy(c->left->container, c->container);
+            if (inv_par) {
+                SPAWN(compute_num_states, e->arg1, env, states, c->left, t);
+            } else {
+                compute_num_states(e->arg1, env, states, c->left, t);
+            }
+            vset_clear(c->left->container);
+            vset_copy(c->right->container, c->container);
+            compute_num_states(e->arg2, env, states, c->right, t);
+            if (inv_par) SYNC(compute_num_states);
+            vset_clear(c->right->container);
+            if ((isinf(c->left->num_states) && isinf(c->right->num_states)) || (c->left->num_states < c->right->num_states)) {
+                c->num_states = c->left->num_states;
+            } else c->num_states = c->right->num_states;
+            c->left->num_states = 0;
+            c->right->num_states = 0;
+        } break;
+        default:
+            LTSminLogExpr (error, "Unhandled predicate expression: ", e, env);
+            HREabort (LTSMIN_EXIT_FAILURE);
+    }
+}
+
+static void
+eval_predicate_set(ltsmin_expr_t e, ltsmin_parse_env_t env, vset_t states, struct inv_check_s* c)
+{
+    LACE_ME;
+
+    switch (e->token) {
+        case PRED_EQ: {
+            vset_join(c->container, c->container, c->left->container);
+        } break;
+        case PRED_TRUE: {
+            // do nothing (c->container already contains everything)
+        } break;
+        case PRED_FALSE: {
+            vset_clear(c->container);
+        } break;
+        case PRED_SVAR: {
+            if (e->idx < N) { // state variable
+                Abort("Unhandled PRED_SVAR");
+            } else { // state label
+                /* following join is necessary because vset does not yet support
+                 * set projection of a projected set. */
+                vset_join(c->left->container, c->container, states);
+                if (inv_par) {
+                    volatile int* ptr = &label_locks[e->idx - N];
+                    while (!cas(ptr, 0, 1)) {
+                        lace_steal_random();
+                        ptr = &label_locks[e->idx - N];
+                    }
+                }
+                eval_label(e->idx - N, c->left->container);
+                if (inv_par) {
+                    label_locks[e->idx - N] = 0;
+                }
+                vset_clear(c->left->container);
+                vset_join(c->container, c->container, label_true[e->idx - N]);
+            }
+        } break;
+        case PRED_NOT: {
+            if (c->right != NULL) { // perform faster set minus for PRED_SVAR
+                /* following line is necessary, because we can't project
+                 * to a projected set. */
+                vset_project(c->right->container, states);
+                vset_minus(c->right->container, c->left->left->container);
+                vset_join(c->container, c->container, c->right->container);
+                vset_clear(c->right->container);
+            } else {
+                vset_copy(c->left->container, c->container);
+                eval_predicate_set(e->arg1, env, states, c->left);
+                vset_minus(c->container, c->left->container);
+                vset_clear(c->left->container);
+            }
+        } break;
+        case PRED_AND: {
+            compute_num_states(e, env, states, c, PRED_AND);
+            if ((isinf(c->left->num_states) && isinf(c->right->num_states)) || (c->left->num_states < c->right->num_states)) {
+                vset_copy(c->right->container, c->container);
+                vset_clear(c->container);
+                eval_predicate_set(e->arg2, env, states, c->right);
+                if (!vset_is_empty(c->right->container)) {
+                    vset_copy(c->left->container, c->right->container); // epic win
+                    eval_predicate_set(e->arg1, env, states, c->left);
+                    vset_copy(c->container, c->left->container);
+                    vset_intersect(c->container, c->right->container);
+                    vset_clear(c->left->container);
+                }
+                vset_clear(c->right->container);
+            } else {
+                vset_copy(c->left->container, c->container);
+                vset_clear(c->container);
+                eval_predicate_set(e->arg1, env, states, c->left);
+                if (!vset_is_empty(c->left->container)) {
+                    vset_copy(c->right->container, c->left->container); // epic win
+                    eval_predicate_set(e->arg2, env, states, c->right);
+                    vset_copy(c->container, c->left->container);
+                    vset_intersect(c->container, c->right->container);
+                    vset_clear(c->right->container);
+                }
+                vset_clear(c->left->container);
+            }
+        } break;
+        case PRED_OR: {
+            compute_num_states(e, env, states, c, PRED_OR);
+            if ((isinf(c->left->num_states) && isinf(c->right->num_states)) || (c->left->num_states < c->right->num_states)) {
+                vset_copy(c->left->container, c->container);
+                vset_copy(c->right->container, c->container);
+                vset_clear(c->container);
+                eval_predicate_set(e->arg1, env, states, c->left);
+                if (!vset_equal(c->right->container, c->left->container)) {
+                    vset_minus(c->right->container, c->left->container); // epic win
+                    eval_predicate_set(e->arg2, env, states, c->right);
+                    vset_copy(c->container, c->left->container);
+                    vset_union(c->container, c->right->container);
+                }
+                vset_clear(c->left->container);
+                vset_clear(c->right->container);
+            } else {
+                vset_copy(c->left->container, c->container);
+                vset_copy(c->right->container, c->container);
+                vset_clear(c->container);
+                eval_predicate_set(e->arg2, env, states, c->right);
+                if (!vset_equal(c->left->container, c->right->container)) {
+                    vset_minus(c->left->container, c->right->container); // epic win
+                    eval_predicate_set(e->arg1, env, states, c->left);
+                    vset_copy(c->container, c->left->container);
+                    vset_union(c->container, c->right->container);
+                }
+                vset_clear(c->left->container);
+                vset_clear(c->right->container);
+            }
+        } break;
+        default:
+            LTSminLogExpr (error, "Unhandled predicate expression: ", e, env);
+            HREabort (LTSMIN_EXIT_FAILURE);
+    }
+}
+
+static inline void
+inv_cleanup()
+{
+    for (int i = 0; i < num_inv; i++) {
+        if (!inv_violated[i]) {
+            mark_visible(model, inv_expr[i], inv_parse_env[i]);
+        }
+    }
+
+    if (GBgetUseGuards(model)) {
+        for (int i = 0; i < nGuards; i++) {
+            pins_add_state_label_visible(model, i);
+        }
+    }
+
+    num_inv_sl_used = 0;
+    for (int i = 0; i < sLbls; i++) {
+        if (!GBgetPorStateLabelVisibility(model)[i]) {
+            if (label_true[i] != NULL) {
+                vset_destroy(label_false[i]);
+                vset_destroy(label_true[i]);
+                vset_destroy(label_tmp[i]);
+                label_false[i] = NULL;
+                label_true[i] = NULL;
+                label_tmp[i] = NULL;
+            }
+        } else {
+            inv_state_labels[num_inv_sl_used++] = i;
+        }
+    }
+    memset(GBgetPorStateLabelVisibility(model), 0, sizeof(int[sLbls]));
+    memset(GBgetPorGroupVisibility(model), 0, sizeof(int[nGrps]));
+}
+
+static void
+learn_labels(vset_t states);
+
+static void
+learn_labels_par(vset_t states);
+
+static inline void
+check_inv(vset_t states, const int level)
+{
+    if (num_inv_violated != num_inv && !vset_is_empty(states)) {
+        int iv = 0;
+        for (int i = 0; i < num_inv; i++) {
+            if (!inv_violated[i]) {
+                vset_project(inv_set[i], states);
+                if (!vset_is_empty(inv_set[i])) {
+                    vset_copy(inv_expr_info[i]->container, inv_set[i]);
+                    eval_predicate_set(inv_expr[i], inv_parse_env[i], states, inv_expr_info[i]);
+                    if (!vset_equal(inv_set[i], inv_expr_info[i]->container)) {
+                        Warning(info, " ");
+                        Warning(info, "Invariant violation (%s) found at depth %d!", inv_detect[i], level);
+                        Warning(info, " ");
+                        inv_violated[i] = 1;
+                        iv = 1;
+                        num_inv_violated++;
+                        if (num_inv_violated == num_inv) {
+                            Warning(info, "all invariants violated");
+                            if(!no_exit) {
+                                Warning(info, "exiting now");
+                                HREabort(LTSMIN_EXIT_COUNTER_EXAMPLE);
+                            }
+                            Warning(info, "continuing...")
+                        }
+                    }
+                    vset_clear(inv_set[i]);
+                    vset_clear(inv_expr_info[i]->container);
+                }
+            }
+        }
+        if (iv) inv_cleanup();
+    }
+}
+
+TASK_3(int, check_inv_par_go, vset_t, states, int, i, int, level)
+{
+    int res = 0;
+    if (!inv_violated[i]) {
+        vset_project(inv_set[i], states);
+        if (!vset_is_empty(inv_set[i])) {
+            vset_copy(inv_expr_info[i]->container, inv_set[i]);
+            if (inv_bin_par) eval_predicate_set_par(inv_expr[i], inv_parse_env[i], inv_expr_info[i], states);
+            else eval_predicate_set(inv_expr[i], inv_parse_env[i], states, inv_expr_info[i]);
+
+            if (!vset_equal(inv_set[i], inv_expr_info[i]->container)) {
+                Warning(info, " ");
+                Warning(info, "Invariant violation (%s) found at depth %d!", inv_detect[i], level);
+                Warning(info, " ");
+                inv_violated[i] = 1;
+                res = 1;
+                add_fetch(num_inv_violated, 1);
+            }
+            vset_clear(inv_expr_info[i]->container);
+            vset_clear(inv_set[i]);
+        }
+    }
+    return res;
+}
+
+static inline void
+check_inv_par(vset_t states, const int level)
+{
+    LACE_ME;
+    if (num_inv_violated != num_inv && !vset_is_empty(states)) {
+        if (inv_bin_par) learn_labels_par(states);
+        int iv = 0;
+        for (int i = 0; i < num_inv; i++) {
+            SPAWN(check_inv_par_go, states, i, level);
+        }
+        for (int i = 0; i < num_inv; i++) {
+            int res = SYNC(check_inv_par_go);
+            iv = res || iv;
+        }
+        if (num_inv_violated == num_inv) {
+            Warning(info, "all invariants violated");
+            if(!no_exit) {
+                Warning(info, "exiting now");
+                HREabort(LTSMIN_EXIT_COUNTER_EXAMPLE);
+            }
+            Warning(info, "continuing...")
+        }
+        if (iv) inv_cleanup();
+    }
+}
+
+#define CHECK_INVARIANTS(s, l) \
+    if (inv_par) check_inv_par((s), (l)); \
+    else check_inv((s), (l));
 
 struct trace_action {
     int *dst;
@@ -845,13 +1271,13 @@ learn_guards_reduce(vset_t true_states, int t, long *guard_count, vset_t *guard_
         guard_t* guards = GBgetGuard(model, t);
         for (int g = 0; g < guards->count && !vset_is_empty(true_states); g++) {
             if (guard_count != NULL) (*guard_count)++;
-            eval_guard(guards->guard[g], true_states);
+            eval_label(guards->guard[g], true_states);
 
             if (!no_soundness_check) {
 
                 // compute guard_maybe (= guard_true \cap guard_false)
-                vset_copy(guard_maybe[guards->guard[g]], guard_true[guards->guard[g]]);
-                vset_intersect(guard_maybe[guards->guard[g]], guard_false[guards->guard[g]]);
+                vset_copy(guard_maybe[guards->guard[g]], label_true[guards->guard[g]]);
+                vset_intersect(guard_maybe[guards->guard[g]], label_false[guards->guard[g]]);
 
                 if (!SPEC_MAYBE_AND_FALSE_IS_FALSE) {
                     // If we have Promela, Java etc. then if we encounter a maybe guard then this is an error.
@@ -863,7 +1289,7 @@ learn_guards_reduce(vset_t true_states, int t, long *guard_count, vset_t *guard_
                 } else {
                     // If we have mCRL2 etc., then we need to store all (real) false states and maybe states
                     // and see if after evaluating all guards there are still maybe states left.
-                    vset_join(tmp, true_states, guard_false[guards->guard[g]]);
+                    vset_join(tmp, true_states, label_false[guards->guard[g]]);
                     vset_union(false_states, tmp);
                     vset_join(tmp, true_states, guard_maybe[guards->guard[g]]);
                     vset_minus(false_states,tmp);
@@ -871,7 +1297,7 @@ learn_guards_reduce(vset_t true_states, int t, long *guard_count, vset_t *guard_
                 }
                 vset_clear(guard_maybe[guards->guard[g]]);
             }
-            vset_join(true_states, true_states, guard_true[guards->guard[g]]);
+            vset_join(true_states, true_states, label_true[guards->guard[g]]);
         }
 
         if (!no_soundness_check && SPEC_MAYBE_AND_FALSE_IS_FALSE) {
@@ -888,7 +1314,7 @@ learn_guards_reduce(vset_t true_states, int t, long *guard_count, vset_t *guard_
 
         if (!no_soundness_check) {
             for (int g = 0; g < guards->count; g++) {
-                vset_minus(guard_true[guards->guard[g]], guard_false[guards->guard[g]]);
+                vset_minus(label_true[guards->guard[g]], label_false[guards->guard[g]]);
             }
         }
     }
@@ -917,7 +1343,7 @@ deadlock_check(vset_t deadlocks, bitvector_t *reach_groups)
     vset_t maybe_states = NULL;
     if (!no_soundness_check && GBgetUseGuards(model)) {
         for(int i=0;i<nGuards;i++) {
-            guard_maybe[i] = vset_create(domain, g_projs[i].len, g_projs[i].proj);
+            guard_maybe[i] = vset_create(domain, l_projs[i].len, l_projs[i].proj);
         }
         false_states = vset_create(domain, -1, NULL);
         maybe_states = vset_create(domain, -1, NULL);
@@ -1054,14 +1480,14 @@ stats_and_progress_report(vset_t current, vset_t visited, int level)
             char fgfbuf[snprintf(NULL, 0, file, dot_dir, level, g)];
             sprintf(fgfbuf, file, dot_dir, level, g);
             fp = fopen(fgfbuf, "w+");
-            vset_dot(fp, guard_false[g]);
+            vset_dot(fp, label_false[g]);
             fclose(fp);
 
             file = "%s/guard_true-l%d-g%d.dot";
             char fgtbuf[snprintf(NULL, 0, file, dot_dir, level, g)];
             sprintf(fgtbuf, file, dot_dir, level, g);
             fp = fopen(fgtbuf, "w+");
-            vset_dot(fp, guard_true[g]);
+            vset_dot(fp, label_true[g]);
             fclose(fp);
         }
     }    
@@ -1307,9 +1733,9 @@ VOID_TASK_1(reach_bfs_reduce, struct reach_red_s *, dummy)
         int guard = GBgetGuard(model, dummy->group)->guard[dummy->index];
         if (!no_soundness_check) {
             vset_copy(dummy->false_container, dummy->true_container);
-            vset_join(dummy->false_container, dummy->false_container, guard_false[guard]);
+            vset_join(dummy->false_container, dummy->false_container, label_false[guard]);
         }
-        vset_join(dummy->true_container, dummy->true_container, guard_true[guard]);
+        vset_join(dummy->true_container, dummy->true_container, label_true[guard]);
     } else { // recursive case
         // send set of states downstream
         vset_copy(dummy->left->true_container, dummy->true_container);
@@ -1477,15 +1903,13 @@ VOID_TASK_3(reach_bfs_next, struct reach_s *, dummy, bitvector_t *, reach_groups
 
 static inline void
 learn_guards(vset_t states, long *guard_count) {
-    LACE_ME;
     if (GBgetUseGuards(model)) {
         for (int g = 0; g < nGuards; g++) {
             if (guard_count != NULL) (*guard_count)++;
-            SPAWN(eval_guard, g, states);
+            LACE_ME;
+            eval_label(g, states);
         }
     }
-    if (GBgetUseGuards(model))
-        for (int g = 0; g < nGuards; g++) SYNC(eval_guard);
 }
 
 static inline void
@@ -1495,12 +1919,31 @@ learn_guards_par(vset_t states, long *guard_count)
     if (GBgetUseGuards(model)) {
         for (int g = 0; g < nGuards; g++) {
             if (guard_count != NULL) (*guard_count)++;
-            SPAWN(eval_guard, g, states);
+            SPAWN(eval_label, g, states);
         }
     }
     if (GBgetUseGuards(model)) {
-        for (int g = 0; g < nGuards; g++) SYNC(eval_guard);
+        for (int g = 0; g < nGuards; g++) SYNC(eval_label);
     }
+}
+
+static inline void
+learn_labels(vset_t states)
+{
+    for (int i = 0; i < num_inv_sl_used; i++) {
+        LACE_ME;
+        eval_label(inv_state_labels[i], states);
+    }
+}
+
+static inline void
+learn_labels_par(vset_t states)
+{
+    LACE_ME;
+    for (int i = 0; i < num_inv_sl_used; i++) {
+        SPAWN(eval_label, inv_state_labels[i], states);
+    }
+    for (int i = 0; i < num_inv_sl_used; i++) SYNC(eval_label);
 }
 
 static void
@@ -1572,7 +2015,7 @@ reach_bfs_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
                     // This means that every maybe is actually false.
                     // We thus remove all maybe's
                     for (int g = 0; g < nGuards; g++) {
-                        vset_minus(guard_true[g], guard_false[g]);
+                        vset_minus(label_true[g], label_false[g]);
                     }
                 }
                 // update counters
@@ -1587,6 +2030,7 @@ reach_bfs_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
                 vset_union(next_level, root->container);
                 vset_clear(root->container);
             }
+            CHECK_INVARIANTS(next_level, level);
         } else {
             // set container to current level
             vset_copy(root->container, current_level);
@@ -1602,7 +2046,7 @@ reach_bfs_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
                 // This means that every maybe is actually false.
                 // We thus remove all maybe's
                 for (int g = 0; g < nGuards; g++) {
-                    vset_minus(guard_true[g], guard_false[g]);
+                    vset_minus(label_true[g], label_false[g]);
                 }
             }
             // update counters
@@ -1612,6 +2056,7 @@ reach_bfs_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
             vset_copy(next_level, root->container);
             vset_clear(root->container);
             vset_minus(next_level, visited);
+            CHECK_INVARIANTS(next_level, level);
         }
 
         // set current_level to next_level
@@ -1686,7 +2131,7 @@ reach_bfs(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
                     // This means that every maybe is actually false.
                     // We thus remove all maybe's
                     for (int g = 0; g < nGuards; g++) {
-                        vset_minus(guard_true[g], guard_false[g]);
+                        vset_minus(label_true[g], label_false[g]);
                     }
                 }
                 // update counters
@@ -1701,6 +2146,7 @@ reach_bfs(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
                 vset_union(next_level, root->container);
                 vset_clear(root->container);
             }
+            CHECK_INVARIANTS(next_level, level);
             vset_union(visited, next_level);
             vset_clear(next_level);
         } else {
@@ -1718,12 +2164,13 @@ reach_bfs(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
                 // This means that every maybe is actually false.
                 // We thus remove all maybe's
                 for (int g = 0; g < nGuards; g++) {
-                    vset_minus(guard_true[g], guard_false[g]);
+                    vset_minus(label_true[g], label_false[g]);
                 }
             }
             // update counters
             *next_count += root->next_count;
             *eg_count += root->eg_count;
+            CHECK_INVARIANTS(next_level, level);
             // add successors to visited set
             vset_union(visited, root->container);
         }
@@ -1779,9 +2226,9 @@ VOID_TASK_1(reach_par_reduce, struct reach_red_s *, dummy)
         int guard = GBgetGuard(model, dummy->group)->guard[dummy->index];
         if (!no_soundness_check) {
             vset_copy(dummy->false_container, dummy->true_container);
-            vset_join_par(dummy->false_container, dummy->false_container, guard_false[guard]);
+            vset_join_par(dummy->false_container, dummy->false_container, label_false[guard]);
         }
-        vset_join_par(dummy->true_container, dummy->true_container, guard_true[guard]);
+        vset_join_par(dummy->true_container, dummy->true_container, label_true[guard]);
         SYNC(vset_join_par);
         if (!no_soundness_check) SYNC(vset_join_par);
     } else { //recursive case
@@ -2003,7 +2450,7 @@ reach_par(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
                     // For the current level the spec is sound.
                     // This means that every maybe is actually false.
                     // We thus remove all maybe's
-                    for (int g = 0; g < nGuards; g++) vset_minus_par(guard_true[g], guard_false[g]);
+                    for (int g = 0; g < nGuards; g++) vset_minus_par(label_true[g], label_false[g]);
                     for (int g = nGuards-1; g >= 0; g--) SYNC(vset_minus_par);
                 }
                 // update counters
@@ -2034,7 +2481,7 @@ reach_par(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
                 // For the current level the spec is sound.
                 // This means that every maybe is actually false.
                 // We thus remove all maybe's
-                for (int g = 0; g < nGuards; g++) vset_minus_par(guard_true[g], guard_false[g]);
+                for (int g = 0; g < nGuards; g++) vset_minus_par(label_true[g], label_false[g]);
                 for (int g = nGuards-1; g >= 0; g--) SYNC(vset_minus_par);
             }
             // update counters
@@ -2117,7 +2564,7 @@ reach_par_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
                     // For the current level the spec is sound.
                     // This means that every maybe is actually false.
                     // We thus remove all maybe's
-                    for (int g = 0; g < nGuards; g++) vset_minus_par(guard_true[g], guard_false[g]);
+                    for (int g = 0; g < nGuards; g++) vset_minus_par(label_true[g], label_false[g]);
                     for (int g = nGuards-1; g >= 0; g--) SYNC(vset_minus_par);
                 }
                 // update counters
@@ -2146,7 +2593,7 @@ reach_par_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
                 // For the current level the spec is sound.
                 // This means that every maybe is actually false.
                 // We thus remove all maybe's
-                for (int g = 0; g < nGuards; g++) vset_minus_par(guard_true[g], guard_false[g]);
+                for (int g = 0; g < nGuards; g++) vset_minus_par(label_true[g], label_false[g]);
                 for (int g = nGuards-1; g >= 0; g--) SYNC(vset_minus_par);
             }
             // update counters
@@ -2199,7 +2646,7 @@ reach_chain_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
     vset_t maybe_states = NULL;
     if (!no_soundness_check && GBgetUseGuards(model)) {
         for(int i=0;i<nGuards;i++) {
-            guard_maybe[i] = vset_create(domain, g_projs[i].len, g_projs[i].proj);
+            guard_maybe[i] = vset_create(domain, l_projs[i].len, l_projs[i].proj);
         }
         false_states = vset_create(domain, -1, NULL);
         maybe_states = vset_create(domain, -1, NULL);
@@ -2236,6 +2683,7 @@ reach_chain_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
                 }
 
                 vset_minus(temp, visited);
+                CHECK_INVARIANTS(temp, level);
                 vset_union(new_states, temp);
                 vset_clear(temp);
             }
@@ -2284,7 +2732,7 @@ reach_chain(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
     vset_t maybe_states = NULL;
     if (!no_soundness_check && GBgetUseGuards(model)) {
         for(int i=0;i<nGuards;i++) {
-            guard_maybe[i] = vset_create(domain, g_projs[i].len, g_projs[i].proj);
+            guard_maybe[i] = vset_create(domain, l_projs[i].len, l_projs[i].proj);
         }
         false_states = vset_create(domain, -1, NULL);
         maybe_states = vset_create(domain, -1, NULL);
@@ -2308,6 +2756,7 @@ reach_chain(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
             (*next_count)++;
             vset_next_fn(temp, new_reduced, group_next[i]);
             vset_clear(new_reduced);
+            CHECK_INVARIANTS(temp, level);
             vset_union(visited, temp);
             if (dlk_detect) {
                 vset_prev(dlk_temp, temp, group_next[i],deadlocks);
@@ -2381,6 +2830,7 @@ reach_sat_fix(reach_proc_t reach_proc, vset_t visited,
         if (dlk_detect) vset_copy(deadlocks, visited);
         vset_least_fixpoint(visited, visited, group_next, nGrps);
         (*next_count)++;
+        CHECK_INVARIANTS(visited, level);
         if (dlk_detect) {
             for (int i = 0; i < nGrps; i++) {
                 vset_prev(dlk_temp, visited, group_next[i],deadlocks);
@@ -2588,6 +3038,8 @@ reach_sat(reach_proc_t reach_proc, vset_t visited,
     stats_and_progress_report(NULL, visited, 0);
     vset_least_fixpoint(visited, visited, group_next, nGrps);
     stats_and_progress_report(NULL, visited, 1);
+
+    CHECK_INVARIANTS(visited, -1);
 
     if (dlk_detect) {
         vset_t deadlocks = vset_create(domain, -1, NULL);
@@ -3055,6 +3507,77 @@ init_model(char *file)
     HREbarrier(HREglobal());
 }
 
+static struct inv_check_s*
+inv_info_prepare(ltsmin_expr_t e, ltsmin_parse_env_t env, int i)
+{
+    if (!e) return NULL;
+
+    struct inv_check_s* result = (struct inv_check_s*) RTmalloc(sizeof(struct inv_check_s));
+
+    switch(e->node_type) {
+    case BINARY_OP:
+        if (e->token == PRED_EQ) {
+            if ((e->arg1->token == PRED_NUM && e->arg2->token == PRED_SVAR)) {
+                result->left = inv_info_prepare(e->arg2, env, i);
+                int val[1] = { -1 == e->num ? e->idx : e->num };
+                vset_add(result->left->container, val);
+            } else if (e->arg1->token == PRED_SVAR && e->arg2->token == PRED_NUM) {
+                result->left = inv_info_prepare(e->arg1, env, i);
+                int val[1] = { -1 == e->num ? e->idx : e->num };
+                vset_add(result->left->container, val);
+            } else {
+                Abort("unsupported sub expressions for ==");
+            }
+            result->container = vset_create(domain, inv_proj[i].len, inv_proj[i].proj);
+        } else {
+            result->left = inv_info_prepare(e->arg1, env, i);
+            result->right = inv_info_prepare(e->arg2, env, i);
+            result->container = vset_create(domain, inv_proj[i].len, inv_proj[i].proj);
+        }
+        break;
+    case UNARY_OP:
+        result->left = inv_info_prepare(e->arg1, env, i);
+        if (e->arg1->token == PRED_EQ) { // speed up set minus
+            int proj[1];
+            if (e->arg1->arg1->token == PRED_SVAR) {
+                proj[0] = e->arg1->arg1->idx;
+            } else if (e->arg1->arg2->token == PRED_SVAR) {
+                proj[0] = e->arg1->arg2->idx;
+            } else {
+                Abort("unsupported");
+            }
+            result->right = (struct inv_check_s*) RTmalloc(sizeof(struct inv_check_s));
+            result->right->container = vset_create(domain, 1, proj);
+        } else {
+            result->right = NULL;
+        }
+        result->container = vset_create(domain, inv_proj[i].len, inv_proj[i].proj);
+        break;
+    default:
+        switch(e->token) {
+        case PRED_TRUE:
+        case PRED_FALSE:
+        case PRED_SVAR:
+            if (e->idx < N) { // state variable
+                int proj[1] = { e->idx };
+                result->container = vset_create(domain, 1, proj);
+            } else {
+                result->container = vset_create(domain, inv_proj[i].len, inv_proj[i].proj);
+                result->left = (struct inv_check_s*) RTmalloc(sizeof(struct inv_check_s));
+                result->left->container = vset_create(domain, -1, NULL);
+                result->right = (struct inv_check_s*) RTmalloc(sizeof(struct inv_check_s));
+                result->right->container = vset_create(domain, l_projs[e->idx - N].len, l_projs[e->idx - N].proj);
+            }
+            break;
+        default:
+            LTSminLogExpr (error, "Unhandled predicate expression: ", e, env);
+            HREabort (LTSMIN_EXIT_FAILURE);
+        }
+        break;
+    }
+    return result;
+}
+
 static void
 init_domain(vset_implementation_t impl) {
     domain = vdom_create_domain(N, impl);
@@ -3069,12 +3592,10 @@ init_domain(vset_implementation_t impl) {
     r_projs        = (proj_info*)RTmalloc(nGrps * sizeof(proj_info));
     w_projs        = (proj_info*)RTmalloc(nGrps * sizeof(proj_info));
 
-    if (GBgetUseGuards(model)) {
-        g_projs        = (proj_info*) RTmalloc(nGuards * sizeof(proj_info));
-        guard_false    = (vset_t*)RTmalloc(nGuards * sizeof(vset_t));
-        guard_true     = (vset_t*)RTmalloc(nGuards * sizeof(vset_t));
-        guard_tmp      = (vset_t*)RTmalloc(nGuards * sizeof(vset_t));
-    }
+    l_projs        = (proj_info*) RTmalloc(sLbls * sizeof(proj_info));
+    label_false    = (vset_t*)RTmalloc(sLbls * sizeof(vset_t));
+    label_true     = (vset_t*)RTmalloc(sLbls * sizeof(vset_t));
+    label_tmp      = (vset_t*)RTmalloc(sLbls * sizeof(vset_t));
 
     matrix_t *read_matrix = RTmalloc(sizeof (matrix_t));
     dm_copy(GBgetExpandMatrix(model), read_matrix);
@@ -3134,23 +3655,40 @@ init_domain(vset_implementation_t impl) {
         }
     }
 
-    for (int i = 0; i < nGuards && GBgetUseGuards(model); i++) {
+    for (int i = 0; i < sLbls; i++) {
 
-        g_projs[i].len     = dm_ones_in_row(GBgetStateLabelInfo(model), i);
-        g_projs[i].proj    = (int*)RTmalloc(g_projs[i].len * sizeof(int));
+        /* Indeed, we skip unused state labels, but allocate memory for pointers
+         * (to vset_t's). Is this bad? Maybe a hashmap is worse. */
+        if (GBgetPorStateLabelVisibility(model)[i]) {
+            l_projs[i].len     = dm_ones_in_row(GBgetStateLabelInfo(model), i);
+            l_projs[i].proj    = (int*)RTmalloc(l_projs[i].len * sizeof(int));
 
-        for (int j = 0, k = 0; j < dm_ncols(GBgetStateLabelInfo(model)); j++) {
-            if (dm_is_set(GBgetStateLabelInfo(model), i, j)) {
-                g_projs[i].proj[k++] = j;
+            for (int j = 0, k = 0; j < dm_ncols(GBgetStateLabelInfo(model)); j++) {
+                if (dm_is_set(GBgetStateLabelInfo(model), i, j)) {
+                    l_projs[i].proj[k++] = j;
+                }
             }
-        }
 
-        if (HREme(HREglobal())==0)
-        {
-            guard_false[i]  = vset_create(domain, g_projs[i].len, g_projs[i].proj);
-            guard_true[i]   = vset_create(domain, g_projs[i].len, g_projs[i].proj);
-            guard_tmp[i]    = vset_create(domain, g_projs[i].len, g_projs[i].proj);
+            if (HREme(HREglobal())==0)
+            {
+                label_false[i]  = vset_create(domain, l_projs[i].len, l_projs[i].proj);
+                label_true[i]   = vset_create(domain, l_projs[i].len, l_projs[i].proj);
+                label_tmp[i]    = vset_create(domain, l_projs[i].len, l_projs[i].proj);
+            }
+        } else {
+            label_false[i]  = NULL;
+            label_true[i]   = NULL;
+            label_tmp[i]    = NULL;
         }
+    }
+
+    memset(GBgetPorStateLabelVisibility(model), 0, sizeof(int[sLbls]));
+
+    inv_set = (vset_t*) RTmalloc(sizeof(vset_t) * num_inv);
+    inv_expr_info = (struct inv_check_s**) RTmalloc(sizeof(struct inv_check_s*) * num_inv);
+    for (int i = 0; i < num_inv; i++) {
+        inv_set[i] = vset_create(domain, inv_proj[i].len, inv_proj[i].proj);
+        inv_expr_info[i] = inv_info_prepare(inv_expr[i], inv_parse_env[i], i);
     }
 }
 
@@ -3162,6 +3700,41 @@ init_action_detection()
     int count = 256; // GBchunkCount(model, action_typeno);
     seen_actions_prepare(count);
     Warning(info, "Detecting actions with prefix \"%s\"", act_detect);
+}
+
+static void
+init_invariant_detection()
+{
+    inv_proj = (proj_info*) RTmalloc(sizeof(proj_info) * num_inv);
+    inv_expr = (ltsmin_expr_t*) RTmalloc(sizeof(ltsmin_expr_t) * num_inv);
+    inv_violated = (int*) RTmalloc(sizeof(int) * num_inv);
+    inv_parse_env = (ltsmin_parse_env_t*) RTmalloc(sizeof(ltsmin_parse_env_t) * num_inv);
+    for (int i = 0; i < num_inv; i++) {
+        inv_parse_env[i] = LTSminParseEnvCreate();
+        inv_expr[i] = parse_file_env (inv_detect[i], pred_parse_file,
+                                      model, inv_parse_env[i]);
+        mark_visible(model, inv_expr[i], inv_parse_env[i]);
+        int deps[N];
+        memset(&deps, 0, sizeof(int[N]));
+        inv_proj[i].len = mark_predicate(model, inv_expr[i], deps, inv_parse_env[i]);
+        inv_proj[i].proj = (int*) RTmalloc(inv_proj[i].len * sizeof(int));
+        for (int j = 0, k = 0; j < N; j++) if (deps[j]) inv_proj[i].proj[k++] = j;
+    }
+
+    for (int i = 0; i < sLbls; i++) {
+        if (GBgetPorStateLabelVisibility(model)[i]) num_inv_sl_used++;
+    }
+
+    inv_state_labels = (int*) RTmalloc(sizeof(int[sLbls]));
+    for (int i = 0, j = 0; i < sLbls; i++) {
+        if (GBgetPorStateLabelVisibility(model)[i]) {
+            inv_state_labels[j++] = i;
+        }
+    }
+
+    if (inv_par) {
+        label_locks = (int*) RTmallocZero(sizeof(int[sLbls]));
+    }
 }
 
 static vset_t
@@ -3555,6 +4128,23 @@ VOID_TASK_1(actual_main, void*, arg)
     if (act_label != -1) action_typeno = lts_type_get_edge_label_typeno(ltstype, act_label);
     if (act_detect != NULL) init_action_detection();
 
+    /* initialize invariant detection */
+    int group_vis[nGrps];
+    memset(&group_vis, 0, sizeof(int[nGrps]));
+    GBsetPorGroupVisibility(model, group_vis);
+
+    int label_vis[sLbls];
+    memset(&label_vis, 0, sizeof(int[sLbls]));
+    GBsetPorStateLabelVisibility(model, label_vis);
+
+    if (inv_detect != NULL) init_invariant_detection();
+
+    if (GBgetUseGuards(model)) {
+        for (int i = 0; i < nGuards; i++) {
+            pins_add_state_label_visible(model, i);
+        }
+    }
+
     /* turn on Lace again (for Sylvan) */
     if (vset_default_domain==VSET_Sylvan || vset_default_domain==VSET_LDDmc) {
         lace_resume();
@@ -3738,11 +4328,11 @@ VOID_TASK_1(actual_main, void*, arg)
             long total_false = 0;
             long total_true = 0;
             for(int i=0;i<nGuards; i++) {
-                vset_count(guard_false[i], &n_count, &e_count);
+                vset_count(label_false[i], &n_count, &e_count);
                 Print(infoLong, "guard_false[%d]: %.*g short vectors, %ld nodes", i, DBL_DIG, e_count, n_count);
                 total_false += n_count;
 
-                vset_count(guard_true[i], &n_count, &e_count);
+                vset_count(label_true[i], &n_count, &e_count);
                 Print(infoLong, "guard_true[%d]: %.*g short vectors, %ld nodes", i, DBL_DIG, e_count, n_count);
                 total_true += n_count;
             }
