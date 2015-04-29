@@ -319,7 +319,6 @@ that can be reused for other languages (e.g. CTL, CTL* and LTL)
 
 input ::= EXPR expr(E) . {
     (void)E;
-    LTSminLogExpr(info,"Expression is: ",E,env);
     env->expr=E;
 }
 
