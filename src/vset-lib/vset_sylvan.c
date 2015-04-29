@@ -544,13 +544,15 @@ set_prev(vset_t dst, vset_t src, vrel_t rel, vset_t univ)
  * Calculate projection of src onto dst
  */
 static void
-set_project(vset_t dst,vset_t src)
+set_project(vset_t dst, vset_t src)
 {
-    LACE_ME;
-
     sylvan_deref(dst->bdd);
-    if (dst->projection != 0) dst->bdd = sylvan_exists(src->bdd, dst->projection);
-    else dst->bdd = src->bdd;
+    if (dst->projection != 0 && dst->projection != src->projection) {
+        LACE_ME;
+        dst->bdd = sylvan_exists(src->bdd, dst->projection);
+    } else {
+        dst->bdd = src->bdd;
+    }
     sylvan_ref(dst->bdd);
 }
 

@@ -489,23 +489,32 @@ set_enum_match(vset_t set, int p_len, int *proj, int *match, vset_element_cb cb,
 static void
 set_project(vset_t dst, vset_t src)
 {
-    entermt(dst);
-    LACE_ME;
-    assert(src->size == dst->dom->shared.size);
-    lddmc_deref(dst->mdd);
-    dst->mdd = lddmc_ref(lddmc_project(src->mdd, dst->proj));
-    leavemt(dst);
+    if (dst->proj == src->proj) {
+        lddmc_deref(dst->mdd);
+        dst->mdd = src->mdd;
+    } else {
+        entermt(dst);
+        LACE_ME;
+        assert(src->size == dst->dom->shared.size);
+        lddmc_deref(dst->mdd);
+        dst->mdd = lddmc_ref(lddmc_project(src->mdd, dst->proj));
+        leavemt(dst);
+    }
 }
 
 static void
 set_project_minus(vset_t dst, vset_t src, vset_t minus)
 {
-    entermt(dst);
-    LACE_ME;
-    assert(src->size == dst->dom->shared.size);
-    lddmc_deref(dst->mdd);
-    dst->mdd = lddmc_ref(lddmc_project_minus(src->mdd, dst->proj, minus->mdd));
-    leavemt(dst);
+    if (dst->proj == src->proj) {
+        set_minus(dst, minus);
+    } else {
+        entermt(dst);
+        LACE_ME;
+        assert(src->size == dst->dom->shared.size);
+        lddmc_deref(dst->mdd);
+        dst->mdd = lddmc_ref(lddmc_project_minus(src->mdd, dst->proj, minus->mdd));
+        leavemt(dst);
+    }
 }
 
 static void
