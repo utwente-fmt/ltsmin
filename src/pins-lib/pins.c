@@ -1182,6 +1182,8 @@ static int              cache=0;
 pins_por_t              PINS_POR = PINS_POR_NONE;
 pins_ltl_type_t         PINS_LTL = PINS_LTL_NONE;
 static const char      *regroup_options = NULL;
+static int              cw_max_cols = -1;
+static int              cw_max_rows = -1;
 
 static char *mucalc_file = NULL;
 
@@ -1440,7 +1442,7 @@ struct poptOption greybox_options[]={
 	{ "cache" , 'c' , POPT_ARG_VAL , &cache , 1 , "enable caching of PINS calls" , NULL },
 	{ "regroup" , 'r' , POPT_ARG_STRING, &regroup_options , 0 ,
           "enable regrouping; available transformations T: "
-          "gs, ga, gsa, gc, gr, cs, cn, cw, ca, csa, rs, rn, ru, w2W, r2+, w2+, W2+, rb4w", "<(T,)+>" },
+          "gs, ga, gsa, gc, gr, cs, cn, cw, ca, csa, rs, rn, ru, w2W, r2+, w2+, W2+, rb4w, lb<((T.)*:)+>", "<(T,)+>" },
     {"mucalc", 0, POPT_ARG_STRING, &mucalc_file, 0, "modal mu-calculus formula or file with modal mu-calculus formula",
           "<mucalc-file>.mcf|<mucalc formula>"},
     { NULL, 0 , POPT_ARG_INCLUDE_TABLE, por_options , 0 , "Partial Order Reduction options", NULL },

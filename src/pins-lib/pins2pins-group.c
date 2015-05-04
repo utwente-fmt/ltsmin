@@ -415,7 +415,8 @@ subsume_cols(matrix_t *r, matrix_t *mayw, matrix_t *mustw, int cola, int colb) {
 }
 
 static void
-apply_regroup_spec (matrix_t* r, matrix_t* mayw, matrix_t* mustw, const char *spec_, guard_t **guards, const char* sep)
+apply_regroup_spec (matrix_t* r, matrix_t* mayw, matrix_t* mustw, const char *spec_, guard_t **guards, const char* sep,
+                    int cw_max_cols, int cw_max_rows)
 {
     
     HREassert(
@@ -465,7 +466,12 @@ apply_regroup_spec (matrix_t* r, matrix_t* mayw, matrix_t* mustw, const char *sp
                 dm_anneal (r, mayw, mustw);
             } else if (strcasecmp (tok, "cw") == 0) {
                 Print1 (info, "Regroup Column sWaps");
-                dm_optimize (r, mayw, mustw);
+                if ((cw_max_cols < 0 || dm_ncols(mayw) <= cw_max_cols) && (cw_max_rows < 0 || dm_nrows(mayw) <= cw_max_rows)) {
+                    dm_optimize (r, mayw, mustw);
+                } else {
+                    Print1 (infoLong, "May-write matrix too large for \"cw\" (%d (>%d) columns, (%d (>%d) rows)",
+                            dm_ncols(mayw), cw_max_cols, dm_nrows(mayw), cw_max_rows);
+                }
             } else if (strcasecmp (tok, "ca") == 0) {
                 Print1 (info, "Regroup Column All permutations");
                 dm_all_perm (r, mayw, mustw);
@@ -487,23 +493,23 @@ apply_regroup_spec (matrix_t* r, matrix_t* mayw, matrix_t* mustw, const char *sp
             } else if (strcasecmp (tok, "gsa") == 0) {
                 const char         *macro = "gc,gr,csa,rs";
                 Print1 (info, "Regroup macro Simulated Annealing: %s", macro);
-                apply_regroup_spec (r, mayw, mustw, macro, guards, sep);
+                apply_regroup_spec (r, mayw, mustw, macro, guards, sep, cw_max_cols, cw_max_rows);
             } else if (strcasecmp (tok, "gs") == 0) {
                 const char         *macro = "gc,gr,cw,rs";
                 Print1 (info, "Regroup macro Group Safely: %s", macro);
-                apply_regroup_spec (r, mayw, mustw, macro, guards, sep);
+                apply_regroup_spec (r, mayw, mustw, macro, guards, sep, cw_max_cols, cw_max_rows);
             } else if (strcasecmp (tok, "ga") == 0) {
                 const char         *macro = "ru,gc,rs,cw,rs";
                 Print1 (info, "Regroup macro Group Aggressively: %s", macro);
-                apply_regroup_spec (r, mayw, mustw, macro, guards, sep);
+                apply_regroup_spec (r, mayw, mustw, macro, guards, sep, cw_max_cols, cw_max_rows);
             } else if (strcasecmp (tok, "gc") == 0) {
                 const char         *macro = "cs,cn";
                 Print1 (info, "Regroup macro Cols: %s", macro);
-                apply_regroup_spec (r, mayw, mustw, macro, guards, sep);
+                apply_regroup_spec (r, mayw, mustw, macro, guards, sep, cw_max_cols, cw_max_rows);
             } else if (strcasecmp (tok, "gr") == 0) {
                 const char         *macro = "rs,rn";
                 Print1 (info, "Regroup macro Rows: %s", macro);
-                apply_regroup_spec (r, mayw, mustw, macro, guards, sep);
+                apply_regroup_spec (r, mayw, mustw, macro, guards, sep, cw_max_cols, cw_max_rows);
             } else if (tok[0] != '\0') {
                 Fatal (1, error, "Unknown regrouping specification: '%s'",
                        tok);
@@ -546,7 +552,7 @@ combine_rows(matrix_t *matrix_new, matrix_t *matrix_old, int new_rows,
 }
 
 model_t
-GBregroup (model_t model, const char *regroup_spec)
+GBregroup (model_t model, const char *regroup_spec, int cw_max_cols, int cw_max_rows)
 {
     // note: context information is available via matrix, doesn't need to
     // be stored again
@@ -564,10 +570,10 @@ GBregroup (model_t model, const char *regroup_spec)
     Print1 (info, "Regroup specification: %s", regroup_spec);
     if (GBgetUseGuards(model)) {
         dm_copy (GBgetMatrix(model, GBgetMatrixID(model, LTSMIN_MATRIX_ACTIONS_READS)), r);
-        apply_regroup_spec (r, mayw, mustw, regroup_spec, GBgetGuardsInfo(model), ",");
+        apply_regroup_spec (r, mayw, mustw, regroup_spec, GBgetGuardsInfo(model), ",", cw_max_cols, cw_max_rows);
     } else {
         dm_copy (GBgetDMInfoRead(model), r);
-        apply_regroup_spec (r, mayw, mustw, regroup_spec, NULL, ",");
+        apply_regroup_spec (r, mayw, mustw, regroup_spec, NULL, ",", cw_max_cols, cw_max_rows);
     }
 
     // post processing regroup specification
