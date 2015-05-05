@@ -38,9 +38,14 @@
 
 hre_context_t ctx;
 
-static ltsmin_expr_t mu_expr = NULL;
-static char* ctl_formula = NULL;
-static char* mu_formula  = NULL;
+static ltsmin_expr_t* mu_exprs = NULL;
+static char** ctl_formulas = NULL;
+static int num_ctl = 0;
+static char** mu_formulas  = NULL;
+static int num_mu = 0;
+static int mu_par = 0;
+static ltsmin_parse_env_t* mu_parse_env = NULL;
+
 static char* dot_dir = NULL;
 
 static char* transitions_save_filename = NULL;
@@ -142,6 +147,8 @@ static si_map_entry GUIDED[] = {
 };
 
 static const char invariant_long[]="invariant";
+static const char ctl_star_long[]="ctl-star";
+static const char mu_long[]="mu";
 #define IF_LONG(long) if(((opt->longName)&&!strcmp(opt->longName,long)))
 
 static void
@@ -200,6 +207,18 @@ reach_popt(poptContext con, enum poptCallbackReason reason,
             inv_detect[num_inv - 1] = (char*) RTmalloc(strlen(arg) + 1);
             memcpy(inv_detect[num_inv - 1], arg, strlen(arg) + 1);
         }
+        IF_LONG(ctl_star_long) {
+            num_ctl++;
+            ctl_formulas = (char**) RTrealloc(ctl_formulas, sizeof(char*) * num_ctl);
+            ctl_formulas[num_ctl - 1] = (char*) RTmalloc(strlen(arg) + 1);
+            memcpy(ctl_formulas[num_ctl - 1], arg, strlen(arg) + 1);
+        }
+        IF_LONG(mu_long) {
+            num_mu++;
+            mu_formulas = (char**) RTrealloc(mu_formulas, sizeof(char*) * num_mu);
+            mu_formulas[num_mu - 1] = (char*) RTmalloc(strlen(arg) + 1);
+            memcpy(mu_formulas[num_mu - 1], arg, strlen(arg) + 1);
+        }
         return;
     }
 }
@@ -216,6 +235,7 @@ static  struct poptOption options[] = {
     { "order" , 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &order , 0 , "set the exploration strategy to a specific order" , "<bfs-prev|bfs|chain-prev|chain|par-prev|par>" },
     { "inv-par", 0, POPT_ARG_VAL, &inv_par, 1, "parallelize invariant detection", NULL },
     { "inv-bin-par", 0, POPT_ARG_VAL, &inv_bin_par, 1, "also parallelize every binary operand, may be slow when lots of state labels are to be evaluated (requires --inv-par)", NULL },
+    { "mu-par", 0, POPT_ARG_VAL, &inv_par, 1, "parallelize mu-calculus", NULL },
     { "saturation" , 0, POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &saturation , 0 , "select the saturation strategy" , "<none|sat-like|sat-loop|sat-fix|sat>" },
     { "sat-granularity" , 0 , POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &sat_granularity , 0 , "set saturation granularity","<number>" },
     { "save-sat-levels", 0, POPT_ARG_VAL, &save_sat_levels, 1, "save previous states seen at saturation levels", NULL },
@@ -228,8 +248,8 @@ static  struct poptOption options[] = {
     { "type", 0, POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT, &trc_type, 0, "trace type to write", "<aut|gcd|gcf|dir|fsm|bcg>" },
     { "save-transitions", 0 , POPT_ARG_STRING, &transitions_save_filename, 0, "file to write transition relations to", "<outputfile>" },
     { "load-transitions", 0 , POPT_ARG_STRING, &transitions_load_filename, 0, "file to read transition relations from", "<inputfile>" },
-    { "mu" , 0 , POPT_ARG_STRING , &mu_formula , 0 , "file with a mu formula" , "<mu-file>.mu" },
-    { "ctl-star" , 0 , POPT_ARG_STRING , &ctl_formula , 0 , "file with a ctl* formula" , "<ctl-file>.ctl" },
+    { mu_long , 0 , POPT_ARG_STRING , NULL , 0 , "file with a mu formula  (can be given multiple times)" , "<mu-file>.mu" },
+    { ctl_star_long , 0 , POPT_ARG_STRING , NULL , 0 , "file with a ctl* formula  (can be given multiple times)" , "<ctl-file>.ctl" },
     { "dot", 0, POPT_ARG_STRING, &dot_dir, 0, "directory to write dot representation of vector sets to", NULL },
     { "pg-solve" , 0 , POPT_ARG_NONE , &pgsolve_flag, 0, "Solve the generated parity game (only for symbolic tool).","" },
     { NULL, 0 , POPT_ARG_INCLUDE_TABLE, spg_solve_options , 0, "Symbolic parity game solver options", NULL},
@@ -3748,16 +3768,13 @@ get_svar_eq_int_set (int state_idx, int state_match, vset_t visited)
   return result;
 }
 
-static array_manager_t mu_var_man = NULL;
-static vset_t* mu_var = NULL;
-
 /* Naive textbook mu-calculus algorithm
  * Taken from:
  * Model Checking and the mu-calculus, E. Allen Emerson
  * DIMACS Series in Discrete Mathematics, 1997 - Citeseer
  */
 static vset_t
-mu_compute (ltsmin_expr_t mu_expr, vset_t visited)
+mu_compute(ltsmin_expr_t mu_expr, vset_t visited, vset_t* mu_var, array_manager_t mu_var_man)
 {
     vset_t result = NULL;
     switch(mu_expr->token) {
@@ -3776,21 +3793,21 @@ mu_compute (ltsmin_expr_t mu_expr, vset_t visited)
         result = get_svar_eq_int_set(mu_expr->arg1->idx, mu_expr->arg2->idx, visited);
     } break;
     case MU_OR: { // OR
-        result = mu_compute(mu_expr->arg1, visited);
-        vset_t mc = mu_compute(mu_expr->arg2, visited);
+        result = mu_compute(mu_expr->arg1, visited, mu_var, mu_var_man);
+        vset_t mc = mu_compute(mu_expr->arg2, visited, mu_var, mu_var_man);
         vset_union(result, mc);
         vset_destroy(mc);
     } break;
     case MU_AND: { // AND
-        result = mu_compute(mu_expr->arg1, visited);
-        vset_t mc = mu_compute(mu_expr->arg2, visited);
+        result = mu_compute(mu_expr->arg1, visited, mu_var, mu_var_man);
+        vset_t mc = mu_compute(mu_expr->arg2, visited, mu_var, mu_var_man);
         vset_intersect(result, mc);
         vset_destroy(mc);
     } break;
     case MU_NOT: { // NEGATION
         result = vset_create(domain, -1, NULL);
         vset_copy(result, visited);
-        vset_t mc = mu_compute(mu_expr->arg1, visited);
+        vset_t mc = mu_compute(mu_expr->arg1, visited, mu_var, mu_var_man);
         vset_minus(result, mc);
         vset_destroy(mc);
     } break;
@@ -3801,7 +3818,7 @@ mu_compute (ltsmin_expr_t mu_expr, vset_t visited)
         if (mu_expr->arg1->token == MU_NEXT) {
             vset_t temp = vset_create(domain, -1, NULL);
             result = vset_create(domain, -1, NULL);
-            vset_t g = mu_compute(mu_expr->arg1->arg1, visited);
+            vset_t g = mu_compute(mu_expr->arg1->arg1, visited, mu_var, mu_var_man);
 
             for(int i=0;i<nGrps;i++){
                 vset_prev(temp,g,group_next[i],visited);
@@ -3817,9 +3834,14 @@ mu_compute (ltsmin_expr_t mu_expr, vset_t visited)
     case MU_NUM:
         Abort("unhandled MU_NUM");
         break;
-    case MU_SVAR:
-        Abort("unhandled MU_SVAR");
-        break;
+    case MU_SVAR: {
+        if (mu_expr->idx < N) { // state variable
+            Abort("Unhandled MU_SVAR");
+        } else { // state label
+            result = vset_create(domain, -1, NULL);
+            vset_join(result, visited, label_true[mu_expr->idx - N]);
+        }
+    } break;
     case MU_EVAR:
         Abort("unhandled MU_EVAR");
         break;
@@ -3838,7 +3860,7 @@ mu_compute (ltsmin_expr_t mu_expr, vset_t visited)
             // compute ! phi
             vset_t notphi = vset_create(domain, -1, NULL);
             vset_copy(notphi, visited);
-            vset_t phi = mu_compute(mu_expr->arg1->arg1, visited);
+            vset_t phi = mu_compute(mu_expr->arg1->arg1, visited, mu_var, mu_var_man);
             vset_minus(notphi, phi);
             vset_destroy(phi);
 
@@ -3872,7 +3894,7 @@ mu_compute (ltsmin_expr_t mu_expr, vset_t visited)
             do {
                 vset_copy(mu_var[mu_expr->idx], tmp);
                 vset_clear(tmp);
-                tmp = mu_compute(mu_expr->arg1, visited);
+                tmp = mu_compute(mu_expr->arg1, visited, mu_var, mu_var_man);
             } while (!vset_equal(mu_var[mu_expr->idx], tmp));
             vset_destroy(tmp);
             // new var reference
@@ -3890,7 +3912,7 @@ mu_compute (ltsmin_expr_t mu_expr, vset_t visited)
             do {
                 vset_copy(mu_var[mu_expr->idx], tmp);
                 vset_clear(tmp);
-                tmp = mu_compute(mu_expr->arg1, visited);
+                tmp = mu_compute(mu_expr->arg1, visited, mu_var, mu_var_man);
             } while (!vset_equal(mu_var[mu_expr->idx], tmp));
             vset_destroy(tmp);
             // new var reference
@@ -3901,6 +3923,51 @@ mu_compute (ltsmin_expr_t mu_expr, vset_t visited)
         Abort("encountered unhandled mu operator");
     }
     return result;
+}
+
+static array_manager_t* mu_var_mans = NULL;
+static vset_t** mu_vars = NULL;
+
+static void
+init_mu_calculus()
+{
+    if (num_mu + num_ctl > 0) {
+        mu_parse_env = (ltsmin_parse_env_t*) RTmalloc(sizeof(ltsmin_parse_env_t) * num_mu + num_ctl);
+        mu_exprs = (ltsmin_expr_t*) RTmalloc(sizeof(ltsmin_expr_t) * num_mu + num_ctl);
+
+        for (int i = 0; i < num_mu; i++) {
+            mu_parse_env[i] = LTSminParseEnvCreate();
+            mu_exprs[i] = parse_file_env(mu_formulas[i], mu_parse_file, model, mu_parse_env[i]);
+            mark_visible(model, mu_exprs[i], mu_parse_env[i]);
+        }
+
+        for (int i = 0; i < num_ctl; i++) {
+            mu_parse_env[num_mu + i] = LTSminParseEnvCreate();
+            ltsmin_expr_t ctl = parse_file_env(ctl_formulas[i], ctl_parse_file, model, mu_parse_env[num_mu + i]);
+            mark_visible(model, ctl, mu_parse_env[num_mu + i]);
+            Warning(infoLong, "converting %s to mu-calculus", ctl_formulas[i]);
+            mu_exprs[num_mu + i] = ctl_star_to_mu(ctl);
+        }
+
+        num_mu = num_mu + num_ctl;
+
+        mu_var_mans = (array_manager_t*) RTmalloc(sizeof(array_manager_t) * num_mu);
+        mu_vars = (vset_t**) RTmalloc(sizeof(vset_t*) * num_mu);
+
+        vset_t tmp = vset_create(domain, -1, NULL);
+
+        for (int i = 0; i < num_mu; i++) {
+            // run a small test to check correctness of mu formula
+            // setup var manager
+            mu_var_mans[i] = create_manager(65535);
+            mu_vars[i] = NULL;
+            ADD_ARRAY(mu_var_mans[i], mu_vars[i], vset_t);
+            vset_t x = mu_compute(mu_exprs[i], tmp, mu_vars[i], mu_var_mans[i]);
+            vset_destroy(x);
+        }
+
+        vset_destroy(tmp);
+    }
 }
 
 /**
@@ -4019,6 +4086,52 @@ parity_game* compute_symbolic_parity_game(vset_t visited, int* src)
         g->e[i] = group_next[i];
     }
     return g;
+}
+
+#define CHECK_MU(s, i) \
+    if (mu_par) check_mu_par((s), (i)); \
+    else check_mu((s), (i));
+
+#define check_mu_go(v, i, s) CALL(check_mu_go, (v), (i), (s))
+VOID_TASK_3(check_mu_go, vset_t, visited, int, i, int*, init)
+{
+    vset_t x = mu_compute(mu_exprs[i], visited, mu_vars[i], mu_var_mans[i]);
+    if (x) {
+        double e_count;
+
+        vset_count(x, NULL, &e_count);
+        Warning(info, "Formula %s holds for %.*g states,", (i >= (num_mu - num_ctl)) ? ctl_formulas[i - (num_mu - num_ctl)] : mu_formulas[i], DBL_DIG, e_count);
+        Warning(info, "the initial state is %sin the set", vset_member(x, init) ? "" : "not ");
+        vset_destroy(x);
+    }
+}
+
+static void
+check_mu(vset_t visited, int* init)
+{
+    if (num_mu > 0) {
+        Print(infoLong, "Starting mu-calculus model checking.");
+        learn_labels(visited);
+        for (int i = 0; i < num_mu; i++) {
+            LACE_ME;
+            check_mu_go(visited, i, init);
+        }
+    }
+}
+
+static void
+check_mu_par(vset_t visited, int* init)
+{
+    LACE_ME;
+    if (num_mu > 0) {
+        Print(infoLong, "Starting parallel mu-calculus model checking.");
+        learn_labels_par(visited);
+        for (int i = 0; i < num_mu; i++) {
+            SPAWN(check_mu_go, visited, i, init);
+        }
+
+        for (int i = 0; i < num_mu; i++) SYNC(check_mu_go);
+    }
 }
 
 VOID_TASK_3(run_reachability, vset_t, states, char*, etf_output, rt_timer_t, timer)
@@ -4227,25 +4340,7 @@ VOID_TASK_1(actual_main, void*, arg)
         }
     }
 
-    /* if checking temporal formula, convert to mu expression */
-    if (mu_formula) {
-        mu_expr = parse_file(mu_formula, mu_parse_file, model);
-    } else if (ctl_formula) {
-        ltsmin_expr_t ctl = parse_file(ctl_formula, ctl_parse_file, model);
-        mu_expr = ctl_star_to_mu(ctl);
-        mu_formula = ctl_formula;
-    }
-
-    /* if checking mu expression, run small correctness test on initial state */
-    if (mu_expr) {
-        // run a small test to check correctness of mu formula
-        // setup var manager
-        mu_var_man = create_manager(65535);
-        ADD_ARRAY(mu_var_man, mu_var, vset_t);
-
-        vset_t x = mu_compute(mu_expr, initial);
-        vset_destroy(x);
-    }
+    init_mu_calculus();
 
     /* determine if we need to generate a symbolic parity game */
 #ifdef LTSMIN_PBES
@@ -4299,6 +4394,8 @@ VOID_TASK_1(actual_main, void*, arg)
         Print(infoShort, "Transition relations written to '%s'\n", transitions_save_filename);
     }
 
+    CHECK_MU(visited, src);
+
     /* save LTS */
     if (files[1] != NULL) {
         do_output(files[1], visited);
@@ -4338,21 +4435,6 @@ VOID_TASK_1(actual_main, void*, arg)
             }
             Print(infoLong, "guard_false: %ld nodes total", total_false);
             Print(infoLong, "guard_true: %ld nodes total", total_true);
-        }
-    }
-
-    if (mu_expr) {
-        Print(infoLong, "Starting mu-calculus model checking.");
-        vset_t x = mu_compute(mu_expr, visited);
-
-        if (x) {
-            double e_count;
-
-            vset_count(x, NULL, &e_count);
-            Warning(info, "mu formula holds for %.*g states\n", DBL_DIG, e_count);
-            Warning(info, " the initial state is %sin the set\n",
-                        vset_member(x, src) ? "" : "not ");
-            vset_destroy(x);
         }
     }
 
