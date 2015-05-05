@@ -1296,7 +1296,7 @@ void tableaux_print(tableaux_t *t)
     int stop = start;
     tableaux_print_compressed(&t->root, 0, &start, &stop);
     for(int i=0; i <= max_level; i++) {
-        Warning(info, "%s", tableaux_lines[i]);
+        Warning(infoLong, "%s", tableaux_lines[i]);
     }
     destroy_manager(line_man);
 }
@@ -1759,14 +1759,14 @@ ltsmin_expr_t tableaux_translate_syntax_tree(tableaux_t* t, syntax_tree_t *s)
                     char buf1[4096];
                     tableaux_node_print(s->node, buf);
                     tableaux_node_print(s->companion->node, buf1);
-                    Warning(info, "encountered preterminal %s with companion %s", buf, buf1);
+                    Warning(infoLong, "encountered preterminal %s with companion %s", buf, buf1);
                     ltsmin_expr_print_ctl(s->companion->S_phi->expr, buf);
                     if (s->node->quantifier == NODE_ALL) {
                         path_var_idx = find_path(NU_PATH, s, s->companion);
-                        Warning(info, " nu-path exist from %s to %s? %s", buf, buf, path_var_idx ? "yes" : "no");
+                        Warning(infoLong, " nu-path exist from %s to %s? %s", buf, buf, path_var_idx ? "yes" : "no");
                     } else {
                         path_var_idx = find_path(MU_PATH, s, s->companion);
-                        Warning(info, " mu-path exist from %s to %s? %s", buf, buf, path_var_idx ? "yes" : "no");
+                        Warning(infoLong, " mu-path exist from %s to %s? %s", buf, buf, path_var_idx ? "yes" : "no");
                     }
 
                     res = LTSminExpr((ltsmin_expr_case)MU_VAR, MU_VAR, s->companion->path_var[path_var_idx], mu_left, mu_right);
@@ -1800,7 +1800,7 @@ ltsmin_expr_t ctl_star_to_mu(ltsmin_expr_t in)
     tableaux_t *t = tableaux_create();
 
     // step 1: convert ctl_star formula to tableaux start node
-    Warning(info, "-- conversion --");
+    Warning(infoLong, "-- conversion --");
     //tableaux_node_t *n = build_test_node(t);
     tableaux_node_t *n = build_initial_node(t,in);
     t->root.node = n;
@@ -1809,15 +1809,15 @@ ltsmin_expr_t ctl_star_to_mu(ltsmin_expr_t in)
     tableaux_build_syntax_tree(t, &t->root);
 
     // debug print this
-    tableaux_print(t);
+    if (log_active(infoLong)) tableaux_print(t);
 
     // step 3: translate the tableaux
     ltsmin_expr_t mu = tableaux_translate_syntax_tree(t, &t->root);
     ltsmin_expr_print_mu(mu, buf);
-    Warning(info, "** %s **", buf);
+    Warning(infoLong, "** %s **", buf);
 
     tableaux_destroy(t);
-    Warning(info, "-- end conversion --");
+    Warning(infoLong, "-- end conversion --");
 
     return mu;
 }
