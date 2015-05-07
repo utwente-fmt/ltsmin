@@ -17,7 +17,7 @@
 
 
 #define MAX_WORKERS 64
-#define SLABS_RATIO 16
+#define SLABS_RATIO 2
 
 typedef struct set_ll_slab_s {
     void               *mem;
