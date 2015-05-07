@@ -450,7 +450,7 @@ static void fork_start(int* argc,char **argv[],int run_threads){
     for(int i=0;i<procs;i++) pid[i]=0;
 
     // this area is mmapped before the fork, so no shm_open is required
-    struct shared_area* shared = create_shared_region(RTmemSize()*4, true);
+    struct shared_area* shared = create_shared_region(RTmemSize()*16, true);
     hre_region_t region=HREcreateRegion(shared,area_malloc,area_align,area_realloc,area_free);
 
     struct message_queue *queues=HREmallocZero(region,procs*sizeof(struct message_queue));
