@@ -927,7 +927,9 @@ extern model_t GBaddMutex(model_t model);
 /**
 \brief Reorder and regroup transitions and state vectors
 */
-extern model_t GBregroup(model_t model, const char *group_spec, int cw_max_cols, int cw_min_cols);
+extern model_t GBregroup(model_t model);
+
+extern struct poptOption group_options[];
 
 /**
  * \brief Returns 1 if the mucalc wrapper is active; 0 otherwise.

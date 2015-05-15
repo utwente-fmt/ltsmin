@@ -1181,9 +1181,6 @@ static int              labels=0;
 static int              cache=0;
 pins_por_t              PINS_POR = PINS_POR_NONE;
 pins_ltl_type_t         PINS_LTL = PINS_LTL_NONE;
-static const char      *regroup_options = NULL;
-static int              cw_max_cols = -1;
-static int              cw_max_rows = -1;
 
 static char *mucalc_file = NULL;
 
@@ -1273,10 +1270,8 @@ GBwrapModel(model_t model)
     /* always add LTL (TODO is this necessary?) */
     model = GBaddLTL(model);
 
-    /* add regrouping if specified */
-    if (regroup_options != NULL) {
-        model = GBregroup(model, regroup_options);
-    }
+    /* add regrouping */
+    model = GBregroup(model);
 
     /* add mu calculus */
     if (mucalc_file) {
@@ -1440,12 +1435,10 @@ struct poptOption greybox_options[]={
 	{ "matrix" , 'm' , POPT_ARG_VAL , &matrix , 1 , "print the dependency matrix for the model and exit" , NULL},
 	{ USE_GUARDS_OPTION , 'g' , POPT_ARG_VAL , &use_guards , 1 , "use guards in combination with the long next-state function to speed up the next-state function" , NULL},
 	{ "cache" , 'c' , POPT_ARG_VAL , &cache , 1 , "enable caching of PINS calls" , NULL },
-	{ "regroup" , 'r' , POPT_ARG_STRING, &regroup_options , 0 ,
-          "enable regrouping; available transformations T: "
-          "gs, ga, gsa, gc, gr, cs, cn, cw, ca, csa, rs, rn, ru, w2W, r2+, w2+, W2+, rb4w, lb<((T.)*:)+>", "<(T,)+>" },
     {"mucalc", 0, POPT_ARG_STRING, &mucalc_file, 0, "modal mu-calculus formula or file with modal mu-calculus formula",
           "<mucalc-file>.mcf|<mucalc formula>"},
     { NULL, 0 , POPT_ARG_INCLUDE_TABLE, por_options , 0 , "Partial Order Reduction options", NULL },
+    { NULL, 0 , POPT_ARG_INCLUDE_TABLE, group_options, 0 , "Regrouping options", NULL },
 	POPT_TABLEEND	
 };
 
