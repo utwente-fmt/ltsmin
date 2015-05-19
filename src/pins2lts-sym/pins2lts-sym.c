@@ -2961,9 +2961,12 @@ establish_group_order(int *group_order, int *initial_count)
 
     bitvector_create(&found_groups, nGrps);
 
-    int labels[nGuards];
-    for (int i = 0; i < nGuards; i++)
+    int label_count = lts_type_get_state_label_count(ltstype);
+    int labels[label_count];
+    for (int i = 0; i < label_count; i++) {
         labels[i] = act_label == i ? act_index : -1;
+    }
+
     for (int i = 0; i < nGrps; i++){
         if (GBtransitionInGroup(model, labels, i)) {
             Warning(info, "Found \"%s\" potentially in group %d", act_detect,i);
