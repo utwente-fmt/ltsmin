@@ -65,12 +65,12 @@ static int
 calculate_size(MDD meta)
 {
     int result = 0;
-    uint32_t val = lddmc_value(meta);
+    uint32_t val = lddmc_getvalue(meta);
     while (val != (uint32_t)-1) {
         if (val != 0) result += 1;
         meta = lddmc_follow(meta, val);
         assert(meta != lddmc_true && meta != lddmc_false);
-        val = lddmc_value(meta);
+        val = lddmc_getvalue(meta);
     }
     return result;
 }
@@ -192,7 +192,7 @@ rel_add_cpy(vrel_t rel, const int *src, const int *dst, const int *cpy)
 
     MDD meta = rel->meta;
     for (;;) {
-        const uint32_t v = lddmc_value(meta);
+        const uint32_t v = lddmc_getvalue(meta);
         if (v == 1 || v == 3) {
             // read or only-read
             cpy_vec[k] = 0; // not supported yet for read levels
