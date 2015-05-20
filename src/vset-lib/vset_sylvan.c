@@ -14,8 +14,9 @@
 
 static int fddbits = 16;
 static int datasize = 23;
-static int maxsize = 26;
+static int maxtablesize = 28;
 static int cachesize = 24;
+static int maxcachesize = 28;
 static int granularity = 1;
 
 static void
@@ -23,7 +24,8 @@ ltsmin_sylvan_init()
 {
     static int initialized=0;
     if (!initialized) {
-        sylvan_init(datasize, maxsize, cachesize, granularity);
+        sylvan_init_package(datasize, maxtablesize, cachesize);
+        sylvan_init_bdd(granularity);
         initialized=1;
     }
 }
@@ -31,8 +33,9 @@ ltsmin_sylvan_init()
 struct poptOption sylvan_options[] = {
     { "sylvan-bits",0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &fddbits, 0, "set number of bits per integer in the state vector","<bits>"},
     { "sylvan-tablesize",0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &datasize , 0 , "set initial size of BDD table to 1<<datasize","<datasize>"},
-    { "sylvan-max-tablesize",0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &maxsize , 0 , "set maximum size of BDD table to 1<<maxsize","<maxsize>"},
-    { "sylvan-cachesize",0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &cachesize , 0 , "set size of memoization cache to 1<<cachesize","<cachesize>"},
+    { "sylvan-maxtablesize",0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &maxtablesize , 0 , "set maximum size of BDD table to 1<<maxsize","<maxtablesize>"},
+    { "sylvan-cachesize",0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &cachesize , 0 , "set initial size of memoization cache to 1<<cachesize","<cachesize>"},
+    { "sylvan-maxcachesize",0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &maxcachesize , 0 , "set maximum size of memoization cache to 1<<cachesize","<maxcachesize>"},
     { "sylvan-granularity",0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &granularity , 0 , "only use memoization cache for every 1/granularity BDD levels","<granularity>"},
     POPT_TABLEEND
 };

@@ -8,16 +8,19 @@
 #include <hre/user.h>
 #include <vset-lib/vdom_object.h>
 
-#include <lddmc.h>
+
+#include <sylvan.h>
 
 static int datasize = 22; // 23 = 128 MB
-static int maxsize = 26;  // 26 = 2048 MB
+static int maxtablesize = 28;  // 28 = 8196 MB
 static int cachesize = 24; // 24 = 576 MB
+static int maxcachesize = 28; // 28 = 9216 MB
 
 struct poptOption lddmc_options[]= {
-    { "lddmc-tablesize", 0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &datasize , 0 , "log2 initial size of LDD nodes table", "<datasize>"},
-    { "lddmc-maxsize", 0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &maxsize , 0 , "log2 maximum size of LDD nodes table", "<maxsize>"},
+    { "lddmc-tablesize", 0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &datasize , 0 , "log2 initial size of LDD nodes table", "<tablesize>"},
+    { "lddmc-maxtablesize", 0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &maxtablesize , 0 , "log2 maximum size of LDD nodes table", "<maxtablesize>"},
     { "lddmc-cachesize", 0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &cachesize , 0 , "log2 size of memoization cache", "<cachesize>"},
+    { "lddmc-maxcachesize", 0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &maxcachesize , 0 , "log2 maximum size of memoization cache", "<maxcachesize>"},
     POPT_TABLEEND
 };
 
@@ -772,7 +775,8 @@ vdom_create_lddmc(int n)
     /* Initialize library if necessary */
     static int initialized = 0;
     if (!initialized) {
-        lddmc_init(datasize, maxsize, cachesize);
+        sylvan_init_package(datasize, maxtablesize, cachesize);
+        sylvan_init_ldd();
         initialized = 1;
     }
 
