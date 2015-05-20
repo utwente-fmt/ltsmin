@@ -528,7 +528,7 @@ set_next(vset_t dst, vset_t src, vrel_t rel)
 
     assert(dst->projection == src->projection);
     sylvan_deref(dst->bdd);
-    dst->bdd = sylvan_ref(sylvan_relprod_paired(src->bdd, rel->bdd, rel->all_variables));
+    dst->bdd = sylvan_ref(sylvan_relnext(src->bdd, rel->bdd, rel->all_variables));
 } 
 
 /**
@@ -541,7 +541,7 @@ set_prev(vset_t dst, vset_t src, vrel_t rel, vset_t univ)
 
     assert(dst->projection == src->projection);
     sylvan_deref(dst->bdd);
-    dst->bdd = sylvan_ref(sylvan_relprod_paired_prev(src->bdd, rel->bdd, rel->all_variables));
+    dst->bdd = sylvan_ref(sylvan_relprev(src->bdd, rel->bdd, rel->all_variables));
     set_intersect(dst, univ);
 }
 
