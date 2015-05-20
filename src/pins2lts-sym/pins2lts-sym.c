@@ -3806,9 +3806,9 @@ start_chunk_thread(void* arg){
 #endif
 
 #ifdef HAVE_SYLVAN
-TASK_1(void*, actual_main, void*, arg)
+VOID_TASK_1(actual_main, void*, arg)
 #else
-static void*
+static void
 actual_main(void)
 #endif
 {
@@ -4198,8 +4198,6 @@ actual_main(void)
             RTfree(priority);
         }
     }
-
-    return 0;
 }
 
 int

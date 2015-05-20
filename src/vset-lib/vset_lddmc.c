@@ -377,10 +377,9 @@ struct enum_context
     void* context;
 };
 
-TASK_3(void*, enumer, uint32_t*, values, size_t, count, struct enum_context*, ctx)
+VOID_TASK_3(enumer, uint32_t*, values, size_t, count, struct enum_context*, ctx)
 {
     ctx->cb(ctx->context, (int*)values);
-    return NULL;
     (void)count;
 }
 
@@ -389,7 +388,7 @@ set_enum(vset_t set, vset_element_cb cb, void* context)
 {
     LACE_ME;
     struct enum_context ctx = (struct enum_context){cb, context};
-    lddmc_sat_all_nopar(set->mdd, (lddmc_sat_cb)TASK(enumer), &ctx);
+    lddmc_sat_all_nopar(set->mdd, (lddmc_enum_cb)TASK(enumer), &ctx);
 }
 
 struct set_update_context
@@ -422,7 +421,7 @@ set_update(vset_t dst, vset_t set, vset_update_cb cb, void* context)
     LACE_ME;
     struct set_update_context ctx = (struct set_update_context){dst, cb, context};
     MDD old = dst->mdd;
-    MDD result = lddmc_ref(lddmc_collect(set->mdd, (lddmc_sat_cb)TASK(set_updater), &ctx));
+    MDD result = lddmc_ref(lddmc_collect(set->mdd, (lddmc_collect_cb)TASK(set_updater), &ctx));
     dst->mdd = lddmc_ref(lddmc_union(dst->mdd, result));
     lddmc_deref(old);
     lddmc_deref(result);
@@ -459,7 +458,7 @@ rel_update(vrel_t rel, vset_t set, vrel_update_cb cb, void* context)
     LACE_ME;
     struct rel_update_context ctx = (struct rel_update_context){rel, cb, context};
     MDD old = rel->mdd;
-    MDD result = lddmc_ref(lddmc_collect(set->mdd, (lddmc_sat_cb)TASK(rel_updater), &ctx));
+    MDD result = lddmc_ref(lddmc_collect(set->mdd, (lddmc_collect_cb)TASK(rel_updater), &ctx));
     rel->mdd = lddmc_ref(lddmc_union(rel->mdd, result));
     lddmc_deref(old);
     lddmc_deref(result);
@@ -486,7 +485,7 @@ set_enum_match(vset_t set, int p_len, int *proj, int *match, vset_element_cb cb,
     MDD cube = lddmc_ref(lddmc_cube((uint32_t*)match, p_len));
 
     struct enum_context ctx = (struct enum_context){cb, context};
-    lddmc_match_sat_par(set->mdd, cube, mdd_proj, (lddmc_sat_cb)TASK(enumer), &ctx);
+    lddmc_match_sat_par(set->mdd, cube, mdd_proj, (lddmc_enum_cb)TASK(enumer), &ctx);
     lddmc_deref(cube);
     lddmc_deref(mdd_proj);
 }
