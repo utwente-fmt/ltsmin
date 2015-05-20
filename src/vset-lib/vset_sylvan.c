@@ -24,7 +24,7 @@ ltsmin_sylvan_init()
 {
     static int initialized=0;
     if (!initialized) {
-        sylvan_init_package(datasize, maxtablesize, cachesize);
+        sylvan_init_package(1LL<<datasize, 1LL<<maxtablesize, 1LL<<cachesize, 1LL<<maxcachesize);
         sylvan_init_bdd(granularity);
         initialized=1;
     }
