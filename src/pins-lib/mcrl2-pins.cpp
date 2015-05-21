@@ -337,7 +337,6 @@ mcrl2_popt (poptContext con, enum poptCallbackReason reason,
         const char **argv;
         RTparseOptions (mcrl2_args,&argc,(char***)&argv);
         argv[0] = (char*)"--mcrl2";
-        MCRL2initGreybox (argc, argv, HREstackBottom());
         const char *opt_rewriter = mcrl2_rewriter_strategy.c_str();
         int opt_verbosity = 0;
         struct poptOption options[] = {
@@ -384,16 +383,6 @@ struct poptOption mcrl2_options[] = {
     { "mcrl2-internal-edge-labels", 0, POPT_ARG_VAL, &readable_edge_labels, 0, "use mcrl2-internal edge label encoding", NULL },
     POPT_TABLEEND
 };
-
-void
-MCRL2initGreybox (int argc,const char *argv[],void* stack_bottom)
-{
-    Warning(debug,"ATerm init");
-    MCRL2_ATERMPP_INIT_(argc, const_cast<char**>(argv), stack_bottom);
-    (void)argc;
-    (void)argv;
-    (void)stack_bottom;
-}
 
 static int
 MCRL2getTransitionsLong (model_t m, int group, int *src, TransitionCB cb, void *ctx)
