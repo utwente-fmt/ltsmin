@@ -1381,14 +1381,14 @@ dm_row_next (dm_row_iterator_t *ix)
 }
 
 int
-dm_ones_in_col (matrix_t *m, int col)
+dm_ones_in_col (const matrix_t *m, int col)
 {
     int                 colp = m->col_perm.data[col].becomes;
     return m->col_perm.count[colp];
 }
 
 int
-dm_ones_in_row (matrix_t *m, int row)
+dm_ones_in_row (const matrix_t *m, int row)
 {
     int                 rowp = m->row_perm.data[row].becomes;
     return m->row_perm.count[rowp];

@@ -130,8 +130,8 @@ extern int          dm_create_row_iterator (dm_row_iterator_t *,
 extern int          dm_col_next (dm_col_iterator_t *);
 extern int          dm_row_next (dm_row_iterator_t *);
 
-extern int          dm_ones_in_row (matrix_t *, int row);
-extern int          dm_ones_in_col (matrix_t *, int col);
+extern int          dm_ones_in_row (const matrix_t *, int row);
+extern int          dm_ones_in_col (const matrix_t *, int col);
 
 extern int          dm_project_vector (matrix_t *, int row, int *src,
                                        int *dst);
