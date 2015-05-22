@@ -27,7 +27,7 @@ void arch_zip_create(const char* name,int buf_size,string_map_t policy,archive_t
 
 
 #ifdef LIBZIP_VERSION
-#if LIBZIP_VERSION_MAJOR == 0 && LIBZIP_VERSION_MINOR >= 10
+#if LIBZIP_VERSION_MAJOR > 0 || (LIBZIP_VERSION_MAJOR == 0 && LIBZIP_VERSION_MINOR >= 10)
 #define zip_file_no_t zip_int64_t 
 #else
 #error "libzip version not supported"
@@ -223,7 +223,7 @@ static copy_zip_context_t copy_zip_setup(struct zip *dst,archive_t src,const cha
 }
 
 #ifdef LIBZIP_VERSION
-#if LIBZIP_VERSION_MAJOR == 0 && LIBZIP_VERSION_MINOR >= 10
+#if LIBZIP_VERSION_MAJOR > 0 || (LIBZIP_VERSION_MAJOR == 0 && LIBZIP_VERSION_MINOR >= 10)
 #define zip_file_no_t zip_int64_t 
 static zip_int64_t
 copy_zip_function(void *state, void *data, zip_uint64_t len, enum zip_source_cmd cmd)
