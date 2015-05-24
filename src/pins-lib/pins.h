@@ -911,6 +911,11 @@ extern model_t GBaddPORCheck(model_t model);
 */
 extern model_t GBaddMucalc (model_t model, const char *mucalc_file);
 
+/**
+\brief Add multi-process fork wrapper
+*/
+extern model_t GBaddFork(model_t model);
+
 
 //@{
 
