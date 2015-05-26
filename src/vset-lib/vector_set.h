@@ -384,11 +384,6 @@ void vdom_set_name(vdom_t dom, int i, char* name);
 */
 char* vdom_get_name(vdom_t dom, int i);
 
-/**
-\brief initialized the universe. Should be called after vdom_create_domain.
-*/
-void vdom_init_universe(vdom_t dom);
-
 //@}
 
 #endif

@@ -548,9 +548,3 @@ vdom_vector_size(vdom_t dom)
 {
     return dom->shared.size;
 }
-
-void
-vdom_init_universe(vdom_t dom)
-{
-    if (dom->shared.init_universe != NULL) dom->shared.init_universe(dom);
-}

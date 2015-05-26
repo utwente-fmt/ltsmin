@@ -745,19 +745,6 @@ dom_save(FILE* f, vdom_t dom)
 }
 
 static void
-init_universe(vdom_t dom)
-{
-    LACE_ME;
-
-    int n = dom->shared.size;
-
-    sylvan_gc_disable();
-    dom->universe = sylvan_ref(sylvan_set_fromarray(dom->vec_to_bddvar, fddbits * n));
-    dom->prime_universe = sylvan_ref(sylvan_set_fromarray(dom->prime_vec_to_bddvar, fddbits * n));
-    sylvan_gc_enable();
-}
-
-static void
 dom_set_function_pointers(vdom_t dom)
 {
     // Set function pointers
@@ -803,8 +790,6 @@ dom_set_function_pointers(vdom_t dom)
     dom->shared.rel_load_proj=rel_load_proj;
     dom->shared.rel_load=rel_load;
     dom->shared.rel_destroy=rel_destroy;
-
-    dom->shared.init_universe=init_universe;
 }
 
 /**
@@ -813,6 +798,8 @@ dom_set_function_pointers(vdom_t dom)
 vdom_t
 vdom_create_sylvan(int n)
 {
+    LACE_ME;
+
     Warning(info,"Creating a Sylvan domain.");
 
     // Call initializator of library (if needed)
@@ -834,12 +821,19 @@ vdom_create_sylvan(int n)
         }
     }
 
+    sylvan_gc_disable();
+    dom->universe = sylvan_ref(sylvan_set_fromarray(dom->vec_to_bddvar, fddbits * n));
+    dom->prime_universe = sylvan_ref(sylvan_set_fromarray(dom->prime_vec_to_bddvar, fddbits * n));
+    sylvan_gc_enable();
+
     return dom;
 }
 
 vdom_t
 vdom_create_sylvan_from_file(FILE *f)
 {
+    LACE_ME;
+
     Warning(info,"Creating a Sylvan domain.");
 
     // Call initializator of library (if needed)
@@ -860,6 +854,11 @@ vdom_create_sylvan_from_file(FILE *f)
 
     fread(dom->vec_to_bddvar, sizeof(BDDVAR), vector_size * bits_per_integer, f);
     fread(dom->prime_vec_to_bddvar, sizeof(BDDVAR), vector_size * bits_per_integer, f);
+
+    sylvan_gc_disable();
+    dom->universe = sylvan_ref(sylvan_set_fromarray(dom->vec_to_bddvar, fddbits * vector_size));
+    dom->prime_universe = sylvan_ref(sylvan_set_fromarray(dom->prime_vec_to_bddvar, fddbits * vector_size));
+    sylvan_gc_enable();
 
     return dom;
 }

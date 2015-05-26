@@ -3097,7 +3097,6 @@ init_model(char *file)
 static void
 init_domain(vset_implementation_t impl) {
     domain = vdom_create_domain(N, impl);
-    if (HREme(HREglobal())==0) vdom_init_universe(domain);
 
     for (int i = 0; i < dm_ncols(GBgetDMInfo(model)); i++) {
         vdom_set_name(domain, i, lts_type_get_state_name(ltstype, i));
@@ -3553,7 +3552,6 @@ actual_main(void)
         if (f == 0) Abort("Cannot open '%s' for reading!", transitions_load_filename);
 
         domain = vdom_create_domain_from_file(f, vset_impl);
-        if (HREme(HREglobal())==0) vdom_init_universe(domain);
 
         /* Call hook */
         vset_pre_load(f, domain);
