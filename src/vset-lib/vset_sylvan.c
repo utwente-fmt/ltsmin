@@ -387,7 +387,7 @@ set_example(vset_t set, int *e)
     memset(e, 0, sizeof(int)*set->vector_size);
 
     char* cube = (char*)alloca(set->vector_size*fddbits*sizeof(char));
-    sylvan_sat_one(set->bdd, set->vec_to_bddvar, set->vector_size*fddbits, cube);
+    sylvan_sat_one(set->bdd, set->variables, cube);
 
     size_t i;
     int j;
