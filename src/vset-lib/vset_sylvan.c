@@ -246,9 +246,9 @@ state_to_bdd(const int* e, size_t vec_length, BDDVAR* vec_to_bddvar, BDD project
     for (i=0;i<varcount-1;i++) assert(vec_to_bddvar[i]<vec_to_bddvar[i+1]);
 
     BDDSET meta = sylvan_set_fromarray(vec_to_bddvar, varcount);
-    BDD bdd = sylvan_ref(sylvan_cube(meta, cube));
-    BDD proj = sylvan_ref(sylvan_exists(bdd, projection));
-    sylvan_deref(bdd);
+    BDD bdd = bdd_refs_push(sylvan_cube(meta, cube));
+    BDD proj = sylvan_exists(bdd, projection);
+    bdd_refs_pop(1);
 
     return proj;
 }
@@ -263,9 +263,10 @@ set_add(vset_t set, const int* e)
 
     // For some reason, we never get projected e, we get full e.
     BDD bdd = state_to_bdd(e, set->dom->shared.size, set->dom->vec_to_bddvar, set->projection);
+    bdd_refs_push(bdd);
     BDD prev = set->bdd;
     set->bdd = sylvan_ref(sylvan_or(prev, bdd));
-    sylvan_deref(bdd);
+    bdd_refs_pop(1);
     sylvan_deref(prev);
 }
 
@@ -278,9 +279,9 @@ set_member(vset_t set, const int* e)
     LACE_ME;
 
     // For some reason, we never get projected e, we get full e.
-    BDD bdd = state_to_bdd(e, set->dom->shared.size, set->dom->vec_to_bddvar, set->projection);
+    BDD bdd = bdd_refs_push(state_to_bdd(e, set->dom->shared.size, set->dom->vec_to_bddvar, set->projection));
     int res = sylvan_and(set->bdd, bdd) != sylvan_false ? 1 : 0;
-    sylvan_deref(bdd);
+    bdd_refs_pop(1);
     return res;
 }
 
@@ -590,15 +591,17 @@ rel_add(vrel_t rel, const int *src, const int *dst)
 
     BDD bdd_src = state_to_bdd(src, rel->vector_size, rel->vec_to_bddvar, sylvan_false);
     BDD bdd_dst = state_to_bdd(dst, rel->vector_size, rel->prime_vec_to_bddvar, sylvan_false);
+    bdd_refs_push(bdd_src);
+    bdd_refs_push(bdd_dst);
 
-    BDD part = sylvan_ref(sylvan_and(bdd_src, bdd_dst));
-    sylvan_deref(bdd_src);
-    sylvan_deref(bdd_dst);
+    BDD part = sylvan_and(bdd_src, bdd_dst);
+    bdd_refs_pop(2);
+    bdd_refs_push(part);
 
     BDD old = rel->bdd;
     rel->bdd = sylvan_ref(sylvan_or(rel->bdd, part));
+    bdd_refs_pop(1);
     sylvan_deref(old);
-    sylvan_deref(part);
 }
 
 static void
