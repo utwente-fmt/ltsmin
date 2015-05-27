@@ -56,7 +56,9 @@ struct vector_relation
     void *expand_ctx;
 
     BDD bdd;                    // Represented BDD
-    size_t vector_size;         // How long is the vector in integers
+
+    int r_k, w_k;
+    BDD cur_is_next;
 
     BDD state_variables;        // X
     BDD prime_variables;        // X'
@@ -116,13 +118,11 @@ set_destroy(vset_t set)
 }
 
 /**
- * Create a "relation" (Dom x Dom)
- * 0 < k <= dom->shared.size
- * The integers in proj, a k-length array, are indices of the 
- * state vector.
+ * Create a transition relation
+ * There are r_k 'read' variables and w_k 'write' variables
  */
 static vrel_t
-rel_create(vdom_t dom, int k, int* proj)
+rel_create_rw(vdom_t dom, int r_k, int *r_proj, int w_k, int *w_proj)
 {
     LACE_ME;
 
@@ -131,25 +131,87 @@ rel_create(vdom_t dom, int k, int* proj)
     rel->dom = dom;
     rel->bdd = sylvan_false; // Initially, empty.
 
-    // Relations are always projections.
-    assert (k >= 0 && k<=dom->shared.size); 
+    rel->r_k = r_k;
+    rel->w_k = w_k;
 
-    rel->vector_size = k;
-
-    BDDVAR state_vars[statebits * k];
-    BDDVAR prime_vars[statebits * k];
-
-    for (int i=0; i<k; i++) {
-        for (int j=0; j<statebits; j++) {
-            state_vars[i*statebits+j] = 2*(proj[i]*statebits+j);
-            prime_vars[i*statebits+j] = 2*(proj[i]*statebits+j)+1;
+    /* Compute a_proj the union of r_proj and w_proj, and a_k the length of a_proj */
+    int a_proj[r_k+w_k];
+    int r_i = 0, w_i = 0, a_i = 0;
+    for (;r_i < r_k || w_i < w_k;) {
+        if (r_i < r_k && w_i < w_k) {
+            if (r_proj[r_i] < w_proj[w_i]) {
+                a_proj[a_i++] = r_proj[r_i++];
+            } else if (r_proj[r_i] > w_proj[w_i]) {
+                a_proj[a_i++] = w_proj[w_i++];
+            } else /* r_proj[r_i] == w_proj[w_i] */ {
+                a_proj[a_i++] = w_proj[w_i++];
+                r_i++;
+            }
+        } else if (r_i < r_k) {
+            a_proj[a_i++] = r_proj[r_i++];
+        } else if (w_i < w_k) {
+            a_proj[a_i++] = w_proj[w_i++];
         }
     }
+    const int a_k = a_i;
 
-    rel->state_variables = sylvan_ref(sylvan_set_fromarray(state_vars, statebits * k));
-    rel->prime_variables = sylvan_ref(sylvan_set_fromarray(prime_vars, statebits * k));
-    rel->all_variables = sylvan_ref(sylvan_set_addall(rel->prime_variables, rel->state_variables));
-    rel->all_action_variables = sylvan_ref(sylvan_set_addall(rel->all_variables, rel->dom->action_variables));
+    /* Compute ro_proj: a_proj \ w_proj */
+    int ro_proj[r_k];
+    int ro_i = 0;
+    for (a_i = w_i = 0; a_i < a_k; a_i++) {
+        if (w_i < w_k) {
+            if (a_proj[a_i] < w_proj[w_i]) {
+                ro_proj[ro_i++] = a_proj[a_i];
+            } else /* a_proj[a_i] == w_proj[w_i] */ {
+                w_i++;
+            }
+        } else {
+            ro_proj[ro_i++] = a_proj[a_i];
+        }
+    }
+    const int ro_k = ro_i;
+
+    /* Create set of (read) state variables for sylvan_cube */
+    BDDVAR state_vars[statebits * r_k];
+    for (int i=0; i<r_k; i++) {
+        for (int j=0; j<statebits; j++) {
+            state_vars[i*statebits+j] = 2*(r_proj[i]*statebits+j);
+        }
+    }
+    rel->state_variables = sylvan_ref(sylvan_set_fromarray(state_vars, statebits * r_k));
+
+    /* Create set of (write) prime variables for sylvan_cube */
+    BDDVAR prime_vars[statebits * w_k];
+    for (int i=0; i<w_k; i++) {
+        for (int j=0; j<statebits; j++) {
+            prime_vars[i*statebits+j] = 2*(w_proj[i]*statebits+j)+1;
+        }
+    }
+    rel->prime_variables = sylvan_ref(sylvan_set_fromarray(prime_vars, statebits * w_k));
+
+    /* Compute all_variables, which are all variables the transition relation is defined on */
+    BDDVAR all_vars[statebits * a_k * 2];
+    for (int i=0; i<a_k; i++) {
+        for (int j=0; j<statebits; j++) {
+            all_vars[2*(i*statebits+j)] = 2*(a_proj[i]*statebits+j);
+            all_vars[2*(i*statebits+j)+1] = 2*(a_proj[i]*statebits+j)+1;
+        }
+    }
+    rel->all_variables = sylvan_ref(sylvan_set_fromarray(all_vars, statebits * a_k * 2));
+
+    /* Compute cur_is_next for variables in ro_proj */
+    BDD cur_is_next = sylvan_true;
+    bdd_refs_push(cur_is_next);
+    for (int i=ro_k-1; i>=0; i--) {
+        for (int j=statebits-1; j>=0; j--) {
+            BDD low = bdd_refs_push(sylvan_makenode(2*(ro_proj[i]*statebits+j)+1, cur_is_next, sylvan_false));
+            BDD high = sylvan_makenode(2*(ro_proj[i]*statebits+j)+1, sylvan_false, cur_is_next);
+            bdd_refs_pop(2);
+            cur_is_next = bdd_refs_push(sylvan_makenode(2*(ro_proj[i]*statebits+j), low, high));
+        }
+    }
+    bdd_refs_pop(1);
+    rel->cur_is_next = sylvan_ref(cur_is_next);
 
     return rel;
 }
@@ -554,38 +616,37 @@ set_zip(vset_t dst, vset_t src)
 
 /**
  * Add (src, dst) to the relation
- * Note that src and dst are PROJECTED (small) vectors!
  */
 static void
 rel_add(vrel_t rel, const int *src, const int *dst)
 {
     LACE_ME;
 
-    check_state(src, rel->vector_size);
-    check_state(dst, rel->vector_size);
+    check_state(src, rel->r_k);
+    check_state(dst, rel->w_k);
 
-    // make cube (interleaved)
-    char cube[rel->vector_size * statebits * 2];
-    char *arr = cube;
+    // make cube of src
+    char src_cube[rel->r_k * statebits];
+    state_to_cube(src, (size_t)rel->r_k, src_cube);
+    BDD src_bdd = bdd_refs_push(sylvan_cube(rel->state_variables, src_cube));
 
-    for (size_t i=0; i<rel->vector_size; i++) {
-        for (int j=0; j<statebits; j++) {
-            *arr++ = (*src & (1LL<<(statebits-j-1))) ? 1 : 0;
-            *arr++ = (*dst & (1LL<<(statebits-j-1))) ? 1 : 0;
-        }
-        src++;
-        dst++;
-    }
+    // make cube of dst
+    char dst_cube[rel->w_k * statebits];
+    state_to_cube(dst, (size_t)rel->w_k, dst_cube);
+    BDD dst_bdd = bdd_refs_push(sylvan_cube(rel->prime_variables, dst_cube));
 
-    // cube it
-    BDD add = sylvan_cube(rel->all_variables, cube);
+    // concatenate src and dst
+    BDD src_and_dst = bdd_refs_push(sylvan_and(src_bdd, dst_bdd));
 
-    // add it to old relation
+    // intersect with cur_is_next
+    BDD to_add = bdd_refs_push(sylvan_and(src_and_dst, rel->cur_is_next));
+
+    // add result to relation
     BDD old = rel->bdd;
-    bdd_refs_push(add);
-    rel->bdd = sylvan_ref(sylvan_or(rel->bdd, add));
-    bdd_refs_pop(1);
+    rel->bdd = sylvan_ref(sylvan_or(rel->bdd, to_add));
     sylvan_deref(old);
+
+    bdd_refs_pop(4);
 }
 
 static void
@@ -639,13 +700,10 @@ static void
 rel_save(FILE* f, vrel_t rel)
 {
     size_t bdd = sylvan_serialize_add(rel->bdd);
-    size_t state_vars = sylvan_serialize_add(rel->state_variables);
-    size_t prime_vars = sylvan_serialize_add(rel->prime_variables);
+    size_t all_vars = sylvan_serialize_add(rel->all_variables);
     sylvan_serialize_tofile(f);
     fwrite(&bdd, sizeof(size_t), 1, f);
-    fwrite(&rel->vector_size, sizeof(size_t), 1, f);
-    fwrite(&state_vars, sizeof(size_t), 1, f);
-    fwrite(&prime_vars, sizeof(size_t), 1, f);
+    fwrite(&all_vars, sizeof(size_t), 1, f);
 }
 
 /* LOADING */
@@ -694,25 +752,16 @@ static void
 rel_load(FILE* f, vrel_t rel)
 {
     if (rel->bdd) sylvan_deref(rel->bdd);
-    if (rel->state_variables) sylvan_deref(rel->state_variables);
-    if (rel->prime_variables) sylvan_deref(rel->prime_variables);
     if (rel->all_variables) sylvan_deref(rel->all_variables);
 
     sylvan_serialize_fromfile(f);
 
-    size_t bdd, state_vars, prime_vars;
+    size_t bdd, all_vars;
     fread(&bdd, sizeof(size_t), 1, f);
-    fread(&rel->vector_size, sizeof(size_t), 1, f);
-    fread(&state_vars, sizeof(size_t), 1, f);
-    fread(&prime_vars, sizeof(size_t), 1, f);
+    fread(&all_vars, sizeof(size_t), 1, f);
 
     rel->bdd = sylvan_ref(sylvan_serialize_get_reversed(bdd));
-    rel->state_variables = sylvan_ref(sylvan_serialize_get_reversed(state_vars));
-    rel->prime_variables = sylvan_ref(sylvan_serialize_get_reversed(prime_vars));
-
-    LACE_ME;
-    rel->all_variables = sylvan_ref(sylvan_set_addall(rel->prime_variables, rel->state_variables));
-    rel->all_action_variables = sylvan_ref(sylvan_set_addall(rel->all_variables, rel->dom->action_variables));
+    rel->all_variables = sylvan_ref(sylvan_serialize_get_reversed(all_vars));
 }
 
 static void
@@ -721,6 +770,18 @@ dom_save(FILE* f, vdom_t dom)
     int vector_size = dom->shared.size;
     fwrite(&vector_size, sizeof(int), 1, f);
     fwrite(&statebits, sizeof(int), 1, f);
+}
+
+static int
+separates_rw()
+{
+    return 1;
+}
+
+static int
+supports_cpy()
+{
+    return 0;
 }
 
 static void
@@ -747,7 +808,7 @@ dom_set_function_pointers(vdom_t dom)
     dom->shared.set_zip=set_zip;
     dom->shared.set_project=set_project;
     dom->shared.set_count=set_count;
-    dom->shared.rel_create=rel_create;
+    dom->shared.rel_create_rw=rel_create_rw;
     dom->shared.rel_add=rel_add;
     dom->shared.rel_count=rel_count;
     dom->shared.set_next=set_next;
@@ -769,6 +830,9 @@ dom_set_function_pointers(vdom_t dom)
     dom->shared.rel_load_proj=rel_load_proj;
     dom->shared.rel_load=rel_load;
     dom->shared.rel_destroy=rel_destroy;
+
+    dom->shared.separates_rw=separates_rw;
+    dom->shared.supports_cpy=supports_cpy;
 }
 
 /**
