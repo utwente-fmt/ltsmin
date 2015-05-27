@@ -595,6 +595,12 @@ rel_add(vrel_t rel, const int *src, const int *dst)
 }
 
 static void
+set_reorder()
+{
+    // ignore
+}
+
+static void
 set_dot(FILE* fp, vset_t src)
 {
     sylvan_fprintdot(fp, src->bdd);
@@ -774,6 +780,8 @@ dom_set_function_pointers(vdom_t dom)
     dom->shared.set_next=set_next;
     dom->shared.set_prev=set_prev;
     // set_least_fixpoint
+
+    dom->shared.reorder=set_reorder;
     dom->shared.set_dot=set_dot;
     dom->shared.rel_dot=rel_dot;
 
