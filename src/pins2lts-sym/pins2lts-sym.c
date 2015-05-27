@@ -3041,6 +3041,9 @@ init_model(char *file)
     HREbarrier(HREglobal());
 
     GBloadFile(model, file);
+#ifdef HAVE_SYLVAN
+    model = GBaddFork(model);
+#endif
     model = GBwrapModel(model);
 
     HREbarrier(HREglobal());
@@ -3496,6 +3499,20 @@ parity_game* compute_symbolic_parity_game(vset_t visited, int* src)
 static char *files[2];
 
 #ifdef HAVE_SYLVAN
+VOID_TASK_0(fork_forcer)
+{
+    /* get initial state */
+    int src[N];
+    GBgetInitialState(model, src);
+    /* get number of state labels */
+    int sLbls = dm_nrows(GBgetStateLabelInfo(model));
+    /* force forking by getting all state labels of initial state */
+    int labels[sLbls];
+    GBgetStateLabelsAll(model, src, labels);
+}
+#endif
+
+#ifdef HAVE_SYLVAN
 VOID_TASK_1(actual_main, void*, arg)
 #else
 static void
@@ -3516,6 +3533,11 @@ actual_main(void)
     init_model(files[0]);
 
     Print(infoLong, "Master ready: %d.", HREme(HREglobal()));
+
+#ifdef HAVE_SYLVAN
+    // force pins2pins-fork (if active) to fork on all threads
+    TOGETHER(fork_forcer);
+#endif
 
     // table number of first edge label
     act_label = lts_type_find_edge_label_prefix (ltstype, LTSMIN_EDGE_TYPE_ACTION_PREFIX);
