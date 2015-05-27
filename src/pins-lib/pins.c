@@ -579,6 +579,9 @@ void GBinitModelDefaults (model_t *p_model, model_t default_src)
     if (model->project_matrix == NULL) model->project_matrix=default_src->project_matrix;
     if (model->use_guards == 0) model->use_guards=default_src->use_guards;
     if (model->mucalc_node_count==0) model->mucalc_node_count = default_src->mucalc_node_count;
+
+    model->static_info_index = default_src->static_info_index;
+    model->static_info_matrices = default_src->static_info_matrices;
 }
 
 void* GBgetContext(model_t model){
