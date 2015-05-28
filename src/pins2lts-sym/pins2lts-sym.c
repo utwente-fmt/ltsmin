@@ -3053,7 +3053,8 @@ init_model(char *file)
 
     HREbarrier(HREglobal());
 
-    GBloadFile(model, file, &model);
+    GBloadFile(model, file);
+    model = GBwrapModel(model);
 
     HREbarrier(HREglobal());
 

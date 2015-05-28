@@ -1033,7 +1033,8 @@ int main (int argc, char *argv[]){
                       HREgreyboxCount);
 
     // Load model from file
-    GBloadFile(model, files[0], &model);
+    GBloadFile(model, files[0]);
+    model = GBwrapModel(model);
     fprintf(stdout,CYAN "INFO: " RESET " Loaded file: %s \n",files[0]);
   
     // if (argc >= 2){
