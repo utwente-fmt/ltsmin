@@ -13,6 +13,7 @@
 #include <sylvan.h>
 
 static int statebits = 16;
+static int actionbits = 16;
 static int datasize = 23;
 static int maxtablesize = 28;
 static int cachesize = 24;
@@ -36,6 +37,7 @@ struct vector_domain
     // Generated based on vec_to_bddvar and prime_vec_to_bddvar
     BDD state_variables;        // Every BDDVAR used for X
     BDD prime_variables;        // Every BDDVAR used for X'
+    BDD action_variables;       // Every BDDVAR used for the action label
 };
 
 struct vector_set
@@ -64,6 +66,7 @@ struct vector_relation
     BDD state_variables;        // X
     BDD prime_variables;        // X'
     BDD all_variables;          // X U X'
+    BDD all_action_variables;   // X U X' U Act
 };
 
 /**
@@ -201,6 +204,7 @@ rel_create_rw(vdom_t dom, int r_k, int *r_proj, int w_k, int *w_proj)
         }
     }
     rel->all_variables = sylvan_ref(sylvan_set_fromarray(all_vars, statebits * a_k * 2));
+    rel->all_action_variables = sylvan_ref(sylvan_or(rel->all_variables, rel->dom->action_variables));
 
     /* Compute cur_is_next for variables in ro_proj */
     BDD cur_is_next = sylvan_true;
@@ -229,6 +233,7 @@ rel_destroy(vrel_t rel)
     sylvan_deref(rel->state_variables);
     sylvan_deref(rel->prime_variables);
     sylvan_deref(rel->all_variables);
+    sylvan_deref(rel->all_action_variables);
     RTfree(rel);
 }
 
@@ -514,7 +519,7 @@ rel_count(vrel_t rel, long *nodes, bn_int_t *elements)
 {
     LACE_ME;
     if (nodes != NULL) *nodes = sylvan_nodecount(rel->bdd);
-    if (elements != NULL) bn_double2int((double)sylvan_satcount(rel->bdd, rel->all_variables), elements);
+    if (elements != NULL) bn_double2int((double)sylvan_satcount(rel->bdd, rel->all_action_variables), elements);
 }
 
 /**
@@ -615,6 +620,70 @@ set_zip(vset_t dst, vset_t src)
     src->bdd = sylvan_ref(sylvan_diff(tmp2, tmp1));
     sylvan_deref(tmp1);
     sylvan_deref(tmp2);
+}
+
+/**
+ * Add (src, dst) to the relation
+ */
+static void
+rel_add_act(vrel_t rel, const int *src, const int *dst, const int *cpy, const int act)
+{
+    LACE_ME;
+
+    check_state(src, rel->r_k);
+    check_state(dst, rel->w_k);
+
+    // make cube of src
+    char src_cube[rel->r_k * statebits];
+    state_to_cube(src, (size_t)rel->r_k, src_cube);
+    BDD src_bdd = bdd_refs_push(sylvan_cube(rel->state_variables, src_cube));
+
+    // Some custom code to create the BDD representing the dst+cpy structure
+    BDD dst_bdd = sylvan_true;
+    for (int i=rel->w_k-1; i>=0; i--) {
+        int k = rel->w_proj[i];
+        if (cpy && cpy[i]) {
+            // take copy of read
+            bdd_refs_push(dst_bdd);
+            for (int j=statebits-1; j>=0; j--) {
+                BDD low = bdd_refs_push(sylvan_makenode(2*(k*statebits+j)+1, dst_bdd, sylvan_false));
+                BDD high = sylvan_makenode(2*(k*statebits+j)+1, sylvan_false, dst_bdd);
+                bdd_refs_pop(2);
+                dst_bdd = bdd_refs_push(sylvan_makenode(2*(k*statebits+j), low, high));
+            }
+            bdd_refs_pop(1);
+        } else {
+            // actually write
+            for (int j=statebits-1; j>=0; j--) {
+                if (dst[i] & (1LL<<(statebits-j-1))) dst_bdd = sylvan_makenode(2*(k*statebits+j)+1, sylvan_false, dst_bdd);
+                else dst_bdd = sylvan_makenode(2*(k*statebits+j)+1, dst_bdd, sylvan_false);
+            }
+        }
+    }
+    bdd_refs_push(dst_bdd);
+
+    // make cube of action
+    char act_cube[actionbits];
+    for (int i=0; i<actionbits; i++) {
+        act_cube[i] = (act & (1LL<<(actionbits-i-1))) ? 1 : 0;
+    }
+    BDD act_bdd = bdd_refs_push(sylvan_cube(rel->dom->action_variables, act_cube));
+
+    // concatenate dst and act
+    BDD dst_and_act = bdd_refs_push(sylvan_and(dst_bdd, act_bdd));
+
+    // concatenate src and dst and act
+    BDD src_and_dst_and_act = bdd_refs_push(sylvan_and(src_bdd, dst_and_act));
+
+    // intersect with cur_is_next
+    BDD to_add = bdd_refs_push(sylvan_and(src_and_dst_and_act, rel->cur_is_next));
+
+    // add result to relation
+    BDD old = rel->bdd;
+    rel->bdd = sylvan_ref(sylvan_or(rel->bdd, to_add));
+    sylvan_deref(old);
+
+    bdd_refs_pop(6);
 }
 
 /**
@@ -802,6 +871,7 @@ dom_save(FILE* f, vdom_t dom)
     int vector_size = dom->shared.size;
     fwrite(&vector_size, sizeof(int), 1, f);
     fwrite(&statebits, sizeof(int), 1, f);
+    fwrite(&actionbits, sizeof(int), 1, f);
 }
 
 static int
@@ -841,6 +911,7 @@ dom_set_function_pointers(vdom_t dom)
     dom->shared.set_project=set_project;
     dom->shared.set_count=set_count;
     dom->shared.rel_create_rw=rel_create_rw;
+    dom->shared.rel_add_act=rel_add_act;
     dom->shared.rel_add_cpy=rel_add_cpy;
     dom->shared.rel_add=rel_add;
     dom->shared.rel_count=rel_count;
@@ -904,6 +975,13 @@ vdom_create_sylvan(int n)
     dom->state_variables = sylvan_ref(sylvan_set_fromarray(state_vars, statebits * n));
     dom->prime_variables = sylvan_ref(sylvan_set_fromarray(prime_vars, statebits * n));
 
+    // Create action_variables
+    BDDVAR action_vars[actionbits];
+    for (int i=0; i<actionbits; i++) {
+        action_vars[i] = 1000000+i;
+    }
+    dom->action_variables = sylvan_ref(sylvan_set_fromarray(action_vars, actionbits));
+
     return dom;
 }
 
@@ -913,5 +991,6 @@ vdom_create_sylvan_from_file(FILE *f)
     int vector_size;
     fread(&vector_size, sizeof(int), 1, f);
     fread(&statebits, sizeof(int), 1, f);
+    fread(&actionbits, sizeof(int), 1, f);
     return vdom_create_sylvan(vector_size);
 }
