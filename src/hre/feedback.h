@@ -2,6 +2,10 @@
 #ifndef HRE_FEEDBACK_H
 #define HRE_FEEDBACK_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
+
 #include <errno.h>
 #include <popt.h>
 #include <stdlib.h>
@@ -183,5 +187,9 @@ extern log_t hre_debug;
 #define Fatal(code,chan,...) Abort(__VA_ARGS__)
 
 extern void HREprintStack ();
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
 
 #endif
