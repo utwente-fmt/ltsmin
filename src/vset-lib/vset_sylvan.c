@@ -34,39 +34,38 @@ struct vector_domain
 {
     struct vector_domain_shared shared;
 
-    // Generated based on vec_to_bddvar and prime_vec_to_bddvar
-    BDD state_variables;        // Every BDDVAR used for X
-    BDD prime_variables;        // Every BDDVAR used for X'
-    BDD action_variables;       // Every BDDVAR used for the action label
+    BDD state_variables;        // set of all state variables
+    BDD prime_variables;        // set of all prime state variables
+    BDD action_variables;       // set of action label variables
 };
 
 struct vector_set
 {
     vdom_t dom;
 
-    BDD bdd;                    // Represented BDD
-    size_t vector_size;         // How long is the vector in integers
+    BDD bdd;
+    size_t vector_size;         // size of state vectors in this set
+    BDD state_variables;        // set of state variables in this set
 
-    BDD projection;             // Universe \ X (for projection)
-    BDD state_variables;        // X (for satcount etc)
+    BDD projection;             // set of state variables not in this set (for set_project)
 };
 
 struct vector_relation
 {
     vdom_t dom;
-    expand_cb expand;
-    void *expand_ctx;
+    expand_cb expand;           // compatibility with generic vector_relation
+    void *expand_ctx;           // idem
 
-    BDD bdd;                    // Represented BDD
+    BDD bdd;
+    BDD all_variables;          // all state/prime state variables that the relation is defined on
+    BDD all_action_variables;   // union of all_variables and dom->action_variables
 
-    int r_k, w_k;
+    /* the following are for rel_add_cpy */
+    int r_k, w_k;               // number of read/write in this relation
     int *w_proj;                // easier for rel_add_cpy
-    BDD cur_is_next;
-
-    BDD state_variables;        // X
-    BDD prime_variables;        // X'
-    BDD all_variables;          // X U X'
-    BDD all_action_variables;   // X U X' U Act
+    BDD cur_is_next;            // helper BDD for read-only (copy) variables
+    BDD state_variables;        // set of READ state variables in this relation
+    BDD prime_variables;        // set of WRITE prime state variables in this relation
 };
 
 /**
@@ -530,9 +529,11 @@ set_union(vset_t dst, vset_t src)
 {
     LACE_ME;
 
-    BDD old = dst->bdd;
-    dst->bdd = sylvan_ref(sylvan_or(dst->bdd, src->bdd));
-    sylvan_deref(old);
+    if (dst != src) {
+        BDD old = dst->bdd;
+        dst->bdd = sylvan_ref(sylvan_or(dst->bdd, src->bdd));
+        sylvan_deref(old);
+    }
 }
 
 /**
@@ -543,9 +544,11 @@ set_intersect(vset_t dst, vset_t src)
 {
     LACE_ME;
 
-    BDD old = dst->bdd;
-    dst->bdd = sylvan_ref(sylvan_and(dst->bdd, src->bdd));
-    sylvan_deref(old);
+    if (dst != src) {
+        BDD old = dst->bdd;
+        dst->bdd = sylvan_ref(sylvan_and(dst->bdd, src->bdd));
+        sylvan_deref(old);
+    }
 }
 
 /**
@@ -556,9 +559,14 @@ set_minus(vset_t dst, vset_t src)
 {
     LACE_ME;
 
-    BDD old = dst->bdd;
-    dst->bdd = sylvan_ref(sylvan_diff(dst->bdd, src->bdd));
-    sylvan_deref(old);
+    if (dst != src) {
+        BDD old = dst->bdd;
+        dst->bdd = sylvan_ref(sylvan_diff(dst->bdd, src->bdd));
+        sylvan_deref(old);
+    } else {
+        sylvan_deref(dst->bdd);
+        dst->bdd = sylvan_false;
+    }
 }
 
 /**
@@ -569,9 +577,17 @@ set_next(vset_t dst, vset_t src, vrel_t rel)
 {
     LACE_ME;
 
-    assert(dst->projection == src->projection);
-    sylvan_deref(dst->bdd);
-    dst->bdd = sylvan_ref(sylvan_relnext(src->bdd, rel->bdd, rel->all_variables));
+    // defined on same variables?
+    assert(dst->state_variables == src->state_variables);
+
+    if (dst != src) {
+        sylvan_deref(dst->bdd);
+        dst->bdd = sylvan_ref(sylvan_relnext(src->bdd, rel->bdd, rel->all_variables));
+    } else {
+        BDD old = dst->bdd;
+        dst->bdd = sylvan_ref(sylvan_relnext(src->bdd, rel->bdd, rel->all_variables));
+        sylvan_deref(old);
+    }
 } 
 
 /**
@@ -582,10 +598,23 @@ set_prev(vset_t dst, vset_t src, vrel_t rel, vset_t univ)
 {
     LACE_ME;
 
-    assert(dst->projection == src->projection);
-    sylvan_deref(dst->bdd);
-    dst->bdd = sylvan_ref(sylvan_relprev(rel->bdd, src->bdd, rel->all_variables));
-    set_intersect(dst, univ);
+    // defined on same variables?
+    assert(dst->state_variables == src->state_variables);
+
+    if (dst == univ) {
+        Abort("Do not call set_prev with dst == univ");
+    }
+
+    if (dst != src) {
+        sylvan_deref(dst->bdd);
+        dst->bdd = sylvan_ref(sylvan_relprev(rel->bdd, src->bdd, rel->all_variables));
+        set_intersect(dst, univ);
+    } else {
+        BDD old = dst->bdd;
+        dst->bdd = sylvan_ref(sylvan_relprev(rel->bdd, src->bdd, rel->all_variables));
+        sylvan_deref(old);
+        set_intersect(dst, univ);
+    }
 }
 
 /**
@@ -595,13 +624,13 @@ static void
 set_project(vset_t dst, vset_t src)
 {
     sylvan_deref(dst->bdd);
-    if (dst->projection != 0 && dst->projection != src->projection) {
+
+    if (dst->projection != src->projection) {
         LACE_ME;
-        dst->bdd = sylvan_exists(src->bdd, dst->projection);
+        dst->bdd = sylvan_ref(sylvan_exists(src->bdd, dst->projection));
     } else {
-        dst->bdd = src->bdd;
+        dst->bdd = sylvan_ref(src->bdd);
     }
-    sylvan_ref(dst->bdd);
 }
 
 /**
@@ -613,6 +642,10 @@ static void
 set_zip(vset_t dst, vset_t src)
 {
     LACE_ME;
+
+    if (src == dst) {
+        Abort("Do not call set_zip with dst == src");
+    }
 
     BDD tmp1 = dst->bdd;
     BDD tmp2 = src->bdd;
@@ -763,9 +796,9 @@ set_dot(FILE* fp, vset_t src)
 }
 
 static void
-rel_dot(FILE* fp, vrel_t src)
+rel_dot(FILE* fp, vrel_t rel)
 {
-    sylvan_fprintdot(fp, src->bdd);
+    sylvan_fprintdot(fp, rel->bdd);
 }
 
 /* SAVING */
@@ -826,14 +859,16 @@ set_load(FILE* f, vdom_t dom)
     sylvan_serialize_fromfile(f);
 
     size_t bdd, state_vars;
-    fread(&bdd, sizeof(size_t), 1, f);
-    fread(&set->vector_size, sizeof(size_t), 1, f);
-    fread(&state_vars, sizeof(size_t), 1, f);
+    if ((fread(&bdd, sizeof(size_t), 1, f) != 1) ||
+        (fread(&set->vector_size, sizeof(size_t), 1, f) != 1) ||
+        (fread(&state_vars, sizeof(size_t), 1, f) != 1)) {
+        Abort("invalid file format");
+    }
+
+    LACE_ME;
 
     set->bdd = sylvan_ref(sylvan_serialize_get_reversed(bdd));
     set->state_variables = sylvan_ref(sylvan_serialize_get_reversed(state_vars));
-
-    LACE_ME;
     set->projection = sylvan_ref(sylvan_set_removeall(dom->state_variables, set->state_variables));
 
     return set;
@@ -858,8 +893,10 @@ rel_load(FILE* f, vrel_t rel)
     sylvan_serialize_fromfile(f);
 
     size_t bdd, all_vars;
-    fread(&bdd, sizeof(size_t), 1, f);
-    fread(&all_vars, sizeof(size_t), 1, f);
+    if ((fread(&bdd, sizeof(size_t), 1, f) != 1) ||
+        (fread(&all_vars, sizeof(size_t), 1, f) != 1)) {
+        Abort("invalid file format");
+    }
 
     rel->bdd = sylvan_ref(sylvan_serialize_get_reversed(bdd));
     rel->all_variables = sylvan_ref(sylvan_serialize_get_reversed(all_vars));
@@ -989,8 +1026,10 @@ vdom_t
 vdom_create_sylvan_from_file(FILE *f)
 {
     int vector_size;
-    fread(&vector_size, sizeof(int), 1, f);
-    fread(&statebits, sizeof(int), 1, f);
-    fread(&actionbits, sizeof(int), 1, f);
+    if ((fread(&vector_size, sizeof(int), 1, f) != 1) ||
+        (fread(&statebits, sizeof(int), 1, f) != 1) ||
+        (fread(&actionbits, sizeof(int), 1, f) != 1)) {
+        Abort("invalid file format");
+    }
     return vdom_create_sylvan(vector_size);
 }
