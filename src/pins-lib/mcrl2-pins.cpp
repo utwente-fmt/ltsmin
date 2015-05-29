@@ -24,11 +24,11 @@ extern "C" {
 }
 
 #ifdef MCRL2_JITTYC_AVAILABLE
-static std::string mcrl2_rewriter_strategy = "jittyc";
+static const char* mcrl2_rewriter = "jittyc";
 #else
-static std::string mcrl2_rewriter_strategy = "jitty";
+static const char* mcrl2_rewriter = "jitty";
 #endif
-static char const* mcrl2_args = "";
+static int mcrl2_verbosity = 0;
 static int         finite_types = 0;
 static int         readable_edge_labels = 1;
 
@@ -333,40 +333,11 @@ mcrl2_popt (poptContext con, enum poptCallbackReason reason,
         break;
     case POPT_CALLBACK_REASON_POST: {
         Warning(debug,"mcrl2 init");
-        int argc;
-        const char **argv;
-        RTparseOptions (mcrl2_args,&argc,(char***)&argv);
-        argv[0] = (char*)"--mcrl2";
-        MCRL2initGreybox (argc, argv, HREstackBottom());
-        const char *opt_rewriter = mcrl2_rewriter_strategy.c_str();
-        int opt_verbosity = 0;
-        struct poptOption options[] = {
-            { "rewriter", 'r', POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT,
-              &opt_rewriter, 0, "select rewriter: jittyc, jitty, ...", NULL },
-            { "verbose", 'v', POPT_ARG_INT, &opt_verbosity, 1,
-              "increase verbosity", "INT" },
-            POPT_AUTOHELP
-            POPT_TABLEEND
-        };
-        poptContext optCon = poptGetContext(NULL, argc, argv, options, 0);
-        int res;
-        while ((res = poptGetNextOpt (optCon)) >= 0) {};
-        if (res < -1) {
-            Abort ("Bad mcrl2 option %s: %s (try --mcrl2=--help)",
-                   poptBadOption (optCon, POPT_BADOPTION_NOALIAS),
-                   poptStrerror (res));
-        } else if (poptPeekArg (optCon) != NULL) {
-            Abort ("Unknown mcrl2 option %s (try --mcrl2=--help)",
-                   poptPeekArg (optCon));
-        }
-        poptFreeContext(optCon);
-        mcrl2_rewriter_strategy = std::string(opt_rewriter);
-        GBregisterLoader("lps",MCRL2loadGreyboxModel);
-        if (opt_verbosity > 0) {
-            Warning(info, "increasing mcrl2 verbosity level by %d",
-                    opt_verbosity);
-            mcrl2_log_level_t level = static_cast<mcrl2_log_level_t>(static_cast<size_t>(mcrl2_logger::get_reporting_level()) + opt_verbosity);
-            mcrl2_logger::set_reporting_level (level);
+        GBregisterLoader("lps", MCRL2loadGreyboxModel);
+        if (mcrl2_verbosity > 0) {
+            Warning(info, "increasing mcrl2 verbosity level by %d", mcrl2_verbosity);
+            mcrl2_log_level_t level = static_cast<mcrl2_log_level_t>(static_cast<size_t>(mcrl2_logger::get_reporting_level()) + mcrl2_verbosity);
+            mcrl2_logger::set_reporting_level(level);
         }
         Warning(info,"mCRL2 language module initialized");
         return;
@@ -379,21 +350,12 @@ mcrl2_popt (poptContext con, enum poptCallbackReason reason,
 
 struct poptOption mcrl2_options[] = {
     { NULL, 0, POPT_ARG_CALLBACK|POPT_CBFLAG_POST|POPT_CBFLAG_SKIPOPTION, (void*)mcrl2_popt, 0 , NULL , NULL},
-    { "mcrl2", 0, POPT_ARG_STRING, &mcrl2_args, 0, "pass options to the mCRL2 library", "<mCRL2 options>" },
+    { "mcrl2-rewriter", 0, POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT, &mcrl2_rewriter, 0, "select mCRL2 rewriter: jittyc, jitty, ...", NULL },
+    { "mcrl2-verbosity", 0, POPT_ARG_INT, &mcrl2_verbosity, 1, "increase mCRL2 verbosity", "INT" },
     { "mcrl2-finite-types", 0, POPT_ARG_VAL, &finite_types, 1, "use mCRL2 finite type information", NULL },
     { "mcrl2-internal-edge-labels", 0, POPT_ARG_VAL, &readable_edge_labels, 0, "use mcrl2-internal edge label encoding", NULL },
     POPT_TABLEEND
 };
-
-void
-MCRL2initGreybox (int argc,const char *argv[],void* stack_bottom)
-{
-    Warning(debug,"ATerm init");
-    MCRL2_ATERMPP_INIT_(argc, const_cast<char**>(argv), stack_bottom);
-    (void)argc;
-    (void)argv;
-    (void)stack_bottom;
-}
 
 static int
 MCRL2getTransitionsLong (model_t m, int group, int *src, TransitionCB cb, void *ctx)
@@ -480,13 +442,13 @@ MCRL2exit ()
 void
 MCRL2loadGreyboxModel (model_t m, const char *model_name)
 {
-    Warning(info, "mCRL2 rewriter: %s", mcrl2_rewriter_strategy.c_str());
+    Warning(info, "mCRL2 rewriter: %s", mcrl2_rewriter);
     // check file exists
     struct stat st;
     if (stat(model_name, &st) != 0)
         Abort ("File does not exist: %s", model_name);
 
-    pins = new ltsmin::pins(m, std::string(model_name), mcrl2_rewriter_strategy);
+    pins = new ltsmin::pins(m, std::string(model_name), std::string(mcrl2_rewriter));
     GBsetContext(m,pins);
 
     lts_type_t ltstype = lts_type_create();

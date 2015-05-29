@@ -579,6 +579,9 @@ void GBinitModelDefaults (model_t *p_model, model_t default_src)
     if (model->project_matrix == NULL) model->project_matrix=default_src->project_matrix;
     if (model->use_guards == 0) model->use_guards=default_src->use_guards;
     if (model->mucalc_node_count==0) model->mucalc_node_count = default_src->mucalc_node_count;
+
+    model->static_info_index = default_src->static_info_index;
+    model->static_info_matrices = default_src->static_info_matrices;
 }
 
 void* GBgetContext(model_t model){
@@ -1195,9 +1198,9 @@ void chunk_table_print(log_t log, model_t model) {
 }
 
 void
-GBloadFile (model_t model, const char *filename, model_t *wrapped)
+GBloadFile(model_t model, const char *filename)
 {
-    char               *extension = strrchr (filename, '.');
+    char *extension = strrchr(filename, '.');
     if (extension) {
         extension++;
         for (int i = 0; i < registered; i++) {
@@ -1205,72 +1208,111 @@ GBloadFile (model_t model, const char *filename, model_t *wrapped)
                 model_loader[i] (model, filename);
                 model->use_guards=use_guards;
 
+                /* if --pins-guards is set, then check implementation */
                 if (GBgetUseGuards(model)) {
-                   if (model->next_long == default_long)
-                       Abort ("No long next-state function implemented for this language module (--"USE_GUARDS_OPTION").");
-                   sl_group_t* guards = GBgetStateLabelGroupInfo (model, GB_SL_GUARDS);
-                   if (model->guards == NULL || guards == NULL || guards->count == 0)
-                       Abort ("No long next-state function implemented for this language module (--"USE_GUARDS_OPTION").");
-                   model->guard_status = RTmalloc (sizeof(int[pins_get_state_label_count(model)]));
-                   model->next_all = guards_all;
-                   model->expand_matrix=GBgetMatrix(model, GBgetMatrixID(model, LTSMIN_MATRIX_ACTIONS_READS));
-                   if (model->expand_matrix == NULL) {
-                       Abort ("Matrix not available for --"USE_GUARDS_OPTION);
-                   }
+                    /* check if a next_long function is implemented */
+                    if (model->next_long == default_long) {
+                        Abort ("No long next-state function implemented for this language module (--"USE_GUARDS_OPTION").");
+                    }
+
+                    /* check if the implementation actually supports and exports guards */
+                    sl_group_t* guards = GBgetStateLabelGroupInfo (model, GB_SL_GUARDS);
+                    if (model->guards == NULL || guards == NULL || guards->count == 0) {
+                        Abort ("No long next-state function implemented for this language module (--"USE_GUARDS_OPTION").");
+                    }
+
+                    model->guard_status = RTmalloc(sizeof(int[pins_get_state_label_count(model)]));
+                    model->next_all = guards_all;
+
+                    /* check if there is a suitable expand matrix (read matrix) for this model */
+                    model->expand_matrix=GBgetMatrix(model, GBgetMatrixID(model, LTSMIN_MATRIX_ACTIONS_READS));
+                    if (model->expand_matrix == NULL) {
+                        Abort ("Matrix not available for --"USE_GUARDS_OPTION);
+                    }
                 }
 
-                if (wrapped) {
-                    if (PINS_POR == PINS_POR_ON)
-                        model = GBaddPOR (model);
-                    else if (PINS_POR == PINS_POR_CHECK)
-                        model = GBaddPORCheck (model);
-                    model = GBaddLTL (model);
-                    if (regroup_options != NULL)
-                        model = GBregroup (model, regroup_options);
-                    if (mucalc_file) {
-                        if (PINS_LTL)
-                            Abort("The -mucalc option and -ltl options can not be combined.");
-                        if (PINS_POR)
-                            Abort("The -mucalc option and -por options can not be combined.");
-                        model = GBaddMucalc (model, mucalc_file);
-                    }
-                    if (cache)
-                        model = GBaddCache (model);
-                    *wrapped = model;
-                }
-
-                if (matrix) {
-                    if (HREme(HREglobal()) == 0) {
-                        GBprintDependencyMatrixCombined(stdout, model);
-                        if (log_active(infoLong)) {
-                            GBprintStateLabelInfo(stdout, model);
-                            GBprintStateLabelGroupInfo(stdout, model);
-                            GBprintPORMatrix(stdout, model);
-                        }
-                        HREbarrier (HREglobal());
-                        HREabort (LTSMIN_EXIT_SUCCESS);
-                    }
-                    HREbarrier (HREglobal());
-                } else if (labels) {
-                    if (HREme(HREglobal()) == 0) {
-                        if (log_active(info)){
-                            lts_type_printf(info, GBgetLTStype(model));
-                        }
-                        chunk_table_print(info, model);
-                        HREbarrier (HREglobal());
-                        HREabort (LTSMIN_EXIT_SUCCESS);
-                    }
-                    HREbarrier (HREglobal());
-                }
                 return;
             }
         }
-        Abort("No factory method has been registered for %s models",
-               extension);
+        Abort("No factory method has been registered for %s models", extension);
     } else {
-        Abort("filename %s doesn't have an extension",
-               filename);
+        Abort("filename %s doesn't have an extension", filename);
     }
+}
+
+model_t
+GBwrapModel(model_t model)
+{
+    /* add partial order reduction */
+    if (PINS_POR == PINS_POR_ON) {
+        model = GBaddPOR(model);
+    } else if (PINS_POR == PINS_POR_CHECK) {
+        model = GBaddPORCheck(model);
+    }
+
+    /* always add LTL (TODO is this necessary?) */
+    model = GBaddLTL(model);
+
+    /* add regrouping if specified */
+    if (regroup_options != NULL) {
+        model = GBregroup(model, regroup_options);
+    }
+
+    /* add mu calculus */
+    if (mucalc_file) {
+        if (PINS_LTL) {
+            Abort("The -mucalc option and -ltl options can not be combined.");
+        }
+        if (PINS_POR) {
+            Abort("The -mucalc option and -por options can not be combined.");
+        }
+        model = GBaddMucalc(model, mucalc_file);
+    }
+
+    /* add cache */
+    if (cache) {
+        model = GBaddCache (model);
+    }
+
+    /* if 'print matrix', print matrix and abort */
+    if (matrix) {
+        if (HREme(HREglobal()) == 0) {
+            /* if we are the main process, then print */
+            GBprintDependencyMatrixCombined(stdout, model);
+            if (log_active(infoLong)) {
+                GBprintStateLabelInfo(stdout, model);
+                GBprintStateLabelGroupInfo(stdout, model);
+                GBprintPORMatrix(stdout, model);
+            }
+            /* synchronize with other processes */
+            HREbarrier(HREglobal());
+            HREabort(LTSMIN_EXIT_SUCCESS);
+        } else {
+            /* wait for main process */
+            HREbarrier(HREglobal());
+            /* at this point, we are killed by HREabort */
+        }
+    }
+
+    /* if 'print labels', print and abort */
+    if (labels) {
+        if (HREme(HREglobal()) == 0) {
+            /* if we are the main process, then print */
+            if (log_active(info)) {
+                lts_type_printf(info, GBgetLTStype(model));
+            }
+            chunk_table_print(info, model);
+            /* synchronize with other processes */
+            HREbarrier(HREglobal());
+            HREabort(LTSMIN_EXIT_SUCCESS);
+        } else {
+            /* wait for main process */
+            HREbarrier(HREglobal());
+            /* at this point, we are killed by HREabort */
+        }
+    }
+
+    return model;
 }
 
 void

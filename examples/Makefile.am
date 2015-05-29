@@ -33,5 +33,5 @@ CLEANFILES += ieee-11073.lps
 	$(MCRL2) -nDf $< $@
 
 %.pbes: %.lps
-	$(PBES) -f nodeadlock.mu $< $@
-    
+	$(PBES) -f $(srcdir)/nodeadlock.mu $< $@
+
