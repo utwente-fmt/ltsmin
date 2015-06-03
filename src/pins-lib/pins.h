@@ -916,6 +916,11 @@ extern model_t GBaddMucalc (model_t model, const char *mucalc_file);
 */
 extern model_t GBaddFork(model_t model);
 
+/**
+\brief Add mutex wrapper (for non thread-safe PINS models)
+*/
+extern model_t GBaddMutex(model_t model);
+
 
 //@{
 
