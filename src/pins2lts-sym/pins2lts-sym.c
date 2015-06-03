@@ -3046,7 +3046,7 @@ init_model(char *file)
 
     GBloadFile(model, file);
 #ifdef HAVE_SYLVAN
-    model = GBaddFork(model);
+    model = GBaddMutex(model);
 #endif
     model = GBwrapModel(model);
 
