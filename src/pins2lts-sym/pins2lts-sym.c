@@ -31,12 +31,7 @@
 #include <util-lib/bitset.h>
 #include <hre/stringindex.h>
 
-#ifdef HAVE_SYLVAN
 #include <sylvan.h>
-#else
-#include <mc-lib/atomics.h>
-#define LACE_ME
-#endif
 
 hre_context_t ctx;
 
@@ -94,30 +89,24 @@ static vset_t *class_enabled = NULL;
 static enum {
     BFS_P,
     BFS,
-#ifdef HAVE_SYLVAN
     PAR,
     PAR_P,
-#endif
     CHAIN_P,
     CHAIN
 } strategy = BFS_P;
 
 static int expand_groups = 1; // set to 0 if transitions are loaded from file
 
-#ifdef HAVE_SYLVAN
 static size_t lace_n_workers = 0;
 static size_t lace_dqsize = 40960000; // can be very big, no problemo
 static size_t lace_stacksize = 0; // use default
-#endif
 
 static char* order = "bfs-prev";
 static si_map_entry ORDER[] = {
     {"bfs-prev", BFS_P},
     {"bfs", BFS},
-#ifdef HAVE_SYLVAN
     {"par", PAR},
     {"par-prev", PAR_P},
-#endif
     {"chain-prev", CHAIN_P},
     {"chain", CHAIN},
     {NULL, 0}
@@ -193,22 +182,16 @@ reach_popt(poptContext con, enum poptCallbackReason reason,
     }
 }
 
-#ifdef HAVE_SYLVAN
 static struct poptOption lace_options[] = {
     { "lace-workers", 0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &lace_n_workers , 0 , "set number of Lace workers (threads for parallelization)","<workers>"},
     { "lace-dqsize",0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &lace_dqsize , 0 , "set length of Lace task queue","<dqsize>"},
     { "lace-stacksize", 0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &lace_stacksize, 0, "set size of program stack in kilo bytes (0=default stack size)", "<stacksize>"},
 POPT_TABLEEND
 };
-#endif
 
 static  struct poptOption options[] = {
     { NULL, 0 , POPT_ARG_CALLBACK|POPT_CBFLAG_POST|POPT_CBFLAG_SKIPOPTION , (void*)reach_popt , 0 , NULL , NULL },
-#ifdef HAVE_SYLVAN
     { "order" , 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &order , 0 , "set the exploration strategy to a specific order" , "<bfs-prev|bfs|chain-prev|chain|par-prev|par>" },
-#else
-    { "order" , 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &order , 0 , "set the exploration strategy to a specific order" , "<bfs-prev|bfs|chain-prev|chain>" },
-#endif
     { "saturation" , 0, POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &saturation , 0 , "select the saturation strategy" , "<none|sat-like|sat-loop|sat-fix|sat>" },
     { "sat-granularity" , 0 , POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &sat_granularity , 0 , "set saturation granularity","<number>" },
     { "save-sat-levels", 0, POPT_ARG_VAL, &save_sat_levels, 1, "save previous states seen at saturation levels", NULL },
@@ -227,9 +210,7 @@ static  struct poptOption options[] = {
     { "pg-solve" , 0 , POPT_ARG_NONE , &pgsolve_flag, 0, "Solve the generated parity game (only for symbolic tool).","" },
     { NULL, 0 , POPT_ARG_INCLUDE_TABLE, spg_solve_options , 0, "Symbolic parity game solver options", NULL},
     { "pg-write" , 0 , POPT_ARG_STRING , &pg_output, 0, "file to write symbolic parity game to","<pg-file>.spg" },
-#ifdef HAVE_SYLVAN
     { NULL, 0 , POPT_ARG_INCLUDE_TABLE, lace_options , 0 , "Lace options",NULL},
-#endif
     { "no-matrix" , 0 , POPT_ARG_VAL , &no_matrix , 1 , "do not print the dependency matrix when -v (verbose) is used" , NULL},
     SPEC_POPT_OPTIONS,
     { NULL, 0 , POPT_ARG_INCLUDE_TABLE, greybox_options , 0 , "PINS options",NULL},
@@ -293,7 +274,6 @@ static label_t* label_long;
 /*
  * Add parallel operations
  */
-#ifdef HAVE_SYLVAN
 // join
 #define vset_join_par(dst, left, right) SPAWN(vset_join_par, dst, left, right)
 VOID_TASK_3(vset_join_par, vset_t, dst, vset_t, left, vset_t, right) { vset_join(dst, left, right); }
@@ -309,7 +289,6 @@ VOID_TASK_2(vset_intersect_par, vset_t, dst, vset_t, src) { vset_intersect(dst, 
 // minus
 #define vset_minus_par(dst, src) SPAWN(vset_minus_par, dst, src)
 VOID_TASK_2(vset_minus_par, vset_t, dst, vset_t, src) { vset_minus(dst, src); }
-#endif
 
 static inline void
 reduce(int group, vset_t set)
@@ -604,13 +583,8 @@ static void eval_cb (vset_t set, void *context, int *src)
     }
 }
 
-#ifdef HAVE_SYLVAN
 #define eval_guard(g, s) CALL(eval_guard, (g), (s))
 VOID_TASK_2(eval_guard, int, guard, vset_t, set)
-#else
-static inline void
-eval_guard (int guard, vset_t set)
-#endif
 {
     // get the short vectors we need to evaluate
     // minus what we have already evaluated
@@ -736,11 +710,7 @@ group_add(void *context, transition_info_t *ti, int *dst, int *cpy)
                     ctx->trace_count++;
                 }
 
-#ifdef HAVE_SYLVAN
                 add_fetch(ErrorActions, 1);
-#else
-                ErrorActions++;
-#endif
             }
         }
     }
@@ -771,13 +741,8 @@ explore_cb(vrel_t rel, void *context, int *src)
     }
 }
 
-#ifdef HAVE_SYLVAN
 #define expand_group_next(g, s) CALL(expand_group_next, (g), (s))
 VOID_TASK_2(expand_group_next, int, group, vset_t, set)
-#else
-static inline void
-expand_group_next(int group, vset_t set)
-#endif
 {
     if (!expand_groups) return; // assume transitions loaded from file cannot expand further
 
@@ -1323,13 +1288,8 @@ reach_destroy(struct reach_s *s)
     RTfree(s);
 }
 
-#ifdef HAVE_SYLVAN
 #define reach_bfs_reduce(dummy) CALL(reach_bfs_reduce, dummy)
 VOID_TASK_1(reach_bfs_reduce, struct reach_red_s *, dummy)
-#else
-static inline void
-reach_bfs_reduce(struct reach_red_s *dummy)
-#endif
 {
     if (dummy->index >= 0) { // base case
         // check if no states which satisfy other guards
@@ -1386,13 +1346,8 @@ reach_bfs_reduce(struct reach_red_s *dummy)
     }
 }
 
-#ifdef HAVE_SYLVAN
 #define reach_bfs_next(dummy, reach_groups, maybe) CALL(reach_bfs_next, dummy, reach_groups, maybe)
 VOID_TASK_3(reach_bfs_next, struct reach_s *, dummy, bitvector_t *, reach_groups, vset_t*, maybe)
-#else
-static inline void
-reach_bfs_next(struct reach_s *dummy, bitvector_t *reach_groups, vset_t* maybe)
-#endif
 {
     if (dummy->index >= 0) {
         if (!bitvector_is_set(reach_groups, dummy->index)) {
@@ -1513,7 +1468,6 @@ reach_bfs_next(struct reach_s *dummy, bitvector_t *reach_groups, vset_t* maybe)
 
 static inline void
 learn_guards(vset_t states, long *guard_count) {
-    #ifdef HAVE_SYLVAN
     LACE_ME;
     if (GBgetUseGuards(model)) {
         for (int g = 0; g < nGuards; g++) {
@@ -1523,14 +1477,6 @@ learn_guards(vset_t states, long *guard_count) {
     }
     if (GBgetUseGuards(model))
         for (int g = 0; g < nGuards; g++) SYNC(eval_guard);
-    #else
-    if (GBgetUseGuards(model)) {
-        for (int g = 0; g < nGuards; g++) {
-            if (guard_count != NULL) (*guard_count)++;
-            eval_guard(g, states);
-        }
-    }
-    #endif
 }
 
 static void
@@ -1783,8 +1729,6 @@ reach_bfs(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
 /**
  * Parallel reachability implementation
  */
-
-#if defined(HAVE_SYLVAN)
 
 VOID_TASK_3(compute_left_maybe, vset_t, left_maybe, vset_t, left_true, vset_t, right_false)
 {
@@ -2213,8 +2157,6 @@ reach_par_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
         }
     }
 }
-
-#endif
 
 static void
 reach_chain_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
@@ -3045,9 +2987,7 @@ init_model(char *file)
     HREbarrier(HREglobal());
 
     GBloadFile(model, file);
-#ifdef HAVE_SYLVAN
     model = GBaddMutex(model);
-#endif
     model = GBwrapModel(model);
 
     HREbarrier(HREglobal());
@@ -3502,18 +3442,12 @@ parity_game* compute_symbolic_parity_game(vset_t visited, int* src)
 static char *files[2];
 
 VOID_TASK_1(actual_main, void*, arg)
-#else
-static void
-actual_main(void)
-#endif
 {
     vset_implementation_t vset_impl = VSET_IMPL_AUTOSELECT;
 
-#ifdef HAVE_SYLVAN
     HREinitBegin(HREappName());
     HREglobalSet(ctx);
     (void)arg;
-#endif
 
     int *src;
     vset_t initial;
@@ -3597,9 +3531,7 @@ actual_main(void)
         expand_groups = 1;
     }
 
-#ifdef HAVE_SYLVAN
     HREbarrier(HREglobal()); // synchronise with slave processes
-#endif
 
     vset_t visited = vset_create(domain, -1, NULL);
     vset_copy(visited, initial);
@@ -3627,14 +3559,12 @@ actual_main(void)
     case BFS_P:
         reach_proc = reach_bfs_prev;
         break;
-#ifdef HAVE_SYLVAN
     case PAR:
         reach_proc = reach_par;
         break;
     case PAR_P:
         reach_proc = reach_par_prev;
         break;
-#endif
     case BFS:
         reach_proc = reach_bfs;
         break;
@@ -3864,7 +3794,6 @@ main (int argc, char *argv[])
                       "representation of the input\n\nOptions");
     lts_lib_setup(); // add options for LTS library
 
-#ifdef HAVE_SYLVAN
     static  struct poptOption par_options[] = {
         { NULL, 0 , POPT_ARG_INCLUDE_TABLE, lace_options , 0 , "Lace options",NULL},
         { NULL, 0 , POPT_ARG_INCLUDE_TABLE, vset_options , 0 , "Vector set options",NULL},
@@ -3890,11 +3819,9 @@ main (int argc, char *argv[])
     *(label_short) = NULL;
     label_long = RTmalloc(sizeof(label_t));
     *(label_long) = NULL;
-#endif
 
     HREinitStart(&argc,&argv,1,2,files,"<model> [<etf>]");
 
-#ifdef HAVE_SYLVAN
     lace_n_workers = n_workers;
 
     Print(infoLong, "Worker %d / %d (pid = %d).", HREme(HREglobal()), HREpeers(HREglobal()), getpid());
@@ -3903,11 +3830,6 @@ main (int argc, char *argv[])
     ctx = HREglobal();
     lace_startup(lace_stacksize, TASK(actual_main), 0);
     Print(infoLong, "Main done.");
-#else
-    actual_main();
-#endif
 
-#ifdef HAVE_SYLVAN
     return 0;
-#endif
 }

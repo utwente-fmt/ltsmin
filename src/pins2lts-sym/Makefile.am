@@ -39,9 +39,7 @@ if HAVE_SPINS
 bin_PROGRAMS += prom2lts-sym
 endif
 
-if HAVE_SYLVAN
 SYM_CPP_FLAGS += $(SYLVAN_CPPFLAGS)
-endif
 
 # etf2lts-sym
 etf2lts_sym_SOURCES   = pins2lts-sym.c
