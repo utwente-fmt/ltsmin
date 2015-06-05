@@ -263,13 +263,7 @@ typedef void (*guided_proc_t)(sat_proc_t sat_proc, reach_proc_t reach_proc,
 
 typedef int (*transitions_t)(model_t model,int group,int*src,TransitionCB cb,void*context);
 
-static transitions_t* transitions_short; // which function to call for the next states.
-static transitions_t* transitions_long;
-
-typedef int (*label_t)(model_t model,int label,int *state);
-
-static label_t* label_short;
-static label_t* label_long;
+static transitions_t transitions_short; // which function to call for the next states.
 
 /*
  * Add parallel operations
@@ -329,7 +323,7 @@ write_trace_state(lts_file_t trace_handle, int src_no, int *state)
   Warning(debug, "dumping state %d", src_no);
 
   for (int i = 0; i < sLbls; i++) {
-      labels[i] = (*label_long)(model, i, state);
+      labels[i] = GBgetStateLabelLong(model, i, state);
   }
 
   lts_write_state(trace_handle, 0, state, labels);
@@ -375,7 +369,7 @@ write_trace_step(lts_file_t trace_handle, int src_no, int *src,
     ctx.found = 0;
 
     for (int i = 0; i < nGrps && !ctx.found; i++) {
-        (*transitions_long)(model, i, src, write_trace_next, &ctx);
+        GBgetTransitionsLong(model, i, src, write_trace_next, &ctx);
     }
 
     if (!ctx.found)
@@ -570,7 +564,7 @@ struct guard_add_info
 static void eval_cb (vset_t set, void *context, int *src)
 {
     // evaluate the guard
-    int result = (*label_short)(model, ((struct guard_add_info*)context)->guard, src);
+    int result = GBgetStateLabelShort(model, ((struct guard_add_info*)context)->guard, src);
 
     // add to the correct set dependening on the result
     int dresult = ((struct guard_add_info*)context)->result;
@@ -3462,6 +3456,7 @@ VOID_TASK_1(actual_main, void*, arg)
     if (act_detect != NULL) init_action_detection();
 
     if (inv_detect) Abort("Invariant violation detection is not implemented.");
+    transitions_short = NULL;
 
     if (PINS_POR != PINS_POR_NONE) Abort("Partial-order reduction and symbolic model checking are not compatible.");
 
@@ -3502,24 +3497,18 @@ VOID_TASK_1(actual_main, void*, arg)
     } else {
         init_domain(vset_impl);
 
-
-
         if(GBgetUseGuards(model)) {
-            *transitions_short = GBgetActionsShort;
+            transitions_short = GBgetActionsShort;
             Print(infoShort, "Using GBgetActionsShort as next-state function");
-        } else { // false
-            *transitions_short = GBgetTransitionsShort;
-            Print(infoShort, "Using GBgetTransitionsShort as next-state function");
-        }
-        *transitions_long = GBgetTransitionsLong;
 
-        *label_short = GBgetStateLabelShort;
-        *label_long = GBgetStateLabelLong;
-
-        if (GBgetUseGuards(model)) {
             if (no_soundness_check) {
                 Warning(info, "Guard-splitting: not checking soundness of the specification, this may result in an incorrect state space!");
-            } else Warning(info, "Guard-splitting: checking soundness of specification, this may be slow!");
+            } else {
+                Warning(info, "Guard-splitting: checking soundness of specification, this may be slow!");
+            }
+        } else {
+            transitions_short = GBgetTransitionsShort;
+            Print(infoShort, "Using GBgetTransitionsShort as next-state function");
         }
 
         initial = vset_create(domain, -1, NULL);
@@ -3811,14 +3800,6 @@ main (int argc, char *argv[])
     size_t n_workers = lace_workers();
     Warning(info, "Using %zu CPUs", n_workers);
 
-    transitions_short = RTmalloc(sizeof(transitions_t));
-    *(transitions_short) = NULL;
-    transitions_long = RTmalloc(sizeof(transitions_t));
-    *(transitions_long) = NULL;
-    label_short = RTmalloc(sizeof(label_t));
-    *(label_short) = NULL;
-    label_long = RTmalloc(sizeof(label_t));
-    *(label_long) = NULL;
 
     HREinitStart(&argc,&argv,1,2,files,"<model> [<etf>]");
 
