@@ -3465,6 +3465,11 @@ VOID_TASK_1(actual_main, void*, arg)
     /* initialize HRE on other workers */
     TOGETHER(init_hre, HREglobal());
 
+    /* check for unsupported options */
+    if (inv_detect) Abort("Invariant violation detection is not implemented.");
+    if (PINS_POR != PINS_POR_NONE) Abort("Partial-order reduction and symbolic model checking are not compatible.");
+    if (inhibit_matrix != NULL && sat_strategy != NO_SAT) Abort("maximal progress is incompatibale with saturation");
+
     vset_implementation_t vset_impl = VSET_IMPL_AUTOSELECT;
 
     int *src;
@@ -3479,10 +3484,7 @@ VOID_TASK_1(actual_main, void*, arg)
     if (act_label != -1) action_typeno = lts_type_get_edge_label_typeno(ltstype, act_label);
     if (act_detect != NULL) init_action_detection();
 
-    if (inv_detect) Abort("Invariant violation detection is not implemented.");
     transitions_short = NULL;
-
-    if (PINS_POR != PINS_POR_NONE) Abort("Partial-order reduction and symbolic model checking are not compatible.");
 
     if (transitions_load_filename != NULL) {
         FILE *f = fopen(transitions_load_filename, "r");
@@ -3549,10 +3551,6 @@ VOID_TASK_1(actual_main, void*, arg)
     vset_t visited = vset_create(domain, -1, NULL);
     vset_copy(visited, initial);
 
-    if (inhibit_matrix!=NULL){
-        if (sat_strategy != NO_SAT) Abort("maximal progress is incompatibale with saturation");
-    }
-    
     if (dot_dir != NULL) {
         DIR* dir = opendir(dot_dir);
         if (dir) {
