@@ -3435,13 +3435,37 @@ parity_game* compute_symbolic_parity_game(vset_t visited, int* src)
 
 static char *files[2];
 
+struct args_t
+{
+    int argc;
+    char **argv;
+};
+
+VOID_TASK_1(init_hre, hre_context_t, context)
+{
+    if (LACE_WORKER_ID != 0) {
+        HREprocessSet(context);
+        HREglobalSet(context);
+    }
+}
+
 VOID_TASK_1(actual_main, void*, arg)
 {
-    vset_implementation_t vset_impl = VSET_IMPL_AUTOSELECT;
+    int argc = ((struct args_t*)arg)->argc;
+    char **argv = ((struct args_t*)arg)->argv;
 
-    HREinitBegin(HREappName());
-    HREglobalSet(ctx);
-    (void)arg;
+    /* initialize HRE */
+    HREinitBegin(argv[0]);
+    HREaddOptions(options,"Perform a symbolic reachability analysis of <model>\n"
+                  "The optional output of this analysis is an ETF "
+                      "representation of the input\n\nOptions");
+    lts_lib_setup(); // add options for LTS library
+    HREinitStart(&argc,&argv,1,2,files,"<model> [<etf>]");
+
+    /* initialize HRE on other workers */
+    TOGETHER(init_hre, HREglobal());
+
+    vset_implementation_t vset_impl = VSET_IMPL_AUTOSELECT;
 
     int *src;
     vset_t initial;
@@ -3777,13 +3801,7 @@ VOID_TASK_1(actual_main, void*, arg)
 int
 main (int argc, char *argv[])
 {
-    HREinitBegin(argv[0]);
-    HREaddOptions(options,"Perform a symbolic reachability analysis of <model>\n"
-                  "The optional output of this analysis is an ETF "
-                      "representation of the input\n\nOptions");
-    lts_lib_setup(); // add options for LTS library
-
-    static  struct poptOption par_options[] = {
+    static struct poptOption par_options[] = {
         { NULL, 0 , POPT_ARG_INCLUDE_TABLE, lace_options , 0 , "Lace options",NULL},
         { NULL, 0 , POPT_ARG_INCLUDE_TABLE, vset_options , 0 , "Vector set options",NULL},
         POPT_TABLEEND
@@ -3796,21 +3814,10 @@ main (int argc, char *argv[])
     if (!(vset_default_domain==VSET_Sylvan || vset_default_domain==VSET_LDDmc)) {
         lace_n_workers = 1;
     }
+
+    struct args_t args = (struct args_t){argc, argv};
     lace_init(lace_n_workers, lace_dqsize);
-    size_t n_workers = lace_workers();
-    Warning(info, "Using %zu CPUs", n_workers);
-
-
-    HREinitStart(&argc,&argv,1,2,files,"<model> [<etf>]");
-
-    lace_n_workers = n_workers;
-
-    Print(infoLong, "Worker %d / %d (pid = %d).", HREme(HREglobal()), HREpeers(HREglobal()), getpid());
-
-    Print(info, "Main process: %d.", HREme(HREglobal()));
-    ctx = HREglobal();
-    lace_startup(lace_stacksize, TASK(actual_main), 0);
-    Print(infoLong, "Main done.");
+    lace_startup(lace_stacksize, TASK(actual_main), (void*)&args);
 
     return 0;
 }
