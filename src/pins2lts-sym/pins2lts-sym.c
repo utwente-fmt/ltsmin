@@ -263,7 +263,7 @@ typedef void (*guided_proc_t)(sat_proc_t sat_proc, reach_proc_t reach_proc,
 
 typedef int (*transitions_t)(model_t model,int group,int*src,TransitionCB cb,void*context);
 
-static transitions_t transitions_short; // which function to call for the next states.
+static transitions_t transitions_short = NULL; // which function to call for the next states.
 
 /*
  * Add parallel operations
@@ -3433,135 +3433,8 @@ parity_game* compute_symbolic_parity_game(vset_t visited, int* src)
     return g;
 }
 
-static char *files[2];
-
-struct args_t
+VOID_TASK_3(run_reachability, vset_t, states, char*, etf_output, rt_timer_t, timer)
 {
-    int argc;
-    char **argv;
-};
-
-VOID_TASK_1(init_hre, hre_context_t, context)
-{
-    if (LACE_WORKER_ID != 0) {
-        HREprocessSet(context);
-        HREglobalSet(context);
-    }
-}
-
-VOID_TASK_1(actual_main, void*, arg)
-{
-    int argc = ((struct args_t*)arg)->argc;
-    char **argv = ((struct args_t*)arg)->argv;
-
-    /* initialize HRE */
-    HREinitBegin(argv[0]);
-    HREaddOptions(options,"Perform a symbolic reachability analysis of <model>\n"
-                  "The optional output of this analysis is an ETF "
-                      "representation of the input\n\nOptions");
-    lts_lib_setup(); // add options for LTS library
-    HREinitStart(&argc,&argv,1,2,files,"<model> [<etf>]");
-
-    /* initialize HRE on other workers */
-    TOGETHER(init_hre, HREglobal());
-
-    /* check for unsupported options */
-    if (inv_detect) Abort("Invariant violation detection is not implemented.");
-    if (PINS_POR != PINS_POR_NONE) Abort("Partial-order reduction and symbolic model checking are not compatible.");
-    if (inhibit_matrix != NULL && sat_strategy != NO_SAT) Abort("maximal progress is incompatibale with saturation");
-
-    vset_implementation_t vset_impl = VSET_IMPL_AUTOSELECT;
-
-    int *src;
-    vset_t initial;
-
-    init_model(files[0]);
-
-    Print(infoLong, "Master ready: %d.", HREme(HREglobal()));
-
-    // table number of first edge label
-    act_label = lts_type_find_edge_label_prefix (ltstype, LTSMIN_EDGE_TYPE_ACTION_PREFIX);
-    if (act_label != -1) action_typeno = lts_type_get_edge_label_typeno(ltstype, act_label);
-    if (act_detect != NULL) init_action_detection();
-
-    transitions_short = NULL;
-
-    if (transitions_load_filename != NULL) {
-        FILE *f = fopen(transitions_load_filename, "r");
-        if (f == 0) Abort("Cannot open '%s' for reading!", transitions_load_filename);
-
-        domain = vdom_create_domain_from_file(f, vset_impl);
-
-        /* Call hook */
-        vset_pre_load(f, domain);
-
-        /* Read initial state */
-        initial = vset_load(f, domain);
-
-        /* Read number of transitions and all transitions */
-        if (fread(&nGrps, sizeof(int), 1, f)!=1) Abort("Invalid file format.");
-        group_next = (vrel_t*)RTmalloc(nGrps * sizeof(vrel_t));
-        for(int i = 0; i < nGrps; i++) group_next[i] = vrel_load_proj(f, domain);
-        for(int i = 0; i < nGrps; i++) vrel_load(f, group_next[i]);
-
-        /* Call hook */
-        vset_post_load(f, domain);
-
-        /* Done! */
-        fclose(f);
-
-        /* Load state into src and initialize globals */
-        N = vdom_vector_size(domain);
-        src = (int*)alloca(sizeof(int)*N);
-        vset_example(initial, src);
-        // we do not need group_explored, group_tmp, projs
-        group_explored = group_tmp = NULL;
-        r_projs = w_projs = NULL;
-
-        Print(infoShort, "Loaded transition relations from '%s'...", files[0]);
-        expand_groups = 0;
-    } else {
-        init_domain(vset_impl);
-
-        if(GBgetUseGuards(model)) {
-            transitions_short = GBgetActionsShort;
-            Print(infoShort, "Using GBgetActionsShort as next-state function");
-
-            if (no_soundness_check) {
-                Warning(info, "Guard-splitting: not checking soundness of the specification, this may result in an incorrect state space!");
-            } else {
-                Warning(info, "Guard-splitting: checking soundness of specification, this may be slow!");
-            }
-        } else {
-            transitions_short = GBgetTransitionsShort;
-            Print(infoShort, "Using GBgetTransitionsShort as next-state function");
-        }
-
-        initial = vset_create(domain, -1, NULL);
-        src = (int*)alloca(sizeof(int)*N);
-        GBgetInitialState(model, src);
-        vset_add(initial, src);
-
-        Print(infoShort, "got initial state");
-        expand_groups = 1;
-    }
-
-    HREbarrier(HREglobal()); // synchronise with slave processes
-
-    vset_t visited = vset_create(domain, -1, NULL);
-    vset_copy(visited, initial);
-
-    if (dot_dir != NULL) {
-        DIR* dir = opendir(dot_dir);
-        if (dir) {
-            closedir(dir);
-        } else if (ENOENT == errno) {
-            Abort("Option 'dot-dir': directory '%s' does not exist", dot_dir);
-        } else {
-            Abort("Option 'dot-dir': failed opening directory '%s'", dot_dir);
-        }
-    }
-    
     sat_proc_t sat_proc = NULL;
     reach_proc_t reach_proc = NULL;
     guided_proc_t guided_proc = NULL;
@@ -3614,47 +3487,184 @@ VOID_TASK_1(actual_main, void*, arg)
         break;
     }
 
-    // temporal logics
+    RTstartTimer(timer);
+    guided_proc(sat_proc, reach_proc, states, etf_output);
+    RTstopTimer(timer);
+}
+
+static char *files[2];
+
+struct args_t
+{
+    int argc;
+    char **argv;
+};
+
+VOID_TASK_1(init_hre, hre_context_t, context)
+{
+    if (LACE_WORKER_ID != 0) {
+        HREprocessSet(context);
+        HREglobalSet(context);
+    }
+}
+
+VOID_TASK_1(actual_main, void*, arg)
+{
+    int argc = ((struct args_t*)arg)->argc;
+    char **argv = ((struct args_t*)arg)->argv;
+
+    /* initialize HRE */
+    HREinitBegin(argv[0]);
+    HREaddOptions(options,"Perform a symbolic reachability analysis of <model>\n"
+                  "The optional output of this analysis is an ETF "
+                      "representation of the input\n\nOptions");
+    lts_lib_setup(); // add options for LTS library
+    HREinitStart(&argc,&argv,1,2,files,"<model> [<etf>]");
+
+    /* initialize HRE on other workers */
+    TOGETHER(init_hre, HREglobal());
+
+    /* check for unsupported options */
+    if (inv_detect) Abort("Invariant violation detection is not implemented.");
+    if (PINS_POR != PINS_POR_NONE) Abort("Partial-order reduction and symbolic model checking are not compatible.");
+    if (inhibit_matrix != NULL && sat_strategy != NO_SAT) Abort("maximal progress is incompatibale with saturation");
+
+    /* turn off Lace for now to speed up while not using parallelism */
+    lace_suspend();
+
+    /* initialize the model and PINS wrappers */
+    init_model(files[0]);
+
+    /* initialize action detection */
+    act_label = lts_type_find_edge_label_prefix (ltstype, LTSMIN_EDGE_TYPE_ACTION_PREFIX);
+    if (act_label != -1) action_typeno = lts_type_get_edge_label_typeno(ltstype, act_label);
+    if (act_detect != NULL) init_action_detection();
+
+    /* turn on Lace again (for Sylvan) */
+    if (vset_default_domain==VSET_Sylvan || vset_default_domain==VSET_LDDmc) {
+        lace_resume();
+    }
+
+    int *src;
+    vset_t initial;
+
+    if (transitions_load_filename != NULL) {
+        FILE *f = fopen(transitions_load_filename, "r");
+        if (f == 0) Abort("Cannot open '%s' for reading!", transitions_load_filename);
+
+        domain = vdom_create_domain_from_file(f, VSET_IMPL_AUTOSELECT);
+
+        /* Call hook */
+        vset_pre_load(f, domain);
+
+        /* Read initial state */
+        initial = vset_load(f, domain);
+
+        /* Read number of transitions and all transitions */
+        if (fread(&nGrps, sizeof(int), 1, f)!=1) Abort("Invalid file format.");
+        group_next = (vrel_t*)RTmalloc(nGrps * sizeof(vrel_t));
+        for(int i = 0; i < nGrps; i++) group_next[i] = vrel_load_proj(f, domain);
+        for(int i = 0; i < nGrps; i++) vrel_load(f, group_next[i]);
+
+        /* Call hook */
+        vset_post_load(f, domain);
+
+        /* Done! */
+        fclose(f);
+
+        /* Load state into src and initialize globals */
+        N = vdom_vector_size(domain);
+        src = (int*)alloca(sizeof(int)*N);
+        vset_example(initial, src);
+        // we do not need group_explored, group_tmp, projs
+        group_explored = group_tmp = NULL;
+        r_projs = w_projs = NULL;
+
+        Print(infoShort, "Loaded transition relations from '%s'...", files[0]);
+        expand_groups = 0;
+    } else {
+        init_domain(VSET_IMPL_AUTOSELECT);
+
+        if(GBgetUseGuards(model)) {
+            transitions_short = GBgetActionsShort;
+            Print(infoShort, "Using GBgetActionsShort as next-state function");
+
+            if (no_soundness_check) {
+                Warning(info, "Guard-splitting: not checking soundness of the specification, this may result in an incorrect state space!");
+            } else {
+                Warning(info, "Guard-splitting: checking soundness of specification, this may be slow!");
+            }
+        } else {
+            transitions_short = GBgetTransitionsShort;
+            Print(infoShort, "Using GBgetTransitionsShort as next-state function");
+        }
+
+        initial = vset_create(domain, -1, NULL);
+        src = (int*)alloca(sizeof(int)*N);
+        GBgetInitialState(model, src);
+        vset_add(initial, src);
+
+        Print(infoShort, "got initial state");
+        expand_groups = 1;
+    }
+
+    /* if writing .dot files, open directory first */
+    if (dot_dir != NULL) {
+        DIR* dir = opendir(dot_dir);
+        if (dir) {
+            closedir(dir);
+        } else if (ENOENT == errno) {
+            Abort("Option 'dot-dir': directory '%s' does not exist", dot_dir);
+        } else {
+            Abort("Option 'dot-dir': failed opening directory '%s'", dot_dir);
+        }
+    }
+
+    /* if checking temporal formula, convert to mu expression */
     if (mu_formula) {
         mu_expr = parse_file(mu_formula, mu_parse_file, model);
-#if 0
-        char buf[1024];
-        ltsmin_expr_print_mu(mu_expr, buf);
-        printf("computing: %s\n",buf);
-#endif
     } else if (ctl_formula) {
         ltsmin_expr_t ctl = parse_file(ctl_formula, ctl_parse_file, model);
         mu_expr = ctl_star_to_mu(ctl);
         mu_formula = ctl_formula;
     }
 
-    if (mu_expr) { // run a small test to check correctness of mu formula
-        // and cause a segfault, because mu_var_man is not initialised yet...
+    /* if checking mu expression, run small correctness test on initial state */
+    if (mu_expr) {
+        // run a small test to check correctness of mu formula
         // setup var manager
         mu_var_man = create_manager(65535);
         ADD_ARRAY(mu_var_man, mu_var, vset_t);
 
-        vset_t x = mu_compute(mu_expr, visited);
+        vset_t x = mu_compute(mu_expr, initial);
         vset_destroy(x);
     }
-    bool spg = false;
+
+    /* determine if we need to generate a symbolic parity game */
 #ifdef LTSMIN_PBES
-    spg = true;
+    bool spg = true;
+#else
+    bool spg = GBhaveMucalc() ? true : false;
 #endif
-    if (GBhaveMucalc()) { // mu-calculus pins2pins layer
-        Warning(info,"Generating a Symbolic Parity Game (SPG).");
-        spg = true;
-    }
+
+    /* if spg, then initialize labeling stuff before reachability */
     if (spg) {
+        Print(infoShort, "Generating a Symbolic Parity Game (SPG).");
         init_spg(model);
     }
 
+    /* create timer */
     rt_timer_t timer = RTcreateTimer();
 
-    RTstartTimer(timer);
-    guided_proc(sat_proc, reach_proc, visited, files[1]);
-    RTstopTimer(timer);
+    /* run reachability */
+    vset_t visited = vset_create(domain, -1, NULL);
+    vset_copy(visited, initial);
+    CALL(run_reachability, visited, files[1], timer);
 
+    /* report states */
+    final_stat_reporting(visited, timer);
+
+    /* save vset/vrel data */
     if (transitions_save_filename != NULL) {
         FILE *f = fopen(transitions_save_filename, "w");
         if (f == NULL) Abort("Cannot open '%s' for writing!", transitions_save_filename);
@@ -3682,26 +3692,12 @@ VOID_TASK_1(actual_main, void*, arg)
         Print(infoShort, "Transition relations written to '%s'\n", transitions_save_filename);
     }
 
-    if (mu_expr) {
-        Print(infoLong, "Starting mu-calculus model checking.");
-        vset_t x = mu_compute(mu_expr, visited);
-
-        if (x) {
-            long   n_count;
-            char   elem_str[1024];
-            double e_count;
-
-            get_vset_size(x, &n_count, &e_count, elem_str, sizeof(elem_str));
-            Warning(info, "mu formula holds for %s (~%1.2e) states\n",
-                        elem_str, e_count);
-            Warning(info, " the initial state is %sin the set\n",
-                        vset_member(x, src) ? "" : "not ");
-            vset_destroy(x);
-        }
+    /* save LTS */
+    if (files[1] != NULL) {
+        do_output(files[1], visited);
     }
 
-    final_stat_reporting(visited, timer);
-
+    /* optionally print counts of all group_next and group_explored sets */
     if (log_active(infoLong)) {
         long   n_count;
         char   elem_str[1024];
@@ -3738,8 +3734,21 @@ VOID_TASK_1(actual_main, void*, arg)
         }
     }
 
-    if (files[1] != NULL)
-        do_output(files[1], visited);
+    if (mu_expr) {
+        Print(infoLong, "Starting mu-calculus model checking.");
+        vset_t x = mu_compute(mu_expr, visited);
+
+        if (x) {
+            long   n_count;
+            char   elem_str[1024];
+            double e_count;
+
+            get_vset_size(x, &n_count, &e_count, elem_str, sizeof(elem_str));
+            Warning(info, "mu formula holds for %s (~%1.2e) states\n", elem_str, e_count);
+            Warning(info, " the initial state is %sin the set\n", vset_member(x, src) ? "" : "not ");
+            vset_destroy(x);
+        }
+    }
 
     if (spg) { // converting the LTS to a symbolic parity game, save and solve.
         vset_destroy(true_states);
@@ -3794,24 +3803,19 @@ VOID_TASK_1(actual_main, void*, arg)
             RTfree(priority);
         }
     }
+
+    /* in case other Lace threads were still suspended... */
+    if (vset_default_domain!=VSET_Sylvan && vset_default_domain!=VSET_LDDmc) {
+        lace_resume();
+    }
 }
 
 int
 main (int argc, char *argv[])
 {
-    static struct poptOption par_options[] = {
-        { NULL, 0 , POPT_ARG_INCLUDE_TABLE, lace_options , 0 , "Lace options",NULL},
-        { NULL, 0 , POPT_ARG_INCLUDE_TABLE, vset_options , 0 , "Vector set options",NULL},
-        POPT_TABLEEND
-    };
-    poptContext optCon = poptGetContext(NULL, argc, (const char**)argv, par_options, 0);
-    int res;
-    while((res = poptGetNextOpt(optCon)) != -1 ) { /* ignore errors */ }
+    poptContext optCon = poptGetContext(NULL, argc, (const char**)argv, lace_options, 0);
+    while(poptGetNextOpt(optCon) != -1 ) { /* ignore errors */ }
     poptFreeContext(optCon);
-
-    if (!(vset_default_domain==VSET_Sylvan || vset_default_domain==VSET_LDDmc)) {
-        lace_n_workers = 1;
-    }
 
     struct args_t args = (struct args_t){argc, argv};
     lace_init(lace_n_workers, lace_dqsize);
